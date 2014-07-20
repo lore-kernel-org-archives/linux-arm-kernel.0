@@ -1,402 +1,96 @@
-From: dmitry.torokhov@gmail.com (Dmitry Torokhov)
-Date: Sun, 20 Jul 2014 13:28:42 -0700
-Subject: [PATCH 2/2] iio: exynos-adc: add experimental touchscreen support
-In-Reply-To: <53CBC969.4090704@kernel.org>
-References: <1405663186-26464-1-git-send-email-cw00.choi@samsung.com>
- <5186890.aLtladpMgD@wuerfel> <5456679.XxlLIvc3Q6@wuerfel>
- <53CBC8D6.6020509@kernel.org> <53CBC969.4090704@kernel.org>
-Message-ID: <20140720202842.GB18347@core.coreip.homeip.net>
+From: xerofoify@gmail.com (Nick Krause)
+Date: Sun, 20 Jul 2014 17:10:23 -0400
+Subject: [PATCH] arm: Fix me in bios32.c
+In-Reply-To: <20140720090935.GD21766@n2100.arm.linux.org.uk>
+References: <1405829179-19476-1-git-send-email-xerofoify@gmail.com>
+ <20140720090935.GD21766@n2100.arm.linux.org.uk>
+Message-ID: <CAPDOMVgUwX47ToxSf__U6EYH8_xUpAJ3A43E2W3qO5g8bhy11w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Jul 20, 2014 at 02:51:37PM +0100, Jonathan Cameron wrote:
-> On 20/07/14 14:49, Jonathan Cameron wrote:
-> >On 18/07/14 20:29, Arnd Bergmann wrote:
-> >>This adds support for the touchscreen on Samsung s3c64xx.
-> >>The driver is completely untested but shows roughly how
-> >>it could be done, following the example of the at91 driver.
-> >>
-> >Hi Arnd,
-> Cc'd linux-input and Dmitry.
-> >
-> >>Open questions include:
-> >>
-> >>- compared to the old plat-samsung/adc driver, there is
-> >>   no support for prioritizing ts over other clients, nor
-> >>   for oversampling. From my reading of the code, the
-> >>   priorities didn't actually have any effect at all, but
-> >>   the oversampling might be needed. Maybe the original
-> >>   authors have some insight.
-> >>
-> >>- I simply register the input device from the adc driver
-> >>   itself, as the at91 code does. The driver also supports
-> >>   sub-nodes, but I don't understand how they are meant
-> >>   to be used, so using those might be better.
-> >So, the alternative you are (I think) referring to is to use
-> >the buffered in kernel client interface.  That way a separate
-> >touch screen driver can use the output channels provided by IIO
-> >in much the same way you might use a regulator or similar.
-> >Note that whilst this is similar to the simple polled interface
-> >used for things like the iio_hwmon driver, the data flow is
-> >quite different (clearly the polled interfce would be
-> >inappropriate here).
-> >
-> >Whilst we've discussed it in the past for touch screen drivers
-> >like this, usually the hardware isn't generic enough to be
-> >of any real use if not being used as a touch screen.  As such
-> >it's often simpler to just have the support directly in the
-> >driver (as you've observed the at91 driver does this).
-> >
-> >Whilst the interface has been there a while, it's not really had
-> >all that much use.  The original target was the simpler case
-> >of 3D accelerometer where we have a generic iio to input
-> >bridge driver. Time constraints meant that I haven't yet actually
-> >formally submitted the input side of this. Whilst there are lots
-> >of other things that can use this interface, right now nothing
-> >actually does so.
-> >
-> >>
-> >>- The new exynos_read_s3c64xx_ts() function is intentionally
-> >>   very similar to the existing exynos_read_raw() functions.
-> >>   It should probably be changed, either by merging the two
-> >>   into one, or by simplifying the exynos_read_s3c64xx_ts()
-> >>   function. This depends a bit on the answers to the questions
-> >>   above.
-> >I'd be tempted to not bother keeping them that similar.  It's
-> >not a generic IIO channel so simplify it where possible.
-> >>
-> >>- We probably need to add support for platform_data as well,
-> >>   I've skipped this so far.
-> >>
-> >>- Is anybody able to debug this driver on real hardware?
-> >>   While it's possible that it actually works, it's more
-> >>   likely that I made a few subtle mistakes.
-> >>
-> >>Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-> >Looks pretty good to me.  A few symantic bits and pieces and
-> >one bug spotted.  Short and sweet.
-> >>
-> >>diff --git a/Documentation/devicetree/bindings/arm/samsung/exynos-adc.txt b/Documentation/devicetree/bindings/arm/samsung/exynos-adc.txt
-> >>index e1b74828f413..4329bf3c3326 100644
-> >>--- a/Documentation/devicetree/bindings/arm/samsung/exynos-adc.txt
-> >>+++ b/Documentation/devicetree/bindings/arm/samsung/exynos-adc.txt
-> >>@@ -41,6 +41,10 @@ Required properties:
-> >>                         and compatible ADC block)
-> >>  - vdd-supply        VDD input supply.
-> >>
-> >>+Optional properties:
-> >>+- has-touchscreen:    If present, indicates that a touchscreen is
-> >>+            connected an usable.
-> >>+
-> >>  Note: child nodes can be added for auto probing from device tree.
-> >>
-> >>  Example: adding device info in dtsi file
-> >>diff --git a/drivers/iio/adc/exynos_adc.c b/drivers/iio/adc/exynos_adc.c
-> >>index 5f95638513d2..cf1d9f3e2492 100644
-> >>--- a/drivers/iio/adc/exynos_adc.c
-> >>+++ b/drivers/iio/adc/exynos_adc.c
-> >>@@ -34,6 +34,7 @@
-> >>  #include <linux/regulator/consumer.h>
-> >>  #include <linux/of_platform.h>
-> >>  #include <linux/err.h>
-> >>+#include <linux/input.h>
-> >Might want to make the input side optional at compile time...
-> >I supose the existing parts are unlikely to be used much in headless
-> >devices, but you never know.  Maybe we just leave this until someone
-> >shouts they want to be able to avoid compiling it in.
-> >>
-> >>  #include <linux/iio/iio.h>
-> >>  #include <linux/iio/machine.h>
-> >>@@ -103,6 +104,7 @@
-> >>
-> >>  /* Bit definitions common for ADC_V1 and ADC_V2 */
-> >>  #define ADC_CON_EN_START    (1u << 0)
-> >>+#define ADC_DATX_PRESSED    (1u << 15)
-> >>  #define ADC_DATX_MASK        0xFFF
-> >>
-> >>  #define EXYNOS_ADC_TIMEOUT    (msecs_to_jiffies(100))
-> >>@@ -110,16 +112,20 @@
-> >>  struct exynos_adc {
-> >>      struct exynos_adc_data    *data;
-> >>      struct device        *dev;
-> >>+    struct input_dev    *input;
-> >>      void __iomem        *regs;
-> >>      void __iomem        *enable_reg;
-> >>      struct clk        *clk;
-> >>      struct clk        *sclk;
-> >>      unsigned int        irq;
-> >>+    unsigned int        tsirq;
-> >>      struct regulator    *vdd;
-> >>
-> >>      struct completion    completion;
-> >>
-> >>+    bool            read_ts;
-> >>      u32            value;
-> >>+    u32            value2;
-> >As I state further down, I'd rather keep a little
-> >clear of the naming used in IIO for bits that aren't
-> >going through IIO (less confusing!). Maybe just
-> >have
-> >     u32 x, y;
-> >>      unsigned int            version;
-> >>  };
-> >>
-> >>@@ -390,12 +396,61 @@ static int exynos_read_raw(struct iio_dev *indio_dev,
-> >>      return ret;
-> >>  }
-> >>
-> >>+static int exynos_read_s3c64xx_ts(struct iio_dev *indio_dev,
-> >>+                struct iio_chan_spec const *chan,
-> >>+                int *val,
-> >>+                int *val2,
-> >>+                long mask)
-> >>+{
-> >>+    struct exynos_adc *info = iio_priv(indio_dev);
-> >>+    unsigned long timeout;
-> >>+    int ret;
-> >>+
-> >>+    if (mask != IIO_CHAN_INFO_RAW)
-> >>+        return -EINVAL;
-> >>+
-> >>+    mutex_lock(&indio_dev->mlock);
-> >>+    info->read_ts = 1;
-> >>+
-> >>+    reinit_completion(&info->completion);
-> >>+
-> >>+    writel(ADC_S3C2410_TSC_PULL_UP_DISABLE | ADC_TSC_AUTOPST,
-> >>+           ADC_V1_TSC(info->regs));
-> >>+
-> >>+    /* Select the ts channel to be used and Trigger conversion */
-> >>+    info->data->start_conv(info, 0);
-> >0 is a rather magic value.  A define perhaps?
-> >>+
-> >>+    timeout = wait_for_completion_timeout
-> >>+            (&info->completion, EXYNOS_ADC_TIMEOUT);
-> >>+    if (timeout == 0) {
-> >>+        dev_warn(&indio_dev->dev, "Conversion timed out! Resetting\n");
-> >>+        if (info->data->init_hw)
-> >>+            info->data->init_hw(info);
-> >>+        ret = -ETIMEDOUT;
-> >>+    } else {
-> >>+        *val = info->value;
-> >>+        *val2 = info->value2;
-> >This is definitely abuse as those two values are not intended for
-> >different values.  If you want to do this please use different naming
-> >and don't try to fiddle it into the IIO read raw framework.
-> >As you've suggested above, better to simplify this code and drop the
-> >bits cloned from the other handler.
-> >>+        ret = IIO_VAL_INT;
-> >>+    }
-> >>+
-> >>+    info->read_ts = 0;
-> >>+    mutex_unlock(&indio_dev->mlock);
-> >>+
-> >>+    return ret;
-> >>+}
-> >>+
-> >>  static irqreturn_t exynos_adc_isr(int irq, void *dev_id)
-> >>  {
-> >>      struct exynos_adc *info = (struct exynos_adc *)dev_id;
-> >>
-> >>      /* Read value */
-> >>-    info->value = readl(ADC_V1_DATX(info->regs)) & ADC_DATX_MASK;
-> >>+    if (info->read_ts) {
-> >>+        info->value = readl(ADC_V1_DATX(info->regs)) & ADC_DATX_MASK;
-> >>+        info->value2 = readl(ADC_V1_DATY(info->regs)) & ADC_DATX_MASK;
-> >ADC_DATY_MASK would be more obviously correct.
-> >
-> >>+        writel(ADC_TSC_WAIT4INT | ADC_S3C2443_TSC_UD_SEN, ADC_V1_TSC(info->regs));
-> >Perhaps the above is cryptic enough to warrant a comment?
-> >>+    } else {
-> >>+        info->value = readl(ADC_V1_DATX(info->regs)) & ADC_DATX_MASK;
-> >>+    }
-> >>
-> >>      /* clear irq */
-> >>      if (info->data->clear_irq)
-> >>@@ -406,6 +461,46 @@ static irqreturn_t exynos_adc_isr(int irq, void *dev_id)
-> >>      return IRQ_HANDLED;
-> >>  }
-> >>
-> >>+/*
-> >>+ * Here we (ab)use a threaded interrupt handler to stay running
-> >>+ * for as long as the touchscreen remains pressed, we report
-> >>+ * a new event with the latest data and then sleep until the
-> >>+ * next timer tick. This mirrors the behavior of the old
-> >>+ * driver, with much less code.
-> >>+ */
-> >>+static irqreturn_t exynos_ts_isr(int irq, void *dev_id)
-> >>+{
-> >>+    struct exynos_adc *info = dev_id;
-> >>+    struct iio_dev *dev = dev_get_drvdata(info->dev);
-> >>+    u32 x, y;
-> >>+    bool pressed;
-> >>+    int ret;
-> >>+
-> >>+    do {
-> >>+        ret =exynos_read_s3c64xx_ts(dev, NULL, &x, &y, IIO_CHAN_INFO_RAW);
-> >= exynos
-> >>+        if (ret == -ETIMEDOUT)
-> >>+            break;
-> >>+
-> >>+        pressed = x & y & ADC_DATX_PRESSED;
-> >>+        if (!pressed)
-> >>+            break;
-> >>+
-> >>+        input_report_abs(info->input, ABS_X, x & ADC_DATX_MASK);
-> >>+        input_report_abs(info->input, ABS_Y, y & ADC_DATX_MASK);
-> >>+        input_report_key(info->input, BTN_TOUCH, 1);
-> >>+        input_sync(info->input);
-> >>+
-> >>+        msleep(1);
-> >>+    } while (1);
+On Sun, Jul 20, 2014 at 5:09 AM, Russell King - ARM Linux
+<linux@arm.linux.org.uk> wrote:
+> On Sun, Jul 20, 2014 at 12:06:19AM -0400, Nicholas Krause wrote:
+>> This fixs a fix me in bios32.c for pci_fixup_it8152 as this if
+>> statement is incorrect needs to be checked against the class bits
+>> not the whole address for the two or conditions and since they don't
+>> have define statements outside of their numeratical value.
+>
+> Unfortunately, this does not address the FIXME at all.  The FIXME does
+> not state that the if statement is incorrect at all.
+>
+>> -     /* fixup for ITE 8152 devices */
+>> -     /* FIXME: add defines for class 0x68000 and 0x80103 */
+>>       if ((dev->class >> 8) == PCI_CLASS_BRIDGE_HOST ||
+>> -         dev->class == 0x68000 ||
+>> -         dev->class == 0x80103) {
+>> +        (dev->class >> 8) == 0x680 ||
+>> +        (dev->class >> 8) == 0x801) {
+>
+> The FIXME states that there should be defines for these values (0x68000
+> and 0x80103).
+>
+> The FIXME statement itself is slightly wrong in that these values are
+> *not* class IDs.  0x680 and 0x801 are the class ID values.
+>
+> We have definitions for class IDs 0x680 and 0x801 in
+> include/linux/pci_ids.h, which are:
+>
+> #define PCI_CLASS_BRIDGE_OTHER          0x0680
+> #define PCI_CLASS_SYSTEM_DMA            0x0801
+>
+> So, to fix the stated issue, without changing the functionality of the
+> code, this is what I expected you to produce:
+>
+>         /* fixup for ITE 8152 devices */
+>         if ((dev->class >> 8) == PCI_CLASS_BRIDGE_HOST ||
+>             dev->class == PCI_CLASS_BRIDGE_OTHER << 8 ||
+>             def->class == PCI_CLASS_SYSTEM_DMA << 8 | 0x03)
+>
+> The reason is that "PCI_CLASS_BRIDGE_OTHER << 8" evaluates to 0x68000
+> and "PCI_CLASS_SYSTEM_DMA << 8 | 0x03" evaluates to 0x80103.  Therefore,
+> the compiled code is the same as the original, because the actual
+> numerical check is the same as it always was.
+>
+> As your solution results in a functional change to the code, that would
+> introduce a new bug - it results in this test matching any PCI device
+> with any programming interface for class "Bridge other" and "System DMA",
+> whereas before the code was looking for a specific value there.
+>
+> Whether this results in the code incorrectly matching devices on the
+> system(s) which use this code is difficult to know, so my only choice
+> here is to reject your change.
+>
+> This is why my fellow kernel developers are asking you to stop trying to
+> fix this stuff - unless you can produce provably correct patches (or at
+> least patches that appear to have no functional change) then you are
+> burdening people with your education, and you will get yourself an
+> undesirable reputation.
+>
+> Even with patches which appear to have no functional change, some
+> maintainers won't take them unless they have actually been tested on
+> real hardware, or that other people agree that the change is a correct
+> one.  That is because there is a long history of apparantly correct
+> changes being made which result in subtle bugs.
+>
+> Bear in mind that a "FIXME" comment indicates that something is not
+> fully correct in some way, and even though it may not be fully correct,
+> the resulting code _works_ on the devices that it has been tested with.
+> Fixing the "FIXME" may result in the code stopping working on those
+> devices - especially if it changes the functionality of the code like
+> your patch above.
+>
+> So, it's often best to leave FIXMEs alone if you don't know what the
+> right solution should be.
+>
+> I hope you will pause, and think about the issues I've raised before
+> continuing with your current project of trying to fix FIXMEs.
+>
+> --
+> FTTC broadband for 0.8mile line: currently at 9.5Mbps down 400kbps up
+> according to speedtest.net.
 
-It would be nice to actually close the device even if someone is
-touching screen. Please implement open/close methods and have them set a
-flag that you would check here.
-
-
-> >>+
-> >>+    input_report_key(info->input, BTN_TOUCH, 0);
-> >>+    input_sync(info->input);
-> >>+
-> >>+    writel(0, ADC_V1_CLRINTPNDNUP(info->regs));
-> >>+
-> >>+    return IRQ_HANDLED;
-> >>+}
-> >>+
-> >>  static int exynos_adc_reg_access(struct iio_dev *indio_dev,
-> >>                    unsigned reg, unsigned writeval,
-> >>                    unsigned *readval)
-> >>@@ -457,12 +552,57 @@ static int exynos_adc_remove_devices(struct device *dev, void *c)
-> >>      return 0;
-> >>  }
-> >>
-> >>+static int exynos_adc_ts_init(struct exynos_adc *info)
-> >>+{
-> >>+    int ret;
-> >>+
-> >>+    info->input = input_allocate_device();
-> >>+    if (!info->input)
-> >>+        return -ENOMEM;
-> >>+
-> >>+    info->input->evbit[0] = BIT_MASK(EV_KEY) | BIT_MASK(EV_ABS);
-> >>+    info->input->keybit[BIT_WORD(BTN_TOUCH)] = BIT_MASK(BTN_TOUCH);
-> >>+
-> >>+    input_set_abs_params(info->input, ABS_X, 0, 0x3FF, 0, 0);
-> >>+    input_set_abs_params(info->input, ABS_Y, 0, 0x3FF, 0, 0);
-> >>+
-> >>+    /* data from s3c2410_ts driver */
-> >>+    info->input->name = "S3C24xx TouchScreen";
-> >>+    info->input->id.bustype = BUS_HOST;
-> >>+    info->input->id.vendor = 0xDEAD;
-> >>+    info->input->id.product = 0xBEEF;
-
-You do not need to fill these entries with fake data.
-
-> >>+    info->input->id.version = 0x0200;
-> >>+
-> >>+    ret = input_register_device(info->input);
-> >>+    if (ret) {
-> >>+        input_free_device(info->input);
-> >>+        goto err;
-> >>+    }
-> >>+
-> >>+    if (info->tsirq > 0)
-> >>+        ret = request_threaded_irq(info->irq, NULL, exynos_ts_isr,
-> >>+                    0, "touchscreen", info);
-> >info->tsirq
-> >(that had me really confused for a moment ;)
-> >Also, perhaps a more specific name.  touchscreen_updown or similar as the
-> >main interrupt is also used during touchscreen operation.
-> >>+    if (ret < 0) {
-> >>+        dev_err(info->dev, "failed requesting touchsccreen irq, irq = %d\n",
-> >>+                            info->irq);
-> >>+        goto err_input;
-> >>+    }
-> >>+
-> >>+    return 0;
-> >>+
-> >>+err_input:
-> >>+    input_unregister_device(info->input);
-> >>+err:
-> >>+    return ret;
-> >>+}
-> >>+
-> >>  static int exynos_adc_probe(struct platform_device *pdev)
-> >>  {
-> >>      struct exynos_adc *info = NULL;
-> >>      struct device_node *np = pdev->dev.of_node;
-> >>      struct iio_dev *indio_dev = NULL;
-> >>      struct resource    *mem;
-> >>+    bool has_ts;
-> >>      int ret = -ENODEV;
-> >>      int irq;
-> >>
-> >>@@ -498,8 +638,14 @@ static int exynos_adc_probe(struct platform_device *pdev)
-> >>          dev_err(&pdev->dev, "no irq resource?\n");
-> >>          return irq;
-> >>      }
-> >>-
-> >>      info->irq = irq;
-> >>+
-> >>+    irq = platform_get_irq(pdev, 1);
-> >>+    if (irq == -EPROBE_DEFER)
-> >>+        return irq;
-> >>+
-> >>+    info->tsirq = irq;
-> >>+
-> >>      info->dev = &pdev->dev;
-> >>
-> >>      init_completion(&info->completion);
-> >>@@ -565,6 +711,12 @@ static int exynos_adc_probe(struct platform_device *pdev)
-> >>      if (info->data->init_hw)
-> >>          info->data->init_hw(info);
-> >>
-> >>+    has_ts = of_property_read_bool(pdev->dev.of_node, "has-touchscreen");
-> >>+    if (has_ts)
-> >>+        ret = exynos_adc_ts_init(info);
-> >>+    if (ret)
-> >>+        goto err_iio;
-> >>+
-> >>      ret = of_platform_populate(np, exynos_adc_match, NULL, &indio_dev->dev);
-> >>      if (ret < 0) {
-> >>          dev_err(&pdev->dev, "failed adding child nodes\n");
-> >>@@ -576,6 +728,11 @@ static int exynos_adc_probe(struct platform_device *pdev)
-> >>  err_of_populate:
-> >>      device_for_each_child(&indio_dev->dev, NULL,
-> >>                  exynos_adc_remove_devices);
-> >>+    if (has_ts) {
-> >>+        input_unregister_device(info->input);
-> >>+        free_irq(info->tsirq, info);
-
-Are we sure that device is quiesced here and interrupt won't arrive
-between input_unregister_device() and free_irq()? I guess if you
-properly implement open/close it won't matter.
-
-> >>+    }
-> >>+err_iio:
-> >>      iio_device_unregister(indio_dev);
-> >>  err_irq:
-> >>      free_irq(info->irq, info);
-> >>@@ -595,9 +752,12 @@ static int exynos_adc_remove(struct platform_device *pdev)
-> >>      struct iio_dev *indio_dev = platform_get_drvdata(pdev);
-> >>      struct exynos_adc *info = iio_priv(indio_dev);
-> >>
-> >>+    input_free_device(info->input);
-
-Should be unregister, not free.
-
-> >>      device_for_each_child(&indio_dev->dev, NULL,
-> >>                  exynos_adc_remove_devices);
-> >>      iio_device_unregister(indio_dev);
-> >>+    if (info->tsirq > 0)
-> >>+        free_irq(info->tsirq, info);
-> >>      free_irq(info->irq, info);
-> >>      if (info->data->exit_hw)
-> >>          info->data->exit_hw(info);
-> >>
-
-Thanks.
-
--- 
-Dmitry
+Hey Russell,
+Fair enough. I thought it was wrong. I just guessed ,probably needed to search
+for the define statements.
+Cheers Nick
