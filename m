@@ -1,384 +1,104 @@
-From: jic23@kernel.org (Jonathan Cameron)
-Date: Sun, 20 Jul 2014 14:51:37 +0100
-Subject: [PATCH 2/2] iio: exynos-adc: add experimental touchscreen support
-In-Reply-To: <53CBC8D6.6020509@kernel.org>
-References: <1405663186-26464-1-git-send-email-cw00.choi@samsung.com>
- <5186890.aLtladpMgD@wuerfel> <5456679.XxlLIvc3Q6@wuerfel>
- <53CBC8D6.6020509@kernel.org>
-Message-ID: <53CBC969.4090704@kernel.org>
+From: horms@verge.net.au (Simon Horman)
+Date: Sun, 20 Jul 2014 22:51:25 +0900
+Subject: [GIT PULL] Renesas ARM Based SoC DT Timers Updates for v3.17
+In-Reply-To: <20140719052758.GE20064@quad.lixom.net>
+References: <cover.1405556312.git.horms+renesas@verge.net.au>
+ <20140719052758.GE20064@quad.lixom.net>
+Message-ID: <20140720135125.GB31336@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 20/07/14 14:49, Jonathan Cameron wrote:
-> On 18/07/14 20:29, Arnd Bergmann wrote:
->> This adds support for the touchscreen on Samsung s3c64xx.
->> The driver is completely untested but shows roughly how
->> it could be done, following the example of the at91 driver.
->>
-> Hi Arnd,
-Cc'd linux-input and Dmitry.
->
->> Open questions include:
->>
->> - compared to the old plat-samsung/adc driver, there is
->>    no support for prioritizing ts over other clients, nor
->>    for oversampling. From my reading of the code, the
->>    priorities didn't actually have any effect at all, but
->>    the oversampling might be needed. Maybe the original
->>    authors have some insight.
->>
->> - I simply register the input device from the adc driver
->>    itself, as the at91 code does. The driver also supports
->>    sub-nodes, but I don't understand how they are meant
->>    to be used, so using those might be better.
-> So, the alternative you are (I think) referring to is to use
-> the buffered in kernel client interface.  That way a separate
-> touch screen driver can use the output channels provided by IIO
-> in much the same way you might use a regulator or similar.
-> Note that whilst this is similar to the simple polled interface
-> used for things like the iio_hwmon driver, the data flow is
-> quite different (clearly the polled interfce would be
-> inappropriate here).
->
-> Whilst we've discussed it in the past for touch screen drivers
-> like this, usually the hardware isn't generic enough to be
-> of any real use if not being used as a touch screen.  As such
-> it's often simpler to just have the support directly in the
-> driver (as you've observed the at91 driver does this).
->
-> Whilst the interface has been there a while, it's not really had
-> all that much use.  The original target was the simpler case
-> of 3D accelerometer where we have a generic iio to input
-> bridge driver. Time constraints meant that I haven't yet actually
-> formally submitted the input side of this. Whilst there are lots
-> of other things that can use this interface, right now nothing
-> actually does so.
->
->>
->> - The new exynos_read_s3c64xx_ts() function is intentionally
->>    very similar to the existing exynos_read_raw() functions.
->>    It should probably be changed, either by merging the two
->>    into one, or by simplifying the exynos_read_s3c64xx_ts()
->>    function. This depends a bit on the answers to the questions
->>    above.
-> I'd be tempted to not bother keeping them that similar.  It's
-> not a generic IIO channel so simplify it where possible.
->>
->> - We probably need to add support for platform_data as well,
->>    I've skipped this so far.
->>
->> - Is anybody able to debug this driver on real hardware?
->>    While it's possible that it actually works, it's more
->>    likely that I made a few subtle mistakes.
->>
->> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-> Looks pretty good to me.  A few symantic bits and pieces and
-> one bug spotted.  Short and sweet.
->>
->> diff --git a/Documentation/devicetree/bindings/arm/samsung/exynos-adc.txt b/Documentation/devicetree/bindings/arm/samsung/exynos-adc.txt
->> index e1b74828f413..4329bf3c3326 100644
->> --- a/Documentation/devicetree/bindings/arm/samsung/exynos-adc.txt
->> +++ b/Documentation/devicetree/bindings/arm/samsung/exynos-adc.txt
->> @@ -41,6 +41,10 @@ Required properties:
->>                          and compatible ADC block)
->>   - vdd-supply        VDD input supply.
->>
->> +Optional properties:
->> +- has-touchscreen:    If present, indicates that a touchscreen is
->> +            connected an usable.
->> +
->>   Note: child nodes can be added for auto probing from device tree.
->>
->>   Example: adding device info in dtsi file
->> diff --git a/drivers/iio/adc/exynos_adc.c b/drivers/iio/adc/exynos_adc.c
->> index 5f95638513d2..cf1d9f3e2492 100644
->> --- a/drivers/iio/adc/exynos_adc.c
->> +++ b/drivers/iio/adc/exynos_adc.c
->> @@ -34,6 +34,7 @@
->>   #include <linux/regulator/consumer.h>
->>   #include <linux/of_platform.h>
->>   #include <linux/err.h>
->> +#include <linux/input.h>
-> Might want to make the input side optional at compile time...
-> I supose the existing parts are unlikely to be used much in headless
-> devices, but you never know.  Maybe we just leave this until someone
-> shouts they want to be able to avoid compiling it in.
->>
->>   #include <linux/iio/iio.h>
->>   #include <linux/iio/machine.h>
->> @@ -103,6 +104,7 @@
->>
->>   /* Bit definitions common for ADC_V1 and ADC_V2 */
->>   #define ADC_CON_EN_START    (1u << 0)
->> +#define ADC_DATX_PRESSED    (1u << 15)
->>   #define ADC_DATX_MASK        0xFFF
->>
->>   #define EXYNOS_ADC_TIMEOUT    (msecs_to_jiffies(100))
->> @@ -110,16 +112,20 @@
->>   struct exynos_adc {
->>       struct exynos_adc_data    *data;
->>       struct device        *dev;
->> +    struct input_dev    *input;
->>       void __iomem        *regs;
->>       void __iomem        *enable_reg;
->>       struct clk        *clk;
->>       struct clk        *sclk;
->>       unsigned int        irq;
->> +    unsigned int        tsirq;
->>       struct regulator    *vdd;
->>
->>       struct completion    completion;
->>
->> +    bool            read_ts;
->>       u32            value;
->> +    u32            value2;
-> As I state further down, I'd rather keep a little
-> clear of the naming used in IIO for bits that aren't
-> going through IIO (less confusing!). Maybe just
-> have
->      u32 x, y;
->>       unsigned int            version;
->>   };
->>
->> @@ -390,12 +396,61 @@ static int exynos_read_raw(struct iio_dev *indio_dev,
->>       return ret;
->>   }
->>
->> +static int exynos_read_s3c64xx_ts(struct iio_dev *indio_dev,
->> +                struct iio_chan_spec const *chan,
->> +                int *val,
->> +                int *val2,
->> +                long mask)
->> +{
->> +    struct exynos_adc *info = iio_priv(indio_dev);
->> +    unsigned long timeout;
->> +    int ret;
->> +
->> +    if (mask != IIO_CHAN_INFO_RAW)
->> +        return -EINVAL;
->> +
->> +    mutex_lock(&indio_dev->mlock);
->> +    info->read_ts = 1;
->> +
->> +    reinit_completion(&info->completion);
->> +
->> +    writel(ADC_S3C2410_TSC_PULL_UP_DISABLE | ADC_TSC_AUTOPST,
->> +           ADC_V1_TSC(info->regs));
->> +
->> +    /* Select the ts channel to be used and Trigger conversion */
->> +    info->data->start_conv(info, 0);
-> 0 is a rather magic value.  A define perhaps?
->> +
->> +    timeout = wait_for_completion_timeout
->> +            (&info->completion, EXYNOS_ADC_TIMEOUT);
->> +    if (timeout == 0) {
->> +        dev_warn(&indio_dev->dev, "Conversion timed out! Resetting\n");
->> +        if (info->data->init_hw)
->> +            info->data->init_hw(info);
->> +        ret = -ETIMEDOUT;
->> +    } else {
->> +        *val = info->value;
->> +        *val2 = info->value2;
-> This is definitely abuse as those two values are not intended for
-> different values.  If you want to do this please use different naming
-> and don't try to fiddle it into the IIO read raw framework.
-> As you've suggested above, better to simplify this code and drop the
-> bits cloned from the other handler.
->> +        ret = IIO_VAL_INT;
->> +    }
->> +
->> +    info->read_ts = 0;
->> +    mutex_unlock(&indio_dev->mlock);
->> +
->> +    return ret;
->> +}
->> +
->>   static irqreturn_t exynos_adc_isr(int irq, void *dev_id)
->>   {
->>       struct exynos_adc *info = (struct exynos_adc *)dev_id;
->>
->>       /* Read value */
->> -    info->value = readl(ADC_V1_DATX(info->regs)) & ADC_DATX_MASK;
->> +    if (info->read_ts) {
->> +        info->value = readl(ADC_V1_DATX(info->regs)) & ADC_DATX_MASK;
->> +        info->value2 = readl(ADC_V1_DATY(info->regs)) & ADC_DATX_MASK;
-> ADC_DATY_MASK would be more obviously correct.
->
->> +        writel(ADC_TSC_WAIT4INT | ADC_S3C2443_TSC_UD_SEN, ADC_V1_TSC(info->regs));
-> Perhaps the above is cryptic enough to warrant a comment?
->> +    } else {
->> +        info->value = readl(ADC_V1_DATX(info->regs)) & ADC_DATX_MASK;
->> +    }
->>
->>       /* clear irq */
->>       if (info->data->clear_irq)
->> @@ -406,6 +461,46 @@ static irqreturn_t exynos_adc_isr(int irq, void *dev_id)
->>       return IRQ_HANDLED;
->>   }
->>
->> +/*
->> + * Here we (ab)use a threaded interrupt handler to stay running
->> + * for as long as the touchscreen remains pressed, we report
->> + * a new event with the latest data and then sleep until the
->> + * next timer tick. This mirrors the behavior of the old
->> + * driver, with much less code.
->> + */
->> +static irqreturn_t exynos_ts_isr(int irq, void *dev_id)
->> +{
->> +    struct exynos_adc *info = dev_id;
->> +    struct iio_dev *dev = dev_get_drvdata(info->dev);
->> +    u32 x, y;
->> +    bool pressed;
->> +    int ret;
->> +
->> +    do {
->> +        ret =exynos_read_s3c64xx_ts(dev, NULL, &x, &y, IIO_CHAN_INFO_RAW);
-> = exynos
->> +        if (ret == -ETIMEDOUT)
->> +            break;
->> +
->> +        pressed = x & y & ADC_DATX_PRESSED;
->> +        if (!pressed)
->> +            break;
->> +
->> +        input_report_abs(info->input, ABS_X, x & ADC_DATX_MASK);
->> +        input_report_abs(info->input, ABS_Y, y & ADC_DATX_MASK);
->> +        input_report_key(info->input, BTN_TOUCH, 1);
->> +        input_sync(info->input);
->> +
->> +        msleep(1);
->> +    } while (1);
->> +
->> +    input_report_key(info->input, BTN_TOUCH, 0);
->> +    input_sync(info->input);
->> +
->> +    writel(0, ADC_V1_CLRINTPNDNUP(info->regs));
->> +
->> +    return IRQ_HANDLED;
->> +}
->> +
->>   static int exynos_adc_reg_access(struct iio_dev *indio_dev,
->>                     unsigned reg, unsigned writeval,
->>                     unsigned *readval)
->> @@ -457,12 +552,57 @@ static int exynos_adc_remove_devices(struct device *dev, void *c)
->>       return 0;
->>   }
->>
->> +static int exynos_adc_ts_init(struct exynos_adc *info)
->> +{
->> +    int ret;
->> +
->> +    info->input = input_allocate_device();
->> +    if (!info->input)
->> +        return -ENOMEM;
->> +
->> +    info->input->evbit[0] = BIT_MASK(EV_KEY) | BIT_MASK(EV_ABS);
->> +    info->input->keybit[BIT_WORD(BTN_TOUCH)] = BIT_MASK(BTN_TOUCH);
->> +
->> +    input_set_abs_params(info->input, ABS_X, 0, 0x3FF, 0, 0);
->> +    input_set_abs_params(info->input, ABS_Y, 0, 0x3FF, 0, 0);
->> +
->> +    /* data from s3c2410_ts driver */
->> +    info->input->name = "S3C24xx TouchScreen";
->> +    info->input->id.bustype = BUS_HOST;
->> +    info->input->id.vendor = 0xDEAD;
->> +    info->input->id.product = 0xBEEF;
->> +    info->input->id.version = 0x0200;
->> +
->> +    ret = input_register_device(info->input);
->> +    if (ret) {
->> +        input_free_device(info->input);
->> +        goto err;
->> +    }
->> +
->> +    if (info->tsirq > 0)
->> +        ret = request_threaded_irq(info->irq, NULL, exynos_ts_isr,
->> +                    0, "touchscreen", info);
-> info->tsirq
-> (that had me really confused for a moment ;)
-> Also, perhaps a more specific name.  touchscreen_updown or similar as the
-> main interrupt is also used during touchscreen operation.
->> +    if (ret < 0) {
->> +        dev_err(info->dev, "failed requesting touchsccreen irq, irq = %d\n",
->> +                            info->irq);
->> +        goto err_input;
->> +    }
->> +
->> +    return 0;
->> +
->> +err_input:
->> +    input_unregister_device(info->input);
->> +err:
->> +    return ret;
->> +}
->> +
->>   static int exynos_adc_probe(struct platform_device *pdev)
->>   {
->>       struct exynos_adc *info = NULL;
->>       struct device_node *np = pdev->dev.of_node;
->>       struct iio_dev *indio_dev = NULL;
->>       struct resource    *mem;
->> +    bool has_ts;
->>       int ret = -ENODEV;
->>       int irq;
->>
->> @@ -498,8 +638,14 @@ static int exynos_adc_probe(struct platform_device *pdev)
->>           dev_err(&pdev->dev, "no irq resource?\n");
->>           return irq;
->>       }
->> -
->>       info->irq = irq;
->> +
->> +    irq = platform_get_irq(pdev, 1);
->> +    if (irq == -EPROBE_DEFER)
->> +        return irq;
->> +
->> +    info->tsirq = irq;
->> +
->>       info->dev = &pdev->dev;
->>
->>       init_completion(&info->completion);
->> @@ -565,6 +711,12 @@ static int exynos_adc_probe(struct platform_device *pdev)
->>       if (info->data->init_hw)
->>           info->data->init_hw(info);
->>
->> +    has_ts = of_property_read_bool(pdev->dev.of_node, "has-touchscreen");
->> +    if (has_ts)
->> +        ret = exynos_adc_ts_init(info);
->> +    if (ret)
->> +        goto err_iio;
->> +
->>       ret = of_platform_populate(np, exynos_adc_match, NULL, &indio_dev->dev);
->>       if (ret < 0) {
->>           dev_err(&pdev->dev, "failed adding child nodes\n");
->> @@ -576,6 +728,11 @@ static int exynos_adc_probe(struct platform_device *pdev)
->>   err_of_populate:
->>       device_for_each_child(&indio_dev->dev, NULL,
->>                   exynos_adc_remove_devices);
->> +    if (has_ts) {
->> +        input_unregister_device(info->input);
->> +        free_irq(info->tsirq, info);
->> +    }
->> +err_iio:
->>       iio_device_unregister(indio_dev);
->>   err_irq:
->>       free_irq(info->irq, info);
->> @@ -595,9 +752,12 @@ static int exynos_adc_remove(struct platform_device *pdev)
->>       struct iio_dev *indio_dev = platform_get_drvdata(pdev);
->>       struct exynos_adc *info = iio_priv(indio_dev);
->>
->> +    input_free_device(info->input);
->>       device_for_each_child(&indio_dev->dev, NULL,
->>                   exynos_adc_remove_devices);
->>       iio_device_unregister(indio_dev);
->> +    if (info->tsirq > 0)
->> +        free_irq(info->tsirq, info);
->>       free_irq(info->irq, info);
->>       if (info->data->exit_hw)
->>           info->data->exit_hw(info);
->>
->
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-iio" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+On Fri, Jul 18, 2014 at 10:27:58PM -0700, Olof Johansson wrote:
+> On Thu, Jul 17, 2014 at 09:40:20AM +0900, Simon Horman wrote:
+> > Hi Olof, Hi Kevin, Hi Arnd,
+> > 
+> > Please consider these Renesas ARM based SoC DT Timers updates for v3.17.
+> > 
+> > This pull request is based on a merge of the following to provide
+> > all dependencies and try to eliminate conflicts. It turns out the changes
+> > in this pull requests are a nexus for dependencies due to modifying DT,
+> > SoC, board and recently moved header files as well as requiring driver
+> > changes.
+> > 
+> > * The clockevents/renesas-timers-dt branch of Daniel Lezcano's tree.
+> >   He has indicated that this branch has stable commit ids and will
+> >   be included in v3.17. Olof and arm at kernel.org were CCed on the
+> >   thread where he, Laurent Pinchart and I discussed the use of that branch.
+> > 
+> >   The clockevents/renesas-timers-dt's branch is in turn based on v3.16-rc3.
+> > 
+> > * "Third Round of Renesas ARM Based SoC DT Updates for v3.17",
+> >   tagged as renesas-dt3-for-v3.17, which I have sent a pull request for.
+> > 
+> > * "Renesas ARM Based SoC Clock Updates for v3.17",
+> >   tagged as renesas-clock-for-v3.17, which you have merged
+> >   into next/soc
+> > 
+> > * "Second Round of Renesas ARM Based SoC soc-cleanup Updates for v3.17",
+> >   tagged as renesas-soc-cleanup2-for-v3.17, which you have merged
+> >   into next/cleanup.
+> > 
+> > * "Third Round of Renesas ARM Based SoC r8a7779 Multiplatform Updates for
+> >   v3.17", tagged as renesas-r8a7779-multiplatform3-for-v3.17, which
+> >   you have merged into next/soc
+> > 
+> > * "Renesas ARM Based SoC Boards Updates for v3.17",
+> >   tagged as renesas-boards-for-v3.17, which you have merged
+> >   into next/boards
+> > 
+> > * "Third Round of Renesas ARM Based SoC Updates for v3.17",
+> >   tagged as renesas-soc3-for-v3.17, which you have merged
+> >   into next/soc
+> > 
+> > 
+> > The following changes since commit 5c174afd407acc7a90701900b279578151bc007f:
+> > 
+> >   Merge branch 'clockevents/renesas-timers-dt' of git://git.linaro.org/people/daniel.lezcano/linux into dt-timers-for-v3.17.base (2014-07-15 16:31:45 +0900)
+> > 
+> > are available in the git repository at:
+> > 
+> > 
+> >   git://git.kernel.org/pub/scm/linux/kernel/git/horms/renesas.git tags/renesas-dt-timers-for-v3.17
+> > 
+> > for you to fetch changes up to 9394af4314554d15762585a3464cefaa2e6d0420:
+> > 
+> >   ARM: shmobile: genmai-reference: Enable MTU2 in device tree (2014-07-15 21:26:42 +0900)
+> > 
+> > ----------------------------------------------------------------
+> > Renesas ARM Based SoC DT Timers Updates for v3.17
+> > 
+> > * Enable timers using DT when booting boards without Legacy-C code
+> > 
+> > ----------------------------------------------------------------
+> > Laurent Pinchart (8):
+> >       ARM: shmobile: r8a7790: Add CMT devices to DT
+> >       ARM: shmobile: r8a7791: Add CMT devices to DT
+> >       ARM: shmobile: r8a7779: Add TMU devices to DT
+> >       ARM: shmobile: lager-reference: Enable CMT0 in device tree
+> >       ARM: shmobile: koelsch-reference: Enable CMT0 in device tree
+> >       ARM: shmobile: marzen-reference: Enable TMU0 in device tree
+> >       ARM: shmobile: r7s72100: Add MTU2 device to DT
+> >       ARM: shmobile: genmai-reference: Enable MTU2 in device tree
+> 
+> Ok, this branch definitely contains a lot more than this. For dependent
+> external branches such as clocksource, we still prefer to see a pull request so
+> that we can merge in the dependency and get a clean diffstat when we do the
+> merge of your branch, otherwise it gets awkward to compare that what we're
+> getting is what you thought you sent (which is one of the things we check on
+> merges).
+> 
+> Please regenerate this pull request as appropriate.
+
+Hi Olof,
+
+FWIW, I believe that that the diffstat between
+5c174afd407acc7a90701900b279578151bc007f and
+9394af4314554d15762585a3464cefaa2e6d0420 is what was included in the
+pull-request. But I guess that all the merged-in branches are hampering
+your verification process.
+
+Would it help if things were arranged as follows?
+
+1. Use the clocksource branch as a base and then;
+2. Merge in each of my branches (the ones listed above) and then;
+3. Add the patches on top
