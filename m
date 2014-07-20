@@ -1,47 +1,60 @@
 From: viresh.kumar@linaro.org (Viresh Kumar)
-Date: Sun, 20 Jul 2014 17:29:47 +0530
-Subject: [PATCH 1/2] PCI: spear: Fix Section mismatch compilation warning for
- probe()
-Message-ID: <76576b662613369d0c71db30ceed4ed5ae1343d2.1405857442.git.viresh.kumar@linaro.org>
+Date: Sun, 20 Jul 2014 17:29:48 +0530
+Subject: [PATCH 2/2] PCI: spear: Remove spear13xx_pcie_remove()
+In-Reply-To: <76576b662613369d0c71db30ceed4ed5ae1343d2.1405857442.git.viresh.kumar@linaro.org>
+References: <76576b662613369d0c71db30ceed4ed5ae1343d2.1405857442.git.viresh.kumar@linaro.org>
+Message-ID: <ac63cf4f32023ef5b8efc5a139abae3d8a5c6607.1405857442.git.viresh.kumar@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Following compilation warning occurs when compiled with:
 CONFIG_DEBUG_SECTION_MISMATCH=y
 
- WARNING: drivers/pci/host/built-in.o(.data+0xc0): Section mismatch in
- reference from the variable spear13xx_pcie_driver to the function
- .init.text:spear13xx_pcie_probe()
+ WARNING: vmlinux.o(.init.data+0x3338): Section mismatch in reference from the
+ variable spear13xx_pcie_driver to the function
+ .exit.text:spear13xx_pcie_remove()
 
-Both .probe() and pcie_init() are marked with __init, but spear13xx_pcie_driver
-isn't. And so section mismatch.
+This driver isn't allowed to unload, and so doesn't have a *_exit() routine. But
+it still has spear13xx_pcie_remove() marked with __exit.
 
-Fix it by marking spear13xx_pcie_driver with __initdata.
+As this driver can't unload, .remove() would never be called, right? So get rid
+of it.
 
 Fixes: 51b66a6 (PCI: spear: Add PCIe driver for ST Microelectronics SPEAr13xx)
-Reported-by: Olof Johansson <olof@lixom.net>
 Signed-off-by: Viresh Kumar <viresh.kumar@linaro.org>
 ---
-Olof/Arnd,
-
-Let me know if a PULL request is required for this, otherwise just apply them
-directly.
-
- drivers/pci/host/pcie-spear13xx.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+ drivers/pci/host/pcie-spear13xx.c | 12 ------------
+ 1 file changed, 12 deletions(-)
 
 diff --git a/drivers/pci/host/pcie-spear13xx.c b/drivers/pci/host/pcie-spear13xx.c
-index 99738e4..67315ea 100644
+index 67315ea..6dea9e4 100644
 --- a/drivers/pci/host/pcie-spear13xx.c
 +++ b/drivers/pci/host/pcie-spear13xx.c
-@@ -382,7 +382,7 @@ static const struct of_device_id spear13xx_pcie_of_match[] = {
- };
- MODULE_DEVICE_TABLE(of, spear13xx_pcie_of_match);
+@@ -365,17 +365,6 @@ static int __init spear13xx_pcie_probe(struct platform_device *pdev)
+ 	return ret;
+ }
  
--static struct platform_driver spear13xx_pcie_driver = {
-+static struct platform_driver spear13xx_pcie_driver __initdata = {
+-static int __exit spear13xx_pcie_remove(struct platform_device *pdev)
+-{
+-	struct spear13xx_pcie *spear13xx_pcie = platform_get_drvdata(pdev);
+-
+-	clk_disable_unprepare(spear13xx_pcie->clk);
+-
+-	phy_exit(spear13xx_pcie->phy);
+-
+-	return 0;
+-}
+-
+ static const struct of_device_id spear13xx_pcie_of_match[] = {
+ 	{ .compatible = "st,spear1340-pcie", },
+ 	{},
+@@ -384,7 +373,6 @@ MODULE_DEVICE_TABLE(of, spear13xx_pcie_of_match);
+ 
+ static struct platform_driver spear13xx_pcie_driver __initdata = {
  	.probe		= spear13xx_pcie_probe,
- 	.remove		= spear13xx_pcie_remove,
+-	.remove		= spear13xx_pcie_remove,
  	.driver = {
+ 		.name	= "spear-pcie",
+ 		.owner	= THIS_MODULE,
 -- 
 2.0.0.rc2
