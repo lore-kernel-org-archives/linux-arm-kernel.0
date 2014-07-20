@@ -1,96 +1,158 @@
-From: xerofoify@gmail.com (Nick Krause)
-Date: Sun, 20 Jul 2014 17:10:23 -0400
-Subject: [PATCH] arm: Fix me in bios32.c
-In-Reply-To: <20140720090935.GD21766@n2100.arm.linux.org.uk>
-References: <1405829179-19476-1-git-send-email-xerofoify@gmail.com>
- <20140720090935.GD21766@n2100.arm.linux.org.uk>
-Message-ID: <CAPDOMVgUwX47ToxSf__U6EYH8_xUpAJ3A43E2W3qO5g8bhy11w@mail.gmail.com>
+From: knaack.h@gmx.de (Hartmut Knaack)
+Date: Sun, 20 Jul 2014 23:37:07 +0200
+Subject: [PATCH 1/2] iio: exynos-adc: add support for s3c64xx adc
+In-Reply-To: <5186890.aLtladpMgD@wuerfel>
+References: <1405663186-26464-1-git-send-email-cw00.choi@samsung.com>
+ <5186890.aLtladpMgD@wuerfel>
+Message-ID: <53CC3683.9090101@gmx.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Jul 20, 2014 at 5:09 AM, Russell King - ARM Linux
-<linux@arm.linux.org.uk> wrote:
-> On Sun, Jul 20, 2014 at 12:06:19AM -0400, Nicholas Krause wrote:
->> This fixs a fix me in bios32.c for pci_fixup_it8152 as this if
->> statement is incorrect needs to be checked against the class bits
->> not the whole address for the two or conditions and since they don't
->> have define statements outside of their numeratical value.
+Arnd Bergmann schrieb:
+> The ADC in s3c64xx is almost the same as exynosv1, but
+> has a different 'select' method. Adding this here will be
+> helpful to move over the existing s3c64xx platform from the
+> legacy plat-samsung/adc driver to the new exynos-adc.
 >
-> Unfortunately, this does not address the FIXME at all.  The FIXME does
-> not state that the if statement is incorrect at all.
+> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+> ---
+There are some style issues, see the comments inline.
+> [In reply to Exynos3250 ADC support, adding Heiko and Ben]
 >
->> -     /* fixup for ITE 8152 devices */
->> -     /* FIXME: add defines for class 0x68000 and 0x80103 */
->>       if ((dev->class >> 8) == PCI_CLASS_BRIDGE_HOST ||
->> -         dev->class == 0x68000 ||
->> -         dev->class == 0x80103) {
->> +        (dev->class >> 8) == 0x680 ||
->> +        (dev->class >> 8) == 0x801) {
+> I spent way too much time this week trying to clean up the
+> old plat-samsung/adc.c driver as preparation for s3c64xx multiplatform
+> support. Eventually I figured out that all that code is much simpler
+> done using the new driver. This adds support for s3c64xx in
+> samsung-adc.c, similar code changes can be done to support the
+> various s3c24xx variants as well.
 >
-> The FIXME states that there should be defines for these values (0x68000
-> and 0x80103).
+> This first patch should be fairly straightforward but is not tested
+> yet. The second patch is more tricky.
 >
-> The FIXME statement itself is slightly wrong in that these values are
-> *not* class IDs.  0x680 and 0x801 are the class ID values.
+> Both are based on the exynos3250 patches sent by Chanwoo Choi.
 >
-> We have definitions for class IDs 0x680 and 0x801 in
-> include/linux/pci_ids.h, which are:
->
-> #define PCI_CLASS_BRIDGE_OTHER          0x0680
-> #define PCI_CLASS_SYSTEM_DMA            0x0801
->
-> So, to fix the stated issue, without changing the functionality of the
-> code, this is what I expected you to produce:
->
->         /* fixup for ITE 8152 devices */
->         if ((dev->class >> 8) == PCI_CLASS_BRIDGE_HOST ||
->             dev->class == PCI_CLASS_BRIDGE_OTHER << 8 ||
->             def->class == PCI_CLASS_SYSTEM_DMA << 8 | 0x03)
->
-> The reason is that "PCI_CLASS_BRIDGE_OTHER << 8" evaluates to 0x68000
-> and "PCI_CLASS_SYSTEM_DMA << 8 | 0x03" evaluates to 0x80103.  Therefore,
-> the compiled code is the same as the original, because the actual
-> numerical check is the same as it always was.
->
-> As your solution results in a functional change to the code, that would
-> introduce a new bug - it results in this test matching any PCI device
-> with any programming interface for class "Bridge other" and "System DMA",
-> whereas before the code was looking for a specific value there.
->
-> Whether this results in the code incorrectly matching devices on the
-> system(s) which use this code is difficult to know, so my only choice
-> here is to reject your change.
->
-> This is why my fellow kernel developers are asking you to stop trying to
-> fix this stuff - unless you can produce provably correct patches (or at
-> least patches that appear to have no functional change) then you are
-> burdening people with your education, and you will get yourself an
-> undesirable reputation.
->
-> Even with patches which appear to have no functional change, some
-> maintainers won't take them unless they have actually been tested on
-> real hardware, or that other people agree that the change is a correct
-> one.  That is because there is a long history of apparantly correct
-> changes being made which result in subtle bugs.
->
-> Bear in mind that a "FIXME" comment indicates that something is not
-> fully correct in some way, and even though it may not be fully correct,
-> the resulting code _works_ on the devices that it has been tested with.
-> Fixing the "FIXME" may result in the code stopping working on those
-> devices - especially if it changes the functionality of the code like
-> your patch above.
->
-> So, it's often best to leave FIXMEs alone if you don't know what the
-> right solution should be.
->
-> I hope you will pause, and think about the issues I've raised before
-> continuing with your current project of trying to fix FIXMEs.
+> diff --git a/Documentation/devicetree/bindings/arm/samsung/exynos-adc.txt b/Documentation/devicetree/bindings/arm/samsung/exynos-adc.txt
+> index 26232f98d8c5..f84e9250429b 100644
+> --- a/Documentation/devicetree/bindings/arm/samsung/exynos-adc.txt
+> +++ b/Documentation/devicetree/bindings/arm/samsung/exynos-adc.txt
+> @@ -11,11 +11,21 @@ New driver handles the following
+>  
+>  Required properties:
+>  - compatible:		Must be "samsung,exynos-adc-v1"
+> -				for exynos4412/5250 controllers.
+> +				for exynos4412/5250 and s5pv210 controllers.
+>  			Must be "samsung,exynos-adc-v2" for
+>  				future controllers.
+>  			Must be "samsung,exynos3250-adc-v2" for
+>  				controllers compatible with ADC of Exynos3250.
+> +			Must be "samsung,s3c2410-adc" for
+> +				the ADC in s3c2410 and compatibles
+> +			Must be "samsung,s3c2416-adc" for
+> +				the ADC in s3c2416 and compatibles
+> +			Must be "samsung,s3c2440-adc" for
+> +				the ADC in s3c2440 and compatibles
+> +			Must be "samsung,s3c2440-adc" for
+> +				the ADC in s3c2440 and compatibles
+> +			Must be "samsung,s3c2443-adc" for
+> +				the ADC in s3c2443 and compatibles
+>  - reg:			Contains ADC register address range (base address and
+>  			length) and the address of the phy enable register.
+>  - interrupts: 		Contains the interrupt information for the timer. The
+> diff --git a/drivers/iio/adc/exynos_adc.c b/drivers/iio/adc/exynos_adc.c
+> index b63e88247eb2..5f95638513d2 100644
+> --- a/drivers/iio/adc/exynos_adc.c
+> +++ b/drivers/iio/adc/exynos_adc.c
+> @@ -39,12 +39,16 @@
+>  #include <linux/iio/machine.h>
+>  #include <linux/iio/driver.h>
+>  
+> -/* EXYNOS4412/5250 ADC_V1 registers definitions */
+> +/* S3C/EXYNOS4412/5250 ADC_V1 registers definitions */
+>  #define ADC_V1_CON(x)		((x) + 0x00)
+> +#define ADC_V1_TSC(x)		((x) + 0x04)
+>  #define ADC_V1_DLY(x)		((x) + 0x08)
+>  #define ADC_V1_DATX(x)		((x) + 0x0C)
+> +#define ADC_V1_DATY(x)		((x) + 0x10)
+> +#define ADC_V1_UPDN(x)		((x) + 0x14)
+>  #define ADC_V1_INTCLR(x)	((x) + 0x18)
+>  #define ADC_V1_MUX(x)		((x) + 0x1c)
+> +#define ADC_V1_CLRINTPNDNUP(x)	((x) + 0x20)
+>  
+>  /* Future ADC_V2 registers definitions */
+>  #define ADC_V2_CON1(x)		((x) + 0x00)
+> @@ -60,6 +64,30 @@
+>  #define ADC_V1_CON_PRSCLV(x)	(((x) & 0xFF) << 6)
+>  #define ADC_V1_CON_STANDBY	(1u << 2)
+>  
+Leave a whitespace around operators below.
+> +#define ADC_S3C2410_CON_SELMUX(x) (((x)&0x7)<<3)
+> +
+> +/* ADCTSC Register Bits */
+> +#define ADC_S3C2443_TSC_UD_SEN		(1<<8)
+> +#define ADC_S3C2410_TSC_YM_SEN		(1<<7)
+> +#define ADC_S3C2410_TSC_YP_SEN		(1<<6)
+> +#define ADC_S3C2410_TSC_XM_SEN		(1<<5)
+> +#define ADC_S3C2410_TSC_XP_SEN		(1<<4)
+> +#define ADC_S3C2410_TSC_PULL_UP_DISABLE	(1<<3)
+> +#define ADC_S3C2410_TSC_AUTO_PST	(1<<2)
+> +#define ADC_S3C2410_TSC_XY_PST(x)	(((x)&0x3)<<0)
+> +
+> +#define ADC_TSC_WAIT4INT (ADC_S3C2410_TSC_YM_SEN | \
+> +			 ADC_S3C2410_TSC_YP_SEN | \
+> +			 ADC_S3C2410_TSC_XP_SEN | \
+> +			 ADC_S3C2410_TSC_XY_PST(3))
+> +
+> +#define ADC_TSC_AUTOPST	(ADC_S3C2410_TSC_YM_SEN | \
+> +			 ADC_S3C2410_TSC_YP_SEN | \
+> +			 ADC_S3C2410_TSC_XP_SEN | \
+> +			 ADC_S3C2410_TSC_AUTO_PST | \
+> +			 ADC_S3C2410_TSC_XY_PST(0))
+> +
+> +
+>  /* Bit definitions for ADC_V2 */
+>  #define ADC_V2_CON1_SOFT_RESET	(1u << 2)
+>  
+> @@ -195,6 +223,26 @@ static void exynos_adc_v1_clear_irq(struct exynos_adc *info)
+>  	writel(1, ADC_V1_INTCLR(info->regs));
+>  }
+>  
+> +static void exynos_adc_s3c64xx_start_conv(struct exynos_adc *info,
+> +				     unsigned long addr)
+This indention could be a bit better.
+> +{
+> +	u32 con1;
+> +
+> +	con1 = readl(ADC_V1_CON(info->regs));
+> +	con1 &= ~ADC_S3C2410_CON_SELMUX(7);
+> +	con1 |= ADC_S3C2410_CON_SELMUX(addr);
+> +	writel(con1 | ADC_CON_EN_START, ADC_V1_CON(info->regs));
+> +}
+> +
+> +static struct exynos_adc_data const exynos_adc_s3c64xx_data = {
+> +	.num_channels	= MAX_ADC_V1_CHANNELS,
+> +
+> +	.init_hw	= exynos_adc_v1_init_hw,
+> +	.exit_hw	= exynos_adc_v1_exit_hw,
+> +	.clear_irq	= exynos_adc_v1_clear_irq,
+> +	.start_conv	= exynos_adc_s3c64xx_start_conv,
+> +};
+> +
+>  static void exynos_adc_v1_start_conv(struct exynos_adc *info,
+>  				     unsigned long addr)
+>  {
+> @@ -280,6 +328,9 @@ static struct exynos_adc_data const exynos3250_adc_v2_data = {
+>  
+>  static const struct of_device_id exynos_adc_match[] = {
+>  	{
+> +		.compatible = "samsung,s3c64100-adc",
+> +		.data = &exynos_adc_s3c64xx_data,
+> +	}, {
+>  		.compatible = "samsung,exynos-adc-v1",
+>  		.data = (void *)&exynos_adc_v1_data,
+>  	}, {
 >
 > --
-> FTTC broadband for 0.8mile line: currently at 9.5Mbps down 400kbps up
-> according to speedtest.net.
-
-Hey Russell,
-Fair enough. I thought it was wrong. I just guessed ,probably needed to search
-for the define statements.
-Cheers Nick
+> To unsubscribe from this list: send the line "unsubscribe linux-iio" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+>
