@@ -1,60 +1,45 @@
 From: viresh.kumar@linaro.org (Viresh Kumar)
-Date: Sun, 20 Jul 2014 17:29:48 +0530
-Subject: [PATCH 2/2] PCI: spear: Remove spear13xx_pcie_remove()
-In-Reply-To: <76576b662613369d0c71db30ceed4ed5ae1343d2.1405857442.git.viresh.kumar@linaro.org>
-References: <76576b662613369d0c71db30ceed4ed5ae1343d2.1405857442.git.viresh.kumar@linaro.org>
-Message-ID: <ac63cf4f32023ef5b8efc5a139abae3d8a5c6607.1405857442.git.viresh.kumar@linaro.org>
+Date: Sun, 20 Jul 2014 17:37:32 +0530
+Subject: [RFC] cpufreq: Add bindings for CPU clock sharing topology
+In-Reply-To: <53CA8D95.8010108@ti.com>
+References: <7e097b71342c9f5f63b07ff2e135eb7beb626aab.1405661369.git.viresh.kumar@linaro.org>
+ <CAOesGMhTkTEXp99gpU8cZBwYmiXpsySG5zMn6oSyo_Mf5PAiUg@mail.gmail.com>
+ <CAKohpo=MmoALOHg-=7cf0jm=OJO57TWQZQXqkRwhRwU-DGPMmA@mail.gmail.com>
+ <CAOesGMhuNzVtUkaUjF+JjNgHcgf08WiM0DG-kzwtcyUxkK_zow@mail.gmail.com>
+ <CAKohpokLqrydV3b=innvOWrW9ijXtZwPKdT5Ew65cjMxsY2Mvw@mail.gmail.com>
+ <53CA8D95.8010108@ti.com>
+Message-ID: <CAKohpok-C+JCebjJkZExx6EjBctoyJF7fV71Vjj7bi1TAdXrFQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Following compilation warning occurs when compiled with:
-CONFIG_DEBUG_SECTION_MISMATCH=y
+On 19 July 2014 20:54, Santosh Shilimkar <santosh.shilimkar@ti.com> wrote:
+> Sorry for jumping late
 
- WARNING: vmlinux.o(.init.data+0x3338): Section mismatch in reference from the
- variable spear13xx_pcie_driver to the function
- .exit.text:spear13xx_pcie_remove()
+No, you aren't late. Its just 2 days old thread :)
 
-This driver isn't allowed to unload, and so doesn't have a *_exit() routine. But
-it still has spear13xx_pcie_remove() marked with __exit.
+> but one of the point I was raising as part of your
+> other series was to extend the CPU topology bindings to cover the voltage
+> domain information which is probably what is really needed to let the
+> CPUfreq extract the information. Not sure if it was already discussed.
 
-As this driver can't unload, .remove() would never be called, right? So get rid
-of it.
+Not it wasn't.
 
-Fixes: 51b66a6 (PCI: spear: Add PCIe driver for ST Microelectronics SPEAr13xx)
-Signed-off-by: Viresh Kumar <viresh.kumar@linaro.org>
----
- drivers/pci/host/pcie-spear13xx.c | 12 ------------
- 1 file changed, 12 deletions(-)
+> After all the CPU clocks, cluster, clock-gating, power domains are pretty much
+> related. So instead of having new binding for CPUFreq, I was wondering whether
+> we can extend the CPU topology binding information to include missing information.
+> Scheduler work anyway needs that information.
+>
+> Ref: Documentation/devicetree/bindings/arm/topology.txt
+>
+> Does that make sense ?
 
-diff --git a/drivers/pci/host/pcie-spear13xx.c b/drivers/pci/host/pcie-spear13xx.c
-index 67315ea..6dea9e4 100644
---- a/drivers/pci/host/pcie-spear13xx.c
-+++ b/drivers/pci/host/pcie-spear13xx.c
-@@ -365,17 +365,6 @@ static int __init spear13xx_pcie_probe(struct platform_device *pdev)
- 	return ret;
- }
- 
--static int __exit spear13xx_pcie_remove(struct platform_device *pdev)
--{
--	struct spear13xx_pcie *spear13xx_pcie = platform_get_drvdata(pdev);
--
--	clk_disable_unprepare(spear13xx_pcie->clk);
--
--	phy_exit(spear13xx_pcie->phy);
--
--	return 0;
--}
--
- static const struct of_device_id spear13xx_pcie_of_match[] = {
- 	{ .compatible = "st,spear1340-pcie", },
- 	{},
-@@ -384,7 +373,6 @@ MODULE_DEVICE_TABLE(of, spear13xx_pcie_of_match);
- 
- static struct platform_driver spear13xx_pcie_driver __initdata = {
- 	.probe		= spear13xx_pcie_probe,
--	.remove		= spear13xx_pcie_remove,
- 	.driver = {
- 		.name	= "spear-pcie",
- 		.owner	= THIS_MODULE,
--- 
-2.0.0.rc2
+Yeah it does, but I am not sure what exactly the bindings should look then.
+So, the most basic step could be moving the new bindings to topology.txt
+and name clock-master to dvfs-master.
+
+What else?
+
+If its going to be much controversial then we *can* go for just dvfs bindings
+for now and then update them later.
+
+Doesn't make sense? :)
