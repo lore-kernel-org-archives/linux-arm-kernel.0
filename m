@@ -1,48 +1,33 @@
-From: antoine.tenart@free-electrons.com (Antoine =?iso-8859-1?Q?T=E9nart?=)
-Date: Mon, 21 Jul 2014 11:09:53 +0200
-Subject: [PATCH v10 0/8] ARM: berlin: add AHCI support
-In-Reply-To: <53CA48F7.5020405@redhat.com>
-References: <1405686607-8126-1-git-send-email-antoine.tenart@free-electrons.com>
- <20140718135758.GB13012@htj.dyndns.org>
- <53CA4608.3040208@redhat.com> <53CA48F7.5020405@redhat.com>
-Message-ID: <20140721090953.GE32208@kwain>
+From: daniel.lezcano@linaro.org (Daniel Lezcano)
+Date: Mon, 21 Jul 2014 11:14:09 +0200
+Subject: [PATCH v2 00/14] AT91: PIT: Cleanups and move to
+ drivers/clocksource
+In-Reply-To: <1404207208-14513-1-git-send-email-maxime.ripard@free-electrons.com>
+References: <1404207208-14513-1-git-send-email-maxime.ripard@free-electrons.com>
+Message-ID: <53CCD9E1.9000402@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Hans,
+On 07/01/2014 11:33 AM, Maxime Ripard wrote:
+> Hi everyone,
+>
+> This series cleans up the PIT driver in order for it to not depend on
+> anything in mach-at91 anymore, and in the end move it out of
+> mach-at91.
+>
+> Along the way, these patches also do a bit of cleanup.
+>
+> This has been tested on a G45-EK without DT and an Xplained with DT.
 
-On Sat, Jul 19, 2014 at 12:31:19PM +0200, Hans de Goede wrote:
-> On 07/19/2014 12:18 PM, Hans de Goede wrote:
-> 
-> >The problem is that:
-> >
-> >1) We need to enable resources before we can do ahci_save_initial_config()
-> >2) We must do ahci_save_initial_config() before we can do ata_host_alloc_pinfo()
-> >3) Therefor we don't have port_info at enable_resources time, which is when we
-> >want to enable the phys (and we cannot just enable the phys elsewhere as
-> >enable_resouces gets used on e.g. resume too).
-> >
-> >So I think it is best to just make the phy pointers an array inside
-> >ahci_host_priv, with a comment that the array indexes must match port
-> >indexes.
-> 
-> So looking at "[PATCH v10 4/8] ata: libahci: allow to use multiple PHYs"
-> I see that currently the phy array indexes do not necessarily match the
-> port indexes. Since you already allocate the phys array at nports size,
-> I suggest simply making the array sparse, leaving in NULL entries for
-> unused ports, and adjusting enable / disable_phys to check for NULL
-> pointers. This way we still have a 1:1 way to map ports <-> phys if
-> we want to do something with phys on a per port basis in the future.
-> 
-> Note please also add a check that reg < nports so that we don't use
-> the array out of bounds if there is an error in the dts.
+For the entire serie:
 
-Ok. I'll rework patch 4 along with the other modifications requested,
-and I'll send a new version early this week.
+Acked-by: Daniel Lezcano <daniel.lezcano@linaro.org>
 
-Antoine
+
 
 -- 
-Antoine T?nart, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
+  <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
+
+Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
+<http://twitter.com/#!/linaroorg> Twitter |
+<http://www.linaro.org/linaro-blog/> Blog
