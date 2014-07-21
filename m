@@ -1,48 +1,46 @@
 From: will.deacon@arm.com (Will Deacon)
-Date: Mon, 21 Jul 2014 09:48:23 +0100
-Subject: [PATCH resend v2] arm64: dmi: Add SMBIOS/DMI support
-In-Reply-To: <CAKv+Gu9K=Hp97cFK2D_HTe=CD6-spvUcP6itOyLB-DcgQatmyA@mail.gmail.com>
-References: <1405079210-30044-1-git-send-email-ard.biesheuvel@linaro.org>
- <20140714133644.GE1779@arm.com>
- <CAKv+Gu_2CYU+Th4xZ3EfjCFqQzBfJ88Hrtx1LwUbG79+1=cqJw@mail.gmail.com>
- <CAKv+Gu9K=Hp97cFK2D_HTe=CD6-spvUcP6itOyLB-DcgQatmyA@mail.gmail.com>
-Message-ID: <20140721084823.GA15666@arm.com>
+Date: Mon, 21 Jul 2014 09:51:50 +0100
+Subject: [PATCH 2/3] ARM: smp_scu: enable SCU standby support
+In-Reply-To: <1405928755-19413-3-git-send-email-shawn.guo@freescale.com>
+References: <1405928755-19413-1-git-send-email-shawn.guo@freescale.com>
+ <1405928755-19413-3-git-send-email-shawn.guo@freescale.com>
+Message-ID: <20140721085150.GB15666@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Jul 20, 2014 at 11:25:34AM +0100, Ard Biesheuvel wrote:
-> On 14 July 2014 15:57, Ard Biesheuvel <ard.biesheuvel@linaro.org> wrote:
-> > On 14 July 2014 15:36, Will Deacon <will.deacon@arm.com> wrote:
-> >> On Fri, Jul 11, 2014 at 12:46:50PM +0100, Ard Biesheuvel wrote:
-> >>> From: Yi Li <yi.li@linaro.org>
-> >>>
-> >>> SMbios is important for server hardware vendors. It implements a spec for
-> >>> providing descriptive information about the platform. Things like serial
-> >>> numbers, physical layout of the ports, build configuration data, and the like.
-> >>>
-> >>> This has been tested by dmidecode and lshw tools.
-> >>>
-> >>> Signed-off-by: Yi Li <yi.li@linaro.org>
-> >>> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
-> >>> ---
-> >>> Changes since previous version:
-> >>> - changed double inclusion guard to arm64 flavour
-> >>> - use kzalloc(GFP_KERNEL) as GFP_ATOMIC is not needed
-> >>> - do a sanity check on the size of the requested mapping
-> >>
-> >> Technically, this patch looks fine to me:
-> >>
-> >>   Reviewed-by: Will Deacon <will.deacon@arm.com>
-> >>
+On Mon, Jul 21, 2014 at 08:45:54AM +0100, Shawn Guo wrote:
+> With SCU standby enabled, SCU CLK will be turned off when all processors
+> are in WFI mode.  And the clock will be turned on when any processor
+> leaves WFI mode.
 > 
-> Hello Catalin,
+> This behavior should be preferable in terms of power efficiency of
+> system idle.  So let's set the SCU standby bit to enable the support in
+> function scu_enable().
 > 
-> This has been tested by Yi on FVP and Juno.
-> Are you ok to take this?
+> Signed-off-by: Shawn Guo <shawn.guo@freescale.com>
+> ---
+>  arch/arm/kernel/smp_scu.c | 3 ++-
+>  1 file changed, 2 insertions(+), 1 deletion(-)
+> 
+> diff --git a/arch/arm/kernel/smp_scu.c b/arch/arm/kernel/smp_scu.c
+> index c947508f84e6..9f29d167d02c 100644
+> --- a/arch/arm/kernel/smp_scu.c
+> +++ b/arch/arm/kernel/smp_scu.c
+> @@ -18,6 +18,7 @@
+>  
+>  #define SCU_CTRL		0x00
+>  #define SCU_ENABLE		(1 << 0)
+> +#define SCU_STANDBY_ENABLE	(1 << 5)
+>  #define SCU_CONFIG		0x04
+>  #define SCU_CPU_STATUS		0x08
+>  #define SCU_INVALIDATE		0x0c
+> @@ -54,7 +55,7 @@ void scu_enable(void __iomem *scu_base)
+>  	if (scu_ctrl & SCU_ENABLE)
+>  		return;
+>  
+> -	scu_ctrl |= SCU_ENABLE;
+> +	scu_ctrl |= SCU_ENABLE | SCU_STANDBY_ENABLE;
 
-Out of interest, how did you test it on Juno? I tried but got some messages
-about missing/invalid DMI data or something similar. Leif reckons I need
-some tricked out firmware for the FVP to get something working, but even
-then the information is apparently bogus.
+I don't think this bit exists on all revisions of the A9.
 
 Will
