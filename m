@@ -1,57 +1,91 @@
-From: lauraa@codeaurora.org (Laura Abbott)
-Date: Mon, 21 Jul 2014 14:22:34 -0700
-Subject: [PATCHv4 4/5] arm: use genalloc for the atomic pool
-In-Reply-To: <20140704134254.GA4142@ulmo>
-References: <1404324218-4743-1-git-send-email-lauraa@codeaurora.org>
- <1404324218-4743-5-git-send-email-lauraa@codeaurora.org>
- <20140704134254.GA4142@ulmo>
-Message-ID: <53CD849A.1000800@codeaurora.org>
+From: sboyd@codeaurora.org (Stephen Boyd)
+Date: Mon, 21 Jul 2014 14:26:35 -0700
+Subject: [GIT PULL] qcom clock changes for 3.17
+Message-ID: <20140721212635.GA19933@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 7/4/2014 6:42 AM, Thierry Reding wrote:
-> On Wed, Jul 02, 2014 at 11:03:37AM -0700, Laura Abbott wrote:
-> [...]
->> diff --git a/arch/arm/mm/dma-mapping.c b/arch/arm/mm/dma-mapping.c
-> [...]
->> index f5190ac..02a1939 100644
->> --- a/arch/arm/mm/dma-mapping.c
->> +++ b/arch/arm/mm/dma-mapping.c
->> @@ -26,6 +26,7 @@
->>  #include <linux/io.h>
->>  #include <linux/vmalloc.h>
->>  #include <linux/sizes.h>
->> +#include <linux/genalloc.h>
-> 
-> Includes should be sorted alphabetically. I realize that's not the case
-> for this particular file, but the downside of that is that your patch no
-> longer applies cleanly on top of linux-next because some other patch did
-> add linux/cma.h at the same location.
-> 
+Hi Mike,
 
-Yes, I'll fix that up. I'll put genalloc.h before gfp.h.
+The following changes since commit a497c3ba1d97fc69c1e78e7b96435ba8c2cb42ee:
 
->>  static int __init early_coherent_pool(char *p)
->>  {
->> -	atomic_pool.size = memparse(p, &p);
->> +	atomic_pool_size = memparse(p, &p);
->>  	return 0;
->>  }
->>  early_param("coherent_pool", early_coherent_pool);
->>  
->> +
-> 
-> There's a gratuituous blank line her.
-> 
-> I also need the below hunk on top of you patch to make this compile on
-> ARM.
-> 
+  Linux 3.16-rc2 (2014-06-21 19:02:54 -1000)
 
-Yes, that does indeed need to be fixed up.
+are available in the git repository at:
 
-Thanks,
-Laura
+  git://git.kernel.org/pub/scm/linux/kernel/git/galak/linux-qcom.git tags/qcom-clocks-for-3.17
 
+for you to fetch changes up to e216ce60a9e05ab399d098f05cd86fd95c9da8d5:
+
+  clk: qcom: Add support for APQ8064 multimedia clocks (2014-07-15 16:39:03 -0700)
+
+----------------------------------------------------------------
+qcom clock changes for 3.17
+
+These patches add support for a handful of Qualcomm's SoC clock
+controllers: APQ8084 gcc and mmcc, IPQ8064 gcc, and APQ8064.
+There's also a small collection of bug fixes that aren't critical
+-rc worthy regressions because the consumer drivers aren't present
+or using the buggy clocks and one optimization for HDMI.
+
+----------------------------------------------------------------
+Georgi Djakov (4):
+      clk: qcom: Add APQ8084 Global Clock Controller documentation
+      clk: qcom: Add APQ8084 Global Clock Controller support
+      clk: qcom: Add APQ8084 clocks for SATA, PCIe and UFS
+      clk: qcom: Add APQ8084 Multimedia Clock Controller (MMCC) support
+
+Kumar Gala (1):
+      clk: qcom: Add support for IPQ8064's global clock controller (GCC)
+
+Srinivas Kandagatla (1):
+      clk: qcom: add clocks necessary for apq8064 sdcc
+
+Stephen Boyd (7):
+      clk: qcom: Fully support apq8064 global clock control
+      clk: qcom: Support bypass RCG configuration
+      clk: qcom: Fix MN frequency tables, parent map, and jpegd
+      clk: qcom: Fix PLL rate configurations
+      clk: qcom: mdp_lut_clk is a child of mdp_src
+      clk: qcom: pll: Add support for configuring SR PLLs
+      clk: qcom: Add support for APQ8064 multimedia clocks
+
+ .../devicetree/bindings/clock/qcom,gcc.txt         |    2 +
+ .../devicetree/bindings/clock/qcom,mmcc.txt        |    2 +
+ drivers/clk/qcom/Kconfig                           |   25 +
+ drivers/clk/qcom/Makefile                          |    3 +
+ drivers/clk/qcom/clk-pll.c                         |   15 +-
+ drivers/clk/qcom/clk-pll.h                         |    2 +
+ drivers/clk/qcom/clk-rcg.c                         |   51 +-
+ drivers/clk/qcom/clk-rcg.h                         |    1 +
+ drivers/clk/qcom/common.c                          |   39 +-
+ drivers/clk/qcom/common.h                          |    6 +
+ drivers/clk/qcom/gcc-apq8084.c                     | 3611 ++++++++++++++++++++
+ drivers/clk/qcom/gcc-ipq806x.c                     | 2424 +++++++++++++
+ drivers/clk/qcom/gcc-msm8960.c                     |  583 +++-
+ drivers/clk/qcom/mmcc-apq8084.c                    | 3352 ++++++++++++++++++
+ drivers/clk/qcom/mmcc-msm8960.c                    |  526 ++-
+ drivers/clk/qcom/mmcc-msm8974.c                    |   10 +-
+ include/dt-bindings/clock/qcom,gcc-apq8084.h       |  351 ++
+ include/dt-bindings/clock/qcom,gcc-ipq806x.h       |  293 ++
+ include/dt-bindings/clock/qcom,gcc-msm8960.h       |   11 +
+ include/dt-bindings/clock/qcom,mmcc-apq8084.h      |  183 +
+ include/dt-bindings/clock/qcom,mmcc-msm8960.h      |    8 +
+ include/dt-bindings/reset/qcom,gcc-apq8084.h       |  109 +
+ include/dt-bindings/reset/qcom,gcc-ipq806x.h       |  132 +
+ include/dt-bindings/reset/qcom,gcc-msm8960.h       |   16 +
+ include/dt-bindings/reset/qcom,mmcc-apq8084.h      |   64 +
+ include/dt-bindings/reset/qcom,mmcc-msm8960.h      |    8 +
+ 26 files changed, 11747 insertions(+), 80 deletions(-)
+ create mode 100644 drivers/clk/qcom/gcc-apq8084.c
+ create mode 100644 drivers/clk/qcom/gcc-ipq806x.c
+ create mode 100644 drivers/clk/qcom/mmcc-apq8084.c
+ create mode 100644 include/dt-bindings/clock/qcom,gcc-apq8084.h
+ create mode 100644 include/dt-bindings/clock/qcom,gcc-ipq806x.h
+ create mode 100644 include/dt-bindings/clock/qcom,mmcc-apq8084.h
+ create mode 100644 include/dt-bindings/reset/qcom,gcc-apq8084.h
+ create mode 100644 include/dt-bindings/reset/qcom,gcc-ipq806x.h
+ create mode 100644 include/dt-bindings/reset/qcom,mmcc-apq8084.h
 -- 
 Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
 hosted by The Linux Foundation
