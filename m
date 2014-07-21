@@ -1,178 +1,90 @@
-From: computersforpeace@gmail.com (Brian Norris)
-Date: Mon, 21 Jul 2014 14:08:04 -0700
-Subject: [PATCH v8 09/11] ARM: brcmstb: dts: add a reference DTS for Broadcom
- 7445
-In-Reply-To: <1405976886-27807-1-git-send-email-computersforpeace@gmail.com>
-References: <1405976886-27807-1-git-send-email-computersforpeace@gmail.com>
-Message-ID: <1405976886-27807-10-git-send-email-computersforpeace@gmail.com>
+From: tharvey@gateworks.com (Tim Harvey)
+Date: Mon, 21 Jul 2014 14:12:50 -0700
+Subject: [PATCH v2] PCI: imx6: fix boot hang when link already enabled
+In-Reply-To: <1405966635-7455-1-git-send-email-l.stach@pengutronix.de>
+References: <1405966635-7455-1-git-send-email-l.stach@pengutronix.de>
+Message-ID: <CAJ+vNU1raC+eajYy33KDU=98NhJguz9j-ob+5oo94Q8oV3Cjqg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Marc Carino <marc.ceeeee@gmail.com>
+On Mon, Jul 21, 2014 at 11:17 AM, Lucas Stach <l.stach@pengutronix.de> wrote:
+> This fixes a boot hang observed when the bootloader
+> already enabled the PCIe link for it's own use. The
+> fundamental problem is that Freescale forgot to wire
+> up the core reset, so software doesn't have a sane way
+> to get the core into a defined state.
+>
+> According to the DW PCIe core reference manual configuration
+> of the core may only happen when the LTSSM is disabled, so
+> this is one of the first things we need to do. Apparently
+> this isn't safe to do when the LTSSM is in any other state
+> than "detect" as we observe an instant machine hang when
+> trying to do so while the link is already up.
+>
+> As a workaround force LTSSM into detect state right before
+> hitting the disable switch.
+>
+> Reported-by: Fabio Estevam <fabio.estevam@freescale.com>
+> Signed-off-by: Lucas Stach <l.stach@pengutronix.de>
+> ---
+> v2: messed up the first submission by omitting a chunk
+>
+> Fabios delay workaround worked because of the following
+> conditions:
+> 1. The driver gets probed and pulls the peripheral reset GPIO
+> 2. Peripheral is held in reset, so won't answer any link
+> negotiation requests
+> 3. The LTSSM times out and falls back into detect state
+> after 24ms (that's why a 30ms delay helps)
+> 4. After LTSSM entered detect state it's safe to hit the
+> disable switch
+> ---
+>  drivers/pci/host/pci-imx6.c | 11 +++++++++++
+>  1 file changed, 11 insertions(+)
+>
+> diff --git a/drivers/pci/host/pci-imx6.c b/drivers/pci/host/pci-imx6.c
+> index a568efaa331c..1c4b4b81fe15 100644
+> --- a/drivers/pci/host/pci-imx6.c
+> +++ b/drivers/pci/host/pci-imx6.c
+> @@ -49,6 +49,9 @@ struct imx6_pcie {
+>
+>  /* PCIe Port Logic registers (memory-mapped) */
+>  #define PL_OFFSET 0x700
+> +#define PCIE_PL_PFLR (PL_OFFSET + 0x08)
+> +#define PCIE_PL_PFLR_LINK_STATE_MASK           (0x3f << 16)
+> +#define PCIE_PL_PFLR_FORCE_LINK                        (1 << 15)
+>  #define PCIE_PHY_DEBUG_R0 (PL_OFFSET + 0x28)
+>  #define PCIE_PHY_DEBUG_R1 (PL_OFFSET + 0x2c)
+>  #define PCIE_PHY_DEBUG_R1_XMLH_LINK_IN_TRAINING        (1 << 29)
+> @@ -214,7 +217,15 @@ static int imx6q_pcie_abort_handler(unsigned long addr,
+>  static int imx6_pcie_assert_core_reset(struct pcie_port *pp)
+>  {
+>         struct imx6_pcie *imx6_pcie = to_imx6_pcie(pp);
+> +       u32 val;
+> +
+> +       val = readl(pp->dbi_base + PCIE_PL_PFLR);
+> +       val &= ~PCIE_PL_PFLR_LINK_STATE_MASK;
+> +       val |= PCIE_PL_PFLR_FORCE_LINK;
+> +       writel(val, pp->dbi_base + PCIE_PL_PFLR);
+>
+> +       regmap_update_bits(imx6_pcie->iomuxc_gpr, IOMUXC_GPR12,
+> +                       IMX6Q_GPR12_PCIE_CTL_2, 0 << 10);
+>         regmap_update_bits(imx6_pcie->iomuxc_gpr, IOMUXC_GPR1,
+>                         IMX6Q_GPR1_PCIE_TEST_PD, 1 << 18);
+>         regmap_update_bits(imx6_pcie->iomuxc_gpr, IOMUXC_GPR1,
+> --
+> 2.0.1
+>
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-pci" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
 
-Add a sample DTS which will allow bootup of a board populated
-with the BCM7445 chip.
+Lucas,
 
-Signed-off-by: Marc Carino <marc.ceeeee@gmail.com>
-Signed-off-by: Brian Norris <computersforpeace@gmail.com>
-Cc: Matt Porter <mporter@linaro.org>
----
- arch/arm/boot/dts/Makefile                 |   2 +
- arch/arm/boot/dts/bcm7445-bcm97445svmb.dts |  14 ++++
- arch/arm/boot/dts/bcm7445.dtsi             | 111 +++++++++++++++++++++++++++++
- 3 files changed, 127 insertions(+)
- create mode 100644 arch/arm/boot/dts/bcm7445-bcm97445svmb.dts
- create mode 100644 arch/arm/boot/dts/bcm7445.dtsi
+Thank you - this does resolve the hang on all my board configurations
+(with and without bridges, external and internal clock-gen).
 
-diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
-index adb5ed9e269e..38439ca9b361 100644
---- a/arch/arm/boot/dts/Makefile
-+++ b/arch/arm/boot/dts/Makefile
-@@ -59,6 +59,8 @@ dtb-$(CONFIG_ARCH_BERLIN) += \
- 	berlin2-sony-nsz-gs7.dtb	\
- 	berlin2cd-google-chromecast.dtb	\
- 	berlin2q-marvell-dmp.dtb
-+dtb-$(CONFIG_ARCH_BRCMSTB) += \
-+	bcm7445-bcm97445svmb.dtb
- dtb-$(CONFIG_ARCH_DAVINCI) += da850-enbw-cmc.dtb \
- 	da850-evm.dtb
- dtb-$(CONFIG_ARCH_EFM32) += efm32gg-dk3750.dtb
-diff --git a/arch/arm/boot/dts/bcm7445-bcm97445svmb.dts b/arch/arm/boot/dts/bcm7445-bcm97445svmb.dts
-new file mode 100644
-index 000000000000..9eec2ac1112f
---- /dev/null
-+++ b/arch/arm/boot/dts/bcm7445-bcm97445svmb.dts
-@@ -0,0 +1,14 @@
-+/dts-v1/;
-+#include "bcm7445.dtsi"
-+
-+/ {
-+	model = "Broadcom STB (bcm7445), SVMB reference board";
-+	compatible = "brcm,bcm7445", "brcm,brcmstb";
-+
-+	memory {
-+		device_type = "memory";
-+		reg = <0x00 0x00000000 0x00 0x40000000>,
-+		      <0x00 0x40000000 0x00 0x40000000>,
-+		      <0x00 0x80000000 0x00 0x40000000>;
-+	};
-+};
-diff --git a/arch/arm/boot/dts/bcm7445.dtsi b/arch/arm/boot/dts/bcm7445.dtsi
-new file mode 100644
-index 000000000000..0ca0f4e523d0
---- /dev/null
-+++ b/arch/arm/boot/dts/bcm7445.dtsi
-@@ -0,0 +1,111 @@
-+#include <dt-bindings/interrupt-controller/arm-gic.h>
-+
-+#include "skeleton.dtsi"
-+
-+/ {
-+	#address-cells = <2>;
-+	#size-cells = <2>;
-+	model = "Broadcom STB (bcm7445)";
-+	compatible = "brcm,bcm7445", "brcm,brcmstb";
-+	interrupt-parent = <&gic>;
-+
-+	chosen {
-+		bootargs = "console=ttyS0,115200 earlyprintk";
-+	};
-+
-+	cpus {
-+		#address-cells = <1>;
-+		#size-cells = <0>;
-+
-+		cpu at 0 {
-+			compatible = "brcm,brahma-b15";
-+			device_type = "cpu";
-+			enable-method = "brcm,brahma-b15";
-+			reg = <0>;
-+		};
-+
-+		cpu at 1 {
-+			compatible = "brcm,brahma-b15";
-+			device_type = "cpu";
-+			enable-method = "brcm,brahma-b15";
-+			reg = <1>;
-+		};
-+
-+		cpu at 2 {
-+			compatible = "brcm,brahma-b15";
-+			device_type = "cpu";
-+			enable-method = "brcm,brahma-b15";
-+			reg = <2>;
-+		};
-+
-+		cpu at 3 {
-+			compatible = "brcm,brahma-b15";
-+			device_type = "cpu";
-+			enable-method = "brcm,brahma-b15";
-+			reg = <3>;
-+		};
-+	};
-+
-+	gic: interrupt-controller at ffd00000 {
-+		compatible = "brcm,brahma-b15-gic", "arm,cortex-a15-gic";
-+		reg = <0x00 0xffd01000 0x00 0x1000>,
-+		      <0x00 0xffd02000 0x00 0x2000>,
-+		      <0x00 0xffd04000 0x00 0x2000>,
-+		      <0x00 0xffd06000 0x00 0x2000>;
-+		interrupt-controller;
-+		#interrupt-cells = <3>;
-+	};
-+
-+	timer {
-+		compatible = "arm,armv7-timer";
-+		interrupts = <GIC_PPI 13 (GIC_CPU_MASK_RAW(15) | IRQ_TYPE_LEVEL_LOW)>,
-+			     <GIC_PPI 14 (GIC_CPU_MASK_RAW(15) | IRQ_TYPE_LEVEL_LOW)>,
-+			     <GIC_PPI 11 (GIC_CPU_MASK_RAW(15) | IRQ_TYPE_LEVEL_LOW)>,
-+			     <GIC_PPI 10 (GIC_CPU_MASK_RAW(15) | IRQ_TYPE_LEVEL_LOW)>;
-+	};
-+
-+	rdb {
-+		#address-cells = <1>;
-+		#size-cells = <1>;
-+		compatible = "simple-bus";
-+		ranges = <0 0x00 0xf0000000 0x1000000>;
-+
-+		serial at 40ab00 {
-+			compatible = "ns16550a";
-+			reg = <0x40ab00 0x20>;
-+			reg-shift = <2>;
-+			reg-io-width = <4>;
-+			interrupts = <GIC_SPI 75 IRQ_TYPE_LEVEL_HIGH>;
-+			clock-frequency = <0x4d3f640>;
-+		};
-+
-+		sun_top_ctrl: syscon at 404000 {
-+			compatible = "brcm,bcm7445-sun-top-ctrl",
-+				     "syscon";
-+			reg = <0x404000 0x51c>;
-+		};
-+
-+		hif_cpubiuctrl: syscon at 3e2400 {
-+			compatible = "brcm,bcm7445-hif-cpubiuctrl",
-+				     "syscon";
-+			reg = <0x3e2400 0x5b4>;
-+		};
-+
-+		hif_continuation: syscon at 452000 {
-+			compatible = "brcm,bcm7445-hif-continuation",
-+				     "syscon";
-+			reg = <0x452000 0x100>;
-+		};
-+	};
-+
-+	smpboot {
-+		compatible = "brcm,brcmstb-smpboot";
-+		syscon-cpu = <&hif_cpubiuctrl 0x88 0x178>;
-+		syscon-cont = <&hif_continuation>;
-+	};
-+
-+	reboot {
-+		compatible = "brcm,brcmstb-reboot";
-+		syscon = <&sun_top_ctrl 0x304 0x308>;
-+	};
-+};
--- 
-1.9.1
+Acked-by: Tim Harvey <tharvey@gateworks.com>
+
+Tim
