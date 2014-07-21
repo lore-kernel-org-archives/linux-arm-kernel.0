@@ -1,34 +1,45 @@
-From: drake@endlessm.com (Daniel Drake)
-Date: Mon, 21 Jul 2014 13:51:59 +0100
-Subject: [PATCH v2 1/2] clk: samsung: exynos4: Enable ARMCLK down feature
-In-Reply-To: <1405694193-29643-1-git-send-email-k.kozlowski@samsung.com>
-References: <1405694193-29643-1-git-send-email-k.kozlowski@samsung.com>
-Message-ID: <CAD8Lp45UtZ_aao2ScUUjRq9AfnxGq9GuT24SLzY-koeBfTTDCw@mail.gmail.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Mon, 21 Jul 2014 14:51:38 +0200
+Subject: [PATCHv2 12/17] cpuidle: mvebu: make the cpuidle driver capable
+ of handling multiple SoCs
+In-Reply-To: <20140721143813.6028b6ed@free-electrons.com>
+References: <1404913221-17343-1-git-send-email-thomas.petazzoni@free-electrons.com>
+ <53CD08CF.6080900@linaro.org> <20140721143813.6028b6ed@free-electrons.com>
+Message-ID: <19699239.33i4BRP9GE@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jul 18, 2014 at 3:36 PM, Krzysztof Kozlowski
-<k.kozlowski@samsung.com> wrote:
-> Enable ARMCLK down feature on all Exynos4 SoCs. The frequency of
-> ARMCLK will be reduced upon entering idle mode (WFI or WFE).
->
-> The feature behaves like very fast cpufreq ondemand governor. In idle
-> mode this reduces energy consumption on full frequency chosen by
-> cpufreq governor by approximately:
->  - Trats2:  6.5% (153 mA -> 143 mA)
->  - Trats:  33.0% (180 mA -> 120 mA)
->  - Gear1:  27.0% (180 mA -> 130 mA)
->
-> The patch uses simillar settings as Exynos5250 (clk-exynos5250.c),
-> except it disables clock up feature and on Exynos4412 ARMCLK down is
-> enabled for all 4 cores.
->
-> Tested on Trats board (Exynos4210), Trats2 board (Exynos4412) and
-> Samsung Gear 1 (Exynos4212).
->
-> Signed-off-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
+On Monday 21 July 2014 14:38:13 Thomas Petazzoni wrote:
+> Dear Daniel Lezcano,
+> 
+> On Mon, 21 Jul 2014 14:34:23 +0200, Daniel Lezcano wrote:
+> 
+> > So there are three solutions:
+> > 
+> > 1. Pass the flag through the platform data, I am not really in favor of 
+> > that as mentioned above
+> 
+> That's what is already implemented.
 
-Tested on ODROID-U2, seems to be working. I don't have a way of
-measuring the power usage, but the system seems as stable as before.
+It's certainly better than checking a global compatible string in
+driver code, IMHO.
 
-Tested-by: Daniel Drake <drake@endlessm.com>
+Instead of a global header file, I would have put the structure
+definition under linux/platform-data, as we do for most other
+legacy drivers.
+
+> > 2. Use the compatible string like the cpuidle-big-little.c driver, but 
+> > Arnd is not in favor of that
+> > 
+> > 3. Register 3 platform drivers, in cpuidle-mvebu-v7.c, and let the 
+> > registering of the cpuidle's platform device to enable the right one
+> 
+> I'm fine with doing (3). Daniel, Arnd, let me know if that's ok for
+> you, and I'll respin the patch series accordingly.
+
+If I understood Daniel correctly, this is temporary anyway until
+we have a proper binding, right?
+
+If so, I don't really mind either approach.
+
+	Arnd
