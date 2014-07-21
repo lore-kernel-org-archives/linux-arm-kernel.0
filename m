@@ -1,46 +1,85 @@
-From: tomasz.figa@gmail.com (Tomasz Figa)
-Date: Mon, 21 Jul 2014 12:23:51 +0200
-Subject: [PATCH v3] ARM: EXYNOS: Fix suspend/resume sequences
-In-Reply-To: <53C53A1A.6060701@samsung.com>
-References: <53C51B57.9040404@samsung.com>
- <1405434287-22710-1-git-send-email-t.figa@samsung.com>
- <53C53A1A.6060701@samsung.com>
-Message-ID: <53CCEA37.4060104@gmail.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Mon, 21 Jul 2014 12:23:58 +0200
+Subject: [PATCH 2/2] iio: exynos-adc: add experimental touchscreen support
+In-Reply-To: <20140720202842.GB18347@core.coreip.homeip.net>
+References: <1405663186-26464-1-git-send-email-cw00.choi@samsung.com>
+ <53CBC969.4090704@kernel.org> <20140720202842.GB18347@core.coreip.homeip.net>
+Message-ID: <5158672.dMAnnUQc7Z@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-
-On 15.07.2014 16:26, Tomasz Figa wrote:
-> Forgot to CC Daniel and linux-pm. Sorry for the noise.
+On Sunday 20 July 2014 13:28:42 Dmitry Torokhov wrote:
+> On Sun, Jul 20, 2014 at 02:51:37PM +0100, Jonathan Cameron wrote:
+> > >>+
+> > >>+    do {
+> > >>+        ret =exynos_read_s3c64xx_ts(dev, NULL, &x, &y, IIO_CHAN_INFO_RAW);
+> > >= exynos
+> > >>+        if (ret == -ETIMEDOUT)
+> > >>+            break;
+> > >>+
+> > >>+        pressed = x & y & ADC_DATX_PRESSED;
+> > >>+        if (!pressed)
+> > >>+            break;
+> > >>+
+> > >>+        input_report_abs(info->input, ABS_X, x & ADC_DATX_MASK);
+> > >>+        input_report_abs(info->input, ABS_Y, y & ADC_DATX_MASK);
+> > >>+        input_report_key(info->input, BTN_TOUCH, 1);
+> > >>+        input_sync(info->input);
+> > >>+
+> > >>+        msleep(1);
+> > >>+    } while (1);
 > 
-> On 15.07.2014 16:24, Tomasz Figa wrote:
->> Due to recent consolidation of Exynos suspend and cpuidle code, some
->> parts of suspend and resume sequences are executed two times, once from
->> exynos_pm_syscore_ops and then from exynos_cpu_pm_notifier() and thus it
->> breaks suspend, at least on Exynos4-based boards. In addition, simple
->> core power down from a cpuidle driver could, in case of CPU 0 could
->> result in calling functions that are specific to suspend and deeper idle
->> states.
->>
->> This patch fixes the issue by moving those operations outside the CPU PM
->> notifier into suspend and AFTR code paths. This leads to a bit of code
->> duplication, but allows additional code simplification, so in the end
->> more code is removed than added.
->>
->> Signed-off-by: Tomasz Figa <t.figa@samsung.com>
->> ---
->>  arch/arm/mach-exynos/pm.c        | 164 ++++++++++++++++++---------------------
->>  drivers/cpuidle/cpuidle-exynos.c |  25 +-----
->>  2 files changed, 80 insertions(+), 109 deletions(-)
->>
+> It would be nice to actually close the device even if someone is
+> touching screen. Please implement open/close methods and have them set a
+> flag that you would check here.
 
-This is an important regression fix for 3.16 and today 3.16-rc6 was
-already released...
+Ok. I think it's even better to move the request_irq() into the open function,
+which will avoid the flag and defer the error handling into the actual opening,
+as well as syncing the running irq with the close function.
 
-Kukjin, could you pick up this patch and few others you missed and make
-sure that it is included in 3.16-rc7? If you are busy, maybe Arnd or
-Olof could take them directly?
+> > >>+    /* data from s3c2410_ts driver */
+> > >>+    info->input->name = "S3C24xx TouchScreen";
+> > >>+    info->input->id.bustype = BUS_HOST;
+> > >>+    info->input->id.vendor = 0xDEAD;
+> > >>+    info->input->id.product = 0xBEEF;
+> 
+> You do not need to fill these entries with fake data.
 
-Best regards,
-Tomasz
+Ok, I wondered about this, but didn't want to change too much from
+the old driver (I changed the version number).
+
+> > >>+    info->input->id.version = 0x0200;
+
+Do I need this?
+
+> > >>@@ -576,6 +728,11 @@ static int exynos_adc_probe(struct platform_device *pdev)
+> > >>  err_of_populate:
+> > >>      device_for_each_child(&indio_dev->dev, NULL,
+> > >>                  exynos_adc_remove_devices);
+> > >>+    if (has_ts) {
+> > >>+        input_unregister_device(info->input);
+> > >>+        free_irq(info->tsirq, info);
+> 
+> Are we sure that device is quiesced here and interrupt won't arrive
+> between input_unregister_device() and free_irq()? I guess if you
+> properly implement open/close it won't matter.
+ 
+Should be fixed now.
+
+> > >>+err_iio:
+> > >>      iio_device_unregister(indio_dev);
+> > >>  err_irq:
+> > >>      free_irq(info->irq, info);
+> > >>@@ -595,9 +752,12 @@ static int exynos_adc_remove(struct platform_device *pdev)
+> > >>      struct iio_dev *indio_dev = platform_get_drvdata(pdev);
+> > >>      struct exynos_adc *info = iio_priv(indio_dev);
+> > >>
+> > >>+    input_free_device(info->input);
+> 
+> Should be unregister, not free.
+
+Ok.
+
+Thanks a lot for the review! I'll send out the new version after some build testing.
+
+	Arnd
