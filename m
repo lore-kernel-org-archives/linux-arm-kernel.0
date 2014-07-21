@@ -1,43 +1,37 @@
-From: shawn.guo@freescale.com (Shawn Guo)
-Date: Mon, 21 Jul 2014 15:45:53 +0800
-Subject: [PATCH 1/3] ARM: smp_scu: use macro for SCU enable bit
-In-Reply-To: <1405928755-19413-1-git-send-email-shawn.guo@freescale.com>
-References: <1405928755-19413-1-git-send-email-shawn.guo@freescale.com>
-Message-ID: <1405928755-19413-2-git-send-email-shawn.guo@freescale.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Mon, 21 Jul 2014 00:58:03 -0700
+Subject: [GIT PULL] ARM: OMAP2+: clock cleanup for 3.17
+In-Reply-To: <alpine.DEB.2.02.1407171817440.22427@utopia.booyaka.com>
+References: <alpine.DEB.2.02.1407171817440.22427@utopia.booyaka.com>
+Message-ID: <20140721075803.GQ18374@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Use macro instead of magic number for SCU enable bit.
+* Paul Walmsley <paul@pwsan.com> [140717 11:20]:
+> Hi Tony,
+> 
+> The following changes since commit a497c3ba1d97fc69c1e78e7b96435ba8c2cb42ee:
+> 
+>   Linux 3.16-rc2 (2014-06-21 19:02:54 -1000)
+> 
+> are available in the git repository at:
+> 
+>   git://git.kernel.org/pub/scm/linux/kernel/git/pjw/omap-pending.git tags/for-v3.17/omap-clock-a
+> 
+> for you to fetch changes up to acd052bb8119dd9117e0af48ff0ac6e56e61b6b4:
+> 
+>   ARM: OMAP2+: clock/interface: remove some headers from clkt_iclk.c file (2014-07-15 14:09:24 -0600)
+> 
+> ----------------------------------------------------------------
+> An OMAP clock cleanup series for 3.17 from Tero Kristo.
+> This is in preparation for moving this code into drivers/clk/ti.
+> 
+> Basic build, boot, and PM test logs are here:
+> 
+> http://www.pwsan.com/omap/testlogs/clock-a-v3.17/20140717034329/
 
-Signed-off-by: Shawn Guo <shawn.guo@freescale.com>
----
- arch/arm/kernel/smp_scu.c | 5 +++--
- 1 file changed, 3 insertions(+), 2 deletions(-)
+Thanks pulling into omap-for-v3.17/soc.
 
-diff --git a/arch/arm/kernel/smp_scu.c b/arch/arm/kernel/smp_scu.c
-index 1aafa0d785eb..c947508f84e6 100644
---- a/arch/arm/kernel/smp_scu.c
-+++ b/arch/arm/kernel/smp_scu.c
-@@ -17,6 +17,7 @@
- #include <asm/cputype.h>
- 
- #define SCU_CTRL		0x00
-+#define SCU_ENABLE		(1 << 0)
- #define SCU_CONFIG		0x04
- #define SCU_CPU_STATUS		0x08
- #define SCU_INVALIDATE		0x0c
-@@ -50,10 +51,10 @@ void scu_enable(void __iomem *scu_base)
- 
- 	scu_ctrl = readl_relaxed(scu_base + SCU_CTRL);
- 	/* already enabled? */
--	if (scu_ctrl & 1)
-+	if (scu_ctrl & SCU_ENABLE)
- 		return;
- 
--	scu_ctrl |= 1;
-+	scu_ctrl |= SCU_ENABLE;
- 	writel_relaxed(scu_ctrl, scu_base + SCU_CTRL);
- 
- 	/*
--- 
-1.9.1
+Regards,
+
+Tony
