@@ -1,75 +1,53 @@
-From: boris.brezillon@free-electrons.com (Boris BREZILLON)
-Date: Mon, 21 Jul 2014 11:57:37 +0200
-Subject: [RESEND PATCH v3 06/11] drm: add DT bindings documentation for
- atmel-hlcdc-dc driver
-In-Reply-To: <1486972.oIqOcvGYCb@avalon>
-References: <1404751384-5077-1-git-send-email-boris.brezillon@free-electrons.com>
- <20140721085908.GI8843@ulmo> <20140721112438.60452e09@bbrezillon>
- <1486972.oIqOcvGYCb@avalon>
-Message-ID: <20140721115737.1377a5fd@bbrezillon>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Mon, 21 Jul 2014 11:03:05 +0100
+Subject: [PATCH resend v2] arm64: dmi: Add SMBIOS/DMI support
+In-Reply-To: <1405079210-30044-1-git-send-email-ard.biesheuvel@linaro.org>
+References: <1405079210-30044-1-git-send-email-ard.biesheuvel@linaro.org>
+Message-ID: <20140721100304.GB12817@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 21 Jul 2014 11:32:55 +0200
-Laurent Pinchart <laurent.pinchart@ideasonboard.com> wrote:
+Ard,
 
-> Hi Boris,
-> 
-> On Monday 21 July 2014 11:24:38 Boris BREZILLON wrote:
-> > On Mon, 21 Jul 2014 10:59:12 +0200 Thierry Reding wrote:
-> > > On Fri, Jul 18, 2014 at 05:43:34PM +0200, Boris BREZILLON wrote:
-> > > [...]
-> > > 
-> > >>>>>>> + - atmel,panel: Should contain a phandle with 2 parameters.
-> > >>>>>>> +   The first cell is a phandle to a DRM panel device
-> > >>>>>>> +   The second cell encodes the RGB mode, which can take the
-> > >>>>>>> following values:
-> > >>>>>>> +   * 0: RGB444
-> > >>>>>>> +   * 1: RGB565
-> > >>>>>>> +   * 2: RGB666
-> > >>>>>>> +   * 3: RGB888
-> > >>>>>> 
-> > >>>>>> These are properties of the panel and should be obtained from
-> > >>>>>> the panel directly rather than an additional cell in this specifier.
-> > >>>>> 
-> > >>>>> Okay.
-> > >>>>> What's the preferred way of doing this ?
-> > >>>>> What about defining an rgb-mode property in the panel node.
-> > >>>> 
-> > >>>> There's .bpc in struct drm_display_info, I suspect that it could be
-> > >>>> used for this. Alternatively, maybe we could extend the list of color
-> > >>>> formats that go into drm_display_info.color_formats? RGB444 is already
-> > >>>> covered.
-> > >> 
-> > >> I forgot to ask about bpc meaning. If, as I think, it means "bits per
-> > >> color" then it cannot be used to encode RGB565 where green color is
-> > >> encoded on 6 bits and red and blue are encoded on 5 bits.
-> > > 
-> > > Yes, I agree that bps is not a good fit for what you need here.
-> > 
-> > Okay, then I think we can replace bpc and color_formats by a bus_formats
-> > table containing all supported formats, and use an enum (something
-> > similar to v4l2_mbus_pixelcode defined in v4l2-mediabus.h [1]) to list
-> > the available formats.
-> > 
-> > As this implies quite a few changes in crtc core and some drm drivers
-> > (nouveau, i915 and radeon), I'd like to be sure this is what both of you
-> > had in mind.
-> 
-> I think it is, but just to make sure I understand you correctly, could you 
-> just show how the drm_display_info structure would look like ?
-> 
+I have some technical questions below before merging this patch.
 
-The new drm_display_info structure should look like this [2] (except
-that color_formats and bpc have not be removed yet), and [1] is just
-here to show how the video_bus_format enum would look like.
+On Fri, Jul 11, 2014 at 12:46:50PM +0100, Ard Biesheuvel wrote:
+> --- /dev/null
+> +++ b/arch/arm64/include/asm/dmi.h
+> @@ -0,0 +1,41 @@
+[...]
+> +static inline void __iomem *dmi_remap(u64 phys, u64 size)
+> +{
+> +	void __iomem *p = efi_lookup_mapped_addr(phys);
 
-[1] http://code.bulix.org/rfd0yx-86557
-[2] http://code.bulix.org/7n03b4-86556
+When are dmi_remap/dmi_early_remap() called? A quick grep through the
+kernel shows that it is at least called once from dmi_scan_machine().
+The latter is a device_initcall() in this patch. However, the comments
+for efi_lookup_mapped_addr() state that it should only be called between
+efi_enter_virtual_mode and efi_free_boot_services. The latter is invoked
+from an early_initcall(). Could you please clarify which part is wrong
+here?
 
+> +
+> +	/*
+> +	 * If the mapping spans multiple pages, do a minimal check to ensure
+> +	 * that the mapping returned by efi_lookup_mapped_addr() covers the
+> +	 * whole requested range (but ignore potential holes)
+> +	 */
+> +	if ((phys & ~PAGE_MASK) + size > PAGE_SIZE
+> +	    && (p + size - 1) != efi_lookup_mapped_addr(phys + size - 1))
+> +		return NULL;
+> +	return p;
+> +}
+> +
+> +/* Reuse existing UEFI mappings for DMI */
+> +#define dmi_alloc(l)			kzalloc(l, GFP_KERNEL)
+> +#define dmi_early_remap(x, l)		dmi_remap(x, l)
+> +#define dmi_early_unmap(x, l)
+> +#define dmi_unmap(x)
 
+Same questions as above, when are these functions called? Can we not
+just use early_ioremap/ioremap like x86?
 
 -- 
-Boris Brezillon, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
+Catalin
