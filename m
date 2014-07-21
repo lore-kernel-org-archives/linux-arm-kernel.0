@@ -1,55 +1,69 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Mon, 21 Jul 2014 10:57:35 +0200
+Date: Mon, 21 Jul 2014 10:58:16 +0200
 Subject: [PATCHv7 0/4] iio: adc: exynos_adc: Support Exynos3250 ADC and
  code clean
-In-Reply-To: <53CCCB20.50802@samsung.com>
+In-Reply-To: <53CCCCA8.1030509@samsung.com>
 References: <1405909068-22539-1-git-send-email-cw00.choi@samsung.com>
- <14522743.f6oFhEQVv4@wuerfel> <53CCCB20.50802@samsung.com>
-Message-ID: <10938575.0qbHyHWX4J@wuerfel>
+ <53CCCB20.50802@samsung.com> <53CCCCA8.1030509@samsung.com>
+Message-ID: <4966271.WeZIcVN3eT@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday 21 July 2014 17:11:12 Chanwoo Choi wrote:
-> >    work to address the comments and do testing.
-> 
-> OK, I'll add this patch.
-> But, I have a question.
-> 
-> Your patch add following compatible string.
-> "s3c64100-adc" is right?
-> 
->  static const struct of_device_id exynos_adc_match[] = {
->         {
-> +               .compatible = "samsung,s3c64100-adc",
-> +               .data = &exynos_adc_s3c64xx_data,
-> +       }, {
-
-There is a typo, thanks for spotting this. It should be
-"samsung,s3c6410-adc", not "samsung,s3c64100-adc".
-
-> > b) For the "compatible" string, I think it makes sense to set a fallback to
-> >    "samsung,exynos-adc-v2" in the case for exynos3250, making the DT
-> >    representation
+On Monday 21 July 2014 17:17:44 Chanwoo Choi wrote:
+> On 07/21/2014 05:11 PM, Chanwoo Choi wrote:
+> > On 07/21/2014 04:38 PM, Arnd Bergmann wrote:
+> >> On Monday 21 July 2014 11:17:44 Chanwoo Choi wrote:
+> >>>
+> >>> This patchset support Exynos3250 ADC (Analog Digital Converter) because
+> >>> Exynos3250 has additional special clock for ADC IP.
+> >>>
+> >>> Changes from v6:
+> >>> - Use "exynos3250-adc" compatible string instead of "exynos3250-adc-v2"
+> >>> - Use "sclk" clock name instead of "sclk_adc"
+> >>> - Remove un-necessary macro for exyno-adc-data-v2 structure.
+> >>> - Remove '(void *)' cast and mark the exynos-adc-data structure as 'const'
+> >>> - Change the number of ADC channels (Exynos3250 has only two channels for ADC)
+> >>>
+> >>
+> >> Looks good to me. Two small requests:
+> >>
+> >> a) if you don't mind, can you add my patch (1/2) to add support for s3c64xx to
+> >>    your series, adding your Signed-off-by line in addition to mine? I think
+> >>    that one was noncontroversial, while the second patch (2/2) need some more
+> >>    work to address the comments and do testing.
 > > 
-> >       compatible = "samsung,exynos3250-adc", "samsung,exynos-adc-v2";
+> > OK, I'll add this patch.
+> > But, I have a question.
 > > 
-> >    It's not entirely compatible because of the addition of the clock, but
-> >    since the register layout is the same, I think it still make sense.
+> > Your patch add following compatible string.
+> > "s3c64100-adc" is right?
+> > 
+> >  static const struct of_device_id exynos_adc_match[] = {
+> >  	{
+> > +		.compatible = "samsung,s3c64100-adc",
+> > +		.data = &exynos_adc_s3c64xx_data,
+> > +	}, {
 > 
-> OK, I'll add it in exynos3250.dtsi as following:
+> Additionally,
+> Documentation/devicetree/bindings/arm/samsung/exynos-adc.txt has not included
+> "samsung,s3c6410-adc" compatible string. Should I add this string in exynos-adc.txt?
 > 
->                 adc: adc at 126C0000 {
-> -                       compatible = "samsung,exynos-adc-v3";
-> +                       compatible = "samsung,exynos3250-adc",
-> +                                    "samsung,exynos-adc-v2";
->                         reg = <0x126C0000 0x100>, <0x10020718 0x4>;
->                         interrupts = <0 137 0>;
-> -                       clock-names = "adc", "sclk_tsadc";
-> +                       clock-names = "adc", "sclk";
->                         clocks = <&cmu CLK_TSADC>, <&cmu CLK_SCLK_TSADC>;
->                         #io-channel-cells = <1>;
->                         io-channel-ranges;
+> drivers/iio/adc/exynos-adc.c has not includeded following compatible string.
+> Should I add this compatible string on exynos-adc.c?
+> 
+> +			Must be "samsung,s3c2410-adc" for
+> +				the ADC in s3c2410 and compatibles
+> +			Must be "samsung,s3c2416-adc" for
+> +				the ADC in s3c2416 and compatibles
+> +			Must be "samsung,s3c2440-adc" for
+> +				the ADC in s3c2440 and compatibles
+> +			Must be "samsung,s3c2440-adc" for
+> +				the ADC in s3c2440 and compatibles
+> +			Must be "samsung,s3c2443-adc" for
+> +				the ADC in s3c2443 and compatibles
+> 
 
-Ok, looks good.
+
+Yes, please.
 
 	Arnd
