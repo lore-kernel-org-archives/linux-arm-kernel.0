@@ -1,49 +1,64 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Mon, 21 Jul 2014 09:51:58 -0600
-Subject: a case for a common efuse API?
-In-Reply-To: <20140709114907.GI23218@tbergstrom-lnx.Nvidia.com>
-References: <53BC4DD7.20906@codeaurora.org>
- <20140709114907.GI23218@tbergstrom-lnx.Nvidia.com>
-Message-ID: <53CD371E.6070600@wwwdotorg.org>
+From: ezequiel@vanguardiasur.com.ar (Ezequiel Garcia)
+Date: Mon, 21 Jul 2014 12:53:52 -0300
+Subject: [PATCH 0/9] usb: musb: several bugfixes for the musb driver
+In-Reply-To: <20140721151140.GG6852@saruman.home>
+References: <1405675890-8802-1-git-send-email-LW@KARO-electronics.de>
+ <20140718161636.GA18460@arch.cereza>
+ <20140718165044.GA30821@saruman.home>
+ <20140721093430.3f528cc7@ipc1.ka-ro>
+ <20140721151140.GG6852@saruman.home>
+Message-ID: <20140721155352.GA20226@arch.cereza>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/09/2014 05:49 AM, Peter De Schrijver wrote:
-> On Tue, Jul 08, 2014 at 10:00:23PM +0200, Stephen Boyd wrote:
->>
->> I added Tegra folks because I see that on Tegra this hardware is exposed
->> via an SoC specific API, tegra_fuse_readl(), and an associated driver in
->> drivers/misc/fuse/tegra/. Unfortunately I don't see any users of the API
->> outside of the speedo code in the same directory and the sysfs bin
->> attribute that may or may not be in use by some userspace code.
->>
+On 21 Jul 10:11 AM, Felipe Balbi wrote:
+> On Mon, Jul 21, 2014 at 09:34:30AM +0200, Lothar Wa?mann wrote:
+> > Hi,
+> > 
+> > Felipe Balbi wrote:
+> > > Hi,
+> > > 
+> > > On Fri, Jul 18, 2014 at 01:16:36PM -0300, Ezequiel Garcia wrote:
+> > > > Hi Lothar,
+> > > > 
+> > > > On 18 Jul 11:31 AM, Lothar Wa?mann wrote:
+> > > > > The first three patches do some source code cleanup in the files that
+> > > > > are modified in the subsequent patches.
+> > > > > 
+> > > > 
+> > > > I've applied patches 4 and 9 on a recent -next, after fixing a conflict
+> > > > due to patch 3 ("usb: musb_am335x: source cleanup"):
+> > > > 
+> > > > > Patch 4 carries the proper fix reported in commit:
+> > > > >         7adb5c876e9c ("usb: musb: Fix panic upon musb_am335x module removal")
+> > > > > 
+> > > > > Patch 9 reinstates module unloading support for the musb_am335x driver
+> > > > >         which was disabled due to a false failure analysis
+> > > > > 
+> > > > 
+> > > > For these two patches, Tested-by: Ezequiel Garcia <ezequiel@vanguardiasur.com.ar>
+> > > > 
+> > > > Tested on a beaglebone with a mass storage USB device, module load/unload
+> > > > works without issues. The module_get/put in the phy is now preventing the
+> > > > musb_am335x driver unload, which seems to be the real cause of the issue
+> > > > I reported. Thanks for providing a proper fix!
+> > > 
+> > > I don't that's a good fix. The problem is that even after am335x
+> > > removing all its child, someone else tried to release the PHY. That
+> > > ordering is the one that needs to be fixed. Doing a module_get on the
+> > > parent device looks like a hack to me.
+> > > 
+> > No. It guarantees that the module cannot be unloaded when its resources
+> > are still in use!
 > 
-> The SATA driver by Mikko Perttunen uses it. The driver hasn't been merged
-> though. There's some more upcoming work which makes use of it.
-> I don't think we can standardize much of an API for this. The data is
-> SoC specific, so the user will always need to have some SoC specific
-> knowledge on how to use it.
+> it's still a hack. You have a child incrementing the usage count on its
+> parent just because a sibbling isn't doing the right thing.
+> 
 
-I think we could have a generic "read fuse X" API. The only thing that'd
-be chip-specific is the value of "X". That could be hard-coded into the
-client drivers, or perhaps represented in a DT propery e.g.
-#fuse-cells/xxx-fuses. That said, I wonder what benefit we'd get from
-such a common API. I suppose if any IP block was to be re-used in
-completely different SoC families, it'd isolate the driver from having
-to call different functions to read fuses on different SoC families, but
-that doesn't seem to happen in practice yet, and the issue could be
-solved later if needed.
+How about having the musb_am335x (glue driver) call request_module and
+module_get on the phy-am335x? Wouldn't this be a cleaner approach?
 
-It'd certainly be hard to create any higher-layer semantic API here,
-since different SoCs store completely different sets of data in fuses,
-so there would be little point in a common "read the MAC address from
-the fuses" API, since that data wouldn't exist in fuses on many SoCs.
-
-> In some cases we need it very early (eg. to
-> determine the correct Tegra20 revision). On Tegra20 we can't use the CPU
-> to read the fuses due to a hw bug, we have to use DMA, which means the
-> transaction becomes blocking and could fail due to lack of resources.
-
-Yes, any such API would become "least common-denominator" or similar;
-i.e. any restriction imposed by any SoC would then affect how the API
-works on any other SoC.
+I haven't checked if this possible, though.
+-- 
+Ezequiel Garcia, VanguardiaSur
+www.vanguardiasur.com.ar
