@@ -1,54 +1,123 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Mon, 21 Jul 2014 09:06:00 -0600
-Subject: [GIT PULL 2/3] ARM: tegra: move fuse code out of arch/arm
-In-Reply-To: <CAOesGMh+zLV781wzdR5=_Bpzh+XMwJfWL-5XMDP6DwG_Hg80kw@mail.gmail.com>
-References: <1403558626-13422-1-git-send-email-swarren@wwwdotorg.org>	<1403558626-13422-2-git-send-email-swarren@wwwdotorg.org>	<20140707004417.GE8469@quad.lixom.net>	<20140708134359.GA23218@tbergstrom-lnx.Nvidia.com>	<CAOesGMhoqvqf-dktp-OfUNTPLahPwkyAPiTeDngr4QjH=VfOGA@mail.gmail.com>	<53C88A4C.3070304@wwwdotorg.org>
- <CAOesGMh+zLV781wzdR5=_Bpzh+XMwJfWL-5XMDP6DwG_Hg80kw@mail.gmail.com>
-Message-ID: <53CD2C58.6060601@wwwdotorg.org>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Mon, 21 Jul 2014 16:09:53 +0100
+Subject: [PATCH 13/11] arm64: Add support for 48-bit VA space with 64KB page
+ configuration
+In-Reply-To: <1405537792-23666-1-git-send-email-catalin.marinas@arm.com>
+References: <1405537792-23666-1-git-send-email-catalin.marinas@arm.com>
+Message-ID: <1405955393-30928-1-git-send-email-catalin.marinas@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/17/2014 11:33 PM, Olof Johansson wrote:
-> On Thu, Jul 17, 2014 at 7:45 PM, Stephen Warren <swarren@wwwdotorg.org> wrote:
->> On 07/08/2014 11:47 AM, Olof Johansson wrote:
->>> On Tue, Jul 8, 2014 at 6:43 AM, Peter De Schrijver
->>> <pdeschrijver@nvidia.com> wrote:
->>>> On Mon, Jul 07, 2014 at 02:44:17AM +0200, Olof Johansson wrote:
->>>>> On Mon, Jun 23, 2014 at 03:23:45PM -0600, Stephen Warren wrote:
->>>>>> This branch moves code related to the Tegra fuses out of arch/arm and
->>>>>> into a centralized location which could be shared with ARM64. It also
->>>>>> adds support for reading the fuse data through sysfs.
->>>>>
->>>>> The new/moved misc driver isn't acked by any misc maintainer, so I can't
->>>>> take this branch.
->>>>>
->>>>> I saw no indication from searching the mailing list of that either,
->>>>> so it wasn't just a missed acked-by.
->>>>>
->>>>> I wonder if this code should go under drivers/soc/ instead?
->>>>
->>>> It's modelled after sunxi_sid.c which lives in drivers/misc/eeprom/.
->>>> Originally this driver was also in drivers/misc/eeprom/, but Stephen objected
->>>> and therefore it was moved to drivers/misc/fuse. I think that's the right
->>>> place still.
->>>
->>> I disagree, I think this belongs under drivers/soc. Especially since
->>> you're adding dependencies on this misc driver from other parts of the
->>> kernel / other drivers.
->>>
->>> I also don't like seeing init calls form platform code down into
->>> drivers/misc like you're adding here. Can you please look at doing
->>> that as a regular init call setup?
->>
->> I strongly disagree with using init calls for this kind of thing. There
->> are ordering dependencies between the initialization code that can only
->> be sanely managed by explicitly calling functions in a particular order;
->> there's simply no way to manage this using initcalls. This is exactly
->> why the hooks in the ARM machine descriptors exist...
-> 
-> Right, but there are non on 64-bit, so you need to solve it for there
-> anyway. And once it's solved there, you might as well keep it common
-> with 32-bit.
+This patch allows support for 3 levels of page tables with 64KB page
+configuration allowing 48-bit VA space. The pgd is no longer a full
+PAGE_SIZE (PTRS_PER_PGD is 64) and (swapper|idmap)_pg_dir are not fully
+populated (pgd_alloc falls back to kzalloc).
 
-My assertion is that we should just do it directly on 64-bit too.
-There's no reason for arm64 to deviate from what arch/arm does already.
+Signed-off-by: Catalin Marinas <catalin.marinas@arm.com>
+---
+
+Some minor clean-up and 64K page configuration can use 48-bit VA space.
+
+ Documentation/arm64/memory.txt |  8 ++++++++
+ arch/arm64/Kconfig             |  2 +-
+ arch/arm64/include/asm/page.h  | 16 +++++++++-------
+ arch/arm64/kernel/head.S       |  6 ++++--
+ 4 files changed, 22 insertions(+), 10 deletions(-)
+
+diff --git a/Documentation/arm64/memory.txt b/Documentation/arm64/memory.txt
+index 8845d0847a66..344e85cc7323 100644
+--- a/Documentation/arm64/memory.txt
++++ b/Documentation/arm64/memory.txt
+@@ -45,6 +45,14 @@ Start			End			Size		Use
+ fffffc0000000000	ffffffffffffffff	   4TB		kernel
+ 
+ 
++AArch64 Linux memory layout with 64KB pages + 3 levels:
++
++Start			End			Size		Use
++-----------------------------------------------------------------------
++0000000000000000	0000ffffffffffff	 256TB		user
++ffff000000000000	ffffffffffffffff	 256TB		kernel
++
++
+ For details of the virtual kernel memory layout please see the kernel
+ booting log.
+ 
+diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
+index 9fe62025776b..2c83f6f3019f 100644
+--- a/arch/arm64/Kconfig
++++ b/arch/arm64/Kconfig
+@@ -199,7 +199,6 @@ config ARM64_VA_BITS_42
+ config ARM64_VA_BITS_48
+ 	bool "48-bit"
+ 	depends on !KVM
+-	depends on ARM64_4K_PAGES
+ 
+ endchoice
+ 
+@@ -212,6 +211,7 @@ config ARM64_VA_BITS
+ config ARM64_PGTABLE_LEVELS
+ 	int
+ 	default 2 if ARM64_64K_PAGES && ARM64_VA_BITS_42
++	default 3 if ARM64_64K_PAGES && ARM64_VA_BITS_48
+ 	default 3 if ARM64_4K_PAGES && ARM64_VA_BITS_39
+ 	default 4 if ARM64_4K_PAGES && ARM64_VA_BITS_48
+ 
+diff --git a/arch/arm64/include/asm/page.h b/arch/arm64/include/asm/page.h
+index 2502754d1921..7a3f462133b0 100644
+--- a/arch/arm64/include/asm/page.h
++++ b/arch/arm64/include/asm/page.h
+@@ -34,17 +34,19 @@
+ /*
+  * The idmap and swapper page tables need some space reserved in the kernel
+  * image. Both require pgd, pud (4 levels only) and pmd tables to (section)
+- * map the kernel. The swapper also maps the FDT (see __create_page_tables for
+- * more information).
++ * map the kernel. With the 64K page configuration, swapper and idmap need to
++ * map to pte level. The swapper also maps the FDT (see __create_page_tables
++ * for more information).
+  */
+-#if CONFIG_ARM64_PGTABLE_LEVELS == 4
+-#define SWAPPER_DIR_SIZE	(3 * PAGE_SIZE)
+-#define IDMAP_DIR_SIZE		(3 * PAGE_SIZE)
++#ifdef CONFIG_ARM64_64K_PAGES
++#define SWAPPER_PGTABLE_LEVELS	(CONFIG_ARM64_PGTABLE_LEVELS)
+ #else
+-#define SWAPPER_DIR_SIZE	(2 * PAGE_SIZE)
+-#define IDMAP_DIR_SIZE		(2 * PAGE_SIZE)
++#define SWAPPER_PGTABLE_LEVELS	(CONFIG_ARM64_PGTABLE_LEVELS - 1)
+ #endif
+ 
++#define SWAPPER_DIR_SIZE	(SWAPPER_PGTABLE_LEVELS * PAGE_SIZE)
++#define IDMAP_DIR_SIZE		(SWAPPER_DIR_SIZE)
++
+ #ifndef __ASSEMBLY__
+ 
+ #include <asm/pgtable-types.h>
+diff --git a/arch/arm64/kernel/head.S b/arch/arm64/kernel/head.S
+index a6db505411bc..0bce493495e9 100644
+--- a/arch/arm64/kernel/head.S
++++ b/arch/arm64/kernel/head.S
+@@ -55,9 +55,11 @@
+ #ifdef CONFIG_ARM64_64K_PAGES
+ #define BLOCK_SHIFT	PAGE_SHIFT
+ #define BLOCK_SIZE	PAGE_SIZE
++#define TABLE_SHIFT	PMD_SHIFT
+ #else
+ #define BLOCK_SHIFT	SECTION_SHIFT
+ #define BLOCK_SIZE	SECTION_SIZE
++#define TABLE_SHIFT	PUD_SHIFT
+ #endif
+ 
+ #define KERNEL_START	KERNEL_RAM_VADDR
+@@ -505,8 +507,8 @@ ENDPROC(__calc_phys_offset)
+  */
+ 	.macro	create_pgd_entry, tbl, virt, tmp1, tmp2
+ 	create_table_entry \tbl, \virt, PGDIR_SHIFT, PTRS_PER_PGD, \tmp1, \tmp2
+-#if CONFIG_ARM64_PGTABLE_LEVELS == 4
+-	create_table_entry \tbl, \virt, PUD_SHIFT, PTRS_PER_PUD, \tmp1, \tmp2
++#if SWAPPER_PGTABLE_LEVELS == 3
++	create_table_entry \tbl, \virt, TABLE_SHIFT, PTRS_PER_PTE, \tmp1, \tmp2
+ #endif
+ 	.endm
+ 
