@@ -1,39 +1,68 @@
-From: stwiss.opensource@diasemi.com (Opensource [Steve Twiss])
-Date: Mon, 21 Jul 2014 14:40:02 +0000
-Subject: [RFC V2] devicetree: Dialog Semiconductor consolidate existing
- vendor prefixes to standardise on 'dlg'
-In-Reply-To: <201407151520.s6FFKcjB009745@swsrvapps-01.diasemi.com>
-References: <201407151520.s6FFKcjB009745@swsrvapps-01.diasemi.com>
-Message-ID: <6ED8E3B22081A4459DAC7699F3695FB7D0B274CB@SW-EX-MBX02.diasemi.com>
+From: dmitry.torokhov@gmail.com (Dmitry Torokhov)
+Date: Mon, 21 Jul 2014 07:44:42 -0700
+Subject: [PATCH 2/2] iio: exynos-adc: add experimental touchscreen support
+In-Reply-To: <5158672.dMAnnUQc7Z@wuerfel>
+References: <1405663186-26464-1-git-send-email-cw00.choi@samsung.com>
+ <53CBC969.4090704@kernel.org>
+ <20140720202842.GB18347@core.coreip.homeip.net>
+ <5158672.dMAnnUQc7Z@wuerfel>
+Message-ID: <20140721144442.GB9112@core.coreip.homeip.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Mon, Jul 21, 2014 at 12:23:58PM +0200, Arnd Bergmann wrote:
+> On Sunday 20 July 2014 13:28:42 Dmitry Torokhov wrote:
+> > On Sun, Jul 20, 2014 at 02:51:37PM +0100, Jonathan Cameron wrote:
+> > > >>+
+> > > >>+    do {
+> > > >>+        ret =exynos_read_s3c64xx_ts(dev, NULL, &x, &y, IIO_CHAN_INFO_RAW);
+> > > >= exynos
+> > > >>+        if (ret == -ETIMEDOUT)
+> > > >>+            break;
+> > > >>+
+> > > >>+        pressed = x & y & ADC_DATX_PRESSED;
+> > > >>+        if (!pressed)
+> > > >>+            break;
+> > > >>+
+> > > >>+        input_report_abs(info->input, ABS_X, x & ADC_DATX_MASK);
+> > > >>+        input_report_abs(info->input, ABS_Y, y & ADC_DATX_MASK);
+> > > >>+        input_report_key(info->input, BTN_TOUCH, 1);
+> > > >>+        input_sync(info->input);
+> > > >>+
+> > > >>+        msleep(1);
+> > > >>+    } while (1);
+> > 
+> > It would be nice to actually close the device even if someone is
+> > touching screen. Please implement open/close methods and have them set a
+> > flag that you would check here.
+> 
+> Ok. I think it's even better to move the request_irq() into the open function,
+> which will avoid the flag and defer the error handling into the actual opening,
+> as well as syncing the running irq with the close function.
 
-On 15 July 2014 16:04, Steve Twiss wrote:
+I do not quite like acquiring resources needed in open. I think drivers should
+do all resource acquisition in probe() and leave open()/close() to
+activate/quiesce devices.
 
->From: Opensource [Steve Twiss] [mailto:stwiss.opensource at diasemi.com]
->Sent: 15 July 2014 16:04
->Subject: [RFC V2] devicetree: Dialog Semiconductor consolidate existing vendor
->prefixes to standardise on 'dlg'
-[...]
->This patch series updates the device tree vendor prefix for
->Dialog Semiconductor.
->Various methods are currently used throughout the kernel: 'diasemi',
->'dialog' and 'dlg'. Others have also been suggested.
->This patch set aims to consolidate the usage of the vendor prefix to
->use a common standard. The prefix 'dlg' is used.
-[...]
+> 
+> > > >>+    /* data from s3c2410_ts driver */
+> > > >>+    info->input->name = "S3C24xx TouchScreen";
+> > > >>+    info->input->id.bustype = BUS_HOST;
+> > > >>+    info->input->id.vendor = 0xDEAD;
+> > > >>+    info->input->id.product = 0xBEEF;
+> > 
+> > You do not need to fill these entries with fake data.
+> 
+> Ok, I wondered about this, but didn't want to change too much from
+> the old driver (I changed the version number).
+> 
+> > > >>+    info->input->id.version = 0x0200;
+> 
+> Do I need this?
 
-Hello all,
+Not really.
 
-Have there been any further thoughts on this? I would like move this issue forwards so
-that this problem this does not keep arising.
+Thanks.
 
->From my point of view, the argument is a simple one: what is the value of existing multiple
-vendor prefixes if they do not work and are not used anywhere?
-
-But, as usual I recognise that the kernel community have different aims and I am willing
-to compromise with my patches in order to move ahead.
-
-Regards,
-Steve
+-- 
+Dmitry
