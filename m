@@ -1,56 +1,39 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Mon, 21 Jul 2014 04:28:07 -0700
-Subject: [RFC PATCH 4/7] ARM: OMAP4+: PRM: register interrupt information
- from DT
-In-Reply-To: <CAGo_u6q2NOxWVG3LOfAyk8qLZss5N6MxCvYkf-yN8c4ec4mftw@mail.gmail.com>
-References: <1402025761-16831-1-git-send-email-nm@ti.com>
- <1402025761-16831-5-git-send-email-nm@ti.com>
- <20140721105149.GU18374@atomide.com>
- <CAGo_u6q2NOxWVG3LOfAyk8qLZss5N6MxCvYkf-yN8c4ec4mftw@mail.gmail.com>
-Message-ID: <20140721112807.GA18374@atomide.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Mon, 21 Jul 2014 13:30:47 +0200
+Subject: [PATCHv2 12/17] cpuidle: mvebu: make the cpuidle driver capable
+ of handling multiple SoCs
+In-Reply-To: <20140721131939.20e81354@free-electrons.com>
+References: <1404913221-17343-1-git-send-email-thomas.petazzoni@free-electrons.com>
+ <8387001.GKG5goCh1a@wuerfel> <20140721131939.20e81354@free-electrons.com>
+Message-ID: <52019695.n2AjkGEsJ7@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Nishanth Menon <nm@ti.com> [140721 04:24]:
-> On Mon, Jul 21, 2014 at 5:51 AM, Tony Lindgren <tony@atomide.com> wrote:
-> >
-> >> +static struct of_device_id omap_prm_dt_match_table[] = {
-> >> +     { .compatible = "ti,omap4-prm" },
-> >> +     { .compatible = "ti,omap5-prm" },
-> >> +     { .compatible = "ti,dra7-prm" },
-> >> +     { }
-> >> +};
-> >> +
-> >
-> > I'd like to avoid adding more driver like stuff to mach-omap2
-> > and parsing compatible flags and dealing with interupts sounds
-> > very driver like.. But maybe just the handling can be moved
-> > out?
+On Monday 21 July 2014 13:19:39 Thomas Petazzoni wrote:
+> On Mon, 21 Jul 2014 13:16:22 +0200, Arnd Bergmann wrote:
 > 
-> I understand your view, but, Handling of interrupts is already in
-> place even now in mach-omap2. Currently the prm devices are handled by
-> mach-omap2 and all this does it to prevent hardcoding of irq numbers
-> within the current code.
-
-Yeah but at a cost of no dev entry, no probe etc. I'd rather keep
-that SoC specific data around until a driver can deal with it
-in a standard way.
-
-> > Would a simple driver be doable that parses the compatible
-> > flags, takes care of the IRQ chaining, and gets some SoC specific
-> > function pointers as auxdata?
+> > > It isn't possible to do:
+> > > 
+> > > if (of_machine_is_compatible("marvell,armada-370-xp-pmsu"))
+> > >         cpuidle_register(&armadaxp_cpuidle_driver, NULL);
+> > > 
+> > > ?
+> > > 
+> > > That will prevent the creation of the new single-declaration header file.
+> > 
+> > It would be best to have a way to read a property (or multiple
+> > properties) from DT instead, to identify the requirements of the
+> > device individually. However, I guess that would also require
+> > changing the DT representation in an incompatible way, which we
+> > normally don't.
 > 
-> Tero has been trying to move PRM/CM stuff to a separate drivers of
-> thier own. With that there wont be a need for auxdata even. - this
-> current logic will get merged with that driver - if and when that is
-> ready. I am not actually adding any driver logic here - just reusing
-> the logic and providing glue for using dt description instead of
-> hardcoded logic that the current mach-omap2 driver does.
+> cpuidle is not represented in DT, so besides checking the global
+> compatible string with of_machine_is_compatible(), or passing data
+> through platform_data (as proposed in the patch series), I don't really
+> see how the cpuidle driver could find out which SoC variant is being
+> used.
 
-Well how about let's just leave out the non-standard parts for
-now, then once the PRM/CM driver can deal with, it can do things
-in a normal way?
+One way I think it can be done is by looking up the pmsu node
+and then looking at some of the properties in there.
 
-Regards,
-
-Tony
+	Arnd
