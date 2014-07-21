@@ -1,31 +1,55 @@
-From: viresh.kumar@linaro.org (Viresh Kumar)
-Date: Mon, 21 Jul 2014 09:58:03 +0530
-Subject: [PATCH 1/2] PCI: spear: Fix Section mismatch compilation warning
- for probe()
-In-Reply-To: <CAL_Jsq+dSoYp83wnXXHnfQ__GkQvoNcijmktvwqvcpazsQGioQ@mail.gmail.com>
-References: <76576b662613369d0c71db30ceed4ed5ae1343d2.1405857442.git.viresh.kumar@linaro.org>
- <20140720192649.GA30124@quad.lixom.net>
- <CAKohpokOJLKOwB_rKz0W-1T0nYX7-2_8nm3wQr6khR55x4gqrA@mail.gmail.com>
- <CAL_Jsq+dSoYp83wnXXHnfQ__GkQvoNcijmktvwqvcpazsQGioQ@mail.gmail.com>
-Message-ID: <CAKohponUGvs818F-Ch4kFrRPv+vwXkuZotiVjQD9To0LuyNcZg@mail.gmail.com>
+From: shawn.guo@freescale.com (Shawn Guo)
+Date: Mon, 21 Jul 2014 13:38:11 +0800
+Subject: [PATCH] ARM: i.MX6: add more chip revision support
+Message-ID: <1405921091-28748-1-git-send-email-shawn.guo@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 21 July 2014 07:45, Rob Herring <robherring2@gmail.com> wrote:
-> The Fixes tag is new and the format is documented in SubmittingPatches
+From: Jason Liu <r64343@freescale.com>
 
-Yeah, just saw that for the first time :)
+Add more revision support for the new i.MX6DQ tap-out (TO1.5).  This
+TO1.5 is the Rev 1.3 as documented in i.MX6DQ data sheet, because TO1.3
+and TO1.4 are never revealed.
 
-> IIRC. I believe it is also supposed to be quotes rather than
-> parentheses around the commit message if we want to be really picky.
+Signed-off-by: Jason Liu <r64343@freescale.com>
+Signed-off-by: Shawn Guo <shawn.guo@freescale.com>
+---
+ arch/arm/mach-imx/anatop.c | 9 +++++++++
+ arch/arm/mach-imx/mxc.h    | 2 ++
+ 2 files changed, 11 insertions(+)
 
-Actually both: ("$subject")
-
-I never saw the doc and picked how it was done by Rafael for cpufreq stuff.
-Though he was correctly adding 12 digits of the sha key, but the quotes
-were missing :)
-
-I will take care of this now.
-
---
-viresh
+diff --git a/arch/arm/mach-imx/anatop.c b/arch/arm/mach-imx/anatop.c
+index 4a40bbb46183..459ba290744b 100644
+--- a/arch/arm/mach-imx/anatop.c
++++ b/arch/arm/mach-imx/anatop.c
+@@ -104,6 +104,15 @@ void __init imx_init_revision_from_anatop(void)
+ 	case 2:
+ 		revision = IMX_CHIP_REVISION_1_2;
+ 		break;
++	case 3:
++		revision = IMX_CHIP_REVISION_1_3;
++		break;
++	case 4:
++		revision = IMX_CHIP_REVISION_1_4;
++		break;
++	case 5:
++		revision = IMX_CHIP_REVISION_1_5;
++		break;
+ 	default:
+ 		revision = IMX_CHIP_REVISION_UNKNOWN;
+ 	}
+diff --git a/arch/arm/mach-imx/mxc.h b/arch/arm/mach-imx/mxc.h
+index a39b69ef4301..17a41ca65acf 100644
+--- a/arch/arm/mach-imx/mxc.h
++++ b/arch/arm/mach-imx/mxc.h
+@@ -43,6 +43,8 @@
+ #define IMX_CHIP_REVISION_1_1		0x11
+ #define IMX_CHIP_REVISION_1_2		0x12
+ #define IMX_CHIP_REVISION_1_3		0x13
++#define IMX_CHIP_REVISION_1_4		0x14
++#define IMX_CHIP_REVISION_1_5		0x15
+ #define IMX_CHIP_REVISION_2_0		0x20
+ #define IMX_CHIP_REVISION_2_1		0x21
+ #define IMX_CHIP_REVISION_2_2		0x22
+-- 
+1.9.1
