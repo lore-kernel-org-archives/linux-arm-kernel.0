@@ -1,95 +1,204 @@
 From: ttynkkynen@nvidia.com (Tuomas Tynkkynen)
-Date: Mon, 21 Jul 2014 18:38:46 +0300
-Subject: [PATCH v2 00/16] Tegra124 CL-DVFS / DFLL clocksource, plus cpufreq
-Message-ID: <1405957142-19416-1-git-send-email-ttynkkynen@nvidia.com>
+Date: Mon, 21 Jul 2014 18:38:48 +0300
+Subject: [PATCH v2 02/16] regulator: Add helpers for low-level register access
+In-Reply-To: <1405957142-19416-1-git-send-email-ttynkkynen@nvidia.com>
+References: <1405957142-19416-1-git-send-email-ttynkkynen@nvidia.com>
+Message-ID: <1405957142-19416-3-git-send-email-ttynkkynen@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-v2 changes:
-- Add new helpers to the regulator framework to obtain the voltage
-  register address etc., as suggested by Mark. Added in patches 1 & 2.
-  They get used in patch 5.
-- Use cpufreq-cpu0 in the cpufreq driver
-- Fixed one bug in patch 8, where deferred probing would attempt to
-  fill the OPP table multiple times and cause a bunch of warnings
+Add helper functions that allow regulator consumers to obtain low-level
+details about the regulator hardware, like the voltage selector register
+address and such. These details can be useful when configuring hardware
+or firmware that want to do low-level access to regulators, with no
+involvement from the kernel.
 
-Original cover letter:
+The use-case for Tegra is a voltage-controlled oscillator clocksource
+which has control logic to change the supply voltage via I2C to achieve
+a desired output clock rate.
 
-This series implements the DFLL/CL-DVFS clock source for the fast CPU
-cluster on Tegra124, and a cpufreq driver that uses the DFLL for
-clocking the CPU. Most of this is based on Paul Walmsley's public patch
-set from December 2013, which is available at
-http://comments.gmane.org/gmane.linux.ports.tegra/15273
+Signed-off-by: Tuomas Tynkkynen <ttynkkynen@nvidia.com>
+---
+ Documentation/power/regulator/consumer.txt | 35 +++++++++++++++
+ drivers/regulator/core.c                   | 71 ++++++++++++++++++++++++++++++
+ include/linux/regulator/consumer.h         | 26 +++++++++++
+ 3 files changed, 132 insertions(+)
 
-The DFLL clock hardware is a voltage-controlled oscillator plus
-control logic that compares the generated output clock with a
-51 MHz reference clock, and can make decisions to either lower
-or raise the DFLL voltage to keep the output rate close to the
-software-requested rate. The voltage changes are done by
-communicating with an off-chip PMIC via either I2C or PWM.
-As the DFLL oscillator is powered via the CPU rail, using
-the DFLL as the CPU clocksource also gives us dynamic CPU
-voltage scaling.
-
-This series has been tested on the Jetson TK1 (Rev C). Porting this to
-the Venice2 should be simple, though do note that it does not have
-active cooling.
-
-Thanks,
-Tuomas
-
-Paul Walmsley (1):
-  clk: tegra: Add DFLL DVCO reset control for Tegra124
-
-Tuomas Tynkkynen (15):
-  regmap: Add regmap_get_device
-  regulator: Add helpers for low-level register access
-  clk: tegra: Add binding for the Tegra124 DFLL clocksource
-  clk: tegra: Add library for the DFLL clock source (open-loop mode)
-  clk: tegra: Add closed loop support for the DFLL
-  clk: tegra: Add functions for parsing CVB tables
-  clk: tegra: Add Tegra124 DFLL clocksource platform driver
-  clk: tegra: Save/restore CCLKG_BURST_POLICY on suspend
-  clk: tegra: Add the DFLL as a possible parent of the cclk_g clock
-  ARM: tegra: Add the DFLL to Tegra124 device tree
-  ARM: tegra: Enable the DFLL on the Jetson TK1
-  cpufreq: tegra124: Add device tree bindings
-  cpufreq: Add cpufreq driver for Tegra124
-  ARM: tegra: Add entries for cpufreq on Tegra124
-  ARM: tegra: Update defconfig for tegra124-cpufreq
-
- .../bindings/clock/nvidia,tegra124-dfll.txt        |   69 +
- .../bindings/cpufreq/tegra124-cpufreq.txt          |   42 +
- Documentation/power/regulator/consumer.txt         |   35 +
- arch/arm/boot/dts/tegra124-jetson-tk1.dts          |    8 +-
- arch/arm/boot/dts/tegra124.dtsi                    |   31 +
- arch/arm/configs/tegra_defconfig                   |    1 +
- arch/arm/mach-tegra/Kconfig                        |    1 +
- drivers/base/regmap/regmap.c                       |   12 +
- drivers/clk/tegra/Makefile                         |    3 +
- drivers/clk/tegra/clk-dfll.c                       | 1735 ++++++++++++++++++++
- drivers/clk/tegra/clk-dfll.h                       |   55 +
- drivers/clk/tegra/clk-tegra-super-gen4.c           |    4 +-
- drivers/clk/tegra/clk-tegra124-dfll-fcpu.c         |  165 ++
- drivers/clk/tegra/clk-tegra124.c                   |   61 +
- drivers/clk/tegra/clk.h                            |    3 +
- drivers/clk/tegra/cvb.c                            |  133 ++
- drivers/clk/tegra/cvb.h                            |   67 +
- drivers/cpufreq/Kconfig.arm                        |    1 +
- drivers/cpufreq/Makefile                           |    1 +
- drivers/cpufreq/tegra124-cpufreq.c                 |  169 ++
- drivers/regulator/core.c                           |   71 +
- include/linux/regmap.h                             |    7 +
- include/linux/regulator/consumer.h                 |   26 +
- 23 files changed, 2698 insertions(+), 2 deletions(-)
- create mode 100644 Documentation/devicetree/bindings/clock/nvidia,tegra124-dfll.txt
- create mode 100644 Documentation/devicetree/bindings/cpufreq/tegra124-cpufreq.txt
- create mode 100644 drivers/clk/tegra/clk-dfll.c
- create mode 100644 drivers/clk/tegra/clk-dfll.h
- create mode 100644 drivers/clk/tegra/clk-tegra124-dfll-fcpu.c
- create mode 100644 drivers/clk/tegra/cvb.c
- create mode 100644 drivers/clk/tegra/cvb.h
- create mode 100644 drivers/cpufreq/tegra124-cpufreq.c
-
+diff --git a/Documentation/power/regulator/consumer.txt b/Documentation/power/regulator/consumer.txt
+index 55c4175..81c0e2b 100644
+--- a/Documentation/power/regulator/consumer.txt
++++ b/Documentation/power/regulator/consumer.txt
+@@ -180,3 +180,38 @@ int regulator_unregister_notifier(struct regulator *regulator,
+ 
+ Regulators use the kernel notifier framework to send event to their interested
+ consumers.
++
++7. Regulator Direct Register Access
++===================================
++Some kinds of power management hardware or firmware are designed such that
++they need to do low-level hardware access to regulators, with no involvement
++from the kernel. Examples of such devices are:
++
++- clocksource with a voltage-controlled oscillator and control logic to change
++  the supply voltage over I2C to achieve a desired output clock rate
++- thermal management firmware that can issue an arbitrary I2C transaction to
++  perform system poweroff during overtemperature conditions
++
++To set up such a device/firmware, various parameters like I2C address of the
++regulator, addresses of various regulator registers etc. need to be configured
++to it. The regulator framework provides the following helpers for querying
++these details.
++
++Bus-specific details, like I2C addresses or transfer rates are handled by the
++regmap framework. To get the regulator's regmap (if supported), use :-
++
++struct regmap *regulator_get_regmap(struct regulator *regulator);
++
++To obtain the hardware register offset and bitmask for the regulator's voltage
++selector register, use :-
++
++int regulator_get_hardware_vsel_register(struct regulator *regulator,
++					 unsigned *vsel_reg,
++					 unsigned *vsel_mask);
++
++To convert a regulator framework voltage selector code (used by
++regulator_list_voltage) to a hardware-specific voltage selector that can be
++directly written to the voltage selector register, use :-
++
++int regulator_list_hardware_vsel(struct regulator *regulator,
++				 unsigned selector);
+diff --git a/drivers/regulator/core.c b/drivers/regulator/core.c
+index c563d93..69c9c08 100644
+--- a/drivers/regulator/core.c
++++ b/drivers/regulator/core.c
+@@ -2228,6 +2228,77 @@ int regulator_list_voltage(struct regulator *regulator, unsigned selector)
+ EXPORT_SYMBOL_GPL(regulator_list_voltage);
+ 
+ /**
++ * regulator_get_regmap - get the regulator's register map
++ * @regulator: regulator source
++ *
++ * Returns the register map for the given regulator, or an ERR_PTR value
++ * if the regulator doesn't use regmap.
++ */
++struct regmap *regulator_get_regmap(struct regulator *regulator)
++{
++	struct regmap *map = regulator->rdev->regmap;
++
++	return map ? map : ERR_PTR(-EOPNOTSUPP);
++}
++
++/**
++ * regulator_get_hardware_vsel_register - get the HW voltage selector register
++ * @regulator: regulator source
++ * @vsel_reg: voltage selector register, output parameter
++ * @vsel_mask: mask for voltage selector bitfield, output parameter
++ *
++ * Returns the hardware register offset and bitmask used for setting the
++ * regulator voltage. This might be useful when configuring voltage-scaling
++ * hardware or firmware that can make I2C requests behind the kernel's back,
++ * for example.
++ *
++ * On success, the output parameters @vsel_reg and @vsel_mask are filled in
++ * and 0 is returned, otherwise a negative errno is returned.
++ */
++int regulator_get_hardware_vsel_register(struct regulator *regulator,
++					 unsigned *vsel_reg,
++					 unsigned *vsel_mask)
++{
++	struct regulator_dev	*rdev = regulator->rdev;
++	struct regulator_ops	*ops = rdev->desc->ops;
++
++	if (ops->set_voltage_sel != regulator_set_voltage_sel_regmap)
++		return -EOPNOTSUPP;
++
++	 *vsel_reg = rdev->desc->vsel_reg;
++	 *vsel_mask = rdev->desc->vsel_mask;
++
++	 return 0;
++}
++EXPORT_SYMBOL_GPL(regulator_get_hardware_vsel_register);
++
++/**
++ * regulator_list_hardware_vsel - get the HW-specific register value for a selector
++ * @regulator: regulator source
++ * @selector: identify voltage to list
++ *
++ * Converts the selector to a hardware-specific voltage selector that can be
++ * directly written to the regulator registers. The address of the voltage
++ * register can be determined by calling @regulator_get_hardware_vsel_register.
++ *
++ * On error a negative errno is returned.
++ */
++int regulator_list_hardware_vsel(struct regulator *regulator,
++				 unsigned selector)
++{
++	struct regulator_dev	*rdev = regulator->rdev;
++	struct regulator_ops	*ops = rdev->desc->ops;
++
++	if (selector >= rdev->desc->n_voltages)
++		return -EINVAL;
++	if (ops->set_voltage_sel != regulator_set_voltage_sel_regmap)
++		return -EOPNOTSUPP;
++
++	return selector;
++}
++EXPORT_SYMBOL_GPL(regulator_list_hardware_vsel);
++
++/**
+  * regulator_get_linear_step - return the voltage step size between VSEL values
+  * @regulator: regulator source
+  *
+diff --git a/include/linux/regulator/consumer.h b/include/linux/regulator/consumer.h
+index 14ec18d..6bb5002 100644
+--- a/include/linux/regulator/consumer.h
++++ b/include/linux/regulator/consumer.h
+@@ -37,6 +37,7 @@
+ 
+ struct device;
+ struct notifier_block;
++struct regmap;
+ 
+ /*
+  * Regulator operating modes.
+@@ -215,6 +216,13 @@ int regulator_set_optimum_mode(struct regulator *regulator, int load_uA);
+ 
+ int regulator_allow_bypass(struct regulator *regulator, bool allow);
+ 
++struct regmap *regulator_get_regmap(struct regulator *regulator);
++int regulator_get_hardware_vsel_register(struct regulator *regulator,
++					 unsigned *vsel_reg,
++					 unsigned *vsel_mask);
++int regulator_list_hardware_vsel(struct regulator *regulator,
++				 unsigned selector);
++
+ /* regulator notifier block */
+ int regulator_register_notifier(struct regulator *regulator,
+ 			      struct notifier_block *nb);
+@@ -457,6 +465,24 @@ static inline int regulator_allow_bypass(struct regulator *regulator,
+ 	return 0;
+ }
+ 
++struct regmap *regulator_get_regmap(struct regulator *regulator)
++{
++	return ERR_PTR(-EOPNOTSUPP);
++}
++
++int regulator_get_hardware_vsel_register(struct regulator *regulator,
++					 unsigned *vsel_reg,
++					 unsigned *vsel_mask)
++{
++	return -EOPNOTSUPP;
++}
++
++int regulator_list_hardware_vsel(struct regulator *regulator,
++				 unsigned selector)
++{
++	return -EOPNOTSUPP;
++}
++
+ static inline int regulator_register_notifier(struct regulator *regulator,
+ 			      struct notifier_block *nb)
+ {
 -- 
 1.8.1.5
