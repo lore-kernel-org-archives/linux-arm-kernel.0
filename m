@@ -1,21 +1,27 @@
-From: gregkh@linuxfoundation.org (Greg Kroah-Hartman)
-Date: Mon, 21 Jul 2014 11:40:07 -0700
-Subject: [PATCH] platform: Make platform_bus device a platform device
-In-Reply-To: <1405962034-25482-1-git-send-email-pawel.moll@arm.com>
-References: <CAOesGMgvd1HbjywN7BDPtr8ZU7vucWH48B=AW3TZjng73YA8WA@mail.gmail.com>
- <1405962034-25482-1-git-send-email-pawel.moll@arm.com>
-Message-ID: <20140721184007.GB572@kroah.com>
+From: ezequiel.garcia@free-electrons.com (Ezequiel Garcia)
+Date: Mon, 21 Jul 2014 16:06:15 -0300
+Subject: mvebu: Can we make the orion-mdio clock a requirement?
+Message-ID: <20140721190614.GB20027@arch.cereza>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jul 21, 2014 at 06:00:34PM +0100, Pawel Moll wrote:
-> ... describing the root of the device tree, so one can write
-> a platform driver initializing the platform.
-> 
-> Signed-off-by: Pawel Moll <pawel.moll@arm.com>
-> ---
-> 
-> For what it's worth, the patch I came up back then.
-> *Untested* against current head...
+Helly everyone,
 
-I like the idea, nice...
+Currently the mvmdio driver does not require a clock to be declared,
+and instead this is optional.
+
+However (almost) all the platforms that currently use it, i.e. the
+Armada, Kirkwood and Dove SoCs, require some clock to be enabled before
+the MDIO registers can be accessed.
+
+The Orion5x SoC doesn't declare any clock for neither the ethernet node,
+nor the MDIO node. Is that correct?
+
+Do you think we could make the clock a required property in the mvmdio
+devicetree node? How would that behave in the non-DT case?
+
+Thanks,
+-- 
+Ezequiel Garc?a, Free Electrons
+Embedded Linux, Kernel and Android Engineering
+http://free-electrons.com
