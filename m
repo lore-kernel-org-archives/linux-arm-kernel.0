@@ -1,42 +1,76 @@
-From: robert.jarzmik@free.fr (Robert Jarzmik)
-Date: Mon, 21 Jul 2014 20:15:16 +0200
-Subject: [PATCH v3 4/4] arm: pxa: add non device-tree timer link to
- clocksource
-In-Reply-To: <53CD25A4.7030606@linaro.org> (Daniel Lezcano's message of "Mon,
- 21 Jul 2014 16:37:24 +0200")
-References: <1405356724-32207-1-git-send-email-robert.jarzmik@free.fr>
- <1405356724-32207-4-git-send-email-robert.jarzmik@free.fr>
- <53CD25A4.7030606@linaro.org>
-Message-ID: <87oawivarv.fsf@free.fr>
+From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
+Date: Mon, 21 Jul 2014 20:15:45 +0200
+Subject: [PATCH v2 0/3] iommu: Remove OMAP IOVMM driver
+In-Reply-To: <20140721093336.GR18374@atomide.com>
+References: <1405680597-10012-1-git-send-email-laurent.pinchart@ideasonboard.com>
+ <9251918.dhlInzvbvO@avalon> <20140721093336.GR18374@atomide.com>
+Message-ID: <5717663.qOZzl7syrN@avalon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Daniel Lezcano <daniel.lezcano@linaro.org> writes:
+Hi Tony and Joerg,
 
-> On 07/14/2014 06:52 PM, Robert Jarzmik wrote:
->> As clocksource pxa_timer was moved to clocksource framework, the
->> pxa_timer initialization needs to be a bit amended, to pass the
->> necessary informations to clocksource, ie :
->>   - the timer interrupt (mach specific)
->>   - the timer registers base (ditto)
->>   - the timer clockrate
->>
->> Signed-off-by: Robert Jarzmik <robert.jarzmik@free.fr>
->>
->> ---
->> Since V2: Arnd's comment : moved extern declaration into .h file
->> ---
+On Monday 21 July 2014 02:33:36 Tony Lindgren wrote:
+> * Laurent Pinchart <laurent.pinchart@ideasonboard.com> [140721 02:16]:
+> > Hi Suman, Joerg and Tony,
+> > 
+> > On Friday 18 July 2014 11:53:56 Suman Anna wrote:
+> > > On 07/18/2014 05:49 AM, Laurent Pinchart wrote:
+> > > > Hello,
+> > > > 
+> > > > The OMAP3 ISP driver was the only user of the OMAP IOVMM API. Now that
+> > > > is has been ported to the DMA API, remove the unused virtual memory
+> > > > manager.
+> > > > 
+> > > > The removal is split in three patches to ease upstream merge. The
+> > > > first patch removes the omap-iovmm driver, the second patch removes
+> > > > setting of now unused platform data fields from arch code, and the
+> > > > last patch cleans up the platform data structure.
+> > > 
+> > > Thanks for the revised series, it looks good. I have also tested the
+> > > series on OMAP3, OMAP4 and OMAP5.
+> > > 
+> > > For the changes in the entire series,
+> > > Acked-by: Suman Anna <s-anna@ti.com>
+> > 
+> > Thank you.
+> > 
+> > > > I'd like to get at least the first patch merged in v3.17. To avoid
+> > > > splitting the series across three kernel versions, it would be nice to
+> > > > also merge at least the second patch for v3.17. If there's no risk of
+> > > > conflict everything could be merged in one go through the ARM SoC
+> > > > tree. Otherwise a stable branch with patch 1/3 will be needed to base
+> > > > the arch change on.
+> > > > 
+> > > > Joerg, Tony, how would you like to proceed ?
+> > 
+> > The v3.17 merge window is getting close, it's probably too late to merge
+> > patch 2/3. Joerg, could you please take 1/3 in your tree for v3.17 ? 2/3
+> > and 3/3 would then get in v3.18. Tony, how would you like to proceed for
+> > those ?
 >
-> Shall I take the patches 4-5 also ?
-Mmm you mean patch 4 I think.
-Then I'd like you too, because it's linked in the serie, and without it the
-former non-DT platforms break, hence I'd like all the serie to go through 1
-tree.
+> How about Joerg maybe do an immutable branch against v3.16-rc1
+> with just these three patches and merge it into your tree?
+> 
+> That way I too can merge the minimal branch in if there are conflics.
+> If that works for Joerg, then for arch/arm/*omap* changes:
+> 
+> Acked-by: Tony Lindgren <tony@atomide.com>
 
-Yet we'd need Haojian's ack here. Haojian, would you give your blessing on the
-serie and agree that Daniel carries all the patches including patch 4/4 ?
+I've created an immutable branch (or, rather, immutable until the changes 
+reach mainline, at which point I will remove the branch) on top of v3.16-rc1 
+with just the three patches from this series. You can find it at.
 
-Cheers.
+	git://linuxtv.org/pinchartl/media.git omap/iommu
 
---
-Robert
+Tony, is there still time to get this (and especially patch 2/3, which touches 
+arch/ code) in v3.17 ?
+
+> If the above is too complicated, then how about Laurent resend patches
+> 2 - 3 once the dependencies have cleared so I can pick them up. This
+> is assuming nothing breaks with patchs 2 - 3 missing naturally :)
+
+-- 
+Regards,
+
+Laurent Pinchart
