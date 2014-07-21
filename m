@@ -1,96 +1,110 @@
-From: thierry.reding@gmail.com (Thierry Reding)
-Date: Mon, 21 Jul 2014 14:55:23 +0200
-Subject: [RESEND PATCH v3 06/11] drm: add DT bindings documentation for
- atmel-hlcdc-dc driver
-In-Reply-To: <20140721143428.078b68a4@bbrezillon>
-References: <1404751384-5077-1-git-send-email-boris.brezillon@free-electrons.com>
- <20140721115737.1377a5fd@bbrezillon> <20140721121245.GA15238@ulmo>
- <1616525.bcHvjgnZ4T@avalon> <20140721143428.078b68a4@bbrezillon>
-Message-ID: <20140721125522.GE15238@ulmo>
+From: b.zolnierkie@samsung.com (Bartlomiej Zolnierkiewicz)
+Date: Mon, 21 Jul 2014 14:55:52 +0200
+Subject: [PATCH v2] ARM: EXYNOS: Fix build with PM_SLEEP=n
+In-Reply-To: <1539661.ni665pgzAx@amdc1032>
+References: <1405323953-25954-1-git-send-email-k.kozlowski@samsung.com>
+ <5864544.mJGdtT36g8@amdc1032> <1539661.ni665pgzAx@amdc1032>
+Message-ID: <93736288.A8L2I1nMme@amdc1032>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jul 21, 2014 at 02:34:28PM +0200, Boris BREZILLON wrote:
-> On Mon, 21 Jul 2014 14:16:42 +0200
-> Laurent Pinchart <laurent.pinchart@ideasonboard.com> wrote:
+On Monday, July 21, 2014 01:11:14 PM Bartlomiej Zolnierkiewicz wrote:
+> On Monday, July 21, 2014 12:38:28 PM Bartlomiej Zolnierkiewicz wrote:
+> > 
+> > Hi,
+> > 
+> > On Saturday, July 19, 2014 04:42:34 AM Kukjin Kim wrote:
+> > > On 07/16/14 20:59, Tomasz Figa wrote:
+> > > > Hi Krzysztof,
+> > > >
+> > > > On 14.07.2014 09:45, Krzysztof Kozlowski wrote:
+> > > >> Fix building of exynos defconfig with disabled PM_SLEEP:
+> > > >> CONFIG_PM_SLEEP=n
+> > > >> CONFIG_PM_SLEEP_SMP=n
+> > > >> CONFIG_SUSPEND=n
+> > > >> by moving functions for power up/down of CPU and cluster to platsmp.c
+> > > >>
+> > > >> The build error messages:
+> > > >> arch/arm/mach-exynos/built-in.o: In function `exynos_boot_secondary':
+> > > >> arch/arm/mach-exynos/platsmp.c:111: undefined reference to `exynos_cpu_power_state'
+> > > >> arch/arm/mach-exynos/platsmp.c:112: undefined reference to `exynos_cpu_power_up'
+> > > >> arch/arm/mach-exynos/platsmp.c:116: undefined reference to `exynos_cpu_power_state'
+> > > >> make: *** [vmlinux] Error 1
+> > > >>
+> > > >> Signed-off-by: Krzysztof Kozlowski<k.kozlowski@samsung.com>
+> > > >>
+> > > >> ---
+> > > >> Changes since v1:
+> > > >> 1. Use different solution - just move the power up/down functions to a
+> > > >>     common place instead of adding stubs in common.h. Suggested by Tomasz
+> > > >>     Figa.
+> > > >> ---
+> > > >>   arch/arm/mach-exynos/platsmp.c | 66 ++++++++++++++++++++++++++++++++++++++++++
+> > > >>   arch/arm/mach-exynos/pm.c      | 66 ------------------------------------------
+> > > >>   2 files changed, 66 insertions(+), 66 deletions(-)
+> > > >>
+> > > >
+> > > + Bart,
+> > > 
+> > > > Reviewed-by: Tomasz Figa<t.figa@samsung.com>
+> > > >
+> > > Applied, thanks.
+> > > 
+> > > Bart, I think this is better at this moment to fix the build breakage 
+> > > with disabling PM...if you have any comments, please let me know.
+> > 
+> > To fix PM_SLEEP=n build itself (with ARM_EXYNOS_CPUIDLE=n) Krzysztof's
+> > patch is not enough and patch [1] is also needed (this patch is very
+> > simple so I think that it is okay for v3.16).
 > 
-> > Hi Thierry,
-> > 
-> > On Monday 21 July 2014 14:12:47 Thierry Reding wrote:
-> > > On Mon, Jul 21, 2014 at 11:57:37AM +0200, Boris BREZILLON wrote:
-> > > > On Mon, 21 Jul 2014 11:32:55 +0200 Laurent Pinchart wrote:
-> > > >> On Monday 21 July 2014 11:24:38 Boris BREZILLON wrote:
-> > > >>> On Mon, 21 Jul 2014 10:59:12 +0200 Thierry Reding wrote:
-> > > >>>> On Fri, Jul 18, 2014 at 05:43:34PM +0200, Boris BREZILLON wrote:
-> > > >>>> [...]
-> > > >>>> 
-> > > >>>>>>>>>> + - atmel,panel: Should contain a phandle with 2 parameters.
-> > > >>>>>>>>>> +   The first cell is a phandle to a DRM panel device
-> > > >>>>>>>>>> +   The second cell encodes the RGB mode, which can take the
-> > > >>>>>>>>>> following values:
-> > > >>>>>>>>>> +   * 0: RGB444
-> > > >>>>>>>>>> +   * 1: RGB565
-> > > >>>>>>>>>> +   * 2: RGB666
-> > > >>>>>>>>>> +   * 3: RGB888
-> > > >>>>>>>>> 
-> > > >>>>>>>>> These are properties of the panel and should be obtained from
-> > > >>>>>>>>> the panel directly rather than an additional cell in this
-> > > >>>>>>>>> specifier.
-> > > >>>>>>>> 
-> > > >>>>>>>> Okay.
-> > > >>>>>>>> What's the preferred way of doing this ?
-> > > >>>>>>>> What about defining an rgb-mode property in the panel node.
-> > > >>>>>>> 
-> > > >>>>>>> There's .bpc in struct drm_display_info, I suspect that it could
-> > > >>>>>>> be used for this. Alternatively, maybe we could extend the list
-> > > >>>>>>> of color formats that go into drm_display_info.color_formats?
-> > > >>>>>>> RGB444 is already covered.
-> > > >>>>> 
-> > > >>>>> I forgot to ask about bpc meaning. If, as I think, it means "bits
-> > > >>>>> per color" then it cannot be used to encode RGB565 where green
-> > > >>>>> color is encoded on 6 bits and red and blue are encoded on 5 bits.
-> > > >>>> 
-> > > >>>> Yes, I agree that bps is not a good fit for what you need here.
-> > > >>> 
-> > > >>> Okay, then I think we can replace bpc and color_formats by a
-> > > >>> bus_formats table containing all supported formats, and use an enum
-> > > >>> (something similar to v4l2_mbus_pixelcode defined in v4l2-mediabus.h
-> > > >>> [1]) to list the available formats.
-> > > >>> 
-> > > >>> As this implies quite a few changes in crtc core and some drm drivers
-> > > >>> (nouveau, i915 and radeon), I'd like to be sure this is what both of
-> > > >>> you had in mind.
-> > > >> 
-> > > >> I think it is, but just to make sure I understand you correctly, could
-> > > >> you just show how the drm_display_info structure would look like ?
-> > > > 
-> > > > The new drm_display_info structure should look like this [2] (except
-> > > > that color_formats and bpc have not be removed yet), and [1] is just
-> > > > here to show how the video_bus_format enum would look like.
-> > > > 
-> > > > [1] http://code.bulix.org/rfd0yx-86557
-> > > > [2] http://code.bulix.org/7n03b4-86556
-> > > 
-> > > Quoting from your paste:
-> > > 
-> > > 	+   const enum video_bus_format *bus_formats;
-> > > 	+   int nbus_formats;
-> > > 
-> > > Do we really need more than one?
-> > 
-> > We do if we want to replace the color_formats and bpc fields.
-> > 
+> Hmmm, I now see that you've applied Krzysztof's patch for v3.17 not v3.16.
 > 
-> Yes, that's what I was about to answer :-).
+> In that case how do you want to deal with PM_SLEEP=n build breakages for
+> v3.16 and what do you mean with "fix the build breakage with disabling PM"?
 
-Maybe we don't need to replace color_formats and bpc field immediately.
-That could be done in a follow-up patch.
+Just a bit of explanation:
 
-Thierry
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: not available
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140721/a5e6d501/attachment-0001.sig>
+The PM_SLEEP=n build breakages show up on automated build tests done by
+various people.  Minimal fixes for them (Krzysztof's patch + patch [1] +
+making ARM_EXYNOS_CPUIDLE depend on PM_SLEEP temporally) are really obvious
+and should be pretty safe so it would be great to have them in v3.16.
+
+If that is not possible lets fix the issue completely early in v3.17 cycle.
+
+Best regards,
+--
+Bartlomiej Zolnierkiewicz
+Samsung R&D Institute Poland
+Samsung Electronics
+
+> Best regards,
+> --
+> Bartlomiej Zolnierkiewicz
+> Samsung R&D Institute Poland
+> Samsung Electronics
+> 
+> > For PM_SLEEP=n and ARM_EXYNOS_CPUIDLE=y config more changes are needed
+> > and they are contained in patch [2] (please note that this patch depends
+> > on patch [3] from Tomasz Figa which was redone recently into [4] so my
+> > patch also needs to be refreshed).  However if you think that this would
+> > result in too much changes for v3.16 kernel we can make ARM_EXYNOS_CPUIDLE
+> > select (or depend on) PM_SLEEP for now and fix the issue completely later
+> > in v3.17 kernel.
+> > 
+> > [1] "[PATCH 1/2] ARM: EXYNOS: Fix build with PM_SLEEP=n part #2"
+> > http://www.mail-archive.com/linux-samsung-soc at vger.kernel.org/msg34080.html
+> > 
+> > [2] "[PATCH 2/2] ARM: EXYNOS: Fix build with PM_SLEEP=n and ARM_EXYNOS_CPUIDLE=y"
+> > http://www.mail-archive.com/linux-samsung-soc at vger.kernel.org/msg34081.html
+> > 
+> > [3] "[PATCH 5/6] ARM: EXYNOS: Fix suspend/resume sequencies"
+> > http://www.mail-archive.com/linux-samsung-soc at vger.kernel.org/msg32809.html
+> > 
+> > [4] "[PATCH v3] ARM: EXYNOS: Fix suspend/resume sequences"
+> > http://www.mail-archive.com/linux-samsung-soc at vger.kernel.org/msg34150.html
+> > 
+> > Best regards,
+> > --
+> > Bartlomiej Zolnierkiewicz
+> > Samsung R&D Institute Poland
+> > Samsung Electronics
