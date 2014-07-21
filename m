@@ -1,41 +1,78 @@
-From: marex@denx.de (Marek Vasut)
-Date: Mon, 21 Jul 2014 18:07:00 +0200
-Subject: [PATCH RFC 1/9] irqchip: gic: Provide support for interrupt
- grouping
-In-Reply-To: <1405954040-30399-2-git-send-email-daniel.thompson@linaro.org>
-References: <1405954040-30399-1-git-send-email-daniel.thompson@linaro.org>
- <1405954040-30399-2-git-send-email-daniel.thompson@linaro.org>
-Message-ID: <201407211807.00119.marex@denx.de>
+From: dmitry.torokhov@gmail.com (Dmitry Torokhov)
+Date: Mon, 21 Jul 2014 09:19:32 -0700
+Subject: [PATCH 2/2] iio: exynos-adc: add experimental touchscreen support
+In-Reply-To: <6569004.FG0IRy8WyL@wuerfel>
+References: <1405663186-26464-1-git-send-email-cw00.choi@samsung.com>
+ <5158672.dMAnnUQc7Z@wuerfel>
+ <20140721144442.GB9112@core.coreip.homeip.net>
+ <6569004.FG0IRy8WyL@wuerfel>
+Message-ID: <20140721161932.GA12180@core.coreip.homeip.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday, July 21, 2014 at 04:47:12 PM, Daniel Thompson wrote:
-> All GIC hardware except GICv1-without-TrustZone support provides a means
-> to group exceptions into group 0 (which can optionally be signally using
-> use FIQ) and group 1. The kernel currently provides no means to exploit
-> this. This patch alters the initialization of the GIC to place all
-> interrupts into group 1 which is the foundational requirement to
-> meaningfully use FIQ.
-
-[...]
-
-> @@ -670,7 +753,11 @@ static void gic_raise_softirq(const struct cpumask
-> *mask, unsigned int irq) dmb(ishst);
+On Mon, Jul 21, 2014 at 05:11:27PM +0200, Arnd Bergmann wrote:
+> On Monday 21 July 2014 07:44:42 Dmitry Torokhov wrote:
+> > > > 
+> > > > It would be nice to actually close the device even if someone is
+> > > > touching screen. Please implement open/close methods and have them set a
+> > > > flag that you would check here.
+> > > 
+> > > Ok. I think it's even better to move the request_irq() into the open function,
+> > > which will avoid the flag and defer the error handling into the actual opening,
+> > > as well as syncing the running irq with the close function.
+> > 
+> > I do not quite like acquiring resources needed in open. I think drivers should
+> > do all resource acquisition in probe() and leave open()/close() to
+> > activate/quiesce devices.
 > 
->  	/* this always happens on GIC0 */
-> -	writel_relaxed(map << 16 | irq, gic_data_dist_base(&gic_data[0]) +
-> GIC_DIST_SOFTINT); +	softint = map << 16 | irq;
-> +	if (gic_data_fiq_enable(&gic_data[0]))
-> +		softint |= 0x8000;
-
-These magic bits here could use some clarification, possibly a comment.
-
-> +	writel_relaxed(softint,
-> +		       gic_data_dist_base(&gic_data[0]) + GIC_DIST_SOFTINT);
+> Ok, I'll move it back then. I'm not sure what I'm supposed to do
+> in open/close then. Isn't it enough to check info->input->users
+> like this?
 > 
->  	raw_spin_unlock_irqrestore(&irq_controller_lock, flags);
->  }
-[...]
+> static irqreturn_t exynos_ts_isr(int irq, void *dev_id)
+> {
+>         struct exynos_adc *info = dev_id;
+>         struct iio_dev *dev = dev_get_drvdata(info->dev);
+>         u32 x, y;
+>         bool pressed;
+>         int ret;
+> 
+>         while (info->input->users) {
+>                 ret = exynos_read_s3c64xx_ts(dev, &x, &y);
+>                 if (ret == -ETIMEDOUT)
+>                         break;
+> 
+>                 pressed = x & y & ADC_DATX_PRESSED;
+>                 if (!pressed) {
+>                         input_report_key(info->input, BTN_TOUCH, 0);
+>                         input_sync(info->input);
+>                         break;
+>                 }
+> 
+>                 input_report_abs(info->input, ABS_X, x & ADC_DATX_MASK);
+>                 input_report_abs(info->input, ABS_Y, y & ADC_DATY_MASK);
+>                 input_report_key(info->input, BTN_TOUCH, 1);
+>                 input_sync(info->input);
+> 
+>                 msleep(1);
+>         };
+> 
+>         writel(0, ADC_V1_CLRINTPNDNUP(info->regs));
+> 
+>         return IRQ_HANDLED;
+> }
+> 
+> I could do enable_irq()/disable_irq(), but that leaves a small
+> race at startup where we request the irq line and then immediately
+> disable it again.
 
-Best regards,
-Marek Vasut
+I think the above (or a separate flag in driver structure) coupled with
+enable/disable IRQ is fine - input core can deal with calls to input_report_*
+on devices that have been properly allocated but have not been registered yet.
+
+drivers/input/keyboard/samsung-keypad.c does similar handling.
+
+Thanks.
+
+-- 
+Dmitry
