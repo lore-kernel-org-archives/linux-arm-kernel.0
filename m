@@ -1,110 +1,103 @@
-From: b.zolnierkie@samsung.com (Bartlomiej Zolnierkiewicz)
-Date: Mon, 21 Jul 2014 14:55:52 +0200
-Subject: [PATCH v2] ARM: EXYNOS: Fix build with PM_SLEEP=n
-In-Reply-To: <1539661.ni665pgzAx@amdc1032>
-References: <1405323953-25954-1-git-send-email-k.kozlowski@samsung.com>
- <5864544.mJGdtT36g8@amdc1032> <1539661.ni665pgzAx@amdc1032>
-Message-ID: <93736288.A8L2I1nMme@amdc1032>
+From: thierry.reding@gmail.com (Thierry Reding)
+Date: Mon, 21 Jul 2014 14:56:26 +0200
+Subject: [RESEND PATCH v3 06/11] drm: add DT bindings documentation for
+ atmel-hlcdc-dc driver
+In-Reply-To: <20140721143321.5bda6ea9@bbrezillon>
+References: <1404751384-5077-1-git-send-email-boris.brezillon@free-electrons.com>
+ <1404751384-5077-7-git-send-email-boris.brezillon@free-electrons.com>
+ <20140714100542.GB9870@ulmo> <20140715120619.7f29c458@bbrezillon>
+ <20140715103136.GA6616@ulmo> <20140718165152.0a9fde09@bbrezillon>
+ <20140721121513.GB15238@ulmo> <20140721143321.5bda6ea9@bbrezillon>
+Message-ID: <20140721125624.GF15238@ulmo>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday, July 21, 2014 01:11:14 PM Bartlomiej Zolnierkiewicz wrote:
-> On Monday, July 21, 2014 12:38:28 PM Bartlomiej Zolnierkiewicz wrote:
-> > 
-> > Hi,
-> > 
-> > On Saturday, July 19, 2014 04:42:34 AM Kukjin Kim wrote:
-> > > On 07/16/14 20:59, Tomasz Figa wrote:
-> > > > Hi Krzysztof,
-> > > >
-> > > > On 14.07.2014 09:45, Krzysztof Kozlowski wrote:
-> > > >> Fix building of exynos defconfig with disabled PM_SLEEP:
-> > > >> CONFIG_PM_SLEEP=n
-> > > >> CONFIG_PM_SLEEP_SMP=n
-> > > >> CONFIG_SUSPEND=n
-> > > >> by moving functions for power up/down of CPU and cluster to platsmp.c
-> > > >>
-> > > >> The build error messages:
-> > > >> arch/arm/mach-exynos/built-in.o: In function `exynos_boot_secondary':
-> > > >> arch/arm/mach-exynos/platsmp.c:111: undefined reference to `exynos_cpu_power_state'
-> > > >> arch/arm/mach-exynos/platsmp.c:112: undefined reference to `exynos_cpu_power_up'
-> > > >> arch/arm/mach-exynos/platsmp.c:116: undefined reference to `exynos_cpu_power_state'
-> > > >> make: *** [vmlinux] Error 1
-> > > >>
-> > > >> Signed-off-by: Krzysztof Kozlowski<k.kozlowski@samsung.com>
-> > > >>
-> > > >> ---
-> > > >> Changes since v1:
-> > > >> 1. Use different solution - just move the power up/down functions to a
-> > > >>     common place instead of adding stubs in common.h. Suggested by Tomasz
-> > > >>     Figa.
-> > > >> ---
-> > > >>   arch/arm/mach-exynos/platsmp.c | 66 ++++++++++++++++++++++++++++++++++++++++++
-> > > >>   arch/arm/mach-exynos/pm.c      | 66 ------------------------------------------
-> > > >>   2 files changed, 66 insertions(+), 66 deletions(-)
-> > > >>
-> > > >
-> > > + Bart,
+On Mon, Jul 21, 2014 at 02:33:21PM +0200, Boris BREZILLON wrote:
+> On Mon, 21 Jul 2014 14:15:16 +0200
+> Thierry Reding <thierry.reding@gmail.com> wrote:
+> 
+> > On Fri, Jul 18, 2014 at 04:51:52PM +0200, Boris BREZILLON wrote:
+> > > Hi Thierry,
 > > > 
-> > > > Reviewed-by: Tomasz Figa<t.figa@samsung.com>
-> > > >
-> > > Applied, thanks.
+> > > Oops, I missed this reply.
 > > > 
-> > > Bart, I think this is better at this moment to fix the build breakage 
-> > > with disabling PM...if you have any comments, please let me know.
+> > > On Tue, 15 Jul 2014 12:31:37 +0200
+> > > Thierry Reding <thierry.reding@gmail.com> wrote:
+> > > 
+> > > > On Tue, Jul 15, 2014 at 12:06:19PM +0200, Boris BREZILLON wrote:
+> > > > > On Mon, 14 Jul 2014 12:05:43 +0200 Thierry Reding <thierry.reding@gmail.com> wrote:
+> > > > > > On Mon, Jul 07, 2014 at 06:42:59PM +0200, Boris BREZILLON wrote:
+> > > > [...]
+> > > > > > > diff --git a/Documentation/devicetree/bindings/drm/atmel-hlcdc-dc.txt b/Documentation/devicetree/bindings/drm/atmel-hlcdc-dc.txt
+> > > > > > [...]
+> > > > > > > +The Atmel HLCDC Display Controller is subdevice of the HLCDC MFD device.
+> > > > > > > +See Documentation/devicetree/bindings/mfd/atmel-hlcdc.txt for more details.
+> > > > > > 
+> > > > > > I think it's better to refer to these using relative filenames. When the
+> > > > > > device tree bindings are moved out of the kernel tree, they may no
+> > > > > > longer use the same hierarchy.
+> > > > > 
+> > > > > Sure.
+> > > > > By relative path you mean ../../mfd/atmel-hlcdc.txt or just
+> > > > > mfd/atmel-hlcdc.txt ?
+> > > > 
+> > > > I think the former is more explicit.
+> > > 
+> > > Okay.
+> > > 
+> > > > 
+> > > > > > > + - atmel,panel: Should contain a phandle with 2 parameters.
+> > > > > > > +   The first cell is a phandle to a DRM panel device
+> > > > > > > +   The second cell encodes the RGB mode, which can take the following values:
+> > > > > > > +   * 0: RGB444
+> > > > > > > +   * 1: RGB565
+> > > > > > > +   * 2: RGB666
+> > > > > > > +   * 3: RGB888
+> > > > > > 
+> > > > > > These are properties of the panel and should be obtained from the panel
+> > > > > > directly rather than an additional cell in this specifier.
+> > > > > 
+> > > > > Okay.
+> > > > > What's the preferred way of doing this ?
+> > > > > What about defining an rgb-mode property in the panel node.
+> > > > 
+> > > > There's .bpc in struct drm_display_info, I suspect that it could be used
+> > > > for this. Alternatively, maybe we could extend the list of color formats
+> > > > that go into drm_display_info.color_formats? RGB444 is already covered.
+> > > 
+> > > I don't think this color_formats field is intended to represent data
+> > > stream format going through the bus.
+> > > Moreover, AFAIU, RGB444 in this definition represent RGB 4:4:4 (chroma
+> > > subsampling rate) and not 12 bits signals (4 bits for each color).
+> > > 
+> > > Anyway I'll propose a patch series adding a new field to
+> > > drm_display_info to encode the mediabus format (as discussed with
+> > > Laurent and you).
+> > > 
+> > > > 
+> > > > Also, like Laurent said, this shouldn't go into the device tree, since
+> > > > it's already implied by the panel's compatible value, so we'd be
+> > > > duplicating information.
+> > > 
+> > > Again, this is not necessarily true (depending on your board design).
+> > > One can decide to connect an RGB888 panel on an RGB666 bus and connect
+> > > the missing pins to ground.
 > > 
-> > To fix PM_SLEEP=n build itself (with ARM_EXYNOS_CPUIDLE=n) Krzysztof's
-> > patch is not enough and patch [1] is also needed (this patch is very
-> > simple so I think that it is okay for v3.16).
+> > I think in that case the board design itself could be considered as an
+> > RGB888 to RGB666 bridge, and I think that's what the device tree should
+> > be describing rather than a panel with a variable number of input
+> > formats.
 > 
-> Hmmm, I now see that you've applied Krzysztof's patch for v3.17 not v3.16.
-> 
-> In that case how do you want to deal with PM_SLEEP=n build breakages for
-> v3.16 and what do you mean with "fix the build breakage with disabling PM"?
+> So, you're suggesting to add an RGB to RGB drm_bridge driver (and
+> the appropriate DT bindings) to handle this case, right ?
 
-Just a bit of explanation:
+Yes, exactly.
 
-The PM_SLEEP=n build breakages show up on automated build tests done by
-various people.  Minimal fixes for them (Krzysztof's patch + patch [1] +
-making ARM_EXYNOS_CPUIDLE depend on PM_SLEEP temporally) are really obvious
-and should be pretty safe so it would be great to have them in v3.16.
-
-If that is not possible lets fix the issue completely early in v3.17 cycle.
-
-Best regards,
---
-Bartlomiej Zolnierkiewicz
-Samsung R&D Institute Poland
-Samsung Electronics
-
-> Best regards,
-> --
-> Bartlomiej Zolnierkiewicz
-> Samsung R&D Institute Poland
-> Samsung Electronics
-> 
-> > For PM_SLEEP=n and ARM_EXYNOS_CPUIDLE=y config more changes are needed
-> > and they are contained in patch [2] (please note that this patch depends
-> > on patch [3] from Tomasz Figa which was redone recently into [4] so my
-> > patch also needs to be refreshed).  However if you think that this would
-> > result in too much changes for v3.16 kernel we can make ARM_EXYNOS_CPUIDLE
-> > select (or depend on) PM_SLEEP for now and fix the issue completely later
-> > in v3.17 kernel.
-> > 
-> > [1] "[PATCH 1/2] ARM: EXYNOS: Fix build with PM_SLEEP=n part #2"
-> > http://www.mail-archive.com/linux-samsung-soc at vger.kernel.org/msg34080.html
-> > 
-> > [2] "[PATCH 2/2] ARM: EXYNOS: Fix build with PM_SLEEP=n and ARM_EXYNOS_CPUIDLE=y"
-> > http://www.mail-archive.com/linux-samsung-soc at vger.kernel.org/msg34081.html
-> > 
-> > [3] "[PATCH 5/6] ARM: EXYNOS: Fix suspend/resume sequencies"
-> > http://www.mail-archive.com/linux-samsung-soc at vger.kernel.org/msg32809.html
-> > 
-> > [4] "[PATCH v3] ARM: EXYNOS: Fix suspend/resume sequences"
-> > http://www.mail-archive.com/linux-samsung-soc at vger.kernel.org/msg34150.html
-> > 
-> > Best regards,
-> > --
-> > Bartlomiej Zolnierkiewicz
-> > Samsung R&D Institute Poland
-> > Samsung Electronics
+Thierry
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: not available
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140721/1f75eb5f/attachment.sig>
