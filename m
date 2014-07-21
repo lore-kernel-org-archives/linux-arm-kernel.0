@@ -1,60 +1,233 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Mon, 21 Jul 2014 03:51:49 -0700
-Subject: [RFC PATCH 4/7] ARM: OMAP4+: PRM: register interrupt information
- from DT
-In-Reply-To: <1402025761-16831-5-git-send-email-nm@ti.com>
-References: <1402025761-16831-1-git-send-email-nm@ti.com>
- <1402025761-16831-5-git-send-email-nm@ti.com>
-Message-ID: <20140721105149.GU18374@atomide.com>
+From: daniel.lezcano@linaro.org (Daniel Lezcano)
+Date: Mon, 21 Jul 2014 12:59:33 +0200
+Subject: [PATCHv2 12/17] cpuidle: mvebu: make the cpuidle driver capable
+ of handling multiple SoCs
+In-Reply-To: <1404913221-17343-13-git-send-email-thomas.petazzoni@free-electrons.com>
+References: <1404913221-17343-1-git-send-email-thomas.petazzoni@free-electrons.com>
+ <1404913221-17343-13-git-send-email-thomas.petazzoni@free-electrons.com>
+Message-ID: <53CCF295.6030907@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Nishanth Menon <nm@ti.com> [140605 20:37]:
-> Allow the PRM interrupt information to be picked up from device tree.
-> the only exception is for OMAP4 which uses values pre-populated and allows
-> compatibility with older dtb.
-> 
-> Signed-off-by: Nishanth Menon <nm@ti.com>
+On 07/09/2014 03:40 PM, Thomas Petazzoni wrote:
+> From: Gregory CLEMENT <gregory.clement@free-electrons.com>
+>
+> In order to prepare the add of new SoCs supports for this cpuidle
+> driver, this patch extends the platform_data understood by the
+> cpuidle-mvebu-v7 driver to contain a "type" identifying which specific
+> SoC the cpuidle driver is being probed for. It will be used by the
+> cpuidle driver to know the list of states for the current SoC.
+
+It makes more sense to use/implement a 'soc_is_xxx' macro or 
+'of_machine_is_compatible', like the other cpuidle drivers, no ?
+
+Is there a good reason to implement a new way to check the board ?
+
+It isn't possible to do:
+
+if (of_machine_is_compatible("marvell,armada-370-xp-pmsu"))
+	cpuidle_register(&armadaxp_cpuidle_driver, NULL);
+
+?
+
+That will prevent the creation of the new single-declaration header file.
+	
+
+
+> Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
+> Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
 > ---
->  arch/arm/mach-omap2/prm44xx.c |   41 +++++++++++++++++++++++++++++++++++++++++
->  1 file changed, 41 insertions(+)
-> 
-> diff --git a/arch/arm/mach-omap2/prm44xx.c b/arch/arm/mach-omap2/prm44xx.c
-> index 1ecf244..784b3e1 100644
-> --- a/arch/arm/mach-omap2/prm44xx.c
-> +++ b/arch/arm/mach-omap2/prm44xx.c
-> @@ -17,6 +17,7 @@
->  #include <linux/errno.h>
->  #include <linux/err.h>
->  #include <linux/io.h>
-> +#include <linux/of_irq.h>
->  
->  
->  #include "soc.h"
-> @@ -698,11 +699,51 @@ int __init omap44xx_prm_init(void)
->  	return prm_register(&omap44xx_prm_ll_data);
->  }
->  
-> +static struct of_device_id omap_prm_dt_match_table[] = {
-> +	{ .compatible = "ti,omap4-prm" },
-> +	{ .compatible = "ti,omap5-prm" },
-> +	{ .compatible = "ti,dra7-prm" },
-> +	{ }
+>   arch/arm/mach-mvebu/pmsu.c         | 20 +++++++++++++-------
+>   drivers/cpuidle/cpuidle-mvebu-v7.c | 32 ++++++++++++++++++++------------
+>   include/linux/mvebu-v7-cpuidle.h   | 26 ++++++++++++++++++++++++++
+>   3 files changed, 59 insertions(+), 19 deletions(-)
+>   create mode 100644 include/linux/mvebu-v7-cpuidle.h
+>
+> diff --git a/arch/arm/mach-mvebu/pmsu.c b/arch/arm/mach-mvebu/pmsu.c
+> index 802edc8..0a24073 100644
+> --- a/arch/arm/mach-mvebu/pmsu.c
+> +++ b/arch/arm/mach-mvebu/pmsu.c
+> @@ -19,10 +19,12 @@
+>   #define pr_fmt(fmt) "mvebu-pmsu: " fmt
+>
+>   #include <linux/cpu_pm.h>
+> +#include <linux/cpuidle.h>
+>   #include <linux/init.h>
+>   #include <linux/io.h>
+>   #include <linux/kernel.h>
+>   #include <linux/mbus.h>
+> +#include <linux/mvebu-v7-cpuidle.h>
+>   #include <linux/of_address.h>
+>   #include <linux/platform_device.h>
+>   #include <linux/resource.h>
+> @@ -75,10 +77,6 @@ extern void armada_370_xp_cpu_resume(void);
+>
+>   static void *mvebu_cpu_resume;
+>
+> -static struct platform_device mvebu_v7_cpuidle_device = {
+> -	.name = "cpuidle-mvebu-v7",
+> -};
+> -
+>   static struct of_device_id of_pmsu_table[] = {
+>   	{ .compatible = "marvell,armada-370-pmsu", },
+>   	{ .compatible = "marvell,armada-370-xp-pmsu", },
+> @@ -325,17 +323,25 @@ static struct notifier_block mvebu_v7_cpu_pm_notifier = {
+>   	.notifier_call = mvebu_v7_cpu_pm_notify,
+>   };
+>
+> -static int __init armada_xp_cpuidle_init(void)
+> +static struct mvebu_v7_cpuidle armada_xp_cpuidle = {
+> +	.type = CPUIDLE_ARMADA_XP,
+> +	.cpu_suspend = armada_370_xp_cpu_suspend,
 > +};
 > +
+> +static struct platform_device mvebu_v7_cpuidle_device = {
+> +	.name = "cpuidle-mvebu-v7",
+> +};
+> +
+> +static __init int armada_xp_cpuidle_init(void)
+>   {
+>   	struct device_node *np;
+> -
+>   	np = of_find_compatible_node(NULL, NULL, "marvell,coherency-fabric");
+>   	if (!np)
+>   		return -ENODEV;
+>   	of_node_put(np);
+>
+>   	mvebu_cpu_resume = armada_370_xp_cpu_resume;
+> -	mvebu_v7_cpuidle_device.dev.platform_data = armada_370_xp_cpu_suspend;
+> +	mvebu_v7_cpuidle_device.dev.platform_data = &armada_xp_cpuidle;
+>
+>   	return 0;
+>   }
+> diff --git a/drivers/cpuidle/cpuidle-mvebu-v7.c b/drivers/cpuidle/cpuidle-mvebu-v7.c
+> index 302596e..82c545bb 100644
+> --- a/drivers/cpuidle/cpuidle-mvebu-v7.c
+> +++ b/drivers/cpuidle/cpuidle-mvebu-v7.c
+> @@ -16,15 +16,15 @@
+>   #include <linux/cpu_pm.h>
+>   #include <linux/cpuidle.h>
+>   #include <linux/module.h>
+> +#include <linux/mvebu-v7-cpuidle.h>
+>   #include <linux/of.h>
+>   #include <linux/suspend.h>
+>   #include <linux/platform_device.h>
+>   #include <asm/cpuidle.h>
+>
+> -#define MVEBU_V7_MAX_STATES	3
+>   #define MVEBU_V7_FLAG_DEEP_IDLE	0x10000
+>
+> -static int (*mvebu_v7_cpu_suspend)(int);
+> +static struct mvebu_v7_cpuidle *pcpuidle;
+>
+>   static int mvebu_v7_enter_idle(struct cpuidle_device *dev,
+>   				struct cpuidle_driver *drv,
+> @@ -32,12 +32,13 @@ static int mvebu_v7_enter_idle(struct cpuidle_device *dev,
+>   {
+>   	int ret;
+>   	bool deepidle = false;
+> +
+>   	cpu_pm_enter();
+>
+>   	if (drv->states[index].flags & MVEBU_V7_FLAG_DEEP_IDLE)
+>   		deepidle = true;
+>
+> -	ret = mvebu_v7_cpu_suspend(deepidle);
+> +	ret = pcpuidle->cpu_suspend(deepidle);
+>   	if (ret)
+>   		return ret;
+>
+> @@ -46,8 +47,8 @@ static int mvebu_v7_enter_idle(struct cpuidle_device *dev,
+>   	return index;
+>   }
+>
+> -static struct cpuidle_driver mvebu_v7_idle_driver = {
+> -	.name			= "mvebu_v7_idle",
+> +static struct cpuidle_driver armadaxp_cpuidle_driver = {
+> +	.name			= "armada_xp_idle",
+>   	.states[0]		= ARM_CPUIDLE_WFI_STATE,
+>   	.states[1]		= {
+>   		.enter			= mvebu_v7_enter_idle,
+> @@ -55,7 +56,7 @@ static struct cpuidle_driver mvebu_v7_idle_driver = {
+>   		.power_usage		= 50,
+>   		.target_residency	= 100,
+>   		.flags			= CPUIDLE_FLAG_TIME_VALID,
+> -		.name			= "MV CPU IDLE",
+> +		.name			= "Idle",
+>   		.desc			= "CPU power down",
+>   	},
+>   	.states[2]		= {
+> @@ -63,19 +64,26 @@ static struct cpuidle_driver mvebu_v7_idle_driver = {
+>   		.exit_latency		= 100,
+>   		.power_usage		= 5,
+>   		.target_residency	= 1000,
+> -		.flags			= CPUIDLE_FLAG_TIME_VALID |
+> -						MVEBU_V7_FLAG_DEEP_IDLE,
+> -		.name			= "MV CPU DEEP IDLE",
+> +		.flags			= (CPUIDLE_FLAG_TIME_VALID |
+> +					   MVEBU_V7_FLAG_DEEP_IDLE),
+> +		.name			= "Deep idle",
+>   		.desc			= "CPU and L2 Fabric power down",
+>   	},
+> -	.state_count = MVEBU_V7_MAX_STATES,
+> +	.state_count = 3,
+>   };
+>
+>   static int mvebu_v7_cpuidle_probe(struct platform_device *pdev)
+>   {
+> +	struct cpuidle_driver *drv;
+> +
+> +	pcpuidle = pdev->dev.platform_data;
+> +
+> +	if (pcpuidle->type == CPUIDLE_ARMADA_XP)
+> +		drv = &armadaxp_cpuidle_driver;
+> +	else
+> +		return -EINVAL;
+>
+> -	mvebu_v7_cpu_suspend = (void *)(pdev->dev.platform_data);
+> -	return cpuidle_register(&mvebu_v7_idle_driver, NULL);
+> +	return cpuidle_register(drv, NULL);
+>   }
+>
+>   static struct platform_driver mvebu_v7_cpuidle_plat_driver = {
+> diff --git a/include/linux/mvebu-v7-cpuidle.h b/include/linux/mvebu-v7-cpuidle.h
+> new file mode 100644
+> index 0000000..00fde86
+> --- /dev/null
+> +++ b/include/linux/mvebu-v7-cpuidle.h
+> @@ -0,0 +1,26 @@
+> +/*
+> + * Marvell EBU cpuidle defintion
+> + *
+> + * Copyright (C) 2014 Marvell
+> + *
+> + * Gregory CLEMENT <gregory.clement@free-electrons.com>
+> + *
+> + * This file is licensed under the terms of the GNU General Public
+> + * License version 2.  This program is licensed "as is" without any
+> + * warranty of any kind, whether express or implied.
+> + *
+> + */
+> +
+> +#ifndef __LINUX_MVEBU_V7_CPUIDLE_H__
+> +#define __LINUX_MVEBU_V7_CPUIDLE_H__
+> +
+> +enum mvebu_v7_cpuidle_types {
+> +	CPUIDLE_ARMADA_XP,
+> +};
+> +
+> +struct mvebu_v7_cpuidle {
+> +	int type;
+> +	int (*cpu_suspend)(unsigned long deepidle);
+> +};
+> +
+> +#endif
+>
 
-I'd like to avoid adding more driver like stuff to mach-omap2
-and parsing compatible flags and dealing with interupts sounds
-very driver like.. But maybe just the handling can be moved
-out?
 
-Would a simple driver be doable that parses the compatible
-flags, takes care of the IRQ chaining, and gets some SoC specific
-function pointers as auxdata?
+-- 
+  <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
 
-That would allow further work later on to remove the auxdata
-dependencies possibly.
-
-Regards,
-
-Tony
+Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
+<http://twitter.com/#!/linaroorg> Twitter |
+<http://www.linaro.org/linaro-blog/> Blog
