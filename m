@@ -1,107 +1,92 @@
-From: lauraa@codeaurora.org (Laura Abbott)
-Date: Mon, 21 Jul 2014 15:00:52 -0700
-Subject: [PATCHv4 5/5] arm64: Add atomic pool for non-coherent and CMA
- allocations.
-In-Reply-To: <20140704133517.GA9860@ulmo>
-References: <1404324218-4743-1-git-send-email-lauraa@codeaurora.org>
- <1404324218-4743-6-git-send-email-lauraa@codeaurora.org>
- <20140704133517.GA9860@ulmo>
-Message-ID: <53CD8D94.9060207@codeaurora.org>
+From: thierry.reding@gmail.com (Thierry Reding)
+Date: Tue, 22 Jul 2014 00:04:11 +0200
+Subject: [RESEND PATCH v3 06/11] drm: add DT bindings documentation for
+ atmel-hlcdc-dc driver
+In-Reply-To: <6062556.5zQdTSJFua@avalon>
+References: <1404751384-5077-1-git-send-email-boris.brezillon@free-electrons.com>
+ <20140721135410.GA13770@ulmo> <20140721162136.286f5b62@bbrezillon>
+ <6062556.5zQdTSJFua@avalon>
+Message-ID: <20140721220409.GF12076@mithrandir>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 7/4/2014 6:35 AM, Thierry Reding wrote:
-> On Wed, Jul 02, 2014 at 11:03:38AM -0700, Laura Abbott wrote:
-> [...]
->> diff --git a/arch/arm64/mm/dma-mapping.c b/arch/arm64/mm/dma-mapping.c
-> [...]
->> +static struct gen_pool *atomic_pool;
->> +
->> +#define DEFAULT_DMA_COHERENT_POOL_SIZE  SZ_256K
->> +static size_t atomic_pool_size = DEFAULT_DMA_COHERENT_POOL_SIZE;
+On Mon, Jul 21, 2014 at 08:30:31PM +0200, Laurent Pinchart wrote:
+> Hi Boris and Thierry,
 > 
-> There doesn't seem to be much use for this since it can't be overridden
-> via init_dma_coherent_pool_size like on ARM.
+> On Monday 21 July 2014 16:21:36 Boris BREZILLON wrote:
+> > On Mon, 21 Jul 2014 15:54:12 +0200 Thierry Reding wrote:
+> > > On Mon, Jul 21, 2014 at 03:47:52PM +0200, Laurent Pinchart wrote:
+> > >> On Monday 21 July 2014 15:43:13 Boris BREZILLON wrote:
+> > >>> On Mon, 21 Jul 2014 15:30:35 +0200 Thierry Reding wrote:
+> > >>>> On Mon, Jul 21, 2014 at 03:22:05PM +0200, Laurent Pinchart wrote:
+> > >>>>> On Monday 21 July 2014 14:55:23 Thierry Reding wrote:
+> > >>>>>> On Mon, Jul 21, 2014 at 02:34:28PM +0200, Boris BREZILLON wrote:
+> > >>>>>>> On Mon, 21 Jul 2014 14:16:42 +0200 Laurent Pinchart wrote:
+> > >>>>>>>> On Monday 21 July 2014 14:12:47 Thierry Reding wrote:
 > 
-
-There is still the command line option coherent_pool=<size> though
-
-[...]
->> +	if (page) {
->> +		int ret;
->> +
->> +		atomic_pool = gen_pool_create(PAGE_SHIFT, -1);
->> +		if (!atomic_pool)
->> +			goto free_page;
->> +
->> +		addr = dma_common_contiguous_remap(page, atomic_pool_size,
->> +					VM_USERMAP, prot, atomic_pool_init);
->> +
->> +		if (!addr)
->> +			goto destroy_genpool;
->> +
->> +		memset(addr, 0, atomic_pool_size);
->> +		__dma_flush_range(addr, addr + atomic_pool_size);
->> +
->> +		ret = gen_pool_add_virt(atomic_pool, (unsigned long)addr,
->> +					page_to_phys(page),
->> +					atomic_pool_size, -1);
->> +		if (ret)
->> +			goto remove_mapping;
->> +
->> +		gen_pool_set_algo(atomic_pool,
->> +				  gen_pool_first_fit_order_align, NULL);
->> +
->> +		pr_info("DMA: preallocated %zd KiB pool for atomic allocations\n",
+> [snip]
 > 
-> I think this should be "%zu" because atomic_pool_size is a size_t, not a
-> ssize_t.
+> > >>>>>>>>> Quoting from your paste:
+> > >>>>>>>>> 	+   const enum video_bus_format *bus_formats;
+> > >>>>>>>>> 	+   int nbus_formats;
+> > >>>>>>>>> 
+> > >>>>>>>>> Do we really need more than one?
+> > >>>>>>>> 
+> > >>>>>>>> We do if we want to replace the color_formats and bpc fields.
+> > >>>>>>> 
+> > >>>>>>> Yes, that's what I was about to answer :-).
+> > >>>>>> 
+> > >>>>>> Maybe we don't need to replace color_formats and bpc field
+> > >>>>>> immediately. That could be done in a follow-up patch.
+> > >>>>> 
+> > >>>>> We don't need to replace them right now, but we should at least
+> > >>>>> agree on how to replace them. Introducing a new field that would
+> > >>>>> need to be replaced in the near future when removing color_formats
+> > >>>>> and bpc would be a waste of time.
+> > >>>> 
+> > >>>> Sure. One of the problems I see with replacing color_formats and bpc
+> > >>>> with the above is that some of the bits within color_formats are set
+> > >>>> when the EDID is parsed. That implies that if they are replaced with
+> > >>>> an array of formats, the array would need to be reallocated during
+> > >>>> EDID parsing. That sounds like ugliness.
+> > >>>> 
+> > >>>> But if you can find a nice way to make it work that'd be great.
+> > >>> 
+> > >>> How about using a list instead of an array ?
+> > >>> This way we can add elements to this list when parsing the EDID.
+> > >>> 
+> > >>> Or we can just define a maximum size for the bus_formats array when
+> > >>> retrieving this info from EDID. If I'm correct we have at most 18 bus
+> > >>> 
+> > >>> formats:
+> > >>>  - 3 color formats:
+> > >>>    * RGB 4:4:4
+> > >>>    * YCbCr 4:4:4
+> > >>>    * YCbCr 4:4:2
+> > >>>  - 6 color depths: 6, 8, 10, 12, 14 and 16 bits per color
+> > >> 
+> > >> bpc isn't a bitmask, so EDID supports up to three formats only.
+> > >> 
+> > >> The color_formats field is computed in the drm_add_display_info()
+> > >> function. You could easily turn it into a local variable and allocate
+> > >> and fill the formats array at the end of the function.
+> > > 
+> > > But you also need to be careful to keep whatever formats the driver might
+> > > have set explicitly.
 > 
+> Do we have drivers that explicitly add formats to the formats parsed from EDID 
+> data ? If so, what's the use case ?
 
-Yes, will fix.
+Drivers could specifically add them if there's no EDID or if the EDID
+is known to be broken. If the former this is probably irrelevant. In the
+latter maybe a better option would be to ignore the EDID-probed ones
+rather than use the union of those provided by the driver and EDID.
 
->> +			atomic_pool_size / 1024);
->> +		return 0;
->> +	}
->> +	goto out;
->> +
->> +remove_mapping:
->> +	dma_common_free_remap(addr, atomic_pool_size, VM_USERMAP);
->> +destroy_genpool:
->> +	gen_pool_destroy(atomic_pool);
->> +	atomic_pool == NULL;
-> 
-> This probably doesn't belong here.
-> 
-
-Dastardly typo.
-
->> +free_page:
->> +	if (!dma_release_from_contiguous(NULL, page, nr_pages))
->> +		__free_pages(page, get_order(atomic_pool_size));
-> 
-> You use get_order(atomic_pool_size) a lot, perhaps it should be a
-> temporary variable?
-> 
-
-Yes, three usages is probably enough.
-
->> +out:
->> +	pr_err("DMA: failed to allocate %zx KiB pool for atomic coherent allocation\n",
->> +		atomic_pool_size / 1024);
-> 
-> Print in decimal rather than hexadecimal?
-> 
-
-I actually prefer hexadecimal but I should at least be consistent between
-error and non-error paths.
-
-> Thierry
-> 
-
-Thanks,
-Laura
-
--- 
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-hosted by The Linux Foundation
+Thierry
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: not available
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140722/4735739e/attachment.sig>
