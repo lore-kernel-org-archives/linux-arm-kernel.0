@@ -1,37 +1,83 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Mon, 21 Jul 2014 00:58:03 -0700
-Subject: [GIT PULL] ARM: OMAP2+: clock cleanup for 3.17
-In-Reply-To: <alpine.DEB.2.02.1407171817440.22427@utopia.booyaka.com>
-References: <alpine.DEB.2.02.1407171817440.22427@utopia.booyaka.com>
-Message-ID: <20140721075803.GQ18374@atomide.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Mon, 21 Jul 2014 10:00:24 +0200
+Subject: [PATCHv6 3/4] iio: devicetree: Add DT binding documentation for
+ Exynos3250 ADC
+In-Reply-To: <53CC725C.9010406@samsung.com>
+References: <1405663186-26464-1-git-send-email-cw00.choi@samsung.com>
+ <5381273.c6GzlyQ7Ea@wuerfel> <53CC725C.9010406@samsung.com>
+Message-ID: <7477106.gq1AqisQx4@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Paul Walmsley <paul@pwsan.com> [140717 11:20]:
-> Hi Tony,
+On Monday 21 July 2014 10:52:28 Chanwoo Choi wrote:
+> > Yes, your current version is certainly better than this, but another way
+> > to address Tomasz' comment would be to change the binding to list the "sclk"
+> > as optional for any device and make the code silently ignore missing sclk
+> > entries, like:
+> > 
+> > 
+> >       info->sclk = devm_clk_get(&pdev->dev, "sclk");
+> >       if (IS_ERR(info->sclk)) {
+> >               switch (PTR_ERR(info->sclk)) {
+> >               case -EPROBE_DEFER:
+> >                       /* silently return error so we can retry */
+> >                       return -EPROBE_DEFER:
+> >               case -ENOENT:
+> >                       /* silently ignore missing optional clk */
+> >                       info->sclk = NULL;
+> >                       break;
+> >               default:
+> >                       /* any other error: clk is defined by doesn't work  */
+> >                       dev_err(&pdev->dev, "failed getting sclk clock, err = %ld\n",
+> >                               PTR_ERR(info->sclk));
+> >                       return PTR_ERR(info->sclk));
+> >               }
+> >       }
 > 
-> The following changes since commit a497c3ba1d97fc69c1e78e7b96435ba8c2cb42ee:
+> I tested this patch suggested by you.
+> But, devm_clk_get returns always '-ENOENT' on follwong two cases:
 > 
->   Linux 3.16-rc2 (2014-06-21 19:02:54 -1000)
+> Case 1.
+> ADC dt node in exynos3250.dtsi don't include 'sclk' clock as following:
 > 
-> are available in the git repository at:
+>                 adc: adc at 126C0000 {
+>                         compatible = "samsung,exynos3250-adc";
+>                         reg = <0x126C0000 0x100>, <0x10020718 0x4>;
+>                         interrupts = <0 137 0>;
+>                         clock-names = "adc";
+>                         clocks = <&cmu CLK_TSADC>;
+>                         #io-channel-cells = <1>;
+>                         io-channel-ranges;
+>                 };
 > 
->   git://git.kernel.org/pub/scm/linux/kernel/git/pjw/omap-pending.git tags/for-v3.17/omap-clock-a
+> Case 2.
+> ADC dt node in exynos3250.dtsi don't include 'sclk' clock
+> but, exynos3250 clock controller don't support CLK_SCLK_TSADC clock as following:
 > 
-> for you to fetch changes up to acd052bb8119dd9117e0af48ff0ac6e56e61b6b4:
-> 
->   ARM: OMAP2+: clock/interface: remove some headers from clkt_iclk.c file (2014-07-15 14:09:24 -0600)
-> 
-> ----------------------------------------------------------------
-> An OMAP clock cleanup series for 3.17 from Tero Kristo.
-> This is in preparation for moving this code into drivers/clk/ti.
-> 
-> Basic build, boot, and PM test logs are here:
-> 
-> http://www.pwsan.com/omap/testlogs/clock-a-v3.17/20140717034329/
+>                 adc: adc at 126C0000 {
+>                         compatible = "samsung,exynos3250-adc";
+>                         reg = <0x126C0000 0x100>, <0x10020718 0x4>;
+>                         interrupts = <0 137 0>;
+>                         clock-names = "adc", "sclk";
+>                         clocks = <&cmu CLK_TSADC>, <&cmu CLK_SCLK_TSADC>;
+>                         #io-channel-cells = <1>;
+>                         io-channel-ranges;
+>                 };
 
-Thanks pulling into omap-for-v3.17/soc.
+But neither of those cases is actually a correct DT representation for
+exynos3250: The first case describes an ADC that doesn't need a second
+clock, so if the hardware actually needs it to function, it is clearly
+unsufficiently described. The second case is even worse because it refers
+to a clock that isn't there. Actually that should probably return a different
+error code, but that's a different matter.
 
-Regards,
+> So, I think exynos-adc needs to use 'needs_sclk' field suggested by Tomasz Figa.
 
-Tony
+I don't mind you adding a field to the data, especially since you already
+need to have separate structures to encode the different number of channels.
+However, I don't see it as necessary either. What you do here is just
+checking the DT representation for correctness and consistency. It's not
+harmful but we don't normally do that because passing incorrect DT blobs
+can cause an infinite number of other problems that we don't check for.
+
+	Arnd
