@@ -1,62 +1,75 @@
-From: daniel.lezcano@linaro.org (Daniel Lezcano)
-Date: Mon, 21 Jul 2014 11:53:32 +0200
-Subject: [PATCH 1/3] cpuidle: exynos: Allow to use the driver without AFTR
-In-Reply-To: <1405931771-24100-1-git-send-email-k.kozlowski@samsung.com>
-References: <1405931771-24100-1-git-send-email-k.kozlowski@samsung.com>
-Message-ID: <53CCE31C.90300@linaro.org>
+From: boris.brezillon@free-electrons.com (Boris BREZILLON)
+Date: Mon, 21 Jul 2014 11:57:37 +0200
+Subject: [RESEND PATCH v3 06/11] drm: add DT bindings documentation for
+ atmel-hlcdc-dc driver
+In-Reply-To: <1486972.oIqOcvGYCb@avalon>
+References: <1404751384-5077-1-git-send-email-boris.brezillon@free-electrons.com>
+ <20140721085908.GI8843@ulmo> <20140721112438.60452e09@bbrezillon>
+ <1486972.oIqOcvGYCb@avalon>
+Message-ID: <20140721115737.1377a5fd@bbrezillon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/21/2014 10:36 AM, Krzysztof Kozlowski wrote:
-> Allow the driver to be used when AFTR enter function is not provided
-> (device platform data is NULL).
->
-> This actually does not give any special energy-saving benefits but
-> allows to track the idle time of each core. Additionally it is a safe
-> way to validate supplied platform data.
->
-> Signed-off-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
+On Mon, 21 Jul 2014 11:32:55 +0200
+Laurent Pinchart <laurent.pinchart@ideasonboard.com> wrote:
 
-I think we already talk about this in the mailing list several times.
-It does not make sense to enable the cpuidle driver for WFI just for the 
-sake of tracking via sysfs some idle timings.
+> Hi Boris,
+> 
+> On Monday 21 July 2014 11:24:38 Boris BREZILLON wrote:
+> > On Mon, 21 Jul 2014 10:59:12 +0200 Thierry Reding wrote:
+> > > On Fri, Jul 18, 2014 at 05:43:34PM +0200, Boris BREZILLON wrote:
+> > > [...]
+> > > 
+> > >>>>>>> + - atmel,panel: Should contain a phandle with 2 parameters.
+> > >>>>>>> +   The first cell is a phandle to a DRM panel device
+> > >>>>>>> +   The second cell encodes the RGB mode, which can take the
+> > >>>>>>> following values:
+> > >>>>>>> +   * 0: RGB444
+> > >>>>>>> +   * 1: RGB565
+> > >>>>>>> +   * 2: RGB666
+> > >>>>>>> +   * 3: RGB888
+> > >>>>>> 
+> > >>>>>> These are properties of the panel and should be obtained from
+> > >>>>>> the panel directly rather than an additional cell in this specifier.
+> > >>>>> 
+> > >>>>> Okay.
+> > >>>>> What's the preferred way of doing this ?
+> > >>>>> What about defining an rgb-mode property in the panel node.
+> > >>>> 
+> > >>>> There's .bpc in struct drm_display_info, I suspect that it could be
+> > >>>> used for this. Alternatively, maybe we could extend the list of color
+> > >>>> formats that go into drm_display_info.color_formats? RGB444 is already
+> > >>>> covered.
+> > >> 
+> > >> I forgot to ask about bpc meaning. If, as I think, it means "bits per
+> > >> color" then it cannot be used to encode RGB565 where green color is
+> > >> encoded on 6 bits and red and blue are encoded on 5 bits.
+> > > 
+> > > Yes, I agree that bps is not a good fit for what you need here.
+> > 
+> > Okay, then I think we can replace bpc and color_formats by a bus_formats
+> > table containing all supported formats, and use an enum (something
+> > similar to v4l2_mbus_pixelcode defined in v4l2-mediabus.h [1]) to list
+> > the available formats.
+> > 
+> > As this implies quite a few changes in crtc core and some drm drivers
+> > (nouveau, i915 and radeon), I'd like to be sure this is what both of you
+> > had in mind.
+> 
+> I think it is, but just to make sure I understand you correctly, could you 
+> just show how the drm_display_info structure would look like ?
+> 
 
-Using the cpuidle driver means using the underlying cpuidle 
-infrastructure with all the stats computation in the governor.
+The new drm_display_info structure should look like this [2] (except
+that color_formats and bpc have not be removed yet), and [1] is just
+here to show how the video_bus_format enum would look like.
 
-If there is a *real* need of a WFI cpuidle driver, then a generic WFI 
-cpuidle driver could be implemented to supersede this one.
+[1] http://code.bulix.org/rfd0yx-86557
+[2] http://code.bulix.org/7n03b4-86556
 
-It took a while to cleanup this driver and remove all the hacks around 
-this AFTR state... :)
-
-
-
-> ---
->   drivers/cpuidle/cpuidle-exynos.c | 3 +++
->   1 file changed, 3 insertions(+)
->
-> diff --git a/drivers/cpuidle/cpuidle-exynos.c b/drivers/cpuidle/cpuidle-exynos.c
-> index 7c0151263828..5325a394be7e 100644
-> --- a/drivers/cpuidle/cpuidle-exynos.c
-> +++ b/drivers/cpuidle/cpuidle-exynos.c
-> @@ -77,7 +77,10 @@ static int exynos_cpuidle_probe(struct platform_device *pdev)
->   {
->   	int ret;
->
-> +	/* If NULL enter only WFI */
->   	exynos_enter_aftr = (void *)(pdev->dev.platform_data);
-> +	if (!exynos_enter_aftr)
-> +		exynos_idle_driver.state_count = 1;
->
->   	ret = cpuidle_register(&exynos_idle_driver, NULL);
->   	if (ret) {
->
 
 
 -- 
-  <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
-
-Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
-<http://twitter.com/#!/linaroorg> Twitter |
-<http://www.linaro.org/linaro-blog/> Blog
+Boris Brezillon, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
