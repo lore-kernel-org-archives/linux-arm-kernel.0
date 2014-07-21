@@ -1,105 +1,39 @@
-From: daniel.lezcano@linaro.org (Daniel Lezcano)
-Date: Mon, 21 Jul 2014 16:37:24 +0200
-Subject: [PATCH v3 4/4] arm: pxa: add non device-tree timer link to
- clocksource
-In-Reply-To: <1405356724-32207-4-git-send-email-robert.jarzmik@free.fr>
-References: <1405356724-32207-1-git-send-email-robert.jarzmik@free.fr>
- <1405356724-32207-4-git-send-email-robert.jarzmik@free.fr>
-Message-ID: <53CD25A4.7030606@linaro.org>
+From: stwiss.opensource@diasemi.com (Opensource [Steve Twiss])
+Date: Mon, 21 Jul 2014 14:40:02 +0000
+Subject: [RFC V2] devicetree: Dialog Semiconductor consolidate existing
+ vendor prefixes to standardise on 'dlg'
+In-Reply-To: <201407151520.s6FFKcjB009745@swsrvapps-01.diasemi.com>
+References: <201407151520.s6FFKcjB009745@swsrvapps-01.diasemi.com>
+Message-ID: <6ED8E3B22081A4459DAC7699F3695FB7D0B274CB@SW-EX-MBX02.diasemi.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/14/2014 06:52 PM, Robert Jarzmik wrote:
-> As clocksource pxa_timer was moved to clocksource framework, the
-> pxa_timer initialization needs to be a bit amended, to pass the
-> necessary informations to clocksource, ie :
->   - the timer interrupt (mach specific)
->   - the timer registers base (ditto)
->   - the timer clockrate
->
-> Signed-off-by: Robert Jarzmik <robert.jarzmik@free.fr>
->
-> ---
-> Since V2: Arnd's comment : moved extern declaration into .h file
-> ---
 
-Shall I take the patches 4-5 also ?
+On 15 July 2014 16:04, Steve Twiss wrote:
 
-Arnd ?
+>From: Opensource [Steve Twiss] [mailto:stwiss.opensource at diasemi.com]
+>Sent: 15 July 2014 16:04
+>Subject: [RFC V2] devicetree: Dialog Semiconductor consolidate existing vendor
+>prefixes to standardise on 'dlg'
+[...]
+>This patch series updates the device tree vendor prefix for
+>Dialog Semiconductor.
+>Various methods are currently used throughout the kernel: 'diasemi',
+>'dialog' and 'dlg'. Others have also been suggested.
+>This patch set aims to consolidate the usage of the vendor prefix to
+>use a common standard. The prefix 'dlg' is used.
+[...]
 
-Thanks
+Hello all,
 
-   -- Daniel
+Have there been any further thoughts on this? I would like move this issue forwards so
+that this problem this does not keep arising.
 
->   arch/arm/mach-pxa/generic.c | 11 +++++++++++
->   include/clocksource/pxa.h   | 18 ++++++++++++++++++
->   2 files changed, 29 insertions(+)
->   create mode 100644 include/clocksource/pxa.h
->
-> diff --git a/arch/arm/mach-pxa/generic.c b/arch/arm/mach-pxa/generic.c
-> index 4225417..6f38e1a 100644
-> --- a/arch/arm/mach-pxa/generic.c
-> +++ b/arch/arm/mach-pxa/generic.c
-> @@ -25,11 +25,13 @@
->   #include <asm/mach/map.h>
->   #include <asm/mach-types.h>
->
-> +#include <mach/irqs.h>
->   #include <mach/reset.h>
->   #include <mach/smemc.h>
->   #include <mach/pxa3xx-regs.h>
->
->   #include "generic.h"
-> +#include <clocksource/pxa.h>
->
->   void clear_reset_status(unsigned int mask)
->   {
-> @@ -57,6 +59,15 @@ unsigned long get_clock_tick_rate(void)
->   EXPORT_SYMBOL(get_clock_tick_rate);
->
->   /*
-> + * For non device-tree builds, keep legacy timer init
-> + */
-> +void pxa_timer_init(void)
-> +{
-> +	pxa_timer_nodt_init(IRQ_OST0, io_p2v(0x40a00000),
-> +			    get_clock_tick_rate());
-> +}
-> +
-> +/*
->    * Get the clock frequency as reflected by CCCR and the turbo flag.
->    * We assume these values have been applied via a fcs.
->    * If info is not 0 we also display the current settings.
-> diff --git a/include/clocksource/pxa.h b/include/clocksource/pxa.h
-> new file mode 100644
-> index 0000000..1efbe5a
-> --- /dev/null
-> +++ b/include/clocksource/pxa.h
-> @@ -0,0 +1,18 @@
-> +/*
-> + * PXA clocksource, clockevents, and OST interrupt handlers.
-> + *
-> + * Copyright (C) 2014 Robert Jarzmik
-> + *
-> + * This program is free software; you can redistribute it and/or modify
-> + * it under the terms of the GNU General Public License as published by
-> + * the Free Software Foundation; version 2 of the License.
-> + *
-> + */
-> +
-> +#ifndef _CLOCKSOURCE_PXA_H
-> +#define _CLOCKSOURCE_PXA_H
-> +
-> +extern void pxa_timer_nodt_init(int irq, void __iomem *base,
-> +			   unsigned long clock_tick_rate);
-> +
-> +#endif
->
+>From my point of view, the argument is a simple one: what is the value of existing multiple
+vendor prefixes if they do not work and are not used anywhere?
 
+But, as usual I recognise that the kernel community have different aims and I am willing
+to compromise with my patches in order to move ahead.
 
--- 
-  <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
-
-Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
-<http://twitter.com/#!/linaroorg> Twitter |
-<http://www.linaro.org/linaro-blog/> Blog
+Regards,
+Steve
