@@ -1,53 +1,50 @@
-From: javier.martinez@collabora.co.uk (Javier Martinez Canillas)
-Date: Mon, 21 Jul 2014 14:44:07 +0200
-Subject: [PATCH v8 00/13] Add Maxim 77802 PMIC support
-In-Reply-To: <1405337769-3741-1-git-send-email-javier.martinez@collabora.co.uk>
-References: <1405337769-3741-1-git-send-email-javier.martinez@collabora.co.uk>
-Message-ID: <53CD0B17.5040706@collabora.co.uk>
+From: linux@roeck-us.net (Guenter Roeck)
+Date: Mon, 21 Jul 2014 05:51:02 -0700
+Subject: [PATCH v5 0/7] kernel: Add support for restart handler call chain
+In-Reply-To: <20140721123056.GF12817@arm.com>
+References: <1405668856-13738-1-git-send-email-linux@roeck-us.net>
+ <20140721123056.GF12817@arm.com>
+Message-ID: <53CD0CB6.1050803@roeck-us.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Lee,
+Hi Catalin,
 
-On 07/14/2014 01:35 PM, Javier Martinez Canillas wrote:
-> 
-> * Patches 1-7 from v7 are not included since those were improvements to
-> the max77686 mfd driver and can be applied independently. Lee Jones said
-> that he is going to pick them from the posted v7 series.
-> 
+On 07/21/2014 05:30 AM, Catalin Marinas wrote:
+> On Fri, Jul 18, 2014 at 08:34:09AM +0100, Guenter Roeck wrote:
+>> Patch 1 of this series implements the restart handler function. Patches 2 and 3
+>> implement calling the restart handler chain from arm and arm64 restart code.
+>>
+>> Patch 4 modifies the restart-poweroff driver to no longer call arm_pm_restart
+>> directly but machine_restart. This is done to avoid calling arm_pm_restart
+>> from more than one place. The change makes the driver architecture independent,
+>> so it would be possible to drop the arm dependency from its Kconfig entry.
+>>
+>> Patch 5 and 6 convert existing restart handlers in the watchdog subsystem
+>> to use the restart handler. Patch 7 unexports arm_pm_restart to ensure
+>> that no one gets the idea to implement a restart handler as module.
+>
+> For the current patches:
+>
+> Acked-by: Catalin Marinas <catalin.marinas@arm.com>
+>
+> Do you plan to convert more of the power/drivers/reset/ code?
+>
 
-Thanks a lot for picking the max77686 preparatory patches.
+Once this series has been accepted, I at least wanted to give it a try.
 
-> 
-> Since there are cross-subsystems dependencies, I think that the best way to
-> sort this out is if relevant maintainers ack the patches so 01/13 to 012/13
-> can be merged through the mfd tree. The patches and the relevant acks are:
-> 
-> Patch 03/13 (regulator - Mark Brown)
-> Patches 04/13 to 09/13 (clk - Mike Turquette)
-> Patches 10/13 to 12/13 (rtc - Alessandro Zummo)
-> 
+> BTW, is it worth doing something similar for pm_power_off (there is
+> generic code calling it directly, so slightly more complicated than
+> pm_restart)?
 
-Mark, Mike and Alessandro,
+I have not thought about it yet.
 
-This is a gentle reminder to look at the patches that touches your subsystems
-and provide acks if possible so Lee can merge the remainder set through the mfd
-tree.
+A quick glance suggests it is much more widely used than the reset handler.
+It looks like the original idea, like with machine_restart, was to have
+one function per architecture, but it seems that is widely abused.
 
-There were only trivial changes for the regulator, clock and rtc drivers since
-v5 (posted almost a month ago in Jun 26) and this series is blocking a lot of
-other patch-sets so is hurting forward progress on the chromebook2 platform as a
-whole.
+Looks pretty messy to me. Maybe after this one is done, if there is interest
+and, more importantly, the need to do something about it.
 
-Lee,
-
-Since I may not be able to get the acks before the merge window opens, do you
-think that is possible to merge patch 01/13 "mfd: max77686: Add Maxim 77802 PMIC
-support" which already has your ack?
-
-So at least we can get the dependency for the other drivers in 3.17 and avoid
-this cross subsystem churn for 3.18 since the rest of the drivers will be able
-to go through the relevant trees.
-
-Thanks a lot and best regards,
-Javier
+Thanks,
+Guenter
