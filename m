@@ -1,66 +1,88 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Mon, 21 Jul 2014 20:29:54 +0200
-Subject: [RFC] arm: section split in boot/compressed/head.S
-In-Reply-To: <20140721175432.GB4179@bivouac.eciton.net>
-References: <20140721175432.GB4179@bivouac.eciton.net>
-Message-ID: <CAKv+Gu8k=1M9Y7mjYVYYqe94YNFAkG-MRw_GipvN7ORxo4CAMA@mail.gmail.com>
+From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
+Date: Mon, 21 Jul 2014 20:30:31 +0200
+Subject: [RESEND PATCH v3 06/11] drm: add DT bindings documentation for
+ atmel-hlcdc-dc driver
+In-Reply-To: <20140721162136.286f5b62@bbrezillon>
+References: <1404751384-5077-1-git-send-email-boris.brezillon@free-electrons.com>
+ <20140721135410.GA13770@ulmo> <20140721162136.286f5b62@bbrezillon>
+Message-ID: <6062556.5zQdTSJFua@avalon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 21 July 2014 19:54, Leif Lindholm <leif.lindholm@linaro.org> wrote:
-> Reported-by: Roy Franz <roy.franz@linaro.org>
->
-> The current code in boot/compressed/head.S executes pretty much
-> sequentially from "start", all the way until the end of
-> "dtb_check_done". However, shortly after the "not_angel" symbol, there
-> is a section change, in the form of a ".text" directive.
->
-> This means any literal pools in .start end up getting inserted into
-> the middle of the instruction stream.
->
-> Would something like the below (pardon the semantic silliness) be an
-> acceptable fix?
->
-> diff --git a/arch/arm/boot/compressed/head.S b/arch/arm/boot/compressed/head.S
-> index 3a8b32d..8ee05e9 100644
-> --- a/arch/arm/boot/compressed/head.S
-> +++ b/arch/arm/boot/compressed/head.S
-> @@ -149,6 +149,10 @@ start:
->                 mov     r0, #0x17               @ angel_SWIreason_EnterSVC
->   ARM(          swi     0x123456        )       @ angel_SWI_ARM
->   THUMB(                svc     0xab            )       @ angel_SWI_THUMB
-> +               b       angel
+Hi Boris and Thierry,
 
+On Monday 21 July 2014 16:21:36 Boris BREZILLON wrote:
+> On Mon, 21 Jul 2014 15:54:12 +0200 Thierry Reding wrote:
+> > On Mon, Jul 21, 2014 at 03:47:52PM +0200, Laurent Pinchart wrote:
+> >> On Monday 21 July 2014 15:43:13 Boris BREZILLON wrote:
+> >>> On Mon, 21 Jul 2014 15:30:35 +0200 Thierry Reding wrote:
+> >>>> On Mon, Jul 21, 2014 at 03:22:05PM +0200, Laurent Pinchart wrote:
+> >>>>> On Monday 21 July 2014 14:55:23 Thierry Reding wrote:
+> >>>>>> On Mon, Jul 21, 2014 at 02:34:28PM +0200, Boris BREZILLON wrote:
+> >>>>>>> On Mon, 21 Jul 2014 14:16:42 +0200 Laurent Pinchart wrote:
+> >>>>>>>> On Monday 21 July 2014 14:12:47 Thierry Reding wrote:
 
-The idea appears to be that code in .start sections from other
-platform specific object files gets put there, so it gets executed
-extremely early.
-Jumping over it kind of defeats the purpose here.
+[snip]
 
-Instead, adding an explicit .ltorg and jumping over /that/ should do
-the trick, I think, but perhaps it's better just to open code the
-literal pool in this case.
+> >>>>>>>>> Quoting from your paste:
+> >>>>>>>>> 	+   const enum video_bus_format *bus_formats;
+> >>>>>>>>> 	+   int nbus_formats;
+> >>>>>>>>> 
+> >>>>>>>>> Do we really need more than one?
+> >>>>>>>> 
+> >>>>>>>> We do if we want to replace the color_formats and bpc fields.
+> >>>>>>> 
+> >>>>>>> Yes, that's what I was about to answer :-).
+> >>>>>> 
+> >>>>>> Maybe we don't need to replace color_formats and bpc field
+> >>>>>> immediately. That could be done in a follow-up patch.
+> >>>>> 
+> >>>>> We don't need to replace them right now, but we should at least
+> >>>>> agree on how to replace them. Introducing a new field that would
+> >>>>> need to be replaced in the near future when removing color_formats
+> >>>>> and bpc would be a waste of time.
+> >>>> 
+> >>>> Sure. One of the problems I see with replacing color_formats and bpc
+> >>>> with the above is that some of the bits within color_formats are set
+> >>>> when the EDID is parsed. That implies that if they are replaced with
+> >>>> an array of formats, the array would need to be reallocated during
+> >>>> EDID parsing. That sounds like ugliness.
+> >>>> 
+> >>>> But if you can find a nice way to make it work that'd be great.
+> >>> 
+> >>> How about using a list instead of an array ?
+> >>> This way we can add elements to this list when parsing the EDID.
+> >>> 
+> >>> Or we can just define a maximum size for the bus_formats array when
+> >>> retrieving this info from EDID. If I'm correct we have at most 18 bus
+> >>> 
+> >>> formats:
+> >>>  - 3 color formats:
+> >>>    * RGB 4:4:4
+> >>>    * YCbCr 4:4:4
+> >>>    * YCbCr 4:4:2
+> >>>  - 6 color depths: 6, 8, 10, 12, 14 and 16 bits per color
+> >> 
+> >> bpc isn't a bitmask, so EDID supports up to three formats only.
+> >> 
+> >> The color_formats field is computed in the drm_add_display_info()
+> >> function. You could easily turn it into a local variable and allocate
+> >> and fill the formats array at the end of the function.
+> > 
+> > But you also need to be careful to keep whatever formats the driver might
+> > have set explicitly.
+
+Do we have drivers that explicitly add formats to the formats parsed from EDID 
+data ? If so, what's the use case ?
+
+> Okay, in this case, using a list is a better idea, don't you think ?
+
+I'd prefer an array if possible, as that would be easier to use for drivers.
+
+In any case, we need to define who allocates and frees the array or the list 
+elements, how and when.
 
 -- 
-Ard.
+Regards,
 
-> +
-> +               .text
-> +angel:
->  not_angel:
->                 safe_svcmode_maskall r0
->                 msr     spsr_cxsf, r9           @ Save the CPU boot mode in
-> @@ -163,8 +167,6 @@ not_angel:
->                  * by the linker here, but it should preserve r7, r8, and r9.
->                  */
->
-> -               .text
-> -
->  #ifdef CONFIG_AUTO_ZRELADDR
->                 @ determine final kernel image address
->                 mov     r4, pc
->
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+Laurent Pinchart
