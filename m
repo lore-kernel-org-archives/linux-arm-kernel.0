@@ -1,92 +1,64 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Mon, 21 Jul 2014 02:35:28 -0700
-Subject: [PATCH 5/5] tty: serial: Add 8250-core based omap driver
-In-Reply-To: <20140718062456.GJ18374@atomide.com>
-References: <1405521903-5877-1-git-send-email-bigeasy@linutronix.de>
- <1405521903-5877-6-git-send-email-bigeasy@linutronix.de>
- <20140717070859.GD18374@atomide.com>
- <20140717074219.GA29193@linutronix.de>
- <20140717081232.GH18374@atomide.com> <53C7A01C.50107@linutronix.de>
- <20140718062456.GJ18374@atomide.com>
-Message-ID: <20140721093528.GS18374@atomide.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Mon, 21 Jul 2014 10:39:51 +0100
+Subject: [PATCH v3 00/13] Add support for Hisilicon SMMU architecture
+In-Reply-To: <53CC7234.4080703@huawei.com>
+References: <1404975186-12032-1-git-send-email-thunder.leizhen@huawei.com>
+ <53CC7234.4080703@huawei.com>
+Message-ID: <20140721093951.GC16122@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Tony Lindgren <tony@atomide.com> [140717 23:28]:
-> * Sebastian Andrzej Siewior <bigeasy@linutronix.de> [140717 03:09]:
-> > On 07/17/2014 10:12 AM, Tony Lindgren wrote:
-> > > Hmm it could be that it works for a while because the clocks are on
-> > > from the bootloader and pm_runtime calls won't do anything. This
-> > > could happen if the interconnect data based on the ti,hwmods entry
-> > > is not getting matched to the new driver. This gets initialized when
-> > > the device entry gets created in omap_device_build_from_dt().
-> > > 
-> > > Or maybe something now affects the clock aliases? It seems that we
-> > > are still missing the clocks entries in the .dtsi files, see the
-> > > mappings with $ git grep uart drivers/clk/ti/
-> > 
-> > I've been looking for something completely different while I noticed
-> > this:
-> > 
-> > in drivers/tty/serial/omap-serial.c
-> > | static struct platform_driver serial_omap_driver = {
-> > |         .driver         = {
-> > |                 .name   = DRIVER_NAME,
-> > |         },
-> > | };
-> > |
-> > 
-> > and DRIVER_NAME should come from include/linux/platform_data/serial-omap.h
-> > Looking further, I've found arch/arm/mach-omap2/serial.c:
-> > | void __init omap_serial_init_port(struct omap_board_data *bdata,
-> > |                         struct omap_uart_port_info *info)
-> > | {
-> > |         char *name
-> > ?
-> > |	name = DRIVER_NAME;
-> > ?
-> > |	pdev = omap_device_build(name, uart->num, oh, pdata, pdata_size);
-> > ?
-> > |
-> > 
-> > Would this explain it?
-> 
-> That would explain it for legacy booting, but not for device tree
-> based booting. I can try to debug it further on Monday.
+[re-adding the lists]
 
-Looks like the following is needed to avoid the error, no idea why..
-But this is what we also do in omap-serial.c. It may be needed in
-other places too?
+On Mon, Jul 21, 2014 at 02:51:48AM +0100, leizhen wrote:
+> Hi, Will
 
-Also, no luck yet on runtime PM. If the console is enabled omap won't
-idle, and if no serial console is enabled, it just hangs. Will try
-to debug this part further, it may be also related to the above.
+Hello,
 
-Regards,
+> I have sent this patch a week ago. I saw that you and Mitchel Humpherys had
+> sent some patches which will impact my code. I list below:
+> iommu/arm-smmu: remove support for chained SMMUs
+> iommu/arm-smmu: fix some checkpatch issues
 
-Tony
+There's also all of the development work I'm doing for VFIO and the page-table
+rework that Varun's working on, so these patches are going to be difficult
+to merge if we ever get to that point. I think Mitchel and Olav are also
+busy trying to get their SMMU supported by the driver. Given that they've
+actually bothered to follow the architecture, I don't see why they should
+be messed about by your patches causing conflicts all over the place.
 
---- a/drivers/tty/serial/8250/8250_core.c
-+++ b/drivers/tty/serial/8250/8250_core.c
-@@ -2066,8 +2066,8 @@ int serial8250_do_startup(struct uart_port *port)
- 	/*
- 	 * Clear the interrupt registers.
- 	 */
--	serial_port_in(port, UART_LSR);
--	serial_port_in(port, UART_RX);
-+	if (serial_port_in(port, UART_LSR) & UART_LSR_DR)
-+		serial_port_in(port, UART_RX);
- 	serial_port_in(port, UART_IIR);
- 	serial_port_in(port, UART_MSR);
- 
-@@ -2228,8 +2228,8 @@ dont_test_tx_en:
- 	 * saved flags to avoid getting false values from polling
- 	 * routines or the previous session.
- 	 */
--	serial_port_in(port, UART_LSR);
--	serial_port_in(port, UART_RX);
-+	if (serial_port_in(port, UART_LSR) & UART_LSR_DR)
-+		serial_port_in(port, UART_RX);
- 	serial_port_in(port, UART_IIR);
- 	serial_port_in(port, UART_MSR);
- 	up->lsr_saved_flags = 0;
+> I can ajust my patch because of above. I known this patch is not follow what
+> you suggested before(fit into arm-smmu.c). But I found when we need to support
+> ARM SMMUv3, maybe we should do like this. I really want to know whether or not
+> you agree the software framework in this patch? Or what do you think about
+> SMMUv3?
+
+The only code I foresee sharing between SMMUv2 and SMMUv3 is the page-table
+creation code. The two architectures are significantly different, so I don't
+think your split really helps us there. For example, you've left the probing
+code in smmu-base.c. Of course, if HiSilicon follow the SMMUv3 spec as well
+they did with SMMUv2, then your point is moot anyway and we may as well go
+home.
+
+> > I tried to merge hisi-smmu driver into arm-smmu.c, but it looks impossible.
+> > The biggest problem is that too many registers are diffrent: the base address,
+> > the field definition, or present only on one side. And if I use #if, hisi-smmu
+> > and arm-smmu can not coexist in one binary file. Almost need 20 #if.
+
+I don't think #ifdefs are necessarily the right way to go. There are IMPDEF
+parts of a compliant SMMU (e.g. power management), so having a new compatible
+string and a set of internal ops which can be overridden by a particular
+implementation wouldn't be the end of the world and would be far less
+invasive.
+
+The problem you have is that your SMMU isn't architecturally compliant, so
+you'll end up having to restructure parts of the driver so you can add
+internal hooks for operations that aren't actually IMPDEF. That's the part
+I'm worried about and we will have to draw the line somewhere, especially
+when other people are trying to work with this code for compliant
+implementations.
+
+So, NAK to your current approach. You need to try something like I said
+above and, if you want to spit the file up, start with the page-table code.
+
+Will
