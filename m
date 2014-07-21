@@ -1,57 +1,125 @@
 From: computersforpeace@gmail.com (Brian Norris)
-Date: Mon, 21 Jul 2014 14:08:00 -0700
-Subject: [PATCH v8 05/11] ARM: Enable erratum 798181 for Broadcom Brahma-B15
+Date: Mon, 21 Jul 2014 14:08:02 -0700
+Subject: [PATCH v8 07/11] ARM: brcmstb: add misc. DT bindings for brcmstb
 In-Reply-To: <1405976886-27807-1-git-send-email-computersforpeace@gmail.com>
 References: <1405976886-27807-1-git-send-email-computersforpeace@gmail.com>
-Message-ID: <1405976886-27807-6-git-send-email-computersforpeace@gmail.com>
+Message-ID: <1405976886-27807-8-git-send-email-computersforpeace@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Gregory Fong <gregory.0xf0@gmail.com>
+From: Marc Carino <marc.ceeeee@gmail.com>
 
-Broadcom Brahma-B15 (r0p0..r0p2) is also affected by Cortex-A15
-erratum 798181, so enable the workaround for Brahma-B15.
+Document the bindings that the Broadcom STB platform needs
+for proper bootup.
 
-Signed-off-by: Gregory Fong <gregory.0xf0@gmail.com>
-Acked-by: Marc Carino <marc.ceeeee@gmail.com>
+Signed-off-by: Marc Carino <marc.ceeeee@gmail.com>
+Acked-by: Florian Fainelli <f.fainelli@gmail.com>
 Signed-off-by: Brian Norris <computersforpeace@gmail.com>
-Cc: Rob Herring <rob.herring@calxeda.com>
-Cc: Will Deacon <will.deacon@arm.com>
 ---
- arch/arm/kernel/smp_tlb.c | 20 ++++++++++++--------
- 1 file changed, 12 insertions(+), 8 deletions(-)
+ .../devicetree/bindings/arm/brcm-brcmstb.txt       | 95 ++++++++++++++++++++++
+ 1 file changed, 95 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/arm/brcm-brcmstb.txt
 
-diff --git a/arch/arm/kernel/smp_tlb.c b/arch/arm/kernel/smp_tlb.c
-index 95d063620b76..2e72be4f623e 100644
---- a/arch/arm/kernel/smp_tlb.c
-+++ b/arch/arm/kernel/smp_tlb.c
-@@ -92,15 +92,19 @@ void erratum_a15_798181_init(void)
- 	unsigned int midr = read_cpuid_id();
- 	unsigned int revidr = read_cpuid(CPUID_REVIDR);
- 
--	/* Cortex-A15 r0p0..r3p2 w/o ECO fix affected */
--	if ((midr & 0xff0ffff0) != 0x410fc0f0 || midr > 0x413fc0f2 ||
--	    (revidr & 0x210) == 0x210) {
--		return;
--	}
--	if (revidr & 0x10)
--		erratum_a15_798181_handler = erratum_a15_798181_partial;
--	else
-+	/* Brahma-B15 r0p0..r0p2 affected
-+	 * Cortex-A15 r0p0..r3p2 w/o ECO fix affected */
-+	if ((midr & 0xff0ffff0) == 0x420f00f0 && midr <= 0x420f00f2)
- 		erratum_a15_798181_handler = erratum_a15_798181_broadcast;
-+	else if ((midr & 0xff0ffff0) == 0x410fc0f0 && midr <= 0x413fc0f2 &&
-+		 (revidr & 0x210) != 0x210) {
-+		if (revidr & 0x10)
-+			erratum_a15_798181_handler =
-+				erratum_a15_798181_partial;
-+		else
-+			erratum_a15_798181_handler =
-+				erratum_a15_798181_broadcast;
-+	}
- }
- #endif
- 
+diff --git a/Documentation/devicetree/bindings/arm/brcm-brcmstb.txt b/Documentation/devicetree/bindings/arm/brcm-brcmstb.txt
+new file mode 100644
+index 000000000000..3c436cc4f35d
+--- /dev/null
++++ b/Documentation/devicetree/bindings/arm/brcm-brcmstb.txt
+@@ -0,0 +1,95 @@
++ARM Broadcom STB platforms Device Tree Bindings
++-----------------------------------------------
++Boards with Broadcom Brahma15 ARM-based BCMxxxx (generally BCM7xxx variants)
++SoC shall have the following DT organization:
++
++Required root node properties:
++    - compatible: "brcm,bcm<chip_id>", "brcm,brcmstb"
++
++example:
++/ {
++    #address-cells = <2>;
++    #size-cells = <2>;
++    model = "Broadcom STB (bcm7445)";
++    compatible = "brcm,bcm7445", "brcm,brcmstb";
++
++Further, syscon nodes that map platform-specific registers used for general
++system control is required:
++
++    - compatible: "brcm,bcm<chip_id>-sun-top-ctrl", "syscon"
++    - compatible: "brcm,bcm<chip_id>-hif-cpubiuctrl", "syscon"
++    - compatible: "brcm,bcm<chip_id>-hif-continuation", "syscon"
++
++example:
++    rdb {
++        #address-cells = <1>;
++        #size-cells = <1>;
++        compatible = "simple-bus";
++        ranges = <0 0x00 0xf0000000 0x1000000>;
++
++        sun_top_ctrl: syscon at 404000 {
++            compatible = "brcm,bcm7445-sun-top-ctrl", "syscon";
++            reg = <0x404000 0x51c>;
++        };
++
++        hif_cpubiuctrl: syscon at 3e2400 {
++            compatible = "brcm,bcm7445-hif-cpubiuctrl", "syscon";
++            reg = <0x3e2400 0x5b4>;
++        };
++
++        hif_continuation: syscon at 452000 {
++            compatible = "brcm,bcm7445-hif-continuation", "syscon";
++            reg = <0x452000 0x100>;
++        };
++    };
++
++Lastly, nodes that allow for support of SMP initialization and reboot are
++required:
++
++smpboot
++-------
++Required properties:
++
++    - compatible
++        The string "brcm,brcmstb-smpboot".
++
++    - syscon-cpu
++        A phandle / integer array property which lets the BSP know the location
++        of certain CPU power-on registers.
++
++        The layout of the property is as follows:
++            o a phandle to the "hif_cpubiuctrl" syscon node
++            o offset to the base CPU power zone register
++            o offset to the base CPU reset register
++
++    - syscon-cont
++        A phandle pointing to the syscon node which describes the CPU boot
++        continuation registers.
++            o a phandle to the "hif_continuation" syscon node
++
++example:
++    smpboot {
++        compatible = "brcm,brcmstb-smpboot";
++        syscon-cpu = <&hif_cpubiuctrl 0x88 0x178>;
++        syscon-cont = <&hif_continuation>;
++    };
++
++reboot
++-------
++Required properties
++
++    - compatible
++        The string property "brcm,brcmstb-reboot".
++
++    - syscon
++        A phandle / integer array that points to the syscon node which describes
++        the general system reset registers.
++            o a phandle to "sun_top_ctrl"
++            o offset to the "reset source enable" register
++            o offset to the "software master reset" register
++
++example:
++    reboot {
++        compatible = "brcm,brcmstb-reboot";
++        syscon = <&sun_top_ctrl 0x304 0x308>;
++    };
 -- 
 1.9.1
