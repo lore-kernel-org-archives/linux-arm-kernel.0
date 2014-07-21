@@ -1,51 +1,61 @@
-From: shawn.guo@freescale.com (Shawn Guo)
-Date: Mon, 21 Jul 2014 17:27:04 +0800
-Subject: [PATCH 2/3] ARM: smp_scu: enable SCU standby support
-In-Reply-To: <20140721085150.GB15666@arm.com>
-References: <1405928755-19413-1-git-send-email-shawn.guo@freescale.com>
- <1405928755-19413-3-git-send-email-shawn.guo@freescale.com>
- <20140721085150.GB15666@arm.com>
-Message-ID: <20140721092703.GL8537@dragon>
+From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
+Date: Mon, 21 Jul 2014 11:32:55 +0200
+Subject: [RESEND PATCH v3 06/11] drm: add DT bindings documentation for
+ atmel-hlcdc-dc driver
+In-Reply-To: <20140721112438.60452e09@bbrezillon>
+References: <1404751384-5077-1-git-send-email-boris.brezillon@free-electrons.com>
+ <20140721085908.GI8843@ulmo> <20140721112438.60452e09@bbrezillon>
+Message-ID: <1486972.oIqOcvGYCb@avalon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jul 21, 2014 at 09:51:50AM +0100, Will Deacon wrote:
-> On Mon, Jul 21, 2014 at 08:45:54AM +0100, Shawn Guo wrote:
-> > With SCU standby enabled, SCU CLK will be turned off when all processors
-> > are in WFI mode.  And the clock will be turned on when any processor
-> > leaves WFI mode.
+Hi Boris,
+
+On Monday 21 July 2014 11:24:38 Boris BREZILLON wrote:
+> On Mon, 21 Jul 2014 10:59:12 +0200 Thierry Reding wrote:
+> > On Fri, Jul 18, 2014 at 05:43:34PM +0200, Boris BREZILLON wrote:
+> > [...]
 > > 
-> > This behavior should be preferable in terms of power efficiency of
-> > system idle.  So let's set the SCU standby bit to enable the support in
-> > function scu_enable().
+> >>>>>>> + - atmel,panel: Should contain a phandle with 2 parameters.
+> >>>>>>> +   The first cell is a phandle to a DRM panel device
+> >>>>>>> +   The second cell encodes the RGB mode, which can take the
+> >>>>>>> following values:
+> >>>>>>> +   * 0: RGB444
+> >>>>>>> +   * 1: RGB565
+> >>>>>>> +   * 2: RGB666
+> >>>>>>> +   * 3: RGB888
+> >>>>>> 
+> >>>>>> These are properties of the panel and should be obtained from
+> >>>>>> the panel directly rather than an additional cell in this specifier.
+> >>>>> 
+> >>>>> Okay.
+> >>>>> What's the preferred way of doing this ?
+> >>>>> What about defining an rgb-mode property in the panel node.
+> >>>> 
+> >>>> There's .bpc in struct drm_display_info, I suspect that it could be
+> >>>> used for this. Alternatively, maybe we could extend the list of color
+> >>>> formats that go into drm_display_info.color_formats? RGB444 is already
+> >>>> covered.
+> >> 
+> >> I forgot to ask about bpc meaning. If, as I think, it means "bits per
+> >> color" then it cannot be used to encode RGB565 where green color is
+> >> encoded on 6 bits and red and blue are encoded on 5 bits.
 > > 
-> > Signed-off-by: Shawn Guo <shawn.guo@freescale.com>
-> > ---
-> >  arch/arm/kernel/smp_scu.c | 3 ++-
-> >  1 file changed, 2 insertions(+), 1 deletion(-)
-> > 
-> > diff --git a/arch/arm/kernel/smp_scu.c b/arch/arm/kernel/smp_scu.c
-> > index c947508f84e6..9f29d167d02c 100644
-> > --- a/arch/arm/kernel/smp_scu.c
-> > +++ b/arch/arm/kernel/smp_scu.c
-> > @@ -18,6 +18,7 @@
-> >  
-> >  #define SCU_CTRL		0x00
-> >  #define SCU_ENABLE		(1 << 0)
-> > +#define SCU_STANDBY_ENABLE	(1 << 5)
-> >  #define SCU_CONFIG		0x04
-> >  #define SCU_CPU_STATUS		0x08
-> >  #define SCU_INVALIDATE		0x0c
-> > @@ -54,7 +55,7 @@ void scu_enable(void __iomem *scu_base)
-> >  	if (scu_ctrl & SCU_ENABLE)
-> >  		return;
-> >  
-> > -	scu_ctrl |= SCU_ENABLE;
-> > +	scu_ctrl |= SCU_ENABLE | SCU_STANDBY_ENABLE;
+> > Yes, I agree that bps is not a good fit for what you need here.
 > 
-> I don't think this bit exists on all revisions of the A9.
+> Okay, then I think we can replace bpc and color_formats by a bus_formats
+> table containing all supported formats, and use an enum (something
+> similar to v4l2_mbus_pixelcode defined in v4l2-mediabus.h [1]) to list
+> the available formats.
+> 
+> As this implies quite a few changes in crtc core and some drm drivers
+> (nouveau, i915 and radeon), I'd like to be sure this is what both of you
+> had in mind.
 
-Thanks for the info, Will.  Is there any side-effect to write the
-standby bit on those revisions which do not define the bit?
+I think it is, but just to make sure I understand you correctly, could you 
+just show how the drm_display_info structure would look like ?
 
-Shawn
+-- 
+Regards,
+
+Laurent Pinchart
