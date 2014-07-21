@@ -1,223 +1,67 @@
-From: l.majewski@samsung.com (Lukasz Majewski)
-Date: Mon, 21 Jul 2014 09:02:34 +0200
-Subject: [PATCH v2] cpufreq: tests: Providing cpufreq regression test
-In-Reply-To: <1405678985-21677-1-git-send-email-l.majewski@samsung.com>
-References: <1405678985-21677-1-git-send-email-l.majewski@samsung.com>
-Message-ID: <1405926154-27214-1-git-send-email-l.majewski@samsung.com>
+From: vinceh@nvidia.com (Vince Hsu)
+Date: Mon, 21 Jul 2014 15:09:29 +0800
+Subject: [PATCH 12/12] ARM: tegra: Convert PMC to a driver
+In-Reply-To: <20140717110110.GI17877@ulmo>
+References: <1405080971-7609-1-git-send-email-thierry.reding@gmail.com>
+ <17053542.QUGvfkeRmc@wuerfel> <20140716151427.GA22027@ulmo>
+ <6322144.IB6iKDb6TK@wuerfel> <20140716185715.GA4843@mithrandir>
+ <20140717085308.GQ23218@tbergstrom-lnx.Nvidia.com>
+ <20140717090156.GR23218@tbergstrom-lnx.Nvidia.com>
+ <20140717110110.GI17877@ulmo>
+Message-ID: <53CCBCA9.7020907@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This commit adds first regression test "cpufreq_freq_test.sh" for the
-cpufreq subsystem.
 
-Signed-off-by: Lukasz Majewski <l.majewski@samsung.com>
+On 07/17/2014 07:01 PM, Thierry Reding wrote:
+> * PGP Signed by an unknown key
+>
+> On Thu, Jul 17, 2014 at 12:01:56PM +0300, Peter De Schrijver wrote:
+>> On Thu, Jul 17, 2014 at 10:53:08AM +0200, Peter De Schrijver wrote:
+>>> On Wed, Jul 16, 2014 at 08:57:16PM +0200, Thierry Reding wrote:
+>>>>> Old Signed by an unknown key
+>>>> On Wed, Jul 16, 2014 at 05:22:03PM +0200, Arnd Bergmann wrote:
+>>>>> On Wednesday 16 July 2014 17:14:29 Thierry Reding wrote:
+>>>>>>> Ok, I'll have a look. I think when this becomes a separate driver, it
+>>>>>>> should also have its own header file, so maybe you can in the meantime
+>>>>>>> make it a local header file in mach-tegra until we have found a good
+>>>>>>> place for it.
+>>>>>> Why do you think it should be a separate header? We already have a
+>>>>>> couple in include/linux and I'm not sure it's useful to add even more.
+>>>>>> If anything I would've thought it made sense to move the content of the
+>>>>>> other headers into tegra-soc.h.
+>>>>> I very much dislike the idea of having a per-vendor header file that
+>>>>> everything gets crammed into. We should try to have proper subsystems
+>>>>> and generic interfaces for these wherever possible.
+>>>> I completely agree. However spreading the SoC-specific functions across
+>>>> multiple header files isn't going to help. If we keep all the per-vendor
+>>>> APIs in one file it makes it easier to see what could still be moved off
+>>>> into a separate subsystem.
+>>>>
+>>>> Now for PMC specifically, we've investigated converting the powergate
+>>>> API to power domains. I don't think it will be possible to make that
+>>>> work. The issue is that there's a defined sequence that needs to be
+>>>> respected to make sure the device is powered up properly. That sequence
+>>>> involves the primary clock and reset of the device. It's been proposed
+>>>> to make these clocks available to the PMC driver so that it can control
+>>>> them, but then we can't make sure that clocks are really off if they
+>>>> need to be, since we have two drivers accessing them. The only way I see
+>>> resets do not have reference counts, so they can be controlled by a
+>>> powerdomain driver without any problems. For clocks, there would only be
+>>> a problem for the module clocks if the drivers don't use runtime PM. If
+>>> we move all drivers to runtime PM, the clock control can move into the
+>>> powerdomain code and runtime PM will ensure domains are not turned off
+>>> with active modules.
+>>>
+>>>> to make that work reliably is by moving complete control of the
+>>>> powergate into drivers so that they can make sure clocks and resets are
+>>>> in the correct states.
+>>>>
+>>> Which won't work if you have domains which contain several modules.
+>> We also need to control the memory clients in the domains using
+>> MC_CLIENT_HOTRESET_CTRL.
+> Oh, great. More interdependencies...
+Some domains depend on others. Can we take this into account?
 
----
-Changes for v2:
-- Replace *_PATCH with *_PATH for variables names
-- Corrected mistakes in the README file
-- Providing detailed explanation of the patch in the README file
----
- drivers/cpufreq/tests/README               |  33 +++++++
- drivers/cpufreq/tests/cpufreq_freq_test.sh | 149 +++++++++++++++++++++++++++++
- 2 files changed, 182 insertions(+)
- create mode 100644 drivers/cpufreq/tests/README
- create mode 100755 drivers/cpufreq/tests/cpufreq_freq_test.sh
-
-diff --git a/drivers/cpufreq/tests/README b/drivers/cpufreq/tests/README
-new file mode 100644
-index 0000000..3e9cd80
---- /dev/null
-+++ b/drivers/cpufreq/tests/README
-@@ -0,0 +1,33 @@
-+This file contains list of cpufreq's available regression tests with a short
-+usage description.
-+
-+1. cpufreq_freq_test.sh
-+
-+Description:
-+------------
-+This script is supposed to test if cpufreq attributes exported by sysfs are
-+exposing correct values.
-+
-+To achieve this goal it saves the current governor and changes it to
-+"performance". Afterwards, it reads the "scaling_available_frequencies"
-+property. With the list of supported frequencies it is able to enforce each of
-+them by writing to "scaling_max_freq" attribute. To make the test more reliable
-+a superfluous load with gzip is created to be sure that we are running with
-+highest possible frequency. This high load is regulated with the 'sleep'
-+duration. After this time the "cpufreq_cur_freq" is read and compared with the
-+original value. As the last step the original governor is restored.
-+
-+This script can work with or without BOOST enabled and helps in spotting errors
-+related to cpufreq and common clock framework.
-+
-+Used attributes:
-+----------------
-+- "scaling_available_frequencies"
-+- "cpuinfo_cur_freq"
-+- "scaling_governor"
-+- "scaling_max_freq"
-+
-+Target devices:
-+---------------
-+
-+All devices which exports mentioned above sysfs attributes.
-\ No newline at end of file
-diff --git a/drivers/cpufreq/tests/cpufreq_freq_test.sh b/drivers/cpufreq/tests/cpufreq_freq_test.sh
-new file mode 100755
-index 0000000..c25f05c
---- /dev/null
-+++ b/drivers/cpufreq/tests/cpufreq_freq_test.sh
-@@ -0,0 +1,149 @@
-+#!/bin/bash
-+#
-+# This file provides a simple mean to test if all declared freqs at
-+# "scaling_available_frequencies" can be set and if "cpuinfo_cur_freq"
-+# returns this value.
-+#
-+# Usage: ./cpufreq_freq_test.sh
-+# Requisite: Compiled in "performance" governor
-+#
-+# This program is free software; you can redistribute it and/or modify
-+# it under the terms of the GNU General Public License as published by
-+# the Free Software Foundation; either version 2 of the License, or
-+# (at your option) any later version.
-+#
-+# This program is distributed in the hope that it will be useful,
-+# but WITHOUT ANY WARRANTY; without even the implied warranty of
-+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+# GNU General Public License for more details.
-+#
-+# You should have received a copy of the GNU General Public License
-+# along with this program; if not, you can access it online at
-+# http://www.gnu.org/licenses/gpl-2.0.html.
-+#
-+# Copyright (C) Samsung Electronics, 2014
-+#
-+# Author: Lukasz Majewski <l.majewski@samsung.com>
-+
-+set +x
-+
-+COLOUR_RED="\33[31m"
-+COLOUR_BLUE="\33[34m"
-+COLOUR_GREEN="\33[32m"
-+COLOUR_DEFAULT="\33[0m"
-+
-+T_PATH=/sys/devices/system/cpu/cpu0/cpufreq
-+BOOST_PATH=/sys/devices/system/cpu/cpufreq
-+
-+if [ ! -d "$T_PATH" ]; then
-+    printf "   $COLOUR_RED No path to CPUFREQ $COLOUR_DEFAULT\n"
-+    exit 1
-+fi
-+
-+ERRORS=0
-+
-+OLD_GOV=`cat $T_PATH/scaling_governor`
-+echo "CURRENT GOVERNOR: $OLD_GOV"
-+echo "SET GOVERNOR: performance"
-+echo "performance" > $T_PATH/scaling_governor
-+
-+function test_freqs1 {
-+    FREQS=`cat $1`
-+    for I in $FREQS; do
-+	cpufreq_set_freq $I
-+	if [ "$2" ]; then
-+	    printf "$COLOUR_BLUE BOOST $COLOUR_DEFAULT" $I
-+	fi
-+	cpufreq_test_freq $I
-+    done
-+}
-+
-+function test_freqs2 {
-+    FREQ=`cat $1`
-+    FREQS_ARRAY=($FREQ)
-+
-+    for freq in ${FREQS_ARRAY[@]}
-+    do
-+	echo "REFERENCE FREQ: $freq"
-+	for f in ${FREQS_ARRAY[@]}
-+	do
-+	    cpufreq_set_freq $freq
-+	    echo -n "----> "
-+	    cpufreq_set_freq $f
-+	    cpufreq_test_freq $f
-+	done
-+    done
-+}
-+
-+function restore {
-+    if [ -f $BOOST_PATH/boost ]; then
-+	cpufreq_boost_state $BOOST_STATE
-+    fi
-+
-+    echo "SET GOVERNOR: $OLD_GOV"
-+    echo $OLD_GOV > $T_PATH/scaling_governor
-+}
-+
-+function die {
-+    printf "   $COLOUR_RED FAILED $COLOUR_DEFAULT\n"
-+    restore_gov
-+    exit 1
-+}
-+
-+function cpufreq_test_freq {
-+    gzip < /dev/urandom > /dev/null &
-+    pid=$!
-+    sleep 0.1
-+    CURR_FREQ=`cat $T_PATH/cpuinfo_cur_freq`
-+    if [ $1 -eq $CURR_FREQ ]; then
-+	printf "\t$COLOUR_GREEN OK $COLOUR_DEFAULT\n"
-+    else
-+	printf "$COLOUR_RED CURRENT $CURR_FREQ $COLOUR_DEFAULT\n"
-+	ERRORS=`expr $ERRORS + 1`
-+	#die
-+    fi
-+    kill -9 $pid
-+    wait $! 2>/dev/null
-+}
-+
-+function cpufreq_set_freq {
-+    echo $1 > $T_PATH/scaling_max_freq || die $?
-+    printf "FREQ:$COLOUR_GREEN %s $COLOUR_DEFAULT" $1
-+}
-+
-+function cpufreq_boost_state {
-+   echo $1 > $BOOST_PATH/boost
-+}
-+
-+function cpufreq_boost_status {
-+   cat $BOOST_PATH/boost
-+}
-+
-+if [ -f $BOOST_PATH/boost ]; then
-+    echo "######################################"
-+    echo "TEST BOOST OPERATION"
-+    echo "######################################"
-+
-+    BOOST_STATE=$(cpufreq_boost_status)
-+    if [ $BOOST_STATE -eq 0 ]; then
-+	cpufreq_boost_state 1
-+    fi
-+    test_freqs1 $T_PATH/scaling_boost_frequencies 1
-+fi
-+
-+echo "######################################"
-+echo "TEST AVAILABLE FREQS"
-+echo "######################################"
-+test_freqs1 $T_PATH/scaling_available_frequencies
-+
-+echo "######################################"
-+echo "TEST FREQS SWITCHING"
-+echo "######################################"
-+test_freqs2 $T_PATH/scaling_available_frequencies
-+
-+echo "######################################"
-+echo "ERRORS: $ERRORS"
-+echo "######################################"
-+
-+restore
-+exit 0
--- 
-2.0.0.rc2
+Thanks,
+Vince
