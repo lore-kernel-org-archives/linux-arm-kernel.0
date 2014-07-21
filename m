@@ -1,197 +1,62 @@
-From: daniel.lezcano@linaro.org (Daniel Lezcano)
-Date: Mon, 21 Jul 2014 11:59:14 +0200
-Subject: [PATCHv2 11/17] cpuidle: mvebu: rename the driver from
- armada-370-xp to mvebu-v7
-In-Reply-To: <1404913221-17343-12-git-send-email-thomas.petazzoni@free-electrons.com>
-References: <1404913221-17343-1-git-send-email-thomas.petazzoni@free-electrons.com>
- <1404913221-17343-12-git-send-email-thomas.petazzoni@free-electrons.com>
-Message-ID: <53CCE472.8020100@linaro.org>
+From: broonie@kernel.org (Mark Brown)
+Date: Mon, 21 Jul 2014 11:04:12 +0100
+Subject: [alsa-devel] [PATCH 2/4] ASoC: s3c64xx/smartq: use dynamic
+ registration
+In-Reply-To: <CAAVeFuKQuvTH=5U8chZeMNLjCkfo78+_r2Gx5WUfy+q3F4QZpQ@mail.gmail.com>
+References: <CAAVeFuJEjMBX+7vsLk5zXV5Moy=WDmWidpVZjQ_=8VD45+QdHg@mail.gmail.com>
+ <20140716075107.GG7978@ulmo> <53C63CBA.20809@codethink.co.uk>
+ <CAAVeFuK55XzwaU+eOWhfUxJ7wEwGqxRCPDZKf+gVeMgeV8ys6g@mail.gmail.com>
+ <20140717074444.GB18640@ulmo>
+ <CAAVeFuJQUA+92jGpgDkyQ+=Qu+okBHzS5aFi7gmdwh+qcFp3fg@mail.gmail.com>
+ <20140717101723.GR17528@sirena.org.uk>
+ <20140717104121.GF17877@ulmo>
+ <20140717110540.GS17528@sirena.org.uk>
+ <CAAVeFuKQuvTH=5U8chZeMNLjCkfo78+_r2Gx5WUfy+q3F4QZpQ@mail.gmail.com>
+Message-ID: <20140721100412.GT17528@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/09/2014 03:40 PM, Thomas Petazzoni wrote:
-> From: Gregory CLEMENT <gregory.clement@free-electrons.com>
->
-> This driver will be able to manage the cpuidle for more SoCs than just
-> Armada 370 and XP. It will also support Armada 38x and potentially
-> other SoC of the Marvell Armada EBU family. To take this into account,
-> this patch renames the driver and its symbols.
->
-> Note that in order to be bisectable, this commit needs to change both
-> the cpuidle driver itself, and the place where the corresponding
-> platform_device is registered.
->
-> Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
-> Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
+On Mon, Jul 21, 2014 at 12:36:43PM +0900, Alexandre Courbot wrote:
+> On Thu, Jul 17, 2014 at 8:05 PM, Mark Brown <broonie@kernel.org> wrote:
 
-Acked-by: Daniel Lezcano <daniel.lezcano@linaro.org>
+> > For set and get, sure - but it's still useful to be able to do bulk
+> > requests for GPIOs especially since that's the only bit of the interface
+> > that requires error handling.
 
-> ---
->   arch/arm/mach-mvebu/pmsu.c                         |  2 +-
->   drivers/cpuidle/Kconfig.arm                        | 12 +++----
->   drivers/cpuidle/Makefile                           |  2 +-
->   ...{cpuidle-armada-370-xp.c => cpuidle-mvebu-v7.c} | 40 +++++++++++-----------
->   4 files changed, 28 insertions(+), 28 deletions(-)
->   rename drivers/cpuidle/{cpuidle-armada-370-xp.c => cpuidle-mvebu-v7.c} (58%)
->
-> diff --git a/arch/arm/mach-mvebu/pmsu.c b/arch/arm/mach-mvebu/pmsu.c
-> index 15e67bf..802edc8 100644
-> --- a/arch/arm/mach-mvebu/pmsu.c
-> +++ b/arch/arm/mach-mvebu/pmsu.c
-> @@ -76,7 +76,7 @@ extern void armada_370_xp_cpu_resume(void);
->   static void *mvebu_cpu_resume;
->
->   static struct platform_device mvebu_v7_cpuidle_device = {
-> -	.name = "cpuidle-armada-370-xp",
-> +	.name = "cpuidle-mvebu-v7",
->   };
->
->   static struct of_device_id of_pmsu_table[] = {
-> diff --git a/drivers/cpuidle/Kconfig.arm b/drivers/cpuidle/Kconfig.arm
-> index b6d69e8..a563427 100644
-> --- a/drivers/cpuidle/Kconfig.arm
-> +++ b/drivers/cpuidle/Kconfig.arm
-> @@ -1,12 +1,6 @@
->   #
->   # ARM CPU Idle drivers
->   #
-> -config ARM_ARMADA_370_XP_CPUIDLE
-> -	bool "CPU Idle Driver for Armada 370/XP family processors"
-> -	depends on ARCH_MVEBU
-> -	help
-> -	  Select this to enable cpuidle on Armada 370/XP processors.
-> -
->   config ARM_BIG_LITTLE_CPUIDLE
->   	bool "Support for ARM big.LITTLE processors"
->   	depends on ARCH_VEXPRESS_TC2_PM
-> @@ -61,3 +55,9 @@ config ARM_EXYNOS_CPUIDLE
->   	depends on ARCH_EXYNOS
->   	help
->   	  Select this to enable cpuidle for Exynos processors
-> +
-> +config ARM_MVEBU_V7_CPUIDLE
-> +	bool "CPU Idle Driver for mvebu v7 family processors"
-> +	depends on ARCH_MVEBU
-> +	help
-> +	  Select this to enable cpuidle on Armada 370, 38x and XP processors.
-> diff --git a/drivers/cpuidle/Makefile b/drivers/cpuidle/Makefile
-> index d8bb1ff..11edb31 100644
-> --- a/drivers/cpuidle/Makefile
-> +++ b/drivers/cpuidle/Makefile
-> @@ -7,7 +7,7 @@ obj-$(CONFIG_ARCH_NEEDS_CPU_IDLE_COUPLED) += coupled.o
->
->   ##################################################################################
->   # ARM SoC drivers
-> -obj-$(CONFIG_ARM_ARMADA_370_XP_CPUIDLE) += cpuidle-armada-370-xp.o
-> +obj-$(CONFIG_ARM_MVEBU_V7_CPUIDLE) += cpuidle-mvebu-v7.o
->   obj-$(CONFIG_ARM_BIG_LITTLE_CPUIDLE)	+= cpuidle-big_little.o
->   obj-$(CONFIG_ARM_CLPS711X_CPUIDLE)	+= cpuidle-clps711x.o
->   obj-$(CONFIG_ARM_HIGHBANK_CPUIDLE)	+= cpuidle-calxeda.o
-> diff --git a/drivers/cpuidle/cpuidle-armada-370-xp.c b/drivers/cpuidle/cpuidle-mvebu-v7.c
-> similarity index 58%
-> rename from drivers/cpuidle/cpuidle-armada-370-xp.c
-> rename to drivers/cpuidle/cpuidle-mvebu-v7.c
-> index 28587d0..302596e 100644
-> --- a/drivers/cpuidle/cpuidle-armada-370-xp.c
-> +++ b/drivers/cpuidle/cpuidle-mvebu-v7.c
-> @@ -21,12 +21,12 @@
->   #include <linux/platform_device.h>
->   #include <asm/cpuidle.h>
->
-> -#define ARMADA_370_XP_MAX_STATES	3
-> -#define ARMADA_370_XP_FLAG_DEEP_IDLE	0x10000
-> +#define MVEBU_V7_MAX_STATES	3
-> +#define MVEBU_V7_FLAG_DEEP_IDLE	0x10000
->
-> -static int (*armada_370_xp_cpu_suspend)(int);
-> +static int (*mvebu_v7_cpu_suspend)(int);
->
-> -static int armada_370_xp_enter_idle(struct cpuidle_device *dev,
-> +static int mvebu_v7_enter_idle(struct cpuidle_device *dev,
->   				struct cpuidle_driver *drv,
->   				int index)
->   {
-> @@ -34,10 +34,10 @@ static int armada_370_xp_enter_idle(struct cpuidle_device *dev,
->   	bool deepidle = false;
->   	cpu_pm_enter();
->
-> -	if (drv->states[index].flags & ARMADA_370_XP_FLAG_DEEP_IDLE)
-> +	if (drv->states[index].flags & MVEBU_V7_FLAG_DEEP_IDLE)
->   		deepidle = true;
->
-> -	ret = armada_370_xp_cpu_suspend(deepidle);
-> +	ret = mvebu_v7_cpu_suspend(deepidle);
->   	if (ret)
->   		return ret;
->
-> @@ -46,11 +46,11 @@ static int armada_370_xp_enter_idle(struct cpuidle_device *dev,
->   	return index;
->   }
->
-> -static struct cpuidle_driver armada_370_xp_idle_driver = {
-> -	.name			= "armada_370_xp_idle",
-> +static struct cpuidle_driver mvebu_v7_idle_driver = {
-> +	.name			= "mvebu_v7_idle",
->   	.states[0]		= ARM_CPUIDLE_WFI_STATE,
->   	.states[1]		= {
-> -		.enter			= armada_370_xp_enter_idle,
-> +		.enter			= mvebu_v7_enter_idle,
->   		.exit_latency		= 10,
->   		.power_usage		= 50,
->   		.target_residency	= 100,
-> @@ -59,35 +59,35 @@ static struct cpuidle_driver armada_370_xp_idle_driver = {
->   		.desc			= "CPU power down",
->   	},
->   	.states[2]		= {
-> -		.enter			= armada_370_xp_enter_idle,
-> +		.enter			= mvebu_v7_enter_idle,
->   		.exit_latency		= 100,
->   		.power_usage		= 5,
->   		.target_residency	= 1000,
->   		.flags			= CPUIDLE_FLAG_TIME_VALID |
-> -						ARMADA_370_XP_FLAG_DEEP_IDLE,
-> +						MVEBU_V7_FLAG_DEEP_IDLE,
->   		.name			= "MV CPU DEEP IDLE",
->   		.desc			= "CPU and L2 Fabric power down",
->   	},
-> -	.state_count = ARMADA_370_XP_MAX_STATES,
-> +	.state_count = MVEBU_V7_MAX_STATES,
->   };
->
-> -static int armada_370_xp_cpuidle_probe(struct platform_device *pdev)
-> +static int mvebu_v7_cpuidle_probe(struct platform_device *pdev)
->   {
->
-> -	armada_370_xp_cpu_suspend = (void *)(pdev->dev.platform_data);
-> -	return cpuidle_register(&armada_370_xp_idle_driver, NULL);
-> +	mvebu_v7_cpu_suspend = (void *)(pdev->dev.platform_data);
-> +	return cpuidle_register(&mvebu_v7_idle_driver, NULL);
->   }
->
-> -static struct platform_driver armada_370_xp_cpuidle_plat_driver = {
-> +static struct platform_driver mvebu_v7_cpuidle_plat_driver = {
->   	.driver = {
-> -		.name = "cpuidle-armada-370-xp",
-> +		.name = "cpuidle-mvebu-v7",
->   		.owner = THIS_MODULE,
->   	},
-> -	.probe = armada_370_xp_cpuidle_probe,
-> +	.probe = mvebu_v7_cpuidle_probe,
->   };
->
-> -module_platform_driver(armada_370_xp_cpuidle_plat_driver);
-> +module_platform_driver(mvebu_v7_cpuidle_plat_driver);
->
->   MODULE_AUTHOR("Gregory CLEMENT <gregory.clement@free-electrons.com>");
-> -MODULE_DESCRIPTION("Armada 370/XP cpu idle driver");
-> +MODULE_DESCRIPTION("Marvel EBU v7 cpuidle driver");
->   MODULE_LICENSE("GPL");
->
+> I foresee many problems if people start using gpiod_array_get() as a
+> way to spare a few lines of error-checking code. First all the GPIOs
+> would end into an array instead of members with meaningful names -
+> unless they are moved later on, but doing so would add extra code and
+> somewhat kill the purpose. It also becomes more difficult to maintain
+> as you are dealing with array indexes to update all over the code.
 
+You just need a few defines for the names, it's not a big deal.
 
--- 
-  <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
+> Finally, it will make it more difficult to use gpiod_array_*() the way
+> it is intended to be used, as you would have to discriminate between
+> GPIOs of the same function and the rest by yourself.
 
-Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
-<http://twitter.com/#!/linaroorg> Twitter |
-<http://www.linaro.org/linaro-blog/> Blog
+Yes, you probably shouldn't mix and match here but that's fine.
+
+> Also, if such a convenience function is legitimate for GPIO, shouldn't
+> it also apply to other sub-systems? E.g. regulator_array_get()?
+
+It's certainly a totally reasonable and expected way of using
+regulator_bulk_get().
+
+> Maybe I am missing your point, but I still think some error-handling
+> code really doesn't hurt here, and the few drivers that would actually
+> benefit from a more automated GPIO request error handling can easily
+> implement it themselves. Let's keep gpiod_array_*() single-purposed
+> and to the point.
+
+I'm not sure I see the massive complication TBH - it's not so much about
+complexity as it is about reducing the amount of boilerplate that people
+need to get right.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140721/ce403552/attachment.sig>
