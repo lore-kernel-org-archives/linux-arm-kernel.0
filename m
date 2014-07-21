@@ -1,123 +1,53 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Mon, 21 Jul 2014 16:09:53 +0100
-Subject: [PATCH 13/11] arm64: Add support for 48-bit VA space with 64KB page
- configuration
-In-Reply-To: <1405537792-23666-1-git-send-email-catalin.marinas@arm.com>
-References: <1405537792-23666-1-git-send-email-catalin.marinas@arm.com>
-Message-ID: <1405955393-30928-1-git-send-email-catalin.marinas@arm.com>
+From: balbi@ti.com (Felipe Balbi)
+Date: Mon, 21 Jul 2014 10:10:43 -0500
+Subject: [PATCH 8/9] usb: phy: am335x: call
+ usb_gen_phy_init()/usb_gen_phy_shutdown() in am335x_init()/am335x_shutdown()
+In-Reply-To: <20140721100307.21172b65@ipc1.ka-ro>
+References: <1405675890-8802-2-git-send-email-LW@KARO-electronics.de>
+ <1405675890-8802-3-git-send-email-LW@KARO-electronics.de>
+ <1405675890-8802-4-git-send-email-LW@KARO-electronics.de>
+ <1405675890-8802-5-git-send-email-LW@KARO-electronics.de>
+ <1405675890-8802-6-git-send-email-LW@KARO-electronics.de>
+ <1405675890-8802-7-git-send-email-LW@KARO-electronics.de>
+ <1405675890-8802-8-git-send-email-LW@KARO-electronics.de>
+ <1405675890-8802-9-git-send-email-LW@KARO-electronics.de>
+ <20140718135713.GH24914@saruman.home>
+ <20140721100307.21172b65@ipc1.ka-ro>
+Message-ID: <20140721151043.GF6852@saruman.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch allows support for 3 levels of page tables with 64KB page
-configuration allowing 48-bit VA space. The pgd is no longer a full
-PAGE_SIZE (PTRS_PER_PGD is 64) and (swapper|idmap)_pg_dir are not fully
-populated (pgd_alloc falls back to kzalloc).
+Hi,,
 
-Signed-off-by: Catalin Marinas <catalin.marinas@arm.com>
----
+On Mon, Jul 21, 2014 at 10:03:07AM +0200, Lothar Wa?mann wrote:
+> Hi,
+> 
+> > On Fri, Jul 18, 2014 at 11:31:29AM +0200, Lothar Wa?mann wrote:
+> > > This patch makes it possible to use the musb driver with HW that
+> > > requires external regulators or clocks.
+> > 
+> > can you provide an example of such HW ? Are you not using the internal
+> > PHYs ?
+> > 
+> The Ka-Ro electronics TX48 module uses the mmc0_clk pin as VBUSEN
+> rathern than usb0_drvvbus. This patch makes it possible to use an
+> external regulator to handle the VBUS switch through the 'vcc-supply'
+> property of the underlying generic_phy device.
 
-Some minor clean-up and 64K page configuration can use 48-bit VA space.
+OK, I get it now. But why would not use usb0_drvvbus ? You could still
+route usb0_drvvbus to the regulator enable pin and the regulator would
+be enabled for you once correct values are written to the IP's mailbox.
 
- Documentation/arm64/memory.txt |  8 ++++++++
- arch/arm64/Kconfig             |  2 +-
- arch/arm64/include/asm/page.h  | 16 +++++++++-------
- arch/arm64/kernel/head.S       |  6 ++++--
- 4 files changed, 22 insertions(+), 10 deletions(-)
+I suppose this has something to do with layout constraints ?
 
-diff --git a/Documentation/arm64/memory.txt b/Documentation/arm64/memory.txt
-index 8845d0847a66..344e85cc7323 100644
---- a/Documentation/arm64/memory.txt
-+++ b/Documentation/arm64/memory.txt
-@@ -45,6 +45,14 @@ Start			End			Size		Use
- fffffc0000000000	ffffffffffffffff	   4TB		kernel
- 
- 
-+AArch64 Linux memory layout with 64KB pages + 3 levels:
-+
-+Start			End			Size		Use
-+-----------------------------------------------------------------------
-+0000000000000000	0000ffffffffffff	 256TB		user
-+ffff000000000000	ffffffffffffffff	 256TB		kernel
-+
-+
- For details of the virtual kernel memory layout please see the kernel
- booting log.
- 
-diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
-index 9fe62025776b..2c83f6f3019f 100644
---- a/arch/arm64/Kconfig
-+++ b/arch/arm64/Kconfig
-@@ -199,7 +199,6 @@ config ARM64_VA_BITS_42
- config ARM64_VA_BITS_48
- 	bool "48-bit"
- 	depends on !KVM
--	depends on ARM64_4K_PAGES
- 
- endchoice
- 
-@@ -212,6 +211,7 @@ config ARM64_VA_BITS
- config ARM64_PGTABLE_LEVELS
- 	int
- 	default 2 if ARM64_64K_PAGES && ARM64_VA_BITS_42
-+	default 3 if ARM64_64K_PAGES && ARM64_VA_BITS_48
- 	default 3 if ARM64_4K_PAGES && ARM64_VA_BITS_39
- 	default 4 if ARM64_4K_PAGES && ARM64_VA_BITS_48
- 
-diff --git a/arch/arm64/include/asm/page.h b/arch/arm64/include/asm/page.h
-index 2502754d1921..7a3f462133b0 100644
---- a/arch/arm64/include/asm/page.h
-+++ b/arch/arm64/include/asm/page.h
-@@ -34,17 +34,19 @@
- /*
-  * The idmap and swapper page tables need some space reserved in the kernel
-  * image. Both require pgd, pud (4 levels only) and pmd tables to (section)
-- * map the kernel. The swapper also maps the FDT (see __create_page_tables for
-- * more information).
-+ * map the kernel. With the 64K page configuration, swapper and idmap need to
-+ * map to pte level. The swapper also maps the FDT (see __create_page_tables
-+ * for more information).
-  */
--#if CONFIG_ARM64_PGTABLE_LEVELS == 4
--#define SWAPPER_DIR_SIZE	(3 * PAGE_SIZE)
--#define IDMAP_DIR_SIZE		(3 * PAGE_SIZE)
-+#ifdef CONFIG_ARM64_64K_PAGES
-+#define SWAPPER_PGTABLE_LEVELS	(CONFIG_ARM64_PGTABLE_LEVELS)
- #else
--#define SWAPPER_DIR_SIZE	(2 * PAGE_SIZE)
--#define IDMAP_DIR_SIZE		(2 * PAGE_SIZE)
-+#define SWAPPER_PGTABLE_LEVELS	(CONFIG_ARM64_PGTABLE_LEVELS - 1)
- #endif
- 
-+#define SWAPPER_DIR_SIZE	(SWAPPER_PGTABLE_LEVELS * PAGE_SIZE)
-+#define IDMAP_DIR_SIZE		(SWAPPER_DIR_SIZE)
-+
- #ifndef __ASSEMBLY__
- 
- #include <asm/pgtable-types.h>
-diff --git a/arch/arm64/kernel/head.S b/arch/arm64/kernel/head.S
-index a6db505411bc..0bce493495e9 100644
---- a/arch/arm64/kernel/head.S
-+++ b/arch/arm64/kernel/head.S
-@@ -55,9 +55,11 @@
- #ifdef CONFIG_ARM64_64K_PAGES
- #define BLOCK_SHIFT	PAGE_SHIFT
- #define BLOCK_SIZE	PAGE_SIZE
-+#define TABLE_SHIFT	PMD_SHIFT
- #else
- #define BLOCK_SHIFT	SECTION_SHIFT
- #define BLOCK_SIZE	SECTION_SIZE
-+#define TABLE_SHIFT	PUD_SHIFT
- #endif
- 
- #define KERNEL_START	KERNEL_RAM_VADDR
-@@ -505,8 +507,8 @@ ENDPROC(__calc_phys_offset)
-  */
- 	.macro	create_pgd_entry, tbl, virt, tmp1, tmp2
- 	create_table_entry \tbl, \virt, PGDIR_SHIFT, PTRS_PER_PGD, \tmp1, \tmp2
--#if CONFIG_ARM64_PGTABLE_LEVELS == 4
--	create_table_entry \tbl, \virt, PUD_SHIFT, PTRS_PER_PUD, \tmp1, \tmp2
-+#if SWAPPER_PGTABLE_LEVELS == 3
-+	create_table_entry \tbl, \virt, TABLE_SHIFT, PTRS_PER_PTE, \tmp1, \tmp2
- #endif
- 	.endm
- 
+cheers
+
+-- 
+balbi
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140721/e1f8ee68/attachment-0001.sig>
