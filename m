@@ -1,48 +1,44 @@
 From: antoine.tenart@free-electrons.com (Antoine =?iso-8859-1?Q?T=E9nart?=)
-Date: Mon, 21 Jul 2014 11:04:23 +0200
-Subject: [PATCH v10 2/8] Documentation: bindings: add the Berlin SATA PHY
-In-Reply-To: <53C95900.9050200@cogentembedded.com>
+Date: Mon, 21 Jul 2014 11:09:53 +0200
+Subject: [PATCH v10 0/8] ARM: berlin: add AHCI support
+In-Reply-To: <53CA48F7.5020405@redhat.com>
 References: <1405686607-8126-1-git-send-email-antoine.tenart@free-electrons.com>
- <1405686607-8126-3-git-send-email-antoine.tenart@free-electrons.com>
- <53C95900.9050200@cogentembedded.com>
-Message-ID: <20140721090423.GD32208@kwain>
+ <20140718135758.GB13012@htj.dyndns.org>
+ <53CA4608.3040208@redhat.com> <53CA48F7.5020405@redhat.com>
+Message-ID: <20140721090953.GE32208@kwain>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Hi Hans,
 
-On Fri, Jul 18, 2014 at 09:27:28PM +0400, Sergei Shtylyov wrote:
-> On 07/18/2014 04:30 PM, Antoine T?nart wrote:
+On Sat, Jul 19, 2014 at 12:31:19PM +0200, Hans de Goede wrote:
+> On 07/19/2014 12:18 PM, Hans de Goede wrote:
 > 
-> >diff --git a/Documentation/devicetree/bindings/phy/berlin-sata-phy.txt b/Documentation/devicetree/bindings/phy/berlin-sata-phy.txt
-> >new file mode 100644
-> >index 000000000000..88f8c23384c0
-> >--- /dev/null
-> >+++ b/Documentation/devicetree/bindings/phy/berlin-sata-phy.txt
-> >@@ -0,0 +1,34 @@
-> >+Berlin SATA PHY
-> >+---------------
-> >+
-> >+Required properties:
-> >+- compatible: should be "marvell,berlin2q-sata-phy"
-> >+- address-cells: should be 1
-> >+- size-cells: should be 0
-> >+- phy-cells: from the generic PHY bindings, must be 1
+> >The problem is that:
+> >
+> >1) We need to enable resources before we can do ahci_save_initial_config()
+> >2) We must do ahci_save_initial_config() before we can do ata_host_alloc_pinfo()
+> >3) Therefor we don't have port_info at enable_resources time, which is when we
+> >want to enable the phys (and we cannot just enable the phys elsewhere as
+> >enable_resouces gets used on e.g. resume too).
+> >
+> >So I think it is best to just make the phy pointers an array inside
+> >ahci_host_priv, with a comment that the array indexes must match port
+> >indexes.
 > 
->    It's "#address-cells", "#size-cells", and "#phy-cells".
+> So looking at "[PATCH v10 4/8] ata: libahci: allow to use multiple PHYs"
+> I see that currently the phy array indexes do not necessarily match the
+> port indexes. Since you already allocate the phys array at nports size,
+> I suggest simply making the array sparse, leaving in NULL entries for
+> unused ports, and adjusting enable / disable_phys to check for NULL
+> pointers. This way we still have a 1:1 way to map ports <-> phys if
+> we want to do something with phys on a per port basis in the future.
+> 
+> Note please also add a check that reg < nports so that we don't use
+> the array out of bounds if there is an error in the dts.
 
-Sure.
-
-> 
-> >+- reg: address and length of the register
-> >+- clocks: reference to the clock entry
-> >+
-> >+Sub-nodes:
-> >+Each PHY should be represented as a sub-node.
-> 
->    Then "#phy-cells" should also belong to the sub-nodes.
-
-No, because the PHY provider is still the parent.
+Ok. I'll rework patch 4 along with the other modifications requested,
+and I'll send a new version early this week.
 
 Antoine
 
