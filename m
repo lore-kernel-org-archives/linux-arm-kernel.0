@@ -1,83 +1,75 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Mon, 21 Jul 2014 10:00:24 +0200
-Subject: [PATCHv6 3/4] iio: devicetree: Add DT binding documentation for
- Exynos3250 ADC
-In-Reply-To: <53CC725C.9010406@samsung.com>
-References: <1405663186-26464-1-git-send-email-cw00.choi@samsung.com>
- <5381273.c6GzlyQ7Ea@wuerfel> <53CC725C.9010406@samsung.com>
-Message-ID: <7477106.gq1AqisQx4@wuerfel>
+From: LW@KARO-electronics.de (Lothar =?UTF-8?B?V2HDn21hbm4=?=)
+Date: Mon, 21 Jul 2014 10:03:07 +0200
+Subject: [PATCH 8/9] usb: phy: am335x: call
+ usb_gen_phy_init()/usb_gen_phy_shutdown() in
+ am335x_init()/am335x_shutdown()
+In-Reply-To: <20140718135713.GH24914@saruman.home>
+References: <1405675890-8802-1-git-send-email-LW@KARO-electronics.de>
+ <1405675890-8802-2-git-send-email-LW@KARO-electronics.de>
+ <1405675890-8802-3-git-send-email-LW@KARO-electronics.de>
+ <1405675890-8802-4-git-send-email-LW@KARO-electronics.de>
+ <1405675890-8802-5-git-send-email-LW@KARO-electronics.de>
+ <1405675890-8802-6-git-send-email-LW@KARO-electronics.de>
+ <1405675890-8802-7-git-send-email-LW@KARO-electronics.de>
+ <1405675890-8802-8-git-send-email-LW@KARO-electronics.de>
+ <1405675890-8802-9-git-send-email-LW@KARO-electronics.de>
+ <20140718135713.GH24914@saruman.home>
+Message-ID: <20140721100307.21172b65@ipc1.ka-ro>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday 21 July 2014 10:52:28 Chanwoo Choi wrote:
-> > Yes, your current version is certainly better than this, but another way
-> > to address Tomasz' comment would be to change the binding to list the "sclk"
-> > as optional for any device and make the code silently ignore missing sclk
-> > entries, like:
+Hi,
+
+> On Fri, Jul 18, 2014 at 11:31:29AM +0200, Lothar Wa?mann wrote:
+> > This patch makes it possible to use the musb driver with HW that
+> > requires external regulators or clocks.
+> 
+> can you provide an example of such HW ? Are you not using the internal
+> PHYs ?
+> 
+The Ka-Ro electronics TX48 module uses the mmc0_clk pin as VBUSEN
+rathern than usb0_drvvbus. This patch makes it possible to use an
+external regulator to handle the VBUS switch through the 'vcc-supply'
+property of the underlying generic_phy device.
+
+> > Signed-off-by: Lothar Wa?mann <LW@KARO-electronics.de>
+> > ---
+> >  drivers/usb/phy/phy-am335x.c |    2 ++
+> >  1 file changed, 2 insertions(+)
 > > 
+> > diff --git a/drivers/usb/phy/phy-am335x.c b/drivers/usb/phy/phy-am335x.c
+> > index 6522fa7..de25674 100644
+> > --- a/drivers/usb/phy/phy-am335x.c
+> > +++ b/drivers/usb/phy/phy-am335x.c
+> > @@ -22,6 +22,7 @@ static int am335x_init(struct usb_phy *phy)
+> >  {
+> >  	struct am335x_phy *am_phy = dev_get_drvdata(phy->dev);
+> >  
+> > +	usb_gen_phy_init(phy);
+> >  	phy_ctrl_power(am_phy->phy_ctrl, am_phy->id, true);
+> >  	return 0;
+> >  }
+> > @@ -31,6 +32,7 @@ static void am335x_shutdown(struct usb_phy *phy)
+> >  	struct am335x_phy *am_phy = dev_get_drvdata(phy->dev);
+> >  
+> >  	phy_ctrl_power(am_phy->phy_ctrl, am_phy->id, false);
+> > +	usb_gen_phy_shutdown(phy);
+> >  }
+> >  
+> >  static int am335x_phy_probe(struct platform_device *pdev)
+> > -- 
+> > 1.7.10.4
 > > 
-> >       info->sclk = devm_clk_get(&pdev->dev, "sclk");
-> >       if (IS_ERR(info->sclk)) {
-> >               switch (PTR_ERR(info->sclk)) {
-> >               case -EPROBE_DEFER:
-> >                       /* silently return error so we can retry */
-> >                       return -EPROBE_DEFER:
-> >               case -ENOENT:
-> >                       /* silently ignore missing optional clk */
-> >                       info->sclk = NULL;
-> >                       break;
-> >               default:
-> >                       /* any other error: clk is defined by doesn't work  */
-> >                       dev_err(&pdev->dev, "failed getting sclk clock, err = %ld\n",
-> >                               PTR_ERR(info->sclk));
-> >                       return PTR_ERR(info->sclk));
-> >               }
-> >       }
 > 
-> I tested this patch suggested by you.
-> But, devm_clk_get returns always '-ENOENT' on follwong two cases:
-> 
-> Case 1.
-> ADC dt node in exynos3250.dtsi don't include 'sclk' clock as following:
-> 
->                 adc: adc at 126C0000 {
->                         compatible = "samsung,exynos3250-adc";
->                         reg = <0x126C0000 0x100>, <0x10020718 0x4>;
->                         interrupts = <0 137 0>;
->                         clock-names = "adc";
->                         clocks = <&cmu CLK_TSADC>;
->                         #io-channel-cells = <1>;
->                         io-channel-ranges;
->                 };
-> 
-> Case 2.
-> ADC dt node in exynos3250.dtsi don't include 'sclk' clock
-> but, exynos3250 clock controller don't support CLK_SCLK_TSADC clock as following:
-> 
->                 adc: adc at 126C0000 {
->                         compatible = "samsung,exynos3250-adc";
->                         reg = <0x126C0000 0x100>, <0x10020718 0x4>;
->                         interrupts = <0 137 0>;
->                         clock-names = "adc", "sclk";
->                         clocks = <&cmu CLK_TSADC>, <&cmu CLK_SCLK_TSADC>;
->                         #io-channel-cells = <1>;
->                         io-channel-ranges;
->                 };
 
-But neither of those cases is actually a correct DT representation for
-exynos3250: The first case describes an ADC that doesn't need a second
-clock, so if the hardware actually needs it to function, it is clearly
-unsufficiently described. The second case is even worse because it refers
-to a clock that isn't there. Actually that should probably return a different
-error code, but that's a different matter.
 
-> So, I think exynos-adc needs to use 'needs_sclk' field suggested by Tomasz Figa.
+-- 
+___________________________________________________________
 
-I don't mind you adding a field to the data, especially since you already
-need to have separate structures to encode the different number of channels.
-However, I don't see it as necessary either. What you do here is just
-checking the DT representation for correctness and consistency. It's not
-harmful but we don't normally do that because passing incorrect DT blobs
-can cause an infinite number of other problems that we don't check for.
+Ka-Ro electronics GmbH | Pascalstra?e 22 | D - 52076 Aachen
+Phone: +49 2408 1402-0 | Fax: +49 2408 1402-10
+Gesch?ftsf?hrer: Matthias Kaussen
+Handelsregistereintrag: Amtsgericht Aachen, HRB 4996
 
-	Arnd
+www.karo-electronics.de | info at karo-electronics.de
+___________________________________________________________
