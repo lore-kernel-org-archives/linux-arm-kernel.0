@@ -1,80 +1,61 @@
-From: balbi@ti.com (Felipe Balbi)
-Date: Mon, 21 Jul 2014 10:15:57 -0500
-Subject: [PATCH v3 0/2] usb: fix controller-PHY binding for OMAP3 platform
-In-Reply-To: <2288457.9ZfWAQMUao@avalon>
-References: <1387209225-11520-1-git-send-email-kishon@ti.com>
- <20131216223826.GG26293@atomide.com>
- <20131216234829.GC29284@saruman.home> <2288457.9ZfWAQMUao@avalon>
-Message-ID: <20140721151557.GH6852@saruman.home>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Mon, 21 Jul 2014 17:16:17 +0200
+Subject: [RFC PATCH 02/10] arm64/efi: efistub: cover entire static mem
+ footprint in PE/COFF .text
+In-Reply-To: <1405955785-13477-1-git-send-email-ard.biesheuvel@linaro.org>
+References: <1405955785-13477-1-git-send-email-ard.biesheuvel@linaro.org>
+Message-ID: <1405955785-13477-3-git-send-email-ard.biesheuvel@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+The static memory footprint of a kernel Image at boot is larger than the
+Image file itself. Things like .bss data and initial page tables are allocated
+statically but populated dynamically so their content is not contained in the
+Image file.
 
-On Mon, Jul 21, 2014 at 05:04:57PM +0200, Laurent Pinchart wrote:
-> Hi Felipe,
-> 
-> What happened to these two patches ?
+However, if EFI has loaded the Image at precisely the desired offset of
+base of DRAM + TEXT_OFFSET, the Image will be booted in place, and we have
+to make sure that the allocation done by the EFI loader is large enough.
 
-looks like I lost them.
+Fix this by growing the PE/COFF .text section to cover the entire static
+memory footprint. The part of the section that is not covered by the payload
+will be zero initialised by the EFI loader.
 
-> On Monday 16 December 2013 17:48:29 Felipe Balbi wrote:
-> > On Mon, Dec 16, 2013 at 02:38:27PM -0800, Tony Lindgren wrote:
-> > > * Felipe Balbi <balbi@ti.com> [131216 13:31]:
-> > > > On Mon, Dec 16, 2013 at 09:23:43PM +0530, Kishon Vijay Abraham I wrote:
-> > > > > After the platform devices are created using PLATFORM_DEVID_AUTO, the
-> > > > > device names given in usb_bind_phy (in board file) does not match with
-> > > > > the actual device name causing the USB PHY library not to return the
-> > > > > PHY reference when the MUSB controller request for the PHY in the
-> > > > > non-dt boot case.
-> > > > > So removed creating platform devices using PLATFORM_DEVID_AUTO in
-> > > > > omap2430.c.
-> > > > > 
-> > > > > Did enumeration testing in omap3 beagle.
-> > > > > 
-> > > > > Changes from v2:
-> > > > > * Fixed the commit log
-> > > > > 
-> > > > > Changes from v1:
-> > > > > * refreshed to the latested mainline kernel
-> > > > > * added musb_put_id from omap2430 remove.
-> > > > 
-> > > > Tony, how do you want to handle this ? You want me to provide you a
-> > > > branch which we both merge ?
-> > > 
-> > > Yes that would be great thanks. For the mach-omap2 touching parts:
-> > > 
-> > > Acked-by: Tony Lindgren <tony@atomide.com>
-> > 
-> > Here it is, let me know if you prefer a signed tag:
-> > 
-> > The following changes since commit 6ce4eac1f600b34f2f7f58f9cd8f0503d79e42ae:
-> > 
-> >   Linux 3.13-rc1 (2013-11-22 11:30:55 -0800)
-> > 
-> > are available in the git repository at:
-> > 
-> >   git://git.kernel.org/pub/scm/linux/kernel/git/balbi/usb.git
-> > usb-phy-binding-omap3
-> > 
-> > for you to fetch changes up to 23ada3130cf4e56acb86fdff4c26113188d52d18:
-> > 
-> >   arm: omap: remove *.auto* from device names given in usb_bind_phy
-> > (2013-12-16 17:44:43 -0600)
-> > 
-> > ----------------------------------------------------------------
-> > Kishon Vijay Abraham I (2):
-> >       usb: musb: omap: remove using PLATFORM_DEVID_AUTO in omap2430.c
-> >       arm: omap: remove *.auto* from device names given in usb_bind_phy
+Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+---
+ arch/arm64/kernel/head.S | 6 +++---
+ 1 file changed, 3 insertions(+), 3 deletions(-)
 
-Kishon, are these still valid ?
-
+diff --git a/arch/arm64/kernel/head.S b/arch/arm64/kernel/head.S
+index 5cd1f3491df5..c63f44f20ae3 100644
+--- a/arch/arm64/kernel/head.S
++++ b/arch/arm64/kernel/head.S
+@@ -150,7 +150,7 @@ optional_header:
+ 	.short	0x20b				// PE32+ format
+ 	.byte	0x02				// MajorLinkerVersion
+ 	.byte	0x14				// MinorLinkerVersion
+-	.long	_edata - stext			// SizeOfCode
++	.long	_end - stext			// SizeOfCode
+ 	.long	0				// SizeOfInitializedData
+ 	.long	0				// SizeOfUninitializedData
+ 	.long	efi_stub_entry - efi_head	// AddressOfEntryPoint
+@@ -168,7 +168,7 @@ extra_header_fields:
+ 	.short	0				// MinorSubsystemVersion
+ 	.long	0				// Win32VersionValue
+ 
+-	.long	_edata - efi_head		// SizeOfImage
++	.long	_end - efi_head			// SizeOfImage
+ 
+ 	// Everything before the kernel image is considered part of the header
+ 	.long	stext_offset			// SizeOfHeaders
+@@ -215,7 +215,7 @@ section_table:
+ 	.byte	0
+ 	.byte	0
+ 	.byte	0        		// end of 0 padding of section name
+-	.long	_edata - stext		// VirtualSize
++	.long	_end - stext		// VirtualSize
+ 	.long	stext_offset		// VirtualAddress
+ 	.long	_edata - stext		// SizeOfRawData
+ 	.long	stext_offset		// PointerToRawData
 -- 
-balbi
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140721/a2857581/attachment-0001.sig>
+1.8.3.2
