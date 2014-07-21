@@ -1,46 +1,60 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Mon, 21 Jul 2014 09:38:55 +0200
-Subject: [PATCHv7 0/4] iio: adc: exynos_adc: Support Exynos3250 ADC and
- code clean
-In-Reply-To: <1405909068-22539-1-git-send-email-cw00.choi@samsung.com>
-References: <1405909068-22539-1-git-send-email-cw00.choi@samsung.com>
-Message-ID: <14522743.f6oFhEQVv4@wuerfel>
+From: rui.zhang@intel.com (Zhang Rui)
+Date: Mon, 21 Jul 2014 15:42:29 +0800
+Subject: [PATCH 0/6] of-thermal hardware trip points + Tegra124 SOCTHERM
+ driver
+In-Reply-To: <1403856699-2140-1-git-send-email-mperttunen@nvidia.com>
+References: <1403856699-2140-1-git-send-email-mperttunen@nvidia.com>
+Message-ID: <1405928549.2455.2.camel@rzhang1-toshiba>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday 21 July 2014 11:17:44 Chanwoo Choi wrote:
+Hi, Eduardo,
+
+what do you think of this patch set?
+
+thanks,
+rui
+
+On Fri, 2014-06-27 at 11:11 +0300, Mikko Perttunen wrote:
+> Hi everyone,
 > 
-> This patchset support Exynos3250 ADC (Analog Digital Converter) because
-> Exynos3250 has additional special clock for ADC IP.
+> this series adds support for hardware-tracked thermal trip points
+> for the device tree thermal framework and introduces a new Tegra124 thermal
+> driver that uses them.
 > 
-> Changes from v6:
-> - Use "exynos3250-adc" compatible string instead of "exynos3250-adc-v2"
-> - Use "sclk" clock name instead of "sclk_adc"
-> - Remove un-necessary macro for exyno-adc-data-v2 structure.
-> - Remove '(void *)' cast and mark the exynos-adc-data structure as 'const'
-> - Change the number of ADC channels (Exynos3250 has only two channels for ADC)
+> Hardware-tracked trip points are trip points that do not need to be polled;
+> the hardware gives an interrupt when the trip point is reached. The device
+> tree thermal framework has not previously given the sensor driver any
+> information about set trip points, so using these has been impossible.
+> This series adds a new callback from of-thermal to the driver to allow telling
+> the driver about trip points. The driver only needs to track two trip points,
+> the framework ensures that the current temperature lies between those two.
+> Behavior for drivers that do not include this callback is unchanged.
 > 
-
-Looks good to me. Two small requests:
-
-a) if you don't mind, can you add my patch (1/2) to add support for s3c64xx to
-   your series, adding your Signed-off-by line in addition to mine? I think
-   that one was noncontroversial, while the second patch (2/2) need some more
-   work to address the comments and do testing.
-
-b) For the "compatible" string, I think it makes sense to set a fallback to
-   "samsung,exynos-adc-v2" in the case for exynos3250, making the DT
-   representation
-
-	compatible = "samsung,exynos3250-adc", "samsung,exynos-adc-v2";
-
-   It's not entirely compatible because of the addition of the clock, but
-   since the register layout is the same, I think it still make sense.
-
-Thanks.
-
-For the entire series,
-
-Acked-by: Arnd Bergmann <arnd@arndb.de>
-
-	Arnd
+> The Tegra124 SOCTHERM thermal driver that is included exposes four thermal zones
+> (the thermctl thermal zones) with hardware-tracked trip point support. While the
+> hardware supports four tracked trip points, only one is used.
+> 
+> Mikko Perttunen (6):
+>   thermal: of: Add support for hardware-tracked trip points
+>   of: Add bindings for nvidia,tegra124-soctherm
+>   ARM: tegra: Add thermal trip points for Jetson TK1
+>   ARM: tegra: Add soctherm and thermal zones to Tegra124 device tree
+>   clk: tegra: Add soctherm and tsensor clocks to Tegra124 init table
+>   thermal: Add Tegra SOCTHERM thermal management driver
+> 
+>  .../devicetree/bindings/thermal/tegra-soctherm.txt |  32 ++
+>  arch/arm/boot/dts/tegra124-jetson-tk1.dts          |  32 ++
+>  arch/arm/boot/dts/tegra124.dtsi                    |  48 ++
+>  drivers/clk/tegra/clk-tegra124.c                   |   2 +
+>  drivers/thermal/Kconfig                            |   7 +
+>  drivers/thermal/Makefile                           |   1 +
+>  drivers/thermal/of-thermal.c                       |  97 +++-
+>  drivers/thermal/tegra_soctherm.c                   | 553 +++++++++++++++++++++
+>  include/dt-bindings/thermal/tegra124-soctherm.h    |  15 +
+>  include/linux/thermal.h                            |   3 +-
+>  10 files changed, 785 insertions(+), 5 deletions(-)
+>  create mode 100644 Documentation/devicetree/bindings/thermal/tegra-soctherm.txt
+>  create mode 100644 drivers/thermal/tegra_soctherm.c
+>  create mode 100644 include/dt-bindings/thermal/tegra124-soctherm.h
+> 
