@@ -1,181 +1,98 @@
-From: pawel.moll@arm.com (Pawel Moll)
-Date: Mon, 21 Jul 2014 18:00:34 +0100
-Subject: [PATCH] platform: Make platform_bus device a platform device
-In-Reply-To: <CAOesGMgvd1HbjywN7BDPtr8ZU7vucWH48B=AW3TZjng73YA8WA@mail.gmail.com>
-References: <CAOesGMgvd1HbjywN7BDPtr8ZU7vucWH48B=AW3TZjng73YA8WA@mail.gmail.com>
-Message-ID: <1405962034-25482-1-git-send-email-pawel.moll@arm.com>
+From: rob.herring@linaro.org (Rob Herring)
+Date: Mon, 21 Jul 2014 12:00:42 -0500
+Subject: [RFC] cpufreq: Add bindings for CPU clock sharing topology
+In-Reply-To: <53CA8D95.8010108@ti.com>
+References: <7e097b71342c9f5f63b07ff2e135eb7beb626aab.1405661369.git.viresh.kumar@linaro.org>
+ <CAOesGMhTkTEXp99gpU8cZBwYmiXpsySG5zMn6oSyo_Mf5PAiUg@mail.gmail.com>
+ <CAKohpo=MmoALOHg-=7cf0jm=OJO57TWQZQXqkRwhRwU-DGPMmA@mail.gmail.com>
+ <CAOesGMhuNzVtUkaUjF+JjNgHcgf08WiM0DG-kzwtcyUxkK_zow@mail.gmail.com>
+ <CAKohpokLqrydV3b=innvOWrW9ijXtZwPKdT5Ew65cjMxsY2Mvw@mail.gmail.com>
+ <53CA8D95.8010108@ti.com>
+Message-ID: <CABGGisyDf7xt7CNii_NJ_stvBGNEeiXBMFxNkA2myS8OQ-VCtw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-... describing the root of the device tree, so one can write
-a platform driver initializing the platform.
+On Sat, Jul 19, 2014 at 10:24 AM, Santosh Shilimkar
+<santosh.shilimkar@ti.com> wrote:
+> Viresh,
+>
+> On Saturday 19 July 2014 10:46 AM, Viresh Kumar wrote:
+>> On 19 July 2014 03:22, Olof Johansson <olof@lixom.net> wrote:
+>>> What is the current API that is being broken, in your opinion?
+>>
+>> So, currently the nodes doesn't have any such property. And drivers
+>> consider all of them as sharing clocks, for eg: cpufreq-cpu0.
+>>
+>> Now, if we use those older DT's after the new changes, drivers would
+>> consider CPUs as having separate clocks. And that would be opposite
+>> of what currently happens.
+>>
+>> Not sure if this counts as broken.
+>>
+>>>> But if that isn't the case, the bindings are very simple & clear to handle.
+>>>> Diff for new bindings:
+>>>
+>>> It's somewhat confusing to see a diff to the patch instead of a new
+>>> version. It seems to remove the cpu 0 entry now?
+>>
+>> Not really, I removed an unwanted example. This is how it looks:
+>>
+>>
+>>
+>> * Generic CPUFreq clock bindings
+>>
+>> Clock lines may or may not be shared among different CPUs on a platform.
+>>
+>> Possible configurations:
+>> 1.) All CPUs share a single clock line
+>> 2.) All CPUs have independent clock lines
+>> 3.) CPUs within a group/cluster share clock line but each group/cluster have a
+>>     separate line for itself
+>>
+>> Optional Properties:
+>> - clock-master: Contains phandle of the master cpu controlling clocks.
+>>
+>>   Ideally there is nothing like a "master" CPU as any CPU can play with DVFS
+>>   settings. But we have to choose one cpu out of a group, so that others can
+>>   point to it.
+>>
+>>   If there is no "clock-master" property for a cpu node, it is considered as
+>>   master. It may or may not have other slave CPUs pointing towards it.
+>>
+>
+> Sorry for jumping late, but one of the point I was raising as part of your
+> other series was to extend the CPU topology bindings to cover the voltage
+> domain information which is probably what is really needed to let the
+> CPUfreq extract the information. Not sure if it was already discussed.
+>
+> After all the CPU clocks, cluster, clock-gating, power domains are pretty much
+> related. So instead of having new binding for CPUFreq, I was wondering whether
+> we can extend the CPU topology binding information to include missing information.
+> Scheduler work anyway needs that information.
+>
+> Ref: Documentation/devicetree/bindings/arm/topology.txt
+>
+> Does that make sense ?
 
-Signed-off-by: Pawel Moll <pawel.moll@arm.com>
----
+To me, but every time I suggest adding things to the topology the ARM
+folks object... I really think we should have built the topology into
+the /cpus hierarchy. Then we could add properties at the correct place
+in the hierarchy where they are common.
 
-For what it's worth, the patch I came up back then.
-*Untested* against current head...
+I don't really like the proposal here. It just doesn't look like a
+clean description of the h/w.
 
- arch/arm/mach-imx/devices/devices.c |  4 ++--
- arch/unicore32/kernel/puv3-core.c   |  2 +-
- arch/unicore32/kernel/puv3-nb0916.c |  6 +++---
- drivers/base/platform.c             | 18 ++++++++++++------
- drivers/char/tile-srom.c            |  2 +-
- drivers/mmc/host/sdhci-pltfm.c      |  2 +-
- drivers/scsi/hosts.c                |  2 +-
- include/linux/platform_device.h     |  2 +-
- 8 files changed, 22 insertions(+), 16 deletions(-)
+Ignoring compatibility, I would like to see something like
+operating-points and/or the clock properties be moved up to /cpus if
+they are shared and be per cpu node when they are not. This of course
+does not work if you have independent OPPs for each cluster with a
+shared clock within cluster.
 
-diff --git a/arch/arm/mach-imx/devices/devices.c b/arch/arm/mach-imx/devices/devices.c
-index 1b4366a..48c3817 100644
---- a/arch/arm/mach-imx/devices/devices.c
-+++ b/arch/arm/mach-imx/devices/devices.c
-@@ -24,12 +24,12 @@
- 
- struct device mxc_aips_bus = {
- 	.init_name	= "mxc_aips",
--	.parent		= &platform_bus,
-+	.parent		= &platform_bus.dev,
- };
- 
- struct device mxc_ahb_bus = {
- 	.init_name	= "mxc_ahb",
--	.parent		= &platform_bus,
-+	.parent		= &platform_bus.dev,
- };
- 
- int __init mxc_device_init(void)
-diff --git a/arch/unicore32/kernel/puv3-core.c b/arch/unicore32/kernel/puv3-core.c
-index 254adee..28d1387 100644
---- a/arch/unicore32/kernel/puv3-core.c
-+++ b/arch/unicore32/kernel/puv3-core.c
-@@ -272,7 +272,7 @@ void __init puv3_core_init(void)
- 	platform_device_register_simple("PKUnity-v3-UART", 1,
- 			puv3_uart1_resources, ARRAY_SIZE(puv3_uart1_resources));
- 	platform_device_register_simple("PKUnity-v3-AC97", -1, NULL, 0);
--	platform_device_register_resndata(&platform_bus, "musb_hdrc", -1,
-+	platform_device_register_resndata(&platform_bus.dev, "musb_hdrc", -1,
- 			puv3_usb_resources, ARRAY_SIZE(puv3_usb_resources),
- 			&puv3_usb_plat, sizeof(puv3_usb_plat));
- }
-diff --git a/arch/unicore32/kernel/puv3-nb0916.c b/arch/unicore32/kernel/puv3-nb0916.c
-index 0c6618e..4b1c462 100644
---- a/arch/unicore32/kernel/puv3-nb0916.c
-+++ b/arch/unicore32/kernel/puv3-nb0916.c
-@@ -112,13 +112,13 @@ int __init mach_nb0916_init(void)
- 	platform_device_register_simple("PKUnity-v3-I2C", -1,
- 			puv3_i2c_resources, ARRAY_SIZE(puv3_i2c_resources));
- 
--	platform_device_register_data(&platform_bus, "pwm-backlight", -1,
-+	platform_device_register_data(&platform_bus.dev, "pwm-backlight", -1,
- 			&nb0916_backlight_data, sizeof(nb0916_backlight_data));
- 
--	platform_device_register_data(&platform_bus, "gpio-keys", -1,
-+	platform_device_register_data(&platform_bus.dev, "gpio-keys", -1,
- 			&nb0916_gpio_button_data, sizeof(nb0916_gpio_button_data));
- 
--	platform_device_register_resndata(&platform_bus, "physmap-flash", -1,
-+	platform_device_register_resndata(&platform_bus.dev, "physmap-flash", -1,
- 			&physmap_flash_resource, 1,
- 			&physmap_flash_data, sizeof(physmap_flash_data));
- 
-diff --git a/drivers/base/platform.c b/drivers/base/platform.c
-index eee48c4..cb69b38 100644
---- a/drivers/base/platform.c
-+++ b/drivers/base/platform.c
-@@ -30,8 +30,8 @@
- /* For automatically allocated device IDs */
- static DEFINE_IDA(platform_devid_ida);
- 
--struct device platform_bus = {
--	.init_name	= "platform",
-+struct platform_device platform_bus = {
-+	.name	= "platform",
- };
- EXPORT_SYMBOL_GPL(platform_bus);
- 
-@@ -300,7 +300,7 @@ int platform_device_add(struct platform_device *pdev)
- 		return -EINVAL;
- 
- 	if (!pdev->dev.parent)
--		pdev->dev.parent = &platform_bus;
-+		pdev->dev.parent = &platform_bus.dev;
- 
- 	pdev->dev.bus = &platform_bus_type;
- 
-@@ -946,12 +946,18 @@ int __init platform_bus_init(void)
- 
- 	early_platform_cleanup();
- 
--	error = device_register(&platform_bus);
-+	dev_set_name(&platform_bus.dev, "%s", platform_bus.name);
-+	error = device_register(&platform_bus.name);
- 	if (error)
- 		return error;
- 	error =  bus_register(&platform_bus_type);
--	if (error)
--		device_unregister(&platform_bus);
-+	if (!error) {
-+		platform_bus.dev.of_node = allnodes;
-+		platform_bus.dev.bus = &platform_bus_type;
-+		bus_add_device(&platform_bus.dev);
-+	} else {
-+		device_unregister(&platform_bus.dev);
-+	}
- 	return error;
- }
- 
-diff --git a/drivers/char/tile-srom.c b/drivers/char/tile-srom.c
-index bd37747..4e4b7a2 100644
---- a/drivers/char/tile-srom.c
-+++ b/drivers/char/tile-srom.c
-@@ -350,7 +350,7 @@ static int srom_setup_minor(struct srom_dev *srom, int index)
- 		       SROM_PAGE_SIZE_OFF, sizeof(srom->page_size)) < 0)
- 		return -EIO;
- 
--	dev = device_create(srom_class, &platform_bus,
-+	dev = device_create(srom_class, &platform_bus.dev,
- 			    MKDEV(srom_major, index), srom, "%d", index);
- 	return PTR_ERR_OR_ZERO(dev);
- }
-diff --git a/drivers/mmc/host/sdhci-pltfm.c b/drivers/mmc/host/sdhci-pltfm.c
-index 7e834fb..9a2b0d0 100644
---- a/drivers/mmc/host/sdhci-pltfm.c
-+++ b/drivers/mmc/host/sdhci-pltfm.c
-@@ -137,7 +137,7 @@ struct sdhci_host *sdhci_pltfm_init(struct platform_device *pdev,
- 		dev_err(&pdev->dev, "Invalid iomem size!\n");
- 
- 	/* Some PCI-based MFD need the parent here */
--	if (pdev->dev.parent != &platform_bus && !np)
-+	if (pdev->dev.parent != &platform_bus.dev && !np)
- 		host = sdhci_alloc_host(pdev->dev.parent,
- 			sizeof(struct sdhci_pltfm_host) + priv_size);
- 	else
-diff --git a/drivers/scsi/hosts.c b/drivers/scsi/hosts.c
-index 3cbb57a..c14c36f 100644
---- a/drivers/scsi/hosts.c
-+++ b/drivers/scsi/hosts.c
-@@ -218,7 +218,7 @@ int scsi_add_host_with_dma(struct Scsi_Host *shost, struct device *dev,
- 		goto fail;
- 
- 	if (!shost->shost_gendev.parent)
--		shost->shost_gendev.parent = dev ? dev : &platform_bus;
-+		shost->shost_gendev.parent = dev ? dev : &platform_bus.dev;
- 	if (!dma_dev)
- 		dma_dev = shost->shost_gendev.parent;
- 
-diff --git a/include/linux/platform_device.h b/include/linux/platform_device.h
-index 16f6654..a99032a 100644
---- a/include/linux/platform_device.h
-+++ b/include/linux/platform_device.h
-@@ -44,7 +44,7 @@ extern int platform_device_register(struct platform_device *);
- extern void platform_device_unregister(struct platform_device *);
- 
- extern struct bus_type platform_bus_type;
--extern struct device platform_bus;
-+extern struct platform_device platform_bus;
- 
- extern void arch_setup_pdev_archdata(struct platform_device *);
- extern struct resource *platform_get_resource(struct platform_device *,
--- 
-1.9.1
+The operating-points binding has obvious shortcomings and this is
+another example. Someone needs to step up with a new binding that
+addresses this and all other issues (e.g. turbo modes, extra per OPP
+data, etc.). I don't really want to see halfway fixes to the binding
+that ignore the other issues (unless there is a really simple
+solution).
+
+Rob
