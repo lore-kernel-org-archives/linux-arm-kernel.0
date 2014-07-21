@@ -1,43 +1,50 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Mon, 21 Jul 2014 14:00:22 +0200
-Subject: [PATCHv2 12/17] cpuidle: mvebu: make the cpuidle driver capable
- of handling multiple SoCs
-In-Reply-To: <20140721133534.3415e425@free-electrons.com>
-References: <1404913221-17343-1-git-send-email-thomas.petazzoni@free-electrons.com>
- <52019695.n2AjkGEsJ7@wuerfel> <20140721133534.3415e425@free-electrons.com>
-Message-ID: <5251405.VTrfDi1rj5@wuerfel>
+Date: Mon, 21 Jul 2014 14:06:10 +0200
+Subject: [PATCH 12/12] ARM: tegra: Convert PMC to a driver
+In-Reply-To: <20140717110652.GA18383@ulmo>
+References: <1405080971-7609-1-git-send-email-thierry.reding@gmail.com>
+ <111661024.qGiugVUugr@wuerfel> <20140717110652.GA18383@ulmo>
+Message-ID: <6373493.kzO00ziuYq@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday 21 July 2014 13:35:34 Thomas Petazzoni wrote:
-> On Mon, 21 Jul 2014 13:30:47 +0200, Arnd Bergmann wrote:
+On Thursday 17 July 2014 13:06:53 Thierry Reding wrote:
 > 
-> > > > It would be best to have a way to read a property (or multiple
-> > > > properties) from DT instead, to identify the requirements of the
-> > > > device individually. However, I guess that would also require
-> > > > changing the DT representation in an incompatible way, which we
-> > > > normally don't.
-> > > 
-> > > cpuidle is not represented in DT, so besides checking the global
-> > > compatible string with of_machine_is_compatible(), or passing data
-> > > through platform_data (as proposed in the patch series), I don't really
-> > > see how the cpuidle driver could find out which SoC variant is being
-> > > used.
-> > 
-> > One way I think it can be done is by looking up the pmsu node
-> > and then looking at some of the properties in there.
-> 
-> Which properties do you have in mind? Should we simply use different
-> compatible strings for the PMSU node, per SoC ? Some other suggestions ?
+> We could go all the way and make it include/soc/tegra/*.h for better
+> namespacing. I guess either way would be fine, really, since the number
+> of files in those directories should be small by definition, so we
+> should be able to do without the extra SoC directory, too. I have a
+> slight preference for a separate SoC directory, do you have any
+> objections?
 
-I don't know, it really depends on what the differences are between
-the SoCs, and I haven't looked at them.
+I'm fine with it either way. I just noticed that you have now
+moved the file, which resulted in a build error:
 
-Using the compatible strings would make it work best if you have one
-driver per variant, and then share some common code, as opposed to
-having one shared driver with a number of exceptions.
+../drivers/ata/ahci_tegra.c:27:35: fatal error: linux/tegra-powergate.h: No such file or directory
+ #include <linux/tegra-powergate.h>
+                                   ^
+compilation terminated.
+make[4]: *** [drivers/ata/ahci_tegra.o] Error 1
 
-If the differences are just a few parameters, it might be better
-to encode those parameters in DT properties instead.
+so somebody needs to pick up this patch:
+
+diff --git a/drivers/ata/ahci_tegra.c b/drivers/ata/ahci_tegra.c
+index d30bb21afd67..d7c6b1f550cd 100644
+--- a/drivers/ata/ahci_tegra.c
++++ b/drivers/ata/ahci_tegra.c
+@@ -24,8 +24,8 @@
+ #include <linux/module.h>
+ #include <linux/of_device.h>
+ #include <linux/platform_device.h>
+-#include <linux/tegra-powergate.h>
+ #include <linux/regulator/consumer.h>
++#include <soc/tegra/pmc.h>
+ #include "ahci.h"
+ 
+ #define SATA_CONFIGURATION_0				0x180
+
+
+I haven't checked which trees are affected of if you have already posted
+a patch to do this.
 
 	Arnd
