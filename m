@@ -1,93 +1,105 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Mon, 21 Jul 2014 18:32:25 +0200
-Subject: [PATCH v2] arm64/efi: efistub: jump to 'stext' directly, not
- through the header
-In-Reply-To: <1405606141.25580.108.camel@deneb.redhat.com>
-References: <1405421886-11692-1-git-send-email-ard.biesheuvel@linaro.org>
- <1405522297.25580.72.camel@deneb.redhat.com>
- <20140716155345.GB30313@leverpostej>
- <1405539927.25580.74.camel@deneb.redhat.com>
- <CAKv+Gu-bqXKoy-G00cWPJES=6A_ofu=cfBOsD0ZriHa4AGxG0A@mail.gmail.com>
- <1405544636.25580.83.camel@deneb.redhat.com>
- <CAKv+Gu8kvU8ndeG2vF5HqRhjK+_F=8D52eabHzy++nTHt_pAYQ@mail.gmail.com>
- <1405606141.25580.108.camel@deneb.redhat.com>
-Message-ID: <CAKv+Gu8c3jhX+XxVR3EvuY6B4da-USgz=UMftGVzMCC7GdU73Q@mail.gmail.com>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Mon, 21 Jul 2014 10:38:25 -0600
+Subject: [GIT PULL 2/3] ARM: tegra: move fuse code out of arch/arm
+In-Reply-To: <20140721155451.GF32578@arm.com>
+References: <1403558626-13422-1-git-send-email-swarren@wwwdotorg.org>
+ <1403558626-13422-2-git-send-email-swarren@wwwdotorg.org>
+ <20140707004417.GE8469@quad.lixom.net>
+ <20140708134359.GA23218@tbergstrom-lnx.Nvidia.com>
+ <CAOesGMhoqvqf-dktp-OfUNTPLahPwkyAPiTeDngr4QjH=VfOGA@mail.gmail.com>
+ <53C88A4C.3070304@wwwdotorg.org>
+ <CAOesGMh+zLV781wzdR5=_Bpzh+XMwJfWL-5XMDP6DwG_Hg80kw@mail.gmail.com>
+ <53CD2C58.6060601@wwwdotorg.org> <20140721155451.GF32578@arm.com>
+Message-ID: <53CD4201.5070705@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 17 July 2014 16:09, Mark Salter <msalter@redhat.com> wrote:
-> On Wed, 2014-07-16 at 23:13 +0200, Ard Biesheuvel wrote:
->> On 16 July 2014 23:03, Mark Salter <msalter@redhat.com> wrote:
->> > On Wed, 2014-07-16 at 22:38 +0200, Ard Biesheuvel wrote:
->> >> On 16 July 2014 21:45, Mark Salter <msalter@redhat.com> wrote:
->> >> > On Wed, 2014-07-16 at 16:53 +0100, Mark Rutland wrote:
->> >> >> On Wed, Jul 16, 2014 at 03:51:37PM +0100, Mark Salter wrote:
->> >> >> > On Tue, 2014-07-15 at 12:58 +0200, Ard Biesheuvel wrote:
->> >> >> > > After the EFI stub has done its business, it jumps into the kernel by branching
->> >> >> > > to offset #0 of the loaded Image, which is where it expects to find the header
->> >> >> > > containing a 'branch to stext' instruction.
->> >> >> > >
->> >> >> > > However, the header is not covered by any PE/COFF section, so the header may
->> >> >> > > not actually be loaded at the expected offset. So instead, jump to 'stext'
->> >> >> > > directly, which is at the base of the PE/COFF .text section, by supplying a
->> >> >> > > symbol 'stext_offset' to efi-entry.o which contains the relative offset of
->> >> >> > > stext into the Image. Also replace other open coded calculations of the same
->> >> >> > > value with a reference to 'stext_offset'
->> >> >> >
->> >> >> > Have you actually seen a situation where the header isn't there?
->> >> >> > Isn't the kernel header actually part of the pe/coff file and
->> >> >> > firmware loads the whole file into RAM?
->> >> >>
->> >> >> From my understanding of Ard's earlier comments, this part isn't
->> >> >> guaranteed per the UEFI spec.
->> >> >>
->> >> >> I would rather we weren't relying on implementation details.
->> >> >>
->> >> >
->> >> > Could be. I didn't see anything about it in the UEFI spec, but I
->> >> > probably wasn't exhaustive in my search. In any case, there's at
->> >> > least one other place broken if the kernel header isn't included
->> >> > in the loaded image.
->> >> >
->> >>
->> >> I have not been able to find anything in the PE/COFF documents that
->> >> tells you what to put in memory areas that are not covered by a
->> >> section. Expecting the header to be there is indeed relying on an
->> >> implementation detail, which seems risky.
->> >> And indeed, if there are any other (non EFI related) uses of header
->> >> fields in the kernel, it would be good to have a look at those well,
->> >
->> > I think we need to come up with a loader which does load an image
->> > without kernel header so that we can test. Otherwise, we'll probably
->> > end up with buggy code anyway. The stub code assumes the the loaded
->> > image pointed to by the system table is the whole image. Seems like
->> > we'd need to add code to determine if it is whole kernel image or
->> > image without initial header. Stub would have to handle both cases.
->> > For instance, one case would want image placed at 2MiB+TEXT_OFFSET,
->> > other case would want 2MiB+TEXT_OFFSET+sizeof(kernel header).
->> >
+On 07/21/2014 09:54 AM, Catalin Marinas wrote:
+> On Mon, Jul 21, 2014 at 09:06:00AM -0600, Stephen Warren wrote:
+>> On 07/17/2014 11:33 PM, Olof Johansson wrote:
+>>> On Thu, Jul 17, 2014 at 7:45 PM, Stephen Warren <swarren@wwwdotorg.org> wrote:
+>>>> On 07/08/2014 11:47 AM, Olof Johansson wrote:
+>>>>> On Tue, Jul 8, 2014 at 6:43 AM, Peter De Schrijver
+>>>>> <pdeschrijver@nvidia.com> wrote:
+>>>>>> On Mon, Jul 07, 2014 at 02:44:17AM +0200, Olof Johansson wrote:
+>>>>>>> On Mon, Jun 23, 2014 at 03:23:45PM -0600, Stephen Warren wrote:
+>>>>>>>> This branch moves code related to the Tegra fuses out of arch/arm and
+>>>>>>>> into a centralized location which could be shared with ARM64. It also
+>>>>>>>> adds support for reading the fuse data through sysfs.
+>>>>>>>
+>>>>>>> The new/moved misc driver isn't acked by any misc maintainer, so I can't
+>>>>>>> take this branch.
+>>>>>>>
+>>>>>>> I saw no indication from searching the mailing list of that either,
+>>>>>>> so it wasn't just a missed acked-by.
+>>>>>>>
+>>>>>>> I wonder if this code should go under drivers/soc/ instead?
+>>>>>>
+>>>>>> It's modelled after sunxi_sid.c which lives in drivers/misc/eeprom/.
+>>>>>> Originally this driver was also in drivers/misc/eeprom/, but Stephen objected
+>>>>>> and therefore it was moved to drivers/misc/fuse. I think that's the right
+>>>>>> place still.
+>>>>>
+>>>>> I disagree, I think this belongs under drivers/soc. Especially since
+>>>>> you're adding dependencies on this misc driver from other parts of the
+>>>>> kernel / other drivers.
+>>>>>
+>>>>> I also don't like seeing init calls form platform code down into
+>>>>> drivers/misc like you're adding here. Can you please look at doing
+>>>>> that as a regular init call setup?
+>>>>
+>>>> I strongly disagree with using init calls for this kind of thing. There
+>>>> are ordering dependencies between the initialization code that can only
+>>>> be sanely managed by explicitly calling functions in a particular order;
+>>>> there's simply no way to manage this using initcalls. This is exactly
+>>>> why the hooks in the ARM machine descriptors exist...
+>>>
+>>> Right, but there are non on 64-bit, so you need to solve it for there
+>>> anyway. And once it's solved there, you might as well keep it common
+>>> with 32-bit.
 >>
->> No, this has nothing to do with misaligned data.
->>
->> The PE/COFF .text section does not start at virtual offset #0 but at
->> virtual offset 'stext - efi_head'.
->> In other words, there is a hole in the virtual image where the header
->> is supposed to be.
->> So if there is no PE/COFF section describing what data should be put
->> at offset #0 by the loader, we can't assume the header is there, even
->> if ImageBase does start at #0
->
-> I get that. You're supposing UEFI will always allocate memory for the
-> full image, but only sometimes copy the PE/COFF headers. I can see your
-> point from a PE/COFF perspective, but not so much from the UEFI spec
-> perspective where the language leads me to think it treats the PE/COFF
-> images as one unit wrt loading. In any case, it really isn't worth
-> arguing about. I don't have any objection to the patch since it won't
-> break anything from my perspective and it'll protect against breakage
-> which could possibly occur with some firmware implementations.
->
+>> My assertion is that we should just do it directly on 64-bit too.
+>> There's no reason for arm64 to deviate from what arch/arm does already.
+> 
+> On arm64, I really want to get away from any SoC specific early
+> initcall. One of the main reason is for things like SCU, interconnects,
+> system cache configurations (even certain clocks) to be enabled in
+> firmware before Linux starts (it's an education process but that's a way
+> for example to prevent people sending patches to enable SoC coherency
+> because they haven't thought about it before upstreaming).
+> 
+> It would be nice to be able to initialise SoC stuff at device_initcall()
+> level (and even keep such code as modules in initramfs) but one of the
+> problems we have is dependency on clocks (and the clock model which
+> doesn't follow the device/driver model). The of_platform_populate() is
+> called at arch_initcall_sync (after arch_initcall to still allow some
+> SoC code, if needed, to run at arch_initcall).
 
-OK, thanks.
+The main thing I want to avoid is a ton of separate drivers that all
+rely on each-other getting resolved by deferred probe. While that might
+work out, it seems pointless to make the kernel try and probe a bunch of
+stuff just to have it fail and get repeated, when we know exactly which
+order everything should get initialized in.
 
--- 
-Ard.
+Another issue is that we have SoCs which only differ in the CPU. I want
+the code to work identically on both SoCs so the CPU has limited affect
+on the low-level IO code. If we're going to enforce a "no machine
+descriptors" rule on arch/arm64, I think we should do the same thing in
+arch/arm for consistency.
+
+> We have a similar issue with arm64 vexpress (well, just on the model)
+> where vexpress_sysreg_init() is a core_initcall (should be fine as
+> arch_initcall) as it needs to be done before of_platform_populate().
+> Pawel on cc should know more of the history here.
+> 
+> I recall there were also some discussions about a SoC driver model which
+> hangs off the top compatible string in the DT (e.g. "arm,vexpress") and
+> allow (minimal) code to be run slightly earlier, though still not
+> earlier than arch_initcall.
+
+I guess that would work out OK; if we force the driver that binds to a
+top-level compatible value of "nvidia,tegraNNN" to probe first, and it
+then calls out to all the low-level init code in a sane order, that
+would solve the problem. I'm not sure that's any better than having a
+machine descriptor with an "init" function though; wrapping all this in
+a driver just seems like overhead, but it would work out OK.
