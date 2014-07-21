@@ -1,50 +1,34 @@
-From: linux@roeck-us.net (Guenter Roeck)
-Date: Mon, 21 Jul 2014 05:51:02 -0700
-Subject: [PATCH v5 0/7] kernel: Add support for restart handler call chain
-In-Reply-To: <20140721123056.GF12817@arm.com>
-References: <1405668856-13738-1-git-send-email-linux@roeck-us.net>
- <20140721123056.GF12817@arm.com>
-Message-ID: <53CD0CB6.1050803@roeck-us.net>
+From: drake@endlessm.com (Daniel Drake)
+Date: Mon, 21 Jul 2014 13:51:59 +0100
+Subject: [PATCH v2 1/2] clk: samsung: exynos4: Enable ARMCLK down feature
+In-Reply-To: <1405694193-29643-1-git-send-email-k.kozlowski@samsung.com>
+References: <1405694193-29643-1-git-send-email-k.kozlowski@samsung.com>
+Message-ID: <CAD8Lp45UtZ_aao2ScUUjRq9AfnxGq9GuT24SLzY-koeBfTTDCw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Catalin,
-
-On 07/21/2014 05:30 AM, Catalin Marinas wrote:
-> On Fri, Jul 18, 2014 at 08:34:09AM +0100, Guenter Roeck wrote:
->> Patch 1 of this series implements the restart handler function. Patches 2 and 3
->> implement calling the restart handler chain from arm and arm64 restart code.
->>
->> Patch 4 modifies the restart-poweroff driver to no longer call arm_pm_restart
->> directly but machine_restart. This is done to avoid calling arm_pm_restart
->> from more than one place. The change makes the driver architecture independent,
->> so it would be possible to drop the arm dependency from its Kconfig entry.
->>
->> Patch 5 and 6 convert existing restart handlers in the watchdog subsystem
->> to use the restart handler. Patch 7 unexports arm_pm_restart to ensure
->> that no one gets the idea to implement a restart handler as module.
+On Fri, Jul 18, 2014 at 3:36 PM, Krzysztof Kozlowski
+<k.kozlowski@samsung.com> wrote:
+> Enable ARMCLK down feature on all Exynos4 SoCs. The frequency of
+> ARMCLK will be reduced upon entering idle mode (WFI or WFE).
 >
-> For the current patches:
+> The feature behaves like very fast cpufreq ondemand governor. In idle
+> mode this reduces energy consumption on full frequency chosen by
+> cpufreq governor by approximately:
+>  - Trats2:  6.5% (153 mA -> 143 mA)
+>  - Trats:  33.0% (180 mA -> 120 mA)
+>  - Gear1:  27.0% (180 mA -> 130 mA)
 >
-> Acked-by: Catalin Marinas <catalin.marinas@arm.com>
+> The patch uses simillar settings as Exynos5250 (clk-exynos5250.c),
+> except it disables clock up feature and on Exynos4412 ARMCLK down is
+> enabled for all 4 cores.
 >
-> Do you plan to convert more of the power/drivers/reset/ code?
+> Tested on Trats board (Exynos4210), Trats2 board (Exynos4412) and
+> Samsung Gear 1 (Exynos4212).
 >
+> Signed-off-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
 
-Once this series has been accepted, I at least wanted to give it a try.
+Tested on ODROID-U2, seems to be working. I don't have a way of
+measuring the power usage, but the system seems as stable as before.
 
-> BTW, is it worth doing something similar for pm_power_off (there is
-> generic code calling it directly, so slightly more complicated than
-> pm_restart)?
-
-I have not thought about it yet.
-
-A quick glance suggests it is much more widely used than the reset handler.
-It looks like the original idea, like with machine_restart, was to have
-one function per architecture, but it seems that is widely abused.
-
-Looks pretty messy to me. Maybe after this one is done, if there is interest
-and, more importantly, the need to do something about it.
-
-Thanks,
-Guenter
+Tested-by: Daniel Drake <drake@endlessm.com>
