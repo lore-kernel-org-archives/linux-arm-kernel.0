@@ -1,47 +1,65 @@
-From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Mon, 21 Jul 2014 10:21:51 +0200
-Subject: [PATCH] ARM: i.MX6: add more chip revision support
-In-Reply-To: <20140721070647.GK8537@dragon>
-References: <1405921091-28748-1-git-send-email-shawn.guo@freescale.com>
- <20140721063520.GR23235@pengutronix.de>
- <20140721070647.GK8537@dragon>
-Message-ID: <20140721082151.GU23235@pengutronix.de>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Mon, 21 Jul 2014 09:28:36 +0100
+Subject: [PATCH 1/1] ahci: st: Provide DT bindings for ST's SATA implementation
+Message-ID: <1405931316-12276-1-git-send-email-lee.jones@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jul 21, 2014 at 03:06:48PM +0800, Shawn Guo wrote:
-> On Mon, Jul 21, 2014 at 08:35:20AM +0200, Sascha Hauer wrote:
-> > On Mon, Jul 21, 2014 at 01:38:11PM +0800, Shawn Guo wrote:
-> > > From: Jason Liu <r64343@freescale.com>
-> > > 
-> > > Add more revision support for the new i.MX6DQ tap-out (TO1.5).  This
-> > > TO1.5 is the Rev 1.3 as documented in i.MX6DQ data sheet, because TO1.3
-> > > and TO1.4 are never revealed.
-> > 
-> > So the chip identifies itself as 1.5 but the data sheet refers to it as
-> > 1.3. Is there a way to make that clear somewhere? Otherwise it's really
-> > confusing.
-> 
-> I can add a note about that in the code, but I'm not really sure if
-> there is a better way to pass such info to end users.  Suggestions are
-> welcomed.
+Cc: devicetree at vger.kernel.org
+Cc: Srinivas Kandagatla <srinivas.kandagatla@st.com>
+Acked-by: Alexandre Torgue <alexandre.torgue@st.com>
+Signed-off-by: Lee Jones <lee.jones@linaro.org>
+---
 
-Since the anatop code can be used by other SoCs aswell and you're saying
-that even the other i.MX6 SoC variants may have a different numbering I
-think adding a comment to the code is the best we can do.
+Hi Tejun,
 
-The only other possibility I can think of is to make the info string we
-print during boot SoC specific again, but I think we are all glad that
-this isn't the case anymore.
+This patch has been on the MLs for a few months now.  It documents
+ST's AHCI driver which was accepted by you and now resides in
+Mainline.
 
-So adding a comment should be fine. At least the code would be the place
-I would look if I remembered that there is some inconsistency and don't
-know exactly what it was.
+Kind regards,
+Lee
 
-Sascha
+ Documentation/devicetree/bindings/ata/ahci-st.txt | 31 +++++++++++++++++++++++
+ 1 file changed, 31 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/ata/ahci-st.txt
 
+diff --git a/Documentation/devicetree/bindings/ata/ahci-st.txt b/Documentation/devicetree/bindings/ata/ahci-st.txt
+new file mode 100644
+index 0000000..0574a77
+--- /dev/null
++++ b/Documentation/devicetree/bindings/ata/ahci-st.txt
+@@ -0,0 +1,31 @@
++STMicroelectronics STi SATA controller
++
++This binding describes a SATA device.
++
++Required properties:
++ - compatible	   : Must be "st,sti-ahci"
++ - reg		   : Physical base addresses and length of register sets
++ - interrupts	   : Interrupt associated with the SATA device
++ - interrupt-names :   Associated name must be; "hostc"
++ - resets	   : The power-down and soft-reset lines of SATA IP
++ - reset-names	   :   Associated names must be; "pwr-dwn" and "sw-rst"
++ - clocks	   : The phandle for the clock
++ - clock-names	   :   Associated name must be; "ahci_clk"
++ - phys		   : The phandle for the PHY device
++ - phy-names	   :   Associated name must be; "ahci_phy"
++
++Example:
++
++	sata0: sata at fe380000 {
++		compatible      = "st,sti-ahci";
++		reg             = <0xfe380000 0x1000>;
++		interrupts      = <GIC_SPI 157 IRQ_TYPE_NONE>;
++		interrupt-names = "hostc";
++		phys	        = <&miphy365x_phy MIPHY_PORT_0 MIPHY_TYPE_SATA>;
++		phy-names       = "ahci_phy";
++		resets	        = <&powerdown STIH416_SATA0_POWERDOWN>,
++				  <&softreset STIH416_SATA0_SOFTRESET>;
++		reset-names     = "pwr-dwn", "sw-rst";
++		clocks	        = <&clk_s_a0_ls CLK_ICN_REG>;
++		clock-names     = "ahci_clk";
++	};
 -- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+1.8.3.2
