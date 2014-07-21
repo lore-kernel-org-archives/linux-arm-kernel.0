@@ -1,70 +1,108 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Mon, 21 Jul 2014 05:31:52 -0700
-Subject: [RFC PATCH 4/7] ARM: OMAP4+: PRM: register interrupt information
- from DT
-In-Reply-To: <CAGo_u6q21_z-+mTWFD2T36mAXahwZt8-GBH0J3yuy+11CLYbxA@mail.gmail.com>
-References: <1402025761-16831-1-git-send-email-nm@ti.com>
- <1402025761-16831-5-git-send-email-nm@ti.com>
- <20140721105149.GU18374@atomide.com>
- <CAGo_u6q2NOxWVG3LOfAyk8qLZss5N6MxCvYkf-yN8c4ec4mftw@mail.gmail.com>
- <20140721112807.GA18374@atomide.com>
- <CAGo_u6q21_z-+mTWFD2T36mAXahwZt8-GBH0J3yuy+11CLYbxA@mail.gmail.com>
-Message-ID: <20140721123152.GC18374@atomide.com>
+From: boris.brezillon@free-electrons.com (Boris BREZILLON)
+Date: Mon, 21 Jul 2014 14:33:21 +0200
+Subject: [RESEND PATCH v3 06/11] drm: add DT bindings documentation for
+ atmel-hlcdc-dc driver
+In-Reply-To: <20140721121513.GB15238@ulmo>
+References: <1404751384-5077-1-git-send-email-boris.brezillon@free-electrons.com>
+ <1404751384-5077-7-git-send-email-boris.brezillon@free-electrons.com>
+ <20140714100542.GB9870@ulmo> <20140715120619.7f29c458@bbrezillon>
+ <20140715103136.GA6616@ulmo> <20140718165152.0a9fde09@bbrezillon>
+ <20140721121513.GB15238@ulmo>
+Message-ID: <20140721143321.5bda6ea9@bbrezillon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Nishanth Menon <nm@ti.com> [140721 05:11]:
-> On Mon, Jul 21, 2014 at 6:28 AM, Tony Lindgren <tony@atomide.com> wrote:
-> > * Nishanth Menon <nm@ti.com> [140721 04:24]:
-> >> On Mon, Jul 21, 2014 at 5:51 AM, Tony Lindgren <tony@atomide.com> wrote:
-> >> >
-> >> >> +static struct of_device_id omap_prm_dt_match_table[] = {
-> >> >> +     { .compatible = "ti,omap4-prm" },
-> >> >> +     { .compatible = "ti,omap5-prm" },
-> >> >> +     { .compatible = "ti,dra7-prm" },
-> >> >> +     { }
-> >> >> +};
-> >> >> +
-> >> >
-> >> > I'd like to avoid adding more driver like stuff to mach-omap2
-> >> > and parsing compatible flags and dealing with interupts sounds
-> >> > very driver like.. But maybe just the handling can be moved
-> >> > out?
-> >>
-> >> I understand your view, but, Handling of interrupts is already in
-> >> place even now in mach-omap2. Currently the prm devices are handled by
-> >> mach-omap2 and all this does it to prevent hardcoding of irq numbers
-> >> within the current code.
-> >
-> > Yeah but at a cost of no dev entry, no probe etc. I'd rather keep
-> > that SoC specific data around until a driver can deal with it
-> > in a standard way.
-> >
-> >> > Would a simple driver be doable that parses the compatible
-> >> > flags, takes care of the IRQ chaining, and gets some SoC specific
-> >> > function pointers as auxdata?
-> >>
-> >> Tero has been trying to move PRM/CM stuff to a separate drivers of
-> >> thier own. With that there wont be a need for auxdata even. - this
-> >> current logic will get merged with that driver - if and when that is
-> >> ready. I am not actually adding any driver logic here - just reusing
-> >> the logic and providing glue for using dt description instead of
-> >> hardcoded logic that the current mach-omap2 driver does.
-> >
-> > Well how about let's just leave out the non-standard parts for
-> > now, then once the PRM/CM driver can deal with, it can do things
-> > in a normal way?
+On Mon, 21 Jul 2014 14:15:16 +0200
+Thierry Reding <thierry.reding@gmail.com> wrote:
+
+> On Fri, Jul 18, 2014 at 04:51:52PM +0200, Boris BREZILLON wrote:
+> > Hi Thierry,
+> > 
+> > Oops, I missed this reply.
+> > 
+> > On Tue, 15 Jul 2014 12:31:37 +0200
+> > Thierry Reding <thierry.reding@gmail.com> wrote:
+> > 
+> > > On Tue, Jul 15, 2014 at 12:06:19PM +0200, Boris BREZILLON wrote:
+> > > > On Mon, 14 Jul 2014 12:05:43 +0200 Thierry Reding <thierry.reding@gmail.com> wrote:
+> > > > > On Mon, Jul 07, 2014 at 06:42:59PM +0200, Boris BREZILLON wrote:
+> > > [...]
+> > > > > > diff --git a/Documentation/devicetree/bindings/drm/atmel-hlcdc-dc.txt b/Documentation/devicetree/bindings/drm/atmel-hlcdc-dc.txt
+> > > > > [...]
+> > > > > > +The Atmel HLCDC Display Controller is subdevice of the HLCDC MFD device.
+> > > > > > +See Documentation/devicetree/bindings/mfd/atmel-hlcdc.txt for more details.
+> > > > > 
+> > > > > I think it's better to refer to these using relative filenames. When the
+> > > > > device tree bindings are moved out of the kernel tree, they may no
+> > > > > longer use the same hierarchy.
+> > > > 
+> > > > Sure.
+> > > > By relative path you mean ../../mfd/atmel-hlcdc.txt or just
+> > > > mfd/atmel-hlcdc.txt ?
+> > > 
+> > > I think the former is more explicit.
+> > 
+> > Okay.
+> > 
+> > > 
+> > > > > > + - atmel,panel: Should contain a phandle with 2 parameters.
+> > > > > > +   The first cell is a phandle to a DRM panel device
+> > > > > > +   The second cell encodes the RGB mode, which can take the following values:
+> > > > > > +   * 0: RGB444
+> > > > > > +   * 1: RGB565
+> > > > > > +   * 2: RGB666
+> > > > > > +   * 3: RGB888
+> > > > > 
+> > > > > These are properties of the panel and should be obtained from the panel
+> > > > > directly rather than an additional cell in this specifier.
+> > > > 
+> > > > Okay.
+> > > > What's the preferred way of doing this ?
+> > > > What about defining an rgb-mode property in the panel node.
+> > > 
+> > > There's .bpc in struct drm_display_info, I suspect that it could be used
+> > > for this. Alternatively, maybe we could extend the list of color formats
+> > > that go into drm_display_info.color_formats? RGB444 is already covered.
+> > 
+> > I don't think this color_formats field is intended to represent data
+> > stream format going through the bus.
+> > Moreover, AFAIU, RGB444 in this definition represent RGB 4:4:4 (chroma
+> > subsampling rate) and not 12 bits signals (4 bits for each color).
+> > 
+> > Anyway I'll propose a patch series adding a new field to
+> > drm_display_info to encode the mediabus format (as discussed with
+> > Laurent and you).
+> > 
+> > > 
+> > > Also, like Laurent said, this shouldn't go into the device tree, since
+> > > it's already implied by the panel's compatible value, so we'd be
+> > > duplicating information.
+> > 
+> > Again, this is not necessarily true (depending on your board design).
+> > One can decide to connect an RGB888 panel on an RGB666 bus and connect
+> > the missing pins to ground.
 > 
-> Broken PRCM interrupt handling for DRA7. but if you like to state
-> which parts are ok, I can probably repost with just those and leave
-> the rest for when ever PRM / CM driver happens to work out (and as a
-> result keep DRA7 daisy chain support broken till then - so probably
-> blocking low power features such as suspend-to-ram till that work is
-> complete.).
+> I think in that case the board design itself could be considered as an
+> RGB888 to RGB666 bridge, and I think that's what the device tree should
+> be describing rather than a panel with a variable number of input
+> formats.
 
-Well if Tero is fine with this approach, looks OK for me. At least
-the .dts entries should work in the long run.
+So, you're suggesting to add an RGB to RGB drm_bridge driver (and
+the appropriate DT bindings) to handle this case, right ?
 
-Regards,
+I don't know much about drm bridges, but I'll take a look.
 
-Tony
+Anyway, at the moment I don't have such hardware (one connecting an
+RGB888 panel on an RGB666 bus), I was just wondering how I could
+represent it ;-).
+
+Thanks,
+
+Boris
+
+
+
+-- 
+Boris Brezillon, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
