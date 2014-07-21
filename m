@@ -1,67 +1,73 @@
-From: thierry.reding@gmail.com (Thierry Reding)
-Date: Mon, 21 Jul 2014 23:55:25 +0200
-Subject: [PATCH 2/6] clk: tegra: make tegra_clocks_apply_init_table
- arch_initcall
-In-Reply-To: <53CD896C.3030605@wwwdotorg.org>
-References: <1405437890-6468-1-git-send-email-pdeschrijver@nvidia.com>
- <1405437890-6468-3-git-send-email-pdeschrijver@nvidia.com>
- <20140716071932.GB7978@ulmo>
- <20140716082740.GK23218@tbergstrom-lnx.Nvidia.com>
- <53CD896C.3030605@wwwdotorg.org>
-Message-ID: <20140721215523.GE12076@mithrandir>
+From: msalter@redhat.com (Mark Salter)
+Date: Mon, 21 Jul 2014 17:56:49 -0400
+Subject: [PATCH] arm64: make CONFIG_ZONE_DMA user settable
+In-Reply-To: <20140718110718.GC19850@arm.com>
+References: <1403499924-11214-1-git-send-email-msalter@redhat.com>
+ <20140623110937.GB15907@arm.com> <1403529423.755.49.camel@deneb.redhat.com>
+ <20140624141455.GE4489@arm.com> <1403620714.755.69.camel@deneb.redhat.com>
+ <20140718110718.GC19850@arm.com>
+Message-ID: <1405979809.25580.133.camel@deneb.redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jul 21, 2014 at 03:43:08PM -0600, Stephen Warren wrote:
-> On 07/16/2014 02:27 AM, Peter De Schrijver wrote:
-> > On Wed, Jul 16, 2014 at 09:19:33AM +0200, Thierry Reding wrote:
-> >> * PGP Signed by an unknown key
-> >>
-> >> On Tue, Jul 15, 2014 at 06:24:32PM +0300, Peter De Schrijver wrote:
-> >> [...]
-> >>> diff --git a/drivers/clk/tegra/clk.c b/drivers/clk/tegra/clk.c
-> >>> index d081732..65cde4e 100644
-> >>> --- a/drivers/clk/tegra/clk.c
-> >>> +++ b/drivers/clk/tegra/clk.c
-> >>> @@ -290,10 +290,13 @@ struct clk ** __init tegra_lookup_dt_id(int clk_id,
-> >>>  
-> >>>  tegra_clk_apply_init_table_func tegra_clk_apply_init_table;
-> >>>  
-> >>> -void __init tegra_clocks_apply_init_table(void)
-> >>> +static int __init tegra_clocks_apply_init_table(void)
-> >>>  {
-> >>>  	if (!tegra_clk_apply_init_table)
-> >>> -		return;
-> >>> +		return 0;
-> >>
-> >> Shouldn't this be an error? Or perhaps WARN()? To make sure this gets
+On Fri, 2014-07-18 at 12:07 +0100, Catalin Marinas wrote:
+> On Tue, Jun 24, 2014 at 03:38:34PM +0100, Mark Salter wrote:
+> > On Tue, 2014-06-24 at 15:14 +0100, Catalin Marinas wrote:
+> > > On Mon, Jun 23, 2014 at 02:17:03PM +0100, Mark Salter wrote:
+> > > > On Mon, 2014-06-23 at 12:09 +0100, Catalin Marinas wrote:
+> > > > > My proposal (in the absence of any kind of description) is to still
+> > > > > create a ZONE_DMA if we have DMA memory below 32-bit, otherwise just add
+> > > > > everything (>32-bit) to ZONE_DMA. Basically an extension from your CMA
+> > > > > patch, make dma_phys_limit static in that file and set it to
+> > > > > memblock_end_of_DRAM() if no 32-bit DMA. Re-use it in the
+> > > > > zone_sizes_init() function for ZONE_DMA (maybe with a pr_info for no
+> > > > > 32-bit only DMA zone).
+> > > > 
+> > > > There's a performance issue with all memory being in ZONE_DMA. It means
+> > > > all normal allocations will fail on ZONE_NORMAL and then have to fall
+> > > > back to ZONE_DMA. It would be better to put some percentage of memory
+> > > > in ZONE_DMA.
+> > > 
+> > > Is the performance penalty real or just theoretical? I haven't run any
+> > > benchmarks myself.
 > > 
-> > An arch_initcall will be called for every ARM platform I think? In case
-> > this gets called on a non-Tegra platform, tegra_clk_apply_init_table will not
-> > be set and therefore a silent return 0; seems the most appropriate thing to do
-> > to me?
+> > It is real insofar as you must eat cycles eliminating ZONE_NORMAL from
+> > consideration in the page allocation hot path. How much that really
+> > costs, I don't know. But it seems like it could be easily avoided by
+> > limiting ZONE_DMA size. Is there any reason it needs to be larger than
+> > 4GiB?
 > 
-> This is one reason that doing all the initialization from separate
-> initcalls sucks. Much better to have a single top-level initialization
-> function that calls exactly what is needed, only what is needed, and
-> only runs on the correct SoCs.
+> Basically ZONE_DMA should allow a 32-bit dma mask. When memory starts
+> above 4G, in the absence of an IOMMU, it is likely that 32-bit devices
+> get some offset for the top bits to be able to address the bottom of the
+> memory. The problem is that dma_to_phys() that early in the kernel has
+> no idea about DMA offsets until later (they can be specified in DT per
+> device).
 > 
-> But failing that, I guess you need to say something like
-> of_is_compatible(root node, "nvidia Tegra"), but of course the
-> definition of "nvidia Tegra" is an ever-growing list of possible values
-> that needs to be used from each separate initcall...
+> The patch belows tries to guess a DMA offset and use the bottom 32-bit
+> of the DRAM as ZONE_DMA.
+> 
+> -------8<-----------------------
+> 
+> From 133656f8378dbb838ad5f12ea29aa9303d7ca922 Mon Sep 17 00:00:00 2001
+> From: Catalin Marinas <catalin.marinas@arm.com>
+> Date: Fri, 18 Jul 2014 11:54:37 +0100
+> Subject: [PATCH] arm64: Create non-empty ZONE_DMA when DRAM starts above 4GB
+> 
+> ZONE_DMA is created to allow 32-bit only devices to access memory in the
+> absence of an IOMMU. On systems where the memory starts above 4GB, it is
+> expected that some devices have a DMA offset hardwired to be able to
+> access the bottom of the memory. Linux currently supports DT bindings
+> for the DMA offsets but they are not (easily) available early during
+> boot.
+> 
+> This patch tries to guess a DMA offset and assumes that ZONE_DMA
+> corresponds to the 32-bit mask above the start of DRAM.
+> 
+> Signed-off-by: Catalin Marinas <catalin.marinas@arm.com>
+> Cc: Mark Salter <msalter@redhat.com>
+> ---
 
-FWIW, we have soc_is_tegra() now in include/soc/tegra/common.h which is
-meant to be used for exactly this purpose. I agree that it isn't optimal
-but it's pretty good. It should be easy to refactor this to make it
-callable from a top-level initialization function when a decision
-regarding that has been made.
+Tested-by: Mark Salter <msalter@redhat.com>
 
-Thierry
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: not available
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140721/07496a14/attachment.sig>
+Thanks.
