@@ -1,24 +1,26 @@
 From: m-karicheri2@ti.com (Murali Karicheri)
-Date: Mon, 21 Jul 2014 12:58:45 -0400
-Subject: [PATCH v7 5/5] PCI: keystone: Update maintainer information
+Date: Mon, 21 Jul 2014 12:58:41 -0400
+Subject: [PATCH v7 1/5] PCI: designware: add rd[wr]_other_conf API
 In-Reply-To: <1405961925-27248-1-git-send-email-m-karicheri2@ti.com>
 References: <1405961925-27248-1-git-send-email-m-karicheri2@ti.com>
-Message-ID: <1405961925-27248-6-git-send-email-m-karicheri2@ti.com>
+Message-ID: <1405961925-27248-2-git-send-email-m-karicheri2@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Update the MAINTAINERS file for the keystone PCIe driver
+v3.65 version of the designware h/w, requires application space
+registers to be configured to access the remote EP config space.
+To support this, add rd[wr]_other_conf API in the pcie_host_opts
 
 Signed-off-by: Murali Karicheri <m-karicheri2@ti.com>
+Reviewed-by: Pratyush Anand <pratyush.anand@st.com>
+Acked-by: Mohit Kumar <mohit.kumar@st.com>
+Acked-by: Jingoo Han <jg1.han@samsung.com>
+Acked-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
 
-CC: Santosh Shilimkar <santosh.shilimkar@ti.com>
 CC: Russell King <linux@arm.linux.org.uk>
 CC: Grant Likely <grant.likely@linaro.org>
 CC: Rob Herring <robh+dt@kernel.org>
-CC: Mohit Kumar <mohit.kumar@st.com>
-CC: Jingoo Han <jg1.han@samsung.com>
 CC: Bjorn Helgaas <bhelgaas@google.com>
-CC: Pratyush Anand <pratyush.anand@st.com>
 CC: Richard Zhu <r65037@freescale.com>
 CC: Kishon Vijay Abraham I <kishon@ti.com>
 CC: Marek Vasut <marex@denx.de>
@@ -30,26 +32,54 @@ CC: Kumar Gala <galak@codeaurora.org>
 CC: Randy Dunlap <rdunlap@infradead.org>
 CC: Grant Likely <grant.likely@linaro.org>
 ---
- MAINTAINERS |    7 +++++++
- 1 file changed, 7 insertions(+)
+ drivers/pci/host/pcie-designware.c |   12 ++++++++++--
+ drivers/pci/host/pcie-designware.h |    4 ++++
+ 2 files changed, 14 insertions(+), 2 deletions(-)
 
-diff --git a/MAINTAINERS b/MAINTAINERS
-index 61a8f48..919b6b1 100644
---- a/MAINTAINERS
-+++ b/MAINTAINERS
-@@ -6805,6 +6805,13 @@ L:	linux-arm-kernel at lists.infradead.org (moderated for non-subscribers)
- S:	Maintained
- F:	drivers/pci/host/*imx6*
+diff --git a/drivers/pci/host/pcie-designware.c b/drivers/pci/host/pcie-designware.c
+index 1eaf4df..d8f3af7 100644
+--- a/drivers/pci/host/pcie-designware.c
++++ b/drivers/pci/host/pcie-designware.c
+@@ -656,7 +656,11 @@ static int dw_pcie_rd_conf(struct pci_bus *bus, u32 devfn, int where,
+ 	}
  
-+PCI DRIVER FOR keystone
-+M:	Murali Karicheri <m-karicheri2@ti.com>
-+L:	linux-pci at vger.kernel.org
-+L:	linux-arm-kernel at lists.infradead.org (moderated for non-subscribers)
-+S:	Maintained
-+F:	drivers/pci/host/*keystone*
-+
- PCI DRIVER FOR MVEBU (Marvell Armada 370 and Armada XP SOC support)
- M:	Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
- M:	Jason Cooper <jason@lakedaemon.net>
+ 	if (bus->number != pp->root_bus_nr)
+-		ret = dw_pcie_rd_other_conf(pp, bus, devfn,
++		if (pp->ops->rd_other_conf)
++			ret = pp->ops->rd_other_conf(pp, bus, devfn,
++						where, size, val);
++		else
++			ret = dw_pcie_rd_other_conf(pp, bus, devfn,
+ 						where, size, val);
+ 	else
+ 		ret = dw_pcie_rd_own_conf(pp, where, size, val);
+@@ -679,7 +683,11 @@ static int dw_pcie_wr_conf(struct pci_bus *bus, u32 devfn,
+ 		return PCIBIOS_DEVICE_NOT_FOUND;
+ 
+ 	if (bus->number != pp->root_bus_nr)
+-		ret = dw_pcie_wr_other_conf(pp, bus, devfn,
++		if (pp->ops->wr_other_conf)
++			ret = pp->ops->wr_other_conf(pp, bus, devfn,
++						where, size, val);
++		else
++			ret = dw_pcie_wr_other_conf(pp, bus, devfn,
+ 						where, size, val);
+ 	else
+ 		ret = dw_pcie_wr_own_conf(pp, where, size, val);
+diff --git a/drivers/pci/host/pcie-designware.h b/drivers/pci/host/pcie-designware.h
+index 77f592f..8121901 100644
+--- a/drivers/pci/host/pcie-designware.h
++++ b/drivers/pci/host/pcie-designware.h
+@@ -61,6 +61,10 @@ struct pcie_host_ops {
+ 			u32 val, void __iomem *dbi_base);
+ 	int (*rd_own_conf)(struct pcie_port *pp, int where, int size, u32 *val);
+ 	int (*wr_own_conf)(struct pcie_port *pp, int where, int size, u32 val);
++	int (*rd_other_conf)(struct pcie_port *pp, struct pci_bus *bus,
++			unsigned int devfn, int where, int size, u32 *val);
++	int (*wr_other_conf)(struct pcie_port *pp, struct pci_bus *bus,
++			unsigned int devfn, int where, int size, u32 val);
+ 	int (*link_up)(struct pcie_port *pp);
+ 	void (*host_init)(struct pcie_port *pp);
+ };
 -- 
 1.7.9.5
