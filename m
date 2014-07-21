@@ -1,228 +1,170 @@
 From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
-Date: Mon, 21 Jul 2014 17:06:24 +0100
-Subject: [PATCH v6 5/7] drivers: cpuidle: CPU idle ARM64 driver
+Date: Mon, 21 Jul 2014 17:06:26 +0100
+Subject: [PATCH v6 7/7] drivers: cpuidle: initialize Exynos driver through DT
 In-Reply-To: <1405958786-17243-1-git-send-email-lorenzo.pieralisi@arm.com>
 References: <1405958786-17243-1-git-send-email-lorenzo.pieralisi@arm.com>
-Message-ID: <1405958786-17243-6-git-send-email-lorenzo.pieralisi@arm.com>
+Message-ID: <1405958786-17243-8-git-send-email-lorenzo.pieralisi@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch implements a generic CPU idle driver for ARM64 machines.
+With the introduction of DT based idle states, CPUidle drivers for
+ARM can now initialize idle states data through properties in the device
+tree.
 
-It relies on the DT idle states infrastructure to initialize idle
-states count and respective parameters. Current code assumes the driver
-is managing idle states on all possible CPUs but can be easily
-generalized to support heterogenous systems and build cpumasks at
-runtime using MIDRs or DT cpu nodes compatible properties.
+This patch adds code to the Exynos CPUidle driver to dynamically
+initialize idle states data through the updated device tree source
+files.
 
-The driver relies on the arm64 CPU operations to call the idle
-initialization hook used to parse and save suspend back-end specific
-idle states information upon probing.
-
-Idle state index 0 is always initialized as a simple wfi state, ie always
-considered present and functional on all ARM64 platforms.
-
-Idle state indices higher than 0 trigger idle state entry by calling
-the cpu_suspend function, that does save the CPU context and executes
-the CPU operations suspend back-end hook. cpu_suspend passes the idle
-state index as a parameter so that the CPU operations suspend back-end
-can retrieve the required idle state data by using the idle state
-index to execute a look-up on its internal data structures.
-
+Cc: Chander Kashyap <chander.kashyap@linaro.org>
+Cc: Kukjin Kim <kgene.kim@samsung.com>
+Cc: Tomasz Figa <t.figa@samsung.com>
 Signed-off-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
 ---
- drivers/cpuidle/Kconfig         |   5 ++
- drivers/cpuidle/Kconfig.arm64   |  14 +++++
- drivers/cpuidle/Makefile        |   4 ++
- drivers/cpuidle/cpuidle-arm64.c | 128 ++++++++++++++++++++++++++++++++++++++++
- 4 files changed, 151 insertions(+)
- create mode 100644 drivers/cpuidle/Kconfig.arm64
- create mode 100644 drivers/cpuidle/cpuidle-arm64.c
+ arch/arm/boot/dts/exynos4210.dtsi | 11 +++++++++++
+ arch/arm/boot/dts/exynos5250.dtsi | 11 +++++++++++
+ drivers/cpuidle/Kconfig.arm       |  1 +
+ drivers/cpuidle/cpuidle-exynos.c  | 37 ++++++++++++++++++++++++-------------
+ 4 files changed, 47 insertions(+), 13 deletions(-)
 
-diff --git a/drivers/cpuidle/Kconfig b/drivers/cpuidle/Kconfig
-index 414e7a96..ebf0c2e 100644
---- a/drivers/cpuidle/Kconfig
-+++ b/drivers/cpuidle/Kconfig
-@@ -43,6 +43,11 @@ depends on ARM
- source "drivers/cpuidle/Kconfig.arm"
- endmenu
+diff --git a/arch/arm/boot/dts/exynos4210.dtsi b/arch/arm/boot/dts/exynos4210.dtsi
+index bc2b444..0270100 100644
+--- a/arch/arm/boot/dts/exynos4210.dtsi
++++ b/arch/arm/boot/dts/exynos4210.dtsi
+@@ -39,12 +39,23 @@
+ 			device_type = "cpu";
+ 			compatible = "arm,cortex-a9";
+ 			reg = <0x900>;
++			cpu-idle-states = <&CLUSTER_SLEEP_0>;
+ 		};
  
-+menu "ARM64 CPU Idle Drivers"
-+depends on ARM64
-+source "drivers/cpuidle/Kconfig.arm64"
-+endmenu
+ 		cpu at 901 {
+ 			device_type = "cpu";
+ 			compatible = "arm,cortex-a9";
+ 			reg = <0x901>;
++			cpu-idle-states = <&CLUSTER_SLEEP_0>;
++		};
 +
- menu "MIPS CPU Idle Drivers"
- depends on MIPS
- source "drivers/cpuidle/Kconfig.mips"
-diff --git a/drivers/cpuidle/Kconfig.arm64 b/drivers/cpuidle/Kconfig.arm64
-new file mode 100644
-index 0000000..d0a08ed
---- /dev/null
-+++ b/drivers/cpuidle/Kconfig.arm64
-@@ -0,0 +1,14 @@
-+#
-+# ARM64 CPU Idle drivers
-+#
++		idle-states {
++			CLUSTER_SLEEP_0: cluster-sleep-0 {
++				compatible = "arm,idle-state";
++				entry-latency-us = <1000>;
++				exit-latency-us = <300>;
++				min-residency-us = <100000>;
++			};
+ 		};
+ 	};
+ 
+diff --git a/arch/arm/boot/dts/exynos5250.dtsi b/arch/arm/boot/dts/exynos5250.dtsi
+index 834fb5a..631906e 100644
+--- a/arch/arm/boot/dts/exynos5250.dtsi
++++ b/arch/arm/boot/dts/exynos5250.dtsi
+@@ -63,12 +63,23 @@
+ 			compatible = "arm,cortex-a15";
+ 			reg = <0>;
+ 			clock-frequency = <1700000000>;
++			cpu-idle-states = <&CLUSTER_SLEEP_0>;
+ 		};
+ 		cpu at 1 {
+ 			device_type = "cpu";
+ 			compatible = "arm,cortex-a15";
+ 			reg = <1>;
+ 			clock-frequency = <1700000000>;
++			cpu-idle-states = <&CLUSTER_SLEEP_0>;
++		};
 +
-+config ARM64_CPUIDLE
-+	bool "Generic ARM64 CPU idle Driver"
-+	select ARM64_CPU_SUSPEND
++		idle-states {
++			CLUSTER_SLEEP_0: cluster-sleep-0 {
++				compatible = "arm,idle-state";
++				entry-latency-us = <1000>;
++				exit-latency-us = <300>;
++				min-residency-us = <100000>;
++			};
+ 		};
+ 	};
+ 
+diff --git a/drivers/cpuidle/Kconfig.arm b/drivers/cpuidle/Kconfig.arm
+index a9b089c..d8a9cd2 100644
+--- a/drivers/cpuidle/Kconfig.arm
++++ b/drivers/cpuidle/Kconfig.arm
+@@ -60,5 +60,6 @@ config ARM_AT91_CPUIDLE
+ config ARM_EXYNOS_CPUIDLE
+ 	bool "Cpu Idle Driver for the Exynos processors"
+ 	depends on ARCH_EXYNOS
 +	select DT_IDLE_STATES
-+	help
-+	  Select this to enable generic cpuidle driver for ARM64.
-+	  It provides a generic idle driver whose idle states are configured
-+	  at run-time through DT nodes. The CPUidle suspend backend is
-+	  initialized by calling the CPU operations init idle hook
-+	  provided by architecture code.
-diff --git a/drivers/cpuidle/Makefile b/drivers/cpuidle/Makefile
-index b27a062..706cb7f 100644
---- a/drivers/cpuidle/Makefile
-+++ b/drivers/cpuidle/Makefile
-@@ -23,6 +23,10 @@ obj-$(CONFIG_ARM_EXYNOS_CPUIDLE)        += cpuidle-exynos.o
- obj-$(CONFIG_MIPS_CPS_CPUIDLE)		+= cpuidle-cps.o
- 
- ###############################################################################
-+# ARM64 drivers
-+obj-$(CONFIG_ARM64_CPUIDLE)		+= cpuidle-arm64.o
-+
-+###############################################################################
- # POWERPC drivers
- obj-$(CONFIG_PSERIES_CPUIDLE)		+= cpuidle-pseries.o
- obj-$(CONFIG_POWERNV_CPUIDLE)		+= cpuidle-powernv.o
-diff --git a/drivers/cpuidle/cpuidle-arm64.c b/drivers/cpuidle/cpuidle-arm64.c
-new file mode 100644
-index 0000000..1aeb426
---- /dev/null
-+++ b/drivers/cpuidle/cpuidle-arm64.c
-@@ -0,0 +1,128 @@
-+/*
-+ * ARM64 generic CPU idle driver.
-+ *
-+ * Copyright (C) 2014 ARM Ltd.
-+ * Author: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+ */
-+
-+#define pr_fmt(fmt) "CPUidle arm64: " fmt
-+
-+#include <linux/cpuidle.h>
-+#include <linux/cpumask.h>
-+#include <linux/cpu_pm.h>
-+#include <linux/kernel.h>
-+#include <linux/module.h>
-+#include <linux/of.h>
+ 	help
+ 	  Select this to enable cpuidle for Exynos processors
+diff --git a/drivers/cpuidle/cpuidle-exynos.c b/drivers/cpuidle/cpuidle-exynos.c
+index 7c01512..097c21d 100644
+--- a/drivers/cpuidle/cpuidle-exynos.c
++++ b/drivers/cpuidle/cpuidle-exynos.c
+@@ -13,11 +13,14 @@
+ #include <linux/export.h>
+ #include <linux/module.h>
+ #include <linux/platform_device.h>
 +#include <linux/slab.h>
-+
-+#include <asm/cpuidle.h>
-+#include <asm/suspend.h>
-+
+ 
+ #include <asm/proc-fns.h>
+ #include <asm/suspend.h>
+ #include <asm/cpuidle.h>
+ 
 +#include "dt_idle_states.h"
 +
-+/*
-+ * arm_enter_idle_state - Programs CPU to enter the specified state
-+ *
-+ * dev: cpuidle device
-+ * drv: cpuidle driver
-+ * idx: state index
-+ *
-+ * Called from the CPUidle framework to program the device to the
-+ * specified target state selected by the governor.
-+ */
-+static int arm_enter_idle_state(struct cpuidle_device *dev,
-+				struct cpuidle_driver *drv, int idx)
-+{
-+	int ret;
-+
-+	if (!idx) {
-+		cpu_do_idle();
-+		return idx;
-+	}
-+
-+	ret = cpu_pm_enter();
-+	if (!ret) {
-+		/*
-+		 * Pass idle state index to cpu_suspend which in turn will
-+		 * call the CPU ops suspend protocol with idle index as a
-+		 * parameter.
-+		 */
-+		ret = cpu_suspend(idx);
-+
-+		cpu_pm_exit();
-+	}
-+
-+	return ret ? -1 : idx;
-+}
-+
-+struct cpuidle_driver arm64_idle_driver = {
-+	.name = "arm64_idle",
-+	.owner = THIS_MODULE,
-+	/*
-+	 * State at index 0 is standby wfi and considered standard
-+	 * on all ARM platforms. If in some platforms simple wfi
-+	 * can't be used as "state 0", DT bindings must be implemented
-+	 * to work around this issue and allow installing a special
-+	 * handler for idle state index 0.
-+	 */
-+	.states[0] = {
-+		.enter                  = arm_enter_idle_state,
-+		.exit_latency           = 1,
-+		.target_residency       = 1,
-+		.power_usage		= UINT_MAX,
-+		.flags                  = CPUIDLE_FLAG_TIME_VALID,
-+		.name                   = "WFI",
-+		.desc                   = "ARM64 WFI",
-+	}
-+};
-+
-+/*
-+ * arm64_idle_init
-+ *
-+ * Registers the arm64 specific cpuidle driver with the cpuidle
-+ * framework. It relies on core code to parse the idle states
-+ * and initialize them using driver data structures accordingly.
-+ */
-+static int __init arm64_idle_init(void)
-+{
-+	int i, ret;
-+	struct cpuidle_driver *drv = &arm64_idle_driver;
-+
+ static void (*exynos_enter_aftr)(void);
+ 
+ static int idle_finisher(unsigned long flags)
+@@ -60,32 +63,40 @@ static struct cpuidle_driver exynos_idle_driver = {
+ 	.owner			= THIS_MODULE,
+ 	.states = {
+ 		[0] = ARM_CPUIDLE_WFI_STATE,
+-		[1] = {
+-			.enter			= exynos_enter_lowpower,
+-			.exit_latency		= 300,
+-			.target_residency	= 100000,
+-			.flags			= CPUIDLE_FLAG_TIME_VALID,
+-			.name			= "C1",
+-			.desc			= "ARM power down",
+-		},
+ 	},
+-	.state_count = 2,
+-	.safe_state_index = 0,
+ };
+ 
+ static int exynos_cpuidle_probe(struct platform_device *pdev)
+ {
+-	int ret;
++	int ret, i;
++	struct cpuidle_driver *drv = &exynos_idle_driver;
+ 
+ 	exynos_enter_aftr = (void *)(pdev->dev.platform_data);
+ 
+-	ret = cpuidle_register(&exynos_idle_driver, NULL);
 +	drv->cpumask = kzalloc(cpumask_size(), GFP_KERNEL);
 +	if (!drv->cpumask)
 +		return -ENOMEM;
 +
-+	cpumask_copy(drv->cpumask, cpu_possible_mask);
-+	/*
-+	 * Start at index 1, request idle state nodes to be filled
-+	 */
++	/* Start at index 1, index 0 standard WFI */
 +	ret = dt_init_idle_driver(drv, 1);
-+	if (ret)
++	if (ret) {
++		dev_err(&pdev->dev, "failed to initialize idle states\n");
 +		goto free_mem;
-+	/*
-+	 * Call arch CPU operations in order to initialize
-+	 * idle states suspend back-end specific data
-+	 */
-+	for_each_cpu(i, drv->cpumask) {
-+		ret = cpu_init_idle(i);
-+		if (ret)
-+			goto free_mem;
 +	}
 +
 +	for (i = 1; i < drv->state_count; i++)
-+		drv->states[i].enter = arm_enter_idle_state;
++		drv->states[i].enter = exynos_enter_lowpower;
 +
 +	ret = cpuidle_register(drv, NULL);
-+	if (ret)
+ 	if (ret) {
+ 		dev_err(&pdev->dev, "failed to register cpuidle driver\n");
+-		return ret;
 +		goto free_mem;
-+
-+	return 0;
+ 	}
+ 
+ 	return 0;
 +free_mem:
 +	kfree(drv->cpumask);
 +	return ret;
-+}
-+device_initcall(arm64_idle_init);
+ }
+ 
+ static struct platform_driver exynos_cpuidle_driver = {
 -- 
 1.9.1
