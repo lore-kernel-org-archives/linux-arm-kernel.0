@@ -1,86 +1,88 @@
 From: thierry.reding@gmail.com (Thierry Reding)
-Date: Tue, 22 Jul 2014 00:04:11 +0200
+Date: Tue, 22 Jul 2014 00:17:17 +0200
 Subject: [RESEND PATCH v3 06/11] drm: add DT bindings documentation for
  atmel-hlcdc-dc driver
-In-Reply-To: <6062556.5zQdTSJFua@avalon>
+In-Reply-To: <20140721170630.GG21766@n2100.arm.linux.org.uk>
 References: <1404751384-5077-1-git-send-email-boris.brezillon@free-electrons.com>
- <20140721135410.GA13770@ulmo> <20140721162136.286f5b62@bbrezillon>
- <6062556.5zQdTSJFua@avalon>
-Message-ID: <20140721220409.GF12076@mithrandir>
+ <20140721143428.078b68a4@bbrezillon> <20140721125522.GE15238@ulmo>
+ <2695740.osZpCPIB8S@avalon> <20140721133034.GI15238@ulmo>
+ <20140721154313.1de8bf6f@bbrezillon>
+ <20140721170630.GG21766@n2100.arm.linux.org.uk>
+Message-ID: <20140721221715.GG12076@mithrandir>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jul 21, 2014 at 08:30:31PM +0200, Laurent Pinchart wrote:
-> Hi Boris and Thierry,
+On Mon, Jul 21, 2014 at 06:06:30PM +0100, Russell King - ARM Linux wrote:
+> On Mon, Jul 21, 2014 at 03:43:13PM +0200, Boris BREZILLON wrote:
+> > How about using a list instead of an array ?
+> > This way we can add elements to this list when parsing the EDID.
+> > 
+> > Or we can just define a maximum size for the bus_formats array when
+> > retrieving this info from EDID. If I'm correct we have at most 18 bus
+> > formats:
+> >  - 3 color formats:
+> >    * RGB 4:4:4
+> >    * YCbCr 4:4:4
+> >    * YCbCr 4:4:2
+> >  - 6 color depths: 6, 8, 10, 12, 14 and 16 bits per color
 > 
-> On Monday 21 July 2014 16:21:36 Boris BREZILLON wrote:
-> > On Mon, 21 Jul 2014 15:54:12 +0200 Thierry Reding wrote:
-> > > On Mon, Jul 21, 2014 at 03:47:52PM +0200, Laurent Pinchart wrote:
-> > >> On Monday 21 July 2014 15:43:13 Boris BREZILLON wrote:
-> > >>> On Mon, 21 Jul 2014 15:30:35 +0200 Thierry Reding wrote:
-> > >>>> On Mon, Jul 21, 2014 at 03:22:05PM +0200, Laurent Pinchart wrote:
-> > >>>>> On Monday 21 July 2014 14:55:23 Thierry Reding wrote:
-> > >>>>>> On Mon, Jul 21, 2014 at 02:34:28PM +0200, Boris BREZILLON wrote:
-> > >>>>>>> On Mon, 21 Jul 2014 14:16:42 +0200 Laurent Pinchart wrote:
-> > >>>>>>>> On Monday 21 July 2014 14:12:47 Thierry Reding wrote:
-> 
-> [snip]
-> 
-> > >>>>>>>>> Quoting from your paste:
-> > >>>>>>>>> 	+   const enum video_bus_format *bus_formats;
-> > >>>>>>>>> 	+   int nbus_formats;
-> > >>>>>>>>> 
-> > >>>>>>>>> Do we really need more than one?
-> > >>>>>>>> 
-> > >>>>>>>> We do if we want to replace the color_formats and bpc fields.
-> > >>>>>>> 
-> > >>>>>>> Yes, that's what I was about to answer :-).
-> > >>>>>> 
-> > >>>>>> Maybe we don't need to replace color_formats and bpc field
-> > >>>>>> immediately. That could be done in a follow-up patch.
-> > >>>>> 
-> > >>>>> We don't need to replace them right now, but we should at least
-> > >>>>> agree on how to replace them. Introducing a new field that would
-> > >>>>> need to be replaced in the near future when removing color_formats
-> > >>>>> and bpc would be a waste of time.
-> > >>>> 
-> > >>>> Sure. One of the problems I see with replacing color_formats and bpc
-> > >>>> with the above is that some of the bits within color_formats are set
-> > >>>> when the EDID is parsed. That implies that if they are replaced with
-> > >>>> an array of formats, the array would need to be reallocated during
-> > >>>> EDID parsing. That sounds like ugliness.
-> > >>>> 
-> > >>>> But if you can find a nice way to make it work that'd be great.
-> > >>> 
-> > >>> How about using a list instead of an array ?
-> > >>> This way we can add elements to this list when parsing the EDID.
-> > >>> 
-> > >>> Or we can just define a maximum size for the bus_formats array when
-> > >>> retrieving this info from EDID. If I'm correct we have at most 18 bus
-> > >>> 
-> > >>> formats:
-> > >>>  - 3 color formats:
-> > >>>    * RGB 4:4:4
-> > >>>    * YCbCr 4:4:4
-> > >>>    * YCbCr 4:4:2
-> > >>>  - 6 color depths: 6, 8, 10, 12, 14 and 16 bits per color
-> > >> 
-> > >> bpc isn't a bitmask, so EDID supports up to three formats only.
-> > >> 
-> > >> The color_formats field is computed in the drm_add_display_info()
-> > >> function. You could easily turn it into a local variable and allocate
-> > >> and fill the formats array at the end of the function.
-> > > 
-> > > But you also need to be careful to keep whatever formats the driver might
-> > > have set explicitly.
-> 
-> Do we have drivers that explicitly add formats to the formats parsed from EDID 
-> data ? If so, what's the use case ?
+> This starts to worry me.  What are we trying to do here - are we trying
+> to encode the connection between the CRTC and the encoder, the encoder
+> and the connector, or the connector and the device?
 
-Drivers could specifically add them if there's no EDID or if the EDID
-is known to be broken. If the former this is probably irrelevant. In the
-latter maybe a better option would be to ignore the EDID-probed ones
-rather than use the union of those provided by the driver and EDID.
+This is about the bus format of the panel device. That would make it the
+latter.
+
+> The encoder to connector and connector to device is mostly a function of
+> the interface spec itself (for example, many HDMI encoders take either a
+> RGB or YUV input and can convert it to the HDMI specified colourspaces for
+> transmission over the connector.)
+
+The discussion here started because we currently have no way to store
+information about the interface for raw RGB. That means currently all
+drivers need to hardcode assumptions about the mode. The idea was to
+make this information available via a field in drm_display_info so that
+drivers could reconfigure depending on what the attached panel expects.
+
+This doesn't only apply to panels, though, the issue is the same when a
+bridge (RGB/LVDS for example) is connected to the encoder.
+
+> If you want to do encoder to connector, what about VGA or some other
+> analogue signalling such as TV composite?  It's easy to take this too
+> far...
+> 
+> Surely the only one which matters is the CRTC to the encoder - that's
+> certainly true of all the setups I've come across so far.  As for that
+> interface, CRTCs I've seen can produce a /wide/ range of different
+> representations.
+> 
+> Some CRTCs (eg, AMBA CLCD) produce R, G, B signals scrunched down on to
+> the LSB bits of a LCD data bus (so RGB888 uses 24 bits, RGB444 would
+> use the LSB 12 bits of those 24 - rather than outputting the R4 bits on
+> a subset of the R8 bits.)
+> 
+> What about RGB565 - where you have differing number of bits for the
+> green channel from red/blue?
+> 
+> Then you have red/blue colour swapping at the CRTC (and similar for YUV)
+> such as on Dove / Armada.
+> 
+> Then there are some encoders have the ability to almost arbitarily map
+> their input pins according to whatever you choose (eg, TDA998x).
+> 
+> This problem isn't as quite as simple as "this is what EDID gives us"
+> and "these are the number of bits representing a colour".
+
+I think what we need is a way to pass information from whatever device
+is behind the encoder (be it a bridge or a panel) to the encoder. And
+likely we'll need a similar (or the same) way to pass that information
+from bridge to bridge or from bridge to panel.
+
+That way the encoder can ask the bridge (or panel) about the format it
+requires and reconfigure itself accordingly. This should be able to work
+with an arbitrary bridge -> [bridge... ->] panel chain where each
+element in the chain can reconfigure depending on what the next element
+requires (or fail if it can't work, which should really never happen).
 
 Thierry
 -------------- next part --------------
@@ -89,4 +91,4 @@ Name: not available
 Type: application/pgp-signature
 Size: 836 bytes
 Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140722/4735739e/attachment.sig>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140722/42d90e28/attachment-0001.sig>
