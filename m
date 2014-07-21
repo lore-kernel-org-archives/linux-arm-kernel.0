@@ -1,46 +1,55 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Mon, 21 Jul 2014 09:51:50 +0100
-Subject: [PATCH 2/3] ARM: smp_scu: enable SCU standby support
-In-Reply-To: <1405928755-19413-3-git-send-email-shawn.guo@freescale.com>
-References: <1405928755-19413-1-git-send-email-shawn.guo@freescale.com>
- <1405928755-19413-3-git-send-email-shawn.guo@freescale.com>
-Message-ID: <20140721085150.GB15666@arm.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Mon, 21 Jul 2014 10:57:35 +0200
+Subject: [PATCHv7 0/4] iio: adc: exynos_adc: Support Exynos3250 ADC and
+ code clean
+In-Reply-To: <53CCCB20.50802@samsung.com>
+References: <1405909068-22539-1-git-send-email-cw00.choi@samsung.com>
+ <14522743.f6oFhEQVv4@wuerfel> <53CCCB20.50802@samsung.com>
+Message-ID: <10938575.0qbHyHWX4J@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jul 21, 2014 at 08:45:54AM +0100, Shawn Guo wrote:
-> With SCU standby enabled, SCU CLK will be turned off when all processors
-> are in WFI mode.  And the clock will be turned on when any processor
-> leaves WFI mode.
+On Monday 21 July 2014 17:11:12 Chanwoo Choi wrote:
+> >    work to address the comments and do testing.
 > 
-> This behavior should be preferable in terms of power efficiency of
-> system idle.  So let's set the SCU standby bit to enable the support in
-> function scu_enable().
+> OK, I'll add this patch.
+> But, I have a question.
 > 
-> Signed-off-by: Shawn Guo <shawn.guo@freescale.com>
-> ---
->  arch/arm/kernel/smp_scu.c | 3 ++-
->  1 file changed, 2 insertions(+), 1 deletion(-)
+> Your patch add following compatible string.
+> "s3c64100-adc" is right?
 > 
-> diff --git a/arch/arm/kernel/smp_scu.c b/arch/arm/kernel/smp_scu.c
-> index c947508f84e6..9f29d167d02c 100644
-> --- a/arch/arm/kernel/smp_scu.c
-> +++ b/arch/arm/kernel/smp_scu.c
-> @@ -18,6 +18,7 @@
->  
->  #define SCU_CTRL		0x00
->  #define SCU_ENABLE		(1 << 0)
-> +#define SCU_STANDBY_ENABLE	(1 << 5)
->  #define SCU_CONFIG		0x04
->  #define SCU_CPU_STATUS		0x08
->  #define SCU_INVALIDATE		0x0c
-> @@ -54,7 +55,7 @@ void scu_enable(void __iomem *scu_base)
->  	if (scu_ctrl & SCU_ENABLE)
->  		return;
->  
-> -	scu_ctrl |= SCU_ENABLE;
-> +	scu_ctrl |= SCU_ENABLE | SCU_STANDBY_ENABLE;
+>  static const struct of_device_id exynos_adc_match[] = {
+>         {
+> +               .compatible = "samsung,s3c64100-adc",
+> +               .data = &exynos_adc_s3c64xx_data,
+> +       }, {
 
-I don't think this bit exists on all revisions of the A9.
+There is a typo, thanks for spotting this. It should be
+"samsung,s3c6410-adc", not "samsung,s3c64100-adc".
 
-Will
+> > b) For the "compatible" string, I think it makes sense to set a fallback to
+> >    "samsung,exynos-adc-v2" in the case for exynos3250, making the DT
+> >    representation
+> > 
+> >       compatible = "samsung,exynos3250-adc", "samsung,exynos-adc-v2";
+> > 
+> >    It's not entirely compatible because of the addition of the clock, but
+> >    since the register layout is the same, I think it still make sense.
+> 
+> OK, I'll add it in exynos3250.dtsi as following:
+> 
+>                 adc: adc at 126C0000 {
+> -                       compatible = "samsung,exynos-adc-v3";
+> +                       compatible = "samsung,exynos3250-adc",
+> +                                    "samsung,exynos-adc-v2";
+>                         reg = <0x126C0000 0x100>, <0x10020718 0x4>;
+>                         interrupts = <0 137 0>;
+> -                       clock-names = "adc", "sclk_tsadc";
+> +                       clock-names = "adc", "sclk";
+>                         clocks = <&cmu CLK_TSADC>, <&cmu CLK_SCLK_TSADC>;
+>                         #io-channel-cells = <1>;
+>                         io-channel-ranges;
+
+Ok, looks good.
+
+	Arnd
