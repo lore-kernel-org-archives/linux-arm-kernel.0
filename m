@@ -1,115 +1,34 @@
-From: maggie.mae.roxas@gmail.com (Maggie Mae Roxas)
-Date: Sun, 20 Jul 2014 19:45:13 -0700
-Subject: Issue found in Armada 370: "No buffer space available" error
- during continuous ping
-In-Reply-To: <CAB8gEUsLmuDkTzGsq8fVs9dZ90d82Brw2cAPBOnobUTcSgQabA@mail.gmail.com>
-References: <CAB8gEUs3Z8OzOMBVqP1yN8zV1E67mGQTaxKKCw=GRuAVxJ4nGQ@mail.gmail.com>
- <CAB8gEUv52mjpAuYRKhv8_VuAwt9Uog5eD2jn45gnyqcd+cXv8g@mail.gmail.com>
- <20140708102142.0f7fe796@free-electrons.com>
- <CAB8gEUvEQdRT3Xarq_z6-KCr3T9xZ7wHvW9Termw8MAg_d-gQA@mail.gmail.com>
- <20140715142431.4eccbcd6@free-electrons.com>
- <20140715124333.GF12333@1wt.eu>
- <CAB8gEUt08QVpgW0fs18tNnCkCw36SD6hxgL8O6p6+oOtX0-yJQ@mail.gmail.com>
- <20140717081527.GJ14723@1wt.eu>
- <CAB8gEUsLmuDkTzGsq8fVs9dZ90d82Brw2cAPBOnobUTcSgQabA@mail.gmail.com>
-Message-ID: <CAB8gEUvwPJUhDN-=tugTyKe93SdNwqNaGtKMF1DRCb8ZNncmmg@mail.gmail.com>
+From: shawn.guo@freescale.com (Shawn Guo)
+Date: Mon, 21 Jul 2014 10:50:38 +0800
+Subject: The imx6q suspend/resume is broken on 3.16-rc due to PCIe
+In-Reply-To: <1405675308.6072.6.camel@weser.hi.pengutronix.de>
+References: <1403772229.4254.4.camel@weser.hi.pengutronix.de>
+ <20140628143712.GA7869@dragon>
+ <1404135864.4305.23.camel@weser.hi.pengutronix.de>
+ <20140701065105.GE14471@dragon>
+ <1404724251.4587.20.camel@weser.hi.pengutronix.de>
+ <20140707135502.GR30239@dragon> <20140716065505.GB2612@dragon>
+ <1405605306.12800.7.camel@weser.hi.pengutronix.de>
+ <247043c4c45c41bf9eaa09aaf91bcc46@DM2PR0301MB0862.namprd03.prod.outlook.com>
+ <1405675308.6072.6.camel@weser.hi.pengutronix.de>
+Message-ID: <20140721025034.GH8537@dragon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Willy,
-Good day.
+On Fri, Jul 18, 2014 at 11:21:48AM +0200, Lucas Stach wrote:
+> However I seem to have a board with rev 1.1 silicon and although the pci
+> driver starts up it never establishes a link. So my board may just work
+> by chance as I don't really know the differences between rev 1.1 silicon
+> and later revisions.
 
-BTW, here are some answers to your questions.
+Lucas, thanks for the info.
 
-> In fact I don't know if you're running your own board or a "standard"
-one (a mirabox or any NAS board).
-We are using a "customized" one, not a "standard" one.
-We based the design on Armada 370 RD Evaluation Board, but we used
-Marvell 88E1512 as Ethernet PHY and Marvell 88F6707 as processor
-instead of the ones in the Armada 370 RD (I think it uses Marvell
-88E1310 as Ethernet PHY and Marvell 88F6W11 as processor).
+I just checked my board on which the issue is seen, and found it has a
+rev 1.3 silicon.  I just tested on a board with rev 1.2 and did not even
+see the issue.
 
-> Because that could also be one of the
-differences between what you observe on your side and our respective
-experiences with our boards.
-Acknowledged.
+Richard,
 
-> Maggie, do you know if it is possible that for any reason your board
-would not deliver an IRQ on Tx completion ? That could explain things.
-> You can easily test reverting commit 4f3a4f701b just in case.
-> If that's the case, then the next step will be to figure out how it is possible
-that IRQs are disabled!
-After reverting 4f3a4f701b, as I reported, issue does not happen anymore.
-Please let me know how to "figure out how it is possible that IRQs are
-disabled".
+Is this an issue only with rev 1.3?
 
-Also, what is the impact if I use this combination?
-> - use 3.13.9 mvneta.c
-> - apply cd71e246c16b30e3f396a85943d5f596202737ba
-> - revert 4f3a4f701b59a3e4b5c8503ac3d905c0a326f922
-
-Are there functionalities that won't work?
-
-Thank you very much for your support.
-
-Regards,
-Maggie Roxas
-
-On Sun, Jul 20, 2014 at 6:57 PM, Maggie Mae Roxas
-<maggie.mae.roxas@gmail.com> wrote:
-> Hi Willy, Thomas,
-> Good day.
->
->> I'll try this one, specifcally this combination:
->> - use 3.13.9 mvneta.c
->> - apply cd71e246c16b30e3f396a85943d5f596202737ba
->> - revert 4f3a4f701b59a3e4b5c8503ac3d905c0a326f922
->
-> This is to confirm that "No buffer space available" issue is resolved
-> after I applied above combinations in in v3.13.9.
-> Thanks a lot for the help!
->
-> BTW, sorry for the late update - all our connections, electricity and
-> stuff are unstable for the past week due to typhoon and we only got
-> everything working just today.
->
-> Thank you again for attending to our reports.
->
-> Regards,
-> Maggie Roxas
->
-> On Thu, Jul 17, 2014 at 1:15 AM, Willy Tarreau <w@1wt.eu> wrote:
->> Hi Maggie,
->>
->> On Wed, Jul 16, 2014 at 10:37:47PM -0700, Maggie Mae Roxas wrote:
->>> Hi Thomas, Willy,
->>> Good day.
->>>
->>> First of all, thanks again for looking further into this.
->>>
->>> > Maggie, do you know if it is possible that for any reason your board
->>> > would not deliver an IRQ on Tx completion ? That could explain things.
->>>
->>> I'm sorrry but I'm not really sure how to check this - all I know is
->>> that the difference in the working and not-working setup (both
->>> software and hardware) is the mvneta.c.
->>
->> In fact I don't know if you're running your own board or a "standard"
->> one (a mirabox or any NAS board). Because that could also be one of the
->> differences between what you observe on your side and our respective
->> experiences with our boards.
->>
->>> > You can easily test reverting commit 4f3a4f701b just in case. If that's
->>> > the case, then the next step will be to figure out how it is possible
->>> > that IRQs are disabled!
->>> I'll try this one, specifcally this combination:
->>> - use 3.13.9 mvneta.c
->>> - apply cd71e246c16b30e3f396a85943d5f596202737ba
->>> - revert 4f3a4f701b59a3e4b5c8503ac3d905c0a326f922
->>>
->>> I will update you the results within today until latest tomorrow.
->>
->> OK fine, thank you!
->>
->> Willy
->>
+Shawn
