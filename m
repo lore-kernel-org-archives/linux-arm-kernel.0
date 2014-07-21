@@ -1,49 +1,97 @@
-From: punit.agrawal@arm.com (Punit Agrawal)
-Date: Mon, 21 Jul 2014 18:35:25 +0100
-Subject: [PATCH 1/2] PM / devfreq: Export helper functions for drivers
-In-Reply-To: <32148397.172891405898897186.JavaMail.weblogic@epml01>
- (=?utf-8?B?Iu2VqOuqheyjvCIncw==?= message of "Sun, 20 Jul 2014 23:28:17
- +0000 (GMT)")
-References: <32148397.172891405898897186.JavaMail.weblogic@epml01>
-Message-ID: <9hh8unmr4wy.fsf@arm.com>
+From: f.fainelli@gmail.com (Florian Fainelli)
+Date: Mon, 21 Jul 2014 10:44:51 -0700
+Subject: [PATCH v3 1/2] ARM: at91/dt: describe rgmii ethernet phy
+ connected to sama5d3xek boards
+In-Reply-To: <53C92D70.6050604@atmel.com>
+References: <1405022394-8311-1-git-send-email-boris.brezillon@free-electrons.com>
+ <1405022394-8311-2-git-send-email-boris.brezillon@free-electrons.com>
+ <53C92D70.6050604@atmel.com>
+Message-ID: <CAGVrzcb3WHyMOW91EjDEsWfMWKb4M_cpauQtY7E+1W7zacR8VQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-??? <myungjoo.ham@samsung.com> writes:
-
-> Sender : Punit Agrawal<punit.agrawal@arm.com>
->> From: ?rjan Eide 
+2014-07-18 7:21 GMT-07:00 Nicolas Ferre <nicolas.ferre@atmel.com>:
+> On 10/07/2014 21:59, Boris BREZILLON :
+>> Add ethernet-phy nodes and specify phy interrupt (connected to pin PB25)
+>> and board specific timing configs.
 >>
->> These functions are indended for use by drivers and should be available
->> also when the driver is built as a module.
+>> Atmel has two different HW designs for its CPU modules: the first one
+>> (produced by Embest) is connecting PHYAD[0-2] pins to pull up resistors
+>> and the other one (produced by Ronetix) is connecting PHYAD0 to a pull up
+>> resistor and PHYAD[1-2] to pull down resistors.
+>> As a result, Ronetix design will have its PHY available at address 0x1 and
+>> Embest design at 0x7.
+>> By defining both phys we're letting the phy core detect the one actually
+>> available on the MDIO bus.
 >>
->> Cc: MyungJoo Ham 
->> Cc: Kyungmin Park 
->> Signed-off-by: ?rjan Eide 
+>> Signed-off-by: Boris BREZILLON <boris.brezillon@free-electrons.com>
+>> ---
+>>
+>> Florian, I dropped your Reviewed-by tag because this patch has slightly
+>> changed.
 >
-> Dear Punit,
-
-Hi MyungJoo,
-
+> Hi Florian,
 >
->
-> Just being curious, is there any reason not to use EXPORT_SYMBOL_GPL ?
+> I would like to have your Ack on this one as we discussed this solution
+> with you.
 
-No reason other than to match the existing EXPORT_SYMBOLs in this file.
-
-Would you prefer this and the following patch to use EXPORT_SYMBOL_GPL
-instead?
+Acked-by: Florian Fainelli <f.fainelli@gmail.com>
 
 >
+> Thanks, bye,
 >
-> Cheers,
-> MyungJoo.
+>
+>>  arch/arm/boot/dts/sama5d3xcm.dtsi | 30 ++++++++++++++++++++++++++++++
+>>  1 file changed, 30 insertions(+)
+>>
+>> diff --git a/arch/arm/boot/dts/sama5d3xcm.dtsi b/arch/arm/boot/dts/sama5d3xcm.dtsi
+>> index b0b1331..755369e 100644
+>> --- a/arch/arm/boot/dts/sama5d3xcm.dtsi
+>> +++ b/arch/arm/boot/dts/sama5d3xcm.dtsi
+>> @@ -34,6 +34,36 @@
+>>
+>>                       macb0: ethernet at f0028000 {
+>>                               phy-mode = "rgmii";
+>> +                             #address-cells = <1>;
+>> +                             #size-cells = <0>;
+>> +
+>> +                             ethernet-phy at 1 {
+>> +                                     reg = <0x1>;
+>> +                                     interrupt-parent = <&pioB>;
+>> +                                     interrupts = <25 IRQ_TYPE_EDGE_FALLING>;
+>> +                                     txen-skew-ps = <800>;
+>> +                                     txc-skew-ps = <3000>;
+>> +                                     rxdv-skew-ps = <400>;
+>> +                                     rxc-skew-ps = <3000>;
+>> +                                     rxd0-skew-ps = <400>;
+>> +                                     rxd1-skew-ps = <400>;
+>> +                                     rxd2-skew-ps = <400>;
+>> +                                     rxd3-skew-ps = <400>;
+>> +                             };
+>> +
+>> +                             ethernet-phy at 7 {
+>> +                                     reg = <0x7>;
+>> +                                     interrupt-parent = <&pioB>;
+>> +                                     interrupts = <25 IRQ_TYPE_EDGE_FALLING>;
+>> +                                     txen-skew-ps = <800>;
+>> +                                     txc-skew-ps = <3000>;
+>> +                                     rxdv-skew-ps = <400>;
+>> +                                     rxc-skew-ps = <3000>;
+>> +                                     rxd0-skew-ps = <400>;
+>> +                                     rxd1-skew-ps = <400>;
+>> +                                     rxd2-skew-ps = <400>;
+>> +                                     rxd3-skew-ps = <400>;
+>> +                             };
+>>                       };
+>>
+>>                       pmc: pmc at fffffc00 {
+>>
+>
 >
 > --
-> MyungJoo Ham (???), PHD
-> Frontier CS Lab, Software Center
-> Samsung Electronics
-> Cell: +82-10-6714-2858--
-> To unsubscribe from this list: send the line "unsubscribe linux-pm" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> Nicolas Ferre
+
+
+
+-- 
+Florian
