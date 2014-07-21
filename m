@@ -1,91 +1,81 @@
 From: computersforpeace@gmail.com (Brian Norris)
-Date: Mon, 21 Jul 2014 14:07:56 -0700
-Subject: [PATCH v8 01/11] ARM: brcmstb: add infrastructure for ARM-based
- Broadcom STB SoCs
+Date: Mon, 21 Jul 2014 14:07:57 -0700
+Subject: [PATCH v8 02/11] power: reset: Add reboot driver for brcmstb
 In-Reply-To: <1405976886-27807-1-git-send-email-computersforpeace@gmail.com>
 References: <1405976886-27807-1-git-send-email-computersforpeace@gmail.com>
-Message-ID: <1405976886-27807-2-git-send-email-computersforpeace@gmail.com>
+Message-ID: <1405976886-27807-3-git-send-email-computersforpeace@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Marc Carino <marc.ceeeee@gmail.com>
 
-The BCM7xxx series of Broadcom SoCs are used primarily in set-top boxes.
-
-This patch adds machine support for the ARM-based Broadcom SoCs.
+Add support for reboot functionality on boards with ARM-based
+Broadcom STB chipsets.
 
 Signed-off-by: Marc Carino <marc.ceeeee@gmail.com>
 Signed-off-by: Brian Norris <computersforpeace@gmail.com>
+Cc: Dmitry Eremin-Solenikov <dbaryshkov@gmail.com>
+Cc: David Woodhouse <dwmw2@infradead.org>
 ---
- arch/arm/configs/multi_v7_defconfig |   1 +
- arch/arm/mach-bcm/Kconfig           |  14 ++
- arch/arm/mach-bcm/Makefile          |   5 +
- arch/arm/mach-bcm/brcmstb.c         |  28 +++
- arch/arm/mach-bcm/brcmstb.h         |  19 ++
- arch/arm/mach-bcm/headsmp-brcmstb.S |  33 ++++
- arch/arm/mach-bcm/platsmp-brcmstb.c | 363 ++++++++++++++++++++++++++++++++++++
- 7 files changed, 463 insertions(+)
- create mode 100644 arch/arm/mach-bcm/brcmstb.c
- create mode 100644 arch/arm/mach-bcm/brcmstb.h
- create mode 100644 arch/arm/mach-bcm/headsmp-brcmstb.S
- create mode 100644 arch/arm/mach-bcm/platsmp-brcmstb.c
+ arch/arm/mach-bcm/Kconfig            |   1 +
+ drivers/power/reset/Kconfig          |  10 +++
+ drivers/power/reset/Makefile         |   1 +
+ drivers/power/reset/brcmstb-reboot.c | 120 +++++++++++++++++++++++++++++++++++
+ 4 files changed, 132 insertions(+)
+ create mode 100644 drivers/power/reset/brcmstb-reboot.c
 
-diff --git a/arch/arm/configs/multi_v7_defconfig b/arch/arm/configs/multi_v7_defconfig
-index 534836497998..bf0df396a3cf 100644
---- a/arch/arm/configs/multi_v7_defconfig
-+++ b/arch/arm/configs/multi_v7_defconfig
-@@ -19,6 +19,7 @@ CONFIG_MACH_DOVE=y
- CONFIG_ARCH_BCM=y
- CONFIG_ARCH_BCM_MOBILE=y
- CONFIG_ARCH_BCM_5301X=y
-+CONFIG_ARCH_BRCMSTB=y
- CONFIG_ARCH_BERLIN=y
- CONFIG_MACH_BERLIN_BG2=y
- CONFIG_MACH_BERLIN_BG2CD=y
 diff --git a/arch/arm/mach-bcm/Kconfig b/arch/arm/mach-bcm/Kconfig
-index 41c839167e87..0073633e7699 100644
+index 0073633e7699..9782e8d80647 100644
 --- a/arch/arm/mach-bcm/Kconfig
 +++ b/arch/arm/mach-bcm/Kconfig
-@@ -87,4 +87,18 @@ config ARCH_BCM_5301X
- 	  different SoC or with the older BCM47XX and BCM53XX based
- 	  network SoC using a MIPS CPU, they are supported by arch/mips/bcm47xx
+@@ -94,6 +94,7 @@ config ARCH_BRCMSTB
+ 	select MIGHT_HAVE_PCI
+ 	select HAVE_SMP
+ 	select HAVE_ARM_ARCH_TIMER
++	select POWER_RESET_BRCMSTB
+ 	help
+ 	  Say Y if you intend to run the kernel on a Broadcom ARM-based STB
+ 	  chipset.
+diff --git a/drivers/power/reset/Kconfig b/drivers/power/reset/Kconfig
+index bdcf5173e377..fcb9825debe5 100644
+--- a/drivers/power/reset/Kconfig
++++ b/drivers/power/reset/Kconfig
+@@ -20,6 +20,16 @@ config POWER_RESET_AXXIA
  
-+config ARCH_BRCMSTB
-+	bool "Broadcom BCM7XXX based boards" if ARCH_MULTI_V7
-+	depends on MMU
-+	select ARM_GIC
-+	select MIGHT_HAVE_PCI
-+	select HAVE_SMP
-+	select HAVE_ARM_ARCH_TIMER
+ 	  Say Y if you have an Axxia family SoC.
+ 
++config POWER_RESET_BRCMSTB
++	bool "Broadcom STB reset driver"
++	depends on POWER_RESET && ARCH_BRCMSTB
 +	help
-+	  Say Y if you intend to run the kernel on a Broadcom ARM-based STB
-+	  chipset.
++	  This driver provides restart support for ARM-based Broadcom STB
++	  boards.
 +
-+	  This enables support for Broadcom ARM-based set-top box chipsets,
-+	  including the 7445 family of chips.
++	  Say Y here if you have an ARM-based Broadcom STB board and you wish
++	  to have restart support.
 +
- endif
-diff --git a/arch/arm/mach-bcm/Makefile b/arch/arm/mach-bcm/Makefile
-index 731292114975..f3665121729b 100644
---- a/arch/arm/mach-bcm/Makefile
-+++ b/arch/arm/mach-bcm/Makefile
-@@ -30,3 +30,8 @@ obj-$(CONFIG_ARCH_BCM2835)	+= board_bcm2835.o
- 
- # BCM5301X
- obj-$(CONFIG_ARCH_BCM_5301X)	+= bcm_5301x.o
-+
-+ifeq ($(CONFIG_ARCH_BRCMSTB),y)
-+obj-y				+= brcmstb.o
-+obj-$(CONFIG_SMP)		+= headsmp-brcmstb.o platsmp-brcmstb.o
-+endif
-diff --git a/arch/arm/mach-bcm/brcmstb.c b/arch/arm/mach-bcm/brcmstb.c
+ config POWER_RESET_GPIO
+ 	bool "GPIO power-off driver"
+ 	depends on OF_GPIO && POWER_RESET
+diff --git a/drivers/power/reset/Makefile b/drivers/power/reset/Makefile
+index dde2e8bbac53..7379818ca69d 100644
+--- a/drivers/power/reset/Makefile
++++ b/drivers/power/reset/Makefile
+@@ -1,5 +1,6 @@
+ obj-$(CONFIG_POWER_RESET_AS3722) += as3722-poweroff.o
+ obj-$(CONFIG_POWER_RESET_AXXIA) += axxia-reset.o
++obj-$(CONFIG_POWER_RESET_BRCMSTB) += brcmstb-reboot.o
+ obj-$(CONFIG_POWER_RESET_GPIO) += gpio-poweroff.o
+ obj-$(CONFIG_POWER_RESET_MSM) += msm-poweroff.o
+ obj-$(CONFIG_POWER_RESET_QNAP) += qnap-poweroff.o
+diff --git a/drivers/power/reset/brcmstb-reboot.c b/drivers/power/reset/brcmstb-reboot.c
 new file mode 100644
-index 000000000000..60a5afa06ed7
+index 000000000000..3f236924742a
 --- /dev/null
-+++ b/arch/arm/mach-bcm/brcmstb.c
-@@ -0,0 +1,28 @@
++++ b/drivers/power/reset/brcmstb-reboot.c
+@@ -0,0 +1,120 @@
 +/*
-+ * Copyright (C) 2013-2014 Broadcom Corporation
++ * Copyright (C) 2013 Broadcom Corporation
 + *
 + * This program is free software; you can redistribute it and/or
 + * modify it under the terms of the GNU General Public License as
@@ -97,453 +87,112 @@ index 000000000000..60a5afa06ed7
 + * GNU General Public License for more details.
 + */
 +
-+#include <linux/init.h>
-+#include <linux/of_platform.h>
-+
-+#include <asm/mach-types.h>
-+#include <asm/mach/arch.h>
-+
-+static const char *brcmstb_match[] __initconst = {
-+	"brcm,bcm7445",
-+	"brcm,brcmstb",
-+	NULL
-+};
-+
-+DT_MACHINE_START(BRCMSTB, "Broadcom STB (Flattened Device Tree)")
-+	.dt_compat	= brcmstb_match,
-+MACHINE_END
-diff --git a/arch/arm/mach-bcm/brcmstb.h b/arch/arm/mach-bcm/brcmstb.h
-new file mode 100644
-index 000000000000..ec0c3d112b36
---- /dev/null
-+++ b/arch/arm/mach-bcm/brcmstb.h
-@@ -0,0 +1,19 @@
-+/*
-+ * Copyright (C) 2013-2014 Broadcom Corporation
-+ *
-+ * This program is free software; you can redistribute it and/or
-+ * modify it under the terms of the GNU General Public License as
-+ * published by the Free Software Foundation version 2.
-+ *
-+ * This program is distributed "as is" WITHOUT ANY WARRANTY of any
-+ * kind, whether express or implied; without even the implied warranty
-+ * of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ * GNU General Public License for more details.
-+ */
-+
-+#ifndef __BRCMSTB_H__
-+#define __BRCMSTB_H__
-+
-+void brcmstb_secondary_startup(void);
-+
-+#endif /* __BRCMSTB_H__ */
-diff --git a/arch/arm/mach-bcm/headsmp-brcmstb.S b/arch/arm/mach-bcm/headsmp-brcmstb.S
-new file mode 100644
-index 000000000000..199c1ea58248
---- /dev/null
-+++ b/arch/arm/mach-bcm/headsmp-brcmstb.S
-@@ -0,0 +1,33 @@
-+/*
-+ * SMP boot code for secondary CPUs
-+ * Based on arch/arm/mach-tegra/headsmp.S
-+ *
-+ * Copyright (C) 2010 NVIDIA, Inc.
-+ * Copyright (C) 2013-2014 Broadcom Corporation
-+ *
-+ * This program is free software; you can redistribute it and/or
-+ * modify it under the terms of the GNU General Public License as
-+ * published by the Free Software Foundation version 2.
-+ *
-+ * This program is distributed "as is" WITHOUT ANY WARRANTY of any
-+ * kind, whether express or implied; without even the implied warranty
-+ * of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ * GNU General Public License for more details.
-+ */
-+
-+#include <asm/assembler.h>
-+#include <linux/linkage.h>
-+#include <linux/init.h>
-+
-+        .section ".text.head", "ax"
-+
-+ENTRY(brcmstb_secondary_startup)
-+        /*
-+         * Ensure CPU is in a sane state by disabling all IRQs and switching
-+         * into SVC mode.
-+         */
-+        setmode	PSR_I_BIT | PSR_F_BIT | SVC_MODE, r0
-+
-+        bl      v7_invalidate_l1
-+        b       secondary_startup
-+ENDPROC(brcmstb_secondary_startup)
-diff --git a/arch/arm/mach-bcm/platsmp-brcmstb.c b/arch/arm/mach-bcm/platsmp-brcmstb.c
-new file mode 100644
-index 000000000000..af780e9c23a6
---- /dev/null
-+++ b/arch/arm/mach-bcm/platsmp-brcmstb.c
-@@ -0,0 +1,363 @@
-+/*
-+ * Broadcom STB CPU SMP and hotplug support for ARM
-+ *
-+ * Copyright (C) 2013-2014 Broadcom Corporation
-+ *
-+ * This program is free software; you can redistribute it and/or
-+ * modify it under the terms of the GNU General Public License as
-+ * published by the Free Software Foundation version 2.
-+ *
-+ * This program is distributed "as is" WITHOUT ANY WARRANTY of any
-+ * kind, whether express or implied; without even the implied warranty
-+ * of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ * GNU General Public License for more details.
-+ */
-+
-+#include <linux/delay.h>
++#include <linux/device.h>
 +#include <linux/errno.h>
 +#include <linux/init.h>
 +#include <linux/io.h>
++#include <linux/jiffies.h>
 +#include <linux/of_address.h>
++#include <linux/of_irq.h>
 +#include <linux/of_platform.h>
++#include <linux/platform_device.h>
 +#include <linux/printk.h>
++#include <linux/reboot.h>
 +#include <linux/regmap.h>
 +#include <linux/smp.h>
 +#include <linux/mfd/syscon.h>
-+#include <linux/spinlock.h>
 +
-+#include <asm/cacheflush.h>
-+#include <asm/cp15.h>
-+#include <asm/mach-types.h>
-+#include <asm/smp_plat.h>
++#include <asm/system_misc.h>
 +
-+#include "brcmstb.h"
++#define RESET_SOURCE_ENABLE_REG 1
++#define SW_MASTER_RESET_REG 2
 +
-+enum {
-+	ZONE_MAN_CLKEN_MASK		= BIT(0),
-+	ZONE_MAN_RESET_CNTL_MASK	= BIT(1),
-+	ZONE_MAN_MEM_PWR_MASK		= BIT(4),
-+	ZONE_RESERVED_1_MASK		= BIT(5),
-+	ZONE_MAN_ISO_CNTL_MASK		= BIT(6),
-+	ZONE_MANUAL_CONTROL_MASK	= BIT(7),
-+	ZONE_PWR_DN_REQ_MASK		= BIT(9),
-+	ZONE_PWR_UP_REQ_MASK		= BIT(10),
-+	ZONE_BLK_RST_ASSERT_MASK	= BIT(12),
-+	ZONE_PWR_OFF_STATE_MASK		= BIT(25),
-+	ZONE_PWR_ON_STATE_MASK		= BIT(26),
-+	ZONE_DPG_PWR_STATE_MASK		= BIT(28),
-+	ZONE_MEM_PWR_STATE_MASK		= BIT(29),
-+	ZONE_RESET_STATE_MASK		= BIT(31),
-+	CPU0_PWR_ZONE_CTRL_REG		= 1,
-+	CPU_RESET_CONFIG_REG		= 2,
-+};
++static struct regmap *regmap;
++static u32 rst_src_en;
++static u32 sw_mstr_rst;
 +
-+static void __iomem *cpubiuctrl_block;
-+static void __iomem *hif_cont_block;
-+static u32 cpu0_pwr_zone_ctrl_reg;
-+static u32 cpu_rst_cfg_reg;
-+static u32 hif_cont_reg;
-+
-+#ifdef CONFIG_HOTPLUG_CPU
-+static DEFINE_PER_CPU_ALIGNED(int, per_cpu_sw_state);
-+
-+static int per_cpu_sw_state_rd(u32 cpu)
-+{
-+	sync_cache_r(SHIFT_PERCPU_PTR(&per_cpu_sw_state, per_cpu_offset(cpu)));
-+	return per_cpu(per_cpu_sw_state, cpu);
-+}
-+
-+static void per_cpu_sw_state_wr(u32 cpu, int val)
-+{
-+	per_cpu(per_cpu_sw_state, cpu) = val;
-+	dmb();
-+	sync_cache_w(SHIFT_PERCPU_PTR(&per_cpu_sw_state, per_cpu_offset(cpu)));
-+	dsb_sev();
-+}
-+#else
-+static inline void per_cpu_sw_state_wr(u32 cpu, int val) { }
-+#endif
-+
-+static void __iomem *pwr_ctrl_get_base(u32 cpu)
-+{
-+	void __iomem *base = cpubiuctrl_block + cpu0_pwr_zone_ctrl_reg;
-+	base += (cpu_logical_map(cpu) * 4);
-+	return base;
-+}
-+
-+static u32 pwr_ctrl_rd(u32 cpu)
-+{
-+	void __iomem *base = pwr_ctrl_get_base(cpu);
-+	return readl_relaxed(base);
-+}
-+
-+static void pwr_ctrl_wr(u32 cpu, u32 val)
-+{
-+	void __iomem *base = pwr_ctrl_get_base(cpu);
-+	writel(val, base);
-+}
-+
-+static void cpu_rst_cfg_set(u32 cpu, int set)
-+{
-+	u32 val;
-+	val = readl_relaxed(cpubiuctrl_block + cpu_rst_cfg_reg);
-+	if (set)
-+		val |= BIT(cpu_logical_map(cpu));
-+	else
-+		val &= ~BIT(cpu_logical_map(cpu));
-+	writel_relaxed(val, cpubiuctrl_block + cpu_rst_cfg_reg);
-+}
-+
-+static void cpu_set_boot_addr(u32 cpu, unsigned long boot_addr)
-+{
-+	const int reg_ofs = cpu_logical_map(cpu) * 8;
-+	writel_relaxed(0, hif_cont_block + hif_cont_reg + reg_ofs);
-+	writel_relaxed(boot_addr, hif_cont_block + hif_cont_reg + 4 + reg_ofs);
-+}
-+
-+static void brcmstb_cpu_boot(u32 cpu)
-+{
-+	pr_info("SMP: Booting CPU%d...\n", cpu);
-+
-+	/*
-+	 * set the reset vector to point to the secondary_startup
-+	 * routine
-+	 */
-+	cpu_set_boot_addr(cpu, virt_to_phys(brcmstb_secondary_startup));
-+
-+	/* unhalt the cpu */
-+	cpu_rst_cfg_set(cpu, 0);
-+}
-+
-+static void brcmstb_cpu_power_on(u32 cpu)
-+{
-+	/*
-+	 * The secondary cores power was cut, so we must go through
-+	 * power-on initialization.
-+	 */
-+	u32 tmp;
-+
-+	pr_info("SMP: Powering up CPU%d...\n", cpu);
-+
-+	/* Request zone power up */
-+	pwr_ctrl_wr(cpu, ZONE_PWR_UP_REQ_MASK);
-+
-+	/* Wait for the power up FSM to complete */
-+	do {
-+		tmp = pwr_ctrl_rd(cpu);
-+	} while (!(tmp & ZONE_PWR_ON_STATE_MASK));
-+
-+	per_cpu_sw_state_wr(cpu, 1);
-+}
-+
-+static int brcmstb_cpu_get_power_state(u32 cpu)
-+{
-+	int tmp = pwr_ctrl_rd(cpu);
-+	return (tmp & ZONE_RESET_STATE_MASK) ? 0 : 1;
-+}
-+
-+#ifdef CONFIG_HOTPLUG_CPU
-+
-+static void brcmstb_cpu_die(u32 cpu)
-+{
-+	v7_exit_coherency_flush(all);
-+
-+	/* Prevent all interrupts from reaching this CPU. */
-+	arch_local_irq_disable();
-+
-+	/*
-+	 * Final full barrier to ensure everything before this instruction has
-+	 * quiesced.
-+	 */
-+	isb();
-+	dsb();
-+
-+	per_cpu_sw_state_wr(cpu, 0);
-+
-+	/* Sit and wait to die */
-+	wfi();
-+
-+	/* We should never get here... */
-+	panic("Spurious interrupt on CPU %d received!\n", cpu);
-+}
-+
-+static int brcmstb_cpu_kill(u32 cpu)
-+{
-+	u32 tmp;
-+
-+	pr_info("SMP: Powering down CPU%d...\n", cpu);
-+
-+	while (per_cpu_sw_state_rd(cpu))
-+		;
-+
-+	/* Program zone reset */
-+	pwr_ctrl_wr(cpu, ZONE_RESET_STATE_MASK | ZONE_BLK_RST_ASSERT_MASK |
-+			      ZONE_PWR_DN_REQ_MASK);
-+
-+	/* Verify zone reset */
-+	tmp = pwr_ctrl_rd(cpu);
-+	if (!(tmp & ZONE_RESET_STATE_MASK))
-+		pr_err("%s: Zone reset bit for CPU %d not asserted!\n",
-+			__func__, cpu);
-+
-+	/* Wait for power down */
-+	do {
-+		tmp = pwr_ctrl_rd(cpu);
-+	} while (!(tmp & ZONE_PWR_OFF_STATE_MASK));
-+
-+	/* Settle-time from Broadcom-internal DVT reference code */
-+	udelay(7);
-+
-+	/* Assert reset on the CPU */
-+	cpu_rst_cfg_set(cpu, 1);
-+
-+	return 1;
-+}
-+
-+#endif /* CONFIG_HOTPLUG_CPU */
-+
-+static int __init setup_hifcpubiuctrl_regs(struct device_node *np)
-+{
-+	int rc = 0;
-+	char *name;
-+	struct device_node *syscon_np = NULL;
-+
-+	name = "syscon-cpu";
-+
-+	syscon_np = of_parse_phandle(np, name, 0);
-+	if (!syscon_np) {
-+		pr_err("can't find phandle %s\n", name);
-+		rc = -EINVAL;
-+		goto cleanup;
-+	}
-+
-+	cpubiuctrl_block = of_iomap(syscon_np, 0);
-+	if (!cpubiuctrl_block) {
-+		pr_err("iomap failed for cpubiuctrl_block\n");
-+		rc = -EINVAL;
-+		goto cleanup;
-+	}
-+
-+	rc = of_property_read_u32_index(np, name, CPU0_PWR_ZONE_CTRL_REG,
-+					&cpu0_pwr_zone_ctrl_reg);
-+	if (rc) {
-+		pr_err("failed to read 1st entry from %s property (%d)\n", name,
-+			rc);
-+		rc = -EINVAL;
-+		goto cleanup;
-+	}
-+
-+	rc = of_property_read_u32_index(np, name, CPU_RESET_CONFIG_REG,
-+					&cpu_rst_cfg_reg);
-+	if (rc) {
-+		pr_err("failed to read 2nd entry from %s property (%d)\n", name,
-+			rc);
-+		rc = -EINVAL;
-+		goto cleanup;
-+	}
-+
-+cleanup:
-+	if (syscon_np)
-+		of_node_put(syscon_np);
-+
-+	return rc;
-+}
-+
-+static int __init setup_hifcont_regs(struct device_node *np)
-+{
-+	int rc = 0;
-+	char *name;
-+	struct device_node *syscon_np = NULL;
-+
-+	name = "syscon-cont";
-+
-+	syscon_np = of_parse_phandle(np, name, 0);
-+	if (!syscon_np) {
-+		pr_err("can't find phandle %s\n", name);
-+		rc = -EINVAL;
-+		goto cleanup;
-+	}
-+
-+	hif_cont_block = of_iomap(syscon_np, 0);
-+	if (!hif_cont_block) {
-+		pr_err("iomap failed for hif_cont_block\n");
-+		rc = -EINVAL;
-+		goto cleanup;
-+	}
-+
-+	/* offset is at top of hif_cont_block */
-+	hif_cont_reg = 0;
-+
-+cleanup:
-+	if (syscon_np)
-+		of_node_put(syscon_np);
-+
-+	return rc;
-+}
-+
-+static void __init brcmstb_cpu_ctrl_setup(unsigned int max_cpus)
++static void brcmstb_reboot(enum reboot_mode mode, const char *cmd)
 +{
 +	int rc;
-+	struct device_node *np;
-+	char *name;
++	u32 tmp;
 +
-+	name = "brcm,brcmstb-smpboot";
-+	np = of_find_compatible_node(NULL, NULL, name);
-+	if (!np) {
-+		pr_err("can't find compatible node %s\n", name);
++	rc = regmap_write(regmap, rst_src_en, 1);
++	if (rc) {
++		pr_err("failed to write rst_src_en (%d)\n", rc);
 +		return;
 +	}
 +
-+	rc = setup_hifcpubiuctrl_regs(np);
-+	if (rc)
++	rc = regmap_read(regmap, rst_src_en, &tmp);
++	if (rc) {
++		pr_err("failed to read rst_src_en (%d)\n", rc);
 +		return;
++	}
 +
-+	rc = setup_hifcont_regs(np);
-+	if (rc)
++	rc = regmap_write(regmap, sw_mstr_rst, 1);
++	if (rc) {
++		pr_err("failed to write sw_mstr_rst (%d)\n", rc);
 +		return;
++	}
++
++	rc = regmap_read(regmap, sw_mstr_rst, &tmp);
++	if (rc) {
++		pr_err("failed to read sw_mstr_rst (%d)\n", rc);
++		return;
++	}
++
++	while (1)
++		;
 +}
 +
-+static DEFINE_SPINLOCK(boot_lock);
-+
-+static void brcmstb_secondary_init(unsigned int cpu)
++static int brcmstb_reboot_probe(struct platform_device *pdev)
 +{
-+	/*
-+	 * Synchronise with the boot thread.
-+	 */
-+	spin_lock(&boot_lock);
-+	spin_unlock(&boot_lock);
-+}
++	int rc;
++	struct device_node *np = pdev->dev.of_node;
 +
-+static int brcmstb_boot_secondary(unsigned int cpu, struct task_struct *idle)
-+{
-+	/*
-+	 * set synchronisation state between this boot processor
-+	 * and the secondary one
-+	 */
-+	spin_lock(&boot_lock);
++	regmap = syscon_regmap_lookup_by_phandle(np, "syscon");
++	if (IS_ERR(regmap)) {
++		pr_err("failed to get syscon phandle\n");
++		return -EINVAL;
++	}
 +
-+	/* Bring up power to the core if necessary */
-+	if (brcmstb_cpu_get_power_state(cpu) == 0)
-+		brcmstb_cpu_power_on(cpu);
++	rc = of_property_read_u32_index(np, "syscon", RESET_SOURCE_ENABLE_REG,
++					&rst_src_en);
++	if (rc) {
++		pr_err("can't get rst_src_en offset (%d)\n", rc);
++		return -EINVAL;
++	}
 +
-+	brcmstb_cpu_boot(cpu);
++	rc = of_property_read_u32_index(np, "syscon", SW_MASTER_RESET_REG,
++					&sw_mstr_rst);
++	if (rc) {
++		pr_err("can't get sw_mstr_rst offset (%d)\n", rc);
++		return -EINVAL;
++	}
 +
-+	/*
-+	 * now the secondary core is starting up let it run its
-+	 * calibrations, then wait for it to finish
-+	 */
-+	spin_unlock(&boot_lock);
++	arm_pm_restart = brcmstb_reboot;
 +
 +	return 0;
 +}
 +
-+static struct smp_operations brcmstb_smp_ops __initdata = {
-+	.smp_prepare_cpus	= brcmstb_cpu_ctrl_setup,
-+	.smp_secondary_init	= brcmstb_secondary_init,
-+	.smp_boot_secondary	= brcmstb_boot_secondary,
-+#ifdef CONFIG_HOTPLUG_CPU
-+	.cpu_kill		= brcmstb_cpu_kill,
-+	.cpu_die		= brcmstb_cpu_die,
-+#endif
++static const struct of_device_id of_match[] = {
++	{ .compatible = "brcm,brcmstb-reboot", },
++	{},
 +};
 +
-+CPU_METHOD_OF_DECLARE(brcmstb_smp, "brcm,brahma-b15", &brcmstb_smp_ops);
++static struct platform_driver brcmstb_reboot_driver = {
++	.probe = brcmstb_reboot_probe,
++	.driver = {
++		.name = "brcmstb-reboot",
++		.owner = THIS_MODULE,
++		.of_match_table = of_match,
++	},
++};
++
++static int __init brcmstb_reboot_init(void)
++{
++	return platform_driver_probe(&brcmstb_reboot_driver,
++					brcmstb_reboot_probe);
++}
++subsys_initcall(brcmstb_reboot_init);
 -- 
 1.9.1
