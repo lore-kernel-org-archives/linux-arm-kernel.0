@@ -1,85 +1,57 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Mon, 21 Jul 2014 12:23:58 +0200
-Subject: [PATCH 2/2] iio: exynos-adc: add experimental touchscreen support
-In-Reply-To: <20140720202842.GB18347@core.coreip.homeip.net>
-References: <1405663186-26464-1-git-send-email-cw00.choi@samsung.com>
- <53CBC969.4090704@kernel.org> <20140720202842.GB18347@core.coreip.homeip.net>
-Message-ID: <5158672.dMAnnUQc7Z@wuerfel>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Mon, 21 Jul 2014 11:26:38 +0100
+Subject: [PATCH 2/3] ARM: smp_scu: enable SCU standby support
+In-Reply-To: <20140721092703.GL8537@dragon>
+References: <1405928755-19413-1-git-send-email-shawn.guo@freescale.com>
+ <1405928755-19413-3-git-send-email-shawn.guo@freescale.com>
+ <20140721085150.GB15666@arm.com> <20140721092703.GL8537@dragon>
+Message-ID: <20140721102638.GE32578@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sunday 20 July 2014 13:28:42 Dmitry Torokhov wrote:
-> On Sun, Jul 20, 2014 at 02:51:37PM +0100, Jonathan Cameron wrote:
-> > >>+
-> > >>+    do {
-> > >>+        ret =exynos_read_s3c64xx_ts(dev, NULL, &x, &y, IIO_CHAN_INFO_RAW);
-> > >= exynos
-> > >>+        if (ret == -ETIMEDOUT)
-> > >>+            break;
-> > >>+
-> > >>+        pressed = x & y & ADC_DATX_PRESSED;
-> > >>+        if (!pressed)
-> > >>+            break;
-> > >>+
-> > >>+        input_report_abs(info->input, ABS_X, x & ADC_DATX_MASK);
-> > >>+        input_report_abs(info->input, ABS_Y, y & ADC_DATX_MASK);
-> > >>+        input_report_key(info->input, BTN_TOUCH, 1);
-> > >>+        input_sync(info->input);
-> > >>+
-> > >>+        msleep(1);
-> > >>+    } while (1);
+On Mon, Jul 21, 2014 at 05:27:04PM +0800, Shawn Guo wrote:
+> On Mon, Jul 21, 2014 at 09:51:50AM +0100, Will Deacon wrote:
+> > On Mon, Jul 21, 2014 at 08:45:54AM +0100, Shawn Guo wrote:
+> > > With SCU standby enabled, SCU CLK will be turned off when all processors
+> > > are in WFI mode.  And the clock will be turned on when any processor
+> > > leaves WFI mode.
+> > > 
+> > > This behavior should be preferable in terms of power efficiency of
+> > > system idle.  So let's set the SCU standby bit to enable the support in
+> > > function scu_enable().
+> > > 
+> > > Signed-off-by: Shawn Guo <shawn.guo@freescale.com>
+> > > ---
+> > >  arch/arm/kernel/smp_scu.c | 3 ++-
+> > >  1 file changed, 2 insertions(+), 1 deletion(-)
+> > > 
+> > > diff --git a/arch/arm/kernel/smp_scu.c b/arch/arm/kernel/smp_scu.c
+> > > index c947508f84e6..9f29d167d02c 100644
+> > > --- a/arch/arm/kernel/smp_scu.c
+> > > +++ b/arch/arm/kernel/smp_scu.c
+> > > @@ -18,6 +18,7 @@
+> > >  
+> > >  #define SCU_CTRL		0x00
+> > >  #define SCU_ENABLE		(1 << 0)
+> > > +#define SCU_STANDBY_ENABLE	(1 << 5)
+> > >  #define SCU_CONFIG		0x04
+> > >  #define SCU_CPU_STATUS		0x08
+> > >  #define SCU_INVALIDATE		0x0c
+> > > @@ -54,7 +55,7 @@ void scu_enable(void __iomem *scu_base)
+> > >  	if (scu_ctrl & SCU_ENABLE)
+> > >  		return;
+> > >  
+> > > -	scu_ctrl |= SCU_ENABLE;
+> > > +	scu_ctrl |= SCU_ENABLE | SCU_STANDBY_ENABLE;
+> > 
+> > I don't think this bit exists on all revisions of the A9.
 > 
-> It would be nice to actually close the device even if someone is
-> touching screen. Please implement open/close methods and have them set a
-> flag that you would check here.
+> Thanks for the info, Will.  Is there any side-effect to write the
+> standby bit on those revisions which do not define the bit?
 
-Ok. I think it's even better to move the request_irq() into the open function,
-which will avoid the flag and defer the error handling into the actual opening,
-as well as syncing the running irq with the close function.
+The usual question - could the firmware enable this bit before Linux
+starts? We already do a read/modify/write sequence here and are only
+supposed to write the enable bit as the rest are implementation defined.
 
-> > >>+    /* data from s3c2410_ts driver */
-> > >>+    info->input->name = "S3C24xx TouchScreen";
-> > >>+    info->input->id.bustype = BUS_HOST;
-> > >>+    info->input->id.vendor = 0xDEAD;
-> > >>+    info->input->id.product = 0xBEEF;
-> 
-> You do not need to fill these entries with fake data.
-
-Ok, I wondered about this, but didn't want to change too much from
-the old driver (I changed the version number).
-
-> > >>+    info->input->id.version = 0x0200;
-
-Do I need this?
-
-> > >>@@ -576,6 +728,11 @@ static int exynos_adc_probe(struct platform_device *pdev)
-> > >>  err_of_populate:
-> > >>      device_for_each_child(&indio_dev->dev, NULL,
-> > >>                  exynos_adc_remove_devices);
-> > >>+    if (has_ts) {
-> > >>+        input_unregister_device(info->input);
-> > >>+        free_irq(info->tsirq, info);
-> 
-> Are we sure that device is quiesced here and interrupt won't arrive
-> between input_unregister_device() and free_irq()? I guess if you
-> properly implement open/close it won't matter.
- 
-Should be fixed now.
-
-> > >>+err_iio:
-> > >>      iio_device_unregister(indio_dev);
-> > >>  err_irq:
-> > >>      free_irq(info->irq, info);
-> > >>@@ -595,9 +752,12 @@ static int exynos_adc_remove(struct platform_device *pdev)
-> > >>      struct iio_dev *indio_dev = platform_get_drvdata(pdev);
-> > >>      struct exynos_adc *info = iio_priv(indio_dev);
-> > >>
-> > >>+    input_free_device(info->input);
-> 
-> Should be unregister, not free.
-
-Ok.
-
-Thanks a lot for the review! I'll send out the new version after some build testing.
-
-	Arnd
+-- 
+Catalin
