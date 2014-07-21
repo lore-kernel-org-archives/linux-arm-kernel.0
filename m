@@ -1,43 +1,56 @@
-From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Mon, 21 Jul 2014 14:38:13 +0200
-Subject: [PATCHv2 12/17] cpuidle: mvebu: make the cpuidle driver capable
- of handling multiple SoCs
-In-Reply-To: <53CD08CF.6080900@linaro.org>
-References: <1404913221-17343-1-git-send-email-thomas.petazzoni@free-electrons.com>
- <52019695.n2AjkGEsJ7@wuerfel>
- <20140721133534.3415e425@free-electrons.com>
- <5251405.VTrfDi1rj5@wuerfel>
- <20140721140917.16e71558@free-electrons.com>
- <53CD08CF.6080900@linaro.org>
-Message-ID: <20140721143813.6028b6ed@free-electrons.com>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Mon, 21 Jul 2014 13:39:50 +0100
+Subject: [PATCH v2 00/11] pwm: Introduce ST's PWM driver
+In-Reply-To: <1405348412-7352-1-git-send-email-lee.jones@linaro.org>
+References: <1405348412-7352-1-git-send-email-lee.jones@linaro.org>
+Message-ID: <20140721123950.GY30888@lee--X1>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear Daniel Lezcano,
+Hi Thierry,
 
-On Mon, 21 Jul 2014 14:34:23 +0200, Daniel Lezcano wrote:
+Did you find some time to look at this set?
 
-> So there are three solutions:
+> I'm pretty sure all of your review comments have been tended to
+> now.  Some have been fixed-up by myself and re-rolled into the
+> original set.  The larger changes have been fixed as subsequent
+> patches for ease of review and history tracking on the internal
+> kernel.
 > 
-> 1. Pass the flag through the platform data, I am not really in favor of 
-> that as mentioned above
-
-That's what is already implemented.
-
+> Kind regards,
+> Lee
 > 
-> 2. Use the compatible string like the cpuidle-big-little.c driver, but 
-> Arnd is not in favor of that
+> Ajit Pal Singh (4):
+>   pwm: st: Fix PWM prescaler handling
+>   pwm: sti: Ensure same period values for all channels
+>   pwm: sti: Sync between enable/disable calls
+>   pwm: sti: Remove PWM period table
 > 
-> 3. Register 3 platform drivers, in cpuidle-mvebu-v7.c, and let the 
-> registering of the cpuidle's platform device to enable the right one
+> Lee Jones (7):
+>   ARM: stih407: Add DT nodes for for PWM
+>   ARM: stih416: Add Pinctrl settings for PWM
+>   ARM: stih416: Add DT nodes for PWM
+>   ARM: stih416-b2020e: Enable PWM on the B2020 Rev-E
+>   ARM: multi_v7_defconfig: Enable ST's PWM driver
+>   pwm: sti: Add new driver for ST's PWM IP
+>   pwm: sti: Supply Device Tree binding documentation for ST's PWM IP
+> 
+>  Documentation/devicetree/bindings/pwm/pwm-st.txt |  41 +++
+>  arch/arm/boot/dts/stih407.dtsi                   |  28 ++
+>  arch/arm/boot/dts/stih416-b2020e.dts             |  10 +
+>  arch/arm/boot/dts/stih416-pinctrl.dtsi           |  50 +++
+>  arch/arm/boot/dts/stih416.dtsi                   |  44 ++-
+>  arch/arm/configs/multi_v7_defconfig              |   1 +
+>  drivers/pwm/Kconfig                              |  10 +
+>  drivers/pwm/Makefile                             |   1 +
+>  drivers/pwm/pwm-sti.c                            | 418 +++++++++++++++++++++++
+>  9 files changed, 602 insertions(+), 1 deletion(-)
+>  create mode 100644 Documentation/devicetree/bindings/pwm/pwm-st.txt
+>  create mode 100644 drivers/pwm/pwm-sti.c
+> 
 
-I'm fine with doing (3). Daniel, Arnd, let me know if that's ok for
-you, and I'll respin the patch series accordingly.
-
-Thanks,
-
-Thomas
 -- 
-Thomas Petazzoni, CTO, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
+Lee Jones
+Linaro STMicroelectronics Landing Team Lead
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
