@@ -1,58 +1,64 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Mon, 21 Jul 2014 10:17:53 +0100
-Subject: [RESEND PATCH 0/6] thermal: sti: Add new Thermal driver
-In-Reply-To: <20140714142703.GC3993@lee--X1>
-References: <1401980819-19962-1-git-send-email-lee.jones@linaro.org>
- <20140624092309.GD13803@lee--X1> <20140709120823.GA32573@lee--X1>
- <1404911964.28592.4.camel@rzhang1-toshiba>
- <20140709134646.GB479@lee--X1> <20140714130824.GA3993@lee--X1>
- <1405347277.28592.25.camel@rzhang1-toshiba>
- <20140714142703.GC3993@lee--X1>
-Message-ID: <20140721091753.GV30888@lee--X1>
+From: boris.brezillon@free-electrons.com (Boris BREZILLON)
+Date: Mon, 21 Jul 2014 11:24:38 +0200
+Subject: [RESEND PATCH v3 06/11] drm: add DT bindings documentation for
+ atmel-hlcdc-dc driver
+In-Reply-To: <20140721085908.GI8843@ulmo>
+References: <1404751384-5077-1-git-send-email-boris.brezillon@free-electrons.com>
+ <1404751384-5077-7-git-send-email-boris.brezillon@free-electrons.com>
+ <20140714100542.GB9870@ulmo> <20140715120619.7f29c458@bbrezillon>
+ <20140715103136.GA6616@ulmo> <20140718165152.0a9fde09@bbrezillon>
+ <20140718174334.209e99c1@bbrezillon> <20140721085908.GI8843@ulmo>
+Message-ID: <20140721112438.60452e09@bbrezillon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 14 Jul 2014, Lee Jones wrote:
+On Mon, 21 Jul 2014 10:59:12 +0200
+Thierry Reding <thierry.reding@gmail.com> wrote:
 
-> On Mon, 14 Jul 2014, Zhang Rui wrote:
-> 
-> > On Mon, 2014-07-14 at 14:08 +0100, Lee Jones wrote:
-> > > On Wed, 09 Jul 2014, Lee Jones wrote:
-> > > > On Wed, 09 Jul 2014, Zhang Rui wrote:
-> > > > > On Wed, 2014-07-09 at 13:08 +0100, Lee Jones wrote:
-> > > > > > On Tue, 24 Jun 2014, Lee Jones wrote:
+> On Fri, Jul 18, 2014 at 05:43:34PM +0200, Boris BREZILLON wrote:
+> [...]
+> > > > > > > + - atmel,panel: Should contain a phandle with 2 parameters.
+> > > > > > > +   The first cell is a phandle to a DRM panel device
+> > > > > > > +   The second cell encodes the RGB mode, which can take the following values:
+> > > > > > > +   * 0: RGB444
+> > > > > > > +   * 1: RGB565
+> > > > > > > +   * 2: RGB666
+> > > > > > > +   * 3: RGB888
 > > > > > > 
-> > > > > > > > I'm re-sending this set, as one of the maintainers' email addresses
-> > > > > > > > is incorrect in the MAINTAINERS file.
-> > > > > > > > 
-> > > > > > > > This patchset adds full support for 2 types of Thermal Controllers
-> > > > > > > > produced by STMicroelectronics.  One is a more traditional memory
-> > > > > > > > mapped variant, the other is controlled solely by system configuration
-> > > > > > > > registers.
-> > > > > > > 
-> > > > > > > Any thing from the Thermal guys? Has this set fallen through the gaps?
-> > > > > > 
-> > > > > > Anything at all?  It's been well over a month now.
-> > > > > > 
-> > > > > Well, for the soc thermal drivers, I'd prefer to take them via Eduardo,
-> > > > > but as we didn't get any feedback from Eduardo, I will take them.
+> > > > > > These are properties of the panel and should be obtained from the panel
+> > > > > > directly rather than an additional cell in this specifier.
+> > > > > 
+> > > > > Okay.
+> > > > > What's the preferred way of doing this ?
+> > > > > What about defining an rgb-mode property in the panel node.
 > > > > 
-> > > > Thanks Rui.
-> > > > 
-> > > > So have you taken all 4 "thermal: sti: *" patches?
+> > > > There's .bpc in struct drm_display_info, I suspect that it could be used
+> > > > for this. Alternatively, maybe we could extend the list of color formats
+> > > > that go into drm_display_info.color_formats? RGB444 is already covered.
 > > > 
-> > > Have you taken these yet?
 > > 
-> > Not yet. will do tomorrow.
-
-I waited 7 days and still don't see them?
-
-> Perfect, thanks for the update.
+> > I forgot to ask about bpc meaning. If, as I think, it means "bits per
+> > color" then it cannot be used to encode RGB565 where green color is
+> > encoded on 6 bits and red and blue are encoded on 5 bits. 
 > 
-> > >   I notice that these aren't in -next yet.
+> Yes, I agree that bps is not a good fit for what you need here.
+
+Okay, then I think we can replace bpc and color_formats by a bus_formats
+table containing all supported formats, and use an enum (something
+similar to v4l2_mbus_pixelcode defined in v4l2-mediabus.h [1]) to list
+the available formats.
+
+As this implies quite a few changes in crtc core and some drm drivers
+(nouveau, i915 and radeon), I'd like to be sure this is what both of you
+had in mind.
+
+Best Regards,
+
+Boris
+
+[1]http://lxr.free-electrons.com/source/include/uapi/linux/v4l2-mediabus.h#L37
 
 -- 
-Lee Jones
-Linaro STMicroelectronics Landing Team Lead
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+Boris Brezillon, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
