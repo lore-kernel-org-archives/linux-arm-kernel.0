@@ -1,86 +1,80 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Mon, 21 Jul 2014 17:16:16 +0200
-Subject: [RFC PATCH 01/10] arm64/efi: efistub: jump to 'stext' directly,
- not through the header
-In-Reply-To: <1405955785-13477-1-git-send-email-ard.biesheuvel@linaro.org>
-References: <1405955785-13477-1-git-send-email-ard.biesheuvel@linaro.org>
-Message-ID: <1405955785-13477-2-git-send-email-ard.biesheuvel@linaro.org>
+From: balbi@ti.com (Felipe Balbi)
+Date: Mon, 21 Jul 2014 10:15:57 -0500
+Subject: [PATCH v3 0/2] usb: fix controller-PHY binding for OMAP3 platform
+In-Reply-To: <2288457.9ZfWAQMUao@avalon>
+References: <1387209225-11520-1-git-send-email-kishon@ti.com>
+ <20131216223826.GG26293@atomide.com>
+ <20131216234829.GC29284@saruman.home> <2288457.9ZfWAQMUao@avalon>
+Message-ID: <20140721151557.GH6852@saruman.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-After the EFI stub has done its business, it jumps into the kernel by branching
-to offset #0 of the loaded Image, which is where it expects to find the header
-containing a 'branch to stext' instruction.
+Hi,
 
-However, the header is not covered by any PE/COFF section, so the header may
-not actually be loaded at the expected offset. So instead, jump to 'stext'
-directly, which is at the base of the PE/COFF .text section, by supplying a
-symbol 'stext_offset' to efi-entry.o which contains the relative offset of
-stext into the Image. Also replace other open coded calculations of the same
-value with a reference to 'stext_offset'
+On Mon, Jul 21, 2014 at 05:04:57PM +0200, Laurent Pinchart wrote:
+> Hi Felipe,
+> 
+> What happened to these two patches ?
 
-Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
----
- arch/arm64/kernel/efi-entry.S |  3 ++-
- arch/arm64/kernel/head.S      | 10 ++++++----
- 2 files changed, 8 insertions(+), 5 deletions(-)
+looks like I lost them.
 
-diff --git a/arch/arm64/kernel/efi-entry.S b/arch/arm64/kernel/efi-entry.S
-index 619b1dd7bcde..a0016d3a17da 100644
---- a/arch/arm64/kernel/efi-entry.S
-+++ b/arch/arm64/kernel/efi-entry.S
-@@ -61,7 +61,8 @@ ENTRY(efi_stub_entry)
- 	 */
- 	mov	x20, x0		// DTB address
- 	ldr	x0, [sp, #16]	// relocated _text address
--	mov	x21, x0
-+	ldr	x21, =stext_offset
-+	add	x21, x0, x21
- 
- 	/*
- 	 * Flush dcache covering current runtime addresses
-diff --git a/arch/arm64/kernel/head.S b/arch/arm64/kernel/head.S
-index 69dafe9621fd..5cd1f3491df5 100644
---- a/arch/arm64/kernel/head.S
-+++ b/arch/arm64/kernel/head.S
-@@ -129,6 +129,8 @@ efi_head:
- #endif
- 
- #ifdef CONFIG_EFI
-+	.globl	stext_offset
-+	.set	stext_offset, stext - efi_head
- 	.align 3
- pe_header:
- 	.ascii	"PE"
-@@ -152,7 +154,7 @@ optional_header:
- 	.long	0				// SizeOfInitializedData
- 	.long	0				// SizeOfUninitializedData
- 	.long	efi_stub_entry - efi_head	// AddressOfEntryPoint
--	.long	stext - efi_head		// BaseOfCode
-+	.long	stext_offset			// BaseOfCode
- 
- extra_header_fields:
- 	.quad	0				// ImageBase
-@@ -169,7 +171,7 @@ extra_header_fields:
- 	.long	_edata - efi_head		// SizeOfImage
- 
- 	// Everything before the kernel image is considered part of the header
--	.long	stext - efi_head		// SizeOfHeaders
-+	.long	stext_offset			// SizeOfHeaders
- 	.long	0				// CheckSum
- 	.short	0xa				// Subsystem (EFI application)
- 	.short	0				// DllCharacteristics
-@@ -214,9 +216,9 @@ section_table:
- 	.byte	0
- 	.byte	0        		// end of 0 padding of section name
- 	.long	_edata - stext		// VirtualSize
--	.long	stext - efi_head	// VirtualAddress
-+	.long	stext_offset		// VirtualAddress
- 	.long	_edata - stext		// SizeOfRawData
--	.long	stext - efi_head	// PointerToRawData
-+	.long	stext_offset		// PointerToRawData
- 
- 	.long	0		// PointerToRelocations (0 for executables)
- 	.long	0		// PointerToLineNumbers (0 for executables)
+> On Monday 16 December 2013 17:48:29 Felipe Balbi wrote:
+> > On Mon, Dec 16, 2013 at 02:38:27PM -0800, Tony Lindgren wrote:
+> > > * Felipe Balbi <balbi@ti.com> [131216 13:31]:
+> > > > On Mon, Dec 16, 2013 at 09:23:43PM +0530, Kishon Vijay Abraham I wrote:
+> > > > > After the platform devices are created using PLATFORM_DEVID_AUTO, the
+> > > > > device names given in usb_bind_phy (in board file) does not match with
+> > > > > the actual device name causing the USB PHY library not to return the
+> > > > > PHY reference when the MUSB controller request for the PHY in the
+> > > > > non-dt boot case.
+> > > > > So removed creating platform devices using PLATFORM_DEVID_AUTO in
+> > > > > omap2430.c.
+> > > > > 
+> > > > > Did enumeration testing in omap3 beagle.
+> > > > > 
+> > > > > Changes from v2:
+> > > > > * Fixed the commit log
+> > > > > 
+> > > > > Changes from v1:
+> > > > > * refreshed to the latested mainline kernel
+> > > > > * added musb_put_id from omap2430 remove.
+> > > > 
+> > > > Tony, how do you want to handle this ? You want me to provide you a
+> > > > branch which we both merge ?
+> > > 
+> > > Yes that would be great thanks. For the mach-omap2 touching parts:
+> > > 
+> > > Acked-by: Tony Lindgren <tony@atomide.com>
+> > 
+> > Here it is, let me know if you prefer a signed tag:
+> > 
+> > The following changes since commit 6ce4eac1f600b34f2f7f58f9cd8f0503d79e42ae:
+> > 
+> >   Linux 3.13-rc1 (2013-11-22 11:30:55 -0800)
+> > 
+> > are available in the git repository at:
+> > 
+> >   git://git.kernel.org/pub/scm/linux/kernel/git/balbi/usb.git
+> > usb-phy-binding-omap3
+> > 
+> > for you to fetch changes up to 23ada3130cf4e56acb86fdff4c26113188d52d18:
+> > 
+> >   arm: omap: remove *.auto* from device names given in usb_bind_phy
+> > (2013-12-16 17:44:43 -0600)
+> > 
+> > ----------------------------------------------------------------
+> > Kishon Vijay Abraham I (2):
+> >       usb: musb: omap: remove using PLATFORM_DEVID_AUTO in omap2430.c
+> >       arm: omap: remove *.auto* from device names given in usb_bind_phy
+
+Kishon, are these still valid ?
+
 -- 
-1.8.3.2
+balbi
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140721/a2857581/attachment-0001.sig>
