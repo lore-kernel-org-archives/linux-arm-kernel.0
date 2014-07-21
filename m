@@ -1,57 +1,63 @@
 From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Mon, 21 Jul 2014 17:16:19 +0200
-Subject: [RFC PATCH 04/10] arm64: add EFI little endian constants to linker
- script
+Date: Mon, 21 Jul 2014 17:16:21 +0200
+Subject: [RFC PATCH 06/10] arm64/efi: efistub: avoid using linker defined
+ constants
 In-Reply-To: <1405955785-13477-1-git-send-email-ard.biesheuvel@linaro.org>
 References: <1405955785-13477-1-git-send-email-ard.biesheuvel@linaro.org>
-Message-ID: <1405955785-13477-5-git-send-email-ard.biesheuvel@linaro.org>
+Message-ID: <1405955785-13477-7-git-send-email-ard.biesheuvel@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Similar to how text offset and kernel size are mangled to produce little
-endian constants for the Image header regardless of the endianness of the
-kernel, this adds a number of constants used in the EFI PE/COFF header which
-can only be calculated (and byte swapped) by the linker.
+When we build the stub as a separate executable, we cannot refer to symbols
+like _edata or _end to find out how large the kernel is. Use image->image_size
+instead, this covers the entire static memory footprint including BSS.
 
 Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
 ---
- arch/arm64/kernel/image.h | 16 +++++++++++++++-
- 1 file changed, 15 insertions(+), 1 deletion(-)
+ arch/arm64/kernel/efi-stub.c | 11 ++++-------
+ 1 file changed, 4 insertions(+), 7 deletions(-)
 
-diff --git a/arch/arm64/kernel/image.h b/arch/arm64/kernel/image.h
-index 8fae0756e175..f5a2f298810d 100644
---- a/arch/arm64/kernel/image.h
-+++ b/arch/arm64/kernel/image.h
-@@ -37,8 +37,10 @@
- 	 (((data) & 0x0000ff0000000000) >> 24) |	\
- 	 (((data) & 0x00ff000000000000) >> 40) |	\
- 	 (((data) & 0xff00000000000000) >> 56))
-+#define DATA_LE32(data) (DATA_LE64(data) >> 32)
- #else
- #define DATA_LE64(data) ((data) & 0xffffffffffffffff)
-+#define DATA_LE32(data) ((data) & 0xffffffff)
- #endif
+diff --git a/arch/arm64/kernel/efi-stub.c b/arch/arm64/kernel/efi-stub.c
+index 1317fef8dde9..8401d7795395 100644
+--- a/arch/arm64/kernel/efi-stub.c
++++ b/arch/arm64/kernel/efi-stub.c
+@@ -11,7 +11,6 @@
+  */
+ #include <linux/efi.h>
+ #include <asm/efi.h>
+-#include <asm/sections.h>
  
- #ifdef CONFIG_CPU_BIG_ENDIAN
-@@ -57,6 +59,18 @@
- #define HEAD_SYMBOLS						\
- 	_kernel_size_le		= DATA_LE64(_end - _text);	\
- 	_kernel_offset_le	= DATA_LE64(TEXT_OFFSET);	\
--	_kernel_flags_le	= DATA_LE64(__HEAD_FLAGS);
-+	_kernel_flags_le	= DATA_LE64(__HEAD_FLAGS);	\
-+	EFI_HEAD_SYMBOLS
-+
-+#ifdef CONFIG_EFI
-+#define EFI_HEAD_SYMBOLS						    \
-+	_efi_stext_offset_le	= DATA_LE32(stext_offset);		    \
-+	_efi_code_virtsize_le	= DATA_LE32(_end - _text - stext_offset);   \
-+	_efi_code_rawsize_le	= DATA_LE32(_edata - _text - stext_offset); \
-+	_efi_image_size_le	= DATA_LE32(_end - _text);		    \
-+	_efi_entry_point_le	= DATA_LE32(efi_stub_entry - _text);
-+#else
-+#define  EFI_HEAD_SYMBOLS
-+#endif
+ efi_status_t handle_kernel_image(efi_system_table_t *sys_table,
+ 				 unsigned long *image_addr,
+@@ -22,14 +21,12 @@ efi_status_t handle_kernel_image(efi_system_table_t *sys_table,
+ 				 efi_loaded_image_t *image)
+ {
+ 	efi_status_t status;
+-	unsigned long kernel_size, kernel_memsize = 0;
  
- #endif /* __ASM_IMAGE_H */
+ 	/* Relocate the image, if required. */
+-	kernel_size = _edata - _text;
+ 	if (*image_addr != (dram_base + TEXT_OFFSET)) {
+-		kernel_memsize = kernel_size + (_end - _edata);
+ 		status = efi_relocate_kernel(sys_table, image_addr,
+-					     kernel_size, kernel_memsize,
++					     image->image_size,
++					     image->image_size,
+ 					     dram_base + TEXT_OFFSET,
+ 					     PAGE_SIZE);
+ 		if (status != EFI_SUCCESS) {
+@@ -38,10 +35,10 @@ efi_status_t handle_kernel_image(efi_system_table_t *sys_table,
+ 		}
+ 		if (*image_addr != (dram_base + TEXT_OFFSET)) {
+ 			pr_efi_err(sys_table, "Failed to alloc kernel memory\n");
+-			efi_free(sys_table, kernel_memsize, *image_addr);
++			efi_free(sys_table, image->image_size, *image_addr);
+ 			return EFI_LOAD_ERROR;
+ 		}
+-		*image_size = kernel_memsize;
++		*image_size = image->image_size;
+ 	}
+ 
+ 
 -- 
 1.8.3.2
