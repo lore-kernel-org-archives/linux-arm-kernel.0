@@ -1,65 +1,87 @@
 From: lee.jones@linaro.org (Lee Jones)
-Date: Mon, 21 Jul 2014 09:28:36 +0100
-Subject: [PATCH 1/1] ahci: st: Provide DT bindings for ST's SATA implementation
-Message-ID: <1405931316-12276-1-git-send-email-lee.jones@linaro.org>
+Date: Mon, 21 Jul 2014 09:32:53 +0100
+Subject: [RESEND PATCH 1/1] ARM: DT: STi: STiH416: Add DT node for ST's SATA
+ device
+Message-ID: <1405931573-12407-1-git-send-email-lee.jones@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Cc: devicetree at vger.kernel.org
-Cc: Srinivas Kandagatla <srinivas.kandagatla@st.com>
 Acked-by: Alexandre Torgue <alexandre.torgue@st.com>
 Signed-off-by: Lee Jones <lee.jones@linaro.org>
 ---
-
-Hi Tejun,
-
-This patch has been on the MLs for a few months now.  It documents
-ST's AHCI driver which was accepted by you and now resides in
-Mainline.
-
-Kind regards,
-Lee
-
- Documentation/devicetree/bindings/ata/ahci-st.txt | 31 +++++++++++++++++++++++
- 1 file changed, 31 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/ata/ahci-st.txt
+ Documentation/devicetree/bindings/ata/ahci-st.txt |  2 +-
+ arch/arm/boot/dts/stih416-b2020.dts               |  4 ++++
+ arch/arm/boot/dts/stih416-b2020e.dts              |  4 ++++
+ arch/arm/boot/dts/stih416.dtsi                    | 16 ++++++++++++++++
+ 4 files changed, 25 insertions(+), 1 deletion(-)
 
 diff --git a/Documentation/devicetree/bindings/ata/ahci-st.txt b/Documentation/devicetree/bindings/ata/ahci-st.txt
-new file mode 100644
-index 0000000..0574a77
---- /dev/null
+index 0574a77..9883542 100644
+--- a/Documentation/devicetree/bindings/ata/ahci-st.txt
 +++ b/Documentation/devicetree/bindings/ata/ahci-st.txt
-@@ -0,0 +1,31 @@
-+STMicroelectronics STi SATA controller
+@@ -21,7 +21,7 @@ Example:
+ 		reg             = <0xfe380000 0x1000>;
+ 		interrupts      = <GIC_SPI 157 IRQ_TYPE_NONE>;
+ 		interrupt-names = "hostc";
+-		phys	        = <&miphy365x_phy MIPHY_PORT_0 MIPHY_TYPE_SATA>;
++		phys	        = <&phy_port0 MIPHY_TYPE_SATA>;
+ 		phy-names       = "ahci_phy";
+ 		resets	        = <&powerdown STIH416_SATA0_POWERDOWN>,
+ 				  <&softreset STIH416_SATA0_SOFTRESET>;
+diff --git a/arch/arm/boot/dts/stih416-b2020.dts b/arch/arm/boot/dts/stih416-b2020.dts
+index c3c2ac6..eb2f246 100644
+--- a/arch/arm/boot/dts/stih416-b2020.dts
++++ b/arch/arm/boot/dts/stih416-b2020.dts
+@@ -23,5 +23,9 @@
+ 				st,pcie-tx-pol-inv;
+ 			};
+ 		};
 +
-+This binding describes a SATA device.
++		sata0: sata at fe380000{
++			status = "okay";
++		};
+ 	};
+ };
+diff --git a/arch/arm/boot/dts/stih416-b2020e.dts b/arch/arm/boot/dts/stih416-b2020e.dts
+index 80aff0f..99a699e 100644
+--- a/arch/arm/boot/dts/stih416-b2020e.dts
++++ b/arch/arm/boot/dts/stih416-b2020e.dts
+@@ -41,5 +41,9 @@
+ 				st,pcie-tx-pol-inv;
+ 			};
+ 		};
 +
-+Required properties:
-+ - compatible	   : Must be "st,sti-ahci"
-+ - reg		   : Physical base addresses and length of register sets
-+ - interrupts	   : Interrupt associated with the SATA device
-+ - interrupt-names :   Associated name must be; "hostc"
-+ - resets	   : The power-down and soft-reset lines of SATA IP
-+ - reset-names	   :   Associated names must be; "pwr-dwn" and "sw-rst"
-+ - clocks	   : The phandle for the clock
-+ - clock-names	   :   Associated name must be; "ahci_clk"
-+ - phys		   : The phandle for the PHY device
-+ - phy-names	   :   Associated name must be; "ahci_phy"
++		sata0: sata at fe380000{
++			status = "okay";
++		};
+ 	};
+ };
+diff --git a/arch/arm/boot/dts/stih416.dtsi b/arch/arm/boot/dts/stih416.dtsi
+index 2b98a0a..060dd53 100644
+--- a/arch/arm/boot/dts/stih416.dtsi
++++ b/arch/arm/boot/dts/stih416.dtsi
+@@ -258,5 +258,21 @@
+ 				reg-names = "sata", "pcie", "syscfg";
+ 			};
+ 		};
 +
-+Example:
++		sata0: sata at fe380000 {
++			compatible      = "st,sti-ahci";
++			reg             = <0xfe380000 0x1000>;
++			interrupts      = <GIC_SPI 157 IRQ_TYPE_NONE>;
++			interrupt-names = "hostc";
++			phys	        = <&phy_port0 MIPHY_TYPE_SATA>;
++			phy-names       = "sata-phy";
++			resets	        = <&powerdown STIH416_SATA0_POWERDOWN>,
++					  <&softreset STIH416_SATA0_SOFTRESET>;
++			reset-names     = "pwr-dwn", "sw-rst";
++			clock-names     = "ahci_clk";
++			clocks	        = <&clk_s_a0_ls CLK_ICN_REG>;
 +
-+	sata0: sata at fe380000 {
-+		compatible      = "st,sti-ahci";
-+		reg             = <0xfe380000 0x1000>;
-+		interrupts      = <GIC_SPI 157 IRQ_TYPE_NONE>;
-+		interrupt-names = "hostc";
-+		phys	        = <&miphy365x_phy MIPHY_PORT_0 MIPHY_TYPE_SATA>;
-+		phy-names       = "ahci_phy";
-+		resets	        = <&powerdown STIH416_SATA0_POWERDOWN>,
-+				  <&softreset STIH416_SATA0_SOFTRESET>;
-+		reset-names     = "pwr-dwn", "sw-rst";
-+		clocks	        = <&clk_s_a0_ls CLK_ICN_REG>;
-+		clock-names     = "ahci_clk";
-+	};
++			status	        = "disabled";
++		};
+ 	};
+ };
 -- 
 1.8.3.2
