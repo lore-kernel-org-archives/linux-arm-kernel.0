@@ -1,38 +1,44 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Mon, 21 Jul 2014 10:51:57 -0700
-Subject: [GIT PULL] omap soc clean-up for v3.17 merge window
-In-Reply-To: <20140721123000.GB18374@atomide.com>
-References: <20140721123000.GB18374@atomide.com>
-Message-ID: <CAOesGMjpvJ5aYsw0ireWDEzYxKMQ3KOU6ofT9anc7dCZdC-3kQ@mail.gmail.com>
+From: leif.lindholm@linaro.org (Leif Lindholm)
+Date: Mon, 21 Jul 2014 18:54:32 +0100
+Subject: [RFC] arm: section split in boot/compressed/head.S
+Message-ID: <20140721175432.GB4179@bivouac.eciton.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jul 21, 2014 at 5:30 AM, Tony Lindgren <tony@atomide.com> wrote:
-> The following changes since commit cd3de83f147601356395b57a8673e9c5ff1e59d1:
->
->   Linux 3.16-rc4 (2014-07-06 12:37:51 -0700)
->
-> are available in the git repository at:
->
->   git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap tags/omap-for-v3.17/soc-cleanup
->
-> for you to fetch changes up to 3db53918e306d3960bf9e12eea8b2fd3f7d0fd62:
->
->   Merge tag 'for-v3.17/omap-clock-a' of git://git.kernel.org/pub/scm/linux/kernel/git/pjw/omap-pending into omap-for-v3.17/soc (2014-07-21 00:35:38 -0700)
->
-> ----------------------------------------------------------------
->
-> SoC specific omap clean-up for v3.17 merge window:
->
-> - Changes to PRM and clock related code to help move
->   things to drivers
->
-> - Removal of unused ctrl module defines that no longer
->   are needed with things moving to .dts files and
->   drivers
->
+Reported-by: Roy Franz <roy.franz@linaro.org>
 
-Merged, thanks.
+The current code in boot/compressed/head.S executes pretty much
+sequentially from "start", all the way until the end of
+"dtb_check_done". However, shortly after the "not_angel" symbol, there
+is a section change, in the form of a ".text" directive.
 
+This means any literal pools in .start end up getting inserted into
+the middle of the instruction stream.
 
--Olof
+Would something like the below (pardon the semantic silliness) be an
+acceptable fix?
+
+diff --git a/arch/arm/boot/compressed/head.S b/arch/arm/boot/compressed/head.S
+index 3a8b32d..8ee05e9 100644
+--- a/arch/arm/boot/compressed/head.S
++++ b/arch/arm/boot/compressed/head.S
+@@ -149,6 +149,10 @@ start:
+ 		mov	r0, #0x17		@ angel_SWIreason_EnterSVC
+  ARM(		swi	0x123456	)	@ angel_SWI_ARM
+  THUMB(		svc	0xab		)	@ angel_SWI_THUMB
++		b	angel
++
++		.text
++angel:
+ not_angel:
+ 		safe_svcmode_maskall r0
+ 		msr	spsr_cxsf, r9		@ Save the CPU boot mode in
+@@ -163,8 +167,6 @@ not_angel:
+ 		 * by the linker here, but it should preserve r7, r8, and r9.
+ 		 */
+ 
+-		.text
+-
+ #ifdef CONFIG_AUTO_ZRELADDR
+ 		@ determine final kernel image address
+ 		mov	r4, pc
