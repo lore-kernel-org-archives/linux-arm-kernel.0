@@ -1,26 +1,44 @@
-From: nm@ti.com (Nishanth Menon)
-Date: Mon, 21 Jul 2014 06:17:38 -0500
-Subject: [RFC PATCH 3/7] ARM: OMAP4+: PRM: remove "wkup" event
-In-Reply-To: <20140721104413.GT18374@atomide.com>
-References: <1402025761-16831-1-git-send-email-nm@ti.com>
- <1402025761-16831-4-git-send-email-nm@ti.com>
- <20140721104413.GT18374@atomide.com>
-Message-ID: <CAGo_u6ryytHiV1dnkPx-qFGa4ZB3KxVDrjmA+Ls5bakHVLunsQ@mail.gmail.com>
+From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
+Date: Mon, 21 Jul 2014 13:19:39 +0200
+Subject: [PATCHv2 12/17] cpuidle: mvebu: make the cpuidle driver capable
+ of handling multiple SoCs
+In-Reply-To: <8387001.GKG5goCh1a@wuerfel>
+References: <1404913221-17343-1-git-send-email-thomas.petazzoni@free-electrons.com>
+ <1404913221-17343-13-git-send-email-thomas.petazzoni@free-electrons.com>
+ <53CCF295.6030907@linaro.org> <8387001.GKG5goCh1a@wuerfel>
+Message-ID: <20140721131939.20e81354@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jul 21, 2014 at 5:44 AM, Tony Lindgren <tony@atomide.com> wrote:
->
-> Hmm so why was it added originally then?
->
-> Do the PRM_IRQSTATUS line and the following line belong together
-> or is it missing something?
+Dear Arnd Bergmann,
 
+On Mon, 21 Jul 2014 13:16:22 +0200, Arnd Bergmann wrote:
 
-Seems like to have been a copy paste from OMAP3 code which did have
-wakeup event at bit 0.
+> > It isn't possible to do:
+> > 
+> > if (of_machine_is_compatible("marvell,armada-370-xp-pmsu"))
+> >         cpuidle_register(&armadaxp_cpuidle_driver, NULL);
+> > 
+> > ?
+> > 
+> > That will prevent the creation of the new single-declaration header file.
+> 
+> It would be best to have a way to read a property (or multiple
+> properties) from DT instead, to identify the requirements of the
+> device individually. However, I guess that would also require
+> changing the DT representation in an incompatible way, which we
+> normally don't.
 
+cpuidle is not represented in DT, so besides checking the global
+compatible string with of_machine_is_compatible(), or passing data
+through platform_data (as proposed in the patch series), I don't really
+see how the cpuidle driver could find out which SoC variant is being
+used.
+
+Best regards,
+
+Thomas
 -- 
----
-Regards,
-Nishanth Menon
+Thomas Petazzoni, CTO, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
