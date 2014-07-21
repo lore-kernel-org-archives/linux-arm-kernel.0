@@ -1,101 +1,94 @@
-From: richard@sigma-star.at (Richard Weinberger)
-Date: Mon, 21 Jul 2014 16:03:15 +0200
-Subject: [PATCH 29/43] arm64: Use sigsp()
-In-Reply-To: <1405951409-16953-1-git-send-email-richard@sigma-star.at>
-References: <1405951409-16953-1-git-send-email-richard@sigma-star.at>
-Message-ID: <1405951409-16953-30-git-send-email-richard@sigma-star.at>
+From: boris.brezillon@free-electrons.com (Boris BREZILLON)
+Date: Mon, 21 Jul 2014 16:18:10 +0200
+Subject: [RESEND PATCH v3 06/11] drm: add DT bindings documentation for
+ atmel-hlcdc-dc driver
+In-Reply-To: <1605488.5CKVSJec67@avalon>
+References: <1404751384-5077-1-git-send-email-boris.brezillon@free-electrons.com>
+ <20140721133034.GI15238@ulmo> <20140721154313.1de8bf6f@bbrezillon>
+ <1605488.5CKVSJec67@avalon>
+Message-ID: <20140721161810.282ca5e5@bbrezillon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Richard Weinberger <richard@nod.at>
+On Mon, 21 Jul 2014 15:47:52 +0200
+Laurent Pinchart <laurent.pinchart@ideasonboard.com> wrote:
 
-Use sigsp() instead of the open coded variant.
+> Hi Boris,
+> 
+> On Monday 21 July 2014 15:43:13 Boris BREZILLON wrote:
+> > On Mon, 21 Jul 2014 15:30:35 +0200 Thierry Reding wrote:
+> > > On Mon, Jul 21, 2014 at 03:22:05PM +0200, Laurent Pinchart wrote:
+> > >> On Monday 21 July 2014 14:55:23 Thierry Reding wrote:
+> > >>> On Mon, Jul 21, 2014 at 02:34:28PM +0200, Boris BREZILLON wrote:
+> > >>>> On Mon, 21 Jul 2014 14:16:42 +0200 Laurent Pinchart wrote:
+> > >>>>> On Monday 21 July 2014 14:12:47 Thierry Reding wrote:
+> > >>>>>> On Mon, Jul 21, 2014 at 11:57:37AM +0200, Boris BREZILLON wrote:
+> > >>
+> > >> [snip]
+> > >> 
+> > >>>>>>> The new drm_display_info structure should look like this [2]
+> > >>>>>>> (except that color_formats and bpc have not be removed yet), and
+> > >>>>>>> [1] is just here to show how the video_bus_format enum would look
+> > >>>>>>> like.
+> > >>>>>>> 
+> > >>>>>>> [1] http://code.bulix.org/rfd0yx-86557
+> > >>>>>>> [2] http://code.bulix.org/7n03b4-86556
+> > >>>>>> 
+> > >>>>>> Quoting from your paste:
+> > >>>>>> 	+   const enum video_bus_format *bus_formats;
+> > >>>>>> 	+   int nbus_formats;
+> > >>>>>> 
+> > >>>>>> Do we really need more than one?
+> > >>>>> 
+> > >>>>> We do if we want to replace the color_formats and bpc fields.
+> > >>>> 
+> > >>>> Yes, that's what I was about to answer :-).
+> > >>> 
+> > >>> Maybe we don't need to replace color_formats and bpc field
+> > >>> immediately. That could be done in a follow-up patch.
+> > >> 
+> > >> We don't need to replace them right now, but we should at least agree on
+> > >> how to replace them. Introducing a new field that would need to be
+> > >> replaced in the near future when removing color_formats and bpc would
+> > >> be a waste of time.
+> > >
+> > > Sure. One of the problems I see with replacing color_formats and bpc
+> > > with the above is that some of the bits within color_formats are set
+> > > when the EDID is parsed. That implies that if they are replaced with
+> > > an array of formats, the array would need to be reallocated during EDID
+> > > parsing. That sounds like ugliness.
+> > > 
+> > > But if you can find a nice way to make it work that'd be great.
+> > 
+> > How about using a list instead of an array ?
+> > This way we can add elements to this list when parsing the EDID.
+> > 
+> > Or we can just define a maximum size for the bus_formats array when
+> > retrieving this info from EDID. If I'm correct we have at most 18 bus
+> > formats:
+> >  - 3 color formats:
+> >    * RGB 4:4:4
+> >    * YCbCr 4:4:4
+> >    * YCbCr 4:4:2
+> >  - 6 color depths: 6, 8, 10, 12, 14 and 16 bits per color
+> 
+> bpc isn't a bitmask, so EDID supports up to three formats only.
 
-Signed-off-by: Richard Weinberger <richard@nod.at>
----
- arch/arm64/kernel/signal.c   | 12 +++---------
- arch/arm64/kernel/signal32.c | 14 ++++----------
- 2 files changed, 7 insertions(+), 19 deletions(-)
+Yes, bpc only contains a single value for now, and it fits the
+DRM_EDID_DIGITAL_DEPTH field [1] (an enum defining the supported pixel
+depth).
+ITOH, DRM_EDID_HDMI_DC_XX [2] (which are referenced in the new
+drm_assign_hdmi_deep_color_info function) are just bitmasks and thus a
+display might support several color depth.
 
-diff --git a/arch/arm64/kernel/signal.c b/arch/arm64/kernel/signal.c
-index b29f5da..6fa7921 100644
---- a/arch/arm64/kernel/signal.c
-+++ b/arch/arm64/kernel/signal.c
-@@ -209,19 +209,13 @@ static int setup_sigframe(struct rt_sigframe __user *sf,
- 	return err;
- }
- 
--static struct rt_sigframe __user *get_sigframe(struct k_sigaction *ka,
-+static struct rt_sigframe __user *get_sigframe(struct ksignal *ksig,
- 					       struct pt_regs *regs)
- {
- 	unsigned long sp, sp_top;
- 	struct rt_sigframe __user *frame;
- 
--	sp = sp_top = regs->sp;
--
--	/*
--	 * This is the X/Open sanctioned signal stack switching.
--	 */
--	if ((ka->sa.sa_flags & SA_ONSTACK) && !sas_ss_flags(sp))
--		sp = sp_top = current->sas_ss_sp + current->sas_ss_size;
-+	sp = sp_top = sigsp(regs->sp, ksig);
- 
- 	sp = (sp - sizeof(struct rt_sigframe)) & ~15;
- 	frame = (struct rt_sigframe __user *)sp;
-@@ -259,7 +253,7 @@ static int setup_rt_frame(int usig, struct ksignal *ksig, sigset_t *set,
- 	struct rt_sigframe __user *frame;
- 	int err = 0;
- 
--	frame = get_sigframe(&ksig->ka, regs);
-+	frame = get_sigframe(ksig, regs);
- 	if (!frame)
- 		return 1;
- 
-diff --git a/arch/arm64/kernel/signal32.c b/arch/arm64/kernel/signal32.c
-index b69ee69..1a5c5bf 100644
---- a/arch/arm64/kernel/signal32.c
-+++ b/arch/arm64/kernel/signal32.c
-@@ -407,20 +407,14 @@ badframe:
- 	return 0;
- }
- 
--static void __user *compat_get_sigframe(struct k_sigaction *ka,
-+static void __user *compat_get_sigframe(struct ksignal *ksig,
- 					struct pt_regs *regs,
- 					int framesize)
- {
--	compat_ulong_t sp = regs->compat_sp;
-+	compat_ulong_t sp = sigsp(regs->compat_sp, ksig);
- 	void __user *frame;
- 
- 	/*
--	 * This is the X/Open sanctioned signal stack switching.
--	 */
--	if ((ka->sa.sa_flags & SA_ONSTACK) && !sas_ss_flags(sp))
--		sp = current->sas_ss_sp + current->sas_ss_size;
--
--	/*
- 	 * ATPCS B01 mandates 8-byte alignment
- 	 */
- 	frame = compat_ptr((compat_uptr_t)((sp - framesize) & ~7));
-@@ -526,7 +520,7 @@ int compat_setup_rt_frame(int usig, struct ksignal *ksig,
- 	struct compat_rt_sigframe __user *frame;
- 	int err = 0;
- 
--	frame = compat_get_sigframe(&ksig->ka, regs, sizeof(*frame));
-+	frame = compat_get_sigframe(ksig, regs, sizeof(*frame));
- 
- 	if (!frame)
- 		return 1;
-@@ -555,7 +549,7 @@ int compat_setup_frame(int usig, struct ksignal *ksig, sigset_t *set,
- 	struct compat_sigframe __user *frame;
- 	int err = 0;
- 
--	frame = compat_get_sigframe(&ksig->ka, regs, sizeof(*frame));
-+	frame = compat_get_sigframe(ksig, regs, sizeof(*frame));
- 
- 	if (!frame)
- 		return 1;
+As a result, I wonder if we shouldn't start supporting several
+color depths (as we do for color formats).
+
+[1]http://lxr.free-electrons.com/source/drivers/gpu/drm/drm_edid.c#L3436
+[2]https://git.kernel.org/cgit/linux/kernel/git/torvalds/linux.git/tree/drivers/gpu/drm/drm_edid.c?id=refs/tags/v3.16-rc6#n3440
+
+
 -- 
-1.8.4.5
+Boris Brezillon, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
