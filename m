@@ -1,94 +1,53 @@
-From: tomasz.figa@gmail.com (Tomasz Figa)
-Date: Mon, 21 Jul 2014 12:38:55 +0200
-Subject: [PATCHv6 3/4] iio: devicetree: Add DT binding documentation for
- Exynos3250 ADC
-In-Reply-To: <7477106.gq1AqisQx4@wuerfel>
-References: <1405663186-26464-1-git-send-email-cw00.choi@samsung.com>
- <5381273.c6GzlyQ7Ea@wuerfel> <53CC725C.9010406@samsung.com>
- <7477106.gq1AqisQx4@wuerfel>
-Message-ID: <53CCEDBF.7010300@gmail.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Mon, 21 Jul 2014 03:44:14 -0700
+Subject: [RFC PATCH 3/7] ARM: OMAP4+: PRM: remove "wkup" event
+In-Reply-To: <1402025761-16831-4-git-send-email-nm@ti.com>
+References: <1402025761-16831-1-git-send-email-nm@ti.com>
+ <1402025761-16831-4-git-send-email-nm@ti.com>
+Message-ID: <20140721104413.GT18374@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 21.07.2014 10:00, Arnd Bergmann wrote:
-> On Monday 21 July 2014 10:52:28 Chanwoo Choi wrote:
->>> Yes, your current version is certainly better than this, but another way
->>> to address Tomasz' comment would be to change the binding to list the "sclk"
->>> as optional for any device and make the code silently ignore missing sclk
->>> entries, like:
->>>
->>>
->>>       info->sclk = devm_clk_get(&pdev->dev, "sclk");
->>>       if (IS_ERR(info->sclk)) {
->>>               switch (PTR_ERR(info->sclk)) {
->>>               case -EPROBE_DEFER:
->>>                       /* silently return error so we can retry */
->>>                       return -EPROBE_DEFER:
->>>               case -ENOENT:
->>>                       /* silently ignore missing optional clk */
->>>                       info->sclk = NULL;
->>>                       break;
->>>               default:
->>>                       /* any other error: clk is defined by doesn't work  */
->>>                       dev_err(&pdev->dev, "failed getting sclk clock, err = %ld\n",
->>>                               PTR_ERR(info->sclk));
->>>                       return PTR_ERR(info->sclk));
->>>               }
->>>       }
->>
->> I tested this patch suggested by you.
->> But, devm_clk_get returns always '-ENOENT' on follwong two cases:
->>
->> Case 1.
->> ADC dt node in exynos3250.dtsi don't include 'sclk' clock as following:
->>
->>                 adc: adc at 126C0000 {
->>                         compatible = "samsung,exynos3250-adc";
->>                         reg = <0x126C0000 0x100>, <0x10020718 0x4>;
->>                         interrupts = <0 137 0>;
->>                         clock-names = "adc";
->>                         clocks = <&cmu CLK_TSADC>;
->>                         #io-channel-cells = <1>;
->>                         io-channel-ranges;
->>                 };
->>
->> Case 2.
->> ADC dt node in exynos3250.dtsi don't include 'sclk' clock
->> but, exynos3250 clock controller don't support CLK_SCLK_TSADC clock as following:
->>
->>                 adc: adc at 126C0000 {
->>                         compatible = "samsung,exynos3250-adc";
->>                         reg = <0x126C0000 0x100>, <0x10020718 0x4>;
->>                         interrupts = <0 137 0>;
->>                         clock-names = "adc", "sclk";
->>                         clocks = <&cmu CLK_TSADC>, <&cmu CLK_SCLK_TSADC>;
->>                         #io-channel-cells = <1>;
->>                         io-channel-ranges;
->>                 };
+* Nishanth Menon <nm@ti.com> [140605 20:37]:
+> "wkup" event at bit offset 0 exists only on OMAP3.
+> OMAP4430/60 PRM_IRQSTATUS_A9, OMAP5/DRA7 PRM_IRQSTATUS_MPU
 > 
-> But neither of those cases is actually a correct DT representation for
-> exynos3250: The first case describes an ADC that doesn't need a second
-> clock, so if the hardware actually needs it to function, it is clearly
-> unsufficiently described. The second case is even worse because it refers
-> to a clock that isn't there. Actually that should probably return a different
-> error code, but that's a different matter.
+> register bit 0 is DPLL_CORE_RECAL_ST not wakeup event like OMAP3.
+
+Hmm so why was it added originally then?
+
+Do the PRM_IRQSTATUS line and the following line belong together
+or is it missing something?
+
+Regards,
+
+Tony
+ 
+> The same applies to AM437x as well.
 > 
->> So, I think exynos-adc needs to use 'needs_sclk' field suggested by Tomasz Figa.
+> Remove the wrong definition.
 > 
-> I don't mind you adding a field to the data, especially since you already
-> need to have separate structures to encode the different number of channels.
-> However, I don't see it as necessary either. What you do here is just
-> checking the DT representation for correctness and consistency. It's not
-> harmful but we don't normally do that because passing incorrect DT blobs
-> can cause an infinite number of other problems that we don't check for.
-
-I believe we should be enforcing as much correctness on DT data as
-possible without too much burden in the code. Otherwise how we are
-supposed to know if an error is caused by wrong/missing data in DT, bug
-in the driver or who knows else?
-
-In this case making this clock required depending on compatible string
-doesn't seem too bothersome to me.
-
-Best regards,
-Tomasz
+> Signed-off-by: Nishanth Menon <nm@ti.com>
+> ---
+>  arch/arm/mach-omap2/prm44xx.c |    1 -
+>  1 file changed, 1 deletion(-)
+> 
+> diff --git a/arch/arm/mach-omap2/prm44xx.c b/arch/arm/mach-omap2/prm44xx.c
+> index d4d745e..1ecf244 100644
+> --- a/arch/arm/mach-omap2/prm44xx.c
+> +++ b/arch/arm/mach-omap2/prm44xx.c
+> @@ -32,7 +32,6 @@
+>  /* Static data */
+>  
+>  static const struct omap_prcm_irq omap4_prcm_irqs[] = {
+> -	OMAP_PRCM_IRQ("wkup",   0,      0),
+>  	OMAP_PRCM_IRQ("io",     9,      1),
+>  };
+>  
+> -- 
+> 1.7.9.5
+> 
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-omap" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
