@@ -1,41 +1,57 @@
 From: computersforpeace@gmail.com (Brian Norris)
-Date: Mon, 21 Jul 2014 14:08:01 -0700
-Subject: [PATCH v8 06/11] ARM: brcmstb: add CPU binding for Broadcom Brahma15
+Date: Mon, 21 Jul 2014 14:08:00 -0700
+Subject: [PATCH v8 05/11] ARM: Enable erratum 798181 for Broadcom Brahma-B15
 In-Reply-To: <1405976886-27807-1-git-send-email-computersforpeace@gmail.com>
 References: <1405976886-27807-1-git-send-email-computersforpeace@gmail.com>
-Message-ID: <1405976886-27807-7-git-send-email-computersforpeace@gmail.com>
+Message-ID: <1405976886-27807-6-git-send-email-computersforpeace@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Marc Carino <marc.ceeeee@gmail.com>
+From: Gregory Fong <gregory.0xf0@gmail.com>
 
-Add the Broadcom Brahma B15 CPU to the DT CPU binding list.
+Broadcom Brahma-B15 (r0p0..r0p2) is also affected by Cortex-A15
+erratum 798181, so enable the workaround for Brahma-B15.
 
-Signed-off-by: Marc Carino <marc.ceeeee@gmail.com>
+Signed-off-by: Gregory Fong <gregory.0xf0@gmail.com>
+Acked-by: Marc Carino <marc.ceeeee@gmail.com>
 Signed-off-by: Brian Norris <computersforpeace@gmail.com>
+Cc: Rob Herring <rob.herring@calxeda.com>
+Cc: Will Deacon <will.deacon@arm.com>
 ---
- Documentation/devicetree/bindings/arm/cpus.txt | 2 ++
- 1 file changed, 2 insertions(+)
+ arch/arm/kernel/smp_tlb.c | 20 ++++++++++++--------
+ 1 file changed, 12 insertions(+), 8 deletions(-)
 
-diff --git a/Documentation/devicetree/bindings/arm/cpus.txt b/Documentation/devicetree/bindings/arm/cpus.txt
-index 1fe72a0778cd..06fd7bba830c 100644
---- a/Documentation/devicetree/bindings/arm/cpus.txt
-+++ b/Documentation/devicetree/bindings/arm/cpus.txt
-@@ -163,6 +163,7 @@ nodes to be present and contain the properties described below.
- 			    "arm,cortex-r4"
- 			    "arm,cortex-r5"
- 			    "arm,cortex-r7"
-+			    "brcm,brahma-b15"
- 			    "faraday,fa526"
- 			    "intel,sa110"
- 			    "intel,sa1100"
-@@ -184,6 +185,7 @@ nodes to be present and contain the properties described below.
- 			  can be one of:
- 			    "allwinner,sun6i-a31"
- 			    "arm,psci"
-+			    "brcm,brahma-b15"
- 			    "marvell,armada-375-smp"
- 			    "marvell,armada-380-smp"
- 			    "marvell,armada-xp-smp"
+diff --git a/arch/arm/kernel/smp_tlb.c b/arch/arm/kernel/smp_tlb.c
+index 95d063620b76..2e72be4f623e 100644
+--- a/arch/arm/kernel/smp_tlb.c
++++ b/arch/arm/kernel/smp_tlb.c
+@@ -92,15 +92,19 @@ void erratum_a15_798181_init(void)
+ 	unsigned int midr = read_cpuid_id();
+ 	unsigned int revidr = read_cpuid(CPUID_REVIDR);
+ 
+-	/* Cortex-A15 r0p0..r3p2 w/o ECO fix affected */
+-	if ((midr & 0xff0ffff0) != 0x410fc0f0 || midr > 0x413fc0f2 ||
+-	    (revidr & 0x210) == 0x210) {
+-		return;
+-	}
+-	if (revidr & 0x10)
+-		erratum_a15_798181_handler = erratum_a15_798181_partial;
+-	else
++	/* Brahma-B15 r0p0..r0p2 affected
++	 * Cortex-A15 r0p0..r3p2 w/o ECO fix affected */
++	if ((midr & 0xff0ffff0) == 0x420f00f0 && midr <= 0x420f00f2)
+ 		erratum_a15_798181_handler = erratum_a15_798181_broadcast;
++	else if ((midr & 0xff0ffff0) == 0x410fc0f0 && midr <= 0x413fc0f2 &&
++		 (revidr & 0x210) != 0x210) {
++		if (revidr & 0x10)
++			erratum_a15_798181_handler =
++				erratum_a15_798181_partial;
++		else
++			erratum_a15_798181_handler =
++				erratum_a15_798181_broadcast;
++	}
+ }
+ #endif
+ 
 -- 
 1.9.1
