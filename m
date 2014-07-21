@@ -1,68 +1,42 @@
-From: l.stach@pengutronix.de (Lucas Stach)
-Date: Mon, 21 Jul 2014 20:12:49 +0200
-Subject: [PATCH] PCI: imx6: fix boot hang when link already enabled
-Message-ID: <1405966369-5712-1-git-send-email-l.stach@pengutronix.de>
+From: robert.jarzmik@free.fr (Robert Jarzmik)
+Date: Mon, 21 Jul 2014 20:15:16 +0200
+Subject: [PATCH v3 4/4] arm: pxa: add non device-tree timer link to
+ clocksource
+In-Reply-To: <53CD25A4.7030606@linaro.org> (Daniel Lezcano's message of "Mon,
+ 21 Jul 2014 16:37:24 +0200")
+References: <1405356724-32207-1-git-send-email-robert.jarzmik@free.fr>
+ <1405356724-32207-4-git-send-email-robert.jarzmik@free.fr>
+ <53CD25A4.7030606@linaro.org>
+Message-ID: <87oawivarv.fsf@free.fr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This fixes a boot hang observed when the bootloader
-already enabled the PCIe link for it's own use. The
-fundamental problem is that Freescale forgot to wire
-up the core reset, so software doesn't have a sane way
-to get the core into a defined state.
+Daniel Lezcano <daniel.lezcano@linaro.org> writes:
 
-According to the DW PCIe core reference manual configuration
-of the core may only happen when the LTSSM is disabled, so
-this is one of the first things we do. Apparently this isn't
-safe to do when the LTSSM is in any other state than
-"detect" as we observe an instant machine hang when trying to
-do so while the link is already up.
+> On 07/14/2014 06:52 PM, Robert Jarzmik wrote:
+>> As clocksource pxa_timer was moved to clocksource framework, the
+>> pxa_timer initialization needs to be a bit amended, to pass the
+>> necessary informations to clocksource, ie :
+>>   - the timer interrupt (mach specific)
+>>   - the timer registers base (ditto)
+>>   - the timer clockrate
+>>
+>> Signed-off-by: Robert Jarzmik <robert.jarzmik@free.fr>
+>>
+>> ---
+>> Since V2: Arnd's comment : moved extern declaration into .h file
+>> ---
+>
+> Shall I take the patches 4-5 also ?
+Mmm you mean patch 4 I think.
+Then I'd like you too, because it's linked in the serie, and without it the
+former non-DT platforms break, hence I'd like all the serie to go through 1
+tree.
 
-As a workaround force LTSSM into detect state right before
-hitting the disable switch.
+Yet we'd need Haojian's ack here. Haojian, would you give your blessing on the
+serie and agree that Daniel carries all the patches including patch 4/4 ?
 
-Reported-by: Fabio Estevam <fabio.estevam@freescale.com>
-Signed-off-by: Lucas Stach <l.stach@pengutronix.de>
----
-Fabios delay workaround worked because of the following
-conditions:
-1. The driver gets probed and pulls the peripheral reset GPIO
-2. Peripheral is held in reset, so won't answer any link
-negotiation requests
-3. The LTSSM times out and falls back into detect state
-after 24ms (that's why a 30ms delay helps)
-4. After LTSSM entered detect state it's safe to hit the
-disable switch
----
- drivers/pci/host/pci-imx6.c | 9 +++++++++
- 1 file changed, 9 insertions(+)
+Cheers.
 
-diff --git a/drivers/pci/host/pci-imx6.c b/drivers/pci/host/pci-imx6.c
-index afa450c54aba..1c4b4b81fe15 100644
---- a/drivers/pci/host/pci-imx6.c
-+++ b/drivers/pci/host/pci-imx6.c
-@@ -49,6 +49,9 @@ struct imx6_pcie {
- 
- /* PCIe Port Logic registers (memory-mapped) */
- #define PL_OFFSET 0x700
-+#define PCIE_PL_PFLR (PL_OFFSET + 0x08)
-+#define PCIE_PL_PFLR_LINK_STATE_MASK		(0x3f << 16)
-+#define PCIE_PL_PFLR_FORCE_LINK			(1 << 15)
- #define PCIE_PHY_DEBUG_R0 (PL_OFFSET + 0x28)
- #define PCIE_PHY_DEBUG_R1 (PL_OFFSET + 0x2c)
- #define PCIE_PHY_DEBUG_R1_XMLH_LINK_IN_TRAINING	(1 << 29)
-@@ -214,6 +217,12 @@ static int imx6q_pcie_abort_handler(unsigned long addr,
- static int imx6_pcie_assert_core_reset(struct pcie_port *pp)
- {
- 	struct imx6_pcie *imx6_pcie = to_imx6_pcie(pp);
-+	u32 val;
-+
-+	val = readl(pp->dbi_base + PCIE_PL_PFLR);
-+	val &= ~PCIE_PL_PFLR_LINK_STATE_MASK;
-+	val |= PCIE_PL_PFLR_FORCE_LINK;
-+	writel(val, pp->dbi_base + PCIE_PL_PFLR);
- 
- 	regmap_update_bits(imx6_pcie->iomuxc_gpr, IOMUXC_GPR12,
- 			IMX6Q_GPR12_PCIE_CTL_2, 0 << 10);
--- 
-2.0.1
+--
+Robert
