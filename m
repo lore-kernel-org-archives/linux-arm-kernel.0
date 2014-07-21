@@ -1,94 +1,31 @@
-From: thierry.reding@gmail.com (Thierry Reding)
-Date: Tue, 22 Jul 2014 00:17:17 +0200
-Subject: [RESEND PATCH v3 06/11] drm: add DT bindings documentation for
- atmel-hlcdc-dc driver
-In-Reply-To: <20140721170630.GG21766@n2100.arm.linux.org.uk>
-References: <1404751384-5077-1-git-send-email-boris.brezillon@free-electrons.com>
- <20140721143428.078b68a4@bbrezillon> <20140721125522.GE15238@ulmo>
- <2695740.osZpCPIB8S@avalon> <20140721133034.GI15238@ulmo>
- <20140721154313.1de8bf6f@bbrezillon>
- <20140721170630.GG21766@n2100.arm.linux.org.uk>
-Message-ID: <20140721221715.GG12076@mithrandir>
+From: nicolas.pitre@linaro.org (Nicolas Pitre)
+Date: Mon, 21 Jul 2014 18:35:37 -0400 (EDT)
+Subject: [PATCH 4/4] (RFC) X86: add IPI tracepoints
+In-Reply-To: <1405887954.11927.5.camel@buesod1.americas.hpqcorp.net>
+References: <1405660735-13408-1-git-send-email-nicolas.pitre@linaro.org>
+ <1405660735-13408-5-git-send-email-nicolas.pitre@linaro.org>
+ <1405887954.11927.5.camel@buesod1.americas.hpqcorp.net>
+Message-ID: <alpine.LFD.2.11.1407211833330.3647@knanqh.ubzr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jul 21, 2014 at 06:06:30PM +0100, Russell King - ARM Linux wrote:
-> On Mon, Jul 21, 2014 at 03:43:13PM +0200, Boris BREZILLON wrote:
-> > How about using a list instead of an array ?
-> > This way we can add elements to this list when parsing the EDID.
+On Sun, 20 Jul 2014, Davidlohr Bueso wrote:
+
+> On Fri, 2014-07-18 at 01:18 -0400, Nicolas Pitre wrote:
+> > On X86 there are already tracepoints for IRQ vectors through which IPIs
+> > are handled.  However this is highly X86 specific, and the IPI signaling
+> > is not currently traced.
 > > 
-> > Or we can just define a maximum size for the bus_formats array when
-> > retrieving this info from EDID. If I'm correct we have at most 18 bus
-> > formats:
-> >  - 3 color formats:
-> >    * RGB 4:4:4
-> >    * YCbCr 4:4:4
-> >    * YCbCr 4:4:2
-> >  - 6 color depths: 6, 8, 10, 12, 14 and 16 bits per color
+> > This is an attempt at adding generic IPI tracepoints to X86.
 > 
-> This starts to worry me.  What are we trying to do here - are we trying
-> to encode the connection between the CRTC and the encoder, the encoder
-> and the connector, or the connector and the device?
+> I welcome this, and fwiw have been trying out this patch. One thing I
+> would like to see, but due to overhead would probably be better suited
+> in userspace (trace-cmd, maybe?), is a more packed description of the
+> IPI. Ie: unifying ipi_init and ipi_exit and show overall cost of the
+> IPI.
 
-This is about the bus format of the panel device. That would make it the
-latter.
+That's best suited for the tool consuming the log in user space.  The 
+same is done with IRQ events already.
 
-> The encoder to connector and connector to device is mostly a function of
-> the interface spec itself (for example, many HDMI encoders take either a
-> RGB or YUV input and can convert it to the HDMI specified colourspaces for
-> transmission over the connector.)
 
-The discussion here started because we currently have no way to store
-information about the interface for raw RGB. That means currently all
-drivers need to hardcode assumptions about the mode. The idea was to
-make this information available via a field in drm_display_info so that
-drivers could reconfigure depending on what the attached panel expects.
-
-This doesn't only apply to panels, though, the issue is the same when a
-bridge (RGB/LVDS for example) is connected to the encoder.
-
-> If you want to do encoder to connector, what about VGA or some other
-> analogue signalling such as TV composite?  It's easy to take this too
-> far...
-> 
-> Surely the only one which matters is the CRTC to the encoder - that's
-> certainly true of all the setups I've come across so far.  As for that
-> interface, CRTCs I've seen can produce a /wide/ range of different
-> representations.
-> 
-> Some CRTCs (eg, AMBA CLCD) produce R, G, B signals scrunched down on to
-> the LSB bits of a LCD data bus (so RGB888 uses 24 bits, RGB444 would
-> use the LSB 12 bits of those 24 - rather than outputting the R4 bits on
-> a subset of the R8 bits.)
-> 
-> What about RGB565 - where you have differing number of bits for the
-> green channel from red/blue?
-> 
-> Then you have red/blue colour swapping at the CRTC (and similar for YUV)
-> such as on Dove / Armada.
-> 
-> Then there are some encoders have the ability to almost arbitarily map
-> their input pins according to whatever you choose (eg, TDA998x).
-> 
-> This problem isn't as quite as simple as "this is what EDID gives us"
-> and "these are the number of bits representing a colour".
-
-I think what we need is a way to pass information from whatever device
-is behind the encoder (be it a bridge or a panel) to the encoder. And
-likely we'll need a similar (or the same) way to pass that information
-from bridge to bridge or from bridge to panel.
-
-That way the encoder can ask the bridge (or panel) about the format it
-requires and reconfigure itself accordingly. This should be able to work
-with an arbitrary bridge -> [bridge... ->] panel chain where each
-element in the chain can reconfigure depending on what the next element
-requires (or fail if it can't work, which should really never happen).
-
-Thierry
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: not available
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140722/42d90e28/attachment-0001.sig>
+Nicolas
