@@ -1,118 +1,55 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Mon, 21 Jul 2014 09:46:02 -0700
-Subject: [GIT PULL 2/3] ARM: tegra: move fuse code out of arch/arm
-In-Reply-To: <53CD4201.5070705@wwwdotorg.org>
-References: <1403558626-13422-1-git-send-email-swarren@wwwdotorg.org>
- <1403558626-13422-2-git-send-email-swarren@wwwdotorg.org>
- <20140707004417.GE8469@quad.lixom.net>
- <20140708134359.GA23218@tbergstrom-lnx.Nvidia.com>
- <CAOesGMhoqvqf-dktp-OfUNTPLahPwkyAPiTeDngr4QjH=VfOGA@mail.gmail.com>
- <53C88A4C.3070304@wwwdotorg.org>
- <CAOesGMh+zLV781wzdR5=_Bpzh+XMwJfWL-5XMDP6DwG_Hg80kw@mail.gmail.com>
- <53CD2C58.6060601@wwwdotorg.org> <20140721155451.GF32578@arm.com>
- <53CD4201.5070705@wwwdotorg.org>
-Message-ID: <CAOesGMgvd1HbjywN7BDPtr8ZU7vucWH48B=AW3TZjng73YA8WA@mail.gmail.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Mon, 21 Jul 2014 17:46:34 +0100
+Subject: [PATCH RFC 5/9] ARM: Add L1 PTE non-secure mapping
+In-Reply-To: <1405954040-30399-6-git-send-email-daniel.thompson@linaro.org>
+References: <1405954040-30399-1-git-send-email-daniel.thompson@linaro.org>
+ <1405954040-30399-6-git-send-email-daniel.thompson@linaro.org>
+Message-ID: <20140721164634.GF21766@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jul 21, 2014 at 9:38 AM, Stephen Warren <swarren@wwwdotorg.org> wrote:
-> On 07/21/2014 09:54 AM, Catalin Marinas wrote:
->> On Mon, Jul 21, 2014 at 09:06:00AM -0600, Stephen Warren wrote:
->>> On 07/17/2014 11:33 PM, Olof Johansson wrote:
->>>> On Thu, Jul 17, 2014 at 7:45 PM, Stephen Warren <swarren@wwwdotorg.org> wrote:
->>>>> On 07/08/2014 11:47 AM, Olof Johansson wrote:
->>>>>> On Tue, Jul 8, 2014 at 6:43 AM, Peter De Schrijver
->>>>>> <pdeschrijver@nvidia.com> wrote:
->>>>>>> On Mon, Jul 07, 2014 at 02:44:17AM +0200, Olof Johansson wrote:
->>>>>>>> On Mon, Jun 23, 2014 at 03:23:45PM -0600, Stephen Warren wrote:
->>>>>>>>> This branch moves code related to the Tegra fuses out of arch/arm and
->>>>>>>>> into a centralized location which could be shared with ARM64. It also
->>>>>>>>> adds support for reading the fuse data through sysfs.
->>>>>>>>
->>>>>>>> The new/moved misc driver isn't acked by any misc maintainer, so I can't
->>>>>>>> take this branch.
->>>>>>>>
->>>>>>>> I saw no indication from searching the mailing list of that either,
->>>>>>>> so it wasn't just a missed acked-by.
->>>>>>>>
->>>>>>>> I wonder if this code should go under drivers/soc/ instead?
->>>>>>>
->>>>>>> It's modelled after sunxi_sid.c which lives in drivers/misc/eeprom/.
->>>>>>> Originally this driver was also in drivers/misc/eeprom/, but Stephen objected
->>>>>>> and therefore it was moved to drivers/misc/fuse. I think that's the right
->>>>>>> place still.
->>>>>>
->>>>>> I disagree, I think this belongs under drivers/soc. Especially since
->>>>>> you're adding dependencies on this misc driver from other parts of the
->>>>>> kernel / other drivers.
->>>>>>
->>>>>> I also don't like seeing init calls form platform code down into
->>>>>> drivers/misc like you're adding here. Can you please look at doing
->>>>>> that as a regular init call setup?
->>>>>
->>>>> I strongly disagree with using init calls for this kind of thing. There
->>>>> are ordering dependencies between the initialization code that can only
->>>>> be sanely managed by explicitly calling functions in a particular order;
->>>>> there's simply no way to manage this using initcalls. This is exactly
->>>>> why the hooks in the ARM machine descriptors exist...
->>>>
->>>> Right, but there are non on 64-bit, so you need to solve it for there
->>>> anyway. And once it's solved there, you might as well keep it common
->>>> with 32-bit.
->>>
->>> My assertion is that we should just do it directly on 64-bit too.
->>> There's no reason for arm64 to deviate from what arch/arm does already.
->>
->> On arm64, I really want to get away from any SoC specific early
->> initcall. One of the main reason is for things like SCU, interconnects,
->> system cache configurations (even certain clocks) to be enabled in
->> firmware before Linux starts (it's an education process but that's a way
->> for example to prevent people sending patches to enable SoC coherency
->> because they haven't thought about it before upstreaming).
->>
->> It would be nice to be able to initialise SoC stuff at device_initcall()
->> level (and even keep such code as modules in initramfs) but one of the
->> problems we have is dependency on clocks (and the clock model which
->> doesn't follow the device/driver model). The of_platform_populate() is
->> called at arch_initcall_sync (after arch_initcall to still allow some
->> SoC code, if needed, to run at arch_initcall).
->
-> The main thing I want to avoid is a ton of separate drivers that all
-> rely on each-other getting resolved by deferred probe. While that might
-> work out, it seems pointless to make the kernel try and probe a bunch of
-> stuff just to have it fail and get repeated, when we know exactly which
-> order everything should get initialized in.
->
-> Another issue is that we have SoCs which only differ in the CPU. I want
-> the code to work identically on both SoCs so the CPU has limited affect
-> on the low-level IO code. If we're going to enforce a "no machine
-> descriptors" rule on arch/arm64, I think we should do the same thing in
-> arch/arm for consistency.
->
->> We have a similar issue with arm64 vexpress (well, just on the model)
->> where vexpress_sysreg_init() is a core_initcall (should be fine as
->> arch_initcall) as it needs to be done before of_platform_populate().
->> Pawel on cc should know more of the history here.
->>
->> I recall there were also some discussions about a SoC driver model which
->> hangs off the top compatible string in the DT (e.g. "arm,vexpress") and
->> allow (minimal) code to be run slightly earlier, though still not
->> earlier than arch_initcall.
->
-> I guess that would work out OK; if we force the driver that binds to a
-> top-level compatible value of "nvidia,tegraNNN" to probe first, and it
-> then calls out to all the low-level init code in a sane order, that
-> would solve the problem. I'm not sure that's any better than having a
-> machine descriptor with an "init" function though; wrapping all this in
-> a driver just seems like overhead, but it would work out OK.
+On Mon, Jul 21, 2014 at 03:47:16PM +0100, Daniel Thompson wrote:
+> From: Marek Vasut <marex@denx.de>
+> 
+> Add new device type, MT_DEVICE_NS. This type sets the NS bit in L1 PTE [1].
+> Accesses to a memory region which is mapped this way generate non-secure
+> access to that memory area. One must be careful here, since the NS bit is
+> only available in L1 PTE, therefore when creating the mapping, the mapping
+> must be at least 1 MiB big and must be aligned to 1 MiB. If that condition
+> was false, the kernel would use regular L2 page mapping for this area instead
+> and the NS bit setting would be ineffective.
 
-This is exactly the same as having a machine descriptor, but the
-arch/arm64 maintainers don't have to look at it so they don't think it
-is one.
+Right, so this says that PTE mappings are not permissible.
 
-So now we need to find a place for machine descriptors somewhere under
-drivers/* too. Sigh. Agreed, this is nothing but overhead and
-overabstraction.
+> +	[MT_DEVICE_NS] = {	  /* Non-secure accesses from secure mode */
+> +		.prot_pte	= PROT_PTE_DEVICE | L_PTE_MT_DEV_SHARED |
+> +				  L_PTE_SHARED,
+> +		.prot_l1	= PMD_TYPE_TABLE,
 
+However, by filling in prot_pte and prot_l1, you're telling the code that
+it /can/ setup such a mapping.  This is screwed.
 
--Olof
+If you want to deny anything but section mappings (because they don't work)
+then you omit prot_pte and prot_l1.  With those omitted, if someone tries
+to abuse this mapping type, then this check in create_mapping() will
+trigger:
+
+        if (type->prot_l1 == 0 && ((addr | phys | length) & ~SECTION_MASK)) {
+                printk(KERN_WARNING "BUG: map for 0x%08llx at 0x%08lx can not "
+                       "be mapped using pages, ignoring.\n",
+                       (long long)__pfn_to_phys(md->pfn), addr);
+                return;
+        }
+
+ioremap doesn't have that check; it assumes that it will always be setting
+up PTE mappings via ioremap_page_range().  In fact, on many platforms
+that's the only option.
+
+So making this interface available via ioremap() seems pointless - but
+more importantly it's extremely error-prone.  So, MT_DEVICE_NS shouldn't
+be using 4 at all, shouldn't be in asm/io.h, but should be with the
+private MT_* definitions in map.h.
+
+-- 
+FTTC broadband for 0.8mile line: currently at 9.5Mbps down 400kbps up
+according to speedtest.net.
