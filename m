@@ -1,131 +1,243 @@
-From: b.zolnierkie@samsung.com (Bartlomiej Zolnierkiewicz)
-Date: Mon, 21 Jul 2014 15:57:04 +0200
-Subject: [PATCH v2] ARM: dts: add CPU nodes for Exynos4 SoCs
-Message-ID: <1444042.RbiCcg7JnP@amdc1032>
+From: richard@sigma-star.at (Richard Weinberger)
+Date: Mon, 21 Jul 2014 16:02:48 +0200
+Subject: [PATCH 02/43] arm64: Use get_signal() signal_setup_done()
+In-Reply-To: <1405951409-16953-1-git-send-email-richard@sigma-star.at>
+References: <1405951409-16953-1-git-send-email-richard@sigma-star.at>
+Message-ID: <1405951409-16953-3-git-send-email-richard@sigma-star.at>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Recent patch by Tomasz Figa ("irqchip: gic: Fix core ID calculation
-when topology is read from DT") fixed GIC driver to filter cluster ID
-from values returned by cpu_logical_map() for SoCs having registers
-mapped without per-CPU banking making it is possible to add CPU nodes
-for Exynos4 SoCs.  In case of Exynos SoCs these CPU nodes are also
-required by future changes adding initialization of cpuidle states in
-Exynos cpuidle driver through DT.
+From: Richard Weinberger <richard@nod.at>
 
-Tested on Origen board (Exynos4210 SoC) and Trats2 (Exynos4412 SoC).
+Use the more generic functions get_signal() signal_setup_done()
+for signal delivery.
 
-Signed-off-by: Bartlomiej Zolnierkiewicz <b.zolnierkie@samsung.com>
+Signed-off-by: Richard Weinberger <richard@nod.at>
 ---
-Based on next-20140717 branch of linux-next tree +
-- [PATCH 2/6] ARM: EXYNOS: Fix core ID used by platsmp and hotplug code
-  http://www.mail-archive.com/linux-samsung-soc at vger.kernel.org/msg32811.html
-- [PATCH] irqchip: gic: Fix core ID calculation when topology is read from DT
-  http://www.mail-archive.com/linux-samsung-soc at vger.kernel.org/msg34277.html
+ arch/arm64/include/asm/signal32.h | 11 ++++-----
+ arch/arm64/kernel/signal.c        | 48 ++++++++++++++++-----------------------
+ arch/arm64/kernel/signal32.c      | 14 ++++++------
+ 3 files changed, 32 insertions(+), 41 deletions(-)
 
-v2:
-- match the unit-address with the reg
-
- arch/arm/boot/dts/exynos4210.dtsi | 17 +++++++++++++++++
- arch/arm/boot/dts/exynos4212.dtsi | 17 +++++++++++++++++
- arch/arm/boot/dts/exynos4412.dtsi | 29 +++++++++++++++++++++++++++++
- 3 files changed, 63 insertions(+)
-
-diff --git a/arch/arm/boot/dts/exynos4210.dtsi b/arch/arm/boot/dts/exynos4210.dtsi
-index ee3001f..bc2b444 100644
---- a/arch/arm/boot/dts/exynos4210.dtsi
-+++ b/arch/arm/boot/dts/exynos4210.dtsi
-@@ -31,6 +31,23 @@
- 		pinctrl2 = &pinctrl_2;
- 	};
+diff --git a/arch/arm64/include/asm/signal32.h b/arch/arm64/include/asm/signal32.h
+index 7c275e3..eeaa975 100644
+--- a/arch/arm64/include/asm/signal32.h
++++ b/arch/arm64/include/asm/signal32.h
+@@ -24,22 +24,21 @@
  
-+	cpus {
-+		#address-cells = <1>;
-+		#size-cells = <0>;
-+
-+		cpu at 900 {
-+			device_type = "cpu";
-+			compatible = "arm,cortex-a9";
-+			reg = <0x900>;
-+		};
-+
-+		cpu at 901 {
-+			device_type = "cpu";
-+			compatible = "arm,cortex-a9";
-+			reg = <0x901>;
-+		};
-+	};
-+
- 	sysram at 02020000 {
- 		compatible = "mmio-sram";
- 		reg = <0x02020000 0x20000>;
-diff --git a/arch/arm/boot/dts/exynos4212.dtsi b/arch/arm/boot/dts/exynos4212.dtsi
-index 3c00e6e..dd0a43e 100644
---- a/arch/arm/boot/dts/exynos4212.dtsi
-+++ b/arch/arm/boot/dts/exynos4212.dtsi
-@@ -22,6 +22,23 @@
- / {
- 	compatible = "samsung,exynos4212", "samsung,exynos4";
+ extern const compat_ulong_t aarch32_sigret_code[6];
  
-+	cpus {
-+		#address-cells = <1>;
-+		#size-cells = <0>;
-+
-+		cpu at A00 {
-+			device_type = "cpu";
-+			compatible = "arm,cortex-a9";
-+			reg = <0xA00>;
-+		};
-+
-+		cpu at A01 {
-+			device_type = "cpu";
-+			compatible = "arm,cortex-a9";
-+			reg = <0xA01>;
-+		};
-+	};
-+
- 	combiner: interrupt-controller at 10440000 {
- 		samsung,combiner-nr = <18>;
- 	};
-diff --git a/arch/arm/boot/dts/exynos4412.dtsi b/arch/arm/boot/dts/exynos4412.dtsi
-index c42a3e1..435a722 100644
---- a/arch/arm/boot/dts/exynos4412.dtsi
-+++ b/arch/arm/boot/dts/exynos4412.dtsi
-@@ -22,6 +22,35 @@
- / {
- 	compatible = "samsung,exynos4412", "samsung,exynos4";
+-int compat_setup_frame(int usig, struct k_sigaction *ka, sigset_t *set,
++int compat_setup_frame(int usig, struct ksignal *ksig, sigset_t *set,
+ 		       struct pt_regs *regs);
+-int compat_setup_rt_frame(int usig, struct k_sigaction *ka, siginfo_t *info,
+-			  sigset_t *set, struct pt_regs *regs);
++int compat_setup_rt_frame(int usig, struct ksignal *ksig, sigset_t *set,
++			  struct pt_regs *regs);
  
-+	cpus {
-+		#address-cells = <1>;
-+		#size-cells = <0>;
-+
-+		cpu at A00 {
-+			device_type = "cpu";
-+			compatible = "arm,cortex-a9";
-+			reg = <0xA00>;
-+		};
-+
-+		cpu at A01 {
-+			device_type = "cpu";
-+			compatible = "arm,cortex-a9";
-+			reg = <0xA01>;
-+		};
-+
-+		cpu at A02 {
-+			device_type = "cpu";
-+			compatible = "arm,cortex-a9";
-+			reg = <0xA02>;
-+		};
-+
-+		cpu at A03 {
-+			device_type = "cpu";
-+			compatible = "arm,cortex-a9";
-+			reg = <0xA03>;
-+		};
-+	};
-+
- 	combiner: interrupt-controller at 10440000 {
- 		samsung,combiner-nr = <20>;
- 	};
+ void compat_setup_restart_syscall(struct pt_regs *regs);
+ #else
+ 
+-static inline int compat_setup_frame(int usid, struct k_sigaction *ka,
++static inline int compat_setup_frame(int usid, struct ksignal *ksig,
+ 				     sigset_t *set, struct pt_regs *regs)
+ {
+ 	return -ENOSYS;
+ }
+ 
+-static inline int compat_setup_rt_frame(int usig, struct k_sigaction *ka,
+-					siginfo_t *info, sigset_t *set,
++static inline int compat_setup_rt_frame(int usig, struct ksignal *ksig, sigset_t *set,
+ 					struct pt_regs *regs)
+ {
+ 	return -ENOSYS;
+diff --git a/arch/arm64/kernel/signal.c b/arch/arm64/kernel/signal.c
+index 6357b9c..b29f5da 100644
+--- a/arch/arm64/kernel/signal.c
++++ b/arch/arm64/kernel/signal.c
+@@ -253,13 +253,13 @@ static void setup_return(struct pt_regs *regs, struct k_sigaction *ka,
+ 	regs->regs[30] = (unsigned long)sigtramp;
+ }
+ 
+-static int setup_rt_frame(int usig, struct k_sigaction *ka, siginfo_t *info,
+-			  sigset_t *set, struct pt_regs *regs)
++static int setup_rt_frame(int usig, struct ksignal *ksig, sigset_t *set,
++			  struct pt_regs *regs)
+ {
+ 	struct rt_sigframe __user *frame;
+ 	int err = 0;
+ 
+-	frame = get_sigframe(ka, regs);
++	frame = get_sigframe(&ksig->ka, regs);
+ 	if (!frame)
+ 		return 1;
+ 
+@@ -269,9 +269,9 @@ static int setup_rt_frame(int usig, struct k_sigaction *ka, siginfo_t *info,
+ 	err |= __save_altstack(&frame->uc.uc_stack, regs->sp);
+ 	err |= setup_sigframe(frame, regs, set);
+ 	if (err == 0) {
+-		setup_return(regs, ka, frame, usig);
+-		if (ka->sa.sa_flags & SA_SIGINFO) {
+-			err |= copy_siginfo_to_user(&frame->info, info);
++		setup_return(regs, &ksig->ka, frame, usig);
++		if (ksig->ka.sa.sa_flags & SA_SIGINFO) {
++			err |= copy_siginfo_to_user(&frame->info, &ksig->info);
+ 			regs->regs[1] = (unsigned long)&frame->info;
+ 			regs->regs[2] = (unsigned long)&frame->uc;
+ 		}
+@@ -291,13 +291,12 @@ static void setup_restart_syscall(struct pt_regs *regs)
+ /*
+  * OK, we're invoking a handler
+  */
+-static void handle_signal(unsigned long sig, struct k_sigaction *ka,
+-			  siginfo_t *info, struct pt_regs *regs)
++static void handle_signal(struct ksignal *ksig, struct pt_regs *regs)
+ {
+ 	struct thread_info *thread = current_thread_info();
+ 	struct task_struct *tsk = current;
+ 	sigset_t *oldset = sigmask_to_save();
+-	int usig = sig;
++	int usig = ksig->sig;
+ 	int ret;
+ 
+ 	/*
+@@ -310,13 +309,12 @@ static void handle_signal(unsigned long sig, struct k_sigaction *ka,
+ 	 * Set up the stack frame
+ 	 */
+ 	if (is_compat_task()) {
+-		if (ka->sa.sa_flags & SA_SIGINFO)
+-			ret = compat_setup_rt_frame(usig, ka, info, oldset,
+-						    regs);
++		if (ksig->ka.sa.sa_flags & SA_SIGINFO)
++			ret = compat_setup_rt_frame(usig, ksig, oldset, regs);
+ 		else
+-			ret = compat_setup_frame(usig, ka, oldset, regs);
++			ret = compat_setup_frame(usig, ksig, oldset, regs);
+ 	} else {
+-		ret = setup_rt_frame(usig, ka, info, oldset, regs);
++		ret = setup_rt_frame(usig, ksig, oldset, regs);
+ 	}
+ 
+ 	/*
+@@ -324,18 +322,14 @@ static void handle_signal(unsigned long sig, struct k_sigaction *ka,
+ 	 */
+ 	ret |= !valid_user_regs(&regs->user_regs);
+ 
+-	if (ret != 0) {
+-		force_sigsegv(sig, tsk);
+-		return;
+-	}
+-
+ 	/*
+ 	 * Fast forward the stepping logic so we step into the signal
+ 	 * handler.
+ 	 */
+-	user_fastforward_single_step(tsk);
++	if (!ret)
++		user_fastforward_single_step(tsk);
+ 
+-	signal_delivered(sig, info, ka, regs, 0);
++	signal_setup_done(ret, ksig, 0);
+ }
+ 
+ /*
+@@ -350,10 +344,9 @@ static void handle_signal(unsigned long sig, struct k_sigaction *ka,
+ static void do_signal(struct pt_regs *regs)
+ {
+ 	unsigned long continue_addr = 0, restart_addr = 0;
+-	struct k_sigaction ka;
+-	siginfo_t info;
+-	int signr, retval = 0;
++	int retval = 0;
+ 	int syscall = (int)regs->syscallno;
++	struct ksignal ksig;
+ 
+ 	/*
+ 	 * If we were from a system call, check for system call restarting...
+@@ -387,8 +380,7 @@ static void do_signal(struct pt_regs *regs)
+ 	 * Get the signal to deliver. When running under ptrace, at this point
+ 	 * the debugger may change all of our registers.
+ 	 */
+-	signr = get_signal_to_deliver(&info, &ka, regs, NULL);
+-	if (signr > 0) {
++	if (get_signal(&ksig)) {
+ 		/*
+ 		 * Depending on the signal settings, we may need to revert the
+ 		 * decision to restart the system call, but skip this if a
+@@ -398,12 +390,12 @@ static void do_signal(struct pt_regs *regs)
+ 		    (retval == -ERESTARTNOHAND ||
+ 		     retval == -ERESTART_RESTARTBLOCK ||
+ 		     (retval == -ERESTARTSYS &&
+-		      !(ka.sa.sa_flags & SA_RESTART)))) {
++		      !(ksig.ka.sa.sa_flags & SA_RESTART)))) {
+ 			regs->regs[0] = -EINTR;
+ 			regs->pc = continue_addr;
+ 		}
+ 
+-		handle_signal(signr, &ka, &info, regs);
++		handle_signal(&ksig, regs);
+ 		return;
+ 	}
+ 
+diff --git a/arch/arm64/kernel/signal32.c b/arch/arm64/kernel/signal32.c
+index 3491c63..b69ee69 100644
+--- a/arch/arm64/kernel/signal32.c
++++ b/arch/arm64/kernel/signal32.c
+@@ -520,18 +520,18 @@ static int compat_setup_sigframe(struct compat_sigframe __user *sf,
+ /*
+  * 32-bit signal handling routines called from signal.c
+  */
+-int compat_setup_rt_frame(int usig, struct k_sigaction *ka, siginfo_t *info,
++int compat_setup_rt_frame(int usig, struct ksignal *ksig,
+ 			  sigset_t *set, struct pt_regs *regs)
+ {
+ 	struct compat_rt_sigframe __user *frame;
+ 	int err = 0;
+ 
+-	frame = compat_get_sigframe(ka, regs, sizeof(*frame));
++	frame = compat_get_sigframe(&ksig->ka, regs, sizeof(*frame));
+ 
+ 	if (!frame)
+ 		return 1;
+ 
+-	err |= copy_siginfo_to_user32(&frame->info, info);
++	err |= copy_siginfo_to_user32(&frame->info, &ksig->info);
+ 
+ 	__put_user_error(0, &frame->sig.uc.uc_flags, err);
+ 	__put_user_error(0, &frame->sig.uc.uc_link, err);
+@@ -541,7 +541,7 @@ int compat_setup_rt_frame(int usig, struct k_sigaction *ka, siginfo_t *info,
+ 	err |= compat_setup_sigframe(&frame->sig, regs, set);
+ 
+ 	if (err == 0) {
+-		compat_setup_return(regs, ka, frame->sig.retcode, frame, usig);
++		compat_setup_return(regs, &ksig->ka, frame->sig.retcode, frame, usig);
+ 		regs->regs[1] = (compat_ulong_t)(unsigned long)&frame->info;
+ 		regs->regs[2] = (compat_ulong_t)(unsigned long)&frame->sig.uc;
+ 	}
+@@ -549,13 +549,13 @@ int compat_setup_rt_frame(int usig, struct k_sigaction *ka, siginfo_t *info,
+ 	return err;
+ }
+ 
+-int compat_setup_frame(int usig, struct k_sigaction *ka, sigset_t *set,
++int compat_setup_frame(int usig, struct ksignal *ksig, sigset_t *set,
+ 		       struct pt_regs *regs)
+ {
+ 	struct compat_sigframe __user *frame;
+ 	int err = 0;
+ 
+-	frame = compat_get_sigframe(ka, regs, sizeof(*frame));
++	frame = compat_get_sigframe(&ksig->ka, regs, sizeof(*frame));
+ 
+ 	if (!frame)
+ 		return 1;
+@@ -564,7 +564,7 @@ int compat_setup_frame(int usig, struct k_sigaction *ka, sigset_t *set,
+ 
+ 	err |= compat_setup_sigframe(frame, regs, set);
+ 	if (err == 0)
+-		compat_setup_return(regs, ka, frame->retcode, frame, usig);
++		compat_setup_return(regs, &ksig->ka, frame->retcode, frame, usig);
+ 
+ 	return err;
+ }
 -- 
-1.8.2.3
+1.8.4.5
