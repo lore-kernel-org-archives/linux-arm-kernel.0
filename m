@@ -1,35 +1,54 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Mon, 21 Jul 2014 16:44:42 +0100
-Subject: [PATCH] spi: omap2-mcspi: fix blatant abuse of the resource
- subsystem
-In-Reply-To: <20140721144104.5e37f1a0@ipc1.ka-ro>
-References: <1405683053-14104-1-git-send-email-LW@KARO-electronics.de>
- <20140718171035.GQ17528@sirena.org.uk>
- <20140721075144.251bb67d@ipc1.ka-ro>
- <20140721121820.GW17528@sirena.org.uk>
- <20140721144104.5e37f1a0@ipc1.ka-ro>
-Message-ID: <20140721154442.GB17528@sirena.org.uk>
+From: ast@plumgrid.com (Alexei Starovoitov)
+Date: Mon, 21 Jul 2014 08:49:29 -0700
+Subject: [PATCH 00/14] arm64: eBPF JIT compiler
+In-Reply-To: <20140721091623.GA16122@arm.com>
+References: <1405708100-13604-1-git-send-email-zlim.lnx@gmail.com>
+ <20140721091623.GA16122@arm.com>
+Message-ID: <CAMEtUuyC+MykPDO0ghTc=oex7KPLEy=BLRgWBdW+qJY7JXQmDQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jul 21, 2014 at 02:41:04PM +0200, Lothar Wa?mann wrote:
-> Mark Brown wrote:
+On Mon, Jul 21, 2014 at 2:16 AM, Will Deacon <will.deacon@arm.com> wrote:
+> Hello,
+>
+> On Fri, Jul 18, 2014 at 07:28:06PM +0100, Zi Shen Lim wrote:
+>> This series implements eBPF JIT compiler for arm64.
+>> Please see [14/14] for change log.
+>>
+>> Patches [1-13/14] implement code generation functions.
+>> Patch [14/14] implements the actual eBPF JIT compiler.
+>>
+>> Many thanks to everyone who's reviewed the code from
+>> RFCv1->RFCv3, especially Alexei for BPF bits, and Will
+>> for ARM64 codegen bits :)
+>>
+>> BTW, I'm happy to maintain arch/arm64/net (i.e. arm64 BPF bits).
+>> Should I add a patch updating MAINTAINERS as Patch 15?
+>
+> I don't think that's necessary at the moment, but if we start seeing an
+> influx of patches to arch/arm64/net, then that could make sense in the
+> future.
+>
+>> This series requires a patch that exports a function
+>> from net/core (resulting from RFCv1 discussion). This patch
+>> has been merged into net-next @ 9f12fbe603f7
+>> ("net: filter: move load_pointer() into filter.h").
+>>
+>> This series applies against net-next and is tested working
+>> with lib/test_bpf on ARMv8 Foundation Model.
+>
+> Looks like it works on my Juno board too, so:
+>
+>   Acked-by: Will Deacon <will.deacon@arm.com>
+>
+> for the series.
+>
+> It's a bit late for 3.17 now, so I guess we'll queue this for 3.18 (which
+> also means the dependency on -next isn't an issue). Perhaps you could repost
+> around -rc3?
 
-> > Just to be clear the issue is with the presentation of your change, it
-> > is not appropriate to provide a changelog which consists mainly of
-> > widely directed personal insults especially given that it omits basic
-> > technical content.
-
-> I understood that, but I feel incapable to come up with a reasonable
-> changelog for this.
-
-Just describe in a specific, technical fashion what the problem is and
-what the fix does without reference to personal qualities of the various
-parties involved in the code being the way it is.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140721/585a0d12/attachment.sig>
+Thanks for testing! Nice to see it working on real hw.
+I'm not sure why you're proposing a 4+ week delay. The patches
+will rot instead of getting used and tested. Imo it makes sense to
+get them into net-next now for 3.17.
+JIT is disabled by sysctl by default anyway.
