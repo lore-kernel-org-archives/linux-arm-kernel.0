@@ -1,69 +1,55 @@
 From: ttynkkynen@nvidia.com (Tuomas Tynkkynen)
-Date: Mon, 21 Jul 2014 18:38:55 +0300
-Subject: [PATCH v2 09/16] clk: tegra: Save/restore CCLKG_BURST_POLICY on
- suspend
+Date: Mon, 21 Jul 2014 18:38:57 +0300
+Subject: [PATCH v2 11/16] ARM: tegra: Add the DFLL to Tegra124 device tree
 In-Reply-To: <1405957142-19416-1-git-send-email-ttynkkynen@nvidia.com>
 References: <1405957142-19416-1-git-send-email-ttynkkynen@nvidia.com>
-Message-ID: <1405957142-19416-10-git-send-email-ttynkkynen@nvidia.com>
+Message-ID: <1405957142-19416-12-git-send-email-ttynkkynen@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Save and restore this register since the LP1 restore assembly routines
-fiddle with it. Otherwise the CPU would keep running on PLLX after
-resume from suspend even when DFLL was the original clocksource.
+The DFLL clocksource is a separate IP block from the usual
+clock-and-reset controller, so it gets its own device tree node.
 
 Signed-off-by: Tuomas Tynkkynen <ttynkkynen@nvidia.com>
 ---
 v2 changes:
-    - none
+     - none (only board dts file needed changes)
 
- drivers/clk/tegra/clk-tegra124.c | 14 ++++++++++++++
- 1 file changed, 14 insertions(+)
+ arch/arm/boot/dts/tegra124.dtsi | 22 ++++++++++++++++++++++
+ 1 file changed, 22 insertions(+)
 
-diff --git a/drivers/clk/tegra/clk-tegra124.c b/drivers/clk/tegra/clk-tegra124.c
-index 77fbf38..758a4cf 100644
---- a/drivers/clk/tegra/clk-tegra124.c
-+++ b/drivers/clk/tegra/clk-tegra124.c
-@@ -89,6 +89,8 @@
- #define PMC_PLLM_WB0_OVERRIDE 0x1dc
- #define PMC_PLLM_WB0_OVERRIDE_2 0x2b0
+diff --git a/arch/arm/boot/dts/tegra124.dtsi b/arch/arm/boot/dts/tegra124.dtsi
+index 03916ef..8ff4332 100644
+--- a/arch/arm/boot/dts/tegra124.dtsi
++++ b/arch/arm/boot/dts/tegra124.dtsi
+@@ -544,6 +544,28 @@
+ 		status = "disabled";
+ 	};
  
-+#define CCLKG_BURST_POLICY 0x368
++	dfll: dfll at 0,70110000 {
++		compatible = "nvidia,tegra124-dfll";
++		reg = <0 0x70110000 0 0x100>, /* DFLL control */
++		      <0 0x70110000 0 0x100>, /* I2C output control */
++		      <0 0x70110100 0 0x100>, /* Integrated I2C controller */
++		      <0 0x70110200 0 0x100>; /* Look-up table RAM */
++		interrupts = <GIC_SPI 62 IRQ_TYPE_LEVEL_HIGH>;
++		clocks = <&tegra_car TEGRA124_CLK_DFLL_SOC>,
++			 <&tegra_car TEGRA124_CLK_DFLL_REF>,
++			 <&tegra_car TEGRA124_CLK_I2C5>;
++		clock-names = "soc", "ref", "i2c";
++		#clock-cells = <0>;
++		clock-output-names = "dfllCPU_out";
++		nvidia,sample-rate = <12500>;
++		nvidia,droop-ctrl = <0x00000f00>;
++		nvidia,force-mode = <1>;
++		nvidia,cf = <10>;
++		nvidia,ci = <0>;
++		nvidia,cg = <2>;
++		status = "disabled";
++	};
 +
- #define UTMIP_PLL_CFG2 0x488
- #define UTMIP_PLL_CFG2_STABLE_COUNT(x) (((x) & 0xffff) << 6)
- #define UTMIP_PLL_CFG2_ACTIVE_DLY_COUNT(x) (((x) & 0x3f) << 18)
-@@ -121,6 +123,8 @@
- #ifdef CONFIG_PM_SLEEP
- static struct cpu_clk_suspend_context {
- 	u32 clk_csite_src;
-+	u32 cclkg_burst;
-+	u32 cclkg_divider;
- } tegra124_cpu_clk_sctx;
- #endif
- 
-@@ -1318,12 +1322,22 @@ static void tegra124_cpu_clock_suspend(void)
- 	tegra124_cpu_clk_sctx.clk_csite_src =
- 				readl(clk_base + CLK_SOURCE_CSITE);
- 	writel(3 << 30, clk_base + CLK_SOURCE_CSITE);
-+
-+	tegra124_cpu_clk_sctx.cclkg_burst =
-+				readl(clk_base + CCLKG_BURST_POLICY);
-+	tegra124_cpu_clk_sctx.cclkg_divider =
-+				readl(clk_base + CCLKG_BURST_POLICY + 4);
- }
- 
- static void tegra124_cpu_clock_resume(void)
- {
- 	writel(tegra124_cpu_clk_sctx.clk_csite_src,
- 				clk_base + CLK_SOURCE_CSITE);
-+
-+	writel(tegra124_cpu_clk_sctx.cclkg_burst,
-+					clk_base + CCLKG_BURST_POLICY);
-+	writel(tegra124_cpu_clk_sctx.cclkg_divider,
-+					clk_base + CCLKG_BURST_POLICY + 4);
- }
- #endif
- 
+ 	ahub at 0,70300000 {
+ 		compatible = "nvidia,tegra124-ahub";
+ 		reg = <0x0 0x70300000 0x0 0x200>,
 -- 
 1.8.1.5
