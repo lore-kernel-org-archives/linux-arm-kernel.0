@@ -1,34 +1,29 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Mon, 21 Jul 2014 13:18:20 +0100
-Subject: [PATCH] spi: omap2-mcspi: fix blatant abuse of the resource
- subsystem
-In-Reply-To: <20140721075144.251bb67d@ipc1.ka-ro>
-References: <1405683053-14104-1-git-send-email-LW@KARO-electronics.de>
- <20140718171035.GQ17528@sirena.org.uk>
- <20140721075144.251bb67d@ipc1.ka-ro>
-Message-ID: <20140721121820.GW17528@sirena.org.uk>
+From: tj@kernel.org (Tejun Heo)
+Date: Mon, 21 Jul 2014 08:18:52 -0400
+Subject: [PATCH 1/1] ahci: st: Provide DT bindings for ST's SATA
+ implementation
+In-Reply-To: <1405931316-12276-1-git-send-email-lee.jones@linaro.org>
+References: <1405931316-12276-1-git-send-email-lee.jones@linaro.org>
+Message-ID: <20140721121852.GC12921@htj.dyndns.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jul 21, 2014 at 07:51:44AM +0200, Lothar Wa?mann wrote:
-> Mark Brown wrote:
+On Mon, Jul 21, 2014 at 09:28:36AM +0100, Lee Jones wrote:
+> Cc: devicetree at vger.kernel.org
+> Cc: Srinivas Kandagatla <srinivas.kandagatla@st.com>
+> Acked-by: Alexandre Torgue <alexandre.torgue@st.com>
+> Signed-off-by: Lee Jones <lee.jones@linaro.org>
+> ---
+> 
+> Hi Tejun,
+> 
+> This patch has been on the MLs for a few months now.  It documents
+> ST's AHCI driver which was accepted by you and now resides in
+> Mainline.
 
-> > I'm not going to apply this with a commit message such as the above.
-> > Quite aside from the tone the fact that it doesn't describe the issue
-> > is not helpful for review, one of the things done in review is to try to
-> > check that the change has the intended effect.
+Sorry about that.  Applied to libata/for-3.17.
 
-> Maybe the original author or the maintainer who accepted this can come
-> up with a decent fix for this.
+Thanks.
 
-Just to be clear the issue is with the presentation of your change, it
-is not appropriate to provide a changelog which consists mainly of
-widely directed personal insults especially given that it omits basic
-technical content.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140721/60630cbb/attachment.sig>
+-- 
+tejun
