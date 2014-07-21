@@ -1,40 +1,58 @@
-From: wsa@the-dreams.de (Wolfram Sang)
-Date: Mon, 21 Jul 2014 11:42:03 +0200
-Subject: [PATCH 1/2] drivers/i2c/busses: use correct type for dma_map/unmap
-In-Reply-To: <1405935725-10457-1-git-send-email-wsa@the-dreams.de>
-References: <1405935725-10457-1-git-send-email-wsa@the-dreams.de>
-Message-ID: <1405935725-10457-2-git-send-email-wsa@the-dreams.de>
+From: will.deacon@arm.com (Will Deacon)
+Date: Mon, 21 Jul 2014 10:44:52 +0100
+Subject: [PATCH 2/3] ARM: smp_scu: enable SCU standby support
+In-Reply-To: <20140721092703.GL8537@dragon>
+References: <1405928755-19413-1-git-send-email-shawn.guo@freescale.com>
+ <1405928755-19413-3-git-send-email-shawn.guo@freescale.com>
+ <20140721085150.GB15666@arm.com> <20140721092703.GL8537@dragon>
+Message-ID: <20140721094452.GD16122@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-dma_{un}map_* uses 'enum dma_data_direction' not 'enum dma_transfer_direction'.
+On Mon, Jul 21, 2014 at 10:27:04AM +0100, Shawn Guo wrote:
+> On Mon, Jul 21, 2014 at 09:51:50AM +0100, Will Deacon wrote:
+> > On Mon, Jul 21, 2014 at 08:45:54AM +0100, Shawn Guo wrote:
+> > > With SCU standby enabled, SCU CLK will be turned off when all processors
+> > > are in WFI mode.  And the clock will be turned on when any processor
+> > > leaves WFI mode.
+> > > 
+> > > This behavior should be preferable in terms of power efficiency of
+> > > system idle.  So let's set the SCU standby bit to enable the support in
+> > > function scu_enable().
+> > > 
+> > > Signed-off-by: Shawn Guo <shawn.guo@freescale.com>
+> > > ---
+> > >  arch/arm/kernel/smp_scu.c | 3 ++-
+> > >  1 file changed, 2 insertions(+), 1 deletion(-)
+> > > 
+> > > diff --git a/arch/arm/kernel/smp_scu.c b/arch/arm/kernel/smp_scu.c
+> > > index c947508f84e6..9f29d167d02c 100644
+> > > --- a/arch/arm/kernel/smp_scu.c
+> > > +++ b/arch/arm/kernel/smp_scu.c
+> > > @@ -18,6 +18,7 @@
+> > >  
+> > >  #define SCU_CTRL		0x00
+> > >  #define SCU_ENABLE		(1 << 0)
+> > > +#define SCU_STANDBY_ENABLE	(1 << 5)
+> > >  #define SCU_CONFIG		0x04
+> > >  #define SCU_CPU_STATUS		0x08
+> > >  #define SCU_INVALIDATE		0x0c
+> > > @@ -54,7 +55,7 @@ void scu_enable(void __iomem *scu_base)
+> > >  	if (scu_ctrl & SCU_ENABLE)
+> > >  		return;
+> > >  
+> > > -	scu_ctrl |= SCU_ENABLE;
+> > > +	scu_ctrl |= SCU_ENABLE | SCU_STANDBY_ENABLE;
+> > 
+> > I don't think this bit exists on all revisions of the A9.
+> 
+> Thanks for the info, Will.  Is there any side-effect to write the
+> standby bit on those revisions which do not define the bit?
 
-Signed-off-by: Wolfram Sang <wsa@the-dreams.de>
----
- drivers/i2c/busses/i2c-at91.c | 4 ++--
- 1 file changed, 2 insertions(+), 2 deletions(-)
+I'm not actually sure what happens at the hardware level, but the TRM is
+pretty clear in its definition of `RESERVED':
 
-diff --git a/drivers/i2c/busses/i2c-at91.c b/drivers/i2c/busses/i2c-at91.c
-index e95f9ba96790..83c989382be9 100644
---- a/drivers/i2c/busses/i2c-at91.c
-+++ b/drivers/i2c/busses/i2c-at91.c
-@@ -210,7 +210,7 @@ static void at91_twi_write_data_dma_callback(void *data)
- 	struct at91_twi_dev *dev = (struct at91_twi_dev *)data;
- 
- 	dma_unmap_single(dev->dev, sg_dma_address(&dev->dma.sg),
--			 dev->buf_len, DMA_MEM_TO_DEV);
-+			 dev->buf_len, DMA_TO_DEVICE);
- 
- 	at91_twi_write(dev, AT91_TWI_CR, AT91_TWI_STOP);
- }
-@@ -289,7 +289,7 @@ static void at91_twi_read_data_dma_callback(void *data)
- 	struct at91_twi_dev *dev = (struct at91_twi_dev *)data;
- 
- 	dma_unmap_single(dev->dev, sg_dma_address(&dev->dma.sg),
--			 dev->buf_len, DMA_DEV_TO_MEM);
-+			 dev->buf_len, DMA_FROM_DEVICE);
- 
- 	/* The last two bytes have to be read without using dma */
- 	dev->buf += dev->buf_len - 2;
--- 
-2.0.0
+ `All reserved bits not used by the implementation must be written as 0 and
+  read as 0.'
+
+Will
