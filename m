@@ -1,73 +1,90 @@
-From: gnurou@gmail.com (Alexandre Courbot)
-Date: Mon, 21 Jul 2014 23:19:37 +0900
-Subject: [alsa-devel] [PATCH 2/4] ASoC: s3c64xx/smartq: use dynamic
- registration
-In-Reply-To: <20140721100412.GT17528@sirena.org.uk>
-References: <CAAVeFuJEjMBX+7vsLk5zXV5Moy=WDmWidpVZjQ_=8VD45+QdHg@mail.gmail.com>
- <20140716075107.GG7978@ulmo> <53C63CBA.20809@codethink.co.uk>
- <CAAVeFuK55XzwaU+eOWhfUxJ7wEwGqxRCPDZKf+gVeMgeV8ys6g@mail.gmail.com>
- <20140717074444.GB18640@ulmo>
- <CAAVeFuJQUA+92jGpgDkyQ+=Qu+okBHzS5aFi7gmdwh+qcFp3fg@mail.gmail.com>
- <20140717101723.GR17528@sirena.org.uk> <20140717104121.GF17877@ulmo>
- <20140717110540.GS17528@sirena.org.uk>
- <CAAVeFuKQuvTH=5U8chZeMNLjCkfo78+_r2Gx5WUfy+q3F4QZpQ@mail.gmail.com>
- <20140721100412.GT17528@sirena.org.uk>
-Message-ID: <CAAVeFuJVPSxfWx-fw-duhO0KG=nG6AfgC1EGQcDw=ZtmjOZV-Q@mail.gmail.com>
+From: boris.brezillon@free-electrons.com (Boris BREZILLON)
+Date: Mon, 21 Jul 2014 16:21:36 +0200
+Subject: [RESEND PATCH v3 06/11] drm: add DT bindings documentation for
+ atmel-hlcdc-dc driver
+In-Reply-To: <20140721135410.GA13770@ulmo>
+References: <1404751384-5077-1-git-send-email-boris.brezillon@free-electrons.com>
+ <20140721133034.GI15238@ulmo> <20140721154313.1de8bf6f@bbrezillon>
+ <1605488.5CKVSJec67@avalon> <20140721135410.GA13770@ulmo>
+Message-ID: <20140721162136.286f5b62@bbrezillon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jul 21, 2014 at 7:04 PM, Mark Brown <broonie@kernel.org> wrote:
-> On Mon, Jul 21, 2014 at 12:36:43PM +0900, Alexandre Courbot wrote:
->> On Thu, Jul 17, 2014 at 8:05 PM, Mark Brown <broonie@kernel.org> wrote:
->
->> > For set and get, sure - but it's still useful to be able to do bulk
->> > requests for GPIOs especially since that's the only bit of the interface
->> > that requires error handling.
->
->> I foresee many problems if people start using gpiod_array_get() as a
->> way to spare a few lines of error-checking code. First all the GPIOs
->> would end into an array instead of members with meaningful names -
->> unless they are moved later on, but doing so would add extra code and
->> somewhat kill the purpose. It also becomes more difficult to maintain
->> as you are dealing with array indexes to update all over the code.
->
-> You just need a few defines for the names, it's not a big deal.
->
->> Finally, it will make it more difficult to use gpiod_array_*() the way
->> it is intended to be used, as you would have to discriminate between
->> GPIOs of the same function and the rest by yourself.
->
-> Yes, you probably shouldn't mix and match here but that's fine.
->
->> Also, if such a convenience function is legitimate for GPIO, shouldn't
->> it also apply to other sub-systems? E.g. regulator_array_get()?
->
-> It's certainly a totally reasonable and expected way of using
-> regulator_bulk_get().
->
->> Maybe I am missing your point, but I still think some error-handling
->> code really doesn't hurt here, and the few drivers that would actually
->> benefit from a more automated GPIO request error handling can easily
->> implement it themselves. Let's keep gpiod_array_*() single-purposed
->> and to the point.
->
-> I'm not sure I see the massive complication TBH - it's not so much about
-> complexity as it is about reducing the amount of boilerplate that people
-> need to get right.
+On Mon, 21 Jul 2014 15:54:12 +0200
+Thierry Reding <thierry.reding@gmail.com> wrote:
 
-I guess our disagreement came from the fact that we want the same
-function to perform two different things. GPIOs are different from
-regulators in that the former are really requested using a (dev,
-function, index) vs. a (dev, function) tuple for regulators. I want a
-convenience function to easily request all the GPIOs that match (dev,
-function) so that functionally identical GPIOs can be manipulated as
-an "atomic" set using the rest of the gpiod_array API (which would
-make no sense for regulators which have no "index". You want an
-equivalent to regulator_bulk_get() so a driver can conveniently
-request all its GPIOs no matter the function they fullfil.
+> On Mon, Jul 21, 2014 at 03:47:52PM +0200, Laurent Pinchart wrote:
+> > Hi Boris,
+> > 
+> > On Monday 21 July 2014 15:43:13 Boris BREZILLON wrote:
+> > > On Mon, 21 Jul 2014 15:30:35 +0200 Thierry Reding wrote:
+> > > > On Mon, Jul 21, 2014 at 03:22:05PM +0200, Laurent Pinchart wrote:
+> > > >> On Monday 21 July 2014 14:55:23 Thierry Reding wrote:
+> > > >>> On Mon, Jul 21, 2014 at 02:34:28PM +0200, Boris BREZILLON wrote:
+> > > >>>> On Mon, 21 Jul 2014 14:16:42 +0200 Laurent Pinchart wrote:
+> > > >>>>> On Monday 21 July 2014 14:12:47 Thierry Reding wrote:
+> > > >>>>>> On Mon, Jul 21, 2014 at 11:57:37AM +0200, Boris BREZILLON wrote:
+> > > >>
+> > > >> [snip]
+> > > >> 
+> > > >>>>>>> The new drm_display_info structure should look like this [2]
+> > > >>>>>>> (except that color_formats and bpc have not be removed yet), and
+> > > >>>>>>> [1] is just here to show how the video_bus_format enum would look
+> > > >>>>>>> like.
+> > > >>>>>>> 
+> > > >>>>>>> [1] http://code.bulix.org/rfd0yx-86557
+> > > >>>>>>> [2] http://code.bulix.org/7n03b4-86556
+> > > >>>>>> 
+> > > >>>>>> Quoting from your paste:
+> > > >>>>>> 	+   const enum video_bus_format *bus_formats;
+> > > >>>>>> 	+   int nbus_formats;
+> > > >>>>>> 
+> > > >>>>>> Do we really need more than one?
+> > > >>>>> 
+> > > >>>>> We do if we want to replace the color_formats and bpc fields.
+> > > >>>> 
+> > > >>>> Yes, that's what I was about to answer :-).
+> > > >>> 
+> > > >>> Maybe we don't need to replace color_formats and bpc field
+> > > >>> immediately. That could be done in a follow-up patch.
+> > > >> 
+> > > >> We don't need to replace them right now, but we should at least agree on
+> > > >> how to replace them. Introducing a new field that would need to be
+> > > >> replaced in the near future when removing color_formats and bpc would
+> > > >> be a waste of time.
+> > > >
+> > > > Sure. One of the problems I see with replacing color_formats and bpc
+> > > > with the above is that some of the bits within color_formats are set
+> > > > when the EDID is parsed. That implies that if they are replaced with
+> > > > an array of formats, the array would need to be reallocated during EDID
+> > > > parsing. That sounds like ugliness.
+> > > > 
+> > > > But if you can find a nice way to make it work that'd be great.
+> > > 
+> > > How about using a list instead of an array ?
+> > > This way we can add elements to this list when parsing the EDID.
+> > > 
+> > > Or we can just define a maximum size for the bus_formats array when
+> > > retrieving this info from EDID. If I'm correct we have at most 18 bus
+> > > formats:
+> > >  - 3 color formats:
+> > >    * RGB 4:4:4
+> > >    * YCbCr 4:4:4
+> > >    * YCbCr 4:4:2
+> > >  - 6 color depths: 6, 8, 10, 12, 14 and 16 bits per color
+> > 
+> > bpc isn't a bitmask, so EDID supports up to three formats only.
+> > 
+> > The color_formats field is computed in the drm_add_display_info() function. 
+> > You could easily turn it into a local variable and allocate and fill the 
+> > formats array at the end of the function.
+> 
+> But you also need to be careful to keep whatever formats the driver
+> might have set explicitly.
 
-These should really be two different functions for two different
-use-cases - gpiod_array_get() that returns an array suitable for being
-manipulated using the rest of the gpiod_array API ; gpiod_bulk_get()
-that takes the equivalent of regulator_bulk_data for GPIOs and fills
-it the same way.
+Okay, in this case, using a list is a better idea, don't you think ?
+
+-- 
+Boris Brezillon, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
