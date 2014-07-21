@@ -1,90 +1,105 @@
-From: boris.brezillon@free-electrons.com (Boris BREZILLON)
-Date: Mon, 21 Jul 2014 16:21:36 +0200
-Subject: [RESEND PATCH v3 06/11] drm: add DT bindings documentation for
- atmel-hlcdc-dc driver
-In-Reply-To: <20140721135410.GA13770@ulmo>
-References: <1404751384-5077-1-git-send-email-boris.brezillon@free-electrons.com>
- <20140721133034.GI15238@ulmo> <20140721154313.1de8bf6f@bbrezillon>
- <1605488.5CKVSJec67@avalon> <20140721135410.GA13770@ulmo>
-Message-ID: <20140721162136.286f5b62@bbrezillon>
+From: daniel.lezcano@linaro.org (Daniel Lezcano)
+Date: Mon, 21 Jul 2014 16:37:24 +0200
+Subject: [PATCH v3 4/4] arm: pxa: add non device-tree timer link to
+ clocksource
+In-Reply-To: <1405356724-32207-4-git-send-email-robert.jarzmik@free.fr>
+References: <1405356724-32207-1-git-send-email-robert.jarzmik@free.fr>
+ <1405356724-32207-4-git-send-email-robert.jarzmik@free.fr>
+Message-ID: <53CD25A4.7030606@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 21 Jul 2014 15:54:12 +0200
-Thierry Reding <thierry.reding@gmail.com> wrote:
+On 07/14/2014 06:52 PM, Robert Jarzmik wrote:
+> As clocksource pxa_timer was moved to clocksource framework, the
+> pxa_timer initialization needs to be a bit amended, to pass the
+> necessary informations to clocksource, ie :
+>   - the timer interrupt (mach specific)
+>   - the timer registers base (ditto)
+>   - the timer clockrate
+>
+> Signed-off-by: Robert Jarzmik <robert.jarzmik@free.fr>
+>
+> ---
+> Since V2: Arnd's comment : moved extern declaration into .h file
+> ---
 
-> On Mon, Jul 21, 2014 at 03:47:52PM +0200, Laurent Pinchart wrote:
-> > Hi Boris,
-> > 
-> > On Monday 21 July 2014 15:43:13 Boris BREZILLON wrote:
-> > > On Mon, 21 Jul 2014 15:30:35 +0200 Thierry Reding wrote:
-> > > > On Mon, Jul 21, 2014 at 03:22:05PM +0200, Laurent Pinchart wrote:
-> > > >> On Monday 21 July 2014 14:55:23 Thierry Reding wrote:
-> > > >>> On Mon, Jul 21, 2014 at 02:34:28PM +0200, Boris BREZILLON wrote:
-> > > >>>> On Mon, 21 Jul 2014 14:16:42 +0200 Laurent Pinchart wrote:
-> > > >>>>> On Monday 21 July 2014 14:12:47 Thierry Reding wrote:
-> > > >>>>>> On Mon, Jul 21, 2014 at 11:57:37AM +0200, Boris BREZILLON wrote:
-> > > >>
-> > > >> [snip]
-> > > >> 
-> > > >>>>>>> The new drm_display_info structure should look like this [2]
-> > > >>>>>>> (except that color_formats and bpc have not be removed yet), and
-> > > >>>>>>> [1] is just here to show how the video_bus_format enum would look
-> > > >>>>>>> like.
-> > > >>>>>>> 
-> > > >>>>>>> [1] http://code.bulix.org/rfd0yx-86557
-> > > >>>>>>> [2] http://code.bulix.org/7n03b4-86556
-> > > >>>>>> 
-> > > >>>>>> Quoting from your paste:
-> > > >>>>>> 	+   const enum video_bus_format *bus_formats;
-> > > >>>>>> 	+   int nbus_formats;
-> > > >>>>>> 
-> > > >>>>>> Do we really need more than one?
-> > > >>>>> 
-> > > >>>>> We do if we want to replace the color_formats and bpc fields.
-> > > >>>> 
-> > > >>>> Yes, that's what I was about to answer :-).
-> > > >>> 
-> > > >>> Maybe we don't need to replace color_formats and bpc field
-> > > >>> immediately. That could be done in a follow-up patch.
-> > > >> 
-> > > >> We don't need to replace them right now, but we should at least agree on
-> > > >> how to replace them. Introducing a new field that would need to be
-> > > >> replaced in the near future when removing color_formats and bpc would
-> > > >> be a waste of time.
-> > > >
-> > > > Sure. One of the problems I see with replacing color_formats and bpc
-> > > > with the above is that some of the bits within color_formats are set
-> > > > when the EDID is parsed. That implies that if they are replaced with
-> > > > an array of formats, the array would need to be reallocated during EDID
-> > > > parsing. That sounds like ugliness.
-> > > > 
-> > > > But if you can find a nice way to make it work that'd be great.
-> > > 
-> > > How about using a list instead of an array ?
-> > > This way we can add elements to this list when parsing the EDID.
-> > > 
-> > > Or we can just define a maximum size for the bus_formats array when
-> > > retrieving this info from EDID. If I'm correct we have at most 18 bus
-> > > formats:
-> > >  - 3 color formats:
-> > >    * RGB 4:4:4
-> > >    * YCbCr 4:4:4
-> > >    * YCbCr 4:4:2
-> > >  - 6 color depths: 6, 8, 10, 12, 14 and 16 bits per color
-> > 
-> > bpc isn't a bitmask, so EDID supports up to three formats only.
-> > 
-> > The color_formats field is computed in the drm_add_display_info() function. 
-> > You could easily turn it into a local variable and allocate and fill the 
-> > formats array at the end of the function.
-> 
-> But you also need to be careful to keep whatever formats the driver
-> might have set explicitly.
+Shall I take the patches 4-5 also ?
 
-Okay, in this case, using a list is a better idea, don't you think ?
+Arnd ?
+
+Thanks
+
+   -- Daniel
+
+>   arch/arm/mach-pxa/generic.c | 11 +++++++++++
+>   include/clocksource/pxa.h   | 18 ++++++++++++++++++
+>   2 files changed, 29 insertions(+)
+>   create mode 100644 include/clocksource/pxa.h
+>
+> diff --git a/arch/arm/mach-pxa/generic.c b/arch/arm/mach-pxa/generic.c
+> index 4225417..6f38e1a 100644
+> --- a/arch/arm/mach-pxa/generic.c
+> +++ b/arch/arm/mach-pxa/generic.c
+> @@ -25,11 +25,13 @@
+>   #include <asm/mach/map.h>
+>   #include <asm/mach-types.h>
+>
+> +#include <mach/irqs.h>
+>   #include <mach/reset.h>
+>   #include <mach/smemc.h>
+>   #include <mach/pxa3xx-regs.h>
+>
+>   #include "generic.h"
+> +#include <clocksource/pxa.h>
+>
+>   void clear_reset_status(unsigned int mask)
+>   {
+> @@ -57,6 +59,15 @@ unsigned long get_clock_tick_rate(void)
+>   EXPORT_SYMBOL(get_clock_tick_rate);
+>
+>   /*
+> + * For non device-tree builds, keep legacy timer init
+> + */
+> +void pxa_timer_init(void)
+> +{
+> +	pxa_timer_nodt_init(IRQ_OST0, io_p2v(0x40a00000),
+> +			    get_clock_tick_rate());
+> +}
+> +
+> +/*
+>    * Get the clock frequency as reflected by CCCR and the turbo flag.
+>    * We assume these values have been applied via a fcs.
+>    * If info is not 0 we also display the current settings.
+> diff --git a/include/clocksource/pxa.h b/include/clocksource/pxa.h
+> new file mode 100644
+> index 0000000..1efbe5a
+> --- /dev/null
+> +++ b/include/clocksource/pxa.h
+> @@ -0,0 +1,18 @@
+> +/*
+> + * PXA clocksource, clockevents, and OST interrupt handlers.
+> + *
+> + * Copyright (C) 2014 Robert Jarzmik
+> + *
+> + * This program is free software; you can redistribute it and/or modify
+> + * it under the terms of the GNU General Public License as published by
+> + * the Free Software Foundation; version 2 of the License.
+> + *
+> + */
+> +
+> +#ifndef _CLOCKSOURCE_PXA_H
+> +#define _CLOCKSOURCE_PXA_H
+> +
+> +extern void pxa_timer_nodt_init(int irq, void __iomem *base,
+> +			   unsigned long clock_tick_rate);
+> +
+> +#endif
+>
+
 
 -- 
-Boris Brezillon, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
+  <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
+
+Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
+<http://twitter.com/#!/linaroorg> Twitter |
+<http://www.linaro.org/linaro-blog/> Blog
