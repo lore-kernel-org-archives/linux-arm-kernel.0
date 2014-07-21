@@ -1,23 +1,23 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Mon, 21 Jul 2014 21:53:55 +0100
-Subject: [PATCH 1/2] arm: Remove RISC OS personality
-In-Reply-To: <1405263538-27589-2-git-send-email-richard@nod.at>
-References: <1405263538-27589-1-git-send-email-richard@nod.at>
- <1405263538-27589-2-git-send-email-richard@nod.at>
-Message-ID: <20140721205355.GH21766@n2100.arm.linux.org.uk>
+From: marek@goldelico.com (Marek Belisko)
+Date: Mon, 21 Jul 2014 23:05:20 +0200
+Subject: [PATCH 0/7] arm: dts: oma3-gta04: Various updates
+Message-ID: <1405976727-15166-1-git-send-email-marek@goldelico.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Jul 13, 2014 at 04:58:57PM +0200, Richard Weinberger wrote:
-> The RISC OS personality seems to be unused and untested for a long time.
-> Let's rip it out.
-> 
-> Signed-off-by: Richard Weinberger <richard@nod.at>
+Following patchset add various improvements to gta04 devicetree.
 
-Thanks.
+Marek Belisko (7):
+  arm: dts: omap3-gta04: Add nand support
+  arm: dts: omap3-gta04: Fix magnetometer model
+  arm: dts: omap3-gta04: Add wifi reset node
+  arm: dts: omap3-gta04: Move spi gpio pins to pmx_core2
+  arm: dts: omap3-gta04: Add USB host support
+  arm: dts: omap3-gta04: Add display alias
+  arm: dts: omap3-gta04: Add twl4030 regulators parameters
 
-Acked-by: Russell King <rmk+kernel@arm.linux.org.uk>
+ arch/arm/boot/dts/omap3-gta04.dts | 150 ++++++++++++++++++++++++++++++++++++--
+ 1 file changed, 145 insertions(+), 5 deletions(-)
 
 -- 
-FTTC broadband for 0.8mile line: currently at 9.5Mbps down 400kbps up
-according to speedtest.net.
+1.9.1
