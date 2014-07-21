@@ -1,104 +1,68 @@
-From: sfr@canb.auug.org.au (Stephen Rothwell)
-Date: Mon, 21 Jul 2014 11:13:24 +1000
-Subject: linux-next: manual merge of the samsung tree with the arm-soc tree
-Message-ID: <20140721111324.1f5ed9b2@canb.auug.org.au>
+From: jg1.han@samsung.com (Jingoo Han)
+Date: Mon, 21 Jul 2014 10:44:28 +0900
+Subject: [PATCH v6 4/5] PCI: add PCI controller for keystone PCIe h/w
+In-Reply-To: <53C9839C.5090604@ti.com>
+References: <1405696469-7172-1-git-send-email-m-karicheri2@ti.com>
+ <1405696469-7172-5-git-send-email-m-karicheri2@ti.com>
+ <CAL_JsqKheoWrSGtxPO=AE8g9iOAqfwRa=81Ku=Cfx8_gpDysOg@mail.gmail.com>
+ <53C9839C.5090604@ti.com>
+Message-ID: <006001cfa485$4f4fcff0$edef6fd0$%han@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Kukjin,
+On Saturday, July 19, 2014 5:29 AM, Murali Karicheri wrote:
+> On 07/18/2014 03:31 PM, Rob Herring wrote:
+> > On Fri, Jul 18, 2014 at 10:14 AM, Murali Karicheri<m-karicheri2@ti.com>  wrote:
+> --- Cut ---
+> >> +
+> >> +Optional properties:-
+> >> +       phys: phandle to Generic Keystone SerDes phy for PCI
+> >> +       phy-names: name of the Generic Keystine SerDes phy for PCI
+> >> +         - If boot loader already does PCI link establishment, then phys and
+> >> +           phy-names shouldn't be present.
+> >> +       ti,enable-linktrain - Enable Link training.
+> >> +         - If boot loader already does PCI link establishment, then this
+> >> +           shouldn't be present.
+> >
+> > Can't you read from the h/w if the link is trained?
 
-Today's linux-next merge of the samsung tree got a conflict in
-arch/arm/mach-exynos/pm.c between commit 7310d99ffcd1 ("ARM: EXYNOS:
-Fix build breakge with PM_SLEEP=n") from the arm-soc tree and commit
-66df3ce29804 ("ARM: EXYNOS: Refactored code for using PMU address via
-DT") from the samsung tree.
+I agree with Rob Herring's suggestion.
 
-I fixed it up (the code modified by the latter was moved by the former,
-so I applied the following patch to the new file) and can carry the fix
-as necessary (no action is required).
+> 
+> Yes.
+> 
+> There are customers who use this driver with PCI Link setup done in the
+> boot loader. This property tells the driver to bypass Link setup
+> procedure in that case. Is this undesirable and if so. how other
+> platforms handle it? Check first if link is trained or start the link
+> setup procedure? Let me know. If this is fine, please provide your Ack.
 
-From: Stephen Rothwell <sfr@canb.auug.org.au>
-Date: Mon, 21 Jul 2014 11:11:17 +1000
-Subject: [PATCH] ARM: EXYNOS: fixup for code movement
+Please, check the following code of Exynos PCIe diver.
 
-Signed-off-by: Stephen Rothwell <sfr@canb.auug.org.au>
----
- arch/arm/mach-exynos/platsmp.c | 16 ++++++++--------
- 1 file changed, 8 insertions(+), 8 deletions(-)
+./drivers/pci/host/pci-exynos.c
 
-diff --git a/arch/arm/mach-exynos/platsmp.c b/arch/arm/mach-exynos/platsmp.c
-index 8b66a9e02b87..1e43b53d23b7 100644
---- a/arch/arm/mach-exynos/platsmp.c
-+++ b/arch/arm/mach-exynos/platsmp.c
-@@ -43,7 +43,7 @@ extern void exynos4_secondary_startup(void);
-  */
- void exynos_cpu_power_down(int cpu)
- {
--	__raw_writel(0, EXYNOS_ARM_CORE_CONFIGURATION(cpu));
-+	pmu_raw_writel(0, EXYNOS_ARM_CORE_CONFIGURATION(cpu));
- }
- 
- /**
-@@ -54,8 +54,8 @@ void exynos_cpu_power_down(int cpu)
-  */
- void exynos_cpu_power_up(int cpu)
- {
--	__raw_writel(S5P_CORE_LOCAL_PWR_EN,
--		     EXYNOS_ARM_CORE_CONFIGURATION(cpu));
-+	pmu_raw_writel(S5P_CORE_LOCAL_PWR_EN,
-+		       EXYNOS_ARM_CORE_CONFIGURATION(cpu));
- }
- 
- /**
-@@ -65,7 +65,7 @@ void exynos_cpu_power_up(int cpu)
-  */
- int exynos_cpu_power_state(int cpu)
- {
--	return (__raw_readl(EXYNOS_ARM_CORE_STATUS(cpu)) &
-+	return (pmu_raw_readl(EXYNOS_ARM_CORE_STATUS(cpu)) &
- 			S5P_CORE_LOCAL_PWR_EN);
- }
- 
-@@ -75,7 +75,7 @@ int exynos_cpu_power_state(int cpu)
-  */
- void exynos_cluster_power_down(int cluster)
- {
--	__raw_writel(0, EXYNOS_COMMON_CONFIGURATION(cluster));
-+	pmu_raw_writel(0, EXYNOS_COMMON_CONFIGURATION(cluster));
- }
- 
- /**
-@@ -84,8 +84,8 @@ void exynos_cluster_power_down(int cluster)
-  */
- void exynos_cluster_power_up(int cluster)
- {
--	__raw_writel(S5P_CORE_LOCAL_PWR_EN,
--		     EXYNOS_COMMON_CONFIGURATION(cluster));
-+	pmu_raw_writel(S5P_CORE_LOCAL_PWR_EN,
-+		       EXYNOS_COMMON_CONFIGURATION(cluster));
- }
- 
- /**
-@@ -95,7 +95,7 @@ void exynos_cluster_power_up(int cluster)
-  */
- int exynos_cluster_power_state(int cluster)
- {
--	return (__raw_readl(EXYNOS_COMMON_STATUS(cluster)) &
-+	return (pmu_raw_readl(EXYNOS_COMMON_STATUS(cluster)) &
- 			S5P_CORE_LOCAL_PWR_EN);
- }
- 
--- 
-2.0.1
+static int exynos_pcie_establish_link(struct pcie_port *pp)
+{
+	struct exynos_pcie *exynos_pcie = to_exynos_pcie(pp);
+	void __iomem *elbi_base = exynos_pcie->elbi_base;
+	void __iomem *pmu_base = exynos_pcie->pmu_base;
 
+	if (dw_pcie_link_up(pp)) {
+		dev_err(pp->dev, "Link already up\n");
+		return 0;
+	}
+	.....
 
--- 
-Cheers,
-Stephen Rothwell                    sfr at canb.auug.org.au
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140721/733fad21/attachment.sig>
+In the case of Exynos PCIe, the Exynos PCIe driver checks the
+h/w bit such as PCIE_ELBI_LTSSM_ENABLE bit of PCIE_ELBI_RDLH_LINKUP
+offset register.
+
+If the link is already set up by the boot loader or other reasons,
+the driver will skip some initialization codes.
+
+The first step is that you find such h/w bit for checking link up.
+If so, please add the code for skipping, when the link is already
+set up.
+
+Best regards,
+Jingoo Han
