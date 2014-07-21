@@ -1,46 +1,121 @@
-From: santosh.shilimkar@ti.com (Santosh Shilimkar)
-Date: Mon, 21 Jul 2014 09:40:32 -0400
-Subject: [RFC] cpufreq: Add bindings for CPU clock sharing topology
-In-Reply-To: <CAKohpok-C+JCebjJkZExx6EjBctoyJF7fV71Vjj7bi1TAdXrFQ@mail.gmail.com>
-References: <7e097b71342c9f5f63b07ff2e135eb7beb626aab.1405661369.git.viresh.kumar@linaro.org>	<CAOesGMhTkTEXp99gpU8cZBwYmiXpsySG5zMn6oSyo_Mf5PAiUg@mail.gmail.com>	<CAKohpo=MmoALOHg-=7cf0jm=OJO57TWQZQXqkRwhRwU-DGPMmA@mail.gmail.com>	<CAOesGMhuNzVtUkaUjF+JjNgHcgf08WiM0DG-kzwtcyUxkK_zow@mail.gmail.com>	<CAKohpokLqrydV3b=innvOWrW9ijXtZwPKdT5Ew65cjMxsY2Mvw@mail.gmail.com>	<53CA8D95.8010108@ti.com>
- <CAKohpok-C+JCebjJkZExx6EjBctoyJF7fV71Vjj7bi1TAdXrFQ@mail.gmail.com>
-Message-ID: <53CD1850.8000904@ti.com>
+From: b.zolnierkie@samsung.com (Bartlomiej Zolnierkiewicz)
+Date: Mon, 21 Jul 2014 15:41:44 +0200
+Subject: [PATCH v2] ARM: EXYNOS: Fix build with PM_SLEEP=n
+In-Reply-To: <93736288.A8L2I1nMme@amdc1032>
+References: <1405323953-25954-1-git-send-email-k.kozlowski@samsung.com>
+ <1539661.ni665pgzAx@amdc1032> <93736288.A8L2I1nMme@amdc1032>
+Message-ID: <19533549.DVV8hdLa08@amdc1032>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sunday 20 July 2014 08:07 AM, Viresh Kumar wrote:
-> On 19 July 2014 20:54, Santosh Shilimkar <santosh.shilimkar@ti.com> wrote:
->> Sorry for jumping late
+On Monday, July 21, 2014 02:55:52 PM Bartlomiej Zolnierkiewicz wrote:
+> On Monday, July 21, 2014 01:11:14 PM Bartlomiej Zolnierkiewicz wrote:
+> > On Monday, July 21, 2014 12:38:28 PM Bartlomiej Zolnierkiewicz wrote:
+> > > 
+> > > Hi,
+> > > 
+> > > On Saturday, July 19, 2014 04:42:34 AM Kukjin Kim wrote:
+> > > > On 07/16/14 20:59, Tomasz Figa wrote:
+> > > > > Hi Krzysztof,
+> > > > >
+> > > > > On 14.07.2014 09:45, Krzysztof Kozlowski wrote:
+> > > > >> Fix building of exynos defconfig with disabled PM_SLEEP:
+> > > > >> CONFIG_PM_SLEEP=n
+> > > > >> CONFIG_PM_SLEEP_SMP=n
+> > > > >> CONFIG_SUSPEND=n
+> > > > >> by moving functions for power up/down of CPU and cluster to platsmp.c
+> > > > >>
+> > > > >> The build error messages:
+> > > > >> arch/arm/mach-exynos/built-in.o: In function `exynos_boot_secondary':
+> > > > >> arch/arm/mach-exynos/platsmp.c:111: undefined reference to `exynos_cpu_power_state'
+> > > > >> arch/arm/mach-exynos/platsmp.c:112: undefined reference to `exynos_cpu_power_up'
+> > > > >> arch/arm/mach-exynos/platsmp.c:116: undefined reference to `exynos_cpu_power_state'
+> > > > >> make: *** [vmlinux] Error 1
+> > > > >>
+> > > > >> Signed-off-by: Krzysztof Kozlowski<k.kozlowski@samsung.com>
+> > > > >>
+> > > > >> ---
+> > > > >> Changes since v1:
+> > > > >> 1. Use different solution - just move the power up/down functions to a
+> > > > >>     common place instead of adding stubs in common.h. Suggested by Tomasz
+> > > > >>     Figa.
+> > > > >> ---
+> > > > >>   arch/arm/mach-exynos/platsmp.c | 66 ++++++++++++++++++++++++++++++++++++++++++
+> > > > >>   arch/arm/mach-exynos/pm.c      | 66 ------------------------------------------
+> > > > >>   2 files changed, 66 insertions(+), 66 deletions(-)
+> > > > >>
+> > > > >
+> > > > + Bart,
+> > > > 
+> > > > > Reviewed-by: Tomasz Figa<t.figa@samsung.com>
+> > > > >
+> > > > Applied, thanks.
+> > > > 
+> > > > Bart, I think this is better at this moment to fix the build breakage 
+> > > > with disabling PM...if you have any comments, please let me know.
+> > > 
+> > > To fix PM_SLEEP=n build itself (with ARM_EXYNOS_CPUIDLE=n) Krzysztof's
+> > > patch is not enough and patch [1] is also needed (this patch is very
+> > > simple so I think that it is okay for v3.16).
+> > 
+> > Hmmm, I now see that you've applied Krzysztof's patch for v3.17 not v3.16.
+> > 
+> > In that case how do you want to deal with PM_SLEEP=n build breakages for
+> > v3.16 and what do you mean with "fix the build breakage with disabling PM"?
 > 
-> No, you aren't late. Its just 2 days old thread :)
+> Just a bit of explanation:
 > 
->> but one of the point I was raising as part of your
->> other series was to extend the CPU topology bindings to cover the voltage
->> domain information which is probably what is really needed to let the
->> CPUfreq extract the information. Not sure if it was already discussed.
+> The PM_SLEEP=n build breakages show up on automated build tests done by
+> various people.  Minimal fixes for them (Krzysztof's patch + patch [1] +
+> making ARM_EXYNOS_CPUIDLE depend on PM_SLEEP temporally) are really obvious
+> and should be pretty safe so it would be great to have them in v3.16.
 > 
-> Not it wasn't.
-> 
->> After all the CPU clocks, cluster, clock-gating, power domains are pretty much
->> related. So instead of having new binding for CPUFreq, I was wondering whether
->> we can extend the CPU topology binding information to include missing information.
->> Scheduler work anyway needs that information.
->>
->> Ref: Documentation/devicetree/bindings/arm/topology.txt
->>
->> Does that make sense ?
-> 
-> Yeah it does, but I am not sure what exactly the bindings should look then.
-> So, the most basic step could be moving the new bindings to topology.txt
-> and name clock-master to dvfs-master.
-> 
-> What else?
-> 
-> If its going to be much controversial then we *can* go for just dvfs bindings
-> for now and then update them later.
-> 
-Would be good to get others opinion. As you said if it is controversial then
-it will stall the development.
+> If that is not possible lets fix the issue completely early in v3.17 cycle.
 
-Regards,
-Santosh
+Okay, so Krzysztof's patch was posted in pull request to Olof on Saturday
+and merged already for v3.17.  In that case I will just refresh my patches
+and resubmit later.  Sorry for all the noise.
+
+Best regards,
+--
+Bartlomiej Zolnierkiewicz
+Samsung R&D Institute Poland
+Samsung Electronics
+
+> Best regards,
+> --
+> Bartlomiej Zolnierkiewicz
+> Samsung R&D Institute Poland
+> Samsung Electronics
+> 
+> > Best regards,
+> > --
+> > Bartlomiej Zolnierkiewicz
+> > Samsung R&D Institute Poland
+> > Samsung Electronics
+> > 
+> > > For PM_SLEEP=n and ARM_EXYNOS_CPUIDLE=y config more changes are needed
+> > > and they are contained in patch [2] (please note that this patch depends
+> > > on patch [3] from Tomasz Figa which was redone recently into [4] so my
+> > > patch also needs to be refreshed).  However if you think that this would
+> > > result in too much changes for v3.16 kernel we can make ARM_EXYNOS_CPUIDLE
+> > > select (or depend on) PM_SLEEP for now and fix the issue completely later
+> > > in v3.17 kernel.
+> > > 
+> > > [1] "[PATCH 1/2] ARM: EXYNOS: Fix build with PM_SLEEP=n part #2"
+> > > http://www.mail-archive.com/linux-samsung-soc at vger.kernel.org/msg34080.html
+> > > 
+> > > [2] "[PATCH 2/2] ARM: EXYNOS: Fix build with PM_SLEEP=n and ARM_EXYNOS_CPUIDLE=y"
+> > > http://www.mail-archive.com/linux-samsung-soc at vger.kernel.org/msg34081.html
+> > > 
+> > > [3] "[PATCH 5/6] ARM: EXYNOS: Fix suspend/resume sequencies"
+> > > http://www.mail-archive.com/linux-samsung-soc at vger.kernel.org/msg32809.html
+> > > 
+> > > [4] "[PATCH v3] ARM: EXYNOS: Fix suspend/resume sequences"
+> > > http://www.mail-archive.com/linux-samsung-soc at vger.kernel.org/msg34150.html
+> > > 
+> > > Best regards,
+> > > --
+> > > Bartlomiej Zolnierkiewicz
+> > > Samsung R&D Institute Poland
+> > > Samsung Electronics
