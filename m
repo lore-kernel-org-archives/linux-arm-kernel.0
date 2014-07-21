@@ -1,70 +1,69 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Mon, 21 Jul 2014 11:13:06 +0100
-Subject: [RESEND PATCH 0/6] thermal: sti: Add new Thermal driver
-In-Reply-To: <1405935299.2455.3.camel@rzhang1-toshiba>
-References: <1401980819-19962-1-git-send-email-lee.jones@linaro.org>
- <20140624092309.GD13803@lee--X1> <20140709120823.GA32573@lee--X1>
- <1404911964.28592.4.camel@rzhang1-toshiba>
- <20140709134646.GB479@lee--X1> <20140714130824.GA3993@lee--X1>
- <1405347277.28592.25.camel@rzhang1-toshiba>
- <20140714142703.GC3993@lee--X1> <20140721091753.GV30888@lee--X1>
- <1405935299.2455.3.camel@rzhang1-toshiba>
-Message-ID: <20140721101306.GW30888@lee--X1>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Mon, 21 Jul 2014 12:18:37 +0200
+Subject: [PATCH resend v2] arm64: dmi: Add SMBIOS/DMI support
+In-Reply-To: <20140721100304.GB12817@arm.com>
+References: <1405079210-30044-1-git-send-email-ard.biesheuvel@linaro.org>
+ <20140721100304.GB12817@arm.com>
+Message-ID: <CAKv+Gu9dfw7+URK+YG6D9_gUiFn17abUk2MUw5Jj5+5BwgrVbA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 21 Jul 2014, Zhang Rui wrote:
+On 21 July 2014 12:03, Catalin Marinas <catalin.marinas@arm.com> wrote:
+> Ard,
+>
+> I have some technical questions below before merging this patch.
+>
+> On Fri, Jul 11, 2014 at 12:46:50PM +0100, Ard Biesheuvel wrote:
+>> --- /dev/null
+>> +++ b/arch/arm64/include/asm/dmi.h
+>> @@ -0,0 +1,41 @@
+> [...]
+>> +static inline void __iomem *dmi_remap(u64 phys, u64 size)
+>> +{
+>> +     void __iomem *p = efi_lookup_mapped_addr(phys);
+>
+> When are dmi_remap/dmi_early_remap() called? A quick grep through the
+> kernel shows that it is at least called once from dmi_scan_machine().
+> The latter is a device_initcall() in this patch. However, the comments
+> for efi_lookup_mapped_addr() state that it should only be called between
+> efi_enter_virtual_mode and efi_free_boot_services. The latter is invoked
+> from an early_initcall(). Could you please clarify which part is wrong
+> here?
+>
 
-> On Mon, 2014-07-21 at 10:17 +0100, Lee Jones wrote:
-> > On Mon, 14 Jul 2014, Lee Jones wrote:
-> > 
-> > > On Mon, 14 Jul 2014, Zhang Rui wrote:
-> > > 
-> > > > On Mon, 2014-07-14 at 14:08 +0100, Lee Jones wrote:
-> > > > > On Wed, 09 Jul 2014, Lee Jones wrote:
-> > > > > > On Wed, 09 Jul 2014, Zhang Rui wrote:
-> > > > > > > On Wed, 2014-07-09 at 13:08 +0100, Lee Jones wrote:
-> > > > > > > > On Tue, 24 Jun 2014, Lee Jones wrote:
-> > > > > > > > 
-> > > > > > > > > > I'm re-sending this set, as one of the maintainers' email addresses
-> > > > > > > > > > is incorrect in the MAINTAINERS file.
-> > > > > > > > > > 
-> > > > > > > > > > This patchset adds full support for 2 types of Thermal Controllers
-> > > > > > > > > > produced by STMicroelectronics.  One is a more traditional memory
-> > > > > > > > > > mapped variant, the other is controlled solely by system configuration
-> > > > > > > > > > registers.
-> > > > > > > > > 
-> > > > > > > > > Any thing from the Thermal guys? Has this set fallen through the gaps?
-> > > > > > > > 
-> > > > > > > > Anything at all?  It's been well over a month now.
-> > > > > > > > 
-> > > > > > > Well, for the soc thermal drivers, I'd prefer to take them via Eduardo,
-> > > > > > > but as we didn't get any feedback from Eduardo, I will take them.
-> > > > > > 
-> > > > > > Thanks Rui.
-> > > > > > 
-> > > > > > So have you taken all 4 "thermal: sti: *" patches?
-> > > > > 
-> > > > > Have you taken these yet?
-> > > > 
-> > > > Not yet. will do tomorrow.
-> > 
-> > I waited 7 days and still don't see them?
-> > 
-> Done, they're in my local tree and I forgot to push them.
-> thanks for the reminder.
+The comment about efi_lookup_mapped_addr() is wrong. Those mappings
+are always available.
+As the comment is in shared code, I will propose a patch to Matt
+Fleming to clarify it.
 
-Thanks dude.
+>> +
+>> +     /*
+>> +      * If the mapping spans multiple pages, do a minimal check to ensure
+>> +      * that the mapping returned by efi_lookup_mapped_addr() covers the
+>> +      * whole requested range (but ignore potential holes)
+>> +      */
+>> +     if ((phys & ~PAGE_MASK) + size > PAGE_SIZE
+>> +         && (p + size - 1) != efi_lookup_mapped_addr(phys + size - 1))
+>> +             return NULL;
+>> +     return p;
+>> +}
+>> +
+>> +/* Reuse existing UEFI mappings for DMI */
+>> +#define dmi_alloc(l)                 kzalloc(l, GFP_KERNEL)
+>> +#define dmi_early_remap(x, l)                dmi_remap(x, l)
+>> +#define dmi_early_unmap(x, l)
+>> +#define dmi_unmap(x)
+>
+> Same questions as above, when are these functions called? Can we not
+> just use early_ioremap/ioremap like x86?
+>
 
-> > > Perfect, thanks for the update.
-> > > 
-> > > > >   I notice that these aren't in -next yet.
-> > 
-> 
-> 
+x86 uses DMI for quirks handling, so there the call to
+dmi_scan_machine() needs to occur very early, hence the early versions
+of map/unmap.
+In our case, DMI/SMBIOS is UEFI only and not executed early, so we can
+just reuse the mappings that have already been set up for UEFI by
+arm64_enter_virtual_mode().
 
 -- 
-Lee Jones
-Linaro STMicroelectronics Landing Team Lead
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+Ard.
