@@ -1,22 +1,31 @@
-From: davem@davemloft.net (David Miller)
-Date: Sun, 20 Jul 2014 21:13:37 -0700 (PDT)
-Subject: [PATCH 2/6] net/macb: add scatter-gather hw feature
-In-Reply-To: <fda3a504240e1f6863107ef6bf1e78586671a030.1405689937.git.cyrille.pitchen@atmel.com>
-References: <cover.1405689937.git.cyrille.pitchen@atmel.com>
- <fda3a504240e1f6863107ef6bf1e78586671a030.1405689937.git.cyrille.pitchen@atmel.com>
-Message-ID: <20140720.211337.211665722122921773.davem@davemloft.net>
+From: viresh.kumar@linaro.org (Viresh Kumar)
+Date: Mon, 21 Jul 2014 09:58:03 +0530
+Subject: [PATCH 1/2] PCI: spear: Fix Section mismatch compilation warning
+ for probe()
+In-Reply-To: <CAL_Jsq+dSoYp83wnXXHnfQ__GkQvoNcijmktvwqvcpazsQGioQ@mail.gmail.com>
+References: <76576b662613369d0c71db30ceed4ed5ae1343d2.1405857442.git.viresh.kumar@linaro.org>
+ <20140720192649.GA30124@quad.lixom.net>
+ <CAKohpokOJLKOwB_rKz0W-1T0nYX7-2_8nm3wQr6khR55x4gqrA@mail.gmail.com>
+ <CAL_Jsq+dSoYp83wnXXHnfQ__GkQvoNcijmktvwqvcpazsQGioQ@mail.gmail.com>
+Message-ID: <CAKohponUGvs818F-Ch4kFrRPv+vwXkuZotiVjQD9To0LuyNcZg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Cyrille Pitchen <cyrille.pitchen@atmel.com>
-Date: Fri, 18 Jul 2014 16:21:14 +0200
+On 21 July 2014 07:45, Rob Herring <robherring2@gmail.com> wrote:
+> The Fixes tag is new and the format is documented in SubmittingPatches
 
-> +		if (tx_skb->mapped_as_page) {
-> +			dma_unmap_page(&bp->pdev->dev, tx_skb->mapping,
-> +				       tx_skb->size, DMA_TO_DEVICE);
-> +		} else {
-> +			dma_unmap_single(&bp->pdev->dev, tx_skb->mapping,
-> +					 tx_skb->size, DMA_TO_DEVICE);
-> +		}
+Yeah, just saw that for the first time :)
 
-Please do not use curly braces for basic block composed of a single statement.
+> IIRC. I believe it is also supposed to be quotes rather than
+> parentheses around the commit message if we want to be really picky.
+
+Actually both: ("$subject")
+
+I never saw the doc and picked how it was done by Rafael for cpufreq stuff.
+Though he was correctly adding 12 digits of the sha key, but the quotes
+were missing :)
+
+I will take care of this now.
+
+--
+viresh
