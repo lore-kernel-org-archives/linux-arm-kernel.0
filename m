@@ -1,50 +1,51 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Mon, 21 Jul 2014 10:16:23 +0100
-Subject: [PATCH 00/14] arm64: eBPF JIT compiler
-In-Reply-To: <1405708100-13604-1-git-send-email-zlim.lnx@gmail.com>
-References: <1405708100-13604-1-git-send-email-zlim.lnx@gmail.com>
-Message-ID: <20140721091623.GA16122@arm.com>
+From: shawn.guo@freescale.com (Shawn Guo)
+Date: Mon, 21 Jul 2014 17:27:04 +0800
+Subject: [PATCH 2/3] ARM: smp_scu: enable SCU standby support
+In-Reply-To: <20140721085150.GB15666@arm.com>
+References: <1405928755-19413-1-git-send-email-shawn.guo@freescale.com>
+ <1405928755-19413-3-git-send-email-shawn.guo@freescale.com>
+ <20140721085150.GB15666@arm.com>
+Message-ID: <20140721092703.GL8537@dragon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
-
-On Fri, Jul 18, 2014 at 07:28:06PM +0100, Zi Shen Lim wrote:
-> This series implements eBPF JIT compiler for arm64.
-> Please see [14/14] for change log.
+On Mon, Jul 21, 2014 at 09:51:50AM +0100, Will Deacon wrote:
+> On Mon, Jul 21, 2014 at 08:45:54AM +0100, Shawn Guo wrote:
+> > With SCU standby enabled, SCU CLK will be turned off when all processors
+> > are in WFI mode.  And the clock will be turned on when any processor
+> > leaves WFI mode.
+> > 
+> > This behavior should be preferable in terms of power efficiency of
+> > system idle.  So let's set the SCU standby bit to enable the support in
+> > function scu_enable().
+> > 
+> > Signed-off-by: Shawn Guo <shawn.guo@freescale.com>
+> > ---
+> >  arch/arm/kernel/smp_scu.c | 3 ++-
+> >  1 file changed, 2 insertions(+), 1 deletion(-)
+> > 
+> > diff --git a/arch/arm/kernel/smp_scu.c b/arch/arm/kernel/smp_scu.c
+> > index c947508f84e6..9f29d167d02c 100644
+> > --- a/arch/arm/kernel/smp_scu.c
+> > +++ b/arch/arm/kernel/smp_scu.c
+> > @@ -18,6 +18,7 @@
+> >  
+> >  #define SCU_CTRL		0x00
+> >  #define SCU_ENABLE		(1 << 0)
+> > +#define SCU_STANDBY_ENABLE	(1 << 5)
+> >  #define SCU_CONFIG		0x04
+> >  #define SCU_CPU_STATUS		0x08
+> >  #define SCU_INVALIDATE		0x0c
+> > @@ -54,7 +55,7 @@ void scu_enable(void __iomem *scu_base)
+> >  	if (scu_ctrl & SCU_ENABLE)
+> >  		return;
+> >  
+> > -	scu_ctrl |= SCU_ENABLE;
+> > +	scu_ctrl |= SCU_ENABLE | SCU_STANDBY_ENABLE;
 > 
-> Patches [1-13/14] implement code generation functions.
-> Patch [14/14] implements the actual eBPF JIT compiler.
-> 
-> Many thanks to everyone who's reviewed the code from
-> RFCv1->RFCv3, especially Alexei for BPF bits, and Will
-> for ARM64 codegen bits :)
-> 
-> BTW, I'm happy to maintain arch/arm64/net (i.e. arm64 BPF bits).
-> Should I add a patch updating MAINTAINERS as Patch 15?
+> I don't think this bit exists on all revisions of the A9.
 
-I don't think that's necessary at the moment, but if we start seeing an
-influx of patches to arch/arm64/net, then that could make sense in the
-future.
+Thanks for the info, Will.  Is there any side-effect to write the
+standby bit on those revisions which do not define the bit?
 
-> This series requires a patch that exports a function
-> from net/core (resulting from RFCv1 discussion). This patch
-> has been merged into net-next @ 9f12fbe603f7
-> ("net: filter: move load_pointer() into filter.h").
-> 
-> This series applies against net-next and is tested working
-> with lib/test_bpf on ARMv8 Foundation Model.
-
-Looks like it works on my Juno board too, so:
-
-  Acked-by: Will Deacon <will.deacon@arm.com>
-
-for the series.
-
-It's a bit late for 3.17 now, so I guess we'll queue this for 3.18 (which
-also means the dependency on -next isn't an issue). Perhaps you could repost
-around -rc3?
-
-Cheers,
-
-Will
+Shawn
