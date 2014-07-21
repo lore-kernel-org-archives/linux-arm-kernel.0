@@ -1,89 +1,43 @@
-From: boris.brezillon@free-electrons.com (Boris BREZILLON)
-Date: Mon, 21 Jul 2014 14:34:28 +0200
-Subject: [RESEND PATCH v3 06/11] drm: add DT bindings documentation for
- atmel-hlcdc-dc driver
-In-Reply-To: <1616525.bcHvjgnZ4T@avalon>
-References: <1404751384-5077-1-git-send-email-boris.brezillon@free-electrons.com>
- <20140721115737.1377a5fd@bbrezillon> <20140721121245.GA15238@ulmo>
- <1616525.bcHvjgnZ4T@avalon>
-Message-ID: <20140721143428.078b68a4@bbrezillon>
+From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
+Date: Mon, 21 Jul 2014 14:38:13 +0200
+Subject: [PATCHv2 12/17] cpuidle: mvebu: make the cpuidle driver capable
+ of handling multiple SoCs
+In-Reply-To: <53CD08CF.6080900@linaro.org>
+References: <1404913221-17343-1-git-send-email-thomas.petazzoni@free-electrons.com>
+ <52019695.n2AjkGEsJ7@wuerfel>
+ <20140721133534.3415e425@free-electrons.com>
+ <5251405.VTrfDi1rj5@wuerfel>
+ <20140721140917.16e71558@free-electrons.com>
+ <53CD08CF.6080900@linaro.org>
+Message-ID: <20140721143813.6028b6ed@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 21 Jul 2014 14:16:42 +0200
-Laurent Pinchart <laurent.pinchart@ideasonboard.com> wrote:
+Dear Daniel Lezcano,
 
-> Hi Thierry,
+On Mon, 21 Jul 2014 14:34:23 +0200, Daniel Lezcano wrote:
+
+> So there are three solutions:
 > 
-> On Monday 21 July 2014 14:12:47 Thierry Reding wrote:
-> > On Mon, Jul 21, 2014 at 11:57:37AM +0200, Boris BREZILLON wrote:
-> > > On Mon, 21 Jul 2014 11:32:55 +0200 Laurent Pinchart wrote:
-> > >> On Monday 21 July 2014 11:24:38 Boris BREZILLON wrote:
-> > >>> On Mon, 21 Jul 2014 10:59:12 +0200 Thierry Reding wrote:
-> > >>>> On Fri, Jul 18, 2014 at 05:43:34PM +0200, Boris BREZILLON wrote:
-> > >>>> [...]
-> > >>>> 
-> > >>>>>>>>>> + - atmel,panel: Should contain a phandle with 2 parameters.
-> > >>>>>>>>>> +   The first cell is a phandle to a DRM panel device
-> > >>>>>>>>>> +   The second cell encodes the RGB mode, which can take the
-> > >>>>>>>>>> following values:
-> > >>>>>>>>>> +   * 0: RGB444
-> > >>>>>>>>>> +   * 1: RGB565
-> > >>>>>>>>>> +   * 2: RGB666
-> > >>>>>>>>>> +   * 3: RGB888
-> > >>>>>>>>> 
-> > >>>>>>>>> These are properties of the panel and should be obtained from
-> > >>>>>>>>> the panel directly rather than an additional cell in this
-> > >>>>>>>>> specifier.
-> > >>>>>>>> 
-> > >>>>>>>> Okay.
-> > >>>>>>>> What's the preferred way of doing this ?
-> > >>>>>>>> What about defining an rgb-mode property in the panel node.
-> > >>>>>>> 
-> > >>>>>>> There's .bpc in struct drm_display_info, I suspect that it could
-> > >>>>>>> be used for this. Alternatively, maybe we could extend the list
-> > >>>>>>> of color formats that go into drm_display_info.color_formats?
-> > >>>>>>> RGB444 is already covered.
-> > >>>>> 
-> > >>>>> I forgot to ask about bpc meaning. If, as I think, it means "bits
-> > >>>>> per color" then it cannot be used to encode RGB565 where green
-> > >>>>> color is encoded on 6 bits and red and blue are encoded on 5 bits.
-> > >>>> 
-> > >>>> Yes, I agree that bps is not a good fit for what you need here.
-> > >>> 
-> > >>> Okay, then I think we can replace bpc and color_formats by a
-> > >>> bus_formats table containing all supported formats, and use an enum
-> > >>> (something similar to v4l2_mbus_pixelcode defined in v4l2-mediabus.h
-> > >>> [1]) to list the available formats.
-> > >>> 
-> > >>> As this implies quite a few changes in crtc core and some drm drivers
-> > >>> (nouveau, i915 and radeon), I'd like to be sure this is what both of
-> > >>> you had in mind.
-> > >> 
-> > >> I think it is, but just to make sure I understand you correctly, could
-> > >> you just show how the drm_display_info structure would look like ?
-> > > 
-> > > The new drm_display_info structure should look like this [2] (except
-> > > that color_formats and bpc have not be removed yet), and [1] is just
-> > > here to show how the video_bus_format enum would look like.
-> > > 
-> > > [1] http://code.bulix.org/rfd0yx-86557
-> > > [2] http://code.bulix.org/7n03b4-86556
-> > 
-> > Quoting from your paste:
-> > 
-> > 	+   const enum video_bus_format *bus_formats;
-> > 	+   int nbus_formats;
-> > 
-> > Do we really need more than one?
+> 1. Pass the flag through the platform data, I am not really in favor of 
+> that as mentioned above
+
+That's what is already implemented.
+
 > 
-> We do if we want to replace the color_formats and bpc fields.
+> 2. Use the compatible string like the cpuidle-big-little.c driver, but 
+> Arnd is not in favor of that
 > 
+> 3. Register 3 platform drivers, in cpuidle-mvebu-v7.c, and let the 
+> registering of the cpuidle's platform device to enable the right one
 
-Yes, that's what I was about to answer :-).
+I'm fine with doing (3). Daniel, Arnd, let me know if that's ok for
+you, and I'll respin the patch series accordingly.
 
+Thanks,
 
+Thomas
 -- 
-Boris Brezillon, Free Electrons
-Embedded Linux and Kernel engineering
+Thomas Petazzoni, CTO, Free Electrons
+Embedded Linux, Kernel and Android engineering
 http://free-electrons.com
