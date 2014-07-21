@@ -1,73 +1,223 @@
-From: w@1wt.eu (Willy Tarreau)
-Date: Mon, 21 Jul 2014 09:03:03 +0200
-Subject: Issue found in Armada 370: "No buffer space available" error
- during continuous ping
-In-Reply-To: <CAB8gEUsK9c3YMpAABifNAWU7zec2ePztSqS4KAYtiT7Sbhadvg@mail.gmail.com>
-References: <20140708102142.0f7fe796@free-electrons.com>
- <CAB8gEUvEQdRT3Xarq_z6-KCr3T9xZ7wHvW9Termw8MAg_d-gQA@mail.gmail.com>
- <20140715142431.4eccbcd6@free-electrons.com> <20140715124333.GF12333@1wt.eu>
- <CAB8gEUt08QVpgW0fs18tNnCkCw36SD6hxgL8O6p6+oOtX0-yJQ@mail.gmail.com>
- <20140717081527.GJ14723@1wt.eu>
- <CAB8gEUsLmuDkTzGsq8fVs9dZ90d82Brw2cAPBOnobUTcSgQabA@mail.gmail.com>
- <CAB8gEUvwPJUhDN-=tugTyKe93SdNwqNaGtKMF1DRCb8ZNncmmg@mail.gmail.com>
- <20140721054405.GK21834@1wt.eu>
- <CAB8gEUsK9c3YMpAABifNAWU7zec2ePztSqS4KAYtiT7Sbhadvg@mail.gmail.com>
-Message-ID: <20140721070303.GM21834@1wt.eu>
+From: l.majewski@samsung.com (Lukasz Majewski)
+Date: Mon, 21 Jul 2014 09:02:34 +0200
+Subject: [PATCH v2] cpufreq: tests: Providing cpufreq regression test
+In-Reply-To: <1405678985-21677-1-git-send-email-l.majewski@samsung.com>
+References: <1405678985-21677-1-git-send-email-l.majewski@samsung.com>
+Message-ID: <1405926154-27214-1-git-send-email-l.majewski@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Maggie,
+This commit adds first regression test "cpufreq_freq_test.sh" for the
+cpufreq subsystem.
 
-On Sun, Jul 20, 2014 at 11:33:22PM -0700, Maggie Mae Roxas wrote:
-> > As you said that you both applied cd71e2 and reverted 4f3a4f, could you
-> please confirm that with cd71 applied only it was not enough?
-> Yes.
-> If mvneta.c used is the v3.13.9 + cd71e2, issue still occurs.
-> If mvneta.c used is the v3.13.9 + cd71e2 - 4f3a4f, issue does not occur anymore.
+Signed-off-by: Lukasz Majewski <l.majewski@samsung.com>
 
-Rather strange then.
+---
+Changes for v2:
+- Replace *_PATCH with *_PATH for variables names
+- Corrected mistakes in the README file
+- Providing detailed explanation of the patch in the README file
+---
+ drivers/cpufreq/tests/README               |  33 +++++++
+ drivers/cpufreq/tests/cpufreq_freq_test.sh | 149 +++++++++++++++++++++++++++++
+ 2 files changed, 182 insertions(+)
+ create mode 100644 drivers/cpufreq/tests/README
+ create mode 100755 drivers/cpufreq/tests/cpufreq_freq_test.sh
 
-> Okay. First, I'll check if the interrupts are working by checking
-> this, as you suggested:
-> <snip>
-> Checking /proc/interrupts when you're sending some traffic should show
-> that the IRQ is increasing from time to time.
-> <snip>
-> I'll inform you the results within the next 2-3 days.
-
-OK.
-
-> We'll be using it as a router, thus, it would really be a problem for us.
-
-OK so clearly the issue must be found.
-Just thinking about something, do you have a custom boot loader ? It
-would be possible that in our case, the Tx IRQ works only because some
-obscure or undocumented bits are set by the boot loader and that in your
-case it's not pre-initialized.
-
-> Will check possibilities of shifting to v3.14+ with our customer -
-> especially if we found problems in ethernet performance as you
-> mentioned.
-> Any recommendations on which version to use, specifically?
-
-LTS would probably even interest your customer as it's an LTS version.
-In this case, always pick the most recent one (3.14.12 today). You may
-even be interested in 3.15.6 which contains another phy fix supposed to
-fix cd71e2, but if you're saying that it doesn't change anything for you
-I guess it will have no effet (might be worth testing for the purpose of
-helping troubleshooting though).
-
-> > Third, considering that other boards work without applying these changes, it might be possible that there's an issue on your board, and maybe detecting it early would allow you to fix it for all future batches, and maybe only apply these patches for the few very first ones.
-> Acknowledged.
-> Once we verified that indeed, the performance was slower (or
-> interrupts were not increasing) - we will inform our hardware team and
-> have them investigate this issue further for possible hardware bugs.
-
-OK. I still have a hard time imagining how hardware itself could prevent
-an IRQ from being delivered from a NIC which is located inside the SoC,
-but there must be an explanation somewhere :-/
-
-> Thanks a lot for the help again, I'll let you know as soon as I have more info.
-
-Thanks,
-Willy
+diff --git a/drivers/cpufreq/tests/README b/drivers/cpufreq/tests/README
+new file mode 100644
+index 0000000..3e9cd80
+--- /dev/null
++++ b/drivers/cpufreq/tests/README
+@@ -0,0 +1,33 @@
++This file contains list of cpufreq's available regression tests with a short
++usage description.
++
++1. cpufreq_freq_test.sh
++
++Description:
++------------
++This script is supposed to test if cpufreq attributes exported by sysfs are
++exposing correct values.
++
++To achieve this goal it saves the current governor and changes it to
++"performance". Afterwards, it reads the "scaling_available_frequencies"
++property. With the list of supported frequencies it is able to enforce each of
++them by writing to "scaling_max_freq" attribute. To make the test more reliable
++a superfluous load with gzip is created to be sure that we are running with
++highest possible frequency. This high load is regulated with the 'sleep'
++duration. After this time the "cpufreq_cur_freq" is read and compared with the
++original value. As the last step the original governor is restored.
++
++This script can work with or without BOOST enabled and helps in spotting errors
++related to cpufreq and common clock framework.
++
++Used attributes:
++----------------
++- "scaling_available_frequencies"
++- "cpuinfo_cur_freq"
++- "scaling_governor"
++- "scaling_max_freq"
++
++Target devices:
++---------------
++
++All devices which exports mentioned above sysfs attributes.
+\ No newline at end of file
+diff --git a/drivers/cpufreq/tests/cpufreq_freq_test.sh b/drivers/cpufreq/tests/cpufreq_freq_test.sh
+new file mode 100755
+index 0000000..c25f05c
+--- /dev/null
++++ b/drivers/cpufreq/tests/cpufreq_freq_test.sh
+@@ -0,0 +1,149 @@
++#!/bin/bash
++#
++# This file provides a simple mean to test if all declared freqs at
++# "scaling_available_frequencies" can be set and if "cpuinfo_cur_freq"
++# returns this value.
++#
++# Usage: ./cpufreq_freq_test.sh
++# Requisite: Compiled in "performance" governor
++#
++# This program is free software; you can redistribute it and/or modify
++# it under the terms of the GNU General Public License as published by
++# the Free Software Foundation; either version 2 of the License, or
++# (at your option) any later version.
++#
++# This program is distributed in the hope that it will be useful,
++# but WITHOUT ANY WARRANTY; without even the implied warranty of
++# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++# GNU General Public License for more details.
++#
++# You should have received a copy of the GNU General Public License
++# along with this program; if not, you can access it online at
++# http://www.gnu.org/licenses/gpl-2.0.html.
++#
++# Copyright (C) Samsung Electronics, 2014
++#
++# Author: Lukasz Majewski <l.majewski@samsung.com>
++
++set +x
++
++COLOUR_RED="\33[31m"
++COLOUR_BLUE="\33[34m"
++COLOUR_GREEN="\33[32m"
++COLOUR_DEFAULT="\33[0m"
++
++T_PATH=/sys/devices/system/cpu/cpu0/cpufreq
++BOOST_PATH=/sys/devices/system/cpu/cpufreq
++
++if [ ! -d "$T_PATH" ]; then
++    printf "   $COLOUR_RED No path to CPUFREQ $COLOUR_DEFAULT\n"
++    exit 1
++fi
++
++ERRORS=0
++
++OLD_GOV=`cat $T_PATH/scaling_governor`
++echo "CURRENT GOVERNOR: $OLD_GOV"
++echo "SET GOVERNOR: performance"
++echo "performance" > $T_PATH/scaling_governor
++
++function test_freqs1 {
++    FREQS=`cat $1`
++    for I in $FREQS; do
++	cpufreq_set_freq $I
++	if [ "$2" ]; then
++	    printf "$COLOUR_BLUE BOOST $COLOUR_DEFAULT" $I
++	fi
++	cpufreq_test_freq $I
++    done
++}
++
++function test_freqs2 {
++    FREQ=`cat $1`
++    FREQS_ARRAY=($FREQ)
++
++    for freq in ${FREQS_ARRAY[@]}
++    do
++	echo "REFERENCE FREQ: $freq"
++	for f in ${FREQS_ARRAY[@]}
++	do
++	    cpufreq_set_freq $freq
++	    echo -n "----> "
++	    cpufreq_set_freq $f
++	    cpufreq_test_freq $f
++	done
++    done
++}
++
++function restore {
++    if [ -f $BOOST_PATH/boost ]; then
++	cpufreq_boost_state $BOOST_STATE
++    fi
++
++    echo "SET GOVERNOR: $OLD_GOV"
++    echo $OLD_GOV > $T_PATH/scaling_governor
++}
++
++function die {
++    printf "   $COLOUR_RED FAILED $COLOUR_DEFAULT\n"
++    restore_gov
++    exit 1
++}
++
++function cpufreq_test_freq {
++    gzip < /dev/urandom > /dev/null &
++    pid=$!
++    sleep 0.1
++    CURR_FREQ=`cat $T_PATH/cpuinfo_cur_freq`
++    if [ $1 -eq $CURR_FREQ ]; then
++	printf "\t$COLOUR_GREEN OK $COLOUR_DEFAULT\n"
++    else
++	printf "$COLOUR_RED CURRENT $CURR_FREQ $COLOUR_DEFAULT\n"
++	ERRORS=`expr $ERRORS + 1`
++	#die
++    fi
++    kill -9 $pid
++    wait $! 2>/dev/null
++}
++
++function cpufreq_set_freq {
++    echo $1 > $T_PATH/scaling_max_freq || die $?
++    printf "FREQ:$COLOUR_GREEN %s $COLOUR_DEFAULT" $1
++}
++
++function cpufreq_boost_state {
++   echo $1 > $BOOST_PATH/boost
++}
++
++function cpufreq_boost_status {
++   cat $BOOST_PATH/boost
++}
++
++if [ -f $BOOST_PATH/boost ]; then
++    echo "######################################"
++    echo "TEST BOOST OPERATION"
++    echo "######################################"
++
++    BOOST_STATE=$(cpufreq_boost_status)
++    if [ $BOOST_STATE -eq 0 ]; then
++	cpufreq_boost_state 1
++    fi
++    test_freqs1 $T_PATH/scaling_boost_frequencies 1
++fi
++
++echo "######################################"
++echo "TEST AVAILABLE FREQS"
++echo "######################################"
++test_freqs1 $T_PATH/scaling_available_frequencies
++
++echo "######################################"
++echo "TEST FREQS SWITCHING"
++echo "######################################"
++test_freqs2 $T_PATH/scaling_available_frequencies
++
++echo "######################################"
++echo "ERRORS: $ERRORS"
++echo "######################################"
++
++restore
++exit 0
+-- 
+2.0.0.rc2
