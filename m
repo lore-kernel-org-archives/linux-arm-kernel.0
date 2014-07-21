@@ -1,127 +1,73 @@
-From: maggie.mae.roxas@gmail.com (Maggie Mae Roxas)
-Date: Sun, 20 Jul 2014 23:33:22 -0700
-Subject: Issue found in Armada 370: "No buffer space available" error
- during continuous ping
-In-Reply-To: <20140721054405.GK21834@1wt.eu>
-References: <CAB8gEUs3Z8OzOMBVqP1yN8zV1E67mGQTaxKKCw=GRuAVxJ4nGQ@mail.gmail.com>
- <CAB8gEUv52mjpAuYRKhv8_VuAwt9Uog5eD2jn45gnyqcd+cXv8g@mail.gmail.com>
- <20140708102142.0f7fe796@free-electrons.com>
- <CAB8gEUvEQdRT3Xarq_z6-KCr3T9xZ7wHvW9Termw8MAg_d-gQA@mail.gmail.com>
- <20140715142431.4eccbcd6@free-electrons.com>
- <20140715124333.GF12333@1wt.eu>
- <CAB8gEUt08QVpgW0fs18tNnCkCw36SD6hxgL8O6p6+oOtX0-yJQ@mail.gmail.com>
- <20140717081527.GJ14723@1wt.eu>
- <CAB8gEUsLmuDkTzGsq8fVs9dZ90d82Brw2cAPBOnobUTcSgQabA@mail.gmail.com>
- <CAB8gEUvwPJUhDN-=tugTyKe93SdNwqNaGtKMF1DRCb8ZNncmmg@mail.gmail.com>
- <20140721054405.GK21834@1wt.eu>
-Message-ID: <CAB8gEUsK9c3YMpAABifNAWU7zec2ePztSqS4KAYtiT7Sbhadvg@mail.gmail.com>
+From: s.hauer@pengutronix.de (Sascha Hauer)
+Date: Mon, 21 Jul 2014 08:35:20 +0200
+Subject: [PATCH] ARM: i.MX6: add more chip revision support
+In-Reply-To: <1405921091-28748-1-git-send-email-shawn.guo@freescale.com>
+References: <1405921091-28748-1-git-send-email-shawn.guo@freescale.com>
+Message-ID: <20140721063520.GR23235@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Willy,
-Good day.
+On Mon, Jul 21, 2014 at 01:38:11PM +0800, Shawn Guo wrote:
+> From: Jason Liu <r64343@freescale.com>
+> 
+> Add more revision support for the new i.MX6DQ tap-out (TO1.5).  This
+> TO1.5 is the Rev 1.3 as documented in i.MX6DQ data sheet, because TO1.3
+> and TO1.4 are never revealed.
 
-> OK. For information, the mirabox uses a 88F6707 and a 88E1510 for
-the phy.
-> So it's very close to what you have.
-Noted.
+So the chip identifies itself as 1.5 but the data sheet refers to it as
+1.3. Is there a way to make that clear somewhere? Otherwise it's really
+confusing.
 
-> As you said that you both applied cd71e2 and reverted 4f3a4f, could you
-please confirm that with cd71 applied only it was not enough?
-Yes.
-If mvneta.c used is the v3.13.9 + cd71e2, issue still occurs.
-If mvneta.c used is the v3.13.9 + cd71e2 - 4f3a4f, issue does not occur anymore.
+Sascha
 
-> I'm finding it really strange, because as you use the same CPU as the
-mirabox,
-> I'm seeing no reason why the IRQ wouldn't work, and since
-you're using a slightly different phy from us, the first patch which
-changes the the RGMII configuration (cd71e2) would be a more likely
-candidate.
+> 
+> Signed-off-by: Jason Liu <r64343@freescale.com>
+> Signed-off-by: Shawn Guo <shawn.guo@freescale.com>
+> ---
+>  arch/arm/mach-imx/anatop.c | 9 +++++++++
+>  arch/arm/mach-imx/mxc.h    | 2 ++
+>  2 files changed, 11 insertions(+)
+> 
+> diff --git a/arch/arm/mach-imx/anatop.c b/arch/arm/mach-imx/anatop.c
+> index 4a40bbb46183..459ba290744b 100644
+> --- a/arch/arm/mach-imx/anatop.c
+> +++ b/arch/arm/mach-imx/anatop.c
+> @@ -104,6 +104,15 @@ void __init imx_init_revision_from_anatop(void)
+>  	case 2:
+>  		revision = IMX_CHIP_REVISION_1_2;
+>  		break;
+> +	case 3:
+> +		revision = IMX_CHIP_REVISION_1_3;
+> +		break;
+> +	case 4:
+> +		revision = IMX_CHIP_REVISION_1_4;
+> +		break;
+> +	case 5:
+> +		revision = IMX_CHIP_REVISION_1_5;
+> +		break;
+>  	default:
+>  		revision = IMX_CHIP_REVISION_UNKNOWN;
+>  	}
+> diff --git a/arch/arm/mach-imx/mxc.h b/arch/arm/mach-imx/mxc.h
+> index a39b69ef4301..17a41ca65acf 100644
+> --- a/arch/arm/mach-imx/mxc.h
+> +++ b/arch/arm/mach-imx/mxc.h
+> @@ -43,6 +43,8 @@
+>  #define IMX_CHIP_REVISION_1_1		0x11
+>  #define IMX_CHIP_REVISION_1_2		0x12
+>  #define IMX_CHIP_REVISION_1_3		0x13
+> +#define IMX_CHIP_REVISION_1_4		0x14
+> +#define IMX_CHIP_REVISION_1_5		0x15
+>  #define IMX_CHIP_REVISION_2_0		0x20
+>  #define IMX_CHIP_REVISION_2_1		0x21
+>  #define IMX_CHIP_REVISION_2_2		0x22
+> -- 
+> 1.9.1
+> 
+> 
 
-Okay. First, I'll check if the interrupts are working by checking
-this, as you suggested:
-<snip>
-Checking /proc/interrupts when you're sending some traffic should show
-that the IRQ is increasing from time to time.
-<snip>
-I'll inform you the results within the next 2-3 days.
-
-> First you're not using a mainline kernel which means that you'll always
-be bothered.
-> Second, removing support for the Tx IRQ means that your Tx traffic can become very slow (typically 134 Mbps instead of 987 for unidirectional traffic), which can be a problem if your board is used as a router for example.
-> If you're building a NAS, you'll have less impact.
-We'll be using it as a router, thus, it would really be a problem for us.
-Will check possibilities of shifting to v3.14+ with our customer -
-especially if we found problems in ethernet performance as you
-mentioned.
-Any recommendations on which version to use, specifically?
-
-> Third, considering that other boards work without applying these changes, it might be possible that there's an issue on your board, and maybe detecting it early would allow you to fix it for all future batches, and maybe only apply these patches for the few very first ones.
-Acknowledged.
-Once we verified that indeed, the performance was slower (or
-interrupts were not increasing) - we will inform our hardware team and
-have them investigate this issue further for possible hardware bugs.
-
-Thanks a lot for the help again, I'll let you know as soon as I have more info.
-
-Regards,
-Maggie Roxas
-
-On Sun, Jul 20, 2014 at 10:44 PM, Willy Tarreau <w@1wt.eu> wrote:
-> Hi Maggie,
->
-> On Sun, Jul 20, 2014 at 07:45:13PM -0700, Maggie Mae Roxas wrote:
->> Hi Willy,
->> Good day.
->>
->> BTW, here are some answers to your questions.
->>
->> > In fact I don't know if you're running your own board or a "standard"
->> one (a mirabox or any NAS board).
->> We are using a "customized" one, not a "standard" one.
->> We based the design on Armada 370 RD Evaluation Board, but we used
->> Marvell 88E1512 as Ethernet PHY and Marvell 88F6707 as processor
->> instead of the ones in the Armada 370 RD (I think it uses Marvell
->> 88E1310 as Ethernet PHY and Marvell 88F6W11 as processor).
->
-> OK. For information, the mirabox uses a 88F6707 and a 88E1510 for
-> the phy. So it's very close to what you have.
->
->> > Maggie, do you know if it is possible that for any reason your board
->> would not deliver an IRQ on Tx completion ? That could explain things.
->> > You can easily test reverting commit 4f3a4f701b just in case.
->> > If that's the case, then the next step will be to figure out how it is possible
->> that IRQs are disabled!
->> After reverting 4f3a4f701b, as I reported, issue does not happen anymore.
->
-> As you said that you both applied cd71e2 and reverted 4f3a4f, could you
-> please confirm that with cd71 applied only it was not enough ? I'm
-> finding it really strange, because as you use the same CPU as the
-> mirabox, I'm seeing no reason why the IRQ wouldn't work, and since
-> you're using a slightly different phy from us, the first patch which
-> changes the the RGMII configuration (cd71e2) would be a more likely
-> candidate.
->
->> Please let me know how to "figure out how it is possible that IRQs are
->> disabled".
->
-> Checking /proc/interrupts when you're sending some traffic should show
-> that the IRQ is increasing from time to time.
->
->> Also, what is the impact if I use this combination?
->
-> First you're not using a mainline kernel which means that you'll always
-> be bothered. Second, removing support for the Tx IRQ means that your
-> Tx traffic can become very slow (typically 134 Mbps instead of 987 for
-> unidirectional traffic), which can be a problem if your board is used
-> as a router for example. If you're building a NAS, you'll have less
-> impact. Third, considering that other boards work without applying
-> these changes, it might be possible that there's an issue on your
-> board, and maybe detecting it early would allow you to fix it for all
-> future batches, and maybe only apply these patches for the few very
-> first ones.
->
-> Regards,
-> Willy
->
+-- 
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
