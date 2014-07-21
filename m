@@ -1,29 +1,31 @@
-From: tj@kernel.org (Tejun Heo)
-Date: Mon, 21 Jul 2014 08:18:52 -0400
-Subject: [PATCH 1/1] ahci: st: Provide DT bindings for ST's SATA
- implementation
-In-Reply-To: <1405931316-12276-1-git-send-email-lee.jones@linaro.org>
-References: <1405931316-12276-1-git-send-email-lee.jones@linaro.org>
-Message-ID: <20140721121852.GC12921@htj.dyndns.org>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Mon, 21 Jul 2014 13:30:56 +0100
+Subject: [PATCH v5 0/7] kernel: Add support for restart handler call chain
+In-Reply-To: <1405668856-13738-1-git-send-email-linux@roeck-us.net>
+References: <1405668856-13738-1-git-send-email-linux@roeck-us.net>
+Message-ID: <20140721123056.GF12817@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jul 21, 2014 at 09:28:36AM +0100, Lee Jones wrote:
-> Cc: devicetree at vger.kernel.org
-> Cc: Srinivas Kandagatla <srinivas.kandagatla@st.com>
-> Acked-by: Alexandre Torgue <alexandre.torgue@st.com>
-> Signed-off-by: Lee Jones <lee.jones@linaro.org>
-> ---
+On Fri, Jul 18, 2014 at 08:34:09AM +0100, Guenter Roeck wrote:
+> Patch 1 of this series implements the restart handler function. Patches 2 and 3
+> implement calling the restart handler chain from arm and arm64 restart code.
 > 
-> Hi Tejun,
+> Patch 4 modifies the restart-poweroff driver to no longer call arm_pm_restart
+> directly but machine_restart. This is done to avoid calling arm_pm_restart
+> from more than one place. The change makes the driver architecture independent,
+> so it would be possible to drop the arm dependency from its Kconfig entry.
 > 
-> This patch has been on the MLs for a few months now.  It documents
-> ST's AHCI driver which was accepted by you and now resides in
-> Mainline.
+> Patch 5 and 6 convert existing restart handlers in the watchdog subsystem
+> to use the restart handler. Patch 7 unexports arm_pm_restart to ensure
+> that no one gets the idea to implement a restart handler as module.
 
-Sorry about that.  Applied to libata/for-3.17.
+For the current patches:
 
-Thanks.
+Acked-by: Catalin Marinas <catalin.marinas@arm.com>
 
--- 
-tejun
+Do you plan to convert more of the power/drivers/reset/ code?
+
+BTW, is it worth doing something similar for pm_power_off (there is
+generic code calling it directly, so slightly more complicated than
+pm_restart)?
