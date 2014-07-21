@@ -1,40 +1,31 @@
-From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Mon, 21 Jul 2014 15:55:15 -0700
-Subject: [PATCH v6 3/7] arm64: kernel: introduce cpu_init_idle CPU
- operation
-In-Reply-To: <1405958786-17243-4-git-send-email-lorenzo.pieralisi@arm.com>
-References: <1405958786-17243-1-git-send-email-lorenzo.pieralisi@arm.com>
- <1405958786-17243-4-git-send-email-lorenzo.pieralisi@arm.com>
-Message-ID: <53CD9A53.5070001@codeaurora.org>
+From: mlongnecker@nvidia.com (Matthew Longnecker)
+Date: Mon, 21 Jul 2014 16:13:13 -0700
+Subject: [PATCH 4/6] ARM: tegra: Add soctherm and thermal zones to Tegra124
+ device tree
+In-Reply-To: <1403856699-2140-5-git-send-email-mperttunen@nvidia.com>
+References: <1403856699-2140-1-git-send-email-mperttunen@nvidia.com>
+ <1403856699-2140-5-git-send-email-mperttunen@nvidia.com>
+Message-ID: <53CD9E89.3030109@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/21/14 09:06, Lorenzo Pieralisi wrote:
-> diff --git a/arch/arm64/kernel/cpuidle.c b/arch/arm64/kernel/cpuidle.c
-> new file mode 100644
-> index 0000000..46eb3ea
-> --- /dev/null
-> +++ b/arch/arm64/kernel/cpuidle.c
-> @@ -0,0 +1,27 @@
-> +/*
-> + * ARM64 CPU idle arch support
-> + *
-> + * Copyright (C) 2014 ARM Ltd.
-> + * Author: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
-> + *
-> + * This program is free software; you can redistribute it and/or modify
-> + * it under the terms of the GNU General Public License version 2 as
-> + * published by the Free Software Foundation.
-> + */
-> +
-> +#include <linux/of.h>
-> +#include <linux/of_device.h>
-> +#include <asm/cpu_ops.h>
-> +
-> +int cpu_init_idle(unsigned int cpu)
+On 6/27/2014 1:11 AM, Mikko Perttunen wrote:
+> This adds the soctherm thermal sensing and management unit to the
+> Tegra124 device tree along with the four thermal zones it exports.
 
-sparse will probably complain here unless we include <asm/cpuidle.h> right?
+Mikko, soctherm doesn't "export thermal zones". I would rewrite your 
+desription like this:
 
--- 
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-hosted by The Linux Foundation
+   Extend the Tegra124 device tree by adding the soctherm thermal
+   sensing and management unit and by defining four thermal zones --
+   one for each temperature sensor in soctherm.
+
+System integrators have some flexibility in deciding how many thermal 
+zones to define for their platform. For example, an integrator could 
+define a single zone for the entire Tegra chip (giving a simple system 
+at runtime) or with multiple zones (giving potentially higher 
+performance near thermal limits). That's why I don't like the 
+implication that soctherm dictates the existence of particular thermal 
+zones.
+
+-Matt
