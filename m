@@ -1,63 +1,66 @@
-From: balbi@ti.com (Felipe Balbi)
-Date: Mon, 21 Jul 2014 10:11:40 -0500
-Subject: [PATCH 0/9] usb: musb: several bugfixes for the musb driver
-In-Reply-To: <20140721093430.3f528cc7@ipc1.ka-ro>
-References: <1405675890-8802-1-git-send-email-LW@KARO-electronics.de>
- <20140718161636.GA18460@arch.cereza>
- <20140718165044.GA30821@saruman.home>
- <20140721093430.3f528cc7@ipc1.ka-ro>
-Message-ID: <20140721151140.GG6852@saruman.home>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Mon, 21 Jul 2014 17:11:27 +0200
+Subject: [PATCH 2/2] iio: exynos-adc: add experimental touchscreen support
+In-Reply-To: <20140721144442.GB9112@core.coreip.homeip.net>
+References: <1405663186-26464-1-git-send-email-cw00.choi@samsung.com>
+ <5158672.dMAnnUQc7Z@wuerfel> <20140721144442.GB9112@core.coreip.homeip.net>
+Message-ID: <6569004.FG0IRy8WyL@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jul 21, 2014 at 09:34:30AM +0200, Lothar Wa?mann wrote:
-> Hi,
+On Monday 21 July 2014 07:44:42 Dmitry Torokhov wrote:
+> > > 
+> > > It would be nice to actually close the device even if someone is
+> > > touching screen. Please implement open/close methods and have them set a
+> > > flag that you would check here.
+> > 
+> > Ok. I think it's even better to move the request_irq() into the open function,
+> > which will avoid the flag and defer the error handling into the actual opening,
+> > as well as syncing the running irq with the close function.
 > 
-> Felipe Balbi wrote:
-> > Hi,
-> > 
-> > On Fri, Jul 18, 2014 at 01:16:36PM -0300, Ezequiel Garcia wrote:
-> > > Hi Lothar,
-> > > 
-> > > On 18 Jul 11:31 AM, Lothar Wa?mann wrote:
-> > > > The first three patches do some source code cleanup in the files that
-> > > > are modified in the subsequent patches.
-> > > > 
-> > > 
-> > > I've applied patches 4 and 9 on a recent -next, after fixing a conflict
-> > > due to patch 3 ("usb: musb_am335x: source cleanup"):
-> > > 
-> > > > Patch 4 carries the proper fix reported in commit:
-> > > >         7adb5c876e9c ("usb: musb: Fix panic upon musb_am335x module removal")
-> > > > 
-> > > > Patch 9 reinstates module unloading support for the musb_am335x driver
-> > > >         which was disabled due to a false failure analysis
-> > > > 
-> > > 
-> > > For these two patches, Tested-by: Ezequiel Garcia <ezequiel@vanguardiasur.com.ar>
-> > > 
-> > > Tested on a beaglebone with a mass storage USB device, module load/unload
-> > > works without issues. The module_get/put in the phy is now preventing the
-> > > musb_am335x driver unload, which seems to be the real cause of the issue
-> > > I reported. Thanks for providing a proper fix!
-> > 
-> > I don't that's a good fix. The problem is that even after am335x
-> > removing all its child, someone else tried to release the PHY. That
-> > ordering is the one that needs to be fixed. Doing a module_get on the
-> > parent device looks like a hack to me.
-> > 
-> No. It guarantees that the module cannot be unloaded when its resources
-> are still in use!
+> I do not quite like acquiring resources needed in open. I think drivers should
+> do all resource acquisition in probe() and leave open()/close() to
+> activate/quiesce devices.
 
-it's still a hack. You have a child incrementing the usage count on its
-parent just because a sibbling isn't doing the right thing.
+Ok, I'll move it back then. I'm not sure what I'm supposed to do
+in open/close then. Isn't it enough to check info->input->users
+like this?
 
--- 
-balbi
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140721/4c17f56f/attachment.sig>
+static irqreturn_t exynos_ts_isr(int irq, void *dev_id)
+{
+        struct exynos_adc *info = dev_id;
+        struct iio_dev *dev = dev_get_drvdata(info->dev);
+        u32 x, y;
+        bool pressed;
+        int ret;
+
+        while (info->input->users) {
+                ret = exynos_read_s3c64xx_ts(dev, &x, &y);
+                if (ret == -ETIMEDOUT)
+                        break;
+
+                pressed = x & y & ADC_DATX_PRESSED;
+                if (!pressed) {
+                        input_report_key(info->input, BTN_TOUCH, 0);
+                        input_sync(info->input);
+                        break;
+                }
+
+                input_report_abs(info->input, ABS_X, x & ADC_DATX_MASK);
+                input_report_abs(info->input, ABS_Y, y & ADC_DATY_MASK);
+                input_report_key(info->input, BTN_TOUCH, 1);
+                input_sync(info->input);
+
+                msleep(1);
+        };
+
+        writel(0, ADC_V1_CLRINTPNDNUP(info->regs));
+
+        return IRQ_HANDLED;
+}
+
+I could do enable_irq()/disable_irq(), but that leaves a small
+race at startup where we request the irq line and then immediately
+disable it again.
+
+	Arnd
