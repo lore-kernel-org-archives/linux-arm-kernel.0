@@ -1,49 +1,81 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Mon, 21 Jul 2014 08:46:27 +0100
-Subject: [PATCH v2 4/4] mfd: pm8921: rename pm8921-core driver
-In-Reply-To: <CABu_nUQDWbejZcQqFSJMhCokeMJXBcsCpsiJxz4gBsmtKiyivA@mail.gmail.com>
-References: <1405613855-27572-1-git-send-email-svarbanov@mm-sol.com>
- <1405613855-27572-5-git-send-email-svarbanov@mm-sol.com>
- <CABu_nUQDWbejZcQqFSJMhCokeMJXBcsCpsiJxz4gBsmtKiyivA@mail.gmail.com>
-Message-ID: <20140721074627.GT30888@lee--X1>
+From: shawn.guo@freescale.com (Shawn Guo)
+Date: Mon, 21 Jul 2014 15:45:55 +0800
+Subject: [PATCH 3/3] ARM: imx: remove SCU standby enable code
+In-Reply-To: <1405928755-19413-1-git-send-email-shawn.guo@freescale.com>
+References: <1405928755-19413-1-git-send-email-shawn.guo@freescale.com>
+Message-ID: <1405928755-19413-4-git-send-email-shawn.guo@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 18 Jul 2014, Prakash Burla wrote:
-> On Thu, Jul 17, 2014 at 9:47 PM, Stanimir Varbanov <svarbanov@mm-sol.com> wrote:
-> > The pm8921-core driver presently supports pm8921 and pm8058
-> > Qualcomm PMICs.  To avoid confusion with new generation PMICs
-> > (like pm8941) rename the pm8921-core driver to more
-> > appropriate name pm8xxx-ssbi, which reflects better that
-> > those chips use SSBI interface.
-> >
-> > Signed-off-by: Stanimir Varbanov <svarbanov@mm-sol.com>
-> > ---
-> >  drivers/mfd/Kconfig                          |   14 +++++-----
-> >  drivers/mfd/Makefile                         |    2 +-
-> >  drivers/mfd/{pm8921-core.c => pm8xxx-ssbi.c} |   38 +++++++++++++-------------
-> >  3 files changed, 27 insertions(+), 27 deletions(-)
-> >  rename drivers/mfd/{pm8921-core.c => pm8xxx-ssbi.c} (92%)
->  .
->  [Nope]
+Since we have scu_enable() enables SCU standby support at SCU core
+level, the code enabling SCU standby at i.MX platform level can be
+removed now.
 
-What does this mean?
+Signed-off-by: Shawn Guo <shawn.guo@freescale.com>
+---
+ arch/arm/mach-imx/common.h        |  2 --
+ arch/arm/mach-imx/cpuidle-imx6q.c |  4 ----
+ arch/arm/mach-imx/platsmp.c       | 10 ----------
+ 3 files changed, 16 deletions(-)
 
-> >  MODULE_LICENSE("GPL v2");
-> > -MODULE_DESCRIPTION("PMIC 8921 core driver");
-> > +MODULE_DESCRIPTION("PMIC PM8XXX SSBI driver");
-> >  MODULE_VERSION("1.0");
-> > -MODULE_ALIAS("platform:pm8921-core");
-> > +MODULE_ALIAS("platform:pm8xxx-ssbi");
->  >How about adding the module author as svarbanov at mm-sol.com/qcom?
->       MODULE_AUTHOR("SVARBANOV<svarbanov@mm-sol.com>");
-
-Module author has the same standards as Git author.
-
-MODULE_AUTHOR("Stanimir Varbanov <svarbanov@mm-sol.com>");
-
+diff --git a/arch/arm/mach-imx/common.h b/arch/arm/mach-imx/common.h
+index 22ba8973bcb9..1dabf435c592 100644
+--- a/arch/arm/mach-imx/common.h
++++ b/arch/arm/mach-imx/common.h
+@@ -98,11 +98,9 @@ void imx_set_cpu_arg(int cpu, u32 arg);
+ void v7_secondary_startup(void);
+ void imx_scu_map_io(void);
+ void imx_smp_prepare(void);
+-void imx_scu_standby_enable(void);
+ #else
+ static inline void imx_scu_map_io(void) {}
+ static inline void imx_smp_prepare(void) {}
+-static inline void imx_scu_standby_enable(void) {}
+ #endif
+ void imx_src_init(void);
+ void imx_gpc_init(void);
+diff --git a/arch/arm/mach-imx/cpuidle-imx6q.c b/arch/arm/mach-imx/cpuidle-imx6q.c
+index 10844d3bb926..aa935787b743 100644
+--- a/arch/arm/mach-imx/cpuidle-imx6q.c
++++ b/arch/arm/mach-imx/cpuidle-imx6q.c
+@@ -66,10 +66,6 @@ static struct cpuidle_driver imx6q_cpuidle_driver = {
+ 
+ int __init imx6q_cpuidle_init(void)
+ {
+-	/* Need to enable SCU standby for entering WAIT modes */
+-	if (!cpu_is_imx6sx())
+-		imx_scu_standby_enable();
+-
+ 	/* Set INT_MEM_CLK_LPM bit to get a reliable WAIT mode support */
+ 	imx6q_set_int_mem_clk_lpm(true);
+ 
+diff --git a/arch/arm/mach-imx/platsmp.c b/arch/arm/mach-imx/platsmp.c
+index 5b57c17c06bd..771bd25c1025 100644
+--- a/arch/arm/mach-imx/platsmp.c
++++ b/arch/arm/mach-imx/platsmp.c
+@@ -20,8 +20,6 @@
+ #include "common.h"
+ #include "hardware.h"
+ 
+-#define SCU_STANDBY_ENABLE	(1 << 5)
+-
+ u32 g_diag_reg;
+ static void __iomem *scu_base;
+ 
+@@ -45,14 +43,6 @@ void __init imx_scu_map_io(void)
+ 	scu_base = IMX_IO_ADDRESS(base);
+ }
+ 
+-void imx_scu_standby_enable(void)
+-{
+-	u32 val = readl_relaxed(scu_base);
+-
+-	val |= SCU_STANDBY_ENABLE;
+-	writel_relaxed(val, scu_base);
+-}
+-
+ static int imx_boot_secondary(unsigned int cpu, struct task_struct *idle)
+ {
+ 	imx_set_cpu_jump(cpu, v7_secondary_startup);
 -- 
-Lee Jones
-Linaro STMicroelectronics Landing Team Lead
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+1.9.1
