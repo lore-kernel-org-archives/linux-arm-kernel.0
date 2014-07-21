@@ -1,64 +1,50 @@
-From: boris.brezillon@free-electrons.com (Boris BREZILLON)
-Date: Mon, 21 Jul 2014 11:24:38 +0200
-Subject: [RESEND PATCH v3 06/11] drm: add DT bindings documentation for
- atmel-hlcdc-dc driver
-In-Reply-To: <20140721085908.GI8843@ulmo>
-References: <1404751384-5077-1-git-send-email-boris.brezillon@free-electrons.com>
- <1404751384-5077-7-git-send-email-boris.brezillon@free-electrons.com>
- <20140714100542.GB9870@ulmo> <20140715120619.7f29c458@bbrezillon>
- <20140715103136.GA6616@ulmo> <20140718165152.0a9fde09@bbrezillon>
- <20140718174334.209e99c1@bbrezillon> <20140721085908.GI8843@ulmo>
-Message-ID: <20140721112438.60452e09@bbrezillon>
+From: will.deacon@arm.com (Will Deacon)
+Date: Mon, 21 Jul 2014 10:16:23 +0100
+Subject: [PATCH 00/14] arm64: eBPF JIT compiler
+In-Reply-To: <1405708100-13604-1-git-send-email-zlim.lnx@gmail.com>
+References: <1405708100-13604-1-git-send-email-zlim.lnx@gmail.com>
+Message-ID: <20140721091623.GA16122@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 21 Jul 2014 10:59:12 +0200
-Thierry Reding <thierry.reding@gmail.com> wrote:
+Hello,
 
-> On Fri, Jul 18, 2014 at 05:43:34PM +0200, Boris BREZILLON wrote:
-> [...]
-> > > > > > > + - atmel,panel: Should contain a phandle with 2 parameters.
-> > > > > > > +   The first cell is a phandle to a DRM panel device
-> > > > > > > +   The second cell encodes the RGB mode, which can take the following values:
-> > > > > > > +   * 0: RGB444
-> > > > > > > +   * 1: RGB565
-> > > > > > > +   * 2: RGB666
-> > > > > > > +   * 3: RGB888
-> > > > > > 
-> > > > > > These are properties of the panel and should be obtained from the panel
-> > > > > > directly rather than an additional cell in this specifier.
-> > > > > 
-> > > > > Okay.
-> > > > > What's the preferred way of doing this ?
-> > > > > What about defining an rgb-mode property in the panel node.
-> > > > 
-> > > > There's .bpc in struct drm_display_info, I suspect that it could be used
-> > > > for this. Alternatively, maybe we could extend the list of color formats
-> > > > that go into drm_display_info.color_formats? RGB444 is already covered.
-> > > 
-> > 
-> > I forgot to ask about bpc meaning. If, as I think, it means "bits per
-> > color" then it cannot be used to encode RGB565 where green color is
-> > encoded on 6 bits and red and blue are encoded on 5 bits. 
+On Fri, Jul 18, 2014 at 07:28:06PM +0100, Zi Shen Lim wrote:
+> This series implements eBPF JIT compiler for arm64.
+> Please see [14/14] for change log.
 > 
-> Yes, I agree that bps is not a good fit for what you need here.
+> Patches [1-13/14] implement code generation functions.
+> Patch [14/14] implements the actual eBPF JIT compiler.
+> 
+> Many thanks to everyone who's reviewed the code from
+> RFCv1->RFCv3, especially Alexei for BPF bits, and Will
+> for ARM64 codegen bits :)
+> 
+> BTW, I'm happy to maintain arch/arm64/net (i.e. arm64 BPF bits).
+> Should I add a patch updating MAINTAINERS as Patch 15?
 
-Okay, then I think we can replace bpc and color_formats by a bus_formats
-table containing all supported formats, and use an enum (something
-similar to v4l2_mbus_pixelcode defined in v4l2-mediabus.h [1]) to list
-the available formats.
+I don't think that's necessary at the moment, but if we start seeing an
+influx of patches to arch/arm64/net, then that could make sense in the
+future.
 
-As this implies quite a few changes in crtc core and some drm drivers
-(nouveau, i915 and radeon), I'd like to be sure this is what both of you
-had in mind.
+> This series requires a patch that exports a function
+> from net/core (resulting from RFCv1 discussion). This patch
+> has been merged into net-next @ 9f12fbe603f7
+> ("net: filter: move load_pointer() into filter.h").
+> 
+> This series applies against net-next and is tested working
+> with lib/test_bpf on ARMv8 Foundation Model.
 
-Best Regards,
+Looks like it works on my Juno board too, so:
 
-Boris
+  Acked-by: Will Deacon <will.deacon@arm.com>
 
-[1]http://lxr.free-electrons.com/source/include/uapi/linux/v4l2-mediabus.h#L37
+for the series.
 
--- 
-Boris Brezillon, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
+It's a bit late for 3.17 now, so I guess we'll queue this for 3.18 (which
+also means the dependency on -next isn't an issue). Perhaps you could repost
+around -rc3?
+
+Cheers,
+
+Will
