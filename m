@@ -1,73 +1,71 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Mon, 21 Jul 2014 16:36:34 -0600
+From: abrestic@chromium.org (Andrew Bresticker)
+Date: Mon, 21 Jul 2014 15:52:19 -0700
 Subject: [PATCH 5/8] of: Add Tegra124 EMC bindings
-In-Reply-To: <1405088313-20048-6-git-send-email-mperttunen@nvidia.com>
+In-Reply-To: <53CD860B.7030800@wwwdotorg.org>
 References: <1405088313-20048-1-git-send-email-mperttunen@nvidia.com>
  <1405088313-20048-6-git-send-email-mperttunen@nvidia.com>
-Message-ID: <53CD95F2.10008@wwwdotorg.org>
+ <CAL1qeaGHfjQhLHvgzt85hmbuY4FOG5-k=f80=CNvzPDEgi9_6w@mail.gmail.com>
+ <53CD860B.7030800@wwwdotorg.org>
+Message-ID: <CAL1qeaHtGQxCO3cGdeCRUYuk6mxei6z1B63-iZdBECEbFqGhHw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/11/2014 08:18 AM, Mikko Perttunen wrote:
-> Add binding documentation for the nvidia,tegra124-emc device tree
-> node.
+On Mon, Jul 21, 2014 at 2:28 PM, Stephen Warren <swarren@wwwdotorg.org> wrote:
+> On 07/11/2014 10:43 AM, Andrew Bresticker wrote:
+>> On Fri, Jul 11, 2014 at 7:18 AM, Mikko Perttunen <mperttunen@nvidia.com> wrote:
+>>> Add binding documentation for the nvidia,tegra124-emc device tree
+>>> node.
+>>
+>>> diff --git a/Documentation/devicetree/bindings/memory-controllers/tegra-emc.txt b/Documentation/devicetree/bindings/memory-controllers/tegra-emc.txt
+>>
+>>> +Required properties :
+>>> +- compatible : "nvidia,tegra124-emc".
+>>> +- reg : Should contain 1 or 2 entries:
+>>> +  - EMC register set
+>>> +  - MC register set : Required only if no node with
+>>> +    'compatible = "nvidia,tegra124-mc"' exists. The MC register set
+>>> +    is first read from the MC node. If it doesn't exist, it is read
+>>> +    from this property.
+>>> +- timings : Should contain 1 entry for each supported clock rate.
+>>> +  Entries should be named "timing at n" where n is a 0-based increasing
+>>> +  number. The timings must be listed in rate-ascending order.
+>>
+>> There are upcoming boards which support multiple DRAM configurations
+>> and require a separate set of timings for each configuration.  Could
+>> we instead have multiple sets of timings with the proper one selected
+>> at runtime by RAM code, as reported by PMC_STRAPPING_OPT_A_0?
+>> Something like:
+>>
+>> emc {
+>>         emc-table at 0 {
+>>                 nvidia,ram-code = <0>;
+>>                 timing at 0 {
+>>                         ...
+>>                 };
+>>                 ...
+>>         };
+>
+> Until recently, there was a binding for Tegra20 EMC in mainline. We
+> should make sure the Tegra124 driver (or rather binding...) is at least
+> as feature-ful as that was.
+>
+> Furthermore, I thought that with some boards, there were more RAM
+> options that there were available RAM code strap bits. I assume that in
+> mainline, we'll simply have different base DT files for the different
+> sets of configurations? Or, will we want to add another level to the DT
+> to represent different sets of RAM code values? I'm not sure what data
+> source the bootloader uses to determine which set of RAM configuration
+> to use when there aren't enough entries in the BCT for the boot ROM to
+> do this automatically, and whether we have any way to get that value
+> into the kernel, so it could use it for the extra DT level lookup?
 
-> diff --git a/Documentation/devicetree/bindings/memory-controllers/tegra-emc.txt b/Documentation/devicetree/bindings/memory-controllers/tegra-emc.txt
-
-> +Required properties :
-> +- compatible : "nvidia,tegra124-emc".
-> +- reg : Should contain 1 or 2 entries:
-> +  - EMC register set
-> +  - MC register set : Required only if no node with
-> +    'compatible = "nvidia,tegra124-mc"' exists. The MC register set
-> +    is first read from the MC node. If it doesn't exist, it is read
-> +    from this property.
-
-I echo what Thierry said about the MC register sharing.
-
-> +- timings : Should contain 1 entry for each supported clock rate.
-
-s/entry/node/ I think.
-
-> +  Entries should be named "timing at n" where n is a 0-based increasing
-> +  number. The timings must be listed in rate-ascending order.
-
-That implies that #address-cells and #size-cells are required too.
-
-> +Required properties for timings :
-
-... and a reg property is needed here.
-
-> +- clock-frequency : Should contain the memory clock rate.
-> +- nvidia,parent-clock-frequency : Should contain the rate of the EMC
-> +  clock's parent clock.
-
-> +- clocks : Must contain an entry for each entry in clock-names.
-> +  See ../clocks/clock-bindings.txt for details.
-> +- clock-names : Must include the following entries:
-> +  - emc-parent : EMC's parent clock.
-
-Shouldn't clocks/clock-names be part of the main node, not the
-per-timing node?
-
-> +- The following properties contain EMC timing characterization values:
-> +  - nvidia,emc-zcal-cnt-long
-> +  - nvidia,emc-auto-cal-interval
-> +  - nvidia,emc-ctt-term-ctrl
-> +  - nvidia,emc-cfg
-> +  - nvidia,emc-cfg-2
-> +  - nvidia,emc-sel-dpd-ctrl
-> +  - nvidia,emc-cfg-dig-dll
-> +  - nvidia,emc-bgbias-ctl0
-> +  - nvidia,emc-auto-cal-config
-> +  - nvidia,emc-auto-cal-config2
-> +  - nvidia,emc-auto-cal-config3
-> +  - nvidia,emc-mode-reset
-> +  - nvidia,emc-mode-1
-> +  - nvidia,emc-mode-2
-> +  - nvidia,emc-mode-4
-> +- nvidia,emc-burst-data : EMC timing characterization data written to
-> +                          EMC registers.
-> +- nvidia,mc-burst-data : EMC timing characterization data written to
-> +                         MC registers.
-> 
+For the ChromeOS boards at least we are neither limited by the number
+of strapping bits (4) nor the number of BCT entries supported by the
+boot ROM (since coreboot does not rely on the boot ROM for SDRAM
+initialization), so having a single set of SDRAM configurations for
+each board, indexed by APBDEV_PMC_STRAPPING_OPT_A_0[7:4] works just
+fine.  Not sure how boards which do use the boot ROM for SDRAM
+initialization handle the BCT limitation.  I believe we considered
+using more board ID strapping bits in order to map the RAM codes to
+sets of configurations before switching to having coreboot do SDRAM
+initialization.
