@@ -1,47 +1,24 @@
-From: LW@KARO-electronics.de (Lothar =?UTF-8?B?V2HDn21hbm4=?=)
-Date: Mon, 21 Jul 2014 14:41:04 +0200
-Subject: [PATCH] spi: omap2-mcspi: fix blatant abuse of the resource
- subsystem
-In-Reply-To: <20140721121820.GW17528@sirena.org.uk>
-References: <1405683053-14104-1-git-send-email-LW@KARO-electronics.de>
- <20140718171035.GQ17528@sirena.org.uk>
- <20140721075144.251bb67d@ipc1.ka-ro>
- <20140721121820.GW17528@sirena.org.uk>
-Message-ID: <20140721144104.5e37f1a0@ipc1.ka-ro>
+From: drake@endlessm.com (Daniel Drake)
+Date: Mon, 21 Jul 2014 13:43:53 +0100
+Subject: [PATCH] ARM: dts: add CPU nodes for Exynos4 SoCs
+In-Reply-To: <1863399.9O2S91ZvEO@amdc1032>
+References: <1863399.9O2S91ZvEO@amdc1032>
+Message-ID: <CAD8Lp46eB3cDqD+1YMnWOG-V8CG7fCG1s2KH7znL0OrHSazRcQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Fri, Jul 18, 2014 at 5:00 PM, Bartlomiej Zolnierkiewicz
+<b.zolnierkie@samsung.com> wrote:
+> Recent patch by Tomasz Figa ("irqchip: gic: Fix core ID calculation
+> when topology is read from DT") fixed GIC driver to filter cluster ID
+> from values returned by cpu_logical_map() for SoCs having registers
+> mapped without per-CPU banking making it is possible to add CPU nodes
+> for Exynos4 SoCs.  In case of Exynos SoCs these CPU nodes are also
+> required by future changes adding initialization of cpuidle states in
+> Exynos cpuidle driver through DT.
 
-Mark Brown wrote:
-> On Mon, Jul 21, 2014 at 07:51:44AM +0200, Lothar Wa?mann wrote:
-> > Mark Brown wrote:
-> 
-> > > I'm not going to apply this with a commit message such as the above.
-> > > Quite aside from the tone the fact that it doesn't describe the issue
-> > > is not helpful for review, one of the things done in review is to try to
-> > > check that the change has the intended effect.
-> 
-> > Maybe the original author or the maintainer who accepted this can come
-> > up with a decent fix for this.
-> 
-> Just to be clear the issue is with the presentation of your change, it
-> is not appropriate to provide a changelog which consists mainly of
-> widely directed personal insults especially given that it omits basic
-> technical content.
->
-I understood that, but I feel incapable to come up with a reasonable
-changelog for this.
+This conflicts with work in the thread "cpufreq: use generic cpufreq
+drivers for exynos platforms" which is already in its 7th iteration.
+Perhaps best to work directly with Thomas to help him finish that series?
 
-
-Lothar Wa?mann
--- 
-___________________________________________________________
-
-Ka-Ro electronics GmbH | Pascalstra?e 22 | D - 52076 Aachen
-Phone: +49 2408 1402-0 | Fax: +49 2408 1402-10
-Gesch?ftsf?hrer: Matthias Kaussen
-Handelsregistereintrag: Amtsgericht Aachen, HRB 4996
-
-www.karo-electronics.de | info at karo-electronics.de
-___________________________________________________________
+Daniel
