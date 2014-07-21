@@ -1,42 +1,71 @@
-From: daniel.thompson@linaro.org (Daniel Thompson)
-Date: Mon, 21 Jul 2014 15:47:20 +0100
-Subject: [PATCH RFC 9/9] arm: imx: non-secure aliased mapping of GIC registers
-In-Reply-To: <1405954040-30399-1-git-send-email-daniel.thompson@linaro.org>
-References: <1405954040-30399-1-git-send-email-daniel.thompson@linaro.org>
-Message-ID: <1405954040-30399-10-git-send-email-daniel.thompson@linaro.org>
+From: wens@csie.org (Chen-Yu Tsai)
+Date: Mon, 21 Jul 2014 22:54:27 +0800
+Subject: [PATCH] ARM: dt: sun6i: Add #address-cells and #size-cells to i2c
+ controller nodes
+Message-ID: <1405954467-29331-1-git-send-email-wens@csie.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Signed-off-by: Daniel Thompson <daniel.thompson@linaro.org>
----
- arch/arm/mach-imx/mach-imx6q.c | 11 +++++++++++
- 1 file changed, 11 insertions(+)
+dtc was giving warnings for missing #address-cells and #size-cells for
+the new sun6i-a31-hummingbird.dts, which has a i2c-based rtc device.
 
-diff --git a/arch/arm/mach-imx/mach-imx6q.c b/arch/arm/mach-imx/mach-imx6q.c
-index e60456d..192d268 100644
---- a/arch/arm/mach-imx/mach-imx6q.c
-+++ b/arch/arm/mach-imx/mach-imx6q.c
-@@ -381,10 +381,21 @@ static void __init imx6q_init_late(void)
- 	}
- }
+This patch adds the properties for all i2c controller nodes for sun6i.
+
+Signed-off-by: Chen-Yu Tsai <wens@csie.org>
+---
+
+Hi Maxime,
+
+This is a fix to get rid of warnings from dtc when building sun6i dts.
+Sorry for now catching it earlier.
+
+
+Cheers
+ChenYu
+
+---
+ arch/arm/boot/dts/sun6i-a31.dtsi | 8 ++++++++
+ 1 file changed, 8 insertions(+)
+
+diff --git a/arch/arm/boot/dts/sun6i-a31.dtsi b/arch/arm/boot/dts/sun6i-a31.dtsi
+index 44b07e5..e06fbfc 100644
+--- a/arch/arm/boot/dts/sun6i-a31.dtsi
++++ b/arch/arm/boot/dts/sun6i-a31.dtsi
+@@ -660,6 +660,8 @@
+ 			clock-frequency = <100000>;
+ 			resets = <&apb2_rst 0>;
+ 			status = "disabled";
++			#address-cells = <1>;
++			#size-cells = <0>;
+ 		};
  
-+static struct map_desc gic_cpu_io_desc __initdata = {
-+		.virtual        = 0xff000000,
-+		.pfn            = __phys_to_pfn(0x00a00000),
-+		.length         = SZ_1M,
-+		.type           = MT_DEVICE_NS,
-+};
-+
- static void __init imx6q_map_io(void)
- {
- 	debug_ll_io_init();
- 	imx_scu_map_io();
-+	/* TODO: Need to check we are running without a secure monitor before
-+	 *       setting up this mapping.
-+	 */
-+	iotable_init(&gic_cpu_io_desc, 1);
- }
+ 		i2c1: i2c at 01c2b000 {
+@@ -670,6 +672,8 @@
+ 			clock-frequency = <100000>;
+ 			resets = <&apb2_rst 1>;
+ 			status = "disabled";
++			#address-cells = <1>;
++			#size-cells = <0>;
+ 		};
  
- static void __init imx6q_init_irq(void)
+ 		i2c2: i2c at 01c2b400 {
+@@ -680,6 +684,8 @@
+ 			clock-frequency = <100000>;
+ 			resets = <&apb2_rst 2>;
+ 			status = "disabled";
++			#address-cells = <1>;
++			#size-cells = <0>;
+ 		};
+ 
+ 		i2c3: i2c at 01c2b800 {
+@@ -690,6 +696,8 @@
+ 			clock-frequency = <100000>;
+ 			resets = <&apb2_rst 3>;
+ 			status = "disabled";
++			#address-cells = <1>;
++			#size-cells = <0>;
+ 		};
+ 
+ 		gmac: ethernet at 01c30000 {
 -- 
-1.9.3
+2.0.1
