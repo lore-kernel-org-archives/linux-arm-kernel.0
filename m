@@ -1,75 +1,85 @@
-From: LW@KARO-electronics.de (Lothar =?UTF-8?B?V2HDn21hbm4=?=)
-Date: Mon, 21 Jul 2014 10:03:07 +0200
-Subject: [PATCH 8/9] usb: phy: am335x: call
- usb_gen_phy_init()/usb_gen_phy_shutdown() in
- am335x_init()/am335x_shutdown()
-In-Reply-To: <20140718135713.GH24914@saruman.home>
-References: <1405675890-8802-1-git-send-email-LW@KARO-electronics.de>
- <1405675890-8802-2-git-send-email-LW@KARO-electronics.de>
- <1405675890-8802-3-git-send-email-LW@KARO-electronics.de>
- <1405675890-8802-4-git-send-email-LW@KARO-electronics.de>
- <1405675890-8802-5-git-send-email-LW@KARO-electronics.de>
- <1405675890-8802-6-git-send-email-LW@KARO-electronics.de>
- <1405675890-8802-7-git-send-email-LW@KARO-electronics.de>
- <1405675890-8802-8-git-send-email-LW@KARO-electronics.de>
- <1405675890-8802-9-git-send-email-LW@KARO-electronics.de>
- <20140718135713.GH24914@saruman.home>
-Message-ID: <20140721100307.21172b65@ipc1.ka-ro>
+From: cw00.choi@samsung.com (Chanwoo Choi)
+Date: Mon, 21 Jul 2014 17:11:12 +0900
+Subject: [PATCHv7 0/4] iio: adc: exynos_adc: Support Exynos3250 ADC and
+ code clean
+In-Reply-To: <14522743.f6oFhEQVv4@wuerfel>
+References: <1405909068-22539-1-git-send-email-cw00.choi@samsung.com>
+ <14522743.f6oFhEQVv4@wuerfel>
+Message-ID: <53CCCB20.50802@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-
-> On Fri, Jul 18, 2014 at 11:31:29AM +0200, Lothar Wa?mann wrote:
-> > This patch makes it possible to use the musb driver with HW that
-> > requires external regulators or clocks.
+On 07/21/2014 04:38 PM, Arnd Bergmann wrote:
+> On Monday 21 July 2014 11:17:44 Chanwoo Choi wrote:
+>>
+>> This patchset support Exynos3250 ADC (Analog Digital Converter) because
+>> Exynos3250 has additional special clock for ADC IP.
+>>
+>> Changes from v6:
+>> - Use "exynos3250-adc" compatible string instead of "exynos3250-adc-v2"
+>> - Use "sclk" clock name instead of "sclk_adc"
+>> - Remove un-necessary macro for exyno-adc-data-v2 structure.
+>> - Remove '(void *)' cast and mark the exynos-adc-data structure as 'const'
+>> - Change the number of ADC channels (Exynos3250 has only two channels for ADC)
+>>
 > 
-> can you provide an example of such HW ? Are you not using the internal
-> PHYs ?
+> Looks good to me. Two small requests:
 > 
-The Ka-Ro electronics TX48 module uses the mmc0_clk pin as VBUSEN
-rathern than usb0_drvvbus. This patch makes it possible to use an
-external regulator to handle the VBUS switch through the 'vcc-supply'
-property of the underlying generic_phy device.
+> a) if you don't mind, can you add my patch (1/2) to add support for s3c64xx to
+>    your series, adding your Signed-off-by line in addition to mine? I think
+>    that one was noncontroversial, while the second patch (2/2) need some more
+>    work to address the comments and do testing.
 
-> > Signed-off-by: Lothar Wa?mann <LW@KARO-electronics.de>
-> > ---
-> >  drivers/usb/phy/phy-am335x.c |    2 ++
-> >  1 file changed, 2 insertions(+)
-> > 
-> > diff --git a/drivers/usb/phy/phy-am335x.c b/drivers/usb/phy/phy-am335x.c
-> > index 6522fa7..de25674 100644
-> > --- a/drivers/usb/phy/phy-am335x.c
-> > +++ b/drivers/usb/phy/phy-am335x.c
-> > @@ -22,6 +22,7 @@ static int am335x_init(struct usb_phy *phy)
-> >  {
-> >  	struct am335x_phy *am_phy = dev_get_drvdata(phy->dev);
-> >  
-> > +	usb_gen_phy_init(phy);
-> >  	phy_ctrl_power(am_phy->phy_ctrl, am_phy->id, true);
-> >  	return 0;
-> >  }
-> > @@ -31,6 +32,7 @@ static void am335x_shutdown(struct usb_phy *phy)
-> >  	struct am335x_phy *am_phy = dev_get_drvdata(phy->dev);
-> >  
-> >  	phy_ctrl_power(am_phy->phy_ctrl, am_phy->id, false);
-> > +	usb_gen_phy_shutdown(phy);
-> >  }
-> >  
-> >  static int am335x_phy_probe(struct platform_device *pdev)
-> > -- 
-> > 1.7.10.4
-> > 
+OK, I'll add this patch.
+But, I have a question.
+
+Your patch add following compatible string.
+"s3c64100-adc" is right?
+
+ static const struct of_device_id exynos_adc_match[] = {
+ 	{
++		.compatible = "samsung,s3c64100-adc",
++		.data = &exynos_adc_s3c64xx_data,
++	}, {
+
 > 
+> b) For the "compatible" string, I think it makes sense to set a fallback to
+>    "samsung,exynos-adc-v2" in the case for exynos3250, making the DT
+>    representation
+> 
+> 	compatible = "samsung,exynos3250-adc", "samsung,exynos-adc-v2";
+> 
+>    It's not entirely compatible because of the addition of the clock, but
+>    since the register layout is the same, I think it still make sense.
 
+OK, I'll add it in exynos3250.dtsi as following:
 
--- 
-___________________________________________________________
+                adc: adc at 126C0000 {
+-                       compatible = "samsung,exynos-adc-v3";
++                       compatible = "samsung,exynos3250-adc",
++                                    "samsung,exynos-adc-v2";
+                        reg = <0x126C0000 0x100>, <0x10020718 0x4>;
+                        interrupts = <0 137 0>;
+-                       clock-names = "adc", "sclk_tsadc";
++                       clock-names = "adc", "sclk";
+                        clocks = <&cmu CLK_TSADC>, <&cmu CLK_SCLK_TSADC>;
+                        #io-channel-cells = <1>;
+                        io-channel-ranges;
 
-Ka-Ro electronics GmbH | Pascalstra?e 22 | D - 52076 Aachen
-Phone: +49 2408 1402-0 | Fax: +49 2408 1402-10
-Gesch?ftsf?hrer: Matthias Kaussen
-Handelsregistereintrag: Amtsgericht Aachen, HRB 4996
+Thanks,
+Chanwoo Choi
 
-www.karo-electronics.de | info at karo-electronics.de
-___________________________________________________________
+> 
+> Thanks.
+> 
+> For the entire series,
+> 
+> Acked-by: Arnd Bergmann <arnd@arndb.de>
+> 
+> 	Arnd
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-kernel" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> Please read the FAQ at  http://www.tux.org/lkml/
+> 
