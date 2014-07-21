@@ -1,42 +1,53 @@
-From: shawn.guo@freescale.com (Shawn Guo)
-Date: Mon, 21 Jul 2014 11:19:38 +0800
-Subject: The imx6q suspend/resume is broken on 3.16-rc due to PCIe
-In-Reply-To: <CAOMZO5DS2NR57kzrjzMBSh8urxSB84Y0TPSJCaGjf7q3cPZPmg@mail.gmail.com>
-References: <1404135864.4305.23.camel@weser.hi.pengutronix.de>
- <20140701065105.GE14471@dragon>
- <1404724251.4587.20.camel@weser.hi.pengutronix.de>
- <20140707135502.GR30239@dragon> <20140716065505.GB2612@dragon>
- <1405605306.12800.7.camel@weser.hi.pengutronix.de>
- <247043c4c45c41bf9eaa09aaf91bcc46@DM2PR0301MB0862.namprd03.prod.outlook.com>
- <1405675308.6072.6.camel@weser.hi.pengutronix.de>
- <20140721025034.GH8537@dragon>
- <CAOMZO5DS2NR57kzrjzMBSh8urxSB84Y0TPSJCaGjf7q3cPZPmg@mail.gmail.com>
-Message-ID: <20140721031937.GI8537@dragon>
+From: gnurou@gmail.com (Alexandre Courbot)
+Date: Mon, 21 Jul 2014 12:36:43 +0900
+Subject: [alsa-devel] [PATCH 2/4] ASoC: s3c64xx/smartq: use dynamic
+ registration
+In-Reply-To: <20140717110540.GS17528@sirena.org.uk>
+References: <CAAVeFuLfgG6W1qK2ATTbq_ydEOjUuM8Wvftm6N1RK3Kz_y1zHg@mail.gmail.com>
+ <20140716071237.GA7978@ulmo>
+ <CAAVeFuJEjMBX+7vsLk5zXV5Moy=WDmWidpVZjQ_=8VD45+QdHg@mail.gmail.com>
+ <20140716075107.GG7978@ulmo> <53C63CBA.20809@codethink.co.uk>
+ <CAAVeFuK55XzwaU+eOWhfUxJ7wEwGqxRCPDZKf+gVeMgeV8ys6g@mail.gmail.com>
+ <20140717074444.GB18640@ulmo>
+ <CAAVeFuJQUA+92jGpgDkyQ+=Qu+okBHzS5aFi7gmdwh+qcFp3fg@mail.gmail.com>
+ <20140717101723.GR17528@sirena.org.uk> <20140717104121.GF17877@ulmo>
+ <20140717110540.GS17528@sirena.org.uk>
+Message-ID: <CAAVeFuKQuvTH=5U8chZeMNLjCkfo78+_r2Gx5WUfy+q3F4QZpQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Jul 20, 2014 at 11:55:42PM -0300, Fabio Estevam wrote:
-> On Sun, Jul 20, 2014 at 11:50 PM, Shawn Guo <shawn.guo@freescale.com> wrote:
-> > On Fri, Jul 18, 2014 at 11:21:48AM +0200, Lucas Stach wrote:
-> >> However I seem to have a board with rev 1.1 silicon and although the pci
-> >> driver starts up it never establishes a link. So my board may just work
-> >> by chance as I don't really know the differences between rev 1.1 silicon
-> >> and later revisions.
-> >
-> > Lucas, thanks for the info.
-> >
-> > I just checked my board on which the issue is seen, and found it has a
-> > rev 1.3 silicon.  I just tested on a board with rev 1.2 and did not even
-> > see the issue.
-> >
-> > Richard,
-> >
-> > Is this an issue only with rev 1.3?
-> 
-> I could see this issue on my board with rev 1.2.
+On Thu, Jul 17, 2014 at 8:05 PM, Mark Brown <broonie@kernel.org> wrote:
+> On Thu, Jul 17, 2014 at 12:41:23PM +0200, Thierry Reding wrote:
+>> On Thu, Jul 17, 2014 at 11:17:23AM +0100, Mark Brown wrote:
+>
+>> > Not so sure about that - what about requesting GPIOs for a bidirectional
+>> > bus?  Thinking about SPI bitbanging here.
+>
+>> Wouldn't you want to use a different means that the gpiod_array_*() API
+>> to handle those cases? gpiod_array_*() is probably most useful to handle
+>> bulk operations on a set of GPIOs that do essentially the same thing. If
+>> you get and then need to index into that array to handle them all
+>> differently then you don't gain very much.
+>
+> For set and get, sure - but it's still useful to be able to do bulk
+> requests for GPIOs especially since that's the only bit of the interface
+> that requires error handling.
 
-Hmm, that's strange.  I tested two imx6q-sabresd boards with rev 1.2
-silicon, and did not see this issue.  Hopefully, someone else can also
-test.
+I foresee many problems if people start using gpiod_array_get() as a
+way to spare a few lines of error-checking code. First all the GPIOs
+would end into an array instead of members with meaningful names -
+unless they are moved later on, but doing so would add extra code and
+somewhat kill the purpose. It also becomes more difficult to maintain
+as you are dealing with array indexes to update all over the code.
+Finally, it will make it more difficult to use gpiod_array_*() the way
+it is intended to be used, as you would have to discriminate between
+GPIOs of the same function and the rest by yourself.
 
-Shawn
+Also, if such a convenience function is legitimate for GPIO, shouldn't
+it also apply to other sub-systems? E.g. regulator_array_get()?
+
+Maybe I am missing your point, but I still think some error-handling
+code really doesn't hurt here, and the few drivers that would actually
+benefit from a more automated GPIO request error handling can easily
+implement it themselves. Let's keep gpiod_array_*() single-purposed
+and to the point.
