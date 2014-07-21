@@ -1,50 +1,26 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Mon, 21 Jul 2014 13:16:22 +0200
-Subject: [PATCHv2 12/17] cpuidle: mvebu: make the cpuidle driver capable
- of handling multiple SoCs
-In-Reply-To: <53CCF295.6030907@linaro.org>
-References: <1404913221-17343-1-git-send-email-thomas.petazzoni@free-electrons.com>
- <1404913221-17343-13-git-send-email-thomas.petazzoni@free-electrons.com>
- <53CCF295.6030907@linaro.org>
-Message-ID: <8387001.GKG5goCh1a@wuerfel>
+From: nm@ti.com (Nishanth Menon)
+Date: Mon, 21 Jul 2014 06:17:38 -0500
+Subject: [RFC PATCH 3/7] ARM: OMAP4+: PRM: remove "wkup" event
+In-Reply-To: <20140721104413.GT18374@atomide.com>
+References: <1402025761-16831-1-git-send-email-nm@ti.com>
+ <1402025761-16831-4-git-send-email-nm@ti.com>
+ <20140721104413.GT18374@atomide.com>
+Message-ID: <CAGo_u6ryytHiV1dnkPx-qFGa4ZB3KxVDrjmA+Ls5bakHVLunsQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday 21 July 2014 12:59:33 Daniel Lezcano wrote:
-> On 07/09/2014 03:40 PM, Thomas Petazzoni wrote:
-> > From: Gregory CLEMENT <gregory.clement@free-electrons.com>
-> >
-> > In order to prepare the add of new SoCs supports for this cpuidle
-> > driver, this patch extends the platform_data understood by the
-> > cpuidle-mvebu-v7 driver to contain a "type" identifying which specific
-> > SoC the cpuidle driver is being probed for. It will be used by the
-> > cpuidle driver to know the list of states for the current SoC.
-> 
-> It makes more sense to use/implement a 'soc_is_xxx' macro or 
-> 'of_machine_is_compatible', like the other cpuidle drivers, no ?
+On Mon, Jul 21, 2014 at 5:44 AM, Tony Lindgren <tony@atomide.com> wrote:
 >
-> Is there a good reason to implement a new way to check the board ?
+> Hmm so why was it added originally then?
+>
+> Do the PRM_IRQSTATUS line and the following line belong together
+> or is it missing something?
 
-In all other subsystems, we try to do this per-device: We have almost
-killed off all soc_is_* macros, and we strongly discourage anybody
-from using of_machine_is_compatible() in driver code, as this goes
-against the goals of multiplatform kernels on which we treat every
-device as a separate thing that may get reused on any number of
-machines or SoCs.
 
-> It isn't possible to do:
-> 
-> if (of_machine_is_compatible("marvell,armada-370-xp-pmsu"))
->         cpuidle_register(&armadaxp_cpuidle_driver, NULL);
-> 
-> ?
-> 
-> That will prevent the creation of the new single-declaration header file.
+Seems like to have been a copy paste from OMAP3 code which did have
+wakeup event at bit 0.
 
-It would be best to have a way to read a property (or multiple
-properties) from DT instead, to identify the requirements of the
-device individually. However, I guess that would also require
-changing the DT representation in an incompatible way, which we
-normally don't.
-
-	Arnd
+-- 
+---
+Regards,
+Nishanth Menon
