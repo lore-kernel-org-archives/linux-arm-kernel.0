@@ -1,26 +1,61 @@
-From: robherring2@gmail.com (Rob Herring)
-Date: Sun, 20 Jul 2014 21:15:06 -0500
-Subject: [PATCH 1/2] PCI: spear: Fix Section mismatch compilation warning
- for probe()
-In-Reply-To: <CAKohpokOJLKOwB_rKz0W-1T0nYX7-2_8nm3wQr6khR55x4gqrA@mail.gmail.com>
-References: <76576b662613369d0c71db30ceed4ed5ae1343d2.1405857442.git.viresh.kumar@linaro.org>
- <20140720192649.GA30124@quad.lixom.net>
- <CAKohpokOJLKOwB_rKz0W-1T0nYX7-2_8nm3wQr6khR55x4gqrA@mail.gmail.com>
-Message-ID: <CAL_Jsq+dSoYp83wnXXHnfQ__GkQvoNcijmktvwqvcpazsQGioQ@mail.gmail.com>
+From: cw00.choi@samsung.com (Chanwoo Choi)
+Date: Mon, 21 Jul 2014 11:17:44 +0900
+Subject: [PATCHv7 0/4] iio: adc: exynos_adc: Support Exynos3250 ADC and code
+ clean
+Message-ID: <1405909068-22539-1-git-send-email-cw00.choi@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Jul 20, 2014 at 7:12 PM, Viresh Kumar <viresh.kumar@linaro.org> wrote:
-> On 21 July 2014 00:56, Olof Johansson <olof@lixom.net> wrote:
->> Please use 12 significant digits, since 7 might not be sufficient later
->> on in time. I've fixed it up here.
->
-> I surely didn't knew this and haven't seen other maintainers do this
-> as well.. And thought, whatever "git log --online" gives would be
-> enough.
+This patchset support Exynos3250 ADC (Analog Digital Converter) because
+Exynos3250 has additional special clock for ADC IP.
 
-The Fixes tag is new and the format is documented in SubmittingPatches
-IIRC. I believe it is also supposed to be quotes rather than
-parentheses around the commit message if we want to be really picky.
+Changes from v6:
+- Use "exynos3250-adc" compatible string instead of "exynos3250-adc-v2"
+- Use "sclk" clock name instead of "sclk_adc"
+- Remove un-necessary macro for exyno-adc-data-v2 structure.
+- Remove '(void *)' cast and mark the exynos-adc-data structure as 'const'
+- Change the number of ADC channels (Exynos3250 has only two channels for ADC)
 
-Rob
+Changes from v5:
+- Add acked message by Kukjin Kim
+- Add reviewed messgae by Tomasz Figa
+- Fix typo (for for -> for)
+
+Changes from v4:
+- Use 'exynos_adc_data' structure instead of 'exynos_adc_ops' structure
+  and remove enum variable of ADC version
+- Fix wrong name of special clock (sclk_tsadc -> sclk_adc)
+- Add reviewed message by Naveen Krishna Chatradhi
+- Add functions for ADC clock control
+
+Changes from v3:
+- Add new 'exynos_adc_ops' structure to improve readability according to
+ Tomasz Figa comment[1]
+ [1] https://lkml.org/lkml/2014/4/16/238
+- Add new 'exynos3250-adc-v2' compatible string to support Exynos3250 ADC
+- Fix wrong compaitlbe string of ADC in Exynos3250 dtsi file
+
+Changes from v2:
+- Check return value of clock function to deal with error exception
+- Fix minor coding style to improve readability
+
+Changes from v1:
+- Add new "samsung,exynos-adc-v3" compatible to support Exynos3250 ADC
+- Add a patch about DT binding documentation
+
+
+Chanwoo Choi (4):
+  iio: adc: exynos_adc: Add exynos_adc_data structure to improve
+    readability
+  iio: adc: exynos_adc: Control special clock of ADC to support
+    Exynos3250 ADC
+  iio: devicetree: Add DT binding documentation for Exynos3250 ADC
+  ARM: dts: Fix wrong compatible string for Exynos3250 ADC
+
+ .../devicetree/bindings/arm/samsung/exynos-adc.txt |  25 +-
+ arch/arm/boot/dts/exynos3250.dtsi                  |   4 +-
+ drivers/iio/adc/exynos_adc.c                       | 335 +++++++++++++++------
+ 3 files changed, 274 insertions(+), 90 deletions(-)
+
+-- 
+1.8.0
