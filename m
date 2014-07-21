@@ -1,68 +1,136 @@
-From: jg1.han@samsung.com (Jingoo Han)
-Date: Mon, 21 Jul 2014 10:44:28 +0900
-Subject: [PATCH v6 4/5] PCI: add PCI controller for keystone PCIe h/w
-In-Reply-To: <53C9839C.5090604@ti.com>
-References: <1405696469-7172-1-git-send-email-m-karicheri2@ti.com>
- <1405696469-7172-5-git-send-email-m-karicheri2@ti.com>
- <CAL_JsqKheoWrSGtxPO=AE8g9iOAqfwRa=81Ku=Cfx8_gpDysOg@mail.gmail.com>
- <53C9839C.5090604@ti.com>
-Message-ID: <006001cfa485$4f4fcff0$edef6fd0$%han@samsung.com>
+From: cw00.choi@samsung.com (Chanwoo Choi)
+Date: Mon, 21 Jul 2014 10:52:28 +0900
+Subject: [PATCHv6 3/4] iio: devicetree: Add DT binding documentation for
+ Exynos3250 ADC
+In-Reply-To: <5381273.c6GzlyQ7Ea@wuerfel>
+References: <1405663186-26464-1-git-send-email-cw00.choi@samsung.com>
+ <5835825.JtcDoyOP8b@wuerfel>
+ <CAGTfZH3mnPJ72wi7aFYoChe_OeuRVsUVo3KGRRLTV5scwPbO4g@mail.gmail.com>
+ <5381273.c6GzlyQ7Ea@wuerfel>
+Message-ID: <53CC725C.9010406@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Saturday, July 19, 2014 5:29 AM, Murali Karicheri wrote:
-> On 07/18/2014 03:31 PM, Rob Herring wrote:
-> > On Fri, Jul 18, 2014 at 10:14 AM, Murali Karicheri<m-karicheri2@ti.com>  wrote:
-> --- Cut ---
-> >> +
-> >> +Optional properties:-
-> >> +       phys: phandle to Generic Keystone SerDes phy for PCI
-> >> +       phy-names: name of the Generic Keystine SerDes phy for PCI
-> >> +         - If boot loader already does PCI link establishment, then phys and
-> >> +           phy-names shouldn't be present.
-> >> +       ti,enable-linktrain - Enable Link training.
-> >> +         - If boot loader already does PCI link establishment, then this
-> >> +           shouldn't be present.
-> >
-> > Can't you read from the h/w if the link is trained?
+On 07/19/2014 03:48 AM, Arnd Bergmann wrote:
+> On Saturday 19 July 2014 02:02:09 Chanwoo Choi wrote:
+>> On Sat, Jul 19, 2014 at 1:33 AM, Arnd Bergmann <arnd@arndb.de> wrote:
+>>> On Saturday 19 July 2014 01:23:15 Chanwoo Choi wrote:
+>>>> If don't add new compatible including specific exynos version,
+>>>> I would add new 'adc-needs-sclk' property with existing 'exynos-adc-v2'
+>>>> compatible name.
+> 
+> What I actually meant is using compatible="exynos-adc-v2.1" or similar
+> rather than "exynos3250-adc". However, as you already explained, the
+> version numbers are apparently just made up, so using "exynos3250-adc"
+> is actually better here. If a future exynos7890 uses the same clocks
+> as exynos3250, it can simply use the same "exynos3250-adc" string here.
 
-I agree with Rob Herring's suggestion.
+OK, I'll use "exynos3250-adc" compatible string instead of "exynos3250-adc-v2".
 
 > 
-> Yes.
+>>>> Dear Naveen, Tomasz,
+>>>>
+>>>> If existing exynos-adc driver add just one property for 'sclk_adc'
+>>>> as following, exynos-adc could not include the exynos version
+>>>> in compatible name.
+>>>>
+>>>> I need your opinion about it.
+>>>>
+>>>>                 adc: adc at 126C0000 {
+>>>>                         compatible = "samsung,exynos-adc-v2";
+>>>>                         reg = <0x126C0000 0x100>, <0x10020718 0x4>;
+>>>>                         interrupts = <0 137 0>;
+>>>>                         clock-names = "adc", "sclk_adc";
+>>>>                         clocks = <&cmu CLK_TSADC>, <&cmu CLK_SCLK_TSADC>;
+>>>> +                        adc-needs-sclk;
+>>>>                         #io-channel-cells = <1>;
+>>>>                         io-channel-ranges;
+>>>>                 }
+>>>
+>>> How about just making it an optional clock? That would be much
+>>> easier because then you can simply see if the clock itself is
+>>> there and use it, or otherwise ignore it.
+>>
+>> The v1 of this patchset[1] got the clock of 'sclk_adc'  but if the dt node
+>> of ADC in dtsi file didn't include 'sclk_adc', print just warning message
+>> without stopping probe as following:
+>>
+>>  [1] https://lkml.org/lkml/2014/4/10/710
+>>
+>> +       info->sclk = devm_clk_get(&pdev->dev, "sclk_adc");
+>> +       if (IS_ERR(info->sclk)) {
+>> +               dev_warn(&pdev->dev, "failed getting sclk clock, err = %ld\n",
+>> +                                                       PTR_ERR(info->sclk));
+>> +               info->sclk = NULL;
+>> +       }
+>>
+>> But, Tomasz Figa suggested the method[2] of this patchset(v6).
+>>  [2] https://lkml.org/lkml/2014/4/11/189
 > 
-> There are customers who use this driver with PCI Link setup done in the
-> boot loader. This property tells the driver to bypass Link setup
-> procedure in that case. Is this undesirable and if so. how other
-> platforms handle it? Check first if link is trained or start the link
-> setup procedure? Let me know. If this is fine, please provide your Ack.
+> Yes, your current version is certainly better than this, but another way
+> to address Tomasz' comment would be to change the binding to list the "sclk"
+> as optional for any device and make the code silently ignore missing sclk
+> entries, like:
+> 
+> 
+> 	info->sclk = devm_clk_get(&pdev->dev, "sclk");
+> 	if (IS_ERR(info->sclk)) {
+> 		switch (PTR_ERR(info->sclk)) {
+> 		case -EPROBE_DEFER:
+> 			/* silently return error so we can retry */
+> 			return -EPROBE_DEFER:
+> 		case -ENOENT:
+> 			/* silently ignore missing optional clk */
+> 			info->sclk = NULL;
+> 			break;
+> 		default:
+> 			/* any other error: clk is defined by doesn't work  */
+> 			dev_err(&pdev->dev, "failed getting sclk clock, err = %ld\n",
+> 				PTR_ERR(info->sclk));
+> 			return PTR_ERR(info->sclk));
+> 		}
+> 	}
 
-Please, check the following code of Exynos PCIe diver.
+I tested this patch suggested by you.
+But, devm_clk_get returns always '-ENOENT' on follwong two cases:
 
-./drivers/pci/host/pci-exynos.c
+Case 1.
+ADC dt node in exynos3250.dtsi don't include 'sclk' clock as following:
 
-static int exynos_pcie_establish_link(struct pcie_port *pp)
-{
-	struct exynos_pcie *exynos_pcie = to_exynos_pcie(pp);
-	void __iomem *elbi_base = exynos_pcie->elbi_base;
-	void __iomem *pmu_base = exynos_pcie->pmu_base;
+                adc: adc at 126C0000 {
+                        compatible = "samsung,exynos3250-adc";
+                        reg = <0x126C0000 0x100>, <0x10020718 0x4>;
+                        interrupts = <0 137 0>;
+                        clock-names = "adc";
+                        clocks = <&cmu CLK_TSADC>;
+                        #io-channel-cells = <1>;
+                        io-channel-ranges;
+		};
 
-	if (dw_pcie_link_up(pp)) {
-		dev_err(pp->dev, "Link already up\n");
-		return 0;
-	}
-	.....
+Case 2.
+ADC dt node in exynos3250.dtsi don't include 'sclk' clock
+but, exynos3250 clock controller don't support CLK_SCLK_TSADC clock as following:
 
-In the case of Exynos PCIe, the Exynos PCIe driver checks the
-h/w bit such as PCIE_ELBI_LTSSM_ENABLE bit of PCIE_ELBI_RDLH_LINKUP
-offset register.
+                adc: adc at 126C0000 {
+                        compatible = "samsung,exynos3250-adc";
+                        reg = <0x126C0000 0x100>, <0x10020718 0x4>;
+                        interrupts = <0 137 0>;
+                        clock-names = "adc", "sclk";
+                        clocks = <&cmu CLK_TSADC>, <&cmu CLK_SCLK_TSADC>;
+                        #io-channel-cells = <1>;
+                        io-channel-ranges;
+		};
 
-If the link is already set up by the boot loader or other reasons,
-the driver will skip some initialization codes.
 
-The first step is that you find such h/w bit for checking link up.
-If so, please add the code for skipping, when the link is already
-set up.
+So, I think exynos-adc needs to use 'needs_sclk' field suggested by Tomasz Figa.
 
-Best regards,
-Jingoo Han
+> 
+> One more comment about the name: Both in the code you use "sclk" as the
+> name, so presumably that is the actual name of the clk as known to this
+> driver, and it makes sense to use clock-names="sclk" as well, if you want
+> to have any name.
+
+OK, I'll use 'sclk' clock name for special clock of ADC.
+
+Thanks,
+Chanwoo Choi
