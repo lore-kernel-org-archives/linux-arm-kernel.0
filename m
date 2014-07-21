@@ -1,36 +1,39 @@
-From: lauraa@codeaurora.org (Laura Abbott)
-Date: Mon, 21 Jul 2014 12:51:04 -0700
-Subject: [PATCHv4 2/5] lib/genalloc.c: Add genpool range check function
-In-Reply-To: <CAOesGMiKBNDmJhiY-yK0uZmG-MnK82=ffNGxqasLKozqgpQQpw@mail.gmail.com>
-References: <1404324218-4743-1-git-send-email-lauraa@codeaurora.org>	<1404324218-4743-3-git-send-email-lauraa@codeaurora.org>
- <CAOesGMiKBNDmJhiY-yK0uZmG-MnK82=ffNGxqasLKozqgpQQpw@mail.gmail.com>
-Message-ID: <53CD6F28.3080203@codeaurora.org>
+From: sebastian.hesselbarth@gmail.com (Sebastian Hesselbarth)
+Date: Mon, 21 Jul 2014 22:12:45 +0200
+Subject: mvebu: Can we make the orion-mdio clock a requirement?
+In-Reply-To: <20140721212818.2d4920c4@free-electrons.com>
+References: <20140721190614.GB20027@arch.cereza>
+ <20140721212818.2d4920c4@free-electrons.com>
+Message-ID: <53CD743D.9080700@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 7/9/2014 3:33 PM, Olof Johansson wrote:
-> On Wed, Jul 2, 2014 at 11:03 AM, Laura Abbott <lauraa@codeaurora.org> wrote:
+On 07/21/2014 09:28 PM, Thomas Petazzoni wrote:
+> On Mon, 21 Jul 2014 16:06:15 -0300, Ezequiel Garcia wrote:
+>> Currently the mvmdio driver does not require a clock to be declared,
+>> and instead this is optional.
 >>
->> After allocating an address from a particular genpool,
->> there is no good way to verify if that address actually
->> belongs to a genpool. Introduce addr_in_gen_pool which
->> will return if an address plus size falls completely
->> within the genpool range.
+>> However (almost) all the platforms that currently use it, i.e. the
+>> Armada, Kirkwood and Dove SoCs, require some clock to be enabled before
+>> the MDIO registers can be accessed.
 >>
->> Signed-off-by: Laura Abbott <lauraa@codeaurora.org>
+>> The Orion5x SoC doesn't declare any clock for neither the ethernet node,
+>> nor the MDIO node. Is that correct?
 > 
-> Reviewed-by: Olof Johansson <olof@lixom.net>
+> There are no gatable clocks on Orion5x, so unless the driver really
+> wants a clock, there's no hard requirement to give a clock reference.
 > 
-> What's the merge path for this code? Part of the arm64 code that needs
-> it, I presume?
+>> Do you think we could make the clock a required property in the mvmdio
+>> devicetree node? How would that behave in the non-DT case?
 > 
+> I don't think the mvmdio driver is used in non-DT contexts.
+> 
+> However, yes, I tend to agree, making the clock mandatory would
+> probably be a good thing.
 
-My plan was to have the entire series go through the arm64 tree unless
-someone has a better idea.
+We can always pass TCLK on Orion5x if there is a need for a mandatory
+clock. Anyway, IIRC clock framework should now properly return
+-EPROPEDEFER only if there is a clock property set. If there is none,
+the error is different and can be catched on Orion5x.
 
-Thanks,
-Laura
-
--- 
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-hosted by The Linux Foundation
+Sebastian
