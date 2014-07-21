@@ -1,88 +1,77 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Mon, 21 Jul 2014 16:54:51 +0100
-Subject: [GIT PULL 2/3] ARM: tegra: move fuse code out of arch/arm
-In-Reply-To: <53CD2C58.6060601@wwwdotorg.org>
-References: <1403558626-13422-1-git-send-email-swarren@wwwdotorg.org>
- <1403558626-13422-2-git-send-email-swarren@wwwdotorg.org>
- <20140707004417.GE8469@quad.lixom.net>
- <20140708134359.GA23218@tbergstrom-lnx.Nvidia.com>
- <CAOesGMhoqvqf-dktp-OfUNTPLahPwkyAPiTeDngr4QjH=VfOGA@mail.gmail.com>
- <53C88A4C.3070304@wwwdotorg.org>
- <CAOesGMh+zLV781wzdR5=_Bpzh+XMwJfWL-5XMDP6DwG_Hg80kw@mail.gmail.com>
- <53CD2C58.6060601@wwwdotorg.org>
-Message-ID: <20140721155451.GF32578@arm.com>
+From: balbi@ti.com (Felipe Balbi)
+Date: Mon, 21 Jul 2014 10:58:53 -0500
+Subject: [PATCH 0/9] usb: musb: several bugfixes for the musb driver
+In-Reply-To: <20140721155352.GA20226@arch.cereza>
+References: <1405675890-8802-1-git-send-email-LW@KARO-electronics.de>
+ <20140718161636.GA18460@arch.cereza>
+ <20140718165044.GA30821@saruman.home>
+ <20140721093430.3f528cc7@ipc1.ka-ro>
+ <20140721151140.GG6852@saruman.home>
+ <20140721155352.GA20226@arch.cereza>
+Message-ID: <20140721155853.GK6852@saruman.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jul 21, 2014 at 09:06:00AM -0600, Stephen Warren wrote:
-> On 07/17/2014 11:33 PM, Olof Johansson wrote:
-> > On Thu, Jul 17, 2014 at 7:45 PM, Stephen Warren <swarren@wwwdotorg.org> wrote:
-> >> On 07/08/2014 11:47 AM, Olof Johansson wrote:
-> >>> On Tue, Jul 8, 2014 at 6:43 AM, Peter De Schrijver
-> >>> <pdeschrijver@nvidia.com> wrote:
-> >>>> On Mon, Jul 07, 2014 at 02:44:17AM +0200, Olof Johansson wrote:
-> >>>>> On Mon, Jun 23, 2014 at 03:23:45PM -0600, Stephen Warren wrote:
-> >>>>>> This branch moves code related to the Tegra fuses out of arch/arm and
-> >>>>>> into a centralized location which could be shared with ARM64. It also
-> >>>>>> adds support for reading the fuse data through sysfs.
-> >>>>>
-> >>>>> The new/moved misc driver isn't acked by any misc maintainer, so I can't
-> >>>>> take this branch.
-> >>>>>
-> >>>>> I saw no indication from searching the mailing list of that either,
-> >>>>> so it wasn't just a missed acked-by.
-> >>>>>
-> >>>>> I wonder if this code should go under drivers/soc/ instead?
-> >>>>
-> >>>> It's modelled after sunxi_sid.c which lives in drivers/misc/eeprom/.
-> >>>> Originally this driver was also in drivers/misc/eeprom/, but Stephen objected
-> >>>> and therefore it was moved to drivers/misc/fuse. I think that's the right
-> >>>> place still.
-> >>>
-> >>> I disagree, I think this belongs under drivers/soc. Especially since
-> >>> you're adding dependencies on this misc driver from other parts of the
-> >>> kernel / other drivers.
-> >>>
-> >>> I also don't like seeing init calls form platform code down into
-> >>> drivers/misc like you're adding here. Can you please look at doing
-> >>> that as a regular init call setup?
-> >>
-> >> I strongly disagree with using init calls for this kind of thing. There
-> >> are ordering dependencies between the initialization code that can only
-> >> be sanely managed by explicitly calling functions in a particular order;
-> >> there's simply no way to manage this using initcalls. This is exactly
-> >> why the hooks in the ARM machine descriptors exist...
+On Mon, Jul 21, 2014 at 12:53:52PM -0300, Ezequiel Garcia wrote:
+> On 21 Jul 10:11 AM, Felipe Balbi wrote:
+> > On Mon, Jul 21, 2014 at 09:34:30AM +0200, Lothar Wa?mann wrote:
+> > > Hi,
+> > > 
+> > > Felipe Balbi wrote:
+> > > > Hi,
+> > > > 
+> > > > On Fri, Jul 18, 2014 at 01:16:36PM -0300, Ezequiel Garcia wrote:
+> > > > > Hi Lothar,
+> > > > > 
+> > > > > On 18 Jul 11:31 AM, Lothar Wa?mann wrote:
+> > > > > > The first three patches do some source code cleanup in the files that
+> > > > > > are modified in the subsequent patches.
+> > > > > > 
+> > > > > 
+> > > > > I've applied patches 4 and 9 on a recent -next, after fixing a conflict
+> > > > > due to patch 3 ("usb: musb_am335x: source cleanup"):
+> > > > > 
+> > > > > > Patch 4 carries the proper fix reported in commit:
+> > > > > >         7adb5c876e9c ("usb: musb: Fix panic upon musb_am335x module removal")
+> > > > > > 
+> > > > > > Patch 9 reinstates module unloading support for the musb_am335x driver
+> > > > > >         which was disabled due to a false failure analysis
+> > > > > > 
+> > > > > 
+> > > > > For these two patches, Tested-by: Ezequiel Garcia <ezequiel@vanguardiasur.com.ar>
+> > > > > 
+> > > > > Tested on a beaglebone with a mass storage USB device, module load/unload
+> > > > > works without issues. The module_get/put in the phy is now preventing the
+> > > > > musb_am335x driver unload, which seems to be the real cause of the issue
+> > > > > I reported. Thanks for providing a proper fix!
+> > > > 
+> > > > I don't that's a good fix. The problem is that even after am335x
+> > > > removing all its child, someone else tried to release the PHY. That
+> > > > ordering is the one that needs to be fixed. Doing a module_get on the
+> > > > parent device looks like a hack to me.
+> > > > 
+> > > No. It guarantees that the module cannot be unloaded when its resources
+> > > are still in use!
 > > 
-> > Right, but there are non on 64-bit, so you need to solve it for there
-> > anyway. And once it's solved there, you might as well keep it common
-> > with 32-bit.
+> > it's still a hack. You have a child incrementing the usage count on its
+> > parent just because a sibbling isn't doing the right thing.
+> > 
 > 
-> My assertion is that we should just do it directly on 64-bit too.
-> There's no reason for arm64 to deviate from what arch/arm does already.
+> How about having the musb_am335x (glue driver) call request_module and
+> module_get on the phy-am335x? Wouldn't this be a cleaner approach?
+> 
+> I haven't checked if this possible, though.
 
-On arm64, I really want to get away from any SoC specific early
-initcall. One of the main reason is for things like SCU, interconnects,
-system cache configurations (even certain clocks) to be enabled in
-firmware before Linux starts (it's an education process but that's a way
-for example to prevent people sending patches to enable SoC coherency
-because they haven't thought about it before upstreaming).
-
-It would be nice to be able to initialise SoC stuff at device_initcall()
-level (and even keep such code as modules in initramfs) but one of the
-problems we have is dependency on clocks (and the clock model which
-doesn't follow the device/driver model). The of_platform_populate() is
-called at arch_initcall_sync (after arch_initcall to still allow some
-SoC code, if needed, to run at arch_initcall).
-
-We have a similar issue with arm64 vexpress (well, just on the model)
-where vexpress_sysreg_init() is a core_initcall (should be fine as
-arch_initcall) as it needs to be done before of_platform_populate().
-Pawel on cc should know more of the history here.
-
-I recall there were also some discussions about a SoC driver model which
-hangs off the top compatible string in the DT (e.g. "arm,vexpress") and
-allow (minimal) code to be run slightly earlier, though still not
-earlier than arch_initcall.
+at most, you would have the phy layer do that so that all PHYs get usage
+counter incremented when they're in use. We can't have this 'fixed' for
+MUSB only.
 
 -- 
-Catalin
+balbi
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140721/4de6e2bb/attachment-0001.sig>
