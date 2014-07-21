@@ -1,134 +1,233 @@
 From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Mon, 21 Jul 2014 17:16:20 +0200
-Subject: [RFC PATCH 05/10] arm64/efi: update the PE/COFF header to be endian
- agnostic
+Date: Mon, 21 Jul 2014 17:16:24 +0200
+Subject: [RFC PATCH 09/10] arm64/efi: enable minimal UEFI Runtime Services for
+ big endian
 In-Reply-To: <1405955785-13477-1-git-send-email-ard.biesheuvel@linaro.org>
 References: <1405955785-13477-1-git-send-email-ard.biesheuvel@linaro.org>
-Message-ID: <1405955785-13477-6-git-send-email-ard.biesheuvel@linaro.org>
+Message-ID: <1405955785-13477-10-git-send-email-ard.biesheuvel@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Update the PE/COFF header to use explicit little endian constants and use
-explicit little endian linker symbols so that the PE/COFF header is always
-emitted in little endian regardless of the endiannes of the kernel.
+This enables the UEFI Runtime Services needed to manipulate the
+non-volatile variable store when running under a BE kernel.
 
 Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
 ---
- arch/arm64/kernel/head.S | 48 ++++++++++++++++++++++++++----------------------
- 1 file changed, 26 insertions(+), 22 deletions(-)
+ arch/arm64/include/asm/efi.h       |   2 +
+ arch/arm64/kernel/efi-be-call.S    |  55 ++++++++++++++++++++
+ arch/arm64/kernel/efi-be-runtime.c | 104 +++++++++++++++++++++++++++++++++++++
+ arch/arm64/kernel/efi.c            |  15 ++++++
+ 4 files changed, 176 insertions(+)
+ create mode 100644 arch/arm64/kernel/efi-be-call.S
+ create mode 100644 arch/arm64/kernel/efi-be-runtime.c
 
-diff --git a/arch/arm64/kernel/head.S b/arch/arm64/kernel/head.S
-index c63f44f20ae3..5179d3df1024 100644
---- a/arch/arm64/kernel/head.S
-+++ b/arch/arm64/kernel/head.S
-@@ -123,7 +123,10 @@ efi_head:
- 	.byte	0x4d
- 	.byte	0x64
- #ifdef CONFIG_EFI
--	.long	pe_header - efi_head		// Offset to the PE header.
-+	.byte	pe_header - efi_head		// Offset to the PE header.
-+	.byte	0
-+	.byte	0
-+	.byte	0
- #else
- 	.word	0				// reserved
- #endif
-@@ -136,30 +139,31 @@ pe_header:
- 	.ascii	"PE"
- 	.short 	0
- coff_header:
--	.short	0xaa64				// AArch64
--	.short	2				// nr_sections
-+	le16	0xaa64				// AArch64
-+	le16	2				// nr_sections
- 	.long	0 				// TimeDateStamp
- 	.long	0				// PointerToSymbolTable
--	.long	1				// NumberOfSymbols
--	.short	section_table - optional_header	// SizeOfOptionalHeader
--	.short	0x206				// Characteristics.
-+	le32	1				// NumberOfSymbols
-+	.byte	section_table - optional_header	// SizeOfOptionalHeader
-+	.byte	0
-+	le16	0x206				// Characteristics.
- 						// IMAGE_FILE_DEBUG_STRIPPED |
- 						// IMAGE_FILE_EXECUTABLE_IMAGE |
- 						// IMAGE_FILE_LINE_NUMS_STRIPPED
- optional_header:
--	.short	0x20b				// PE32+ format
-+	le16	0x20b				// PE32+ format
- 	.byte	0x02				// MajorLinkerVersion
- 	.byte	0x14				// MinorLinkerVersion
--	.long	_end - stext			// SizeOfCode
-+	.long	_efi_code_virtsize_le		// SizeOfCode
- 	.long	0				// SizeOfInitializedData
- 	.long	0				// SizeOfUninitializedData
--	.long	efi_stub_entry - efi_head	// AddressOfEntryPoint
--	.long	stext_offset			// BaseOfCode
-+	.long	_efi_entry_point_le		// AddressOfEntryPoint
-+	.long	_efi_stext_offset_le		// BaseOfCode
+diff --git a/arch/arm64/include/asm/efi.h b/arch/arm64/include/asm/efi.h
+index a34fd3b12e2b..44e642b6ab61 100644
+--- a/arch/arm64/include/asm/efi.h
++++ b/arch/arm64/include/asm/efi.h
+@@ -44,4 +44,6 @@ extern void efi_idmap_init(void);
  
- extra_header_fields:
- 	.quad	0				// ImageBase
--	.long	0x20				// SectionAlignment
--	.long	0x8				// FileAlignment
-+	le32	0x20				// SectionAlignment
-+	le32	0x8				// FileAlignment
- 	.short	0				// MajorOperatingSystemVersion
- 	.short	0				// MinorOperatingSystemVersion
- 	.short	0				// MajorImageVersion
-@@ -168,19 +172,19 @@ extra_header_fields:
- 	.short	0				// MinorSubsystemVersion
- 	.long	0				// Win32VersionValue
+ #define efi_call_early(f, ...) sys_table_arg->boottime->f(__VA_ARGS__)
  
--	.long	_end - efi_head			// SizeOfImage
-+	.long	_efi_image_size_le		// SizeOfImage
++extern void efi_be_runtime_setup(void);
++
+ #endif /* _ASM_EFI_H */
+diff --git a/arch/arm64/kernel/efi-be-call.S b/arch/arm64/kernel/efi-be-call.S
+new file mode 100644
+index 000000000000..24c92a4c352b
+--- /dev/null
++++ b/arch/arm64/kernel/efi-be-call.S
+@@ -0,0 +1,55 @@
++
++#include <linux/linkage.h>
++
++	.text
++	.align		3
++ENTRY(efi_be_phys_call)
++	/*
++	 * Entered at physical address with 1:1 mapping enabled.
++	 */
++	stp	x29, x30, [sp, #-96]!
++	mov	x29, sp
++	str	x27, [sp, #16]
++
++	ldr	x8, =efi_be_phys_call	// virt address of this function
++	adr	x9, efi_be_phys_call	// phys address of this function
++	sub	x9, x8, x9		// calculate virt to phys offset in x9
++
++	/* preserve all inputs */
++	stp	x0, x1, [sp, #32]
++	stp	x2, x3, [sp, #48]
++	stp	x4, x5, [sp, #64]
++	stp	x6, x7, [sp, #80]
++
++	/* get phys address of stack */
++	sub	sp, sp, x9
++
++	/* switch to LE, disable MMU and D-cache but leave I-cache enabled */
++	mrs	x27, sctlr_el1
++	bic	x8, x27, #1 << 2	// clear SCTLR.C
++	msr	sctlr_el1, x8
++
++	bl	flush_cache_all
++
++	/* restore inputs but rotated by 1 register */
++	ldp	x7, x0, [sp, #32]
++	ldp	x1, x2, [sp, #48]
++	ldp	x3, x4, [sp, #64]
++	ldp	x5, x6, [sp, #80]
++
++	bic	x8, x27, #1 << 2	// clear SCTLR.C
++	bic	x8, x8, #1 << 0		// clear SCTLR.M
++	bic	x8, x8, #1 << 25	// clear SCTLR.EE
++	msr	sctlr_el1, x8
++	isb
++
++	blr	x7
++
++	/* switch back to BE and reenable MMU and D-cache */
++	msr	sctlr_el1, x27
++
++	mov	sp, x29
++	ldr	x27, [sp, #16]
++	ldp	x29, x30, [sp], #96
++	ret
++ENDPROC(efi_be_phys_call)
+diff --git a/arch/arm64/kernel/efi-be-runtime.c b/arch/arm64/kernel/efi-be-runtime.c
+new file mode 100644
+index 000000000000..62e6c441b77b
+--- /dev/null
++++ b/arch/arm64/kernel/efi-be-runtime.c
+@@ -0,0 +1,104 @@
++
++#include <linux/efi.h>
++#include <linux/spinlock.h>
++#include <asm/efi.h>
++#include <asm/neon.h>
++#include <asm/tlbflush.h>
++
++static efi_runtime_services_t *runtime;
++static efi_status_t (*efi_be_call)(phys_addr_t func, ...);
++
++static DEFINE_SPINLOCK(efi_be_rt_lock);
++
++static unsigned long efi_be_call_pre(void)
++{
++	unsigned long flags;
++
++	kernel_neon_begin();
++	spin_lock_irqsave(&efi_be_rt_lock, flags);
++	cpu_switch_mm(idmap_pg_dir, &init_mm);
++	flush_tlb_all();
++	return flags;
++}
++
++static void efi_be_call_post(unsigned long flags)
++{
++	cpu_switch_mm(current, current->active_mm);
++	flush_tlb_all();
++	spin_unlock_irqrestore(&efi_be_rt_lock, flags);
++	kernel_neon_end();
++}
++
++static efi_status_t efi_be_get_variable(efi_char16_t *name,
++					efi_guid_t *vendor,
++					u32 *attr,
++					unsigned long *data_size,
++					void *data)
++{
++	unsigned long flags;
++	efi_status_t status;
++
++	*data_size = cpu_to_le64(*data_size);
++	flags = efi_be_call_pre();
++	status = efi_be_call(le64_to_cpu(runtime->get_variable),
++			     virt_to_phys(name), virt_to_phys(vendor),
++			     virt_to_phys(attr), virt_to_phys(data_size),
++			     virt_to_phys(data));
++	efi_be_call_post(flags);
++	*attr = le32_to_cpu(*attr);
++	*data_size = le64_to_cpu(*data_size);
++	return status;
++}
++
++static efi_status_t efi_be_get_next_variable(unsigned long *name_size,
++					     efi_char16_t *name,
++					     efi_guid_t *vendor)
++{
++	unsigned long flags;
++	efi_status_t status;
++
++	*name_size = cpu_to_le64(*name_size);
++	flags = efi_be_call_pre();
++	status = efi_be_call(le64_to_cpu(runtime->get_next_variable),
++			     virt_to_phys(name_size), virt_to_phys(name),
++			     virt_to_phys(vendor));
++	efi_be_call_post(flags);
++	*name_size = le64_to_cpu(*name_size);
++	return status;
++}
++
++static efi_status_t efi_be_set_variable(efi_char16_t *name,
++					efi_guid_t *vendor,
++					u32 attr,
++					unsigned long data_size,
++					void *data)
++{
++	unsigned long flags;
++	efi_status_t status;
++
++	flags = efi_be_call_pre();
++	status = efi_be_call(le64_to_cpu(runtime->set_variable),
++			     virt_to_phys(name), virt_to_phys(vendor),
++			     cpu_to_le32(attr), cpu_to_le64(data_size),
++			     virt_to_phys(data));
++	efi_be_call_post(flags);
++	return status;
++}
++
++void efi_be_runtime_setup(void)
++{
++	extern u8 efi_be_phys_call[];
++
++	runtime = ioremap_cache(le64_to_cpu(efi.systab->runtime),
++				sizeof(efi_runtime_services_t));
++	if (!runtime) {
++		pr_err("Failed to set up BE wrappers for UEFI Runtime Services!\n");
++		return;
++	}
++
++	efi_be_call = (void *)virt_to_phys(efi_be_phys_call);
++
++	efi.get_variable = efi_be_get_variable;
++	efi.get_next_variable = efi_be_get_next_variable;
++	efi.set_variable = efi_be_set_variable;
++}
+diff --git a/arch/arm64/kernel/efi.c b/arch/arm64/kernel/efi.c
+index 96df58824189..21e98810c5dd 100644
+--- a/arch/arm64/kernel/efi.c
++++ b/arch/arm64/kernel/efi.c
+@@ -406,6 +406,21 @@ static int __init arm64_enter_virtual_mode(void)
  
- 	// Everything before the kernel image is considered part of the header
--	.long	stext_offset			// SizeOfHeaders
-+	.long	_efi_stext_offset_le		// SizeOfHeaders
- 	.long	0				// CheckSum
--	.short	0xa				// Subsystem (EFI application)
-+	le16	0xa				// Subsystem (EFI application)
- 	.short	0				// DllCharacteristics
- 	.quad	0				// SizeOfStackReserve
- 	.quad	0				// SizeOfStackCommit
- 	.quad	0				// SizeOfHeapReserve
- 	.quad	0				// SizeOfHeapCommit
- 	.long	0				// LoaderFlags
--	.long	0x6				// NumberOfRvaAndSizes
-+	le32	0x6				// NumberOfRvaAndSizes
+ 	efi.memmap = &memmap;
  
- 	.quad	0				// ExportTable
- 	.quad	0				// ImportTable
-@@ -208,23 +212,23 @@ section_table:
- 	.long	0			// PointerToLineNumbers
- 	.short	0			// NumberOfRelocations
- 	.short	0			// NumberOfLineNumbers
--	.long	0x42100040		// Characteristics (section flags)
-+	le32	0x42100040		// Characteristics (section flags)
- 
- 
- 	.ascii	".text"
- 	.byte	0
- 	.byte	0
- 	.byte	0        		// end of 0 padding of section name
--	.long	_end - stext		// VirtualSize
--	.long	stext_offset		// VirtualAddress
--	.long	_edata - stext		// SizeOfRawData
--	.long	stext_offset		// PointerToRawData
-+	.long	_efi_code_virtsize_le	// VirtualSize
-+	.long	_efi_stext_offset_le	// VirtualAddress
-+	.long	_efi_code_rawsize_le	// SizeOfRawData
-+	.long	_efi_stext_offset_le	// PointerToRawData
- 
- 	.long	0		// PointerToRelocations (0 for executables)
- 	.long	0		// PointerToLineNumbers (0 for executables)
- 	.short	0		// NumberOfRelocations  (0 for executables)
- 	.short	0		// NumberOfLineNumbers  (0 for executables)
--	.long	0xe0500020	// Characteristics (section flags)
-+	le32	0xe0500020	// Characteristics (section flags)
- 	.align 5
- #endif
- 
++	if (IS_ENABLED(CONFIG_CPU_BIG_ENDIAN)) {
++		efi.systab = ioremap_cache(efi_system_table,
++					   sizeof(efi_system_table_t));
++		if (!efi.systab) {
++			pr_err("Failed to remap EFI system table!\n");
++			return -1;
++		}
++		free_boot_services();
++		efi_be_runtime_setup();
++
++		set_bit(EFI_SYSTEM_TABLES, &efi.flags);
++		set_bit(EFI_RUNTIME_SERVICES, &efi.flags);
++		return 0;
++	}
++
+ 	/* Map the runtime regions */
+ 	virtmap = kmalloc(mapsize, GFP_KERNEL);
+ 	if (!virtmap) {
 -- 
 1.8.3.2
