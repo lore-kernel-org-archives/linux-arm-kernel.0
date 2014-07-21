@@ -1,89 +1,131 @@
-From: thierry.reding@gmail.com (Thierry Reding)
-Date: Mon, 21 Jul 2014 15:54:12 +0200
-Subject: [RESEND PATCH v3 06/11] drm: add DT bindings documentation for
- atmel-hlcdc-dc driver
-In-Reply-To: <1605488.5CKVSJec67@avalon>
-References: <1404751384-5077-1-git-send-email-boris.brezillon@free-electrons.com>
- <20140721133034.GI15238@ulmo> <20140721154313.1de8bf6f@bbrezillon>
- <1605488.5CKVSJec67@avalon>
-Message-ID: <20140721135410.GA13770@ulmo>
+From: b.zolnierkie@samsung.com (Bartlomiej Zolnierkiewicz)
+Date: Mon, 21 Jul 2014 15:57:04 +0200
+Subject: [PATCH v2] ARM: dts: add CPU nodes for Exynos4 SoCs
+Message-ID: <1444042.RbiCcg7JnP@amdc1032>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jul 21, 2014 at 03:47:52PM +0200, Laurent Pinchart wrote:
-> Hi Boris,
-> 
-> On Monday 21 July 2014 15:43:13 Boris BREZILLON wrote:
-> > On Mon, 21 Jul 2014 15:30:35 +0200 Thierry Reding wrote:
-> > > On Mon, Jul 21, 2014 at 03:22:05PM +0200, Laurent Pinchart wrote:
-> > >> On Monday 21 July 2014 14:55:23 Thierry Reding wrote:
-> > >>> On Mon, Jul 21, 2014 at 02:34:28PM +0200, Boris BREZILLON wrote:
-> > >>>> On Mon, 21 Jul 2014 14:16:42 +0200 Laurent Pinchart wrote:
-> > >>>>> On Monday 21 July 2014 14:12:47 Thierry Reding wrote:
-> > >>>>>> On Mon, Jul 21, 2014 at 11:57:37AM +0200, Boris BREZILLON wrote:
-> > >>
-> > >> [snip]
-> > >> 
-> > >>>>>>> The new drm_display_info structure should look like this [2]
-> > >>>>>>> (except that color_formats and bpc have not be removed yet), and
-> > >>>>>>> [1] is just here to show how the video_bus_format enum would look
-> > >>>>>>> like.
-> > >>>>>>> 
-> > >>>>>>> [1] http://code.bulix.org/rfd0yx-86557
-> > >>>>>>> [2] http://code.bulix.org/7n03b4-86556
-> > >>>>>> 
-> > >>>>>> Quoting from your paste:
-> > >>>>>> 	+   const enum video_bus_format *bus_formats;
-> > >>>>>> 	+   int nbus_formats;
-> > >>>>>> 
-> > >>>>>> Do we really need more than one?
-> > >>>>> 
-> > >>>>> We do if we want to replace the color_formats and bpc fields.
-> > >>>> 
-> > >>>> Yes, that's what I was about to answer :-).
-> > >>> 
-> > >>> Maybe we don't need to replace color_formats and bpc field
-> > >>> immediately. That could be done in a follow-up patch.
-> > >> 
-> > >> We don't need to replace them right now, but we should at least agree on
-> > >> how to replace them. Introducing a new field that would need to be
-> > >> replaced in the near future when removing color_formats and bpc would
-> > >> be a waste of time.
-> > >
-> > > Sure. One of the problems I see with replacing color_formats and bpc
-> > > with the above is that some of the bits within color_formats are set
-> > > when the EDID is parsed. That implies that if they are replaced with
-> > > an array of formats, the array would need to be reallocated during EDID
-> > > parsing. That sounds like ugliness.
-> > > 
-> > > But if you can find a nice way to make it work that'd be great.
-> > 
-> > How about using a list instead of an array ?
-> > This way we can add elements to this list when parsing the EDID.
-> > 
-> > Or we can just define a maximum size for the bus_formats array when
-> > retrieving this info from EDID. If I'm correct we have at most 18 bus
-> > formats:
-> >  - 3 color formats:
-> >    * RGB 4:4:4
-> >    * YCbCr 4:4:4
-> >    * YCbCr 4:4:2
-> >  - 6 color depths: 6, 8, 10, 12, 14 and 16 bits per color
-> 
-> bpc isn't a bitmask, so EDID supports up to three formats only.
-> 
-> The color_formats field is computed in the drm_add_display_info() function. 
-> You could easily turn it into a local variable and allocate and fill the 
-> formats array at the end of the function.
+Recent patch by Tomasz Figa ("irqchip: gic: Fix core ID calculation
+when topology is read from DT") fixed GIC driver to filter cluster ID
+from values returned by cpu_logical_map() for SoCs having registers
+mapped without per-CPU banking making it is possible to add CPU nodes
+for Exynos4 SoCs.  In case of Exynos SoCs these CPU nodes are also
+required by future changes adding initialization of cpuidle states in
+Exynos cpuidle driver through DT.
 
-But you also need to be careful to keep whatever formats the driver
-might have set explicitly.
+Tested on Origen board (Exynos4210 SoC) and Trats2 (Exynos4412 SoC).
 
-Thierry
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: not available
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140721/2013db14/attachment.sig>
+Signed-off-by: Bartlomiej Zolnierkiewicz <b.zolnierkie@samsung.com>
+---
+Based on next-20140717 branch of linux-next tree +
+- [PATCH 2/6] ARM: EXYNOS: Fix core ID used by platsmp and hotplug code
+  http://www.mail-archive.com/linux-samsung-soc at vger.kernel.org/msg32811.html
+- [PATCH] irqchip: gic: Fix core ID calculation when topology is read from DT
+  http://www.mail-archive.com/linux-samsung-soc at vger.kernel.org/msg34277.html
+
+v2:
+- match the unit-address with the reg
+
+ arch/arm/boot/dts/exynos4210.dtsi | 17 +++++++++++++++++
+ arch/arm/boot/dts/exynos4212.dtsi | 17 +++++++++++++++++
+ arch/arm/boot/dts/exynos4412.dtsi | 29 +++++++++++++++++++++++++++++
+ 3 files changed, 63 insertions(+)
+
+diff --git a/arch/arm/boot/dts/exynos4210.dtsi b/arch/arm/boot/dts/exynos4210.dtsi
+index ee3001f..bc2b444 100644
+--- a/arch/arm/boot/dts/exynos4210.dtsi
++++ b/arch/arm/boot/dts/exynos4210.dtsi
+@@ -31,6 +31,23 @@
+ 		pinctrl2 = &pinctrl_2;
+ 	};
+ 
++	cpus {
++		#address-cells = <1>;
++		#size-cells = <0>;
++
++		cpu at 900 {
++			device_type = "cpu";
++			compatible = "arm,cortex-a9";
++			reg = <0x900>;
++		};
++
++		cpu at 901 {
++			device_type = "cpu";
++			compatible = "arm,cortex-a9";
++			reg = <0x901>;
++		};
++	};
++
+ 	sysram at 02020000 {
+ 		compatible = "mmio-sram";
+ 		reg = <0x02020000 0x20000>;
+diff --git a/arch/arm/boot/dts/exynos4212.dtsi b/arch/arm/boot/dts/exynos4212.dtsi
+index 3c00e6e..dd0a43e 100644
+--- a/arch/arm/boot/dts/exynos4212.dtsi
++++ b/arch/arm/boot/dts/exynos4212.dtsi
+@@ -22,6 +22,23 @@
+ / {
+ 	compatible = "samsung,exynos4212", "samsung,exynos4";
+ 
++	cpus {
++		#address-cells = <1>;
++		#size-cells = <0>;
++
++		cpu at A00 {
++			device_type = "cpu";
++			compatible = "arm,cortex-a9";
++			reg = <0xA00>;
++		};
++
++		cpu at A01 {
++			device_type = "cpu";
++			compatible = "arm,cortex-a9";
++			reg = <0xA01>;
++		};
++	};
++
+ 	combiner: interrupt-controller at 10440000 {
+ 		samsung,combiner-nr = <18>;
+ 	};
+diff --git a/arch/arm/boot/dts/exynos4412.dtsi b/arch/arm/boot/dts/exynos4412.dtsi
+index c42a3e1..435a722 100644
+--- a/arch/arm/boot/dts/exynos4412.dtsi
++++ b/arch/arm/boot/dts/exynos4412.dtsi
+@@ -22,6 +22,35 @@
+ / {
+ 	compatible = "samsung,exynos4412", "samsung,exynos4";
+ 
++	cpus {
++		#address-cells = <1>;
++		#size-cells = <0>;
++
++		cpu at A00 {
++			device_type = "cpu";
++			compatible = "arm,cortex-a9";
++			reg = <0xA00>;
++		};
++
++		cpu at A01 {
++			device_type = "cpu";
++			compatible = "arm,cortex-a9";
++			reg = <0xA01>;
++		};
++
++		cpu at A02 {
++			device_type = "cpu";
++			compatible = "arm,cortex-a9";
++			reg = <0xA02>;
++		};
++
++		cpu at A03 {
++			device_type = "cpu";
++			compatible = "arm,cortex-a9";
++			reg = <0xA03>;
++		};
++	};
++
+ 	combiner: interrupt-controller at 10440000 {
+ 		samsung,combiner-nr = <20>;
+ 	};
+-- 
+1.8.2.3
