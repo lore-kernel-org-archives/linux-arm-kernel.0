@@ -1,95 +1,42 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Mon, 21 Jul 2014 17:11:18 +0100
-Subject: [PATCH] exynos: boot serial endian fix
-Message-ID: <1405959078-10603-1-git-send-email-broonie@kernel.org>
+From: pawel.moll@arm.com (Pawel Moll)
+Date: Mon, 21 Jul 2014 17:14:06 +0100
+Subject: [GIT PULL 2/3] ARM: tegra: move fuse code out of arch/arm
+In-Reply-To: <20140721155451.GF32578@arm.com>
+References: <1403558626-13422-1-git-send-email-swarren@wwwdotorg.org>
+ <1403558626-13422-2-git-send-email-swarren@wwwdotorg.org>
+ <20140707004417.GE8469@quad.lixom.net>
+ <20140708134359.GA23218@tbergstrom-lnx.Nvidia.com>
+ <CAOesGMhoqvqf-dktp-OfUNTPLahPwkyAPiTeDngr4QjH=VfOGA@mail.gmail.com>
+ <53C88A4C.3070304@wwwdotorg.org>
+ <CAOesGMh+zLV781wzdR5=_Bpzh+XMwJfWL-5XMDP6DwG_Hg80kw@mail.gmail.com>
+ <53CD2C58.6060601@wwwdotorg.org> <20140721155451.GF32578@arm.com>
+Message-ID: <1405959246.5204.68.camel@hornet>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Victor Kamensky <victor.kamensky@linaro.org>
+On Mon, 2014-07-21 at 16:54 +0100, Catalin Marinas wrote:
+> We have a similar issue with arm64 vexpress (well, just on the model)
+> where vexpress_sysreg_init() is a core_initcall (should be fine as
+> arch_initcall) as it needs to be done before of_platform_populate().
+> Pawel on cc should know more of the history here.
 
-In order to support booting a big endian kernel the uncompress serial
-line write utils need to use endian neutral functions to read h/w
-register. Fix uart_rd, uart_wr and serial chip fifo related macros to do
-this.
+In case of vexpress the trick was to squeeze everything into the device
+model. Once this was done, there was enough initcall levels to get all
+dependencies sorted. The device model is good. We seemed to have learned
+to abuse it claiming that "things must be initialised early", while in 9
+out of 10 cases they don't have to be "that early"...
 
-Signed-off-by: Victor Kamensky <victor.kamensky@linaro.org>
-Signed-off-by: Mark Brown <broonie@linaro.org>
----
- arch/arm/include/debug/samsung.S | 9 +++++++++
- 1 file changed, 9 insertions(+)
+> I recall there were also some discussions about a SoC driver model which
+> hangs off the top compatible string in the DT (e.g. "arm,vexpress") and
+> allow (minimal) code to be run slightly earlier, though still not
+> earlier than arch_initcall.
 
-diff --git a/arch/arm/include/debug/samsung.S b/arch/arm/include/debug/samsung.S
-index 8d8d922e5e44..dc62d4ae04d0 100644
---- a/arch/arm/include/debug/samsung.S
-+++ b/arch/arm/include/debug/samsung.S
-@@ -9,17 +9,20 @@
-  * published by the Free Software Foundation.
- */
- 
-+#include <asm/assembler.h>
- #include <linux/serial_s3c.h>
- 
- /* The S5PV210/S5PC110 implementations are as belows. */
- 
- 	.macro fifo_level_s5pv210 rd, rx
- 		ldr	\rd, [\rx, # S3C2410_UFSTAT]
-+	ARM_BE8(rev	\rd, \rd)
- 		and	\rd, \rd, #S5PV210_UFSTAT_TXMASK
- 	.endm
- 
- 	.macro  fifo_full_s5pv210 rd, rx
- 		ldr	\rd, [\rx, # S3C2410_UFSTAT]
-+	ARM_BE8(rev	\rd, \rd)
- 		tst	\rd, #S5PV210_UFSTAT_TXFULL
- 	.endm
- 
-@@ -28,6 +31,7 @@
- 
- 	.macro fifo_level_s3c2440 rd, rx
- 		ldr	\rd, [\rx, # S3C2410_UFSTAT]
-+	ARM_BE8(rev	\rd, \rd)
- 		and	\rd, \rd, #S3C2440_UFSTAT_TXMASK
- 	.endm
- 
-@@ -37,6 +41,7 @@
- 
- 	.macro  fifo_full_s3c2440 rd, rx
- 		ldr	\rd, [\rx, # S3C2410_UFSTAT]
-+	ARM_BE8(rev	\rd, \rd)
- 		tst	\rd, #S3C2440_UFSTAT_TXFULL
- 	.endm
- 
-@@ -50,6 +55,7 @@
- 
- 	.macro	busyuart, rd, rx
- 		ldr	\rd, [\rx, # S3C2410_UFCON]
-+	ARM_BE8(rev	\rd, \rd)
- 		tst	\rd, #S3C2410_UFCON_FIFOMODE	@ fifo enabled?
- 		beq	1001f				@
- 		@ FIFO enabled...
-@@ -61,6 +67,7 @@
- 1001:
- 		@ busy waiting for non fifo
- 		ldr	\rd, [\rx, # S3C2410_UTRSTAT]
-+	ARM_BE8(rev	\rd, \rd)
- 		tst	\rd, #S3C2410_UTRSTAT_TXFE
- 		beq	1001b
- 
-@@ -69,6 +76,7 @@
- 
- 	.macro	waituart,rd,rx
- 		ldr	\rd, [\rx, # S3C2410_UFCON]
-+	ARM_BE8(rev	\rd, \rd)
- 		tst	\rd, #S3C2410_UFCON_FIFOMODE	@ fifo enabled?
- 		beq	1001f				@
- 		@ FIFO enabled...
-@@ -80,6 +88,7 @@
- 1001:
- 		@ idle waiting for non fifo
- 		ldr	\rd, [\rx, # S3C2410_UTRSTAT]
-+	ARM_BE8(rev	\rd, \rd)
- 		tst	\rd, #S3C2410_UTRSTAT_TXFE
- 		beq	1001b
- 
--- 
-2.0.1
+This was just a loose idea:
+
+http://thread.gmane.org/gmane.linux.ports.arm.kernel/204361/focus=204843
+
+I still like it, and it seems logical to me. We've got a platform. It's
+got a compatible string. We can write a driver for this platform that
+does all magic at appropriate initcall level.
+
+Pawe?
