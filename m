@@ -1,91 +1,54 @@
-From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
-Date: Mon, 21 Jul 2014 17:04:57 +0200
-Subject: [PATCH v3 0/2] usb: fix controller-PHY binding for OMAP3 platform
-In-Reply-To: <20131216234829.GC29284@saruman.home>
-References: <1387209225-11520-1-git-send-email-kishon@ti.com>
- <20131216223826.GG26293@atomide.com> <20131216234829.GC29284@saruman.home>
-Message-ID: <2288457.9ZfWAQMUao@avalon>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Mon, 21 Jul 2014 09:06:00 -0600
+Subject: [GIT PULL 2/3] ARM: tegra: move fuse code out of arch/arm
+In-Reply-To: <CAOesGMh+zLV781wzdR5=_Bpzh+XMwJfWL-5XMDP6DwG_Hg80kw@mail.gmail.com>
+References: <1403558626-13422-1-git-send-email-swarren@wwwdotorg.org>	<1403558626-13422-2-git-send-email-swarren@wwwdotorg.org>	<20140707004417.GE8469@quad.lixom.net>	<20140708134359.GA23218@tbergstrom-lnx.Nvidia.com>	<CAOesGMhoqvqf-dktp-OfUNTPLahPwkyAPiTeDngr4QjH=VfOGA@mail.gmail.com>	<53C88A4C.3070304@wwwdotorg.org>
+ <CAOesGMh+zLV781wzdR5=_Bpzh+XMwJfWL-5XMDP6DwG_Hg80kw@mail.gmail.com>
+Message-ID: <53CD2C58.6060601@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Felipe,
+On 07/17/2014 11:33 PM, Olof Johansson wrote:
+> On Thu, Jul 17, 2014 at 7:45 PM, Stephen Warren <swarren@wwwdotorg.org> wrote:
+>> On 07/08/2014 11:47 AM, Olof Johansson wrote:
+>>> On Tue, Jul 8, 2014 at 6:43 AM, Peter De Schrijver
+>>> <pdeschrijver@nvidia.com> wrote:
+>>>> On Mon, Jul 07, 2014 at 02:44:17AM +0200, Olof Johansson wrote:
+>>>>> On Mon, Jun 23, 2014 at 03:23:45PM -0600, Stephen Warren wrote:
+>>>>>> This branch moves code related to the Tegra fuses out of arch/arm and
+>>>>>> into a centralized location which could be shared with ARM64. It also
+>>>>>> adds support for reading the fuse data through sysfs.
+>>>>>
+>>>>> The new/moved misc driver isn't acked by any misc maintainer, so I can't
+>>>>> take this branch.
+>>>>>
+>>>>> I saw no indication from searching the mailing list of that either,
+>>>>> so it wasn't just a missed acked-by.
+>>>>>
+>>>>> I wonder if this code should go under drivers/soc/ instead?
+>>>>
+>>>> It's modelled after sunxi_sid.c which lives in drivers/misc/eeprom/.
+>>>> Originally this driver was also in drivers/misc/eeprom/, but Stephen objected
+>>>> and therefore it was moved to drivers/misc/fuse. I think that's the right
+>>>> place still.
+>>>
+>>> I disagree, I think this belongs under drivers/soc. Especially since
+>>> you're adding dependencies on this misc driver from other parts of the
+>>> kernel / other drivers.
+>>>
+>>> I also don't like seeing init calls form platform code down into
+>>> drivers/misc like you're adding here. Can you please look at doing
+>>> that as a regular init call setup?
+>>
+>> I strongly disagree with using init calls for this kind of thing. There
+>> are ordering dependencies between the initialization code that can only
+>> be sanely managed by explicitly calling functions in a particular order;
+>> there's simply no way to manage this using initcalls. This is exactly
+>> why the hooks in the ARM machine descriptors exist...
+> 
+> Right, but there are non on 64-bit, so you need to solve it for there
+> anyway. And once it's solved there, you might as well keep it common
+> with 32-bit.
 
-What happened to these two patches ?
-
-On Monday 16 December 2013 17:48:29 Felipe Balbi wrote:
-> On Mon, Dec 16, 2013 at 02:38:27PM -0800, Tony Lindgren wrote:
-> > * Felipe Balbi <balbi@ti.com> [131216 13:31]:
-> > > On Mon, Dec 16, 2013 at 09:23:43PM +0530, Kishon Vijay Abraham I wrote:
-> > > > After the platform devices are created using PLATFORM_DEVID_AUTO, the
-> > > > device names given in usb_bind_phy (in board file) does not match with
-> > > > the actual device name causing the USB PHY library not to return the
-> > > > PHY reference when the MUSB controller request for the PHY in the
-> > > > non-dt boot case.
-> > > > So removed creating platform devices using PLATFORM_DEVID_AUTO in
-> > > > omap2430.c.
-> > > > 
-> > > > Did enumeration testing in omap3 beagle.
-> > > > 
-> > > > Changes from v2:
-> > > > * Fixed the commit log
-> > > > 
-> > > > Changes from v1:
-> > > > * refreshed to the latested mainline kernel
-> > > > * added musb_put_id from omap2430 remove.
-> > > 
-> > > Tony, how do you want to handle this ? You want me to provide you a
-> > > branch which we both merge ?
-> > 
-> > Yes that would be great thanks. For the mach-omap2 touching parts:
-> > 
-> > Acked-by: Tony Lindgren <tony@atomide.com>
-> 
-> Here it is, let me know if you prefer a signed tag:
-> 
-> The following changes since commit 6ce4eac1f600b34f2f7f58f9cd8f0503d79e42ae:
-> 
->   Linux 3.13-rc1 (2013-11-22 11:30:55 -0800)
-> 
-> are available in the git repository at:
-> 
->   git://git.kernel.org/pub/scm/linux/kernel/git/balbi/usb.git
-> usb-phy-binding-omap3
-> 
-> for you to fetch changes up to 23ada3130cf4e56acb86fdff4c26113188d52d18:
-> 
->   arm: omap: remove *.auto* from device names given in usb_bind_phy
-> (2013-12-16 17:44:43 -0600)
-> 
-> ----------------------------------------------------------------
-> Kishon Vijay Abraham I (2):
->       usb: musb: omap: remove using PLATFORM_DEVID_AUTO in omap2430.c
->       arm: omap: remove *.auto* from device names given in usb_bind_phy
-> 
->  arch/arm/mach-omap2/board-2430sdp.c        |  2 +-
->  arch/arm/mach-omap2/board-3430sdp.c        |  2 +-
->  arch/arm/mach-omap2/board-cm-t35.c         |  2 +-
->  arch/arm/mach-omap2/board-devkit8000.c     |  2 +-
->  arch/arm/mach-omap2/board-ldp.c            |  2 +-
->  arch/arm/mach-omap2/board-omap3beagle.c    |  2 +-
->  arch/arm/mach-omap2/board-omap3logic.c     |  2 +-
->  arch/arm/mach-omap2/board-omap3pandora.c   |  2 +-
->  arch/arm/mach-omap2/board-omap3stalker.c   |  2 +-
->  arch/arm/mach-omap2/board-omap3touchbook.c |  2 +-
->  arch/arm/mach-omap2/board-overo.c          |  2 +-
->  arch/arm/mach-omap2/board-rx51.c           |  2 +-
->  drivers/usb/musb/musb_core.c               | 31 ++++++++++++++++++++++++++-
->  drivers/usb/musb/musb_core.h               |  2 ++
->  drivers/usb/musb/omap2430.c                | 19 ++++++++++++++++--
->  15 files changed, 61 insertions(+), 15 deletions(-)
-
--- 
-Regards,
-
-Laurent Pinchart
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 473 bytes
-Desc: This is a digitally signed message part.
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140721/209b6fa3/attachment.sig>
+My assertion is that we should just do it directly on 64-bit too.
+There's no reason for arm64 to deviate from what arch/arm does already.
