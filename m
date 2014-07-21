@@ -1,65 +1,47 @@
-From: cw00.choi@samsung.com (Chanwoo Choi)
-Date: Mon, 21 Jul 2014 17:17:44 +0900
-Subject: [PATCHv7 0/4] iio: adc: exynos_adc: Support Exynos3250 ADC and
- code clean
-In-Reply-To: <53CCCB20.50802@samsung.com>
-References: <1405909068-22539-1-git-send-email-cw00.choi@samsung.com>
- <14522743.f6oFhEQVv4@wuerfel> <53CCCB20.50802@samsung.com>
-Message-ID: <53CCCCA8.1030509@samsung.com>
+From: s.hauer@pengutronix.de (Sascha Hauer)
+Date: Mon, 21 Jul 2014 10:21:51 +0200
+Subject: [PATCH] ARM: i.MX6: add more chip revision support
+In-Reply-To: <20140721070647.GK8537@dragon>
+References: <1405921091-28748-1-git-send-email-shawn.guo@freescale.com>
+ <20140721063520.GR23235@pengutronix.de>
+ <20140721070647.GK8537@dragon>
+Message-ID: <20140721082151.GU23235@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/21/2014 05:11 PM, Chanwoo Choi wrote:
-> On 07/21/2014 04:38 PM, Arnd Bergmann wrote:
->> On Monday 21 July 2014 11:17:44 Chanwoo Choi wrote:
->>>
->>> This patchset support Exynos3250 ADC (Analog Digital Converter) because
->>> Exynos3250 has additional special clock for ADC IP.
->>>
->>> Changes from v6:
->>> - Use "exynos3250-adc" compatible string instead of "exynos3250-adc-v2"
->>> - Use "sclk" clock name instead of "sclk_adc"
->>> - Remove un-necessary macro for exyno-adc-data-v2 structure.
->>> - Remove '(void *)' cast and mark the exynos-adc-data structure as 'const'
->>> - Change the number of ADC channels (Exynos3250 has only two channels for ADC)
->>>
->>
->> Looks good to me. Two small requests:
->>
->> a) if you don't mind, can you add my patch (1/2) to add support for s3c64xx to
->>    your series, adding your Signed-off-by line in addition to mine? I think
->>    that one was noncontroversial, while the second patch (2/2) need some more
->>    work to address the comments and do testing.
+On Mon, Jul 21, 2014 at 03:06:48PM +0800, Shawn Guo wrote:
+> On Mon, Jul 21, 2014 at 08:35:20AM +0200, Sascha Hauer wrote:
+> > On Mon, Jul 21, 2014 at 01:38:11PM +0800, Shawn Guo wrote:
+> > > From: Jason Liu <r64343@freescale.com>
+> > > 
+> > > Add more revision support for the new i.MX6DQ tap-out (TO1.5).  This
+> > > TO1.5 is the Rev 1.3 as documented in i.MX6DQ data sheet, because TO1.3
+> > > and TO1.4 are never revealed.
+> > 
+> > So the chip identifies itself as 1.5 but the data sheet refers to it as
+> > 1.3. Is there a way to make that clear somewhere? Otherwise it's really
+> > confusing.
 > 
-> OK, I'll add this patch.
-> But, I have a question.
-> 
-> Your patch add following compatible string.
-> "s3c64100-adc" is right?
-> 
->  static const struct of_device_id exynos_adc_match[] = {
->  	{
-> +		.compatible = "samsung,s3c64100-adc",
-> +		.data = &exynos_adc_s3c64xx_data,
-> +	}, {
+> I can add a note about that in the code, but I'm not really sure if
+> there is a better way to pass such info to end users.  Suggestions are
+> welcomed.
 
-Additionally,
-Documentation/devicetree/bindings/arm/samsung/exynos-adc.txt has not included
-"samsung,s3c6410-adc" compatible string. Should I add this string in exynos-adc.txt?
+Since the anatop code can be used by other SoCs aswell and you're saying
+that even the other i.MX6 SoC variants may have a different numbering I
+think adding a comment to the code is the best we can do.
 
-drivers/iio/adc/exynos-adc.c has not includeded following compatible string.
-Should I add this compatible string on exynos-adc.c?
+The only other possibility I can think of is to make the info string we
+print during boot SoC specific again, but I think we are all glad that
+this isn't the case anymore.
 
-+			Must be "samsung,s3c2410-adc" for
-+				the ADC in s3c2410 and compatibles
-+			Must be "samsung,s3c2416-adc" for
-+				the ADC in s3c2416 and compatibles
-+			Must be "samsung,s3c2440-adc" for
-+				the ADC in s3c2440 and compatibles
-+			Must be "samsung,s3c2440-adc" for
-+				the ADC in s3c2440 and compatibles
-+			Must be "samsung,s3c2443-adc" for
-+				the ADC in s3c2443 and compatibles
+So adding a comment should be fine. At least the code would be the place
+I would look if I remembered that there is some inconsistency and don't
+know exactly what it was.
 
-Thanks,
-Chanwoo Choi
+Sascha
+
+-- 
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
