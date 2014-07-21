@@ -1,159 +1,181 @@
-From: m-karicheri2@ti.com (Murali Karicheri)
-Date: Mon, 21 Jul 2014 12:58:43 -0400
-Subject: [PATCH v7 3/5] PCI: designware: enhance dw_pcie_host_init() to
- support v3.65 DW hardware
-In-Reply-To: <1405961925-27248-1-git-send-email-m-karicheri2@ti.com>
-References: <1405961925-27248-1-git-send-email-m-karicheri2@ti.com>
-Message-ID: <1405961925-27248-4-git-send-email-m-karicheri2@ti.com>
+From: pawel.moll@arm.com (Pawel Moll)
+Date: Mon, 21 Jul 2014 18:00:34 +0100
+Subject: [PATCH] platform: Make platform_bus device a platform device
+In-Reply-To: <CAOesGMgvd1HbjywN7BDPtr8ZU7vucWH48B=AW3TZjng73YA8WA@mail.gmail.com>
+References: <CAOesGMgvd1HbjywN7BDPtr8ZU7vucWH48B=AW3TZjng73YA8WA@mail.gmail.com>
+Message-ID: <1405962034-25482-1-git-send-email-pawel.moll@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-keystone PCI controller is based on v3.65 designware hardware. This
-version differs from newer versions of the hardware in few functional
-areas discussed below that makes it necessary to change dw_pcie_host_init()
-to support v3.65 based PCI controller.
+... describing the root of the device tree, so one can write
+a platform driver initializing the platform.
 
- 1. No support for ATU port. So any ATU specific resource handling code
-    is to be bypassed for v3.65 h/w.
- 2. MSI controller uses Application space to implement MSI and 32 MSI
-    interrupts are multiplexed over 8 IRQs to the host. Hence the code
-    to process MSI IRQ needs to be different. This patch allows platform
-    driver to provide its own irq_domain_ops ptr to irq_domain_add_linear()
-    through an API callback from the designware core driver.
- 3. MSI interrupt generation requires EP to write to the RC's application
-    register. So enhance the driver to allow setup of inbound access to
-    MSI irq register as a post scan bus API callback.
-
-Signed-off-by: Murali Karicheri <m-karicheri2@ti.com>
-Reviewed-by: Pratyush Anand <pratyush.anand@st.com>
-Acked-by: Mohit KUMAR <mohit.kumar@st.com>
-
-CC: Santosh Shilimkar <santosh.shilimkar@ti.com>
-CC: Russell King <linux@arm.linux.org.uk>
-CC: Grant Likely <grant.likely@linaro.org>
-CC: Rob Herring <robh+dt@kernel.org>
-CC: Jingoo Han <jg1.han@samsung.com>
-CC: Bjorn Helgaas <bhelgaas@google.com>
-CC: Richard Zhu <r65037@freescale.com>
-CC: Kishon Vijay Abraham I <kishon@ti.com>
-CC: Marek Vasut <marex@denx.de>
-CC: Arnd Bergmann <arnd@arndb.de>
-CC: Pawel Moll <pawel.moll@arm.com>
-CC: Mark Rutland <mark.rutland@arm.com>
-CC: Ian Campbell <ijc+devicetree@hellion.org.uk>
-CC: Kumar Gala <galak@codeaurora.org>
-CC: Randy Dunlap <rdunlap@infradead.org>
-CC: Grant Likely <grant.likely@linaro.org>
+Signed-off-by: Pawel Moll <pawel.moll@arm.com>
 ---
- drivers/pci/host/pcie-designware.c |   54 +++++++++++++++++++++++-------------
- drivers/pci/host/pcie-designware.h |    2 ++
- 2 files changed, 36 insertions(+), 20 deletions(-)
 
-diff --git a/drivers/pci/host/pcie-designware.c b/drivers/pci/host/pcie-designware.c
-index 905941c..35bb4af 100644
---- a/drivers/pci/host/pcie-designware.c
-+++ b/drivers/pci/host/pcie-designware.c
-@@ -420,8 +420,8 @@ int __init dw_pcie_host_init(struct pcie_port *pp)
- 	struct device_node *np = pp->dev->of_node;
- 	struct of_pci_range range;
- 	struct of_pci_range_parser parser;
-+	int i, ret;
- 	u32 val;
--	int i;
+For what it's worth, the patch I came up back then.
+*Untested* against current head...
+
+ arch/arm/mach-imx/devices/devices.c |  4 ++--
+ arch/unicore32/kernel/puv3-core.c   |  2 +-
+ arch/unicore32/kernel/puv3-nb0916.c |  6 +++---
+ drivers/base/platform.c             | 18 ++++++++++++------
+ drivers/char/tile-srom.c            |  2 +-
+ drivers/mmc/host/sdhci-pltfm.c      |  2 +-
+ drivers/scsi/hosts.c                |  2 +-
+ include/linux/platform_device.h     |  2 +-
+ 8 files changed, 22 insertions(+), 16 deletions(-)
+
+diff --git a/arch/arm/mach-imx/devices/devices.c b/arch/arm/mach-imx/devices/devices.c
+index 1b4366a..48c3817 100644
+--- a/arch/arm/mach-imx/devices/devices.c
++++ b/arch/arm/mach-imx/devices/devices.c
+@@ -24,12 +24,12 @@
  
- 	if (of_pci_range_parser_init(&parser, np)) {
- 		dev_err(pp->dev, "missing ranges property\n");
-@@ -467,21 +467,26 @@ int __init dw_pcie_host_init(struct pcie_port *pp)
- 		}
- 	}
- 
--	pp->cfg0_base = pp->cfg.start;
--	pp->cfg1_base = pp->cfg.start + pp->config.cfg0_size;
- 	pp->mem_base = pp->mem.start;
- 
--	pp->va_cfg0_base = devm_ioremap(pp->dev, pp->cfg0_base,
--					pp->config.cfg0_size);
- 	if (!pp->va_cfg0_base) {
--		dev_err(pp->dev, "error with ioremap in function\n");
--		return -ENOMEM;
-+		pp->cfg0_base = pp->cfg.start;
-+		pp->va_cfg0_base = devm_ioremap(pp->dev, pp->cfg0_base,
-+						pp->config.cfg0_size);
-+		if (!pp->va_cfg0_base) {
-+			dev_err(pp->dev, "error with ioremap in function\n");
-+			return -ENOMEM;
-+		}
- 	}
--	pp->va_cfg1_base = devm_ioremap(pp->dev, pp->cfg1_base,
--					pp->config.cfg1_size);
-+
- 	if (!pp->va_cfg1_base) {
--		dev_err(pp->dev, "error with ioremap\n");
--		return -ENOMEM;
-+		pp->cfg1_base = pp->cfg.start + pp->config.cfg0_size;
-+		pp->va_cfg1_base = devm_ioremap(pp->dev, pp->cfg1_base,
-+						pp->config.cfg1_size);
-+		if (!pp->va_cfg1_base) {
-+			dev_err(pp->dev, "error with ioremap\n");
-+			return -ENOMEM;
-+		}
- 	}
- 
- 	if (of_property_read_u32(np, "num-lanes", &pp->lanes)) {
-@@ -490,16 +495,22 @@ int __init dw_pcie_host_init(struct pcie_port *pp)
- 	}
- 
- 	if (IS_ENABLED(CONFIG_PCI_MSI)) {
--		pp->irq_domain = irq_domain_add_linear(pp->dev->of_node,
--					MAX_MSI_IRQS, &msi_domain_ops,
--					&dw_pcie_msi_chip);
--		if (!pp->irq_domain) {
--			dev_err(pp->dev, "irq domain init failed\n");
--			return -ENXIO;
--		}
-+		if (!pp->ops->msi_host_init) {
-+			pp->irq_domain = irq_domain_add_linear(pp->dev->of_node,
-+						MAX_MSI_IRQS, &msi_domain_ops,
-+						&dw_pcie_msi_chip);
-+			if (!pp->irq_domain) {
-+				dev_err(pp->dev, "irq domain init failed\n");
-+				return -ENXIO;
-+			}
- 
--		for (i = 0; i < MAX_MSI_IRQS; i++)
--			irq_create_mapping(pp->irq_domain, i);
-+			for (i = 0; i < MAX_MSI_IRQS; i++)
-+				irq_create_mapping(pp->irq_domain, i);
-+		} else {
-+			ret = pp->ops->msi_host_init(pp, &dw_pcie_msi_chip);
-+			if (ret < 0)
-+				return ret;
-+		}
- 	}
- 
- 	if (pp->ops->host_init)
-@@ -759,6 +770,9 @@ static struct pci_bus *dw_pcie_scan_bus(int nr, struct pci_sys_data *sys)
- 		BUG();
- 	}
- 
-+	if (bus && pp->ops->scan_bus)
-+		pp->ops->scan_bus(pp);
-+
- 	return bus;
- }
- 
-diff --git a/drivers/pci/host/pcie-designware.h b/drivers/pci/host/pcie-designware.h
-index 387f69e..080c649 100644
---- a/drivers/pci/host/pcie-designware.h
-+++ b/drivers/pci/host/pcie-designware.h
-@@ -70,6 +70,8 @@ struct pcie_host_ops {
- 	void (*msi_set_irq)(struct pcie_port *pp, int irq);
- 	void (*msi_clear_irq)(struct pcie_port *pp, int irq);
- 	u32 (*get_msi_data)(struct pcie_port *pp);
-+	void (*scan_bus)(struct pcie_port *pp);
-+	int (*msi_host_init)(struct pcie_port *pp, struct msi_chip *chip);
+ struct device mxc_aips_bus = {
+ 	.init_name	= "mxc_aips",
+-	.parent		= &platform_bus,
++	.parent		= &platform_bus.dev,
  };
  
- int dw_pcie_cfg_read(void __iomem *addr, int where, int size, u32 *val);
+ struct device mxc_ahb_bus = {
+ 	.init_name	= "mxc_ahb",
+-	.parent		= &platform_bus,
++	.parent		= &platform_bus.dev,
+ };
+ 
+ int __init mxc_device_init(void)
+diff --git a/arch/unicore32/kernel/puv3-core.c b/arch/unicore32/kernel/puv3-core.c
+index 254adee..28d1387 100644
+--- a/arch/unicore32/kernel/puv3-core.c
++++ b/arch/unicore32/kernel/puv3-core.c
+@@ -272,7 +272,7 @@ void __init puv3_core_init(void)
+ 	platform_device_register_simple("PKUnity-v3-UART", 1,
+ 			puv3_uart1_resources, ARRAY_SIZE(puv3_uart1_resources));
+ 	platform_device_register_simple("PKUnity-v3-AC97", -1, NULL, 0);
+-	platform_device_register_resndata(&platform_bus, "musb_hdrc", -1,
++	platform_device_register_resndata(&platform_bus.dev, "musb_hdrc", -1,
+ 			puv3_usb_resources, ARRAY_SIZE(puv3_usb_resources),
+ 			&puv3_usb_plat, sizeof(puv3_usb_plat));
+ }
+diff --git a/arch/unicore32/kernel/puv3-nb0916.c b/arch/unicore32/kernel/puv3-nb0916.c
+index 0c6618e..4b1c462 100644
+--- a/arch/unicore32/kernel/puv3-nb0916.c
++++ b/arch/unicore32/kernel/puv3-nb0916.c
+@@ -112,13 +112,13 @@ int __init mach_nb0916_init(void)
+ 	platform_device_register_simple("PKUnity-v3-I2C", -1,
+ 			puv3_i2c_resources, ARRAY_SIZE(puv3_i2c_resources));
+ 
+-	platform_device_register_data(&platform_bus, "pwm-backlight", -1,
++	platform_device_register_data(&platform_bus.dev, "pwm-backlight", -1,
+ 			&nb0916_backlight_data, sizeof(nb0916_backlight_data));
+ 
+-	platform_device_register_data(&platform_bus, "gpio-keys", -1,
++	platform_device_register_data(&platform_bus.dev, "gpio-keys", -1,
+ 			&nb0916_gpio_button_data, sizeof(nb0916_gpio_button_data));
+ 
+-	platform_device_register_resndata(&platform_bus, "physmap-flash", -1,
++	platform_device_register_resndata(&platform_bus.dev, "physmap-flash", -1,
+ 			&physmap_flash_resource, 1,
+ 			&physmap_flash_data, sizeof(physmap_flash_data));
+ 
+diff --git a/drivers/base/platform.c b/drivers/base/platform.c
+index eee48c4..cb69b38 100644
+--- a/drivers/base/platform.c
++++ b/drivers/base/platform.c
+@@ -30,8 +30,8 @@
+ /* For automatically allocated device IDs */
+ static DEFINE_IDA(platform_devid_ida);
+ 
+-struct device platform_bus = {
+-	.init_name	= "platform",
++struct platform_device platform_bus = {
++	.name	= "platform",
+ };
+ EXPORT_SYMBOL_GPL(platform_bus);
+ 
+@@ -300,7 +300,7 @@ int platform_device_add(struct platform_device *pdev)
+ 		return -EINVAL;
+ 
+ 	if (!pdev->dev.parent)
+-		pdev->dev.parent = &platform_bus;
++		pdev->dev.parent = &platform_bus.dev;
+ 
+ 	pdev->dev.bus = &platform_bus_type;
+ 
+@@ -946,12 +946,18 @@ int __init platform_bus_init(void)
+ 
+ 	early_platform_cleanup();
+ 
+-	error = device_register(&platform_bus);
++	dev_set_name(&platform_bus.dev, "%s", platform_bus.name);
++	error = device_register(&platform_bus.name);
+ 	if (error)
+ 		return error;
+ 	error =  bus_register(&platform_bus_type);
+-	if (error)
+-		device_unregister(&platform_bus);
++	if (!error) {
++		platform_bus.dev.of_node = allnodes;
++		platform_bus.dev.bus = &platform_bus_type;
++		bus_add_device(&platform_bus.dev);
++	} else {
++		device_unregister(&platform_bus.dev);
++	}
+ 	return error;
+ }
+ 
+diff --git a/drivers/char/tile-srom.c b/drivers/char/tile-srom.c
+index bd37747..4e4b7a2 100644
+--- a/drivers/char/tile-srom.c
++++ b/drivers/char/tile-srom.c
+@@ -350,7 +350,7 @@ static int srom_setup_minor(struct srom_dev *srom, int index)
+ 		       SROM_PAGE_SIZE_OFF, sizeof(srom->page_size)) < 0)
+ 		return -EIO;
+ 
+-	dev = device_create(srom_class, &platform_bus,
++	dev = device_create(srom_class, &platform_bus.dev,
+ 			    MKDEV(srom_major, index), srom, "%d", index);
+ 	return PTR_ERR_OR_ZERO(dev);
+ }
+diff --git a/drivers/mmc/host/sdhci-pltfm.c b/drivers/mmc/host/sdhci-pltfm.c
+index 7e834fb..9a2b0d0 100644
+--- a/drivers/mmc/host/sdhci-pltfm.c
++++ b/drivers/mmc/host/sdhci-pltfm.c
+@@ -137,7 +137,7 @@ struct sdhci_host *sdhci_pltfm_init(struct platform_device *pdev,
+ 		dev_err(&pdev->dev, "Invalid iomem size!\n");
+ 
+ 	/* Some PCI-based MFD need the parent here */
+-	if (pdev->dev.parent != &platform_bus && !np)
++	if (pdev->dev.parent != &platform_bus.dev && !np)
+ 		host = sdhci_alloc_host(pdev->dev.parent,
+ 			sizeof(struct sdhci_pltfm_host) + priv_size);
+ 	else
+diff --git a/drivers/scsi/hosts.c b/drivers/scsi/hosts.c
+index 3cbb57a..c14c36f 100644
+--- a/drivers/scsi/hosts.c
++++ b/drivers/scsi/hosts.c
+@@ -218,7 +218,7 @@ int scsi_add_host_with_dma(struct Scsi_Host *shost, struct device *dev,
+ 		goto fail;
+ 
+ 	if (!shost->shost_gendev.parent)
+-		shost->shost_gendev.parent = dev ? dev : &platform_bus;
++		shost->shost_gendev.parent = dev ? dev : &platform_bus.dev;
+ 	if (!dma_dev)
+ 		dma_dev = shost->shost_gendev.parent;
+ 
+diff --git a/include/linux/platform_device.h b/include/linux/platform_device.h
+index 16f6654..a99032a 100644
+--- a/include/linux/platform_device.h
++++ b/include/linux/platform_device.h
+@@ -44,7 +44,7 @@ extern int platform_device_register(struct platform_device *);
+ extern void platform_device_unregister(struct platform_device *);
+ 
+ extern struct bus_type platform_bus_type;
+-extern struct device platform_bus;
++extern struct platform_device platform_bus;
+ 
+ extern void arch_setup_pdev_archdata(struct platform_device *);
+ extern struct resource *platform_get_resource(struct platform_device *,
 -- 
-1.7.9.5
+1.9.1
