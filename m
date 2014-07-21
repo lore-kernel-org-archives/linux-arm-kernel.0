@@ -1,55 +1,49 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Mon, 21 Jul 2014 17:46:34 +0100
-Subject: [PATCH RFC 5/9] ARM: Add L1 PTE non-secure mapping
-In-Reply-To: <1405954040-30399-6-git-send-email-daniel.thompson@linaro.org>
-References: <1405954040-30399-1-git-send-email-daniel.thompson@linaro.org>
- <1405954040-30399-6-git-send-email-daniel.thompson@linaro.org>
-Message-ID: <20140721164634.GF21766@n2100.arm.linux.org.uk>
+From: ezequiel.garcia@free-electrons.com (Ezequiel Garcia)
+Date: Mon, 21 Jul 2014 13:48:13 -0300
+Subject: [PATCH 3/6] net: mvpp2: Fix the BM pool buffer release check
+In-Reply-To: <1405961296-5846-1-git-send-email-ezequiel.garcia@free-electrons.com>
+References: <1405961296-5846-1-git-send-email-ezequiel.garcia@free-electrons.com>
+Message-ID: <1405961296-5846-4-git-send-email-ezequiel.garcia@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jul 21, 2014 at 03:47:16PM +0100, Daniel Thompson wrote:
-> From: Marek Vasut <marex@denx.de>
-> 
-> Add new device type, MT_DEVICE_NS. This type sets the NS bit in L1 PTE [1].
-> Accesses to a memory region which is mapped this way generate non-secure
-> access to that memory area. One must be careful here, since the NS bit is
-> only available in L1 PTE, therefore when creating the mapping, the mapping
-> must be at least 1 MiB big and must be aligned to 1 MiB. If that condition
-> was false, the kernel would use regular L2 page mapping for this area instead
-> and the NS bit setting would be ineffective.
+After a call to mvpp2_bm_bufs_free(), the caller usually wants to know
+if the function successfully freed the requested number. However, this
+cannot be done by looking into the BM pool count, because the current
+buffer count was updated by mvpp2_bm_bufs_free().
 
-Right, so this says that PTE mappings are not permissible.
+In fact, the current callers of mvpp2_bm_bufs_free() use it to release
+all the buffers in the pool, so we can fix this by simply checking
+if the pool is not empty.
 
-> +	[MT_DEVICE_NS] = {	  /* Non-secure accesses from secure mode */
-> +		.prot_pte	= PROT_PTE_DEVICE | L_PTE_MT_DEV_SHARED |
-> +				  L_PTE_SHARED,
-> +		.prot_l1	= PMD_TYPE_TABLE,
+Signed-off-by: Ezequiel Garcia <ezequiel.garcia@free-electrons.com>
+---
+ drivers/net/ethernet/marvell/mvpp2.c | 6 +++---
+ 1 file changed, 3 insertions(+), 3 deletions(-)
 
-However, by filling in prot_pte and prot_l1, you're telling the code that
-it /can/ setup such a mapping.  This is screwed.
-
-If you want to deny anything but section mappings (because they don't work)
-then you omit prot_pte and prot_l1.  With those omitted, if someone tries
-to abuse this mapping type, then this check in create_mapping() will
-trigger:
-
-        if (type->prot_l1 == 0 && ((addr | phys | length) & ~SECTION_MASK)) {
-                printk(KERN_WARNING "BUG: map for 0x%08llx at 0x%08lx can not "
-                       "be mapped using pages, ignoring.\n",
-                       (long long)__pfn_to_phys(md->pfn), addr);
-                return;
-        }
-
-ioremap doesn't have that check; it assumes that it will always be setting
-up PTE mappings via ioremap_page_range().  In fact, on many platforms
-that's the only option.
-
-So making this interface available via ioremap() seems pointless - but
-more importantly it's extremely error-prone.  So, MT_DEVICE_NS shouldn't
-be using 4 at all, shouldn't be in asm/io.h, but should be with the
-private MT_* definitions in map.h.
-
+diff --git a/drivers/net/ethernet/marvell/mvpp2.c b/drivers/net/ethernet/marvell/mvpp2.c
+index aa139df..43d3391 100644
+--- a/drivers/net/ethernet/marvell/mvpp2.c
++++ b/drivers/net/ethernet/marvell/mvpp2.c
+@@ -3420,7 +3420,7 @@ static int mvpp2_bm_pool_destroy(struct platform_device *pdev,
+ 	u32 val;
+ 
+ 	num = mvpp2_bm_bufs_free(priv, bm_pool, bm_pool->buf_num);
+-	if (num != bm_pool->buf_num) {
++	if (bm_pool->buf_num) {
+ 		WARN(1, "cannot free all buffers in pool %d\n", bm_pool->id);
+ 		return 0;
+ 	}
+@@ -3748,8 +3748,8 @@ static int mvpp2_bm_update_mtu(struct net_device *dev, int mtu)
+ 	int pkt_size = MVPP2_RX_PKT_SIZE(mtu);
+ 
+ 	/* Update BM pool with new buffer size */
+-	num = mvpp2_bm_bufs_free(port->priv, port_pool, pkts_num);
+-	if (num != pkts_num) {
++	mvpp2_bm_bufs_free(port->priv, port_pool, pkts_num);
++	if (port_pool->buf_num) {
+ 		WARN(1, "cannot free all buffers in pool %d\n", port_pool->id);
+ 		return -EIO;
+ 	}
 -- 
-FTTC broadband for 0.8mile line: currently at 9.5Mbps down 400kbps up
-according to speedtest.net.
+2.0.1
