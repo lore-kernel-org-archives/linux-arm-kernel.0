@@ -1,27 +1,60 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Mon, 21 Jul 2014 12:47:01 +0200
-Subject: [PATCHv6 3/4] iio: devicetree: Add DT binding documentation for
- Exynos3250 ADC
-In-Reply-To: <53CCEDBF.7010300@gmail.com>
-References: <1405663186-26464-1-git-send-email-cw00.choi@samsung.com>
- <7477106.gq1AqisQx4@wuerfel> <53CCEDBF.7010300@gmail.com>
-Message-ID: <5314104.0WdOMs1CRl@wuerfel>
+From: tony@atomide.com (Tony Lindgren)
+Date: Mon, 21 Jul 2014 03:51:49 -0700
+Subject: [RFC PATCH 4/7] ARM: OMAP4+: PRM: register interrupt information
+ from DT
+In-Reply-To: <1402025761-16831-5-git-send-email-nm@ti.com>
+References: <1402025761-16831-1-git-send-email-nm@ti.com>
+ <1402025761-16831-5-git-send-email-nm@ti.com>
+Message-ID: <20140721105149.GU18374@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday 21 July 2014 12:38:55 Tomasz Figa wrote:
+* Nishanth Menon <nm@ti.com> [140605 20:37]:
+> Allow the PRM interrupt information to be picked up from device tree.
+> the only exception is for OMAP4 which uses values pre-populated and allows
+> compatibility with older dtb.
 > 
-> I believe we should be enforcing as much correctness on DT data as
-> possible without too much burden in the code. Otherwise how we are
-> supposed to know if an error is caused by wrong/missing data in DT, bug
-> in the driver or who knows else?
+> Signed-off-by: Nishanth Menon <nm@ti.com>
+> ---
+>  arch/arm/mach-omap2/prm44xx.c |   41 +++++++++++++++++++++++++++++++++++++++++
+>  1 file changed, 41 insertions(+)
 > 
-> In this case making this clock required depending on compatible string
-> doesn't seem too bothersome to me.
+> diff --git a/arch/arm/mach-omap2/prm44xx.c b/arch/arm/mach-omap2/prm44xx.c
+> index 1ecf244..784b3e1 100644
+> --- a/arch/arm/mach-omap2/prm44xx.c
+> +++ b/arch/arm/mach-omap2/prm44xx.c
+> @@ -17,6 +17,7 @@
+>  #include <linux/errno.h>
+>  #include <linux/err.h>
+>  #include <linux/io.h>
+> +#include <linux/of_irq.h>
+>  
+>  
+>  #include "soc.h"
+> @@ -698,11 +699,51 @@ int __init omap44xx_prm_init(void)
+>  	return prm_register(&omap44xx_prm_ll_data);
+>  }
+>  
+> +static struct of_device_id omap_prm_dt_match_table[] = {
+> +	{ .compatible = "ti,omap4-prm" },
+> +	{ .compatible = "ti,omap5-prm" },
+> +	{ .compatible = "ti,dra7-prm" },
+> +	{ }
+> +};
+> +
 
-It makes some sense given that we already need the separate compatible
-string (for the number of channels). Without that part, I'd probably
-prefer not having the new string just for the extra clock being required,
-that could be handled more easily by just making it an optional clock.
+I'd like to avoid adding more driver like stuff to mach-omap2
+and parsing compatible flags and dealing with interupts sounds
+very driver like.. But maybe just the handling can be moved
+out?
 
-	Arnd
+Would a simple driver be doable that parses the compatible
+flags, takes care of the IRQ chaining, and gets some SoC specific
+function pointers as auxdata?
+
+That would allow further work later on to remove the auxdata
+dependencies possibly.
+
+Regards,
+
+Tony
