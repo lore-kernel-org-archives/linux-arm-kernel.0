@@ -1,36 +1,50 @@
 From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
-Date: Mon, 21 Jul 2014 10:36:09 +0200
-Subject: [PATCH 1/3] cpuidle: exynos: Allow to use the driver without AFTR
-Message-ID: <1405931771-24100-1-git-send-email-k.kozlowski@samsung.com>
+Date: Mon, 21 Jul 2014 10:36:10 +0200
+Subject: [PATCH 2/3] ARM: EXYNOS: Enable cpuidle in WFI on all SoCs
+In-Reply-To: <1405931771-24100-1-git-send-email-k.kozlowski@samsung.com>
+References: <1405931771-24100-1-git-send-email-k.kozlowski@samsung.com>
+Message-ID: <1405931771-24100-2-git-send-email-k.kozlowski@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Allow the driver to be used when AFTR enter function is not provided
-(device platform data is NULL).
+Add cpuidle device for each SoC but set AFTR enter function only on
+supported ones (for now these are only Exynos4210 and Exynos5250). For
+other chipsets use only WFI.
 
 This actually does not give any special energy-saving benefits but
-allows to track the idle time of each core. Additionally it is a safe
-way to validate supplied platform data.
+allows to track the idle time of each core.
 
 Signed-off-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
 ---
- drivers/cpuidle/cpuidle-exynos.c | 3 +++
- 1 file changed, 3 insertions(+)
+ arch/arm/mach-exynos/exynos.c | 10 ++++++++--
+ 1 file changed, 8 insertions(+), 2 deletions(-)
 
-diff --git a/drivers/cpuidle/cpuidle-exynos.c b/drivers/cpuidle/cpuidle-exynos.c
-index 7c0151263828..5325a394be7e 100644
---- a/drivers/cpuidle/cpuidle-exynos.c
-+++ b/drivers/cpuidle/cpuidle-exynos.c
-@@ -77,7 +77,10 @@ static int exynos_cpuidle_probe(struct platform_device *pdev)
+diff --git a/arch/arm/mach-exynos/exynos.c b/arch/arm/mach-exynos/exynos.c
+index 2a43a1734eca..4109d592f6fc 100644
+--- a/arch/arm/mach-exynos/exynos.c
++++ b/arch/arm/mach-exynos/exynos.c
+@@ -171,14 +171,20 @@ static void exynos_restart(enum reboot_mode mode, const char *cmd)
+ 
+ static struct platform_device exynos_cpuidle = {
+ 	.name              = "exynos_cpuidle",
+-	.dev.platform_data = exynos_enter_aftr,
++	/*
++	 * Currently AFTR is not implemented for each SoC.
++	 * Set this to exynos_enter_aftr() only for supported SoCs.
++	 */
++	.dev.platform_data = NULL,
+ 	.id                = -1,
+ };
+ 
+ void __init exynos_cpuidle_init(void)
  {
- 	int ret;
+ 	if (soc_is_exynos4210() || soc_is_exynos5250())
+-		platform_device_register(&exynos_cpuidle);
++		exynos_cpuidle.dev.platform_data = exynos_enter_aftr;
++
++	platform_device_register(&exynos_cpuidle);
+ }
  
-+	/* If NULL enter only WFI */
- 	exynos_enter_aftr = (void *)(pdev->dev.platform_data);
-+	if (!exynos_enter_aftr)
-+		exynos_idle_driver.state_count = 1;
- 
- 	ret = cpuidle_register(&exynos_idle_driver, NULL);
- 	if (ret) {
+ void __init exynos_cpufreq_init(void)
 -- 
 1.9.1
