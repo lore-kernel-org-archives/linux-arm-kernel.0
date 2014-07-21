@@ -1,61 +1,46 @@
-From: LW@KARO-electronics.de (Lothar =?UTF-8?B?V2HDn21hbm4=?=)
-Date: Mon, 21 Jul 2014 09:34:30 +0200
-Subject: [PATCH 0/9] usb: musb: several bugfixes for the musb driver
-In-Reply-To: <20140718165044.GA30821@saruman.home>
-References: <1405675890-8802-1-git-send-email-LW@KARO-electronics.de>
- <20140718161636.GA18460@arch.cereza>
- <20140718165044.GA30821@saruman.home>
-Message-ID: <20140721093430.3f528cc7@ipc1.ka-ro>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Mon, 21 Jul 2014 09:38:55 +0200
+Subject: [PATCHv7 0/4] iio: adc: exynos_adc: Support Exynos3250 ADC and
+ code clean
+In-Reply-To: <1405909068-22539-1-git-send-email-cw00.choi@samsung.com>
+References: <1405909068-22539-1-git-send-email-cw00.choi@samsung.com>
+Message-ID: <14522743.f6oFhEQVv4@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-
-Felipe Balbi wrote:
-> Hi,
+On Monday 21 July 2014 11:17:44 Chanwoo Choi wrote:
 > 
-> On Fri, Jul 18, 2014 at 01:16:36PM -0300, Ezequiel Garcia wrote:
-> > Hi Lothar,
-> > 
-> > On 18 Jul 11:31 AM, Lothar Wa?mann wrote:
-> > > The first three patches do some source code cleanup in the files that
-> > > are modified in the subsequent patches.
-> > > 
-> > 
-> > I've applied patches 4 and 9 on a recent -next, after fixing a conflict
-> > due to patch 3 ("usb: musb_am335x: source cleanup"):
-> > 
-> > > Patch 4 carries the proper fix reported in commit:
-> > >         7adb5c876e9c ("usb: musb: Fix panic upon musb_am335x module removal")
-> > > 
-> > > Patch 9 reinstates module unloading support for the musb_am335x driver
-> > >         which was disabled due to a false failure analysis
-> > > 
-> > 
-> > For these two patches, Tested-by: Ezequiel Garcia <ezequiel@vanguardiasur.com.ar>
-> > 
-> > Tested on a beaglebone with a mass storage USB device, module load/unload
-> > works without issues. The module_get/put in the phy is now preventing the
-> > musb_am335x driver unload, which seems to be the real cause of the issue
-> > I reported. Thanks for providing a proper fix!
+> This patchset support Exynos3250 ADC (Analog Digital Converter) because
+> Exynos3250 has additional special clock for ADC IP.
 > 
-> I don't that's a good fix. The problem is that even after am335x
-> removing all its child, someone else tried to release the PHY. That
-> ordering is the one that needs to be fixed. Doing a module_get on the
-> parent device looks like a hack to me.
+> Changes from v6:
+> - Use "exynos3250-adc" compatible string instead of "exynos3250-adc-v2"
+> - Use "sclk" clock name instead of "sclk_adc"
+> - Remove un-necessary macro for exyno-adc-data-v2 structure.
+> - Remove '(void *)' cast and mark the exynos-adc-data structure as 'const'
+> - Change the number of ADC channels (Exynos3250 has only two channels for ADC)
 > 
-No. It guarantees that the module cannot be unloaded when its resources
-are still in use!
 
+Looks good to me. Two small requests:
 
-Lothar Wa?mann
--- 
-___________________________________________________________
+a) if you don't mind, can you add my patch (1/2) to add support for s3c64xx to
+   your series, adding your Signed-off-by line in addition to mine? I think
+   that one was noncontroversial, while the second patch (2/2) need some more
+   work to address the comments and do testing.
 
-Ka-Ro electronics GmbH | Pascalstra?e 22 | D - 52076 Aachen
-Phone: +49 2408 1402-0 | Fax: +49 2408 1402-10
-Gesch?ftsf?hrer: Matthias Kaussen
-Handelsregistereintrag: Amtsgericht Aachen, HRB 4996
+b) For the "compatible" string, I think it makes sense to set a fallback to
+   "samsung,exynos-adc-v2" in the case for exynos3250, making the DT
+   representation
 
-www.karo-electronics.de | info at karo-electronics.de
-___________________________________________________________
+	compatible = "samsung,exynos3250-adc", "samsung,exynos-adc-v2";
+
+   It's not entirely compatible because of the addition of the clock, but
+   since the register layout is the same, I think it still make sense.
+
+Thanks.
+
+For the entire series,
+
+Acked-by: Arnd Bergmann <arnd@arndb.de>
+
+	Arnd
