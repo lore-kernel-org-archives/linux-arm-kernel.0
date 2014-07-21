@@ -1,78 +1,93 @@
-From: dmitry.torokhov@gmail.com (Dmitry Torokhov)
-Date: Mon, 21 Jul 2014 09:19:32 -0700
-Subject: [PATCH 2/2] iio: exynos-adc: add experimental touchscreen support
-In-Reply-To: <6569004.FG0IRy8WyL@wuerfel>
-References: <1405663186-26464-1-git-send-email-cw00.choi@samsung.com>
- <5158672.dMAnnUQc7Z@wuerfel>
- <20140721144442.GB9112@core.coreip.homeip.net>
- <6569004.FG0IRy8WyL@wuerfel>
-Message-ID: <20140721161932.GA12180@core.coreip.homeip.net>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Mon, 21 Jul 2014 18:32:25 +0200
+Subject: [PATCH v2] arm64/efi: efistub: jump to 'stext' directly, not
+ through the header
+In-Reply-To: <1405606141.25580.108.camel@deneb.redhat.com>
+References: <1405421886-11692-1-git-send-email-ard.biesheuvel@linaro.org>
+ <1405522297.25580.72.camel@deneb.redhat.com>
+ <20140716155345.GB30313@leverpostej>
+ <1405539927.25580.74.camel@deneb.redhat.com>
+ <CAKv+Gu-bqXKoy-G00cWPJES=6A_ofu=cfBOsD0ZriHa4AGxG0A@mail.gmail.com>
+ <1405544636.25580.83.camel@deneb.redhat.com>
+ <CAKv+Gu8kvU8ndeG2vF5HqRhjK+_F=8D52eabHzy++nTHt_pAYQ@mail.gmail.com>
+ <1405606141.25580.108.camel@deneb.redhat.com>
+Message-ID: <CAKv+Gu8c3jhX+XxVR3EvuY6B4da-USgz=UMftGVzMCC7GdU73Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jul 21, 2014 at 05:11:27PM +0200, Arnd Bergmann wrote:
-> On Monday 21 July 2014 07:44:42 Dmitry Torokhov wrote:
-> > > > 
-> > > > It would be nice to actually close the device even if someone is
-> > > > touching screen. Please implement open/close methods and have them set a
-> > > > flag that you would check here.
-> > > 
-> > > Ok. I think it's even better to move the request_irq() into the open function,
-> > > which will avoid the flag and defer the error handling into the actual opening,
-> > > as well as syncing the running irq with the close function.
-> > 
-> > I do not quite like acquiring resources needed in open. I think drivers should
-> > do all resource acquisition in probe() and leave open()/close() to
-> > activate/quiesce devices.
-> 
-> Ok, I'll move it back then. I'm not sure what I'm supposed to do
-> in open/close then. Isn't it enough to check info->input->users
-> like this?
-> 
-> static irqreturn_t exynos_ts_isr(int irq, void *dev_id)
-> {
->         struct exynos_adc *info = dev_id;
->         struct iio_dev *dev = dev_get_drvdata(info->dev);
->         u32 x, y;
->         bool pressed;
->         int ret;
-> 
->         while (info->input->users) {
->                 ret = exynos_read_s3c64xx_ts(dev, &x, &y);
->                 if (ret == -ETIMEDOUT)
->                         break;
-> 
->                 pressed = x & y & ADC_DATX_PRESSED;
->                 if (!pressed) {
->                         input_report_key(info->input, BTN_TOUCH, 0);
->                         input_sync(info->input);
->                         break;
->                 }
-> 
->                 input_report_abs(info->input, ABS_X, x & ADC_DATX_MASK);
->                 input_report_abs(info->input, ABS_Y, y & ADC_DATY_MASK);
->                 input_report_key(info->input, BTN_TOUCH, 1);
->                 input_sync(info->input);
-> 
->                 msleep(1);
->         };
-> 
->         writel(0, ADC_V1_CLRINTPNDNUP(info->regs));
-> 
->         return IRQ_HANDLED;
-> }
-> 
-> I could do enable_irq()/disable_irq(), but that leaves a small
-> race at startup where we request the irq line and then immediately
-> disable it again.
+On 17 July 2014 16:09, Mark Salter <msalter@redhat.com> wrote:
+> On Wed, 2014-07-16 at 23:13 +0200, Ard Biesheuvel wrote:
+>> On 16 July 2014 23:03, Mark Salter <msalter@redhat.com> wrote:
+>> > On Wed, 2014-07-16 at 22:38 +0200, Ard Biesheuvel wrote:
+>> >> On 16 July 2014 21:45, Mark Salter <msalter@redhat.com> wrote:
+>> >> > On Wed, 2014-07-16 at 16:53 +0100, Mark Rutland wrote:
+>> >> >> On Wed, Jul 16, 2014 at 03:51:37PM +0100, Mark Salter wrote:
+>> >> >> > On Tue, 2014-07-15 at 12:58 +0200, Ard Biesheuvel wrote:
+>> >> >> > > After the EFI stub has done its business, it jumps into the kernel by branching
+>> >> >> > > to offset #0 of the loaded Image, which is where it expects to find the header
+>> >> >> > > containing a 'branch to stext' instruction.
+>> >> >> > >
+>> >> >> > > However, the header is not covered by any PE/COFF section, so the header may
+>> >> >> > > not actually be loaded at the expected offset. So instead, jump to 'stext'
+>> >> >> > > directly, which is at the base of the PE/COFF .text section, by supplying a
+>> >> >> > > symbol 'stext_offset' to efi-entry.o which contains the relative offset of
+>> >> >> > > stext into the Image. Also replace other open coded calculations of the same
+>> >> >> > > value with a reference to 'stext_offset'
+>> >> >> >
+>> >> >> > Have you actually seen a situation where the header isn't there?
+>> >> >> > Isn't the kernel header actually part of the pe/coff file and
+>> >> >> > firmware loads the whole file into RAM?
+>> >> >>
+>> >> >> From my understanding of Ard's earlier comments, this part isn't
+>> >> >> guaranteed per the UEFI spec.
+>> >> >>
+>> >> >> I would rather we weren't relying on implementation details.
+>> >> >>
+>> >> >
+>> >> > Could be. I didn't see anything about it in the UEFI spec, but I
+>> >> > probably wasn't exhaustive in my search. In any case, there's at
+>> >> > least one other place broken if the kernel header isn't included
+>> >> > in the loaded image.
+>> >> >
+>> >>
+>> >> I have not been able to find anything in the PE/COFF documents that
+>> >> tells you what to put in memory areas that are not covered by a
+>> >> section. Expecting the header to be there is indeed relying on an
+>> >> implementation detail, which seems risky.
+>> >> And indeed, if there are any other (non EFI related) uses of header
+>> >> fields in the kernel, it would be good to have a look at those well,
+>> >
+>> > I think we need to come up with a loader which does load an image
+>> > without kernel header so that we can test. Otherwise, we'll probably
+>> > end up with buggy code anyway. The stub code assumes the the loaded
+>> > image pointed to by the system table is the whole image. Seems like
+>> > we'd need to add code to determine if it is whole kernel image or
+>> > image without initial header. Stub would have to handle both cases.
+>> > For instance, one case would want image placed at 2MiB+TEXT_OFFSET,
+>> > other case would want 2MiB+TEXT_OFFSET+sizeof(kernel header).
+>> >
+>>
+>> No, this has nothing to do with misaligned data.
+>>
+>> The PE/COFF .text section does not start at virtual offset #0 but at
+>> virtual offset 'stext - efi_head'.
+>> In other words, there is a hole in the virtual image where the header
+>> is supposed to be.
+>> So if there is no PE/COFF section describing what data should be put
+>> at offset #0 by the loader, we can't assume the header is there, even
+>> if ImageBase does start at #0
+>
+> I get that. You're supposing UEFI will always allocate memory for the
+> full image, but only sometimes copy the PE/COFF headers. I can see your
+> point from a PE/COFF perspective, but not so much from the UEFI spec
+> perspective where the language leads me to think it treats the PE/COFF
+> images as one unit wrt loading. In any case, it really isn't worth
+> arguing about. I don't have any objection to the patch since it won't
+> break anything from my perspective and it'll protect against breakage
+> which could possibly occur with some firmware implementations.
+>
 
-I think the above (or a separate flag in driver structure) coupled with
-enable/disable IRQ is fine - input core can deal with calls to input_report_*
-on devices that have been properly allocated but have not been registered yet.
-
-drivers/input/keyboard/samsung-keypad.c does similar handling.
-
-Thanks.
+OK, thanks.
 
 -- 
-Dmitry
+Ard.
