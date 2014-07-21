@@ -1,57 +1,61 @@
-From: rui.zhang@intel.com (Zhang Rui)
-Date: Mon, 21 Jul 2014 17:34:59 +0800
-Subject: [RESEND PATCH 0/6] thermal: sti: Add new Thermal driver
-In-Reply-To: <20140721091753.GV30888@lee--X1>
-References: <1401980819-19962-1-git-send-email-lee.jones@linaro.org>
- <20140624092309.GD13803@lee--X1> <20140709120823.GA32573@lee--X1>
- <1404911964.28592.4.camel@rzhang1-toshiba> <20140709134646.GB479@lee--X1>
- <20140714130824.GA3993@lee--X1> <1405347277.28592.25.camel@rzhang1-toshiba>
- <20140714142703.GC3993@lee--X1> <20140721091753.GV30888@lee--X1>
-Message-ID: <1405935299.2455.3.camel@rzhang1-toshiba>
+From: tony@atomide.com (Tony Lindgren)
+Date: Mon, 21 Jul 2014 02:33:36 -0700
+Subject: [PATCH v2 0/3] iommu: Remove OMAP IOVMM driver
+In-Reply-To: <9251918.dhlInzvbvO@avalon>
+References: <1405680597-10012-1-git-send-email-laurent.pinchart@ideasonboard.com>
+ <53C95124.1010902@ti.com> <9251918.dhlInzvbvO@avalon>
+Message-ID: <20140721093336.GR18374@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 2014-07-21 at 10:17 +0100, Lee Jones wrote:
-> On Mon, 14 Jul 2014, Lee Jones wrote:
+* Laurent Pinchart <laurent.pinchart@ideasonboard.com> [140721 02:16]:
+> Hi Suman, Joerg and Tony,
 > 
-> > On Mon, 14 Jul 2014, Zhang Rui wrote:
-> > 
-> > > On Mon, 2014-07-14 at 14:08 +0100, Lee Jones wrote:
-> > > > On Wed, 09 Jul 2014, Lee Jones wrote:
-> > > > > On Wed, 09 Jul 2014, Zhang Rui wrote:
-> > > > > > On Wed, 2014-07-09 at 13:08 +0100, Lee Jones wrote:
-> > > > > > > On Tue, 24 Jun 2014, Lee Jones wrote:
-> > > > > > > 
-> > > > > > > > > I'm re-sending this set, as one of the maintainers' email addresses
-> > > > > > > > > is incorrect in the MAINTAINERS file.
-> > > > > > > > > 
-> > > > > > > > > This patchset adds full support for 2 types of Thermal Controllers
-> > > > > > > > > produced by STMicroelectronics.  One is a more traditional memory
-> > > > > > > > > mapped variant, the other is controlled solely by system configuration
-> > > > > > > > > registers.
-> > > > > > > > 
-> > > > > > > > Any thing from the Thermal guys? Has this set fallen through the gaps?
-> > > > > > > 
-> > > > > > > Anything at all?  It's been well over a month now.
-> > > > > > > 
-> > > > > > Well, for the soc thermal drivers, I'd prefer to take them via Eduardo,
-> > > > > > but as we didn't get any feedback from Eduardo, I will take them.
-> > > > > 
-> > > > > Thanks Rui.
-> > > > > 
-> > > > > So have you taken all 4 "thermal: sti: *" patches?
-> > > > 
-> > > > Have you taken these yet?
+> On Friday 18 July 2014 11:53:56 Suman Anna wrote:
+> > On 07/18/2014 05:49 AM, Laurent Pinchart wrote:
+> > > Hello,
 > > > 
-> > > Not yet. will do tomorrow.
-> 
-> I waited 7 days and still don't see them?
-> 
-Done, they're in my local tree and I forgot to push them.
-thanks for the reminder.
-
--rui
-> > Perfect, thanks for the update.
+> > > The OMAP3 ISP driver was the only user of the OMAP IOVMM API. Now that is
+> > > has been ported to the DMA API, remove the unused virtual memory manager.
+> > > 
+> > > The removal is split in three patches to ease upstream merge. The first
+> > > patch removes the omap-iovmm driver, the second patch removes setting of
+> > > now unused platform data fields from arch code, and the last patch cleans
+> > > up the platform data structure.
 > > 
-> > > >   I notice that these aren't in -next yet.
+> > Thanks for the revised series, it looks good. I have also tested the
+> > series on OMAP3, OMAP4 and OMAP5.
+> > 
+> > For the changes in the entire series,
+> > Acked-by: Suman Anna <s-anna@ti.com>
 > 
+> Thank you.
+> 
+> > > I'd like to get at least the first patch merged in v3.17. To avoid
+> > > splitting the series across three kernel versions, it would be nice to
+> > > also merge at least the second patch for v3.17. If there's no risk of
+> > > conflict everything could be merged in one go through the ARM SoC tree.
+> > > Otherwise a stable branch with patch 1/3 will be needed to base the arch
+> > > change on.
+> > > 
+> > > Joerg, Tony, how would you like to proceed ?
+> 
+> The v3.17 merge window is getting close, it's probably too late to merge patch 
+> 2/3. Joerg, could you please take 1/3 in your tree for v3.17 ? 2/3 and 3/3 
+> would then get in v3.18. Tony, how would you like to proceed for those ?
+
+How about Joerg maybe do an immutable branch against v3.16-rc1
+with just these three patches and merge it into your tree?
+
+That way I too can merge the minimal branch in if there are conflics.
+If that works for Joerg, then for arch/arm/*omap* changes:
+
+Acked-by: Tony Lindgren <tony@atomide.com>
+
+If the above is too complicated, then how about Laurent resend patches
+2 - 3 once the dependencies have cleared so I can pick them up. This
+is assuming nothing breaks with patchs 2 - 3 missing naturally :)
+
+Regards,
+
+Tony
