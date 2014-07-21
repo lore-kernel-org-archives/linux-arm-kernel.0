@@ -1,25 +1,62 @@
-From: maxime.coquelin@st.com (Maxime Coquelin)
-Date: Mon, 21 Jul 2014 11:50:03 +0200
-Subject: [PATCH 6/6] ARM: multi_v7_defconfig: Configure in ST's Thermal
- Controller
-In-Reply-To: <1401980819-19962-7-git-send-email-lee.jones@linaro.org>
-References: <1401980819-19962-1-git-send-email-lee.jones@linaro.org>
- <1401980819-19962-7-git-send-email-lee.jones@linaro.org>
-Message-ID: <53CCE24B.6000505@st.com>
+From: daniel.lezcano@linaro.org (Daniel Lezcano)
+Date: Mon, 21 Jul 2014 11:53:32 +0200
+Subject: [PATCH 1/3] cpuidle: exynos: Allow to use the driver without AFTR
+In-Reply-To: <1405931771-24100-1-git-send-email-k.kozlowski@samsung.com>
+References: <1405931771-24100-1-git-send-email-k.kozlowski@samsung.com>
+Message-ID: <53CCE31C.90300@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On 07/21/2014 10:36 AM, Krzysztof Kozlowski wrote:
+> Allow the driver to be used when AFTR enter function is not provided
+> (device platform data is NULL).
+>
+> This actually does not give any special energy-saving benefits but
+> allows to track the idle time of each core. Additionally it is a safe
+> way to validate supplied platform data.
+>
+> Signed-off-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
+
+I think we already talk about this in the mailing list several times.
+It does not make sense to enable the cpuidle driver for WFI just for the 
+sake of tracking via sysfs some idle timings.
+
+Using the cpuidle driver means using the underlying cpuidle 
+infrastructure with all the stats computation in the governor.
+
+If there is a *real* need of a WFI cpuidle driver, then a generic WFI 
+cpuidle driver could be implemented to supersede this one.
+
+It took a while to cleanup this driver and remove all the hacks around 
+this AFTR state... :)
 
 
-On 06/05/2014 05:06 PM, Lee Jones wrote:
-> Signed-off-by: Ajit Pal Singh <ajitpal.singh@st.com>
-> Signed-off-by: Lee Jones <lee.jones@linaro.org>
+
 > ---
->   arch/arm/configs/multi_v7_defconfig | 2 ++
->   1 file changed, 2 insertions(+)
+>   drivers/cpuidle/cpuidle-exynos.c | 3 +++
+>   1 file changed, 3 insertions(+)
+>
+> diff --git a/drivers/cpuidle/cpuidle-exynos.c b/drivers/cpuidle/cpuidle-exynos.c
+> index 7c0151263828..5325a394be7e 100644
+> --- a/drivers/cpuidle/cpuidle-exynos.c
+> +++ b/drivers/cpuidle/cpuidle-exynos.c
+> @@ -77,7 +77,10 @@ static int exynos_cpuidle_probe(struct platform_device *pdev)
+>   {
+>   	int ret;
+>
+> +	/* If NULL enter only WFI */
+>   	exynos_enter_aftr = (void *)(pdev->dev.platform_data);
+> +	if (!exynos_enter_aftr)
+> +		exynos_idle_driver.state_count = 1;
+>
+>   	ret = cpuidle_register(&exynos_idle_driver, NULL);
+>   	if (ret) {
 >
 
-Added to my queue for v3.17.
 
-Thanks,
-Maxime
+-- 
+  <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
+
+Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
+<http://twitter.com/#!/linaroorg> Twitter |
+<http://www.linaro.org/linaro-blog/> Blog
