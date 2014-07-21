@@ -1,49 +1,33 @@
 From: ezequiel.garcia@free-electrons.com (Ezequiel Garcia)
-Date: Mon, 21 Jul 2014 13:48:13 -0300
-Subject: [PATCH 3/6] net: mvpp2: Fix the BM pool buffer release check
+Date: Mon, 21 Jul 2014 13:48:11 -0300
+Subject: [PATCH 1/6] net: mvpp2: Fix the periodic XON enable bit
 In-Reply-To: <1405961296-5846-1-git-send-email-ezequiel.garcia@free-electrons.com>
 References: <1405961296-5846-1-git-send-email-ezequiel.garcia@free-electrons.com>
-Message-ID: <1405961296-5846-4-git-send-email-ezequiel.garcia@free-electrons.com>
+Message-ID: <1405961296-5846-2-git-send-email-ezequiel.garcia@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-After a call to mvpp2_bm_bufs_free(), the caller usually wants to know
-if the function successfully freed the requested number. However, this
-cannot be done by looking into the BM pool count, because the current
-buffer count was updated by mvpp2_bm_bufs_free().
+From: Marcin Wojtas <mw@semihalf.com>
 
-In fact, the current callers of mvpp2_bm_bufs_free() use it to release
-all the buffers in the pool, so we can fix this by simply checking
-if the pool is not empty.
+This bit was originally wrong, the correct value is BIT(1), so fix it.
 
-Signed-off-by: Ezequiel Garcia <ezequiel.garcia@free-electrons.com>
+Signed-off-by: Marcin Wojtas <mw@semihalf.com>
 ---
- drivers/net/ethernet/marvell/mvpp2.c | 6 +++---
- 1 file changed, 3 insertions(+), 3 deletions(-)
+ drivers/net/ethernet/marvell/mvpp2.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
 diff --git a/drivers/net/ethernet/marvell/mvpp2.c b/drivers/net/ethernet/marvell/mvpp2.c
-index aa139df..43d3391 100644
+index f4de2a9..8eac438 100644
 --- a/drivers/net/ethernet/marvell/mvpp2.c
 +++ b/drivers/net/ethernet/marvell/mvpp2.c
-@@ -3420,7 +3420,7 @@ static int mvpp2_bm_pool_destroy(struct platform_device *pdev,
- 	u32 val;
- 
- 	num = mvpp2_bm_bufs_free(priv, bm_pool, bm_pool->buf_num);
--	if (num != bm_pool->buf_num) {
-+	if (bm_pool->buf_num) {
- 		WARN(1, "cannot free all buffers in pool %d\n", bm_pool->id);
- 		return 0;
- 	}
-@@ -3748,8 +3748,8 @@ static int mvpp2_bm_update_mtu(struct net_device *dev, int mtu)
- 	int pkt_size = MVPP2_RX_PKT_SIZE(mtu);
- 
- 	/* Update BM pool with new buffer size */
--	num = mvpp2_bm_bufs_free(port->priv, port_pool, pkts_num);
--	if (num != pkts_num) {
-+	mvpp2_bm_bufs_free(port->priv, port_pool, pkts_num);
-+	if (port_pool->buf_num) {
- 		WARN(1, "cannot free all buffers in pool %d\n", port_pool->id);
- 		return -EIO;
- 	}
+@@ -262,7 +262,7 @@
+ #define      MVPP2_GMAC_MAX_RX_SIZE_MASK	0x7ffc
+ #define      MVPP2_GMAC_MIB_CNTR_EN_MASK	BIT(15)
+ #define MVPP2_GMAC_CTRL_1_REG			0x4
+-#define      MVPP2_GMAC_PERIODIC_XON_EN_MASK	BIT(0)
++#define      MVPP2_GMAC_PERIODIC_XON_EN_MASK	BIT(1)
+ #define      MVPP2_GMAC_GMII_LB_EN_MASK		BIT(5)
+ #define      MVPP2_GMAC_PCS_LB_EN_BIT		6
+ #define      MVPP2_GMAC_PCS_LB_EN_MASK		BIT(6)
 -- 
 2.0.1
