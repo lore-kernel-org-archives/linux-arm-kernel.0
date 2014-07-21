@@ -1,181 +1,95 @@
-From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
-Date: Mon, 21 Jul 2014 17:06:25 +0100
-Subject: [PATCH v6 6/7] drivers: cpuidle: initialize big.LITTLE driver through
- DT
-In-Reply-To: <1405958786-17243-1-git-send-email-lorenzo.pieralisi@arm.com>
-References: <1405958786-17243-1-git-send-email-lorenzo.pieralisi@arm.com>
-Message-ID: <1405958786-17243-7-git-send-email-lorenzo.pieralisi@arm.com>
+From: broonie@kernel.org (Mark Brown)
+Date: Mon, 21 Jul 2014 17:11:18 +0100
+Subject: [PATCH] exynos: boot serial endian fix
+Message-ID: <1405959078-10603-1-git-send-email-broonie@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-With the introduction of DT based idle states, CPUidle drivers for ARM
-can now initialize idle states data through properties in the device tree.
+From: Victor Kamensky <victor.kamensky@linaro.org>
 
-This patch adds code to the big.LITTLE CPUidle driver to dynamically
-initialize idle states data through the updated device tree source file.
+In order to support booting a big endian kernel the uncompress serial
+line write utils need to use endian neutral functions to read h/w
+register. Fix uart_rd, uart_wr and serial chip fifo related macros to do
+this.
 
-Cc: Chander Kashyap <chander.kashyap@linaro.org>
-Signed-off-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
+Signed-off-by: Victor Kamensky <victor.kamensky@linaro.org>
+Signed-off-by: Mark Brown <broonie@linaro.org>
 ---
- arch/arm/boot/dts/vexpress-v2p-ca15_a7.dts | 23 ++++++++++++++++
- drivers/cpuidle/Kconfig.arm                |  1 +
- drivers/cpuidle/cpuidle-big_little.c       | 43 +++++++++++++++---------------
- 3 files changed, 46 insertions(+), 21 deletions(-)
+ arch/arm/include/debug/samsung.S | 9 +++++++++
+ 1 file changed, 9 insertions(+)
 
-diff --git a/arch/arm/boot/dts/vexpress-v2p-ca15_a7.dts b/arch/arm/boot/dts/vexpress-v2p-ca15_a7.dts
-index a25c262..d61da86 100644
---- a/arch/arm/boot/dts/vexpress-v2p-ca15_a7.dts
-+++ b/arch/arm/boot/dts/vexpress-v2p-ca15_a7.dts
-@@ -38,6 +38,7 @@
- 			compatible = "arm,cortex-a15";
- 			reg = <0>;
- 			cci-control-port = <&cci_control1>;
-+			cpu-idle-states = <&CLUSTER_SLEEP_BIG>;
- 		};
+diff --git a/arch/arm/include/debug/samsung.S b/arch/arm/include/debug/samsung.S
+index 8d8d922e5e44..dc62d4ae04d0 100644
+--- a/arch/arm/include/debug/samsung.S
++++ b/arch/arm/include/debug/samsung.S
+@@ -9,17 +9,20 @@
+  * published by the Free Software Foundation.
+ */
  
- 		cpu1: cpu at 1 {
-@@ -45,6 +46,7 @@
- 			compatible = "arm,cortex-a15";
- 			reg = <1>;
- 			cci-control-port = <&cci_control1>;
-+			cpu-idle-states = <&CLUSTER_SLEEP_BIG>;
- 		};
++#include <asm/assembler.h>
+ #include <linux/serial_s3c.h>
  
- 		cpu2: cpu at 2 {
-@@ -52,6 +54,7 @@
- 			compatible = "arm,cortex-a7";
- 			reg = <0x100>;
- 			cci-control-port = <&cci_control2>;
-+			cpu-idle-states = <&CLUSTER_SLEEP_LITTLE>;
- 		};
+ /* The S5PV210/S5PC110 implementations are as belows. */
  
- 		cpu3: cpu at 3 {
-@@ -59,6 +62,7 @@
- 			compatible = "arm,cortex-a7";
- 			reg = <0x101>;
- 			cci-control-port = <&cci_control2>;
-+			cpu-idle-states = <&CLUSTER_SLEEP_LITTLE>;
- 		};
+ 	.macro fifo_level_s5pv210 rd, rx
+ 		ldr	\rd, [\rx, # S3C2410_UFSTAT]
++	ARM_BE8(rev	\rd, \rd)
+ 		and	\rd, \rd, #S5PV210_UFSTAT_TXMASK
+ 	.endm
  
- 		cpu4: cpu at 4 {
-@@ -66,6 +70,25 @@
- 			compatible = "arm,cortex-a7";
- 			reg = <0x102>;
- 			cci-control-port = <&cci_control2>;
-+			cpu-idle-states = <&CLUSTER_SLEEP_LITTLE>;
-+		};
-+
-+		idle-states {
-+			CLUSTER_SLEEP_BIG: cluster-sleep-big {
-+				compatible = "arm,idle-state";
-+				local-timer-stop;
-+				entry-latency-us = <1000>;
-+				exit-latency-us = <700>;
-+				min-residency-us = <3500>;
-+			};
-+
-+			CLUSTER_SLEEP_LITTLE: cluster-sleep-little {
-+				compatible = "arm,idle-state";
-+				local-timer-stop;
-+				entry-latency-us = <1000>;
-+				exit-latency-us = <500>;
-+				min-residency-us = <3000>;
-+			};
- 		};
- 	};
+ 	.macro  fifo_full_s5pv210 rd, rx
+ 		ldr	\rd, [\rx, # S3C2410_UFSTAT]
++	ARM_BE8(rev	\rd, \rd)
+ 		tst	\rd, #S5PV210_UFSTAT_TXFULL
+ 	.endm
  
-diff --git a/drivers/cpuidle/Kconfig.arm b/drivers/cpuidle/Kconfig.arm
-index b6d69e8..a9b089c 100644
---- a/drivers/cpuidle/Kconfig.arm
-+++ b/drivers/cpuidle/Kconfig.arm
-@@ -12,6 +12,7 @@ config ARM_BIG_LITTLE_CPUIDLE
- 	depends on ARCH_VEXPRESS_TC2_PM
- 	select ARM_CPU_SUSPEND
- 	select CPU_IDLE_MULTIPLE_DRIVERS
-+	select DT_IDLE_STATES
- 	help
- 	  Select this option to enable CPU idle driver for big.LITTLE based
- 	  ARM systems. Driver manages CPUs coordination through MCPM and
-diff --git a/drivers/cpuidle/cpuidle-big_little.c b/drivers/cpuidle/cpuidle-big_little.c
-index b45fc62..0a88480 100644
---- a/drivers/cpuidle/cpuidle-big_little.c
-+++ b/drivers/cpuidle/cpuidle-big_little.c
-@@ -24,6 +24,8 @@
- #include <asm/smp_plat.h>
- #include <asm/suspend.h>
+@@ -28,6 +31,7 @@
  
-+#include "dt_idle_states.h"
-+
- static int bl_enter_powerdown(struct cpuidle_device *dev,
- 			      struct cpuidle_driver *drv, int idx);
+ 	.macro fifo_level_s3c2440 rd, rx
+ 		ldr	\rd, [\rx, # S3C2410_UFSTAT]
++	ARM_BE8(rev	\rd, \rd)
+ 		and	\rd, \rd, #S3C2440_UFSTAT_TXMASK
+ 	.endm
  
-@@ -61,32 +63,12 @@ static struct cpuidle_driver bl_idle_little_driver = {
- 	.name = "little_idle",
- 	.owner = THIS_MODULE,
- 	.states[0] = ARM_CPUIDLE_WFI_STATE,
--	.states[1] = {
--		.enter			= bl_enter_powerdown,
--		.exit_latency		= 700,
--		.target_residency	= 2500,
--		.flags			= CPUIDLE_FLAG_TIME_VALID |
--					  CPUIDLE_FLAG_TIMER_STOP,
--		.name			= "C1",
--		.desc			= "ARM little-cluster power down",
--	},
--	.state_count = 2,
- };
+@@ -37,6 +41,7 @@
  
- static struct cpuidle_driver bl_idle_big_driver = {
- 	.name = "big_idle",
- 	.owner = THIS_MODULE,
- 	.states[0] = ARM_CPUIDLE_WFI_STATE,
--	.states[1] = {
--		.enter			= bl_enter_powerdown,
--		.exit_latency		= 500,
--		.target_residency	= 2000,
--		.flags			= CPUIDLE_FLAG_TIME_VALID |
--					  CPUIDLE_FLAG_TIMER_STOP,
--		.name			= "C1",
--		.desc			= "ARM big-cluster power down",
--	},
--	.state_count = 2,
- };
+ 	.macro  fifo_full_s3c2440 rd, rx
+ 		ldr	\rd, [\rx, # S3C2410_UFSTAT]
++	ARM_BE8(rev	\rd, \rd)
+ 		tst	\rd, #S3C2440_UFSTAT_TXFULL
+ 	.endm
  
- /*
-@@ -165,7 +147,8 @@ static int __init bl_idle_driver_init(struct cpuidle_driver *drv, int cpu_id)
+@@ -50,6 +55,7 @@
  
- static int __init bl_idle_init(void)
- {
--	int ret;
-+	int ret, i;
-+	struct cpuidle_driver *drv;
+ 	.macro	busyuart, rd, rx
+ 		ldr	\rd, [\rx, # S3C2410_UFCON]
++	ARM_BE8(rev	\rd, \rd)
+ 		tst	\rd, #S3C2410_UFCON_FIFOMODE	@ fifo enabled?
+ 		beq	1001f				@
+ 		@ FIFO enabled...
+@@ -61,6 +67,7 @@
+ 1001:
+ 		@ busy waiting for non fifo
+ 		ldr	\rd, [\rx, # S3C2410_UTRSTAT]
++	ARM_BE8(rev	\rd, \rd)
+ 		tst	\rd, #S3C2410_UTRSTAT_TXFE
+ 		beq	1001b
  
- 	/*
- 	 * Initialize the driver just for a compliant set of machines
-@@ -187,6 +170,24 @@ static int __init bl_idle_init(void)
- 	if (ret)
- 		goto out_uninit_little;
+@@ -69,6 +76,7 @@
  
-+	 /* Start at index 1, index 0 standard WFI */
-+	ret = dt_init_idle_driver(&bl_idle_big_driver, 1);
-+	if (ret)
-+		goto out_uninit_big;
-+
-+	 /* Start at index 1, index 0 standard WFI */
-+	ret = dt_init_idle_driver(&bl_idle_little_driver, 1);
-+	if (ret)
-+		goto out_uninit_big;
-+
-+	drv = &bl_idle_big_driver;
-+	for (i = 1; i < drv->state_count; i++)
-+		drv->states[i].enter = bl_enter_powerdown;
-+
-+	drv = &bl_idle_little_driver;
-+	for (i = 1; i < drv->state_count; i++)
-+		drv->states[i].enter = bl_enter_powerdown;
-+
- 	ret = cpuidle_register(&bl_idle_little_driver, NULL);
- 	if (ret)
- 		goto out_uninit_big;
+ 	.macro	waituart,rd,rx
+ 		ldr	\rd, [\rx, # S3C2410_UFCON]
++	ARM_BE8(rev	\rd, \rd)
+ 		tst	\rd, #S3C2410_UFCON_FIFOMODE	@ fifo enabled?
+ 		beq	1001f				@
+ 		@ FIFO enabled...
+@@ -80,6 +88,7 @@
+ 1001:
+ 		@ idle waiting for non fifo
+ 		ldr	\rd, [\rx, # S3C2410_UTRSTAT]
++	ARM_BE8(rev	\rd, \rd)
+ 		tst	\rd, #S3C2410_UTRSTAT_TXFE
+ 		beq	1001b
+ 
 -- 
-1.9.1
+2.0.1
