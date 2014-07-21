@@ -1,36 +1,55 @@
-From: ezequiel.garcia@free-electrons.com (Ezequiel Garcia)
-Date: Mon, 21 Jul 2014 13:48:16 -0300
-Subject: [PATCH 6/6] ARM: mvebu: Add missing MDIO clock in Armada 375
-In-Reply-To: <1405961296-5846-1-git-send-email-ezequiel.garcia@free-electrons.com>
-References: <1405961296-5846-1-git-send-email-ezequiel.garcia@free-electrons.com>
-Message-ID: <1405961296-5846-7-git-send-email-ezequiel.garcia@free-electrons.com>
+From: m-karicheri2@ti.com (Murali Karicheri)
+Date: Mon, 21 Jul 2014 12:58:45 -0400
+Subject: [PATCH v7 5/5] PCI: keystone: Update maintainer information
+In-Reply-To: <1405961925-27248-1-git-send-email-m-karicheri2@ti.com>
+References: <1405961925-27248-1-git-send-email-m-karicheri2@ti.com>
+Message-ID: <1405961925-27248-6-git-send-email-m-karicheri2@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-In Armada 375 SoCs, the MDIO is handled by a separate orion-mdio driver,
-despite the register is contained within the "LMS" block of the network
-controller.
+Update the MAINTAINERS file for the keystone PCIe driver
 
-Therefore we need to add the clock to the MDIO devicetree to prevent the
-controller from being accesed with its clock gated. This is needed, for
-instance, to be able to load the MDIO driver before the network driver.
+Signed-off-by: Murali Karicheri <m-karicheri2@ti.com>
 
-Signed-off-by: Ezequiel Garcia <ezequiel.garcia@free-electrons.com>
+CC: Santosh Shilimkar <santosh.shilimkar@ti.com>
+CC: Russell King <linux@arm.linux.org.uk>
+CC: Grant Likely <grant.likely@linaro.org>
+CC: Rob Herring <robh+dt@kernel.org>
+CC: Mohit Kumar <mohit.kumar@st.com>
+CC: Jingoo Han <jg1.han@samsung.com>
+CC: Bjorn Helgaas <bhelgaas@google.com>
+CC: Pratyush Anand <pratyush.anand@st.com>
+CC: Richard Zhu <r65037@freescale.com>
+CC: Kishon Vijay Abraham I <kishon@ti.com>
+CC: Marek Vasut <marex@denx.de>
+CC: Arnd Bergmann <arnd@arndb.de>
+CC: Pawel Moll <pawel.moll@arm.com>
+CC: Mark Rutland <mark.rutland@arm.com>
+CC: Ian Campbell <ijc+devicetree@hellion.org.uk>
+CC: Kumar Gala <galak@codeaurora.org>
+CC: Randy Dunlap <rdunlap@infradead.org>
+CC: Grant Likely <grant.likely@linaro.org>
 ---
- arch/arm/boot/dts/armada-375.dtsi | 1 +
- 1 file changed, 1 insertion(+)
+ MAINTAINERS |    7 +++++++
+ 1 file changed, 7 insertions(+)
 
-diff --git a/arch/arm/boot/dts/armada-375.dtsi b/arch/arm/boot/dts/armada-375.dtsi
-index bfcbe58..c1e49e7 100644
---- a/arch/arm/boot/dts/armada-375.dtsi
-+++ b/arch/arm/boot/dts/armada-375.dtsi
-@@ -158,6 +158,7 @@
- 				#size-cells = <0>;
- 				compatible = "marvell,orion-mdio";
- 				reg = <0xc0054 0x4>;
-+				clocks = <&gateclk 19>;
- 			};
+diff --git a/MAINTAINERS b/MAINTAINERS
+index 61a8f48..919b6b1 100644
+--- a/MAINTAINERS
++++ b/MAINTAINERS
+@@ -6805,6 +6805,13 @@ L:	linux-arm-kernel at lists.infradead.org (moderated for non-subscribers)
+ S:	Maintained
+ F:	drivers/pci/host/*imx6*
  
- 			/* Network controller */
++PCI DRIVER FOR keystone
++M:	Murali Karicheri <m-karicheri2@ti.com>
++L:	linux-pci at vger.kernel.org
++L:	linux-arm-kernel at lists.infradead.org (moderated for non-subscribers)
++S:	Maintained
++F:	drivers/pci/host/*keystone*
++
+ PCI DRIVER FOR MVEBU (Marvell Armada 370 and Armada XP SOC support)
+ M:	Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
+ M:	Jason Cooper <jason@lakedaemon.net>
 -- 
-2.0.1
+1.7.9.5
