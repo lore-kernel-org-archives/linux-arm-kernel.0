@@ -1,46 +1,170 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Mon, 21 Jul 2014 17:01:47 +0100
-Subject: [PATCH] exynos: Support big endian mode in secondary_startup
-Message-ID: <1405958507-8606-1-git-send-email-broonie@kernel.org>
+From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
+Date: Mon, 21 Jul 2014 17:06:23 +0100
+Subject: [PATCH v6 4/7] arm64: add PSCI CPU_SUSPEND based cpu_suspend support
+In-Reply-To: <1405958786-17243-1-git-send-email-lorenzo.pieralisi@arm.com>
+References: <1405958786-17243-1-git-send-email-lorenzo.pieralisi@arm.com>
+Message-ID: <1405958786-17243-5-git-send-email-lorenzo.pieralisi@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Victor Kamensky <victor.kamensky@linaro.org>
+This patch implements the cpu_suspend cpu operations method through
+the PSCI CPU SUSPEND API. The PSCI implementation translates the idle state
+index passed by the cpu_suspend core call into a valid PSCI state according to
+the PSCI states initialized at boot through the cpu_init_idle() CPU
+operations hook.
 
-Exynos processors generally operate in little endian mode so their
-bootloader and ROM will almost always operate in little endian mode.
-This means that if a big endian kernel is run it must switch the CPU
-into big endian mode after gaining control.
+Entry point is set to cpu_resume physical address, that represents the
+default kernel execution address following a CPU reset; for standby
+states the entry point address is useless and will therefore be ignored
+by the PSCI implementation.
 
-The generic secondary_startup that is called from exynos specific
-secondary startup code will do the switch, but we need it to do earlier
-because exynos specific secondary_startup code which runs first also
-works with data that is big endian when the kernel is compiled for big
-endian.
-
-[Rewrote commit message. -- broonie]
-
-Signed-off-by: Victor Kamensky <victor.kamensky@linaro.org>
-Signed-off-by: Mark Brown <broonie@linaro.org>
+Signed-off-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
 ---
- arch/arm/mach-exynos/headsmp.S | 5 +++++
- 1 file changed, 5 insertions(+)
+ arch/arm64/kernel/psci.c | 89 ++++++++++++++++++++++++++++++++++++++++++++++++
+ 1 file changed, 89 insertions(+)
 
-diff --git a/arch/arm/mach-exynos/headsmp.S b/arch/arm/mach-exynos/headsmp.S
-index b54f9701e421..ac8364efb985 100644
---- a/arch/arm/mach-exynos/headsmp.S
-+++ b/arch/arm/mach-exynos/headsmp.S
-@@ -18,6 +18,11 @@
-  * ready for them to initialise.
-  */
- ENTRY(exynos4_secondary_startup)
+diff --git a/arch/arm64/kernel/psci.c b/arch/arm64/kernel/psci.c
+index a623c44..bbdf41d 100644
+--- a/arch/arm64/kernel/psci.c
++++ b/arch/arm64/kernel/psci.c
+@@ -21,6 +21,7 @@
+ #include <linux/reboot.h>
+ #include <linux/pm.h>
+ #include <linux/delay.h>
++#include <linux/slab.h>
+ #include <uapi/linux/psci.h>
+ 
+ #include <asm/compiler.h>
+@@ -28,6 +29,7 @@
+ #include <asm/errno.h>
+ #include <asm/psci.h>
+ #include <asm/smp_plat.h>
++#include <asm/suspend.h>
+ #include <asm/system_misc.h>
+ 
+ #define PSCI_POWER_STATE_TYPE_STANDBY		0
+@@ -65,6 +67,8 @@ enum psci_function {
+ 	PSCI_FN_MAX,
+ };
+ 
++static DEFINE_PER_CPU_READ_MOSTLY(struct psci_power_state *, psci_power_state);
++
+ static u32 psci_function_id[PSCI_FN_MAX];
+ 
+ static int psci_to_linux_errno(int errno)
+@@ -93,6 +97,18 @@ static u32 psci_power_state_pack(struct psci_power_state state)
+ 		 & PSCI_0_2_POWER_STATE_AFFL_MASK);
+ }
+ 
++static void psci_power_state_unpack(u32 power_state,
++				    struct psci_power_state *state)
++{
++	state->id = (power_state & PSCI_0_2_POWER_STATE_ID_MASK) >>
++			PSCI_0_2_POWER_STATE_ID_SHIFT;
++	state->type = (power_state & PSCI_0_2_POWER_STATE_TYPE_MASK) >>
++			PSCI_0_2_POWER_STATE_TYPE_SHIFT;
++	state->affinity_level =
++			(power_state & PSCI_0_2_POWER_STATE_AFFL_MASK) >>
++			PSCI_0_2_POWER_STATE_AFFL_SHIFT;
++}
++
+ /*
+  * The following two functions are invoked via the invoke_psci_fn pointer
+  * and will not be inlined, allowing us to piggyback on the AAPCS.
+@@ -199,6 +215,61 @@ static int psci_migrate_info_type(void)
+ 	return err;
+ }
+ 
++static int cpu_psci_cpu_init_idle(struct device_node *cpu_node,
++				  unsigned int cpu)
++{
++	int i, ret, count = 0;
++	struct psci_power_state *psci_states;
++	struct device_node *state_node;
++
 +	/*
-+	 * ROM code operates in little endian mode, when we get control we
-+	 * need to switch it to big endian mode.
++	 * If the PSCI cpu_suspend function hook has not been initialized
++	 * idle states must not be enabled, so bail out
 +	 */
-+ARM_BE8(setend	be)
- 	mrc	p15, 0, r0, c0, c0, 5
- 	and	r0, r0, #15
- 	adr	r4, 1f
++	if (!psci_ops.cpu_suspend)
++		return -EOPNOTSUPP;
++
++	/* Count idle states */
++	while ((state_node = of_parse_phandle(cpu_node, "cpu-idle-states",
++					      count)))
++		count++;
++
++	if (!count)
++		return -ENODEV;
++
++	psci_states = kcalloc(count, sizeof(*psci_states), GFP_KERNEL);
++	if (!psci_states) {
++		pr_warn("idle state psci_state allocation failed\n");
++		return -ENOMEM;
++	}
++
++	for (i = 0; i < count; i++) {
++		u32 psci_power_state;
++
++		state_node = of_parse_phandle(cpu_node, "cpu-idle-states", i);
++
++		ret = of_property_read_u32(state_node,
++					   "arm,psci-suspend-param",
++					   &psci_power_state);
++		if (ret) {
++			pr_warn(" * %s missing arm,psci-suspend-param property\n",
++				state_node->full_name);
++			goto free_mem;
++		}
++
++		pr_debug("psci-power-state %#x index %d\n", psci_power_state,
++							    i);
++		psci_power_state_unpack(psci_power_state, &psci_states[i]);
++	}
++	/* Idle states parsed correctly, initialize per-cpu pointer */
++	per_cpu(psci_power_state, cpu) = psci_states;
++	return 0;
++
++free_mem:
++	kfree(psci_states);
++	return ret;
++}
++
+ static int get_set_conduit_method(struct device_node *np)
+ {
+ 	const char *method;
+@@ -436,8 +507,23 @@ static int cpu_psci_cpu_kill(unsigned int cpu)
+ #endif
+ #endif
+ 
++static int __maybe_unused cpu_psci_cpu_suspend(unsigned long index)
++{
++	struct psci_power_state *state = __get_cpu_var(psci_power_state);
++	/*
++	 * idle state index 0 corresponds to wfi, should never be called
++	 * from the cpu_suspend operations
++	 */
++	if (WARN_ON_ONCE(!index))
++		return -EINVAL;
++
++	return psci_ops.cpu_suspend(state[index - 1],
++				    virt_to_phys(cpu_resume));
++}
++
+ const struct cpu_operations cpu_psci_ops = {
+ 	.name		= "psci",
++	.cpu_init_idle	= cpu_psci_cpu_init_idle,
+ #ifdef CONFIG_SMP
+ 	.cpu_init	= cpu_psci_cpu_init,
+ 	.cpu_prepare	= cpu_psci_cpu_prepare,
+@@ -448,5 +534,8 @@ const struct cpu_operations cpu_psci_ops = {
+ 	.cpu_kill	= cpu_psci_cpu_kill,
+ #endif
+ #endif
++#ifdef CONFIG_ARM64_CPU_SUSPEND
++	.cpu_suspend	= cpu_psci_cpu_suspend,
++#endif
+ };
+ 
 -- 
-2.0.1
+1.9.1
