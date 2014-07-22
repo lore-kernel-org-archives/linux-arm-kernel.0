@@ -1,77 +1,116 @@
-From: cw00.choi@samsung.com (Chanwoo Choi)
-Date: Tue, 22 Jul 2014 11:17:59 +0900
-Subject: [PATCHv7 0/4] iio: adc: exynos_adc: Support Exynos3250 ADC and
- code clean
-In-Reply-To: <4966271.WeZIcVN3eT@wuerfel>
-References: <1405909068-22539-1-git-send-email-cw00.choi@samsung.com>
- <53CCCB20.50802@samsung.com> <53CCCCA8.1030509@samsung.com>
- <4966271.WeZIcVN3eT@wuerfel>
-Message-ID: <53CDC9D7.5000803@samsung.com>
+From: shawn.guo@freescale.com (Shawn Guo)
+Date: Tue, 22 Jul 2014 10:22:33 +0800
+Subject: [PATCH 1/6] ARM: dts: vf610: add USB PHY and controller
+In-Reply-To: <839af70e8acf139bc0f7bbdb4dd68dd146b5d6a8.1405702442.git.stefan@agner.ch>
+References: <cover.1405702442.git.stefan@agner.ch>
+ <839af70e8acf139bc0f7bbdb4dd68dd146b5d6a8.1405702442.git.stefan@agner.ch>
+Message-ID: <20140722022232.GR8537@dragon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Arnd,
-
-On 07/21/2014 05:58 PM, Arnd Bergmann wrote:
-> On Monday 21 July 2014 17:17:44 Chanwoo Choi wrote:
->> On 07/21/2014 05:11 PM, Chanwoo Choi wrote:
->>> On 07/21/2014 04:38 PM, Arnd Bergmann wrote:
->>>> On Monday 21 July 2014 11:17:44 Chanwoo Choi wrote:
->>>>>
->>>>> This patchset support Exynos3250 ADC (Analog Digital Converter) because
->>>>> Exynos3250 has additional special clock for ADC IP.
->>>>>
->>>>> Changes from v6:
->>>>> - Use "exynos3250-adc" compatible string instead of "exynos3250-adc-v2"
->>>>> - Use "sclk" clock name instead of "sclk_adc"
->>>>> - Remove un-necessary macro for exyno-adc-data-v2 structure.
->>>>> - Remove '(void *)' cast and mark the exynos-adc-data structure as 'const'
->>>>> - Change the number of ADC channels (Exynos3250 has only two channels for ADC)
->>>>>
->>>>
->>>> Looks good to me. Two small requests:
- >>>>
->>>> a) if you don't mind, can you add my patch (1/2) to add support for s3c64xx to
->>>>    your series, adding your Signed-off-by line in addition to mine? I think
->>>>    that one was noncontroversial, while the second patch (2/2) need some more
->>>>    work to address the comments and do testing.
->>>
->>> OK, I'll add this patch.
->>> But, I have a question.
->>>
->>> Your patch add following compatible string.
->>> "s3c64100-adc" is right?
->>>
->>>  static const struct of_device_id exynos_adc_match[] = {
->>>  	{
->>> +		.compatible = "samsung,s3c64100-adc",
->>> +		.data = &exynos_adc_s3c64xx_data,
->>> +	}, {
->>
->> Additionally,
->> Documentation/devicetree/bindings/arm/samsung/exynos-adc.txt has not included
->> "samsung,s3c6410-adc" compatible string. Should I add this string in exynos-adc.txt?
->>
->> drivers/iio/adc/exynos-adc.c has not includeded following compatible string.
->> Should I add this compatible string on exynos-adc.c?
->>
->> +			Must be "samsung,s3c2410-adc" for
->> +				the ADC in s3c2410 and compatibles
->> +			Must be "samsung,s3c2416-adc" for
->> +				the ADC in s3c2416 and compatibles
->> +			Must be "samsung,s3c2440-adc" for
->> +				the ADC in s3c2440 and compatibles
->> +			Must be "samsung,s3c2440-adc" for
->> +				the ADC in s3c2440 and compatibles
->> +			Must be "samsung,s3c2443-adc" for
->> +				the ADC in s3c2443 and compatibles
->>
+On Fri, Jul 18, 2014 at 07:01:37PM +0200, Stefan Agner wrote:
+> This adds USB PHY and USB controller nodes. Vybrid SoCs have two
+> independent USB cores which each supports DR (dual role). However,
+> real OTG is not supported since the OTG ID pin is not available.
 > 
+> The PHYs are located within the anadig register range, hence we need
+> to change the length of the anadig registers.
 > 
-> Yes, please.
+> Signed-off-by: Stefan Agner <stefan@agner.ch>
+> ---
+>  arch/arm/boot/dts/vf610.dtsi | 46 +++++++++++++++++++++++++++++++++++++++++---
+>  1 file changed, 43 insertions(+), 3 deletions(-)
+> 
+> diff --git a/arch/arm/boot/dts/vf610.dtsi b/arch/arm/boot/dts/vf610.dtsi
+> index 6a6190c..f6c3f02 100644
+> --- a/arch/arm/boot/dts/vf610.dtsi
+> +++ b/arch/arm/boot/dts/vf610.dtsi
+> @@ -25,6 +25,8 @@
+>  		gpio2 = &gpio3;
+>  		gpio3 = &gpio4;
+>  		gpio4 = &gpio5;
+> +		usbphy0 = &usbphy0;
+> +		usbphy1 = &usbphy1;
+>  	};
+>  
+>  	cpus {
+> @@ -285,9 +287,25 @@
+>  				gpio-ranges = <&iomuxc 0 128 7>;
+>  			};
+>  
+> -			anatop at 40050000 {
+> -				compatible = "fsl,vf610-anatop";
+> -				reg = <0x40050000 0x1000>;
+> +			anatop: anatop at 40050000 {
+> +				compatible = "fsl,vf610-anatop", "syscon";
+> +				reg = <0x40050000 0x400>;
+> +			};
+> +
+> +			usbphy0: usbphy at 40050800 {
+> +				compatible = "fsl,vf610-usbphy", "fsl,imx23-usbphy";
 
-I send following patchset[1] to support s3c24xx/s3c64xx ADC.
-[1] http://www.spinics.net/lists/kernel/msg1791305.html
+Since phy driver will match "fsl,vf610-usbphy" anyway, we do not need
+"fsl,imx23-usbphy" here.
 
-Thanks,
-Chanwoo Choi
+> +				reg = <0x40050800 0x400>;
+> +				interrupts = <0 50 IRQ_TYPE_LEVEL_HIGH>;
+> +				clocks = <&clks VF610_CLK_USBPHY0>;
+> +				fsl,anatop = <&anatop>;
+> +			};
+> +
+> +			usbphy1: usbphy at 40050c00 {
+> +				compatible = "fsl,vf610-usbphy", "fsl,imx23-usbphy";
+> +				reg = <0x40050c00 0x400>;
+> +				interrupts = <0 51 IRQ_TYPE_LEVEL_HIGH>;
+> +				clocks = <&clks VF610_CLK_USBPHY1>;
+> +				fsl,anatop = <&anatop>;
+>  			};
+>  
+>  			i2c0: i2c at 40066000 {
+> @@ -309,6 +327,18 @@
+>  				reg = <0x4006b000 0x1000>;
+>  				#clock-cells = <1>;
+>  			};
+> +
+> +			usbdev0: usb at 40034000 {
+> +				compatible = "fsl,imx6q-usb", "fsl,imx27-usb";
+
+It doesn't really make any sense to have "fsl,imx6q-usb" here.  The
+following one should be less confusing.
+
+	compatible = "fsl,vf610-usb", "fsl,imx27-usb";
+
+Shawn
+
+> +				reg = <0x40034000 0x800>;
+> +				interrupts = <0 75 IRQ_TYPE_LEVEL_HIGH>;
+> +				clocks = <&clks VF610_CLK_USBC0>;
+> +				fsl,usbphy = <&usbphy0>;
+> +				dr_mode = "peripheral";
+> +				status = "disabled";
+> +			};
+> +
+> +
+>  		};
+>  
+>  		aips1: aips-bus at 40080000 {
+> @@ -371,6 +401,16 @@
+>  				status = "disabled";
+>  			};
+>  
+> +			usbh1: usb at 400b4000 {
+> +				compatible = "fsl,imx6q-usb", "fsl,imx27-usb";
+> +				reg = <0x400b4000 0x800>;
+> +				interrupts = <0 76 IRQ_TYPE_LEVEL_HIGH>;
+> +				clocks = <&clks VF610_CLK_USBC1>;
+> +				fsl,usbphy = <&usbphy1>;
+> +				dr_mode = "host";
+> +				status = "disabled";
+> +			};
+> +
+>  			ftm: ftm at 400b8000 {
+>  				compatible = "fsl,ftm-timer";
+>  				reg = <0x400b8000 0x1000 0x400b9000 0x1000>;
+> -- 
+> 2.0.1
+> 
