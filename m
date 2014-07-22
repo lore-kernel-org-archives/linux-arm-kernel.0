@@ -1,44 +1,74 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Tue, 22 Jul 2014 01:10:53 +0100
-Subject: [PATCH v8 00/13] Add Maxim 77802 PMIC support
-In-Reply-To: <53CD0B17.5040706@collabora.co.uk>
-References: <1405337769-3741-1-git-send-email-javier.martinez@collabora.co.uk>
- <53CD0B17.5040706@collabora.co.uk>
-Message-ID: <20140722001053.GO17528@sirena.org.uk>
+From: luto@amacapital.net (Andy Lutomirski)
+Date: Mon, 21 Jul 2014 17:14:35 -0700
+Subject: [PATCH v7 8/9] ARM: vdso initialization, mapping,
+ and synchronization
+In-Reply-To: <20140702185422.GP24879@arm.com>
+References: <53B2C178.30607@mentor.com> <20140701141541.GP28164@arm.com>
+ <CALCETrWeTeeuz4vW6wrhtDrdg54O-hhFbspfKEEunRZ0zf7ZBg@mail.gmail.com>
+ <20140702144050.GD24879@arm.com>
+ <CALCETrUVa-Yt7qZpzkpiAGVf+sYeasNq_YS1MuH6CFfWCcW6BA@mail.gmail.com>
+ <53B430F3.9070804@mentor.com> <20140702162726.GG24879@arm.com>
+ <CALCETrVSqH66jqG2_O2dir-3md4SHH800qs++4KhWYsGm9T-BQ@mail.gmail.com>
+ <20140702172443.GI24879@arm.com>
+ <CALCETrU-461E2ybeYcN7KFSPkwWtHikwCDo4t9T5Z5dCBGmNJA@mail.gmail.com>
+ <20140702185422.GP24879@arm.com>
+Message-ID: <CALCETrXGi3a3G=dH2R6-mu2BwGdEyn3AXrGVRstye6zPO1mFxA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jul 21, 2014 at 02:44:07PM +0200, Javier Martinez Canillas wrote:
-> On 07/14/2014 01:35 PM, Javier Martinez Canillas wrote:
+On Wed, Jul 2, 2014 at 11:54 AM, Will Deacon <will.deacon@arm.com> wrote:
+> Cheers for this, Andy.
+>
+> On Wed, Jul 02, 2014 at 07:34:22PM +0100, Andy Lutomirski wrote:
+>> On Wed, Jul 2, 2014 at 10:24 AM, Will Deacon <will.deacon@arm.com> wrote:
+>> > ELF Header:
+>> >   Start of section headers:          1888 (bytes into file)
+>> >   Size of section headers:           64 (bytes)
+>> >   Number of section headers:         14
+>>
+>> That's 896 bytes for the section table, starting at offset 1888.
+>>
+>> >   Section header string table index: 13
+>>
+>>
+>> >
+>> > Section Headers:
+>> >   [13] .shstrtab         STRTAB           0000000000000000  000006e8
+>> >        0000000000000078  0000000000000000           0     0     1
+>>
+>> 120 bytes of section headers strings, starting at offset 1768 (and not
+>> allocatable -- no 'A' here).
+>>
+>> >
+>> > Program Headers:
+>> >   Type           Offset             VirtAddr           PhysAddr
+>> >                  FileSiz            MemSiz              Flags  Align
+>> >   LOAD           0x0000000000000000 0x0000000000000000 0x0000000000000000
+>> >                  0x00000000000006e8 0x00000000000006e8  R E    10
+>>
+>> The loadable segment is 1768 bytes long, starting at the beginning of
+>> the file (and therefore the beginning of the mapping).
+>>
+>> So you have a total of 1016 bytes of non-allocatable stuff at the end
+>> that I've accounted for.  I assume that the whole file is 2784 bytes.
+>
+> Correct.
+>
+>> If you added text or data to bring PT_LOAD to between 3081 and 4095
+>> bytes, then the section headers and/or section string table would
+>> cross a page boundary.
+>
+> Ok, so that explains why things are working at the moment and it sounds like
+> we have some wiggle room too. I'll look at moving the datapage anyway, since
+> having these artificial limits is error-prone and fragile, but I don't think
+> it's something we need to panic about immediately.
+>
+> Also, if you get to the bottom of your binutils issues with the section
+> allocation, that might work for us since we don't really have any legacy
+> binutils supporting arm64.
 
-> Mark, Mike and Alessandro,
+Just in case anyone still cares about this thread, moving the vvar
+area back before the vdso text is queued up for 3.17.  I gave up on
+reliably keeping binutils happy with my ugly hack.
 
-> This is a gentle reminder to look at the patches that touches your subsystems
-> and provide acks if possible so Lee can merge the remainder set through the mfd
-> tree.
-
-Please stop nagging, you are chasing after only one week which is
-excessive for something that isn't an urgent bugfix (especially
-with a series like this that has had many rapid repins).  Several weeks
-to a month would be more appropriate, and then resending the patches
-rather than sending contentless pings is more useful.  Sending mails
-like this just means that people have more mail to read that isn't your
-patch, it is more likely to get you negative attention than positive -
-for example, I will tend to deprioritise things where I'm being chased
-too urgently as I do not wish to encourage such behaviour by being seen
-to reward it.
-
-In general I would recommend taking a step back, slowing down, and if
-you are not getting a response either thinking of something else to do
-in parallel or trying to do things that make it easier to accept your
-change if there are any (sometimes it's just a case of waiting).  Look
-at how frequently the relevant maintainers tend to respond, at what the
-previous review comments have been and also consider the possibility
-that people might take holidays or just be busy.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140722/d23818bb/attachment-0001.sig>
+--Andy
