@@ -1,305 +1,133 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Tue, 22 Jul 2014 11:01:10 -0700
-Subject: [PATCH] ARM: multi_v7_defconfig: major refresh
-Message-ID: <1406052070-6207-1-git-send-email-olof@lixom.net>
+From: grygorii.strashko@ti.com (Grygorii Strashko)
+Date: Tue, 22 Jul 2014 21:46:46 +0300
+Subject: [PATCH v2 1/5] i2c: Don't start transfers when suspended
+In-Reply-To: <1405608520-5644-1-git-send-email-hechtb@gmail.com>
+References: <1405608520-5644-1-git-send-email-hechtb@gmail.com>
+Message-ID: <53CEB196.9060903@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This is a major refresh of the multi_v7_defconfig:
+Hi
 
-- Bring over a bunch of Samsung drivers to make ODROID-U3 and Chromebooks usable
- * Enable big.LITTLE
- * MCPM
- * CYAPA touchpad
- * Samsung-related MTD/regulator/clk/pinmux drivers
- * Add some of the CrOS EC drivers
-- Turn on TPM, HW_RANDOM
-- OMAP_USB3 -> TI_PIPE3 option rename
-- Enable MCPM/b.L for VEXPRESS
-- Add new CONFIG_MTD_SPI_NOR since it otherwise masks off SPI NOR drivers
-- CONFIG_LOGO, because penguins.
+On 07/17/2014 05:48 PM, Bastian Hecht wrote:
+> i2c transfer requests come in very uncontrolled, like from interrupt routines.
+> We might be suspended when this happens. To avoid i2c timeouts caused by
+> powered down busses we check for suspension.
+> 
+> Several bus drivers handle this problem on their own. We can clean things up
+> by moving the protection mechanism into the core.
 
-I took care to keep the new options that have been added for whose the
-drivers are not yet in our for-next branch. This was pretty awkward so
-we should sort out how to handle those better in the future.
+ I'm not sure, this optimization is safe  (
+Because, in many cases the access to PMIC IC needs to be allowed till late
+stages of suspending (at least till suspend_noirq stage or even later).
+For example, on some OMAP SoC Voltage management code need to use services
+provided by PMIC IC, which is connected to I2C.
 
-Signed-off-by: Olof Johansson <olof@lixom.net>
----
- arch/arm/configs/multi_v7_defconfig |   74 +++++++++++++++++++++++++++--------
- 1 file changed, 58 insertions(+), 16 deletions(-)
+As result, it may cause regression and break PM functionality on some SoCs
+if i2c-core will block I2c transfers unconditionally at device's
+suspending stage.
 
-diff --git a/arch/arm/configs/multi_v7_defconfig b/arch/arm/configs/multi_v7_defconfig
-index 16518a7..c7654cf 100644
---- a/arch/arm/configs/multi_v7_defconfig
-+++ b/arch/arm/configs/multi_v7_defconfig
-@@ -50,6 +50,7 @@ CONFIG_MACH_SPEAR1310=y
- CONFIG_MACH_SPEAR1340=y
- CONFIG_ARCH_STI=y
- CONFIG_ARCH_EXYNOS=y
-+CONFIG_EXYNOS5420_MCPM=y
- CONFIG_ARCH_SUNXI=y
- CONFIG_ARCH_SIRF=y
- CONFIG_ARCH_TEGRA=y
-@@ -57,21 +58,23 @@ CONFIG_ARCH_TEGRA_2x_SOC=y
- CONFIG_ARCH_TEGRA_3x_SOC=y
- CONFIG_ARCH_TEGRA_114_SOC=y
- CONFIG_ARCH_TEGRA_124_SOC=y
--CONFIG_TEGRA_EMC_SCALING_ENABLE=y
- CONFIG_ARCH_U8500=y
- CONFIG_MACH_HREFV60=y
- CONFIG_MACH_SNOWBALL=y
--CONFIG_MACH_UX500_DT=y
- CONFIG_ARCH_VEXPRESS=y
- CONFIG_ARCH_VEXPRESS_CA9X4=y
-+CONFIG_ARCH_VEXPRESS_DCSCB=y
-+CONFIG_ARCH_VEXPRESS_TC2_PM=y
- CONFIG_ARCH_WM8850=y
- CONFIG_ARCH_ZYNQ=y
--CONFIG_TRUSTED_FOUNDATIONS=y
- CONFIG_PCI=y
- CONFIG_PCI_MSI=y
- CONFIG_PCI_MVEBU=y
- CONFIG_PCI_TEGRA=y
- CONFIG_SMP=y
-+CONFIG_BIG_LITTLE=y
-+CONFIG_BL_SWITCHER=y
-+CONFIG_BL_SWITCHER_DUMMY_IF=y
- CONFIG_NR_CPUS=8
- CONFIG_HIGHPTE=y
- CONFIG_CMA=y
-@@ -81,8 +84,10 @@ CONFIG_KEXEC=y
- CONFIG_CPU_FREQ=y
- CONFIG_CPU_FREQ_STAT_DETAILS=y
- CONFIG_CPU_FREQ_DEFAULT_GOV_ONDEMAND=y
-+CONFIG_ARM_BIG_LITTLE_CPUFREQ=y
-+CONFIG_ARM_DT_BL_CPUFREQ=y
-+CONFIG_ARM_VEXPRESS_SPC_CPUFREQ=y
- CONFIG_CPU_IDLE=y
--CONFIG_NEON=y
- CONFIG_NET=y
- CONFIG_PACKET=y
- CONFIG_UNIX=y
-@@ -100,14 +105,12 @@ CONFIG_IPV6_MIP6=m
- CONFIG_IPV6_TUNNEL=m
- CONFIG_IPV6_MULTIPLE_TABLES=y
- CONFIG_CAN=y
--CONFIG_CAN_RAW=y
--CONFIG_CAN_BCM=y
--CONFIG_CAN_DEV=y
- CONFIG_CAN_MCP251X=y
- CONFIG_CFG80211=m
- CONFIG_MAC80211=m
- CONFIG_RFKILL=y
- CONFIG_RFKILL_INPUT=y
-+CONFIG_RFKILL_REGULATOR=y
- CONFIG_RFKILL_GPIO=y
- CONFIG_DEVTMPFS=y
- CONFIG_DEVTMPFS_MOUNT=y
-@@ -116,6 +119,7 @@ CONFIG_CMA_SIZE_MBYTES=64
- CONFIG_OMAP_OCP2SCP=y
- CONFIG_MTD=y
- CONFIG_MTD_M25P80=y
-+CONFIG_MTD_SPI_NOR=y
- CONFIG_BLK_DEV_LOOP=y
- CONFIG_ICS932S401=y
- CONFIG_APDS9802ALS=y
-@@ -156,10 +160,11 @@ CONFIG_RT2800USB=m
- CONFIG_INPUT_EVDEV=y
- CONFIG_KEYBOARD_GPIO=y
- CONFIG_KEYBOARD_TEGRA=y
--CONFIG_KEYBOARD_SPEAR=y
- CONFIG_KEYBOARD_ST_KEYSCAN=y
-+CONFIG_KEYBOARD_SPEAR=y
- CONFIG_KEYBOARD_CROS_EC=y
- CONFIG_MOUSE_PS2_ELANTECH=y
-+CONFIG_MOUSE_CYAPA=y
- CONFIG_INPUT_TOUCHSCREEN=y
- CONFIG_TOUCHSCREEN_STMPE=y
- CONFIG_INPUT_MISC=y
-@@ -190,8 +195,15 @@ CONFIG_SERIAL_FSL_LPUART=y
- CONFIG_SERIAL_FSL_LPUART_CONSOLE=y
- CONFIG_SERIAL_ST_ASC=y
- CONFIG_SERIAL_ST_ASC_CONSOLE=y
-+CONFIG_HW_RANDOM=y
-+CONFIG_HW_RANDOM_OMAP=m
-+CONFIG_HW_RANDOM_OMAP3_ROM=m
-+CONFIG_HW_RANDOM_EXYNOS=m
-+CONFIG_HW_RANDOM_MSM=m
-+CONFIG_TCG_TPM=y
-+CONFIG_TCG_TIS_I2C_INFINEON=y
- CONFIG_I2C_CHARDEV=y
--CONFIG_I2C_MUX=y
-+CONFIG_I2C_ARB_GPIO_CHALLENGE=y
- CONFIG_I2C_MUX_PCA954x=y
- CONFIG_I2C_MUX_PINCTRL=y
- CONFIG_I2C_CADENCE=y
-@@ -199,12 +211,14 @@ CONFIG_I2C_DESIGNWARE_PLATFORM=y
- CONFIG_I2C_EXYNOS5=y
- CONFIG_I2C_MV64XXX=y
- CONFIG_I2C_SIRF=y
--CONFIG_I2C_TEGRA=y
- CONFIG_I2C_ST=y
-+CONFIG_I2C_TEGRA=y
-+CONFIG_I2C_CROS_EC_TUNNEL=y
- CONFIG_SPI=y
- CONFIG_SPI_OMAP24XX=y
- CONFIG_SPI_ORION=y
- CONFIG_SPI_PL022=y
-+CONFIG_SPI_S3C64XX=y
- CONFIG_SPI_SIRF=y
- CONFIG_SPI_SUN4I=y
- CONFIG_SPI_SUN6I=y
-@@ -214,7 +228,6 @@ CONFIG_SPI_TEGRA20_SLINK=y
- CONFIG_PINCTRL_AS3722=y
- CONFIG_PINCTRL_PALMAS=y
- CONFIG_GPIO_SYSFS=y
--CONFIG_GPIO_GENERIC_PLATFORM=y
- CONFIG_GPIO_DWAPB=y
- CONFIG_GPIO_PCA953X=y
- CONFIG_GPIO_PCA953X_IRQ=y
-@@ -233,14 +246,20 @@ CONFIG_THERMAL=y
- CONFIG_ARMADA_THERMAL=y
- CONFIG_ST_THERMAL_SYSCFG=y
- CONFIG_ST_THERMAL_MEMMAP=y
-+CONFIG_EXYNOS_THERMAL=y
-+CONFIG_EXYNOS_THERMAL_CORE=y
- CONFIG_WATCHDOG=y
-+CONFIG_S3C2410_WATCHDOG=y
- CONFIG_ORION_WATCHDOG=y
- CONFIG_SUNXI_WATCHDOG=y
- CONFIG_MFD_AS3722=y
- CONFIG_MFD_BCM590XX=y
- CONFIG_MFD_CROS_EC=y
-+CONFIG_MFD_CROS_EC_I2C=y
- CONFIG_MFD_CROS_EC_SPI=y
-+CONFIG_MFD_MAX77686=y
- CONFIG_MFD_MAX8907=y
-+CONFIG_MFD_MAX8997=y
- CONFIG_MFD_SEC_CORE=y
- CONFIG_MFD_STMPE=y
- CONFIG_MFD_PALMAS=y
-@@ -253,6 +272,8 @@ CONFIG_REGULATOR_AS3722=y
- CONFIG_REGULATOR_BCM590XX=y
- CONFIG_REGULATOR_GPIO=y
- CONFIG_REGULATOR_MAX8907=y
-+CONFIG_REGULATOR_MAX8997=y
-+CONFIG_REGULATOR_MAX77686=y
- CONFIG_REGULATOR_PALMAS=y
- CONFIG_REGULATOR_S2MPS11=y
- CONFIG_REGULATOR_S5M8767=y
-@@ -274,13 +295,17 @@ CONFIG_DRM_PANEL_SIMPLE=y
- CONFIG_FB_ARMCLCD=y
- CONFIG_FB_WM8505=y
- CONFIG_FB_SIMPLE=y
-+CONFIG_EXYNOS_VIDEO=y
-+CONFIG_EXYNOS_MIPI_DSI=y
- CONFIG_BACKLIGHT_LCD_SUPPORT=y
--CONFIG_BACKLIGHT_CLASS_DEVICE=y
- CONFIG_BACKLIGHT_PWM=y
- CONFIG_FRAMEBUFFER_CONSOLE=y
-+CONFIG_LOGO=y
- CONFIG_SOUND=y
- CONFIG_SND=y
- CONFIG_SND_SOC=y
-+CONFIG_SND_SOC_SAMSUNG=y
-+CONFIG_SND_SOC_SNOW=y
- CONFIG_SND_SOC_TEGRA=y
- CONFIG_SND_SOC_TEGRA_RT5640=y
- CONFIG_SND_SOC_TEGRA_WM8753=y
-@@ -293,15 +318,19 @@ CONFIG_USB_XHCI_HCD=y
- CONFIG_USB_XHCI_MVEBU=y
- CONFIG_USB_EHCI_HCD=y
- CONFIG_USB_EHCI_TEGRA=y
-+CONFIG_USB_EHCI_EXYNOS=y
- CONFIG_USB_EHCI_HCD_PLATFORM=y
- CONFIG_USB_ISP1760_HCD=y
- CONFIG_USB_OHCI_HCD=y
-+CONFIG_USB_OHCI_EXYNOS=y
- CONFIG_USB_OHCI_HCD_PLATFORM=y
- CONFIG_USB_STORAGE=y
-+CONFIG_USB_DWC3=y
- CONFIG_USB_CHIPIDEA=y
- CONFIG_USB_CHIPIDEA_HOST=y
-+CONFIG_USB_HSIC_USB3503=y
- CONFIG_AB8500_USB=y
--CONFIG_OMAP_USB3=y
-+CONFIG_TI_PIPE3=y
- CONFIG_SAMSUNG_USB2PHY=y
- CONFIG_SAMSUNG_USB3PHY=y
- CONFIG_USB_GPIO_VBUS=y
-@@ -316,18 +345,19 @@ CONFIG_MMC_SDHCI_OF_ARASAN=y
- CONFIG_MMC_SDHCI_ESDHC_IMX=y
- CONFIG_MMC_SDHCI_DOVE=y
- CONFIG_MMC_SDHCI_TEGRA=y
-+CONFIG_MMC_SDHCI_S3C=y
- CONFIG_MMC_SDHCI_PXAV3=y
- CONFIG_MMC_SDHCI_SPEAR=y
--CONFIG_MMC_SDHCI_S3C=y
- CONFIG_MMC_SDHCI_S3C_DMA=y
- CONFIG_MMC_SDHCI_BCM_KONA=y
- CONFIG_MMC_SDHCI_ST=y
- CONFIG_MMC_OMAP=y
- CONFIG_MMC_OMAP_HS=y
- CONFIG_MMC_MVSDIO=y
--CONFIG_MMC_SUNXI=y
- CONFIG_MMC_DW=y
-+CONFIG_MMC_DW_IDMAC=y
- CONFIG_MMC_DW_EXYNOS=y
-+CONFIG_MMC_SUNXI=y
- CONFIG_NEW_LEDS=y
- CONFIG_LEDS_CLASS=y
- CONFIG_LEDS_PWM=y
-@@ -339,11 +369,14 @@ CONFIG_RTC_CLASS=y
- CONFIG_RTC_DRV_AS3722=y
- CONFIG_RTC_DRV_DS1307=y
- CONFIG_RTC_DRV_MAX8907=y
-+CONFIG_RTC_DRV_MAX77686=y
- CONFIG_RTC_DRV_PALMAS=y
- CONFIG_RTC_DRV_TWL4030=y
- CONFIG_RTC_DRV_TPS6586X=y
- CONFIG_RTC_DRV_TPS65910=y
- CONFIG_RTC_DRV_EM3027=y
-+CONFIG_RTC_DRV_S5M=y
-+CONFIG_RTC_DRV_S3C=y
- CONFIG_RTC_DRV_PL031=y
- CONFIG_RTC_DRV_VT8500=y
- CONFIG_RTC_DRV_SUNXI=y
-@@ -369,21 +402,31 @@ CONFIG_KEYBOARD_NVEC=y
- CONFIG_SERIO_NVEC_PS2=y
- CONFIG_NVEC_POWER=y
- CONFIG_QCOM_GSBI=y
-+CONFIG_COMMON_CLK_MAX77686=y
- CONFIG_COMMON_CLK_QCOM=y
- CONFIG_MSM_GCC_8660=y
- CONFIG_MSM_MMCC_8960=y
- CONFIG_MSM_MMCC_8974=y
- CONFIG_TEGRA_IOMMU_GART=y
- CONFIG_TEGRA_IOMMU_SMMU=y
-+CONFIG_EXYNOS_IOMMU=y
- CONFIG_MEMORY=y
- CONFIG_IIO=y
-+CONFIG_EXYNOS_ADC=y
- CONFIG_AK8975=y
- CONFIG_PWM=y
-+CONFIG_PWM_SAMSUNG=y
- CONFIG_PWM_TEGRA=y
- CONFIG_PWM_VT8500=y
- CONFIG_OMAP_USB2=y
- CONFIG_PHY_MIPHY365X=y
-+CONFIG_PHY_EXYNOS5250_SATA=y
- CONFIG_PHY_SUN4I_USB=y
-+CONFIG_PHY_SAMSUNG_USB2=y
-+CONFIG_PHY_EXYNOS4210_USB2=y
-+CONFIG_PHY_EXYNOS4X12_USB2=y
-+CONFIG_PHY_EXYNOS5250_USB2=y
-+CONFIG_PHY_EXYNOS5_USBDRD=y
- CONFIG_EXT4_FS=y
- CONFIG_VFAT_FS=y
- CONFIG_TMPFS=y
-@@ -398,4 +441,3 @@ CONFIG_PRINTK_TIME=y
- CONFIG_DEBUG_FS=y
- CONFIG_MAGIC_SYSRQ=y
- CONFIG_LOCKUP_DETECTOR=y
--CONFIG_CRYPTO_DEV_TEGRA_AES=y
--- 
-1.7.10.4
+May be it will be useful to add just "suspended" field in i2c adapter
+structure and provide corresponding accessors.
+
+> 
+> Signed-off-by: Bastian Hecht <hechtb@gmail.com>
+> ---
+> changelog v2:
+> 
+> - commit message extended.
+> - initialization added for adap->suspended
+> - swapped branch for increased performance
+> 
+> 
+>   drivers/i2c/i2c-core.c | 25 ++++++++++++++++++++++++-
+>   include/linux/i2c.h    |  1 +
+>   2 files changed, 25 insertions(+), 1 deletion(-)
+> 
+> diff --git a/drivers/i2c/i2c-core.c b/drivers/i2c/i2c-core.c
+> index 7c7f4b8..b15dc20 100644
+> --- a/drivers/i2c/i2c-core.c
+> +++ b/drivers/i2c/i2c-core.c
+> @@ -343,6 +343,13 @@ static int i2c_legacy_resume(struct device *dev)
+>   static int i2c_device_pm_suspend(struct device *dev)
+>   {
+>   	const struct dev_pm_ops *pm = dev->driver ? dev->driver->pm : NULL;
+> +	struct i2c_adapter *adap = i2c_verify_adapter(dev);
+> +
+> +	if (adap) {
+> +		i2c_lock_adapter(adap);
+> +		adap->suspended = true;
+> +		i2c_unlock_adapter(adap);
+> +	}
+>   
+>   	if (pm)
+>   		return pm_generic_suspend(dev);
+> @@ -353,6 +360,13 @@ static int i2c_device_pm_suspend(struct device *dev)
+>   static int i2c_device_pm_resume(struct device *dev)
+>   {
+>   	const struct dev_pm_ops *pm = dev->driver ? dev->driver->pm : NULL;
+> +	struct i2c_adapter *adap = i2c_verify_adapter(dev);
+> +
+> +	if (adap) {
+> +		i2c_lock_adapter(adap);
+> +		adap->suspended = false;
+> +		i2c_unlock_adapter(adap);
+> +	}
+>   
+>   	if (pm)
+>   		return pm_generic_resume(dev);
+> @@ -1243,6 +1257,7 @@ static int i2c_register_adapter(struct i2c_adapter *adap)
+>   	dev_set_name(&adap->dev, "i2c-%d", adap->nr);
+>   	adap->dev.bus = &i2c_bus_type;
+>   	adap->dev.type = &i2c_adapter_type;
+> +	adap->suspended = false;
+>   	res = device_register(&adap->dev);
+>   	if (res)
+>   		goto out_list;
+> @@ -1819,7 +1834,10 @@ int i2c_transfer(struct i2c_adapter *adap, struct i2c_msg *msgs, int num)
+>   			i2c_lock_adapter(adap);
+>   		}
+>   
+> -		ret = __i2c_transfer(adap, msgs, num);
+> +		if (!adap->suspended)
+> +			ret = __i2c_transfer(adap, msgs, num);
+> +		else
+> +			ret = -EIO;
+>   		i2c_unlock_adapter(adap);
+>   
+>   		return ret;
+> @@ -2577,6 +2595,10 @@ s32 i2c_smbus_xfer(struct i2c_adapter *adapter, u16 addr, unsigned short flags,
+>   
+>   	if (adapter->algo->smbus_xfer) {
+>   		i2c_lock_adapter(adapter);
+> +		if (adapter->suspended) {
+> +			res = -EIO;
+> +			goto unlock;
+> +		}
+>   
+>   		/* Retry automatically on arbitration loss */
+>   		orig_jiffies = jiffies;
+> @@ -2590,6 +2612,7 @@ s32 i2c_smbus_xfer(struct i2c_adapter *adapter, u16 addr, unsigned short flags,
+>   				       orig_jiffies + adapter->timeout))
+>   				break;
+>   		}
+> +unlock:
+>   		i2c_unlock_adapter(adapter);
+>   
+>   		if (res != -EOPNOTSUPP || !adapter->algo->master_xfer)
+> diff --git a/include/linux/i2c.h b/include/linux/i2c.h
+> index b556e0a..af08c75 100644
+> --- a/include/linux/i2c.h
+> +++ b/include/linux/i2c.h
+> @@ -434,6 +434,7 @@ struct i2c_adapter {
+>   	int timeout;			/* in jiffies */
+>   	int retries;
+>   	struct device dev;		/* the adapter device */
+> +	unsigned int suspended:1;
+>   
+>   	int nr;
+>   	char name[48];
+> 
+
+Regards,
+- grygroii
