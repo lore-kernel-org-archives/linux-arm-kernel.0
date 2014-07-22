@@ -1,24 +1,29 @@
-From: peter.griffin@linaro.org (Peter Griffin)
-Date: Tue, 22 Jul 2014 14:59:29 +0100
-Subject: [PATCH 1/3] usb: host: st-hcd: Add USB HCD support for STi SoCs
-In-Reply-To: <Pine.LNX.4.44L0.1407141054010.10763-100000@netrider.rowland.org>
-References: <20140714083549.GK2954@lee--X1>
- <Pine.LNX.4.44L0.1407141054010.10763-100000@netrider.rowland.org>
-Message-ID: <20140722135929.GA24561@griffinp-ThinkPad-X1-Carbon-2nd>
+From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
+Date: Tue, 22 Jul 2014 16:07:47 +0200
+Subject: [PATCH] ARM: at91/dt: sam9x5: fix ADC compatible string
+Message-ID: <1406038067-14697-1-git-send-email-alexandre.belloni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Alan,
+Use the correct compatible string for the ADC of the at91sam9x5 family of SoCs.
 
-> > 
-> > Most platform drivers have already been moved.
-> 
-> Okay, I grant the point.  Objections withdrawn.  Fix up the spelling 
-> error and the other stuff in the Kconfig help text, and this will be 
-> acceptable.
+Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
+---
+ arch/arm/boot/dts/at91sam9x5.dtsi | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-Thanks, I intend to send a new version shortly.
-
-regards,
-
-Peter.
+diff --git a/arch/arm/boot/dts/at91sam9x5.dtsi b/arch/arm/boot/dts/at91sam9x5.dtsi
+index 2c0d6ea3ab41..5d7cf394f537 100644
+--- a/arch/arm/boot/dts/at91sam9x5.dtsi
++++ b/arch/arm/boot/dts/at91sam9x5.dtsi
+@@ -964,7 +964,7 @@
+ 			adc0: adc at f804c000 {
+ 				#address-cells = <1>;
+ 				#size-cells = <0>;
+-				compatible = "atmel,at91sam9260-adc";
++				compatible = "atmel,at91sam9x5-adc";
+ 				reg = <0xf804c000 0x100>;
+ 				interrupts = <19 IRQ_TYPE_LEVEL_HIGH 0>;
+ 				clocks = <&adc_clk>,
+-- 
+1.9.1
