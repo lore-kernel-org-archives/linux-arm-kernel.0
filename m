@@ -1,40 +1,71 @@
-From: pwalmsley@nvidia.com (Paul Walmsley)
-Date: Mon, 21 Jul 2014 20:45:22 -0700
-Subject: Tegra baseline test results for v3.16-rc6
-Message-ID: <53CDDE52.90506@nvidia.com>
+From: thunder.leizhen@huawei.com (leizhen)
+Date: Tue, 22 Jul 2014 11:54:45 +0800
+Subject: [PATCH v3 00/13] Add support for Hisilicon SMMU architecture
+In-Reply-To: <20140721093951.GC16122@arm.com>
+References: <1404975186-12032-1-git-send-email-thunder.leizhen@huawei.com>
+ <53CC7234.4080703@huawei.com> <20140721093951.GC16122@arm.com>
+Message-ID: <53CDE085.9090709@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Here are some basic Tegra test results for Linux v3.16-rc6.
-Logs and other details at:
+On 2014/7/21 17:39, Will Deacon wrote:
+> [re-adding the lists]
+> 
+> On Mon, Jul 21, 2014 at 02:51:48AM +0100, leizhen wrote:
+>> Hi, Will
+> 
+> Hello,
+> 
+>> I have sent this patch a week ago. I saw that you and Mitchel Humpherys had
+>> sent some patches which will impact my code. I list below:
+>> iommu/arm-smmu: remove support for chained SMMUs
+>> iommu/arm-smmu: fix some checkpatch issues
+> 
+> There's also all of the development work I'm doing for VFIO and the page-table
+> rework that Varun's working on, so these patches are going to be difficult
+> to merge if we ever get to that point. I think Mitchel and Olav are also
+> busy trying to get their SMMU supported by the driver. Given that they've
+> actually bothered to follow the architecture, I don't see why they should
+> be messed about by your patches causing conflicts all over the place.
+> 
+>> I can ajust my patch because of above. I known this patch is not follow what
+>> you suggested before(fit into arm-smmu.c). But I found when we need to support
+>> ARM SMMUv3, maybe we should do like this. I really want to know whether or not
+>> you agree the software framework in this patch? Or what do you think about
+>> SMMUv3?
+> 
+> The only code I foresee sharing between SMMUv2 and SMMUv3 is the page-table
+> creation code. The two architectures are significantly different, so I don't
+> think your split really helps us there. For example, you've left the probing
+> code in smmu-base.c. Of course, if HiSilicon follow the SMMUv3 spec as well
+> they did with SMMUv2, then your point is moot anyway and we may as well go
+> home.
+> 
+>>> I tried to merge hisi-smmu driver into arm-smmu.c, but it looks impossible.
+>>> The biggest problem is that too many registers are diffrent: the base address,
+>>> the field definition, or present only on one side. And if I use #if, hisi-smmu
+>>> and arm-smmu can not coexist in one binary file. Almost need 20 #if.
+> 
+> I don't think #ifdefs are necessarily the right way to go. There are IMPDEF
+> parts of a compliant SMMU (e.g. power management), so having a new compatible
+> string and a set of internal ops which can be overridden by a particular
+> implementation wouldn't be the end of the world and would be far less
+> invasive.
+> 
+> The problem you have is that your SMMU isn't architecturally compliant, so
+> you'll end up having to restructure parts of the driver so you can add
+> internal hooks for operations that aren't actually IMPDEF. That's the part
+> I'm worried about and we will have to draw the line somewhere, especially
+> when other people are trying to work with this code for compliant
+> implementations.
+> 
+> So, NAK to your current approach. You need to try something like I said
+> above and, if you want to spit the file up, start with the page-table code.
+> 
+> Will
+> 
+> .
+> 
 
-     http://nvt.pwsan.com/pub/linux/testlogs/test_v3.16-rc6/20140721180104/
-
-
-Test summary
-------------
-
-Build: zImage:
-     Pass: ( 2/ 2): multi_v7_defconfig, tegra_defconfig
-
-Boot to userspace: multi_v7_defconfig:
-     Pass: ( 2/ 2): tegra114-dalmore-a04, tegra30-beaver
-
-Boot to userspace: tegra_defconfig:
-     Pass: ( 2/ 2): tegra114-dalmore-a04, tegra30-beaver
-
-
-vmlinux object size
-(delta in bytes from test_v3.16-rc5 (1795cd9b3a91d4b5473c97f491d63892442212ab)):
-    text     data      bss    total  kernel
-   +2289     +376        0    +2665  multi_v7_defconfig
-   +2341     +408        0    +2749  tegra_defconfig
-
-
-Boot-time memory difference
-(delta in bytes from test_v3.16-rc5 (1795cd9b3a91d4b5473c97f491d63892442212ab))
-     avail    rsrvd     high    freed                board              kconfig                  dtb
-       -8k       8k        .        . tegra114-dalmore-a04   multi_v7_defconfig     tegra114-dalmore
-         .        .        .        . tegra114-dalmore-a04      tegra_defconfig     tegra114-dalmore
-       -8k       8k        .        .       tegra30-beaver   multi_v7_defconfig       tegra30-beaver
-         .        .        .        .       tegra30-beaver      tegra_defconfig       tegra30-beaver
+OK. We have decided to discard current SMMU hardware design, and will
+completely follow the SMMUv3 specification.
