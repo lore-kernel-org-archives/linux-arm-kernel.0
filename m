@@ -1,47 +1,115 @@
-From: t.figa@samsung.com (Tomasz Figa)
-Date: Tue, 22 Jul 2014 18:48:02 +0200
-Subject: [PATCH 2/2] arm: add early_ioremap support
-In-Reply-To: <1404898792-4201-3-git-send-email-leif.lindholm@linaro.org>
-References: <1404898792-4201-1-git-send-email-leif.lindholm@linaro.org>
- <1404898792-4201-3-git-send-email-leif.lindholm@linaro.org>
-Message-ID: <53CE95C2.8090807@samsung.com>
+From: nm@ti.com (Nishanth Menon)
+Date: Tue, 22 Jul 2014 11:50:26 -0500
+Subject: [PATCH 2/2] ARM: DRA7: hwmod: Add dra74x and dra72x specific
+ ocp interface lists
+In-Reply-To: <1405499774-19770-3-git-send-email-lokeshvutla@ti.com>
+References: <1405499774-19770-1-git-send-email-lokeshvutla@ti.com>
+ <1405499774-19770-3-git-send-email-lokeshvutla@ti.com>
+Message-ID: <53CE9652.4080304@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Leif,
-
-On 09.07.2014 11:39, Leif Lindholm wrote:
-> From: Mark Salter <msalter@redhat.com>
+On 07/16/2014 03:36 AM, Lokesh Vutla wrote:
+> From: Rajendra Nayak <rnayak@ti.com>
 > 
-> This patch uses the generic early_ioremap code to implement
-> early_ioremap for ARM. The ARM-specific bits come mostly from
-> an earlier patch from Leif Lindholm <leif.lindholm@linaro.org>
-> here:
+> To deal with IPs which are specific to dra74x and dra72x, maintain seperate
+> ocp interface lists, while keeping the common list for all common IPs.
 > 
->   https://lkml.org/lkml/2013/10/3/279
+> Move USB OTG SS4 to dra74x only list since its unavailable in
+> dra72x and is giving an abort during boot. The dra72x only list
+> is empty for now and a placeholder for future hwmod additions which
+> are specific to dra72x.
+> 
+> Fixes: d904b38 ARM: DRA7: hwmod: Add SYSCONFIG for usb_otg_ss
 
-[snip]
+please use a format as following:
+Fixes: d904b38df0db13 ("ARM: DRA7: hwmod: Add SYSCONFIG for usb_otg_ss")
 
-> diff --git a/arch/arm/mm/early_ioremap.c b/arch/arm/mm/early_ioremap.c
-> new file mode 100644
-> index 0000000..1013109
-> --- /dev/null
-> +++ b/arch/arm/mm/early_ioremap.c
-> @@ -0,0 +1,86 @@
-> +/*
-> + * early_ioremap() support for ARM
-> + *
-> + * Based on existing support in arch/x86/mm/ioremap.c
-> + *
-> + * Restrictions: currently only functional before paging_init()
+> Reported-by: Keerthy <j-keerthy@ti.com>
+> Signed-off-by: Rajendra Nayak <rnayak@ti.com>
+> Signed-off-by: Lokesh Vutla <lokeshvutla@ti.com>
+> ---
+>  arch/arm/mach-omap2/omap_hwmod.c          |    3 +++
+>  arch/arm/mach-omap2/omap_hwmod_7xx_data.c |   22 ++++++++++++++++++++--
+>  2 files changed, 23 insertions(+), 2 deletions(-)
+> 
+> diff --git a/arch/arm/mach-omap2/omap_hwmod.c b/arch/arm/mach-omap2/omap_hwmod.c
+> index 6c074f3..14f8370 100644
+> --- a/arch/arm/mach-omap2/omap_hwmod.c
+> +++ b/arch/arm/mach-omap2/omap_hwmod.c
+> @@ -3345,6 +3345,9 @@ int __init omap_hwmod_register_links(struct omap_hwmod_ocp_if **ois)
+>  	if (!ois)
+>  		return 0;
+>  
+> +	if (ois[0] == NULL) /*empty list*/
+/* Empty list */ ?
+> +		return 0;
+> +
 
-Uhm, that's bad... This would explain why my earlycon code generates a
-fault as soon as something prints after paging_init(). I'd say this
-feature would be much more useful if mappings were carried over
-paging_init(), so that mapped devices are available later as well.
+This change looks like a different patch?
 
-I'll see if I can code this on top of your patch, but unfortunately it
-might end up with -ENOTIME.
+>  	if (!linkspace) {
+>  		if (_alloc_linkspace(ois)) {
+>  			pr_err("omap_hwmod: could not allocate link space\n");
+> diff --git a/arch/arm/mach-omap2/omap_hwmod_7xx_data.c b/arch/arm/mach-omap2/omap_hwmod_7xx_data.c
+> index 284324f..c95033c 100644
+> --- a/arch/arm/mach-omap2/omap_hwmod_7xx_data.c
+> +++ b/arch/arm/mach-omap2/omap_hwmod_7xx_data.c
+> @@ -35,6 +35,7 @@
+>  #include "i2c.h"
+>  #include "mmc.h"
+>  #include "wd_timer.h"
+> +#include "soc.h"
+>  
+>  /* Base offset for all DRA7XX interrupts external to MPUSS */
+>  #define DRA7XX_IRQ_GIC_START	32
+> @@ -2705,7 +2706,6 @@ static struct omap_hwmod_ocp_if *dra7xx_hwmod_ocp_ifs[] __initdata = {
+>  	&dra7xx_l4_per3__usb_otg_ss1,
+>  	&dra7xx_l4_per3__usb_otg_ss2,
+>  	&dra7xx_l4_per3__usb_otg_ss3,
+> -	&dra7xx_l4_per3__usb_otg_ss4,
+>  	&dra7xx_l3_main_1__vcp1,
+>  	&dra7xx_l4_per2__vcp1,
+>  	&dra7xx_l3_main_1__vcp2,
+> @@ -2714,8 +2714,26 @@ static struct omap_hwmod_ocp_if *dra7xx_hwmod_ocp_ifs[] __initdata = {
+>  	NULL,
+>  };
+>  
+> +static struct omap_hwmod_ocp_if *dra74x_hwmod_ocp_ifs[] __initdata = {
+> +	&dra7xx_l4_per3__usb_otg_ss4,
+> +	NULL,
+> +};
+> +
+> +static struct omap_hwmod_ocp_if *dra72x_hwmod_ocp_ifs[] __initdata = {
+> +	NULL,
+> +};
+> +
+>  int __init dra7xx_hwmod_init(void)
+>  {
+> +	int ret;
+> +
+>  	omap_hwmod_init();
+> -	return omap_hwmod_register_links(dra7xx_hwmod_ocp_ifs);
+> +	ret = omap_hwmod_register_links(dra7xx_hwmod_ocp_ifs);
+if (ret)
+	goto out;
+> +
+> +	if (!ret && soc_is_dra74x())
+no need of !ret
+> +		return omap_hwmod_register_links(dra74x_hwmod_ocp_ifs);
+ret = omap_hwmod_register_links(dra74x_hwmod_ocp_ifs);
+> +	else if (!ret && soc_is_dra72x())
+no need of else and !ret
+> +		return omap_hwmod_register_links(dra72x_hwmod_ocp_ifs);
+ret = omap_hwmod_register_links(dra72x_hwmod_ocp_ifs);
+> +
 
-Best regards,
-Tomasz
+out:
+> +	return ret;
+>  }
+> 
+
+
+-- 
+Regards,
+Nishanth Menon
