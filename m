@@ -1,40 +1,45 @@
 From: k.khlebnikov@samsung.com (Konstantin Khlebnikov)
-Date: Tue, 22 Jul 2014 19:36:23 +0400
-Subject: [PATCH 1/2] ARM: LPAE: load upper bits of early TTBR0/TTBR1
-Message-ID: <20140722153623.25088.37742.stgit@buzz>
+Date: Tue, 22 Jul 2014 19:36:35 +0400
+Subject: [PATCH 2/2] ARM: LPAE: reduce damage caused by idmap to virtual memory
+ layout
+In-Reply-To: <20140722153623.25088.37742.stgit@buzz>
+References: <20140722153623.25088.37742.stgit@buzz>
+Message-ID: <20140722153635.25088.14197.stgit@buzz>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch fixes booting when idmap pgd lays above 4gb. Commit
-4756dcbfd37 mostly had fixed this, but it'd failed to load upper bits.
+idmap layout combines both phisical and virtual addresses.
+Everything works fine if ram physically lays below PAGE_OFFSET.
+Otherwise idmap starts punching huge holes in virtual memory layout.
+It maps ram by 2MiB sections, but when it allocates new pmd page it
+cuts 1GiB at once.
 
-Also this fixes adding TTBR1_OFFSET to TTRR1: if lower part overflows
-carry flag must be added to the upper part.
+This patch makes a copy of all affected pmds from init_mm.
+Only few (usually one) 2MiB sections will be lost.
+This is not eliminates problem but makes it 512 times less likely.
+
+Usually idmap is used only for a short period. For examle for booting
+secondary cpu __turn_mmu_on (executed in physical addresses) jumps to
+virtual address of __secondary_switched which calls secondary_start_kernel
+which in turn calls cpu_switch_mm and switches to normal pgd from init_mm.
+So everything will be fine if these functions aren't intersect with idmap.
 
 Signed-off-by: Konstantin Khlebnikov <k.khlebnikov@samsung.com>
-Cc: Cyril Chemparathy <cyril@ti.com>
-Cc: Vitaly Andrianov <vitalya@ti.com>
 ---
- arch/arm/mm/proc-v7-3level.S |    7 +++----
- 1 file changed, 3 insertions(+), 4 deletions(-)
+ arch/arm/mm/idmap.c |    3 +++
+ 1 file changed, 3 insertions(+)
 
-diff --git a/arch/arm/mm/proc-v7-3level.S b/arch/arm/mm/proc-v7-3level.S
-index 22e3ad6..f0481dd 100644
---- a/arch/arm/mm/proc-v7-3level.S
-+++ b/arch/arm/mm/proc-v7-3level.S
-@@ -140,12 +140,11 @@ ENDPROC(cpu_v7_set_pte_ext)
- 	mov	\tmp, \ttbr1, lsr #(32 - ARCH_PGD_SHIFT)	@ upper bits
- 	mov	\ttbr1, \ttbr1, lsl #ARCH_PGD_SHIFT		@ lower bits
- 	addls	\ttbr1, \ttbr1, #TTBR1_OFFSET
--	mcrr	p15, 1, \ttbr1, \zero, c2			@ load TTBR1
-+	adcls	\tmp, \tmp, #0
-+	mcrr	p15, 1, \ttbr1, \tmp, c2			@ load TTBR1
- 	mov	\tmp, \ttbr0, lsr #(32 - ARCH_PGD_SHIFT)	@ upper bits
- 	mov	\ttbr0, \ttbr0, lsl #ARCH_PGD_SHIFT		@ lower bits
--	mcrr	p15, 0, \ttbr0, \zero, c2			@ load TTBR0
--	mcrr	p15, 1, \ttbr1, \zero, c2			@ load TTBR1
--	mcrr	p15, 0, \ttbr0, \zero, c2			@ load TTBR0
-+	mcrr	p15, 0, \ttbr0, \tmp, c2			@ load TTBR0
- 	.endm
- 
- 	/*
+diff --git a/arch/arm/mm/idmap.c b/arch/arm/mm/idmap.c
+index 8e0e52e..dcd023c 100644
+--- a/arch/arm/mm/idmap.c
++++ b/arch/arm/mm/idmap.c
+@@ -25,6 +25,9 @@ static void idmap_add_pmd(pud_t *pud, unsigned long addr, unsigned long end,
+ 			pr_warning("Failed to allocate identity pmd.\n");
+ 			return;
+ 		}
++		if (!pud_none(*pud))
++			memcpy(pmd, pmd_offset(pud, 0),
++			       PTRS_PER_PMD * sizeof(pmd_t));
+ 		pud_populate(&init_mm, pud, pmd);
+ 		pmd += pmd_index(addr);
+ 	} else
