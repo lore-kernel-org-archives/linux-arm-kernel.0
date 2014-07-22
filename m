@@ -1,48 +1,54 @@
-From: jungseoklee85@gmail.com (Jungseok Lee)
-Date: Wed, 23 Jul 2014 00:50:32 +0900
-Subject: [PATCH 13/11] arm64: Add support for 48-bit VA space with 64KB
- page configuration
-In-Reply-To: <20140722153738.GJ2219@arm.com>
-References: <ADA477FA-165D-4679-A38F-C82C901BEE4D@gmail.com>
- <AABDB416-D194-4825-8113-4748C10BC339@gmail.com>
- <2C360BFC-E4CF-448D-9110-4197DCAEAD4F@gmail.com>
- <20140722153738.GJ2219@arm.com>
-Message-ID: <5B882F73-E1F1-4243-852A-83EC23A68D0E@gmail.com>
+From: balbi@ti.com (Felipe Balbi)
+Date: Tue, 22 Jul 2014 10:51:17 -0500
+Subject: [PATCH v2 1/3] usb: dwc3: add ST dwc3 glue layer to manage dwc3 HC
+In-Reply-To: <20140722154503.GC23210@lee--X1>
+References: <1404541530-27856-1-git-send-email-peter.griffin@linaro.org>
+ <1404541530-27856-2-git-send-email-peter.griffin@linaro.org>
+ <20140707124627.GG6407@lee--X1>
+ <20140722091800.GB8233@griffinp-ThinkPad-X1-Carbon-2nd>
+ <20140722145711.GC20588@saruman.home>
+ <20140722154503.GC23210@lee--X1>
+Message-ID: <20140722155117.GF20588@saruman.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Jul 23, 2014, at 12:37 AM, Catalin Marinas wrote:
-> On Tue, Jul 22, 2014 at 04:13:27PM +0100, Jungseok Lee wrote:
->> On Jul 22, 2014, at 00:09 +900 Catalin Marinas wrote:
->>> This patch allows support for 3 levels of page tables with 64KB page 
->>> configuration allowing 48-bit VA space. The pgd is no longer a full 
->>> PAGE_SIZE (PTRS_PER_PGD is 64) and (swapper|idmap)_pg_dir are not fully 
->>> populated (pgd_alloc falls back to kzalloc). 
->>> 
->>> Signed-off-by: Catalin Marinas <catalin.marinas@arm.com> 
->>> --- 
->> 
->> One more step :)
+On Tue, Jul 22, 2014 at 04:45:03PM +0100, Lee Jones wrote:
+> > > > > +static void st_dwc3_init(struct st_dwc3 *dwc3_data)
+> > > > > +{
+> > > > > +	u32 reg = st_dwc3_readl(dwc3_data->glue_base, USB2_CLKRST_CTRL);
+> > > > > +
+> > > > > +	reg |= aux_clk_en(1) | ext_cfg_reset_n(1) | xhci_revision(1);
+> > > > > +	reg &= ~sw_pipew_reset_n(1);
+> > > > 
+> > > > 1?  Better to add defines for these magic numbers.  What is 1 anyway?
+> > > 
+> > > They are just bit setting macros, I've converted them over to use BIT macro now,
+> > > so it no longer takes a parameter.
+> > 
+> > the macros are better, but make them upper case as everybody else.
 > 
-> The last before the upcoming merging window. I also updated the
-> pgtable-4levels branch with the latest.
-
-I've checked it out. I will leave a comment ASAP if needed.
-
->> Are you going to post the next version of this series including [12/11]
->> and [13/11] or finalize the series?
+> When you say that the macros are better, what do you mean?
 > 
-> I wasn't planning to post another series. It's good to get the clean-up
-> merged with the change that 48-bit VA now depends on BROKEN until KVM is
-> sorted (for 3.18).
-
-I see.
-
->> In addition, could you put my gmail address in CC in coming patch or
->> the next version? It help me follow up the series easily.
+> Defines do the job in a manner which is a great deal cleaner:
 > 
-> Do you want me to add any reviewed etc. tags from you?
+> #define AUX_CLK_EN        BIT(0)
+> #define SW_PIPEW_RESET_N  BIT(4)
+> #define EXT_CFG_RESET_N   BIT(8)
+> #define XHCI_REVISION     BIT(12)
+> 
+> reg = AUX_CLK_EN | SW_PIPEW_RESET_N | XHCI_REVISION;
+> reg &= ~SW_PIPEW_RESET_N
 
-No, it's okay. What I mean is mailing thread, not tags.
+this is what I meant ;-) I see what I wrote can be very ambiguous :-p
 
-- Jungseok Lee
+cheers
+
+-- 
+balbi
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140722/b62b0981/attachment.sig>
