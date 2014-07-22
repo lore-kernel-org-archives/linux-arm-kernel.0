@@ -1,115 +1,62 @@
-From: nm@ti.com (Nishanth Menon)
-Date: Tue, 22 Jul 2014 11:50:26 -0500
-Subject: [PATCH 2/2] ARM: DRA7: hwmod: Add dra74x and dra72x specific
- ocp interface lists
-In-Reply-To: <1405499774-19770-3-git-send-email-lokeshvutla@ti.com>
-References: <1405499774-19770-1-git-send-email-lokeshvutla@ti.com>
- <1405499774-19770-3-git-send-email-lokeshvutla@ti.com>
-Message-ID: <53CE9652.4080304@ti.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Tue, 22 Jul 2014 17:54:29 +0100
+Subject: [GIT PULL 2/3] ARM: tegra: move fuse code out of arch/arm
+In-Reply-To: <53CE90ED.8030900@wwwdotorg.org>
+References: <20140708134359.GA23218@tbergstrom-lnx.Nvidia.com>
+ <CAOesGMhoqvqf-dktp-OfUNTPLahPwkyAPiTeDngr4QjH=VfOGA@mail.gmail.com>
+ <53C88A4C.3070304@wwwdotorg.org>
+ <CAOesGMh+zLV781wzdR5=_Bpzh+XMwJfWL-5XMDP6DwG_Hg80kw@mail.gmail.com>
+ <53CD2C58.6060601@wwwdotorg.org> <20140721155451.GF32578@arm.com>
+ <53CD4201.5070705@wwwdotorg.org>
+ <CAOesGMgvd1HbjywN7BDPtr8ZU7vucWH48B=AW3TZjng73YA8WA@mail.gmail.com>
+ <20140722102749.GB2219@arm.com> <53CE90ED.8030900@wwwdotorg.org>
+Message-ID: <20140722165428.GT2219@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/16/2014 03:36 AM, Lokesh Vutla wrote:
-> From: Rajendra Nayak <rnayak@ti.com>
+On Tue, Jul 22, 2014 at 05:27:25PM +0100, Stephen Warren wrote:
+> On 07/22/2014 04:27 AM, Catalin Marinas wrote:
+> ...
+> > ...It's also aimed at
+> > pushing back on hardware people who think they can mess up, for example,
+> > a GIC implementation because the rest is just software and you can
+> > always add #ifdefs.
 > 
-> To deal with IPs which are specific to dra74x and dra72x, maintain seperate
-> ocp interface lists, while keeping the common list for all common IPs.
+> I'm very concerned about this statement.
 > 
-> Move USB OTG SS4 to dra74x only list since its unavailable in
-> dra72x and is giving an abort during boot. The dra72x only list
-> is empty for now and a placeholder for future hwmod additions which
-> are specific to dra72x.
-> 
-> Fixes: d904b38 ARM: DRA7: hwmod: Add SYSCONFIG for usb_otg_ss
+> Yes, it would be nice if all HW was sanely designed, but it's not
+> always. The time to push back on bad HW design is during IP licensing
+> agreements or HW design reviews, not upstreaming.
 
-please use a format as following:
-Fixes: d904b38df0db13 ("ARM: DRA7: hwmod: Add SYSCONFIG for usb_otg_ss")
+I agree about the HW design reviews. But I suspect some software people
+in such companies, concerned with upstreaming Linux support, are allowed
+to give feedback. And the feedback could be something like (just an
+example) "if we use a standard GIC and the architected timer, sane
+(!PL310-like) system caches, we get the benefit of no additional
+upstream work, better virtualisation support etc". I hope someone in the
+HW team would take such feedback into account rather than assume that
+software and upstreaming comes for free.
 
-> Reported-by: Keerthy <j-keerthy@ti.com>
-> Signed-off-by: Rajendra Nayak <rnayak@ti.com>
-> Signed-off-by: Lokesh Vutla <lokeshvutla@ti.com>
-> ---
->  arch/arm/mach-omap2/omap_hwmod.c          |    3 +++
->  arch/arm/mach-omap2/omap_hwmod_7xx_data.c |   22 ++++++++++++++++++++--
->  2 files changed, 23 insertions(+), 2 deletions(-)
-> 
-> diff --git a/arch/arm/mach-omap2/omap_hwmod.c b/arch/arm/mach-omap2/omap_hwmod.c
-> index 6c074f3..14f8370 100644
-> --- a/arch/arm/mach-omap2/omap_hwmod.c
-> +++ b/arch/arm/mach-omap2/omap_hwmod.c
-> @@ -3345,6 +3345,9 @@ int __init omap_hwmod_register_links(struct omap_hwmod_ocp_if **ois)
->  	if (!ois)
->  		return 0;
->  
-> +	if (ois[0] == NULL) /*empty list*/
-/* Empty list */ ?
-> +		return 0;
-> +
+Of course, we've never rejected Linux upstreaming because of the
+hardware design (well, as long as Linux could reliably run on it) and I
+don't plan to do this in the future, but just show that there are clear
+benefits in doing something in a more standardised way (e.g. SBSA for
+servers).
 
-This change looks like a different patch?
+Even though ARM licenses the architecture, there is no way to enforce a
+HW design as part of the agreement (or risk not licensing the IP at
+all). But there is effort to standardise things like SBSA, Trusted
+Firmware.
 
->  	if (!linkspace) {
->  		if (_alloc_linkspace(ois)) {
->  			pr_err("omap_hwmod: could not allocate link space\n");
-> diff --git a/arch/arm/mach-omap2/omap_hwmod_7xx_data.c b/arch/arm/mach-omap2/omap_hwmod_7xx_data.c
-> index 284324f..c95033c 100644
-> --- a/arch/arm/mach-omap2/omap_hwmod_7xx_data.c
-> +++ b/arch/arm/mach-omap2/omap_hwmod_7xx_data.c
-> @@ -35,6 +35,7 @@
->  #include "i2c.h"
->  #include "mmc.h"
->  #include "wd_timer.h"
-> +#include "soc.h"
->  
->  /* Base offset for all DRA7XX interrupts external to MPUSS */
->  #define DRA7XX_IRQ_GIC_START	32
-> @@ -2705,7 +2706,6 @@ static struct omap_hwmod_ocp_if *dra7xx_hwmod_ocp_ifs[] __initdata = {
->  	&dra7xx_l4_per3__usb_otg_ss1,
->  	&dra7xx_l4_per3__usb_otg_ss2,
->  	&dra7xx_l4_per3__usb_otg_ss3,
-> -	&dra7xx_l4_per3__usb_otg_ss4,
->  	&dra7xx_l3_main_1__vcp1,
->  	&dra7xx_l4_per2__vcp1,
->  	&dra7xx_l3_main_1__vcp2,
-> @@ -2714,8 +2714,26 @@ static struct omap_hwmod_ocp_if *dra7xx_hwmod_ocp_ifs[] __initdata = {
->  	NULL,
->  };
->  
-> +static struct omap_hwmod_ocp_if *dra74x_hwmod_ocp_ifs[] __initdata = {
-> +	&dra7xx_l4_per3__usb_otg_ss4,
-> +	NULL,
-> +};
-> +
-> +static struct omap_hwmod_ocp_if *dra72x_hwmod_ocp_ifs[] __initdata = {
-> +	NULL,
-> +};
-> +
->  int __init dra7xx_hwmod_init(void)
->  {
-> +	int ret;
-> +
->  	omap_hwmod_init();
-> -	return omap_hwmod_register_links(dra7xx_hwmod_ocp_ifs);
-> +	ret = omap_hwmod_register_links(dra7xx_hwmod_ocp_ifs);
-if (ret)
-	goto out;
-> +
-> +	if (!ret && soc_is_dra74x())
-no need of !ret
-> +		return omap_hwmod_register_links(dra74x_hwmod_ocp_ifs);
-ret = omap_hwmod_register_links(dra74x_hwmod_ocp_ifs);
-> +	else if (!ret && soc_is_dra72x())
-no need of else and !ret
-> +		return omap_hwmod_register_links(dra72x_hwmod_ocp_ifs);
-ret = omap_hwmod_register_links(dra72x_hwmod_ocp_ifs);
-> +
+> Any pushback during SW upstreaming simply serves to make it difficult
+> for the SW people doing the upstreaming. It has zero impact on the
+> current HW design (it's already shipped). It probably has zero impact on
+> the next N revisions of the HW (they're already baked). It's possible it
+> has zero-to-minimal impact on any future HW (end-user product
+> requirements are what matter most).
 
-out:
-> +	return ret;
->  }
-> 
-
+I agree that pushing back during SW upstreaming is very late. But I hope
+to raise the awareness earlier for ARMv8 hardware.
 
 -- 
-Regards,
-Nishanth Menon
+Catalin
