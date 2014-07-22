@@ -1,33 +1,76 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Tue, 22 Jul 2014 22:20:36 +0100
-Subject: [PATCH v2 1/5] i2c: Don't start transfers when suspended
-In-Reply-To: <53CEB196.9060903@ti.com>
-References: <1405608520-5644-1-git-send-email-hechtb@gmail.com>
- <53CEB196.9060903@ti.com>
-Message-ID: <20140722212036.GL21766@n2100.arm.linux.org.uk>
+From: paul@pwsan.com (Paul Walmsley)
+Date: Tue, 22 Jul 2014 21:21:57 +0000 (UTC)
+Subject: [GIT PULL] ARM: OMAP2+: first set of hwmod data patches for v3.17
+Message-ID: <alpine.DEB.2.02.1407222120460.25593@utopia.booyaka.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jul 22, 2014 at 09:46:46PM +0300, Grygorii Strashko wrote:
->  I'm not sure, this optimization is safe  (
-> Because, in many cases the access to PMIC IC needs to be allowed till late
-> stages of suspending (at least till suspend_noirq stage or even later).
-> For example, on some OMAP SoC Voltage management code need to use services
-> provided by PMIC IC, which is connected to I2C.
+-----BEGIN PGP SIGNED MESSAGE-----
+Hash: SHA1
 
-This is definitely not safe.  I worked on a PXA platform a while back
-where the only way to tell the thing to "sleep" was to send an I2C
-message to a microcontroller asking it to remove power.
+Hi Tony
 
-Plus, as you say, you may also have PMICs that you need to talk to
-in order to shut power off to various peripherals (and maybe even
-the CPU itself) during the suspend process.
+The following changes since commit a497c3ba1d97fc69c1e78e7b96435ba8c2cb42ee:
 
-I2C is one of those cases where devices attached to the I2C bus are
-themselves responsible for doing their own suspend shutdown at the
-appropriate time; it's not the responsibility of the I2C core to
-know this kind of system/driver dependent detail.
+  Linux 3.16-rc2 (2014-06-21 19:02:54 -1000)
 
--- 
-FTTC broadband for 0.8mile line: currently at 9.5Mbps down 400kbps up
-according to speedtest.net.
+are available in the git repository at:
+
+  git://git.kernel.org/pub/scm/linux/kernel/git/pjw/omap-pending.git tags/for-v3.17/omap-hwmod-a
+
+for you to fetch changes up to c913c8a15a02e91c1f0302d68bebf66838a9689d:
+
+  ARM: DRA7: hwmod: Add data for RTC (2014-07-22 14:35:06 -0600)
+
+- ----------------------------------------------------------------
+OMAP hwmod data additions for v3.17.  Most of these are DRA7xx-related,
+although one patch adds DSS hwmods for AM43xx.
+
+Basic build, boot, and PM test results are available here:
+
+http://www.pwsan.com/omap/testlogs/hwmod-a-v3.17/20140722143514/
+
+- ----------------------------------------------------------------
+Kishon Vijay Abraham I (2):
+      arm: dra7xx: Add hwmod data for pcie1 phy and pcie2 phy
+      arm: dra7xx: Add hwmod data for pcie1 and pcie2 subsystems
+
+Lokesh Vutla (1):
+      ARM: DRA7: hwmod: Add data for RTC
+
+Mugunthan V N (1):
+      arm: dra7xx: Add hwmod data for MDIO and CPSW
+
+Roger Quadros (1):
+      ARM: DRA7: hwmod: Add OCP2SCP3 module
+
+Sathya Prakash M R (1):
+      ARM: AM43xx: hwmod: add DSS hwmod data
+
+ arch/arm/mach-omap2/Makefile                       |   1 +
+ arch/arm/mach-omap2/cm2_7xx.h                      |   4 +
+ .../mach-omap2/omap_hwmod_2xxx_3xxx_ipblock_data.c |  40 ----
+ arch/arm/mach-omap2/omap_hwmod_43xx_data.c         | 100 ++++++++
+ arch/arm/mach-omap2/omap_hwmod_7xx_data.c          | 260 +++++++++++++++++++++
+ .../mach-omap2/omap_hwmod_common_ipblock_data.c    |  55 +++++
+ arch/arm/mach-omap2/prcm43xx.h                     |   1 +
+ arch/arm/mach-omap2/prm7xx.h                       |   4 +
+ 8 files changed, 425 insertions(+), 40 deletions(-)
+ create mode 100644 arch/arm/mach-omap2/omap_hwmod_common_ipblock_data.c
+-----BEGIN PGP SIGNATURE-----
+Version: GnuPG v1
+
+iQIcBAEBAgAGBQJTztWUAAoJEMePsQ0LvSpLjF4P/0PEGsq8ctRAQNaIKsVNtsDg
+2plzao0Zk0hJjwTQ1HfcrGOiaMRwBpulmvb/hkFu4y7GDBiY2WEJn8d6qHDzbzLJ
+2XJxfY69wtrQBs5SG587xNJSmDVoZXKZRbghM0fqJi3ip41bge5HtRD19VXVN5Rj
+KZbKZVHWxtyVyZD1Lzl5lTufBgIgLG3nJUrkpIR5nPa0R9k2KtJMeFs88U578Nfs
+XT6rQwKyFULqXCYoOOE1Kl2Wmo9mdeVEByx6GYUf0Qz5KES+3+2hiCBsc4FylVSO
+tW695bfMgOQ186UZXSYxnQ2pDU/D1meVQ2IQVvlKyG7q+BPslWOgoeFgr1yVZkCz
+wRPILUn6G6JRyJ/cCN8nYfrTnFXmV6Ve+Tb2BroHHkiJLPuxNEenFHkVHDaZgwYK
+1zDoi1QAVUfy9cnic5yv2/Wd+5rxWwW2V9RCoAU4CT/sRrbH+kqMD1kR0U/Gr06k
+L9nowkGwvTUO6aKtUjdsCRXKlThZLcjZcj+yGbDaF7V9UhGS1ys5bTgIXqGU8CDT
+ZNg17MpslWTfL2NG6WFkSjU7DO2H8oO3D+o6pETSN6+h2SRkfLhxTjkILm6wSQVQ
+HFgPE0fKNLWCRZZk8klAOiG6S4GlxK9S7lDAbVEgr4ivTShdH1p0EsjqDRu+ckPX
+AJ8zX9YSxfEqcW/f08LX
+=I+wx
+-----END PGP SIGNATURE-----
