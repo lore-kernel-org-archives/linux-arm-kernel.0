@@ -1,35 +1,67 @@
-From: ezequiel.garcia@free-electrons.com (Ezequiel Garcia)
-Date: Tue, 22 Jul 2014 20:46:53 -0300
-Subject: mvebu: Can we make the orion-mdio clock a requirement?
-In-Reply-To: <20140721222326.668db913@free-electrons.com>
-References: <20140721190614.GB20027@arch.cereza>
- <20140721212818.2d4920c4@free-electrons.com>
- <53CD743D.9080700@gmail.com>
- <20140721222326.668db913@free-electrons.com>
-Message-ID: <20140722234653.GB21545@arch.cereza>
+From: lauraa@codeaurora.org (Laura Abbott)
+Date: Tue, 22 Jul 2014 16:51:04 -0700
+Subject: [PATCHv4 5/5] arm64: Add atomic pool for non-coherent and CMA
+ allocations.
+In-Reply-To: <20140722210352.GA10604@arm.com>
+References: <1404324218-4743-1-git-send-email-lauraa@codeaurora.org>
+ <1404324218-4743-6-git-send-email-lauraa@codeaurora.org>
+ <201407222006.44666.arnd@arndb.de> <20140722210352.GA10604@arm.com>
+Message-ID: <53CEF8E8.3080607@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 21 Jul 10:23 PM, Thomas Petazzoni wrote:
-> On Mon, 21 Jul 2014 22:12:45 +0200, Sebastian Hesselbarth wrote:
+On 7/22/2014 2:03 PM, Catalin Marinas wrote:
+> On Tue, Jul 22, 2014 at 07:06:44PM +0100, Arnd Bergmann wrote:
+[...]
+>>> +               if (!addr)
+>>> +                       goto destroy_genpool;
+>>> +
+>>> +               memset(addr, 0, atomic_pool_size);
+>>> +               __dma_flush_range(addr, addr + atomic_pool_size);
+>>
+>> It also seems weird to flush the cache on a virtual address of
+>> an uncacheable mapping. Is that well-defined?
 > 
-> > > However, yes, I tend to agree, making the clock mandatory would
-> > > probably be a good thing.
-> > 
-> > We can always pass TCLK on Orion5x if there is a need for a mandatory
-> > clock. Anyway, IIRC clock framework should now properly return
-> > -EPROPEDEFER only if there is a clock property set. If there is none,
-> > the error is different and can be catched on Orion5x.
-> 
-> Yes, I already use tclk on Orion5x for various clock references.
+> Yes. According to D5.8.1 (Data and unified caches), "if cache
+> maintenance is performed on a memory location, the effect of that cache
+> maintenance is visible to all aliases of that physical memory location.
+> These properties are consistent with implementing all caches that can
+> handle data accesses as Physically-indexed, physically-tagged (PIPT)
+> caches".
 > 
 
-Since we all agree, I'll prepare a patchset changing the mvmdio devicetree
-binding so the clock is required.
+This was actually unintentional on my part. I'm going to clean this up
+to flush via the existing cached mapping to make it clearer what's going
+on.
 
-On the driver side, we can only print a warning if the clock is missing,
-to keep compatibility.
+>> In the CMA case, the
+>> original mapping should already be uncached here, so you don't need
+>> to flush it.
+> 
+> I don't think it is non-cacheable already, at least not for arm64 (CMA
+> can be used on coherent architectures as well).
+> 
+
+Memory allocated via dma_alloc_from_contiguous is not guaranteed to be
+uncached. On arm, we allocate the page of memory and the remap it as
+appropriate.
+
+>> In the alloc_pages() case, I think you need to unmap
+>> the pages from the linear mapping instead.
+> 
+> Even if unmapped, it would not remove dirty cache lines (which are
+> associated with physical addresses anyway). But we don't need to worry
+> about unmapping anyway, see above (that's unless we find some
+> architecture implementation where having such cacheable/non-cacheable
+> aliases is not efficient enough, the efficiency is not guaranteed by the
+> ARM ARM, just the correct behaviour).
+> 
+
+Let's hope that never happens.
+
+Thanks,
+Laura
+
 -- 
-Ezequiel Garc?a, Free Electrons
-Embedded Linux, Kernel and Android Engineering
-http://free-electrons.com
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+hosted by The Linux Foundation
