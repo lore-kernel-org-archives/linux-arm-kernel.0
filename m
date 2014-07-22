@@ -1,85 +1,96 @@
-From: daniel.thompson@linaro.org (Daniel Thompson)
-Date: Tue, 22 Jul 2014 11:16:14 +0100
-Subject: [PATCH RFC 5/9] ARM: Add L1 PTE non-secure mapping
-In-Reply-To: <20140721164634.GF21766@n2100.arm.linux.org.uk>
-References: <1405954040-30399-1-git-send-email-daniel.thompson@linaro.org>
- <1405954040-30399-6-git-send-email-daniel.thompson@linaro.org>
- <20140721164634.GF21766@n2100.arm.linux.org.uk>
-Message-ID: <53CE39EE.5020309@linaro.org>
+From: lokeshvutla@ti.com (Lokesh Vutla)
+Date: Tue, 22 Jul 2014 15:49:39 +0530
+Subject: [PATCH V2 1/2] ARM: DRA7: hwmod: Add data for RTC
+In-Reply-To: <1404894932-26677-2-git-send-email-lokeshvutla@ti.com>
+References: <alpine.DEB.2.02.1407060031120.23762@utopia.booyaka.com>
+ <1404894932-26677-1-git-send-email-lokeshvutla@ti.com>
+ <1404894932-26677-2-git-send-email-lokeshvutla@ti.com>
+Message-ID: <53CE3ABB.5010506@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 21/07/14 17:46, Russell King - ARM Linux wrote:
-> On Mon, Jul 21, 2014 at 03:47:16PM +0100, Daniel Thompson wrote:
->> From: Marek Vasut <marex@denx.de>
->>
->> Add new device type, MT_DEVICE_NS. This type sets the NS bit in L1 PTE [1].
->> Accesses to a memory region which is mapped this way generate non-secure
->> access to that memory area. One must be careful here, since the NS bit is
->> only available in L1 PTE, therefore when creating the mapping, the mapping
->> must be at least 1 MiB big and must be aligned to 1 MiB. If that condition
->> was false, the kernel would use regular L2 page mapping for this area instead
->> and the NS bit setting would be ineffective.
+Hi Paul,
+On Wednesday 09 July 2014 02:05 PM, Lokesh Vutla wrote:
+> Add hwmod data for RTC
 > 
-> Right, so this says that PTE mappings are not permissible.
+> Signed-off-by: Lokesh Vutla <lokeshvutla@ti.com>
+> Signed-off-by: Sekhar Nori <nsekhar@ti.com>
+> Reviewed-by: Rajendra Nayak <rnayak@ti.com>
+Can you take this patch. I have submitted logs also.
+
+Thanks and regards,
+Lokesh
+> ---
+> Changes since V1:
+> Rebased on top of linux-next 20140708.
 > 
->> +	[MT_DEVICE_NS] = {	  /* Non-secure accesses from secure mode */
->> +		.prot_pte	= PROT_PTE_DEVICE | L_PTE_MT_DEV_SHARED |
->> +				  L_PTE_SHARED,
->> +		.prot_l1	= PMD_TYPE_TABLE,
+>  arch/arm/mach-omap2/omap_hwmod_7xx_data.c |   41 +++++++++++++++++++++++++++++
+>  1 file changed, 41 insertions(+)
 > 
-> However, by filling in prot_pte and prot_l1, you're telling the code that
-> it /can/ setup such a mapping.  This is screwed.
-
-I'll fix this.
-
-
-> If you want to deny anything but section mappings (because they don't work)
-> then you omit prot_pte and prot_l1.  With those omitted, if someone tries
-> to abuse this mapping type, then this check in create_mapping() will
-> trigger:
+> diff --git a/arch/arm/mach-omap2/omap_hwmod_7xx_data.c b/arch/arm/mach-omap2/omap_hwmod_7xx_data.c
+> index 20b4398..d8032b9 100644
+> --- a/arch/arm/mach-omap2/omap_hwmod_7xx_data.c
+> +++ b/arch/arm/mach-omap2/omap_hwmod_7xx_data.c
+> @@ -1249,6 +1249,38 @@ static struct omap_hwmod dra7xx_qspi_hwmod = {
+>  };
+>  
+>  /*
+> + * 'rtcss' class
+> + *
+> + */
+> +static struct omap_hwmod_class_sysconfig dra7xx_rtcss_sysc = {
+> +	.sysc_offs	= 0x0078,
+> +	.sysc_flags	= SYSC_HAS_SIDLEMODE,
+> +	.idlemodes	= (SIDLE_FORCE | SIDLE_NO | SIDLE_SMART |
+> +			   SIDLE_SMART_WKUP),
+> +	.sysc_fields	= &omap_hwmod_sysc_type3,
+> +};
+> +
+> +static struct omap_hwmod_class dra7xx_rtcss_hwmod_class = {
+> +	.name	= "rtcss",
+> +	.sysc	= &dra7xx_rtcss_sysc,
+> +};
+> +
+> +/* rtcss */
+> +static struct omap_hwmod dra7xx_rtcss_hwmod = {
+> +	.name		= "rtcss",
+> +	.class		= &dra7xx_rtcss_hwmod_class,
+> +	.clkdm_name	= "rtc_clkdm",
+> +	.main_clk	= "sys_32k_ck",
+> +	.prcm = {
+> +		.omap4 = {
+> +			.clkctrl_offs = DRA7XX_CM_RTC_RTCSS_CLKCTRL_OFFSET,
+> +			.context_offs = DRA7XX_RM_RTC_RTCSS_CONTEXT_OFFSET,
+> +			.modulemode   = MODULEMODE_SWCTRL,
+> +		},
+> +	},
+> +};
+> +
+> +/*
+>   * 'sata' class
+>   *
+>   */
+> @@ -2344,6 +2376,14 @@ static struct omap_hwmod_ocp_if dra7xx_l3_main_1__qspi = {
+>  	.user		= OCP_USER_MPU | OCP_USER_SDMA,
+>  };
+>  
+> +/* l4_per3 -> rtcss */
+> +static struct omap_hwmod_ocp_if dra7xx_l4_per3__rtcss = {
+> +	.master		= &dra7xx_l4_per3_hwmod,
+> +	.slave		= &dra7xx_rtcss_hwmod,
+> +	.clk		= "l4_root_clk_div",
+> +	.user		= OCP_USER_MPU | OCP_USER_SDMA,
+> +};
+> +
+>  static struct omap_hwmod_addr_space dra7xx_sata_addrs[] = {
+>  	{
+>  		.name		= "sysc",
+> @@ -2673,6 +2713,7 @@ static struct omap_hwmod_ocp_if *dra7xx_hwmod_ocp_ifs[] __initdata = {
+>  	&dra7xx_l4_cfg__mpu,
+>  	&dra7xx_l4_cfg__ocp2scp1,
+>  	&dra7xx_l3_main_1__qspi,
+> +	&dra7xx_l4_per3__rtcss,
+>  	&dra7xx_l4_cfg__sata,
+>  	&dra7xx_l4_cfg__smartreflex_core,
+>  	&dra7xx_l4_cfg__smartreflex_mpu,
 > 
->         if (type->prot_l1 == 0 && ((addr | phys | length) & ~SECTION_MASK)) {
->                 printk(KERN_WARNING "BUG: map for 0x%08llx at 0x%08lx can not "
->                        "be mapped using pages, ignoring.\n",
->                        (long long)__pfn_to_phys(md->pfn), addr);
->                 return;
->         }
-> 
-> ioremap doesn't have that check; it assumes that it will always be setting
-> up PTE mappings via ioremap_page_range().  In fact, on many platforms
-> that's the only option.
-
-I have proposed a patch (which I just noticed is currently *really*
-broken but ignore that for now) to prevent the fallback to
-ioremap_page_range(). As you say this leaves nothing but the lookup in
-the static mappings for many platforms.
-
-That patches looks at PMD_SECT_NS directly but could be changed to zero
-check ->prot_l1 instead.
-
-That removes the danger of spuriously getting bad mappings but is
-certainly not elegant.
-
-
-> So making this interface available via ioremap() seems pointless - but
-> more importantly it's extremely error-prone.  So, MT_DEVICE_NS shouldn't
-> be using 4 at all, shouldn't be in asm/io.h, but should be with the
-> private MT_* definitions in map.h.
-
-I wanted to use ioremap() because it allows platform neutral code in the
-GIC driver to look up a staticly configured non-secure aliased mapping
-for the GIC (if it exists). Also given the mapping is used for register
-I/O ioremap() also felt "right".
-
-Is new API better? A very thin wrapper around find_static_vm_paddr()?
-
-I guess the best thing would be to allocate the mapping dynamically. It
-might be possible for __arm_ioremap_pfn_caller() to change the NS flag
-in the first-level table after allocating a naturally aligned 1MB
-vm_area and before updating the second-level? We are not required to use
-sections, however all pages that share a L1 entry get the same security
-flags.
-
-
-Daniel.
