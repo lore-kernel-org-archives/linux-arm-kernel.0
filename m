@@ -1,49 +1,37 @@
 From: lee.jones@linaro.org (Lee Jones)
-Date: Tue, 22 Jul 2014 12:11:18 +0100
-Subject: [PATCH 12/19] mfd: max8925-core: Fix 'missing blank line after
+Date: Tue, 22 Jul 2014 12:11:13 +0100
+Subject: [PATCH 07/19] mfd: sec-core: Fix 'missing blank line after
  declarations' warning
 In-Reply-To: <1406027485-15657-1-git-send-email-lee.jones@linaro.org>
 References: <1406027485-15657-1-git-send-email-lee.jones@linaro.org>
-Message-ID: <1406027485-15657-13-git-send-email-lee.jones@linaro.org>
+Message-ID: <1406027485-15657-8-git-send-email-lee.jones@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 This is part of an effort to clean-up the MFD subsystem.
 
 WARNING: Missing a blank line after declarations
-+       struct max8925_chip *chip = irq_data_get_irq_chip_data(data);
-+       max8925_irqs[data->irq - chip->irq_base].enable
++               const struct of_device_id *match;
++               match = of_match_node(sec_dt_match, i2c->dev.of_node);
 
-WARNING: Missing a blank line after declarations
-+       struct max8925_chip *chip = irq_data_get_irq_chip_data(data);
-+       max8925_irqs[data->irq - chip->irq_base].enable = 0;
-
-total: 0 errors, 2 warnings, 927 lines checked
+total: 0 errors, 1 warnings, 494 lines checked
 
 Signed-off-by: Lee Jones <lee.jones@linaro.org>
 ---
- drivers/mfd/max8925-core.c | 2 ++
- 1 file changed, 2 insertions(+)
+ drivers/mfd/sec-core.c | 1 +
+ 1 file changed, 1 insertion(+)
 
-diff --git a/drivers/mfd/max8925-core.c b/drivers/mfd/max8925-core.c
-index f3faf0c..97a787a 100644
---- a/drivers/mfd/max8925-core.c
-+++ b/drivers/mfd/max8925-core.c
-@@ -624,6 +624,7 @@ static void max8925_irq_sync_unlock(struct irq_data *data)
- static void max8925_irq_enable(struct irq_data *data)
- {
- 	struct max8925_chip *chip = irq_data_get_irq_chip_data(data);
+diff --git a/drivers/mfd/sec-core.c b/drivers/mfd/sec-core.c
+index fb8ba64..dba7e2b 100644
+--- a/drivers/mfd/sec-core.c
++++ b/drivers/mfd/sec-core.c
+@@ -273,6 +273,7 @@ static inline unsigned long sec_i2c_get_driver_data(struct i2c_client *i2c,
+ #ifdef CONFIG_OF
+ 	if (i2c->dev.of_node) {
+ 		const struct of_device_id *match;
 +
- 	max8925_irqs[data->irq - chip->irq_base].enable
- 		= max8925_irqs[data->irq - chip->irq_base].offs;
- }
-@@ -631,6 +632,7 @@ static void max8925_irq_enable(struct irq_data *data)
- static void max8925_irq_disable(struct irq_data *data)
- {
- 	struct max8925_chip *chip = irq_data_get_irq_chip_data(data);
-+
- 	max8925_irqs[data->irq - chip->irq_base].enable = 0;
- }
- 
+ 		match = of_match_node(sec_dt_match, i2c->dev.of_node);
+ 		return (unsigned long)match->data;
+ 	}
 -- 
 1.8.3.2
