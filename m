@@ -1,50 +1,41 @@
-From: marex@denx.de (Marek Vasut)
-Date: Tue, 22 Jul 2014 07:45:05 +0200
-Subject: [PATCH] ARM: dts: imx: Add alias for ethernet controller
-In-Reply-To: <20140722052046.GW8537@dragon>
-References: <1393588721-8598-1-git-send-email-marex@denx.de>
- <201407220700.49046.marex@denx.de> <20140722052046.GW8537@dragon>
-Message-ID: <201407220745.05173.marex@denx.de>
+From: gnurou@gmail.com (Alexandre Courbot)
+Date: Tue, 22 Jul 2014 14:46:55 +0900
+Subject: [PATCH RESEND] drm/ttm: expose CPU address of DMA-allocated pages
+In-Reply-To: <CAPM=9txDw7fJpeFB72OdSgAVuaZbpfivV-9imT9V1MBYDvBv-A@mail.gmail.com>
+References: <1405390206-5081-1-git-send-email-acourbot@nvidia.com>
+ <CAAVeFuJFCQdRuuJ=WQAL65MMoWzPj03evGiXmfQh=2K7+i5Gdg@mail.gmail.com>
+ <CAPM=9txDw7fJpeFB72OdSgAVuaZbpfivV-9imT9V1MBYDvBv-A@mail.gmail.com>
+Message-ID: <CAAVeFuLfREn00Qw51Q9=0ncqO-WAR87Sf=0VWOPETrk9T5sG2w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday, July 22, 2014 at 07:20:48 AM, Shawn Guo wrote:
-> On Tue, Jul 22, 2014 at 07:00:48AM +0200, Marek Vasut wrote:
-> > On Tuesday, July 22, 2014 at 05:03:38 AM, Shawn Guo wrote:
-> > > On Tue, Jul 22, 2014 at 04:10:26AM +0200, Marek Vasut wrote:
-> > > > On Monday, March 24, 2014 at 02:49:38 AM, Shawn Guo wrote:
-> > > > > On Tue, Mar 18, 2014 at 01:37:09AM +0100, Marek Vasut wrote:
-> > > > > > On Friday, February 28, 2014 at 12:58:41 PM, Marek Vasut wrote:
-> > > > > > > Add alias for FEC ethernet on i.MX to allow bootloaders (like
-> > > > > > > U-Boot) patch-in the MAC address for FEC using this alias.
-> > > > > > > 
-> > > > > > > Signed-off-by: Marek Vasut <marex@denx.de>
-> > > > > > > Cc: Shawn Guo <shawn.guo@linaro.org>
-> > > > > > 
-> > > > > > Bump ?
-> > > > > 
-> > > > > Sorry.  I had actually applied the patch but forgot replying.
-> > > > 
-> > > > Hello Shawn,
-> > > > 
-> > > > I'd like to apply this patch for 3.14-stable , are you OK with this
-> > > > please ? Shall I submit it ?
-> > > 
-> > > I do not see why this is a stable material.  But you do not need my
-> > > approval to send patch for stable kernel.  The person you need to
-> > > convince is Greg.
-> > 
-> > Without this patch, you will not get a mac address patched into the DT by
-> > the bootloader. Therefore, your device will use a random mac address on
-> > the network which is different on every boot. This is not a good thing,
-> > don't you agree?
-> 
-> I agree this is not a good thing.  But it's neither a regression nor a
-> critical issue as defined by stable_kernel_rules.txt.
+On Tue, Jul 22, 2014 at 2:07 PM, Dave Airlie <airlied@gmail.com> wrote:
+> On 22 July 2014 14:21, Alexandre Courbot <gnurou@gmail.com> wrote:
+>> DRM maintainers, could I have a comment about this patch? A bunch of
+>> Nouveau changes depend on it.
+>
+> I'm not sure we really have anyone who is in a great position to comment,
+>
+> my major issue would be its allocate a large chunk of RAM that might
+> not be needed
+> in all cases, and if we could avoid that when we don't need it, then
+> it would be good.
 
-If I cannot even properly boot from an NFS root with v3.14.y , it seems to me to 
-be problem enough. Also, MAC address should be a unique identifier, if the FEC 
-picks a random MAC, it will wreak havoc on the network (in the better case).
+Strictly speaking memory allocated using dma_alloc_coherent() should
+only be accessed by the CPU through the returned mapping, so having
+this extra information is probably as legitimate as the current
+dma_address array.
 
-Best regards,
-Marek Vasut
+Now I agree that this results in more memory being used, which is
+especially sad since this information is already known in the dma_page
+internal structure. Maybe we could expose the whole dma_pages instead
+of just the dma address? That way both addresses would be accessible
+for the same memory cost (we will need an array to store the adresses
+to the dma_pages).
+
+>
+> Or maybe we could join some allocations together, but with the Linux
+> mm subsystem,
+> who knows maybe separate small allocs have a better hope of success.
+>
+> Dave.
