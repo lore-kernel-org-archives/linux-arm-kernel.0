@@ -1,112 +1,90 @@
-From: s-anna@ti.com (Suman Anna)
-Date: Tue, 22 Jul 2014 13:54:05 -0500
-Subject: [v3 PATCH 3/6] ARM: dts: am33xx: Add prcm_resets node
-In-Reply-To: <1405615531-15649-3-git-send-email-dmurphy@ti.com>
-References: <1405615531-15649-1-git-send-email-dmurphy@ti.com>
- <1405615531-15649-3-git-send-email-dmurphy@ti.com>
-Message-ID: <53CEB34D.7000601@ti.com>
+From: m-karicheri2@ti.com (Murali Karicheri)
+Date: Tue, 22 Jul 2014 14:58:53 -0400
+Subject: [PATCH v6 4/5] PCI: add PCI controller for keystone PCIe h/w
+In-Reply-To: <CAL_JsqJXb28RHhZG9=-NACwAr1ooGhfMOPjtsTGO2s3Dx7ayxQ@mail.gmail.com>
+References: <1405696469-7172-1-git-send-email-m-karicheri2@ti.com>
+ <1405696469-7172-5-git-send-email-m-karicheri2@ti.com>
+ <CAL_JsqKheoWrSGtxPO=AE8g9iOAqfwRa=81Ku=Cfx8_gpDysOg@mail.gmail.com>
+ <53C9839C.5090604@ti.com> <006001cfa485$4f4fcff0$edef6fd0$%han@samsung.com>
+ <53CD424B.1090806@ti.com>
+ <CAL_JsqJXb28RHhZG9=-NACwAr1ooGhfMOPjtsTGO2s3Dx7ayxQ@mail.gmail.com>
+Message-ID: <53CEB46D.2020006@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Dan,
+On 07/22/2014 11:41 AM, Rob Herring wrote:
+> On Mon, Jul 21, 2014 at 11:39 AM, Murali Karicheri<m-karicheri2@ti.com>  wrote:
+>> On 07/20/2014 09:44 PM, Jingoo Han wrote:
+>>> On Saturday, July 19, 2014 5:29 AM, Murali Karicheri wrote:
+>>>> On 07/18/2014 03:31 PM, Rob Herring wrote:
+>>>>> On Fri, Jul 18, 2014 at 10:14 AM, Murali Karicheri<m-karicheri2@ti.com>
+>>>>> wrote:
+>>>> --- Cut ---
+>>>>>> +
+>>>>>> +Optional properties:-
+>>>>>> +       phys: phandle to Generic Keystone SerDes phy for PCI
+>>>>>> +       phy-names: name of the Generic Keystine SerDes phy for PCI
+>>>>>> +         - If boot loader already does PCI link establishment, then
+>>>>>> phys and
+>>>>>> +           phy-names shouldn't be present.
+>>>>>> +       ti,enable-linktrain - Enable Link training.
+>>>>>> +         - If boot loader already does PCI link establishment, then
+>>>>>> this
+>>>>>> +           shouldn't be present.
+>>>>>
+>>>>> Can't you read from the h/w if the link is trained?
+>>>
+>>> I agree with Rob Herring's suggestion.
+>>>
+>>>> Yes.
+>>>>
+>>>> There are customers who use this driver with PCI Link setup done in the
+>>>> boot loader. This property tells the driver to bypass Link setup
+>>>> procedure in that case. Is this undesirable and if so. how other
+>>>> platforms handle it? Check first if link is trained or start the link
+>>>> setup procedure? Let me know. If this is fine, please provide your Ack.
+>>>
+>>> Please, check the following code of Exynos PCIe diver.
+>>>
+>>> ./drivers/pci/host/pci-exynos.c
+>>>
+>>> static int exynos_pcie_establish_link(struct pcie_port *pp)
+>>> {
+>>>          struct exynos_pcie *exynos_pcie = to_exynos_pcie(pp);
+>>>          void __iomem *elbi_base = exynos_pcie->elbi_base;
+>>>          void __iomem *pmu_base = exynos_pcie->pmu_base;
+>>>
+>>>          if (dw_pcie_link_up(pp)) {
+>>>                  dev_err(pp->dev, "Link already up\n");
+>>>                  return 0;
+>>>          }
+>>>          .....
+>>>
+>>> In the case of Exynos PCIe, the Exynos PCIe driver checks the
+>>> h/w bit such as PCIE_ELBI_LTSSM_ENABLE bit of PCIE_ELBI_RDLH_LINKUP
+>>> offset register.
+>>>
+>>> If the link is already set up by the boot loader or other reasons,
+>>> the driver will skip some initialization codes.
+>>>
+>>> The first step is that you find such h/w bit for checking link up.
+>>> If so, please add the code for skipping, when the link is already
+>>> set up.
+>>>
+>> Rob, Jingoo,
+>>
+>> We have similar bit to check for Link status and I have removed the DT
+>> property and skip Link retrain if PCIe Link is already Up. I will be
+>> resending the series with Patch 4/5 updated.
+> For both keystone and exynos, is this status bit in the phy? If so,
+> sounds like this should be a standard phy function op.
+>
+> Rob
+Rob,
 
-On 07/17/2014 11:45 AM, Murphy, Dan wrote:
-> Add the prcm_resets node to the prcm parent node.
-> 
-> Add the am33xx_resets file to define the
-> am33xx reset lines that are handled by this reset
-> framework.
-> 
-> Signed-off-by: Dan Murphy <dmurphy@ti.com>
-> ---
-> 
-> v3 - No changes
-> 
->  arch/arm/boot/dts/am33xx-resets.dtsi |   42 ++++++++++++++++++++++++++++++++++
->  arch/arm/boot/dts/am33xx.dtsi        |    7 ++++++
->  2 files changed, 49 insertions(+)
->  create mode 100644 arch/arm/boot/dts/am33xx-resets.dtsi
-> 
-> diff --git a/arch/arm/boot/dts/am33xx-resets.dtsi b/arch/arm/boot/dts/am33xx-resets.dtsi
-> new file mode 100644
-> index 0000000..9260626
-> --- /dev/null
-> +++ b/arch/arm/boot/dts/am33xx-resets.dtsi
-> @@ -0,0 +1,42 @@
-> +/*
-> + * Device Tree Source for AM33XX reset data
-> + *
-> + * Copyright (C) 2014 Texas Instruments, Inc.
-> + *
-> + * This program is free software; you can redistribute it and/or modify
-> + * it under the terms of the GNU General Public License version 2 as
-> + * published by the Free Software Foundation.
-> + */
-> +
-> +&prcm_resets {
-> +	gfx_rstctrl {
-> +		reg = <0x1104>,
-> +			  <0x1114>;
-> +
-> +		gfx_reset: gfx_reset {
-> +			control-bit = <0x01>;
-> +			status-bit = <0x01>;
-> +		};
-> +	};
-> +
-> +	per_rstctrl {
-> +		reg = <0xD00>,
-> +			  <0xD0C>;
-> +
-> +		iva_reset: iva_reset {
+There is phy bit as well as PCIe specific Link LTSSM state for Keystone.
+Phy one is handled by the Phy driver and PCie driver care about LTSSM
+state bit. I have removed the enable_link_train DT attribute from
+patch 4/5. Can you ack it now?
 
-There is no IVA on AM33xx, this should be corrected to reflect the PRU_ICSS.
-
-> +			control-bit = <0x04>;
-> +			status-bit = <0x10>;
-> +		};
-> +	};
-
-Not defining the WkupM3 reset control?
-
-> +
-> +	device_rstctrl {
-> +		reg = <0xf00>,
-> +			  <0xf08>;
-> +
-> +		device_reset: device_reset {
-> +			control-bit = <0x01>;
-> +			status-bit = <0x01>;
-> +		};
-> +	};
-> +
-> +};
-> diff --git a/arch/arm/boot/dts/am33xx.dtsi b/arch/arm/boot/dts/am33xx.dtsi
-> index 4a4e02d..5cdc8f0 100644
-> --- a/arch/arm/boot/dts/am33xx.dtsi
-> +++ b/arch/arm/boot/dts/am33xx.dtsi
-> @@ -117,6 +117,12 @@
->  
->  			prcm_clockdomains: clockdomains {
->  			};
-> +
-> +			prcm_resets: resets {
-> +				#address-cells = <1>;
-> +				#size-cells = <1>;
-
-Should be corrected as per comment on DT bindings.
-
-regards
-Suman
-
-> +				#reset-cells = <1>;
-> +			};
->  		};
->  
->  		scrm: scrm at 44e10000 {
-> @@ -834,3 +840,4 @@
->  };
->  
->  /include/ "am33xx-clocks.dtsi"
-> +/include/ "am33xx-resets.dtsi"
-> 
+Murali
