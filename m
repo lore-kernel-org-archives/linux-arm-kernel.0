@@ -1,44 +1,48 @@
-From: bhelgaas@google.com (Bjorn Helgaas)
-Date: Tue, 22 Jul 2014 12:27:10 -0600
-Subject: [PATCH v2 09/12] PCI: Remove ARCH_KIRKWOOD dependency
-In-Reply-To: <1405028192-9623-10-git-send-email-andrew@lunn.ch>
-References: <1405028192-9623-1-git-send-email-andrew@lunn.ch>
- <1405028192-9623-10-git-send-email-andrew@lunn.ch>
-Message-ID: <20140722182710.GA19181@google.com>
+From: nm@ti.com (Nishanth Menon)
+Date: Tue, 22 Jul 2014 13:31:43 -0500
+Subject: [PATCH] pinctrl: dra: dt-bindings: Fix pull enable/disable
+In-Reply-To: <20140722164752.GJ20588@saruman.home>
+References: <1406043594-14181-1-git-send-email-nm@ti.com>
+ <20140722164752.GJ20588@saruman.home>
+Message-ID: <53CEAE0F.9080901@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jul 10, 2014 at 11:36:29PM +0200, Andrew Lunn wrote:
-> mach-kirkwood has been removed, now that kirkwood lives in mach-mvebu.
-> ARCH_MVEBU is sufficient.
+On 07/22/2014 11:47 AM, Felipe Balbi wrote:
+> On Tue, Jul 22, 2014 at 10:39:54AM -0500, Nishanth Menon wrote:
+>> The DRA74/72 control module pins have a weak pull up and pull down.
+>> This is configured by bit offset 17. if BIT(17) is 1, a pull up is
+>> selected, else a pull down is selected.
+>>
+>> However, this pull resisstor is applied based on BIT(16) -
+>> PULLUDENABLE - if BIT(18) is *0*, then pull as defined in BIT(17) is
+>> applied, else no weak pulls are applied. We defined this in reverse.
+>>
+>> Reference: Table 18-5 (Description of the pad configuration register
+>> bits) in Technical Reference Manual Revision (DRA74x revision Q:
+>> SPRUHI2Q Revised June 2014 and DRA72x revision F: SPRUHP2F - Revised
+>> June 2014)
+>>
+>> Fixes: 6e58b8f1daaf1a ("ARM: dts: DRA7: Add the dts files for dra7 SoC and dra7-evm board")
+>> Signed-off-by: Nishanth Menon <nm@ti.com>
+>> ---
 > 
-> Signed-off-by: Andrew Lunn <andrew@lunn.ch>
+> Tested on an upcoming board.
+> 
+> Tested-by: Felipe Balbi <balbi@ti.com>
+> Acked-by: Felipe Balbi <balbi@ti.com>
+> 
+> 
+Felipe,
+Thanks.
 
-Applied with Jason's ack to pci/host-mvebu for v3.17, thanks!
+Tony,
 
-> Cc: Bjorn Helgaas <bhelgaas@google.com>
-> Cc: linux-pci at vger.kernel.org
-> ---
->  drivers/pci/host/Kconfig | 2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
-> 
-> diff --git a/drivers/pci/host/Kconfig b/drivers/pci/host/Kconfig
-> index 21df477be0c8..88f4862fa452 100644
-> --- a/drivers/pci/host/Kconfig
-> +++ b/drivers/pci/host/Kconfig
-> @@ -3,7 +3,7 @@ menu "PCI host controller drivers"
->  
->  config PCI_MVEBU
->  	bool "Marvell EBU PCIe controller"
-> -	depends on ARCH_MVEBU || ARCH_DOVE || ARCH_KIRKWOOD
-> +	depends on ARCH_MVEBU || ARCH_DOVE
->  	depends on OF
->  
->  config PCIE_DW
-> -- 
-> 2.0.1
-> 
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-pci" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+If you could consider this for the rc cycle it might be great(as well
+as for stable). The pull direction error can cause all kinds of
+Pull-down Vs Pull-Up contention with severe risk for certain IP
+reliability.
+
+-- 
+Regards,
+Nishanth Menon
