@@ -1,93 +1,100 @@
-From: computersforpeace@gmail.com (Brian Norris)
-Date: Tue, 22 Jul 2014 13:02:13 -0700
-Subject: [PATCH v8 02/11] power: reset: Add reboot driver for brcmstb
-In-Reply-To: <62122849.RXJHvac7Iy@wuerfel>
-References: <1405976886-27807-1-git-send-email-computersforpeace@gmail.com>
- <1405976886-27807-3-git-send-email-computersforpeace@gmail.com>
- <62122849.RXJHvac7Iy@wuerfel>
-Message-ID: <20140722200213.GF28323@ld-irv-0074>
+From: keescook@chromium.org (Kees Cook)
+Date: Tue, 22 Jul 2014 13:15:01 -0700
+Subject: [PATCH v5 1/3] arm64: ptrace: reload a syscall number after
+ ptrace operations
+In-Reply-To: <1406020499-5537-2-git-send-email-takahiro.akashi@linaro.org>
+References: <1406020499-5537-1-git-send-email-takahiro.akashi@linaro.org>
+ <1406020499-5537-2-git-send-email-takahiro.akashi@linaro.org>
+Message-ID: <CAGXu5jKkJUGn_MpEEr8U=n_A+iW9s8vSX1WoVNzRJMVyGQRjpA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jul 22, 2014 at 09:28:39AM +0200, Arnd Bergmann wrote:
-> On Monday 21 July 2014 14:07:57 Brian Norris wrote:
-> > diff --git a/arch/arm/mach-bcm/Kconfig b/arch/arm/mach-bcm/Kconfig
-> > index 0073633e7699..9782e8d80647 100644
-> > --- a/arch/arm/mach-bcm/Kconfig
-> > +++ b/arch/arm/mach-bcm/Kconfig
-> > @@ -94,6 +94,7 @@ config ARCH_BRCMSTB
-> >         select MIGHT_HAVE_PCI
-> >         select HAVE_SMP
-> >         select HAVE_ARM_ARCH_TIMER
-> > +       select POWER_RESET_BRCMSTB
-> >         help
-> >           Say Y if you intend to run the kernel on a Broadcom ARM-based STB
-> >           chipset.
-> > diff --git a/drivers/power/reset/Kconfig b/drivers/power/reset/Kconfig
-> > index bdcf5173e377..fcb9825debe5 100644
-> > --- a/drivers/power/reset/Kconfig
-> > +++ b/drivers/power/reset/Kconfig
-> > @@ -20,6 +20,16 @@ config POWER_RESET_AXXIA
-> >  
-> >           Say Y if you have an Axxia family SoC.
-> >  
-> > +config POWER_RESET_BRCMSTB
-> > +       bool "Broadcom STB reset driver"
-> > +       depends on POWER_RESET && ARCH_BRCMSTB
-> > +       help
-> > +         This driver provides restart support for ARM-based Broadcom STB
-> > +         boards.
-> > +
-> > +         Say Y here if you have an ARM-based Broadcom STB board and you wish
-> > +         to have restart support.
-> > +
-> >  config POWER_RESET_GPIO
-> >         bool "GPIO power-off driver"
-> >         depends on OF_GPIO && POWER_RESET
-> > 
-> 
-> (nitpicking)
-> 
-> You shouldn't have both a user-selectable option and 'select' it from
-> the platform, because it makes it inherently not selectable, in particular
-> in the combination with 'depends on ARCH_BRCMSTB'.
+On Tue, Jul 22, 2014 at 2:14 AM, AKASHI Takahiro
+<takahiro.akashi@linaro.org> wrote:
+> Arm64 holds a syscall number in w8(x8) register. Ptrace tracer may change
+> its value either to:
+>   * any valid syscall number to alter a system call, or
+>   * -1 to skip a system call
+>
+> This patch implements this behavior by reloading that value into syscallno
+> in struct pt_regs after tracehook_report_syscall_entry() or
+> secure_computing(). In case of '-1', a return value of system call can also
+> be changed by the tracer setting the value to x0 register, and so
+> sys_ni_nosyscall() should not be called.
+>
+> See also:
+>     42309ab4, ARM: 8087/1: ptrace: reload syscall number after
+>               secure_computing() check
+>
+> Signed-off-by: AKASHI Takahiro <takahiro.akashi@linaro.org>
+> ---
+>  arch/arm64/kernel/entry.S  |    2 ++
+>  arch/arm64/kernel/ptrace.c |   13 +++++++++++++
+>  2 files changed, 15 insertions(+)
+>
+> diff --git a/arch/arm64/kernel/entry.S b/arch/arm64/kernel/entry.S
+> index 5141e79..de8bdbc 100644
+> --- a/arch/arm64/kernel/entry.S
+> +++ b/arch/arm64/kernel/entry.S
+> @@ -628,6 +628,8 @@ ENDPROC(el0_svc)
+>  __sys_trace:
+>         mov     x0, sp
+>         bl      syscall_trace_enter
+> +       cmp     w0, #-1                         // skip syscall?
+> +       b.eq    ret_to_user
+>         adr     lr, __sys_trace_return          // return address
+>         uxtw    scno, w0                        // syscall number (possibly new)
+>         mov     x1, sp                          // pointer to regs
+> diff --git a/arch/arm64/kernel/ptrace.c b/arch/arm64/kernel/ptrace.c
+> index 70526cf..100d7d1 100644
+> --- a/arch/arm64/kernel/ptrace.c
+> +++ b/arch/arm64/kernel/ptrace.c
+> @@ -21,6 +21,7 @@
+>
+>  #include <linux/audit.h>
+>  #include <linux/compat.h>
+> +#include <linux/errno.h>
+>  #include <linux/kernel.h>
+>  #include <linux/sched.h>
+>  #include <linux/mm.h>
+> @@ -1109,9 +1110,21 @@ static void tracehook_report_syscall(struct pt_regs *regs,
+>
+>  asmlinkage int syscall_trace_enter(struct pt_regs *regs)
+>  {
+> +       unsigned long saved_x0, saved_x8;
+> +
+> +       saved_x0 = regs->regs[0];
+> +       saved_x8 = regs->regs[8];
+> +
+>         if (test_thread_flag(TIF_SYSCALL_TRACE))
+>                 tracehook_report_syscall(regs, PTRACE_SYSCALL_ENTER);
+>
+> +       regs->syscallno = regs->regs[8];
+> +       if ((long)regs->syscallno == ~0UL) { /* skip this syscall */
+> +               regs->regs[8] = saved_x8;
+> +               if (regs->regs[0] == saved_x0) /* not changed by user */
+> +                       regs->regs[0] = -ENOSYS;
 
-OK, thanks for the comment. Note that there is some precedent for this
-bad Kconfig behavior in the same subsystem (POWER_RESET_GPIO and
-POWER_RESET_VEXPRESS are both 'select'ed in arch/arm/mach-*/Kconfig).
+I'm not sure this is right compared to other architectures. Generally
+when a tracer performs a syscall skip, it's up to them to also adjust
+the return value. They may want to be faking a syscall, and what if
+the value they want to return happens to be what x0 was going into the
+tracer? It would have no way to avoid this -ENOSYS case. I think
+things are fine without this test.
 
-[...]
-> My preference in this case however would be to just drop the 'select'
-> statement and add the driver to the defconfig file.
+-Kees
 
-How about a third option, where we drop the 'select' statement and
-set POWER_RESET_BRCMSTB to be 'default y'? Then we don't have to modify
-the defconfig, and it gives the added bonus of choosing a sane default
-even if you're not based on the multi_v7_defconfig. i.e.:
+> +       }
+> +
+>         if (test_thread_flag(TIF_SYSCALL_TRACEPOINT))
+>                 trace_sys_enter(regs, regs->syscallno);
+>
+> --
+> 1.7.9.5
+>
 
-diff --git a/arch/arm/mach-bcm/Kconfig b/arch/arm/mach-bcm/Kconfig
-index 58c01aed9752..634de7b7fd28 100644
---- a/arch/arm/mach-bcm/Kconfig
-+++ b/arch/arm/mach-bcm/Kconfig
-@@ -94,7 +94,6 @@ config ARCH_BRCMSTB
- 	select MIGHT_HAVE_PCI
- 	select HAVE_SMP
- 	select HAVE_ARM_ARCH_TIMER
--	select POWER_RESET_BRCMSTB
- 	select BRCMSTB_GISB_ARB
- 	select BRCMSTB_L2_IRQ
- 	help
-diff --git a/drivers/power/reset/Kconfig b/drivers/power/reset/Kconfig
-index fcb9825debe5..ab5d57e2766d 100644
---- a/drivers/power/reset/Kconfig
-+++ b/drivers/power/reset/Kconfig
-@@ -23,6 +23,7 @@ config POWER_RESET_AXXIA
- config POWER_RESET_BRCMSTB
- 	bool "Broadcom STB reset driver"
- 	depends on POWER_RESET && ARCH_BRCMSTB
-+	default y
- 	help
- 	  This driver provides restart support for ARM-based Broadcom STB
- 	  boards.
 
-Brian
+
+-- 
+Kees Cook
+Chrome OS Security
