@@ -1,24 +1,47 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Tue, 22 Jul 2014 11:18:34 -0600
-Subject: [PATCH 4/6] clk: tegra: add nvidia,tegra132-ccplex-clk binding
-In-Reply-To: <1405437890-6468-5-git-send-email-pdeschrijver@nvidia.com>
-References: <1405437890-6468-1-git-send-email-pdeschrijver@nvidia.com>
- <1405437890-6468-5-git-send-email-pdeschrijver@nvidia.com>
-Message-ID: <53CE9CEA.2060200@wwwdotorg.org>
+From: abrestic@chromium.org (Andrew Bresticker)
+Date: Tue, 22 Jul 2014 10:22:27 -0700
+Subject: [PATCH 5/8] of: Add Tegra124 EMC bindings
+In-Reply-To: <53CE9514.1050903@wwwdotorg.org>
+References: <1405088313-20048-1-git-send-email-mperttunen@nvidia.com>
+ <1405088313-20048-6-git-send-email-mperttunen@nvidia.com>
+ <CAL1qeaGHfjQhLHvgzt85hmbuY4FOG5-k=f80=CNvzPDEgi9_6w@mail.gmail.com>
+ <53CD860B.7030800@wwwdotorg.org>
+ <CAL1qeaHtGQxCO3cGdeCRUYuk6mxei6z1B63-iZdBECEbFqGhHw@mail.gmail.com>
+ <53CE9514.1050903@wwwdotorg.org>
+Message-ID: <CAL1qeaEkL+mxb0S4JhQbXBjyNyKJndffTSjMaAFQD6ooDJPd+Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/15/2014 09:24 AM, Peter De Schrijver wrote:
-> Tegra132 has a few new clocks for the CPU complex (ccplex).
+On Tue, Jul 22, 2014 at 9:45 AM, Stephen Warren <swarren@wwwdotorg.org> wrote:
+>
+> Does the bootloader adjust the DT that's passed to the kernel so that
+> only the relevant single set of EMC timings is contained in the DT?
 
-> diff --git a/Documentation/devicetree/bindings/clock/nvidia,tegra132-ccplex-clk.txt b/Documentation/devicetree/bindings/clock/nvidia,tegra132-ccplex-clk.txt
+No, the DT contains all possible EMC timings for that board.
 
-> +Example SoC include file:
-> +
-> +/ {
-> +	ccplex-clock at 0,70040000 {
-> +		compatible = "nvidia,tegra132-ccplex-clk";
-> +		reg = <0x0 0x70040000 0x0 0x1000>;
-> +		status = "okay";
+> On a system where the boot ROM initializes RAM, and where the HW design
+> might have multiple SDRAM configuration, here's what usually happens:
+>
+> a) The BCT contains N sets of SDRAM configurations.
+>
+> b) The boot ROM reads the SDRAM strapping bits, and uses them to pick
+> the correct SDRAM configuration from the N sets in the BCT.
+>
+> c) The kernel DT has N sets of SDRAM configurations.
+>
+> d) The kernel reads the SDRAM strapping bits, and uses them to pick the
+> correct SDRAM configuration from the N sets in the DT.
+>
+> On the ChromeOS boards (so (a) and (b) above are irrelevant) where N is
+> too large to fit into APBDEV_PMC_STRAPPING_OPT_A_0[7:4], (c) and (d)
+> won't work. I assume the kernel DT therefore must be adjusted to only
+> contain the single SDRAM configuration that is relevant for the current HW?
+>
+> (isn't STRAPPING_OPT_A split into 2 2-bit fields; 2 bits for SDRAM index
+> and 2 bits for boot flash index, so max N is quite small?)
 
-That's the default, so it's not worth including that property.
+Right, there are normally only 2 SDRAM strapping bits available.
+ChromeOS gets around this by having 4 identical boot device entries in
+the BCT, so all possible values of STRAPPING_OPT_A[7:6] map to the
+same boot device.  This allows us to use all 4 strapping bits in
+coreboot to pick the SDRAM configuration.
