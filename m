@@ -1,74 +1,64 @@
-From: luto@amacapital.net (Andy Lutomirski)
-Date: Mon, 21 Jul 2014 17:14:35 -0700
-Subject: [PATCH v7 8/9] ARM: vdso initialization, mapping,
- and synchronization
-In-Reply-To: <20140702185422.GP24879@arm.com>
-References: <53B2C178.30607@mentor.com> <20140701141541.GP28164@arm.com>
- <CALCETrWeTeeuz4vW6wrhtDrdg54O-hhFbspfKEEunRZ0zf7ZBg@mail.gmail.com>
- <20140702144050.GD24879@arm.com>
- <CALCETrUVa-Yt7qZpzkpiAGVf+sYeasNq_YS1MuH6CFfWCcW6BA@mail.gmail.com>
- <53B430F3.9070804@mentor.com> <20140702162726.GG24879@arm.com>
- <CALCETrVSqH66jqG2_O2dir-3md4SHH800qs++4KhWYsGm9T-BQ@mail.gmail.com>
- <20140702172443.GI24879@arm.com>
- <CALCETrU-461E2ybeYcN7KFSPkwWtHikwCDo4t9T5Z5dCBGmNJA@mail.gmail.com>
- <20140702185422.GP24879@arm.com>
-Message-ID: <CALCETrXGi3a3G=dH2R6-mu2BwGdEyn3AXrGVRstye6zPO1mFxA@mail.gmail.com>
+From: peter.chen@freescale.com (Peter Chen)
+Date: Tue, 22 Jul 2014 08:13:24 +0800
+Subject: [PATCH 0/6] vf610: Add USB support
+In-Reply-To: <cover.1405702442.git.stefan@agner.ch>
+References: <cover.1405702442.git.stefan@agner.ch>
+Message-ID: <20140722001322.GA6636@shlinux1.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jul 2, 2014 at 11:54 AM, Will Deacon <will.deacon@arm.com> wrote:
-> Cheers for this, Andy.
->
-> On Wed, Jul 02, 2014 at 07:34:22PM +0100, Andy Lutomirski wrote:
->> On Wed, Jul 2, 2014 at 10:24 AM, Will Deacon <will.deacon@arm.com> wrote:
->> > ELF Header:
->> >   Start of section headers:          1888 (bytes into file)
->> >   Size of section headers:           64 (bytes)
->> >   Number of section headers:         14
->>
->> That's 896 bytes for the section table, starting at offset 1888.
->>
->> >   Section header string table index: 13
->>
->>
->> >
->> > Section Headers:
->> >   [13] .shstrtab         STRTAB           0000000000000000  000006e8
->> >        0000000000000078  0000000000000000           0     0     1
->>
->> 120 bytes of section headers strings, starting at offset 1768 (and not
->> allocatable -- no 'A' here).
->>
->> >
->> > Program Headers:
->> >   Type           Offset             VirtAddr           PhysAddr
->> >                  FileSiz            MemSiz              Flags  Align
->> >   LOAD           0x0000000000000000 0x0000000000000000 0x0000000000000000
->> >                  0x00000000000006e8 0x00000000000006e8  R E    10
->>
->> The loadable segment is 1768 bytes long, starting at the beginning of
->> the file (and therefore the beginning of the mapping).
->>
->> So you have a total of 1016 bytes of non-allocatable stuff at the end
->> that I've accounted for.  I assume that the whole file is 2784 bytes.
->
-> Correct.
->
->> If you added text or data to bring PT_LOAD to between 3081 and 4095
->> bytes, then the section headers and/or section string table would
->> cross a page boundary.
->
-> Ok, so that explains why things are working at the moment and it sounds like
-> we have some wiggle room too. I'll look at moving the datapage anyway, since
-> having these artificial limits is error-prone and fragile, but I don't think
-> it's something we need to panic about immediately.
->
-> Also, if you get to the bottom of your binutils issues with the section
-> allocation, that might work for us since we don't really have any legacy
-> binutils supporting arm64.
+On Fri, Jul 18, 2014 at 07:01:36PM +0200, Stefan Agner wrote:
+> This patchset adds USB support for Vybrid VF610 SoC. It extends the
+> clock framework to support the USB PHY cocks, extends the device
+> tree files and adds support for the non-core registers in the
+> usbmisc_imx driver.
+> 
+> This patchset needs the eSDHC length fix available in Shawn's
+> for-next branch.
+> 
 
-Just in case anyone still cares about this thread, moving the vvar
-area back before the vdso text is queued up for 3.17.  I gave up on
-reliably keeping binutils happy with my ugly hack.
+Why it is related to USB patchset?
 
---Andy
+> The whole patchset proved to be working on a Colibri VF61. The
+> first USB controller runs in peripheral mode. I could successfully
+> use RNDIS, however with some stability issues: Suddenly the other
+> side was not reachable anymore and the interface needed to brought
+> down and back up again. I'm still investigating this.
+
+Do you use ubuntu as host distribution? I find ubuntu will lost the
+first connection for usb-ethernet-gadget(usb0) as network interface,
+but once you re-config usb0 again (ifconfig usb0 ip up), it should work
+and will not lose connection any more.
+
+> 
+> The second USB controller, running in USB host mode, showed no
+> issues so far.
+> 
+> Stefan Agner (6):
+>   ARM: dts: vf610: add USB PHY and controller
+>   ARM: imx: clk-vf610: add USBPHY clocks
+>   ARM: dts: vf610: Add usbmisc for non-core registers
+>   chipidea: usbmisc_imx: Add USB support for VF610 SoCs
+>   usb: phy: mxs: Add VF610 USB PHY support
+>   ARM: dts: vf610-colibri: add USB support
+> 
+>  arch/arm/boot/dts/vf610-colibri.dts     | 10 +++++
+>  arch/arm/boot/dts/vf610.dtsi            | 55 ++++++++++++++++++++++--
+>  arch/arm/mach-imx/clk-vf610.c           | 12 +++++-
+>  drivers/usb/chipidea/usbmisc_imx.c      | 76 +++++++++++++++++++++++----------
+>  drivers/usb/phy/phy-mxs-usb.c           |  5 +++
+>  include/dt-bindings/clock/vf610-clock.h |  5 ++-
+>  6 files changed, 135 insertions(+), 28 deletions(-)
+> 
+> -- 
+> 2.0.1
+> 
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-usb" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+
+-- 
+
+Best Regards,
+Peter Chen
