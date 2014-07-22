@@ -1,202 +1,150 @@
-From: m-karicheri2@ti.com (Murali Karicheri)
-Date: Tue, 22 Jul 2014 18:52:12 -0400
-Subject: [PATCH v7 4/5] PCI: add PCI controller for keystone PCIe h/w
-In-Reply-To: <20140722223527.GA27965@google.com>
+From: bhelgaas@google.com (Bjorn Helgaas)
+Date: Tue, 22 Jul 2014 16:57:08 -0600
+Subject: [PATCH v7 0/5] Add Keystone PCIe controller driver
+In-Reply-To: <1405961925-27248-1-git-send-email-m-karicheri2@ti.com>
 References: <1405961925-27248-1-git-send-email-m-karicheri2@ti.com>
- <1405961925-27248-5-git-send-email-m-karicheri2@ti.com>
- <20140722223527.GA27965@google.com>
-Message-ID: <53CEEB1C.9020202@ti.com>
+Message-ID: <20140722225708.GB27965@google.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Bjorn,
+On Mon, Jul 21, 2014 at 12:58:40PM -0400, Murali Karicheri wrote:
+> This patch series add PCIe controller driver for keystone SoCs. This is
+> based on v4 of the series posted to the mailing list. Keystone PCI controller
+> is based on version 3.65 of the DW hardware. This driver uses the DW core
+> functions to implement the PCI controller driver for keystone.
+> 
+> Testing:
+> =======
+> 
+> Testing of the driver is done on TI's K2HK EVM inserted to a Elma blu!eco
+> MicroTCA chassis AMC slot with JumpGen SEM-200 AMC SATA Storage and Dual
+> Ethernet Card Express inserted on another AMC slot. The e1000e driver available
+> on intel's website is patched to the kernel source tree and build. e1000e.ko
+> is dynamically loaded and executed ping and iperf tests to test the
+> functionality.
+> 
+> Thanks to all of you who have contributed by reviewing and offering valuable
+> comments. If you want me to add your "Reviewed-by", please let me know so that
+> I can add it to the commit log and re-send. Patch 1-3 has Acks from maintainers
+> and I believe this can be merged to upstream branch. Patch 4 is waiting for
+> Ack from DT maintainer. Please provide the same at the earliest.
+> 
+> Thanks
+> 
+> Signed-off-by: Murali Karicheri <m-karicheri2@ti.com>
+> 
+> CC: Russell King <linux@arm.linux.org.uk>
+> CC: Grant Likely <grant.likely@linaro.org>
+> CC: Rob Herring <robh+dt@kernel.org>
+> CC: Mohit Kumar <mohit.kumar@st.com>
+> CC: Jingoo Han <jg1.han@samsung.com>
+> CC: Bjorn Helgaas <bhelgaas@google.com>
+> CC: Pratyush Anand <pratyush.anand@st.com>
+> CC: Richard Zhu <r65037@freescale.com>
+> CC: Kishon Vijay Abraham I <kishon@ti.com>
+> CC: Marek Vasut <marex@denx.de>
+> CC: Arnd Bergmann <arnd@arndb.de>
+> CC: Pawel Moll <pawel.moll@arm.com>
+> CC: Mark Rutland <mark.rutland@arm.com>
+> CC: Ian Campbell <ijc+devicetree@hellion.org.uk>
+> CC: Kumar Gala <galak@codeaurora.org>
+> CC: Randy Dunlap <rdunlap@infradead.org>
+> CC: Grant Likely <grant.likely@linaro.org>
+> 
+> Changelog:
+> 
+> v7
+>  - Removed ti,enable_linktrain DT property. The driver now check if
+>    the link is up and then retrain the link if not already up. This
+>    is as per comment from DT maintainer.
+>  - Rebased to upstream kernel v3.16-rc6
+> 
+> v6
+>  - Added Ack from Maintainer for patch 3. Patch 1-3 now have the
+>    Acks from maintainer and can be merged to upstream branch.
+>    Patch 4 is waiting ack from DT maintainer.
+> v5
+>  - Rebased to upstream kernel v3.16-rc5
+>  - Reworked Patch 3/6 and 4/6 into a single patch based on
+>    maintainer comment to use a API callback model to support
+>    the v3.65 h/w.
+> v4
+>  - Addressed comments against 5/5.
+>  - Added a patch 6/6 for Maintainer information
+>  - Added couple of Acked-By:
+>  - Rebased to latest Linux 3.16-rc4
+> v3
+>  - DW application register handling code is now part of
+>    Keystone PCI driver. RFC had this code part of Keystone
+>    PCI driver, then V1 moved this to a separate file to
+>    re-use on other platforms that uses this version of the
+>    DW h/w. Then based on comments against v2, this is moved
+>    back to Keystone driver.
+>  - Keystone SerDes phy driver is removed from this series so that
+>    this can be merged independent of that patch
+>  - added msi_set_irq()/clear_irq() API's to support Keystone
+> 
+> V2
+>  - Split the designware pcie enhancement patch to multiple
+>    patches based on functionality added
+>  - Remove the quirk code and add a patch to fix mps/mrss
+>    tuning for ARM. Use kernel command line parameter
+>    pci=pcie_bus_perf to work with Keystone PCI Controller.
+>    Following patch addressed this.
+>      [PATCH v1] ARM: pci: add call to pcie_bus_configure_settings()
+>  - Add documentation for device tree bindings
+>  - Add separate interrupt controller nodes for MSI and Legacy
+>    IRQs and use irq map for legacy IRQ
+>  - Use compatibility to identify v3.65 version of the DW hardware
+>    and use it to customize the designware common code.
+>  - Use reg property for configuration space instead of range
+>  - Other minor updates based on code inspection. 
+> 
+> V1
+>  - Add an interrupt controller node for Legacy irq chip and use
+>    interrupt map/map-mask property to map legacy IRQs A/B/C/D
+>  - Add a Phy driver to replace the original serdes driver
+>  - Move common application register handling code to a separate
+>    file to allow re-use across other platforms that use older
+>    DW PCIe h/w
+>  - PCI quirk for maximum read request size. Check and override only
+>    if the maximum is higher than what controller can handle.
+>  - Converted to a module platform driver.
+> 
+> Murali Karicheri (5):
+>   PCI: designware: add rd[wr]_other_conf API
+>   PCI: designware: refactor MSI code to work with v3.65 dw hardware
 
-On 07/22/2014 06:35 PM, Bjorn Helgaas wrote:
-> On Mon, Jul 21, 2014 at 12:58:44PM -0400, Murali Karicheri wrote:
->> keystone PCIe controller is based on v3.65 version of the
->> designware h/w. Main differences are
->> 	1. No ATU support
->> 	2. Legacy and MSI irq functions are implemented in
->> 	   application register space
->> 	3. MSI interrupts are multiplexed over 8 IRQ lines to the Host
->> 	   side.
->> All of the Application register space handing code are organized into
->> pci-keystone-dw.c and the functions are called from pci-keystone.c
->> to implement PCI controller driver. Also add necessary DT documentation
->> for the driver.
->>
->> Signed-off-by: Murali Karicheri<m-karicheri2@ti.com>
->> Acked-by: Santosh Shilimkar<santosh.shilimkar@ti.com>
->> ...
->
->> +++ b/Documentation/devicetree/bindings/pci/pci-keystone.txt
->> ...
->
->> +Note for PCI driver usage
->> +=========================
->> +Driver requires pci=pcie_bus_perf in the bootargs for proper functioning.
->
-> Whoa, why is this?  Special boot args should not be required.
+I applied the above two to my pci/host-designware branch.  The rest didn't
+apply cleanly because I applied Kishon's DRA7xx changes first, and there
+are several conflicts.  Can you rebase the rest of them on top of
+pci/host-designware?
 
-This was discussed initially and I had added following commit to get 
-this working instead of a PCI quirk. To get some background please see 
-the thread for commit below that you also had signed off as well.
+>   PCI: designware: enhance dw_pcie_host_init() to support v3.65 DW
+>     hardware
+>   PCI: add PCI controller for keystone PCIe h/w
+>   PCI: keystone: Update maintainer information
 
-commit 8b5742ad156d30ee38486652cdbd152e2d6ebbcc
-Author: Murali Karicheri <m-karicheri2@ti.com>
-Date:   Wed May 28 13:14:53 2014 -0400
+You can squash the MAINTAINERS update into the driver addition.  They're
+logically part of the same change.
 
-     ARM/PCI: Call pcie_bus_configure_settings() to set MPS
+Bjorn
 
-     Call pcie_bus_configure_settings() on ARM, like for other platforms.
-     pcie_bus_configure_settings() makes sure the MPS across the bus is 
-uniform
-     and provides the ability to tune the MRSS and MPS to higher performance
-     values.  This is particularly important for embedded where there is no
-     firmware to program these PCIe settings for the OS.
-
-     Signed-off-by: Murali Karicheri <m-karicheri2@ti.com>
-     Signed-off-by: Bjorn Helgaas <bhelgaas@google.com>
-     CC: Russell King <linux@arm.linux.org.uk>
-     CC: Arnd Bergmann <arnd@arndb.de>
-     CC: Jason Gunthorpe <jgunthorpe@obsidianresearch.com>
-     CC: Santosh Shilimkar <santosh.shilimkar@ti.com>
-
-This was added as a preparatory patch to support keystone and
-avoid a PCI quirk to do the same. Keystone has MRSS limitation
-of 256 bytes. So adding a bootargs flag was suggested a better option 
-than a PCI quirk.
-
-I will look into the rest of the comments and possibly try to address 
-them or discuss.
-
-BTW, please apply patch 1-3 that has already got ack from maintainers
-and is indepdent of this patch.
-
-Thanks
-
-Murali
-
->
->> diff --git a/drivers/pci/host/Kconfig b/drivers/pci/host/Kconfig
->> index 21df477..f8bc475 100644
->> --- a/drivers/pci/host/Kconfig
->> +++ b/drivers/pci/host/Kconfig
->> @@ -46,4 +46,9 @@ config PCI_HOST_GENERIC
->>   	  Say Y here if you want to support a simple generic PCI host
->>   	  controller, such as the one emulated by kvmtool.
->>
->> +config PCI_KEYSTONE
->> +	bool "TI Keystone PCIe controller"
->> +	depends on ARCH_KEYSTONE
->> +	select PCIE_DW
->> +	select PCIEPORTBUS
->
-> It'd be nice to have some help text here.  I know, not everybody else does.
->
->> +++ b/drivers/pci/host/pci-keystone-dw.c
->> ...
->> +void ks_dw_pcie_handle_msi_irq(struct keystone_pcie *ks_pcie , int offset)
->> +{
->> +	struct pcie_port *pp =&ks_pcie->pp;
->> +	u32 pending, vector;
->> +	int src, virq;
->> +
->> +	pending = readl(ks_pcie->va_app_base + MSI0_IRQ_STATUS + (offset<<  4));
->
-> Blank line here (before the block comment).
->
->> +	/*
->> +	 * MSI0, Status bit 0-3 shows vectors 0, 8, 16, 24, MSI1 status bit
->> +	 * shows 1, 9, 17, 25 and so forth
->> +	 */
->> +	for (src = 0; src<  4; src++) {
->> +		if (BIT(src)&  pending) {
->> +			vector = offset + (src<<  3);
->> +			virq = irq_linear_revmap(pp->irq_domain, vector);
->> +			dev_dbg(pp->dev,
->> +				"irq: bit %d, vector %d, virq %d\n",
->> +				 src, vector, virq);
->> +			generic_handle_irq(virq);
->> +		}
->> +	}
->> +}
->> +
->> ...
->
->> +static void __iomem *ks_pcie_cfg_setup(struct keystone_pcie *ks_pcie, u8 bus,
->> +					unsigned int devfn)
->> +{
->> +	u8 device = PCI_SLOT(devfn), function = PCI_FUNC(devfn);
->> +	struct pcie_port *pp =&ks_pcie->pp;
->> +	u32 regval;
->> +
->> +	if (bus == 0)
->> +		return pp->dbi_base;
->> +
->> +	regval = (bus<<  16) | (device<<  8) | function;
->> +	/*
->> +	 * Since Bus#1 will be a virtual bus, we need to have TYPE0
->> +	 * access only.
->> +	 * TYPE 1
->> +	 */
->> +	if (bus != 1)
->> +		regval |= BIT(24);
->> +
->> +	writel(regval, ks_pcie->va_app_base + CFG_SETUP);
->> +	return pp->va_cfg0_base;
->> +}
->> +
->> +int ks_dw_pcie_rd_other_conf(struct pcie_port *pp, struct pci_bus *bus,
->> +		unsigned int devfn, int where, int size, u32 *val)
->> +{
->> +	struct keystone_pcie *ks_pcie = to_keystone_pcie(pp);
->> +	u8 bus_num = bus->number;
->> +	void __iomem *addr;
->> +	int ret;
->> +
->> +	addr = ks_pcie_cfg_setup(ks_pcie, bus_num, devfn);
->> +	ret = dw_pcie_cfg_read(addr + (where&  ~0x3), where, size, val);
->
-> This *looks* like it needs a lock to protect against concurrent
-> ks_pcie_cfg_setup() users, since it writes a register.
->
->> +
->> +	return ret;
->
-> Please use the same style as in ks_dw_pcie_wr_other_conf(), i.e., get rid
-> of "ret".
->
->> +}
->> +
->> +int ks_dw_pcie_wr_other_conf(struct pcie_port *pp,
->> +		struct pci_bus *bus, unsigned int devfn, int where,
->> +		int size, u32 val)
->> +{
->> +	struct keystone_pcie *ks_pcie = to_keystone_pcie(pp);
->> +	u8 bus_num = bus->number;
->> +	void __iomem *addr;
->> +
->> +	addr = ks_pcie_cfg_setup(ks_pcie, bus_num, devfn);
->> +
->> +	return dw_pcie_cfg_write(addr + (where&  ~0x3), where, size, val);
->> +}
->
->> +++ b/drivers/pci/host/pci-keystone.c
->> ...
->
->> +static struct platform_driver ks_pcie_driver __refdata = {
->
-> Why does this need to be __refdata?  There are no other occurrences in
-> drivers/pci.
->
->> +	.probe  = ks_pcie_probe,
->> +	.remove = __exit_p(ks_pcie_remove),
->> +	.driver = {
->> +		.name	= "keystone-pcie",
->> +		.owner	= THIS_MODULE,
->> +		.of_match_table = of_match_ptr(ks_pcie_of_match),
->> +	},
->> +};
->
-> Bjorn
+>  .../devicetree/bindings/pci/pci-keystone.txt       |   68 +++
+>  MAINTAINERS                                        |    7 +
+>  drivers/pci/host/Kconfig                           |    5 +
+>  drivers/pci/host/Makefile                          |    1 +
+>  drivers/pci/host/pci-keystone-dw.c                 |  521 ++++++++++++++++++++
+>  drivers/pci/host/pci-keystone.c                    |  386 +++++++++++++++
+>  drivers/pci/host/pci-keystone.h                    |   58 +++
+>  drivers/pci/host/pcie-designware.c                 |  116 +++--
+>  drivers/pci/host/pcie-designware.h                 |    9 +
+>  9 files changed, 1135 insertions(+), 36 deletions(-)
+>  create mode 100644 Documentation/devicetree/bindings/pci/pci-keystone.txt
+>  create mode 100644 drivers/pci/host/pci-keystone-dw.c
+>  create mode 100644 drivers/pci/host/pci-keystone.c
+>  create mode 100644 drivers/pci/host/pci-keystone.h
+> 
+> -- 
+> 1.7.9.5
+> 
