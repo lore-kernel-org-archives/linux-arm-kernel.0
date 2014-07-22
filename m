@@ -1,39 +1,72 @@
-From: computersforpeace@gmail.com (Brian Norris)
-Date: Mon, 21 Jul 2014 19:56:03 -0700
-Subject: [PATCH v2] mtd: atmel_nand: make ecc parameters same as definition
-In-Reply-To: <1402559925-20910-1-git-send-email-voice.shen@atmel.com>
-References: <1402559925-20910-1-git-send-email-voice.shen@atmel.com>
-Message-ID: <20140722025603.GC7537@ld-irv-0074>
+From: shawn.guo@freescale.com (Shawn Guo)
+Date: Tue, 22 Jul 2014 10:57:09 +0800
+Subject: [PATCH] ARM: dts: imx6qdl-sabresd: add always on pcie regulator
+In-Reply-To: <1405707270-22901-1-git-send-email-l.stach@pengutronix.de>
+References: <1405707270-22901-1-git-send-email-l.stach@pengutronix.de>
+Message-ID: <20140722025708.GU8537@dragon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jun 12, 2014 at 03:58:45PM +0800, Bo Shen wrote:
-> If the ecc parameter is not the same as definition, when the
-> mtd core check these parameters, it will give the error result.
+On Fri, Jul 18, 2014 at 08:14:30PM +0200, Lucas Stach wrote:
+> Everything in the PCI specification assumes devices to be
+> enumerable on startup. This is only possible if they have
+> power available.
 > 
-> Take the following as an example:
+> A future improvement may allow this regulator to be switched
+> off for D3hot and D3cold power states, but there is a lot
+> of work to do the pcie host controller side for this to work.
+> To keep things simple always enable the regulator for now.
 > 
-> Calculate how many bits can be corrected in one page.
-> According to the ecc parameters definition,
-> 
-> one page correct bits = (mtd->writesize * ecc->strength) / ecc->size
-> 
-> take the following use case as an example:
-> mtd->writesize = 2048 bytes
-> ecc->strength = 4 bytes (for 512 bytes)
-> 
-> before this patch, the ecc->size = 2048, so the result is 4 bytes.
-> after this patch, the ecc->size = 512, so the result is 16 bytes.
-> 
-> So, align the ecc parameters the same as definition to correct
-> this kind of error.
-> 
-> Signed-off-by: Bo Shen <voice.shen@atmel.com>
-> Acked-by: Josh Wu <josh.wu@atmel.com>
+> Signed-off-by: Lucas Stach <l.stach@pengutronix.de>
+
+Just curious if this fixes any known PCIe issue?
+
 > ---
-> Changes in v2:
->   - Enhancement the commit message.
+>  arch/arm/boot/dts/imx6qdl-sabresd.dtsi | 12 ++++++++++++
+>  1 file changed, 12 insertions(+)
+> 
+> diff --git a/arch/arm/boot/dts/imx6qdl-sabresd.dtsi b/arch/arm/boot/dts/imx6qdl-sabresd.dtsi
+> index ec43dde78525..bbbd501098e6 100644
+> --- a/arch/arm/boot/dts/imx6qdl-sabresd.dtsi
+> +++ b/arch/arm/boot/dts/imx6qdl-sabresd.dtsi
+> @@ -54,6 +54,17 @@
+>  			gpio = <&gpio4 10 0>;
+>  			enable-active-high;
+>  		};
+> +
+> +		reg_pcie: regulator at 3 {
+> +			compatible = "regulator-fixed";
+> +			reg = <3>;
+> +			regulator-name = "pcie-supply";
 
-Pushed to l2-mtd.git. Thanks!
+I would start asking to name the regulator in the same way that board
+document like schematics names it.  In this case, it should be
+"MPCIE_3V3".
 
-Brian
+> +			regulator-min-microvolt = <3300000>;
+> +			regulator-max-microvolt = <3300000>;
+> +			gpio = <&gpio3 19 0>;
+> +			regulator-always-on;
+> +			enable-active-high;
+> +		};
+>  	};
+>  
+>  	gpio-keys {
+> @@ -323,6 +334,7 @@
+>  				MX6QDL_PAD_ENET_TXD1__GPIO1_IO29 0x80000000
+>  				MX6QDL_PAD_EIM_D22__GPIO3_IO22  0x80000000
+>  				MX6QDL_PAD_ENET_CRS_DV__GPIO1_IO25 0x80000000
+> +				MX6QDL_PAD_EIM_D19__GPIO3_IO19  0x80000000
+
+No more GPIO setup in hog group, and no more 0x80000000 on pad config.
+Please have a dedicate pinctrl entry for it with a proper config value,
+and refer to the entry in that reg_pcie node.
+
+Shawn
+
+>  			>;
+>  		};
+>  
+> -- 
+> 2.0.1
+> 
