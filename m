@@ -1,73 +1,35 @@
-From: eric.dumazet@gmail.com (Eric Dumazet)
-Date: Wed, 23 Jul 2014 00:58:28 +0200
-Subject: [PATCH 4/6] net/macb: add RX checksum offload feature
-In-Reply-To: <53CE9109.9040407@atmel.com>
-References: <cover.1405689937.git.cyrille.pitchen@atmel.com>
- <f29965fee23dc0de99b388373017efeffa1aac10.1405689937.git.cyrille.pitchen@atmel.com>
- <1405697784.10255.99.camel@edumazet-glaptop2.roam.corp.google.com>
- <53CE9109.9040407@atmel.com>
-Message-ID: <1406069908.3363.7.camel@edumazet-glaptop2.roam.corp.google.com>
+From: ezequiel.garcia@free-electrons.com (Ezequiel Garcia)
+Date: Tue, 22 Jul 2014 20:20:04 -0300
+Subject: [PATCH 0/6] net: mvpp2: Assorted fixes
+In-Reply-To: <20140723002916.67a0bb3c@free-electrons.com>
+References: <1405961296-5846-1-git-send-email-ezequiel.garcia@free-electrons.com>
+ <20140721.202749.913689946944612851.davem@davemloft.net>
+ <20140722144519.GA682@arch.cereza>
+ <20140722.131639.1180592286226896307.davem@davemloft.net>
+ <20140723002916.67a0bb3c@free-electrons.com>
+Message-ID: <20140722232004.GA7838@arch.cereza>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 2014-07-22 at 18:27 +0200, Cyrille Pitchen wrote:
-> Le 18/07/2014 17:36, Eric Dumazet a ?crit :
-> > On Fri, 2014-07-18 at 16:21 +0200, Cyrille Pitchen wrote:
-> >> Signed-off-by: Cyrille Pitchen <cyrille.pitchen@atmel.com>
-> >> ---
-> >>  drivers/net/ethernet/cadence/macb.c | 29 ++++++++++++++++++++++++++++-
-> >>  drivers/net/ethernet/cadence/macb.h |  2 ++
-> >>  2 files changed, 30 insertions(+), 1 deletion(-)
-> >>
-> >> diff --git a/drivers/net/ethernet/cadence/macb.c b/drivers/net/ethernet/cadence/macb.c
-> >> index 9bdcd1b..6acd6e2 100644
-> >> --- a/drivers/net/ethernet/cadence/macb.c
-> >> +++ b/drivers/net/ethernet/cadence/macb.c
-> >> @@ -766,6 +766,8 @@ static int gem_rx(struct macb *bp, int budget)
-> >>  
-> >>  		skb->protocol = eth_type_trans(skb, bp->dev);
-> >>  		skb_checksum_none_assert(skb);
-> >> +		if (bp->dev->features & NETIF_F_RXCSUM)
-> >> +			skb->ip_summed = CHECKSUM_UNNECESSARY;
-> >>  
-> > 
-> > 
-> > Really ?
-> > 
-> > If this is what you meant, this deserves a big and fat comment.
-> > 
-> > 
-> > 
-> Hi Eric,
+On 23 Jul 12:29 AM, Thomas Petazzoni wrote:
+> On Tue, 22 Jul 2014 13:16:39 -0700 (PDT), David Miller wrote:
 > 
-> Isn't it the proper way to do? According to Cadence documentation
-> about RX checksum offload:
-> "If any of the checksums (IP, TCP or UDP) are verified incorrect by
-> the GEM, the packet is discarded."
+> > >> This series does not apply to the 'net' tree at all, please respin
+> > >> and resubmit.
+> > > 
+> > > This series applies on net-next.
+> > > 
+> > > Sorry for not mentioning it,
+> > 
+> > They are bonafide bug fixes, therefore should be targetted at 'net'.
 > 
-> If I understand, when RX checksum offload is enabled setting bit 24 of
-> the Network Configuration Register, the driver only receives RX frames
-> with correct checksum. Then it tells the kernel that there's no need
-> to verify the checksum again in software. This is done setting
-> skb->ip_summed to CHECKSUM_UNNECESSARY. Intel e1000 driver does the
-> same in e1000_rx_checksum() function.
+> Except that I believe they are fixes for a driver which itself is in
+> net-next, i.e scheduled for 3.17.
 > 
-> Also bit 24 of the Network Configuration Register is updated by
-> macb_open() and macb_set_features() so it always matches the state of
-> NETIF_F_RXCSUM flag in dev->features, once the network interface is
-> up. That's why I'd rather read from dev->features than read from
-> register.
-> 
-> Did I make a mistake? Is it the kind of comment you expect to be
-> added?
-> 
-> Regards,
 
-Usually, frames are not discarded, and a bit is present in rx descriptor
-to tell us if (TCP) checksum was validated by the NIC
-
-We want tcpdump to get a copy of corrupted TCP frames, even if TCP stack
-drops them later.
-
-If this NIC drops incorrect frames, I am afraid we cant use this RX
-offload at all.
+That's right. These are fixes for the new mvpp2 driver, which is only
+in net-next.
+-- 
+Ezequiel Garc?a, Free Electrons
+Embedded Linux, Kernel and Android Engineering
+http://free-electrons.com
