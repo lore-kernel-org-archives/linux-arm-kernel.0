@@ -1,89 +1,39 @@
 From: svarbanov@mm-sol.com (Stanimir Varbanov)
-Date: Tue, 22 Jul 2014 14:51:53 +0300
-Subject: [PATCH v2 1/4] mfd: pm8xxx-spmi: add support for Qualcomm SPMI
- PMICs
-In-Reply-To: <20140722110341.GE8406@lee--X1>
+Date: Tue, 22 Jul 2014 14:54:00 +0300
+Subject: [PATCH v2 4/4] mfd: pm8921: rename pm8921-core driver
+In-Reply-To: <20140722103252.GD8406@lee--X1>
 References: <1405613855-27572-1-git-send-email-svarbanov@mm-sol.com>
- <1405613855-27572-2-git-send-email-svarbanov@mm-sol.com>
- <20140722110341.GE8406@lee--X1>
-Message-ID: <53CE5059.4010107@mm-sol.com>
+ <1405613855-27572-5-git-send-email-svarbanov@mm-sol.com>
+ <20140722103252.GD8406@lee--X1>
+Message-ID: <53CE50D8.9070608@mm-sol.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/22/2014 02:03 PM, Lee Jones wrote:
+On 07/22/2014 01:32 PM, Lee Jones wrote:
 > On Thu, 17 Jul 2014, Stanimir Varbanov wrote:
 > 
->> From: Josh Cartwright <joshc@codeaurora.org>
->>
->> The Qualcomm SPMI PMIC chips are components used with the
->> Snapdragon 800 series SoC family.  This driver exists
->> largely as a glue mfd component, it exists to be an owner
->> of an SPMI regmap for children devices described in
->> device tree.
+>> The pm8921-core driver presently supports pm8921 and pm8058
+>> Qualcomm PMICs.  To avoid confusion with new generation PMICs
+>> (like pm8941) rename the pm8921-core driver to more
+>> appropriate name pm8xxx-ssbi, which reflects better that
+>> those chips use SSBI interface.
 >>
 >> Signed-off-by: Stanimir Varbanov <svarbanov@mm-sol.com>
-> 
-> Needs to be signed off by the author.
-> 
 >> ---
->>  drivers/mfd/Kconfig       |   16 +++++++++++
->>  drivers/mfd/Makefile      |    1 +
->>  drivers/mfd/pm8xxx-spmi.c |   63 +++++++++++++++++++++++++++++++++++++++++++++
->>  3 files changed, 80 insertions(+), 0 deletions(-)
->>  create mode 100644 drivers/mfd/pm8xxx-spmi.c
+>>  drivers/mfd/Kconfig                          |   14 +++++-----
+>>  drivers/mfd/Makefile                         |    2 +-
+>>  drivers/mfd/{pm8921-core.c => pm8xxx-ssbi.c} |   38 +++++++++++++-------------
+>>  3 files changed, 27 insertions(+), 27 deletions(-)
+>>  rename drivers/mfd/{pm8921-core.c => pm8xxx-ssbi.c} (92%)
 > 
-> [...]
+> Patch looks fine to me.
 > 
->> +++ b/drivers/mfd/pm8xxx-spmi.c
->> @@ -0,0 +1,63 @@
->> +/*
->> + * Copyright (c) 2014, The Linux Foundation. All rights reserved.
->> + *
->> + * This program is free software; you can redistribute it and/or modify
->> + * it under the terms of the GNU General Public License version 2 and
->> + * only version 2 as published by the Free Software Foundation.
->> + *
->> + * This program is distributed in the hope that it will be useful,
->> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
->> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
->> + * GNU General Public License for more details.
->> + */
+>   Acked-by: Lee Jones <lee.jones@linaro.org>
 > 
-> There should be a '\n' here.
+> I'm assuming we want to wait for the others in the set to be ready
+> before applying?
 
-OK.
-
-> 
->> +#include <linux/kernel.h>
->> +#include <linux/module.h>
->> +#include <linux/spmi.h>
->> +#include <linux/regmap.h>
->> +#include <linux/of_platform.h>
-> 
-> [...]
-> 
->> +MODULE_DESCRIPTION("PM8XXX SPMI PMIC driver");
->> +MODULE_ALIAS("platform:" KBUILD_MODNAME);
-
-I will change this to:
-
-MODULE_ALIAS("spmi:pm8xxx-spmi");
-
->> +MODULE_AUTHOR("The Linux Foundation");
-> 
-> The Linux Foundation did not write this patch.
-
-OK, I will change the author or remove the tag completely.
-
-> 
->> +MODULE_LICENSE("GPL v2");
-> 
-> Appart from that:
-> 
-> Acked-by: Lee Jones <lee.jones@linaro.org>
-> 
-
-Thanks. I will resend the whole patch set with your acks.
+yes, I think you will need an ack for the DT binding document?
 
 -- 
 regards,
