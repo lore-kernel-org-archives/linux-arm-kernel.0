@@ -1,34 +1,70 @@
-From: joe@perches.com (Joe Perches)
-Date: Tue, 22 Jul 2014 06:33:58 -0700
-Subject: [PATCH 09/19] mfd: ezx-pcap: Repair coding style errors picked
- up with checkpatch
-In-Reply-To: <1406027485-15657-10-git-send-email-lee.jones@linaro.org>
-References: <1406027485-15657-1-git-send-email-lee.jones@linaro.org>
- <1406027485-15657-10-git-send-email-lee.jones@linaro.org>
-Message-ID: <1406036038.30871.19.camel@joe-AO725>
+From: shawn.guo@freescale.com (Shawn Guo)
+Date: Tue, 22 Jul 2014 21:48:16 +0800
+Subject: [PATCH] ARM: imx6: fix SMP compilation again
+In-Reply-To: <16557676.B1fW0k49Wz@wuerfel>
+References: <37015543.ZyZKZyEIPW@wuerfel> <20140722085055.GX8537@dragon>
+ <16557676.B1fW0k49Wz@wuerfel>
+Message-ID: <20140722134815.GZ8537@dragon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 2014-07-22 at 12:11 +0100, Lee Jones wrote:
-> This is part of an effort to clean-up the MFD subsystem.
+On Tue, Jul 22, 2014 at 12:26:31PM +0200, Arnd Bergmann wrote:
+> Ah, you are right, I got the text wrong here, and I think I now understand
+> why it didn't happen earlier. Updated patch below (same patch, new
+> text).
 > 
-> WARNING: Missing a blank line after declarations
-> +       u32 flags;
-> +       void (*callback)(void *, u16[]);
+> 8<-------------
+> Subject: [PATCH] ARM: imx6: fix SMP compilation again
+> 
+> My earlier patch 1fc593feaf8e ("ARM: imx: build i.MX6 functions
+> only when needed") fixed a problem with building an i.MX5 kernel,
+> but now the problem has returned for the case where we allow
+> ARMv6K SMP builds in multiplatform. With CONFIG_CPU_V7 disabled,
+> but i.MX3 and SMP enabled, we get this build error:
 
-False positive from an old version of checkpatch.
+Maybe I missed something, but I have problem to get the following three
+conditions meet in a single kernel configuration.
 
-The one in -next doesn't emit this as it's
-simply a function pointer declaration.
+ a) CONFIG_CPU_V7 disabled
+ b) i.MX3 enabled
+ c) SMP enabled
 
-> diff --git a/drivers/mfd/ezx-pcap.c b/drivers/mfd/ezx-pcap.c
-[]
-> @@ -25,8 +25,9 @@ struct pcap_adc_request {
->  	u8 bank;
->  	u8 ch[2];
->  	u32 flags;
-> -	void (*callback)(void *, u16[]);
->  	void *data;
-> +
-> +	void (*callback)(void *, u16[]);
->  };
+When I get a) and b) in the config, I have no way to get c).  And it
+seems that the only way to get a) and c) at the same time is to enable
+MACH_REALVIEW_PB11MP, which is not part of multi-platform support.  So
+i.MX3 cannot be enabled in there.
+
+I tried both mainline and -next tree.  I really need some help to
+reproduce the error first.
+
+> 
+> arch/arm/mach-imx/built-in.o: In function `v7_secondary_startup':
+> :(.text+0x5124): undefined reference to `v7_invalidate_l1'
+> 
+> This puts the code inside of an "ifdef CONFIG_SMP" to hopefully
+
+The code says "ifdef CONFIG_SOC_IMX6"?
+
+Shawn
+
+> do the right thing in all configurations.
+> 
+> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+> 
+> diff --git a/arch/arm/mach-imx/Makefile b/arch/arm/mach-imx/Makefile
+> index ac88599ca080..23c02932bf84 100644
+> --- a/arch/arm/mach-imx/Makefile
+> +++ b/arch/arm/mach-imx/Makefile
+> @@ -93,9 +93,11 @@ obj-$(CONFIG_HAVE_IMX_ANATOP) += anatop.o
+>  obj-$(CONFIG_HAVE_IMX_GPC) += gpc.o
+>  obj-$(CONFIG_HAVE_IMX_MMDC) += mmdc.o
+>  obj-$(CONFIG_HAVE_IMX_SRC) += src.o
+> +ifdef CONFIG_SOC_IMX6
+>  AFLAGS_headsmp.o :=-Wa,-march=armv7-a
+>  obj-$(CONFIG_SMP) += headsmp.o platsmp.o
+>  obj-$(CONFIG_HOTPLUG_CPU) += hotplug.o
+> +endif
+>  obj-$(CONFIG_SOC_IMX6Q) += clk-imx6q.o mach-imx6q.o
+>  obj-$(CONFIG_SOC_IMX6SL) += clk-imx6sl.o mach-imx6sl.o
+>  obj-$(CONFIG_SOC_IMX6SX) += clk-imx6sx.o mach-imx6sx.o
+> 
