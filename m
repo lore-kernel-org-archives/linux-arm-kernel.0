@@ -1,36 +1,29 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Tue, 22 Jul 2014 14:49:22 +0200
-Subject: PATCH] video: fix up versatile CLCD helper move
-In-Reply-To: <9561883.zqovrcBa4A@wuerfel>
-References: <9561883.zqovrcBa4A@wuerfel>
-Message-ID: <CACRpkdb3hFm6+NzdY6PNh-u5JE90mxSBXrLvxA=gOrG_gYD0kw@mail.gmail.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Tue, 22 Jul 2014 14:59:25 +0200
+Subject: [PATCH 2/2] iio: adc: exynos_adc: Add support for S3C24xx ADC
+In-Reply-To: <1405995074-3271-3-git-send-email-cw00.choi@samsung.com>
+References: <1405995074-3271-1-git-send-email-cw00.choi@samsung.com>
+ <1405995074-3271-3-git-send-email-cw00.choi@samsung.com>
+Message-ID: <5954793.q4YDWmuNDB@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jul 15, 2014 at 10:39 AM, Arnd Bergmann <arnd@arndb.de> wrote:
-
-> commit 11c32d7b6274cb0f ("video: move Versatile CLCD helpers")
-> moved files out of the plat-versatile directory but in the process
-> got a few of the dependencies wrong:
->
-> - If CONFIG_FB is not set, the file no longer gets built, resulting
->   in a link error
-> - If CONFIG_FB or CONFIG_FB_ARMCLCD are disabled, we also get a
->   Kconfig warning for incorrect dependencies due to the symbol
->   being 'select'ed from the platform Kconfig.
-> - When the file is not built, we also get a link error for missing
->   symbols.
->
-> This patch should fix all three, by removing the 'select' statements,
-> changing the Kconfig description of the symbol to be enabled in
-> exactly the right configurations, and adding inline stub functions
-> for the case when the framebuffer driver is disabled.
->
+On Tuesday 22 July 2014 11:11:14 Chanwoo Choi wrote:
+> This patch add support for s3c2410/s3c2416/s3c2440/s3c2443 ADC. The s3c24xx
+> is alomost same as ADCv1. But, There are a little difference as following:
+> - ADCMUX register address to select channel
+> - ADCDAT mask (10bit or 12bit ADC resolution according to SoC version)
+> 
+> Signed-off-by: Chanwoo Choi <cw00.choi@samsung.com>
 > Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+> 
 
-Excellent, thanks a lot Arnd! I struggled with this but didn't
-get it right after all :-/
-Reviewed-by: Linus Walleij <linus.walleij@linaro.org>
+While looking at the driver again to see if the touchscreen patch needs
+an update for this, I noticed that the s3c24xx variants don't have the
+ADC_V1_INTCLR and ADC_V1_CLRINTPNDNUP registers, so I assume your patch
+will have to be updated not to acknowledge the interrupts.
 
-Yours,
-Linus Walleij
+It's possible that writing to the missing registers is harmless though and
+that you don't need that change.
+
+	Arnd
