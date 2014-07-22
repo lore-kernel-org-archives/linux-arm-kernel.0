@@ -1,75 +1,64 @@
 From: lee.jones@linaro.org (Lee Jones)
-Date: Tue, 22 Jul 2014 12:11:24 +0100
-Subject: [PATCH 18/19] mfd: kempld-core: Correct a variety of checkpatch
- warnings
+Date: Tue, 22 Jul 2014 12:11:15 +0100
+Subject: [PATCH 09/19] mfd: ezx-pcap: Repair coding style errors picked up
+ with checkpatch
 In-Reply-To: <1406027485-15657-1-git-send-email-lee.jones@linaro.org>
 References: <1406027485-15657-1-git-send-email-lee.jones@linaro.org>
-Message-ID: <1406027485-15657-19-git-send-email-lee.jones@linaro.org>
+Message-ID: <1406027485-15657-10-git-send-email-lee.jones@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-WARNING: line over 80 characters
-+module_param_string(force_device_id, force_device_id, sizeof(force_device_id), 0);
-
-WARNING: msleep < 20ms can sleep for up to 20ms; see Documentation/timers/timers-howto.txt
-+               msleep(1);
-
-WARNING: __initdata should be placed after kempld_dmi_table[]
-+static struct dmi_system_id __initdata kempld_dmi_table[] = {
-
-WARNING: line over 80 characters
-+               for (id = kempld_dmi_table; id->matches[0].slot != DMI_NONE; id++)
-
-total: 0 errors, 4 warnings, 771 lines checked
-
 This is part of an effort to clean-up the MFD subsystem.
+
+WARNING: Missing a blank line after declarations
++       u32 flags;
++       void (*callback)(void *, u16[]);
+
+WARNING: sizeof t should be sizeof(t)
++       memset(&t, 0, sizeof t);
+
+WARNING: void function return statements are not generally useful
++       return;
++}
+
+total: 0 errors, 3 warnings, 542 lines checked
 
 Signed-off-by: Lee Jones <lee.jones@linaro.org>
 ---
- drivers/mfd/kempld-core.c | 10 ++++++----
- 1 file changed, 6 insertions(+), 4 deletions(-)
+ drivers/mfd/ezx-pcap.c | 6 +++---
+ 1 file changed, 3 insertions(+), 3 deletions(-)
 
-diff --git a/drivers/mfd/kempld-core.c b/drivers/mfd/kempld-core.c
-index f7ff018..bd26961 100644
---- a/drivers/mfd/kempld-core.c
-+++ b/drivers/mfd/kempld-core.c
-@@ -24,7 +24,8 @@
- 
- #define MAX_ID_LEN 4
- static char force_device_id[MAX_ID_LEN + 1] = "";
--module_param_string(force_device_id, force_device_id, sizeof(force_device_id), 0);
-+module_param_string(force_device_id, force_device_id,
-+		    sizeof(force_device_id), 0);
- MODULE_PARM_DESC(force_device_id, "Override detected product");
- 
- /*
-@@ -36,7 +37,7 @@ static void kempld_get_hardware_mutex(struct kempld_device_data *pld)
- {
- 	/* The mutex bit will read 1 until access has been granted */
- 	while (ioread8(pld->io_index) & KEMPLD_MUTEX_KEY)
--		msleep(1);
-+		usleep_range(1000, 3000);
- }
- 
- static void kempld_release_hardware_mutex(struct kempld_device_data *pld)
-@@ -499,7 +500,7 @@ static struct platform_driver kempld_driver = {
- 	.remove		= kempld_remove,
+diff --git a/drivers/mfd/ezx-pcap.c b/drivers/mfd/ezx-pcap.c
+index 2ed774e..5a9a35e 100644
+--- a/drivers/mfd/ezx-pcap.c
++++ b/drivers/mfd/ezx-pcap.c
+@@ -25,8 +25,9 @@ struct pcap_adc_request {
+ 	u8 bank;
+ 	u8 ch[2];
+ 	u32 flags;
+-	void (*callback)(void *, u16[]);
+ 	void *data;
++
++	void (*callback)(void *, u16[]);
  };
  
--static struct dmi_system_id __initdata kempld_dmi_table[] = {
-+static struct dmi_system_id kempld_dmi_table[] __initdata = {
- 	{
- 		.ident = "BHL6",
- 		.matches = {
-@@ -736,7 +737,8 @@ static int __init kempld_init(void)
- 	int ret;
+ struct pcap_adc_sync_request {
+@@ -62,7 +63,7 @@ static int ezx_pcap_putget(struct pcap_chip *pcap, u32 *data)
+ 	struct spi_message m;
+ 	int status;
  
- 	if (force_device_id[0]) {
--		for (id = kempld_dmi_table; id->matches[0].slot != DMI_NONE; id++)
-+		for (id = kempld_dmi_table;
-+		     id->matches[0].slot != DMI_NONE; id++)
- 			if (strstr(id->ident, force_device_id))
- 				if (id->callback && id->callback(id))
- 					break;
+-	memset(&t, 0, sizeof t);
++	memset(&t, 0, sizeof(t));
+ 	spi_message_init(&m);
+ 	t.len = sizeof(u32);
+ 	spi_message_add_tail(&t, &m);
+@@ -211,7 +212,6 @@ static void pcap_irq_handler(unsigned int irq, struct irq_desc *desc)
+ 
+ 	desc->irq_data.chip->irq_ack(&desc->irq_data);
+ 	queue_work(pcap->workqueue, &pcap->isr_work);
+-	return;
+ }
+ 
+ /* ADC */
 -- 
 1.8.3.2
