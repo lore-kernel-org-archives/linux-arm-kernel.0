@@ -1,21 +1,24 @@
 From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Tue, 22 Jul 2014 11:16:15 -0600
-Subject: [PATCH 1/6] clk: tegra: don't abort clk init on error
-In-Reply-To: <1405437890-6468-2-git-send-email-pdeschrijver@nvidia.com>
+Date: Tue, 22 Jul 2014 11:18:34 -0600
+Subject: [PATCH 4/6] clk: tegra: add nvidia,tegra132-ccplex-clk binding
+In-Reply-To: <1405437890-6468-5-git-send-email-pdeschrijver@nvidia.com>
 References: <1405437890-6468-1-git-send-email-pdeschrijver@nvidia.com>
- <1405437890-6468-2-git-send-email-pdeschrijver@nvidia.com>
-Message-ID: <53CE9C5F.1030005@wwwdotorg.org>
+ <1405437890-6468-5-git-send-email-pdeschrijver@nvidia.com>
+Message-ID: <53CE9CEA.2060200@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 On 07/15/2014 09:24 AM, Peter De Schrijver wrote:
-> Just continue initializing clocks if there's an error on one of them. This
-> is useful if there's a mistake in the inittable, because the system could
-> hang if clk_disable_unused() disables some of the critical clocks in this
-> table.
+> Tegra132 has a few new clocks for the CPU complex (ccplex).
 
-If there's a problem in the init table, we should simply fix it instead
-of working around it.
+> diff --git a/Documentation/devicetree/bindings/clock/nvidia,tegra132-ccplex-clk.txt b/Documentation/devicetree/bindings/clock/nvidia,tegra132-ccplex-clk.txt
 
-At the very least, we need to WARN on this rather than just ignoring
-problems.
+> +Example SoC include file:
+> +
+> +/ {
+> +	ccplex-clock at 0,70040000 {
+> +		compatible = "nvidia,tegra132-ccplex-clk";
+> +		reg = <0x0 0x70040000 0x0 0x1000>;
+> +		status = "okay";
+
+That's the default, so it's not worth including that property.
