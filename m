@@ -1,41 +1,71 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Tue, 22 Jul 2014 16:37:39 +0100
-Subject: [PATCH 13/11] arm64: Add support for 48-bit VA space with 64KB
- page configuration
-In-Reply-To: <2C360BFC-E4CF-448D-9110-4197DCAEAD4F@gmail.com>
-References: <ADA477FA-165D-4679-A38F-C82C901BEE4D@gmail.com>
- <AABDB416-D194-4825-8113-4748C10BC339@gmail.com>
- <2C360BFC-E4CF-448D-9110-4197DCAEAD4F@gmail.com>
-Message-ID: <20140722153738.GJ2219@arm.com>
+From: nm@ti.com (Nishanth Menon)
+Date: Tue, 22 Jul 2014 10:39:54 -0500
+Subject: [PATCH] pinctrl: dra: dt-bindings: Fix pull enable/disable
+Message-ID: <1406043594-14181-1-git-send-email-nm@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jul 22, 2014 at 04:13:27PM +0100, Jungseok Lee wrote:
-> On Jul 22, 2014, at 00:09 +900 Catalin Marinas wrote:
-> > This patch allows support for 3 levels of page tables with 64KB page 
-> > configuration allowing 48-bit VA space. The pgd is no longer a full 
-> > PAGE_SIZE (PTRS_PER_PGD is 64) and (swapper|idmap)_pg_dir are not fully 
-> > populated (pgd_alloc falls back to kzalloc). 
-> > 
-> > Signed-off-by: Catalin Marinas <catalin.marinas@arm.com> 
-> > --- 
-> 
-> One more step :)
+The DRA74/72 control module pins have a weak pull up and pull down.
+This is configured by bit offset 17. if BIT(17) is 1, a pull up is
+selected, else a pull down is selected.
 
-The last before the upcoming merging window. I also updated the
-pgtable-4levels branch with the latest.
+However, this pull resisstor is applied based on BIT(16) -
+PULLUDENABLE - if BIT(18) is *0*, then pull as defined in BIT(17) is
+applied, else no weak pulls are applied. We defined this in reverse.
 
-> Are you going to post the next version of this series including [12/11]
-> and [13/11] or finalize the series?
+Reference: Table 18-5 (Description of the pad configuration register
+bits) in Technical Reference Manual Revision (DRA74x revision Q:
+SPRUHI2Q Revised June 2014 and DRA72x revision F: SPRUHP2F - Revised
+June 2014)
 
-I wasn't planning to post another series. It's good to get the clean-up
-merged with the change that 48-bit VA now depends on BROKEN until KVM is
-sorted (for 3.18).
+Fixes: 6e58b8f1daaf1a ("ARM: dts: DRA7: Add the dts files for dra7 SoC and dra7-evm board")
+Signed-off-by: Nishanth Menon <nm@ti.com>
+---
+Patch based on v3.16-rc5 tag
 
-> In addition, could you put my gmail address in CC in coming patch or
-> the next version? It help me follow up the series easily.
+1: dra72x-evm:  Boot ok: http://slexy.org/raw/s20I6QXQa (needs MMC filesystem that current dts does not have.
+	- Fails in plain Vanilla 3.16-rc5 kernel due to missing patch to handle USB IP instance delta (between dra72x and dra74x) appropriately.
+	- Tested with fixes needed: https://patchwork.kernel.org/patch/4565431/ and https://patchwork.kernel.org/patch/4565461/
 
-Do you want me to add any reviewed etc. tags from you?
+2: dra7xx-evm:  Boot PASS: http://slexy.org/raw/s21c6X2wOd
 
+Equivalent testing on 3.14 based product kernel:
+ dra72x-evm:  Boot PASS: http://slexy.org/raw/s21yIgttJw
+ dra7xx-evm:  Boot PASS: http://slexy.org/raw/s20w7OZaJJ
+
+It is obvious that current users of padconf have'nt had trouble with
+the wrong definitions. I think I might have been the first to discover
+this as emmc on beagleboard-X15 (an upcoming platform) exposed this problem.
+
+ include/dt-bindings/pinctrl/dra.h |    7 ++++---
+ 1 file changed, 4 insertions(+), 3 deletions(-)
+
+diff --git a/include/dt-bindings/pinctrl/dra.h b/include/dt-bindings/pinctrl/dra.h
+index 002a285..3d33794 100644
+--- a/include/dt-bindings/pinctrl/dra.h
++++ b/include/dt-bindings/pinctrl/dra.h
+@@ -30,7 +30,8 @@
+ #define MUX_MODE14	0xe
+ #define MUX_MODE15	0xf
+ 
+-#define PULL_ENA		(1 << 16)
++#define PULL_ENA		(0 << 16)
++#define PULL_DIS		(1 << 16)
+ #define PULL_UP			(1 << 17)
+ #define INPUT_EN		(1 << 18)
+ #define SLEWCONTROL		(1 << 19)
+@@ -38,10 +39,10 @@
+ #define WAKEUP_EVENT		(1 << 25)
+ 
+ /* Active pin states */
+-#define PIN_OUTPUT		0
++#define PIN_OUTPUT		(0 | PULL_DIS)
+ #define PIN_OUTPUT_PULLUP	(PIN_OUTPUT | PULL_ENA | PULL_UP)
+ #define PIN_OUTPUT_PULLDOWN	(PIN_OUTPUT | PULL_ENA)
+-#define PIN_INPUT		INPUT_EN
++#define PIN_INPUT		(INPUT_EN | PULL_DIS)
+ #define PIN_INPUT_SLEW		(INPUT_EN | SLEWCONTROL)
+ #define PIN_INPUT_PULLUP	(PULL_ENA | INPUT_EN | PULL_UP)
+ #define PIN_INPUT_PULLDOWN	(PULL_ENA | INPUT_EN)
 -- 
-Catalin
+1.7.9.5
