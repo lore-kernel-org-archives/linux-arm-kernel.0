@@ -1,72 +1,122 @@
-From: m-karicheri2@ti.com (Murali Karicheri)
-Date: Tue, 22 Jul 2014 15:00:23 -0400
-Subject: [PATCH v6 4/5] PCI: add PCI controller for keystone PCIe h/w
-In-Reply-To: <CAL_JsqLrh_M0gTRezST9jX1X_5Eo98taNcHok6QX6vDMxeqkcw@mail.gmail.com>
-References: <1405696469-7172-1-git-send-email-m-karicheri2@ti.com>
- <1405696469-7172-5-git-send-email-m-karicheri2@ti.com>
- <CAL_JsqKheoWrSGtxPO=AE8g9iOAqfwRa=81Ku=Cfx8_gpDysOg@mail.gmail.com>
- <5467203.eMVRoNeSx1@wuerfel>
- <CAL_JsqLrh_M0gTRezST9jX1X_5Eo98taNcHok6QX6vDMxeqkcw@mail.gmail.com>
-Message-ID: <53CEB4C7.1020601@ti.com>
+From: s-anna@ti.com (Suman Anna)
+Date: Tue, 22 Jul 2014 14:01:58 -0500
+Subject: [v3 PATCH 4/6] ARM: dts: am4372: Add prcm_resets node
+In-Reply-To: <1405615531-15649-4-git-send-email-dmurphy@ti.com>
+References: <1405615531-15649-1-git-send-email-dmurphy@ti.com>
+ <1405615531-15649-4-git-send-email-dmurphy@ti.com>
+Message-ID: <53CEB526.3090101@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/22/2014 11:37 AM, Rob Herring wrote:
-> On Fri, Jul 18, 2014 at 2:50 PM, Arnd Bergmann<arnd@arndb.de>  wrote:
->> On Friday 18 July 2014 14:31:39 Rob Herring wrote:
->>>> +
->>>> + Example:
->>>> +       pcie_msi_intc: msi-interrupt-controller {
->>>> +                       interrupt-controller;
->>>> +                       #interrupt-cells =<1>;
->>>> +                       interrupt-parent =<&gic>;
->>>> +                       interrupts =<GIC_SPI 30 IRQ_TYPE_EDGE_RISING>,
->>>> +<GIC_SPI 31 IRQ_TYPE_EDGE_RISING>,
->>>> +<GIC_SPI 32 IRQ_TYPE_EDGE_RISING>,
->>>> +<GIC_SPI 33 IRQ_TYPE_EDGE_RISING>,
->>>> +<GIC_SPI 34 IRQ_TYPE_EDGE_RISING>,
->>>> +<GIC_SPI 35 IRQ_TYPE_EDGE_RISING>,
->>>> +<GIC_SPI 36 IRQ_TYPE_EDGE_RISING>,
->>>> +<GIC_SPI 37 IRQ_TYPE_EDGE_RISING>;
->>>> +       };
->>>> +
->>>> +pcie_intc: Interrupt controller device node for Legacy irq chip
->>>> +       interrupt-cells: should be set to 1
->>>> +       interrupt-parent: Parent interrupt controller phandle
->>>> +       interrupts: GIC interrupt lines connected to PCI Legacy interrupt lines
->>>> +
->>>> + Example:
->>>> +       pcie_intc: legacy-interrupt-controller {
->>>> +               interrupt-controller;
->>>> +               #interrupt-cells =<1>;
->>>> +               interrupt-parent =<&gic>;
->>>> +               interrupts =<GIC_SPI 26 IRQ_TYPE_EDGE_RISING>,
->>>> +<GIC_SPI 27 IRQ_TYPE_EDGE_RISING>,
->>>> +<GIC_SPI 28 IRQ_TYPE_EDGE_RISING>,
->>>> +<GIC_SPI 29 IRQ_TYPE_EDGE_RISING>;
->>>> +       };
->>> This seems wrong. Legacy interrupts should be described with
->>> interrupt-map and then PCI child devices have a standard interrupt
->>> specifier.
->>>
->>> I'm not sure about MSIs, but I would think they would have a standard
->>> format too.
->>>
->> IIRC, it's actually the correct way to do this here: the problem is that
->> the PCI IRQs are not directly connected to the GIC, but instead there is
->> a nested irqchip that has each PCI IRQ routed to it and that requires
->> an extra EOI for each interrupt.
->>
->> The interrupt-map in the PCI host points to this special irqchip rather
->> than to the GIC.
-> Okay, if there is still an interrupt-map property, then I agree. This
-> wasn't clear in the example.
-Rob,
+Hi Dan,
 
-There is and is described in designware DT documentation. This documentation
-refers to that and also describe DT bindings specific to Keystone. Could you
-Ack this based on this?
+On 07/17/2014 11:45 AM, Murphy, Dan wrote:
+> Add the prcm_resets node to the prcm parent node.
+> 
+> Add the am34xx_resets file to define the
+> am34xx reset lines that are handled by this reset
+> framework.
+> 
+> Signed-off-by: Dan Murphy <dmurphy@ti.com>
+> ---
+> 
+> v3 - No changes
+> 
+>  arch/arm/boot/dts/am4372.dtsi        |    7 +++++
+>  arch/arm/boot/dts/am43xx-resets.dtsi |   52 ++++++++++++++++++++++++++++++++++
+>  2 files changed, 59 insertions(+)
+>  create mode 100644 arch/arm/boot/dts/am43xx-resets.dtsi
+> 
+> diff --git a/arch/arm/boot/dts/am4372.dtsi b/arch/arm/boot/dts/am4372.dtsi
+> index 49fa596..d0aa9c9 100644
+> --- a/arch/arm/boot/dts/am4372.dtsi
+> +++ b/arch/arm/boot/dts/am4372.dtsi
+> @@ -88,6 +88,12 @@
+>  
+>  			prcm_clockdomains: clockdomains {
+>  			};
+> +
+> +			prcm_resets: resets {
+> +				#address-cells = <1>;
+> +				#size-cells = <1>;
 
-Murali
->
-> Rob
+Should be corrected as per comment on DT bindings.
+
+> +				#reset-cells = <1>;
+> +			};
+>  		};
+>  
+>  		scrm: scrm at 44e10000 {
+> @@ -892,3 +898,4 @@
+>  };
+>  
+>  /include/ "am43xx-clocks.dtsi"
+> +/include/ "am43xx-resets.dtsi"
+> diff --git a/arch/arm/boot/dts/am43xx-resets.dtsi b/arch/arm/boot/dts/am43xx-resets.dtsi
+> new file mode 100644
+> index 0000000..ef338ba
+> --- /dev/null
+> +++ b/arch/arm/boot/dts/am43xx-resets.dtsi
+> @@ -0,0 +1,52 @@
+> +/*
+> + * Device Tree Source for AM43XX reset data
+> + *
+> + * Copyright (C) 2014 Texas Instruments, Inc.
+> + *
+> + * This program is free software; you can redistribute it and/or modify
+> + * it under the terms of the GNU General Public License version 2 as
+> + * published by the Free Software Foundation.
+> + */
+> +
+> +&prcm_resets {
+> +	icss_rstctrl {
+> +		reg = <0x810>,
+> +			  <0x814>;
+> +
+> +		icss_reset: icss_reset {
+> +			control-bit = <0x01>;
+> +			status-bit = <0x01>;
+> +		};
+> +	};
+> +
+> +	gfx_rstctrl {
+> +		reg = <0x410>,
+> +			  <0x414>;
+> +
+> +		gfx_reset: gfx_reset {
+> +			control-bit = <0x01>;
+> +			status-bit = <0x01>;
+> +		};
+> +	};
+> +
+> +	per_rstctrl {
+> +		reg = <0x2010>,
+> +			  <0x2014>;
+> +
+> +		iva_reset: iva_reset {
+> +			control-bit = <0x01>;
+> +			status-bit = <0x01>;
+> +		};
+
+There's no IVA on AM4372. Looking at the offset, it looks like you were
+defining this for the WkupM3, in which case you got the initial node
+name wrong. The PER rstctrl has the reset management for PRU-ICSS, so
+you also need to correct the icss_rstctrl accordingly.
+
+regards
+Suman
+
+> +	};
+> +
+> +	device_rstctrl {
+> +		reg = <0x4000>,
+> +			  <0x4004>;
+> +
+> +		device_reset: device_reset {
+> +			control-bit = <0x01>;
+> +			status-bit = <0x01>;
+> +		};
+> +	};
+> +
+> +};
+> 
