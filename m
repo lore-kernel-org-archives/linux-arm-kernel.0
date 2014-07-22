@@ -1,19 +1,32 @@
 From: olof@lixom.net (Olof Johansson)
-Date: Tue, 22 Jul 2014 09:06:30 -0700
-Subject: [PATCH 2/2] ARM: multi_v7_defconfig: Enable MiPHY365x - ST's
- Generic (SATA & PCIe) PHY
-In-Reply-To: <1406021985-8763-2-git-send-email-lee.jones@linaro.org>
-References: <1406021985-8763-1-git-send-email-lee.jones@linaro.org>
- <1406021985-8763-2-git-send-email-lee.jones@linaro.org>
-Message-ID: <20140722160630.GA31092@quad.lixom.net>
+Date: Tue, 22 Jul 2014 09:08:44 -0700
+Subject: [PATCH v2] bus: ARM CCN PMU driver
+In-Reply-To: <1406023886.25343.48.camel@hornet>
+References: <1405091188-31754-1-git-send-email-pawel.moll@arm.com>
+ <1406023886.25343.48.camel@hornet>
+Message-ID: <CAOesGMijrD6SxAyjvQptmAB8swqcvXNkiVS_nRCtUVtX2vYUFQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jul 22, 2014 at 10:39:45AM +0100, Lee Jones wrote:
-> Signed-off-by: Lee Jones <lee.jones@linaro.org>
+On Tue, Jul 22, 2014 at 3:11 AM, Pawel Moll <pawel.moll@arm.com> wrote:
+> Hi Arnd, Kevin, Olof,
+>
+> On Fri, 2014-07-11 at 16:06 +0100, Pawel Moll wrote:
+>> Driver providing perf backend for ARM Cache Coherent Network
+>> interconnect. Supports counting all hardware events and crosspoint
+>> watchpoints.
+>>
+>> Currently works with CCN-504 only, although there should be
+>> no changes required for CCN-508 (just impossible to test it now).
+>>
+>> Signed-off-by: Pawel Moll <pawel.moll@arm.com>
+>
+> Would you consider taking this through arm-soc tree? There isn't
+> anything in MAINTAINERS, but I vaguely remember Arnd proposing this
+> directory in the first place...
 
-Appled both. In the future, feel free to batch them up in one commit,
-no need to keep them separate since they're related.
+Yeah, drivers/bus lacks an owner and we've normally been the ones
+merging them. Please send a fresh version of the patch over.
 
 
 -Olof
