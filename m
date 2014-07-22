@@ -1,90 +1,72 @@
 From: m-karicheri2@ti.com (Murali Karicheri)
-Date: Tue, 22 Jul 2014 14:58:53 -0400
+Date: Tue, 22 Jul 2014 15:00:23 -0400
 Subject: [PATCH v6 4/5] PCI: add PCI controller for keystone PCIe h/w
-In-Reply-To: <CAL_JsqJXb28RHhZG9=-NACwAr1ooGhfMOPjtsTGO2s3Dx7ayxQ@mail.gmail.com>
+In-Reply-To: <CAL_JsqLrh_M0gTRezST9jX1X_5Eo98taNcHok6QX6vDMxeqkcw@mail.gmail.com>
 References: <1405696469-7172-1-git-send-email-m-karicheri2@ti.com>
  <1405696469-7172-5-git-send-email-m-karicheri2@ti.com>
  <CAL_JsqKheoWrSGtxPO=AE8g9iOAqfwRa=81Ku=Cfx8_gpDysOg@mail.gmail.com>
- <53C9839C.5090604@ti.com> <006001cfa485$4f4fcff0$edef6fd0$%han@samsung.com>
- <53CD424B.1090806@ti.com>
- <CAL_JsqJXb28RHhZG9=-NACwAr1ooGhfMOPjtsTGO2s3Dx7ayxQ@mail.gmail.com>
-Message-ID: <53CEB46D.2020006@ti.com>
+ <5467203.eMVRoNeSx1@wuerfel>
+ <CAL_JsqLrh_M0gTRezST9jX1X_5Eo98taNcHok6QX6vDMxeqkcw@mail.gmail.com>
+Message-ID: <53CEB4C7.1020601@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/22/2014 11:41 AM, Rob Herring wrote:
-> On Mon, Jul 21, 2014 at 11:39 AM, Murali Karicheri<m-karicheri2@ti.com>  wrote:
->> On 07/20/2014 09:44 PM, Jingoo Han wrote:
->>> On Saturday, July 19, 2014 5:29 AM, Murali Karicheri wrote:
->>>> On 07/18/2014 03:31 PM, Rob Herring wrote:
->>>>> On Fri, Jul 18, 2014 at 10:14 AM, Murali Karicheri<m-karicheri2@ti.com>
->>>>> wrote:
->>>> --- Cut ---
->>>>>> +
->>>>>> +Optional properties:-
->>>>>> +       phys: phandle to Generic Keystone SerDes phy for PCI
->>>>>> +       phy-names: name of the Generic Keystine SerDes phy for PCI
->>>>>> +         - If boot loader already does PCI link establishment, then
->>>>>> phys and
->>>>>> +           phy-names shouldn't be present.
->>>>>> +       ti,enable-linktrain - Enable Link training.
->>>>>> +         - If boot loader already does PCI link establishment, then
->>>>>> this
->>>>>> +           shouldn't be present.
->>>>>
->>>>> Can't you read from the h/w if the link is trained?
+On 07/22/2014 11:37 AM, Rob Herring wrote:
+> On Fri, Jul 18, 2014 at 2:50 PM, Arnd Bergmann<arnd@arndb.de>  wrote:
+>> On Friday 18 July 2014 14:31:39 Rob Herring wrote:
+>>>> +
+>>>> + Example:
+>>>> +       pcie_msi_intc: msi-interrupt-controller {
+>>>> +                       interrupt-controller;
+>>>> +                       #interrupt-cells =<1>;
+>>>> +                       interrupt-parent =<&gic>;
+>>>> +                       interrupts =<GIC_SPI 30 IRQ_TYPE_EDGE_RISING>,
+>>>> +<GIC_SPI 31 IRQ_TYPE_EDGE_RISING>,
+>>>> +<GIC_SPI 32 IRQ_TYPE_EDGE_RISING>,
+>>>> +<GIC_SPI 33 IRQ_TYPE_EDGE_RISING>,
+>>>> +<GIC_SPI 34 IRQ_TYPE_EDGE_RISING>,
+>>>> +<GIC_SPI 35 IRQ_TYPE_EDGE_RISING>,
+>>>> +<GIC_SPI 36 IRQ_TYPE_EDGE_RISING>,
+>>>> +<GIC_SPI 37 IRQ_TYPE_EDGE_RISING>;
+>>>> +       };
+>>>> +
+>>>> +pcie_intc: Interrupt controller device node for Legacy irq chip
+>>>> +       interrupt-cells: should be set to 1
+>>>> +       interrupt-parent: Parent interrupt controller phandle
+>>>> +       interrupts: GIC interrupt lines connected to PCI Legacy interrupt lines
+>>>> +
+>>>> + Example:
+>>>> +       pcie_intc: legacy-interrupt-controller {
+>>>> +               interrupt-controller;
+>>>> +               #interrupt-cells =<1>;
+>>>> +               interrupt-parent =<&gic>;
+>>>> +               interrupts =<GIC_SPI 26 IRQ_TYPE_EDGE_RISING>,
+>>>> +<GIC_SPI 27 IRQ_TYPE_EDGE_RISING>,
+>>>> +<GIC_SPI 28 IRQ_TYPE_EDGE_RISING>,
+>>>> +<GIC_SPI 29 IRQ_TYPE_EDGE_RISING>;
+>>>> +       };
+>>> This seems wrong. Legacy interrupts should be described with
+>>> interrupt-map and then PCI child devices have a standard interrupt
+>>> specifier.
 >>>
->>> I agree with Rob Herring's suggestion.
+>>> I'm not sure about MSIs, but I would think they would have a standard
+>>> format too.
 >>>
->>>> Yes.
->>>>
->>>> There are customers who use this driver with PCI Link setup done in the
->>>> boot loader. This property tells the driver to bypass Link setup
->>>> procedure in that case. Is this undesirable and if so. how other
->>>> platforms handle it? Check first if link is trained or start the link
->>>> setup procedure? Let me know. If this is fine, please provide your Ack.
->>>
->>> Please, check the following code of Exynos PCIe diver.
->>>
->>> ./drivers/pci/host/pci-exynos.c
->>>
->>> static int exynos_pcie_establish_link(struct pcie_port *pp)
->>> {
->>>          struct exynos_pcie *exynos_pcie = to_exynos_pcie(pp);
->>>          void __iomem *elbi_base = exynos_pcie->elbi_base;
->>>          void __iomem *pmu_base = exynos_pcie->pmu_base;
->>>
->>>          if (dw_pcie_link_up(pp)) {
->>>                  dev_err(pp->dev, "Link already up\n");
->>>                  return 0;
->>>          }
->>>          .....
->>>
->>> In the case of Exynos PCIe, the Exynos PCIe driver checks the
->>> h/w bit such as PCIE_ELBI_LTSSM_ENABLE bit of PCIE_ELBI_RDLH_LINKUP
->>> offset register.
->>>
->>> If the link is already set up by the boot loader or other reasons,
->>> the driver will skip some initialization codes.
->>>
->>> The first step is that you find such h/w bit for checking link up.
->>> If so, please add the code for skipping, when the link is already
->>> set up.
->>>
->> Rob, Jingoo,
+>> IIRC, it's actually the correct way to do this here: the problem is that
+>> the PCI IRQs are not directly connected to the GIC, but instead there is
+>> a nested irqchip that has each PCI IRQ routed to it and that requires
+>> an extra EOI for each interrupt.
 >>
->> We have similar bit to check for Link status and I have removed the DT
->> property and skip Link retrain if PCIe Link is already Up. I will be
->> resending the series with Patch 4/5 updated.
-> For both keystone and exynos, is this status bit in the phy? If so,
-> sounds like this should be a standard phy function op.
->
-> Rob
+>> The interrupt-map in the PCI host points to this special irqchip rather
+>> than to the GIC.
+> Okay, if there is still an interrupt-map property, then I agree. This
+> wasn't clear in the example.
 Rob,
 
-There is phy bit as well as PCIe specific Link LTSSM state for Keystone.
-Phy one is handled by the Phy driver and PCie driver care about LTSSM
-state bit. I have removed the enable_link_train DT attribute from
-patch 4/5. Can you ack it now?
+There is and is described in designware DT documentation. This documentation
+refers to that and also describe DT bindings specific to Keystone. Could you
+Ack this based on this?
 
 Murali
+>
+> Rob
