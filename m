@@ -1,56 +1,33 @@
-From: robh@kernel.org (Rob Herring)
-Date: Tue, 22 Jul 2014 12:11:01 -0500
-Subject: [PATCH 2/2] arm: add early_ioremap support
-In-Reply-To: <53CE95C2.8090807@samsung.com>
-References: <1404898792-4201-1-git-send-email-leif.lindholm@linaro.org>
- <1404898792-4201-3-git-send-email-leif.lindholm@linaro.org>
- <53CE95C2.8090807@samsung.com>
-Message-ID: <CAL_Jsq+hRYySuT_40iGVwe-8GYuPBmHy+GbqQ6T5HSCDfCSMQw@mail.gmail.com>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Tue, 22 Jul 2014 11:15:21 -0600
+Subject: [PATCH 2/6] clk: tegra: make tegra_clocks_apply_init_table
+ arch_initcall
+In-Reply-To: <1405437890-6468-3-git-send-email-pdeschrijver@nvidia.com>
+References: <1405437890-6468-1-git-send-email-pdeschrijver@nvidia.com>
+ <1405437890-6468-3-git-send-email-pdeschrijver@nvidia.com>
+Message-ID: <53CE9C29.5030508@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jul 22, 2014 at 11:48 AM, Tomasz Figa <t.figa@samsung.com> wrote:
-> Hi Leif,
->
-> On 09.07.2014 11:39, Leif Lindholm wrote:
->> From: Mark Salter <msalter@redhat.com>
->>
->> This patch uses the generic early_ioremap code to implement
->> early_ioremap for ARM. The ARM-specific bits come mostly from
->> an earlier patch from Leif Lindholm <leif.lindholm@linaro.org>
->> here:
->>
->>   https://lkml.org/lkml/2013/10/3/279
->
-> [snip]
->
->> diff --git a/arch/arm/mm/early_ioremap.c b/arch/arm/mm/early_ioremap.c
->> new file mode 100644
->> index 0000000..1013109
->> --- /dev/null
->> +++ b/arch/arm/mm/early_ioremap.c
->> @@ -0,0 +1,86 @@
->> +/*
->> + * early_ioremap() support for ARM
->> + *
->> + * Based on existing support in arch/x86/mm/ioremap.c
->> + *
->> + * Restrictions: currently only functional before paging_init()
->
-> Uhm, that's bad... This would explain why my earlycon code generates a
-> fault as soon as something prints after paging_init(). I'd say this
-> feature would be much more useful if mappings were carried over
-> paging_init(), so that mapped devices are available later as well.
->
-> I'll see if I can code this on top of your patch, but unfortunately it
-> might end up with -ENOTIME.
+On 07/15/2014 09:24 AM, Peter De Schrijver wrote:
+> tegra_clocks_apply_init_table needs to be called after the udelay loop has
+> been calibrated (see 441f199a37cfd66c5dd8dd45490bd3ea6971117d why that is).
 
-I have fixmap support that's needed for earlycon. Here is the branch:
+Instead of just the commit ID, can you please mention the commit subject
+too:
 
-git://git.kernel.org/pub/scm/linux/kernel/git/robh/linux.git fixmap
+441f199a37cf "clk: tegra: defer application of init table"
 
-It is based on an earlier version of patchset and not on the latest
-version from Leif. Unfortunately, I don't have more time to spend on
-it ATM.
+> On existing Tegra SoCs this was done by calling tegra_clocks_apply_init_table
+> from tegra_dt_init. To make this also work on ARM64, we need to
+> change this into an initcall. tegra_dt_init is called from customize_machine
+> which is an arch_initcall. Therefore this should also work on existing 32bit
+> Tegra SoCs.
 
-Rob
+I still strongly dislike performing this basic initialization from
+random separate initcalls. I think we should create a single initcall
+for all the Tegra initialization, even if it isn't able to be a machine
+descriptor hook function any more.
+
+That said, discussions re: that are ongoing in other threads, so it's no
+worth reworking this patch yet.
