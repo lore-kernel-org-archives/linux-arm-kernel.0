@@ -1,47 +1,52 @@
-From: maxime.coquelin@st.com (Maxime Coquelin)
-Date: Tue, 22 Jul 2014 18:40:12 +0200
-Subject: [PATCH 2/2] ARM: multi_v7_defconfig: Enable MiPHY365x - ST's
- Generic (SATA & PCIe) PHY
-In-Reply-To: <20140722161732.GB31092@quad.lixom.net>
-References: <1406021985-8763-1-git-send-email-lee.jones@linaro.org>
- <1406021985-8763-2-git-send-email-lee.jones@linaro.org>
- <20140722160630.GA31092@quad.lixom.net> <53CE8E14.9020206@st.com>
- <20140722161732.GB31092@quad.lixom.net>
-Message-ID: <53CE93EC.5090706@st.com>
+From: t.figa@samsung.com (Tomasz Figa)
+Date: Tue, 22 Jul 2014 18:39:51 +0200
+Subject: [PATCH 1/2] arm: use generic fixmap.h
+In-Reply-To: <1404898792-4201-2-git-send-email-leif.lindholm@linaro.org>
+References: <1404898792-4201-1-git-send-email-leif.lindholm@linaro.org>
+ <1404898792-4201-2-git-send-email-leif.lindholm@linaro.org>
+Message-ID: <53CE93D7.5010608@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi Leif,
 
+On 09.07.2014 11:39, Leif Lindholm wrote:
+> From: Mark Salter <msalter@redhat.com>
+> 
+> ARM is different from other architectures in that fixmap pages are
+> indexed with a positive offset from FIXADDR_START. Other architectures
+> index with a negative offset from FIXADDR_TOP. In order to use the
+> generic fixmap.h definitions, this patch redefines FIXADDR_TOP to be
+> inclusive of the useable range. That is, FIXADDR_TOP is the virtual
+> address of the topmost fixed page. The newly defined FIXADDR_END is
+> the first virtual address past the fixed mappings.
+> 
+> The patch also introduces local helper macros in highmem.c to reverse
+> the iteration order of fixmap pages.
+> 
+> Signed-off-by: Mark Salter <msalter@redhat.com>
+> [Rebased to 3.16-rc4, reverse kmap fixmap traversal]
+> Signed-off-by: Leif Lindholm <leif.lindholm@linaro.org>
+> ---
+>  arch/arm/include/asm/fixmap.h |   45 ++++++++++++++++++++++++++---------------
+>  arch/arm/mm/highmem.c         |   13 +++++++-----
+>  arch/arm/mm/init.c            |    2 +-
+>  3 files changed, 38 insertions(+), 22 deletions(-)
+> 
 
-On 07/22/2014 06:17 PM, Olof Johansson wrote:
-> On Tue, Jul 22, 2014 at 06:15:16PM +0200, Maxime Coquelin wrote:
->> Hi Olof,
->>
->> On 07/22/2014 06:06 PM, Olof Johansson wrote:
->>> On Tue, Jul 22, 2014 at 10:39:45AM +0100, Lee Jones wrote:
->>>> Signed-off-by: Lee Jones <lee.jones@linaro.org>
->>>
->>> Appled both. In the future, feel free to batch them up in one commit,
->>> no need to keep them separate since they're related.
->>
->> I added both to the pull request for defconfig I sent this afternoon.
->> Not an issue?
->
-> Yes, that's an issue.
->
-> If you comment on a patch you apply, then others will know that you have picked
-> it up.
+I've tried to use this series to enable earlycon without hardcoded
+static mappings, but apparently something is not right yet. Please see
+below.
 
-Oops... I usually reply to notify when I pick a patch, but I missed for 
-this one.
+[snip]
 
-Sorry for that.
+> -extern void __this_fixmap_does_not_exist(void);
+> +#define FIXMAP_PAGE_NORMAL (L_PTE_MT_WRITEBACK | L_PTE_YOUNG | L_PTE_PRESENT)
+> +#define FIXMAP_PAGE_IO (L_PTE_MT_DEV_NONSHARED | L_PTE_YOUNG | L_PTE_PRESENT)
 
-Maxime
->
-> I've dropped the versions I applied now so that we don't get duplicate commits
-> when I merge your branch.
->
->
-> -Olof
->
+This set of flags gives a read-only mapping on the machine I'm testing
+on (Exynos4412, Cortex A9MPcore). If I use the same set of flags as used
+in arch/arm/mm/mmu.c for MT_DEVICE_NONSHARED then the mapping works fine.
+
+Best regards,
+Tomasz
