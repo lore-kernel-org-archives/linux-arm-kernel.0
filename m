@@ -1,45 +1,105 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Tue, 22 Jul 2014 15:03:12 -0600
-Subject: [PATCH v5 1/8] of: Add NVIDIA Tegra SATA controller binding
-In-Reply-To: <20140718150603.GA7196@ulmo>
-References: <1405500863-19696-2-git-send-email-mperttunen@nvidia.com>
- <1405667500-7402-1-git-send-email-mperttunen@nvidia.com>
- <53C8C9BD.3070709@nvidia.com> <53C8F6E6.6020901@redhat.com>
- <20140718150603.GA7196@ulmo>
-Message-ID: <53CED190.8060702@wwwdotorg.org>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Tue, 22 Jul 2014 22:03:52 +0100
+Subject: [PATCHv4 5/5] arm64: Add atomic pool for non-coherent and CMA
+ allocations.
+In-Reply-To: <201407222006.44666.arnd@arndb.de>
+References: <1404324218-4743-1-git-send-email-lauraa@codeaurora.org>
+ <1404324218-4743-6-git-send-email-lauraa@codeaurora.org>
+ <201407222006.44666.arnd@arndb.de>
+Message-ID: <20140722210352.GA10604@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/18/2014 09:06 AM, Thierry Reding wrote:
-> On Fri, Jul 18, 2014 at 12:28:54PM +0200, Hans de Goede wrote:
->> Hi,
->>
->> On 07/18/2014 09:16 AM, Mikko Perttunen wrote:
->>> So here's v5: this time, as suggested, I handle the sata clock myself and let ahci_platform handle it too, leading it to be prepared+enabled twice. This works fine, and allows us to remove the DT ordering requirement.
->>>
->>> I also have in the works a patchset that adds the name-based ahci_platform_get_resources function, but that is not quite ready yet, even if it is quite far along. Also, I am going on vacation and returning on 28.7., so if this v5 is acceptable maybe it could be merged for 3.17 and I could work on the new get_resources scheme after I get back from vacation?
->>
->> Yes that works for me v3 of all the patches with no newer version +
->> v5 of patch 1 and 7 are pretty clean and can go into 3.17 from my pov,
->> Tejun can you pick these up for 3.17 please?
+On Tue, Jul 22, 2014 at 07:06:44PM +0100, Arnd Bergmann wrote:
+> On Wednesday 02 July 2014, Laura Abbott wrote:
+> > +       pgprot_t prot = __pgprot(PROT_NORMAL_NC);
+> > +       unsigned long nr_pages = atomic_pool_size >> PAGE_SHIFT;
+> > +       struct page *page;
+> > +       void *addr;
+> > +
+> > +
+> > +       if (dev_get_cma_area(NULL))
+> > +               page = dma_alloc_from_contiguous(NULL, nr_pages,
+> > +                                       get_order(atomic_pool_size));
+> > +       else
+> > +               page = alloc_pages(GFP_KERNEL, get_order(atomic_pool_size));
+> > +
+> > +
+> > +       if (page) {
+> > +               int ret;
+> > +
+> > +               atomic_pool = gen_pool_create(PAGE_SHIFT, -1);
+> > +               if (!atomic_pool)
+> > +                       goto free_page;
+> > +
+> > +               addr = dma_common_contiguous_remap(page, atomic_pool_size,
+> > +                                       VM_USERMAP, prot, atomic_pool_init);
+> > +
 > 
-> Tejun,
+> I just stumbled over this thread and noticed the code here: When you do
+> alloc_pages() above, you actually get pages that are already mapped into
+> the linear kernel mapping as cacheable pages. Your new
+> dma_common_contiguous_remap tries to map them as noncacheable. This
+> seems broken because it allows the CPU to treat both mappings as
+> cacheable, and that won't be coherent with device DMA.
+
+It does *not* allow the CPU to treat both as cacheable. It treats the
+non-cacheable mapping as non-cacheable (and the cacheable one as
+cacheable). The only requirements the ARM ARM makes in this situation
+(B2.9 point 5 in the ARMv8 ARM):
+
+- Before writing to a location not using the Write-Back attribute,
+  software must invalidate, or clean, a location from the caches if any
+  agent might have written to the location with the Write-Back
+  attribute. This avoids the possibility of overwriting the location
+  with stale data.
+- After writing to a location with the Write-Back attribute, software
+  must clean the location from the caches, to make the write visible to
+  external memory.
+- Before reading the location with a cacheable attribute, software must
+  invalidate the location from the caches, to ensure that any value held
+  in the caches reflects the last value made visible in external memory.
+
+So we as long as the CPU accesses such memory only via the non-cacheable
+mapping, the only requirement is to flush the cache so that there are no
+dirty lines that could be evicted.
+
+(if the mismatched attributes were for example Normal vs Device, the
+Device guarantees would be lost but in the cacheable vs non-cacheable
+it's not too bad; same for ARMv7).
+
+> > +               if (!addr)
+> > +                       goto destroy_genpool;
+> > +
+> > +               memset(addr, 0, atomic_pool_size);
+> > +               __dma_flush_range(addr, addr + atomic_pool_size);
 > 
-> I think the following patches can go through your tree without causing
-> breakage through unresolved dependencies:
-...
-> Stephen, the rest of the patches would probably best go through the
-> Tegra tree so that we can handle the dependencies there. I've already
-> sent out pull requests for 3.17 today, but maybe Arnd and Olof can be
-> convinced to take one more.
+> It also seems weird to flush the cache on a virtual address of
+> an uncacheable mapping. Is that well-defined?
 
-At this point, I'm just going to wait for 3.18 for anything that didn't
-make it into 3.17.
+Yes. According to D5.8.1 (Data and unified caches), "if cache
+maintenance is performed on a memory location, the effect of that cache
+maintenance is visible to all aliases of that physical memory location.
+These properties are consistent with implementing all caches that can
+handle data accesses as Physically-indexed, physically-tagged (PIPT)
+caches".
 
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 901 bytes
-Desc: OpenPGP digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140722/997fcbdb/attachment.sig>
+> In the CMA case, the
+> original mapping should already be uncached here, so you don't need
+> to flush it.
+
+I don't think it is non-cacheable already, at least not for arm64 (CMA
+can be used on coherent architectures as well).
+
+> In the alloc_pages() case, I think you need to unmap
+> the pages from the linear mapping instead.
+
+Even if unmapped, it would not remove dirty cache lines (which are
+associated with physical addresses anyway). But we don't need to worry
+about unmapping anyway, see above (that's unless we find some
+architecture implementation where having such cacheable/non-cacheable
+aliases is not efficient enough, the efficiency is not guaranteed by the
+ARM ARM, just the correct behaviour).
+
+-- 
+Catalin
