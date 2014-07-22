@@ -1,57 +1,76 @@
-From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Tue, 22 Jul 2014 19:59:53 +0900
-Subject: [GIT PULL 4/5] Samsung exynos_mct update for v3.17
-In-Reply-To: <53CCD3AB.7040205@linaro.org>
-References: <53C9C164.9030404@samsung.com>
- <20140719220623.GF15676@quad.lixom.net> <53CCD3AB.7040205@linaro.org>
-Message-ID: <01b601cfa59c$12c2c7f0$384857d0$@samsung.com>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Tue, 22 Jul 2014 12:03:41 +0100
+Subject: [PATCH v2 1/4] mfd: pm8xxx-spmi: add support for Qualcomm SPMI
+ PMICs
+In-Reply-To: <1405613855-27572-2-git-send-email-svarbanov@mm-sol.com>
+References: <1405613855-27572-1-git-send-email-svarbanov@mm-sol.com>
+ <1405613855-27572-2-git-send-email-svarbanov@mm-sol.com>
+Message-ID: <20140722110341.GE8406@lee--X1>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Daniel Lezcano wrote:
-> 
-> On 07/20/2014 12:06 AM, Olof Johansson wrote:
-> > On Sat, Jul 19, 2014 at 09:52:52AM +0900, Kukjin Kim wrote:
-> >> Note that this is also based on 3.16-rc5 because of dependency with
-> >> previous samsung fixes including exynos_mct already merged in
-> >> mainline during -rc.
-> >>
-> >> The following changes since commit 1795cd9b3a91d4b5473c97f491d63892442212ab:
-> >>
-> >>    Linux 3.16-rc5 (2014-07-13 14:04:33 -0700)
-> >>
-> >> are available in the git repository at:
-> >>
-> >
-> >> git://git.kernel.org/pub/scm/linux/kernel/git/kgene/linux-samsung.git
-> >> tags/exynos-mct
-> >>
-> >> for you to fetch changes up to 1a631118c1d085fe162f3b6d44f710c72206ef2d:
-> >>
-> >>    clocksource: exynos_mct: Only use 32-bits where possible
-> >> (2014-07-19 03:07:52 +0900)
-> >>
-> >> ----------------------------------------------------------------
-> >> exynos_mct update for v3.17
-> >> - only use 32-bit access for performance benefits on exynos
-> >>    32-bit system and this means ARCH timer should be supported
-> >>    on exynos 64-bit system instead of current MCT.
-> >> - use readl_relaxed/writel_relaxed to consistently use the
-> >>    proper functions in exynos_mct.
-> >
-> > There's no reason for these to go through arm-soc, is there? They should
-> > go through the clocksource tree (Daniel Lezcano / Thomas Gleixner). They
-> > also lack acks from them if they for some reason need to go through arm-soc.
-> 
-Olof, you're right. The branch has no dependency with arm-soc so I agreed.
+On Thu, 17 Jul 2014, Stanimir Varbanov wrote:
 
-> Yes, that's right. Furthermore I have been discussing with Doug about
-> these patches before.
+> From: Josh Cartwright <joshc@codeaurora.org>
 > 
-> Kukjin, is there any dependency on these patches ?
+> The Qualcomm SPMI PMIC chips are components used with the
+> Snapdragon 800 series SoC family.  This driver exists
+> largely as a glue mfd component, it exists to be an owner
+> of an SPMI regmap for children devices described in
+> device tree.
 > 
-Yeah, Daniel, it should be handled in the clocksource tree so how should I do
-for it?
+> Signed-off-by: Stanimir Varbanov <svarbanov@mm-sol.com>
 
-Thanks,
-Kukjin
+Needs to be signed off by the author.
+
+> ---
+>  drivers/mfd/Kconfig       |   16 +++++++++++
+>  drivers/mfd/Makefile      |    1 +
+>  drivers/mfd/pm8xxx-spmi.c |   63 +++++++++++++++++++++++++++++++++++++++++++++
+>  3 files changed, 80 insertions(+), 0 deletions(-)
+>  create mode 100644 drivers/mfd/pm8xxx-spmi.c
+
+[...]
+
+> +++ b/drivers/mfd/pm8xxx-spmi.c
+> @@ -0,0 +1,63 @@
+> +/*
+> + * Copyright (c) 2014, The Linux Foundation. All rights reserved.
+> + *
+> + * This program is free software; you can redistribute it and/or modify
+> + * it under the terms of the GNU General Public License version 2 and
+> + * only version 2 as published by the Free Software Foundation.
+> + *
+> + * This program is distributed in the hope that it will be useful,
+> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
+> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+> + * GNU General Public License for more details.
+> + */
+
+There should be a '\n' here.
+
+> +#include <linux/kernel.h>
+> +#include <linux/module.h>
+> +#include <linux/spmi.h>
+> +#include <linux/regmap.h>
+> +#include <linux/of_platform.h>
+
+[...]
+
+> +MODULE_DESCRIPTION("PM8XXX SPMI PMIC driver");
+> +MODULE_ALIAS("platform:" KBUILD_MODNAME);
+> +MODULE_AUTHOR("The Linux Foundation");
+
+The Linux Foundation did not write this patch.
+
+> +MODULE_LICENSE("GPL v2");
+
+Appart from that:
+
+Acked-by: Lee Jones <lee.jones@linaro.org>
+
+-- 
+Lee Jones
+Linaro STMicroelectronics Landing Team Lead
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
