@@ -1,48 +1,33 @@
-From: nm@ti.com (Nishanth Menon)
-Date: Tue, 22 Jul 2014 13:31:43 -0500
-Subject: [PATCH] pinctrl: dra: dt-bindings: Fix pull enable/disable
-In-Reply-To: <20140722164752.GJ20588@saruman.home>
-References: <1406043594-14181-1-git-send-email-nm@ti.com>
- <20140722164752.GJ20588@saruman.home>
-Message-ID: <53CEAE0F.9080901@ti.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Tue, 22 Jul 2014 20:33:44 +0200
+Subject: [PATCH v2] iio: exynos-adc: add experimental touchscreen support
+In-Reply-To: <20140722180904.GB5489@core.coreip.homeip.net>
+References: <5068889.1KfVx3ksNo@wuerfel>
+ <20140722180904.GB5489@core.coreip.homeip.net>
+Message-ID: <5072247.HRN2kuegE2@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/22/2014 11:47 AM, Felipe Balbi wrote:
-> On Tue, Jul 22, 2014 at 10:39:54AM -0500, Nishanth Menon wrote:
->> The DRA74/72 control module pins have a weak pull up and pull down.
->> This is configured by bit offset 17. if BIT(17) is 1, a pull up is
->> selected, else a pull down is selected.
->>
->> However, this pull resisstor is applied based on BIT(16) -
->> PULLUDENABLE - if BIT(18) is *0*, then pull as defined in BIT(17) is
->> applied, else no weak pulls are applied. We defined this in reverse.
->>
->> Reference: Table 18-5 (Description of the pad configuration register
->> bits) in Technical Reference Manual Revision (DRA74x revision Q:
->> SPRUHI2Q Revised June 2014 and DRA72x revision F: SPRUHP2F - Revised
->> June 2014)
->>
->> Fixes: 6e58b8f1daaf1a ("ARM: dts: DRA7: Add the dts files for dra7 SoC and dra7-evm board")
->> Signed-off-by: Nishanth Menon <nm@ti.com>
->> ---
+On Tuesday 22 July 2014 11:09:04 Dmitry Torokhov wrote:
+> > @@ -565,6 +722,15 @@ static int exynos_adc_probe(struct platform_device *pdev)
+> >       if (info->data->init_hw)
+> >               info->data->init_hw(info);
+> >  
+> > +     /* leave out any TS related code if unreachable */
+> > +     if (IS_BUILTIN(CONFIG_INPUT) ||
+> > +         (IS_MODULE(CONFIG_INPUT) && config_enabled(MODULE)))
 > 
-> Tested on an upcoming board.
+> This is ugly... We need IS_SUBSYSTEM_AVAILABLE() wrapper for this...
 > 
-> Tested-by: Felipe Balbi <balbi@ti.com>
-> Acked-by: Felipe Balbi <balbi@ti.com>
+> Anyway,
+> 
+> Acked-by: Dmitry Torokhov <dmitry.torokhov@gmail.com>
 > 
 > 
-Felipe,
-Thanks.
 
-Tony,
+I actually have a patch to introduce IS_REACHABLE() for this purpose,
+but I haven't sent it out for review yet. The main user of this would
+be drivers/media, which had the correct logic earlier until someone
+tried to "simplify" it by replacing it all with IS_ENABLED()...
 
-If you could consider this for the rc cycle it might be great(as well
-as for stable). The pull direction error can cause all kinds of
-Pull-down Vs Pull-Up contention with severe risk for certain IP
-reliability.
-
--- 
-Regards,
-Nishanth Menon
+	Arnd
