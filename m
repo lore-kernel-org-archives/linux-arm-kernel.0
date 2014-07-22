@@ -1,79 +1,44 @@
-From: heiko@sntech.de (Heiko =?ISO-8859-1?Q?St=FCbner?=)
-Date: Tue, 22 Jul 2014 17:45 +0200
-Subject: [PATCH v5 00/14] Clock support for rk3066,rk3188 and rk3288
-In-Reply-To: <2878354.yVHl3h6vxm@diego>
-References: <156042792.J76K6jxIGl@diego>
- <CAOesGMgcM3Z68VUOu8g6Ee0FjvW4r3R2sLtf255e9pv+gGyqFA@mail.gmail.com>
- <2878354.yVHl3h6vxm@diego>
-Message-ID: <14804456.X61YuWlsJQ@diego>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Tue, 22 Jul 2014 16:45:03 +0100
+Subject: [PATCH v2 1/3] usb: dwc3: add ST dwc3 glue layer to manage dwc3 HC
+In-Reply-To: <20140722145711.GC20588@saruman.home>
+References: <1404541530-27856-1-git-send-email-peter.griffin@linaro.org>
+ <1404541530-27856-2-git-send-email-peter.griffin@linaro.org>
+ <20140707124627.GG6407@lee--X1>
+ <20140722091800.GB8233@griffinp-ThinkPad-X1-Carbon-2nd>
+ <20140722145711.GC20588@saruman.home>
+Message-ID: <20140722154503.GC23210@lee--X1>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Mike,
-
-Am Montag, 14. Juli 2014, 10:07:01 schrieb Heiko St?bner:
-> Hi Olof,
-> 
-> Am Sonntag, 13. Juli 2014, 20:12:07 schrieb Olof Johansson:
-> > Hi,
+> > > > +static void st_dwc3_init(struct st_dwc3 *dwc3_data)
+> > > > +{
+> > > > +	u32 reg = st_dwc3_readl(dwc3_data->glue_base, USB2_CLKRST_CTRL);
+> > > > +
+> > > > +	reg |= aux_clk_en(1) | ext_cfg_reset_n(1) | xhci_revision(1);
+> > > > +	reg &= ~sw_pipew_reset_n(1);
+> > > 
+> > > 1?  Better to add defines for these magic numbers.  What is 1 anyway?
 > > 
-> > On Sun, Jul 13, 2014 at 12:46 PM, Mike Turquette <mturquette@linaro.org>
+> > They are just bit setting macros, I've converted them over to use BIT macro now,
+> > so it no longer takes a parameter.
 > 
-> wrote:
-> > > Quoting Heiko St?bner (2014-07-02 16:53:24)
-> > > 
-> > >> This series adds a clock driver infrastructure for Rockchip SoCs in
-> > >> general and clock-definitions for the RK3188 and RK3288 in particular.
-> > >> 
-> > >> Apart from the arch/arm patches included here, there are some more
-> > >> in the waiting line, like adding the i2c nodes and possibly the pwm,
-> > >> i2s
-> > >> and spi nodes if the relevant drivers get accepted, where the ids
-> > >> defined in the dt-binding headers are needed.
-> > >> 
-> > >> So if the whole thing is acceptable could we either offer a branch
-> > >> from the clk-tree that can get merged or take the whole series through
-> > >> the arm tree?
-> > > 
-> > > Heiko,
-> > > 
-> > > This version looks good. I've pushed a branch with all 14 of these
-> > > patches based on 3.16-rc3 to the clk tree. See:
-> > > 
-> > > git://git.linaro.org/people/mike.turquette/linux.git clk-rockchip
-> > > 
-> > > If everyone is OK to merge that stable branch then I will merge
-> > > clk-rockchip into clk-next and we're all good. If the arm-soc guys want
-> > > to carve it up a bit further or handle it in a different way then we can
-> > > do that. I've Cc'd arm-soc for clarification.
-> > 
-> > Traditionally we usually take the DT changes through arm-soc, but as
-> > long as we share the branch we might be ok. We tend to stick them in
-> > different branches in our tree though, so rockchip will be a little
-> > mis-sorted this release. Not a big deal, and we can deal with it.
-> > 
-> > So, I'll leave it to Heiko to choose here, he knows best what other DT
-> > changes are coming this release. If he wants to carry the DT changes
-> > separately, then patches 1-10 would be for the clk tree, so it should
-> > be easy to reset the branch back a bit (and 11-14 would be for
-> > arm-soc).
-> 
-> hmm, there are essentially two changeset/branches upcoming:
-> - the collected dts changes for rk3066 and rk3188 I posted saturday
->   These essentially extend patches 12-14
-> - rk3288 support which would start off patch 11 (the reset controller)
-> 
-> So if we were to separate the series I would say patches 1-11 in the shared
-> branch and patch 12-14 as the first ones for a rk3066/rk3188 specific
-> branch.
+> the macros are better, but make them upper case as everybody else.
 
-are you ok with simply resetting the clk-rockchip branch to
-	"ARM: rockchip: Select ARCH_HAS_RESET_CONTROLLER"
-being the last commit and the last 3 patches going through arm-soc?
+When you say that the macros are better, what do you mean?
 
-As we're already at -rc6 now, it would be very cool if we could get this 
-sorted soon.
+Defines do the job in a manner which is a great deal cleaner:
 
+#define AUX_CLK_EN        BIT(0)
+#define SW_PIPEW_RESET_N  BIT(4)
+#define EXT_CFG_RESET_N   BIT(8)
+#define XHCI_REVISION     BIT(12)
 
-Thanks
-Heiko
+reg = AUX_CLK_EN | SW_PIPEW_RESET_N | XHCI_REVISION;
+reg &= ~SW_PIPEW_RESET_N
+
+-- 
+Lee Jones
+Linaro STMicroelectronics Landing Team Lead
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
