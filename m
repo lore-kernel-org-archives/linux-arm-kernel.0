@@ -1,42 +1,39 @@
 From: lee.jones@linaro.org (Lee Jones)
-Date: Tue, 22 Jul 2014 13:08:14 +0100
-Subject: [PATCH 03/19] mfd: tps80031: Fix 'missing break or fall-through
- comment' warning
-In-Reply-To: <5230900.iFlbGceLXl@wuerfel>
+Date: Tue, 22 Jul 2014 13:13:06 +0100
+Subject: [PATCH 01/19] mfd: max77686: Fix 'line over 80 chars' warning
+In-Reply-To: <CAMf-jSn4y40p+tpUNMnCMMmAEQbjXBqbfgPy3zWrTs_b85uvxg@mail.gmail.com>
 References: <1406027485-15657-1-git-send-email-lee.jones@linaro.org>
- <1406027485-15657-4-git-send-email-lee.jones@linaro.org>
- <5230900.iFlbGceLXl@wuerfel>
-Message-ID: <20140722120814.GA16065@lee--X1>
+ <1406027485-15657-2-git-send-email-lee.jones@linaro.org>
+ <CAMf-jSn4y40p+tpUNMnCMMmAEQbjXBqbfgPy3zWrTs_b85uvxg@mail.gmail.com>
+Message-ID: <20140722121306.GB16065@lee--X1>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 22 Jul 2014, Arnd Bergmann wrote:
+On Tue, 22 Jul 2014, pramod gurav wrote:
 
-> On Tuesday 22 July 2014 12:11:09 Lee Jones wrote:
-> > --- a/drivers/mfd/tps80031.c
-> > +++ b/drivers/mfd/tps80031.c
-> > @@ -334,6 +334,7 @@ static bool rd_wr_reg_id1(struct device *dev, unsigned int reg)
-> >         case TPS80031_PREQ1_RES_ASS_A ... TPS80031_PREQ3_RES_ASS_C:
-> >         case TPS80031_SMPS_OFFSET ... TPS80031_BATDEBOUNCING:
-> >         case TPS80031_CFG_INPUT_PUPD1 ... TPS80031_CFG_SMPS_PD:
-> > +               /* Fall through */
-> >         case TPS80031_BACKUP_REG:
-> >                 return true;
-> >         default:
+> On Tue, Jul 22, 2014 at 4:41 PM, Lee Jones <lee.jones@linaro.org> wrote:
+> > This is part of an effort to clean-up the MFD subsystem.
+> >
+> <snip>
+> >         max77686->rtc_regmap = devm_regmap_init_i2c(max77686->rtc,
+> Which kernel are you on? Because 3.16.rc6 does not match with these
+> lines. Its something like this:
+>           'max77686->regmap = devm_regmap_init_i2c(i2c,
+> &max77686_regmap_config);'
 > 
-> This one seems to make the code look worse: You are only adding the comment
-> to one case, not all of them, and it was perfectly understandable
-> before.
-> 
-> Further, there are a couple of other functions following this one that
-> also don't have that comment.
-> 
-> It seems checkpatch missed all the other cases because they contain '...'
-> lists, whereas the one above does not. I think it's better left alone.
+> Sorry if I am missing something.
 
-You're right.  I forgot to remove this patch from the set.
+It's based on the most recent MFD for-mfd-next branch.
 
-Please see: https://lkml.org/lkml/2014/7/21/223
+You're missing the following patches:
+
+  mfd: max77686: Remove unneeded OOM error message
+  mfd: max77686: Make error checking consistent
+  mfd: max77686: Return correct error when pdata isn't found
+  mfd: max77686: Make platform data over-rule DT
+  mfd: max77686: Don't define dummy function if OF isn't enabled
+  mfd: max77686: Add power management support
+  mfd: max77686: Convert to use regmap_irq
 
 -- 
 Lee Jones
