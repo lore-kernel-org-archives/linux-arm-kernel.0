@@ -1,38 +1,60 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Tue, 22 Jul 2014 09:13:54 +0100
-Subject: [PATCH v7 8/9] ARM: vdso initialization, mapping, and
- synchronization
-In-Reply-To: <CALCETrXGi3a3G=dH2R6-mu2BwGdEyn3AXrGVRstye6zPO1mFxA@mail.gmail.com>
-References: <CALCETrWeTeeuz4vW6wrhtDrdg54O-hhFbspfKEEunRZ0zf7ZBg@mail.gmail.com>
- <20140702144050.GD24879@arm.com>
- <CALCETrUVa-Yt7qZpzkpiAGVf+sYeasNq_YS1MuH6CFfWCcW6BA@mail.gmail.com>
- <53B430F3.9070804@mentor.com> <20140702162726.GG24879@arm.com>
- <CALCETrVSqH66jqG2_O2dir-3md4SHH800qs++4KhWYsGm9T-BQ@mail.gmail.com>
- <20140702172443.GI24879@arm.com>
- <CALCETrU-461E2ybeYcN7KFSPkwWtHikwCDo4t9T5Z5dCBGmNJA@mail.gmail.com>
- <20140702185422.GP24879@arm.com>
- <CALCETrXGi3a3G=dH2R6-mu2BwGdEyn3AXrGVRstye6zPO1mFxA@mail.gmail.com>
-Message-ID: <20140722081354.GE24282@arm.com>
+From: shawn.guo@freescale.com (Shawn Guo)
+Date: Tue, 22 Jul 2014 16:15:38 +0800
+Subject: iMX6Q FEC: transmit queue 0 timed out
+In-Reply-To: <CAOpc7mHvddM1bCex13yPTRrEkFqYvk2YHYajZeMn+MG83neUBA@mail.gmail.com>
+References: <20140602124242.GB933@n2100.arm.linux.org.uk>
+ <CAOpc7mFbJQNeBmOG0C-Qn856MmhtUkTq=QeDPC-EWXryi6sFGg@mail.gmail.com>
+ <20140602133352.GC933@n2100.arm.linux.org.uk>
+ <CAOpc7mHJ5CqCcB1rE3b8q58HDdSWeG41PTAMwgeARAL_hgUt_g@mail.gmail.com>
+ <d7f1957c2afc44e8b900001e606905c0@BLUPR03MB373.namprd03.prod.outlook.com>
+ <CAOpc7mHHOmEcvnSDTc+9eyCtLyMBvR2aU36XFcddT4pa0f2KOQ@mail.gmail.com>
+ <a97d34741f694cd2b89b4c7f0bebc114@BLUPR03MB373.namprd03.prod.outlook.com>
+ <CAOpc7mHxYVOUQVcTqPH9pLXtqNaxgeqJGoJ=U4cRNgSzOpj7Wg@mail.gmail.com>
+ <20140604135047.GC23430@n2100.arm.linux.org.uk>
+ <CAOpc7mHvddM1bCex13yPTRrEkFqYvk2YHYajZeMn+MG83neUBA@mail.gmail.com>
+Message-ID: <20140722081536.GD5485@dragon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jul 22, 2014 at 01:14:35AM +0100, Andy Lutomirski wrote:
-> On Wed, Jul 2, 2014 at 11:54 AM, Will Deacon <will.deacon@arm.com> wrote:
-> > Ok, so that explains why things are working at the moment and it sounds like
-> > we have some wiggle room too. I'll look at moving the datapage anyway, since
-> > having these artificial limits is error-prone and fragile, but I don't think
-> > it's something we need to panic about immediately.
-> >
-> > Also, if you get to the bottom of your binutils issues with the section
-> > allocation, that might work for us since we don't really have any legacy
-> > binutils supporting arm64.
+On Wed, Jul 16, 2014 at 10:41:10AM +0200, Holger Schurig wrote:
+> Andy,
 > 
-> Just in case anyone still cares about this thread, moving the vvar
-> area back before the vdso text is queued up for 3.17.  I gave up on
-> reliably keeping binutils happy with my ugly hack.
+> to revive an old thread: I now got ethernet working. Basically, I
+> needed to set the system so that the PHY is generating the ref-clock.
+> I found even code in arch/arm/mach-imx/mach-imx6q.c that controls
+> setting of GPR1[21] from the device tree. However, I wasn't really
+> able to come up with a device-tree that triggers the code
+> IMX6Q_GPR1_ENET_CLK_SEL_PAD. For example, Neither
+> Documentation/devicetree/bindings/net/fsl-fec.txt nor any other file
+> there mention anything on how to do this.
+> 
+> Currently I disable the 3rd clock. I changed the default
+>          clocks = <&clks 117>, <&clks 117>, <&clks 190>;
+>          clock-names = "ipg", "ahb", "ptp";
+> (from imx6qdl.dtsi) to my dts:
+>          clocks = <&clks 117>, <&clks 117>;
+>          clock-names = "ipg", "ahb";
+> 
+> Would I have needed to create some dummy clock, e.g. "ext-phy-clk" and
+> specified that as a third clock in my dts?
 
-The same change is also queued for arm64.
+Since in your setup PHY is generating the reference clock, you need to
+define this clock in your board dts, and overwrite the 'ptp' clock with
+it, something like the following.
 
-Thanks Andy,
+clocks {
+	#address-cells = <1>;
+	#size-cells = <0>;
 
-Will
+	rmii_clk: clock at 0 {
+		compatible = "fixed-clock";
+		reg = <0>;
+		#clock-cells = <0>;
+		clock-frequency = <25000000>;  /* 25MHz for example */
+		clock-output-names = "rmii_ref_clk";
+	};
+};
+
+&fec {
+        clocks = <&clks 117>, <&clks 117>, <&rmii_clk>;
+};
