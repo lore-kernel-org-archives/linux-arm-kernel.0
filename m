@@ -1,33 +1,35 @@
-From: maxime.coquelin@st.com (Maxime Coquelin)
-Date: Tue, 22 Jul 2014 18:15:35 +0200
-Subject: [STLinux Kernel] [PATCH v3 10/10] MAINTAINERS: Add sdhci-st file
- to ARCH/STI architecture
-In-Reply-To: <CAOesGMhEnwGJR+SgM6XJhW9WT5LAo_-Hxd+kfQHBz7thu+QFJA@mail.gmail.com>
-References: <1401899424-1365-1-git-send-email-peter.griffin@linaro.org>	<1401899424-1365-11-git-send-email-peter.griffin@linaro.org>	<53A80754.9000900@st.com>	<53CE556C.10607@st.com>
- <CAOesGMhEnwGJR+SgM6XJhW9WT5LAo_-Hxd+kfQHBz7thu+QFJA@mail.gmail.com>
-Message-ID: <53CE8E27.1060002@st.com>
+From: olof@lixom.net (Olof Johansson)
+Date: Tue, 22 Jul 2014 09:17:32 -0700
+Subject: [PATCH 2/2] ARM: multi_v7_defconfig: Enable MiPHY365x - ST's
+ Generic (SATA & PCIe) PHY
+In-Reply-To: <53CE8E14.9020206@st.com>
+References: <1406021985-8763-1-git-send-email-lee.jones@linaro.org>
+ <1406021985-8763-2-git-send-email-lee.jones@linaro.org>
+ <20140722160630.GA31092@quad.lixom.net> <53CE8E14.9020206@st.com>
+Message-ID: <20140722161732.GB31092@quad.lixom.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Tue, Jul 22, 2014 at 06:15:16PM +0200, Maxime Coquelin wrote:
+> Hi Olof,
+> 
+> On 07/22/2014 06:06 PM, Olof Johansson wrote:
+> >On Tue, Jul 22, 2014 at 10:39:45AM +0100, Lee Jones wrote:
+> >>Signed-off-by: Lee Jones <lee.jones@linaro.org>
+> >
+> >Appled both. In the future, feel free to batch them up in one commit,
+> >no need to keep them separate since they're related.
+> 
+> I added both to the pull request for defconfig I sent this afternoon.
+> Not an issue?
+
+Yes, that's an issue.
+
+If you comment on a patch you apply, then others will know that you have picked
+it up.
+
+I've dropped the versions I applied now so that we don't get duplicate commits
+when I merge your branch.
 
 
-On 07/22/2014 06:00 PM, Olof Johansson wrote:
-> On Tue, Jul 22, 2014 at 5:13 AM, Maxime Coquelin <maxime.coquelin@st.com> wrote:
->> Hi Olof, Arnd, Kevin,
->>
->>          I am preparing two tags for v3.17 regarding STi platform.
->>          One for DT, and one for defconfigs.
->>
->>          Except this one, I have no patches for ARM-SoC.
->>          Can you take this patch directly?
->>
->>          Or should I send a pull request with this one only?
->
-> We can apply directly. I'll do that in a moment here.
-
-Thanks!
-Maxime
->
->
-> -Olof
->
+-Olof
