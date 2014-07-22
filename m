@@ -1,51 +1,58 @@
-From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
-Date: Tue, 22 Jul 2014 16:31:28 +0200
-Subject: [PATCH] ARM: imx6: fix SMP compilation again
-In-Reply-To: <20140722134815.GZ8537@dragon>
-References: <37015543.ZyZKZyEIPW@wuerfel> <20140722085055.GX8537@dragon>
- <16557676.B1fW0k49Wz@wuerfel> <20140722134815.GZ8537@dragon>
-Message-ID: <20140722143128.GC28538@pengutronix.de>
+From: varkabhadram@gmail.com (Varka Bhadram)
+Date: Tue, 22 Jul 2014 20:02:53 +0530
+Subject: [PATCH v4 02/11] mfd: add documentation for atmel-hlcdc DT
+ bindings
+In-Reply-To: <1406034695-15534-3-git-send-email-boris.brezillon@free-electrons.com>
+References: <1406034695-15534-1-git-send-email-boris.brezillon@free-electrons.com>
+ <1406034695-15534-3-git-send-email-boris.brezillon@free-electrons.com>
+Message-ID: <53CE7615.4070001@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jul 22, 2014 at 09:48:16PM +0800, Shawn Guo wrote:
-> On Tue, Jul 22, 2014 at 12:26:31PM +0200, Arnd Bergmann wrote:
-> > Ah, you are right, I got the text wrong here, and I think I now understand
-> > why it didn't happen earlier. Updated patch below (same patch, new
-> > text).
-> > 
-> > 8<-------------
-> > Subject: [PATCH] ARM: imx6: fix SMP compilation again
-> > 
-> > My earlier patch 1fc593feaf8e ("ARM: imx: build i.MX6 functions
-> > only when needed") fixed a problem with building an i.MX5 kernel,
-> > but now the problem has returned for the case where we allow
-> > ARMv6K SMP builds in multiplatform. With CONFIG_CPU_V7 disabled,
-> > but i.MX3 and SMP enabled, we get this build error:
-> 
-> Maybe I missed something, but I have problem to get the following three
-> conditions meet in a single kernel configuration.
-> 
->  a) CONFIG_CPU_V7 disabled
->  b) i.MX3 enabled
->  c) SMP enabled
-> 
-> When I get a) and b) in the config, I have no way to get c).  And it
-> seems that the only way to get a) and c) at the same time is to enable
-> MACH_REALVIEW_PB11MP, which is not part of multi-platform support.  So
-> i.MX3 cannot be enabled in there.
-> 
-> I tried both mainline and -next tree.  I really need some help to
-> reproduce the error first.
-Without even looking at the patch, I think the key here is this part of
-Arnd's commit log:
 
-	for the case where we allow ARMv6K SMP builds in multiplatform
-	...
+On Tuesday 22 July 2014 06:41 PM, Boris BREZILLON wrote:
+> The HLCDC IP available on some Atmel SoCs (i.e. at91sam9n12, at91sam9x5
+> family or sama5d3 family) exposes 2 subdevices:
+> - a display controller (controlled by a DRM driver)
+> - a PWM chip
+>
+> This patch adds documentation for atmel-hlcdc DT bindings.
+>
+> Signed-off-by: Boris BREZILLON <boris.brezillon@free-electrons.com>
+> ---
+>   .../devicetree/bindings/mfd/atmel-hlcdc.txt        | 50 ++++++++++++++++++++++
+>   1 file changed, 50 insertions(+)
+>   create mode 100644 Documentation/devicetree/bindings/mfd/atmel-hlcdc.txt
+>
+> diff --git a/Documentation/devicetree/bindings/mfd/atmel-hlcdc.txt b/Documentation/devicetree/bindings/mfd/atmel-hlcdc.txt
+> new file mode 100644
+> index 0000000..e9cc1b2
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/mfd/atmel-hlcdc.txt
+> @@ -0,0 +1,50 @@
+> +Device-Tree bindings for Atmel's HLCDC (High LCD Controller) MFD driver
+> +
+> +Required properties:
+> + - compatible: value should be one of the following:
+> +   "atmel,sama5d3-hlcdc"
+> + - reg: base address and size of the HLCDC device registers.
+> + - clock-names: the name of the 3 clocks requested by the HLCDC device.
+> +   Should contain "periph_clk", "sys_clk" and "slow_clk".
+> + - clocks: should contain the 3 clocks requested by the HLCDC device.
+> +
 
-Best regards
-Uwe
+These bindings not clearly readable. It would be readable if
+
+Required properties:
+  - compatible	: value should be one of the following:"atmel,sama5d3-hlcdc"
+  - reg		: base address and size of the HLCDC device registers.
+  - clock-names	: the name of the 3 clocks requested by the HLCDC device.
+		  Should contain "periph_clk", "sys_clk" and "slow_clk".
+  - clocks	: should contain the 3 clocks requested by the HLCDC device.
+
+......
+
 
 -- 
-Pengutronix e.K.                           | Uwe Kleine-K?nig            |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Regards,
+Varka Bhadram
