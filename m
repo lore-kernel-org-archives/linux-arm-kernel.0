@@ -1,53 +1,37 @@
-From: matthias.bgg@gmail.com (Matthias Brugger)
-Date: Tue, 22 Jul 2014 18:25:45 +0200
-Subject: [GIT PULL v2] Mediatek basic support for v3.17
-Message-ID: <CABuKBe+_Bosow3VeM5geMKHv9LagOik0BL_T+aarQU4pEbRXUQ@mail.gmail.com>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Tue, 22 Jul 2014 10:27:25 -0600
+Subject: [GIT PULL 2/3] ARM: tegra: move fuse code out of arch/arm
+In-Reply-To: <20140722102749.GB2219@arm.com>
+References: <1403558626-13422-2-git-send-email-swarren@wwwdotorg.org>
+ <20140707004417.GE8469@quad.lixom.net>
+ <20140708134359.GA23218@tbergstrom-lnx.Nvidia.com>
+ <CAOesGMhoqvqf-dktp-OfUNTPLahPwkyAPiTeDngr4QjH=VfOGA@mail.gmail.com>
+ <53C88A4C.3070304@wwwdotorg.org>
+ <CAOesGMh+zLV781wzdR5=_Bpzh+XMwJfWL-5XMDP6DwG_Hg80kw@mail.gmail.com>
+ <53CD2C58.6060601@wwwdotorg.org> <20140721155451.GF32578@arm.com>
+ <53CD4201.5070705@wwwdotorg.org>
+ <CAOesGMgvd1HbjywN7BDPtr8ZU7vucWH48B=AW3TZjng73YA8WA@mail.gmail.com>
+ <20140722102749.GB2219@arm.com>
+Message-ID: <53CE90ED.8030900@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Patches 1-4 from v10 of the patch set have been merged by Daniel Lezcano [0].
-This
+On 07/22/2014 04:27 AM, Catalin Marinas wrote:
+...
+> ...It's also aimed at
+> pushing back on hardware people who think they can mess up, for example,
+> a GIC implementation because the rest is just software and you can
+> always add #ifdefs.
 
+I'm very concerned about this statement.
 
+Yes, it would be nice if all HW was sanely designed, but it's not
+always. The time to push back on bad HW design is during IP licensing
+agreements or HW design reviews, not upstreaming.
 
-
-----------------------------------------------------------------
-The following changes since commit 7171511eaec5bf23fb06078f59784a3a0626b38f:
-
-  Linux 3.16-rc1 (2014-06-15 17:45:28 -1000)
-
-are available in the git repository at:
-
-  https://github.com/mbgg/linux-mediatek.git tags/v3.17-next-mediatek-support
-
-for you to fetch changes up to afaedea451149ab8f08c37ce688c8021ed347811:
-
-  arm: mediatek: add dts for Aquaris5 mobile phone (2014-07-22 17:52:38 +0200)
-
-----------------------------------------------------------------
-This patch set adds basic support for the Mediatek Cortex-A7 SoCs.
-
-Support is quite basic, as the only component working up to now are the
-timers.
-
-----------------------------------------------------------------
-Matthias Brugger (3):
-      arm: add basic support for Mediatek MT6589 boards
-      dt-bindings: add documentation for Mediatek SoC
-      arm: mediatek: add dts for Aquaris5 mobile phone
-
- Documentation/devicetree/bindings/arm/mediatek.txt |    8 ++
- arch/arm/Kconfig                                   |    2 +
- arch/arm/Makefile                                  |    1 +
- arch/arm/boot/dts/mt6589-aquaris5.dts              |   25 ++++++
- arch/arm/boot/dts/mt6589.dtsi                      |   94 ++++++++++++++++++++
- arch/arm/mach-mediatek/Kconfig                     |    6 ++
- arch/arm/mach-mediatek/Makefile                    |    1 +
- arch/arm/mach-mediatek/mediatek.c                  |   27 ++++++
- 8 files changed, 164 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/arm/mediatek.txt
- create mode 100644 arch/arm/boot/dts/mt6589-aquaris5.dts
- create mode 100644 arch/arm/boot/dts/mt6589.dtsi
- create mode 100644 arch/arm/mach-mediatek/Kconfig
- create mode 100644 arch/arm/mach-mediatek/Makefile
- create mode 100644 arch/arm/mach-mediatek/mediatek.c
+Any pushback during SW upstreaming simply serves to make it difficult
+for the SW people doing the upstreaming. It has zero impact on the
+current HW design (it's already shipped). It probably has zero impact on
+the next N revisions of the HW (they're already baked). It's possible it
+has zero-to-minimal impact on any future HW (end-user product
+requirements are what matter most).
