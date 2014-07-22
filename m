@@ -1,89 +1,59 @@
-From: computersforpeace@gmail.com (Brian Norris)
-Date: Tue, 22 Jul 2014 13:44:31 -0700
-Subject: [PATCH v8 00/11] ARM: brcmstb: Add Broadcom STB SoC support
-In-Reply-To: <5675728.WLk3P96IBM@wuerfel>
-References: <1405976886-27807-1-git-send-email-computersforpeace@gmail.com>
- <5675728.WLk3P96IBM@wuerfel>
-Message-ID: <20140722204431.GG28323@ld-irv-0074>
+From: jason@lakedaemon.net (Jason Cooper)
+Date: Tue, 22 Jul 2014 16:57:06 -0400
+Subject: [GIT PULL] ARM: mvebu: SoC changes for v3.17 (round 3)
+Message-ID: <20140722205706.GA23220@titan.lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-+ Sebastian
+All,
 
-On Tue, Jul 22, 2014 at 09:35:45AM +0200, Arnd Bergmann wrote:
-> On Monday 21 July 2014 14:07:55 Brian Norris wrote:
-> > I'm taking over the latest resubmission of this patch series.
-> > There are a few moderate changes for v8 (noted below), but we
-> > are waiting mostly for an Ack for the reboot driver.
-> > 
-> > This patchset contains the board support package for the
-> > Broadcom BCM7445 ARM-based SoC [1]. These changes contain a
-> > minimal set of code needed for a BCM7445-based board to boot
-> > the Linux kernel.
-> > 
-> > These changes heavily leverage the OF/devicetree framework. The
-> > machine is also built into the multi-platform ARMv7 image.
-> > 
-> > Changes are also available here:
-> > 
-> >   https://github.com/brcm/linux/tree/brcmstb-v8
-> >   git://github.com/brcm/linux.git +brcmstb-v8
-> 
-> Whole series
-> 
-> Acked-by: Arnd Bergmann <arnd@arndb.de>
+Here's the cpufreq changes I mentioned over the weekend.  It's been in
+-next for a while.  Once I get the new version of cpuidle from ThomasP,
+I'll push that as quickly as possible.
 
-Thanks!
+As usual (do I need to type this each time any more? :) ), this is an
+incremental pull request from tags/mvebu-soc-3.17-2 up to
+tags/mvebu-soc-3.17-3 on the mvebu/soc branch.
 
-> I think we should try to get this merged into 3.17, it's already
-> taken too long and the patches look good.
+Please pull.
 
-Yes, it's about time.
+thx,
 
-> Please add the core architecture patches for arch/arm into Russell's
-> patch tracker http://www.arm.linux.org.uk/developer/patches/.
+Jason.
 
-OK, that's unfamiliar to me, but I'll try that out.
 
-> For the platform changes in the first patch, I would prefer to have
-> Matt pick up the first patch, but we can also apply it directly into
-> arm-soc if he prefers that.
+The following changes since commit ba364fc752daeded072a5ef31e43b84cb1f9e5fd:
 
-That brings up a question related to PATCH 11 in the series (MAINTAINERS
-update); who will be maintaining arch/arm/mach-bcm/*brcmstb*, and how
-will code go upstream? It seems like Matt and Christian are officially
-mach-bcm maintainers, although I don't know if Christian is still
-involved.
+  ARM: Kirkwood: Remove mach-kirkwood (2014-07-13 22:13:39 +0000)
 
-Also, BCM7xxx shares little in common with the rest of mach-bcm, except
-a company name, so we'd really like at least the 'Maintainer' entries
-for the CC. I was planning on a separate git tree too, although it could
-have conflicts if we touch arch/arm/mach-bcm/{Makefile,Kconfig}.
+are available in the git repository at:
 
-So would we send a separate arm-soc pull request for the arm-soc
-targeted changes (and all future development)?
+  git://git.infradead.org/linux-mvebu.git tags/mvebu-soc-3.17-3
 
-> The reset driver can ideally go through the drivers/power/ maintainers,
-> but if they are not interested in merging it, we can also take that
-> through arm-soc.
+for you to fetch changes up to ba3ec5780bba27819bbc4f669e6c77418a00f14b:
 
-I don't see much activity from the drivers/power/ maintainers on the
-mailing lists, and I know David Woodhouse at least has been severely
-distracted (I took over for him on driver/mtd/ recently), so I don't
-expect much. (EDIT: I see [1]. Nice!)
+  Merge branch 'mvebu/soc-cpufreq' into mvebu/soc (2014-07-22 20:46:48 +0000)
 
-> See also my one comment on that driver.
+----------------------------------------------------------------
 
-I proposed an additional diff on that patch in response.
+mvebu SoC changes for v3.17 (round 3)
 
-I can strip the drivers/power/reboot/ driver out and send it separately
-to our new drivers/power/ maintainer (thanks Sebastian!), and hope that
-it gets through for 3.17.
+ - mvebu:
+    - Add cpufreq support for Armada XP
 
-For the reset of mach-bcm stuff, I'll just send an arm-soc pull request
-soon enough, unless Matt/Arnd/Olof object.
+----------------------------------------------------------------
+Jason Cooper (1):
+      Merge branch 'mvebu/soc-cpufreq' into mvebu/soc
 
-Thanks,
-Brian
+Thomas Petazzoni (3):
+      ARM: mvebu: ensure CPU clocks are enabled
+      ARM: mvebu: extend PMSU code to support dynamic frequency scaling
+      clk: mvebu: extend clk-cpu for dynamic frequency scaling
 
-[1] https://lkml.org/lkml/2014/7/16/539
+ .../devicetree/bindings/clock/mvebu-cpu-clock.txt  |   5 +-
+ arch/arm/mach-mvebu/platsmp.c                      |   1 +
+ arch/arm/mach-mvebu/pmsu.c                         | 162 +++++++++++++++++++++
+ drivers/clk/mvebu/clk-cpu.c                        |  80 +++++++++-
+ include/linux/mvebu-pmsu.h                         |  20 +++
+ 5 files changed, 261 insertions(+), 7 deletions(-)
+ create mode 100644 include/linux/mvebu-pmsu.h
