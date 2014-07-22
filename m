@@ -1,37 +1,41 @@
 From: lee.jones@linaro.org (Lee Jones)
-Date: Tue, 22 Jul 2014 12:11:11 +0100
-Subject: [PATCH 05/19] mfd: wm8350-irq: Fix 'line over 80 chars' warning
+Date: Tue, 22 Jul 2014 12:11:14 +0100
+Subject: [PATCH 08/19] mfd: twl6040: Fix 'insert space after ','', error
 In-Reply-To: <1406027485-15657-1-git-send-email-lee.jones@linaro.org>
 References: <1406027485-15657-1-git-send-email-lee.jones@linaro.org>
-Message-ID: <1406027485-15657-6-git-send-email-lee.jones@linaro.org>
+Message-ID: <1406027485-15657-9-git-send-email-lee.jones@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 This is part of an effort to clean-up the MFD subsystem.
 
-WARNING: line over 80 characters
-+       wm8350->irq_base = irq_alloc_descs(irq_base, 0, ARRAY_SIZE(wm8350_irqs), 0);
+ERROR: space required after that ',' (ctx:VxO)
++                                 0, &twl6040_irq_chip,&twl6040->irq_data);
+                                                      ^
 
-total: 0 errors, 1 warnings, 552 lines checked
+ERROR: space required before that '&' (ctx:OxV)
++                                 0, &twl6040_irq_chip,&twl6040->irq_data);
+                                                       ^
+
+total: 2 errors, 0 warnings, 816 lines checked
 
 Signed-off-by: Lee Jones <lee.jones@linaro.org>
 ---
- drivers/mfd/wm8350-irq.c | 3 ++-
- 1 file changed, 2 insertions(+), 1 deletion(-)
+ drivers/mfd/twl6040.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/drivers/mfd/wm8350-irq.c b/drivers/mfd/wm8350-irq.c
-index cd01f79..813ff50 100644
---- a/drivers/mfd/wm8350-irq.c
-+++ b/drivers/mfd/wm8350-irq.c
-@@ -497,7 +497,8 @@ int wm8350_irq_init(struct wm8350 *wm8350, int irq,
- 	if (pdata && pdata->irq_base > 0)
- 		irq_base = pdata->irq_base;
+diff --git a/drivers/mfd/twl6040.c b/drivers/mfd/twl6040.c
+index ae26d84..f9c06c5 100644
+--- a/drivers/mfd/twl6040.c
++++ b/drivers/mfd/twl6040.c
+@@ -700,7 +700,7 @@ static int twl6040_probe(struct i2c_client *client,
+ 	}
  
--	wm8350->irq_base = irq_alloc_descs(irq_base, 0, ARRAY_SIZE(wm8350_irqs), 0);
-+	wm8350->irq_base =
-+		irq_alloc_descs(irq_base, 0, ARRAY_SIZE(wm8350_irqs), 0);
- 	if (wm8350->irq_base < 0) {
- 		dev_warn(wm8350->dev, "Allocating irqs failed with %d\n",
- 			wm8350->irq_base);
+ 	ret = regmap_add_irq_chip(twl6040->regmap, twl6040->irq, IRQF_ONESHOT,
+-				  0, &twl6040_irq_chip,&twl6040->irq_data);
++				  0, &twl6040_irq_chip, &twl6040->irq_data);
+ 	if (ret < 0)
+ 		goto gpio_err;
+ 
 -- 
 1.8.3.2
