@@ -1,51 +1,60 @@
-From: maxime.coquelin@st.com (Maxime Coquelin)
-Date: Tue, 22 Jul 2014 14:13:32 +0200
-Subject: [STLinux Kernel] [PATCH v3 10/10] MAINTAINERS: Add sdhci-st file
- to ARCH/STI architecture
-In-Reply-To: <53A80754.9000900@st.com>
-References: <1401899424-1365-1-git-send-email-peter.griffin@linaro.org>	<1401899424-1365-11-git-send-email-peter.griffin@linaro.org>
- <53A80754.9000900@st.com>
-Message-ID: <53CE556C.10607@st.com>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Tue, 22 Jul 2014 13:15:56 +0100
+Subject: [PATCH 02/19] mfd: max8925-i2c: Fix 'blank line after
+ declarations' warning
+In-Reply-To: <CAMf-jSn5zZ1FBt+atzB9frZZ6yu_OTTfmJF2e7CEgQDbdzytBg@mail.gmail.com>
+References: <1406027485-15657-1-git-send-email-lee.jones@linaro.org>
+ <1406027485-15657-3-git-send-email-lee.jones@linaro.org>
+ <CAMf-jSn5zZ1FBt+atzB9frZZ6yu_OTTfmJF2e7CEgQDbdzytBg@mail.gmail.com>
+Message-ID: <20140722121556.GC16065@lee--X1>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Olof, Arnd, Kevin,
+On Tue, 22 Jul 2014, pramod gurav wrote:
 
-	I am preparing two tags for v3.17 regarding STi platform.
-	One for DT, and one for defconfigs.
+> On Tue, Jul 22, 2014 at 4:41 PM, Lee Jones <lee.jones@linaro.org> wrote:
+> > This is part of an effort to clean-up the MFD subsystem.
+> >
+> > WARNING: Missing a blank line after declarations
+> > +       int ret;
+> > +       ret = i2c_add_driver(&max8925_driver);
+> >
+> > total: 0 errors, 1 warnings, 275 lines checked
+> >
+> > Signed-off-by: Lee Jones <lee.jones@linaro.org>
+> > ---
+> >  drivers/mfd/max8925-i2c.c | 2 ++
+> >  1 file changed, 2 insertions(+)
+> >
+> > diff --git a/drivers/mfd/max8925-i2c.c b/drivers/mfd/max8925-i2c.c
+> > index a83eed5..ecbe78e 100644
+> > --- a/drivers/mfd/max8925-i2c.c
+> > +++ b/drivers/mfd/max8925-i2c.c
+> > @@ -257,9 +257,11 @@ static struct i2c_driver max8925_driver = {
+> >  static int __init max8925_i2c_init(void)
+> >  {
+> >         int ret;
+> > +
+> >         ret = i2c_add_driver(&max8925_driver);
+> >         if (ret != 0)
+> >                 pr_err("Failed to register MAX8925 I2C driver: %d\n", ret);
+> > +
+> There are more such changes required in this file. If they could go
+> with this, will be good.
 
-	Except this one, I have no patches for ARM-SoC.
-	Can you take this patch directly?
+Checkpatch only found this one:
 
-	Or should I send a pull request with this one only?
+> WARNING: Missing a blank line after declarations
+> #260: FILE: drivers/mfd/max8925-i2c.c:260:
+> +	int ret;
+> +	ret = i2c_add_driver(&max8925_driver);
+> 
+> total: 0 errors, 1 warnings, 275 lines checked
 
-Regards,
-Maxime
+Can you point me to the others please?
 
-On 06/23/2014 12:54 PM, Maxime Coquelin wrote:
->
->
-> On 06/04/2014 06:30 PM, Peter Griffin wrote:
->> Signed-off-by: Peter Griffin <peter.griffin@linaro.org>
->
-> Acked-by: Maxime Coquelin <maxime.coquelin@st.com>
->
->> --- MAINTAINERS | 1 + 1 file changed, 1 insertion(+)
->>
->> diff --git a/MAINTAINERS b/MAINTAINERS index 6dc67b1..19dc265
->> 100644 --- a/MAINTAINERS +++ b/MAINTAINERS @@ -1306,6 +1306,7 @@ F:
->> drivers/pinctrl/pinctrl-st.c F:	drivers/media/rc/st_rc.c F:
->> drivers/i2c/busses/i2c-st.c F:	drivers/tty/serial/st-asc.c +F:
->> drivers/mmc/host/sdhci-st.c
->>
->> ARM/TECHNOLOGIC SYSTEMS TS7250 MACHINE SUPPORT M:	Lennert Buytenhek
->> <kernel@wantstofly.org>
->>
->
->
->
-> _______________________________________________
-> Kernel mailing list
-> Kernel at stlinux.com
-> http://www.stlinux.com/mailman/listinfo/kernel
->
+-- 
+Lee Jones
+Linaro STMicroelectronics Landing Team Lead
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
