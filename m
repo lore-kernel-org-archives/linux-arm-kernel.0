@@ -1,79 +1,61 @@
-From: l.stach@pengutronix.de (Lucas Stach)
-Date: Tue, 22 Jul 2014 09:51:08 +0200
-Subject: [PATCH] ARM: dts: imx6qdl-sabresd: add always on pcie regulator
-In-Reply-To: <20140722025708.GU8537@dragon>
-References: <1405707270-22901-1-git-send-email-l.stach@pengutronix.de>
- <20140722025708.GU8537@dragon>
-Message-ID: <1406015468.4667.9.camel@weser.hi.pengutronix.de>
+From: LW@KARO-electronics.de (Lothar =?UTF-8?B?V2HDn21hbm4=?=)
+Date: Tue, 22 Jul 2014 10:06:13 +0200
+Subject: [PATCH 8/9] usb: phy: am335x: call
+ usb_gen_phy_init()/usb_gen_phy_shutdown() in
+ am335x_init()/am335x_shutdown()
+In-Reply-To: <20140721151043.GF6852@saruman.home>
+References: <1405675890-8802-2-git-send-email-LW@KARO-electronics.de>
+ <1405675890-8802-3-git-send-email-LW@KARO-electronics.de>
+ <1405675890-8802-4-git-send-email-LW@KARO-electronics.de>
+ <1405675890-8802-5-git-send-email-LW@KARO-electronics.de>
+ <1405675890-8802-6-git-send-email-LW@KARO-electronics.de>
+ <1405675890-8802-7-git-send-email-LW@KARO-electronics.de>
+ <1405675890-8802-8-git-send-email-LW@KARO-electronics.de>
+ <1405675890-8802-9-git-send-email-LW@KARO-electronics.de>
+ <20140718135713.GH24914@saruman.home>
+ <20140721100307.21172b65@ipc1.ka-ro>
+ <20140721151043.GF6852@saruman.home>
+Message-ID: <20140722100613.779a3e11@ipc1.ka-ro>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Shawn,
+Hi,
 
-Am Dienstag, den 22.07.2014, 10:57 +0800 schrieb Shawn Guo:
-> On Fri, Jul 18, 2014 at 08:14:30PM +0200, Lucas Stach wrote:
-> > Everything in the PCI specification assumes devices to be
-> > enumerable on startup. This is only possible if they have
-> > power available.
+Felipe Balbi wrote:
+> Hi,,
+> 
+> On Mon, Jul 21, 2014 at 10:03:07AM +0200, Lothar Wa?mann wrote:
+> > Hi,
 > > 
-> > A future improvement may allow this regulator to be switched
-> > off for D3hot and D3cold power states, but there is a lot
-> > of work to do the pcie host controller side for this to work.
-> > To keep things simple always enable the regulator for now.
-> > 
-> > Signed-off-by: Lucas Stach <l.stach@pengutronix.de>
+> > > On Fri, Jul 18, 2014 at 11:31:29AM +0200, Lothar Wa?mann wrote:
+> > > > This patch makes it possible to use the musb driver with HW that
+> > > > requires external regulators or clocks.
+> > > 
+> > > can you provide an example of such HW ? Are you not using the internal
+> > > PHYs ?
+> > > 
+> > The Ka-Ro electronics TX48 module uses the mmc0_clk pin as VBUSEN
+> > rathern than usb0_drvvbus. This patch makes it possible to use an
+> > external regulator to handle the VBUS switch through the 'vcc-supply'
+> > property of the underlying generic_phy device.
 > 
-> Just curious if this fixes any known PCIe issue?
+> OK, I get it now. But why would not use usb0_drvvbus ? You could still
+> route usb0_drvvbus to the regulator enable pin and the regulator would
+> be enabled for you once correct values are written to the IP's mailbox.
+> 
+> I suppose this has something to do with layout constraints ?
+> 
+Yes. The usb0_drvvbus is used for a different purpose.
 
-Yes this allows PCIe devices to work on my SabreSD board. I don't know
-if it's required for all revisions, the schematics certainly show a
-mounting option where the load switch isn't populated but bridged by 0R
-resistor.
 
-> 
-> > ---
-> >  arch/arm/boot/dts/imx6qdl-sabresd.dtsi | 12 ++++++++++++
-> >  1 file changed, 12 insertions(+)
-> > 
-> > diff --git a/arch/arm/boot/dts/imx6qdl-sabresd.dtsi b/arch/arm/boot/dts/imx6qdl-sabresd.dtsi
-> > index ec43dde78525..bbbd501098e6 100644
-> > --- a/arch/arm/boot/dts/imx6qdl-sabresd.dtsi
-> > +++ b/arch/arm/boot/dts/imx6qdl-sabresd.dtsi
-> > @@ -54,6 +54,17 @@
-> >  			gpio = <&gpio4 10 0>;
-> >  			enable-active-high;
-> >  		};
-> > +
-> > +		reg_pcie: regulator at 3 {
-> > +			compatible = "regulator-fixed";
-> > +			reg = <3>;
-> > +			regulator-name = "pcie-supply";
-> 
-> I would start asking to name the regulator in the same way that board
-> document like schematics names it.  In this case, it should be
-> "MPCIE_3V3".
-> 
-> > +			regulator-min-microvolt = <3300000>;
-> > +			regulator-max-microvolt = <3300000>;
-> > +			gpio = <&gpio3 19 0>;
-> > +			regulator-always-on;
-> > +			enable-active-high;
-> > +		};
-> >  	};
-> >  
-> >  	gpio-keys {
-> > @@ -323,6 +334,7 @@
-> >  				MX6QDL_PAD_ENET_TXD1__GPIO1_IO29 0x80000000
-> >  				MX6QDL_PAD_EIM_D22__GPIO3_IO22  0x80000000
-> >  				MX6QDL_PAD_ENET_CRS_DV__GPIO1_IO25 0x80000000
-> > +				MX6QDL_PAD_EIM_D19__GPIO3_IO19  0x80000000
-> 
-> No more GPIO setup in hog group, and no more 0x80000000 on pad config.
-> Please have a dedicate pinctrl entry for it with a proper config value,
-> and refer to the entry in that reg_pcie node.
-> 
-Ok, will fix.
-
+Lothar Wa?mann
 -- 
-Pengutronix e.K.             | Lucas Stach                 |
-Industrial Linux Solutions   | http://www.pengutronix.de/  |
+___________________________________________________________
+
+Ka-Ro electronics GmbH | Pascalstra?e 22 | D - 52076 Aachen
+Phone: +49 2408 1402-0 | Fax: +49 2408 1402-10
+Gesch?ftsf?hrer: Matthias Kaussen
+Handelsregistereintrag: Amtsgericht Aachen, HRB 4996
+
+www.karo-electronics.de | info at karo-electronics.de
+___________________________________________________________
