@@ -1,62 +1,100 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Tue, 22 Jul 2014 17:54:29 +0100
-Subject: [GIT PULL 2/3] ARM: tegra: move fuse code out of arch/arm
-In-Reply-To: <53CE90ED.8030900@wwwdotorg.org>
-References: <20140708134359.GA23218@tbergstrom-lnx.Nvidia.com>
- <CAOesGMhoqvqf-dktp-OfUNTPLahPwkyAPiTeDngr4QjH=VfOGA@mail.gmail.com>
- <53C88A4C.3070304@wwwdotorg.org>
- <CAOesGMh+zLV781wzdR5=_Bpzh+XMwJfWL-5XMDP6DwG_Hg80kw@mail.gmail.com>
- <53CD2C58.6060601@wwwdotorg.org> <20140721155451.GF32578@arm.com>
- <53CD4201.5070705@wwwdotorg.org>
- <CAOesGMgvd1HbjywN7BDPtr8ZU7vucWH48B=AW3TZjng73YA8WA@mail.gmail.com>
- <20140722102749.GB2219@arm.com> <53CE90ED.8030900@wwwdotorg.org>
-Message-ID: <20140722165428.GT2219@arm.com>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Tue, 22 Jul 2014 10:57:22 -0600
+Subject: [PATCH 8/8] clk: tegra: Add EMC clock driver
+In-Reply-To: <1405088313-20048-9-git-send-email-mperttunen@nvidia.com>
+References: <1405088313-20048-1-git-send-email-mperttunen@nvidia.com>
+ <1405088313-20048-9-git-send-email-mperttunen@nvidia.com>
+Message-ID: <53CE97F2.80300@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jul 22, 2014 at 05:27:25PM +0100, Stephen Warren wrote:
-> On 07/22/2014 04:27 AM, Catalin Marinas wrote:
-> ...
-> > ...It's also aimed at
-> > pushing back on hardware people who think they can mess up, for example,
-> > a GIC implementation because the rest is just software and you can
-> > always add #ifdefs.
-> 
-> I'm very concerned about this statement.
-> 
-> Yes, it would be nice if all HW was sanely designed, but it's not
-> always. The time to push back on bad HW design is during IP licensing
-> agreements or HW design reviews, not upstreaming.
+On 07/11/2014 08:18 AM, Mikko Perttunen wrote:
+> The driver is currently only tested on Tegra124 Jetson TK1, but should
+> work with other Tegra124 boards, provided that correct EMC tables are
+> provided through the device tree. Older chip models have differing
+> timing change sequences, so they are not currently supported.
 
-I agree about the HW design reviews. But I suspect some software people
-in such companies, concerned with upstreaming Linux support, are allowed
-to give feedback. And the feedback could be something like (just an
-example) "if we use a standard GIC and the architected timer, sane
-(!PL310-like) system caches, we get the benefit of no additional
-upstream work, better virtualisation support etc". I hope someone in the
-HW team would take such feedback into account rather than assume that
-software and upstreaming comes for free.
+> diff --git a/drivers/clk/tegra/clk-emc.c b/drivers/clk/tegra/clk-emc.c
 
-Of course, we've never rejected Linux upstreaming because of the
-hardware design (well, as long as Linux could reliably run on it) and I
-don't plan to do this in the future, but just show that there are clear
-benefits in doing something in a more standardised way (e.g. SBSA for
-servers).
+> +struct emc_timing {
+> +	unsigned long rate, parent_rate;
+> +	u8 parent_index;
+> +	struct clk *parent;
+> +
+> +	/* Store EMC burst data in a union to minimize mistakes. This allows
+> +	 * us to use the same burst data lists as used by the downstream and
+> +	 * ChromeOS kernels. */
 
-Even though ARM licenses the architecture, there is no way to enforce a
-HW design as part of the agreement (or risk not licensing the IP at
-all). But there is effort to standardise things like SBSA, Trusted
-Firmware.
+Nit: */ should be on its own line. This applies to many comments in the
+file.
 
-> Any pushback during SW upstreaming simply serves to make it difficult
-> for the SW people doing the upstreaming. It has zero impact on the
-> current HW design (it's already shipped). It probably has zero impact on
-> the next N revisions of the HW (they're already baked). It's possible it
-> has zero-to-minimal impact on any future HW (end-user product
-> requirements are what matter most).
+> +/* * * * * * * * * * * * * * * * * * * * * * * * * *
+> + * Timing change sequence functions                *
+> + * * * * * * * * * * * * * * * * * * * * * * * * * */
 
-I agree that pushing back during SW upstreaming is very late. But I hope
-to raise the awareness earlier for ARMv8 hardware.
+Nit: This kind of banner comment is unusual, but I guess it's fine.
 
--- 
-Catalin
+> +static void emc_seq_update_timing(struct tegra_emc *tegra)
+...
+> +	dev_err(&tegra->pdev->dev, "timing update failed\n");
+> +	BUG();
+> +}
+
+Is there any way to avoid all these BUGs? Can we just continue on and
+retry the next time, or disallow any further clock rate changes or
+something?
+
+> +/* * * * * * * * * * * * * * * * * * * * * * * * * *
+> + * Debugfs entry                                   *
+> + * * * * * * * * * * * * * * * * * * * * * * * * * */
+> +
+> +static int emc_debug_rate_get(void *data, u64 *rate)
+> +{
+> +	struct tegra_emc *tegra = data;
+> +
+> +	*rate = clk_get_rate(tegra->hw.clk);
+> +
+> +	return 0;
+> +}
+> +
+> +static int emc_debug_rate_set(void *data, u64 rate)
+> +{
+> +	struct tegra_emc *tegra = data;
+> +
+> +	return clk_set_rate(tegra->hw.clk, rate);
+> +}
+> +
+> +DEFINE_SIMPLE_ATTRIBUTE(emc_debug_rate_fops, emc_debug_rate_get,
+> +			emc_debug_rate_set, "%lld\n");
+
+I think the rate can already be obtained through
+...debug/clock/clock_summary. I'm not sure about changing the rate, but
+shouldn't that be a feature of the common clock core, not individual
+drivers?
+
+> +static int load_timings_from_dt(struct tegra_emc *tegra,
+> +				struct device_node *node)
+> +{
+...
+> +	for_each_child_of_node(node, child) {
+...
+> +		if (timing->rate <= prev_rate) {
+> +			dev_err(&tegra->pdev->dev,
+> +				"timing %s: rate not increasing\n",
+> +				child->name);
+
+I don't believe there's any guaranteed node enumeration order. If the
+driver needs the child nodes sorted, it should sort them itself.
+
+> +static const struct of_device_id tegra_car_of_match[] = {
+> +	{ .compatible = "nvidia,tegra124-car" },
+> +	{}
+> +};
+> +
+> +static const struct of_device_id tegra_mc_of_match[] = {
+> +	{ .compatible = "nvidia,tegra124-mc" },
+> +	{}
+> +};
+
+It would be better if this driver explicitly called into the driver for
+other modules, rather than directly touching their registers.
