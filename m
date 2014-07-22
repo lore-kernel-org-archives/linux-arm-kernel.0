@@ -1,28 +1,30 @@
-From: pawel.moll@arm.com (Pawel Moll)
-Date: Tue, 22 Jul 2014 11:11:26 +0100
-Subject: [PATCH v2] bus: ARM CCN PMU driver
-In-Reply-To: <1405091188-31754-1-git-send-email-pawel.moll@arm.com>
-References: <1405091188-31754-1-git-send-email-pawel.moll@arm.com>
-Message-ID: <1406023886.25343.48.camel@hornet>
+From: mugunthanvnm@ti.com (Mugunthan V N)
+Date: Tue, 22 Jul 2014 15:41:43 +0530
+Subject: [Re-send PATCH 1/1] arm: dra7xx: Add hwmod data for MDIO and CPSW
+In-Reply-To: <20140717074948.GF18374@atomide.com>
+References: <1404825399-10330-1-git-send-email-mugunthanvnm@ti.com>
+ <20140717074948.GF18374@atomide.com>
+Message-ID: <53CE38DF.1060305@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Arnd, Kevin, Olof, 
+On Thursday 17 July 2014 01:19 PM, Tony Lindgren wrote:
+> We seem to have this layout WR_SOFT_RESET and WR_CONTROL in the TRM:
+>
+> WR_SOFT_RESET
+> [0]     SOFT_RESET
+>
+> WR_CONTROL
+> [3:2]   MMR_STDBYMODE   0 = force-idle, 1 = no-standby
+> [1:0]   MMR_IDLEMODE    0 = force-idle, 1 = no-idle
+>
+> And so it seems to match what am33xx also has for am33xx_cpgmac_sysc
+> and am33xx TRM for 14.5.9 CONTROL register. So as far as I'm concerned:
+>
+> Acked-by: Tony Lindgren <tony@atomide.com>
+Paul,
 
-On Fri, 2014-07-11 at 16:06 +0100, Pawel Moll wrote:
-> Driver providing perf backend for ARM Cache Coherent Network
-> interconnect. Supports counting all hardware events and crosspoint
-> watchpoints.
-> 
-> Currently works with CCN-504 only, although there should be
-> no changes required for CCN-508 (just impossible to test it now).
-> 
-> Signed-off-by: Pawel Moll <pawel.moll@arm.com>
+Can you pull this patch as Tony acked the patch.
 
-Would you consider taking this through arm-soc tree? There isn't
-anything in MAINTAINERS, but I vaguely remember Arnd proposing this
-directory in the first place...
-
-Cheers!
-
-Pawel
+Regards
+Mugunthan V N
