@@ -1,76 +1,48 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Tue, 22 Jul 2014 12:03:41 +0100
-Subject: [PATCH v2 1/4] mfd: pm8xxx-spmi: add support for Qualcomm SPMI
- PMICs
-In-Reply-To: <1405613855-27572-2-git-send-email-svarbanov@mm-sol.com>
-References: <1405613855-27572-1-git-send-email-svarbanov@mm-sol.com>
- <1405613855-27572-2-git-send-email-svarbanov@mm-sol.com>
-Message-ID: <20140722110341.GE8406@lee--X1>
+From: kgene.kim@samsung.com (Kukjin Kim)
+Date: Tue, 22 Jul 2014 20:07:27 +0900
+Subject: [GIT PULL 1/5] Samsung non-critical-fixes for v3.17
+In-Reply-To: <20140719215942.GC15676@quad.lixom.net>
+References: <53C9C121.6090403@samsung.com>
+ <20140719215942.GC15676@quad.lixom.net>
+Message-ID: <01c901cfa59d$1f644ff0$5e2cefd0$@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 17 Jul 2014, Stanimir Varbanov wrote:
-
-> From: Josh Cartwright <joshc@codeaurora.org>
+Olof Johansson wrote:
 > 
-> The Qualcomm SPMI PMIC chips are components used with the
-> Snapdragon 800 series SoC family.  This driver exists
-> largely as a glue mfd component, it exists to be an owner
-> of an SPMI regmap for children devices described in
-> device tree.
+> On Sat, Jul 19, 2014 at 09:51:45AM +0900, Kukjin Kim wrote:
+> > The following changes since commit 1795cd9b3a91d4b5473c97f491d63892442212ab:
+> >
+> >   Linux 3.16-rc5 (2014-07-13 14:04:33 -0700)
+> >
+> > are available in the git repository at:
+> >
 > 
-> Signed-off-by: Stanimir Varbanov <svarbanov@mm-sol.com>
+> > git://git.kernel.org/pub/scm/linux/kernel/git/kgene/linux-samsung.git
+> > tags/fixes-for-3.17
+> >
+> > for you to fetch changes up to 042b687f880adcca77847688aac35e2e16927944:
+> >
+> >   ARM: EXYNOS: Fix build breakge with PM_SLEEP=n (2014-07-19
+> > 04:45:02 +0900)
+> >
+> > ----------------------------------------------------------------
+> > Samsung non critical fixes for v3.17
+> > - update exynos_defconfig for remove outdated configs and
+> > enable most of the configs used on latest exynos platforms
+> > - fix build breakge for exynos_defconfig with PM_SLEEP=n
+> 
+> Hi,
+> 
+Hi, Olof,
 
-Needs to be signed off by the author.
+> We now separate out defconfigs (as you might have noticed if you looked
+> at our tree). I don't see any dependencies between these changes and
+> the rest so I'll cherry-pick the patches into fixes-non-critical (for
+> the build fix) and defconfig for that patch.
+> 
+OK, I'm fine and I will follow the way next time.
 
-> ---
->  drivers/mfd/Kconfig       |   16 +++++++++++
->  drivers/mfd/Makefile      |    1 +
->  drivers/mfd/pm8xxx-spmi.c |   63 +++++++++++++++++++++++++++++++++++++++++++++
->  3 files changed, 80 insertions(+), 0 deletions(-)
->  create mode 100644 drivers/mfd/pm8xxx-spmi.c
+Thanks for your cherry-pick and pulling other trees.
 
-[...]
-
-> +++ b/drivers/mfd/pm8xxx-spmi.c
-> @@ -0,0 +1,63 @@
-> +/*
-> + * Copyright (c) 2014, The Linux Foundation. All rights reserved.
-> + *
-> + * This program is free software; you can redistribute it and/or modify
-> + * it under the terms of the GNU General Public License version 2 and
-> + * only version 2 as published by the Free Software Foundation.
-> + *
-> + * This program is distributed in the hope that it will be useful,
-> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
-> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-> + * GNU General Public License for more details.
-> + */
-
-There should be a '\n' here.
-
-> +#include <linux/kernel.h>
-> +#include <linux/module.h>
-> +#include <linux/spmi.h>
-> +#include <linux/regmap.h>
-> +#include <linux/of_platform.h>
-
-[...]
-
-> +MODULE_DESCRIPTION("PM8XXX SPMI PMIC driver");
-> +MODULE_ALIAS("platform:" KBUILD_MODNAME);
-> +MODULE_AUTHOR("The Linux Foundation");
-
-The Linux Foundation did not write this patch.
-
-> +MODULE_LICENSE("GPL v2");
-
-Appart from that:
-
-Acked-by: Lee Jones <lee.jones@linaro.org>
-
--- 
-Lee Jones
-Linaro STMicroelectronics Landing Team Lead
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+- Kukjin
