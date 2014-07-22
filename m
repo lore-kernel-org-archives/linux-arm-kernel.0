@@ -1,66 +1,41 @@
-From: robherring2@gmail.com (Rob Herring)
-Date: Tue, 22 Jul 2014 10:37:34 -0500
-Subject: [PATCH v6 4/5] PCI: add PCI controller for keystone PCIe h/w
-In-Reply-To: <5467203.eMVRoNeSx1@wuerfel>
-References: <1405696469-7172-1-git-send-email-m-karicheri2@ti.com>
- <1405696469-7172-5-git-send-email-m-karicheri2@ti.com>
- <CAL_JsqKheoWrSGtxPO=AE8g9iOAqfwRa=81Ku=Cfx8_gpDysOg@mail.gmail.com>
- <5467203.eMVRoNeSx1@wuerfel>
-Message-ID: <CAL_JsqLrh_M0gTRezST9jX1X_5Eo98taNcHok6QX6vDMxeqkcw@mail.gmail.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Tue, 22 Jul 2014 16:37:39 +0100
+Subject: [PATCH 13/11] arm64: Add support for 48-bit VA space with 64KB
+ page configuration
+In-Reply-To: <2C360BFC-E4CF-448D-9110-4197DCAEAD4F@gmail.com>
+References: <ADA477FA-165D-4679-A38F-C82C901BEE4D@gmail.com>
+ <AABDB416-D194-4825-8113-4748C10BC339@gmail.com>
+ <2C360BFC-E4CF-448D-9110-4197DCAEAD4F@gmail.com>
+Message-ID: <20140722153738.GJ2219@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jul 18, 2014 at 2:50 PM, Arnd Bergmann <arnd@arndb.de> wrote:
-> On Friday 18 July 2014 14:31:39 Rob Herring wrote:
->> > +
->> > + Example:
->> > +       pcie_msi_intc: msi-interrupt-controller {
->> > +                       interrupt-controller;
->> > +                       #interrupt-cells = <1>;
->> > +                       interrupt-parent = <&gic>;
->> > +                       interrupts = <GIC_SPI 30 IRQ_TYPE_EDGE_RISING>,
->> > +                                       <GIC_SPI 31 IRQ_TYPE_EDGE_RISING>,
->> > +                                       <GIC_SPI 32 IRQ_TYPE_EDGE_RISING>,
->> > +                                       <GIC_SPI 33 IRQ_TYPE_EDGE_RISING>,
->> > +                                       <GIC_SPI 34 IRQ_TYPE_EDGE_RISING>,
->> > +                                       <GIC_SPI 35 IRQ_TYPE_EDGE_RISING>,
->> > +                                       <GIC_SPI 36 IRQ_TYPE_EDGE_RISING>,
->> > +                                       <GIC_SPI 37 IRQ_TYPE_EDGE_RISING>;
->> > +       };
->> > +
->> > +pcie_intc: Interrupt controller device node for Legacy irq chip
->> > +       interrupt-cells: should be set to 1
->> > +       interrupt-parent: Parent interrupt controller phandle
->> > +       interrupts: GIC interrupt lines connected to PCI Legacy interrupt lines
->> > +
->> > + Example:
->> > +       pcie_intc: legacy-interrupt-controller {
->> > +               interrupt-controller;
->> > +               #interrupt-cells = <1>;
->> > +               interrupt-parent = <&gic>;
->> > +               interrupts = <GIC_SPI 26 IRQ_TYPE_EDGE_RISING>,
->> > +                       <GIC_SPI 27 IRQ_TYPE_EDGE_RISING>,
->> > +                       <GIC_SPI 28 IRQ_TYPE_EDGE_RISING>,
->> > +                       <GIC_SPI 29 IRQ_TYPE_EDGE_RISING>;
->> > +       };
->>
->> This seems wrong. Legacy interrupts should be described with
->> interrupt-map and then PCI child devices have a standard interrupt
->> specifier.
->>
->> I'm not sure about MSIs, but I would think they would have a standard
->> format too.
->>
->
-> IIRC, it's actually the correct way to do this here: the problem is that
-> the PCI IRQs are not directly connected to the GIC, but instead there is
-> a nested irqchip that has each PCI IRQ routed to it and that requires
-> an extra EOI for each interrupt.
->
-> The interrupt-map in the PCI host points to this special irqchip rather
-> than to the GIC.
+On Tue, Jul 22, 2014 at 04:13:27PM +0100, Jungseok Lee wrote:
+> On Jul 22, 2014, at 00:09 +900 Catalin Marinas wrote:
+> > This patch allows support for 3 levels of page tables with 64KB page 
+> > configuration allowing 48-bit VA space. The pgd is no longer a full 
+> > PAGE_SIZE (PTRS_PER_PGD is 64) and (swapper|idmap)_pg_dir are not fully 
+> > populated (pgd_alloc falls back to kzalloc). 
+> > 
+> > Signed-off-by: Catalin Marinas <catalin.marinas@arm.com> 
+> > --- 
+> 
+> One more step :)
 
-Okay, if there is still an interrupt-map property, then I agree. This
-wasn't clear in the example.
+The last before the upcoming merging window. I also updated the
+pgtable-4levels branch with the latest.
 
-Rob
+> Are you going to post the next version of this series including [12/11]
+> and [13/11] or finalize the series?
+
+I wasn't planning to post another series. It's good to get the clean-up
+merged with the change that 48-bit VA now depends on BROKEN until KVM is
+sorted (for 3.18).
+
+> In addition, could you put my gmail address in CC in coming patch or
+> the next version? It help me follow up the series easily.
+
+Do you want me to add any reviewed etc. tags from you?
+
+-- 
+Catalin
