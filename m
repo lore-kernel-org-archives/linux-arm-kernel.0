@@ -1,35 +1,18 @@
-From: shawn.guo@freescale.com (Shawn Guo)
-Date: Tue, 22 Jul 2014 11:03:38 +0800
-Subject: [PATCH] ARM: dts: imx: Add alias for ethernet controller
-In-Reply-To: <201407220410.26694.marex@denx.de>
-References: <1393588721-8598-1-git-send-email-marex@denx.de>
- <201403180137.09760.marex@denx.de> <20140324014936.GA4006@dragon>
- <201407220410.26694.marex@denx.de>
-Message-ID: <20140722030337.GV8537@dragon>
+From: computersforpeace@gmail.com (Brian Norris)
+Date: Mon, 21 Jul 2014 20:12:14 -0700
+Subject: [PATCH v2 1/3] mtd: atmel_nand: add NFC status error check
+In-Reply-To: <1402393811-24578-1-git-send-email-josh.wu@atmel.com>
+References: <1402393811-24578-1-git-send-email-josh.wu@atmel.com>
+Message-ID: <20140722031214.GD7537@ld-irv-0074>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jul 22, 2014 at 04:10:26AM +0200, Marek Vasut wrote:
-> On Monday, March 24, 2014 at 02:49:38 AM, Shawn Guo wrote:
-> > On Tue, Mar 18, 2014 at 01:37:09AM +0100, Marek Vasut wrote:
-> > > On Friday, February 28, 2014 at 12:58:41 PM, Marek Vasut wrote:
-> > > > Add alias for FEC ethernet on i.MX to allow bootloaders (like U-Boot)
-> > > > patch-in the MAC address for FEC using this alias.
-> > > > 
-> > > > Signed-off-by: Marek Vasut <marex@denx.de>
-> > > > Cc: Shawn Guo <shawn.guo@linaro.org>
-> > > 
-> > > Bump ?
-> > 
-> > Sorry.  I had actually applied the patch but forgot replying.
+On Tue, Jun 10, 2014 at 05:50:09PM +0800, Josh Wu wrote:
+> Add a new function to read the NFC status. Meantime, this function will
+> theck if there is any errors in NFC.
 > 
-> Hello Shawn,
-> 
-> I'd like to apply this patch for 3.14-stable , are you OK with this please ? 
-> Shall I submit it ?
+> Signed-off-by: Josh Wu <josh.wu@atmel.com>
 
-I do not see why this is a stable material.  But you do not need my
-approval to send patch for stable kernel.  The person you need to
-convince is Greg.
+Fixed up some of the wording and pushed to l2-mtd.git. Thanks!
 
-Shawn
+Brian
