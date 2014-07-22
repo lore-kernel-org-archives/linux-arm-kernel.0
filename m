@@ -1,115 +1,14 @@
-From: spk.linux@gmail.com (Sachin Kamat)
-Date: Tue, 22 Jul 2014 09:43:45 +0530
-Subject: [PATCH] cpufreq: tests: Providing cpufreq regression test
-In-Reply-To: <20140718135933.0837e094@amdc2363>
-References: <1405678985-21677-1-git-send-email-l.majewski@samsung.com>
- <CAK5sBcH=L-7=BHNPQUjuoQfQx5QeFmBSdwdow+RXBExgCOP0Ww@mail.gmail.com>
- <20140718135933.0837e094@amdc2363>
-Message-ID: <CAK5sBcGdrmfkc_hyV3DewwLjGa3=1xjctzqcTNC9C2yPFmEFCg@mail.gmail.com>
+From: xerofoify@gmail.com (Nick Krause)
+Date: Tue, 22 Jul 2014 00:16:26 -0400
+Subject: Fix me in netx-regs.h
+Message-ID: <CAPDOMVhdK67Fc5KsamL8XKdRNy0VjKB3ub24krgwmRsnZGtQNQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Lukasz,
-
-On Fri, Jul 18, 2014 at 5:29 PM, Lukasz Majewski <l.majewski@samsung.com> wrote:
-> Hi Sachin,
->
->> Hi Lukasz,
->>
->> I tested this script on 4210 based Origen board.
->> This is the output:
->> ./cpufreq_freq_test.sh
->> CURRENT GOVERNOR: performance
->> SET GOVERNOR: performance
->> ######################################
->> TEST AVAILABLE FREQS
->> ######################################
->> FREQ: 1200000 sleep: invalid number '0.1'
->> [    5.918347] random: gzip urandom read with 61 bits of entropy
->> available OK
->> FREQ: 1000000 sleep: invalid number '0.1'
->>          OK
->> FREQ: 800000 sleep: invalid number '0.1'
->>          OK
->> FREQ: 500000 sleep: invalid number '0.1'
->>          OK
->> FREQ: 200000 sleep: invalid number '0.1'
->>          OK
->> ######################################
->> TEST FREQS SWITCHING
->> ######################################
->> REFERENCE FREQ: 1200000
->> FREQ: 1200000 ----> FREQ: 1200000 sleep: invalid number '0.1'
->>          OK
->> FREQ: 1200000 ----> FREQ: 1000000 sleep: invalid number '0.1'
->>          OK
->> FREQ: 1200000 ----> FREQ: 800000 sleep: invalid number '0.1'
->>          OK
->> FREQ: 1200000 ----> FREQ: 500000 sleep: invalid number '0.1'
->>          OK
->> FREQ: 1200000 ----> FREQ: 200000 sleep: invalid number '0.1'
->>          OK
->> REFERENCE FREQ: 1000000
->> FREQ: 1000000 ----> FREQ: 1200000 sleep: invalid number '0.1'
->>          OK
->> FREQ: 1000000 ----> FREQ: 1000000 sleep: invalid number '0.1'
->>          OK
->> FREQ: 1000000 ----> FREQ: 800000 sleep: invalid number '0.1'
->>          OK
->> FREQ: 1000000 ----> FREQ: 500000 sleep: invalid number '0.1'
->>          OK
->> FREQ: 1000000 ----> FREQ: 200000 sleep: invalid number '0.1'
->>          OK
->> REFERENCE FREQ: 800000
->> FREQ: 800000 ----> FREQ: 1200000 sleep: invalid number '0.1'
->>          OK
->> FREQ: 800000 ----> FREQ: 1000000 sleep: invalid number '0.1'
->>          OK
->> FREQ: 800000 ----> FREQ: 800000 sleep: invalid number '0.1'
->>          OK
->> FREQ: 800000 ----> FREQ: 500000 sleep: invalid number '0.1'
->>          OK
->> FREQ: 800000 ----> FREQ: 200000 sleep: invalid number '0.1'
->>          OK
->> REFERENCE FREQ: 500000
->> FREQ: 500000 ----> FREQ: 1200000 sleep: invalid number '0.1'
->>          OK
->> FREQ: 500000 ----> FREQ: 1000000 sleep: invalid number '0.1'
->>          OK
->> FREQ: 500000 ----> FREQ: 800000 sleep: invalid number '0.1'
->>          OK
->> FREQ: 500000 ----> FREQ: 500000 sleep: invalid number '0.1'
->>          OK
->> FREQ: 500000 ----> FREQ: 200000 sleep: invalid number '0.1'
->>          OK
->> REFERENCE FREQ: 200000
->> FREQ: 200000 ----> FREQ: 1200000 sleep: invalid number '0.1'
->>          OK
->> FREQ: 200000 ----> FREQ: 1000000 sleep: invalid number '0.1'
->>          OK
->> FREQ: 200000 ----> FREQ: 800000 sleep: invalid number '0.1'
->>          OK
->> FREQ: 200000 ----> FREQ: 500000 sleep: invalid number '0.1'
->>          OK
->> FREQ: 200000 ----> FREQ: 200000 sleep: invalid number '0.1'
->>          OK
->> ######################################
->> ERRORS: 0
->> ######################################
->>
->> Though it says 0 errors, what does the "invalid number..." signify?
->
-> I guess that this message is caused by your default sleep
-> implementation.
->
-> Could you type 'sleep 0.1' and then 'sleep 1' in your console on the
-> target system?
-> Is the "invalid number" not present with the second case?
-
-Only with first case (sleep 0.1) I get the "invalid number" message.
-sleep 1 seems to be OK.
-
-
--- 
-Regards,
-Sachin.
+Hey Russell,
+I did give thought to our previous conversations and I will still do
+fix mes but am going to be more careful
+with I submit them. Furthermore it seems  #define
+NETX_GPIO_COUNTER_CTRL_GPIO_RE is not defined
+correctly. As the maintainer what should I define it to?
+Cheers Nick
