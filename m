@@ -1,46 +1,40 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Tue, 22 Jul 2014 13:17:44 +0100
-Subject: [PATCH v2 4/4] mfd: pm8921: rename pm8921-core driver
-In-Reply-To: <53CE50D8.9070608@mm-sol.com>
-References: <1405613855-27572-1-git-send-email-svarbanov@mm-sol.com>
- <1405613855-27572-5-git-send-email-svarbanov@mm-sol.com>
- <20140722103252.GD8406@lee--X1> <53CE50D8.9070608@mm-sol.com>
-Message-ID: <20140722121744.GD16065@lee--X1>
+From: pramod.gurav.etc@gmail.com (pramod gurav)
+Date: Tue, 22 Jul 2014 17:57:52 +0530
+Subject: [PATCH 01/19] mfd: max77686: Fix 'line over 80 chars' warning
+In-Reply-To: <20140722121306.GB16065@lee--X1>
+References: <1406027485-15657-1-git-send-email-lee.jones@linaro.org>
+ <1406027485-15657-2-git-send-email-lee.jones@linaro.org>
+ <CAMf-jSn4y40p+tpUNMnCMMmAEQbjXBqbfgPy3zWrTs_b85uvxg@mail.gmail.com>
+ <20140722121306.GB16065@lee--X1>
+Message-ID: <CAMf-jSmyzMzucni8-Ego1K+-TvHm5S+HaY5OQKmR1QbjTNrOGQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 22 Jul 2014, Stanimir Varbanov wrote:
+On Tue, Jul 22, 2014 at 5:43 PM, Lee Jones <lee.jones@linaro.org> wrote:
+> On Tue, 22 Jul 2014, pramod gurav wrote:
+>
+> It's based on the most recent MFD for-mfd-next branch.
+>
+> You're missing the following patches:
+>
+>   mfd: max77686: Remove unneeded OOM error message
+>   mfd: max77686: Make error checking consistent
+>   mfd: max77686: Return correct error when pdata isn't found
+>   mfd: max77686: Make platform data over-rule DT
+>   mfd: max77686: Don't define dummy function if OF isn't enabled
+>   mfd: max77686: Add power management support
+>   mfd: max77686: Convert to use regmap_irq
+>
+ok. Thanks. :)
 
-> On 07/22/2014 01:32 PM, Lee Jones wrote:
-> > On Thu, 17 Jul 2014, Stanimir Varbanov wrote:
-> > 
-> >> The pm8921-core driver presently supports pm8921 and pm8058
-> >> Qualcomm PMICs.  To avoid confusion with new generation PMICs
-> >> (like pm8941) rename the pm8921-core driver to more
-> >> appropriate name pm8xxx-ssbi, which reflects better that
-> >> those chips use SSBI interface.
-> >>
-> >> Signed-off-by: Stanimir Varbanov <svarbanov@mm-sol.com>
-> >> ---
-> >>  drivers/mfd/Kconfig                          |   14 +++++-----
-> >>  drivers/mfd/Makefile                         |    2 +-
-> >>  drivers/mfd/{pm8921-core.c => pm8xxx-ssbi.c} |   38 +++++++++++++-------------
-> >>  3 files changed, 27 insertions(+), 27 deletions(-)
-> >>  rename drivers/mfd/{pm8921-core.c => pm8xxx-ssbi.c} (92%)
-> > 
-> > Patch looks fine to me.
-> > 
-> >   Acked-by: Lee Jones <lee.jones@linaro.org>
-> > 
-> > I'm assuming we want to wait for the others in the set to be ready
-> > before applying?
-> 
-> yes, I think you will need an ack for the DT binding document?
+> --
+> Lee Jones
+> Linaro STMicroelectronics Landing Team Lead
+> Linaro.org ? Open source software for ARM SoCs
+> Follow Linaro: Facebook | Twitter | Blog
 
-I prefer to leave these to the DT guys.
+
 
 -- 
-Lee Jones
-Linaro STMicroelectronics Landing Team Lead
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+Thanks and Regards
+Pramod
