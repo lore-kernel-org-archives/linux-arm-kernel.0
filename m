@@ -1,79 +1,31 @@
-From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
-Date: Wed, 23 Jul 2014 02:24:23 +0400
-Subject: [PATCH v3] ARM: shmobile: r8a7790: link PCI USB devices to USB PHY
-Message-ID: <201407230224.24152.sergei.shtylyov@cogentembedded.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Wed, 23 Jul 2014 00:24:23 +0200
+Subject: [PATCH v8 00/11] ARM: brcmstb: Add Broadcom STB SoC support
+In-Reply-To: <20140722213350.GX2593@beef>
+References: <1405976886-27807-1-git-send-email-computersforpeace@gmail.com>
+ <5044348.IEPQPrahyu@wuerfel> <20140722213350.GX2593@beef>
+Message-ID: <6456081.JRV4vu9CHq@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Describe the PCI USB devices that are behind the PCI bridges, adding necessary
-links to the USB PHY device.
+On Tuesday 22 July 2014 17:33:50 Matt Porter wrote:
+> 
+> > > For the reset of mach-bcm stuff, I'll just send an arm-soc pull request
+> > > soon enough, unless Matt/Arnd/Olof object.
+> > 
+> > I'll wait for Matt to comment before pulling it, otherwise that sounds
+> > fine.
+> 
+> I'm fine with it, but we were asked to have one request for bcm5301x to
+> make life easy for the arm-soc team. If we want each platform to do pull
+> requests directly with arm-soc we should advise Hauke to do the same as
+> well with bcm5301x. I think the chances of Kconfig/Makefile conflicts are
+> relatively low as there's a dwindling amount of code of interest in new
+> platform mach directories like ours.
+> 
+> I would like to see a consistent path for all BCM platform maintainers.
+> 
 
-Based on the original work by Ben Dooks <ben.dooks@codethink.co.uk>.
+Ok. Brian, please send the pull request or patches to Matt then.
 
-Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
-
----
-This patch is against 'renesas-devel-v3.16-rc5-20140722' tag of Simon Horman's
-'renesas.git' repo plus R8A7790/Lager USB PHY support patches posted before.
-The patch requires the USB PHY driver, and USB HCD generic PHY support (also
-already posted) in order to work.
-
-Changes in version 3:
-- adjusted "phys" properties in the PCI OHCI/EHCI device nodes;
-- resolved rejects.
-
-Changes in version 2:
-- renamed the PCI OHCI/EHCI device nodes to comply with the PCI binding;
-- changed the PHY specifier in the PCI#2 node to reflect that channel #1 support
-  was dropped;
-- resolved rejects, refreshed the patch.
-
- arch/arm/boot/dts/r8a7790.dtsi |   28 ++++++++++++++++++++++++++++
- 1 file changed, 28 insertions(+)
-
-Index: renesas/arch/arm/boot/dts/r8a7790.dtsi
-===================================================================
---- renesas.orig/arch/arm/boot/dts/r8a7790.dtsi
-+++ renesas/arch/arm/boot/dts/r8a7790.dtsi
-@@ -999,6 +999,20 @@
- 		interrupt-map = <0x0000 0 0 1 &gic 0 108 IRQ_TYPE_LEVEL_HIGH
- 				 0x0800 0 0 1 &gic 0 108 IRQ_TYPE_LEVEL_HIGH
- 				 0x1000 0 0 2 &gic 0 108 IRQ_TYPE_LEVEL_HIGH>;
-+
-+		usb at 0,1 {
-+			reg = <0x800 0 0 0 0>;
-+			device_type = "pci";
-+			phys = <&usb0 0>;
-+			phy-names = "usb";
-+		};
-+
-+		usb at 0,2 {
-+			reg = <0x1000 0 0 0 0>;
-+			device_type = "pci";
-+			phys = <&usb0 0>;
-+			phy-names = "usb";
-+		};
- 	};
- 
- 	pci1: pci at ee0b0000 {
-@@ -1039,6 +1053,20 @@
- 		interrupt-map = <0x0000 0 0 1 &gic 0 113 IRQ_TYPE_LEVEL_HIGH
- 				 0x0800 0 0 1 &gic 0 113 IRQ_TYPE_LEVEL_HIGH
- 				 0x1000 0 0 2 &gic 0 113 IRQ_TYPE_LEVEL_HIGH>;
-+
-+		usb at 0,1 {
-+			reg = <0x800 0 0 0 0>;
-+			device_type = "pci";
-+			phys = <&usb2 0>;
-+			phy-names = "usb";
-+		};
-+
-+		usb at 0,2 {
-+			reg = <0x1000 0 0 0 0>;
-+			device_type = "pci";
-+			phys = <&usb2 0>;
-+			phy-names = "usb";
-+		};
- 	};
- 
- 	pciec: pcie at fe000000 {
+	Arnd
