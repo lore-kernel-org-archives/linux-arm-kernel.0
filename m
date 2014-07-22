@@ -1,55 +1,167 @@
-From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
-Date: Tue, 22 Jul 2014 09:42:46 +0200
-Subject: [GIT PULL v2] nommu fixes for 3.17-rc1
-In-Reply-To: <20140711073054.GI11056@pengutronix.de>
-References: <20140630144355.GH14781@pengutronix.de>
- <20140701094159.GM14781@pengutronix.de>
- <20140711073054.GI11056@pengutronix.de>
-Message-ID: <20140722074246.GA28538@pengutronix.de>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Tue, 22 Jul 2014 15:42:59 +0800
+Subject: [[RFC PATCH]] gpio: gpio-mxc: make sure gpio is input when
+ request IRQ
+In-Reply-To: <53CE107A.1000000@tqsc.de>
+References: <1405518664-31313-1-git-send-email-list-09_linux_arm@tqsc.de>
+ <20140722062803.GA21229@dragon> <53CE107A.1000000@tqsc.de>
+Message-ID: <20140722074257.GC21229@dragon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Russell,
++ Grant and devicetree list
 
-On Fri, Jul 11, 2014 at 09:30:54AM +0200, Uwe Kleine-K?nig wrote:
-> On Tue, Jul 01, 2014 at 11:41:59AM +0200, Uwe Kleine-K?nig wrote:
-> > I updated my tag to pull to not include the commit that drops ARM740T,
-> > ARM940T and ARM946E-S because of Arnd's concerns. Also the two cleanups
-> > that depended on this one are dropped.
+On Tue, Jul 22, 2014 at 09:19:22AM +0200, Markus Niebel wrote:
+> Am 22.07.2014 08:28, wrote Shawn Guo:
+> > On Wed, Jul 16, 2014 at 03:51:04PM +0200, Markus Niebel wrote:
+> >> From: Markus Niebel <Markus.Niebel@tq-group.com>
+> >>
+> >> When requesting an GPIO irq for imx Soc two things are missing:
+> >> - there is no check, if the GPIO is already requested
+> >> - there is no check, if the GPIO is configured as input
+> >>
+> >> The first case can lead to reconfiguring the GPIO pin from third
+> >> party while it is used as IRQ pin, second case will (eventually)
+> >> prevent IRQ from being seen by SOC becaus the pin is driven by
+> >> Soc
+> >>
+> >> This patch tries to implement (logic taken roughly from gpio-omap)
+> >> - basic check if gpio already requested
+> >> - if needed requests the gpio and configures as IN.
+> >> - if gpio is already requested it is only verified if pin is IN
+> >> - gpio is locked as irq
+> >>
+> >> Tested on a not mainlined i.MX6 based hardware with pin configured
+> >> by bootloader as OUT HIGH and expecting a low active IRQ.
+> >>
+> >> Signed-off-by: Markus Niebel <Markus.Niebel@tq-group.com>
+> >> ---
+> >>  drivers/gpio/gpio-mxc.c |   35 +++++++++++++++++++++++++++++++++++
+> >>  1 file changed, 35 insertions(+)
+> >>
+> >> diff --git a/drivers/gpio/gpio-mxc.c b/drivers/gpio/gpio-mxc.c
+> >> index db83b3c..4316a38 100644
+> >> --- a/drivers/gpio/gpio-mxc.c
+> >> +++ b/drivers/gpio/gpio-mxc.c
+> >> @@ -175,6 +175,31 @@ static int gpio_set_irq_type(struct irq_data *d, u32 type)
+> >>  	u32 gpio = port->bgc.gc.base + gpio_idx;
+> >>  	int edge;
+> >>  	void __iomem *reg = port->base;
+> >> +	int ret = 0;
+> >> +
+> >> +	if (!gpiochip_is_requested(&port->bgc.gc, gpio_idx)) {
+> >> +		char label[32];
+> >> +
+> >> +		snprintf(label, 32, "gpio%u-irq", gpio);
+> >> +		ret = gpio_request_one(gpio, GPIOF_DIR_IN, label);
 > > 
-> > (As before) I picked -rc3 as base because 1c2f87c22566..6980c3e2514e~ is
-> > broken on nommu. 
-> > 
-> > The following changes since commit 4c834452aad01531db949414f94f817a86348d59:
-> > 
-> >   Linux 3.16-rc3 (2014-06-29 14:11:36 -0700)
-> > 
-> > are available in the git repository at:
-> > 
-> >   git://git.pengutronix.de/git/ukl/linux.git tags/nommu-for-rmk
-> > 
-> > for you to fetch changes up to 83de911cf897a4317147dd9cb379378c2c4abf4c:
-> > 
-> >   ARM: make user_addr_max more robust (2014-07-01 11:12:09 +0200)
-> > 
-> > ----------------------------------------------------------------
-> > Two different fixes for the same problem making some ARM nommu configurations
-> > not boot since 3.6-rc1. The problem is that user_addr_max returned the biggest
-> > available RAM address which makes some copy_from_user variants fail to read
-> > from XIP memory.
-> > 
-> > Even in the presence of one of the two fixes the other still makes sense, so
-> > both patches are included here.
-> > 
-> > This problem was the last one preventing efm32 boot to a prompt with mainline.
-> You neither commented nor pulled this request (at least I didn't find it
-> in your repository). Is it still on your radar?
-I'd really like to have this in 3.17. Any chances? Would you prefer to
-get these patches into your patch tracker?
+> > I'm not sure it's correct to call gpio_request_one() from .set_irq_type
+> > hook.  It looks like a API usage violation to me.  It should really be
+> > called from client driver.
+> 
+> Thats why it is an RFC. I add Linus Walleij to the cc-list.
+> 
+> Let me describe the problem:
+> 
+> Currently client drivers have simply interrupts and interrupt-parent
+> in their bindings, but no interrupt-gpios. Therefore in this case a
+> client does not know about a dedicated gpio which is to be requested
+> and configured.
 
-Best regards
-Uwe
+Okay.  I understand your problem now.  This is an issue in case we
+specify a GPIO to be used as interrupt from device tree.  In non-DT
+world, client driver knows this is an interrupt on GPIO, and therefore
+takes the responsibility to request and configure the GPIO to work as
+interrupt.  But in DT case, client driver does not know whether it's an
+IRQ line or GPIO based interrupt.  The consequence is that GPIO
+subsystem, OF subsystem, client driver, none of the three is requesting
+and configuring the GPIO to be used as interrupt.
 
--- 
-Pengutronix e.K.                           | Uwe Kleine-K?nig            |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+This is a common issue instead of i.MX specific, and should be addressed
+globally, I think.
+
+Shawn
+
+> 
+> > 
+> >> +	} else {
+> >> +		val = readl(port->base + GPIO_GDIR);
+> >> +		if (val & BIT(gpio_idx))
+> >> +			ret = -EINVAL;
+> > 
+> > It says that the GPIO is requested by someone, but we're not really sure
+> > if it's the correct one, i.e. the one is requesting set_irq_type.
+> > 
+> 
+> Yes, but the current situation is even worse (in my eyes): an IRQ can be requested and an
+> independend party can request and configure the gpio as output ...
+> 
+> >> +	}
+> >> +
+> >> +	if (ret) {
+> >> +		dev_err(port->bgc.gc.dev, "unable to set gpio_idx %u as IN\n",
+> >> +			gpio_idx);
+> >> +		return ret;
+> >> +	}
+> > 
+> > Having said that, I'm not sure any above changes is really necessary.
+> > If any, I would say only gpiochip_is_requested() check makes some sense,
+> > but we should just fail out if the GPIO hasn't been requested.  Nothing
+> > more can be done in there.
+> 
+> Going that way as a consequence a reworked device tree binding for gpio irq is needed
+> (just like in the platform data days) when providing a gpio number and the client has
+> to request gpio and irq - correct me if I'm wrong.
+> 
+> Maybe here is something needed with deeper knowledge in the gpio subsystem.
+> 
+> > 
+> >> +
+> >> +	ret = gpio_lock_as_irq(&port->bgc.gc, gpio_idx);
+> >> +	if (ret) {
+> >> +		dev_err(port->bgc.gc.dev, "unable to lock gpio_idx %u for IRQ\n",
+> >> +			gpio_idx);
+> >> +		return ret;
+> >> +	}
+> > 
+> > This and the following changes do make sense to me.
+> > 
+> > Shawn
+> > 
+> >>  
+> >>  	port->both_edges &= ~(1 << gpio_idx);
+> >>  	switch (type) {
+> >> @@ -231,6 +256,15 @@ static int gpio_set_irq_type(struct irq_data *d, u32 type)
+> >>  	return 0;
+> >>  }
+> >>  
+> >> +static void gpio_irq_shutdown(struct irq_data *d)
+> >> +{
+> >> +	struct irq_chip_generic *gc = irq_data_get_irq_chip_data(d);
+> >> +	struct mxc_gpio_port *port = gc->private;
+> >> +	u32 gpio_idx = d->hwirq;
+> >> +
+> >> +	gpio_unlock_as_irq(&port->bgc.gc, gpio_idx);
+> >> +}
+> >> +
+> >>  static void mxc_flip_edge(struct mxc_gpio_port *port, u32 gpio)
+> >>  {
+> >>  	void __iomem *reg = port->base;
+> >> @@ -353,6 +387,7 @@ static void __init mxc_gpio_init_gc(struct mxc_gpio_port *port, int irq_base)
+> >>  	ct->chip.irq_mask = irq_gc_mask_clr_bit;
+> >>  	ct->chip.irq_unmask = irq_gc_mask_set_bit;
+> >>  	ct->chip.irq_set_type = gpio_set_irq_type;
+> >> +	ct->chip.irq_shutdown = gpio_irq_shutdown;
+> >>  	ct->chip.irq_set_wake = gpio_set_wake_irq;
+> >>  	ct->regs.ack = GPIO_ISR;
+> >>  	ct->regs.mask = GPIO_IMR;
+> >> -- 
+> >> 1.7.9.5
+> >>
+> > 
+> > _______________________________________________
+> > linux-arm-kernel mailing list
+> > linux-arm-kernel at lists.infradead.org
+> > http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+> > 
+> 
