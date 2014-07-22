@@ -1,32 +1,47 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Tue, 22 Jul 2014 09:08:44 -0700
-Subject: [PATCH v2] bus: ARM CCN PMU driver
-In-Reply-To: <1406023886.25343.48.camel@hornet>
-References: <1405091188-31754-1-git-send-email-pawel.moll@arm.com>
- <1406023886.25343.48.camel@hornet>
-Message-ID: <CAOesGMijrD6SxAyjvQptmAB8swqcvXNkiVS_nRCtUVtX2vYUFQ@mail.gmail.com>
+From: bhelgaas@google.com (Bjorn Helgaas)
+Date: Tue, 22 Jul 2014 10:08:54 -0600
+Subject: [PATCH v4] pcie: Add Xilinx PCIe Host Bridge IP driver
+In-Reply-To: <CA+mB=1JupzQy+R14kKAk7mTJR2FcZ+cQv-uXQSB6jEVBW95aGQ@mail.gmail.com>
+References: <1404361654-2894-1-git-send-email-sthokal@xilinx.com>
+ <20140716173824.GA24357@google.com>
+ <CA+mB=1JupzQy+R14kKAk7mTJR2FcZ+cQv-uXQSB6jEVBW95aGQ@mail.gmail.com>
+Message-ID: <CAErSpo41HwMferWm8q69Sz0t-Cs1WHgwwVp1VKsoxxyvrgQhfQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jul 22, 2014 at 3:11 AM, Pawel Moll <pawel.moll@arm.com> wrote:
-> Hi Arnd, Kevin, Olof,
+On Mon, Jul 21, 2014 at 11:10 PM, Srikanth Thokala <sthokal@xilinx.com> wrote:
+> On Wed, Jul 16, 2014 at 11:08 PM, Bjorn Helgaas <bhelgaas@google.com> wrote:
+>> ...
+>> I see I forgot to ask for a MAINTAINERS entry for this driver.  Can
+>> you add one?
 >
-> On Fri, 2014-07-11 at 16:06 +0100, Pawel Moll wrote:
->> Driver providing perf backend for ARM Cache Coherent Network
->> interconnect. Supports counting all hardware events and crosspoint
->> watchpoints.
->>
->> Currently works with CCN-504 only, although there should be
->> no changes required for CCN-508 (just impossible to test it now).
->>
->> Signed-off-by: Pawel Moll <pawel.moll@arm.com>
+> There was a discussion on this earlier and Michal mentioned it is not
+> required as it is
+> handled by our Xilinx record.
 >
-> Would you consider taking this through arm-soc tree? There isn't
-> anything in MAINTAINERS, but I vaguely remember Arnd proposing this
-> directory in the first place...
+> Here is the reply from Michal to the MAINTAINERS update comment,
+>
+> < Reply from Michal >
+>
+>> Please also include a MAINTAINERS update for drivers/pci/host/pci-xilinx.c.
+>
+> This should be handle by our record that's why MAINTAINERS update is
+> not necessary.
+> (N: xilinx below)
 
-Yeah, drivers/bus lacks an owner and we've normally been the ones
-merging them. Please send a fresh version of the patch over.
+That's technically true in the sense that get_maintainer.pl will do
+the right thing, but I often review patches in email (without
+extracting them), so it's more convenient to just look in MAINTAINERS
+to see if they have the right acks.  But I guess I can deal with it
+either way.
 
-
--Olof
+> ARM/ZYNQ ARCHITECTURE
+> M:      Michal Simek <michal.simek@xilinx.com>
+> L:      linux-arm-kernel at lists.infradead.org (moderated for non-subscribers)
+> W:      http://wiki.xilinx.com
+> T:      git git://git.xilinx.com/linux-xlnx.git
+> S:      Supported
+> F:      arch/arm/mach-zynq/
+> F:      drivers/cpuidle/cpuidle-zynq.c
+> N:      zynq
+> N:      xilinx
