@@ -1,44 +1,59 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 22 Jul 2014 22:57:17 +0200
-Subject: [PATCH v8 00/11] ARM: brcmstb: Add Broadcom STB SoC support
-In-Reply-To: <20140722204431.GG28323@ld-irv-0074>
+Date: Tue, 22 Jul 2014 23:02:07 +0200
+Subject: [PATCH v8 02/11] power: reset: Add reboot driver for brcmstb
+In-Reply-To: <20140722200213.GF28323@ld-irv-0074>
 References: <1405976886-27807-1-git-send-email-computersforpeace@gmail.com>
- <5675728.WLk3P96IBM@wuerfel> <20140722204431.GG28323@ld-irv-0074>
-Message-ID: <5044348.IEPQPrahyu@wuerfel>
+ <62122849.RXJHvac7Iy@wuerfel> <20140722200213.GF28323@ld-irv-0074>
+Message-ID: <5224854.YNJjMxFltp@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 22 July 2014 13:44:31 Brian Norris wrote:
-> > For the platform changes in the first patch, I would prefer to have
-> > Matt pick up the first patch, but we can also apply it directly into
-> > arm-soc if he prefers that.
+On Tuesday 22 July 2014 13:02:13 Brian Norris wrote:
+> How about a third option, where we drop the 'select' statement and
+> set POWER_RESET_BRCMSTB to be 'default y'? Then we don't have to modify
+> the defconfig, and it gives the added bonus of choosing a sane default
+> even if you're not based on the multi_v7_defconfig. i.e.:
 > 
-> That brings up a question related to PATCH 11 in the series (MAINTAINERS
-> update); who will be maintaining arch/arm/mach-bcm/*brcmstb*, and how
-> will code go upstream? It seems like Matt and Christian are officially
-> mach-bcm maintainers, although I don't know if Christian is still
-> involved.
+> diff --git a/arch/arm/mach-bcm/Kconfig b/arch/arm/mach-bcm/Kconfig
+> index 58c01aed9752..634de7b7fd28 100644
+> --- a/arch/arm/mach-bcm/Kconfig
+> +++ b/arch/arm/mach-bcm/Kconfig
+> @@ -94,7 +94,6 @@ config ARCH_BRCMSTB
+>         select MIGHT_HAVE_PCI
+>         select HAVE_SMP
+>         select HAVE_ARM_ARCH_TIMER
+> -       select POWER_RESET_BRCMSTB
+>         select BRCMSTB_GISB_ARB
+>         select BRCMSTB_L2_IRQ
+>         help
+> diff --git a/drivers/power/reset/Kconfig b/drivers/power/reset/Kconfig
+> index fcb9825debe5..ab5d57e2766d 100644
+> --- a/drivers/power/reset/Kconfig
+> +++ b/drivers/power/reset/Kconfig
+> @@ -23,6 +23,7 @@ config POWER_RESET_AXXIA
+>  config POWER_RESET_BRCMSTB
+>         bool "Broadcom STB reset driver"
+>         depends on POWER_RESET && ARCH_BRCMSTB
+> +       default y
+>         help
+>           This driver provides restart support for ARM-based Broadcom STB
+>           boards.
 
-You have to solve that question together with Matt. From my perspective
-it would be easier if I only have to deal with one person for mach-bcm,
-but it's really up to you.
+I don't like this too much. Why do you want to allow disabling the
+driver if you make it 'default y' in the first place?
 
-> Also, BCM7xxx shares little in common with the rest of mach-bcm, except
-> a company name, so we'd really like at least the 'Maintainer' entries
-> for the CC. I was planning on a separate git tree too, although it could
-> have conflicts if we touch arch/arm/mach-bcm/{Makefile,Kconfig}.
-> 
-> So would we send a separate arm-soc pull request for the arm-soc
-> targeted changes (and all future development)?
+We try to avoid 'default y' for user-selectable drivers in general.
+I noticed that in my example, I was missing the default. It should
+have been 
 
-You can definitely have the separate MAINTAINERS entry without necessarily
-becoming a maintainer at the same level. I know Matt is very responsive
-and can forward your patches to arm-soc if that works for you.
+config POWER_RESET_BRCMSTB
+        bool "Broadcom STB reset driver" if COMPILE_TEST
+        depends on POWER_RESET && ARM
+	default ARCH_BRCMSTB
 
-> For the reset of mach-bcm stuff, I'll just send an arm-soc pull request
-> soon enough, unless Matt/Arnd/Olof object.
-
-I'll wait for Matt to comment before pulling it, otherwise that sounds
-fine.
+This way, it always gets selected when ARCH_BRCMSTB is on and
+COMPILE_TEST is off. With COMPILE_TEST enabled, it defaults to
+ARCH_BRCMSTB but can be enabled or disabled for the purpose
+of compile testing.
 
 	Arnd
