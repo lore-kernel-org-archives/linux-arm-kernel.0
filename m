@@ -1,59 +1,85 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Tue, 22 Jul 2014 18:33:10 +0200
-Subject: [PATCH 0/2] pinctrl: sunxi: misc improvements for gpio
-In-Reply-To: <1405358677-23657-1-git-send-email-wens@csie.org>
-References: <1405358677-23657-1-git-send-email-wens@csie.org>
-Message-ID: <CACRpkdZhZkB6=_ehVXxWAnvkVYy_KOU84fcGRSRTc9-2X2paqQ@mail.gmail.com>
+From: f.fainelli@gmail.com (Florian Fainelli)
+Date: Tue, 22 Jul 2014 09:39:15 -0700
+Subject: [PATCH 4/6] net/macb: add RX checksum offload feature
+In-Reply-To: <53CE9109.9040407@atmel.com>
+References: <cover.1405689937.git.cyrille.pitchen@atmel.com>
+ <f29965fee23dc0de99b388373017efeffa1aac10.1405689937.git.cyrille.pitchen@atmel.com>
+ <1405697784.10255.99.camel@edumazet-glaptop2.roam.corp.google.com>
+ <53CE9109.9040407@atmel.com>
+Message-ID: <CAGVrzca2YWZkVkUs_c06ApXrE3hdDgbsC7-6x2M4DS-Qn6S0aQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-I'm waiting for Maxime to look at these patches before merging.
-
-On Mon, Jul 14, 2014 at 7:24 PM, Chen-Yu Tsai <wens@csie.org> wrote:
-
-> These 2 patches are fixes / improvements to the gpio side of the
-> sunxi pinctrl driver. They are based on pinctrl/devel (3a19805).
-> The patches change the same lines of code, so they are sent together.
+2014-07-22 9:27 GMT-07:00 Cyrille Pitchen <cyrille.pitchen@atmel.com>:
+> Le 18/07/2014 17:36, Eric Dumazet a ?crit :
+>> On Fri, 2014-07-18 at 16:21 +0200, Cyrille Pitchen wrote:
+>>> Signed-off-by: Cyrille Pitchen <cyrille.pitchen@atmel.com>
+>>> ---
+>>>  drivers/net/ethernet/cadence/macb.c | 29 ++++++++++++++++++++++++++++-
+>>>  drivers/net/ethernet/cadence/macb.h |  2 ++
+>>>  2 files changed, 30 insertions(+), 1 deletion(-)
+>>>
+>>> diff --git a/drivers/net/ethernet/cadence/macb.c b/drivers/net/ethernet/cadence/macb.c
+>>> index 9bdcd1b..6acd6e2 100644
+>>> --- a/drivers/net/ethernet/cadence/macb.c
+>>> +++ b/drivers/net/ethernet/cadence/macb.c
+>>> @@ -766,6 +766,8 @@ static int gem_rx(struct macb *bp, int budget)
+>>>
+>>>              skb->protocol = eth_type_trans(skb, bp->dev);
+>>>              skb_checksum_none_assert(skb);
+>>> +            if (bp->dev->features & NETIF_F_RXCSUM)
+>>> +                    skb->ip_summed = CHECKSUM_UNNECESSARY;
+>>>
+>>
+>>
+>> Really ?
+>>
+>> If this is what you meant, this deserves a big and fat comment.
+>>
+>>
+>>
+> Hi Eric,
 >
-> Patch 1 adds locking gpio lines when used as external interrupts.
-> Similar patches were done by Linus and other maintainers for various
-> platforms.
-
-Nice.
-
-> A somewhat related issue is that the sunxi pinctrl driver does not
-> block users from requesting an already muxed pin as a gpio line.
-> Maybe we should do some locking there as well? Are there any kernel
-> interfaces for this? Or do we need to do it in the driver specifically
-> for our hardware?
+> Isn't it the proper way to do? According to Cadence documentation about RX checksum offload:
+> "If any of the checksums (IP, TCP or UDP) are verified incorrect by the GEM, the packet is discarded."
 >
-> (I had the unfortunate experience of poking GPIOs listed in the fex
-> files, not noticing they were used by the uart console.)
+> If I understand, when RX checksum offload is enabled setting bit 24 of the Network Configuration Register, the driver only receives RX frames with correct checksum. Then it tells the kernel that there's no need to verify the checksum again in software. This is done setting skb->ip_summed to CHECKSUM_UNNECESSARY. Intel e1000 driver does the same in e1000_rx_checksum() function.
+
+This is not the same thing as what the e1000 driver is doing, the
+e1000 driver is checking a per-packet status mask which tells it
+whether a given packet had its protocol level checksum computed by the
+HW.
+
+I think there might be some slight confusion here between the Ethernet
+frame Frame Control Checksum which is at the Ethernet level, and will
+(with most adapters not supporting RX_FCS_ERR) cause the Ethernet
+controller to drop frames at the MAC level, and the higher level
+protocol checksums such as the TCP or UDP checksum.
+
+>
+> Also bit 24 of the Network Configuration Register is updated by macb_open() and macb_set_features() so it always matches the state of NETIF_F_RXCSUM flag in dev->features, once the network interface is up. That's why I'd rather read from dev->features than read from register.
+
+I don't think the Cadence GEM Ethernet controller is any different
+than other hardware out there, there must be a per-packet status bit
+which tells whether the TCP/UDP or other protocol checksum was
+successfully validated by the hardware. One of the reason for that, is
+that depending on the type of traffic your receive (e.g: ARP), there
+might be no protocol-level checksum at all in the packet, and the
+hardware should know about that.
+
+>
+> Did I make a mistake? Is it the kind of comment you expect to be added?
+>
+> Regards,
+>
+> Cyrille
+>
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
 
 
-The pin control core explicitly allows concurrent muxing to some
-certain function and GPIO usage (see Documentation/pinctrl.txt).
 
-This is because some HW may allow you to e.g. "spy" on pins
-using it's GPIO registers, or use it from the GPIO subsystem
-at the same time some other way.
-
-If this does not apply to your hardware, you can further
-restrictions in the driver, for example pinctrl_request_gpio()
-can return something negative from the pin control part
-of the driver, like -EBUSY.
-
-> AFAIK pinctrl pin numbers are device specific, so I'm wondering if we
-> should also number them in terms of offsets, rather than absolute pin
-> numbers. It's more of an asthetic change though. Any thoughts?
-
-Usually I say these pin numbers should try to match what is
-in the data sheet so it is easy to understand and debug. Sometimes
-pins are numbered with letters and stuff so they rather have names
-than numbers, then some artificial numbering is applied, whatever
-is helpful.
-
-I'm not directly familiar with the sunxi numbering system though...
-
-Yours,
-Linus Walleij
+-- 
+Florian
