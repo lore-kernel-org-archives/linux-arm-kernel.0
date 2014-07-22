@@ -1,28 +1,37 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Tue, 22 Jul 2014 15:52:32 +0100
-Subject: [PATCH 5/5] ARM: multi_v7_defconfig: Enable ST's Power Reset driver
-In-Reply-To: <1406040752-25229-1-git-send-email-lee.jones@linaro.org>
-References: <1406040752-25229-1-git-send-email-lee.jones@linaro.org>
-Message-ID: <1406040752-25229-6-git-send-email-lee.jones@linaro.org>
+From: shawn.guo@freescale.com (Shawn Guo)
+Date: Tue, 22 Jul 2014 22:52:57 +0800
+Subject: [PATCH] ARM: imx6: fix SMP compilation again
+In-Reply-To: <12850450.mxMbPOMjsW@wuerfel>
+References: <37015543.ZyZKZyEIPW@wuerfel> <16557676.B1fW0k49Wz@wuerfel>
+ <20140722134815.GZ8537@dragon> <12850450.mxMbPOMjsW@wuerfel>
+Message-ID: <20140722145256.GA8537@dragon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Signed-off-by: Lee Jones <lee.jones@linaro.org>
----
- arch/arm/configs/multi_v7_defconfig | 1 +
- 1 file changed, 1 insertion(+)
+On Tue, Jul 22, 2014 at 04:37:55PM +0200, Arnd Bergmann wrote:
+> On Tuesday 22 July 2014 21:48:16 Shawn Guo wrote:
+> > I tried both mainline and -next tree.  I really need some help to
+> > reproduce the error first.
+> 
+> My branch is at git.kernel.org/pub/scm/linux/kernel/git/arnd/playground.git
+> in the randconfig-next branch. Sorry for the inconvenience.
 
-diff --git a/arch/arm/configs/multi_v7_defconfig b/arch/arm/configs/multi_v7_defconfig
-index 5348364..1878e8d 100644
---- a/arch/arm/configs/multi_v7_defconfig
-+++ b/arch/arm/configs/multi_v7_defconfig
-@@ -221,6 +221,7 @@ CONFIG_CHARGER_TPS65090=y
- CONFIG_POWER_RESET_AS3722=y
- CONFIG_POWER_RESET_GPIO=y
- CONFIG_POWER_RESET_SUN6I=y
-+CONFIG_POWER_RESET_ST=y
- CONFIG_SENSORS_LM90=y
- CONFIG_THERMAL=y
- CONFIG_ARMADA_THERMAL=y
--- 
-1.8.3.2
+Okay, I can see the error on your branch with the fixing patch reverted.
+
+> 
+> > > arch/arm/mach-imx/built-in.o: In function `v7_secondary_startup':
+> > > :(.text+0x5124): undefined reference to `v7_invalidate_l1'
+> > > 
+> > > This puts the code inside of an "ifdef CONFIG_SMP" to hopefully
+> > 
+> > The code says "ifdef CONFIG_SOC_IMX6"?
+> 
+> It seems I'm having a bad day. I'll fix it up.
+
+With that fixed up,
+
+Acked-by: Shawn Guo <shawn.guo@freescale.com>
+
+Or let me know if you expect me to handle the patch.
+
+Shawn
