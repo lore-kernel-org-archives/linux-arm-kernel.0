@@ -1,42 +1,51 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Tue, 22 Jul 2014 13:13:06 +0100
-Subject: [PATCH 01/19] mfd: max77686: Fix 'line over 80 chars' warning
-In-Reply-To: <CAMf-jSn4y40p+tpUNMnCMMmAEQbjXBqbfgPy3zWrTs_b85uvxg@mail.gmail.com>
-References: <1406027485-15657-1-git-send-email-lee.jones@linaro.org>
- <1406027485-15657-2-git-send-email-lee.jones@linaro.org>
- <CAMf-jSn4y40p+tpUNMnCMMmAEQbjXBqbfgPy3zWrTs_b85uvxg@mail.gmail.com>
-Message-ID: <20140722121306.GB16065@lee--X1>
+From: maxime.coquelin@st.com (Maxime Coquelin)
+Date: Tue, 22 Jul 2014 14:13:32 +0200
+Subject: [STLinux Kernel] [PATCH v3 10/10] MAINTAINERS: Add sdhci-st file
+ to ARCH/STI architecture
+In-Reply-To: <53A80754.9000900@st.com>
+References: <1401899424-1365-1-git-send-email-peter.griffin@linaro.org>	<1401899424-1365-11-git-send-email-peter.griffin@linaro.org>
+ <53A80754.9000900@st.com>
+Message-ID: <53CE556C.10607@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 22 Jul 2014, pramod gurav wrote:
+Hi Olof, Arnd, Kevin,
 
-> On Tue, Jul 22, 2014 at 4:41 PM, Lee Jones <lee.jones@linaro.org> wrote:
-> > This is part of an effort to clean-up the MFD subsystem.
-> >
-> <snip>
-> >         max77686->rtc_regmap = devm_regmap_init_i2c(max77686->rtc,
-> Which kernel are you on? Because 3.16.rc6 does not match with these
-> lines. Its something like this:
->           'max77686->regmap = devm_regmap_init_i2c(i2c,
-> &max77686_regmap_config);'
-> 
-> Sorry if I am missing something.
+	I am preparing two tags for v3.17 regarding STi platform.
+	One for DT, and one for defconfigs.
 
-It's based on the most recent MFD for-mfd-next branch.
+	Except this one, I have no patches for ARM-SoC.
+	Can you take this patch directly?
 
-You're missing the following patches:
+	Or should I send a pull request with this one only?
 
-  mfd: max77686: Remove unneeded OOM error message
-  mfd: max77686: Make error checking consistent
-  mfd: max77686: Return correct error when pdata isn't found
-  mfd: max77686: Make platform data over-rule DT
-  mfd: max77686: Don't define dummy function if OF isn't enabled
-  mfd: max77686: Add power management support
-  mfd: max77686: Convert to use regmap_irq
+Regards,
+Maxime
 
--- 
-Lee Jones
-Linaro STMicroelectronics Landing Team Lead
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+On 06/23/2014 12:54 PM, Maxime Coquelin wrote:
+>
+>
+> On 06/04/2014 06:30 PM, Peter Griffin wrote:
+>> Signed-off-by: Peter Griffin <peter.griffin@linaro.org>
+>
+> Acked-by: Maxime Coquelin <maxime.coquelin@st.com>
+>
+>> --- MAINTAINERS | 1 + 1 file changed, 1 insertion(+)
+>>
+>> diff --git a/MAINTAINERS b/MAINTAINERS index 6dc67b1..19dc265
+>> 100644 --- a/MAINTAINERS +++ b/MAINTAINERS @@ -1306,6 +1306,7 @@ F:
+>> drivers/pinctrl/pinctrl-st.c F:	drivers/media/rc/st_rc.c F:
+>> drivers/i2c/busses/i2c-st.c F:	drivers/tty/serial/st-asc.c +F:
+>> drivers/mmc/host/sdhci-st.c
+>>
+>> ARM/TECHNOLOGIC SYSTEMS TS7250 MACHINE SUPPORT M:	Lennert Buytenhek
+>> <kernel@wantstofly.org>
+>>
+>
+>
+>
+> _______________________________________________
+> Kernel mailing list
+> Kernel at stlinux.com
+> http://www.stlinux.com/mailman/listinfo/kernel
+>
