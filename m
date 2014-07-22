@@ -1,34 +1,29 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 22 Jul 2014 13:33:29 +0200
-Subject: [PATCH 03/19] mfd: tps80031: Fix 'missing break or fall-through
- comment' warning
-In-Reply-To: <1406027485-15657-4-git-send-email-lee.jones@linaro.org>
+From: pramod.gurav.etc@gmail.com (pramod gurav)
+Date: Tue, 22 Jul 2014 17:15:43 +0530
+Subject: [PATCH 01/19] mfd: max77686: Fix 'line over 80 chars' warning
+In-Reply-To: <1406027485-15657-2-git-send-email-lee.jones@linaro.org>
 References: <1406027485-15657-1-git-send-email-lee.jones@linaro.org>
- <1406027485-15657-4-git-send-email-lee.jones@linaro.org>
-Message-ID: <5230900.iFlbGceLXl@wuerfel>
+ <1406027485-15657-2-git-send-email-lee.jones@linaro.org>
+Message-ID: <CAMf-jSn4y40p+tpUNMnCMMmAEQbjXBqbfgPy3zWrTs_b85uvxg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 22 July 2014 12:11:09 Lee Jones wrote:
-> --- a/drivers/mfd/tps80031.c
-> +++ b/drivers/mfd/tps80031.c
-> @@ -334,6 +334,7 @@ static bool rd_wr_reg_id1(struct device *dev, unsigned int reg)
->         case TPS80031_PREQ1_RES_ASS_A ... TPS80031_PREQ3_RES_ASS_C:
->         case TPS80031_SMPS_OFFSET ... TPS80031_BATDEBOUNCING:
->         case TPS80031_CFG_INPUT_PUPD1 ... TPS80031_CFG_SMPS_PD:
-> +               /* Fall through */
->         case TPS80031_BACKUP_REG:
->                 return true;
->         default:
+On Tue, Jul 22, 2014 at 4:41 PM, Lee Jones <lee.jones@linaro.org> wrote:
+> This is part of an effort to clean-up the MFD subsystem.
+>
+<snip>
+>         max77686->rtc_regmap = devm_regmap_init_i2c(max77686->rtc,
+Which kernel are you on? Because 3.16.rc6 does not match with these
+lines. Its something like this:
+          'max77686->regmap = devm_regmap_init_i2c(i2c,
+&max77686_regmap_config);'
 
-This one seems to make the code look worse: You are only adding the comment
-to one case, not all of them, and it was perfectly understandable
-before.
+Sorry if I am missing something.
 
-Further, there are a couple of other functions following this one that
-also don't have that comment.
+> Please read the FAQ at  http://www.tux.org/lkml/
 
-It seems checkpatch missed all the other cases because they contain '...'
-lists, whereas the one above does not. I think it's better left alone.
 
-	Arnd
+
+-- 
+Thanks and Regards
+Pramod
