@@ -1,18 +1,33 @@
-From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
-Date: Wed, 23 Jul 2014 01:13:45 +0400
-Subject: [PATCH v3 0/2] Add USB PHY device tree support for R8A7790/Lager board
-Message-ID: <201407230113.46444.sergei.shtylyov@cogentembedded.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Tue, 22 Jul 2014 22:20:36 +0100
+Subject: [PATCH v2 1/5] i2c: Don't start transfers when suspended
+In-Reply-To: <53CEB196.9060903@ti.com>
+References: <1405608520-5644-1-git-send-email-hechtb@gmail.com>
+ <53CEB196.9060903@ti.com>
+Message-ID: <20140722212036.GL21766@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello.
+On Tue, Jul 22, 2014 at 09:46:46PM +0300, Grygorii Strashko wrote:
+>  I'm not sure, this optimization is safe  (
+> Because, in many cases the access to PMIC IC needs to be allowed till late
+> stages of suspending (at least till suspend_noirq stage or even later).
+> For example, on some OMAP SoC Voltage management code need to use services
+> provided by PMIC IC, which is connected to I2C.
 
-   Here's the set of 2 patches against Simon Horman's 'renesas.git' repo,
-'renesas-devel-v3.16-rc5-20140722' tag. Here we add the USB PHY device tree
-support on the R8A7790/Lager reference board. The patchset requires the USB PHY
-driver (just re-posted) in order to work.
+This is definitely not safe.  I worked on a PXA platform a while back
+where the only way to tell the thing to "sleep" was to send an I2C
+message to a microcontroller asking it to remove power.
 
-[1/2] ARM: shmobile: r8a7790: add USB PHY DT support
-[2/2] ARM: shmobile: lager: enable USB PHY
+Plus, as you say, you may also have PMICs that you need to talk to
+in order to shut power off to various peripherals (and maybe even
+the CPU itself) during the suspend process.
 
-WBR, Sergei
+I2C is one of those cases where devices attached to the I2C bus are
+themselves responsible for doing their own suspend shutdown at the
+appropriate time; it's not the responsibility of the I2C core to
+know this kind of system/driver dependent detail.
+
+-- 
+FTTC broadband for 0.8mile line: currently at 9.5Mbps down 400kbps up
+according to speedtest.net.
