@@ -1,46 +1,55 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 22 Jul 2014 09:35:45 +0200
-Subject: [PATCH v8 00/11] ARM: brcmstb: Add Broadcom STB SoC support
-In-Reply-To: <1405976886-27807-1-git-send-email-computersforpeace@gmail.com>
-References: <1405976886-27807-1-git-send-email-computersforpeace@gmail.com>
-Message-ID: <5675728.WLk3P96IBM@wuerfel>
+From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
+Date: Tue, 22 Jul 2014 09:42:46 +0200
+Subject: [GIT PULL v2] nommu fixes for 3.17-rc1
+In-Reply-To: <20140711073054.GI11056@pengutronix.de>
+References: <20140630144355.GH14781@pengutronix.de>
+ <20140701094159.GM14781@pengutronix.de>
+ <20140711073054.GI11056@pengutronix.de>
+Message-ID: <20140722074246.GA28538@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday 21 July 2014 14:07:55 Brian Norris wrote:
-> I'm taking over the latest resubmission of this patch series.
-> There are a few moderate changes for v8 (noted below), but we
-> are waiting mostly for an Ack for the reboot driver.
-> 
-> This patchset contains the board support package for the
-> Broadcom BCM7445 ARM-based SoC [1]. These changes contain a
-> minimal set of code needed for a BCM7445-based board to boot
-> the Linux kernel.
-> 
-> These changes heavily leverage the OF/devicetree framework. The
-> machine is also built into the multi-platform ARMv7 image.
-> 
-> Changes are also available here:
-> 
->   https://github.com/brcm/linux/tree/brcmstb-v8
->   git://github.com/brcm/linux.git +brcmstb-v8
+Hi Russell,
 
-Whole series
+On Fri, Jul 11, 2014 at 09:30:54AM +0200, Uwe Kleine-K?nig wrote:
+> On Tue, Jul 01, 2014 at 11:41:59AM +0200, Uwe Kleine-K?nig wrote:
+> > I updated my tag to pull to not include the commit that drops ARM740T,
+> > ARM940T and ARM946E-S because of Arnd's concerns. Also the two cleanups
+> > that depended on this one are dropped.
+> > 
+> > (As before) I picked -rc3 as base because 1c2f87c22566..6980c3e2514e~ is
+> > broken on nommu. 
+> > 
+> > The following changes since commit 4c834452aad01531db949414f94f817a86348d59:
+> > 
+> >   Linux 3.16-rc3 (2014-06-29 14:11:36 -0700)
+> > 
+> > are available in the git repository at:
+> > 
+> >   git://git.pengutronix.de/git/ukl/linux.git tags/nommu-for-rmk
+> > 
+> > for you to fetch changes up to 83de911cf897a4317147dd9cb379378c2c4abf4c:
+> > 
+> >   ARM: make user_addr_max more robust (2014-07-01 11:12:09 +0200)
+> > 
+> > ----------------------------------------------------------------
+> > Two different fixes for the same problem making some ARM nommu configurations
+> > not boot since 3.6-rc1. The problem is that user_addr_max returned the biggest
+> > available RAM address which makes some copy_from_user variants fail to read
+> > from XIP memory.
+> > 
+> > Even in the presence of one of the two fixes the other still makes sense, so
+> > both patches are included here.
+> > 
+> > This problem was the last one preventing efm32 boot to a prompt with mainline.
+> You neither commented nor pulled this request (at least I didn't find it
+> in your repository). Is it still on your radar?
+I'd really like to have this in 3.17. Any chances? Would you prefer to
+get these patches into your patch tracker?
 
-Acked-by: Arnd Bergmann <arnd@arndb.de>
+Best regards
+Uwe
 
-I think we should try to get this merged into 3.17, it's already
-taken too long and the patches look good.
-
-Please add the core architecture patches for arch/arm into Russell's
-patch tracker http://www.arm.linux.org.uk/developer/patches/.
-
-For the platform changes in the first patch, I would prefer to have
-Matt pick up the first patch, but we can also apply it directly into
-arm-soc if he prefers that.
-
-The reset driver can ideally go through the drivers/power/ maintainers,
-but if they are not interested in merging it, we can also take that
-through arm-soc. See also my one comment on that driver.
-
-	Arnd
+-- 
+Pengutronix e.K.                           | Uwe Kleine-K?nig            |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
