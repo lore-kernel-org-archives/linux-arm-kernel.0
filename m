@@ -1,48 +1,37 @@
 From: lee.jones@linaro.org (Lee Jones)
-Date: Tue, 22 Jul 2014 12:11:16 +0100
-Subject: [PATCH 10/19] mfd: lp8788-irq: Fix 'missing blank line after
- declarations' warning
+Date: Tue, 22 Jul 2014 12:11:11 +0100
+Subject: [PATCH 05/19] mfd: wm8350-irq: Fix 'line over 80 chars' warning
 In-Reply-To: <1406027485-15657-1-git-send-email-lee.jones@linaro.org>
 References: <1406027485-15657-1-git-send-email-lee.jones@linaro.org>
-Message-ID: <1406027485-15657-11-git-send-email-lee.jones@linaro.org>
+Message-ID: <1406027485-15657-6-git-send-email-lee.jones@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 This is part of an effort to clean-up the MFD subsystem.
 
-WARNING: Missing a blank line after declarations
-+       struct lp8788_irq_data *irqd = irq_data_get_irq_chip_data(data);
-+       irqd->enabled[data->hwirq] = 1;
+WARNING: line over 80 characters
++       wm8350->irq_base = irq_alloc_descs(irq_base, 0, ARRAY_SIZE(wm8350_irqs), 0);
 
-WARNING: Missing a blank line after declarations
-+       struct lp8788_irq_data *irqd = irq_data_get_irq_chip_data(data);
-+       irqd->enabled[data->hwirq] = 0;
-
-total: 0 errors, 2 warnings, 198 lines checked
+total: 0 errors, 1 warnings, 552 lines checked
 
 Signed-off-by: Lee Jones <lee.jones@linaro.org>
 ---
- drivers/mfd/lp8788-irq.c | 2 ++
- 1 file changed, 2 insertions(+)
+ drivers/mfd/wm8350-irq.c | 3 ++-
+ 1 file changed, 2 insertions(+), 1 deletion(-)
 
-diff --git a/drivers/mfd/lp8788-irq.c b/drivers/mfd/lp8788-irq.c
-index c84ded5..23982db 100644
---- a/drivers/mfd/lp8788-irq.c
-+++ b/drivers/mfd/lp8788-irq.c
-@@ -66,12 +66,14 @@ static inline u8 _irq_to_val(enum lp8788_int_id id, int enable)
- static void lp8788_irq_enable(struct irq_data *data)
- {
- 	struct lp8788_irq_data *irqd = irq_data_get_irq_chip_data(data);
-+
- 	irqd->enabled[data->hwirq] = 1;
- }
+diff --git a/drivers/mfd/wm8350-irq.c b/drivers/mfd/wm8350-irq.c
+index cd01f79..813ff50 100644
+--- a/drivers/mfd/wm8350-irq.c
++++ b/drivers/mfd/wm8350-irq.c
+@@ -497,7 +497,8 @@ int wm8350_irq_init(struct wm8350 *wm8350, int irq,
+ 	if (pdata && pdata->irq_base > 0)
+ 		irq_base = pdata->irq_base;
  
- static void lp8788_irq_disable(struct irq_data *data)
- {
- 	struct lp8788_irq_data *irqd = irq_data_get_irq_chip_data(data);
-+
- 	irqd->enabled[data->hwirq] = 0;
- }
- 
+-	wm8350->irq_base = irq_alloc_descs(irq_base, 0, ARRAY_SIZE(wm8350_irqs), 0);
++	wm8350->irq_base =
++		irq_alloc_descs(irq_base, 0, ARRAY_SIZE(wm8350_irqs), 0);
+ 	if (wm8350->irq_base < 0) {
+ 		dev_warn(wm8350->dev, "Allocating irqs failed with %d\n",
+ 			wm8350->irq_base);
 -- 
 1.8.3.2
