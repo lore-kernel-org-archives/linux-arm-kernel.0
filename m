@@ -1,49 +1,77 @@
-From: shawn.guo@freescale.com (Shawn Guo)
-Date: Tue, 22 Jul 2014 10:16:35 +0800
-Subject: [PATCH 5/6] usb: phy: mxs: Add VF610 USB PHY support
-In-Reply-To: <af194168fadd80c26f94da740f1e61ce6603225a.1405702442.git.stefan@agner.ch>
-References: <cover.1405702442.git.stefan@agner.ch>
- <af194168fadd80c26f94da740f1e61ce6603225a.1405702442.git.stefan@agner.ch>
-Message-ID: <20140722021634.GQ8537@dragon>
+From: cw00.choi@samsung.com (Chanwoo Choi)
+Date: Tue, 22 Jul 2014 11:17:59 +0900
+Subject: [PATCHv7 0/4] iio: adc: exynos_adc: Support Exynos3250 ADC and
+ code clean
+In-Reply-To: <4966271.WeZIcVN3eT@wuerfel>
+References: <1405909068-22539-1-git-send-email-cw00.choi@samsung.com>
+ <53CCCB20.50802@samsung.com> <53CCCCA8.1030509@samsung.com>
+ <4966271.WeZIcVN3eT@wuerfel>
+Message-ID: <53CDC9D7.5000803@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jul 18, 2014 at 07:01:41PM +0200, Stefan Agner wrote:
-> This adds support for the USB PHY in Vybrid VF610. We assume that
-> the disconnection without VBUS is also needed for Vybrid. For all
-> other flags, the presumption of innocence applies.
-> 
-> Signed-off-by: Stefan Agner <stefan@agner.ch>
-> ---
->  drivers/usb/phy/phy-mxs-usb.c | 5 +++++
->  1 file changed, 5 insertions(+)
-> 
-> diff --git a/drivers/usb/phy/phy-mxs-usb.c b/drivers/usb/phy/phy-mxs-usb.c
-> index c42bdf0..207946b 100644
-> --- a/drivers/usb/phy/phy-mxs-usb.c
-> +++ b/drivers/usb/phy/phy-mxs-usb.c
-> @@ -125,10 +125,15 @@ static const struct mxs_phy_data imx6sl_phy_data = {
->  		MXS_PHY_NEED_IP_FIX,
->  };
->  
-> +static const struct mxs_phy_data vf610_phy_data = {
-> +	.flags = MXS_PHY_DISCONNECT_LINE_WITHOUT_VBUS,
-> +};
-> +
->  static const struct of_device_id mxs_phy_dt_ids[] = {
->  	{ .compatible = "fsl,imx6sl-usbphy", .data = &imx6sl_phy_data, },
->  	{ .compatible = "fsl,imx6q-usbphy", .data = &imx6q_phy_data, },
->  	{ .compatible = "fsl,imx23-usbphy", .data = &imx23_phy_data, },
-> +	{ .compatible = "fsl,vf610-usbphy", .data = &vf610_phy_data, },
+Hi Arnd,
 
-This new compatible string should be documented in
-Documentation/devicetree/bindings/usb/mxs-phy.txt.
-
-Shawn
-
->  	{ /* sentinel */ }
->  };
->  MODULE_DEVICE_TABLE(of, mxs_phy_dt_ids);
-> -- 
-> 2.0.1
+On 07/21/2014 05:58 PM, Arnd Bergmann wrote:
+> On Monday 21 July 2014 17:17:44 Chanwoo Choi wrote:
+>> On 07/21/2014 05:11 PM, Chanwoo Choi wrote:
+>>> On 07/21/2014 04:38 PM, Arnd Bergmann wrote:
+>>>> On Monday 21 July 2014 11:17:44 Chanwoo Choi wrote:
+>>>>>
+>>>>> This patchset support Exynos3250 ADC (Analog Digital Converter) because
+>>>>> Exynos3250 has additional special clock for ADC IP.
+>>>>>
+>>>>> Changes from v6:
+>>>>> - Use "exynos3250-adc" compatible string instead of "exynos3250-adc-v2"
+>>>>> - Use "sclk" clock name instead of "sclk_adc"
+>>>>> - Remove un-necessary macro for exyno-adc-data-v2 structure.
+>>>>> - Remove '(void *)' cast and mark the exynos-adc-data structure as 'const'
+>>>>> - Change the number of ADC channels (Exynos3250 has only two channels for ADC)
+>>>>>
+>>>>
+>>>> Looks good to me. Two small requests:
+ >>>>
+>>>> a) if you don't mind, can you add my patch (1/2) to add support for s3c64xx to
+>>>>    your series, adding your Signed-off-by line in addition to mine? I think
+>>>>    that one was noncontroversial, while the second patch (2/2) need some more
+>>>>    work to address the comments and do testing.
+>>>
+>>> OK, I'll add this patch.
+>>> But, I have a question.
+>>>
+>>> Your patch add following compatible string.
+>>> "s3c64100-adc" is right?
+>>>
+>>>  static const struct of_device_id exynos_adc_match[] = {
+>>>  	{
+>>> +		.compatible = "samsung,s3c64100-adc",
+>>> +		.data = &exynos_adc_s3c64xx_data,
+>>> +	}, {
+>>
+>> Additionally,
+>> Documentation/devicetree/bindings/arm/samsung/exynos-adc.txt has not included
+>> "samsung,s3c6410-adc" compatible string. Should I add this string in exynos-adc.txt?
+>>
+>> drivers/iio/adc/exynos-adc.c has not includeded following compatible string.
+>> Should I add this compatible string on exynos-adc.c?
+>>
+>> +			Must be "samsung,s3c2410-adc" for
+>> +				the ADC in s3c2410 and compatibles
+>> +			Must be "samsung,s3c2416-adc" for
+>> +				the ADC in s3c2416 and compatibles
+>> +			Must be "samsung,s3c2440-adc" for
+>> +				the ADC in s3c2440 and compatibles
+>> +			Must be "samsung,s3c2440-adc" for
+>> +				the ADC in s3c2440 and compatibles
+>> +			Must be "samsung,s3c2443-adc" for
+>> +				the ADC in s3c2443 and compatibles
+>>
 > 
+> 
+> Yes, please.
+
+I send following patchset[1] to support s3c24xx/s3c64xx ADC.
+[1] http://www.spinics.net/lists/kernel/msg1791305.html
+
+Thanks,
+Chanwoo Choi
