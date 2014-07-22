@@ -1,71 +1,115 @@
-From: thunder.leizhen@huawei.com (leizhen)
-Date: Tue, 22 Jul 2014 11:54:45 +0800
-Subject: [PATCH v3 00/13] Add support for Hisilicon SMMU architecture
-In-Reply-To: <20140721093951.GC16122@arm.com>
-References: <1404975186-12032-1-git-send-email-thunder.leizhen@huawei.com>
- <53CC7234.4080703@huawei.com> <20140721093951.GC16122@arm.com>
-Message-ID: <53CDE085.9090709@huawei.com>
+From: spk.linux@gmail.com (Sachin Kamat)
+Date: Tue, 22 Jul 2014 09:43:45 +0530
+Subject: [PATCH] cpufreq: tests: Providing cpufreq regression test
+In-Reply-To: <20140718135933.0837e094@amdc2363>
+References: <1405678985-21677-1-git-send-email-l.majewski@samsung.com>
+ <CAK5sBcH=L-7=BHNPQUjuoQfQx5QeFmBSdwdow+RXBExgCOP0Ww@mail.gmail.com>
+ <20140718135933.0837e094@amdc2363>
+Message-ID: <CAK5sBcGdrmfkc_hyV3DewwLjGa3=1xjctzqcTNC9C2yPFmEFCg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2014/7/21 17:39, Will Deacon wrote:
-> [re-adding the lists]
-> 
-> On Mon, Jul 21, 2014 at 02:51:48AM +0100, leizhen wrote:
->> Hi, Will
-> 
-> Hello,
-> 
->> I have sent this patch a week ago. I saw that you and Mitchel Humpherys had
->> sent some patches which will impact my code. I list below:
->> iommu/arm-smmu: remove support for chained SMMUs
->> iommu/arm-smmu: fix some checkpatch issues
-> 
-> There's also all of the development work I'm doing for VFIO and the page-table
-> rework that Varun's working on, so these patches are going to be difficult
-> to merge if we ever get to that point. I think Mitchel and Olav are also
-> busy trying to get their SMMU supported by the driver. Given that they've
-> actually bothered to follow the architecture, I don't see why they should
-> be messed about by your patches causing conflicts all over the place.
-> 
->> I can ajust my patch because of above. I known this patch is not follow what
->> you suggested before(fit into arm-smmu.c). But I found when we need to support
->> ARM SMMUv3, maybe we should do like this. I really want to know whether or not
->> you agree the software framework in this patch? Or what do you think about
->> SMMUv3?
-> 
-> The only code I foresee sharing between SMMUv2 and SMMUv3 is the page-table
-> creation code. The two architectures are significantly different, so I don't
-> think your split really helps us there. For example, you've left the probing
-> code in smmu-base.c. Of course, if HiSilicon follow the SMMUv3 spec as well
-> they did with SMMUv2, then your point is moot anyway and we may as well go
-> home.
-> 
->>> I tried to merge hisi-smmu driver into arm-smmu.c, but it looks impossible.
->>> The biggest problem is that too many registers are diffrent: the base address,
->>> the field definition, or present only on one side. And if I use #if, hisi-smmu
->>> and arm-smmu can not coexist in one binary file. Almost need 20 #if.
-> 
-> I don't think #ifdefs are necessarily the right way to go. There are IMPDEF
-> parts of a compliant SMMU (e.g. power management), so having a new compatible
-> string and a set of internal ops which can be overridden by a particular
-> implementation wouldn't be the end of the world and would be far less
-> invasive.
-> 
-> The problem you have is that your SMMU isn't architecturally compliant, so
-> you'll end up having to restructure parts of the driver so you can add
-> internal hooks for operations that aren't actually IMPDEF. That's the part
-> I'm worried about and we will have to draw the line somewhere, especially
-> when other people are trying to work with this code for compliant
-> implementations.
-> 
-> So, NAK to your current approach. You need to try something like I said
-> above and, if you want to spit the file up, start with the page-table code.
-> 
-> Will
-> 
-> .
-> 
+Hi Lukasz,
 
-OK. We have decided to discard current SMMU hardware design, and will
-completely follow the SMMUv3 specification.
+On Fri, Jul 18, 2014 at 5:29 PM, Lukasz Majewski <l.majewski@samsung.com> wrote:
+> Hi Sachin,
+>
+>> Hi Lukasz,
+>>
+>> I tested this script on 4210 based Origen board.
+>> This is the output:
+>> ./cpufreq_freq_test.sh
+>> CURRENT GOVERNOR: performance
+>> SET GOVERNOR: performance
+>> ######################################
+>> TEST AVAILABLE FREQS
+>> ######################################
+>> FREQ: 1200000 sleep: invalid number '0.1'
+>> [    5.918347] random: gzip urandom read with 61 bits of entropy
+>> available OK
+>> FREQ: 1000000 sleep: invalid number '0.1'
+>>          OK
+>> FREQ: 800000 sleep: invalid number '0.1'
+>>          OK
+>> FREQ: 500000 sleep: invalid number '0.1'
+>>          OK
+>> FREQ: 200000 sleep: invalid number '0.1'
+>>          OK
+>> ######################################
+>> TEST FREQS SWITCHING
+>> ######################################
+>> REFERENCE FREQ: 1200000
+>> FREQ: 1200000 ----> FREQ: 1200000 sleep: invalid number '0.1'
+>>          OK
+>> FREQ: 1200000 ----> FREQ: 1000000 sleep: invalid number '0.1'
+>>          OK
+>> FREQ: 1200000 ----> FREQ: 800000 sleep: invalid number '0.1'
+>>          OK
+>> FREQ: 1200000 ----> FREQ: 500000 sleep: invalid number '0.1'
+>>          OK
+>> FREQ: 1200000 ----> FREQ: 200000 sleep: invalid number '0.1'
+>>          OK
+>> REFERENCE FREQ: 1000000
+>> FREQ: 1000000 ----> FREQ: 1200000 sleep: invalid number '0.1'
+>>          OK
+>> FREQ: 1000000 ----> FREQ: 1000000 sleep: invalid number '0.1'
+>>          OK
+>> FREQ: 1000000 ----> FREQ: 800000 sleep: invalid number '0.1'
+>>          OK
+>> FREQ: 1000000 ----> FREQ: 500000 sleep: invalid number '0.1'
+>>          OK
+>> FREQ: 1000000 ----> FREQ: 200000 sleep: invalid number '0.1'
+>>          OK
+>> REFERENCE FREQ: 800000
+>> FREQ: 800000 ----> FREQ: 1200000 sleep: invalid number '0.1'
+>>          OK
+>> FREQ: 800000 ----> FREQ: 1000000 sleep: invalid number '0.1'
+>>          OK
+>> FREQ: 800000 ----> FREQ: 800000 sleep: invalid number '0.1'
+>>          OK
+>> FREQ: 800000 ----> FREQ: 500000 sleep: invalid number '0.1'
+>>          OK
+>> FREQ: 800000 ----> FREQ: 200000 sleep: invalid number '0.1'
+>>          OK
+>> REFERENCE FREQ: 500000
+>> FREQ: 500000 ----> FREQ: 1200000 sleep: invalid number '0.1'
+>>          OK
+>> FREQ: 500000 ----> FREQ: 1000000 sleep: invalid number '0.1'
+>>          OK
+>> FREQ: 500000 ----> FREQ: 800000 sleep: invalid number '0.1'
+>>          OK
+>> FREQ: 500000 ----> FREQ: 500000 sleep: invalid number '0.1'
+>>          OK
+>> FREQ: 500000 ----> FREQ: 200000 sleep: invalid number '0.1'
+>>          OK
+>> REFERENCE FREQ: 200000
+>> FREQ: 200000 ----> FREQ: 1200000 sleep: invalid number '0.1'
+>>          OK
+>> FREQ: 200000 ----> FREQ: 1000000 sleep: invalid number '0.1'
+>>          OK
+>> FREQ: 200000 ----> FREQ: 800000 sleep: invalid number '0.1'
+>>          OK
+>> FREQ: 200000 ----> FREQ: 500000 sleep: invalid number '0.1'
+>>          OK
+>> FREQ: 200000 ----> FREQ: 200000 sleep: invalid number '0.1'
+>>          OK
+>> ######################################
+>> ERRORS: 0
+>> ######################################
+>>
+>> Though it says 0 errors, what does the "invalid number..." signify?
+>
+> I guess that this message is caused by your default sleep
+> implementation.
+>
+> Could you type 'sleep 0.1' and then 'sleep 1' in your console on the
+> target system?
+> Is the "invalid number" not present with the second case?
+
+Only with first case (sleep 0.1) I get the "invalid number" message.
+sleep 1 seems to be OK.
+
+
+-- 
+Regards,
+Sachin.
