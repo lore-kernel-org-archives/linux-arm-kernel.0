@@ -1,34 +1,34 @@
 From: lee.jones@linaro.org (Lee Jones)
-Date: Tue, 22 Jul 2014 15:52:30 +0100
-Subject: [PATCH 3/5] ARM: sti: Add Restart support for the STiH417 (Cannes)
+Date: Tue, 22 Jul 2014 15:52:31 +0100
+Subject: [PATCH 4/5] ARM: sti: Add Restart support for the STiH416 (Orly2)
  board
 In-Reply-To: <1406040752-25229-1-git-send-email-lee.jones@linaro.org>
 References: <1406040752-25229-1-git-send-email-lee.jones@linaro.org>
-Message-ID: <1406040752-25229-4-git-send-email-lee.jones@linaro.org>
+Message-ID: <1406040752-25229-5-git-send-email-lee.jones@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Signed-off-by: Lee Jones <lee.jones@linaro.org>
 ---
- arch/arm/boot/dts/stih407.dtsi | 6 ++++++
+ arch/arm/boot/dts/stih416.dtsi | 6 ++++++
  1 file changed, 6 insertions(+)
 
-diff --git a/arch/arm/boot/dts/stih407.dtsi b/arch/arm/boot/dts/stih407.dtsi
-index 4f9024f..a370e73 100644
---- a/arch/arm/boot/dts/stih407.dtsi
-+++ b/arch/arm/boot/dts/stih407.dtsi
-@@ -63,6 +63,12 @@
+diff --git a/arch/arm/boot/dts/stih416.dtsi b/arch/arm/boot/dts/stih416.dtsi
+index 84758d7..95b15b0 100644
+--- a/arch/arm/boot/dts/stih416.dtsi
++++ b/arch/arm/boot/dts/stih416.dtsi
+@@ -28,6 +28,12 @@
  		ranges;
- 		compatible = "simple-bus";
+ 		compatible	= "simple-bus";
  
 +		restart {
-+			compatible = "st,stih407-restart";
-+			st,syscfg = <&syscfg_sbc_reg>;
++			compatible = "st,stih416-restart";
++			st,syscfg = <&syscfg_sbc>;
 +			status = "okay";
 +		};
 +
- 		syscfg_sbc: sbc-syscfg at 9620000 {
- 			compatible = "st,stih407-sbc-syscfg", "syscon";
- 			reg = <0x9620000 0x1000>;
+ 		powerdown: powerdown-controller {
+ 			#reset-cells = <1>;
+ 			compatible = "st,stih416-powerdown";
 -- 
 1.8.3.2
