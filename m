@@ -1,64 +1,40 @@
-From: shawn.guo@freescale.com (Shawn Guo)
-Date: Tue, 22 Jul 2014 12:32:54 +0800
-Subject: [PATCH v2] ARM: i.MX6: add more chip revision support
-Message-ID: <1406003574-4977-1-git-send-email-shawn.guo@freescale.com>
+From: marex@denx.de (Marek Vasut)
+Date: Tue, 22 Jul 2014 07:00:48 +0200
+Subject: [PATCH] ARM: dts: imx: Add alias for ethernet controller
+In-Reply-To: <20140722030337.GV8537@dragon>
+References: <1393588721-8598-1-git-send-email-marex@denx.de>
+ <201407220410.26694.marex@denx.de> <20140722030337.GV8537@dragon>
+Message-ID: <201407220700.49046.marex@denx.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Jason Liu <r64343@freescale.com>
+On Tuesday, July 22, 2014 at 05:03:38 AM, Shawn Guo wrote:
+> On Tue, Jul 22, 2014 at 04:10:26AM +0200, Marek Vasut wrote:
+> > On Monday, March 24, 2014 at 02:49:38 AM, Shawn Guo wrote:
+> > > On Tue, Mar 18, 2014 at 01:37:09AM +0100, Marek Vasut wrote:
+> > > > On Friday, February 28, 2014 at 12:58:41 PM, Marek Vasut wrote:
+> > > > > Add alias for FEC ethernet on i.MX to allow bootloaders (like
+> > > > > U-Boot) patch-in the MAC address for FEC using this alias.
+> > > > > 
+> > > > > Signed-off-by: Marek Vasut <marex@denx.de>
+> > > > > Cc: Shawn Guo <shawn.guo@linaro.org>
+> > > > 
+> > > > Bump ?
+> > > 
+> > > Sorry.  I had actually applied the patch but forgot replying.
+> > 
+> > Hello Shawn,
+> > 
+> > I'd like to apply this patch for 3.14-stable , are you OK with this
+> > please ? Shall I submit it ?
+> 
+> I do not see why this is a stable material.  But you do not need my
+> approval to send patch for stable kernel.  The person you need to
+> convince is Greg.
 
-Add more revision support for the new i.MX6DQ tape-out (TO1.5).  This
-TO1.5 is the Rev 1.3 as documented in i.MX6DQ data sheet, because TO1.3
-and TO1.4 are never revealed.
+Without this patch, you will not get a mac address patched into the DT by the 
+bootloader. Therefore, your device will use a random mac address on the network 
+which is different on every boot. This is not a good thing, don't you agree?
 
-Signed-off-by: Jason Liu <r64343@freescale.com>
-Signed-off-by: Shawn Guo <shawn.guo@freescale.com>
----
-Changes since v1:
- - Add a note in code for the numbering mismatch between code and
-   data sheet
- - Fix a typo of tape-out in commit log
-
- arch/arm/mach-imx/anatop.c | 13 +++++++++++++
- arch/arm/mach-imx/mxc.h    |  2 ++
- 2 files changed, 15 insertions(+)
-
-diff --git a/arch/arm/mach-imx/anatop.c b/arch/arm/mach-imx/anatop.c
-index 4a40bbb46183..8259a625a920 100644
---- a/arch/arm/mach-imx/anatop.c
-+++ b/arch/arm/mach-imx/anatop.c
-@@ -104,6 +104,19 @@ void __init imx_init_revision_from_anatop(void)
- 	case 2:
- 		revision = IMX_CHIP_REVISION_1_2;
- 		break;
-+	case 3:
-+		revision = IMX_CHIP_REVISION_1_3;
-+		break;
-+	case 4:
-+		revision = IMX_CHIP_REVISION_1_4;
-+		break;
-+	case 5:
-+		/*
-+		 * i.MX6DQ TO1.5 is defined as Rev 1.3 in Data Sheet, marked
-+		 * as 'D' in Part Number last character.
-+		 */
-+		revision = IMX_CHIP_REVISION_1_5;
-+		break;
- 	default:
- 		revision = IMX_CHIP_REVISION_UNKNOWN;
- 	}
-diff --git a/arch/arm/mach-imx/mxc.h b/arch/arm/mach-imx/mxc.h
-index a39b69ef4301..17a41ca65acf 100644
---- a/arch/arm/mach-imx/mxc.h
-+++ b/arch/arm/mach-imx/mxc.h
-@@ -43,6 +43,8 @@
- #define IMX_CHIP_REVISION_1_1		0x11
- #define IMX_CHIP_REVISION_1_2		0x12
- #define IMX_CHIP_REVISION_1_3		0x13
-+#define IMX_CHIP_REVISION_1_4		0x14
-+#define IMX_CHIP_REVISION_1_5		0x15
- #define IMX_CHIP_REVISION_2_0		0x20
- #define IMX_CHIP_REVISION_2_1		0x21
- #define IMX_CHIP_REVISION_2_2		0x22
--- 
-1.9.1
+Best regards,
+Marek Vasut
