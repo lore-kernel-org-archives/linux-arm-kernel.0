@@ -1,37 +1,36 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Mon, 21 Jul 2014 23:37:40 -0700
-Subject: [PATCH V2 1/2] ARM: OMAP2+: DMA: remove requirement of irq for
- platform-dma driver
-In-Reply-To: <1402573523-13814-2-git-send-email-r.sricharan@ti.com>
-References: <1402573523-13814-1-git-send-email-r.sricharan@ti.com>
- <1402573523-13814-2-git-send-email-r.sricharan@ti.com>
-Message-ID: <20140722063740.GG18374@atomide.com>
+From: jingchang.lu@freescale.com (Jingchang Lu)
+Date: Tue, 22 Jul 2014 06:58:46 +0000
+Subject: [PATCH 2/6] ARM: imx: clk-vf610: add USBPHY clocks
+In-Reply-To: <20140722023205.GS8537@dragon>
+References: <cover.1405702442.git.stefan@agner.ch>
+ <fe660ff42e95a286a954c0560b2b7b2aad81634b.1405702442.git.stefan@agner.ch>
+ <20140722023205.GS8537@dragon>
+Message-ID: <59acaa7259a54090ab28b037fb412a47@BL2PR03MB467.namprd03.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Sricharan R <r.sricharan@ti.com> [140612 04:48]:
-> From: Nishanth Menon <nm@ti.com>
-> 
-> we have currently 2 DMA drivers that try to co-exist.
-> drivers/dma/omap-dma.c which registers it's own IRQ and is device tree
-> aware and uses arch/arm/plat-omap/dma.c instance created by
-> arch/arm/mach-omap2/dma.c to maintain channel usage (omap_request_dma).
-> 
-> Currently both try to register interrupts and mach-omap2/plat-omap dma.c
-> attempts to use the IRQ number registered by hwmod to register it's own
-> interrupt handler.
-> 
-> Now, there is no reasonable way of static allocating DMA irq in GIC
-> SPI when we use crossbar. However, since the dma_chan structure is
-> freed as a result of IRQ not being present due to devm allocation,
-> maintaining information of channel by platform code fails at a later
-> point in time when that region of memory is reused.
-> 
-> So, if hwmod does not indicate an IRQ number, then, assume that
-> dma-engine will take care of the interrupt handling.
 
-Looks OK to me, applying both into omap-for-v3.17/soc thanks.
+>-----Original Message-----
+>From: Shawn Guo [mailto:shawn.guo at freescale.com]
+>Sent: Tuesday, July 22, 2014 10:32 AM
+>To: Stefan Agner; Lu Jingchang-B35083
+>Cc: Chen Peter-B29397; s.hauer at pengutronix.de; linux-arm-
+>kernel at lists.infradead.org; linux-usb at vger.kernel.org; linux-
+>kernel at vger.kernel.org
+>Subject: Re: [PATCH 2/6] ARM: imx: clk-vf610: add USBPHY clocks
+>
+>On Fri, Jul 18, 2014 at 07:01:38PM +0200, Stefan Agner wrote:
+>> This commit adds PLL7 which is required for USBPHY1. It also adds the
+>> USB PHY and USB Controller clocks and the gates to enable them.
+>>
+>> Signed-off-by: Stefan Agner <stefan@agner.ch>
+>
+>Jingchang,
+>
+>Does the patch look good to you?
+>
+>Shawn
+>
+For the clk creation, I think it is ok if the functionality has been tested, thanks!
 
-Regards,
-
-Tony
+Acked-by: Jingchang Lu <jingchang.lu@freescale.com>
