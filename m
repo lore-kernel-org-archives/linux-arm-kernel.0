@@ -1,61 +1,38 @@
-From: LW@KARO-electronics.de (Lothar =?UTF-8?B?V2HDn21hbm4=?=)
-Date: Tue, 22 Jul 2014 10:06:13 +0200
-Subject: [PATCH 8/9] usb: phy: am335x: call
- usb_gen_phy_init()/usb_gen_phy_shutdown() in
- am335x_init()/am335x_shutdown()
-In-Reply-To: <20140721151043.GF6852@saruman.home>
-References: <1405675890-8802-2-git-send-email-LW@KARO-electronics.de>
- <1405675890-8802-3-git-send-email-LW@KARO-electronics.de>
- <1405675890-8802-4-git-send-email-LW@KARO-electronics.de>
- <1405675890-8802-5-git-send-email-LW@KARO-electronics.de>
- <1405675890-8802-6-git-send-email-LW@KARO-electronics.de>
- <1405675890-8802-7-git-send-email-LW@KARO-electronics.de>
- <1405675890-8802-8-git-send-email-LW@KARO-electronics.de>
- <1405675890-8802-9-git-send-email-LW@KARO-electronics.de>
- <20140718135713.GH24914@saruman.home>
- <20140721100307.21172b65@ipc1.ka-ro>
- <20140721151043.GF6852@saruman.home>
-Message-ID: <20140722100613.779a3e11@ipc1.ka-ro>
+From: will.deacon@arm.com (Will Deacon)
+Date: Tue, 22 Jul 2014 09:13:54 +0100
+Subject: [PATCH v7 8/9] ARM: vdso initialization, mapping, and
+ synchronization
+In-Reply-To: <CALCETrXGi3a3G=dH2R6-mu2BwGdEyn3AXrGVRstye6zPO1mFxA@mail.gmail.com>
+References: <CALCETrWeTeeuz4vW6wrhtDrdg54O-hhFbspfKEEunRZ0zf7ZBg@mail.gmail.com>
+ <20140702144050.GD24879@arm.com>
+ <CALCETrUVa-Yt7qZpzkpiAGVf+sYeasNq_YS1MuH6CFfWCcW6BA@mail.gmail.com>
+ <53B430F3.9070804@mentor.com> <20140702162726.GG24879@arm.com>
+ <CALCETrVSqH66jqG2_O2dir-3md4SHH800qs++4KhWYsGm9T-BQ@mail.gmail.com>
+ <20140702172443.GI24879@arm.com>
+ <CALCETrU-461E2ybeYcN7KFSPkwWtHikwCDo4t9T5Z5dCBGmNJA@mail.gmail.com>
+ <20140702185422.GP24879@arm.com>
+ <CALCETrXGi3a3G=dH2R6-mu2BwGdEyn3AXrGVRstye6zPO1mFxA@mail.gmail.com>
+Message-ID: <20140722081354.GE24282@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-
-Felipe Balbi wrote:
-> Hi,,
+On Tue, Jul 22, 2014 at 01:14:35AM +0100, Andy Lutomirski wrote:
+> On Wed, Jul 2, 2014 at 11:54 AM, Will Deacon <will.deacon@arm.com> wrote:
+> > Ok, so that explains why things are working at the moment and it sounds like
+> > we have some wiggle room too. I'll look at moving the datapage anyway, since
+> > having these artificial limits is error-prone and fragile, but I don't think
+> > it's something we need to panic about immediately.
+> >
+> > Also, if you get to the bottom of your binutils issues with the section
+> > allocation, that might work for us since we don't really have any legacy
+> > binutils supporting arm64.
 > 
-> On Mon, Jul 21, 2014 at 10:03:07AM +0200, Lothar Wa?mann wrote:
-> > Hi,
-> > 
-> > > On Fri, Jul 18, 2014 at 11:31:29AM +0200, Lothar Wa?mann wrote:
-> > > > This patch makes it possible to use the musb driver with HW that
-> > > > requires external regulators or clocks.
-> > > 
-> > > can you provide an example of such HW ? Are you not using the internal
-> > > PHYs ?
-> > > 
-> > The Ka-Ro electronics TX48 module uses the mmc0_clk pin as VBUSEN
-> > rathern than usb0_drvvbus. This patch makes it possible to use an
-> > external regulator to handle the VBUS switch through the 'vcc-supply'
-> > property of the underlying generic_phy device.
-> 
-> OK, I get it now. But why would not use usb0_drvvbus ? You could still
-> route usb0_drvvbus to the regulator enable pin and the regulator would
-> be enabled for you once correct values are written to the IP's mailbox.
-> 
-> I suppose this has something to do with layout constraints ?
-> 
-Yes. The usb0_drvvbus is used for a different purpose.
+> Just in case anyone still cares about this thread, moving the vvar
+> area back before the vdso text is queued up for 3.17.  I gave up on
+> reliably keeping binutils happy with my ugly hack.
 
+The same change is also queued for arm64.
 
-Lothar Wa?mann
--- 
-___________________________________________________________
+Thanks Andy,
 
-Ka-Ro electronics GmbH | Pascalstra?e 22 | D - 52076 Aachen
-Phone: +49 2408 1402-0 | Fax: +49 2408 1402-10
-Gesch?ftsf?hrer: Matthias Kaussen
-Handelsregistereintrag: Amtsgericht Aachen, HRB 4996
-
-www.karo-electronics.de | info at karo-electronics.de
-___________________________________________________________
+Will
