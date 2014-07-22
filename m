@@ -1,31 +1,37 @@
-From: gregkh@linuxfoundation.org (Greg Kroah-Hartman)
-Date: Tue, 22 Jul 2014 15:16:19 -0700
-Subject: [PATCH v3] platform: Make platform_bus device a platform device
-In-Reply-To: <1406051719-17354-1-git-send-email-pawel.moll@arm.com>
-References: <20140722173713.GA8959@kroah.com>
- <1406051719-17354-1-git-send-email-pawel.moll@arm.com>
-Message-ID: <20140722221619.GA15781@kroah.com>
+From: sboyd@codeaurora.org (Stephen Boyd)
+Date: Tue, 22 Jul 2014 15:21:10 -0700
+Subject: [PATCH] sched_clock: Avoid corrupting hrtimer tree during suspend
+In-Reply-To: <53C9B862.5050106@linaro.org>
+References: <1405721392-30795-1-git-send-email-sboyd@codeaurora.org>
+ <53C99EC5.2060602@linaro.org> <53C9A1EC.8060905@codeaurora.org>
+ <53C9A2E7.8020307@linaro.org> <53C9ACCA.3070306@codeaurora.org>
+ <53C9B862.5050106@linaro.org>
+Message-ID: <53CEE3D6.6070207@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jul 22, 2014 at 06:55:19PM +0100, Pawel Moll wrote:
-> ... describing the root of the device tree, so one can write
-> a platform driver initializing the platform.
-> 
-> There has been a lot of references to platform_bus device where
-> it didn't make any sense, because simply using NULL as a parent
-> will make the device be adopted by the top level anyway.
-> 
-> Signed-off-by: Pawel Moll <pawel.moll@arm.com>
-> ---
-> Changes since v2:
-> 
-> * replaced references to platform_bus.dev with NULL
->   in places where it shouldn't make any difference
+On 07/18/14 17:14, John Stultz wrote:
+> On 07/18/2014 04:24 PM, Stephen Boyd wrote:
+>> On 07/18/14 15:42, John Stultz wrote:
+>>> If its a regression (and needs -stable backports) it needs to go in via
+>>> tip/timers/urgent, and not via the regular merge window.
+>>>
+>>> Whats the additional risk -stable wise for canceling the timer during
+>>> suspend and starting it back up during resume?
+>>>
+>> I'd say close to zero given that we'd only be making the timer run a
+>> little bit later and we have slack in there already. Here's that version.
+> Ok, thanks. I'll try to do a closer review it and get it queued. Is
+> there anyone who might be able to validate this and provide a Tested-by: ?
+>
 
-How about split this up with just the "change to NULL" changes as one
-patch, and the rest as a second one?
+Maybe someone from Linaro can give a Tested-by? I basically did this:
 
-thanks,
+# grep -A1 'sched_clock' /proc/timer_list && echo mem > /sys/power/state && grep -A1 'sched_clock' /proc/timer_list
 
-greg k-h
+
+and made sure that the expires time was reset.
+
+-- 
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+hosted by The Linux Foundation
