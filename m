@@ -1,57 +1,90 @@
-From: pramod.gurav.etc@gmail.com (pramod gurav)
-Date: Tue, 22 Jul 2014 17:20:15 +0530
-Subject: [PATCH 02/19] mfd: max8925-i2c: Fix 'blank line after
- declarations' warning
-In-Reply-To: <1406027485-15657-3-git-send-email-lee.jones@linaro.org>
-References: <1406027485-15657-1-git-send-email-lee.jones@linaro.org>
- <1406027485-15657-3-git-send-email-lee.jones@linaro.org>
-Message-ID: <CAMf-jSn5zZ1FBt+atzB9frZZ6yu_OTTfmJF2e7CEgQDbdzytBg@mail.gmail.com>
+From: svarbanov@mm-sol.com (Stanimir Varbanov)
+Date: Tue, 22 Jul 2014 14:51:53 +0300
+Subject: [PATCH v2 1/4] mfd: pm8xxx-spmi: add support for Qualcomm SPMI
+ PMICs
+In-Reply-To: <20140722110341.GE8406@lee--X1>
+References: <1405613855-27572-1-git-send-email-svarbanov@mm-sol.com>
+ <1405613855-27572-2-git-send-email-svarbanov@mm-sol.com>
+ <20140722110341.GE8406@lee--X1>
+Message-ID: <53CE5059.4010107@mm-sol.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jul 22, 2014 at 4:41 PM, Lee Jones <lee.jones@linaro.org> wrote:
-> This is part of an effort to clean-up the MFD subsystem.
->
-> WARNING: Missing a blank line after declarations
-> +       int ret;
-> +       ret = i2c_add_driver(&max8925_driver);
->
-> total: 0 errors, 1 warnings, 275 lines checked
->
-> Signed-off-by: Lee Jones <lee.jones@linaro.org>
-> ---
->  drivers/mfd/max8925-i2c.c | 2 ++
->  1 file changed, 2 insertions(+)
->
-> diff --git a/drivers/mfd/max8925-i2c.c b/drivers/mfd/max8925-i2c.c
-> index a83eed5..ecbe78e 100644
-> --- a/drivers/mfd/max8925-i2c.c
-> +++ b/drivers/mfd/max8925-i2c.c
-> @@ -257,9 +257,11 @@ static struct i2c_driver max8925_driver = {
->  static int __init max8925_i2c_init(void)
->  {
->         int ret;
-> +
->         ret = i2c_add_driver(&max8925_driver);
->         if (ret != 0)
->                 pr_err("Failed to register MAX8925 I2C driver: %d\n", ret);
-> +
-There are more such changes required in this file. If they could go
-with this, will be good.
->         return ret;
->  }
->  subsys_initcall(max8925_i2c_init);
-> --
-> 1.8.3.2
->
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-kernel" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
-> Please read the FAQ at  http://www.tux.org/lkml/
+On 07/22/2014 02:03 PM, Lee Jones wrote:
+> On Thu, 17 Jul 2014, Stanimir Varbanov wrote:
+> 
+>> From: Josh Cartwright <joshc@codeaurora.org>
+>>
+>> The Qualcomm SPMI PMIC chips are components used with the
+>> Snapdragon 800 series SoC family.  This driver exists
+>> largely as a glue mfd component, it exists to be an owner
+>> of an SPMI regmap for children devices described in
+>> device tree.
+>>
+>> Signed-off-by: Stanimir Varbanov <svarbanov@mm-sol.com>
+> 
+> Needs to be signed off by the author.
+> 
+>> ---
+>>  drivers/mfd/Kconfig       |   16 +++++++++++
+>>  drivers/mfd/Makefile      |    1 +
+>>  drivers/mfd/pm8xxx-spmi.c |   63 +++++++++++++++++++++++++++++++++++++++++++++
+>>  3 files changed, 80 insertions(+), 0 deletions(-)
+>>  create mode 100644 drivers/mfd/pm8xxx-spmi.c
+> 
+> [...]
+> 
+>> +++ b/drivers/mfd/pm8xxx-spmi.c
+>> @@ -0,0 +1,63 @@
+>> +/*
+>> + * Copyright (c) 2014, The Linux Foundation. All rights reserved.
+>> + *
+>> + * This program is free software; you can redistribute it and/or modify
+>> + * it under the terms of the GNU General Public License version 2 and
+>> + * only version 2 as published by the Free Software Foundation.
+>> + *
+>> + * This program is distributed in the hope that it will be useful,
+>> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
+>> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+>> + * GNU General Public License for more details.
+>> + */
+> 
+> There should be a '\n' here.
 
+OK.
 
+> 
+>> +#include <linux/kernel.h>
+>> +#include <linux/module.h>
+>> +#include <linux/spmi.h>
+>> +#include <linux/regmap.h>
+>> +#include <linux/of_platform.h>
+> 
+> [...]
+> 
+>> +MODULE_DESCRIPTION("PM8XXX SPMI PMIC driver");
+>> +MODULE_ALIAS("platform:" KBUILD_MODNAME);
+
+I will change this to:
+
+MODULE_ALIAS("spmi:pm8xxx-spmi");
+
+>> +MODULE_AUTHOR("The Linux Foundation");
+> 
+> The Linux Foundation did not write this patch.
+
+OK, I will change the author or remove the tag completely.
+
+> 
+>> +MODULE_LICENSE("GPL v2");
+> 
+> Appart from that:
+> 
+> Acked-by: Lee Jones <lee.jones@linaro.org>
+> 
+
+Thanks. I will resend the whole patch set with your acks.
 
 -- 
-Thanks and Regards
-Pramod
+regards,
+Stan
