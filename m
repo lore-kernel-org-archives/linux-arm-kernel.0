@@ -1,37 +1,27 @@
-From: marek.belisko@gmail.com (Belisko Marek)
-Date: Tue, 22 Jul 2014 11:00:57 +0200
-Subject: [PATCH 1/7] arm: dts: omap3-gta04: Add nand support
-In-Reply-To: <20140722062442.GF18374@atomide.com>
-References: <1405976727-15166-1-git-send-email-marek@goldelico.com>
- <1405976727-15166-2-git-send-email-marek@goldelico.com>
- <20140722062442.GF18374@atomide.com>
-Message-ID: <CAAfyv35BLu-iU0wURh28S-EyYQ+e5v4iAKAf1dkz=UFASg7LBA@mail.gmail.com>
+From: maxime.coquelin@st.com (Maxime Coquelin)
+Date: Tue, 22 Jul 2014 11:02:12 +0200
+Subject: [STLinux Kernel] [PATCH v3+1 5/5] ARM: DT: STi: STiH416: Add
+ DT node for MiPHY365x
+In-Reply-To: <20140711115406.GB2954@lee--X1>
+References: <1404906074-31992-1-git-send-email-lee.jones@linaro.org>	<1404906074-31992-6-git-send-email-lee.jones@linaro.org>
+ <20140711115406.GB2954@lee--X1>
+Message-ID: <53CE2894.2030109@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jul 22, 2014 at 8:24 AM, Tony Lindgren <tony@atomide.com> wrote:
-> * Marek Belisko <marek@goldelico.com> [140721 14:08]:
+Hi Lee,
+
+On 07/11/2014 01:54 PM, Lee Jones wrote:
+> The MiPHY365x is a Generic PHY which can serve various SATA or PCIe
+> devices. It has 2 ports which it can use for either; both SATA, both
+> PCIe or one of each in any configuration.
 >
-> Can you please add the descriptions to all the patches?
-OK thanks for review. I'll send v2.
-> Other than that looks OK to me.
+> Acked-by: Mark Rutland <mark.rutland@arm.com>
+> Acked-by: Alexandre Torgue <alexandre.torgue@st.com>
+> Signed-off-by: Lee Jones <lee.jones@linaro.org>
 >
-> Regards,
->
-> Tony
 
-BR,
+Added to my queue for v3.17.
 
-marek
-
--- 
-as simple and primitive as possible
--------------------------------------------------
-Marek Belisko - OPEN-NANDRA
-Freelance Developer
-
-Ruska Nova Ves 219 | Presov, 08005 Slovak Republic
-Tel: +421 915 052 184
-skype: marekwhite
-twitter: #opennandra
-web: http://open-nandra.com
+Thanks,
+Maxime
