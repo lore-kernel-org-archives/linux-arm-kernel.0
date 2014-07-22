@@ -1,70 +1,79 @@
-From: ezequiel.garcia@free-electrons.com (Ezequiel Garcia)
-Date: Tue, 22 Jul 2014 20:41:09 -0300
-Subject: [PATCH] ARM: mm: implement no-highmem fast path in
- kmap_atomic_pfn()
-In-Reply-To: <1404305055-16769-1-git-send-email-thomas.petazzoni@free-electrons.com>
-References: <1404305055-16769-1-git-send-email-thomas.petazzoni@free-electrons.com>
-Message-ID: <20140722234109.GA21545@arch.cereza>
+From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
+Date: Wed, 23 Jul 2014 01:42:30 +0200
+Subject: [PATCH v2 0/3] iommu: Remove OMAP IOVMM driver
+In-Reply-To: <20140722061929.GD18374@atomide.com>
+References: <1405680597-10012-1-git-send-email-laurent.pinchart@ideasonboard.com>
+ <5717663.qOZzl7syrN@avalon> <20140722061929.GD18374@atomide.com>
+Message-ID: <2209624.IN4gI3gsAa@avalon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 02 Jul 02:44 PM, Thomas Petazzoni wrote:
-> Since CONFIG_HIGHMEM got enabled on ARMv5 Kirkwood, we have noticed a
-> very significant drop in networking performance. The test were
-> conducted on an OpenBlocks A7 board. Without this patch, the outgoing
-> performance measured with iperf are:
-> 
->  - highmem OFF, TSO OFF   544 Mbit/s
->  - highmem OFF, TSO ON	  942 Mbit/s
->  - highmem ON,  TSO OFF   306 Mbit/s
->  - highmem ON,  TSO ON    246 Mbit/s
-> 
-> On this Kirkwood platform, the L2 cache is a Feroceon cache, and with
-> this cache, all the range operations have to be done on virtual
-> addresses and not physical addresses. Therefore, whenever
-> CONFIG_HIGHMEM is enabled, the cache maintenance operations call
-> kmap_atomic_pfn() and kunmap_atomic().
-> 
-> However, kmap_atomic_pfn() does not implement the same fast path for
-> non-highmem pages as the one implemented in kmap_atomic(), and this is
-> one of the reason for the performance drop. While this patch does not
-> fully restore the performances, it clearly improves them a lot:
-> 
->       	      	        without patch  with patch
-> 
->  - highmem ON, TSO OFF   306 Mbit/s     387 Mbit/s
->  - highmem ON, TSO ON    246 Mbit/s     434 Mbit/s
-> 
-> We're still far from the !CONFIG_HIGHMEM performances, but it does
-> improve a bit the situation.
-> 
-> Thanks a lot to Ezequiel Garcia and Gregory Clement for all the
-> testing work around this topic.
-> 
-> Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
-> ---
->  arch/arm/mm/highmem.c | 3 +++
->  1 file changed, 3 insertions(+)
-> 
-> diff --git a/arch/arm/mm/highmem.c b/arch/arm/mm/highmem.c
-> index 45aeaac..e17ed00 100644
-> --- a/arch/arm/mm/highmem.c
-> +++ b/arch/arm/mm/highmem.c
-> @@ -127,8 +127,11 @@ void *kmap_atomic_pfn(unsigned long pfn)
->  {
->  	unsigned long vaddr;
->  	int idx, type;
-> +	struct page *page = pfn_to_page(pfn);
->  
->  	pagefault_disable();
-> +	if (!PageHighMem(page))
-> +		return page_address(page);
->  
->  	type = kmap_atomic_idx_push();
->  	idx = type + KM_TYPE_NR * smp_processor_id();
+Hi Joerg,
 
-What's the status of this one?
+(Your attention is kindly requested in time for v3.17, please see below)
+
+On Monday 21 July 2014 23:19:29 Tony Lindgren wrote:
+> * Laurent Pinchart <laurent.pinchart@ideasonboard.com> [140721 11:17]:
+> > On Monday 21 July 2014 02:33:36 Tony Lindgren wrote:
+> >> * Laurent Pinchart <laurent.pinchart@ideasonboard.com> [140721 02:16]:
+> >>> On Friday 18 July 2014 11:53:56 Suman Anna wrote:
+> >>>> On 07/18/2014 05:49 AM, Laurent Pinchart wrote:
+> >>>>> Hello,
+> >>>>> 
+> >>>>> The OMAP3 ISP driver was the only user of the OMAP IOVMM API. Now
+> >>>>> that is has been ported to the DMA API, remove the unused virtual
+> >>>>> memory manager.
+> >>>>> 
+> >>>>> The removal is split in three patches to ease upstream merge. The
+> >>>>> first patch removes the omap-iovmm driver, the second patch
+> >>>>> removes setting of now unused platform data fields from arch code,
+> >>>>> and the last patch cleans up the platform data structure.
+> >>>> 
+> >>>> Thanks for the revised series, it looks good. I have also tested the
+> >>>> series on OMAP3, OMAP4 and OMAP5.
+> >>>> 
+> >>>> For the changes in the entire series,
+> >>>> Acked-by: Suman Anna <s-anna@ti.com>
+> >>> 
+> >>> Thank you.
+> >>> 
+> >>>>> I'd like to get at least the first patch merged in v3.17. To avoid
+> >>>>> splitting the series across three kernel versions, it would be
+> >>>>> nice to also merge at least the second patch for v3.17. If there's
+> >>>>> no risk of conflict everything could be merged in one go through
+> >>>>> the ARM SoC tree. Otherwise a stable branch with patch 1/3 will be
+> >>>>> needed to base the arch change on.
+> >>>>> 
+> >>>>> Joerg, Tony, how would you like to proceed ?
+> >>> 
+> >>> The v3.17 merge window is getting close, it's probably too late to
+> >>> merge patch 2/3. Joerg, could you please take 1/3 in your tree for
+> >>> v3.17 ? 2/3 and 3/3 would then get in v3.18. Tony, how would you like
+> >>> to proceed for those ?
+> >> 
+> >> How about Joerg maybe do an immutable branch against v3.16-rc1
+> >> with just these three patches and merge it into your tree?
+> >> 
+> >> That way I too can merge the minimal branch in if there are conflics.
+> >> If that works for Joerg, then for arch/arm/*omap* changes:
+> >> 
+> >> Acked-by: Tony Lindgren <tony@atomide.com>
+> > 
+> > I've created an immutable branch (or, rather, immutable until the changes
+> > reach mainline, at which point I will remove the branch) on top of
+> > v3.16-rc1 with just the three patches from this series. You can find it
+> > at.
+> > 
+> > 	git://linuxtv.org/pinchartl/media.git omap/iommu
+> > 
+> > Tony, is there still time to get this (and especially patch 2/3, which
+> > touches arch/ code) in v3.17 ?
+> 
+> Yes as long as Joerg is OK to merge that branch in :)
+
+Are you ? :-)
+
 -- 
-Ezequiel Garc?a, Free Electrons
-Embedded Linux, Kernel and Android Engineering
-http://free-electrons.com
+Regards,
+
+Laurent Pinchart
