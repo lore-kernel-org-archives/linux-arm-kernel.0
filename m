@@ -1,85 +1,47 @@
-From: f.fainelli@gmail.com (Florian Fainelli)
-Date: Tue, 22 Jul 2014 09:39:15 -0700
-Subject: [PATCH 4/6] net/macb: add RX checksum offload feature
-In-Reply-To: <53CE9109.9040407@atmel.com>
-References: <cover.1405689937.git.cyrille.pitchen@atmel.com>
- <f29965fee23dc0de99b388373017efeffa1aac10.1405689937.git.cyrille.pitchen@atmel.com>
- <1405697784.10255.99.camel@edumazet-glaptop2.roam.corp.google.com>
- <53CE9109.9040407@atmel.com>
-Message-ID: <CAGVrzca2YWZkVkUs_c06ApXrE3hdDgbsC7-6x2M4DS-Qn6S0aQ@mail.gmail.com>
+From: maxime.coquelin@st.com (Maxime Coquelin)
+Date: Tue, 22 Jul 2014 18:40:12 +0200
+Subject: [PATCH 2/2] ARM: multi_v7_defconfig: Enable MiPHY365x - ST's
+ Generic (SATA & PCIe) PHY
+In-Reply-To: <20140722161732.GB31092@quad.lixom.net>
+References: <1406021985-8763-1-git-send-email-lee.jones@linaro.org>
+ <1406021985-8763-2-git-send-email-lee.jones@linaro.org>
+ <20140722160630.GA31092@quad.lixom.net> <53CE8E14.9020206@st.com>
+ <20140722161732.GB31092@quad.lixom.net>
+Message-ID: <53CE93EC.5090706@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2014-07-22 9:27 GMT-07:00 Cyrille Pitchen <cyrille.pitchen@atmel.com>:
-> Le 18/07/2014 17:36, Eric Dumazet a ?crit :
->> On Fri, 2014-07-18 at 16:21 +0200, Cyrille Pitchen wrote:
->>> Signed-off-by: Cyrille Pitchen <cyrille.pitchen@atmel.com>
->>> ---
->>>  drivers/net/ethernet/cadence/macb.c | 29 ++++++++++++++++++++++++++++-
->>>  drivers/net/ethernet/cadence/macb.h |  2 ++
->>>  2 files changed, 30 insertions(+), 1 deletion(-)
+
+
+On 07/22/2014 06:17 PM, Olof Johansson wrote:
+> On Tue, Jul 22, 2014 at 06:15:16PM +0200, Maxime Coquelin wrote:
+>> Hi Olof,
+>>
+>> On 07/22/2014 06:06 PM, Olof Johansson wrote:
+>>> On Tue, Jul 22, 2014 at 10:39:45AM +0100, Lee Jones wrote:
+>>>> Signed-off-by: Lee Jones <lee.jones@linaro.org>
 >>>
->>> diff --git a/drivers/net/ethernet/cadence/macb.c b/drivers/net/ethernet/cadence/macb.c
->>> index 9bdcd1b..6acd6e2 100644
->>> --- a/drivers/net/ethernet/cadence/macb.c
->>> +++ b/drivers/net/ethernet/cadence/macb.c
->>> @@ -766,6 +766,8 @@ static int gem_rx(struct macb *bp, int budget)
->>>
->>>              skb->protocol = eth_type_trans(skb, bp->dev);
->>>              skb_checksum_none_assert(skb);
->>> +            if (bp->dev->features & NETIF_F_RXCSUM)
->>> +                    skb->ip_summed = CHECKSUM_UNNECESSARY;
->>>
+>>> Appled both. In the future, feel free to batch them up in one commit,
+>>> no need to keep them separate since they're related.
 >>
->>
->> Really ?
->>
->> If this is what you meant, this deserves a big and fat comment.
->>
->>
->>
-> Hi Eric,
+>> I added both to the pull request for defconfig I sent this afternoon.
+>> Not an issue?
 >
-> Isn't it the proper way to do? According to Cadence documentation about RX checksum offload:
-> "If any of the checksums (IP, TCP or UDP) are verified incorrect by the GEM, the packet is discarded."
+> Yes, that's an issue.
 >
-> If I understand, when RX checksum offload is enabled setting bit 24 of the Network Configuration Register, the driver only receives RX frames with correct checksum. Then it tells the kernel that there's no need to verify the checksum again in software. This is done setting skb->ip_summed to CHECKSUM_UNNECESSARY. Intel e1000 driver does the same in e1000_rx_checksum() function.
+> If you comment on a patch you apply, then others will know that you have picked
+> it up.
 
-This is not the same thing as what the e1000 driver is doing, the
-e1000 driver is checking a per-packet status mask which tells it
-whether a given packet had its protocol level checksum computed by the
-HW.
+Oops... I usually reply to notify when I pick a patch, but I missed for 
+this one.
 
-I think there might be some slight confusion here between the Ethernet
-frame Frame Control Checksum which is at the Ethernet level, and will
-(with most adapters not supporting RX_FCS_ERR) cause the Ethernet
-controller to drop frames at the MAC level, and the higher level
-protocol checksums such as the TCP or UDP checksum.
+Sorry for that.
 
+Maxime
 >
-> Also bit 24 of the Network Configuration Register is updated by macb_open() and macb_set_features() so it always matches the state of NETIF_F_RXCSUM flag in dev->features, once the network interface is up. That's why I'd rather read from dev->features than read from register.
-
-I don't think the Cadence GEM Ethernet controller is any different
-than other hardware out there, there must be a per-packet status bit
-which tells whether the TCP/UDP or other protocol checksum was
-successfully validated by the hardware. One of the reason for that, is
-that depending on the type of traffic your receive (e.g: ARP), there
-might be no protocol-level checksum at all in the packet, and the
-hardware should know about that.
-
+> I've dropped the versions I applied now so that we don't get duplicate commits
+> when I merge your branch.
 >
-> Did I make a mistake? Is it the kind of comment you expect to be added?
 >
-> Regards,
+> -Olof
 >
-> Cyrille
->
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
-
-
-
--- 
-Florian
