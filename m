@@ -1,59 +1,48 @@
 From: lee.jones@linaro.org (Lee Jones)
-Date: Tue, 22 Jul 2014 12:11:21 +0100
-Subject: [PATCH 15/19] mfd: tc6387xb: Remove unnecessary braces and correct
- style warnings
+Date: Tue, 22 Jul 2014 12:11:16 +0100
+Subject: [PATCH 10/19] mfd: lp8788-irq: Fix 'missing blank line after
+ declarations' warning
 In-Reply-To: <1406027485-15657-1-git-send-email-lee.jones@linaro.org>
 References: <1406027485-15657-1-git-send-email-lee.jones@linaro.org>
-Message-ID: <1406027485-15657-16-git-send-email-lee.jones@linaro.org>
+Message-ID: <1406027485-15657-11-git-send-email-lee.jones@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 This is part of an effort to clean-up the MFD subsystem.
 
-WARNING: braces {} are not necessary for single statement blocks
-+       if (!iomem) {
-+               return -EINVAL;
-+       }
+WARNING: Missing a blank line after declarations
++       struct lp8788_irq_data *irqd = irq_data_get_irq_chip_data(data);
++       irqd->enabled[data->hwirq] = 1;
 
-WARNING: sizeof *tc6387xb should be sizeof(*tc6387xb)
-+       tc6387xb = kzalloc(sizeof *tc6387xb, GFP_KERNEL);
+WARNING: Missing a blank line after declarations
++       struct lp8788_irq_data *irqd = irq_data_get_irq_chip_data(data);
++       irqd->enabled[data->hwirq] = 0;
 
-WARNING: Prefer [subsystem eg: netdev]_info([subsystem]dev, ... then dev_info(dev, ... then pr_info(...  to printk(KERN_INFO ...
-+       printk(KERN_INFO "Toshiba tc6387xb initialised\n");
-
-total: 0 errors, 3 warnings, 242 lines checked
+total: 0 errors, 2 warnings, 198 lines checked
 
 Signed-off-by: Lee Jones <lee.jones@linaro.org>
 ---
- drivers/mfd/tc6387xb.c | 7 +++----
- 1 file changed, 3 insertions(+), 4 deletions(-)
+ drivers/mfd/lp8788-irq.c | 2 ++
+ 1 file changed, 2 insertions(+)
 
-diff --git a/drivers/mfd/tc6387xb.c b/drivers/mfd/tc6387xb.c
-index 591a331..e71f880 100644
---- a/drivers/mfd/tc6387xb.c
-+++ b/drivers/mfd/tc6387xb.c
-@@ -147,11 +147,10 @@ static int tc6387xb_probe(struct platform_device *dev)
- 	int irq, ret;
+diff --git a/drivers/mfd/lp8788-irq.c b/drivers/mfd/lp8788-irq.c
+index c84ded5..23982db 100644
+--- a/drivers/mfd/lp8788-irq.c
++++ b/drivers/mfd/lp8788-irq.c
+@@ -66,12 +66,14 @@ static inline u8 _irq_to_val(enum lp8788_int_id id, int enable)
+ static void lp8788_irq_enable(struct irq_data *data)
+ {
+ 	struct lp8788_irq_data *irqd = irq_data_get_irq_chip_data(data);
++
+ 	irqd->enabled[data->hwirq] = 1;
+ }
  
- 	iomem = platform_get_resource(dev, IORESOURCE_MEM, 0);
--	if (!iomem) {
-+	if (!iomem)
- 		return -EINVAL;
--	}
+ static void lp8788_irq_disable(struct irq_data *data)
+ {
+ 	struct lp8788_irq_data *irqd = irq_data_get_irq_chip_data(data);
++
+ 	irqd->enabled[data->hwirq] = 0;
+ }
  
--	tc6387xb = kzalloc(sizeof *tc6387xb, GFP_KERNEL);
-+	tc6387xb = kzalloc(sizeof(*tc6387xb), GFP_KERNEL);
- 	if (!tc6387xb)
- 		return -ENOMEM;
- 
-@@ -189,7 +188,7 @@ static int tc6387xb_probe(struct platform_device *dev)
- 	if (pdata && pdata->enable)
- 		pdata->enable(dev);
- 
--	printk(KERN_INFO "Toshiba tc6387xb initialised\n");
-+	dev_info(&dev->dev, "Toshiba tc6387xb initialised\n");
- 
- 	ret = mfd_add_devices(&dev->dev, dev->id, tc6387xb_cells,
- 			      ARRAY_SIZE(tc6387xb_cells), iomem, irq, NULL);
 -- 
 1.8.3.2
