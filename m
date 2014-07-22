@@ -1,43 +1,44 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Tue, 22 Jul 2014 17:13:31 +0100
-Subject: [PATCH 2/3] ARM: smp_scu: enable SCU standby support
-In-Reply-To: <20140722020911.GO8537@dragon>
-References: <1405928755-19413-1-git-send-email-shawn.guo@freescale.com>
- <1405928755-19413-3-git-send-email-shawn.guo@freescale.com>
- <20140721085150.GB15666@arm.com> <20140721092703.GL8537@dragon>
- <20140721102638.GE32578@arm.com> <20140722020911.GO8537@dragon>
-Message-ID: <20140722161331.GN2219@arm.com>
+From: olof@lixom.net (Olof Johansson)
+Date: Tue, 22 Jul 2014 09:14:33 -0700
+Subject: [PATCH 1/3] ARM: exynos: remove unused <mach/memory.h>
+In-Reply-To: <20140722075138.GB28538@pengutronix.de>
+References: <1404295043-6661-1-git-send-email-u.kleine-koenig@pengutronix.de>
+ <20140722075138.GB28538@pengutronix.de>
+Message-ID: <CAOesGMgA0fc0_8JOOE01y=UKv-eAZuWiAkAKHG5iam0Zkhp9TA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jul 22, 2014 at 03:09:12AM +0100, Shawn Guo wrote:
-> On Mon, Jul 21, 2014 at 11:26:38AM +0100, Catalin Marinas wrote:
-> > The usual question - could the firmware enable this bit before Linux
-> > starts?
-> 
-> It could, I guess.  Actually, on i.MX we're setting this bit in platform
-> code right now.  But I think setting this bit makes sense for most of
-> the platforms, so it can reasonably be done in SCU core function.  Isn't
-> it the point of having core/common function after all?
+On Tue, Jul 22, 2014 at 12:51 AM, Uwe Kleine-K?nig
+<u.kleine-koenig@pengutronix.de> wrote:
+> Hello,
+>
+> who takes care of this series?
+>
+> In fact they are all orthogonal to each other.
+>
+> The first patch
+>
+>         ARM: exynos: remove unused <mach/memory.h>
+>
+> has been reviewed and tested by Tomasz Figa and Sachin Kamat. Can the
+> Samsung people pick it up? Or armsoc?
 
-Only that it wouldn't be consistent. If a platform (like some OMAPs)
-boots in non-secure mode, the SCU would be already enabled the firmware
-and your patch would not have any effect (that's one reason on arm64 I
-try to get some consistency between various platforms and not rely on
-the kernel which may or may not be able to enable certain features; but
-it's late to enforced this on arm32).
+Kukjin should apply this one.
 
-> > We already do a read/modify/write sequence here and are only
-> > supposed to write the enable bit as the rest are implementation defined.
-> 
-> Isn't standby bit implemented by all A9 SCU except a couple of very
-> early revisions (per Will)?
+> Patch 2 (v2!)
+>
+>         ARM: remove remaining definitions of PLAT_PHYS_OFFSET from <mach/memory.h>
+>
+> touches several arch/arm/mach-*/include/mach/memory.h and
+> arch/arm/Kconfig. armsoc? Russell?
 
-And we don't know the behaviour of setting this bit on such A9 early
-revisions. So we can try to (1) find out if there are any in the field,
-(2) read the RTL to see if anything happens or (3) add a check in Linux
-for such revisions. I think (3) should be the case but you need to figure
-out which revisions these are.
+This can go through either, but Russell has already reviewed it once
+so send it to his patch tracker.
 
--- 
-Catalin
+> Patch 3 fixes a warning regarding nommu and touches the Kconfig entry
+> for Integrator and Renesas (non-multiplatform). armsoc?
+
+Don't know without seeing the patch. What's the patch subject so I can find it?
+
+
+-Olof
