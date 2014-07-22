@@ -1,59 +1,44 @@
-From: jason@lakedaemon.net (Jason Cooper)
-Date: Tue, 22 Jul 2014 16:57:06 -0400
-Subject: [GIT PULL] ARM: mvebu: SoC changes for v3.17 (round 3)
-Message-ID: <20140722205706.GA23220@titan.lakedaemon.net>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Tue, 22 Jul 2014 22:57:17 +0200
+Subject: [PATCH v8 00/11] ARM: brcmstb: Add Broadcom STB SoC support
+In-Reply-To: <20140722204431.GG28323@ld-irv-0074>
+References: <1405976886-27807-1-git-send-email-computersforpeace@gmail.com>
+ <5675728.WLk3P96IBM@wuerfel> <20140722204431.GG28323@ld-irv-0074>
+Message-ID: <5044348.IEPQPrahyu@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-All,
+On Tuesday 22 July 2014 13:44:31 Brian Norris wrote:
+> > For the platform changes in the first patch, I would prefer to have
+> > Matt pick up the first patch, but we can also apply it directly into
+> > arm-soc if he prefers that.
+> 
+> That brings up a question related to PATCH 11 in the series (MAINTAINERS
+> update); who will be maintaining arch/arm/mach-bcm/*brcmstb*, and how
+> will code go upstream? It seems like Matt and Christian are officially
+> mach-bcm maintainers, although I don't know if Christian is still
+> involved.
 
-Here's the cpufreq changes I mentioned over the weekend.  It's been in
--next for a while.  Once I get the new version of cpuidle from ThomasP,
-I'll push that as quickly as possible.
+You have to solve that question together with Matt. From my perspective
+it would be easier if I only have to deal with one person for mach-bcm,
+but it's really up to you.
 
-As usual (do I need to type this each time any more? :) ), this is an
-incremental pull request from tags/mvebu-soc-3.17-2 up to
-tags/mvebu-soc-3.17-3 on the mvebu/soc branch.
+> Also, BCM7xxx shares little in common with the rest of mach-bcm, except
+> a company name, so we'd really like at least the 'Maintainer' entries
+> for the CC. I was planning on a separate git tree too, although it could
+> have conflicts if we touch arch/arm/mach-bcm/{Makefile,Kconfig}.
+> 
+> So would we send a separate arm-soc pull request for the arm-soc
+> targeted changes (and all future development)?
 
-Please pull.
+You can definitely have the separate MAINTAINERS entry without necessarily
+becoming a maintainer at the same level. I know Matt is very responsive
+and can forward your patches to arm-soc if that works for you.
 
-thx,
+> For the reset of mach-bcm stuff, I'll just send an arm-soc pull request
+> soon enough, unless Matt/Arnd/Olof object.
 
-Jason.
+I'll wait for Matt to comment before pulling it, otherwise that sounds
+fine.
 
-
-The following changes since commit ba364fc752daeded072a5ef31e43b84cb1f9e5fd:
-
-  ARM: Kirkwood: Remove mach-kirkwood (2014-07-13 22:13:39 +0000)
-
-are available in the git repository at:
-
-  git://git.infradead.org/linux-mvebu.git tags/mvebu-soc-3.17-3
-
-for you to fetch changes up to ba3ec5780bba27819bbc4f669e6c77418a00f14b:
-
-  Merge branch 'mvebu/soc-cpufreq' into mvebu/soc (2014-07-22 20:46:48 +0000)
-
-----------------------------------------------------------------
-
-mvebu SoC changes for v3.17 (round 3)
-
- - mvebu:
-    - Add cpufreq support for Armada XP
-
-----------------------------------------------------------------
-Jason Cooper (1):
-      Merge branch 'mvebu/soc-cpufreq' into mvebu/soc
-
-Thomas Petazzoni (3):
-      ARM: mvebu: ensure CPU clocks are enabled
-      ARM: mvebu: extend PMSU code to support dynamic frequency scaling
-      clk: mvebu: extend clk-cpu for dynamic frequency scaling
-
- .../devicetree/bindings/clock/mvebu-cpu-clock.txt  |   5 +-
- arch/arm/mach-mvebu/platsmp.c                      |   1 +
- arch/arm/mach-mvebu/pmsu.c                         | 162 +++++++++++++++++++++
- drivers/clk/mvebu/clk-cpu.c                        |  80 +++++++++-
- include/linux/mvebu-pmsu.h                         |  20 +++
- 5 files changed, 261 insertions(+), 7 deletions(-)
- create mode 100644 include/linux/mvebu-pmsu.h
+	Arnd
