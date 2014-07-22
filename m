@@ -1,87 +1,37 @@
-From: luto@amacapital.net (Andy Lutomirski)
-Date: Mon, 21 Jul 2014 18:53:43 -0700
-Subject: [PATCH v3 8/8] x86_64,
- entry: Use split-phase syscall_trace_enter for 64-bit syscalls
-In-Reply-To: <2baeb5fad958c292705885941d61ab31771a75bb.1405992946.git.luto@amacapital.net>
-References: <2baeb5fad958c292705885941d61ab31771a75bb.1405992946.git.luto@amacapital.net>
-Message-ID: <ba0a8c0f87970f0af60f38ce2d07def3e991b419.1405992946.git.luto@amacapital.net>
+From: shawn.guo@freescale.com (Shawn Guo)
+Date: Tue, 22 Jul 2014 09:56:14 +0800
+Subject: [PATCH 2/3] ARM: smp_scu: enable SCU standby support
+In-Reply-To: <20140721094452.GD16122@arm.com>
+References: <1405928755-19413-1-git-send-email-shawn.guo@freescale.com>
+ <1405928755-19413-3-git-send-email-shawn.guo@freescale.com>
+ <20140721085150.GB15666@arm.com> <20140721092703.GL8537@dragon>
+ <20140721094452.GD16122@arm.com>
+Message-ID: <20140722015613.GN8537@dragon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On KVM on my box, this reduces the overhead from an always-accept
-seccomp filter from ~130ns to ~17ns.  Most of that comes from
-avoiding IRET on every syscall when seccomp is enabled.
+On Mon, Jul 21, 2014 at 10:44:52AM +0100, Will Deacon wrote:
+> > > > @@ -54,7 +55,7 @@ void scu_enable(void __iomem *scu_base)
+> > > >  	if (scu_ctrl & SCU_ENABLE)
+> > > >  		return;
+> > > >  
+> > > > -	scu_ctrl |= SCU_ENABLE;
+> > > > +	scu_ctrl |= SCU_ENABLE | SCU_STANDBY_ENABLE;
+> > > 
+> > > I don't think this bit exists on all revisions of the A9.
+> > 
+> > Thanks for the info, Will.  Is there any side-effect to write the
+> > standby bit on those revisions which do not define the bit?
+> 
+> I'm not actually sure what happens at the hardware level, but the TRM is
+> pretty clear in its definition of `RESERVED':
+> 
+>  `All reserved bits not used by the implementation must be written as 0 and
+>   read as 0.'
 
-In extremely approximate hacked-up benchmarking, just bypassing IRET
-saves about 80ns, so there's another 43ns of savings here from
-simplifying the seccomp path.
+Okay.  Can you please tell which revisions of A9 do not implement this
+standby bit, so that I can check and skip them?  The oldest revision I
+can find on http://infocenter.arm.com/ is r2p0, which already implements
+the bit.
 
-The diffstat is also rather nice :)
-
-Signed-off-by: Andy Lutomirski <luto@amacapital.net>
----
- arch/x86/kernel/entry_64.S | 38 +++++++++++++++-----------------------
- 1 file changed, 15 insertions(+), 23 deletions(-)
-
-diff --git a/arch/x86/kernel/entry_64.S b/arch/x86/kernel/entry_64.S
-index 1eb3094..13e0c1d 100644
---- a/arch/x86/kernel/entry_64.S
-+++ b/arch/x86/kernel/entry_64.S
-@@ -479,22 +479,6 @@ sysret_signal:
- 
- #ifdef CONFIG_AUDITSYSCALL
- 	/*
--	 * Fast path for syscall audit without full syscall trace.
--	 * We just call __audit_syscall_entry() directly, and then
--	 * jump back to the normal fast path.
--	 */
--auditsys:
--	movq %r10,%r9			/* 6th arg: 4th syscall arg */
--	movq %rdx,%r8			/* 5th arg: 3rd syscall arg */
--	movq %rsi,%rcx			/* 4th arg: 2nd syscall arg */
--	movq %rdi,%rdx			/* 3rd arg: 1st syscall arg */
--	movq %rax,%rsi			/* 2nd arg: syscall number */
--	movl $AUDIT_ARCH_X86_64,%edi	/* 1st arg: audit arch */
--	call __audit_syscall_entry
--	LOAD_ARGS 0		/* reload call-clobbered registers */
--	jmp system_call_fastpath
--
--	/*
- 	 * Return fast path for syscall audit.  Call __audit_syscall_exit()
- 	 * directly and then jump back to the fast path with TIF_SYSCALL_AUDIT
- 	 * masked off.
-@@ -511,17 +495,25 @@ sysret_audit:
- 
- 	/* Do syscall tracing */
- tracesys:
--#ifdef CONFIG_AUDITSYSCALL
--	testl $(_TIF_WORK_SYSCALL_ENTRY & ~_TIF_SYSCALL_AUDIT),TI_flags+THREAD_INFO(%rsp,RIP-ARGOFFSET)
--	jz auditsys
--#endif
-+	leaq -REST_SKIP(%rsp), %rdi
-+	movq $AUDIT_ARCH_X86_64, %rsi
-+	call syscall_trace_enter_phase1
-+	test %rax, %rax
-+	jnz tracesys_phase2		/* if needed, run the slow path */
-+	LOAD_ARGS 0			/* else restore clobbered regs */
-+	jmp system_call_fastpath	/*      and return to the fast path */
-+
-+tracesys_phase2:
- 	SAVE_REST
- 	FIXUP_TOP_OF_STACK %rdi
--	movq %rsp,%rdi
--	call syscall_trace_enter
-+	movq %rsp, %rdi
-+	movq $AUDIT_ARCH_X86_64, %rsi
-+	movq %rax,%rdx
-+	call syscall_trace_enter_phase2
-+
- 	/*
- 	 * Reload arg registers from stack in case ptrace changed them.
--	 * We don't reload %rax because syscall_trace_enter() returned
-+	 * We don't reload %rax because syscall_trace_entry_phase2() returned
- 	 * the value it wants us to use in the table lookup.
- 	 */
- 	LOAD_ARGS ARGOFFSET, 1
--- 
-1.9.3
+Shawn
