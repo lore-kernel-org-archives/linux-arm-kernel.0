@@ -1,167 +1,95 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Tue, 22 Jul 2014 15:42:59 +0800
-Subject: [[RFC PATCH]] gpio: gpio-mxc: make sure gpio is input when
- request IRQ
-In-Reply-To: <53CE107A.1000000@tqsc.de>
-References: <1405518664-31313-1-git-send-email-list-09_linux_arm@tqsc.de>
- <20140722062803.GA21229@dragon> <53CE107A.1000000@tqsc.de>
-Message-ID: <20140722074257.GC21229@dragon>
+From: l.stach@pengutronix.de (Lucas Stach)
+Date: Tue, 22 Jul 2014 09:47:19 +0200
+Subject: [PATCH v2] PCI: imx6: fix boot hang when link already enabled
+In-Reply-To: <1d83254966df448ea71a08830ad00713@DM2PR0301MB0862.namprd03.prod.outlook.com>
+References: <1405966635-7455-1-git-send-email-l.stach@pengutronix.de>
+ <1d83254966df448ea71a08830ad00713@DM2PR0301MB0862.namprd03.prod.outlook.com>
+Message-ID: <1406015239.4667.5.camel@weser.hi.pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-+ Grant and devicetree list
+Hi Richard,
 
-On Tue, Jul 22, 2014 at 09:19:22AM +0200, Markus Niebel wrote:
-> Am 22.07.2014 08:28, wrote Shawn Guo:
-> > On Wed, Jul 16, 2014 at 03:51:04PM +0200, Markus Niebel wrote:
-> >> From: Markus Niebel <Markus.Niebel@tq-group.com>
-> >>
-> >> When requesting an GPIO irq for imx Soc two things are missing:
-> >> - there is no check, if the GPIO is already requested
-> >> - there is no check, if the GPIO is configured as input
-> >>
-> >> The first case can lead to reconfiguring the GPIO pin from third
-> >> party while it is used as IRQ pin, second case will (eventually)
-> >> prevent IRQ from being seen by SOC becaus the pin is driven by
-> >> Soc
-> >>
-> >> This patch tries to implement (logic taken roughly from gpio-omap)
-> >> - basic check if gpio already requested
-> >> - if needed requests the gpio and configures as IN.
-> >> - if gpio is already requested it is only verified if pin is IN
-> >> - gpio is locked as irq
-> >>
-> >> Tested on a not mainlined i.MX6 based hardware with pin configured
-> >> by bootloader as OUT HIGH and expecting a low active IRQ.
-> >>
-> >> Signed-off-by: Markus Niebel <Markus.Niebel@tq-group.com>
-> >> ---
-> >>  drivers/gpio/gpio-mxc.c |   35 +++++++++++++++++++++++++++++++++++
-> >>  1 file changed, 35 insertions(+)
-> >>
-> >> diff --git a/drivers/gpio/gpio-mxc.c b/drivers/gpio/gpio-mxc.c
-> >> index db83b3c..4316a38 100644
-> >> --- a/drivers/gpio/gpio-mxc.c
-> >> +++ b/drivers/gpio/gpio-mxc.c
-> >> @@ -175,6 +175,31 @@ static int gpio_set_irq_type(struct irq_data *d, u32 type)
-> >>  	u32 gpio = port->bgc.gc.base + gpio_idx;
-> >>  	int edge;
-> >>  	void __iomem *reg = port->base;
-> >> +	int ret = 0;
-> >> +
-> >> +	if (!gpiochip_is_requested(&port->bgc.gc, gpio_idx)) {
-> >> +		char label[32];
-> >> +
-> >> +		snprintf(label, 32, "gpio%u-irq", gpio);
-> >> +		ret = gpio_request_one(gpio, GPIOF_DIR_IN, label);
+Am Dienstag, den 22.07.2014, 07:24 +0000 schrieb
+Hong-Xing.Zhu at freescale.com:
+> Hi Lucas:
+> Thanks for your help on this case firstly.
+> See my comments marked by Richard below.
+> Best Regards
+> Richard Zhu
+> 
+> 
+> > -----Original Message-----
+> > From: linux-pci-owner at vger.kernel.org [mailto:linux-pci-owner at vger.kernel.org]
+> > On Behalf Of Lucas Stach
+> > Sent: Tuesday, July 22, 2014 2:17 AM
+> > To: bhelgaas at google.com
+> > Cc: linux-pci at vger.kernel.org; Estevam Fabio-R49496; Guo Shawn-R65073; Marek
+> > Vasut; d.mueller at elsoft.ch; Zhu Richard-R65037; tharvey at gateworks.com;
+> > kernel at pengutronix.de; linux-arm-kernel at lists.infradead.org
+> > Subject: [PATCH v2] PCI: imx6: fix boot hang when link already enabled
 > > 
-> > I'm not sure it's correct to call gpio_request_one() from .set_irq_type
-> > hook.  It looks like a API usage violation to me.  It should really be
-> > called from client driver.
-> 
-> Thats why it is an RFC. I add Linus Walleij to the cc-list.
-> 
-> Let me describe the problem:
-> 
-> Currently client drivers have simply interrupts and interrupt-parent
-> in their bindings, but no interrupt-gpios. Therefore in this case a
-> client does not know about a dedicated gpio which is to be requested
-> and configured.
+> > This fixes a boot hang observed when the bootloader already enabled the PCIe
+> > link for it's own use. The fundamental problem is that Freescale forgot to
+> > wire up the core reset, so software doesn't have a sane way to get the core
+> > into a defined state.
+> > 
+> > According to the DW PCIe core reference manual configuration of the core may
+> > only happen when the LTSSM is disabled, so this is one of the first things we
+> > need to do. Apparently this isn't safe to do when the LTSSM is in any other
+> > state than "detect" as we observe an instant machine hang when trying to do so
+> > while the link is already up.
+> > 
+> > As a workaround force LTSSM into detect state right before hitting the disable
+> > switch.
+> > 
+> > Reported-by: Fabio Estevam <fabio.estevam@freescale.com>
+> > Signed-off-by: Lucas Stach <l.stach@pengutronix.de>
+> > ---
+> > v2: messed up the first submission by omitting a chunk
+> > 
+> > Fabios delay workaround worked because of the following
+> > conditions:
+> > 1. The driver gets probed and pulls the peripheral reset GPIO 2. Peripheral is
+> > held in reset, so won't answer any link negotiation requests 3. The LTSSM
+> > times out and falls back into detect state after 24ms (that's why a 30ms delay
+> > helps) 4. After LTSSM entered detect state it's safe to hit the disable switch
+> > ---
+> >  drivers/pci/host/pci-imx6.c | 11 +++++++++++
+> >  1 file changed, 11 insertions(+)
+> > 
+> > diff --git a/drivers/pci/host/pci-imx6.c b/drivers/pci/host/pci-imx6.c index
+> > a568efaa331c..1c4b4b81fe15 100644
+> > --- a/drivers/pci/host/pci-imx6.c
+> > +++ b/drivers/pci/host/pci-imx6.c
+> > @@ -49,6 +49,9 @@ struct imx6_pcie {
+> > 
+> >  /* PCIe Port Logic registers (memory-mapped) */  #define PL_OFFSET 0x700
+> > +#define PCIE_PL_PFLR (PL_OFFSET + 0x08)
+> > +#define PCIE_PL_PFLR_LINK_STATE_MASK		(0x3f << 16)
+> > +#define PCIE_PL_PFLR_FORCE_LINK			(1 << 15)
+> >  #define PCIE_PHY_DEBUG_R0 (PL_OFFSET + 0x28)  #define PCIE_PHY_DEBUG_R1
+> > (PL_OFFSET + 0x2c)
+> >  #define PCIE_PHY_DEBUG_R1_XMLH_LINK_IN_TRAINING	(1 << 29)
+> > @@ -214,7 +217,15 @@ static int imx6q_pcie_abort_handler(unsigned long addr,
+> > static int imx6_pcie_assert_core_reset(struct pcie_port *pp)  {
+> >  	struct imx6_pcie *imx6_pcie = to_imx6_pcie(pp);
+> > +	u32 val;
+> > +
+> > +	val = readl(pp->dbi_base + PCIE_PL_PFLR);
+> > +	val &= ~PCIE_PL_PFLR_LINK_STATE_MASK;
+> > +	val |= PCIE_PL_PFLR_FORCE_LINK;
+> > +	writel(val, pp->dbi_base + PCIE_PL_PFLR);
+> [Richard] At this point, the port logic register access are relied on the
+> pcie clks enable in uboot. Otherwise, kernel would be hang, if the pcie is not enabled
+> in uboot ever.
 
-Okay.  I understand your problem now.  This is an issue in case we
-specify a GPIO to be used as interrupt from device tree.  In non-DT
-world, client driver knows this is an interrupt on GPIO, and therefore
-takes the responsibility to request and configure the GPIO to work as
-interrupt.  But in DT case, client driver does not know whether it's an
-IRQ line or GPIO based interrupt.  The consequence is that GPIO
-subsystem, OF subsystem, client driver, none of the three is requesting
-and configuring the GPIO to be used as interrupt.
+You are right, I'll fix this to check if the LTSSEM and REF_SSP are
+enabled in the IOMUX GPR registers. This should give a good indication
+whether the bootloader enabled PCIe or not.
 
-This is a common issue instead of i.MX specific, and should be addressed
-globally, I think.
-
-Shawn
-
-> 
-> > 
-> >> +	} else {
-> >> +		val = readl(port->base + GPIO_GDIR);
-> >> +		if (val & BIT(gpio_idx))
-> >> +			ret = -EINVAL;
-> > 
-> > It says that the GPIO is requested by someone, but we're not really sure
-> > if it's the correct one, i.e. the one is requesting set_irq_type.
-> > 
-> 
-> Yes, but the current situation is even worse (in my eyes): an IRQ can be requested and an
-> independend party can request and configure the gpio as output ...
-> 
-> >> +	}
-> >> +
-> >> +	if (ret) {
-> >> +		dev_err(port->bgc.gc.dev, "unable to set gpio_idx %u as IN\n",
-> >> +			gpio_idx);
-> >> +		return ret;
-> >> +	}
-> > 
-> > Having said that, I'm not sure any above changes is really necessary.
-> > If any, I would say only gpiochip_is_requested() check makes some sense,
-> > but we should just fail out if the GPIO hasn't been requested.  Nothing
-> > more can be done in there.
-> 
-> Going that way as a consequence a reworked device tree binding for gpio irq is needed
-> (just like in the platform data days) when providing a gpio number and the client has
-> to request gpio and irq - correct me if I'm wrong.
-> 
-> Maybe here is something needed with deeper knowledge in the gpio subsystem.
-> 
-> > 
-> >> +
-> >> +	ret = gpio_lock_as_irq(&port->bgc.gc, gpio_idx);
-> >> +	if (ret) {
-> >> +		dev_err(port->bgc.gc.dev, "unable to lock gpio_idx %u for IRQ\n",
-> >> +			gpio_idx);
-> >> +		return ret;
-> >> +	}
-> > 
-> > This and the following changes do make sense to me.
-> > 
-> > Shawn
-> > 
-> >>  
-> >>  	port->both_edges &= ~(1 << gpio_idx);
-> >>  	switch (type) {
-> >> @@ -231,6 +256,15 @@ static int gpio_set_irq_type(struct irq_data *d, u32 type)
-> >>  	return 0;
-> >>  }
-> >>  
-> >> +static void gpio_irq_shutdown(struct irq_data *d)
-> >> +{
-> >> +	struct irq_chip_generic *gc = irq_data_get_irq_chip_data(d);
-> >> +	struct mxc_gpio_port *port = gc->private;
-> >> +	u32 gpio_idx = d->hwirq;
-> >> +
-> >> +	gpio_unlock_as_irq(&port->bgc.gc, gpio_idx);
-> >> +}
-> >> +
-> >>  static void mxc_flip_edge(struct mxc_gpio_port *port, u32 gpio)
-> >>  {
-> >>  	void __iomem *reg = port->base;
-> >> @@ -353,6 +387,7 @@ static void __init mxc_gpio_init_gc(struct mxc_gpio_port *port, int irq_base)
-> >>  	ct->chip.irq_mask = irq_gc_mask_clr_bit;
-> >>  	ct->chip.irq_unmask = irq_gc_mask_set_bit;
-> >>  	ct->chip.irq_set_type = gpio_set_irq_type;
-> >> +	ct->chip.irq_shutdown = gpio_irq_shutdown;
-> >>  	ct->chip.irq_set_wake = gpio_set_wake_irq;
-> >>  	ct->regs.ack = GPIO_ISR;
-> >>  	ct->regs.mask = GPIO_IMR;
-> >> -- 
-> >> 1.7.9.5
-> >>
-> > 
-> > _______________________________________________
-> > linux-arm-kernel mailing list
-> > linux-arm-kernel at lists.infradead.org
-> > http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
-> > 
-> 
+Regards,
+Lucas
+-- 
+Pengutronix e.K.             | Lucas Stach                 |
+Industrial Linux Solutions   | http://www.pengutronix.de/  |
