@@ -1,96 +1,149 @@
-From: shawn.guo@freescale.com (Shawn Guo)
-Date: Tue, 22 Jul 2014 21:18:33 +0800
-Subject: [PATCH 1/6] ARM: dts: vf610: add USB PHY and controller
-In-Reply-To: <64fa5f4fcf6d1331796d2fd7899e3cbd@agner.ch>
-References: <cover.1405702442.git.stefan@agner.ch>
- <839af70e8acf139bc0f7bbdb4dd68dd146b5d6a8.1405702442.git.stefan@agner.ch>
- <20140722022232.GR8537@dragon> <64fa5f4fcf6d1331796d2fd7899e3cbd@agner.ch>
-Message-ID: <20140722131832.GY8537@dragon>
+From: achandran@mvista.com (Arun Chandran)
+Date: Tue, 22 Jul 2014 18:55:49 +0530
+Subject: Kexec on arm64
+In-Reply-To: <CAFdej03nixSU=3h+HYk2E3Onb2P3--Di0GM+wCwLS6ZNH7UjEQ@mail.gmail.com>
+References: <CAFdej006OSyhgDcJ2iZdbjt+PtysN=i_+9Dr4GTmr=+t5yg4Kw@mail.gmail.com>
+ <1405443898.22585.7.camel@smoke>
+ <CAL85gmC9LLcN_uxMY1bM5kLx=N7rZGdGO3bmGHeUVo=Rqgk8uw@mail.gmail.com>
+ <1405551861.7262.26.camel@smoke>
+ <CAFdej03nixSU=3h+HYk2E3Onb2P3--Di0GM+wCwLS6ZNH7UjEQ@mail.gmail.com>
+Message-ID: <CAFdej00J2mJwcg2Cy6CHVuuQZ4uQ2zZg8oErGPi0uPejievB+Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jul 22, 2014 at 11:57:31AM +0200, Stefan Agner wrote:
-> Am 2014-07-22 04:22, schrieb Shawn Guo:
-> > On Fri, Jul 18, 2014 at 07:01:37PM +0200, Stefan Agner wrote:
-> >> This adds USB PHY and USB controller nodes. Vybrid SoCs have two
-> >> independent USB cores which each supports DR (dual role). However,
-> >> real OTG is not supported since the OTG ID pin is not available.
-> >>
-> >> The PHYs are located within the anadig register range, hence we need
-> >> to change the length of the anadig registers.
-> >>
-> >> Signed-off-by: Stefan Agner <stefan@agner.ch>
-> >> ---
-> >>  arch/arm/boot/dts/vf610.dtsi | 46 +++++++++++++++++++++++++++++++++++++++++---
-> >>  1 file changed, 43 insertions(+), 3 deletions(-)
-> >>
-> >> diff --git a/arch/arm/boot/dts/vf610.dtsi b/arch/arm/boot/dts/vf610.dtsi
-> >> index 6a6190c..f6c3f02 100644
-> >> --- a/arch/arm/boot/dts/vf610.dtsi
-> >> +++ b/arch/arm/boot/dts/vf610.dtsi
-> >> @@ -25,6 +25,8 @@
-> >>  		gpio2 = &gpio3;
-> >>  		gpio3 = &gpio4;
-> >>  		gpio4 = &gpio5;
-> >> +		usbphy0 = &usbphy0;
-> >> +		usbphy1 = &usbphy1;
-> >>  	};
-> >>
-> >>  	cpus {
-> >> @@ -285,9 +287,25 @@
-> >>  				gpio-ranges = <&iomuxc 0 128 7>;
-> >>  			};
-> >>
-> >> -			anatop at 40050000 {
-> >> -				compatible = "fsl,vf610-anatop";
-> >> -				reg = <0x40050000 0x1000>;
-> >> +			anatop: anatop at 40050000 {
-> >> +				compatible = "fsl,vf610-anatop", "syscon";
-> >> +				reg = <0x40050000 0x400>;
-> >> +			};
-> >> +
-> >> +			usbphy0: usbphy at 40050800 {
-> >> +				compatible = "fsl,vf610-usbphy", "fsl,imx23-usbphy";
-> > 
-> > Since phy driver will match "fsl,vf610-usbphy" anyway, we do not need
-> > "fsl,imx23-usbphy" here.
-> 
-> <snip>
-> 
-> >> @@ -309,6 +327,18 @@
-> >>  				reg = <0x4006b000 0x1000>;
-> >>  				#clock-cells = <1>;
-> >>  			};
-> >> +
-> >> +			usbdev0: usb at 40034000 {
-> >> +				compatible = "fsl,imx6q-usb", "fsl,imx27-usb";
-> > 
-> > It doesn't really make any sense to have "fsl,imx6q-usb" here.  The
-> > following one should be less confusing.
-> > 
-> > 	compatible = "fsl,vf610-usb", "fsl,imx27-usb";
-> 
-> 
-> I don't quite understand the rule here, when do we drop compatible you
-> suggest in fsl,imx23-usbphy and when do we keep the "fallback" as we do
-> for the USB controller?
-> 
-> Documentation/devicetree/bindings/usb/mxs-phy.txt says:
-> > "fsl,imx23-usbphy" is still a fallback for other strings
+Hi Geoff,
 
-As "fsl,vf610-usbphy" should be added into mxs-phy.txt as a new
-compatible string, "fsl,imx23-usbphy" will not be the "fallback" of it,
-so there is no point to have "fsl,imx23-usbphy" for vf610 usbphy.
+On Tue, Jul 22, 2014 at 3:14 PM, Arun Chandran <achandran@mvista.com> wrote:
+> On Thu, Jul 17, 2014 at 4:34 AM, Geoff Levand <geoff@infradead.org> wrote:
+>> Hi Feng,
+>>
+>> On Wed, 2014-07-16 at 10:57 -0700, Feng Kan wrote:
+>>> Just following up on the conversation. The cpu return address of 0 should work
+>>> in your case. Since thats the _start of the bootloader, it will run
+>>> some core init
+>>> code and then put the core back in wfe.
+>>
+>> OK, I fixed up my code so that zero is valid cpu return address.  Arun,
+>> could you try my latest I pushed out today?
+>>
+> Hi Geoff,
+>
+> Sorry for the late reply I was away.
+>
+> Yes I tried the new code.
+> My dts file has the below change.
+>
+> ################
+> diff --git a/arch/arm64/boot/dts/apm-storm.dtsi
+> b/arch/arm64/boot/dts/apm-storm.dtsi
+> index e0bf91d..b64e549 100644
+> --- a/arch/arm64/boot/dts/apm-storm.dtsi
+> +++ b/arch/arm64/boot/dts/apm-storm.dtsi
+> @@ -24,64 +24,64 @@
+>                         compatible = "apm,potenza", "arm,armv8";
+>                         reg = <0x0 0x000>;
+>                         enable-method = "spin-table";
+> -                       cpu-release-addr = <0x1 0x0000fff8>;
+> -                       cpu-return-addr = <0x0 0x0> /* Updated by bootloader */
+> +                       cpu-release-addr = <0x40 0x0000fff8>;
+> +                       cpu-return-addr = <0x0 0x0>; /* Updated by bootloader */
+>                 };
+> #################
+> All other cpu nodes have similar change.
+>
 
-> 
-> And Documentation/devicetree/bindings/usb/ci-hdrc-imx.txt says:
-> > - compatible: Should be "fsl,imx27-usb"
+I tried the same dtb with UP configuration. For UP kernel to compile
+did the below modifications
 
-The "fsl,imx27-usb" is the only compatible string defined by the
-binding, and vf610 usb will also match it, so we need to have it in the
-vf610 usb compatible string.  "fsl,vf610-usb" is put there only for
-saving DTB update in case someday vf610 usb needs a new programming
-model and the binding needs to be extended to have "fsl,vf610-usb" as
-a new compatible.
+##############################
+diff --git a/arch/arm64/kernel/cpu_ops.c b/arch/arm64/kernel/cpu_ops.c
+index 1ccedb4c..c6a2a7e 100644
+--- a/arch/arm64/kernel/cpu_ops.c
++++ b/arch/arm64/kernel/cpu_ops.c
+@@ -89,6 +89,7 @@ void __init cpu_read_bootcpu_ops(void)
+        cpu_read_ops(dn, 0);
+ }
 
-Shawn
++#if 0
+ int __init cpu_ops_init(void)
+ {
+        int result = 0;
+@@ -110,3 +111,4 @@ void cpu_ops_shutdown(void)
+        if (cpu_operation_psci.shutdown)
+                cpu_operation_psci.shutdown();
+ }
++#endif
+diff --git a/arch/arm64/kernel/machine_kexec.c
+b/arch/arm64/kernel/machine_kexec.c
+index fba6d50..c3cf246 100644
+--- a/arch/arm64/kernel/machine_kexec.c
++++ b/arch/arm64/kernel/machine_kexec.c
+@@ -609,7 +609,7 @@ void machine_kexec(struct kimage *image)
+        flush_icache_range((unsigned long)reboot_code_buffer,
+                (unsigned long)reboot_code_buffer + KEXEC_CONTROL_PAGE_SIZE);
+
+-       dump_cpus();
++       //dump_cpus();
+
+        pr_info("Bye!\n");
+
+diff --git a/arch/arm64/kernel/process.c b/arch/arm64/kernel/process.c
+index 31cba91..6bc85f78 100644
+--- a/arch/arm64/kernel/process.c
++++ b/arch/arm64/kernel/process.c
+@@ -83,7 +83,7 @@ void soft_restart(unsigned long addr)
+
+        setup_restart();
+
+-       smp_secondary_shutdown();
++       //smp_secondary_shutdown();
+
+        /* Switch to the identity mapping */
+        phys_reset = (phys_reset_t)virt_to_phys(cpu_reset);
+@@ -130,7 +130,7 @@ void arch_cpu_idle_dead(void)
+  */
+ void machine_shutdown(void)
+ {
+-       smp_send_stop();
++       //smp_send_stop();
+ }
+
+ /*
+diff --git a/arch/arm64/mm/proc.S b/arch/arm64/mm/proc.S
+index c29dde1..14c339c 100644
+--- a/arch/arm64/mm/proc.S
++++ b/arch/arm64/mm/proc.S
+@@ -73,7 +73,7 @@ ENTRY(cpu_reset)
+        bic     x1, x1, #1
+        msr     sctlr_el1, x1                   // disable the MMU
+        isb
+-       bl      secondary_shutdown
++#      bl      secondary_shutdown
+        ret     x0
+ ENDPROC(cpu_reset)
+#####################
+
+With the default target configuration "kexec -e" failed to execute
+in UP scenario also.
+
+But I had some luck when I did the same steps with L3 cache
+disabled. According to http://www.spinics.net/lists/arm-kernel/msg329541.html
+it has an L3 cache. Luckily I was able to disable it in u-boot.
+
+With the L3 cache disabled configuration I am able to
+do "kexec -e". Please see the log attached.
+
+Feng,
+I doubt kernel is unaware of the presence of L3 cache, this subsequently
+makes "kexec -e" to fail.
+
+Do you have any idea how to make the kernel to take control of L3 cache?
+
+--Arun
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: kexec_unipro_log
+Type: application/octet-stream
+Size: 9227 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140722/8336d688/attachment-0001.obj>
