@@ -1,63 +1,37 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Tue, 22 Jul 2014 14:35:12 +0800
-Subject: [PATCH] SPI: spi-imx: enable realtime master workqueue
-In-Reply-To: <1405683059-23316-1-git-send-email-list-09_linux_arm@tqsc.de>
-References: <1405683059-23316-1-git-send-email-list-09_linux_arm@tqsc.de>
-Message-ID: <20140722063510.GB21229@dragon>
+From: tony@atomide.com (Tony Lindgren)
+Date: Mon, 21 Jul 2014 23:37:40 -0700
+Subject: [PATCH V2 1/2] ARM: OMAP2+: DMA: remove requirement of irq for
+ platform-dma driver
+In-Reply-To: <1402573523-13814-2-git-send-email-r.sricharan@ti.com>
+References: <1402573523-13814-1-git-send-email-r.sricharan@ti.com>
+ <1402573523-13814-2-git-send-email-r.sricharan@ti.com>
+Message-ID: <20140722063740.GG18374@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jul 18, 2014 at 01:30:59PM +0200, Markus Niebel wrote:
-> From: Markus Niebel <Markus.Niebel@tq-group.de>
+* Sricharan R <r.sricharan@ti.com> [140612 04:48]:
+> From: Nishanth Menon <nm@ti.com>
 > 
-> SPI master provides an option to run the SPI workqueue
-> with realtime prio. This feature is currently used only
-> by spi-pl022.
+> we have currently 2 DMA drivers that try to co-exist.
+> drivers/dma/omap-dma.c which registers it's own IRQ and is device tree
+> aware and uses arch/arm/plat-omap/dma.c instance created by
+> arch/arm/mach-omap2/dma.c to maintain channel usage (omap_request_dma).
 > 
-> Support this feature for spi-imx by parsing an optional
-> bool value from device tree.
+> Currently both try to register interrupts and mach-omap2/plat-omap dma.c
+> attempts to use the IRQ number registered by hwmod to register it's own
+> interrupt handler.
+> 
+> Now, there is no reasonable way of static allocating DMA irq in GIC
+> SPI when we use crossbar. However, since the dma_chan structure is
+> freed as a result of IRQ not being present due to devm allocation,
+> maintaining information of channel by platform code fails at a later
+> point in time when that region of memory is reused.
+> 
+> So, if hwmod does not indicate an IRQ number, then, assume that
+> dma-engine will take care of the interrupt handling.
 
-This sounds like a Linux specific feature/implementation, so shouldn't
-be a decision of device tree.
+Looks OK to me, applying both into omap-for-v3.17/soc thanks.
 
-Shawn
+Regards,
 
-> 
-> Note: maybe useful for all SPI controllers.
-> 
-> Signed-off-by: Markus Niebel <Markus.Niebel@tq-group.de>
-> ---
->  .../devicetree/bindings/spi/fsl-imx-cspi.txt       |    4 ++++
->  drivers/spi/spi-imx.c                              |    1 +
->  2 files changed, 5 insertions(+)
-> 
-> diff --git a/Documentation/devicetree/bindings/spi/fsl-imx-cspi.txt b/Documentation/devicetree/bindings/spi/fsl-imx-cspi.txt
-> index 4256a6d..6b908c7 100644
-> --- a/Documentation/devicetree/bindings/spi/fsl-imx-cspi.txt
-> +++ b/Documentation/devicetree/bindings/spi/fsl-imx-cspi.txt
-> @@ -8,6 +8,10 @@ Required properties:
->  - fsl,spi-num-chipselects : Contains the number of the chipselect
->  - cs-gpios : Specifies the gpio pins to be used for chipselects.
->  
-> +Optional properties:
-> +- fsl,rt : indicates the controller should run the message pump with realtime
-> +	   priority to minimise the transfer latency on the bus (boolean)
-> +
->  Example:
->  
->  ecspi at 70010000 {
-> diff --git a/drivers/spi/spi-imx.c b/drivers/spi/spi-imx.c
-> index 5daff20..3a9c373 100644
-> --- a/drivers/spi/spi-imx.c
-> +++ b/drivers/spi/spi-imx.c
-> @@ -835,6 +835,7 @@ static int spi_imx_probe(struct platform_device *pdev)
->  	master->bits_per_word_mask = SPI_BPW_RANGE_MASK(1, 32);
->  	master->bus_num = pdev->id;
->  	master->num_chipselect = num_cs;
-> +	master->rt = of_property_read_bool(np, "fsl,rt");
->  
->  	spi_imx = spi_master_get_devdata(master);
->  	spi_imx->bitbang.master = master;
-> -- 
-> 1.7.9.5
-> 
+Tony
