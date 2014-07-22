@@ -1,35 +1,43 @@
-From: weiyj_lk@163.com (weiyj_lk at 163.com)
-Date: Tue, 22 Jul 2014 22:18:08 +0800
-Subject: [PATCH -next] ARM: mvebu: fix return value check in
- armada_xp_pmsu_cpufreq_init()
-Message-ID: <1406038688-26417-1-git-send-email-weiyj_lk@163.com>
+From: varkabhadram@gmail.com (Varka Bhadram)
+Date: Tue, 22 Jul 2014 19:59:58 +0530
+Subject: [PATCH v2] iio: exynos-adc: add experimental touchscreen support
+In-Reply-To: <5068889.1KfVx3ksNo@wuerfel>
+References: <5068889.1KfVx3ksNo@wuerfel>
+Message-ID: <53CE7566.8020906@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Wei Yongjun <yongjun_wei@trendmicro.com.cn>
 
-In case of error, the function clk_get() returns ERR_PTR()
-and never returns NULL. The NULL test in the return value
-check should be replaced with IS_ERR().
+On Tuesday 22 July 2014 06:33 PM, Arnd Bergmann wrote:
 
-Signed-off-by: Wei Yongjun <yongjun_wei@trendmicro.com.cn>
----
- arch/arm/mach-mvebu/pmsu.c | 4 ++--
- 1 file changed, 2 insertions(+), 2 deletions(-)
+(...)
 
-diff --git a/arch/arm/mach-mvebu/pmsu.c b/arch/arm/mach-mvebu/pmsu.c
-index c30b7d7..4f6ef6e 100644
---- a/arch/arm/mach-mvebu/pmsu.c
-+++ b/arch/arm/mach-mvebu/pmsu.c
-@@ -637,9 +637,9 @@ static int __init armada_xp_pmsu_cpufreq_init(void)
- 		}
- 
- 		clk = clk_get(cpu_dev, 0);
--		if (!clk) {
-+		if (IS_ERR(clk)) {
- 			pr_err("Cannot get clock for CPU %d\n", cpu);
--			return -ENODEV;
-+			return PTR_ERR(clk);
- 		}
- 
- 		/*
+>   
+> +static int exynos_read_s3c64xx_ts(struct iio_dev *indio_dev, int *x, int *y)
+> +{
+> +	struct exynos_adc *info = iio_priv(indio_dev);
+> +	unsigned long timeout;
+> +	int ret;
+> +
+> +	mutex_lock(&indio_dev->mlock);
+> +	info->read_ts = true;
+> +
+> +	reinit_completion(&info->completion);
+> +
+> +	writel(ADC_S3C2410_TSC_PULL_UP_DISABLE | ADC_TSC_AUTOPST,
+> +	       ADC_V1_TSC(info->regs));
+> +
+> +	/* Select the ts channel to be used and Trigger conversion */
+> +	info->data->start_conv(info, ADC_S3C2410_MUX_TS);
+> +
+> +	timeout = wait_for_completion_timeout
+> +			(&info->completion, EXYNOS_ADC_TIMEOUT);
+
+Should be properly aligned:
+
+	wait_for_completion_timeout(&info->completion,
+				    EXYNOS_ADC_TIMEOUT);
+
+-- 
+Regards,
+Varka Bhadram
