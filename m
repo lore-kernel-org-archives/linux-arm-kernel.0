@@ -1,30 +1,27 @@
-From: mugunthanvnm@ti.com (Mugunthan V N)
-Date: Tue, 22 Jul 2014 15:41:43 +0530
-Subject: [Re-send PATCH 1/1] arm: dra7xx: Add hwmod data for MDIO and CPSW
-In-Reply-To: <20140717074948.GF18374@atomide.com>
-References: <1404825399-10330-1-git-send-email-mugunthanvnm@ti.com>
- <20140717074948.GF18374@atomide.com>
-Message-ID: <53CE38DF.1060305@ti.com>
+From: airlied@gmail.com (Dave Airlie)
+Date: Tue, 22 Jul 2014 20:15:29 +1000
+Subject: [PATCH] drm: shmobile: fix warnings
+In-Reply-To: <20140722085225.GI21766@n2100.arm.linux.org.uk>
+References: <E1X6Ho7-0006ru-U9@rmk-PC.arm.linux.org.uk>
+ <20140722085225.GI21766@n2100.arm.linux.org.uk>
+Message-ID: <CAPM=9ty6F8_i3G13MXQzO4-sEVSDfB=6pUPTDvfO8yyMpQ1T4Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday 17 July 2014 01:19 PM, Tony Lindgren wrote:
-> We seem to have this layout WR_SOFT_RESET and WR_CONTROL in the TRM:
+On 22 July 2014 18:52, Russell King - ARM Linux <linux@arm.linux.org.uk> wrote:
+> On Sun, Jul 13, 2014 at 12:19:03PM +0100, Russell King wrote:
+>> drivers/gpu/drm/shmobile/shmob_drm_drv.c:300:5: warning: "CONFIG_PM_SLEEP" is not defined [-Wundef]
+>>
+>> Always use #ifdef with CONFIG symbols, never just bare #if
+>>
+>> Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
 >
-> WR_SOFT_RESET
-> [0]     SOFT_RESET
+> Ping?
 >
-> WR_CONTROL
-> [3:2]   MMR_STDBYMODE   0 = force-idle, 1 = no-standby
-> [1:0]   MMR_IDLEMODE    0 = force-idle, 1 = no-idle
->
-> And so it seems to match what am33xx also has for am33xx_cpgmac_sysc
-> and am33xx TRM for 14.5.9 CONTROL register. So as far as I'm concerned:
->
-> Acked-by: Tony Lindgren <tony@atomide.com>
-Paul,
 
-Can you pull this patch as Tony acked the patch.
+I merged all these to -next earlier today,
 
-Regards
-Mugunthan V N
+I'm still looking at the other ones that have dependant patches on
+Greg on how best to merge.
+
+Dave.
