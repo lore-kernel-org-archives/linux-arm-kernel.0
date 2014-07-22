@@ -1,64 +1,31 @@
-From: heiko@sntech.de (Heiko =?ISO-8859-1?Q?St=FCbner?=)
-Date: Tue, 22 Jul 2014 23:45:47 +0200
-Subject: [PATCH] ARM: dts: rk3188-radxarock: add GPIO IR receiver node
-In-Reply-To: <20140714190355.GA16904@gmail.com>
-References: <1405253401-15534-1-git-send-email-b.galvani@gmail.com>
- <2390327.HZxnbJmfOO@diego> <20140714190355.GA16904@gmail.com>
-Message-ID: <3433422.DZFVBm30W2@diego>
+From: gregkh@linuxfoundation.org (Greg Kroah-Hartman)
+Date: Tue, 22 Jul 2014 15:16:19 -0700
+Subject: [PATCH v3] platform: Make platform_bus device a platform device
+In-Reply-To: <1406051719-17354-1-git-send-email-pawel.moll@arm.com>
+References: <20140722173713.GA8959@kroah.com>
+ <1406051719-17354-1-git-send-email-pawel.moll@arm.com>
+Message-ID: <20140722221619.GA15781@kroah.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am Montag, 14. Juli 2014, 21:04:26 schrieb Beniamino Galvani:
-> On Sun, Jul 13, 2014 at 02:37:40PM +0200, Heiko St?bner wrote:
-> > Am Sonntag, 13. Juli 2014, 14:10:01 schrieb Beniamino Galvani:
-> > > This adds a device tree node for the infrared receiver connected to a
-> > > GPIO pin on the Radxa Rock.
-> > > 
-> > > Signed-off-by: Beniamino Galvani <b.galvani@gmail.com>
-> > > ---
-> > > 
-> > >  arch/arm/boot/dts/rk3188-radxarock.dts |   13 +++++++++++++
-> > >  1 file changed, 13 insertions(+)
-> > > 
-> > > diff --git a/arch/arm/boot/dts/rk3188-radxarock.dts
-> > > b/arch/arm/boot/dts/rk3188-radxarock.dts index 19d45b4..1d87bcb 100644
-> > > --- a/arch/arm/boot/dts/rk3188-radxarock.dts
-> > > +++ b/arch/arm/boot/dts/rk3188-radxarock.dts
-> > > @@ -23,6 +23,13 @@
-> > > 
-> > >  		reg = <0x60000000 0x80000000>;
-> > >  	
-> > >  	};
-> > > 
-> > > +	ir_recv: ir-receiver {
-> > > +		compatible = "gpio-ir-receiver";
-> > > +		gpios = <&gpio0 10 1>;
-> > > +		pinctrl-names = "default";
-> > > +		pinctrl-0 = <&ir_recv_pin>;
-> > > +	};
-> > > +
-> > 
-> > hmm, on second glance, I'm actually not sure if this shouldn't belong in
-> > the soc subnode, like the gpio-keys and leds.
+On Tue, Jul 22, 2014 at 06:55:19PM +0100, Pawel Moll wrote:
+> ... describing the root of the device tree, so one can write
+> a platform driver initializing the platform.
 > 
-> (adding devicetree mailing list)
+> There has been a lot of references to platform_bus device where
+> it didn't make any sense, because simply using NULL as a parent
+> will make the device be adopted by the top level anyway.
 > 
-> I placed the IR receiver under the root node after looking at what
-> other boards do, for example:
+> Signed-off-by: Pawel Moll <pawel.moll@arm.com>
+> ---
+> Changes since v2:
 > 
->   imx6dl-hummingboard.dts
->   imx6qdl-cubox-i.dtsi
->   dove-cubox.dts
-> 
-> On the other hand, if gpio-keys and leds are under the soc node
-> probably it makes sense to follow the same rule also for the IR
-> receiver.
+> * replaced references to platform_bus.dev with NULL
+>   in places where it shouldn't make any difference
 
-your way was the right one actually ... using artificial subnodes is not 
-encouraged at all - see comments I received , so the soc node itself also may 
-go away.
+How about split this up with just the "change to NULL" changes as one
+patch, and the rest as a second one?
 
-I'll add the patch to my queue.
+thanks,
 
-
-Heiko
+greg k-h
