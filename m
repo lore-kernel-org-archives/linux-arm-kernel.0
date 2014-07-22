@@ -1,38 +1,50 @@
-From: davem@davemloft.net (David Miller)
-Date: Tue, 22 Jul 2014 13:16:39 -0700 (PDT)
-Subject: [PATCH 0/6] net: mvpp2: Assorted fixes
-In-Reply-To: <20140722144519.GA682@arch.cereza>
-References: <1405961296-5846-1-git-send-email-ezequiel.garcia@free-electrons.com>
- <20140721.202749.913689946944612851.davem@davemloft.net>
- <20140722144519.GA682@arch.cereza>
-Message-ID: <20140722.131639.1180592286226896307.davem@davemloft.net>
+From: olof@lixom.net (Olof Johansson)
+Date: Tue, 22 Jul 2014 13:28:38 -0700
+Subject: [PATCH] ARM: multi_v7_defconfig: major refresh
+In-Reply-To: <12165027.MHmNZOI7jc@wuerfel>
+References: <1406052070-6207-1-git-send-email-olof@lixom.net>
+ <12165027.MHmNZOI7jc@wuerfel>
+Message-ID: <CAOesGMjo0AY=eGcfTh1sVxKkURK9bzK8SBAeEbvBFN4R0sF34A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Ezequiel Garcia <ezequiel.garcia@free-electrons.com>
-Date: Tue, 22 Jul 2014 11:45:19 -0300
+On Tue, Jul 22, 2014 at 11:36 AM, Arnd Bergmann <arnd@arndb.de> wrote:
+> On Tuesday 22 July 2014 11:01:10 Olof Johansson wrote:
+>> This is a major refresh of the multi_v7_defconfig:
+>>
+>> - Bring over a bunch of Samsung drivers to make ODROID-U3 and Chromebooks usable
+>>  * Enable big.LITTLE
+>>  * MCPM
+>>  * CYAPA touchpad
+>>  * Samsung-related MTD/regulator/clk/pinmux drivers
+>>  * Add some of the CrOS EC drivers
+>> - Turn on TPM, HW_RANDOM
+>> - OMAP_USB3 -> TI_PIPE3 option rename
+>> - Enable MCPM/b.L for VEXPRESS
+>> - Add new CONFIG_MTD_SPI_NOR since it otherwise masks off SPI NOR drivers
+>> - CONFIG_LOGO, because penguins.
+>>
+>> I took care to keep the new options that have been added for whose the
+>> drivers are not yet in our for-next branch. This was pretty awkward so
+>> we should sort out how to handle those better in the future.
+>
+> Since you've already done all those, how about enabling THUMB2_KERNEL?
+> For the multi_v7_defconfig, it should actually give some benefits,
+> since it's rather large, and it would be good to have some more testing
+> with this option enabled.
+>
+> I guess the first step would be to enable it and just see if your
+> boot farm survives the change.
 
-> On 21 Jul 08:27 PM, David Miller wrote:
->> From: Ezequiel Garcia <ezequiel.garcia@free-electrons.com>
->> Date: Mon, 21 Jul 2014 13:48:10 -0300
->> 
->> > This patchset contains a set of fixes for issues found while doing some
->> > more intensive tests on the recently accepted mvpp2 ethernet driver.
->> > 
->> > David: if we are still in time, we'd like to get the driver fixes merged
->> > for v3.17-rc1.
->> > 
->> > For the devicetree changes, it's already too late for that, since Jason
->> > Cooper has already posted the PRs for v3.17. I'll re-post them when
->> > v3.17-rc1 is released.
->> > 
->> > As usual, feedback is welcome.
->> 
->> This series does not apply to the 'net' tree at all, please respin
->> and resubmit.
-> 
-> This series applies on net-next.
-> 
-> Sorry for not mentioning it,
+Good point, I'll definitely give that a go once the current issues are resolved.
 
-They are bonafide bug fixes, therefore should be targetted at 'net'.
+Which are: These changes make 5250-based machines (snow and arndale)
+break. Lots of i2c timeouts on SATA and hdmi-phy. Looks like arndale
+might be missing pinctrl setups for it?
+
+Tushar, Kukjin, any chance you can investigate from your end? I'd like
+to get this change in since it allows for better multiplatform
+coverage, but the Exynos breakage must be fixed...
+
+
+-Olof
