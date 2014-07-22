@@ -1,37 +1,52 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Tue, 22 Jul 2014 10:27:25 -0600
-Subject: [GIT PULL 2/3] ARM: tegra: move fuse code out of arch/arm
-In-Reply-To: <20140722102749.GB2219@arm.com>
-References: <1403558626-13422-2-git-send-email-swarren@wwwdotorg.org>
- <20140707004417.GE8469@quad.lixom.net>
- <20140708134359.GA23218@tbergstrom-lnx.Nvidia.com>
- <CAOesGMhoqvqf-dktp-OfUNTPLahPwkyAPiTeDngr4QjH=VfOGA@mail.gmail.com>
- <53C88A4C.3070304@wwwdotorg.org>
- <CAOesGMh+zLV781wzdR5=_Bpzh+XMwJfWL-5XMDP6DwG_Hg80kw@mail.gmail.com>
- <53CD2C58.6060601@wwwdotorg.org> <20140721155451.GF32578@arm.com>
- <53CD4201.5070705@wwwdotorg.org>
- <CAOesGMgvd1HbjywN7BDPtr8ZU7vucWH48B=AW3TZjng73YA8WA@mail.gmail.com>
- <20140722102749.GB2219@arm.com>
-Message-ID: <53CE90ED.8030900@wwwdotorg.org>
+From: cyrille.pitchen@atmel.com (Cyrille Pitchen)
+Date: Tue, 22 Jul 2014 18:27:53 +0200
+Subject: [PATCH 4/6] net/macb: add RX checksum offload feature
+In-Reply-To: <1405697784.10255.99.camel@edumazet-glaptop2.roam.corp.google.com>
+References: <cover.1405689937.git.cyrille.pitchen@atmel.com>	
+ <f29965fee23dc0de99b388373017efeffa1aac10.1405689937.git.cyrille.pitchen@atmel.com>
+ <1405697784.10255.99.camel@edumazet-glaptop2.roam.corp.google.com>
+Message-ID: <53CE9109.9040407@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/22/2014 04:27 AM, Catalin Marinas wrote:
-...
-> ...It's also aimed at
-> pushing back on hardware people who think they can mess up, for example,
-> a GIC implementation because the rest is just software and you can
-> always add #ifdefs.
+Le 18/07/2014 17:36, Eric Dumazet a ?crit :
+> On Fri, 2014-07-18 at 16:21 +0200, Cyrille Pitchen wrote:
+>> Signed-off-by: Cyrille Pitchen <cyrille.pitchen@atmel.com>
+>> ---
+>>  drivers/net/ethernet/cadence/macb.c | 29 ++++++++++++++++++++++++++++-
+>>  drivers/net/ethernet/cadence/macb.h |  2 ++
+>>  2 files changed, 30 insertions(+), 1 deletion(-)
+>>
+>> diff --git a/drivers/net/ethernet/cadence/macb.c b/drivers/net/ethernet/cadence/macb.c
+>> index 9bdcd1b..6acd6e2 100644
+>> --- a/drivers/net/ethernet/cadence/macb.c
+>> +++ b/drivers/net/ethernet/cadence/macb.c
+>> @@ -766,6 +766,8 @@ static int gem_rx(struct macb *bp, int budget)
+>>  
+>>  		skb->protocol = eth_type_trans(skb, bp->dev);
+>>  		skb_checksum_none_assert(skb);
+>> +		if (bp->dev->features & NETIF_F_RXCSUM)
+>> +			skb->ip_summed = CHECKSUM_UNNECESSARY;
+>>  
+> 
+> 
+> Really ?
+> 
+> If this is what you meant, this deserves a big and fat comment.
+> 
+> 
+> 
+Hi Eric,
 
-I'm very concerned about this statement.
+Isn't it the proper way to do? According to Cadence documentation about RX checksum offload:
+"If any of the checksums (IP, TCP or UDP) are verified incorrect by the GEM, the packet is discarded."
 
-Yes, it would be nice if all HW was sanely designed, but it's not
-always. The time to push back on bad HW design is during IP licensing
-agreements or HW design reviews, not upstreaming.
+If I understand, when RX checksum offload is enabled setting bit 24 of the Network Configuration Register, the driver only receives RX frames with correct checksum. Then it tells the kernel that there's no need to verify the checksum again in software. This is done setting skb->ip_summed to CHECKSUM_UNNECESSARY. Intel e1000 driver does the same in e1000_rx_checksum() function.
 
-Any pushback during SW upstreaming simply serves to make it difficult
-for the SW people doing the upstreaming. It has zero impact on the
-current HW design (it's already shipped). It probably has zero impact on
-the next N revisions of the HW (they're already baked). It's possible it
-has zero-to-minimal impact on any future HW (end-user product
-requirements are what matter most).
+Also bit 24 of the Network Configuration Register is updated by macb_open() and macb_set_features() so it always matches the state of NETIF_F_RXCSUM flag in dev->features, once the network interface is up. That's why I'd rather read from dev->features than read from register.
+
+Did I make a mistake? Is it the kind of comment you expect to be added?
+
+Regards,
+
+Cyrille
