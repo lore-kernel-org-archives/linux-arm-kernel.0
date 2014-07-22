@@ -1,37 +1,79 @@
-From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Tue, 22 Jul 2014 15:21:10 -0700
-Subject: [PATCH] sched_clock: Avoid corrupting hrtimer tree during suspend
-In-Reply-To: <53C9B862.5050106@linaro.org>
-References: <1405721392-30795-1-git-send-email-sboyd@codeaurora.org>
- <53C99EC5.2060602@linaro.org> <53C9A1EC.8060905@codeaurora.org>
- <53C9A2E7.8020307@linaro.org> <53C9ACCA.3070306@codeaurora.org>
- <53C9B862.5050106@linaro.org>
-Message-ID: <53CEE3D6.6070207@codeaurora.org>
+From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
+Date: Wed, 23 Jul 2014 02:24:23 +0400
+Subject: [PATCH v3] ARM: shmobile: r8a7790: link PCI USB devices to USB PHY
+Message-ID: <201407230224.24152.sergei.shtylyov@cogentembedded.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/18/14 17:14, John Stultz wrote:
-> On 07/18/2014 04:24 PM, Stephen Boyd wrote:
->> On 07/18/14 15:42, John Stultz wrote:
->>> If its a regression (and needs -stable backports) it needs to go in via
->>> tip/timers/urgent, and not via the regular merge window.
->>>
->>> Whats the additional risk -stable wise for canceling the timer during
->>> suspend and starting it back up during resume?
->>>
->> I'd say close to zero given that we'd only be making the timer run a
->> little bit later and we have slack in there already. Here's that version.
-> Ok, thanks. I'll try to do a closer review it and get it queued. Is
-> there anyone who might be able to validate this and provide a Tested-by: ?
->
+Describe the PCI USB devices that are behind the PCI bridges, adding necessary
+links to the USB PHY device.
 
-Maybe someone from Linaro can give a Tested-by? I basically did this:
+Based on the original work by Ben Dooks <ben.dooks@codethink.co.uk>.
 
-# grep -A1 'sched_clock' /proc/timer_list && echo mem > /sys/power/state && grep -A1 'sched_clock' /proc/timer_list
+Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
 
+---
+This patch is against 'renesas-devel-v3.16-rc5-20140722' tag of Simon Horman's
+'renesas.git' repo plus R8A7790/Lager USB PHY support patches posted before.
+The patch requires the USB PHY driver, and USB HCD generic PHY support (also
+already posted) in order to work.
 
-and made sure that the expires time was reset.
+Changes in version 3:
+- adjusted "phys" properties in the PCI OHCI/EHCI device nodes;
+- resolved rejects.
 
--- 
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-hosted by The Linux Foundation
+Changes in version 2:
+- renamed the PCI OHCI/EHCI device nodes to comply with the PCI binding;
+- changed the PHY specifier in the PCI#2 node to reflect that channel #1 support
+  was dropped;
+- resolved rejects, refreshed the patch.
+
+ arch/arm/boot/dts/r8a7790.dtsi |   28 ++++++++++++++++++++++++++++
+ 1 file changed, 28 insertions(+)
+
+Index: renesas/arch/arm/boot/dts/r8a7790.dtsi
+===================================================================
+--- renesas.orig/arch/arm/boot/dts/r8a7790.dtsi
++++ renesas/arch/arm/boot/dts/r8a7790.dtsi
+@@ -999,6 +999,20 @@
+ 		interrupt-map = <0x0000 0 0 1 &gic 0 108 IRQ_TYPE_LEVEL_HIGH
+ 				 0x0800 0 0 1 &gic 0 108 IRQ_TYPE_LEVEL_HIGH
+ 				 0x1000 0 0 2 &gic 0 108 IRQ_TYPE_LEVEL_HIGH>;
++
++		usb at 0,1 {
++			reg = <0x800 0 0 0 0>;
++			device_type = "pci";
++			phys = <&usb0 0>;
++			phy-names = "usb";
++		};
++
++		usb at 0,2 {
++			reg = <0x1000 0 0 0 0>;
++			device_type = "pci";
++			phys = <&usb0 0>;
++			phy-names = "usb";
++		};
+ 	};
+ 
+ 	pci1: pci at ee0b0000 {
+@@ -1039,6 +1053,20 @@
+ 		interrupt-map = <0x0000 0 0 1 &gic 0 113 IRQ_TYPE_LEVEL_HIGH
+ 				 0x0800 0 0 1 &gic 0 113 IRQ_TYPE_LEVEL_HIGH
+ 				 0x1000 0 0 2 &gic 0 113 IRQ_TYPE_LEVEL_HIGH>;
++
++		usb at 0,1 {
++			reg = <0x800 0 0 0 0>;
++			device_type = "pci";
++			phys = <&usb2 0>;
++			phy-names = "usb";
++		};
++
++		usb at 0,2 {
++			reg = <0x1000 0 0 0 0>;
++			device_type = "pci";
++			phys = <&usb2 0>;
++			phy-names = "usb";
++		};
+ 	};
+ 
+ 	pciec: pcie at fe000000 {
