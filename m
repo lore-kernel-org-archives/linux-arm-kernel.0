@@ -1,110 +1,103 @@
-From: gregkh@linuxfoundation.org (Greg Kroah-Hartman)
-Date: Tue, 22 Jul 2014 11:15:05 -0700
-Subject: [PATCH v3] platform: Make platform_bus device a platform device
-In-Reply-To: <1406052069.25343.93.camel@hornet>
-References: <20140722173713.GA8959@kroah.com>
- <1406051719-17354-1-git-send-email-pawel.moll@arm.com>
- <1406052069.25343.93.camel@hornet>
-Message-ID: <20140722181505.GA9898@kroah.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Tue, 22 Jul 2014 19:18:57 +0100
+Subject: [GIT PULL v2.1] Mediatek basic support for v3.17
+In-Reply-To: <CABuKBeLc=Bbpqrksdjoc_0Sx_rVpZLuY1aUY1WtK5Vp20Jiv8g@mail.gmail.com>
+References: <CABuKBeLc=Bbpqrksdjoc_0Sx_rVpZLuY1aUY1WtK5Vp20Jiv8g@mail.gmail.com>
+Message-ID: <20140722181857.GK21766@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jul 22, 2014 at 07:01:09PM +0100, Pawel Moll wrote:
-> On Tue, 2014-07-22 at 18:55 +0100, Pawel Moll wrote:
-> > * replaced references to platform_bus.dev with NULL
-> >   in places where it shouldn't make any difference
+Your To: header contains many tens of people.  Which person out of
+all those do you expect to pull your changes?
+
+Email has a way to identify whom you are talking _to_ and whom you wish
+to _copy_ for information purposes.
+
+These are the "To:" and "Cc:" fields on email.  Those on the "To:" list
+are those who you are directly addressing your message.  Those on the
+Cc: list are "Carbon Copy" recipients, in other words, ones you are
+notifying for information purposes.
+
+Let's say that you're an HR department.  You're firing an employee.
+You send your message "To" the employee and "To" the employee's managers.
+Congratulations, you've just fired the employee along with his managers.
+
+If instead, you send your message "To" the employee and "Cc" the
+employee's managers, it's then clear that the employee's managers
+are being copied for information purposes.
+
+The same thing applies here.  Send your pull request "To" the person
+or group of people who you wish to action your request, and include
+on the "Cc" those whom may be interested in seeing the pull request
+for information purposes.
+
+Please be more careful with your email addressing technique in the
+future, thanks.
+
+[No, I haven't pulled anything]
+
+On Tue, Jul 22, 2014 at 06:34:17PM +0200, Matthias Brugger wrote:
+> The patches 1-4 from the v10 series [0] of the patch set have been
+> merged by Daniel Lezcano [1]. This pull request has just the remaining
+> patches 5-7
 > 
-> So now the leftovers...
+> There is an Ack from Rob Herring for the SoC device tree binding patch.
+> The other two patches lack an Ack from the maintainers.
 > 
-> > diff --git a/arch/arm/mach-imx/devices/devices.c b/arch/arm/mach-imx/devices/devices.c
-> > index 1b4366a..48c3817 100644
-> > --- a/arch/arm/mach-imx/devices/devices.c
-> > +++ b/arch/arm/mach-imx/devices/devices.c
-> > @@ -24,12 +24,12 @@
-> > 
-> >  struct device mxc_aips_bus = {
-> >         .init_name      = "mxc_aips",
-> > -       .parent         = &platform_bus,
-> > +       .parent         = &platform_bus.dev,
-> >  };
-> > 
-> >  struct device mxc_ahb_bus = {
-> >         .init_name      = "mxc_ahb",
-> > -       .parent         = &platform_bus,
-> > +       .parent         = &platform_bus.dev,
-> >  };
-> > 
-> >  int __init mxc_device_init(void)
+> [0] http://thread.gmane.org/gmane.linux.documentation/25231
+> [1] https://lkml.org/lkml/2014/7/21/291
 > 
-> Seems that the author meant to have those two bus devices hanging from
-> the platform_bus in device hierarchy. Seems fair enough to me.
-
-No, not at all, this is a different bus, put the root bus at the root of
-the sysfs tree, not at some "arbritrary" point on a platform device.
-
-> > diff --git a/drivers/char/tile-srom.c b/drivers/char/tile-srom.c
-> > index bd37747..4e4b7a2 100644
-> > --- a/drivers/char/tile-srom.c
-> > +++ b/drivers/char/tile-srom.c
-> > @@ -350,7 +350,7 @@ static int srom_setup_minor(struct srom_dev *srom, int index)
-> >                        SROM_PAGE_SIZE_OFF, sizeof(srom->page_size)) < 0)
-> >                 return -EIO;
-> > 
-> > -       dev = device_create(srom_class, &platform_bus,
-> > +       dev = device_create(srom_class, &platform_bus.dev,
-> >                             MKDEV(srom_major, index), srom, "%d", index);
-> >         return PTR_ERR_OR_ZERO(dev);
-> >  }
+> ---
 > 
-> Again, non-platform device placed in the hierarchy.
-
-Again, not ok.  If it's a platform device, it's a platform device, and
-make it one.  If it isn't, like this one, make it a virtual device and
-pass NULL here.
-
-> > diff --git a/drivers/mmc/host/sdhci-pltfm.c b/drivers/mmc/host/sdhci-pltfm.c
-> > index 7e834fb..9a2b0d0 100644
-> > --- a/drivers/mmc/host/sdhci-pltfm.c
-> > +++ b/drivers/mmc/host/sdhci-pltfm.c
-> > @@ -137,7 +137,7 @@ struct sdhci_host *sdhci_pltfm_init(struct platform_device *pdev,
-> >                 dev_err(&pdev->dev, "Invalid iomem size!\n");
-> > 
-> >         /* Some PCI-based MFD need the parent here */
-> > -       if (pdev->dev.parent != &platform_bus && !np)
-> > +       if (pdev->dev.parent != &platform_bus.dev && !np)
-> >                 host = sdhci_alloc_host(pdev->dev.parent,
-> >                         sizeof(struct sdhci_pltfm_host) + priv_size);
-> >         else
+> Changes for v2.1:
+> - fix screwed up explanation
 > 
-> Special treatment for non-platform devices.
-
-Ugh, why should you care?  I don't understand the logic here.
-
-> > diff --git a/drivers/scsi/hosts.c b/drivers/scsi/hosts.c
-> > index 3cbb57a..c14c36f 100644
-> > --- a/drivers/scsi/hosts.c
-> > +++ b/drivers/scsi/hosts.c
-> > @@ -218,7 +218,7 @@ int scsi_add_host_with_dma(struct Scsi_Host *shost, struct device *dev,
-> >                 goto fail;
-> > 
-> >         if (!shost->shost_gendev.parent)
-> > -               shost->shost_gendev.parent = dev ? dev : &platform_bus;
-> > +               shost->shost_gendev.parent = dev ? dev : &platform_bus.dev;
-> >         if (!dma_dev)
-> >                 dma_dev = shost->shost_gendev.parent;
-> > 
+> Changes for v2:
+> - request includes just patches 5-7 from the series
 > 
-> shost_gendev is a generic (as in struct device, non-platform one)
-> device, that is being explicitly placed in the hierarchy.
+> ----------------------------------------------------------------
+> The following changes since commit 7171511eaec5bf23fb06078f59784a3a0626b38f:
+> 
+>   Linux 3.16-rc1 (2014-06-15 17:45:28 -1000)
+> 
+> are available in the git repository at:
+> 
+>   https://github.com/mbgg/linux-mediatek.git tags/v3.17-next-mediatek-support
+> 
+> for you to fetch changes up to afaedea451149ab8f08c37ce688c8021ed347811:
+> 
+>   arm: mediatek: add dts for Aquaris5 mobile phone (2014-07-22 17:52:38 +0200)
+> 
+> ----------------------------------------------------------------
+> This patch set adds basic support for the Mediatek Cortex-A7 SoCs.
+> 
+> Support is quite basic, as the only component working up to now are the
+> timers.
+> 
+> Signed-off-by: Matthias Brugger matthias.bgg at gmail.com
+> 
+> ----------------------------------------------------------------
+> Matthias Brugger (3):
+>       arm: add basic support for Mediatek MT6589 boards
+>       dt-bindings: add documentation for Mediatek SoC
+>       arm: mediatek: add dts for Aquaris5 mobile phone
+> 
+>  Documentation/devicetree/bindings/arm/mediatek.txt |    8 ++
+>  arch/arm/Kconfig                                   |    2 +
+>  arch/arm/Makefile                                  |    1 +
+>  arch/arm/boot/dts/mt6589-aquaris5.dts              |   25 ++++++
+>  arch/arm/boot/dts/mt6589.dtsi                      |   94 ++++++++++++++++++++
+>  arch/arm/mach-mediatek/Kconfig                     |    6 ++
+>  arch/arm/mach-mediatek/Makefile                    |    1 +
+>  arch/arm/mach-mediatek/mediatek.c                  |   27 ++++++
+>  8 files changed, 164 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/arm/mediatek.txt
+>  create mode 100644 arch/arm/boot/dts/mt6589-aquaris5.dts
+>  create mode 100644 arch/arm/boot/dts/mt6589.dtsi
+>  create mode 100644 arch/arm/mach-mediatek/Kconfig
+>  create mode 100644 arch/arm/mach-mediatek/Makefile
+>  create mode 100644 arch/arm/mach-mediatek/mediatek.c
 
-Then make it a virtual device, as that's what it is, replace this with
-NULL.
-
-> So it makes it 4, not 3 ;-) places where referencing platform_bus
-> *maybe* makes some sense.
-
-Nope, see above :)
-
-thanks,
-
-greg k-h
+-- 
+FTTC broadband for 0.8mile line: currently at 9.5Mbps down 400kbps up
+according to speedtest.net.
