@@ -1,60 +1,38 @@
-From: shawn.guo@freescale.com (Shawn Guo)
-Date: Tue, 22 Jul 2014 16:15:38 +0800
-Subject: iMX6Q FEC: transmit queue 0 timed out
-In-Reply-To: <CAOpc7mHvddM1bCex13yPTRrEkFqYvk2YHYajZeMn+MG83neUBA@mail.gmail.com>
-References: <20140602124242.GB933@n2100.arm.linux.org.uk>
- <CAOpc7mFbJQNeBmOG0C-Qn856MmhtUkTq=QeDPC-EWXryi6sFGg@mail.gmail.com>
- <20140602133352.GC933@n2100.arm.linux.org.uk>
- <CAOpc7mHJ5CqCcB1rE3b8q58HDdSWeG41PTAMwgeARAL_hgUt_g@mail.gmail.com>
- <d7f1957c2afc44e8b900001e606905c0@BLUPR03MB373.namprd03.prod.outlook.com>
- <CAOpc7mHHOmEcvnSDTc+9eyCtLyMBvR2aU36XFcddT4pa0f2KOQ@mail.gmail.com>
- <a97d34741f694cd2b89b4c7f0bebc114@BLUPR03MB373.namprd03.prod.outlook.com>
- <CAOpc7mHxYVOUQVcTqPH9pLXtqNaxgeqJGoJ=U4cRNgSzOpj7Wg@mail.gmail.com>
- <20140604135047.GC23430@n2100.arm.linux.org.uk>
- <CAOpc7mHvddM1bCex13yPTRrEkFqYvk2YHYajZeMn+MG83neUBA@mail.gmail.com>
-Message-ID: <20140722081536.GD5485@dragon>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Tue, 22 Jul 2014 10:30:50 +0200
+Subject: [PATCH] ARM: imx6: fix SMP compilation again
+Message-ID: <37015543.ZyZKZyEIPW@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jul 16, 2014 at 10:41:10AM +0200, Holger Schurig wrote:
-> Andy,
-> 
-> to revive an old thread: I now got ethernet working. Basically, I
-> needed to set the system so that the PHY is generating the ref-clock.
-> I found even code in arch/arm/mach-imx/mach-imx6q.c that controls
-> setting of GPR1[21] from the device tree. However, I wasn't really
-> able to come up with a device-tree that triggers the code
-> IMX6Q_GPR1_ENET_CLK_SEL_PAD. For example, Neither
-> Documentation/devicetree/bindings/net/fsl-fec.txt nor any other file
-> there mention anything on how to do this.
-> 
-> Currently I disable the 3rd clock. I changed the default
->          clocks = <&clks 117>, <&clks 117>, <&clks 190>;
->          clock-names = "ipg", "ahb", "ptp";
-> (from imx6qdl.dtsi) to my dts:
->          clocks = <&clks 117>, <&clks 117>;
->          clock-names = "ipg", "ahb";
-> 
-> Would I have needed to create some dummy clock, e.g. "ext-phy-clk" and
-> specified that as a third clock in my dts?
+My earlier patch 1fc593feaf8e ("ARM: imx: build i.MX6 functions
+only when needed") fixed a problem with building an i.MX5 kernel,
+but missed the corner case of building a kernel for i.MX5 with
+SMP enabled. It is an extremely rare case that has only now
+happened after many thousands of randconfig kernel builds.
 
-Since in your setup PHY is generating the reference clock, you need to
-define this clock in your board dts, and overwrite the 'ptp' clock with
-it, something like the following.
+The error message I get is
+arch/arm/mach-imx/built-in.o: In function `v7_secondary_startup':
+:(.text+0x5124): undefined reference to `v7_invalidate_l1'
 
-clocks {
-	#address-cells = <1>;
-	#size-cells = <0>;
+This puts the code inside of an "ifdef CONFIG_SMP" to hopefully
+do the right thing in all configurations.
 
-	rmii_clk: clock at 0 {
-		compatible = "fixed-clock";
-		reg = <0>;
-		#clock-cells = <0>;
-		clock-frequency = <25000000>;  /* 25MHz for example */
-		clock-output-names = "rmii_ref_clk";
-	};
-};
+Signed-off-by: Arnd Bergmann <arnd@arndb.de>
 
-&fec {
-        clocks = <&clks 117>, <&clks 117>, <&rmii_clk>;
-};
+diff --git a/arch/arm/mach-imx/Makefile b/arch/arm/mach-imx/Makefile
+index ac88599ca080..23c02932bf84 100644
+--- a/arch/arm/mach-imx/Makefile
++++ b/arch/arm/mach-imx/Makefile
+@@ -93,9 +93,11 @@ obj-$(CONFIG_HAVE_IMX_ANATOP) += anatop.o
+ obj-$(CONFIG_HAVE_IMX_GPC) += gpc.o
+ obj-$(CONFIG_HAVE_IMX_MMDC) += mmdc.o
+ obj-$(CONFIG_HAVE_IMX_SRC) += src.o
++ifdef CONFIG_SOC_IMX6
+ AFLAGS_headsmp.o :=-Wa,-march=armv7-a
+ obj-$(CONFIG_SMP) += headsmp.o platsmp.o
+ obj-$(CONFIG_HOTPLUG_CPU) += hotplug.o
++endif
+ obj-$(CONFIG_SOC_IMX6Q) += clk-imx6q.o mach-imx6q.o
+ obj-$(CONFIG_SOC_IMX6SL) += clk-imx6sl.o mach-imx6sl.o
+ obj-$(CONFIG_SOC_IMX6SX) += clk-imx6sx.o mach-imx6sx.o
