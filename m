@@ -1,116 +1,30 @@
-From: shawn.guo@freescale.com (Shawn Guo)
-Date: Tue, 22 Jul 2014 10:22:33 +0800
-Subject: [PATCH 1/6] ARM: dts: vf610: add USB PHY and controller
-In-Reply-To: <839af70e8acf139bc0f7bbdb4dd68dd146b5d6a8.1405702442.git.stefan@agner.ch>
-References: <cover.1405702442.git.stefan@agner.ch>
- <839af70e8acf139bc0f7bbdb4dd68dd146b5d6a8.1405702442.git.stefan@agner.ch>
-Message-ID: <20140722022232.GR8537@dragon>
+From: marex@denx.de (Marek Vasut)
+Date: Tue, 22 Jul 2014 04:10:26 +0200
+Subject: [PATCH] ARM: dts: imx: Add alias for ethernet controller
+In-Reply-To: <20140324014936.GA4006@dragon>
+References: <1393588721-8598-1-git-send-email-marex@denx.de>
+ <201403180137.09760.marex@denx.de> <20140324014936.GA4006@dragon>
+Message-ID: <201407220410.26694.marex@denx.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jul 18, 2014 at 07:01:37PM +0200, Stefan Agner wrote:
-> This adds USB PHY and USB controller nodes. Vybrid SoCs have two
-> independent USB cores which each supports DR (dual role). However,
-> real OTG is not supported since the OTG ID pin is not available.
+On Monday, March 24, 2014 at 02:49:38 AM, Shawn Guo wrote:
+> On Tue, Mar 18, 2014 at 01:37:09AM +0100, Marek Vasut wrote:
+> > On Friday, February 28, 2014 at 12:58:41 PM, Marek Vasut wrote:
+> > > Add alias for FEC ethernet on i.MX to allow bootloaders (like U-Boot)
+> > > patch-in the MAC address for FEC using this alias.
+> > > 
+> > > Signed-off-by: Marek Vasut <marex@denx.de>
+> > > Cc: Shawn Guo <shawn.guo@linaro.org>
+> > 
+> > Bump ?
 > 
-> The PHYs are located within the anadig register range, hence we need
-> to change the length of the anadig registers.
-> 
-> Signed-off-by: Stefan Agner <stefan@agner.ch>
-> ---
->  arch/arm/boot/dts/vf610.dtsi | 46 +++++++++++++++++++++++++++++++++++++++++---
->  1 file changed, 43 insertions(+), 3 deletions(-)
-> 
-> diff --git a/arch/arm/boot/dts/vf610.dtsi b/arch/arm/boot/dts/vf610.dtsi
-> index 6a6190c..f6c3f02 100644
-> --- a/arch/arm/boot/dts/vf610.dtsi
-> +++ b/arch/arm/boot/dts/vf610.dtsi
-> @@ -25,6 +25,8 @@
->  		gpio2 = &gpio3;
->  		gpio3 = &gpio4;
->  		gpio4 = &gpio5;
-> +		usbphy0 = &usbphy0;
-> +		usbphy1 = &usbphy1;
->  	};
->  
->  	cpus {
-> @@ -285,9 +287,25 @@
->  				gpio-ranges = <&iomuxc 0 128 7>;
->  			};
->  
-> -			anatop at 40050000 {
-> -				compatible = "fsl,vf610-anatop";
-> -				reg = <0x40050000 0x1000>;
-> +			anatop: anatop at 40050000 {
-> +				compatible = "fsl,vf610-anatop", "syscon";
-> +				reg = <0x40050000 0x400>;
-> +			};
-> +
-> +			usbphy0: usbphy at 40050800 {
-> +				compatible = "fsl,vf610-usbphy", "fsl,imx23-usbphy";
+> Sorry.  I had actually applied the patch but forgot replying.
 
-Since phy driver will match "fsl,vf610-usbphy" anyway, we do not need
-"fsl,imx23-usbphy" here.
+Hello Shawn,
 
-> +				reg = <0x40050800 0x400>;
-> +				interrupts = <0 50 IRQ_TYPE_LEVEL_HIGH>;
-> +				clocks = <&clks VF610_CLK_USBPHY0>;
-> +				fsl,anatop = <&anatop>;
-> +			};
-> +
-> +			usbphy1: usbphy at 40050c00 {
-> +				compatible = "fsl,vf610-usbphy", "fsl,imx23-usbphy";
-> +				reg = <0x40050c00 0x400>;
-> +				interrupts = <0 51 IRQ_TYPE_LEVEL_HIGH>;
-> +				clocks = <&clks VF610_CLK_USBPHY1>;
-> +				fsl,anatop = <&anatop>;
->  			};
->  
->  			i2c0: i2c at 40066000 {
-> @@ -309,6 +327,18 @@
->  				reg = <0x4006b000 0x1000>;
->  				#clock-cells = <1>;
->  			};
-> +
-> +			usbdev0: usb at 40034000 {
-> +				compatible = "fsl,imx6q-usb", "fsl,imx27-usb";
+I'd like to apply this patch for 3.14-stable , are you OK with this please ? 
+Shall I submit it ?
 
-It doesn't really make any sense to have "fsl,imx6q-usb" here.  The
-following one should be less confusing.
-
-	compatible = "fsl,vf610-usb", "fsl,imx27-usb";
-
-Shawn
-
-> +				reg = <0x40034000 0x800>;
-> +				interrupts = <0 75 IRQ_TYPE_LEVEL_HIGH>;
-> +				clocks = <&clks VF610_CLK_USBC0>;
-> +				fsl,usbphy = <&usbphy0>;
-> +				dr_mode = "peripheral";
-> +				status = "disabled";
-> +			};
-> +
-> +
->  		};
->  
->  		aips1: aips-bus at 40080000 {
-> @@ -371,6 +401,16 @@
->  				status = "disabled";
->  			};
->  
-> +			usbh1: usb at 400b4000 {
-> +				compatible = "fsl,imx6q-usb", "fsl,imx27-usb";
-> +				reg = <0x400b4000 0x800>;
-> +				interrupts = <0 76 IRQ_TYPE_LEVEL_HIGH>;
-> +				clocks = <&clks VF610_CLK_USBC1>;
-> +				fsl,usbphy = <&usbphy1>;
-> +				dr_mode = "host";
-> +				status = "disabled";
-> +			};
-> +
->  			ftm: ftm at 400b8000 {
->  				compatible = "fsl,ftm-timer";
->  				reg = <0x400b8000 0x1000 0x400b9000 0x1000>;
-> -- 
-> 2.0.1
-> 
+Best regards,
+Marek Vasut
