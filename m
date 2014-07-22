@@ -1,58 +1,65 @@
-From: javier.martinez@collabora.co.uk (Javier Martinez Canillas)
-Date: Tue, 22 Jul 2014 02:46:20 +0200
-Subject: [PATCH v8 00/13] Add Maxim 77802 PMIC support
-In-Reply-To: <20140722001053.GO17528@sirena.org.uk>
-References: <1405337769-3741-1-git-send-email-javier.martinez@collabora.co.uk>
- <53CD0B17.5040706@collabora.co.uk> <20140722001053.GO17528@sirena.org.uk>
-Message-ID: <53CDB45C.10805@collabora.co.uk>
+From: phoenix.liyi@huawei.com (liyi 00215672)
+Date: Tue, 22 Jul 2014 01:16:01 +0000
+Subject: =?gb2312?B?tPC4tDogW1BBVENIIHJlc2VuZCB2Ml0gYXJtNjQ6IGRtaTogQWRkIFNNQklP?=
+ =?gb2312?Q?S/DMI_support?=
+In-Reply-To: <20140721084823.GA15666@arm.com>
+References: <1405079210-30044-1-git-send-email-ard.biesheuvel@linaro.org>
+ <20140714133644.GE1779@arm.com>
+ <CAKv+Gu_2CYU+Th4xZ3EfjCFqQzBfJ88Hrtx1LwUbG79+1=cqJw@mail.gmail.com>
+ <CAKv+Gu9K=Hp97cFK2D_HTe=CD6-spvUcP6itOyLB-DcgQatmyA@mail.gmail.com>
+ <20140721084823.GA15666@arm.com>
+Message-ID: <D0F5605BA99F0B4594FB1EEC24E785CC37CB10A6@SZXEMA510-MBX.china.huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/22/2014 02:10 AM, Mark Brown wrote:
-> On Mon, Jul 21, 2014 at 02:44:07PM +0200, Javier Martinez Canillas wrote:
->> On 07/14/2014 01:35 PM, Javier Martinez Canillas wrote:
-> 
->> Mark, Mike and Alessandro,
-> 
->> This is a gentle reminder to look at the patches that touches your subsystems
->> and provide acks if possible so Lee can merge the remainder set through the mfd
->> tree.
-> 
-> Please stop nagging, you are chasing after only one week which is
-> excessive for something that isn't an urgent bugfix (especially
-> with a series like this that has had many rapid repins).  Several weeks
-> to a month would be more appropriate, and then resending the patches
-> rather than sending contentless pings is more useful.  Sending mails
-> like this just means that people have more mail to read that isn't your
-> patch, it is more likely to get you negative attention than positive -
-> for example, I will tend to deprioritise things where I'm being chased
-> too urgently as I do not wish to encourage such behaviour by being seen
-> to reward it.
-> 
+Hi Will,
 
-I didn't mean to bother you. It's true that it has been only a week since I
-posted v8 of this series but I didn't have feedback for the clock, rtc and
-regulator drivers since v5 which was posted on June, 26 so I thought that a ping
-just to be sure it was not forgotten was not that bad. But sorry I won't do it
-again and will just wait.
+	You need to add the SMBIOS support in UEFI on JUNO ,then you will get some proper information from DMI driver.
 
-About the many re-spins, as most mfd drivers this PMIC support touches different
-subsystems and the series had many patches so each time I had feedback for some
-patches I prepared a new version and reposted the whole series. This doesn't
-mean that all the patches changed from version to version though, some patches
-have not changed for several revisions.
+	Thanks!
 
-> In general I would recommend taking a step back, slowing down, and if
-> you are not getting a response either thinking of something else to do
-> in parallel or trying to do things that make it easier to accept your
-> change if there are any (sometimes it's just a case of waiting).  Look
-> at how frequently the relevant maintainers tend to respond, at what the
-> previous review comments have been and also consider the possibility
-> that people might take holidays or just be busy.
+Yi
+
+-----????-----
+???: Will Deacon [mailto:will.deacon at arm.com] 
+????: 2014?7?21? 16:48
+???: Ard Biesheuvel
+??: Catalin Marinas; yi.li at linaro.org; liyi 00215672; grant.likely at linaro.org; leif.lindholm at linaro.org; linux-arm-kernel at lists.infradead.org; Mark Rutland
+??: Re: [PATCH resend v2] arm64: dmi: Add SMBIOS/DMI support
+
+On Sun, Jul 20, 2014 at 11:25:34AM +0100, Ard Biesheuvel wrote:
+> On 14 July 2014 15:57, Ard Biesheuvel <ard.biesheuvel@linaro.org> wrote:
+> > On 14 July 2014 15:36, Will Deacon <will.deacon@arm.com> wrote:
+> >> On Fri, Jul 11, 2014 at 12:46:50PM +0100, Ard Biesheuvel wrote:
+> >>> From: Yi Li <yi.li@linaro.org>
+> >>>
+> >>> SMbios is important for server hardware vendors. It implements a spec for
+> >>> providing descriptive information about the platform. Things like serial
+> >>> numbers, physical layout of the ports, build configuration data, and the like.
+> >>>
+> >>> This has been tested by dmidecode and lshw tools.
+> >>>
+> >>> Signed-off-by: Yi Li <yi.li@linaro.org>
+> >>> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+> >>> ---
+> >>> Changes since previous version:
+> >>> - changed double inclusion guard to arm64 flavour
+> >>> - use kzalloc(GFP_KERNEL) as GFP_ATOMIC is not needed
+> >>> - do a sanity check on the size of the requested mapping
+> >>
+> >> Technically, this patch looks fine to me:
+> >>
+> >>   Reviewed-by: Will Deacon <will.deacon@arm.com>
+> >>
 > 
+> Hello Catalin,
+> 
+> This has been tested by Yi on FVP and Juno.
+> Are you ok to take this?
 
-Sorry, I didn't mean to imply that you are not busy or might be on holidays. I
-guess I just got anxious due the merge window being close...
+Out of interest, how did you test it on Juno? I tried but got some messages
+about missing/invalid DMI data or something similar. Leif reckons I need
+some tricked out firmware for the FVP to get something working, but even
+then the information is apparently bogus.
 
-Best regards,
-Javier
+Will
