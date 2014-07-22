@@ -1,37 +1,49 @@
 From: lee.jones@linaro.org (Lee Jones)
-Date: Tue, 22 Jul 2014 12:11:10 +0100
-Subject: [PATCH 04/19] mfd: mcp-core: Fix 'blank line after declarations'
- warning
+Date: Tue, 22 Jul 2014 12:11:18 +0100
+Subject: [PATCH 12/19] mfd: max8925-core: Fix 'missing blank line after
+ declarations' warning
 In-Reply-To: <1406027485-15657-1-git-send-email-lee.jones@linaro.org>
 References: <1406027485-15657-1-git-send-email-lee.jones@linaro.org>
-Message-ID: <1406027485-15657-5-git-send-email-lee.jones@linaro.org>
+Message-ID: <1406027485-15657-13-git-send-email-lee.jones@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 This is part of an effort to clean-up the MFD subsystem.
 
 WARNING: Missing a blank line after declarations
-+       unsigned long flags;
-+       spin_lock_irqsave(&mcp->lock, flags);
++       struct max8925_chip *chip = irq_data_get_irq_chip_data(data);
++       max8925_irqs[data->irq - chip->irq_base].enable
 
-total: 0 errors, 1 warnings, 238 lines checked
+WARNING: Missing a blank line after declarations
++       struct max8925_chip *chip = irq_data_get_irq_chip_data(data);
++       max8925_irqs[data->irq - chip->irq_base].enable = 0;
+
+total: 0 errors, 2 warnings, 927 lines checked
 
 Signed-off-by: Lee Jones <lee.jones@linaro.org>
 ---
- drivers/mfd/mcp-core.c | 1 +
- 1 file changed, 1 insertion(+)
+ drivers/mfd/max8925-core.c | 2 ++
+ 1 file changed, 2 insertions(+)
 
-diff --git a/drivers/mfd/mcp-core.c b/drivers/mfd/mcp-core.c
-index 62e5e36..7f5066e 100644
---- a/drivers/mfd/mcp-core.c
-+++ b/drivers/mfd/mcp-core.c
-@@ -137,6 +137,7 @@ EXPORT_SYMBOL(mcp_reg_read);
- void mcp_enable(struct mcp *mcp)
+diff --git a/drivers/mfd/max8925-core.c b/drivers/mfd/max8925-core.c
+index f3faf0c..97a787a 100644
+--- a/drivers/mfd/max8925-core.c
++++ b/drivers/mfd/max8925-core.c
+@@ -624,6 +624,7 @@ static void max8925_irq_sync_unlock(struct irq_data *data)
+ static void max8925_irq_enable(struct irq_data *data)
  {
- 	unsigned long flags;
+ 	struct max8925_chip *chip = irq_data_get_irq_chip_data(data);
 +
- 	spin_lock_irqsave(&mcp->lock, flags);
- 	if (mcp->use_count++ == 0)
- 		mcp->ops->enable(mcp);
+ 	max8925_irqs[data->irq - chip->irq_base].enable
+ 		= max8925_irqs[data->irq - chip->irq_base].offs;
+ }
+@@ -631,6 +632,7 @@ static void max8925_irq_enable(struct irq_data *data)
+ static void max8925_irq_disable(struct irq_data *data)
+ {
+ 	struct max8925_chip *chip = irq_data_get_irq_chip_data(data);
++
+ 	max8925_irqs[data->irq - chip->irq_base].enable = 0;
+ }
+ 
 -- 
 1.8.3.2
