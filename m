@@ -1,100 +1,45 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Tue, 22 Jul 2014 10:57:22 -0600
-Subject: [PATCH 8/8] clk: tegra: Add EMC clock driver
-In-Reply-To: <1405088313-20048-9-git-send-email-mperttunen@nvidia.com>
-References: <1405088313-20048-1-git-send-email-mperttunen@nvidia.com>
- <1405088313-20048-9-git-send-email-mperttunen@nvidia.com>
-Message-ID: <53CE97F2.80300@wwwdotorg.org>
+From: michal.simek@xilinx.com (Michal Simek)
+Date: Tue, 22 Jul 2014 19:02:08 +0200
+Subject: [PATCH v4] pcie: Add Xilinx PCIe Host Bridge IP driver
+In-Reply-To: <CAErSpo41HwMferWm8q69Sz0t-Cs1WHgwwVp1VKsoxxyvrgQhfQ@mail.gmail.com>
+References: <1404361654-2894-1-git-send-email-sthokal@xilinx.com>
+ <20140716173824.GA24357@google.com>
+ <CA+mB=1JupzQy+R14kKAk7mTJR2FcZ+cQv-uXQSB6jEVBW95aGQ@mail.gmail.com>
+ <CAErSpo41HwMferWm8q69Sz0t-Cs1WHgwwVp1VKsoxxyvrgQhfQ@mail.gmail.com>
+Message-ID: <dc252e61-3179-4f51-90e6-f92929e93d40@BN1AFFO11FD030.protection.gbl>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/11/2014 08:18 AM, Mikko Perttunen wrote:
-> The driver is currently only tested on Tegra124 Jetson TK1, but should
-> work with other Tegra124 boards, provided that correct EMC tables are
-> provided through the device tree. Older chip models have differing
-> timing change sequences, so they are not currently supported.
+On 07/22/2014 06:08 PM, Bjorn Helgaas wrote:
+> On Mon, Jul 21, 2014 at 11:10 PM, Srikanth Thokala <sthokal@xilinx.com> wrote:
+>> On Wed, Jul 16, 2014 at 11:08 PM, Bjorn Helgaas <bhelgaas@google.com> wrote:
+>>> ...
+>>> I see I forgot to ask for a MAINTAINERS entry for this driver.  Can
+>>> you add one?
+>>
+>> There was a discussion on this earlier and Michal mentioned it is not
+>> required as it is
+>> handled by our Xilinx record.
+>>
+>> Here is the reply from Michal to the MAINTAINERS update comment,
+>>
+>> < Reply from Michal >
+>>
+>>> Please also include a MAINTAINERS update for drivers/pci/host/pci-xilinx.c.
+>>
+>> This should be handle by our record that's why MAINTAINERS update is
+>> not necessary.
+>> (N: xilinx below)
+> 
+> That's technically true in the sense that get_maintainer.pl will do
+> the right thing, but I often review patches in email (without
+> extracting them), so it's more convenient to just look in MAINTAINERS
+> to see if they have the right acks.  But I guess I can deal with it
+> either way.
 
-> diff --git a/drivers/clk/tegra/clk-emc.c b/drivers/clk/tegra/clk-emc.c
+There is also another reason for using just this fragment.
+Because developers and their responsibilities are changing so often
+and I just know who is responsible for it at that time.
 
-> +struct emc_timing {
-> +	unsigned long rate, parent_rate;
-> +	u8 parent_index;
-> +	struct clk *parent;
-> +
-> +	/* Store EMC burst data in a union to minimize mistakes. This allows
-> +	 * us to use the same burst data lists as used by the downstream and
-> +	 * ChromeOS kernels. */
-
-Nit: */ should be on its own line. This applies to many comments in the
-file.
-
-> +/* * * * * * * * * * * * * * * * * * * * * * * * * *
-> + * Timing change sequence functions                *
-> + * * * * * * * * * * * * * * * * * * * * * * * * * */
-
-Nit: This kind of banner comment is unusual, but I guess it's fine.
-
-> +static void emc_seq_update_timing(struct tegra_emc *tegra)
-...
-> +	dev_err(&tegra->pdev->dev, "timing update failed\n");
-> +	BUG();
-> +}
-
-Is there any way to avoid all these BUGs? Can we just continue on and
-retry the next time, or disallow any further clock rate changes or
-something?
-
-> +/* * * * * * * * * * * * * * * * * * * * * * * * * *
-> + * Debugfs entry                                   *
-> + * * * * * * * * * * * * * * * * * * * * * * * * * */
-> +
-> +static int emc_debug_rate_get(void *data, u64 *rate)
-> +{
-> +	struct tegra_emc *tegra = data;
-> +
-> +	*rate = clk_get_rate(tegra->hw.clk);
-> +
-> +	return 0;
-> +}
-> +
-> +static int emc_debug_rate_set(void *data, u64 rate)
-> +{
-> +	struct tegra_emc *tegra = data;
-> +
-> +	return clk_set_rate(tegra->hw.clk, rate);
-> +}
-> +
-> +DEFINE_SIMPLE_ATTRIBUTE(emc_debug_rate_fops, emc_debug_rate_get,
-> +			emc_debug_rate_set, "%lld\n");
-
-I think the rate can already be obtained through
-...debug/clock/clock_summary. I'm not sure about changing the rate, but
-shouldn't that be a feature of the common clock core, not individual
-drivers?
-
-> +static int load_timings_from_dt(struct tegra_emc *tegra,
-> +				struct device_node *node)
-> +{
-...
-> +	for_each_child_of_node(node, child) {
-...
-> +		if (timing->rate <= prev_rate) {
-> +			dev_err(&tegra->pdev->dev,
-> +				"timing %s: rate not increasing\n",
-> +				child->name);
-
-I don't believe there's any guaranteed node enumeration order. If the
-driver needs the child nodes sorted, it should sort them itself.
-
-> +static const struct of_device_id tegra_car_of_match[] = {
-> +	{ .compatible = "nvidia,tegra124-car" },
-> +	{}
-> +};
-> +
-> +static const struct of_device_id tegra_mc_of_match[] = {
-> +	{ .compatible = "nvidia,tegra124-mc" },
-> +	{}
-> +};
-
-It would be better if this driver explicitly called into the driver for
-other modules, rather than directly touching their registers.
+Thanks,
+Michal
