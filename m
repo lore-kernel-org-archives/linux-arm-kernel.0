@@ -1,133 +1,92 @@
-From: grygorii.strashko@ti.com (Grygorii Strashko)
-Date: Tue, 22 Jul 2014 21:46:46 +0300
-Subject: [PATCH v2 1/5] i2c: Don't start transfers when suspended
-In-Reply-To: <1405608520-5644-1-git-send-email-hechtb@gmail.com>
-References: <1405608520-5644-1-git-send-email-hechtb@gmail.com>
-Message-ID: <53CEB196.9060903@ti.com>
+From: pawel.moll@arm.com (Pawel Moll)
+Date: Tue, 22 Jul 2014 19:01:09 +0100
+Subject: [PATCH v3] platform: Make platform_bus device a platform device
+In-Reply-To: <1406051719-17354-1-git-send-email-pawel.moll@arm.com>
+References: <20140722173713.GA8959@kroah.com>
+ <1406051719-17354-1-git-send-email-pawel.moll@arm.com>
+Message-ID: <1406052069.25343.93.camel@hornet>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi
+On Tue, 2014-07-22 at 18:55 +0100, Pawel Moll wrote:
+> * replaced references to platform_bus.dev with NULL
+>   in places where it shouldn't make any difference
 
-On 07/17/2014 05:48 PM, Bastian Hecht wrote:
-> i2c transfer requests come in very uncontrolled, like from interrupt routines.
-> We might be suspended when this happens. To avoid i2c timeouts caused by
-> powered down busses we check for suspension.
-> 
-> Several bus drivers handle this problem on their own. We can clean things up
-> by moving the protection mechanism into the core.
+So now the leftovers...
 
- I'm not sure, this optimization is safe  (
-Because, in many cases the access to PMIC IC needs to be allowed till late
-stages of suspending (at least till suspend_noirq stage or even later).
-For example, on some OMAP SoC Voltage management code need to use services
-provided by PMIC IC, which is connected to I2C.
+> diff --git a/arch/arm/mach-imx/devices/devices.c b/arch/arm/mach-imx/devices/devices.c
+> index 1b4366a..48c3817 100644
+> --- a/arch/arm/mach-imx/devices/devices.c
+> +++ b/arch/arm/mach-imx/devices/devices.c
+> @@ -24,12 +24,12 @@
+> 
+>  struct device mxc_aips_bus = {
+>         .init_name      = "mxc_aips",
+> -       .parent         = &platform_bus,
+> +       .parent         = &platform_bus.dev,
+>  };
+> 
+>  struct device mxc_ahb_bus = {
+>         .init_name      = "mxc_ahb",
+> -       .parent         = &platform_bus,
+> +       .parent         = &platform_bus.dev,
+>  };
+> 
+>  int __init mxc_device_init(void)
 
-As result, it may cause regression and break PM functionality on some SoCs
-if i2c-core will block I2c transfers unconditionally at device's
-suspending stage.
+Seems that the author meant to have those two bus devices hanging from
+the platform_bus in device hierarchy. Seems fair enough to me.
 
-May be it will be useful to add just "suspended" field in i2c adapter
-structure and provide corresponding accessors.
+> diff --git a/drivers/char/tile-srom.c b/drivers/char/tile-srom.c
+> index bd37747..4e4b7a2 100644
+> --- a/drivers/char/tile-srom.c
+> +++ b/drivers/char/tile-srom.c
+> @@ -350,7 +350,7 @@ static int srom_setup_minor(struct srom_dev *srom, int index)
+>                        SROM_PAGE_SIZE_OFF, sizeof(srom->page_size)) < 0)
+>                 return -EIO;
+> 
+> -       dev = device_create(srom_class, &platform_bus,
+> +       dev = device_create(srom_class, &platform_bus.dev,
+>                             MKDEV(srom_major, index), srom, "%d", index);
+>         return PTR_ERR_OR_ZERO(dev);
+>  }
 
+Again, non-platform device placed in the hierarchy.
+
+> diff --git a/drivers/mmc/host/sdhci-pltfm.c b/drivers/mmc/host/sdhci-pltfm.c
+> index 7e834fb..9a2b0d0 100644
+> --- a/drivers/mmc/host/sdhci-pltfm.c
+> +++ b/drivers/mmc/host/sdhci-pltfm.c
+> @@ -137,7 +137,7 @@ struct sdhci_host *sdhci_pltfm_init(struct platform_device *pdev,
+>                 dev_err(&pdev->dev, "Invalid iomem size!\n");
 > 
-> Signed-off-by: Bastian Hecht <hechtb@gmail.com>
-> ---
-> changelog v2:
+>         /* Some PCI-based MFD need the parent here */
+> -       if (pdev->dev.parent != &platform_bus && !np)
+> +       if (pdev->dev.parent != &platform_bus.dev && !np)
+>                 host = sdhci_alloc_host(pdev->dev.parent,
+>                         sizeof(struct sdhci_pltfm_host) + priv_size);
+>         else
+
+Special treatment for non-platform devices.
+
+> diff --git a/drivers/scsi/hosts.c b/drivers/scsi/hosts.c
+> index 3cbb57a..c14c36f 100644
+> --- a/drivers/scsi/hosts.c
+> +++ b/drivers/scsi/hosts.c
+> @@ -218,7 +218,7 @@ int scsi_add_host_with_dma(struct Scsi_Host *shost, struct device *dev,
+>                 goto fail;
 > 
-> - commit message extended.
-> - initialization added for adap->suspended
-> - swapped branch for increased performance
-> 
-> 
->   drivers/i2c/i2c-core.c | 25 ++++++++++++++++++++++++-
->   include/linux/i2c.h    |  1 +
->   2 files changed, 25 insertions(+), 1 deletion(-)
-> 
-> diff --git a/drivers/i2c/i2c-core.c b/drivers/i2c/i2c-core.c
-> index 7c7f4b8..b15dc20 100644
-> --- a/drivers/i2c/i2c-core.c
-> +++ b/drivers/i2c/i2c-core.c
-> @@ -343,6 +343,13 @@ static int i2c_legacy_resume(struct device *dev)
->   static int i2c_device_pm_suspend(struct device *dev)
->   {
->   	const struct dev_pm_ops *pm = dev->driver ? dev->driver->pm : NULL;
-> +	struct i2c_adapter *adap = i2c_verify_adapter(dev);
-> +
-> +	if (adap) {
-> +		i2c_lock_adapter(adap);
-> +		adap->suspended = true;
-> +		i2c_unlock_adapter(adap);
-> +	}
->   
->   	if (pm)
->   		return pm_generic_suspend(dev);
-> @@ -353,6 +360,13 @@ static int i2c_device_pm_suspend(struct device *dev)
->   static int i2c_device_pm_resume(struct device *dev)
->   {
->   	const struct dev_pm_ops *pm = dev->driver ? dev->driver->pm : NULL;
-> +	struct i2c_adapter *adap = i2c_verify_adapter(dev);
-> +
-> +	if (adap) {
-> +		i2c_lock_adapter(adap);
-> +		adap->suspended = false;
-> +		i2c_unlock_adapter(adap);
-> +	}
->   
->   	if (pm)
->   		return pm_generic_resume(dev);
-> @@ -1243,6 +1257,7 @@ static int i2c_register_adapter(struct i2c_adapter *adap)
->   	dev_set_name(&adap->dev, "i2c-%d", adap->nr);
->   	adap->dev.bus = &i2c_bus_type;
->   	adap->dev.type = &i2c_adapter_type;
-> +	adap->suspended = false;
->   	res = device_register(&adap->dev);
->   	if (res)
->   		goto out_list;
-> @@ -1819,7 +1834,10 @@ int i2c_transfer(struct i2c_adapter *adap, struct i2c_msg *msgs, int num)
->   			i2c_lock_adapter(adap);
->   		}
->   
-> -		ret = __i2c_transfer(adap, msgs, num);
-> +		if (!adap->suspended)
-> +			ret = __i2c_transfer(adap, msgs, num);
-> +		else
-> +			ret = -EIO;
->   		i2c_unlock_adapter(adap);
->   
->   		return ret;
-> @@ -2577,6 +2595,10 @@ s32 i2c_smbus_xfer(struct i2c_adapter *adapter, u16 addr, unsigned short flags,
->   
->   	if (adapter->algo->smbus_xfer) {
->   		i2c_lock_adapter(adapter);
-> +		if (adapter->suspended) {
-> +			res = -EIO;
-> +			goto unlock;
-> +		}
->   
->   		/* Retry automatically on arbitration loss */
->   		orig_jiffies = jiffies;
-> @@ -2590,6 +2612,7 @@ s32 i2c_smbus_xfer(struct i2c_adapter *adapter, u16 addr, unsigned short flags,
->   				       orig_jiffies + adapter->timeout))
->   				break;
->   		}
-> +unlock:
->   		i2c_unlock_adapter(adapter);
->   
->   		if (res != -EOPNOTSUPP || !adapter->algo->master_xfer)
-> diff --git a/include/linux/i2c.h b/include/linux/i2c.h
-> index b556e0a..af08c75 100644
-> --- a/include/linux/i2c.h
-> +++ b/include/linux/i2c.h
-> @@ -434,6 +434,7 @@ struct i2c_adapter {
->   	int timeout;			/* in jiffies */
->   	int retries;
->   	struct device dev;		/* the adapter device */
-> +	unsigned int suspended:1;
->   
->   	int nr;
->   	char name[48];
+>         if (!shost->shost_gendev.parent)
+> -               shost->shost_gendev.parent = dev ? dev : &platform_bus;
+> +               shost->shost_gendev.parent = dev ? dev : &platform_bus.dev;
+>         if (!dma_dev)
+>                 dma_dev = shost->shost_gendev.parent;
 > 
 
-Regards,
-- grygroii
+shost_gendev is a generic (as in struct device, non-platform one)
+device, that is being explicitly placed in the hierarchy.
+
+So it makes it 4, not 3 ;-) places where referencing platform_bus
+*maybe* makes some sense.
+
+Pawel
