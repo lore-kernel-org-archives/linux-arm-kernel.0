@@ -1,50 +1,89 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Tue, 22 Jul 2014 13:28:38 -0700
-Subject: [PATCH] ARM: multi_v7_defconfig: major refresh
-In-Reply-To: <12165027.MHmNZOI7jc@wuerfel>
-References: <1406052070-6207-1-git-send-email-olof@lixom.net>
- <12165027.MHmNZOI7jc@wuerfel>
-Message-ID: <CAOesGMjo0AY=eGcfTh1sVxKkURK9bzK8SBAeEbvBFN4R0sF34A@mail.gmail.com>
+From: computersforpeace@gmail.com (Brian Norris)
+Date: Tue, 22 Jul 2014 13:44:31 -0700
+Subject: [PATCH v8 00/11] ARM: brcmstb: Add Broadcom STB SoC support
+In-Reply-To: <5675728.WLk3P96IBM@wuerfel>
+References: <1405976886-27807-1-git-send-email-computersforpeace@gmail.com>
+ <5675728.WLk3P96IBM@wuerfel>
+Message-ID: <20140722204431.GG28323@ld-irv-0074>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jul 22, 2014 at 11:36 AM, Arnd Bergmann <arnd@arndb.de> wrote:
-> On Tuesday 22 July 2014 11:01:10 Olof Johansson wrote:
->> This is a major refresh of the multi_v7_defconfig:
->>
->> - Bring over a bunch of Samsung drivers to make ODROID-U3 and Chromebooks usable
->>  * Enable big.LITTLE
->>  * MCPM
->>  * CYAPA touchpad
->>  * Samsung-related MTD/regulator/clk/pinmux drivers
->>  * Add some of the CrOS EC drivers
->> - Turn on TPM, HW_RANDOM
->> - OMAP_USB3 -> TI_PIPE3 option rename
->> - Enable MCPM/b.L for VEXPRESS
->> - Add new CONFIG_MTD_SPI_NOR since it otherwise masks off SPI NOR drivers
->> - CONFIG_LOGO, because penguins.
->>
->> I took care to keep the new options that have been added for whose the
->> drivers are not yet in our for-next branch. This was pretty awkward so
->> we should sort out how to handle those better in the future.
->
-> Since you've already done all those, how about enabling THUMB2_KERNEL?
-> For the multi_v7_defconfig, it should actually give some benefits,
-> since it's rather large, and it would be good to have some more testing
-> with this option enabled.
->
-> I guess the first step would be to enable it and just see if your
-> boot farm survives the change.
++ Sebastian
 
-Good point, I'll definitely give that a go once the current issues are resolved.
+On Tue, Jul 22, 2014 at 09:35:45AM +0200, Arnd Bergmann wrote:
+> On Monday 21 July 2014 14:07:55 Brian Norris wrote:
+> > I'm taking over the latest resubmission of this patch series.
+> > There are a few moderate changes for v8 (noted below), but we
+> > are waiting mostly for an Ack for the reboot driver.
+> > 
+> > This patchset contains the board support package for the
+> > Broadcom BCM7445 ARM-based SoC [1]. These changes contain a
+> > minimal set of code needed for a BCM7445-based board to boot
+> > the Linux kernel.
+> > 
+> > These changes heavily leverage the OF/devicetree framework. The
+> > machine is also built into the multi-platform ARMv7 image.
+> > 
+> > Changes are also available here:
+> > 
+> >   https://github.com/brcm/linux/tree/brcmstb-v8
+> >   git://github.com/brcm/linux.git +brcmstb-v8
+> 
+> Whole series
+> 
+> Acked-by: Arnd Bergmann <arnd@arndb.de>
 
-Which are: These changes make 5250-based machines (snow and arndale)
-break. Lots of i2c timeouts on SATA and hdmi-phy. Looks like arndale
-might be missing pinctrl setups for it?
+Thanks!
 
-Tushar, Kukjin, any chance you can investigate from your end? I'd like
-to get this change in since it allows for better multiplatform
-coverage, but the Exynos breakage must be fixed...
+> I think we should try to get this merged into 3.17, it's already
+> taken too long and the patches look good.
 
+Yes, it's about time.
 
--Olof
+> Please add the core architecture patches for arch/arm into Russell's
+> patch tracker http://www.arm.linux.org.uk/developer/patches/.
+
+OK, that's unfamiliar to me, but I'll try that out.
+
+> For the platform changes in the first patch, I would prefer to have
+> Matt pick up the first patch, but we can also apply it directly into
+> arm-soc if he prefers that.
+
+That brings up a question related to PATCH 11 in the series (MAINTAINERS
+update); who will be maintaining arch/arm/mach-bcm/*brcmstb*, and how
+will code go upstream? It seems like Matt and Christian are officially
+mach-bcm maintainers, although I don't know if Christian is still
+involved.
+
+Also, BCM7xxx shares little in common with the rest of mach-bcm, except
+a company name, so we'd really like at least the 'Maintainer' entries
+for the CC. I was planning on a separate git tree too, although it could
+have conflicts if we touch arch/arm/mach-bcm/{Makefile,Kconfig}.
+
+So would we send a separate arm-soc pull request for the arm-soc
+targeted changes (and all future development)?
+
+> The reset driver can ideally go through the drivers/power/ maintainers,
+> but if they are not interested in merging it, we can also take that
+> through arm-soc.
+
+I don't see much activity from the drivers/power/ maintainers on the
+mailing lists, and I know David Woodhouse at least has been severely
+distracted (I took over for him on driver/mtd/ recently), so I don't
+expect much. (EDIT: I see [1]. Nice!)
+
+> See also my one comment on that driver.
+
+I proposed an additional diff on that patch in response.
+
+I can strip the drivers/power/reboot/ driver out and send it separately
+to our new drivers/power/ maintainer (thanks Sebastian!), and hope that
+it gets through for 3.17.
+
+For the reset of mach-bcm stuff, I'll just send an arm-soc pull request
+soon enough, unless Matt/Arnd/Olof object.
+
+Thanks,
+Brian
+
+[1] https://lkml.org/lkml/2014/7/16/539
