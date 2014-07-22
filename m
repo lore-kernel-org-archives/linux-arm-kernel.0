@@ -1,53 +1,27 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Tue, 22 Jul 2014 16:56:45 +0100
-Subject: [PATCH v2 1/3] usb: dwc3: add ST dwc3 glue layer to manage dwc3 HC
-In-Reply-To: <20140722155117.GF20588@saruman.home>
-References: <1404541530-27856-1-git-send-email-peter.griffin@linaro.org>
- <1404541530-27856-2-git-send-email-peter.griffin@linaro.org>
- <20140707124627.GG6407@lee--X1>
- <20140722091800.GB8233@griffinp-ThinkPad-X1-Carbon-2nd>
- <20140722145711.GC20588@saruman.home>
- <20140722154503.GC23210@lee--X1>
- <20140722155117.GF20588@saruman.home>
-Message-ID: <20140722155645.GD23210@lee--X1>
+From: olof@lixom.net (Olof Johansson)
+Date: Tue, 22 Jul 2014 09:00:02 -0700
+Subject: [STLinux Kernel] [PATCH v3 10/10] MAINTAINERS: Add sdhci-st file
+ to ARCH/STI architecture
+In-Reply-To: <53CE556C.10607@st.com>
+References: <1401899424-1365-1-git-send-email-peter.griffin@linaro.org>
+ <1401899424-1365-11-git-send-email-peter.griffin@linaro.org>
+ <53A80754.9000900@st.com> <53CE556C.10607@st.com>
+Message-ID: <CAOesGMhEnwGJR+SgM6XJhW9WT5LAo_-Hxd+kfQHBz7thu+QFJA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 22 Jul 2014, Felipe Balbi wrote:
+On Tue, Jul 22, 2014 at 5:13 AM, Maxime Coquelin <maxime.coquelin@st.com> wrote:
+> Hi Olof, Arnd, Kevin,
+>
+>         I am preparing two tags for v3.17 regarding STi platform.
+>         One for DT, and one for defconfigs.
+>
+>         Except this one, I have no patches for ARM-SoC.
+>         Can you take this patch directly?
+>
+>         Or should I send a pull request with this one only?
 
-> On Tue, Jul 22, 2014 at 04:45:03PM +0100, Lee Jones wrote:
-> > > > > > +static void st_dwc3_init(struct st_dwc3 *dwc3_data)
-> > > > > > +{
-> > > > > > +	u32 reg = st_dwc3_readl(dwc3_data->glue_base, USB2_CLKRST_CTRL);
-> > > > > > +
-> > > > > > +	reg |= aux_clk_en(1) | ext_cfg_reset_n(1) | xhci_revision(1);
-> > > > > > +	reg &= ~sw_pipew_reset_n(1);
-> > > > > 
-> > > > > 1?  Better to add defines for these magic numbers.  What is 1 anyway?
-> > > > 
-> > > > They are just bit setting macros, I've converted them over to use BIT macro now,
-> > > > so it no longer takes a parameter.
-> > > 
-> > > the macros are better, but make them upper case as everybody else.
-> > 
-> > When you say that the macros are better, what do you mean?
-> > 
-> > Defines do the job in a manner which is a great deal cleaner:
-> > 
-> > #define AUX_CLK_EN        BIT(0)
-> > #define SW_PIPEW_RESET_N  BIT(4)
-> > #define EXT_CFG_RESET_N   BIT(8)
-> > #define XHCI_REVISION     BIT(12)
-> > 
-> > reg = AUX_CLK_EN | SW_PIPEW_RESET_N | XHCI_REVISION;
-> > reg &= ~SW_PIPEW_RESET_N
-> 
-> this is what I meant ;-) I see what I wrote can be very ambiguous :-p
+We can apply directly. I'll do that in a moment here.
 
-Okay great, thanks for clarifying. :)
 
--- 
-Lee Jones
-Linaro STMicroelectronics Landing Team Lead
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+-Olof
