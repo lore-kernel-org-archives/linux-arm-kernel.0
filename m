@@ -1,42 +1,45 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 22 Jul 2014 20:52:58 +0200
-Subject: [PATCH] ARM: imx6: fix SMP compilation again
-In-Reply-To: <20140722145256.GA8537@dragon>
-References: <37015543.ZyZKZyEIPW@wuerfel> <12850450.mxMbPOMjsW@wuerfel>
- <20140722145256.GA8537@dragon>
-Message-ID: <6831797.zmrgHS8Arb@wuerfel>
+From: paul@pwsan.com (Paul Walmsley)
+Date: Tue, 22 Jul 2014 18:53:43 +0000 (UTC)
+Subject: [Re-send PATCH 1/1] arm: dra7xx: Add hwmod data for MDIO and CPSW
+In-Reply-To: <20140717075028.GG18374@atomide.com>
+References: <1404825399-10330-1-git-send-email-mugunthanvnm@ti.com>
+ <20140709095552.GA25154@breakpoint.cc> <20140709100147.GB25154@breakpoint.cc>
+ <alpine.DEB.2.02.1407152019020.21432@utopia.booyaka.com>
+ <20140716070643.GC3378@breakpoint.cc>
+ <alpine.DEB.2.02.1407161854360.23074@utopia.booyaka.com>
+ <20140717075028.GG18374@atomide.com>
+Message-ID: <alpine.DEB.2.02.1407221853340.25593@utopia.booyaka.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 22 July 2014 22:52:57 Shawn Guo wrote:
-> On Tue, Jul 22, 2014 at 04:37:55PM +0200, Arnd Bergmann wrote:
-> > On Tuesday 22 July 2014 21:48:16 Shawn Guo wrote:
-> > > I tried both mainline and -next tree.  I really need some help to
-> > > reproduce the error first.
+On Thu, 17 Jul 2014, Tony Lindgren wrote:
+
+> * Paul Walmsley <paul@pwsan.com> [140716 11:59]:
+> > On Wed, 16 Jul 2014, Sebastian Andrzej Siewior wrote:
 > > 
-> > My branch is at git.kernel.org/pub/scm/linux/kernel/git/arnd/playground.git
-> > in the randconfig-next branch. Sorry for the inconvenience.
-> 
-> Okay, I can see the error on your branch with the fixing patch reverted.
-> 
-> > 
-> > > > arch/arm/mach-imx/built-in.o: In function `v7_secondary_startup':
-> > > > :(.text+0x5124): undefined reference to `v7_invalidate_l1'
-> > > > 
-> > > > This puts the code inside of an "ifdef CONFIG_SMP" to hopefully
+> > > On 2014-07-15 20:21:21 [+0000], Paul Walmsley wrote:
 > > > 
-> > > The code says "ifdef CONFIG_SOC_IMX6"?
+> > > > > Acked-by: Sebastian Andrzej Siewior <sebastian@breakpoint.cc>
+> > > > > 
+> > > > > This is basically what Tony hasked me to do: No IRQ numbers & iomem.
+> > > > 
+> > > > Sorry - I'm a bit confused - Sebastian, did you test this one?  If so, is 
+> > > > it okay to add a Tested-by from you?
+> > > 
+> > > Tested-by: Sebastian Andrzej Siewior <sebastian@breakpoint.cc>
 > > 
-> > It seems I'm having a bad day. I'll fix it up.
+> > Thanks Sebastian.
+> > 
+> > Mugunthan, next step would be for you to get a Reviewed-by: by someone who 
+> > has access to the (non-public) DRA7xx TRM, and can review for SoC 
+> > integration.  Since Rajendra is no longer at TI, the right person is 
+> > probably Tony.
+> > 
+> > Then this patch should be mergeable.
 > 
-> With that fixed up,
-> 
-> Acked-by: Shawn Guo <shawn.guo@freescale.com>
-> 
-> Or let me know if you expect me to handle the patch.
-> 
+> Yeah took a look at it and acked it.
 
-If you don't mind, just put it into your tree. I'm currently in the
-middle of going through my older patches and don't want to lose this one.
+Thanks queued for 3.17.
 
-	Arnd
+
+- Paul
