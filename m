@@ -1,27 +1,39 @@
-From: shawn.guo@freescale.com (Shawn Guo)
-Date: Tue, 22 Jul 2014 10:34:03 +0800
-Subject: [PATCH 4/6] chipidea: usbmisc_imx: Add USB support for VF610 SoCs
-In-Reply-To: <e776c8a6ea0d919edb5e3ce1bf0697b23f09f028.1405702442.git.stefan@agner.ch>
-References: <cover.1405702442.git.stefan@agner.ch>
- <e776c8a6ea0d919edb5e3ce1bf0697b23f09f028.1405702442.git.stefan@agner.ch>
-Message-ID: <20140722023402.GT8537@dragon>
+From: computersforpeace@gmail.com (Brian Norris)
+Date: Mon, 21 Jul 2014 19:56:03 -0700
+Subject: [PATCH v2] mtd: atmel_nand: make ecc parameters same as definition
+In-Reply-To: <1402559925-20910-1-git-send-email-voice.shen@atmel.com>
+References: <1402559925-20910-1-git-send-email-voice.shen@atmel.com>
+Message-ID: <20140722025603.GC7537@ld-irv-0074>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jul 18, 2014 at 07:01:40PM +0200, Stefan Agner wrote:
-> @@ -283,6 +307,10 @@ static const struct of_device_id usbmisc_imx_dt_ids[] = {
->  		.compatible = "fsl,imx6q-usbmisc",
->  		.data = &imx6q_usbmisc_ops,
->  	},
-> +	{
-> +		.compatible = "fsl,vf610-usbmisc",
+On Thu, Jun 12, 2014 at 03:58:45PM +0800, Bo Shen wrote:
+> If the ecc parameter is not the same as definition, when the
+> mtd core check these parameters, it will give the error result.
+> 
+> Take the following as an example:
+> 
+> Calculate how many bits can be corrected in one page.
+> According to the ecc parameters definition,
+> 
+> one page correct bits = (mtd->writesize * ecc->strength) / ecc->size
+> 
+> take the following use case as an example:
+> mtd->writesize = 2048 bytes
+> ecc->strength = 4 bytes (for 512 bytes)
+> 
+> before this patch, the ecc->size = 2048, so the result is 4 bytes.
+> after this patch, the ecc->size = 512, so the result is 16 bytes.
+> 
+> So, align the ecc parameters the same as definition to correct
+> this kind of error.
+> 
+> Signed-off-by: Bo Shen <voice.shen@atmel.com>
+> Acked-by: Josh Wu <josh.wu@atmel.com>
+> ---
+> Changes in v2:
+>   - Enhancement the commit message.
 
-Update Documentation/devicetree/bindings/usb/usbmisc-imx.txt please.
+Pushed to l2-mtd.git. Thanks!
 
-Shawn
-
-> +		.data = &vf610_usbmisc_ops,
-> +	},
->  	{ /* sentinel */ }
->  };
->  MODULE_DEVICE_TABLE(of, usbmisc_imx_dt_ids);
+Brian
