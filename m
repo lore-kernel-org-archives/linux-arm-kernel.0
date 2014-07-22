@@ -1,29 +1,40 @@
-From: alex.bennee@linaro.org (=?UTF-8?q?Alex=20Benn=C3=A9e?=)
-Date: Tue, 22 Jul 2014 16:14:42 +0100
-Subject: [PATCH] Documentation/arm64/memory.txt: fix typo
-Message-ID: <1406042082-1519-1-git-send-email-alex.bennee@linaro.org>
+From: k.khlebnikov@samsung.com (Konstantin Khlebnikov)
+Date: Tue, 22 Jul 2014 19:36:23 +0400
+Subject: [PATCH 1/2] ARM: LPAE: load upper bits of early TTBR0/TTBR1
+Message-ID: <20140722153623.25088.37742.stgit@buzz>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-There is no swapper_pgd_dir, it meant swapper_pg_dir.
+This patch fixes booting when idmap pgd lays above 4gb. Commit
+4756dcbfd37 mostly had fixed this, but it'd failed to load upper bits.
 
-Signed-off-by: Alex Benn?e <alex.bennee@linaro.org>
+Also this fixes adding TTBR1_OFFSET to TTRR1: if lower part overflows
+carry flag must be added to the upper part.
+
+Signed-off-by: Konstantin Khlebnikov <k.khlebnikov@samsung.com>
+Cc: Cyril Chemparathy <cyril@ti.com>
+Cc: Vitaly Andrianov <vitalya@ti.com>
 ---
- Documentation/arm64/memory.txt | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+ arch/arm/mm/proc-v7-3level.S |    7 +++----
+ 1 file changed, 3 insertions(+), 4 deletions(-)
 
-diff --git a/Documentation/arm64/memory.txt b/Documentation/arm64/memory.txt
-index d50fa61..dd724c8 100644
---- a/Documentation/arm64/memory.txt
-+++ b/Documentation/arm64/memory.txt
-@@ -17,7 +17,7 @@ User addresses have bits 63:39 set to 0 while the kernel addresses have
- the same bits set to 1. TTBRx selection is given by bit 63 of the
- virtual address. The swapper_pg_dir contains only kernel (global)
- mappings while the user pgd contains only user (non-global) mappings.
--The swapper_pgd_dir address is written to TTBR1 and never written to
-+The swapper_pg_dir address is written to TTBR1 and never written to
- TTBR0.
+diff --git a/arch/arm/mm/proc-v7-3level.S b/arch/arm/mm/proc-v7-3level.S
+index 22e3ad6..f0481dd 100644
+--- a/arch/arm/mm/proc-v7-3level.S
++++ b/arch/arm/mm/proc-v7-3level.S
+@@ -140,12 +140,11 @@ ENDPROC(cpu_v7_set_pte_ext)
+ 	mov	\tmp, \ttbr1, lsr #(32 - ARCH_PGD_SHIFT)	@ upper bits
+ 	mov	\ttbr1, \ttbr1, lsl #ARCH_PGD_SHIFT		@ lower bits
+ 	addls	\ttbr1, \ttbr1, #TTBR1_OFFSET
+-	mcrr	p15, 1, \ttbr1, \zero, c2			@ load TTBR1
++	adcls	\tmp, \tmp, #0
++	mcrr	p15, 1, \ttbr1, \tmp, c2			@ load TTBR1
+ 	mov	\tmp, \ttbr0, lsr #(32 - ARCH_PGD_SHIFT)	@ upper bits
+ 	mov	\ttbr0, \ttbr0, lsl #ARCH_PGD_SHIFT		@ lower bits
+-	mcrr	p15, 0, \ttbr0, \zero, c2			@ load TTBR0
+-	mcrr	p15, 1, \ttbr1, \zero, c2			@ load TTBR1
+-	mcrr	p15, 0, \ttbr0, \zero, c2			@ load TTBR0
++	mcrr	p15, 0, \ttbr0, \tmp, c2			@ load TTBR0
+ 	.endm
  
- 
--- 
-2.0.2
+ 	/*
