@@ -1,68 +1,57 @@
-From: varkabhadram@gmail.com (Varka Bhadram)
-Date: Tue, 22 Jul 2014 20:06:11 +0530
-Subject: [PATCH v4 04/11] pwm: add DT bindings documentation for
- atmel-hlcdc-pwm driver
-In-Reply-To: <1406034695-15534-5-git-send-email-boris.brezillon@free-electrons.com>
-References: <1406034695-15534-1-git-send-email-boris.brezillon@free-electrons.com>
- <1406034695-15534-5-git-send-email-boris.brezillon@free-electrons.com>
-Message-ID: <53CE76DB.7030902@gmail.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Tue, 22 Jul 2014 16:37:55 +0200
+Subject: [PATCH] ARM: imx6: fix SMP compilation again
+In-Reply-To: <20140722134815.GZ8537@dragon>
+References: <37015543.ZyZKZyEIPW@wuerfel> <16557676.B1fW0k49Wz@wuerfel>
+ <20140722134815.GZ8537@dragon>
+Message-ID: <12850450.mxMbPOMjsW@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Tuesday 22 July 2014 21:48:16 Shawn Guo wrote:
+> On Tue, Jul 22, 2014 at 12:26:31PM +0200, Arnd Bergmann wrote:
+> > Ah, you are right, I got the text wrong here, and I think I now understand
+> > why it didn't happen earlier. Updated patch below (same patch, new
+> > text).
+> > 
+> > 8<-------------
+> > Subject: [PATCH] ARM: imx6: fix SMP compilation again
+> > 
+> > My earlier patch 1fc593feaf8e ("ARM: imx: build i.MX6 functions
+> > only when needed") fixed a problem with building an i.MX5 kernel,
+> > but now the problem has returned for the case where we allow
+> > ARMv6K SMP builds in multiplatform. With CONFIG_CPU_V7 disabled,
+> > but i.MX3 and SMP enabled, we get this build error:
+> 
+> Maybe I missed something, but I have problem to get the following three
+> conditions meet in a single kernel configuration.
+> 
+>  a) CONFIG_CPU_V7 disabled
+>  b) i.MX3 enabled
+>  c) SMP enabled
+> 
+> When I get a) and b) in the config, I have no way to get c).  And it
+> seems that the only way to get a) and c) at the same time is to enable
+> MACH_REALVIEW_PB11MP, which is not part of multi-platform support.  So
+> i.MX3 cannot be enabled in there.
 
-On Tuesday 22 July 2014 06:41 PM, Boris BREZILLON wrote:
-> The HLCDC IP available in some Atmel SoCs (i.e. sam9x5i.e. at91sam9n12,
-> at91sam9x5 family or sama5d3 family) provide a PWM device.
->
-> The DT bindings used for this PWM device is following the default 3 cells
-> bindings described in Documentation/devicetree/bindings/pwm/pwm.txt.
->
-> Signed-off-by: Boris BREZILLON <boris.brezillon@free-electrons.com>
-> ---
->   .../devicetree/bindings/pwm/atmel-hlcdc-pwm.txt    | 55 ++++++++++++++++++++++
->   1 file changed, 55 insertions(+)
->   create mode 100644 Documentation/devicetree/bindings/pwm/atmel-hlcdc-pwm.txt
->
-> diff --git a/Documentation/devicetree/bindings/pwm/atmel-hlcdc-pwm.txt b/Documentation/devicetree/bindings/pwm/atmel-hlcdc-pwm.txt
-> new file mode 100644
-> index 0000000..86ad3e2
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/pwm/atmel-hlcdc-pwm.txt
-> @@ -0,0 +1,55 @@
-> +Device-Tree bindings for Atmel's HLCDC (High LCD Controller) PWM driver
-> +
-> +The Atmel HLCDC PWM is subdevice of the HLCDC MFD device.
-> +See ../mfd/atmel-hlcdc.txt for more details.
-> +
-> +Required properties:
-> + - compatible: value should be one of the following:
-> +   "atmel,hlcdc-pwm"
-> + - pinctr-names: the pin control state names. Should contain "default".
-> + - pinctrl-0: should contain the pinctrl states described by pinctrl
-> +   default.
-> + - #pwm-cells: should be set to 3. This PWM chip use the default 3 cells
-> +   bindings defined in Documentation/devicetree/bindings/pwm/pwm.txt.
-> +   The first cell encodes the PWM id (0 is the only acceptable value here,
-> +   because the chip only provide one PWM).
-> +   The second cell encodes the PWM period in nanoseconds.
-> +   The third cell encodes the PWM flags (the only supported flag is
-> +   PWM_POLARITY_INVERTED)
+I have a patch series to make ARCH_REALVIEW multiplatform-enabled,
+and I guess the condition can only be hit with these patches, or any
+other that selects HAS_SMP.
 
-It will be readable if:
-Required properties:
-  - compatible	: value should be one of the following: "atmel,hlcdc-pwm"
-  - pinctr-names	: the pin control state names. Should contain "default".
-  - pinctrl-0	: should contain the pinctrl states described by pinctrl default.
-  - #pwm-cells	: should be set to 3. This PWM chip use the default 3 cells
-		  bindings defined in Documentation/devicetree/bindings/pwm/pwm.txt.
-		  The first cell encodes the PWM id (0 is the only acceptable value here,
-		  because the chip only provide one PWM).
-		  The second cell encodes the PWM period in nanoseconds.
-		  The third cell encodes the PWM flags (the only supported flag is
-		  PWM_POLARITY_INVERTED)
-....
+> I tried both mainline and -next tree.  I really need some help to
+> reproduce the error first.
 
+My branch is at git.kernel.org/pub/scm/linux/kernel/git/arnd/playground.git
+in the randconfig-next branch. Sorry for the inconvenience.
 
--- 
-Regards,
-Varka Bhadram
+> > arch/arm/mach-imx/built-in.o: In function `v7_secondary_startup':
+> > :(.text+0x5124): undefined reference to `v7_invalidate_l1'
+> > 
+> > This puts the code inside of an "ifdef CONFIG_SMP" to hopefully
+> 
+> The code says "ifdef CONFIG_SOC_IMX6"?
+
+It seems I'm having a bad day. I'll fix it up.
+
+	Arnd
