@@ -1,33 +1,37 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 22 Jul 2014 20:33:44 +0200
-Subject: [PATCH v2] iio: exynos-adc: add experimental touchscreen support
-In-Reply-To: <20140722180904.GB5489@core.coreip.homeip.net>
-References: <5068889.1KfVx3ksNo@wuerfel>
- <20140722180904.GB5489@core.coreip.homeip.net>
-Message-ID: <5072247.HRN2kuegE2@wuerfel>
+Date: Tue, 22 Jul 2014 20:36:54 +0200
+Subject: [PATCH] ARM: multi_v7_defconfig: major refresh
+In-Reply-To: <1406052070-6207-1-git-send-email-olof@lixom.net>
+References: <1406052070-6207-1-git-send-email-olof@lixom.net>
+Message-ID: <12165027.MHmNZOI7jc@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 22 July 2014 11:09:04 Dmitry Torokhov wrote:
-> > @@ -565,6 +722,15 @@ static int exynos_adc_probe(struct platform_device *pdev)
-> >       if (info->data->init_hw)
-> >               info->data->init_hw(info);
-> >  
-> > +     /* leave out any TS related code if unreachable */
-> > +     if (IS_BUILTIN(CONFIG_INPUT) ||
-> > +         (IS_MODULE(CONFIG_INPUT) && config_enabled(MODULE)))
+On Tuesday 22 July 2014 11:01:10 Olof Johansson wrote:
+> This is a major refresh of the multi_v7_defconfig:
 > 
-> This is ugly... We need IS_SUBSYSTEM_AVAILABLE() wrapper for this...
+> - Bring over a bunch of Samsung drivers to make ODROID-U3 and Chromebooks usable
+>  * Enable big.LITTLE
+>  * MCPM
+>  * CYAPA touchpad
+>  * Samsung-related MTD/regulator/clk/pinmux drivers
+>  * Add some of the CrOS EC drivers
+> - Turn on TPM, HW_RANDOM
+> - OMAP_USB3 -> TI_PIPE3 option rename
+> - Enable MCPM/b.L for VEXPRESS
+> - Add new CONFIG_MTD_SPI_NOR since it otherwise masks off SPI NOR drivers
+> - CONFIG_LOGO, because penguins.
 > 
-> Anyway,
-> 
-> Acked-by: Dmitry Torokhov <dmitry.torokhov@gmail.com>
-> 
-> 
+> I took care to keep the new options that have been added for whose the
+> drivers are not yet in our for-next branch. This was pretty awkward so
+> we should sort out how to handle those better in the future.
 
-I actually have a patch to introduce IS_REACHABLE() for this purpose,
-but I haven't sent it out for review yet. The main user of this would
-be drivers/media, which had the correct logic earlier until someone
-tried to "simplify" it by replacing it all with IS_ENABLED()...
+Since you've already done all those, how about enabling THUMB2_KERNEL?
+For the multi_v7_defconfig, it should actually give some benefits,
+since it's rather large, and it would be good to have some more testing
+with this option enabled.
+
+I guess the first step would be to enable it and just see if your
+boot farm survives the change.
 
 	Arnd
