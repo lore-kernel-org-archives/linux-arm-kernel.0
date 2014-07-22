@@ -1,47 +1,42 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Tue, 22 Jul 2014 09:52:34 +0100
-Subject: [PATCH] drm: rcar-du: fix warnings
-In-Reply-To: <E1X6Ho2-0006rq-Qg@rmk-PC.arm.linux.org.uk>
-References: <E1X6Ho2-0006rq-Qg@rmk-PC.arm.linux.org.uk>
-Message-ID: <20140722085234.GJ21766@n2100.arm.linux.org.uk>
+From: rmk@arm.linux.org.uk (Russell King)
+Date: Tue, 22 Jul 2014 09:51:20 +0100
+Subject: [GIT PULL] msm drm update for component changes
+In-Reply-To: <20140709093458.GA17540@rmk-PC.arm.linux.org.uk>
+References: <20140709093458.GA17540@rmk-PC.arm.linux.org.uk>
+Message-ID: <20140722085119.GA15250@rmk-PC.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Jul 13, 2014 at 12:18:58PM +0100, Russell King wrote:
-> drivers/gpu/drm/rcar-du/rcar_du_drv.c:190:5: warning: "CONFIG_PM_SLEEP" is not defined [-Wundef]
+On Wed, Jul 09, 2014 at 10:34:58AM +0100, Russell King wrote:
+> David,
 > 
-> Always use #ifdef with CONFIG symbols, never just bare #if
+> Please incorporate the latest msm drm update for component changes, which can be found at:
 > 
-> Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
+>   git://ftp.arm.linux.org.uk/~rmk/linux-arm.git component-for-drm
 
 Ping?
 
-> ---
->  drivers/gpu/drm/rcar-du/rcar_du_drv.c | 2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
 > 
-> diff --git a/drivers/gpu/drm/rcar-du/rcar_du_drv.c b/drivers/gpu/drm/rcar-du/rcar_du_drv.c
-> index 792fd1d20e86..fda64b7b73e8 100644
-> --- a/drivers/gpu/drm/rcar-du/rcar_du_drv.c
-> +++ b/drivers/gpu/drm/rcar-du/rcar_du_drv.c
-> @@ -187,7 +187,7 @@ static struct drm_driver rcar_du_driver = {
->   * Power management
->   */
->  
-> -#if CONFIG_PM_SLEEP
-> +#ifdef CONFIG_PM_SLEEP
->  static int rcar_du_pm_suspend(struct device *dev)
->  {
->  	struct rcar_du_device *rcdu = dev_get_drvdata(dev);
-> -- 
-> 1.8.3.1
+> with SHA1 84448288546d13d7e06fd6638fb78ddff559b399.
 > 
+> This updates the MSM's DRM driver for the updates merged in Greg's
+> driver-core tree, converting MSM to use the pre-declared array of
+> matches rather than walking the device tree each time we try to bind.
 > 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
-
--- 
-FTTC broadband for 0.8mile line: currently at 9.5Mbps down 400kbps up
-according to speedtest.net.
+> This will update the following files:
+> 
+>  drivers/base/component.c      | 192 ++++++++++++++++++++++++++++++++++--------
+>  drivers/gpu/drm/msm/msm_drv.c |  83 ++++++++----------
+>  include/linux/component.h     |   7 ++
+>  3 files changed, 199 insertions(+), 83 deletions(-)
+> 
+> through these changes:
+> 
+> Russell King (5):
+>       component: fix missed cleanup in case of devres failure
+>       component: ignore multiple additions of the same component
+>       component: add support for component match array
+>       component: fix bug with legacy API
+>       drm: msm: update to use component match support
+> 
+> Many thanks.
