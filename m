@@ -1,31 +1,44 @@
-From: mlongnecker@nvidia.com (Matthew Longnecker)
-Date: Mon, 21 Jul 2014 16:13:13 -0700
-Subject: [PATCH 4/6] ARM: tegra: Add soctherm and thermal zones to Tegra124
- device tree
-In-Reply-To: <1403856699-2140-5-git-send-email-mperttunen@nvidia.com>
-References: <1403856699-2140-1-git-send-email-mperttunen@nvidia.com>
- <1403856699-2140-5-git-send-email-mperttunen@nvidia.com>
-Message-ID: <53CD9E89.3030109@nvidia.com>
+From: broonie@kernel.org (Mark Brown)
+Date: Tue, 22 Jul 2014 01:10:53 +0100
+Subject: [PATCH v8 00/13] Add Maxim 77802 PMIC support
+In-Reply-To: <53CD0B17.5040706@collabora.co.uk>
+References: <1405337769-3741-1-git-send-email-javier.martinez@collabora.co.uk>
+ <53CD0B17.5040706@collabora.co.uk>
+Message-ID: <20140722001053.GO17528@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 6/27/2014 1:11 AM, Mikko Perttunen wrote:
-> This adds the soctherm thermal sensing and management unit to the
-> Tegra124 device tree along with the four thermal zones it exports.
+On Mon, Jul 21, 2014 at 02:44:07PM +0200, Javier Martinez Canillas wrote:
+> On 07/14/2014 01:35 PM, Javier Martinez Canillas wrote:
 
-Mikko, soctherm doesn't "export thermal zones". I would rewrite your 
-desription like this:
+> Mark, Mike and Alessandro,
 
-   Extend the Tegra124 device tree by adding the soctherm thermal
-   sensing and management unit and by defining four thermal zones --
-   one for each temperature sensor in soctherm.
+> This is a gentle reminder to look at the patches that touches your subsystems
+> and provide acks if possible so Lee can merge the remainder set through the mfd
+> tree.
 
-System integrators have some flexibility in deciding how many thermal 
-zones to define for their platform. For example, an integrator could 
-define a single zone for the entire Tegra chip (giving a simple system 
-at runtime) or with multiple zones (giving potentially higher 
-performance near thermal limits). That's why I don't like the 
-implication that soctherm dictates the existence of particular thermal 
-zones.
+Please stop nagging, you are chasing after only one week which is
+excessive for something that isn't an urgent bugfix (especially
+with a series like this that has had many rapid repins).  Several weeks
+to a month would be more appropriate, and then resending the patches
+rather than sending contentless pings is more useful.  Sending mails
+like this just means that people have more mail to read that isn't your
+patch, it is more likely to get you negative attention than positive -
+for example, I will tend to deprioritise things where I'm being chased
+too urgently as I do not wish to encourage such behaviour by being seen
+to reward it.
 
--Matt
+In general I would recommend taking a step back, slowing down, and if
+you are not getting a response either thinking of something else to do
+in parallel or trying to do things that make it easier to accept your
+change if there are any (sometimes it's just a case of waiting).  Look
+at how frequently the relevant maintainers tend to respond, at what the
+previous review comments have been and also consider the possibility
+that people might take holidays or just be busy.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140722/d23818bb/attachment-0001.sig>
