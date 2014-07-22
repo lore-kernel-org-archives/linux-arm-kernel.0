@@ -1,334 +1,130 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 22 Jul 2014 15:03:12 +0200
-Subject: [PATCH v2] iio: exynos-adc: add experimental touchscreen support
-Message-ID: <5068889.1KfVx3ksNo@wuerfel>
+From: jonsmirl@gmail.com (jonsmirl at gmail.com)
+Date: Tue, 22 Jul 2014 09:11:10 -0400
+Subject: [linux-sunxi] GSoC 2014 #1 status report - Improving Allwinner
+ SoC support
+In-Reply-To: <CAGb2v679RqNj4FhT=T5Wx64My6ckDD0Eeq_5aVPh6zz9ei8+rQ@mail.gmail.com>
+References: <53BE0B4F.1090001@elopez.com.ar> <53CAC9ED.9080302@elopez.com.ar>
+ <CAGb2v67YZVnY1869uau_R7MGKGW2EeS2P0qtN0TX_0Uan-aRNw@mail.gmail.com>
+ <CAGb2v679RqNj4FhT=T5Wx64My6ckDD0Eeq_5aVPh6zz9ei8+rQ@mail.gmail.com>
+Message-ID: <CAKON4OyuMp95ptocvEs7wQEE-3Uz+=HKBOCuLXrgTsprzvcgxQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This adds support for the touchscreen on Samsung s3c64xx.
-The driver is completely untested but shows roughly how
-it could be done, following the example of the at91 driver.
+On Tue, Jul 22, 2014 at 6:22 AM, Chen-Yu Tsai <wens@csie.org> wrote:
+> On Sun, Jul 20, 2014 at 12:18 PM, Chen-Yu Tsai <wens@csie.org> wrote:
+>> Hi Emilio,
+>>
+>> On Sun, Jul 20, 2014 at 3:41 AM, Emilio L?pez <emilio@elopez.com.ar> wrote:
+>>> Hi everyone,
+>>>
+>>> Here's this week's update on my GSoC project; if you missed the first issue
+>>> or you want a refresher of what this is about, you can read it on the list
+>>> archives[0]
+>>>
+>>> A couple of days after the last report, and with the help of Jon Smirl, I
+>>> got the hardware working on mainline Linux, first on only 16 bit stereo
+>>> mode, then mono as well, and later on, also on 24 bit mode. The first thing
+>>> I had to do was rework the cyclic DMA code to make it perform decently and
+>>> avoid underruns. The rest took a bit of playing with values and reading the
+>>> Allwinner documentation. There is one unresolved issue with 24 bit audio
+>>> still - for some reason, the volume is really low compared to the same track
+>>> played on 16 bit. Unfortunately the SDK driver doesn't support 24 bit, so
+>>> it's hard to compare with anything else.
+>>
+>> So I have not experimented on this, it's just a hunch:
+>> Could it be that the 24bit audio samples you're sending to the audio codec
+>> is aligned incorrectly? So the sample is actually seen as down-shifted by
+>> 8 bits, resulting in the low volume?
+>
+> So the user manual says that 24 bit samples should be right justified,
+> or in the most significant bytes. The way to do it in ASoC is to declare
+> support 32 bit, instead of 24 bit, audio, and also set .sig_bits to 24.
+>
+> See: http://www.spinics.net/lists/alsa-devel/msg40846.html
+>
+> This makes ALSA send 32bit data, and the hardware will drop the lower 8
+> bits. S24_LE denotes 24bit in the lower bits, and thus we cannot use it.
+>
+> However, there is something puzzling about the FIFO modes. The manual
+> says that with TX FIFO modes 00/10, 16 bit audio should take the most
+> significant 2 bytes of the FIFO as the audio sample to convert. However
+> the DMA engine looks like it's writing the least significant 2 bytes.
+> I know the code as it is now works, but still I think we should get
+> this straightened out.
 
-Open questions include:
+Are you getting any underrun errors? We both got them.
 
-- compared to the old plat-samsung/adc driver, there is
-  no support for prioritizing ts over other clients, nor
-  for oversampling. From my reading of the code, the
-  priorities didn't actually have any effect at all, but
-  the oversampling might be needed. Maybe the original
-  authors have some insight.
+>
+> As a side note, the code still needs some cleaning up. I see some
+> duplicate codec/dais.
 
-- We probably need to add support for platform_data as well,
-  I've skipped this so far.
+I initially copied dummy-codec into the source file. It needs to be
+removed and the driver should use the dummy-codec provided by ALSA.
+The driver should not use simple-audio-card since there is nothing to
+bind.
 
-Signed-off-by: Arnd Bergmann <arnd@arndb.de>
----
-This should address all previous comments, and I've also added
-a write to ADC_V1_DLY() as the old driver does.
+The routing="" in the DTS is to allow you to specify which jacks are
+implemented in your hardware. That code is not complete.  Once it is
+complete board the Cubietruck DTS could specify only LINEOUT. Then all
+of the unneeded ALSA controls will drop out of the UI.
 
-diff --git a/Documentation/devicetree/bindings/arm/samsung/exynos-adc.txt b/Documentation/devicetree/bindings/arm/samsung/exynos-adc.txt
-index cad81b666a67..ba30836c73cb 100644
---- a/Documentation/devicetree/bindings/arm/samsung/exynos-adc.txt
-+++ b/Documentation/devicetree/bindings/arm/samsung/exynos-adc.txt
-@@ -43,6 +43,10 @@ Required properties:
- 				       and compatible ADC block)
- - vdd-supply		VDD input supply.
- 
-+Optional properties:
-+- has-touchscreen:	If present, indicates that a touchscreen is
-+			connected an usable.
-+
- Note: child nodes can be added for auto probing from device tree.
- 
- Example: adding device info in dtsi file
-diff --git a/drivers/iio/adc/exynos_adc.c b/drivers/iio/adc/exynos_adc.c
-index 420c5cda09c3..3b684a117b9c 100644
---- a/drivers/iio/adc/exynos_adc.c
-+++ b/drivers/iio/adc/exynos_adc.c
-@@ -34,6 +34,7 @@
- #include <linux/regulator/consumer.h>
- #include <linux/of_platform.h>
- #include <linux/err.h>
-+#include <linux/input.h>
- 
- #include <linux/iio/iio.h>
- #include <linux/iio/machine.h>
-@@ -66,6 +67,9 @@
- 
- #define ADC_S3C2410_CON_SELMUX(x) (((x)&0x7)<<3)
- 
-+/* touch screen always uses channel 0 */
-+#define ADC_S3C2410_MUX_TS	0
-+
- /* ADCTSC Register Bits */
- #define ADC_S3C2443_TSC_UD_SEN		(1u << 8)
- #define ADC_S3C2410_TSC_YM_SEN		(1u << 7)
-@@ -103,24 +107,32 @@
- 
- /* Bit definitions common for ADC_V1 and ADC_V2 */
- #define ADC_CON_EN_START	(1u << 0)
-+#define ADC_DATX_PRESSED	(1u << 15)
- #define ADC_DATX_MASK		0xFFF
-+#define ADC_DATY_MASK		0xFFF
- 
- #define EXYNOS_ADC_TIMEOUT	(msecs_to_jiffies(100))
- 
- struct exynos_adc {
- 	struct exynos_adc_data	*data;
- 	struct device		*dev;
-+	struct input_dev	*input;
- 	void __iomem		*regs;
- 	void __iomem		*enable_reg;
- 	struct clk		*clk;
- 	struct clk		*sclk;
- 	unsigned int		irq;
-+	unsigned int		tsirq;
- 	struct regulator	*vdd;
- 
- 	struct completion	completion;
- 
- 	u32			value;
- 	unsigned int            version;
-+
-+	bool			read_ts;
-+	u32			ts_x;
-+	u32			ts_y;
- };
- 
- struct exynos_adc_data {
-@@ -205,6 +217,9 @@ static void exynos_adc_v1_init_hw(struct exynos_adc *info)
- 	/* Enable 12-bit ADC resolution */
- 	con1 |= ADC_V1_CON_RES;
- 	writel(con1, ADC_V1_CON(info->regs));
-+
-+	/* set default touchscreen delay */
-+	writel(10000, ADC_V1_DLY(info->regs));
- }
- 
- static void exynos_adc_v1_exit_hw(struct exynos_adc *info)
-@@ -390,12 +405,54 @@ static int exynos_read_raw(struct iio_dev *indio_dev,
- 	return ret;
- }
- 
-+static int exynos_read_s3c64xx_ts(struct iio_dev *indio_dev, int *x, int *y)
-+{
-+	struct exynos_adc *info = iio_priv(indio_dev);
-+	unsigned long timeout;
-+	int ret;
-+
-+	mutex_lock(&indio_dev->mlock);
-+	info->read_ts = true;
-+
-+	reinit_completion(&info->completion);
-+
-+	writel(ADC_S3C2410_TSC_PULL_UP_DISABLE | ADC_TSC_AUTOPST,
-+	       ADC_V1_TSC(info->regs));
-+
-+	/* Select the ts channel to be used and Trigger conversion */
-+	info->data->start_conv(info, ADC_S3C2410_MUX_TS);
-+
-+	timeout = wait_for_completion_timeout
-+			(&info->completion, EXYNOS_ADC_TIMEOUT);
-+	if (timeout == 0) {
-+		dev_warn(&indio_dev->dev, "Conversion timed out! Resetting\n");
-+		if (info->data->init_hw)
-+			info->data->init_hw(info);
-+		ret = -ETIMEDOUT;
-+	} else {
-+		*x = info->ts_x;
-+		*y = info->ts_y;
-+		ret = 0;
-+	}
-+
-+	info->read_ts = false;
-+	mutex_unlock(&indio_dev->mlock);
-+
-+	return ret;
-+}
-+
- static irqreturn_t exynos_adc_isr(int irq, void *dev_id)
- {
- 	struct exynos_adc *info = (struct exynos_adc *)dev_id;
- 
- 	/* Read value */
--	info->value = readl(ADC_V1_DATX(info->regs)) & ADC_DATX_MASK;
-+	if (info->read_ts) {
-+		info->ts_x = readl(ADC_V1_DATX(info->regs));
-+		info->ts_y = readl(ADC_V1_DATY(info->regs));
-+		writel(ADC_TSC_WAIT4INT | ADC_S3C2443_TSC_UD_SEN, ADC_V1_TSC(info->regs));
-+	} else {
-+		info->value = readl(ADC_V1_DATX(info->regs)) & ADC_DATX_MASK;
-+	}
- 
- 	/* clear irq */
- 	if (info->data->clear_irq)
-@@ -406,6 +463,46 @@ static irqreturn_t exynos_adc_isr(int irq, void *dev_id)
- 	return IRQ_HANDLED;
- }
- 
-+/*
-+ * Here we (ab)use a threaded interrupt handler to stay running
-+ * for as long as the touchscreen remains pressed, we report
-+ * a new event with the latest data and then sleep until the
-+ * next timer tick. This mirrors the behavior of the old
-+ * driver, with much less code.
-+ */
-+static irqreturn_t exynos_ts_isr(int irq, void *dev_id)
-+{
-+	struct exynos_adc *info = dev_id;
-+	struct iio_dev *dev = dev_get_drvdata(info->dev);
-+	u32 x, y;
-+	bool pressed;
-+	int ret;
-+
-+	while (info->input->users) {
-+		ret = exynos_read_s3c64xx_ts(dev, &x, &y);
-+		if (ret == -ETIMEDOUT)
-+			break;
-+
-+		pressed = x & y & ADC_DATX_PRESSED;
-+		if (!pressed) {
-+			input_report_key(info->input, BTN_TOUCH, 0);
-+			input_sync(info->input);
-+			break;
-+		}
-+
-+		input_report_abs(info->input, ABS_X, x & ADC_DATX_MASK);
-+		input_report_abs(info->input, ABS_Y, y & ADC_DATY_MASK);
-+		input_report_key(info->input, BTN_TOUCH, 1);
-+		input_sync(info->input);
-+
-+		msleep(1);
-+	};
-+
-+	writel(0, ADC_V1_CLRINTPNDNUP(info->regs));
-+
-+	return IRQ_HANDLED;
-+}
-+
- static int exynos_adc_reg_access(struct iio_dev *indio_dev,
- 			      unsigned reg, unsigned writeval,
- 			      unsigned *readval)
-@@ -457,12 +554,66 @@ static int exynos_adc_remove_devices(struct device *dev, void *c)
- 	return 0;
- }
- 
-+static int exynos_adc_ts_open(struct input_dev *dev)
-+{
-+	struct exynos_adc *info = input_get_drvdata(dev);
-+
-+	enable_irq(info->tsirq);
-+
-+	return 0;
-+}
-+
-+static void exynos_adc_ts_close(struct input_dev *dev)
-+{
-+	struct exynos_adc *info = input_get_drvdata(dev);
-+
-+	disable_irq(info->tsirq);
-+}
-+
-+static int exynos_adc_ts_init(struct exynos_adc *info)
-+{
-+	int ret;
-+
-+	if (info->tsirq <= 0)
-+		return -ENODEV;
-+
-+	info->input = input_allocate_device();
-+	if (!info->input)
-+		return -ENOMEM;
-+
-+	info->input->evbit[0] = BIT_MASK(EV_KEY) | BIT_MASK(EV_ABS);
-+	info->input->keybit[BIT_WORD(BTN_TOUCH)] = BIT_MASK(BTN_TOUCH);
-+
-+	input_set_abs_params(info->input, ABS_X, 0, 0x3FF, 0, 0);
-+	input_set_abs_params(info->input, ABS_Y, 0, 0x3FF, 0, 0);
-+
-+	info->input->name = "S3C24xx TouchScreen";
-+	info->input->id.bustype = BUS_HOST;
-+	info->input->open = exynos_adc_ts_open;
-+	info->input->close = exynos_adc_ts_close;
-+	
-+	input_set_drvdata(info->input, info);
-+
-+	ret = input_register_device(info->input);
-+	if (ret)
-+		input_free_device(info->input);
-+
-+	disable_irq(info->tsirq);
-+	ret = request_threaded_irq(info->tsirq, NULL, exynos_ts_isr,
-+				   0, "touchscreen", info);
-+	if (ret)
-+		input_unregister_device(info->input);
-+
-+	return ret;
-+}
-+
- static int exynos_adc_probe(struct platform_device *pdev)
- {
- 	struct exynos_adc *info = NULL;
- 	struct device_node *np = pdev->dev.of_node;
- 	struct iio_dev *indio_dev = NULL;
- 	struct resource	*mem;
-+	bool has_ts = false;
- 	int ret = -ENODEV;
- 	int irq;
- 
-@@ -498,8 +649,14 @@ static int exynos_adc_probe(struct platform_device *pdev)
- 		dev_err(&pdev->dev, "no irq resource?\n");
- 		return irq;
- 	}
--
- 	info->irq = irq;
-+
-+	irq = platform_get_irq(pdev, 1);
-+	if (irq == -EPROBE_DEFER)
-+		return irq; 
-+
-+	info->tsirq = irq;
-+
- 	info->dev = &pdev->dev;
- 
- 	init_completion(&info->completion);
-@@ -565,6 +722,15 @@ static int exynos_adc_probe(struct platform_device *pdev)
- 	if (info->data->init_hw)
- 		info->data->init_hw(info);
- 
-+	/* leave out any TS related code if unreachable */
-+	if (IS_BUILTIN(CONFIG_INPUT) ||
-+	    (IS_MODULE(CONFIG_INPUT) && config_enabled(MODULE)))
-+		has_ts = of_property_read_bool(pdev->dev.of_node, "has-touchscreen");
-+	if (has_ts)
-+		ret = exynos_adc_ts_init(info);
-+	if (ret)
-+		goto err_iio;
-+
- 	ret = of_platform_populate(np, exynos_adc_match, NULL, &indio_dev->dev);
- 	if (ret < 0) {
- 		dev_err(&pdev->dev, "failed adding child nodes\n");
-@@ -576,6 +742,11 @@ static int exynos_adc_probe(struct platform_device *pdev)
- err_of_populate:
- 	device_for_each_child(&indio_dev->dev, NULL,
- 				exynos_adc_remove_devices);
-+	if (has_ts) {
-+		input_unregister_device(info->input);
-+		free_irq(info->tsirq, info);
-+	}
-+err_iio:
- 	iio_device_unregister(indio_dev);
- err_irq:
- 	free_irq(info->irq, info);
-@@ -595,6 +766,11 @@ static int exynos_adc_remove(struct platform_device *pdev)
- 	struct iio_dev *indio_dev = platform_get_drvdata(pdev);
- 	struct exynos_adc *info = iio_priv(indio_dev);
- 
-+	if (IS_BUILTIN(CONFIG_INPUT) ||
-+	    (IS_MODULE(CONFIG_INPUT) && config_enabled(MODULE))) {
-+		free_irq(info->tsirq, info);
-+		input_unregister_device(info->input);
-+	}
- 	device_for_each_child(&indio_dev->dev, NULL,
- 				exynos_adc_remove_devices);
- 	iio_device_unregister(indio_dev);
+Looks like some sort of clock callback is need to lock the PLL2 rate.
+You don't want to have something playing on the codec and then have a
+another device reprogram PLL2 in the middle of the song.
+
+No one has tried capture yet. Cubieboard2 has MICIN. I don't have one of those.
+
+>
+>> I'll grab your tree and test 24bit tomorrow. (Good thing I have 24 bit
+>> music files.) :)
+>
+> I now have my CubieTruck singing nicely with 24 bit music. Either the
+> player or ALSA will extend the 24 bits to 32 bits. The only downside
+> is you cannot specify S24_LE when streaming directly to the hardware
+> device.
+>
+>
+> Cheers
+> ChenYu
+>
+>>> Aside from the audio stuff, I worked a bit on the DMA driver, after
+>>> realizing memcpy could be optimized a fair bit. By using proper alignment
+>>> and choosing the best bus width and as big a burst as possible, I was able
+>>> to go from a totally unscientifically measured ~3MB/s to ~13MB/s on a single
+>>> thread, single channel, 1000 iterations dmatest run with noverify=0. I will
+>>> be sending a v3 with these new changes as well as addressing comments I
+>>> received in the next few days.
+>>
+>> This still seems quite slow? I think there was a discussion about this
+>> on IRC, you included? Any followups there?
+>>
+>>> To round up on this week's developments, I also worked on the audio clock
+>>> representation, involving PLL2, the codec clock gate and "module 1" clocks
+>>> (AC97, SPDIF, IIS) to enable Jon to work on IIS. Patches for these clocks
+>>> will be out in the list soon as well.
+>>
+>> Thanks! I look forward to them.
+>>
+>>
+>> Cheers
+>> ChenYu
+>>
+>>> You can expect the next status report in about a week's time.
+>>>
+>>> Cheers!
+>>>
+>>> Emilio
+>>>
+>>> [0]
+>>> http://lists.infradead.org/pipermail/linux-arm-kernel/2014-July/271150.html
+>
+> --
+> You received this message because you are subscribed to the Google Groups "linux-sunxi" group.
+> To unsubscribe from this group and stop receiving emails from it, send an email to linux-sunxi+unsubscribe at googlegroups.com.
+> For more options, visit https://groups.google.com/d/optout.
+
+
+
+-- 
+Jon Smirl
+jonsmirl at gmail.com
