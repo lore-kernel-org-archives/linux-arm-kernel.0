@@ -1,48 +1,37 @@
-From: joel.schopp@amd.com (Joel Schopp)
-Date: Tue, 22 Jul 2014 12:28:09 -0500
-Subject: [PATCH] kvmtool: arm64: fix compilation error
-Message-ID: <20140722172809.4939.92258.stgit@joelaarch64.amd.com>
+From: pawel.moll@arm.com (Pawel Moll)
+Date: Tue, 22 Jul 2014 18:30:06 +0100
+Subject: [PATCH v2] platform: Make platform_bus device a platform device
+In-Reply-To: <20140722171013.GA6605@kroah.com>
+References: <20140721184007.GB572@kroah.com>
+ <1406023327-18525-1-git-send-email-pawel.moll@arm.com>
+ <20140722171013.GA6605@kroah.com>
+Message-ID: <1406050206.25343.87.camel@hornet>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Currently tools/kvm doesn't build on arm64 when gtk3 is present.  The error looks like this:
+On Tue, 2014-07-22 at 18:10 +0100, Greg Kroah-Hartman wrote:
+> On Tue, Jul 22, 2014 at 11:02:07AM +0100, Pawel Moll wrote:
+> > ... describing the root of the device tree, so one can write
+> > a platform driver initializing the platform.
+> > 
+> > All references to platform_bus device have been fixed up,
+> > although in most cases they could be simply removed or
+> > replaced by NULL (platform devices with no parent are adopted
+> > by main platform_bus device automagically).
+> 
+> In looking at this some more, I think all of these should be made NULL,
+> why are we exporting this symbol at all?
 
-  LINK     lkvm
-ui/gtk3.o: In function `kvm_gtk_key_press':
-/extra/sb/linux-kvm/tools/kvm/ui/gtk3.c:201: undefined reference to `kbd_queue'
-/extra/sb/linux-kvm/tools/kvm/ui/gtk3.c:204: undefined reference to `kbd_queue'
-/extra/sb/linux-kvm/tools/kvm/ui/gtk3.c:216: undefined reference to `kbd_queue'
-/extra/sb/linux-kvm/tools/kvm/ui/gtk3.c:217: undefined reference to `kbd_queue'
-/extra/sb/linux-kvm/tools/kvm/ui/gtk3.c:218: undefined reference to `kbd_queue'
-ui/gtk3.o:/extra/sb/linux-kvm/tools/kvm/ui/gtk3.c:219: more undefined references to `kbd_queue' follow
-collect2: error: ld returned 1 exit status
-make: *** [lkvm] Error 1
+I think there are about 3 non-obvious uses of it, which would probably
+need looking into. All other ones that simply do of_platform_populate()
+or platform_device_register*() with platform_bus as a parent, which has
+exactly the same effect as it was NULL.
 
-The patch below makes the error go away and the resulting lkvm runs on arm64.
+I can imagine situations where one would want to walk the device
+hierarchy stopping at platform_bus, how I'm not sure how "legitimate"
+that would be.
 
-Cc: Pekka Enberg <penberg@kernel.org>
-Signed-off-by: Joel Schopp <joel.schopp@amd.com>
----
- tools/kvm/Makefile |    2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+I'll post v3 with NULLs where I think it is enough so we can see the
+other cases.
 
-diff --git a/tools/kvm/Makefile b/tools/kvm/Makefile
-index 880d580..fba60f1 100644
---- a/tools/kvm/Makefile
-+++ b/tools/kvm/Makefile
-@@ -102,6 +102,7 @@ OBJS	+= hw/pci-shmem.o
- OBJS	+= kvm-ipc.o
- OBJS	+= builtin-sandbox.o
- OBJS	+= virtio/mmio.o
-+OBJS	+= hw/i8042.o
- 
- # Translate uname -m into ARCH string
- ARCH ?= $(shell uname -m | sed -e s/i.86/i386/ -e s/ppc.*/powerpc/ \
-@@ -129,7 +130,6 @@ ifeq ($(ARCH),x86)
- 	OBJS	+= x86/kvm.o
- 	OBJS	+= x86/kvm-cpu.o
- 	OBJS	+= x86/mptable.o
--	OBJS	+= hw/i8042.o
- # Exclude BIOS object files from header dependencies.
- 	OTHEROBJS	+= x86/bios.o
- 	OTHEROBJS	+= x86/bios/bios-rom.o
+Pawel
