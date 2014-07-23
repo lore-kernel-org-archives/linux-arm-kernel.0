@@ -1,24 +1,60 @@
-From: shawn.guo@freescale.com (Shawn Guo)
-Date: Wed, 23 Jul 2014 12:50:57 +0800
-Subject: [PATCH 2/3] ARM: smp_scu: enable SCU standby support
-In-Reply-To: <20140722161331.GN2219@arm.com>
-References: <1405928755-19413-1-git-send-email-shawn.guo@freescale.com>
- <1405928755-19413-3-git-send-email-shawn.guo@freescale.com>
- <20140721085150.GB15666@arm.com> <20140721092703.GL8537@dragon>
- <20140721102638.GE32578@arm.com> <20140722020911.GO8537@dragon>
- <20140722161331.GN2219@arm.com>
-Message-ID: <20140723045055.GA5615@dragon>
+From: viresh.kumar@linaro.org (Viresh Kumar)
+Date: Wed, 23 Jul 2014 10:25:08 +0530
+Subject: [RFC] cpufreq: Add bindings for CPU clock sharing topology
+In-Reply-To: <CABGGisyDf7xt7CNii_NJ_stvBGNEeiXBMFxNkA2myS8OQ-VCtw@mail.gmail.com>
+References: <7e097b71342c9f5f63b07ff2e135eb7beb626aab.1405661369.git.viresh.kumar@linaro.org>
+ <CAOesGMhTkTEXp99gpU8cZBwYmiXpsySG5zMn6oSyo_Mf5PAiUg@mail.gmail.com>
+ <CAKohpo=MmoALOHg-=7cf0jm=OJO57TWQZQXqkRwhRwU-DGPMmA@mail.gmail.com>
+ <CAOesGMhuNzVtUkaUjF+JjNgHcgf08WiM0DG-kzwtcyUxkK_zow@mail.gmail.com>
+ <CAKohpokLqrydV3b=innvOWrW9ijXtZwPKdT5Ew65cjMxsY2Mvw@mail.gmail.com>
+ <53CA8D95.8010108@ti.com>
+ <CABGGisyDf7xt7CNii_NJ_stvBGNEeiXBMFxNkA2myS8OQ-VCtw@mail.gmail.com>
+Message-ID: <CAKohpokPAcmERN3S3Wbf7a4gXaQAWyBtKV7RXDHYThMWW57fGA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jul 22, 2014 at 05:13:31PM +0100, Catalin Marinas wrote:
-> And we don't know the behaviour of setting this bit on such A9 early
-> revisions. So we can try to (1) find out if there are any in the field,
-> (2) read the RTL to see if anything happens or (3) add a check in Linux
-> for such revisions. I think (3) should be the case but you need to figure
-> out which revisions these are.
+On 21 July 2014 22:30, Rob Herring <rob.herring@linaro.org> wrote:
 
-Can I ask the favor from you ARM folks on that, since I cannot figure
-it out from any public information?
+> To me, but every time I suggest adding things to the topology the ARM
+> folks object... I really think we should have built the topology into
+> the /cpus hierarchy. Then we could add properties at the correct place
+> in the hierarchy where they are common.
+>
+> I don't really like the proposal here. It just doesn't look like a
+> clean description of the h/w.
 
-Shawn
+I knew it wouldn't be easy to get these bindings correctly in the first
+attempt atleast, but I still went for it so that this thread can progress:
+
+https://lkml.org/lkml/2014/7/18/3
+
+There are changes waiting to get some kind of intermediate solution
+in, so that other platforms can reuse cpufreq-cpu0 driver. Also, so that
+cpufreq-cpu0 can be converted to cpufreq-generic, so that it can support
+almost any platform.
+
+Can you please reply to that thread to suggest some intermediate
+solution that we can get fixed in 3.17? Mvebu and Krait are waiting for
+these patches to get in..
+
+The solution can be simple enough as right now we have only two kinds
+of platforms:
+- All CPUs share clock
+- All CPUs have separate clocks
+
+The most simple solution of that could have been a Kconfig entry, but that
+would be a problem for multi-arch builds if these platforms do want to get
+build with multi-arch config. Otherwise we have to get some binding in
+place for 3.17..
+
+Please see if you can get that thread going :)
+
+> Ignoring compatibility, I would like to see something like
+> operating-points and/or the clock properties be moved up to /cpus if
+> they are shared and be per cpu node when they are not. This of course
+> does not work if you have independent OPPs for each cluster with a
+> shared clock within cluster.
+
+Yeah, that had always been the issue. People probably tried to get a
+cluster {} block as well to simplify that but there were some objections
+to it as well, though not sure what happened to that stuff..
