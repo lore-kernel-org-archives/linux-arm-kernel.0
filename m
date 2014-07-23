@@ -1,66 +1,121 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Wed, 23 Jul 2014 11:32:19 +0100
-Subject: [PATCH 00/14] arm64: eBPF JIT compiler
-In-Reply-To: <CAMEtUuyC+MykPDO0ghTc=oex7KPLEy=BLRgWBdW+qJY7JXQmDQ@mail.gmail.com>
-References: <1405708100-13604-1-git-send-email-zlim.lnx@gmail.com>
- <20140721091623.GA16122@arm.com>
- <CAMEtUuyC+MykPDO0ghTc=oex7KPLEy=BLRgWBdW+qJY7JXQmDQ@mail.gmail.com>
-Message-ID: <20140723103219.GA1366@localhost>
+From: paul@pwsan.com (Paul Walmsley)
+Date: Wed, 23 Jul 2014 10:44:33 +0000 (UTC)
+Subject: [PATCH] ARM: OMAP2+: clock: allow omap2_dpll_round_rate() to round
+ to next-lowest rate
+Message-ID: <alpine.DEB.2.02.1407231043230.32419@utopia.booyaka.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jul 21, 2014 at 04:49:29PM +0100, Alexei Starovoitov wrote:
-> On Mon, Jul 21, 2014 at 2:16 AM, Will Deacon <will.deacon@arm.com> wrote:
-> > On Fri, Jul 18, 2014 at 07:28:06PM +0100, Zi Shen Lim wrote:
-> >> This series implements eBPF JIT compiler for arm64.
-> >> Please see [14/14] for change log.
-> >>
-> >> Patches [1-13/14] implement code generation functions.
-> >> Patch [14/14] implements the actual eBPF JIT compiler.
-> >>
-> >> Many thanks to everyone who's reviewed the code from
-> >> RFCv1->RFCv3, especially Alexei for BPF bits, and Will
-> >> for ARM64 codegen bits :)
-> >>
-> >> BTW, I'm happy to maintain arch/arm64/net (i.e. arm64 BPF bits).
-> >> Should I add a patch updating MAINTAINERS as Patch 15?
-> >
-> > I don't think that's necessary at the moment, but if we start seeing an
-> > influx of patches to arch/arm64/net, then that could make sense in the
-> > future.
-> >
-> >> This series requires a patch that exports a function
-> >> from net/core (resulting from RFCv1 discussion). This patch
-> >> has been merged into net-next @ 9f12fbe603f7
-> >> ("net: filter: move load_pointer() into filter.h").
-> >>
-> >> This series applies against net-next and is tested working
-> >> with lib/test_bpf on ARMv8 Foundation Model.
-> >
-> > Looks like it works on my Juno board too, so:
-> >
-> >   Acked-by: Will Deacon <will.deacon@arm.com>
-> >
-> > for the series.
-> >
-> > It's a bit late for 3.17 now, so I guess we'll queue this for 3.18 (which
-> > also means the dependency on -next isn't an issue). Perhaps you could repost
-> > around -rc3?
-> 
-> Thanks for testing! Nice to see it working on real hw.
-> I'm not sure why you're proposing a 4+ week delay. The patches
-> will rot instead of getting used and tested. Imo it makes sense to
-> get them into net-next now for 3.17.
-> JIT is disabled by sysctl by default anyway.
 
-We normally like some patches (especially new functionality) to sit in
-linux-next for a while before the mering window (ideally starting with
--rc4 or -rc5). We are at -rc6 already, so getting close to the 3.17
-merging window.
+Change the behavior of omap2_dpll_round_rate() to round to either the
+exact rate requested, or the next lowest rate that the clock is able to
+provide.
 
-Another aspect is that the arm64/bpf branch depends on the net tree, so
-it can't easily go in via the arm64 tree for 3.17 (3.18 would not be a
-problem).
+This is not an ideal fix, but is intended to provide a relatively safe
+way for drivers to set PLL rates, until a better solution can be
+implemented.
 
+For the time being, omap3_noncore_dpll_set_rate() is still allowed to
+set its rate to something other than what the caller requested; but will
+warn when this occurs.
+
+Cc: Tomi Valkeinen <tomi.valkeinen@ti.com>
+Cc: Mike Turquette <mturquette@linaro.org>
+Signed-off-by: Paul Walmsley <paul@pwsan.com>
+---
+ arch/arm/mach-omap2/clkt_dpll.c | 28 +++++++++++++++++++++-------
+ arch/arm/mach-omap2/dpll3xxx.c  | 12 ++++++++++--
+ 2 files changed, 31 insertions(+), 9 deletions(-)
+
+diff --git a/arch/arm/mach-omap2/clkt_dpll.c b/arch/arm/mach-omap2/clkt_dpll.c
+index 332af927f4d3..85701142c5fc 100644
+--- a/arch/arm/mach-omap2/clkt_dpll.c
++++ b/arch/arm/mach-omap2/clkt_dpll.c
+@@ -293,10 +293,13 @@ long omap2_dpll_round_rate(struct clk_hw *hw, unsigned long target_rate,
+ {
+ 	struct clk_hw_omap *clk = to_clk_hw_omap(hw);
+ 	int m, n, r, scaled_max_m;
++	int min_delta_m = INT_MAX, min_delta_n = INT_MAX;
+ 	unsigned long scaled_rt_rp;
+ 	unsigned long new_rate = 0;
+ 	struct dpll_data *dd;
+ 	unsigned long ref_rate;
++	long delta;
++	long prev_min_delta = LONG_MAX;
+ 	const char *clk_name;
+ 
+ 	if (!clk || !clk->dpll_data)
+@@ -342,23 +345,34 @@ long omap2_dpll_round_rate(struct clk_hw *hw, unsigned long target_rate,
+ 		if (r == DPLL_MULT_UNDERFLOW)
+ 			continue;
+ 
++		/* skip rates above our target rate */
++		delta = target_rate - new_rate;
++		if (delta < 0)
++			continue;
++
++		if (delta < prev_min_delta) {
++			prev_min_delta = delta;
++			min_delta_m = m;
++			min_delta_n = n;
++		}
++
+ 		pr_debug("clock: %s: m = %d: n = %d: new_rate = %lu\n",
+ 			 clk_name, m, n, new_rate);
+ 
+-		if (target_rate == new_rate) {
+-			dd->last_rounded_m = m;
+-			dd->last_rounded_n = n;
+-			dd->last_rounded_rate = target_rate;
++		if (delta == 0)
+ 			break;
+-		}
+ 	}
+ 
+-	if (target_rate != new_rate) {
++	if (prev_min_delta == LONG_MAX) {
+ 		pr_debug("clock: %s: cannot round to rate %lu\n",
+ 			 clk_name, target_rate);
+ 		return ~0;
+ 	}
+ 
+-	return target_rate;
++	dd->last_rounded_m = min_delta_m;
++	dd->last_rounded_n = min_delta_n;
++	dd->last_rounded_rate = target_rate - prev_min_delta;
++
++	return dd->last_rounded_rate;
+ }
+ 
+diff --git a/arch/arm/mach-omap2/dpll3xxx.c b/arch/arm/mach-omap2/dpll3xxx.c
+index fcd8036af910..839a13e1208b 100644
+--- a/arch/arm/mach-omap2/dpll3xxx.c
++++ b/arch/arm/mach-omap2/dpll3xxx.c
+@@ -469,6 +469,7 @@ int omap3_noncore_dpll_set_rate(struct clk_hw *hw, unsigned long rate,
+ {
+ 	struct clk_hw_omap *clk = to_clk_hw_omap(hw);
+ 	struct clk *new_parent = NULL;
++	unsigned long rrate;
+ 	u16 freqsel = 0;
+ 	struct dpll_data *dd;
+ 	int ret;
+@@ -496,8 +497,15 @@ int omap3_noncore_dpll_set_rate(struct clk_hw *hw, unsigned long rate,
+ 		__clk_prepare(dd->clk_ref);
+ 		clk_enable(dd->clk_ref);
+ 
+-		if (dd->last_rounded_rate != rate)
+-			rate = __clk_round_rate(hw->clk, rate);
++		if (dd->last_rounded_rate != rate) {
++			rrate = __clk_round_rate(hw->clk, rate);
++			if (rrate != rate) {
++				pr_warn("%s: %s: final rate %lu does not match desired rate %lu\n",
++					__func__, __clk_get_name(hw->clk),
++					rrate, rate);
++				rate = rrate;
++			}
++		}
+ 
+ 		if (dd->last_rounded_rate == 0)
+ 			return -EINVAL;
 -- 
-Catalin
+2.0.1
