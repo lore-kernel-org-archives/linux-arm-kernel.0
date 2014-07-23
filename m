@@ -1,127 +1,182 @@
-From: l.majewski@samsung.com (Lukasz Majewski)
-Date: Wed, 23 Jul 2014 12:10:42 +0200
-Subject: [PATCH v2] cpufreq: tests: Providing cpufreq regression test
-In-Reply-To: <CAKohpok++gPcNk9-E4MsFdNBy8qL7oLYvatk1EvcW1OHwroZXQ@mail.gmail.com>
-References: <1405678985-21677-1-git-send-email-l.majewski@samsung.com>
- <1405926154-27214-1-git-send-email-l.majewski@samsung.com>
- <CAKohpondk7Cty8MhTcjyzZW8Z0o4AVupYE0rRnG4YJf+SmDyjg@mail.gmail.com>
- <20140723093824.5e51918f@amdc2363>
- <CAKohpok++gPcNk9-E4MsFdNBy8qL7oLYvatk1EvcW1OHwroZXQ@mail.gmail.com>
-Message-ID: <20140723121042.5b6f49e3@amdc2363>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Wed, 23 Jul 2014 11:12:54 +0100
+Subject: [RFC V2] devicetree: Dialog Semiconductor consolidate existing
+ vendor prefixes to standardise on 'dlg'
+In-Reply-To: <6ED8E3B22081A4459DAC7699F3695FB7D0B2762A@SW-EX-MBX02.diasemi.com>
+References: <201407151520.s6FFKcjB009745@swsrvapps-01.diasemi.com>
+ <20140722070927.GC28529@lee--X1>
+ <6ED8E3B22081A4459DAC7699F3695FB7D0B2762A@SW-EX-MBX02.diasemi.com>
+Message-ID: <20140723101254.GH23210@lee--X1>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Viresh,
-
-> On 23 July 2014 13:08, Lukasz Majewski <l.majewski@samsung.com> wrote:
-> > Do you want to say that we have enough tests and we don't need
-> > more ?
-> 
-> No. We don't have any tests at all :)
-
-Then we should encourage as many developers as possible to share their
-private tests with us.
+On Wed, 23 Jul 2014, Opensource [Steve Twiss] wrote:
 
 > 
-> > I always thought that we shall have as much regression tests as
-> > possible.
+> On 22 July 2014 08:09, Lee Jones wrote:
 > 
-> Yeah, tests are welcomed but the question is where should they get
-> added. Don't know if its common to add tests directly to kernel.
-
-There was a similar discussion with device tree and finally it was
-included in the mainline repository.
-
-> 
-> And also if the test is really good, not discouraging your work.
-> 
-> >> On 21 July 2014 12:32, Lukasz Majewski <l.majewski@samsung.com>
-> >> wrote:
-> >> > This commit adds first regression test "cpufreq_freq_test.sh" for
-> >> > the cpufreq subsystem.
+> >-----Original Message-----
+> >From: Lee Jones [mailto:lee.jones at linaro.org]
+> >> From: Opensource [Steve Twiss] <stwiss.opensource@diasemi.com>
 > >>
-> >> That's not enough, Tell us why we should continue reading this
-> >> mail..
+> >> This patch series updates the device tree vendor prefix for
+> >> Dialog Semiconductor.
+> >>
+> >> Various methods are currently used throughout the kernel: 'diasemi',
+> >> 'dialog' and 'dlg'. Others have also been suggested.
+> >>
+> >> This patch set aims to consolidate the usage of the vendor prefix to
+> >> use a common standard. The prefix 'dlg' is used.
+> >>
+> >> Here is my working for justifying this change:
+> >>
+> >> ./arch/arm/boot/dts/imx6qdl-phytec-pfla02.dtsi
+> >> 	Has the following entry:
+> >> 	compatible = "dialog,da9063";
+> >> 	However the DA9063 driver does not support device tree yet so
+> >> 	it would be safe to rename this.
+> >>
+> >> ./arch/arm/boot/dts/imx53-smd.dts
+> >> 	Has the following entry:
+> >> 	compatible = "dialog,da9053", "dialog,da9052";
+> >> 	However, the existing driver files for DA9053 define a different
+> >> 	compatible string with the "dlg" prefix. See the entries below.
+> >> 	None of these would have allowed the "dialog" prefix.
+> >> 	{ .compatible = "dlg,da9052", .data = &da9052_i2c_id[0] },
+> >> 	{ .compatible = "dlg,da9053-aa", .data = &da9052_i2c_id[1] },
+> >> 	{ .compatible = "dlg,da9053-ba", .data = &da9052_i2c_id[2] },
+> >> 	{ .compatible = "dlg,da9053-bb", .data = &da9052_i2c_id[3] },
+> >> 	{ .compatible = "dlg,da9053-bc", .data = &da9052_i2c_id[4] },
+> >> 	In this particular case the change for DA9053 did not match up
+> >> 	with the expected compatibility strings and therefore I have
+> >> 	retained the more general "dlg,da9053" because I do not know
+> >> 	which silicon variant (-aa, -ba, -bb, or -bc) is the correct
+> >> 	one to use.
+> >>
+> >> ./devicetree/bindings/i2c/trivial-devices.txt
+> >> 	Has the following entry:
+> >> 	dialog,da9053  DA9053: flexible system level PMIC with multicore support
+> >> 	Instead of depreciating this "dialog" line I am just replacing it
+> >> 	with a "dlg" because the existing driver DA9053 does not support
+> >> 	the dialog keyword.
+> >>
+> >> ./drivers/mfd/da9055-core.c
+> >> 	Has the following entries for the mfd cells
+> >> 		.of_compatible = "dialog,da9055-gpio", etc...
+> >> 	In this case, the driver does not actually pass in any platform data
+> >> 	to any of the mfd cells and so they are not actually used
+> >> 	yet in the driver. Nobody else references this information.
+> >>
+> >> ./devicetree/bindings/regulator/da9210.txt
+> >> 	Has the following two entries in the binding file:
+> >> 	- compatible:	must be "diasemi,da9210"
+> >> 	compatible = "diasemi,da9210";
+> >> 	However the DA9210 driver does not support device tree.
+> >>
+> >> ./arch/arm/boot/dts/r8a7790-lager.dts
+> >> ./arch/arm/boot/dts/r8a7791-koelsch.dts
+> >> 	These two files have the following entries:
+> >> 	compatible = "diasemi,da9210";
+> >> 	These both reference the "diasemi,da9210" but the device
+> >> 	driver does not support device tree
+> >>
+> >> The remaining files in the kernel I have found correctly references
+> >> the driver files compatibility information and so did not need to
+> >> be changed.
+> >>
+> >> ./devicetree/bindings/mfd/da9052-i2c.txt
+> >> 	- compatible : Should be "dlg,da9052", "dlg,da9053-aa",
+> >> 		 "dlg,da9053-ab", or "dlg,da9053-bb"
+> >>
+> >> ./devicetree/bindings/mfd/da9055.txt
+> >> 	compatible = "dlg,da9055-pmic";
+> >>
+> >> ./arch/arm/boot/dts/imx53-voipac-dmm-668.dtsi
+> >> 	compatible = "dlg,da9053-aa", "dlg,da9052";
+> >>
+> >> ./arch/arm/boot/dts/imx53-qsb.dts
+> >> 	compatible = "dlg,da9053-aa", "dlg,da9052";
+> >>
+> >> ./devicetree/bindings/sound/da9055.txt
+> >> 	- compatible: "dlg,da9055-codec"
+> >> 	compatible = "dlg,da9055-codec";
+> >>
+> >>
+> >> Signed-off-by: Opensource [Steve Twiss] <stwiss.opensource@diasemi.com>
+> >> ---
+> >> Checks performed with linux-next/next-20140715/scripts/checkpatch.pl
+> >>  trivial-devices.txt       total: 0 errors, 0 warnings, 89 lines checked
+> >>  da9210.txt                total: 0 errors, 0 warnings, 21 lines checked
+> >>  vendor-prefixes.txt       total: 0 errors, 0 warnings, 149 lines checked
+> >>  imx53-smd.dts             total: 0 errors, 2 warnings, 279 lines checked
+> >>  imx6qdl-phytec-pfla02.dtsi total: 0 errors, 2 warnings, 357 lines checked
+> >>  r8a7790-lager.dts         total: 0 errors, 3 warnings, 403 lines checked
+> >>  r8a7791-koelsch.dts       total: 0 errors, 4 warnings, 461 lines checked
+> >>  da9055-core.c             total: 0 errors, 0 warnings, 428 lines checked
+> >>
+> >> This e-mail is in response to the previous threads here:
+> >> https://lkml.org/lkml/2014/6/11/262
+> >> http://comments.gmane.org/gmane.linux.ports.arm.kernel/341358
+> >>
+> >> Changes since RFC V1
+> >> - addition of changes to DTS files referencing "diasemi,da9210"
+> >>    arch/arm/boot/dts/r8a7790-lager.dts
+> >>    arch/arm/boot/dts/r8a7791-koelsch.dts
+> >>
+> >> This RFC V2 does not answer the response to RFC V1 from Mark Brown:
+> >> http://www.spinics.net/lists/arm-kernel/msg347615.html
+> >>
+> >> This patch applies against linux-next and next-20140715
+> >>
+> >> Regards,
+> >> Steve Twiss, Dialog Semiconductor Ltd.
+> >>
+> >>
+> >>
+> >>  .../devicetree/bindings/i2c/trivial-devices.txt    |  2 +-
+> >>  .../devicetree/bindings/regulator/da9210.txt       |  4 ++--
+> >>  .../devicetree/bindings/vendor-prefixes.txt        |  1 +
+> >>  arch/arm/boot/dts/imx53-smd.dts                    |  2 +-
+> >>  arch/arm/boot/dts/imx6qdl-phytec-pfla02.dtsi       |  2 +-
+> >>  arch/arm/boot/dts/r8a7790-lager.dts                |  2 +-
+> >>  arch/arm/boot/dts/r8a7791-koelsch.dts              |  2 +-
+> >>  drivers/mfd/da9055-core.c                          | 26 ++++++++++----------
 > >
-> > Hmm... If "regression" and "test" don't catch the attention of a
-> > diligent maintainer, then I cannot do much more to encourage him to
-> > read the whole e-mail :-)
-> 
-> What I meant to say was, your subject and body must be good enough
-> to answer most of the things. You don't have to tell much about the
-> implementation but other things should be pretty clear from logs.
-> 
-> Your current logs are quite short for something that's not a normal
-> practice.
-
-It is hard for me to agree on this issue.
-
-> 
-> > I can imagine that maintainers are very busy, therefore I've
-> > prepared README file with detailed description of the script
-> > operation.
-> 
-> Yeah, a README is welcomed and would be useful for users as well..
-> 
-> >> I couldn't make out the purpose of this test and why we need it.
-> >> How do we ensure that "cpufreq attributes exported by sysfs are
-> >> exposing correct values"?
+> >For the MFD changes:
 > >
-> > First of all the cpufreq attributes are part of the subsystem API.
-> > There are systems which actually depend on them, so we would be
-> > better off to test if they work as intended.
+> >  Acked-by: Lee Jones <lee.jones@linaro.org>
 > >
-> > Secondly, the test takes those values and then with use of other
-> > attribute enforce the value, which is then read via cat'ing
-> > cpufreq_cur_freq. If any of the attributes is wrong then we will
-> > spot the error immediately.
+> >Which tree is this patch going into?  Do you want me to take it and
+> >supply an IB for the other Maintainers to pull from?
 > 
-> Shouldn't you use userspace governor then instead of performance?
-
-Performance assures that we will have the right frequency set.
-
-However, there can be a similar patch to use userspace governor and
-various load to fail if ondemand's frequency flipping is detected.
-
-> And then we don't need the gzip stuff at all. We can just set it to
-> the right freq and get current freq to see if it matches?
-
-Sometimes "interresting" things show up when you have 100% CPU load and
-you try to switch frequency.
-In my opinion usage of gzip makes the test more difficult to pass.
-
+> Hi Lee,
 > 
-> And now that we are starting to get tests added into the kernel (will
-> still wait to see what Rafael has to advice),
-
-Ok. Lets wait for Rafael's opinion.
-
-> we better think of the
-> way these are going to get added. Probably a single script with
-> parameters like what to test?
-
-It is one possible solution, where another one is to run the all scripts
-in the directory.
-
-I'm curious about Rafael's opinion.
-
+> I'm not sure if this question was for me directly, but I do not have any
+> preference who takes this change or how it gets pulled. Thank you.
 > 
-> >> And actually what do we mean by this statement even? What kind of
-> >> errors can be there in exposing these values.
+> There was a request from Rob Herring
+> http://www.spinics.net/lists/arm-kernel/msg349289.html
+> to reformat the original e-mail content and also to drop the annoying 
+> "Opensource" and square brackets from my Signed-off-by:
+> signature.
+
+... and Author:
+
+So for me to take this, I need to see DT or Maintainer Acks for the
+bindings and DTS(I) changes.
+
+> So, the decision is to take the patch into an immutable branch
+> and you need me to re-format the e-mail content -- I will resend 
+> with those changes.
+> 
+> Regards,
+> Steve
+> 
 > >
-> > Errors with cpufreq and CCF cooperation - especially when some
-> > parts of cpufreq code uses direct write to MUX, DIV or PLL SoC
-> > registers.
-> >
-> > Also, one can check if permutations of changing all available
-> > frequencies are working properly.
-> 
-> Yeah, that would be fine. Probably need to think more about scripts
-> name.
+> >>  8 files changed, 21 insertions(+), 20 deletions(-)
 
 -- 
-Best regards,
-
-Lukasz Majewski
-
-Samsung R&D Institute Poland (SRPOL) | Linux Platform Group
+Lee Jones
+Linaro STMicroelectronics Landing Team Lead
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
