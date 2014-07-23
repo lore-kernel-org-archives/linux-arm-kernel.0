@@ -1,44 +1,34 @@
-From: andrew@lunn.ch (Andrew Lunn)
-Date: Wed, 23 Jul 2014 16:14:43 +0200
-Subject: [PATCH 1/2] Added dts defintion for Lenovo ix4-300d nas
-In-Reply-To: <20140723134534.GF23220@titan.lakedaemon.net>
-References: <1406117232-5962-1-git-send-email-yahoo@perenite.com>
- <20140723134534.GF23220@titan.lakedaemon.net>
-Message-ID: <20140723141443.GC2856@lunn.ch>
+From: pawel.moll@arm.com (Pawel Moll)
+Date: Wed, 23 Jul 2014 15:24:26 +0100
+Subject: [PATCH] ARM: multi_v7_defconfig: major refresh
+In-Reply-To: <1406052070-6207-1-git-send-email-olof@lixom.net>
+References: <1406052070-6207-1-git-send-email-olof@lixom.net>
+Message-ID: <1406125466.25343.138.camel@hornet>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Benoit,
-
+On Tue, 2014-07-22 at 19:01 +0100, Olof Johansson wrote:
+> This is a major refresh of the multi_v7_defconfig:
 > 
-> > +			};
-> > +
-> > +			serial at 12000 {
-> > +				clocks = <&coreclk 0>;
+> - Bring over a bunch of Samsung drivers to make ODROID-U3 and Chromebooks usable
+>  * Enable big.LITTLE
+>  * MCPM
+>  * CYAPA touchpad
+>  * Samsung-related MTD/regulator/clk/pinmux drivers
+>  * Add some of the CrOS EC drivers
+> - Turn on TPM, HW_RANDOM
+> - OMAP_USB3 -> TI_PIPE3 option rename
+> - Enable MCPM/b.L for VEXPRESS
+> - Add new CONFIG_MTD_SPI_NOR since it otherwise masks off SPI NOR drivers
+> - CONFIG_LOGO, because penguins.
+> 
+> I took care to keep the new options that have been added for whose the
+> drivers are not yet in our for-next branch. This was pretty awkward so
+> we should sort out how to handle those better in the future.
+> 
+> Signed-off-by: Olof Johansson <olof@lixom.net>
 
-I don't think you need the clocks property. It should be already set
-in armada-xp.dtsi.
+It doesn't apply cleanly on 3.16-rc6, but after manual merge VE still
+boots :-) (for what it's worth)
 
-> > +				adt7473 at 2e {
-> > +					compatible = "adt7473";
-
-Please include a vendor prefix here. 
-
-
-> > +					reg = <0x2e>;
-> > +				};
-> > +
-> > +				pcf8563 at 51 {
-> > +					compatible = "pcf8563";
-
-and a vendor prefix here.
-
-> > +	/* warning: you need both eth1 & 0 to be initialize for poweroff to shutdown otherwise it reboots */
-
-What do you mean by initialized? Driver loaded? Interface up? 
-
-> This is a great first version
-
-I agree with Jason, well done.
-
-  Andrew
+Pawe?
