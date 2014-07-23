@@ -1,82 +1,67 @@
-From: peter.griffin@linaro.org (Peter Griffin)
-Date: Wed, 23 Jul 2014 15:33:23 +0100
-Subject: [PATCH v2 1/3] usb: dwc3: add ST dwc3 glue layer to manage dwc3 HC
-In-Reply-To: <20140722145711.GC20588@saruman.home>
-References: <1404541530-27856-1-git-send-email-peter.griffin@linaro.org>
- <1404541530-27856-2-git-send-email-peter.griffin@linaro.org>
- <20140707124627.GG6407@lee--X1>
- <20140722091800.GB8233@griffinp-ThinkPad-X1-Carbon-2nd>
- <20140722145711.GC20588@saruman.home>
-Message-ID: <20140723143323.GA26565@griffinp-ThinkPad-X1-Carbon-2nd>
+From: wens@csie.org (Chen-Yu Tsai)
+Date: Wed, 23 Jul 2014 22:37:36 +0800
+Subject: [PATCH 1/5] rtc: sun6i: Add sun6i RTC driver
+In-Reply-To: <20140723095542.GN20328@lukather>
+References: <1405323137-24287-1-git-send-email-wens@csie.org>
+ <1405323137-24287-2-git-send-email-wens@csie.org>
+ <20140718080718.GI20328@lukather>
+ <CAGb2v64K0iZ9e+1bdtkFVv5=t6nmTCTmUKeXLP-GvMaxAxQi+g@mail.gmail.com>
+ <20140723095542.GN20328@lukather>
+Message-ID: <CAGb2v643dOqRae38PBL+Jy0qVZ5Yv3SWA3QmEvRsyjTS=y1kSA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Felipe,
+On Wed, Jul 23, 2014 at 5:55 PM, Maxime Ripard
+<maxime.ripard@free-electrons.com> wrote:
+> Hi,
+>
+> On Mon, Jul 21, 2014 at 10:46:06PM +0800, Chen-Yu Tsai wrote:
+>> Hi,
+>>
+>> On Fri, Jul 18, 2014 at 4:07 PM, Maxime Ripard
+>> <maxime.ripard@free-electrons.com> wrote:
+>> > Hi,
+>> >
+>> > On Mon, Jul 14, 2014 at 03:32:13PM +0800, Chen-Yu Tsai wrote:
+>> >> This patch introduces the driver for the RTC in the Allwinner A31 and
+>> >> A23 SoCs.
+>> >>
+>> >> Unlike the RTC found in A10/A20 SoCs, which was part of the timer, the
+>> >> RTC in A31/A23 are a separate hardware block, which also contain a few
+>> >> controls for the RTC block hardware (a regulator and RTC block GPIO pin
+>> >> latches), while also having separate interrupts for the alarms.
+>> >
+>> > Do you plan on supporting those at some point?
+>>
+>> I haven't seen any devices use the regulator (which has an output pin).
+>> I suppose we shouldn't add drivers for things we can't verify.
+>> As for the GPIO pin latches, I'll have to experiment some more to figure
+>> out what they do exactly.
+>
+> Ok.
+>
+>> > It's also worth noting that the first registers are supposed to
+>> > control the source of the low frequency oscillator in the SoC, which
+>> > will probably be the most troublesome, since we need these clocks very
+>> > early on.
+>>
+>> That's true. I suppose the bootloader configures this. IIRC I've seen
+>> code for this in boot0 or boot1 from Allwinner. I can't find the equivalent
+>> for our sun4i u-boot though.
+>
+> Do you know what was the bootloader configuring it to?
 
-Thanks for reviewing, see my comments inline: -
+I checked this some time ago, when I started to look at the sunxi clock code.
+For all the devices (sun6/7/8i) I've checked, the system is configured to use
+the external 32.768k oscillator.
 
-> > > Just use {read,write}l_relaxed() directly.
-> > 
-> > Ok, unabstracted in v3
-> 
-> no, no... all other glues add their own local helpers for register
-> access. This is good for tracing, it's very easy to add a tracepoint to
-> this sort of function and get very low overhead tracing of every
-> register access.
+> I don't really know how we can deal with this in a nice way, but I
+> guess it's not so urgent.
 
-I've put the IO accessors back in for V3
+I agree. I will look at the BROM (for sun4/7i) and boot0 (sun6i) for signs of
+when it is configured. Then we can determine if we need to implement it
+somewhere.
 
-> > They are just bit setting macros, I've converted them over to use BIT macro now,
-> > so it no longer takes a parameter.
-> 
-> the macros are better, but make them upper case as everybody else.
+[...]
 
-Fixed in v3.
-
-
-> > I've asked ST how this value was derirved and why. It came from validation. 
-> > The docs don't mention that it is necessary, and removing it
-> > seems to have no ill effects. So I've removed this udelay in v3.
-> 
-> make sure to test with many, many iterations just to make sure.
-
-Yes will do, I've been booting my board all day, and so far no failures.
-
-> > Ok. Do the DT folks have any comment on this?
-> 
-> look at the child's dr-mode property instead of adding your own.
-
-Thanks for the hint, now using dr-mode binding in V3 :-)
- 
-> 
-> > > > +	dwc3_data->glue_base = devm_request_and_ioremap(dev, res);
-> 
-> use devm_ioremap_resource()
-
-Fixed in V3
-
-> > Your right, this was wrong. It was some legacy code which is
-> > unnecessary and I've removed this in v3.
-> 
-> if you're going for DT, why don't you create the parent and the child
-> from DT as omap/exynos/qcom are doing ?
-
-Now creating parent and child from DT like OMAP in v3
-
-> > > > +	reset_control_assert(dwc3_data->rstc_pwrdn);
-> > > > +
-> > > > +	pinctrl_pm_select_sleep_state(dev);
-> 
-> pinctrl will select sleep and default states automatically for you.
-
-I've left this in v3, as greping around I couldn't see how that could happen automatically.
-
-Also I just double checked with linusw on irc who confirmed that the only state which is 
-ever auto-selected is "default". All other states, as well as going back to default
-state need to be explicitly called.
-
-Hope thats ok.
-
-regards,
-
-Peter.
+ChenYu
