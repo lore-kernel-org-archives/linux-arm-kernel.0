@@ -1,139 +1,366 @@
-From: daniel.lezcano@linaro.org (Daniel Lezcano)
-Date: Wed, 23 Jul 2014 15:24:07 +0200
-Subject: [PATCH 1/4] tracepoint: add generic tracepoint definitions for
- IPI tracing
-In-Reply-To: <1405660735-13408-2-git-send-email-nicolas.pitre@linaro.org>
-References: <1405660735-13408-1-git-send-email-nicolas.pitre@linaro.org>
- <1405660735-13408-2-git-send-email-nicolas.pitre@linaro.org>
-Message-ID: <53CFB777.6070308@linaro.org>
+From: jason@lakedaemon.net (Jason Cooper)
+Date: Wed, 23 Jul 2014 09:45:34 -0400
+Subject: [PATCH 1/2] Added dts defintion for Lenovo ix4-300d nas
+In-Reply-To: <1406117232-5962-1-git-send-email-yahoo@perenite.com>
+References: <1406117232-5962-1-git-send-email-yahoo@perenite.com>
+Message-ID: <20140723134534.GF23220@titan.lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/18/2014 07:18 AM, Nicolas Pitre wrote:
-> The Inter Processor Interrupt is used to make another processor do a
-> specific action such as rescheduling tasks, signal a timer event or
-> execute something in another CPU's context. IRQs are already traceable
-> but IPIs were not. Tracing them is useful for monitoring IPI latency,
-> or to verify when they are the source of CPU wake-ups with power
-> management implications.
->
-> Three trace hooks are defined: ipi_raise, ipi_entry and ipi_exit. To make
-> them portable, a string is used to identify them and correlate related
-> events. Additionally, ipi_raise records a bitmask representing targeted
-> CPUs.
->
-> Signed-off-by: Nicolas Pitre <nico@linaro.org>
+Benoit,
 
-Acked-by: Daniel Lezcano <daniel.lezcano@linaro.org>
+Thanks for the patch!  A few minor things:
 
+Please Cc: the mvebu maintainers patches regarding Armada XP SoCs, I
+almost missed this. ;-)
 
+I know, we probably need to update MAINTAINERS for the dts{i} files...
+
+Also, Please adjust your Subject line to start with "ARM: mvebu: ...",
+you can use 'git log --oneline -- arch/arm/boot/dts/armada*' to get an
+idea of what we prefer to see.
+
+On Wed, Jul 23, 2014 at 05:07:11AM -0700, benoitm974 wrote:
+> Signed-off-by: benoitm974 <yahoo@perenite.com>
+
+Please use your real name here, as well as in the From: of the email.
 
 > ---
->   include/trace/events/ipi.h | 89 ++++++++++++++++++++++++++++++++++++++++++++++
->   1 file changed, 89 insertions(+)
->   create mode 100644 include/trace/events/ipi.h
->
-> diff --git a/include/trace/events/ipi.h b/include/trace/events/ipi.h
+>  arch/arm/boot/dts/Makefile                     |   1 +
+>  arch/arm/boot/dts/armada-xp-lenovo-ix4300d.dts | 267 +++++++++++++++++++++++++
+>  2 files changed, 268 insertions(+)
+>  create mode 100644 arch/arm/boot/dts/armada-xp-lenovo-ix4300d.dts
+> 
+> diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
+> index adb5ed9..f759dd2 100644
+> --- a/arch/arm/boot/dts/Makefile
+> +++ b/arch/arm/boot/dts/Makefile
+> @@ -438,6 +438,7 @@ dtb-$(CONFIG_MACH_ARMADA_XP) += \
+>  	armada-xp-db.dtb \
+>  	armada-xp-gp.dtb \
+>  	armada-xp-netgear-rn2120.dtb \
+> +	armada-xp-lenovo-ix4300d.dtb \
+>  	armada-xp-matrix.dtb \
+>  	armada-xp-openblocks-ax3-4.dtb
+
+Please place in alphabetical order.  Yes, I know it wasn't to begin
+with. :(  Feel free to fix it up while you are adding your line.
+
+>  dtb-$(CONFIG_MACH_DOVE) += dove-cm-a510.dtb \
+> diff --git a/arch/arm/boot/dts/armada-xp-lenovo-ix4300d.dts b/arch/arm/boot/dts/armada-xp-lenovo-ix4300d.dts
 > new file mode 100644
-> index 0000000000..834a7362a6
+> index 0000000..e04e7a6
 > --- /dev/null
-> +++ b/include/trace/events/ipi.h
-> @@ -0,0 +1,89 @@
-> +#undef TRACE_SYSTEM
-> +#define TRACE_SYSTEM ipi
-> +
-> +#if !defined(_TRACE_IPI_H) || defined(TRACE_HEADER_MULTI_READ)
-> +#define _TRACE_IPI_H
-> +
-> +#include <linux/tracepoint.h>
-> +
-> +/**
-> + * ipi_raise - called when a smp cross call is made
+> +++ b/arch/arm/boot/dts/armada-xp-lenovo-ix4300d.dts
+> @@ -0,0 +1,267 @@
+> +/*
+> + * Device Tree file for LENOVO IX4-300d
 > + *
-> + * @mask: mask of recipient CPUs for the IPI
-> + * @reason: string identifying the IPI purpose
+> + * Copyright (C) 2014, Benoit Masson <yahoo@perenite.com>
 > + *
-> + * It is necessary for @reason to be a static string declared with
-> + * __tracepoint_string.
+> + * This program is free software; you can redistribute it and/or
+> + * modify it under the terms of the GNU General Public License
+> + * as published by the Free Software Foundation; either version
+> + * 2 of the License, or (at your option) any later version.
 > + */
-> +TRACE_EVENT(ipi_raise,
 > +
-> +	TP_PROTO(const struct cpumask *mask, const char *reason),
+> +/dts-v1/;
 > +
-> +	TP_ARGS(mask, reason),
+> +#include <dt-bindings/input/input.h>
+> +#include <dt-bindings/gpio/gpio.h>
+> +#include "armada-xp-mv78230.dtsi"
 > +
-> +	TP_STRUCT__entry(
-> +		__bitmask(target_cpus, nr_cpumask_bits)
-> +		__field(const char *, reason)
-> +	),
+> +/ {
+> +	model = "LENOVO IX4-300d";
+> +	compatible = "lenovo,ix4-300d", "marvell,armadaxp-mv78230", "marvell,armadaxp", "marvell,armada-370-xp";
 > +
-> +	TP_fast_assign(
-> +		__assign_bitmask(target_cpus, cpumask_bits(mask), nr_cpumask_bits);
-> +		__entry->reason = reason;
-> +	),
+> +	chosen {
+> +		bootargs = "console=ttyS0,115200 earlyprintk";
+> +	};
 > +
-> +	TP_printk("target_mask=%s (%s)", __get_bitmask(target_cpus), __entry->reason)
-> +);
+> +	memory {
+> +		device_type = "memory";
+> +		reg = <0 0x00000000 0 0x20000000>; /* 512MB */
+> +	};
 > +
-> +DECLARE_EVENT_CLASS(ipi_handler,
+> +	soc {
+> +		ranges = <MBUS_ID(0xf0, 0x01) 0 0 0xd0000000 0x100000
+> +			  MBUS_ID(0x01, 0x1d) 0 0 0xfff00000 0x100000>;
 > +
-> +	TP_PROTO(const char *reason),
+> +		pcie-controller {
+> +			status = "okay";
 > +
-> +	TP_ARGS(reason),
+> +			pcie at 1,0 {
+> +				/* Port 0, Lane 0 */
+> +				status = "okay";
+> +			};
+> +			pcie at 5,0 {
+> +                                /* Port 1, Lane 0 */
+> +                                status = "okay";
+> +                        };
 > +
-> +	TP_STRUCT__entry(
-> +		__field(const char *, reason)
-> +	),
-> +
-> +	TP_fast_assign(
-> +		__entry->reason = reason;
-> +	),
-> +
-> +	TP_printk("(%s)", __entry->reason)
-> +);
-> +
-> +/**
-> + * ipi_entry - called immediately before the IPI handler
-> + *
-> + * @reason: string identifying the IPI purpose
-> + *
-> + * It is necessary for @reason to be a static string declared with
-> + * __tracepoint_string, ideally the same as used with trace_ipi_raise
-> + * for that IPI.
-> + */
-> +DEFINE_EVENT(ipi_handler, ipi_entry,
-> +
-> +	TP_PROTO(const char *reason),
-> +
-> +	TP_ARGS(reason)
-> +);
-> +
-> +/**
-> + * ipi_exit - called immediately after the IPI handler returns
-> + *
-> + * @reason: string identifying the IPI purpose
-> + *
-> + * It is necessary for @reason to be a static string declared with
-> + * __tracepoint_string, ideally the same as used with trace_ipi_raise for
-> + * that IPI.
-> + */
-> +DEFINE_EVENT(ipi_handler, ipi_exit,
-> +
-> +	TP_PROTO(const char *reason),
-> +
-> +	TP_ARGS(reason)
-> +);
-> +
-> +#endif /* _TRACE_IPI_H */
-> +
-> +/* This part must be outside protection */
-> +#include <trace/define_trace.h>
->
 
+spurious extra line, and it looks like you have some whitespace issues.
+Please make sure you use leading tabs.
 
--- 
-  <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
+> +		};
+> +
+> +		internal-regs {
+> +			pinctrl {
+> +				poweroff: poweroff {
+> +                                        marvell,pins = "mpp24";
+> +                                        marvell,function = "gpio";
+> +                                };
+> +
+> +                                power_button_pin: power-button-pin {
+> +                                        marvell,pins = "mpp44";
+> +                                        marvell,function = "gpio";
+> +                                };
+> +
+> +                                reset_button_pin: reset-button-pin {
+> +                                        marvell,pins = "mpp45";
+> +                                        marvell,function = "gpio";
+> +                                };
+> +				select_button_pin: select-button-pin {
+> +                                        marvell,pins = "mpp41";
+> +                                        marvell,function = "gpio";
+> +                                };
+> +
+> +                                scroll_button_pin: scroll-button-pin {
+> +                                        marvell,pins = "mpp42";
+> +                                        marvell,function = "gpio";
+> +                                };
+> +				hdd_led_pin: hdd-led-pin {
+> +					marvell,pins = "mpp26";
+> +					marvell,function = "gpio";
+> +		                };
 
-Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
-<http://twitter.com/#!/linaroorg> Twitter |
-<http://www.linaro.org/linaro-blog/> Blog
+More leading tabs issues in this block.
+
+> +			};
+> +
+> +			serial at 12000 {
+> +				clocks = <&coreclk 0>;
+> +				status = "okay";
+> +			};
+> +
+> +			mdio {
+> +				phy0: ethernet-phy at 0 { /* Marvell 88E1318 */
+> +					reg = <0>;
+> +				};
+> +
+> +				phy1: ethernet-phy at 1 { /* Marvell 88E1318 */
+> +					reg = <1>;
+> +				};
+> +			};
+> +
+> +			ethernet at 70000 {
+> +				status = "okay";
+> +				phy = <&phy0>;
+> +				phy-mode = "rgmii-id";
+> +			};
+> +
+> +			ethernet at 74000 {
+> +				status = "okay";
+> +				phy = <&phy1>;
+> +				phy-mode = "rgmii-id";
+> +			};
+> +
+> +			usb at 50000 {
+> +                                status = "okay";
+> +                        };
+> +
+> +                        usb at 51000 {
+> +                                status = "okay";
+> +                        };
+
+And here.
+
+> +
+> +			i2c at 11000 {
+> +				compatible = "marvell,mv78230-a0-i2c", "marvell,mv64xxx-i2c";
+> +                                clock-frequency = <400000>;
+
+And here.
+
+> +				status = "okay";
+> +
+> +				adt7473 at 2e {
+> +					compatible = "adt7473";
+> +					reg = <0x2e>;
+> +				};
+> +
+> +				pcf8563 at 51 {
+> +					compatible = "pcf8563";
+> +					reg = <0x51>;
+> +				};
+> +
+> +			};
+
+Need an empty line here.
+
+> +			nand at d0000 {
+> +                                status = "okay";
+> +                                num-cs = <1>;
+> +                                marvell,nand-keep-config;
+> +                                marvell,nand-enable-arbiter;
+> +                                nand-on-flash-bbt;
+> +
+> +                                partition at 0 {
+> +                                        label = "u-boot";
+> +                                        reg = <0x0000000 0xe0000>;
+> +                                        read-only;
+> +                                };
+> +
+> +                                partition at e0000 {
+> +                                        label = "u-boot-env";
+> +                                        reg = <0xe0000 0x20000>;
+> +                                        read-only;
+> +                                };
+> +
+> +                                partition at 100000 {
+> +                                        label = "u-boot-env2";
+> +                                        reg = <0x100000 0x20000>;
+> +					read-only;
+> +                                };
+> +
+> +                                partition at 120000 {
+> +                                        label = "zImage";
+> +                                        reg = <0x120000 0x400000>;
+> +                                };
+> +
+> +                                partition at 520000 {
+> +                                        label = "initrd";
+> +                                        reg = <0x520000 0x400000>;
+> +                                };
+> +                                partition at xE00000 {
+> +                                        label = "boot";
+> +                                        reg = <0xE00000 0x3F200000>;
+> +                                };
+> +                                partition at flash {
+> +                                        label = "flash";
+> +                                        reg = <0x0 0x40000000>;
+> +                                };
+> +                        };
+> +
+
+Don't need this empty line.
+
+> +		};
+> +	};
+
+Empty line here.
+
+> +	gpio-keys {
+> +                compatible = "gpio-keys";
+> +		pinctrl-0 = <&power_button_pin &reset_button_pin &select_button_pin &scroll_button_pin>;
+
+Yeah... I think you get the point ;-) please check the rest of the
+patch.  I'll stop mentioning it.
+
+> +                pinctrl-names = "default";
+> +
+> +                power-button {
+> +                        label = "Power Button";
+> +                        linux,code = <KEY_POWER>;
+> +                        gpios = <&gpio1 12 GPIO_ACTIVE_HIGH>;
+> +                };
+> +                reset-button {
+> +                        label = "Reset Button";
+> +                        linux,code = <KEY_RESTART>;
+> +                        gpios = <&gpio1 13 GPIO_ACTIVE_LOW>;
+> +                };
+> +		select-button {
+> +                        label = "Select Button";
+> +                        linux,code = <BTN_SELECT>;
+> +                        gpios = <&gpio1 9 GPIO_ACTIVE_LOW>;
+> +                };
+> +		scroll-button {
+> +                        label = "Scroll Button";
+> +                        linux,code = <KEY_SCROLLDOWN>;
+> +                        gpios = <&gpio1 10 GPIO_ACTIVE_LOW>;
+> +                };
+> +        };
+> +
+> +	spi3 {
+> +                compatible = "spi-gpio";
+> +                status = "okay";
+> +                gpio-sck = <&gpio0 25 0>;
+> +                gpio-mosi = <&gpio1 15 0>; /*gpio 47*/
+> +                cs-gpios = <&gpio0 27 0 >;
+
+I know no one else does it, but please use GPIO_ACTIVE_HIGH for these
+three.
+
+> +                num-chipselects = <1>;
+> +                #address-cells = <1>;
+> +                #size-cells = <0>;
+> +
+> +                gpio2: gpio2 at 0 {
+> +                        compatible = "fairchild,74hc595";
+> +                        gpio-controller;
+> +                        #gpio-cells = <2>;
+> +                        reg = <0>;
+> +                        registers-number = <2>;
+> +                        spi-max-frequency = <100000>;
+> +                };
+> +	};
+> +
+> +	gpio-leds {
+> +                compatible = "gpio-leds";
+> +		pinctrl-0 = <&hdd_led_pin>;
+> +		pinctrl-names = "default";
+> +
+> +		hdd-led {
+> +                        label = "ix4300d:blue:hdd";
+> +                        gpios = <&gpio0 26 GPIO_ACTIVE_HIGH>;
+> +                        default-state = "off";
+> +                };
+> +
+> +		power-led {
+> +                        label = "ix4300d:power";
+> +                        gpios = <&gpio2 1 GPIO_ACTIVE_LOW>;
+> +			linux,default-trigger = "timer"; /* init blinking while booting */
+
+Watch >80 char lines.
+
+> +                        default-state = "on";
+> +                };
+> +
+> +		sysfail-led {
+> +                        label = "ix4300d:sysfail:red";
+> +                        gpios = <&gpio2 2 GPIO_ACTIVE_HIGH>;
+> +                        default-state = "off";
+> +                };
+> +		sys-led {
+> +                        label = "ix4300d:sys:blue";
+> +                        gpios = <&gpio2 3 GPIO_ACTIVE_HIGH>;
+> +                        default-state = "off";
+> +                };
+> +		hddfail-led {
+> +                        label = "ix4300d:hddfail:red";
+> +                        gpios = <&gpio2 4 GPIO_ACTIVE_HIGH>;
+> +                        default-state = "off";
+> +                };
+> +
+> +	};
+> +	/* warning: you need both eth1 & 0 to be initialize for poweroff to shutdown otherwise it reboots */
+
+Same here, please convert to multi-line comment.
+
+> +	gpio-poweroff {
+> +                compatible = "gpio-poweroff";
+> +                pinctrl-0 = <&poweroff>;
+> +                pinctrl-names = "default";
+> +                gpios = <&gpio0 24 GPIO_ACTIVE_HIGH>;
+> +        };
+> +
+> +};
+
+This is a great first version, it really just a bunch of minor details
+to fixup for v2.  Please Cc myself, Andrew, Gregory, and Sebastian when
+you send v2.  I've included them in the Cc.
+
+thx,
+
+Jason.
