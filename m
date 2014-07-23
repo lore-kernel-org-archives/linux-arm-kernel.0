@@ -1,54 +1,248 @@
-From: andrew@lunn.ch (Andrew Lunn)
-Date: Thu, 24 Jul 2014 01:29:09 +0200
-Subject: [PATCH 2/2] ARM: mvebu: Added dts defintion for Lenovo Iomega
- ix4-300d NAS
-In-Reply-To: <20140723232715.GL23220@titan.lakedaemon.net>
-References: <1406155973-13657-1-git-send-email-yahoo@perenite.com>
- <20140723232715.GL23220@titan.lakedaemon.net>
-Message-ID: <20140723232909.GE28485@lunn.ch>
+From: rjw@rjwysocki.net (Rafael J. Wysocki)
+Date: Thu, 24 Jul 2014 01:58:06 +0200
+Subject: [PATCH v2] cpufreq: tests: Providing cpufreq regression test
+In-Reply-To: <1405926154-27214-1-git-send-email-l.majewski@samsung.com>
+References: <1405678985-21677-1-git-send-email-l.majewski@samsung.com>
+ <1405926154-27214-1-git-send-email-l.majewski@samsung.com>
+Message-ID: <3777635.Nvoh2EpFlu@vostro.rjw.lan>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> On Wed, Jul 23, 2014 at 03:52:53PM -0700, Benoit Masson wrote:
-> > The Lenovo Iomega ix4-300d is a 4-Bay sata NAS with dual Gb,
-> >  USB2.0 & 3.0, powered by a Marvell Armada XP MV78230 dual core CPU.
-> > 
-> > http://shop.lenovo.com/fr/fr/servers/network-storage/lenovoemc/ix4-300d/
-> > Signed-off-by: Benoit Masson <yahoo@perenite.com>
-> > ---
-> >  arch/arm/boot/dts/Makefile                      |   3 +-
-> >  arch/arm/boot/dts/armada-xp-lenovo-ix4-300d.dts | 284 ++++++++++++++++++++++++
-> >  2 files changed, 286 insertions(+), 1 deletion(-)
-> >  create mode 100644 arch/arm/boot/dts/armada-xp-lenovo-ix4-300d.dts
-> ...
-> > diff --git a/arch/arm/boot/dts/armada-xp-lenovo-ix4-300d.dts b/arch/arm/boot/dts/armada-xp-lenovo-ix4-300d.dts
-> > new file mode 100644
-> > index 0000000..1f33cbc
-> > --- /dev/null
-> > +++ b/arch/arm/boot/dts/armada-xp-lenovo-ix4-300d.dts
-> ...
-> > +	/* Warning: you need both eth1 & 0 PHY initialized
-> > +		(i.e having them up does the tweak)
-> > +		for poweroff to shutdown otherwise it reboots */
+On Monday, July 21, 2014 09:02:34 AM Lukasz Majewski wrote:
+> This commit adds first regression test "cpufreq_freq_test.sh" for the
+> cpufreq subsystem.
+
+First of all, I'm not seeing any explanation why this script should be
+shipped with the kernel.
+
+What regressions it tests against in particular and how it does that.
+
+Please write that down in the changelog.  It doesn't need to be very
+detailed.
+
+Second, I'm not sure this is the first such test (someone already
+mentioned cpupower).
+
+> Signed-off-by: Lukasz Majewski <l.majewski@samsung.com>
 > 
-> nit: multi-line comments are like this:
+> ---
+> Changes for v2:
+> - Replace *_PATCH with *_PATH for variables names
+> - Corrected mistakes in the README file
+> - Providing detailed explanation of the patch in the README file
+> ---
+>  drivers/cpufreq/tests/README               |  33 +++++++
+>  drivers/cpufreq/tests/cpufreq_freq_test.sh | 149 +++++++++++++++++++++++++++++
+>  2 files changed, 182 insertions(+)
+>  create mode 100644 drivers/cpufreq/tests/README
+>  create mode 100755 drivers/cpufreq/tests/cpufreq_freq_test.sh
 > 
-> 	/*
-> 	 * Warning: you need both eth1 & 0 PHY initialized (i.e having
-> 	 * them up does the tweak) for poweroff to shutdown otherwise it
-> 	 * reboots
-> 	 */
+> diff --git a/drivers/cpufreq/tests/README b/drivers/cpufreq/tests/README
+
+drivers/cpufreq/ is not a place for scripts.
+
+We have scripts/ for that and you can add a "power" subdirectory in there
+and put your script into it.
+
+Alternatively, you can use the existing tools/power/ directory for that (but
+then please add a subdirectory for your script).
+
+> new file mode 100644
+> index 0000000..3e9cd80
+> --- /dev/null
+> +++ b/drivers/cpufreq/tests/README
+> @@ -0,0 +1,33 @@
+> +This file contains list of cpufreq's available regression tests with a short
+> +usage description.
+> +
+> +1. cpufreq_freq_test.sh
+> +
+> +Description:
+> +------------
+> +This script is supposed to test if cpufreq attributes exported by sysfs are
+> +exposing correct values.
+> +
+> +To achieve this goal it saves the current governor and changes it to
+> +"performance". Afterwards, it reads the "scaling_available_frequencies"
+> +property. With the list of supported frequencies it is able to enforce each of
+> +them by writing to "scaling_max_freq" attribute. To make the test more reliable
+> +a superfluous load with gzip is created to be sure that we are running with
+> +highest possible frequency. This high load is regulated with the 'sleep'
+> +duration. After this time the "cpufreq_cur_freq" is read and compared with the
+> +original value. As the last step the original governor is restored.
+> +
+> +This script can work with or without BOOST enabled and helps in spotting errors
+> +related to cpufreq and common clock framework.
+> +
+> +Used attributes:
+> +----------------
+> +- "scaling_available_frequencies"
+> +- "cpuinfo_cur_freq"
+> +- "scaling_governor"
+> +- "scaling_max_freq"
+> +
+> +Target devices:
+> +---------------
+> +
+> +All devices which exports mentioned above sysfs attributes.
+> \ No newline at end of file
+> diff --git a/drivers/cpufreq/tests/cpufreq_freq_test.sh b/drivers/cpufreq/tests/cpufreq_freq_test.sh
+> new file mode 100755
+> index 0000000..c25f05c
+> --- /dev/null
+> +++ b/drivers/cpufreq/tests/cpufreq_freq_test.sh
+> @@ -0,0 +1,149 @@
+> +#!/bin/bash
+> +#
+> +# This file provides a simple mean to test if all declared freqs at
+> +# "scaling_available_frequencies" can be set and if "cpuinfo_cur_freq"
+> +# returns this value.
+> +#
+> +# Usage: ./cpufreq_freq_test.sh
+> +# Requisite: Compiled in "performance" governor
+> +#
+> +# This program is free software; you can redistribute it and/or modify
+> +# it under the terms of the GNU General Public License as published by
+> +# the Free Software Foundation; either version 2 of the License, or
+> +# (at your option) any later version.
+> +#
+> +# This program is distributed in the hope that it will be useful,
+> +# but WITHOUT ANY WARRANTY; without even the implied warranty of
+> +# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+> +# GNU General Public License for more details.
+> +#
+> +# You should have received a copy of the GNU General Public License
+> +# along with this program; if not, you can access it online at
+> +# http://www.gnu.org/licenses/gpl-2.0.html.
+> +#
+> +# Copyright (C) Samsung Electronics, 2014
+> +#
+> +# Author: Lukasz Majewski <l.majewski@samsung.com>
+> +
+> +set +x
+> +
+> +COLOUR_RED="\33[31m"
+> +COLOUR_BLUE="\33[34m"
+> +COLOUR_GREEN="\33[32m"
+> +COLOUR_DEFAULT="\33[0m"
+> +
+> +T_PATH=/sys/devices/system/cpu/cpu0/cpufreq
+> +BOOST_PATH=/sys/devices/system/cpu/cpufreq
+> +
+> +if [ ! -d "$T_PATH" ]; then
+> +    printf "   $COLOUR_RED No path to CPUFREQ $COLOUR_DEFAULT\n"
+> +    exit 1
+> +fi
+> +
+> +ERRORS=0
+> +
+> +OLD_GOV=`cat $T_PATH/scaling_governor`
+> +echo "CURRENT GOVERNOR: $OLD_GOV"
+> +echo "SET GOVERNOR: performance"
+> +echo "performance" > $T_PATH/scaling_governor
+> +
+> +function test_freqs1 {
+> +    FREQS=`cat $1`
+> +    for I in $FREQS; do
+> +	cpufreq_set_freq $I
+> +	if [ "$2" ]; then
+> +	    printf "$COLOUR_BLUE BOOST $COLOUR_DEFAULT" $I
+> +	fi
+> +	cpufreq_test_freq $I
+> +    done
+> +}
+> +
+> +function test_freqs2 {
+> +    FREQ=`cat $1`
+> +    FREQS_ARRAY=($FREQ)
+> +
+> +    for freq in ${FREQS_ARRAY[@]}
+> +    do
+> +	echo "REFERENCE FREQ: $freq"
+> +	for f in ${FREQS_ARRAY[@]}
+> +	do
+> +	    cpufreq_set_freq $freq
+> +	    echo -n "----> "
+> +	    cpufreq_set_freq $f
+> +	    cpufreq_test_freq $f
+> +	done
+> +    done
+> +}
+> +
+> +function restore {
+> +    if [ -f $BOOST_PATH/boost ]; then
+> +	cpufreq_boost_state $BOOST_STATE
+> +    fi
+> +
+> +    echo "SET GOVERNOR: $OLD_GOV"
+> +    echo $OLD_GOV > $T_PATH/scaling_governor
+> +}
+> +
+> +function die {
+> +    printf "   $COLOUR_RED FAILED $COLOUR_DEFAULT\n"
+> +    restore_gov
+> +    exit 1
+> +}
+> +
+> +function cpufreq_test_freq {
+> +    gzip < /dev/urandom > /dev/null &
+> +    pid=$!
+> +    sleep 0.1
+> +    CURR_FREQ=`cat $T_PATH/cpuinfo_cur_freq`
+> +    if [ $1 -eq $CURR_FREQ ]; then
+> +	printf "\t$COLOUR_GREEN OK $COLOUR_DEFAULT\n"
+> +    else
+> +	printf "$COLOUR_RED CURRENT $CURR_FREQ $COLOUR_DEFAULT\n"
+> +	ERRORS=`expr $ERRORS + 1`
+> +	#die
+> +    fi
+> +    kill -9 $pid
+> +    wait $! 2>/dev/null
+> +}
+> +
+> +function cpufreq_set_freq {
+> +    echo $1 > $T_PATH/scaling_max_freq || die $?
+> +    printf "FREQ:$COLOUR_GREEN %s $COLOUR_DEFAULT" $1
+> +}
+> +
+> +function cpufreq_boost_state {
+> +   echo $1 > $BOOST_PATH/boost
+> +}
+> +
+> +function cpufreq_boost_status {
+> +   cat $BOOST_PATH/boost
+> +}
+> +
+> +if [ -f $BOOST_PATH/boost ]; then
+> +    echo "######################################"
+> +    echo "TEST BOOST OPERATION"
+> +    echo "######################################"
+> +
+> +    BOOST_STATE=$(cpufreq_boost_status)
+> +    if [ $BOOST_STATE -eq 0 ]; then
+> +	cpufreq_boost_state 1
+> +    fi
+> +    test_freqs1 $T_PATH/scaling_boost_frequencies 1
+> +fi
+> +
+> +echo "######################################"
+> +echo "TEST AVAILABLE FREQS"
+> +echo "######################################"
+> +test_freqs1 $T_PATH/scaling_available_frequencies
+> +
+> +echo "######################################"
+> +echo "TEST FREQS SWITCHING"
+> +echo "######################################"
+> +test_freqs2 $T_PATH/scaling_available_frequencies
+> +
+> +echo "######################################"
+> +echo "ERRORS: $ERRORS"
+> +echo "######################################"
+> +
+> +restore
+> +exit 0
 > 
-> If that's the only thing left, I'll fix it up when I pull it in.  No
-> need to respin just for this.
 
-Hi Jason
-
-We should not really leave the i2c compatibility string as it is.
-Hopefully the OEM moved onto B1 stepping at some point.  Although B1
-devices will work with the workaround, you get better performance
-without it.
-
-We should wait for Gregory to look at the quirk and soc-id code.
-
-   Andrew
+-- 
+I speak only for myself.
+Rafael J. Wysocki, Intel Open Source Technology Center.
