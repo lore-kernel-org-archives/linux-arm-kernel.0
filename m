@@ -1,301 +1,62 @@
-From: yahoo@perenite.com (benoitm974)
-Date: Wed, 23 Jul 2014 05:07:11 -0700
-Subject: [PATCH 1/2] Added dts defintion for Lenovo ix4-300d nas
-Message-ID: <1406117232-5962-1-git-send-email-yahoo@perenite.com>
+From: LW@KARO-electronics.de (Lothar =?UTF-8?B?V2HDn21hbm4=?=)
+Date: Wed, 23 Jul 2014 14:11:41 +0200
+Subject: [PATCH v5 1/2] i2c: add DMA support for freescale i2c driver
+In-Reply-To: <b1778af62e7b42b39381fb2699b34eb1@BL2PR03MB338.namprd03.prod.outlook.com>
+References: <1406103883-3572-1-git-send-email-yao.yuan@freescale.com>
+ <1406103883-3572-2-git-send-email-yao.yuan@freescale.com>
+ <20140723114834.411f6bb4@ipc1.ka-ro>
+ <b1778af62e7b42b39381fb2699b34eb1@BL2PR03MB338.namprd03.prod.outlook.com>
+Message-ID: <20140723141141.6ac64f85@ipc1.ka-ro>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Signed-off-by: benoitm974 <yahoo@perenite.com>
----
- arch/arm/boot/dts/Makefile                     |   1 +
- arch/arm/boot/dts/armada-xp-lenovo-ix4300d.dts | 267 +++++++++++++++++++++++++
- 2 files changed, 268 insertions(+)
- create mode 100644 arch/arm/boot/dts/armada-xp-lenovo-ix4300d.dts
+Hi,
 
-diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
-index adb5ed9..f759dd2 100644
---- a/arch/arm/boot/dts/Makefile
-+++ b/arch/arm/boot/dts/Makefile
-@@ -438,6 +438,7 @@ dtb-$(CONFIG_MACH_ARMADA_XP) += \
- 	armada-xp-db.dtb \
- 	armada-xp-gp.dtb \
- 	armada-xp-netgear-rn2120.dtb \
-+	armada-xp-lenovo-ix4300d.dtb \
- 	armada-xp-matrix.dtb \
- 	armada-xp-openblocks-ax3-4.dtb
- dtb-$(CONFIG_MACH_DOVE) += dove-cm-a510.dtb \
-diff --git a/arch/arm/boot/dts/armada-xp-lenovo-ix4300d.dts b/arch/arm/boot/dts/armada-xp-lenovo-ix4300d.dts
-new file mode 100644
-index 0000000..e04e7a6
---- /dev/null
-+++ b/arch/arm/boot/dts/armada-xp-lenovo-ix4300d.dts
-@@ -0,0 +1,267 @@
-+/*
-+ * Device Tree file for LENOVO IX4-300d
-+ *
-+ * Copyright (C) 2014, Benoit Masson <yahoo@perenite.com>
-+ *
-+ * This program is free software; you can redistribute it and/or
-+ * modify it under the terms of the GNU General Public License
-+ * as published by the Free Software Foundation; either version
-+ * 2 of the License, or (at your option) any later version.
-+ */
-+
-+/dts-v1/;
-+
-+#include <dt-bindings/input/input.h>
-+#include <dt-bindings/gpio/gpio.h>
-+#include "armada-xp-mv78230.dtsi"
-+
-+/ {
-+	model = "LENOVO IX4-300d";
-+	compatible = "lenovo,ix4-300d", "marvell,armadaxp-mv78230", "marvell,armadaxp", "marvell,armada-370-xp";
-+
-+	chosen {
-+		bootargs = "console=ttyS0,115200 earlyprintk";
-+	};
-+
-+	memory {
-+		device_type = "memory";
-+		reg = <0 0x00000000 0 0x20000000>; /* 512MB */
-+	};
-+
-+	soc {
-+		ranges = <MBUS_ID(0xf0, 0x01) 0 0 0xd0000000 0x100000
-+			  MBUS_ID(0x01, 0x1d) 0 0 0xfff00000 0x100000>;
-+
-+		pcie-controller {
-+			status = "okay";
-+
-+			pcie at 1,0 {
-+				/* Port 0, Lane 0 */
-+				status = "okay";
-+			};
-+			pcie at 5,0 {
-+                                /* Port 1, Lane 0 */
-+                                status = "okay";
-+                        };
-+
-+		};
-+
-+		internal-regs {
-+			pinctrl {
-+				poweroff: poweroff {
-+                                        marvell,pins = "mpp24";
-+                                        marvell,function = "gpio";
-+                                };
-+
-+                                power_button_pin: power-button-pin {
-+                                        marvell,pins = "mpp44";
-+                                        marvell,function = "gpio";
-+                                };
-+
-+                                reset_button_pin: reset-button-pin {
-+                                        marvell,pins = "mpp45";
-+                                        marvell,function = "gpio";
-+                                };
-+				select_button_pin: select-button-pin {
-+                                        marvell,pins = "mpp41";
-+                                        marvell,function = "gpio";
-+                                };
-+
-+                                scroll_button_pin: scroll-button-pin {
-+                                        marvell,pins = "mpp42";
-+                                        marvell,function = "gpio";
-+                                };
-+				hdd_led_pin: hdd-led-pin {
-+					marvell,pins = "mpp26";
-+					marvell,function = "gpio";
-+		                };
-+			};
-+
-+			serial at 12000 {
-+				clocks = <&coreclk 0>;
-+				status = "okay";
-+			};
-+
-+			mdio {
-+				phy0: ethernet-phy at 0 { /* Marvell 88E1318 */
-+					reg = <0>;
-+				};
-+
-+				phy1: ethernet-phy at 1 { /* Marvell 88E1318 */
-+					reg = <1>;
-+				};
-+			};
-+
-+			ethernet at 70000 {
-+				status = "okay";
-+				phy = <&phy0>;
-+				phy-mode = "rgmii-id";
-+			};
-+
-+			ethernet at 74000 {
-+				status = "okay";
-+				phy = <&phy1>;
-+				phy-mode = "rgmii-id";
-+			};
-+
-+			usb at 50000 {
-+                                status = "okay";
-+                        };
-+
-+                        usb at 51000 {
-+                                status = "okay";
-+                        };
-+
-+			i2c at 11000 {
-+				compatible = "marvell,mv78230-a0-i2c", "marvell,mv64xxx-i2c";
-+                                clock-frequency = <400000>;
-+				status = "okay";
-+
-+				adt7473 at 2e {
-+					compatible = "adt7473";
-+					reg = <0x2e>;
-+				};
-+
-+				pcf8563 at 51 {
-+					compatible = "pcf8563";
-+					reg = <0x51>;
-+				};
-+
-+			};
-+			nand at d0000 {
-+                                status = "okay";
-+                                num-cs = <1>;
-+                                marvell,nand-keep-config;
-+                                marvell,nand-enable-arbiter;
-+                                nand-on-flash-bbt;
-+
-+                                partition at 0 {
-+                                        label = "u-boot";
-+                                        reg = <0x0000000 0xe0000>;
-+                                        read-only;
-+                                };
-+
-+                                partition at e0000 {
-+                                        label = "u-boot-env";
-+                                        reg = <0xe0000 0x20000>;
-+                                        read-only;
-+                                };
-+
-+                                partition at 100000 {
-+                                        label = "u-boot-env2";
-+                                        reg = <0x100000 0x20000>;
-+					read-only;
-+                                };
-+
-+                                partition at 120000 {
-+                                        label = "zImage";
-+                                        reg = <0x120000 0x400000>;
-+                                };
-+
-+                                partition at 520000 {
-+                                        label = "initrd";
-+                                        reg = <0x520000 0x400000>;
-+                                };
-+                                partition at xE00000 {
-+                                        label = "boot";
-+                                        reg = <0xE00000 0x3F200000>;
-+                                };
-+                                partition at flash {
-+                                        label = "flash";
-+                                        reg = <0x0 0x40000000>;
-+                                };
-+                        };
-+
-+		};
-+	};
-+	gpio-keys {
-+                compatible = "gpio-keys";
-+		pinctrl-0 = <&power_button_pin &reset_button_pin &select_button_pin &scroll_button_pin>;
-+                pinctrl-names = "default";
-+
-+                power-button {
-+                        label = "Power Button";
-+                        linux,code = <KEY_POWER>;
-+                        gpios = <&gpio1 12 GPIO_ACTIVE_HIGH>;
-+                };
-+                reset-button {
-+                        label = "Reset Button";
-+                        linux,code = <KEY_RESTART>;
-+                        gpios = <&gpio1 13 GPIO_ACTIVE_LOW>;
-+                };
-+		select-button {
-+                        label = "Select Button";
-+                        linux,code = <BTN_SELECT>;
-+                        gpios = <&gpio1 9 GPIO_ACTIVE_LOW>;
-+                };
-+		scroll-button {
-+                        label = "Scroll Button";
-+                        linux,code = <KEY_SCROLLDOWN>;
-+                        gpios = <&gpio1 10 GPIO_ACTIVE_LOW>;
-+                };
-+        };
-+
-+	spi3 {
-+                compatible = "spi-gpio";
-+                status = "okay";
-+                gpio-sck = <&gpio0 25 0>;
-+                gpio-mosi = <&gpio1 15 0>; /*gpio 47*/
-+                cs-gpios = <&gpio0 27 0 >;
-+                num-chipselects = <1>;
-+                #address-cells = <1>;
-+                #size-cells = <0>;
-+
-+                gpio2: gpio2 at 0 {
-+                        compatible = "fairchild,74hc595";
-+                        gpio-controller;
-+                        #gpio-cells = <2>;
-+                        reg = <0>;
-+                        registers-number = <2>;
-+                        spi-max-frequency = <100000>;
-+                };
-+	};
-+
-+	gpio-leds {
-+                compatible = "gpio-leds";
-+		pinctrl-0 = <&hdd_led_pin>;
-+		pinctrl-names = "default";
-+
-+		hdd-led {
-+                        label = "ix4300d:blue:hdd";
-+                        gpios = <&gpio0 26 GPIO_ACTIVE_HIGH>;
-+                        default-state = "off";
-+                };
-+
-+		power-led {
-+                        label = "ix4300d:power";
-+                        gpios = <&gpio2 1 GPIO_ACTIVE_LOW>;
-+			linux,default-trigger = "timer"; /* init blinking while booting */
-+                        default-state = "on";
-+                };
-+
-+		sysfail-led {
-+                        label = "ix4300d:sysfail:red";
-+                        gpios = <&gpio2 2 GPIO_ACTIVE_HIGH>;
-+                        default-state = "off";
-+                };
-+		sys-led {
-+                        label = "ix4300d:sys:blue";
-+                        gpios = <&gpio2 3 GPIO_ACTIVE_HIGH>;
-+                        default-state = "off";
-+                };
-+		hddfail-led {
-+                        label = "ix4300d:hddfail:red";
-+                        gpios = <&gpio2 4 GPIO_ACTIVE_HIGH>;
-+                        default-state = "off";
-+                };
-+
-+	};
-+	/* warning: you need both eth1 & 0 to be initialize for poweroff to shutdown otherwise it reboots */
-+	gpio-poweroff {
-+                compatible = "gpio-poweroff";
-+                pinctrl-0 = <&poweroff>;
-+                pinctrl-names = "default";
-+                gpios = <&gpio0 24 GPIO_ACTIVE_HIGH>;
-+        };
-+
-+};
+Yao Yuan wrote:
+> Hi,
+> 
+> Thanks for your review.
+> 
+> Lothar Wa?mann wrote:
+> > Yuan Yao wrote:
+> > > Add dma support for i2c. This function depend on DMA driver.
+> > > You can turn on it by write both the dmas and dma-name properties in dts node.
+> > >
+> > > Signed-off-by: Yuan Yao <yao.yuan@freescale.com>
+> > > ---
+> > >  drivers/i2c/busses/i2c-imx.c | 377
+> [...]
+> > > +
+> > > +fail_rx:
+> > > +	dma_release_channel(dma->chan_rx);
+> > > +fail_tx:
+> > > +	dma_release_channel(dma->chan_tx);
+> > > +fail_al:
+> > > +	devm_kfree(dev, dma);
+> > >
+> > No need for this one (that's the whole point of using devm_kzalloc())!
+> > 
+> 
+> When DMA request failed, I2C will switch to PIO mode. So if the failed reason is just like DMA channel request failed. At this time the DMA should free by devm_kfree(). Is it?
+> 
+OK. I didn't notice that failing DMA support wasn't a showstopper for
+the whole driver.
+In this case I would remove the 'failed' from the messages inside 
+i2c_imx_dma_request() to make them more benign looking and output them
+with dev_dbg(), so they can be en-/disabled with CONFIG_I2C_DEBUG_BUS.
+
+What about returning -EPROBE_DEFER in appropriate cases (when there is
+a chance that the DMA driver will be probed later than the I2C driver)?
+
+
+Lothar Wa?mann
 -- 
-1.9.1
+___________________________________________________________
+
+Ka-Ro electronics GmbH | Pascalstra?e 22 | D - 52076 Aachen
+Phone: +49 2408 1402-0 | Fax: +49 2408 1402-10
+Gesch?ftsf?hrer: Matthias Kaussen
+Handelsregistereintrag: Amtsgericht Aachen, HRB 4996
+
+www.karo-electronics.de | info at karo-electronics.de
+___________________________________________________________
