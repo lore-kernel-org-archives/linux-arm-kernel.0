@@ -1,19 +1,44 @@
-From: t.figa@samsung.com (Tomasz Figa)
-Date: Wed, 23 Jul 2014 14:47:42 +0200
-Subject: [PATCH v2 1/2] clk: samsung: exynos4: Enable ARMCLK down feature
-In-Reply-To: <1405694193-29643-1-git-send-email-k.kozlowski@samsung.com>
-References: <1405694193-29643-1-git-send-email-k.kozlowski@samsung.com>
-Message-ID: <53CFAEEE.7040702@samsung.com>
+From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
+Date: Wed, 23 Jul 2014 15:00:39 +0200
+Subject: [PATCHv3 02/16] ARM: mvebu: sort the #include of pmsu.c in alphabetic
+ order
+In-Reply-To: <1406120453-29291-1-git-send-email-thomas.petazzoni@free-electrons.com>
+References: <1406120453-29291-1-git-send-email-thomas.petazzoni@free-electrons.com>
+Message-ID: <1406120453-29291-3-git-send-email-thomas.petazzoni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Krzysztof,
+From: Gregory CLEMENT <gregory.clement@free-electrons.com>
 
-On 18.07.2014 16:36, Krzysztof Kozlowski wrote:
-> Enable ARMCLK down feature on all Exynos4 SoCs. The frequency of
-> ARMCLK will be reduced upon entering idle mode (WFI or WFE).
+Sorting the headers in alphabetic order will help to reduce conflicts
+when adding new headers later.
 
-Will apply the whole series to Samsung clock tree.
+Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
+Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
+---
+ arch/arm/mach-mvebu/pmsu.c | 6 +++---
+ 1 file changed, 3 insertions(+), 3 deletions(-)
 
-Best regards,
-Tomasz
+diff --git a/arch/arm/mach-mvebu/pmsu.c b/arch/arm/mach-mvebu/pmsu.c
+index 5fda549..9e18cce 100644
+--- a/arch/arm/mach-mvebu/pmsu.c
++++ b/arch/arm/mach-mvebu/pmsu.c
+@@ -19,13 +19,13 @@
+ #define pr_fmt(fmt) "mvebu-pmsu: " fmt
+ 
+ #include <linux/cpu_pm.h>
+-#include <linux/kernel.h>
+ #include <linux/init.h>
+-#include <linux/of_address.h>
+ #include <linux/io.h>
++#include <linux/kernel.h>
++#include <linux/of_address.h>
+ #include <linux/platform_device.h>
+-#include <linux/smp.h>
+ #include <linux/resource.h>
++#include <linux/smp.h>
+ #include <asm/cacheflush.h>
+ #include <asm/cp15.h>
+ #include <asm/smp_plat.h>
+-- 
+2.0.0
