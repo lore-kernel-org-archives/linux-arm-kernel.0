@@ -1,21 +1,27 @@
-From: marex@denx.de (Marek Vasut)
-Date: Wed, 23 Jul 2014 14:28:01 +0200
-Subject: [PATCH v5 0/2] i2c: add DMA support for freescale i2c driver
-In-Reply-To: <1406103883-3572-1-git-send-email-yao.yuan@freescale.com>
-References: <1406103883-3572-1-git-send-email-yao.yuan@freescale.com>
-Message-ID: <201407231428.01278.marex@denx.de>
+From: jason@lakedaemon.net (Jason Cooper)
+Date: Wed, 23 Jul 2014 08:32:43 -0400
+Subject: [PATCH -next] ARM: mvebu: fix return value check in
+ armada_xp_pmsu_cpufreq_init()
+In-Reply-To: <1406038688-26417-1-git-send-email-weiyj_lk@163.com>
+References: <1406038688-26417-1-git-send-email-weiyj_lk@163.com>
+Message-ID: <20140723123243.GE23220@titan.lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday, July 23, 2014 at 10:24:41 AM, Yuan Yao wrote:
-> Changed in v5:
-> - add "*chan_dev = dma->chan_using->device->dev" for reduce the call time.
+On Tue, Jul 22, 2014 at 10:18:08PM +0800, weiyj_lk at 163.com wrote:
+> From: Wei Yongjun <yongjun_wei@trendmicro.com.cn>
+> 
+> In case of error, the function clk_get() returns ERR_PTR()
+> and never returns NULL. The NULL test in the return value
+> check should be replaced with IS_ERR().
+> 
+> Signed-off-by: Wei Yongjun <yongjun_wei@trendmicro.com.cn>
+> ---
+>  arch/arm/mach-mvebu/pmsu.c | 4 ++--
+>  1 file changed, 2 insertions(+), 2 deletions(-)
 
-Did you check if the compiler generates different code ?
+Applied to mvebu/soc.
 
-> - add the test logs.
+thx,
 
-[...]
-
-Best regards,
-Marek Vasut
+Jason.
