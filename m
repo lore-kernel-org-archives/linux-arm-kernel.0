@@ -1,35 +1,32 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Wed, 23 Jul 2014 01:28:02 -0700
-Subject: [GIT PULL] ARM: OMAP2+: first set of hwmod data patches for v3.17
-In-Reply-To: <alpine.DEB.2.02.1407222120460.25593@utopia.booyaka.com>
-References: <alpine.DEB.2.02.1407222120460.25593@utopia.booyaka.com>
-Message-ID: <20140723082802.GJ18374@atomide.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Wed, 23 Jul 2014 10:45:40 +0200
+Subject: [PATCH 3/3] pinctrl: Introduce pinctrl driver for Qualcomm pm8xxx
+In-Reply-To: <CAJAp7Ojgf6iuSKtRnvyTCOxj5AwDA6W4eOeCpsfRqGAxcMPM1w@mail.gmail.com>
+References: <1404782785-1824-1-git-send-email-bjorn.andersson@sonymobile.com>
+ <1404782785-1824-4-git-send-email-bjorn.andersson@sonymobile.com>
+ <CACRpkdYqzsbisK-X22dwCcLFdvRm6-uJjNoEjv-h1-Jn6Uy-iw@mail.gmail.com>
+ <CAJAp7Ojgf6iuSKtRnvyTCOxj5AwDA6W4eOeCpsfRqGAxcMPM1w@mail.gmail.com>
+Message-ID: <CACRpkdZynmMjzB78ZUvxMiBEK_Lox5j0+Z8qGf_jvK184BLwHg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Paul Walmsley <paul@pwsan.com> [140722 14:24]:
-> Hi Tony
-> 
-> The following changes since commit a497c3ba1d97fc69c1e78e7b96435ba8c2cb42ee:
-> 
->   Linux 3.16-rc2 (2014-06-21 19:02:54 -1000)
-> 
-> are available in the git repository at:
-> 
->   git://git.kernel.org/pub/scm/linux/kernel/git/pjw/omap-pending.git tags/for-v3.17/omap-hwmod-a
-> 
-> for you to fetch changes up to c913c8a15a02e91c1f0302d68bebf66838a9689d:
-> 
->   ARM: DRA7: hwmod: Add data for RTC (2014-07-22 14:35:06 -0600)
-> 
-> ----------------------------------------------------------------
-> OMAP hwmod data additions for v3.17.  Most of these are DRA7xx-related,
-> although one patch adds DSS hwmods for AM43xx.
-> 
-> Basic build, boot, and PM test results are available here:
-> 
-> http://www.pwsan.com/omap/testlogs/hwmod-a-v3.17/20140722143514/
+On Tue, Jul 15, 2014 at 12:48 AM, Bjorn Andersson <bjorn@kryo.se> wrote:
+> On Wed, Jul 9, 2014 at 2:32 AM, Linus Walleij <linus.walleij@linaro.org> wrote:
+>> On Tue, Jul 8, 2014 at 3:26 AM, Bjorn Andersson
+> [...]
 
-Thanks pulling into omap-for-v3.17/soc.
+>> "direction" also seems a bit bool ... even "output_value".
+>>
+>
+> "direction" is 2 bits that can be both be set, unfortunately it's not entirely
+> clear to me what's expected when setting both; so I've copied the logic as good
+> as possible from the codeaurora driver.
 
-Tony
+Oh, can you do this?
+
+u8 foo:2;
+
+?
+
+Yours,
+Linus Walleij
