@@ -1,64 +1,32 @@
-From: nicolas.pitre@linaro.org (Nicolas Pitre)
-Date: Wed, 23 Jul 2014 18:00:11 -0400 (EDT)
-Subject: [PATCH 4/4] (RFC) X86: add IPI tracepoints
-In-Reply-To: <20140721185459.54c81bd5@gandalf.local.home>
-References: <1405660735-13408-1-git-send-email-nicolas.pitre@linaro.org>
- <1405660735-13408-5-git-send-email-nicolas.pitre@linaro.org>
- <20140718162750.62cbf965@gandalf.local.home>
- <alpine.LFD.2.11.1407181656160.3647@knanqh.ubzr>
- <20140721185459.54c81bd5@gandalf.local.home>
-Message-ID: <alpine.LFD.2.11.1407231751130.6061@knanqh.ubzr>
+From: eric@eukrea.com (Eric =?ISO-8859-1?B?QuluYXJk?=)
+Date: Thu, 24 Jul 2014 00:16:22 +0200
+Subject: iMX6Q - PCIe
+In-Reply-To: <CACUGKYP9w+qUUtp2LRKgD-Dz+2pubFeX82dGQ6tiv2Ji6VgVig@mail.gmail.com>
+References: <CACUGKYP9w+qUUtp2LRKgD-Dz+2pubFeX82dGQ6tiv2Ji6VgVig@mail.gmail.com>
+Message-ID: <20140724001622.2b475138@e6520eb>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 21 Jul 2014, Steven Rostedt wrote:
+Hi John,
 
-> On Fri, 18 Jul 2014 16:59:50 -0400 (EDT)
-> Nicolas Pitre <nicolas.pitre@linaro.org> wrote:
+Le Wed, 23 Jul 2014 14:49:15 -0700,
+John Tobias <john.tobias.ph@gmail.com> a ?crit :
+> I am trying to use the PCIe on iMX6Q and I am using kernel 3.15.2 and
+> AEH-AR9462-LC WFI-BT module.
 > 
-> > On Fri, 18 Jul 2014, Steven Rostedt wrote:
-> > 
-> > > On Fri, 18 Jul 2014 01:18:55 -0400
-> > > Nicolas Pitre <nicolas.pitre@linaro.org> wrote:
-> > > 
-> > >  
-> > > > diff --git a/arch/x86/kernel/smp.c b/arch/x86/kernel/smp.c
-> > > > index be8e1bde07..e154d176cf 100644
-> > > > --- a/arch/x86/kernel/smp.c
-> > > > +++ b/arch/x86/kernel/smp.c
-> > > > @@ -31,6 +31,12 @@
-> > > >  #include <asm/apic.h>
-> > > >  #include <asm/nmi.h>
-> > > >  #include <asm/trace/irq_vectors.h>
-> > > > +
-> > > > +#define CREATE_TRACE_POINTS
-> > > > +#undef TRACE_INCLUDE_PATH
-> > > > +#undef TRACE_INCLUDE_FILE
-> > > 
-> > > I'm curious to why you added the #undefs. I wouldn't think they were
-> > > needed.
-> > 
-> > They are needed because asm/trace/irq_vectors.h included prior that 
-> > point defines them for itself and that makes the inclusion of 
-> > trace/events/ipi.h fail.
-> > 
+> The said module were able to detect by the kernel, able to bring up
+> the wifi and bluetooth interface and able to scan bluetooth devices as
+> as scan wifi.
 > 
-> Bah, I tried to get rid of the need for those, but it seems that the
-> macro magic is getting a bit out of hand. I need a new macro magic
-> hat :-p
+> When, I run /usr/sbin/wpa_supplicant -Dnl80211 -iwlp1s0
+> -c/tmp/wpa_supplicant.conf, I got the following logs (please see
+> below). The wpa supplicant keeps trying to connect but for unknown
+> reason, it keeps disconnecting.
 > 
-> What you got here will have to do.
+> 
+> Any idea?.
+> 
+you can try to disable MSI (at least that's how I got ath9k working in
+FSL's kernel)
 
-OK.
-
-Now the real question: should I submit it for mainline?  I'm a little 
-bothered by the fact that all exception vectors already have tracepoints 
-of their own, albeit deeply tied to X86 nomenclature.  But nothing that 
-relates to IPI sources.  This patch fixes that by adding some 
-tracepoints alongside existing ones which may go a long way in making 
-their instrumentation with generic (arch independent) tools.
-
-What do people think?
-
-
-Nicolas
+Eric
