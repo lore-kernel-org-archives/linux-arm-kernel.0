@@ -1,25 +1,31 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Wed, 23 Jul 2014 00:43:28 -0700
-Subject: omap-wakeupgen.c: Remove function for fix me
-In-Reply-To: <CAPDOMVinWFVKY=mMOA1f6pd4orOgcKh1kE01MPVaLZi0Z_tMmg@mail.gmail.com>
-References: <CAPDOMVinWFVKY=mMOA1f6pd4orOgcKh1kE01MPVaLZi0Z_tMmg@mail.gmail.com>
-Message-ID: <20140723074328.GI18374@atomide.com>
+From: cyrille.pitchen@atmel.com (Cyrille Pitchen)
+Date: Wed, 23 Jul 2014 09:45:12 +0200
+Subject: [PATCH 2/6] net/macb: add scatter-gather hw feature
+In-Reply-To: <20140720.211337.211665722122921773.davem@davemloft.net>
+References: <cover.1405689937.git.cyrille.pitchen@atmel.com>	<fda3a504240e1f6863107ef6bf1e78586671a030.1405689937.git.cyrille.pitchen@atmel.com>
+ <20140720.211337.211665722122921773.davem@davemloft.net>
+Message-ID: <53CF6808.4070206@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Nick Krause <xerofoify@gmail.com> [140722 14:12]:
-> static void __init irq_pm_init(void)
-> 382 {
-> 383         /* FIXME: Remove this when MPU OSWR support is added */
-> 384         if (!soc_is_omap54xx())
-> 385                 cpu_pm_register_notifier(&irq_notifier_block);
-> 386 }
-> I am wondering is this omap supported now if it is can I remove it?
+Le 21/07/2014 06:13, David Miller a ?crit :
+> From: Cyrille Pitchen <cyrille.pitchen@atmel.com>
+> Date: Fri, 18 Jul 2014 16:21:14 +0200
+> 
+>> +		if (tx_skb->mapped_as_page) {
+>> +			dma_unmap_page(&bp->pdev->dev, tx_skb->mapping,
+>> +				       tx_skb->size, DMA_TO_DEVICE);
+>> +		} else {
+>> +			dma_unmap_single(&bp->pdev->dev, tx_skb->mapping,
+>> +					 tx_skb->size, DMA_TO_DEVICE);
+>> +		}
+> 
+> Please do not use curly braces for basic block composed of a single statement.
+> 
+Hi David,
 
-Does REVISIT cause issues for you with cscope? It may be easier to
-replace the cscope bugging FIXME statements with just REVISIT unless
-a real fix is provided.
+thanks for your review, I'll fix it in the next series of patch.
 
 Regards,
 
-Tony
+Cyrille
