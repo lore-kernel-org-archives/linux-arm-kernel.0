@@ -1,31 +1,114 @@
-From: xerofoify@gmail.com (Nick Krause)
-Date: Wed, 23 Jul 2014 11:08:51 -0400
-Subject: omap-wakeupgen.c: Remove function for fix me
-In-Reply-To: <20140723074328.GI18374@atomide.com>
-References: <CAPDOMVinWFVKY=mMOA1f6pd4orOgcKh1kE01MPVaLZi0Z_tMmg@mail.gmail.com>
- <20140723074328.GI18374@atomide.com>
-Message-ID: <CAPDOMVjrSskMHq0ZdB6mpGJBn9gvbpguLSK-+aHaV9k0QrqzHA@mail.gmail.com>
+From: keescook@chromium.org (Kees Cook)
+Date: Wed, 23 Jul 2014 08:13:25 -0700
+Subject: [PATCH v5 1/3] arm64: ptrace: reload a syscall number after
+ ptrace operations
+In-Reply-To: <53CF5E53.3060409@linaro.org>
+References: <1406020499-5537-1-git-send-email-takahiro.akashi@linaro.org>
+ <1406020499-5537-2-git-send-email-takahiro.akashi@linaro.org>
+ <CAGXu5jKkJUGn_MpEEr8U=n_A+iW9s8vSX1WoVNzRJMVyGQRjpA@mail.gmail.com>
+ <53CF5E53.3060409@linaro.org>
+Message-ID: <CAGXu5jKhn+a9mpNkkyUmdjtXpkhjQtwDkFh+BYU76xDttDoszA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jul 23, 2014 at 3:43 AM, Tony Lindgren <tony@atomide.com> wrote:
-> * Nick Krause <xerofoify@gmail.com> [140722 14:12]:
->> static void __init irq_pm_init(void)
->> 382 {
->> 383         /* FIXME: Remove this when MPU OSWR support is added */
->> 384         if (!soc_is_omap54xx())
->> 385                 cpu_pm_register_notifier(&irq_notifier_block);
->> 386 }
->> I am wondering is this omap supported now if it is can I remove it?
+On Wed, Jul 23, 2014 at 12:03 AM, AKASHI Takahiro
+<takahiro.akashi@linaro.org> wrote:
+> On 07/23/2014 05:15 AM, Kees Cook wrote:
+>>
+>> On Tue, Jul 22, 2014 at 2:14 AM, AKASHI Takahiro
+>> <takahiro.akashi@linaro.org> wrote:
+>>>
+>>> Arm64 holds a syscall number in w8(x8) register. Ptrace tracer may change
+>>> its value either to:
+>>>    * any valid syscall number to alter a system call, or
+>>>    * -1 to skip a system call
+>>>
+>>> This patch implements this behavior by reloading that value into
+>>> syscallno
+>>> in struct pt_regs after tracehook_report_syscall_entry() or
+>>> secure_computing(). In case of '-1', a return value of system call can
+>>> also
+>>> be changed by the tracer setting the value to x0 register, and so
+>>> sys_ni_nosyscall() should not be called.
+>>>
+>>> See also:
+>>>      42309ab4, ARM: 8087/1: ptrace: reload syscall number after
+>>>                secure_computing() check
+>>>
+>>> Signed-off-by: AKASHI Takahiro <takahiro.akashi@linaro.org>
+>>> ---
+>>>   arch/arm64/kernel/entry.S  |    2 ++
+>>>   arch/arm64/kernel/ptrace.c |   13 +++++++++++++
+>>>   2 files changed, 15 insertions(+)
+>>>
+>>> diff --git a/arch/arm64/kernel/entry.S b/arch/arm64/kernel/entry.S
+>>> index 5141e79..de8bdbc 100644
+>>> --- a/arch/arm64/kernel/entry.S
+>>> +++ b/arch/arm64/kernel/entry.S
+>>> @@ -628,6 +628,8 @@ ENDPROC(el0_svc)
+>>>   __sys_trace:
+>>>          mov     x0, sp
+>>>          bl      syscall_trace_enter
+>>> +       cmp     w0, #-1                         // skip syscall?
+>>> +       b.eq    ret_to_user
+>>>          adr     lr, __sys_trace_return          // return address
+>>>          uxtw    scno, w0                        // syscall number
+>>> (possibly new)
+>>>          mov     x1, sp                          // pointer to regs
+>>> diff --git a/arch/arm64/kernel/ptrace.c b/arch/arm64/kernel/ptrace.c
+>>> index 70526cf..100d7d1 100644
+>>> --- a/arch/arm64/kernel/ptrace.c
+>>> +++ b/arch/arm64/kernel/ptrace.c
+>>> @@ -21,6 +21,7 @@
+>>>
+>>>   #include <linux/audit.h>
+>>>   #include <linux/compat.h>
+>>> +#include <linux/errno.h>
+>>>   #include <linux/kernel.h>
+>>>   #include <linux/sched.h>
+>>>   #include <linux/mm.h>
+>>> @@ -1109,9 +1110,21 @@ static void tracehook_report_syscall(struct
+>>> pt_regs *regs,
+>>>
+>>>   asmlinkage int syscall_trace_enter(struct pt_regs *regs)
+>>>   {
+>>> +       unsigned long saved_x0, saved_x8;
+>>> +
+>>> +       saved_x0 = regs->regs[0];
+>>> +       saved_x8 = regs->regs[8];
+>>> +
+>>>          if (test_thread_flag(TIF_SYSCALL_TRACE))
+>>>                  tracehook_report_syscall(regs, PTRACE_SYSCALL_ENTER);
+>>>
+>>> +       regs->syscallno = regs->regs[8];
+>>> +       if ((long)regs->syscallno == ~0UL) { /* skip this syscall */
+>>> +               regs->regs[8] = saved_x8;
+>>> +               if (regs->regs[0] == saved_x0) /* not changed by user */
+>>> +                       regs->regs[0] = -ENOSYS;
+>>
+>>
+>> I'm not sure this is right compared to other architectures. Generally
+>> when a tracer performs a syscall skip, it's up to them to also adjust
+>> the return value. They may want to be faking a syscall, and what if
+>> the value they want to return happens to be what x0 was going into the
+>> tracer? It would have no way to avoid this -ENOSYS case. I think
+>> things are fine without this test.
 >
-> Does REVISIT cause issues for you with cscope? It may be easier to
-> replace the cscope bugging FIXME statements with just REVISIT unless
-> a real fix is provided.
 >
-> Regards,
->
-> Tony
+> Yeah, I know this issue, but was not sure that setting a return value
+> is mandatory. (x86 seems to return -ENOSYS by default if not explicitly
+> specified.)
+> Is "fake a system call" a more appropriate word than "skip"?
 
+I think this is just a matter of semantics and perspective. From the
+kernel's perspective, it's always a "skip" since the syscall is never
+actually executed. But from the perspective of userspace, it's really
+up to the tracer to decide how it should be seen: the tracer could
+return -ENOSYS, or a fake return value, etc. But generally, I think
+"skip" is the most accurate term for this.
 
-Very well then , seems like a good idea will try later.
-Nick
+-Kees
+
+-- 
+Kees Cook
+Chrome OS Security
