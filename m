@@ -1,51 +1,80 @@
 From: lauraa@codeaurora.org (Laura Abbott)
-Date: Tue, 22 Jul 2014 18:35:03 -0700
-Subject: [PATCHv4 0/5] Atomic pool for arm64
-Message-ID: <1406079308-5232-1-git-send-email-lauraa@codeaurora.org>
+Date: Tue, 22 Jul 2014 18:35:05 -0700
+Subject: [PATCHv4 2/5] lib/genalloc.c: Add genpool range check function
+In-Reply-To: <1406079308-5232-1-git-send-email-lauraa@codeaurora.org>
+References: <1406079308-5232-1-git-send-email-lauraa@codeaurora.org>
+Message-ID: <1406079308-5232-3-git-send-email-lauraa@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+After allocating an address from a particular genpool,
+there is no good way to verify if that address actually
+belongs to a genpool. Introduce addr_in_gen_pool which
+will return if an address plus size falls completely
+within the genpool range.
 
-This is another revision of the series to properly add atomic allocations
-for arm64. This version mostly addressed review comments. As always,
-reviews and testing welcome
+Acked-by: Will Deacon <will.deacon@arm.com>
+Reviewed-by: Olof Johansson <olof@lixom.net>
+Signed-off-by: Laura Abbott <lauraa@codeaurora.org>
+---
+ include/linux/genalloc.h |  3 +++
+ lib/genalloc.c           | 29 +++++++++++++++++++++++++++++
+ 2 files changed, 32 insertions(+)
 
-Thanks,
-Laura
-
-v4: Addressed comments from Thierry and Catalin. Updated map_vm_area call in
-dma_common_pages_remap since the API changed.
-
-v3: Now a patch series due to refactoring of arm code. arm and arm64 now both
-use genalloc for atomic pool management. genalloc extensions added.
-DMA remapping code factored out as well.
-
-v2: Various bug fixes pointed out by David and Ritesh (CMA dependency, swapping
-coherent, noncoherent). I'm still not sure how to address the devicetree
-suggestion by Will [1][2]. I added the devicetree mailing list this time around
-to get more input on this.
-
-[1] http://lists.infradead.org/pipermail/linux-arm-kernel/2014-April/249180.html
-[2] http://lists.infradead.org/pipermail/linux-arm-kernel/2014-April/249528.html
-
-Laura Abbott (5):
-  lib/genalloc.c: Add power aligned algorithm
-  lib/genalloc.c: Add genpool range check function
-  common: dma-mapping: Introduce common remapping functions
-  arm: use genalloc for the atomic pool
-  arm64: Add atomic pool for non-coherent and CMA allocations.
-
- arch/arm/Kconfig                         |   1 +
- arch/arm/mm/dma-mapping.c                | 210 +++++++++----------------------
- arch/arm64/Kconfig                       |   1 +
- arch/arm64/mm/dma-mapping.c              | 164 +++++++++++++++++++++---
- drivers/base/dma-mapping.c               |  67 ++++++++++
- include/asm-generic/dma-mapping-common.h |   9 ++
- include/linux/genalloc.h                 |   7 ++
- lib/genalloc.c                           |  50 ++++++++
- 8 files changed, 338 insertions(+), 171 deletions(-)
-
+diff --git a/include/linux/genalloc.h b/include/linux/genalloc.h
+index 3cd0934..1ccaab4 100644
+--- a/include/linux/genalloc.h
++++ b/include/linux/genalloc.h
+@@ -121,6 +121,9 @@ extern struct gen_pool *devm_gen_pool_create(struct device *dev,
+ 		int min_alloc_order, int nid);
+ extern struct gen_pool *dev_get_gen_pool(struct device *dev);
+ 
++bool addr_in_gen_pool(struct gen_pool *pool, unsigned long start,
++			size_t size);
++
+ #ifdef CONFIG_OF
+ extern struct gen_pool *of_get_named_gen_pool(struct device_node *np,
+ 	const char *propname, int index);
+diff --git a/lib/genalloc.c b/lib/genalloc.c
+index 9758529..66edf93 100644
+--- a/lib/genalloc.c
++++ b/lib/genalloc.c
+@@ -403,6 +403,35 @@ void gen_pool_for_each_chunk(struct gen_pool *pool,
+ EXPORT_SYMBOL(gen_pool_for_each_chunk);
+ 
+ /**
++ * addr_in_gen_pool - checks if an address falls within the range of a pool
++ * @pool:	the generic memory pool
++ * @start:	start address
++ * @size:	size of the region
++ *
++ * Check if the range of addresses falls within the specified pool. Takes
++ * the rcu_read_lock for the duration of the check.
++ */
++bool addr_in_gen_pool(struct gen_pool *pool, unsigned long start,
++			size_t size)
++{
++	bool found = false;
++	unsigned long end = start + size;
++	struct gen_pool_chunk *chunk;
++
++	rcu_read_lock();
++	list_for_each_entry_rcu(chunk, &(pool)->chunks, next_chunk) {
++		if (start >= chunk->start_addr && start <= chunk->end_addr) {
++			if (end <= chunk->end_addr) {
++				found = true;
++				break;
++			}
++		}
++	}
++	rcu_read_unlock();
++	return found;
++}
++
++/**
+  * gen_pool_avail - get available free space of the pool
+  * @pool: pool to get available free space
+  *
 -- 
 The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
 hosted by The Linux Foundation
