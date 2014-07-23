@@ -1,60 +1,45 @@
-From: viresh.kumar@linaro.org (Viresh Kumar)
-Date: Wed, 23 Jul 2014 10:25:08 +0530
-Subject: [RFC] cpufreq: Add bindings for CPU clock sharing topology
-In-Reply-To: <CABGGisyDf7xt7CNii_NJ_stvBGNEeiXBMFxNkA2myS8OQ-VCtw@mail.gmail.com>
-References: <7e097b71342c9f5f63b07ff2e135eb7beb626aab.1405661369.git.viresh.kumar@linaro.org>
- <CAOesGMhTkTEXp99gpU8cZBwYmiXpsySG5zMn6oSyo_Mf5PAiUg@mail.gmail.com>
- <CAKohpo=MmoALOHg-=7cf0jm=OJO57TWQZQXqkRwhRwU-DGPMmA@mail.gmail.com>
- <CAOesGMhuNzVtUkaUjF+JjNgHcgf08WiM0DG-kzwtcyUxkK_zow@mail.gmail.com>
- <CAKohpokLqrydV3b=innvOWrW9ijXtZwPKdT5Ew65cjMxsY2Mvw@mail.gmail.com>
- <53CA8D95.8010108@ti.com>
- <CABGGisyDf7xt7CNii_NJ_stvBGNEeiXBMFxNkA2myS8OQ-VCtw@mail.gmail.com>
-Message-ID: <CAKohpokPAcmERN3S3Wbf7a4gXaQAWyBtKV7RXDHYThMWW57fGA@mail.gmail.com>
+From: shawn.guo@freescale.com (Shawn Guo)
+Date: Wed, 23 Jul 2014 13:02:04 +0800
+Subject: [PATCH] ARM: imx6: fix SMP compilation again
+In-Reply-To: <6831797.zmrgHS8Arb@wuerfel>
+References: <37015543.ZyZKZyEIPW@wuerfel> <12850450.mxMbPOMjsW@wuerfel>
+ <20140722145256.GA8537@dragon> <6831797.zmrgHS8Arb@wuerfel>
+Message-ID: <20140723050203.GB5615@dragon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 21 July 2014 22:30, Rob Herring <rob.herring@linaro.org> wrote:
+On Tue, Jul 22, 2014 at 08:52:58PM +0200, Arnd Bergmann wrote:
+> On Tuesday 22 July 2014 22:52:57 Shawn Guo wrote:
+> > On Tue, Jul 22, 2014 at 04:37:55PM +0200, Arnd Bergmann wrote:
+> > > On Tuesday 22 July 2014 21:48:16 Shawn Guo wrote:
+> > > > I tried both mainline and -next tree.  I really need some help to
+> > > > reproduce the error first.
+> > > 
+> > > My branch is at git.kernel.org/pub/scm/linux/kernel/git/arnd/playground.git
+> > > in the randconfig-next branch. Sorry for the inconvenience.
+> > 
+> > Okay, I can see the error on your branch with the fixing patch reverted.
+> > 
+> > > 
+> > > > > arch/arm/mach-imx/built-in.o: In function `v7_secondary_startup':
+> > > > > :(.text+0x5124): undefined reference to `v7_invalidate_l1'
+> > > > > 
+> > > > > This puts the code inside of an "ifdef CONFIG_SMP" to hopefully
+> > > > 
+> > > > The code says "ifdef CONFIG_SOC_IMX6"?
+> > > 
+> > > It seems I'm having a bad day. I'll fix it up.
+> > 
+> > With that fixed up,
+> > 
+> > Acked-by: Shawn Guo <shawn.guo@freescale.com>
+> > 
+> > Or let me know if you expect me to handle the patch.
+> > 
+> 
+> If you don't mind, just put it into your tree. I'm currently in the
+> middle of going through my older patches and don't want to lose this one.
 
-> To me, but every time I suggest adding things to the topology the ARM
-> folks object... I really think we should have built the topology into
-> the /cpus hierarchy. Then we could add properties at the correct place
-> in the hierarchy where they are common.
->
-> I don't really like the proposal here. It just doesn't look like a
-> clean description of the h/w.
+Okay, applied after fixing up the commit log.
 
-I knew it wouldn't be easy to get these bindings correctly in the first
-attempt atleast, but I still went for it so that this thread can progress:
-
-https://lkml.org/lkml/2014/7/18/3
-
-There are changes waiting to get some kind of intermediate solution
-in, so that other platforms can reuse cpufreq-cpu0 driver. Also, so that
-cpufreq-cpu0 can be converted to cpufreq-generic, so that it can support
-almost any platform.
-
-Can you please reply to that thread to suggest some intermediate
-solution that we can get fixed in 3.17? Mvebu and Krait are waiting for
-these patches to get in..
-
-The solution can be simple enough as right now we have only two kinds
-of platforms:
-- All CPUs share clock
-- All CPUs have separate clocks
-
-The most simple solution of that could have been a Kconfig entry, but that
-would be a problem for multi-arch builds if these platforms do want to get
-build with multi-arch config. Otherwise we have to get some binding in
-place for 3.17..
-
-Please see if you can get that thread going :)
-
-> Ignoring compatibility, I would like to see something like
-> operating-points and/or the clock properties be moved up to /cpus if
-> they are shared and be per cpu node when they are not. This of course
-> does not work if you have independent OPPs for each cluster with a
-> shared clock within cluster.
-
-Yeah, that had always been the issue. People probably tried to get a
-cluster {} block as well to simplify that but there were some objections
-to it as well, though not sure what happened to that stuff..
+Shawn
