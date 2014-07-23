@@ -1,36 +1,62 @@
-From: ttynkkynen@nvidia.com (Tuomas Tynkkynen)
-Date: Wed, 23 Jul 2014 22:17:27 +0300
-Subject: [PATCH v2 14/16] cpufreq: Add cpufreq driver for Tegra124
-In-Reply-To: <CAKohponLh66Ubr6=wY2OZCCrK11KZDj=DmXXqXsGGTHSG45wpA@mail.gmail.com>
-References: <1405957142-19416-1-git-send-email-ttynkkynen@nvidia.com>	<1405957142-19416-15-git-send-email-ttynkkynen@nvidia.com>	<CAKohpomQthJ_XE-HhzW07Q4aVtxQVy97iaL0Vy6Q4Lhw22A=VA@mail.gmail.com>	<53CFA33F.6030307@nvidia.com>
- <CAKohponLh66Ubr6=wY2OZCCrK11KZDj=DmXXqXsGGTHSG45wpA@mail.gmail.com>
-Message-ID: <53D00A47.7050203@nvidia.com>
+From: luto@amacapital.net (Andy Lutomirski)
+Date: Wed, 23 Jul 2014 12:20:18 -0700
+Subject: [PATCH v3 0/8] Two-phase seccomp and x86 tracing changes
+In-Reply-To: <CAGXu5jJ93-vto9voMENc4jX5itcd_Rm5AZjeChF57fpMYnWocA@mail.gmail.com>
+References: <cover.1405992946.git.luto@amacapital.net>
+ <CAGXu5jJ93-vto9voMENc4jX5itcd_Rm5AZjeChF57fpMYnWocA@mail.gmail.com>
+Message-ID: <CALCETrVwqDeRbFOw=k_OhQZ4V6Pn5v3t8ODw75UuE7HKPFz=Sw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Tue, Jul 22, 2014 at 12:37 PM, Kees Cook <keescook@chromium.org> wrote:
+> On Mon, Jul 21, 2014 at 6:49 PM, Andy Lutomirski <luto@amacapital.net> wrote:
+>> [applies on jmorris's security-next tree]
+>>
+>> This is both a cleanup and a speedup.  It reduces overhead due to
+>> installing a trivial seccomp filter by 87%.  The speedup comes from
+>> avoiding the full syscall tracing mechanism for filters that don't
+>> return SECCOMP_RET_TRACE.
+>>
+>> This series works by splitting the seccomp hooks into two phases.
+>> The first phase evaluates the filter; it can skip syscalls, allow
+>> them, kill the calling task, or pass a u32 to the second phase.  The
+>> second phase requires a full tracing context, and it sends ptrace
+>> events if necessary.
+>>
+>> Once this is done, I implemented a similar split for the x86 syscall
+>> entry work.  The C callback is invoked in two phases: the first has
+>> only a partial frame, and it can request phase 2 processing with a
+>> full frame.
+>>
+>> Finally, I switch the 64-bit system_call code to use the new split
+>> entry work.  This is a net deletion of assembly code: it replaces
+>> all of the audit entry muck.
+>>
+>> In the process, I fixed some bugs.
+>>
+>> If this is acceptable, someone can do the same tweak for the
+>> ia32entry and entry_32 code.
+>>
+>> This passes all seccomp tests that I know of.  Now that it's properly
+>> rebased, even the previously expected failures are gone.
+>>
+>> Kees, if you like this version, can you create a branch with patches
+>> 1-4?  I think that the rest should go into tip/x86 once everyone's happy
+>> with it.
+>>
+>> Changes from v2:
+>>  - Fixed 32-bit x86 build (and the tests pass).
+>>  - Put the doc patch where it belongs.
+>
+> Thanks! This looks good to me. I'll add it to my tree.
+>
+> Peter, how do you feel about this series? Do the x86 changes look good to you?
+>
 
+It looks like patches 1-4 have landed here:
 
-On 23/07/14 19:50, Viresh Kumar wrote:
-> On 23 July 2014 17:27, Tuomas Tynkkynen <ttynkkynen@nvidia.com> wrote:
->> The platform device is required for the deferred probe that can happen if the
->> DFLL driver hasn't initialized yet, and module_init() callbacks don't seem to
->> respect -EPROBE_DEFER.
-> 
-> Oh, which call in this file will return EPROBE_DEFER? I couldn't make out
-> which one will depend on DFLL driver.
-> 
+https://git.kernel.org/cgit/linux/kernel/git/kees/linux.git/log/?h=seccomp/fastpath
 
-It's this:
+hpa, what's the route forward for the x86 part?
 
-+static int tegra124_cpufreq_probe(struct platform_device *pdev)
-+{
-[...]
-+
-+	dfll_clk = of_clk_get_by_name(cpu_dev->of_node, "dfll");
-+	if (IS_ERR(dfll_clk)) {
-+		ret = PTR_ERR(dfll_clk);
-+		goto out_put_cpu_clk;
-+	}
-
--- 
-nvpublic
+--Andy
