@@ -1,78 +1,69 @@
-From: viresh.kumar@linaro.org (Viresh Kumar)
-Date: Wed, 23 Jul 2014 14:19:54 +0530
-Subject: [PATCH v2] cpufreq: tests: Providing cpufreq regression test
-In-Reply-To: <20140723093824.5e51918f@amdc2363>
-References: <1405678985-21677-1-git-send-email-l.majewski@samsung.com>
- <1405926154-27214-1-git-send-email-l.majewski@samsung.com>
- <CAKohpondk7Cty8MhTcjyzZW8Z0o4AVupYE0rRnG4YJf+SmDyjg@mail.gmail.com>
- <20140723093824.5e51918f@amdc2363>
-Message-ID: <CAKohpok++gPcNk9-E4MsFdNBy8qL7oLYvatk1EvcW1OHwroZXQ@mail.gmail.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Wed, 23 Jul 2014 01:50:03 -0700
+Subject: OMAP2+: gpmc: fix gpmc_hwecc_bch_capable()
+In-Reply-To: <20980858CB6D3A4BAE95CA194937D5E73EB02569@DBDE04.ent.ti.com>
+References: <1405301778.29716.72.camel@mars>
+ <20980858CB6D3A4BAE95CA194937D5E73EB02569@DBDE04.ent.ti.com>
+Message-ID: <20140723085003.GB22006@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 23 July 2014 13:08, Lukasz Majewski <l.majewski@samsung.com> wrote:
-> Do you want to say that we have enough tests and we don't need more ?
+* Gupta, Pekon <pekon@ti.com> [140713 22:43]:
+> >From: Christoph Fritz [mailto:chf.fritz at googlemail.com]
+> >
+> >This patch adds bch8 ecc software fallback which is mostly used by
+> >omap3s because they lack hardware elm support.
+> >
+> >Fixes: 0611c41934ab35ce84dea34ab291897ad3cbc7be (ARM: OMAP2+: gpmc:
+> >update gpmc_hwecc_bch_capable() for new platforms and ECC schemes)
+> >Cc: <stable@vger.kernel.org> # 3.15.x+
+> >Signed-off-by: Christoph Fritz <chf.fritz@googlemail.com>
+> >---
+> > arch/arm/mach-omap2/gpmc-nand.c |   18 ++++++++++--------
+> > 1 file changed, 10 insertions(+), 8 deletions(-)
+> >
+> >diff --git a/arch/arm/mach-omap2/gpmc-nand.c b/arch/arm/mach-omap2/gpmc-nand.c
+> >index 17cd393..93914d2 100644
+> >--- a/arch/arm/mach-omap2/gpmc-nand.c
+> >+++ b/arch/arm/mach-omap2/gpmc-nand.c
+> >@@ -50,6 +50,16 @@ static bool gpmc_hwecc_bch_capable(enum omap_ecc ecc_opt)
+> > 		 soc_is_omap54xx() || soc_is_dra7xx())
+> > 		return 1;
+> >
+> >+	if (ecc_opt == OMAP_ECC_BCH4_CODE_HW_DETECTION_SW ||
+> >+		 ecc_opt == OMAP_ECC_BCH8_CODE_HW_DETECTION_SW) {
+> >+		if (cpu_is_omap24xx())
+> >+			return 0;
+> >+		else if (cpu_is_omap3630() && (GET_OMAP_REVISION() == 0))
+> >+			return 0;
+> >+		else
+> >+			return 1;
+> >+	}
+> >+
+> > 	/* OMAP3xxx do not have ELM engine, so cannot support ECC schemes
+> > 	 * which require H/W based ECC error detection */
+> > 	if ((cpu_is_omap34xx() || cpu_is_omap3630()) &&
+> >@@ -57,14 +67,6 @@ static bool gpmc_hwecc_bch_capable(enum omap_ecc ecc_opt)
+> > 		 (ecc_opt == OMAP_ECC_BCH8_CODE_HW)))
+> > 		return 0;
+> >
+> >-	/*
+> >-	 * For now, assume 4-bit mode is only supported on OMAP3630 ES1.x, x>=1
+> >-	 * and AM33xx derivates. Other chips may be added if confirmed to work.
+> >-	 */
+> >-	if ((ecc_opt == OMAP_ECC_BCH4_CODE_HW_DETECTION_SW) &&
+> >-	    (!cpu_is_omap3630() || (GET_OMAP_REVISION() == 0)))
+> >-		return 0;
+> >-
+> > 	/* legacy platforms support only HAM1 (1-bit Hamming) ECC scheme */
+> > 	if (ecc_opt == OMAP_ECC_HAM1_CODE_HW)
+> > 		return 1;
+> >--
+> >1.7.10.4
+> >
+> Thanks much for this fix.
+> Reviewed-by: Pekon Gupta <pekon@ti.com>
 
-No. We don't have any tests at all :)
+Applying into omap-for-v3.16/fixes thanks.
 
-> I always thought that we shall have as much regression tests as
-> possible.
-
-Yeah, tests are welcomed but the question is where should they get added.
-Don't know if its common to add tests directly to kernel.
-
-And also if the test is really good, not discouraging your work.
-
->> On 21 July 2014 12:32, Lukasz Majewski <l.majewski@samsung.com> wrote:
->> > This commit adds first regression test "cpufreq_freq_test.sh" for
->> > the cpufreq subsystem.
->>
->> That's not enough, Tell us why we should continue reading this mail..
->
-> Hmm... If "regression" and "test" don't catch the attention of a
-> diligent maintainer, then I cannot do much more to encourage him to
-> read the whole e-mail :-)
-
-What I meant to say was, your subject and body must be good enough
-to answer most of the things. You don't have to tell much about the
-implementation but other things should be pretty clear from logs.
-
-Your current logs are quite short for something that's not a normal practice.
-
-> I can imagine that maintainers are very busy, therefore I've prepared
-> README file with detailed description of the script operation.
-
-Yeah, a README is welcomed and would be useful for users as well..
-
->> I couldn't make out the purpose of this test and why we need it. How
->> do we ensure that "cpufreq attributes exported by sysfs are exposing
->> correct values"?
->
-> First of all the cpufreq attributes are part of the subsystem API.
-> There are systems which actually depend on them, so we would be better
-> off to test if they work as intended.
->
-> Secondly, the test takes those values and then with use of other
-> attribute enforce the value, which is then read via cat'ing
-> cpufreq_cur_freq. If any of the attributes is wrong then we will spot
-> the error immediately.
-
-Shouldn't you use userspace governor then instead of performance?
-And then we don't need the gzip stuff at all. We can just set it to the
-right freq and get current freq to see if it matches?
-
-And now that we are starting to get tests added into the kernel (will still
-wait to see what Rafael has to advice), we better think of the way these
-are going to get added. Probably a single script with parameters like
-what to test?
-
->> And actually what do we mean by this statement even? What kind of
->> errors can be there in exposing these values.
->
-> Errors with cpufreq and CCF cooperation - especially when some parts of
-> cpufreq code uses direct write to MUX, DIV or PLL SoC registers.
->
-> Also, one can check if permutations of changing all available
-> frequencies are working properly.
-
-Yeah, that would be fine. Probably need to think more about scripts name.
+Tony
