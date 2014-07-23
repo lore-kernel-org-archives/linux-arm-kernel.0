@@ -1,91 +1,44 @@
-From: msalter@redhat.com (Mark Salter)
-Date: Wed, 23 Jul 2014 17:25:34 -0400
-Subject: arm64 flushing 255GB of vmalloc space takes too long
-In-Reply-To: <20140711124553.GG11473@arm.com>
-References: <CAMPhdO-j5SfHexP8hafB2EQVs91TOqp_k_SLwWmo9OHVEvNWiQ@mail.gmail.com>
- <20140709174055.GC2814@arm.com>
- <CAMPhdO_XqAL4oXcuJkp2PTQ-J07sGG4Nm5HjHO=yGqS+KuWQzg@mail.gmail.com>
- <53BF3D58.2010900@codeaurora.org> <20140711124553.GG11473@arm.com>
-Message-ID: <1406150734.12484.79.camel@deneb.redhat.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Wed, 23 Jul 2014 23:29:33 +0200
+Subject: [PATCH RESEND v2] bus: ARM CCN PMU driver
+In-Reply-To: <201407232223.39341.arnd@arndb.de>
+References: <1406050379-15199-1-git-send-email-pawel.moll@arm.com>
+ <201407232223.39341.arnd@arndb.de>
+Message-ID: <39594081.3C5fmmXpMJ@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 2014-07-11 at 13:45 +0100, Catalin Marinas wrote:
-> On Fri, Jul 11, 2014 at 02:26:48AM +0100, Laura Abbott wrote:
-> > On 7/9/2014 11:04 AM, Eric Miao wrote:
-> > > On Wed, Jul 9, 2014 at 10:40 AM, Catalin Marinas
-> > > <catalin.marinas@arm.com> wrote:
-> > >> On Wed, Jul 09, 2014 at 05:53:26PM +0100, Eric Miao wrote:
-> > >>> On Tue, Jul 8, 2014 at 6:43 PM, Laura Abbott <lauraa@codeaurora.org> wrote:
-> > >>>> I have an arm64 target which has been observed hanging in __purge_vmap_area_lazy
-> > >>>> in vmalloc.c The root cause of this 'hang' is that flush_tlb_kernel_range is
-> > >>>> attempting to flush 255GB of virtual address space. This takes ~2 seconds and
-> > >>>> preemption is disabled at this time thanks to the purge lock. Disabling
-> > >>>> preemption for that time is long enough to trigger a watchdog we have setup.
-> > >>
-> > >> That's definitely not good.
-> > >>
-> > >>>> A couple of options I thought of:
-> > >>>> 1) Increase the timeout of our watchdog to allow the flush to occur. Nobody
-> > >>>> I suggested this to likes the idea as the watchdog firing generally catches
-> > >>>> behavior that results in poor system performance and disabling preemption
-> > >>>> for that long does seem like a problem.
-> > >>>> 2) Change __purge_vmap_area_lazy to do less work under a spinlock. This would
-> > >>>> certainly have a performance impact and I don't even know if it is plausible.
-> > >>>> 3) Allow module unloading to trigger a vmalloc purge beforehand to help avoid
-> > >>>> this case. This would still be racy if another vfree came in during the time
-> > >>>> between the purge and the vfree but it might be good enough.
-> > >>>> 4) Add 'if size > threshold flush entire tlb' (I haven't profiled this yet)
-> > >>>
-> > >>> We have the same problem. I'd agree with point 2 and point 4, point 1/3 do not
-> > >>> actually fix this issue. purge_vmap_area_lazy() could be called in other
-> > >>> cases.
-> > >>
-> > >> I would also discard point 2 as it still takes ~2 seconds, only that not
-> > >> under a spinlock.
-> > > 
-> > > Point is - we could still end up a good amount of time in that function,
-> > > giving the default value of lazy_vfree_pages to be 32MB * log(ncpu),
-> > > worst case of all vmap areas being only one page, tlb flush page by
-> > > page, and traversal of the list, calling __free_vmap_area() that many
-> > > times won't likely to reduce the execution time to microsecond level.
-> > > 
-> > > If it's something inevitable - we do it in a bit cleaner way.
-> 
-> In general I think it makes sense to add a mutex instead of a spinlock
-> here if slowdown is caused by other things as well. That's independent
-> of the TLB invalidation optimisation for arm64.
-> 
-> > > Or we end up having platform specific tlb flush implementation just as we
-> > > did for cache ops. I would expect only few platforms will have their own
-> > > thresholds. A simple heuristic guess of the threshold based on number of
-> > > tlb entries would be good to go?
+On Wednesday 23 July 2014 22:23:38 Arnd Bergmann wrote:
+> On Tuesday 22 July 2014, Pawel Moll wrote:
+> > Driver providing perf backend for ARM Cache Coherent Network
+> > interconnect. Supports counting all hardware events and crosspoint
+> > watchpoints.
 > > 
-> > Mark Salter actually proposed a fix to this back in May 
+> > Currently works with CCN-504 only, although there should be
+> > no changes required for CCN-508 (just impossible to test it now).
 > > 
-> > https://lkml.org/lkml/2014/5/2/311
-> > 
-> > I never saw any further comments on it though. It also matches what x86
-> > does with their TLB flushing. It fixes the problem for me and the threshold
-> > seems to be the best we can do unless we want to introduce options per
-> > platform. It will need to be rebased to the latest tree though.
+> > Signed-off-by: Pawel Moll <pawel.moll@arm.com>
 > 
-> There were other patches in this area and I forgot about this. The
-> problem is that the ARM architecture does not define the actual
-> micro-architectural implementation of the TLBs (and it shouldn't), so
-> there is no way to guess how many TLB entries there are. It's not an
-> easy figure to get either since there are multiple levels of caching for
-> the TLBs.
-> 
-> So we either guess some value here (we may not always be optimal) or we
-> put some time bound (e.g. based on sched_clock()) on how long to loop.
-> The latter is not optimal either, the only aim being to avoid
-> soft-lockups.
-> 
+> Applied to next/drivers, thanks!
 
-Sorry for the late reply...
+I'm getting build errors with CONFIG_PERF_EVENTS disabled. 
+Is the patch below the right answer, or should we still load
+the driver and #ifdef the perf-events code?
 
-So, what would you like to see wrt this, Catalin? A reworked patch based
-on time? IMO, something based on loop count or time seems better than
-the status quo of a CPU potentially wasting 10s of seconds flushing the
-tlb.
+It seems to me that the driver doesn't do anything besides
+perf events, but I could be missing something.
+
+	Arnd
+
+diff --git a/drivers/bus/Kconfig b/drivers/bus/Kconfig
+index 5c0c2764839f..603eb1be4f6a 100644
+--- a/drivers/bus/Kconfig
++++ b/drivers/bus/Kconfig
+@@ -53,6 +53,7 @@ config ARM_CCI
+ config ARM_CCN
+ 	bool "ARM CCN driver support"
+ 	depends on ARM || ARM64
++	depends on PERF_EVENTS
+ 	help
+ 	  PMU (perf) driver supporting the ARM CCN (Cache Coherent Network)
+ 	  interconnect.
