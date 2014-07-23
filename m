@@ -1,122 +1,199 @@
-From: keescook@chromium.org (Kees Cook)
-Date: Wed, 23 Jul 2014 08:36:05 -0700
-Subject: [PATCH v5 0/3] arm64: Add seccomp support
-In-Reply-To: <53CF5F9E.4020404@linaro.org>
-References: <1406020499-5537-1-git-send-email-takahiro.akashi@linaro.org>
- <CAGXu5j+1huPbBKH25HK6PmAL3Mi-zgD5UDRp-6wx8vuPVOBDEg@mail.gmail.com>
- <53CF5F9E.4020404@linaro.org>
-Message-ID: <CAGXu5j+2MXht31xQcsXL2DaRGrgxn2YxJY8vgbDHHKZAcidfbA@mail.gmail.com>
+From: sebastian.hesselbarth@gmail.com (Sebastian Hesselbarth)
+Date: Wed, 23 Jul 2014 17:45:57 +0200
+Subject: [PATCH 1/2] Added dts defintion for Lenovo ix4-300d nas
+In-Reply-To: <20140723134534.GF23220@titan.lakedaemon.net>
+References: <1406117232-5962-1-git-send-email-yahoo@perenite.com>
+ <20140723134534.GF23220@titan.lakedaemon.net>
+Message-ID: <53CFD8B5.2030205@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jul 23, 2014 at 12:09 AM, AKASHI Takahiro
-<takahiro.akashi@linaro.org> wrote:
-> On 07/23/2014 05:16 AM, Kees Cook wrote:
->>
->> On Tue, Jul 22, 2014 at 2:14 AM, AKASHI Takahiro
->> <takahiro.akashi@linaro.org> wrote:
->>>
->>> (Please apply this patch after my audit patch in order to avoid some
->>> conflict on arm64/Kconfig.)
->>>
->>> This patch enables secure computing (system call filtering) on arm64.
->>> System calls can be allowed or denied by loaded bpf-style rules.
->>> Architecture specific part is to run secure_computing() on syscall entry
->>> and check the result. See [3/3]
->>
->>
->> Thanks for working on this!
->>
->>> Prerequisites are:
->>>   * "arm64: Add audit support" patch
->>>
->>> This code is tested on ARMv8 fast model using
->>>   * libseccomp v2.1.1 with modifications for arm64 and verified by its
->>> "live"
->>>     tests, 20, 21 and 24.
->>>   * modified version of Kees' seccomp test for 'changing/skipping a
->>> syscall'
->>>     behavior
->>
->>
->> Would you be able to share this? I'd love to add it to the seccomp
->> regression suite for the arm64-specific parts.
->
->
-> Yep, I forked your repo here:
-> https://github.com/t-akashi/seccomp.git
-> (See trace_arm64 branch)
+On 07/23/2014 03:45 PM, Jason Cooper wrote:
+> Thanks for the patch!  A few minor things:
 
-Great, thanks! I'll incorporate your changes into my trace branch. (It
-looks like using PTRACE_GETREGSET works on all archs, so I'll switch
-to using that for all.)
+Benoit,
 
--Kees
+I also have some minor remarks just because I stumble over them
+all the time.
 
->
-> Thanks,
-> -Takahiro AKASHI
->
->
->> Thanks!
->>
->> -Kees
->>
->>>
->>> Changes v4 -> v5:
->>> * rebased to v3.16-rc
->>> * add patch [1/3] to allow ptrace to change a system call
->>>    (please note that this patch should be applied even without seccomp.)
->>>
->>> Changes v3 -> v4:
->>> * removed the following patch and moved it to "arm64: prerequisites for
->>>    audit and ftrace" patchset since it is required for audit and ftrace
->>> in
->>>    case of !COMPAT, too.
->>>    "arm64: is_compat_task is defined both in asm/compat.h and
->>> linux/compat.h"
->>>
->>> Changes v2 -> v3:
->>> * removed unnecessary 'type cast' operations [2/3]
->>> * check for a return value (-1) of secure_computing() explicitly [2/3]
->>> * aligned with the patch, "arm64: split syscall_trace() into separate
->>>    functions for enter/exit" [2/3]
->>> * changed default of CONFIG_SECCOMP to n [2/3]
->>>
->>> Changes v1 -> v2:
->>> * added generic seccomp.h for arm64 to utilize it [1,2/3]
->>> * changed syscall_trace() to return more meaningful value (-EPERM)
->>>    on seccomp failure case [2/3]
->>> * aligned with the change in "arm64: make a single hook to
->>> syscall_trace()
->>>    for all syscall features" v2 [2/3]
->>> * removed is_compat_task() definition from compat.h [3/3]
->>>
->>> AKASHI Takahiro (3):
->>>    arm64: ptrace: reload a syscall number after ptrace operations
->>>    asm-generic: Add generic seccomp.h for secure computing mode 1
->>>    arm64: Add seccomp support
->>>
->>>   arch/arm64/Kconfig               |   14 ++++++++++++++
->>>   arch/arm64/include/asm/seccomp.h |   25 +++++++++++++++++++++++++
->>>   arch/arm64/include/asm/unistd.h  |    3 +++
->>>   arch/arm64/kernel/entry.S        |    2 ++
->>>   arch/arm64/kernel/ptrace.c       |   18 ++++++++++++++++++
->>>   include/asm-generic/seccomp.h    |   28 ++++++++++++++++++++++++++++
->>>   6 files changed, 90 insertions(+)
->>>   create mode 100644 arch/arm64/include/asm/seccomp.h
->>>   create mode 100644 include/asm-generic/seccomp.h
->>>
->>> --
->>> 1.7.9.5
->>>
->>
->>
->>
->
+>> ---
+>>   arch/arm/boot/dts/Makefile                     |   1 +
+>>   arch/arm/boot/dts/armada-xp-lenovo-ix4300d.dts | 267 +++++++++++++++++++++++++
 
+I looked it up and Lenovo names it "ix4-300d", maybe you should
+rename the dts "armada-xp-lenovo-ix4-300d.dts" then.
 
+[...]
+>> diff --git a/arch/arm/boot/dts/armada-xp-lenovo-ix4300d.dts b/arch/arm/boot/dts/armada-xp-lenovo-ix4300d.dts
+>> new file mode 100644
+>> index 0000000..e04e7a6
+>> --- /dev/null
+>> +++ b/arch/arm/boot/dts/armada-xp-lenovo-ix4300d.dts
+>> @@ -0,0 +1,267 @@
+>> +/*
+>> + * Device Tree file for LENOVO IX4-300d
 
--- 
-Kees Cook
-Chrome OS Security
+It is spelled "Lenovo" and the full name is "Lenovo Iomega ix4-300d".
+As it is the initial commit, we should be more sensitive on the case
+here.
+
+>> + * Copyright (C) 2014, Benoit Masson <yahoo@perenite.com>
+>> + *
+>> + * This program is free software; you can redistribute it and/or
+>> + * modify it under the terms of the GNU General Public License
+>> + * as published by the Free Software Foundation; either version
+>> + * 2 of the License, or (at your option) any later version.
+>> + */
+>> +
+>> +/dts-v1/;
+>> +
+>> +#include <dt-bindings/input/input.h>
+>> +#include <dt-bindings/gpio/gpio.h>
+>> +#include "armada-xp-mv78230.dtsi"
+>> +
+>> +/ {
+>> +	model = "LENOVO IX4-300d";
+
+Same comment about "Lenovo Iomega ix4-300d"
+
+>> +	compatible = "lenovo,ix4-300d", "marvell,armadaxp-mv78230", "marvell,armadaxp", "marvell,armada-370-xp";
+>> +
+>> +	chosen {
+>> +		bootargs = "console=ttyS0,115200 earlyprintk";
+
+Consider to add
+
+stdout-path = "/soc/internal-regs/serial at 12000";
+
+That way you would not have to fix it up for e.g. Barebox.
+Unfortunately, neither Armada 370 nor XP dtsi define node
+labels yet, so you have to put the full node path.
+
+>> +	};
+>> +
+[...]
+>> +	soc {
+>> +		ranges = <MBUS_ID(0xf0, 0x01) 0 0 0xd0000000 0x100000
+>> +			  MBUS_ID(0x01, 0x1d) 0 0 0xfff00000 0x100000>;
+>> +
+>> +		pcie-controller {
+>> +			status = "okay";
+>> +
+>> +			pcie at 1,0 {
+>> +				/* Port 0, Lane 0 */
+>> +				status = "okay";
+>> +			};
+>> +			pcie at 5,0 {
+>> +                                /* Port 1, Lane 0 */
+>> +                                status = "okay";
+>> +                        };
+>> +
+
+Any chance you know what is connected to above PCIe ports?
+If so, put a comment above the node itself naming the attached
+device, e.g.
+
+/* USB 3.0 xHCI controller */
+pcie at 1,0 {...}
+
+Also, I saw you have a good impression about the GPIOs used on
+the ix4-300d. If you also know the PERST# GPIOs, add them with
+
+reset-gpios = <&gpioN M GPIO_ACTIVE_LOW>;
+
+where N, M follow gpio# = (32 * N) + M, i.e. N=1, M=22 for gpio54.
+
+>> +		};
+>> +
+>> +		internal-regs {
+>> +			pinctrl {
+>> +				poweroff: poweroff {
+
+nit: poweroff_pin: poweroff-pin {...}
+like the ones below?
+
+>> +                                        marvell,pins = "mpp24";
+>> +                                        marvell,function = "gpio";
+>> +                                };
+>> +
+>> +                                power_button_pin: power-button-pin {
+>> +                                        marvell,pins = "mpp44";
+>> +                                        marvell,function = "gpio";
+>> +                                };
+>> +
+>> +                                reset_button_pin: reset-button-pin {
+>> +                                        marvell,pins = "mpp45";
+>> +                                        marvell,function = "gpio";
+>> +                                };
+>> +				select_button_pin: select-button-pin {
+>> +                                        marvell,pins = "mpp41";
+>> +                                        marvell,function = "gpio";
+>> +                                };
+>> +
+>> +                                scroll_button_pin: scroll-button-pin {
+>> +                                        marvell,pins = "mpp42";
+>> +                                        marvell,function = "gpio";
+>> +                                };
+>> +				hdd_led_pin: hdd-led-pin {
+>> +					marvell,pins = "mpp26";
+>> +					marvell,function = "gpio";
+>> +		                };
+[...]
+>> +			};
+>> +
+>> +			serial at 12000 {
+>> +				clocks = <&coreclk 0>;
+
+As Andrew already said, no need to duplicate the clocks property.
+
+>> +				status = "okay";
+>> +			};
+[...]
+>> +	spi3 {
+>> +                compatible = "spi-gpio";
+>> +                status = "okay";
+>> +                gpio-sck = <&gpio0 25 0>;
+>> +                gpio-mosi = <&gpio1 15 0>; /*gpio 47*/
+>> +                cs-gpios = <&gpio0 27 0 >;
+[...]
+>> +                num-chipselects = <1>;
+>> +                #address-cells = <1>;
+>> +                #size-cells = <0>;
+>> +
+>> +                gpio2: gpio2 at 0 {
+>> +                        compatible = "fairchild,74hc595";
+
+Freaky we have a driver for a 74x595 8-bit shift register ;)
+
+>> +                        gpio-controller;
+>> +                        #gpio-cells = <2>;
+>> +                        reg = <0>;
+>> +                        registers-number = <2>;
+>> +                        spi-max-frequency = <100000>;
+>> +                };
+>> +	};
+>> +
+>> +	gpio-leds {
+>> +                compatible = "gpio-leds";
+>> +		pinctrl-0 = <&hdd_led_pin>;
+>> +		pinctrl-names = "default";
+>> +
+>> +		hdd-led {
+>> +                        label = "ix4300d:blue:hdd";
+
+Can you get rid of "ix4300d:" or rename it to "ix4-300d:" without
+breaking any userspace stuff? If so, please update all LEDs.
+
+>> +                        gpios = <&gpio0 26 GPIO_ACTIVE_HIGH>;
+>> +                        default-state = "off";
+>> +                };
+[...]
+>> +	/* warning: you need both eth1 & 0 to be initialize for poweroff to shutdown otherwise it reboots */
+
+I don't get the comment.
+
+> This is a great first version
+
+Yup, Thanks!
+
+Sebastian
