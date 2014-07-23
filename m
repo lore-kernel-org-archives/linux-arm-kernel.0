@@ -1,56 +1,76 @@
 From: wens@csie.org (Chen-Yu Tsai)
-Date: Wed, 23 Jul 2014 23:33:05 +0800
-Subject: [PATCH v5 0/2] serial: 8250_dw: optional reset control and deferred
- probe support
-Message-ID: <1406129587-24668-1-git-send-email-wens@csie.org>
+Date: Wed, 23 Jul 2014 23:33:06 +0800
+Subject: [PATCH v5 1/2] serial: 8250_dw: Add optional reset control support
+In-Reply-To: <1406129587-24668-1-git-send-email-wens@csie.org>
+References: <1406129587-24668-1-git-send-email-wens@csie.org>
+Message-ID: <1406129587-24668-2-git-send-email-wens@csie.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Greg,
+The Allwinner A31 and A23 SoCs have a reset controller
+maintaining the UART in reset by default.
 
-This series adds optional reset control and deferred probing support
-to 8250_dw. These are required to support the UARTs on sun6i/sun8i.
-They were originally part of my sun8i PRCM series. The other parts
-of that series have been merged already. It would be really nice
-if we could get these 2 in as well.
+This patch adds optional reset support to the driver.
 
-Patch 1 adds optional reset control support to the 8250_dw, which
-is used by sun6i and sun8i platforms. Till now, this wasn't needed
-from a working standpoint, as the bootloader de-asserts the reset
-control on the console UART for us. However, during the development
-of the sun8i patches, I noticed other UARTs wouldn't work. Also the
-new sun6i A31 Hummingbird has multiple UARTs available, which would
-require this patch.
+Signed-off-by: Chen-Yu Tsai <wens@csie.org>
+Acked-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+---
+ Documentation/devicetree/bindings/serial/snps-dw-apb-uart.txt | 1 +
+ drivers/tty/serial/8250/8250_dw.c                             | 9 +++++++++
+ 2 files changed, 10 insertions(+)
 
-Patch 2 adds deferred probing to 8250_dw. In my case, even though
-the clocks and reset controller "devices" were registered before
-the UART, the 8250_dw driver binded with the UART devices before
-the clocks and resets were available. This resulted in the 8250_dw
-driver failing. I only tested the R_UART device.
-
-Patch 2 also does proper cleanup in the event that probing failed.
-
-Maxime, I dropped your Acked-by because I added the cleanup code
-path.
-
-Changes since v4:
-  - Rebased onto tty-next (4847914)
-  - Do proper cleanup in the probe function if errors are encountered.
-
-No changes before v4.
-
-
-Cheers
-ChenYu
-
-
-Chen-Yu Tsai (2):
-  serial: 8250_dw: Add optional reset control support
-  serial: 8250_dw: Add support for deferred probing
-
- .../bindings/serial/snps-dw-apb-uart.txt           |  1 +
- drivers/tty/serial/8250/8250_dw.c                  | 50 +++++++++++++++++++---
- 2 files changed, 44 insertions(+), 7 deletions(-)
-
+diff --git a/Documentation/devicetree/bindings/serial/snps-dw-apb-uart.txt b/Documentation/devicetree/bindings/serial/snps-dw-apb-uart.txt
+index 095ac71..7f76214 100644
+--- a/Documentation/devicetree/bindings/serial/snps-dw-apb-uart.txt
++++ b/Documentation/devicetree/bindings/serial/snps-dw-apb-uart.txt
+@@ -15,6 +15,7 @@ The supplying peripheral clock can also be handled, needing a second property
+ 	Required elements: "baudclk", "apb_pclk"
+ 
+ Optional properties:
++- resets : phandle to the parent reset controller.
+ - reg-shift : quantity to shift the register offsets by.  If this property is
+   not present then the register offsets are not shifted.
+ - reg-io-width : the size (in bytes) of the IO accesses that should be
+diff --git a/drivers/tty/serial/8250/8250_dw.c b/drivers/tty/serial/8250/8250_dw.c
+index affdcb1..501db2f 100644
+--- a/drivers/tty/serial/8250/8250_dw.c
++++ b/drivers/tty/serial/8250/8250_dw.c
+@@ -26,6 +26,7 @@
+ #include <linux/slab.h>
+ #include <linux/acpi.h>
+ #include <linux/clk.h>
++#include <linux/reset.h>
+ #include <linux/pm_runtime.h>
+ 
+ #include <asm/byteorder.h>
+@@ -60,6 +61,7 @@ struct dw8250_data {
+ 	int			line;
+ 	struct clk		*clk;
+ 	struct clk		*pclk;
++	struct reset_control	*rst;
+ 	struct uart_8250_dma	dma;
+ };
+ 
+@@ -383,6 +385,10 @@ static int dw8250_probe(struct platform_device *pdev)
+ 		}
+ 	}
+ 
++	data->rst = devm_reset_control_get_optional(&pdev->dev, NULL);
++	if (!IS_ERR(data->rst))
++		reset_control_deassert(data->rst);
++
+ 	data->dma.rx_chan_id = -1;
+ 	data->dma.tx_chan_id = -1;
+ 	data->dma.rx_param = data;
+@@ -426,6 +432,9 @@ static int dw8250_remove(struct platform_device *pdev)
+ 
+ 	serial8250_unregister_port(data->line);
+ 
++	if (!IS_ERR(data->rst))
++		reset_control_assert(data->rst);
++
+ 	if (!IS_ERR(data->pclk))
+ 		clk_disable_unprepare(data->pclk);
+ 
 -- 
 2.0.1
