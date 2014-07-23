@@ -1,63 +1,78 @@
-From: jason@lakedaemon.net (Jason Cooper)
-Date: Wed, 23 Jul 2014 19:42:56 -0400
-Subject: [PATCH 2/2] ARM: mvebu: Added dts defintion for Lenovo Iomega
- ix4-300d NAS
-In-Reply-To: <20140723232909.GE28485@lunn.ch>
-References: <1406155973-13657-1-git-send-email-yahoo@perenite.com>
- <20140723232715.GL23220@titan.lakedaemon.net>
- <20140723232909.GE28485@lunn.ch>
-Message-ID: <20140723234256.GN23220@titan.lakedaemon.net>
+From: olof@lixom.net (Olof Johansson)
+Date: Wed, 23 Jul 2014 16:45:15 -0700
+Subject: [GIT PULL] ARM: mvebu: SoC changes for v3.17 (round 3)
+In-Reply-To: <20140723234130.GM23220@titan.lakedaemon.net>
+References: <20140722205706.GA23220@titan.lakedaemon.net>
+ <201407232231.41787.arnd@arndb.de>
+ <20140723234130.GM23220@titan.lakedaemon.net>
+Message-ID: <CAOesGMj1euJo-NPO-Ah18enuJc12u9ndaYo=9dM37pX_yX-wUw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jul 24, 2014 at 01:29:09AM +0200, Andrew Lunn wrote:
-> > On Wed, Jul 23, 2014 at 03:52:53PM -0700, Benoit Masson wrote:
-> > > The Lenovo Iomega ix4-300d is a 4-Bay sata NAS with dual Gb,
-> > >  USB2.0 & 3.0, powered by a Marvell Armada XP MV78230 dual core CPU.
-> > > 
-> > > http://shop.lenovo.com/fr/fr/servers/network-storage/lenovoemc/ix4-300d/
-> > > Signed-off-by: Benoit Masson <yahoo@perenite.com>
-> > > ---
-> > >  arch/arm/boot/dts/Makefile                      |   3 +-
-> > >  arch/arm/boot/dts/armada-xp-lenovo-ix4-300d.dts | 284 ++++++++++++++++++++++++
-> > >  2 files changed, 286 insertions(+), 1 deletion(-)
-> > >  create mode 100644 arch/arm/boot/dts/armada-xp-lenovo-ix4-300d.dts
-> > ...
-> > > diff --git a/arch/arm/boot/dts/armada-xp-lenovo-ix4-300d.dts b/arch/arm/boot/dts/armada-xp-lenovo-ix4-300d.dts
-> > > new file mode 100644
-> > > index 0000000..1f33cbc
-> > > --- /dev/null
-> > > +++ b/arch/arm/boot/dts/armada-xp-lenovo-ix4-300d.dts
-> > ...
-> > > +	/* Warning: you need both eth1 & 0 PHY initialized
-> > > +		(i.e having them up does the tweak)
-> > > +		for poweroff to shutdown otherwise it reboots */
-> > 
-> > nit: multi-line comments are like this:
-> > 
-> > 	/*
-> > 	 * Warning: you need both eth1 & 0 PHY initialized (i.e having
-> > 	 * them up does the tweak) for poweroff to shutdown otherwise it
-> > 	 * reboots
-> > 	 */
-> > 
-> > If that's the only thing left, I'll fix it up when I pull it in.  No
-> > need to respin just for this.
-> 
-> Hi Jason
-> 
-> We should not really leave the i2c compatibility string as it is.
+On Wed, Jul 23, 2014 at 4:41 PM, Jason Cooper <jason@lakedaemon.net> wrote:
+> On Wed, Jul 23, 2014 at 10:31:41PM +0200, Arnd Bergmann wrote:
+>> On Tuesday 22 July 2014, Jason Cooper wrote:
+>> > All,
+>> >
+>> > Here's the cpufreq changes I mentioned over the weekend.  It's been in
+>> > -next for a while.  Once I get the new version of cpuidle from ThomasP,
+>> > I'll push that as quickly as possible.
+>>
+>> Just for my information, is this coordinated with the cpufreq maintainers?
+>> I remember being asked to ensure all cpufreq/cpuidle stuff has an Ack
+>> from them, even stuff that doesn't touch drivers/cpufreq at all.
+>
+> Good to know.
+>
+>> The contents look good to me. I can merge them if there are no objections
+>> from Viresh, feel free to send the next batch already without waiting
+>> for me to pull.
+>
+> We've been coordinating with Viresh.  He has an unsettled issue on his
+> side he hopes to have resolved soon.  Worst case scenario, he doesn't
+> get the change in for v3.17, we'll have to do a minor DT fix on top of
+> -rc1.
+>
+>> > As usual (do I need to type this each time any more? :) ), this is an
+>> > incremental pull request from tags/mvebu-soc-3.17-2 up to
+>> > tags/mvebu-soc-3.17-3 on the mvebu/soc branch.
+>>
+>> It certainly helps me to have this information, but you can write it
+>> more briefly, e.g. "based on tags/mvebu-soc-3.17-2".
+>
+> Ahhhh....  Much more succinct.  Thank you.  On a side note, I wonder
+> what it would take to get 'git request-pull' smart enough to add that
+> information when handed a tag?
+>
+>> > The following changes since commit ba364fc752daeded072a5ef31e43b84cb1f9e5fd:
+>> >
+>> >   ARM: Kirkwood: Remove mach-kirkwood (2014-07-13 22:13:39 +0000)
+>
+> eg:
+>
+>   ARM: Kirkwood: Remove mach-kirkwood (tags/mvebu-soc-3.17-2)
 
-Agreed.
+That only maps to the tag in your tree, which might or might not map
+directly to something that we know or care about. We do tend to keep
+naming similar, but not always identical. For example, the branch for
+that tag would be mvebu/soc2 in our tree.
 
-> Hopefully the OEM moved onto B1 stepping at some point.  Although B1
-> devices will work with the workaround, you get better performance
-> without it.
-> 
-> We should wait for Gregory to look at the quirk and soc-id code.
+>> >
+>> > are available in the git repository at:
+>> >
+>> >   git://git.infradead.org/linux-mvebu.git tags/mvebu-soc-3.17-3
+>> >
+>> > for you to fetch changes up to ba3ec5780bba27819bbc4f669e6c77418a00f14b:
+>> >
+>> >   Merge branch 'mvebu/soc-cpufreq' into mvebu/soc (2014-07-22 20:46:48 +0000)
+>> >
+>> > ----------------------------------------------------------------
+>
+> Is the date of the base commit useful in any way in the pull request?
 
-Yep.
+I find the SHA to be useful, I will sometimes run "git branch
+--contains ba3ec57<...>" to see where the base is merged already. The
+date, for me, less so.
 
-thx,
 
-Jason.
+-Olof
