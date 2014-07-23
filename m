@@ -1,38 +1,67 @@
-From: benoitm@perenite.com (Benoit Masson)
-Date: Wed, 23 Jul 2014 23:03:14 +0200
-Subject: [PATCH 2/2] Adding lenovo in vendor
-In-Reply-To: <20140723172646.GI23220@titan.lakedaemon.net>
-References: <1406117232-5962-1-git-send-email-yahoo@perenite.com>
- <1406117232-5962-2-git-send-email-yahoo@perenite.com>
- <20140723134756.GG23220@titan.lakedaemon.net> <20140723151033.GF2856@lunn.ch>
- <20140723172646.GI23220@titan.lakedaemon.net>
-Message-ID: <C7BAB83C-9000-41AC-AFD7-CEA54CF7C00A@perenite.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Wed, 23 Jul 2014 23:05:49 +0200
+Subject: [PATCH] ARM: mvebu: fix build without platforms selected
+Message-ID: <7339332.ZE2mWIdyDh@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Looking at the vendor list it should then be "Lenovo Group Ltd." since no other vendor except 1 use Limited all other use Ltd.
-Fine with this ?
-Le 23 juil. 2014 ? 19:26, Jason Cooper <jason@lakedaemon.net> a ?crit :
+When building a multiplatform kernel that enables 'ARCH_MVEBU' but
+none of the individual options under it, we get this link error:
 
-> On Wed, Jul 23, 2014 at 05:10:33PM +0200, Andrew Lunn wrote:
->>>> +lenovo	LENOVO
->>> 
->>> is this their official, registered company name?
->> 
->> http://www.lenovo.com/ww/lenovo/FAQs.html says
->> 
->> 1. What is Lenovo?s stock symbol (ticker)?
->> HKSE: 992.hk
->> ADR (Level I): LNVGY
->> 
->> So i think lenovo is probably the more understandable vendor prefix,
->> even if it is not the official stock ticker.
->> 
->> However there official registered company name appears to be
->> Lenovo Group Limited.
-> 
-> Agreed, Benoit, please do 'lenovo  Lenovo Group Limited'
-> 
-> thx,
-> 
-> Jason.
+arch/arm/mach-mvebu/built-in.o: In function `mvebu_armada375_smp_wa_init':
+:(.text+0x190): undefined reference to `mvebu_setup_boot_addr_wa'
+
+The best solution seems to be to ensure that in this configuration,
+we don't actually build any of the mvebu code.
+
+Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+---
+diff --git a/arch/arm/mach-mvebu/Kconfig b/arch/arm/mach-mvebu/Kconfig
+index 955d4a3afabd..c1e4567a5ab3 100644
+--- a/arch/arm/mach-mvebu/Kconfig
++++ b/arch/arm/mach-mvebu/Kconfig
+@@ -14,11 +14,15 @@ menuconfig ARCH_MVEBU
+ 
+ if ARCH_MVEBU
+ 
++config MACH_MVEBU_ANY
++	bool
++
+ config MACH_MVEBU_V7
+ 	bool
+ 	select ARMADA_370_XP_TIMER
+ 	select CACHE_L2X0
+ 	select ARM_CPU_SUSPEND
++	select MACH_MVEBU_ANY
+ 
+ config MACH_ARMADA_370
+ 	bool "Marvell Armada 370 boards" if ARCH_MULTI_V7
+@@ -75,6 +79,7 @@ config MACH_DOVE
+ 	select CACHE_L2X0
+ 	select CPU_PJ4
+ 	select DOVE_CLK
++	select MACH_MVEBU_ANY
+ 	select ORION_IRQCHIP
+ 	select ORION_TIMER
+ 	select PINCTRL_DOVE
+@@ -87,6 +92,7 @@ config MACH_KIRKWOOD
+ 	select ARCH_REQUIRE_GPIOLIB
+ 	select CPU_FEROCEON
+ 	select KIRKWOOD_CLK
++	select MACH_MVEBU_ANY
+ 	select ORION_IRQCHIP
+ 	select ORION_TIMER
+ 	select PCI
+diff --git a/arch/arm/mach-mvebu/Makefile b/arch/arm/mach-mvebu/Makefile
+index bc7689e530a4..e24136b42765 100644
+--- a/arch/arm/mach-mvebu/Makefile
++++ b/arch/arm/mach-mvebu/Makefile
+@@ -4,7 +4,7 @@ ccflags-$(CONFIG_ARCH_MULTIPLATFORM) := -I$(srctree)/$(src)/include \
+ AFLAGS_coherency_ll.o		:= -Wa,-march=armv7-a
+ CFLAGS_pmsu.o			:= -march=armv7-a
+ 
+-obj-y				 += system-controller.o mvebu-soc-id.o
++obj-$(CONFIG_MACH_MVEBU_ANY)	 += system-controller.o mvebu-soc-id.o
+ 
+ ifeq ($(CONFIG_MACH_MVEBU_V7),y)
+ obj-y				 += cpu-reset.o board-v7.o coherency.o coherency_ll.o pmsu.o pmsu_ll.o
