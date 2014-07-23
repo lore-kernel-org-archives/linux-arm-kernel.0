@@ -1,29 +1,27 @@
-From: peter.griffin@linaro.org (Peter Griffin)
-Date: Wed, 23 Jul 2014 15:48:35 +0100
-Subject: [PATCH v3 3/3] MAINTAINERS: Add dwc3-st.c file to ARCH/STI
- architecture
-In-Reply-To: <1406126915-30601-1-git-send-email-peter.griffin@linaro.org>
-References: <1406126915-30601-1-git-send-email-peter.griffin@linaro.org>
-Message-ID: <1406126915-30601-4-git-send-email-peter.griffin@linaro.org>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Wed, 23 Jul 2014 16:50:14 +0200
+Subject: [PATCH 3/3] pinctrl: rockchip: add drive-strength control for
+ rk3288
+In-Reply-To: <29291825.rqOIHNJZsg@diego>
+References: <3086962.49c4Dnm508@diego>
+	<29291825.rqOIHNJZsg@diego>
+Message-ID: <CACRpkdZh4Y44QNJibcUAg_8LCsiurKY+F7p4q2qxL2WL5Joz+w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Signed-off-by: Peter Griffin <peter.griffin@linaro.org>
----
- MAINTAINERS | 1 +
- 1 file changed, 1 insertion(+)
+On Sun, Jul 20, 2014 at 1:50 AM, Heiko St?bner <heiko@sntech.de> wrote:
 
-diff --git a/MAINTAINERS b/MAINTAINERS
-index 702ca10..269ad3b 100644
---- a/MAINTAINERS
-+++ b/MAINTAINERS
-@@ -1325,6 +1325,7 @@ F:	drivers/pinctrl/pinctrl-st.c
- F:	drivers/media/rc/st_rc.c
- F:	drivers/i2c/busses/i2c-st.c
- F:	drivers/tty/serial/st-asc.c
-+F:	drivers/usb/dwc3/dwc3-st.c
- 
- ARM/TECHNOLOGIC SYSTEMS TS7250 MACHINE SUPPORT
- M:	Lennert Buytenhek <kernel@wantstofly.org>
--- 
-1.9.1
+> The rk3288 is the first Rockchip soc handling the drive strength on a per-pin
+> basis, while the older ones can set the drive-strength only for specific
+> pin-groups. Therefore limit setting the drive-strength to this soc for now.
+>
+> Signed-off-by: Heiko Stuebner <heiko@sntech.de>
+
+Patch applied.
+
+Others SoC:s have opted to create sub-drivers on a per-soc basis
+when stuff gets too complicated, please keep this in mind if the
+file starts growing wild...
+
+Yours,
+Linus Walleij
