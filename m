@@ -1,69 +1,63 @@
 From: tony@atomide.com (Tony Lindgren)
-Date: Wed, 23 Jul 2014 01:50:03 -0700
-Subject: OMAP2+: gpmc: fix gpmc_hwecc_bch_capable()
-In-Reply-To: <20980858CB6D3A4BAE95CA194937D5E73EB02569@DBDE04.ent.ti.com>
-References: <1405301778.29716.72.camel@mars>
- <20980858CB6D3A4BAE95CA194937D5E73EB02569@DBDE04.ent.ti.com>
-Message-ID: <20140723085003.GB22006@atomide.com>
+Date: Wed, 23 Jul 2014 01:54:45 -0700
+Subject: [PATCH] ARM: OMAP: generic: add call to of_clk_init()
+In-Reply-To: <1405162508-9835-1-git-send-email-zonque@gmail.com>
+References: <1405162508-9835-1-git-send-email-zonque@gmail.com>
+Message-ID: <20140723085444.GC22006@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Gupta, Pekon <pekon@ti.com> [140713 22:43]:
-> >From: Christoph Fritz [mailto:chf.fritz at googlemail.com]
-> >
-> >This patch adds bch8 ecc software fallback which is mostly used by
-> >omap3s because they lack hardware elm support.
-> >
-> >Fixes: 0611c41934ab35ce84dea34ab291897ad3cbc7be (ARM: OMAP2+: gpmc:
-> >update gpmc_hwecc_bch_capable() for new platforms and ECC schemes)
-> >Cc: <stable@vger.kernel.org> # 3.15.x+
-> >Signed-off-by: Christoph Fritz <chf.fritz@googlemail.com>
-> >---
-> > arch/arm/mach-omap2/gpmc-nand.c |   18 ++++++++++--------
-> > 1 file changed, 10 insertions(+), 8 deletions(-)
-> >
-> >diff --git a/arch/arm/mach-omap2/gpmc-nand.c b/arch/arm/mach-omap2/gpmc-nand.c
-> >index 17cd393..93914d2 100644
-> >--- a/arch/arm/mach-omap2/gpmc-nand.c
-> >+++ b/arch/arm/mach-omap2/gpmc-nand.c
-> >@@ -50,6 +50,16 @@ static bool gpmc_hwecc_bch_capable(enum omap_ecc ecc_opt)
-> > 		 soc_is_omap54xx() || soc_is_dra7xx())
-> > 		return 1;
-> >
-> >+	if (ecc_opt == OMAP_ECC_BCH4_CODE_HW_DETECTION_SW ||
-> >+		 ecc_opt == OMAP_ECC_BCH8_CODE_HW_DETECTION_SW) {
-> >+		if (cpu_is_omap24xx())
-> >+			return 0;
-> >+		else if (cpu_is_omap3630() && (GET_OMAP_REVISION() == 0))
-> >+			return 0;
-> >+		else
-> >+			return 1;
-> >+	}
-> >+
-> > 	/* OMAP3xxx do not have ELM engine, so cannot support ECC schemes
-> > 	 * which require H/W based ECC error detection */
-> > 	if ((cpu_is_omap34xx() || cpu_is_omap3630()) &&
-> >@@ -57,14 +67,6 @@ static bool gpmc_hwecc_bch_capable(enum omap_ecc ecc_opt)
-> > 		 (ecc_opt == OMAP_ECC_BCH8_CODE_HW)))
-> > 		return 0;
-> >
-> >-	/*
-> >-	 * For now, assume 4-bit mode is only supported on OMAP3630 ES1.x, x>=1
-> >-	 * and AM33xx derivates. Other chips may be added if confirmed to work.
-> >-	 */
-> >-	if ((ecc_opt == OMAP_ECC_BCH4_CODE_HW_DETECTION_SW) &&
-> >-	    (!cpu_is_omap3630() || (GET_OMAP_REVISION() == 0)))
-> >-		return 0;
-> >-
-> > 	/* legacy platforms support only HAM1 (1-bit Hamming) ECC scheme */
-> > 	if (ecc_opt == OMAP_ECC_HAM1_CODE_HW)
-> > 		return 1;
-> >--
-> >1.7.10.4
-> >
-> Thanks much for this fix.
-> Reviewed-by: Pekon Gupta <pekon@ti.com>
+* Daniel Mack <zonque@gmail.com> [140712 03:57]:
+> This is needed to instanciate fixed clocks in the DT.
 
-Applying into omap-for-v3.16/fixes thanks.
+Makes sense to me. Does this fix some regression or hang
+that's needed for the -rc series?
+
+Also would like to get an ack from Tero on this as the other
+clocks are initialized elsewhere.
+
+Regards,
 
 Tony
+ 
+> Signed-off-by: Daniel Mack <zonque@gmail.com>
+> ---
+>  arch/arm/mach-omap2/board-generic.c | 8 ++++++++
+>  1 file changed, 8 insertions(+)
+> 
+> diff --git a/arch/arm/mach-omap2/board-generic.c b/arch/arm/mach-omap2/board-generic.c
+> index 5606fa2..39f154a 100644
+> --- a/arch/arm/mach-omap2/board-generic.c
+> +++ b/arch/arm/mach-omap2/board-generic.c
+> @@ -15,6 +15,7 @@
+>  #include <linux/of_irq.h>
+>  #include <linux/of_platform.h>
+>  #include <linux/irqdomain.h>
+> +#include <linux/clk-provider.h>
+>  
+>  #include <asm/mach/arch.h>
+>  
+> @@ -33,6 +34,11 @@ static struct of_device_id omap_dt_match_table[] __initdata = {
+>  	{ }
+>  };
+>  
+> +static struct of_device_id clk_match[] __initdata = {
+> +	{ .compatible = "fixed-clock", .data = of_fixed_clk_setup, },
+> +	{ }
+> +};
+> +
+>  static void __init omap_generic_init(void)
+>  {
+>  	omapdss_early_init_of();
+> @@ -40,6 +46,8 @@ static void __init omap_generic_init(void)
+>  	pdata_quirks_init(omap_dt_match_table);
+>  
+>  	omapdss_init_of();
+> +
+> +	of_clk_init(clk_match);
+>  }
+>  
+>  #ifdef CONFIG_SOC_OMAP2420
+> -- 
+> 1.9.3
+> 
