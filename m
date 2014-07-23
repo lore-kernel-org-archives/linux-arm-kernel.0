@@ -1,47 +1,121 @@
-From: jiang.liu@linux.intel.com (Jiang Liu)
-Date: Wed, 23 Jul 2014 11:47:55 +0800
-Subject: [RFC Patch V1 21/30] mm, irqchip: Use cpu_to_mem()/numa_mem_id()
- to support memoryless node
-In-Reply-To: <20140718124038.GE24496@titan.lakedaemon.net>
-References: <1405064267-11678-1-git-send-email-jiang.liu@linux.intel.com>
- <1405064267-11678-22-git-send-email-jiang.liu@linux.intel.com>
- <20140718124038.GE24496@titan.lakedaemon.net>
-Message-ID: <53CF306B.9080103@linux.intel.com>
+From: lokeshvutla@ti.com (Lokesh Vutla)
+Date: Wed, 23 Jul 2014 09:27:53 +0530
+Subject: [PATCH 2/2] ARM: DRA7: hwmod: Add dra74x and dra72x specific
+ ocp interface lists
+In-Reply-To: <53CE9652.4080304@ti.com>
+References: <1405499774-19770-1-git-send-email-lokeshvutla@ti.com>
+ <1405499774-19770-3-git-send-email-lokeshvutla@ti.com>
+ <53CE9652.4080304@ti.com>
+Message-ID: <53CF32C1.9040807@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Jason,
-	Thanks for your review. According to review comments,
-we need to rework the patch set in another direction and will
-give up this patch.
-Regards!
-Gerry
-
-On 2014/7/18 20:40, Jason Cooper wrote:
-> On Fri, Jul 11, 2014 at 03:37:38PM +0800, Jiang Liu wrote:
->> When CONFIG_HAVE_MEMORYLESS_NODES is enabled, cpu_to_node()/numa_node_id()
->> may return a node without memory, and later cause system failure/panic
->> when calling kmalloc_node() and friends with returned node id.
->> So use cpu_to_mem()/numa_mem_id() instead to get the nearest node with
->> memory for the/current cpu.
+Hi Nishanth,
+On Tuesday 22 July 2014 10:20 PM, Nishanth Menon wrote:
+> On 07/16/2014 03:36 AM, Lokesh Vutla wrote:
+>> From: Rajendra Nayak <rnayak@ti.com>
 >>
->> If CONFIG_HAVE_MEMORYLESS_NODES is disabled, cpu_to_mem()/numa_mem_id()
->> is the same as cpu_to_node()/numa_node_id().
+>> To deal with IPs which are specific to dra74x and dra72x, maintain seperate
+>> ocp interface lists, while keeping the common list for all common IPs.
 >>
->> Signed-off-by: Jiang Liu <jiang.liu@linux.intel.com>
+>> Move USB OTG SS4 to dra74x only list since its unavailable in
+>> dra72x and is giving an abort during boot. The dra72x only list
+>> is empty for now and a placeholder for future hwmod additions which
+>> are specific to dra72x.
+>>
+>> Fixes: d904b38 ARM: DRA7: hwmod: Add SYSCONFIG for usb_otg_ss
+> 
+> please use a format as following:
+> Fixes: d904b38df0db13 ("ARM: DRA7: hwmod: Add SYSCONFIG for usb_otg_ss")
+> 
+>> Reported-by: Keerthy <j-keerthy@ti.com>
+>> Signed-off-by: Rajendra Nayak <rnayak@ti.com>
+>> Signed-off-by: Lokesh Vutla <lokeshvutla@ti.com>
 >> ---
->>  drivers/irqchip/irq-clps711x.c |    2 +-
->>  drivers/irqchip/irq-gic.c      |    2 +-
->>  2 files changed, 2 insertions(+), 2 deletions(-)
+>>  arch/arm/mach-omap2/omap_hwmod.c          |    3 +++
+>>  arch/arm/mach-omap2/omap_hwmod_7xx_data.c |   22 ++++++++++++++++++++--
+>>  2 files changed, 23 insertions(+), 2 deletions(-)
+>>
+>> diff --git a/arch/arm/mach-omap2/omap_hwmod.c b/arch/arm/mach-omap2/omap_hwmod.c
+>> index 6c074f3..14f8370 100644
+>> --- a/arch/arm/mach-omap2/omap_hwmod.c
+>> +++ b/arch/arm/mach-omap2/omap_hwmod.c
+>> @@ -3345,6 +3345,9 @@ int __init omap_hwmod_register_links(struct omap_hwmod_ocp_if **ois)
+>>  	if (!ois)
+>>  		return 0;
+>>  
+>> +	if (ois[0] == NULL) /*empty list*/
+> /* Empty list */ ?
+>> +		return 0;
+>> +
 > 
-> Do you have anything depending on this?  Can apply it to irqchip?  If
-> you need to keep it with other changes,
+> This change looks like a different patch?
+Since we are introducing empty lists in this patch, I guess
+this can go in the same patch.
 > 
-> Acked-by: Jason Cooper <jason@lakedaemon.net>
+>>  	if (!linkspace) {
+>>  		if (_alloc_linkspace(ois)) {
+>>  			pr_err("omap_hwmod: could not allocate link space\n");
+>> diff --git a/arch/arm/mach-omap2/omap_hwmod_7xx_data.c b/arch/arm/mach-omap2/omap_hwmod_7xx_data.c
+>> index 284324f..c95033c 100644
+>> --- a/arch/arm/mach-omap2/omap_hwmod_7xx_data.c
+>> +++ b/arch/arm/mach-omap2/omap_hwmod_7xx_data.c
+>> @@ -35,6 +35,7 @@
+>>  #include "i2c.h"
+>>  #include "mmc.h"
+>>  #include "wd_timer.h"
+>> +#include "soc.h"
+>>  
+>>  /* Base offset for all DRA7XX interrupts external to MPUSS */
+>>  #define DRA7XX_IRQ_GIC_START	32
+>> @@ -2705,7 +2706,6 @@ static struct omap_hwmod_ocp_if *dra7xx_hwmod_ocp_ifs[] __initdata = {
+>>  	&dra7xx_l4_per3__usb_otg_ss1,
+>>  	&dra7xx_l4_per3__usb_otg_ss2,
+>>  	&dra7xx_l4_per3__usb_otg_ss3,
+>> -	&dra7xx_l4_per3__usb_otg_ss4,
+>>  	&dra7xx_l3_main_1__vcp1,
+>>  	&dra7xx_l4_per2__vcp1,
+>>  	&dra7xx_l3_main_1__vcp2,
+>> @@ -2714,8 +2714,26 @@ static struct omap_hwmod_ocp_if *dra7xx_hwmod_ocp_ifs[] __initdata = {
+>>  	NULL,
+>>  };
+>>  
+>> +static struct omap_hwmod_ocp_if *dra74x_hwmod_ocp_ifs[] __initdata = {
+>> +	&dra7xx_l4_per3__usb_otg_ss4,
+>> +	NULL,
+>> +};
+>> +
+>> +static struct omap_hwmod_ocp_if *dra72x_hwmod_ocp_ifs[] __initdata = {
+>> +	NULL,
+>> +};
+>> +
+>>  int __init dra7xx_hwmod_init(void)
+>>  {
+>> +	int ret;
+>> +
+>>  	omap_hwmod_init();
+>> -	return omap_hwmod_register_links(dra7xx_hwmod_ocp_ifs);
+>> +	ret = omap_hwmod_register_links(dra7xx_hwmod_ocp_ifs);
+> if (ret)
+> 	goto out;
+>> +
+>> +	if (!ret && soc_is_dra74x())
+> no need of !ret
+>> +		return omap_hwmod_register_links(dra74x_hwmod_ocp_ifs);
+> ret = omap_hwmod_register_links(dra74x_hwmod_ocp_ifs);
+>> +	else if (!ret && soc_is_dra72x())
+> no need of else and !ret
+>> +		return omap_hwmod_register_links(dra72x_hwmod_ocp_ifs);
+> ret = omap_hwmod_register_links(dra72x_hwmod_ocp_ifs);
+>> +
 > 
-> But please do let me know if I can take it.
+> out:
+Ok. Will do this and repost.
+
+Thanks and regards,
+Lokesh
+>> +	return ret;
+>>  }
+>>
 > 
-> thx,
-> 
-> Jason.
 > 
