@@ -1,81 +1,40 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Wed, 23 Jul 2014 11:45:54 +0100
-Subject: [PATCHv4 3/5] common: dma-mapping: Introduce common remapping
- functions
-In-Reply-To: <1406079308-5232-4-git-send-email-lauraa@codeaurora.org>
-References: <1406079308-5232-1-git-send-email-lauraa@codeaurora.org>
- <1406079308-5232-4-git-send-email-lauraa@codeaurora.org>
-Message-ID: <20140723104554.GB1366@localhost>
+From: viresh.kumar@linaro.org (Viresh Kumar)
+Date: Wed, 23 Jul 2014 16:18:51 +0530
+Subject: [PATCH v2] cpufreq: tests: Providing cpufreq regression test
+In-Reply-To: <20140723121042.5b6f49e3@amdc2363>
+References: <1405678985-21677-1-git-send-email-l.majewski@samsung.com>
+ <1405926154-27214-1-git-send-email-l.majewski@samsung.com>
+ <CAKohpondk7Cty8MhTcjyzZW8Z0o4AVupYE0rRnG4YJf+SmDyjg@mail.gmail.com>
+ <20140723093824.5e51918f@amdc2363>
+ <CAKohpok++gPcNk9-E4MsFdNBy8qL7oLYvatk1EvcW1OHwroZXQ@mail.gmail.com>
+ <20140723121042.5b6f49e3@amdc2363>
+Message-ID: <CAKohpomfGsvzJUn23-u-KoyNaY8sRaMLk0S4GdQJR0DxyscJWg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jul 23, 2014 at 02:35:06AM +0100, Laura Abbott wrote:
-> --- a/arch/arm/mm/dma-mapping.c
-> +++ b/arch/arm/mm/dma-mapping.c
-> @@ -298,37 +298,19 @@ static void *
->  __dma_alloc_remap(struct page *page, size_t size, gfp_t gfp, pgprot_t prot,
->  	const void *caller)
->  {
-> -	struct vm_struct *area;
-> -	unsigned long addr;
-> -
->  	/*
->  	 * DMA allocation can be mapped to user space, so lets
->  	 * set VM_USERMAP flags too.
->  	 */
-> -	area = get_vm_area_caller(size, VM_ARM_DMA_CONSISTENT | VM_USERMAP,
-> -				  caller);
-> -	if (!area)
-> -		return NULL;
-> -	addr = (unsigned long)area->addr;
-> -	area->phys_addr = __pfn_to_phys(page_to_pfn(page));
-> -
-> -	if (ioremap_page_range(addr, addr + size, area->phys_addr, prot)) {
-> -		vunmap((void *)addr);
-> -		return NULL;
-> -	}
-> -	return (void *)addr;
-> +	return dma_common_contiguous_remap(page, size,
-> +			VM_ARM_DMA_CONSISTENT | VM_USERMAP,
-> +			prot, caller);
+On 23 July 2014 15:40, Lukasz Majewski <l.majewski@samsung.com> wrote:
 
-I think we still need at least a comment in the commit log since the arm
-code is moving from ioremap_page_range() to map_vm_area(). There is a
-slight performance penalty with the addition of a kmalloc() on this
-path.
+>> Shouldn't you use userspace governor then instead of performance?
+>
+> Performance assures that we will have the right frequency set.
 
-Or even better (IMO), see below.
+Why wouldn't userspace assure that?
 
-> --- a/drivers/base/dma-mapping.c
-> +++ b/drivers/base/dma-mapping.c
-[...]
-> +void *dma_common_contiguous_remap(struct page *page, size_t size,
-> +			unsigned long vm_flags,
-> +			pgprot_t prot, const void *caller)
-> +{
-> +	int i;
-> +	struct page **pages;
-> +	void *ptr;
-> +
-> +	pages = kmalloc(sizeof(struct page *) << get_order(size), GFP_KERNEL);
-> +	if (!pages)
-> +		return NULL;
-> +
-> +	for (i = 0; i < (size >> PAGE_SHIFT); i++)
-> +		pages[i] = page + i;
-> +
-> +	ptr = dma_common_pages_remap(pages, size, vm_flags, prot, caller);
-> +
-> +	kfree(pages);
-> +
-> +	return ptr;
-> +}
+> However, there can be a similar patch to use userspace governor and
+> various load to fail if ondemand's frequency flipping is detected.
 
-You could avoid the dma_common_page_remap() here (and kmalloc) and
-simply use ioremap_page_range(). We know that
-dma_common_contiguous_remap() is only called with contiguous physical
-range, so ioremap_page_range() is suitable. It also makes it a
-non-functional change for arch/arm.
+That's why I want to get to the motive behind this patch.
+AFAIU, we are checking if its fine to switch to available frequencies
+or not and if yes, do we actually switch to those. Right?
 
--- 
-Catalin
+For, this testcase we just need a single test and I still don't see why
+performance is better than userspace?
+
+>> And then we don't need the gzip stuff at all. We can just set it to
+>> the right freq and get current freq to see if it matches?
+>
+> Sometimes "interresting" things show up when you have 100% CPU load and
+> you try to switch frequency.
+
+That's a different test then. And that's how it should be presented.
+So, probably another option to the script, which isn't forced on people.
