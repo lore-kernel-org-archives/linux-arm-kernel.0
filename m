@@ -1,78 +1,183 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Wed, 23 Jul 2014 18:14:02 +0200
-Subject: [[RFC PATCH]] gpio: gpio-mxc: make sure gpio is input when
- request IRQ
-In-Reply-To: <20140722074257.GC21229@dragon>
-References: <1405518664-31313-1-git-send-email-list-09_linux_arm@tqsc.de>
- <20140722062803.GA21229@dragon> <53CE107A.1000000@tqsc.de>
- <20140722074257.GC21229@dragon>
-Message-ID: <CACRpkdYxOv+k2Sazm83sA=LwKUv5yMzag44A=Ez8pNQHRO3V6A@mail.gmail.com>
+From: ashwin.chaugule@linaro.org (Ashwin Chaugule)
+Date: Wed, 23 Jul 2014 12:15:15 -0400
+Subject: [PATCH v6 4/7] arm64: add PSCI CPU_SUSPEND based cpu_suspend
+ support
+In-Reply-To: <1405958786-17243-5-git-send-email-lorenzo.pieralisi@arm.com>
+References: <1405958786-17243-1-git-send-email-lorenzo.pieralisi@arm.com>
+ <1405958786-17243-5-git-send-email-lorenzo.pieralisi@arm.com>
+Message-ID: <CAJ5Y-ea6Z8EDe_kMZ3O3CxGD7k-M9JLKN-iEr7FB=-GwKGhSdA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jul 22, 2014 at 9:42 AM, Shawn Guo <shawn.guo@linaro.org> wrote:
-> On Tue, Jul 22, 2014 at 09:19:22AM +0200, Markus Niebel wrote:
-
->> Currently client drivers have simply interrupts and interrupt-parent
->> in their bindings, but no interrupt-gpios. Therefore in this case a
->> client does not know about a dedicated gpio which is to be requested
->> and configured.
+On 21 July 2014 12:06, Lorenzo Pieralisi <lorenzo.pieralisi@arm.com> wrote:
+> This patch implements the cpu_suspend cpu operations method through
+> the PSCI CPU SUSPEND API. The PSCI implementation translates the idle state
+> index passed by the cpu_suspend core call into a valid PSCI state according to
+> the PSCI states initialized at boot through the cpu_init_idle() CPU
+> operations hook.
 >
-> Okay.  I understand your problem now.  This is an issue in case we
-> specify a GPIO to be used as interrupt from device tree.  In non-DT
-> world, client driver knows this is an interrupt on GPIO, and therefore
-> takes the responsibility to request and configure the GPIO to work as
-> interrupt.  But in DT case, client driver does not know whether it's an
-> IRQ line or GPIO based interrupt.  The consequence is that GPIO
-> subsystem, OF subsystem, client driver, none of the three is requesting
-> and configuring the GPIO to be used as interrupt.
+> Entry point is set to cpu_resume physical address, that represents the
+> default kernel execution address following a CPU reset; for standby
+> states the entry point address is useless and will therefore be ignored
+> by the PSCI implementation.
 >
-> This is a common issue instead of i.MX specific, and should be addressed
-> globally, I think.
+> Signed-off-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
+> ---
+>  arch/arm64/kernel/psci.c | 89 ++++++++++++++++++++++++++++++++++++++++++++++++
+>  1 file changed, 89 insertions(+)
+>
+> diff --git a/arch/arm64/kernel/psci.c b/arch/arm64/kernel/psci.c
+> index a623c44..bbdf41d 100644
+> --- a/arch/arm64/kernel/psci.c
+> +++ b/arch/arm64/kernel/psci.c
+> @@ -21,6 +21,7 @@
+>  #include <linux/reboot.h>
+>  #include <linux/pm.h>
+>  #include <linux/delay.h>
+> +#include <linux/slab.h>
+>  #include <uapi/linux/psci.h>
+>
+>  #include <asm/compiler.h>
+> @@ -28,6 +29,7 @@
+>  #include <asm/errno.h>
+>  #include <asm/psci.h>
+>  #include <asm/smp_plat.h>
+> +#include <asm/suspend.h>
+>  #include <asm/system_misc.h>
+>
+>  #define PSCI_POWER_STATE_TYPE_STANDBY          0
+> @@ -65,6 +67,8 @@ enum psci_function {
+>         PSCI_FN_MAX,
+>  };
+>
+> +static DEFINE_PER_CPU_READ_MOSTLY(struct psci_power_state *, psci_power_state);
+> +
+>  static u32 psci_function_id[PSCI_FN_MAX];
+>
+>  static int psci_to_linux_errno(int errno)
+> @@ -93,6 +97,18 @@ static u32 psci_power_state_pack(struct psci_power_state state)
+>                  & PSCI_0_2_POWER_STATE_AFFL_MASK);
+>  }
+>
+> +static void psci_power_state_unpack(u32 power_state,
+> +                                   struct psci_power_state *state)
+> +{
+> +       state->id = (power_state & PSCI_0_2_POWER_STATE_ID_MASK) >>
+> +                       PSCI_0_2_POWER_STATE_ID_SHIFT;
+> +       state->type = (power_state & PSCI_0_2_POWER_STATE_TYPE_MASK) >>
+> +                       PSCI_0_2_POWER_STATE_TYPE_SHIFT;
+> +       state->affinity_level =
+> +                       (power_state & PSCI_0_2_POWER_STATE_AFFL_MASK) >>
+> +                       PSCI_0_2_POWER_STATE_AFFL_SHIFT;
+> +}
+> +
+>  /*
+>   * The following two functions are invoked via the invoke_psci_fn pointer
+>   * and will not be inlined, allowing us to piggyback on the AAPCS.
+> @@ -199,6 +215,61 @@ static int psci_migrate_info_type(void)
+>         return err;
+>  }
+>
+> +static int cpu_psci_cpu_init_idle(struct device_node *cpu_node,
+> +                                 unsigned int cpu)
+> +{
+> +       int i, ret, count = 0;
+> +       struct psci_power_state *psci_states;
+> +       struct device_node *state_node;
+> +
+> +       /*
+> +        * If the PSCI cpu_suspend function hook has not been initialized
+> +        * idle states must not be enabled, so bail out
+> +        */
+> +       if (!psci_ops.cpu_suspend)
+> +               return -EOPNOTSUPP;
+> +
+> +       /* Count idle states */
+> +       while ((state_node = of_parse_phandle(cpu_node, "cpu-idle-states",
+> +                                             count)))
+> +               count++;
+> +
+> +       if (!count)
+> +               return -ENODEV;
+> +
+> +       psci_states = kcalloc(count, sizeof(*psci_states), GFP_KERNEL);
+> +       if (!psci_states) {
+> +               pr_warn("idle state psci_state allocation failed\n");
+> +               return -ENOMEM;
+> +       }
+> +
+> +       for (i = 0; i < count; i++) {
+> +               u32 psci_power_state;
+> +
+> +               state_node = of_parse_phandle(cpu_node, "cpu-idle-states", i);
+> +
+> +               ret = of_property_read_u32(state_node,
+> +                                          "arm,psci-suspend-param",
+> +                                          &psci_power_state);
+> +               if (ret) {
+> +                       pr_warn(" * %s missing arm,psci-suspend-param property\n",
+> +                               state_node->full_name);
+> +                       goto free_mem;
+> +               }
+> +
+> +               pr_debug("psci-power-state %#x index %d\n", psci_power_state,
+> +                                                           i);
+> +               psci_power_state_unpack(psci_power_state, &psci_states[i]);
+> +       }
+> +       /* Idle states parsed correctly, initialize per-cpu pointer */
+> +       per_cpu(psci_power_state, cpu) = psci_states;
+> +       return 0;
+> +
+> +free_mem:
+> +       kfree(psci_states);
+> +       return ret;
+> +}
+> +
+>  static int get_set_conduit_method(struct device_node *np)
+>  {
+>         const char *method;
+> @@ -436,8 +507,23 @@ static int cpu_psci_cpu_kill(unsigned int cpu)
+>  #endif
+>  #endif
+>
+> +static int __maybe_unused cpu_psci_cpu_suspend(unsigned long index)
+> +{
+> +       struct psci_power_state *state = __get_cpu_var(psci_power_state);
+> +       /*
+> +        * idle state index 0 corresponds to wfi, should never be called
+> +        * from the cpu_suspend operations
+> +        */
+> +       if (WARN_ON_ONCE(!index))
+> +               return -EINVAL;
+> +
+> +       return psci_ops.cpu_suspend(state[index - 1],
+> +                                   virt_to_phys(cpu_resume));
+> +}
+> +
+>  const struct cpu_operations cpu_psci_ops = {
+>         .name           = "psci",
+> +       .cpu_init_idle  = cpu_psci_cpu_init_idle,
+>  #ifdef CONFIG_SMP
+>         .cpu_init       = cpu_psci_cpu_init,
+>         .cpu_prepare    = cpu_psci_cpu_prepare,
+> @@ -448,5 +534,8 @@ const struct cpu_operations cpu_psci_ops = {
+>         .cpu_kill       = cpu_psci_cpu_kill,
+>  #endif
+>  #endif
+> +#ifdef CONFIG_ARM64_CPU_SUSPEND
+> +       .cpu_suspend    = cpu_psci_cpu_suspend,
+> +#endif
+>  };
+>
+> --
+> 1.9.1
 
-This is very well documented in Documentation/gpio/driver.txt these
-days. Quoting:
+Reviewed-by: Ashwin Chaugule <ashwin.chaugule@linaro.org>
 
-"
-It is legal for any IRQ consumer to request an IRQ from any irqchip no matter
-if that is a combined GPIO+IRQ driver. The basic premise is that gpio_chip and
-irq_chip are orthogonal, and offering their services independent of each
-other.
-
-gpiod_to_irq() is just a convenience function to figure out the IRQ for a
-certain GPIO line and should not be relied upon to have been called before
-the IRQ is used.
-
-So always prepare the hardware and make it ready for action in respective
-callbacks from the GPIO and irqchip APIs. Do not rely on gpiod_to_irq() having
-been called first.
-
-This orthogonality leads to ambiguities that we need to solve: if there is
-competition inside the subsystem which side is using the resource (a certain
-GPIO line and register for example) it needs to deny certain operations and
-keep track of usage inside of the gpiolib subsystem. This is why the API
-below exists.
-
-
-Locking IRQ usage
------------------
-Input GPIOs can be used as IRQ signals. When this happens, a driver is requested
-to mark the GPIO as being used as an IRQ:
-
-        int gpiod_lock_as_irq(struct gpio_desc *desc)
-
-This will prevent the use of non-irq related GPIO APIs until the GPIO IRQ lock
-is released:
-
-        void gpiod_unlock_as_irq(struct gpio_desc *desc)
-
-When implementing an irqchip inside a GPIO driver, these two functions should
-typically be called in the .startup() and .shutdown() callbacks from the
-irqchip.
-"
-
-So: make sure each API can be used orthogonally by just poking
-into the hardware registers. Do not call gpio_request_one().
-
-Yours,
-Linus Walleij
+>
+>
+>
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
