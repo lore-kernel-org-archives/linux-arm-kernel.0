@@ -1,44 +1,47 @@
-From: davem@davemloft.net (David Miller)
-Date: Tue, 22 Jul 2014 19:52:22 -0700 (PDT)
-Subject: [PATCH 0/6] net: mvpp2: Assorted fixes
-In-Reply-To: <20140722.174153.413669013449137654.davem@davemloft.net>
-References: <20140723002916.67a0bb3c@free-electrons.com>
- <20140722232004.GA7838@arch.cereza>
- <20140722.174153.413669013449137654.davem@davemloft.net>
-Message-ID: <20140722.195222.775371949777233094.davem@davemloft.net>
+From: jiang.liu@linux.intel.com (Jiang Liu)
+Date: Wed, 23 Jul 2014 11:47:55 +0800
+Subject: [RFC Patch V1 21/30] mm, irqchip: Use cpu_to_mem()/numa_mem_id()
+ to support memoryless node
+In-Reply-To: <20140718124038.GE24496@titan.lakedaemon.net>
+References: <1405064267-11678-1-git-send-email-jiang.liu@linux.intel.com>
+ <1405064267-11678-22-git-send-email-jiang.liu@linux.intel.com>
+ <20140718124038.GE24496@titan.lakedaemon.net>
+Message-ID: <53CF306B.9080103@linux.intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: David Miller <davem@davemloft.net>
-Date: Tue, 22 Jul 2014 17:41:53 -0700 (PDT)
+Hi Jason,
+	Thanks for your review. According to review comments,
+we need to rework the patch set in another direction and will
+give up this patch.
+Regards!
+Gerry
 
-> From: Ezequiel Garcia <ezequiel.garcia@free-electrons.com>
-> Date: Tue, 22 Jul 2014 20:20:04 -0300
+On 2014/7/18 20:40, Jason Cooper wrote:
+> On Fri, Jul 11, 2014 at 03:37:38PM +0800, Jiang Liu wrote:
+>> When CONFIG_HAVE_MEMORYLESS_NODES is enabled, cpu_to_node()/numa_node_id()
+>> may return a node without memory, and later cause system failure/panic
+>> when calling kmalloc_node() and friends with returned node id.
+>> So use cpu_to_mem()/numa_mem_id() instead to get the nearest node with
+>> memory for the/current cpu.
+>>
+>> If CONFIG_HAVE_MEMORYLESS_NODES is disabled, cpu_to_mem()/numa_mem_id()
+>> is the same as cpu_to_node()/numa_node_id().
+>>
+>> Signed-off-by: Jiang Liu <jiang.liu@linux.intel.com>
+>> ---
+>>  drivers/irqchip/irq-clps711x.c |    2 +-
+>>  drivers/irqchip/irq-gic.c      |    2 +-
+>>  2 files changed, 2 insertions(+), 2 deletions(-)
 > 
->> On 23 Jul 12:29 AM, Thomas Petazzoni wrote:
->>> On Tue, 22 Jul 2014 13:16:39 -0700 (PDT), David Miller wrote:
->>> 
->>> > >> This series does not apply to the 'net' tree at all, please respin
->>> > >> and resubmit.
->>> > > 
->>> > > This series applies on net-next.
->>> > > 
->>> > > Sorry for not mentioning it,
->>> > 
->>> > They are bonafide bug fixes, therefore should be targetted at 'net'.
->>> 
->>> Except that I believe they are fixes for a driver which itself is in
->>> net-next, i.e scheduled for 3.17.
->>> 
->> 
->> That's right. These are fixes for the new mvpp2 driver, which is only
->> in net-next.
+> Do you have anything depending on this?  Can apply it to irqchip?  If
+> you need to keep it with other changes,
 > 
-> Ok, I queued them back up, thanks for the clarification.
-
-I've applied the 4 driver patches to net-next.  But, since the ARM
-device tree file changes did not go into net-next, I can't apply the
-last two patches to my tree.  You'll need to sort that out yourself.
-
-It's a bit unfortunate that things are now out of sync like this, but
-that's what you asked me to do.
+> Acked-by: Jason Cooper <jason@lakedaemon.net>
+> 
+> But please do let me know if I can take it.
+> 
+> thx,
+> 
+> Jason.
+> 
