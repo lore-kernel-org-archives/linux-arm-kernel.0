@@ -1,63 +1,69 @@
-From: l.stach@pengutronix.de (Lucas Stach)
-Date: Wed, 23 Jul 2014 19:29:11 +0200
-Subject: [PATCH] ARM: dts: imx6qdl-sabresd: add always on pcie regulator
-Message-ID: <1406136551-8015-1-git-send-email-l.stach@pengutronix.de>
+From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
+Date: Wed, 23 Jul 2014 18:32:04 +0100
+Subject: [PATCH v6 2/7] drivers: cpuidle: implement DT based idle states
+ infrastructure
+In-Reply-To: <CAJ5Y-eY9YACzk_8LpZ9mnaj4stqOF_uWWt1+tL7nexqZj-ZFyQ@mail.gmail.com>
+References: <1405958786-17243-1-git-send-email-lorenzo.pieralisi@arm.com>
+ <1405958786-17243-3-git-send-email-lorenzo.pieralisi@arm.com>
+ <CAJ5Y-eY9YACzk_8LpZ9mnaj4stqOF_uWWt1+tL7nexqZj-ZFyQ@mail.gmail.com>
+Message-ID: <20140723173204.GB21746@e102568-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Everything in the PCI specification assumes devices to be
-enumerable on startup. This is only possible if they have
-power available.
+Hi Ashwin,
 
-A future improvement may allow this regulator to be switched
-off for D3hot and D3cold power states, but there is a lot
-of work to do the pcie host controller side for this to work.
-To keep things simple always enable the regulator for now.
+On Wed, Jul 23, 2014 at 05:34:16PM +0100, Ashwin Chaugule wrote:
+> Hi Lorenzo,
+> 
+> On 21 July 2014 12:06, Lorenzo Pieralisi <lorenzo.pieralisi@arm.com> wrote:
+> > +/**
+> > + * dt_init_idle_driver() - Parse the DT idle states and initialize the
+> > + *                        idle driver states array
+> > + *
+> > + * @drv:         Pointer to CPU idle driver to be initialized
+> > + * @start_idx:    First idle state index to be initialized
+> > + *
+> > + * On success the states array in the cpuidle driver contains
+> > + * initialized entries in the states array, starting from index start_idx.
+> > + *
+> > + * Return:
+> > + *     0 on success
+> > + *     <0 on failure
+> > + */
+> > +int dt_init_idle_driver(struct cpuidle_driver *drv, unsigned int start_idx)
+> > +{
+> > +       unsigned int i, state_idx = start_idx;
+> > +       struct cpuidle_state *idle_state;
+> > +       struct device_node *state_node, *cpu_node;
+> > +
+> > +
+> > +       if (state_idx >= CPUIDLE_STATE_MAX)
+> > +               return -EINVAL;
+> > +       /*
+> > +        * We get the idle states for the first logical cpu in the
+> > +        * driver mask. The kernel does not check idle states on all
+> > +        * cpus in the driver mask, they are assumed to be the same
+> > +        * by default.
+> > +        */
+> > +       cpu_node = of_cpu_device_node_get(cpumask_first(drv->cpumask));
+> 
+> Is this an assumption for the short term? My understanding from the
+> corresponding ACPI discussions is that the order of idle states may
+> not necessarily be same for all CPUs, even for big.Little?
 
-Signed-off-by: Lucas Stach <l.stach@pengutronix.de>
----
-v2: - rename to MPCIE_3V3
-    - add proper pinctrl
----
- arch/arm/boot/dts/imx6qdl-sabresd.dtsi | 19 +++++++++++++++++++
- 1 file changed, 19 insertions(+)
+Well, it is more of a problem of the CPUidle infrastructure than related
+to this specific patchset. The idle states for a specific cpumask (ie CPUidle
+driver) are expected to be all the same, same order same data.
 
-diff --git a/arch/arm/boot/dts/imx6qdl-sabresd.dtsi b/arch/arm/boot/dts/imx6qdl-sabresd.dtsi
-index 40ea36534643..f35c06102969 100644
---- a/arch/arm/boot/dts/imx6qdl-sabresd.dtsi
-+++ b/arch/arm/boot/dts/imx6qdl-sabresd.dtsi
-@@ -54,6 +54,19 @@
- 			gpio = <&gpio4 10 0>;
- 			enable-active-high;
- 		};
-+
-+		reg_pcie: regulator at 3 {
-+			compatible = "regulator-fixed";
-+			reg = <3>;
-+			pinctrl-names = "default";
-+			pinctrl-0 = <&pinctrl_pcie_reg>;
-+			regulator-name = "MPCIE_3V3";
-+			regulator-min-microvolt = <3300000>;
-+			regulator-max-microvolt = <3300000>;
-+			gpio = <&gpio3 19 0>;
-+			regulator-always-on;
-+			enable-active-high;
-+		};
- 	};
- 
- 	gpio-keys {
-@@ -399,6 +412,12 @@
- 			>;
- 		};
- 
-+		pinctrl_pcie_reg: pciereggrp {
-+			fsl,pins = <
-+				MX6QDL_PAD_EIM_D19__GPIO3_IO19	0x1b0b0
-+			>;
-+		};
-+
- 		pinctrl_pwm1: pwm1grp {
- 			fsl,pins = <
- 				MX6QDL_PAD_SD1_DAT3__PWM1_OUT		0x1b0b1
--- 
-2.0.1
+Current driver can be used on homegeneous ARM64 SMP systems, but I am fairly
+confident we can extend it for big.LITTLE and also other funky SMP
+configurations, the parsing code only expects all cpus in the mask
+to have the same set of idle states (and so does the CPUidle core), if that's
+not the case, the cpus belong in different CPUidle drivers (ie a CPUidle
+driver is a set of states valid on a cpumask).
+
+So my answer is yes, it is a proper assumption and not only for the
+short term, but in general.
+
+HTH,
+Lorenzo
