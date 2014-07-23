@@ -1,198 +1,54 @@
-From: thierry.reding@gmail.com (Thierry Reding)
-Date: Wed, 23 Jul 2014 09:09:50 +0200
+From: pramod.gurav.etc@gmail.com (pramod gurav)
+Date: Wed, 23 Jul 2014 12:51:43 +0530
 Subject: [PATCH v2 14/16] cpufreq: Add cpufreq driver for Tegra124
 In-Reply-To: <1405957142-19416-15-git-send-email-ttynkkynen@nvidia.com>
 References: <1405957142-19416-1-git-send-email-ttynkkynen@nvidia.com>
  <1405957142-19416-15-git-send-email-ttynkkynen@nvidia.com>
-Message-ID: <20140723070949.GB15759@ulmo.nvidia.com>
+Message-ID: <CAMf-jSkOF3qN=GSju=tsMp5SBUo+TqNQOROnirr=N_zz7Ca43Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jul 21, 2014 at 06:39:00PM +0300, Tuomas Tynkkynen wrote:
-[...]
-> diff --git a/drivers/cpufreq/tegra124-cpufreq.c b/drivers/cpufreq/tegra124-cpufreq.c
-[...]
+On Mon, Jul 21, 2014 at 9:09 PM, Tuomas Tynkkynen <ttynkkynen@nvidia.com> wrote:
+> Add a new cpufreq driver for Tegra124. Instead of using the PLLX as
+
+<snip>
+
+> +
 > +static int tegra124_cpu_switch_to_dfll(void)
 > +{
-> +	struct clk *original_cpu_clk_parent;
+> +       struct clk *original_cpu_clk_parent;
+> +       unsigned long rate;
+> +       struct dev_pm_opp *opp;
+> +       int ret;
+> +
+> +       rate = clk_get_rate(cpu_clk);
+> +       opp = dev_pm_opp_find_freq_ceil(cpu_dev, &rate);
+> +       if (IS_ERR(opp))
+> +               return PTR_ERR(opp);
+> +
+> +       ret = clk_set_rate(dfll_clk, rate);
+> +       if (ret)
+> +               return ret;
+> +
+> +       original_cpu_clk_parent = clk_get_parent(cpu_clk);
+> +       clk_set_parent(cpu_clk, pllp_clk);
 
-Maybe just "parent"?
+Needs return check.
 
-> +	unsigned long rate;
-> +	struct dev_pm_opp *opp;
-> +	int ret;
-> +
-> +	rate = clk_get_rate(cpu_clk);
-> +	opp = dev_pm_opp_find_freq_ceil(cpu_dev, &rate);
-> +	if (IS_ERR(opp))
-> +		return PTR_ERR(opp);
-> +
-> +	ret = clk_set_rate(dfll_clk, rate);
-> +	if (ret)
-> +		return ret;
-> +
-> +	original_cpu_clk_parent = clk_get_parent(cpu_clk);
-> +	clk_set_parent(cpu_clk, pllp_clk);
-> +	if (ret)
-> +		return ret;
-> +
-> +	ret = clk_prepare_enable(dfll_clk);
-> +	if (ret)
-> +		goto out_switch_to_original_parent;
-
-This could simply be "out" or "err" or anything else shorter than the
-above.
+> +       if (ret)
+> +               return ret;
+Which 'ret' is being checked here? nothing is assigned here. May be
+fixing previous comment will fix this.
 
 > +
-> +	clk_set_parent(cpu_clk, dfll_clk);
-> +
-> +	return 0;
-> +
-> +out_switch_to_original_parent:
-> +	clk_set_parent(cpu_clk, original_cpu_clk_parent);
-> +
-> +	return ret;
-> +}
-> +
-> +static struct platform_device_info cpufreq_cpu0_devinfo = {
-> +	.name = "cpufreq-cpu0",
-> +};
-> +
-> +static int tegra124_cpufreq_probe(struct platform_device *pdev)
-> +{
-> +	int ret;
-> +
-> +	cpu_dev = get_cpu_device(0);
-> +	if (!cpu_dev)
-> +		return -ENODEV;
-> +
-> +	cpu_clk = of_clk_get_by_name(cpu_dev->of_node, "cpu_g");
-> +	if (IS_ERR(cpu_clk))
-> +		return PTR_ERR(cpu_clk);
-> +
-> +	dfll_clk = of_clk_get_by_name(cpu_dev->of_node, "dfll");
-> +	if (IS_ERR(dfll_clk)) {
-> +		ret = PTR_ERR(dfll_clk);
-> +		goto out_put_cpu_clk;
-> +	}
-> +
-> +	pllx_clk = of_clk_get_by_name(cpu_dev->of_node, "pll_x");
-> +	if (IS_ERR(pllx_clk)) {
-> +		ret = PTR_ERR(pllx_clk);
-> +		goto out_put_dfll_clk;
-> +	}
-> +
-> +	pllp_clk = of_clk_get_by_name(cpu_dev->of_node, "pll_p");
-> +	if (IS_ERR(pllp_clk)) {
-> +		ret = PTR_ERR(pllp_clk);
-> +		goto out_put_pllx_clk;
-> +	}
+> +       ret = clk_prepare_enable(dfll_clk);
 
-Can the above not be devm_clk_get(cpu_dev, "...") so that you can remove
-all the clk_put() calls in the cleanup code below?
+<snip>
 
-> +
-> +	ret = dev_pm_opp_init_cpufreq_table(cpu_dev, &freq_table);
-> +	if (ret)
-> +		goto out_put_pllp_clk;
-> +
-> +	ret = tegra124_cpu_switch_to_dfll();
-> +	if (ret)
-> +		goto out_free_table;
-> +
-> +	platform_device_register_full(&cpufreq_cpu0_devinfo);
+> Please read the FAQ at  http://www.tux.org/lkml/
 
-Should the cpufreq_cpu0_devinfo device perhaps be a child of pdev?
 
-> +
-> +	return 0;
-> +
-> +out_free_table:
-> +	dev_pm_opp_free_cpufreq_table(cpu_dev, &freq_table);
-> +out_put_pllp_clk:
-> +	clk_put(pllp_clk);
-> +out_put_pllx_clk:
-> +	clk_put(pllx_clk);
-> +out_put_dfll_clk:
-> +	clk_put(dfll_clk);
-> +out_put_cpu_clk:
-> +	clk_put(cpu_clk);
-> +
-> +	return ret;
-> +}
-> +
-> +static struct platform_driver tegra124_cpufreq_platdrv = {
-> +	.driver = {
-> +		.name	= "cpufreq-tegra124",
-> +		.owner	= THIS_MODULE,
-> +	},
-> +	.probe		= tegra124_cpufreq_probe,
 
-Note that simply leaving out .remove() here doesn't guarantee that the
-driver won't be unloaded. Also building it into the kernel doesn't
-prevent that. You can still unbind the driver via sysfs. So you'd need
-to add a .suppress_bind_attrs = true above.
-
-But is there even a reason why we need that? Couldn't we make the
-driver's .remove() undo what .probe() did so that the driver can be
-unloaded?
-
-Otherwise it probably makes more sense not to use a driver (and dummy
-device) at all as Viresh already mentioned.
-
-> +};
-> +
-> +static const struct of_device_id soc_of_matches[] = {
-> +	{ .compatible = "nvidia,tegra124", },
-> +	{}
-> +};
-> +
-> +static int __init tegra_cpufreq_init(void)
-> +{
-> +	int ret;
-> +	struct platform_device *pdev;
-> +
-> +	if (!of_find_matching_node(NULL, soc_of_matches))
-> +		return -ENODEV;
-
-I think this could be of_machine_is_compatible() since there's only a
-single entry in the match table. If there's a good chance that we may
-end up with more entries, perhaps now would be a good time to add an
-of_match_machine() function?
-
-> +
-> +	ret = platform_driver_register(&tegra124_cpufreq_platdrv);
-> +	if (ret)
-> +		return ret;
-> +
-> +	pdev = platform_device_register_simple("cpufreq-tegra124", -1, NULL, 0);
-> +	if (IS_ERR(pdev)) {
-> +		platform_driver_unregister(&tegra124_cpufreq_platdrv);
-> +		return PTR_ERR(pdev);
-> +	}
-> +
-> +	return 0;
-> +}
-> +
-> +MODULE_AUTHOR("Tuomas Tynkkynen <ttynkkynen@nvidia.com>");
-> +MODULE_DESCRIPTION("cpufreq driver for nVIDIA Tegra124");
-
-We use "NVIDIA" everywhere nowadays.
-
-> +MODULE_LICENSE("GPLv2");
-
-The correct license string is "GPL v2".
-
-> +module_init(tegra_cpufreq_init);
-
-The placement of this is unusual. It should go immediately below the
-tegra_cpufreq_init() function.
-
-Thierry
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: not available
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140723/1a280ee0/attachment-0001.sig>
+-- 
+Thanks and Regards
+Pramod
