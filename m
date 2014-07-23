@@ -1,73 +1,30 @@
-From: cw00.choi@samsung.com (Chanwoo Choi)
-Date: Wed, 23 Jul 2014 10:41:52 +0900
-Subject: [PATCHv8 0/4] iio: adc: exynos_adc: Support Exynos3250 ADC and
- code clean
-In-Reply-To: <1405994696-3117-1-git-send-email-cw00.choi@samsung.com>
-References: <1405994696-3117-1-git-send-email-cw00.choi@samsung.com>
-Message-ID: <53CF12E0.5030903@samsung.com>
+From: marcel@ziswiler.com (Marcel Ziswiler)
+Date: Wed, 23 Jul 2014 04:23:00 +0200
+Subject: [PATCH] ARM: tegra: apalis t30: fix device tree compatible node
+Message-ID: <aa2cbaac07707c3d64599d3841b9d6f77567a91f.1406081870.git.marcel@ziswiler.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear Jonathan,
+Working on sound support I noticed the Apalis T30 Evaluation board
+device tree missing the more generic Apalis T30 compatible string.
 
-Could you please pick this patchset for 3.17?
+Signed-off-by: Marcel Ziswiler <marcel@ziswiler.com>
+---
+ arch/arm/boot/dts/tegra30-apalis-eval.dts |    2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-Best Regards,
-Chanwoo Choi
-
-On 07/22/2014 11:04 AM, Chanwoo Choi wrote:
-> This patchset support Exynos3250 ADC (Analog Digital Converter) because
-> Exynos3250 has additional special clock for ADC IP.
-> 
-> Changes from v7:
-> - Add acked message by Arnd Bergmann
-> - Use two compatible string for Exynos3250 ADC as following:
->   : compatible = "samsung,exynos3250-adc", "samsung,exynos-adc-v2;
-> 
-> Changes from v6:
-> - Use "exynos3250-adc" compatible string instead of "exynos3250-adc-v2"
-> - Use "sclk" clock name instead of "sclk_adc"
-> - Remove un-necessary macro for exyno-adc-data-v2 structure.
-> - Remove '(void *)' cast and mark the exynos-adc-data structure as 'const'
-> - Change the number of ADC channels (Exynos3250 has only two channels for ADC)
-> 
-> Changes from v5:
-> - Add acked message by Kukjin Kim
-> - Add reviewed messgae by Tomasz Figa
-> - Fix typo (for for -> for)
-> 
-> Changes from v4:
-> - Use 'exynos_adc_data' structure instead of 'exynos_adc_ops' structure
->   and remove enum variable of ADC version
-> - Fix wrong name of special clock (sclk_tsadc -> sclk_adc)
-> - Add reviewed message by Naveen Krishna Chatradhi
-> - Add functions for ADC clock control
-> 
-> Changes from v3:
-> - Add new 'exynos_adc_ops' structure to improve readability according to
->  Tomasz Figa comment[1]
->  [1] https://lkml.org/lkml/2014/4/16/238
-> - Add new 'exynos3250-adc-v2' compatible string to support Exynos3250 ADC
-> - Fix wrong compaitlbe string of ADC in Exynos3250 dtsi file
-> 
-> Changes from v2:
-> - Check return value of clock function to deal with error exception
-> - Fix minor coding style to improve readability
-> 
-> Changes from v1:
-> - Add new "samsung,exynos-adc-v3" compatible to support Exynos3250 ADC
-> - Add a patch about DT binding documentation
-> 
-> Chanwoo Choi (4):
->   iio: adc: exynos_adc: Add exynos_adc_data structure to improve
->     readability
->   iio: adc: exynos_adc: Control special clock of ADC to support
->     Exynos3250 ADC
->   iio: devicetree: Add DT binding documentation for Exynos3250 ADC
->   ARM: dts: Fix wrong compatible string for Exynos3250 ADC
-> 
->  .../devicetree/bindings/arm/samsung/exynos-adc.txt |  25 +-
->  arch/arm/boot/dts/exynos3250.dtsi                  |   5 +-
->  drivers/iio/adc/exynos_adc.c                       | 335 +++++++++++++++------
->  3 files changed, 275 insertions(+), 90 deletions(-)
-> 
+diff --git a/arch/arm/boot/dts/tegra30-apalis-eval.dts b/arch/arm/boot/dts/tegra30-apalis-eval.dts
+index 9921433..45d40f0 100644
+--- a/arch/arm/boot/dts/tegra30-apalis-eval.dts
++++ b/arch/arm/boot/dts/tegra30-apalis-eval.dts
+@@ -5,7 +5,7 @@
+ 
+ / {
+ 	model = "Toradex Apalis T30 on Apalis Evaluation Board";
+-	compatible = "toradex,apalis_t30-eval", "nvidia,tegra30";
++	compatible = "toradex,apalis_t30-eval", "toradex,apalis_t30", "nvidia,tegra30";
+ 
+ 	aliases {
+ 		rtc0 = "/i2c at 7000c000/rtc at 68";
+-- 
+1.7.9.5
