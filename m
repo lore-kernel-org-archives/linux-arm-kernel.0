@@ -1,45 +1,127 @@
-From: varkabhadram@gmail.com (Varka Bhadram)
-Date: Wed, 23 Jul 2014 16:44:59 +0530
-Subject: [PATCH v5 1/2] i2c: add DMA support for freescale i2c driver
-In-Reply-To: <b1778af62e7b42b39381fb2699b34eb1@BL2PR03MB338.namprd03.prod.outlook.com>
-References: <1406103883-3572-1-git-send-email-yao.yuan@freescale.com>	<1406103883-3572-2-git-send-email-yao.yuan@freescale.com>
- <20140723114834.411f6bb4@ipc1.ka-ro>
- <b1778af62e7b42b39381fb2699b34eb1@BL2PR03MB338.namprd03.prod.outlook.com>
-Message-ID: <53CF9933.8030908@gmail.com>
+From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
+Date: Wed, 23 Jul 2014 13:19:30 +0200
+Subject: [PATCHv3 0/7] cpufreq support for Marvell Armada XP
+In-Reply-To: <1404920715-19834-1-git-send-email-thomas.petazzoni@free-electrons.com>
+References: <1404920715-19834-1-git-send-email-thomas.petazzoni@free-electrons.com>
+Message-ID: <20140723131930.46dcbc2e@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/23/2014 04:41 PM, Yao Yuan wrote:
-> Hi,
->
-> Thanks for your review.
->
-> Lothar Wa?mann wrote:
->> Yuan Yao wrote:
->>> Add dma support for i2c. This function depend on DMA driver.
->>> You can turn on it by write both the dmas and dma-name properties in dts node.
->>>
->>> Signed-off-by: Yuan Yao <yao.yuan@freescale.com>
->>> ---
->>>   drivers/i2c/busses/i2c-imx.c | 377
-> [...]
->>> +
->>> +fail_rx:
->>> +	dma_release_channel(dma->chan_rx);
->>> +fail_tx:
->>> +	dma_release_channel(dma->chan_tx);
->>> +fail_al:
->>> +	devm_kfree(dev, dma);
->>>
->> No need for this one (that's the whole point of using devm_kzalloc())!
->>
-> When DMA request failed, I2C will switch to PIO mode. So if the failed reason is just like DMA channel request failed. At this time the DMA should free by devm_kfree(). Is it?
+Viresh, Jason,
 
-If probe failed the memory will be freed automatically because
-we are using devm_kzalloc()...
+So, what do we do with this patch series, which depends on the
+cpufreq-generic driver? Has there been any solution found for 3.17 ?
 
-If we use devm_kzalloc() ,no need to free manually on fail...
+Jason, in any case, I'd like the following patches to be merged for
+3.17, regardless of what happens with the cpufreq driver:
+
+ ARM: mvebu: ensure CPU clocks are enabled
+ ARM: mvebu: extend PMSU code to support dynamic frequency scaling
+ clk: mvebu: extend clk-cpu for dynamic frequency scaling
+
+One patch should be split:
+
+ ARM: mvebu: update Armada XP DT for dynamic frequency scaling
+
+ -> In this patch, the addition of clock-latency is related to the
+    cpufreq generic DT binding, so I think we shouldn't merge that. But
+    on the other hand, this patch also adds the new registers for the
+    Armada XP CPU clock, which is used by "clk: mvebu: extend clk-cpu
+    for dynamic frequency scaling".
+
+The patch:
+
+ ARM: mvebu: allow enabling of cpufreq on Armada XP
+
+can be dropped, since ARCH_HAS_CPUFREQ has been removed.
+
+The other patches are defconfig changes, which are meaningless without
+the cpufreq-generic driver.
+
+Jason, what do you think about me sending a new version of the patch
+series, which will have two clearly separated set of patches:
+
+ 1/ A first set of patches that can be applied regardless of what
+    happens on the cpufreq driver side. Getting it merged will not
+    bring cpufreq support, but it will add the foundations needed to
+    support it.
+
+ 2/ A second set of patches that use the cpufreq-generic driver, which
+    might get applied of the cpufreq maintainers find a solution in
+    time for 3.17. If not, then I'll re-adapt them for 3.18.
+
+What do you think?
+
+Thomas
+
+
+On Wed,  9 Jul 2014 17:45:08 +0200, Thomas Petazzoni wrote:
+> Mike, Viresh, Rafael, Jason, Gregory, Andrew, Sebastian,
+> 
+> Here is the third version of the patches adding cpufreq support for
+> the Marvell Armada XP processor.
+> 
+> Changes since v2
+> ================
+> 
+>  - As suggested by Stephen Boyd, instead of using a new clock notifier
+>    that somewhat "hides" the dependency of the clk-cpu clock driver on
+>    the PMSU, use a direct call from the clk-cpu driver to the PMSU
+>    driver.
+> 
+>  - Add a comment that explains why the OPP are not removed on failure
+>    in the PMSU code initializing the cpufreq logic, in answer to the
+>    review from Ezequiel Garcia.
+> 
+> Changes since v1
+> ================
+> 
+>  - Rework the patch series to use the generalized cpufreq-cpu0
+>    (renamed cpufreq-generic) driver instead of having an Armada XP
+>    specific cpufreq driver. This was suggested by Viresh
+>    Kumar. Basically, it only involved adding a "clock-latency"
+>    property in the DT, and changing the PMSU code to register the two
+>    OPPs supported by each CPU, and registering the "cpufreq-generic"
+>    platform device instead of the "armadaxp-cpufreq" one.
+> 
+> Jason, this patch series is based on 3.16-rc3, but it applies fine
+> even with mvebu/fixes and mvebu/soc merged (which contain some PMSU
+> changes), so I haven't based the patch series on those branches. To
+> _work_, the code needs the new cpufreq-generic driver which is pending
+> in Viresh Kumar's tree for 3.17, but there is no build dependency.
+> 
+> Thanks,
+> 
+> Thomas
+> 
+> Thomas Petazzoni (7):
+>   ARM: mvebu: ensure CPU clocks are enabled
+>   ARM: mvebu: extend PMSU code to support dynamic frequency scaling
+>   clk: mvebu: extend clk-cpu for dynamic frequency scaling
+>   ARM: mvebu: update Armada XP DT for dynamic frequency scaling
+>   ARM: mvebu: allow enabling of cpufreq on Armada XP
+>   ARM: mvebu: update mvebu_v7_defconfig with cpufreq support
+>   ARM: configs: add cpufreq-generic in multi_v7_defconfig
+> 
+>  .../devicetree/bindings/clock/mvebu-cpu-clock.txt  |   5 +-
+>  arch/arm/boot/dts/armada-xp-mv78230.dtsi           |   2 +
+>  arch/arm/boot/dts/armada-xp-mv78260.dtsi           |   2 +
+>  arch/arm/boot/dts/armada-xp-mv78460.dtsi           |   4 +
+>  arch/arm/boot/dts/armada-xp.dtsi                   |   2 +-
+>  arch/arm/configs/multi_v7_defconfig                |   1 +
+>  arch/arm/configs/mvebu_v7_defconfig                |   2 +
+>  arch/arm/mach-mvebu/Kconfig                        |   1 +
+>  arch/arm/mach-mvebu/platsmp.c                      |   1 +
+>  arch/arm/mach-mvebu/pmsu.c                         | 162 +++++++++++++++++++++
+>  drivers/clk/mvebu/clk-cpu.c                        |  80 +++++++++-
+>  include/linux/mvebu-pmsu.h                         |  20 +++
+>  12 files changed, 274 insertions(+), 8 deletions(-)
+>  create mode 100644 include/linux/mvebu-pmsu.h
+> 
+
+
 
 -- 
-Regards,
-Varka Bhadram.
+Thomas Petazzoni, CTO, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
