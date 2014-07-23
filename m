@@ -1,183 +1,104 @@
-From: ashwin.chaugule@linaro.org (Ashwin Chaugule)
-Date: Wed, 23 Jul 2014 12:15:15 -0400
-Subject: [PATCH v6 4/7] arm64: add PSCI CPU_SUSPEND based cpu_suspend
- support
-In-Reply-To: <1405958786-17243-5-git-send-email-lorenzo.pieralisi@arm.com>
-References: <1405958786-17243-1-git-send-email-lorenzo.pieralisi@arm.com>
- <1405958786-17243-5-git-send-email-lorenzo.pieralisi@arm.com>
-Message-ID: <CAJ5Y-ea6Z8EDe_kMZ3O3CxGD7k-M9JLKN-iEr7FB=-GwKGhSdA@mail.gmail.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Wed, 23 Jul 2014 18:10:21 +0200
+Subject: [[RFC PATCH]] gpio: gpio-mxc: make sure gpio is input when
+ request IRQ
+In-Reply-To: <1405518664-31313-1-git-send-email-list-09_linux_arm@tqsc.de>
+References: <1405518664-31313-1-git-send-email-list-09_linux_arm@tqsc.de>
+Message-ID: <CACRpkdb5a1uMJ29p1_at93EoBcGdKD5tRZysVPT99wXd=RpCeg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 21 July 2014 12:06, Lorenzo Pieralisi <lorenzo.pieralisi@arm.com> wrote:
-> This patch implements the cpu_suspend cpu operations method through
-> the PSCI CPU SUSPEND API. The PSCI implementation translates the idle state
-> index passed by the cpu_suspend core call into a valid PSCI state according to
-> the PSCI states initialized at boot through the cpu_init_idle() CPU
-> operations hook.
+On Wed, Jul 16, 2014 at 3:51 PM, Markus Niebel
+<list-09_linux_arm@tqsc.de> wrote:
+
+> From: Markus Niebel <Markus.Niebel@tq-group.com>
 >
-> Entry point is set to cpu_resume physical address, that represents the
-> default kernel execution address following a CPU reset; for standby
-> states the entry point address is useless and will therefore be ignored
-> by the PSCI implementation.
+> When requesting an GPIO irq for imx Soc two things are missing:
+> - there is no check, if the GPIO is already requested
+> - there is no check, if the GPIO is configured as input
 >
-> Signed-off-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
+> The first case can lead to reconfiguring the GPIO pin from third
+> party while it is used as IRQ pin, second case will (eventually)
+> prevent IRQ from being seen by SOC becaus the pin is driven by
+> Soc
+>
+> This patch tries to implement (logic taken roughly from gpio-omap)
+> - basic check if gpio already requested
+> - if needed requests the gpio and configures as IN.
+> - if gpio is already requested it is only verified if pin is IN
+> - gpio is locked as irq
+>
+> Tested on a not mainlined i.MX6 based hardware with pin configured
+> by bootloader as OUT HIGH and expecting a low active IRQ.
+>
+> Signed-off-by: Markus Niebel <Markus.Niebel@tq-group.com>
 > ---
->  arch/arm64/kernel/psci.c | 89 ++++++++++++++++++++++++++++++++++++++++++++++++
->  1 file changed, 89 insertions(+)
+>  drivers/gpio/gpio-mxc.c |   35 +++++++++++++++++++++++++++++++++++
+>  1 file changed, 35 insertions(+)
 >
-> diff --git a/arch/arm64/kernel/psci.c b/arch/arm64/kernel/psci.c
-> index a623c44..bbdf41d 100644
-> --- a/arch/arm64/kernel/psci.c
-> +++ b/arch/arm64/kernel/psci.c
-> @@ -21,6 +21,7 @@
->  #include <linux/reboot.h>
->  #include <linux/pm.h>
->  #include <linux/delay.h>
-> +#include <linux/slab.h>
->  #include <uapi/linux/psci.h>
->
->  #include <asm/compiler.h>
-> @@ -28,6 +29,7 @@
->  #include <asm/errno.h>
->  #include <asm/psci.h>
->  #include <asm/smp_plat.h>
-> +#include <asm/suspend.h>
->  #include <asm/system_misc.h>
->
->  #define PSCI_POWER_STATE_TYPE_STANDBY          0
-> @@ -65,6 +67,8 @@ enum psci_function {
->         PSCI_FN_MAX,
->  };
->
-> +static DEFINE_PER_CPU_READ_MOSTLY(struct psci_power_state *, psci_power_state);
+> diff --git a/drivers/gpio/gpio-mxc.c b/drivers/gpio/gpio-mxc.c
+> index db83b3c..4316a38 100644
+> --- a/drivers/gpio/gpio-mxc.c
+> +++ b/drivers/gpio/gpio-mxc.c
+> @@ -175,6 +175,31 @@ static int gpio_set_irq_type(struct irq_data *d, u32 type)
+>         u32 gpio = port->bgc.gc.base + gpio_idx;
+>         int edge;
+>         void __iomem *reg = port->base;
+> +       int ret = 0;
 > +
->  static u32 psci_function_id[PSCI_FN_MAX];
->
->  static int psci_to_linux_errno(int errno)
-> @@ -93,6 +97,18 @@ static u32 psci_power_state_pack(struct psci_power_state state)
->                  & PSCI_0_2_POWER_STATE_AFFL_MASK);
->  }
->
-> +static void psci_power_state_unpack(u32 power_state,
-> +                                   struct psci_power_state *state)
-> +{
-> +       state->id = (power_state & PSCI_0_2_POWER_STATE_ID_MASK) >>
-> +                       PSCI_0_2_POWER_STATE_ID_SHIFT;
-> +       state->type = (power_state & PSCI_0_2_POWER_STATE_TYPE_MASK) >>
-> +                       PSCI_0_2_POWER_STATE_TYPE_SHIFT;
-> +       state->affinity_level =
-> +                       (power_state & PSCI_0_2_POWER_STATE_AFFL_MASK) >>
-> +                       PSCI_0_2_POWER_STATE_AFFL_SHIFT;
-> +}
+> +       if (!gpiochip_is_requested(&port->bgc.gc, gpio_idx)) {
+> +               char label[32];
 > +
->  /*
->   * The following two functions are invoked via the invoke_psci_fn pointer
->   * and will not be inlined, allowing us to piggyback on the AAPCS.
-> @@ -199,6 +215,61 @@ static int psci_migrate_info_type(void)
->         return err;
->  }
->
-> +static int cpu_psci_cpu_init_idle(struct device_node *cpu_node,
-> +                                 unsigned int cpu)
-> +{
-> +       int i, ret, count = 0;
-> +       struct psci_power_state *psci_states;
-> +       struct device_node *state_node;
-> +
-> +       /*
-> +        * If the PSCI cpu_suspend function hook has not been initialized
-> +        * idle states must not be enabled, so bail out
-> +        */
-> +       if (!psci_ops.cpu_suspend)
-> +               return -EOPNOTSUPP;
-> +
-> +       /* Count idle states */
-> +       while ((state_node = of_parse_phandle(cpu_node, "cpu-idle-states",
-> +                                             count)))
-> +               count++;
-> +
-> +       if (!count)
-> +               return -ENODEV;
-> +
-> +       psci_states = kcalloc(count, sizeof(*psci_states), GFP_KERNEL);
-> +       if (!psci_states) {
-> +               pr_warn("idle state psci_state allocation failed\n");
-> +               return -ENOMEM;
+> +               snprintf(label, 32, "gpio%u-irq", gpio);
+> +               ret = gpio_request_one(gpio, GPIOF_DIR_IN, label);
+
+Wut? Auto-request here? This can not be right.
+
+> +       } else {
+> +               val = readl(port->base + GPIO_GDIR);
+> +               if (val & BIT(gpio_idx))
+> +                       ret = -EINVAL;
 > +       }
 > +
-> +       for (i = 0; i < count; i++) {
-> +               u32 psci_power_state;
-> +
-> +               state_node = of_parse_phandle(cpu_node, "cpu-idle-states", i);
-> +
-> +               ret = of_property_read_u32(state_node,
-> +                                          "arm,psci-suspend-param",
-> +                                          &psci_power_state);
-> +               if (ret) {
-> +                       pr_warn(" * %s missing arm,psci-suspend-param property\n",
-> +                               state_node->full_name);
-> +                       goto free_mem;
-> +               }
-> +
-> +               pr_debug("psci-power-state %#x index %d\n", psci_power_state,
-> +                                                           i);
-> +               psci_power_state_unpack(psci_power_state, &psci_states[i]);
+> +       if (ret) {
+> +               dev_err(port->bgc.gc.dev, "unable to set gpio_idx %u as IN\n",
+> +                       gpio_idx);
+> +               return ret;
 > +       }
-> +       /* Idle states parsed correctly, initialize per-cpu pointer */
-> +       per_cpu(psci_power_state, cpu) = psci_states;
-> +       return 0;
 > +
-> +free_mem:
-> +       kfree(psci_states);
-> +       return ret;
-> +}
-> +
->  static int get_set_conduit_method(struct device_node *np)
->  {
->         const char *method;
-> @@ -436,8 +507,23 @@ static int cpu_psci_cpu_kill(unsigned int cpu)
->  #endif
->  #endif
+> +       ret = gpio_lock_as_irq(&port->bgc.gc, gpio_idx);
+
+This call should be done in the new
+.irq_request_resources callback in struct irq_chip.
+
+> +       if (ret) {
+> +               dev_err(port->bgc.gc.dev, "unable to lock gpio_idx %u for IRQ\n",
+> +                       gpio_idx);
+> +               return ret;
+> +       }
 >
-> +static int __maybe_unused cpu_psci_cpu_suspend(unsigned long index)
+>         port->both_edges &= ~(1 << gpio_idx);
+>         switch (type) {
+> @@ -231,6 +256,15 @@ static int gpio_set_irq_type(struct irq_data *d, u32 type)
+>         return 0;
+>  }
+>
+> +static void gpio_irq_shutdown(struct irq_data *d)
 > +{
-> +       struct psci_power_state *state = __get_cpu_var(psci_power_state);
-> +       /*
-> +        * idle state index 0 corresponds to wfi, should never be called
-> +        * from the cpu_suspend operations
-> +        */
-> +       if (WARN_ON_ONCE(!index))
-> +               return -EINVAL;
+> +       struct irq_chip_generic *gc = irq_data_get_irq_chip_data(d);
+> +       struct mxc_gpio_port *port = gc->private;
+> +       u32 gpio_idx = d->hwirq;
 > +
-> +       return psci_ops.cpu_suspend(state[index - 1],
-> +                                   virt_to_phys(cpu_resume));
+> +       gpio_unlock_as_irq(&port->bgc.gc, gpio_idx);
 > +}
-> +
->  const struct cpu_operations cpu_psci_ops = {
->         .name           = "psci",
-> +       .cpu_init_idle  = cpu_psci_cpu_init_idle,
->  #ifdef CONFIG_SMP
->         .cpu_init       = cpu_psci_cpu_init,
->         .cpu_prepare    = cpu_psci_cpu_prepare,
-> @@ -448,5 +534,8 @@ const struct cpu_operations cpu_psci_ops = {
->         .cpu_kill       = cpu_psci_cpu_kill,
->  #endif
->  #endif
-> +#ifdef CONFIG_ARM64_CPU_SUSPEND
-> +       .cpu_suspend    = cpu_psci_cpu_suspend,
-> +#endif
->  };
->
-> --
-> 1.9.1
 
-Reviewed-by: Ashwin Chaugule <ashwin.chaugule@linaro.org>
+This call should be done in the new
+.irq_release_resources callback in struct irq_chip.
 
->
->
->
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+Looking at the driver, it should be switched to using the new
+irqchip helpers inside gpiolib, see e.g.
+commit 7bcbce55f20e41c014df4d5d9c8448f7b5e49d79
+"gpio: pca953x: use gpiolib irqchip helpers"
+
+Yours,
+Linus Walleij
