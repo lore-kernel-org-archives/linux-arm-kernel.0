@@ -1,40 +1,53 @@
-From: viresh.kumar@linaro.org (Viresh Kumar)
-Date: Wed, 23 Jul 2014 16:18:51 +0530
-Subject: [PATCH v2] cpufreq: tests: Providing cpufreq regression test
-In-Reply-To: <20140723121042.5b6f49e3@amdc2363>
-References: <1405678985-21677-1-git-send-email-l.majewski@samsung.com>
- <1405926154-27214-1-git-send-email-l.majewski@samsung.com>
- <CAKohpondk7Cty8MhTcjyzZW8Z0o4AVupYE0rRnG4YJf+SmDyjg@mail.gmail.com>
- <20140723093824.5e51918f@amdc2363>
- <CAKohpok++gPcNk9-E4MsFdNBy8qL7oLYvatk1EvcW1OHwroZXQ@mail.gmail.com>
- <20140723121042.5b6f49e3@amdc2363>
-Message-ID: <CAKohpomfGsvzJUn23-u-KoyNaY8sRaMLk0S4GdQJR0DxyscJWg@mail.gmail.com>
+From: ezequiel.garcia@free-electrons.com (Ezequiel Garcia)
+Date: Wed, 23 Jul 2014 07:53:18 -0300
+Subject: [PATCH 0/6] net: mvpp2: Assorted fixes
+In-Reply-To: <20140722.195222.775371949777233094.davem@davemloft.net>
+References: <20140723002916.67a0bb3c@free-electrons.com>
+ <20140722232004.GA7838@arch.cereza>
+ <20140722.174153.413669013449137654.davem@davemloft.net>
+ <20140722.195222.775371949777233094.davem@davemloft.net>
+Message-ID: <20140723105318.GA1729@arch.cereza>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 23 July 2014 15:40, Lukasz Majewski <l.majewski@samsung.com> wrote:
+On 22 Jul 07:52 PM, David Miller wrote:
+> From: David Miller <davem@davemloft.net>
+> Date: Tue, 22 Jul 2014 17:41:53 -0700 (PDT)
+> 
+> > From: Ezequiel Garcia <ezequiel.garcia@free-electrons.com>
+> > Date: Tue, 22 Jul 2014 20:20:04 -0300
+> > 
+> >> On 23 Jul 12:29 AM, Thomas Petazzoni wrote:
+> >>> On Tue, 22 Jul 2014 13:16:39 -0700 (PDT), David Miller wrote:
+> >>> 
+> >>> > >> This series does not apply to the 'net' tree at all, please respin
+> >>> > >> and resubmit.
+> >>> > > 
+> >>> > > This series applies on net-next.
+> >>> > > 
+> >>> > > Sorry for not mentioning it,
+> >>> > 
+> >>> > They are bonafide bug fixes, therefore should be targetted at 'net'.
+> >>> 
+> >>> Except that I believe they are fixes for a driver which itself is in
+> >>> net-next, i.e scheduled for 3.17.
+> >>> 
+> >> 
+> >> That's right. These are fixes for the new mvpp2 driver, which is only
+> >> in net-next.
+> > 
+> > Ok, I queued them back up, thanks for the clarification.
+> 
+> I've applied the 4 driver patches to net-next.  But, since the ARM
+> device tree file changes did not go into net-next, I can't apply the
+> last two patches to my tree.  You'll need to sort that out yourself.
+> 
+> It's a bit unfortunate that things are now out of sync like this, but
+> that's what you asked me to do.
 
->> Shouldn't you use userspace governor then instead of performance?
->
-> Performance assures that we will have the right frequency set.
-
-Why wouldn't userspace assure that?
-
-> However, there can be a similar patch to use userspace governor and
-> various load to fail if ondemand's frequency flipping is detected.
-
-That's why I want to get to the motive behind this patch.
-AFAIU, we are checking if its fine to switch to available frequencies
-or not and if yes, do we actually switch to those. Right?
-
-For, this testcase we just need a single test and I still don't see why
-performance is better than userspace?
-
->> And then we don't need the gzip stuff at all. We can just set it to
->> the right freq and get current freq to see if it matches?
->
-> Sometimes "interresting" things show up when you have 100% CPU load and
-> you try to switch frequency.
-
-That's a different test then. And that's how it should be presented.
-So, probably another option to the script, which isn't forced on people.
+Thanks for applying this. We'll queue the devicetree changes as fixes
+for v3.17-rc1 through the arm-soc tree.
+-- 
+Ezequiel Garc?a, Free Electrons
+Embedded Linux, Kernel and Android Engineering
+http://free-electrons.com
