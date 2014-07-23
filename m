@@ -1,89 +1,141 @@
-From: thierry.reding@gmail.com (Thierry Reding)
-Date: Wed, 23 Jul 2014 09:24:43 +0200
-Subject: [PATCH v2 14/16] cpufreq: Add cpufreq driver for Tegra124
-In-Reply-To: <CAKohponmg24pvnX2Jhfg5LHKKHx3VEm-6a_JXTGhVXY-aj3EOw@mail.gmail.com>
-References: <1405957142-19416-1-git-send-email-ttynkkynen@nvidia.com>
- <1405957142-19416-15-git-send-email-ttynkkynen@nvidia.com>
- <CAKohpomQthJ_XE-HhzW07Q4aVtxQVy97iaL0Vy6Q4Lhw22A=VA@mail.gmail.com>
- <20140723065412.GA15759@ulmo.nvidia.com>
- <CAKohponmg24pvnX2Jhfg5LHKKHx3VEm-6a_JXTGhVXY-aj3EOw@mail.gmail.com>
-Message-ID: <20140723072442.GC15759@ulmo.nvidia.com>
+From: l.majewski@samsung.com (Lukasz Majewski)
+Date: Wed, 23 Jul 2014 09:38:24 +0200
+Subject: [PATCH v2] cpufreq: tests: Providing cpufreq regression test
+In-Reply-To: <CAKohpondk7Cty8MhTcjyzZW8Z0o4AVupYE0rRnG4YJf+SmDyjg@mail.gmail.com>
+References: <1405678985-21677-1-git-send-email-l.majewski@samsung.com>
+ <1405926154-27214-1-git-send-email-l.majewski@samsung.com>
+ <CAKohpondk7Cty8MhTcjyzZW8Z0o4AVupYE0rRnG4YJf+SmDyjg@mail.gmail.com>
+Message-ID: <20140723093824.5e51918f@amdc2363>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jul 23, 2014 at 12:28:21PM +0530, Viresh Kumar wrote:
-> On 23 July 2014 12:24, Thierry Reding <thierry.reding@gmail.com> wrote:
-> > On Wed, Jul 23, 2014 at 10:14:44AM +0530, Viresh Kumar wrote:
-> >> On 21 July 2014 21:09, Tuomas Tynkkynen <ttynkkynen@nvidia.com> wrote:
-> >>
-> >> > diff --git a/drivers/cpufreq/Kconfig.arm b/drivers/cpufreq/Kconfig.arm
-> >> > index 7364a53..df3c73e 100644
-> >> > --- a/drivers/cpufreq/Kconfig.arm
-> >> > +++ b/drivers/cpufreq/Kconfig.arm
-> >> > @@ -244,6 +244,7 @@ config ARM_SPEAR_CPUFREQ
-> >> >  config ARM_TEGRA_CPUFREQ
-> >> >         bool "TEGRA CPUFreq support"
-> >> >         depends on ARCH_TEGRA
-> >> > +       depends on GENERIC_CPUFREQ_CPU0
-> >>
-> >> Wouldn't this also disturb the existing cpufreq driver for earlier
-> >> tegra platforms? i.e. we don't need cpufreq-cpu0 for them
-> >> atleast as of now.
+Hi Viresh,
+
+> Hi Lukasz,
+> 
+> I haven't replied yet as I wanted to see what the general feed of
+> Rafael is going to be :)
+> 
+> As this is something new and wasn't sure if we really want this..
+
+Do you want to say that we have enough tests and we don't need more ?
+
+I always thought that we shall have as much regression tests as
+possible.
+
+
+> 
+> On 21 July 2014 12:32, Lukasz Majewski <l.majewski@samsung.com> wrote:
+> > This commit adds first regression test "cpufreq_freq_test.sh" for
+> > the cpufreq subsystem.
+> 
+> That's not enough, Tell us why we should continue reading this mail..
+
+Hmm... If "regression" and "test" don't catch the attention of a
+diligent maintainer, then I cannot do much more to encourage him to
+read the whole e-mail :-)
+
+I can imagine that maintainers are very busy, therefore I've prepared
+README file with detailed description of the script operation.
+
+> 
+> > Signed-off-by: Lukasz Majewski <l.majewski@samsung.com>
 > >
-> > Perhaps this should be "select" rather than "depends on"?
+> > ---
+> > Changes for v2:
+> > - Replace *_PATCH with *_PATH for variables names
+> > - Corrected mistakes in the README file
+> > - Providing detailed explanation of the patch in the README file
+> > ---
+> >  drivers/cpufreq/tests/README               |  33 +++++++
+> >  drivers/cpufreq/tests/cpufreq_freq_test.sh | 149
+> > +++++++++++++++++++++++++++++
 > 
-> Don't know, its not optionaly for tegra124 and so a "depends on"
-> might fit better ?
+> Probably a better place would be tools/power/cpufreq/
+> 
+> @Rafael?
 
-ARM_TEGRA_CPUFREQ is still optional, so the select only applies when the
-Tegra cpufreq driver is enabled. This is mostly just out of convenience,
-though. The Tegra cpufreq driver uses the generic CPU0 cpufreq driver so
-a select will automatically pull in the necessary dependency. With a
-"depends on" the Tegra cpufreq driver only becomes available after
-you've selected GENERIC_CPUFREQ_CPU0, which is somewhat unintuitive.
+Rafael, I'm open for suggestions.
 
-To illustrate with an example: as a user, I want to enable CPU frequency
-scaling on Tegra. So I use menuconfig to navigate to the "CPU Frequency
-scaling" menu (enable it if not available yet) and look for an entry
-that says "Tegra". But I can't find it because it's hidden due to the
-lack of GENERIC_CPUFREQ_CPU0. That the Tegra CPU frequency driver uses a
-generic driver is an implementation detail that users shouldn't have to
-be aware of.
-
-> >> > +static int tegra124_cpufreq_probe(struct platform_device *pdev)
-> >> > +{
-> >> > +       int ret;
-> >> > +
-> >> > +       cpu_dev = get_cpu_device(0);
-> >> > +       if (!cpu_dev)
-> >> > +               return -ENODEV;
-> >> > +
-> >>
-> >> Shouldn't we do a of_node_get() here?
+> 
+> >  2 files changed, 182 insertions(+)
+> >  create mode 100644 drivers/cpufreq/tests/README
+> >  create mode 100755 drivers/cpufreq/tests/cpufreq_freq_test.sh
 > >
-> > I think this would need to be get_device() since it's the struct device
-> > that's being used subsequently.
+> > diff --git a/drivers/cpufreq/tests/README
+> > b/drivers/cpufreq/tests/README new file mode 100644
+> > index 0000000..3e9cd80
+> > --- /dev/null
+> > +++ b/drivers/cpufreq/tests/README
+> > @@ -0,0 +1,33 @@
+> > +This file contains list of cpufreq's available regression tests
+> > with a short +usage description.
+> > +
+> > +1. cpufreq_freq_test.sh
+> > +
+> > +Description:
+> > +------------
+> > +This script is supposed to test if cpufreq attributes exported by
+> > sysfs are +exposing correct values.
+> > +
+> > +To achieve this goal it saves the current governor and changes it
+> > to +"performance". Afterwards, it reads the
+> > "scaling_available_frequencies" +property. With the list of
+> > supported frequencies it is able to enforce each of +them by
+> > writing to "scaling_max_freq" attribute. To make the test more
+> > reliable +a superfluous load with gzip is created to be sure that
+> > we are running with +highest possible frequency. This high load is
+> > regulated with the 'sleep' +duration. After this time the
+> > "cpufreq_cur_freq" is read and compared with the +original value.
+> > As the last step the original governor is restored.
 > 
-> Probably I didn't write it well..
+> I couldn't make out the purpose of this test and why we need it. How
+> do we ensure that "cpufreq attributes exported by sysfs are exposing
+> correct values"?
+
+First of all the cpufreq attributes are part of the subsystem API.
+There are systems which actually depend on them, so we would be better
+off to test if they work as intended.
+
+Secondly, the test takes those values and then with use of other
+attribute enforce the value, which is then read via cat'ing
+cpufreq_cur_freq. If any of the attributes is wrong then we will spot
+the error immediately.
+
 > 
-> What I meant was after doing a get_cpu_device() we might also need
-> to do  of_node_get(cpu_dev->of_node) as we would be using of_node
-> in further code.
+> And actually what do we mean by this statement even? What kind of
+> errors can be there in exposing these values.
 
-But we're using cpu_dev->of_node, so we need to make sure cpu_dev
-doesn't go away suddenly. Simply keeping a reference to ->of_node
-won't ensure that.
+Errors with cpufreq and CCF cooperation - especially when some parts of
+cpufreq code uses direct write to MUX, DIV or PLL SoC registers.
 
-I guess technically it would be better if get_cpu_device() already
-incremented the reference count on the returned struct device. Currently
-it would theoretically still be possible for the device to disappear
-between the call to get_cpu_device() and a call to get_device().
+Also, one can check if permutations of changing all available
+frequencies are working properly.
 
-Thierry
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: not available
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140723/8de8a192/attachment.sig>
+This script allowed me to find at least two bugs at Exynos cpufreq
+subsystem in the past. And those fixes are already applied to mainline.
+
+> 
+> I want to understand the purpose of this script very clearly first
+> and then only will look at the details.
+
+There is a clean shell script code to go through it, the README file
+with detailed description of the script purpose and operation.
+
+What else shall I write?
+
+
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-pm" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> 
+
+
+
+-- 
+Best regards,
+
+Lukasz Majewski
+
+Samsung R&D Institute Poland (SRPOL) | Linux Platform Group
