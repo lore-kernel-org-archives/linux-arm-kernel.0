@@ -1,171 +1,186 @@
 From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Wed, 23 Jul 2014 15:00:42 +0200
-Subject: [PATCHv3 05/16] ARM: mvebu: rename the armada_370_xp symbols to
- mvebu_v7 in pmsu.c
+Date: Wed, 23 Jul 2014 15:00:48 +0200
+Subject: [PATCHv3 11/16] cpuidle: mvebu: rename the driver from armada-370-xp
+ to mvebu-v7
 In-Reply-To: <1406120453-29291-1-git-send-email-thomas.petazzoni@free-electrons.com>
 References: <1406120453-29291-1-git-send-email-thomas.petazzoni@free-electrons.com>
-Message-ID: <1406120453-29291-6-git-send-email-thomas.petazzoni@free-electrons.com>
+Message-ID: <1406120453-29291-12-git-send-email-thomas.petazzoni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Gregory CLEMENT <gregory.clement@free-electrons.com>
 
-Most of the function related to the PMSU are not specific to the
-Armada 370 or Armada XP SoCs. They can also be used for most of the
-other mvebu ARMv7 SoCs, and will actually be used to support cpuidle
-on Armada 38x.
+This driver will be able to manage the cpuidle for more SoCs than just
+Armada 370 and XP. It will also support Armada 38x and potentially
+other SoC of the Marvell Armada EBU family. To take this into account,
+this patch renames the driver and its symbols.
+
+It also changes the driver name from cpuidle-armada-370-xp to
+cpuidle-armada-xp, because separate platform drivers will be
+registered for the other SoC types. This change must be done
+simultaneously in the cpuidle driver and in the PMSU code in order to
+remain bisectable.
 
 Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
 Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
 ---
- arch/arm/mach-mvebu/armada-370-xp.h |  1 -
- arch/arm/mach-mvebu/platsmp.c       |  2 +-
- arch/arm/mach-mvebu/pmsu.c          | 34 +++++++++++++++++-----------------
- arch/arm/mach-mvebu/pmsu.h          |  2 ++
- 4 files changed, 20 insertions(+), 19 deletions(-)
+ arch/arm/mach-mvebu/pmsu.c                         |  2 +-
+ drivers/cpuidle/Kconfig.arm                        | 12 +++----
+ drivers/cpuidle/Makefile                           |  2 +-
+ ...{cpuidle-armada-370-xp.c => cpuidle-mvebu-v7.c} | 39 +++++++++++-----------
+ 4 files changed, 27 insertions(+), 28 deletions(-)
+ rename drivers/cpuidle/{cpuidle-armada-370-xp.c => cpuidle-mvebu-v7.c} (58%)
 
-diff --git a/arch/arm/mach-mvebu/armada-370-xp.h b/arch/arm/mach-mvebu/armada-370-xp.h
-index 52c1603a..84cd90d 100644
---- a/arch/arm/mach-mvebu/armada-370-xp.h
-+++ b/arch/arm/mach-mvebu/armada-370-xp.h
-@@ -25,6 +25,5 @@ extern struct smp_operations armada_xp_smp_ops;
- #endif
- 
- int armada_370_xp_pmsu_idle_enter(unsigned long deepidle);
--void armada_370_xp_pmsu_idle_exit(void);
- 
- #endif /* __MACH_ARMADA_370_XP_H */
-diff --git a/arch/arm/mach-mvebu/platsmp.c b/arch/arm/mach-mvebu/platsmp.c
-index b6fa9f0..6da2b72 100644
---- a/arch/arm/mach-mvebu/platsmp.c
-+++ b/arch/arm/mach-mvebu/platsmp.c
-@@ -108,7 +108,7 @@ static int armada_xp_boot_secondary(unsigned int cpu, struct task_struct *idle)
-  */
- static void armada_xp_secondary_init(unsigned int cpu)
- {
--	armada_370_xp_pmsu_idle_exit();
-+	mvebu_v7_pmsu_idle_exit();
- }
- 
- static void __init armada_xp_smp_init_cpus(void)
 diff --git a/arch/arm/mach-mvebu/pmsu.c b/arch/arm/mach-mvebu/pmsu.c
-index 272a9c05..501d450 100644
+index 15e67bf..0cd2d09 100644
 --- a/arch/arm/mach-mvebu/pmsu.c
 +++ b/arch/arm/mach-mvebu/pmsu.c
-@@ -73,7 +73,7 @@ extern void ll_enable_coherency(void);
+@@ -76,7 +76,7 @@ extern void armada_370_xp_cpu_resume(void);
+ static void *mvebu_cpu_resume;
  
- extern void armada_370_xp_cpu_resume(void);
- 
--static struct platform_device armada_xp_cpuidle_device = {
-+static struct platform_device mvebu_v7_cpuidle_device = {
- 	.name = "cpuidle-armada-370-xp",
+ static struct platform_device mvebu_v7_cpuidle_device = {
+-	.name = "cpuidle-armada-370-xp",
++	.name = "cpuidle-armada-xp",
  };
  
-@@ -132,7 +132,7 @@ int mvebu_setup_boot_addr_wa(unsigned int crypto_eng_target,
- 	return 0;
- }
+ static struct of_device_id of_pmsu_table[] = {
+diff --git a/drivers/cpuidle/Kconfig.arm b/drivers/cpuidle/Kconfig.arm
+index b6d69e8..a563427 100644
+--- a/drivers/cpuidle/Kconfig.arm
++++ b/drivers/cpuidle/Kconfig.arm
+@@ -1,12 +1,6 @@
+ #
+ # ARM CPU Idle drivers
+ #
+-config ARM_ARMADA_370_XP_CPUIDLE
+-	bool "CPU Idle Driver for Armada 370/XP family processors"
+-	depends on ARCH_MVEBU
+-	help
+-	  Select this to enable cpuidle on Armada 370/XP processors.
+-
+ config ARM_BIG_LITTLE_CPUIDLE
+ 	bool "Support for ARM big.LITTLE processors"
+ 	depends on ARCH_VEXPRESS_TC2_PM
+@@ -61,3 +55,9 @@ config ARM_EXYNOS_CPUIDLE
+ 	depends on ARCH_EXYNOS
+ 	help
+ 	  Select this to enable cpuidle for Exynos processors
++
++config ARM_MVEBU_V7_CPUIDLE
++	bool "CPU Idle Driver for mvebu v7 family processors"
++	depends on ARCH_MVEBU
++	help
++	  Select this to enable cpuidle on Armada 370, 38x and XP processors.
+diff --git a/drivers/cpuidle/Makefile b/drivers/cpuidle/Makefile
+index d8bb1ff..11edb31 100644
+--- a/drivers/cpuidle/Makefile
++++ b/drivers/cpuidle/Makefile
+@@ -7,7 +7,7 @@ obj-$(CONFIG_ARCH_NEEDS_CPU_IDLE_COUPLED) += coupled.o
  
--static int __init armada_370_xp_pmsu_init(void)
-+static int __init mvebu_v7_pmsu_init(void)
+ ##################################################################################
+ # ARM SoC drivers
+-obj-$(CONFIG_ARM_ARMADA_370_XP_CPUIDLE) += cpuidle-armada-370-xp.o
++obj-$(CONFIG_ARM_MVEBU_V7_CPUIDLE) += cpuidle-mvebu-v7.o
+ obj-$(CONFIG_ARM_BIG_LITTLE_CPUIDLE)	+= cpuidle-big_little.o
+ obj-$(CONFIG_ARM_CLPS711X_CPUIDLE)	+= cpuidle-clps711x.o
+ obj-$(CONFIG_ARM_HIGHBANK_CPUIDLE)	+= cpuidle-calxeda.o
+diff --git a/drivers/cpuidle/cpuidle-armada-370-xp.c b/drivers/cpuidle/cpuidle-mvebu-v7.c
+similarity index 58%
+rename from drivers/cpuidle/cpuidle-armada-370-xp.c
+rename to drivers/cpuidle/cpuidle-mvebu-v7.c
+index 28587d0..7252fd8 100644
+--- a/drivers/cpuidle/cpuidle-armada-370-xp.c
++++ b/drivers/cpuidle/cpuidle-mvebu-v7.c
+@@ -21,12 +21,11 @@
+ #include <linux/platform_device.h>
+ #include <asm/cpuidle.h>
+ 
+-#define ARMADA_370_XP_MAX_STATES	3
+-#define ARMADA_370_XP_FLAG_DEEP_IDLE	0x10000
++#define MVEBU_V7_FLAG_DEEP_IDLE	0x10000
+ 
+-static int (*armada_370_xp_cpu_suspend)(int);
++static int (*mvebu_v7_cpu_suspend)(int);
+ 
+-static int armada_370_xp_enter_idle(struct cpuidle_device *dev,
++static int mvebu_v7_enter_idle(struct cpuidle_device *dev,
+ 				struct cpuidle_driver *drv,
+ 				int index)
  {
- 	struct device_node *np;
- 	struct resource res;
-@@ -176,7 +176,7 @@ static int __init armada_370_xp_pmsu_init(void)
- 	return ret;
- }
+@@ -34,10 +33,10 @@ static int armada_370_xp_enter_idle(struct cpuidle_device *dev,
+ 	bool deepidle = false;
+ 	cpu_pm_enter();
  
--static void armada_370_xp_pmsu_enable_l2_powerdown_onidle(void)
-+static void mvebu_v7_pmsu_enable_l2_powerdown_onidle(void)
- {
- 	u32 reg;
+-	if (drv->states[index].flags & ARMADA_370_XP_FLAG_DEEP_IDLE)
++	if (drv->states[index].flags & MVEBU_V7_FLAG_DEEP_IDLE)
+ 		deepidle = true;
  
-@@ -190,7 +190,7 @@ static void armada_370_xp_pmsu_enable_l2_powerdown_onidle(void)
- }
- 
- /* No locking is needed because we only access per-CPU registers */
--static int armada_370_xp_prepare(unsigned long deepidle)
-+static int mvebu_v7_pmsu_idle_prepare(bool deepidle)
- {
- 	unsigned int hw_cpu = cpu_logical_map(smp_processor_id());
- 	u32 reg;
-@@ -233,7 +233,7 @@ int armada_370_xp_pmsu_idle_enter(unsigned long deepidle)
- {
- 	int ret;
- 
--	ret = armada_370_xp_prepare(deepidle);
-+	ret = mvebu_v7_pmsu_idle_prepare(deepidle);
+-	ret = armada_370_xp_cpu_suspend(deepidle);
++	ret = mvebu_v7_cpu_suspend(deepidle);
  	if (ret)
  		return ret;
  
-@@ -272,7 +272,7 @@ static int armada_370_xp_cpu_suspend(unsigned long deepidle)
+@@ -46,11 +45,11 @@ static int armada_370_xp_enter_idle(struct cpuidle_device *dev,
+ 	return index;
  }
  
- /* No locking is needed because we only access per-CPU registers */
--void armada_370_xp_pmsu_idle_exit(void)
-+void mvebu_v7_pmsu_idle_exit(void)
- {
- 	unsigned int hw_cpu = cpu_logical_map(smp_processor_id());
- 	u32 reg;
-@@ -294,24 +294,24 @@ void armada_370_xp_pmsu_idle_exit(void)
- 	writel(reg, pmsu_mp_base + PMSU_STATUS_AND_MASK(hw_cpu));
- }
- 
--static int armada_370_xp_cpu_pm_notify(struct notifier_block *self,
-+static int mvebu_v7_cpu_pm_notify(struct notifier_block *self,
- 				    unsigned long action, void *hcpu)
- {
- 	if (action == CPU_PM_ENTER) {
- 		unsigned int hw_cpu = cpu_logical_map(smp_processor_id());
- 		mvebu_pmsu_set_cpu_boot_addr(hw_cpu, armada_370_xp_cpu_resume);
- 	} else if (action == CPU_PM_EXIT) {
--		armada_370_xp_pmsu_idle_exit();
-+		mvebu_v7_pmsu_idle_exit();
- 	}
- 
- 	return NOTIFY_OK;
- }
- 
--static struct notifier_block armada_370_xp_cpu_pm_notifier = {
--	.notifier_call = armada_370_xp_cpu_pm_notify,
-+static struct notifier_block mvebu_v7_cpu_pm_notifier = {
-+	.notifier_call = mvebu_v7_cpu_pm_notify,
+-static struct cpuidle_driver armada_370_xp_idle_driver = {
+-	.name			= "armada_370_xp_idle",
++static struct cpuidle_driver armadaxp_idle_driver = {
++	.name			= "armada_xp_idle",
+ 	.states[0]		= ARM_CPUIDLE_WFI_STATE,
+ 	.states[1]		= {
+-		.enter			= armada_370_xp_enter_idle,
++		.enter			= mvebu_v7_enter_idle,
+ 		.exit_latency		= 10,
+ 		.power_usage		= 50,
+ 		.target_residency	= 100,
+@@ -59,35 +58,35 @@ static struct cpuidle_driver armada_370_xp_idle_driver = {
+ 		.desc			= "CPU power down",
+ 	},
+ 	.states[2]		= {
+-		.enter			= armada_370_xp_enter_idle,
++		.enter			= mvebu_v7_enter_idle,
+ 		.exit_latency		= 100,
+ 		.power_usage		= 5,
+ 		.target_residency	= 1000,
+ 		.flags			= CPUIDLE_FLAG_TIME_VALID |
+-						ARMADA_370_XP_FLAG_DEEP_IDLE,
++						MVEBU_V7_FLAG_DEEP_IDLE,
+ 		.name			= "MV CPU DEEP IDLE",
+ 		.desc			= "CPU and L2 Fabric power down",
+ 	},
+-	.state_count = ARMADA_370_XP_MAX_STATES,
++	.state_count = 3,
  };
  
--static int __init armada_370_xp_cpu_pm_init(void)
-+static int __init mvebu_v7_cpu_pm_init(void)
+-static int armada_370_xp_cpuidle_probe(struct platform_device *pdev)
++static int mvebu_v7_cpuidle_probe(struct platform_device *pdev)
  {
- 	struct device_node *np;
  
-@@ -334,13 +334,13 @@ static int __init armada_370_xp_cpu_pm_init(void)
- 		return 0;
- 	of_node_put(np);
- 
--	armada_370_xp_pmsu_enable_l2_powerdown_onidle();
--	armada_xp_cpuidle_device.dev.platform_data = armada_370_xp_cpu_suspend;
--	platform_device_register(&armada_xp_cpuidle_device);
--	cpu_pm_register_notifier(&armada_370_xp_cpu_pm_notifier);
-+	mvebu_v7_pmsu_enable_l2_powerdown_onidle();
-+	mvebu_v7_cpuidle_device.dev.platform_data = armada_370_xp_cpu_suspend;
-+	platform_device_register(&mvebu_v7_cpuidle_device);
-+	cpu_pm_register_notifier(&mvebu_v7_cpu_pm_notifier);
- 
- 	return 0;
+-	armada_370_xp_cpu_suspend = (void *)(pdev->dev.platform_data);
+-	return cpuidle_register(&armada_370_xp_idle_driver, NULL);
++	mvebu_v7_cpu_suspend = pdev->dev.platform_data;
++	return cpuidle_register(&armadaxp_idle_driver, NULL);
  }
  
--arch_initcall(armada_370_xp_cpu_pm_init);
--early_initcall(armada_370_xp_pmsu_init);
-+arch_initcall(mvebu_v7_cpu_pm_init);
-+early_initcall(mvebu_v7_pmsu_init);
-diff --git a/arch/arm/mach-mvebu/pmsu.h b/arch/arm/mach-mvebu/pmsu.h
-index ae50194..6b58c1f 100644
---- a/arch/arm/mach-mvebu/pmsu.h
-+++ b/arch/arm/mach-mvebu/pmsu.h
-@@ -16,4 +16,6 @@ int mvebu_setup_boot_addr_wa(unsigned int crypto_eng_target,
-                              unsigned int crypto_eng_attribute,
-                              phys_addr_t resume_addr_reg);
+-static struct platform_driver armada_370_xp_cpuidle_plat_driver = {
++static struct platform_driver armadaxp_cpuidle_plat_driver = {
+ 	.driver = {
+-		.name = "cpuidle-armada-370-xp",
++		.name = "cpuidle-armada-xp",
+ 		.owner = THIS_MODULE,
+ 	},
+-	.probe = armada_370_xp_cpuidle_probe,
++	.probe = mvebu_v7_cpuidle_probe,
+ };
  
-+void mvebu_v7_pmsu_idle_exit(void);
-+
- #endif	/* __MACH_370_XP_PMSU_H */
+-module_platform_driver(armada_370_xp_cpuidle_plat_driver);
++module_platform_driver(armadaxp_cpuidle_plat_driver);
+ 
+ MODULE_AUTHOR("Gregory CLEMENT <gregory.clement@free-electrons.com>");
+-MODULE_DESCRIPTION("Armada 370/XP cpu idle driver");
++MODULE_DESCRIPTION("Marvell EBU v7 cpuidle driver");
+ MODULE_LICENSE("GPL");
 -- 
 2.0.0
