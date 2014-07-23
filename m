@@ -1,40 +1,49 @@
-From: alexander.stein@systec-electronic.com (Alexander Stein)
-Date: Wed, 23 Jul 2014 15:02:00 +0200
-Subject: [PATCH RFC] arm/mach-imximx/iomux-v3: Do not export symbol without
- public declaration
-Message-ID: <1406120520-14390-1-git-send-email-alexander.stein@systec-electronic.com>
+From: michal.simek@xilinx.com (Michal Simek)
+Date: Wed, 23 Jul 2014 15:05:39 +0200
+Subject: [PATCH] ARM: zynq: DT: Add CAN node
+Message-ID: <52d799e17cd3539713625c6f6a6666620f52d692.1406120732.git.michal.simek@xilinx.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Both mxc_iomux_v3_setup_pad and mxc_iomux_v3_setup_multiple_pads are
-declared in iomux-v3.h which can't be used in any module. None of the
-objects in this directory is tristate. Neither can the header be included
-in out-of-tree modules.
+Add node describing Zynq's CAN controller.
 
-Signed-off-by: Alexander Stein <alexander.stein@systec-electronic.com>
+Signed-off-by: Michal Simek <michal.simek@xilinx.com>
 ---
- arch/arm/mach-imx/iomux-v3.c | 2 --
- 1 file changed, 2 deletions(-)
 
-diff --git a/arch/arm/mach-imx/iomux-v3.c b/arch/arm/mach-imx/iomux-v3.c
-index 9dae74bf47fc..d61f9606fc56 100644
---- a/arch/arm/mach-imx/iomux-v3.c
-+++ b/arch/arm/mach-imx/iomux-v3.c
-@@ -55,7 +55,6 @@ int mxc_iomux_v3_setup_pad(iomux_v3_cfg_t pad)
- 
- 	return 0;
- }
--EXPORT_SYMBOL(mxc_iomux_v3_setup_pad);
- 
- int mxc_iomux_v3_setup_multiple_pads(iomux_v3_cfg_t *pad_list, unsigned count)
- {
-@@ -71,7 +70,6 @@ int mxc_iomux_v3_setup_multiple_pads(iomux_v3_cfg_t *pad_list, unsigned count)
- 	}
- 	return 0;
- }
--EXPORT_SYMBOL(mxc_iomux_v3_setup_multiple_pads);
- 
- void mxc_iomux_v3_init(void __iomem *iomux_v3_base)
- {
--- 
-1.8.5.5
+ arch/arm/boot/dts/zynq-7000.dtsi | 13 ++++++++++++-
+ 1 file changed, 12 insertions(+), 1 deletion(-)
+
+diff --git a/arch/arm/boot/dts/zynq-7000.dtsi b/arch/arm/boot/dts/zynq-7000.dtsi
+index 366ca6434f54..2287d9b4ed1a 100644
+--- a/arch/arm/boot/dts/zynq-7000.dtsi
++++ b/arch/arm/boot/dts/zynq-7000.dtsi
+@@ -71,7 +71,18 @@
+ 			interrupts = <0 7 4>;
+ 			interrupt-parent = <&intc>;
+ 			clocks = <&clkc 12>;
+-		};
++		};
++
++		can0: can at e0008000 {
++			compatible = "xlnx,zynq-can-1.0";
++			clocks = <&clkc 19>, <&clkc 36>;
++			clock-names = "can_clk", "pclk";
++			reg = <0xe0008000 0x1000>;
++			interrupts = <0 28 4>;
++			interrupt-parent = <&intc>;
++			tx-fifo-depth = <0x40>;
++			rx-fifo-depth = <0x40>;
++		};
+
+ 		gpio0: gpio at e000a000 {
+ 			compatible = "xlnx,zynq-gpio-1.0";
+--
+1.8.2.3
+
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: not available
+Type: application/pgp-signature
+Size: 198 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140723/b9a77014/attachment-0001.sig>
