@@ -1,50 +1,44 @@
-From: herbert@gondor.apana.org.au (Herbert Xu)
-Date: Wed, 23 Jul 2014 22:13:09 +0800
-Subject: [PATCH 3/3] crypto: Add Allwinner Security System crypto
- accelerator
-In-Reply-To: <201407231607.21106.marex@denx.de>
-References: <1400771396-9686-1-git-send-email-clabbe.montjoie@gmail.com>
- <201405241400.03456.marex@denx.de>
- <20140723135735.GA30132@gondor.apana.org.au>
- <201407231607.21106.marex@denx.de>
-Message-ID: <20140723141309.GA30324@gondor.apana.org.au>
+From: andrew@lunn.ch (Andrew Lunn)
+Date: Wed, 23 Jul 2014 16:14:43 +0200
+Subject: [PATCH 1/2] Added dts defintion for Lenovo ix4-300d nas
+In-Reply-To: <20140723134534.GF23220@titan.lakedaemon.net>
+References: <1406117232-5962-1-git-send-email-yahoo@perenite.com>
+ <20140723134534.GF23220@titan.lakedaemon.net>
+Message-ID: <20140723141443.GC2856@lunn.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jul 23, 2014 at 04:07:20PM +0200, Marek Vasut wrote:
-> On Wednesday, July 23, 2014 at 03:57:35 PM, Herbert Xu wrote:
-> > On Sat, May 24, 2014 at 02:00:03PM +0200, Marek Vasut wrote:
-> > > > +	}
-> > > > +#endif
-> > > > +
-> > > > +#ifdef CONFIG_CRYPTO_DEV_SUNXI_SS_MD5
-> > > > +	err = crypto_register_shash(&sunxi_md5_alg);
-> > > 
-> > > Do not use shash for such device. This is clearly and ahash (and async in
-> > > general) device. The rule of a thumb here is that you use sync algos only
-> > > for devices which have dedicated instructions for computing the
-> > > transformation. For devices which are attached to some kind of bus, you
-> > > use async algos (ahash etc).
-> > 
-> > I'm sorry that I didn't catch this earlier but there is no such
-> > rule.
-> > 
-> > Unless you need the async interface you should stick to the sync
-> > interfaces for the sake of simplicity.
-> > 
-> > We have a number of existing drivers that are synchronous but
-> > using the async interface.  They should either be converted
-> > over to the sync interface or made interrupt-driven if possible.
+Hi Benoit,
+
 > 
-> Sure, but this device is interrupt driven and uses DMA to feed the crypto 
-> engine, therefore async, right ?
+> > +			};
+> > +
+> > +			serial at 12000 {
+> > +				clocks = <&coreclk 0>;
 
-If it's interrupt-driven, then yes it would certainly make sense to
-be async.  But all I see is polling in the latest posting, was the
-first version different?
+I don't think you need the clocks property. It should be already set
+in armada-xp.dtsi.
 
-Cheers,
--- 
-Email: Herbert Xu <herbert@gondor.apana.org.au>
-Home Page: http://gondor.apana.org.au/~herbert/
-PGP Key: http://gondor.apana.org.au/~herbert/pubkey.txt
+> > +				adt7473 at 2e {
+> > +					compatible = "adt7473";
+
+Please include a vendor prefix here. 
+
+
+> > +					reg = <0x2e>;
+> > +				};
+> > +
+> > +				pcf8563 at 51 {
+> > +					compatible = "pcf8563";
+
+and a vendor prefix here.
+
+> > +	/* warning: you need both eth1 & 0 to be initialize for poweroff to shutdown otherwise it reboots */
+
+What do you mean by initialized? Driver loaded? Interface up? 
+
+> This is a great first version
+
+I agree with Jason, well done.
+
+  Andrew
