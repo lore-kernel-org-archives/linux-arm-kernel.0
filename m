@@ -1,68 +1,168 @@
-From: heiko@sntech.de (Heiko =?ISO-8859-1?Q?St=FCbner?=)
-Date: Wed, 23 Jul 2014 02:45:16 +0200
-Subject: [PATCH v2] ARM: rockchip: Add cpu hotplug support for RK3XXX SoCs
-In-Reply-To: <1405775006-950-1-git-send-email-romain.perier@gmail.com>
-References: <1405775006-950-1-git-send-email-romain.perier@gmail.com>
-Message-ID: <1757206.77MvIsS1hO@diego>
+From: jg1.han@samsung.com (Jingoo Han)
+Date: Wed, 23 Jul 2014 10:27:28 +0900
+Subject: [PATCH v7 3/5] PCI: designware: enhance dw_pcie_host_init() to
+ support v3.65 DW hardware
+In-Reply-To: <1405961925-27248-4-git-send-email-m-karicheri2@ti.com>
+References: <1405961925-27248-1-git-send-email-m-karicheri2@ti.com>
+ <1405961925-27248-4-git-send-email-m-karicheri2@ti.com>
+Message-ID: <003201cfa615$44615ff0$cd241fd0$%han@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am Samstag, 19. Juli 2014, 13:03:26 schrieb Romain Perier:
-> Adds ability to shutdown all CPUs except the first one
-> (since it might be special for a lot of platforms).
-> It is now possible to use kexec which requires such a feature.
+On Tuesday, July 22, 2014 1:59 AM, Murali Karicheri wrote:
 > 
-> Signed-off-by: Romain Perier <romain.perier@gmail.com>
+> keystone PCI controller is based on v3.65 designware hardware. This
+> version differs from newer versions of the hardware in few functional
+> areas discussed below that makes it necessary to change dw_pcie_host_init()
+> to support v3.65 based PCI controller.
+> 
+>  1. No support for ATU port. So any ATU specific resource handling code
+>     is to be bypassed for v3.65 h/w.
+>  2. MSI controller uses Application space to implement MSI and 32 MSI
+>     interrupts are multiplexed over 8 IRQs to the host. Hence the code
+>     to process MSI IRQ needs to be different. This patch allows platform
+>     driver to provide its own irq_domain_ops ptr to irq_domain_add_linear()
+>     through an API callback from the designware core driver.
+>  3. MSI interrupt generation requires EP to write to the RC's application
+>     register. So enhance the driver to allow setup of inbound access to
+>     MSI irq register as a post scan bus API callback.
+> 
+> Signed-off-by: Murali Karicheri <m-karicheri2@ti.com>
+> Reviewed-by: Pratyush Anand <pratyush.anand@st.com>
+> Acked-by: Mohit KUMAR <mohit.kumar@st.com>
+> 
+> CC: Santosh Shilimkar <santosh.shilimkar@ti.com>
+> CC: Russell King <linux@arm.linux.org.uk>
+> CC: Grant Likely <grant.likely@linaro.org>
+> CC: Rob Herring <robh+dt@kernel.org>
+> CC: Jingoo Han <jg1.han@samsung.com>
 
-works like a charm :-)
+Acked-by: Jingoo Han <jg1.han@samsung.com>
 
-I've added it to my tree and will send it off in the next days.
+Best regards,
+Jingoo Han
 
-
-Heiko
-
+> CC: Bjorn Helgaas <bhelgaas@google.com>
+> CC: Richard Zhu <r65037@freescale.com>
+> CC: Kishon Vijay Abraham I <kishon@ti.com>
+> CC: Marek Vasut <marex@denx.de>
+> CC: Arnd Bergmann <arnd@arndb.de>
+> CC: Pawel Moll <pawel.moll@arm.com>
+> CC: Mark Rutland <mark.rutland@arm.com>
+> CC: Ian Campbell <ijc+devicetree@hellion.org.uk>
+> CC: Kumar Gala <galak@codeaurora.org>
+> CC: Randy Dunlap <rdunlap@infradead.org>
+> CC: Grant Likely <grant.likely@linaro.org>
 > ---
->  arch/arm/mach-rockchip/platsmp.c | 20 ++++++++++++++++++++
->  1 file changed, 20 insertions(+)
+>  drivers/pci/host/pcie-designware.c |   54 +++++++++++++++++++++++-------------
+>  drivers/pci/host/pcie-designware.h |    2 ++
+>  2 files changed, 36 insertions(+), 20 deletions(-)
 > 
-> diff --git a/arch/arm/mach-rockchip/platsmp.c
-> b/arch/arm/mach-rockchip/platsmp.c index 910835d..189684f 100644
-> --- a/arch/arm/mach-rockchip/platsmp.c
-> +++ b/arch/arm/mach-rockchip/platsmp.c
-> @@ -21,6 +21,7 @@
->  #include <linux/of_address.h>
+> diff --git a/drivers/pci/host/pcie-designware.c b/drivers/pci/host/pcie-designware.c
+> index 905941c..35bb4af 100644
+> --- a/drivers/pci/host/pcie-designware.c
+> +++ b/drivers/pci/host/pcie-designware.c
+> @@ -420,8 +420,8 @@ int __init dw_pcie_host_init(struct pcie_port *pp)
+>  	struct device_node *np = pp->dev->of_node;
+>  	struct of_pci_range range;
+>  	struct of_pci_range_parser parser;
+> +	int i, ret;
+>  	u32 val;
+> -	int i;
 > 
->  #include <asm/cacheflush.h>
-> +#include <asm/cp15.h>
->  #include <asm/smp_scu.h>
->  #include <asm/smp_plat.h>
->  #include <asm/mach/map.h>
-> @@ -178,8 +179,27 @@ static void __init rockchip_smp_prepare_cpus(unsigned
-> int max_cpus) pmu_set_power_domain(0 + i, false);
+>  	if (of_pci_range_parser_init(&parser, np)) {
+>  		dev_err(pp->dev, "missing ranges property\n");
+> @@ -467,21 +467,26 @@ int __init dw_pcie_host_init(struct pcie_port *pp)
+>  		}
+>  	}
+> 
+> -	pp->cfg0_base = pp->cfg.start;
+> -	pp->cfg1_base = pp->cfg.start + pp->config.cfg0_size;
+>  	pp->mem_base = pp->mem.start;
+> 
+> -	pp->va_cfg0_base = devm_ioremap(pp->dev, pp->cfg0_base,
+> -					pp->config.cfg0_size);
+>  	if (!pp->va_cfg0_base) {
+> -		dev_err(pp->dev, "error with ioremap in function\n");
+> -		return -ENOMEM;
+> +		pp->cfg0_base = pp->cfg.start;
+> +		pp->va_cfg0_base = devm_ioremap(pp->dev, pp->cfg0_base,
+> +						pp->config.cfg0_size);
+> +		if (!pp->va_cfg0_base) {
+> +			dev_err(pp->dev, "error with ioremap in function\n");
+> +			return -ENOMEM;
+> +		}
+>  	}
+> -	pp->va_cfg1_base = devm_ioremap(pp->dev, pp->cfg1_base,
+> -					pp->config.cfg1_size);
+> +
+>  	if (!pp->va_cfg1_base) {
+> -		dev_err(pp->dev, "error with ioremap\n");
+> -		return -ENOMEM;
+> +		pp->cfg1_base = pp->cfg.start + pp->config.cfg0_size;
+> +		pp->va_cfg1_base = devm_ioremap(pp->dev, pp->cfg1_base,
+> +						pp->config.cfg1_size);
+> +		if (!pp->va_cfg1_base) {
+> +			dev_err(pp->dev, "error with ioremap\n");
+> +			return -ENOMEM;
+> +		}
+>  	}
+> 
+>  	if (of_property_read_u32(np, "num-lanes", &pp->lanes)) {
+> @@ -490,16 +495,22 @@ int __init dw_pcie_host_init(struct pcie_port *pp)
+>  	}
+> 
+>  	if (IS_ENABLED(CONFIG_PCI_MSI)) {
+> -		pp->irq_domain = irq_domain_add_linear(pp->dev->of_node,
+> -					MAX_MSI_IRQS, &msi_domain_ops,
+> -					&dw_pcie_msi_chip);
+> -		if (!pp->irq_domain) {
+> -			dev_err(pp->dev, "irq domain init failed\n");
+> -			return -ENXIO;
+> -		}
+> +		if (!pp->ops->msi_host_init) {
+> +			pp->irq_domain = irq_domain_add_linear(pp->dev->of_node,
+> +						MAX_MSI_IRQS, &msi_domain_ops,
+> +						&dw_pcie_msi_chip);
+> +			if (!pp->irq_domain) {
+> +				dev_err(pp->dev, "irq domain init failed\n");
+> +				return -ENXIO;
+> +			}
+> 
+> -		for (i = 0; i < MAX_MSI_IRQS; i++)
+> -			irq_create_mapping(pp->irq_domain, i);
+> +			for (i = 0; i < MAX_MSI_IRQS; i++)
+> +				irq_create_mapping(pp->irq_domain, i);
+> +		} else {
+> +			ret = pp->ops->msi_host_init(pp, &dw_pcie_msi_chip);
+> +			if (ret < 0)
+> +				return ret;
+> +		}
+>  	}
+> 
+>  	if (pp->ops->host_init)
+> @@ -759,6 +770,9 @@ static struct pci_bus *dw_pcie_scan_bus(int nr, struct pci_sys_data *sys)
+>  		BUG();
+>  	}
+> 
+> +	if (bus && pp->ops->scan_bus)
+> +		pp->ops->scan_bus(pp);
+> +
+>  	return bus;
 >  }
 > 
-> +#ifdef CONFIG_HOTPLUG_CPU
-> +static int rockchip_cpu_kill(unsigned int cpu)
-> +{
-> +	pmu_set_power_domain(0 + cpu, false);
-> +	return 1;
-> +}
-> +
-> +static void rockchip_cpu_die(unsigned int cpu)
-> +{
-> +	v7_exit_coherency_flush(louis);
-> +	while(1)
-> +		cpu_do_idle();
-> +}
-> +#endif
-> +
->  static struct smp_operations rockchip_smp_ops __initdata = {
->  	.smp_prepare_cpus	= rockchip_smp_prepare_cpus,
->  	.smp_boot_secondary	= rockchip_boot_secondary,
-> +#ifdef CONFIG_HOTPLUG_CPU
-> +	.cpu_kill		= rockchip_cpu_kill,
-> +	.cpu_die		= rockchip_cpu_die,
-> +#endif
+> diff --git a/drivers/pci/host/pcie-designware.h b/drivers/pci/host/pcie-designware.h
+> index 387f69e..080c649 100644
+> --- a/drivers/pci/host/pcie-designware.h
+> +++ b/drivers/pci/host/pcie-designware.h
+> @@ -70,6 +70,8 @@ struct pcie_host_ops {
+>  	void (*msi_set_irq)(struct pcie_port *pp, int irq);
+>  	void (*msi_clear_irq)(struct pcie_port *pp, int irq);
+>  	u32 (*get_msi_data)(struct pcie_port *pp);
+> +	void (*scan_bus)(struct pcie_port *pp);
+> +	int (*msi_host_init)(struct pcie_port *pp, struct msi_chip *chip);
 >  };
->  CPU_METHOD_OF_DECLARE(rk3066_smp, "rockchip,rk3066-smp",
-> &rockchip_smp_ops);
+> 
+>  int dw_pcie_cfg_read(void __iomem *addr, int where, int size, u32 *val);
+> --
+> 1.7.9.5
