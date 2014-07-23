@@ -1,51 +1,35 @@
-From: gregkh@linuxfoundation.org (Greg Kroah-Hartman)
-Date: Wed, 23 Jul 2014 10:41:37 -0700
-Subject: [PATCH v4 1/2] platform: Remove most references to platform_bus
- device
-In-Reply-To: <1406135239-17550-1-git-send-email-pawel.moll@arm.com>
-References: <1406135239-17550-1-git-send-email-pawel.moll@arm.com>
-Message-ID: <20140723174137.GC16664@kroah.com>
+From: jgunthorpe@obsidianresearch.com (Jason Gunthorpe)
+Date: Wed, 23 Jul 2014 11:42:29 -0600
+Subject: [PATCH v7 4/5] PCI: add PCI controller for keystone PCIe h/w
+In-Reply-To: <20140722235200.GC27965@google.com>
+References: <1405961925-27248-1-git-send-email-m-karicheri2@ti.com>
+ <1405961925-27248-5-git-send-email-m-karicheri2@ti.com>
+ <20140722223527.GA27965@google.com> <53CEEB1C.9020202@ti.com>
+ <20140722235200.GC27965@google.com>
+Message-ID: <20140723174228.GB11270@obsidianresearch.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jul 23, 2014 at 06:07:18PM +0100, Pawel Moll wrote:
-> A number of board files in arch/arm and arch/unicore32
-> explicitly reference platform_bus device as a parent
-> for new platform devices.
-> 
-> This is unnecessary, as platform device API guarantees
-> that devices with NULL parent are going to by adopted
-> by the mentioned "root" device.
-> 
-> This patch removes or replaces with NULL such references.
-> 
-> Signed-off-by: Pawel Moll <pawel.moll@arm.com>
-> ---
->  arch/arm/mach-bcm/board_bcm21664.c      |  3 +--
->  arch/arm/mach-bcm/board_bcm281xx.c      |  3 +--
->  arch/arm/mach-clps711x/board-edb7211.c  |  6 +++---
->  arch/arm/mach-clps711x/board-p720t.c    |  6 +++---
->  arch/arm/mach-imx/mach-mx27ads.c        |  2 +-
->  arch/arm/mach-shmobile/board-ape6evm.c  | 14 +++++++-------
->  arch/arm/mach-shmobile/board-bockw.c    | 19 ++++++++----------
->  arch/arm/mach-shmobile/board-genmai.c   |  5 ++---
->  arch/arm/mach-shmobile/board-koelsch.c  | 26 ++++++++++++-------------
->  arch/arm/mach-shmobile/board-lager.c    | 34 ++++++++++++++-------------------
->  arch/arm/mach-shmobile/board-marzen.c   |  1 -
->  arch/arm/mach-shmobile/setup-r7s72100.c |  2 +-
->  arch/arm/mach-shmobile/setup-r8a73a4.c  |  8 ++++----
->  arch/arm/mach-shmobile/setup-r8a7778.c  | 13 ++++++-------
->  arch/arm/mach-shmobile/setup-r8a7779.c  |  6 +++---
->  arch/arm/mach-shmobile/setup-r8a7790.c  | 10 +++++-----
->  arch/arm/mach-shmobile/setup-r8a7791.c  |  8 ++++----
->  arch/unicore32/kernel/puv3-core.c       |  2 +-
->  arch/unicore32/kernel/puv3-nb0916.c     |  6 +++---
->  19 files changed, 79 insertions(+), 95 deletions(-)
+On Tue, Jul 22, 2014 at 05:52:00PM -0600, Bjorn Helgaas wrote:
+> If there is a hardware defect, a PCI quirk is a reasonable way to work
+> around it, since that's the main purpose of quirks.  fixup_mpss_256()
+> is an example of something that sounds superficially similar.
 
-Looks good, if there are no objections, I'll take this through my
-driver-core tree, so that your follow-on patches that change things will
-still apply.
+It was my suggestion to engage the PCI-E tuning code. By my
+understanding the HW bug is that read response segmentation at the
+host bridge does not work - so all read requests from any downstream
+device must have responses that fit within a single packet.
 
-thanks,
+This is completely against how the spec envisions things working,
+segmentation is a mandatory function. As you point out there is no
+parameter bounding the maximum read request size that a completer will
+accept.
 
-greg k-h
+So, the only fix is that every downstream device must always have a
+MRSS set to less than the MPS of the host bridge.
+
+Which means the tuning code must be involved somehow, as that code
+controls the MRSS of unrelated devices...
+
+Regards,
+Jason
