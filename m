@@ -1,67 +1,67 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 23 Jul 2014 23:05:49 +0200
-Subject: [PATCH] ARM: mvebu: fix build without platforms selected
-Message-ID: <7339332.ZE2mWIdyDh@wuerfel>
+From: benoitm@perenite.com (Benoit Masson)
+Date: Wed, 23 Jul 2014 23:15:18 +0200
+Subject: [PATCH 1/2] Added dts defintion for Lenovo ix4-300d nas
+In-Reply-To: <20140723164958.GH2856@lunn.ch>
+References: <1406117232-5962-1-git-send-email-yahoo@perenite.com>
+ <20140723134534.GF23220@titan.lakedaemon.net> <20140723141443.GC2856@lunn.ch>
+ <47823826-CDE8-47D2-B1B6-B688118CF985@perenite.com>
+ <20140723164958.GH2856@lunn.ch>
+Message-ID: <9AE6F1AD-9296-47E9-91E2-9E34AA48EBB4@perenite.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-When building a multiplatform kernel that enables 'ARCH_MVEBU' but
-none of the individual options under it, we get this link error:
+Well after several test with the original BSP driver I found that this is not fully WOL related. It could be that the LED pin is linked to poweron for WOL, yet here the issue is on shutdown pulling up MPP24 should poweroff the deice but only reboots it except is both PHY have some reg written to...
 
-arch/arm/mach-mvebu/built-in.o: In function `mvebu_armada375_smp_wa_init':
-:(.text+0x190): undefined reference to `mvebu_setup_boot_addr_wa'
+By the way the current nv_neta does not seems to support WOL for 88e1318 and still having them both up is enough to have poweroff to work, which is why I'm putting the WOL as a side track.
 
-The best solution seems to be to ensure that in this configuration,
-we don't actually build any of the mvebu code.
+Both phy are :
+marvell,88e1318
 
-Signed-off-by: Arnd Bergmann <arnd@arndb.de>
----
-diff --git a/arch/arm/mach-mvebu/Kconfig b/arch/arm/mach-mvebu/Kconfig
-index 955d4a3afabd..c1e4567a5ab3 100644
---- a/arch/arm/mach-mvebu/Kconfig
-+++ b/arch/arm/mach-mvebu/Kconfig
-@@ -14,11 +14,15 @@ menuconfig ARCH_MVEBU
- 
- if ARCH_MVEBU
- 
-+config MACH_MVEBU_ANY
-+	bool
-+
- config MACH_MVEBU_V7
- 	bool
- 	select ARMADA_370_XP_TIMER
- 	select CACHE_L2X0
- 	select ARM_CPU_SUSPEND
-+	select MACH_MVEBU_ANY
- 
- config MACH_ARMADA_370
- 	bool "Marvell Armada 370 boards" if ARCH_MULTI_V7
-@@ -75,6 +79,7 @@ config MACH_DOVE
- 	select CACHE_L2X0
- 	select CPU_PJ4
- 	select DOVE_CLK
-+	select MACH_MVEBU_ANY
- 	select ORION_IRQCHIP
- 	select ORION_TIMER
- 	select PINCTRL_DOVE
-@@ -87,6 +92,7 @@ config MACH_KIRKWOOD
- 	select ARCH_REQUIRE_GPIOLIB
- 	select CPU_FEROCEON
- 	select KIRKWOOD_CLK
-+	select MACH_MVEBU_ANY
- 	select ORION_IRQCHIP
- 	select ORION_TIMER
- 	select PCI
-diff --git a/arch/arm/mach-mvebu/Makefile b/arch/arm/mach-mvebu/Makefile
-index bc7689e530a4..e24136b42765 100644
---- a/arch/arm/mach-mvebu/Makefile
-+++ b/arch/arm/mach-mvebu/Makefile
-@@ -4,7 +4,7 @@ ccflags-$(CONFIG_ARCH_MULTIPLATFORM) := -I$(srctree)/$(src)/include \
- AFLAGS_coherency_ll.o		:= -Wa,-march=armv7-a
- CFLAGS_pmsu.o			:= -march=armv7-a
- 
--obj-y				 += system-controller.o mvebu-soc-id.o
-+obj-$(CONFIG_MACH_MVEBU_ANY)	 += system-controller.o mvebu-soc-id.o
- 
- ifeq ($(CONFIG_MACH_MVEBU_V7),y)
- obj-y				 += cpu-reset.o board-v7.o coherency.o coherency_ll.o pmsu.o pmsu_ll.o
+example of a minimal reg write that lead MPP24 to shutdown instead of rebooting on original BSP driver
+XXXXX BasicInit
+XXXXXXXXXXXXXX phyAdr 0: regOffs: 16 data: 3 caller: mvEthE1310PhyBasicInit+0x2c/0x58
+XXXXXXXXXXXXXX phyAdr 0: regOffs: 10 data: 830 caller: mvEthE1310PhyBasicInit+0x3c/0x58
+XXXXXXXXXXXXXX phyAdr 0: regOffs: 16 data: 0 caller: mvEthE1310PhyBasicInit+0x4c/0x58
+XXXXX BasicInit
+XXXXXXXXXXXXXX phyAdr 1: regOffs: 16 data: 3 caller: mvEthE1310PhyBasicInit+0x2c/0x58
+XXXXXXXXXXXXXX phyAdr 1: regOffs: 10 data: 830 caller: mvEthE1310PhyBasicInit+0x3c/0x58
+XXXXXXXXXXXXXX phyAdr 1: regOffs: 16 data: 0 caller: mvEthE1310PhyBasicInit+0x4c/0x58
+
+I've tried something like:
+compatible = "marvell,88e1318";
+                                        device_type = "ethernet-phy";
+                                        marvell,reg-init =
+                                          /* Init led/activity workaround for MP24 shutdown. */
+                                          <3 0x10 0 0x830>;
+
+In the dts but without luck
+
+Regards,
+Benoit
+
+
+Le 23 juil. 2014 ? 18:49, Andrew Lunn <andrew@lunn.ch> a ?crit :
+
+>> Well actually the PHY need to be initialized (at least 1 mII reg
+>> written), which from marvel LSP driver always occurs, while it
+>> doesn't with mainline PHY driver (drivers/net/phy/marvell.c), so the
+>> only simple way I found to have at least one PHY reg on both
+>> interface written is to have both eth up at OS config level.
+> 
+> Thanks for the information. This sounds like a wake on LAN feature.
+> I've seen other Marvell hardware connect a PHY LED output pin to the
+> circuit controlling the main power supply. When the PHY detects the
+> magic wake-up packet, it 'blinks' the LED so turning the power back
+> on.
+> 
+> My guess is, the register write to the PHY is configuring the LED. Do
+> you have the datasheet for the PHY? Can you check this?
+> 
+>> Probably the best option would be to have a reg-init = <reg offset
+>> value> on both phy dts definition but the current armada mii doesn't
+>> support this dts config...
+> 
+> Once we understand what is going on here, we can consider adding
+> support for this.
+> 
+> 	Andrew
