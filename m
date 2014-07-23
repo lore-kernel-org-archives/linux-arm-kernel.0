@@ -1,150 +1,40 @@
-From: nicolas.pitre@linaro.org (Nicolas Pitre)
-Date: Wed, 23 Jul 2014 18:18:34 -0400 (EDT)
-Subject: [PATCH 2/4] ARM: add IPI tracepoints
-In-Reply-To: <1405660735-13408-3-git-send-email-nicolas.pitre@linaro.org>
-References: <1405660735-13408-1-git-send-email-nicolas.pitre@linaro.org>
- <1405660735-13408-3-git-send-email-nicolas.pitre@linaro.org>
-Message-ID: <alpine.LFD.2.11.1407231807070.6061@knanqh.ubzr>
+From: andrew@lunn.ch (Andrew Lunn)
+Date: Thu, 24 Jul 2014 00:26:40 +0200
+Subject: [PATCH 1/2] Added dts defintion for Lenovo ix4-300d nas
+In-Reply-To: <9AE6F1AD-9296-47E9-91E2-9E34AA48EBB4@perenite.com>
+References: <1406117232-5962-1-git-send-email-yahoo@perenite.com>
+ <20140723134534.GF23220@titan.lakedaemon.net>
+ <20140723141443.GC2856@lunn.ch>
+ <47823826-CDE8-47D2-B1B6-B688118CF985@perenite.com>
+ <20140723164958.GH2856@lunn.ch>
+ <9AE6F1AD-9296-47E9-91E2-9E34AA48EBB4@perenite.com>
+Message-ID: <20140723222640.GA28485@lunn.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-@Russell: Can I have your ACK on this patch before I send the series 
-upstream?  Here's the revised version accounting for the changes the 
-discussion in this thread brought about
+> Both phy are :
+> marvell,88e1318
 
-Author: Nicolas Pitre <nicolas.pitre@linaro.org>
-Date:   Fri Jul 18 00:07:05 2014 -0400
+I don't have the datasheet for this specific phy model, but i do have
+the datasheet for another similar phy.
+ 
+> example of a minimal reg write that lead MPP24 to shutdown instead
+> of rebooting on original BSP driver
 
-    ARM: add IPI tracepoints
-    
-    The strings used to list IPIs in /proc/interrupts are reused for tracing
-    purposes.
-    
-    While at it, prevent a negative ipinr from escaping the range check
-    in handle_IPI().
-    
-    Signed-off-by: Nicolas Pitre <nico@linaro.org>
-    Acked-by: Steven Rostedt <rostedt@goodmis.org>
+> XXXXX BasicInit
 
-diff --git a/arch/arm/kernel/smp.c b/arch/arm/kernel/smp.c
-index 7c4fada440..9388a3d479 100644
---- a/arch/arm/kernel/smp.c
-+++ b/arch/arm/kernel/smp.c
-@@ -47,6 +47,9 @@
- #include <asm/mach/arch.h>
- #include <asm/mpu.h>
- 
-+#define CREATE_TRACE_POINTS
-+#include <trace/events/ipi.h>
-+
- /*
-  * as from 2.5, kernels no longer have an init_tasks structure
-  * so we need some other way of telling a new secondary core
-@@ -430,38 +433,15 @@ void __init smp_prepare_cpus(unsigned int max_cpus)
- 	}
- }
- 
--static void (*smp_cross_call)(const struct cpumask *, unsigned int);
-+static void (*__smp_cross_call)(const struct cpumask *, unsigned int);
- 
- void __init set_smp_cross_call(void (*fn)(const struct cpumask *, unsigned int))
- {
--	if (!smp_cross_call)
--		smp_cross_call = fn;
--}
--
--void arch_send_call_function_ipi_mask(const struct cpumask *mask)
--{
--	smp_cross_call(mask, IPI_CALL_FUNC);
--}
--
--void arch_send_wakeup_ipi_mask(const struct cpumask *mask)
--{
--	smp_cross_call(mask, IPI_WAKEUP);
--}
--
--void arch_send_call_function_single_ipi(int cpu)
--{
--	smp_cross_call(cpumask_of(cpu), IPI_CALL_FUNC_SINGLE);
-+	if (!__smp_cross_call)
-+		__smp_cross_call = fn;
- }
- 
--#ifdef CONFIG_IRQ_WORK
--void arch_irq_work_raise(void)
--{
--	if (is_smp())
--		smp_cross_call(cpumask_of(smp_processor_id()), IPI_IRQ_WORK);
--}
--#endif
--
--static const char *ipi_types[NR_IPI] = {
-+static const char *ipi_types[NR_IPI] __tracepoint_string = {
- #define S(x,s)	[x] = s
- 	S(IPI_WAKEUP, "CPU wakeup interrupts"),
- 	S(IPI_TIMER, "Timer broadcast interrupts"),
-@@ -473,6 +453,12 @@ static const char *ipi_types[NR_IPI] = {
- 	S(IPI_COMPLETION, "completion interrupts"),
- };
- 
-+static void smp_cross_call(const struct cpumask *target, unsigned int ipinr)
-+{
-+	trace_ipi_raise(target, ipi_types[ipinr]);
-+	__smp_cross_call(target, ipinr);
-+}
-+
- void show_ipi_list(struct seq_file *p, int prec)
- {
- 	unsigned int cpu, i;
-@@ -499,6 +485,29 @@ u64 smp_irq_stat_cpu(unsigned int cpu)
- 	return sum;
- }
- 
-+void arch_send_call_function_ipi_mask(const struct cpumask *mask)
-+{
-+	smp_cross_call(mask, IPI_CALL_FUNC);
-+}
-+
-+void arch_send_wakeup_ipi_mask(const struct cpumask *mask)
-+{
-+	smp_cross_call(mask, IPI_WAKEUP);
-+}
-+
-+void arch_send_call_function_single_ipi(int cpu)
-+{
-+	smp_cross_call(cpumask_of(cpu), IPI_CALL_FUNC_SINGLE);
-+}
-+
-+#ifdef CONFIG_IRQ_WORK
-+void arch_irq_work_raise(void)
-+{
-+	if (is_smp())
-+		smp_cross_call(cpumask_of(smp_processor_id()), IPI_IRQ_WORK);
-+}
-+#endif
-+
- #ifdef CONFIG_GENERIC_CLOCKEVENTS_BROADCAST
- void tick_broadcast(const struct cpumask *mask)
- {
-@@ -556,8 +565,10 @@ void handle_IPI(int ipinr, struct pt_regs *regs)
- 	unsigned int cpu = smp_processor_id();
- 	struct pt_regs *old_regs = set_irq_regs(regs);
- 
--	if (ipinr < NR_IPI)
-+	if ((unsigned)ipinr < NR_IPI) {
-+		trace_ipi_entry(ipi_types[ipinr]);
- 		__inc_irq_stat(cpu, ipi_irqs[ipinr]);
-+	}
- 
- 	switch (ipinr) {
- 	case IPI_WAKEUP:
-@@ -612,6 +623,9 @@ void handle_IPI(int ipinr, struct pt_regs *regs)
- 		       cpu, ipinr);
- 		break;
- 	}
-+
-+	if ((unsigned)ipinr < NR_IPI)
-+		trace_ipi_exit(ipi_types[ipinr]);
- 	set_irq_regs(old_regs);
- }
- 
+I'm assuming regOffs is decimal, and data is hex?
+
+> phyAdr 0: regOffs: 16 data: 3
+
+Copper Specific control register. 3 means Polarity Reversal Disable &
+Jabber function disable.
+
+> phyAdr 0: regOffs: 10 data: 830
+
+Reg 10 is the 1000BASE-T Status register, which is read only!
+
+So this is not making much sense. Are we missing some changes to the
+page register? Register 16 of page 3 is the LED control register.
+
+     Andrew
