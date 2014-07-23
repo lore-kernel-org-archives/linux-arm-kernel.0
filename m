@@ -1,25 +1,29 @@
-From: joro@8bytes.org (Joerg Roedel)
-Date: Wed, 23 Jul 2014 15:52:17 +0200
-Subject: [PATCH v2 0/3] iommu: Remove OMAP IOVMM driver
-In-Reply-To: <20140722061929.GD18374@atomide.com>
-References: <1405680597-10012-1-git-send-email-laurent.pinchart@ideasonboard.com>
- <9251918.dhlInzvbvO@avalon> <20140721093336.GR18374@atomide.com>
- <5717663.qOZzl7syrN@avalon> <20140722061929.GD18374@atomide.com>
-Message-ID: <20140723135217.GE31450@8bytes.org>
+From: herbert@gondor.apana.org.au (Herbert Xu)
+Date: Wed, 23 Jul 2014 21:54:12 +0800
+Subject: [PATCH v4 3/3] crypto: Add Allwinner Security System crypto
+ accelerator
+In-Reply-To: <20140723134857.GO20328@lukather>
+References: <1405169953-13695-1-git-send-email-clabbe.montjoie@gmail.com>
+ <1405169953-13695-4-git-send-email-clabbe.montjoie@gmail.com>
+ <20140723131620.GC29178@gondor.apana.org.au>
+ <20140723134857.GO20328@lukather>
+Message-ID: <20140723135412.GA30046@gondor.apana.org.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jul 21, 2014 at 11:19:29PM -0700, Tony Lindgren wrote:
-> > Tony, is there still time to get this (and especially patch 2/3, which touches 
-> > arch/ code) in v3.17 ?
-> 
-> Yes as long as Joerg is OK to merge that branch in :)
+On Wed, Jul 23, 2014 at 03:48:57PM +0200, Maxime Ripard wrote:
+>
+> The exact opposite has been asked for during v1's review...
 
-Fine with me, I can take only patch 1 or all 3 into my arm/omap branch,
-given Tony's Acked-by.
+Indeed but unfortunately it was bogus advice.  The async interface
+brings with it a lot of complexity which should be avoided unless
+you actually need it.
 
-Then you guys can merge in this branch wherever you want :)
+Even if you use the sync interface your driver will still be
+available to all async users.
 
 Cheers,
-
-	Joerg
+-- 
+Email: Herbert Xu <herbert@gondor.apana.org.au>
+Home Page: http://gondor.apana.org.au/~herbert/
+PGP Key: http://gondor.apana.org.au/~herbert/pubkey.txt
