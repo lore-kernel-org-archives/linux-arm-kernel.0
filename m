@@ -1,41 +1,85 @@
-From: anarsoul@gmail.com (Vasily Khoruzhick)
-Date: Wed, 23 Jul 2014 10:59:36 +0300
-Subject: [PATCH] Input: s3c2410_ts: Move to
- clk_prepare_enable/clk_disable_unprepare
-In-Reply-To: <20140723060913.GD25004@core.coreip.homeip.net>
-References: <1404155377-2862-1-git-send-email-anarsoul@gmail.com>
- <2138540.gOK28iFQ6r@vasilykh-desktop-i5>
- <20140723060913.GD25004@core.coreip.homeip.net>
-Message-ID: <2335676.R6Ieja8iHY@vasilykh-desktop-i5>
+From: daniel.lezcano@linaro.org (Daniel Lezcano)
+Date: Wed, 23 Jul 2014 10:03:23 +0200
+Subject: [GIT PULL 4/5] Samsung exynos_mct update for v3.17
+In-Reply-To: <53CEF4BC.1050105@samsung.com>
+References: <53C9C164.9030404@samsung.com>
+ <20140719220623.GF15676@quad.lixom.net> <53CCD3AB.7040205@linaro.org>
+ <01b601cfa59c$12c2c7f0$384857d0$@samsung.com> <53CEA020.309@linaro.org>
+ <53CEF4BC.1050105@samsung.com>
+Message-ID: <53CF6C4B.8010608@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 22 July 2014 23:09:14 Dmitry Torokhov wrote:
-> Hi Vasily,
-> 
-> On Wed, Jul 09, 2014 at 12:13:41PM +0300, Vasily Khoruzhick wrote:
-> > On 8 July 2014 18:00:49 Dmitry Torokhov wrote:
-> > 
-> > Hi Dmitry,
-> > 
-> > > > -	clk_disable(ts.clock);
-> > > > +	clk_disable_unprepare(ts.clock);
-> > > 
-> > > Do we really need to unprepare on suspend? Why simply disabling is not
-> > > enough here?
-> > 
-> > You're right, disabling should be enough here. I'll resend a patch after
-> > testing on a hardware.
-> 
-> I ended up cutting out suspend/resume parts and applying.
+On 07/23/2014 01:33 AM, Kukjin Kim wrote:
+> On 07/23/14 02:32, Daniel Lezcano wrote:
+>> On 07/22/2014 12:59 PM, Kukjin Kim wrote:
+>>> Daniel Lezcano wrote:
+>>>>
+>>>> On 07/20/2014 12:06 AM, Olof Johansson wrote:
+>>>>> On Sat, Jul 19, 2014 at 09:52:52AM +0900, Kukjin Kim wrote:
+>>>>>> Note that this is also based on 3.16-rc5 because of dependency with
+>>>>>> previous samsung fixes including exynos_mct already merged in
+>>>>>> mainline during -rc.
+>>>>>>
+>>>>>> The following changes since commit
+>>>>>> 1795cd9b3a91d4b5473c97f491d63892442212ab:
+>>>>>>
+>>>>>> Linux 3.16-rc5 (2014-07-13 14:04:33 -0700)
+>>>>>>
+>>>>>> are available in the git repository at:
+>>>>>>
+>>>>>
+>>>>>> git://git.kernel.org/pub/scm/linux/kernel/git/kgene/linux-samsung.git
+>>>>>> tags/exynos-mct
+>>>>>>
+>>>>>> for you to fetch changes up to
+>>>>>> 1a631118c1d085fe162f3b6d44f710c72206ef2d:
+>>>>>>
+>>>>>> clocksource: exynos_mct: Only use 32-bits where possible
+>>>>>> (2014-07-19 03:07:52 +0900)
+>>>>>>
+>>>>>> ----------------------------------------------------------------
+>>>>>> exynos_mct update for v3.17
+>>>>>> - only use 32-bit access for performance benefits on exynos
+>>>>>> 32-bit system and this means ARCH timer should be supported
+>>>>>> on exynos 64-bit system instead of current MCT.
+>>>>>> - use readl_relaxed/writel_relaxed to consistently use the
+>>>>>> proper functions in exynos_mct.
+>>>>>
+>>>>> There's no reason for these to go through arm-soc, is there? They
+>>>>> should
+>>>>> go through the clocksource tree (Daniel Lezcano / Thomas Gleixner).
+>>>>> They
+>>>>> also lack acks from them if they for some reason need to go through
+>>>>> arm-soc.
+>>>>
+>>> Olof, you're right. The branch has no dependency with arm-soc so I
+>>> agreed.
+>>>
+>>>> Yes, that's right. Furthermore I have been discussing with Doug about
+>>>> these patches before.
+>>>>
+>>>> Kukjin, is there any dependency on these patches ?
+>>>>
+>>> Yeah, Daniel, it should be handled in the clocksource tree so how
+>>> should I do
+>>> for it?
+>>
+>> I can pull your branch v3.17-next/mct-exynos and you drop the merge from
+>> this branch in your master ?
+>>
+> Yes please and I did drop the merge in my -next just now.
 
-Ah, I was about to send v2. I've tested a version with clk_disable/clk_enable 
-in suspend/resume parts, and it works OK for me.
+Ok, thanks.
 
-Thanks!
+The patches are applied in my branch for 3.17.
 
-Regards,
-Vasily
+   -- Daniel
 
-> 
-> Thanks.
+
+-- 
+  <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
+
+Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
+<http://twitter.com/#!/linaroorg> Twitter |
+<http://www.linaro.org/linaro-blog/> Blog
