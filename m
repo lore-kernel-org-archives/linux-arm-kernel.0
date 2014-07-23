@@ -1,26 +1,37 @@
 From: herbert@gondor.apana.org.au (Herbert Xu)
-Date: Wed, 23 Jul 2014 21:54:12 +0800
-Subject: [PATCH v4 3/3] crypto: Add Allwinner Security System crypto
+Date: Wed, 23 Jul 2014 21:57:35 +0800
+Subject: [PATCH 3/3] crypto: Add Allwinner Security System crypto
  accelerator
-In-Reply-To: <20140723134857.GO20328@lukather>
-References: <1405169953-13695-1-git-send-email-clabbe.montjoie@gmail.com>
- <1405169953-13695-4-git-send-email-clabbe.montjoie@gmail.com>
- <20140723131620.GC29178@gondor.apana.org.au>
- <20140723134857.GO20328@lukather>
-Message-ID: <20140723135412.GA30046@gondor.apana.org.au>
+In-Reply-To: <201405241400.03456.marex@denx.de>
+References: <1400771396-9686-1-git-send-email-clabbe.montjoie@gmail.com>
+ <1400771396-9686-4-git-send-email-clabbe.montjoie@gmail.com>
+ <201405241400.03456.marex@denx.de>
+Message-ID: <20140723135735.GA30132@gondor.apana.org.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jul 23, 2014 at 03:48:57PM +0200, Maxime Ripard wrote:
+On Sat, May 24, 2014 at 02:00:03PM +0200, Marek Vasut wrote:
 >
-> The exact opposite has been asked for during v1's review...
+> > +	}
+> > +#endif
+> > +
+> > +#ifdef CONFIG_CRYPTO_DEV_SUNXI_SS_MD5
+> > +	err = crypto_register_shash(&sunxi_md5_alg);
+> 
+> Do not use shash for such device. This is clearly and ahash (and async in 
+> general) device. The rule of a thumb here is that you use sync algos only for 
+> devices which have dedicated instructions for computing the transformation. For 
+> devices which are attached to some kind of bus, you use async algos (ahash etc).
 
-Indeed but unfortunately it was bogus advice.  The async interface
-brings with it a lot of complexity which should be avoided unless
-you actually need it.
+I'm sorry that I didn't catch this earlier but there is no such
+rule.
 
-Even if you use the sync interface your driver will still be
-available to all async users.
+Unless you need the async interface you should stick to the sync
+interfaces for the sake of simplicity.
+
+We have a number of existing drivers that are synchronous but
+using the async interface.  They should either be converted
+over to the sync interface or made interrupt-driven if possible.
 
 Cheers,
 -- 
