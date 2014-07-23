@@ -1,39 +1,79 @@
-From: andrew@lunn.ch (Andrew Lunn)
-Date: Thu, 24 Jul 2014 00:32:35 +0200
-Subject: [PATCH 1/2] Adding Lenovo - Lenovo Group Ltd. to the
- vendor-prefixes list.
-In-Reply-To: <1406154923-13612-1-git-send-email-yahoo@perenite.com>
-References: <1406154923-13612-1-git-send-email-yahoo@perenite.com>
-Message-ID: <20140723223235.GB28485@lunn.ch>
+From: s-anna@ti.com (Suman Anna)
+Date: Wed, 23 Jul 2014 17:43:31 -0500
+Subject: [PATCH 0/2] ARM: DRA7: hwmod: Add dra74x and dra72x specific
+ ocp interface lists
+In-Reply-To: <53CF34B8.6000602@ti.com>
+References: <1405499774-19770-1-git-send-email-lokeshvutla@ti.com>
+ <53CE952D.6040705@ti.com> <53CF34B8.6000602@ti.com>
+Message-ID: <53D03A93.90002@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jul 23, 2014 at 03:35:22PM -0700, Benoit Masson wrote:
-> Lenovo Group Ltd. (stylized as lenovo) is a Chinese multinational computer technology company with headquarters in Beijing, China, and Morrisville, North Carolina, United States.
+Hi Lokesh,
+
+On 07/22/2014 11:06 PM, Vutla, Lokesh wrote:
+> Hi Nishanth,
+> On Tuesday 22 July 2014 10:15 PM, Nishanth Menon wrote:
+>> On 07/16/2014 03:36 AM, Lokesh Vutla wrote:
+>>> This series add seperate ocp interface lists that are specific to dra74x
+>>> and dra72x, and moving USB OTG SS4 to dra74x only since its not present
+>>> in dra72x. Without this USB OTG SS4 hwmod gives an abort on dra72x.
+>>>
+>>> Adding support for soc_is_dra74x() and soc_is_dra72x() in order to differentiate
+>>> between dra74x and dra72x and pass the respective ocp interface lists.
+>>>
+>>> Verified on dra74x evm and dra72x evm using 3.16-rc5 based mainline kernel.
+
+Thanks for the series. I also need this for the differences in DSPs
+present on both SoCs.
+
+>>>
+>>> Before:
+>>> dra74x : http://paste.ubuntu.com/7802364/ 
+>>> dra72x : http://paste.ubuntu.com/7802334/ (Kernel panic)
+>>>
+>>> After-
+>>> dra74x : http://paste.ubuntu.com/7802340/
+>>> dra72x : http://paste.ubuntu.com/7802338/ (booted)
+>>>
+>>> Rajendra Nayak (2):
+>>>   ARM: DRA7: Add support for soc_is_dra74x() and soc_is_dra72x()
+>>>     varients
+>>>   ARM: DRA7: hwmod: Add dra74x and dra72x specific ocp interface lists
+>>>
+>>>  arch/arm/mach-omap2/omap_hwmod.c          |    3 +++
+>>>  arch/arm/mach-omap2/omap_hwmod_7xx_data.c |   22 ++++++++++++++++++++--
+>>>  arch/arm/mach-omap2/soc.h                 |    7 +++++++
+>>>  3 files changed, 30 insertions(+), 2 deletions(-)
+>>>
+>> Tested-by: Nishanth Menon <nm@ti.com>
+> Thanks..
+>>
+>> BUT, I suggest a follow up series to do exactly the same (moving stuff
+>> that are not common from dra7.dtsi to dra72x.dtsi and 74x.dtsi) as
+>> well to ensure that dts indicates exactly the same information (only
+>> the applicable IPs are present in dts).
+
+We also need a similar split for clockdomains, and possibly powerdomains
+(I haven't compared all of them myself).
+
+regards
+Suman
+
+> The separation of dra72x.dtsi and dra74x.dtsi is already happened and the patch is
+> already present in mainline[1].
+> Looks like usb_otg_ss4 is still present in dra7.dtsi, but this should go into dra74x.dtsi.
+> I ll take it up.
 > 
-> http://www.lenovo.com/
-> Signed-off-by: Benoit Masson <yahoo@perenite.com>
-
-Acked-by: Andrew Lunn <andrew@lunn.ch>
-
-	  Andrew
-
-> ---
->  Documentation/devicetree/bindings/vendor-prefixes.txt | 1 +
->  1 file changed, 1 insertion(+)
+> [1] https://git.kernel.org/cgit/linux/kernel/git/torvalds/linux.git/commit/?id=38b248db60e32734417534b57f9ab687c445113a
 > 
-> diff --git a/Documentation/devicetree/bindings/vendor-prefixes.txt b/Documentation/devicetree/bindings/vendor-prefixes.txt
-> index 46a311e..ae09892 100644
-> --- a/Documentation/devicetree/bindings/vendor-prefixes.txt
-> +++ b/Documentation/devicetree/bindings/vendor-prefixes.txt
-> @@ -71,6 +71,7 @@ karo	Ka-Ro electronics GmbH
->  keymile	Keymile GmbH
->  lacie	LaCie
->  lantiq	Lantiq Semiconductor
-> +lenovo	Lenovo Group Ltd.
->  lg	LG Corporation
->  linux	Linux-specific binding
->  lsi	LSI Corp. (LSI Logic)
-> -- 
-> 1.9.1
+> Thanks and regards,
+> Lokesh
+> 
+>>
+> 
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-omap" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
 > 
