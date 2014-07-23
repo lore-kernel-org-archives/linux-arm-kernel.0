@@ -1,54 +1,74 @@
-From: viresh.kumar@linaro.org (Viresh Kumar)
-Date: Wed, 23 Jul 2014 12:28:21 +0530
-Subject: [PATCH v2 14/16] cpufreq: Add cpufreq driver for Tegra124
-In-Reply-To: <20140723065412.GA15759@ulmo.nvidia.com>
-References: <1405957142-19416-1-git-send-email-ttynkkynen@nvidia.com>
- <1405957142-19416-15-git-send-email-ttynkkynen@nvidia.com>
- <CAKohpomQthJ_XE-HhzW07Q4aVtxQVy97iaL0Vy6Q4Lhw22A=VA@mail.gmail.com>
- <20140723065412.GA15759@ulmo.nvidia.com>
-Message-ID: <CAKohponmg24pvnX2Jhfg5LHKKHx3VEm-6a_JXTGhVXY-aj3EOw@mail.gmail.com>
+From: wangzhou.bry@gmail.com (Zhou Wang)
+Date: Wed, 23 Jul 2014 15:03:38 +0800
+Subject: [PATCH v1 3/3] mtd: hisilicon: add device tree binding
+ documentation
+In-Reply-To: <1405421906-660-4-git-send-email-wangzhou.bry@gmail.com>
+References: <1405421906-660-1-git-send-email-wangzhou.bry@gmail.com>
+ <1405421906-660-4-git-send-email-wangzhou.bry@gmail.com>
+Message-ID: <53CF5E4A.8050306@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 23 July 2014 12:24, Thierry Reding <thierry.reding@gmail.com> wrote:
-> On Wed, Jul 23, 2014 at 10:14:44AM +0530, Viresh Kumar wrote:
->> On 21 July 2014 21:09, Tuomas Tynkkynen <ttynkkynen@nvidia.com> wrote:
->>
->> > diff --git a/drivers/cpufreq/Kconfig.arm b/drivers/cpufreq/Kconfig.arm
->> > index 7364a53..df3c73e 100644
->> > --- a/drivers/cpufreq/Kconfig.arm
->> > +++ b/drivers/cpufreq/Kconfig.arm
->> > @@ -244,6 +244,7 @@ config ARM_SPEAR_CPUFREQ
->> >  config ARM_TEGRA_CPUFREQ
->> >         bool "TEGRA CPUFreq support"
->> >         depends on ARCH_TEGRA
->> > +       depends on GENERIC_CPUFREQ_CPU0
->>
->> Wouldn't this also disturb the existing cpufreq driver for earlier
->> tegra platforms? i.e. we don't need cpufreq-cpu0 for them
->> atleast as of now.
+On 2014?07?15? 18:58, Zhou Wang wrote:
+> Signed-off-by: Zhou Wang <wangzhou.bry@gmail.com>
+> ---
+>   .../devicetree/bindings/mtd/hisi-nand.txt          |   40 ++++++++++++++++++++
+>   1 file changed, 40 insertions(+)
+>   create mode 100644 Documentation/devicetree/bindings/mtd/hisi-nand.txt
 >
-> Perhaps this should be "select" rather than "depends on"?
 
-Don't know, its not optionaly for tegra124 and so a "depends on"
-might fit better ?
+Hi Randy Dunlap,
 
->> > +static int tegra124_cpufreq_probe(struct platform_device *pdev)
->> > +{
->> > +       int ret;
->> > +
->> > +       cpu_dev = get_cpu_device(0);
->> > +       if (!cpu_dev)
->> > +               return -ENODEV;
->> > +
->>
->> Shouldn't we do a of_node_get() here?
+Is there anything that should be modified about this binding document? 
+It would be very appreciated that I could get some comments from you.
+
+Best regards,
+Zhou
+
+> diff --git a/Documentation/devicetree/bindings/mtd/hisi-nand.txt b/Documentation/devicetree/bindings/mtd/hisi-nand.txt
+> new file mode 100644
+> index 0000000..c8b3988
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/mtd/hisi-nand.txt
+> @@ -0,0 +1,40 @@
+> +Hisilicon Hip04 Soc NAND controller DT binding
+> +
+> +Required properties:
+> +- compatible:          Should be "hisilicon,504-nfc".
+> +- reg:                 The first contains base physical address and size of
+> +                       NAND controller's registers. The second contains base
+> +                       physical address and size of NAND controller's buffer.
+> +- interrupts:          Interrupt number for nfc.
+> +- nand-bus-width:      See nand.txt.
+> +- nand-ecc-mode:       See nand.txt.
+> +- hisi,nand-ecc-bits:  ECC bits type support.
+> +                 <0>:  none ecc
+> +                 <1>:  Can correct 1bit per 512byte.
+> +                 <6>:  Can correct 16bits per 1K byte.
+> +- #address-cells:      partition address, should be set 1.
+> +- #size-cells:         partition size, should be set 1.
+> +
+> +Flash chip may optionally contain additional sub-nodes describing partitions of
+> +the address space. See partition.txt for more detail.
+> +
+> +Example:
+> +
+> +	nand: nand at 4020000 {
+> +		compatible = "hisilicon,504-nfc";
+> +		reg = <0x4020000 0x10000>, <0x5000000 0x1000>;
+> +		interrupts = <0 379 4>;
+> +		nand-bus-width = <8>;
+> +		nand-ecc-mode = "hw";
+> +		hisi,nand-ecc-bits = <1>;
+> +		#address-cells = <1>;
+> +		#size-cells = <1>;
+> +
+> +		partition at 0 {
+> +			label = "nand_text";
+> +			reg = <0x00000000 0x00400000>;
+> +		};
+> +
+> +		...
+> +
+> +	};
 >
-> I think this would need to be get_device() since it's the struct device
-> that's being used subsequently.
-
-Probably I didn't write it well..
-
-What I meant was after doing a get_cpu_device() we might also need
-to do  of_node_get(cpu_dev->of_node) as we would be using of_node
-in further code.
