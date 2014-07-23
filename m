@@ -1,35 +1,89 @@
-From: andrew@lunn.ch (Andrew Lunn)
-Date: Wed, 23 Jul 2014 18:49:58 +0200
-Subject: [PATCH 1/2] Added dts defintion for Lenovo ix4-300d nas
-In-Reply-To: <47823826-CDE8-47D2-B1B6-B688118CF985@perenite.com>
-References: <1406117232-5962-1-git-send-email-yahoo@perenite.com>
- <20140723134534.GF23220@titan.lakedaemon.net>
- <20140723141443.GC2856@lunn.ch>
- <47823826-CDE8-47D2-B1B6-B688118CF985@perenite.com>
-Message-ID: <20140723164958.GH2856@lunn.ch>
+From: m-karicheri2@ti.com (Murali Karicheri)
+Date: Wed, 23 Jul 2014 12:56:34 -0400
+Subject: [PATCH v7 0/5] Add Keystone PCIe controller driver
+In-Reply-To: <CAErSpo6gEVP7XbiPZ90MP4zn5mrjaJLZTW0_sdjg9Q6HjnnkFg@mail.gmail.com>
+References: <1405961925-27248-1-git-send-email-m-karicheri2@ti.com>
+ <20140722225708.GB27965@google.com> <53CFD444.4010700@ti.com>
+ <CAErSpo6gEVP7XbiPZ90MP4zn5mrjaJLZTW0_sdjg9Q6HjnnkFg@mail.gmail.com>
+Message-ID: <53CFE942.3020804@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> Well actually the PHY need to be initialized (at least 1 mII reg
-> written), which from marvel LSP driver always occurs, while it
-> doesn't with mainline PHY driver (drivers/net/phy/marvell.c), so the
-> only simple way I found to have at least one PHY reg on both
-> interface written is to have both eth up at OS config level.
+On 07/23/2014 12:43 PM, Bjorn Helgaas wrote:
+> On Wed, Jul 23, 2014 at 9:27 AM, Murali Karicheri<m-karicheri2@ti.com>  wrote:
+>>
+>> Bjorn,
+>>
+>>
+>> On 07/22/2014 06:57 PM, Bjorn Helgaas wrote:
+>>>
+>>> On Mon, Jul 21, 2014 at 12:58:40PM -0400, Murali Karicheri wrote:
+>>
+>>
+>>>> Murali Karicheri (5):
+>>>>     PCI: designware: add rd[wr]_other_conf API
+>>>>     PCI: designware: refactor MSI code to work with v3.65 dw hardware
+>>>
+>>>
+>>> I applied the above two to my pci/host-designware branch.  The rest didn't
+>>> apply cleanly because I applied Kishon's DRA7xx changes first, and there
+>>> are several conflicts.  Can you rebase the rest of them on top of
+>>> pci/host-designware?
+>>
+>>
+>> Thanks for applying 1 and 2.
+>>
+>> I will fix up 3 based on your branch and send you updated patch 3 and 4
+>> today.  Hope you can apply this updated patch so that I don't have to
+>> address any rebase issues. Regarding the MRSS comment, I will discuss it on
+>> that thread and send you a fix for removing the bootargs depedency based on
+>> what comes out of that discussion. Is that fine?
+>
+> Yep, sounds reasonable.  I'm about to leave for vacation, so I won't
+> be able to apply these until mid-August, but I think we can still get
+> them into v3.17 since it's new hardware that shouldn't affect anything
+> else.
+>
+Ok Thanks
+> For MRSS, I'll probably open a bugzilla and reference it in the
+> changelog just so we don't forget about it.
+Not done it before. Will check and do this.
 
-Thanks for the information. This sounds like a wake on LAN feature.
-I've seen other Marvell hardware connect a PHY LED output pin to the
-circuit controlling the main power supply. When the PHY detects the
-magic wake-up packet, it 'blinks' the LED so turning the power back
-on.
+Regards,
 
-My guess is, the register write to the PHY is configuring the LED. Do
-you have the datasheet for the PHY? Can you check this?
+Murali
 
-> Probably the best option would be to have a reg-init = <reg offset
-> value> on both phy dts definition but the current armada mii doesn't
-> support this dts config...
-
-Once we understand what is going on here, we can consider adding
-support for this.
-
-	Andrew
+>
+>>>>     PCI: designware: enhance dw_pcie_host_init() to support v3.65 DW
+>>>>       hardware
+>>>>     PCI: add PCI controller for keystone PCIe h/w
+>>>>     PCI: keystone: Update maintainer information
+>>>
+>>>
+>>> You can squash the MAINTAINERS update into the driver addition.  They're
+>>> logically part of the same change.
+>>>
+>>> Bjorn
+>>>
+>>>>    .../devicetree/bindings/pci/pci-keystone.txt       |   68 +++
+>>>>    MAINTAINERS                                        |    7 +
+>>>>    drivers/pci/host/Kconfig                           |    5 +
+>>>>    drivers/pci/host/Makefile                          |    1 +
+>>>>    drivers/pci/host/pci-keystone-dw.c                 |  521
+>>>> ++++++++++++++++++++
+>>>>    drivers/pci/host/pci-keystone.c                    |  386
+>>>> +++++++++++++++
+>>>>    drivers/pci/host/pci-keystone.h                    |   58 +++
+>>>>    drivers/pci/host/pcie-designware.c                 |  116 +++--
+>>>>    drivers/pci/host/pcie-designware.h                 |    9 +
+>>>>    9 files changed, 1135 insertions(+), 36 deletions(-)
+>>>>    create mode 100644
+>>>> Documentation/devicetree/bindings/pci/pci-keystone.txt
+>>>>    create mode 100644 drivers/pci/host/pci-keystone-dw.c
+>>>>    create mode 100644 drivers/pci/host/pci-keystone.c
+>>>>    create mode 100644 drivers/pci/host/pci-keystone.h
+>>>>
+>>>> --
+>>>> 1.7.9.5
+>>>>
+>>
