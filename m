@@ -1,51 +1,44 @@
-From: marex@denx.de (Marek Vasut)
-Date: Wed, 23 Jul 2014 17:51:01 +0200
-Subject: [PATCH 3/3] crypto: Add Allwinner Security System crypto
- accelerator
-In-Reply-To: <20140723141309.GA30324@gondor.apana.org.au>
-References: <1400771396-9686-1-git-send-email-clabbe.montjoie@gmail.com>
- <201407231607.21106.marex@denx.de>
- <20140723141309.GA30324@gondor.apana.org.au>
-Message-ID: <201407231751.02050.marex@denx.de>
+From: soren.brinkmann@xilinx.com (=?utf-8?B?U8O2cmVu?= Brinkmann)
+Date: Wed, 23 Jul 2014 09:07:02 -0700
+Subject: [PATCH] ARM: zynq: DT: Add CAN node
+In-Reply-To: <52d799e17cd3539713625c6f6a6666620f52d692.1406120732.git.michal.simek@xilinx.com>
+References: <52d799e17cd3539713625c6f6a6666620f52d692.1406120732.git.michal.simek@xilinx.com>
+Message-ID: <0a68731a-e0f0-4e19-b9a4-57cec4c8de3b@BN1BFFO11FD048.protection.gbl>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday, July 23, 2014 at 04:13:09 PM, Herbert Xu wrote:
-> On Wed, Jul 23, 2014 at 04:07:20PM +0200, Marek Vasut wrote:
-> > On Wednesday, July 23, 2014 at 03:57:35 PM, Herbert Xu wrote:
-> > > On Sat, May 24, 2014 at 02:00:03PM +0200, Marek Vasut wrote:
-> > > > > +	}
-> > > > > +#endif
-> > > > > +
-> > > > > +#ifdef CONFIG_CRYPTO_DEV_SUNXI_SS_MD5
-> > > > > +	err = crypto_register_shash(&sunxi_md5_alg);
-> > > > 
-> > > > Do not use shash for such device. This is clearly and ahash (and
-> > > > async in general) device. The rule of a thumb here is that you use
-> > > > sync algos only for devices which have dedicated instructions for
-> > > > computing the transformation. For devices which are attached to some
-> > > > kind of bus, you use async algos (ahash etc).
-> > > 
-> > > I'm sorry that I didn't catch this earlier but there is no such
-> > > rule.
-> > > 
-> > > Unless you need the async interface you should stick to the sync
-> > > interfaces for the sake of simplicity.
-> > > 
-> > > We have a number of existing drivers that are synchronous but
-> > > using the async interface.  They should either be converted
-> > > over to the sync interface or made interrupt-driven if possible.
-> > 
-> > Sure, but this device is interrupt driven and uses DMA to feed the crypto
-> > engine, therefore async, right ?
+On Wed, 2014-07-23 at 03:05PM +0200, Michal Simek wrote:
+> Add node describing Zynq's CAN controller.
 > 
-> If it's interrupt-driven, then yes it would certainly make sense to
-> be async.  But all I see is polling in the latest posting, was the
-> first version different?
+> Signed-off-by: Michal Simek <michal.simek@xilinx.com>
+> ---
+> 
+>  arch/arm/boot/dts/zynq-7000.dtsi | 13 ++++++++++++-
+>  1 file changed, 12 insertions(+), 1 deletion(-)
+> 
+> diff --git a/arch/arm/boot/dts/zynq-7000.dtsi b/arch/arm/boot/dts/zynq-7000.dtsi
+> index 366ca6434f54..2287d9b4ed1a 100644
+> --- a/arch/arm/boot/dts/zynq-7000.dtsi
+> +++ b/arch/arm/boot/dts/zynq-7000.dtsi
+> @@ -71,7 +71,18 @@
+>  			interrupts = <0 7 4>;
+>  			interrupt-parent = <&intc>;
+>  			clocks = <&clkc 12>;
+> -		};
+> +		};
+> +
+> +		can0: can at e0008000 {
+> +			compatible = "xlnx,zynq-can-1.0";
+> +			clocks = <&clkc 19>, <&clkc 36>;
+> +			clock-names = "can_clk", "pclk";
+> +			reg = <0xe0008000 0x1000>;
+> +			interrupts = <0 28 4>;
+> +			interrupt-parent = <&intc>;
+> +			tx-fifo-depth = <0x40>;
+> +			rx-fifo-depth = <0x40>;
+> +		};
 
-I stand corrected then, sorry.
+What about the second CAN core? You also probably want to add
+'status = "disabled"' in the dtsi.
 
-Is it possible to use DMA to feed the crypto accelerator, Corentin?
-
-Best regards,
-Marek Vasut
+	S?ren
