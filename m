@@ -1,38 +1,56 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Wed, 23 Jul 2014 16:29:02 +0100
-Subject: [PATCH v3 3/3] MAINTAINERS: Add dwc3-st.c file to ARCH/STI
- architecture
-In-Reply-To: <1406126915-30601-4-git-send-email-peter.griffin@linaro.org>
-References: <1406126915-30601-1-git-send-email-peter.griffin@linaro.org>
- <1406126915-30601-4-git-send-email-peter.griffin@linaro.org>
-Message-ID: <20140723152902.GK23210@lee--X1>
+From: wens@csie.org (Chen-Yu Tsai)
+Date: Wed, 23 Jul 2014 23:33:05 +0800
+Subject: [PATCH v5 0/2] serial: 8250_dw: optional reset control and deferred
+ probe support
+Message-ID: <1406129587-24668-1-git-send-email-wens@csie.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 23 Jul 2014, Peter Griffin wrote:
+Hi Greg,
 
-> Signed-off-by: Peter Griffin <peter.griffin@linaro.org>
-> ---
->  MAINTAINERS | 1 +
->  1 file changed, 1 insertion(+)
+This series adds optional reset control and deferred probing support
+to 8250_dw. These are required to support the UARTs on sun6i/sun8i.
+They were originally part of my sun8i PRCM series. The other parts
+of that series have been merged already. It would be really nice
+if we could get these 2 in as well.
 
-Acked-by: Lee Jones <lee.jones@linaro.org>
-> 
-> diff --git a/MAINTAINERS b/MAINTAINERS
-> index 702ca10..269ad3b 100644
-> --- a/MAINTAINERS
-> +++ b/MAINTAINERS
-> @@ -1325,6 +1325,7 @@ F:	drivers/pinctrl/pinctrl-st.c
->  F:	drivers/media/rc/st_rc.c
->  F:	drivers/i2c/busses/i2c-st.c
->  F:	drivers/tty/serial/st-asc.c
-> +F:	drivers/usb/dwc3/dwc3-st.c
->  
->  ARM/TECHNOLOGIC SYSTEMS TS7250 MACHINE SUPPORT
->  M:	Lennert Buytenhek <kernel@wantstofly.org>
+Patch 1 adds optional reset control support to the 8250_dw, which
+is used by sun6i and sun8i platforms. Till now, this wasn't needed
+from a working standpoint, as the bootloader de-asserts the reset
+control on the console UART for us. However, during the development
+of the sun8i patches, I noticed other UARTs wouldn't work. Also the
+new sun6i A31 Hummingbird has multiple UARTs available, which would
+require this patch.
+
+Patch 2 adds deferred probing to 8250_dw. In my case, even though
+the clocks and reset controller "devices" were registered before
+the UART, the 8250_dw driver binded with the UART devices before
+the clocks and resets were available. This resulted in the 8250_dw
+driver failing. I only tested the R_UART device.
+
+Patch 2 also does proper cleanup in the event that probing failed.
+
+Maxime, I dropped your Acked-by because I added the cleanup code
+path.
+
+Changes since v4:
+  - Rebased onto tty-next (4847914)
+  - Do proper cleanup in the probe function if errors are encountered.
+
+No changes before v4.
+
+
+Cheers
+ChenYu
+
+
+Chen-Yu Tsai (2):
+  serial: 8250_dw: Add optional reset control support
+  serial: 8250_dw: Add support for deferred probing
+
+ .../bindings/serial/snps-dw-apb-uart.txt           |  1 +
+ drivers/tty/serial/8250/8250_dw.c                  | 50 +++++++++++++++++++---
+ 2 files changed, 44 insertions(+), 7 deletions(-)
 
 -- 
-Lee Jones
-Linaro STMicroelectronics Landing Team Lead
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+2.0.1
