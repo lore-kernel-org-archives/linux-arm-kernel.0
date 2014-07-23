@@ -1,121 +1,81 @@
-From: paul@pwsan.com (Paul Walmsley)
-Date: Wed, 23 Jul 2014 10:44:33 +0000 (UTC)
-Subject: [PATCH] ARM: OMAP2+: clock: allow omap2_dpll_round_rate() to round
- to next-lowest rate
-Message-ID: <alpine.DEB.2.02.1407231043230.32419@utopia.booyaka.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Wed, 23 Jul 2014 11:45:54 +0100
+Subject: [PATCHv4 3/5] common: dma-mapping: Introduce common remapping
+ functions
+In-Reply-To: <1406079308-5232-4-git-send-email-lauraa@codeaurora.org>
+References: <1406079308-5232-1-git-send-email-lauraa@codeaurora.org>
+ <1406079308-5232-4-git-send-email-lauraa@codeaurora.org>
+Message-ID: <20140723104554.GB1366@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Wed, Jul 23, 2014 at 02:35:06AM +0100, Laura Abbott wrote:
+> --- a/arch/arm/mm/dma-mapping.c
+> +++ b/arch/arm/mm/dma-mapping.c
+> @@ -298,37 +298,19 @@ static void *
+>  __dma_alloc_remap(struct page *page, size_t size, gfp_t gfp, pgprot_t prot,
+>  	const void *caller)
+>  {
+> -	struct vm_struct *area;
+> -	unsigned long addr;
+> -
+>  	/*
+>  	 * DMA allocation can be mapped to user space, so lets
+>  	 * set VM_USERMAP flags too.
+>  	 */
+> -	area = get_vm_area_caller(size, VM_ARM_DMA_CONSISTENT | VM_USERMAP,
+> -				  caller);
+> -	if (!area)
+> -		return NULL;
+> -	addr = (unsigned long)area->addr;
+> -	area->phys_addr = __pfn_to_phys(page_to_pfn(page));
+> -
+> -	if (ioremap_page_range(addr, addr + size, area->phys_addr, prot)) {
+> -		vunmap((void *)addr);
+> -		return NULL;
+> -	}
+> -	return (void *)addr;
+> +	return dma_common_contiguous_remap(page, size,
+> +			VM_ARM_DMA_CONSISTENT | VM_USERMAP,
+> +			prot, caller);
 
-Change the behavior of omap2_dpll_round_rate() to round to either the
-exact rate requested, or the next lowest rate that the clock is able to
-provide.
+I think we still need at least a comment in the commit log since the arm
+code is moving from ioremap_page_range() to map_vm_area(). There is a
+slight performance penalty with the addition of a kmalloc() on this
+path.
 
-This is not an ideal fix, but is intended to provide a relatively safe
-way for drivers to set PLL rates, until a better solution can be
-implemented.
+Or even better (IMO), see below.
 
-For the time being, omap3_noncore_dpll_set_rate() is still allowed to
-set its rate to something other than what the caller requested; but will
-warn when this occurs.
+> --- a/drivers/base/dma-mapping.c
+> +++ b/drivers/base/dma-mapping.c
+[...]
+> +void *dma_common_contiguous_remap(struct page *page, size_t size,
+> +			unsigned long vm_flags,
+> +			pgprot_t prot, const void *caller)
+> +{
+> +	int i;
+> +	struct page **pages;
+> +	void *ptr;
+> +
+> +	pages = kmalloc(sizeof(struct page *) << get_order(size), GFP_KERNEL);
+> +	if (!pages)
+> +		return NULL;
+> +
+> +	for (i = 0; i < (size >> PAGE_SHIFT); i++)
+> +		pages[i] = page + i;
+> +
+> +	ptr = dma_common_pages_remap(pages, size, vm_flags, prot, caller);
+> +
+> +	kfree(pages);
+> +
+> +	return ptr;
+> +}
 
-Cc: Tomi Valkeinen <tomi.valkeinen@ti.com>
-Cc: Mike Turquette <mturquette@linaro.org>
-Signed-off-by: Paul Walmsley <paul@pwsan.com>
----
- arch/arm/mach-omap2/clkt_dpll.c | 28 +++++++++++++++++++++-------
- arch/arm/mach-omap2/dpll3xxx.c  | 12 ++++++++++--
- 2 files changed, 31 insertions(+), 9 deletions(-)
+You could avoid the dma_common_page_remap() here (and kmalloc) and
+simply use ioremap_page_range(). We know that
+dma_common_contiguous_remap() is only called with contiguous physical
+range, so ioremap_page_range() is suitable. It also makes it a
+non-functional change for arch/arm.
 
-diff --git a/arch/arm/mach-omap2/clkt_dpll.c b/arch/arm/mach-omap2/clkt_dpll.c
-index 332af927f4d3..85701142c5fc 100644
---- a/arch/arm/mach-omap2/clkt_dpll.c
-+++ b/arch/arm/mach-omap2/clkt_dpll.c
-@@ -293,10 +293,13 @@ long omap2_dpll_round_rate(struct clk_hw *hw, unsigned long target_rate,
- {
- 	struct clk_hw_omap *clk = to_clk_hw_omap(hw);
- 	int m, n, r, scaled_max_m;
-+	int min_delta_m = INT_MAX, min_delta_n = INT_MAX;
- 	unsigned long scaled_rt_rp;
- 	unsigned long new_rate = 0;
- 	struct dpll_data *dd;
- 	unsigned long ref_rate;
-+	long delta;
-+	long prev_min_delta = LONG_MAX;
- 	const char *clk_name;
- 
- 	if (!clk || !clk->dpll_data)
-@@ -342,23 +345,34 @@ long omap2_dpll_round_rate(struct clk_hw *hw, unsigned long target_rate,
- 		if (r == DPLL_MULT_UNDERFLOW)
- 			continue;
- 
-+		/* skip rates above our target rate */
-+		delta = target_rate - new_rate;
-+		if (delta < 0)
-+			continue;
-+
-+		if (delta < prev_min_delta) {
-+			prev_min_delta = delta;
-+			min_delta_m = m;
-+			min_delta_n = n;
-+		}
-+
- 		pr_debug("clock: %s: m = %d: n = %d: new_rate = %lu\n",
- 			 clk_name, m, n, new_rate);
- 
--		if (target_rate == new_rate) {
--			dd->last_rounded_m = m;
--			dd->last_rounded_n = n;
--			dd->last_rounded_rate = target_rate;
-+		if (delta == 0)
- 			break;
--		}
- 	}
- 
--	if (target_rate != new_rate) {
-+	if (prev_min_delta == LONG_MAX) {
- 		pr_debug("clock: %s: cannot round to rate %lu\n",
- 			 clk_name, target_rate);
- 		return ~0;
- 	}
- 
--	return target_rate;
-+	dd->last_rounded_m = min_delta_m;
-+	dd->last_rounded_n = min_delta_n;
-+	dd->last_rounded_rate = target_rate - prev_min_delta;
-+
-+	return dd->last_rounded_rate;
- }
- 
-diff --git a/arch/arm/mach-omap2/dpll3xxx.c b/arch/arm/mach-omap2/dpll3xxx.c
-index fcd8036af910..839a13e1208b 100644
---- a/arch/arm/mach-omap2/dpll3xxx.c
-+++ b/arch/arm/mach-omap2/dpll3xxx.c
-@@ -469,6 +469,7 @@ int omap3_noncore_dpll_set_rate(struct clk_hw *hw, unsigned long rate,
- {
- 	struct clk_hw_omap *clk = to_clk_hw_omap(hw);
- 	struct clk *new_parent = NULL;
-+	unsigned long rrate;
- 	u16 freqsel = 0;
- 	struct dpll_data *dd;
- 	int ret;
-@@ -496,8 +497,15 @@ int omap3_noncore_dpll_set_rate(struct clk_hw *hw, unsigned long rate,
- 		__clk_prepare(dd->clk_ref);
- 		clk_enable(dd->clk_ref);
- 
--		if (dd->last_rounded_rate != rate)
--			rate = __clk_round_rate(hw->clk, rate);
-+		if (dd->last_rounded_rate != rate) {
-+			rrate = __clk_round_rate(hw->clk, rate);
-+			if (rrate != rate) {
-+				pr_warn("%s: %s: final rate %lu does not match desired rate %lu\n",
-+					__func__, __clk_get_name(hw->clk),
-+					rrate, rate);
-+				rate = rrate;
-+			}
-+		}
- 
- 		if (dd->last_rounded_rate == 0)
- 			return -EINVAL;
 -- 
-2.0.1
+Catalin
