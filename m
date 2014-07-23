@@ -1,51 +1,62 @@
-From: jason@lakedaemon.net (Jason Cooper)
-Date: Wed, 23 Jul 2014 08:18:47 -0400
-Subject: [GIT PULL] ARM: mvebu: DT fixes for v3.17 (round 3)
-Message-ID: <20140723121847.GD23220@titan.lakedaemon.net>
+From: monstr@monstr.eu (Michal Simek)
+Date: Wed, 23 Jul 2014 14:26:40 +0200
+Subject: [GIT PULL] Xilinx Zynq dt changes for v3.17 - second pull request
+Message-ID: <53CFAA00.3080008@monstr.eu>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-All,
+Hi,
 
-This is a small round of fixes for new nodes adding ethernet support to
-Armada 375.  Since the nodes were only added for v3.17, these patches
-are queued for v3.17, instead of as fixes for v3.16-rcX.
+please add these two patches to your arm-soc tree.
+This branch is based on zynq/dt branch which is already
+in your tree.
+http://git.kernel.org/cgit/linux/kernel/git/arm/arm-soc.git/log/?h=zynq/dt
 
-This is an incremental pull request from tags/mvebu-dt-3.17-2 up to
-tags/mvebu-dt-3.17-3 on the mvebu/dt branch.
+GPIO driver and binding are already available in Linus gpio tree
+and it enables us to do testing on Linux-next.
 
-Please pull.
-
-thx,
-
-Jason.
+Thanks,
+Michal
 
 
-The following changes since commit 3843607838cc5436d02a6771e661969a54c2fee0:
+The following changes since commit 8fe9346b945d76ddb3f08c00e34d701174c62fa0:
 
-  ARM: mvebu: update Armada XP DT for dynamic frequency scaling (2014-07-16 12:54:13 +0000)
+  ARM: zynq: DT: Migrate UART to Cadence binding (2014-07-18 11:54:24 +0200)
 
 are available in the git repository at:
 
-  git://git.infradead.org/linux-mvebu.git tags/mvebu-dt-3.17-3
+  git://git.xilinx.com/linux-xlnx.git tags/zynq-dt-for-3.17-2
 
-for you to fetch changes up to 112dc53db1c27594e3b1504189c2004115fb1914:
+for you to fetch changes up to e0a5c552caf7a4865f3d5aa077003ef2d35217db:
 
-  ARM: mvebu: Add missing MDIO clock in Armada 375 (2014-07-23 12:04:40 +0000)
-
-----------------------------------------------------------------
-mvebu DT changes for v3.17 (round 3)
-
- - Armada 375
-    - Fix ethernet aliases for new node added for v3.17
-    - Add missing MDIO clock for new node added for v3.17
+  ARM: zynq: DT: Add GPIO node (2014-07-23 14:05:56 +0200)
 
 ----------------------------------------------------------------
-Ezequiel Garcia (1):
-      ARM: mvebu: Add missing MDIO clock in Armada 375
+arm: Xilinx Zynq dt patches for v3.17 second pull request
 
-Marcin Wojtas (1):
-      ARM: mvebu: Add ethernet aliases required by U-Boot
+- Add GPIO and XADC node to dtsi
 
- arch/arm/boot/dts/armada-375.dtsi | 3 +++
- 1 file changed, 3 insertions(+)
+----------------------------------------------------------------
+Soren Brinkmann (2):
+      ARM: zynq: DT: Add XADC node
+      ARM: zynq: DT: Add GPIO node
+
+ arch/arm/boot/dts/zynq-7000.dtsi | 18 ++++++++++++++++++
+ 1 file changed, 18 insertions(+)
+
+
+-- 
+Michal Simek, Ing. (M.Eng), OpenPGP -> KeyID: FE3D1F91
+w: www.monstr.eu p: +42-0-721842854
+Maintainer of Linux kernel - Microblaze cpu - http://www.monstr.eu/fdt/
+Maintainer of Linux kernel - Xilinx Zynq ARM architecture
+Microblaze U-BOOT custodian and responsible for u-boot arm zynq platform
+
+
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 263 bytes
+Desc: OpenPGP digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140723/2c790792/attachment.sig>
