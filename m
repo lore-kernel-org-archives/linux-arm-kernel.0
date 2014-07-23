@@ -1,40 +1,82 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Wed, 23 Jul 2014 15:29:40 +0100
-Subject: [PATCH 13/11] arm64: Add support for 48-bit VA space with 64KB
- page configuration
-In-Reply-To: <619F8412-0992-4C87-AF55-83F70E605F7A@gmail.com>
-References: <ADA477FA-165D-4679-A38F-C82C901BEE4D@gmail.com>
- <AABDB416-D194-4825-8113-4748C10BC339@gmail.com>
- <2C360BFC-E4CF-448D-9110-4197DCAEAD4F@gmail.com>
- <20140722153738.GJ2219@arm.com>
- <619F8412-0992-4C87-AF55-83F70E605F7A@gmail.com>
-Message-ID: <20140723142939.GC20966@arm.com>
+From: peter.griffin@linaro.org (Peter Griffin)
+Date: Wed, 23 Jul 2014 15:33:23 +0100
+Subject: [PATCH v2 1/3] usb: dwc3: add ST dwc3 glue layer to manage dwc3 HC
+In-Reply-To: <20140722145711.GC20588@saruman.home>
+References: <1404541530-27856-1-git-send-email-peter.griffin@linaro.org>
+ <1404541530-27856-2-git-send-email-peter.griffin@linaro.org>
+ <20140707124627.GG6407@lee--X1>
+ <20140722091800.GB8233@griffinp-ThinkPad-X1-Carbon-2nd>
+ <20140722145711.GC20588@saruman.home>
+Message-ID: <20140723143323.GA26565@griffinp-ThinkPad-X1-Carbon-2nd>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jul 23, 2014 at 02:49:09PM +0100, Jungseok Lee wrote:
-> On Jul 23, 2014, at 12:37 AM, Catalin Marinas wrote:
-> > On Tue, Jul 22, 2014 at 04:13:27PM +0100, Jungseok Lee wrote:
-> >> On Jul 22, 2014, at 00:09 +900 Catalin Marinas wrote:
-> >>> This patch allows support for 3 levels of page tables with 64KB page 
-> >>> configuration allowing 48-bit VA space. The pgd is no longer a full 
-> >>> PAGE_SIZE (PTRS_PER_PGD is 64) and (swapper|idmap)_pg_dir are not fully 
-> >>> populated (pgd_alloc falls back to kzalloc). 
-> >>> 
-> >>> Signed-off-by: Catalin Marinas <catalin.marinas@arm.com> 
-> >>> --- 
-> >> 
-> >> One more step :)
+Hi Felipe,
+
+Thanks for reviewing, see my comments inline: -
+
+> > > Just use {read,write}l_relaxed() directly.
 > > 
-> > The last before the upcoming merging window. I also updated the
-> > pgtable-4levels branch with the latest.
+> > Ok, unabstracted in v3
 > 
-> I've tested the latest potable-4levels branch and 64KB + 3 Levels
-> works fine on model.
+> no, no... all other glues add their own local helpers for register
+> access. This is good for tracing, it's very easy to add a tracepoint to
+> this sort of function and get very low overhead tracing of every
+> register access.
+
+I've put the IO accessors back in for V3
+
+> > They are just bit setting macros, I've converted them over to use BIT macro now,
+> > so it no longer takes a parameter.
 > 
-> Tested-by: Jungseok Lee <jungseoklee85@gmail.com>
+> the macros are better, but make them upper case as everybody else.
 
-Thanks.
+Fixed in v3.
 
--- 
-Catalin
+
+> > I've asked ST how this value was derirved and why. It came from validation. 
+> > The docs don't mention that it is necessary, and removing it
+> > seems to have no ill effects. So I've removed this udelay in v3.
+> 
+> make sure to test with many, many iterations just to make sure.
+
+Yes will do, I've been booting my board all day, and so far no failures.
+
+> > Ok. Do the DT folks have any comment on this?
+> 
+> look at the child's dr-mode property instead of adding your own.
+
+Thanks for the hint, now using dr-mode binding in V3 :-)
+ 
+> 
+> > > > +	dwc3_data->glue_base = devm_request_and_ioremap(dev, res);
+> 
+> use devm_ioremap_resource()
+
+Fixed in V3
+
+> > Your right, this was wrong. It was some legacy code which is
+> > unnecessary and I've removed this in v3.
+> 
+> if you're going for DT, why don't you create the parent and the child
+> from DT as omap/exynos/qcom are doing ?
+
+Now creating parent and child from DT like OMAP in v3
+
+> > > > +	reset_control_assert(dwc3_data->rstc_pwrdn);
+> > > > +
+> > > > +	pinctrl_pm_select_sleep_state(dev);
+> 
+> pinctrl will select sleep and default states automatically for you.
+
+I've left this in v3, as greping around I couldn't see how that could happen automatically.
+
+Also I just double checked with linusw on irc who confirmed that the only state which is 
+ever auto-selected is "default". All other states, as well as going back to default
+state need to be explicitly called.
+
+Hope thats ok.
+
+regards,
+
+Peter.
