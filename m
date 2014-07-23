@@ -1,34 +1,66 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Wed, 23 Jul 2014 17:20:27 +0200
-Subject: [alsa-devel] [PATCH 2/4] ASoC: s3c64xx/smartq: use dynamic
- registration
-In-Reply-To: <20140716110927.GK7978@ulmo>
-References: <20140714183624.GV6800@sirena.org.uk> <4657735.1VKsbQGuH6@wuerfel>
- <CAAVeFu+Z2xzUy6pGWu3H4MXdkBq39-USHbwNU9ih6AvvxPyu5A@mail.gmail.com>
- <53C4DF0D.8010208@metafoo.de>
- <CAAVeFuJRCwSwcEOng2M6s+mWhJT8sUtsh7YGE-hBTGUFWAhtrQ@mail.gmail.com>
- <CAAVeFuLfgG6W1qK2ATTbq_ydEOjUuM8Wvftm6N1RK3Kz_y1zHg@mail.gmail.com>
- <20140716071237.GA7978@ulmo>
- <CAAVeFuJEjMBX+7vsLk5zXV5Moy=WDmWidpVZjQ_=8VD45+QdHg@mail.gmail.com>
- <20140716075107.GG7978@ulmo> <53C63CBA.20809@codethink.co.uk>
- <20140716110927.GK7978@ulmo>
-Message-ID: <CACRpkdZr=i+s5DzmR3n+FKC3DzvqfZCKM=HaWSX5WiwcCENBUQ@mail.gmail.com>
+From: m-karicheri2@ti.com (Murali Karicheri)
+Date: Wed, 23 Jul 2014 11:27:00 -0400
+Subject: [PATCH v7 0/5] Add Keystone PCIe controller driver
+In-Reply-To: <20140722225708.GB27965@google.com>
+References: <1405961925-27248-1-git-send-email-m-karicheri2@ti.com>
+ <20140722225708.GB27965@google.com>
+Message-ID: <53CFD444.4010700@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jul 16, 2014 at 1:09 PM, Thierry Reding
-<thierry.reding@gmail.com> wrote:
-> On Wed, Jul 16, 2014 at 09:50:02AM +0100, Rob Jones wrote:
 
->> In light of this, should I hold off starting on devm_gpiod_get_array()
->> as discussed on here last week?
+Bjorn,
+
+On 07/22/2014 06:57 PM, Bjorn Helgaas wrote:
+> On Mon, Jul 21, 2014 at 12:58:40PM -0400, Murali Karicheri wrote:
+
+>> Murali Karicheri (5):
+>>    PCI: designware: add rd[wr]_other_conf API
+>>    PCI: designware: refactor MSI code to work with v3.65 dw hardware
 >
-> I'll let Alex or Linus answer this, since I wasn't involved in the
-> devm_gpiod_get_array() discussions.
+> I applied the above two to my pci/host-designware branch.  The rest didn't
+> apply cleanly because I applied Kishon's DRA7xx changes first, and there
+> are several conflicts.  Can you rebase the rest of them on top of
+> pci/host-designware?
 
-I'm gonna shut up in this thread as Alex is doing such an excellent
-job at hashing out the details of gpiod*, and he understands it way
-better than me.
+Thanks for applying 1 and 2.
 
-Yours,
-Linus Walleij
+I will fix up 3 based on your branch and send you updated patch 3 and 4 
+today.  Hope you can apply this updated patch so that I don't have to 
+address any rebase issues. Regarding the MRSS comment, I will discuss it 
+on that thread and send you a fix for removing the bootargs depedency 
+based on what comes out of that discussion. Is that fine?
+
+Regards,
+
+Murali
+
+>
+>>    PCI: designware: enhance dw_pcie_host_init() to support v3.65 DW
+>>      hardware
+>>    PCI: add PCI controller for keystone PCIe h/w
+>>    PCI: keystone: Update maintainer information
+>
+> You can squash the MAINTAINERS update into the driver addition.  They're
+> logically part of the same change.
+>
+> Bjorn
+>
+>>   .../devicetree/bindings/pci/pci-keystone.txt       |   68 +++
+>>   MAINTAINERS                                        |    7 +
+>>   drivers/pci/host/Kconfig                           |    5 +
+>>   drivers/pci/host/Makefile                          |    1 +
+>>   drivers/pci/host/pci-keystone-dw.c                 |  521 ++++++++++++++++++++
+>>   drivers/pci/host/pci-keystone.c                    |  386 +++++++++++++++
+>>   drivers/pci/host/pci-keystone.h                    |   58 +++
+>>   drivers/pci/host/pcie-designware.c                 |  116 +++--
+>>   drivers/pci/host/pcie-designware.h                 |    9 +
+>>   9 files changed, 1135 insertions(+), 36 deletions(-)
+>>   create mode 100644 Documentation/devicetree/bindings/pci/pci-keystone.txt
+>>   create mode 100644 drivers/pci/host/pci-keystone-dw.c
+>>   create mode 100644 drivers/pci/host/pci-keystone.c
+>>   create mode 100644 drivers/pci/host/pci-keystone.h
+>>
+>> --
+>> 1.7.9.5
+>>
