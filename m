@@ -1,50 +1,74 @@
-From: jic23@kernel.org (Jonathan Cameron)
-Date: Wed, 23 Jul 2014 21:59:36 +0100
-Subject: [PATCHv8 4/4] ARM: dts: Fix wrong compatible string for Exynos3250
- ADC
-In-Reply-To: <1405994696-3117-5-git-send-email-cw00.choi@samsung.com>
-References: <1405994696-3117-1-git-send-email-cw00.choi@samsung.com>
- <1405994696-3117-5-git-send-email-cw00.choi@samsung.com>
-Message-ID: <53D02238.40001@kernel.org>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Wed, 23 Jul 2014 22:59:38 +0200
+Subject: [GIT PULL v2.1] Mediatek basic support for v3.17
+In-Reply-To: <20140722181857.GK21766@n2100.arm.linux.org.uk>
+References: <CABuKBeLc=Bbpqrksdjoc_0Sx_rVpZLuY1aUY1WtK5Vp20Jiv8g@mail.gmail.com>
+ <20140722181857.GK21766@n2100.arm.linux.org.uk>
+Message-ID: <201407232259.39339.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 22/07/14 03:04, Chanwoo Choi wrote:
-> This patchset fix wrong compatible string for Exynos3250 ADC. Exynos3250 SoC
-> need to control only special clock for ADC. Exynos SoC except for Exynos3250
-> has not included special clock for ADC. The exynos ADC driver can control
-> special clock if compatible string is 'exynos3250-adc-v2'.
->
-> Signed-off-by: Chanwoo Choi <cw00.choi@samsung.com>
-> Acked-by: Kyungmin Park <kyungmin.park@samsung.com>
-> Reviewed-by: Tomasz Figa <t.figa@samsung.com>
-> Acked-by: Kukjin Kim <kgene.kim@samsung.com>
-> Acked-by: Arnd Bergmann <arnd@arndb.de>
-Applied to the togreg branch of iio.git - initially pushed out as testing.
+On Tuesday 22 July 2014, Russell King - ARM Linux wrote:
+> Your To: header contains many tens of people.  Which person out of
+> all those do you expect to pull your changes?
+> 
+> Email has a way to identify whom you are talking _to_ and whom you wish
+> to _copy_ for information purposes.
+> 
+> These are the "To:" and "Cc:" fields on email.  Those on the "To:" list
+> are those who you are directly addressing your message.  Those on the
+> Cc: list are "Carbon Copy" recipients, in other words, ones you are
+> notifying for information purposes.
 
-Thanks
+Absolutely. In addition, I'd recommend always addressing the maintainer
+by name, with a friendly greeting, to ensure they really know they
+are meant.
 
-Jonathan
-> ---
->   arch/arm/boot/dts/exynos3250.dtsi | 5 +++--
->   1 file changed, 3 insertions(+), 2 deletions(-)
->
-> diff --git a/arch/arm/boot/dts/exynos3250.dtsi b/arch/arm/boot/dts/exynos3250.dtsi
-> index 15c9c87..767189a 100644
-> --- a/arch/arm/boot/dts/exynos3250.dtsi
-> +++ b/arch/arm/boot/dts/exynos3250.dtsi
-> @@ -407,10 +407,11 @@
->   		};
->
->   		adc: adc at 126C0000 {
-> -			compatible = "samsung,exynos-adc-v3";
-> +			compatible = "samsung,exynos3250-adc",
-> +				     "samsung,exynos-adc-v2";
->   			reg = <0x126C0000 0x100>, <0x10020718 0x4>;
->   			interrupts = <0 137 0>;
-> -			clock-names = "adc", "sclk_tsadc";
-> +			clock-names = "adc", "sclk";
->   			clocks = <&cmu CLK_TSADC>, <&cmu CLK_SCLK_TSADC>;
->   			#io-channel-cells = <1>;
->   			io-channel-ranges;
->
+I would also add that you should be careful with the number of people
+on Cc in any email. If the Cc list exceeds 1024 characters, the kernel.org
+mailing lists will reject your mail. It normally isn't necessary to
+have all those people on Cc.
+
+As a special case for arm-soc, please send the patches "To: arm at kernel.org"
+so it ends up in the right folders for Olof and me.
+
+> > ----------------------------------------------------------------
+> > The following changes since commit 7171511eaec5bf23fb06078f59784a3a0626b38f:
+> > 
+> >   Linux 3.16-rc1 (2014-06-15 17:45:28 -1000)
+> > 
+> > are available in the git repository at:
+> > 
+> >   https://github.com/mbgg/linux-mediatek.git tags/v3.17-next-mediatek-support
+> > 
+> > for you to fetch changes up to afaedea451149ab8f08c37ce688c8021ed347811:
+> > 
+> >   arm: mediatek: add dts for Aquaris5 mobile phone (2014-07-22 17:52:38 +0200)
+> > 
+> > ----------------------------------------------------------------
+> > This patch set adds basic support for the Mediatek Cortex-A7 SoCs.
+> > 
+> > Support is quite basic, as the only component working up to now are the
+> > timers.
+> > 
+> > Signed-off-by: Matthias Brugger matthias.bgg at gmail.com
+> > 
+> > ----------------------------------------------------------------
+> > Matthias Brugger (3):
+> >       arm: add basic support for Mediatek MT6589 boards
+> >       dt-bindings: add documentation for Mediatek SoC
+> >       arm: mediatek: add dts for Aquaris5 mobile phone
+
+Patches look good, I've pulled them into the next/soc tree. It would be
+good for the future to sign your tags with a gpg key that is signed by
+other kernel developers you know.
+
+Two other patches I'd like to see are:
+
+- adding the dts file to ls arch/arm/boot/dts/Makefile
+- adding your platform and all drivers you need to multi_v7_defconfig
+  so they are included in regular build tests.
+
+Thanks,
+
+	Arnd
