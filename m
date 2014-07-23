@@ -1,34 +1,40 @@
 From: pawel.moll@arm.com (Pawel Moll)
-Date: Wed, 23 Jul 2014 15:24:26 +0100
-Subject: [PATCH] ARM: multi_v7_defconfig: major refresh
-In-Reply-To: <1406052070-6207-1-git-send-email-olof@lixom.net>
-References: <1406052070-6207-1-git-send-email-olof@lixom.net>
-Message-ID: <1406125466.25343.138.camel@hornet>
+Date: Wed, 23 Jul 2014 15:26:53 +0100
+Subject: [PATCH v3] platform: Make platform_bus device a platform device
+In-Reply-To: <CAOesGMgya9i=zc_AVO_mgrC_FjYz-RWxwXguNueVA=7gpq=5sA@mail.gmail.com>
+References: <20140722173713.GA8959@kroah.com>
+ <1406051719-17354-1-git-send-email-pawel.moll@arm.com>
+ <CAOesGMgya9i=zc_AVO_mgrC_FjYz-RWxwXguNueVA=7gpq=5sA@mail.gmail.com>
+Message-ID: <1406125613.25343.140.camel@hornet>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 2014-07-22 at 19:01 +0100, Olof Johansson wrote:
-> This is a major refresh of the multi_v7_defconfig:
+On Tue, 2014-07-22 at 20:46 +0100, Olof Johansson wrote:
+> > @@ -946,12 +946,18 @@ int __init platform_bus_init(void)
+> >
+> >         early_platform_cleanup();
+> >
+> > -       error = device_register(&platform_bus);
+> > +       dev_set_name(&platform_bus.dev, "%s", platform_bus.name);
+> > +       error = device_register(&platform_bus.dev);
+> >         if (error)
+> >                 return error;
+> >         error =  bus_register(&platform_bus_type);
+> > -       if (error)
+> > -               device_unregister(&platform_bus);
+> > +       if (!error) {
+> > +               platform_bus.dev.of_node = of_allnodes;
 > 
-> - Bring over a bunch of Samsung drivers to make ODROID-U3 and Chromebooks usable
->  * Enable big.LITTLE
->  * MCPM
->  * CYAPA touchpad
->  * Samsung-related MTD/regulator/clk/pinmux drivers
->  * Add some of the CrOS EC drivers
-> - Turn on TPM, HW_RANDOM
-> - OMAP_USB3 -> TI_PIPE3 option rename
-> - Enable MCPM/b.L for VEXPRESS
-> - Add new CONFIG_MTD_SPI_NOR since it otherwise masks off SPI NOR drivers
-> - CONFIG_LOGO, because penguins.
+> This breaks all non-OF platforms:
 > 
-> I took care to keep the new options that have been added for whose the
-> drivers are not yet in our for-next branch. This was pretty awkward so
-> we should sort out how to handle those better in the future.
-> 
-> Signed-off-by: Olof Johansson <olof@lixom.net>
+> drivers/base/platform.c: In function 'platform_bus_init':
+> drivers/base/platform.c:955:30: error: 'of_allnodes' undeclared (first
+> use in this function)
+>    platform_bus.dev.of_node = of_allnodes;
 
-It doesn't apply cleanly on 3.16-rc6, but after manual merge VE still
-boots :-) (for what it's worth)
+Right, of course, my bad. I can't see any other way of getting the tree
+root, so an #ifdef it will be...
+
+Thanks for pointing this out!
 
 Pawe?
