@@ -1,70 +1,94 @@
-From: john.tobias.ph@gmail.com (John Tobias)
-Date: Wed, 23 Jul 2014 14:49:15 -0700
-Subject: iMX6Q - PCIe
-Message-ID: <CACUGKYP9w+qUUtp2LRKgD-Dz+2pubFeX82dGQ6tiv2Ji6VgVig@mail.gmail.com>
+From: lauraa@codeaurora.org (Laura Abbott)
+Date: Wed, 23 Jul 2014 14:56:11 -0700
+Subject: [PATCHv4 3/5] common: dma-mapping: Introduce common remapping
+ functions
+In-Reply-To: <20140723104554.GB1366@localhost>
+References: <1406079308-5232-1-git-send-email-lauraa@codeaurora.org>
+ <1406079308-5232-4-git-send-email-lauraa@codeaurora.org>
+ <20140723104554.GB1366@localhost>
+Message-ID: <53D02F7B.5020309@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi All,
+On 7/23/2014 3:45 AM, Catalin Marinas wrote:
+> On Wed, Jul 23, 2014 at 02:35:06AM +0100, Laura Abbott wrote:
+>> --- a/arch/arm/mm/dma-mapping.c
+>> +++ b/arch/arm/mm/dma-mapping.c
+>> @@ -298,37 +298,19 @@ static void *
+>>  __dma_alloc_remap(struct page *page, size_t size, gfp_t gfp, pgprot_t prot,
+>>  	const void *caller)
+>>  {
+>> -	struct vm_struct *area;
+>> -	unsigned long addr;
+>> -
+>>  	/*
+>>  	 * DMA allocation can be mapped to user space, so lets
+>>  	 * set VM_USERMAP flags too.
+>>  	 */
+>> -	area = get_vm_area_caller(size, VM_ARM_DMA_CONSISTENT | VM_USERMAP,
+>> -				  caller);
+>> -	if (!area)
+>> -		return NULL;
+>> -	addr = (unsigned long)area->addr;
+>> -	area->phys_addr = __pfn_to_phys(page_to_pfn(page));
+>> -
+>> -	if (ioremap_page_range(addr, addr + size, area->phys_addr, prot)) {
+>> -		vunmap((void *)addr);
+>> -		return NULL;
+>> -	}
+>> -	return (void *)addr;
+>> +	return dma_common_contiguous_remap(page, size,
+>> +			VM_ARM_DMA_CONSISTENT | VM_USERMAP,
+>> +			prot, caller);
+> 
+> I think we still need at least a comment in the commit log since the arm
+> code is moving from ioremap_page_range() to map_vm_area(). There is a
+> slight performance penalty with the addition of a kmalloc() on this
+> path.
+> 
+> Or even better (IMO), see below.
+> 
+>> --- a/drivers/base/dma-mapping.c
+>> +++ b/drivers/base/dma-mapping.c
+> [...]
+>> +void *dma_common_contiguous_remap(struct page *page, size_t size,
+>> +			unsigned long vm_flags,
+>> +			pgprot_t prot, const void *caller)
+>> +{
+>> +	int i;
+>> +	struct page **pages;
+>> +	void *ptr;
+>> +
+>> +	pages = kmalloc(sizeof(struct page *) << get_order(size), GFP_KERNEL);
+>> +	if (!pages)
+>> +		return NULL;
+>> +
+>> +	for (i = 0; i < (size >> PAGE_SHIFT); i++)
+>> +		pages[i] = page + i;
+>> +
+>> +	ptr = dma_common_pages_remap(pages, size, vm_flags, prot, caller);
+>> +
+>> +	kfree(pages);
+>> +
+>> +	return ptr;
+>> +}
+> 
+> You could avoid the dma_common_page_remap() here (and kmalloc) and
+> simply use ioremap_page_range(). We know that
+> dma_common_contiguous_remap() is only called with contiguous physical
+> range, so ioremap_page_range() is suitable. It also makes it a
+> non-functional change for arch/arm.
+> 
 
-I am trying to use the PCIe on iMX6Q and I am using kernel 3.15.2 and
-AEH-AR9462-LC WFI-BT module.
+My original thought with using map_vm_area vs. ioremap_page_range was
+that ioremap_page_range is really intended for mapping io devices and
+the like into the kernel virtual address space. map_vm_area is designed
+to handle pages of kernel managed memory. Perhaps it's too nit-picky
+a distinction though.
 
-The said module were able to detect by the kernel, able to bring up
-the wifi and bluetooth interface and able to scan bluetooth devices as
-as scan wifi.
+Thanks,
+Laura
 
-When, I run /usr/sbin/wpa_supplicant -Dnl80211 -iwlp1s0
--c/tmp/wpa_supplicant.conf, I got the following logs (please see
-below). The wpa supplicant keeps trying to connect but for unknown
-reason, it keeps disconnecting.
-
-
-Any idea?.
-
-Regards,
-
-john
-
-[  572.744649] IPv6: ADDRCONF(NETDEV_UP): wlp1s0: link is not ready
-wlp1s0: CTRL-EVENT-SCAN-STARTED
-wlp1s0: SME: Trying to authentica[  576.314045] wlp1s0: authenticate
-with d8:c7:c8:3b:e0:72
-te with d8:c7:c8:3b:e0:72 (SSID='MySSID' freq=5580 MHz)
-[  576.334915] wlp1s0: direct probe to d8:c7:c8:3b:e0:72 (try 1/3)
-[  576.541579] wlp1s0: direct probe to d8:c7:c8:3b:e0:72 (try 2/3)
-[  576.748576] wlp1s0: direct probe to d8:c7:c8:3b:e0:72 (try 3/3)
-[  576.955575] wlp1s0: authentication with d8:c7:c8:3b:e0:72 timed out
-wlp1s0: CTRL-EVENT-SCAN-STARTED
-wlp1s0: SME: Trying to authentica[  577.469346] wlp1s0: authenticate
-with d8:c7:c8:3b:e0:62
-te with d8:c7:c8:3b:e0:62 (SSID='MySSID' freq=2462 MHz)
-[  577.489959] wlp1s0: direct probe to d8:c7:c8:3b:e0:62 (try 1/3)
-[  577.696656] wlp1s0: direct probe to d8:c7:c8:3b:e0:62 (try 2/3)
-[  577.903586] wlp1s0: direct probe to d8:c7:c8:3b:e0:62 (try 3/3)
-[  578.110586] wlp1s0: authentication with d8:c7:c8:3b:e0:62 timed out
-wlp1s0: CTRL-EVENT-SCAN-STARTED
-wlp1s0: SME: Trying to authentica[  578.565037] wlp1s0: authenticate
-with 6c:f3:7f:1a:22:2a
-te with 6c:f3:7f:1a:22:2a (SSID='MySSID' freq=5240 MHz)
-[  578.586309] wlp1s0: direct probe to 6c:f3:7f:1a:22:2a (try 1/3)
-[  578.792580] wlp1s0: direct probe to 6c:f3:7f:1a:22:2a (try 2/3)
-[  578.999627] wlp1s0: direct probe to 6c:f3:7f:1a:22:2a (try 3/3)
-[  579.206576] wlp1s0: authentication with 6c:f3:7f:1a:22:2a timed out
-wlp1s0: CTRL-EVENT-SCAN-STARTED
-wlp1s0: SME: Trying to authentica[  579.594670] wlp1s0: authenticate
-with 24:de:c6:18:36:52
-te with 24:de:c6:18:36:52 (SSID='MySSID' freq=5660 MHz)
-[  579.615907] wlp1s0: direct probe to 24:de:c6:18:36:52 (try 1/3)
-[  579.822587] wlp1s0: direct probe to 24:de:c6:18:36:52 (try 2/3)
-[  580.029587] wlp1s0: direct probe to 24:de:c6:18:36:52 (try 3/3)
-[  580.236582] wlp1s0: authentication with 24:de:c6:18:36:52 timed out
-wlp1s0: CTRL-EVENT-SCAN-STARTED
-wlp1s0: SME: Trying to authentica[  580.510611] wlp1s0: authenticate
-with 6c:f3:7f:1a:2a:6a
-te with 6c:f3:7f:1a:2a:6a (SSID='MySSID' freq=5200 MHz)
-[  580.532053] wlp1s0: direct probe to 6c:f3:7f:1a:2a:6a (try 1/3)
-[  580.539067] wlp1s0: aborting authentication with 6c:f3:7f:1a:2a:6a
-by local choice (Reason: 3=DEAUTH_LEAVING)
-wlp1s0: CTRL-EVENT-DISCONNECTED bssid=6c:f3:7f:1a:2a:6a reason=3
-locally_generated=1
+-- 
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+hosted by The Linux Foundation
