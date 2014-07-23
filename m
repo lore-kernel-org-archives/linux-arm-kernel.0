@@ -1,41 +1,66 @@
-From: jason@lakedaemon.net (Jason Cooper)
-Date: Wed, 23 Jul 2014 08:13:31 -0400
-Subject: [PATCH 0/6] net: mvpp2: Assorted fixes
-In-Reply-To: <1405961296-5846-1-git-send-email-ezequiel.garcia@free-electrons.com>
-References: <1405961296-5846-1-git-send-email-ezequiel.garcia@free-electrons.com>
-Message-ID: <20140723121331.GC23220@titan.lakedaemon.net>
+From: LW@KARO-electronics.de (Lothar =?UTF-8?B?V2HDn21hbm4=?=)
+Date: Wed, 23 Jul 2014 14:15:02 +0200
+Subject: [PATCH v5 1/2] i2c: add DMA support for freescale i2c driver
+In-Reply-To: <53CF9933.8030908@gmail.com>
+References: <1406103883-3572-1-git-send-email-yao.yuan@freescale.com>
+ <1406103883-3572-2-git-send-email-yao.yuan@freescale.com>
+ <20140723114834.411f6bb4@ipc1.ka-ro>
+ <b1778af62e7b42b39381fb2699b34eb1@BL2PR03MB338.namprd03.prod.outlook.com>
+ <53CF9933.8030908@gmail.com>
+Message-ID: <20140723141502.2d726afe@ipc1.ka-ro>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jul 21, 2014 at 01:48:10PM -0300, Ezequiel Garcia wrote:
-> This patchset contains a set of fixes for issues found while doing some
-> more intensive tests on the recently accepted mvpp2 ethernet driver.
-> 
-> David: if we are still in time, we'd like to get the driver fixes merged
-> for v3.17-rc1.
-> 
-> For the devicetree changes, it's already too late for that, since Jason
-> Cooper has already posted the PRs for v3.17. I'll re-post them when
-> v3.17-rc1 is released.
-> 
-> As usual, feedback is welcome.
-> 
-> Ezequiel Garcia (3):
->   net: mvpp2: Fix the BM pool buffer release check
->   net: mvpp2: Simplify BM pool buffers freeing
->   ARM: mvebu: Add missing MDIO clock in Armada 375
-> 
-> Marcin Wojtas (3):
->   net: mvpp2: Fix the periodic XON enable bit
->   net: mvpp2: Enable proper PHY polling and fix port functionality
->   ARM: mvebu: Add ethernet aliases required by U-Boot
-> 
->  arch/arm/boot/dts/armada-375.dtsi    |  3 ++
->  drivers/net/ethernet/marvell/mvpp2.c | 65 +++++++++++++++++++++++-------------
->  2 files changed, 44 insertions(+), 24 deletions(-)
+Hi,
 
-Patches 5 and 6 (dtsi changes) applied to mvebu/dt for v3.17
+Varka Bhadram wrote:
+> On 07/23/2014 04:41 PM, Yao Yuan wrote:
+> > Hi,
+> >
+> > Thanks for your review.
+> >
+> > Lothar Wa?mann wrote:
+> >> Yuan Yao wrote:
+> >>> Add dma support for i2c. This function depend on DMA driver.
+> >>> You can turn on it by write both the dmas and dma-name properties in dts node.
+> >>>
+> >>> Signed-off-by: Yuan Yao <yao.yuan@freescale.com>
+> >>> ---
+> >>>   drivers/i2c/busses/i2c-imx.c | 377
+> > [...]
+> >>> +
+> >>> +fail_rx:
+> >>> +	dma_release_channel(dma->chan_rx);
+> >>> +fail_tx:
+> >>> +	dma_release_channel(dma->chan_tx);
+> >>> +fail_al:
+> >>> +	devm_kfree(dev, dma);
+> >>>
+> >> No need for this one (that's the whole point of using devm_kzalloc())!
+> >>
+> > When DMA request failed, I2C will switch to PIO mode. So if the failed reason is just like DMA channel request failed. At this time the DMA should free by devm_kfree(). Is it?
+> 
+> If probe failed the memory will be freed automatically because
+> we are using devm_kzalloc()...
+> 
+> If we use devm_kzalloc() ,no need to free manually on fail...
+> 
+Yes, but as Yuan Yao stated, the driver will still work
+without DMA but carry around the unecessary allocated imx_i2c_dma
+struct.
+The devm_kfree() is not in the failure path of the driver's probe()
+function, but in the function that tries to initialize the optional DMA
+support.
 
-thx,
 
-Jason.
+Lothar Wa?mann
+-- 
+___________________________________________________________
+
+Ka-Ro electronics GmbH | Pascalstra?e 22 | D - 52076 Aachen
+Phone: +49 2408 1402-0 | Fax: +49 2408 1402-10
+Gesch?ftsf?hrer: Matthias Kaussen
+Handelsregistereintrag: Amtsgericht Aachen, HRB 4996
+
+www.karo-electronics.de | info at karo-electronics.de
+___________________________________________________________
