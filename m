@@ -1,31 +1,47 @@
-From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
-Date: Wed, 23 Jul 2014 16:00:47 +0200
-Subject: [PATCH v2 0/3] iommu: Remove OMAP IOVMM driver
-In-Reply-To: <20140723135217.GE31450@8bytes.org>
-References: <1405680597-10012-1-git-send-email-laurent.pinchart@ideasonboard.com>
- <20140722061929.GD18374@atomide.com> <20140723135217.GE31450@8bytes.org>
-Message-ID: <4101565.HEj9dhtF5Z@avalon>
+From: 21cnbao@gmail.com (Barry Song)
+Date: Wed, 23 Jul 2014 22:03:17 +0800
+Subject: [PATCH] clocksource: sirf: disable counter before re-setting it
+Message-ID: <1406124197-25083-1-git-send-email-21cnbao@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Joerg,
+From: Hao Liu <Hao.Liu@csr.com>
 
-On Wednesday 23 July 2014 15:52:17 Joerg Roedel wrote:
-> On Mon, Jul 21, 2014 at 11:19:29PM -0700, Tony Lindgren wrote:
-> > > Tony, is there still time to get this (and especially patch 2/3, which
-> > > touches arch/ code) in v3.17 ?
-> > 
-> > Yes as long as Joerg is OK to merge that branch in :)
-> 
-> Fine with me, I can take only patch 1 or all 3 into my arm/omap branch,
-> given Tony's Acked-by.
-> 
-> Then you guys can merge in this branch wherever you want :)
+according to HW spec, we have to disable counter before setting
+it, if we don't this, in pressure test, sometimes the timer might
+not generate interrupt any more.
 
-Thank you. Assuming there's currently no conflict to be resolved, I believe 
-the easiest would be for both you and Tony to merge my branch in your trees.
+and this patch also fixes a typo for register set by changing 0x7
+to 0x3. 0x7 is loop mode in HW, but here we are using oneshot 0x3.
 
+Signed-off-by: Hao Liu <Hao.Liu@csr.com>
+Signed-off-by: Barry Song <Baohua.Song@csr.com>
+---
+ drivers/clocksource/timer-marco.c |    5 ++++-
+ 1 file changed, 4 insertions(+), 1 deletion(-)
+
+diff --git a/drivers/clocksource/timer-marco.c b/drivers/clocksource/timer-marco.c
+index 330e930..caf7a20 100644
+--- a/drivers/clocksource/timer-marco.c
++++ b/drivers/clocksource/timer-marco.c
+@@ -63,7 +63,7 @@ static inline void sirfsoc_timer_count_disable(int idx)
+ /* enable count and interrupt */
+ static inline void sirfsoc_timer_count_enable(int idx)
+ {
+-	writel_relaxed(readl_relaxed(sirfsoc_timer_base + SIRFSOC_TIMER_32COUNTER_0_CTRL + 4 * idx) | 0x7,
++	writel_relaxed(readl_relaxed(sirfsoc_timer_base + SIRFSOC_TIMER_32COUNTER_0_CTRL + 4 * idx) | 0x3,
+ 		sirfsoc_timer_base + SIRFSOC_TIMER_32COUNTER_0_CTRL + 4 * idx);
+ }
+ 
+@@ -103,6 +103,9 @@ static int sirfsoc_timer_set_next_event(unsigned long delta,
+ {
+ 	int cpu = smp_processor_id();
+ 
++	/* disable timer first, then modify the related registers */
++	sirfsoc_timer_count_disable(cpu);
++
+ 	writel_relaxed(0, sirfsoc_timer_base + SIRFSOC_TIMER_COUNTER_0 +
+ 		4 * cpu);
+ 	writel_relaxed(delta, sirfsoc_timer_base + SIRFSOC_TIMER_MATCH_0 +
 -- 
-Regards,
-
-Laurent Pinchart
+1.7.9.5
