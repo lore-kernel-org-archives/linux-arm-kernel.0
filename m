@@ -1,32 +1,150 @@
-From: eric@eukrea.com (Eric =?ISO-8859-1?B?QuluYXJk?=)
-Date: Thu, 24 Jul 2014 00:16:22 +0200
-Subject: iMX6Q - PCIe
-In-Reply-To: <CACUGKYP9w+qUUtp2LRKgD-Dz+2pubFeX82dGQ6tiv2Ji6VgVig@mail.gmail.com>
-References: <CACUGKYP9w+qUUtp2LRKgD-Dz+2pubFeX82dGQ6tiv2Ji6VgVig@mail.gmail.com>
-Message-ID: <20140724001622.2b475138@e6520eb>
+From: nicolas.pitre@linaro.org (Nicolas Pitre)
+Date: Wed, 23 Jul 2014 18:18:34 -0400 (EDT)
+Subject: [PATCH 2/4] ARM: add IPI tracepoints
+In-Reply-To: <1405660735-13408-3-git-send-email-nicolas.pitre@linaro.org>
+References: <1405660735-13408-1-git-send-email-nicolas.pitre@linaro.org>
+ <1405660735-13408-3-git-send-email-nicolas.pitre@linaro.org>
+Message-ID: <alpine.LFD.2.11.1407231807070.6061@knanqh.ubzr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi John,
+@Russell: Can I have your ACK on this patch before I send the series 
+upstream?  Here's the revised version accounting for the changes the 
+discussion in this thread brought about
 
-Le Wed, 23 Jul 2014 14:49:15 -0700,
-John Tobias <john.tobias.ph@gmail.com> a ?crit :
-> I am trying to use the PCIe on iMX6Q and I am using kernel 3.15.2 and
-> AEH-AR9462-LC WFI-BT module.
-> 
-> The said module were able to detect by the kernel, able to bring up
-> the wifi and bluetooth interface and able to scan bluetooth devices as
-> as scan wifi.
-> 
-> When, I run /usr/sbin/wpa_supplicant -Dnl80211 -iwlp1s0
-> -c/tmp/wpa_supplicant.conf, I got the following logs (please see
-> below). The wpa supplicant keeps trying to connect but for unknown
-> reason, it keeps disconnecting.
-> 
-> 
-> Any idea?.
-> 
-you can try to disable MSI (at least that's how I got ath9k working in
-FSL's kernel)
+Author: Nicolas Pitre <nicolas.pitre@linaro.org>
+Date:   Fri Jul 18 00:07:05 2014 -0400
 
-Eric
+    ARM: add IPI tracepoints
+    
+    The strings used to list IPIs in /proc/interrupts are reused for tracing
+    purposes.
+    
+    While at it, prevent a negative ipinr from escaping the range check
+    in handle_IPI().
+    
+    Signed-off-by: Nicolas Pitre <nico@linaro.org>
+    Acked-by: Steven Rostedt <rostedt@goodmis.org>
+
+diff --git a/arch/arm/kernel/smp.c b/arch/arm/kernel/smp.c
+index 7c4fada440..9388a3d479 100644
+--- a/arch/arm/kernel/smp.c
++++ b/arch/arm/kernel/smp.c
+@@ -47,6 +47,9 @@
+ #include <asm/mach/arch.h>
+ #include <asm/mpu.h>
+ 
++#define CREATE_TRACE_POINTS
++#include <trace/events/ipi.h>
++
+ /*
+  * as from 2.5, kernels no longer have an init_tasks structure
+  * so we need some other way of telling a new secondary core
+@@ -430,38 +433,15 @@ void __init smp_prepare_cpus(unsigned int max_cpus)
+ 	}
+ }
+ 
+-static void (*smp_cross_call)(const struct cpumask *, unsigned int);
++static void (*__smp_cross_call)(const struct cpumask *, unsigned int);
+ 
+ void __init set_smp_cross_call(void (*fn)(const struct cpumask *, unsigned int))
+ {
+-	if (!smp_cross_call)
+-		smp_cross_call = fn;
+-}
+-
+-void arch_send_call_function_ipi_mask(const struct cpumask *mask)
+-{
+-	smp_cross_call(mask, IPI_CALL_FUNC);
+-}
+-
+-void arch_send_wakeup_ipi_mask(const struct cpumask *mask)
+-{
+-	smp_cross_call(mask, IPI_WAKEUP);
+-}
+-
+-void arch_send_call_function_single_ipi(int cpu)
+-{
+-	smp_cross_call(cpumask_of(cpu), IPI_CALL_FUNC_SINGLE);
++	if (!__smp_cross_call)
++		__smp_cross_call = fn;
+ }
+ 
+-#ifdef CONFIG_IRQ_WORK
+-void arch_irq_work_raise(void)
+-{
+-	if (is_smp())
+-		smp_cross_call(cpumask_of(smp_processor_id()), IPI_IRQ_WORK);
+-}
+-#endif
+-
+-static const char *ipi_types[NR_IPI] = {
++static const char *ipi_types[NR_IPI] __tracepoint_string = {
+ #define S(x,s)	[x] = s
+ 	S(IPI_WAKEUP, "CPU wakeup interrupts"),
+ 	S(IPI_TIMER, "Timer broadcast interrupts"),
+@@ -473,6 +453,12 @@ static const char *ipi_types[NR_IPI] = {
+ 	S(IPI_COMPLETION, "completion interrupts"),
+ };
+ 
++static void smp_cross_call(const struct cpumask *target, unsigned int ipinr)
++{
++	trace_ipi_raise(target, ipi_types[ipinr]);
++	__smp_cross_call(target, ipinr);
++}
++
+ void show_ipi_list(struct seq_file *p, int prec)
+ {
+ 	unsigned int cpu, i;
+@@ -499,6 +485,29 @@ u64 smp_irq_stat_cpu(unsigned int cpu)
+ 	return sum;
+ }
+ 
++void arch_send_call_function_ipi_mask(const struct cpumask *mask)
++{
++	smp_cross_call(mask, IPI_CALL_FUNC);
++}
++
++void arch_send_wakeup_ipi_mask(const struct cpumask *mask)
++{
++	smp_cross_call(mask, IPI_WAKEUP);
++}
++
++void arch_send_call_function_single_ipi(int cpu)
++{
++	smp_cross_call(cpumask_of(cpu), IPI_CALL_FUNC_SINGLE);
++}
++
++#ifdef CONFIG_IRQ_WORK
++void arch_irq_work_raise(void)
++{
++	if (is_smp())
++		smp_cross_call(cpumask_of(smp_processor_id()), IPI_IRQ_WORK);
++}
++#endif
++
+ #ifdef CONFIG_GENERIC_CLOCKEVENTS_BROADCAST
+ void tick_broadcast(const struct cpumask *mask)
+ {
+@@ -556,8 +565,10 @@ void handle_IPI(int ipinr, struct pt_regs *regs)
+ 	unsigned int cpu = smp_processor_id();
+ 	struct pt_regs *old_regs = set_irq_regs(regs);
+ 
+-	if (ipinr < NR_IPI)
++	if ((unsigned)ipinr < NR_IPI) {
++		trace_ipi_entry(ipi_types[ipinr]);
+ 		__inc_irq_stat(cpu, ipi_irqs[ipinr]);
++	}
+ 
+ 	switch (ipinr) {
+ 	case IPI_WAKEUP:
+@@ -612,6 +623,9 @@ void handle_IPI(int ipinr, struct pt_regs *regs)
+ 		       cpu, ipinr);
+ 		break;
+ 	}
++
++	if ((unsigned)ipinr < NR_IPI)
++		trace_ipi_exit(ipi_types[ipinr]);
+ 	set_irq_regs(old_regs);
+ }
+ 
