@@ -1,57 +1,122 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Wed, 23 Jul 2014 16:34:25 +0100
-Subject: [PATCH v3 2/3] usb: dwc3: dwc3-st: Add st-dwc3 devicetree
- bindings documentation
-In-Reply-To: <1406126915-30601-3-git-send-email-peter.griffin@linaro.org>
-References: <1406126915-30601-1-git-send-email-peter.griffin@linaro.org>
- <1406126915-30601-3-git-send-email-peter.griffin@linaro.org>
-Message-ID: <20140723153425.GL23210@lee--X1>
+From: keescook@chromium.org (Kees Cook)
+Date: Wed, 23 Jul 2014 08:36:05 -0700
+Subject: [PATCH v5 0/3] arm64: Add seccomp support
+In-Reply-To: <53CF5F9E.4020404@linaro.org>
+References: <1406020499-5537-1-git-send-email-takahiro.akashi@linaro.org>
+ <CAGXu5j+1huPbBKH25HK6PmAL3Mi-zgD5UDRp-6wx8vuPVOBDEg@mail.gmail.com>
+ <53CF5F9E.4020404@linaro.org>
+Message-ID: <CAGXu5j+2MXht31xQcsXL2DaRGrgxn2YxJY8vgbDHHKZAcidfbA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 23 Jul 2014, Peter Griffin wrote:
+On Wed, Jul 23, 2014 at 12:09 AM, AKASHI Takahiro
+<takahiro.akashi@linaro.org> wrote:
+> On 07/23/2014 05:16 AM, Kees Cook wrote:
+>>
+>> On Tue, Jul 22, 2014 at 2:14 AM, AKASHI Takahiro
+>> <takahiro.akashi@linaro.org> wrote:
+>>>
+>>> (Please apply this patch after my audit patch in order to avoid some
+>>> conflict on arm64/Kconfig.)
+>>>
+>>> This patch enables secure computing (system call filtering) on arm64.
+>>> System calls can be allowed or denied by loaded bpf-style rules.
+>>> Architecture specific part is to run secure_computing() on syscall entry
+>>> and check the result. See [3/3]
+>>
+>>
+>> Thanks for working on this!
+>>
+>>> Prerequisites are:
+>>>   * "arm64: Add audit support" patch
+>>>
+>>> This code is tested on ARMv8 fast model using
+>>>   * libseccomp v2.1.1 with modifications for arm64 and verified by its
+>>> "live"
+>>>     tests, 20, 21 and 24.
+>>>   * modified version of Kees' seccomp test for 'changing/skipping a
+>>> syscall'
+>>>     behavior
+>>
+>>
+>> Would you be able to share this? I'd love to add it to the seccomp
+>> regression suite for the arm64-specific parts.
+>
+>
+> Yep, I forked your repo here:
+> https://github.com/t-akashi/seccomp.git
+> (See trace_arm64 branch)
 
-> This patch documents the device tree documentation required for
-> the ST usb3 controller glue layer found in STiH407 devices.
-> 
-> Signed-off-by: Giuseppe Cavallaro <peppe.cavallaro@st.com>
-> Signed-off-by: Peter Griffin <peter.griffin@linaro.org>
-> ---
->  Documentation/devicetree/bindings/usb/dwc3-st.txt | 69 +++++++++++++++++++++++
->  1 file changed, 69 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/usb/dwc3-st.txt
-> 
-> diff --git a/Documentation/devicetree/bindings/usb/dwc3-st.txt b/Documentation/devicetree/bindings/usb/dwc3-st.txt
-> new file mode 100644
-> index 0000000..de3fea3
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/usb/dwc3-st.txt
-> @@ -0,0 +1,69 @@
-> +ST DWC3 glue logic
-> +
-> +This file documents the parameters for the dwc3-st driver.
-> +This driver controls the glue logic used to configure the dwc3 core on
-> +STiH407 based platforms.
-> +
-> +Required properties:
-> + - compatible	: must be "st,stih407-dwc3"
+Great, thanks! I'll incorporate your changes into my trace branch. (It
+looks like using PTRACE_GETREGSET works on all archs, so I'll switch
+to using that for all.)
 
-Does this only exist for Cannes?
+-Kees
 
-> + - reg		: glue logic base address and USB syscfg ctrl register offset
-> + - reg-names	: should be "reg-glue" and "syscfg-reg"
-> + - st,syscon	: should be phandle to system configuration node which
-> +		  encompasses the glue registers
+>
+> Thanks,
+> -Takahiro AKASHI
+>
+>
+>> Thanks!
+>>
+>> -Kees
+>>
+>>>
+>>> Changes v4 -> v5:
+>>> * rebased to v3.16-rc
+>>> * add patch [1/3] to allow ptrace to change a system call
+>>>    (please note that this patch should be applied even without seccomp.)
+>>>
+>>> Changes v3 -> v4:
+>>> * removed the following patch and moved it to "arm64: prerequisites for
+>>>    audit and ftrace" patchset since it is required for audit and ftrace
+>>> in
+>>>    case of !COMPAT, too.
+>>>    "arm64: is_compat_task is defined both in asm/compat.h and
+>>> linux/compat.h"
+>>>
+>>> Changes v2 -> v3:
+>>> * removed unnecessary 'type cast' operations [2/3]
+>>> * check for a return value (-1) of secure_computing() explicitly [2/3]
+>>> * aligned with the patch, "arm64: split syscall_trace() into separate
+>>>    functions for enter/exit" [2/3]
+>>> * changed default of CONFIG_SECCOMP to n [2/3]
+>>>
+>>> Changes v1 -> v2:
+>>> * added generic seccomp.h for arm64 to utilize it [1,2/3]
+>>> * changed syscall_trace() to return more meaningful value (-EPERM)
+>>>    on seccomp failure case [2/3]
+>>> * aligned with the change in "arm64: make a single hook to
+>>> syscall_trace()
+>>>    for all syscall features" v2 [2/3]
+>>> * removed is_compat_task() definition from compat.h [3/3]
+>>>
+>>> AKASHI Takahiro (3):
+>>>    arm64: ptrace: reload a syscall number after ptrace operations
+>>>    asm-generic: Add generic seccomp.h for secure computing mode 1
+>>>    arm64: Add seccomp support
+>>>
+>>>   arch/arm64/Kconfig               |   14 ++++++++++++++
+>>>   arch/arm64/include/asm/seccomp.h |   25 +++++++++++++++++++++++++
+>>>   arch/arm64/include/asm/unistd.h  |    3 +++
+>>>   arch/arm64/kernel/entry.S        |    2 ++
+>>>   arch/arm64/kernel/ptrace.c       |   18 ++++++++++++++++++
+>>>   include/asm-generic/seccomp.h    |   28 ++++++++++++++++++++++++++++
+>>>   6 files changed, 90 insertions(+)
+>>>   create mode 100644 arch/arm64/include/asm/seccomp.h
+>>>   create mode 100644 include/asm-generic/seccomp.h
+>>>
+>>> --
+>>> 1.7.9.5
+>>>
+>>
+>>
+>>
+>
 
-This should be st,syscfg.  As you have it in the example.
 
-Besides this small issue, I don't see anything controversial so once
-fixed up, you can apply my:
-
-Acked-by: Lee Jones <lee.jones@linaro.org>
 
 -- 
-Lee Jones
-Linaro STMicroelectronics Landing Team Lead
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+Kees Cook
+Chrome OS Security
