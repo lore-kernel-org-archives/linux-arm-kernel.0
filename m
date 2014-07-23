@@ -1,85 +1,50 @@
-From: daniel.lezcano@linaro.org (Daniel Lezcano)
-Date: Wed, 23 Jul 2014 10:03:23 +0200
-Subject: [GIT PULL 4/5] Samsung exynos_mct update for v3.17
-In-Reply-To: <53CEF4BC.1050105@samsung.com>
-References: <53C9C164.9030404@samsung.com>
- <20140719220623.GF15676@quad.lixom.net> <53CCD3AB.7040205@linaro.org>
- <01b601cfa59c$12c2c7f0$384857d0$@samsung.com> <53CEA020.309@linaro.org>
- <53CEF4BC.1050105@samsung.com>
-Message-ID: <53CF6C4B.8010608@linaro.org>
+From: will.deacon@arm.com (Will Deacon)
+Date: Wed, 23 Jul 2014 09:25:05 +0100
+Subject: [PATCH v5 1/3] arm64: ptrace: reload a syscall number after
+ ptrace operations
+In-Reply-To: <53CF5E53.3060409@linaro.org>
+References: <1406020499-5537-1-git-send-email-takahiro.akashi@linaro.org>
+ <1406020499-5537-2-git-send-email-takahiro.akashi@linaro.org>
+ <CAGXu5jKkJUGn_MpEEr8U=n_A+iW9s8vSX1WoVNzRJMVyGQRjpA@mail.gmail.com>
+ <53CF5E53.3060409@linaro.org>
+Message-ID: <20140723082505.GB27260@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/23/2014 01:33 AM, Kukjin Kim wrote:
-> On 07/23/14 02:32, Daniel Lezcano wrote:
->> On 07/22/2014 12:59 PM, Kukjin Kim wrote:
->>> Daniel Lezcano wrote:
->>>>
->>>> On 07/20/2014 12:06 AM, Olof Johansson wrote:
->>>>> On Sat, Jul 19, 2014 at 09:52:52AM +0900, Kukjin Kim wrote:
->>>>>> Note that this is also based on 3.16-rc5 because of dependency with
->>>>>> previous samsung fixes including exynos_mct already merged in
->>>>>> mainline during -rc.
->>>>>>
->>>>>> The following changes since commit
->>>>>> 1795cd9b3a91d4b5473c97f491d63892442212ab:
->>>>>>
->>>>>> Linux 3.16-rc5 (2014-07-13 14:04:33 -0700)
->>>>>>
->>>>>> are available in the git repository at:
->>>>>>
->>>>>
->>>>>> git://git.kernel.org/pub/scm/linux/kernel/git/kgene/linux-samsung.git
->>>>>> tags/exynos-mct
->>>>>>
->>>>>> for you to fetch changes up to
->>>>>> 1a631118c1d085fe162f3b6d44f710c72206ef2d:
->>>>>>
->>>>>> clocksource: exynos_mct: Only use 32-bits where possible
->>>>>> (2014-07-19 03:07:52 +0900)
->>>>>>
->>>>>> ----------------------------------------------------------------
->>>>>> exynos_mct update for v3.17
->>>>>> - only use 32-bit access for performance benefits on exynos
->>>>>> 32-bit system and this means ARCH timer should be supported
->>>>>> on exynos 64-bit system instead of current MCT.
->>>>>> - use readl_relaxed/writel_relaxed to consistently use the
->>>>>> proper functions in exynos_mct.
->>>>>
->>>>> There's no reason for these to go through arm-soc, is there? They
->>>>> should
->>>>> go through the clocksource tree (Daniel Lezcano / Thomas Gleixner).
->>>>> They
->>>>> also lack acks from them if they for some reason need to go through
->>>>> arm-soc.
->>>>
->>> Olof, you're right. The branch has no dependency with arm-soc so I
->>> agreed.
->>>
->>>> Yes, that's right. Furthermore I have been discussing with Doug about
->>>> these patches before.
->>>>
->>>> Kukjin, is there any dependency on these patches ?
->>>>
->>> Yeah, Daniel, it should be handled in the clocksource tree so how
->>> should I do
->>> for it?
->>
->> I can pull your branch v3.17-next/mct-exynos and you drop the merge from
->> this branch in your master ?
->>
-> Yes please and I did drop the merge in my -next just now.
+On Wed, Jul 23, 2014 at 08:03:47AM +0100, AKASHI Takahiro wrote:
+> On 07/23/2014 05:15 AM, Kees Cook wrote:
+> > On Tue, Jul 22, 2014 at 2:14 AM, AKASHI Takahiro
+> > <takahiro.akashi@linaro.org> wrote:
+> >>   asmlinkage int syscall_trace_enter(struct pt_regs *regs)
+> >>   {
+> >> +       unsigned long saved_x0, saved_x8;
+> >> +
+> >> +       saved_x0 = regs->regs[0];
+> >> +       saved_x8 = regs->regs[8];
+> >> +
+> >>          if (test_thread_flag(TIF_SYSCALL_TRACE))
+> >>                  tracehook_report_syscall(regs, PTRACE_SYSCALL_ENTER);
+> >>
+> >> +       regs->syscallno = regs->regs[8];
+> >> +       if ((long)regs->syscallno == ~0UL) { /* skip this syscall */
+> >> +               regs->regs[8] = saved_x8;
+> >> +               if (regs->regs[0] == saved_x0) /* not changed by user */
+> >> +                       regs->regs[0] = -ENOSYS;
+> >
+> > I'm not sure this is right compared to other architectures. Generally
+> > when a tracer performs a syscall skip, it's up to them to also adjust
+> > the return value. They may want to be faking a syscall, and what if
+> > the value they want to return happens to be what x0 was going into the
+> > tracer? It would have no way to avoid this -ENOSYS case. I think
+> > things are fine without this test.
+> 
+> Yeah, I know this issue, but was not sure that setting a return value
+> is mandatory. (x86 seems to return -ENOSYS by default if not explicitly
+> specified.)
+> Is "fake a system call" a more appropriate word than "skip"?
+> 
+> I will defer to Will.
 
-Ok, thanks.
+I agree with Kees -- iirc, I only suggested restoring x8.
 
-The patches are applied in my branch for 3.17.
-
-   -- Daniel
-
-
--- 
-  <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
-
-Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
-<http://twitter.com/#!/linaroorg> Twitter |
-<http://www.linaro.org/linaro-blog/> Blog
+Will
