@@ -1,57 +1,70 @@
-From: michal.simek@xilinx.com (Michal Simek)
-Date: Thu, 24 Jul 2014 08:44:59 +0200
-Subject: [PATCH] ARM: zynq: DT: Add CAN node
-In-Reply-To: <20140723160702.GA14564@xsjandreislx>
-References: <52d799e17cd3539713625c6f6a6666620f52d692.1406120732.git.michal.simek@xilinx.com>
- <20140723160702.GA14564@xsjandreislx>
-Message-ID: <2fe3a869-d17c-4521-a5c1-7c347ae34726@BN1BFFO11FD060.protection.gbl>
+From: LW@KARO-electronics.de (Lothar =?UTF-8?B?V2HDn21hbm4=?=)
+Date: Thu, 24 Jul 2014 08:49:15 +0200
+Subject: [PATCHv4 4/5] of/mtd/nand: add generic binding and helper for
+ NAND_BBT_NO_OOB_BBM
+In-Reply-To: <20140724020627.GD3711@ld-irv-0074>
+References: <1402579245-13377-1-git-send-email-LW@KARO-electronics.de>
+ <1402579245-13377-2-git-send-email-LW@KARO-electronics.de>
+ <1402579245-13377-3-git-send-email-LW@KARO-electronics.de>
+ <1402579245-13377-4-git-send-email-LW@KARO-electronics.de>
+ <1402579245-13377-5-git-send-email-LW@KARO-electronics.de>
+ <20140724020627.GD3711@ld-irv-0074>
+Message-ID: <20140724084915.703a1fa0@ipc1.ka-ro>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/23/2014 06:07 PM, S?ren Brinkmann wrote:
-> On Wed, 2014-07-23 at 03:05PM +0200, Michal Simek wrote:
->> Add node describing Zynq's CAN controller.
->>
->> Signed-off-by: Michal Simek <michal.simek@xilinx.com>
->> ---
->>
->>  arch/arm/boot/dts/zynq-7000.dtsi | 13 ++++++++++++-
->>  1 file changed, 12 insertions(+), 1 deletion(-)
->>
->> diff --git a/arch/arm/boot/dts/zynq-7000.dtsi b/arch/arm/boot/dts/zynq-7000.dtsi
->> index 366ca6434f54..2287d9b4ed1a 100644
->> --- a/arch/arm/boot/dts/zynq-7000.dtsi
->> +++ b/arch/arm/boot/dts/zynq-7000.dtsi
->> @@ -71,7 +71,18 @@
->>  			interrupts = <0 7 4>;
->>  			interrupt-parent = <&intc>;
->>  			clocks = <&clkc 12>;
->> -		};
->> +		};
->> +
->> +		can0: can at e0008000 {
->> +			compatible = "xlnx,zynq-can-1.0";
->> +			clocks = <&clkc 19>, <&clkc 36>;
->> +			clock-names = "can_clk", "pclk";
->> +			reg = <0xe0008000 0x1000>;
->> +			interrupts = <0 28 4>;
->> +			interrupt-parent = <&intc>;
->> +			tx-fifo-depth = <0x40>;
->> +			rx-fifo-depth = <0x40>;
->> +		};
+Hi,
+
+Brian Norris wrote:
+> (BTW, that's a mighty CC list you have! I'm not sure all CC'd parties
+> are interested in this series; e.g., Russel and the ARM list seem
+> unrelated)
 > 
-> What about the second CAN core? You also probably want to add
-> 'status = "disabled"' in the dtsi.
+> Hi Lothar,
+> 
+> Sorry for the delay on this. I get busy enough that I can't/don't reply
+> to everything quickly...
+> 
+> On Thu, Jun 12, 2014 at 03:20:44PM +0200, Lothar Wa?mann wrote:
+> > add a boolean property 'nand-no-oob-bbm' and helper function to be
+> > able to set the NAND_BBT_NO_OOB_BBM flag in DT capable NAND drivers
+> > and use it for i.MX and MXS nand drivers.
+> 
+> If I'm understanding your previous conversations with Huang correctly,
+> you *must* use NAND_BBT_NO_OOB_BBM if you're going to use the
+> fsl,no-blockmark-swap option. Correct? If so, then you might not need
+> a separate 'nand-no-oob-bbm' binding; your driver should imply from
+> 'fsl,no-blockmark-swap' that it must also enable NAND_BBT_NO_OOB_BBM.
+> 
+no-blockmark-swap implies NO_OOB_BBM but NO_OOB_BBM may also be used
+independent from no-blockmark-swap.
 
-Second can core - yes.
+IMO writing a bad block marker to flash (which is prevented by
+the NAND_BBT_NO_OOB_BBM flag) is a misinterpretation of the purpose of
+the BB mark in the first place. The manufacturer guarantees that blocks
+which are initially bad will have at least one zero bit in the position
+of the BB mark. That's all to it.
 
-I can add status = "disabled" but then question is if make
-sense to change status for any zynq dts file. Or just
-keep enable both.
+There is no guarantee, that you will even be able to write any
+deterministic data to a block that has turned bad due to wearout or
+other flash defects. It is rather bogus to rely on data written to a
+known bad block to reflect the state of the block.
 
-In our repo is enabled can0 on zc702.
+> Also, as I noted in [1], I don't really like exposing a ton of
+> individual boolean DT properties like this. (At least this property is
+> orthogonal to the bad block table; I was a little off-base in [1].)
+> 
+How else should this information be conveyed to the flash drivers?
 
-What do you think?
 
-Thanks,
-Michal
+Lothar Wa?mann
+-- 
+___________________________________________________________
+
+Ka-Ro electronics GmbH | Pascalstra?e 22 | D - 52076 Aachen
+Phone: +49 2408 1402-0 | Fax: +49 2408 1402-10
+Gesch?ftsf?hrer: Matthias Kaussen
+Handelsregistereintrag: Amtsgericht Aachen, HRB 4996
+
+www.karo-electronics.de | info at karo-electronics.de
+___________________________________________________________
