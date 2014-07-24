@@ -1,73 +1,55 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Thu, 24 Jul 2014 16:34:06 +0100
-Subject: [PATCH 03/19] ARM64 / ACPI: Introduce lowlevel suspend function
-In-Reply-To: <1406206825-15590-4-git-send-email-hanjun.guo@linaro.org>
-References: <1406206825-15590-1-git-send-email-hanjun.guo@linaro.org>
- <1406206825-15590-4-git-send-email-hanjun.guo@linaro.org>
-Message-ID: <20140724153406.GC26190@leverpostej>
+From: olof@lixom.net (Olof Johansson)
+Date: Thu, 24 Jul 2014 08:39:30 -0700
+Subject: linux-next: manual merge of the usb tree with the arm-soc tree
+In-Reply-To: <20140724163329.03002387@canb.auug.org.au>
+References: <20140724162811.5e12107a@canb.auug.org.au>
+ <20140724163329.03002387@canb.auug.org.au>
+Message-ID: <CAOesGMgZHHKLMeyGKq_ZfSxWsRcLL3a=ogbW8s=KTUrjf6L3qA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jul 24, 2014 at 02:00:09PM +0100, Hanjun Guo wrote:
-> From: Graeme Gregory <graeme.gregory@linaro.org>
-> 
-> acpi_wakeup_address is used on x86 as the address bios jumps into
-> when machine wakes up from suspend. As arm64 does not have such a
-> bios this mechanism will be provided by other means. But the define
-> is still required inside the acpi core.
-> 
-> Introduce a null stub for acpi_suspend_lowlevel as this is also
-> required by core. This will be filled in when standards are
-> defined for arm64 ACPI global power states.
-> 
-> Reviewed-by: Grant Likely <grant.likely@linaro.org>
-> Signed-off-by: Graeme Gregory <graeme.gregory@linaro.org>
-> Signed-off-by: Hanjun Guo <hanjun.guo@linaro.org>
-> ---
->  arch/arm64/include/asm/acpi.h |   12 ++++++++++++
->  arch/arm64/kernel/acpi.c      |    7 +++++++
->  2 files changed, 19 insertions(+)
-> 
-> diff --git a/arch/arm64/include/asm/acpi.h b/arch/arm64/include/asm/acpi.h
-> index e8581ea..44b617f 100644
-> --- a/arch/arm64/include/asm/acpi.h
-> +++ b/arch/arm64/include/asm/acpi.h
-> @@ -36,6 +36,18 @@ static inline bool acpi_has_cpu_in_madt(void)
->  	return 1;
->  }
->  
-> +/* Low-level suspend routine.
-> + *
-> + * ACPI S-states for ARM64 have to be defined
-> + * and approved before doing anything else, maybe
-> + * we need update the ACPI spec, here we
-> + * just introduce function and macro needed by
-> + * ACPI core as IA64 did, and revisit them when
-> + * the spec is ready.
-> + */
-> +extern int (*acpi_suspend_lowlevel)(void);
-> +#define acpi_wakeup_address 0
-> +
->  #endif /* CONFIG_ACPI */
->  
->  #endif /*_ASM_ACPI_H*/
-> diff --git a/arch/arm64/kernel/acpi.c b/arch/arm64/kernel/acpi.c
-> index ac78e4e..f5a10b5 100644
-> --- a/arch/arm64/kernel/acpi.c
-> +++ b/arch/arm64/kernel/acpi.c
-> @@ -95,3 +95,10 @@ static int __init parse_acpi(char *arg)
->  	return 0;
->  }
->  early_param("acpi", parse_acpi);
-> +
-> +/*
-> + * acpi_suspend_lowlevel() - save kernel state and suspend.
-> + *
-> + * TBD when ARM/ARM64 starts to support suspend...
-> + */
-> +int (*acpi_suspend_lowlevel)(void);
+On Wed, Jul 23, 2014 at 11:33 PM, Stephen Rothwell <sfr@canb.auug.org.au> wrote:
+> Hi Greg,
+>
+> On Thu, 24 Jul 2014 16:28:11 +1000 Stephen Rothwell <sfr@canb.auug.org.au> wrote:
+>>
+>> Today's linux-next merge of the usb tree got a conflict in
+>> drivers/phy/Kconfig between commit 64562e99477f ("phy: Add drivers for
+>> PCIe and SATA phy on SPEAr13xx") from the arm-soc tree and commit
+>> 1de990d8a169 ("phy: qcom: Add driver for QCOM APQ8064 SATA PHY") from
+>> the usb tree.
+>>
+>> I fixed it up (see below) and can carry the fix as necessary (no action
+>> is required).
+>
+> Also drivers/phy/Makefile
+>
+> --
+> Cheers,
+> Stephen Rothwell                    sfr at canb.auug.org.au
+>
+> diff --cc drivers/phy/Makefile
+> index 241c741e6e39,971ad0aac388..000000000000
+> --- a/drivers/phy/Makefile
+> +++ b/drivers/phy/Makefile
+> @@@ -18,8 -21,7 +21,10 @@@ phy-exynos-usb2-y                    += phy-samsung-usb2
+>   phy-exynos-usb2-$(CONFIG_PHY_EXYNOS4210_USB2) += phy-exynos4210-usb2.o
+>   phy-exynos-usb2-$(CONFIG_PHY_EXYNOS4X12_USB2) += phy-exynos4x12-usb2.o
+>   phy-exynos-usb2-$(CONFIG_PHY_EXYNOS5250_USB2) += phy-exynos5250-usb2.o
+>  +phy-exynos-usb2-$(CONFIG_PHY_S5PV210_USB2)    += phy-s5pv210-usb2.o
+>   obj-$(CONFIG_PHY_EXYNOS5_USBDRD)      += phy-exynos5-usbdrd.o
+>   obj-$(CONFIG_PHY_XGENE)                       += phy-xgene.o
+>  +obj-$(CONFIG_PHY_ST_SPEAR1310_MIPHY)  += phy-spear1310-miphy.o
+>  +obj-$(CONFIG_PHY_ST_SPEAR1340_MIPHY)  += phy-spear1340-miphy.o
+> + obj-$(CONFIG_PHY_QCOM_APQ8064_SATA)   += phy-qcom-apq8064-sata.o
+> + obj-$(CONFIG_PHY_QCOM_IPQ806X_SATA)   += phy-qcom-ipq806x-sata.o
 
-Shouldn't this should be intialised to NULL explicitly?
 
-Thanks,
-Mark.
+We've both been sinners here. New entries should be added in
+alphabetical order to avoid these conflicts, and neither of us caught
+it.
+
+Resolution looks OK though.
+
+
+-Olof
