@@ -1,28 +1,74 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Thu, 24 Jul 2014 16:16:28 +0100
-Subject: [PATCH v5 3/3] arm64: Add seccomp support
-In-Reply-To: <CALCETrWTDS7VSyuR5wgGxpu-_YMWVUVmv9ht6t1tCSX=GA46cQ@mail.gmail.com>
-References: <1406020499-5537-1-git-send-email-takahiro.akashi@linaro.org>
- <1406020499-5537-4-git-send-email-takahiro.akashi@linaro.org>
- <53D082E9.8090303@amacapital.net> <53D09C4F.9010104@linaro.org>
- <CALCETrWTDS7VSyuR5wgGxpu-_YMWVUVmv9ht6t1tCSX=GA46cQ@mail.gmail.com>
-Message-ID: <20140724151628.GH13371@arm.com>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Thu, 24 Jul 2014 16:21:04 +0100
+Subject: [PATCH 09/19] ARM64 / ACPI: Move the initialization of
+ cpu_logical_map(0) before acpi_boot_init()
+In-Reply-To: <1406206825-15590-10-git-send-email-hanjun.guo@linaro.org>
+References: <1406206825-15590-1-git-send-email-hanjun.guo@linaro.org>
+ <1406206825-15590-10-git-send-email-hanjun.guo@linaro.org>
+Message-ID: <20140724152103.GB26190@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jul 24, 2014 at 04:00:03PM +0100, Andy Lutomirski wrote:
-> On Jul 23, 2014 10:40 PM, "AKASHI Takahiro" <takahiro.akashi@linaro.org> wrote:
-> > when I implemented audit for arm64, the assumptions were
-> > * If userspace is LE, then the kernel is also LE and if BE, then the kernel is BE.
-> > * the syscall numbers and how arguments are encoded are the same btw BE and LE.
-> > So syscall_get_arch() always return the same value.
+On Thu, Jul 24, 2014 at 02:00:15PM +0100, Hanjun Guo wrote:
+> Move the initialization of cpu_logical_map(0) before acpi_boot_init()
+> to remove the duplicated initialization of cpu_logical_map(0).
+
+It always make sense to initialise CPU0's logical map entry from the
+hardware values, so you could do this earlier in the series, before you
+introduce any ACPI code. Then you don't have the churn in acpi.c
+
 > 
-> If arm64 ever adds support for mixed-endian userspace, this could
-> become awkward.  Hmm.
+> Signed-off-by: Hanjun Guo <hanjun.guo@linaro.org>
+> ---
+>  arch/arm64/kernel/acpi.c  |    3 ---
+>  arch/arm64/kernel/setup.c |    3 ++-
+>  2 files changed, 2 insertions(+), 4 deletions(-)
+> 
+> diff --git a/arch/arm64/kernel/acpi.c b/arch/arm64/kernel/acpi.c
+> index 801e268..ff0f6a0 100644
+> --- a/arch/arm64/kernel/acpi.c
+> +++ b/arch/arm64/kernel/acpi.c
+> @@ -244,9 +244,6 @@ int __init acpi_boot_init(void)
+>  	if (err)
+>  		pr_err("Can't find FADT\n");
+>  
+> -	/* Get the boot CPU's MPIDR before MADT parsing */
+> -	cpu_logical_map(0) = read_cpuid_mpidr() & MPIDR_HWID_BITMASK;
+> -
+>  	err = acpi_parse_madt_gic_cpu_interface_entries();
+>  
+>  	return err;
+> diff --git a/arch/arm64/kernel/setup.c b/arch/arm64/kernel/setup.c
+> index e00d40c..17ab98e 100644
+> --- a/arch/arm64/kernel/setup.c
+> +++ b/arch/arm64/kernel/setup.c
+> @@ -394,13 +394,14 @@ void __init setup_arch(char **cmdline_p)
+>  
+>  	efi_idmap_init();
+>  
+> +	/* Get the boot CPU's MPIDR before cpu logical map is built */
 
-I really doubt we would ever support mixed endian user space. Too many
-problems with translating syscalls, futexes (someone looked into this
-and gave up eventually).
+That comment's a bit useless; I think it can just be dropped.
 
--- 
-Catalin
+All you need to do is move the initialisation of cpu_logical_map(0)
+before unflatten_device_tree(). When you introduce acpi_boot_init(),
+place it after the initialisation.
+
+Thanks,
+Mark.
+
+> +	cpu_logical_map(0) = read_cpuid_mpidr() & MPIDR_HWID_BITMASK;
+>  	acpi_boot_init();
+>  
+>  	unflatten_device_tree();
+>  
+>  	psci_init();
+>  
+> -	cpu_logical_map(0) = read_cpuid_mpidr() & MPIDR_HWID_BITMASK;
+>  	cpu_read_bootcpu_ops();
+>  #ifdef CONFIG_SMP
+>  	smp_init_cpus();
+> -- 
+> 1.7.9.5
+> 
+> 
