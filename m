@@ -1,46 +1,41 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Thu, 24 Jul 2014 04:51:41 -0700
-Subject: [GIT PULL] non-urgent omap fixes for v3.17 merge window
-Message-ID: <20140724115140.GB29045@atomide.com>
+From: cyrille.pitchen@atmel.com (Cyrille Pitchen)
+Date: Thu, 24 Jul 2014 13:51:03 +0200
+Subject: [PATCH v2 6/6] net/macb: enable scatter-gather feature and set DMA
+ burst length for sama5d4 gem
+In-Reply-To: <cover.1406192657.git.cyrille.pitchen@atmel.com>
+References: <cover.1406192657.git.cyrille.pitchen@atmel.com>
+Message-ID: <1918ae71a967c7c58ebd3e0a96fdc0aebde54e80.1406192657.git.cyrille.pitchen@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The following changes since commit cd3de83f147601356395b57a8673e9c5ff1e59d1:
+Signed-off-by: Cyrille Pitchen <cyrille.pitchen@atmel.com>
+---
+ drivers/net/ethernet/cadence/macb.c | 6 ++++++
+ 1 file changed, 6 insertions(+)
 
-  Linux 3.16-rc4 (2014-07-06 12:37:51 -0700)
-
-are available in the git repository at:
-
-  git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap tags/omap-for-v3.17/fixes-not-urgent-signed
-
-for you to fetch changes up to 00e4e5b5b0339bde4b0ecb23d7d7969a3bebd44d:
-
-  Merge remote-tracking branch 'roger/for-v3.17/gpmc-omap' into omap-for-v3.17/fixes-not-urgent (2014-07-15 00:24:39 -0700)
-
-----------------------------------------------------------------
-
-Fixes for omaps that were not considered urgent enough for the
-rc series. Mostly a fix for GPMC allocation and omap5 ABB
-(Adaptive Body Bias).
-
-----------------------------------------------------------------
-Andrii.Tseglytskyi (1):
-      ARM: dts: OMAP5: Add device nodes for ABB
-
-Nicholas Krause (1):
-      omap16xx: Removes fixme no longer needed in ocpi_enable()
-
-Rickard Strandqvist (1):
-      ARM: omap2+: usb-tusb6010.c: Cleaning up variable is set more than once
-
-Rostislav Lisovy (1):
-      ARM: omap2+: gpmc-nand: Use dynamic platform_device_alloc()
-
-Tony Lindgren (1):
-      Merge remote-tracking branch 'roger/for-v3.17/gpmc-omap' into omap-for-v3.17/fixes-not-urgent
-
- arch/arm/boot/dts/omap5.dtsi       | 60 +++++++++++++++++++++++++++++
- arch/arm/mach-omap1/ocpi.c         |  1 -
- arch/arm/mach-omap2/gpmc-nand.c    | 79 ++++++++++++++++++--------------------
- arch/arm/mach-omap2/usb-tusb6010.c |  1 -
- 4 files changed, 97 insertions(+), 44 deletions(-)
+diff --git a/drivers/net/ethernet/cadence/macb.c b/drivers/net/ethernet/cadence/macb.c
+index 6836f88..ca5d779 100644
+--- a/drivers/net/ethernet/cadence/macb.c
++++ b/drivers/net/ethernet/cadence/macb.c
+@@ -2005,6 +2005,11 @@ static struct macb_config sama5d3_config = {
+ 	.dma_burst_length = 16,
+ };
+ 
++static struct macb_config sama5d4_config = {
++	.caps = 0,
++	.dma_burst_length = 4,
++};
++
+ static const struct of_device_id macb_dt_ids[] = {
+ 	{ .compatible = "cdns,at32ap7000-macb" },
+ 	{ .compatible = "cdns,at91sam9260-macb" },
+@@ -2012,6 +2017,7 @@ static const struct of_device_id macb_dt_ids[] = {
+ 	{ .compatible = "cdns,pc302-gem", .data = &pc302gem_config },
+ 	{ .compatible = "cdns,gem", .data = &pc302gem_config },
+ 	{ .compatible = "atmel,sama5d3-gem", .data = &sama5d3_config },
++	{ .compatible = "atmel,sama5d4-gem", .data = &sama5d4_config },
+ 	{ /* sentinel */ }
+ };
+ MODULE_DEVICE_TABLE(of, macb_dt_ids);
+-- 
+1.8.2.2
