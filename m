@@ -1,24 +1,32 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 24 Jul 2014 14:07:43 +0200
-Subject: [GIT PULL] Few regression fixes for omaps for v3.16-rc series
-In-Reply-To: <20140724114348.GA29045@atomide.com>
-References: <20140724114348.GA29045@atomide.com>
-Message-ID: <5087610.iA71nMtfdT@wuerfel>
+From: jason@lakedaemon.net (Jason Cooper)
+Date: Thu, 24 Jul 2014 08:11:37 -0400
+Subject: [PATCH 2/2] ARM: mvebu: Added dts defintion for Lenovo Iomega
+ ix4-300d NAS
+In-Reply-To: <20140723234256.GN23220@titan.lakedaemon.net>
+References: <1406155973-13657-1-git-send-email-yahoo@perenite.com>
+ <20140723232715.GL23220@titan.lakedaemon.net>
+ <20140723232909.GE28485@lunn.ch>
+ <20140723234256.GN23220@titan.lakedaemon.net>
+Message-ID: <20140724121137.GU23220@titan.lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday 24 July 2014 04:43:49 Tony Lindgren wrote:
-> Two regression fixes for omaps and one fix for device signaling:
-> 
-> - L2 cache regression fix for a warning about trying to access
->   a read-only register
-> 
-> - GPMC ECC software fallback regression fix for omap3
-> 
-> - Fix for dra7 pinctrl pull-up direction that causes signal issues
->   for anybody trying to use the internal pull up or down
-> 
+Benoit,
 
-Merged into the fixes branch, thanks!
+> On Thu, Jul 24, 2014 at 01:29:09AM +0200, Andrew Lunn wrote:
+> > 
+> > We should not really leave the i2c compatibility string as it is.
+> > 
 
-	Arnd
+If you were to apply
+
+  ed2d859119f9 ARM: mvebu: Fix broken SoC ID detection
+
+And then remove the -a0 i2c compatible string, does your board boot?
+
+The referenced patch has been in mainline since v3.16-rc3, so you could
+just try that kernel w/o the compatible string.
+
+thx,
+
+Jason.
