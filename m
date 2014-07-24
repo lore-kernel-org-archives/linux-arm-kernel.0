@@ -1,62 +1,51 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Thu, 24 Jul 2014 09:08:21 -0700
-Subject: next build: 629 warnings 1 failures (next/next-20140723)
-In-Reply-To: <20140724132448.GB13371@arm.com>
-References: <53cf8323.e4b6440a.7d37.4f75@mx.google.com>
- <CAOesGMhT9n7nVbCay5cU74pv2qrbqMooZLoY923Lk6SzXk5z+A@mail.gmail.com>
- <20140724085037.GB1994@arm.com> <20140724104318.GA13371@arm.com>
- <20140724132448.GB13371@arm.com>
-Message-ID: <CAOesGMhhB7pEA18aSJCQYtxpuqAXEdskMGAwzXfZJf9UY3aemQ@mail.gmail.com>
+From: sam@ravnborg.org (Sam Ravnborg)
+Date: Thu, 24 Jul 2014 18:12:25 +0200
+Subject: [PATCH] arm64/crypto: fix makefile rule for aes-glue-%.o
+In-Reply-To: <CAKv+Gu-B9_sgGgw9obrBGNUFSS1JcskN34s1X4PU8F5bauHT1Q@mail.gmail.com>
+References: <mvmr4264i1p.fsf@hawking.suse.de>
+ <CAKv+Gu8SbM_Z=ymBFb2D4EWJeo-6dWuKqE2YNOkqJTKLDEJcYA@mail.gmail.com>
+ <mvm4my7j5xh.fsf@hawking.suse.de>
+ <CAKv+Gu-6rUxUnF+dRuroDJqy2K2B5F0r7_bm0X-vyiuQ-83W5w@mail.gmail.com>
+ <CAKv+Gu96k7GOVR85EXtro3Lt0jjiJqxyvT9cwJZ1qc6uzq97bw@mail.gmail.com>
+ <mvmvbqmj3b2.fsf@hawking.suse.de>
+ <CAKv+Gu_9HRwAxkJjT3KRvDbupp0yzstyq1dXsXkTu9M6swdCKQ@mail.gmail.com>
+ <mvmr41aj2ob.fsf@hawking.suse.de>
+ <CAKv+Gu_z4VTssLDhiQxi8DRJNEUgzrM5bFzje8NXEmBiA2vqeg@mail.gmail.com>
+ <CAKv+Gu-B9_sgGgw9obrBGNUFSS1JcskN34s1X4PU8F5bauHT1Q@mail.gmail.com>
+Message-ID: <20140724161225.GA11204@ravnborg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jul 24, 2014 at 6:24 AM, Catalin Marinas
-<catalin.marinas@arm.com> wrote:
-> On Thu, Jul 24, 2014 at 11:43:18AM +0100, Catalin Marinas wrote:
->> On Thu, Jul 24, 2014 at 09:50:37AM +0100, Will Deacon wrote:
->> > On Thu, Jul 24, 2014 at 12:27:30AM +0100, Olof Johansson wrote:
->> > > I'm building with a vanilla gcc 4.8.2 / binutils 2.23.2. That
->> > > shouldn't be broken like this, so those changes should be fixed (or
->> > > minimal toolchain expecations need to be documented -- but there
->> > > really is no good reason to require 4.9.0/2.24).
->> >
->> > These all come from the GICv3 driver, so it's not going to be a lot of fun
->> > fixing them. You'd have to introduce a macro for generating the system-reg
->> > accesses (for both C and asm), then switch the GIC driver and the arch code
->> > over to using that.
->>
->> We may need to document that enabling GICv3 requires a newer toolchain.
->>
->> Otherwise, my years old macros ;) (adapted here and untested):
-> [...]
->> But I'll let Marc comment when he gets back from holiday (I'm pretty
->> sure he will enjoy it ;))
->
-> Saving Marc some time:
->
-> ------------8<--------------------------------
->
-> From 3acb8b49aeba9f48153a2d719dec05d0b862e285 Mon Sep 17 00:00:00 2001
-> From: Catalin Marinas <catalin.marinas@arm.com>
-> Date: Thu, 24 Jul 2014 14:14:42 +0100
-> Subject: [PATCH] arm64: gicv3: Allow GICv3 compilation with older binutils
->
-> GICv3 introduces new system registers accessible with the full msr/mrs
-> syntax (e.g. mrs x0, Sx_op0_op1_CRm_CRn_op2). However, only recent
-> binutils understand the new syntax. This patch introduces msr_s/mrs_s
-> assembly macros which generate the equivalent instructions above and
-> converts the existing GICv3 code (both drivers/irqchip/ and
-> arch/arm64/kernel/).
->
-> Signed-off-by: Catalin Marinas <catalin.marinas@arm.com>
-> Suggested-by: Mark Rutland <mark.rutland@arm.com>
-> Reported-by: Olof Johansson <olof@lixom.net>
-> Cc: Will Deacon <will.deacon@arm.com>
-> Cc: Marc Zyngier <marc.zyngier@arm.com>
+On Thu, Jul 24, 2014 at 04:24:48PM +0200, Ard Biesheuvel wrote:
+> On 24 July 2014 16:18, Ard Biesheuvel <ard.biesheuvel@linaro.org> wrote:
+> > On 24 July 2014 15:40, Andreas Schwab <schwab@suse.de> wrote:
+> >> Ard Biesheuvel <ard.biesheuvel@linaro.org> writes:
+> >>
+> >>> On 24 July 2014 15:26, Andreas Schwab <schwab@suse.de> wrote:
+> >>>> You are not using CONFIG_MODVERSIONS.
+> >>>>
+> >>>
+> >>> I am
+> >>
+> >> No, you aren't, since you say that your .cmd contains a command to
+> >> create aes-glue-ce.o, which with CONFIG_MODVERSIONS it doesn't.
+> >>
+> >
+> > OK, you're right, it contains a command to create .tmp_aes-glue-ce.o.
+> > But I am still not seeing the error you are seeing, strangely enough.
+> 
+> OK, now I am seeing it.
+> 
+> Acked-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
 
-Tested-by: Olof Johansson <olof@lixom.net>
+Jumping in the end of the thread here - sorry for that.
 
+Another way to solve this would be to create two
+small wrapper files:
+aes-glue-neon.c - which include aes-glue.c
+aes-glue-ce.c that include aes-glue.c
 
-Thanks!
+Then you could use standard kbuild support for building your module.
+And we will not potentially break it when we change cc_o_c in the near future.
 
--Olof
+	Sam
