@@ -1,32 +1,24 @@
 From: detheridge@ti.com (Darren Etheridge)
-Date: Thu, 24 Jul 2014 14:35:23 -0500
-Subject: [PATCH RFA 1/2] drm/i2c: tda998x: allow re-use of tda998x support
- code
-In-Reply-To: <E1XAKSc-0004YT-4Q@rmk-PC.arm.linux.org.uk>
-References: <E1XAKSc-0004YT-4Q@rmk-PC.arm.linux.org.uk>
-Message-ID: <53D15FFB.2040804@ti.com>
+Date: Thu, 24 Jul 2014 14:36:20 -0500
+Subject: [PATCH RFA 2/2] drm/i2c: tda998x: add component support
+In-Reply-To: <E1XAKSh-0004YX-7c@rmk-PC.arm.linux.org.uk>
+References: <E1XAKSh-0004YX-7c@rmk-PC.arm.linux.org.uk>
+Message-ID: <53D16034.1040508@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 On 07/24/2014 09:57 AM, Russell King wrote:
-> Re-jig the TDA998x code so that we separate the functionality from the
-> drm slave encoder implementation.  In several places, this is pretty
-> clearly the correct thing to do, because we can avoid repetitively
-> having to convert from the drm_encoder to the TDA998x private
-> structure, particularly with the driver internal functions.
+> Add component helper support to the tda998x driver.  This permits the
+> TDA998x to be declared as a separate device in device tree, and bound
+> at the appropriate moment with a co-operating card driver.
 >
-> The main motivation behind this change is to allow the code to be
-> re-used with a standard drm_encoder and drm_connector implementation
-> based on the component helpers, rather than the slave_encoder system.
-> The addition of this will be in the following patch.
->
-> We keep the slave_encoder interface as there are existing users of
-> this; we need to give them time to convert and test.
+> The existing slave_encoder interfaces are kept while there are existing
+> users of it in order to prevent regressions.
 >
 > Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
 > ---
-> RFA = request for acks, but tested-by's would also be great,
-> particularly from the tilcdc folk.
+> RFA = request for acks, but tested-by's are also welcome, particularly
+> for tilcdc hardware.
 >
 
 Works fine on BeagleBone Black (tilcdc + tda998x)
