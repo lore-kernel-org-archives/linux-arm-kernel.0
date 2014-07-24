@@ -1,53 +1,56 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Thu, 24 Jul 2014 10:57:19 +0900
-Subject: [PATCH] ARM: shmobile: r8a7791: Fix SD2CKCR register address
-In-Reply-To: <cover.1406162627.git.horms+renesas@verge.net.au>
-References: <cover.1406162627.git.horms+renesas@verge.net.au>
-Message-ID: <c9b227723d051184b9e78f20c75ae2f9d44a6ea2.1406162627.git.horms+renesas@verge.net.au>
+Date: Thu, 24 Jul 2014 10:57:15 +0900
+Subject: [GIT PULL] Second Round of Renesas ARM Based SoC Fixes for v3.16
+Message-ID: <cover.1406162627.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Shinobu Uehara <shinobu.uehara.xc@renesas.com>
+Hi Olof, Hi Kevin, Hi Arnd,
 
-59e79895b95892863617ce630fbda467f2470575
-(ARM: shmobile: r8a7791: Add clocks)
-added r8a7791 SD clocks when v3.14.
+Please consider these second round of Renesas ARM based SoC fixes for v3.16.
 
-2c60a7df72711fb8b4be1e6aa651ab166a8931bc
-(ARM: shmobile: Add SDHI devices for Koelsch DTS)
-enabled SD on r8a7791 Koelsch when v3.15.
+The first round of fixes was prior to the release of v3.16-rc1 so
+this pull-request is based on v3.16-rc1.
 
-1299df03d7191ab4356c995dde8b912d3c8922e9
-(ARM: shmobile: henninger: add SDHI0/2 DT support)
-enable SD on r8a7791 Henninger when v3.16.
+I would like this change considered for v3.15-stable.
+I can handle submitting it there if you like.
 
-But r8a7791 SD clock had wrong address.
-This patch fixup it.
+I do not think it is necessary to consider it for v3.14-stable
+as although the incorrect code is present there it is not exercised
+in that release.
 
-[Kuninori Morimoto: tidyup for upstreaming]
 
-Signed-off-by: Shinobu Uehara <shinobu.uehara.xc@renesas.com>
-Signed-off-by: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
-Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
----
+The following changes since commit 7171511eaec5bf23fb06078f59784a3a0626b38f:
+
+  Linux 3.16-rc1 (2014-06-15 17:45:28 -1000)
+
+are available in the git repository at:
+
+  git://git.kernel.org/pub/scm/linux/kernel/git/horms/renesas.git tags/renesas-fixes2-for-v3.16
+
+for you to fetch changes up to c9b227723d051184b9e78f20c75ae2f9d44a6ea2:
+
+  ARM: shmobile: r8a7791: Fix SD2CKCR register address (2014-07-23 08:55:12 +0900)
+
+----------------------------------------------------------------
+Second Round of Renesas ARM Based SoC Fixes for v3.16
+
+* Fix SD2CKCR register address of r8a7791 (R-Car M2) SoC
+
+  This corrects a bug introduced in v3.14 by
+  59e79895b9589286 ("ARM: shmobile: r8a7791: Add clocks").
+
+  However, it does not manifest in mainline code until
+  SDHI devices were enabled on the Koelsch board in v3.15 by
+  2c60a7df72711fb8 ("ARM: shmobile: Add SDHI devices for Koelsch DTS").
+
+  It also manifests on the Henninger board when
+  SDHI devices were enabled in v3.16-rc1 by
+  1299df03d7191ab4 ("ARM: shmobile: henninger: add SDHI0/2 DT support")
+
+----------------------------------------------------------------
+Shinobu Uehara (1):
+      ARM: shmobile: r8a7791: Fix SD2CKCR register address
+
  arch/arm/boot/dts/r8a7791.dtsi | 4 ++--
  1 file changed, 2 insertions(+), 2 deletions(-)
-
-diff --git a/arch/arm/boot/dts/r8a7791.dtsi b/arch/arm/boot/dts/r8a7791.dtsi
-index 8d7ffae..79f68ac 100644
---- a/arch/arm/boot/dts/r8a7791.dtsi
-+++ b/arch/arm/boot/dts/r8a7791.dtsi
-@@ -540,9 +540,9 @@
- 			#clock-cells = <0>;
- 			clock-output-names = "sd1";
- 		};
--		sd2_clk: sd3_clk at e615007c {
-+		sd2_clk: sd3_clk at e615026c {
- 			compatible = "renesas,r8a7791-div6-clock", "renesas,cpg-div6-clock";
--			reg = <0 0xe615007c 0 4>;
-+			reg = <0 0xe615026c 0 4>;
- 			clocks = <&pll1_div2_clk>;
- 			#clock-cells = <0>;
- 			clock-output-names = "sd2";
--- 
-2.0.1
