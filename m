@@ -1,276 +1,157 @@
-From: l.majewski@samsung.com (Lukasz Majewski)
-Date: Thu, 24 Jul 2014 09:04:02 +0200
-Subject: [PATCH v2] cpufreq: tests: Providing cpufreq regression test
-In-Reply-To: <3777635.Nvoh2EpFlu@vostro.rjw.lan>
-References: <1405678985-21677-1-git-send-email-l.majewski@samsung.com>
- <1405926154-27214-1-git-send-email-l.majewski@samsung.com>
- <3777635.Nvoh2EpFlu@vostro.rjw.lan>
-Message-ID: <20140724090402.1f981470@amdc2363>
+From: sfr@canb.auug.org.au (Stephen Rothwell)
+Date: Thu, 24 Jul 2014 17:07:55 +1000
+Subject: linux-next: build failure after merge of the usb tree
+Message-ID: <20140724170755.035cea1c@canb.auug.org.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Rafael,
+Hi Greg,
 
-> On Monday, July 21, 2014 09:02:34 AM Lukasz Majewski wrote:
-> > This commit adds first regression test "cpufreq_freq_test.sh" for
-> > the cpufreq subsystem.
-> 
-> First of all, I'm not seeing any explanation why this script should be
-> shipped with the kernel.
+After merging the usb tree, today's linux-next build (x86_64 allmodconfig)
+failed like this:
 
-OK.
+drivers/phy/phy-spear1310-miphy.c: In function 'spear1310_miphy_probe':
+drivers/phy/phy-spear1310-miphy.c:232:14: warning: passing argument 2 of 'devm_phy_create' from incompatible pointer type
+  priv->phy = devm_phy_create(dev, &spear1310_miphy_ops, NULL);
+              ^
+In file included from drivers/phy/phy-spear1310-miphy.c:21:0:
+include/linux/phy/phy.h:164:13: note: expected 'struct device_node *' but argument is of type 'struct phy_ops *'
+ struct phy *devm_phy_create(struct device *dev, struct device_node *node,
+             ^
+drivers/phy/phy-spear1310-miphy.c:232:14: error: too few arguments to function 'devm_phy_create'
+  priv->phy = devm_phy_create(dev, &spear1310_miphy_ops, NULL);
+              ^
+In file included from drivers/phy/phy-spear1310-miphy.c:21:0:
+include/linux/phy/phy.h:164:13: note: declared here
+ struct phy *devm_phy_create(struct device *dev, struct device_node *node,
+             ^
+drivers/phy/phy-spear1340-miphy.c: In function 'spear1340_miphy_probe':
+drivers/phy/phy-spear1340-miphy.c:264:14: warning: passing argument 2 of 'devm_phy_create' from incompatible pointer type
+  priv->phy = devm_phy_create(dev, &spear1340_miphy_ops, NULL);
+              ^
+In file included from drivers/phy/phy-spear1340-miphy.c:21:0:
+include/linux/phy/phy.h:164:13: note: expected 'struct device_node *' but argument is of type 'struct phy_ops *'
+ struct phy *devm_phy_create(struct device *dev, struct device_node *node,
+             ^
+drivers/phy/phy-spear1340-miphy.c:264:14: error: too few arguments to function 'devm_phy_create'
+  priv->phy = devm_phy_create(dev, &spear1340_miphy_ops, NULL);
+              ^
+In file included from drivers/phy/phy-spear1340-miphy.c:21:0:
+include/linux/phy/phy.h:164:13: note: declared here
+ struct phy *devm_phy_create(struct device *dev, struct device_node *node,
+             ^
 
-> 
-> What regressions it tests against in particular and 
+Caused by commit f0ed817638b5 ("phy: core: Let node ptr of PHY point to
+PHY and not of PHY provider") interacting with commit 64562e99477f
+("phy: Add drivers for PCIe and SATA phy on SPEAr13xx") from the
+arm-soc tree.
 
-Do you require SHA's/commit messages of commits which were developed to
-fix issues spotted with this test script?
+I fixed that up and then got:
 
-> how it does that.
+drivers/pinctrl/pinctrl-tegra-xusb.c: In function 'tegra_xusb_padctl_probe':
+drivers/pinctrl/pinctrl-tegra-xusb.c:913:8: warning: passing argument 2 of 'devm_phy_create' from incompatible pointer type
+  phy = devm_phy_create(&pdev->dev, &pcie_phy_ops, NULL);
+        ^
+In file included from drivers/pinctrl/pinctrl-tegra-xusb.c:18:0:
+include/linux/phy/phy.h:164:13: note: expected 'struct device_node *' but argument is of type 'const struct phy_ops *'
+ struct phy *devm_phy_create(struct device *dev, struct device_node *node,
+             ^
+drivers/pinctrl/pinctrl-tegra-xusb.c:913:8: error: too few arguments to function 'devm_phy_create'
+  phy = devm_phy_create(&pdev->dev, &pcie_phy_ops, NULL);
+        ^
+In file included from drivers/pinctrl/pinctrl-tegra-xusb.c:18:0:
+include/linux/phy/phy.h:164:13: note: declared here
+ struct phy *devm_phy_create(struct device *dev, struct device_node *node,
+             ^
+drivers/pinctrl/pinctrl-tegra-xusb.c:922:8: warning: passing argument 2 of 'devm_phy_create' from incompatible pointer type
+  phy = devm_phy_create(&pdev->dev, &sata_phy_ops, NULL);
+        ^
+In file included from drivers/pinctrl/pinctrl-tegra-xusb.c:18:0:
+include/linux/phy/phy.h:164:13: note: expected 'struct device_node *' but argument is of type 'const struct phy_ops *'
+ struct phy *devm_phy_create(struct device *dev, struct device_node *node,
+             ^
+drivers/pinctrl/pinctrl-tegra-xusb.c:922:8: error: too few arguments to function 'devm_phy_create'
+  phy = devm_phy_create(&pdev->dev, &sata_phy_ops, NULL);
+        ^
+In file included from drivers/pinctrl/pinctrl-tegra-xusb.c:18:0:
+include/linux/phy/phy.h:164:13: note: declared here
+ struct phy *devm_phy_create(struct device *dev, struct device_node *node,
+             ^
 
-Is this information required in the commit message or can it stay in
-the README file created in the same commit?
+>From an interaction with commit dc0a39386687 ("pinctrl: Add NVIDIA
+Tegra XUSB pad controller support") from the arm-soc tree.
 
-> 
-> Please write that down in the changelog.  It doesn't need to be very
-> detailed.
-> 
-> Second, I'm not sure this is the first such test (someone already
-> mentioned cpupower).
+Final merge fix patch:
 
-It's no problem for me to add such scripts to other work.
+From: Stephen Rothwell <sfr@canb.auug.org.au>
+Date: Thu, 24 Jul 2014 16:55:16 +1000
+Subject: [PATCH] phy: fix up for devm_phy_create api change
 
-> 
-> > Signed-off-by: Lukasz Majewski <l.majewski@samsung.com>
-> > 
-> > ---
-> > Changes for v2:
-> > - Replace *_PATCH with *_PATH for variables names
-> > - Corrected mistakes in the README file
-> > - Providing detailed explanation of the patch in the README file
-> > ---
-> >  drivers/cpufreq/tests/README               |  33 +++++++
-> >  drivers/cpufreq/tests/cpufreq_freq_test.sh | 149
-> > +++++++++++++++++++++++++++++ 2 files changed, 182 insertions(+)
-> >  create mode 100644 drivers/cpufreq/tests/README
-> >  create mode 100755 drivers/cpufreq/tests/cpufreq_freq_test.sh
-> > 
-> > diff --git a/drivers/cpufreq/tests/README
-> > b/drivers/cpufreq/tests/README
-> 
-> drivers/cpufreq/ is not a place for scripts.
-> 
-> We have scripts/ for that and you can add a "power" subdirectory in
-> there and put your script into it.
-> 
-> Alternatively, you can use the existing tools/power/ directory for
-> that (but then please add a subdirectory for your script).
+Signed-off-by: Stephen Rothwell <sfr@canb.auug.org.au>
+---
+ drivers/phy/phy-spear1310-miphy.c    | 2 +-
+ drivers/phy/phy-spear1340-miphy.c    | 2 +-
+ drivers/pinctrl/pinctrl-tegra-xusb.c | 4 ++--
+ 3 files changed, 4 insertions(+), 4 deletions(-)
 
-Ok.
-
-> 
-> > new file mode 100644
-> > index 0000000..3e9cd80
-> > --- /dev/null
-> > +++ b/drivers/cpufreq/tests/README
-> > @@ -0,0 +1,33 @@
-> > +This file contains list of cpufreq's available regression tests
-> > with a short +usage description.
-> > +
-> > +1. cpufreq_freq_test.sh
-> > +
-> > +Description:
-> > +------------
-> > +This script is supposed to test if cpufreq attributes exported by
-> > sysfs are +exposing correct values.
-> > +
-> > +To achieve this goal it saves the current governor and changes it
-> > to +"performance". Afterwards, it reads the
-> > "scaling_available_frequencies" +property. With the list of
-> > supported frequencies it is able to enforce each of +them by
-> > writing to "scaling_max_freq" attribute. To make the test more
-> > reliable +a superfluous load with gzip is created to be sure that
-> > we are running with +highest possible frequency. This high load is
-> > regulated with the 'sleep' +duration. After this time the
-> > "cpufreq_cur_freq" is read and compared with the +original value.
-> > As the last step the original governor is restored. + +This script
-> > can work with or without BOOST enabled and helps in spotting errors
-> > +related to cpufreq and common clock framework. +
-> > +Used attributes:
-> > +----------------
-> > +- "scaling_available_frequencies"
-> > +- "cpuinfo_cur_freq"
-> > +- "scaling_governor"
-> > +- "scaling_max_freq"
-> > +
-> > +Target devices:
-> > +---------------
-> > +
-> > +All devices which exports mentioned above sysfs attributes.
-> > \ No newline at end of file
-> > diff --git a/drivers/cpufreq/tests/cpufreq_freq_test.sh
-> > b/drivers/cpufreq/tests/cpufreq_freq_test.sh new file mode 100755
-> > index 0000000..c25f05c
-> > --- /dev/null
-> > +++ b/drivers/cpufreq/tests/cpufreq_freq_test.sh
-> > @@ -0,0 +1,149 @@
-> > +#!/bin/bash
-> > +#
-> > +# This file provides a simple mean to test if all declared freqs at
-> > +# "scaling_available_frequencies" can be set and if
-> > "cpuinfo_cur_freq" +# returns this value.
-> > +#
-> > +# Usage: ./cpufreq_freq_test.sh
-> > +# Requisite: Compiled in "performance" governor
-> > +#
-> > +# This program is free software; you can redistribute it and/or
-> > modify +# it under the terms of the GNU General Public License as
-> > published by +# the Free Software Foundation; either version 2 of
-> > the License, or +# (at your option) any later version.
-> > +#
-> > +# This program is distributed in the hope that it will be useful,
-> > +# but WITHOUT ANY WARRANTY; without even the implied warranty of
-> > +# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-> > +# GNU General Public License for more details.
-> > +#
-> > +# You should have received a copy of the GNU General Public License
-> > +# along with this program; if not, you can access it online at
-> > +# http://www.gnu.org/licenses/gpl-2.0.html.
-> > +#
-> > +# Copyright (C) Samsung Electronics, 2014
-> > +#
-> > +# Author: Lukasz Majewski <l.majewski@samsung.com>
-> > +
-> > +set +x
-> > +
-> > +COLOUR_RED="\33[31m"
-> > +COLOUR_BLUE="\33[34m"
-> > +COLOUR_GREEN="\33[32m"
-> > +COLOUR_DEFAULT="\33[0m"
-> > +
-> > +T_PATH=/sys/devices/system/cpu/cpu0/cpufreq
-> > +BOOST_PATH=/sys/devices/system/cpu/cpufreq
-> > +
-> > +if [ ! -d "$T_PATH" ]; then
-> > +    printf "   $COLOUR_RED No path to CPUFREQ $COLOUR_DEFAULT\n"
-> > +    exit 1
-> > +fi
-> > +
-> > +ERRORS=0
-> > +
-> > +OLD_GOV=`cat $T_PATH/scaling_governor`
-> > +echo "CURRENT GOVERNOR: $OLD_GOV"
-> > +echo "SET GOVERNOR: performance"
-> > +echo "performance" > $T_PATH/scaling_governor
-> > +
-> > +function test_freqs1 {
-> > +    FREQS=`cat $1`
-> > +    for I in $FREQS; do
-> > +	cpufreq_set_freq $I
-> > +	if [ "$2" ]; then
-> > +	    printf "$COLOUR_BLUE BOOST $COLOUR_DEFAULT" $I
-> > +	fi
-> > +	cpufreq_test_freq $I
-> > +    done
-> > +}
-> > +
-> > +function test_freqs2 {
-> > +    FREQ=`cat $1`
-> > +    FREQS_ARRAY=($FREQ)
-> > +
-> > +    for freq in ${FREQS_ARRAY[@]}
-> > +    do
-> > +	echo "REFERENCE FREQ: $freq"
-> > +	for f in ${FREQS_ARRAY[@]}
-> > +	do
-> > +	    cpufreq_set_freq $freq
-> > +	    echo -n "----> "
-> > +	    cpufreq_set_freq $f
-> > +	    cpufreq_test_freq $f
-> > +	done
-> > +    done
-> > +}
-> > +
-> > +function restore {
-> > +    if [ -f $BOOST_PATH/boost ]; then
-> > +	cpufreq_boost_state $BOOST_STATE
-> > +    fi
-> > +
-> > +    echo "SET GOVERNOR: $OLD_GOV"
-> > +    echo $OLD_GOV > $T_PATH/scaling_governor
-> > +}
-> > +
-> > +function die {
-> > +    printf "   $COLOUR_RED FAILED $COLOUR_DEFAULT\n"
-> > +    restore_gov
-> > +    exit 1
-> > +}
-> > +
-> > +function cpufreq_test_freq {
-> > +    gzip < /dev/urandom > /dev/null &
-> > +    pid=$!
-> > +    sleep 0.1
-> > +    CURR_FREQ=`cat $T_PATH/cpuinfo_cur_freq`
-> > +    if [ $1 -eq $CURR_FREQ ]; then
-> > +	printf "\t$COLOUR_GREEN OK $COLOUR_DEFAULT\n"
-> > +    else
-> > +	printf "$COLOUR_RED CURRENT $CURR_FREQ $COLOUR_DEFAULT\n"
-> > +	ERRORS=`expr $ERRORS + 1`
-> > +	#die
-> > +    fi
-> > +    kill -9 $pid
-> > +    wait $! 2>/dev/null
-> > +}
-> > +
-> > +function cpufreq_set_freq {
-> > +    echo $1 > $T_PATH/scaling_max_freq || die $?
-> > +    printf "FREQ:$COLOUR_GREEN %s $COLOUR_DEFAULT" $1
-> > +}
-> > +
-> > +function cpufreq_boost_state {
-> > +   echo $1 > $BOOST_PATH/boost
-> > +}
-> > +
-> > +function cpufreq_boost_status {
-> > +   cat $BOOST_PATH/boost
-> > +}
-> > +
-> > +if [ -f $BOOST_PATH/boost ]; then
-> > +    echo "######################################"
-> > +    echo "TEST BOOST OPERATION"
-> > +    echo "######################################"
-> > +
-> > +    BOOST_STATE=$(cpufreq_boost_status)
-> > +    if [ $BOOST_STATE -eq 0 ]; then
-> > +	cpufreq_boost_state 1
-> > +    fi
-> > +    test_freqs1 $T_PATH/scaling_boost_frequencies 1
-> > +fi
-> > +
-> > +echo "######################################"
-> > +echo "TEST AVAILABLE FREQS"
-> > +echo "######################################"
-> > +test_freqs1 $T_PATH/scaling_available_frequencies
-> > +
-> > +echo "######################################"
-> > +echo "TEST FREQS SWITCHING"
-> > +echo "######################################"
-> > +test_freqs2 $T_PATH/scaling_available_frequencies
-> > +
-> > +echo "######################################"
-> > +echo "ERRORS: $ERRORS"
-> > +echo "######################################"
-> > +
-> > +restore
-> > +exit 0
-> > 
-> 
-
-
+diff --git a/drivers/phy/phy-spear1310-miphy.c b/drivers/phy/phy-spear1310-miphy.c
+index c58c869d57e0..6dcbfcddb372 100644
+--- a/drivers/phy/phy-spear1310-miphy.c
++++ b/drivers/phy/phy-spear1310-miphy.c
+@@ -229,7 +229,7 @@ static int spear1310_miphy_probe(struct platform_device *pdev)
+ 		return -EINVAL;
+ 	}
+ 
+-	priv->phy = devm_phy_create(dev, &spear1310_miphy_ops, NULL);
++	priv->phy = devm_phy_create(dev, NULL, &spear1310_miphy_ops, NULL);
+ 	if (IS_ERR(priv->phy)) {
+ 		dev_err(dev, "failed to create SATA PCIe PHY\n");
+ 		return PTR_ERR(priv->phy);
+diff --git a/drivers/phy/phy-spear1340-miphy.c b/drivers/phy/phy-spear1340-miphy.c
+index 8de98adf21c3..7135ba2603b6 100644
+--- a/drivers/phy/phy-spear1340-miphy.c
++++ b/drivers/phy/phy-spear1340-miphy.c
+@@ -261,7 +261,7 @@ static int spear1340_miphy_probe(struct platform_device *pdev)
+ 		return PTR_ERR(priv->misc);
+ 	}
+ 
+-	priv->phy = devm_phy_create(dev, &spear1340_miphy_ops, NULL);
++	priv->phy = devm_phy_create(dev, NULL, &spear1340_miphy_ops, NULL);
+ 	if (IS_ERR(priv->phy)) {
+ 		dev_err(dev, "failed to create SATA PCIe PHY\n");
+ 		return PTR_ERR(priv->phy);
+diff --git a/drivers/pinctrl/pinctrl-tegra-xusb.c b/drivers/pinctrl/pinctrl-tegra-xusb.c
+index 4a7daf577b49..a06620474845 100644
+--- a/drivers/pinctrl/pinctrl-tegra-xusb.c
++++ b/drivers/pinctrl/pinctrl-tegra-xusb.c
+@@ -910,7 +910,7 @@ static int tegra_xusb_padctl_probe(struct platform_device *pdev)
+ 		goto reset;
+ 	}
+ 
+-	phy = devm_phy_create(&pdev->dev, &pcie_phy_ops, NULL);
++	phy = devm_phy_create(&pdev->dev, NULL, &pcie_phy_ops, NULL);
+ 	if (IS_ERR(phy)) {
+ 		err = PTR_ERR(phy);
+ 		goto unregister;
+@@ -919,7 +919,7 @@ static int tegra_xusb_padctl_probe(struct platform_device *pdev)
+ 	padctl->phys[TEGRA_XUSB_PADCTL_PCIE] = phy;
+ 	phy_set_drvdata(phy, padctl);
+ 
+-	phy = devm_phy_create(&pdev->dev, &sata_phy_ops, NULL);
++	phy = devm_phy_create(&pdev->dev, NULL, &sata_phy_ops, NULL);
+ 	if (IS_ERR(phy)) {
+ 		err = PTR_ERR(phy);
+ 		goto unregister;
+-- 
+2.0.1
 
 -- 
-Best regards,
-
-Lukasz Majewski
-
-Samsung R&D Institute Poland (SRPOL) | Linux Platform Group
+Cheers,
+Stephen Rothwell                    sfr at canb.auug.org.au
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140724/8c977cb0/attachment.sig>
