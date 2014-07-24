@@ -1,39 +1,132 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Thu, 24 Jul 2014 14:57:50 +0200
-Subject: [PATCH 0/2] pinctrl: sunxi: misc improvements for gpio
-In-Reply-To: <CACRpkdZhZkB6=_ehVXxWAnvkVYy_KOU84fcGRSRTc9-2X2paqQ@mail.gmail.com>
-References: <1405358677-23657-1-git-send-email-wens@csie.org>
- <CACRpkdZhZkB6=_ehVXxWAnvkVYy_KOU84fcGRSRTc9-2X2paqQ@mail.gmail.com>
-Message-ID: <20140724125750.GY20328@lukather>
+From: hanjun.guo@linaro.org (Hanjun Guo)
+Date: Thu, 24 Jul 2014 21:00:06 +0800
+Subject: [PATCH 00/19] Introduce ACPI for ARM64 based on ACPI 5.1
+Message-ID: <1406206825-15590-1-git-send-email-hanjun.guo@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jul 22, 2014 at 06:33:10PM +0200, Linus Walleij wrote:
-> > AFAIK pinctrl pin numbers are device specific, so I'm wondering if we
-> > should also number them in terms of offsets, rather than absolute pin
-> > numbers. It's more of an asthetic change though. Any thoughts?
-> 
-> Usually I say these pin numbers should try to match what is
-> in the data sheet so it is easy to understand and debug. Sometimes
-> pins are numbered with letters and stuff so they rather have names
-> than numbers, then some artificial numbering is applied, whatever
-> is helpful.
-> 
-> I'm not directly familiar with the sunxi numbering system though...
+ACPI 5.1 was released [1] and it fixed some major gaps to run ACPI
+on ARM, this patch just follow the ACPI 5.1 spec and prepare the
+code to run ACPI on ARM64.
 
-I'd prefer if we had an absolute number that more or less matches the
-one in the datasheet.
+ACPI 5.1 has some major changes for the following tables and
+method which are essential for ARM platforms:
 
-Maxime
+1) MADT table updates.
+New fields were introduced to cover MPIDR and virtualization in
+GICC, and introduce GICR and GIC MSI frame structure to cover
+GICv3 and GICv2m (this patch set only cover GICv2).
+
+2) FADT updates for PSCI
+New fields were introduced to cover PSCI and ACPI can use psci
+to boot SMP and other PSCI related functions.
+
+3) GTDT
+GTDT was updated to support arch timer, memory-mapped tiemr,
+SBSA watchdog timer, in this patch, only arch timer tested on
+Juno board, so only arch timer init is available.
+
+4) _DSD
+_DSD (Device Specific Data) will provide some key values which
+presented by FDT before, it makes possible that some devices can
+be emumerated in ACPI way, please refer to the document provided
+in this patch set for detail.
+
+This patch set is the ARM64 ACPI core patches covered MADT, FADT
+and GTDT, _DSD is not covered in this patch set. We first introduce
+acpi.c and its related head file which are needed by ACPI core, and
+then get RSDP to extract all the ACPI boot-time tables.
+
+When all the boot-time tables (FADT, MADT, GTDT) are ready, then
+parse them to init the sytem when booted. Specifically, 
+a) we use FADT to init PSCI and use PSCI to boot SMP;
+b) Use MADT for GIC init and SMP init;
+c) GTDT for arch timer init.
+
+This patch set is based on the former ACPICA patches I sent, and I
+already compiled it OK with:
+a) each patch applied on ARM64 with CONFIG_ACPI=y;
+b) CONFIG_ACPI=n on ARM64;
+c) CONFIG_ACPI=y on x86.
+
+Also this patch set was tested by Graeme on ARM64 Juno platform, it
+boot successfully with ACPI only (no device tree).
+
+[1]
+You can download ACPI 5.1 from http://www.uefi.org/specifications
+
+Al Stone (3):
+  ARM64 / ACPI: Get RSDP and ACPI boot-time tables
+  ARM64 / ACPI: Introduce early_param for "acpi"
+  ARM64 / ACPI: Select ACPI_REDUCED_HARDWARE_ONLY if ACPI is enabled on
+    ARM64
+
+Ashwin Chaugule (1):
+  ACPI / table: Add new function to get table entries
+
+Graeme Gregory (4):
+  ARM64 / ACPI: Introduce lowlevel suspend function
+  ARM64 / ACPI: If we chose to boot from acpi then disable FDT
+  ARM64 / ACPI: Enable ARM64 in Kconfig
+  Documentation: ACPI for ARM64
+
+Hanjun Guo (10):
+  ARM64 / ACPI: Introduce arch_fix_phys_package_id() for cpu topology
+  ARM64 / ACPI: Make PCI optional for ACPI on ARM64
+  ARM64 / ACPI: Parse FADT table to get PSCI flags for PSCI init
+  ARM64 / ACPI: Parse MADT to map logical cpu to MPIDR and get
+    cpu_possible/present_map
+  ACPI / table: Print GIC information when MADT is parsed
+  ARM64 / ACPI: Move the initialization of cpu_logical_map(0) before
+    acpi_boot_init()
+  ARM64 / ACPI: Get the enable method for SMP initialization in ACPI
+    way
+  ACPI / processor: Make it possible to get CPU hardware ID via GICC
+  ARM64 / ACPI: Introduce ACPI_IRQ_MODEL_GIC and register device's gsi
+  ARM64 / ACPI: Parse GTDT to initialize arch timer
+
+Tomasz Nowicki (1):
+  ARM64 / ACPI: Add GICv2 specific ACPI boot support
+
+ Documentation/arm64/arm-acpi.txt     |  240 ++++++++++++++++++++
+ Documentation/kernel-parameters.txt  |    3 +-
+ arch/arm64/Kconfig                   |    3 +
+ arch/arm64/include/asm/acenv.h       |   18 ++
+ arch/arm64/include/asm/acpi.h        |   90 ++++++++
+ arch/arm64/include/asm/cpu.h         |   11 +
+ arch/arm64/include/asm/cpu_ops.h     |    9 +-
+ arch/arm64/include/asm/pci.h         |   11 +
+ arch/arm64/include/asm/smp.h         |    2 +-
+ arch/arm64/include/asm/topology.h    |    2 +
+ arch/arm64/kernel/Makefile           |    1 +
+ arch/arm64/kernel/acpi.c             |  403 ++++++++++++++++++++++++++++++++++
+ arch/arm64/kernel/cpu_ops.c          |   52 ++++-
+ arch/arm64/kernel/irq.c              |    5 +
+ arch/arm64/kernel/psci.c             |   95 +++++---
+ arch/arm64/kernel/setup.c            |   11 +-
+ arch/arm64/kernel/smp.c              |   39 +++-
+ arch/arm64/kernel/time.c             |    7 +
+ arch/arm64/kernel/topology.c         |   14 ++
+ drivers/acpi/Kconfig                 |    6 +-
+ drivers/acpi/Makefile                |    2 +-
+ drivers/acpi/bus.c                   |    3 +
+ drivers/acpi/internal.h              |    5 +
+ drivers/acpi/processor_core.c        |   36 +++
+ drivers/acpi/tables.c                |  109 +++++++--
+ drivers/clocksource/arm_arch_timer.c |  117 ++++++++--
+ drivers/irqchip/irq-gic.c            |  114 ++++++++++
+ include/linux/acpi.h                 |    5 +
+ include/linux/clocksource.h          |    6 +
+ include/linux/irqchip/arm-gic-acpi.h |   36 +++
+ include/linux/pci.h                  |   37 +++-
+ 31 files changed, 1397 insertions(+), 95 deletions(-)
+ create mode 100644 Documentation/arm64/arm-acpi.txt
+ create mode 100644 arch/arm64/include/asm/acenv.h
+ create mode 100644 arch/arm64/include/asm/acpi.h
+ create mode 100644 arch/arm64/include/asm/cpu.h
+ create mode 100644 arch/arm64/include/asm/pci.h
+ create mode 100644 arch/arm64/kernel/acpi.c
+ create mode 100644 include/linux/irqchip/arm-gic-acpi.h
 
 -- 
-Maxime Ripard, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140724/ed4c4083/attachment.sig>
+1.7.9.5
