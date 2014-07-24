@@ -1,46 +1,30 @@
-From: sebastian.hesselbarth@gmail.com (Sebastian Hesselbarth)
-Date: Thu, 24 Jul 2014 20:57:57 +0200
-Subject: [PATCH 1/2] Documentation: arm: add URLs to public datasheets
- for the Marvell Armada XP SoC
-In-Reply-To: <1406227593-29749-2-git-send-email-thomas.petazzoni@free-electrons.com>
+From: andrew@lunn.ch (Andrew Lunn)
+Date: Thu, 24 Jul 2014 20:57:47 +0200
+Subject: [PATCH 0/2] ARM: Marvell Armada XP datasheet publicly available
+In-Reply-To: <1406227593-29749-1-git-send-email-thomas.petazzoni@free-electrons.com>
 References: <1406227593-29749-1-git-send-email-thomas.petazzoni@free-electrons.com>
- <1406227593-29749-2-git-send-email-thomas.petazzoni@free-electrons.com>
-Message-ID: <53D15735.7050807@gmail.com>
+Message-ID: <20140724185747.GH28485@lunn.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/24/2014 08:46 PM, Thomas Petazzoni wrote:
-> Marvell has very recently released a public version of the "Functional
-> specifications" and "Hardware specifications" datasheets for the
-> Marvell Armada XP SoC. This allows contributors and developers not
-> under NDA with Marvell to get more details about this SoC than what
-> the current kernel code shows, and hopefully allows to improve the
-> support for this SoC in the mainline kernel, as well as in other
-> projects.
+On Thu, Jul 24, 2014 at 08:46:31PM +0200, Thomas Petazzoni wrote:
+> Hello,
 > 
-> Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
-> ---
->  Documentation/arm/Marvell/README | 3 +--
->  1 file changed, 1 insertion(+), 2 deletions(-)
+> This series of two patches make a few updates to the README file of
+> the kernel documentation related to Marvell ARM platforms in the
+> kernel.
 > 
-> diff --git a/Documentation/arm/Marvell/README b/Documentation/arm/Marvell/README
-> index 1af3a5d..5172934 100644
-> --- a/Documentation/arm/Marvell/README
-> +++ b/Documentation/arm/Marvell/README
-> @@ -102,8 +102,7 @@ EBU Armada family
->          MV78460
->      NOTE: not to be confused with the non-SMP 78xx0 SoCs
->      Product Brief: http://www.marvell.com/embedded-processors/armada-xp/assets/Marvell-ArmadaXP-SoC-product%20brief.pdf
-> -
-> -  No public datasheet available.
-> +    Functional Spec: http://www.marvell.com/embedded-processors/armada-xp/assets/ARMADA-XP-Functional-SpecDatasheet.pdf
+> The most important announcement is the public release by Marvell of
+> the datasheet for the Armada XP SoC. It follows the publication, a few
+> weeks ago, of the Armada 370 datasheet.
 
-"Pulled, thanks!" :)
+Good news. Thanks for pushing to get this published.
 
-Again, great work and a very good read indeed!
+ 
+> The second patch makes a few other updates to the same documentation,
+> taking into account recent movements in the support for Marvell SoCs
+> in the kernel.
 
-Acked-by: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
+Acked-by: Andrew Lunn <andrew@lunn.ch>
 
-for the two.
-
-Sebastian
+	  Andrew
