@@ -1,148 +1,134 @@
-From: horms@verge.net.au (Simon Horman)
-Date: Thu, 24 Jul 2014 11:05:05 +0900
-Subject: [GIT PULL] Renesas ARM Based SoC DT Timers Updates for v3.17
-In-Reply-To: <CAOesGMjWBEK3=4um3p3iGZbwXUDw2hxTYQPXAtcG3MF2ZibwyQ@mail.gmail.com>
-References: <cover.1405556312.git.horms+renesas@verge.net.au>
- <20140719052758.GE20064@quad.lixom.net>
- <20140720135125.GB31336@verge.net.au>
- <20140723235400.GA346@verge.net.au>
- <CAOesGMjWBEK3=4um3p3iGZbwXUDw2hxTYQPXAtcG3MF2ZibwyQ@mail.gmail.com>
-Message-ID: <20140724020503.GB11022@verge.net.au>
+From: computersforpeace@gmail.com (Brian Norris)
+Date: Wed, 23 Jul 2014 19:06:27 -0700
+Subject: [PATCHv4 4/5] of/mtd/nand: add generic binding and helper for
+ NAND_BBT_NO_OOB_BBM
+In-Reply-To: <1402579245-13377-5-git-send-email-LW@KARO-electronics.de>
+References: <1402579245-13377-1-git-send-email-LW@KARO-electronics.de>
+ <1402579245-13377-2-git-send-email-LW@KARO-electronics.de>
+ <1402579245-13377-3-git-send-email-LW@KARO-electronics.de>
+ <1402579245-13377-4-git-send-email-LW@KARO-electronics.de>
+ <1402579245-13377-5-git-send-email-LW@KARO-electronics.de>
+Message-ID: <20140724020627.GD3711@ld-irv-0074>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Arnd,
+(BTW, that's a mighty CC list you have! I'm not sure all CC'd parties
+are interested in this series; e.g., Russel and the ARM list seem
+unrelated)
 
-I understand from Olof that you are handling pull-requests at this time.
-I would like you to consider this one in light of the extra
-information that I have provided below.
+Hi Lothar,
 
-On Wed, Jul 23, 2014 at 05:00:21PM -0700, Olof Johansson wrote:
-> Ah, sorry. Got lost in the other pull requests.
+Sorry for the delay on this. I get busy enough that I can't/don't reply
+to everything quickly...
+
+On Thu, Jun 12, 2014 at 03:20:44PM +0200, Lothar Wa?mann wrote:
+> add a boolean property 'nand-no-oob-bbm' and helper function to be
+> able to set the NAND_BBT_NO_OOB_BBM flag in DT capable NAND drivers
+> and use it for i.MX and MXS nand drivers.
+
+If I'm understanding your previous conversations with Huang correctly,
+you *must* use NAND_BBT_NO_OOB_BBM if you're going to use the
+fsl,no-blockmark-swap option. Correct? If so, then you might not need
+a separate 'nand-no-oob-bbm' binding; your driver should imply from
+'fsl,no-blockmark-swap' that it must also enable NAND_BBT_NO_OOB_BBM.
+
+Also, as I noted in [1], I don't really like exposing a ton of
+individual boolean DT properties like this. (At least this property is
+orthogonal to the bad block table; I was a little off-base in [1].)
+
+Brian
+
+[1] http://lists.infradead.org/pipermail/linux-mtd/2014-July/054764.html
+
+> Signed-off-by: Lothar Wa?mann <LW@KARO-electronics.de>
+> ---
+>  Documentation/devicetree/bindings/mtd/nand.txt |    1 +
+>  drivers/mtd/nand/gpmi-nand/gpmi-nand.c         |    3 +++
+>  drivers/mtd/nand/mxc_nand.c                    |    2 ++
+>  drivers/of/of_mtd.c                            |   12 ++++++++++++
+>  include/linux/of_mtd.h                         |    6 ++++++
+>  5 files changed, 24 insertions(+)
 > 
-> On Wed, Jul 23, 2014 at 4:54 PM, Simon Horman <horms@verge.net.au> wrote:
-> > Hi Olof,
-> >
-> > I'd value your feedback on this if you have a moment.
-> >
-> > On Sun, Jul 20, 2014 at 10:51:25PM +0900, Simon Horman wrote:
-> >> On Fri, Jul 18, 2014 at 10:27:58PM -0700, Olof Johansson wrote:
-> >> > On Thu, Jul 17, 2014 at 09:40:20AM +0900, Simon Horman wrote:
-> >> > > Hi Olof, Hi Kevin, Hi Arnd,
-> >> > >
-> >> > > Please consider these Renesas ARM based SoC DT Timers updates for v3.17.
-> >> > >
-> >> > > This pull request is based on a merge of the following to provide
-> >> > > all dependencies and try to eliminate conflicts. It turns out the changes
-> >> > > in this pull requests are a nexus for dependencies due to modifying DT,
-> >> > > SoC, board and recently moved header files as well as requiring driver
-> >> > > changes.
-> >> > >
-> >> > > * The clockevents/renesas-timers-dt branch of Daniel Lezcano's tree.
-> >> > >   He has indicated that this branch has stable commit ids and will
-> >> > >   be included in v3.17. Olof and arm at kernel.org were CCed on the
-> >> > >   thread where he, Laurent Pinchart and I discussed the use of that branch.
-> >> > >
-> >> > >   The clockevents/renesas-timers-dt's branch is in turn based on v3.16-rc3.
-> >> > >
-> >> > > * "Third Round of Renesas ARM Based SoC DT Updates for v3.17",
-> >> > >   tagged as renesas-dt3-for-v3.17, which I have sent a pull request for.
-> >> > >
-> >> > > * "Renesas ARM Based SoC Clock Updates for v3.17",
-> >> > >   tagged as renesas-clock-for-v3.17, which you have merged
-> >> > >   into next/soc
-
-This should have been :
-
-         * "Third Round of Renesas ARM Based SoC Clock Updates for v3.17",
-	   tagged as renesas-clock3-for-v3.17.
-
-	   I somehow forgot to tag that branch and send a pull-request.
-	   I have done so now.
-
-> >> > > * "Second Round of Renesas ARM Based SoC soc-cleanup Updates for v3.17",
-> >> > >   tagged as renesas-soc-cleanup2-for-v3.17, which you have merged
-> >> > >   into next/cleanup.
-> >> > >
-> >> > > * "Third Round of Renesas ARM Based SoC r8a7779 Multiplatform Updates for
-> >> > >   v3.17", tagged as renesas-r8a7779-multiplatform3-for-v3.17, which
-> >> > >   you have merged into next/soc
-> >> > >
-> >> > > * "Renesas ARM Based SoC Boards Updates for v3.17",
-> >> > >   tagged as renesas-boards-for-v3.17, which you have merged
-> >> > >   into next/boards
-> >> > >
-> >> > > * "Third Round of Renesas ARM Based SoC Updates for v3.17",
-> >> > >   tagged as renesas-soc3-for-v3.17, which you have merged
-> >> > >   into next/soc
-> >> > >
-> >> > >
-> >> > > The following changes since commit 5c174afd407acc7a90701900b279578151bc007f:
-> >> > >
-> >> > >   Merge branch 'clockevents/renesas-timers-dt' of git://git.linaro.org/people/daniel.lezcano/linux into dt-timers-for-v3.17.base (2014-07-15 16:31:45 +0900)
-> >> > >
-> >> > > are available in the git repository at:
-> >> > >
-> >> > >
-> >> > >   git://git.kernel.org/pub/scm/linux/kernel/git/horms/renesas.git tags/renesas-dt-timers-for-v3.17
-> >> > >
-> >> > > for you to fetch changes up to 9394af4314554d15762585a3464cefaa2e6d0420:
-> >> > >
-> >> > >   ARM: shmobile: genmai-reference: Enable MTU2 in device tree (2014-07-15 21:26:42 +0900)
-> >> > >
-> >> > > ----------------------------------------------------------------
-> >> > > Renesas ARM Based SoC DT Timers Updates for v3.17
-> >> > >
-> >> > > * Enable timers using DT when booting boards without Legacy-C code
-> >> > >
-> >> > > ----------------------------------------------------------------
-> >> > > Laurent Pinchart (8):
-> >> > >       ARM: shmobile: r8a7790: Add CMT devices to DT
-> >> > >       ARM: shmobile: r8a7791: Add CMT devices to DT
-> >> > >       ARM: shmobile: r8a7779: Add TMU devices to DT
-> >> > >       ARM: shmobile: lager-reference: Enable CMT0 in device tree
-> >> > >       ARM: shmobile: koelsch-reference: Enable CMT0 in device tree
-> >> > >       ARM: shmobile: marzen-reference: Enable TMU0 in device tree
-> >> > >       ARM: shmobile: r7s72100: Add MTU2 device to DT
-> >> > >       ARM: shmobile: genmai-reference: Enable MTU2 in device tree
-> >> >
-> >> > Ok, this branch definitely contains a lot more than this. For dependent
-> >> > external branches such as clocksource, we still prefer to see a pull request so
-> >> > that we can merge in the dependency and get a clean diffstat when we do the
-> >> > merge of your branch, otherwise it gets awkward to compare that what we're
-> >> > getting is what you thought you sent (which is one of the things we check on
-> >> > merges).
-> >> >
-> >> > Please regenerate this pull request as appropriate.
-> >>
-> >> Hi Olof,
-> >>
-> >> FWIW, I believe that that the diffstat between
-> >> 5c174afd407acc7a90701900b279578151bc007f and
-> >> 9394af4314554d15762585a3464cefaa2e6d0420 is what was included in the
-> >> pull-request. But I guess that all the merged-in branches are hampering
-> >> your verification process.
-> >>
-> >> Would it help if things were arranged as follows?
-> >>
-> >> 1. Use the clocksource branch as a base and then;
-> >> 2. Merge in each of my branches (the ones listed above) and then;
-> >> 3. Add the patches on top
-> 
-> So there's nothing wrong per se with the way you arranged it, even
-> though it is more convenient for us from a review perspective to get
-> merges of branches at the tips of previous branch heads (i.e.
-> tags/merge requests). It just makes it easier to spot "Oh, that side
-> of the merge is from this branch that we've already reviewed", etc.
-> 
-> For generating pull requests for these complex merges, what we do when
-> sending stuff upstream is that we generate a dummy merge and
-> "manually" (through a script) generate the diffstat and shortlog from
-> that. Git can get confused about what is actually the merge-base
-> otherwise, which is what happened in this case for you.
-
-Thanks. I believe that the cause of this problem is the missing
-renesas-clocks3-for-v3.17 pull-request that I noted above.
-
-As discussed off-list, I think that with that taken into account this
-pull-request should match its description.
+> diff --git a/Documentation/devicetree/bindings/mtd/nand.txt b/Documentation/devicetree/bindings/mtd/nand.txt
+> index b53f92e..e46bfbe 100644
+> --- a/Documentation/devicetree/bindings/mtd/nand.txt
+> +++ b/Documentation/devicetree/bindings/mtd/nand.txt
+> @@ -5,6 +5,7 @@
+>    "soft_bch".
+>  - nand-bus-width : 8 or 16 bus width if not present 8
+>  - nand-on-flash-bbt: boolean to enable on flash bbt option if not present false
+> +- nand-no-oob-bbm: boolean to disable writing bad block markers to flash
+>  
+>  - nand-ecc-strength: integer representing the number of bits to correct
+>  		     per ECC step.
+> diff --git a/drivers/mtd/nand/gpmi-nand/gpmi-nand.c b/drivers/mtd/nand/gpmi-nand/gpmi-nand.c
+> index 959cb9b..37537b4 100644
+> --- a/drivers/mtd/nand/gpmi-nand/gpmi-nand.c
+> +++ b/drivers/mtd/nand/gpmi-nand/gpmi-nand.c
+> @@ -1724,6 +1724,9 @@ static int gpmi_nand_init(struct gpmi_nand_data *this)
+>  	if (of_get_nand_on_flash_bbt(this->dev->of_node)) {
+>  		chip->bbt_options |= NAND_BBT_USE_FLASH | NAND_BBT_NO_OOB;
+>  
+> +		if (of_get_nand_no_oob_bbm(this->dev->of_node))
+> +			chip->bbt_options |= NAND_BBT_NO_OOB_BBM;
+> +
+>  		if (of_property_read_bool(this->dev->of_node,
+>  						"fsl,no-blockmark-swap"))
+>  			this->swap_block_mark = false;
+> diff --git a/drivers/mtd/nand/mxc_nand.c b/drivers/mtd/nand/mxc_nand.c
+> index dba262b..bb54a2a 100644
+> --- a/drivers/mtd/nand/mxc_nand.c
+> +++ b/drivers/mtd/nand/mxc_nand.c
+> @@ -1496,6 +1496,8 @@ static int mxcnd_probe(struct platform_device *pdev)
+>  		this->bbt_md = &bbt_mirror_descr;
+>  		/* update flash based bbt */
+>  		this->bbt_options |= NAND_BBT_USE_FLASH;
+> +		if (of_get_nand_no_oob_bbm(pdev->dev.of_node))
+> +			this->bbt_options |= NAND_BBT_NO_OOB_BBM;
+>  	}
+>  
+>  	init_completion(&host->op_completion);
+> diff --git a/drivers/of/of_mtd.c b/drivers/of/of_mtd.c
+> index b7361ed..d947acc 100644
+> --- a/drivers/of/of_mtd.c
+> +++ b/drivers/of/of_mtd.c
+> @@ -117,3 +117,15 @@ bool of_get_nand_on_flash_bbt(struct device_node *np)
+>  	return of_property_read_bool(np, "nand-on-flash-bbt");
+>  }
+>  EXPORT_SYMBOL_GPL(of_get_nand_on_flash_bbt);
+> +
+> +/**
+> + * of_get_nand_no_oob_bbm - Get nand no oob bbm for given device_node
+> + * @np:	Pointer to the given device_node
+> + *
+> + * return true if present, false otherwise
+> + */
+> +bool of_get_nand_no_oob_bbm(struct device_node *np)
+> +{
+> +	return of_property_read_bool(np, "nand-no-oob-bbm");
+> +}
+> +EXPORT_SYMBOL_GPL(of_get_nand_no_oob_bbm);
+> diff --git a/include/linux/of_mtd.h b/include/linux/of_mtd.h
+> index e266caa..6ece1a9 100644
+> --- a/include/linux/of_mtd.h
+> +++ b/include/linux/of_mtd.h
+> @@ -17,6 +17,7 @@ int of_get_nand_ecc_step_size(struct device_node *np);
+>  int of_get_nand_ecc_strength(struct device_node *np);
+>  int of_get_nand_bus_width(struct device_node *np);
+>  bool of_get_nand_on_flash_bbt(struct device_node *np);
+> +bool of_get_nand_no_oob_bbm(struct device_node *np);
+>  
+>  #else /* CONFIG_OF_MTD */
+>  
+> @@ -45,6 +46,11 @@ static inline bool of_get_nand_on_flash_bbt(struct device_node *np)
+>  	return false;
+>  }
+>  
+> +static inline bool of_get_nand_no_oob_bbm(struct device_node *np)
+> +{
+> +	return false;
+> +}
+> +
+>  #endif /* CONFIG_OF_MTD */
+>  
+>  #endif /* __LINUX_OF_MTD_H */
