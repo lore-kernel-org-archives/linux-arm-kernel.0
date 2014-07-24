@@ -1,75 +1,91 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Wed, 23 Jul 2014 19:48:01 -0700
-Subject: [PATCH v4 1/2] platform: Remove most references to platform_bus
- device
-In-Reply-To: <20140724021457.GA31573@kroah.com>
-References: <1406135239-17550-1-git-send-email-pawel.moll@arm.com>
- <20140723174137.GC16664@kroah.com>
- <CAOesGMiGzfwLZvkxzzQQ0k4M7i2VukrCHGXCrFhZ6A3mkjVbiw@mail.gmail.com>
- <20140724021457.GA31573@kroah.com>
-Message-ID: <CAOesGMjuPqpjkhABjjhvd7z0PUK==pbn+afFXWQ+s6zWRFY1ow@mail.gmail.com>
+From: mturquette@linaro.org (Mike Turquette)
+Date: Wed, 23 Jul 2014 19:44:46 -0700
+Subject: [PATCH v5 00/14] Clock support for rk3066,rk3188 and rk3288
+In-Reply-To: <14804456.X61YuWlsJQ@diego>
+References: <156042792.J76K6jxIGl@diego>
+ <CAOesGMgcM3Z68VUOu8g6Ee0FjvW4r3R2sLtf255e9pv+gGyqFA@mail.gmail.com>
+ <2878354.yVHl3h6vxm@diego> <14804456.X61YuWlsJQ@diego>
+Message-ID: <20140724024446.15832.18112@quantum>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jul 23, 2014 at 7:14 PM, Greg Kroah-Hartman
-<gregkh@linuxfoundation.org> wrote:
-> On Wed, Jul 23, 2014 at 10:49:01AM -0700, Olof Johansson wrote:
->> On Wed, Jul 23, 2014 at 10:41 AM, Greg Kroah-Hartman
->> <gregkh@linuxfoundation.org> wrote:
->> > On Wed, Jul 23, 2014 at 06:07:18PM +0100, Pawel Moll wrote:
->> >> A number of board files in arch/arm and arch/unicore32
->> >> explicitly reference platform_bus device as a parent
->> >> for new platform devices.
->> >>
->> >> This is unnecessary, as platform device API guarantees
->> >> that devices with NULL parent are going to by adopted
->> >> by the mentioned "root" device.
->> >>
->> >> This patch removes or replaces with NULL such references.
->> >>
->> >> Signed-off-by: Pawel Moll <pawel.moll@arm.com>
->> >> ---
->> >>  arch/arm/mach-bcm/board_bcm21664.c      |  3 +--
->> >>  arch/arm/mach-bcm/board_bcm281xx.c      |  3 +--
->> >>  arch/arm/mach-clps711x/board-edb7211.c  |  6 +++---
->> >>  arch/arm/mach-clps711x/board-p720t.c    |  6 +++---
->> >>  arch/arm/mach-imx/mach-mx27ads.c        |  2 +-
->> >>  arch/arm/mach-shmobile/board-ape6evm.c  | 14 +++++++-------
->> >>  arch/arm/mach-shmobile/board-bockw.c    | 19 ++++++++----------
->> >>  arch/arm/mach-shmobile/board-genmai.c   |  5 ++---
->> >>  arch/arm/mach-shmobile/board-koelsch.c  | 26 ++++++++++++-------------
->> >>  arch/arm/mach-shmobile/board-lager.c    | 34 ++++++++++++++-------------------
->> >>  arch/arm/mach-shmobile/board-marzen.c   |  1 -
->> >>  arch/arm/mach-shmobile/setup-r7s72100.c |  2 +-
->> >>  arch/arm/mach-shmobile/setup-r8a73a4.c  |  8 ++++----
->> >>  arch/arm/mach-shmobile/setup-r8a7778.c  | 13 ++++++-------
->> >>  arch/arm/mach-shmobile/setup-r8a7779.c  |  6 +++---
->> >>  arch/arm/mach-shmobile/setup-r8a7790.c  | 10 +++++-----
->> >>  arch/arm/mach-shmobile/setup-r8a7791.c  |  8 ++++----
->> >>  arch/unicore32/kernel/puv3-core.c       |  2 +-
->> >>  arch/unicore32/kernel/puv3-nb0916.c     |  6 +++---
->> >>  19 files changed, 79 insertions(+), 95 deletions(-)
->> >
->> > Looks good, if there are no objections, I'll take this through my
->> > driver-core tree, so that your follow-on patches that change things will
->> > still apply.
->>
->> Acked-by: Olof Johansson <olof@lixom.net>
->>
->> Just in case we end up having dependent patches and/or lots of
->> conflicts, can you stick these on a short topic branch that we can
->> also pull in?
->
-> Hm, I don't normally do "short topic branches", so I've just stuck it
-> into my driver-core-next branch of my driver-core.git tree on
-> kernel.org.  I doubt the "make platform_bus static" or "make it a
-> platform device" will happen soon, given my questions on the other patch
-> in this series.
+Quoting Heiko St?bner (2014-07-22 08:45:00)
+> Hi Mike,
+> 
+> Am Montag, 14. Juli 2014, 10:07:01 schrieb Heiko St?bner:
+> > Hi Olof,
+> > 
+> > Am Sonntag, 13. Juli 2014, 20:12:07 schrieb Olof Johansson:
+> > > Hi,
+> > > 
+> > > On Sun, Jul 13, 2014 at 12:46 PM, Mike Turquette <mturquette@linaro.org>
+> > 
+> > wrote:
+> > > > Quoting Heiko St?bner (2014-07-02 16:53:24)
+> > > > 
+> > > >> This series adds a clock driver infrastructure for Rockchip SoCs in
+> > > >> general and clock-definitions for the RK3188 and RK3288 in particular.
+> > > >> 
+> > > >> Apart from the arch/arm patches included here, there are some more
+> > > >> in the waiting line, like adding the i2c nodes and possibly the pwm,
+> > > >> i2s
+> > > >> and spi nodes if the relevant drivers get accepted, where the ids
+> > > >> defined in the dt-binding headers are needed.
+> > > >> 
+> > > >> So if the whole thing is acceptable could we either offer a branch
+> > > >> from the clk-tree that can get merged or take the whole series through
+> > > >> the arm tree?
+> > > > 
+> > > > Heiko,
+> > > > 
+> > > > This version looks good. I've pushed a branch with all 14 of these
+> > > > patches based on 3.16-rc3 to the clk tree. See:
+> > > > 
+> > > > git://git.linaro.org/people/mike.turquette/linux.git clk-rockchip
+> > > > 
+> > > > If everyone is OK to merge that stable branch then I will merge
+> > > > clk-rockchip into clk-next and we're all good. If the arm-soc guys want
+> > > > to carve it up a bit further or handle it in a different way then we can
+> > > > do that. I've Cc'd arm-soc for clarification.
+> > > 
+> > > Traditionally we usually take the DT changes through arm-soc, but as
+> > > long as we share the branch we might be ok. We tend to stick them in
+> > > different branches in our tree though, so rockchip will be a little
+> > > mis-sorted this release. Not a big deal, and we can deal with it.
+> > > 
+> > > So, I'll leave it to Heiko to choose here, he knows best what other DT
+> > > changes are coming this release. If he wants to carry the DT changes
+> > > separately, then patches 1-10 would be for the clk tree, so it should
+> > > be easy to reset the branch back a bit (and 11-14 would be for
+> > > arm-soc).
+> > 
+> > hmm, there are essentially two changeset/branches upcoming:
+> > - the collected dts changes for rk3066 and rk3188 I posted saturday
+> >   These essentially extend patches 12-14
+> > - rk3288 support which would start off patch 11 (the reset controller)
+> > 
+> > So if we were to separate the series I would say patches 1-11 in the shared
+> > branch and patch 12-14 as the first ones for a rk3066/rk3188 specific
+> > branch.
+> 
+> are you ok with simply resetting the clk-rockchip branch to
+>         "ARM: rockchip: Select ARCH_HAS_RESET_CONTROLLER"
+> being the last commit and the last 3 patches going through arm-soc?
+> 
+> As we're already at -rc6 now, it would be very cool if we could get this 
+> sorted soon.
 
-Ok. Hopefully this doesn't cause too many conflicts before the merge
-window. None right now. And if it does, driver-core-next is only 30
-patches so we could merge it as a dependency if needed (I'll let you
-know if it comes to that).
+Done! My apologies on the delay but I was traveling for business for a
+week, and then relocated my apartment the next week and only just now
+have the internet tubes been hooked up to my new home.
 
+I've pushed the truncated branch to my linaro tree and merged the same
+into clk-next.
 
--Olof
+Regards,
+Mike
+
+> 
+> 
+> Thanks
+> Heiko
