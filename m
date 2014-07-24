@@ -1,65 +1,53 @@
-From: herbert@gondor.apana.org.au (Herbert Xu)
-Date: Thu, 24 Jul 2014 09:40:57 +0800
-Subject: [PATCH 3/3] crypto: Add Allwinner Security System crypto
- accelerator
-In-Reply-To: <201407232138.35268.marex@denx.de>
-References: <1400771396-9686-1-git-send-email-clabbe.montjoie@gmail.com>
- <201407231751.02050.marex@denx.de> <53D0045C.6090605@gmail.com>
- <201407232138.35268.marex@denx.de>
-Message-ID: <20140724014057.GA2448@gondor.apana.org.au>
+From: horms+renesas@verge.net.au (Simon Horman)
+Date: Thu, 24 Jul 2014 10:57:19 +0900
+Subject: [PATCH] ARM: shmobile: r8a7791: Fix SD2CKCR register address
+In-Reply-To: <cover.1406162627.git.horms+renesas@verge.net.au>
+References: <cover.1406162627.git.horms+renesas@verge.net.au>
+Message-ID: <c9b227723d051184b9e78f20c75ae2f9d44a6ea2.1406162627.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jul 23, 2014 at 09:38:35PM +0200, Marek Vasut wrote:
-> On Wednesday, July 23, 2014 at 08:52:12 PM, Corentin LABBE wrote:
-> > Le 23/07/2014 17:51, Marek Vasut a ?crit :
-> > > On Wednesday, July 23, 2014 at 04:13:09 PM, Herbert Xu wrote:
-> > >> On Wed, Jul 23, 2014 at 04:07:20PM +0200, Marek Vasut wrote:
-> > >>> On Wednesday, July 23, 2014 at 03:57:35 PM, Herbert Xu wrote:
-> > >>>> On Sat, May 24, 2014 at 02:00:03PM +0200, Marek Vasut wrote:
-> > >>>>>> +	}
-> > >>>>>> +#endif
-> > >>>>>> +
-> > >>>>>> +#ifdef CONFIG_CRYPTO_DEV_SUNXI_SS_MD5
-> > >>>>>> +	err = crypto_register_shash(&sunxi_md5_alg);
-> > >>>>> 
-> > >>>>> Do not use shash for such device. This is clearly and ahash (and
-> > >>>>> async in general) device. The rule of a thumb here is that you use
-> > >>>>> sync algos only for devices which have dedicated instructions for
-> > >>>>> computing the transformation. For devices which are attached to some
-> > >>>>> kind of bus, you use async algos (ahash etc).
-> > >>>> 
-> > >>>> I'm sorry that I didn't catch this earlier but there is no such
-> > >>>> rule.
-> > >>>> 
-> > >>>> Unless you need the async interface you should stick to the sync
-> > >>>> interfaces for the sake of simplicity.
-> > >>>> 
-> > >>>> We have a number of existing drivers that are synchronous but
-> > >>>> using the async interface.  They should either be converted
-> > >>>> over to the sync interface or made interrupt-driven if possible.
-> > >>> 
-> > >>> Sure, but this device is interrupt driven and uses DMA to feed the
-> > >>> crypto engine, therefore async, right ?
-> > >> 
-> > >> If it's interrupt-driven, then yes it would certainly make sense to
-> > >> be async.  But all I see is polling in the latest posting, was the
-> > >> first version different?
-> > > 
-> > > I stand corrected then, sorry.
-> > > 
-> > > Is it possible to use DMA to feed the crypto accelerator, Corentin?
-> > > 
-> > > Best regards,
-> > > Marek Vasut
-> > 
-> > Yes, DMA is possible and will be implemented soon.
-> > So if I have well understood, I keep using async interface.
-> 
-> Yeah, in this case, using DMA and async interface combo is the way to go.
+From: Shinobu Uehara <shinobu.uehara.xc@renesas.com>
 
-OK fair enough.
+59e79895b95892863617ce630fbda467f2470575
+(ARM: shmobile: r8a7791: Add clocks)
+added r8a7791 SD clocks when v3.14.
+
+2c60a7df72711fb8b4be1e6aa651ab166a8931bc
+(ARM: shmobile: Add SDHI devices for Koelsch DTS)
+enabled SD on r8a7791 Koelsch when v3.15.
+
+1299df03d7191ab4356c995dde8b912d3c8922e9
+(ARM: shmobile: henninger: add SDHI0/2 DT support)
+enable SD on r8a7791 Henninger when v3.16.
+
+But r8a7791 SD clock had wrong address.
+This patch fixup it.
+
+[Kuninori Morimoto: tidyup for upstreaming]
+
+Signed-off-by: Shinobu Uehara <shinobu.uehara.xc@renesas.com>
+Signed-off-by: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
+Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
+---
+ arch/arm/boot/dts/r8a7791.dtsi | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
+
+diff --git a/arch/arm/boot/dts/r8a7791.dtsi b/arch/arm/boot/dts/r8a7791.dtsi
+index 8d7ffae..79f68ac 100644
+--- a/arch/arm/boot/dts/r8a7791.dtsi
++++ b/arch/arm/boot/dts/r8a7791.dtsi
+@@ -540,9 +540,9 @@
+ 			#clock-cells = <0>;
+ 			clock-output-names = "sd1";
+ 		};
+-		sd2_clk: sd3_clk at e615007c {
++		sd2_clk: sd3_clk at e615026c {
+ 			compatible = "renesas,r8a7791-div6-clock", "renesas,cpg-div6-clock";
+-			reg = <0 0xe615007c 0 4>;
++			reg = <0 0xe615026c 0 4>;
+ 			clocks = <&pll1_div2_clk>;
+ 			#clock-cells = <0>;
+ 			clock-output-names = "sd2";
 -- 
-Email: Herbert Xu <herbert@gondor.apana.org.au>
-Home Page: http://gondor.apana.org.au/~herbert/
-PGP Key: http://gondor.apana.org.au/~herbert/pubkey.txt
+2.0.1
