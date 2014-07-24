@@ -1,307 +1,153 @@
-From: rdunlap@infradead.org (Randy Dunlap)
-Date: Thu, 24 Jul 2014 14:19:14 -0700
-Subject: [PATCH 19/19] Documentation: ACPI for ARM64
-In-Reply-To: <CAFoFrHaWWxRPRYM5+bWj0tGnz05SokqwVGejUCUi+U-KChFBdQ@mail.gmail.com>
-References: <1406206825-15590-1-git-send-email-hanjun.guo@linaro.org>	<1406206825-15590-20-git-send-email-hanjun.guo@linaro.org>
- <CAFoFrHaWWxRPRYM5+bWj0tGnz05SokqwVGejUCUi+U-KChFBdQ@mail.gmail.com>
-Message-ID: <53D17852.3050606@infradead.org>
+From: naresh.bhat@linaro.org (Naresh Bhat)
+Date: Fri, 25 Jul 2014 03:27:21 +0530
+Subject: [PATCH 05/19] ARM64 / ACPI: Make PCI optional for ACPI on ARM64
+In-Reply-To: <1406206825-15590-6-git-send-email-hanjun.guo@linaro.org>
+References: <1406206825-15590-1-git-send-email-hanjun.guo@linaro.org>
+ <1406206825-15590-6-git-send-email-hanjun.guo@linaro.org>
+Message-ID: <CAFoFrHZQ6zsM-jVpUzuFfL3_1i=HU6g+ogJY2Zoy7wx82E03RA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/24/2014 02:16 PM, Naresh Bhat wrote:
-> 
-> On 24 July 2014 18:30, Hanjun Guo <hanjun.guo at linaro.org <mailto:hanjun.guo@linaro.org>> wrote:
-> 
->     From: Graeme Gregory <graeme.gregory at linaro.org <mailto:graeme.gregory@linaro.org>>
-> 
->     Add documentation for the guidelines of how to use ACPI
->     on ARM64.
-> 
->     Signed-off-by: Graeme Gregory <graeme.gregory at linaro.org <mailto:graeme.gregory@linaro.org>>
->     Signed-off-by: Hanjun Guo <hanjun.guo at linaro.org <mailto:hanjun.guo@linaro.org>>
->     ---
->      Documentation/arm64/arm-acpi.txt |  240 ++++++++++++++++++++++++++++++++++++++
->      1 file changed, 240 insertions(+)
->      create mode 100644 Documentation/arm64/arm-acpi.txt
-> 
->     diff --git a/Documentation/arm64/arm-acpi.txt b/Documentation/arm64/arm-acpi.txt
->     new file mode 100644
->     index 0000000..12cd550
->     --- /dev/null
->     +++ b/Documentation/arm64/arm-acpi.txt
->     @@ -0,0 +1,240 @@
->     +ACPI on ARMv8 Servers
->     +---------------------
->     +
->     +ACPI will be used for ARMv8 general purpose servers designed to follow
->     +the SBSA specification (currently available to people with an ARM login at
->     +http://silver.arm.com)
->     +
->     +The implemented ACPI version is 5.1 + errata as released by the UEFI Forum,
->     +which is available at <http://www.uefi.org/acpi/specs>.
->     +
->     +If the machine does not meet these requirements then it is likely that Device
->     +Tree (DT) is more suitable for the hardware.
->     +
->     +Relationship with Device Tree
->     +-----------------------------
->     +
->     +ACPI support in drivers and subsystems for ARMv8 should never be mutually
->     +exclusive with DT support at compile time.
->     +
->     +At boot time the kernel will only use one description method depending on
->     +parameters passed from the bootloader.
->     +
->     +Regardless of whether DT or ACPI is used, the kernel must always be capable
->     +of booting with either scheme.
->     +
->     +When booting using ACPI tables the /chosen node in DT will still be parsed
->     +to extract the kernel command line and initrd path. No other section of
->     +the DT will be used.
->     +
->     +Booting using ACPI tables
->     +-------------------------
->     +
->     +Currently, the only defined method to pass ACPI tables to the kernel on ARMv8
->     +is via the UEFI system configuration table.
->     +
->     +The UEFI implementation MUST set the ACPI_20_TABLE_GUID to point to the
->     +RSDP table (the table with the ACPI signature "RSD PTR ").
->     +
->     +The pointer to the RSDP table will be retrieved from EFI by the ACPI core.
->     +
->     +Processing of ACPI tables may be disabled by passing acpi=off on the kernel
->     +command line.
->     +
->     +DO use an XSDT, RSDTs are deprecated and should not be used on arm64. They
->     +only allow for 32bit addresses.
->     +
->     +DO NOT use the 32-bit address fields in the FADT, they are deprecated, the
->     +64-bit alternatives MUST be used.
->     +
->     +The minimum set of tables MUST include RSDP, XSDT, FACS, FADT, DSDT, MADT
->     +and GTDT. If PCI is used the MCFG table MUST also be present.
->     +
->     +ACPI Detection
->     +--------------
->     +
->     +Drivers should determine their probe() type by checking for ACPI_HANDLE,
->     +or .of_node, or other information in the device structure. This is
->     +detailed further in the "Driver Recomendations" section.
->     +
->     +If the presence of ACPI needs to be detected at runtime, then check the value
->     +of acpi_disabled. If CONFIG_ACPI not being set acpi_disabled will always be 1.
->     +
->     +Device Enumeration
->     +------------------
->     +
->     +Device descriptions in ACPI should use standard recognised ACPI interfaces.
-> 
-> 
-> recognized
-
-Yeah, I saw all of these also, but we accept British or American spelling of these words.
-
->  
-> 
->     +These are far simpler than the information provided via Device Tree. Drivers
->     +should take into account this simplicity and work with sensible defaults.
->     +
->     +On no account should a Device Tree attempt to be replicated in ASL using such
->     +constructs as Name(KEY0, "Value1") type constructs. Additional driver specific
->     +data should be passed in the appropriate _DSM (ACPI Section 9.14.1) method or
->     +_DSD (ACPI Section 6.2.5). This data should be rare and not OS specific.
->     +
->     +Common _DSD bindings should be submitted to ASWG to be included in the
->     +document :-
->     +
->     +http://www.uefi.org/sites/default/files/resources/_DSD-implementation-guide-toplevel.htm
->     +
->     +TODO: Clarification and examples from Juno implementation.
->     +
->     +Programmable Power Control Resources
->     +------------------------------------
->     +
->     +Programmable power control resources include such resources as voltage/current
->     +providers (regulators) and clock sources.
->     +
->     +For power control of these resources they should be represented with Power
->     +Resource Objects (ACPI Section 7.1). The ACPI core will then handle correctly
->     +enabling/disabling of resources as they are needed.
->     +
->     +There exists in the ACPI 5.1 specification no standard binding for these objects
->     +to enable programmable levels or rates so this should be avoid if possible and
->     +the resources set to appropriate level by the firmware. If this is not possible
->     +then any manipulation should be abstracted in ASL.
->     +
->     +Each device in ACPI has D-states and these can be controlled through
->     +the optional methods _PS0..._PS3 where _PS0 is full on and _PS3 is full off.
->     +
->     +If either _PS0 or _PS3 is implemented, then the other method must also be
->     +implemented.
->     +
->     +If a device requires usage or setup of a power resource when on, the ASL
->     +should organise that it is allocated/enabled using the _PS0 method.
-> 
->  
-> organize
-> 
->     +
->     +Resources allocated/enabled in the _PS0 method should be disabled/de-allocated
->     +in the _PS3 method.
->     +
->     +Such code in _PS? methods will of course be very platform specific but
->     +should allow the driver to operate the device without special non standard
->     +values being read from ASL. Further, abstracting the use of these resources
->     +allows hardware revisions without requiring updates to the kernel.
->     +
->     +TODO: Clarification and examples from Juno implementation.
->     +
->     +Clocks
->     +------
->     +
->     +Like clocks that are part of the power resources there is no standard way
->     +to represent a clock tree in ACPI 5.1 in a similar manner to how it is
->     +described in DT.
->     +
->     +Devices affected by this include things like UARTs, SoC driven LCD displays,
->     +etc.
->     +
->     +The firmware for example UEFI should initialise these clocks to fixed working
-> 
-> 
-> initialize
->  
-> 
->     +values before the kernel is executed. If a driver requires to know rates of
->     +clocks set by firmware then they can be passed to kernel using _DSD.
->     +
->     +example :-
->     +
->     +Device (CLK0) {
->     +       ...
->     +
->     +       Name (_DSD, Package() {
->     +               ToUUID("XXXXX"),
->     +               Package() {
->     +                       Package(2) {"#clock-cells", 0},
->     +                       Package(2) {"clock-frequency", "10000"}
->     +               }
->     +       })
->     +
->     +       ...
->     +}
->     +
->     +Device (USR1) {
->     +       ...
->     +
->     +       Name (_DSD, Package() {
->     +               ToUUID("XXXXX"),
->     +               Package() {
->     +                       Package(2) {"clocks", Package() {1, ^CLK0}}},
->     +               }
->     +       })
->     +
->     +       ...
->     +}
->     +
->     +Driver Recommendations
->     +----------------------
->     +
->     +DO NOT remove any FDT handling when adding ACPI support for a driver, different
->     +systems may use the same device.
->     +
->     +DO try and keep complex sections of ACPI and DT functionality seperate. This
-> 
-> 
-> separate
->  
-> 
->     +may mean a patch to break out some complex DT to another function before
->     +the patch to add ACPI. This may happen in other functions but is most likely
->     +in probe function. This gives a clearer flow of data for reviewing driver
->     +source.
->     +
->     +probe() :-
->     +
->     +TODO: replace this with a specific real example from Juno?
->     +
->     +static int device_probe_dt(struct platform_device *pdev)
->     +{
->     +       /* DT specific functionality */
->     +       ...
->     +}
->     +
->     +static int device_probe_acpi(struct platform_device *pdev)
->     +{
->     +       /* ACPI specific functionality */
->     +       ...
->     +}
->     +
->     +static int device_probe(stuct platform_device *pdev)
->     +{
->     +       ...
->     +       acpi_handle handle = ACPI_HANDLE(&pdev->dev);
->     +       struct device_node node = pdev->dev.of_node;
->     +       ...
->     +
->     +       if (node)
->     +               ret = device_probe_dt(pdev);
->     +       else if (handle)
->     +               ret = device_probe_acpi(pdev);
->     +       else
->     +               /* other initialisation */
-> 
-> 
-> initialization
->  
-> 
->     +               ...
->     +       /* Continue with any generic probe operations */
->     +       ...
->     +}
->     +
->     +DO keep the MODULE_DEVICE_TABLE entries together in the driver to make it clear
->     +the different names the driver is probed for, both from DT and from ACPI.
->     +
->     +module device tables :-
->     +
->     +static struct of_device_id virtio_mmio_match[] = {
->     +        { .compatible = "virtio,mmio", },
->     +        {},
->     +};
->     +MODULE_DEVICE_TABLE(of, virtio_mmio_match);
->     +
->     +static const struct acpi_device_id virtio_mmio_acpi_match[] = {
->     +        { "LNRO0005", },
->     +        { }
->     +};
->     +MODULE_DEVICE_TABLE(acpi, virtio_mmio_acpi_match);
->     +
->     +TODO: Add any other helpful rules that develop from Juno ACPI work.
->     +
->     +ASWG
->     +----
->     +
->     +The following areas are not yet well defined for ARM in the current ACPI
->     +specification and are expected to be worked through in the UEFI ACPI
->     +Specification Working Group (ASWG) <http://www.uefi.org/workinggroups>.
->     +Participation in this group is open to all UEFI members.
->     +
->     +       - ACPI based CPU topology
->     +       - ACPI based Power management
->     +       - CPU idle control based on PSCI
->     +       - CPU performance control (CPPC)
->     +
->     +No code shall be accepted into the kernel unless it complies with the released
->     +standards from UEFI ASWG. If there are features missing from ACPI to make it
->     +function on a platform ECRs should be submitted to ASWG and go through the
->     +approval process.
->     --
->     1.7.9.5
-> 
-> 
+On 24 July 2014 18:30, Hanjun Guo <hanjun.guo@linaro.org> wrote:
+>
+> As PCI for ARM64 is not ready, so introduce some stub functions
+> to make PCI optional for ACPI, and make ACPI core run without
+> CONFIG_PCI on ARM64.
+>
+> Since ACPI on X86 and IA64 depends on PCI and this patch only makes
+> PCI optinal for ARM64, it will not break anything on X86 and IA64.
 
 
--- 
-~Randy
+optional
+
+>
+>
+> Signed-off-by: Hanjun Guo <hanjun.guo@linaro.org>
+> ---
+>  arch/arm64/include/asm/pci.h |   11 +++++++++++
+>  drivers/acpi/Makefile        |    2 +-
+>  drivers/acpi/internal.h      |    5 +++++
+>  include/linux/pci.h          |   37 +++++++++++++++++++++++++++----------
+>  4 files changed, 44 insertions(+), 11 deletions(-)
+>  create mode 100644 arch/arm64/include/asm/pci.h
+>
+> diff --git a/arch/arm64/include/asm/pci.h b/arch/arm64/include/asm/pci.h
+> new file mode 100644
+> index 0000000..250cd24
+> --- /dev/null
+> +++ b/arch/arm64/include/asm/pci.h
+> @@ -0,0 +1,11 @@
+> +#ifndef __ASM_PCI_H
+> +#define __ASM_PCI_H
+> +#ifdef __KERNEL__
+> +
+> +/*
+> + * PCI address space differs from physical memory address space
+> + */
+> +#define PCI_DMA_BUS_IS_PHYS    (0)
+> +
+> +#endif  /* __KERNEL__ */
+> +#endif  /* __ASM_PCI_H */
+> diff --git a/drivers/acpi/Makefile b/drivers/acpi/Makefile
+> index 505d4d7..8e9bbe6 100644
+> --- a/drivers/acpi/Makefile
+> +++ b/drivers/acpi/Makefile
+> @@ -39,7 +39,7 @@ acpi-y                                += processor_core.o
+>  acpi-$(CONFIG_ARCH_MIGHT_HAVE_ACPI_PDC) += processor_pdc.o
+>  acpi-y                         += ec.o
+>  acpi-$(CONFIG_ACPI_DOCK)       += dock.o
+> -acpi-y                         += pci_root.o pci_link.o pci_irq.o
+> +acpi-$(CONFIG_PCI)             += pci_root.o pci_link.o pci_irq.o
+>  acpi-y                         += acpi_lpss.o
+>  acpi-y                         += acpi_platform.o
+>  acpi-y                         += acpi_pnp.o
+> diff --git a/drivers/acpi/internal.h b/drivers/acpi/internal.h
+> index 4c5cf77..e1e6487 100644
+> --- a/drivers/acpi/internal.h
+> +++ b/drivers/acpi/internal.h
+> @@ -26,8 +26,13 @@
+>  acpi_status acpi_os_initialize1(void);
+>  int init_acpi_device_notify(void);
+>  int acpi_scan_init(void);
+> +#ifdef CONFIG_PCI
+>  void acpi_pci_root_init(void);
+>  void acpi_pci_link_init(void);
+> +#else
+> +static inline void acpi_pci_root_init(void) {}
+> +static inline void acpi_pci_link_init(void) {}
+> +#endif
+>  void acpi_processor_init(void);
+>  void acpi_platform_init(void);
+>  void acpi_pnp_init(void);
+> diff --git a/include/linux/pci.h b/include/linux/pci.h
+> index 466bcd1..27d7354 100644
+> --- a/include/linux/pci.h
+> +++ b/include/linux/pci.h
+> @@ -558,15 +558,6 @@ struct pci_ops {
+>         int (*write)(struct pci_bus *bus, unsigned int devfn, int where, int size, u32 val);
+>  };
+>
+> -/*
+> - * ACPI needs to be able to access PCI config space before we've done a
+> - * PCI bus scan and created pci_bus structures.
+> - */
+> -int raw_pci_read(unsigned int domain, unsigned int bus, unsigned int devfn,
+> -                int reg, int len, u32 *val);
+> -int raw_pci_write(unsigned int domain, unsigned int bus, unsigned int devfn,
+> -                 int reg, int len, u32 val);
+> -
+>  struct pci_bus_region {
+>         dma_addr_t start;
+>         dma_addr_t end;
+> @@ -1293,6 +1284,16 @@ typedef int (*arch_set_vga_state_t)(struct pci_dev *pdev, bool decode,
+>                       unsigned int command_bits, u32 flags);
+>  void pci_register_set_vga_state(arch_set_vga_state_t func);
+>
+> +/*
+> + * ACPI needs to be able to access PCI config space before we've done a
+> + * PCI bus scan and created pci_bus structures.
+> + */
+> +int raw_pci_read(unsigned int domain, unsigned int bus, unsigned int devfn,
+> +                int reg, int len, u32 *val);
+> +int raw_pci_write(unsigned int domain, unsigned int bus, unsigned int devfn,
+> +                 int reg, int len, u32 val);
+> +void pcibios_penalize_isa_irq(int irq, int active);
+> +
+>  #else /* CONFIG_PCI is not enabled */
+>
+>  /*
+> @@ -1394,6 +1395,23 @@ static inline struct pci_dev *pci_get_bus_and_slot(unsigned int bus,
+>                                                 unsigned int devfn)
+>  { return NULL; }
+>
+> +static inline struct pci_bus *pci_find_bus(int domain, int busnr)
+> +{ return NULL; }
+> +
+> +static inline int pci_bus_write_config_byte(struct pci_bus *bus,
+> +                               unsigned int devfn, int where, u8 val)
+> +{ return -ENODEV; }
+> +
+> +static inline int raw_pci_read(unsigned int domain, unsigned int bus,
+> +                       unsigned int devfn, int reg, int len, u32 *val)
+> +{ return -EINVAL; }
+> +
+> +static inline int raw_pci_write(unsigned int domain, unsigned int bus,
+> +                       unsigned int devfn, int reg, int len, u32 val)
+> +{ return -EINVAL; }
+> +
+> +static inline void pcibios_penalize_isa_irq(int irq, int active) { }
+> +
+>  static inline int pci_domain_nr(struct pci_bus *bus) { return 0; }
+>  static inline struct pci_dev *pci_dev_get(struct pci_dev *dev) { return NULL; }
+>
+> @@ -1597,7 +1615,6 @@ int pcibios_set_pcie_reset_state(struct pci_dev *dev,
+>                                  enum pcie_reset_state state);
+>  int pcibios_add_device(struct pci_dev *dev);
+>  void pcibios_release_device(struct pci_dev *dev);
+> -void pcibios_penalize_isa_irq(int irq, int active);
+>
+>  #ifdef CONFIG_HIBERNATE_CALLBACKS
+>  extern struct dev_pm_ops pcibios_pm_ops;
+> --
+> 1.7.9.5
+>
