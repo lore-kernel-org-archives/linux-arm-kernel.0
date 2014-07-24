@@ -1,69 +1,35 @@
-From: herbert@gondor.apana.org.au (Herbert Xu)
-Date: Thu, 24 Jul 2014 21:38:23 +0800
-Subject: [PATCH v4 3/3] crypto: Add Allwinner Security System crypto
- accelerator
-In-Reply-To: <53D0E857.8000405@gmail.com>
-References: <1405169953-13695-1-git-send-email-clabbe.montjoie@gmail.com>
- <1405169953-13695-4-git-send-email-clabbe.montjoie@gmail.com>
- <20140724060054.GA6545@gondor.apana.org.au>
- <53D0E857.8000405@gmail.com>
-Message-ID: <20140724133823.GA9638@gondor.apana.org.au>
+From: schwab@suse.de (Andreas Schwab)
+Date: Thu, 24 Jul 2014 15:40:04 +0200
+Subject: [PATCH] arm64/crypto: fix makefile rule for aes-glue-%.o
+In-Reply-To: <CAKv+Gu_9HRwAxkJjT3KRvDbupp0yzstyq1dXsXkTu9M6swdCKQ@mail.gmail.com>
+ (Ard Biesheuvel's message of "Thu, 24 Jul 2014 15:29:57 +0200")
+References: <mvmvbri4k06.fsf@hawking.suse.de>
+ <CAKv+Gu-NAVjMR-Jkw=W-8f7M5FSsQOSdzYN6A0kHDd1m0WA8EA@mail.gmail.com>
+ <mvmr4264i1p.fsf@hawking.suse.de>
+ <CAKv+Gu8SbM_Z=ymBFb2D4EWJeo-6dWuKqE2YNOkqJTKLDEJcYA@mail.gmail.com>
+ <mvm4my7j5xh.fsf@hawking.suse.de>
+ <CAKv+Gu-6rUxUnF+dRuroDJqy2K2B5F0r7_bm0X-vyiuQ-83W5w@mail.gmail.com>
+ <CAKv+Gu96k7GOVR85EXtro3Lt0jjiJqxyvT9cwJZ1qc6uzq97bw@mail.gmail.com>
+ <mvmvbqmj3b2.fsf@hawking.suse.de>
+ <CAKv+Gu_9HRwAxkJjT3KRvDbupp0yzstyq1dXsXkTu9M6swdCKQ@mail.gmail.com>
+Message-ID: <mvmr41aj2ob.fsf@hawking.suse.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jul 24, 2014 at 01:04:55PM +0200, Corentin LABBE wrote:
-> Le 24/07/2014 08:00, Herbert Xu a ?crit :
-> > On Sat, Jul 12, 2014 at 02:59:13PM +0200, LABBE Corentin wrote:
-> >>
-> >> +/* sunxi_hash_init: initialize request context
-> >> + * Activate the SS, and configure it for MD5 or SHA1
-> >> + */
-> >> +int sunxi_hash_init(struct ahash_request *areq)
-> >> +{
-> >> +	const char *hash_type;
-> >> +	struct crypto_ahash *tfm = crypto_ahash_reqtfm(areq);
-> >> +	struct sunxi_req_ctx *op = crypto_ahash_ctx(tfm);
-> >> +
-> >> +	mutex_lock(&ss->lock);
-> >> +
-> >> +	hash_type = crypto_tfm_alg_name(areq->base.tfm);
-> >> +
-> >> +	op->byte_count = 0;
-> >> +	op->nbwait = 0;
-> >> +	op->waitbuf = 0;
-> >> +
-> >> +	/* Enable and configure SS for MD5 or SHA1 */
-> >> +	if (strcmp(hash_type, "sha1") == 0)
-> >> +		op->mode = SS_OP_SHA1;
-> >> +	else
-> >> +		op->mode = SS_OP_MD5;
-> >> +
-> >> +	writel(op->mode | SS_ENABLED, ss->base + SS_CTL);
-> >> +	return 0;
-> > 
-> > The hash driver is completely broken.  You are modifying tfm
-> > ctx data which is shared by all users of a single tfm.  So
-> > if two users conduct hashes in parallel they will step all
-> > over each other.
-> 
-> So where can I store data for each request ?
+Ard Biesheuvel <ard.biesheuvel@linaro.org> writes:
 
-Well, first of all you need to stop storing state in the hardware.
-After each operation the hardware may be used by some other user
-for a completely different hash request.  So leaving the hash state
-in the hardware is a no-no.
+> On 24 July 2014 15:26, Andreas Schwab <schwab@suse.de> wrote:
+>> You are not using CONFIG_MODVERSIONS.
+>>
+>
+> I am
 
-If your hardware supports exporting the hash state then you just
-have to export it after each operation and reimporting before the
-next one.
+No, you aren't, since you say that your .cmd contains a command to
+create aes-glue-ce.o, which with CONFIG_MODVERSIONS it doesn't.
 
-If your hardware is incapable of exporting partial hash state then
-you will have to use a software fallback for init/update.  If your
-hardware is incapable of importing partial hash state then you will
-also have to do finup/final using a software fallback.
+Andreas.
 
-Cheers,
 -- 
-Email: Herbert Xu <herbert@gondor.apana.org.au>
-Home Page: http://gondor.apana.org.au/~herbert/
-PGP Key: http://gondor.apana.org.au/~herbert/pubkey.txt
+Andreas Schwab, SUSE Labs, schwab at suse.de
+GPG Key fingerprint = 0196 BAD8 1CE9 1970 F4BE  1748 E4D4 88E3 0EEA B9D7
+"And now for something completely different."
