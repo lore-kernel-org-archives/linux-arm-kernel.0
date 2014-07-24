@@ -1,39 +1,47 @@
 From: maxime.coquelin@st.com (Maxime COQUELIN)
-Date: Thu, 24 Jul 2014 14:02:55 +0200
-Subject: [PATCH 1/2] serial: st-asc: Don't call BUG in asc_console_setup()
+Date: Thu, 24 Jul 2014 14:02:56 +0200
+Subject: [PATCH 2/2] serial: st-asc: Fix overflow in baudrate calculation
 In-Reply-To: <1406203376-18203-1-git-send-email-maxime.coquelin@st.com>
 References: <1406203376-18203-1-git-send-email-maxime.coquelin@st.com>
-Message-ID: <1406203376-18203-2-git-send-email-maxime.coquelin@st.com>
+Message-ID: <1406203376-18203-3-git-send-email-maxime.coquelin@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-In order to prevent an asc instance to be used as early console, BUG_ON is
-used on either mapbase or membase being NULL.
+In the current calculation, if the required baud rate is above 262143,
+we get an overflow.
 
-Problem is that this condition is also true when we set console to be a ttyASx
-different to the first asc instance being probed.
-
-Instead of calling BUG_ON, it now returns -ENXIO when either mapbase or
-membase is NULL.
+This patch uses a 64bits variable to do the maths.
+Also, we remove the '+1' to avoid a divide by zero if the input clock
+rate is something unexpected.
+Indeed, if the input clock rate is zero, it is preferable to be notified,
+since the UART won't work anyway.
 
 Signed-off-by: Maxime Coquelin <maxime.coquelin@st.com>
 ---
- drivers/tty/serial/st-asc.c | 3 ++-
- 1 file changed, 2 insertions(+), 1 deletion(-)
+ drivers/tty/serial/st-asc.c | 10 +++++-----
+ 1 file changed, 5 insertions(+), 5 deletions(-)
 
 diff --git a/drivers/tty/serial/st-asc.c b/drivers/tty/serial/st-asc.c
-index f48b1cc..2369bc0 100644
+index 2369bc0..7ac9902 100644
 --- a/drivers/tty/serial/st-asc.c
 +++ b/drivers/tty/serial/st-asc.c
-@@ -849,7 +849,8 @@ static int asc_console_setup(struct console *co, char *options)
- 	 * this to be called during the uart port registration when the
- 	 * driver gets probed and the port should be mapped at that point.
- 	 */
--	BUG_ON(ascport->port.mapbase == 0 || ascport->port.membase == NULL);
-+	if (ascport->port.mapbase == 0 || ascport->port.membase == NULL)
-+		return -ENXIO;
+@@ -533,12 +533,12 @@ static void asc_set_termios(struct uart_port *port, struct ktermios *termios,
+ 		 * ASCBaudRate =   ------------------------
+ 		 *                          inputclock
+ 		 *
+-		 * However to keep the maths inside 32bits we divide top and
+-		 * bottom by 64. The +1 is to avoid a divide by zero if the
+-		 * input clock rate is something unexpected.
++		 * To keep maths inside 64bits, we divide inputclock by 16.
+ 		 */
+-		u32 counter = (baud * 16384) / ((port->uartclk / 64) + 1);
+-		asc_out(port, ASC_BAUDRATE, counter);
++		u64 dividend = (u64)baud * (1 << 16);
++
++		do_div(dividend, port->uartclk / 16);
++		asc_out(port, ASC_BAUDRATE, dividend);
+ 		ctrl_val |= ASC_CTL_BAUDMODE;
+ 	}
  
- 	if (options)
- 		uart_parse_options(options, &baud, &parity, &bits, &flow);
 -- 
 1.9.1
