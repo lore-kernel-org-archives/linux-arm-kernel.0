@@ -1,43 +1,39 @@
-From: l.stach@pengutronix.de (Lucas Stach)
-Date: Thu, 24 Jul 2014 12:02:43 +0200
-Subject: [RFC] PCI: pcie-designware: allow drivers as loadable modules
-In-Reply-To: <5303286.K45Li7B92z@wuerfel>
-References: <5303286.K45Li7B92z@wuerfel>
-Message-ID: <1406196163.4590.21.camel@weser.hi.pengutronix.de>
+From: javi.merino@arm.com (Javi Merino)
+Date: Thu, 24 Jul 2014 11:05:52 +0100
+Subject: [PATCH v2] cpufreq: tests: Providing cpufreq regression test
+In-Reply-To: <20140723121042.5b6f49e3@amdc2363>
+References: <1405678985-21677-1-git-send-email-l.majewski@samsung.com>
+ <1405926154-27214-1-git-send-email-l.majewski@samsung.com>
+ <CAKohpondk7Cty8MhTcjyzZW8Z0o4AVupYE0rRnG4YJf+SmDyjg@mail.gmail.com>
+ <20140723093824.5e51918f@amdc2363>
+ <CAKohpok++gPcNk9-E4MsFdNBy8qL7oLYvatk1EvcW1OHwroZXQ@mail.gmail.com>
+ <20140723121042.5b6f49e3@amdc2363>
+Message-ID: <20140724100551.GA2697@e104805>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am Donnerstag, den 24.07.2014, 11:17 +0200 schrieb Arnd Bergmann:
-> From 0ee79c7451851a34e5a7c33eb6020befcdcb2b24 Mon Sep 17 00:00:00 2001
-> From: Arnd Bergmann <arnd@arndb.de>
-> Date: Thu, 24 Jul 2014 11:12:48 +0200
-> Subject: [PATCH] PCI: pcie-designware: allow drivers as loadable modules
+On Wed, Jul 23, 2014 at 11:10:42AM +0100, Lukasz Majewski wrote:
+> Hi Viresh,
 > 
-> The new pcie-spear13xx driver uses the pcie-designware library
-> and in the current form it can be built as a loadable module.
-> However, the functions it uses from the base driver are not exported,
-> so this results in a build failure and a module that can never
-> be loaded:
+> > On 23 July 2014 13:08, Lukasz Majewski <l.majewski@samsung.com> wrote:
+> > > Do you want to say that we have enough tests and we don't need
+> > > more ?
+> > 
+> > No. We don't have any tests at all :)
 > 
-> ERROR: "dw_pcie_host_init" [drivers/pci/host/pcie-spear13xx.ko] undefined!
-> ERROR: "dw_handle_msi_irq" [drivers/pci/host/pcie-spear13xx.ko] undefined!
-> ERROR: "dw_pcie_msi_init" [drivers/pci/host/pcie-spear13xx.ko] undefined!
-> ERROR: "dw_pcie_cfg_write" [drivers/pci/host/pcie-spear13xx.ko] undefined!
-> ERROR: "dw_pcie_cfg_read" [drivers/pci/host/pcie-spear13xx.ko] undefined!
-> ERROR: "dw_pcie_setup_rc" [drivers/pci/host/pcie-spear13xx.ko] undefined!
-> ERROR: "dw_pcie_link_up" [drivers/pci/host/pcie-spear13xx.ko] undefined!
-> 
-> If we want to allow loadable pcie-designware drivers, we have to
-> export all those symbols and ensure none of them are marked as __init.
-> This also requires making pci_assign_unassigned_resources available
-> after boot.
+> Then we should encourage as many developers as possible to share their
+> private tests with us.
 
-My series "PCI: designware: init order/resource alloc fixes" removes
-this function call from pcie-designware, so if it get's accepted this
-should not be necessary.
+Linaro publishes their regression tests here:
 
-Regards,
-Lucas
--- 
-Pengutronix e.K.             | Lucas Stach                 |
-Industrial Linux Solutions   | http://www.pengutronix.de/  |
+https://git.linaro.org/tools/pm-qa.git
+
+Description:
+
+https://wiki.linaro.org/WorkingGroups/PowerManagement/Resources/TestSuite/PmQaSpecification#Cpufreq
+
+I have only used the thermal ones, I can't comment on the cpufreq
+tests.
+
+Cheers,
+Javi
