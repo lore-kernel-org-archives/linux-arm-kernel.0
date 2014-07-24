@@ -1,44 +1,75 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Thu, 24 Jul 2014 16:24:48 +0200
-Subject: [PATCH] arm64/crypto: fix makefile rule for aes-glue-%.o
-In-Reply-To: <CAKv+Gu_z4VTssLDhiQxi8DRJNEUgzrM5bFzje8NXEmBiA2vqeg@mail.gmail.com>
-References: <mvmvbri4k06.fsf@hawking.suse.de>
- <CAKv+Gu-NAVjMR-Jkw=W-8f7M5FSsQOSdzYN6A0kHDd1m0WA8EA@mail.gmail.com>
- <mvmr4264i1p.fsf@hawking.suse.de>
- <CAKv+Gu8SbM_Z=ymBFb2D4EWJeo-6dWuKqE2YNOkqJTKLDEJcYA@mail.gmail.com>
- <mvm4my7j5xh.fsf@hawking.suse.de>
- <CAKv+Gu-6rUxUnF+dRuroDJqy2K2B5F0r7_bm0X-vyiuQ-83W5w@mail.gmail.com>
- <CAKv+Gu96k7GOVR85EXtro3Lt0jjiJqxyvT9cwJZ1qc6uzq97bw@mail.gmail.com>
- <mvmvbqmj3b2.fsf@hawking.suse.de>
- <CAKv+Gu_9HRwAxkJjT3KRvDbupp0yzstyq1dXsXkTu9M6swdCKQ@mail.gmail.com>
- <mvmr41aj2ob.fsf@hawking.suse.de>
- <CAKv+Gu_z4VTssLDhiQxi8DRJNEUgzrM5bFzje8NXEmBiA2vqeg@mail.gmail.com>
-Message-ID: <CAKv+Gu-B9_sgGgw9obrBGNUFSS1JcskN34s1X4PU8F5bauHT1Q@mail.gmail.com>
+From: stern@rowland.harvard.edu (Alan Stern)
+Date: Thu, 24 Jul 2014 10:26:47 -0400 (EDT)
+Subject: [PATCH v2 1/3] usb: host: st-hcd: Add USB HCD support for STi SoCs
+In-Reply-To: <5967609.vndF2bDyS1@wuerfel>
+Message-ID: <Pine.LNX.4.44L0.1407241019530.1146-100000@iolanthe.rowland.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 24 July 2014 16:18, Ard Biesheuvel <ard.biesheuvel@linaro.org> wrote:
-> On 24 July 2014 15:40, Andreas Schwab <schwab@suse.de> wrote:
->> Ard Biesheuvel <ard.biesheuvel@linaro.org> writes:
->>
->>> On 24 July 2014 15:26, Andreas Schwab <schwab@suse.de> wrote:
->>>> You are not using CONFIG_MODVERSIONS.
->>>>
->>>
->>> I am
->>
->> No, you aren't, since you say that your .cmd contains a command to
->> create aes-glue-ce.o, which with CONFIG_MODVERSIONS it doesn't.
->>
->
-> OK, you're right, it contains a command to create .tmp_aes-glue-ce.o.
-> But I am still not seeing the error you are seeing, strangely enough.
+On Thu, 24 Jul 2014, Arnd Bergmann wrote:
 
-OK, now I am seeing it.
+> > > The way you do this apparently is to create a device that encapsulates
+> > > the OHCI and the EHCI and then goes on to create child devices that
+> > > are bound to the real drivers.
+> > 
+> > Yes, although this isn't the first driver to take that approach USB_HCD_BCMA
+> > (bcma-hcd.c) and USB_HCD_SSB (ssb-hcd.c) do much the same thing.
+> 
+> I just had a look at them, and I think the case is different here:
+> 
+> For the two bcma driver, there is a discoverable bus (bcma) rather than
+> the platform bus, and it only exposes one device, so the bcma-hcd driver
+> is actually needed so we get two device that can be bound to the regular
+> drivers.
+> 
+> For the ssb-hcd driver, it's less clear and that one could be
+> reworked into two separate drivers.
+> 
+> > > The way it should be done however is to put the two host controllers
+> > > into DT directly and describe their resources (phy, clock, reset, ...)
+> > > using the DT bindings for those.
+> > 
+> > I'm of course happy to change it if required. I see looking through that a lot 
+> > of other platforms do it the way you describe with a
+> > 
+> > ehci-<platname>.c and ohci-<platname>.c
+> 
+> Right. We are trying to  gradually move some of them over to use the
+> generic *hci-platform.c drivers though.
+> 
+> > > Depending on what kind of special requirements the ST version has,
+> > > this can be done either by using the generic ohci/ehci bindings
+> > > with extensions where necessary, or by creating a new binding and
+> > > new driver files that use 'ohci_init_driver'/'ehci_init_driver'
+> > > to inherit from the common code.
+> > > 
+> > > The first of the two approaches is preferred.
+> > 
+> > We don't have anything particularly special, just a couple of reset lines,
+> > clock, phy, etc.
+> 
+> Ok, good. Please see Documentation/devicetree/bindings/usb/usb-?hci.txt
+> then. You might actually be able to just use the existing drivers
+> without new code by just adding the proper DT nodes that follow these
+> bindings.
+> 
+> > > > +   pdev->dev.parent = &parent->dev;
+> > > > +   pdev->dev.dma_mask = &pdev->dev.coherent_dma_mask;
+> > > > +   pdev->dev.coherent_dma_mask = DMA_BIT_MASK(32);
+> > > 
+> > > This is something we shouldn't ever do these days, the DMA settings
+> > > should come directly from DT without driver interaction.
+> > 
+> > Ok, I'll wait to hear the outcome of Greg/Alans views before either fixing
+> > it or starting over.
+> 
+> Ok.
 
-Acked-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+As far as I'm concerned, any of these approaches is okay although
+putting everything into DT is the most desirable, because it will
+minimize the code size.
 
-Thanks for your patience.
+Mostly what's at issue here is the design preferences of the people at 
+Linaro and all others who work on architecture-specific stuff.
 
--- 
-Ard.
+Alan Stern
