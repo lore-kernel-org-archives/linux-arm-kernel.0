@@ -1,144 +1,125 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Thu, 24 Jul 2014 10:53:09 +0200
-Subject: [PATCH v2 1/8] dma: sun4i: Add support for the DMA engine on
- sun[457]i SoCs
-In-Reply-To: <53C843DC.8090808@elopez.com.ar>
-References: <1404619518-7592-1-git-send-email-emilio@elopez.com.ar>
- <1404619518-7592-2-git-send-email-emilio@elopez.com.ar>
- <20140717205639.GH20328@lukather> <53C843DC.8090808@elopez.com.ar>
-Message-ID: <20140724085309.GR20328@lukather>
+From: chiau.ee.chew@intel.com (chiau.ee.chew at intel.com)
+Date: Fri, 25 Jul 2014 01:10:54 +0800
+Subject: [PATCH v2] spi/pxa2xx-pci: Add common clock framework support in PCI
+ glue layer
+Message-ID: <1406221854-12828-1-git-send-email-chiau.ee.chew@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+From: Chew, Chiau Ee <chiau.ee.chew@intel.com>
 
-On Thu, Jul 17, 2014 at 06:45:00PM -0300, Emilio L?pez wrote:
-> >>+	depends on (MACH_SUN4I || MACH_SUN5I || MACH_SUN7I || (COMPILE_TEST && OF && ARM))
-> >
-> >This pretty much defeats the purpose of COMPILE_TEST
-> 
-> QCOM_BAM_DMA does it that way; it's better to get some coverage than
-> none I guess?
+SPI PXA2XX core layer has dependency on common clock framework
+to obtain information on host supported clock rate. Thus, we
+setup the clock device in the PCI glue layer to enable PCI mode
+host pass in the clock rate information.
 
-You'll get that kind of coverage with multi_v7 already, so that looks
-quite redundant.
+Signed-off-by: Chew, Chiau Ee <chiau.ee.chew@intel.com>
+Acked-by: Kweh, Hock Leong <hock.leong.kweh@intel.com>
+---
+ changelog v2:
+ i. add CONFIG_COMMON_CLK dependency for SPI_PXA2XX_PCI in Kconfig
+ ii. add clk cleanup in remove()
 
-> >>+	help
-> >>+	  Enable support for the DMA controller present in the sun4i,
-> >>+	  sun5i and sun7i Allwinner ARM SoCs.
-> >>+
-> (...)
-> >>+
-> >>+/** Normal DMA register values **/
-> >>+
-> >>+/* Normal DMA source/destination data request type values */
-> >>+#define NDMA_DRQ_TYPE_SDRAM			0x16
-> >>+#define NDMA_DRQ_TYPE_LIMIT			(0x1F + 1)
-> >
-> >Hmmm, I'm unsure what this is about... What is it supposed to do, and
-> >how is it different from BIT(5) ?
-> 
-> if (val < NDMA_DRQ_TYPE_LIMIT)
-> 	/* valid value */
-> else
-> 	/* invalid value */
-> 
-> 0x1F is the last valid value
+ drivers/spi/Kconfig          |    2 +-
+ drivers/spi/spi-pxa2xx-pci.c |   21 ++++++++++++++++++++-
+ 2 files changed, 21 insertions(+), 2 deletions(-)
 
-Ok.
-
-> >>+
-> >>+static void set_pchan_interrupt(struct sun4i_dma_dev *priv,
-> >>+				struct sun4i_dma_pchan *pchan,
-> >>+				int half, int end)
-> >>+{
-> >>+	u32 reg = readl_relaxed(priv->base + DMA_IRQ_ENABLE_REG);
-> >>+	int pchan_number = pchan - priv->pchans;
-> >>+
-> >>+	if (half)
-> >>+		reg |= BIT(pchan_number * 2);
-> >>+	else
-> >>+		reg &= ~BIT(pchan_number * 2);
-> >>+
-> >>+	if (end)
-> >>+		reg |= BIT(pchan_number * 2 + 1);
-> >>+	else
-> >>+		reg &= ~BIT(pchan_number * 2 + 1);
-> >>+
-> >>+	writel_relaxed(reg, priv->base + DMA_IRQ_ENABLE_REG);
-> >
-> >I don't see any interrupts here.
-> 
-> Hm?
-
-I'm not sure, but I think I meant spinlocks, it doesn't make much
-sense otherwise.
-
-> >>+	for_each_sg(sgl, sg, sg_len, i) {
-> >>+		/* Figure out addresses */
-> >>+		if (dir == DMA_MEM_TO_DEV) {
-> >>+			srcaddr = sg_dma_address(sg);
-> >>+			dstaddr = sconfig->dst_addr;
-> >>+		} else {
-> >>+			srcaddr = sconfig->src_addr;
-> >>+			dstaddr = sg_dma_address(sg);
-> >>+		}
-> >>+
-> >>+		/* TODO: should this be configurable? */
-> >>+		para = DDMA_MAGIC_SPI_PARAMETERS;
-> >
-> >What is it? Is it supposed to change from one client device to
-> >another?
-> 
-> These are the magic DMA engine timings that keep SPI going. I
-> haven't seen any interface on DMAEngine to configure timings, and so
-> far they seem to work for everything we support, so I've kept them
-> here. I don't know if other devices need different timings because,
-> as usual, we only have the "para" bitfield meanings, but no comment
-> on what the values should be when doing a certain operation :|
-
-If it works for everything you tested so far, I guess you can leave it
-that way, only adding what you just replied to the TODO.
-
-> >>+static enum dma_status sun4i_dma_tx_status(struct dma_chan *chan,
-> >>+					   dma_cookie_t cookie,
-> >>+					   struct dma_tx_state *state)
-> >>+{
-> >>+	struct sun4i_dma_vchan *vchan = to_sun4i_dma_vchan(chan);
-> >>+	struct sun4i_dma_pchan *pchan = vchan->pchan;
-> >>+	struct sun4i_dma_contract *contract;
-> >>+	struct sun4i_dma_promise *promise;
-> >>+	struct virt_dma_desc *vd;
-> >>+	unsigned long flags;
-> >>+	enum dma_status ret;
-> >>+	size_t bytes = 0;
-> >>+
-> >>+	ret = dma_cookie_status(chan, cookie, state);
-> >>+	if (ret == DMA_COMPLETE)
-> >>+		return ret;
-> >>+
-> >>+	spin_lock_irqsave(&vchan->vc.lock, flags);
-> >>+	vd = vchan_find_desc(&vchan->vc, cookie);
-> >>+	if (!vd) /* TODO */
-> >
-> >TODO what?
-> >
-> 
-> /* TODO: remove the TODO */
-
-:)
-
-Thanks!
-Maxime
-
+diff --git a/drivers/spi/Kconfig b/drivers/spi/Kconfig
+index 62e2242..aa005cb 100644
+--- a/drivers/spi/Kconfig
++++ b/drivers/spi/Kconfig
+@@ -380,7 +380,7 @@ config SPI_PXA2XX
+ 	  additional documentation can be found a Documentation/spi/pxa2xx.
+ 
+ config SPI_PXA2XX_PCI
+-	def_tristate SPI_PXA2XX && PCI
++	def_tristate SPI_PXA2XX && PCI && COMMON_CLK
+ 
+ config SPI_ROCKCHIP
+ 	tristate "Rockchip SPI controller driver"
+diff --git a/drivers/spi/spi-pxa2xx-pci.c b/drivers/spi/spi-pxa2xx-pci.c
+index c1865c9..20ebbc7 100644
+--- a/drivers/spi/spi-pxa2xx-pci.c
++++ b/drivers/spi/spi-pxa2xx-pci.c
+@@ -7,6 +7,8 @@
+ #include <linux/of_device.h>
+ #include <linux/module.h>
+ #include <linux/spi/pxa2xx_spi.h>
++#include <linux/clk.h>
++#include <linux/clk-provider.h>
+ 
+ enum {
+ 	PORT_CE4100,
+@@ -21,6 +23,7 @@ struct pxa_spi_info {
+ 	int tx_chan_id;
+ 	int rx_slave_id;
+ 	int rx_chan_id;
++	unsigned long max_clk_rate;
+ };
+ 
+ static struct pxa_spi_info spi_info_configs[] = {
+@@ -32,6 +35,7 @@ static struct pxa_spi_info spi_info_configs[] = {
+ 		.tx_chan_id = -1,
+ 		.rx_slave_id = -1,
+ 		.rx_chan_id = -1,
++		.max_clk_rate = 3686400,
+ 	},
+ 	[PORT_BYT] = {
+ 		.type = LPSS_SSP,
+@@ -41,6 +45,7 @@ static struct pxa_spi_info spi_info_configs[] = {
+ 		.tx_chan_id = 0,
+ 		.rx_slave_id = 1,
+ 		.rx_chan_id = 1,
++		.max_clk_rate = 50000000,
+ 	},
+ };
+ 
+@@ -53,6 +58,7 @@ static int pxa2xx_spi_pci_probe(struct pci_dev *dev,
+ 	struct pxa2xx_spi_master spi_pdata;
+ 	struct ssp_device *ssp;
+ 	struct pxa_spi_info *c;
++	char buf[40];
+ 
+ 	ret = pcim_enable_device(dev);
+ 	if (ret)
+@@ -84,6 +90,12 @@ static int pxa2xx_spi_pci_probe(struct pci_dev *dev,
+ 	ssp->port_id = (c->port_id >= 0) ? c->port_id : dev->devfn;
+ 	ssp->type = c->type;
+ 
++	snprintf(buf, sizeof(buf), "pxa2xx-spi.%d", ssp->port_id);
++	ssp->clk = clk_register_fixed_rate(&dev->dev, buf , NULL,
++					CLK_IS_ROOT, c->max_clk_rate);
++	 if (IS_ERR(ssp->clk))
++		return PTR_ERR(ssp->clk);
++
+ 	memset(&pi, 0, sizeof(pi));
+ 	pi.parent = &dev->dev;
+ 	pi.name = "pxa2xx-spi";
+@@ -92,8 +104,10 @@ static int pxa2xx_spi_pci_probe(struct pci_dev *dev,
+ 	pi.size_data = sizeof(spi_pdata);
+ 
+ 	pdev = platform_device_register_full(&pi);
+-	if (IS_ERR(pdev))
++	if (IS_ERR(pdev)) {
++		clk_unregister(ssp->clk);
+ 		return PTR_ERR(pdev);
++	}
+ 
+ 	pci_set_drvdata(dev, pdev);
+ 
+@@ -103,8 +117,13 @@ static int pxa2xx_spi_pci_probe(struct pci_dev *dev,
+ static void pxa2xx_spi_pci_remove(struct pci_dev *dev)
+ {
+ 	struct platform_device *pdev = pci_get_drvdata(dev);
++	struct pxa2xx_spi_master *spi_pdata;
++
++	spi_pdata = dev_get_platdata(&pdev->dev);
+ 
+ 	platform_device_unregister(pdev);
++	clk_unregister(spi_pdata->ssp.clk);
++	pci_set_drvdata(dev, NULL);
+ }
+ 
+ static const struct pci_device_id pxa2xx_spi_pci_devices[] = {
 -- 
-Maxime Ripard, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140724/1d013a68/attachment.sig>
+1.7.4.4
