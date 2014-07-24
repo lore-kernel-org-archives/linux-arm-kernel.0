@@ -1,38 +1,76 @@
 From: peter.griffin@linaro.org (Peter Griffin)
-Date: Thu, 24 Jul 2014 12:00:13 +0100
-Subject: [PATCH v2 0/3] Add USB HCD support for STi SoCs
-Message-ID: <1406199616-10533-1-git-send-email-peter.griffin@linaro.org>
+Date: Thu, 24 Jul 2014 12:00:15 +0100
+Subject: [PATCH v2 2/3] usb: host: st-hcd: Add st-hcd devicetree bindings
+ documentation.
+In-Reply-To: <1406199616-10533-1-git-send-email-peter.griffin@linaro.org>
+References: <1406199616-10533-1-git-send-email-peter.griffin@linaro.org>
+Message-ID: <1406199616-10533-3-git-send-email-peter.griffin@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This driver adds support for the USB HCD controller present in STi
-SoC's from STMicroelectronics. It has been tested on the stih416-b2020
-board.
+This patch documents the device tree documentation required for
+the ST HCD controller found in STMicroelectronics SoCs.
 
-The original author is no longer with the company and therefore emails
-to his address bounce, thus I have not added him to CC.
-
-Changes since v1:
- - Correct s/OCHI/OHCI/ spelling
- - Improve kconfig help message
- - Various formating / spelling nits identified by Lee Jones
- - Make driver depend on OF & remove node checks in code
- - Use devm_ioremap_resource
- - Remove unnecessary header files
-
-Peter Griffin (3):
-  usb: host: st-hcd: Add USB HCD support for STi SoCs
-  usb: host: st-hcd: Add st-hcd devicetree bindings documentation.
-  MAINTAINERS: Add st-hcd to ARCH/STI architecture
-
- Documentation/devicetree/bindings/usb/st-hcd.txt |  51 +++
- MAINTAINERS                                      |   1 +
- drivers/usb/host/Kconfig                         |  13 +
- drivers/usb/host/Makefile                        |   1 +
- drivers/usb/host/st-hcd.c                        | 471 +++++++++++++++++++++++
- 5 files changed, 537 insertions(+)
+Signed-off-by: Peter Griffin <peter.griffin@linaro.org>
+---
+ Documentation/devicetree/bindings/usb/st-hcd.txt | 49 ++++++++++++++++++++++++
+ 1 file changed, 49 insertions(+)
  create mode 100644 Documentation/devicetree/bindings/usb/st-hcd.txt
- create mode 100644 drivers/usb/host/st-hcd.c
 
+diff --git a/Documentation/devicetree/bindings/usb/st-hcd.txt b/Documentation/devicetree/bindings/usb/st-hcd.txt
+new file mode 100644
+index 0000000..b963be2
+--- /dev/null
++++ b/Documentation/devicetree/bindings/usb/st-hcd.txt
+@@ -0,0 +1,49 @@
++ST HCD (Host Controller Driver) for USB 2.0 and 1.1
++
++The device node has the following properties.
++
++Required properties:
++ - compatible		: must be "st,usb-300x"
++ - reg			: physical base addresses of the controller and length of memory mapped
++			  region
++ - reg-names		: names associated to the reg defines above, should be "ehci" and "ohci"
++ - interrupts		: interrupt numbers to the cpu
++ - interrupt-names	: should be "ehci" and "ohci"
++
++ - pinctrl-names	: a pinctrl state named "default" must be defined
++-  pinctrl-0		: phandle referencing pin configuration of the USB controller
++See: Documentation/devicetree/bindings/pinctrl/pinctrl-binding.txt
++
++ - clocks		: phandle list of usb clocks.
++ - clock-names		: should be "ic" for interconnect clock and "ohci" for the 48MHz clock
++See: Documentation/devicetree/bindings/clock/clock-bindings.txt
++
++ - resets		: phandle to the powerdown and reset controller for the USB IP
++ - reset-names		: should be "powerdown" and "softreset".
++See: Documentation/devicetree/bindings/reset/st,sti-powerdown.txt
++See: Documentation/devicetree/bindings/reset/reset.txt
++
++Example:
++
++usb0: usb at fe100000 {
++	compatible	= "st,usb-300x";
++	reg		= <0xfe1ffc00 0x100>,
++			  <0xfe1ffe00 0x100>;
++	reg-names	= "ohci", "ehci";
++
++	interrupts	=  <GIC_SPI 148 IRQ_TYPE_NONE>,
++			   <GIC_SPI 149 IRQ_TYPE_NONE>;
++	interrupt-names	= "ehci", "ohci";
++	pinctrl-names	= "default";
++	pinctrl-0	= <&pinctrl_usb0>;
++	clocks		= <&clk_s_a1_ls CLK_ICN_IF_2>,
++			  <&clockgen_b0 0>;
++	clock-names	= "ic", "ohci";
++
++	resets		= <&powerdown STIH416_USB0_POWERDOWN>,
++			  <&softreset STIH416_USB0_SOFTRESET>;
++	reset-names	= "powerdown", "softreset";
++
++	phys		= <&usb2_phy>;
++	phy-names	= "usb2-phy";
++};
 -- 
 1.9.1
