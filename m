@@ -1,44 +1,70 @@
-From: heiko@sntech.de (Heiko =?ISO-8859-1?Q?St=FCbner?=)
-Date: Fri, 25 Jul 2014 00:33:24 +0200
-Subject: [PATCH] ARM: dts: Build dtbs for Rockchip boards
-In-Reply-To: <1406240270-13278-1-git-send-email-dianders@chromium.org>
-References: <1406240270-13278-1-git-send-email-dianders@chromium.org>
-Message-ID: <7536612.LCojB7a6aY@diego>
+From: jason@lakedaemon.net (Jason Cooper)
+Date: Thu, 24 Jul 2014 18:48:36 -0400
+Subject: next build: 629 warnings 1 failures (next/next-20140723)
+In-Reply-To: <20140724132448.GB13371@arm.com>
+References: <53cf8323.e4b6440a.7d37.4f75@mx.google.com>
+ <CAOesGMhT9n7nVbCay5cU74pv2qrbqMooZLoY923Lk6SzXk5z+A@mail.gmail.com>
+ <20140724085037.GB1994@arm.com> <20140724104318.GA13371@arm.com>
+ <20140724132448.GB13371@arm.com>
+Message-ID: <20140724224836.GY23220@titan.lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am Donnerstag, 24. Juli 2014, 15:17:50 schrieb Doug Anderson:
-> This allows the "make dtbs" target to work.
+On Thu, Jul 24, 2014 at 02:24:48PM +0100, Catalin Marinas wrote:
+> On Thu, Jul 24, 2014 at 11:43:18AM +0100, Catalin Marinas wrote:
+> > On Thu, Jul 24, 2014 at 09:50:37AM +0100, Will Deacon wrote:
+> > > On Thu, Jul 24, 2014 at 12:27:30AM +0100, Olof Johansson wrote:
+> > > > I'm building with a vanilla gcc 4.8.2 / binutils 2.23.2. That
+> > > > shouldn't be broken like this, so those changes should be fixed (or
+> > > > minimal toolchain expecations need to be documented -- but there
+> > > > really is no good reason to require 4.9.0/2.24).
+> > > 
+> > > These all come from the GICv3 driver, so it's not going to be a lot of fun
+> > > fixing them. You'd have to introduce a macro for generating the system-reg
+> > > accesses (for both C and asm), then switch the GIC driver and the arch code
+> > > over to using that.
+> > 
+> > We may need to document that enabling GICv3 requires a newer toolchain.
+> > 
+> > Otherwise, my years old macros ;) (adapted here and untested):
+> [...]
+> > But I'll let Marc comment when he gets back from holiday (I'm pretty
+> > sure he will enjoy it ;))
 > 
-> Signed-off-by: Doug Anderson <dianders@chromium.org>
-
-I'll add it to my rk3288-branch
-
-
-Thanks
-Heiko
-
+> Saving Marc some time:
+> 
+> ------------8<--------------------------------
+> 
+> From 3acb8b49aeba9f48153a2d719dec05d0b862e285 Mon Sep 17 00:00:00 2001
+> From: Catalin Marinas <catalin.marinas@arm.com>
+> Date: Thu, 24 Jul 2014 14:14:42 +0100
+> Subject: [PATCH] arm64: gicv3: Allow GICv3 compilation with older binutils
+> 
+> GICv3 introduces new system registers accessible with the full msr/mrs
+> syntax (e.g. mrs x0, Sx_op0_op1_CRm_CRn_op2). However, only recent
+> binutils understand the new syntax. This patch introduces msr_s/mrs_s
+> assembly macros which generate the equivalent instructions above and
+> converts the existing GICv3 code (both drivers/irqchip/ and
+> arch/arm64/kernel/).
+> 
+> Signed-off-by: Catalin Marinas <catalin.marinas@arm.com>
+> Suggested-by: Mark Rutland <mark.rutland@arm.com>
+> Reported-by: Olof Johansson <olof@lixom.net>
+> Cc: Will Deacon <will.deacon@arm.com>
+> Cc: Marc Zyngier <marc.zyngier@arm.com>
 > ---
-> This is built upon (ARM: dts: add rk3288 evaluation board) at
-> <https://patchwork.kernel.org/patch/4579541/>, which won't actually
-> build without the bindings that just landed in today's clk-next.
-> 
->  arch/arm/boot/dts/Makefile | 5 +++++
->  1 file changed, 5 insertions(+)
-> 
-> diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
-> index 82f498b..026f61d 100644
-> --- a/arch/arm/boot/dts/Makefile
-> +++ b/arch/arm/boot/dts/Makefile
-> @@ -341,6 +341,11 @@ dtb-$(CONFIG_ARCH_QCOM) += \
->  	qcom-apq8084-mtp.dtb \
->  	qcom-msm8660-surf.dtb \
->  	qcom-msm8960-cdp.dtb
-> +dtb-$(CONFIG_ARCH_ROCKCHIP) += \
-> +	rk3066a-bqcurie2.dtb \
-> +	rk3188-radxarock.dtb \
-> +	rk3288-evb-act8846.dtb \
-> +	rk3288-evb-rk808.dtb
->  dtb-$(CONFIG_ARCH_S3C24XX) += s3c2416-smdk2416.dtb
->  dtb-$(CONFIG_ARCH_S3C64XX) += s3c6410-mini6410.dtb \
->  	s3c6410-smdk6410.dtb
+>  arch/arm64/include/asm/sysreg.h    | 60 ++++++++++++++++++++++++++++++++++++++
+>  arch/arm64/kernel/head.S           |  6 ++--
+>  drivers/irqchip/irq-gic-v3.c       | 16 +++++-----
+>  include/linux/irqchip/arm-gic-v3.h | 42 +++++++++++++-------------
+>  4 files changed, 93 insertions(+), 31 deletions(-)
+>  create mode 100644 arch/arm64/include/asm/sysreg.h
+
+I'm going to assume this goes on top of Marc's series, and that you'll
+take it through arm64:
+
+Acked-by: Jason Cooper <jason@lakedaemon.net>
+
+thx,
+
+Jason.
