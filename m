@@ -1,313 +1,71 @@
-From: rdunlap@infradead.org (Randy Dunlap)
-Date: Thu, 24 Jul 2014 13:42:00 -0700
-Subject: [PATCH 19/19] Documentation: ACPI for ARM64
-In-Reply-To: <1406206825-15590-20-git-send-email-hanjun.guo@linaro.org>
-References: <1406206825-15590-1-git-send-email-hanjun.guo@linaro.org>
- <1406206825-15590-20-git-send-email-hanjun.guo@linaro.org>
-Message-ID: <53D16F98.9080107@infradead.org>
+From: sam@ravnborg.org (Sam Ravnborg)
+Date: Thu, 24 Jul 2014 22:45:26 +0200
+Subject: [PATCH] arm64/crypto: fix makefile rule for aes-glue-%.o
+In-Reply-To: <CAKv+Gu8ikMGNVHeuujSf4eaK+LOFKMWxKF8i76VthnKYgvOcYQ@mail.gmail.com>
+References: <mvm4my7j5xh.fsf@hawking.suse.de>
+ <CAKv+Gu-6rUxUnF+dRuroDJqy2K2B5F0r7_bm0X-vyiuQ-83W5w@mail.gmail.com>
+ <CAKv+Gu96k7GOVR85EXtro3Lt0jjiJqxyvT9cwJZ1qc6uzq97bw@mail.gmail.com>
+ <mvmvbqmj3b2.fsf@hawking.suse.de>
+ <CAKv+Gu_9HRwAxkJjT3KRvDbupp0yzstyq1dXsXkTu9M6swdCKQ@mail.gmail.com>
+ <mvmr41aj2ob.fsf@hawking.suse.de>
+ <CAKv+Gu_z4VTssLDhiQxi8DRJNEUgzrM5bFzje8NXEmBiA2vqeg@mail.gmail.com>
+ <CAKv+Gu-B9_sgGgw9obrBGNUFSS1JcskN34s1X4PU8F5bauHT1Q@mail.gmail.com>
+ <20140724161225.GA11204@ravnborg.org>
+ <CAKv+Gu8ikMGNVHeuujSf4eaK+LOFKMWxKF8i76VthnKYgvOcYQ@mail.gmail.com>
+Message-ID: <20140724204526.GA11754@ravnborg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/24/2014 06:00 AM, Hanjun Guo wrote:
-> From: Graeme Gregory <graeme.gregory@linaro.org>
+On Thu, Jul 24, 2014 at 09:25:13PM +0200, Ard Biesheuvel wrote:
+> On 24 July 2014 18:12, Sam Ravnborg <sam@ravnborg.org> wrote:
+> > On Thu, Jul 24, 2014 at 04:24:48PM +0200, Ard Biesheuvel wrote:
+> >> On 24 July 2014 16:18, Ard Biesheuvel <ard.biesheuvel@linaro.org> wrote:
+> >> > On 24 July 2014 15:40, Andreas Schwab <schwab@suse.de> wrote:
+> >> >> Ard Biesheuvel <ard.biesheuvel@linaro.org> writes:
+> >> >>
+> >> >>> On 24 July 2014 15:26, Andreas Schwab <schwab@suse.de> wrote:
+> >> >>>> You are not using CONFIG_MODVERSIONS.
+> >> >>>>
+> >> >>>
+> >> >>> I am
+> >> >>
+> >> >> No, you aren't, since you say that your .cmd contains a command to
+> >> >> create aes-glue-ce.o, which with CONFIG_MODVERSIONS it doesn't.
+> >> >>
+> >> >
+> >> > OK, you're right, it contains a command to create .tmp_aes-glue-ce.o.
+> >> > But I am still not seeing the error you are seeing, strangely enough.
+> >>
+> >> OK, now I am seeing it.
+> >>
+> >> Acked-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+> >
+> > Jumping in the end of the thread here - sorry for that.
+> >
 > 
-> Add documentation for the guidelines of how to use ACPI
-> on ARM64.
+> No worries
 > 
-> Signed-off-by: Graeme Gregory <graeme.gregory@linaro.org>
-> Signed-off-by: Hanjun Guo <hanjun.guo@linaro.org>
-> ---
->  Documentation/arm64/arm-acpi.txt |  240 ++++++++++++++++++++++++++++++++++++++
->  1 file changed, 240 insertions(+)
->  create mode 100644 Documentation/arm64/arm-acpi.txt
+> > Another way to solve this would be to create two
+> > small wrapper files:
+> > aes-glue-neon.c - which include aes-glue.c
+> > aes-glue-ce.c that include aes-glue.c
+> >
+> > Then you could use standard kbuild support for building your module.
+> > And we will not potentially break it when we change cc_o_c in the near future.
+> >
 > 
-> diff --git a/Documentation/arm64/arm-acpi.txt b/Documentation/arm64/arm-acpi.txt
-> new file mode 100644
-> index 0000000..12cd550
-> --- /dev/null
-> +++ b/Documentation/arm64/arm-acpi.txt
-> @@ -0,0 +1,240 @@
-> +ACPI on ARMv8 Servers
-> +---------------------
-> +
-> +ACPI will be used for ARMv8 general purpose servers designed to follow
-> +the SBSA specification (currently available to people with an ARM login at
-> +http://silver.arm.com)
+> I see how that would fix this issue, but frankly, if we need to add .c
+> files that only #include other .c files to support building multiple
+> objects from a single .c file, I think the flaw is in the build
+> system, and I would rather fix the build system instead.
+The kbuild syntax could be extended to allow building multiple .o files from
+a single .c file. But the need for this feature is so seldom that
+people would not recognize the syntax most likely.
 
-                    .com).
+Btw. the current solution is already faulty - even with the fix.
+There are no support for make C=2 arch/.../crypto/
 
-> +
-> +The implemented ACPI version is 5.1 + errata as released by the UEFI Forum,
-> +which is available at <http://www.uefi.org/acpi/specs>.
-> +
-> +If the machine does not meet these requirements then it is likely that Device
-> +Tree (DT) is more suitable for the hardware.
-> +
-> +Relationship with Device Tree
-> +-----------------------------
-> +
-> +ACPI support in drivers and subsystems for ARMv8 should never be mutually
-> +exclusive with DT support at compile time.
-> +
-> +At boot time the kernel will only use one description method depending on
-> +parameters passed from the bootloader.
-> +
-> +Regardless of whether DT or ACPI is used, the kernel must always be capable
-> +of booting with either scheme.
-> +
-> +When booting using ACPI tables the /chosen node in DT will still be parsed
-> +to extract the kernel command line and initrd path. No other section of
-> +the DT will be used.
-> +
-> +Booting using ACPI tables
-> +-------------------------
-> +
-> +Currently, the only defined method to pass ACPI tables to the kernel on ARMv8
-> +is via the UEFI system configuration table.
-> +
-> +The UEFI implementation MUST set the ACPI_20_TABLE_GUID to point to the
-> +RSDP table (the table with the ACPI signature "RSD PTR ").
-> +
-> +The pointer to the RSDP table will be retrieved from EFI by the ACPI core.
-> +
-> +Processing of ACPI tables may be disabled by passing acpi=off on the kernel
-> +command line.
-> +
-> +DO use an XSDT, RSDTs are deprecated and should not be used on arm64. They
+Therefore - for now the correct fix is to use two wrapper .c files,
+and accept this. It will not have the C=2 problem above.
 
-             XSDT;
-
-> +only allow for 32bit addresses.
-
-                  32-bit
-
-> +
-> +DO NOT use the 32-bit address fields in the FADT, they are deprecated, the
-
-                                               FADT; they are deprecated. The
-
-> +64-bit alternatives MUST be used.
-> +
-> +The minimum set of tables MUST include RSDP, XSDT, FACS, FADT, DSDT, MADT
-> +and GTDT. If PCI is used the MCFG table MUST also be present.
-> +
-> +ACPI Detection
-> +--------------
-> +
-> +Drivers should determine their probe() type by checking for ACPI_HANDLE,
-> +or .of_node, or other information in the device structure. This is
-> +detailed further in the "Driver Recomendations" section.
-
-                                   Recommendations
-
-> +
-> +If the presence of ACPI needs to be detected at runtime, then check the value
-> +of acpi_disabled. If CONFIG_ACPI not being set acpi_disabled will always be 1.
-
-                     If CONFIG_ACPI is not set, acpi_disabled will always be 1.
-
-> +
-> +Device Enumeration
-> +------------------
-> +
-> +Device descriptions in ACPI should use standard recognised ACPI interfaces.
-> +These are far simpler than the information provided via Device Tree. Drivers
-> +should take into account this simplicity and work with sensible defaults.
-> +
-> +On no account should a Device Tree attempt to be replicated in ASL using such
-> +constructs as Name(KEY0, "Value1") type constructs. Additional driver specific
-> +data should be passed in the appropriate _DSM (ACPI Section 9.14.1) method or
-> +_DSD (ACPI Section 6.2.5). This data should be rare and not OS specific.
-> +
-> +Common _DSD bindings should be submitted to ASWG to be included in the
-> +document :-
-> +
-> +http://www.uefi.org/sites/default/files/resources/_DSD-implementation-guide-toplevel.htm
-> +
-> +TODO: Clarification and examples from Juno implementation.
-> +
-> +Programmable Power Control Resources
-> +------------------------------------
-> +
-> +Programmable power control resources include such resources as voltage/current
-> +providers (regulators) and clock sources.
-> +
-> +For power control of these resources they should be represented with Power
-> +Resource Objects (ACPI Section 7.1). The ACPI core will then handle correctly
-> +enabling/disabling of resources as they are needed.
-> +
-> +There exists in the ACPI 5.1 specification no standard binding for these objects
-> +to enable programmable levels or rates so this should be avoid if possible and
-
-                                                            avoided
-
-> +the resources set to appropriate level by the firmware. If this is not possible
-
-                                    levels
-
-> +then any manipulation should be abstracted in ASL.
-> +
-> +Each device in ACPI has D-states and these can be controlled through
-> +the optional methods _PS0..._PS3 where _PS0 is full on and _PS3 is full off.
-> +
-> +If either _PS0 or _PS3 is implemented, then the other method must also be
-> +implemented.
-> +
-> +If a device requires usage or setup of a power resource when on, the ASL
-> +should organise that it is allocated/enabled using the _PS0 method.
-> +
-> +Resources allocated/enabled in the _PS0 method should be disabled/de-allocated
-> +in the _PS3 method.
-> +
-> +Such code in _PS? methods will of course be very platform specific but
-> +should allow the driver to operate the device without special non standard
-
-                                                                 non-standard
-
-> +values being read from ASL. Further, abstracting the use of these resources
-> +allows hardware revisions without requiring updates to the kernel.
-> +
-> +TODO: Clarification and examples from Juno implementation.
-> +
-> +Clocks
-> +------
-> +
-> +Like clocks that are part of the power resources there is no standard way
-> +to represent a clock tree in ACPI 5.1 in a similar manner to how it is
-> +described in DT.
-> +
-> +Devices affected by this include things like UARTs, SoC driven LCD displays,
-> +etc.
-> +
-> +The firmware for example UEFI should initialise these clocks to fixed working
-
-                (for example, UEFI)
-
-> +values before the kernel is executed. If a driver requires to know rates of
-> +clocks set by firmware then they can be passed to kernel using _DSD.
-> +
-> +example :-
-> +
-> +Device (CLK0) {
-> +	...
-> +
-> +	Name (_DSD, Package() {
-> +		ToUUID("XXXXX"),
-> +		Package() {
-> +			Package(2) {"#clock-cells", 0},
-> +			Package(2) {"clock-frequency", "10000"}
-> +		}
-> +	})
-> +
-> +	...
-> +}
-> +
-> +Device (USR1) {
-> +	...
-> +
-> +	Name (_DSD, Package() {
-> +		ToUUID("XXXXX"),
-> +		Package() {
-> +			Package(2) {"clocks", Package() {1, ^CLK0}}},
-> +		}
-> +	})
-> +
-> +	...
-> +}
-> +			
-> +Driver Recommendations
-> +----------------------
-> +
-> +DO NOT remove any FDT handling when adding ACPI support for a driver, different
-
-                                                                 driver. Different
-
-> +systems may use the same device.
-> +
-> +DO try and keep complex sections of ACPI and DT functionality seperate. This
-
-                                                                 separate.
-
-> +may mean a patch to break out some complex DT to another function before
-> +the patch to add ACPI. This may happen in other functions but is most likely
-> +in probe function. This gives a clearer flow of data for reviewing driver
-> +source.
-> +
-> +probe() :-
-> +
-> +TODO: replace this with a specific real example from Juno?
-> +
-> +static int device_probe_dt(struct platform_device *pdev)
-> +{
-> +	/* DT specific functionality */
-> +	...
-> +}
-> +
-> +static int device_probe_acpi(struct platform_device *pdev)
-> +{
-> +	/* ACPI specific functionality */
-> +	...
-> +}
-> +
-> +static int device_probe(stuct platform_device *pdev)
-> +{
-> +	...
-> +	acpi_handle handle = ACPI_HANDLE(&pdev->dev);
-> +	struct device_node node = pdev->dev.of_node;
-> +	...
-> +
-> +	if (node)
-> +		ret = device_probe_dt(pdev);
-> +	else if (handle)
-> +		ret = device_probe_acpi(pdev);
-> +	else
-> +		/* other initialisation */
-> +		...
-> +	/* Continue with any generic probe operations */
-> +	...
-> +}
-> +
-> +DO keep the MODULE_DEVICE_TABLE entries together in the driver to make it clear
-> +the different names the driver is probed for, both from DT and from ACPI.
-> +
-> +module device tables :-
-> +
-> +static struct of_device_id virtio_mmio_match[] = {
-> +        { .compatible = "virtio,mmio", },
-> +        {},
-> +};
-> +MODULE_DEVICE_TABLE(of, virtio_mmio_match);
-> +
-> +static const struct acpi_device_id virtio_mmio_acpi_match[] = {
-> +        { "LNRO0005", },
-> +        { }
-> +};
-> +MODULE_DEVICE_TABLE(acpi, virtio_mmio_acpi_match);
-> +
-> +TODO: Add any other helpful rules that develop from Juno ACPI work.
-> +
-> +ASWG
-> +----
-> +
-> +The following areas are not yet well defined for ARM in the current ACPI
-> +specification and are expected to be worked through in the UEFI ACPI
-> +Specification Working Group (ASWG) <http://www.uefi.org/workinggroups>.
-> +Participation in this group is open to all UEFI members.
-> +
-> +	- ACPI based CPU topology
-> +	- ACPI based Power management
-> +	- CPU idle control based on PSCI
-> +	- CPU performance control (CPPC)
-> +
-> +No code shall be accepted into the kernel unless it complies with the released
-> +standards from UEFI ASWG. If there are features missing from ACPI to make it
-> +function on a platform ECRs should be submitted to ASWG and go through the
-
-            on a platform, ECRs
-
-> +approval process.
-> 
-
-
--- 
-~Randy
+	Sam
