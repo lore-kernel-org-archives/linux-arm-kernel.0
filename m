@@ -1,53 +1,32 @@
-From: herbert@gondor.apana.org.au (Herbert Xu)
-Date: Thu, 24 Jul 2014 14:00:54 +0800
-Subject: [PATCH v4 3/3] crypto: Add Allwinner Security System crypto
- accelerator
-In-Reply-To: <1405169953-13695-4-git-send-email-clabbe.montjoie@gmail.com>
-References: <1405169953-13695-1-git-send-email-clabbe.montjoie@gmail.com>
- <1405169953-13695-4-git-send-email-clabbe.montjoie@gmail.com>
-Message-ID: <20140724060054.GA6545@gondor.apana.org.au>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Thu, 24 Jul 2014 14:10:25 +0800
+Subject: [PATCH] ARM: dts: imx: Add alias for ethernet controller
+In-Reply-To: <20140724035253.GA7484@kroah.com>
+References: <1406167639-6911-1-git-send-email-marex@denx.de>
+ <20140724031753.GA6827@dragon> <20140724035253.GA7484@kroah.com>
+Message-ID: <20140724061023.GB6827@dragon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Jul 12, 2014 at 02:59:13PM +0200, LABBE Corentin wrote:
->
-> +/* sunxi_hash_init: initialize request context
-> + * Activate the SS, and configure it for MD5 or SHA1
-> + */
-> +int sunxi_hash_init(struct ahash_request *areq)
-> +{
-> +	const char *hash_type;
-> +	struct crypto_ahash *tfm = crypto_ahash_reqtfm(areq);
-> +	struct sunxi_req_ctx *op = crypto_ahash_ctx(tfm);
-> +
-> +	mutex_lock(&ss->lock);
-> +
-> +	hash_type = crypto_tfm_alg_name(areq->base.tfm);
-> +
-> +	op->byte_count = 0;
-> +	op->nbwait = 0;
-> +	op->waitbuf = 0;
-> +
-> +	/* Enable and configure SS for MD5 or SHA1 */
-> +	if (strcmp(hash_type, "sha1") == 0)
-> +		op->mode = SS_OP_SHA1;
-> +	else
-> +		op->mode = SS_OP_MD5;
-> +
-> +	writel(op->mode | SS_ENABLED, ss->base + SS_CTL);
-> +	return 0;
+On Wed, Jul 23, 2014 at 08:52:53PM -0700, Greg KH wrote:
+> On Thu, Jul 24, 2014 at 11:17:55AM +0800, Shawn Guo wrote:
+> > On Thu, Jul 24, 2014 at 04:07:19AM +0200, Marek Vasut wrote:
+> > > commit 22970070e027cbbb9b2878f8f7c31d0d7f29e94d upstream.
+> > > 
+> > > Add alias for FEC ethernet on i.MX25, i.MX27, i.MX51 and i.MX53 to allow
+> > > bootloaders (like U-Boot) patch-in the MAC address for FEC using this
+> > > alias.
+> > > 
+> > > Signed-off-by: Marek Vasut <marex@denx.de>
+> > > Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
+> > > Cc: <stable@vger.kernel.org> # 3.14.x
+> > 
+> > Since the patch is already on mainline, and the submitting target is
+> > 3.14.x stable kernel, you should really send it to Greg.
+> 
+> No, Marek did the right thing here by sending it to the stable at vger
+> mailing list, never send stable patches only to me.
 
-The hash driver is completely broken.  You are modifying tfm
-ctx data which is shared by all users of a single tfm.  So
-if two users conduct hashes in parallel they will step all
-over each other.
+Oh, I did not mean sending the patch only to you, but have you on copy.
 
-Worse, the unpaired mutex_lock will quickly lead to dead locks.
-
-You cannot assume that final will be called.
-
-Cheers,
--- 
-Email: Herbert Xu <herbert@gondor.apana.org.au>
-Home Page: http://gondor.apana.org.au/~herbert/
-PGP Key: http://gondor.apana.org.au/~herbert/pubkey.txt
+Shawn
