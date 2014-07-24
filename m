@@ -1,33 +1,119 @@
-From: antoine.tenart@free-electrons.com (=?UTF-8?q?Antoine=20T=C3=A9nart?=)
-Date: Thu, 24 Jul 2014 11:17:27 +0200
-Subject: [PATCH v11 5/8] ata: ahci_platform: add a generic AHCI compatible
-In-Reply-To: <1406193450-17283-1-git-send-email-antoine.tenart@free-electrons.com>
-References: <1406193450-17283-1-git-send-email-antoine.tenart@free-electrons.com>
-Message-ID: <1406193450-17283-6-git-send-email-antoine.tenart@free-electrons.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Thu, 24 Jul 2014 11:17:45 +0200
+Subject: [RFC] PCI: pcie-designware: allow drivers as loadable modules
+Message-ID: <5303286.K45Li7B92z@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The ahci_platform driver is a generic driver using the libahci_platform
-functions. Add a generic compatible to avoid having an endless list of
-compatibles with no differences for the same driver.
+>From 0ee79c7451851a34e5a7c33eb6020befcdcb2b24 Mon Sep 17 00:00:00 2001
+From: Arnd Bergmann <arnd@arndb.de>
+Date: Thu, 24 Jul 2014 11:12:48 +0200
+Subject: [PATCH] PCI: pcie-designware: allow drivers as loadable modules
 
-Signed-off-by: Antoine T?nart <antoine.tenart@free-electrons.com>
+The new pcie-spear13xx driver uses the pcie-designware library
+and in the current form it can be built as a loadable module.
+However, the functions it uses from the base driver are not exported,
+so this results in a build failure and a module that can never
+be loaded:
+
+ERROR: "dw_pcie_host_init" [drivers/pci/host/pcie-spear13xx.ko] undefined!
+ERROR: "dw_handle_msi_irq" [drivers/pci/host/pcie-spear13xx.ko] undefined!
+ERROR: "dw_pcie_msi_init" [drivers/pci/host/pcie-spear13xx.ko] undefined!
+ERROR: "dw_pcie_cfg_write" [drivers/pci/host/pcie-spear13xx.ko] undefined!
+ERROR: "dw_pcie_cfg_read" [drivers/pci/host/pcie-spear13xx.ko] undefined!
+ERROR: "dw_pcie_setup_rc" [drivers/pci/host/pcie-spear13xx.ko] undefined!
+ERROR: "dw_pcie_link_up" [drivers/pci/host/pcie-spear13xx.ko] undefined!
+
+If we want to allow loadable pcie-designware drivers, we have to
+export all those symbols and ensure none of them are marked as __init.
+This also requires making pci_assign_unassigned_resources available
+after boot.
+
+Signed-off-by: Arnd Bergmann <arnd@arndb.de>
 ---
- drivers/ata/ahci_platform.c | 2 ++
- 1 file changed, 2 insertions(+)
+If we don't want this patch for some reason, we should instead mark
+this driver 'bool' in Kconfig, so it becomes impossible to encounter
+this build error.
 
-diff --git a/drivers/ata/ahci_platform.c b/drivers/ata/ahci_platform.c
-index 95f9ca82082a..61b15e784020 100644
---- a/drivers/ata/ahci_platform.c
-+++ b/drivers/ata/ahci_platform.c
-@@ -77,6 +77,8 @@ static SIMPLE_DEV_PM_OPS(ahci_pm_ops, ahci_platform_suspend,
- 			 ahci_platform_resume);
+diff --git a/drivers/pci/host/pcie-designware.c b/drivers/pci/host/pcie-designware.c
+index 1eaf4df3618a..0348408ebc68 100644
+--- a/drivers/pci/host/pcie-designware.c
++++ b/drivers/pci/host/pcie-designware.c
+@@ -88,6 +88,7 @@ int dw_pcie_cfg_read(void __iomem *addr, int where, int size, u32 *val)
  
- static const struct of_device_id ahci_of_match[] = {
-+	{ .compatible = "generic-ahci", },
-+	/* Keep the following compatibles for device tree compatibility */
- 	{ .compatible = "snps,spear-ahci", },
- 	{ .compatible = "snps,exynos5440-ahci", },
- 	{ .compatible = "ibm,476gtr-ahci", },
--- 
-1.9.1
+ 	return PCIBIOS_SUCCESSFUL;
+ }
++EXPORT_SYMBOL_GPL(dw_pcie_cfg_read);
+ 
+ int dw_pcie_cfg_write(void __iomem *addr, int where, int size, u32 val)
+ {
+@@ -102,6 +103,7 @@ int dw_pcie_cfg_write(void __iomem *addr, int where, int size, u32 val)
+ 
+ 	return PCIBIOS_SUCCESSFUL;
+ }
++EXPORT_SYMBOL_GPL(dw_pcie_cfg_write);
+ 
+ static inline void dw_pcie_readl_rc(struct pcie_port *pp, u32 reg, u32 *val)
+ {
+@@ -182,6 +184,7 @@ irqreturn_t dw_handle_msi_irq(struct pcie_port *pp)
+ 
+ 	return ret;
+ }
++EXPORT_SYMBOL_GPL(dw_handle_msi_irq);
+ 
+ void dw_pcie_msi_init(struct pcie_port *pp)
+ {
+@@ -192,6 +195,7 @@ void dw_pcie_msi_init(struct pcie_port *pp)
+ 			virt_to_phys((void *)pp->msi_data));
+ 	dw_pcie_wr_own_conf(pp, PCIE_MSI_ADDR_HI, 4, 0);
+ }
++EXPORT_SYMBOL_GPL(dw_pcie_msi_init);
+ 
+ static int find_valid_pos0(struct pcie_port *pp, int msgvec, int pos, int *pos0)
+ {
+@@ -378,6 +382,7 @@ int dw_pcie_link_up(struct pcie_port *pp)
+ 	else
+ 		return 0;
+ }
++EXPORT_SYMBOL_GPL(dw_pcie_link_up);
+ 
+ static int dw_pcie_msi_map(struct irq_domain *domain, unsigned int irq,
+ 			irq_hw_number_t hwirq)
+@@ -393,7 +398,7 @@ static const struct irq_domain_ops msi_domain_ops = {
+ 	.map = dw_pcie_msi_map,
+ };
+ 
+-int __init dw_pcie_host_init(struct pcie_port *pp)
++int dw_pcie_host_init(struct pcie_port *pp)
+ {
+ 	struct device_node *np = pp->dev->of_node;
+ 	struct of_pci_range range;
+@@ -503,6 +508,7 @@ int __init dw_pcie_host_init(struct pcie_port *pp)
+ 
+ 	return 0;
+ }
++EXPORT_SYMBOL_GPL(dw_pcie_host_init);
+ 
+ static void dw_pcie_prog_viewport_cfg0(struct pcie_port *pp, u32 busdev)
+ {
+@@ -829,6 +835,7 @@ void dw_pcie_setup_rc(struct pcie_port *pp)
+ 		PCI_COMMAND_MASTER | PCI_COMMAND_SERR;
+ 	dw_pcie_writel_rc(pp, val, PCI_COMMAND);
+ }
++EXPORT_SYMBOL_GPL(dw_pcie_setup_rc);
+ 
+ MODULE_AUTHOR("Jingoo Han <jg1.han@samsung.com>");
+ MODULE_DESCRIPTION("Designware PCIe host controller driver");
+diff --git a/drivers/pci/setup-bus.c b/drivers/pci/setup-bus.c
+index 6373985ad3f7..eeef7a1f4d0d 100644
+--- a/drivers/pci/setup-bus.c
++++ b/drivers/pci/setup-bus.c
+@@ -1634,7 +1634,7 @@ dump:
+ 	pci_bus_dump_resources(bus);
+ }
+ 
+-void __init pci_assign_unassigned_resources(void)
++void pci_assign_unassigned_resources(void)
+ {
+ 	struct pci_bus *root_bus;
+ 
