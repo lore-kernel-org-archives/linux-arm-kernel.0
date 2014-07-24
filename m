@@ -1,239 +1,91 @@
-From: antoine.tenart@free-electrons.com (=?UTF-8?q?Antoine=20T=C3=A9nart?=)
-Date: Thu, 24 Jul 2014 11:17:25 +0200
-Subject: [PATCH v11 3/8] ata: libahci_platform: move port_map parameters into
- the AHCI structure
-In-Reply-To: <1406193450-17283-1-git-send-email-antoine.tenart@free-electrons.com>
-References: <1406193450-17283-1-git-send-email-antoine.tenart@free-electrons.com>
-Message-ID: <1406193450-17283-4-git-send-email-antoine.tenart@free-electrons.com>
+From: daniel.lezcano@linaro.org (Daniel Lezcano)
+Date: Thu, 24 Jul 2014 11:17:37 +0200
+Subject: [PATCHv3 13/16] cpuidle: mvebu: add Armada 38x support
+In-Reply-To: <1406120453-29291-14-git-send-email-thomas.petazzoni@free-electrons.com>
+References: <1406120453-29291-1-git-send-email-thomas.petazzoni@free-electrons.com>
+ <1406120453-29291-14-git-send-email-thomas.petazzoni@free-electrons.com>
+Message-ID: <53D0CF31.8000607@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch moves force_port_map and mask_port_map into the
-ahci_host_priv structure. This allows to modify them into the AHCI
-framework. This is needed by the new dt bindings representing ports as
-the port_map mask is computed automatically.
+On 07/23/2014 03:00 PM, Thomas Petazzoni wrote:
+> This commit adds the list of cpuidle states supported by the Armada
+> 38x SoC in the cpuidle-mvebu-v7 driver, as well as the necessary logic
+> around it to support this SoC.
+>
+> Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
 
-Signed-off-by: Antoine T?nart <antoine.tenart@free-electrons.com>
----
- drivers/ata/ahci.h             |  6 +++---
- drivers/ata/ahci_da850.c       |  3 +--
- drivers/ata/ahci_imx.c         |  3 +--
- drivers/ata/ahci_mvebu.c       |  3 +--
- drivers/ata/ahci_platform.c    |  3 +--
- drivers/ata/ahci_st.c          |  2 +-
- drivers/ata/ahci_sunxi.c       |  2 +-
- drivers/ata/ahci_xgene.c       |  2 +-
- drivers/ata/libahci.c          | 17 +++++++----------
- drivers/ata/libahci_platform.c |  8 ++------
- include/linux/ahci_platform.h  |  4 +---
- 11 files changed, 20 insertions(+), 33 deletions(-)
+Acked-by: Daniel Lezcano <daniel.lezcano@linaro.org>
 
-diff --git a/drivers/ata/ahci.h b/drivers/ata/ahci.h
-index 5513296e5e2e..cb8d58926851 100644
---- a/drivers/ata/ahci.h
-+++ b/drivers/ata/ahci.h
-@@ -321,6 +321,8 @@ struct ahci_host_priv {
- 	u32			cap;		/* cap to use */
- 	u32			cap2;		/* cap2 to use */
- 	u32			port_map;	/* port map to use */
-+	u32			force_port_map;	/* force port map */
-+	u32			mask_port_map;	/* mask out particular bits */
- 	u32			saved_cap;	/* saved initial cap */
- 	u32			saved_cap2;	/* saved initial cap2 */
- 	u32			saved_port_map;	/* saved initial port_map */
-@@ -361,9 +363,7 @@ unsigned int ahci_dev_classify(struct ata_port *ap);
- void ahci_fill_cmd_slot(struct ahci_port_priv *pp, unsigned int tag,
- 			u32 opts);
- void ahci_save_initial_config(struct device *dev,
--			      struct ahci_host_priv *hpriv,
--			      unsigned int force_port_map,
--			      unsigned int mask_port_map);
-+			      struct ahci_host_priv *hpriv);
- void ahci_init_controller(struct ata_host *host);
- int ahci_reset_controller(struct ata_host *host);
- 
-diff --git a/drivers/ata/ahci_da850.c b/drivers/ata/ahci_da850.c
-index 2b77d53bccf8..33b862b2c5db 100644
---- a/drivers/ata/ahci_da850.c
-+++ b/drivers/ata/ahci_da850.c
-@@ -85,8 +85,7 @@ static int ahci_da850_probe(struct platform_device *pdev)
- 
- 	da850_sata_init(dev, pwrdn_reg, hpriv->mmio);
- 
--	rc = ahci_platform_init_host(pdev, hpriv, &ahci_da850_port_info,
--				     0, 0, 0);
-+	rc = ahci_platform_init_host(pdev, hpriv, &ahci_da850_port_info, 0);
- 	if (rc)
- 		goto disable_resources;
- 
-diff --git a/drivers/ata/ahci_imx.c b/drivers/ata/ahci_imx.c
-index cac4360f272a..c8eef2d745d8 100644
---- a/drivers/ata/ahci_imx.c
-+++ b/drivers/ata/ahci_imx.c
-@@ -454,8 +454,7 @@ static int imx_ahci_probe(struct platform_device *pdev)
- 	reg_val = clk_get_rate(imxpriv->ahb_clk) / 1000;
- 	writel(reg_val, hpriv->mmio + IMX_TIMER1MS);
- 
--	ret = ahci_platform_init_host(pdev, hpriv, &ahci_imx_port_info,
--				      0, 0, 0);
-+	ret = ahci_platform_init_host(pdev, hpriv, &ahci_imx_port_info, 0);
- 	if (ret)
- 		goto disable_sata;
- 
-diff --git a/drivers/ata/ahci_mvebu.c b/drivers/ata/ahci_mvebu.c
-index fd3dfd733b84..0ba0cf7a9ba9 100644
---- a/drivers/ata/ahci_mvebu.c
-+++ b/drivers/ata/ahci_mvebu.c
-@@ -88,8 +88,7 @@ static int ahci_mvebu_probe(struct platform_device *pdev)
- 	ahci_mvebu_mbus_config(hpriv, dram);
- 	ahci_mvebu_regret_option(hpriv);
- 
--	rc = ahci_platform_init_host(pdev, hpriv, &ahci_mvebu_port_info,
--				     0, 0, 0);
-+	rc = ahci_platform_init_host(pdev, hpriv, &ahci_mvebu_port_info, 0);
- 	if (rc)
- 		goto disable_resources;
- 
-diff --git a/drivers/ata/ahci_platform.c b/drivers/ata/ahci_platform.c
-index b10d81ddb528..95f9ca82082a 100644
---- a/drivers/ata/ahci_platform.c
-+++ b/drivers/ata/ahci_platform.c
-@@ -60,8 +60,7 @@ static int ahci_probe(struct platform_device *pdev)
- 	if (of_device_is_compatible(dev->of_node, "hisilicon,hisi-ahci"))
- 		hflags |= AHCI_HFLAG_NO_FBS | AHCI_HFLAG_NO_NCQ;
- 
--	rc = ahci_platform_init_host(pdev, hpriv, &ahci_port_info,
--				     hflags, 0, 0);
-+	rc = ahci_platform_init_host(pdev, hpriv, &ahci_port_info, hflags);
- 	if (rc)
- 		goto pdata_exit;
- 
-diff --git a/drivers/ata/ahci_st.c b/drivers/ata/ahci_st.c
-index 2595598df9ce..6767c7790b4a 100644
---- a/drivers/ata/ahci_st.c
-+++ b/drivers/ata/ahci_st.c
-@@ -166,7 +166,7 @@ static int st_ahci_probe(struct platform_device *pdev)
- 	if (err)
- 		return err;
- 
--	err = ahci_platform_init_host(pdev, hpriv, &st_ahci_port_info, 0, 0, 0);
-+	err = ahci_platform_init_host(pdev, hpriv, &st_ahci_port_info, 0);
- 	if (err) {
- 		ahci_platform_disable_resources(hpriv);
- 		return err;
-diff --git a/drivers/ata/ahci_sunxi.c b/drivers/ata/ahci_sunxi.c
-index 02002f125bd4..9f8ff1f9e912 100644
---- a/drivers/ata/ahci_sunxi.c
-+++ b/drivers/ata/ahci_sunxi.c
-@@ -188,7 +188,7 @@ static int ahci_sunxi_probe(struct platform_device *pdev)
- 		 AHCI_HFLAG_NO_PMP | AHCI_HFLAG_YES_NCQ;
- 
- 	rc = ahci_platform_init_host(pdev, hpriv, &ahci_sunxi_port_info,
--				     hflags, 0, 0);
-+				     hflags);
- 	if (rc)
- 		goto disable_resources;
- 
-diff --git a/drivers/ata/ahci_xgene.c b/drivers/ata/ahci_xgene.c
-index ee3a3659bd9e..87d39fbe616b 100644
---- a/drivers/ata/ahci_xgene.c
-+++ b/drivers/ata/ahci_xgene.c
-@@ -487,7 +487,7 @@ static int xgene_ahci_probe(struct platform_device *pdev)
- 	hflags = AHCI_HFLAG_NO_PMP | AHCI_HFLAG_YES_NCQ;
- 
- 	rc = ahci_platform_init_host(pdev, hpriv, &xgene_ahci_port_info,
--				     hflags, 0, 0);
-+				     hflags);
- 	if (rc)
- 		goto disable_resources;
- 
-diff --git a/drivers/ata/libahci.c b/drivers/ata/libahci.c
-index d72ce0470309..3c0b623747bd 100644
---- a/drivers/ata/libahci.c
-+++ b/drivers/ata/libahci.c
-@@ -398,10 +398,7 @@ static ssize_t ahci_show_em_supported(struct device *dev,
-  *	LOCKING:
-  *	None.
-  */
--void ahci_save_initial_config(struct device *dev,
--			      struct ahci_host_priv *hpriv,
--			      unsigned int force_port_map,
--			      unsigned int mask_port_map)
-+void ahci_save_initial_config(struct device *dev, struct ahci_host_priv *hpriv)
- {
- 	void __iomem *mmio = hpriv->mmio;
- 	u32 cap, cap2, vers, port_map;
-@@ -468,17 +465,17 @@ void ahci_save_initial_config(struct device *dev,
- 		cap &= ~HOST_CAP_FBS;
- 	}
- 
--	if (force_port_map && port_map != force_port_map) {
-+	if (hpriv->force_port_map && port_map != hpriv->force_port_map) {
- 		dev_info(dev, "forcing port_map 0x%x -> 0x%x\n",
--			 port_map, force_port_map);
--		port_map = force_port_map;
-+			 port_map, hpriv->force_port_map);
-+		port_map = hpriv->force_port_map;
- 	}
- 
--	if (mask_port_map) {
-+	if (hpriv->mask_port_map) {
- 		dev_warn(dev, "masking port_map 0x%x -> 0x%x\n",
- 			port_map,
--			port_map & mask_port_map);
--		port_map &= mask_port_map;
-+			port_map & hpriv->mask_port_map);
-+		port_map &= hpriv->mask_port_map;
- 	}
- 
- 	/* cross check port_map and cap.n_ports */
-diff --git a/drivers/ata/libahci_platform.c b/drivers/ata/libahci_platform.c
-index b0077589f065..db9b90d876dd 100644
---- a/drivers/ata/libahci_platform.c
-+++ b/drivers/ata/libahci_platform.c
-@@ -289,8 +289,6 @@ EXPORT_SYMBOL_GPL(ahci_platform_get_resources);
-  * @hpriv: ahci-host private data for the host
-  * @pi_template: template for the ata_port_info to use
-  * @host_flags: ahci host flags used in ahci_host_priv
-- * @force_port_map: param passed to ahci_save_initial_config
-- * @mask_port_map: param passed to ahci_save_initial_config
-  *
-  * This function does all the usual steps needed to bring up an
-  * ahci-platform host, note any necessary resources (ie clks, phy, etc.)
-@@ -302,9 +300,7 @@ EXPORT_SYMBOL_GPL(ahci_platform_get_resources);
- int ahci_platform_init_host(struct platform_device *pdev,
- 			    struct ahci_host_priv *hpriv,
- 			    const struct ata_port_info *pi_template,
--			    unsigned long host_flags,
--			    unsigned int force_port_map,
--			    unsigned int mask_port_map)
-+			    unsigned long host_flags)
- {
- 	struct device *dev = &pdev->dev;
- 	struct ata_port_info pi = *pi_template;
-@@ -322,7 +318,7 @@ int ahci_platform_init_host(struct platform_device *pdev,
- 	pi.private_data = (void *)host_flags;
- 	hpriv->flags |= host_flags;
- 
--	ahci_save_initial_config(dev, hpriv, force_port_map, mask_port_map);
-+	ahci_save_initial_config(dev, hpriv);
- 
- 	if (hpriv->cap & HOST_CAP_NCQ)
- 		pi.flags |= ATA_FLAG_NCQ;
-diff --git a/include/linux/ahci_platform.h b/include/linux/ahci_platform.h
-index 6dfd51a04d77..554bcafa7eb4 100644
---- a/include/linux/ahci_platform.h
-+++ b/include/linux/ahci_platform.h
-@@ -44,9 +44,7 @@ struct ahci_host_priv *ahci_platform_get_resources(
- int ahci_platform_init_host(struct platform_device *pdev,
- 			    struct ahci_host_priv *hpriv,
- 			    const struct ata_port_info *pi_template,
--			    unsigned long host_flags,
--			    unsigned int force_port_map,
--			    unsigned int mask_port_map);
-+			    unsigned long host_flags);
- 
- int ahci_platform_suspend_host(struct device *dev);
- int ahci_platform_resume_host(struct device *dev);
+> ---
+>   drivers/cpuidle/cpuidle-mvebu-v7.c | 29 ++++++++++++++++++++++++++++-
+>   1 file changed, 28 insertions(+), 1 deletion(-)
+>
+> diff --git a/drivers/cpuidle/cpuidle-mvebu-v7.c b/drivers/cpuidle/cpuidle-mvebu-v7.c
+> index d23597f..45371bb 100644
+> --- a/drivers/cpuidle/cpuidle-mvebu-v7.c
+> +++ b/drivers/cpuidle/cpuidle-mvebu-v7.c
+> @@ -1,5 +1,5 @@
+>   /*
+> - * Marvell Armada 370 and Armada XP SoC cpuidle driver
+> + * Marvell Armada 370, 38x and XP SoC cpuidle driver
+>    *
+>    * Copyright (C) 2014 Marvell
+>    *
+> @@ -86,6 +86,21 @@ static struct cpuidle_driver armada370_idle_driver = {
+>   	.state_count = 2,
+>   };
+>
+> +static struct cpuidle_driver armada38x_idle_driver = {
+> +	.name			= "armada_38x_idle",
+> +	.states[0]		= ARM_CPUIDLE_WFI_STATE,
+> +	.states[1]		= {
+> +		.enter			= mvebu_v7_enter_idle,
+> +		.exit_latency		= 10,
+> +		.power_usage		= 5,
+> +		.target_residency	= 100,
+> +		.flags			= CPUIDLE_FLAG_TIME_VALID,
+> +		.name			= "Idle",
+> +		.desc			= "CPU and SCU power down",
+> +	},
+> +	.state_count = 2,
+> +};
+> +
+>   static int mvebu_v7_cpuidle_probe(struct platform_device *pdev)
+>   {
+>   	mvebu_v7_cpu_suspend = pdev->dev.platform_data;
+> @@ -94,6 +109,8 @@ static int mvebu_v7_cpuidle_probe(struct platform_device *pdev)
+>   		return cpuidle_register(&armadaxp_idle_driver, NULL);
+>   	else if (!strcmp(pdev->dev.driver->name, "cpuidle-armada-370"))
+>   		return cpuidle_register(&armada370_idle_driver, NULL);
+> +	else if (!strcmp(pdev->dev.driver->name, "cpuidle-armada-38x"))
+> +		return cpuidle_register(&armada38x_idle_driver, NULL);
+>   	else
+>   		return -EINVAL;
+>   }
+> @@ -118,6 +135,16 @@ static struct platform_driver armada370_cpuidle_plat_driver = {
+>
+>   module_platform_driver(armada370_cpuidle_plat_driver);
+>
+> +static struct platform_driver armada38x_cpuidle_plat_driver = {
+> +	.driver = {
+> +		.name = "cpuidle-armada-38x",
+> +		.owner = THIS_MODULE,
+> +	},
+> +	.probe = mvebu_v7_cpuidle_probe,
+> +};
+> +
+> +module_platform_driver(armada38x_cpuidle_plat_driver);
+> +
+>   MODULE_AUTHOR("Gregory CLEMENT <gregory.clement@free-electrons.com>");
+>   MODULE_DESCRIPTION("Marvell EBU v7 cpuidle driver");
+>   MODULE_LICENSE("GPL");
+>
+
+
 -- 
-1.9.1
+  <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
+
+Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
+<http://twitter.com/#!/linaroorg> Twitter |
+<http://www.linaro.org/linaro-blog/> Blog
