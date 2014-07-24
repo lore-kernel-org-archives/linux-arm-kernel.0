@@ -1,56 +1,32 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Thu, 24 Jul 2014 14:53:49 +0200
-Subject: [PATCH] arm64/crypto: fix makefile rule for aes-glue-%.o
-In-Reply-To: <CAKv+Gu-6rUxUnF+dRuroDJqy2K2B5F0r7_bm0X-vyiuQ-83W5w@mail.gmail.com>
-References: <mvmvbri4k06.fsf@hawking.suse.de>
- <CAKv+Gu-NAVjMR-Jkw=W-8f7M5FSsQOSdzYN6A0kHDd1m0WA8EA@mail.gmail.com>
- <mvmr4264i1p.fsf@hawking.suse.de>
- <CAKv+Gu8SbM_Z=ymBFb2D4EWJeo-6dWuKqE2YNOkqJTKLDEJcYA@mail.gmail.com>
- <mvm4my7j5xh.fsf@hawking.suse.de>
- <CAKv+Gu-6rUxUnF+dRuroDJqy2K2B5F0r7_bm0X-vyiuQ-83W5w@mail.gmail.com>
-Message-ID: <CAKv+Gu96k7GOVR85EXtro3Lt0jjiJqxyvT9cwJZ1qc6uzq97bw@mail.gmail.com>
+From: hanjun.guo@linaro.org (Hanjun Guo)
+Date: Thu, 24 Jul 2014 20:59:14 +0800
+Subject: [PATCH 0/3] ACPICA updates for ACPI 5.1 MADT, FADT,
+ GTDT (Just for patch review)
+Message-ID: <1406206757-15512-1-git-send-email-hanjun.guo@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 24 July 2014 14:35, Ard Biesheuvel <ard.biesheuvel@linaro.org> wrote:
-> On 24 July 2014 14:29, Andreas Schwab <schwab@suse.de> wrote:
->> Ard Biesheuvel <ard.biesheuvel@linaro.org> writes:
->>
->>> On 30 June 2014 15:56, Andreas Schwab <schwab@suse.de> wrote:
->>>> Ard Biesheuvel <ard.biesheuvel@linaro.org> writes:
->>>>
->>>>> Out of curiosity, how did you trigger this failure? I have build this
->>>>> code numerous times (and so have others) and I have never seen this
->>>>> failure.
->>>>
->>>> Did you ever start with a clean tree?
->>>>
->>>
->>> Yep, building both in-tree and out-of-tree, no trouble at all.
->>
->> So you probably didn't configure them as modules.
->>
->
-> Yes, all the time, in fact. They have now been added as built-ins to
-> the defconfig, but I always build as modules, because it is far easier
-> when developing.
+This is the patch set to update ACPICA for MADT, FADT, GTDT in
+ACPI 5.1. These patches are only for review purpose, ACPICA
+patches will have there own special upstream process, it will be
+handled by Bob and Lv.
 
-Also, looking into this a bit more, in my case I do see
-arch/arm64/crypto/.aes-glue-ce.o.cmd containing the command line and
-the full set of include/config/... rules that are used to track
-dependencies on the configuration.
+Bob, Lv, please ignore this patch set since you are working on
+them now, it just for people to undstand the later ARM64 ACPI
+core patches better and for temporary test purpose. I will rebase
+my patch set once new version of ACPICA is released, thanks.
 
-So what strikes me as odd is this:
+Hanjun Guo (2):
+  ACPI / ACPICA: Introduce ARM Boot Architecture Flags in FADT
+  ACPI / ACPICA: Add GTDT support updated by ACPI 5.1
 
->   CC [M]  arch/arm64/crypto/aes-glue-ce.o
-> ld: cannot find arch/arm64/crypto/aes-glue-ce.o: No such file or directory
+Tomasz Nowicki (1):
+  ACPI / ACPICA: Add new features for MADT which introduced by ACPI 5.1
 
-so it seems make is perfectly happy to create the aes-glue-ce.o file,
-but the subsequent ld that uses it as input cannot find it. Perhaps
-the dependencies are screwed up elsewehere?
-
-Are there any other circumstances of interest? How many threads are
-you building in parallel? Other steps to reproduce?
+ include/acpi/actbl.h  |   12 ++++--
+ include/acpi/actbl1.h |   40 +++++++++++++++++---
+ include/acpi/actbl3.h |   99 ++++++++++++++++++++++++++++++++++++++++++-------
+ 3 files changed, 129 insertions(+), 22 deletions(-)
 
 -- 
-Ard.
+1.7.9.5
