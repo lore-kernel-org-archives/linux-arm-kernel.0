@@ -1,251 +1,137 @@
 From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Fri, 25 Jul 2014 08:30:04 +0900
-Subject: [GIT PULL 2/2] 2nd Samsung S5PV210 DT support for v3.17
-Message-ID: <53D196FC.40004@samsung.com>
+Date: Fri, 25 Jul 2014 08:31:06 +0900
+Subject: [PATCH v2] ARM: dts: add CPU nodes for Exynos4 SoCs
+In-Reply-To: <1444042.RbiCcg7JnP@amdc1032>
+References: <1444042.RbiCcg7JnP@amdc1032>
+Message-ID: <53D1973A.9060907@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Note that this is based on tags/samsung-cleanup
+On 07/21/14 22:57, Bartlomiej Zolnierkiewicz wrote:
+> Recent patch by Tomasz Figa ("irqchip: gic: Fix core ID calculation
+> when topology is read from DT") fixed GIC driver to filter cluster ID
+> from values returned by cpu_logical_map() for SoCs having registers
+> mapped without per-CPU banking making it is possible to add CPU nodes
+> for Exynos4 SoCs.  In case of Exynos SoCs these CPU nodes are also
+> required by future changes adding initialization of cpuidle states in
+> Exynos cpuidle driver through DT.
+>
+> Tested on Origen board (Exynos4210 SoC) and Trats2 (Exynos4412 SoC).
+>
+> Signed-off-by: Bartlomiej Zolnierkiewicz<b.zolnierkie@samsung.com>
+> ---
+> Based on next-20140717 branch of linux-next tree +
+> - [PATCH 2/6] ARM: EXYNOS: Fix core ID used by platsmp and hotplug code
+>    http://www.mail-archive.com/linux-samsung-soc at vger.kernel.org/msg32811.html
+> - [PATCH] irqchip: gic: Fix core ID calculation when topology is read from DT
+>    http://www.mail-archive.com/linux-samsung-soc at vger.kernel.org/msg34277.html
+>
+> v2:
+> - match the unit-address with the reg
+>
+>   arch/arm/boot/dts/exynos4210.dtsi | 17 +++++++++++++++++
+>   arch/arm/boot/dts/exynos4212.dtsi | 17 +++++++++++++++++
+>   arch/arm/boot/dts/exynos4412.dtsi | 29 +++++++++++++++++++++++++++++
+>   3 files changed, 63 insertions(+)
+>
+> diff --git a/arch/arm/boot/dts/exynos4210.dtsi b/arch/arm/boot/dts/exynos4210.dtsi
+> index ee3001f..bc2b444 100644
+> --- a/arch/arm/boot/dts/exynos4210.dtsi
+> +++ b/arch/arm/boot/dts/exynos4210.dtsi
+> @@ -31,6 +31,23 @@
+>   		pinctrl2 =&pinctrl_2;
+>   	};
+>
+> +	cpus {
+> +		#address-cells =<1>;
+> +		#size-cells =<0>;
+> +
+> +		cpu at 900 {
+> +			device_type = "cpu";
+> +			compatible = "arm,cortex-a9";
+> +			reg =<0x900>;
+> +		};
+> +
+> +		cpu at 901 {
+> +			device_type = "cpu";
+> +			compatible = "arm,cortex-a9";
+> +			reg =<0x901>;
+> +		};
+> +	};
+> +
+>   	sysram at 02020000 {
+>   		compatible = "mmio-sram";
+>   		reg =<0x02020000 0x20000>;
+> diff --git a/arch/arm/boot/dts/exynos4212.dtsi b/arch/arm/boot/dts/exynos4212.dtsi
+> index 3c00e6e..dd0a43e 100644
+> --- a/arch/arm/boot/dts/exynos4212.dtsi
+> +++ b/arch/arm/boot/dts/exynos4212.dtsi
+> @@ -22,6 +22,23 @@
+>   / {
+>   	compatible = "samsung,exynos4212", "samsung,exynos4";
+>
+> +	cpus {
+> +		#address-cells =<1>;
+> +		#size-cells =<0>;
+> +
+> +		cpu at A00 {
+> +			device_type = "cpu";
+> +			compatible = "arm,cortex-a9";
+> +			reg =<0xA00>;
+> +		};
+> +
+> +		cpu at A01 {
+> +			device_type = "cpu";
+> +			compatible = "arm,cortex-a9";
+> +			reg =<0xA01>;
+> +		};
+> +	};
+> +
+>   	combiner: interrupt-controller at 10440000 {
+>   		samsung,combiner-nr =<18>;
+>   	};
+> diff --git a/arch/arm/boot/dts/exynos4412.dtsi b/arch/arm/boot/dts/exynos4412.dtsi
+> index c42a3e1..435a722 100644
+> --- a/arch/arm/boot/dts/exynos4412.dtsi
+> +++ b/arch/arm/boot/dts/exynos4412.dtsi
+> @@ -22,6 +22,35 @@
+>   / {
+>   	compatible = "samsung,exynos4412", "samsung,exynos4";
+>
+> +	cpus {
+> +		#address-cells =<1>;
+> +		#size-cells =<0>;
+> +
+> +		cpu at A00 {
+> +			device_type = "cpu";
+> +			compatible = "arm,cortex-a9";
+> +			reg =<0xA00>;
+> +		};
+> +
+> +		cpu at A01 {
+> +			device_type = "cpu";
+> +			compatible = "arm,cortex-a9";
+> +			reg =<0xA01>;
+> +		};
+> +
+> +		cpu at A02 {
+> +			device_type = "cpu";
+> +			compatible = "arm,cortex-a9";
+> +			reg =<0xA02>;
+> +		};
+> +
+> +		cpu at A03 {
+> +			device_type = "cpu";
+> +			compatible = "arm,cortex-a9";
+> +			reg =<0xA03>;
+> +		};
+> +	};
+> +
+>   	combiner: interrupt-controller at 10440000 {
+>   		samsung,combiner-nr =<20>;
+>   	};
 
-The following changes since commit a7a30232df01db886473324050d79c3122937c78:
+OK, I'm fine on this, will apply.
 
-   Merge branch 'v3.17-next/cleanup-samsung' into v3.17-next/dt-s5pv210 
-(2014-07-19 04:24:18 +0900)
-
-are available in the git repository at:
-
-
-   git://git.kernel.org/pub/scm/linux/kernel/git/kgene/linux-samsung.git 
-tags/s5pv210-dt
-
-for you to fetch changes up to f1ff47454bb2fe0d5644f981679d1bea532816fd:
-
-   clk: samsung: s5pv210: Remove legacy board support (2014-07-19 
-04:32:19 +0900)
-
-----------------------------------------------------------------
-Samsung S5PV210 DT support for v3.17
-
-- support common clock framework for s5pv210 clock
-- add generic PHY driver on s5pv210 to support it via DT
-- add dt support for s5pv210-goni, smdkc110, smdkv210 and torbreck boards
-- remove board files from mach-s5pv210 and unused codes
-- enable multiplatform for s5pv210
-
-----------------------------------------------------------------
-Mateusz Krawczuk (6):
-       clk: samsung: Add clock driver for S5PV210 and compatible SoCs
-       ARM: S5PV210: Migrate clock handling to Common Clock Framework
-       phy: Add support for S5PV210 to the Exynos USB 2.0 PHY driver
-       ARM: S5PV210: Add board file for boot using Device Tree
-       ARM: dts: Add Device tree for s5pv210 SoC
-       ARM: dts: Add Device tree for s5pc110/s5pv210 boards
-
-Tomasz Figa (13):
-       cpufreq: s3c24xx: Remove some dead code
-       serial: samsung: Remove support for legacy clock code
-       ARM: SAMSUNG: Remove legacy clock code
-       clk: samsung: Add S5PV210 Audio Subsystem clock driver
-       ARM: S5PV210: Remove support for board files
-       ARM: S5PV210: Untie PM support from legacy code
-       ARM: S5PV210: move debug-macro.S into the common space
-       ARM: S5PV210: Register cpufreq platform device
-       cpufreq: s5pv210: Make the driver multiplatform aware
-       ARM: S5PV210: Enable multi-platform build support
-       gpio: samsung: Remove legacy support of S5PV210
-       ARM: SAMSUNG: Remove remaining legacy code
-       clk: samsung: s5pv210: Remove legacy board support
-
-  .../bindings/clock/clk-s5pv210-audss.txt           |   53 +
-  .../bindings/clock/samsung,s5pv210-clock.txt       |   78 ++
-  .../devicetree/bindings/phy/samsung-phy.txt        |    1 +
-  arch/arm/Kconfig                                   |   22 +-
-  arch/arm/Kconfig.debug                             |   12 +-
-  arch/arm/Makefile                                  |    4 +-
-  arch/arm/boot/dts/Makefile                         |    5 +
-  arch/arm/boot/dts/s5pv210-aquila.dts               |  392 ++++++
-  arch/arm/boot/dts/s5pv210-goni.dts                 |  449 +++++++
-  arch/arm/boot/dts/s5pv210-pinctrl.dtsi             |  839 ++++++++++++
-  arch/arm/boot/dts/s5pv210-smdkc110.dts             |   78 ++
-  arch/arm/boot/dts/s5pv210-smdkv210.dts             |  238 ++++
-  arch/arm/boot/dts/s5pv210-torbreck.dts             |   92 ++
-  arch/arm/boot/dts/s5pv210.dtsi                     |  633 +++++++++
-  .../mach/debug-macro.S => include/debug/s5pv210.S} |   23 +-
-  arch/arm/mach-exynos/pm.c                          |    1 -
-  arch/arm/mach-s3c24xx/common.c                     |    2 -
-  arch/arm/mach-s3c24xx/iotiming-s3c2412.c           |    1 -
-  arch/arm/mach-s3c24xx/mach-h1940.c                 |    5 +-
-  arch/arm/mach-s3c24xx/mach-jive.c                  |    1 -
-  arch/arm/mach-s3c24xx/mach-smdk2413.c              |    1 -
-  arch/arm/mach-s3c24xx/mach-smdk2416.c              |    1 -
-  arch/arm/mach-s3c24xx/mach-smdk2443.c              |    1 -
-  arch/arm/mach-s3c24xx/mach-vstms.c                 |    1 -
-  arch/arm/mach-s3c24xx/s3c2410.c                    |    6 -
-  arch/arm/mach-s3c24xx/s3c2412.c                    |    6 -
-  arch/arm/mach-s3c24xx/s3c2442.c                    |    1 -
-  arch/arm/mach-s3c24xx/s3c244x.c                    |    6 -
-  arch/arm/mach-s3c64xx/mach-anw6410.c               |    1 -
-  arch/arm/mach-s3c64xx/mach-crag6410.c              |    1 -
-  arch/arm/mach-s3c64xx/mach-hmt.c                   |    1 -
-  arch/arm/mach-s3c64xx/mach-ncp.c                   |    1 -
-  arch/arm/mach-s3c64xx/mach-smartq.c                |    1 -
-  arch/arm/mach-s3c64xx/mach-smdk6400.c              |    1 -
-  arch/arm/mach-s3c64xx/mach-smdk6410.c              |    1 -
-  arch/arm/mach-s3c64xx/s3c6400.c                    |    1 -
-  arch/arm/mach-s3c64xx/s3c6410.c                    |    1 -
-  arch/arm/mach-s5pv210/Kconfig                      |  197 +--
-  arch/arm/mach-s5pv210/Makefile                     |   29 +-
-  arch/arm/mach-s5pv210/Makefile.boot                |    2 -
-  arch/arm/mach-s5pv210/clock.c                      | 1365 
---------------------
-  arch/arm/mach-s5pv210/common.c                     |  279 ----
-  arch/arm/mach-s5pv210/common.h                     |   21 +-
-  arch/arm/mach-s5pv210/dev-audio.c                  |  246 ----
-  arch/arm/mach-s5pv210/dma.c                        |  130 --
-  arch/arm/mach-s5pv210/include/mach/dma.h           |   26 -
-  arch/arm/mach-s5pv210/include/mach/gpio.h          |  140 --
-  arch/arm/mach-s5pv210/include/mach/hardware.h      |   18 -
-  arch/arm/mach-s5pv210/include/mach/irqs.h          |  137 --
-  arch/arm/mach-s5pv210/include/mach/map.h           |  158 ---
-  arch/arm/mach-s5pv210/include/mach/memory.h        |   27 -
-  arch/arm/mach-s5pv210/include/mach/pm-core.h       |   46 -
-  arch/arm/mach-s5pv210/include/mach/regs-clock.h    |    2 +-
-  arch/arm/mach-s5pv210/include/mach/regs-gpio.h     |   41 -
-  arch/arm/mach-s5pv210/include/mach/regs-irq.h      |   18 -
-  arch/arm/mach-s5pv210/mach-aquila.c                |  687 ----------
-  arch/arm/mach-s5pv210/mach-goni.c                  |  916 -------------
-  arch/arm/mach-s5pv210/mach-smdkc110.c              |  159 ---
-  arch/arm/mach-s5pv210/mach-smdkv210.c              |  337 -----
-  arch/arm/mach-s5pv210/mach-torbreck.c              |  135 --
-  arch/arm/mach-s5pv210/pm.c                         |  147 ++-
-  arch/arm/mach-s5pv210/s5pv210.c                    |   77 ++
-  arch/arm/mach-s5pv210/setup-fb-24bpp.c             |   49 -
-  arch/arm/mach-s5pv210/setup-fimc.c                 |   43 -
-  arch/arm/mach-s5pv210/setup-i2c0.c                 |   28 -
-  arch/arm/mach-s5pv210/setup-i2c1.c                 |   28 -
-  arch/arm/mach-s5pv210/setup-i2c2.c                 |   28 -
-  arch/arm/mach-s5pv210/setup-ide.c                  |   39 -
-  arch/arm/mach-s5pv210/setup-keypad.c               |   24 -
-  arch/arm/mach-s5pv210/setup-sdhci-gpio.c           |  103 --
-  arch/arm/mach-s5pv210/setup-spi.c                  |   34 -
-  arch/arm/mach-s5pv210/setup-usb-phy.c              |   95 --
-  .../s5p-sleep.S => mach-s5pv210/sleep.S}           |   19 +-
-  arch/arm/plat-samsung/Kconfig                      |  143 +-
-  arch/arm/plat-samsung/Makefile                     |   15 -
-  arch/arm/plat-samsung/clock-clksrc.c               |  212 ---
-  arch/arm/plat-samsung/clock.c                      |  539 --------
-  arch/arm/plat-samsung/cpu.c                        |    3 +-
-  arch/arm/plat-samsung/devs.c                       |  330 -----
-  arch/arm/plat-samsung/include/plat/camport.h       |   28 -
-  arch/arm/plat-samsung/include/plat/clock-clksrc.h  |   83 --
-  arch/arm/plat-samsung/include/plat/clock.h         |  152 ---
-  arch/arm/plat-samsung/include/plat/cpu-freq-core.h |    3 -
-  arch/arm/plat-samsung/include/plat/cpu.h           |   13 -
-  arch/arm/plat-samsung/include/plat/devs.h          |   42 -
-  arch/arm/plat-samsung/include/plat/fb-core.h       |   15 -
-  arch/arm/plat-samsung/include/plat/fb.h            |   22 -
-  arch/arm/plat-samsung/include/plat/fimc-core.h     |   51 -
-  arch/arm/plat-samsung/include/plat/gpio-cfg.h      |   64 -
-  arch/arm/plat-samsung/include/plat/hdmi.h          |   16 -
-  arch/arm/plat-samsung/include/plat/irqs.h          |   72 --
-  arch/arm/plat-samsung/include/plat/mfc.h           |   35 -
-  arch/arm/plat-samsung/include/plat/pll.h           |  323 -----
-  arch/arm/plat-samsung/include/plat/s5p-clock.h     |   65 -
-  arch/arm/plat-samsung/include/plat/sdhci.h         |   47 -
-  arch/arm/plat-samsung/include/plat/tv-core.h       |   44 -
-  arch/arm/plat-samsung/init.c                       |    1 -
-  arch/arm/plat-samsung/pm-gpio.c                    |    4 +-
-  arch/arm/plat-samsung/s5p-clock.c                  |  294 -----
-  arch/arm/plat-samsung/s5p-dev-mfc.c                |   81 +-
-  arch/arm/plat-samsung/s5p-dev-uart.c               |   88 --
-  arch/arm/plat-samsung/s5p-irq-eint.c               |  221 ----
-  arch/arm/plat-samsung/s5p-irq-gpioint.c            |  218 ----
-  arch/arm/plat-samsung/s5p-irq-pm.c                 |   92 --
-  arch/arm/plat-samsung/s5p-irq.c                    |   31 -
-  arch/arm/plat-samsung/s5p-pm.c                     |   40 -
-  drivers/clk/samsung/Makefile                       |    1 +
-  drivers/clk/samsung/clk-s5pv210-audss.c            |  241 ++++
-  drivers/clk/samsung/clk-s5pv210.c                  |  856 ++++++++++++
-  drivers/cpufreq/s3c2410-cpufreq.c                  |    2 -
-  drivers/cpufreq/s3c2412-cpufreq.c                  |    3 -
-  drivers/cpufreq/s3c2440-cpufreq.c                  |    3 -
-  drivers/cpufreq/s3c24xx-cpufreq.c                  |    1 -
-  drivers/cpufreq/s5pv210-cpufreq.c                  |  131 +-
-  drivers/gpio/gpio-samsung.c                        |  240 ----
-  drivers/phy/Kconfig                                |   10 +
-  drivers/phy/Makefile                               |    1 +
-  drivers/phy/phy-s5pv210-usb2.c                     |  187 +++
-  drivers/phy/phy-samsung-usb2.c                     |    6 +
-  drivers/phy/phy-samsung-usb2.h                     |    1 +
-  drivers/tty/serial/samsung.c                       |    4 -
-  include/dt-bindings/clock/s5pv210-audss.h          |   34 +
-  include/dt-bindings/clock/s5pv210.h                |  239 ++++
-  123 files changed, 4786 insertions(+), 9352 deletions(-)
-  create mode 100644 
-Documentation/devicetree/bindings/clock/clk-s5pv210-audss.txt
-  create mode 100644 
-Documentation/devicetree/bindings/clock/samsung,s5pv210-clock.txt
-  create mode 100644 arch/arm/boot/dts/s5pv210-aquila.dts
-  create mode 100644 arch/arm/boot/dts/s5pv210-goni.dts
-  create mode 100644 arch/arm/boot/dts/s5pv210-pinctrl.dtsi
-  create mode 100644 arch/arm/boot/dts/s5pv210-smdkc110.dts
-  create mode 100644 arch/arm/boot/dts/s5pv210-smdkv210.dts
-  create mode 100644 arch/arm/boot/dts/s5pv210-torbreck.dts
-  create mode 100644 arch/arm/boot/dts/s5pv210.dtsi
-  rename arch/arm/{mach-s5pv210/include/mach/debug-macro.S => 
-include/debug/s5pv210.S} (62%)
-  delete mode 100644 arch/arm/mach-s5pv210/Makefile.boot
-  delete mode 100644 arch/arm/mach-s5pv210/clock.c
-  delete mode 100644 arch/arm/mach-s5pv210/common.c
-  delete mode 100644 arch/arm/mach-s5pv210/dev-audio.c
-  delete mode 100644 arch/arm/mach-s5pv210/dma.c
-  delete mode 100644 arch/arm/mach-s5pv210/include/mach/dma.h
-  delete mode 100644 arch/arm/mach-s5pv210/include/mach/gpio.h
-  delete mode 100644 arch/arm/mach-s5pv210/include/mach/hardware.h
-  delete mode 100644 arch/arm/mach-s5pv210/include/mach/irqs.h
-  delete mode 100644 arch/arm/mach-s5pv210/include/mach/map.h
-  delete mode 100644 arch/arm/mach-s5pv210/include/mach/memory.h
-  delete mode 100644 arch/arm/mach-s5pv210/include/mach/pm-core.h
-  delete mode 100644 arch/arm/mach-s5pv210/include/mach/regs-gpio.h
-  delete mode 100644 arch/arm/mach-s5pv210/include/mach/regs-irq.h
-  delete mode 100644 arch/arm/mach-s5pv210/mach-aquila.c
-  delete mode 100644 arch/arm/mach-s5pv210/mach-goni.c
-  delete mode 100644 arch/arm/mach-s5pv210/mach-smdkc110.c
-  delete mode 100644 arch/arm/mach-s5pv210/mach-smdkv210.c
-  delete mode 100644 arch/arm/mach-s5pv210/mach-torbreck.c
-  create mode 100644 arch/arm/mach-s5pv210/s5pv210.c
-  delete mode 100644 arch/arm/mach-s5pv210/setup-fb-24bpp.c
-  delete mode 100644 arch/arm/mach-s5pv210/setup-fimc.c
-  delete mode 100644 arch/arm/mach-s5pv210/setup-i2c0.c
-  delete mode 100644 arch/arm/mach-s5pv210/setup-i2c1.c
-  delete mode 100644 arch/arm/mach-s5pv210/setup-i2c2.c
-  delete mode 100644 arch/arm/mach-s5pv210/setup-ide.c
-  delete mode 100644 arch/arm/mach-s5pv210/setup-keypad.c
-  delete mode 100644 arch/arm/mach-s5pv210/setup-sdhci-gpio.c
-  delete mode 100644 arch/arm/mach-s5pv210/setup-spi.c
-  delete mode 100644 arch/arm/mach-s5pv210/setup-usb-phy.c
-  rename arch/arm/{plat-samsung/s5p-sleep.S => mach-s5pv210/sleep.S} (53%)
-  delete mode 100644 arch/arm/plat-samsung/clock-clksrc.c
-  delete mode 100644 arch/arm/plat-samsung/clock.c
-  delete mode 100644 arch/arm/plat-samsung/include/plat/camport.h
-  delete mode 100644 arch/arm/plat-samsung/include/plat/clock-clksrc.h
-  delete mode 100644 arch/arm/plat-samsung/include/plat/clock.h
-  delete mode 100644 arch/arm/plat-samsung/include/plat/fimc-core.h
-  delete mode 100644 arch/arm/plat-samsung/include/plat/hdmi.h
-  delete mode 100644 arch/arm/plat-samsung/include/plat/irqs.h
-  delete mode 100644 arch/arm/plat-samsung/include/plat/mfc.h
-  delete mode 100644 arch/arm/plat-samsung/include/plat/pll.h
-  delete mode 100644 arch/arm/plat-samsung/include/plat/s5p-clock.h
-  delete mode 100644 arch/arm/plat-samsung/include/plat/tv-core.h
-  delete mode 100644 arch/arm/plat-samsung/s5p-clock.c
-  delete mode 100644 arch/arm/plat-samsung/s5p-dev-uart.c
-  delete mode 100644 arch/arm/plat-samsung/s5p-irq-eint.c
-  delete mode 100644 arch/arm/plat-samsung/s5p-irq-gpioint.c
-  delete mode 100644 arch/arm/plat-samsung/s5p-irq-pm.c
-  delete mode 100644 arch/arm/plat-samsung/s5p-irq.c
-  delete mode 100644 arch/arm/plat-samsung/s5p-pm.c
-  create mode 100644 drivers/clk/samsung/clk-s5pv210-audss.c
-  create mode 100644 drivers/clk/samsung/clk-s5pv210.c
-  create mode 100644 drivers/phy/phy-s5pv210-usb2.c
-  create mode 100644 include/dt-bindings/clock/s5pv210-audss.h
-  create mode 100644 include/dt-bindings/clock/s5pv210.h
+Thanks,
+Kukjin
