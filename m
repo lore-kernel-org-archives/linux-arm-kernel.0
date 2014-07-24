@@ -1,61 +1,33 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Thu, 24 Jul 2014 10:57:33 +0900
-Subject: [GIT PULL] Third Round of Renesas ARM Based SoC Clock Updates for
- v3.17
-Message-ID: <cover.1406164563.git.horms+renesas@verge.net.au>
+Date: Thu, 24 Jul 2014 10:57:39 +0900
+Subject: [PATCH 2/5] ARM: shmobile: r8a7740: add TMU clock support for DT
+In-Reply-To: <cover.1406164563.git.horms+renesas@verge.net.au>
+References: <cover.1406164563.git.horms+renesas@verge.net.au>
+Message-ID: <ef9cb75ca70c8d31b2493d1fd6cbf8b3dd1dec95.1406164563.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Olof, Hi Kevin, Hi Arnd,
+This will be used when initialising TMU devices using DT
+until common clock framework support is added.
 
-Please consider these third round of Renesas ARM based SoC clock updates for v3.17.
+Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
+---
+ arch/arm/mach-shmobile/clock-r8a7740.c | 2 ++
+ 1 file changed, 2 insertions(+)
 
-This pull request is based on the previous round of
-such requests, tagged as renesas-clock2-for-v3.17,
-which has already been pulled into the next/soc branch of arm-soc.
-
-I apologise that this is being sent after the release of v3.16-rc6.
-It has been queued up in next since well before then and not
-sending this pull-request was an oversight on my part.
-
-The now-tagged branch of this pull-requests is one of the branched merged
-to form a base for "Renesas ARM Based SoC DT Timers Updates for v3.17". And
-I believe its absence is the cause of the problem you flagged with regards
-to the presence of changes outside of those listed for that pull-request.
-
-
-The following changes since commit ff4ce48e1f163d945c037c1c90ce12950961d91d:
-
-  ARM: shmobile: sh73a0: add SCI clock support for DT (2014-07-12 15:15:39 +0200)
-
-are available in the git repository at:
-
-  git://git.kernel.org/pub/scm/linux/kernel/git/horms/renesas.git tags/renesas-clock3-for-v3.17
-
-for you to fetch changes up to a0f7e7496d56ac2da7c684e2035815318c17973a:
-
-  ARM: shmobile: sh73a0: add CMT1 clock support for DT (2014-07-15 13:34:17 +0900)
-
-----------------------------------------------------------------
-Third Round of Renesas ARM Based SoC Clock Updates for v3.17
-
-* Add legacy clocks for SCI for SoCs that do not yet have CCF support.
-  This is to allow timer devices to be enabled using DT and
-  will be removed after CCF support is added for each SoC.
-
-  This is in keeping with the approach taken for enabling
-  SCI (serial) devices using DT on these SoCs.
-
-----------------------------------------------------------------
-Simon Horman (5):
-      ARM: shmobile: r8a7778: add TMU clock support for DT
-      ARM: shmobile: r8a7740: add TMU clock support for DT
-      ARM: shmobile: r8a73a4: add CMT1 clock support for DT
-      ARM: shmobile: r8a7740: add CMT1 clock support for DT
-      ARM: shmobile: sh73a0: add CMT1 clock support for DT
-
- arch/arm/mach-shmobile/clock-r8a73a4.c | 1 +
- arch/arm/mach-shmobile/clock-r8a7740.c | 3 +++
- arch/arm/mach-shmobile/clock-r8a7778.c | 2 ++
- arch/arm/mach-shmobile/clock-sh73a0.c  | 1 +
- 4 files changed, 7 insertions(+)
+diff --git a/arch/arm/mach-shmobile/clock-r8a7740.c b/arch/arm/mach-shmobile/clock-r8a7740.c
+index 68592b7..3f34b3f 100644
+--- a/arch/arm/mach-shmobile/clock-r8a7740.c
++++ b/arch/arm/mach-shmobile/clock-r8a7740.c
+@@ -598,7 +598,9 @@ static struct clk_lookup lookups[] = {
+ 
+ 	/* ICK */
+ 	CLKDEV_ICK_ID("fck",	"sh-tmu.1",		&mstp_clks[MSTP111]),
++	CLKDEV_ICK_ID("fck",	"fff90000.timer",	&mstp_clks[MSTP111]),
+ 	CLKDEV_ICK_ID("fck",	"sh-tmu.0",		&mstp_clks[MSTP125]),
++	CLKDEV_ICK_ID("fck",	"fff80000.timer",	&mstp_clks[MSTP125]),
+ 	CLKDEV_ICK_ID("fck",	"sh-cmt-48.1",		&mstp_clks[MSTP329]),
+ 	CLKDEV_ICK_ID("host",	"renesas_usbhs",	&mstp_clks[MSTP416]),
+ 	CLKDEV_ICK_ID("func",	"renesas_usbhs",	&mstp_clks[MSTP407]),
+-- 
+2.0.1
