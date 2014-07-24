@@ -1,79 +1,61 @@
-From: keescook@chromium.org (Kees Cook)
-Date: Wed, 23 Jul 2014 21:41:30 -0700
-Subject: [PATCH v5 2/3] asm-generic: Add generic seccomp.h for secure
- computing mode 1
-In-Reply-To: <53D0802A.7070703@amacapital.net>
-References: <1406020499-5537-1-git-send-email-takahiro.akashi@linaro.org>
- <1406020499-5537-3-git-send-email-takahiro.akashi@linaro.org>
- <53D0802A.7070703@amacapital.net>
-Message-ID: <CAGXu5j+GuoxR5o8CZZFZAEwQA=rRwBmBM-ZDU+nFAfHoqf8z9Q@mail.gmail.com>
+From: zlim.lnx@gmail.com (Z Lim)
+Date: Wed, 23 Jul 2014 21:55:36 -0700
+Subject: [PATCH 00/14] arm64: eBPF JIT compiler
+In-Reply-To: <20140723103219.GA1366@localhost>
+References: <1405708100-13604-1-git-send-email-zlim.lnx@gmail.com>
+ <20140721091623.GA16122@arm.com>
+ <CAMEtUuyC+MykPDO0ghTc=oex7KPLEy=BLRgWBdW+qJY7JXQmDQ@mail.gmail.com>
+ <20140723103219.GA1366@localhost>
+Message-ID: <CABg9mcvU44W5AkPLtyswNWdDdF_nnqvLyKqv7RWhpuRRSWDW3A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jul 23, 2014 at 8:40 PM, Andy Lutomirski <luto@amacapital.net> wrote:
-> On 07/22/2014 02:14 AM, AKASHI Takahiro wrote:
+On Wed, Jul 23, 2014 at 3:32 AM, Catalin Marinas
+<catalin.marinas@arm.com> wrote:
+> On Mon, Jul 21, 2014 at 04:49:29PM +0100, Alexei Starovoitov wrote:
+>> On Mon, Jul 21, 2014 at 2:16 AM, Will Deacon <will.deacon@arm.com> wrote:
+>> > On Fri, Jul 18, 2014 at 07:28:06PM +0100, Zi Shen Lim wrote:
+[...]
+>> >> This series applies against net-next and is tested working
+>> >> with lib/test_bpf on ARMv8 Foundation Model.
+>> >
+>> > Looks like it works on my Juno board too, so:
+>> >
+>> >   Acked-by: Will Deacon <will.deacon@arm.com>
+>> >
+>> > for the series.
+>> >
+>> > It's a bit late for 3.17 now, so I guess we'll queue this for 3.18 (which
+>> > also means the dependency on -next isn't an issue). Perhaps you could repost
+>> > around -rc3?
 >>
->> Those values (__NR_seccomp_*) are used solely in secure_computing()
->> to identify mode 1 system calls. If compat system calls have different
->> syscall numbers, asm/seccomp.h may override them.
->>
->> Acked-by: Arnd Bergmann <arnd@arndb.de>
->> Signed-off-by: AKASHI Takahiro <takahiro.akashi@linaro.org>
->> ---
->>   include/asm-generic/seccomp.h |   28 ++++++++++++++++++++++++++++
->>   1 file changed, 28 insertions(+)
->>   create mode 100644 include/asm-generic/seccomp.h
->>
->> diff --git a/include/asm-generic/seccomp.h b/include/asm-generic/seccomp.h
->> new file mode 100644
->> index 0000000..5e97022
->> --- /dev/null
->> +++ b/include/asm-generic/seccomp.h
->> @@ -0,0 +1,28 @@
->> +/*
->> + * include/asm-generic/seccomp.h
->> + *
->> + * Copyright (C) 2014 Linaro Limited
->> + * Author: AKASHI Takahiro <takahiro.akashi@linaro.org>
->> + *
->> + * This program is free software; you can redistribute it and/or modify
->> + * it under the terms of the GNU General Public License version 2 as
->> + * published by the Free Software Foundation.
->> + */
->> +#ifndef _ASM_GENERIC_SECCOMP_H
->> +#define _ASM_GENERIC_SECCOMP_H
->> +
->> +#include <asm-generic/unistd.h>
->> +
->> +#if defined(CONFIG_COMPAT) && !defined(__NR_seccomp_read_32)
->> +#define __NR_seccomp_read_32           __NR_read
->> +#define __NR_seccomp_write_32          __NR_write
->> +#define __NR_seccomp_exit_32           __NR_exit
->> +#define __NR_seccomp_sigreturn_32      __NR_rt_sigreturn
->> +#endif /* CONFIG_COMPAT && ! already defined */
->> +
->> +#define __NR_seccomp_read              __NR_read
->> +#define __NR_seccomp_write             __NR_write
->> +#define __NR_seccomp_exit              __NR_exit
->> +#define __NR_seccomp_sigreturn         __NR_rt_sigreturn
+>> Thanks for testing! Nice to see it working on real hw.
+>> I'm not sure why you're proposing a 4+ week delay. The patches
+>> will rot instead of getting used and tested. Imo it makes sense to
+>> get them into net-next now for 3.17.
+>> JIT is disabled by sysctl by default anyway.
 >
+> We normally like some patches (especially new functionality) to sit in
+> linux-next for a while before the mering window (ideally starting with
+> -rc4 or -rc5). We are at -rc6 already, so getting close to the 3.17
+> merging window.
 >
-> I don't like these names.  __NR_seccomp_read sounds like the number of a
-> syscall called seccomp_read.
+> Another aspect is that the arm64/bpf branch depends on the net tree, so
+> it can't easily go in via the arm64 tree for 3.17 (3.18 would not be a
+> problem).
+
+Hi Catalin, I take it you prefer this series going through arm64 tree,
+targeting 3.18, is that right?
+
+I understand your preference to have it sitting in linux-next for a
+longer period for arm64 material, I'll repost this again after 3.17 so
+it gets more exposure in linux-next.
+
+BTW, are you open to this series going through net tree? I'm
+(preemptively) asking because during development of this series, I've
+had to rebase a couple times against net-next to handle dependencies.
+Or is the general practice to handle conflicts in linux-next itself?
+
 >
-> Also, shouldn't something be including this header?  I'm confused.
-
-Ah! Good catch. These names are correct (see kernel/seccomp.c's
-mode1_syscalls and mode1_syscalls_32 arrays), but the location of this
-change was unexpected. I was expecting this file to live in
-arch/*/include/asm/seccomp.h, not in include/asm-generic/seccomp.h.
-
-However, since it's always the same list, it might make sense to
-consolidate them into a single place as a default to make arch porting
-easier. However, I think that should be a separate patch.
-
--Kees
-
--- 
-Kees Cook
-Chrome OS Security
+> --
+> Catalin
