@@ -1,36 +1,36 @@
 From: afaerber@suse.de (=?UTF-8?q?Andreas=20F=C3=A4rber?=)
-Date: Fri, 25 Jul 2014 01:00:20 +0200
-Subject: [PATCH v2 11/11] ARM: dts: zynq: Add AXI clkgen for Parallella
+Date: Fri, 25 Jul 2014 01:00:18 +0200
+Subject: [PATCH v2 09/11] Documentation: devicetree: Fix ADI AXI SPDIF
+ specification
 In-Reply-To: <1406242820-20140-1-git-send-email-afaerber@suse.de>
 References: <1406242820-20140-1-git-send-email-afaerber@suse.de>
-Message-ID: <1406242820-20140-12-git-send-email-afaerber@suse.de>
+Message-ID: <1406242820-20140-10-git-send-email-afaerber@suse.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
+
+The specification requires compatible = "adi,axi-spdif-1.00.a" but
+driver and example and file name indicate "adi,axi-spdif-tx-1.00.a".
+Change the specification to match the implementation.
 
 Signed-off-by: Andreas F?rber <afaerber@suse.de>
 ---
  v2: New
  
- arch/arm/boot/dts/zynq-parallella.dts | 7 +++++++
- 1 file changed, 7 insertions(+)
+ Documentation/devicetree/bindings/sound/adi,axi-spdif-tx.txt | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/arch/arm/boot/dts/zynq-parallella.dts b/arch/arm/boot/dts/zynq-parallella.dts
-index 65fbd8b..d2eefad 100644
---- a/arch/arm/boot/dts/zynq-parallella.dts
-+++ b/arch/arm/boot/dts/zynq-parallella.dts
-@@ -57,6 +57,13 @@
- 			};
- 		};
+diff --git a/Documentation/devicetree/bindings/sound/adi,axi-spdif-tx.txt b/Documentation/devicetree/bindings/sound/adi,axi-spdif-tx.txt
+index 46f3449..4eb7997 100644
+--- a/Documentation/devicetree/bindings/sound/adi,axi-spdif-tx.txt
++++ b/Documentation/devicetree/bindings/sound/adi,axi-spdif-tx.txt
+@@ -1,7 +1,7 @@
+ ADI AXI-SPDIF controller
  
-+		axi_clkgen: axi-clkgen at 66000000 {
-+			compatible = "adi,axi-clkgen-1.00.a";
-+			reg = <0x66000000 0x10000>;
-+			#clock-cells = <0>;
-+			clocks = <&clkc 17>;
-+		};
-+
- 		audio_clock: audio-clock {
- 			compatible = "fixed-clock";
- 			#clock-cells = <0>;
+ Required properties:
+- - compatible : Must be "adi,axi-spdif-1.00.a"
++ - compatible : Must be "adi,axi-spdif-tx-1.00.a"
+  - reg : Must contain SPDIF core's registers location and length
+  - clocks : Pairs of phandle and specifier referencing the controller's clocks.
+    The controller expects two clocks, the clock used for the AXI interface and
 -- 
 1.9.3
