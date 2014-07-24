@@ -1,20 +1,61 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Thu, 24 Jul 2014 18:47:15 +0100
-Subject: [PATCH] arm64: fix soft lockup due to large tlb flush range
-In-Reply-To: <1406213775-28617-1-git-send-email-msalter@redhat.com>
-References: <20140724142417.GE13371@arm.com>
- <1406213775-28617-1-git-send-email-msalter@redhat.com>
-Message-ID: <20140724174714.GN13371@arm.com>
+From: mturquette@linaro.org (Mike Turquette)
+Date: Thu, 24 Jul 2014 10:52:51 -0700
+Subject: [PATCHv3 3/7] clk: mvebu: extend clk-cpu for dynamic frequency
+ scaling
+In-Reply-To: <20140724083325.0c578091@free-electrons.com>
+References: <1404920715-19834-1-git-send-email-thomas.petazzoni@free-electrons.com>
+ <20140723235358.6419.26311@quantum>
+ <20140724083325.0c578091@free-electrons.com>
+Message-ID: <20140724175251.3823.74667@quantum>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jul 24, 2014 at 03:56:15PM +0100, Mark Salter wrote:
-> Under certain loads, this soft lockup has been observed:
+Quoting Thomas Petazzoni (2014-07-23 23:33:25)
+> Hello,
 > 
->    BUG: soft lockup - CPU#2 stuck for 22s! [ip6tables:1016]
->    Modules linked in: ip6t_rpfilter ip6t_REJECT cfg80211 rfkill xt_conntrack ebtable_nat ebtable_broute bridge stp llc ebtable_filter ebtables ip6table_nat nf_conntrack_ipv6 nf_defrag_ipv6 nf_nat_ipv6 ip6table_mangle ip6table_security ip6table_raw ip6table_filter ip6_tables iptable_nat nf_conntrack_ipv4 nf_defrag_ipv4 nf_nat_ipv4 nf_nat nf_conntrack iptable_mangle iptable_security iptable_raw vfat fat efivarfs xfs libcrc32c
+> (Not sure why this e-mail comes with me as the From:, but anyway.)
+> 
+> On Wed, 23 Jul 2014 16:53:58 -0700, Thomas Petazzoni wrote:
+> 
+> > +static int clk_cpu_set_rate(struct clk_hw *hwclk, unsigned long rate,
+> > +                           unsigned long parent_rate)
+> > +{
+> > +       if (__clk_is_enabled(hwclk->clk))
+> > +               return clk_cpu_on_set_rate(hwclk, rate, parent_rate);
+> > +       else
+> > +               return clk_cpu_off_set_rate(hwclk, rate, parent_rate);
+> > 
+> > This is racy. You don't hold the clk_enable lock so it could be enable
+> > between the conditional check and executing clk_cpu_on_set_rate.
+> 
+> Right.
+> 
+> > How do you ensure that secondary CPU clocks are not enabled/disabled
+> > when changing rates?
+> 
+> In practice, this currently cannot happen: we enable the secondary CPU
+> clocks before starting the secondary CPUs, and we never ever disable or
+> re-enable again those clocks. So with the present code, I believe there
+> is no problem. Even when we do CPU hotplug, we don't turn off the CPU
+> clocks, simply because they cannot be turned off: the enable/disable
+> state is only used here as an indication so that the clock driver knows
+> which frequency change strategy it should apply.
+> 
+> But you're anyway right, I'll send a followup patch adding the lock.
+> Would that be OK for you?
 
-Merged (with minor tweaks, comment added). Thanks.
+Sounds good. Can you also fix up the changelog in patch #2? After that
+I am happy with this series. I guess Jason will take it in and send it
+for his PR?
 
--- 
-Catalin
+Thanks,
+Mike
+
+> 
+> Thanks,
+> 
+> Thomas
+> -- 
+> Thomas Petazzoni, CTO, Free Electrons
+> Embedded Linux, Kernel and Android engineering
+> http://free-electrons.com
