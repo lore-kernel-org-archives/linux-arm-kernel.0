@@ -1,30 +1,26 @@
-From: andrew@lunn.ch (Andrew Lunn)
-Date: Thu, 24 Jul 2014 20:57:47 +0200
-Subject: [PATCH 0/2] ARM: Marvell Armada XP datasheet publicly available
-In-Reply-To: <1406227593-29749-1-git-send-email-thomas.petazzoni@free-electrons.com>
-References: <1406227593-29749-1-git-send-email-thomas.petazzoni@free-electrons.com>
-Message-ID: <20140724185747.GH28485@lunn.ch>
+From: broonie@kernel.org (Mark Brown)
+Date: Thu, 24 Jul 2014 20:12:37 +0100
+Subject: [PATCH] arm64: audit: Fix build for audit changes
+In-Reply-To: <1405596402-23844-1-git-send-email-broonie@kernel.org>
+References: <1405596402-23844-1-git-send-email-broonie@kernel.org>
+Message-ID: <20140724191237.GM17528@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jul 24, 2014 at 08:46:31PM +0200, Thomas Petazzoni wrote:
-> Hello,
+On Thu, Jul 17, 2014 at 12:26:42PM +0100, Mark Brown wrote:
+> From: Mark Brown <broonie@linaro.org>
 > 
-> This series of two patches make a few updates to the README file of
-> the kernel documentation related to Marvell ARM platforms in the
-> kernel.
-> 
-> The most important announcement is the public release by Marvell of
-> the datasheet for the Armada XP SoC. It follows the publication, a few
-> weeks ago, of the Armada 370 datasheet.
+> Commit 3efe33f5d2 (audit: x86: drop arch from __audit_syscall_entry()
+> interface) removed the arch parameter from __audit_syscall_entry() and
+> updated the only current user in mainline but this breaks the ARMv8 audit
+> code that has been added in -next. Fix this by making the equivalent
+> update to ARMv8.
 
-Good news. Thanks for pushing to get this published.
-
- 
-> The second patch makes a few other updates to the same documentation,
-> taking into account recent movements in the support for Marvell SoCs
-> in the kernel.
-
-Acked-by: Andrew Lunn <andrew@lunn.ch>
-
-	  Andrew
+This is still broken -next.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140724/e5e74e46/attachment.sig>
