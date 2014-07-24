@@ -1,63 +1,43 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Thu, 24 Jul 2014 21:25:13 +0200
-Subject: [PATCH] arm64/crypto: fix makefile rule for aes-glue-%.o
-In-Reply-To: <20140724161225.GA11204@ravnborg.org>
-References: <mvmr4264i1p.fsf@hawking.suse.de>
- <CAKv+Gu8SbM_Z=ymBFb2D4EWJeo-6dWuKqE2YNOkqJTKLDEJcYA@mail.gmail.com>
- <mvm4my7j5xh.fsf@hawking.suse.de>
- <CAKv+Gu-6rUxUnF+dRuroDJqy2K2B5F0r7_bm0X-vyiuQ-83W5w@mail.gmail.com>
- <CAKv+Gu96k7GOVR85EXtro3Lt0jjiJqxyvT9cwJZ1qc6uzq97bw@mail.gmail.com>
- <mvmvbqmj3b2.fsf@hawking.suse.de>
- <CAKv+Gu_9HRwAxkJjT3KRvDbupp0yzstyq1dXsXkTu9M6swdCKQ@mail.gmail.com>
- <mvmr41aj2ob.fsf@hawking.suse.de>
- <CAKv+Gu_z4VTssLDhiQxi8DRJNEUgzrM5bFzje8NXEmBiA2vqeg@mail.gmail.com>
- <CAKv+Gu-B9_sgGgw9obrBGNUFSS1JcskN34s1X4PU8F5bauHT1Q@mail.gmail.com>
- <20140724161225.GA11204@ravnborg.org>
-Message-ID: <CAKv+Gu8ikMGNVHeuujSf4eaK+LOFKMWxKF8i76VthnKYgvOcYQ@mail.gmail.com>
+From: detheridge@ti.com (Darren Etheridge)
+Date: Thu, 24 Jul 2014 14:35:23 -0500
+Subject: [PATCH RFA 1/2] drm/i2c: tda998x: allow re-use of tda998x support
+ code
+In-Reply-To: <E1XAKSc-0004YT-4Q@rmk-PC.arm.linux.org.uk>
+References: <E1XAKSc-0004YT-4Q@rmk-PC.arm.linux.org.uk>
+Message-ID: <53D15FFB.2040804@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 24 July 2014 18:12, Sam Ravnborg <sam@ravnborg.org> wrote:
-> On Thu, Jul 24, 2014 at 04:24:48PM +0200, Ard Biesheuvel wrote:
->> On 24 July 2014 16:18, Ard Biesheuvel <ard.biesheuvel@linaro.org> wrote:
->> > On 24 July 2014 15:40, Andreas Schwab <schwab@suse.de> wrote:
->> >> Ard Biesheuvel <ard.biesheuvel@linaro.org> writes:
->> >>
->> >>> On 24 July 2014 15:26, Andreas Schwab <schwab@suse.de> wrote:
->> >>>> You are not using CONFIG_MODVERSIONS.
->> >>>>
->> >>>
->> >>> I am
->> >>
->> >> No, you aren't, since you say that your .cmd contains a command to
->> >> create aes-glue-ce.o, which with CONFIG_MODVERSIONS it doesn't.
->> >>
->> >
->> > OK, you're right, it contains a command to create .tmp_aes-glue-ce.o.
->> > But I am still not seeing the error you are seeing, strangely enough.
->>
->> OK, now I am seeing it.
->>
->> Acked-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+On 07/24/2014 09:57 AM, Russell King wrote:
+> Re-jig the TDA998x code so that we separate the functionality from the
+> drm slave encoder implementation.  In several places, this is pretty
+> clearly the correct thing to do, because we can avoid repetitively
+> having to convert from the drm_encoder to the TDA998x private
+> structure, particularly with the driver internal functions.
 >
-> Jumping in the end of the thread here - sorry for that.
+> The main motivation behind this change is to allow the code to be
+> re-used with a standard drm_encoder and drm_connector implementation
+> based on the component helpers, rather than the slave_encoder system.
+> The addition of this will be in the following patch.
+>
+> We keep the slave_encoder interface as there are existing users of
+> this; we need to give them time to convert and test.
+>
+> Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
+> ---
+> RFA = request for acks, but tested-by's would also be great,
+> particularly from the tilcdc folk.
 >
 
-No worries
+Works fine on BeagleBone Black (tilcdc + tda998x)
 
-> Another way to solve this would be to create two
-> small wrapper files:
-> aes-glue-neon.c - which include aes-glue.c
-> aes-glue-ce.c that include aes-glue.c
->
-> Then you could use standard kbuild support for building your module.
-> And we will not potentially break it when we change cc_o_c in the near future.
->
+Tested against 3.16-rc6, using unmodified tilcdc driver, unmodified dts.
 
-I see how that would fix this issue, but frankly, if we need to add .c
-files that only #include other .c files to support building multiple
-objects from a single .c file, I think the flaw is in the build
-system, and I would rather fix the build system instead.
+Version details:
+Linux am335x-evm 3.16.0-rc6-00002-gf8a096f-dirty #40 SMP Thu Jul 24 
+13:49:42 CDT 2014 armv7l GNU/Linux
 
-Cheers,
-Ard.
+Tried modetest with a variety of modes, all looked correct.
+Tested as both built-in and modules.
+
+Tested-by: Darren Etheridge <detheridge@ti.com>
