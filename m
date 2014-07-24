@@ -1,56 +1,71 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Thu, 24 Jul 2014 13:20:36 +0200
-Subject: [PATCH 00/14] clk: sunxi: Improve MMC clocks support
-In-Reply-To: <53CA4CCA.5040303@redhat.com>
-References: <1405588134-2396-1-git-send-email-maxime.ripard@free-electrons.com>
- <53CA4CCA.5040303@redhat.com>
-Message-ID: <20140724112036.GS20328@lukather>
+From: will.deacon@arm.com (Will Deacon)
+Date: Thu, 24 Jul 2014 12:32:05 +0100
+Subject: [PATCH 00/14] arm64: eBPF JIT compiler
+In-Reply-To: <CABg9mcvU44W5AkPLtyswNWdDdF_nnqvLyKqv7RWhpuRRSWDW3A@mail.gmail.com>
+References: <1405708100-13604-1-git-send-email-zlim.lnx@gmail.com>
+ <20140721091623.GA16122@arm.com>
+ <CAMEtUuyC+MykPDO0ghTc=oex7KPLEy=BLRgWBdW+qJY7JXQmDQ@mail.gmail.com>
+ <20140723103219.GA1366@localhost>
+ <CABg9mcvU44W5AkPLtyswNWdDdF_nnqvLyKqv7RWhpuRRSWDW3A@mail.gmail.com>
+Message-ID: <20140724113205.GL1994@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Hans,
-
-On Sat, Jul 19, 2014 at 12:47:38PM +0200, Hans de Goede wrote:
-> Hi,
+On Thu, Jul 24, 2014 at 05:55:36AM +0100, Z Lim wrote:
+> On Wed, Jul 23, 2014 at 3:32 AM, Catalin Marinas
+> <catalin.marinas@arm.com> wrote:
+> > On Mon, Jul 21, 2014 at 04:49:29PM +0100, Alexei Starovoitov wrote:
+> >> On Mon, Jul 21, 2014 at 2:16 AM, Will Deacon <will.deacon@arm.com> wrote:
+> >> > On Fri, Jul 18, 2014 at 07:28:06PM +0100, Zi Shen Lim wrote:
+> [...]
+> >> >> This series applies against net-next and is tested working
+> >> >> with lib/test_bpf on ARMv8 Foundation Model.
+> >> >
+> >> > Looks like it works on my Juno board too, so:
+> >> >
+> >> >   Acked-by: Will Deacon <will.deacon@arm.com>
+> >> >
+> >> > for the series.
+> >> >
+> >> > It's a bit late for 3.17 now, so I guess we'll queue this for 3.18 (which
+> >> > also means the dependency on -next isn't an issue). Perhaps you could repost
+> >> > around -rc3?
+> >>
+> >> Thanks for testing! Nice to see it working on real hw.
+> >> I'm not sure why you're proposing a 4+ week delay. The patches
+> >> will rot instead of getting used and tested. Imo it makes sense to
+> >> get them into net-next now for 3.17.
+> >> JIT is disabled by sysctl by default anyway.
+> >
+> > We normally like some patches (especially new functionality) to sit in
+> > linux-next for a while before the mering window (ideally starting with
+> > -rc4 or -rc5). We are at -rc6 already, so getting close to the 3.17
+> > merging window.
+> >
+> > Another aspect is that the arm64/bpf branch depends on the net tree, so
+> > it can't easily go in via the arm64 tree for 3.17 (3.18 would not be a
+> > problem).
 > 
-> On 07/17/2014 11:08 AM, Maxime Ripard wrote:
-> >Hi everyone,
-> >
-> >Here is an attempt at improving the MMC clock support in the Allwinner
-> >SoCs.
-> >
-> >Until now, the MMC clocks were having a custom phase function that was
-> >directly setting an obscure value in the right register, because we
-> >were not really having any idea of what these values were.
-> >
-> >Now that we have more informations, we can introduce a common function
-> >call to get and set the phase of a particular clock, and use this in
-> >both our provider and our client.
-> >
-> >Another issue we had so far on the A13 was that, out of reset, the
-> >PLL6 driving the MMC was running too high to be working. We can solve
-> >that by adding two new properties in the DT to setup the rate
-> >constraints we might have on a clock.
-> 
-> Looks good to me, thanks for working on this.
-> 
-> Question have you dumped the raw mmc0 clk reg before and after this
-> patch set to verify that the end result is the same ?
+> Hi Catalin, I take it you prefer this series going through arm64 tree,
+> targeting 3.18, is that right?
 
-I did at 100MHz, but I was missing other test cases, so more testing
-at the various other frequencies we might run at would be very much
-welcome (and some cross-testing).
+Right.
 
-Maxime
+> I understand your preference to have it sitting in linux-next for a
+> longer period for arm64 material, I'll repost this again after 3.17 so
+> it gets more exposure in linux-next.
 
--- 
-Maxime Ripard, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140724/57a6cf15/attachment.sig>
+Brill, thanks!
+
+> BTW, are you open to this series going through net tree? I'm
+> (preemptively) asking because during development of this series, I've
+> had to rebase a couple times against net-next to handle dependencies.
+> Or is the general practice to handle conflicts in linux-next itself?
+
+We don't have a problem with it going via the -net tree if there's a reason
+for doing so (i.e. a new dependency that crops up after your rebase) but we
+should stick with the arm64 tree if we can.
+
+Cheers,
+
+Will
