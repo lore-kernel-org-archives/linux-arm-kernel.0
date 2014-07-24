@@ -1,133 +1,57 @@
-From: jason@lakedaemon.net (Jason Cooper)
-Date: Thu, 24 Jul 2014 10:07:57 -0400
-Subject: [PATCH 2/2] ARM: mvebu: Added dts defintion for Lenovo Iomega
- ix4-300d NAS
-In-Reply-To: <C2E7C8C1-1198-4785-AB9C-C27B5E27A8D4@perenite.com>
-References: <1406154923-13612-1-git-send-email-yahoo@perenite.com>
- <1406154923-13612-2-git-send-email-yahoo@perenite.com>
- <20140723224236.GC28485@lunn.ch>
- <94F87063-D717-435B-B7C5-EDAC9B26742C@perenite.com>
- <20140723225841.GD28485@lunn.ch>
- <10A7C530-7CD2-4ED0-889A-7FAC1922320F@perenite.com>
- <20140723231535.GK23220@titan.lakedaemon.net>
- <53D0FA2F.6050209@free-electrons.com>
- <20140724124520.GV23220@titan.lakedaemon.net>
- <C2E7C8C1-1198-4785-AB9C-C27B5E27A8D4@perenite.com>
-Message-ID: <20140724140757.GW23220@titan.lakedaemon.net>
+From: peter.griffin@linaro.org (Peter Griffin)
+Date: Thu, 24 Jul 2014 15:14:12 +0100
+Subject: [PATCH v2 1/3] usb: host: st-hcd: Add USB HCD support for STi SoCs
+In-Reply-To: <5967609.vndF2bDyS1@wuerfel>
+References: <1406199616-10533-1-git-send-email-peter.griffin@linaro.org>
+ <11018717.Ey5qEJxGNJ@wuerfel>
+ <20140724122254.GA15266@griffinp-ThinkPad-X1-Carbon-2nd>
+ <5967609.vndF2bDyS1@wuerfel>
+Message-ID: <20140724141412.GA21823@griffinp-ThinkPad-X1-Carbon-2nd>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Benoit,
+Hi Arnd,
 
-Please try to avoid top-posting.  I've re-flowed it, below.
 
-Arnd, Andrew, question for both of you below.
-
-On Thu, Jul 24, 2014 at 03:40:42PM +0200, Benoit Masson wrote:
-> Le 24 juil. 2014 ? 14:45, Jason Cooper <jason@lakedaemon.net> a ?crit :
+<snip>
+> > 
+> > I'm of course happy to change it if required. I see looking through that a lot 
+> > of other platforms do it the way you describe with a
+> > 
+> > ehci-<platname>.c and ohci-<platname>.c
 > 
-> > On Thu, Jul 24, 2014 at 02:21:03PM +0200, Gregory CLEMENT wrote:
-> >> On 24/07/2014 01:15, Jason Cooper wrote:
-> >>> On Thu, Jul 24, 2014 at 01:11:12AM +0200, Benoit Masson wrote:
-> >>>> Le 24 juil. 2014 ? 00:58, Andrew Lunn <andrew@lunn.ch> a ?crit :
-> >>>> 
-> >>>>>> For the marvell,mv78230-a0-i2c unfortunately i've spend 3 hours
-> >>>>>> trying to understand this but it only works with this on the
-> >>>>>> ix4-300d :(. There was multiple patch around this and maybe one
-> >>>>>> broke the auto-detect part of this, I've tried compiling with some
-> >>>>>> 3.10 or lower kernel but no luck here I still have to put this a0
-> >>>>>> option.
-> >>>>> 
-> >>>>> Lets first confirm you have an a0 SoC.
-> >>>>> 
-> >>>>> At boot time, it should print:
-> >>>>> 
-> >>>>> pr_info("MVEBU SoC ID=0x%X, Rev=0x%X\n", soc_dev_id, soc_rev);
-> >>>>> 
-> >>>>> What revision do you have?
-> >>>>> 
-> >>>>> If the auto detect code really is broken, Gregory will likely take a
-> >>>>> look.
-> >>>> 
-> >>>> I sure do,
-> >>>> 
-> >>>> confirmed by u-boot  output below:
-> >>>> 
-> >>>> U-Boot 2009.08 (Mar 04 2013 - 11:13:04) Marvell version:  2.3.2 PQ
-> >>>> U-Boot Addressing:
-> >>>>       Code:..00600000:006BFFF0
-> >>>>       BSS:..00708EC0
-> >>>>       Stack:..0x5fff70
-> >>>>       PageTable:.0x8e0000
-> >>>>       Heap address:.0x900000:0xe00000
-> >>>> Board: DB-78230-BP rev 2.0 Wistron
-> >>>> SoC:   MV78230 A0
-> >>>> 
-> >>>> From kernel I get:
-> >>>> 
-> >>>> mvebu-soc-id: MVEBU SoC ID=0x7823, Rev=0x1
-> >>> 
-> >>> Well, isn't that a peach?  :)  Gregory?
-> >> 
-> >> A peach?? For me it is either a fruit or a princess, so I am puzzled!
-> > 
-> > Doc Holiday quote from the movie Tombstone.  The full quote was "Well,
-> > isn't that a peach of a hand?" while sitting at the poker table.
-> > 
-> >> Well about the issue, we patch the device tree for the i2c quirk only for
-> >> the openblock AX3.
-> > 
-> > Ahhh, that's right.  I need to slow down and dig a bit more. :(
+> Right. We are trying to  gradually move some of them over to use the
+> generic *hci-platform.c drivers though.
 
-^^^^^ This is the important bit.
-
+Right, ok I understand.
+ 
+> > > Depending on what kind of special requirements the ST version has,
+> > > this can be done either by using the generic ohci/ehci bindings
+> > > with extensions where necessary, or by creating a new binding and
+> > > new driver files that use 'ohci_init_driver'/'ehci_init_driver'
+> > > to inherit from the common code.
+> > > 
+> > > The first of the two approaches is preferred.
 > > 
-> >> If I remember well it was because the device tree was already written
-> >> for this board before we found there was an issue with the A0 version
-> >> of the CPU. 
-> > 
-> > No, it's because we didn't think any manufacturers would be silly enough
-> > to use the a0 in production.  That assumption worked out well. :-P
-> > 
-> >> The rule was that for new boards then they have to set the marvell,mv78230-a0-i2c
-> >> compatible string. I also didn't expect that we found "new" product using the A0 version.
-> >> 
-> >> We have 3 options now:
-> >> 
-> >> - remove the check on the openblock AX3 board and always try to apply the quirck for A0 version
-> >> - add a check for this new board in the mvebu_dt_init function
-> >> - let the compatible string marvell,mv78230-a0-i2c in this dts
-> >> 
-> >> I would prefer the option 1 but I fear that Arnd would prefer the 2 other options.
-> > 
-> > I like option 1 and 3.  Option 3 is a *correct* description of the
-> > hardware, and should be done.  Option 1 makes Linux user-friendly for boards
-> > that are exactly the same, but changed out SoC stepping mid-production.
-> > 
-> > Option 2 needs to be undone.  We shouldn't need to change compiled code
-> > for every new board that comes along.  Which was the whole point of DT,
-> > right?
-> > 
-> So I'm a bit puzzled now. First email from Jason mention that the
-> final patch was doe in 3.16rc3 and indeed I made my dts using 3.15,
-> now I'm on 3.16 mainline, but didn't tested since to remove the a0
-> compatible string. Should I give it a try or from Gregory's email
-> understand that the patch was only for ax3 board ?
+> > We don't have anything particularly special, just a couple of reset lines,
+> > clock, phy, etc.
+> 
+> Ok, good. Please see Documentation/devicetree/bindings/usb/usb-?hci.txt
+> then. You might actually be able to just use the existing drivers
+> without new code by just adding the proper DT nodes that follow these
+> bindings.
 
-Ignore what I said before about the patch.  It doesn't apply to your
-board.  We need to fix the quirk to trigger on SoC revision, not board
-compatible, as it currently does.
+The only issues I can see with the generic versions are: -
+1) We also have a powerdown line in addition to the reset line both of which are 
+exposed via reset controller API, so I would need to add that into ehci-platform
+and ohci-platform.
 
-The only outstanding point (Arnd?), is that I think it's ok to have the
-i2c...a0 compatible string in the dts files, but Andrew seems to think
-otherwise.  Is that still true Andrew?
+2) We have a magic poke in st_ehci_configure_bus of the current driver to configure
+the AHB to ST bus protocol convertor IP. I'm not quite sure where I could hook that
+in (sorry... slightly pulling back on my "nothing special comment" a bit ;-).
 
-> Feel free as long as the device is still opened, uart connected, to
-> send me your test as I'll soon have to turn into a production NAS ...
+3) We also set the rate of the ohci clock, which the generic driver doesn't do.
 
-Hopefully, we'll hear from one of them today, and we can merge your
-patch as-is with the minor comment reformatting.
+regards,
 
-thx,
-
-Jason.
+Peter.
