@@ -1,534 +1,307 @@
-From: luto@amacapital.net (Andy Lutomirski)
-Date: Thu, 24 Jul 2014 13:56:24 -0700
-Subject: [PATCH v4] arm64, ia64, ppc, s390, sh, tile, um, x86,
- mm: Remove default gate area
-Message-ID: <6435254cc74d6e9172931f27be3854d522ad299b.1406232860.git.luto@amacapital.net>
+From: rdunlap@infradead.org (Randy Dunlap)
+Date: Thu, 24 Jul 2014 14:19:14 -0700
+Subject: [PATCH 19/19] Documentation: ACPI for ARM64
+In-Reply-To: <CAFoFrHaWWxRPRYM5+bWj0tGnz05SokqwVGejUCUi+U-KChFBdQ@mail.gmail.com>
+References: <1406206825-15590-1-git-send-email-hanjun.guo@linaro.org>	<1406206825-15590-20-git-send-email-hanjun.guo@linaro.org>
+ <CAFoFrHaWWxRPRYM5+bWj0tGnz05SokqwVGejUCUi+U-KChFBdQ@mail.gmail.com>
+Message-ID: <53D17852.3050606@infradead.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The core mm code will provide a default gate area based on
-FIXADDR_USER_START and FIXADDR_USER_END if
-!defined(__HAVE_ARCH_GATE_AREA) && defined(AT_SYSINFO_EHDR).
+On 07/24/2014 02:16 PM, Naresh Bhat wrote:
+> 
+> On 24 July 2014 18:30, Hanjun Guo <hanjun.guo at linaro.org <mailto:hanjun.guo@linaro.org>> wrote:
+> 
+>     From: Graeme Gregory <graeme.gregory at linaro.org <mailto:graeme.gregory@linaro.org>>
+> 
+>     Add documentation for the guidelines of how to use ACPI
+>     on ARM64.
+> 
+>     Signed-off-by: Graeme Gregory <graeme.gregory at linaro.org <mailto:graeme.gregory@linaro.org>>
+>     Signed-off-by: Hanjun Guo <hanjun.guo at linaro.org <mailto:hanjun.guo@linaro.org>>
+>     ---
+>      Documentation/arm64/arm-acpi.txt |  240 ++++++++++++++++++++++++++++++++++++++
+>      1 file changed, 240 insertions(+)
+>      create mode 100644 Documentation/arm64/arm-acpi.txt
+> 
+>     diff --git a/Documentation/arm64/arm-acpi.txt b/Documentation/arm64/arm-acpi.txt
+>     new file mode 100644
+>     index 0000000..12cd550
+>     --- /dev/null
+>     +++ b/Documentation/arm64/arm-acpi.txt
+>     @@ -0,0 +1,240 @@
+>     +ACPI on ARMv8 Servers
+>     +---------------------
+>     +
+>     +ACPI will be used for ARMv8 general purpose servers designed to follow
+>     +the SBSA specification (currently available to people with an ARM login at
+>     +http://silver.arm.com)
+>     +
+>     +The implemented ACPI version is 5.1 + errata as released by the UEFI Forum,
+>     +which is available at <http://www.uefi.org/acpi/specs>.
+>     +
+>     +If the machine does not meet these requirements then it is likely that Device
+>     +Tree (DT) is more suitable for the hardware.
+>     +
+>     +Relationship with Device Tree
+>     +-----------------------------
+>     +
+>     +ACPI support in drivers and subsystems for ARMv8 should never be mutually
+>     +exclusive with DT support at compile time.
+>     +
+>     +At boot time the kernel will only use one description method depending on
+>     +parameters passed from the bootloader.
+>     +
+>     +Regardless of whether DT or ACPI is used, the kernel must always be capable
+>     +of booting with either scheme.
+>     +
+>     +When booting using ACPI tables the /chosen node in DT will still be parsed
+>     +to extract the kernel command line and initrd path. No other section of
+>     +the DT will be used.
+>     +
+>     +Booting using ACPI tables
+>     +-------------------------
+>     +
+>     +Currently, the only defined method to pass ACPI tables to the kernel on ARMv8
+>     +is via the UEFI system configuration table.
+>     +
+>     +The UEFI implementation MUST set the ACPI_20_TABLE_GUID to point to the
+>     +RSDP table (the table with the ACPI signature "RSD PTR ").
+>     +
+>     +The pointer to the RSDP table will be retrieved from EFI by the ACPI core.
+>     +
+>     +Processing of ACPI tables may be disabled by passing acpi=off on the kernel
+>     +command line.
+>     +
+>     +DO use an XSDT, RSDTs are deprecated and should not be used on arm64. They
+>     +only allow for 32bit addresses.
+>     +
+>     +DO NOT use the 32-bit address fields in the FADT, they are deprecated, the
+>     +64-bit alternatives MUST be used.
+>     +
+>     +The minimum set of tables MUST include RSDP, XSDT, FACS, FADT, DSDT, MADT
+>     +and GTDT. If PCI is used the MCFG table MUST also be present.
+>     +
+>     +ACPI Detection
+>     +--------------
+>     +
+>     +Drivers should determine their probe() type by checking for ACPI_HANDLE,
+>     +or .of_node, or other information in the device structure. This is
+>     +detailed further in the "Driver Recomendations" section.
+>     +
+>     +If the presence of ACPI needs to be detected at runtime, then check the value
+>     +of acpi_disabled. If CONFIG_ACPI not being set acpi_disabled will always be 1.
+>     +
+>     +Device Enumeration
+>     +------------------
+>     +
+>     +Device descriptions in ACPI should use standard recognised ACPI interfaces.
+> 
+> 
+> recognized
 
-This default is only useful for ia64.  arm64, ppc, s390, sh, tile,
-64-bit UML, and x86_32 have their own code just to disable it.  arm,
-32-bit UML, and x86_64 have gate areas, but they have their own
-implementations.
+Yeah, I saw all of these also, but we accept British or American spelling of these words.
 
-This gets rid of the default and moves the code into ia64.
+>  
+> 
+>     +These are far simpler than the information provided via Device Tree. Drivers
+>     +should take into account this simplicity and work with sensible defaults.
+>     +
+>     +On no account should a Device Tree attempt to be replicated in ASL using such
+>     +constructs as Name(KEY0, "Value1") type constructs. Additional driver specific
+>     +data should be passed in the appropriate _DSM (ACPI Section 9.14.1) method or
+>     +_DSD (ACPI Section 6.2.5). This data should be rare and not OS specific.
+>     +
+>     +Common _DSD bindings should be submitted to ASWG to be included in the
+>     +document :-
+>     +
+>     +http://www.uefi.org/sites/default/files/resources/_DSD-implementation-guide-toplevel.htm
+>     +
+>     +TODO: Clarification and examples from Juno implementation.
+>     +
+>     +Programmable Power Control Resources
+>     +------------------------------------
+>     +
+>     +Programmable power control resources include such resources as voltage/current
+>     +providers (regulators) and clock sources.
+>     +
+>     +For power control of these resources they should be represented with Power
+>     +Resource Objects (ACPI Section 7.1). The ACPI core will then handle correctly
+>     +enabling/disabling of resources as they are needed.
+>     +
+>     +There exists in the ACPI 5.1 specification no standard binding for these objects
+>     +to enable programmable levels or rates so this should be avoid if possible and
+>     +the resources set to appropriate level by the firmware. If this is not possible
+>     +then any manipulation should be abstracted in ASL.
+>     +
+>     +Each device in ACPI has D-states and these can be controlled through
+>     +the optional methods _PS0..._PS3 where _PS0 is full on and _PS3 is full off.
+>     +
+>     +If either _PS0 or _PS3 is implemented, then the other method must also be
+>     +implemented.
+>     +
+>     +If a device requires usage or setup of a power resource when on, the ASL
+>     +should organise that it is allocated/enabled using the _PS0 method.
+> 
+>  
+> organize
+> 
+>     +
+>     +Resources allocated/enabled in the _PS0 method should be disabled/de-allocated
+>     +in the _PS3 method.
+>     +
+>     +Such code in _PS? methods will of course be very platform specific but
+>     +should allow the driver to operate the device without special non standard
+>     +values being read from ASL. Further, abstracting the use of these resources
+>     +allows hardware revisions without requiring updates to the kernel.
+>     +
+>     +TODO: Clarification and examples from Juno implementation.
+>     +
+>     +Clocks
+>     +------
+>     +
+>     +Like clocks that are part of the power resources there is no standard way
+>     +to represent a clock tree in ACPI 5.1 in a similar manner to how it is
+>     +described in DT.
+>     +
+>     +Devices affected by this include things like UARTs, SoC driven LCD displays,
+>     +etc.
+>     +
+>     +The firmware for example UEFI should initialise these clocks to fixed working
+> 
+> 
+> initialize
+>  
+> 
+>     +values before the kernel is executed. If a driver requires to know rates of
+>     +clocks set by firmware then they can be passed to kernel using _DSD.
+>     +
+>     +example :-
+>     +
+>     +Device (CLK0) {
+>     +       ...
+>     +
+>     +       Name (_DSD, Package() {
+>     +               ToUUID("XXXXX"),
+>     +               Package() {
+>     +                       Package(2) {"#clock-cells", 0},
+>     +                       Package(2) {"clock-frequency", "10000"}
+>     +               }
+>     +       })
+>     +
+>     +       ...
+>     +}
+>     +
+>     +Device (USR1) {
+>     +       ...
+>     +
+>     +       Name (_DSD, Package() {
+>     +               ToUUID("XXXXX"),
+>     +               Package() {
+>     +                       Package(2) {"clocks", Package() {1, ^CLK0}}},
+>     +               }
+>     +       })
+>     +
+>     +       ...
+>     +}
+>     +
+>     +Driver Recommendations
+>     +----------------------
+>     +
+>     +DO NOT remove any FDT handling when adding ACPI support for a driver, different
+>     +systems may use the same device.
+>     +
+>     +DO try and keep complex sections of ACPI and DT functionality seperate. This
+> 
+> 
+> separate
+>  
+> 
+>     +may mean a patch to break out some complex DT to another function before
+>     +the patch to add ACPI. This may happen in other functions but is most likely
+>     +in probe function. This gives a clearer flow of data for reviewing driver
+>     +source.
+>     +
+>     +probe() :-
+>     +
+>     +TODO: replace this with a specific real example from Juno?
+>     +
+>     +static int device_probe_dt(struct platform_device *pdev)
+>     +{
+>     +       /* DT specific functionality */
+>     +       ...
+>     +}
+>     +
+>     +static int device_probe_acpi(struct platform_device *pdev)
+>     +{
+>     +       /* ACPI specific functionality */
+>     +       ...
+>     +}
+>     +
+>     +static int device_probe(stuct platform_device *pdev)
+>     +{
+>     +       ...
+>     +       acpi_handle handle = ACPI_HANDLE(&pdev->dev);
+>     +       struct device_node node = pdev->dev.of_node;
+>     +       ...
+>     +
+>     +       if (node)
+>     +               ret = device_probe_dt(pdev);
+>     +       else if (handle)
+>     +               ret = device_probe_acpi(pdev);
+>     +       else
+>     +               /* other initialisation */
+> 
+> 
+> initialization
+>  
+> 
+>     +               ...
+>     +       /* Continue with any generic probe operations */
+>     +       ...
+>     +}
+>     +
+>     +DO keep the MODULE_DEVICE_TABLE entries together in the driver to make it clear
+>     +the different names the driver is probed for, both from DT and from ACPI.
+>     +
+>     +module device tables :-
+>     +
+>     +static struct of_device_id virtio_mmio_match[] = {
+>     +        { .compatible = "virtio,mmio", },
+>     +        {},
+>     +};
+>     +MODULE_DEVICE_TABLE(of, virtio_mmio_match);
+>     +
+>     +static const struct acpi_device_id virtio_mmio_acpi_match[] = {
+>     +        { "LNRO0005", },
+>     +        { }
+>     +};
+>     +MODULE_DEVICE_TABLE(acpi, virtio_mmio_acpi_match);
+>     +
+>     +TODO: Add any other helpful rules that develop from Juno ACPI work.
+>     +
+>     +ASWG
+>     +----
+>     +
+>     +The following areas are not yet well defined for ARM in the current ACPI
+>     +specification and are expected to be worked through in the UEFI ACPI
+>     +Specification Working Group (ASWG) <http://www.uefi.org/workinggroups>.
+>     +Participation in this group is open to all UEFI members.
+>     +
+>     +       - ACPI based CPU topology
+>     +       - ACPI based Power management
+>     +       - CPU idle control based on PSCI
+>     +       - CPU performance control (CPPC)
+>     +
+>     +No code shall be accepted into the kernel unless it complies with the released
+>     +standards from UEFI ASWG. If there are features missing from ACPI to make it
+>     +function on a platform ECRs should be submitted to ASWG and go through the
+>     +approval process.
+>     --
+>     1.7.9.5
+> 
+> 
 
-This should save some code on architectures without a gate area: it's
-now possible to inline the gate_area functions in the default case.
 
-Cc: Catalin Marinas <catalin.marinas@arm.com>
-Cc: Will Deacon <will.deacon@arm.com>
-Cc: Tony Luck <tony.luck@intel.com>
-Cc: Fenghua Yu <fenghua.yu@intel.com>
-Cc: Benjamin Herrenschmidt <benh@kernel.crashing.org>
-Cc: Paul Mackerras <paulus@samba.org>
-Cc: Martin Schwidefsky <schwidefsky@de.ibm.com>
-Cc: Heiko Carstens <heiko.carstens@de.ibm.com>
-Cc: linux390 at de.ibm.com
-Cc: Chris Metcalf <cmetcalf@tilera.com>
-Cc: Jeff Dike <jdike@addtoit.com>
-Cc: Richard Weinberger <richard@nod.at>
-Cc: Thomas Gleixner <tglx@linutronix.de>
-Cc: Ingo Molnar <mingo@redhat.com>
-Cc: "H. Peter Anvin" <hpa@zytor.com>
-Cc: Nathan Lynch <Nathan_Lynch@mentor.com>
-Cc: x86 at kernel.org
-Cc: linux-arch at vger.kernel.org
-Cc: linux-arm-kernel at lists.infradead.org
-Cc: linux-kernel at vger.kernel.org
-Cc: linux-ia64 at vger.kernel.org
-Cc: linuxppc-dev at lists.ozlabs.org
-Cc: linux-s390 at vger.kernel.org
-Cc: linux-sh at vger.kernel.org
-Cc: user-mode-linux-devel at lists.sourceforge.net
-Cc: linux-mm at kvack.org
-Acked-by: Nathan Lynch <nathan_lynch@mentor.com>
-Acked-by: H. Peter Anvin <hpa@linux.intel.com>
-Acked-by: Benjamin Herrenschmidt <benh@kernel.crashing.org> [in principle]
-Acked-by: Richard Weinberger <richard@nod.at> [for um]
-Acked-by: Will Deacon <will.deacon@arm.com> [for arm64]
-Signed-off-by: Andy Lutomirski <luto@amacapital.net>
----
-
-Changes from v3: Fix ia64 build (I was missing in_gate_area in the ia64 part).
-
-This now builds successfully with allnoconfig on ia64.  I don't know how
-to test-boot it (no QEMU support), and I got a failure on a randconfig,
-but I don't think the randconfig failure has anything to do with this
-patch.
-
- arch/arm64/include/asm/page.h      |  3 ---
- arch/arm64/kernel/vdso.c           | 19 -------------------
- arch/ia64/include/asm/page.h       |  2 ++
- arch/ia64/mm/init.c                | 31 +++++++++++++++++++++++++++++++
- arch/powerpc/include/asm/page.h    |  3 ---
- arch/powerpc/kernel/vdso.c         | 16 ----------------
- arch/s390/include/asm/page.h       |  2 --
- arch/s390/kernel/vdso.c            | 15 ---------------
- arch/sh/include/asm/page.h         |  5 -----
- arch/sh/kernel/vsyscall/vsyscall.c | 15 ---------------
- arch/tile/include/asm/page.h       |  6 ------
- arch/tile/kernel/vdso.c            | 15 ---------------
- arch/um/include/asm/page.h         |  5 +++++
- arch/x86/include/asm/page.h        |  1 -
- arch/x86/include/asm/page_64.h     |  2 ++
- arch/x86/um/asm/elf.h              |  1 -
- arch/x86/um/mem_64.c               | 15 ---------------
- arch/x86/vdso/vdso32-setup.c       | 19 +------------------
- include/linux/mm.h                 | 17 ++++++++++++-----
- mm/memory.c                        | 38 --------------------------------------
- mm/nommu.c                         |  5 -----
- 21 files changed, 53 insertions(+), 182 deletions(-)
-
-diff --git a/arch/arm64/include/asm/page.h b/arch/arm64/include/asm/page.h
-index 46bf666..992710f 100644
---- a/arch/arm64/include/asm/page.h
-+++ b/arch/arm64/include/asm/page.h
-@@ -28,9 +28,6 @@
- #define PAGE_SIZE		(_AC(1,UL) << PAGE_SHIFT)
- #define PAGE_MASK		(~(PAGE_SIZE-1))
- 
--/* We do define AT_SYSINFO_EHDR but don't use the gate mechanism */
--#define __HAVE_ARCH_GATE_AREA		1
--
- #ifndef __ASSEMBLY__
- 
- #ifdef CONFIG_ARM64_64K_PAGES
-diff --git a/arch/arm64/kernel/vdso.c b/arch/arm64/kernel/vdso.c
-index 50384fe..f630626 100644
---- a/arch/arm64/kernel/vdso.c
-+++ b/arch/arm64/kernel/vdso.c
-@@ -187,25 +187,6 @@ const char *arch_vma_name(struct vm_area_struct *vma)
- }
- 
- /*
-- * We define AT_SYSINFO_EHDR, so we need these function stubs to keep
-- * Linux happy.
-- */
--int in_gate_area_no_mm(unsigned long addr)
--{
--	return 0;
--}
--
--int in_gate_area(struct mm_struct *mm, unsigned long addr)
--{
--	return 0;
--}
--
--struct vm_area_struct *get_gate_vma(struct mm_struct *mm)
--{
--	return NULL;
--}
--
--/*
-  * Update the vDSO data page to keep in sync with kernel timekeeping.
-  */
- void update_vsyscall(struct timekeeper *tk)
-diff --git a/arch/ia64/include/asm/page.h b/arch/ia64/include/asm/page.h
-index f1e1b2e..1f1bf14 100644
---- a/arch/ia64/include/asm/page.h
-+++ b/arch/ia64/include/asm/page.h
-@@ -231,4 +231,6 @@ get_order (unsigned long size)
- #define PERCPU_ADDR		(-PERCPU_PAGE_SIZE)
- #define LOAD_OFFSET		(KERNEL_START - KERNEL_TR_PAGE_SIZE)
- 
-+#define __HAVE_ARCH_GATE_AREA	1
-+
- #endif /* _ASM_IA64_PAGE_H */
-diff --git a/arch/ia64/mm/init.c b/arch/ia64/mm/init.c
-index 25c3502..0e7ad82 100644
---- a/arch/ia64/mm/init.c
-+++ b/arch/ia64/mm/init.c
-@@ -278,6 +278,37 @@ setup_gate (void)
- 	ia64_patch_gate();
- }
- 
-+static struct vm_area_struct gate_vma;
-+
-+static int __init gate_vma_init(void)
-+{
-+	gate_vma.vm_mm = NULL;
-+	gate_vma.vm_start = FIXADDR_USER_START;
-+	gate_vma.vm_end = FIXADDR_USER_END;
-+	gate_vma.vm_flags = VM_READ | VM_MAYREAD | VM_EXEC | VM_MAYEXEC;
-+	gate_vma.vm_page_prot = __P101;
-+
-+	return 0;
-+}
-+__initcall(gate_vma_init);
-+
-+struct vm_area_struct *get_gate_vma(struct mm_struct *mm)
-+{
-+	return &gate_vma;
-+}
-+
-+int in_gate_area_no_mm(unsigned long addr)
-+{
-+	if ((addr >= FIXADDR_USER_START) && (addr < FIXADDR_USER_END))
-+		return 1;
-+	return 0;
-+}
-+
-+int in_gate_area(struct mm_struct *mm, unsigned long addr)
-+{
-+	return in_gate_area_no_mm(addr);
-+}
-+
- void ia64_mmu_init(void *my_cpu_data)
- {
- 	unsigned long pta, impl_va_bits;
-diff --git a/arch/powerpc/include/asm/page.h b/arch/powerpc/include/asm/page.h
-index 32e4e21..26fe1ae 100644
---- a/arch/powerpc/include/asm/page.h
-+++ b/arch/powerpc/include/asm/page.h
-@@ -48,9 +48,6 @@ extern unsigned int HPAGE_SHIFT;
- #define HUGE_MAX_HSTATE		(MMU_PAGE_COUNT-1)
- #endif
- 
--/* We do define AT_SYSINFO_EHDR but don't use the gate mechanism */
--#define __HAVE_ARCH_GATE_AREA		1
--
- /*
-  * Subtle: (1 << PAGE_SHIFT) is an int, not an unsigned long. So if we
-  * assign PAGE_MASK to a larger type it gets extended the way we want
-diff --git a/arch/powerpc/kernel/vdso.c b/arch/powerpc/kernel/vdso.c
-index ce74c33..f174351 100644
---- a/arch/powerpc/kernel/vdso.c
-+++ b/arch/powerpc/kernel/vdso.c
-@@ -840,19 +840,3 @@ static int __init vdso_init(void)
- 	return 0;
- }
- arch_initcall(vdso_init);
--
--int in_gate_area_no_mm(unsigned long addr)
--{
--	return 0;
--}
--
--int in_gate_area(struct mm_struct *mm, unsigned long addr)
--{
--	return 0;
--}
--
--struct vm_area_struct *get_gate_vma(struct mm_struct *mm)
--{
--	return NULL;
--}
--
-diff --git a/arch/s390/include/asm/page.h b/arch/s390/include/asm/page.h
-index 114258e..7b2ac6e 100644
---- a/arch/s390/include/asm/page.h
-+++ b/arch/s390/include/asm/page.h
-@@ -162,6 +162,4 @@ static inline int devmem_is_allowed(unsigned long pfn)
- #include <asm-generic/memory_model.h>
- #include <asm-generic/getorder.h>
- 
--#define __HAVE_ARCH_GATE_AREA 1
--
- #endif /* _S390_PAGE_H */
-diff --git a/arch/s390/kernel/vdso.c b/arch/s390/kernel/vdso.c
-index 6136490..0bbb7e0 100644
---- a/arch/s390/kernel/vdso.c
-+++ b/arch/s390/kernel/vdso.c
-@@ -316,18 +316,3 @@ static int __init vdso_init(void)
- 	return 0;
- }
- early_initcall(vdso_init);
--
--int in_gate_area_no_mm(unsigned long addr)
--{
--	return 0;
--}
--
--int in_gate_area(struct mm_struct *mm, unsigned long addr)
--{
--	return 0;
--}
--
--struct vm_area_struct *get_gate_vma(struct mm_struct *mm)
--{
--	return NULL;
--}
-diff --git a/arch/sh/include/asm/page.h b/arch/sh/include/asm/page.h
-index 15d9703..fe20d14 100644
---- a/arch/sh/include/asm/page.h
-+++ b/arch/sh/include/asm/page.h
-@@ -186,11 +186,6 @@ typedef struct page *pgtable_t;
- #include <asm-generic/memory_model.h>
- #include <asm-generic/getorder.h>
- 
--/* vDSO support */
--#ifdef CONFIG_VSYSCALL
--#define __HAVE_ARCH_GATE_AREA
--#endif
--
- /*
-  * Some drivers need to perform DMA into kmalloc'ed buffers
-  * and so we have to increase the kmalloc minalign for this.
-diff --git a/arch/sh/kernel/vsyscall/vsyscall.c b/arch/sh/kernel/vsyscall/vsyscall.c
-index 5ca5797..ea2aa13 100644
---- a/arch/sh/kernel/vsyscall/vsyscall.c
-+++ b/arch/sh/kernel/vsyscall/vsyscall.c
-@@ -92,18 +92,3 @@ const char *arch_vma_name(struct vm_area_struct *vma)
- 
- 	return NULL;
- }
--
--struct vm_area_struct *get_gate_vma(struct mm_struct *mm)
--{
--	return NULL;
--}
--
--int in_gate_area(struct mm_struct *mm, unsigned long address)
--{
--	return 0;
--}
--
--int in_gate_area_no_mm(unsigned long address)
--{
--	return 0;
--}
-diff --git a/arch/tile/include/asm/page.h b/arch/tile/include/asm/page.h
-index 6727680..a213a8d 100644
---- a/arch/tile/include/asm/page.h
-+++ b/arch/tile/include/asm/page.h
-@@ -39,12 +39,6 @@
- #define HPAGE_MASK	(~(HPAGE_SIZE - 1))
- 
- /*
-- * We do define AT_SYSINFO_EHDR to support vDSO,
-- * but don't use the gate mechanism.
-- */
--#define __HAVE_ARCH_GATE_AREA		1
--
--/*
-  * If the Kconfig doesn't specify, set a maximum zone order that
-  * is enough so that we can create huge pages from small pages given
-  * the respective sizes of the two page types.  See <linux/mmzone.h>.
-diff --git a/arch/tile/kernel/vdso.c b/arch/tile/kernel/vdso.c
-index 1533af2..5bc51d7 100644
---- a/arch/tile/kernel/vdso.c
-+++ b/arch/tile/kernel/vdso.c
-@@ -121,21 +121,6 @@ const char *arch_vma_name(struct vm_area_struct *vma)
- 	return NULL;
- }
- 
--struct vm_area_struct *get_gate_vma(struct mm_struct *mm)
--{
--	return NULL;
--}
--
--int in_gate_area(struct mm_struct *mm, unsigned long address)
--{
--	return 0;
--}
--
--int in_gate_area_no_mm(unsigned long address)
--{
--	return 0;
--}
--
- int setup_vdso_pages(void)
- {
- 	struct page **pagelist;
-diff --git a/arch/um/include/asm/page.h b/arch/um/include/asm/page.h
-index 5ff53d9..71c5d13 100644
---- a/arch/um/include/asm/page.h
-+++ b/arch/um/include/asm/page.h
-@@ -119,4 +119,9 @@ extern unsigned long uml_physmem;
- #include <asm-generic/getorder.h>
- 
- #endif	/* __ASSEMBLY__ */
-+
-+#ifdef CONFIG_X86_32
-+#define __HAVE_ARCH_GATE_AREA 1
-+#endif
-+
- #endif	/* __UM_PAGE_H */
-diff --git a/arch/x86/include/asm/page.h b/arch/x86/include/asm/page.h
-index 775873d..802dde3 100644
---- a/arch/x86/include/asm/page.h
-+++ b/arch/x86/include/asm/page.h
-@@ -70,7 +70,6 @@ extern bool __virt_addr_valid(unsigned long kaddr);
- #include <asm-generic/memory_model.h>
- #include <asm-generic/getorder.h>
- 
--#define __HAVE_ARCH_GATE_AREA 1
- #define HAVE_ARCH_HUGETLB_UNMAPPED_AREA
- 
- #endif	/* __KERNEL__ */
-diff --git a/arch/x86/include/asm/page_64.h b/arch/x86/include/asm/page_64.h
-index 0f1ddee..f408caf 100644
---- a/arch/x86/include/asm/page_64.h
-+++ b/arch/x86/include/asm/page_64.h
-@@ -39,4 +39,6 @@ void copy_page(void *to, void *from);
- 
- #endif	/* !__ASSEMBLY__ */
- 
-+#define __HAVE_ARCH_GATE_AREA 1
-+
- #endif /* _ASM_X86_PAGE_64_H */
-diff --git a/arch/x86/um/asm/elf.h b/arch/x86/um/asm/elf.h
-index 0feee2f..25a1022 100644
---- a/arch/x86/um/asm/elf.h
-+++ b/arch/x86/um/asm/elf.h
-@@ -216,6 +216,5 @@ extern long elf_aux_hwcap;
- #define ELF_HWCAP (elf_aux_hwcap)
- 
- #define SET_PERSONALITY(ex) do ; while(0)
--#define __HAVE_ARCH_GATE_AREA 1
- 
- #endif
-diff --git a/arch/x86/um/mem_64.c b/arch/x86/um/mem_64.c
-index c6492e7..f8fecad 100644
---- a/arch/x86/um/mem_64.c
-+++ b/arch/x86/um/mem_64.c
-@@ -9,18 +9,3 @@ const char *arch_vma_name(struct vm_area_struct *vma)
- 
- 	return NULL;
- }
--
--struct vm_area_struct *get_gate_vma(struct mm_struct *mm)
--{
--	return NULL;
--}
--
--int in_gate_area(struct mm_struct *mm, unsigned long addr)
--{
--	return 0;
--}
--
--int in_gate_area_no_mm(unsigned long addr)
--{
--	return 0;
--}
-diff --git a/arch/x86/vdso/vdso32-setup.c b/arch/x86/vdso/vdso32-setup.c
-index e4f7781..e904c27 100644
---- a/arch/x86/vdso/vdso32-setup.c
-+++ b/arch/x86/vdso/vdso32-setup.c
-@@ -115,23 +115,6 @@ static __init int ia32_binfmt_init(void)
- 	return 0;
- }
- __initcall(ia32_binfmt_init);
--#endif
--
--#else  /* CONFIG_X86_32 */
--
--struct vm_area_struct *get_gate_vma(struct mm_struct *mm)
--{
--	return NULL;
--}
--
--int in_gate_area(struct mm_struct *mm, unsigned long addr)
--{
--	return 0;
--}
--
--int in_gate_area_no_mm(unsigned long addr)
--{
--	return 0;
--}
-+#endif /* CONFIG_SYSCTL */
- 
- #endif	/* CONFIG_X86_64 */
-diff --git a/include/linux/mm.h b/include/linux/mm.h
-index e03dd29..8981cc8 100644
---- a/include/linux/mm.h
-+++ b/include/linux/mm.h
-@@ -2014,13 +2014,20 @@ static inline bool kernel_page_present(struct page *page) { return true; }
- #endif /* CONFIG_HIBERNATION */
- #endif
- 
-+#ifdef __HAVE_ARCH_GATE_AREA
- extern struct vm_area_struct *get_gate_vma(struct mm_struct *mm);
--#ifdef	__HAVE_ARCH_GATE_AREA
--int in_gate_area_no_mm(unsigned long addr);
--int in_gate_area(struct mm_struct *mm, unsigned long addr);
-+extern int in_gate_area_no_mm(unsigned long addr);
-+extern int in_gate_area(struct mm_struct *mm, unsigned long addr);
- #else
--int in_gate_area_no_mm(unsigned long addr);
--#define in_gate_area(mm, addr) ({(void)mm; in_gate_area_no_mm(addr);})
-+static inline struct vm_area_struct *get_gate_vma(struct mm_struct *mm)
-+{
-+	return NULL;
-+}
-+static inline int in_gate_area_no_mm(unsigned long addr) { return 0; }
-+static inline int in_gate_area(struct mm_struct *mm, unsigned long addr)
-+{
-+	return 0;
-+}
- #endif	/* __HAVE_ARCH_GATE_AREA */
- 
- #ifdef CONFIG_SYSCTL
-diff --git a/mm/memory.c b/mm/memory.c
-index d67fd9f..099d234 100644
---- a/mm/memory.c
-+++ b/mm/memory.c
-@@ -3399,44 +3399,6 @@ int __pmd_alloc(struct mm_struct *mm, pud_t *pud, unsigned long address)
- }
- #endif /* __PAGETABLE_PMD_FOLDED */
- 
--#if !defined(__HAVE_ARCH_GATE_AREA)
--
--#if defined(AT_SYSINFO_EHDR)
--static struct vm_area_struct gate_vma;
--
--static int __init gate_vma_init(void)
--{
--	gate_vma.vm_mm = NULL;
--	gate_vma.vm_start = FIXADDR_USER_START;
--	gate_vma.vm_end = FIXADDR_USER_END;
--	gate_vma.vm_flags = VM_READ | VM_MAYREAD | VM_EXEC | VM_MAYEXEC;
--	gate_vma.vm_page_prot = __P101;
--
--	return 0;
--}
--__initcall(gate_vma_init);
--#endif
--
--struct vm_area_struct *get_gate_vma(struct mm_struct *mm)
--{
--#ifdef AT_SYSINFO_EHDR
--	return &gate_vma;
--#else
--	return NULL;
--#endif
--}
--
--int in_gate_area_no_mm(unsigned long addr)
--{
--#ifdef AT_SYSINFO_EHDR
--	if ((addr >= FIXADDR_USER_START) && (addr < FIXADDR_USER_END))
--		return 1;
--#endif
--	return 0;
--}
--
--#endif	/* __HAVE_ARCH_GATE_AREA */
--
- static int __follow_pte(struct mm_struct *mm, unsigned long address,
- 		pte_t **ptepp, spinlock_t **ptlp)
- {
-diff --git a/mm/nommu.c b/mm/nommu.c
-index 4a852f6..a881d96 100644
---- a/mm/nommu.c
-+++ b/mm/nommu.c
-@@ -1981,11 +1981,6 @@ error:
- 	return -ENOMEM;
- }
- 
--int in_gate_area_no_mm(unsigned long addr)
--{
--	return 0;
--}
--
- int filemap_fault(struct vm_area_struct *vma, struct vm_fault *vmf)
- {
- 	BUG();
 -- 
-1.9.3
+~Randy
