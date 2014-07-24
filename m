@@ -1,65 +1,53 @@
-From: takahiro.akashi@linaro.org (AKASHI Takahiro)
-Date: Thu, 24 Jul 2014 14:57:11 +0900
-Subject: [PATCH v5 1/3] arm64: ptrace: reload a syscall number after ptrace
- operations
-In-Reply-To: <53D08358.4020902@amacapital.net>
-References: <1406020499-5537-1-git-send-email-takahiro.akashi@linaro.org>
- <1406020499-5537-2-git-send-email-takahiro.akashi@linaro.org>
- <53D08358.4020902@amacapital.net>
-Message-ID: <53D0A037.2060308@linaro.org>
+From: herbert@gondor.apana.org.au (Herbert Xu)
+Date: Thu, 24 Jul 2014 14:00:54 +0800
+Subject: [PATCH v4 3/3] crypto: Add Allwinner Security System crypto
+ accelerator
+In-Reply-To: <1405169953-13695-4-git-send-email-clabbe.montjoie@gmail.com>
+References: <1405169953-13695-1-git-send-email-clabbe.montjoie@gmail.com>
+ <1405169953-13695-4-git-send-email-clabbe.montjoie@gmail.com>
+Message-ID: <20140724060054.GA6545@gondor.apana.org.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/24/2014 12:54 PM, Andy Lutomirski wrote:
-> On 07/22/2014 02:14 AM, AKASHI Takahiro wrote:
->> Arm64 holds a syscall number in w8(x8) register. Ptrace tracer may change
->> its value either to:
->>    * any valid syscall number to alter a system call, or
->>    * -1 to skip a system call
->>
->> This patch implements this behavior by reloading that value into syscallno
->> in struct pt_regs after tracehook_report_syscall_entry() or
->> secure_computing(). In case of '-1', a return value of system call can also
->> be changed by the tracer setting the value to x0 register, and so
->> sys_ni_nosyscall() should not be called.
->>
->> See also:
->>      42309ab4, ARM: 8087/1: ptrace: reload syscall number after
->>           secure_computing() check
->>
->> Signed-off-by: AKASHI Takahiro <takahiro.akashi@linaro.org>
->> ---
->>   arch/arm64/kernel/entry.S  |    2 ++
->>   arch/arm64/kernel/ptrace.c |   13 +++++++++++++
->>   2 files changed, 15 insertions(+)
->>
->> diff --git a/arch/arm64/kernel/entry.S b/arch/arm64/kernel/entry.S
->> index 5141e79..de8bdbc 100644
->> --- a/arch/arm64/kernel/entry.S
->> +++ b/arch/arm64/kernel/entry.S
->> @@ -628,6 +628,8 @@ ENDPROC(el0_svc)
->>   __sys_trace:
->>       mov    x0, sp
->>       bl    syscall_trace_enter
->> +    cmp    w0, #-1                // skip syscall?
->> +    b.eq    ret_to_user
+On Sat, Jul 12, 2014 at 02:59:13PM +0200, LABBE Corentin wrote:
 >
-> Does this mean that skipped syscalls will cause exit tracing to be skipped?
+> +/* sunxi_hash_init: initialize request context
+> + * Activate the SS, and configure it for MD5 or SHA1
+> + */
+> +int sunxi_hash_init(struct ahash_request *areq)
+> +{
+> +	const char *hash_type;
+> +	struct crypto_ahash *tfm = crypto_ahash_reqtfm(areq);
+> +	struct sunxi_req_ctx *op = crypto_ahash_ctx(tfm);
+> +
+> +	mutex_lock(&ss->lock);
+> +
+> +	hash_type = crypto_tfm_alg_name(areq->base.tfm);
+> +
+> +	op->byte_count = 0;
+> +	op->nbwait = 0;
+> +	op->waitbuf = 0;
+> +
+> +	/* Enable and configure SS for MD5 or SHA1 */
+> +	if (strcmp(hash_type, "sha1") == 0)
+> +		op->mode = SS_OP_SHA1;
+> +	else
+> +		op->mode = SS_OP_MD5;
+> +
+> +	writel(op->mode | SS_ENABLED, ss->base + SS_CTL);
+> +	return 0;
 
-Yes. (and I guess yes on arm, too)
+The hash driver is completely broken.  You are modifying tfm
+ctx data which is shared by all users of a single tfm.  So
+if two users conduct hashes in parallel they will step all
+over each other.
 
- > If so, then you risk (at least) introducing
-> a nice user-triggerable OOPS if audit is enabled.
+Worse, the unpaired mutex_lock will quickly lead to dead locks.
 
-Can you please elaborate this?
-Since I didn't find any definition of audit's behavior when syscall is
-rewritten to -1, I thought it is reasonable to skip "exit tracing" of
-"skipped" syscall.
-(otherwise, "fake" seems to be more appropriate :)
+You cannot assume that final will be called.
 
--Takahiro AKASHI
-
-> This bug existed for *years* on x86_32, and it amazes me that no one
-> ever triggered it by accident. (Grr, audit.)
->
-> --Andy
+Cheers,
+-- 
+Email: Herbert Xu <herbert@gondor.apana.org.au>
+Home Page: http://gondor.apana.org.au/~herbert/
+PGP Key: http://gondor.apana.org.au/~herbert/pubkey.txt
