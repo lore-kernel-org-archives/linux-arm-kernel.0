@@ -1,55 +1,148 @@
-From: jason@lakedaemon.net (Jason Cooper)
-Date: Thu, 24 Jul 2014 10:56:21 -0400
-Subject: [PATCH 2/2] ARM: mvebu: Added dts defintion for Lenovo Iomega
- ix4-300d NAS
-In-Reply-To: <20140724142918.GG28485@lunn.ch>
-References: <20140723224236.GC28485@lunn.ch>
- <94F87063-D717-435B-B7C5-EDAC9B26742C@perenite.com>
- <20140723225841.GD28485@lunn.ch>
- <10A7C530-7CD2-4ED0-889A-7FAC1922320F@perenite.com>
- <20140723231535.GK23220@titan.lakedaemon.net>
- <53D0FA2F.6050209@free-electrons.com>
- <20140724124520.GV23220@titan.lakedaemon.net>
- <C2E7C8C1-1198-4785-AB9C-C27B5E27A8D4@perenite.com>
- <20140724140757.GW23220@titan.lakedaemon.net>
- <20140724142918.GG28485@lunn.ch>
-Message-ID: <20140724145621.GX23220@titan.lakedaemon.net>
+From: msalter@redhat.com (Mark Salter)
+Date: Thu, 24 Jul 2014 10:56:15 -0400
+Subject: [PATCH] arm64: fix soft lockup due to large tlb flush range
+In-Reply-To: <20140724142417.GE13371@arm.com>
+References: <20140724142417.GE13371@arm.com>
+Message-ID: <1406213775-28617-1-git-send-email-msalter@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jul 24, 2014 at 04:29:18PM +0200, Andrew Lunn wrote:
-> > The only outstanding point (Arnd?), is that I think it's ok to have the
-> > i2c...a0 compatible string in the dts files, but Andrew seems to think
-> > otherwise.  Is that still true Andrew?
-> 
-> Hi Jason
-> 
-> I can live with i2c...a0 compatible string, but it has minor problems:
-> 
-> 1) The binding Documentation says not to do it. So we are ignoring our
->    own documentation.
+Under certain loads, this soft lockup has been observed:
 
-This can be updated.
+   BUG: soft lockup - CPU#2 stuck for 22s! [ip6tables:1016]
+   Modules linked in: ip6t_rpfilter ip6t_REJECT cfg80211 rfkill xt_conntrack ebtable_nat ebtable_broute bridge stp llc ebtable_filter ebtables ip6table_nat nf_conntrack_ipv6 nf_defrag_ipv6 nf_nat_ipv6 ip6table_mangle ip6table_security ip6table_raw ip6table_filter ip6_tables iptable_nat nf_conntrack_ipv4 nf_defrag_ipv4 nf_nat_ipv4 nf_nat nf_conntrack iptable_mangle iptable_security iptable_raw vfat fat efivarfs xfs libcrc32c
 
-> 2) It seems likely that at some point the OEM will swap to B1 revision
->    SoCs. The i2c device then does not require this quirk, but we have
->    hard coded in the DT file that it is required. B1 revision would
->    work, but not optimally.
+   CPU: 2 PID: 1016 Comm: ip6tables Not tainted 3.13.0-0.rc7.30.sa2.aarch64 #1
+   task: fffffe03e81d1400 ti: fffffe03f01f8000 task.ti: fffffe03f01f8000
+   PC is at __cpu_flush_kern_tlb_range+0xc/0x40
+   LR is at __purge_vmap_area_lazy+0x28c/0x3ac
+   pc : [<fffffe000009c5cc>] lr : [<fffffe0000182710>] pstate: 80000145
+   sp : fffffe03f01fbb70
+   x29: fffffe03f01fbb70 x28: fffffe03f01f8000
+   x27: fffffe0000b19000 x26: 00000000000000d0
+   x25: 000000000000001c x24: fffffe03f01fbc50
+   x23: fffffe03f01fbc58 x22: fffffe03f01fbc10
+   x21: fffffe0000b2a3f8 x20: 0000000000000802
+   x19: fffffe0000b2a3c8 x18: 000003fffdf52710
+   x17: 000003ff9d8bb910 x16: fffffe000050fbfc
+   x15: 0000000000005735 x14: 000003ff9d7e1a5c
+   x13: 0000000000000000 x12: 000003ff9d7e1a5c
+   x11: 0000000000000007 x10: fffffe0000c09af0
+   x9 : fffffe0000ad1000 x8 : 000000000000005c
+   x7 : fffffe03e8624000 x6 : 0000000000000000
+   x5 : 0000000000000000 x4 : 0000000000000000
+   x3 : fffffe0000c09cc8 x2 : 0000000000000000
+   x1 : 000fffffdfffca80 x0 : 000fffffcd742150
 
-The quirk can go both ways.  eg, we can detect that we *aren't* on an A0
-and need to remove the compatible string.
+The __cpu_flush_kern_tlb_range() function looks like:
 
-> So i would prefer not to explicitly enable the quirk, but determine at
-> run time if the quirk is needed for the SoC revision it is running on.
+  ENTRY(__cpu_flush_kern_tlb_range)
+	dsb	sy
+	lsr	x0, x0, #12
+	lsr	x1, x1, #12
+  1:	tlbi	vaae1is, x0
+	add	x0, x0, #1
+	cmp	x0, x1
+	b.lo	1b
+	dsb	sy
+	isb
+	ret
+  ENDPROC(__cpu_flush_kern_tlb_range)
 
-I agree, but that is Linux-centric.  We need to handle it coherently in
-the binding docs for *BSD, bootloaders, etc.
+The above soft lockup shows the PC at tlbi insn with:
 
-I suggest we update the binding to allow using the compatible string,
-and advise that to avoid end-user frustration, implementations should
-detect the SoC revision at runtime and either add or remove the
-compatible string.
+  x0 = 0x000fffffcd742150
+  x1 = 0x000fffffdfffca80
 
-thx,
+So __cpu_flush_kern_tlb_range has 0x128ba930 tlbi flushes left
+after it has already been looping for 23 seconds!.
 
-Jason.
+Looking up one frame at __purge_vmap_area_lazy(), there is:
+
+	...
+	list_for_each_entry_rcu(va, &vmap_area_list, list) {
+		if (va->flags & VM_LAZY_FREE) {
+			if (va->va_start < *start)
+				*start = va->va_start;
+			if (va->va_end > *end)
+				*end = va->va_end;
+			nr += (va->va_end - va->va_start) >> PAGE_SHIFT;
+			list_add_tail(&va->purge_list, &valist);
+			va->flags |= VM_LAZY_FREEING;
+			va->flags &= ~VM_LAZY_FREE;
+		}
+	}
+	...
+	if (nr || force_flush)
+		flush_tlb_kernel_range(*start, *end);
+
+So if two areas are being freed, the range passed to
+flush_tlb_kernel_range() may be as large as the vmalloc
+space. For arm64, this is ~240GB for 4k pagesize and ~2TB
+for 64kpage size.
+
+This patch works around this problem by adding a loop limit.
+If the range is larger than the limit, use flush_tlb_all()
+rather than flushing based on individual pages. The limit
+chosen is arbitrary and would be better if based on the
+actual size of the tlb. I looked through the ARM ARM but
+didn't see any easy way to get the actual tlb size, so for
+now the arbitrary limit is better than the soft lockup.
+
+Signed-off-by: Mark Salter <msalter@redhat.com>
+---
+ arch/arm64/include/asm/tlbflush.h | 25 ++++++++++++++++++++++---
+ 1 file changed, 22 insertions(+), 3 deletions(-)
+
+diff --git a/arch/arm64/include/asm/tlbflush.h b/arch/arm64/include/asm/tlbflush.h
+index b9349c4..af3e572 100644
+--- a/arch/arm64/include/asm/tlbflush.h
++++ b/arch/arm64/include/asm/tlbflush.h
+@@ -98,8 +98,8 @@ static inline void flush_tlb_page(struct vm_area_struct *vma,
+ 	dsb(ish);
+ }
+ 
+-static inline void flush_tlb_range(struct vm_area_struct *vma,
+-					unsigned long start, unsigned long end)
++static inline void __flush_tlb_range(struct vm_area_struct *vma,
++				     unsigned long start, unsigned long end)
+ {
+ 	unsigned long asid = (unsigned long)ASID(vma->vm_mm) << 48;
+ 	unsigned long addr;
+@@ -112,7 +112,9 @@ static inline void flush_tlb_range(struct vm_area_struct *vma,
+ 	dsb(ish);
+ }
+ 
+-static inline void flush_tlb_kernel_range(unsigned long start, unsigned long end)
++#define MAX_TLB_LOOP 1024
++
++static inline void __flush_tlb_kernel_range(unsigned long start, unsigned long end)
+ {
+ 	unsigned long addr;
+ 	start >>= 12;
+@@ -124,6 +126,23 @@ static inline void flush_tlb_kernel_range(unsigned long start, unsigned long end
+ 	dsb(ish);
+ }
+ 
++static inline void flush_tlb_range(struct vm_area_struct *vma,
++				   unsigned long start, unsigned long end)
++{
++	if (((end - start) >> PAGE_SHIFT) < MAX_TLB_LOOP)
++		__flush_tlb_range(vma, start, end);
++	else
++		flush_tlb_mm(vma->vm_mm);
++}
++
++static inline void flush_tlb_kernel_range(unsigned long start, unsigned long end)
++{
++	if (((end - start) >> PAGE_SHIFT) < MAX_TLB_LOOP)
++		__flush_tlb_kernel_range(start, end);
++	else
++		flush_tlb_all();
++}
++
+ /*
+  * On AArch64, the cache coherency is handled via the set_pte_at() function.
+  */
+-- 
+1.9.0
