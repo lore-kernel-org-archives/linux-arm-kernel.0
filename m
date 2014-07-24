@@ -1,38 +1,39 @@
-From: jason@lakedaemon.net (Jason Cooper)
-Date: Thu, 24 Jul 2014 08:00:34 -0400
-Subject: [PATCHv3 11/16] cpuidle: mvebu: rename the driver from
- armada-370-xp to mvebu-v7
-In-Reply-To: <53D0CEA3.1050204@linaro.org>
-References: <1406120453-29291-1-git-send-email-thomas.petazzoni@free-electrons.com>
- <1406120453-29291-12-git-send-email-thomas.petazzoni@free-electrons.com>
- <53D0CEA3.1050204@linaro.org>
-Message-ID: <20140724120034.GS23220@titan.lakedaemon.net>
+From: maxime.coquelin@st.com (Maxime COQUELIN)
+Date: Thu, 24 Jul 2014 14:02:55 +0200
+Subject: [PATCH 1/2] serial: st-asc: Don't call BUG in asc_console_setup()
+In-Reply-To: <1406203376-18203-1-git-send-email-maxime.coquelin@st.com>
+References: <1406203376-18203-1-git-send-email-maxime.coquelin@st.com>
+Message-ID: <1406203376-18203-2-git-send-email-maxime.coquelin@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jul 24, 2014 at 11:15:15AM +0200, Daniel Lezcano wrote:
-> On 07/23/2014 03:00 PM, Thomas Petazzoni wrote:
-> >From: Gregory CLEMENT <gregory.clement@free-electrons.com>
-> >
-> >This driver will be able to manage the cpuidle for more SoCs than just
-> >Armada 370 and XP. It will also support Armada 38x and potentially
-> >other SoC of the Marvell Armada EBU family. To take this into account,
-> >this patch renames the driver and its symbols.
-> >
-> >It also changes the driver name from cpuidle-armada-370-xp to
-> >cpuidle-armada-xp, because separate platform drivers will be
-> >registered for the other SoC types. This change must be done
-> >simultaneously in the cpuidle driver and in the PMSU code in order to
-> >remain bisectable.
-> >
-> >Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
-> >Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
-> 
-> Acked-by: Daniel Lezcano <daniel.lezcano@linaro.org>
+In order to prevent an asc instance to be used as early console, BUG_ON is
+used on either mapbase or membase being NULL.
 
-Thanks for getting on top of this so quickly after returning from
-vacation!
+Problem is that this condition is also true when we set console to be a ttyASx
+different to the first asc instance being probed.
 
-thx,
+Instead of calling BUG_ON, it now returns -ENXIO when either mapbase or
+membase is NULL.
 
-Jason.
+Signed-off-by: Maxime Coquelin <maxime.coquelin@st.com>
+---
+ drivers/tty/serial/st-asc.c | 3 ++-
+ 1 file changed, 2 insertions(+), 1 deletion(-)
+
+diff --git a/drivers/tty/serial/st-asc.c b/drivers/tty/serial/st-asc.c
+index f48b1cc..2369bc0 100644
+--- a/drivers/tty/serial/st-asc.c
++++ b/drivers/tty/serial/st-asc.c
+@@ -849,7 +849,8 @@ static int asc_console_setup(struct console *co, char *options)
+ 	 * this to be called during the uart port registration when the
+ 	 * driver gets probed and the port should be mapped at that point.
+ 	 */
+-	BUG_ON(ascport->port.mapbase == 0 || ascport->port.membase == NULL);
++	if (ascport->port.mapbase == 0 || ascport->port.membase == NULL)
++		return -ENXIO;
+ 
+ 	if (options)
+ 		uart_parse_options(options, &baud, &parity, &bits, &flow);
+-- 
+1.9.1
