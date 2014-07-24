@@ -1,41 +1,85 @@
 From: cyrille.pitchen@atmel.com (Cyrille Pitchen)
-Date: Thu, 24 Jul 2014 13:51:03 +0200
-Subject: [PATCH v2 6/6] net/macb: enable scatter-gather feature and set DMA
- burst length for sama5d4 gem
-In-Reply-To: <cover.1406192657.git.cyrille.pitchen@atmel.com>
-References: <cover.1406192657.git.cyrille.pitchen@atmel.com>
-Message-ID: <1918ae71a967c7c58ebd3e0a96fdc0aebde54e80.1406192657.git.cyrille.pitchen@atmel.com>
+Date: Thu, 24 Jul 2014 13:59:21 +0200
+Subject: [PATCH 4/6] net/macb: add RX checksum offload feature
+In-Reply-To: <1406069908.3363.7.camel@edumazet-glaptop2.roam.corp.google.com>
+References: <cover.1405689937.git.cyrille.pitchen@atmel.com>		
+ <f29965fee23dc0de99b388373017efeffa1aac10.1405689937.git.cyrille.pitchen@atmel.com>	
+ <1405697784.10255.99.camel@edumazet-glaptop2.roam.corp.google.com>	
+ <53CE9109.9040407@atmel.com>
+ <1406069908.3363.7.camel@edumazet-glaptop2.roam.corp.google.com>
+Message-ID: <53D0F519.1050009@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Signed-off-by: Cyrille Pitchen <cyrille.pitchen@atmel.com>
----
- drivers/net/ethernet/cadence/macb.c | 6 ++++++
- 1 file changed, 6 insertions(+)
+Le 23/07/2014 00:58, Eric Dumazet a ?crit :
+> On Tue, 2014-07-22 at 18:27 +0200, Cyrille Pitchen wrote:
+>> Le 18/07/2014 17:36, Eric Dumazet a ?crit :
+>>> On Fri, 2014-07-18 at 16:21 +0200, Cyrille Pitchen wrote:
+>>>> Signed-off-by: Cyrille Pitchen <cyrille.pitchen@atmel.com>
+>>>> ---
+>>>>  drivers/net/ethernet/cadence/macb.c | 29 ++++++++++++++++++++++++++++-
+>>>>  drivers/net/ethernet/cadence/macb.h |  2 ++
+>>>>  2 files changed, 30 insertions(+), 1 deletion(-)
+>>>>
+>>>> diff --git a/drivers/net/ethernet/cadence/macb.c b/drivers/net/ethernet/cadence/macb.c
+>>>> index 9bdcd1b..6acd6e2 100644
+>>>> --- a/drivers/net/ethernet/cadence/macb.c
+>>>> +++ b/drivers/net/ethernet/cadence/macb.c
+>>>> @@ -766,6 +766,8 @@ static int gem_rx(struct macb *bp, int budget)
+>>>>  
+>>>>  		skb->protocol = eth_type_trans(skb, bp->dev);
+>>>>  		skb_checksum_none_assert(skb);
+>>>> +		if (bp->dev->features & NETIF_F_RXCSUM)
+>>>> +			skb->ip_summed = CHECKSUM_UNNECESSARY;
+>>>>  
+>>>
+>>>
+>>> Really ?
+>>>
+>>> If this is what you meant, this deserves a big and fat comment.
+>>>
+>>>
+>>>
+>> Hi Eric,
+>>
+>> Isn't it the proper way to do? According to Cadence documentation
+>> about RX checksum offload:
+>> "If any of the checksums (IP, TCP or UDP) are verified incorrect by
+>> the GEM, the packet is discarded."
+>>
+>> If I understand, when RX checksum offload is enabled setting bit 24 of
+>> the Network Configuration Register, the driver only receives RX frames
+>> with correct checksum. Then it tells the kernel that there's no need
+>> to verify the checksum again in software. This is done setting
+>> skb->ip_summed to CHECKSUM_UNNECESSARY. Intel e1000 driver does the
+>> same in e1000_rx_checksum() function.
+>>
+>> Also bit 24 of the Network Configuration Register is updated by
+>> macb_open() and macb_set_features() so it always matches the state of
+>> NETIF_F_RXCSUM flag in dev->features, once the network interface is
+>> up. That's why I'd rather read from dev->features than read from
+>> register.
+>>
+>> Did I make a mistake? Is it the kind of comment you expect to be
+>> added?
+>>
+>> Regards,
+> 
+> Usually, frames are not discarded, and a bit is present in rx descriptor
+> to tell us if (TCP) checksum was validated by the NIC
+> 
+> We want tcpdump to get a copy of corrupted TCP frames, even if TCP stack
+> drops them later.
+> 
+> If this NIC drops incorrect frames, I am afraid we cant use this RX
+> offload at all.
+> 
+> 
+> 
+OK thanks for your comments. In the next series of patches I'll allow RX 
+checksum offload only when promiscuous mode is disabled. Also I'll check the
+status returned by the GEM through the buffer descriptor.
 
-diff --git a/drivers/net/ethernet/cadence/macb.c b/drivers/net/ethernet/cadence/macb.c
-index 6836f88..ca5d779 100644
---- a/drivers/net/ethernet/cadence/macb.c
-+++ b/drivers/net/ethernet/cadence/macb.c
-@@ -2005,6 +2005,11 @@ static struct macb_config sama5d3_config = {
- 	.dma_burst_length = 16,
- };
- 
-+static struct macb_config sama5d4_config = {
-+	.caps = 0,
-+	.dma_burst_length = 4,
-+};
-+
- static const struct of_device_id macb_dt_ids[] = {
- 	{ .compatible = "cdns,at32ap7000-macb" },
- 	{ .compatible = "cdns,at91sam9260-macb" },
-@@ -2012,6 +2017,7 @@ static const struct of_device_id macb_dt_ids[] = {
- 	{ .compatible = "cdns,pc302-gem", .data = &pc302gem_config },
- 	{ .compatible = "cdns,gem", .data = &pc302gem_config },
- 	{ .compatible = "atmel,sama5d3-gem", .data = &sama5d3_config },
-+	{ .compatible = "atmel,sama5d4-gem", .data = &sama5d4_config },
- 	{ /* sentinel */ }
- };
- MODULE_DEVICE_TABLE(of, macb_dt_ids);
--- 
-1.8.2.2
+Regards,
+
+Cyrille
