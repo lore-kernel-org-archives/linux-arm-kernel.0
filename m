@@ -1,39 +1,71 @@
 From: hanjun.guo@linaro.org (Hanjun Guo)
-Date: Thu, 24 Jul 2014 21:00:23 +0800
-Subject: [PATCH 17/19] ARM64 / ACPI: If we chose to boot from acpi then
- disable FDT
+Date: Thu, 24 Jul 2014 21:00:24 +0800
+Subject: [PATCH 18/19] ARM64 / ACPI: Enable ARM64 in Kconfig
 In-Reply-To: <1406206825-15590-1-git-send-email-hanjun.guo@linaro.org>
 References: <1406206825-15590-1-git-send-email-hanjun.guo@linaro.org>
-Message-ID: <1406206825-15590-18-git-send-email-hanjun.guo@linaro.org>
+Message-ID: <1406206825-15590-19-git-send-email-hanjun.guo@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Graeme Gregory <graeme.gregory@linaro.org>
 
-If the early boot methods of acpi are happy that we have valid ACPI
-tables and acpi=off has not been passed. Then do not unflat devicetree
-effectively disabling further hardware probing from DT.
+Add Kconfigs to build ACPI on ARM64, and make ACPI available on ARM64.
 
+acpi_idle driver is x86/IA64 dependent now, so make CONFIG_ACPI_PROCESSOR
+depend on X86 || IA64, and implement it on ARM64 in the future.
+
+Reviewed-by: Grant Likely <grant.likely@linaro.org>
 Signed-off-by: Graeme Gregory <graeme.gregory@linaro.org>
+Signed-off-by: Al Stone <al.stone@linaro.org>
 Signed-off-by: Hanjun Guo <hanjun.guo@linaro.org>
 ---
- arch/arm64/kernel/setup.c |    4 ++--
- 1 file changed, 2 insertions(+), 2 deletions(-)
+ arch/arm64/Kconfig   |    2 ++
+ drivers/acpi/Kconfig |    6 +++---
+ 2 files changed, 5 insertions(+), 3 deletions(-)
 
-diff --git a/arch/arm64/kernel/setup.c b/arch/arm64/kernel/setup.c
-index 17ab98e..4ace77c 100644
---- a/arch/arm64/kernel/setup.c
-+++ b/arch/arm64/kernel/setup.c
-@@ -397,8 +397,8 @@ void __init setup_arch(char **cmdline_p)
- 	/* Get the boot CPU's MPIDR before cpu logical map is built */
- 	cpu_logical_map(0) = read_cpuid_mpidr() & MPIDR_HWID_BITMASK;
- 	acpi_boot_init();
--
--	unflatten_device_tree();
-+	if (acpi_disabled)
-+		unflatten_device_tree();
+diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
+index 95835bc..1e0ca19 100644
+--- a/arch/arm64/Kconfig
++++ b/arch/arm64/Kconfig
+@@ -362,6 +362,8 @@ source "drivers/Kconfig"
  
- 	psci_init();
+ source "drivers/firmware/Kconfig"
  
++source "drivers/acpi/Kconfig"
++
+ source "fs/Kconfig"
+ 
+ source "arch/arm64/kvm/Kconfig"
+diff --git a/drivers/acpi/Kconfig b/drivers/acpi/Kconfig
+index 3f5f745..f6b6791 100644
+--- a/drivers/acpi/Kconfig
++++ b/drivers/acpi/Kconfig
+@@ -5,8 +5,7 @@
+ menuconfig ACPI
+ 	bool "ACPI (Advanced Configuration and Power Interface) Support"
+ 	depends on !IA64_HP_SIM
+-	depends on IA64 || X86
+-	depends on PCI
++	depends on ((IA64 || X86) && PCI) || ARM64
+ 	select PNP
+ 	default y
+ 	help
+@@ -163,6 +162,7 @@ config ACPI_PROCESSOR
+ 	tristate "Processor"
+ 	select THERMAL
+ 	select CPU_IDLE
++	depends on X86 || IA64
+ 	default y
+ 	help
+ 	  This driver installs ACPI as the idle handler for Linux and uses
+@@ -263,7 +263,7 @@ config ACPI_DEBUG
+ 
+ config ACPI_PCI_SLOT
+ 	bool "PCI slot detection driver"
+-	depends on SYSFS
++	depends on SYSFS && PCI
+ 	default n
+ 	help
+ 	  This driver creates entries in /sys/bus/pci/slots/ for all PCI
 -- 
 1.7.9.5
