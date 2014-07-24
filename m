@@ -1,49 +1,56 @@
-From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Thu, 24 Jul 2014 14:10:46 +0200
-Subject: [PATCHv3 00/16] cpuidle for Marvell Armada 370 and 38x
-In-Reply-To: <20140724120349.GT23220@titan.lakedaemon.net>
-References: <1406120453-29291-1-git-send-email-thomas.petazzoni@free-electrons.com>
- <20140724120349.GT23220@titan.lakedaemon.net>
-Message-ID: <20140724141046.6a0f064b@free-electrons.com>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Thu, 24 Jul 2014 14:13:15 +0200
+Subject: [PATCH v11 0/2] Add support for the Allwinner A31 DMA Controller
+In-Reply-To: <1405626376-471-1-git-send-email-maxime.ripard@free-electrons.com>
+References: <1405626376-471-1-git-send-email-maxime.ripard@free-electrons.com>
+Message-ID: <20140724121315.GV20328@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear Jason Cooper,
+Vinod, Dan,
 
-On Thu, 24 Jul 2014 08:03:49 -0400, Jason Cooper wrote:
-
-> >  .../bindings/arm/armada-380-mpcore-soc-ctrl.txt    |  14 ++
-> >  arch/arm/boot/dts/armada-38x.dtsi                  |   5 +
-> >  arch/arm/configs/mvebu_v7_defconfig                |   2 +
-> >  arch/arm/mach-mvebu/armada-370-xp.h                |   1 -
-> >  arch/arm/mach-mvebu/board-v7.c                     |   9 +-
-> >  arch/arm/mach-mvebu/common.h                       |   2 +
-> >  arch/arm/mach-mvebu/headsmp-a9.S                   |  15 --
-> >  arch/arm/mach-mvebu/platsmp-a9.c                   |  42 +---
-> >  arch/arm/mach-mvebu/platsmp.c                      |   2 +-
-> >  arch/arm/mach-mvebu/pmsu.c                         | 273 ++++++++++++++++++---
-> >  arch/arm/mach-mvebu/pmsu.h                         |   5 +
-> >  arch/arm/mach-mvebu/pmsu_ll.S                      |  36 +++
-> >  arch/arm/mach-mvebu/system-controller.c            |  31 +++
-> >  drivers/cpuidle/Kconfig.arm                        |  12 +-
-> >  drivers/cpuidle/Makefile                           |   2 +-
-> >  drivers/cpuidle/cpuidle-armada-370-xp.c            |  93 -------
-> >  drivers/cpuidle/cpuidle-mvebu-v7.c                 | 150 +++++++++++
-> >  17 files changed, 500 insertions(+), 194 deletions(-)
-> >  create mode 100644 Documentation/devicetree/bindings/arm/armada-380-mpcore-soc-ctrl.txt
-> >  delete mode 100644 drivers/cpuidle/cpuidle-armada-370-xp.c
-> >  create mode 100644 drivers/cpuidle/cpuidle-mvebu-v7.c
+On Thu, Jul 17, 2014 at 09:46:14PM +0200, Maxime Ripard wrote:
+> Hi,
 > 
-> Whole series, except 10 (went to mvebu/dt), and 16 (went to
-> mvebu/defconfig) applied to mvebu/soc-cpuidle.  Patches 11 to 13 applied
-> with Daniel's Ack.
+> This patchset adds support for the DMA controller found in the
+> Allwinner A31 and A23 SoCs.
 > 
-> It'll be in -next tonight.
+> This has been tested using the newly introduced SPI driver on an A31
+> EVK. Support for DMA-driven SPI transfers will be the subject of
+> another patch serie.
+> 
+> This has been around for around 5 monthes now, and didn't get any
+> review but nitpicks for three versions, so I feel like it could be
+> merged quite quickly.
 
-Great, thanks a lot!
+Ok, so, who should I bribe to get this merged?
 
-Thomas
+The first version was posted on the 2/24, we're at v11 already, and I
+only got a single mail from either one of you.
+
+Don't get me wrong, I'd be ok to make any change you deemed necessary,
+but in order to do so, I at least have to get a sign of life from you,
+and so far, you've both always been MIA.
+
+We're pretty much in the same situation for the other DMA driver
+Emilio has been sending for over a month now, that he is doing as part
+as a GSoC for the Linux Foundation, with not a single maintainer
+review so far.
+
+I'm getting quite tired of this honestly, and I'm not sure it sends
+the right message to the hobbyists and companies that try to get
+things right by contributing.
+
+Maxime
+
 -- 
-Thomas Petazzoni, CTO, Free Electrons
+Maxime Ripard, Free Electrons
 Embedded Linux, Kernel and Android engineering
 http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140724/48ac8d0a/attachment.sig>
