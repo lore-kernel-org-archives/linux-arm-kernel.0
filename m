@@ -1,62 +1,112 @@
 From: afaerber@suse.de (=?UTF-8?q?Andreas=20F=C3=A4rber?=)
-Date: Fri, 25 Jul 2014 01:00:09 +0200
-Subject: [PATCH v2 00/11] ARM: dts: zynq: Prepare Parallella
-Message-ID: <1406242820-20140-1-git-send-email-afaerber@suse.de>
+Date: Fri, 25 Jul 2014 01:00:12 +0200
+Subject: [PATCH v2 03/11] ARM: dts: zynq: Add Parallella device tree
+In-Reply-To: <1406242820-20140-1-git-send-email-afaerber@suse.de>
+References: <1406242820-20140-1-git-send-email-afaerber@suse.de>
+Message-ID: <1406242820-20140-4-git-send-email-afaerber@suse.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+This allows to boot the Adapteva Parallella board to serial console.
 
-This patch series adds an initial device tree for the Parallella board.
-UART, SD card, Ethernet are enabled.
-Not yet enabled are HDMI, QSPI flash and 2x USB.
-
-v2 adds some SPI and FPGA pieces and tidies the device tree with a 
-compatible string and matching documentation.
-
-Not having all pieces for testing all of this (most notably I'm missing 
-ADI ADV7513 and AXI-HDMI support for VDMA and axi-clkgen, as well as 
-the 25Q128A flash chip for QSPI), I've kept new things in separate patches
-so that we can make progress on the basic version and possibly squash
-further cherry-picked pieces.
-
-Punnaiah Choudary Kalluri had recently proposed to extend the Chipidea 
-USB driver for Zynq; it kept complaining about the PHY though, and I 
-haven't spotted a revised version based on the generic driver yet.
-https://patchwork.kernel.org/patch/4434681/
-
-My rebasing work branch is here:
-https://github.com/afaerber/linux/commits/parallella-next
-
-Regards,
-Andreas
-
-Cc: Punnaiah Choudary Kalluri <punnaia@xilinx.com> (USB)
-Cc: Lars-Peter Clausen <lars@metafoo.de> (HDMI)
-
-Andreas F?rber (11):
-  Documentation: devicetree: Adapteva vendor prefix
-  Documentation: devicetree: Adapteva boards
-  ARM: dts: zynq: Add Parallella device tree
-  ARM: dts: zynq: Update deprecated xuartps clock names
-  ARM: dts: zynq: Add QSPI for Parallella
-  ARM: dts: zynq: Add DMAC for Parallella
-  Documentation: devicetree: Fix Xilinx VDMA specification
-  ARM: dts: zynq: Add VDMA to Parallella
-  Documentation: devicetree: Fix ADI AXI SPDIF specification
-  ARM: dts: zynq: Add SPDIF for Parallella
-  ARM: dts: zynq: Add AXI clkgen for Parallella
-
- Documentation/devicetree/bindings/arm/adapteva.txt |   7 ++
- .../devicetree/bindings/dma/xilinx/xilinx_vdma.txt |   2 +-
- .../devicetree/bindings/sound/adi,axi-spdif-tx.txt |   2 +-
- .../devicetree/bindings/vendor-prefixes.txt        |   1 +
- arch/arm/boot/dts/Makefile                         |   4 +-
- arch/arm/boot/dts/zynq-7000.dtsi                   |  58 +++++++++-
- arch/arm/boot/dts/zynq-parallella.dts              | 119 +++++++++++++++++++++
- 7 files changed, 188 insertions(+), 5 deletions(-)
- create mode 100644 Documentation/devicetree/bindings/arm/adapteva.txt
+Cc: Andreas Olofsson <andreas@adapteva.com>
+Signed-off-by: Andreas F?rber <afaerber@suse.de>
+---
+ v1 -> v2:
+ * Added board-specific compatible string (Olof Johansson).
+ * Added /chosen linux,stdout-path property (Olof Johansson).
+ * Fixed /memory reg size 0x20000000 -> 0x40000000 (0 considered).
+ * Added vendor name to root node's model property (Olof Johansson).
+ 
+ arch/arm/boot/dts/Makefile            |  4 ++-
+ arch/arm/boot/dts/zynq-parallella.dts | 64 +++++++++++++++++++++++++++++++++++
+ 2 files changed, 67 insertions(+), 1 deletion(-)
  create mode 100644 arch/arm/boot/dts/zynq-parallella.dts
 
+diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
+index adb5ed9..976720f 100644
+--- a/arch/arm/boot/dts/Makefile
++++ b/arch/arm/boot/dts/Makefile
+@@ -419,7 +419,9 @@ dtb-$(CONFIG_ARCH_VT8500) += vt8500-bv07.dtb \
+ 	wm8650-mid.dtb \
+ 	wm8750-apc8750.dtb \
+ 	wm8850-w70v2.dtb
+-dtb-$(CONFIG_ARCH_ZYNQ) += zynq-zc702.dtb \
++dtb-$(CONFIG_ARCH_ZYNQ) += \
++	zynq-parallella.dtb \
++	zynq-zc702.dtb \
+ 	zynq-zc706.dtb \
+ 	zynq-zed.dtb
+ dtb-$(CONFIG_MACH_ARMADA_370) += \
+diff --git a/arch/arm/boot/dts/zynq-parallella.dts b/arch/arm/boot/dts/zynq-parallella.dts
+new file mode 100644
+index 0000000..41afd9d
+--- /dev/null
++++ b/arch/arm/boot/dts/zynq-parallella.dts
+@@ -0,0 +1,64 @@
++/*
++ * Copyright (c) 2014 SUSE LINUX Products GmbH
++ *
++ * Derived from zynq-zed.dts:
++ *
++ *  Copyright (C) 2011 Xilinx
++ *  Copyright (C) 2012 National Instruments Corp.
++ *  Copyright (C) 2013 Xilinx
++ *
++ * This software is licensed under the terms of the GNU General Public
++ * License version 2, as published by the Free Software Foundation, and
++ * may be copied, distributed, and modified under those terms.
++ *
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
++ */
++/dts-v1/;
++/include/ "zynq-7000.dtsi"
++
++/ {
++	model = "Adapteva Parallella Board";
++	compatible = "adapteva,parallella", "xlnx,zynq-7000";
++
++	memory {
++		device_type = "memory";
++		reg = <0 0x40000000>;
++	};
++
++	chosen {
++		bootargs = "console=ttyPS0,115200 earlyprintk root=/dev/mmcblk0p2 rootfstype=ext4 rw rootwait";
++		linux,stdout-path = "/amba/serial at e0001000";
++	};
++};
++
++&gem0 {
++	status = "okay";
++	phy-mode = "rgmii-id";
++	phy-handle = <&ethernet_phy>;
++	#address-cells = <1>;
++	#size-cells = <0>;
++
++	ethernet_phy: ethernet-phy at 0 {
++		/* Marvell 88E1318 */
++		compatible = "ethernet-phy-id0141.0e90",
++		             "ethernet-phy-ieee802.3-c22";
++		reg = <0>;
++		marvell,reg-init = <0x3 0x10 0xff00 0x1e>,
++		                   <0x3 0x11 0xfff0 0xa>;
++	};
++};
++
++&i2c0 {
++	status = "okay";
++};
++
++&sdhci1 {
++	status = "okay";
++};
++
++&uart1 {
++	status = "okay";
++};
 -- 
 1.9.3
