@@ -1,45 +1,58 @@
-From: pawel.moll@arm.com (Pawel Moll)
-Date: Thu, 24 Jul 2014 18:12:52 +0100
-Subject: [PATCH v3] platform: Make platform_bus device a platform device
-In-Reply-To: <20140723193434.GA31983@kroah.com>
-References: <20140722173713.GA8959@kroah.com>
- <1406051719-17354-1-git-send-email-pawel.moll@arm.com>
- <1406052069.25343.93.camel@hornet> <20140722181505.GA9898@kroah.com>
- <1406135762.25343.151.camel@hornet> <20140723193434.GA31983@kroah.com>
-Message-ID: <1406221972.25343.184.camel@hornet>
+From: broonie@kernel.org (Mark Brown)
+Date: Thu, 24 Jul 2014 18:39:26 +0100
+Subject: [PATCH RFC 2/2] regulator: twl: Re-add clk32kg to get wifi working
+In-Reply-To: <53D12044.1060500@kpanic.de>
+References: <1405338655-18415-1-git-send-email-sassmann@kpanic.de>
+ <1405338655-18415-3-git-send-email-sassmann@kpanic.de>
+ <20140714120051.GF6800@sirena.org.uk> <53C3C77F.7080208@kpanic.de>
+ <20140714181338.GR6800@sirena.org.uk> <53C525A2.8080609@kpanic.de>
+ <20140716212340.GZ17528@sirena.org.uk> <53D12044.1060500@kpanic.de>
+Message-ID: <20140724173926.GK17528@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 2014-07-23 at 20:34 +0100, Greg Kroah-Hartman wrote:
-> > > > > diff --git a/drivers/scsi/hosts.c b/drivers/scsi/hosts.c
-> > > > > index 3cbb57a..c14c36f 100644
-> > > > > --- a/drivers/scsi/hosts.c
-> > > > > +++ b/drivers/scsi/hosts.c
-> > > > > @@ -218,7 +218,7 @@ int scsi_add_host_with_dma(struct Scsi_Host *shost, struct device *dev,
-> > > > >                 goto fail;
-> > > > > 
-> > > > >         if (!shost->shost_gendev.parent)
-> > > > > -               shost->shost_gendev.parent = dev ? dev : &platform_bus;
-> > > > > +               shost->shost_gendev.parent = dev ? dev : &platform_bus.dev;
-> > > > >         if (!dma_dev)
-> > > > >                 dma_dev = shost->shost_gendev.parent;
-> > > > > 
-> > > > 
-> > > > shost_gendev is a generic (as in struct device, non-platform one)
-> > > > device, that is being explicitly placed in the hierarchy.
-> > > 
-> > > Then make it a virtual device, as that's what it is, replace this with
-> > > NULL.
-> > 
-> > Makes sense to me, I just wonder what the author meant.
-> 
-> With scsi code, who knows :)
+On Thu, Jul 24, 2014 at 05:03:32PM +0200, Stefan Assmann wrote:
 
-Looking at this further, it seems that the main purpose here is to make
-sure that dma_dev is not NULL...
+> OK, here's a first attempt to add a clock driver for the twl6030. Let
+> me know if this is going the right direction and I'll post a proper
+> patchset.
 
-So it's not just simply a case of s/&platform_bus/NULL/ - maybe the
-function should fail when !dma_dev? I'll split the patch so each case is
-separate and post them to relevant maintainers.
+Looks reasonable to me, though I'm not a clock expert.  Few comments...
 
-Pawel
+> +static int of_twl6030_clk32kg_remove(struct platform_device *pdev)
+> +{
+> +	return 0;
+> +}
+
+Shouldn't need empty functions.
+
+> -	ret = regmap_bulk_write(regmap, twl_priv->twl_map[mod_no].base + reg,
+> -				value, num_bytes);
+> -
+> +	if (num_bytes == 1) {
+> +		ret = regmap_write(regmap,
+> +				   twl_priv->twl_map[mod_no].base + reg,
+> +				   *value);
+> +	} else {
+> +		ret = regmap_bulk_write(regmap,
+> +					twl_priv->twl_map[mod_no].base + reg,
+> +					value, num_bytes);
+> +	}
+
+Just always use regmap_raw_write() - for single byte values there is no
+difference anyway, bulk_write() only makes a difference if the values
+are multi-byte.
+
+> -	ret = regmap_bulk_read(regmap, twl_priv->twl_map[mod_no].base + reg,
+> -			       value, num_bytes);
+> -
+> +	if (num_bytes == 1) {
+
+Similarly here.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140724/628077f5/attachment.sig>
