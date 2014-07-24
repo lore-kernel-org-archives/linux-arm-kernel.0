@@ -1,38 +1,62 @@
-From: ohad@wizery.com (Ohad Ben-Cohen)
-Date: Thu, 24 Jul 2014 16:45:44 +0300
-Subject: [PATCH 1/2] hwspinlock/omap: enable module before reading
- SYSSTATUS register
-In-Reply-To: <1404342060-2919-2-git-send-email-s-anna@ti.com>
-References: <1404342060-2919-1-git-send-email-s-anna@ti.com>
- <1404342060-2919-2-git-send-email-s-anna@ti.com>
-Message-ID: <CAK=Wgba3OOgZG_smj5=raE+ZXZ-F0ksn4pcGeDc1JDE34Q-wFg@mail.gmail.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Thu, 24 Jul 2014 14:52:38 +0100
+Subject: [PATCHv4 3/5] common: dma-mapping: Introduce common remapping
+ functions
+In-Reply-To: <53D02F7B.5020309@codeaurora.org>
+References: <1406079308-5232-1-git-send-email-lauraa@codeaurora.org>
+ <1406079308-5232-4-git-send-email-lauraa@codeaurora.org>
+ <20140723104554.GB1366@localhost> <53D02F7B.5020309@codeaurora.org>
+Message-ID: <20140724135238.GC13371@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Suman,
+On Wed, Jul 23, 2014 at 10:56:11PM +0100, Laura Abbott wrote:
+> On 7/23/2014 3:45 AM, Catalin Marinas wrote:
+> > On Wed, Jul 23, 2014 at 02:35:06AM +0100, Laura Abbott wrote:
+> >> --- a/drivers/base/dma-mapping.c
+> >> +++ b/drivers/base/dma-mapping.c
+> > [...]
+> >> +void *dma_common_contiguous_remap(struct page *page, size_t size,
+> >> +			unsigned long vm_flags,
+> >> +			pgprot_t prot, const void *caller)
+> >> +{
+> >> +	int i;
+> >> +	struct page **pages;
+> >> +	void *ptr;
+> >> +
+> >> +	pages = kmalloc(sizeof(struct page *) << get_order(size), GFP_KERNEL);
+> >> +	if (!pages)
+> >> +		return NULL;
+> >> +
+> >> +	for (i = 0; i < (size >> PAGE_SHIFT); i++)
+> >> +		pages[i] = page + i;
+> >> +
+> >> +	ptr = dma_common_pages_remap(pages, size, vm_flags, prot, caller);
+> >> +
+> >> +	kfree(pages);
+> >> +
+> >> +	return ptr;
+> >> +}
+> > 
+> > You could avoid the dma_common_page_remap() here (and kmalloc) and
+> > simply use ioremap_page_range(). We know that
+> > dma_common_contiguous_remap() is only called with contiguous physical
+> > range, so ioremap_page_range() is suitable. It also makes it a
+> > non-functional change for arch/arm.
+> 
+> My original thought with using map_vm_area vs. ioremap_page_range was
+> that ioremap_page_range is really intended for mapping io devices and
+> the like into the kernel virtual address space. map_vm_area is designed
+> to handle pages of kernel managed memory. Perhaps it's too nit-picky
+> a distinction though.
 
-On Thu, Jul 3, 2014 at 2:00 AM, Suman Anna <s-anna@ti.com> wrote:
-> The number of hwspinlocks are determined based on the value read
-> from the IP block's SYSSTATUS register. However, the module may
-> not be enabled and clocked, and the read may result in a bus error.
->
-> This particular issue is seen rather easily on AM33XX, since the
-> module wakeup is software controlled, and it is disabled out of
-> reset. Make sure the module is enabled and clocked before reading
-> the SYSSTATUS register.
->
-> Signed-off-by: Suman Anna <s-anna@ti.com>
-...
-> +       /*
-> +        * runtime PM will make sure the clock of this module is
-> +        * enabled again iff at least one lock is requested
-> +        */
-> +       ret = pm_runtime_put_sync(&pdev->dev);
+I think you are right. We had a discussion in the past about using
+ioremap on valid RAM addresses and decided not to allow this. This would
+be similar with the ioremap_page_range() here.
 
-Is there a specific reason for using the put_sync variant here? If
-not, let's just use the regular put().
+>From my perspective, you can leave the code as is (wouldn't be any
+functional change for arm64 since it was using vmap() already). But
+please add a comment in the commit log about this change.
 
-Let me know, and I can do the change while applying these two patches.
-
-Thanks,
-Ohad.
+-- 
+Catalin
