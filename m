@@ -1,24 +1,40 @@
 From: yao.yuan@freescale.com (Yao Yuan)
-Date: Thu, 24 Jul 2014 03:19:27 +0000
-Subject: [PATCH v4 1/2] i2c: add DMA support for freescale i2c driver
-In-Reply-To: <20140521080047.GC2708@katana>
-References: <1396579272-19542-1-git-send-email-yao.yuan@freescale.com>
- <1396579272-19542-2-git-send-email-yao.yuan@freescale.com>
- <201404041628.55471.marex@denx.de>
- <aab78696ac364d9c832993c08915bad3@BL2PR03MB338.namprd03.prod.outlook.com>
- <20140404174011.GA8489@katana> <20140521080047.GC2708@katana>
-Message-ID: <e97f086de6e9427f96ca5ac582031f86@BL2PR03MB338.namprd03.prod.outlook.com>
+Date: Thu, 24 Jul 2014 03:36:34 +0000
+Subject: [PATCH v5 0/2] i2c: add DMA support for freescale i2c driver
+In-Reply-To: <201407231428.01278.marex@denx.de>
+References: <1406103883-3572-1-git-send-email-yao.yuan@freescale.com>
+ <201407231428.01278.marex@denx.de>
+Message-ID: <e5547e015bf6447e9b4fc18e82ddce74@BL2PR03MB338.namprd03.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, May 21, 2014 at 4:01 PM +0200, Wolfram Sang wrote:
+Hi,
+
+Marek Vasut wrote:
+> On Wednesday, July 23, 2014 at 10:24:41 AM, Yuan Yao wrote:
+> > Changed in v5:
+> > - add "*chan_dev = dma->chan_using->device->dev" for reduce the call time.
 > 
-> Ping. Any updates? I think this was pretty close to inclusion?
+> Did you check if the compiler generates different code ?
+> 
 
-Hi, Wolfram
-	Thanks for your concern. Sorry for my reply so late. I had on a business trip for months.
-At that time I have no device to debug it. Now, I'm come back and I will try my best to finish it.
-I have sent the patch for V5. Thanks for your review.
+Sorry, I didn't compare the assembly code. It's a subtle change. 
+As you mentioned the "noodle" before.
 
-Best regards,
-Yuan Yao
+Old:
+dma_map_single(dma->chan_using->device->dev, ...);
+dma_mapping_error(dma->chan_using->device->dev, ...);
+dma_unmap_single(dma->chan_using->device->dev, ...);
+	
+New:
+struct device *chan_dev = dma->chan_using->device->dev;
+dma_map_single(chan_dev, ...);
+dma_mapping_error(chan_dev, ...);
+dma_unmap_single(chan_dev, ...);
+
+> > - add the test logs.
+> 
+> [...]
+> 
+> Best regards,
+> Marek Vasut
