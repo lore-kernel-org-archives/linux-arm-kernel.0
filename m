@@ -1,35 +1,38 @@
-From: schwab@suse.de (Andreas Schwab)
-Date: Thu, 24 Jul 2014 15:40:04 +0200
-Subject: [PATCH] arm64/crypto: fix makefile rule for aes-glue-%.o
-In-Reply-To: <CAKv+Gu_9HRwAxkJjT3KRvDbupp0yzstyq1dXsXkTu9M6swdCKQ@mail.gmail.com>
- (Ard Biesheuvel's message of "Thu, 24 Jul 2014 15:29:57 +0200")
-References: <mvmvbri4k06.fsf@hawking.suse.de>
- <CAKv+Gu-NAVjMR-Jkw=W-8f7M5FSsQOSdzYN6A0kHDd1m0WA8EA@mail.gmail.com>
- <mvmr4264i1p.fsf@hawking.suse.de>
- <CAKv+Gu8SbM_Z=ymBFb2D4EWJeo-6dWuKqE2YNOkqJTKLDEJcYA@mail.gmail.com>
- <mvm4my7j5xh.fsf@hawking.suse.de>
- <CAKv+Gu-6rUxUnF+dRuroDJqy2K2B5F0r7_bm0X-vyiuQ-83W5w@mail.gmail.com>
- <CAKv+Gu96k7GOVR85EXtro3Lt0jjiJqxyvT9cwJZ1qc6uzq97bw@mail.gmail.com>
- <mvmvbqmj3b2.fsf@hawking.suse.de>
- <CAKv+Gu_9HRwAxkJjT3KRvDbupp0yzstyq1dXsXkTu9M6swdCKQ@mail.gmail.com>
-Message-ID: <mvmr41aj2ob.fsf@hawking.suse.de>
+From: ohad@wizery.com (Ohad Ben-Cohen)
+Date: Thu, 24 Jul 2014 16:45:44 +0300
+Subject: [PATCH 1/2] hwspinlock/omap: enable module before reading
+ SYSSTATUS register
+In-Reply-To: <1404342060-2919-2-git-send-email-s-anna@ti.com>
+References: <1404342060-2919-1-git-send-email-s-anna@ti.com>
+ <1404342060-2919-2-git-send-email-s-anna@ti.com>
+Message-ID: <CAK=Wgba3OOgZG_smj5=raE+ZXZ-F0ksn4pcGeDc1JDE34Q-wFg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Ard Biesheuvel <ard.biesheuvel@linaro.org> writes:
+Hi Suman,
 
-> On 24 July 2014 15:26, Andreas Schwab <schwab@suse.de> wrote:
->> You are not using CONFIG_MODVERSIONS.
->>
+On Thu, Jul 3, 2014 at 2:00 AM, Suman Anna <s-anna@ti.com> wrote:
+> The number of hwspinlocks are determined based on the value read
+> from the IP block's SYSSTATUS register. However, the module may
+> not be enabled and clocked, and the read may result in a bus error.
 >
-> I am
+> This particular issue is seen rather easily on AM33XX, since the
+> module wakeup is software controlled, and it is disabled out of
+> reset. Make sure the module is enabled and clocked before reading
+> the SYSSTATUS register.
+>
+> Signed-off-by: Suman Anna <s-anna@ti.com>
+...
+> +       /*
+> +        * runtime PM will make sure the clock of this module is
+> +        * enabled again iff at least one lock is requested
+> +        */
+> +       ret = pm_runtime_put_sync(&pdev->dev);
 
-No, you aren't, since you say that your .cmd contains a command to
-create aes-glue-ce.o, which with CONFIG_MODVERSIONS it doesn't.
+Is there a specific reason for using the put_sync variant here? If
+not, let's just use the regular put().
 
-Andreas.
+Let me know, and I can do the change while applying these two patches.
 
--- 
-Andreas Schwab, SUSE Labs, schwab at suse.de
-GPG Key fingerprint = 0196 BAD8 1CE9 1970 F4BE  1748 E4D4 88E3 0EEA B9D7
-"And now for something completely different."
+Thanks,
+Ohad.
