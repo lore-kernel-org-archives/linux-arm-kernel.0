@@ -1,47 +1,56 @@
-From: wens@csie.org (Chen-Yu Tsai)
-Date: Fri, 25 Jul 2014 00:17:20 +0800
-Subject: [PATCH 2/2] pinctrl: sunxi: number gpio ranges starting from 0
-In-Reply-To: <20140724160141.GZ20328@lukather>
-References: <1405358677-23657-1-git-send-email-wens@csie.org>
- <1405358677-23657-3-git-send-email-wens@csie.org>
- <CAGb2v64mZjmB+ftQ7yM5LzhUyPVGtCXq6DOUQ-pumLb73_DYLQ@mail.gmail.com>
- <20140724160141.GZ20328@lukather>
-Message-ID: <CAGb2v66jhspz7ornqQ0UXy6cRXptbOvUhQPX6jYttyCqmkZaxA@mail.gmail.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Thu, 24 Jul 2014 18:26:48 +0200
+Subject: [PATCH v2 1/3] usb: host: st-hcd: Add USB HCD support for STi SoCs
+In-Reply-To: <20140724141412.GA21823@griffinp-ThinkPad-X1-Carbon-2nd>
+References: <1406199616-10533-1-git-send-email-peter.griffin@linaro.org>
+ <5967609.vndF2bDyS1@wuerfel>
+ <20140724141412.GA21823@griffinp-ThinkPad-X1-Carbon-2nd>
+Message-ID: <5840432.YNRZREIYz5@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jul 25, 2014 at 12:01 AM, Maxime Ripard
-<maxime.ripard@free-electrons.com> wrote:
-> On Thu, Jul 24, 2014 at 09:19:18PM +0800, Chen-Yu Tsai wrote:
->> > This patch also changes the GPIO bindings for R_PIO:
->> >
->> >     gpios = <&r_pio B N flag>;
->> >
->> > Where B originally was the pinbank label (L or M) counted from A,
->> > with this patch it becomes (L or M) counted from its pinbank base (L).
->> >
->> > Thus
->> >
->> >     gpios = <&r_pio 10 11 0>; /* PL11 */
->> >
->> > becomes
->> >
->> >     gpios = <&r_pio 0 11 0>; /* PL11 */
->> >
->> > IMO this is correct, as the binding shows the bank offset and pin offset
->> > within the bank for the GPIO controller. But I'm worried it might be a
->> > bit confusing.
->>
->> I see you Acked this patch, but also in your reply to my cover letter,
->> you mentioned that you want absolute pin numbers matching the datasheets.
->> What about the GPIO DT bindings, as I explained above?
->>
->> Just double checking. Thanks.
->
-> I'd like it to have the absolute numbers in sysfs, but the relative
-> one in the DT. But I guess it's already what's happening, right?
+On Thursday 24 July 2014 15:14:12 Peter Griffin wrote:
 
-That's right. Just checking. :)
+> > > > Depending on what kind of special requirements the ST version has,
+> > > > this can be done either by using the generic ohci/ehci bindings
+> > > > with extensions where necessary, or by creating a new binding and
+> > > > new driver files that use 'ohci_init_driver'/'ehci_init_driver'
+> > > > to inherit from the common code.
+> > > > 
+> > > > The first of the two approaches is preferred.
+> > > 
+> > > We don't have anything particularly special, just a couple of reset lines,
+> > > clock, phy, etc.
+> > 
+> > Ok, good. Please see Documentation/devicetree/bindings/usb/usb-?hci.txt
+> > then. You might actually be able to just use the existing drivers
+> > without new code by just adding the proper DT nodes that follow these
+> > bindings.
+> 
+> The only issues I can see with the generic versions are: -
+> 1) We also have a powerdown line in addition to the reset line both of which are 
+> exposed via reset controller API, so I would need to add that into ehci-platform
+> and ohci-platform.
 
+Ok, adding this would not be too hard.
 
-ChenYu
+> 2) We have a magic poke in st_ehci_configure_bus of the current driver to configure
+> the AHB to ST bus protocol convertor IP. I'm not quite sure where I could hook that
+> in (sorry... slightly pulling back on my "nothing special comment" a bit ;-).
+
+Hmm, doing this would require adding some form of quirk, either by compatible
+string or using an extra DT property for detection.
+
+> 3) We also set the rate of the ohci clock, which the generic driver doesn't do.
+
+Hmm, I guess this is the reason why sometimes it's nice to have names associated
+with the clocks. The generic driver assumes that all clocks just need to be
+turned on, and we decided not to use any naming when that binding was introduced.
+
+Each of these seems solvable, but the combination of these sounds like it
+would be better to create a new pair of drivers. I'd suggest you start by making
+a copy of ohci-platform and removing everything you don't need, then add support
+for the three things above. Give the clock a name, in case we want to merge the
+drivers again later.
+
+	Arnd
