@@ -1,158 +1,29 @@
-From: luto@amacapital.net (Andy Lutomirski)
-Date: Wed, 23 Jul 2014 20:52:09 -0700
-Subject: [PATCH v5 3/3] arm64: Add seccomp support
-In-Reply-To: <1406020499-5537-4-git-send-email-takahiro.akashi@linaro.org>
-References: <1406020499-5537-1-git-send-email-takahiro.akashi@linaro.org>
- <1406020499-5537-4-git-send-email-takahiro.akashi@linaro.org>
-Message-ID: <53D082E9.8090303@amacapital.net>
+From: greg@kroah.com (Greg KH)
+Date: Wed, 23 Jul 2014 20:52:53 -0700
+Subject: [PATCH] ARM: dts: imx: Add alias for ethernet controller
+In-Reply-To: <20140724031753.GA6827@dragon>
+References: <1406167639-6911-1-git-send-email-marex@denx.de>
+ <20140724031753.GA6827@dragon>
+Message-ID: <20140724035253.GA7484@kroah.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/22/2014 02:14 AM, AKASHI Takahiro wrote:
-> secure_computing() should always be called first in syscall_trace_enter().
->
-> If secure_computing() returns -1, we should stop further handling. Then
-> that system call may eventually fail with a specified return value (errno),
-> be trapped or the process itself be killed depending on loaded rules.
-> In these cases, syscall_trace_enter() also returns -1, that results in
-> skiping a normal syscall handling as well as syscall_trace_exit().
->
-> Signed-off-by: AKASHI Takahiro <takahiro.akashi@linaro.org>
-> ---
->   arch/arm64/Kconfig               |   14 ++++++++++++++
->   arch/arm64/include/asm/seccomp.h |   25 +++++++++++++++++++++++++
->   arch/arm64/include/asm/unistd.h  |    3 +++
->   arch/arm64/kernel/ptrace.c       |    5 +++++
->   4 files changed, 47 insertions(+)
->   create mode 100644 arch/arm64/include/asm/seccomp.h
->
-> diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
-> index 3a18571..eeac003 100644
-> --- a/arch/arm64/Kconfig
-> +++ b/arch/arm64/Kconfig
-> @@ -32,6 +32,7 @@ config ARM64
->   	select HAVE_ARCH_AUDITSYSCALL
->   	select HAVE_ARCH_JUMP_LABEL
->   	select HAVE_ARCH_KGDB
-> +	select HAVE_ARCH_SECCOMP_FILTER
->   	select HAVE_ARCH_TRACEHOOK
->   	select HAVE_C_RECORDMCOUNT
->   	select HAVE_DEBUG_BUGVERBOSE
-> @@ -259,6 +260,19 @@ config ARCH_HAS_CACHE_LINE_SIZE
->
->   source "mm/Kconfig"
->
-> +config SECCOMP
-> +	bool "Enable seccomp to safely compute untrusted bytecode"
-> +	---help---
-> +	  This kernel feature is useful for number crunching applications
-> +	  that may need to compute untrusted bytecode during their
-> +	  execution. By using pipes or other transports made available to
-> +	  the process as file descriptors supporting the read/write
-> +	  syscalls, it's possible to isolate those applications in
-> +	  their own address space using seccomp. Once seccomp is
-> +	  enabled via prctl(PR_SET_SECCOMP), it cannot be disabled
-> +	  and the task is only allowed to execute a few safe syscalls
-> +	  defined by each seccomp mode.
-> +
->   config XEN_DOM0
->   	def_bool y
->   	depends on XEN
-> diff --git a/arch/arm64/include/asm/seccomp.h b/arch/arm64/include/asm/seccomp.h
-> new file mode 100644
-> index 0000000..c76fac9
-> --- /dev/null
-> +++ b/arch/arm64/include/asm/seccomp.h
-> @@ -0,0 +1,25 @@
-> +/*
-> + * arch/arm64/include/asm/seccomp.h
-> + *
-> + * Copyright (C) 2014 Linaro Limited
-> + * Author: AKASHI Takahiro <takahiro.akashi@linaro.org>
-> + *
-> + * This program is free software; you can redistribute it and/or modify
-> + * it under the terms of the GNU General Public License version 2 as
-> + * published by the Free Software Foundation.
-> + */
-> +#ifndef _ASM_SECCOMP_H
-> +#define _ASM_SECCOMP_H
-> +
-> +#include <asm/unistd.h>
-> +
-> +#ifdef CONFIG_COMPAT
-> +#define __NR_seccomp_read_32		__NR_compat_read
-> +#define __NR_seccomp_write_32		__NR_compat_write
-> +#define __NR_seccomp_exit_32		__NR_compat_exit
-> +#define __NR_seccomp_sigreturn_32	__NR_compat_rt_sigreturn
-> +#endif /* CONFIG_COMPAT */
-> +
-> +#include <asm-generic/seccomp.h>
-> +
-> +#endif /* _ASM_SECCOMP_H */
-> diff --git a/arch/arm64/include/asm/unistd.h b/arch/arm64/include/asm/unistd.h
-> index c980ab7..729c155 100644
-> --- a/arch/arm64/include/asm/unistd.h
-> +++ b/arch/arm64/include/asm/unistd.h
-> @@ -31,6 +31,9 @@
->    * Compat syscall numbers used by the AArch64 kernel.
->    */
->   #define __NR_compat_restart_syscall	0
-> +#define __NR_compat_exit		1
-> +#define __NR_compat_read		3
-> +#define __NR_compat_write		4
->   #define __NR_compat_sigreturn		119
->   #define __NR_compat_rt_sigreturn	173
->
-> diff --git a/arch/arm64/kernel/ptrace.c b/arch/arm64/kernel/ptrace.c
-> index 100d7d1..e477f6f 100644
-> --- a/arch/arm64/kernel/ptrace.c
-> +++ b/arch/arm64/kernel/ptrace.c
-> @@ -28,6 +28,7 @@
->   #include <linux/smp.h>
->   #include <linux/ptrace.h>
->   #include <linux/user.h>
-> +#include <linux/seccomp.h>
->   #include <linux/security.h>
->   #include <linux/init.h>
->   #include <linux/signal.h>
-> @@ -1115,6 +1116,10 @@ asmlinkage int syscall_trace_enter(struct pt_regs *regs)
->   	saved_x0 = regs->regs[0];
->   	saved_x8 = regs->regs[8];
->
-> +	if (secure_computing(regs->syscallno) == -1)
-> +		/* seccomp failures shouldn't expose any additional code. */
-> +		return -1;
-> +
+On Thu, Jul 24, 2014 at 11:17:55AM +0800, Shawn Guo wrote:
+> On Thu, Jul 24, 2014 at 04:07:19AM +0200, Marek Vasut wrote:
+> > commit 22970070e027cbbb9b2878f8f7c31d0d7f29e94d upstream.
+> > 
+> > Add alias for FEC ethernet on i.MX25, i.MX27, i.MX51 and i.MX53 to allow
+> > bootloaders (like U-Boot) patch-in the MAC address for FEC using this
+> > alias.
+> > 
+> > Signed-off-by: Marek Vasut <marex@denx.de>
+> > Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
+> > Cc: <stable@vger.kernel.org> # 3.14.x
+> 
+> Since the patch is already on mainline, and the submitting target is
+> 3.14.x stable kernel, you should really send it to Greg.
 
-This will conflict with the fastpath stuff in Kees' tree.  (Actually, 
-it's likely to apply cleanly, but fail to compile.)  The fix is trivial, 
-but, given that the fastpath stuff is new, can you take a look and see 
-if arm64 can use it effectively?
+No, Marek did the right thing here by sending it to the stable at vger
+mailing list, never send stable patches only to me.
 
-I suspect that the performance considerations are rather different on 
-arm64 as compared to x86 (I really hope that x86 is the only 
-architecture with the absurd sysret vs. iret distinction), but at least 
-the seccomp_data stuff ought to help anywhere.  (It looks like there's a 
-distinct fast path, too, so the two-phase thing might also be a fairly 
-large win if it's supportable.)
-
-See:
-
-https://git.kernel.org/cgit/linux/kernel/git/kees/linux.git/log/?h=seccomp/fastpath
-
-Also, I'll ask the usual question?  What are all of the factors other 
-than nr and args that affect syscall execution?  What are the audit arch 
-values?  Do they match correctly?
-
-For example, it looks like, if arm64 adds OABI support, you'll have a 
-problem.  (Note that arm currently disables audit and seccomp if OABI is 
-enabled for exactly this reason.)
-
-Do any syscall implementations care whether the user code is LE or BE? 
-Are the arguments encoded the same way?
-
-An arm-specific question: will there be any confusion as a result of the 
-fact that compat syscalls seems to stick nr in w7, but arm64 puts them 
-somewhere else?
-
---Andy
+greg k-h
