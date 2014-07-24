@@ -1,174 +1,529 @@
-From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
-Date: Thu, 24 Jul 2014 11:44:01 +0200
-Subject: [PATCH v2 1/2] clk: samsung: exynos4: Enable ARMCLK down feature
-In-Reply-To: <1406184144.8807.4.camel@AMDC1943>
-References: <1405694193-29643-1-git-send-email-k.kozlowski@samsung.com>
- <20140724001853.6419.551@quantum> <1406184144.8807.4.camel@AMDC1943>
-Message-ID: <1406195041.21857.4.camel@AMDC1943>
+From: 21cnbao@gmail.com (Barry Song)
+Date: Thu, 24 Jul 2014 17:48:05 +0800
+Subject: [PATCH v5 1/4] pwm: add CSR SiRFSoc PWM driver
+In-Reply-To: <1405475714-10006-2-git-send-email-huayi.li@csr.com>
+References: <1405475714-10006-1-git-send-email-huayi.li@csr.com>
+ <1405475714-10006-2-git-send-email-huayi.li@csr.com>
+Message-ID: <CAGsJ_4xwEEaZJVy0-JkQN+1vhGNYHYbp_UUS1XN52hu+w_OoAQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On czw, 2014-07-24 at 08:42 +0200, Krzysztof Kozlowski wrote:
-> On ?ro, 2014-07-23 at 17:18 -0700, Mike Turquette wrote:
-> > Quoting Krzysztof Kozlowski (2014-07-18 07:36:32)
-> > > Enable ARMCLK down feature on all Exynos4 SoCs. The frequency of
-> > > ARMCLK will be reduced upon entering idle mode (WFI or WFE).
-> > > 
-> > > The feature behaves like very fast cpufreq ondemand governor. In idle
-> > > mode this reduces energy consumption on full frequency chosen by
-> > > cpufreq governor by approximately:
-> > >  - Trats2:  6.5% (153 mA -> 143 mA)
-> > >  - Trats:  33.0% (180 mA -> 120 mA)
-> > >  - Gear1:  27.0% (180 mA -> 130 mA)
-> > 
-> > Nice power savings! Just a quick question on this feature: the clock
-> > frequency is changed in hardware as a result of WFI/WFE?
-> 
-> Yes. This feature makes changes in DIVCORE and DIVCORE2 clock dividers
-> when given core enters WFI/WFE.
-> 
-> > And this only
-> > happens when all CPUs in a cluster (e.g. all 4 CPUs in Exynos 4412) are
-> > in WFI/WFE state?
-> 
-> No, this is per-core. However measured energy savings above were in case
-> where all cores entered idle (WFI).
+2014-07-16 9:55 GMT+08:00 Huayi Li <huayi.li@csr.com>:
+> PWM controller of CSR SiRFSoC can generate 7 independent outputs. Each output
+> duty cycle can be adjusted by setting the corresponding wait & hold registers.
+> There are 6 external channels (0 to 5) and 1 internal channel (6).
+> Supports a wide frequency range: the source clock divider can be from 2
+> up to 65536*2.
+>
+> Signed-off-by: Huayi Li <huayi.li@csr.com>
+> ---
+>  drivers/pwm/Kconfig    |  10 ++
+>  drivers/pwm/Makefile   |   1 +
+>  drivers/pwm/pwm-sirf.c | 450 +++++++++++++++++++++++++++++++++++++++++++++++++
+>  3 files changed, 461 insertions(+)
+>  create mode 100644 drivers/pwm/pwm-sirf.c
+>
+> diff --git a/drivers/pwm/Kconfig b/drivers/pwm/Kconfig
+> index 4ad7b89..77d65a6 100644
+> --- a/drivers/pwm/Kconfig
+> +++ b/drivers/pwm/Kconfig
+> @@ -215,6 +215,16 @@ config PWM_SAMSUNG
+>           To compile this driver as a module, choose M here: the module
+>           will be called pwm-samsung.
+>
+> +config PWM_SIRF
+> +       tristate "SiRF PWM support"
+> +       depends on ARCH_SIRF
+> +       help
+> +         Generic PWM framework driver for the PWM controller on SiRF
+> +         SoCs.
+> +
+> +         To compile this driver as a module, choose M here: the module
+> +         will be called pwm-sirf.
+> +
+>  config PWM_SPEAR
+>         tristate "STMicroelectronics SPEAr PWM support"
+>         depends on PLAT_SPEAR
+> diff --git a/drivers/pwm/Makefile b/drivers/pwm/Makefile
+> index 5c86a19..7fa4f14 100644
+> --- a/drivers/pwm/Makefile
+> +++ b/drivers/pwm/Makefile
+> @@ -19,6 +19,7 @@ obj-$(CONFIG_PWM_PUV3)                += pwm-puv3.o
+>  obj-$(CONFIG_PWM_PXA)          += pwm-pxa.o
+>  obj-$(CONFIG_PWM_RENESAS_TPU)  += pwm-renesas-tpu.o
+>  obj-$(CONFIG_PWM_SAMSUNG)      += pwm-samsung.o
+> +obj-$(CONFIG_PWM_SIRF)         += pwm-sirf.o
+>  obj-$(CONFIG_PWM_SPEAR)                += pwm-spear.o
+>  obj-$(CONFIG_PWM_TEGRA)                += pwm-tegra.o
+>  obj-$(CONFIG_PWM_TIECAP)       += pwm-tiecap.o
+> diff --git a/drivers/pwm/pwm-sirf.c b/drivers/pwm/pwm-sirf.c
+> new file mode 100644
+> index 0000000..a5a9e2f
+> --- /dev/null
+> +++ b/drivers/pwm/pwm-sirf.c
+> @@ -0,0 +1,450 @@
+> +/*
+> + * SIRF serial SoC PWM device core driver
+> + *
+> + * Copyright (c) 2014 Cambridge Silicon Radio Limited, a CSR plc group company.
+> + *
+> + * Licensed under GPLv2.
+> + */
+> +
+> +#include <linux/clk.h>
+> +#include <linux/delay.h>
+> +#include <linux/device.h>
+> +#include <linux/init.h>
+> +#include <linux/io.h>
+> +#include <linux/kernel.h>
+> +#include <linux/module.h>
+> +#include <linux/of.h>
+> +#include <linux/platform_device.h>
+> +#include <linux/pwm.h>
+> +
+> +#define SIRF_PWM_SELECT_PRECLK                 0x0
+> +#define SIRF_PWM_OE                            0x4
+> +#define SIRF_PWM_ENABLE_PRECLOCK               0x8
+> +#define SIRF_PWM_ENABLE_POSTCLOCK              0xC
+> +#define SIRF_PWM_GET_WAIT_OFFSET(n)            (0x10 + 0x8*n)
+> +#define SIRF_PWM_GET_HOLD_OFFSET(n)            (0x14 + 0x8*n)
+> +
+> +#define SIRF_PWM_TR_STEP(n)                    (0x48 + 0x8*n)
+> +#define SIRF_PWM_STEP_HOLD(n)                  (0x4c + 0x8*n)
+> +
+> +#define SRC_FIELD_SIZE                         3
+> +#define BYPASS_MODE_BIT                                21
+> +#define TRANS_MODE_SELECT_BIT                  7
+> +
+> +#define SIRF_MAX_SRC_CLK                       5
+> +
+> +struct sirf_pwm_chip {
+> +       struct pwm_chip chip;
+> +       struct mutex mutex;
+> +       void __iomem *base;
+> +       struct clk *pwmc_clk;
+> +};
+> +
+> +struct sirf_pwm {
+> +       u32 sigsrc_clk_idx;
+> +       struct clk *sigsrc_clk;
+> +       u32 bypass_mode;
+> +       u32 duty_ns;
+> +};
+> +
+> +static inline struct sirf_pwm_chip *to_sirf_pwm_chip(struct pwm_chip *chip)
+> +{
+> +       return container_of(chip, struct sirf_pwm_chip, chip);
+> +}
+> +
+> +static int sirf_pwm_request(struct pwm_chip *chip, struct pwm_device *pwm)
+> +{
+> +       struct sirf_pwm *spwm;
+> +
+> +       spwm = devm_kzalloc(chip->dev, sizeof(*spwm), GFP_KERNEL);
+> +       if (!spwm)
+> +               return -ENOMEM;
+> +
+> +       pwm_set_chip_data(pwm, spwm);
+> +
+> +       return 0;
+> +}
+> +
+> +static void sirf_pwm_free(struct pwm_chip *chip, struct pwm_device *pwm)
+> +{
+> +       struct sirf_pwm *spwm = pwm_get_chip_data(pwm);
+> +
+> +       if (!spwm)
+> +               devm_kfree(chip->dev, spwm);
+> +}
+> +
+> +static u32 sirf_pwm_ns_to_cycles(struct pwm_device *pwm, u32 time_ns)
+> +{
+> +       struct sirf_pwm *spwm = pwm_get_chip_data(pwm);
+> +       u32 src_clk_rate = clk_get_rate(spwm->sigsrc_clk);
+> +       u64 cycle;
+> +
+> +       cycle = div_u64((u64)src_clk_rate * time_ns, NSEC_PER_SEC);
+> +
+> +       return (u32)(cycle > 1 ? cycle : 1);
+> +}
+> +
+> +static void _sirf_pwm_hwconfig(struct pwm_chip *chip, struct pwm_device *pwm)
+> +{
+> +       u32 period_cycles, high_cycles, low_cycles;
+> +       struct sirf_pwm_chip *spwmc = to_sirf_pwm_chip(chip);
+> +       struct sirf_pwm *spwm = pwm_get_chip_data(pwm);
+> +
+> +       period_cycles = sirf_pwm_ns_to_cycles(pwm, pwm_get_period(pwm));
+> +
+> +       /*
+> +        * enter bypass mode, high_cycles and low_cycle
+> +        * do not need to config if period_cycles == 1
+> +        */
+> +       if (period_cycles == 1) {
+> +               spwm->bypass_mode = 1;
 
-Aaargh, that is obviously incorrect, my mistake. You're right that this
-is for whole cluster as all cores share ARMCLK (and clock dividers).
-However you can enable WFI/WFE detection per core. 
+the bypass mode need some comments here.  or we need to add a "TODO:
+move to clk subsystem" here, it is actually not PWM, but a clock
+output now.
 
-The datasheet does not describe what will happen exactly when you enable
-the WFI/WFE detection for core0 and leave it disabled for other cores. I
-assume that upon entering WFI on core0 everything will be slowed down
-regardless of pending work on other cores but I didn't test it.
 
-Best regards,
-Krzysztof
+> +       } else {
+> +               spwm->bypass_mode = 0;
+> +
+> +               high_cycles = sirf_pwm_ns_to_cycles(pwm, spwm->duty_ns);
+> +               low_cycles = period_cycles - high_cycles;
+> +
+> +               /*
+> +                * high_cycles will equal to period_cycles when duty_ns
+> +                * is big enough, so low_cycles will be 0,
+> +                * a wrong value will be written to register after
+> +                * low_cycles minus 1 later.
+> +                */
+> +               if (high_cycles == period_cycles) {
+> +                       high_cycles--;
+> +                       low_cycles = 1;
+> +               }
+> +
+> +               mutex_lock(&spwmc->mutex);
+> +
+> +               writel(high_cycles - 1,
+> +                       spwmc->base + SIRF_PWM_GET_WAIT_OFFSET(pwm->hwpwm));
+> +               writel(low_cycles - 1,
+> +                       spwmc->base + SIRF_PWM_GET_HOLD_OFFSET(pwm->hwpwm));
+> +
+> +               mutex_unlock(&spwmc->mutex);
+> +       }
+> +}
+> +
+> +static int sirf_pwm_config(struct pwm_chip *chip, struct pwm_device *pwm,
+> +                       int duty_ns, int period_ns)
+> +{
+> +       struct sirf_pwm_chip *spwmc = to_sirf_pwm_chip(chip);
+> +       struct sirf_pwm *spwm = pwm_get_chip_data(pwm);
+> +
+> +       if (!test_bit(PWMF_ENABLED, &pwm->flags)) {
+> +               u32 src_clk_rate, src_clk_rate_min = ~0;
+> +               u32 i;
+> +               u64 cycle;
+> +               u32 cycle_diff;
+> +               u32 ns_diff, ns_diff_min = ~0;
+> +               int ret;
+> +               char src_clk_name[10];
+> +               struct clk *sigsrc_clk;
+> +
+> +               /*
+> +                * select a best source clock for the specific PWM clock
+> +                * 1. select the clock with minimal error
+> +                * 2. select the slower clock if some of them have
+> +                *    the same error
+> +                */
+> +               for (i = 0; i < SIRF_MAX_SRC_CLK; i++) {
+> +                       sprintf(src_clk_name, "sigsrc%d", i);
+> +                       sigsrc_clk = devm_clk_get(chip->dev, src_clk_name);
+> +                       if (IS_ERR(sigsrc_clk))
+> +                               continue;
+> +
+> +                       src_clk_rate = clk_get_rate(sigsrc_clk);
+> +
+> +                       cycle = (u64)src_clk_rate * period_ns;
+> +                       div_u64_rem(cycle, NSEC_PER_SEC, &cycle_diff);
+> +
+> +                       ns_diff = (u32)cycle_diff / src_clk_rate;
+> +
+> +                       if (ns_diff <= ns_diff_min &&
+> +                                       src_clk_rate < src_clk_rate_min) {
+> +                               ns_diff_min = ns_diff;
+> +                               src_clk_rate_min = src_clk_rate;
+> +                               spwm->sigsrc_clk_idx = i;
+> +                               spwm->sigsrc_clk = sigsrc_clk;
+> +                       } else {
+> +                               devm_clk_put(chip->dev, sigsrc_clk);
+> +                       }
+> +               }
+> +
+> +               /*
+> +                * enable PWM before writing the register
+> +                */
+> +               ret = clk_prepare_enable(spwmc->pwmc_clk);
+> +               if (ret)
+> +                       return ret;
+> +       }
+> +
+> +       spwm->duty_ns = duty_ns;
+> +
+> +       _sirf_pwm_hwconfig(chip, pwm);
 
-> 
-> Best regards,
-> Krzysztof
-> 
-> 
-> > 
-> > Thanks,
-> > Mike
-> > 
-> > > 
-> > > The patch uses simillar settings as Exynos5250 (clk-exynos5250.c),
-> > > except it disables clock up feature and on Exynos4412 ARMCLK down is
-> > > enabled for all 4 cores.
-> > > 
-> > > Tested on Trats board (Exynos4210), Trats2 board (Exynos4412) and
-> > > Samsung Gear 1 (Exynos4212).
-> > > 
-> > > Signed-off-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
-> > > 
-> > > ---
-> > > 
-> > > Changes since v1:
-> > > 1. Add PWR_CTRL registers to the list of saved clk registers on
-> > >    Exynos4x12. Suggested by Tomasz Figa.
-> > > 2. Disable the clock up feature. (sug. Tomasz Figa)
-> > > 3. Use macros for setting clock down ratio. (sug. Tomasz Figa)
-> > > 4. Use num_possible_cpus() for exception on Exynos4x12. (sug. Tomasz
-> > >    Figa)
-> > > 5. Enable the clock down feature also on Exynos4210 Trats board.
-> > > ---
-> > >  drivers/clk/samsung/clk-exynos4.c | 46 +++++++++++++++++++++++++++++++++++++++
-> > >  1 file changed, 46 insertions(+)
-> > > 
-> > > diff --git a/drivers/clk/samsung/clk-exynos4.c b/drivers/clk/samsung/clk-exynos4.c
-> > > index 7f4a473a7ad7..86c7709dc6d6 100644
-> > > --- a/drivers/clk/samsung/clk-exynos4.c
-> > > +++ b/drivers/clk/samsung/clk-exynos4.c
-> > > @@ -114,11 +114,27 @@
-> > >  #define DIV_CPU1               0x14504
-> > >  #define GATE_SCLK_CPU          0x14800
-> > >  #define GATE_IP_CPU            0x14900
-> > > +#define PWR_CTRL1              0x15020
-> > > +#define E4X12_PWR_CTRL2                0x15024
-> > >  #define E4X12_DIV_ISP0         0x18300
-> > >  #define E4X12_DIV_ISP1         0x18304
-> > >  #define E4X12_GATE_ISP0                0x18800
-> > >  #define E4X12_GATE_ISP1                0x18804
-> > >  
-> > > +/* Below definitions are used for PWR_CTRL settings */
-> > > +#define PWR_CTRL1_CORE2_DOWN_RATIO(x)          (((x) & 0x7) << 28)
-> > > +#define PWR_CTRL1_CORE1_DOWN_RATIO(x)          (((x) & 0x7) << 16)
-> > > +#define PWR_CTRL1_DIV2_DOWN_EN                 (1 << 9)
-> > > +#define PWR_CTRL1_DIV1_DOWN_EN                 (1 << 8)
-> > > +#define PWR_CTRL1_USE_CORE3_WFE                        (1 << 7)
-> > > +#define PWR_CTRL1_USE_CORE2_WFE                        (1 << 6)
-> > > +#define PWR_CTRL1_USE_CORE1_WFE                        (1 << 5)
-> > > +#define PWR_CTRL1_USE_CORE0_WFE                        (1 << 4)
-> > > +#define PWR_CTRL1_USE_CORE3_WFI                        (1 << 3)
-> > > +#define PWR_CTRL1_USE_CORE2_WFI                        (1 << 2)
-> > > +#define PWR_CTRL1_USE_CORE1_WFI                        (1 << 1)
-> > > +#define PWR_CTRL1_USE_CORE0_WFI                        (1 << 0)
-> > > +
-> > >  /* the exynos4 soc type */
-> > >  enum exynos4_soc {
-> > >         EXYNOS4210,
-> > > @@ -155,6 +171,7 @@ static unsigned long exynos4210_clk_save[] __initdata = {
-> > >         E4210_GATE_IP_LCD1,
-> > >         E4210_GATE_IP_PERIR,
-> > >         E4210_MPLL_CON0,
-> > > +       PWR_CTRL1,
-> > >  };
-> > >  
-> > >  static unsigned long exynos4x12_clk_save[] __initdata = {
-> > > @@ -164,6 +181,8 @@ static unsigned long exynos4x12_clk_save[] __initdata = {
-> > >         E4X12_DIV_ISP,
-> > >         E4X12_DIV_CAM1,
-> > >         E4X12_MPLL_CON0,
-> > > +       PWR_CTRL1,
-> > > +       E4X12_PWR_CTRL2,
-> > >  };
-> > >  
-> > >  static unsigned long exynos4_clk_pll_regs[] __initdata = {
-> > > @@ -1164,6 +1183,32 @@ static struct samsung_pll_clock exynos4x12_plls[nr_plls] __initdata = {
-> > >                         VPLL_LOCK, VPLL_CON0, NULL),
-> > >  };
-> > >  
-> > > +static void __init exynos4_core_down_clock(enum exynos4_soc soc)
-> > > +{
-> > > +       unsigned int tmp;
-> > > +
-> > > +       /*
-> > > +        * Enable arm clock down (in idle) and set arm divider
-> > > +        * ratios in WFI/WFE state.
-> > > +        */
-> > > +       tmp = (PWR_CTRL1_CORE2_DOWN_RATIO(7) | PWR_CTRL1_CORE1_DOWN_RATIO(7) |
-> > > +               PWR_CTRL1_DIV2_DOWN_EN | PWR_CTRL1_DIV1_DOWN_EN |
-> > > +               PWR_CTRL1_USE_CORE1_WFE | PWR_CTRL1_USE_CORE0_WFE |
-> > > +               PWR_CTRL1_USE_CORE1_WFI | PWR_CTRL1_USE_CORE0_WFI);
-> > > +       /* On Exynos4412 enable it also on core 2 and 3 */
-> > > +       if (num_possible_cpus() == 4)
-> > > +               tmp |= PWR_CTRL1_USE_CORE3_WFE | PWR_CTRL1_USE_CORE2_WFE |
-> > > +                      PWR_CTRL1_USE_CORE3_WFI | PWR_CTRL1_USE_CORE2_WFI;
-> > > +       __raw_writel(tmp, reg_base + PWR_CTRL1);
-> > > +
-> > > +       /*
-> > > +        * Disable the clock up feature on Exynos4x12, in case it was
-> > > +        * enabled by bootloader.
-> > > +        */
-> > > +       if (exynos4_soc == EXYNOS4X12)
-> > > +               __raw_writel(0x0, reg_base + E4X12_PWR_CTRL2);
-> > > +}
-> > > +
-> > >  /* register exynos4 clocks */
-> > >  static void __init exynos4_clk_init(struct device_node *np,
-> > >                                     enum exynos4_soc soc)
-> > > @@ -1250,6 +1295,7 @@ static void __init exynos4_clk_init(struct device_node *np,
-> > >         samsung_clk_register_alias(ctx, exynos4_aliases,
-> > >                         ARRAY_SIZE(exynos4_aliases));
-> > >  
-> > > +       exynos4_core_down_clock(soc);
-> > >         exynos4_clk_sleep_init();
-> > >  
-> > >         pr_info("%s clocks: sclk_apll = %ld, sclk_mpll = %ld\n"
-> > > -- 
-> > > 1.9.1
-> > > 
+it looks weird if we config pwm if it has been enabled. the whole
+produre to select suitable clock source is not executed?
+and only duty_ns can be configed?
+
+> +
+> +       /*
+> +        * if the PWM is not enabled, turn off the clock again
+> +        */
+> +       if (!test_bit(PWMF_ENABLED, &pwm->flags))
+> +               clk_disable_unprepare(spwmc->pwmc_clk);
+> +
+> +       return 0;
+> +}
+> +
+> +static void _sirf_pwm_hwenable(struct pwm_chip *chip, struct pwm_device *pwm)
+> +{
+> +       struct sirf_pwm_chip *spwmc = to_sirf_pwm_chip(chip);
+> +       struct sirf_pwm *spwm = pwm_get_chip_data(pwm);
+> +       u32 val;
+> +
+> +       mutex_lock(&spwmc->mutex);
+> +
+> +       /* disable preclock */
+> +       val = readl(spwmc->base + SIRF_PWM_ENABLE_PRECLOCK);
+> +       val &= ~(1 << pwm->hwpwm);
+> +       writel(val, spwmc->base + SIRF_PWM_ENABLE_PRECLOCK);
+> +
+> +       /* select preclock source must after disable preclk */
+> +       val = readl(spwmc->base + SIRF_PWM_SELECT_PRECLK);
+> +       val &= ~(0x7 << (SRC_FIELD_SIZE * pwm->hwpwm));
+> +       val |= (spwm->sigsrc_clk_idx << (SRC_FIELD_SIZE * pwm->hwpwm));
+> +
+> +       if (spwm->bypass_mode == 1)
+> +               val |= (0x1 << (BYPASS_MODE_BIT + pwm->hwpwm));
+> +       else
+> +               val &= ~(0x1 << (BYPASS_MODE_BIT + pwm->hwpwm));
+> +
+> +       writel(val, spwmc->base + SIRF_PWM_SELECT_PRECLK);
+> +
+> +       /* wait for some time */
+> +       usleep_range(100, 200);
+> +
+> +       /* enable preclock */
+> +       val = readl(spwmc->base + SIRF_PWM_ENABLE_PRECLOCK);
+> +       val |= (1 << pwm->hwpwm);
+> +       writel(val, spwmc->base + SIRF_PWM_ENABLE_PRECLOCK);
+> +
+> +       /* enable post clock*/
+> +       val = readl(spwmc->base + SIRF_PWM_ENABLE_POSTCLOCK);
+> +       val |= (1 << pwm->hwpwm);
+> +       writel(val, spwmc->base + SIRF_PWM_ENABLE_POSTCLOCK);
+> +
+> +       /* enable output */
+> +       val = readl(spwmc->base + SIRF_PWM_OE);
+> +       val |= 1 << pwm->hwpwm;
+> +       val |= 1 << (pwm->hwpwm + TRANS_MODE_SELECT_BIT);
+> +
+> +       writel(val, spwmc->base + SIRF_PWM_OE);
+> +
+> +       mutex_unlock(&spwmc->mutex);
+> +}
+> +
+> +static int sirf_pwm_enable(struct pwm_chip *chip, struct pwm_device *pwm)
+> +{
+> +       struct sirf_pwm_chip *spwmc = to_sirf_pwm_chip(chip);
+> +       struct sirf_pwm *spwm = pwm_get_chip_data(pwm);
+> +       u32 ret;
+> +
+> +       ret = clk_prepare_enable(spwm->sigsrc_clk);
+> +       if (ret)
+> +               return ret;
+> +
+> +       ret = clk_prepare_enable(spwmc->pwmc_clk);
+> +       if (ret)
+> +               return ret;
+> +
+> +       _sirf_pwm_hwenable(chip, pwm);
+> +
+> +       return 0;
+> +}
+> +
+> +static void sirf_pwm_disable(struct pwm_chip *chip, struct pwm_device *pwm)
+> +{
+> +       u32 val;
+> +       struct sirf_pwm_chip *spwmc = to_sirf_pwm_chip(chip);
+> +       struct sirf_pwm *spwm = pwm_get_chip_data(pwm);
+> +
+> +       mutex_lock(&spwmc->mutex);
+> +
+> +       /* disable output */
+> +       val = readl(spwmc->base + SIRF_PWM_OE);
+> +       val &= ~(1 << pwm->hwpwm);
+> +       writel(val, spwmc->base + SIRF_PWM_OE);
+> +
+> +       /* disable postclock */
+> +       val = readl(spwmc->base + SIRF_PWM_ENABLE_POSTCLOCK);
+> +       val &= ~(1 << pwm->hwpwm);
+> +       writel(val, spwmc->base + SIRF_PWM_ENABLE_POSTCLOCK);
+> +
+> +       /* disable preclock */
+> +       val = readl(spwmc->base + SIRF_PWM_ENABLE_PRECLOCK);
+> +       val &= ~(1 << pwm->hwpwm);
+> +       writel(val, spwmc->base + SIRF_PWM_ENABLE_PRECLOCK);
+> +
+> +       mutex_unlock(&spwmc->mutex);
+> +
+> +       clk_disable_unprepare(spwm->sigsrc_clk);
+> +
+> +       clk_disable_unprepare(spwmc->pwmc_clk);
+> +}
+> +
+> +static const struct pwm_ops sirf_pwm_ops = {
+> +       .request = sirf_pwm_request,
+> +       .free = sirf_pwm_free,
+> +       .enable = sirf_pwm_enable,
+> +       .disable = sirf_pwm_disable,
+> +       .config = sirf_pwm_config,
+> +       .owner = THIS_MODULE,
+> +};
+> +
+> +static int sirf_pwm_probe(struct platform_device *pdev)
+> +{
+> +       struct sirf_pwm_chip *spwmc;
+> +       struct resource *mem_res;
+> +       int ret;
+> +
+> +       spwmc = devm_kzalloc(&pdev->dev, sizeof(*spwmc),
+> +                       GFP_KERNEL);
+> +       if (!spwmc)
+> +               return -ENOMEM;
+> +
+> +       platform_set_drvdata(pdev, spwmc);
+> +
+> +       mem_res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+> +       spwmc->base = devm_ioremap_resource(&pdev->dev, mem_res);
+> +       if (IS_ERR(spwmc->base))
+> +               return PTR_ERR(spwmc->base);
+> +
+> +       /*
+> +        * get clock for PWM controller
+> +        */
+> +       spwmc->pwmc_clk = devm_clk_get(&pdev->dev, "pwmc");
+> +       if (IS_ERR(spwmc->pwmc_clk)) {
+> +               dev_err(&pdev->dev, "failed to get PWM controller clock\n");
+> +               return PTR_ERR(spwmc->pwmc_clk);
+> +       }
+> +
+> +       spwmc->chip.dev = &pdev->dev;
+> +       spwmc->chip.ops = &sirf_pwm_ops;
+> +       spwmc->chip.base = -1;
+> +       spwmc->chip.npwm = 7;
+> +
+> +       mutex_init(&spwmc->mutex);
+> +
+> +       ret = pwmchip_add(&spwmc->chip);
+> +       if (ret < 0) {
+> +               dev_err(&pdev->dev, "failed to register PWM chip\n");
+> +               return ret;
+> +       }
+> +
+> +       return 0;
+> +}
+> +
+> +static int sirf_pwm_remove(struct platform_device *pdev)
+> +{
+> +       struct sirf_pwm_chip *spwmc = platform_get_drvdata(pdev);
+> +
+> +       return pwmchip_remove(&spwmc->chip);
+> +}
+> +
+> +#ifdef CONFIG_PM_SLEEP
+> +static int sirf_pwm_suspend(struct device *dev)
+> +{
+> +       struct sirf_pwm_chip *spwmc = dev_get_drvdata(dev);
+> +       struct pwm_device *pwm;
+> +       int i;
+> +
+> +       for (i = 0; i < spwmc->chip.npwm; i++) {
+> +               pwm = &spwmc->chip.pwms[i];
+> +               /*
+> +                * disable PWM which is not disabled when user suspend
+> +                */
+> +               if (test_bit(PWMF_REQUESTED, &pwm->flags) &&
+> +                               test_bit(PWMF_ENABLED, &pwm->flags))
+> +                       sirf_pwm_disable(pwm->chip, pwm);
+> +       }
+> +
+> +       return 0;
+> +}
+> +
+> +static int sirf_pwm_resume(struct device *dev)
+> +{
+> +       struct sirf_pwm_chip *spwmc = dev_get_drvdata(dev);
+> +       struct pwm_device *pwm;
+> +       struct sirf_pwm *spwm;
+> +       int i;
+> +
+> +       for (i = 0; i < spwmc->chip.npwm; i++) {
+> +               pwm = &spwmc->chip.pwms[i];
+> +               spwm = pwm_get_chip_data(pwm);
+> +
+> +               if (test_bit(PWMF_REQUESTED, &pwm->flags) &&
+> +                               test_bit(PWMF_ENABLED, &pwm->flags)) {
+> +                       sirf_pwm_config(&spwmc->chip, pwm, spwm->duty_ns,
+> +                                       pwm_get_period(pwm));
+> +                       sirf_pwm_enable(&spwmc->chip, pwm);
+> +               }
+> +       }
+> +
+> +       return 0;
+> +}
+> +
+> +static int sirf_pwm_restore(struct device *dev)
+> +{
+> +       struct sirf_pwm_chip *spwmc = dev_get_drvdata(dev);
+> +       struct pwm_device *pwm;
+> +       struct sirf_pwm *spwm;
+> +       int i;
+> +
+> +       for (i = 0; i < spwmc->chip.npwm; i++) {
+> +               pwm = &spwmc->chip.pwms[i];
+> +               spwm = pwm_get_chip_data(pwm);
+> +               /*
+> +                * while restoring from hibernation, state of PWM is enabled,
+> +                * but PWM hardware is not re-enabled, register about config
+> +                * and enable should be restored here
+> +                */
+> +               if (test_bit(PWMF_REQUESTED, &pwm->flags) &&
+> +                               test_bit(PWMF_ENABLED, &pwm->flags)) {
+> +                       _sirf_pwm_hwconfig(&spwmc->chip, pwm);
+> +                       _sirf_pwm_hwenable(&spwmc->chip, pwm);
+> +               }
+> +       }
+> +
+> +       return 0;
+> +}
+> +#else
+> +#define sirf_pwm_resume NULL
+> +#define sirf_pwm_suspend NULL
+> +#define sirf_pwm_restore NULL
+> +#endif
+> +
+> +static const struct dev_pm_ops sirf_pwm_pm_ops = {
+> +       .suspend = sirf_pwm_suspend,
+> +       .resume = sirf_pwm_resume,
+> +       .restore = sirf_pwm_restore,
+> +};
+> +
+> +static const struct of_device_id sirf_pwm_of_match[] = {
+> +       { .compatible = "sirf,prima2-pwm", },
+> +       {}
+> +};
+> +MODULE_DEVICE_TABLE(of, sirf_pwm_of_match);
+> +
+> +static struct platform_driver sirf_pwm_driver = {
+> +       .driver = {
+> +               .name = "sirf-pwm",
+> +               .pm = &sirf_pwm_pm_ops,
+> +               .of_match_table = sirf_pwm_of_match,
+> +       },
+> +       .probe = sirf_pwm_probe,
+> +       .remove = sirf_pwm_remove,
+> +};
+> +module_platform_driver(sirf_pwm_driver);
+> +
+> +MODULE_DESCRIPTION("SIRF serial SoC PWM device core driver");
+> +MODULE_AUTHOR("RongJun Ying <Rongjun.Ying@csr.com>");
+> +MODULE_AUTHOR("Huayi Li <huayi.li@csr.com>");
+> +MODULE_LICENSE("GPL v2");
+> --
+> 1.9.3
+
+-barry
