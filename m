@@ -1,199 +1,367 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Thu, 24 Jul 2014 16:47:45 +0100
-Subject: [PATCH 10/19] ARM64 / ACPI: Get the enable method for SMP
- initialization in ACPI way
-In-Reply-To: <1406206825-15590-11-git-send-email-hanjun.guo@linaro.org>
-References: <1406206825-15590-1-git-send-email-hanjun.guo@linaro.org>
- <1406206825-15590-11-git-send-email-hanjun.guo@linaro.org>
-Message-ID: <20140724154745.GD26190@leverpostej>
+From: stwiss.opensource@diasemi.com (Opensource [Steve Twiss])
+Date: Thu, 24 Jul 2014 16:46:33 +0100
+Subject: [RESEND RFC V2] devicetree: Dialog Semiconductor consolidate
+ existing vendor prefixes to standardise on 'dlg'
+Message-ID: <201407241554.s6OFsqbW031651@swsrvapps-01.diasemi.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jul 24, 2014 at 02:00:16PM +0100, Hanjun Guo wrote:
-> ACPI 5.1 only has two explicit methods to boot up SMP,
-> PSCI and Parking protocol, but the Parking protocol is
-> only suitable for ARMv7 now, so make PSCI as the only way
-> for the SMP boot protocol before some updates for the
-> ACPI spec or the Parking protocol spec.
-> 
-> Signed-off-by: Hanjun Guo <hanjun.guo@linaro.org>
-> Signed-off-by: Tomasz Nowicki <tomasz.nowicki@linaro.org>
-> ---
->  arch/arm64/include/asm/acpi.h    |   21 +++++++++++++++
->  arch/arm64/include/asm/cpu_ops.h |    9 ++++++-
->  arch/arm64/include/asm/smp.h     |    2 +-
->  arch/arm64/kernel/acpi.c         |    9 +++++++
->  arch/arm64/kernel/cpu_ops.c      |   52 ++++++++++++++++++++++++++++++++++----
->  arch/arm64/kernel/smp.c          |   29 +++++++++++++++++++--
->  6 files changed, 113 insertions(+), 9 deletions(-)
-> 
-> diff --git a/arch/arm64/include/asm/acpi.h b/arch/arm64/include/asm/acpi.h
-> index 5ce85f8..6240327 100644
-> --- a/arch/arm64/include/asm/acpi.h
-> +++ b/arch/arm64/include/asm/acpi.h
-> @@ -14,6 +14,27 @@
-> 
->  /* Basic configuration for ACPI */
->  #ifdef CONFIG_ACPI
-> +/*
-> + * ACPI 5.1 only has two explicit methods to
-> + * boot up SMP, PSCI and Parking protocol,
-> + * but the Parking protocol is only defined
-> + * for ARMv7 now, so make PSCI as the only
-> + * way for the SMP boot protocol before some
-> + * updates for the ACPI spec or the Parking
-> + * protocol spec.
-> + *
-> + * This enum is intend to make the boot method
-> + * scalable when above updates are happended,
-> + * which NOT means to support all of them.
-> + */
-> +enum acpi_smp_boot_protocol {
-> +       ACPI_SMP_BOOT_PSCI,
-> +       ACPI_SMP_BOOT_PARKING_PROTOCOL,
-> +       ACPI_SMP_BOOT_PROTOCOL_MAX
-> +};
-> +
-> +enum acpi_smp_boot_protocol smp_boot_protocol(void);
-> +
->  extern int acpi_disabled;
->  extern int acpi_noirq;
->  extern int acpi_pci_disabled;
-> diff --git a/arch/arm64/include/asm/cpu_ops.h b/arch/arm64/include/asm/cpu_ops.h
-> index d7b4b38..2a7c6fd 100644
-> --- a/arch/arm64/include/asm/cpu_ops.h
-> +++ b/arch/arm64/include/asm/cpu_ops.h
-> @@ -61,7 +61,14 @@ struct cpu_operations {
->  };
-> 
->  extern const struct cpu_operations *cpu_ops[NR_CPUS];
-> -extern int __init cpu_read_ops(struct device_node *dn, int cpu);
-> +extern int __init cpu_of_read_ops(struct device_node *dn, int cpu);
-> +
-> +#ifdef CONFIG_ACPI
-> +extern int __init cpu_acpi_read_ops(int cpu);
-> +#else
-> +static inline int __init cpu_acpi_read_ops(int cpu) { return -ENODEV; }
-> +#endif
-> +
->  extern void __init cpu_read_bootcpu_ops(void);
-> 
->  #endif /* ifndef __ASM_CPU_OPS_H */
-> diff --git a/arch/arm64/include/asm/smp.h b/arch/arm64/include/asm/smp.h
-> index a498f2c..a5cea56 100644
-> --- a/arch/arm64/include/asm/smp.h
-> +++ b/arch/arm64/include/asm/smp.h
-> @@ -39,7 +39,7 @@ extern void show_ipi_list(struct seq_file *p, int prec);
->  extern void handle_IPI(int ipinr, struct pt_regs *regs);
-> 
->  /*
-> - * Setup the set of possible CPUs (via set_cpu_possible)
-> + * Platform specific SMP operations
->   */
->  extern void smp_init_cpus(void);
+From: Steve Twiss <stwiss.opensource@diasemi.com>
 
-While the originial comment is out of date, the new form is plain wrong.
+This patch series updates the device tree vendor prefix for
+Dialog Semiconductor.
 
-Something like "Discover the set of possible CPUs and determine their
-SMP operations" would be a better description of what's going on here.
+Various methods are currently used throughout the kernel: 'diasemi',
+'dialog' and 'dlg'. Others have also been suggested.
 
-> 
-> diff --git a/arch/arm64/kernel/acpi.c b/arch/arm64/kernel/acpi.c
-> index ff0f6a0..2af6662 100644
-> --- a/arch/arm64/kernel/acpi.c
-> +++ b/arch/arm64/kernel/acpi.c
-> @@ -184,6 +184,15 @@ static int __init acpi_parse_madt_gic_cpu_interface_entries(void)
->         return 0;
->  }
-> 
-> +/* Protocol to bring up secondary CPUs */
-> +enum acpi_smp_boot_protocol smp_boot_protocol(void)
-> +{
-> +       if (acpi_psci_present)
-> +               return ACPI_SMP_BOOT_PSCI;
-> +       else
-> +               return ACPI_SMP_BOOT_PARKING_PROTOCOL;
-> +}
-> +
->  static int __init acpi_parse_fadt(struct acpi_table_header *table)
->  {
->         struct acpi_table_fadt *fadt = (struct acpi_table_fadt *)table;
-> diff --git a/arch/arm64/kernel/cpu_ops.c b/arch/arm64/kernel/cpu_ops.c
-> index d62d12f..4d9b3cf 100644
-> --- a/arch/arm64/kernel/cpu_ops.c
-> +++ b/arch/arm64/kernel/cpu_ops.c
-> @@ -16,11 +16,13 @@
->   * along with this program.  If not, see <http://www.gnu.org/licenses/>.
->   */
-> 
-> -#include <asm/cpu_ops.h>
-> -#include <asm/smp_plat.h>
->  #include <linux/errno.h>
->  #include <linux/of.h>
->  #include <linux/string.h>
-> +#include <linux/acpi.h>
-> +
-> +#include <asm/cpu_ops.h>
-> +#include <asm/smp_plat.h>
+This patch set aims to consolidate the usage of the vendor prefix to
+use a common standard. The prefix 'dlg' is used.
 
-Was the header move just for consistency with other files, or is there
-some ordering requirement here?
 
-> 
->  extern const struct cpu_operations smp_spin_table_ops;
->  extern const struct cpu_operations cpu_psci_ops;
-> @@ -52,7 +54,7 @@ static const struct cpu_operations * __init cpu_get_ops(const char *name)
->  /*
->   * Read a cpu's enable method from the device tree and record it in cpu_ops.
->   */
-> -int __init cpu_read_ops(struct device_node *dn, int cpu)
-> +int __init cpu_of_read_ops(struct device_node *dn, int cpu)
->  {
->         const char *enable_method = of_get_property(dn, "enable-method", NULL);
->         if (!enable_method) {
-> @@ -76,12 +78,52 @@ int __init cpu_read_ops(struct device_node *dn, int cpu)
->         return 0;
->  }
-> 
-> +#ifdef CONFIG_ACPI
-> +/*
-> + * Read a cpu's enable method in the ACPI way and record it in cpu_ops.
-> + */
-> +int __init cpu_acpi_read_ops(int cpu)
-> +{
-> +       /*
-> +        * For ACPI 5.1, only two kind of methods are provided,
-> +        * Parking protocol and PSCI, but Parking protocol is
-> +        * used on ARMv7 only, so make PSCI as the only method
-> +        * for SMP initialization before the ACPI spec or Parking
-> +        * protocol spec is updated.
-> +        */
+Signed-off-by: Steve Twiss <stwiss.opensource@diasemi.com>
 
-That comment is a little misleading. The parking protocol is _specified_
-for ARMv7 only.
+---
+Checks performed with linux-next/next-20140715/scripts/checkpatch.pl
+ trivial-devices.txt       total: 0 errors, 0 warnings, 89 lines checked
+ da9210.txt                total: 0 errors, 0 warnings, 21 lines checked
+ vendor-prefixes.txt       total: 0 errors, 0 warnings, 149 lines checked
+ imx53-smd.dts             total: 0 errors, 2 warnings, 279 lines checked
+ imx6qdl-phytec-pfla02.dtsi total: 0 errors, 2 warnings, 357 lines checked
+ r8a7790-lager.dts         total: 0 errors, 3 warnings, 403 lines checked
+ r8a7791-koelsch.dts       total: 0 errors, 4 warnings, 461 lines checked
+ da9055-core.c             total: 0 errors, 0 warnings, 428 lines checked
 
-> +       switch (smp_boot_protocol()) {
-> +       case ACPI_SMP_BOOT_PSCI:
-> +               cpu_ops[cpu] = cpu_get_ops("psci");
-> +               break;
-> +       case ACPI_SMP_BOOT_PARKING_PROTOCOL:
-> +       default:
-> +               cpu_ops[cpu] = NULL;
-> +               break;
-> +       }
-> +
-> +       if (!cpu_ops[cpu]) {
-> +               pr_warn("CPU %d: unsupported enable-method, only PSCI is supported\n",
-> +                       cpu);
-> +               return -EOPNOTSUPP;
-> +       }
+This is a resend according to requests for e-mail reformatting and removal
+of '[]' in From: and Signed-off-by: tags. There are no patch alterations
+from RFC V2.
 
-That's going to require changes as things get updated, and
-"enable-method" is a term from DT rather than ACPI.
+I am requesting Acks for the bindings and DTS(I) changes in this patch
+specifically the two remaining files r8a7790-lager.dts and r8a7791-koelsch.dts
+In a previous reply SHMobile was identified as needing to Ack this patch
+before it could proceed.
+- http://www.spinics.net/lists/arm-kernel/msg349289.html
+- https://lkml.org/lkml/2014/6/11/273
 
-How about:
+If there are problems with this request, can I get a quick explanation in
+the reply so I can fix it and move forwards please?
 
-	"CPU%d: boot protocol unsupported or unknown\n".
+Please see this thread for latest comments:
+http://www.spinics.net/lists/arm-kernel/msg349809.html
 
-Cheers,
-Mark.
+Acked-by the following people so far:
+
+- Rob Herring
+  http://www.spinics.net/lists/arm-kernel/msg349289.html
+
+- Lee Jones
+  For the MFD changes:
+  http://www.spinics.net/lists/arm-kernel/msg349457.html
+
+- Shawn Guo
+  arch/arm/boot/dts/imx53-smd.dts                    |  2 +-
+  arch/arm/boot/dts/imx6qdl-phytec-pfla02.dtsi       |  2 +-
+  http://www.spinics.net/lists/arm-kernel/msg349398.html
+
+
+Here is my working for justifying this change:
+
+./arch/arm/boot/dts/imx6qdl-phytec-pfla02.dtsi
+	Has the following entry:
+	compatible = "dialog,da9063";
+	However the DA9063 driver does not support device tree yet so
+	it would be safe to rename this.
+
+./arch/arm/boot/dts/imx53-smd.dts
+	Has the following entry:
+	compatible = "dialog,da9053", "dialog,da9052";
+	However, the existing driver files for DA9053 define a different
+	compatible string with the "dlg" prefix. See the entries below.
+	None of these would have allowed the "dialog" prefix.
+	{ .compatible = "dlg,da9052", .data = &da9052_i2c_id[0] },
+	{ .compatible = "dlg,da9053-aa", .data = &da9052_i2c_id[1] },
+	{ .compatible = "dlg,da9053-ba", .data = &da9052_i2c_id[2] },
+	{ .compatible = "dlg,da9053-bb", .data = &da9052_i2c_id[3] },
+	{ .compatible = "dlg,da9053-bc", .data = &da9052_i2c_id[4] },
+	In this particular case the change for DA9053 did not match up
+	with the expected compatibility strings and therefore I have
+	retained the more general "dlg,da9053" because I do not know
+	which silicon variant (-aa, -ba, -bb, or -bc) is the correct
+	one to use.
+
+./devicetree/bindings/i2c/trivial-devices.txt
+	Has the following entry:
+	dialog,da9053  DA9053: flexible system level PMIC with multicore support
+	Instead of depreciating this "dialog" line am just replacing it
+	with a "dlg" because the existing driver DA9053 does not support
+	the dialog keyword.
+
+./drivers/mfd/da9055-core.c
+	Has the following entries for the mfd cells 
+		.of_compatible = "dialog,da9055-gpio", etc...
+	In this case, the driver does not actually pass in any platform data
+	to any of the mfd cells and so they are not actually used
+	yet in the driver. Nobody else references this information
+	so they can safely be changed.
+
+./devicetree/bindings/regulator/da9210.txt
+	Has the following two entries in the binding file:
+	- compatible:	must be "diasemi,da9210"
+	compatible = "diasemi,da9210";
+	However the DA9210 driver does not support device tree.
+
+./arch/arm/boot/dts/r8a7790-lager.dts
+./arch/arm/boot/dts/r8a7791-koelsch.dts
+	These two files have the following entries:
+	compatible = "diasemi,da9210";
+	These both reference the "diasemi,da9210" but the device
+	driver does not support device tree
+
+The remaining files in the kernel I have found correctly references
+the driver files compatibility information and so did not need to
+be changed.
+
+./devicetree/bindings/mfd/da9052-i2c.txt
+	- compatible : Should be "dlg,da9052", "dlg,da9053-aa",
+		 "dlg,da9053-ab", or "dlg,da9053-bb"
+
+./devicetree/bindings/mfd/da9055.txt
+	compatible = "dlg,da9055-pmic";
+
+./arch/arm/boot/dts/imx53-voipac-dmm-668.dtsi
+	compatible = "dlg,da9053-aa", "dlg,da9052";
+
+./arch/arm/boot/dts/imx53-qsb.dts
+	compatible = "dlg,da9053-aa", "dlg,da9052";
+
+./devicetree/bindings/sound/da9055.txt
+	- compatible: "dlg,da9055-codec"
+	compatible = "dlg,da9055-codec";
+
+
+This e-mail is in response to the previous threads here:
+https://lkml.org/lkml/2014/6/11/262
+http://comments.gmane.org/gmane.linux.ports.arm.kernel/341358
+
+Changes since RFC V1
+- addition of changes to DTS files referencing "diasemi,da9210"
+   arch/arm/boot/dts/r8a7790-lager.dts
+   arch/arm/boot/dts/r8a7791-koelsch.dts
+
+Changes to e-mail content (no patch changes) since RFC V2
+- reformatted e-mail according to comments
+  http://www.spinics.net/lists/arm-kernel/msg349289.html
+  http://www.spinics.net/lists/arm-kernel/msg349809.html
+
+This RFC V2 resend does not answer the response to RFC V1
+from Mark Brown:
+http://www.spinics.net/lists/arm-kernel/msg347615.html
+
+This patch applies against linux-next and next-20140715 
+
+Regards,
+Steve Twiss, Dialog Semiconductor Ltd.
+
+
+
+ .../devicetree/bindings/i2c/trivial-devices.txt    |  2 +-
+ .../devicetree/bindings/regulator/da9210.txt       |  4 ++--
+ .../devicetree/bindings/vendor-prefixes.txt        |  1 +
+ arch/arm/boot/dts/imx53-smd.dts                    |  2 +-
+ arch/arm/boot/dts/imx6qdl-phytec-pfla02.dtsi       |  2 +-
+ arch/arm/boot/dts/r8a7790-lager.dts                |  2 +-
+ arch/arm/boot/dts/r8a7791-koelsch.dts              |  2 +-
+ drivers/mfd/da9055-core.c                          | 26 +++++++++++-----------
+ 8 files changed, 21 insertions(+), 20 deletions(-)
+
+diff --git a/Documentation/devicetree/bindings/i2c/trivial-devices.txt b/Documentation/devicetree/bindings/i2c/trivial-devices.txt
+index 37803eb..a02b8a1 100644
+--- a/Documentation/devicetree/bindings/i2c/trivial-devices.txt
++++ b/Documentation/devicetree/bindings/i2c/trivial-devices.txt
+@@ -44,7 +44,7 @@ dallas,ds1775		Tiny Digital Thermometer and Thermostat
+ dallas,ds3232		Extremely Accurate I??C RTC with Integrated Crystal and SRAM
+ dallas,ds4510		CPU Supervisor with Nonvolatile Memory and Programmable I/O
+ dallas,ds75		Digital Thermometer and Thermostat
+-dialog,da9053		DA9053: flexible system level PMIC with multicore support
++dlg,da9053		DA9053: flexible system level PMIC with multicore support
+ epson,rx8025		High-Stability. I2C-Bus INTERFACE REAL TIME CLOCK MODULE
+ epson,rx8581		I2C-BUS INTERFACE REAL TIME CLOCK MODULE
+ fsl,mag3110		MAG3110: Xtrinsic High Accuracy, 3D Magnetometer
+diff --git a/Documentation/devicetree/bindings/regulator/da9210.txt b/Documentation/devicetree/bindings/regulator/da9210.txt
+index f120f22..3297c53 100644
+--- a/Documentation/devicetree/bindings/regulator/da9210.txt
++++ b/Documentation/devicetree/bindings/regulator/da9210.txt
+@@ -2,7 +2,7 @@
+ 
+ Required properties:
+ 
+-- compatible:	must be "diasemi,da9210"
++- compatible:	must be "dlg,da9210"
+ - reg:		the i2c slave address of the regulator. It should be 0x68.
+ 
+ Any standard regulator properties can be used to configure the single da9210
+@@ -11,7 +11,7 @@ DCDC.
+ Example:
+ 
+ 	da9210 at 68 {
+-		compatible = "diasemi,da9210";
++		compatible = "dlg,da9210";
+ 		reg = <0x68>;
+ 
+ 		regulator-min-microvolt = <900000>;
+diff --git a/Documentation/devicetree/bindings/vendor-prefixes.txt b/Documentation/devicetree/bindings/vendor-prefixes.txt
+index 5d27e5a..35a833e 100644
+--- a/Documentation/devicetree/bindings/vendor-prefixes.txt
++++ b/Documentation/devicetree/bindings/vendor-prefixes.txt
+@@ -37,6 +37,7 @@ dallas	Maxim Integrated Products (formerly Dallas Semiconductor)
+ davicom	DAVICOM Semiconductor, Inc.
+ denx	Denx Software Engineering
+ digi	Digi International Inc.
++dlg	Dialog Semiconductor
+ dlink	D-Link Corporation
+ dmo	Data Modul AG
+ ebv	EBV Elektronik
+diff --git a/arch/arm/boot/dts/imx53-smd.dts b/arch/arm/boot/dts/imx53-smd.dts
+index 5ec1590..1d32557 100644
+--- a/arch/arm/boot/dts/imx53-smd.dts
++++ b/arch/arm/boot/dts/imx53-smd.dts
+@@ -265,7 +265,7 @@
+ 	};
+ 
+ 	pmic: dialog at 48 {
+-		compatible = "dialog,da9053", "dialog,da9052";
++		compatible = "dlg,da9053", "dlg,da9052";
+ 		reg = <0x48>;
+ 	};
+ };
+diff --git a/arch/arm/boot/dts/imx6qdl-phytec-pfla02.dtsi b/arch/arm/boot/dts/imx6qdl-phytec-pfla02.dtsi
+index 2694aa8..0e50bb0 100644
+--- a/arch/arm/boot/dts/imx6qdl-phytec-pfla02.dtsi
++++ b/arch/arm/boot/dts/imx6qdl-phytec-pfla02.dtsi
+@@ -83,7 +83,7 @@
+ 	};
+ 
+ 	pmic at 58 {
+-		compatible = "dialog,da9063";
++		compatible = "dlg,da9063";
+ 		reg = <0x58>;
+ 		interrupt-parent = <&gpio4>;
+ 		interrupts = <17 0x8>; /* active-low GPIO4_17 */
+diff --git a/arch/arm/boot/dts/r8a7790-lager.dts b/arch/arm/boot/dts/r8a7790-lager.dts
+index 856b423..e3db105 100644
+--- a/arch/arm/boot/dts/r8a7790-lager.dts
++++ b/arch/arm/boot/dts/r8a7790-lager.dts
+@@ -374,7 +374,7 @@
+ 	status = "okay";
+ 
+ 	vdd_dvfs: regulator at 68 {
+-		compatible = "diasemi,da9210";
++		compatible = "dlg,da9210";
+ 		reg = <0x68>;
+ 
+ 		regulator-min-microvolt = <1000000>;
+diff --git a/arch/arm/boot/dts/r8a7791-koelsch.dts b/arch/arm/boot/dts/r8a7791-koelsch.dts
+index 23486c0..33b9532 100644
+--- a/arch/arm/boot/dts/r8a7791-koelsch.dts
++++ b/arch/arm/boot/dts/r8a7791-koelsch.dts
+@@ -426,7 +426,7 @@
+ 	clock-frequency = <100000>;
+ 
+ 	vdd_dvfs: regulator at 68 {
+-		compatible = "diasemi,da9210";
++		compatible = "dlg,da9210";
+ 		reg = <0x68>;
+ 
+ 		regulator-min-microvolt = <1000000>;
+diff --git a/drivers/mfd/da9055-core.c b/drivers/mfd/da9055-core.c
+index caf8dcf..b4d920c 100644
+--- a/drivers/mfd/da9055-core.c
++++ b/drivers/mfd/da9055-core.c
+@@ -296,73 +296,73 @@ static struct resource da9055_ld05_6_resource = {
+ 
+ static const struct mfd_cell da9055_devs[] = {
+ 	{
+-		.of_compatible = "dialog,da9055-gpio",
++		.of_compatible = "dlg,da9055-gpio",
+ 		.name = "da9055-gpio",
+ 	},
+ 	{
+-		.of_compatible = "dialog,da9055-regulator",
++		.of_compatible = "dlg,da9055-regulator",
+ 		.name = "da9055-regulator",
+ 		.id = 1,
+ 	},
+ 	{
+-		.of_compatible = "dialog,da9055-regulator",
++		.of_compatible = "dlg,da9055-regulator",
+ 		.name = "da9055-regulator",
+ 		.id = 2,
+ 	},
+ 	{
+-		.of_compatible = "dialog,da9055-regulator",
++		.of_compatible = "dlg,da9055-regulator",
+ 		.name = "da9055-regulator",
+ 		.id = 3,
+ 	},
+ 	{
+-		.of_compatible = "dialog,da9055-regulator",
++		.of_compatible = "dlg,da9055-regulator",
+ 		.name = "da9055-regulator",
+ 		.id = 4,
+ 	},
+ 	{
+-		.of_compatible = "dialog,da9055-regulator",
++		.of_compatible = "dlg,da9055-regulator",
+ 		.name = "da9055-regulator",
+ 		.id = 5,
+ 	},
+ 	{
+-		.of_compatible = "dialog,da9055-regulator",
++		.of_compatible = "dlg,da9055-regulator",
+ 		.name = "da9055-regulator",
+ 		.id = 6,
+ 	},
+ 	{
+-		.of_compatible = "dialog,da9055-regulator",
++		.of_compatible = "dlg,da9055-regulator",
+ 		.name = "da9055-regulator",
+ 		.id = 7,
+ 		.resources = &da9055_ld05_6_resource,
+ 		.num_resources = 1,
+ 	},
+ 	{
+-		.of_compatible = "dialog,da9055-regulator",
++		.of_compatible = "dlg,da9055-regulator",
+ 		.name = "da9055-regulator",
+ 		.resources = &da9055_ld05_6_resource,
+ 		.num_resources = 1,
+ 		.id = 8,
+ 	},
+ 	{
+-		.of_compatible = "dialog,da9055-onkey",
++		.of_compatible = "dlg,da9055-onkey",
+ 		.name = "da9055-onkey",
+ 		.resources = &da9055_onkey_resource,
+ 		.num_resources = 1,
+ 	},
+ 	{
+-		.of_compatible = "dialog,da9055-rtc",
++		.of_compatible = "dlg,da9055-rtc",
+ 		.name = "da9055-rtc",
+ 		.resources = da9055_rtc_resource,
+ 		.num_resources = ARRAY_SIZE(da9055_rtc_resource),
+ 	},
+ 	{
+-		.of_compatible = "dialog,da9055-hwmon",
++		.of_compatible = "dlg,da9055-hwmon",
+ 		.name = "da9055-hwmon",
+ 		.resources = &da9055_hwmon_resource,
+ 		.num_resources = 1,
+ 	},
+ 	{
+-		.of_compatible = "dialog,da9055-watchdog",
++		.of_compatible = "dlg,da9055-watchdog",
+ 		.name = "da9055-watchdog",
+ 	},
+ };
+-- 
+end-of-patch for RESEND PATCH RFC V2
