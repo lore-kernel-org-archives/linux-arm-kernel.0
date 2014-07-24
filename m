@@ -1,153 +1,36 @@
-From: naresh.bhat@linaro.org (Naresh Bhat)
-Date: Fri, 25 Jul 2014 03:27:21 +0530
-Subject: [PATCH 05/19] ARM64 / ACPI: Make PCI optional for ACPI on ARM64
-In-Reply-To: <1406206825-15590-6-git-send-email-hanjun.guo@linaro.org>
-References: <1406206825-15590-1-git-send-email-hanjun.guo@linaro.org>
- <1406206825-15590-6-git-send-email-hanjun.guo@linaro.org>
-Message-ID: <CAFoFrHZQ6zsM-jVpUzuFfL3_1i=HU6g+ogJY2Zoy7wx82E03RA@mail.gmail.com>
+From: dianders@chromium.org (Doug Anderson)
+Date: Thu, 24 Jul 2014 15:17:50 -0700
+Subject: [PATCH] ARM: dts: Build dtbs for Rockchip boards
+Message-ID: <1406240270-13278-1-git-send-email-dianders@chromium.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 24 July 2014 18:30, Hanjun Guo <hanjun.guo@linaro.org> wrote:
->
-> As PCI for ARM64 is not ready, so introduce some stub functions
-> to make PCI optional for ACPI, and make ACPI core run without
-> CONFIG_PCI on ARM64.
->
-> Since ACPI on X86 and IA64 depends on PCI and this patch only makes
-> PCI optinal for ARM64, it will not break anything on X86 and IA64.
+This allows the "make dtbs" target to work.
 
+Signed-off-by: Doug Anderson <dianders@chromium.org>
+---
+This is built upon (ARM: dts: add rk3288 evaluation board) at
+<https://patchwork.kernel.org/patch/4579541/>, which won't actually
+build without the bindings that just landed in today's clk-next.
 
-optional
+ arch/arm/boot/dts/Makefile | 5 +++++
+ 1 file changed, 5 insertions(+)
 
->
->
-> Signed-off-by: Hanjun Guo <hanjun.guo@linaro.org>
-> ---
->  arch/arm64/include/asm/pci.h |   11 +++++++++++
->  drivers/acpi/Makefile        |    2 +-
->  drivers/acpi/internal.h      |    5 +++++
->  include/linux/pci.h          |   37 +++++++++++++++++++++++++++----------
->  4 files changed, 44 insertions(+), 11 deletions(-)
->  create mode 100644 arch/arm64/include/asm/pci.h
->
-> diff --git a/arch/arm64/include/asm/pci.h b/arch/arm64/include/asm/pci.h
-> new file mode 100644
-> index 0000000..250cd24
-> --- /dev/null
-> +++ b/arch/arm64/include/asm/pci.h
-> @@ -0,0 +1,11 @@
-> +#ifndef __ASM_PCI_H
-> +#define __ASM_PCI_H
-> +#ifdef __KERNEL__
-> +
-> +/*
-> + * PCI address space differs from physical memory address space
-> + */
-> +#define PCI_DMA_BUS_IS_PHYS    (0)
-> +
-> +#endif  /* __KERNEL__ */
-> +#endif  /* __ASM_PCI_H */
-> diff --git a/drivers/acpi/Makefile b/drivers/acpi/Makefile
-> index 505d4d7..8e9bbe6 100644
-> --- a/drivers/acpi/Makefile
-> +++ b/drivers/acpi/Makefile
-> @@ -39,7 +39,7 @@ acpi-y                                += processor_core.o
->  acpi-$(CONFIG_ARCH_MIGHT_HAVE_ACPI_PDC) += processor_pdc.o
->  acpi-y                         += ec.o
->  acpi-$(CONFIG_ACPI_DOCK)       += dock.o
-> -acpi-y                         += pci_root.o pci_link.o pci_irq.o
-> +acpi-$(CONFIG_PCI)             += pci_root.o pci_link.o pci_irq.o
->  acpi-y                         += acpi_lpss.o
->  acpi-y                         += acpi_platform.o
->  acpi-y                         += acpi_pnp.o
-> diff --git a/drivers/acpi/internal.h b/drivers/acpi/internal.h
-> index 4c5cf77..e1e6487 100644
-> --- a/drivers/acpi/internal.h
-> +++ b/drivers/acpi/internal.h
-> @@ -26,8 +26,13 @@
->  acpi_status acpi_os_initialize1(void);
->  int init_acpi_device_notify(void);
->  int acpi_scan_init(void);
-> +#ifdef CONFIG_PCI
->  void acpi_pci_root_init(void);
->  void acpi_pci_link_init(void);
-> +#else
-> +static inline void acpi_pci_root_init(void) {}
-> +static inline void acpi_pci_link_init(void) {}
-> +#endif
->  void acpi_processor_init(void);
->  void acpi_platform_init(void);
->  void acpi_pnp_init(void);
-> diff --git a/include/linux/pci.h b/include/linux/pci.h
-> index 466bcd1..27d7354 100644
-> --- a/include/linux/pci.h
-> +++ b/include/linux/pci.h
-> @@ -558,15 +558,6 @@ struct pci_ops {
->         int (*write)(struct pci_bus *bus, unsigned int devfn, int where, int size, u32 val);
->  };
->
-> -/*
-> - * ACPI needs to be able to access PCI config space before we've done a
-> - * PCI bus scan and created pci_bus structures.
-> - */
-> -int raw_pci_read(unsigned int domain, unsigned int bus, unsigned int devfn,
-> -                int reg, int len, u32 *val);
-> -int raw_pci_write(unsigned int domain, unsigned int bus, unsigned int devfn,
-> -                 int reg, int len, u32 val);
-> -
->  struct pci_bus_region {
->         dma_addr_t start;
->         dma_addr_t end;
-> @@ -1293,6 +1284,16 @@ typedef int (*arch_set_vga_state_t)(struct pci_dev *pdev, bool decode,
->                       unsigned int command_bits, u32 flags);
->  void pci_register_set_vga_state(arch_set_vga_state_t func);
->
-> +/*
-> + * ACPI needs to be able to access PCI config space before we've done a
-> + * PCI bus scan and created pci_bus structures.
-> + */
-> +int raw_pci_read(unsigned int domain, unsigned int bus, unsigned int devfn,
-> +                int reg, int len, u32 *val);
-> +int raw_pci_write(unsigned int domain, unsigned int bus, unsigned int devfn,
-> +                 int reg, int len, u32 val);
-> +void pcibios_penalize_isa_irq(int irq, int active);
-> +
->  #else /* CONFIG_PCI is not enabled */
->
->  /*
-> @@ -1394,6 +1395,23 @@ static inline struct pci_dev *pci_get_bus_and_slot(unsigned int bus,
->                                                 unsigned int devfn)
->  { return NULL; }
->
-> +static inline struct pci_bus *pci_find_bus(int domain, int busnr)
-> +{ return NULL; }
-> +
-> +static inline int pci_bus_write_config_byte(struct pci_bus *bus,
-> +                               unsigned int devfn, int where, u8 val)
-> +{ return -ENODEV; }
-> +
-> +static inline int raw_pci_read(unsigned int domain, unsigned int bus,
-> +                       unsigned int devfn, int reg, int len, u32 *val)
-> +{ return -EINVAL; }
-> +
-> +static inline int raw_pci_write(unsigned int domain, unsigned int bus,
-> +                       unsigned int devfn, int reg, int len, u32 val)
-> +{ return -EINVAL; }
-> +
-> +static inline void pcibios_penalize_isa_irq(int irq, int active) { }
-> +
->  static inline int pci_domain_nr(struct pci_bus *bus) { return 0; }
->  static inline struct pci_dev *pci_dev_get(struct pci_dev *dev) { return NULL; }
->
-> @@ -1597,7 +1615,6 @@ int pcibios_set_pcie_reset_state(struct pci_dev *dev,
->                                  enum pcie_reset_state state);
->  int pcibios_add_device(struct pci_dev *dev);
->  void pcibios_release_device(struct pci_dev *dev);
-> -void pcibios_penalize_isa_irq(int irq, int active);
->
->  #ifdef CONFIG_HIBERNATE_CALLBACKS
->  extern struct dev_pm_ops pcibios_pm_ops;
-> --
-> 1.7.9.5
->
+diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
+index 82f498b..026f61d 100644
+--- a/arch/arm/boot/dts/Makefile
++++ b/arch/arm/boot/dts/Makefile
+@@ -341,6 +341,11 @@ dtb-$(CONFIG_ARCH_QCOM) += \
+ 	qcom-apq8084-mtp.dtb \
+ 	qcom-msm8660-surf.dtb \
+ 	qcom-msm8960-cdp.dtb
++dtb-$(CONFIG_ARCH_ROCKCHIP) += \
++	rk3066a-bqcurie2.dtb \
++	rk3188-radxarock.dtb \
++	rk3288-evb-act8846.dtb \
++	rk3288-evb-rk808.dtb
+ dtb-$(CONFIG_ARCH_S3C24XX) += s3c2416-smdk2416.dtb
+ dtb-$(CONFIG_ARCH_S3C64XX) += s3c6410-mini6410.dtb \
+ 	s3c6410-smdk6410.dtb
+-- 
+2.0.0.526.g5318336
