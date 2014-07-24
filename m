@@ -1,32 +1,149 @@
-From: skannan@codeaurora.org (skannan at codeaurora.org)
-Date: Thu, 24 Jul 2014 09:12:13 -0000
-Subject: [PATCH] cpufreq: Don't destroy/realloc policy/sysfs on
- hotplug/suspend
-In-Reply-To: <CAKohpokynnTttD7Wbq8uBB4SXK9xFEBdRJ2ozhMQscyvq69xRw@mail.gmail.com>
-References: <1404959850-11617-1-git-send-email-skannan@codeaurora.org>
- <16164926.ZsJxe6UV3e@vostro.rjw.lan> <53D07737.70904@codeaurora.org>
- <CAKohpokynnTttD7Wbq8uBB4SXK9xFEBdRJ2ozhMQscyvq69xRw@mail.gmail.com>
-Message-ID: <ca2398ca40725bf3b1b258ab3707970e.squirrel@www.codeaurora.org>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Thu, 24 Jul 2014 10:13:22 +0100
+Subject: Kexec on arm64
+In-Reply-To: <CAFdej03nixSU=3h+HYk2E3Onb2P3--Di0GM+wCwLS6ZNH7UjEQ@mail.gmail.com>
+References: <CAFdej006OSyhgDcJ2iZdbjt+PtysN=i_+9Dr4GTmr=+t5yg4Kw@mail.gmail.com>
+ <1405443898.22585.7.camel@smoke>
+ <CAL85gmC9LLcN_uxMY1bM5kLx=N7rZGdGO3bmGHeUVo=Rqgk8uw@mail.gmail.com>
+ <1405551861.7262.26.camel@smoke>
+ <CAFdej03nixSU=3h+HYk2E3Onb2P3--Di0GM+wCwLS6ZNH7UjEQ@mail.gmail.com>
+Message-ID: <20140724091322.GB4079@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+[...]
 
-Viresh Kumar wrote:
-> On 24 July 2014 08:32, Saravana Kannan <skannan@codeaurora.org> wrote:
->> Ok, I think I've figured this out. But one question. Is it possible to
->> physically remove one CPU in a bunch of "related cpus" without also
->> unplugging the rest? Put another way, can you unplug one core from a
->> cluster?
->
-> Are we talking about doing this here:
->
-> echo 0 > /sys/devices/system/cpu/cpuX/online      ??
->
-> If yes, then what's the confusion all about? Yes we do it all the time.
->
+> 2) Rebooting
+> #########################
+> # kexec -e
+> kexec version: 1kvm: exiting hardware virtualization
+> 4.07.17.12.17-gbStarting new kernel
+> 6cccb4
+>  Ump_spin_tanblaeb_lcpeu_d ite:127: oi dh:a n7d,l holding count: 0e
+>  kernel NULL pointer dereference at virtual address 00000291
+> smp_spin_Itnaibtlei_cpaul_diie:12z7:i nigd :c 3g,r oholding couunpt :s 0u
 
-No. That's why I said physically remove.
+Hmm. This looks like two threads/CPUs are outputting characters at the
+same time, something like "smp_spin_table_die" and "Initial cpu" seem to
+be interspersed.
 
--- 
-The Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-hosted by The Linux Foundation
+Mark.
+
+> bsys cpu
+> smpL_isnpuixn _table_cpu_diev:e1r2s7i:o ni d: 6, hol3d.i1n6g. 0c-orucnt: 0
+> 4+ (arun at arun-OptiPlex-9010) (gcc version 4.9.1 20140505 (prerelease)
+> (crosstool-NG linaro-1.13.1-4.9-2014.05 - Linaro GCC 4.9-2014.05) )
+> #25 SMP smp_sPpin_tablReE_EcMpPuT_ dTie:127: iude:  J5u, hlo ld2ing
+> coun2:
+> 37:03 IST 2014
+> smp_Cspin_tPabUl:e _AcApruc_die:127: id: h46,4  hPorldiong count:c e0s
+>  or [500f0000] revision 0
+> smp_speifni_:t aGbeltet_cpu_die:i1n2g7 : ipd:a 2, holdinrga mceount:t e0
+> rs from FDT:
+> smep_fsip:i nC_atable_cpu_dien:'1t27: i df: 1i, holdinngd  cSoyusntt:e 0
+> m Table in device tree!
+> macchimne_kexaec:: 572C: smp_pMrAo:c efsasiorl_ied = 0
+> d to reserve 16 MiB
+> dachine_kexecO:n5 7n4o:
+>  e 0 totalpages: 4194304
+> a k e xec image inNfoor:m
+>  l zone: 57344 pages used for memmap
+>     type:        0
+> z   sta r tN:o     r  m4a0000800l04
+>  one: 4194304 pages, LIFO batch:31
+>     head:   P E R   43Cea9bPf002
+> U: Embedded 11 pages/cpu @ffffffc3fff7d000 s13120 r8192 d23744 u45056
+>     nrp_cspeug-maelnltosc: 2
+> : s13120 r8192 d23744 u45056 alloc=11*4096
+>    p c p usegment-[a0l]l:o c0:0 0[0000400]00 800 000[ -0 ]0000004000
+> 881c 0[000],  280c000h bytes,  [200]6 0 3pages
+>  [0] 4 [0] 5 [0] 6 [0] 7
+> eexBeuc_is_dtb:1i1l5:t  m1a gizc: 0 : 0 : noon
+>  lists in Zone order, mobility grouping on.  Total pages: 4136960
+> /  K e r segment[1]: n0e0l0 00c0o400m08a0000 m-a n0d00
+> 00040l008ai30n00e,:  3r000ho obty=tes, 3/ dpeagesv
+>  nfs rw nfsroot=10.162.103.228:/nfs_root/dora_june_6/apm-image-minimal-mustangbe
+> ip=10.162.103.21:10.162.103.228:10.162.103.1:255.255.255.0:mustangk:eextehc_0is:_odtb:1f15f:
+>  pmaangic:i 0c =: 0 : 1no
+> console=ttyS0,115200 earlyprintk=uart8250-32bit,0x1c020000 debug
+> maxcpus=8 swiotlb=65536 log_buf_len=1M
+> 8aclhinoeg_kex_ec:582: cobnturfo_ll_ecode_page:        nf:f f1ff0fbc4edb67ee8
+>  576
+> 6achinee_akrelxyec: 58l4: reobogo tb_ucfo dfe_buffer_physr:e e :0
+> 000010435eaffb00007
+>  (92%)
+> macPhine_IkDexec:58 6h:a srehb otot_acode_bufferb:l e   e n t
+> rfifffffce3se:a f4f0b000
+> 96 (order: 3, 32768 bytes)
+> macDhine_kexeecn:t5r88: ryel occate_neaw_ckheer nelh:a s     fffffhf
+> c0t0a0093b18
+> ble entries: 2097152 (order: 12, 16777216 bytes)
+> machineI_kneoxedc:5e90-: relocate_cnaecwh_ek ehransel_size: b8hh( 1t84)a bytes
+> ble entries: 1048576 (order: 11, 8388608 bytes)
+> machinMe_keemxoercy::5 913: kexec6_5d0t8b_6addr2:4 K
+> 0/0100004600708a0000
+> 77216K available (4360K kernel code, 299K rwdata, 1528K rodata, 6556K
+> init, 202K bss, 268592K reserved)
+> oacVhinei_kretxueacl: 595: kexec_kkeirmnaegle _mhead:     e m o r0y0
+> 00l0043eaa9bf002y
+>  ut:
+>     vmalloc : 0xffffff8000000000 - 0xffffffbbffff0000   (245759 MB)
+>     vmemmap : 0xffffffbce0000000 - 0xffffffbcee000000   (   224 MB)
+> 0  machine_ kmeoxdecu:l597:e kexecs_ k:i m0age_xsftarft:    f  f
+> f0f0b0f0f0c04000080004
+>  00000 - 0xffffffc000000000   (    64 MB)
+>     memory  : 0xffffffc000000000 - 0xffffffc400000000   ( 16384 MB)
+>       .init : 0xffffffc000642000 -machine_ke x0excf:f5f99:f
+> kexec_efntfrcy0_0d0ump:
+> ca9340   (  6557 kB)
+>       .text : 0xffffffc000080000 - 0xffffffc0006411c4   (  5893 kB)
+> f     .data : 0xffffffc000caa000 - 0xffffffc000cf4f28     (I
+> 43ea9bf002 =  343ea9b0f000 (f0fffffc 3ekaB9)b
+>  000)
+> d D 40S0LU00B8:0 0H0W1 = a4000080000l i(gfnf=f6f4ffc,00008000 0O)r
+> ######################
+> 
+> This doesn't seems to be working. Random behaviors are observed. Some
+> times it rebooted to u-boot
+> prompt. Sometimes kernel soft resets itself in an endless loop
+> (bootlog is repeating over and over again)
+> 
+> To debug what is happening I put a while(1) just before jumping into
+> kexec reboot code.
+> 
+> diff --git a/arch/arm64/kernel/process.c b/arch/arm64/kernel/process.c
+> index 31cba91..8843623 100644
+> --- a/arch/arm64/kernel/process.c
+> +++ b/arch/arm64/kernel/process.c
+> @@ -85,6 +85,7 @@ void soft_restart(unsigned long addr)
+> 
+>         smp_secondary_shutdown();
+> 
+> +       while(1);
+>         /* Switch to the identity mapping */
+>         phys_reset = (phys_reset_t)virt_to_phys(cpu_reset);
+>         phys_reset(addr);
+> 
+> I break into target with BDI3000 now; and see the below output
+> 
+> TARGET#0>state
+> Core#0: halted 0xffffffc000085240 External Debug Request
+> Core#1: halted 0x0000004000080394 External Debug Request
+> Core#2: halted 0x0000004000080394 External Debug Request
+> Core#3: halted 0x0000004000080394 External Debug Request
+> Core#4: halted 0xffffffc0000802f8 External Debug Request
+> Core#5: halted 0x0000004000080394 External Debug Request
+> Core#6: halted 0xffffffc0000802f8 External Debug Request
+> Core#7: halted 0x0000004000080394 External Debug Request
+> 
+> I think some of the secondary CPUs are not behaving as expected;
+> As of now I don't have any clues for this.
+> 
+> 
+> --Arun
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+> 
