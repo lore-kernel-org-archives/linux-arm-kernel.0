@@ -1,148 +1,261 @@
-From: msalter@redhat.com (Mark Salter)
-Date: Thu, 24 Jul 2014 10:56:15 -0400
-Subject: [PATCH] arm64: fix soft lockup due to large tlb flush range
-In-Reply-To: <20140724142417.GE13371@arm.com>
-References: <20140724142417.GE13371@arm.com>
-Message-ID: <1406213775-28617-1-git-send-email-msalter@redhat.com>
+From: rmk+kernel@arm.linux.org.uk (Russell King)
+Date: Thu, 24 Jul 2014 15:57:39 +0100
+Subject: [PATCH RFA 2/2] drm/i2c: tda998x: add component support
+Message-ID: <E1XAKSh-0004YX-7c@rmk-PC.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Under certain loads, this soft lockup has been observed:
+Add component helper support to the tda998x driver.  This permits the
+TDA998x to be declared as a separate device in device tree, and bound
+at the appropriate moment with a co-operating card driver.
 
-   BUG: soft lockup - CPU#2 stuck for 22s! [ip6tables:1016]
-   Modules linked in: ip6t_rpfilter ip6t_REJECT cfg80211 rfkill xt_conntrack ebtable_nat ebtable_broute bridge stp llc ebtable_filter ebtables ip6table_nat nf_conntrack_ipv6 nf_defrag_ipv6 nf_nat_ipv6 ip6table_mangle ip6table_security ip6table_raw ip6table_filter ip6_tables iptable_nat nf_conntrack_ipv4 nf_defrag_ipv4 nf_nat_ipv4 nf_nat nf_conntrack iptable_mangle iptable_security iptable_raw vfat fat efivarfs xfs libcrc32c
+The existing slave_encoder interfaces are kept while there are existing
+users of it in order to prevent regressions.
 
-   CPU: 2 PID: 1016 Comm: ip6tables Not tainted 3.13.0-0.rc7.30.sa2.aarch64 #1
-   task: fffffe03e81d1400 ti: fffffe03f01f8000 task.ti: fffffe03f01f8000
-   PC is at __cpu_flush_kern_tlb_range+0xc/0x40
-   LR is at __purge_vmap_area_lazy+0x28c/0x3ac
-   pc : [<fffffe000009c5cc>] lr : [<fffffe0000182710>] pstate: 80000145
-   sp : fffffe03f01fbb70
-   x29: fffffe03f01fbb70 x28: fffffe03f01f8000
-   x27: fffffe0000b19000 x26: 00000000000000d0
-   x25: 000000000000001c x24: fffffe03f01fbc50
-   x23: fffffe03f01fbc58 x22: fffffe03f01fbc10
-   x21: fffffe0000b2a3f8 x20: 0000000000000802
-   x19: fffffe0000b2a3c8 x18: 000003fffdf52710
-   x17: 000003ff9d8bb910 x16: fffffe000050fbfc
-   x15: 0000000000005735 x14: 000003ff9d7e1a5c
-   x13: 0000000000000000 x12: 000003ff9d7e1a5c
-   x11: 0000000000000007 x10: fffffe0000c09af0
-   x9 : fffffe0000ad1000 x8 : 000000000000005c
-   x7 : fffffe03e8624000 x6 : 0000000000000000
-   x5 : 0000000000000000 x4 : 0000000000000000
-   x3 : fffffe0000c09cc8 x2 : 0000000000000000
-   x1 : 000fffffdfffca80 x0 : 000fffffcd742150
-
-The __cpu_flush_kern_tlb_range() function looks like:
-
-  ENTRY(__cpu_flush_kern_tlb_range)
-	dsb	sy
-	lsr	x0, x0, #12
-	lsr	x1, x1, #12
-  1:	tlbi	vaae1is, x0
-	add	x0, x0, #1
-	cmp	x0, x1
-	b.lo	1b
-	dsb	sy
-	isb
-	ret
-  ENDPROC(__cpu_flush_kern_tlb_range)
-
-The above soft lockup shows the PC at tlbi insn with:
-
-  x0 = 0x000fffffcd742150
-  x1 = 0x000fffffdfffca80
-
-So __cpu_flush_kern_tlb_range has 0x128ba930 tlbi flushes left
-after it has already been looping for 23 seconds!.
-
-Looking up one frame at __purge_vmap_area_lazy(), there is:
-
-	...
-	list_for_each_entry_rcu(va, &vmap_area_list, list) {
-		if (va->flags & VM_LAZY_FREE) {
-			if (va->va_start < *start)
-				*start = va->va_start;
-			if (va->va_end > *end)
-				*end = va->va_end;
-			nr += (va->va_end - va->va_start) >> PAGE_SHIFT;
-			list_add_tail(&va->purge_list, &valist);
-			va->flags |= VM_LAZY_FREEING;
-			va->flags &= ~VM_LAZY_FREE;
-		}
-	}
-	...
-	if (nr || force_flush)
-		flush_tlb_kernel_range(*start, *end);
-
-So if two areas are being freed, the range passed to
-flush_tlb_kernel_range() may be as large as the vmalloc
-space. For arm64, this is ~240GB for 4k pagesize and ~2TB
-for 64kpage size.
-
-This patch works around this problem by adding a loop limit.
-If the range is larger than the limit, use flush_tlb_all()
-rather than flushing based on individual pages. The limit
-chosen is arbitrary and would be better if based on the
-actual size of the tlb. I looked through the ARM ARM but
-didn't see any easy way to get the actual tlb size, so for
-now the arbitrary limit is better than the soft lockup.
-
-Signed-off-by: Mark Salter <msalter@redhat.com>
+Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
 ---
- arch/arm64/include/asm/tlbflush.h | 25 ++++++++++++++++++++++---
- 1 file changed, 22 insertions(+), 3 deletions(-)
+RFA = request for acks, but tested-by's are also welcome, particularly
+for tilcdc hardware.
 
-diff --git a/arch/arm64/include/asm/tlbflush.h b/arch/arm64/include/asm/tlbflush.h
-index b9349c4..af3e572 100644
---- a/arch/arm64/include/asm/tlbflush.h
-+++ b/arch/arm64/include/asm/tlbflush.h
-@@ -98,8 +98,8 @@ static inline void flush_tlb_page(struct vm_area_struct *vma,
- 	dsb(ish);
- }
- 
--static inline void flush_tlb_range(struct vm_area_struct *vma,
--					unsigned long start, unsigned long end)
-+static inline void __flush_tlb_range(struct vm_area_struct *vma,
-+				     unsigned long start, unsigned long end)
- {
- 	unsigned long asid = (unsigned long)ASID(vma->vm_mm) << 48;
- 	unsigned long addr;
-@@ -112,7 +112,9 @@ static inline void flush_tlb_range(struct vm_area_struct *vma,
- 	dsb(ish);
- }
- 
--static inline void flush_tlb_kernel_range(unsigned long start, unsigned long end)
-+#define MAX_TLB_LOOP 1024
-+
-+static inline void __flush_tlb_kernel_range(unsigned long start, unsigned long end)
- {
- 	unsigned long addr;
- 	start >>= 12;
-@@ -124,6 +126,23 @@ static inline void flush_tlb_kernel_range(unsigned long start, unsigned long end
- 	dsb(ish);
- }
- 
-+static inline void flush_tlb_range(struct vm_area_struct *vma,
-+				   unsigned long start, unsigned long end)
-+{
-+	if (((end - start) >> PAGE_SHIFT) < MAX_TLB_LOOP)
-+		__flush_tlb_range(vma, start, end);
-+	else
-+		flush_tlb_mm(vma->vm_mm);
-+}
-+
-+static inline void flush_tlb_kernel_range(unsigned long start, unsigned long end)
-+{
-+	if (((end - start) >> PAGE_SHIFT) < MAX_TLB_LOOP)
-+		__flush_tlb_kernel_range(start, end);
-+	else
-+		flush_tlb_all();
-+}
-+
- /*
-  * On AArch64, the cache coherency is handled via the set_pte_at() function.
+ drivers/gpu/drm/i2c/tda998x_drv.c | 212 +++++++++++++++++++++++++++++++++++---
+ 1 file changed, 198 insertions(+), 14 deletions(-)
+
+diff --git a/drivers/gpu/drm/i2c/tda998x_drv.c b/drivers/gpu/drm/i2c/tda998x_drv.c
+index 64e120c5299a..3b07ff7e6348 100644
+--- a/drivers/gpu/drm/i2c/tda998x_drv.c
++++ b/drivers/gpu/drm/i2c/tda998x_drv.c
+@@ -15,8 +15,7 @@
+  * this program.  If not, see <http://www.gnu.org/licenses/>.
   */
+ 
+-
+-
++#include <linux/component.h>
+ #include <linux/hdmi.h>
+ #include <linux/module.h>
+ #include <linux/irq.h>
+@@ -1252,18 +1251,6 @@ static struct drm_encoder_slave_funcs tda998x_encoder_slave_funcs = {
+ 
+ /* I2C driver functions */
+ 
+-static int
+-tda998x_probe(struct i2c_client *client, const struct i2c_device_id *id)
+-{
+-	return 0;
+-}
+-
+-static int
+-tda998x_remove(struct i2c_client *client)
+-{
+-	return 0;
+-}
+-
+ static int tda998x_create(struct i2c_client *client, struct tda998x_priv *priv)
+ {
+ 	struct device_node *np = client->dev.of_node;
+@@ -1412,6 +1399,203 @@ static int tda998x_encoder_init(struct i2c_client *client,
+ 	return 0;
+ }
+ 
++struct tda998x_priv2 {
++	struct tda998x_priv base;
++	struct drm_encoder encoder;
++	struct drm_connector connector;
++};
++
++#define conn_to_tda998x_priv2(x) \
++	container_of(x, struct tda998x_priv2, connector);
++
++#define enc_to_tda998x_priv2(x) \
++	container_of(x, struct tda998x_priv2, encoder);
++
++static void tda998x_encoder2_dpms(struct drm_encoder *encoder, int mode)
++{
++	struct tda998x_priv2 *priv = enc_to_tda998x_priv2(encoder);
++
++	tda998x_encoder_dpms(&priv->base, mode);
++}
++
++static void tda998x_encoder_prepare(struct drm_encoder *encoder)
++{
++	tda998x_encoder2_dpms(encoder, DRM_MODE_DPMS_OFF);
++}
++
++static void tda998x_encoder_commit(struct drm_encoder *encoder)
++{
++	tda998x_encoder2_dpms(encoder, DRM_MODE_DPMS_ON);
++}
++
++static void tda998x_encoder2_mode_set(struct drm_encoder *encoder,
++				      struct drm_display_mode *mode,
++				      struct drm_display_mode *adjusted_mode)
++{
++	struct tda998x_priv2 *priv = enc_to_tda998x_priv2(encoder);
++
++	tda998x_encoder_mode_set(&priv->base, mode, adjusted_mode);
++}
++
++static const struct drm_encoder_helper_funcs tda998x_encoder_helper_funcs = {
++	.dpms = tda998x_encoder2_dpms,
++	.save = tda998x_encoder_save,
++	.restore = tda998x_encoder_restore,
++	.mode_fixup = tda998x_encoder_mode_fixup,
++	.prepare = tda998x_encoder_prepare,
++	.commit = tda998x_encoder_commit,
++	.mode_set = tda998x_encoder2_mode_set,
++};
++
++static void tda998x_encoder_destroy(struct drm_encoder *encoder)
++{
++	struct tda998x_priv2 *priv = enc_to_tda998x_priv2(encoder);
++
++	tda998x_destroy(&priv->base);
++	drm_encoder_cleanup(encoder);
++}
++
++static const struct drm_encoder_funcs tda998x_encoder_funcs = {
++	.destroy = tda998x_encoder_destroy,
++};
++
++static int tda998x_connector_get_modes(struct drm_connector *connector)
++{
++	struct tda998x_priv2 *priv = conn_to_tda998x_priv2(connector);
++
++	return tda998x_encoder_get_modes(&priv->base, connector);
++}
++
++static int tda998x_connector_mode_valid(struct drm_connector *connector,
++					struct drm_display_mode *mode)
++{
++	struct tda998x_priv2 *priv = conn_to_tda998x_priv2(connector);
++
++	return tda998x_encoder_mode_valid(&priv->base, mode);
++}
++
++static struct drm_encoder *
++tda998x_connector_best_encoder(struct drm_connector *connector)
++{
++	struct tda998x_priv2 *priv = conn_to_tda998x_priv2(connector);
++
++	return &priv->encoder;
++}
++
++static
++const struct drm_connector_helper_funcs tda998x_connector_helper_funcs = {
++	.get_modes = tda998x_connector_get_modes,
++	.mode_valid = tda998x_connector_mode_valid,
++	.best_encoder = tda998x_connector_best_encoder,
++};
++
++static enum drm_connector_status
++tda998x_connector_detect(struct drm_connector *connector, bool force)
++{
++	struct tda998x_priv2 *priv = conn_to_tda998x_priv2(connector);
++
++	return tda998x_encoder_detect(&priv->base);
++}
++
++static void tda998x_connector_destroy(struct drm_connector *connector)
++{
++	drm_sysfs_connector_remove(connector);
++	drm_connector_cleanup(connector);
++}
++
++static const struct drm_connector_funcs tda998x_connector_funcs = {
++	.dpms = drm_helper_connector_dpms,
++	.fill_modes = drm_helper_probe_single_connector_modes,
++	.detect = tda998x_connector_detect,
++	.destroy = tda998x_connector_destroy,
++};
++
++static int tda998x_bind(struct device *dev, struct device *master, void *data)
++{
++	struct tda998x_encoder_params *params = dev->platform_data;
++	struct i2c_client *client = to_i2c_client(dev);
++	struct drm_device *drm = data;
++	struct tda998x_priv2 *priv;
++	int ret;
++
++	priv = devm_kzalloc(dev, sizeof(*priv), GFP_KERNEL);
++	if (!priv)
++		return -ENOMEM;
++
++	dev_set_drvdata(dev, priv);
++
++	priv->base.encoder = &priv->encoder;
++	priv->connector.interlace_allowed = 1;
++	priv->encoder.possible_crtcs = 1 << 0;
++
++	ret = tda998x_create(client, &priv->base);
++	if (ret)
++		return ret;
++
++	if (!dev->of_node && params)
++		tda998x_encoder_set_config(&priv->base, params);
++
++	tda998x_encoder_set_polling(&priv->base, &priv->connector);
++
++	drm_encoder_helper_add(&priv->encoder, &tda998x_encoder_helper_funcs);
++	ret = drm_encoder_init(drm, &priv->encoder, &tda998x_encoder_funcs,
++			       DRM_MODE_ENCODER_TMDS);
++	if (ret)
++		goto err_encoder;
++
++	drm_connector_helper_add(&priv->connector,
++				 &tda998x_connector_helper_funcs);
++	ret = drm_connector_init(drm, &priv->connector,
++				 &tda998x_connector_funcs,
++				 DRM_MODE_CONNECTOR_HDMIA);
++	if (ret)
++		goto err_connector;
++
++	ret = drm_sysfs_connector_add(&priv->connector);
++	if (ret)
++		goto err_sysfs;
++
++	priv->connector.encoder = &priv->encoder;
++	drm_mode_connector_attach_encoder(&priv->connector, &priv->encoder);
++
++	return 0;
++
++err_sysfs:
++	drm_connector_cleanup(&priv->connector);
++err_connector:
++	drm_encoder_cleanup(&priv->encoder);
++err_encoder:
++	tda998x_destroy(&priv->base);
++	return ret;
++}
++
++static void tda998x_unbind(struct device *dev, struct device *master,
++			   void *data)
++{
++	struct tda998x_priv2 *priv = dev_get_drvdata(dev);
++
++	drm_connector_cleanup(&priv->connector);
++	drm_encoder_cleanup(&priv->encoder);
++	tda998x_destroy(&priv->base);
++}
++
++static const struct component_ops tda998x_ops = {
++	.bind = tda998x_bind,
++	.unbind = tda998x_unbind,
++};
++
++static int
++tda998x_probe(struct i2c_client *client, const struct i2c_device_id *id)
++{
++	return component_add(&client->dev, &tda998x_ops);
++}
++
++static int tda998x_remove(struct i2c_client *client)
++{
++	component_del(&client->dev, &tda998x_ops);
++	return 0;
++}
++
+ #ifdef CONFIG_OF
+ static const struct of_device_id tda998x_dt_ids[] = {
+ 	{ .compatible = "nxp,tda998x", },
 -- 
-1.9.0
+1.8.3.1
