@@ -1,86 +1,307 @@
-From: shawn.guo@freescale.com (Shawn Guo)
-Date: Thu, 24 Jul 2014 17:17:54 +0800
-Subject: [PATCH] imx-drm: imx-drm-core: add suspend/resume support
-Message-ID: <1406193474-13695-1-git-send-email-shawn.guo@freescale.com>
+From: caesar.wang@rock-chips.com (caesar)
+Date: Thu, 24 Jul 2014 17:29:54 +0800
+Subject: [PATCH v3 2/2] pwm: rockchip: Added to support for RK3288 SoC
+In-Reply-To: <1949437.1N5XrQ9a4Y@diego>
+References: <1406097521-6457-1-git-send-email-caesar.wang@rock-chips.com>
+ <1648580.P46ct6rREY@diego> <53D06BE3.7010509@rock-chips.com>
+ <1949437.1N5XrQ9a4Y@diego>
+Message-ID: <53D0D212.40400@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-HDMI currently stops working after a system suspend/resume cycle.  It
-turns out that the cause is the imx-hdmi encoder .dpms hook doesn't get
-called from anywhere across suspend/resume cycle.
+Hi Heiko,
 
-The patch follows what exynos drm driver does to walk the list of
-connectors and call their .dpms function from suspend/resume hook.  And
-the connectors' .dpms function will in turn filter down to the .dpms
-hooks of encoders and CRTCs.
-
-With this change, HDMI can continue working after a suspend/resume
-cycle.
-
-Signed-off-by: Shawn Guo <shawn.guo@freescale.com>
----
-Tested with HDMI and LVDS.  It'd be great if someone can help test TVE
-to ensure the patch doesn't break anything.
-
- drivers/staging/imx-drm/imx-drm-core.c | 39 ++++++++++++++++++++++++++++++++++
- 1 file changed, 39 insertions(+)
-
-diff --git a/drivers/staging/imx-drm/imx-drm-core.c b/drivers/staging/imx-drm/imx-drm-core.c
-index def8280d7ee6..b0ea1f0ed32f 100644
---- a/drivers/staging/imx-drm/imx-drm-core.c
-+++ b/drivers/staging/imx-drm/imx-drm-core.c
-@@ -696,6 +696,44 @@ static int imx_drm_platform_remove(struct platform_device *pdev)
- 	return 0;
- }
- 
-+#if CONFIG_PM_SLEEP
-+static int imx_drm_suspend(struct device *dev)
-+{
-+	struct drm_device *drm_dev = dev_get_drvdata(dev);
-+	struct drm_connector *connector;
-+
-+	drm_kms_helper_poll_disable(drm_dev);
-+
-+	drm_modeset_lock_all(drm_dev);
-+	list_for_each_entry(connector, &drm_dev->mode_config.connector_list, head) {
-+		if (connector->funcs->dpms)
-+			connector->funcs->dpms(connector, DRM_MODE_DPMS_OFF);
-+	}
-+	drm_modeset_unlock_all(drm_dev);
-+
-+	return 0;
-+}
-+
-+static int imx_drm_resume(struct device *dev)
-+{
-+	struct drm_device *drm_dev = dev_get_drvdata(dev);
-+	struct drm_connector *connector;
-+
-+	drm_modeset_lock_all(drm_dev);
-+	list_for_each_entry(connector, &drm_dev->mode_config.connector_list, head) {
-+		if (connector->funcs->dpms)
-+			connector->funcs->dpms(connector, DRM_MODE_DPMS_ON);
-+	}
-+	drm_modeset_unlock_all(drm_dev);
-+
-+	drm_kms_helper_poll_enable(drm_dev);
-+
-+	return 0;
-+}
-+#endif
-+
-+static SIMPLE_DEV_PM_OPS(imx_drm_pm_ops, imx_drm_suspend, imx_drm_resume);
-+
- static const struct of_device_id imx_drm_dt_ids[] = {
- 	{ .compatible = "fsl,imx-display-subsystem", },
- 	{ /* sentinel */ },
-@@ -708,6 +746,7 @@ static struct platform_driver imx_drm_pdrv = {
- 	.driver		= {
- 		.owner	= THIS_MODULE,
- 		.name	= "imx-drm",
-+		.pm	= &imx_drm_pm_ops,
- 		.of_match_table = imx_drm_dt_ids,
- 	},
- };
--- 
-1.9.1
+? 2014?07?24? 16:05, Heiko St?bner ??:
+> Hi caesar.
+>
+> Am Donnerstag, 24. Juli 2014, 10:13:55 schrieb caesar:
+>>>> +static void rockchip_pwm_set_enable_v1(struct pwm_chip *chip, bool
+>>>> enable)
+>>>> +{
+>>>> +	struct rockchip_pwm_chip *pc = to_rockchip_pwm_chip(chip);
+>>>> +	u32 val = 0;
+>>>> +	u32 enable_conf = PWM_CTRL_OUTPUT_EN | PWM_CTRL_TIMER_EN;
+>>>> +
+>>>> +	val = readl_relaxed(pc->base + pc->data->regs.ctrl);
+>>>> +
+>>>> +	if (enable)
+>>>> +		val |= enable_conf;
+>>>> +	else
+>>>> +		val &= ~enable_conf;
+>>>> +
+>>>> +	writel_relaxed(val, pc->base + pc->data->regs.ctrl);
+>>>> +}
+>>>> +
+>>>> +static void rockchip_pwm_set_enable_v2(struct pwm_chip *chip, bool
+>>>> enable)
+>>>> +{
+>>>> +	struct rockchip_pwm_chip *pc = to_rockchip_pwm_chip(chip);
+>>>> +	u32 val = 0;
+>>>> +	u32 enable_conf = PWM_OUTPUT_LEFT | PWM_LP_DISABLE | PWM_ENABLE |
+>>>> +		PWM_CONTINUOUS | PWM_DUTY_POSITIVE | PWM_INACTIVE_NEGATIVE;
+>>>> +
+>>>> +	val = readl_relaxed(pc->base + pc->data->regs.ctrl);
+>>>> +
+>>>> +	if (enable)
+>>>> +		val |= enable_conf;
+>>>> +	else
+>>>> +		val &= ~enable_conf;
+>>>> +
+>>>> +	writel_relaxed(val, pc->base + pc->data->regs.ctrl);
+>>>> +}
+>>>> +
+>>>> +static void rockchip_pwm_set_enable_vop(struct pwm_chip *chip, bool
+>>>> enable) +{
+>>>> +	struct rockchip_pwm_chip *pc = to_rockchip_pwm_chip(chip);
+>>>> +	u32 val = 0;
+>>>> +	u32 enable_conf = PWM_OUTPUT_LEFT | PWM_LP_DISABLE | PWM_ENABLE |
+>>>> +		PWM_CONTINUOUS | PWM_DUTY_POSITIVE | PWM_INACTIVE_NEGATIVE;
+>>>> +
+>>>> +	val = readl_relaxed(pc->base + pc->data->regs.ctrl);
+>>>> +
+>>>> +	if (enable)
+>>>> +		val |= enable_conf;
+>>>> +	else
+>>>> +		val &= ~enable_conf;
+>>>> +
+>>>> +	writel_relaxed(val, pc->base + pc->data->regs.ctrl);
+>>>> +}
+>>> not sure if I'm just blind ... do rockchip_pwm_set_enable_v2 and
+>>> rockchip_pwm_set_enable_vop differ at all?
+>>>
+>>> If they don't differ, I guess pwm_data_vop should just use
+>>> rockchip_pwm_set_enable_v2 instead of duplicating it.
+>>>
+>> Yes, the rockchip_pwm_set_enable_v1 & v2 & vop is similar.
+>>
+>> So my v2 patch use "u32 enable_conf" instead of it .
+>> +struct rockchip_pwm_data {
+>>
+>>   > + .........
+>>   > + u32 enable_conf;
+>>   > +};
+>>
+>> The thierry has suggested it [1] in my v2 patch:
+>>
+>> For this I think it would be more readable to provide function pointers
+>> rather than a variable. That is:
+>>
+>> 	struct rockchip_pwm_data {
+>> 		...
+>> 		int (*enable)(struct pwm_chip *chip, struct pwm_device *pwm);
+>> 		int (*disable)(struct pwm_chip *chip, struct pwm_device *pwm);
+>> 	};
+>> Then you can implement these for each variant of the chip and call them
+>> from the common rockchip_pwm_enable(), somewhat like this.
+>>
+>>
+>> Perhaps,thierry's suggestion I got it wrong.
+> Using the function pointers like Thierry suggested looks nice, so no I don't
+> think you got it wrong :-)
+>
+> What I meant was to simply reuse the existing function
+> rockchip_pwm_set_enable_v2 when there is _no_ difference at all to
+> rockchip_pwm_set_enable_vop, like
+>
+> static const struct rockchip_pwm_data pwm_data_v2 = {
+> 	.regs.duty = PWM_LRC,
+> 	.regs.period = PWM_HRC,
+> 	.regs.cntr = PWM_CNTR,
+> 	.regs.ctrl = PWM_CTRL,
+> 	.prescaler = PRESCALER-1,
+> 	.set_enable = rockchip_pwm_set_enable_v2,
+> };
+>
+> static const struct rockchip_pwm_data pwm_data_vop = {
+> 	.regs.duty = PWM_LRC,
+> 	.regs.period = PWM_HRC,
+> 	.regs.cntr = PWM_CTRL,
+> 	.regs.ctrl = PWM_CNTR,
+> 	.prescaler = PRESCALER-1,
+> 	.set_enable = rockchip_pwm_set_enable_v2,
+> };
+>
+>
+> Heiko
+:-( ok, I will fix this and the other issuses in v4, thanks.
+>> Hi thierry& Heiko :-)
+>> Maybe,could you suggest solve it reasonable? thanks.
+>>
+>> [1]: https://lkml.org/lkml/2014/7/21/113
+>>
+>>>> +
+>>>>
+>>>>    static int rockchip_pwm_config(struct pwm_chip *chip, struct pwm_device
+>>>>
+>>>> *pwm, int duty_ns, int period_ns)
+>>>>
+>>>>    {
+>>>>
+>>>> @@ -52,20 +126,20 @@ static int rockchip_pwm_config(struct pwm_chip
+>>>> *chip,
+>>>> struct pwm_device *pwm, * default prescaler value for all practical clock
+>>>> rate values.
+>>>>
+>>>>    	 */
+>>>>    	
+>>>>    	div = clk_rate * period_ns;
+>>>>
+>>>> -	do_div(div, PRESCALER * NSEC_PER_SEC);
+>>>> +	do_div(div, pc->data->prescaler * NSEC_PER_SEC);
+>>>>
+>>>>    	period = div;
+>>>>    	
+>>>>    	div = clk_rate * duty_ns;
+>>>>
+>>>> -	do_div(div, PRESCALER * NSEC_PER_SEC);
+>>>> +	do_div(div, pc->data->prescaler * NSEC_PER_SEC);
+>>>>
+>>>>    	duty = div;
+>>>>    	
+>>>>    	ret = clk_enable(pc->clk);
+>>>>    	if (ret)
+>>>>    	
+>>>>    		return ret;
+>>>>
+>>>> -	writel(period, pc->base + PWM_LRC);
+>>>> -	writel(duty, pc->base + PWM_HRC);
+>>>> -	writel(0, pc->base + PWM_CNTR);
+>>>> +	writel(period, pc->base + pc->data->regs.period);
+>>>> +	writel(duty, pc->base + pc->data->regs.duty);
+>>>> +	writel(0, pc->base + pc->data->regs.cntr);
+>>>>
+>>>>    	clk_disable(pc->clk);
+>>>>
+>>>> @@ -76,15 +150,12 @@ static int rockchip_pwm_enable(struct pwm_chip
+>>>> *chip,
+>>>> struct pwm_device *pwm) {
+>>>>
+>>>>    	struct rockchip_pwm_chip *pc = to_rockchip_pwm_chip(chip);
+>>>>    	int ret;
+>>>>
+>>>> -	u32 val;
+>>>>
+>>>>    	ret = clk_enable(pc->clk);
+>>>>    	if (ret)
+>>>>    	
+>>>>    		return ret;
+>>>>
+>>>> -	val = readl_relaxed(pc->base + PWM_CTRL);
+>>>> -	val |= PWM_CTRL_OUTPUT_EN | PWM_CTRL_TIMER_EN;
+>>>> -	writel_relaxed(val, pc->base + PWM_CTRL);
+>>>> +	pc->data->set_enable(chip, true);
+>>>>
+>>>>    	return 0;
+>>>>    
+>>>>    }
+>>>>
+>>>> @@ -92,11 +163,8 @@ static int rockchip_pwm_enable(struct pwm_chip *chip,
+>>>> struct pwm_device *pwm) static void rockchip_pwm_disable(struct pwm_chip
+>>>> *chip, struct pwm_device *pwm) {
+>>>>
+>>>>    	struct rockchip_pwm_chip *pc = to_rockchip_pwm_chip(chip);
+>>>>
+>>>> -	u32 val;
+>>>>
+>>>> -	val = readl_relaxed(pc->base + PWM_CTRL);
+>>>> -	val &= ~(PWM_CTRL_OUTPUT_EN | PWM_CTRL_TIMER_EN);
+>>>> -	writel_relaxed(val, pc->base + PWM_CTRL);
+>>>> +	pc->data->set_enable(chip, false);
+>>>>
+>>>>    	clk_disable(pc->clk);
+>>>>    
+>>>>    }
+>>>>
+>>>> @@ -108,12 +176,52 @@ static const struct pwm_ops rockchip_pwm_ops = {
+>>>>
+>>>>    	.owner = THIS_MODULE,
+>>>>    
+>>>>    };
+>>>>
+>>>> +static const struct rockchip_pwm_data pwm_data_v1 = {
+>>>> +	.regs.duty = PWM_HRC,
+>>>> +	.regs.period = PWM_LRC,
+>>>> +	.regs.cntr = PWM_CNTR,
+>>>> +	.regs.ctrl = PWM_CTRL,
+>>>> +	.prescaler = PRESCALER,
+>>>> +	.set_enable = rockchip_pwm_set_enable_v1,
+>>>> +};
+>>>> +
+>>>> +static const struct rockchip_pwm_data pwm_data_v2 = {
+>>>> +	.regs.duty = PWM_LRC,
+>>>> +	.regs.period = PWM_HRC,
+>>>> +	.regs.cntr = PWM_CNTR,
+>>>> +	.regs.ctrl = PWM_CTRL,
+>>>> +	.prescaler = PRESCALER-1,
+>>>> +	.set_enable = rockchip_pwm_set_enable_v2,
+>>>> +};
+>>>> +
+>>>> +static const struct rockchip_pwm_data pwm_data_vop = {
+>>>> +	.regs.duty = PWM_LRC,
+>>>> +	.regs.period = PWM_HRC,
+>>>> +	.regs.cntr = PWM_CTRL,
+>>>> +	.regs.ctrl = PWM_CNTR,
+>>>> +	.prescaler = PRESCALER-1,
+>>>> +	.set_enable = rockchip_pwm_set_enable_vop,
+>>>> +};
+>>>> +
+>>>> +static const struct of_device_id rockchip_pwm_dt_ids[] = {
+>>>> +	{ .compatible = "rockchip,rk2928-pwm", .data = &pwm_data_v1},
+>>>> +	{ .compatible = "rockchip,rk3288-pwm", .data = &pwm_data_v2},
+>>>> +	{ .compatible = "rockchip,vop-pwm", .data = &pwm_data_vop},
+>>>> +	{ /* sentinel */ }
+>>>> +};
+>>>> +MODULE_DEVICE_TABLE(of, rockchip_pwm_dt_ids);
+>>>> +
+>>>>
+>>>>    static int rockchip_pwm_probe(struct platform_device *pdev)
+>>>>    {
+>>>>
+>>>> +	const struct of_device_id *id;
+>>>>
+>>>>    	struct rockchip_pwm_chip *pc;
+>>>>    	struct resource *r;
+>>>>    	int ret;
+>>>>
+>>>> +	id = of_match_device(rockchip_pwm_dt_ids, &pdev->dev);
+>>>> +	if (!id)
+>>>> +		return -EINVAL;
+>>>> +
+>>>>
+>>>>    	pc = devm_kzalloc(&pdev->dev, sizeof(*pc), GFP_KERNEL);
+>>>>    	if (!pc)
+>>>>    	
+>>>>    		return -ENOMEM;
+>>>>
+>>>> @@ -133,6 +241,7 @@ static int rockchip_pwm_probe(struct platform_device
+>>>> *pdev)
+>>>>
+>>>>    	platform_set_drvdata(pdev, pc);
+>>>>
+>>>> +	pc->data = id->data;
+>>>>
+>>>>    	pc->chip.dev = &pdev->dev;
+>>>>    	pc->chip.ops = &rockchip_pwm_ops;
+>>>>    	pc->chip.base = -1;
+>>>>
+>>>> @@ -156,12 +265,6 @@ static int rockchip_pwm_remove(struct
+>>>> platform_device
+>>>> *pdev) return pwmchip_remove(&pc->chip);
+>>>>
+>>>>    }
+>>>>
+>>>> -static const struct of_device_id rockchip_pwm_dt_ids[] = {
+>>>> -	{ .compatible = "rockchip,rk2928-pwm" },
+>>>> -	{ /* sentinel */ }
+>>>> -};
+>>>> -MODULE_DEVICE_TABLE(of, rockchip_pwm_dt_ids);
+>>>> -
+>>>>
+>>>>    static struct platform_driver rockchip_pwm_driver = {
+>>>>    
+>>>>    	.driver = {
+>>>>    	
+>>>>    		.name = "rockchip-pwm",
+>
+>
+>
