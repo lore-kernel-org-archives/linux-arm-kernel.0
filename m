@@ -1,38 +1,56 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Thu, 24 Jul 2014 14:48:57 +0200
-Subject: [PATCH 2/2] pinctrl: sunxi: number gpio ranges starting from 0
-In-Reply-To: <1405358677-23657-3-git-send-email-wens@csie.org>
-References: <1405358677-23657-1-git-send-email-wens@csie.org>
- <1405358677-23657-3-git-send-email-wens@csie.org>
-Message-ID: <20140724124857.GX20328@lukather>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Thu, 24 Jul 2014 14:53:49 +0200
+Subject: [PATCH] arm64/crypto: fix makefile rule for aes-glue-%.o
+In-Reply-To: <CAKv+Gu-6rUxUnF+dRuroDJqy2K2B5F0r7_bm0X-vyiuQ-83W5w@mail.gmail.com>
+References: <mvmvbri4k06.fsf@hawking.suse.de>
+ <CAKv+Gu-NAVjMR-Jkw=W-8f7M5FSsQOSdzYN6A0kHDd1m0WA8EA@mail.gmail.com>
+ <mvmr4264i1p.fsf@hawking.suse.de>
+ <CAKv+Gu8SbM_Z=ymBFb2D4EWJeo-6dWuKqE2YNOkqJTKLDEJcYA@mail.gmail.com>
+ <mvm4my7j5xh.fsf@hawking.suse.de>
+ <CAKv+Gu-6rUxUnF+dRuroDJqy2K2B5F0r7_bm0X-vyiuQ-83W5w@mail.gmail.com>
+Message-ID: <CAKv+Gu96k7GOVR85EXtro3Lt0jjiJqxyvT9cwJZ1qc6uzq97bw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jul 15, 2014 at 01:24:37AM +0800, Chen-Yu Tsai wrote:
-> The pinctrl-sunxi driver originally used the pin number as the gpio
-> range offset. This resulted in large, bogus gpio numbers for the
-> new sun6i-a31-r pinctrl devices.
-> 
-> This patch makes the driver number the gpios ranges starting from an
-> offset of 0, by subtracting the pin_base number from the pin number.
-> This also makes the system-wide gpio number match the pin number.
-> 
-> Tested on sun8i with sysfs exported gpios.
-> 
-> Signed-off-by: Chen-Yu Tsai <wens@csie.org>
+On 24 July 2014 14:35, Ard Biesheuvel <ard.biesheuvel@linaro.org> wrote:
+> On 24 July 2014 14:29, Andreas Schwab <schwab@suse.de> wrote:
+>> Ard Biesheuvel <ard.biesheuvel@linaro.org> writes:
+>>
+>>> On 30 June 2014 15:56, Andreas Schwab <schwab@suse.de> wrote:
+>>>> Ard Biesheuvel <ard.biesheuvel@linaro.org> writes:
+>>>>
+>>>>> Out of curiosity, how did you trigger this failure? I have build this
+>>>>> code numerous times (and so have others) and I have never seen this
+>>>>> failure.
+>>>>
+>>>> Did you ever start with a clean tree?
+>>>>
+>>>
+>>> Yep, building both in-tree and out-of-tree, no trouble at all.
+>>
+>> So you probably didn't configure them as modules.
+>>
+>
+> Yes, all the time, in fact. They have now been added as built-ins to
+> the defconfig, but I always build as modules, because it is far easier
+> when developing.
 
-Acked-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+Also, looking into this a bit more, in my case I do see
+arch/arm64/crypto/.aes-glue-ce.o.cmd containing the command line and
+the full set of include/config/... rules that are used to track
+dependencies on the configuration.
 
-Maxime
+So what strikes me as odd is this:
+
+>   CC [M]  arch/arm64/crypto/aes-glue-ce.o
+> ld: cannot find arch/arm64/crypto/aes-glue-ce.o: No such file or directory
+
+so it seems make is perfectly happy to create the aes-glue-ce.o file,
+but the subsequent ld that uses it as input cannot find it. Perhaps
+the dependencies are screwed up elsewehere?
+
+Are there any other circumstances of interest? How many threads are
+you building in parallel? Other steps to reproduce?
 
 -- 
-Maxime Ripard, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140724/3c18f510/attachment.sig>
+Ard.
