@@ -1,72 +1,24 @@
-From: peter.griffin@linaro.org (Peter Griffin)
-Date: Thu, 24 Jul 2014 13:22:54 +0100
-Subject: [PATCH v2 1/3] usb: host: st-hcd: Add USB HCD support for STi SoCs
-In-Reply-To: <11018717.Ey5qEJxGNJ@wuerfel>
-References: <1406199616-10533-1-git-send-email-peter.griffin@linaro.org>
- <1406199616-10533-2-git-send-email-peter.griffin@linaro.org>
- <11018717.Ey5qEJxGNJ@wuerfel>
-Message-ID: <20140724122254.GA15266@griffinp-ThinkPad-X1-Carbon-2nd>
+From: lars@metafoo.de (Lars-Peter Clausen)
+Date: Thu, 24 Jul 2014 14:29:09 +0200
+Subject: [alsa-devel] DMA engine API issue
+In-Reply-To: <28702317.aD0C1Ga3DS@avalon>
+References: <1406032431-3807-1-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
+ <87d2cwvmxa.wl%kuninori.morimoto.gx@gmail.com> <3361994.F0HgAeJkR9@avalon>
+ <28702317.aD0C1Ga3DS@avalon>
+Message-ID: <53D0FC15.6050601@metafoo.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Arnd,
+On 07/23/2014 01:07 PM, Laurent Pinchart wrote:
+[...]
+> Let's start by answering the background question and updating the DMA engine
+> API documentation once and for good : in which context are drivers allowed to
+> call the prep, tx_submit and issue_pending functions ?
+>
 
-Thanks for reviewing, see my comments below: -
+I think the expectation is that these functions can be called in any 
+context. Maybe what's missing is a way to tell the DMA engine driver to get 
+ready and that it is going to be used very soon. This could be done from the 
+sound devices open() callback.
 
-> Unfortunately, this seems to be done in a rather strange way,
-> I suspect you'll have to start over, but I'll let Alan and Greg
-> weigh in.
-> 
-> > +
-> > +struct st_hcd_dev {
-> > +	int port_nr;
-> > +	struct platform_device *ehci_device;
-> > +	struct platform_device *ohci_device;
-> > +	struct clk *ic_clk;
-> > +	struct clk *ohci_clk;
-> > +	struct reset_control *pwr;
-> > +	struct reset_control *rst;
-> > +	struct phy *phy;
-> > +};
-> 
-> The way you do this apparently is to create a device that encapsulates
-> the OHCI and the EHCI and then goes on to create child devices that
-> are bound to the real drivers.
-
-Yes, although this isn't the first driver to take that approach USB_HCD_BCMA
-(bcma-hcd.c) and USB_HCD_SSB (ssb-hcd.c) do much the same thing.
-
-> 
-> The way it should be done however is to put the two host controllers
-> into DT directly and describe their resources (phy, clock, reset, ...)
-> using the DT bindings for those.
-
-I'm of course happy to change it if required. I see looking through that a lot 
-of other platforms do it the way you describe with a
-
-ehci-<platname>.c and ohci-<platname>.c 
-> 
-> Depending on what kind of special requirements the ST version has,
-> this can be done either by using the generic ohci/ehci bindings
-> with extensions where necessary, or by creating a new binding and
-> new driver files that use 'ohci_init_driver'/'ehci_init_driver'
-> to inherit from the common code.
-> 
-> The first of the two approaches is preferred.
-
-We don't have anything particularly special, just a couple of reset lines,
-clock, phy, etc.
-> 
-> > +	pdev->dev.parent = &parent->dev;
-> > +	pdev->dev.dma_mask = &pdev->dev.coherent_dma_mask;
-> > +	pdev->dev.coherent_dma_mask = DMA_BIT_MASK(32);
-> 
-> This is something we shouldn't ever do these days, the DMA settings
-> should come directly from DT without driver interaction.
-
-Ok, I'll wait to hear the outcome of Greg/Alans views before either fixing
-it or starting over.
-
-regards,
-
-Peter.
+- Lars
