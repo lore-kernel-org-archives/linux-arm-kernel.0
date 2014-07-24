@@ -1,61 +1,81 @@
-From: mkl@pengutronix.de (Marc Kleine-Budde)
-Date: Thu, 24 Jul 2014 11:56:32 +0200
-Subject: [PATCH] imx-drm: imx-drm-core: add suspend/resume support
-In-Reply-To: <1406195275.4590.18.camel@weser.hi.pengutronix.de>
-References: <1406193474-13695-1-git-send-email-shawn.guo@freescale.com>
- <1406195275.4590.18.camel@weser.hi.pengutronix.de>
-Message-ID: <53D0D850.8050201@pengutronix.de>
+From: hock.leong.kweh@intel.com (Kweh Hock Leong)
+Date: Thu, 24 Jul 2014 18:01:51 +0800
+Subject: [PATCH] spi/pxa2xx-pci: Enable DMA binding through device name
+Message-ID: <1406196111-22861-1-git-send-email-hock.leong.kweh@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/24/2014 11:47 AM, Lucas Stach wrote:
-> Am Donnerstag, den 24.07.2014, 17:17 +0800 schrieb Shawn Guo:
->> HDMI currently stops working after a system suspend/resume cycle.  It
->> turns out that the cause is the imx-hdmi encoder .dpms hook doesn't get
->> called from anywhere across suspend/resume cycle.
->>
->> The patch follows what exynos drm driver does to walk the list of
->> connectors and call their .dpms function from suspend/resume hook.  And
->> the connectors' .dpms function will in turn filter down to the .dpms
->> hooks of encoders and CRTCs.
->>
->> With this change, HDMI can continue working after a suspend/resume
->> cycle.
->>
->> Signed-off-by: Shawn Guo <shawn.guo@freescale.com>
->> ---
->> Tested with HDMI and LVDS.  It'd be great if someone can help test TVE
->> to ensure the patch doesn't break anything.
->>
->>  drivers/staging/imx-drm/imx-drm-core.c | 39 ++++++++++++++++++++++++++++++++++
->>  1 file changed, 39 insertions(+)
->>
->> diff --git a/drivers/staging/imx-drm/imx-drm-core.c b/drivers/staging/imx-drm/imx-drm-core.c
->> index def8280d7ee6..b0ea1f0ed32f 100644
->> --- a/drivers/staging/imx-drm/imx-drm-core.c
->> +++ b/drivers/staging/imx-drm/imx-drm-core.c
->> @@ -696,6 +696,44 @@ static int imx_drm_platform_remove(struct platform_device *pdev)
->>  	return 0;
->>  }
->>  
->> +#if CONFIG_PM_SLEEP
-> 
-> use #ifdef
+From: "Chew, Chiau Ee" <chiau.ee.chew@intel.com>
 
-...or remove #if/#ifdef and mark as __maybe_unused
+Intel LPSS Baytrail supports two DMA controllers and SPI is only
+using one of the DMA controller. During DMA channel request,
+we need to ensure the requested Tx and Rx channels are from the correct
+DMA controller. Thus, we add extra checking in filter callback funtion
+by matching against the DMA controller device name.
 
-Marc
+Signed-off-by: Chew, Chiau Ee <chiau.ee.chew@intel.com>
+Signed-off-by: Kweh, Hock Leong <hock.leong.kweh@intel.com>
+---
+ drivers/spi/spi-pxa2xx-dma.c   | 5 +++++
+ drivers/spi/spi-pxa2xx-pci.c   | 3 +++
+ include/linux/spi/pxa2xx_spi.h | 1 +
+ 3 files changed, 9 insertions(+)
 
+diff --git a/drivers/spi/spi-pxa2xx-dma.c b/drivers/spi/spi-pxa2xx-dma.c
+index c41ff14..4c4e918 100644
+--- a/drivers/spi/spi-pxa2xx-dma.c
++++ b/drivers/spi/spi-pxa2xx-dma.c
+@@ -214,6 +214,11 @@ static bool pxa2xx_spi_dma_filter(struct dma_chan *chan, void *param)
+ {
+ 	const struct pxa2xx_spi_master *pdata = param;
+ 
++	if (pdata->dma_devname) {
++		if (strcmp(dev_name(chan->device->dev), pdata->dma_devname))
++			return false;
++	}
++
+ 	return chan->chan_id == pdata->tx_chan_id ||
+ 	       chan->chan_id == pdata->rx_chan_id;
+ }
+diff --git a/drivers/spi/spi-pxa2xx-pci.c b/drivers/spi/spi-pxa2xx-pci.c
+index c1865c9..7a21bce 100644
+--- a/drivers/spi/spi-pxa2xx-pci.c
++++ b/drivers/spi/spi-pxa2xx-pci.c
+@@ -21,6 +21,7 @@ struct pxa_spi_info {
+ 	int tx_chan_id;
+ 	int rx_slave_id;
+ 	int rx_chan_id;
++	char *dma_devname;
+ };
+ 
+ static struct pxa_spi_info spi_info_configs[] = {
+@@ -41,6 +42,7 @@ static struct pxa_spi_info spi_info_configs[] = {
+ 		.tx_chan_id = 0,
+ 		.rx_slave_id = 1,
+ 		.rx_chan_id = 1,
++		.dma_devname = "0000:00:1e.0"
+ 	},
+ };
+ 
+@@ -72,6 +74,7 @@ static int pxa2xx_spi_pci_probe(struct pci_dev *dev,
+ 	spi_pdata.rx_slave_id = c->rx_slave_id;
+ 	spi_pdata.rx_chan_id = c->rx_chan_id;
+ 	spi_pdata.enable_dma = c->rx_slave_id >= 0 && c->tx_slave_id >= 0;
++	spi_pdata.dma_devname = c->dma_devname;
+ 
+ 	ssp = &spi_pdata.ssp;
+ 	ssp->phys_base = pci_resource_start(dev, 0);
+diff --git a/include/linux/spi/pxa2xx_spi.h b/include/linux/spi/pxa2xx_spi.h
+index 82d5111..264c3cb 100644
+--- a/include/linux/spi/pxa2xx_spi.h
++++ b/include/linux/spi/pxa2xx_spi.h
+@@ -34,6 +34,7 @@ struct pxa2xx_spi_master {
+ 	int tx_chan_id;
+ 	int rx_slave_id;
+ 	int tx_slave_id;
++	char *dma_devname;
+ 
+ 	/* For non-PXA arches */
+ 	struct ssp_device ssp;
 -- 
-Pengutronix e.K.                  | Marc Kleine-Budde           |
-Industrial Linux Solutions        | Phone: +49-231-2826-924     |
-Vertretung West/Dortmund          | Fax:   +49-5121-206917-5555 |
-Amtsgericht Hildesheim, HRA 2686  | http://www.pengutronix.de   |
-
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 242 bytes
-Desc: OpenPGP digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140724/453066e7/attachment.sig>
+1.9.1
