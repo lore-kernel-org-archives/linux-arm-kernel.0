@@ -1,88 +1,63 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 24 Jul 2014 15:01:13 +0200
-Subject: [PATCH v2 1/3] usb: host: st-hcd: Add USB HCD support for STi SoCs
-In-Reply-To: <20140724122254.GA15266@griffinp-ThinkPad-X1-Carbon-2nd>
-References: <1406199616-10533-1-git-send-email-peter.griffin@linaro.org>
- <11018717.Ey5qEJxGNJ@wuerfel>
- <20140724122254.GA15266@griffinp-ThinkPad-X1-Carbon-2nd>
-Message-ID: <5967609.vndF2bDyS1@wuerfel>
+From: hanjun.guo@linaro.org (Hanjun Guo)
+Date: Thu, 24 Jul 2014 21:00:10 +0800
+Subject: [PATCH 04/19] ARM64 / ACPI: Introduce arch_fix_phys_package_id() for
+ cpu topology
+In-Reply-To: <1406206825-15590-1-git-send-email-hanjun.guo@linaro.org>
+References: <1406206825-15590-1-git-send-email-hanjun.guo@linaro.org>
+Message-ID: <1406206825-15590-5-git-send-email-hanjun.guo@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday 24 July 2014 13:22:54 Peter Griffin wrote:
-> Thanks for reviewing, see my comments below: -
-> 
-> > Unfortunately, this seems to be done in a rather strange way,
-> > I suspect you'll have to start over, but I'll let Alan and Greg
-> > weigh in.
-> > 
-> > > +
-> > > +struct st_hcd_dev {
-> > > +   int port_nr;
-> > > +   struct platform_device *ehci_device;
-> > > +   struct platform_device *ohci_device;
-> > > +   struct clk *ic_clk;
-> > > +   struct clk *ohci_clk;
-> > > +   struct reset_control *pwr;
-> > > +   struct reset_control *rst;
-> > > +   struct phy *phy;
-> > > +};
-> > 
-> > The way you do this apparently is to create a device that encapsulates
-> > the OHCI and the EHCI and then goes on to create child devices that
-> > are bound to the real drivers.
-> 
-> Yes, although this isn't the first driver to take that approach USB_HCD_BCMA
-> (bcma-hcd.c) and USB_HCD_SSB (ssb-hcd.c) do much the same thing.
+arch_fix_phys_package_id() will be called in ACPI core to use
+the slot number provided by ACPI to update the physical package
+id, then we can get the right value in the "physical id" field
+of /proc/cpuinfo.
 
-I just had a look at them, and I think the case is different here:
+Signed-off-by: Hanjun Guo <hanjun.guo@linaro.org>
+---
+ arch/arm64/include/asm/topology.h |    2 ++
+ arch/arm64/kernel/topology.c      |   14 ++++++++++++++
+ 2 files changed, 16 insertions(+)
 
-For the two bcma driver, there is a discoverable bus (bcma) rather than
-the platform bus, and it only exposes one device, so the bcma-hcd driver
-is actually needed so we get two device that can be bound to the regular
-drivers.
-
-For the ssb-hcd driver, it's less clear and that one could be
-reworked into two separate drivers.
-
-> > The way it should be done however is to put the two host controllers
-> > into DT directly and describe their resources (phy, clock, reset, ...)
-> > using the DT bindings for those.
-> 
-> I'm of course happy to change it if required. I see looking through that a lot 
-> of other platforms do it the way you describe with a
-> 
-> ehci-<platname>.c and ohci-<platname>.c
-
-Right. We are trying to  gradually move some of them over to use the
-generic *hci-platform.c drivers though.
-
-> > Depending on what kind of special requirements the ST version has,
-> > this can be done either by using the generic ohci/ehci bindings
-> > with extensions where necessary, or by creating a new binding and
-> > new driver files that use 'ohci_init_driver'/'ehci_init_driver'
-> > to inherit from the common code.
-> > 
-> > The first of the two approaches is preferred.
-> 
-> We don't have anything particularly special, just a couple of reset lines,
-> clock, phy, etc.
-
-Ok, good. Please see Documentation/devicetree/bindings/usb/usb-?hci.txt
-then. You might actually be able to just use the existing drivers
-without new code by just adding the proper DT nodes that follow these
-bindings.
-
-> > > +   pdev->dev.parent = &parent->dev;
-> > > +   pdev->dev.dma_mask = &pdev->dev.coherent_dma_mask;
-> > > +   pdev->dev.coherent_dma_mask = DMA_BIT_MASK(32);
-> > 
-> > This is something we shouldn't ever do these days, the DMA settings
-> > should come directly from DT without driver interaction.
-> 
-> Ok, I'll wait to hear the outcome of Greg/Alans views before either fixing
-> it or starting over.
-
-Ok.
-
-	Arnd
+diff --git a/arch/arm64/include/asm/topology.h b/arch/arm64/include/asm/topology.h
+index 7ebcd31..2b216d4 100644
+--- a/arch/arm64/include/asm/topology.h
++++ b/arch/arm64/include/asm/topology.h
+@@ -23,11 +23,13 @@ extern struct cpu_topology cpu_topology[NR_CPUS];
+ void init_cpu_topology(void);
+ void store_cpu_topology(unsigned int cpuid);
+ const struct cpumask *cpu_coregroup_mask(int cpu);
++void arch_fix_phys_package_id(int num, u32 slot);
+ 
+ #else
+ 
+ static inline void init_cpu_topology(void) { }
+ static inline void store_cpu_topology(unsigned int cpuid) { }
++static inline void arch_fix_phys_package_id(int num, u32 slot) { }
+ 
+ #endif
+ 
+diff --git a/arch/arm64/kernel/topology.c b/arch/arm64/kernel/topology.c
+index 43514f9..c547885 100644
+--- a/arch/arm64/kernel/topology.c
++++ b/arch/arm64/kernel/topology.c
+@@ -281,3 +281,17 @@ void __init init_cpu_topology(void)
+ 	if (parse_dt_topology())
+ 		reset_cpu_topology();
+ }
++
++/*
++ * Use the CPU slot number provided by ACPI to update the physical
++ * package id when cpuid_topo->cluster_id is not available, then we
++ * can get the right value in the "physical id" field of /proc/cpuinfo.
++ */
++void arch_fix_phys_package_id(int num, u32 slot)
++{
++	struct cpu_topology *cpuid_topo = &cpu_topology[num];
++
++	if (cpuid_topo->cluster_id == -1)
++		cpuid_topo->cluster_id = slot;
++}
++EXPORT_SYMBOL_GPL(arch_fix_phys_package_id);
+-- 
+1.7.9.5
