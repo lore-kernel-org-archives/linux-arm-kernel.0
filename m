@@ -1,74 +1,73 @@
 From: mark.rutland@arm.com (Mark Rutland)
-Date: Thu, 24 Jul 2014 16:21:04 +0100
-Subject: [PATCH 09/19] ARM64 / ACPI: Move the initialization of
- cpu_logical_map(0) before acpi_boot_init()
-In-Reply-To: <1406206825-15590-10-git-send-email-hanjun.guo@linaro.org>
+Date: Thu, 24 Jul 2014 16:34:06 +0100
+Subject: [PATCH 03/19] ARM64 / ACPI: Introduce lowlevel suspend function
+In-Reply-To: <1406206825-15590-4-git-send-email-hanjun.guo@linaro.org>
 References: <1406206825-15590-1-git-send-email-hanjun.guo@linaro.org>
- <1406206825-15590-10-git-send-email-hanjun.guo@linaro.org>
-Message-ID: <20140724152103.GB26190@leverpostej>
+ <1406206825-15590-4-git-send-email-hanjun.guo@linaro.org>
+Message-ID: <20140724153406.GC26190@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jul 24, 2014 at 02:00:15PM +0100, Hanjun Guo wrote:
-> Move the initialization of cpu_logical_map(0) before acpi_boot_init()
-> to remove the duplicated initialization of cpu_logical_map(0).
-
-It always make sense to initialise CPU0's logical map entry from the
-hardware values, so you could do this earlier in the series, before you
-introduce any ACPI code. Then you don't have the churn in acpi.c
-
+On Thu, Jul 24, 2014 at 02:00:09PM +0100, Hanjun Guo wrote:
+> From: Graeme Gregory <graeme.gregory@linaro.org>
 > 
+> acpi_wakeup_address is used on x86 as the address bios jumps into
+> when machine wakes up from suspend. As arm64 does not have such a
+> bios this mechanism will be provided by other means. But the define
+> is still required inside the acpi core.
+> 
+> Introduce a null stub for acpi_suspend_lowlevel as this is also
+> required by core. This will be filled in when standards are
+> defined for arm64 ACPI global power states.
+> 
+> Reviewed-by: Grant Likely <grant.likely@linaro.org>
+> Signed-off-by: Graeme Gregory <graeme.gregory@linaro.org>
 > Signed-off-by: Hanjun Guo <hanjun.guo@linaro.org>
 > ---
->  arch/arm64/kernel/acpi.c  |    3 ---
->  arch/arm64/kernel/setup.c |    3 ++-
->  2 files changed, 2 insertions(+), 4 deletions(-)
+>  arch/arm64/include/asm/acpi.h |   12 ++++++++++++
+>  arch/arm64/kernel/acpi.c      |    7 +++++++
+>  2 files changed, 19 insertions(+)
 > 
+> diff --git a/arch/arm64/include/asm/acpi.h b/arch/arm64/include/asm/acpi.h
+> index e8581ea..44b617f 100644
+> --- a/arch/arm64/include/asm/acpi.h
+> +++ b/arch/arm64/include/asm/acpi.h
+> @@ -36,6 +36,18 @@ static inline bool acpi_has_cpu_in_madt(void)
+>  	return 1;
+>  }
+>  
+> +/* Low-level suspend routine.
+> + *
+> + * ACPI S-states for ARM64 have to be defined
+> + * and approved before doing anything else, maybe
+> + * we need update the ACPI spec, here we
+> + * just introduce function and macro needed by
+> + * ACPI core as IA64 did, and revisit them when
+> + * the spec is ready.
+> + */
+> +extern int (*acpi_suspend_lowlevel)(void);
+> +#define acpi_wakeup_address 0
+> +
+>  #endif /* CONFIG_ACPI */
+>  
+>  #endif /*_ASM_ACPI_H*/
 > diff --git a/arch/arm64/kernel/acpi.c b/arch/arm64/kernel/acpi.c
-> index 801e268..ff0f6a0 100644
+> index ac78e4e..f5a10b5 100644
 > --- a/arch/arm64/kernel/acpi.c
 > +++ b/arch/arm64/kernel/acpi.c
-> @@ -244,9 +244,6 @@ int __init acpi_boot_init(void)
->  	if (err)
->  		pr_err("Can't find FADT\n");
->  
-> -	/* Get the boot CPU's MPIDR before MADT parsing */
-> -	cpu_logical_map(0) = read_cpuid_mpidr() & MPIDR_HWID_BITMASK;
-> -
->  	err = acpi_parse_madt_gic_cpu_interface_entries();
->  
->  	return err;
-> diff --git a/arch/arm64/kernel/setup.c b/arch/arm64/kernel/setup.c
-> index e00d40c..17ab98e 100644
-> --- a/arch/arm64/kernel/setup.c
-> +++ b/arch/arm64/kernel/setup.c
-> @@ -394,13 +394,14 @@ void __init setup_arch(char **cmdline_p)
->  
->  	efi_idmap_init();
->  
-> +	/* Get the boot CPU's MPIDR before cpu logical map is built */
+> @@ -95,3 +95,10 @@ static int __init parse_acpi(char *arg)
+>  	return 0;
+>  }
+>  early_param("acpi", parse_acpi);
+> +
+> +/*
+> + * acpi_suspend_lowlevel() - save kernel state and suspend.
+> + *
+> + * TBD when ARM/ARM64 starts to support suspend...
+> + */
+> +int (*acpi_suspend_lowlevel)(void);
 
-That comment's a bit useless; I think it can just be dropped.
-
-All you need to do is move the initialisation of cpu_logical_map(0)
-before unflatten_device_tree(). When you introduce acpi_boot_init(),
-place it after the initialisation.
+Shouldn't this should be intialised to NULL explicitly?
 
 Thanks,
 Mark.
-
-> +	cpu_logical_map(0) = read_cpuid_mpidr() & MPIDR_HWID_BITMASK;
->  	acpi_boot_init();
->  
->  	unflatten_device_tree();
->  
->  	psci_init();
->  
-> -	cpu_logical_map(0) = read_cpuid_mpidr() & MPIDR_HWID_BITMASK;
->  	cpu_read_bootcpu_ops();
->  #ifdef CONFIG_SMP
->  	smp_init_cpus();
-> -- 
-> 1.7.9.5
-> 
-> 
