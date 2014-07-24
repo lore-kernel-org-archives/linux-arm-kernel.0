@@ -1,47 +1,51 @@
-From: s-anna@ti.com (Suman Anna)
-Date: Thu, 24 Jul 2014 10:13:37 -0500
-Subject: [PATCH 1/2] hwspinlock/omap: enable module before reading
- SYSSTATUS register
-In-Reply-To: <CAK=Wgba3OOgZG_smj5=raE+ZXZ-F0ksn4pcGeDc1JDE34Q-wFg@mail.gmail.com>
-References: <1404342060-2919-1-git-send-email-s-anna@ti.com>
- <1404342060-2919-2-git-send-email-s-anna@ti.com>
- <CAK=Wgba3OOgZG_smj5=raE+ZXZ-F0ksn4pcGeDc1JDE34Q-wFg@mail.gmail.com>
-Message-ID: <53D122A1.4040204@ti.com>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Thu, 24 Jul 2014 16:15:29 +0100
+Subject: [PATCH v2 5/6] ARM: at91: change compatibility string for
+ sama5d3x gem
+In-Reply-To: <b8cbfb4e8d5d156d477634164c21cfa6f509c4ea.1406192657.git.cyrille.pitchen@atmel.com>
+References: <cover.1406192657.git.cyrille.pitchen@atmel.com>
+ <b8cbfb4e8d5d156d477634164c21cfa6f509c4ea.1406192657.git.cyrille.pitchen@atmel.com>
+Message-ID: <20140724151529.GA26190@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Ohad,
+On Thu, Jul 24, 2014 at 12:51:02PM +0100, Cyrille Pitchen wrote:
+> this new compatibility string prevents macb/gem driver from using the
+> scatter-gather and gso features on sama5d3x boards.
 
-On 07/24/2014 08:45 AM, Ohad Ben-Cohen wrote:
-> Hi Suman,
-> 
-> On Thu, Jul 3, 2014 at 2:00 AM, Suman Anna <s-anna@ti.com> wrote:
->> The number of hwspinlocks are determined based on the value read
->> from the IP block's SYSSTATUS register. However, the module may
->> not be enabled and clocked, and the read may result in a bus error.
->>
->> This particular issue is seen rather easily on AM33XX, since the
->> module wakeup is software controlled, and it is disabled out of
->> reset. Make sure the module is enabled and clocked before reading
->> the SYSSTATUS register.
->>
->> Signed-off-by: Suman Anna <s-anna@ti.com>
-> ...
->> +       /*
->> +        * runtime PM will make sure the clock of this module is
->> +        * enabled again iff at least one lock is requested
->> +        */
->> +       ret = pm_runtime_put_sync(&pdev->dev);
-> 
-> Is there a specific reason for using the put_sync variant here? If
-> not, let's just use the regular put().
+What will happen were the driver to attempt to use the features on this
+board?
 
-There was no particular reason, you can change it.
+How will this affect existing DTBs?
+
+Thanks,
+Mark.
 
 > 
-> Let me know, and I can do the change while applying these two patches.
-
-Sure, thanks.
-
-regards
-Suman
+> Signed-off-by: Cyrille Pitchen <cyrille.pitchen@atmel.com>
+> ---
+>  arch/arm/boot/dts/sama5d3_gmac.dtsi | 2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
+> 
+> diff --git a/arch/arm/boot/dts/sama5d3_gmac.dtsi b/arch/arm/boot/dts/sama5d3_gmac.dtsi
+> index a6cb050..de5ed59 100644
+> --- a/arch/arm/boot/dts/sama5d3_gmac.dtsi
+> +++ b/arch/arm/boot/dts/sama5d3_gmac.dtsi
+> @@ -74,7 +74,7 @@
+>  			};
+>  
+>  			macb0: ethernet at f0028000 {
+> -				compatible = "cdns,pc302-gem", "cdns,gem";
+> +				compatible = "atmel,sama5d3-gem";
+>  				reg = <0xf0028000 0x100>;
+>  				interrupts = <34 IRQ_TYPE_LEVEL_HIGH 3>;
+>  				pinctrl-names = "default";
+> -- 
+> 1.8.2.2
+> 
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+> 
