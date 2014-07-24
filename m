@@ -1,34 +1,36 @@
-From: heiko@sntech.de (Heiko =?ISO-8859-1?Q?St=FCbner?=)
-Date: Thu, 24 Jul 2014 16:47:05 +0200
-Subject: [GIT PULL] ARM: rockchip: cpu hotplug support for rk3066 and rk3188
-Message-ID: <2493373.SAC3dT5BBy@diego>
+From: pawel.moll@arm.com (Pawel Moll)
+Date: Thu, 24 Jul 2014 15:45:41 +0100
+Subject: [PATCH RESEND v2] bus: ARM CCN PMU driver
+In-Reply-To: <39594081.3C5fmmXpMJ@wuerfel>
+References: <1406050379-15199-1-git-send-email-pawel.moll@arm.com>
+ <201407232223.39341.arnd@arndb.de> <39594081.3C5fmmXpMJ@wuerfel>
+Message-ID: <1406213141.25343.175.camel@hornet>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Arnd, Olof,
+On Wed, 2014-07-23 at 23:29 +0200, Arnd Bergmann wrote:
+> On Wednesday 23 July 2014 22:23:38 Arnd Bergmann wrote:
+> > On Tuesday 22 July 2014, Pawel Moll wrote:
+> > > Driver providing perf backend for ARM Cache Coherent Network
+> > > interconnect. Supports counting all hardware events and crosspoint
+> > > watchpoints.
+> > > 
+> > > Currently works with CCN-504 only, although there should be
+> > > no changes required for CCN-508 (just impossible to test it now).
+> > > 
+> > > Signed-off-by: Pawel Moll <pawel.moll@arm.com>
+> > 
+> > Applied to next/drivers, thanks!
+> 
+> I'm getting build errors with CONFIG_PERF_EVENTS disabled. 
+> Is the patch below the right answer, or should we still load
+> the driver and #ifdef the perf-events code?
+> 
+> It seems to me that the driver doesn't do anything besides
+> perf events, but I could be missing something.
 
-The following changes since commit 7171511eaec5bf23fb06078f59784a3a0626b38f:
+No, you're right. At the moment this is only a PMU driver, and I don't
+expect this would change any time soon, so your change will do the job,
+thanks!
 
-  Linux 3.16-rc1 (2014-06-15 17:45:28 -1000)
-
-are available in the git repository at:
-
-  git://git.kernel.org/pub/scm/linux/kernel/git/mmind/linux-rockchip.git tags/v3.17-rockchip-smp-hotplug
-
-for you to fetch changes up to f54b91fdfa7a1b5603d6d00f9972765662a4e6ef:
-
-  ARM: rockchip: Add cpu hotplug support for RK3XXX SoCs (2014-07-23 11:42:29 +0200)
-
-----------------------------------------------------------------
-CPU-Hotplug support for RK3066 and RK3188
-
-----------------------------------------------------------------
-Heiko Stuebner (1):
-      ARM: rockchip: select ARMv7 compiler flags for platsmp.o
-
-Romain Perier (1):
-      ARM: rockchip: Add cpu hotplug support for RK3XXX SoCs
-
- arch/arm/mach-rockchip/Makefile  |  2 ++
- arch/arm/mach-rockchip/platsmp.c | 20 ++++++++++++++++++++
- 2 files changed, 22 insertions(+)
+Pawel
