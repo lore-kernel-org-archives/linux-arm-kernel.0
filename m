@@ -1,61 +1,79 @@
-From: soren.brinkmann@xilinx.com (=?utf-8?B?U8O2cmVu?= Brinkmann)
-Date: Thu, 24 Jul 2014 08:55:21 -0700
-Subject: [PATCH] ARM: zynq: DT: Add CAN node
-In-Reply-To: <2fe3a869-d17c-4521-a5c1-7c347ae34726@BN1BFFO11FD060.protection.gbl>
-References: <52d799e17cd3539713625c6f6a6666620f52d692.1406120732.git.michal.simek@xilinx.com>
- <20140723160702.GA14564@xsjandreislx>
- <2fe3a869-d17c-4521-a5c1-7c347ae34726@BN1BFFO11FD060.protection.gbl>
-Message-ID: <d973d7c8-30e7-458e-9d57-15da917cde04@BL2FFO11FD030.protection.gbl>
+From: cyrille.pitchen@atmel.com (Cyrille Pitchen)
+Date: Thu, 24 Jul 2014 17:57:42 +0200
+Subject: [PATCH v2 5/6] ARM: at91: change compatibility string for sama5d3x
+ gem
+In-Reply-To: <20140724151529.GA26190@leverpostej>
+References: <cover.1406192657.git.cyrille.pitchen@atmel.com>
+ <b8cbfb4e8d5d156d477634164c21cfa6f509c4ea.1406192657.git.cyrille.pitchen@atmel.com>
+ <20140724151529.GA26190@leverpostej>
+Message-ID: <53D12CF6.6070502@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 2014-07-24 at 08:44AM +0200, Michal Simek wrote:
-> On 07/23/2014 06:07 PM, S?ren Brinkmann wrote:
-> > On Wed, 2014-07-23 at 03:05PM +0200, Michal Simek wrote:
-> >> Add node describing Zynq's CAN controller.
-> >>
-> >> Signed-off-by: Michal Simek <michal.simek@xilinx.com>
-> >> ---
-> >>
-> >>  arch/arm/boot/dts/zynq-7000.dtsi | 13 ++++++++++++-
-> >>  1 file changed, 12 insertions(+), 1 deletion(-)
-> >>
-> >> diff --git a/arch/arm/boot/dts/zynq-7000.dtsi b/arch/arm/boot/dts/zynq-7000.dtsi
-> >> index 366ca6434f54..2287d9b4ed1a 100644
-> >> --- a/arch/arm/boot/dts/zynq-7000.dtsi
-> >> +++ b/arch/arm/boot/dts/zynq-7000.dtsi
-> >> @@ -71,7 +71,18 @@
-> >>  			interrupts = <0 7 4>;
-> >>  			interrupt-parent = <&intc>;
-> >>  			clocks = <&clkc 12>;
-> >> -		};
-> >> +		};
-> >> +
-> >> +		can0: can at e0008000 {
-> >> +			compatible = "xlnx,zynq-can-1.0";
-> >> +			clocks = <&clkc 19>, <&clkc 36>;
-> >> +			clock-names = "can_clk", "pclk";
-> >> +			reg = <0xe0008000 0x1000>;
-> >> +			interrupts = <0 28 4>;
-> >> +			interrupt-parent = <&intc>;
-> >> +			tx-fifo-depth = <0x40>;
-> >> +			rx-fifo-depth = <0x40>;
-> >> +		};
-> > 
-> > What about the second CAN core? You also probably want to add
-> > 'status = "disabled"' in the dtsi.
+Le 24/07/2014 17:15, Mark Rutland a ?crit :
+> On Thu, Jul 24, 2014 at 12:51:02PM +0100, Cyrille Pitchen wrote:
+>> this new compatibility string prevents macb/gem driver from using the
+>> scatter-gather and gso features on sama5d3x boards.
 > 
-> Second can core - yes.
+> What will happen were the driver to attempt to use the features on this
+> board?
 > 
-> I can add status = "disabled" but then question is if make
-> sense to change status for any zynq dts file. Or just
-> keep enable both.
+> How will this affect existing DTBs?
 > 
-> In our repo is enabled can0 on zc702.
-> 
-> What do you think?
+> Thanks,
+> Mark.
+>
+Hi Mark,
 
-Well, it should be enabled on boards that have CAN pinned out. Does any
-of our boards have that?
+patch 2 for then scatter-gather feature introducted a new compatible string
+"atmel,sama5d3-gem". Its associated config has the MACB_CAPS_SG_DISABLED flag
+so the feature is not available indeed.
 
-	S?ren
+patch 2 also set the very same flag for the config associated to the already 
+existing strings "cdns,pc302-gem" and "cdns,gem". Then if you don't update 
+your device tree, the scatter-gather feature won't be enabled for gem anyway. 
+However SG feature will be enabled for the old macb.
+
+The main idea is to do the change in two steps to avoid indroducing bugs. This
+series of patches is the first step. Later an additionnal patch may be 
+introduced to enable SG feature for gem on all platforms but sama5d3x. This 
+should be done by removing the MACB_CAPS_SG_DISABLED flag from pc302gem_config.
+Till then you don't need to update your device tree.
+
+For now, the SG feature is known to be broken on sama5d3x and there is work in 
+progress with Cadence support to fix this issue. It seems to be specific to 
+sama5d3x gem. SG feature was successfully tested on sama5d3x macb and also on 
+sama5d4 gem.
+
+Regards,
+
+Cyrille
+
+>>
+>> Signed-off-by: Cyrille Pitchen <cyrille.pitchen@atmel.com>
+>> ---
+>>  arch/arm/boot/dts/sama5d3_gmac.dtsi | 2 +-
+>>  1 file changed, 1 insertion(+), 1 deletion(-)
+>>
+>> diff --git a/arch/arm/boot/dts/sama5d3_gmac.dtsi b/arch/arm/boot/dts/sama5d3_gmac.dtsi
+>> index a6cb050..de5ed59 100644
+>> --- a/arch/arm/boot/dts/sama5d3_gmac.dtsi
+>> +++ b/arch/arm/boot/dts/sama5d3_gmac.dtsi
+>> @@ -74,7 +74,7 @@
+>>  			};
+>>  
+>>  			macb0: ethernet at f0028000 {
+>> -				compatible = "cdns,pc302-gem", "cdns,gem";
+>> +				compatible = "atmel,sama5d3-gem";
+>>  				reg = <0xf0028000 0x100>;
+>>  				interrupts = <34 IRQ_TYPE_LEVEL_HIGH 3>;
+>>  				pinctrl-names = "default";
+>> -- 
+>> 1.8.2.2
+>>
+>>
+>> _______________________________________________
+>> linux-arm-kernel mailing list
+>> linux-arm-kernel at lists.infradead.org
+>> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+>>
