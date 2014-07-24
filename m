@@ -1,85 +1,98 @@
-From: cyrille.pitchen@atmel.com (Cyrille Pitchen)
-Date: Thu, 24 Jul 2014 13:59:21 +0200
-Subject: [PATCH 4/6] net/macb: add RX checksum offload feature
-In-Reply-To: <1406069908.3363.7.camel@edumazet-glaptop2.roam.corp.google.com>
-References: <cover.1405689937.git.cyrille.pitchen@atmel.com>		
- <f29965fee23dc0de99b388373017efeffa1aac10.1405689937.git.cyrille.pitchen@atmel.com>	
- <1405697784.10255.99.camel@edumazet-glaptop2.roam.corp.google.com>	
- <53CE9109.9040407@atmel.com>
- <1406069908.3363.7.camel@edumazet-glaptop2.roam.corp.google.com>
-Message-ID: <53D0F519.1050009@atmel.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Thu, 24 Jul 2014 04:58:50 -0700
+Subject: [GIT PULL] omap soc changes for v3.17 merge window
+Message-ID: <20140724115850.GC29045@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Le 23/07/2014 00:58, Eric Dumazet a ?crit :
-> On Tue, 2014-07-22 at 18:27 +0200, Cyrille Pitchen wrote:
->> Le 18/07/2014 17:36, Eric Dumazet a ?crit :
->>> On Fri, 2014-07-18 at 16:21 +0200, Cyrille Pitchen wrote:
->>>> Signed-off-by: Cyrille Pitchen <cyrille.pitchen@atmel.com>
->>>> ---
->>>>  drivers/net/ethernet/cadence/macb.c | 29 ++++++++++++++++++++++++++++-
->>>>  drivers/net/ethernet/cadence/macb.h |  2 ++
->>>>  2 files changed, 30 insertions(+), 1 deletion(-)
->>>>
->>>> diff --git a/drivers/net/ethernet/cadence/macb.c b/drivers/net/ethernet/cadence/macb.c
->>>> index 9bdcd1b..6acd6e2 100644
->>>> --- a/drivers/net/ethernet/cadence/macb.c
->>>> +++ b/drivers/net/ethernet/cadence/macb.c
->>>> @@ -766,6 +766,8 @@ static int gem_rx(struct macb *bp, int budget)
->>>>  
->>>>  		skb->protocol = eth_type_trans(skb, bp->dev);
->>>>  		skb_checksum_none_assert(skb);
->>>> +		if (bp->dev->features & NETIF_F_RXCSUM)
->>>> +			skb->ip_summed = CHECKSUM_UNNECESSARY;
->>>>  
->>>
->>>
->>> Really ?
->>>
->>> If this is what you meant, this deserves a big and fat comment.
->>>
->>>
->>>
->> Hi Eric,
->>
->> Isn't it the proper way to do? According to Cadence documentation
->> about RX checksum offload:
->> "If any of the checksums (IP, TCP or UDP) are verified incorrect by
->> the GEM, the packet is discarded."
->>
->> If I understand, when RX checksum offload is enabled setting bit 24 of
->> the Network Configuration Register, the driver only receives RX frames
->> with correct checksum. Then it tells the kernel that there's no need
->> to verify the checksum again in software. This is done setting
->> skb->ip_summed to CHECKSUM_UNNECESSARY. Intel e1000 driver does the
->> same in e1000_rx_checksum() function.
->>
->> Also bit 24 of the Network Configuration Register is updated by
->> macb_open() and macb_set_features() so it always matches the state of
->> NETIF_F_RXCSUM flag in dev->features, once the network interface is
->> up. That's why I'd rather read from dev->features than read from
->> register.
->>
->> Did I make a mistake? Is it the kind of comment you expect to be
->> added?
->>
->> Regards,
-> 
-> Usually, frames are not discarded, and a bit is present in rx descriptor
-> to tell us if (TCP) checksum was validated by the NIC
-> 
-> We want tcpdump to get a copy of corrupted TCP frames, even if TCP stack
-> drops them later.
-> 
-> If this NIC drops incorrect frames, I am afraid we cant use this RX
-> offload at all.
-> 
-> 
-> 
-OK thanks for your comments. In the next series of patches I'll allow RX 
-checksum offload only when promiscuous mode is disabled. Also I'll check the
-status returned by the GEM through the buffer descriptor.
+The following changes since commit 3db53918e306d3960bf9e12eea8b2fd3f7d0fd62:
 
-Regards,
+  Merge tag 'for-v3.17/omap-clock-a' of git://git.kernel.org/pub/scm/linux/kernel/git/pjw/omap-pending into omap-for-v3.17/soc (2014-07-21 00:35:38 -0700)
 
-Cyrille
+are available in the git repository at:
+
+
+  git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap tags/omap-for-v3.17/soc-new
+
+for you to fetch changes up to 3965f5ba0489c01f419216c8909965b9a6a39388:
+
+  Merge branch 'omap-for-v3.17/mailbox' into omap-for-v3.17/soc (2014-07-23 01:26:02 -0700)
+
+----------------------------------------------------------------
+
+SoC related changes for omaps for v3.17 merge window:
+
+- Add device tree and hwmod data for various devices
+  for new SoCs
+
+- Remove legacy mailbox hwmod data that's no longer
+  needed for SoCs that are DT only. Note that this may
+  cause a minor merge conflict in mach-omap2/devices.c
+  with omap_init_mbox() and omap_init_hdmi_audio(), both
+  are legacy code that is getting removed
+
+----------------------------------------------------------------
+Kishon Vijay Abraham I (2):
+      arm: dra7xx: Add hwmod data for pcie1 phy and pcie2 phy
+      arm: dra7xx: Add hwmod data for pcie1 and pcie2 subsystems
+
+Lokesh Vutla (1):
+      ARM: DRA7: hwmod: Add data for RTC
+
+Mugunthan V N (1):
+      arm: dra7xx: Add hwmod data for MDIO and CPSW
+
+Nishanth Menon (2):
+      ARM: OMAP2+: DMA: remove requirement of irq for platform-dma driver
+      ARM: DRA7: hwmod: remove interrupts for DMA
+
+Roger Quadros (1):
+      ARM: DRA7: hwmod: Add OCP2SCP3 module
+
+Sathya Prakash M R (1):
+      ARM: AM43xx: hwmod: add DSS hwmod data
+
+Suman Anna (10):
+      ARM: dts: OMAP2+: Add mailbox fifo and user information
+      ARM: dts: OMAP4: Add mailbox node
+      ARM: dts: AM33xx: Add mailbox node
+      ARM: dts: AM4372: Correct mailbox node data
+      ARM: dts: DRA7: Add mailbox nodes
+      ARM: DRA7: hwmod_data: Add mailbox hwmod data
+      ARM: OMAP2+: Avoid mailbox legacy device creation for DT-boot
+      ARM: OMAP2: hwmod_data: Remove legacy mailbox data and addrs
+      ARM: OMAP4: hwmod_data: Remove legacy mailbox addrs
+      ARM: AM33xx: hwmod_data: Remove legacy mailbox addrs
+
+Tony Lindgren (2):
+      Merge tag 'for-v3.17/omap-hwmod-a' of git://git.kernel.org/.../pjw/omap-pending into omap-for-v3.17/soc
+      Merge branch 'omap-for-v3.17/mailbox' into omap-for-v3.17/soc
+
+ arch/arm/boot/dts/am33xx.dtsi                      |   9 +
+ arch/arm/boot/dts/am4372.dtsi                      |   3 -
+ arch/arm/boot/dts/dra7.dtsi                        | 117 +++++
+ arch/arm/boot/dts/omap2420.dtsi                    |   2 +
+ arch/arm/boot/dts/omap2430.dtsi                    |   2 +
+ arch/arm/boot/dts/omap3.dtsi                       |   2 +
+ arch/arm/boot/dts/omap4.dtsi                       |   9 +
+ arch/arm/boot/dts/omap5.dtsi                       |   2 +
+ arch/arm/mach-omap2/Makefile                       |   1 +
+ arch/arm/mach-omap2/cm2_7xx.h                      |   4 +
+ arch/arm/mach-omap2/devices.c                      |   2 +-
+ arch/arm/mach-omap2/dma.c                          |   3 +
+ arch/arm/mach-omap2/omap_hwmod_2420_data.c         |  14 -
+ arch/arm/mach-omap2/omap_hwmod_2430_data.c         |  13 -
+ .../omap_hwmod_2xxx_3xxx_interconnect_data.c       |   9 -
+ .../mach-omap2/omap_hwmod_2xxx_3xxx_ipblock_data.c |  40 --
+ .../omap_hwmod_33xx_43xx_interconnect_data.c       |  10 -
+ arch/arm/mach-omap2/omap_hwmod_43xx_data.c         | 100 ++++
+ arch/arm/mach-omap2/omap_hwmod_44xx_data.c         |  10 -
+ arch/arm/mach-omap2/omap_hwmod_7xx_data.c          | 574 ++++++++++++++++++++-
+ arch/arm/mach-omap2/omap_hwmod_common_data.h       |   1 -
+ .../mach-omap2/omap_hwmod_common_ipblock_data.c    |  55 ++
+ arch/arm/mach-omap2/prcm43xx.h                     |   1 +
+ arch/arm/mach-omap2/prm7xx.h                       |   4 +
+ arch/arm/plat-omap/dma.c                           |   5 +-
+ include/linux/omap-dma.h                           |   1 +
+ 26 files changed, 881 insertions(+), 112 deletions(-)
+ create mode 100644 arch/arm/mach-omap2/omap_hwmod_common_ipblock_data.c
