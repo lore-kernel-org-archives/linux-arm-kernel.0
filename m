@@ -1,43 +1,37 @@
-From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Fri, 25 Jul 2014 08:36:19 +0900
-Subject: [PATCH 1/1] ARM: exynos_defconfig: Enable SBS battery support
-In-Reply-To: <1406227380-3569-1-git-send-email-javier.martinez@collabora.co.uk>
-References: <1406227380-3569-1-git-send-email-javier.martinez@collabora.co.uk>
-Message-ID: <53D19873.3040806@samsung.com>
+From: akpm@linux-foundation.org (Andrew Morton)
+Date: Thu, 24 Jul 2014 16:44:20 -0700
+Subject: [PATCH v11 0/2] Add support for the Allwinner A31 DMA Controller
+In-Reply-To: <20140724121315.GV20328@lukather>
+References: <1405626376-471-1-git-send-email-maxime.ripard@free-electrons.com>
+ <20140724121315.GV20328@lukather>
+Message-ID: <20140724164420.d7c58c9b5f6bf3e06137494f@linux-foundation.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/25/14 03:43, Javier Martinez Canillas wrote:
-> Many Exynos5 boards (e.g: Snow, Peach Pit and Pi) have
-> a SBS-compliant gas gauge battery. Enable it as module
-> so the needed support is available for these boards.
->
-> Suggested-by: Doug Anderson<dianders@chromium.org>
-> Signed-off-by: Javier Martinez Canillas<javier.martinez@collabora.co.uk>
-> ---
->   arch/arm/configs/exynos_defconfig | 1 +
->   1 file changed, 1 insertion(+)
->
-> diff --git a/arch/arm/configs/exynos_defconfig b/arch/arm/configs/exynos_defconfig
-> index fc7d168..c390bb9 100644
-> --- a/arch/arm/configs/exynos_defconfig
-> +++ b/arch/arm/configs/exynos_defconfig
-> @@ -77,6 +77,7 @@ CONFIG_SPI_S3C64XX=y
->   CONFIG_I2C_S3C2410=y
->   CONFIG_DEBUG_GPIO=y
->   CONFIG_POWER_SUPPLY=y
-> +CONFIG_BATTERY_SBS=m
->   CONFIG_CHARGER_TPS65090=y
->   # CONFIG_HWMON is not set
->   CONFIG_THERMAL=y
+On Thu, 24 Jul 2014 14:13:15 +0200 Maxime Ripard <maxime.ripard@free-electrons.com> wrote:
 
-Looks good to me.
+> On Thu, Jul 17, 2014 at 09:46:14PM +0200, Maxime Ripard wrote:
+> > Hi,
+> > 
+> > This patchset adds support for the DMA controller found in the
+> > Allwinner A31 and A23 SoCs.
+> > 
+> > This has been tested using the newly introduced SPI driver on an A31
+> > EVK. Support for DMA-driven SPI transfers will be the subject of
+> > another patch serie.
+> > 
+> > This has been around for around 5 monthes now, and didn't get any
+> > review but nitpicks for three versions, so I feel like it could be
+> > merged quite quickly.
+> 
+> Ok, so, who should I bribe to get this merged?
 
-Olof, since previous exynos_defconfig has been updated in arm-soc and no 
-branch for it in my tree at this time, picking this into arm-soc 
-directly would be better and you may add my ack on this.
+Turns out I'm easily bribed.  The code looks pretty clean and simple
+and is refreshingly free of comments, which only confuse people anyway.
 
-Acked-by: Kukjin Kim <kgene.kim@samsung.com>
+I think we could do this as a single patch - is there any benefit to
+splitting it apart like this?
 
-Thanks,
-Kukjin
+The combinations of spin_lock()/spin_lock_irq() and spin_lock_irqsave()
+are a bit scary - it's easy to get these optimisations wrong.  Has it
+been thoroughly tested with lockdep enabled?
