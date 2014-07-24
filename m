@@ -1,39 +1,34 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Thu, 24 Jul 2014 15:43:27 +0100
-Subject: [PATCH 04/19] ARM64 / ACPI: Introduce arch_fix_phys_package_id()
- for cpu topology
-In-Reply-To: <1406206825-15590-5-git-send-email-hanjun.guo@linaro.org>
-References: <1406206825-15590-1-git-send-email-hanjun.guo@linaro.org>
- <1406206825-15590-5-git-send-email-hanjun.guo@linaro.org>
-Message-ID: <20140724144327.GJ17528@sirena.org.uk>
+From: heiko@sntech.de (Heiko =?ISO-8859-1?Q?St=FCbner?=)
+Date: Thu, 24 Jul 2014 16:47:05 +0200
+Subject: [GIT PULL] ARM: rockchip: cpu hotplug support for rk3066 and rk3188
+Message-ID: <2493373.SAC3dT5BBy@diego>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jul 24, 2014 at 09:00:10PM +0800, Hanjun Guo wrote:
+Hi Arnd, Olof,
 
-> +/*
-> + * Use the CPU slot number provided by ACPI to update the physical
-> + * package id when cpuid_topo->cluster_id is not available, then we
-> + * can get the right value in the "physical id" field of /proc/cpuinfo.
-> + */
-> +void arch_fix_phys_package_id(int num, u32 slot)
-> +{
-> +	struct cpu_topology *cpuid_topo = &cpu_topology[num];
-> +
-> +	if (cpuid_topo->cluster_id == -1)
-> +		cpuid_topo->cluster_id = slot;
-> +}
-> +EXPORT_SYMBOL_GPL(arch_fix_phys_package_id);
+The following changes since commit 7171511eaec5bf23fb06078f59784a3a0626b38f:
 
-As I said on the previous version of this patch are you sure this runs
-at a point between the cluster ID getting initialized to -1 and the slot
-being initialized (bear in mind that we now use MPIDR information if
-availabe).  I don't understand why we don't just unconditionally use the
-value given.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140724/ea69f852/attachment.sig>
+  Linux 3.16-rc1 (2014-06-15 17:45:28 -1000)
+
+are available in the git repository at:
+
+  git://git.kernel.org/pub/scm/linux/kernel/git/mmind/linux-rockchip.git tags/v3.17-rockchip-smp-hotplug
+
+for you to fetch changes up to f54b91fdfa7a1b5603d6d00f9972765662a4e6ef:
+
+  ARM: rockchip: Add cpu hotplug support for RK3XXX SoCs (2014-07-23 11:42:29 +0200)
+
+----------------------------------------------------------------
+CPU-Hotplug support for RK3066 and RK3188
+
+----------------------------------------------------------------
+Heiko Stuebner (1):
+      ARM: rockchip: select ARMv7 compiler flags for platsmp.o
+
+Romain Perier (1):
+      ARM: rockchip: Add cpu hotplug support for RK3XXX SoCs
+
+ arch/arm/mach-rockchip/Makefile  |  2 ++
+ arch/arm/mach-rockchip/platsmp.c | 20 ++++++++++++++++++++
+ 2 files changed, 22 insertions(+)
