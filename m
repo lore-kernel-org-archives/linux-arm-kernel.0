@@ -1,112 +1,42 @@
 From: afaerber@suse.de (=?UTF-8?q?Andreas=20F=C3=A4rber?=)
-Date: Fri, 25 Jul 2014 01:00:12 +0200
-Subject: [PATCH v2 03/11] ARM: dts: zynq: Add Parallella device tree
+Date: Fri, 25 Jul 2014 01:00:13 +0200
+Subject: [PATCH v2 04/11] ARM: dts: zynq: Update deprecated xuartps clock names
 In-Reply-To: <1406242820-20140-1-git-send-email-afaerber@suse.de>
 References: <1406242820-20140-1-git-send-email-afaerber@suse.de>
-Message-ID: <1406242820-20140-4-git-send-email-afaerber@suse.de>
+Message-ID: <1406242820-20140-5-git-send-email-afaerber@suse.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This allows to boot the Adapteva Parallella board to serial console.
+Avoids deprecation warning messages.
 
-Cc: Andreas Olofsson <andreas@adapteva.com>
 Signed-off-by: Andreas F?rber <afaerber@suse.de>
 ---
- v1 -> v2:
- * Added board-specific compatible string (Olof Johansson).
- * Added /chosen linux,stdout-path property (Olof Johansson).
- * Fixed /memory reg size 0x20000000 -> 0x40000000 (0 considered).
- * Added vendor name to root node's model property (Olof Johansson).
+ v2: New
  
- arch/arm/boot/dts/Makefile            |  4 ++-
- arch/arm/boot/dts/zynq-parallella.dts | 64 +++++++++++++++++++++++++++++++++++
- 2 files changed, 67 insertions(+), 1 deletion(-)
- create mode 100644 arch/arm/boot/dts/zynq-parallella.dts
+ arch/arm/boot/dts/zynq-7000.dtsi | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
 
-diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
-index adb5ed9..976720f 100644
---- a/arch/arm/boot/dts/Makefile
-+++ b/arch/arm/boot/dts/Makefile
-@@ -419,7 +419,9 @@ dtb-$(CONFIG_ARCH_VT8500) += vt8500-bv07.dtb \
- 	wm8650-mid.dtb \
- 	wm8750-apc8750.dtb \
- 	wm8850-w70v2.dtb
--dtb-$(CONFIG_ARCH_ZYNQ) += zynq-zc702.dtb \
-+dtb-$(CONFIG_ARCH_ZYNQ) += \
-+	zynq-parallella.dtb \
-+	zynq-zc702.dtb \
- 	zynq-zc706.dtb \
- 	zynq-zed.dtb
- dtb-$(CONFIG_MACH_ARMADA_370) += \
-diff --git a/arch/arm/boot/dts/zynq-parallella.dts b/arch/arm/boot/dts/zynq-parallella.dts
-new file mode 100644
-index 0000000..41afd9d
---- /dev/null
-+++ b/arch/arm/boot/dts/zynq-parallella.dts
-@@ -0,0 +1,64 @@
-+/*
-+ * Copyright (c) 2014 SUSE LINUX Products GmbH
-+ *
-+ * Derived from zynq-zed.dts:
-+ *
-+ *  Copyright (C) 2011 Xilinx
-+ *  Copyright (C) 2012 National Instruments Corp.
-+ *  Copyright (C) 2013 Xilinx
-+ *
-+ * This software is licensed under the terms of the GNU General Public
-+ * License version 2, as published by the Free Software Foundation, and
-+ * may be copied, distributed, and modified under those terms.
-+ *
-+ * This program is distributed in the hope that it will be useful,
-+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ * GNU General Public License for more details.
-+ */
-+/dts-v1/;
-+/include/ "zynq-7000.dtsi"
-+
-+/ {
-+	model = "Adapteva Parallella Board";
-+	compatible = "adapteva,parallella", "xlnx,zynq-7000";
-+
-+	memory {
-+		device_type = "memory";
-+		reg = <0 0x40000000>;
-+	};
-+
-+	chosen {
-+		bootargs = "console=ttyPS0,115200 earlyprintk root=/dev/mmcblk0p2 rootfstype=ext4 rw rootwait";
-+		linux,stdout-path = "/amba/serial at e0001000";
-+	};
-+};
-+
-+&gem0 {
-+	status = "okay";
-+	phy-mode = "rgmii-id";
-+	phy-handle = <&ethernet_phy>;
-+	#address-cells = <1>;
-+	#size-cells = <0>;
-+
-+	ethernet_phy: ethernet-phy at 0 {
-+		/* Marvell 88E1318 */
-+		compatible = "ethernet-phy-id0141.0e90",
-+		             "ethernet-phy-ieee802.3-c22";
-+		reg = <0>;
-+		marvell,reg-init = <0x3 0x10 0xff00 0x1e>,
-+		                   <0x3 0x11 0xfff0 0xa>;
-+	};
-+};
-+
-+&i2c0 {
-+	status = "okay";
-+};
-+
-+&sdhci1 {
-+	status = "okay";
-+};
-+
-+&uart1 {
-+	status = "okay";
-+};
+diff --git a/arch/arm/boot/dts/zynq-7000.dtsi b/arch/arm/boot/dts/zynq-7000.dtsi
+index 760bbc4..8fd826a 100644
+--- a/arch/arm/boot/dts/zynq-7000.dtsi
++++ b/arch/arm/boot/dts/zynq-7000.dtsi
+@@ -108,7 +108,7 @@
+ 			compatible = "xlnx,xuartps";
+ 			status = "disabled";
+ 			clocks = <&clkc 23>, <&clkc 40>;
+-			clock-names = "ref_clk", "aper_clk";
++			clock-names = "uart_clk", "pclk";
+ 			reg = <0xE0000000 0x1000>;
+ 			interrupts = <0 27 4>;
+ 		};
+@@ -117,7 +117,7 @@
+ 			compatible = "xlnx,xuartps";
+ 			status = "disabled";
+ 			clocks = <&clkc 24>, <&clkc 41>;
+-			clock-names = "ref_clk", "aper_clk";
++			clock-names = "uart_clk", "pclk";
+ 			reg = <0xE0001000 0x1000>;
+ 			interrupts = <0 50 4>;
+ 		};
 -- 
 1.9.3
