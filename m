@@ -1,68 +1,67 @@
-From: gregkh@linuxfoundation.org (Greg Kroah-Hartman)
-Date: Wed, 23 Jul 2014 19:14:57 -0700
-Subject: [PATCH v4 1/2] platform: Remove most references to platform_bus
- device
-In-Reply-To: <CAOesGMiGzfwLZvkxzzQQ0k4M7i2VukrCHGXCrFhZ6A3mkjVbiw@mail.gmail.com>
-References: <1406135239-17550-1-git-send-email-pawel.moll@arm.com>
- <20140723174137.GC16664@kroah.com>
- <CAOesGMiGzfwLZvkxzzQQ0k4M7i2VukrCHGXCrFhZ6A3mkjVbiw@mail.gmail.com>
-Message-ID: <20140724021457.GA31573@kroah.com>
+From: rob.herring@linaro.org (Rob Herring)
+Date: Wed, 23 Jul 2014 21:24:16 -0500
+Subject: [RFC] cpufreq: Add bindings for CPU clock sharing topology
+In-Reply-To: <20140724003314.6419.51564@quantum>
+References: <7e097b71342c9f5f63b07ff2e135eb7beb626aab.1405661369.git.viresh.kumar@linaro.org>
+ <CAOesGMhTkTEXp99gpU8cZBwYmiXpsySG5zMn6oSyo_Mf5PAiUg@mail.gmail.com>
+ <CAKohpo=MmoALOHg-=7cf0jm=OJO57TWQZQXqkRwhRwU-DGPMmA@mail.gmail.com>
+ <CAOesGMhuNzVtUkaUjF+JjNgHcgf08WiM0DG-kzwtcyUxkK_zow@mail.gmail.com>
+ <CAKohpokLqrydV3b=innvOWrW9ijXtZwPKdT5Ew65cjMxsY2Mvw@mail.gmail.com>
+ <53CA8D95.8010108@ti.com>
+ <CAKohpok-C+JCebjJkZExx6EjBctoyJF7fV71Vjj7bi1TAdXrFQ@mail.gmail.com>
+ <20140724003314.6419.51564@quantum>
+Message-ID: <CABGGisxHxdTyh500ey+KVLV3EnfYZvtsCV=Nt4Nqu7p6KJOwdA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jul 23, 2014 at 10:49:01AM -0700, Olof Johansson wrote:
-> On Wed, Jul 23, 2014 at 10:41 AM, Greg Kroah-Hartman
-> <gregkh@linuxfoundation.org> wrote:
-> > On Wed, Jul 23, 2014 at 06:07:18PM +0100, Pawel Moll wrote:
-> >> A number of board files in arch/arm and arch/unicore32
-> >> explicitly reference platform_bus device as a parent
-> >> for new platform devices.
-> >>
-> >> This is unnecessary, as platform device API guarantees
-> >> that devices with NULL parent are going to by adopted
-> >> by the mentioned "root" device.
-> >>
-> >> This patch removes or replaces with NULL such references.
-> >>
-> >> Signed-off-by: Pawel Moll <pawel.moll@arm.com>
-> >> ---
-> >>  arch/arm/mach-bcm/board_bcm21664.c      |  3 +--
-> >>  arch/arm/mach-bcm/board_bcm281xx.c      |  3 +--
-> >>  arch/arm/mach-clps711x/board-edb7211.c  |  6 +++---
-> >>  arch/arm/mach-clps711x/board-p720t.c    |  6 +++---
-> >>  arch/arm/mach-imx/mach-mx27ads.c        |  2 +-
-> >>  arch/arm/mach-shmobile/board-ape6evm.c  | 14 +++++++-------
-> >>  arch/arm/mach-shmobile/board-bockw.c    | 19 ++++++++----------
-> >>  arch/arm/mach-shmobile/board-genmai.c   |  5 ++---
-> >>  arch/arm/mach-shmobile/board-koelsch.c  | 26 ++++++++++++-------------
-> >>  arch/arm/mach-shmobile/board-lager.c    | 34 ++++++++++++++-------------------
-> >>  arch/arm/mach-shmobile/board-marzen.c   |  1 -
-> >>  arch/arm/mach-shmobile/setup-r7s72100.c |  2 +-
-> >>  arch/arm/mach-shmobile/setup-r8a73a4.c  |  8 ++++----
-> >>  arch/arm/mach-shmobile/setup-r8a7778.c  | 13 ++++++-------
-> >>  arch/arm/mach-shmobile/setup-r8a7779.c  |  6 +++---
-> >>  arch/arm/mach-shmobile/setup-r8a7790.c  | 10 +++++-----
-> >>  arch/arm/mach-shmobile/setup-r8a7791.c  |  8 ++++----
-> >>  arch/unicore32/kernel/puv3-core.c       |  2 +-
-> >>  arch/unicore32/kernel/puv3-nb0916.c     |  6 +++---
-> >>  19 files changed, 79 insertions(+), 95 deletions(-)
-> >
-> > Looks good, if there are no objections, I'll take this through my
-> > driver-core tree, so that your follow-on patches that change things will
-> > still apply.
-> 
-> Acked-by: Olof Johansson <olof@lixom.net>
-> 
-> Just in case we end up having dependent patches and/or lots of
-> conflicts, can you stick these on a short topic branch that we can
-> also pull in?
+On Wed, Jul 23, 2014 at 7:33 PM, Mike Turquette
+<mike.turquette@linaro.org> wrote:
+> Quoting Viresh Kumar (2014-07-20 05:07:32)
+>> On 19 July 2014 20:54, Santosh Shilimkar <santosh.shilimkar@ti.com> wrote:
+>> > Sorry for jumping late
+>>
+>> No, you aren't late. Its just 2 days old thread :)
+>>
+>> > but one of the point I was raising as part of your
+>> > other series was to extend the CPU topology bindings to cover the voltage
+>> > domain information which is probably what is really needed to let the
+>> > CPUfreq extract the information. Not sure if it was already discussed.
+>>
+>> Not it wasn't.
+>>
+>> > After all the CPU clocks, cluster, clock-gating, power domains are pretty much
+>> > related. So instead of having new binding for CPUFreq, I was wondering whether
+>> > we can extend the CPU topology binding information to include missing information.
+>> > Scheduler work anyway needs that information.
+>> >
+>> > Ref: Documentation/devicetree/bindings/arm/topology.txt
+>> >
+>> > Does that make sense ?
+>>
+>> Yeah it does, but I am not sure what exactly the bindings should look then.
+>> So, the most basic step could be moving the new bindings to topology.txt
+>> and name clock-master to dvfs-master.
+>>
+>> What else?
+>
+> If we're going to model the hardware then the binding should not use the
+> CPU phandles in "clock-master" or "dvfs-master". The correct thing to
+> model for a given CPU is which clock consumes. It's not accurate to say
+> that one CPU is the "master", at least not in this context.
+>
+> A previous approach tried to compare struct clk pointers, which is a bad
+> idea since those are just cookies and should not be deref'd by drivers.
+> However a similar approach would be to compare the phandle, right?
 
-Hm, I don't normally do "short topic branches", so I've just stuck it
-into my driver-core-next branch of my driver-core.git tree on
-kernel.org.  I doubt the "make platform_bus static" or "make it a
-platform device" will happen soon, given my questions on the other patch
-in this series.
+I think there needs to be a way to query whether a rate change for a
+clock affects other children. As pointed out previously, the clock to
+a core may not be shared, but it's parent that can change rates could
+be shared. This could be done with functions
+clk_get_parent_rate_change to return the clock in heirarchy which can
+change rates, and clk_is_parent_clk which tells if one clock is a
+child of another clock. It's been a while since I've looked at the
+clock api. It could also be done by experiment. Change the rate for
+core 0 and see if core 1's rate is changed and still equal. There's
+probably some ordering issue with doing that though.
 
-thanks,
-
-greg k-h
+Rob
