@@ -1,163 +1,126 @@
-From: svarbanov@mm-sol.com (Stanimir Varbanov)
-Date: Thu, 24 Jul 2014 15:45:21 +0300
-Subject: [PATCH v3 4/4] mfd: pm8921: rename pm8921-core driver
-In-Reply-To: <1406205921-7452-1-git-send-email-svarbanov@mm-sol.com>
-References: <1406205921-7452-1-git-send-email-svarbanov@mm-sol.com>
-Message-ID: <1406205921-7452-5-git-send-email-svarbanov@mm-sol.com>
+From: achandran@mvista.com (Arun Chandran)
+Date: Thu, 24 Jul 2014 18:19:20 +0530
+Subject: Kexec on arm64
+In-Reply-To: <20140724093603.GC4079@leverpostej>
+References: <CAFdej006OSyhgDcJ2iZdbjt+PtysN=i_+9Dr4GTmr=+t5yg4Kw@mail.gmail.com>
+ <1405443898.22585.7.camel@smoke>
+ <CAL85gmC9LLcN_uxMY1bM5kLx=N7rZGdGO3bmGHeUVo=Rqgk8uw@mail.gmail.com>
+ <1405551861.7262.26.camel@smoke>
+ <CAFdej03nixSU=3h+HYk2E3Onb2P3--Di0GM+wCwLS6ZNH7UjEQ@mail.gmail.com>
+ <CAFdej00J2mJwcg2Cy6CHVuuQZ4uQ2zZg8oErGPi0uPejievB+Q@mail.gmail.com>
+ <1406162287.4062.39.camel@smoke>
+ <20140724093603.GC4079@leverpostej>
+Message-ID: <CAFdej02saQv=SMgV75LrB_5BMH+8DZL8MLdToq1rs577AbO-Vg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The pm8921-core driver presently supports pm8921 and pm8058
-Qualcomm PMICs.  To avoid confusion with new generation PMICs
-(like pm8941) rename the pm8921-core driver to more
-appropriate name pm8xxx-ssbi, which reflects better that
-those chips use SSBI interface.
+On Thu, Jul 24, 2014 at 3:06 PM, Mark Rutland <mark.rutland@arm.com> wrote:
+> On Thu, Jul 24, 2014 at 01:38:07AM +0100, Geoff Levand wrote:
+>> Hi Arun,
+>>
+>> On Tue, 2014-07-22 at 18:55 +0530, Arun Chandran wrote:
+>>
+>> > I tried the same dtb with UP configuration. For UP kernel to compile
+>> > did the below modifications
+>>
+>> I'll test and fixup the kexec UP build in the next few days.
+>>
+>> ...
+>>
+>> > With the default target configuration "kexec -e" failed to execute
+>> > in UP scenario also.
+>
+> It would be helpful to know _how_ it failed. Do you have any log output?
 
-Signed-off-by: Stanimir Varbanov <svarbanov@mm-sol.com>
-Acked-by: Lee Jones <lee.jones@linaro.org>
----
- drivers/mfd/Kconfig                          |   14 +++++-----
- drivers/mfd/Makefile                         |    2 +-
- drivers/mfd/{pm8921-core.c => pm8xxx-ssbi.c} |   38 +++++++++++++-------------
- 3 files changed, 27 insertions(+), 27 deletions(-)
- rename drivers/mfd/{pm8921-core.c => pm8xxx-ssbi.c} (92%)
+I don't have any error log for for this.
+If I loop before jumping to relocate_new_kernel and break with
+BDI I can see.
 
-diff --git a/drivers/mfd/Kconfig b/drivers/mfd/Kconfig
-index 122e2d9..884bc32 100644
---- a/drivers/mfd/Kconfig
-+++ b/drivers/mfd/Kconfig
-@@ -507,8 +507,8 @@ config UCB1400_CORE
- config MFD_PM8XXX
- 	tristate
- 
--config MFD_PM8921_CORE
--	tristate "Qualcomm PM8921 PMIC chip"
-+config MFD_PM8XXX_SSBI
-+	tristate "Qualcomm PM8XXX SSBI PMICs"
- 	depends on (ARM || HEXAGON)
- 	select IRQ_DOMAIN
- 	select MFD_CORE
-@@ -516,13 +516,13 @@ config MFD_PM8921_CORE
- 	select REGMAP
- 	help
- 	  If you say yes to this option, support will be included for the
--	  built-in PM8921 PMIC chip.
-+	  built-in PM8921 and PM8058 PMIC chips.
- 
--	  This is required if your board has a PM8921 and uses its features,
--	  such as: MPPs, GPIOs, regulators, interrupts, and PWM.
-+	  This is required if your board has a PM8921 or PM8058 and uses
-+	  its features, such as: MPPs, GPIOs, regulators, interrupts, and PWM.
- 
--	  Say M here if you want to include support for PM8921 chip as a module.
--	  This will build a module called "pm8921-core".
-+	  Say M here if you want to include support for PM8921 or PM8058 chip
-+	  as a module. This will build a module called "pm8xxx-ssbi".
- 
- config MFD_PM8XXX_SPMI
- 	tristate "Qualcomm PM8XXX SPMI PMICs"
-diff --git a/drivers/mfd/Makefile b/drivers/mfd/Makefile
-index 93d82cc..d332085 100644
---- a/drivers/mfd/Makefile
-+++ b/drivers/mfd/Makefile
-@@ -152,7 +152,7 @@ obj-$(CONFIG_MFD_SI476X_CORE)	+= si476x-core.o
- 
- obj-$(CONFIG_MFD_CS5535)	+= cs5535-mfd.o
- obj-$(CONFIG_MFD_OMAP_USB_HOST)	+= omap-usb-host.o omap-usb-tll.o
--obj-$(CONFIG_MFD_PM8921_CORE) 	+= pm8921-core.o ssbi.o
-+obj-$(CONFIG_MFD_PM8XXX_SSBI) 	+= pm8xxx-ssbi.o ssbi.o
- obj-$(CONFIG_MFD_PM8XXX_SPMI)	+= pm8xxx-spmi.o
- obj-$(CONFIG_TPS65911_COMPARATOR)	+= tps65911-comparator.o
- obj-$(CONFIG_MFD_TPS65090)	+= tps65090.o
-diff --git a/drivers/mfd/pm8921-core.c b/drivers/mfd/pm8xxx-ssbi.c
-similarity index 92%
-rename from drivers/mfd/pm8921-core.c
-rename to drivers/mfd/pm8xxx-ssbi.c
-index 9595138..102d7fb 100644
---- a/drivers/mfd/pm8921-core.c
-+++ b/drivers/mfd/pm8xxx-ssbi.c
-@@ -277,14 +277,14 @@ static const struct regmap_config ssbi_regmap_config = {
- 	.reg_write = ssbi_reg_write
- };
- 
--static const struct of_device_id pm8921_id_table[] = {
-+static const struct of_device_id pm8xxx_id_table[] = {
- 	{ .compatible = "qcom,pm8058", },
- 	{ .compatible = "qcom,pm8921", },
- 	{ }
- };
--MODULE_DEVICE_TABLE(of, pm8921_id_table);
-+MODULE_DEVICE_TABLE(of, pm8xxx_id_table);
- 
--static int pm8921_probe(struct platform_device *pdev)
-+static int pm8xxx_probe(struct platform_device *pdev)
- {
- 	struct regmap *regmap;
- 	int irq, rc;
-@@ -354,18 +354,18 @@ static int pm8921_probe(struct platform_device *pdev)
- 	return rc;
+CPU#0>state
+Core#0: halted 0x0000004000094230 External Debug Request
+
+CPU#0>rd
+GPR00: 000000000000003f 0000000034d5d918 0000004000000000 0000000000000004
+GPR04: 000000000000001f 000000000000001b 0000000000000000 ffffffffffffffff
+GPR08: 0000000000000014 ffffffffffffffff 0000000000000000 0000000000000002
+GPR12: ffffffc000085030 aa0e03ed3600004a 9100218cf940018a ffffffffffffffff
+GPR16: ffffffc0000cc00c 0000000000434260 0000007ffe514d80 00000043eadd2000
+GPR20: ffffffc3eadd2000 ffffffc000cc5000 ffffffc3ea42bf88 00000003eadd2000
+GPR24: ffffffc0004ada58 ffffffc0005b2e68 ffffffc0005b2e88 ffffffc0005b2ef0
+GPR28: ffffffc000092000 ffffffc3f017bce0 ffffffc000085054 ffffffc3f017bce0
+
+x0 contains a corrupted address in this case
+
+If I do the same without dosabling Dcache
+#######
+diff --git a/arch/arm64/kernel/process.c b/arch/arm64/kernel/process.c
+index 6bc85f78..61f95a2 100644
+--- a/arch/arm64/kernel/process.c
++++ b/arch/arm64/kernel/process.c
+@@ -70,10 +70,10 @@ static void setup_restart(void)
+        flush_cache_all();
+
+        /* Turn D-cache off */
+-       cpu_cache_off();
++//     cpu_cache_off();
+
+        /* Push out any further dirty data, and ensure cache is empty */
+-       flush_cache_all();
++//     flush_cache_all();
  }
- 
--static int pm8921_remove_child(struct device *dev, void *unused)
-+static int pm8xxx_remove_child(struct device *dev, void *unused)
- {
- 	platform_device_unregister(to_platform_device(dev));
- 	return 0;
- }
- 
--static int pm8921_remove(struct platform_device *pdev)
-+static int pm8xxx_remove(struct platform_device *pdev)
- {
- 	int irq = platform_get_irq(pdev, 0);
- 	struct pm_irq_chip *chip = platform_get_drvdata(pdev);
- 
--	device_for_each_child(&pdev->dev, NULL, pm8921_remove_child);
-+	device_for_each_child(&pdev->dev, NULL, pm8xxx_remove_child);
- 	irq_set_chained_handler(irq, NULL);
- 	irq_set_handler_data(irq, NULL);
- 	irq_domain_remove(chip->irqdomain);
-@@ -373,29 +373,29 @@ static int pm8921_remove(struct platform_device *pdev)
- 	return 0;
- }
- 
--static struct platform_driver pm8921_driver = {
--	.probe		= pm8921_probe,
--	.remove		= pm8921_remove,
-+static struct platform_driver pm8xxx_driver = {
-+	.probe		= pm8xxx_probe,
-+	.remove		= pm8xxx_remove,
- 	.driver		= {
--		.name	= "pm8921-core",
-+		.name	= "pm8xxx-ssbi",
- 		.owner	= THIS_MODULE,
--		.of_match_table = pm8921_id_table,
-+		.of_match_table = pm8xxx_id_table,
- 	},
- };
- 
--static int __init pm8921_init(void)
-+static int __init pm8xxx_init(void)
- {
--	return platform_driver_register(&pm8921_driver);
-+	return platform_driver_register(&pm8xxx_driver);
- }
--subsys_initcall(pm8921_init);
-+subsys_initcall(pm8xxx_init);
- 
--static void __exit pm8921_exit(void)
-+static void __exit pm8xxx_exit(void)
- {
--	platform_driver_unregister(&pm8921_driver);
-+	platform_driver_unregister(&pm8xxx_driver);
- }
--module_exit(pm8921_exit);
-+module_exit(pm8xxx_exit);
- 
- MODULE_LICENSE("GPL v2");
--MODULE_DESCRIPTION("PMIC 8921 core driver");
-+MODULE_DESCRIPTION("PMIC PM8XXX SSBI driver");
- MODULE_VERSION("1.0");
--MODULE_ALIAS("platform:pm8921-core");
-+MODULE_ALIAS("platform:pm8xxx-ssbi");
--- 
-1.7.0.4
+
+ void soft_restart(unsigned long addr)
+##########
+I can see
+
+CPU#0>state
+Core#0: halted 0x0000004000094230 External Debug Request
+
+CPU#0>
+CPU#0>rd
+GPR00: 00000043eae90000 0000000034d5d91c 0000004000000000 0000000000000004
+GPR04: 000000000000001f 000000000000001b 0000000000000000 ffffffffffffffff
+GPR08: 0000000000000014 ffffffffffffffff 0000000000000000 0000000000000002
+GPR12: ffffffc000085028 aa0e03ed3600004a 9100218cf940018a ffffffffffffffff
+GPR16: ffffffc0000cc00c 0000000000434260 0000007fe79f31e0 00000043eae90000
+GPR20: ffffffc3eae90000 ffffffc000cc5000 ffffffc3ea42ef88 00000003eae90000
+GPR24: ffffffc0004ada58 ffffffc0005b2e68 ffffffc0005b2e88 ffffffc0005b2ef0
+GPR28: ffffffc000092000 ffffffc3ebad7ce0 ffffffc00008504c ffffffc3ebad7ce0
+CPU#0>
+CPU#0>go 0x00000043eae90000
+CPU#0>
+CPU#0>
+CPU#0>h
+    Core number       : 0
+    Core state        : debug (AArch64 EL1)
+    Debug entry cause : External Debug Request
+    Current PC        : 0xffffffc000083200
+    Current CPSR      : 0x600003c5 (EL1h)
+
+In this case x0 contais the correct jump address; but kexeced
+goes to " 0xffffffc000083200". It did not print anything at
+console.
+
+If you have any other experiments to find the root cause
+please tell me I can do it.
+
+>
+>> >
+>> > But I had some luck when I did the same steps with L3 cache
+>> > disabled. According to http://www.spinics.net/lists/arm-kernel/msg329541.html
+>> > it has an L3 cache. Luckily I was able to disable it in u-boot.
+>> >
+>> > With the L3 cache disabled configuration I am able to
+>> > do "kexec -e". Please see the log attached.
+>
+> Hmm. We don't expect the kernel to do any L3 management. It seems that
+> memory subsystems with L3 caches respecting cache maintenance by VA are
+> going to become relatively common, and we expect to handle them all by
+> performing maintenance by VA. See commit c218bca74eea (arm64: Relax the
+> kernel cache requirements for boot) for what we do at boot time.
+>
+
+I will confirm this by booting with L3 cache enabled, reboot to u-boot,
+don't flush L3 from u-boot and again boot to linux.
+
+--Arun
