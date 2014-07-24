@@ -1,57 +1,33 @@
-From: peter.griffin@linaro.org (Peter Griffin)
-Date: Thu, 24 Jul 2014 15:14:12 +0100
-Subject: [PATCH v2 1/3] usb: host: st-hcd: Add USB HCD support for STi SoCs
-In-Reply-To: <5967609.vndF2bDyS1@wuerfel>
-References: <1406199616-10533-1-git-send-email-peter.griffin@linaro.org>
- <11018717.Ey5qEJxGNJ@wuerfel>
- <20140724122254.GA15266@griffinp-ThinkPad-X1-Carbon-2nd>
- <5967609.vndF2bDyS1@wuerfel>
-Message-ID: <20140724141412.GA21823@griffinp-ThinkPad-X1-Carbon-2nd>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Thu, 24 Jul 2014 16:18:13 +0200
+Subject: [PATCH] arm64/crypto: fix makefile rule for aes-glue-%.o
+In-Reply-To: <mvmr41aj2ob.fsf@hawking.suse.de>
+References: <mvmvbri4k06.fsf@hawking.suse.de>
+ <CAKv+Gu-NAVjMR-Jkw=W-8f7M5FSsQOSdzYN6A0kHDd1m0WA8EA@mail.gmail.com>
+ <mvmr4264i1p.fsf@hawking.suse.de>
+ <CAKv+Gu8SbM_Z=ymBFb2D4EWJeo-6dWuKqE2YNOkqJTKLDEJcYA@mail.gmail.com>
+ <mvm4my7j5xh.fsf@hawking.suse.de>
+ <CAKv+Gu-6rUxUnF+dRuroDJqy2K2B5F0r7_bm0X-vyiuQ-83W5w@mail.gmail.com>
+ <CAKv+Gu96k7GOVR85EXtro3Lt0jjiJqxyvT9cwJZ1qc6uzq97bw@mail.gmail.com>
+ <mvmvbqmj3b2.fsf@hawking.suse.de>
+ <CAKv+Gu_9HRwAxkJjT3KRvDbupp0yzstyq1dXsXkTu9M6swdCKQ@mail.gmail.com>
+ <mvmr41aj2ob.fsf@hawking.suse.de>
+Message-ID: <CAKv+Gu_z4VTssLDhiQxi8DRJNEUgzrM5bFzje8NXEmBiA2vqeg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Arnd,
+On 24 July 2014 15:40, Andreas Schwab <schwab@suse.de> wrote:
+> Ard Biesheuvel <ard.biesheuvel@linaro.org> writes:
+>
+>> On 24 July 2014 15:26, Andreas Schwab <schwab@suse.de> wrote:
+>>> You are not using CONFIG_MODVERSIONS.
+>>>
+>>
+>> I am
+>
+> No, you aren't, since you say that your .cmd contains a command to
+> create aes-glue-ce.o, which with CONFIG_MODVERSIONS it doesn't.
+>
 
-
-<snip>
-> > 
-> > I'm of course happy to change it if required. I see looking through that a lot 
-> > of other platforms do it the way you describe with a
-> > 
-> > ehci-<platname>.c and ohci-<platname>.c
-> 
-> Right. We are trying to  gradually move some of them over to use the
-> generic *hci-platform.c drivers though.
-
-Right, ok I understand.
- 
-> > > Depending on what kind of special requirements the ST version has,
-> > > this can be done either by using the generic ohci/ehci bindings
-> > > with extensions where necessary, or by creating a new binding and
-> > > new driver files that use 'ohci_init_driver'/'ehci_init_driver'
-> > > to inherit from the common code.
-> > > 
-> > > The first of the two approaches is preferred.
-> > 
-> > We don't have anything particularly special, just a couple of reset lines,
-> > clock, phy, etc.
-> 
-> Ok, good. Please see Documentation/devicetree/bindings/usb/usb-?hci.txt
-> then. You might actually be able to just use the existing drivers
-> without new code by just adding the proper DT nodes that follow these
-> bindings.
-
-The only issues I can see with the generic versions are: -
-1) We also have a powerdown line in addition to the reset line both of which are 
-exposed via reset controller API, so I would need to add that into ehci-platform
-and ohci-platform.
-
-2) We have a magic poke in st_ehci_configure_bus of the current driver to configure
-the AHB to ST bus protocol convertor IP. I'm not quite sure where I could hook that
-in (sorry... slightly pulling back on my "nothing special comment" a bit ;-).
-
-3) We also set the rate of the ohci clock, which the generic driver doesn't do.
-
-regards,
-
-Peter.
+OK, you're right, it contains a command to create .tmp_aes-glue-ce.o.
+But I am still not seeing the error you are seeing, strangely enough.
