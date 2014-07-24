@@ -1,39 +1,39 @@
-From: andrew@lunn.ch (Andrew Lunn)
-Date: Thu, 24 Jul 2014 16:29:18 +0200
-Subject: [PATCH 2/2] ARM: mvebu: Added dts defintion for Lenovo Iomega
- ix4-300d NAS
-In-Reply-To: <20140724140757.GW23220@titan.lakedaemon.net>
-References: <1406154923-13612-2-git-send-email-yahoo@perenite.com>
- <20140723224236.GC28485@lunn.ch>
- <94F87063-D717-435B-B7C5-EDAC9B26742C@perenite.com>
- <20140723225841.GD28485@lunn.ch>
- <10A7C530-7CD2-4ED0-889A-7FAC1922320F@perenite.com>
- <20140723231535.GK23220@titan.lakedaemon.net>
- <53D0FA2F.6050209@free-electrons.com>
- <20140724124520.GV23220@titan.lakedaemon.net>
- <C2E7C8C1-1198-4785-AB9C-C27B5E27A8D4@perenite.com>
- <20140724140757.GW23220@titan.lakedaemon.net>
-Message-ID: <20140724142918.GG28485@lunn.ch>
+From: broonie@kernel.org (Mark Brown)
+Date: Thu, 24 Jul 2014 15:43:27 +0100
+Subject: [PATCH 04/19] ARM64 / ACPI: Introduce arch_fix_phys_package_id()
+ for cpu topology
+In-Reply-To: <1406206825-15590-5-git-send-email-hanjun.guo@linaro.org>
+References: <1406206825-15590-1-git-send-email-hanjun.guo@linaro.org>
+ <1406206825-15590-5-git-send-email-hanjun.guo@linaro.org>
+Message-ID: <20140724144327.GJ17528@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> The only outstanding point (Arnd?), is that I think it's ok to have the
-> i2c...a0 compatible string in the dts files, but Andrew seems to think
-> otherwise.  Is that still true Andrew?
+On Thu, Jul 24, 2014 at 09:00:10PM +0800, Hanjun Guo wrote:
 
-Hi Jason
+> +/*
+> + * Use the CPU slot number provided by ACPI to update the physical
+> + * package id when cpuid_topo->cluster_id is not available, then we
+> + * can get the right value in the "physical id" field of /proc/cpuinfo.
+> + */
+> +void arch_fix_phys_package_id(int num, u32 slot)
+> +{
+> +	struct cpu_topology *cpuid_topo = &cpu_topology[num];
+> +
+> +	if (cpuid_topo->cluster_id == -1)
+> +		cpuid_topo->cluster_id = slot;
+> +}
+> +EXPORT_SYMBOL_GPL(arch_fix_phys_package_id);
 
-I can live with i2c...a0 compatible string, but it has minor problems:
-
-1) The binding Documentation says not to do it. So we are ignoring our
-   own documentation.
-
-2) It seems likely that at some point the OEM will swap to B1 revision
-   SoCs. The i2c device then does not require this quirk, but we have
-   hard coded in the DT file that it is required. B1 revision would
-   work, but not optimally.
-
-So i would prefer not to explicitly enable the quirk, but determine at
-run time if the quirk is needed for the SoC revision it is running on.
-
-    Andrew
+As I said on the previous version of this patch are you sure this runs
+at a point between the cluster ID getting initialized to -1 and the slot
+being initialized (bear in mind that we now use MPIDR information if
+availabe).  I don't understand why we don't just unconditionally use the
+value given.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140724/ea69f852/attachment.sig>
