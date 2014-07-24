@@ -1,43 +1,31 @@
-From: john.tobias.ph@gmail.com (John Tobias)
-Date: Thu, 24 Jul 2014 11:40:28 -0700
-Subject: iMX6Q - PCIe
-In-Reply-To: <20140724095410.1b9bb401@e6520eb>
-References: <CACUGKYP9w+qUUtp2LRKgD-Dz+2pubFeX82dGQ6tiv2Ji6VgVig@mail.gmail.com>
- <20140724001622.2b475138@e6520eb>
- <CACUGKYMpgN6PY5hrzNuM3KbT2+ZZtZ8M3es8QkXLxMD_hVcEAQ@mail.gmail.com>
- <20140724095410.1b9bb401@e6520eb>
-Message-ID: <CACUGKYONXE+8Avuzr5yHaqsKk0TBQ9vH9uoU-BZdBUhA76F6vw@mail.gmail.com>
+From: javier.martinez@collabora.co.uk (Javier Martinez Canillas)
+Date: Thu, 24 Jul 2014 20:43:00 +0200
+Subject: [PATCH 1/1] ARM: exynos_defconfig: Enable SBS battery support
+Message-ID: <1406227380-3569-1-git-send-email-javier.martinez@collabora.co.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Eric,
+Many Exynos5 boards (e.g: Snow, Peach Pit and Pi) have
+a SBS-compliant gas gauge battery. Enable it as module
+so the needed support is available for these boards.
 
-Thanks for the info.
+Suggested-by: Doug Anderson <dianders@chromium.org>
+Signed-off-by: Javier Martinez Canillas <javier.martinez@collabora.co.uk>
+---
+ arch/arm/configs/exynos_defconfig | 1 +
+ 1 file changed, 1 insertion(+)
 
-I tested 3 PCIe modules and one of them got working properly on kernel
-3.15.2 and the fsl kernel 3.10.17.
-
-
-Regards,
-
-john
-
-
-On Thu, Jul 24, 2014 at 12:54 AM, Eric B?nard <eric@eukrea.com> wrote:
-> Hi John,
->
-> Le Wed, 23 Jul 2014 15:44:47 -0700,
-> John Tobias <john.tobias.ph@gmail.com> a ?crit :
->> I have a few questions:
->>
->> 1. May I know what FSL's kernel version you are using?.
-> was 3.0.35 + backport from 3.14 for 802.11 + ath9k from
-> http://drvbp1.linux-foundation.org/~mcgrof/rel-html/backports/
->
->> 2. Did you make changes in your device tree for PCIe?.
-> no DT on this kernel
->
->> 3. Can I have the model/part # of your ath9k?.
-> tested with Mikrotik R11E & Ubiquiti SR71
->
-> Eric
+diff --git a/arch/arm/configs/exynos_defconfig b/arch/arm/configs/exynos_defconfig
+index fc7d168..c390bb9 100644
+--- a/arch/arm/configs/exynos_defconfig
++++ b/arch/arm/configs/exynos_defconfig
+@@ -77,6 +77,7 @@ CONFIG_SPI_S3C64XX=y
+ CONFIG_I2C_S3C2410=y
+ CONFIG_DEBUG_GPIO=y
+ CONFIG_POWER_SUPPLY=y
++CONFIG_BATTERY_SBS=m
+ CONFIG_CHARGER_TPS65090=y
+ # CONFIG_HWMON is not set
+ CONFIG_THERMAL=y
+-- 
+2.0.0.rc2
