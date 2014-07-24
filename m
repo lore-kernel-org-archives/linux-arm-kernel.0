@@ -1,89 +1,72 @@
-From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Thu, 24 Jul 2014 14:21:03 +0200
-Subject: [PATCH 2/2] ARM: mvebu: Added dts defintion for Lenovo Iomega
- ix4-300d NAS
-In-Reply-To: <20140723231535.GK23220@titan.lakedaemon.net>
-References: <1406154923-13612-1-git-send-email-yahoo@perenite.com>
- <1406154923-13612-2-git-send-email-yahoo@perenite.com>
- <20140723224236.GC28485@lunn.ch>
- <94F87063-D717-435B-B7C5-EDAC9B26742C@perenite.com>
- <20140723225841.GD28485@lunn.ch>
- <10A7C530-7CD2-4ED0-889A-7FAC1922320F@perenite.com>
- <20140723231535.GK23220@titan.lakedaemon.net>
-Message-ID: <53D0FA2F.6050209@free-electrons.com>
+From: peter.griffin@linaro.org (Peter Griffin)
+Date: Thu, 24 Jul 2014 13:22:54 +0100
+Subject: [PATCH v2 1/3] usb: host: st-hcd: Add USB HCD support for STi SoCs
+In-Reply-To: <11018717.Ey5qEJxGNJ@wuerfel>
+References: <1406199616-10533-1-git-send-email-peter.griffin@linaro.org>
+ <1406199616-10533-2-git-send-email-peter.griffin@linaro.org>
+ <11018717.Ey5qEJxGNJ@wuerfel>
+Message-ID: <20140724122254.GA15266@griffinp-ThinkPad-X1-Carbon-2nd>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 24/07/2014 01:15, Jason Cooper wrote:
-> On Thu, Jul 24, 2014 at 01:11:12AM +0200, Benoit Masson wrote:
->> Le 24 juil. 2014 ? 00:58, Andrew Lunn <andrew@lunn.ch> a ?crit :
->>
->>>> For the marvell,mv78230-a0-i2c unfortunately i've spend 3 hours
->>>> trying to understand this but it only works with this on the
->>>> ix4-300d :(. There was multiple patch around this and maybe one
->>>> broke the auto-detect part of this, I've tried compiling with some
->>>> 3.10 or lower kernel but no luck here I still have to put this a0
->>>> option.
->>>
->>> Lets first confirm you have an a0 SoC.
->>>
->>> At boot time, it should print:
->>>
->>> pr_info("MVEBU SoC ID=0x%X, Rev=0x%X\n", soc_dev_id, soc_rev);
->>>
->>> What revision do you have?
->>>
->>> If the auto detect code really is broken, Gregory will likely take a
->>> look.
->>
->> I sure do,
->>
->> confirmed by u-boot  output below:
->>
->> U-Boot 2009.08 (Mar 04 2013 - 11:13:04) Marvell version:  2.3.2 PQ
->> U-Boot Addressing:
->>        Code:..00600000:006BFFF0
->>        BSS:..00708EC0
->>        Stack:..0x5fff70
->>        PageTable:.0x8e0000
->>        Heap address:.0x900000:0xe00000
->> Board: DB-78230-BP rev 2.0 Wistron
->> SoC:   MV78230 A0
->>
->> From kernel I get:
->>
->> mvebu-soc-id: MVEBU SoC ID=0x7823, Rev=0x1
+Hi Arnd,
+
+Thanks for reviewing, see my comments below: -
+
+> Unfortunately, this seems to be done in a rather strange way,
+> I suspect you'll have to start over, but I'll let Alan and Greg
+> weigh in.
 > 
-> Well, isn't that a peach?  :)  Gregory?
+> > +
+> > +struct st_hcd_dev {
+> > +	int port_nr;
+> > +	struct platform_device *ehci_device;
+> > +	struct platform_device *ohci_device;
+> > +	struct clk *ic_clk;
+> > +	struct clk *ohci_clk;
+> > +	struct reset_control *pwr;
+> > +	struct reset_control *rst;
+> > +	struct phy *phy;
+> > +};
+> 
+> The way you do this apparently is to create a device that encapsulates
+> the OHCI and the EHCI and then goes on to create child devices that
+> are bound to the real drivers.
 
-A peach?? For me it is either a fruit or a princess, so I am puzzled!
-
-Well about the issue, we patch the device tree for the i2c quirk only for
-the openblock AX3. If I remember well it was because the device tree was already
-written for this board before we found there was an issue with the A0 version of the
-CPU. The rule was that for new boards then they have to set the marvell,mv78230-a0-i2c
-compatible string. I also didn't expect that we found "new" product using the A0 version.
-
-We have 3 options now:
-
-- remove the check on the openblock AX3 board and always try to apply the quirck for A0 version
-- add a check for this new board in the mvebu_dt_init function
-- let the compatible string marvell,mv78230-a0-i2c in this dts
-
-I would prefer the option 1 but I fear that Arnd would prefer the 2 other options.
-
-Gregory
-
+Yes, although this isn't the first driver to take that approach USB_HCD_BCMA
+(bcma-hcd.c) and USB_HCD_SSB (ssb-hcd.c) do much the same thing.
 
 > 
-> thx,
-> 
-> Jason.
-> 
+> The way it should be done however is to put the two host controllers
+> into DT directly and describe their resources (phy, clock, reset, ...)
+> using the DT bindings for those.
 
+I'm of course happy to change it if required. I see looking through that a lot 
+of other platforms do it the way you describe with a
 
--- 
-Gregory Clement, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
+ehci-<platname>.c and ohci-<platname>.c 
+> 
+> Depending on what kind of special requirements the ST version has,
+> this can be done either by using the generic ohci/ehci bindings
+> with extensions where necessary, or by creating a new binding and
+> new driver files that use 'ohci_init_driver'/'ehci_init_driver'
+> to inherit from the common code.
+> 
+> The first of the two approaches is preferred.
+
+We don't have anything particularly special, just a couple of reset lines,
+clock, phy, etc.
+> 
+> > +	pdev->dev.parent = &parent->dev;
+> > +	pdev->dev.dma_mask = &pdev->dev.coherent_dma_mask;
+> > +	pdev->dev.coherent_dma_mask = DMA_BIT_MASK(32);
+> 
+> This is something we shouldn't ever do these days, the DMA settings
+> should come directly from DT without driver interaction.
+
+Ok, I'll wait to hear the outcome of Greg/Alans views before either fixing
+it or starting over.
+
+regards,
+
+Peter.
