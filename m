@@ -1,51 +1,54 @@
-From: soren.brinkmann@xilinx.com (=?utf-8?B?U8O2cmVu?= Brinkmann)
-Date: Thu, 24 Jul 2014 16:28:16 -0700
-Subject: [PATCH v2 06/11] ARM: dts: zynq: Add DMAC for Parallella
-In-Reply-To: <1406242820-20140-7-git-send-email-afaerber@suse.de>
-References: <1406242820-20140-1-git-send-email-afaerber@suse.de>
- <1406242820-20140-7-git-send-email-afaerber@suse.de>
-Message-ID: <bc390439-9a5b-43a1-a70c-a4c6517a6cb6@BN1AFFO11FD005.protection.gbl>
+From: kgene.kim@samsung.com (Kukjin Kim)
+Date: Fri, 25 Jul 2014 08:29:25 +0900
+Subject: [GIT PULL 1/2] 2nd Samsung power related updates for v3.17
+Message-ID: <53D196D5.3030307@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 2014-07-25 at 01:00AM +0200, Andreas F?rber wrote:
-> Signed-off-by: Andreas F?rber <afaerber@suse.de>
-> ---
->  v2: New
->  
->  arch/arm/boot/dts/zynq-7000.dtsi      | 17 +++++++++++++++++
->  arch/arm/boot/dts/zynq-parallella.dts |  4 ++++
->  2 files changed, 21 insertions(+)
-> 
-> diff --git a/arch/arm/boot/dts/zynq-7000.dtsi b/arch/arm/boot/dts/zynq-7000.dtsi
-> index eed3df0..1a70277 100644
-> --- a/arch/arm/boot/dts/zynq-7000.dtsi
-> +++ b/arch/arm/boot/dts/zynq-7000.dtsi
-> @@ -223,6 +223,23 @@
->  			};
->  		};
->  
-> +		dmac_s: dmac at f8003000 {
-> +			compatible = "arm,pl330", "arm,primecell";
-> +			reg = <0xf8003000 0x1000>;
-> +			status = "disabled";
-I think for this IP we can omit the 'status' property since it is always
-enabled. I don't see a reason to override it in each board DT.
+The following changes since commit 5f534d10d223636b3cd214376471fcfef71baea2:
 
-> +			interrupt-parent = <&intc>;
-> +			interrupts = <0 13 4>,
-> +			             <0 14 4>, <0 15 4>,
-> +			             <0 16 4>, <0 17 4>,
-> +			             <0 40 4>, <0 41 4>,
-> +			             <0 42 4>, <0 43 4>;
-> +			#dma-cells = <1>;
-> +			#dma-channels = <8>;
-> +			#dma-requests = <4>;
-> +			clocks = <&clkc 27>;
-> +			clock-names = "apb_pclk";
-> +		};
-> +
+   Merge branch 'v3.17-next/cpuidle-exynos' into v3.17-next/power-exynos 
+(2014-07-23 08:18:15 +0900)
 
-Acked-by: Soren Brinkmann <soren.brinkmann@xilinx.com>
+are available in the git repository at:
 
-	S?ren
+
+   git://git.kernel.org/pub/scm/linux/kernel/git/kgene/linux-samsung.git 
+tags/power-exynos
+
+for you to fetch changes up to 6887d9e5682886b5d9fe81217ff2f1410724cdb9:
+
+   ARM: EXYNOS: Move cpufreq and cpuidle device registration to 
+init_machine (2014-07-23 08:20:38 +0900)
+
+----------------------------------------------------------------
+Samsung power management related updates for v3.17
+
+- support cluster power off on exynos5420 and exynos5800
+   to save power.
+- use PMU address via DT to remove PMU static mapping
+- remove exynos_cpuidle_init() and exynos_cpufreq_init()
+
+* Note that this is including tags/samsung-cleanup and
+tags/exynos-cpuidle are already merged into arm-soc.
+
+----------------------------------------------------------------
+Abhilash Kesavan (1):
+       ARM: EXYNOS: Support cluster power off on exynos5420/5800
+
+Pankaj Dubey (2):
+       ARM: EXYNOS: Refactored code for using PMU address via DT
+       ARM: EXYNOS: Move cpufreq and cpuidle device registration to 
+init_machine
+
+  arch/arm/mach-exynos/common.h                |  14 +-
+  arch/arm/mach-exynos/exynos.c                |  30 +-
+  arch/arm/mach-exynos/include/mach/map.h      |   3 -
+  arch/arm/mach-exynos/mcpm-exynos.c           |  70 ++--
+  arch/arm/mach-exynos/platsmp.c               |   4 +-
+  arch/arm/mach-exynos/pm.c                    |  76 ++--
+  arch/arm/mach-exynos/pmu.c                   |  40 +-
+  arch/arm/mach-exynos/regs-pmu.h              | 524 
++++++++++++++--------------
+  arch/arm/plat-samsung/include/plat/map-s5p.h |   1 -
+  9 files changed, 374 insertions(+), 388 deletions(-)
