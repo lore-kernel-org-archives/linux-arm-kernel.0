@@ -1,25 +1,30 @@
 From: marex@denx.de (Marek Vasut)
-Date: Thu, 24 Jul 2014 06:14:11 +0200
-Subject: [PATCH v4 1/2] i2c: add DMA support for freescale i2c driver
-In-Reply-To: <e97f086de6e9427f96ca5ac582031f86@BL2PR03MB338.namprd03.prod.outlook.com>
-References: <1396579272-19542-1-git-send-email-yao.yuan@freescale.com>
- <20140521080047.GC2708@katana>
- <e97f086de6e9427f96ca5ac582031f86@BL2PR03MB338.namprd03.prod.outlook.com>
-Message-ID: <201407240614.11878.marex@denx.de>
+Date: Thu, 24 Jul 2014 06:15:23 +0200
+Subject: [PATCH] ARM: dts: imx: Add alias for ethernet controller
+In-Reply-To: <20140724031753.GA6827@dragon>
+References: <1406167639-6911-1-git-send-email-marex@denx.de>
+ <20140724031753.GA6827@dragon>
+Message-ID: <201407240615.23329.marex@denx.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday, July 24, 2014 at 05:19:27 AM, Yao Yuan wrote:
-> On Fri, May 21, 2014 at 4:01 PM +0200, Wolfram Sang wrote:
-> > Ping. Any updates? I think this was pretty close to inclusion?
+On Thursday, July 24, 2014 at 05:17:55 AM, Shawn Guo wrote:
+> On Thu, Jul 24, 2014 at 04:07:19AM +0200, Marek Vasut wrote:
+> > commit 22970070e027cbbb9b2878f8f7c31d0d7f29e94d upstream.
+> > 
+> > Add alias for FEC ethernet on i.MX25, i.MX27, i.MX51 and i.MX53 to allow
+> > bootloaders (like U-Boot) patch-in the MAC address for FEC using this
+> > alias.
+> > 
+> > Signed-off-by: Marek Vasut <marex@denx.de>
+> > Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
+> > Cc: <stable@vger.kernel.org> # 3.14.x
 > 
-> Hi, Wolfram
-> 	Thanks for your concern. Sorry for my reply so late. I had on a business
-> trip for months. At that time I have no device to debug it. Now, I'm come
-> back and I will try my best to finish it. I have sent the patch for V5.
-> Thanks for your review.
+> Since the patch is already on mainline, and the submitting target is
+> 3.14.x stable kernel, you should really send it to Greg.
 
-So you have no means to test this ? Can this be tested on MX5 ? MX6 ?
+So this is not enough to add this "# 3.14.x" ? I followed the stable submissing 
+guidelines, but I probably missed something then ?
 
 Best regards,
 Marek Vasut
