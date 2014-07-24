@@ -1,30 +1,44 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 24 Jul 2014 13:42:10 +0200
-Subject: [PATCH] spi/pxa2xx-pci: Enable DMA binding through device name
-In-Reply-To: <1406196111-22861-1-git-send-email-hock.leong.kweh@intel.com>
-References: <1406196111-22861-1-git-send-email-hock.leong.kweh@intel.com>
-Message-ID: <10365151.12bEvS9Gvj@wuerfel>
+From: tony@atomide.com (Tony Lindgren)
+Date: Thu, 24 Jul 2014 04:43:49 -0700
+Subject: [GIT PULL] Few regression fixes for omaps for v3.16-rc series
+Message-ID: <20140724114348.GA29045@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday 24 July 2014 18:01:51 Kweh Hock Leong wrote:
-> From: "Chew, Chiau Ee" <chiau.ee.chew@intel.com>
-> 
-> Intel LPSS Baytrail supports two DMA controllers and SPI is only
-> using one of the DMA controller. During DMA channel request,
-> we need to ensure the requested Tx and Rx channels are from the correct
-> DMA controller. Thus, we add extra checking in filter callback funtion
-> by matching against the DMA controller device name.
-> 
-> Signed-off-by: Chew, Chiau Ee <chiau.ee.chew@intel.com>
-> Signed-off-by: Kweh, Hock Leong <hock.leong.kweh@intel.com>
+The following changes since commit 1d29a0722f6c38f79785c9ffb911730598de84e2:
 
-I'm confused. Doesn't  Bay Trail use ACPI to do the DMA
-engine configuration? That should set find the right device/chan_id/slave_id
-combination without any interaction, through the use of dma_request_slave_channel.
+  ARM: OMAP2+: Remove non working OMAP HDMI audio initialization (2014-07-08 01:08:44 -0700)
 
-On a related note, there seems to be a bug in this driver, which
-attempts to set the slave_id through dmaengine_slave_config(), which
-is wrong in both cases, ACPI and filter functions.
+are available in the git repository at:
 
-	Arnd
+  git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap tags/omap-for-v3.16/fixes-rc6
+
+for you to fetch changes up to 33753cd2ba41c72a0756edc5dc094d91602deda5:
+
+  ARM: OMAP2+: gpmc: fix gpmc_hwecc_bch_capable() (2014-07-23 01:48:24 -0700)
+
+----------------------------------------------------------------
+Two regression fixes for omaps and one fix for device signaling:
+
+- L2 cache regression fix for a warning about trying to access
+  a read-only register
+
+- GPMC ECC software fallback regression fix for omap3
+
+- Fix for dra7 pinctrl pull-up direction that causes signal issues
+  for anybody trying to use the internal pull up or down
+
+----------------------------------------------------------------
+Christoph Fritz (1):
+      ARM: OMAP2+: gpmc: fix gpmc_hwecc_bch_capable()
+
+Nishanth Menon (1):
+      pinctrl: dra: dt-bindings: Fix pull enable/disable
+
+Sekhar Nori (1):
+      ARM: OMAP2+: l2c: squelch warning dump on power control setting
+
+ arch/arm/mach-omap2/gpmc-nand.c    | 18 ++++++++++--------
+ arch/arm/mach-omap2/omap4-common.c |  4 ++++
+ include/dt-bindings/pinctrl/dra.h  |  7 ++++---
+ 3 files changed, 18 insertions(+), 11 deletions(-)
