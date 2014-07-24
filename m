@@ -1,31 +1,62 @@
-From: javier.martinez@collabora.co.uk (Javier Martinez Canillas)
-Date: Thu, 24 Jul 2014 20:43:00 +0200
-Subject: [PATCH 1/1] ARM: exynos_defconfig: Enable SBS battery support
-Message-ID: <1406227380-3569-1-git-send-email-javier.martinez@collabora.co.uk>
+From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
+Date: Thu, 24 Jul 2014 20:46:33 +0200
+Subject: [PATCH 2/2] Documentation: arm: misc updates to Marvell EBU SoC status
+In-Reply-To: <1406227593-29749-1-git-send-email-thomas.petazzoni@free-electrons.com>
+References: <1406227593-29749-1-git-send-email-thomas.petazzoni@free-electrons.com>
+Message-ID: <1406227593-29749-3-git-send-email-thomas.petazzoni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Many Exynos5 boards (e.g: Snow, Peach Pit and Pi) have
-a SBS-compliant gas gauge battery. Enable it as module
-so the needed support is available for these boards.
+Following the merging of mach-kirkwood into mach-mvebu, the removal of
+mach-kirkwood, and the progress of the integration of mach-dove into
+mach-mvebu, this commit makes a few updates to the Marvell README file
+in the kernel documentation.
 
-Suggested-by: Doug Anderson <dianders@chromium.org>
-Signed-off-by: Javier Martinez Canillas <javier.martinez@collabora.co.uk>
+Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
 ---
- arch/arm/configs/exynos_defconfig | 1 +
- 1 file changed, 1 insertion(+)
+ Documentation/arm/Marvell/README | 16 +++++++++-------
+ 1 file changed, 9 insertions(+), 7 deletions(-)
 
-diff --git a/arch/arm/configs/exynos_defconfig b/arch/arm/configs/exynos_defconfig
-index fc7d168..c390bb9 100644
---- a/arch/arm/configs/exynos_defconfig
-+++ b/arch/arm/configs/exynos_defconfig
-@@ -77,6 +77,7 @@ CONFIG_SPI_S3C64XX=y
- CONFIG_I2C_S3C2410=y
- CONFIG_DEBUG_GPIO=y
- CONFIG_POWER_SUPPLY=y
-+CONFIG_BATTERY_SBS=m
- CONFIG_CHARGER_TPS65090=y
- # CONFIG_HWMON is not set
- CONFIG_THERMAL=y
+diff --git a/Documentation/arm/Marvell/README b/Documentation/arm/Marvell/README
+index 5172934..4dc66c1 100644
+--- a/Documentation/arm/Marvell/README
++++ b/Documentation/arm/Marvell/README
+@@ -53,8 +53,8 @@ Kirkwood family
+                 Functional Spec: http://www.marvell.com/embedded-processors/kirkwood/assets/FS_88F6180_9x_6281_OpenSource.pdf
+   Homepage: http://www.marvell.com/embedded-processors/kirkwood/
+   Core: Feroceon ARMv5 compatible
+-  Linux kernel mach directory: arch/arm/mach-kirkwood
+-  Linux kernel plat directory: arch/arm/plat-orion
++  Linux kernel mach directory: arch/arm/mach-mvebu
++  Linux kernel plat directory: none
+ 
+ Discovery family
+ ----------------
+@@ -136,7 +136,9 @@ Dove family (application processor)
+                 Functional Spec : http://www.marvell.com/application-processors/armada-500/assets/Armada-510-Functional-Spec.pdf
+   Homepage: http://www.marvell.com/application-processors/armada-500/
+   Core: ARMv7 compatible
+-  Directory: arch/arm/mach-dove
++
++  Directory: arch/arm/mach-mvebu (DT enabled platforms)
++             arch/arm/mach-dove (non-DT enabled platforms)
+ 
+ PXA 2xx/3xx/93x/95x family
+ --------------------------
+@@ -254,10 +256,10 @@ Berlin family (Digital Entertainment)
+ Long-term plans
+ ---------------
+ 
+- * Unify the mach-dove/, mach-mv78xx0/, mach-orion5x/ and
+-   mach-kirkwood/ into the mach-mvebu/ to support all SoCs from the
+-   Marvell EBU (Engineering Business Unit) in a single mach-<foo>
+-   directory. The plat-orion/ would therefore disappear.
++ * Unify the mach-dove/, mach-mv78xx0/, mach-orion5x/ into the
++   mach-mvebu/ to support all SoCs from the Marvell EBU (Engineering
++   Business Unit) in a single mach-<foo> directory. The plat-orion/
++   would therefore disappear.
+ 
+  * Unify the mach-mmp/ and mach-pxa/ into the same mach-pxa
+    directory. The plat-pxa/ would therefore disappear.
 -- 
-2.0.0.rc2
+2.0.0
