@@ -1,52 +1,39 @@
-From: jason@lakedaemon.net (Jason Cooper)
-Date: Thu, 24 Jul 2014 07:11:00 -0400
-Subject: [PATCHv3 2/7] ARM: mvebu: extend PMSU code to support dynamic
- frequency scaling
-In-Reply-To: <20140724082902.0e64d454@free-electrons.com>
-References: <1404920715-19834-1-git-send-email-thomas.petazzoni@free-electrons.com>
- <1404920715-19834-3-git-send-email-thomas.petazzoni@free-electrons.com>
- <20140723235026.6419.93364@quantum>
- <20140724082902.0e64d454@free-electrons.com>
-Message-ID: <20140724111100.GR23220@titan.lakedaemon.net>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Thu, 24 Jul 2014 12:14:42 +0100
+Subject: [PATCH v2 3/3] MAINTAINERS: Add st-hcd to ARCH/STI architecture
+In-Reply-To: <1406199616-10533-4-git-send-email-peter.griffin@linaro.org>
+References: <1406199616-10533-1-git-send-email-peter.griffin@linaro.org>
+ <1406199616-10533-4-git-send-email-peter.griffin@linaro.org>
+Message-ID: <20140724111442.GA7063@lee--X1>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jul 24, 2014 at 08:29:02AM +0200, Thomas Petazzoni wrote:
-> Dear Mike Turquette,
-> 
-> On Wed, 23 Jul 2014 16:50:26 -0700, Mike Turquette wrote:
-> 
-> > >  * registers the frequency operating points supported by the CPU;
-> > > 
-> > >  * registers a clock notifier of the CPU clocks. The notifier function
-> > 
-> > Where does this code register a clock notifier callback?
-> > 
-> > >    listens to the newly introduced APPLY_RATE_CHANGE event, and uses
-> > 
-> > I don't see APPLY_RATE_CHANGE referenced.
-> 
-> Yes, this is a mistake of the commit log, due to remains of the v2 of
-> the patch series. Back in the v2, there was indeed a new clock notifier
-> being used. But Stephen Boyd argued against that, and instead suggested
-> to use a direct function call, which this v3 implements, as stated in
-> the cover letter:
-> 
->  - As suggested by Stephen Boyd, instead of using a new clock notifier
->    that somewhat "hides" the dependency of the clk-cpu clock driver on
->    the PMSU, use a direct call from the clk-cpu driver to the PMSU
->    driver.
-> 
-> The commit log of this commit was not adjusted consequently, and this
-> is my fault. Jason, is it still time to change this commit log?
+On Thu, 24 Jul 2014, Peter Griffin wrote:
 
-If there are no code changes, I'd prefer not to.  We're rather late in
-the game.
+> Signed-off-by: Peter Griffin <peter.griffin@linaro.org>
+> ---
+>  MAINTAINERS | 1 +
+>  1 file changed, 1 insertion(+)
 
-Even though it's not ideal, the commit in question does have a Link: tag
-pointing at the patch email on which this conversation is based.  So a
-frustrated future developer won't be frustrated long. :)
+I Acked, this already.  Please carry them forward through revisions.
 
-thx,
+Acked-by: Lee Jones <lee.jones@linaro.org>
 
-Jason.
+> diff --git a/MAINTAINERS b/MAINTAINERS
+> index 702ca10..359a64e 100644
+> --- a/MAINTAINERS
+> +++ b/MAINTAINERS
+> @@ -1325,6 +1325,7 @@ F:	drivers/pinctrl/pinctrl-st.c
+>  F:	drivers/media/rc/st_rc.c
+>  F:	drivers/i2c/busses/i2c-st.c
+>  F:	drivers/tty/serial/st-asc.c
+> +F:	drivers/usb/host/st-hcd.c
+>  
+>  ARM/TECHNOLOGIC SYSTEMS TS7250 MACHINE SUPPORT
+>  M:	Lennert Buytenhek <kernel@wantstofly.org>
+
+-- 
+Lee Jones
+Linaro STMicroelectronics Landing Team Lead
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
