@@ -1,95 +1,36 @@
 From: antoine.tenart@free-electrons.com (=?UTF-8?q?Antoine=20T=C3=A9nart?=)
-Date: Thu, 24 Jul 2014 11:17:28 +0200
-Subject: [PATCH v11 6/8] Documentation: bindings: document the sub-nodes AHCI
- bindings
+Date: Thu, 24 Jul 2014 11:17:30 +0200
+Subject: [PATCH v11 8/8] ARM: berlin: enable the eSATA interface on the BG2Q
+ DMP
 In-Reply-To: <1406193450-17283-1-git-send-email-antoine.tenart@free-electrons.com>
 References: <1406193450-17283-1-git-send-email-antoine.tenart@free-electrons.com>
-Message-ID: <1406193450-17283-7-git-send-email-antoine.tenart@free-electrons.com>
+Message-ID: <1406193450-17283-9-git-send-email-antoine.tenart@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The libahci now allows to use multiple PHYs and to represent each port
-as a sub-node. Add these bindings to the documentation.
+The BG2Q has an AHCI SATA controller with an eSATA interface. Enable it.
+Only enable the first port, the BG2Q DMP does not support the second one.
 
 Signed-off-by: Antoine T?nart <antoine.tenart@free-electrons.com>
 ---
- .../devicetree/bindings/ata/ahci-platform.txt      | 41 ++++++++++++++++++++++
- 1 file changed, 41 insertions(+)
+ arch/arm/boot/dts/berlin2q-marvell-dmp.dts | 8 ++++++++
+ 1 file changed, 8 insertions(+)
 
-diff --git a/Documentation/devicetree/bindings/ata/ahci-platform.txt b/Documentation/devicetree/bindings/ata/ahci-platform.txt
-index c96d8dcf98fd..93a6ad3965ca 100644
---- a/Documentation/devicetree/bindings/ata/ahci-platform.txt
-+++ b/Documentation/devicetree/bindings/ata/ahci-platform.txt
-@@ -3,6 +3,10 @@
- SATA nodes are defined to describe on-chip Serial ATA controllers.
- Each SATA controller should have its own node.
- 
-+It is possible, but not required, to represent each port as a sub-node.
-+It allows to enable each port independently when dealing with multiple
-+PHYs.
+diff --git a/arch/arm/boot/dts/berlin2q-marvell-dmp.dts b/arch/arm/boot/dts/berlin2q-marvell-dmp.dts
+index 995150f93795..385f6af64d0c 100644
+--- a/arch/arm/boot/dts/berlin2q-marvell-dmp.dts
++++ b/arch/arm/boot/dts/berlin2q-marvell-dmp.dts
+@@ -37,3 +37,11 @@
+ &uart0 {
+ 	status = "okay";
+ };
 +
- Required properties:
- - compatible        : compatible string, one of:
-   - "allwinner,sun4i-a10-ahci"
-@@ -14,18 +18,35 @@ Required properties:
-   - "snps,dwc-ahci"
-   - "snps,exynos5440-ahci"
-   - "snps,spear-ahci"
-+  - "generic-ahci"
- - interrupts        : <interrupt mapping for SATA IRQ>
- - reg               : <registers mapping>
- 
-+Please note that when using "generic-ahci" you must also specify a SoC specific
-+compatible:
-+	compatible = "manufacturer,soc-model-ahci", "generic-ahci";
++&sata0 {
++	status = "okay";
++};
 +
- Optional properties:
- - dma-coherent      : Present if dma operations are coherent
- - clocks            : a list of phandle + clock specifier pairs
- - target-supply     : regulator for SATA target power
-+- phys              : reference to the SATA PHY node
-+- phy-names         : must be "sata-phy"
- 
- "fsl,imx53-ahci", "fsl,imx6q-ahci" required properties:
- - clocks            : must contain the sata, sata_ref and ahb clocks
- - clock-names       : must contain "ahb" for the ahb clock
- 
-+Required properties when using sub-nodes:
-+- #address-cells    : number of cells to encode an address
-+- #size-cells       : number of cells representing the size of an address
-+
-+
-+Sub-nodes required properties:
-+- reg               : the port number
-+- phys              : reference to the SATA PHY node
-+
-+
- Examples:
-         sata at ffe08000 {
- 		compatible = "snps,spear-ahci";
-@@ -40,3 +61,23 @@ Examples:
- 		clocks = <&pll6 0>, <&ahb_gates 25>;
- 		target-supply = <&reg_ahci_5v>;
- 	};
-+
-+With sub-nodes:
-+	sata at f7e90000 {
-+		compatible = "marvell,berlin2q-achi", "generic-ahci";
-+		reg = <0xe90000 0x1000>;
-+		interrupts = <GIC_SPI 7 IRQ_TYPE_LEVEL_HIGH>;
-+		clocks = <&chip CLKID_SATA>;
-+		#address-cells = <1>;
-+		#size-cells = <0>;
-+
-+		sata0: sata-port at 0 {
-+			reg = <0>;
-+			phys = <&sata_phy 0>;
-+		};
-+
-+		sata1: sata-port at 1 {
-+			reg = <1>;
-+			phys = <&sata_phy 1>;
-+		};
-+	};
++&sata_phy {
++	status = "okay";
++};
 -- 
 1.9.1
