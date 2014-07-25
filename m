@@ -1,173 +1,76 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Fri, 25 Jul 2014 13:24:24 +0100
-Subject: [PATCH 10/19] ARM64 / ACPI: Get the enable method for SMP
- initialization in ACPI way
-In-Reply-To: <53D236B9.7000302@linaro.org>
-References: <1406206825-15590-1-git-send-email-hanjun.guo@linaro.org>
- <1406206825-15590-11-git-send-email-hanjun.guo@linaro.org>
- <20140724154745.GD26190@leverpostej> <53D236B9.7000302@linaro.org>
-Message-ID: <20140725122424.GD19632@leverpostej>
+From: list-09_linux_arm@tqsc.de (Markus Niebel)
+Date: Fri, 25 Jul 2014 14:52:05 +0200
+Subject: [[RFC PATCH]] gpio: gpio-mxc: make sure gpio is input when request
+ IRQ
+In-Reply-To: <CACRpkdarH_-2uW55C5bAUxM1ESgSb6tJAWc4UqEoWr8uc_kQRQ@mail.gmail.com>
+References: <1405518664-31313-1-git-send-email-list-09_linux_arm@tqsc.de>	<20140722062803.GA21229@dragon>	<53CE107A.1000000@tqsc.de>	<20140722074257.GC21229@dragon>	<CACRpkdYxOv+k2Sazm83sA=LwKUv5yMzag44A=Ez8pNQHRO3V6A@mail.gmail.com>	<53D0C008.70305@tqsc.de>
+ <CACRpkdarH_-2uW55C5bAUxM1ESgSb6tJAWc4UqEoWr8uc_kQRQ@mail.gmail.com>
+Message-ID: <53D252F5.2060601@tqsc.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jul 25, 2014 at 11:51:37AM +0100, Hanjun Guo wrote:
-> On 2014-7-24 23:47, Mark Rutland wrote:
-> > On Thu, Jul 24, 2014 at 02:00:16PM +0100, Hanjun Guo wrote:
-> >> ACPI 5.1 only has two explicit methods to boot up SMP,
-> >> PSCI and Parking protocol, but the Parking protocol is
-> >> only suitable for ARMv7 now, so make PSCI as the only way
-> >> for the SMP boot protocol before some updates for the
-> >> ACPI spec or the Parking protocol spec.
-> >>
-> >> Signed-off-by: Hanjun Guo <hanjun.guo@linaro.org>
-> >> Signed-off-by: Tomasz Nowicki <tomasz.nowicki@linaro.org>
-> >> ---
-> >>  arch/arm64/include/asm/acpi.h    |   21 +++++++++++++++
-> >>  arch/arm64/include/asm/cpu_ops.h |    9 ++++++-
-> >>  arch/arm64/include/asm/smp.h     |    2 +-
-> >>  arch/arm64/kernel/acpi.c         |    9 +++++++
-> >>  arch/arm64/kernel/cpu_ops.c      |   52 ++++++++++++++++++++++++++++++++++----
-> >>  arch/arm64/kernel/smp.c          |   29 +++++++++++++++++++--
-> >>  6 files changed, 113 insertions(+), 9 deletions(-)
-> [...]
-> >>  /*
-> >> - * Setup the set of possible CPUs (via set_cpu_possible)
-> >> + * Platform specific SMP operations
-> >>   */
-> >>  extern void smp_init_cpus(void);
-> > 
-> > While the originial comment is out of date, the new form is plain wrong.
-> > 
-> > Something like "Discover the set of possible CPUs and determine their
-> > SMP operations" would be a better description of what's going on here.
+Am 25.07.2014 13:38, wrote Linus Walleij:
+> On Thu, Jul 24, 2014 at 10:12 AM, Markus Niebel
+> <list-09_linux_arm@tqsc.de> wrote:
+>> Am 23.07.2014 18:14, wrote Linus Walleij:
 > 
-> Agreed.
-
-Ok.
-
-> > 
-> >>
-> >> diff --git a/arch/arm64/kernel/acpi.c b/arch/arm64/kernel/acpi.c
-> >> index ff0f6a0..2af6662 100644
-> >> --- a/arch/arm64/kernel/acpi.c
-> >> +++ b/arch/arm64/kernel/acpi.c
-> >> @@ -184,6 +184,15 @@ static int __init acpi_parse_madt_gic_cpu_interface_entries(void)
-> >>         return 0;
-> >>  }
-> >>
-> >> +/* Protocol to bring up secondary CPUs */
-> >> +enum acpi_smp_boot_protocol smp_boot_protocol(void)
-> >> +{
-> >> +       if (acpi_psci_present)
-> >> +               return ACPI_SMP_BOOT_PSCI;
-> >> +       else
-> >> +               return ACPI_SMP_BOOT_PARKING_PROTOCOL;
-> >> +}
-> >> +
-> >>  static int __init acpi_parse_fadt(struct acpi_table_header *table)
-> >>  {
-> >>         struct acpi_table_fadt *fadt = (struct acpi_table_fadt *)table;
-> >> diff --git a/arch/arm64/kernel/cpu_ops.c b/arch/arm64/kernel/cpu_ops.c
-> >> index d62d12f..4d9b3cf 100644
-> >> --- a/arch/arm64/kernel/cpu_ops.c
-> >> +++ b/arch/arm64/kernel/cpu_ops.c
-> >> @@ -16,11 +16,13 @@
-> >>   * along with this program.  If not, see <http://www.gnu.org/licenses/>.
-> >>   */
-> >>
-> >> -#include <asm/cpu_ops.h>
-> >> -#include <asm/smp_plat.h>
-> >>  #include <linux/errno.h>
-> >>  #include <linux/of.h>
-> >>  #include <linux/string.h>
-> >> +#include <linux/acpi.h>
-> >> +
-> >> +#include <asm/cpu_ops.h>
-> >> +#include <asm/smp_plat.h>
-> > 
-> > Was the header move just for consistency with other files, or is there
-> > some ordering requirement here?
+>>> So always prepare the hardware and make it ready for action in respective
+>>> callbacks from the GPIO and irqchip APIs. Do not rely on gpiod_to_irq() having
+>>> been called first.
+>>>
+>>
+>> So a gpio driver is responsible to read status of gpio lines and flag any gpio line
+>> currently configured as out (base on the information read from hardware registers)
+>> on driver probe time - correct?
 > 
-> Ordering requirement, it will meet compile error for "return -ENODEV;"
-> in the head file which I introduced, I know I can include the right
-> head file in asm/cpu_ops.h, but I think move the asm/xx.h after the
-> include of linux/xx.h would be fine.
+> I don't think anyone reads that information explicitly to set up
+> these flags.
+> 
+> Drivers just leave the pins in their power-on maiden state without
+> trying to figure out how they're set-up. But as you say, if you call
+> gpiod_get_direction() on them, the flag gets set up indeed.
+> 
+> So usually these flags are set by code, calling
+> gpiod_[get/set]_direction().
+> Then they do get flagged as outputs or inputs.
+> 
+>> If yes is the driver allowed to call
+>> gpiod_get_direction() to have the FLAG_IS_OUT set in the gpiolib layer?
+> 
+> I don't know if it'd be a good idea to loop over all gpios in a new
+> irqchip and fetch the direction just to get the flags right, so far
+> we haven't done that and I don't know what the usecase would be.
+> 
 
-If a file uses something defined in a header, it should include that
-header. So if you need ENODEV in cpu_ops.h, make cpu_ops.h include
-<linux/errno.h>. It is not fine to deliberately rely on implicit
-includes.
+I've came to a situation where it would have been helpful to know - bootloader
+configured a pin as output and linux tried to configure the pin as IRQ input.
+*YES I KNOW THIS IS NOT CORRECT* but it took some time to see, what happened.
 
-Moving the headers around is a separate issue. I have no problem with
-doing that for consistency with other files.
+> If we need that we should do it in gpiolib for all drivers don't you
+> think?
+
+A pragmatic / lean solution would be to deny the IRQ configuration when
+seeing the pin configured as output in hardware and print out an error
+on the gpio driver level.
 
 > 
-> > 
-> >>
-> >>  extern const struct cpu_operations smp_spin_table_ops;
-> >>  extern const struct cpu_operations cpu_psci_ops;
-> >> @@ -52,7 +54,7 @@ static const struct cpu_operations * __init cpu_get_ops(const char *name)
-> >>  /*
-> >>   * Read a cpu's enable method from the device tree and record it in cpu_ops.
-> >>   */
-> >> -int __init cpu_read_ops(struct device_node *dn, int cpu)
-> >> +int __init cpu_of_read_ops(struct device_node *dn, int cpu)
-> >>  {
-> >>         const char *enable_method = of_get_property(dn, "enable-method", NULL);
-> >>         if (!enable_method) {
-> >> @@ -76,12 +78,52 @@ int __init cpu_read_ops(struct device_node *dn, int cpu)
-> >>         return 0;
-> >>  }
-> >>
-> >> +#ifdef CONFIG_ACPI
-> >> +/*
-> >> + * Read a cpu's enable method in the ACPI way and record it in cpu_ops.
-> >> + */
-> >> +int __init cpu_acpi_read_ops(int cpu)
-> >> +{
-> >> +       /*
-> >> +        * For ACPI 5.1, only two kind of methods are provided,
-> >> +        * Parking protocol and PSCI, but Parking protocol is
-> >> +        * used on ARMv7 only, so make PSCI as the only method
-> >> +        * for SMP initialization before the ACPI spec or Parking
-> >> +        * protocol spec is updated.
-> >> +        */
-> > 
-> > That comment is a little misleading. The parking protocol is _specified_
-> > for ARMv7 only.
+> But then we need a rationale for doing it, other than it's nice :-)
+> It is already called on-the-fly by debugfs when a user needs that
+> info.
+
+See above, I think an error on a misconfigured system would be enough.
+Maybe the documentation for gpio drivers should have a hint for driver
+implementors.
+
+So first step would be to convert the driver to the irqchip helper and then
+add calls to gpiod_[un]lock_as_irq at the right places.
+
+Will try to do that after my holiday.
+
 > 
-> Agreed. But I'm just wondering if the Parking protocol is modified and
-> then support ARMv8, how to describe it in the comments?
-
-We update the comments if and when that happens.
-
-> > 
-> >> +       switch (smp_boot_protocol()) {
-> >> +       case ACPI_SMP_BOOT_PSCI:
-> >> +               cpu_ops[cpu] = cpu_get_ops("psci");
-> >> +               break;
-> >> +       case ACPI_SMP_BOOT_PARKING_PROTOCOL:
-> >> +       default:
-> >> +               cpu_ops[cpu] = NULL;
-> >> +               break;
-> >> +       }
-> >> +
-> >> +       if (!cpu_ops[cpu]) {
-> >> +               pr_warn("CPU %d: unsupported enable-method, only PSCI is supported\n",
-> >> +                       cpu);
-> >> +               return -EOPNOTSUPP;
-> >> +       }
-> > 
-> > That's going to require changes as things get updated, and
-> > "enable-method" is a term from DT rather than ACPI.
-> > 
-> > How about:
-> > 
-> > 	"CPU%d: boot protocol unsupported or unknown\n".
+> Yours,
+> Linus Walleij
 > 
-> Pretty fine to me :)
+Yours,
 
-Ok.
-
-Cheers,
-Mark.
+Markus Niebel
