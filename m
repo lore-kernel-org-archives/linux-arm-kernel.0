@@ -1,36 +1,34 @@
-From: wens@csie.org (Chen-Yu Tsai)
-Date: Fri, 25 Jul 2014 17:13:26 +0800
-Subject: [PATCH v3 4/6] ARM: dts: sun8i: add rtc device node
-In-Reply-To: <1406279608-489-1-git-send-email-wens@csie.org>
-References: <1406279608-489-1-git-send-email-wens@csie.org>
-Message-ID: <1406279608-489-5-git-send-email-wens@csie.org>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Fri, 25 Jul 2014 10:21:09 +0100
+Subject: [PATCH] arm64: audit: Fix build for audit changes
+In-Reply-To: <20140724191237.GM17528@sirena.org.uk>
+References: <1405596402-23844-1-git-send-email-broonie@kernel.org>
+ <20140724191237.GM17528@sirena.org.uk>
+Message-ID: <20140725092108.GB24268@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-sun8i shares the same rtc hardware as sun6i. Now that we have a driver
-for it, add a device node to the DTSI for it so we can use it.
+On Thu, Jul 24, 2014 at 08:12:37PM +0100, Mark Brown wrote:
+> On Thu, Jul 17, 2014 at 12:26:42PM +0100, Mark Brown wrote:
+> > From: Mark Brown <broonie@linaro.org>
+> > 
+> > Commit 3efe33f5d2 (audit: x86: drop arch from __audit_syscall_entry()
+> > interface) removed the arch parameter from __audit_syscall_entry() and
+> > updated the only current user in mainline but this breaks the ARMv8 audit
+> > code that has been added in -next. Fix this by making the equivalent
+> > update to ARMv8.
+> 
+> This is still broken -next.
 
-Signed-off-by: Chen-Yu Tsai <wens@csie.org>
----
- arch/arm/boot/dts/sun8i-a23.dtsi | 6 ++++++
- 1 file changed, 6 insertions(+)
+It should now be temporarily fixed for the defconfig
+(CONFIG_AUTIDSYSCALL disabled). I'm reluctant to merge the audit tree in
+the arm64 tree as (a) I haven't seen a confirmation that this branch is
+stable and will go upstream as is and (b) there are x86 changes without
+Acks from the x86 maintainers (whether needed or not, I can't say).
 
-diff --git a/arch/arm/boot/dts/sun8i-a23.dtsi b/arch/arm/boot/dts/sun8i-a23.dtsi
-index 54ac0787..e0d1048 100644
---- a/arch/arm/boot/dts/sun8i-a23.dtsi
-+++ b/arch/arm/boot/dts/sun8i-a23.dtsi
-@@ -285,6 +285,12 @@
- 			interrupts = <1 9 0xf04>;
- 		};
- 
-+		rtc: rtc at 01f00000 {
-+			compatible = "allwinner,sun6i-a31-rtc";
-+			reg = <0x01f00000 0x54>;
-+			interrupts = <0 40 4>;
-+		};
-+
- 		prcm at 01f01400 {
- 			compatible = "allwinner,sun8i-a23-prcm";
- 			reg = <0x01f01400 0x200>;
+So my temporary patch is some #ifndef's around the offending code. It
+will be reverted and your patch applied once the audit tree meets the
+arm64 tree.
+
 -- 
-2.0.1
+Catalin
