@@ -1,86 +1,111 @@
-From: linux@roeck-us.net (Guenter Roeck)
-Date: Fri, 25 Jul 2014 11:53:14 -0700
-Subject: [PATCH v5 0/7] kernel: Add support for restart handler call chain
-In-Reply-To: <1405668856-13738-1-git-send-email-linux@roeck-us.net>
-References: <1405668856-13738-1-git-send-email-linux@roeck-us.net>
-Message-ID: <20140725185314.GA4788@roeck-us.net>
+From: paul@pwsan.com (Paul Walmsley)
+Date: Fri, 25 Jul 2014 18:56:45 +0000 (UTC)
+Subject: OMAP baseline test results for v3.16-rc6
+Message-ID: <alpine.DEB.2.02.1407251855270.5875@utopia.booyaka.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Any idea, anyone, what might be necessary to get this series accepted ?
 
-Guenter
+Here are some basic OMAP test results for Linux v3.14-rc6.
+Logs and other details at:
 
-On Fri, Jul 18, 2014 at 12:34:09AM -0700, Guenter Roeck wrote:
-> Various drivers implement architecture and/or device specific means
-> to restart (reset) the system. Various mechanisms have been implemented
-> to support those schemes. The best known mechanism is arm_pm_restart,
-> which is a function pointer to be set either from platform specific code
-> or from drivers. Another mechanism is to use hardware watchdogs to issue
-> a reset; this mechanism is used if there is no other method available
-> to reset a board or system. Two examples are alim7101_wdt, which currently
-> uses the reboot notifier to trigger a reset, and moxart_wdt, which registers
-> the arm_pm_restart function. Several other restart drivers for arm, all
-> directly calling arm_pm_restart, are in the process of being integrated
-> into the kernel. All those drivers would benefit from the new API.
-> 
-> The existing mechanisms have a number of drawbacks. Typically only one scheme
-> to restart the system is supported (at least if arm_pm_restart is used).
-> At least in theory there can be multiple means to restart the system, some of
-> which may be less desirable (for example one mechanism may only reset the CPU,
-> while another may reset the entire system). Using arm_pm_restart can also be
-> racy if the function pointer is set from a driver, as the driver may be in
-> the process of being unloaded when arm_pm_restart is called.
-> Using the reboot notifier is always racy, as it is unknown if and when
-> other functions using the reboot notifier have completed execution
-> by the time the watchdog fires.
-> 
-> Introduce a system restart handler call chain to solve the described problems.
-> This call chain is expected to be executed from the architecture specific
-> machine_restart() function. Drivers providing system restart functionality
-> (such as the watchdog drivers mentioned above) are expected to register
-> with this call chain. By using the priority field in the notifier block,
-> callers can control restart handler execution sequence and thus ensure that
-> the restart handler with the optimal restart capabilities for a given system
-> is called first.
-> 
-> Since the first revision of this patchset, a number of separate patch
-> submissions have been made which either depend on it or could make use of it.
-> 
-> http://www.spinics.net/linux/lists/arm-kernel/msg344796.html
-> 	registers three notifiers.
-> https://lkml.org/lkml/2014/7/8/962
-> 	would benefit from it.
-> 
-> Patch 1 of this series implements the restart handler function. Patches 2 and 3
-> implement calling the restart handler chain from arm and arm64 restart code.
-> 
-> Patch 4 modifies the restart-poweroff driver to no longer call arm_pm_restart
-> directly but machine_restart. This is done to avoid calling arm_pm_restart
-> from more than one place. The change makes the driver architecture independent,
-> so it would be possible to drop the arm dependency from its Kconfig entry.
-> 
-> Patch 5 and 6 convert existing restart handlers in the watchdog subsystem
-> to use the restart handler. Patch 7 unexports arm_pm_restart to ensure
-> that no one gets the idea to implement a restart handler as module.
-> 
-> ---
-> v5: Rebased series to v3.16-rc5
->     Function renames:
->     register_restart_notifier -> register_restart_handler
->     unregister_restart_notifier -> unregister_restart_handler
->     kernel_restart_notify -> do_kernel_restart
-> v4: Document restart notifier priorities
->     Select 128 as default priority for newly introduced notifiers
->     Fix checkpatch warning (line too long) in moxart patch
-> v3: Drop RFC.
->     Add kernel_restart_notify wrapper function to execute notifier
->     Improve documentation.
->     Move restart_notifier_list into kernel/reboot.c and make it static.
-> v2: Add patch 4.
->     Only call blocking notifier call chain if arm_pm_restart was not set.
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-watchdog" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
-> 
+    http://www.pwsan.com/omap/testlogs/test_v3.14-rc6/20140401161621/
+
+
+Test summary
+------------
+
+Build: uImage:
+    Pass ( 3/ 3): omap1_defconfig, omap1_defconfig_1510innovator_only,
+		  omap1_defconfig_5912osk_only
+
+Build: uImage+dtb:
+    Pass ( 9/ 9): omap2plus_defconfig_am33xx_only/am335x-bone,
+		  omap2plus_defconfig/omap4-panda,
+		  omap2plus_defconfig/omap4-panda-es,
+		  omap2plus_defconfig/am3517-evm,
+		  omap2plus_defconfig/omap2430-sdp,
+		  omap2plus_defconfig/omap3-beagle,
+		  omap2plus_defconfig/omap3-beagle-xm,
+		  omap2plus_defconfig/omap3-evm-37xx,
+		  omap2plus_defconfig/omap4-var-som
+
+Build: zImage:
+    Pass (14/14): multi_v7_defconfig, omap2plus_defconfig,
+		  omap2plus_defconfig_am33xx_only,
+		  omap2plus_defconfig_2430sdp_only,
+		  omap2plus_defconfig_cpupm, omap2plus_defconfig_no_pm,
+		  omap2plus_defconfig_n800_only_a,
+		  omap2plus_defconfig_n800_multi_omap2xxx,
+		  omap2plus_defconfig_omap2_4_only,
+		  omap2plus_defconfig_omap3_4_only,
+		  rmk_omap3430_ldp_allnoconfig,
+		  rmk_omap3430_ldp_oldconfig,
+		  rmk_omap4430_sdp_allnoconfig,
+		  rmk_omap4430_sdp_oldconfig
+
+Boot to userspace:
+    FAIL ( 1/12): 2430sdp
+    skip ( 2/12): 5912osk, cmt3517
+    Pass ( 9/12): 3517evm, 3530es3beagle, 3730beaglexm, 37xxevm,
+		  4430es2panda, 4460pandaes, am335xbone, am335xbonelt,
+		  4460varsomom
+
+PM: chip retention via suspend:
+    FAIL ( 3/ 7): 2430sdp, 4430es2panda, 4460varsomom
+    Pass ( 4/ 7): 3530es3beagle, 3730beaglexm, 37xxevm, 4460pandaes
+
+PM: chip retention via dynamic idle:
+    FAIL ( 7/ 7): 2430sdp, 3530es3beagle, 3730beaglexm, 37xxevm,
+		  4430es2panda, 4460pandaes, 4460varsomom
+
+PM: chip off except CORE via suspend:
+    FAIL ( 1/ 1): 3730beaglexm
+
+PM: chip off except CORE via dynamic idle:
+    FAIL ( 1/ 1): 3730beaglexm
+
+PM: chip off via suspend:
+    FAIL ( 5/ 5): 3530es3beagle, 37xxevm, 4430es2panda, 4460pandaes,
+		  4460varsomom
+
+PM: chip off via dynamic idle:
+    FAIL ( 5/ 5): 3530es3beagle, 37xxevm, 4430es2panda, 4460pandaes,
+		  4460varsomom
+
+
+vmlinux object size
+(delta in bytes from test_v3.14-rc5 (0414855fdc4a40da05221fc6062cccbc0c30f169)):
+   text     data      bss    total  kernel
+   +614      -24        0     +590  omap1_defconfig
+   +610      +16        0     +626  omap1_defconfig_1510innovator_only
+   +582       +8        0     +590  omap1_defconfig_5912osk_only
+  +1792     +248      -64    +1976  multi_v7_defconfig
+  +1984      +32        0    +2016  omap2plus_defconfig
+  +1068      +16        0    +1084  omap2plus_defconfig_2430sdp_only
+  +1452      +16        0    +1468  omap2plus_defconfig_am33xx_only
+  +5432      -16        0    +5416  omap2plus_defconfig_am43xx_only
+  +5952        0        0    +5952  omap2plus_defconfig_cpupm
+  +1800      +16        0    +1816  omap2plus_defconfig_dra7xx_only
+   +218      +16        0     +234  omap2plus_defconfig_n800_multi_omap2xxx
+   +218      +16        0     +234  omap2plus_defconfig_n800_only_a
+  +1984        0        0    +1984  omap2plus_defconfig_no_pm
+  +1852      -16        0    +1836  omap2plus_defconfig_omap2_4_only
+  +1920      +32        0    +1952  omap2plus_defconfig_omap3_4_only
+  +1800      -16        0    +1784  omap2plus_defconfig_omap5_only
+  +1052        0     -324     +728  rmk_omap3430_ldp_allnoconfig
+  +1512      +24     +256    +1792  rmk_omap3430_ldp_oldconfig
+   +752      +16     -156     +612  rmk_omap4430_sdp_allnoconfig
+  +2256      -16     +264    +2504  rmk_omap4430_sdp_oldconfig
+
+Boot-time memory difference
+(delta in bytes from test_v3.14-rc5 (0414855fdc4a40da05221fc6062cccbc0c30f169))
+  avail  rsrvd   high  freed  board          kconfig
+    -8k     8k      .      .  2430sdp        omap2plus_defconfig
+    -8k     8k      .      .  3517evm        omap2plus_defconfig
+    -8k     8k      .      .  3530es3beagle  omap2plus_defconfig
+    -8k     8k      .      .  3730beaglexm   omap2plus_defconfig
+    -8k     8k      .      .  37xxevm        omap2plus_defconfig
+    -8k     8k      .      .  4430es2panda   omap2plus_defconfig
+    -8k     8k      .      .  4460pandaes    omap2plus_defconfig
+    -8k     8k      .      .  4460varsomom   omap2plus_defconfig
