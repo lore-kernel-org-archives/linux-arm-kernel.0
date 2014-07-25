@@ -1,42 +1,77 @@
-From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
-Date: Fri, 25 Jul 2014 11:09:12 +0200
-Subject: [PATCH v2 2/3] ARM: remove remaining definitions of
- PLAT_PHYS_OFFSET from <mach/memory.h>
-In-Reply-To: <20140725000621.GO21766@n2100.arm.linux.org.uk>
-References: <1404295043-6661-2-git-send-email-u.kleine-koenig@pengutronix.de>
- <1404717185-10010-1-git-send-email-u.kleine-koenig@pengutronix.de>
- <20140725000621.GO21766@n2100.arm.linux.org.uk>
-Message-ID: <20140725090912.GC6146@pengutronix.de>
+From: boris.brezillon@free-electrons.com (Boris BREZILLON)
+Date: Fri, 25 Jul 2014 11:10:33 +0200
+Subject: [PATCH] ARM: at91: at91sam9x5: sets NPCS0 (PA14) back to GPIO
+In-Reply-To: <53D21C57.3010805@aksignal.cz>
+References: <1405074175-22444-1-git-send-email-voice.shen@atmel.com>
+ <53D10C50.50305@aksignal.cz> <20140724162645.4e19c26c@bbrezillon>
+ <53D12103.3020103@aksignal.cz> <20140724175848.44f5da10@bbrezillon>
+ <53D1F5D0.1080006@aksignal.cz> <20140725083053.GD9532@piout.net>
+ <53D2174B.4020403@aksignal.cz> <20140725085436.GF9532@piout.net>
+ <53D21C57.3010805@aksignal.cz>
+Message-ID: <20140725111033.49a0e7e8@bbrezillon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Russell,
+On Fri, 25 Jul 2014 10:59:03 +0200
+Ji?? Prchal <jiri.prchal@aksignal.cz> wrote:
 
-On Fri, Jul 25, 2014 at 01:06:22AM +0100, Russell King - ARM Linux wrote:
-> On Mon, Jul 07, 2014 at 09:13:05AM +0200, Uwe Kleine-K?nig wrote:
-> > The platforms selecting NEED_MACH_MEMORY_H defined the start address of
-> > their physical memory in the respective <mach/memory.h>. With
-> > ARM_PATCH_PHYS_VIRT=y (which is quite common today) this is useless
-> > though because the definition isn't used but determined dynamically.
-> > 
-> > So remove the definitions from all <mach/memory.h> and provide the
-> > Kconfig symbol PHYS_OFFSET with the respective defaults in case
-> > ARM_PATCH_PHYS_VIRT isn't enabled.
-> > 
-> > This allows to drop the dependency of PHYS_OFFSET on !NEED_MACH_MEMORY_H
-> > which prevents compiling an integrator nommu-kernel.
-> > (CONFIG_PAGE_OFFSET which has "default PHYS_OFFSET if !MMU" expanded to
-> > "0x" because CONFIG_PHYS_OFFSET doesn't exist as INTEGRATOR selects
-> > NEED_MACH_MEMORY_H.)
 > 
-> Should I assume that this hasn't been build tested?
-darn, I admit being guilty not retesting it after rebasing to 3.16-rc. I
-think I did test it when I wrote the patch the first time, but you made
-me unsure if I tested all relevant cases. Working on a follow-up patch.
+> 
+> Dne 25.7.2014 v 10:54 Alexandre Belloni napsal(a):
+> > On 25/07/2014 at 10:37:31 +0200, Ji?? Prchal wrote :
+> >>
+> >>
+> >> Dne 25.7.2014 v 10:30 Alexandre Belloni napsal(a):
+> >>> Hi,
+> >>>
+> >>> On 25/07/2014 at 08:14:40 +0200, Ji?? Prchal wrote :
+> >>>> I'm using custom board. My spi node:
+> >>>> 			spi0: spi at f0000000 {
+> >>>
+> >>> You should override the pinctrl here as you are using gpios for the cs.
+> >>> 				pinctrl-0 = <&pinctrl_spi0_custom>;
+> >>>
+> >>>> 				status = "okay";
+> >>>> 				cs-gpios = <&pioA 23 0
+> >>>> 					    &pioA 22 0
+> >>>> 					    &pioC 29 0
+> >>>> 					    &pioA 14 0>;
+> >>>>
+> >>>
+> >>> 		pinctrl at fffff400 {
+> >>> 				spi0 {
+> >>> 					 pinctrl_spi0_custom: spi0-custom {
+> >>> 							 atmel,pins =
+> >>> 									 <AT91_PIOA 23 AT91_PERIPH_GPIO AT91_PINCTRL_NONE>,
+> >>> 									 <AT91_PIOA 22 AT91_PERIPH_GPIO AT91_PINCTRL_NONE>,
+> >>> 									 <AT91_PIOC 29 AT91_PERIPH_GPIO AT91_PINCTRL_NONE>,
+> >>> 									 <AT91_PIOA 14 AT91_PERIPH_GPIO AT91_PINCTRL_NONE>;
+> >>> 					 };
+> >>> 				};
+> >>> 		};
+> >>>
+> >> Of course, it's the way, but in all other drivers, for example LEDS,
+> >> it's not needed. And in other way, if I will not use PA14 at all,
+> >> the pin will goes down every spi transfer.
+> >
+> > You must not assumed that the pins are muxed to their default state
+> > which is gpio and you should set the pinctrl accordingly for each
+> > device.
+> >
+> > If you don't use PA14 at all, then you don't really care about its
+> > state...
+> Yes and no, what about on board is populated some chip on PA14, but for some reason at this time I don't need it and not 
+> defined in DT?
 
-Mea culpa
-Uwe
+As long as it's populated you should define it in the DT (the DT should
+represent your hardware) and if you don't want to use the populated
+device, just set the status property to "disabled" (I'm not sure it
+works for spi subdevices though).
+
+
+
 
 -- 
-Pengutronix e.K.                           | Uwe Kleine-K?nig            |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Boris Brezillon, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
