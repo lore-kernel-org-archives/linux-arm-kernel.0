@@ -1,64 +1,99 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Fri, 25 Jul 2014 11:36:18 +0100
-Subject: Kexec on arm64
-In-Reply-To: <1406247468.4062.59.camel@smoke>
-References: <CAFdej006OSyhgDcJ2iZdbjt+PtysN=i_+9Dr4GTmr=+t5yg4Kw@mail.gmail.com>
- <1405443898.22585.7.camel@smoke>
- <CAL85gmC9LLcN_uxMY1bM5kLx=N7rZGdGO3bmGHeUVo=Rqgk8uw@mail.gmail.com>
- <1405551861.7262.26.camel@smoke>
- <CAFdej03nixSU=3h+HYk2E3Onb2P3--Di0GM+wCwLS6ZNH7UjEQ@mail.gmail.com>
- <CAFdej00J2mJwcg2Cy6CHVuuQZ4uQ2zZg8oErGPi0uPejievB+Q@mail.gmail.com>
- <1406162287.4062.39.camel@smoke>
- <20140724093603.GC4079@leverpostej>
- <1406247468.4062.59.camel@smoke>
-Message-ID: <20140725103618.GB18920@leverpostej>
+From: takahiro.akashi@linaro.org (AKASHI Takahiro)
+Date: Fri, 25 Jul 2014 19:36:49 +0900
+Subject: [PATCH v5 1/3] arm64: ptrace: reload a syscall number after ptrace
+ operations
+In-Reply-To: <CALCETrU9_sdODRz-xZ4bouq+anHhmfx2tkr7hg00RVf_bBBJwg@mail.gmail.com>
+References: <1406020499-5537-1-git-send-email-takahiro.akashi@linaro.org>
+ <1406020499-5537-2-git-send-email-takahiro.akashi@linaro.org>
+ <53D08358.4020902@amacapital.net> <53D0A037.2060308@linaro.org>
+ <CALCETrU9_sdODRz-xZ4bouq+anHhmfx2tkr7hg00RVf_bBBJwg@mail.gmail.com>
+Message-ID: <53D23341.4040403@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jul 25, 2014 at 01:17:48AM +0100, Geoff Levand wrote:
-> Hi,
-> 
-> On Thu, 2014-07-24 at 10:36 +0100, Mark Rutland wrote:
-> > On Thu, Jul 24, 2014 at 01:38:07AM +0100, Geoff Levand wrote:
->  
-> > > All memory management for the main cpu is done by the arch code.  Kexec
-> > > and cpu hot plug only work with the secondary cpus, so the problem would
-> > > be in the arch memory code, either in setup_restart() for shutdown, or
-> > > in the startup code.
-> > 
-> > It's possible that soft_restart and setup_restart are a little dodgy, as
-> > they also rely on the compiler being smart and not touching the stack
-> > after setup_restart().
-> > 
-> > However, they provide absolutely no guarantee that any data has been
-> > flushed out to the PoC [1]. If you require any data to be flushed out to the
-> > PoC so as to be visible to noncacheable accesses, you will need to
-> > ensure that this is flushed by VA before soft_restart is called. Data
-> > may have migrated to another cache (e.g. another CPU, or the L3) where
-> > it is not visible.
-> 
-> OK, kexec's reset routine relocate_new_kernel does use a few global
-> variables that are set by the main kexec routines.  I added a call to
-> __flush_dcache_area(), which uses 'dc civac' for those.
-> 
-> I had thought the call to __flush_dcache_all, which uses 'dc cisw', in
-> flush_cache_all() would be enough.
+On 07/25/2014 12:01 AM, Andy Lutomirski wrote:
+> On Jul 23, 2014 10:57 PM, "AKASHI Takahiro" <takahiro.akashi@linaro.org> wrote:
+>>
+>> On 07/24/2014 12:54 PM, Andy Lutomirski wrote:
+>>>
+>>> On 07/22/2014 02:14 AM, AKASHI Takahiro wrote:
+>>>>
+>>>> Arm64 holds a syscall number in w8(x8) register. Ptrace tracer may change
+>>>> its value either to:
+>>>>     * any valid syscall number to alter a system call, or
+>>>>     * -1 to skip a system call
+>>>>
+>>>> This patch implements this behavior by reloading that value into syscallno
+>>>> in struct pt_regs after tracehook_report_syscall_entry() or
+>>>> secure_computing(). In case of '-1', a return value of system call can also
+>>>> be changed by the tracer setting the value to x0 register, and so
+>>>> sys_ni_nosyscall() should not be called.
+>>>>
+>>>> See also:
+>>>>       42309ab4, ARM: 8087/1: ptrace: reload syscall number after
+>>>>            secure_computing() check
+>>>>
+>>>> Signed-off-by: AKASHI Takahiro <takahiro.akashi@linaro.org>
+>>>> ---
+>>>>    arch/arm64/kernel/entry.S  |    2 ++
+>>>>    arch/arm64/kernel/ptrace.c |   13 +++++++++++++
+>>>>    2 files changed, 15 insertions(+)
+>>>>
+>>>> diff --git a/arch/arm64/kernel/entry.S b/arch/arm64/kernel/entry.S
+>>>> index 5141e79..de8bdbc 100644
+>>>> --- a/arch/arm64/kernel/entry.S
+>>>> +++ b/arch/arm64/kernel/entry.S
+>>>> @@ -628,6 +628,8 @@ ENDPROC(el0_svc)
+>>>>    __sys_trace:
+>>>>        mov    x0, sp
+>>>>        bl    syscall_trace_enter
+>>>> +    cmp    w0, #-1                // skip syscall?
+>>>> +    b.eq    ret_to_user
+>>>
+>>>
+>>> Does this mean that skipped syscalls will cause exit tracing to be skipped?
+>>
+>>
+>> Yes. (and I guess yes on arm, too)
+>>
+>>
+>>> If so, then you risk (at least) introducing
+>>>
+>>> a nice user-triggerable OOPS if audit is enabled.
+>>
+>>
+>> Can you please elaborate this?
+>> Since I didn't find any definition of audit's behavior when syscall is
+>> rewritten to -1, I thought it is reasonable to skip "exit tracing" of
+>> "skipped" syscall.
+>> (otherwise, "fake" seems to be more appropriate :)
+>
+> The audit entry hook will oops if you call it twice in a row without
+> calling the exit hook in between.
 
-Unfortunately Set/Way ops don't provide the guarantee you require. While
-they may happen to force prior writes out to the PoC on some
-implementations, this guarantee is not provided by the architecture. The
-only way to guarantee data is out at the PoC per the architecture is to
-use cache maintenance by VA (unless you are unlucky enough to be on a
-32-bit system with an outer cache that requires MMIO maintenance).
+Thank you, I could reproduce this problem which hits BUG(in_syscall) in
+audit_syscall_entry(). Really bad, and I fixed it in my next version and
+now a "skipped" system call is also traced by audit.
 
-Almost every use of Set/Way operations is dodgy. They only make sense
-for IMPLEMENTATION DEFINED power-on / power-off sequences (which the
-arm64 kernel won't be dealing with), and some edge cases where you need
-to guarantee that the local d-caches are empty (to avoid unexpectedly
-hitting in the cache).
+I ran libseccomp test and Kees' test under auditd running with a rule,
+	auditctl -a exit,always -S all
+and all the tests seemed to pass.
 
-The naming of __flush_dcache_all is certainly misleading and I intend to
-address that shortly.
+   I can also imagine ptracers getting
+> confused if ptrace entry and exit don't line up.
+
+FYI, on arm64, we can distinguish syscall enter/exit with x12 register.
+
+> What happens if user code directly issues syscall ~0?  Does the return
+> value register get set?  Is the behavior different between traced and
+> untraced syscalls?
+
+Interesting cases. Let me think about it.
 
 Thanks,
-Mark.
+-Takahiro AKASHI
+
+>  The current approach seems a bit scary.
+>
+> --Andy
+>
