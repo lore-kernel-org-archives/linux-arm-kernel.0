@@ -1,65 +1,52 @@
-From: vinod.koul@intel.com (Vinod Koul)
-Date: Fri, 25 Jul 2014 14:12:15 +0530
-Subject: [PATCH] dmaengine: fsl-edma: fix dmamux index calculating error
-In-Reply-To: <1404204063-20961-1-git-send-email-jingchang.lu@freescale.com>
-References: <1404204063-20961-1-git-send-email-jingchang.lu@freescale.com>
-Message-ID: <20140725084215.GL8181@intel.com>
+From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
+Date: Fri, 25 Jul 2014 10:50:14 +0200
+Subject: [PATCH] ARM: at91: at91sam9x5: sets NPCS0 (PA14) back to GPIO
+In-Reply-To: <20140725103645.7fbf5b63@bbrezillon>
+References: <1405074175-22444-1-git-send-email-voice.shen@atmel.com>
+ <53D10C50.50305@aksignal.cz> <20140724162645.4e19c26c@bbrezillon>
+ <53D12103.3020103@aksignal.cz> <20140724175848.44f5da10@bbrezillon>
+ <53D1F5D0.1080006@aksignal.cz> <20140725083053.GD9532@piout.net>
+ <20140725103645.7fbf5b63@bbrezillon>
+Message-ID: <20140725085014.GE9532@piout.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jul 01, 2014 at 04:41:03PM +0800, Jingchang Lu wrote:
-> Signed-off-by: Jingchang Lu <jingchang.lu@freescale.com>
-
-Applied, thanks
-
--- 
-~Vinod
-
-> ---
->  drivers/dma/fsl-edma.c | 6 ++++--
->  1 file changed, 4 insertions(+), 2 deletions(-)
+On 25/07/2014 at 10:36:45 +0200, Boris Brezillon wrote :
+> Hi Alexandre,
 > 
-> diff --git a/drivers/dma/fsl-edma.c b/drivers/dma/fsl-edma.c
-> index b396a7f..24ab3d3 100644
-> --- a/drivers/dma/fsl-edma.c
-> +++ b/drivers/dma/fsl-edma.c
-> @@ -248,11 +248,12 @@ static void fsl_edma_chan_mux(struct fsl_edma_chan *fsl_chan,
->  			unsigned int slot, bool enable)
->  {
->  	u32 ch = fsl_chan->vchan.chan.chan_id;
-> -	void __iomem *muxaddr = fsl_chan->edma->muxbase[ch / DMAMUX_NR];
-> +	void __iomem *muxaddr;
->  	unsigned chans_per_mux, ch_off;
->  
->  	chans_per_mux = fsl_chan->edma->n_chans / DMAMUX_NR;
->  	ch_off = fsl_chan->vchan.chan.chan_id % chans_per_mux;
-> +	muxaddr = fsl_chan->edma->muxbase[ch / chans_per_mux];
->  
->  	if (enable)
->  		edma_writeb(fsl_chan->edma,
-> @@ -724,6 +725,7 @@ static struct dma_chan *fsl_edma_xlate(struct of_phandle_args *dma_spec,
->  {
->  	struct fsl_edma_engine *fsl_edma = ofdma->of_dma_data;
->  	struct dma_chan *chan, *_chan;
-> +	unsigned long chans_per_mux = fsl_edma->n_chans / DMAMUX_NR;
->  
->  	if (dma_spec->args_count != 2)
->  		return NULL;
-> @@ -732,7 +734,7 @@ static struct dma_chan *fsl_edma_xlate(struct of_phandle_args *dma_spec,
->  	list_for_each_entry_safe(chan, _chan, &fsl_edma->dma_dev.channels, device_node) {
->  		if (chan->client_count)
->  			continue;
-> -		if ((chan->chan_id / DMAMUX_NR) == dma_spec->args[0]) {
-> +		if ((chan->chan_id / chans_per_mux) == dma_spec->args[0]) {
->  			chan = dma_get_slave_channel(chan);
->  			if (chan) {
->  				chan->device->privatecnt++;
+> On Fri, 25 Jul 2014 10:30:54 +0200
+> Alexandre Belloni <alexandre.belloni@free-electrons.com> wrote:
+> 
+> > Hi,
+> > 
+> > On 25/07/2014 at 08:14:40 +0200, Ji?? Prchal wrote :
+> > > I'm using custom board. My spi node:
+> > > 			spi0: spi at f0000000 {
+> > 
+> > You should override the pinctrl here as you are using gpios for the cs.
+> > 				pinctrl-0 = <&pinctrl_spi0_custom>;
+> 
+> I guess you meant:
+> 			pinctrl-0 <&pinctrl_spi0 &pinctrl_spi0_custom>;
+> 
+
+Sure, you are right
+
+> I suggested the same thing, however I'm pretty sure this is not the
+> source of the problem. As I said, gpio_request already mux the
+> associated pin to GPIO function.
+> 
+> Best Regards,
+> 
+> Boris
+> 
+> 
 > -- 
-> 1.8.0
-> 
-> --
-> To unsubscribe from this list: send the line "unsubscribe dmaengine" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> Boris Brezillon, Free Electrons
+> Embedded Linux and Kernel engineering
+> http://free-electrons.com
 
 -- 
+Alexandre Belloni, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
