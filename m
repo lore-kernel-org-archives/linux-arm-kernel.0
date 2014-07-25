@@ -1,163 +1,237 @@
 From: m.smarduch@samsung.com (Mario Smarduch)
-Date: Thu, 24 Jul 2014 17:56:04 -0700
-Subject: [PATCH v9 0/4] arm: dirty page logging support for ARMv7
-Message-ID: <1406249768-25315-1-git-send-email-m.smarduch@samsung.com>
+Date: Thu, 24 Jul 2014 17:56:06 -0700
+Subject: [PATCH v9 2/4] arm: ARMv7 dirty page logging inital mem region write
+ protect (w/no huge PUD support)
+In-Reply-To: <1406249768-25315-1-git-send-email-m.smarduch@samsung.com>
+References: <1406249768-25315-1-git-send-email-m.smarduch@samsung.com>
+Message-ID: <1406249768-25315-3-git-send-email-m.smarduch@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds support for dirty page logging so far tested only on ARMv7 HW,
-and verified to compile on armv8, ia64, mips, ppc, s390 and compile and run on
-x86_64. 
+Patch adds  support for initial write protection VM memlsot. This patch series
+assumes that huge PUDs will not be used in 2nd stage tables.
 
-Change from previous version:
-- kvm_flush_remote_tlbs() has generic and architecture specific variants.
-  armv7 (later armv8) uses arch variant all other archtectures use generic 
-  version. Reason being arm uses HW broadcast for TLB invalidation.
-- kvm_vm_ioctl_get_dirty_log() - is generic between armv7, x86 (later ARMv8),
-  other architectures use arch variant
-
-The approach is documented 
-
-https://lists.cs.columbia.edu/pipermail/kvmarm/2014-July/010329.html
-https://lists.cs.columbia.edu/pipermail/kvmarm/2014-July/010338.html
-
-Compile targets
-- x86_64 - defconfig also did validation, simple migration on same host.
-- ia64 - ia64-linux-gcc4.6.3 - defconfig, ia64 Kconfig defines BROKEN worked 
-  around that to make sure new changes don't break build. Eventually build 
-  breaks when comping ioapic.c, unrelated to this patch.
-- mips - mips64-linux-gcc4.6.3 - malta_kvm_defconfig
-- ppc - powerpc64-linux-gcc4.6.3 - pseries_defconfig
-- s390 - s390x-linux-gcc4.6.3 - defconfig
-
-Dirty page logging support -
-- initially write protects VM RAM memory regions - 2nd stage page tables
-- add support to read dirty page log and again write protect the dirty pages 
-  - second stage page table for next pass.
-- second stage huge page are dissolved into page tables to keep track of
-  dirty pages at page granularity. Tracking at huge page granularity limits
-  migration to an almost idle system.
-- In the event migration is canceled, normal behavior is resumed huge pages
-  are rebuilt over time.
-- At this time reverse mappings are not used to for write protecting of 2nd 
-  stage tables.
-
-- Future work
-  - Enable diry memory logging to work on ARMv8 FastModels/Foundations Model
-
-Test Environment:
----------------------------------------------------------------------------
-NOTE: RUNNING on FAST Models will hardly ever fail and mask bugs, initially 
-      light loads were succeeding without dirty page logging support.
----------------------------------------------------------------------------
-- Will put all components on github, including test setup on github
-- In short summary
-  o Two ARM Exyonys 5440 development platforms - 4-way 1.7 GHz, with 8GB, 256GB
-    storage, 1GBs Ethernet, with swap enabled
-  o NFS Server runing Ubuntu 13.04
-    - both ARM boards mount shared file system
-    - Shared file system includes - QEMU, Guest Kernel, DTB, multiple Ext3 root
-      file systems.
-  o Component versions: qemu-1.7.5, vexpress-a15, host/guest kernel 3.15-rc1,
-  o Use QEMU Ctr+A+C and migrate -d tcp:IP:port command
-    - Destination command syntax: can change smp to 4, machine model outdated,
-      but has been tested on virt by others (need to upgrade)
-
-        /mnt/migration/qemu-system-arm -enable-kvm -smp 2 -kernel \
-        /mnt/migration/zImage -dtb /mnt/migration/guest-a15.dtb -m 1792 \
-        -M vexpress-a15 -cpu cortex-a15 -nographic \
-        -append "root=/dev/vda rw console=ttyAMA0 rootwait" \
-        -drive if=none,file=/mnt/migration/guest1.root,id=vm1 \
-        -device virtio-blk-device,drive=vm1 \
-        -netdev type=tap,id=net0,ifname=tap0 \
-        -device virtio-net-device,netdev=net0,mac="52:54:00:12:34:58" \
-        -incoming tcp:0:4321
-
-    - Source command syntax same except '-incoming'
-
-  o Test migration of multiple VMs use tap0, tap1, ..., and guest0.root, .....
-    has been tested as well.
-  o On source run multiple copies of 'dirtyram.arm' - simple program to dirty
-    pages periodically.
-    ./dirtyarm.ram <total mmap size> <dirty page size> <sleep time>
-    Example:
-    ./dirtyram.arm 102580 812 30
-    - dirty 102580 pages
-    - 812 pages every 30ms with an incrementing counter
-    - run anywhere from one to as many copies as VM resources can support. If
-      the dirty rate is too high migration will run indefintely
-    - run date output loop, check date is picked up smoothly
-    - place guest/host into page reclaim/swap mode - by whatever means in this
-      case run multiple copies of 'dirtyram.ram' on host
-    - issue migrate command(s) on source
-    - Top result is 409600, 8192, 5
-  o QEMU is instrumented to save RAM memory regions on source and destination
-    after memory is migrated, but before guest started. Later files are
-    checksummed on both ends for correctness, given VMs are small this works.
-  o Guest kernel is instrumented to capture current cycle counter - last cycle
-    and compare to qemu down time to test arch timer accuracy.
-  o Network failover is at L3 due to interface limitations, ping continues
-    working transparently
-  o Also tested 'migrate_cancel' to test reassemble of huge pages (inserted low
-    level instrumentation code).
-- Basic Network Test - Assuming one ethernet interface available
-
-Source host IP 192.168.10.101/24, VM tap0 192.168.2.1/24 and
-VM eth0 192.168.2.100/24 with default route 192.168.2.1
-
-Destination host IP 192.168.10.100/24, VM same settings as above.
-Both VMs have identical MAC addresses.
-
-Initially NFS server route to 192.168.2.100 is via 192.168.10.101
-
-- ssh 192.168.2.100
-- start migration from source to destination
-- after migration ends
-- on NFS server switch routes.
-   route add -host 192.168.2.100 gw 192.168.10.100
-
-ssh should resume after route switch. ping as well should work
-seamlessly.
-
-
-
-Mario Smarduch (4):
-  add ARMv7 HYP API to flush VM TLBs, change generic TLB flush to
-    support arch flush
-  ARMv7  dirty page logging inital mem region write protect (w/no huge
-    PUD support)
-  dirty log write protect mgmt. Moved x86, armv7 to generic, set armv8
-    ia64 mips powerpc s390 arch specific
-  ARMv7 dirty page logging 2nd stage page fault handling support
-
- arch/arm/include/asm/kvm_asm.h        |    1 +
- arch/arm/include/asm/kvm_host.h       |    2 +
- arch/arm/include/asm/kvm_mmu.h        |   20 ++++
+Signed-off-by: Mario Smarduch <m.smarduch@samsung.com>
+---
+ arch/arm/include/asm/kvm_host.h       |    1 +
+ arch/arm/include/asm/kvm_mmu.h        |   20 ++++++
  arch/arm/include/asm/pgtable-3level.h |    1 +
- arch/arm/kvm/Kconfig                  |    1 +
- arch/arm/kvm/arm.c                    |   17 ++-
- arch/arm/kvm/interrupts.S             |   12 ++
- arch/arm/kvm/mmu.c                    |  198 ++++++++++++++++++++++++++++++++-
- arch/arm64/include/asm/kvm_host.h     |    2 +
- arch/arm64/kvm/Kconfig                |    1 +
- arch/ia64/include/asm/kvm_host.h      |    1 +
- arch/ia64/kvm/Kconfig                 |    1 +
- arch/ia64/kvm/kvm-ia64.c              |    2 +-
- arch/mips/include/asm/kvm_host.h      |    2 +-
- arch/mips/kvm/Kconfig                 |    1 +
- arch/mips/kvm/kvm_mips.c              |    2 +-
- arch/powerpc/include/asm/kvm_host.h   |    2 +
- arch/powerpc/kvm/Kconfig              |    1 +
- arch/powerpc/kvm/book3s.c             |    2 +-
- arch/powerpc/kvm/booke.c              |    2 +-
- arch/s390/include/asm/kvm_host.h      |    2 +
- arch/s390/kvm/Kconfig                 |    1 +
- arch/s390/kvm/kvm-s390.c              |    2 +-
- arch/x86/kvm/x86.c                    |   86 --------------
- include/linux/kvm_host.h              |    3 +
- virt/kvm/Kconfig                      |    6 +
- virt/kvm/kvm_main.c                   |   94 ++++++++++++++++
- 27 files changed, 366 insertions(+), 99 deletions(-)
+ arch/arm/kvm/arm.c                    |    9 +++
+ arch/arm/kvm/mmu.c                    |  128 +++++++++++++++++++++++++++++++++
+ 5 files changed, 159 insertions(+)
 
+diff --git a/arch/arm/include/asm/kvm_host.h b/arch/arm/include/asm/kvm_host.h
+index 042206f..6521a2d 100644
+--- a/arch/arm/include/asm/kvm_host.h
++++ b/arch/arm/include/asm/kvm_host.h
+@@ -231,5 +231,6 @@ int kvm_perf_teardown(void);
+ u64 kvm_arm_timer_get_reg(struct kvm_vcpu *, u64 regid);
+ int kvm_arm_timer_set_reg(struct kvm_vcpu *, u64 regid, u64 value);
+ void kvm_arch_flush_remote_tlbs(struct kvm *);
++void kvm_mmu_wp_memory_region(struct kvm *kvm, int slot);
+ 
+ #endif /* __ARM_KVM_HOST_H__ */
+diff --git a/arch/arm/include/asm/kvm_mmu.h b/arch/arm/include/asm/kvm_mmu.h
+index 5cc0b0f..08ab5e8 100644
+--- a/arch/arm/include/asm/kvm_mmu.h
++++ b/arch/arm/include/asm/kvm_mmu.h
+@@ -114,6 +114,26 @@ static inline void kvm_set_s2pmd_writable(pmd_t *pmd)
+ 	pmd_val(*pmd) |= L_PMD_S2_RDWR;
+ }
+ 
++static inline void kvm_set_s2pte_readonly(pte_t *pte)
++{
++	pte_val(*pte) = (pte_val(*pte) & ~L_PTE_S2_RDWR) | L_PTE_S2_RDONLY;
++}
++
++static inline bool kvm_s2pte_readonly(pte_t *pte)
++{
++	return (pte_val(*pte) & L_PTE_S2_RDWR) == L_PTE_S2_RDONLY;
++}
++
++static inline void kvm_set_s2pmd_readonly(pmd_t *pmd)
++{
++	pmd_val(*pmd) = (pmd_val(*pmd) & ~L_PMD_S2_RDWR) | L_PMD_S2_RDONLY;
++}
++
++static inline bool kvm_s2pmd_readonly(pmd_t *pmd)
++{
++	return (pmd_val(*pmd) & L_PMD_S2_RDWR) == L_PMD_S2_RDONLY;
++}
++
+ /* Open coded p*d_addr_end that can deal with 64bit addresses */
+ #define kvm_pgd_addr_end(addr, end)					\
+ ({	u64 __boundary = ((addr) + PGDIR_SIZE) & PGDIR_MASK;		\
+diff --git a/arch/arm/include/asm/pgtable-3level.h b/arch/arm/include/asm/pgtable-3level.h
+index 85c60ad..d8bb40b 100644
+--- a/arch/arm/include/asm/pgtable-3level.h
++++ b/arch/arm/include/asm/pgtable-3level.h
+@@ -129,6 +129,7 @@
+ #define L_PTE_S2_RDONLY			(_AT(pteval_t, 1) << 6)   /* HAP[1]   */
+ #define L_PTE_S2_RDWR			(_AT(pteval_t, 3) << 6)   /* HAP[2:1] */
+ 
++#define L_PMD_S2_RDONLY			(_AT(pteval_t, 1) << 6)   /* HAP[1]   */
+ #define L_PMD_S2_RDWR			(_AT(pmdval_t, 3) << 6)   /* HAP[2:1] */
+ 
+ /*
+diff --git a/arch/arm/kvm/arm.c b/arch/arm/kvm/arm.c
+index 3c82b37..e11c2dd 100644
+--- a/arch/arm/kvm/arm.c
++++ b/arch/arm/kvm/arm.c
+@@ -242,6 +242,15 @@ void kvm_arch_commit_memory_region(struct kvm *kvm,
+ 				   const struct kvm_memory_slot *old,
+ 				   enum kvm_mr_change change)
+ {
++#ifdef CONFIG_ARM
++	/*
++	 * At this point memslot has been committed and there is an
++	 * allocated dirty_bitmap[], dirty pages will be be tracked while the
++	 * memory slot is write protected.
++	 */
++	if ((change != KVM_MR_DELETE) && (mem->flags & KVM_MEM_LOG_DIRTY_PAGES))
++		kvm_mmu_wp_memory_region(kvm, mem->slot);
++#endif
+ }
+ 
+ void kvm_arch_flush_shadow_all(struct kvm *kvm)
+diff --git a/arch/arm/kvm/mmu.c b/arch/arm/kvm/mmu.c
+index 35254c6..7bfc792 100644
+--- a/arch/arm/kvm/mmu.c
++++ b/arch/arm/kvm/mmu.c
+@@ -763,6 +763,134 @@ static bool transparent_hugepage_adjust(pfn_t *pfnp, phys_addr_t *ipap)
+ 	return false;
+ }
+ 
++#ifdef CONFIG_ARM
++/**
++ * stage2_wp_pte_range - write protect PTE range
++ * @pmd:	pointer to pmd entry
++ * @addr:	range start address
++ * @end:	range end address
++ */
++static void stage2_wp_pte_range(pmd_t *pmd, phys_addr_t addr, phys_addr_t end)
++{
++	pte_t *pte;
++
++	pte = pte_offset_kernel(pmd, addr);
++	do {
++		if (!pte_none(*pte)) {
++			if (!kvm_s2pte_readonly(pte))
++				kvm_set_s2pte_readonly(pte);
++		}
++	} while (pte++, addr += PAGE_SIZE, addr != end);
++}
++
++/**
++ * stage2_wp_pmd_range - write protect PMD range
++ * @pud:	pointer to pud entry
++ * @addr:	range start address
++ * @end:	range end address
++ */
++static void stage2_wp_pmd_range(pud_t *pud, phys_addr_t addr, phys_addr_t end)
++{
++	pmd_t *pmd;
++	phys_addr_t next;
++
++	pmd = pmd_offset(pud, addr);
++
++	do {
++		next = kvm_pmd_addr_end(addr, end);
++		if (!pmd_none(*pmd)) {
++			if (kvm_pmd_huge(*pmd)) {
++				if (!kvm_s2pmd_readonly(pmd))
++					kvm_set_s2pmd_readonly(pmd);
++			} else
++				stage2_wp_pte_range(pmd, addr, next);
++
++		}
++	} while (pmd++, addr = next, addr != end);
++}
++
++/**
++  * stage2_wp_pud_range - write protect PUD range
++  * @kvm:	pointer to kvm structure
++  * @pud:	pointer to pgd entry
++  * @addr:	range start address
++  * @end:	range end address
++  *
++  * While walking the PUD range huge PUD pages are ignored, in the future this
++  * may need to be revisited. Determine how to handle huge PUDs when logging
++  * of dirty pages is enabled.
++  */
++static void  stage2_wp_pud_range(struct kvm *kvm, pgd_t *pgd,
++				phys_addr_t addr, phys_addr_t end)
++{
++	pud_t *pud;
++	phys_addr_t next;
++
++	pud = pud_offset(pgd, addr);
++	do {
++		next = kvm_pud_addr_end(addr, end);
++		/* TODO: huge PUD not supported, revisit later */
++		BUG_ON(pud_huge(*pud));
++		if (!pud_none(*pud))
++			stage2_wp_pmd_range(pud, addr, next);
++	} while (pud++, addr = next, addr != end);
++}
++
++/**
++ * stage2_wp_range() - write protect stage2 memory region range
++ * @kvm:	The KVM pointer
++ * @start:	Start address of range
++ * &end:	End address of range
++ */
++static void stage2_wp_range(struct kvm *kvm, phys_addr_t addr, phys_addr_t end)
++{
++	pgd_t *pgd;
++	phys_addr_t next;
++
++	pgd = kvm->arch.pgd + pgd_index(addr);
++	do {
++		/*
++		 * Release kvm_mmu_lock periodically if the memory region is
++		 * large features like detect hung task, lock detector or lock
++		 * dep  may panic. In addition holding the lock this long will
++		 * also starve other vCPUs. Applies to huge VM memory regions.
++		 */
++		if (need_resched() || spin_needbreak(&kvm->mmu_lock))
++			cond_resched_lock(&kvm->mmu_lock);
++
++		next = kvm_pgd_addr_end(addr, end);
++		if (pgd_present(*pgd))
++			stage2_wp_pud_range(kvm, pgd, addr, next);
++	} while (pgd++, addr = next, addr != end);
++}
++
++/**
++ * kvm_mmu_wp_memory_region() - write protect stage 2 entries for memory slot
++ * @kvm:	The KVM pointer
++ * @slot:	The memory slot to write protect
++ *
++ * Called to start logging dirty pages after memory region
++ * KVM_MEM_LOG_DIRTY_PAGES operation is called. After this function returns
++ * all present PMD and PTEs are write protected in the memory region.
++ * Afterwards read of dirty page log can be called.
++ *
++ * Acquires kvm_mmu_lock. Called with kvm->slots_lock mutex acquired,
++ * serializing operations for VM memory regions.
++ */
++
++void kvm_mmu_wp_memory_region(struct kvm *kvm, int slot)
++{
++	struct kvm_memory_slot *memslot = id_to_memslot(kvm->memslots, slot);
++	phys_addr_t start = memslot->base_gfn << PAGE_SHIFT;
++	phys_addr_t end = (memslot->base_gfn + memslot->npages) << PAGE_SHIFT;
++
++	spin_lock(&kvm->mmu_lock);
++	stage2_wp_range(kvm, start, end);
++	kvm_flush_remote_tlbs(kvm);
++	spin_unlock(&kvm->mmu_lock);
++}
++#endif
++
+ static int user_mem_abort(struct kvm_vcpu *vcpu, phys_addr_t fault_ipa,
+ 			  struct kvm_memory_slot *memslot,
+ 			  unsigned long fault_status)
 -- 
 1.7.9.5
