@@ -1,77 +1,84 @@
-From: monstr@monstr.eu (Michal Simek)
-Date: Fri, 25 Jul 2014 10:02:50 +0200
-Subject: [PATCH v2 06/11] ARM: dts: zynq: Add DMAC for Parallella
-In-Reply-To: <bc390439-9a5b-43a1-a70c-a4c6517a6cb6@BN1AFFO11FD005.protection.gbl>
-References: <1406242820-20140-1-git-send-email-afaerber@suse.de>
- <1406242820-20140-7-git-send-email-afaerber@suse.de>
- <bc390439-9a5b-43a1-a70c-a4c6517a6cb6@BN1AFFO11FD005.protection.gbl>
-Message-ID: <53D20F2A.5020209@monstr.eu>
+From: antoine.tenart@free-electrons.com (Antoine =?iso-8859-1?Q?T=E9nart?=)
+Date: Fri, 25 Jul 2014 10:07:38 +0200
+Subject: [PATCH v3 07/12] usb: chipidea: add a usb2 driver for ci13xxx
+In-Reply-To: <20140725021853.GA11052@shlinux1.ap.freescale.net>
+References: <1405499166-6726-1-git-send-email-antoine.tenart@free-electrons.com>
+ <1405499166-6726-8-git-send-email-antoine.tenart@free-electrons.com>
+ <20140725021853.GA11052@shlinux1.ap.freescale.net>
+Message-ID: <20140725080738.GA9756@kwain>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/25/2014 01:28 AM, S?ren Brinkmann wrote:
-> On Fri, 2014-07-25 at 01:00AM +0200, Andreas F?rber wrote:
->> Signed-off-by: Andreas F?rber <afaerber@suse.de>
->> ---
->>  v2: New
->>  
->>  arch/arm/boot/dts/zynq-7000.dtsi      | 17 +++++++++++++++++
->>  arch/arm/boot/dts/zynq-parallella.dts |  4 ++++
->>  2 files changed, 21 insertions(+)
->>
->> diff --git a/arch/arm/boot/dts/zynq-7000.dtsi b/arch/arm/boot/dts/zynq-7000.dtsi
->> index eed3df0..1a70277 100644
->> --- a/arch/arm/boot/dts/zynq-7000.dtsi
->> +++ b/arch/arm/boot/dts/zynq-7000.dtsi
->> @@ -223,6 +223,23 @@
->>  			};
->>  		};
->>  
->> +		dmac_s: dmac at f8003000 {
->> +			compatible = "arm,pl330", "arm,primecell";
->> +			reg = <0xf8003000 0x1000>;
->> +			status = "disabled";
-> I think for this IP we can omit the 'status' property since it is always
-> enabled. I don't see a reason to override it in each board DT.
+Hi Peter,
 
-Done this change myself
+On Fri, Jul 25, 2014 at 10:18:54AM +0800, Peter Chen wrote:
+> On Wed, Jul 16, 2014 at 10:26:01AM +0200, Antoine T?nart wrote:
+> > Add a USB2 ChipIdea driver for ci13xxx, with optional PHY, clock
+> > and DMA mask, to support USB2 ChipIdea controllers that don't need
+> > specific functions.
+> 
+> You may need to indicate it is a generic usb2 glue layer driver at both
+> subject and context.
+
+"USB2 ChipIdea driver for ci13xxx" seemed quite generic to me.
+
+> > 
+> > Needed for the Marvell Berlin SoCs USB controllers.
+> 
+> You can say it is tested at Marvell Berlin SoCs USB controllers.
+
+Ok, I'll explicitly say it.
+
+> > +
+> > +static int ci_hdrc_usb2_dt_probe(struct device *dev,
+> > +				    struct ci_hdrc_platform_data *ci_pdata,
+> > +				    struct ci_hdrc_usb2_priv *priv)
+> > +{
+> > +	u32 mask;
+> > +	int ret;
+> > +
+> > +	priv->clk = devm_clk_get(dev, NULL);
+> > +	if (!IS_ERR(priv->clk)) {
+> > +		ret = clk_prepare_enable(priv->clk);
+> > +		if (ret) {
+> > +			dev_err(dev, "failed to enable the clock: %d\n", ret);
+> > +			return ret;
+> > +		}
+> > +	}
+> 
+> The clk API may be needed for both DT and non-DT cases.
+
+Yes sure, I'll move this to the ci_hdrc_usb2_probe().
 
 > 
->> +			interrupt-parent = <&intc>;
->> +			interrupts = <0 13 4>,
->> +			             <0 14 4>, <0 15 4>,
->> +			             <0 16 4>, <0 17 4>,
->> +			             <0 40 4>, <0 41 4>,
->> +			             <0 42 4>, <0 43 4>;
->> +			#dma-cells = <1>;
->> +			#dma-channels = <8>;
->> +			#dma-requests = <4>;
->> +			clocks = <&clkc 27>;
->> +			clock-names = "apb_pclk";
->> +		};
->> +
+> > +
+> > +	ci_pdata->phy = of_phy_get(dev->of_node, 0);
+> > +	if (IS_ERR(ci_pdata->phy)) {
+> > +		if (PTR_ERR(ci_pdata->phy) == -EPROBE_DEFER)
+> > +			return -EPROBE_DEFER;
+> > +
+> > +		/* PHY is optional */
+> > +		ci_pdata->phy = NULL;
+> > +	}
+> > +
+> > +	if (of_property_read_u32(dev->of_node, "dma-mask", &mask))
+> > +		priv->dma_mask = mask;
+> > +
+> According to discussion, you may not need dma_mask in driver any more,
+> and use below API for both DT and non-DT case.
 > 
-> Acked-by: Soren Brinkmann <soren.brinkmann@xilinx.com>
+>         err = dma_set_mask_and_coherent(&pdev->dev, DMA_BIT_MASK(32));
+>         if (err)
+>         	                handle error;
 
+This would only be needed in non-dt cases, as the DMA mask is configured
+in drivers/of/platform.c otherwise.
 
-Applied to zynq/dt branch.
-https://github.com/Xilinx/linux-xlnx/commits/zynq/dt
+Thanks!
 
-Thanks,
-Michal
+Antoine
 
 -- 
-Michal Simek, Ing. (M.Eng), OpenPGP -> KeyID: FE3D1F91
-w: www.monstr.eu p: +42-0-721842854
-Maintainer of Linux kernel - Microblaze cpu - http://www.monstr.eu/fdt/
-Maintainer of Linux kernel - Xilinx Zynq ARM architecture
-Microblaze U-BOOT custodian and responsible for u-boot arm zynq platform
-
-
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 263 bytes
-Desc: OpenPGP digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140725/a7752890/attachment-0001.sig>
+Antoine T?nart, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
