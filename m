@@ -1,84 +1,48 @@
-From: antoine.tenart@free-electrons.com (Antoine =?iso-8859-1?Q?T=E9nart?=)
-Date: Fri, 25 Jul 2014 10:07:38 +0200
-Subject: [PATCH v3 07/12] usb: chipidea: add a usb2 driver for ci13xxx
-In-Reply-To: <20140725021853.GA11052@shlinux1.ap.freescale.net>
-References: <1405499166-6726-1-git-send-email-antoine.tenart@free-electrons.com>
- <1405499166-6726-8-git-send-email-antoine.tenart@free-electrons.com>
- <20140725021853.GA11052@shlinux1.ap.freescale.net>
-Message-ID: <20140725080738.GA9756@kwain>
+From: monstr@monstr.eu (Michal Simek)
+Date: Fri, 25 Jul 2014 10:08:06 +0200
+Subject: [PATCH v2 09/11] Documentation: devicetree: Fix ADI AXI SPDIF
+ specification
+In-Reply-To: <53D20A61.1050506@metafoo.de>
+References: <1406242820-20140-1-git-send-email-afaerber@suse.de>
+ <1406242820-20140-10-git-send-email-afaerber@suse.de>
+ <53D20A61.1050506@metafoo.de>
+Message-ID: <53D21066.8000905@monstr.eu>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Peter,
+Hi Mark,
 
-On Fri, Jul 25, 2014 at 10:18:54AM +0800, Peter Chen wrote:
-> On Wed, Jul 16, 2014 at 10:26:01AM +0200, Antoine T?nart wrote:
-> > Add a USB2 ChipIdea driver for ci13xxx, with optional PHY, clock
-> > and DMA mask, to support USB2 ChipIdea controllers that don't need
-> > specific functions.
+On 07/25/2014 09:42 AM, Lars-Peter Clausen wrote:
+> On 07/25/2014 01:00 AM, Andreas F?rber wrote:
+>> The specification requires compatible = "adi,axi-spdif-1.00.a" but
+>> driver and example and file name indicate "adi,axi-spdif-tx-1.00.a".
+>> Change the specification to match the implementation.
+>>
+>> Signed-off-by: Andreas F?rber <afaerber@suse.de>
 > 
-> You may need to indicate it is a generic usb2 glue layer driver at both
-> subject and context.
+> Acked-by: Lars-Peter Clausen <lars@metafoo.de>
 
-"USB2 ChipIdea driver for ci13xxx" seemed quite generic to me.
+All these patches have been added through your tree that's why I think
+you should take this fix through his tree.
 
-> > 
-> > Needed for the Marvell Berlin SoCs USB controllers.
-> 
-> You can say it is tested at Marvell Berlin SoCs USB controllers.
+Here is my:
+Reviewed-by: Michal Simek <michal.simek@xilinx.com>
 
-Ok, I'll explicitly say it.
-
-> > +
-> > +static int ci_hdrc_usb2_dt_probe(struct device *dev,
-> > +				    struct ci_hdrc_platform_data *ci_pdata,
-> > +				    struct ci_hdrc_usb2_priv *priv)
-> > +{
-> > +	u32 mask;
-> > +	int ret;
-> > +
-> > +	priv->clk = devm_clk_get(dev, NULL);
-> > +	if (!IS_ERR(priv->clk)) {
-> > +		ret = clk_prepare_enable(priv->clk);
-> > +		if (ret) {
-> > +			dev_err(dev, "failed to enable the clock: %d\n", ret);
-> > +			return ret;
-> > +		}
-> > +	}
-> 
-> The clk API may be needed for both DT and non-DT cases.
-
-Yes sure, I'll move this to the ci_hdrc_usb2_probe().
-
-> 
-> > +
-> > +	ci_pdata->phy = of_phy_get(dev->of_node, 0);
-> > +	if (IS_ERR(ci_pdata->phy)) {
-> > +		if (PTR_ERR(ci_pdata->phy) == -EPROBE_DEFER)
-> > +			return -EPROBE_DEFER;
-> > +
-> > +		/* PHY is optional */
-> > +		ci_pdata->phy = NULL;
-> > +	}
-> > +
-> > +	if (of_property_read_u32(dev->of_node, "dma-mask", &mask))
-> > +		priv->dma_mask = mask;
-> > +
-> According to discussion, you may not need dma_mask in driver any more,
-> and use below API for both DT and non-DT case.
-> 
->         err = dma_set_mask_and_coherent(&pdev->dev, DMA_BIT_MASK(32));
->         if (err)
->         	                handle error;
-
-This would only be needed in non-dt cases, as the DMA mask is configured
-in drivers/of/platform.c otherwise.
-
-Thanks!
-
-Antoine
+Thanks,
+Michal
 
 -- 
-Antoine T?nart, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
+Michal Simek, Ing. (M.Eng), OpenPGP -> KeyID: FE3D1F91
+w: www.monstr.eu p: +42-0-721842854
+Maintainer of Linux kernel - Microblaze cpu - http://www.monstr.eu/fdt/
+Maintainer of Linux kernel - Xilinx Zynq ARM architecture
+Microblaze U-BOOT custodian and responsible for u-boot arm zynq platform
+
+
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 263 bytes
+Desc: OpenPGP digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140725/3f7f6506/attachment.sig>
