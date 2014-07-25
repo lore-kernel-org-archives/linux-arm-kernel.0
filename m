@@ -1,66 +1,113 @@
-From: hanjun.guo@linaro.org (Hanjun Guo)
-Date: Fri, 25 Jul 2014 18:39:08 +0800
-Subject: [PATCH 09/19] ARM64 / ACPI: Move the initialization of
- cpu_logical_map(0) before acpi_boot_init()
-In-Reply-To: <20140724152103.GB26190@leverpostej>
-References: <1406206825-15590-1-git-send-email-hanjun.guo@linaro.org>
- <1406206825-15590-10-git-send-email-hanjun.guo@linaro.org>
- <20140724152103.GB26190@leverpostej>
-Message-ID: <53D233CC.1070006@linaro.org>
+From: afaerber@suse.de (=?UTF-8?B?QW5kcmVhcyBGw6RyYmVy?=)
+Date: Fri, 25 Jul 2014 12:43:09 +0200
+Subject: [PATCH v2 05/11] ARM: dts: zynq: Add QSPI for Parallella
+In-Reply-To: <7aabd35a-0b4a-4d03-9976-ef3926929ddc@BL2FFO11FD027.protection.gbl>
+References: <1406242820-20140-1-git-send-email-afaerber@suse.de>
+ <1406242820-20140-6-git-send-email-afaerber@suse.de>
+ <ddb38ce5-9e31-4c94-967c-7784c7fba75c@BN1BFFO11FD028.protection.gbl>
+ <53D20E5B.9070501@monstr.eu> <53D21887.2020305@suse.de>
+ <53D2258B.9000609@xilinx.com>
+ <7aabd35a-0b4a-4d03-9976-ef3926929ddc@BL2FFO11FD027.protection.gbl>
+Message-ID: <53D234BD.2040005@suse.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2014-7-24 23:21, Mark Rutland wrote:
-> On Thu, Jul 24, 2014 at 02:00:15PM +0100, Hanjun Guo wrote:
->> Move the initialization of cpu_logical_map(0) before acpi_boot_init()
->> to remove the duplicated initialization of cpu_logical_map(0).
-> 
-> It always make sense to initialise CPU0's logical map entry from the
-> hardware values, so you could do this earlier in the series, before you
-> introduce any ACPI code. Then you don't have the churn in acpi.c
+Hi Harini,
 
-ok, I will prepare a separate patch to do this before ACPI code, does it
-make sense to you?
-
-> 
+Am 25.07.2014 12:31, schrieb Harini Katakam:
+>> -----Original Message-----
+>> From: Michal Simek [mailto:michal.simek at xilinx.com]
+>> Sent: Friday, July 25, 2014 3:08 PM
+>> To: Andreas F?rber; monstr at monstr.eu; Soren Brinkmann
+>> Cc: Harini Katakam; Michal Simek; Andreas Olofsson; Matteo Vit; Sean
+>> Rickerd; devicetree at vger.kernel.org; linux-arm-kernel at lists.infradead.org;
+>> linux-kernel at vger.kernel.org; Rob Herring; Pawel Moll; Mark Rutland; Ian
+>> Campbell; Kumar Gala; Russell King
+>> Subject: Re: [PATCH v2 05/11] ARM: dts: zynq: Add QSPI for Parallella
 >>
->> Signed-off-by: Hanjun Guo <hanjun.guo@linaro.org>
->> ---
->>  arch/arm64/kernel/acpi.c  |    3 ---
->>  arch/arm64/kernel/setup.c |    3 ++-
->>  2 files changed, 2 insertions(+), 4 deletions(-)
->>
->> diff --git a/arch/arm64/kernel/acpi.c b/arch/arm64/kernel/acpi.c
->> index 801e268..ff0f6a0 100644
->> --- a/arch/arm64/kernel/acpi.c
->> +++ b/arch/arm64/kernel/acpi.c
->> @@ -244,9 +244,6 @@ int __init acpi_boot_init(void)
->>  	if (err)
->>  		pr_err("Can't find FADT\n");
->>  
->> -	/* Get the boot CPU's MPIDR before MADT parsing */
->> -	cpu_logical_map(0) = read_cpuid_mpidr() & MPIDR_HWID_BITMASK;
->> -
->>  	err = acpi_parse_madt_gic_cpu_interface_entries();
->>  
->>  	return err;
->> diff --git a/arch/arm64/kernel/setup.c b/arch/arm64/kernel/setup.c
->> index e00d40c..17ab98e 100644
->> --- a/arch/arm64/kernel/setup.c
->> +++ b/arch/arm64/kernel/setup.c
->> @@ -394,13 +394,14 @@ void __init setup_arch(char **cmdline_p)
->>  
->>  	efi_idmap_init();
->>  
->> +	/* Get the boot CPU's MPIDR before cpu logical map is built */
+>> On 07/25/2014 10:42 AM, Andreas F?rber wrote:
+>>> Am 25.07.2014 09:59, schrieb Michal Simek:
+>>>> On 07/25/2014 01:18 AM, S?ren Brinkmann wrote:
+>>>>> On Fri, 2014-07-25 at 01:00AM +0200, Andreas F?rber wrote:
+>>>>>> Prepare SPI0 and SPI1 while at it.
+>>>
+>>>> Patch subject is incorrect. You are adding SPI and QSPI.
+>>>
+>>> Yes, it originally added only QSPI, but I considered it a good deed to
+>>> add SPI as well while already reading that part of the TRM. :)
+>>>
+>>>>>>
+>>>>>> Signed-off-by: Andreas F?rber <afaerber@suse.de> --- v2: New
+>>>>>>
+>>>>>> arch/arm/boot/dts/zynq-7000.dtsi      | 37
+>>>>>> +++++++++++++++++++++++++++++++++++
+>>>>>> arch/arm/boot/dts/zynq-parallella.dts |  4 ++++ 2 files
+>>>>>> changed, 41 insertions(+)
+>>>>>>
+>>>>>> diff --git a/arch/arm/boot/dts/zynq-7000.dtsi
+>>>>>> b/arch/arm/boot/dts/zynq-7000.dtsi index 8fd826a..eed3df0
+>>>>>> 100644 --- a/arch/arm/boot/dts/zynq-7000.dtsi +++
+>>>>>> b/arch/arm/boot/dts/zynq-7000.dtsi @@ -122,6 +122,30 @@
+>>>>>> interrupts = <0 50 4>; };
+>>>>>>
+>>>>>> +		spi0: spi at e0006000 { +			compatible =
+>> "xlnx,zynq-spi-r1p6";
+>>>>>> +			reg = <0xe0006000 0x1000>; +			status
+>> = "disabled"; +
+>>>>>> interrupt-parent = <&intc>; +			interrupts = <0 26 4>;
+>> +
+>>>>>> clocks = <&clkc 25>, <&clkc 34>; +			clock-names =
+>> "ref_clk",
+>>>>>> "pclk"; +			#address-cells = <1>; +			#size-
+>> cells = <0>; +		};
+>>>>>> + +		spi1: spi at e0007000 { +			compatible =
+>>>>>> "xlnx,zynq-spi-r1p6"; +			reg = <0xe0007000 0x1000>; +
+>> 			status
+>>>>>> = "disabled"; +			interrupt-parent = <&intc>; +
+>> 		interrupts =
+>>>>>> <0 49 4>; +			clocks = <&clkc 26>, <&clkc 35>; +
+>> 		clock-names
+>>>>>> = "ref_clk", "pclk"; +			#address-cells = <1>; +
+>> 		#size-cells
+>>>>>> = <0>; +		}; +
+>>>>> Until here things look good.
+>>>>>
+>>>>>> gem0: ethernet at e000b000 { compatible = "cdns,gem"; reg =
+>>>>>> <0xe000b000 0x4000>; @@ -140,6 +164,19 @@ clock-names = "pclk",
+>>>>>> "hclk", "tx_clk"; };
+>>>>>>
+>>>>>> +		qspi: qspi at e000d000 { +			compatible =
+>>>>>> "xlnx,zynq-spi-r1p6"; +			reg = <0xe000d000 0x1000>; +
+>> 			status
+>>>>>> = "disabled"; +			interrupt-parent = <&intc>; +
+>> 		interrupts =
+>>>>>> <0 19 4>; +			clocks = <&clkc 10>, <&clkc 43>; +
+>> 		clock-names
+>>>>>> = "ref_clk", "pclk"; +			num-cs = <1>; +
+>> 	#address-cells =
+>>>>>> <1>; +			#size-cells = <0>; +		}; +
+>>>>> I'm not sure what the status of this driver is. I think QSPI is
+>>>>> still under review on the mailing lists and I don't think we
+>>>>> should add this yet.
+>>>
+>>>> Driver for qspi is not in the mainline yet but it doesn't mean that
+>>>> this fragment won't work. Harini: Can you please correct me if I am
+>>>> wrong?
+>>>
 > 
-> That comment's a bit useless; I think it can just be dropped.
-> 
-> All you need to do is move the initialisation of cpu_logical_map(0)
-> before unflatten_device_tree(). When you introduce acpi_boot_init(),
-> place it after the initialisation.
+> It can be added but it will have to be disabled as there is no qspi driver
+> at the moment in mainline.
 
-ok, I agree with you, will update it.
+Did you read the actual patch? It's using the upstream SPI driver for
+now, and it's disabled for anything but the new board I'm adding.
 
-Thanks
-Hanjun
+https://patchwork.kernel.org/patch/4620201/
+
+Wouldn't a dedicated QSPI driver only result in a compatible string
+being prepended before the SPI compatible string?
+
+Andreas
+
+-- 
+SUSE LINUX Products GmbH, Maxfeldstr. 5, 90409 N?rnberg, Germany
+GF: Jeff Hawn, Jennifer Guild, Felix Imend?rffer; HRB 16746 AG N?rnberg
