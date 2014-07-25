@@ -1,32 +1,25 @@
-From: daniel.lezcano@linaro.org (Daniel Lezcano)
-Date: Fri, 25 Jul 2014 15:36:11 +0200
-Subject: [PATCH] ARM: rockchip: Fix missing dtbs in Makefile
-Message-ID: <1406295371-2517-1-git-send-email-daniel.lezcano@linaro.org>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Fri, 25 Jul 2014 14:45:21 +0100
+Subject: arm64 Kernel is overly verbose on user faults
+In-Reply-To: <CAAqcGHkjgOfs1Yj3SNmjpzE2cdGTh4EQ0njyka6UaeVVnbvQGw@mail.gmail.com>
+References: <CAAqcGHkjgOfs1Yj3SNmjpzE2cdGTh4EQ0njyka6UaeVVnbvQGw@mail.gmail.com>
+Message-ID: <20140725134520.GJ24268@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The dtb for rockchip are missing in the Makefile.
+On Fri, Jul 25, 2014 at 01:22:49PM +0100, Riku Voipio wrote:
+> Arm64 kernel dmesg will print out a multiline message if any user
+> binary segfaults. We get "unhandled level X translation fault" with
+> pr_info, show_pte() with pr_alert and show_regs with default kernel
+> level:
 
-Add the missing ones.
+I agree show_pte() is not useful for user debugging but I'm not sure
+about show_regs(), it may come in handy when debugging some user
+application.
 
-Signed-off-by: Daniel Lezcano <daniel.lezcano@linaro.org>
----
- arch/arm/boot/dts/Makefile |    3 +++
- 1 file changed, 3 insertions(+)
+We could hide the extra information like show_pte behind a
+CONFIG_DEBUG_USER while keeping the short reporting as it currently is
+(based on show_unhandled_signals).
 
-diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
-index adb5ed9..fb7c589 100644
---- a/arch/arm/boot/dts/Makefile
-+++ b/arch/arm/boot/dts/Makefile
-@@ -445,6 +445,9 @@ dtb-$(CONFIG_MACH_DOVE) += dove-cm-a510.dtb \
- 	dove-d2plug.dtb \
- 	dove-d3plug.dtb \
- 	dove-dove-db.dtb
-+dtb-$(CONFIG_ARCH_ROCKCHIP) += \
-+	rk3288-evb-act8846.dtb \
-+	rk3288-evb-rk808.dtb
- 
- targets += dtbs dtbs_install
- targets += $(dtb-y)
 -- 
-1.7.9.5
+Catalin
