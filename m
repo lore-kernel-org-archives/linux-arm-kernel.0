@@ -1,29 +1,50 @@
-From: hanjun.guo@linaro.org (Hanjun Guo)
-Date: Fri, 25 Jul 2014 18:42:15 +0800
-Subject: [PATCH 03/19] ARM64 / ACPI: Introduce lowlevel suspend function
-In-Reply-To: <20140724153406.GC26190@leverpostej>
-References: <1406206825-15590-1-git-send-email-hanjun.guo@linaro.org>
- <1406206825-15590-4-git-send-email-hanjun.guo@linaro.org>
- <20140724153406.GC26190@leverpostej>
-Message-ID: <53D23487.6090703@linaro.org>
+From: andriy.shevchenko@linux.intel.com (Andy Shevchenko)
+Date: Fri, 25 Jul 2014 13:45:47 +0300
+Subject: [PATCH] spi/pxa2xx-pci: Enable DMA binding through device name
+In-Reply-To: <5426556.OzZIXLrofJ@wuerfel>
+References: <1406196111-22861-1-git-send-email-hock.leong.kweh@intel.com>
+ <20140725090714.GY1857@lahna.fi.intel.com>
+ <20140725095559.GA1857@lahna.fi.intel.com> <5426556.OzZIXLrofJ@wuerfel>
+Message-ID: <1406285147.8530.13.camel@smile.fi.intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2014-7-24 23:34, Mark Rutland wrote:
-[...]
->>  early_param("acpi", parse_acpi);
->> +
->> +/*
->> + * acpi_suspend_lowlevel() - save kernel state and suspend.
->> + *
->> + * TBD when ARM/ARM64 starts to support suspend...
->> + */
->> +int (*acpi_suspend_lowlevel)(void);
-> 
-> Shouldn't this should be intialised to NULL explicitly?
+On Fri, 2014-07-25 at 12:19 +0200, Arnd Bergmann wrote:
+> On Friday 25 July 2014 12:55:59 Mika Westerberg wrote:
+> > On Fri, Jul 25, 2014 at 12:07:14PM +0300, Mika Westerberg wrote:
+> > > On Fri, Jul 25, 2014 at 10:38:36AM +0200, Arnd Bergmann wrote:
+> > > > On Friday 25 July 2014 11:22:49 Mika Westerberg wrote:
 
-Yes, as ARM64 does not support suspend, initialize it
-to NULL will be fine, will update in next version.
+[]
 
-Thanks
-Hanjun
+> > Something like this?
+
+Arnd, this dependency to certain DMA driver looks really bad.
+
+If we go that way, can we split that part to [another] module and make
+it dependent to DW_DMAC?
+
+Or shall we introduce a dmaengine type field in the platform data and
+dynamically choose proper filter-whatever-function to get the channel?
+
+> > Hock Leong / Chiaue Ee, are you able to check if this works on your BYT
+> > machines?
+
+> What I think you got wrong here (by following my bad advice) is the master
+> number. Looking at the code for dw_dma, I think src_master needs to be '1'
+> for your driver.
+
+On some SoCs we have up to 4 masters. It's blurry for me how the SPI
+should choose those masters. Currently it works fine, but I suspect
+there are [might be] performance issues.
+
+What about AVR32 case? We have to fix drivers as well there.
+
+> the dw_dma driver can be simplified a little by removing the special
+> case for the request line setting.
+
+Yes, this part I like.
+
+-- 
+Andy Shevchenko <andriy.shevchenko@intel.com>
+Intel Finland Oy
