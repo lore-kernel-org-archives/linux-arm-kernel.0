@@ -1,79 +1,38 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Fri, 25 Jul 2014 08:28:13 +0200
-Subject: [PATCH] arm64/crypto: fix makefile rule for aes-glue-%.o
-In-Reply-To: <20140724204526.GA11754@ravnborg.org>
-References: <mvm4my7j5xh.fsf@hawking.suse.de>
- <CAKv+Gu-6rUxUnF+dRuroDJqy2K2B5F0r7_bm0X-vyiuQ-83W5w@mail.gmail.com>
- <CAKv+Gu96k7GOVR85EXtro3Lt0jjiJqxyvT9cwJZ1qc6uzq97bw@mail.gmail.com>
- <mvmvbqmj3b2.fsf@hawking.suse.de>
- <CAKv+Gu_9HRwAxkJjT3KRvDbupp0yzstyq1dXsXkTu9M6swdCKQ@mail.gmail.com>
- <mvmr41aj2ob.fsf@hawking.suse.de>
- <CAKv+Gu_z4VTssLDhiQxi8DRJNEUgzrM5bFzje8NXEmBiA2vqeg@mail.gmail.com>
- <CAKv+Gu-B9_sgGgw9obrBGNUFSS1JcskN34s1X4PU8F5bauHT1Q@mail.gmail.com>
- <20140724161225.GA11204@ravnborg.org>
- <CAKv+Gu8ikMGNVHeuujSf4eaK+LOFKMWxKF8i76VthnKYgvOcYQ@mail.gmail.com>
- <20140724204526.GA11754@ravnborg.org>
-Message-ID: <CAKv+Gu9S8vVALGFR1qL+sFfnUuYR9pkkwy0t6NuJHrs9bVxdBw@mail.gmail.com>
+From: shawn.guo@freescale.com (Shawn Guo)
+Date: Fri, 25 Jul 2014 14:31:27 +0800
+Subject: [PATCH] imx-drm: imx-drm-core: add suspend/resume support
+In-Reply-To: <1406194732.21800.1.camel@paszta.hi.pengutronix.de>
+References: <1406193474-13695-1-git-send-email-shawn.guo@freescale.com>
+ <1406194732.21800.1.camel@paszta.hi.pengutronix.de>
+Message-ID: <20140725063126.GF8821@dragon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 24 July 2014 22:45, Sam Ravnborg <sam@ravnborg.org> wrote:
-> On Thu, Jul 24, 2014 at 09:25:13PM +0200, Ard Biesheuvel wrote:
->> On 24 July 2014 18:12, Sam Ravnborg <sam@ravnborg.org> wrote:
->> > On Thu, Jul 24, 2014 at 04:24:48PM +0200, Ard Biesheuvel wrote:
->> >> On 24 July 2014 16:18, Ard Biesheuvel <ard.biesheuvel@linaro.org> wrote:
->> >> > On 24 July 2014 15:40, Andreas Schwab <schwab@suse.de> wrote:
->> >> >> Ard Biesheuvel <ard.biesheuvel@linaro.org> writes:
->> >> >>
->> >> >>> On 24 July 2014 15:26, Andreas Schwab <schwab@suse.de> wrote:
->> >> >>>> You are not using CONFIG_MODVERSIONS.
->> >> >>>>
->> >> >>>
->> >> >>> I am
->> >> >>
->> >> >> No, you aren't, since you say that your .cmd contains a command to
->> >> >> create aes-glue-ce.o, which with CONFIG_MODVERSIONS it doesn't.
->> >> >>
->> >> >
->> >> > OK, you're right, it contains a command to create .tmp_aes-glue-ce.o.
->> >> > But I am still not seeing the error you are seeing, strangely enough.
->> >>
->> >> OK, now I am seeing it.
->> >>
->> >> Acked-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
->> >
->> > Jumping in the end of the thread here - sorry for that.
->> >
->>
->> No worries
->>
->> > Another way to solve this would be to create two
->> > small wrapper files:
->> > aes-glue-neon.c - which include aes-glue.c
->> > aes-glue-ce.c that include aes-glue.c
->> >
->> > Then you could use standard kbuild support for building your module.
->> > And we will not potentially break it when we change cc_o_c in the near future.
->> >
->>
->> I see how that would fix this issue, but frankly, if we need to add .c
->> files that only #include other .c files to support building multiple
->> objects from a single .c file, I think the flaw is in the build
->> system, and I would rather fix the build system instead.
-> The kbuild syntax could be extended to allow building multiple .o files from
-> a single .c file. But the need for this feature is so seldom that
-> people would not recognize the syntax most likely.
->
+On Thu, Jul 24, 2014 at 11:38:52AM +0200, Philipp Zabel wrote:
+> Hi Shawn,
+> 
+> Am Donnerstag, den 24.07.2014, 17:17 +0800 schrieb Shawn Guo:
+> > HDMI currently stops working after a system suspend/resume cycle.  It
+> > turns out that the cause is the imx-hdmi encoder .dpms hook doesn't get
+> > called from anywhere across suspend/resume cycle.
+> > 
+> > The patch follows what exynos drm driver does to walk the list of
+> > connectors and call their .dpms function from suspend/resume hook.  And
+> > the connectors' .dpms function will in turn filter down to the .dpms
+> > hooks of encoders and CRTCs.
+> > 
+> > With this change, HDMI can continue working after a suspend/resume
+> > cycle.
+> > 
+> > Signed-off-by: Shawn Guo <shawn.guo@freescale.com>
+> > ---
+> > Tested with HDMI and LVDS.  It'd be great if someone can help test TVE
+> > to ensure the patch doesn't break anything.
+> 
+> Tested-by: Philipp Zabel <p.zabel@pengutronix.de>
+> 
+> on i.MX53-QSB with VGA via TVE.
 
-True
+Thanks much, Philipp.
 
-> Btw. the current solution is already faulty - even with the fix.
-> There are no support for make C=2 arch/.../crypto/
->
-
-So can you elaborate on how it is faulty?
-
-> Therefore - for now the correct fix is to use two wrapper .c files,
-> and accept this. It will not have the C=2 problem above.
->
->         Sam
+Shawn
