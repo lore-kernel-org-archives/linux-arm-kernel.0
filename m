@@ -1,83 +1,53 @@
-From: boris.brezillon@free-electrons.com (Boris BREZILLON)
-Date: Fri, 25 Jul 2014 11:01:24 +0200
-Subject: [PATCH] ARM: at91: at91sam9x5: sets NPCS0 (PA14) back to GPIO
-In-Reply-To: <53D21B3F.7060006@aksignal.cz>
-References: <1405074175-22444-1-git-send-email-voice.shen@atmel.com>
- <53D10C50.50305@aksignal.cz> <20140724162645.4e19c26c@bbrezillon>
- <53D12103.3020103@aksignal.cz> <20140724175848.44f5da10@bbrezillon>
- <53D1F5D0.1080006@aksignal.cz> <20140725095319.16a8465c@bbrezillon>
- <53D214E1.4050105@aksignal.cz> <20140725104553.403921b1@bbrezillon>
- <53D21B3F.7060006@aksignal.cz>
-Message-ID: <20140725110124.3f0dce6c@bbrezillon>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Fri, 25 Jul 2014 10:01:09 +0100
+Subject: next build: 629 warnings 1 failures (next/next-20140723)
+In-Reply-To: <20140724224836.GY23220@titan.lakedaemon.net>
+References: <53cf8323.e4b6440a.7d37.4f75@mx.google.com>
+ <CAOesGMhT9n7nVbCay5cU74pv2qrbqMooZLoY923Lk6SzXk5z+A@mail.gmail.com>
+ <20140724085037.GB1994@arm.com> <20140724104318.GA13371@arm.com>
+ <20140724132448.GB13371@arm.com>
+ <20140724224836.GY23220@titan.lakedaemon.net>
+Message-ID: <20140725090109.GA24268@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 25 Jul 2014 10:54:23 +0200
-Ji?? Prchal <jiri.prchal@aksignal.cz> wrote:
-
-> Here it is:
-> cat /sys/kernel/debug/gpio
-> GPIOs 0-31, platform/fffff400.gpio, fffff400.gpio:
-> [in20] GPIOfffff400.gpio3: [gpio] set
-> [spi0.3] GPIOfffff400.gpio14: [gpio] set
-> [in19] GPIOfffff400.gpio21: [gpio] set
-> [spi0.1] GPIOfffff400.gpio22: [gpio] set
-> [spi0.0] GPIOfffff400.gpio23: [gpio] set
-> [in18] GPIOfffff400.gpio28: [gpio] set
-> [out20] GPIOfffff400.gpio29: [gpio] clear
-> [out18] GPIOfffff400.gpio30: [gpio] clear
-> [out19] GPIOfffff400.gpio31: [gpio] clear
+On Thu, Jul 24, 2014 at 11:48:36PM +0100, Jason Cooper wrote:
+> On Thu, Jul 24, 2014 at 02:24:48PM +0100, Catalin Marinas wrote:
+> > From 3acb8b49aeba9f48153a2d719dec05d0b862e285 Mon Sep 17 00:00:00 2001
+> > From: Catalin Marinas <catalin.marinas@arm.com>
+> > Date: Thu, 24 Jul 2014 14:14:42 +0100
+> > Subject: [PATCH] arm64: gicv3: Allow GICv3 compilation with older binutils
+> > 
+> > GICv3 introduces new system registers accessible with the full msr/mrs
+> > syntax (e.g. mrs x0, Sx_op0_op1_CRm_CRn_op2). However, only recent
+> > binutils understand the new syntax. This patch introduces msr_s/mrs_s
+> > assembly macros which generate the equivalent instructions above and
+> > converts the existing GICv3 code (both drivers/irqchip/ and
+> > arch/arm64/kernel/).
+> > 
+> > Signed-off-by: Catalin Marinas <catalin.marinas@arm.com>
+> > Suggested-by: Mark Rutland <mark.rutland@arm.com>
+> > Reported-by: Olof Johansson <olof@lixom.net>
+> > Cc: Will Deacon <will.deacon@arm.com>
+> > Cc: Marc Zyngier <marc.zyngier@arm.com>
+> > ---
+> >  arch/arm64/include/asm/sysreg.h    | 60 ++++++++++++++++++++++++++++++++++++++
+> >  arch/arm64/kernel/head.S           |  6 ++--
+> >  drivers/irqchip/irq-gic-v3.c       | 16 +++++-----
+> >  include/linux/irqchip/arm-gic-v3.h | 42 +++++++++++++-------------
+> >  4 files changed, 93 insertions(+), 31 deletions(-)
+> >  create mode 100644 arch/arm64/include/asm/sysreg.h
 > 
-> GPIOs 32-50, platform/fffff600.gpio, fffff600.gpio:
-> [blue] GPIOfffff600.gpio12: [gpio] set
-> [gsm_on] GPIOfffff600.gpio13: [gpio] clear
-> [yellow] GPIOfffff600.gpio14: [gpio] clear
-> [gsm_rst] GPIOfffff600.gpio15: [gpio] clear
-> [green] GPIOfffff600.gpio16: [gpio] clear
-> [red] GPIOfffff600.gpio18: [gpio] clear
+> I'm going to assume this goes on top of Marc's series, and that you'll
+> take it through arm64:
 > 
-> GPIOs 64-95, platform/fffff800.gpio, fffff800.gpio:
-> [in17] GPIOfffff800.gpio16: [gpio] set
-> [in13] GPIOfffff800.gpio18: [gpio] set
-> [in14] GPIOfffff800.gpio20: [gpio] set
-> [por] GPIOfffff800.gpio25: [gpio] clear
-> [out16] GPIOfffff800.gpio26: [gpio] clear
-> [out15] GPIOfffff800.gpio28: [gpio] clear
-> [spi0.2] GPIOfffff800.gpio29: [gpio] set
-> [out17] GPIOfffff800.gpio30: [gpio] clear
-> 
-> GPIOs 96-117, platform/fffffa00.gpio, fffffa00.gpio:
-> [nand_enable] GPIOfffffa00.gpio4: [gpio] set
-> [nand_rdy] GPIOfffffa00.gpio5: [gpio] set
-> [atmel_usba_udc] GPIOfffffa00.gpio21: [gpio] clear
-> 
+> Acked-by: Jason Cooper <jason@lakedaemon.net>
 
-Every thing seems in place.
-Could you enable CONFIG_DEBUG_PINCTRL and grep on "enable pin" ?
-
-> 
-> Dne 25.7.2014 v 10:45 Boris BREZILLON napsal(a):
-> > On Fri, 25 Jul 2014 10:27:13 +0200
-> > Ji?? Prchal <jiri.prchal@aksignal.cz> wrote:
-> >
-> > [...]
-> >>
-> >>
-> >>> Could you also paste the content of /sys/kernel/debug/gpio ?
-> >> The /sys/kernel/debug/ is empty.
-> >
-> > You have to enable CONFIG_DEBUG_FS in your config and then mount the
-> > debug file system:
-> >
-> > #mount -t debugfs dbg /sys/kernel/debug
-> >
-> >
-> >
-> >
-
-
+Thanks. I'll let Marc decide (he's back next week) as I go on holiday
+soon. Ideally it should go into -next and upstream together with the
+rest of the GICv3 patches but I (or Will if I'm way) am happy to take
+the patch once GICv3 hits mainline (I would like to avoid merging the
+irqchip tree into the arm64 tree just to be able to apply this fix).
 
 -- 
-Boris Brezillon, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
+Catalin
