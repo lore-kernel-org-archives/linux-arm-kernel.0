@@ -1,53 +1,31 @@
-From: afaerber@suse.de (=?UTF-8?q?Andreas=20F=C3=A4rber?=)
-Date: Fri, 25 Jul 2014 13:12:31 +0200
-Subject: [PATCH v3] ARM: dts: zynq: Add SPI
-In-Reply-To: <1cf9126b-c5e4-4ae7-a294-071584857d6c@BN1AFFO11FD052.protection.gbl>
-References: <1cf9126b-c5e4-4ae7-a294-071584857d6c@BN1AFFO11FD052.protection.gbl>
-Message-ID: <1406286752-8905-1-git-send-email-afaerber@suse.de>
+From: hanjun.guo@linaro.org (Hanjun Guo)
+Date: Fri, 25 Jul 2014 19:11:33 +0800
+Subject: [PATCH 07/19] ARM64 / ACPI: Parse MADT to map logical cpu to
+ MPIDR and get cpu_possible/present_map
+In-Reply-To: <CAFoFrHYSYhv3cM_zSFA5Xg+Xfr8BszzRVFhd0GODFpduRPBrbQ@mail.gmail.com>
+References: <1406206825-15590-1-git-send-email-hanjun.guo@linaro.org>	<1406206825-15590-8-git-send-email-hanjun.guo@linaro.org>
+ <CAFoFrHYSYhv3cM_zSFA5Xg+Xfr8BszzRVFhd0GODFpduRPBrbQ@mail.gmail.com>
+Message-ID: <53D23B65.6070708@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Signed-off-by: Andreas F?rber <afaerber@suse.de>
----
- v3: Split off from QSPI (Michal Simek).
- 
- arch/arm/boot/dts/zynq-7000.dtsi | 24 ++++++++++++++++++++++++
- 1 file changed, 24 insertions(+)
+Hi Naresh,
 
-diff --git a/arch/arm/boot/dts/zynq-7000.dtsi b/arch/arm/boot/dts/zynq-7000.dtsi
-index cf0f3e4..ef11dab 100644
---- a/arch/arm/boot/dts/zynq-7000.dtsi
-+++ b/arch/arm/boot/dts/zynq-7000.dtsi
-@@ -140,6 +140,30 @@
- 			interrupts = <0 50 4>;
- 		};
- 
-+		spi0: spi at e0006000 {
-+			compatible = "xlnx,zynq-spi-r1p6";
-+			reg = <0xe0006000 0x1000>;
-+			status = "disabled";
-+			interrupt-parent = <&intc>;
-+			interrupts = <0 26 4>;
-+			clocks = <&clkc 25>, <&clkc 34>;
-+			clock-names = "ref_clk", "pclk";
-+			#address-cells = <1>;
-+			#size-cells = <0>;
-+		};
-+
-+		spi1: spi at e0007000 {
-+			compatible = "xlnx,zynq-spi-r1p6";
-+			reg = <0xe0007000 0x1000>;
-+			status = "disabled";
-+			interrupt-parent = <&intc>;
-+			interrupts = <0 49 4>;
-+			clocks = <&clkc 26>, <&clkc 35>;
-+			clock-names = "ref_clk", "pclk";
-+			#address-cells = <1>;
-+			#size-cells = <0>;
-+		};
-+
- 		gem0: ethernet at e000b000 {
- 			compatible = "cdns,gem";
- 			reg = <0xe000b000 0x4000>;
--- 
-1.9.3
+On 2014-7-25 7:06, Naresh Bhat wrote:
+> On 24 July 2014 18:30, Hanjun Guo <hanjun.guo@linaro.org> wrote:
+>> MADT contains the information for MPIDR which is essential for
+>> SMP initialization, parse the GIC cpu interface structures to
+>> get the MPIDR value and map it to cpu_logical_map(), and add
+>> enabled cpu with valid MPIDR into cpu_possible_map and
+>> cpu_present_map.
+[...]
+>> +/**
+>> + * acpi_register_gic_cpu_interface - register a gic cpu interface and
+>> + * generates a logic cpu number
+> 
+> logic - logical
+
+Thanks for all the typos you got, will fix them.
+
+Best Regards
+Hanjun
