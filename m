@@ -1,34 +1,58 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Fri, 25 Jul 2014 10:21:09 +0100
-Subject: [PATCH] arm64: audit: Fix build for audit changes
-In-Reply-To: <20140724191237.GM17528@sirena.org.uk>
-References: <1405596402-23844-1-git-send-email-broonie@kernel.org>
- <20140724191237.GM17528@sirena.org.uk>
-Message-ID: <20140725092108.GB24268@arm.com>
+From: boris.brezillon@free-electrons.com (Boris BREZILLON)
+Date: Fri, 25 Jul 2014 11:31:10 +0200
+Subject: [PATCH] ARM: at91: at91sam9x5: sets NPCS0 (PA14) back to GPIO
+In-Reply-To: <53D21FCF.7010402@aksignal.cz>
+References: <1405074175-22444-1-git-send-email-voice.shen@atmel.com>
+ <53D10C50.50305@aksignal.cz> <20140724162645.4e19c26c@bbrezillon>
+ <53D12103.3020103@aksignal.cz> <20140724175848.44f5da10@bbrezillon>
+ <53D1F5D0.1080006@aksignal.cz> <20140725095319.16a8465c@bbrezillon>
+ <53D214E1.4050105@aksignal.cz> <20140725104553.403921b1@bbrezillon>
+ <53D21B3F.7060006@aksignal.cz> <20140725110124.3f0dce6c@bbrezillon>
+ <53D21FCF.7010402@aksignal.cz>
+Message-ID: <20140725113110.70c4aa41@bbrezillon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jul 24, 2014 at 08:12:37PM +0100, Mark Brown wrote:
-> On Thu, Jul 17, 2014 at 12:26:42PM +0100, Mark Brown wrote:
-> > From: Mark Brown <broonie@linaro.org>
-> > 
-> > Commit 3efe33f5d2 (audit: x86: drop arch from __audit_syscall_entry()
-> > interface) removed the arch parameter from __audit_syscall_entry() and
-> > updated the only current user in mainline but this breaks the ARMv8 audit
-> > code that has been added in -next. Fix this by making the equivalent
-> > update to ARMv8.
-> 
-> This is still broken -next.
+On Fri, 25 Jul 2014 11:13:51 +0200
+Ji?? Prchal <jiri.prchal@aksignal.cz> wrote:
 
-It should now be temporarily fixed for the defconfig
-(CONFIG_AUTIDSYSCALL disabled). I'm reluctant to merge the audit tree in
-the arm64 tree as (a) I haven't seen a confirmation that this branch is
-stable and will go upstream as is and (b) there are x86 changes without
-Acks from the x86 maintainers (whether needed or not, I can't say).
 
-So my temporary patch is some #ifndef's around the offending code. It
-will be reverted and your patch applied once the audit tree meets the
-arm64 tree.
+> >
+> > Every thing seems in place.
+> > Could you enable CONFIG_DEBUG_PINCTRL and grep on "enable pin" ?
+> / # dmesg | grep "enable pin"
+> [    0.968750] pinctrl-at91 ahb:apb:pinctrl at fffff400: enable pin 101 as GPIO
+> [    0.968750] pinctrl-at91 ahb:apb:pinctrl at fffff400: enable pin 101 as PIOD5 0x20
+> [    0.968750] pinctrl-at91 ahb:apb:pinctrl at fffff400: enable pin 100 as GPIO
+> [    0.968750] pinctrl-at91 ahb:apb:pinctrl at fffff400: enable pin 100 as PIOD4 0x10
+> [    1.238281] pinctrl-at91 ahb:apb:pinctrl at fffff400: enable pin 23 as GPIO
+> [    1.238281] pinctrl-at91 ahb:apb:pinctrl at fffff400: enable pin 23 as PIOA23 0x800000
+> [    1.238281] pinctrl-at91 ahb:apb:pinctrl at fffff400: enable pin 22 as GPIO
+> [    1.238281] pinctrl-at91 ahb:apb:pinctrl at fffff400: enable pin 22 as PIOA22 0x400000
+> [    1.242187] pinctrl-at91 ahb:apb:pinctrl at fffff400: enable pin 93 as GPIO
+> [    1.242187] pinctrl-at91 ahb:apb:pinctrl at fffff400: enable pin 93 as PIOC29 0x20000000
+> [    1.246093] pinctrl-at91 ahb:apb:pinctrl at fffff400: enable pin 14 as GPIO
+> [    1.246093] pinctrl-at91 ahb:apb:pinctrl at fffff400: enable pin 14 as PIOA14 0x4000
+
+
+Okay, this cleary shows that PA14 pin is muxed as a GPIO (or at least
+the driver think it is).
+
+
+Could you launch these commands (you'll need the devmem tool) and
+paste the results ?
+
+#devmem 0xfffff408
+#devmem 0xfffff418
+#devmem 0xfffff438
+#devmem 0xfffff43c
+#devmem 0xfffff458
+#devmem 0xfffff468
+#devmem 0xfffff470
+#devmem 0xfffff474
+#devmem 0xfffff498
 
 -- 
-Catalin
+Boris Brezillon, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
