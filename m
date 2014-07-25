@@ -1,215 +1,84 @@
-From: peter.chen@freescale.com (Peter Chen)
-Date: Fri, 25 Jul 2014 10:18:54 +0800
-Subject: [PATCH v3 07/12] usb: chipidea: add a usb2 driver for ci13xxx
-In-Reply-To: <1405499166-6726-8-git-send-email-antoine.tenart@free-electrons.com>
-References: <1405499166-6726-1-git-send-email-antoine.tenart@free-electrons.com>
- <1405499166-6726-8-git-send-email-antoine.tenart@free-electrons.com>
-Message-ID: <20140725021853.GA11052@shlinux1.ap.freescale.net>
+From: punnaiah.choudary.kalluri@xilinx.com (Punnaiah Choudary Kalluri)
+Date: Fri, 25 Jul 2014 03:49:23 +0000
+Subject: [PATCH v2 00/11] ARM: dts: zynq: Prepare Parallella
+In-Reply-To: <1406242820-20140-1-git-send-email-afaerber@suse.de>
+References: <1406242820-20140-1-git-send-email-afaerber@suse.de>
+Message-ID: <dc23839c-7a69-4674-9d92-80a1d68e9b23@BY2FFO11FD003.protection.gbl>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jul 16, 2014 at 10:26:01AM +0200, Antoine T?nart wrote:
-> Add a USB2 ChipIdea driver for ci13xxx, with optional PHY, clock
-> and DMA mask, to support USB2 ChipIdea controllers that don't need
-> specific functions.
+Hi Andreas,
 
-You may need to indicate it is a generic usb2 glue layer driver at both
-subject and context.
-> 
-> Needed for the Marvell Berlin SoCs USB controllers.
+>-----Original Message-----
+>From: Andreas F?rber [mailto:afaerber at suse.de]
+>Sent: Friday, July 25, 2014 4:30 AM
+>To: Michal Simek
+>Cc: Andreas Olofsson; Matteo Vit; Sean Rickerd; devicetree at vger.kernel.org;
+>linux-arm-kernel at lists.infradead.org; linux-kernel at vger.kernel.org; Andreas
+>F?rber; Punnaiah Choudary Kalluri; Lars-Peter Clausen
+>Subject: [PATCH v2 00/11] ARM: dts: zynq: Prepare Parallella
+>
+>Hello,
+>
+>This patch series adds an initial device tree for the Parallella board.
+>UART, SD card, Ethernet are enabled.
+>Not yet enabled are HDMI, QSPI flash and 2x USB.
+>
+>v2 adds some SPI and FPGA pieces and tidies the device tree with a
+>compatible string and matching documentation.
+>
+>Not having all pieces for testing all of this (most notably I'm missing
+>ADI ADV7513 and AXI-HDMI support for VDMA and axi-clkgen, as well as
+>the 25Q128A flash chip for QSPI), I've kept new things in separate patches
+>so that we can make progress on the basic version and possibly squash
+>further cherry-picked pieces.
+>
+>Punnaiah Choudary Kalluri had recently proposed to extend the Chipidea
+>USB driver for Zynq; it kept complaining about the PHY though, and I
+>haven't spotted a revised version based on the generic driver yet.
+>https://patchwork.kernel.org/patch/4434681/
 
-You can say it is tested at Marvell Berlin SoCs USB controllers.
+The plan is, go with generic chip idea driver which is currently under review. 
+http://www.spinics.net/lists/linux-usb/msg109576.html
 
-> 
-> Signed-off-by: Antoine T?nart <antoine.tenart@free-electrons.com>
-> ---
->  drivers/usb/chipidea/Makefile       |   1 +
->  drivers/usb/chipidea/ci_hdrc_usb2.c | 147 ++++++++++++++++++++++++++++++++++++
->  2 files changed, 148 insertions(+)
->  create mode 100644 drivers/usb/chipidea/ci_hdrc_usb2.c
-> 
-> diff --git a/drivers/usb/chipidea/Makefile b/drivers/usb/chipidea/Makefile
-> index 2f099c7df7b5..1fc86a2ca22d 100644
-> --- a/drivers/usb/chipidea/Makefile
-> +++ b/drivers/usb/chipidea/Makefile
-> @@ -10,6 +10,7 @@ ci_hdrc-$(CONFIG_USB_OTG_FSM)		+= otg_fsm.o
->  
->  # Glue/Bridge layers go here
->  
-> +obj-$(CONFIG_USB_CHIPIDEA)	+= ci_hdrc_usb2.o
->  obj-$(CONFIG_USB_CHIPIDEA)	+= ci_hdrc_msm.o
->  obj-$(CONFIG_USB_CHIPIDEA)	+= ci_hdrc_zevio.o
->  
-> diff --git a/drivers/usb/chipidea/ci_hdrc_usb2.c b/drivers/usb/chipidea/ci_hdrc_usb2.c
-> new file mode 100644
-> index 000000000000..4ec2240d00a1
-> --- /dev/null
-> +++ b/drivers/usb/chipidea/ci_hdrc_usb2.c
-> @@ -0,0 +1,147 @@
-> +/*
-> + * Copyright (C) 2014 Marvell Technology Group Ltd.
-> + *
-> + * Antoine T?nart <antoine.tenart@free-electrons.com>
-> + *
-> + * This file is licensed under the terms of the GNU General Public
-> + * License version 2. This program is licensed "as is" without any
-> + * warranty of any kind, whether express or implied.
-> + */
-> +
-> +#include <linux/clk.h>
-> +#include <linux/dma-mapping.h>
-> +#include <linux/module.h>
-> +#include <linux/of.h>
-> +#include <linux/platform_device.h>
-> +#include <linux/usb/chipidea.h>
-> +#include <linux/usb/hcd.h>
-> +#include <linux/usb/ulpi.h>
-> +
-> +#include "ci.h"
-> +
-> +struct ci_hdrc_usb2_priv {
-> +	struct platform_device	*ci_pdev;
-> +	struct clk		*clk;
-> +	u32			dma_mask;
-> +};
-> +
-> +static int ci_hdrc_usb2_dt_probe(struct device *dev,
-> +				    struct ci_hdrc_platform_data *ci_pdata,
-> +				    struct ci_hdrc_usb2_priv *priv)
-> +{
-> +	u32 mask;
-> +	int ret;
-> +
-> +	priv->clk = devm_clk_get(dev, NULL);
-> +	if (!IS_ERR(priv->clk)) {
-> +		ret = clk_prepare_enable(priv->clk);
-> +		if (ret) {
-> +			dev_err(dev, "failed to enable the clock: %d\n", ret);
-> +			return ret;
-> +		}
-> +	}
+So, please wait some more time for extending the Chip idea driver support
+ to zynq.
 
-The clk API may be needed for both DT and non-DT cases.
-
-> +
-> +	ci_pdata->phy = of_phy_get(dev->of_node, 0);
-> +	if (IS_ERR(ci_pdata->phy)) {
-> +		if (PTR_ERR(ci_pdata->phy) == -EPROBE_DEFER)
-> +			return -EPROBE_DEFER;
-> +
-> +		/* PHY is optional */
-> +		ci_pdata->phy = NULL;
-> +	}
-> +
-> +	if (of_property_read_u32(dev->of_node, "dma-mask", &mask))
-> +		priv->dma_mask = mask;
-> +
-According to discussion, you may not need dma_mask in driver any more,
-and use below API for both DT and non-DT case.
-
-        err = dma_set_mask_and_coherent(&pdev->dev, DMA_BIT_MASK(32));
-        if (err)
-        	                handle error;
-
-Peter
-
-> +	return 0;
-> +}
-> +
-> +static struct ci_hdrc_platform_data ci_default_pdata = {
-> +	.capoffset	= DEF_CAPOFFSET,
-> +	.flags		= CI_HDRC_REQUIRE_TRANSCEIVER |
-> +			  CI_HDRC_DISABLE_STREAMING,
-> +};
-> +
-> +static int ci_hdrc_usb2_probe(struct platform_device *pdev)
-> +{
-> +	struct device *dev = &pdev->dev;
-> +	struct ci_hdrc_usb2_priv *priv;
-> +	struct ci_hdrc_platform_data *ci_pdata = dev_get_platdata(&pdev->dev);
-> +	int ret;
-> +
-> +	if (!ci_pdata)
-> +		ci_pdata = &ci_default_pdata;
-> +
-> +	priv = devm_kzalloc(dev, sizeof(*priv), GFP_KERNEL);
-> +	if (!priv)
-> +		return -ENOMEM;
-> +
-> +	if (dev->of_node) {
-> +		ret = ci_hdrc_usb2_dt_probe(dev, ci_pdata, priv);
-> +		if (ret)
-> +			return ret;
-> +	}
-> +
-> +	ci_pdata->name = dev_name(&pdev->dev);
-> +
-> +	if (priv->dma_mask) {
-> +		ret = dma_coerce_mask_and_coherent(&pdev->dev, priv->dma_mask);
-> +		if (ret)
-> +			return ret;
-> +	}
-> +
-> +	priv->ci_pdev = ci_hdrc_add_device(dev, pdev->resource,
-> +				     pdev->num_resources, ci_pdata);
-> +	if (IS_ERR(priv->ci_pdev)) {
-> +		ret = PTR_ERR(priv->ci_pdev);
-> +		if (ret != -EPROBE_DEFER)
-> +			dev_err(dev,
-> +				"failed to register ci_hdrc platform device: %d\n",
-> +				ret);
-> +		goto clk_err;
-> +	}
-> +
-> +	platform_set_drvdata(pdev, priv);
-> +
-> +	pm_runtime_no_callbacks(dev);
-> +	pm_runtime_enable(dev);
-> +
-> +	return 0;
-> +
-> +clk_err:
-> +	if (!IS_ERR(priv->clk))
-> +		clk_disable_unprepare(priv->clk);
-> +	return ret;
-> +}
-> +
-> +static int ci_hdrc_usb2_remove(struct platform_device *pdev)
-> +{
-> +	struct ci_hdrc_usb2_priv *priv = platform_get_drvdata(pdev);
-> +
-> +	pm_runtime_disable(&pdev->dev);
-> +	ci_hdrc_remove_device(priv->ci_pdev);
-> +	clk_disable_unprepare(priv->clk);
-> +
-> +	return 0;
-> +}
-> +
-> +static const struct of_device_id ci_hdrc_usb2_of_match[] = {
-> +	{ .compatible = "chipidea,usb2" },
-> +	{ }
-> +};
-> +MODULE_DEVICE_TABLE(of, ci_hdrc_usb2_of_match);
-> +
-> +static struct platform_driver ci_hdrc_usb2_driver = {
-> +	.probe	= ci_hdrc_usb2_probe,
-> +	.remove	= ci_hdrc_usb2_remove,
-> +	.driver	= {
-> +		.name		= "chipidea-usb2",
-> +		.owner		= THIS_MODULE,
-> +		.of_match_table	= of_match_ptr(ci_hdrc_usb2_of_match),
-> +	},
-> +};
-> +module_platform_driver(ci_hdrc_usb2_driver);
-> +
-> +MODULE_DESCRIPTION("ChipIdea HDRC USB2 binding for ci13xxx");
-> +MODULE_AUTHOR("Antoine T?nart <antoine.tenart@free-electrons.com>");
-> +MODULE_LICENSE("GPL");
-> -- 
-> 1.9.1
-> 
-
--- 
-
-Best Regards,
-Peter Chen
+Punnaiah
+>
+>My rebasing work branch is here:
+>https://github.com/afaerber/linux/commits/parallella-next
+>
+>Regards,
+>Andreas
+>
+>Cc: Punnaiah Choudary Kalluri <punnaia@xilinx.com> (USB)
+>Cc: Lars-Peter Clausen <lars@metafoo.de> (HDMI)
+>
+>Andreas F?rber (11):
+>  Documentation: devicetree: Adapteva vendor prefix
+>  Documentation: devicetree: Adapteva boards
+>  ARM: dts: zynq: Add Parallella device tree
+>  ARM: dts: zynq: Update deprecated xuartps clock names
+>  ARM: dts: zynq: Add QSPI for Parallella
+>  ARM: dts: zynq: Add DMAC for Parallella
+>  Documentation: devicetree: Fix Xilinx VDMA specification
+>  ARM: dts: zynq: Add VDMA to Parallella
+>  Documentation: devicetree: Fix ADI AXI SPDIF specification
+>  ARM: dts: zynq: Add SPDIF for Parallella
+>  ARM: dts: zynq: Add AXI clkgen for Parallella
+>
+> Documentation/devicetree/bindings/arm/adapteva.txt |   7 ++
+> .../devicetree/bindings/dma/xilinx/xilinx_vdma.txt |   2 +-
+> .../devicetree/bindings/sound/adi,axi-spdif-tx.txt |   2 +-
+> .../devicetree/bindings/vendor-prefixes.txt        |   1 +
+> arch/arm/boot/dts/Makefile                         |   4 +-
+> arch/arm/boot/dts/zynq-7000.dtsi                   |  58 +++++++++-
+> arch/arm/boot/dts/zynq-parallella.dts              | 119
+>+++++++++++++++++++++
+> 7 files changed, 188 insertions(+), 5 deletions(-)
+> create mode 100644 Documentation/devicetree/bindings/arm/adapteva.txt
+> create mode 100644 arch/arm/boot/dts/zynq-parallella.dts
+>
+>--
+>1.9.3
