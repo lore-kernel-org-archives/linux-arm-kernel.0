@@ -1,51 +1,56 @@
-From: soren.brinkmann@xilinx.com (=?utf-8?B?U8O2cmVu?= Brinkmann)
-Date: Fri, 25 Jul 2014 07:43:44 -0700
-Subject: [PATCH v2 06/11] ARM: dts: zynq: Add DMAC for Parallella
-In-Reply-To: <53D21458.3060403@suse.de>
-References: <1406242820-20140-1-git-send-email-afaerber@suse.de>
- <1406242820-20140-7-git-send-email-afaerber@suse.de>
- <bc390439-9a5b-43a1-a70c-a4c6517a6cb6@BN1AFFO11FD005.protection.gbl>
- <53D20F2A.5020209@monstr.eu> <53D21458.3060403@suse.de>
-Message-ID: <9d1e0d28-1fa2-4ef4-9d6f-b64829223f74@BN1AFFO11FD021.protection.gbl>
+From: James.Bottomley@HansenPartnership.com (James Bottomley)
+Date: Fri, 25 Jul 2014 07:46:56 -0700
+Subject: [PATCH 4/5] [SCSI] Do not use platform_bus as a parent
+In-Reply-To: <1406298233-27876-4-git-send-email-pawel.moll@arm.com>
+References: <1406298233-27876-1-git-send-email-pawel.moll@arm.com>
+ <1406298233-27876-4-git-send-email-pawel.moll@arm.com>
+Message-ID: <1406299616.1789.13.camel@jarvis.lan>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 2014-07-25 at 10:24AM +0200, Andreas F?rber wrote:
-> Am 25.07.2014 10:02, schrieb Michal Simek:
-> > On 07/25/2014 01:28 AM, S?ren Brinkmann wrote:
-> >> On Fri, 2014-07-25 at 01:00AM +0200, Andreas F?rber wrote:
-> >>> Signed-off-by: Andreas F?rber <afaerber@suse.de>
-> >>> ---
-> >>>  v2: New
-> >>>  
-> >>>  arch/arm/boot/dts/zynq-7000.dtsi      | 17 +++++++++++++++++
-> >>>  arch/arm/boot/dts/zynq-parallella.dts |  4 ++++
-> >>>  2 files changed, 21 insertions(+)
-> >>>
-> >>> diff --git a/arch/arm/boot/dts/zynq-7000.dtsi b/arch/arm/boot/dts/zynq-7000.dtsi
-> >>> index eed3df0..1a70277 100644
-> >>> --- a/arch/arm/boot/dts/zynq-7000.dtsi
-> >>> +++ b/arch/arm/boot/dts/zynq-7000.dtsi
-> >>> @@ -223,6 +223,23 @@
-> >>>  			};
-> >>>  		};
-> >>>  
-> >>> +		dmac_s: dmac at f8003000 {
-> >>> +			compatible = "arm,pl330", "arm,primecell";
-> >>> +			reg = <0xf8003000 0x1000>;
-> >>> +			status = "disabled";
-> >> I think for this IP we can omit the 'status' property since it is always
-> >> enabled. I don't see a reason to override it in each board DT.
-> > 
-> > Done this change myself
+On Fri, 2014-07-25 at 15:23 +0100, Pawel Moll wrote:
+> The host devices without a parent were "forcefully adopted"
+> by platform bus. This patch removes this assignment. In
+> effect the dev_dev may be NULL now, which means ISA.
 > 
-> Fine with me, but allow me to point out that the TRM documents the DMAC
-> being mapped as DMAC S at the above address, and as DMAC NS at F800_4000
-> (secure vs. non-secure, ch. 4.6, p. 116). Not sure how this would be
-> handled driver-wise if not through alternative dt nodes?
+> Cc: James E.J. Bottomley <JBottomley@parallels.com>
+> Cc: linux-scsi at vger.kernel.org
+> Signed-off-by: Pawel Moll <pawel.moll@arm.com>
+> ---
+> 
+> This patch is a part of effort to remove references to platform_bus
+> and make it static.
+> 
+> James, could you please have a look and advice if the change is
+> correct? Would you happen to know the "real reasons" behind
+> using the root platform_bus device a parent?
 
-The upstream Linux runs in secure state on Zynq, hence I think this is fine. If
-somebody wants to run Linux on Zynq non-secure they have to do some work
-anyhow. This way the standard configuration can use the DMA engine.
+Yes, for DMA purposes, the parent cannot now be NULL; we'll get a panic
+in the DMA transfers if it is.  A lot of the legacy ISA device on x86
+and I thought some ARM SOC devices don't pass in the parent device, so
+we hang them off a known parent.
 
-	S?ren
+You can grep for it; these are the devices that will begin to panic if
+you apply this patch:
+
+arch/ia64/hp/sim/simscsi.c:     error = scsi_add_host(host, NULL);
+drivers/scsi/a2091.c:   error = scsi_add_host(instance, NULL);
+drivers/scsi/a3000.c:   error = scsi_add_host(instance, NULL);
+drivers/scsi/aha152x.c: if( scsi_add_host(shpnt, NULL) ) {
+drivers/scsi/gdth.c:    error = scsi_add_host(shp, NULL);
+drivers/scsi/gdth.c:    error = scsi_add_host(shp, NULL);
+drivers/scsi/gvp11.c:   error = scsi_add_host(instance, NULL);
+drivers/scsi/imm.c:     err = scsi_add_host(host, NULL);
+drivers/scsi/pcmcia/fdomain_stub.c:    if (scsi_add_host(host, NULL))
+drivers/scsi/pcmcia/nsp_cs.c:   ret = scsi_add_host (host, NULL);
+drivers/scsi/pcmcia/qlogic_stub.c:      if (scsi_add_host(shost, NULL))
+drivers/scsi/pcmcia/sym53c500_cs.c:     if (scsi_add_host(host, NULL))
+drivers/scsi/ppa.c:     err = scsi_add_host(host, NULL);
+drivers/scsi/qlogicfas.c:       if (scsi_add_host(hreg, NULL))
+drivers/scsi/scsi_module.c:             error = scsi_add_host(shost, NULL);
+drivers/scsi/sgiwd93.c: err = scsi_add_host(host, NULL);
+
+Note I've picked up scsi_module, so anything that uses the SCSI module
+interface also has this problem.
+
+James
