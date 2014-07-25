@@ -1,78 +1,113 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 25 Jul 2014 09:58:42 +0200
-Subject: [PATCH] spi/pxa2xx-pci: Enable DMA binding through device name
-In-Reply-To: <20140725071138.GU1857@lahna.fi.intel.com>
-References: <1406196111-22861-1-git-send-email-hock.leong.kweh@intel.com>
- <20140724140620.GP1857@lahna.fi.intel.com>
- <20140725071138.GU1857@lahna.fi.intel.com>
-Message-ID: <5574058.fMy2hcvT92@wuerfel>
+From: monstr@monstr.eu (Michal Simek)
+Date: Fri, 25 Jul 2014 09:59:23 +0200
+Subject: [PATCH v2 05/11] ARM: dts: zynq: Add QSPI for Parallella
+In-Reply-To: <ddb38ce5-9e31-4c94-967c-7784c7fba75c@BN1BFFO11FD028.protection.gbl>
+References: <1406242820-20140-1-git-send-email-afaerber@suse.de>
+ <1406242820-20140-6-git-send-email-afaerber@suse.de>
+ <ddb38ce5-9e31-4c94-967c-7784c7fba75c@BN1BFFO11FD028.protection.gbl>
+Message-ID: <53D20E5B.9070501@monstr.eu>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday 25 July 2014 10:11:38 Mika Westerberg wrote:
-> On Thu, Jul 24, 2014 at 05:06:20PM +0300, Mika Westerberg wrote:
-> > > On a related note, there seems to be a bug in this driver, which
-> > > attempts to set the slave_id through dmaengine_slave_config(), which
-> > > is wrong in both cases, ACPI and filter functions.
-> > 
-> > Good point. We will fix this, thanks.
+On 07/25/2014 01:18 AM, S?ren Brinkmann wrote:
+> On Fri, 2014-07-25 at 01:00AM +0200, Andreas F?rber wrote:
+>> Prepare SPI0 and SPI1 while at it.
+
+Patch subject is incorrect. You are adding SPI and QSPI.
+
+>>
+>> Signed-off-by: Andreas F?rber <afaerber@suse.de>
+>> ---
+>>  v2: New
+>>  
+>>  arch/arm/boot/dts/zynq-7000.dtsi      | 37 +++++++++++++++++++++++++++++++++++
+>>  arch/arm/boot/dts/zynq-parallella.dts |  4 ++++
+>>  2 files changed, 41 insertions(+)
+>>
+>> diff --git a/arch/arm/boot/dts/zynq-7000.dtsi b/arch/arm/boot/dts/zynq-7000.dtsi
+>> index 8fd826a..eed3df0 100644
+>> --- a/arch/arm/boot/dts/zynq-7000.dtsi
+>> +++ b/arch/arm/boot/dts/zynq-7000.dtsi
+>> @@ -122,6 +122,30 @@
+>>  			interrupts = <0 50 4>;
+>>  		};
+>>  
+>> +		spi0: spi at e0006000 {
+>> +			compatible = "xlnx,zynq-spi-r1p6";
+>> +			reg = <0xe0006000 0x1000>;
+>> +			status = "disabled";
+>> +			interrupt-parent = <&intc>;
+>> +			interrupts = <0 26 4>;
+>> +			clocks = <&clkc 25>, <&clkc 34>;
+>> +			clock-names = "ref_clk", "pclk";
+>> +			#address-cells = <1>;
+>> +			#size-cells = <0>;
+>> +		};
+>> +
+>> +		spi1: spi at e0007000 {
+>> +			compatible = "xlnx,zynq-spi-r1p6";
+>> +			reg = <0xe0007000 0x1000>;
+>> +			status = "disabled";
+>> +			interrupt-parent = <&intc>;
+>> +			interrupts = <0 49 4>;
+>> +			clocks = <&clkc 26>, <&clkc 35>;
+>> +			clock-names = "ref_clk", "pclk";
+>> +			#address-cells = <1>;
+>> +			#size-cells = <0>;
+>> +		};
+>> +
+> Until here things look good.
 > 
-> I take that back. How we are supposed to set the slave_id if we don't
-> have request line information available (from ACPI or DT)?
+>>  		gem0: ethernet at e000b000 {
+>>  			compatible = "cdns,gem";
+>>  			reg = <0xe000b000 0x4000>;
+>> @@ -140,6 +164,19 @@
+>>  			clock-names = "pclk", "hclk", "tx_clk";
+>>  		};
+>>  
+>> +		qspi: qspi at e000d000 {
+>> +			compatible = "xlnx,zynq-spi-r1p6";
+>> +			reg = <0xe000d000 0x1000>;
+>> +			status = "disabled";
+>> +			interrupt-parent = <&intc>;
+>> +			interrupts = <0 19 4>;
+>> +			clocks = <&clkc 10>, <&clkc 43>;
+>> +			clock-names = "ref_clk", "pclk";
+>> +			num-cs = <1>;
+>> +			#address-cells = <1>;
+>> +			#size-cells = <0>;
+>> +		};
+>> +
+> I'm not sure what the status of this driver is. I think QSPI is still
+> under review on the mailing lists and I don't think we should add this
+> yet.
 
-If you don't have the request line information, you are screwed and you
-can't set it from either the filter function or slave_config.
+Driver for qspi is not in the mainline yet but it doesn't mean
+that this fragment won't work.
+Harini: Can you please correct me if I am wrong?
 
-However, it looks like you do have it, at least this is what the
-code tells me:
+I would prefer to send two separate patches.
 
-static struct pxa_spi_info spi_info_configs[] = {
-        [PORT_CE4100] = {
-		...
-        },
-        [PORT_BYT] = {
-                .type = LPSS_SSP,
-                .port_id = 0,
-                .num_chipselect = 1,
-                .tx_slave_id = 0,
-                .tx_chan_id = 0,
-                .rx_slave_id = 1,
-                .rx_chan_id = 1,
-        },
-};
+1. just add SPI to zynq
+2. if Harini confirms that it is working I think that make sense to enable
+at least simple mode for qspi. That's why not a problem to add it too.
+It means qspi patch with enabling for your board as second patch.
 
-All you need to do is change your filter function to take the
-slave id from pxa_spi_info and stick it in there, e.g.
+Thanks,
+Michal
 
-static bool pxa2xx_spi_dw_dma_filter(struct dma_chan *chan, void *param)
-{       
-        const struct pxa2xx_spi_master *pdata = param;
-        struct dw_dma_chan *dwc = to_dw_dma_chan(chan);
-        
-        dwc->request_line = fargs->req;
-        dwc->src_master = 0;
-        dwc->dst_master = 0;
-        
-        return 1;
-}           
+-- 
+Michal Simek, Ing. (M.Eng), OpenPGP -> KeyID: FE3D1F91
+w: www.monstr.eu p: +42-0-721842854
+Maintainer of Linux kernel - Microblaze cpu - http://www.monstr.eu/fdt/
+Maintainer of Linux kernel - Xilinx Zynq ARM architecture
+Microblaze U-BOOT custodian and responsible for u-boot arm zynq platform
 
-Note that the filter function by definition is specific to the dma
-controller, not the dma slave (that's why most people define it in
-the dmaengine driver), and the pxa2xx_spi_dma_filter() function used
-in spi-pxa2xx-dma.c looks like it was written for another dma engine:
 
-The dw-dma driver doesn't care at all about the channel number, so
-matching it with the platform data is pointless, but it does need
-the master and request numbers to be set in the filter function,
-as dw_dma_of_filter() and dw_dma_acpi_filter() do.
-
-It also really needs a check to see if the dma engine is the right
-one for the device, as the current filter function will just take
-a channel (with the right number) from any dma engine, and that
-breaks as soon as you register a second dma controller in the system.
-
-I agree that this is very ugly, but that's exactly why we came up
-with the dma_request_slave_channel interface to replace the need
-for filter functions that everybody gets wrong.
-
-	Arnd
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 263 bytes
+Desc: OpenPGP digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140725/ece305c0/attachment.sig>
