@@ -1,89 +1,73 @@
-From: mturquette@linaro.org (Mike Turquette)
-Date: Fri, 25 Jul 2014 15:31:40 -0700
-Subject: [PATCH v8 00/13] Add Maxim 77802 PMIC support
-In-Reply-To: <1405337769-3741-1-git-send-email-javier.martinez@collabora.co.uk>
-References: <1405337769-3741-1-git-send-email-javier.martinez@collabora.co.uk>
-Message-ID: <20140725223140.4791.61816@quantum>
+From: bpringlemeir@nbsps.com (Bill Pringlemeir)
+Date: Fri, 25 Jul 2014 18:36:28 -0400
+Subject: fsl_lpuart/VF610: Division by zero.
+In-Reply-To: <87ha256q8l.fsf@nbsps.com> (Bill Pringlemeir's message of "Fri,
+ 25 Jul 2014 18:14:02 -0400")
+References: <87ha256q8l.fsf@nbsps.com>
+Message-ID: <87d2ct6p77.fsf@nbsps.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Quoting Javier Martinez Canillas (2014-07-14 04:35:56)
-> This series are based on drivers added by Simon Glass to the Chrome OS
-> kernel and adds support for the Maxim 77802 Power Management IC, their
-> regulators, clocks, RTC and i2c interface.
-> 
-> This is a v8 of the patch-set that addresses issues pointed out in v7.
-> Individual changes are added on each patch but the biggest changes are:
-> 
-> * Patches 1-7 from v7 are not included since those were improvements to
-> the max77686 mfd driver and can be applied independently. Lee Jones said
-> that he is going to pick them from the posted v7 series.
-> 
-> I've created a patchwork bundle with 1-7 from v7 to make it easy to apply:
-> 
-> https://patchwork.kernel.org/bundle/javier/max77686-improvements/
-> 
-> * The Dynamic Voltage Scaling support has been removed since that can be
-> added in a follow up series and shouldn't block the minimum PMIC support.
-> 
-> The patch-set has been tested on both Daisy/Snow (max77686) and Peach
-> Pit (max77802) Chromebooks and it's composed of the following patches:
-> 
-> [PATCH v8 01/13] mfd: max77686: Add Maxim 77802 PMIC support
-> [PATCH v8 02/13] mfd: max77802: Add DT binding documentation
-> [PATCH v8 03/13] regulator: Add driver for Maxim 77802 PMIC regulators
-> [PATCH v8 04/13] clk: max77686: Add DT include for MAX77686 PMIC clock
-> [PATCH v8 05/13] clk: Add generic driver for Maxim PMIC clocks
-> [PATCH v8 06/13] clk: max77686: Convert to the generic max clock driver
-> [PATCH v8 07/13] clk: max77686: Improve Maxim 77686 PMIC clocks binding
-> [PATCH v8 08/13] clk: Add driver for Maxim 77802 PMIC clocks
-> [PATCH v8 09/13] clk: max77802: Add DT binding documentation
+On 25 Jul 2014, bpringlemeir at nbsps.com wrote:
 
-For patches 4-9:
+> I have this 'dmesg' with ttyLP1,
+>
+> Division by zero in kernel.  CPU: 0 PID: 187 Comm: getty Not tainted
+> 3.15.0-rc8-04600-ge74a685-dirty #465 [<80013b18>] (unwind_backtrace)
+> from [<80011e3c>] (show_stack+0x10/0x14) [<80011e3c>] (show_stack)
+> from [<8019a11c>] (Ldiv0+0x8/0x10) [<8019a11c>] (Ldiv0) from
+> [<801f0ad4>] (lpuart_startup+0x1e4/0x398) [<801f0ad4>]
+> (lpuart_startup) from [<801ef2e8>] (uart_startup.part.18+0x84/0x1e8)
+> [<801ef2e8>] (uart_startup.part.18) from [<801efd40>]
+> (uart_open+0xe4/0x14c) [<801efd40>] (uart_open) from [<801d586c>]
+> (tty_open+0x1a0/0x5d0) [<801d586c>] (tty_open) from [<800a1008>]
+> (chrdev_open+0x9c/0x160) [<800a1008>] (chrdev_open) from [<8009bd0c>]
+> (do_dentry_open.isra.15+0x1b4/0x270) [<8009bd0c>]
+> (do_dentry_open.isra.15) from [<8009be98>] (finish_open+0x20/0x3c)
+> [<8009be98>] (finish_open) from [<800a8bfc>]
+> (do_last.isra.66+0x404/0xc60) [<800a8bfc>] (do_last.isra.66) from
+> [<800a950c>] (path_openat+0xb4/0x5b0) [<800a950c>] (path_openat) from
+> [<800aa900>] (do_filp_open+0x2c/0x80) [<800aa900>] (do_filp_open) from
+> [<8009ce50>] (do_sys_open+0x120/0x1e0) [<8009ce50>] (do_sys_open) from
+> [<8000ed80>] (ret_fast_syscall+0x0/0x30) random: nonblocking pool is
+> initialized
+>
+> I looked at the vmlinux objdump and it is here,
+>
+> static int lpuart_dma_rx_request(struct uart_port *port)
+> {
+> ...
+> 	sport->dma_rx_timeout = (sport->port.timeout - HZ / 50) *
+> 				FSL_UART_RX_DMA_BUFFER_SIZE * 3 /
+> 				sport->rxfifo_size / 2;
+>
+> The variable 'sport->rxfifo_size' is set in lpuart_setup_watermark()
+> and this is called after lpuart_dma_rx_request() in lpuart_startup().
+>
+> It looks the same in the 'tty/serial' tree?
+>
+> https://git.kernel.org/cgit/linux/kernel/git/gregkh/tty.git/tree/drivers/tty/serial/fsl_lpuart.c#n768
+>
+> I tried some simple changes but then I get no serial output, so I
+> thought it might be better to see if I am using the wrong git trees or
+> if the fix is more obvious to someone familiar with the code.
+>
+> I think that normally everyone runs the console on this port and
+> 'lpuart_console_setup()' is setting 'sport->rxfifo_size' before hand?
+> Or I don't understand why no one else is seeing this?
 
-Acked-by: Mike Turquette <mturquette@linaro.org>
+I failed to add,
 
-Regards,
-Mike
+   &uart1 {
+           pinctrl-names = "default";
+           pinctrl-0 = <&pinctrl_uart1>;
+           status = "okay";
+   };
 
-> [PATCH v8 10/13] rtc: max77686: Allow the max77686 rtc to wakeup the system
-> [PATCH v8 11/13] rtc: max77686: Remove dead code for SMPL and WTSR
-> [PATCH v8 12/13] rtc: Add driver for Maxim 77802 PMIC Real-Time-Clock
-> [PATCH v8 13/13] ARM: dts: Add max77802 to exynos5420-peach-pit and exynos5800-peach-pi
-> 
-> Patch 01/13 extend the max77686 mfd driver to also support the max77802
-> PMIC and patch 02/13 adds the DT binding documentation for this PMIC.
-> 
-> Patch 03/13 adds support for the regulators found in the PMIC.
-> 
-> Patch 04/13 to 07/13 are improvements and refactoring to the max77686 clock
-> driver to avoid code duplication when adding max77802 clocks support in patch
-> 08/13. Patch 09/13 adds the DT binding document for the max77802 clock driver.
-> 
-> Patches 10/13 and 11/13 are improvements to max77686 RTC driver and patch
-> 12/13 adds support for the RTC found in the max77802 PMIC.
-> 
-> Finally patch 13/13 adds the required device node to the Peach Pit and Pi
-> exynos5 based boards.
-> 
-> Since there are cross-subsystems dependencies, I think that the best way to
-> sort this out is if relevant maintainers ack the patches so 01/13 to 012/13
-> can be merged through the mfd tree. The patches and the relevant acks are:
-> 
-> Patch 03/13 (regulator - Mark Brown)
-> Patches 04/13 to 09/13 (clk - Mike Turquette)
-> Patches 10/13 to 12/13 (rtc - Alessandro Zummo)
-> 
-> Patch 13/13 is only a DTS change so it can be picked by Kukjin Kim once the
-> other patches are picked by Lee Jones.
-> 
-> Since we are in 3.16-rc5 already, it would be great if I can get your acks
-> or feedback since I was hoping this series to make it to 3.17. This is due
-> other series that were already posted depend on this one.
-> 
-> Also, the series have been reviewed and tested by Samsung folks and most of
-> the patches already collected Reviewed-by and Tested-by tags.
-> 
-> Thanks a lot and best regards,
-> Javier
-> 
+to my device tree and then this condition triggered.  I can see the
+'dmesg' by telneting to the device.  So maybe it is not so interesting.
+
+If I put the proper initialization as above, then it is fine.
+
+Thanks,
+Bill Pringlemeir.
