@@ -1,99 +1,110 @@
-From: takahiro.akashi@linaro.org (AKASHI Takahiro)
-Date: Fri, 25 Jul 2014 19:36:49 +0900
-Subject: [PATCH v5 1/3] arm64: ptrace: reload a syscall number after ptrace
- operations
-In-Reply-To: <CALCETrU9_sdODRz-xZ4bouq+anHhmfx2tkr7hg00RVf_bBBJwg@mail.gmail.com>
-References: <1406020499-5537-1-git-send-email-takahiro.akashi@linaro.org>
- <1406020499-5537-2-git-send-email-takahiro.akashi@linaro.org>
- <53D08358.4020902@amacapital.net> <53D0A037.2060308@linaro.org>
- <CALCETrU9_sdODRz-xZ4bouq+anHhmfx2tkr7hg00RVf_bBBJwg@mail.gmail.com>
-Message-ID: <53D23341.4040403@linaro.org>
+From: varkabhadram@gmail.com (Varka Bhadram)
+Date: Fri, 25 Jul 2014 16:06:01 +0530
+Subject: [PATCH v3 1/6] rtc: sun6i: Add sun6i RTC driver
+In-Reply-To: <1406279608-489-2-git-send-email-wens@csie.org>
+References: <1406279608-489-1-git-send-email-wens@csie.org>
+ <1406279608-489-2-git-send-email-wens@csie.org>
+Message-ID: <53D23311.5000402@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/25/2014 12:01 AM, Andy Lutomirski wrote:
-> On Jul 23, 2014 10:57 PM, "AKASHI Takahiro" <takahiro.akashi@linaro.org> wrote:
->>
->> On 07/24/2014 12:54 PM, Andy Lutomirski wrote:
->>>
->>> On 07/22/2014 02:14 AM, AKASHI Takahiro wrote:
->>>>
->>>> Arm64 holds a syscall number in w8(x8) register. Ptrace tracer may change
->>>> its value either to:
->>>>     * any valid syscall number to alter a system call, or
->>>>     * -1 to skip a system call
->>>>
->>>> This patch implements this behavior by reloading that value into syscallno
->>>> in struct pt_regs after tracehook_report_syscall_entry() or
->>>> secure_computing(). In case of '-1', a return value of system call can also
->>>> be changed by the tracer setting the value to x0 register, and so
->>>> sys_ni_nosyscall() should not be called.
->>>>
->>>> See also:
->>>>       42309ab4, ARM: 8087/1: ptrace: reload syscall number after
->>>>            secure_computing() check
->>>>
->>>> Signed-off-by: AKASHI Takahiro <takahiro.akashi@linaro.org>
->>>> ---
->>>>    arch/arm64/kernel/entry.S  |    2 ++
->>>>    arch/arm64/kernel/ptrace.c |   13 +++++++++++++
->>>>    2 files changed, 15 insertions(+)
->>>>
->>>> diff --git a/arch/arm64/kernel/entry.S b/arch/arm64/kernel/entry.S
->>>> index 5141e79..de8bdbc 100644
->>>> --- a/arch/arm64/kernel/entry.S
->>>> +++ b/arch/arm64/kernel/entry.S
->>>> @@ -628,6 +628,8 @@ ENDPROC(el0_svc)
->>>>    __sys_trace:
->>>>        mov    x0, sp
->>>>        bl    syscall_trace_enter
->>>> +    cmp    w0, #-1                // skip syscall?
->>>> +    b.eq    ret_to_user
->>>
->>>
->>> Does this mean that skipped syscalls will cause exit tracing to be skipped?
->>
->>
->> Yes. (and I guess yes on arm, too)
->>
->>
->>> If so, then you risk (at least) introducing
->>>
->>> a nice user-triggerable OOPS if audit is enabled.
->>
->>
->> Can you please elaborate this?
->> Since I didn't find any definition of audit's behavior when syscall is
->> rewritten to -1, I thought it is reasonable to skip "exit tracing" of
->> "skipped" syscall.
->> (otherwise, "fake" seems to be more appropriate :)
+On 07/25/2014 02:43 PM, Chen-Yu Tsai wrote:
+> This patch introduces the driver for the RTC in the Allwinner A31 and
+> A23 SoCs.
 >
-> The audit entry hook will oops if you call it twice in a row without
-> calling the exit hook in between.
-
-Thank you, I could reproduce this problem which hits BUG(in_syscall) in
-audit_syscall_entry(). Really bad, and I fixed it in my next version and
-now a "skipped" system call is also traced by audit.
-
-I ran libseccomp test and Kees' test under auditd running with a rule,
-	auditctl -a exit,always -S all
-and all the tests seemed to pass.
-
-   I can also imagine ptracers getting
-> confused if ptrace entry and exit don't line up.
-
-FYI, on arm64, we can distinguish syscall enter/exit with x12 register.
-
-> What happens if user code directly issues syscall ~0?  Does the return
-> value register get set?  Is the behavior different between traced and
-> untraced syscalls?
-
-Interesting cases. Let me think about it.
-
-Thanks,
--Takahiro AKASHI
-
->  The current approach seems a bit scary.
+> Unlike the RTC found in A10/A20 SoCs, which was part of the timer, the
+> RTC in A31/A23 are a separate hardware block, which also contain a few
+> controls for the RTC block hardware (a regulator and RTC block GPIO pin
+> latches), while also having separate interrupts for the alarms.
 >
-> --Andy
+> The hardware is different enough to make a different driver for it.
 >
+> Signed-off-by: Chen-Yu Tsai <wens@csie.org>
+> ---
+>   .../devicetree/bindings/rtc/sun6i-rtc.txt          |  17 +
+>   drivers/rtc/Kconfig                                |   7 +
+>   drivers/rtc/Makefile                               |   1 +
+>   drivers/rtc/rtc-sun6i.c                            | 447 +++++++++++++++++++++
+>   4 files changed, 472 insertions(+)
+>   create mode 100644 Documentation/devicetree/bindings/rtc/sun6i-rtc.txt
+>   create mode 100644 drivers/rtc/rtc-sun6i.c
+>
+(....)
+
+> +static int sun6i_rtc_settime(struct device *dev, struct rtc_time *rtc_tm)
+> +{
+> +	struct sun6i_rtc_dev *chip = dev_get_drvdata(dev);
+> +	u32 date = 0;
+> +	u32 time = 0;
+> +	int year;
+> +
+> +	year = rtc_tm->tm_year + 1900;
+> +	if (year < SUN6I_YEAR_MIN || year > SUN6I_YEAR_MAX) {
+> +		dev_err(dev, "rtc only supports year in range %d - %d\n",
+> +				SUN6I_YEAR_MIN, SUN6I_YEAR_MAX);
+
+dev_err(dev, "rtc only supports year in range %d - %d\n",
+	SUN6I_YEAR_MIN, SUN6I_YEAR_MAX);
+
+> +		return -EINVAL;
+> +	}
+> +
+> +	rtc_tm->tm_year -= SUN6I_YEAR_OFF;
+> +	rtc_tm->tm_mon += 1;
+> +
+> +	date = SUN6I_DATE_SET_DAY_VALUE(rtc_tm->tm_mday) |
+> +		SUN6I_DATE_SET_MON_VALUE(rtc_tm->tm_mon)  |
+> +		SUN6I_DATE_SET_YEAR_VALUE(rtc_tm->tm_year);
+> +
+> +	if (is_leap_year(year))
+> +		date |= SUN6I_LEAP_SET_VALUE(1);
+> +
+> +	time = SUN6I_TIME_SET_SEC_VALUE(rtc_tm->tm_sec)  |
+> +		SUN6I_TIME_SET_MIN_VALUE(rtc_tm->tm_min)  |
+> +		SUN6I_TIME_SET_HOUR_VALUE(rtc_tm->tm_hour);
+> +
+> +	/* Check whether registers are writable */
+> +	if (sun6i_rtc_wait(chip, SUN6I_LOSC_CTRL,
+> +				SUN6I_LOSC_CTRL_ACC_MASK, 50)) {
+
+if (sun6i_rtc_wait(chip, SUN6I_LOSC_CTRL,
+		   SUN6I_LOSC_CTRL_ACC_MASK, 50)
+
+> +		dev_err(dev, "rtc is still busy.\n");
+> +		return -EBUSY;
+> +	}
+> +
+> +	writel(time, chip->base + SUN6I_RTC_HMS);
+> +
+> +	/*
+> +	 * After writing the RTC HH-MM-SS register, the
+> +	 * SUN6I_LOSC_CTRL_RTC_HMS_ACC bit is set and it will not
+> +	 * be cleared until the real writing operation is finished
+> +	 */
+> +
+> +	if (sun6i_rtc_wait(chip, SUN6I_LOSC_CTRL,
+> +				SUN6I_LOSC_CTRL_RTC_HMS_ACC, 50)) {
+
+same..
+
+> +		dev_err(dev, "Failed to set rtc time.\n");
+> +		return -ETIMEDOUT;
+> +	}
+> +
+> +	writel(date, chip->base + SUN6I_RTC_YMD);
+> +
+> +	/*
+> +	 * After writing the RTC YY-MM-DD register, the
+> +	 * SUN6I_LOSC_CTRL_RTC_YMD_ACC bit is set and it will not
+> +	 * be cleared until the real writing operation is finished
+> +	 */
+> +
+> +	if (sun6i_rtc_wait(chip, SUN6I_LOSC_CTRL,
+> +				SUN6I_LOSC_CTRL_RTC_YMD_ACC, 50)) {
+
+same...
+
+
+-- 
+Regards,
+Varka Bhadram.
