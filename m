@@ -1,24 +1,95 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Fri, 25 Jul 2014 11:16:43 +0100
-Subject: [PATCH] exynos: Support big endian mode in secondary_startup
-In-Reply-To: <073c01cfa7c3$39ec6a10$adc53e30$@samsung.com>
-References: <1405958507-8606-1-git-send-email-broonie@kernel.org>
- <073c01cfa7c3$39ec6a10$adc53e30$@samsung.com>
-Message-ID: <20140725101643.GN17528@sirena.org.uk>
+From: boris.brezillon@free-electrons.com (Boris BREZILLON)
+Date: Fri, 25 Jul 2014 12:18:04 +0200
+Subject: [PATCH] ARM: at91: at91sam9x5: sets NPCS0 (PA14) back to GPIO
+In-Reply-To: <53D22C26.4030208@aksignal.cz>
+References: <1405074175-22444-1-git-send-email-voice.shen@atmel.com>
+ <53D10C50.50305@aksignal.cz> <20140724162645.4e19c26c@bbrezillon>
+ <53D12103.3020103@aksignal.cz> <20140724175848.44f5da10@bbrezillon>
+ <53D1F5D0.1080006@aksignal.cz> <20140725095319.16a8465c@bbrezillon>
+ <53D214E1.4050105@aksignal.cz> <20140725104553.403921b1@bbrezillon>
+ <53D21B3F.7060006@aksignal.cz> <20140725110124.3f0dce6c@bbrezillon>
+ <53D21FCF.7010402@aksignal.cz> <20140725113110.70c4aa41@bbrezillon>
+ <53D22C26.4030208@aksignal.cz>
+Message-ID: <20140725121804.18b05a5d@bbrezillon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jul 25, 2014 at 01:45:14PM +0900, Kukjin Kim wrote:
+On Fri, 25 Jul 2014 12:06:30 +0200
+Ji?? Prchal <jiri.prchal@aksignal.cz> wrote:
 
-> Basically, I have no objection on this, BTW is there any requirement to support
-> big endian on exynos stuff? Just wondering...
+> 
+> 
+> Dne 25.7.2014 v 11:31 Boris BREZILLON napsal(a):
+> > On Fri, 25 Jul 2014 11:13:51 +0200
+> > Ji?? Prchal <jiri.prchal@aksignal.cz> wrote:
+> >
+> >
+> >>>
+> >>> Every thing seems in place.
+> >>> Could you enable CONFIG_DEBUG_PINCTRL and grep on "enable pin" ?
+> >> / # dmesg | grep "enable pin"
+> >> [    0.968750] pinctrl-at91 ahb:apb:pinctrl at fffff400: enable pin 101 as GPIO
+> >> [    0.968750] pinctrl-at91 ahb:apb:pinctrl at fffff400: enable pin 101 as PIOD5 0x20
+> >> [    0.968750] pinctrl-at91 ahb:apb:pinctrl at fffff400: enable pin 100 as GPIO
+> >> [    0.968750] pinctrl-at91 ahb:apb:pinctrl at fffff400: enable pin 100 as PIOD4 0x10
+> >> [    1.238281] pinctrl-at91 ahb:apb:pinctrl at fffff400: enable pin 23 as GPIO
+> >> [    1.238281] pinctrl-at91 ahb:apb:pinctrl at fffff400: enable pin 23 as PIOA23 0x800000
+> >> [    1.238281] pinctrl-at91 ahb:apb:pinctrl at fffff400: enable pin 22 as GPIO
+> >> [    1.238281] pinctrl-at91 ahb:apb:pinctrl at fffff400: enable pin 22 as PIOA22 0x400000
+> >> [    1.242187] pinctrl-at91 ahb:apb:pinctrl at fffff400: enable pin 93 as GPIO
+> >> [    1.242187] pinctrl-at91 ahb:apb:pinctrl at fffff400: enable pin 93 as PIOC29 0x20000000
+> >> [    1.246093] pinctrl-at91 ahb:apb:pinctrl at fffff400: enable pin 14 as GPIO
+> >> [    1.246093] pinctrl-at91 ahb:apb:pinctrl at fffff400: enable pin 14 as PIOA14 0x4000
+> >
+> >
+> > Okay, this cleary shows that PA14 pin is muxed as a GPIO (or at least
+> > the driver think it is).
+> >
+> >
+> > Could you launch these commands (you'll need the devmem tool) and
+> > paste the results ?
+> >
+> > #devmem 0xfffff408
+> > #devmem 0xfffff418
+> > #devmem 0xfffff438
+> > #devmem 0xfffff43c
+> > #devmem 0xfffff458
+> > #devmem 0xfffff468
+> > #devmem 0xfffff470
+> > #devmem 0xfffff474
+> > #devmem 0xfffff498
+> >
+> / # devmem 0xfffff408
+> 0xF0E04018
+> / # devmem 0xfffff418
+> 0xE0C04000
+> / # devmem 0xfffff438
+> 0x00C04000
+> / # devmem 0xfffff43c
+> 0x13FFD7FB
+> / # devmem 0xfffff458
+> 0x00000000
+> / # devmem 0xfffff468
+> 0xFF223B4E
+> / # devmem 0xfffff470
+> 0x0F000000
+> / # devmem 0xfffff474
+> 0x00000000
+> / # devmem 0xfffff498
+> 0xFFFFFFFF
+> 
+> I get thought if is possible that in time of probe fm25 (it's first) is not configured PA14 (it 's last)?
 
-We've been using it for testing within Linaro.  I don't know of any real
-world users.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140725/d9825cfb/attachment.sig>
+Oh, nice catch!
+I think you've found the origin of this bug.
+Indeed each device is instantiated sequentially and thus when the first
+device is probed (CS0) the last one has not requested it's cs_gpio yet
+(and PA14 is still assigned to periph A).
+
+Declaring cs-pins and referencing them in pinctrl-0 solves the issue
+because in this case all CS pins are requested during controller probe.
+
+-- 
+Boris Brezillon, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
