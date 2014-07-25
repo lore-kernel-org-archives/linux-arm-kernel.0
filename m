@@ -1,38 +1,44 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Fri, 25 Jul 2014 12:03:42 +0100
-Subject: [PATCH v5 1/3] arm64: ptrace: reload a syscall number after
- ptrace operations
-In-Reply-To: <53D23341.4040403@linaro.org>
-References: <1406020499-5537-1-git-send-email-takahiro.akashi@linaro.org>
- <1406020499-5537-2-git-send-email-takahiro.akashi@linaro.org>
- <53D08358.4020902@amacapital.net> <53D0A037.2060308@linaro.org>
- <CALCETrU9_sdODRz-xZ4bouq+anHhmfx2tkr7hg00RVf_bBBJwg@mail.gmail.com>
- <53D23341.4040403@linaro.org>
-Message-ID: <20140725110342.GD5269@arm.com>
+From: broonie@kernel.org (Mark Brown)
+Date: Fri, 25 Jul 2014 12:04:04 +0100
+Subject: [PATCH] arm64: audit: Fix build for audit changes
+In-Reply-To: <20140725092108.GB24268@arm.com>
+References: <1405596402-23844-1-git-send-email-broonie@kernel.org>
+ <20140724191237.GM17528@sirena.org.uk>
+ <20140725092108.GB24268@arm.com>
+Message-ID: <20140725110404.GQ17528@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jul 25, 2014 at 11:36:49AM +0100, AKASHI Takahiro wrote:
-> On 07/25/2014 12:01 AM, Andy Lutomirski wrote:
-> >>> If so, then you risk (at least) introducing
-> >>>
-> >>> a nice user-triggerable OOPS if audit is enabled.
-> >>
-> >>
-> >> Can you please elaborate this?
-> >> Since I didn't find any definition of audit's behavior when syscall is
-> >> rewritten to -1, I thought it is reasonable to skip "exit tracing" of
-> >> "skipped" syscall.
-> >> (otherwise, "fake" seems to be more appropriate :)
-> >
-> > The audit entry hook will oops if you call it twice in a row without
-> > calling the exit hook in between.
-> 
-> Thank you, I could reproduce this problem which hits BUG(in_syscall) in
-> audit_syscall_entry(). Really bad, and I fixed it in my next version and
-> now a "skipped" system call is also traced by audit.
+On Fri, Jul 25, 2014 at 10:21:09AM +0100, Catalin Marinas wrote:
+> On Thu, Jul 24, 2014 at 08:12:37PM +0100, Mark Brown wrote:
 
-Can you reproduce this on arch/arm/ too? If so, we should also fix the code
-there.
+> > This is still broken -next.
 
-Will
+> It should now be temporarily fixed for the defconfig
+> (CONFIG_AUTIDSYSCALL disabled). I'm reluctant to merge the audit tree in
+> the arm64 tree as (a) I haven't seen a confirmation that this branch is
+> stable and will go upstream as is and (b) there are x86 changes without
+> Acks from the x86 maintainers (whether needed or not, I can't say).
+
+I'd not expect it to be essential, it's just a function prototype
+change.
+
+> So my temporary patch is some #ifndef's around the offending code. It
+> will be reverted and your patch applied once the audit tree meets the
+> arm64 tree.
+
+That's good thanks, though it's still going to mean we have massive
+bisection breaks and anyone with an existing config will run into
+trouble - I'm going to be adding all*config builds to my daily tests
+soon too which will still trigger the issue).  
+
+I suspect the easiest thing would be to cherry pick the commit over (it
+can always be reverted later on if there's an issue) if a shared branch
+can't be arranged.  It's a real shame Eric hasn't replied here...
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140725/7967cc6d/attachment.sig>
