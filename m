@@ -1,157 +1,320 @@
 From: hanjun.guo@linaro.org (Hanjun Guo)
-Date: Fri, 25 Jul 2014 18:51:37 +0800
-Subject: [PATCH 10/19] ARM64 / ACPI: Get the enable method for SMP
- initialization in ACPI way
-In-Reply-To: <20140724154745.GD26190@leverpostej>
+Date: Fri, 25 Jul 2014 18:55:07 +0800
+Subject: [PATCH 19/19] Documentation: ACPI for ARM64
+In-Reply-To: <53D16F98.9080107@infradead.org>
 References: <1406206825-15590-1-git-send-email-hanjun.guo@linaro.org>
- <1406206825-15590-11-git-send-email-hanjun.guo@linaro.org>
- <20140724154745.GD26190@leverpostej>
-Message-ID: <53D236B9.7000302@linaro.org>
+ <1406206825-15590-20-git-send-email-hanjun.guo@linaro.org>
+ <53D16F98.9080107@infradead.org>
+Message-ID: <53D2378B.20109@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2014-7-24 23:47, Mark Rutland wrote:
-> On Thu, Jul 24, 2014 at 02:00:16PM +0100, Hanjun Guo wrote:
->> ACPI 5.1 only has two explicit methods to boot up SMP,
->> PSCI and Parking protocol, but the Parking protocol is
->> only suitable for ARMv7 now, so make PSCI as the only way
->> for the SMP boot protocol before some updates for the
->> ACPI spec or the Parking protocol spec.
+Hi Randy,
+
+Thank you for your careful review comments, I will update it in next version :)
+
+Best Regards
+Hanjun
+
+On 2014-7-25 4:42, Randy Dunlap wrote:
+> On 07/24/2014 06:00 AM, Hanjun Guo wrote:
+>> From: Graeme Gregory <graeme.gregory@linaro.org>
 >>
+>> Add documentation for the guidelines of how to use ACPI
+>> on ARM64.
+>>
+>> Signed-off-by: Graeme Gregory <graeme.gregory@linaro.org>
 >> Signed-off-by: Hanjun Guo <hanjun.guo@linaro.org>
->> Signed-off-by: Tomasz Nowicki <tomasz.nowicki@linaro.org>
 >> ---
->>  arch/arm64/include/asm/acpi.h    |   21 +++++++++++++++
->>  arch/arm64/include/asm/cpu_ops.h |    9 ++++++-
->>  arch/arm64/include/asm/smp.h     |    2 +-
->>  arch/arm64/kernel/acpi.c         |    9 +++++++
->>  arch/arm64/kernel/cpu_ops.c      |   52 ++++++++++++++++++++++++++++++++++----
->>  arch/arm64/kernel/smp.c          |   29 +++++++++++++++++++--
->>  6 files changed, 113 insertions(+), 9 deletions(-)
-[...]
->>  /*
->> - * Setup the set of possible CPUs (via set_cpu_possible)
->> + * Platform specific SMP operations
->>   */
->>  extern void smp_init_cpus(void);
-> 
-> While the originial comment is out of date, the new form is plain wrong.
-> 
-> Something like "Discover the set of possible CPUs and determine their
-> SMP operations" would be a better description of what's going on here.
-
-Agreed.
-
-> 
+>>  Documentation/arm64/arm-acpi.txt |  240 ++++++++++++++++++++++++++++++++++++++
+>>  1 file changed, 240 insertions(+)
+>>  create mode 100644 Documentation/arm64/arm-acpi.txt
 >>
->> diff --git a/arch/arm64/kernel/acpi.c b/arch/arm64/kernel/acpi.c
->> index ff0f6a0..2af6662 100644
->> --- a/arch/arm64/kernel/acpi.c
->> +++ b/arch/arm64/kernel/acpi.c
->> @@ -184,6 +184,15 @@ static int __init acpi_parse_madt_gic_cpu_interface_entries(void)
->>         return 0;
->>  }
->>
->> +/* Protocol to bring up secondary CPUs */
->> +enum acpi_smp_boot_protocol smp_boot_protocol(void)
->> +{
->> +       if (acpi_psci_present)
->> +               return ACPI_SMP_BOOT_PSCI;
->> +       else
->> +               return ACPI_SMP_BOOT_PARKING_PROTOCOL;
+>> diff --git a/Documentation/arm64/arm-acpi.txt b/Documentation/arm64/arm-acpi.txt
+>> new file mode 100644
+>> index 0000000..12cd550
+>> --- /dev/null
+>> +++ b/Documentation/arm64/arm-acpi.txt
+>> @@ -0,0 +1,240 @@
+>> +ACPI on ARMv8 Servers
+>> +---------------------
+>> +
+>> +ACPI will be used for ARMv8 general purpose servers designed to follow
+>> +the SBSA specification (currently available to people with an ARM login at
+>> +http://silver.arm.com)
+> 
+>                     .com).
+> 
+>> +
+>> +The implemented ACPI version is 5.1 + errata as released by the UEFI Forum,
+>> +which is available at <http://www.uefi.org/acpi/specs>.
+>> +
+>> +If the machine does not meet these requirements then it is likely that Device
+>> +Tree (DT) is more suitable for the hardware.
+>> +
+>> +Relationship with Device Tree
+>> +-----------------------------
+>> +
+>> +ACPI support in drivers and subsystems for ARMv8 should never be mutually
+>> +exclusive with DT support at compile time.
+>> +
+>> +At boot time the kernel will only use one description method depending on
+>> +parameters passed from the bootloader.
+>> +
+>> +Regardless of whether DT or ACPI is used, the kernel must always be capable
+>> +of booting with either scheme.
+>> +
+>> +When booting using ACPI tables the /chosen node in DT will still be parsed
+>> +to extract the kernel command line and initrd path. No other section of
+>> +the DT will be used.
+>> +
+>> +Booting using ACPI tables
+>> +-------------------------
+>> +
+>> +Currently, the only defined method to pass ACPI tables to the kernel on ARMv8
+>> +is via the UEFI system configuration table.
+>> +
+>> +The UEFI implementation MUST set the ACPI_20_TABLE_GUID to point to the
+>> +RSDP table (the table with the ACPI signature "RSD PTR ").
+>> +
+>> +The pointer to the RSDP table will be retrieved from EFI by the ACPI core.
+>> +
+>> +Processing of ACPI tables may be disabled by passing acpi=off on the kernel
+>> +command line.
+>> +
+>> +DO use an XSDT, RSDTs are deprecated and should not be used on arm64. They
+> 
+>              XSDT;
+> 
+>> +only allow for 32bit addresses.
+> 
+>                   32-bit
+> 
+>> +
+>> +DO NOT use the 32-bit address fields in the FADT, they are deprecated, the
+> 
+>                                                FADT; they are deprecated. The
+> 
+>> +64-bit alternatives MUST be used.
+>> +
+>> +The minimum set of tables MUST include RSDP, XSDT, FACS, FADT, DSDT, MADT
+>> +and GTDT. If PCI is used the MCFG table MUST also be present.
+>> +
+>> +ACPI Detection
+>> +--------------
+>> +
+>> +Drivers should determine their probe() type by checking for ACPI_HANDLE,
+>> +or .of_node, or other information in the device structure. This is
+>> +detailed further in the "Driver Recomendations" section.
+> 
+>                                    Recommendations
+> 
+>> +
+>> +If the presence of ACPI needs to be detected at runtime, then check the value
+>> +of acpi_disabled. If CONFIG_ACPI not being set acpi_disabled will always be 1.
+> 
+>                      If CONFIG_ACPI is not set, acpi_disabled will always be 1.
+> 
+>> +
+>> +Device Enumeration
+>> +------------------
+>> +
+>> +Device descriptions in ACPI should use standard recognised ACPI interfaces.
+>> +These are far simpler than the information provided via Device Tree. Drivers
+>> +should take into account this simplicity and work with sensible defaults.
+>> +
+>> +On no account should a Device Tree attempt to be replicated in ASL using such
+>> +constructs as Name(KEY0, "Value1") type constructs. Additional driver specific
+>> +data should be passed in the appropriate _DSM (ACPI Section 9.14.1) method or
+>> +_DSD (ACPI Section 6.2.5). This data should be rare and not OS specific.
+>> +
+>> +Common _DSD bindings should be submitted to ASWG to be included in the
+>> +document :-
+>> +
+>> +http://www.uefi.org/sites/default/files/resources/_DSD-implementation-guide-toplevel.htm
+>> +
+>> +TODO: Clarification and examples from Juno implementation.
+>> +
+>> +Programmable Power Control Resources
+>> +------------------------------------
+>> +
+>> +Programmable power control resources include such resources as voltage/current
+>> +providers (regulators) and clock sources.
+>> +
+>> +For power control of these resources they should be represented with Power
+>> +Resource Objects (ACPI Section 7.1). The ACPI core will then handle correctly
+>> +enabling/disabling of resources as they are needed.
+>> +
+>> +There exists in the ACPI 5.1 specification no standard binding for these objects
+>> +to enable programmable levels or rates so this should be avoid if possible and
+> 
+>                                                             avoided
+> 
+>> +the resources set to appropriate level by the firmware. If this is not possible
+> 
+>                                     levels
+> 
+>> +then any manipulation should be abstracted in ASL.
+>> +
+>> +Each device in ACPI has D-states and these can be controlled through
+>> +the optional methods _PS0..._PS3 where _PS0 is full on and _PS3 is full off.
+>> +
+>> +If either _PS0 or _PS3 is implemented, then the other method must also be
+>> +implemented.
+>> +
+>> +If a device requires usage or setup of a power resource when on, the ASL
+>> +should organise that it is allocated/enabled using the _PS0 method.
+>> +
+>> +Resources allocated/enabled in the _PS0 method should be disabled/de-allocated
+>> +in the _PS3 method.
+>> +
+>> +Such code in _PS? methods will of course be very platform specific but
+>> +should allow the driver to operate the device without special non standard
+> 
+>                                                                  non-standard
+> 
+>> +values being read from ASL. Further, abstracting the use of these resources
+>> +allows hardware revisions without requiring updates to the kernel.
+>> +
+>> +TODO: Clarification and examples from Juno implementation.
+>> +
+>> +Clocks
+>> +------
+>> +
+>> +Like clocks that are part of the power resources there is no standard way
+>> +to represent a clock tree in ACPI 5.1 in a similar manner to how it is
+>> +described in DT.
+>> +
+>> +Devices affected by this include things like UARTs, SoC driven LCD displays,
+>> +etc.
+>> +
+>> +The firmware for example UEFI should initialise these clocks to fixed working
+> 
+>                 (for example, UEFI)
+> 
+>> +values before the kernel is executed. If a driver requires to know rates of
+>> +clocks set by firmware then they can be passed to kernel using _DSD.
+>> +
+>> +example :-
+>> +
+>> +Device (CLK0) {
+>> +	...
+>> +
+>> +	Name (_DSD, Package() {
+>> +		ToUUID("XXXXX"),
+>> +		Package() {
+>> +			Package(2) {"#clock-cells", 0},
+>> +			Package(2) {"clock-frequency", "10000"}
+>> +		}
+>> +	})
+>> +
+>> +	...
 >> +}
 >> +
->>  static int __init acpi_parse_fadt(struct acpi_table_header *table)
->>  {
->>         struct acpi_table_fadt *fadt = (struct acpi_table_fadt *)table;
->> diff --git a/arch/arm64/kernel/cpu_ops.c b/arch/arm64/kernel/cpu_ops.c
->> index d62d12f..4d9b3cf 100644
->> --- a/arch/arm64/kernel/cpu_ops.c
->> +++ b/arch/arm64/kernel/cpu_ops.c
->> @@ -16,11 +16,13 @@
->>   * along with this program.  If not, see <http://www.gnu.org/licenses/>.
->>   */
->>
->> -#include <asm/cpu_ops.h>
->> -#include <asm/smp_plat.h>
->>  #include <linux/errno.h>
->>  #include <linux/of.h>
->>  #include <linux/string.h>
->> +#include <linux/acpi.h>
+>> +Device (USR1) {
+>> +	...
 >> +
->> +#include <asm/cpu_ops.h>
->> +#include <asm/smp_plat.h>
+>> +	Name (_DSD, Package() {
+>> +		ToUUID("XXXXX"),
+>> +		Package() {
+>> +			Package(2) {"clocks", Package() {1, ^CLK0}}},
+>> +		}
+>> +	})
+>> +
+>> +	...
+>> +}
+>> +			
+>> +Driver Recommendations
+>> +----------------------
+>> +
+>> +DO NOT remove any FDT handling when adding ACPI support for a driver, different
 > 
-> Was the header move just for consistency with other files, or is there
-> some ordering requirement here?
-
-Ordering requirement, it will meet compile error for "return -ENODEV;"
-in the head file which I introduced, I know I can include the right
-head file in asm/cpu_ops.h, but I think move the asm/xx.h after the
-include of linux/xx.h would be fine.
-
+>                                                                  driver. Different
 > 
->>
->>  extern const struct cpu_operations smp_spin_table_ops;
->>  extern const struct cpu_operations cpu_psci_ops;
->> @@ -52,7 +54,7 @@ static const struct cpu_operations * __init cpu_get_ops(const char *name)
->>  /*
->>   * Read a cpu's enable method from the device tree and record it in cpu_ops.
->>   */
->> -int __init cpu_read_ops(struct device_node *dn, int cpu)
->> +int __init cpu_of_read_ops(struct device_node *dn, int cpu)
->>  {
->>         const char *enable_method = of_get_property(dn, "enable-method", NULL);
->>         if (!enable_method) {
->> @@ -76,12 +78,52 @@ int __init cpu_read_ops(struct device_node *dn, int cpu)
->>         return 0;
->>  }
->>
->> +#ifdef CONFIG_ACPI
->> +/*
->> + * Read a cpu's enable method in the ACPI way and record it in cpu_ops.
->> + */
->> +int __init cpu_acpi_read_ops(int cpu)
+>> +systems may use the same device.
+>> +
+>> +DO try and keep complex sections of ACPI and DT functionality seperate. This
+> 
+>                                                                  separate.
+> 
+>> +may mean a patch to break out some complex DT to another function before
+>> +the patch to add ACPI. This may happen in other functions but is most likely
+>> +in probe function. This gives a clearer flow of data for reviewing driver
+>> +source.
+>> +
+>> +probe() :-
+>> +
+>> +TODO: replace this with a specific real example from Juno?
+>> +
+>> +static int device_probe_dt(struct platform_device *pdev)
 >> +{
->> +       /*
->> +        * For ACPI 5.1, only two kind of methods are provided,
->> +        * Parking protocol and PSCI, but Parking protocol is
->> +        * used on ARMv7 only, so make PSCI as the only method
->> +        * for SMP initialization before the ACPI spec or Parking
->> +        * protocol spec is updated.
->> +        */
-> 
-> That comment is a little misleading. The parking protocol is _specified_
-> for ARMv7 only.
-
-Agreed. But I'm just wondering if the Parking protocol is modified and
-then support ARMv8, how to describe it in the comments?
-
-> 
->> +       switch (smp_boot_protocol()) {
->> +       case ACPI_SMP_BOOT_PSCI:
->> +               cpu_ops[cpu] = cpu_get_ops("psci");
->> +               break;
->> +       case ACPI_SMP_BOOT_PARKING_PROTOCOL:
->> +       default:
->> +               cpu_ops[cpu] = NULL;
->> +               break;
->> +       }
+>> +	/* DT specific functionality */
+>> +	...
+>> +}
 >> +
->> +       if (!cpu_ops[cpu]) {
->> +               pr_warn("CPU %d: unsupported enable-method, only PSCI is supported\n",
->> +                       cpu);
->> +               return -EOPNOTSUPP;
->> +       }
+>> +static int device_probe_acpi(struct platform_device *pdev)
+>> +{
+>> +	/* ACPI specific functionality */
+>> +	...
+>> +}
+>> +
+>> +static int device_probe(stuct platform_device *pdev)
+>> +{
+>> +	...
+>> +	acpi_handle handle = ACPI_HANDLE(&pdev->dev);
+>> +	struct device_node node = pdev->dev.of_node;
+>> +	...
+>> +
+>> +	if (node)
+>> +		ret = device_probe_dt(pdev);
+>> +	else if (handle)
+>> +		ret = device_probe_acpi(pdev);
+>> +	else
+>> +		/* other initialisation */
+>> +		...
+>> +	/* Continue with any generic probe operations */
+>> +	...
+>> +}
+>> +
+>> +DO keep the MODULE_DEVICE_TABLE entries together in the driver to make it clear
+>> +the different names the driver is probed for, both from DT and from ACPI.
+>> +
+>> +module device tables :-
+>> +
+>> +static struct of_device_id virtio_mmio_match[] = {
+>> +        { .compatible = "virtio,mmio", },
+>> +        {},
+>> +};
+>> +MODULE_DEVICE_TABLE(of, virtio_mmio_match);
+>> +
+>> +static const struct acpi_device_id virtio_mmio_acpi_match[] = {
+>> +        { "LNRO0005", },
+>> +        { }
+>> +};
+>> +MODULE_DEVICE_TABLE(acpi, virtio_mmio_acpi_match);
+>> +
+>> +TODO: Add any other helpful rules that develop from Juno ACPI work.
+>> +
+>> +ASWG
+>> +----
+>> +
+>> +The following areas are not yet well defined for ARM in the current ACPI
+>> +specification and are expected to be worked through in the UEFI ACPI
+>> +Specification Working Group (ASWG) <http://www.uefi.org/workinggroups>.
+>> +Participation in this group is open to all UEFI members.
+>> +
+>> +	- ACPI based CPU topology
+>> +	- ACPI based Power management
+>> +	- CPU idle control based on PSCI
+>> +	- CPU performance control (CPPC)
+>> +
+>> +No code shall be accepted into the kernel unless it complies with the released
+>> +standards from UEFI ASWG. If there are features missing from ACPI to make it
+>> +function on a platform ECRs should be submitted to ASWG and go through the
 > 
-> That's going to require changes as things get updated, and
-> "enable-method" is a term from DT rather than ACPI.
+>             on a platform, ECRs
 > 
-> How about:
+>> +approval process.
+>>
 > 
-> 	"CPU%d: boot protocol unsupported or unknown\n".
-
-Pretty fine to me :)
-
-Thanks
-Hanjun
+> 
