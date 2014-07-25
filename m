@@ -1,56 +1,36 @@
-From: paul@pwsan.com (Paul Walmsley)
-Date: Fri, 25 Jul 2014 12:55:49 +0000 (UTC)
-Subject: [GIT PULL] ARM: OMAP2+: PLL rounding change for v3.17
-Message-ID: <alpine.DEB.2.02.1407251254540.18958@utopia.booyaka.com>
+From: vinod.koul@intel.com (Vinod Koul)
+Date: Fri, 25 Jul 2014 18:42:17 +0530
+Subject: [PATCH v11 0/2] Add support for the Allwinner A31 DMA Controller
+In-Reply-To: <1405626376-471-1-git-send-email-maxime.ripard@free-electrons.com>
+References: <1405626376-471-1-git-send-email-maxime.ripard@free-electrons.com>
+Message-ID: <20140725131217.GS8181@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
------BEGIN PGP SIGNED MESSAGE-----
-Hash: SHA1
+On Thu, Jul 17, 2014 at 09:46:14PM +0200, Maxime Ripard wrote:
+> Hi,
+> 
+> This patchset adds support for the DMA controller found in the
+> Allwinner A31 and A23 SoCs.
+> 
+> This has been tested using the newly introduced SPI driver on an A31
+> EVK. Support for DMA-driven SPI transfers will be the subject of
+> another patch serie.
+> 
+> This has been around for around 5 monthes now, and didn't get any
+> review but nitpicks for three versions, so I feel like it could be
+> merged quite quickly.
+I have applied this now.
 
-Hi Tony
+Can you please send follow patches for these:
+- don't recall if I pointed earlier, but can we use direct conversion for
+  calculating convert_burst() and convert_buswidth(), latter one at least
+  seem doable
+- don't use devm_request_irq(). You have irq enabled and you have killed
+  tasklet. This is too racy. You need to ensure no irqs can be generated before killing
+  tasklets.
+- use synchronize_irq() before killing tasklet
 
-The following changes since commit a497c3ba1d97fc69c1e78e7b96435ba8c2cb42ee:
+Thanks
 
-  Linux 3.16-rc2 (2014-06-21 19:02:54 -1000)
-
-are available in the git repository at:
-
-  git://git.kernel.org/pub/scm/linux/kernel/git/pjw/omap-pending.git tags/for-v3.17/omap-clock-b
-
-for you to fetch changes up to 0a26344440b5f9940c99112fdc3804f073b1f5a7:
-
-  ARM: OMAP2+: clock: allow omap2_dpll_round_rate() to round to next-lowest rate (2014-07-25 06:11:15 -0600)
-
-- ----------------------------------------------------------------
-Modify OMAP PLL rate rounding function to round to the exact rate requested
-or the next one below it.  This is intended to resolve some DSS problems.
-
-Basic build, boot, and PM test results are available here:
-
-http://www.pwsan.com/omap/testlogs/clock-b-v3.17/20140725061121/
-
-- ----------------------------------------------------------------
-Paul Walmsley (1):
-      ARM: OMAP2+: clock: allow omap2_dpll_round_rate() to round to next-lowest rate
-
- arch/arm/mach-omap2/clkt_dpll.c | 28 +++++++++++++++++++++-------
- arch/arm/mach-omap2/dpll3xxx.c  | 13 +++++++++++--
- 2 files changed, 32 insertions(+), 9 deletions(-)
------BEGIN PGP SIGNATURE-----
-Version: GnuPG v1
-
-iQIcBAEBAgAGBQJT0lNoAAoJEMePsQ0LvSpL1vEP/0likn5MTdDXY9zOEsygmx6E
-+Ihd/htnvpqX/5E900Gu+zziAL5gWfhOzOk/LfcoSjxPnp3MsWysFShJSGlg4bR9
-sNhlgk4bGTvra8DwozDpVUJvlwfVex/SjbByAz2/9WFNYy8s/rY+LdID3z2q2USC
-Op9cly11RrAUcwpwv/A1JovL4ZFKGFV4bWgqdYkixu3cl7bNTozvSqHxVIidLFSe
-xX+YeAm8MZjW31GvicpGTs+cGmZAVh4UMMjnR+vgMDUGB9QZ71uLB0N0D3rlCSxH
-kYnHKVJxpmm5ehYDyDx3J1D/UlHu3/8V53evO8aFZKpyOiF8cVlOaYyXOEVfBkfn
-MoRda2saEE3/LlkOh3sOizXeQicq8lAl48Ntikar3+WBBVsABCOeT/Y2/wrmo1dA
-2CkeogC47Ho/mUBxoQoWDM4fyXhSnGBRh/HG5IKs71sWQuaJDSlSr4Btdxv1uf+s
-oYu2lfAeWSntmD5ErgncSkKWTWC0Kgc+0D0JX/guLS8i2Y4fokfE4SECF0aborQP
-k+Fn3jXkUuws2fhcUNsleYzLAn9JHtM+aHseIu45s08Bjt7KmuTTz02gK63c9mG+
-6TymbzNmv1RL+HkPBhYjmv7xTFmvgOJYPlPi40csZ+XXZ8JcYRjwFotyC8kwZ8BS
-Y6rnxa2hdQs5bOk/GZeQ
-=s8Vm
------END PGP SIGNATURE-----
+-- 
