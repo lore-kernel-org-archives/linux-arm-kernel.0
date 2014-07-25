@@ -1,139 +1,204 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 25 Jul 2014 12:19:02 +0200
-Subject: [PATCH] spi/pxa2xx-pci: Enable DMA binding through device name
-In-Reply-To: <20140725095559.GA1857@lahna.fi.intel.com>
-References: <1406196111-22861-1-git-send-email-hock.leong.kweh@intel.com>
- <20140725090714.GY1857@lahna.fi.intel.com>
- <20140725095559.GA1857@lahna.fi.intel.com>
-Message-ID: <5426556.OzZIXLrofJ@wuerfel>
+From: josh.wu@atmel.com (Josh Wu)
+Date: Fri, 25 Jul 2014 18:20:00 +0800
+Subject: [PATCH v3 3/3] media: atmel-isi: add primary DT support
+In-Reply-To: <1406283219-32015-1-git-send-email-josh.wu@atmel.com>
+References: <1406283219-32015-1-git-send-email-josh.wu@atmel.com>
+Message-ID: <1406283600-32084-1-git-send-email-josh.wu@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday 25 July 2014 12:55:59 Mika Westerberg wrote:
-> On Fri, Jul 25, 2014 at 12:07:14PM +0300, Mika Westerberg wrote:
-> > On Fri, Jul 25, 2014 at 10:38:36AM +0200, Arnd Bergmann wrote:
-> > > On Friday 25 July 2014 11:22:49 Mika Westerberg wrote:
-> > > > > All you need to do is change your filter function to take the
-> > > > > slave id from pxa_spi_info and stick it in there, e.g.
-> > > > > 
-> > > > > static bool pxa2xx_spi_dw_dma_filter(struct dma_chan *chan, void *param)
-> > > > > {       
-> > > > >         const struct pxa2xx_spi_master *pdata = param;
-> > > > >         struct dw_dma_chan *dwc = to_dw_dma_chan(chan);
-> > > > >         
-> > > > >         dwc->request_line = fargs->req;
-> > > > >         dwc->src_master = 0;
-> > > > >         dwc->dst_master = 0;
-> > > > >         
-> > > > >         return 1;
-> > > > > }           
-> > > > 
-> > > > Oh man. That makes pxa2xx_spi dependent on a certain specific DMA engine
-> > > > driver.
-> > > 
-> > > I think you can improve this by putting the filter function (and a pointer
-> > > to it) into the pxa2xx_spi_master data provided by the PCI driver.
-> > 
-> > Indeed, that looks better. It still makes the PCI part of the driver
-> > dependent on a particular DMA engine driver but is certainly better than
-> > the core pxa2xx_spi driver.
-> 
-> Something like this?
-> 
-> Hock Leong / Chiaue Ee, are you able to check if this works on your BYT
-> machines?
+This patch add the DT support for Atmel ISI driver.
+It use the same v4l2 DT interface that defined in video-interfaces.txt.
 
-I think I found a small bug, and one detail that could be improved.
+Signed-off-by: Josh Wu <josh.wu@atmel.com>
+Cc: devicetree at vger.kernel.org
+Reviewed-by: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
+---
+v2 -> v3:
+  add bus-width property support.
+  add error handling when calling atmel_isi_probe_dt().
 
-> @@ -321,12 +310,14 @@ int pxa2xx_spi_dma_setup(struct driver_data *drv_data)
->  		return -ENOMEM;
->  
->  	drv_data->tx_chan = dma_request_slave_channel_compat(mask,
-> -				pxa2xx_spi_dma_filter, pdata, dev, "tx");
-> +				pdata->dma_filter, pdata->dma_filter_param,
-> +				dev, "tx");
->  	if (!drv_data->tx_chan)
->  		return -ENODEV;
+v1 -> v2:
+  refine the binding document.
+  add port node description.
+  removed the optional property.
 
-If you change this part to pass '(void *)info->tx_slave_id' rather than
-pdata->dma_filter_param, you can simplify the next code:
+ .../devicetree/bindings/media/atmel-isi.txt        | 51 +++++++++++++++++
+ drivers/media/platform/soc_camera/atmel-isi.c      | 64 +++++++++++++++++++++-
+ 2 files changed, 113 insertions(+), 2 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/media/atmel-isi.txt
 
-> +static bool pxa2xx_spi_pci_dma_filter(struct dma_chan *chan, void *param)
-> +{
-> +	struct dw_dma_chan *dwc = to_dw_dma_chan(chan);
-> +	const struct pxa_spi_info *info = param;
-> +
-> +	if (chan->chan_id == info->tx_chan_id)
-> +		dwc->request_line = info->tx_slave_id;
-> +	else if (chan->chan_id == info->rx_chan_id)
-> +		dwc->request_line = info->rx_slave_id;
-> +	else
-> +		return false;
-> +
-> +	dwc->src_master = 0;
-> +	dwc->dst_master = 0;
-> +
-> +	return true;
-> +}
-
-to disregard the tx_chan_id, which is really arbitrary as far as I can tell.
-
-What I think you got wrong here (by following my bad advice) is the master
-number. Looking at the code for dw_dma, I think src_master needs to be '1'
-for your driver.
-
-If we do the same change in the drivers/tty/serial/8250/8250_pci.c driver,
-the dw_dma driver can be simplified a little by removing the special
-case for the request line setting.
-
-diff --git a/drivers/dma/dw/core.c b/drivers/dma/dw/core.c
-index 1af731b83b3f..674f69fe6662 100644
---- a/drivers/dma/dw/core.c
-+++ b/drivers/dma/dw/core.c
-@@ -37,24 +37,6 @@
-  * support descriptor writeback.
-  */
+diff --git a/Documentation/devicetree/bindings/media/atmel-isi.txt b/Documentation/devicetree/bindings/media/atmel-isi.txt
+new file mode 100644
+index 0000000..17e71b7
+--- /dev/null
++++ b/Documentation/devicetree/bindings/media/atmel-isi.txt
+@@ -0,0 +1,51 @@
++Atmel Image Sensor Interface (ISI) SoC Camera Subsystem
++----------------------------------------------
++
++Required properties:
++- compatible: must be "atmel,at91sam9g45-isi"
++- reg: physical base address and length of the registers set for the device;
++- interrupts: should contain IRQ line for the ISI;
++- clocks: list of clock specifiers, corresponding to entries in
++          the clock-names property;
++- clock-names: must contain "isi_clk", which is the isi peripherial clock.
++
++ISI supports a single port node with parallel bus. It should contain one
++'port' child node with child 'endpoint' node. Please refer to the bindings
++defined in Documentation/devicetree/bindings/media/video-interfaces.txt.
++
++Example:
++	isi: isi at f0034000 {
++		compatible = "atmel,at91sam9g45-isi";
++		reg = <0xf0034000 0x4000>;
++		interrupts = <37 IRQ_TYPE_LEVEL_HIGH 5>;
++
++		clocks = <&isi_clk>;
++		clock-names = "isi_clk";
++
++		pinctrl-names = "default";
++		pinctrl-0 = <&pinctrl_isi>;
++
++		port {
++			#address-cells = <1>;
++			#size-cells = <0>;
++
++			isi_0: endpoint {
++				remote-endpoint = <&ov2640_0>;
++				bus-width = <8>;
++			};
++		};
++	};
++
++	i2c1: i2c at f0018000 {
++		ov2640: camera at 0x30 {
++			compatible = "omnivision,ov2640";
++			reg = <0x30>;
++
++			port {
++				ov2640_0: endpoint {
++					remote-endpoint = <&isi_0>;
++					bus-width = <8>;
++				};
++			};
++		};
++	};
+diff --git a/drivers/media/platform/soc_camera/atmel-isi.c b/drivers/media/platform/soc_camera/atmel-isi.c
+index 74af560..ca4e43e 100644
+--- a/drivers/media/platform/soc_camera/atmel-isi.c
++++ b/drivers/media/platform/soc_camera/atmel-isi.c
+@@ -25,6 +25,7 @@
+ #include <media/atmel-isi.h>
+ #include <media/soc_camera.h>
+ #include <media/soc_mediabus.h>
++#include <media/v4l2-of.h>
+ #include <media/videobuf2-dma-contig.h>
  
--static inline bool is_request_line_unset(struct dw_dma_chan *dwc)
--{
--	return dwc->request_line == (typeof(dwc->request_line))~0;
--}
--
--static inline void dwc_set_masters(struct dw_dma_chan *dwc)
--{
--	struct dw_dma *dw = to_dw_dma(dwc->chan.device);
--	struct dw_dma_slave *dws = dwc->chan.private;
--	unsigned char mmax = dw->nr_masters - 1;
--
--	if (!is_request_line_unset(dwc))
--		return;
--
--	dwc->src_master = min_t(unsigned char, mmax, dwc_get_sms(dws));
--	dwc->dst_master = min_t(unsigned char, mmax, dwc_get_dms(dws));
--}
--
- #define DWC_DEFAULT_CTLLO(_chan) ({				\
- 		struct dw_dma_chan *_dwc = to_dw_dma_chan(_chan);	\
- 		struct dma_slave_config	*_sconfig = &_dwc->dma_sconfig;	\
-@@ -967,10 +949,6 @@ set_runtime_config(struct dma_chan *chan, struct dma_slave_config *sconfig)
- 	memcpy(&dwc->dma_sconfig, sconfig, sizeof(*sconfig));
- 	dwc->direction = sconfig->direction;
+ #define MAX_BUFFER_NUM			32
+@@ -33,6 +34,7 @@
+ #define VID_LIMIT_BYTES			(16 * 1024 * 1024)
+ #define MIN_FRAME_RATE			15
+ #define FRAME_INTERVAL_MILLI_SEC	(1000 / MIN_FRAME_RATE)
++#define ISI_DEFAULT_MCLK_FREQ		25000000
  
--	/* Take the request line from slave_id member */
--	if (is_request_line_unset(dwc))
--		dwc->request_line = sconfig->slave_id;
--
- 	convert_burst(&dwc->dma_sconfig.src_maxburst);
- 	convert_burst(&dwc->dma_sconfig.dst_maxburst);
+ /* Frame buffer descriptor */
+ struct fbd {
+@@ -883,6 +885,50 @@ static int atmel_isi_remove(struct platform_device *pdev)
+ 	return 0;
+ }
  
-@@ -1123,8 +1101,6 @@ static int dwc_alloc_chan_resources(struct dma_chan *chan)
- 	 * doesn't mean what you think it means), and status writeback.
- 	 */
++static int atmel_isi_probe_dt(struct atmel_isi *isi,
++			struct platform_device *pdev)
++{
++	struct device_node *np= pdev->dev.of_node;
++	struct v4l2_of_endpoint ep;
++	int err;
++
++	/* Default settings for ISI */
++	isi->pdata.full_mode = 1;
++	isi->pdata.mck_hz = ISI_DEFAULT_MCLK_FREQ;
++	isi->pdata.frate = ISI_CFG1_FRATE_CAPTURE_ALL;
++
++	np = of_graph_get_next_endpoint(np, NULL);
++	if (!np) {
++		dev_err(&pdev->dev, "Could not find the endpoint\n");
++		return -EINVAL;
++	}
++
++	err = v4l2_of_parse_endpoint(np, &ep);
++	if (err) {
++		dev_err(&pdev->dev, "Could not parse the endpoint\n");
++		goto err_probe_dt;
++	}
++
++	switch (ep.bus.parallel.bus_width) {
++	case 8:
++		isi->pdata.data_width_flags = ISI_DATAWIDTH_8;
++		break;
++	case 10:
++		isi->pdata.data_width_flags = ISI_DATAWIDTH_10;
++		break;
++	default:
++		dev_err(&pdev->dev, "Not supported bus width: %d\n",
++				ep.bus.parallel.bus_width);
++		err = -EINVAL;
++		goto err_probe_dt;
++	}
++
++err_probe_dt:
++	of_node_put(np);
++
++	return err;
++}
++
+ static int atmel_isi_probe(struct platform_device *pdev)
+ {
+ 	unsigned int irq;
+@@ -894,7 +940,7 @@ static int atmel_isi_probe(struct platform_device *pdev)
+ 	struct isi_platform_data *pdata;
  
--	dwc_set_masters(dwc);
--
- 	spin_lock_irqsave(&dwc->lock, flags);
- 	i = dwc->descs_allocated;
- 	while (dwc->descs_allocated < NR_DESCS_PER_CHANNEL) {
-
-	Arnd
+ 	pdata = dev->platform_data;
+-	if (!pdata || !pdata->data_width_flags) {
++	if ((!pdata || !pdata->data_width_flags) && !pdev->dev.of_node) {
+ 		dev_err(&pdev->dev,
+ 			"No config available for Atmel ISI\n");
+ 		return -EINVAL;
+@@ -910,7 +956,14 @@ static int atmel_isi_probe(struct platform_device *pdev)
+ 	if (IS_ERR(isi->pclk))
+ 		return PTR_ERR(isi->pclk);
+ 
+-	memcpy(&isi->pdata, pdata, sizeof(isi->pdata));
++	if (pdata) {
++		memcpy(&isi->pdata, pdata, sizeof(isi->pdata));
++	} else {
++		ret = atmel_isi_probe_dt(isi, pdev);
++		if (ret)
++			return ret;
++	}
++
+ 	isi->active = NULL;
+ 	spin_lock_init(&isi->lock);
+ 	INIT_LIST_HEAD(&isi->video_buffer_list);
+@@ -1012,11 +1065,18 @@ err_alloc_ctx:
+ 	return ret;
+ }
+ 
++static const struct of_device_id atmel_isi_of_match[] = {
++	{ .compatible = "atmel,at91sam9g45-isi" },
++	{ }
++};
++MODULE_DEVICE_TABLE(of, atmel_isi_of_match);
++
+ static struct platform_driver atmel_isi_driver = {
+ 	.remove		= atmel_isi_remove,
+ 	.driver		= {
+ 		.name = "atmel_isi",
+ 		.owner = THIS_MODULE,
++		.of_match_table = atmel_isi_of_match,
+ 	},
+ };
+ 
+-- 
+1.9.1
