@@ -1,407 +1,369 @@
-From: vikas.sajjan@samsung.com (Vikas Sajjan)
-Date: Fri, 25 Jul 2014 10:50:03 +0545
-Subject: [PATCH v6 2/4] ARM: EXYNOS: Refactor the code to use DT based
- lookup
-In-Reply-To: <061a01cfa7af$1a36fb40$4ea4f1c0$@samsung.com>
-References: <1404738090-30522-1-git-send-email-vikas.sajjan@samsung.com>
- <061a01cfa7af$1a36fb40$4ea4f1c0$@samsung.com>
-Message-ID: <CAGm_ybjSsMKHpbJw33M4sYcqv+K7jdo1=G=-QxwctiHV=JR3Ng@mail.gmail.com>
+From: kgene.kim@samsung.com (Kukjin Kim)
+Date: Fri, 25 Jul 2014 14:28:02 +0900
+Subject: [PATCH v2 1/4] ARM: dts: exynos5250: max77686 is Snow only
+In-Reply-To: <1405704009-8430-2-git-send-email-afaerber@suse.de>
+References: <1405704009-8430-1-git-send-email-afaerber@suse.de>
+ <1405704009-8430-2-git-send-email-afaerber@suse.de>
+Message-ID: <08fe01cfa7c9$341cc700$9c565500$@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Kukjin,
+Andreas F?rber wrote:
+> 
+> Move it from exynos5250-cros-common.dtsi to exynos5250-snow.dts.
+> Spring does not need it, it uses an s5m8767 instead.
+> 
+> Signed-off-by: Andreas F?rber <afaerber@suse.de>
+> ---
 
-On Fri, Jul 25, 2014 at 8:06 AM, Kukjin Kim <kgene.kim@samsung.com> wrote:
-> Vikas Sajjan wrote:
->>
->> Refactoring the pm.c to avoid using "soc_is_exynos" checks,
->> instead use the DT based lookup.
->>
-> Yes! please.
->
-> Can you please make a separate patch from this series?
->
- Sure, will respin this patch separating from this series.
+Hi Andreas,
 
-> And see my small comments inline...
->
->> While at it, consolidate the common code across SoCs
->> and create a static helper functions.
->>
->> Signed-off-by: Vikas Sajjan <vikas.sajjan@samsung.com>
->> ---
->>  arch/arm/mach-exynos/pm.c       |  232 +++++++++++++++++++++++++++++++--------
->>  arch/arm/mach-exynos/regs-pmu.h |    1 +
->>  2 files changed, 189 insertions(+), 44 deletions(-)
->>
->> diff --git a/arch/arm/mach-exynos/pm.c b/arch/arm/mach-exynos/pm.c
->> index ba75171..c0dae28 100644
->> --- a/arch/arm/mach-exynos/pm.c
->> +++ b/arch/arm/mach-exynos/pm.c
->> @@ -38,6 +38,8 @@
->>  #include "regs-pmu.h"
->>  #include "regs-sys.h"
->>
->> +#define REG_TABLE_END (-1U)
->> +
->>  /**
->>   * struct exynos_wkup_irq - Exynos GIC to PMU IRQ mapping
->>   * @hwirq: Hardware IRQ signal of the GIC
->> @@ -61,6 +63,19 @@ static struct sleep_save exynos_core_save[] = {
->>       SAVE_ITEM(S5P_SROM_BC3),
->>  };
->>
->> +struct exynos_pm_data {
->> +     const struct exynos_wkup_irq *wkup_irq;
->> +     unsigned int wake_disable_mask;
->> +     unsigned int *release_ret_regs;
->> +
->> +     void (*pm_prepare)(void);
->> +     void (*pm_resume)(void);
->> +     int (*pm_suspend)(void);
->> +     int (*cpu_suspend)(unsigned long);
->> +};
->> +
->> +struct exynos_pm_data *pm_data;
->> +
->>  /*
->>   * GIC wake-up support
->>   */
->> @@ -89,14 +104,21 @@ static inline u32 pmu_raw_readl(u32 offset)
->>       return __raw_readl(pmu_base_addr + offset);
->>  }
->>
->> +unsigned int exynos_release_ret_regs[] = {
->> +     S5P_PAD_RET_MAUDIO_OPTION,
->> +     S5P_PAD_RET_GPIO_OPTION,
->> +     S5P_PAD_RET_UART_OPTION,
->> +     S5P_PAD_RET_MMCA_OPTION,
->> +     S5P_PAD_RET_MMCB_OPTION,
->> +     S5P_PAD_RET_EBIA_OPTION,
->> +     S5P_PAD_RET_EBIB_OPTION,
->> +     REG_TABLE_END,
->> +};
->> +
->>  static int exynos_irq_set_wake(struct irq_data *data, unsigned int state)
->>  {
->>       const struct exynos_wkup_irq *wkup_irq;
->> -
->> -     if (soc_is_exynos5250())
->> -             wkup_irq = exynos5250_wkup_irq;
->> -     else
->> -             wkup_irq = exynos4_wkup_irq;
->> +     wkup_irq = pm_data->wkup_irq;
->
-> if (pm_data->wkup_irq) ?
+I think this should be reviewed by chrome guys.
 
-sure, will add the check.
 
->
->>
->>       while (wkup_irq->mask) {
->>               if (wkup_irq->hwirq == data->hwirq) {
->> @@ -253,13 +275,13 @@ static void exynos_cpu_restore_register(void)
->>
->>  static int exynos_cpu_suspend(unsigned long arg)
->>  {
->> -#ifdef CONFIG_CACHE_L2X0
->> -     outer_flush_all();
->> -#endif
->> -
->> -     if (soc_is_exynos5250())
->> -             flush_cache_all();
->> +     if (pm_data->cpu_suspend)
->> +             return pm_data->cpu_suspend(arg);
->> +     return -1;
->> +}
->>
->> +static int exynos_cpu_do_idle(void)
->> +{
->>       /* issue the standby signal into the pm unit. */
->>       cpu_do_idle();
->>
->> @@ -269,32 +291,73 @@ static int exynos_cpu_suspend(unsigned long arg)
->>
->>  static void exynos_pm_prepare(void)
->>  {
->> -     unsigned int tmp;
->> +     if (pm_data->pm_prepare)
->> +             pm_data->pm_prepare();
->> +}
->> +
->> +static int exynos4_cpu_suspend(unsigned long arg)
->> +{
->> +#ifdef CONFIG_CACHE_L2X0
->> +     outer_flush_all();
->> +#endif
->> +     return exynos_cpu_do_idle();
->> +}
->> +
->> +static int exynos5250_cpu_suspend(unsigned long arg)
->> +{
->> +#ifdef CONFIG_CACHE_L2X0
->> +     outer_flush_all();
->> +#endif
->> +     flush_cache_all();
->> +     return exynos_cpu_do_idle();
->> +}
->>
->> +static void exynos_pm_set_wakeup_mask(void)
->> +{
->>       /* Set wake-up mask registers */
->>       pmu_raw_writel(exynos_get_eint_wake_mask(), S5P_EINT_WAKEUP_MASK);
->>       pmu_raw_writel(exynos_irqwake_intmask & ~(1 << 31), S5P_WAKEUP_MASK);
->> +}
->>
->> -     s3c_pm_do_save(exynos_core_save, ARRAY_SIZE(exynos_core_save));
->> -
->> -     if (soc_is_exynos5250()) {
->> -             s3c_pm_do_save(exynos5_sys_save, ARRAY_SIZE(exynos5_sys_save));
->> -             /* Disable USE_RETENTION of JPEG_MEM_OPTION */
->> -             tmp = pmu_raw_readl(EXYNOS5_JPEG_MEM_OPTION);
->> -             tmp &= ~EXYNOS5_OPTION_USE_RETENTION;
->> -             pmu_raw_writel(tmp, EXYNOS5_JPEG_MEM_OPTION);
->> -     }
->> -
->> +static void exynos_pm_enter_sleep_mode(void)
->> +{
->>       /* Set value of power down register for sleep mode */
->> -
->>       exynos_sys_powerdown_conf(SYS_SLEEP);
->>       pmu_raw_writel(S5P_CHECK_SLEEP, S5P_INFORM1);
->>
->>       /* ensure at least INFORM0 has the resume address */
->> -
->>       pmu_raw_writel(virt_to_phys(exynos_cpu_resume), S5P_INFORM0);
->>  }
->>
->> +static void exynos5250_pm_prepare(void)
->> +{
->> +     unsigned int tmp;
->> +
->> +     /* Set wake-up mask registers */
->> +     exynos_pm_set_wakeup_mask();
->> +
->> +     s3c_pm_do_save(exynos_core_save, ARRAY_SIZE(exynos_core_save));
->> +
->> +     s3c_pm_do_save(exynos5_sys_save, ARRAY_SIZE(exynos5_sys_save));
->> +
->> +     /* Disable USE_RETENTION of JPEG_MEM_OPTION */
->> +     tmp = pmu_raw_readl(EXYNOS5_JPEG_MEM_OPTION);
->> +     tmp &= ~EXYNOS5_OPTION_USE_RETENTION;
->> +     pmu_raw_writel(tmp, EXYNOS5_JPEG_MEM_OPTION);
->> +
->> +     exynos_pm_enter_sleep_mode();
->> +}
->> +
->> +static void exynos4_pm_prepare(void)
->> +{
->> +     /* Set wake-up mask registers */
->> +     exynos_pm_set_wakeup_mask();
->> +
->> +     s3c_pm_do_save(exynos_core_save, ARRAY_SIZE(exynos_core_save));
->> +
->> +     exynos_pm_enter_sleep_mode();
->> +}
->> +
->>  static void exynos_pm_central_suspend(void)
->>  {
->>       unsigned long tmp;
->> @@ -307,6 +370,13 @@ static void exynos_pm_central_suspend(void)
->>
->>  static int exynos_pm_suspend(void)
->>  {
->> +     if (pm_data->pm_suspend)
->> +             return pm_data->pm_suspend();
->> +     return -1;
->> +}
->> +
->> +static int exynos4_pm_suspend(void)
->> +{
->>       unsigned long tmp;
->>
->>       exynos_pm_central_suspend();
->> @@ -316,9 +386,20 @@ static int exynos_pm_suspend(void)
->>       tmp = (S5P_USE_STANDBY_WFI0 | S5P_USE_STANDBY_WFE0);
->>       pmu_raw_writel(tmp, S5P_CENTRAL_SEQ_OPTION);
->>
->> -     if (read_cpuid_part_number() == ARM_CPU_PART_CORTEX_A9)
->> -             exynos_cpu_save_register();
->> +     exynos_cpu_save_register();
->> +     return 0;
->> +}
->> +
->> +static int exynos5250_pm_suspend(void)
->> +{
->> +     unsigned long tmp;
->> +
->> +     exynos_pm_central_suspend();
->> +
->> +     /* Setting SEQ_OPTION register */
->>
->> +     tmp = (S5P_USE_STANDBY_WFI0 | S5P_USE_STANDBY_WFE0);
->> +     pmu_raw_writel(tmp, S5P_CENTRAL_SEQ_OPTION);
->>       return 0;
->>  }
->>
->> @@ -345,39 +426,57 @@ static int exynos_pm_central_resume(void)
->>       return 0;
->>  }
->>
->> +static void exynos_pm_set_release_retention(void)
->> +{
->> +     unsigned int i;
->> +
->> +     for (i = 0; (pm_data->release_ret_regs[i] != REG_TABLE_END); i++)
->> +             pmu_raw_writel(EXYNOS_WAKEUP_FROM_LOWPWR,
->> +                             pm_data->release_ret_regs[i]);
->> +}
->> +
->>  static void exynos_pm_resume(void)
->>  {
->> +     if (pm_data->pm_resume)
->> +             pm_data->pm_resume();
->> +}
->> +
->> +static void exynos4_pm_resume(void)
->> +{
->>       if (exynos_pm_central_resume())
->>               goto early_wakeup;
->>
->> -     if (read_cpuid_part_number() == ARM_CPU_PART_CORTEX_A9)
->> -             exynos_cpu_restore_register();
->> +     exynos_cpu_restore_register();
->>
->>       /* For release retention */
->> -
->> -     pmu_raw_writel((1 << 28), S5P_PAD_RET_MAUDIO_OPTION);
->> -     pmu_raw_writel((1 << 28), S5P_PAD_RET_GPIO_OPTION);
->> -     pmu_raw_writel((1 << 28), S5P_PAD_RET_UART_OPTION);
->> -     pmu_raw_writel((1 << 28), S5P_PAD_RET_MMCA_OPTION);
->> -     pmu_raw_writel((1 << 28), S5P_PAD_RET_MMCB_OPTION);
->> -     pmu_raw_writel((1 << 28), S5P_PAD_RET_EBIA_OPTION);
->> -     pmu_raw_writel((1 << 28), S5P_PAD_RET_EBIB_OPTION);
->> -
->> -     if (soc_is_exynos5250())
->> -             s3c_pm_do_restore(exynos5_sys_save,
->> -                     ARRAY_SIZE(exynos5_sys_save));
->> +     exynos_pm_set_release_retention();
->>
->>       s3c_pm_do_restore_core(exynos_core_save, ARRAY_SIZE(exynos_core_save));
->>
->> -     if (read_cpuid_part_number() == ARM_CPU_PART_CORTEX_A9)
->> -             scu_enable(S5P_VA_SCU);
->> +     scu_enable(S5P_VA_SCU);
->>
->>  early_wakeup:
->>
->>       /* Clear SLEEP mode set in INFORM1 */
->>       pmu_raw_writel(0x0, S5P_INFORM1);
->> +}
->> +
->> +static void exynos5250_pm_resume(void)
->> +{
->> +     if (exynos_pm_central_resume())
->> +             goto early_wakeup;
->>
->> -     return;
->> +     /* For release retention */
->> +     exynos_pm_set_release_retention();
->> +
->> +     s3c_pm_do_restore(exynos5_sys_save, ARRAY_SIZE(exynos5_sys_save));
->> +
->> +     s3c_pm_do_restore_core(exynos_core_save, ARRAY_SIZE(exynos_core_save));
->> +
->> +early_wakeup:
->> +
->> +     /* Clear SLEEP mode set in INFORM1 */
->> +     pmu_raw_writel(0x0, S5P_INFORM1);
->>  }
->>
->>  static struct syscore_ops exynos_pm_syscore_ops = {
->> @@ -480,18 +579,63 @@ static struct notifier_block exynos_cpu_pm_notifier_block = {
->>       .notifier_call = exynos_cpu_pm_notifier,
->>  };
->>
->> +static struct exynos_pm_data exynos4_pm_data = {
->> +     .wkup_irq       = exynos4_wkup_irq,
->> +     .wake_disable_mask = ((0xFF << 8) | (0x1F << 1)),
->> +     .release_ret_regs = exynos_release_ret_regs,
->> +     .pm_suspend     = exynos4_pm_suspend,
->> +     .pm_resume      = exynos4_pm_resume,
->> +     .pm_prepare     = exynos4_pm_prepare,
->> +     .cpu_suspend    = exynos4_cpu_suspend,
->> +};
->> +
->> +static struct exynos_pm_data exynos5250_pm_data = {
->> +     .wkup_irq       = exynos5250_wkup_irq,
->> +     .wake_disable_mask = ((0xFF << 8) | (0x1F << 1)),
->> +     .release_ret_regs = exynos_release_ret_regs,
->> +     .pm_suspend     = exynos5250_pm_suspend,
->> +     .pm_resume      = exynos5250_pm_resume,
->> +     .pm_prepare     = exynos5250_pm_prepare,
->> +     .cpu_suspend    = exynos5250_cpu_suspend,
->> +};
->> +
->> +static struct of_device_id exynos_pmu_of_device_ids[] = {
->> +     {
->> +             .compatible = "samsung,exynos4210-pmu",
->> +             .data = (void *)&exynos4_pm_data,
->> +     }, {
->> +             .compatible = "samsung,exynos4212-pmu",
->> +             .data = (void *)&exynos4_pm_data,
->> +     }, {
->> +             .compatible = "samsung,exynos4412-pmu",
->> +             .data = (void *)&exynos4_pm_data,
->> +     }, {
->> +             .compatible = "samsung,exynos5250-pmu",
->> +             .data = (void *)&exynos5250_pm_data,
->> +     },
->> +     { /*sentinel*/ },
->> +};
->> +
->>  void __init exynos_pm_init(void)
->>  {
->>       u32 tmp;
->> +     const struct of_device_id *match;
->>
->>       cpu_pm_register_notifier(&exynos_cpu_pm_notifier_block);
->>
->> +     of_find_matching_node_and_match(NULL, exynos_pmu_of_device_ids, &match);
->> +
->> +     if (!match)
->> +             panic("Failed to find PMU node\n");
->
-> Well, panic() is really required at this point? How about 5260, 5410, 5440 ?
+Doug, can you have a look this series for exynos5250-chromebook?
+I'm not sure exynos5250-cros-common is still useful for exynos5250-spring...
 
-Right, i shall remove panic, will return if PMU node NOT found.
+- Kukjin
 
->
->> +
->> +     pm_data = (struct exynos_pm_data *) match->data;
->> +
->>       /* Platform-specific GIC callback */
->>       gic_arch_extn.irq_set_wake = exynos_irq_set_wake;
->>
->>       /* All wakeup disable */
->>       tmp = pmu_raw_readl(S5P_WAKEUP_MASK);
->> -     tmp |= ((0xFF << 8) | (0x1F << 1));
->> +     tmp |= pm_data->wake_disable_mask;
->>       pmu_raw_writel(tmp, S5P_WAKEUP_MASK);
->>
->>       register_syscore_ops(&exynos_pm_syscore_ops);
->> diff --git a/arch/arm/mach-exynos/regs-pmu.h b/arch/arm/mach-exynos/regs-pmu.h
->> index 9b46a52..3a6a559 100644
->> --- a/arch/arm/mach-exynos/regs-pmu.h
->> +++ b/arch/arm/mach-exynos/regs-pmu.h
->> @@ -21,6 +21,7 @@
->>  #define S5P_USE_STANDBY_WFI0                 (1 << 16)
->>  #define S5P_USE_STANDBY_WFE0                 (1 << 24)
->>
->> +#define EXYNOS_WAKEUP_FROM_LOWPWR            (1 << 28)
->>  #define EXYNOS_SWRESET                               0x0400
->>  #define EXYNOS5440_SWRESET                   0x00C4
->>
->> --
->> 1.7.9.5
->
+>  v2: New (Doug Anderson)
+> 
+>  arch/arm/boot/dts/exynos5250-cros-common.dtsi | 151 -------------------------
+>  arch/arm/boot/dts/exynos5250-snow.dts         | 155 ++++++++++++++++++++++++++
+>  2 files changed, 155 insertions(+), 151 deletions(-)
+> 
+> diff --git a/arch/arm/boot/dts/exynos5250-cros-common.dtsi b/arch/arm/boot/dts/exynos5250-cros-
+> common.dtsi
+> index 89ac90f..61128d1 100644
+> --- a/arch/arm/boot/dts/exynos5250-cros-common.dtsi
+> +++ b/arch/arm/boot/dts/exynos5250-cros-common.dtsi
+> @@ -27,163 +27,12 @@
+>  		i2c2_bus: i2c2-bus {
+>  			samsung,pin-pud = <0>;
+>  		};
+> -
+> -		max77686_irq: max77686-irq {
+> -			samsung,pins = "gpx3-2";
+> -			samsung,pin-function = <0>;
+> -			samsung,pin-pud = <0>;
+> -			samsung,pin-drv = <0>;
+> -		};
+>  	};
+> 
+>  	i2c at 12C60000 {
+>  		status = "okay";
+>  		samsung,i2c-sda-delay = <100>;
+>  		samsung,i2c-max-bus-freq = <378000>;
+> -
+> -		max77686 at 09 {
+> -			compatible = "maxim,max77686";
+> -			interrupt-parent = <&gpx3>;
+> -			interrupts = <2 0>;
+> -			pinctrl-names = "default";
+> -			pinctrl-0 = <&max77686_irq>;
+> -			wakeup-source;
+> -			reg = <0x09>;
+> -			#clock-cells = <1>;
+> -
+> -			voltage-regulators {
+> -				ldo1_reg: LDO1 {
+> -					regulator-name = "P1.0V_LDO_OUT1";
+> -					regulator-min-microvolt = <1000000>;
+> -					regulator-max-microvolt = <1000000>;
+> -					regulator-always-on;
+> -				};
+> -
+> -				ldo2_reg: LDO2 {
+> -					regulator-name = "P1.8V_LDO_OUT2";
+> -					regulator-min-microvolt = <1800000>;
+> -					regulator-max-microvolt = <1800000>;
+> -					regulator-always-on;
+> -				};
+> -
+> -				ldo3_reg: LDO3 {
+> -					regulator-name = "P1.8V_LDO_OUT3";
+> -					regulator-min-microvolt = <1800000>;
+> -					regulator-max-microvolt = <1800000>;
+> -					regulator-always-on;
+> -				};
+> -
+> -				ldo7_reg: LDO7 {
+> -					regulator-name = "P1.1V_LDO_OUT7";
+> -					regulator-min-microvolt = <1100000>;
+> -					regulator-max-microvolt = <1100000>;
+> -					regulator-always-on;
+> -				};
+> -
+> -				ldo8_reg: LDO8 {
+> -					regulator-name = "P1.0V_LDO_OUT8";
+> -					regulator-min-microvolt = <1000000>;
+> -					regulator-max-microvolt = <1000000>;
+> -					regulator-always-on;
+> -				};
+> -
+> -				ldo10_reg: LDO10 {
+> -					regulator-name = "P1.8V_LDO_OUT10";
+> -					regulator-min-microvolt = <1800000>;
+> -					regulator-max-microvolt = <1800000>;
+> -					regulator-always-on;
+> -				};
+> -
+> -				ldo12_reg: LDO12 {
+> -					regulator-name = "P3.0V_LDO_OUT12";
+> -					regulator-min-microvolt = <3000000>;
+> -					regulator-max-microvolt = <3000000>;
+> -					regulator-always-on;
+> -				};
+> -
+> -				ldo14_reg: LDO14 {
+> -					regulator-name = "P1.8V_LDO_OUT14";
+> -					regulator-min-microvolt = <1800000>;
+> -					regulator-max-microvolt = <1800000>;
+> -					regulator-always-on;
+> -				};
+> -
+> -				ldo15_reg: LDO15 {
+> -					regulator-name = "P1.0V_LDO_OUT15";
+> -					regulator-min-microvolt = <1000000>;
+> -					regulator-max-microvolt = <1000000>;
+> -					regulator-always-on;
+> -				};
+> -
+> -				ldo16_reg: LDO16 {
+> -					regulator-name = "P1.8V_LDO_OUT16";
+> -					regulator-min-microvolt = <1800000>;
+> -					regulator-max-microvolt = <1800000>;
+> -					regulator-always-on;
+> -				};
+> -
+> -				buck1_reg: BUCK1 {
+> -					regulator-name = "vdd_mif";
+> -					regulator-min-microvolt = <950000>;
+> -					regulator-max-microvolt = <1300000>;
+> -					regulator-always-on;
+> -					regulator-boot-on;
+> -				};
+> -
+> -				buck2_reg: BUCK2 {
+> -					regulator-name = "vdd_arm";
+> -					regulator-min-microvolt = <850000>;
+> -					regulator-max-microvolt = <1350000>;
+> -					regulator-always-on;
+> -					regulator-boot-on;
+> -				};
+> -
+> -				buck3_reg: BUCK3 {
+> -					regulator-name = "vdd_int";
+> -					regulator-min-microvolt = <900000>;
+> -					regulator-max-microvolt = <1200000>;
+> -					regulator-always-on;
+> -					regulator-boot-on;
+> -				};
+> -
+> -				buck4_reg: BUCK4 {
+> -					regulator-name = "vdd_g3d";
+> -					regulator-min-microvolt = <850000>;
+> -					regulator-max-microvolt = <1300000>;
+> -					regulator-always-on;
+> -					regulator-boot-on;
+> -				};
+> -
+> -				buck5_reg: BUCK5 {
+> -					regulator-name = "P1.8V_BUCK_OUT5";
+> -					regulator-min-microvolt = <1800000>;
+> -					regulator-max-microvolt = <1800000>;
+> -					regulator-always-on;
+> -					regulator-boot-on;
+> -				};
+> -
+> -				buck6_reg: BUCK6 {
+> -					regulator-name = "P1.35V_BUCK_OUT6";
+> -					regulator-min-microvolt = <1350000>;
+> -					regulator-max-microvolt = <1350000>;
+> -					regulator-always-on;
+> -				};
+> -
+> -				buck7_reg: BUCK7 {
+> -					regulator-name = "P2.0V_BUCK_OUT7";
+> -					regulator-min-microvolt = <2000000>;
+> -					regulator-max-microvolt = <2000000>;
+> -					regulator-always-on;
+> -				};
+> -
+> -				buck8_reg: BUCK8 {
+> -					regulator-name = "P2.85V_BUCK_OUT8";
+> -					regulator-min-microvolt = <2850000>;
+> -					regulator-max-microvolt = <2850000>;
+> -					regulator-always-on;
+> -				};
+> -			};
+> -		};
+>  	};
+> 
+>  	i2c at 12C70000 {
+> diff --git a/arch/arm/boot/dts/exynos5250-snow.dts b/arch/arm/boot/dts/exynos5250-snow.dts
+> index c682c88..0f867a3 100644
+> --- a/arch/arm/boot/dts/exynos5250-snow.dts
+> +++ b/arch/arm/boot/dts/exynos5250-snow.dts
+> @@ -344,4 +344,159 @@
+>  	};
+>  };
+> 
+> +&i2c_0 {
+> +	max77686 at 09 {
+> +		compatible = "maxim,max77686";
+> +		interrupt-parent = <&gpx3>;
+> +		interrupts = <2 0>;
+> +		pinctrl-names = "default";
+> +		pinctrl-0 = <&max77686_irq>;
+> +		wakeup-source;
+> +		reg = <0x09>;
+> +		#clock-cells = <1>;
+> +
+> +		voltage-regulators {
+> +			ldo1_reg: LDO1 {
+> +				regulator-name = "P1.0V_LDO_OUT1";
+> +				regulator-min-microvolt = <1000000>;
+> +				regulator-max-microvolt = <1000000>;
+> +				regulator-always-on;
+> +			};
+> +
+> +			ldo2_reg: LDO2 {
+> +				regulator-name = "P1.8V_LDO_OUT2";
+> +				regulator-min-microvolt = <1800000>;
+> +				regulator-max-microvolt = <1800000>;
+> +				regulator-always-on;
+> +			};
+> +
+> +			ldo3_reg: LDO3 {
+> +				regulator-name = "P1.8V_LDO_OUT3";
+> +				regulator-min-microvolt = <1800000>;
+> +				regulator-max-microvolt = <1800000>;
+> +				regulator-always-on;
+> +			};
+> +
+> +			ldo7_reg: LDO7 {
+> +				regulator-name = "P1.1V_LDO_OUT7";
+> +				regulator-min-microvolt = <1100000>;
+> +				regulator-max-microvolt = <1100000>;
+> +				regulator-always-on;
+> +			};
+> +
+> +			ldo8_reg: LDO8 {
+> +				regulator-name = "P1.0V_LDO_OUT8";
+> +				regulator-min-microvolt = <1000000>;
+> +				regulator-max-microvolt = <1000000>;
+> +				regulator-always-on;
+> +			};
+> +
+> +			ldo10_reg: LDO10 {
+> +				regulator-name = "P1.8V_LDO_OUT10";
+> +				regulator-min-microvolt = <1800000>;
+> +				regulator-max-microvolt = <1800000>;
+> +				regulator-always-on;
+> +			};
+> +
+> +			ldo12_reg: LDO12 {
+> +				regulator-name = "P3.0V_LDO_OUT12";
+> +				regulator-min-microvolt = <3000000>;
+> +				regulator-max-microvolt = <3000000>;
+> +				regulator-always-on;
+> +			};
+> +
+> +			ldo14_reg: LDO14 {
+> +				regulator-name = "P1.8V_LDO_OUT14";
+> +				regulator-min-microvolt = <1800000>;
+> +				regulator-max-microvolt = <1800000>;
+> +				regulator-always-on;
+> +			};
+> +
+> +			ldo15_reg: LDO15 {
+> +				regulator-name = "P1.0V_LDO_OUT15";
+> +				regulator-min-microvolt = <1000000>;
+> +				regulator-max-microvolt = <1000000>;
+> +				regulator-always-on;
+> +			};
+> +
+> +			ldo16_reg: LDO16 {
+> +				regulator-name = "P1.8V_LDO_OUT16";
+> +				regulator-min-microvolt = <1800000>;
+> +				regulator-max-microvolt = <1800000>;
+> +				regulator-always-on;
+> +			};
+> +
+> +			buck1_reg: BUCK1 {
+> +				regulator-name = "vdd_mif";
+> +				regulator-min-microvolt = <950000>;
+> +				regulator-max-microvolt = <1300000>;
+> +				regulator-always-on;
+> +				regulator-boot-on;
+> +			};
+> +
+> +			buck2_reg: BUCK2 {
+> +				regulator-name = "vdd_arm";
+> +				regulator-min-microvolt = <850000>;
+> +				regulator-max-microvolt = <1350000>;
+> +				regulator-always-on;
+> +				regulator-boot-on;
+> +			};
+> +
+> +			buck3_reg: BUCK3 {
+> +				regulator-name = "vdd_int";
+> +				regulator-min-microvolt = <900000>;
+> +				regulator-max-microvolt = <1200000>;
+> +				regulator-always-on;
+> +				regulator-boot-on;
+> +			};
+> +
+> +			buck4_reg: BUCK4 {
+> +				regulator-name = "vdd_g3d";
+> +				regulator-min-microvolt = <850000>;
+> +				regulator-max-microvolt = <1300000>;
+> +				regulator-always-on;
+> +				regulator-boot-on;
+> +			};
+> +
+> +			buck5_reg: BUCK5 {
+> +				regulator-name = "P1.8V_BUCK_OUT5";
+> +				regulator-min-microvolt = <1800000>;
+> +				regulator-max-microvolt = <1800000>;
+> +				regulator-always-on;
+> +				regulator-boot-on;
+> +			};
+> +
+> +			buck6_reg: BUCK6 {
+> +				regulator-name = "P1.35V_BUCK_OUT6";
+> +				regulator-min-microvolt = <1350000>;
+> +				regulator-max-microvolt = <1350000>;
+> +				regulator-always-on;
+> +			};
+> +
+> +			buck7_reg: BUCK7 {
+> +				regulator-name = "P2.0V_BUCK_OUT7";
+> +				regulator-min-microvolt = <2000000>;
+> +				regulator-max-microvolt = <2000000>;
+> +				regulator-always-on;
+> +			};
+> +
+> +			buck8_reg: BUCK8 {
+> +				regulator-name = "P2.85V_BUCK_OUT8";
+> +				regulator-min-microvolt = <2850000>;
+> +				regulator-max-microvolt = <2850000>;
+> +				regulator-always-on;
+> +			};
+> +		};
+> +	};
+> +};
+> +
+> +&pinctrl_0 {
+> +	max77686_irq: max77686-irq {
+> +		samsung,pins = "gpx3-2";
+> +		samsung,pin-function = <0>;
+> +		samsung,pin-pud = <0>;
+> +		samsung,pin-drv = <0>;
+> +	};
+> +};
+> +
+>  #include "cros-ec-keyboard.dtsi"
+> --
+> 1.9.3
