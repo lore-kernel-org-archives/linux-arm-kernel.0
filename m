@@ -1,103 +1,96 @@
-From: jason@lakedaemon.net (Jason Cooper)
-Date: Thu, 24 Jul 2014 20:05:54 -0400
-Subject: [PATCHv3 00/16] cpuidle for Marvell Armada 370 and 38x
-In-Reply-To: <20140724120349.GT23220@titan.lakedaemon.net>
-References: <1406120453-29291-1-git-send-email-thomas.petazzoni@free-electrons.com>
- <20140724120349.GT23220@titan.lakedaemon.net>
-Message-ID: <20140725000554.GA23220@titan.lakedaemon.net>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Fri, 25 Jul 2014 01:06:22 +0100
+Subject: [PATCH v2 2/3] ARM: remove remaining definitions of
+ PLAT_PHYS_OFFSET from <mach/memory.h>
+In-Reply-To: <1404717185-10010-1-git-send-email-u.kleine-koenig@pengutronix.de>
+References: <1404295043-6661-2-git-send-email-u.kleine-koenig@pengutronix.de>
+ <1404717185-10010-1-git-send-email-u.kleine-koenig@pengutronix.de>
+Message-ID: <20140725000621.GO21766@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jul 24, 2014 at 08:03:49AM -0400, Jason Cooper wrote:
-> Thomas, all,
+On Mon, Jul 07, 2014 at 09:13:05AM +0200, Uwe Kleine-K?nig wrote:
+> The platforms selecting NEED_MACH_MEMORY_H defined the start address of
+> their physical memory in the respective <mach/memory.h>. With
+> ARM_PATCH_PHYS_VIRT=y (which is quite common today) this is useless
+> though because the definition isn't used but determined dynamically.
 > 
-> On Wed, Jul 23, 2014 at 03:00:37PM +0200, Thomas Petazzoni wrote:
-> > Hello,
-> > 
-> > Here comes the third version of the cpuidle support for Armada 370 and
-> > Armada 38x.
-> > 
-> > We are hoping to see this patch series merged for 3.17.
-> > 
-> > Most patches are touching only arch/arm/mach-mvebu/ code so they
-> > should be handled by the mvebu maintainers. However, patches 11-13 are
-> > touching the mvebu cpuidle driver, with a possible issue on patch 11,
-> > which touches both the cpuidle driver and the mach-mvebu code in order
-> > to rename the driver without breaking functionality (if needed, we can
-> > decide to split the commits, it would break functionality temporarly,
-> > but not buildability).
-> > 
-> > Changes since v2
-> > ================
-> > 
-> >  * According to the discussion with Daniel Lezcano (cpuidle
-> >    maintainer) and Arnd Bergmann, changed the cpuidle-mvebu-v7 driver
-> >    to actually register three separate cpuidle platform driver, one
-> >    per-SoC. This way, we don't need special platform data to convey
-> >    the SoC type being used, as this information is already available
-> >    by looking at the driver name.
-> > 
-> >    This change impacts the patches "cpuidle: mvebu: rename the driver
-> >    from armada-370-xp to mvebu-v7", "cpuidle: mvebu: add Armada 370
-> >    support", "cpuidle: mvebu: add Armada 38x support", "ARM: mvebu:
-> >    add cpuidle support for Armada 370" and "ARM: mvebu: add cpuidle
-> >    support for Armada 38x". Other patches are unchanged. The patch
-> >    "cpuidle: mvebu: make the cpuidle driver capable of handling
-> >    multiple SoCs" was no longer needed, so it has been removed.
-> > 
-> ...
-> > Gregory CLEMENT (14):
-> >   ARM: mvebu: split again armada_370_xp_pmsu_idle_enter() in PMSU code
-> >   ARM: mvebu: sort the #include of pmsu.c in alphabetic order
-> >   ARM: mvebu: add a common function for the boot address work around
-> >   ARM: mvebu: use the common function for Armada 375 SMP workaround
-> >   ARM: mvebu: rename the armada_370_xp symbols to mvebu_v7 in pmsu.c
-> >   ARM: mvebu: make the cpuidle initialization more generic
-> >   ARM: mvebu: use a local variable to store the resume address
-> >   ARM: mvebu: make the snoop disabling optional in
-> >     mvebu_v7_pmsu_idle_prepare()
-> >   ARM: mvebu: export the SCU address
-> >   ARM: mvebu: add CA9 MPcore SoC Controller node
-> >   cpuidle: mvebu: rename the driver from armada-370-xp to mvebu-v7
-> >   ARM: mvebu: add cpuidle support for Armada 370
-> >   ARM: mvebu: add cpuidle support for Armada 38x
-> >   ARM: mvebu: defconfig: enable cpuidle support in mvebu_v7_defconfig
-> > 
-> > Thomas Petazzoni (2):
-> >   cpuidle: mvebu: add Armada 370 support
-> >   cpuidle: mvebu: add Armada 38x support
-> > 
-> >  .../bindings/arm/armada-380-mpcore-soc-ctrl.txt    |  14 ++
-> >  arch/arm/boot/dts/armada-38x.dtsi                  |   5 +
-> >  arch/arm/configs/mvebu_v7_defconfig                |   2 +
-> >  arch/arm/mach-mvebu/armada-370-xp.h                |   1 -
-> >  arch/arm/mach-mvebu/board-v7.c                     |   9 +-
-> >  arch/arm/mach-mvebu/common.h                       |   2 +
-> >  arch/arm/mach-mvebu/headsmp-a9.S                   |  15 --
-> >  arch/arm/mach-mvebu/platsmp-a9.c                   |  42 +---
-> >  arch/arm/mach-mvebu/platsmp.c                      |   2 +-
-> >  arch/arm/mach-mvebu/pmsu.c                         | 273 ++++++++++++++++++---
-> >  arch/arm/mach-mvebu/pmsu.h                         |   5 +
-> >  arch/arm/mach-mvebu/pmsu_ll.S                      |  36 +++
-> >  arch/arm/mach-mvebu/system-controller.c            |  31 +++
-> >  drivers/cpuidle/Kconfig.arm                        |  12 +-
-> >  drivers/cpuidle/Makefile                           |   2 +-
-> >  drivers/cpuidle/cpuidle-armada-370-xp.c            |  93 -------
-> >  drivers/cpuidle/cpuidle-mvebu-v7.c                 | 150 +++++++++++
-> >  17 files changed, 500 insertions(+), 194 deletions(-)
-> >  create mode 100644 Documentation/devicetree/bindings/arm/armada-380-mpcore-soc-ctrl.txt
-> >  delete mode 100644 drivers/cpuidle/cpuidle-armada-370-xp.c
-> >  create mode 100644 drivers/cpuidle/cpuidle-mvebu-v7.c
+> So remove the definitions from all <mach/memory.h> and provide the
+> Kconfig symbol PHYS_OFFSET with the respective defaults in case
+> ARM_PATCH_PHYS_VIRT isn't enabled.
 > 
-> Whole series, except 10 (went to mvebu/dt), and 16 (went to
-> mvebu/defconfig) applied to mvebu/soc-cpuidle.  Patches 11 to 13 applied
-> with Daniel's Ack.
+> This allows to drop the dependency of PHYS_OFFSET on !NEED_MACH_MEMORY_H
+> which prevents compiling an integrator nommu-kernel.
+> (CONFIG_PAGE_OFFSET which has "default PHYS_OFFSET if !MMU" expanded to
+> "0x" because CONFIG_PHYS_OFFSET doesn't exist as INTEGRATOR selects
+> NEED_MACH_MEMORY_H.)
 
-Now merged into mvebu/soc.
+Should I assume that this hasn't been build tested?
 
-It's getting really close.  I'll try to send out the pull request
-tomorrow am.  
+> diff --git a/arch/arm/include/asm/memory.h b/arch/arm/include/asm/memory.h
+> index 2b751464d6ff..04ccf1c0a1af 100644
+> --- a/arch/arm/include/asm/memory.h
+> +++ b/arch/arm/include/asm/memory.h
+> @@ -150,13 +150,11 @@
+>  
+>  /*
+>   * PLAT_PHYS_OFFSET is the offset (from zero) of the start of physical
+> - * memory.  This is used for XIP and NoMMU kernels, or by kernels which
+> - * have their own mach/memory.h.  Assembly code must always use
+> + * memory.  This is used for XIP and NoMMU kernels, and on platforms that don't
+> + * have CONFIG_ARM_PATCH_PHYS_VIRT. Assembly code must always use
+>   * PLAT_PHYS_OFFSET and not PHYS_OFFSET.
+>   */
+> -#ifndef PLAT_PHYS_OFFSET
+>  #define PLAT_PHYS_OFFSET	UL(CONFIG_PHYS_OFFSET)
+> -#endif
 
-thx,
+So when CONFIG_PHYS_OFFSET is not defined, PLAT_PHYS_OFFSET becomes the
+identifier "CONFIG_PHYS_OFFSETUL" here.
 
-Jason.
+This leads our first error:
+
+arch/arm/include/asm/memory.h:157:29: error: 'CONFIG_PHYS_OFFSETUL' undeclared (first use in this function)
+
+> diff --git a/arch/arm/mach-realview/include/mach/memory.h b/arch/arm/mach-realview/include/mach/memory.h
+> index db09170e3832..eb69feb3b804 100644
+> --- a/arch/arm/mach-realview/include/mach/memory.h
+> +++ b/arch/arm/mach-realview/include/mach/memory.h
+> @@ -21,17 +21,6 @@
+>  #define __ASM_ARCH_MEMORY_H
+>  
+>  /*
+> - * Physical DRAM offset.
+> - */
+> -#ifdef CONFIG_REALVIEW_HIGH_PHYS_OFFSET
+> -#define PLAT_PHYS_OFFSET		UL(0x70000000)
+> -#else
+> -#define PLAT_PHYS_OFFSET		UL(0x00000000)
+> -#endif
+> -
+> -#ifdef CONFIG_SPARSEMEM
+> -
+> -/*
+>   * Sparsemem definitions for RealView PBX.
+>   *
+>   * The RealView PBX board has another block of 512MB of RAM at 0x20000000,
+
+This bit of the patch is obviously bollocks - you're removing the
+#ifdef CONFIG_SPARSEMEM but its balancing #endif remains.
+
+This gives us our second error:
+
+arch/arm/mach-realview/include/mach/memory.h:62:2: error: #endif without #if
+
+Olof's kbuilder found these, and I expect mine will find them in a bit
+over an hours time, followed by the zero day stuff when it hits
+linux-next (probably tomorrow.)
+
+Submitting not very well tested patches now generates /lots/ of automated
+build systems to find their errors.  Don't do it. :)
+
+(Hint: try building realview_defconfig and realview-smp_defconfig.)
+
+-- 
+FTTC broadband for 0.8mile line: currently at 9.5Mbps down 400kbps up
+according to speedtest.net.
