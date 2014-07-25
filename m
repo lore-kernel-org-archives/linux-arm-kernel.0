@@ -1,32 +1,28 @@
 From: heiko@sntech.de (Heiko Stuebner)
-Date: Fri, 25 Jul 2014 23:49:39 +0200
-Subject: [PATCH v3 7/8] ARM: dts: add rk3288 evaluation board
+Date: Fri, 25 Jul 2014 23:49:38 +0200
+Subject: [PATCH v3 6/8] ARM: dts: rockchip: add core rk3288 dtsi
 In-Reply-To: <1406324980-2450-1-git-send-email-heiko@sntech.de>
 References: <1406324980-2450-1-git-send-email-heiko@sntech.de>
-Message-ID: <1406324980-2450-8-git-send-email-heiko@sntech.de>
+Message-ID: <1406324980-2450-7-git-send-email-heiko@sntech.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-There exist 2 variants using either the act8846 or rk808 as pmic, while the
-rest of the board stays the same.
+Node definitions shared by all rk3288 based boards.
 
 Signed-off-by: Heiko Stuebner <heiko@sntech.de>
 Tested-by: Will Deacon <will.deacon@arm.com>
+Tested-by: Doug Anderson <dianders@chromium.org>
 ---
- arch/arm/boot/dts/rk3288-evb-act8846.dts | 134 +++++++++++++++++++++++++++++++
- arch/arm/boot/dts/rk3288-evb-rk808.dts   |  18 +++++
- arch/arm/boot/dts/rk3288-evb.dtsi        |  74 +++++++++++++++++
- 3 files changed, 226 insertions(+)
- create mode 100644 arch/arm/boot/dts/rk3288-evb-act8846.dts
- create mode 100644 arch/arm/boot/dts/rk3288-evb-rk808.dts
- create mode 100644 arch/arm/boot/dts/rk3288-evb.dtsi
+ arch/arm/boot/dts/rk3288.dtsi | 575 ++++++++++++++++++++++++++++++++++++++++++
+ 1 file changed, 575 insertions(+)
+ create mode 100644 arch/arm/boot/dts/rk3288.dtsi
 
-diff --git a/arch/arm/boot/dts/rk3288-evb-act8846.dts b/arch/arm/boot/dts/rk3288-evb-act8846.dts
+diff --git a/arch/arm/boot/dts/rk3288.dtsi b/arch/arm/boot/dts/rk3288.dtsi
 new file mode 100644
-index 0000000..7d59ff4
+index 0000000..3ef8951
 --- /dev/null
-+++ b/arch/arm/boot/dts/rk3288-evb-act8846.dts
-@@ -0,0 +1,134 @@
++++ b/arch/arm/boot/dts/rk3288.dtsi
+@@ -0,0 +1,575 @@
 +/*
 + * This program is free software; you can redistribute it and/or modify
 + * it under the terms of the GNU General Public License as published by
@@ -39,229 +35,566 @@ index 0000000..7d59ff4
 + * GNU General Public License for more details.
 + */
 +
-+/dts-v1/;
-+#include "rk3288-evb.dtsi"
++#include <dt-bindings/gpio/gpio.h>
++#include <dt-bindings/interrupt-controller/irq.h>
++#include <dt-bindings/interrupt-controller/arm-gic.h>
++#include <dt-bindings/pinctrl/rockchip.h>
++#include <dt-bindings/clock/rk3288-cru.h>
++#include "skeleton.dtsi"
 +
 +/ {
-+	compatible = "rockchip,rk3288-evb-act8846", "rockchip,rk3288";
-+};
++	compatible = "rockchip,rk3288";
 +
-+&i2c0 {
-+	hym8563 at 51 {
-+		compatible = "haoyu,hym8563";
-+		reg = <0x51>;
++	interrupt-parent = <&gic>;
 +
-+		interrupt-parent = <&gpio0>;
-+		interrupts = <4 IRQ_TYPE_EDGE_FALLING>;
-+
-+		pinctrl-names = "default";
-+		pinctrl-0 = <&hym8563_int>;
-+
-+		#clock-cells = <0>;
-+		clock-output-names = "xin32k";
++	aliases {
++		i2c0 = &i2c0;
++		i2c1 = &i2c1;
++		i2c2 = &i2c2;
++		i2c3 = &i2c3;
++		i2c4 = &i2c4;
++		i2c5 = &i2c5;
++		serial0 = &uart0;
++		serial1 = &uart1;
++		serial2 = &uart2;
++		serial3 = &uart3;
++		serial4 = &uart4;
 +	};
 +
-+	act8846: act8846 at 5a {
-+		compatible = "active-semi,act8846";
-+		reg = <0x5a>;
-+		status = "okay";
-+
-+		regulators {
-+			vcc_ddr: REG1 {
-+				regulator-name = "VCC_DDR";
-+				regulator-min-microvolt = <1200000>;
-+				regulator-max-microvolt = <1200000>;
-+				regulator-always-on;
-+			};
-+
-+			vcc_io: REG2 {
-+				regulator-name = "VCC_IO";
-+				regulator-min-microvolt = <3300000>;
-+				regulator-max-microvolt = <3300000>;
-+				regulator-always-on;
-+			};
-+
-+			vdd_log: REG3 {
-+				regulator-name = "VDD_LOG";
-+				regulator-min-microvolt = <1000000>;
-+				regulator-max-microvolt = <1000000>;
-+				regulator-always-on;
-+			};
-+
-+			vcc_20: REG4 {
-+				regulator-name = "VCC_20";
-+				regulator-min-microvolt = <2000000>;
-+				regulator-max-microvolt = <2000000>;
-+				regulator-always-on;
-+			};
-+
-+			vccio_sd: REG5 {
-+				regulator-name = "VCCIO_SD";
-+				regulator-min-microvolt = <3300000>;
-+				regulator-max-microvolt = <3300000>;
-+				regulator-always-on;
-+			};
-+
-+			vdd10_lcd: REG6 {
-+				regulator-name = "VDD10_LCD";
-+				regulator-min-microvolt = <1000000>;
-+				regulator-max-microvolt = <1000000>;
-+				regulator-always-on;
-+			};
-+
-+			vcca_codec: REG7 {
-+				regulator-name = "VCCA_CODEC";
-+				regulator-min-microvolt = <3300000>;
-+				regulator-max-microvolt = <3300000>;
-+				regulator-always-on;
-+			};
-+
-+			vcca_tp: REG8 {
-+				regulator-name = "VCCA_TP";
-+				regulator-min-microvolt = <3300000>;
-+				regulator-max-microvolt = <3300000>;
-+				regulator-always-on;
-+			};
-+
-+			vccio_pmu: REG9 {
-+				regulator-name = "VCCIO_PMU";
-+				regulator-min-microvolt = <3300000>;
-+				regulator-max-microvolt = <3300000>;
-+				regulator-always-on;
-+			};
-+
-+			vdd_10: REG10 {
-+				regulator-name = "VDD_10";
-+				regulator-min-microvolt = <1000000>;
-+				regulator-max-microvolt = <1000000>;
-+				regulator-always-on;
-+			};
-+
-+			vcc_18: REG11 {
-+				regulator-name = "VCC_18";
-+				regulator-min-microvolt = <1800000>;
-+				regulator-max-microvolt = <1800000>;
-+				regulator-always-on;
-+			};
-+
-+			vcc18_lcd: REG12 {
-+				regulator-name = "VCC18_LCD";
-+				regulator-min-microvolt = <1800000>;
-+				regulator-max-microvolt = <1800000>;
-+				regulator-always-on;
-+			};
-+		};
-+	};
-+};
-+
-+&pinctrl {
-+	hym8563 {
-+		hym8563_int: hym8563-int {
-+			rockchip,pins = <RK_GPIO0 4 RK_FUNC_GPIO &pcfg_pull_up>;
-+		};
-+	};
-+};
-diff --git a/arch/arm/boot/dts/rk3288-evb-rk808.dts b/arch/arm/boot/dts/rk3288-evb-rk808.dts
-new file mode 100644
-index 0000000..9a88b6c
---- /dev/null
-+++ b/arch/arm/boot/dts/rk3288-evb-rk808.dts
-@@ -0,0 +1,18 @@
-+/*
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License as published by
-+ * the Free Software Foundation; either version 2 of the License, or
-+ * (at your option) any later version.
-+ *
-+ * This program is distributed in the hope that it will be useful,
-+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ * GNU General Public License for more details.
-+ */
-+
-+/dts-v1/;
-+#include "rk3288-evb.dtsi"
-+
-+/ {
-+	compatible = "rockchip,rk3288-evb-rk808", "rockchip,rk3288";
-+};
-diff --git a/arch/arm/boot/dts/rk3288-evb.dtsi b/arch/arm/boot/dts/rk3288-evb.dtsi
-new file mode 100644
-index 0000000..749e20d
---- /dev/null
-+++ b/arch/arm/boot/dts/rk3288-evb.dtsi
-@@ -0,0 +1,74 @@
-+/*
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License as published by
-+ * the Free Software Foundation; either version 2 of the License, or
-+ * (at your option) any later version.
-+ *
-+ * This program is distributed in the hope that it will be useful,
-+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ * GNU General Public License for more details.
-+ */
-+
-+#include "rk3288.dtsi"
-+
-+/ {
-+	memory {
-+		reg = <0x0 0x80000000>;
-+	};
-+
-+	gpio-keys {
-+		compatible = "gpio-keys";
++	cpus {
 +		#address-cells = <1>;
 +		#size-cells = <0>;
-+		autorepeat;
 +
-+		pinctrl-names = "default";
-+		pinctrl-0 = <&pwrbtn>;
-+
-+		button at 0 {
-+			gpios = <&gpio0 5 GPIO_ACTIVE_LOW>;
-+			linux,code = <116>;
-+			label = "GPIO Key Power";
-+			linux,input-type = <1>;
-+			gpio-key,wakeup = <1>;
-+			debounce-interval = <100>;
++		cpu at 500 {
++			device_type = "cpu";
++			compatible = "arm,cortex-a12";
++			reg = <0x500>;
++		};
++		cpu at 501 {
++			device_type = "cpu";
++			compatible = "arm,cortex-a12";
++			reg = <0x501>;
++		};
++		cpu at 502 {
++			device_type = "cpu";
++			compatible = "arm,cortex-a12";
++			reg = <0x502>;
++		};
++		cpu at 503 {
++			device_type = "cpu";
++			compatible = "arm,cortex-a12";
++			reg = <0x503>;
 +		};
 +	};
-+};
 +
-+&i2c0 {
-+	status = "okay";
-+};
++	xin24m: oscillator {
++		compatible = "fixed-clock";
++		clock-frequency = <24000000>;
++		clock-output-names = "xin24m";
++		#clock-cells = <0>;
++	};
 +
-+&wdt {
-+	status = "okay";
-+};
++	timer {
++		compatible = "arm,armv7-timer";
++		interrupts = <GIC_PPI 13 (GIC_CPU_MASK_SIMPLE(4) | IRQ_TYPE_LEVEL_HIGH)>,
++			     <GIC_PPI 14 (GIC_CPU_MASK_SIMPLE(4) | IRQ_TYPE_LEVEL_HIGH)>,
++			     <GIC_PPI 11 (GIC_CPU_MASK_SIMPLE(4) | IRQ_TYPE_LEVEL_HIGH)>,
++			     <GIC_PPI 10 (GIC_CPU_MASK_SIMPLE(4) | IRQ_TYPE_LEVEL_HIGH)>;
++		clock-frequency = <24000000>;
++	};
 +
-+&uart0 {
-+	status = "okay";
-+};
++	i2c1: i2c at ff140000 {
++		compatible = "rockchip,rk3288-i2c";
++		reg = <0xff140000 0x1000>;
++		interrupts = <GIC_SPI 62 IRQ_TYPE_LEVEL_HIGH>;
++		#address-cells = <1>;
++		#size-cells = <0>;
++		clock-names = "i2c";
++		clocks = <&cru PCLK_I2C1>;
++		pinctrl-names = "default";
++		pinctrl-0 = <&i2c1_xfer>;
++		status = "disabled";
++	};
 +
-+&uart1 {
-+	status = "okay";
-+};
++	i2c3: i2c at ff150000 {
++		compatible = "rockchip,rk3288-i2c";
++		reg = <0xff150000 0x1000>;
++		interrupts = <GIC_SPI 63 IRQ_TYPE_LEVEL_HIGH>;
++		#address-cells = <1>;
++		#size-cells = <0>;
++		clock-names = "i2c";
++		clocks = <&cru PCLK_I2C3>;
++		pinctrl-names = "default";
++		pinctrl-0 = <&i2c3_xfer>;
++		status = "disabled";
++	};
 +
-+&uart2 {
-+	status = "okay";
-+};
++	i2c4: i2c at ff160000 {
++		compatible = "rockchip,rk3288-i2c";
++		reg = <0xff160000 0x1000>;
++		interrupts = <GIC_SPI 64 IRQ_TYPE_LEVEL_HIGH>;
++		#address-cells = <1>;
++		#size-cells = <0>;
++		clock-names = "i2c";
++		clocks = <&cru PCLK_I2C4>;
++		pinctrl-names = "default";
++		pinctrl-0 = <&i2c4_xfer>;
++		status = "disabled";
++	};
 +
-+&uart3 {
-+	status = "okay";
-+};
++	i2c5: i2c at ff170000 {
++		compatible = "rockchip,rk3288-i2c";
++		reg = <0xff170000 0x1000>;
++		interrupts = <GIC_SPI 65 IRQ_TYPE_LEVEL_HIGH>;
++		#address-cells = <1>;
++		#size-cells = <0>;
++		clock-names = "i2c";
++		clocks = <&cru PCLK_I2C5>;
++		pinctrl-names = "default";
++		pinctrl-0 = <&i2c5_xfer>;
++		status = "disabled";
++	};
 +
-+&uart4 {
-+	status = "okay";
-+};
++	uart0: serial at ff180000 {
++		compatible = "rockchip,rk3288-uart", "snps,dw-apb-uart";
++		reg = <0xff180000 0x100>;
++		interrupts = <GIC_SPI 55 IRQ_TYPE_LEVEL_HIGH>;
++		reg-shift = <2>;
++		reg-io-width = <4>;
++		clocks = <&cru SCLK_UART0>, <&cru PCLK_UART0>;
++		clock-names = "baudclk", "apb_pclk";
++		pinctrl-names = "default";
++		pinctrl-0 = <&uart0_xfer>;
++		status = "disabled";
++	};
 +
-+&pinctrl {
-+	buttons {
-+		pwrbtn: pwrbtn {
-+			rockchip,pins = <0 5 RK_FUNC_GPIO &pcfg_pull_up>;
++	uart1: serial at ff190000 {
++		compatible = "rockchip,rk3288-uart", "snps,dw-apb-uart";
++		reg = <0xff190000 0x100>;
++		interrupts = <GIC_SPI 56 IRQ_TYPE_LEVEL_HIGH>;
++		reg-shift = <2>;
++		reg-io-width = <4>;
++		clocks = <&cru SCLK_UART1>, <&cru PCLK_UART1>;
++		clock-names = "baudclk", "apb_pclk";
++		pinctrl-names = "default";
++		pinctrl-0 = <&uart1_xfer>;
++		status = "disabled";
++	};
++
++	uart2: serial at ff690000 {
++		compatible = "rockchip,rk3288-uart", "snps,dw-apb-uart";
++		reg = <0xff690000 0x100>;
++		interrupts = <GIC_SPI 57 IRQ_TYPE_LEVEL_HIGH>;
++		reg-shift = <2>;
++		reg-io-width = <4>;
++		clocks = <&cru SCLK_UART2>, <&cru PCLK_UART2>;
++		clock-names = "baudclk", "apb_pclk";
++		pinctrl-names = "default";
++		pinctrl-0 = <&uart2_xfer>;
++		status = "disabled";
++	};
++
++	uart3: serial at ff1b0000 {
++		compatible = "rockchip,rk3288-uart", "snps,dw-apb-uart";
++		reg = <0xff1b0000 0x100>;
++		interrupts = <GIC_SPI 58 IRQ_TYPE_LEVEL_HIGH>;
++		reg-shift = <2>;
++		reg-io-width = <4>;
++		clocks = <&cru SCLK_UART3>, <&cru PCLK_UART3>;
++		clock-names = "baudclk", "apb_pclk";
++		pinctrl-names = "default";
++		pinctrl-0 = <&uart3_xfer>;
++		status = "disabled";
++	};
++
++	uart4: serial at ff1c0000 {
++		compatible = "rockchip,rk3288-uart", "snps,dw-apb-uart";
++		reg = <0xff1c0000 0x100>;
++		interrupts = <GIC_SPI 59 IRQ_TYPE_LEVEL_HIGH>;
++		reg-shift = <2>;
++		reg-io-width = <4>;
++		clocks = <&cru SCLK_UART4>, <&cru PCLK_UART4>;
++		clock-names = "baudclk", "apb_pclk";
++		pinctrl-names = "default";
++		pinctrl-0 = <&uart4_xfer>;
++		status = "disabled";
++	};
++
++	i2c0: i2c at ff650000 {
++		compatible = "rockchip,rk3288-i2c";
++		reg = <0xff650000 0x1000>;
++		interrupts = <GIC_SPI 60 IRQ_TYPE_LEVEL_HIGH>;
++		#address-cells = <1>;
++		#size-cells = <0>;
++		clock-names = "i2c";
++		clocks = <&cru PCLK_I2C0>;
++		pinctrl-names = "default";
++		pinctrl-0 = <&i2c0_xfer>;
++		status = "disabled";
++	};
++
++	i2c2: i2c at ff660000 {
++		compatible = "rockchip,rk3288-i2c";
++		reg = <0xff660000 0x1000>;
++		interrupts = <GIC_SPI 61 IRQ_TYPE_LEVEL_HIGH>;
++		#address-cells = <1>;
++		#size-cells = <0>;
++		clock-names = "i2c";
++		clocks = <&cru PCLK_I2C2>;
++		pinctrl-names = "default";
++		pinctrl-0 = <&i2c2_xfer>;
++		status = "disabled";
++	};
++
++	pmu: power-management at ff730000 {
++		compatible = "rockchip,rk3288-pmu", "syscon";
++		reg = <0xff730000 0x100>;
++	};
++
++	sgrf: syscon at ff740000 {
++		compatible = "rockchip,rk3288-sgrf", "syscon";
++		reg = <0xff740000 0x1000>;
++	};
++
++	cru: clock-controller at ff760000 {
++		compatible = "rockchip,rk3288-cru";
++		reg = <0xff760000 0x1000>;
++		rockchip,grf = <&grf>;
++		#clock-cells = <1>;
++		#reset-cells = <1>;
++	};
++
++	grf: syscon at ff770000 {
++		compatible = "rockchip,rk3288-grf", "syscon";
++		reg = <0xff770000 0x1000>;
++	};
++
++	wdt: watchdog at ff800000 {
++		compatible = "rockchip,rk3288-wdt", "snps,dw-wdt";
++		reg = <0xff800000 0x100>;
++		interrupts = <GIC_SPI 111 IRQ_TYPE_LEVEL_HIGH>;
++		status = "disabled";
++	};
++
++	gic: interrupt-controller at ffc01000 {
++		compatible = "arm,gic-400";
++		interrupt-controller;
++		#interrupt-cells = <3>;
++		#address-cells = <0>;
++
++		reg = <0xffc01000 0x1000>,
++		      <0xffc02000 0x1000>,
++		      <0xffc04000 0x2000>,
++		      <0xffc06000 0x2000>;
++		interrupts = <GIC_PPI 9 0xf04>;
++	};
++
++	pinctrl: pinctrl {
++		compatible = "rockchip,rk3288-pinctrl";
++		rockchip,grf = <&grf>;
++		rockchip,pmu = <&pmu>;
++		#address-cells = <1>;
++		#size-cells = <1>;
++		ranges;
++
++		gpio0: gpio0 at ff750000 {
++			compatible = "rockchip,gpio-bank";
++			reg =	<0xff750000 0x100>;
++			interrupts = <GIC_SPI 81 IRQ_TYPE_LEVEL_HIGH>;
++			clocks = <&cru PCLK_GPIO0>;
++
++			gpio-controller;
++			#gpio-cells = <2>;
++
++			interrupt-controller;
++			#interrupt-cells = <2>;
++		};
++
++		gpio1: gpio1 at ff780000 {
++			compatible = "rockchip,gpio-bank";
++			reg = <0xff780000 0x100>;
++			interrupts = <GIC_SPI 82 IRQ_TYPE_LEVEL_HIGH>;
++			clocks = <&cru PCLK_GPIO1>;
++
++			gpio-controller;
++			#gpio-cells = <2>;
++
++			interrupt-controller;
++			#interrupt-cells = <2>;
++		};
++
++		gpio2: gpio2 at ff790000 {
++			compatible = "rockchip,gpio-bank";
++			reg = <0xff790000 0x100>;
++			interrupts = <GIC_SPI 83 IRQ_TYPE_LEVEL_HIGH>;
++			clocks = <&cru PCLK_GPIO2>;
++
++			gpio-controller;
++			#gpio-cells = <2>;
++
++			interrupt-controller;
++			#interrupt-cells = <2>;
++		};
++
++		gpio3: gpio3 at ff7a0000 {
++			compatible = "rockchip,gpio-bank";
++			reg = <0xff7a0000 0x100>;
++			interrupts = <GIC_SPI 84 IRQ_TYPE_LEVEL_HIGH>;
++			clocks = <&cru PCLK_GPIO3>;
++
++			gpio-controller;
++			#gpio-cells = <2>;
++
++			interrupt-controller;
++			#interrupt-cells = <2>;
++		};
++
++		gpio4: gpio4 at ff7b0000 {
++			compatible = "rockchip,gpio-bank";
++			reg = <0xff7b0000 0x100>;
++			interrupts = <GIC_SPI 85 IRQ_TYPE_LEVEL_HIGH>;
++			clocks = <&cru PCLK_GPIO4>;
++
++			gpio-controller;
++			#gpio-cells = <2>;
++
++			interrupt-controller;
++			#interrupt-cells = <2>;
++		};
++
++		gpio5: gpio5 at ff7c0000 {
++			compatible = "rockchip,gpio-bank";
++			reg = <0xff7c0000 0x100>;
++			interrupts = <GIC_SPI 86 IRQ_TYPE_LEVEL_HIGH>;
++			clocks = <&cru PCLK_GPIO5>;
++
++			gpio-controller;
++			#gpio-cells = <2>;
++
++			interrupt-controller;
++			#interrupt-cells = <2>;
++		};
++
++		gpio6: gpio6 at ff7d0000 {
++			compatible = "rockchip,gpio-bank";
++			reg = <0xff7d0000 0x100>;
++			interrupts = <GIC_SPI 87 IRQ_TYPE_LEVEL_HIGH>;
++			clocks = <&cru PCLK_GPIO6>;
++
++			gpio-controller;
++			#gpio-cells = <2>;
++
++			interrupt-controller;
++			#interrupt-cells = <2>;
++		};
++
++		gpio7: gpio7 at ff7e0000 {
++			compatible = "rockchip,gpio-bank";
++			reg = <0xff7e0000 0x100>;
++			interrupts = <GIC_SPI 88 IRQ_TYPE_LEVEL_HIGH>;
++			clocks = <&cru PCLK_GPIO7>;
++
++			gpio-controller;
++			#gpio-cells = <2>;
++
++			interrupt-controller;
++			#interrupt-cells = <2>;
++		};
++
++		gpio8: gpio8 at ff7f0000 {
++			compatible = "rockchip,gpio-bank";
++			reg = <0xff7f0000 0x100>;
++			interrupts = <GIC_SPI 89 IRQ_TYPE_LEVEL_HIGH>;
++			clocks = <&cru PCLK_GPIO8>;
++
++			gpio-controller;
++			#gpio-cells = <2>;
++
++			interrupt-controller;
++			#interrupt-cells = <2>;
++		};
++
++		pcfg_pull_up: pcfg-pull-up {
++			bias-pull-up;
++		};
++
++		pcfg_pull_down: pcfg-pull-down {
++			bias-pull-down;
++		};
++
++		pcfg_pull_none: pcfg-pull-none {
++			bias-disable;
++		};
++
++		i2c0 {
++			i2c0_xfer: i2c0-xfer {
++				rockchip,pins = <0 15 RK_FUNC_1 &pcfg_pull_none>,
++						<0 16 RK_FUNC_1 &pcfg_pull_none>;
++			};
++		};
++
++		i2c1 {
++			i2c1_xfer: i2c1-xfer {
++				rockchip,pins = <8 4 RK_FUNC_1 &pcfg_pull_none>,
++						<8 5 RK_FUNC_1 &pcfg_pull_none>;
++			};
++		};
++
++		i2c2 {
++			i2c2_xfer: i2c2-xfer {
++				rockchip,pins = <6 9 RK_FUNC_1 &pcfg_pull_none>,
++						<6 10 RK_FUNC_1 &pcfg_pull_none>;
++			};
++		};
++
++		i2c3 {
++			i2c3_xfer: i2c3-xfer {
++				rockchip,pins = <2 16 RK_FUNC_1 &pcfg_pull_none>,
++						<2 17 RK_FUNC_1 &pcfg_pull_none>;
++			};
++		};
++
++		i2c4 {
++			i2c4_xfer: i2c4-xfer {
++				rockchip,pins = <7 17 RK_FUNC_1 &pcfg_pull_none>,
++						<7 18 RK_FUNC_1 &pcfg_pull_none>;
++			};
++		};
++
++		i2c5 {
++			i2c5_xfer: i2c5-xfer {
++				rockchip,pins = <7 19 RK_FUNC_1 &pcfg_pull_none>,
++						<7 20 RK_FUNC_1 &pcfg_pull_none>;
++			};
++		};
++
++		sdmmc {
++			sdmmc_clk: sdmmc-clk {
++				rockchip,pins = <6 20 RK_FUNC_1 &pcfg_pull_none>;
++			};
++
++			sdmmc_cmd: sdmmc-cmd {
++				rockchip,pins = <6 21 RK_FUNC_1 &pcfg_pull_up>;
++			};
++
++			sdmmc_cd: sdmcc-cd {
++				rockchip,pins = <6 22 RK_FUNC_1 &pcfg_pull_up>;
++			};
++
++			sdmmc_bus1: sdmmc-bus1 {
++				rockchip,pins = <6 16 RK_FUNC_1 &pcfg_pull_up>;
++			};
++
++			sdmmc_bus4: sdmmc-bus4 {
++				rockchip,pins = <6 16 RK_FUNC_1 &pcfg_pull_up>,
++						<6 17 RK_FUNC_1 &pcfg_pull_up>,
++						<6 18 RK_FUNC_1 &pcfg_pull_up>,
++						<6 19 RK_FUNC_1 &pcfg_pull_up>;
++			};
++		};
++
++		emmc {
++			emmc_clk: emmc-clk {
++				rockchip,pins = <3 18 RK_FUNC_2 &pcfg_pull_none>;
++			};
++
++			emmc_cmd: emmc-cmd {
++				rockchip,pins = <3 16 RK_FUNC_2 &pcfg_pull_up>;
++			};
++
++			emmc_pwr: emmc-pwr {
++				rockchip,pins = <3 9 RK_FUNC_2 &pcfg_pull_up>;
++			};
++
++			emmc_bus1: emmc-bus1 {
++				rockchip,pins = <3 0 RK_FUNC_2 &pcfg_pull_up>;
++			};
++
++			emmc_bus4: emmc-bus4 {
++				rockchip,pins = <3 0 RK_FUNC_2 &pcfg_pull_up>,
++						<3 1 RK_FUNC_2 &pcfg_pull_up>,
++						<3 2 RK_FUNC_2 &pcfg_pull_up>,
++						<3 3 RK_FUNC_2 &pcfg_pull_up>;
++			};
++
++			emmc_bus8: emmc-bus8 {
++				rockchip,pins = <3 0 RK_FUNC_2 &pcfg_pull_up>,
++						<3 1 RK_FUNC_2 &pcfg_pull_up>,
++						<3 2 RK_FUNC_2 &pcfg_pull_up>,
++						<3 3 RK_FUNC_2 &pcfg_pull_up>,
++						<3 4 RK_FUNC_2 &pcfg_pull_up>,
++						<3 5 RK_FUNC_2 &pcfg_pull_up>,
++						<3 6 RK_FUNC_2 &pcfg_pull_up>,
++						<3 7 RK_FUNC_2 &pcfg_pull_up>;
++			};
++		};
++
++		uart0 {
++			uart0_xfer: uart0-xfer {
++				rockchip,pins = <4 16 RK_FUNC_1 &pcfg_pull_up>,
++						<4 17 RK_FUNC_1 &pcfg_pull_none>;
++			};
++
++			uart0_cts: uart0-cts {
++				rockchip,pins = <4 18 RK_FUNC_1 &pcfg_pull_none>;
++			};
++
++			uart0_rts: uart0-rts {
++				rockchip,pins = <4 19 RK_FUNC_1 &pcfg_pull_none>;
++			};
++		};
++
++		uart1 {
++			uart1_xfer: uart1-xfer {
++				rockchip,pins = <5 8 RK_FUNC_1 &pcfg_pull_up>,
++						<5 9 RK_FUNC_1 &pcfg_pull_none>;
++			};
++
++			uart1_cts: uart1-cts {
++				rockchip,pins = <5 10 RK_FUNC_1 &pcfg_pull_none>;
++			};
++
++			uart1_rts: uart1-rts {
++				rockchip,pins = <5 11 RK_FUNC_1 &pcfg_pull_none>;
++			};
++		};
++
++		uart2 {
++			uart2_xfer: uart2-xfer {
++				rockchip,pins = <7 22 RK_FUNC_1 &pcfg_pull_up>,
++						<7 23 RK_FUNC_1 &pcfg_pull_none>;
++			};
++			/* no rts / cts for uart2 */
++		};
++
++		uart3 {
++			uart3_xfer: uart3-xfer {
++				rockchip,pins = <7 7 RK_FUNC_1 &pcfg_pull_up>,
++						<7 8 RK_FUNC_1 &pcfg_pull_none>;
++			};
++
++			uart3_cts: uart3-cts {
++				rockchip,pins = <7 9 RK_FUNC_1 &pcfg_pull_none>;
++			};
++
++			uart3_rts: uart3-rts {
++				rockchip,pins = <7 10 RK_FUNC_1 &pcfg_pull_none>;
++			};
++		};
++
++		uart4 {
++			uart4_xfer: uart4-xfer {
++				rockchip,pins = <5 12 3 &pcfg_pull_up>,
++						<5 13 3 &pcfg_pull_none>;
++			};
++
++			uart4_cts: uart4-cts {
++				rockchip,pins = <5 14 3 &pcfg_pull_none>;
++			};
++
++			uart4_rts: uart4-rts {
++				rockchip,pins = <5 15 3 &pcfg_pull_none>;
++			};
 +		};
 +	};
 +};
