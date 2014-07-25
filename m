@@ -1,64 +1,34 @@
 From: pawel.moll@arm.com (Pawel Moll)
-Date: Fri, 25 Jul 2014 15:23:51 +0100
-Subject: [PATCH 3/5] mmc: sdhci-pltfm: Do not use parent as the host's device
+Date: Fri, 25 Jul 2014 15:23:50 +0100
+Subject: [PATCH 2/5] char: tile-srom: Remove reference to platform_bus
 In-Reply-To: <1406298233-27876-1-git-send-email-pawel.moll@arm.com>
 References: <1406298233-27876-1-git-send-email-pawel.moll@arm.com>
-Message-ID: <1406298233-27876-3-git-send-email-pawel.moll@arm.com>
+Message-ID: <1406298233-27876-2-git-send-email-pawel.moll@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The code selecting a device for the sdhci host has been
-continuously tweaked (4b711cb13843f5082e82970dd1e8031383134a65
-"mmc: sdhci-pltfm: Add structure for host-specific data" and
-a4d2177f00a5252d825236c5124bc1e9918bdb41 "mmc: sdhci-pltfm: dt
-device does not pass parent to sdhci_alloc_host") while there
-does not seem to be any reason to use platform device's parent
-in the first place.
+The code was creating "srom" class devices using
+platform_bus as a parent. As they are not really
+platform devices, make them virtual, using NULL instead.
 
-The comment saying "Some PCI-based MFD need the parent here"
-seem to refer to Timberdale FPGA driver (the only MFD driver
-registering SDHCI cell, drivers/mfd/timberdale.c) but again,
-the only situation when parent device matter is runtime PM,
-which is not implemented for Timberdale.
-
-Cc: Chris Ball <chris@printf.net>
-Cc: Anton Vorontsov <anton@enomsg.org>
-Cc: Ulf Hansson <ulf.hansson@linaro.org>
-Cc: linux-mmc at vger.kernel.org
-Cc: linuxppc-dev at lists.ozlabs.org
+Cc: Chris Metcalf <cmetcalf@tilera.com>
 Signed-off-by: Pawel Moll <pawel.moll@arm.com>
 ---
+ drivers/char/tile-srom.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-This patch is a part of effort to remove references to platform_bus
-and make it static.
-
-Chris, Anton, Ulf - could you please advise if the assumptions
-above are correct or if I'm completely wrong? Do you know what
-where the real reasons to use parent originally? The PCI comment
-seems like a red herring to me...
-
- drivers/mmc/host/sdhci-pltfm.c | 9 ++-------
- 1 file changed, 2 insertions(+), 7 deletions(-)
-
-diff --git a/drivers/mmc/host/sdhci-pltfm.c b/drivers/mmc/host/sdhci-pltfm.c
-index 7e834fb..4996112 100644
---- a/drivers/mmc/host/sdhci-pltfm.c
-+++ b/drivers/mmc/host/sdhci-pltfm.c
-@@ -136,13 +136,8 @@ struct sdhci_host *sdhci_pltfm_init(struct platform_device *pdev,
- 	if (resource_size(iomem) < 0x100)
- 		dev_err(&pdev->dev, "Invalid iomem size!\n");
+diff --git a/drivers/char/tile-srom.c b/drivers/char/tile-srom.c
+index bd37747..be88699 100644
+--- a/drivers/char/tile-srom.c
++++ b/drivers/char/tile-srom.c
+@@ -350,7 +350,7 @@ static int srom_setup_minor(struct srom_dev *srom, int index)
+ 		       SROM_PAGE_SIZE_OFF, sizeof(srom->page_size)) < 0)
+ 		return -EIO;
  
--	/* Some PCI-based MFD need the parent here */
--	if (pdev->dev.parent != &platform_bus && !np)
--		host = sdhci_alloc_host(pdev->dev.parent,
--			sizeof(struct sdhci_pltfm_host) + priv_size);
--	else
--		host = sdhci_alloc_host(&pdev->dev,
--			sizeof(struct sdhci_pltfm_host) + priv_size);
-+	host = sdhci_alloc_host(&pdev->dev,
-+		sizeof(struct sdhci_pltfm_host) + priv_size);
- 
- 	if (IS_ERR(host)) {
- 		ret = PTR_ERR(host);
+-	dev = device_create(srom_class, &platform_bus,
++	dev = device_create(srom_class, NULL,
+ 			    MKDEV(srom_major, index), srom, "%d", index);
+ 	return PTR_ERR_OR_ZERO(dev);
+ }
 -- 
 1.9.1
