@@ -1,88 +1,62 @@
-From: vinod.koul@intel.com (Vinod Koul)
-Date: Fri, 25 Jul 2014 12:50:08 +0530
-Subject: [PATCH v3 2/2] ARM: dts: at_xdmac: add bindings documentation
-In-Reply-To: <1404825096-15724-3-git-send-email-ludovic.desroches@atmel.com>
-References: <1404825096-15724-1-git-send-email-ludovic.desroches@atmel.com>
- <1404825096-15724-3-git-send-email-ludovic.desroches@atmel.com>
-Message-ID: <20140725072008.GI8181@intel.com>
+From: monstr@monstr.eu (Michal Simek)
+Date: Fri, 25 Jul 2014 09:38:31 +0200
+Subject: [PATCH v2 04/11] ARM: dts: zynq: Update deprecated xuartps clock
+ names
+In-Reply-To: <50aad941-92d9-428a-a708-77040e24b651@BY2FFO11FD008.protection.gbl>
+References: <1406242820-20140-1-git-send-email-afaerber@suse.de>
+ <1406242820-20140-5-git-send-email-afaerber@suse.de>
+ <82ab6426-211e-451e-99c3-df40dbea817e@BN1AFFO11FD039.protection.gbl>
+ <53D1931C.7080409@suse.de>
+ <50aad941-92d9-428a-a708-77040e24b651@BY2FFO11FD008.protection.gbl>
+Message-ID: <53D20977.2050605@monstr.eu>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jul 08, 2014 at 03:11:36PM +0200, Ludovic Desroches wrote:
-> Add bindings documentation for the new Atmel DMA controller (XDMAC)
-> introduced with SAMA5D4.
+On 07/25/2014 01:24 AM, S?ren Brinkmann wrote:
+> On Fri, 2014-07-25 at 01:13AM +0200, Andreas F?rber wrote:
+>> Am 25.07.2014 01:09, schrieb S?ren Brinkmann:
+>>> On Fri, 2014-07-25 at 01:00AM +0200, Andreas F?rber wrote:
+>>>> Avoids deprecation warning messages.
+>>>
+>>> A patch that updates those names is already in armsoc.
+>>
+>> Which tree/branch should I base this series on then? It seemed the
+>> Xilinx branches were all heavily outdated some days ago, so this is
+>> against vanilla v3.16-rc6.
+
+I have updated that branches. From my experience none is looking
+at these branches and I mainly use them for communication
+with arm-soc where sign tags are used which you can see them there.
+
 > 
-> Signed-off-by: Ludovic Desroches <ludovic.desroches@atmel.com>
-> ---
->  .../devicetree/bindings/dma/atmel-xdma.txt         |   48 ++++++++++++++++++++
->  1 file changed, 48 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/dma/atmel-xdma.txt
+> That is something for the maintainers to answer. But in general, you're
+> adding a lot of stuff that is not yet upstream, AFAIK. Some is still
+> under review I think (like QSPI), others are just staged for the next
+> merge window and parts are still in flight. Michal hopefully has a
+> better overview.
+> This particular patch can simply be omitted I think.
 
-I dont see delta with current atmel-dma bindings. Shouldn't we reuse that
-here too?
+There are several options and I think the best is arm-soc tree
+where you can see what have been accepted.
+And also I believe all arm-soc trees are added to linux-next.
 
-Surely we dont want to add binding per contoller even if they are similar!
+That's why I would use linux-next or arm-soc.
+
+Thanks,
+Michal
 
 -- 
-~Vinod
+Michal Simek, Ing. (M.Eng), OpenPGP -> KeyID: FE3D1F91
+w: www.monstr.eu p: +42-0-721842854
+Maintainer of Linux kernel - Microblaze cpu - http://www.monstr.eu/fdt/
+Maintainer of Linux kernel - Xilinx Zynq ARM architecture
+Microblaze U-BOOT custodian and responsible for u-boot arm zynq platform
 
-> 
-> diff --git a/Documentation/devicetree/bindings/dma/atmel-xdma.txt b/Documentation/devicetree/bindings/dma/atmel-xdma.txt
-> new file mode 100644
-> index 0000000..647f099
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/dma/atmel-xdma.txt
-> @@ -0,0 +1,48 @@
-> +* Atmel Extensible Direct Memory Access Controller (XDMAC)
-> +
-> +* XDMA Controller
-> +Required properties:
-> +- compatible: Should be "atmel,<chip>-dma".
-> +- reg: Should contain DMA registers location and length.
-> +- interrupts: Should contain DMA interrupt.
-> +- #dma-cells: Must be <2>, used to represent the number of integer cells in
-> +the dmas property of client devices.
-> +  - The 1st cell specifies the memory interface (16 most significant bits) and
-> +  the peripheral interface (16 less significant bits) to use.
-> +  - The 2nd cell specifies the channel configuration register:
-> +    - bit 30-24: PERID, peripheral identifier.
-> +
-> +Example:
-> +
-> +dma1: dma-controller at f0004000 {
-> +	compatible = "atmel,sama5d4-dma";
-> +	reg = <0xf0004000 0x200>;
-> +	interrupts = <50 4 0>;
-> +	#dma-cells = <2>;
-> +};
-> +
-> +
-> +* DMA clients
-> +DMA clients connected to the Atmel XDMA controller must use the format
-> +described in the dma.txt file, using a two-cell specifier for each channel.
-> +The three cells in order are:
-> +1. A phandle pointing to the DMA controller.
-> +2. The memory interface (16 most significant bits), the peripheral interface
-> +(16 less significant bits).
-> +3. Channel configuration register. Configurable fields are:
-> +  - bit 30-24: PERID, peripheral identifier.
-> +
-> +Example:
-> +
-> +i2c2: i2c at f8024000 {
-> +	compatible = "atmel,at91sam9x5-i2c";
-> +	reg = <0xf8024000 0x4000>;
-> +	interrupts = <34 4 6>;
-> +	dmas = <&dma1
-> +		(AT91_XDMAC_DT_MEM_IF(0) | AT91_XDMAC_DT_PER_IF(1))
-> +		AT91_XDMAC_DT_PERID(6)>,
-> +	       <&dma1
-> +		(AT91_XDMAC_DT_MEM_IF(0) | AT91_XDMAC_DT_PER_IF(1))
-> +		AT91_XDMAC_DT_PERID(7)>;
-> +	dma-names = "tx", "rx";
-> +};
-> -- 
-> 1.7.9.5
-> 
 
--- 
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 263 bytes
+Desc: OpenPGP digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140725/3939a92d/attachment-0001.sig>
