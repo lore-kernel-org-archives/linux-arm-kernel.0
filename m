@@ -1,82 +1,56 @@
-From: srikanth.thokala@xilinx.com (Srikanth Thokala)
-Date: Fri, 25 Jul 2014 12:51:41 +0000
-Subject: [PATCH v2 07/11] Documentation: devicetree: Fix Xilinx VDMA
- specification
-In-Reply-To: <53D225F2.4070504@xilinx.com>
-References: <1406242820-20140-1-git-send-email-afaerber@suse.de>
- <1406242820-20140-8-git-send-email-afaerber@suse.de>
- <53D20C19.5000306@monstr.eu> <53D21983.8060901@suse.de>
- <53D225F2.4070504@xilinx.com>
-Message-ID: <32b0ee01-c15a-47eb-94c5-a60ca5016b85@BY2FFO11FD024.protection.gbl>
+From: paul@pwsan.com (Paul Walmsley)
+Date: Fri, 25 Jul 2014 12:55:49 +0000 (UTC)
+Subject: [GIT PULL] ARM: OMAP2+: PLL rounding change for v3.17
+Message-ID: <alpine.DEB.2.02.1407251254540.18958@utopia.booyaka.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Andreas,
+-----BEGIN PGP SIGNED MESSAGE-----
+Hash: SHA1
 
-> -----Original Message-----
-> From: Michal Simek [mailto:michal.simek at xilinx.com]
-> Sent: Friday, July 25, 2014 3:10 PM
-> To: Andreas F?rber; monstr at monstr.eu; Srikanth Thokala
-> Cc: Vinod Koul; Michal Simek; Andreas Olofsson; Matteo Vit; Sean Rickerd;
-> devicetree at vger.kernel.org; linux-arm-kernel at lists.infradead.org; linux-
-> kernel at vger.kernel.org; Rob Herring; Pawel Moll; Mark Rutland; Ian Campbell;
-> Kumar Gala
-> Subject: Re: [PATCH v2 07/11] Documentation: devicetree: Fix Xilinx VDMA
-> specification
->
-> Hi Andreas,
->
-> On 07/25/2014 10:46 AM, Andreas F?rber wrote:
-> > Hi Michal,
-> >
-> > Am 25.07.2014 09:49, schrieb Michal Simek:
-> >> On 07/25/2014 01:00 AM, Andreas F?rber wrote:
-> >>> The specification requires xlnx,data-width, but example and driver
-> >>> use xlnx,datawidth. Change the specification to match the implementation.
-> >>>
-> >>> Signed-off-by: Andreas F?rber <afaerber@suse.de>
-> >>> ---
-> >>>  v2: New
-> >>>
-> >>>  Documentation/devicetree/bindings/dma/xilinx/xilinx_vdma.txt | 2 +-
-> >>>  1 file changed, 1 insertion(+), 1 deletion(-)
-> >>>
-> >>> diff --git
-> >>> a/Documentation/devicetree/bindings/dma/xilinx/xilinx_vdma.txt
-> >>> b/Documentation/devicetree/bindings/dma/xilinx/xilinx_vdma.txt
-> >>> index 1405ed0..e4c4d47 100644
-> >>> --- a/Documentation/devicetree/bindings/dma/xilinx/xilinx_vdma.txt
-> >>> +++ b/Documentation/devicetree/bindings/dma/xilinx/xilinx_vdma.txt
-> >>> @@ -25,7 +25,7 @@ Required child node properties:
-> >>>  - compatible: It should be either "xlnx,axi-vdma-mm2s-channel" or
-> >>>   "xlnx,axi-vdma-s2mm-channel".
-> >>>  - interrupts: Should contain per channel VDMA interrupts.
-> >>> -- xlnx,data-width: Should contain the stream data width, take
-> >>> values
-> >>> +- xlnx,datawidth: Should contain the stream data width, take values
-> >>>   {32,64...1024}.
-> >
-> > BTW I just notice that this values specification is ambiguous as to
-> > whether 96 is a valid value or only powers of 2 like 128. Maybe you
-> > want to clarify that in a follow-up patch?
->
-> really appreciate your help for improving this.
-> Srikanth T: Can you please look at it?
+Hi Tony
 
-It should be only power of 2.  I could send a patch, but it is design-specific and
-the design will not allow to take the intermediate values and so the device-tree
-script.  So, I feel it should be fine to keep this way.
+The following changes since commit a497c3ba1d97fc69c1e78e7b96435ba8c2cb42ee:
 
-Thanks for this patch.
+  Linux 3.16-rc2 (2014-06-21 19:02:54 -1000)
 
-Srikanth
+are available in the git repository at:
 
->
-> Thanks,
-> Michal
->
->
+  git://git.kernel.org/pub/scm/linux/kernel/git/pjw/omap-pending.git tags/for-v3.17/omap-clock-b
 
+for you to fetch changes up to 0a26344440b5f9940c99112fdc3804f073b1f5a7:
 
+  ARM: OMAP2+: clock: allow omap2_dpll_round_rate() to round to next-lowest rate (2014-07-25 06:11:15 -0600)
 
-This email and any attachments are intended for the sole use of the named recipient(s) and contain(s) confidential information that may be proprietary, privileged or copyrighted under applicable law. If you are not the intended recipient, do not read, copy, or forward this email message or any attachments. Delete this email message and any attachments immediately.
+- ----------------------------------------------------------------
+Modify OMAP PLL rate rounding function to round to the exact rate requested
+or the next one below it.  This is intended to resolve some DSS problems.
+
+Basic build, boot, and PM test results are available here:
+
+http://www.pwsan.com/omap/testlogs/clock-b-v3.17/20140725061121/
+
+- ----------------------------------------------------------------
+Paul Walmsley (1):
+      ARM: OMAP2+: clock: allow omap2_dpll_round_rate() to round to next-lowest rate
+
+ arch/arm/mach-omap2/clkt_dpll.c | 28 +++++++++++++++++++++-------
+ arch/arm/mach-omap2/dpll3xxx.c  | 13 +++++++++++--
+ 2 files changed, 32 insertions(+), 9 deletions(-)
+-----BEGIN PGP SIGNATURE-----
+Version: GnuPG v1
+
+iQIcBAEBAgAGBQJT0lNoAAoJEMePsQ0LvSpL1vEP/0likn5MTdDXY9zOEsygmx6E
++Ihd/htnvpqX/5E900Gu+zziAL5gWfhOzOk/LfcoSjxPnp3MsWysFShJSGlg4bR9
+sNhlgk4bGTvra8DwozDpVUJvlwfVex/SjbByAz2/9WFNYy8s/rY+LdID3z2q2USC
+Op9cly11RrAUcwpwv/A1JovL4ZFKGFV4bWgqdYkixu3cl7bNTozvSqHxVIidLFSe
+xX+YeAm8MZjW31GvicpGTs+cGmZAVh4UMMjnR+vgMDUGB9QZ71uLB0N0D3rlCSxH
+kYnHKVJxpmm5ehYDyDx3J1D/UlHu3/8V53evO8aFZKpyOiF8cVlOaYyXOEVfBkfn
+MoRda2saEE3/LlkOh3sOizXeQicq8lAl48Ntikar3+WBBVsABCOeT/Y2/wrmo1dA
+2CkeogC47Ho/mUBxoQoWDM4fyXhSnGBRh/HG5IKs71sWQuaJDSlSr4Btdxv1uf+s
+oYu2lfAeWSntmD5ErgncSkKWTWC0Kgc+0D0JX/guLS8i2Y4fokfE4SECF0aborQP
+k+Fn3jXkUuws2fhcUNsleYzLAn9JHtM+aHseIu45s08Bjt7KmuTTz02gK63c9mG+
+6TymbzNmv1RL+HkPBhYjmv7xTFmvgOJYPlPi40csZ+XXZ8JcYRjwFotyC8kwZ8BS
+Y6rnxa2hdQs5bOk/GZeQ
+=s8Vm
+-----END PGP SIGNATURE-----
