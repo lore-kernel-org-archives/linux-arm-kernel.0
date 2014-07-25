@@ -1,79 +1,127 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Fri, 25 Jul 2014 13:14:11 +0100
-Subject: next build: 629 warnings 1 failures (next/next-20140723)
-In-Reply-To: <20140725112623.GG23220@titan.lakedaemon.net>
-References: <53cf8323.e4b6440a.7d37.4f75@mx.google.com>
- <CAOesGMhT9n7nVbCay5cU74pv2qrbqMooZLoY923Lk6SzXk5z+A@mail.gmail.com>
- <20140724085037.GB1994@arm.com> <20140724104318.GA13371@arm.com>
- <20140724132448.GB13371@arm.com>
- <20140724224836.GY23220@titan.lakedaemon.net>
- <20140725090109.GA24268@arm.com>
- <20140725112623.GG23220@titan.lakedaemon.net>
-Message-ID: <20140725121411.GE24268@arm.com>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Fri, 25 Jul 2014 13:14:49 +0100
+Subject: Kexec on arm64
+In-Reply-To: <CAFdej01w_pE6vv+13cCCyfDs4Rbdkzx4CMUj9q97HBKV0B53ow@mail.gmail.com>
+References: <CAFdej006OSyhgDcJ2iZdbjt+PtysN=i_+9Dr4GTmr=+t5yg4Kw@mail.gmail.com>
+ <1405443898.22585.7.camel@smoke>
+ <CAL85gmC9LLcN_uxMY1bM5kLx=N7rZGdGO3bmGHeUVo=Rqgk8uw@mail.gmail.com>
+ <1405551861.7262.26.camel@smoke>
+ <CAFdej03nixSU=3h+HYk2E3Onb2P3--Di0GM+wCwLS6ZNH7UjEQ@mail.gmail.com>
+ <CAFdej00J2mJwcg2Cy6CHVuuQZ4uQ2zZg8oErGPi0uPejievB+Q@mail.gmail.com>
+ <1406162287.4062.39.camel@smoke>
+ <20140724093603.GC4079@leverpostej>
+ <1406247468.4062.59.camel@smoke>
+ <CAFdej01w_pE6vv+13cCCyfDs4Rbdkzx4CMUj9q97HBKV0B53ow@mail.gmail.com>
+Message-ID: <20140725121448.GB19632@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jul 25, 2014 at 12:26:23PM +0100, Jason Cooper wrote:
-> On Fri, Jul 25, 2014 at 10:01:09AM +0100, Catalin Marinas wrote:
-> > On Thu, Jul 24, 2014 at 11:48:36PM +0100, Jason Cooper wrote:
-> > > On Thu, Jul 24, 2014 at 02:24:48PM +0100, Catalin Marinas wrote:
-> > > > From 3acb8b49aeba9f48153a2d719dec05d0b862e285 Mon Sep 17 00:00:00 2001
-> > > > From: Catalin Marinas <catalin.marinas@arm.com>
-> > > > Date: Thu, 24 Jul 2014 14:14:42 +0100
-> > > > Subject: [PATCH] arm64: gicv3: Allow GICv3 compilation with older binutils
-> > > > 
-> > > > GICv3 introduces new system registers accessible with the full msr/mrs
-> > > > syntax (e.g. mrs x0, Sx_op0_op1_CRm_CRn_op2). However, only recent
-> > > > binutils understand the new syntax. This patch introduces msr_s/mrs_s
-> > > > assembly macros which generate the equivalent instructions above and
-> > > > converts the existing GICv3 code (both drivers/irqchip/ and
-> > > > arch/arm64/kernel/).
-> > > > 
-> > > > Signed-off-by: Catalin Marinas <catalin.marinas@arm.com>
-> > > > Suggested-by: Mark Rutland <mark.rutland@arm.com>
-> > > > Reported-by: Olof Johansson <olof@lixom.net>
-> > > > Cc: Will Deacon <will.deacon@arm.com>
-> > > > Cc: Marc Zyngier <marc.zyngier@arm.com>
-> > > > ---
-> > > >  arch/arm64/include/asm/sysreg.h    | 60 ++++++++++++++++++++++++++++++++++++++
-> > > >  arch/arm64/kernel/head.S           |  6 ++--
-> > > >  drivers/irqchip/irq-gic-v3.c       | 16 +++++-----
-> > > >  include/linux/irqchip/arm-gic-v3.h | 42 +++++++++++++-------------
-> > > >  4 files changed, 93 insertions(+), 31 deletions(-)
-> > > >  create mode 100644 arch/arm64/include/asm/sysreg.h
-> > > 
-> > > I'm going to assume this goes on top of Marc's series, and that you'll
-> > > take it through arm64:
-> > > 
-> > > Acked-by: Jason Cooper <jason@lakedaemon.net>
-> > 
-> > Thanks. I'll let Marc decide (he's back next week) as I go on holiday
-> > soon. Ideally it should go into -next and upstream together with the
-> > rest of the GICv3 patches but I (or Will if I'm way) am happy to take
-> > the patch once GICv3 hits mainline (I would like to avoid merging the
-> > irqchip tree into the arm64 tree just to be able to apply this fix).
+On Fri, Jul 25, 2014 at 12:48:04PM +0100, Arun Chandran wrote:
+> Hi Geoff,
 > 
-> That's why I created a topic branch for GICv3. ;-)  If you pull:
-> 
->   git://git.infradead.org/users/jcooper/linux.git tags/deps-irqchip-gic-3.17
-> 
-> You'll get:
-> 
->   021f653791ad irqchip: gic-v3: Initial support for GICv3
->   d51d0af43b30 irqchip: gic: Move some bits of GICv2 to a library-type file
-> 
-> based on v3.16-rc1 and nothing more.
-> 
-> That tag is on the irqchip/gic branch, which I'll put all the other
-> changes to gic on top of once Marc has had a chance to review them.
-> 
-> The intent was for arm64 to pull the above, and apply the rest of Marc's
-> series on top.  The fix just posted would go on top of that.  But if you
-> want to wait...
+> On Fri, Jul 25, 2014 at 5:47 AM, Geoff Levand <geoff@infradead.org> wrote:
+> > Hi,
+> >
+> > On Thu, 2014-07-24 at 10:36 +0100, Mark Rutland wrote:
+> >> On Thu, Jul 24, 2014 at 01:38:07AM +0100, Geoff Levand wrote:
+> >
+> >> > All memory management for the main cpu is done by the arch code.  Kexec
+> >> > and cpu hot plug only work with the secondary cpus, so the problem would
+> >> > be in the arch memory code, either in setup_restart() for shutdown, or
+> >> > in the startup code.
+> >>
+> >> It's possible that soft_restart and setup_restart are a little dodgy, as
+> >> they also rely on the compiler being smart and not touching the stack
+> >> after setup_restart().
+> >>
+> >> However, they provide absolutely no guarantee that any data has been
+> >> flushed out to the PoC [1]. If you require any data to be flushed out to the
+> >> PoC so as to be visible to noncacheable accesses, you will need to
+> >> ensure that this is flushed by VA before soft_restart is called. Data
+> >> may have migrated to another cache (e.g. another CPU, or the L3) where
+> >> it is not visible.
+> >
+> > OK, kexec's reset routine relocate_new_kernel does use a few global
+> > variables that are set by the main kexec routines.  I added a call to
+> > __flush_dcache_area(), which uses 'dc civac' for those.
+> >
+> > I had thought the call to __flush_dcache_all, which uses 'dc cisw', in
+> > flush_cache_all() would be enough.
+> >
+> > Arun, I also fixed UP builds.  Could you pull my latest and try with L3
+> > enabled?
+> >
+> I got this working. As 'Mark Rutland' pointed in another mail that
+> it could be problem with flushing the cache; I did a read of
+> 1GB data from start of RAM to a volatile var. I assume that
+> this will clear and invalidate all that in cache (L1=32K, L2=256 K, L3=8M)
 
-That's great, thanks. I wasn't aware (or maybe I forgot) of the plans
-for how to get GICv3 merged. I pulled the tag above and applied the fix
-on top.
+You've managed to get the cache to evict some lines, which proves my
+theory, but this is absolute nonsense and guarantees nothing.
 
--- 
-Catalin
+So NAK to this.
+
+If you need to perform cache maintenance to guarantee data is visible to
+non-cacheable accesses  you _must_ use the architected mechanism for
+cleaning data to the PoC: DC CVAC. We have wrappers for flushing ranges.
+
+Anything else is nonsense and does not provide the guarantee you need.
+
+That said, I still am not sure what guarantee you are attempting to get.
+Which data do you need out at the PoC?
+
+Thanks,
+Mark.
+
+> 
+> ###################
+> diff --git a/arch/arm64/kernel/process.c b/arch/arm64/kernel/process.c
+> index 786daa6..90418f3 100644
+> --- a/arch/arm64/kernel/process.c
+> +++ b/arch/arm64/kernel/process.c
+> @@ -63,6 +63,10 @@ static inline void smp_secondary_shutdown(void) {}
+> 
+>  static void setup_restart(void)
+>  {
+> +       volatile u64 tmp;
+> +       volatile u64 *addr;
+> +
+> +       addr = (u64 *)(0xffffffc000000000);
+>         /*
+>          * Tell the mm system that we are going to reboot -
+>          * we may need it to insert some 1:1 mappings so that
+> @@ -75,6 +79,11 @@ static void setup_restart(void)
+>         /* Clean and invalidate caches */
+>         flush_cache_all();
+> 
+> +       for ( ;addr < (u64 *)0xffffffc040000000; addr++)
+> +       {
+> +               tmp = *addr;
+> +       }
+> +
+>         /* Turn D-cache off */
+>         cpu_cache_off();
+> 
+> ###################
+> 
+> With the above change latest kernel @
+> https://git.linaro.org/people/geoff.levand/linux-kexec.git
+> is able to do kexec with L3 enabled in UP scenario.
+> 
+> --Arun
+> 
+> 
+> 
+> 
+> 
+> 
+> 
+> 
+> 
+> 
+> 
+> 
+> 
+> > -Geoff
+> >
+> 
