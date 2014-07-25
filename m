@@ -1,31 +1,36 @@
 From: wens@csie.org (Chen-Yu Tsai)
-Date: Fri, 25 Jul 2014 17:13:27 +0800
-Subject: [PATCH v3 5/6] ARM: sunxi: Add A31 RTC driver to sunxi_defconfig
+Date: Fri, 25 Jul 2014 17:13:26 +0800
+Subject: [PATCH v3 4/6] ARM: dts: sun8i: add rtc device node
 In-Reply-To: <1406279608-489-1-git-send-email-wens@csie.org>
 References: <1406279608-489-1-git-send-email-wens@csie.org>
-Message-ID: <1406279608-489-6-git-send-email-wens@csie.org>
+Message-ID: <1406279608-489-5-git-send-email-wens@csie.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Now that we have a driver for A31's RTC, enable it
-in the default sunxi config.
+sun8i shares the same rtc hardware as sun6i. Now that we have a driver
+for it, add a device node to the DTSI for it so we can use it.
 
 Signed-off-by: Chen-Yu Tsai <wens@csie.org>
 ---
- arch/arm/configs/sunxi_defconfig | 1 +
- 1 file changed, 1 insertion(+)
+ arch/arm/boot/dts/sun8i-a23.dtsi | 6 ++++++
+ 1 file changed, 6 insertions(+)
 
-diff --git a/arch/arm/configs/sunxi_defconfig b/arch/arm/configs/sunxi_defconfig
-index 7209bfd..0abc2ab 100644
---- a/arch/arm/configs/sunxi_defconfig
-+++ b/arch/arm/configs/sunxi_defconfig
-@@ -93,6 +93,7 @@ CONFIG_LEDS_TRIGGER_DEFAULT_ON=y
- CONFIG_RTC_CLASS=y
- # CONFIG_RTC_INTF_SYSFS is not set
- # CONFIG_RTC_INTF_PROC is not set
-+CONFIG_RTC_DRV_SUN6I=y
- CONFIG_RTC_DRV_SUNXI=y
- # CONFIG_IOMMU_SUPPORT is not set
- CONFIG_PHY_SUN4I_USB=y
+diff --git a/arch/arm/boot/dts/sun8i-a23.dtsi b/arch/arm/boot/dts/sun8i-a23.dtsi
+index 54ac0787..e0d1048 100644
+--- a/arch/arm/boot/dts/sun8i-a23.dtsi
++++ b/arch/arm/boot/dts/sun8i-a23.dtsi
+@@ -285,6 +285,12 @@
+ 			interrupts = <1 9 0xf04>;
+ 		};
+ 
++		rtc: rtc at 01f00000 {
++			compatible = "allwinner,sun6i-a31-rtc";
++			reg = <0x01f00000 0x54>;
++			interrupts = <0 40 4>;
++		};
++
+ 		prcm at 01f01400 {
+ 			compatible = "allwinner,sun8i-a23-prcm";
+ 			reg = <0x01f01400 0x200>;
 -- 
 2.0.1
