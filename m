@@ -1,30 +1,127 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Fri, 25 Jul 2014 18:34:00 +0100
-Subject: [PATCH v2 01/16] regmap: Add regmap_get_device
-In-Reply-To: <1405957142-19416-2-git-send-email-ttynkkynen@nvidia.com>
-References: <1405957142-19416-1-git-send-email-ttynkkynen@nvidia.com>
- <1405957142-19416-2-git-send-email-ttynkkynen@nvidia.com>
-Message-ID: <20140725173400.GZ17528@sirena.org.uk>
+From: m.smarduch@samsung.com (Mario Smarduch)
+Date: Fri, 25 Jul 2014 10:37:34 -0700
+Subject: [PATCH v9 1/4] arm: add ARMv7 HYP API to flush VM TLBs,
+ change generic TLB flush to support arch flush
+In-Reply-To: <53D1F537.2070306@suse.de>
+References: <1406249768-25315-1-git-send-email-m.smarduch@samsung.com>
+ <1406249768-25315-2-git-send-email-m.smarduch@samsung.com>
+ <53D1F537.2070306@suse.de>
+Message-ID: <53D295DE.2090901@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jul 21, 2014 at 06:38:47PM +0300, Tuomas Tynkkynen wrote:
-> Add a new function regmap_get_device to obtain the underlying struct
-> device from a regmap.
+On 07/24/2014 11:12 PM, Alexander Graf wrote:
+> 
+> On 25.07.14 02:56, Mario Smarduch wrote:
+>> Patch adds HYP interface for global VM TLB invalidation without address
+>> parameter. Generic VM TLB flush calls ARMv7 arch defined TLB flush
+>> function.
+>>
+>> Signed-off-by: Mario Smarduch <m.smarduch@samsung.com>
+>> ---
+>>   arch/arm/include/asm/kvm_asm.h  |    1 +
+>>   arch/arm/include/asm/kvm_host.h |    1 +
+>>   arch/arm/kvm/Kconfig            |    1 +
+>>   arch/arm/kvm/interrupts.S       |   12 ++++++++++++
+>>   arch/arm/kvm/mmu.c              |   17 +++++++++++++++++
+>>   virt/kvm/Kconfig                |    3 +++
+>>   virt/kvm/kvm_main.c             |    4 ++++
+>>   7 files changed, 39 insertions(+)
+>>
+>> diff --git a/arch/arm/include/asm/kvm_asm.h
+>> b/arch/arm/include/asm/kvm_asm.h
+>> index 53b3c4a..21bc519 100644
+>> --- a/arch/arm/include/asm/kvm_asm.h
+>> +++ b/arch/arm/include/asm/kvm_asm.h
+>> @@ -78,6 +78,7 @@ extern char __kvm_hyp_code_end[];
+>>     extern void __kvm_flush_vm_context(void);
+>>   extern void __kvm_tlb_flush_vmid_ipa(struct kvm *kvm, phys_addr_t ipa);
+>> +extern void __kvm_tlb_flush_vmid(struct kvm *kvm);
+>>     extern int __kvm_vcpu_run(struct kvm_vcpu *vcpu);
+>>   #endif
+>> diff --git a/arch/arm/include/asm/kvm_host.h
+>> b/arch/arm/include/asm/kvm_host.h
+>> index 193ceaf..042206f 100644
+>> --- a/arch/arm/include/asm/kvm_host.h
+>> +++ b/arch/arm/include/asm/kvm_host.h
+>> @@ -230,5 +230,6 @@ int kvm_perf_teardown(void);
+>>     u64 kvm_arm_timer_get_reg(struct kvm_vcpu *, u64 regid);
+>>   int kvm_arm_timer_set_reg(struct kvm_vcpu *, u64 regid, u64 value);
+>> +void kvm_arch_flush_remote_tlbs(struct kvm *);
+>>     #endif /* __ARM_KVM_HOST_H__ */
+>> diff --git a/arch/arm/kvm/Kconfig b/arch/arm/kvm/Kconfig
+>> index 466bd29..44d3b6f 100644
+>> --- a/arch/arm/kvm/Kconfig
+>> +++ b/arch/arm/kvm/Kconfig
+>> @@ -22,6 +22,7 @@ config KVM
+>>       select ANON_INODES
+>>       select HAVE_KVM_CPU_RELAX_INTERCEPT
+>>       select KVM_MMIO
+>> +    select HAVE_KVM_ARCH_TLB_FLUSH_ALL
+>>       select KVM_ARM_HOST
+>>       depends on ARM_VIRT_EXT && ARM_LPAE
+>>       ---help---
+>> diff --git a/arch/arm/kvm/interrupts.S b/arch/arm/kvm/interrupts.S
+>> index 0d68d40..1258d46 100644
+>> --- a/arch/arm/kvm/interrupts.S
+>> +++ b/arch/arm/kvm/interrupts.S
+>> @@ -66,6 +66,18 @@ ENTRY(__kvm_tlb_flush_vmid_ipa)
+>>       bx    lr
+>>   ENDPROC(__kvm_tlb_flush_vmid_ipa)
+>>   +/**
+>> + * void __kvm_tlb_flush_vmid(struct kvm *kvm) - Flush per-VMID TLBs
+>> + *
+>> + * Reuses __kvm_tlb_flush_vmid_ipa() for ARMv7, without passing address
+>> + * parameter
+>> + */
+>> +
+>> +ENTRY(__kvm_tlb_flush_vmid)
+>> +    b    __kvm_tlb_flush_vmid_ipa
+>> +ENDPROC(__kvm_tlb_flush_vmid)
+>> +
+>> +
+>>   /********************************************************************
+>>    * Flush TLBs and instruction caches of all CPUs inside the
+>> inner-shareable
+>>    * domain, for all VMIDs
+>> diff --git a/arch/arm/kvm/mmu.c b/arch/arm/kvm/mmu.c
+>> index 2ac9588..35254c6 100644
+>> --- a/arch/arm/kvm/mmu.c
+>> +++ b/arch/arm/kvm/mmu.c
+>> @@ -56,6 +56,23 @@ static void kvm_tlb_flush_vmid_ipa(struct kvm *kvm,
+>> phys_addr_t ipa)
+>>           kvm_call_hyp(__kvm_tlb_flush_vmid_ipa, kvm, ipa);
+>>   }
+>>   +#ifdef CONFIG_ARM
+> 
+> Why the ifdef? We're in ARM code here, no?
 
-I've applied this...
+For the time being to compile ARM64.
 
-> +struct device *regmap_get_device(struct regmap *map)
-> +{
-> +	return map->dev;
-> +}
-> +
+> 
+>> +/**
+>> + * kvm_arch_flush_remote_tlbs() - flush all VM TLB entries
+>> + * @kvm:       pointer to kvm structure.
+>> + *
+>> + * Interface to HYP function to flush all VM TLB entries without address
+>> + * parameter. In HYP mode reuses __kvm_tlb_flush_vmid_ipa() function
+>> used by
+>> + * kvm_tlb_flush_vmid_ipa().
+>> + */
+>> +void kvm_arch_flush_remote_tlbs(struct kvm *kvm)
+>> +{
+>> +    if (kvm)
+>> +        kvm_call_hyp(__kvm_tlb_flush_vmid, kvm);
+> 
+> I don't see why we should ever call this function with kvm==NULL.
 
-...plus a followup exporting the symbol so it can be used from modules.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140725/978e921c/attachment.sig>
+Yes that true, I copied a generic arm/arm64 mmu function. But it's
+use here guarantees kvm != NULL.
+
+> 
+> 
+> Alex
+> 
+
+Thanks,
+  Mario
