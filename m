@@ -1,29 +1,45 @@
-From: sfr@canb.auug.org.au (Stephen Rothwell)
-Date: Fri, 25 Jul 2014 10:13:55 +1000
-Subject: linux-next: manual merge of the arm-soc tree with the arm tree
-Message-ID: <20140725101355.7946e4b9@canb.auug.org.au>
+From: jason@lakedaemon.net (Jason Cooper)
+Date: Thu, 24 Jul 2014 20:15:06 -0400
+Subject: [PATCH 0/2] ARM: Marvell Armada XP datasheet publicly available
+In-Reply-To: <1406227593-29749-1-git-send-email-thomas.petazzoni@free-electrons.com>
+References: <1406227593-29749-1-git-send-email-thomas.petazzoni@free-electrons.com>
+Message-ID: <20140725001506.GC23220@titan.lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi all,
+On Thu, Jul 24, 2014 at 08:46:31PM +0200, Thomas Petazzoni wrote:
+> Hello,
+> 
+> This series of two patches make a few updates to the README file of
+> the kernel documentation related to Marvell ARM platforms in the
+> kernel.
+> 
+> The most important announcement is the public release by Marvell of
+> the datasheet for the Armada XP SoC. It follows the publication, a few
+> weeks ago, of the Armada 370 datasheet.
 
-Today's linux-next merge of the arm-soc tree got a conflict in
-arch/arm/mach-integrator/include/mach/memory.h between commit
-3ae4e9812941 ("ARM: 8113/1: remove remaining definitions of
-PLAT_PHYS_OFFSET from <mach/memory.h>") from the arm tree and commit
-e6dc195c1c69 ("ARM: integrator: get rid of <mach/memory.h>") from the
-arm-soc tree.
+Great work Thomas!  Please extend a Thank You to the folks at Marvell.
 
-I fixed it up (I just removed the file) and can carry the fix as
-necessary (no action is required).
+> The second patch makes a few other updates to the same documentation,
+> taking into account recent movements in the support for Marvell SoCs
+> in the kernel.
+> 
+> The series is based on top of Jason's mvebu/soc branch.
+> 
+> Thanks,
+> 
+> Thomas
+> 
+> Thomas Petazzoni (2):
+>   Documentation: arm: add URLs to public datasheets for the Marvell
+>     Armada XP SoC
+>   Documentation: arm: misc updates to Marvell EBU SoC status
+> 
+>  Documentation/arm/Marvell/README | 19 ++++++++++---------
+>  1 file changed, 10 insertions(+), 9 deletions(-)
 
--- 
-Cheers,
-Stephen Rothwell                    sfr at canb.auug.org.au
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140725/407f7426/attachment.sig>
+Applied to mvebu/soc with Sebastian's and Andrew's Acks.
+
+thx,
+
+Jason.
