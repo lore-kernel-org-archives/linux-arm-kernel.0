@@ -1,42 +1,38 @@
-From: tomasz.figa@gmail.com (Tomasz Figa)
-Date: Fri, 25 Jul 2014 13:00:49 +0200
-Subject: [PATCH v7 3/4] ARM: EXYNOS: Add platform driver support for Exynos
- PMU
-In-Reply-To: <000501cfa7c9$e59f4840$b0ddd8c0$@samsung.com>
-References: <1404878455-31518-1-git-send-email-pankaj.dubey@samsung.com>
- <1404878455-31518-4-git-send-email-pankaj.dubey@samsung.com>
- <067501cfa7bd$8e6cb460$ab461d20$@samsung.com>
- <000501cfa7c9$e59f4840$b0ddd8c0$@samsung.com>
-Message-ID: <53D238E1.3030901@gmail.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Fri, 25 Jul 2014 12:03:42 +0100
+Subject: [PATCH v5 1/3] arm64: ptrace: reload a syscall number after
+ ptrace operations
+In-Reply-To: <53D23341.4040403@linaro.org>
+References: <1406020499-5537-1-git-send-email-takahiro.akashi@linaro.org>
+ <1406020499-5537-2-git-send-email-takahiro.akashi@linaro.org>
+ <53D08358.4020902@amacapital.net> <53D0A037.2060308@linaro.org>
+ <CALCETrU9_sdODRz-xZ4bouq+anHhmfx2tkr7hg00RVf_bBBJwg@mail.gmail.com>
+ <53D23341.4040403@linaro.org>
+Message-ID: <20140725110342.GD5269@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Pankaj, Kukjin,
-
-On 25.07.2014 07:32, Pankaj Dubey wrote:
-> Hi Kukjin,
+On Fri, Jul 25, 2014 at 11:36:49AM +0100, AKASHI Takahiro wrote:
+> On 07/25/2014 12:01 AM, Andy Lutomirski wrote:
+> >>> If so, then you risk (at least) introducing
+> >>>
+> >>> a nice user-triggerable OOPS if audit is enabled.
+> >>
+> >>
+> >> Can you please elaborate this?
+> >> Since I didn't find any definition of audit's behavior when syscall is
+> >> rewritten to -1, I thought it is reasonable to skip "exit tracing" of
+> >> "skipped" syscall.
+> >> (otherwise, "fake" seems to be more appropriate :)
+> >
+> > The audit entry hook will oops if you call it twice in a row without
+> > calling the exit hook in between.
 > 
-> On Friday, July 25, 2014 Kukjin Kim wrote:
+> Thank you, I could reproduce this problem which hits BUG(in_syscall) in
+> audit_syscall_entry(). Really bad, and I fixed it in my next version and
+> now a "skipped" system call is also traced by audit.
 
-[snip]
+Can you reproduce this on arch/arm/ too? If so, we should also fix the code
+there.
 
->>>
->> Looks good to me, will apply this and 4/4.
->>
-> 
-> We need to hold these two patches until dependent patch [1] from Tomasz Figa
-> gets merged.
-> 
-> [1]: mfd: syscon: Decouple syscon interface from syscon devices
->       https://lkml.org/lkml/2014/6/24/188
-
-That RFC patch had few comments from Arnd needed to be addressed, so it
-needs a new revision.
-
-Pankaj, If I remember correctly, we had talked about this and the
-conclusion was that you would take care of addressing the comments and
-sending new version of the patch. Any update on this or have I missed
-something?
-
-Best regards,
-Tomasz
+Will
