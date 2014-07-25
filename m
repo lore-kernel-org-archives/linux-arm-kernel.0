@@ -1,189 +1,53 @@
-From: mturquette@linaro.org (Mike Turquette)
-Date: Fri, 25 Jul 2014 15:22:13 -0700
-Subject: [PATCH v2 1/2] clk: samsung: exynos4: Enable ARMCLK down feature
-In-Reply-To: <1406195041.21857.4.camel@AMDC1943>
-References: <1405694193-29643-1-git-send-email-k.kozlowski@samsung.com>
- <20140724001853.6419.551@quantum> <1406184144.8807.4.camel@AMDC1943>
- <1406195041.21857.4.camel@AMDC1943>
-Message-ID: <20140725222213.4791.58949@quantum>
+From: bpringlemeir@nbsps.com (Bill Pringlemeir)
+Date: Fri, 25 Jul 2014 18:14:02 -0400
+Subject: fsl_lpuart/VF610: Division by zero.
+Message-ID: <87ha256q8l.fsf@nbsps.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Quoting Krzysztof Kozlowski (2014-07-24 02:44:01)
-> On czw, 2014-07-24 at 08:42 +0200, Krzysztof Kozlowski wrote:
-> > On ?ro, 2014-07-23 at 17:18 -0700, Mike Turquette wrote:
-> > > Quoting Krzysztof Kozlowski (2014-07-18 07:36:32)
-> > > > Enable ARMCLK down feature on all Exynos4 SoCs. The frequency of
-> > > > ARMCLK will be reduced upon entering idle mode (WFI or WFE).
-> > > > 
-> > > > The feature behaves like very fast cpufreq ondemand governor. In idle
-> > > > mode this reduces energy consumption on full frequency chosen by
-> > > > cpufreq governor by approximately:
-> > > >  - Trats2:  6.5% (153 mA -> 143 mA)
-> > > >  - Trats:  33.0% (180 mA -> 120 mA)
-> > > >  - Gear1:  27.0% (180 mA -> 130 mA)
-> > > 
-> > > Nice power savings! Just a quick question on this feature: the clock
-> > > frequency is changed in hardware as a result of WFI/WFE?
-> > 
-> > Yes. This feature makes changes in DIVCORE and DIVCORE2 clock dividers
-> > when given core enters WFI/WFE.
-> > 
-> > > And this only
-> > > happens when all CPUs in a cluster (e.g. all 4 CPUs in Exynos 4412) are
-> > > in WFI/WFE state?
-> > 
-> > No, this is per-core. However measured energy savings above were in case
-> > where all cores entered idle (WFI).
-> 
-> Aaargh, that is obviously incorrect, my mistake. You're right that this
-> is for whole cluster as all cores share ARMCLK (and clock dividers).
-> However you can enable WFI/WFE detection per core. 
-> 
-> The datasheet does not describe what will happen exactly when you enable
-> the WFI/WFE detection for core0 and leave it disabled for other cores. I
-> assume that upon entering WFI on core0 everything will be slowed down
-> regardless of pending work on other cores but I didn't test it.
+I have this 'dmesg' with ttyLP1,
 
-OK, that is interesting. The reason I was asking was exactly for that
-type of corner case. My concern was that the clock rate should be
-modeled properly in the clock framework if any CPUs are still running
-when the ARMCLK down feature is activated. But based on your response it
-sounds like that is more of a bug than a real possible use case, so
-probably we don't have to worry about modeling the ARMCLK rate when the
-ARMCLK down feature is activated.
+Division by zero in kernel.
+CPU: 0 PID: 187 Comm: getty Not tainted 3.15.0-rc8-04600-ge74a685-dirty #465
+[<80013b18>] (unwind_backtrace) from [<80011e3c>] (show_stack+0x10/0x14)
+[<80011e3c>] (show_stack) from [<8019a11c>] (Ldiv0+0x8/0x10)
+[<8019a11c>] (Ldiv0) from [<801f0ad4>] (lpuart_startup+0x1e4/0x398)
+[<801f0ad4>] (lpuart_startup) from [<801ef2e8>] (uart_startup.part.18+0x84/0x1e8)
+[<801ef2e8>] (uart_startup.part.18) from [<801efd40>] (uart_open+0xe4/0x14c)
+[<801efd40>] (uart_open) from [<801d586c>] (tty_open+0x1a0/0x5d0)
+[<801d586c>] (tty_open) from [<800a1008>] (chrdev_open+0x9c/0x160)
+[<800a1008>] (chrdev_open) from [<8009bd0c>] (do_dentry_open.isra.15+0x1b4/0x270)
+[<8009bd0c>] (do_dentry_open.isra.15) from [<8009be98>] (finish_open+0x20/0x3c)
+[<8009be98>] (finish_open) from [<800a8bfc>] (do_last.isra.66+0x404/0xc60)
+[<800a8bfc>] (do_last.isra.66) from [<800a950c>] (path_openat+0xb4/0x5b0)
+[<800a950c>] (path_openat) from [<800aa900>] (do_filp_open+0x2c/0x80)
+[<800aa900>] (do_filp_open) from [<8009ce50>] (do_sys_open+0x120/0x1e0)
+[<8009ce50>] (do_sys_open) from [<8000ed80>] (ret_fast_syscall+0x0/0x30)
+random: nonblocking pool is initialized
 
-Regards,
-Mike
+I looked at the vmlinux objdump and it is here,
 
-> 
-> Best regards,
-> Krzysztof
-> 
-> > 
-> > Best regards,
-> > Krzysztof
-> > 
-> > 
-> > > 
-> > > Thanks,
-> > > Mike
-> > > 
-> > > > 
-> > > > The patch uses simillar settings as Exynos5250 (clk-exynos5250.c),
-> > > > except it disables clock up feature and on Exynos4412 ARMCLK down is
-> > > > enabled for all 4 cores.
-> > > > 
-> > > > Tested on Trats board (Exynos4210), Trats2 board (Exynos4412) and
-> > > > Samsung Gear 1 (Exynos4212).
-> > > > 
-> > > > Signed-off-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
-> > > > 
-> > > > ---
-> > > > 
-> > > > Changes since v1:
-> > > > 1. Add PWR_CTRL registers to the list of saved clk registers on
-> > > >    Exynos4x12. Suggested by Tomasz Figa.
-> > > > 2. Disable the clock up feature. (sug. Tomasz Figa)
-> > > > 3. Use macros for setting clock down ratio. (sug. Tomasz Figa)
-> > > > 4. Use num_possible_cpus() for exception on Exynos4x12. (sug. Tomasz
-> > > >    Figa)
-> > > > 5. Enable the clock down feature also on Exynos4210 Trats board.
-> > > > ---
-> > > >  drivers/clk/samsung/clk-exynos4.c | 46 +++++++++++++++++++++++++++++++++++++++
-> > > >  1 file changed, 46 insertions(+)
-> > > > 
-> > > > diff --git a/drivers/clk/samsung/clk-exynos4.c b/drivers/clk/samsung/clk-exynos4.c
-> > > > index 7f4a473a7ad7..86c7709dc6d6 100644
-> > > > --- a/drivers/clk/samsung/clk-exynos4.c
-> > > > +++ b/drivers/clk/samsung/clk-exynos4.c
-> > > > @@ -114,11 +114,27 @@
-> > > >  #define DIV_CPU1               0x14504
-> > > >  #define GATE_SCLK_CPU          0x14800
-> > > >  #define GATE_IP_CPU            0x14900
-> > > > +#define PWR_CTRL1              0x15020
-> > > > +#define E4X12_PWR_CTRL2                0x15024
-> > > >  #define E4X12_DIV_ISP0         0x18300
-> > > >  #define E4X12_DIV_ISP1         0x18304
-> > > >  #define E4X12_GATE_ISP0                0x18800
-> > > >  #define E4X12_GATE_ISP1                0x18804
-> > > >  
-> > > > +/* Below definitions are used for PWR_CTRL settings */
-> > > > +#define PWR_CTRL1_CORE2_DOWN_RATIO(x)          (((x) & 0x7) << 28)
-> > > > +#define PWR_CTRL1_CORE1_DOWN_RATIO(x)          (((x) & 0x7) << 16)
-> > > > +#define PWR_CTRL1_DIV2_DOWN_EN                 (1 << 9)
-> > > > +#define PWR_CTRL1_DIV1_DOWN_EN                 (1 << 8)
-> > > > +#define PWR_CTRL1_USE_CORE3_WFE                        (1 << 7)
-> > > > +#define PWR_CTRL1_USE_CORE2_WFE                        (1 << 6)
-> > > > +#define PWR_CTRL1_USE_CORE1_WFE                        (1 << 5)
-> > > > +#define PWR_CTRL1_USE_CORE0_WFE                        (1 << 4)
-> > > > +#define PWR_CTRL1_USE_CORE3_WFI                        (1 << 3)
-> > > > +#define PWR_CTRL1_USE_CORE2_WFI                        (1 << 2)
-> > > > +#define PWR_CTRL1_USE_CORE1_WFI                        (1 << 1)
-> > > > +#define PWR_CTRL1_USE_CORE0_WFI                        (1 << 0)
-> > > > +
-> > > >  /* the exynos4 soc type */
-> > > >  enum exynos4_soc {
-> > > >         EXYNOS4210,
-> > > > @@ -155,6 +171,7 @@ static unsigned long exynos4210_clk_save[] __initdata = {
-> > > >         E4210_GATE_IP_LCD1,
-> > > >         E4210_GATE_IP_PERIR,
-> > > >         E4210_MPLL_CON0,
-> > > > +       PWR_CTRL1,
-> > > >  };
-> > > >  
-> > > >  static unsigned long exynos4x12_clk_save[] __initdata = {
-> > > > @@ -164,6 +181,8 @@ static unsigned long exynos4x12_clk_save[] __initdata = {
-> > > >         E4X12_DIV_ISP,
-> > > >         E4X12_DIV_CAM1,
-> > > >         E4X12_MPLL_CON0,
-> > > > +       PWR_CTRL1,
-> > > > +       E4X12_PWR_CTRL2,
-> > > >  };
-> > > >  
-> > > >  static unsigned long exynos4_clk_pll_regs[] __initdata = {
-> > > > @@ -1164,6 +1183,32 @@ static struct samsung_pll_clock exynos4x12_plls[nr_plls] __initdata = {
-> > > >                         VPLL_LOCK, VPLL_CON0, NULL),
-> > > >  };
-> > > >  
-> > > > +static void __init exynos4_core_down_clock(enum exynos4_soc soc)
-> > > > +{
-> > > > +       unsigned int tmp;
-> > > > +
-> > > > +       /*
-> > > > +        * Enable arm clock down (in idle) and set arm divider
-> > > > +        * ratios in WFI/WFE state.
-> > > > +        */
-> > > > +       tmp = (PWR_CTRL1_CORE2_DOWN_RATIO(7) | PWR_CTRL1_CORE1_DOWN_RATIO(7) |
-> > > > +               PWR_CTRL1_DIV2_DOWN_EN | PWR_CTRL1_DIV1_DOWN_EN |
-> > > > +               PWR_CTRL1_USE_CORE1_WFE | PWR_CTRL1_USE_CORE0_WFE |
-> > > > +               PWR_CTRL1_USE_CORE1_WFI | PWR_CTRL1_USE_CORE0_WFI);
-> > > > +       /* On Exynos4412 enable it also on core 2 and 3 */
-> > > > +       if (num_possible_cpus() == 4)
-> > > > +               tmp |= PWR_CTRL1_USE_CORE3_WFE | PWR_CTRL1_USE_CORE2_WFE |
-> > > > +                      PWR_CTRL1_USE_CORE3_WFI | PWR_CTRL1_USE_CORE2_WFI;
-> > > > +       __raw_writel(tmp, reg_base + PWR_CTRL1);
-> > > > +
-> > > > +       /*
-> > > > +        * Disable the clock up feature on Exynos4x12, in case it was
-> > > > +        * enabled by bootloader.
-> > > > +        */
-> > > > +       if (exynos4_soc == EXYNOS4X12)
-> > > > +               __raw_writel(0x0, reg_base + E4X12_PWR_CTRL2);
-> > > > +}
-> > > > +
-> > > >  /* register exynos4 clocks */
-> > > >  static void __init exynos4_clk_init(struct device_node *np,
-> > > >                                     enum exynos4_soc soc)
-> > > > @@ -1250,6 +1295,7 @@ static void __init exynos4_clk_init(struct device_node *np,
-> > > >         samsung_clk_register_alias(ctx, exynos4_aliases,
-> > > >                         ARRAY_SIZE(exynos4_aliases));
-> > > >  
-> > > > +       exynos4_core_down_clock(soc);
-> > > >         exynos4_clk_sleep_init();
-> > > >  
-> > > >         pr_info("%s clocks: sclk_apll = %ld, sclk_mpll = %ld\n"
-> > > > -- 
-> > > > 1.9.1
-> > > > 
-> 
+static int lpuart_dma_rx_request(struct uart_port *port)
+{
+...
+	sport->dma_rx_timeout = (sport->port.timeout - HZ / 50) *
+				FSL_UART_RX_DMA_BUFFER_SIZE * 3 /
+				sport->rxfifo_size / 2;
+
+The variable 'sport->rxfifo_size' is set in lpuart_setup_watermark() and
+this is called after lpuart_dma_rx_request() in lpuart_startup().
+
+It looks the same in the 'tty/serial' tree?
+
+ https://git.kernel.org/cgit/linux/kernel/git/gregkh/tty.git/tree/drivers/tty/serial/fsl_lpuart.c#n768
+
+I tried some simple changes but then I get no serial output, so I
+thought it might be better to see if I am using the wrong git trees or
+if the fix is more obvious to someone familiar with the code.
+
+I think that normally everyone runs the console on this port and
+'lpuart_console_setup()' is setting 'sport->rxfifo_size' before hand?
+Or I don't understand why no one else is seeing this?
+
+Thanks,
+Bill Pringlemeir.
