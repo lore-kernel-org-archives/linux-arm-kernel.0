@@ -1,152 +1,79 @@
-From: afaerber@suse.de (=?ISO-8859-15?Q?Andreas_F=E4rber?=)
-Date: Fri, 25 Jul 2014 14:11:52 +0200
-Subject: [PATCHv6 1/5] mmc: dw_mmc: modify the dt-binding for removing
- slot-node and supports-highspeed
-In-Reply-To: <1406250713-22604-2-git-send-email-jh80.chung@samsung.com>
-References: <1406250713-22604-1-git-send-email-jh80.chung@samsung.com>
- <1406250713-22604-2-git-send-email-jh80.chung@samsung.com>
-Message-ID: <53D24988.9010208@suse.de>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Fri, 25 Jul 2014 13:14:11 +0100
+Subject: next build: 629 warnings 1 failures (next/next-20140723)
+In-Reply-To: <20140725112623.GG23220@titan.lakedaemon.net>
+References: <53cf8323.e4b6440a.7d37.4f75@mx.google.com>
+ <CAOesGMhT9n7nVbCay5cU74pv2qrbqMooZLoY923Lk6SzXk5z+A@mail.gmail.com>
+ <20140724085037.GB1994@arm.com> <20140724104318.GA13371@arm.com>
+ <20140724132448.GB13371@arm.com>
+ <20140724224836.GY23220@titan.lakedaemon.net>
+ <20140725090109.GA24268@arm.com>
+ <20140725112623.GG23220@titan.lakedaemon.net>
+Message-ID: <20140725121411.GE24268@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Jaehoon,
-
-Am 25.07.2014 03:11, schrieb Jaehoon Chung:
-> Almost Soc is used the slot per a host.
-
-Something's very wrong with this sentence. What are you trying to say?
-Almost all SoCs use one slot only per host controller device?
-
-> Don't use the slot-node and deprecated the "supports-highsped" property.
-
-s/deprecated/deprecate/ ?
-s/highsped/highspeed/
-
-> Instead, use the cap-mmc/sd-highspeed.
+On Fri, Jul 25, 2014 at 12:26:23PM +0100, Jason Cooper wrote:
+> On Fri, Jul 25, 2014 at 10:01:09AM +0100, Catalin Marinas wrote:
+> > On Thu, Jul 24, 2014 at 11:48:36PM +0100, Jason Cooper wrote:
+> > > On Thu, Jul 24, 2014 at 02:24:48PM +0100, Catalin Marinas wrote:
+> > > > From 3acb8b49aeba9f48153a2d719dec05d0b862e285 Mon Sep 17 00:00:00 2001
+> > > > From: Catalin Marinas <catalin.marinas@arm.com>
+> > > > Date: Thu, 24 Jul 2014 14:14:42 +0100
+> > > > Subject: [PATCH] arm64: gicv3: Allow GICv3 compilation with older binutils
+> > > > 
+> > > > GICv3 introduces new system registers accessible with the full msr/mrs
+> > > > syntax (e.g. mrs x0, Sx_op0_op1_CRm_CRn_op2). However, only recent
+> > > > binutils understand the new syntax. This patch introduces msr_s/mrs_s
+> > > > assembly macros which generate the equivalent instructions above and
+> > > > converts the existing GICv3 code (both drivers/irqchip/ and
+> > > > arch/arm64/kernel/).
+> > > > 
+> > > > Signed-off-by: Catalin Marinas <catalin.marinas@arm.com>
+> > > > Suggested-by: Mark Rutland <mark.rutland@arm.com>
+> > > > Reported-by: Olof Johansson <olof@lixom.net>
+> > > > Cc: Will Deacon <will.deacon@arm.com>
+> > > > Cc: Marc Zyngier <marc.zyngier@arm.com>
+> > > > ---
+> > > >  arch/arm64/include/asm/sysreg.h    | 60 ++++++++++++++++++++++++++++++++++++++
+> > > >  arch/arm64/kernel/head.S           |  6 ++--
+> > > >  drivers/irqchip/irq-gic-v3.c       | 16 +++++-----
+> > > >  include/linux/irqchip/arm-gic-v3.h | 42 +++++++++++++-------------
+> > > >  4 files changed, 93 insertions(+), 31 deletions(-)
+> > > >  create mode 100644 arch/arm64/include/asm/sysreg.h
+> > > 
+> > > I'm going to assume this goes on top of Marc's series, and that you'll
+> > > take it through arm64:
+> > > 
+> > > Acked-by: Jason Cooper <jason@lakedaemon.net>
+> > 
+> > Thanks. I'll let Marc decide (he's back next week) as I go on holiday
+> > soon. Ideally it should go into -next and upstream together with the
+> > rest of the GICv3 patches but I (or Will if I'm way) am happy to take
+> > the patch once GICv3 hits mainline (I would like to avoid merging the
+> > irqchip tree into the arm64 tree just to be able to apply this fix).
 > 
-> Signed-off-by: Jaehoon Chung <jh80.chung@samsung.com>
-> Reviewed-by: Tushar Behera <trblinux@gmail.com>
-> Reviewed-by: Ulf Hansson <ulf.hansson@linaro.org>
-> Tested-by: Sachin Kamat <sachin.kamat@samsung.com>
-> Acked-by: Seungwon Jeon <tgih.jun@samsung.com>
-> ---
->  .../devicetree/bindings/mmc/exynos-dw-mshc.txt     |   17 +++++------------
->  .../devicetree/bindings/mmc/k3-dw-mshc.txt         |   12 +++++-------
->  .../devicetree/bindings/mmc/synopsys-dw-mshc.txt   |   12 +++++-------
->  3 files changed, 15 insertions(+), 26 deletions(-)
+> That's why I created a topic branch for GICv3. ;-)  If you pull:
 > 
-> diff --git a/Documentation/devicetree/bindings/mmc/exynos-dw-mshc.txt b/Documentation/devicetree/bindings/mmc/exynos-dw-mshc.txt
-> index 532b1d4..9308325 100644
-> --- a/Documentation/devicetree/bindings/mmc/exynos-dw-mshc.txt
-> +++ b/Documentation/devicetree/bindings/mmc/exynos-dw-mshc.txt
-> @@ -46,13 +46,14 @@ Required Properties:
->        - if CIU clock divider value is 0 (that is divide by 1), both tx and rx
->          phase shift clocks should be 0.
->  
-> -Required properties for a slot:
-> +Required properties for a slot (Deprecated - Recommend to use one slot per a host):
+>   git://git.infradead.org/users/jcooper/linux.git tags/deps-irqchip-gic-3.17
+> 
+> You'll get:
+> 
+>   021f653791ad irqchip: gic-v3: Initial support for GICv3
+>   d51d0af43b30 irqchip: gic: Move some bits of GICv2 to a library-type file
+> 
+> based on v3.16-rc1 and nothing more.
+> 
+> That tag is on the irqchip/gic branch, which I'll put all the other
+> changes to gic on top of once Marc has had a chance to review them.
+> 
+> The intent was for arm64 to pull the above, and apply the rest of Marc's
+> series on top.  The fix just posted would go on top of that.  But if you
+> want to wait...
 
-"per host"
-
->  
->  * gpios: specifies a list of gpios used for command, clock and data bus. The
->    first gpio is the command line and the second gpio is the clock line. The
->    rest of the gpios (depending on the bus-width property) are the data lines in
->    no particular order. The format of the gpio specifier depends on the gpio
->    controller.
-> + (Deprecated - Refer to Documentaion/devicetree/binding/pinctrl/samsung-pinctrl.txt)
-
-"Documentation/"
-
-Nit: Is the indentation intentional? (parenthesis not aligned with text)
-
->  
->  Example:
->  
-> @@ -69,21 +70,13 @@ Example:
->  
->  	dwmmc0 at 12200000 {
->  		num-slots = <1>;
-> -		supports-highspeed;
-> +		cap-mmc-highspeed;
-> +		cap-sd-highspeed;
->  		broken-cd;
->  		fifo-depth = <0x80>;
->  		card-detect-delay = <200>;
->  		samsung,dw-mshc-ciu-div = <3>;
->  		samsung,dw-mshc-sdr-timing = <2 3>;
->  		samsung,dw-mshc-ddr-timing = <1 2>;
-> -
-> -		slot at 0 {
-> -			reg = <0>;
-> -			bus-width = <8>;
-> -			gpios = <&gpc0 0 2 0 3>, <&gpc0 1 2 0 3>,
-> -				<&gpc1 0 2 3 3>, <&gpc1 1 2 3 3>,
-> -				<&gpc1 2 2 3 3>, <&gpc1 3 2 3 3>,
-> -				<&gpc0 3 2 3 3>, <&gpc0 4 2 3 3>,
-> -				<&gpc0 5 2 3 3>, <&gpc0 6 2 3 3>;
-> -		};
-> +		bus-width = <8>;
->  	};
-> diff --git a/Documentation/devicetree/bindings/mmc/k3-dw-mshc.txt b/Documentation/devicetree/bindings/mmc/k3-dw-mshc.txt
-> index e5bc49f..3b35449 100644
-> --- a/Documentation/devicetree/bindings/mmc/k3-dw-mshc.txt
-> +++ b/Documentation/devicetree/bindings/mmc/k3-dw-mshc.txt
-> @@ -34,13 +34,11 @@ Example:
->  		num-slots = <1>;
->  		vmmc-supply = <&ldo12>;
->  		fifo-depth = <0x100>;
-> -		supports-highspeed;
->  		pinctrl-names = "default";
->  		pinctrl-0 = <&sd_pmx_pins &sd_cfg_func1 &sd_cfg_func2>;
-> -		slot at 0 {
-> -			reg = <0>;
-> -			bus-width = <4>;
-> -			disable-wp;
-> -			cd-gpios = <&gpio10 3 0>;
-> -		};
-> +		bus-width = <4>;
-> +		disable-wp;
-> +		cd-gpios = <&gpio10 3 0>;
-> +		cap-mmc-highspeed;
-> +		cap-sd-highspeed;
->  	};
-> diff --git a/Documentation/devicetree/bindings/mmc/synopsys-dw-mshc.txt b/Documentation/devicetree/bindings/mmc/synopsys-dw-mshc.txt
-> index 2d4a725..346c609 100644
-> --- a/Documentation/devicetree/bindings/mmc/synopsys-dw-mshc.txt
-> +++ b/Documentation/devicetree/bindings/mmc/synopsys-dw-mshc.txt
-> @@ -67,7 +67,8 @@ Optional properties:
->  * card-detect-delay: Delay in milli-seconds before detecting card after card
->    insert event. The default value is 0.
->  
-> -* supports-highspeed: Enables support for high speed cards (up to 50MHz)
-> +* supports-highspeed (DEPRECATED): Enables support for high speed cards (up to 50MHz)
-> +			   (use "cap-mmc-highspeed" or "cap-sd-highspeed" instead)
->  
->  * broken-cd: as documented in mmc core bindings.
->  
-> @@ -98,14 +99,11 @@ board specific portions as listed below.
->  		clock-frequency = <400000000>;
->  		clock-freq-min-max = <400000 200000000>;
->  		num-slots = <1>;
-> -		supports-highspeed;
->  		broken-cd;
->  		fifo-depth = <0x80>;
->  		card-detect-delay = <200>;
->  		vmmc-supply = <&buck8>;
-> -
-> -		slot at 0 {
-> -			reg = <0>;
-> -			bus-width = <8>;
-> -		};
-> +		bus-width = <8>;
-> +		cap-mmc-highspeed;
-> +		cap-sd-highspeed;
->  	};
-
-Regards,
-Andreas
+That's great, thanks. I wasn't aware (or maybe I forgot) of the plans
+for how to get GICv3 merged. I pulled the tag above and applied the fix
+on top.
 
 -- 
-SUSE LINUX Products GmbH, Maxfeldstr. 5, 90409 N?rnberg, Germany
-GF: Jeff Hawn, Jennifer Guild, Felix Imend?rffer; HRB 16746 AG N?rnberg
+Catalin
