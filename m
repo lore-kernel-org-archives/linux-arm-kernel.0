@@ -1,50 +1,120 @@
-From: andriy.shevchenko@linux.intel.com (Andy Shevchenko)
-Date: Fri, 25 Jul 2014 13:45:47 +0300
-Subject: [PATCH] spi/pxa2xx-pci: Enable DMA binding through device name
-In-Reply-To: <5426556.OzZIXLrofJ@wuerfel>
-References: <1406196111-22861-1-git-send-email-hock.leong.kweh@intel.com>
- <20140725090714.GY1857@lahna.fi.intel.com>
- <20140725095559.GA1857@lahna.fi.intel.com> <5426556.OzZIXLrofJ@wuerfel>
-Message-ID: <1406285147.8530.13.camel@smile.fi.intel.com>
+From: harini.katakam@xilinx.com (Harini Katakam)
+Date: Fri, 25 Jul 2014 10:47:31 +0000
+Subject: [PATCH v2 05/11] ARM: dts: zynq: Add QSPI for Parallella
+References: <1406242820-20140-1-git-send-email-afaerber@suse.de>
+ <1406242820-20140-6-git-send-email-afaerber@suse.de>
+ <ddb38ce5-9e31-4c94-967c-7784c7fba75c@BN1BFFO11FD028.protection.gbl>
+ <53D20E5B.9070501@monstr.eu> <53D21887.2020305@suse.de>
+ <53D2258B.9000609@xilinx.com>
+Message-ID: <2bb3733f-f6db-4953-b3f2-8d76203d7c91@BY2FFO11FD002.protection.gbl>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 2014-07-25 at 12:19 +0200, Arnd Bergmann wrote:
-> On Friday 25 July 2014 12:55:59 Mika Westerberg wrote:
-> > On Fri, Jul 25, 2014 at 12:07:14PM +0300, Mika Westerberg wrote:
-> > > On Fri, Jul 25, 2014 at 10:38:36AM +0200, Arnd Bergmann wrote:
-> > > > On Friday 25 July 2014 11:22:49 Mika Westerberg wrote:
+Hi,
 
-[]
+> -----Original Message-----
+> From: Harini Katakam
+> Sent: Friday, July 25, 2014 4:01 PM
+> To: 'Michal Simek'; Andreas F?rber; monstr at monstr.eu; Soren Brinkmann
+> Cc: Michal Simek; Andreas Olofsson; Matteo Vit; Sean Rickerd;
+> devicetree at vger.kernel.org; linux-arm-kernel at lists.infradead.org; linux-
+> kernel at vger.kernel.org; Rob Herring; Pawel Moll; Mark Rutland; Ian
+> Campbell; Kumar Gala; Russell King
+> Subject: RE: [PATCH v2 05/11] ARM: dts: zynq: Add QSPI for Parallella
+> 
+> Hi,
+> 
+> > -----Original Message-----
+> > From: Michal Simek [mailto:michal.simek at xilinx.com]
+> > Sent: Friday, July 25, 2014 3:08 PM
+> > To: Andreas F?rber; monstr at monstr.eu; Soren Brinkmann
+> > Cc: Harini Katakam; Michal Simek; Andreas Olofsson; Matteo Vit; Sean
+> > Rickerd; devicetree at vger.kernel.org; linux-arm-
+> kernel at lists.infradead.org;
+> > linux-kernel at vger.kernel.org; Rob Herring; Pawel Moll; Mark Rutland; Ian
+> > Campbell; Kumar Gala; Russell King
+> > Subject: Re: [PATCH v2 05/11] ARM: dts: zynq: Add QSPI for Parallella
+> >
+> > On 07/25/2014 10:42 AM, Andreas F?rber wrote:
+> > > Am 25.07.2014 09:59, schrieb Michal Simek:
+> > >> On 07/25/2014 01:18 AM, S?ren Brinkmann wrote:
+> > >>> On Fri, 2014-07-25 at 01:00AM +0200, Andreas F?rber wrote:
+> > >>>> Prepare SPI0 and SPI1 while at it.
+> > >
+> > >> Patch subject is incorrect. You are adding SPI and QSPI.
+> > >
+> > > Yes, it originally added only QSPI, but I considered it a good deed to
+> > > add SPI as well while already reading that part of the TRM. :)
+> > >
+> > >>>>
+> > >>>> Signed-off-by: Andreas F?rber <afaerber@suse.de> --- v2: New
+> > >>>>
+> > >>>> arch/arm/boot/dts/zynq-7000.dtsi      | 37
+> > >>>> +++++++++++++++++++++++++++++++++++
+> > >>>> arch/arm/boot/dts/zynq-parallella.dts |  4 ++++ 2 files
+> > >>>> changed, 41 insertions(+)
+> > >>>>
+> > >>>> diff --git a/arch/arm/boot/dts/zynq-7000.dtsi
+> > >>>> b/arch/arm/boot/dts/zynq-7000.dtsi index 8fd826a..eed3df0
+> > >>>> 100644 --- a/arch/arm/boot/dts/zynq-7000.dtsi +++
+> > >>>> b/arch/arm/boot/dts/zynq-7000.dtsi @@ -122,6 +122,30 @@
+> > >>>> interrupts = <0 50 4>; };
+> > >>>>
+> > >>>> +		spi0: spi at e0006000 { +			compatible =
+> > "xlnx,zynq-spi-r1p6";
+> > >>>> +			reg = <0xe0006000 0x1000>; +
+> 	status
+> > = "disabled"; +
+> > >>>> interrupt-parent = <&intc>; +			interrupts = <0 26 4>;
+> > +
+> > >>>> clocks = <&clkc 25>, <&clkc 34>; +			clock-names
+> =
+> > "ref_clk",
+> > >>>> "pclk"; +			#address-cells = <1>; +			#size-
+> > cells = <0>; +		};
+> > >>>> + +		spi1: spi at e0007000 { +			compatible =
+> > >>>> "xlnx,zynq-spi-r1p6"; +			reg = <0xe0007000 0x1000>; +
+> > 			status
+> > >>>> = "disabled"; +			interrupt-parent = <&intc>; +
+> > 		interrupts =
+> > >>>> <0 49 4>; +			clocks = <&clkc 26>, <&clkc 35>; +
+> > 		clock-names
+> > >>>> = "ref_clk", "pclk"; +			#address-cells = <1>; +
+> > 		#size-cells
+> > >>>> = <0>; +		}; +
+> > >>> Until here things look good.
+> > >>>
+> > >>>> gem0: ethernet at e000b000 { compatible = "cdns,gem"; reg =
+> > >>>> <0xe000b000 0x4000>; @@ -140,6 +164,19 @@ clock-names = "pclk",
+> > >>>> "hclk", "tx_clk"; };
+> > >>>>
+> > >>>> +		qspi: qspi at e000d000 { +
+> 	compatible =
+> > >>>> "xlnx,zynq-spi-r1p6"; +			reg = <0xe000d000 0x1000>; +
+> > 			status
+> > >>>> = "disabled"; +			interrupt-parent = <&intc>; +
+> > 		interrupts =
+> > >>>> <0 19 4>; +			clocks = <&clkc 10>, <&clkc 43>; +
+> > 		clock-names
+> > >>>> = "ref_clk", "pclk"; +			num-cs = <1>; +
+> > 	#address-cells =
+> > >>>> <1>; +			#size-cells = <0>; +		}; +
+> > >>> I'm not sure what the status of this driver is. I think QSPI is
+> > >>> still under review on the mailing lists and I don't think we
+> > >>> should add this yet.
+> > >
+> > >> Driver for qspi is not in the mainline yet but it doesn't mean that
+> > >> this fragment won't work. Harini: Can you please correct me if I am
+> > >> wrong?
+> > >
+> 
+> It can be added but it will have to be disabled as there is no qspi driver
+> at the moment in mainline.
+> 
 
-> > Something like this?
+The cadence spi driver can't be used for qspi directly.
+It?s better not to add qspi now. Once qspi driver is in mainline, qspi
+can be added with the corresponding compatibility string.
 
-Arnd, this dependency to certain DMA driver looks really bad.
-
-If we go that way, can we split that part to [another] module and make
-it dependent to DW_DMAC?
-
-Or shall we introduce a dmaengine type field in the platform data and
-dynamically choose proper filter-whatever-function to get the channel?
-
-> > Hock Leong / Chiaue Ee, are you able to check if this works on your BYT
-> > machines?
-
-> What I think you got wrong here (by following my bad advice) is the master
-> number. Looking at the code for dw_dma, I think src_master needs to be '1'
-> for your driver.
-
-On some SoCs we have up to 4 masters. It's blurry for me how the SPI
-should choose those masters. Currently it works fine, but I suspect
-there are [might be] performance issues.
-
-What about AVR32 case? We have to fix drivers as well there.
-
-> the dw_dma driver can be simplified a little by removing the special
-> case for the request line setting.
-
-Yes, this part I like.
-
--- 
-Andy Shevchenko <andriy.shevchenko@intel.com>
-Intel Finland Oy
+Regards,
+Harini
