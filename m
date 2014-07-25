@@ -1,24 +1,30 @@
 From: broonie@kernel.org (Mark Brown)
-Date: Fri, 25 Jul 2014 18:28:22 +0100
-Subject: [PATCH -next] spi/rockchip: fix error return code in
- rockchip_spi_probe()
-In-Reply-To: <1405864924-14137-1-git-send-email-weiyj_lk@163.com>
-References: <1405864924-14137-1-git-send-email-weiyj_lk@163.com>
-Message-ID: <20140725172822.GX17528@sirena.org.uk>
+Date: Fri, 25 Jul 2014 18:34:00 +0100
+Subject: [PATCH v2 01/16] regmap: Add regmap_get_device
+In-Reply-To: <1405957142-19416-2-git-send-email-ttynkkynen@nvidia.com>
+References: <1405957142-19416-1-git-send-email-ttynkkynen@nvidia.com>
+ <1405957142-19416-2-git-send-email-ttynkkynen@nvidia.com>
+Message-ID: <20140725173400.GZ17528@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Jul 20, 2014 at 10:02:04PM +0800, weiyj_lk at 163.com wrote:
-> From: Wei Yongjun <yongjun_wei@trendmicro.com.cn>
-> 
-> Fix to return -EINVAL from the error handling case instead of 0 when
-> failed to get fifo length.
+On Mon, Jul 21, 2014 at 06:38:47PM +0300, Tuomas Tynkkynen wrote:
+> Add a new function regmap_get_device to obtain the underlying struct
+> device from a regmap.
 
-Applied, thanks.
+I've applied this...
+
+> +struct device *regmap_get_device(struct regmap *map)
+> +{
+> +	return map->dev;
+> +}
+> +
+
+...plus a followup exporting the symbol so it can be used from modules.
 -------------- next part --------------
 A non-text attachment was scrubbed...
 Name: signature.asc
 Type: application/pgp-signature
 Size: 819 bytes
 Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140725/66ad94d4/attachment.sig>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140725/978e921c/attachment.sig>
