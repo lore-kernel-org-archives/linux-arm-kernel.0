@@ -1,152 +1,53 @@
 From: nicolas.pitre@linaro.org (Nicolas Pitre)
-Date: Fri, 25 Jul 2014 16:05:32 -0400
-Subject: [PATCH v2 4/5] ARM64: add IPI tracepoints
+Date: Fri, 25 Jul 2014 16:05:29 -0400
+Subject: [PATCH v2 1/5] tracing: Do not do anything special with
+ tracepoint_string when tracing is disabled
 In-Reply-To: <1406318733-26754-1-git-send-email-nicolas.pitre@linaro.org>
 References: <1406318733-26754-1-git-send-email-nicolas.pitre@linaro.org>
-Message-ID: <1406318733-26754-5-git-send-email-nicolas.pitre@linaro.org>
+Message-ID: <1406318733-26754-2-git-send-email-nicolas.pitre@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The strings used to list IPIs in /proc/interrupts are reused for tracing
-purposes.
+From: Steven Rostedt <rostedt@goodmis.org>
 
-While at it, the code is slightly cleaned up so the ipi_types array
-indices are no longer offset by IPI_RESCHEDULE whose value is 0 anyway.
+When CONFIG_TRACING is not enabled, there's no reason to save the trace
+strings either by the linker or as a static variable that can be
+referenced later. Simply pass back the string that is given to
+tracepoint_string().
 
+Signed-off-by: Steven Rostedt <rostedt@goodmis.org>
 Signed-off-by: Nicolas Pitre <nico@linaro.org>
-Acked-by: Steven Rostedt <rostedt@goodmis.org>
-Acked-by: Catalin Marinas <catalin.marinas@arm.com>
 ---
- arch/arm64/kernel/smp.c | 65 +++++++++++++++++++++++++++++--------------------
- 1 file changed, 39 insertions(+), 26 deletions(-)
+ include/linux/ftrace_event.h | 10 ++++++++++
+ 1 file changed, 10 insertions(+)
 
-diff --git a/arch/arm64/kernel/smp.c b/arch/arm64/kernel/smp.c
-index 40f38f46c8..a89c66f3b4 100644
---- a/arch/arm64/kernel/smp.c
-+++ b/arch/arm64/kernel/smp.c
-@@ -50,6 +50,9 @@
- #include <asm/tlbflush.h>
- #include <asm/ptrace.h>
+diff --git a/include/linux/ftrace_event.h b/include/linux/ftrace_event.h
+index cff3106ffe..b29636327d 100644
+--- a/include/linux/ftrace_event.h
++++ b/include/linux/ftrace_event.h
+@@ -574,6 +574,7 @@ do {									\
+ 		__trace_printk(ip, fmt, ##args);			\
+ } while (0)
  
-+#define CREATE_TRACE_POINTS
-+#include <trace/events/ipi.h>
-+
- /*
-  * as from 2.5, kernels no longer have an init_tasks structure
-  * so we need some other way of telling a new secondary core
-@@ -307,8 +310,6 @@ void __init smp_prepare_boot_cpu(void)
- 	set_my_cpu_offset(per_cpu_offset(smp_processor_id()));
- }
- 
--static void (*smp_cross_call)(const struct cpumask *, unsigned int);
--
- /*
-  * Enumerate the possible CPU set from the device tree and build the
-  * cpu logical map array containing MPIDR values related to logical
-@@ -463,32 +464,15 @@ void __init smp_prepare_cpus(unsigned int max_cpus)
- 	}
- }
- 
-+static void (*__smp_cross_call)(const struct cpumask *, unsigned int);
- 
- void __init set_smp_cross_call(void (*fn)(const struct cpumask *, unsigned int))
- {
--	smp_cross_call = fn;
-+	__smp_cross_call = fn;
- }
- 
--void arch_send_call_function_ipi_mask(const struct cpumask *mask)
--{
--	smp_cross_call(mask, IPI_CALL_FUNC);
--}
--
--void arch_send_call_function_single_ipi(int cpu)
--{
--	smp_cross_call(cpumask_of(cpu), IPI_CALL_FUNC_SINGLE);
--}
--
--#ifdef CONFIG_IRQ_WORK
--void arch_irq_work_raise(void)
--{
--	if (smp_cross_call)
--		smp_cross_call(cpumask_of(smp_processor_id()), IPI_IRQ_WORK);
--}
--#endif
--
--static const char *ipi_types[NR_IPI] = {
--#define S(x,s)	[x - IPI_RESCHEDULE] = s
-+static const char *ipi_types[NR_IPI] __tracepoint_string = {
-+#define S(x,s)	[x] = s
- 	S(IPI_RESCHEDULE, "Rescheduling interrupts"),
- 	S(IPI_CALL_FUNC, "Function call interrupts"),
- 	S(IPI_CALL_FUNC_SINGLE, "Single function call interrupts"),
-@@ -497,12 +481,18 @@ static const char *ipi_types[NR_IPI] = {
- 	S(IPI_IRQ_WORK, "IRQ work interrupts"),
- };
- 
-+static void smp_cross_call(const struct cpumask *target, unsigned int ipinr)
-+{
-+	trace_ipi_raise(target, ipi_types[ipinr]);
-+	__smp_cross_call(target, ipinr);
-+}
-+
- void show_ipi_list(struct seq_file *p, int prec)
- {
- 	unsigned int cpu, i;
- 
- 	for (i = 0; i < NR_IPI; i++) {
--		seq_printf(p, "%*s%u:%s", prec - 1, "IPI", i + IPI_RESCHEDULE,
-+		seq_printf(p, "%*s%u:%s", prec - 1, "IPI", i,
- 			   prec >= 4 ? " " : "");
- 		for_each_online_cpu(cpu)
- 			seq_printf(p, "%10u ",
-@@ -522,6 +512,24 @@ u64 smp_irq_stat_cpu(unsigned int cpu)
- 	return sum;
- }
- 
-+void arch_send_call_function_ipi_mask(const struct cpumask *mask)
-+{
-+	smp_cross_call(mask, IPI_CALL_FUNC);
-+}
-+
-+void arch_send_call_function_single_ipi(int cpu)
-+{
-+	smp_cross_call(cpumask_of(cpu), IPI_CALL_FUNC_SINGLE);
-+}
-+
-+#ifdef CONFIG_IRQ_WORK
-+void arch_irq_work_raise(void)
-+{
-+	if (__smp_cross_call)
-+		smp_cross_call(cpumask_of(smp_processor_id()), IPI_IRQ_WORK);
-+}
++#ifdef CONFIG_TRACING
+ /**
+  * tracepoint_string - register constant persistent string to trace system
+  * @str - a constant persistent string that will be referenced in tracepoints
+@@ -607,6 +608,15 @@ do {									\
+ 		___tp_str;						\
+ 	})
+ #define __tracepoint_string	__attribute__((section("__tracepoint_str")))
++#else
++/*
++ * tracepoint_string() is used to save the string address for userspace
++ * tracing tools. When tracing isn't configured, there's no need to save
++ * anything.
++ */
++# define tracepoint_string(str) str
++# define __tracepoint_string
 +#endif
-+
- static DEFINE_RAW_SPINLOCK(stop_lock);
  
- /*
-@@ -553,8 +561,10 @@ void handle_IPI(int ipinr, struct pt_regs *regs)
- 	unsigned int cpu = smp_processor_id();
- 	struct pt_regs *old_regs = set_irq_regs(regs);
- 
--	if (ipinr >= IPI_RESCHEDULE && ipinr < IPI_RESCHEDULE + NR_IPI)
--		__inc_irq_stat(cpu, ipi_irqs[ipinr - IPI_RESCHEDULE]);
-+	if ((unsigned)ipinr < NR_IPI) {
-+		trace_ipi_entry(ipi_types[ipinr]);
-+		__inc_irq_stat(cpu, ipi_irqs[ipinr]);
-+	}
- 
- 	switch (ipinr) {
- 	case IPI_RESCHEDULE:
-@@ -599,6 +609,9 @@ void handle_IPI(int ipinr, struct pt_regs *regs)
- 		pr_crit("CPU%u: Unknown IPI message 0x%x\n", cpu, ipinr);
- 		break;
- 	}
-+
-+	if ((unsigned)ipinr < NR_IPI)
-+		trace_ipi_exit(ipi_types[ipinr]);
- 	set_irq_regs(old_regs);
- }
- 
+ #ifdef CONFIG_PERF_EVENTS
+ struct perf_event;
 -- 
 1.8.4.108.g55ea5f6
