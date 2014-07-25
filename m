@@ -1,59 +1,133 @@
-From: andrew@lunn.ch (Andrew Lunn)
-Date: Fri, 25 Jul 2014 21:03:22 +0200
-Subject: [PATCH] ARM: mvebu: armada xp: Generalize use of i2c quirk
-In-Reply-To: <6576319.3qh6UrO3Zo@wuerfel>
-References: <1406308951-14612-1-git-send-email-andrew@lunn.ch>
- <6576319.3qh6UrO3Zo@wuerfel>
-Message-ID: <20140725190322.GA14713@lunn.ch>
+From: paul@pwsan.com (Paul Walmsley)
+Date: Fri, 25 Jul 2014 19:14:20 +0000 (UTC)
+Subject: OMAP baseline test results for v3.16-rc4
+In-Reply-To: <20140707080238.GF28884@atomide.com>
+References: <alpine.DEB.2.02.1407062339420.15016@utopia.booyaka.com>
+ <20140707080238.GF28884@atomide.com>
+Message-ID: <alpine.DEB.2.02.1407251857480.5875@utopia.booyaka.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> Based on the discussion on IRC, I think we can actually simplify the
-> existing quirk and avoid spreading it further. Below would be my
-> preferred approach.
-> 
-> 8<------
-> [PATCH] ARM: mvebu: simplify openblocks ax3 quirk
-> 
-> We currently check the SoC revision in order to find out whether we
-> have an old or new openblocks ax3 machine and apply a quirk to
-> fix the compatible string for the old ones so the i2c driver does
-> not crash.
-> 
-> As it turns out, that is not necessary because the code for the a0
-> version also works on all following revisions, just slightly slower.
-> As only an RTC is connected to this bus and there are no performance
-> constraints in accessing that, we can easily apply that fixup
-> for all ax3 machines.
-> 
-> This also fixes the dtb file to contain the specific revision for a0,
-> so we can eventually run without the quirk. Other machines that may
-> be based on the a0 revision should do the same.
+On Mon, 7 Jul 2014, Tony Lindgren wrote:
 
-So lets discuss this.
+> With v3.16-rc4 the PM features for omap3 should be working
+> finally for device tree based booting. At lest beaglexm and
+> 3xxevm should work.
 
-What we already has works fine for AX3. Your version just simplifies
-it some more, forcing all AX3 to never use hardware offloading, with
-the aim to reduce maintenance burden in the long run. To remove the
-quirk we either need to know the last A0 based AX3 has given out the
-magic smoke, or we have a ABI break forcing all AX3 owners to upgrade
-there DT blobs. The first we can never know, and we really don't want
-the second, it is against the principles of DT.
+Just to follow up briefly on this: there was indeed a bug in the OMAP3 
+test scripts here that resulted in the UART wakeup not being enabled.
 
-Your patch does nothing for other products out in the wild with A0
-SoCs. We now know there are some IX4-400d with A0. And Benoit Masson
-had to figure out the i2c issue the hard way. Although it appears that
-WRT1900AC is using B0, maybe there are some early devices with A0?
-Can we ever know if there are?
+Once that was fixed, system suspend-based chip-retention and chip-off 
+modes work.
 
-By detecting this issue at run time, we avoid these issues. We avoid
-some poor developer bringing up a board has to work out why their
-kernel hangs during boot. We avoid some poor potential OpenWRT user
-finding out that A0 WRT1900AC does exist, and their box no longer
-boots after installing OpenWRT. And are the other products we don't
-know about yet using A0?
+However, scheduler-idle based chip-retention and chip-off still are not
+working.  Looking at the logs, it appears that some domains are not 
+dynamically going idle.  For example, looking at:
 
-Is the potential maintenance burden savings worth the pain we might be
-causing others by not doing this at runtime?
+http://www.pwsan.com/omap/testlogs/test_v3.16-rc6/20140724142225/pm/37xxevm/37xxevm_log.txt
 
-	Andrew
+it can be seen that core_pwrdm's retention count doesn't increase between 
+the two PM debug dumps.  The important lines are:
+
+core_pwrdm (ON),OFF:0,RET:2,INA:0,ON:3,RET-LOGIC-OFF:0,RET-MEMBANK1-OFF:0,RET-MEMBANK2-OFF:0
+
+and 
+
+core_pwrdm (ON),OFF:0,RET:2,INA:0,ON:3,RET-LOGIC-OFF:0,RET-MEMBANK1-OFF:0,RET-MEMBANK2-OFF:0
+
+That's why the test reports mark the dynamic PM modes as failing.
+
+...
+
+Here's an example where things worked:
+
+http://www.pwsan.com/omap/testlogs/test_v3.10/20130717134228/pm/3530es3beagle/3530es3beagle_log.txt
+
+In this one, it can be seen that the CORE counts transitioned from:
+
+core_pwrdm (ON),OFF:0,RET:2,INA:0,ON:3,RET-LOGIC-OFF:0,RET-MEMBANK1-OFF:0,RET-MEMBANK2-OFF:0
+
+to
+
+core_pwrdm (ON),OFF:0,RET:10,INA:0,ON:11,RET-LOGIC-OFF:0,RET-MEMBANK1-OFF:0,RET-MEMBANK2-OFF:0
+
+between the retention suspend/resume test ending and the dynamic 
+retention idle test ending.
+
+
+- Paul
+
+
+
+# # cat /debug/pm_debug/count
+
+
+
+usbhost_pwrdm (ON),OFF:0,RET:333,INA:0,ON:334,RET-LOGIC-OFF:0,RET-MEMBANK1-OFF:0
+sgx_pwrdm (OFF),OFF:1,RET:0,INA:0,ON:1,RET-LOGIC-OFF:0,RET-MEMBANK1-OFF:0
+core_pwrdm (ON),OFF:0,RET:2,INA:0,ON:3,RET-LOGIC-OFF:0,RET-MEMBANK1-OFF:0,RET-MEMBANK2-OFF:0
+per_pwrdm (ON),OFF:0,RET:2,INA:0,ON:3,RET-LOGIC-OFF:0,RET-MEMBANK1-OFF:0
+dss_pwrdm (ON),OFF:0,RET:333,INA:0,ON:334,RET-LOGIC-OFF:0,RET-MEMBANK1-OFF:0
+cam_pwrdm (RET),OFF:0,RET:1,INA:0,ON:1,RET-LOGIC-OFF:0,RET-MEMBANK1-OFF:0
+neon_pwrdm (ON),OFF:0,RET:297,INA:36,ON:334,RET-LOGIC-OFF:0
+mpu_pwrdm (ON),OFF:0,RET:297,INA:36,ON:334,RET-LOGIC-OFF:0,RET-MEMBANK1-OFF:0
+iva2_pwrdm (RET),OFF:0,RET:1,INA:0,ON:1,RET-LOGIC-OFF:0,RET-MEMBANK1-OFF:0,RET-MEMBANK2-OFF:0,RET-MEMBANK3-OFF:0,RET-MEMBANK4-OFF:0
+usbhost_clkdm->usbhost_pwrdm (1)
+sgx_clkdm->sgx_pwrdm (0)
+per_clkdm->per_pwrdm (15)
+cam_clkdm->cam_pwrdm (0)
+dss_clkdm->dss_pwrdm (1)
+d2d_clkdm->core_pwrdm (0)
+iva2_clkdm->iva2_pwrdm (0)
+mpu_clkdm->mpu_pwrdm (0)
+core_l4_clkdm->core_pwrdm (22)
+core_l3_clkdm->core_pwrdm (1)
+neon_clkdm->neon_pwrdm (0)
+# # # # ./test_rootfs_access_nonexistent_file__ret_susp
+
+/bin/sh: 32: ./test_rootfs_access_nonexistent_file__ret_susp: not found
+# # 
+%% End retention double suspend/resume UART wakeup test
+
+
+%% Start retention dynamic idle UART wakeup test
+
+for u in `ls -1d /sys/bus/platform/drivers/omap_uart/*.serial | paste -s 
+-d' '`; do echo 3000 >  $u/power/autosuspend_delay_ms; done
+
+# # 
+
+# # 
+
+# # cat /debug/pm_debug/count
+
+usbhost_pwrdm (ON),OFF:0,RET:433,INA:0,ON:434,RET-LOGIC-OFF:0,RET-MEMBANK1-OFF:0
+sgx_pwrdm (OFF),OFF:1,RET:0,INA:0,ON:1,RET-LOGIC-OFF:0,RET-MEMBANK1-OFF:0
+core_pwrdm (ON),OFF:0,RET:2,INA:0,ON:3,RET-LOGIC-OFF:0,RET-MEMBANK1-OFF:0,RET-MEMBANK2-OFF:0
+per_pwrdm (ON),OFF:0,RET:23,INA:0,ON:24,RET-LOGIC-OFF:0,RET-MEMBANK1-OFF:0
+dss_pwrdm (ON),OFF:0,RET:433,INA:0,ON:434,RET-LOGIC-OFF:0,RET-MEMBANK1-OFF:0
+cam_pwrdm (RET),OFF:0,RET:1,INA:0,ON:1,RET-LOGIC-OFF:0,RET-MEMBANK1-OFF:0
+neon_pwrdm (ON),OFF:0,RET:393,INA:40,ON:434,RET-LOGIC-OFF:0
+mpu_pwrdm (ON),OFF:0,RET:393,INA:40,ON:434,RET-LOGIC-OFF:0,RET-MEMBANK1-OFF:0
+iva2_pwrdm (RET),OFF:0,RET:1,INA:0,ON:1,RET-LOGIC-OFF:0,RET-MEMBANK1-OFF:0,RET-MEMBANK2-OFF:0,RET-MEMBANK3-OFF:0,RET-MEMBANK4-OFF:0
+usbhost_clkdm->usbhost_pwrdm (1)
+sgx_clkdm->sgx_pwrdm (0)
+per_clkdm->per_pwrdm (13)
+cam_clkdm->cam_pwrdm (0)
+dss_clkdm->dss_pwrdm (1)
+d2d_clkdm->core_pwrdm (0)
+iva2_clkdm->iva2_pwrdm (0)
+mpu_clkdm->mpu_pwrdm (0)
+core_l4_clkdm->core_pwrdm (21)
+core_l3_clkdm->core_pwrdm (1)
+neon_clkdm->neon_pwrdm (0)
+# # 
+
+# # ./test_rootfs_access_nonexistent_file__ret_dyn
+
+/bin/sh: 44: ./test_rootfs_access_nonexistent_file__ret_dyn: not found
+# # for u in `ls -1d /sys/bus/platform/drivers/omap_uart/*.serial | paste 
+-s -d' '`; do echo -1 >  $u/power/autosuspend_delay_ms; done
+
+# # 
+%% End retention dynamic idle UART wakeup test
