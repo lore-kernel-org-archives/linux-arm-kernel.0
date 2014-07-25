@@ -1,100 +1,49 @@
-From: harini.katakam@xilinx.com (Harini Katakam)
-Date: Fri, 25 Jul 2014 10:31:08 +0000
-Subject: [PATCH v2 05/11] ARM: dts: zynq: Add QSPI for Parallella
-In-Reply-To: <53D2258B.9000609@xilinx.com>
-References: <1406242820-20140-1-git-send-email-afaerber@suse.de>
- <1406242820-20140-6-git-send-email-afaerber@suse.de>
- <ddb38ce5-9e31-4c94-967c-7784c7fba75c@BN1BFFO11FD028.protection.gbl>
- <53D20E5B.9070501@monstr.eu> <53D21887.2020305@suse.de>
- <53D2258B.9000609@xilinx.com>
-Message-ID: <7aabd35a-0b4a-4d03-9976-ef3926929ddc@BL2FFO11FD027.protection.gbl>
+From: jiri.prchal@aksignal.cz (=?UTF-8?B?SmnFmcOtIFByY2hhbA==?=)
+Date: Fri, 25 Jul 2014 12:32:38 +0200
+Subject: [PATCH] ARM: at91: at91sam9x5: sets NPCS0 (PA14) back to GPIO
+In-Reply-To: <20140725121804.18b05a5d@bbrezillon>
+References: <1405074175-22444-1-git-send-email-voice.shen@atmel.com>	<53D10C50.50305@aksignal.cz>	<20140724162645.4e19c26c@bbrezillon>	<53D12103.3020103@aksignal.cz>	<20140724175848.44f5da10@bbrezillon>	<53D1F5D0.1080006@aksignal.cz>	<20140725095319.16a8465c@bbrezillon>	<53D214E1.4050105@aksignal.cz>	<20140725104553.403921b1@bbrezillon>	<53D21B3F.7060006@aksignal.cz>	<20140725110124.3f0dce6c@bbrezillon>	<53D21FCF.7010402@aksignal.cz>	<20140725113110.70c4aa41@bbrezillon>	<53D22C26.4030208@aksignal.cz>
+ <20140725121804.18b05a5d@bbrezillon>
+Message-ID: <53D23246.1010300@aksignal.cz>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
 
-> -----Original Message-----
-> From: Michal Simek [mailto:michal.simek at xilinx.com]
-> Sent: Friday, July 25, 2014 3:08 PM
-> To: Andreas F?rber; monstr at monstr.eu; Soren Brinkmann
-> Cc: Harini Katakam; Michal Simek; Andreas Olofsson; Matteo Vit; Sean
-> Rickerd; devicetree at vger.kernel.org; linux-arm-kernel at lists.infradead.org;
-> linux-kernel at vger.kernel.org; Rob Herring; Pawel Moll; Mark Rutland; Ian
-> Campbell; Kumar Gala; Russell King
-> Subject: Re: [PATCH v2 05/11] ARM: dts: zynq: Add QSPI for Parallella
-> 
-> On 07/25/2014 10:42 AM, Andreas F?rber wrote:
-> > Am 25.07.2014 09:59, schrieb Michal Simek:
-> >> On 07/25/2014 01:18 AM, S?ren Brinkmann wrote:
-> >>> On Fri, 2014-07-25 at 01:00AM +0200, Andreas F?rber wrote:
-> >>>> Prepare SPI0 and SPI1 while at it.
-> >
-> >> Patch subject is incorrect. You are adding SPI and QSPI.
-> >
-> > Yes, it originally added only QSPI, but I considered it a good deed to
-> > add SPI as well while already reading that part of the TRM. :)
-> >
-> >>>>
-> >>>> Signed-off-by: Andreas F?rber <afaerber@suse.de> --- v2: New
-> >>>>
-> >>>> arch/arm/boot/dts/zynq-7000.dtsi      | 37
-> >>>> +++++++++++++++++++++++++++++++++++
-> >>>> arch/arm/boot/dts/zynq-parallella.dts |  4 ++++ 2 files
-> >>>> changed, 41 insertions(+)
-> >>>>
-> >>>> diff --git a/arch/arm/boot/dts/zynq-7000.dtsi
-> >>>> b/arch/arm/boot/dts/zynq-7000.dtsi index 8fd826a..eed3df0
-> >>>> 100644 --- a/arch/arm/boot/dts/zynq-7000.dtsi +++
-> >>>> b/arch/arm/boot/dts/zynq-7000.dtsi @@ -122,6 +122,30 @@
-> >>>> interrupts = <0 50 4>; };
-> >>>>
-> >>>> +		spi0: spi at e0006000 { +			compatible =
-> "xlnx,zynq-spi-r1p6";
-> >>>> +			reg = <0xe0006000 0x1000>; +			status
-> = "disabled"; +
-> >>>> interrupt-parent = <&intc>; +			interrupts = <0 26 4>;
-> +
-> >>>> clocks = <&clkc 25>, <&clkc 34>; +			clock-names =
-> "ref_clk",
-> >>>> "pclk"; +			#address-cells = <1>; +			#size-
-> cells = <0>; +		};
-> >>>> + +		spi1: spi at e0007000 { +			compatible =
-> >>>> "xlnx,zynq-spi-r1p6"; +			reg = <0xe0007000 0x1000>; +
-> 			status
-> >>>> = "disabled"; +			interrupt-parent = <&intc>; +
-> 		interrupts =
-> >>>> <0 49 4>; +			clocks = <&clkc 26>, <&clkc 35>; +
-> 		clock-names
-> >>>> = "ref_clk", "pclk"; +			#address-cells = <1>; +
-> 		#size-cells
-> >>>> = <0>; +		}; +
-> >>> Until here things look good.
-> >>>
-> >>>> gem0: ethernet at e000b000 { compatible = "cdns,gem"; reg =
-> >>>> <0xe000b000 0x4000>; @@ -140,6 +164,19 @@ clock-names = "pclk",
-> >>>> "hclk", "tx_clk"; };
-> >>>>
-> >>>> +		qspi: qspi at e000d000 { +			compatible =
-> >>>> "xlnx,zynq-spi-r1p6"; +			reg = <0xe000d000 0x1000>; +
-> 			status
-> >>>> = "disabled"; +			interrupt-parent = <&intc>; +
-> 		interrupts =
-> >>>> <0 19 4>; +			clocks = <&clkc 10>, <&clkc 43>; +
-> 		clock-names
-> >>>> = "ref_clk", "pclk"; +			num-cs = <1>; +
-> 	#address-cells =
-> >>>> <1>; +			#size-cells = <0>; +		}; +
-> >>> I'm not sure what the status of this driver is. I think QSPI is
-> >>> still under review on the mailing lists and I don't think we
-> >>> should add this yet.
-> >
-> >> Driver for qspi is not in the mainline yet but it doesn't mean that
-> >> this fragment won't work. Harini: Can you please correct me if I am
-> >> wrong?
-> >
 
-It can be added but it will have to be disabled as there is no qspi driver
-at the moment in mainline.
-
-Regards,
-Harini
+Dne 25.7.2014 v 12:18 Boris BREZILLON napsal(a):
+>> / # devmem 0xfffff408
+>> 0xF0E04018
+>> / # devmem 0xfffff418
+>> 0xE0C04000
+>> / # devmem 0xfffff438
+>> 0x00C04000
+>> / # devmem 0xfffff43c
+>> 0x13FFD7FB
+>> / # devmem 0xfffff458
+>> 0x00000000
+>> / # devmem 0xfffff468
+>> 0xFF223B4E
+>> / # devmem 0xfffff470
+>> 0x0F000000
+>> / # devmem 0xfffff474
+>> 0x00000000
+>> / # devmem 0xfffff498
+>> 0xFFFFFFFF
+>>
+>> I get thought if is possible that in time of probe fm25 (it's first) is not configured PA14 (it 's last)?
+>
+> Oh, nice catch!
+> I think you've found the origin of this bug.
+> Indeed each device is instantiated sequentially and thus when the first
+> device is probed (CS0) the last one has not requested it's cs_gpio yet
+> (and PA14 is still assigned to periph A).
+>
+> Declaring cs-pins and referencing them in pinctrl-0 solves the issue
+> because in this case all CS pins are requested during controller probe.
+>
+So, what would be the right fix up? I my patch it's not good idea since some other driver can request pin for other 
+peripheral earlier than spi. In board dts it could be new investigating for someone else who don't know this issue. I 
+think the best way would be request all cs in early spi init since cs depends on each other and must be all of them in 
+right state before any communication on bus. They are part of bus, like miso, mosi, clk, not part of chips. Also they 
+are defined in parent spi node, not in child chip node.
+Am I right?
