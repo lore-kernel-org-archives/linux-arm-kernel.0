@@ -1,68 +1,67 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Fri, 25 Jul 2014 16:50:10 +0100
-Subject: [PATCH 6/6 v4] ARM: realview: basic device tree implementation
-In-Reply-To: <20140725152401.GA21830@leverpostej>
-References: <1406294628-16079-1-git-send-email-linus.walleij@linaro.org>
- <1406294628-16079-7-git-send-email-linus.walleij@linaro.org>
- <20140725152401.GA21830@leverpostej>
-Message-ID: <20140725155010.GP21766@n2100.arm.linux.org.uk>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Fri, 25 Jul 2014 17:55 +0200
+Subject: [PATCH] spi/pxa2xx-pci: Enable DMA binding through device name
+In-Reply-To: <1406285147.8530.13.camel@smile.fi.intel.com>
+References: <1406196111-22861-1-git-send-email-hock.leong.kweh@intel.com>
+ <5426556.OzZIXLrofJ@wuerfel> <1406285147.8530.13.camel@smile.fi.intel.com>
+Message-ID: <5237362.DJsH7MtqlU@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jul 25, 2014 at 04:24:02PM +0100, Mark Rutland wrote:
-> Hi Linus,
+On Friday 25 July 2014 13:45:47 Andy Shevchenko wrote:
+> On Fri, 2014-07-25 at 12:19 +0200, Arnd Bergmann wrote:
+> > On Friday 25 July 2014 12:55:59 Mika Westerberg wrote:
+> > > On Fri, Jul 25, 2014 at 12:07:14PM +0300, Mika Westerberg wrote:
+> > > > On Fri, Jul 25, 2014 at 10:38:36AM +0200, Arnd Bergmann wrote:
+> > > > > On Friday 25 July 2014 11:22:49 Mika Westerberg wrote:
 > 
-> On Fri, Jul 25, 2014 at 02:23:48PM +0100, Linus Walleij wrote:
-> > +static void __init realview_dt_init_machine(void)
-> > +{
-> > +       int ret;
-> > +
-> > +#if IS_ENABLED(CONFIG_CACHE_L2X0)
-> > +       if (of_machine_is_compatible("arm,realview-eb"))
-> > +               /*
-> > +                * 1MB (128KB/way), 8-way associativity,
-> > +                * evmon/parity/share enabled
-> > +                * Bits:  .... ...0 0111 1001 0000 .... .... ....
-> > +                */
-> > +               l2x0_of_init(0x00790000, 0xfe000fff);
-> > +       else if (of_machine_is_compatible("arm,realview-pb1176"))
-> > +               /*
-> > +                * 128Kb (16Kb/way) 8-way associativity.
-> > +                * evmon/parity/share enabled.
-> > +                */
-> > +               l2x0_of_init(0x00730000, 0xfe000fff);
-> > +       else if (of_machine_is_compatible("arm,realview-pb11mp"))
-> > +               /*
-> > +                * 1MB (128KB/way), 8-way associativity,
-> > +                * evmon/parity/share enabled
-> > +                * Bits:  .... ...0 0111 1001 0000 .... .... ....
-> > +                */
-> > +               l2x0_of_init(0x00730000, 0xfe000fff);
-> > +       else if (of_machine_is_compatible("arm,realview-pbx"))
-> > +               /*
-> > +                * 16KB way size, 8-way associativity, parity disabled
-> > +                * Bits:  .. 0 0 0 0 1 00 1 0 1 001 0 000 0 .... .... ....
-> > +                */
-> > +               l2x0_of_init(0x02520000, 0xc0000fff);
-> > +#endif
+> []
 > 
-> Are these just copied form what we already have for non-DT?
+> > > Something like this?
 > 
-> Do we know that these are all necessary?
+> Arnd, this dependency to certain DMA driver looks really bad.
+> 
+> If we go that way, can we split that part to [another] module and make
+> it dependent to DW_DMAC?
 
-It is necessary to provide the cache sizes on Realview because the
-older L2C210/L2C220 do not have a method of encoding that information
-in the register - and given that ARM doesn't seem to like shipping
-Linux compatible boot loaders on their eval hardware, we can't really
-say that it should be dealt with there.
+I don't see what you gain from that. The PCI ID will tell you which DMA
+engine is being used. The driver already hardcodes a slave_id based on
+the PCI ID today, and the 
 
-I toyed with the idea of adding the standard cache size specifications
-to the L2C code, it sounds like there's a reason to do that now.
+> Or shall we introduce a dmaengine type field in the platform data and
+> dynamically choose proper filter-whatever-function to get the channel?
 
-Let's not mess around with adding stuff like the above to work around
-the L2 code not parsing the appropriate specs from DT, let's do the
-right thing and add bindings to allow DT to provide the cache geometry.
+We already have an interface for this, in the form of
+dma_request_slave_channel(), which takes a string identifier that
+is used to look up all that information in either device tree or
+ACPI. It wouldn't be unreasonable to add a third path in there
+to handle hardcoded platform devices, but that's a lot of work.
+Note that you still need to encode a reference to the dma engine
+in some way to do this right. The current code (with or without Mika's
+patch) will break as soon as you have multiple DMA engine devices.
 
--- 
-FTTC broadband for 0.8mile line: currently at 9.5Mbps down 400kbps up
-according to speedtest.net.
+The current plan I think is to convert all platforms to use DT
+or ACPI so they get the right data from tables passed by the
+platform. I'm a bit puzzled about why Intel wants to support the
+non-ACPI non-DT case again. If we have to support this case anyway,
+what good will ACPI do us on those platforms?
+
+> > > Hock Leong / Chiaue Ee, are you able to check if this works on your BYT
+> > > machines?
+> 
+> > What I think you got wrong here (by following my bad advice) is the master
+> > number. Looking at the code for dw_dma, I think src_master needs to be '1'
+> > for your driver.
+> 
+> On some SoCs we have up to 4 masters. It's blurry for me how the SPI
+> should choose those masters. Currently it works fine, but I suspect
+> there are [might be] performance issues.
+
+I think it works because the dw-dma defaults to the values used by
+the specific implementation in your hardware.
+
+> What about AVR32 case? We have to fix drivers as well there.
+
+which ones?
+
+	Arnd
