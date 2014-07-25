@@ -1,114 +1,105 @@
-From: agraf@suse.de (Alexander Graf)
-Date: Fri, 25 Jul 2014 08:12:07 +0200
-Subject: [PATCH v9 1/4] arm: add ARMv7 HYP API to flush VM TLBs, change
- generic TLB flush to support arch flush
-In-Reply-To: <1406249768-25315-2-git-send-email-m.smarduch@samsung.com>
-References: <1406249768-25315-1-git-send-email-m.smarduch@samsung.com>
- <1406249768-25315-2-git-send-email-m.smarduch@samsung.com>
-Message-ID: <53D1F537.2070306@suse.de>
+From: jiri.prchal@aksignal.cz (=?UTF-8?B?SmnFmcOtIFByY2hhbA==?=)
+Date: Fri, 25 Jul 2014 08:14:40 +0200
+Subject: [PATCH] ARM: at91: at91sam9x5: sets NPCS0 (PA14) back to GPIO
+In-Reply-To: <20140724175848.44f5da10@bbrezillon>
+References: <1405074175-22444-1-git-send-email-voice.shen@atmel.com>	<53D10C50.50305@aksignal.cz>	<20140724162645.4e19c26c@bbrezillon>	<53D12103.3020103@aksignal.cz>
+ <20140724175848.44f5da10@bbrezillon>
+Message-ID: <53D1F5D0.1080006@aksignal.cz>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 
-On 25.07.14 02:56, Mario Smarduch wrote:
-> Patch adds HYP interface for global VM TLB invalidation without address
-> parameter. Generic VM TLB flush calls ARMv7 arch defined TLB flush function.
+
+Dne 24.7.2014 v 17:58 Boris BREZILLON napsal(a):
+> On Thu, 24 Jul 2014 17:06:43 +0200
+> Ji?? Prchal <jiri.prchal@aksignal.cz> wrote:
 >
-> Signed-off-by: Mario Smarduch <m.smarduch@samsung.com>
-> ---
->   arch/arm/include/asm/kvm_asm.h  |    1 +
->   arch/arm/include/asm/kvm_host.h |    1 +
->   arch/arm/kvm/Kconfig            |    1 +
->   arch/arm/kvm/interrupts.S       |   12 ++++++++++++
->   arch/arm/kvm/mmu.c              |   17 +++++++++++++++++
->   virt/kvm/Kconfig                |    3 +++
->   virt/kvm/kvm_main.c             |    4 ++++
->   7 files changed, 39 insertions(+)
+>> Hi,
+>>
+>> Dne 24.7.2014 v 16:26 Boris BREZILLON napsal(a):
+>>> Hello Ji??,
+>>>
+>>> First of all, please try to use git format-patch when submitting a
+>>> patch to any kernel mailing list.
+>> Sorry for that.
+>>>
+>>> On Thu, 24 Jul 2014 15:38:24 +0200
+>>> Ji?? Prchal <jiri.prchal@aksignal.cz> wrote:
+>>>
+>>>> After ROMBOOT tries boot from flash on SPI0 NPCS0, this NPCS0 (PA14) remains set to PERIPH_A.
+>>>> Because of that, this pin is unusable to something else.
+>>>> This patch sets it back to GPIO.
+>>>
+>>> The policy is to leave pins in an unknown state till some peripheral
+>>> need them.
+>>>
+>>> What are you trying to use this pin for ?
+>> For chip select, but #3. And when SPI communicate with cs0 (PA22), it goes down too (PA14), so 2 devices on bus were
+>> selected.
 >
-> diff --git a/arch/arm/include/asm/kvm_asm.h b/arch/arm/include/asm/kvm_asm.h
-> index 53b3c4a..21bc519 100644
-> --- a/arch/arm/include/asm/kvm_asm.h
-> +++ b/arch/arm/include/asm/kvm_asm.h
-> @@ -78,6 +78,7 @@ extern char __kvm_hyp_code_end[];
->   
->   extern void __kvm_flush_vm_context(void);
->   extern void __kvm_tlb_flush_vmid_ipa(struct kvm *kvm, phys_addr_t ipa);
-> +extern void __kvm_tlb_flush_vmid(struct kvm *kvm);
->   
->   extern int __kvm_vcpu_run(struct kvm_vcpu *vcpu);
->   #endif
-> diff --git a/arch/arm/include/asm/kvm_host.h b/arch/arm/include/asm/kvm_host.h
-> index 193ceaf..042206f 100644
-> --- a/arch/arm/include/asm/kvm_host.h
-> +++ b/arch/arm/include/asm/kvm_host.h
-> @@ -230,5 +230,6 @@ int kvm_perf_teardown(void);
->   
->   u64 kvm_arm_timer_get_reg(struct kvm_vcpu *, u64 regid);
->   int kvm_arm_timer_set_reg(struct kvm_vcpu *, u64 regid, u64 value);
-> +void kvm_arch_flush_remote_tlbs(struct kvm *);
->   
->   #endif /* __ARM_KVM_HOST_H__ */
-> diff --git a/arch/arm/kvm/Kconfig b/arch/arm/kvm/Kconfig
-> index 466bd29..44d3b6f 100644
-> --- a/arch/arm/kvm/Kconfig
-> +++ b/arch/arm/kvm/Kconfig
-> @@ -22,6 +22,7 @@ config KVM
->   	select ANON_INODES
->   	select HAVE_KVM_CPU_RELAX_INTERCEPT
->   	select KVM_MMIO
-> +	select HAVE_KVM_ARCH_TLB_FLUSH_ALL
->   	select KVM_ARM_HOST
->   	depends on ARM_VIRT_EXT && ARM_LPAE
->   	---help---
-> diff --git a/arch/arm/kvm/interrupts.S b/arch/arm/kvm/interrupts.S
-> index 0d68d40..1258d46 100644
-> --- a/arch/arm/kvm/interrupts.S
-> +++ b/arch/arm/kvm/interrupts.S
-> @@ -66,6 +66,18 @@ ENTRY(__kvm_tlb_flush_vmid_ipa)
->   	bx	lr
->   ENDPROC(__kvm_tlb_flush_vmid_ipa)
->   
-> +/**
-> + * void __kvm_tlb_flush_vmid(struct kvm *kvm) - Flush per-VMID TLBs
-> + *
-> + * Reuses __kvm_tlb_flush_vmid_ipa() for ARMv7, without passing address
-> + * parameter
-> + */
-> +
-> +ENTRY(__kvm_tlb_flush_vmid)
-> +	b	__kvm_tlb_flush_vmid_ipa
-> +ENDPROC(__kvm_tlb_flush_vmid)
-> +
-> +
->   /********************************************************************
->    * Flush TLBs and instruction caches of all CPUs inside the inner-shareable
->    * domain, for all VMIDs
-> diff --git a/arch/arm/kvm/mmu.c b/arch/arm/kvm/mmu.c
-> index 2ac9588..35254c6 100644
-> --- a/arch/arm/kvm/mmu.c
-> +++ b/arch/arm/kvm/mmu.c
-> @@ -56,6 +56,23 @@ static void kvm_tlb_flush_vmid_ipa(struct kvm *kvm, phys_addr_t ipa)
->   		kvm_call_hyp(__kvm_tlb_flush_vmid_ipa, kvm, ipa);
->   }
->   
-> +#ifdef CONFIG_ARM
+> Are you using a 9x5ek board or a custom one, in the latter case could
+> you paste your spi0 node definition ?
+I'm using custom board. My spi node:
+			spi0: spi at f0000000 {
+				status = "okay";
+				cs-gpios = <&pioA 23 0
+					    &pioA 22 0
+					    &pioC 29 0
+					    &pioA 14 0>;
 
-Why the ifdef? We're in ARM code here, no?
+				fm25 at 0 {
+					compatible = "cypress,fm25";
+					spi-max-frequency = <40000000>;
+					reg = <0>;
+					pagesize = <256>;
+					size = <131072>;
+					address-width = <24>;
+				};
+				/* ADC */
+				spidev at 1 {
+					compatible = "spidev";
+					reg = <1>;
+					spi-max-frequency = <1000000>;
+				};
+				/* IO expander for busaddr */
+				spidev at 2 {
+					compatible = "spidev";
+					reg = <2>;
+					label = "busaddr";
+					spi-max-frequency = <10000000>;
+				};
+				/* audio codec */
+				codec: codec at 3 {
+					compatible = "ti,tlv320aic3x";
+					spi-max-frequency = <1000000>;
+					reg = <3>;
+				};
+			};
 
-> +/**
-> + * kvm_arch_flush_remote_tlbs() - flush all VM TLB entries
-> + * @kvm:       pointer to kvm structure.
-> + *
-> + * Interface to HYP function to flush all VM TLB entries without address
-> + * parameter. In HYP mode reuses __kvm_tlb_flush_vmid_ipa() function used by
-> + * kvm_tlb_flush_vmid_ipa().
-> + */
-> +void kvm_arch_flush_remote_tlbs(struct kvm *kvm)
-> +{
-> +	if (kvm)
-> +		kvm_call_hyp(__kvm_tlb_flush_vmid, kvm);
-
-I don't see why we should ever call this function with kvm==NULL.
-
-
-Alex
+This does not work without patch, because of 2 chips selected at one time because of PA14 is periph_a. Probably ROMBOOT 
+changes that.
+>
+>>> If you just want to use it as a chip select for an spi device, take a
+>>> look at [1].
+>> At [1] it's OK until as cs0 is for example PA22 and cs1 is PA14.
+>
+> If you want PA14 to control cs1 and PA22 to control cs0 (both
+> configured as GPIOs), you'll have the following definition:
+>
+> cs-gpios = <&pioA 22 0>, <&pioA 14 0>, <0>, <0>;
+See my node.
+>
+>>>
+>>> Here the gpio is requested by the spi core when defining the cs-gpios
+>>> property. The gpio controller then request the listed pins to the pin
+>>> controller (pinctrl driver).
+>> GPIO is not set in driver as GPIO, at least I didn't find it.
+>
+> Take a look at [1], which is set as the gpio_request_enable callback,
+> called by pinctrl core when a gpio is requested.
+But is this called from spi driver when requesting gpios as cs?
+>
+>
+> [1]http://lxr.free-electrons.com/source/drivers/pinctrl/pinctrl-at91.c#L665
+>
+>
