@@ -1,369 +1,304 @@
-From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Fri, 25 Jul 2014 14:28:02 +0900
-Subject: [PATCH v2 1/4] ARM: dts: exynos5250: max77686 is Snow only
-In-Reply-To: <1405704009-8430-2-git-send-email-afaerber@suse.de>
-References: <1405704009-8430-1-git-send-email-afaerber@suse.de>
- <1405704009-8430-2-git-send-email-afaerber@suse.de>
-Message-ID: <08fe01cfa7c9$341cc700$9c565500$@samsung.com>
+From: pankaj.dubey@samsung.com (Pankaj Dubey)
+Date: Fri, 25 Jul 2014 11:02:57 +0530
+Subject: [PATCH v7 3/4] ARM: EXYNOS: Add platform driver support for Exynos
+ PMU
+In-Reply-To: <067501cfa7bd$8e6cb460$ab461d20$@samsung.com>
+References: <1404878455-31518-1-git-send-email-pankaj.dubey@samsung.com>
+ <1404878455-31518-4-git-send-email-pankaj.dubey@samsung.com>
+ <067501cfa7bd$8e6cb460$ab461d20$@samsung.com>
+Message-ID: <000501cfa7c9$e59f4840$b0ddd8c0$@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Andreas F?rber wrote:
-> 
-> Move it from exynos5250-cros-common.dtsi to exynos5250-snow.dts.
-> Spring does not need it, it uses an s5m8767 instead.
-> 
-> Signed-off-by: Andreas F?rber <afaerber@suse.de>
-> ---
+Hi Kukjin,
 
-Hi Andreas,
-
-I think this should be reviewed by chrome guys.
-
-
-Doug, can you have a look this series for exynos5250-chromebook?
-I'm not sure exynos5250-cros-common is still useful for exynos5250-spring...
-
-- Kukjin
-
->  v2: New (Doug Anderson)
+On Friday, July 25, 2014 Kukjin Kim wrote:
+> Subject: RE: [PATCH v7 3/4] ARM: EXYNOS: Add platform driver support for
+> Exynos PMU
 > 
->  arch/arm/boot/dts/exynos5250-cros-common.dtsi | 151 -------------------------
->  arch/arm/boot/dts/exynos5250-snow.dts         | 155 ++++++++++++++++++++++++++
->  2 files changed, 155 insertions(+), 151 deletions(-)
+> Pankaj Dubey wrote:
+> >
+> > This patch modifies Exynos Power Management Unit (PMU) initialization
+> > implementation in following way:
+> >
+> > - Added platform driver support and probe function where Exynos PMU
+> >   driver will register itself as syscon provider with syscon framework.
+> > - Added platform struct exynos_pmu_data to hold platform specific data.
+> > - For each SoC's PMU support now we can add platform data and statically
+> >   bind PMU configuration and SoC specific initialization function.
+> > - Separate each SoC's PMU initialization function and make it as part of
+> >   platform data.
+> > - It also removes uses of soc_is_exynosXYZ().
+> >
+> > Signed-off-by: Pankaj Dubey <pankaj.dubey@samsung.com>
+> > Reviewed-by: Tomasz Figa <t.figa@samsung.com>
+> > ---
+> >  arch/arm/mach-exynos/Kconfig |    1 +
+> >  arch/arm/mach-exynos/pmu.c   |  185
+> +++++++++++++++++++++++++++++++++---------
+> >  2 files changed, 146 insertions(+), 40 deletions(-)
+> >
+> Looks good to me, will apply this and 4/4.
 > 
-> diff --git a/arch/arm/boot/dts/exynos5250-cros-common.dtsi b/arch/arm/boot/dts/exynos5250-cros-
-> common.dtsi
-> index 89ac90f..61128d1 100644
-> --- a/arch/arm/boot/dts/exynos5250-cros-common.dtsi
-> +++ b/arch/arm/boot/dts/exynos5250-cros-common.dtsi
-> @@ -27,163 +27,12 @@
->  		i2c2_bus: i2c2-bus {
->  			samsung,pin-pud = <0>;
->  		};
-> -
-> -		max77686_irq: max77686-irq {
-> -			samsung,pins = "gpx3-2";
-> -			samsung,pin-function = <0>;
-> -			samsung,pin-pud = <0>;
-> -			samsung,pin-drv = <0>;
-> -		};
->  	};
+
+We need to hold these two patches until dependent patch [1] from Tomasz Figa
+gets merged.
+
+[1]: mfd: syscon: Decouple syscon interface from syscon devices
+      https://lkml.org/lkml/2014/6/24/188
+
+
+Thanks,
+Pankaj Dubey
+
+> Thanks,
+> Kukjin
 > 
->  	i2c at 12C60000 {
->  		status = "okay";
->  		samsung,i2c-sda-delay = <100>;
->  		samsung,i2c-max-bus-freq = <378000>;
-> -
-> -		max77686 at 09 {
-> -			compatible = "maxim,max77686";
-> -			interrupt-parent = <&gpx3>;
-> -			interrupts = <2 0>;
-> -			pinctrl-names = "default";
-> -			pinctrl-0 = <&max77686_irq>;
-> -			wakeup-source;
-> -			reg = <0x09>;
-> -			#clock-cells = <1>;
-> -
-> -			voltage-regulators {
-> -				ldo1_reg: LDO1 {
-> -					regulator-name = "P1.0V_LDO_OUT1";
-> -					regulator-min-microvolt = <1000000>;
-> -					regulator-max-microvolt = <1000000>;
-> -					regulator-always-on;
-> -				};
-> -
-> -				ldo2_reg: LDO2 {
-> -					regulator-name = "P1.8V_LDO_OUT2";
-> -					regulator-min-microvolt = <1800000>;
-> -					regulator-max-microvolt = <1800000>;
-> -					regulator-always-on;
-> -				};
-> -
-> -				ldo3_reg: LDO3 {
-> -					regulator-name = "P1.8V_LDO_OUT3";
-> -					regulator-min-microvolt = <1800000>;
-> -					regulator-max-microvolt = <1800000>;
-> -					regulator-always-on;
-> -				};
-> -
-> -				ldo7_reg: LDO7 {
-> -					regulator-name = "P1.1V_LDO_OUT7";
-> -					regulator-min-microvolt = <1100000>;
-> -					regulator-max-microvolt = <1100000>;
-> -					regulator-always-on;
-> -				};
-> -
-> -				ldo8_reg: LDO8 {
-> -					regulator-name = "P1.0V_LDO_OUT8";
-> -					regulator-min-microvolt = <1000000>;
-> -					regulator-max-microvolt = <1000000>;
-> -					regulator-always-on;
-> -				};
-> -
-> -				ldo10_reg: LDO10 {
-> -					regulator-name = "P1.8V_LDO_OUT10";
-> -					regulator-min-microvolt = <1800000>;
-> -					regulator-max-microvolt = <1800000>;
-> -					regulator-always-on;
-> -				};
-> -
-> -				ldo12_reg: LDO12 {
-> -					regulator-name = "P3.0V_LDO_OUT12";
-> -					regulator-min-microvolt = <3000000>;
-> -					regulator-max-microvolt = <3000000>;
-> -					regulator-always-on;
-> -				};
-> -
-> -				ldo14_reg: LDO14 {
-> -					regulator-name = "P1.8V_LDO_OUT14";
-> -					regulator-min-microvolt = <1800000>;
-> -					regulator-max-microvolt = <1800000>;
-> -					regulator-always-on;
-> -				};
-> -
-> -				ldo15_reg: LDO15 {
-> -					regulator-name = "P1.0V_LDO_OUT15";
-> -					regulator-min-microvolt = <1000000>;
-> -					regulator-max-microvolt = <1000000>;
-> -					regulator-always-on;
-> -				};
-> -
-> -				ldo16_reg: LDO16 {
-> -					regulator-name = "P1.8V_LDO_OUT16";
-> -					regulator-min-microvolt = <1800000>;
-> -					regulator-max-microvolt = <1800000>;
-> -					regulator-always-on;
-> -				};
-> -
-> -				buck1_reg: BUCK1 {
-> -					regulator-name = "vdd_mif";
-> -					regulator-min-microvolt = <950000>;
-> -					regulator-max-microvolt = <1300000>;
-> -					regulator-always-on;
-> -					regulator-boot-on;
-> -				};
-> -
-> -				buck2_reg: BUCK2 {
-> -					regulator-name = "vdd_arm";
-> -					regulator-min-microvolt = <850000>;
-> -					regulator-max-microvolt = <1350000>;
-> -					regulator-always-on;
-> -					regulator-boot-on;
-> -				};
-> -
-> -				buck3_reg: BUCK3 {
-> -					regulator-name = "vdd_int";
-> -					regulator-min-microvolt = <900000>;
-> -					regulator-max-microvolt = <1200000>;
-> -					regulator-always-on;
-> -					regulator-boot-on;
-> -				};
-> -
-> -				buck4_reg: BUCK4 {
-> -					regulator-name = "vdd_g3d";
-> -					regulator-min-microvolt = <850000>;
-> -					regulator-max-microvolt = <1300000>;
-> -					regulator-always-on;
-> -					regulator-boot-on;
-> -				};
-> -
-> -				buck5_reg: BUCK5 {
-> -					regulator-name = "P1.8V_BUCK_OUT5";
-> -					regulator-min-microvolt = <1800000>;
-> -					regulator-max-microvolt = <1800000>;
-> -					regulator-always-on;
-> -					regulator-boot-on;
-> -				};
-> -
-> -				buck6_reg: BUCK6 {
-> -					regulator-name = "P1.35V_BUCK_OUT6";
-> -					regulator-min-microvolt = <1350000>;
-> -					regulator-max-microvolt = <1350000>;
-> -					regulator-always-on;
-> -				};
-> -
-> -				buck7_reg: BUCK7 {
-> -					regulator-name = "P2.0V_BUCK_OUT7";
-> -					regulator-min-microvolt = <2000000>;
-> -					regulator-max-microvolt = <2000000>;
-> -					regulator-always-on;
-> -				};
-> -
-> -				buck8_reg: BUCK8 {
-> -					regulator-name = "P2.85V_BUCK_OUT8";
-> -					regulator-min-microvolt = <2850000>;
-> -					regulator-max-microvolt = <2850000>;
-> -					regulator-always-on;
-> -				};
-> -			};
-> -		};
->  	};
-> 
->  	i2c at 12C70000 {
-> diff --git a/arch/arm/boot/dts/exynos5250-snow.dts b/arch/arm/boot/dts/exynos5250-snow.dts
-> index c682c88..0f867a3 100644
-> --- a/arch/arm/boot/dts/exynos5250-snow.dts
-> +++ b/arch/arm/boot/dts/exynos5250-snow.dts
-> @@ -344,4 +344,159 @@
->  	};
->  };
-> 
-> +&i2c_0 {
-> +	max77686 at 09 {
-> +		compatible = "maxim,max77686";
-> +		interrupt-parent = <&gpx3>;
-> +		interrupts = <2 0>;
-> +		pinctrl-names = "default";
-> +		pinctrl-0 = <&max77686_irq>;
-> +		wakeup-source;
-> +		reg = <0x09>;
-> +		#clock-cells = <1>;
-> +
-> +		voltage-regulators {
-> +			ldo1_reg: LDO1 {
-> +				regulator-name = "P1.0V_LDO_OUT1";
-> +				regulator-min-microvolt = <1000000>;
-> +				regulator-max-microvolt = <1000000>;
-> +				regulator-always-on;
-> +			};
-> +
-> +			ldo2_reg: LDO2 {
-> +				regulator-name = "P1.8V_LDO_OUT2";
-> +				regulator-min-microvolt = <1800000>;
-> +				regulator-max-microvolt = <1800000>;
-> +				regulator-always-on;
-> +			};
-> +
-> +			ldo3_reg: LDO3 {
-> +				regulator-name = "P1.8V_LDO_OUT3";
-> +				regulator-min-microvolt = <1800000>;
-> +				regulator-max-microvolt = <1800000>;
-> +				regulator-always-on;
-> +			};
-> +
-> +			ldo7_reg: LDO7 {
-> +				regulator-name = "P1.1V_LDO_OUT7";
-> +				regulator-min-microvolt = <1100000>;
-> +				regulator-max-microvolt = <1100000>;
-> +				regulator-always-on;
-> +			};
-> +
-> +			ldo8_reg: LDO8 {
-> +				regulator-name = "P1.0V_LDO_OUT8";
-> +				regulator-min-microvolt = <1000000>;
-> +				regulator-max-microvolt = <1000000>;
-> +				regulator-always-on;
-> +			};
-> +
-> +			ldo10_reg: LDO10 {
-> +				regulator-name = "P1.8V_LDO_OUT10";
-> +				regulator-min-microvolt = <1800000>;
-> +				regulator-max-microvolt = <1800000>;
-> +				regulator-always-on;
-> +			};
-> +
-> +			ldo12_reg: LDO12 {
-> +				regulator-name = "P3.0V_LDO_OUT12";
-> +				regulator-min-microvolt = <3000000>;
-> +				regulator-max-microvolt = <3000000>;
-> +				regulator-always-on;
-> +			};
-> +
-> +			ldo14_reg: LDO14 {
-> +				regulator-name = "P1.8V_LDO_OUT14";
-> +				regulator-min-microvolt = <1800000>;
-> +				regulator-max-microvolt = <1800000>;
-> +				regulator-always-on;
-> +			};
-> +
-> +			ldo15_reg: LDO15 {
-> +				regulator-name = "P1.0V_LDO_OUT15";
-> +				regulator-min-microvolt = <1000000>;
-> +				regulator-max-microvolt = <1000000>;
-> +				regulator-always-on;
-> +			};
-> +
-> +			ldo16_reg: LDO16 {
-> +				regulator-name = "P1.8V_LDO_OUT16";
-> +				regulator-min-microvolt = <1800000>;
-> +				regulator-max-microvolt = <1800000>;
-> +				regulator-always-on;
-> +			};
-> +
-> +			buck1_reg: BUCK1 {
-> +				regulator-name = "vdd_mif";
-> +				regulator-min-microvolt = <950000>;
-> +				regulator-max-microvolt = <1300000>;
-> +				regulator-always-on;
-> +				regulator-boot-on;
-> +			};
-> +
-> +			buck2_reg: BUCK2 {
-> +				regulator-name = "vdd_arm";
-> +				regulator-min-microvolt = <850000>;
-> +				regulator-max-microvolt = <1350000>;
-> +				regulator-always-on;
-> +				regulator-boot-on;
-> +			};
-> +
-> +			buck3_reg: BUCK3 {
-> +				regulator-name = "vdd_int";
-> +				regulator-min-microvolt = <900000>;
-> +				regulator-max-microvolt = <1200000>;
-> +				regulator-always-on;
-> +				regulator-boot-on;
-> +			};
-> +
-> +			buck4_reg: BUCK4 {
-> +				regulator-name = "vdd_g3d";
-> +				regulator-min-microvolt = <850000>;
-> +				regulator-max-microvolt = <1300000>;
-> +				regulator-always-on;
-> +				regulator-boot-on;
-> +			};
-> +
-> +			buck5_reg: BUCK5 {
-> +				regulator-name = "P1.8V_BUCK_OUT5";
-> +				regulator-min-microvolt = <1800000>;
-> +				regulator-max-microvolt = <1800000>;
-> +				regulator-always-on;
-> +				regulator-boot-on;
-> +			};
-> +
-> +			buck6_reg: BUCK6 {
-> +				regulator-name = "P1.35V_BUCK_OUT6";
-> +				regulator-min-microvolt = <1350000>;
-> +				regulator-max-microvolt = <1350000>;
-> +				regulator-always-on;
-> +			};
-> +
-> +			buck7_reg: BUCK7 {
-> +				regulator-name = "P2.0V_BUCK_OUT7";
-> +				regulator-min-microvolt = <2000000>;
-> +				regulator-max-microvolt = <2000000>;
-> +				regulator-always-on;
-> +			};
-> +
-> +			buck8_reg: BUCK8 {
-> +				regulator-name = "P2.85V_BUCK_OUT8";
-> +				regulator-min-microvolt = <2850000>;
-> +				regulator-max-microvolt = <2850000>;
-> +				regulator-always-on;
-> +			};
-> +		};
-> +	};
-> +};
-> +
-> +&pinctrl_0 {
-> +	max77686_irq: max77686-irq {
-> +		samsung,pins = "gpx3-2";
-> +		samsung,pin-function = <0>;
-> +		samsung,pin-pud = <0>;
-> +		samsung,pin-drv = <0>;
-> +	};
-> +};
-> +
->  #include "cros-ec-keyboard.dtsi"
-> --
-> 1.9.3
+> > diff --git a/arch/arm/mach-exynos/Kconfig
+> > b/arch/arm/mach-exynos/Kconfig index 8f9b66c..a2944ac 100644
+> > --- a/arch/arm/mach-exynos/Kconfig
+> > +++ b/arch/arm/mach-exynos/Kconfig
+> > @@ -24,6 +24,7 @@ menuconfig ARCH_EXYNOS
+> >  	select PM_GENERIC_DOMAINS if PM_RUNTIME
+> >  	select S5P_DEV_MFC
+> >  	select SRAM
+> > +	select MFD_SYSCON
+> >  	help
+> >  	  Support for SAMSUNG EXYNOS SoCs (EXYNOS4/5)
+> >
+> > diff --git a/arch/arm/mach-exynos/pmu.c b/arch/arm/mach-exynos/pmu.c
+> > index ff9d23f..5b76728 100644
+> > --- a/arch/arm/mach-exynos/pmu.c
+> > +++ b/arch/arm/mach-exynos/pmu.c
+> > @@ -1,5 +1,5 @@
+> >  /*
+> > - * Copyright (c) 2011-2012 Samsung Electronics Co., Ltd.
+> > + * Copyright (c) 2011-2014 Samsung Electronics Co., Ltd.
+> >   *		http://www.samsung.com/
+> >   *
+> >   * EXYNOS - CPU PMU(Power Management Unit) support @@ -10,12 +10,28
+> > @@
+> >   */
+> >
+> >  #include <linux/io.h>
+> > -#include <linux/kernel.h>
+> > +#include <linux/of.h>
+> > +#include <linux/platform_device.h>
+> > +#include <linux/regmap.h>
+> > +#include <linux/mfd/syscon.h>
+> >
+> >  #include "common.h"
+> >  #include "regs-pmu.h"
+> >
+> > -static const struct exynos_pmu_conf *exynos_pmu_config;
+> > +struct exynos_pmu_data {
+> > +	const struct exynos_pmu_conf *pmu_config;
+> > +	const struct exynos_pmu_conf *pmu_config_extra;
+> > +
+> > +	void (*pmu_init)(void);
+> > +	void (*powerdown_conf)(enum sys_powerdown); };
+> > +
+> > +struct exynos_pmu_context {
+> > +	struct device *dev;
+> > +	const struct exynos_pmu_data *pmu_data; };
+> > +
+> > +static struct exynos_pmu_context *pmu_context;
+> >
+> >  static const struct exynos_pmu_conf exynos4210_pmu_config[] = {
+> >  	/* { .offset = offset, .val = { AFTR, LPA, SLEEP } */ @@ -335,7
+> > +351,7 @@ static unsigned int const exynos5_list_diable_wfi_wfe[] = {
+> >  	EXYNOS5_ISP_ARM_OPTION,
+> >  };
+> >
+> > -static void exynos5_init_pmu(void)
+> > +static void exynos5_powerdown_conf(enum sys_powerdown mode)
+> >  {
+> >  	unsigned int i;
+> >  	unsigned int tmp;
+> > @@ -372,51 +388,140 @@ void exynos_sys_powerdown_conf(enum
+> > sys_powerdown mode)  {
+> >  	unsigned int i;
+> >
+> > -	if (soc_is_exynos5250())
+> > -		exynos5_init_pmu();
+> > +	const struct exynos_pmu_data *pmu_data = pmu_context->pmu_data;
+> >
+> > -	for (i = 0; (exynos_pmu_config[i].offset != PMU_TABLE_END) ; i++)
+> > -		pmu_raw_writel(exynos_pmu_config[i].val[mode],
+> > -				exynos_pmu_config[i].offset);
+> > +	if (pmu_data->powerdown_conf)
+> > +		pmu_data->powerdown_conf(mode);
+> >
+> > -	if (soc_is_exynos4412()) {
+> > -		for (i = 0; exynos4412_pmu_config[i].offset != PMU_TABLE_END
+;
+> i++)
+> > -			pmu_raw_writel(exynos4412_pmu_config[i].val[mode],
+> > -					exynos4412_pmu_config[i].offset);
+> > +	if (pmu_data->pmu_config) {
+> > +		for (i = 0; (pmu_data->pmu_config[i].offset !=
+PMU_TABLE_END)
+> ; i++)
+> > +			pmu_raw_writel(pmu_data->pmu_config[i].val[mode],
+> > +					pmu_data->pmu_config[i].offset);
+> > +	}
+> > +
+> > +	if (pmu_data->pmu_config_extra) {
+> > +		for (i = 0; pmu_data->pmu_config_extra[i].offset !=
+> PMU_TABLE_END; i++)
+> > +
+pmu_raw_writel(pmu_data->pmu_config_extra[i].val[mode],
+> > +
+pmu_data->pmu_config_extra[i].offset);
+> >  	}
+> >  }
+> >
+> > -static int __init exynos_pmu_init(void)
+> > +static void exynos5250_pmu_init(void)
+> >  {
+> >  	unsigned int value;
+> > +	/*
+> > +	 * When SYS_WDTRESET is set, watchdog timer reset request
+> > +	 * is ignored by power management unit.
+> > +	 */
+> > +	value = pmu_raw_readl(EXYNOS5_AUTO_WDTRESET_DISABLE);
+> > +	value &= ~EXYNOS5_SYS_WDTRESET;
+> > +	pmu_raw_writel(value, EXYNOS5_AUTO_WDTRESET_DISABLE);
+> > +
+> > +	value = pmu_raw_readl(EXYNOS5_MASK_WDTRESET_REQUEST);
+> > +	value &= ~EXYNOS5_SYS_WDTRESET;
+> > +	pmu_raw_writel(value, EXYNOS5_MASK_WDTRESET_REQUEST); }
+> > +
+> > +static const struct exynos_pmu_data exynos4210_pmu_data = {
+> > +	.pmu_config	= exynos4210_pmu_config,
+> > +};
+> > +
+> > +static const struct exynos_pmu_data exynos4212_pmu_data = {
+> > +	.pmu_config	= exynos4x12_pmu_config,
+> > +};
+> > +
+> > +static const struct exynos_pmu_data exynos4412_pmu_data = {
+> > +	.pmu_config		= exynos4x12_pmu_config,
+> > +	.pmu_config_extra	= exynos4412_pmu_config,
+> > +};
+> > +
+> > +static const struct exynos_pmu_data exynos5250_pmu_data = {
+> > +	.pmu_config	= exynos5250_pmu_config,
+> > +	.pmu_init	= exynos5250_pmu_init,
+> > +	.powerdown_conf	= exynos5_powerdown_conf,
+> > +};
+> > +
+> > +static const struct regmap_config pmu_regmap_config = {
+> > +	.reg_bits = 32,
+> > +	.val_bits = 32,
+> > +	.reg_stride = 4,
+> > +};
+> >
+> > -	exynos_pmu_config = exynos4210_pmu_config;
+> > -
+> > -	if (soc_is_exynos4210()) {
+> > -		exynos_pmu_config = exynos4210_pmu_config;
+> > -		pr_info("EXYNOS4210 PMU Initialize\n");
+> > -	} else if (soc_is_exynos4212() || soc_is_exynos4412()) {
+> > -		exynos_pmu_config = exynos4x12_pmu_config;
+> > -		pr_info("EXYNOS4x12 PMU Initialize\n");
+> > -	} else if (soc_is_exynos5250()) {
+> > -		/*
+> > -		 * When SYS_WDTRESET is set, watchdog timer reset request
+> > -		 * is ignored by power management unit.
+> > -		 */
+> > -		value =
+> pmu_raw_readl(EXYNOS5_AUTO_WDTRESET_DISABLE);
+> > -		value &= ~EXYNOS5_SYS_WDTRESET;
+> > -		pmu_raw_writel(value,
+> EXYNOS5_AUTO_WDTRESET_DISABLE);
+> > -
+> > -		value =
+> pmu_raw_readl(EXYNOS5_MASK_WDTRESET_REQUEST);
+> > -		value &= ~EXYNOS5_SYS_WDTRESET;
+> > -		pmu_raw_writel(value,
+> EXYNOS5_MASK_WDTRESET_REQUEST);
+> > -
+> > -		exynos_pmu_config = exynos5250_pmu_config;
+> > -		pr_info("EXYNOS5250 PMU Initialize\n");
+> > -	} else {
+> > -		pr_info("EXYNOS: PMU not supported\n");
+> > +/*
+> > + * PMU platform driver and devicetree bindings.
+> > + */
+> > +static const struct of_device_id exynos_pmu_of_device_ids[] = {
+> > +	{
+> > +		.compatible = "samsung,exynos4210-pmu",
+> > +		.data = &exynos4210_pmu_data,
+> > +	}, {
+> > +		.compatible = "samsung,exynos4212-pmu",
+> > +		.data = &exynos4212_pmu_data,
+> > +	}, {
+> > +		.compatible = "samsung,exynos4412-pmu",
+> > +		.data = &exynos4412_pmu_data,
+> > +	}, {
+> > +		.compatible = "samsung,exynos5250-pmu",
+> > +		.data = &exynos5250_pmu_data,
+> > +	},
+> > +	{ /*sentinel*/ },
+> > +};
+> > +
+> > +static int exynos_pmu_probe(struct platform_device *pdev) {
+> > +	const struct of_device_id *match;
+> > +	struct device *dev = &pdev->dev;
+> > +	struct regmap *regmap;
+> > +	struct resource *res;
+> > +
+> > +	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+> > +	pmu_base_addr = devm_ioremap_resource(dev, res);
+> > +	if (IS_ERR(pmu_base_addr))
+> > +		return PTR_ERR(pmu_base_addr);
+> > +
+> > +	pmu_context = devm_kzalloc(&pdev->dev,
+> > +			sizeof(struct exynos_pmu_context),
+> > +			GFP_KERNEL);
+> > +	if (!pmu_context) {
+> > +		dev_err(dev, "Cannot allocate memory.\n");
+> > +		return -ENOMEM;
+> > +	}
+> > +	pmu_context->dev = dev;
+> > +
+> > +	regmap = devm_regmap_init_mmio(dev, pmu_base_addr,
+> > +					&pmu_regmap_config);
+> > +	if (IS_ERR(regmap)) {
+> > +		dev_err(dev, "regmap init failed\n");
+> > +		return PTR_ERR(regmap);
+> >  	}
+> >
+> > +	devm_syscon_register(dev, regmap);
+> > +
+> > +	match = of_match_node(exynos_pmu_of_device_ids, pdev->dev.of_node);
+> > +
+> > +	pmu_context->pmu_data = match->data;
+> > +
+> > +	if (pmu_context->pmu_data->pmu_init)
+> > +		pmu_context->pmu_data->pmu_init();
+> > +
+> > +	platform_set_drvdata(pdev, pmu_context);
+> > +
+> > +	dev_dbg(dev, "Exynos PMU Driver probe done\n");
+> >  	return 0;
+> >  }
+> > -arch_initcall(exynos_pmu_init);
+> > +
+> > +static struct platform_driver exynos_pmu_driver = {
+> > +	.driver  = {
+> > +		.name   = "exynos-pmu",
+> > +		.owner	= THIS_MODULE,
+> > +		.of_match_table = exynos_pmu_of_device_ids,
+> > +	},
+> > +	.probe = exynos_pmu_probe,
+> > +};
+> > +
+> > +static int __init exynos_pmu_init(void) {
+> > +	return platform_driver_register(&exynos_pmu_driver);
+> > +
+> > +}
+> > +postcore_initcall(exynos_pmu_init);
+> > --
+> > 1.7.9.5
