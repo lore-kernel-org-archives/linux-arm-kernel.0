@@ -1,50 +1,44 @@
-From: vinod.koul@intel.com (Vinod Koul)
-Date: Fri, 25 Jul 2014 22:12:18 +0530
-Subject: [PATCH v11 0/2] Add support for the Allwinner A31 DMA Controller
-In-Reply-To: <20140725163746.GC20328@lukather>
-References: <1405626376-471-1-git-send-email-maxime.ripard@free-electrons.com>
- <20140725131217.GS8181@intel.com> <20140725163746.GC20328@lukather>
-Message-ID: <20140725164218.GW8181@intel.com>
+From: balbi@ti.com (Felipe Balbi)
+Date: Fri, 25 Jul 2014 11:53:04 -0500
+Subject: [PATCH v2] ARM: AM43xx: hwmod: add DSS hwmod data
+In-Reply-To: <alpine.DEB.2.02.1407222110260.25593@utopia.booyaka.com>
+References: <1402994233-22599-1-git-send-email-tomi.valkeinen@ti.com>
+ <alpine.DEB.2.02.1407222110260.25593@utopia.booyaka.com>
+Message-ID: <20140725165304.GD29132@saruman.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jul 25, 2014 at 06:37:46PM +0200, Maxime Ripard wrote:
-> > Can you please send follow patches for these:
-> > - don't recall if I pointed earlier, but can we use direct conversion for
-> >   calculating convert_burst() and convert_buswidth(), latter one at least
-> >   seem doable
+On Tue, Jul 22, 2014 at 09:14:20PM +0000, Paul Walmsley wrote:
+> On Tue, 17 Jun 2014, Tomi Valkeinen wrote:
 > 
-> Ok. Do you still want the error reporting for the invalid width and
-> burst size?
-I think for convert_buswidth() we can do away with a switch case and convert
-the numbers directly
-
-> > - don't use devm_request_irq(). You have irq enabled and you have killed
-> >   tasklet. This is too racy. You need to ensure no irqs can be generated before killing
-> >   tasklets.
+> > From: Sathya Prakash M R <sathyap@ti.com>
+> > 
+> > Add DSS hwmod data for AM43xx.
+> > 
+> > Signed-off-by: Sathya Prakash M R <sathyap@ti.com>
+> > [tomi.valkeinen at ti.com: added missing dispc flags]
+> > Signed-off-by: Tomi Valkeinen <tomi.valkeinen@ti.com>
+> > Acked-by: Rajendra Nayak <rnayak@ti.com>
 > 
-> Ok, would calling disable_irq before killing the tasklet an option for
-> you ? that would allow to keep the devm_request_irq.
-disable_irq also does syncronize, so it might work. But then again if the
-probe fails after registering irq due to some other reason, and you get into
-races with unitialized driver as well.
+> This one didn't compile on an AM43xx-only build:
+> 
+> ----
+> arch/arm/mach-omap2/built-in.o:(.data+0x3f2c): undefined reference to `omap2_dss_hwmod_class'
+> arch/arm/mach-omap2/built-in.o:(.data+0x405c): undefined reference to `omap2_rfbi_hwmod_class'
+> make: *** [vmlinux] Error 1
+> test_build: Tue Jul 22 13:48:50 MDT 2014: FAILED on omap2plus_defconfig_am43xx_only hwmod-a-v3.17
+> ----
+> 
+> Have queued the following patch instead.
 
-I think it might be easier to amnge by working with plain old request_irq()
-
-> I'll also send patches for the various breakages and warnings spotted
-> by the autobuilders.
-Yes please, I havent seen the reports in detail yet, but they are reporting
-mainly due COMPILE_TEST. DO you really want that?
-
-Yes it did help me to compile for ARM, i didnt see any defconfig which has
-this MACH in arm/configs
+queued for v3.17, I assume. Still not available from linux-next though.
 
 -- 
-~Vinod
+balbi
 -------------- next part --------------
 A non-text attachment was scrubbed...
 Name: signature.asc
 Type: application/pgp-signature
-Size: 836 bytes
+Size: 819 bytes
 Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140725/56c99054/attachment.sig>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140725/a010bda4/attachment.sig>
