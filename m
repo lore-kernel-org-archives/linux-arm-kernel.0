@@ -1,115 +1,54 @@
-From: m.smarduch@samsung.com (Mario Smarduch)
-Date: Fri, 25 Jul 2014 10:45:17 -0700
-Subject: [PATCH v9 2/4] arm: ARMv7  dirty page logging inital mem region
- write protect (w/no huge PUD support)
-In-Reply-To: <53D1F642.6010007@suse.de>
-References: <1406249768-25315-1-git-send-email-m.smarduch@samsung.com>
- <1406249768-25315-3-git-send-email-m.smarduch@samsung.com>
- <53D1F642.6010007@suse.de>
-Message-ID: <53D297AD.8020103@samsung.com>
+From: grygorii.strashko@ti.com (Grygorii Strashko)
+Date: Fri, 25 Jul 2014 21:31:35 +0300
+Subject: [RFC PATCH 2/3] PM / clock_ops: allow to specify custom
+ pm_clk_notifier callback
+In-Reply-To: <1406313096-29761-1-git-send-email-grygorii.strashko@ti.com>
+References: <1406313096-29761-1-git-send-email-grygorii.strashko@ti.com>
+Message-ID: <1406313096-29761-3-git-send-email-grygorii.strashko@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/24/2014 11:16 PM, Alexander Graf wrote:
-> 
-> On 25.07.14 02:56, Mario Smarduch wrote:
->> Patch adds  support for initial write protection VM memlsot. This
->> patch series
->> assumes that huge PUDs will not be used in 2nd stage tables.
-> 
-> Is this a valid assumption?
+The CLK PM domain assumes that platform code should always provide
+list of Connection IDs of the clock (con_id) in
+pm_clk_notifier_block structure. Then CLK PM domain uses these con_ids
+to setup list of clocks per device.
 
-Right now it's unclear if PUDs will be used to back guest
-memory, assuming so required quite a bit of additional code.
-After discussing on mailing list it was recommended to
-treat this as BUG_ON case for now.
+Such approach is inconvenient when devices can have different number
+of clocks. For example, if maximum number of clocks used by
+device is 4 the pm_clk_notifier_block structure will look like:
 
-> 
->>
->> Signed-off-by: Mario Smarduch <m.smarduch@samsung.com>
->> ---
->>   arch/arm/include/asm/kvm_host.h       |    1 +
->>   arch/arm/include/asm/kvm_mmu.h        |   20 ++++++
->>   arch/arm/include/asm/pgtable-3level.h |    1 +
->>   arch/arm/kvm/arm.c                    |    9 +++
->>   arch/arm/kvm/mmu.c                    |  128
->> +++++++++++++++++++++++++++++++++
->>   5 files changed, 159 insertions(+)
->>
->> diff --git a/arch/arm/include/asm/kvm_host.h
->> b/arch/arm/include/asm/kvm_host.h
->> index 042206f..6521a2d 100644
->> --- a/arch/arm/include/asm/kvm_host.h
->> +++ b/arch/arm/include/asm/kvm_host.h
->> @@ -231,5 +231,6 @@ int kvm_perf_teardown(void);
->>   u64 kvm_arm_timer_get_reg(struct kvm_vcpu *, u64 regid);
->>   int kvm_arm_timer_set_reg(struct kvm_vcpu *, u64 regid, u64 value);
->>   void kvm_arch_flush_remote_tlbs(struct kvm *);
->> +void kvm_mmu_wp_memory_region(struct kvm *kvm, int slot);
->>     #endif /* __ARM_KVM_HOST_H__ */
->> diff --git a/arch/arm/include/asm/kvm_mmu.h
->> b/arch/arm/include/asm/kvm_mmu.h
->> index 5cc0b0f..08ab5e8 100644
->> --- a/arch/arm/include/asm/kvm_mmu.h
->> +++ b/arch/arm/include/asm/kvm_mmu.h
->> @@ -114,6 +114,26 @@ static inline void kvm_set_s2pmd_writable(pmd_t
->> *pmd)
->>       pmd_val(*pmd) |= L_PMD_S2_RDWR;
->>   }
->>   +static inline void kvm_set_s2pte_readonly(pte_t *pte)
->> +{
->> +    pte_val(*pte) = (pte_val(*pte) & ~L_PTE_S2_RDWR) | L_PTE_S2_RDONLY;
->> +}
->> +
->> +static inline bool kvm_s2pte_readonly(pte_t *pte)
->> +{
->> +    return (pte_val(*pte) & L_PTE_S2_RDWR) == L_PTE_S2_RDONLY;
->> +}
->> +
->> +static inline void kvm_set_s2pmd_readonly(pmd_t *pmd)
->> +{
->> +    pmd_val(*pmd) = (pmd_val(*pmd) & ~L_PMD_S2_RDWR) | L_PMD_S2_RDONLY;
->> +}
->> +
->> +static inline bool kvm_s2pmd_readonly(pmd_t *pmd)
->> +{
->> +    return (pmd_val(*pmd) & L_PMD_S2_RDWR) == L_PMD_S2_RDONLY;
->> +}
->> +
->>   /* Open coded p*d_addr_end that can deal with 64bit addresses */
->>   #define kvm_pgd_addr_end(addr, end)                    \
->>   ({    u64 __boundary = ((addr) + PGDIR_SIZE) & PGDIR_MASK;        \
->> diff --git a/arch/arm/include/asm/pgtable-3level.h
->> b/arch/arm/include/asm/pgtable-3level.h
->> index 85c60ad..d8bb40b 100644
->> --- a/arch/arm/include/asm/pgtable-3level.h
->> +++ b/arch/arm/include/asm/pgtable-3level.h
->> @@ -129,6 +129,7 @@
->>   #define L_PTE_S2_RDONLY            (_AT(pteval_t, 1) << 6)   /*
->> HAP[1]   */
->>   #define L_PTE_S2_RDWR            (_AT(pteval_t, 3) << 6)   /*
->> HAP[2:1] */
->>   +#define L_PMD_S2_RDONLY            (_AT(pteval_t, 1) << 6)   /*
->> HAP[1]   */
->>   #define L_PMD_S2_RDWR            (_AT(pmdval_t, 3) << 6)   /*
->> HAP[2:1] */
->>     /*
->> diff --git a/arch/arm/kvm/arm.c b/arch/arm/kvm/arm.c
->> index 3c82b37..e11c2dd 100644
->> --- a/arch/arm/kvm/arm.c
->> +++ b/arch/arm/kvm/arm.c
->> @@ -242,6 +242,15 @@ void kvm_arch_commit_memory_region(struct kvm *kvm,
->>                      const struct kvm_memory_slot *old,
->>                      enum kvm_mr_change change)
->>   {
->> +#ifdef CONFIG_ARM
-> 
-> Same question on CONFIG_ARM here. Is this the define used to distinguish
-> between 32bit and 64bit?
+static struct pm_clk_notifier_block platform_domain_notifier = {
+	.pm_domain = &keystone_pm_domain,
+	.con_ids = { "fck", "opt1", "opt2", "opt3", NULL },
+};
 
-Yes let ARM64 compile. Eventually we'll come back to ARM64 soon, and
-these will go.
-> 
-> 
-> Alex
-> 
+More over, clocks in DT have to be named using only con_ids:
+	clocks = <&paclk13>, <&clkcpgmac>, <&chipclk12>;
+	clock-names = "fck", "opt1", "opt2";
+
+This patch allow to specify custom pm_clk_notifier callback from
+platform code and in such way makes CLK PM domain initialization
+more flexible. For example, Keystone 2 will provide custom callback
+to fill list of clocks for Device with all clocks assigned to this
+Device in DT.
+
+Signed-off-by: Grygorii Strashko <grygorii.strashko@ti.com>
+---
+ drivers/base/power/clock_ops.c |    3 ++-
+ 1 file changed, 2 insertions(+), 1 deletion(-)
+
+diff --git a/drivers/base/power/clock_ops.c b/drivers/base/power/clock_ops.c
+index 2d5c9c1..c103598 100644
+--- a/drivers/base/power/clock_ops.c
++++ b/drivers/base/power/clock_ops.c
+@@ -520,6 +520,7 @@ void pm_clk_add_notifier(struct bus_type *bus,
+ 	if (!bus || !clknb)
+ 		return;
+ 
+-	clknb->nb.notifier_call = pm_clk_notify;
++	if (!clknb->nb.notifier_call)
++		clknb->nb.notifier_call = pm_clk_notify;
+ 	bus_register_notifier(bus, &clknb->nb);
+ }
+-- 
+1.7.9.5
