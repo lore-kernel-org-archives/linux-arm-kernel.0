@@ -1,154 +1,78 @@
-From: wens@csie.org (Chen-Yu Tsai)
-Date: Fri, 25 Jul 2014 15:57:06 +0800
-Subject: [PATCH v2 1/6] rtc: sun6i: Add sun6i RTC driver
-In-Reply-To: <53CFDC9F.9060208@gmail.com>
-References: <1406126338-15062-1-git-send-email-wens@csie.org>
- <1406126338-15062-2-git-send-email-wens@csie.org> <53CFDC9F.9060208@gmail.com>
-Message-ID: <CAGb2v6746P-9rtW3gjUS3ttkZeqW6gNbunXHiSidNag1gCmk0A@mail.gmail.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Fri, 25 Jul 2014 09:58:42 +0200
+Subject: [PATCH] spi/pxa2xx-pci: Enable DMA binding through device name
+In-Reply-To: <20140725071138.GU1857@lahna.fi.intel.com>
+References: <1406196111-22861-1-git-send-email-hock.leong.kweh@intel.com>
+ <20140724140620.GP1857@lahna.fi.intel.com>
+ <20140725071138.GU1857@lahna.fi.intel.com>
+Message-ID: <5574058.fMy2hcvT92@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jul 24, 2014 at 12:02 AM, Varka Bhadram <varkabhadram@gmail.com> wrote:
->
-> On Wednesday 23 July 2014 08:08 PM, Chen-Yu Tsai wrote:
->>
->> This patch introduces the driver for the RTC in the Allwinner A31 and
->> A23 SoCs.
->>
->> Unlike the RTC found in A10/A20 SoCs, which was part of the timer, the
->> RTC in A31/A23 are a separate hardware block, which also contain a few
->> controls for the RTC block hardware (a regulator and RTC block GPIO pin
->> latches), while also having separate interrupts for the alarms.
->>
->> The hardware is different enough to make a different driver for it.
->>
-> (...)
->
->
->> +Required properties:
->> +- compatible : Should be "allwinner,sun6i-a31-rtc"
->> +- reg: physical base address of the controller and length of memory
->> mapped
->> +  region.
->> +- interrupts: IRQ line for the RTC alarm 0.
->> +
->
->
-> proper indentation..
-> - compatible    : Should be "allwinner,sun6i-a31-rtc"
->
-> - reg           : physical base address of the controller and length of
-> memory mapped
->                   region.
->
-> - interrupts    : IRQ line for the RTC alarm 0.
-> ....
->
->> +Example:
->> +
->
->
-> (...)
->
->
->> +
->> +       ret = devm_request_irq(&pdev->dev, chip->irq, sun6i_rtc_alarmirq,
->> +                       0, dev_name(&pdev->dev), chip);
->
->
-> should match open parenthesis...
->
->
-> devm_request_irq(&pdev->dev, chip->irq, sun6i_rtc_alarmirq,
->                  0, dev_name(&pdev->dev), chip);
+On Friday 25 July 2014 10:11:38 Mika Westerberg wrote:
+> On Thu, Jul 24, 2014 at 05:06:20PM +0300, Mika Westerberg wrote:
+> > > On a related note, there seems to be a bug in this driver, which
+> > > attempts to set the slave_id through dmaengine_slave_config(), which
+> > > is wrong in both cases, ACPI and filter functions.
+> > 
+> > Good point. We will fix this, thanks.
+> 
+> I take that back. How we are supposed to set the slave_id if we don't
+> have request line information available (from ACPI or DT)?
 
-ok.
+If you don't have the request line information, you are screwed and you
+can't set it from either the filter function or slave_config.
 
->> +       if (ret) {
->> +               dev_err(&pdev->dev, "Could not request IRQ\n");
->> +               return ret;
->> +       }
->> +
->> +       /* clear the alarm counter value */
->> +       writel(0, chip->base + SUN6I_ALRM_COUNTER);
->> +
->> +       /* disable counter alarm */
->> +       writel(0, chip->base + SUN6I_ALRM_EN);
->> +
->> +       /* disable counter alarm interrupt */
->> +       writel(0, chip->base + SUN6I_ALRM_IRQ_EN);
->> +
->> +       /* disable week alarm */
->> +       writel(0, chip->base + SUN6I_ALRM1_EN);
->> +
->> +       /* disable week alarm interrupt */
->> +       writel(0, chip->base + SUN6I_ALRM1_IRQ_EN);
->> +
->> +       /* clear counter alarm pending interrupts */
->> +       writel(SUN6I_ALRM_IRQ_STA_CNT_IRQ_PEND, chip->base +
->> +                       SUN6I_ALRM_IRQ_STA);
->> +
->> +       /* clear week alarm pending interrupts */
->> +       writel(SUN6I_ALRM1_IRQ_STA_WEEK_IRQ_PEND, chip->base +
->> +                       SUN6I_ALRM1_IRQ_STA);
->> +
->> +       /* disable alarm wakeup */
->> +       writel(0, chip->base + SUN6I_ALARM_CONFIG);
->> +
->> +       chip->rtc = rtc_device_register("rtc-sun6i", &pdev->dev,
->> +                       &sun6i_rtc_ops, THIS_MODULE);
->
->
-> dto....
+However, it looks like you do have it, at least this is what the
+code tells me:
 
-ok.
+static struct pxa_spi_info spi_info_configs[] = {
+        [PORT_CE4100] = {
+		...
+        },
+        [PORT_BYT] = {
+                .type = LPSS_SSP,
+                .port_id = 0,
+                .num_chipselect = 1,
+                .tx_slave_id = 0,
+                .tx_chan_id = 0,
+                .rx_slave_id = 1,
+                .rx_chan_id = 1,
+        },
+};
 
->> +       if (IS_ERR(chip->rtc)) {
->> +               dev_err(&pdev->dev, "unable to register device\n");
->> +               return PTR_ERR(chip->rtc);
->> +       }
->> +
->> +       dev_info(&pdev->dev, "RTC enabled\n");
->> +
->> +       return 0;
->> +}
->> +
->> +static int sun6i_rtc_remove(struct platform_device *pdev)
->> +{
->> +       struct sun6i_rtc_dev *chip = platform_get_drvdata(pdev);
->> +
->> +       rtc_device_unregister(chip->rtc);
->> +
->> +       return 0;
->> +}
->> +
->> +static const struct of_device_id sun6i_rtc_dt_ids[] = {
->> +       { .compatible = "allwinner,sun6i-a31-rtc" },
->> +       { /* sentinel */ },
->> +};
->> +MODULE_DEVICE_TABLE(of, sun6i_rtc_dt_ids);
->> +
->> +static struct platform_driver sun6i_rtc_driver = {
->> +       .probe          = sun6i_rtc_probe,
->> +       .remove         = sun6i_rtc_remove,
->> +       .driver         = {
->> +               .name           = "sun6i-rtc",
->> +               .owner          = THIS_MODULE,
->
->
-> we can drop owner field....
+All you need to do is change your filter function to take the
+slave id from pxa_spi_info and stick it in there, e.g.
 
-May I ask why this is not needed? Seems most if not all drivers
-set it.
+static bool pxa2xx_spi_dw_dma_filter(struct dma_chan *chan, void *param)
+{       
+        const struct pxa2xx_spi_master *pdata = param;
+        struct dw_dma_chan *dwc = to_dw_dma_chan(chan);
+        
+        dwc->request_line = fargs->req;
+        dwc->src_master = 0;
+        dwc->dst_master = 0;
+        
+        return 1;
+}           
 
-Thanks.
+Note that the filter function by definition is specific to the dma
+controller, not the dma slave (that's why most people define it in
+the dmaengine driver), and the pxa2xx_spi_dma_filter() function used
+in spi-pxa2xx-dma.c looks like it was written for another dma engine:
 
->> +               .of_match_table = sun6i_rtc_dt_ids,
->> +       },
->> +};
->> +
->> +module_platform_driver(sun6i_rtc_driver);
->> +
->> +MODULE_DESCRIPTION("sun6i RTC driver");
->> +MODULE_AUTHOR("Chen-Yu Tsai <wens@csie.org>");
->> +MODULE_LICENSE("GPL");
+The dw-dma driver doesn't care at all about the channel number, so
+matching it with the platform data is pointless, but it does need
+the master and request numbers to be set in the filter function,
+as dw_dma_of_filter() and dw_dma_acpi_filter() do.
+
+It also really needs a check to see if the dma engine is the right
+one for the device, as the current filter function will just take
+a channel (with the right number) from any dma engine, and that
+breaks as soon as you register a second dma controller in the system.
+
+I agree that this is very ugly, but that's exactly why we came up
+with the dma_request_slave_channel interface to replace the need
+for filter functions that everybody gets wrong.
+
+	Arnd
