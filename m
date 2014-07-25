@@ -1,27 +1,29 @@
-From: jason@lakedaemon.net (Jason Cooper)
-Date: Thu, 24 Jul 2014 20:10:57 -0400
-Subject: [PATCH] ARM: dts: dove: add DT LCD controllers
-In-Reply-To: <E1XAKGS-0004WE-8h@rmk-PC.arm.linux.org.uk>
-References: <E1XAKGS-0004WE-8h@rmk-PC.arm.linux.org.uk>
-Message-ID: <20140725001057.GB23220@titan.lakedaemon.net>
+From: sfr@canb.auug.org.au (Stephen Rothwell)
+Date: Fri, 25 Jul 2014 10:13:55 +1000
+Subject: linux-next: manual merge of the arm-soc tree with the arm tree
+Message-ID: <20140725101355.7946e4b9@canb.auug.org.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jul 24, 2014 at 03:45:00PM +0100, Russell King wrote:
-> Add the DT fragment for the Marvell Dove LCD controllers.
-> 
-> Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
-> ---
-> Jason,
-> 
-> David Airlie has taken the Armada DRM changes into his tree, so the DT
-> bits can now be queued for the next merge window.
-> 
->  arch/arm/boot/dts/dove.dtsi | 14 ++++++++++++++
->  1 file changed, 14 insertions(+)
+Hi all,
 
-Applied to mvebu/dt with Sebastian's Ack.
+Today's linux-next merge of the arm-soc tree got a conflict in
+arch/arm/mach-integrator/include/mach/memory.h between commit
+3ae4e9812941 ("ARM: 8113/1: remove remaining definitions of
+PLAT_PHYS_OFFSET from <mach/memory.h>") from the arm tree and commit
+e6dc195c1c69 ("ARM: integrator: get rid of <mach/memory.h>") from the
+arm-soc tree.
 
-thx,
+I fixed it up (I just removed the file) and can carry the fix as
+necessary (no action is required).
 
-Jason.
+-- 
+Cheers,
+Stephen Rothwell                    sfr at canb.auug.org.au
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140725/407f7426/attachment.sig>
