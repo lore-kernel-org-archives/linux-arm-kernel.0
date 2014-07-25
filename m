@@ -1,58 +1,47 @@
-From: daniel.lezcano@linaro.org (Daniel Lezcano)
-Date: Fri, 25 Jul 2014 16:13:22 +0200
-Subject: [PATCH] ARM: rockchip: Fix missing dtbs in Makefile
-In-Reply-To: <6733241.HeFFY6HYNT@diego>
-References: <1406295371-2517-1-git-send-email-daniel.lezcano@linaro.org>
- <6733241.HeFFY6HYNT@diego>
-Message-ID: <53D26602.4060103@linaro.org>
+From: pawel.moll@arm.com (Pawel Moll)
+Date: Fri, 25 Jul 2014 15:23:49 +0100
+Subject: [PATCH 1/5] ARM: imx: Remove references to platform_bus in mxc code
+Message-ID: <1406298233-27876-1-git-send-email-pawel.moll@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/25/2014 04:08 PM, Heiko St?bner wrote:
-> Hi Daniel,
->
-> Am Freitag, 25. Juli 2014, 15:36:11 schrieb Daniel Lezcano:
->> The dtb for rockchip are missing in the Makefile.
->>
->> Add the missing ones.
->>
->> Signed-off-by: Daniel Lezcano <daniel.lezcano@linaro.org>
->
-> Doug Anderson posted yesterday a similar patch [0]
-> 	"ARM: dts: Build dtbs for Rockchip boards"
-> which I've added already.
+The bus devices created to be parents for other peripherals
+were using platform_bus as a parent, not being platform
+devices themselves. Remove the references, making them
+virtual devices instead.
 
-ah, ok. I missed it.
+Cc: Shawn Guo <shawn.guo@freescale.com>
+Cc: Sascha Hauer <kernel@pengutronix.de>
+Cc: Russell King <linux@arm.linux.org.uk>
+Cc: linux-arm-kernel at lists.infradead.org
+Signed-off-by: Pawel Moll <pawel.moll@arm.com>
+---
 
-Thanks
+This patch is a part of effort to remove references to platform_bus
+and make it static.
 
-   -- Daniel
+Shawn, Sascha - could you, please, have a look if such change
+is acceptable for you?
 
-> [0] https://lkml.org/lkml/2014/7/24/652
->> ---
->>   arch/arm/boot/dts/Makefile |    3 +++
->>   1 file changed, 3 insertions(+)
->>
->> diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
->> index adb5ed9..fb7c589 100644
->> --- a/arch/arm/boot/dts/Makefile
->> +++ b/arch/arm/boot/dts/Makefile
->> @@ -445,6 +445,9 @@ dtb-$(CONFIG_MACH_DOVE) += dove-cm-a510.dtb \
->>   	dove-d2plug.dtb \
->>   	dove-d3plug.dtb \
->>   	dove-dove-db.dtb
->> +dtb-$(CONFIG_ARCH_ROCKCHIP) += \
->> +	rk3288-evb-act8846.dtb \
->> +	rk3288-evb-rk808.dtb
->>
->>   targets += dtbs dtbs_install
->>   targets += $(dtb-y)
->
+ arch/arm/mach-imx/devices/devices.c | 2 --
+ 1 file changed, 2 deletions(-)
 
-
+diff --git a/arch/arm/mach-imx/devices/devices.c b/arch/arm/mach-imx/devices/devices.c
+index 1b4366a..8eab544 100644
+--- a/arch/arm/mach-imx/devices/devices.c
++++ b/arch/arm/mach-imx/devices/devices.c
+@@ -24,12 +24,10 @@
+ 
+ struct device mxc_aips_bus = {
+ 	.init_name	= "mxc_aips",
+-	.parent		= &platform_bus,
+ };
+ 
+ struct device mxc_ahb_bus = {
+ 	.init_name	= "mxc_ahb",
+-	.parent		= &platform_bus,
+ };
+ 
+ int __init mxc_device_init(void)
 -- 
-  <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
-
-Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
-<http://twitter.com/#!/linaroorg> Twitter |
-<http://www.linaro.org/linaro-blog/> Blog
+1.9.1
