@@ -1,71 +1,152 @@
-From: jdelvare@suse.de (Jean Delvare)
-Date: Fri, 25 Jul 2014 14:07:28 +0200
-Subject: [PATCH v2] i2c: pca954x: put the mux to disconnected state
- after resume
-In-Reply-To: <1406289466-936-1-git-send-email-jszhang@marvell.com>
-References: <1406289466-936-1-git-send-email-jszhang@marvell.com>
-Message-ID: <20140725140728.23d876bd@endymion.delvare>
+From: afaerber@suse.de (=?ISO-8859-15?Q?Andreas_F=E4rber?=)
+Date: Fri, 25 Jul 2014 14:11:52 +0200
+Subject: [PATCHv6 1/5] mmc: dw_mmc: modify the dt-binding for removing
+ slot-node and supports-highspeed
+In-Reply-To: <1406250713-22604-2-git-send-email-jh80.chung@samsung.com>
+References: <1406250713-22604-1-git-send-email-jh80.chung@samsung.com>
+ <1406250713-22604-2-git-send-email-jh80.chung@samsung.com>
+Message-ID: <53D24988.9010208@suse.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 25 Jul 2014 19:57:46 +0800, Jisheng Zhang wrote:
-> pca954x may be power lost during suspend, so after resume we also suffer
-> the issue fixed by commit cd823db8b1161ef0d756514d280715a576d65cc3,
-> 
->  "pca954x power-on default is channel 0 connected. If multiple pca954x
->  muxes are connected to the same physical I2C bus, the parent bus will
->  see channel 0 devices behind both muxes by default."
-> 
-> What's more, when resume bootloader may also operate the mux, so the
-> the channel connected after that may not be the one driver thought.
-> 
-> We fix this problem by putting the mux to disconnected state and
-> clearing last_chan in the resume hook.
-> 
-> Signed-off-by: Jisheng Zhang <jszhang@marvell.com>
-> ---
->  drivers/i2c/muxes/i2c-mux-pca954x.c | 15 +++++++++++++++
->  1 file changed, 15 insertions(+)
-> 
-> diff --git a/drivers/i2c/muxes/i2c-mux-pca954x.c b/drivers/i2c/muxes/i2c-mux-pca954x.c
-> index 9bd4212..ec11b40 100644
-> --- a/drivers/i2c/muxes/i2c-mux-pca954x.c
-> +++ b/drivers/i2c/muxes/i2c-mux-pca954x.c
-> @@ -41,6 +41,7 @@
->  #include <linux/i2c-mux.h>
->  #include <linux/i2c/pca954x.h>
->  #include <linux/module.h>
-> +#include <linux/pm.h>
->  #include <linux/slab.h>
->  
->  #define PCA954X_MAX_NCHANS 8
-> @@ -273,9 +274,23 @@ static int pca954x_remove(struct i2c_client *client)
->  	return 0;
->  }
->  
-> +#ifdef CONFIG_PM_SLEEP
-> +static int pca954x_resume(struct device *dev)
-> +{
-> +	struct i2c_client *client = to_i2c_client(dev);
-> +	struct pca954x *data = i2c_get_clientdata(client);
-> +
-> +	data->last_chan = 0;
-> +	return i2c_smbus_write_byte(client, 0);
-> +}
-> +#endif
-> +
-> +static SIMPLE_DEV_PM_OPS(pca954x_pm, NULL, pca954x_resume);
-> +
->  static struct i2c_driver pca954x_driver = {
->  	.driver		= {
->  		.name	= "pca954x",
-> +		.pm	= &pca954x_pm,
->  		.owner	= THIS_MODULE,
->  	},
->  	.probe		= pca954x_probe,
+Hi Jaehoon,
 
-Reviewed-by: Jean Delvare <jdelvare@suse.de>
+Am 25.07.2014 03:11, schrieb Jaehoon Chung:
+> Almost Soc is used the slot per a host.
+
+Something's very wrong with this sentence. What are you trying to say?
+Almost all SoCs use one slot only per host controller device?
+
+> Don't use the slot-node and deprecated the "supports-highsped" property.
+
+s/deprecated/deprecate/ ?
+s/highsped/highspeed/
+
+> Instead, use the cap-mmc/sd-highspeed.
+> 
+> Signed-off-by: Jaehoon Chung <jh80.chung@samsung.com>
+> Reviewed-by: Tushar Behera <trblinux@gmail.com>
+> Reviewed-by: Ulf Hansson <ulf.hansson@linaro.org>
+> Tested-by: Sachin Kamat <sachin.kamat@samsung.com>
+> Acked-by: Seungwon Jeon <tgih.jun@samsung.com>
+> ---
+>  .../devicetree/bindings/mmc/exynos-dw-mshc.txt     |   17 +++++------------
+>  .../devicetree/bindings/mmc/k3-dw-mshc.txt         |   12 +++++-------
+>  .../devicetree/bindings/mmc/synopsys-dw-mshc.txt   |   12 +++++-------
+>  3 files changed, 15 insertions(+), 26 deletions(-)
+> 
+> diff --git a/Documentation/devicetree/bindings/mmc/exynos-dw-mshc.txt b/Documentation/devicetree/bindings/mmc/exynos-dw-mshc.txt
+> index 532b1d4..9308325 100644
+> --- a/Documentation/devicetree/bindings/mmc/exynos-dw-mshc.txt
+> +++ b/Documentation/devicetree/bindings/mmc/exynos-dw-mshc.txt
+> @@ -46,13 +46,14 @@ Required Properties:
+>        - if CIU clock divider value is 0 (that is divide by 1), both tx and rx
+>          phase shift clocks should be 0.
+>  
+> -Required properties for a slot:
+> +Required properties for a slot (Deprecated - Recommend to use one slot per a host):
+
+"per host"
+
+>  
+>  * gpios: specifies a list of gpios used for command, clock and data bus. The
+>    first gpio is the command line and the second gpio is the clock line. The
+>    rest of the gpios (depending on the bus-width property) are the data lines in
+>    no particular order. The format of the gpio specifier depends on the gpio
+>    controller.
+> + (Deprecated - Refer to Documentaion/devicetree/binding/pinctrl/samsung-pinctrl.txt)
+
+"Documentation/"
+
+Nit: Is the indentation intentional? (parenthesis not aligned with text)
+
+>  
+>  Example:
+>  
+> @@ -69,21 +70,13 @@ Example:
+>  
+>  	dwmmc0 at 12200000 {
+>  		num-slots = <1>;
+> -		supports-highspeed;
+> +		cap-mmc-highspeed;
+> +		cap-sd-highspeed;
+>  		broken-cd;
+>  		fifo-depth = <0x80>;
+>  		card-detect-delay = <200>;
+>  		samsung,dw-mshc-ciu-div = <3>;
+>  		samsung,dw-mshc-sdr-timing = <2 3>;
+>  		samsung,dw-mshc-ddr-timing = <1 2>;
+> -
+> -		slot at 0 {
+> -			reg = <0>;
+> -			bus-width = <8>;
+> -			gpios = <&gpc0 0 2 0 3>, <&gpc0 1 2 0 3>,
+> -				<&gpc1 0 2 3 3>, <&gpc1 1 2 3 3>,
+> -				<&gpc1 2 2 3 3>, <&gpc1 3 2 3 3>,
+> -				<&gpc0 3 2 3 3>, <&gpc0 4 2 3 3>,
+> -				<&gpc0 5 2 3 3>, <&gpc0 6 2 3 3>;
+> -		};
+> +		bus-width = <8>;
+>  	};
+> diff --git a/Documentation/devicetree/bindings/mmc/k3-dw-mshc.txt b/Documentation/devicetree/bindings/mmc/k3-dw-mshc.txt
+> index e5bc49f..3b35449 100644
+> --- a/Documentation/devicetree/bindings/mmc/k3-dw-mshc.txt
+> +++ b/Documentation/devicetree/bindings/mmc/k3-dw-mshc.txt
+> @@ -34,13 +34,11 @@ Example:
+>  		num-slots = <1>;
+>  		vmmc-supply = <&ldo12>;
+>  		fifo-depth = <0x100>;
+> -		supports-highspeed;
+>  		pinctrl-names = "default";
+>  		pinctrl-0 = <&sd_pmx_pins &sd_cfg_func1 &sd_cfg_func2>;
+> -		slot at 0 {
+> -			reg = <0>;
+> -			bus-width = <4>;
+> -			disable-wp;
+> -			cd-gpios = <&gpio10 3 0>;
+> -		};
+> +		bus-width = <4>;
+> +		disable-wp;
+> +		cd-gpios = <&gpio10 3 0>;
+> +		cap-mmc-highspeed;
+> +		cap-sd-highspeed;
+>  	};
+> diff --git a/Documentation/devicetree/bindings/mmc/synopsys-dw-mshc.txt b/Documentation/devicetree/bindings/mmc/synopsys-dw-mshc.txt
+> index 2d4a725..346c609 100644
+> --- a/Documentation/devicetree/bindings/mmc/synopsys-dw-mshc.txt
+> +++ b/Documentation/devicetree/bindings/mmc/synopsys-dw-mshc.txt
+> @@ -67,7 +67,8 @@ Optional properties:
+>  * card-detect-delay: Delay in milli-seconds before detecting card after card
+>    insert event. The default value is 0.
+>  
+> -* supports-highspeed: Enables support for high speed cards (up to 50MHz)
+> +* supports-highspeed (DEPRECATED): Enables support for high speed cards (up to 50MHz)
+> +			   (use "cap-mmc-highspeed" or "cap-sd-highspeed" instead)
+>  
+>  * broken-cd: as documented in mmc core bindings.
+>  
+> @@ -98,14 +99,11 @@ board specific portions as listed below.
+>  		clock-frequency = <400000000>;
+>  		clock-freq-min-max = <400000 200000000>;
+>  		num-slots = <1>;
+> -		supports-highspeed;
+>  		broken-cd;
+>  		fifo-depth = <0x80>;
+>  		card-detect-delay = <200>;
+>  		vmmc-supply = <&buck8>;
+> -
+> -		slot at 0 {
+> -			reg = <0>;
+> -			bus-width = <8>;
+> -		};
+> +		bus-width = <8>;
+> +		cap-mmc-highspeed;
+> +		cap-sd-highspeed;
+>  	};
+
+Regards,
+Andreas
 
 -- 
-Jean Delvare
-SUSE L3 Support
+SUSE LINUX Products GmbH, Maxfeldstr. 5, 90409 N?rnberg, Germany
+GF: Jeff Hawn, Jennifer Guild, Felix Imend?rffer; HRB 16746 AG N?rnberg
