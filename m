@@ -1,69 +1,54 @@
-From: boris.brezillon@free-electrons.com (Boris BREZILLON)
-Date: Fri, 25 Jul 2014 13:34:26 +0200
-Subject: [PATCH] ARM: at91: at91sam9x5: sets NPCS0 (PA14) back to GPIO
-In-Reply-To: <53D23246.1010300@aksignal.cz>
-References: <1405074175-22444-1-git-send-email-voice.shen@atmel.com>
- <53D10C50.50305@aksignal.cz> <20140724162645.4e19c26c@bbrezillon>
- <53D12103.3020103@aksignal.cz> <20140724175848.44f5da10@bbrezillon>
- <53D1F5D0.1080006@aksignal.cz> <20140725095319.16a8465c@bbrezillon>
- <53D214E1.4050105@aksignal.cz> <20140725104553.403921b1@bbrezillon>
- <53D21B3F.7060006@aksignal.cz> <20140725110124.3f0dce6c@bbrezillon>
- <53D21FCF.7010402@aksignal.cz> <20140725113110.70c4aa41@bbrezillon>
- <53D22C26.4030208@aksignal.cz> <20140725121804.18b05a5d@bbrezillon>
- <53D23246.1010300@aksignal.cz>
-Message-ID: <20140725133426.57f5cf6e@bbrezillon>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Fri, 25 Jul 2014 13:38:55 +0200
+Subject: [[RFC PATCH]] gpio: gpio-mxc: make sure gpio is input when
+ request IRQ
+In-Reply-To: <53D0C008.70305@tqsc.de>
+References: <1405518664-31313-1-git-send-email-list-09_linux_arm@tqsc.de>
+ <20140722062803.GA21229@dragon> <53CE107A.1000000@tqsc.de>
+ <20140722074257.GC21229@dragon>
+ <CACRpkdYxOv+k2Sazm83sA=LwKUv5yMzag44A=Ez8pNQHRO3V6A@mail.gmail.com>
+ <53D0C008.70305@tqsc.de>
+Message-ID: <CACRpkdarH_-2uW55C5bAUxM1ESgSb6tJAWc4UqEoWr8uc_kQRQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 25 Jul 2014 12:32:38 +0200
-Ji?? Prchal <jiri.prchal@aksignal.cz> wrote:
+On Thu, Jul 24, 2014 at 10:12 AM, Markus Niebel
+<list-09_linux_arm@tqsc.de> wrote:
+> Am 23.07.2014 18:14, wrote Linus Walleij:
 
-> 
-> 
-> Dne 25.7.2014 v 12:18 Boris BREZILLON napsal(a):
-> >> / # devmem 0xfffff408
-> >> 0xF0E04018
-> >> / # devmem 0xfffff418
-> >> 0xE0C04000
-> >> / # devmem 0xfffff438
-> >> 0x00C04000
-> >> / # devmem 0xfffff43c
-> >> 0x13FFD7FB
-> >> / # devmem 0xfffff458
-> >> 0x00000000
-> >> / # devmem 0xfffff468
-> >> 0xFF223B4E
-> >> / # devmem 0xfffff470
-> >> 0x0F000000
-> >> / # devmem 0xfffff474
-> >> 0x00000000
-> >> / # devmem 0xfffff498
-> >> 0xFFFFFFFF
-> >>
-> >> I get thought if is possible that in time of probe fm25 (it's first) is not configured PA14 (it 's last)?
-> >
-> > Oh, nice catch!
-> > I think you've found the origin of this bug.
-> > Indeed each device is instantiated sequentially and thus when the first
-> > device is probed (CS0) the last one has not requested it's cs_gpio yet
-> > (and PA14 is still assigned to periph A).
-> >
-> > Declaring cs-pins and referencing them in pinctrl-0 solves the issue
-> > because in this case all CS pins are requested during controller probe.
-> >
-> So, what would be the right fix up? I my patch it's not good idea since some other driver can request pin for other 
-> peripheral earlier than spi. In board dts it could be new investigating for someone else who don't know this issue. I 
-> think the best way would be request all cs in early spi init since cs depends on each other and must be all of them in 
-> right state before any communication on bus. They are part of bus, like miso, mosi, clk, not part of chips. Also they 
-> are defined in parent spi node, not in child chip node.
-> Am I right?
+>> So always prepare the hardware and make it ready for action in respective
+>> callbacks from the GPIO and irqchip APIs. Do not rely on gpiod_to_irq() having
+>> been called first.
+>>
+>
+> So a gpio driver is responsible to read status of gpio lines and flag any gpio line
+> currently configured as out (base on the information read from hardware registers)
+> on driver probe time - correct?
 
-Yes, you can take a look at [1] as an example.
+I don't think anyone reads that information explicitly to set up
+these flags.
 
-[1]http://lxr.free-electrons.com/source/drivers/spi/spi-efm32.c#L361
+Drivers just leave the pins in their power-on maiden state without
+trying to figure out how they're set-up. But as you say, if you call
+gpiod_get_direction() on them, the flag gets set up indeed.
 
+So usually these flags are set by code, calling
+gpiod_[get/set]_direction().
+Then they do get flagged as outputs or inputs.
 
--- 
-Boris Brezillon, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
+> If yes is the driver allowed to call
+> gpiod_get_direction() to have the FLAG_IS_OUT set in the gpiolib layer?
+
+I don't know if it'd be a good idea to loop over all gpios in a new
+irqchip and fetch the direction just to get the flags right, so far
+we haven't done that and I don't know what the usecase would be.
+
+If we need that we should do it in gpiolib for all drivers don't you
+think?
+
+But then we need a rationale for doing it, other than it's nice :-)
+It is already called on-the-fly by debugfs when a user needs that
+info.
+
+Yours,
+Linus Walleij
