@@ -1,44 +1,47 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Fri, 25 Jul 2014 15:52:02 +0200
-Subject: [[RFC PATCH]] gpio: gpio-mxc: make sure gpio is input when
- request IRQ
-In-Reply-To: <53D252F5.2060601@tqsc.de>
-References: <1405518664-31313-1-git-send-email-list-09_linux_arm@tqsc.de>
- <20140722062803.GA21229@dragon> <53CE107A.1000000@tqsc.de>
- <20140722074257.GC21229@dragon>
- <CACRpkdYxOv+k2Sazm83sA=LwKUv5yMzag44A=Ez8pNQHRO3V6A@mail.gmail.com>
- <53D0C008.70305@tqsc.de>
- <CACRpkdarH_-2uW55C5bAUxM1ESgSb6tJAWc4UqEoWr8uc_kQRQ@mail.gmail.com>
- <53D252F5.2060601@tqsc.de>
-Message-ID: <CACRpkdZckrmsG+mOKoZWVH=QqyV0FmDsqUMkbbyi2YJiGFZ5dw@mail.gmail.com>
+From: l.stach@pengutronix.de (Lucas Stach)
+Date: Fri, 25 Jul 2014 15:55:28 +0200
+Subject: [PATCH 2/3] ARM: dts: nitrogen6x: add hdmi
+In-Reply-To: <CAOMZO5BUDMfwDi944brOQoiNkWG_5yBn0XPTPYsLh8_cpyDc3w@mail.gmail.com>
+References: <1406285393-23545-1-git-send-email-l.stach@pengutronix.de>
+ <1406285393-23545-2-git-send-email-l.stach@pengutronix.de>
+ <CAOMZO5BUDMfwDi944brOQoiNkWG_5yBn0XPTPYsLh8_cpyDc3w@mail.gmail.com>
+Message-ID: <1406296528.4643.22.camel@weser.hi.pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jul 25, 2014 at 2:52 PM, Markus Niebel
-<list-09_linux_arm@tqsc.de> wrote:
-> Am 25.07.2014 13:38, wrote Linus Walleij:
+Am Freitag, den 25.07.2014, 10:48 -0300 schrieb Fabio Estevam:
+> Hi Lucas,
+> 
+> On Fri, Jul 25, 2014 at 7:49 AM, Lucas Stach <l.stach@pengutronix.de> wrote:
+> > From: Michael Olbrich <m.olbrich@pengutronix.de>
+> >
+> > Signed-off-by: Michael Olbrich <m.olbrich@pengutronix.de>
+> > Signed-off-by: Lucas Stach <l.stach@pengutronix.de>
+> > ---
+> >  arch/arm/boot/dts/imx6qdl-nitrogen6x.dtsi | 6 ++++++
+> >  1 file changed, 6 insertions(+)
+> >
+> > diff --git a/arch/arm/boot/dts/imx6qdl-nitrogen6x.dtsi b/arch/arm/boot/dts/imx6qdl-nitrogen6x.dtsi
+> > index 3362d2600d85..4e27cf9f3d2e 100644
+> > --- a/arch/arm/boot/dts/imx6qdl-nitrogen6x.dtsi
+> > +++ b/arch/arm/boot/dts/imx6qdl-nitrogen6x.dtsi
+> > @@ -174,6 +174,12 @@
+> >         status = "okay";
+> >  };
+> >
+> > +&hdmi {
+> > +       ddc-i2c-bus = <&i2c2>;
+> > +       hpd-unreliable;
+> 
+> I don't see this property available in linux-next yet. Are we missing
+> the patch that adds it?
+> 
+Right, we are missing a patch here. It already has been posted to the
+list long time ago, but obviously fell through the cracks. Thanks for
+spotting.
 
->> I don't know if it'd be a good idea to loop over all gpios in a new
->> irqchip and fetch the direction just to get the flags right, so far
->> we haven't done that and I don't know what the usecase would be.
->
-> I've came to a situation where it would have been helpful to know - bootloader
-> configured a pin as output and linux tried to configure the pin as IRQ input.
-> *YES I KNOW THIS IS NOT CORRECT* but it took some time to see, what happened.
-
-Hm, maybe we should call gpiod_get_direction() first in
-gpio_lock_as_irq(), so we check the hardware and know there that the
-flag is correctly set here?
-
->> If we need that we should do it in gpiolib for all drivers don't you
->> think?
->
-> A pragmatic / lean solution would be to deny the IRQ configuration when
-> seeing the pin configured as output in hardware and print out an error
-> on the gpio driver level.
-
-I guess that is what I'm suggesting, not sure if I follow
-correctly.
-
-Yours,
-Linus Walleij
+Regards,
+Lucas
+-- 
+Pengutronix e.K.             | Lucas Stach                 |
+Industrial Linux Solutions   | http://www.pengutronix.de/  |
