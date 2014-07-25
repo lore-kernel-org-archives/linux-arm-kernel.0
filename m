@@ -1,394 +1,215 @@
-From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Fri, 25 Jul 2014 11:21:11 +0900
-Subject: [PATCH v6 2/4] ARM: EXYNOS: Refactor the code to use DT based
- lookup
-In-Reply-To: <1404738090-30522-1-git-send-email-vikas.sajjan@samsung.com>
-References: <1404738090-30522-1-git-send-email-vikas.sajjan@samsung.com>
-Message-ID: <061a01cfa7af$1a36fb40$4ea4f1c0$@samsung.com>
+From: peter.chen@freescale.com (Peter Chen)
+Date: Fri, 25 Jul 2014 10:18:54 +0800
+Subject: [PATCH v3 07/12] usb: chipidea: add a usb2 driver for ci13xxx
+In-Reply-To: <1405499166-6726-8-git-send-email-antoine.tenart@free-electrons.com>
+References: <1405499166-6726-1-git-send-email-antoine.tenart@free-electrons.com>
+ <1405499166-6726-8-git-send-email-antoine.tenart@free-electrons.com>
+Message-ID: <20140725021853.GA11052@shlinux1.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Vikas Sajjan wrote:
-> 
-> Refactoring the pm.c to avoid using "soc_is_exynos" checks,
-> instead use the DT based lookup.
-> 
-Yes! please.
+On Wed, Jul 16, 2014 at 10:26:01AM +0200, Antoine T?nart wrote:
+> Add a USB2 ChipIdea driver for ci13xxx, with optional PHY, clock
+> and DMA mask, to support USB2 ChipIdea controllers that don't need
+> specific functions.
 
-Can you please make a separate patch from this series?
-
-And see my small comments inline...
-
-> While at it, consolidate the common code across SoCs
-> and create a static helper functions.
+You may need to indicate it is a generic usb2 glue layer driver at both
+subject and context.
 > 
-> Signed-off-by: Vikas Sajjan <vikas.sajjan@samsung.com>
+> Needed for the Marvell Berlin SoCs USB controllers.
+
+You can say it is tested at Marvell Berlin SoCs USB controllers.
+
+> 
+> Signed-off-by: Antoine T?nart <antoine.tenart@free-electrons.com>
 > ---
->  arch/arm/mach-exynos/pm.c       |  232 +++++++++++++++++++++++++++++++--------
->  arch/arm/mach-exynos/regs-pmu.h |    1 +
->  2 files changed, 189 insertions(+), 44 deletions(-)
+>  drivers/usb/chipidea/Makefile       |   1 +
+>  drivers/usb/chipidea/ci_hdrc_usb2.c | 147 ++++++++++++++++++++++++++++++++++++
+>  2 files changed, 148 insertions(+)
+>  create mode 100644 drivers/usb/chipidea/ci_hdrc_usb2.c
 > 
-> diff --git a/arch/arm/mach-exynos/pm.c b/arch/arm/mach-exynos/pm.c
-> index ba75171..c0dae28 100644
-> --- a/arch/arm/mach-exynos/pm.c
-> +++ b/arch/arm/mach-exynos/pm.c
-> @@ -38,6 +38,8 @@
->  #include "regs-pmu.h"
->  #include "regs-sys.h"
-> 
-> +#define REG_TABLE_END (-1U)
+> diff --git a/drivers/usb/chipidea/Makefile b/drivers/usb/chipidea/Makefile
+> index 2f099c7df7b5..1fc86a2ca22d 100644
+> --- a/drivers/usb/chipidea/Makefile
+> +++ b/drivers/usb/chipidea/Makefile
+> @@ -10,6 +10,7 @@ ci_hdrc-$(CONFIG_USB_OTG_FSM)		+= otg_fsm.o
+>  
+>  # Glue/Bridge layers go here
+>  
+> +obj-$(CONFIG_USB_CHIPIDEA)	+= ci_hdrc_usb2.o
+>  obj-$(CONFIG_USB_CHIPIDEA)	+= ci_hdrc_msm.o
+>  obj-$(CONFIG_USB_CHIPIDEA)	+= ci_hdrc_zevio.o
+>  
+> diff --git a/drivers/usb/chipidea/ci_hdrc_usb2.c b/drivers/usb/chipidea/ci_hdrc_usb2.c
+> new file mode 100644
+> index 000000000000..4ec2240d00a1
+> --- /dev/null
+> +++ b/drivers/usb/chipidea/ci_hdrc_usb2.c
+> @@ -0,0 +1,147 @@
+> +/*
+> + * Copyright (C) 2014 Marvell Technology Group Ltd.
+> + *
+> + * Antoine T?nart <antoine.tenart@free-electrons.com>
+> + *
+> + * This file is licensed under the terms of the GNU General Public
+> + * License version 2. This program is licensed "as is" without any
+> + * warranty of any kind, whether express or implied.
+> + */
 > +
->  /**
->   * struct exynos_wkup_irq - Exynos GIC to PMU IRQ mapping
->   * @hwirq: Hardware IRQ signal of the GIC
-> @@ -61,6 +63,19 @@ static struct sleep_save exynos_core_save[] = {
->  	SAVE_ITEM(S5P_SROM_BC3),
->  };
-> 
-> +struct exynos_pm_data {
-> +	const struct exynos_wkup_irq *wkup_irq;
-> +	unsigned int wake_disable_mask;
-> +	unsigned int *release_ret_regs;
+> +#include <linux/clk.h>
+> +#include <linux/dma-mapping.h>
+> +#include <linux/module.h>
+> +#include <linux/of.h>
+> +#include <linux/platform_device.h>
+> +#include <linux/usb/chipidea.h>
+> +#include <linux/usb/hcd.h>
+> +#include <linux/usb/ulpi.h>
 > +
-> +	void (*pm_prepare)(void);
-> +	void (*pm_resume)(void);
-> +	int (*pm_suspend)(void);
-> +	int (*cpu_suspend)(unsigned long);
+> +#include "ci.h"
+> +
+> +struct ci_hdrc_usb2_priv {
+> +	struct platform_device	*ci_pdev;
+> +	struct clk		*clk;
+> +	u32			dma_mask;
 > +};
 > +
-> +struct exynos_pm_data *pm_data;
+> +static int ci_hdrc_usb2_dt_probe(struct device *dev,
+> +				    struct ci_hdrc_platform_data *ci_pdata,
+> +				    struct ci_hdrc_usb2_priv *priv)
+> +{
+> +	u32 mask;
+> +	int ret;
 > +
->  /*
->   * GIC wake-up support
->   */
-> @@ -89,14 +104,21 @@ static inline u32 pmu_raw_readl(u32 offset)
->  	return __raw_readl(pmu_base_addr + offset);
->  }
-> 
-> +unsigned int exynos_release_ret_regs[] = {
-> +	S5P_PAD_RET_MAUDIO_OPTION,
-> +	S5P_PAD_RET_GPIO_OPTION,
-> +	S5P_PAD_RET_UART_OPTION,
-> +	S5P_PAD_RET_MMCA_OPTION,
-> +	S5P_PAD_RET_MMCB_OPTION,
-> +	S5P_PAD_RET_EBIA_OPTION,
-> +	S5P_PAD_RET_EBIB_OPTION,
-> +	REG_TABLE_END,
-> +};
-> +
->  static int exynos_irq_set_wake(struct irq_data *data, unsigned int state)
->  {
->  	const struct exynos_wkup_irq *wkup_irq;
-> -
-> -	if (soc_is_exynos5250())
-> -		wkup_irq = exynos5250_wkup_irq;
-> -	else
-> -		wkup_irq = exynos4_wkup_irq;
-> +	wkup_irq = pm_data->wkup_irq;
+> +	priv->clk = devm_clk_get(dev, NULL);
+> +	if (!IS_ERR(priv->clk)) {
+> +		ret = clk_prepare_enable(priv->clk);
+> +		if (ret) {
+> +			dev_err(dev, "failed to enable the clock: %d\n", ret);
+> +			return ret;
+> +		}
+> +	}
 
-if (pm_data->wkup_irq) ?
+The clk API may be needed for both DT and non-DT cases.
 
-> 
->  	while (wkup_irq->mask) {
->  		if (wkup_irq->hwirq == data->hwirq) {
-> @@ -253,13 +275,13 @@ static void exynos_cpu_restore_register(void)
-> 
->  static int exynos_cpu_suspend(unsigned long arg)
->  {
-> -#ifdef CONFIG_CACHE_L2X0
-> -	outer_flush_all();
-> -#endif
-> -
-> -	if (soc_is_exynos5250())
-> -		flush_cache_all();
-> +	if (pm_data->cpu_suspend)
-> +		return pm_data->cpu_suspend(arg);
-> +	return -1;
-> +}
-> 
-> +static int exynos_cpu_do_idle(void)
-> +{
->  	/* issue the standby signal into the pm unit. */
->  	cpu_do_idle();
-> 
-> @@ -269,32 +291,73 @@ static int exynos_cpu_suspend(unsigned long arg)
-> 
->  static void exynos_pm_prepare(void)
->  {
-> -	unsigned int tmp;
-> +	if (pm_data->pm_prepare)
-> +		pm_data->pm_prepare();
-> +}
 > +
-> +static int exynos4_cpu_suspend(unsigned long arg)
-> +{
-> +#ifdef CONFIG_CACHE_L2X0
-> +	outer_flush_all();
-> +#endif
-> +	return exynos_cpu_do_idle();
-> +}
+> +	ci_pdata->phy = of_phy_get(dev->of_node, 0);
+> +	if (IS_ERR(ci_pdata->phy)) {
+> +		if (PTR_ERR(ci_pdata->phy) == -EPROBE_DEFER)
+> +			return -EPROBE_DEFER;
 > +
-> +static int exynos5250_cpu_suspend(unsigned long arg)
-> +{
-> +#ifdef CONFIG_CACHE_L2X0
-> +	outer_flush_all();
-> +#endif
-> +	flush_cache_all();
-> +	return exynos_cpu_do_idle();
-> +}
-> 
-> +static void exynos_pm_set_wakeup_mask(void)
-> +{
->  	/* Set wake-up mask registers */
->  	pmu_raw_writel(exynos_get_eint_wake_mask(), S5P_EINT_WAKEUP_MASK);
->  	pmu_raw_writel(exynos_irqwake_intmask & ~(1 << 31), S5P_WAKEUP_MASK);
-> +}
-> 
-> -	s3c_pm_do_save(exynos_core_save, ARRAY_SIZE(exynos_core_save));
-> -
-> -	if (soc_is_exynos5250()) {
-> -		s3c_pm_do_save(exynos5_sys_save, ARRAY_SIZE(exynos5_sys_save));
-> -		/* Disable USE_RETENTION of JPEG_MEM_OPTION */
-> -		tmp = pmu_raw_readl(EXYNOS5_JPEG_MEM_OPTION);
-> -		tmp &= ~EXYNOS5_OPTION_USE_RETENTION;
-> -		pmu_raw_writel(tmp, EXYNOS5_JPEG_MEM_OPTION);
-> -	}
-> -
-> +static void exynos_pm_enter_sleep_mode(void)
-> +{
->  	/* Set value of power down register for sleep mode */
-> -
->  	exynos_sys_powerdown_conf(SYS_SLEEP);
->  	pmu_raw_writel(S5P_CHECK_SLEEP, S5P_INFORM1);
-> 
->  	/* ensure at least INFORM0 has the resume address */
-> -
->  	pmu_raw_writel(virt_to_phys(exynos_cpu_resume), S5P_INFORM0);
->  }
-> 
-> +static void exynos5250_pm_prepare(void)
-> +{
-> +	unsigned int tmp;
+> +		/* PHY is optional */
+> +		ci_pdata->phy = NULL;
+> +	}
 > +
-> +	/* Set wake-up mask registers */
-> +	exynos_pm_set_wakeup_mask();
+> +	if (of_property_read_u32(dev->of_node, "dma-mask", &mask))
+> +		priv->dma_mask = mask;
 > +
-> +	s3c_pm_do_save(exynos_core_save, ARRAY_SIZE(exynos_core_save));
-> +
-> +	s3c_pm_do_save(exynos5_sys_save, ARRAY_SIZE(exynos5_sys_save));
-> +
-> +	/* Disable USE_RETENTION of JPEG_MEM_OPTION */
-> +	tmp = pmu_raw_readl(EXYNOS5_JPEG_MEM_OPTION);
-> +	tmp &= ~EXYNOS5_OPTION_USE_RETENTION;
-> +	pmu_raw_writel(tmp, EXYNOS5_JPEG_MEM_OPTION);
-> +
-> +	exynos_pm_enter_sleep_mode();
-> +}
-> +
-> +static void exynos4_pm_prepare(void)
-> +{
-> +	/* Set wake-up mask registers */
-> +	exynos_pm_set_wakeup_mask();
-> +
-> +	s3c_pm_do_save(exynos_core_save, ARRAY_SIZE(exynos_core_save));
-> +
-> +	exynos_pm_enter_sleep_mode();
-> +}
-> +
->  static void exynos_pm_central_suspend(void)
->  {
->  	unsigned long tmp;
-> @@ -307,6 +370,13 @@ static void exynos_pm_central_suspend(void)
-> 
->  static int exynos_pm_suspend(void)
->  {
-> +	if (pm_data->pm_suspend)
-> +		return pm_data->pm_suspend();
-> +	return -1;
-> +}
-> +
-> +static int exynos4_pm_suspend(void)
-> +{
->  	unsigned long tmp;
-> 
->  	exynos_pm_central_suspend();
-> @@ -316,9 +386,20 @@ static int exynos_pm_suspend(void)
->  	tmp = (S5P_USE_STANDBY_WFI0 | S5P_USE_STANDBY_WFE0);
->  	pmu_raw_writel(tmp, S5P_CENTRAL_SEQ_OPTION);
-> 
-> -	if (read_cpuid_part_number() == ARM_CPU_PART_CORTEX_A9)
-> -		exynos_cpu_save_register();
-> +	exynos_cpu_save_register();
+According to discussion, you may not need dma_mask in driver any more,
+and use below API for both DT and non-DT case.
+
+        err = dma_set_mask_and_coherent(&pdev->dev, DMA_BIT_MASK(32));
+        if (err)
+        	                handle error;
+
+Peter
+
 > +	return 0;
 > +}
 > +
-> +static int exynos5250_pm_suspend(void)
-> +{
-> +	unsigned long tmp;
-> +
-> +	exynos_pm_central_suspend();
-> +
-> +	/* Setting SEQ_OPTION register */
-> 
-> +	tmp = (S5P_USE_STANDBY_WFI0 | S5P_USE_STANDBY_WFE0);
-> +	pmu_raw_writel(tmp, S5P_CENTRAL_SEQ_OPTION);
->  	return 0;
->  }
-> 
-> @@ -345,39 +426,57 @@ static int exynos_pm_central_resume(void)
->  	return 0;
->  }
-> 
-> +static void exynos_pm_set_release_retention(void)
-> +{
-> +	unsigned int i;
-> +
-> +	for (i = 0; (pm_data->release_ret_regs[i] != REG_TABLE_END); i++)
-> +		pmu_raw_writel(EXYNOS_WAKEUP_FROM_LOWPWR,
-> +				pm_data->release_ret_regs[i]);
-> +}
-> +
->  static void exynos_pm_resume(void)
->  {
-> +	if (pm_data->pm_resume)
-> +		pm_data->pm_resume();
-> +}
-> +
-> +static void exynos4_pm_resume(void)
-> +{
->  	if (exynos_pm_central_resume())
->  		goto early_wakeup;
-> 
-> -	if (read_cpuid_part_number() == ARM_CPU_PART_CORTEX_A9)
-> -		exynos_cpu_restore_register();
-> +	exynos_cpu_restore_register();
-> 
->  	/* For release retention */
-> -
-> -	pmu_raw_writel((1 << 28), S5P_PAD_RET_MAUDIO_OPTION);
-> -	pmu_raw_writel((1 << 28), S5P_PAD_RET_GPIO_OPTION);
-> -	pmu_raw_writel((1 << 28), S5P_PAD_RET_UART_OPTION);
-> -	pmu_raw_writel((1 << 28), S5P_PAD_RET_MMCA_OPTION);
-> -	pmu_raw_writel((1 << 28), S5P_PAD_RET_MMCB_OPTION);
-> -	pmu_raw_writel((1 << 28), S5P_PAD_RET_EBIA_OPTION);
-> -	pmu_raw_writel((1 << 28), S5P_PAD_RET_EBIB_OPTION);
-> -
-> -	if (soc_is_exynos5250())
-> -		s3c_pm_do_restore(exynos5_sys_save,
-> -			ARRAY_SIZE(exynos5_sys_save));
-> +	exynos_pm_set_release_retention();
-> 
->  	s3c_pm_do_restore_core(exynos_core_save, ARRAY_SIZE(exynos_core_save));
-> 
-> -	if (read_cpuid_part_number() == ARM_CPU_PART_CORTEX_A9)
-> -		scu_enable(S5P_VA_SCU);
-> +	scu_enable(S5P_VA_SCU);
-> 
->  early_wakeup:
-> 
->  	/* Clear SLEEP mode set in INFORM1 */
->  	pmu_raw_writel(0x0, S5P_INFORM1);
-> +}
-> +
-> +static void exynos5250_pm_resume(void)
-> +{
-> +	if (exynos_pm_central_resume())
-> +		goto early_wakeup;
-> 
-> -	return;
-> +	/* For release retention */
-> +	exynos_pm_set_release_retention();
-> +
-> +	s3c_pm_do_restore(exynos5_sys_save, ARRAY_SIZE(exynos5_sys_save));
-> +
-> +	s3c_pm_do_restore_core(exynos_core_save, ARRAY_SIZE(exynos_core_save));
-> +
-> +early_wakeup:
-> +
-> +	/* Clear SLEEP mode set in INFORM1 */
-> +	pmu_raw_writel(0x0, S5P_INFORM1);
->  }
-> 
->  static struct syscore_ops exynos_pm_syscore_ops = {
-> @@ -480,18 +579,63 @@ static struct notifier_block exynos_cpu_pm_notifier_block = {
->  	.notifier_call = exynos_cpu_pm_notifier,
->  };
-> 
-> +static struct exynos_pm_data exynos4_pm_data = {
-> +	.wkup_irq	= exynos4_wkup_irq,
-> +	.wake_disable_mask = ((0xFF << 8) | (0x1F << 1)),
-> +	.release_ret_regs = exynos_release_ret_regs,
-> +	.pm_suspend	= exynos4_pm_suspend,
-> +	.pm_resume	= exynos4_pm_resume,
-> +	.pm_prepare	= exynos4_pm_prepare,
-> +	.cpu_suspend	= exynos4_cpu_suspend,
+> +static struct ci_hdrc_platform_data ci_default_pdata = {
+> +	.capoffset	= DEF_CAPOFFSET,
+> +	.flags		= CI_HDRC_REQUIRE_TRANSCEIVER |
+> +			  CI_HDRC_DISABLE_STREAMING,
 > +};
 > +
-> +static struct exynos_pm_data exynos5250_pm_data = {
-> +	.wkup_irq	= exynos5250_wkup_irq,
-> +	.wake_disable_mask = ((0xFF << 8) | (0x1F << 1)),
-> +	.release_ret_regs = exynos_release_ret_regs,
-> +	.pm_suspend	= exynos5250_pm_suspend,
-> +	.pm_resume	= exynos5250_pm_resume,
-> +	.pm_prepare	= exynos5250_pm_prepare,
-> +	.cpu_suspend	= exynos5250_cpu_suspend,
-> +};
+> +static int ci_hdrc_usb2_probe(struct platform_device *pdev)
+> +{
+> +	struct device *dev = &pdev->dev;
+> +	struct ci_hdrc_usb2_priv *priv;
+> +	struct ci_hdrc_platform_data *ci_pdata = dev_get_platdata(&pdev->dev);
+> +	int ret;
 > +
-> +static struct of_device_id exynos_pmu_of_device_ids[] = {
-> +	{
-> +		.compatible = "samsung,exynos4210-pmu",
-> +		.data = (void *)&exynos4_pm_data,
-> +	}, {
-> +		.compatible = "samsung,exynos4212-pmu",
-> +		.data = (void *)&exynos4_pm_data,
-> +	}, {
-> +		.compatible = "samsung,exynos4412-pmu",
-> +		.data = (void *)&exynos4_pm_data,
-> +	}, {
-> +		.compatible = "samsung,exynos5250-pmu",
-> +		.data = (void *)&exynos5250_pm_data,
+> +	if (!ci_pdata)
+> +		ci_pdata = &ci_default_pdata;
+> +
+> +	priv = devm_kzalloc(dev, sizeof(*priv), GFP_KERNEL);
+> +	if (!priv)
+> +		return -ENOMEM;
+> +
+> +	if (dev->of_node) {
+> +		ret = ci_hdrc_usb2_dt_probe(dev, ci_pdata, priv);
+> +		if (ret)
+> +			return ret;
+> +	}
+> +
+> +	ci_pdata->name = dev_name(&pdev->dev);
+> +
+> +	if (priv->dma_mask) {
+> +		ret = dma_coerce_mask_and_coherent(&pdev->dev, priv->dma_mask);
+> +		if (ret)
+> +			return ret;
+> +	}
+> +
+> +	priv->ci_pdev = ci_hdrc_add_device(dev, pdev->resource,
+> +				     pdev->num_resources, ci_pdata);
+> +	if (IS_ERR(priv->ci_pdev)) {
+> +		ret = PTR_ERR(priv->ci_pdev);
+> +		if (ret != -EPROBE_DEFER)
+> +			dev_err(dev,
+> +				"failed to register ci_hdrc platform device: %d\n",
+> +				ret);
+> +		goto clk_err;
+> +	}
+> +
+> +	platform_set_drvdata(pdev, priv);
+> +
+> +	pm_runtime_no_callbacks(dev);
+> +	pm_runtime_enable(dev);
+> +
+> +	return 0;
+> +
+> +clk_err:
+> +	if (!IS_ERR(priv->clk))
+> +		clk_disable_unprepare(priv->clk);
+> +	return ret;
+> +}
+> +
+> +static int ci_hdrc_usb2_remove(struct platform_device *pdev)
+> +{
+> +	struct ci_hdrc_usb2_priv *priv = platform_get_drvdata(pdev);
+> +
+> +	pm_runtime_disable(&pdev->dev);
+> +	ci_hdrc_remove_device(priv->ci_pdev);
+> +	clk_disable_unprepare(priv->clk);
+> +
+> +	return 0;
+> +}
+> +
+> +static const struct of_device_id ci_hdrc_usb2_of_match[] = {
+> +	{ .compatible = "chipidea,usb2" },
+> +	{ }
+> +};
+> +MODULE_DEVICE_TABLE(of, ci_hdrc_usb2_of_match);
+> +
+> +static struct platform_driver ci_hdrc_usb2_driver = {
+> +	.probe	= ci_hdrc_usb2_probe,
+> +	.remove	= ci_hdrc_usb2_remove,
+> +	.driver	= {
+> +		.name		= "chipidea-usb2",
+> +		.owner		= THIS_MODULE,
+> +		.of_match_table	= of_match_ptr(ci_hdrc_usb2_of_match),
 > +	},
-> +	{ /*sentinel*/ },
 > +};
+> +module_platform_driver(ci_hdrc_usb2_driver);
 > +
->  void __init exynos_pm_init(void)
->  {
->  	u32 tmp;
-> +	const struct of_device_id *match;
+> +MODULE_DESCRIPTION("ChipIdea HDRC USB2 binding for ci13xxx");
+> +MODULE_AUTHOR("Antoine T?nart <antoine.tenart@free-electrons.com>");
+> +MODULE_LICENSE("GPL");
+> -- 
+> 1.9.1
 > 
->  	cpu_pm_register_notifier(&exynos_cpu_pm_notifier_block);
-> 
-> +	of_find_matching_node_and_match(NULL, exynos_pmu_of_device_ids, &match);
-> +
-> +	if (!match)
-> +		panic("Failed to find PMU node\n");
 
-Well, panic() is really required at this point? How about 5260, 5410, 5440 ?
+-- 
 
-> +
-> +	pm_data = (struct exynos_pm_data *) match->data;
-> +
->  	/* Platform-specific GIC callback */
->  	gic_arch_extn.irq_set_wake = exynos_irq_set_wake;
-> 
->  	/* All wakeup disable */
->  	tmp = pmu_raw_readl(S5P_WAKEUP_MASK);
-> -	tmp |= ((0xFF << 8) | (0x1F << 1));
-> +	tmp |= pm_data->wake_disable_mask;
->  	pmu_raw_writel(tmp, S5P_WAKEUP_MASK);
-> 
->  	register_syscore_ops(&exynos_pm_syscore_ops);
-> diff --git a/arch/arm/mach-exynos/regs-pmu.h b/arch/arm/mach-exynos/regs-pmu.h
-> index 9b46a52..3a6a559 100644
-> --- a/arch/arm/mach-exynos/regs-pmu.h
-> +++ b/arch/arm/mach-exynos/regs-pmu.h
-> @@ -21,6 +21,7 @@
->  #define S5P_USE_STANDBY_WFI0			(1 << 16)
->  #define S5P_USE_STANDBY_WFE0			(1 << 24)
-> 
-> +#define EXYNOS_WAKEUP_FROM_LOWPWR		(1 << 28)
->  #define EXYNOS_SWRESET				0x0400
->  #define EXYNOS5440_SWRESET			0x00C4
-> 
-> --
-> 1.7.9.5
+Best Regards,
+Peter Chen
