@@ -1,45 +1,61 @@
-From: jiri.prchal@aksignal.cz (=?UTF-8?B?SmnFmcOtIFByY2hhbA==?=)
-Date: Fri, 25 Jul 2014 10:37:31 +0200
-Subject: [PATCH] ARM: at91: at91sam9x5: sets NPCS0 (PA14) back to GPIO
-In-Reply-To: <20140725083053.GD9532@piout.net>
-References: <1405074175-22444-1-git-send-email-voice.shen@atmel.com>
- <53D10C50.50305@aksignal.cz> <20140724162645.4e19c26c@bbrezillon>
- <53D12103.3020103@aksignal.cz> <20140724175848.44f5da10@bbrezillon>
- <53D1F5D0.1080006@aksignal.cz> <20140725083053.GD9532@piout.net>
-Message-ID: <53D2174B.4020403@aksignal.cz>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Fri, 25 Jul 2014 10:38:36 +0200
+Subject: [PATCH] spi/pxa2xx-pci: Enable DMA binding through device name
+In-Reply-To: <20140725082249.GX1857@lahna.fi.intel.com>
+References: <1406196111-22861-1-git-send-email-hock.leong.kweh@intel.com>
+ <5574058.fMy2hcvT92@wuerfel> <20140725082249.GX1857@lahna.fi.intel.com>
+Message-ID: <7309109.iKHmHOxjzD@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Friday 25 July 2014 11:22:49 Mika Westerberg wrote:
+> > All you need to do is change your filter function to take the
+> > slave id from pxa_spi_info and stick it in there, e.g.
+> > 
+> > static bool pxa2xx_spi_dw_dma_filter(struct dma_chan *chan, void *param)
+> > {       
+> >         const struct pxa2xx_spi_master *pdata = param;
+> >         struct dw_dma_chan *dwc = to_dw_dma_chan(chan);
+> >         
+> >         dwc->request_line = fargs->req;
+> >         dwc->src_master = 0;
+> >         dwc->dst_master = 0;
+> >         
+> >         return 1;
+> > }           
+> 
+> Oh man. That makes pxa2xx_spi dependent on a certain specific DMA engine
+> driver.
 
+I think you can improve this by putting the filter function (and a pointer
+to it) into the pxa2xx_spi_master data provided by the PCI driver.
 
-Dne 25.7.2014 v 10:30 Alexandre Belloni napsal(a):
-> Hi,
->
-> On 25/07/2014 at 08:14:40 +0200, Ji?? Prchal wrote :
->> I'm using custom board. My spi node:
->> 			spi0: spi at f0000000 {
->
-> You should override the pinctrl here as you are using gpios for the cs.
-> 				pinctrl-0 = <&pinctrl_spi0_custom>;
->
->> 				status = "okay";
->> 				cs-gpios = <&pioA 23 0
->> 					    &pioA 22 0
->> 					    &pioC 29 0
->> 					    &pioA 14 0>;
->>
->
-> 		pinctrl at fffff400 {
-> 				spi0 {
-> 					 pinctrl_spi0_custom: spi0-custom {
-> 							 atmel,pins =
-> 									 <AT91_PIOA 23 AT91_PERIPH_GPIO AT91_PINCTRL_NONE>,
-> 									 <AT91_PIOA 22 AT91_PERIPH_GPIO AT91_PINCTRL_NONE>,
-> 									 <AT91_PIOC 29 AT91_PERIPH_GPIO AT91_PINCTRL_NONE>,
-> 									 <AT91_PIOA 14 AT91_PERIPH_GPIO AT91_PINCTRL_NONE>;
-> 					 };
-> 				};
-> 		};
->
-Of course, it's the way, but in all other drivers, for example LEDS, it's not needed. And in other way, if I will not 
-use PA14 at all, the pin will goes down every spi transfer.
+On ARM, we usually provide those pointers through platform_data from
+the board file.
+
+> > Note that the filter function by definition is specific to the dma
+> > controller, not the dma slave (that's why most people define it in
+> > the dmaengine driver), and the pxa2xx_spi_dma_filter() function used
+> > in spi-pxa2xx-dma.c looks like it was written for another dma engine:
+> 
+> I wonder what's the rationale that passing slave_id with
+> dma_slave_config is wrong? The current code works fine with that and is
+> is independent of the DMA engine driver (even though we know that it is
+> going to be dw-dma).
+> 
+> The dw-dma handles slave_id in its implementation of
+> dmaengine_slave_config().
+
+The main point is that a single 'slave_id' is not actually enough to
+identify what a slave needs. In case of dw_dma, the dma engine actually
+requires three numbers (request line, source master, destination master)
+to identify it, and there is no good way to put all that information into
+a single integer. Other dma engines require a different set of data.
+
+There are only two drivers left that actually use slave_id in this way,
+and only for the legacy (no DT or ACPI) case, every other driver uses
+either DT or a filter function. I believe the shmobile part will soon
+be done with, after shmobile has been converted to DT, and after that
+we should remove the slave_id field from the dma_slave_config interface.
+
+	Arnd
