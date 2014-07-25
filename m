@@ -1,22 +1,33 @@
-From: gnomes@lxorguk.ukuu.org.uk (One Thousand Gnomes)
-Date: Fri, 25 Jul 2014 22:45:14 +0100
-Subject: [PATCH] spi/pxa2xx-pci: Enable DMA binding through device name
-In-Reply-To: <5237362.DJsH7MtqlU@wuerfel>
-References: <1406196111-22861-1-git-send-email-hock.leong.kweh@intel.com>
- <5426556.OzZIXLrofJ@wuerfel>
- <1406285147.8530.13.camel@smile.fi.intel.com>
- <5237362.DJsH7MtqlU@wuerfel>
-Message-ID: <20140725224514.10f13885@alan.etchedpixels.co.uk>
+From: heiko@sntech.de (Heiko Stuebner)
+Date: Fri, 25 Jul 2014 23:49:36 +0200
+Subject: [PATCH v3 4/8] ARM: Kconfig: set default gpio number for rockchip SoCs
+In-Reply-To: <1406324980-2450-1-git-send-email-heiko@sntech.de>
+References: <1406324980-2450-1-git-send-email-heiko@sntech.de>
+Message-ID: <1406324980-2450-5-git-send-email-heiko@sntech.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> The current plan I think is to convert all platforms to use DT
-> or ACPI so they get the right data from tables passed by the
-> platform. I'm a bit puzzled about why Intel wants to support the
-> non-ACPI non-DT case again. If we have to support this case anyway,
-> what good will ACPI do us on those platforms?
+The new rk3288 needs a bigger gpio space, as it has 9 gpio banks.
 
-Because some industries move very very slowly so still don't believe in
-requiring ACPI or ACPI capable operating systems.
+Signed-off-by: Heiko Stuebner <heiko@sntech.de>
+Reviewed-by: Doug Anderson <dianders@chromium.org>
+Tested-by: Doug Anderson <dianders@chromium.org>
+Tested-by: Will Deacon <will.deacon@arm.com>
+---
+ arch/arm/Kconfig | 1 +
+ 1 file changed, 1 insertion(+)
 
-Alan
+diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+index 245058b..b3ba139 100644
+--- a/arch/arm/Kconfig
++++ b/arch/arm/Kconfig
+@@ -1558,6 +1558,7 @@ config ARCH_NR_GPIO
+ 	default 416 if ARCH_SUNXI
+ 	default 392 if ARCH_U8500
+ 	default 352 if ARCH_VT8500
++	default 288 if ARCH_ROCKCHIP
+ 	default 264 if MACH_H4700
+ 	default 0
+ 	help
+-- 
+1.9.0
