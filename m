@@ -1,30 +1,26 @@
 From: ajaykumar.rs@samsung.com (Ajay Kumar)
-Date: Sat, 26 Jul 2014 01:14:23 +0530
-Subject: [PATCH 2/3] ARM: dts: Add DT changes for display on peach_pit
+Date: Sat, 26 Jul 2014 01:14:24 +0530
+Subject: [PATCH 3/3] ARM: dts: Add DT changes for display on peach_pi
 In-Reply-To: <1406317464-7525-1-git-send-email-ajaykumar.rs@samsung.com>
 References: <1406317464-7525-1-git-send-email-ajaykumar.rs@samsung.com>
-Message-ID: <1406317464-7525-3-git-send-email-ajaykumar.rs@samsung.com>
+Message-ID: <1406317464-7525-4-git-send-email-ajaykumar.rs@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add DT nodes for ps8622 bridge chip and panel-simple panel.
-Add backlight power supply for pwm-backlight.
-Also add bridge phandle needed by dp to enable display on peach_pit.
-
-Note that, peach_pit doesn't support "chunghwa,claa101wb01" panel,
-but still we choose to reuse the binding since "chunghwa,claa101wb01"
-has similar LCD timings.
+Add DT nodes for panel-simple "auo,b133htn01" panel.
+Add backlight enable pin and backlight power supply for pwm-backlight.
+Also add panel phandle needed by dp to enable display on peach_pi.
 
 Signed-off-by: Ajay Kumar <ajaykumar.rs@samsung.com>
 ---
- arch/arm/boot/dts/exynos5420-peach-pit.dts |   36 +++++++++++++++-------------
- 1 file changed, 19 insertions(+), 17 deletions(-)
+ arch/arm/boot/dts/exynos5800-peach-pi.dts |   27 ++++++++++-----------------
+ 1 file changed, 10 insertions(+), 17 deletions(-)
 
-diff --git a/arch/arm/boot/dts/exynos5420-peach-pit.dts b/arch/arm/boot/dts/exynos5420-peach-pit.dts
-index 228a6b1..79beba8 100644
---- a/arch/arm/boot/dts/exynos5420-peach-pit.dts
-+++ b/arch/arm/boot/dts/exynos5420-peach-pit.dts
-@@ -30,11 +30,12 @@
+diff --git a/arch/arm/boot/dts/exynos5800-peach-pi.dts b/arch/arm/boot/dts/exynos5800-peach-pi.dts
+index f3ee48b..5342638 100644
+--- a/arch/arm/boot/dts/exynos5800-peach-pi.dts
++++ b/arch/arm/boot/dts/exynos5800-peach-pi.dts
+@@ -28,11 +28,13 @@
  		i2c20 = "/spi at 12d40000/cros-ec at 0/i2c-tunnel";
  	};
  
@@ -34,25 +30,26 @@ index 228a6b1..79beba8 100644
  		pwms = <&pwm 0 1000000 0>;
  		brightness-levels = <0 100 500 1000 1500 2000 2500 2800>;
  		default-brightness-level = <7>;
++		enable-gpios = <&gpx2 2 0>;
 +		power-supply = <&tps65090_fet1>;
  		pinctrl-0 = <&pwm0_out>;
  		pinctrl-names = "default";
  	};
-@@ -100,6 +101,12 @@
+@@ -98,6 +100,12 @@
  		regulator-boot-on;
  		regulator-always-on;
  	};
 +
 +	panel: panel-simple {
-+		compatible = "chunghwa,claa101wb01", "simple-panel";
++		compatible = "auo,b133htn01", "simple-panel";
 +		power-supply = <&tps65090_fet6>;
 +		backlight = <&backlight>;
 +	};
  };
  
  &dp {
-@@ -113,22 +120,7 @@
- 	samsung,link-rate = <0x06>;
+@@ -111,22 +119,7 @@
+ 	samsung,link-rate = <0x0a>;
  	samsung,lane-count = <2>;
  	samsung,hpd-gpio = <&gpx2 6 0>;
 -
@@ -60,37 +57,20 @@ index 228a6b1..79beba8 100644
 -		native-mode = <&timing1>;
 -
 -		timing1: timing at 1 {
--			clock-frequency = <70589280>;
--			hactive = <1366>;
--			vactive = <768>;
--			hfront-porch = <40>;
--			hback-porch = <40>;
--			hsync-len = <32>;
--			vback-porch = <10>;
--			vfront-porch = <12>;
--			vsync-len = <6>;
+-			clock-frequency = <150660000>;
+-			hactive = <1920>;
+-			vactive = <1080>;
+-			hfront-porch = <60>;
+-			hback-porch = <172>;
+-			hsync-len = <80>;
+-			vback-porch = <25>;
+-			vfront-porch = <10>;
+-			vsync-len = <10>;
 -		};
 -	};
-+	bridge = <&ps8625>;
++	panel = <&panel>;
  };
  
  &fimd {
-@@ -155,6 +147,16 @@
- 		pinctrl-names = "default";
- 		pinctrl-0 = <&max98090_irq>;
- 	};
-+
-+	ps8625: ps8625-bridge at 48 {
-+		compatible = "parade,ps8625";
-+		reg = <0x48>;
-+		sleep-gpios = <&gpx3 5 0>;
-+		reset-gpios = <&gpy7 7 0>;
-+		lane-count = <2>;
-+		panel = <&panel>;
-+		backlight = <&backlight>;
-+	};
- };
- 
- &hsi2c_9 {
 -- 
 1.7.9.5
