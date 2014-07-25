@@ -1,36 +1,54 @@
-From: vinod.koul@intel.com (Vinod Koul)
-Date: Fri, 25 Jul 2014 18:42:17 +0530
-Subject: [PATCH v11 0/2] Add support for the Allwinner A31 DMA Controller
-In-Reply-To: <1405626376-471-1-git-send-email-maxime.ripard@free-electrons.com>
-References: <1405626376-471-1-git-send-email-maxime.ripard@free-electrons.com>
-Message-ID: <20140725131217.GS8181@intel.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Fri, 25 Jul 2014 15:23:42 +0200
+Subject: [PATCH 0/6] ARM RealView DeviceTree support v4
+Message-ID: <1406294628-16079-1-git-send-email-linus.walleij@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jul 17, 2014 at 09:46:14PM +0200, Maxime Ripard wrote:
-> Hi,
-> 
-> This patchset adds support for the DMA controller found in the
-> Allwinner A31 and A23 SoCs.
-> 
-> This has been tested using the newly introduced SPI driver on an A31
-> EVK. Support for DMA-driven SPI transfers will be the subject of
-> another patch serie.
-> 
-> This has been around for around 5 monthes now, and didn't get any
-> review but nitpicks for three versions, so I feel like it could be
-> merged quite quickly.
-I have applied this now.
+As it says, now that v3.16 has settled and my infrastructure is
+in place, I've updated the RealView DeviceTree patch. Starting
+to look good: we can now push almost everything down into
+different driver subsystems, have a look.
 
-Can you please send follow patches for these:
-- don't recall if I pointed earlier, but can we use direct conversion for
-  calculating convert_burst() and convert_buswidth(), latter one at least
-  seem doable
-- don't use devm_request_irq(). You have irq enabled and you have killed
-  tasklet. This is too racy. You need to ensure no irqs can be generated before killing
-  tasklets.
-- use synchronize_irq() before killing tasklet
+Linus Walleij (6):
+  leds: add a driver for syscon-based LEDs
+  leds: add device tree bindings for syscon LEDs
+  power: reset: driver for the Versatile syscon reboot
+  power: reset: DT bindings for the Versatile reset driver
+  soc: add driver for the ARM RealView
+  ARM: realview: basic device tree implementation
 
-Thanks
+ Documentation/devicetree/bindings/arm/arm-boards   |  66 ++++++
+ Documentation/devicetree/bindings/arm/gic.txt      |   1 +
+ .../devicetree/bindings/leds/leds-syscon.txt       |  83 +++++++
+ .../bindings/reset/arm-versatile-reboot.txt        |  18 ++
+ arch/arm/boot/dts/Makefile                         |   1 +
+ arch/arm/boot/dts/arm-realview-pb1176.dts          | 240 +++++++++++++++++++++
+ arch/arm/mach-realview/Kconfig                     |  13 ++
+ arch/arm/mach-realview/Makefile                    |   1 +
+ arch/arm/mach-realview/realview-dt.c               |  72 +++++++
+ drivers/irqchip/irq-gic.c                          |   1 +
+ drivers/leds/Kconfig                               |  10 +
+ drivers/leds/Makefile                              |   1 +
+ drivers/leds/leds-syscon.c                         | 152 +++++++++++++
+ drivers/power/reset/Kconfig                        |   9 +
+ drivers/power/reset/Makefile                       |   1 +
+ drivers/power/reset/arm-versatile-reboot.c         | 121 +++++++++++
+ drivers/soc/Kconfig                                |   1 +
+ drivers/soc/Makefile                               |   1 +
+ drivers/soc/versatile/Kconfig                      |  10 +
+ drivers/soc/versatile/Makefile                     |   1 +
+ drivers/soc/versatile/soc-realview.c               | 144 +++++++++++++
+ 21 files changed, 947 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/leds/leds-syscon.txt
+ create mode 100644 Documentation/devicetree/bindings/reset/arm-versatile-reboot.txt
+ create mode 100644 arch/arm/boot/dts/arm-realview-pb1176.dts
+ create mode 100644 arch/arm/mach-realview/realview-dt.c
+ create mode 100644 drivers/leds/leds-syscon.c
+ create mode 100644 drivers/power/reset/arm-versatile-reboot.c
+ create mode 100644 drivers/soc/versatile/Kconfig
+ create mode 100644 drivers/soc/versatile/Makefile
+ create mode 100644 drivers/soc/versatile/soc-realview.c
 
 -- 
+1.9.3
