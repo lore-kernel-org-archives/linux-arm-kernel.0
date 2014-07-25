@@ -1,67 +1,65 @@
-From: afaerber@suse.de (=?UTF-8?B?QW5kcmVhcyBGw6RyYmVy?=)
-Date: Fri, 25 Jul 2014 10:46:59 +0200
-Subject: [PATCH v2 07/11] Documentation: devicetree: Fix Xilinx VDMA
- specification
-In-Reply-To: <53D20C19.5000306@monstr.eu>
-References: <1406242820-20140-1-git-send-email-afaerber@suse.de>
- <1406242820-20140-8-git-send-email-afaerber@suse.de>
- <53D20C19.5000306@monstr.eu>
-Message-ID: <53D21983.8060901@suse.de>
+From: vinod.koul@intel.com (Vinod Koul)
+Date: Fri, 25 Jul 2014 14:12:15 +0530
+Subject: [PATCH] dmaengine: fsl-edma: fix dmamux index calculating error
+In-Reply-To: <1404204063-20961-1-git-send-email-jingchang.lu@freescale.com>
+References: <1404204063-20961-1-git-send-email-jingchang.lu@freescale.com>
+Message-ID: <20140725084215.GL8181@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Michal,
+On Tue, Jul 01, 2014 at 04:41:03PM +0800, Jingchang Lu wrote:
+> Signed-off-by: Jingchang Lu <jingchang.lu@freescale.com>
 
-Am 25.07.2014 09:49, schrieb Michal Simek:
-> On 07/25/2014 01:00 AM, Andreas F?rber wrote:
->> The specification requires xlnx,data-width, but example and driver use
->> xlnx,datawidth. Change the specification to match the implementation.
->>
->> Signed-off-by: Andreas F?rber <afaerber@suse.de>
->> ---
->>  v2: New
->>  
->>  Documentation/devicetree/bindings/dma/xilinx/xilinx_vdma.txt | 2 +-
->>  1 file changed, 1 insertion(+), 1 deletion(-)
->>
->> diff --git a/Documentation/devicetree/bindings/dma/xilinx/xilinx_vdma.txt b/Documentation/devicetree/bindings/dma/xilinx/xilinx_vdma.txt
->> index 1405ed0..e4c4d47 100644
->> --- a/Documentation/devicetree/bindings/dma/xilinx/xilinx_vdma.txt
->> +++ b/Documentation/devicetree/bindings/dma/xilinx/xilinx_vdma.txt
->> @@ -25,7 +25,7 @@ Required child node properties:
->>  - compatible: It should be either "xlnx,axi-vdma-mm2s-channel" or
->>  	"xlnx,axi-vdma-s2mm-channel".
->>  - interrupts: Should contain per channel VDMA interrupts.
->> -- xlnx,data-width: Should contain the stream data width, take values
->> +- xlnx,datawidth: Should contain the stream data width, take values
->>  	{32,64...1024}.
-
-BTW I just notice that this values specification is ambiguous as to
-whether 96 is a valid value or only powers of 2 like 128. Maybe you want
-to clarify that in a follow-up patch?
-
-Cheers,
-Andreas
-
->>  
->>  Optional child node properties:
->>
-> 
-> Can you please take this patch through your tree?
-> 
-> Reviewed-by: Michal Simek <michal.simek@xilinx.com>
-> 
-> Thanks,
-> Michal
+Applied, thanks
 
 -- 
-SUSE LINUX Products GmbH, Maxfeldstr. 5, 90409 N?rnberg, Germany
-GF: Jeff Hawn, Jennifer Guild, Felix Imend?rffer; HRB 16746 AG N?rnberg
+~Vinod
 
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: OpenPGP digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140725/ece09d6f/attachment.sig>
+> ---
+>  drivers/dma/fsl-edma.c | 6 ++++--
+>  1 file changed, 4 insertions(+), 2 deletions(-)
+> 
+> diff --git a/drivers/dma/fsl-edma.c b/drivers/dma/fsl-edma.c
+> index b396a7f..24ab3d3 100644
+> --- a/drivers/dma/fsl-edma.c
+> +++ b/drivers/dma/fsl-edma.c
+> @@ -248,11 +248,12 @@ static void fsl_edma_chan_mux(struct fsl_edma_chan *fsl_chan,
+>  			unsigned int slot, bool enable)
+>  {
+>  	u32 ch = fsl_chan->vchan.chan.chan_id;
+> -	void __iomem *muxaddr = fsl_chan->edma->muxbase[ch / DMAMUX_NR];
+> +	void __iomem *muxaddr;
+>  	unsigned chans_per_mux, ch_off;
+>  
+>  	chans_per_mux = fsl_chan->edma->n_chans / DMAMUX_NR;
+>  	ch_off = fsl_chan->vchan.chan.chan_id % chans_per_mux;
+> +	muxaddr = fsl_chan->edma->muxbase[ch / chans_per_mux];
+>  
+>  	if (enable)
+>  		edma_writeb(fsl_chan->edma,
+> @@ -724,6 +725,7 @@ static struct dma_chan *fsl_edma_xlate(struct of_phandle_args *dma_spec,
+>  {
+>  	struct fsl_edma_engine *fsl_edma = ofdma->of_dma_data;
+>  	struct dma_chan *chan, *_chan;
+> +	unsigned long chans_per_mux = fsl_edma->n_chans / DMAMUX_NR;
+>  
+>  	if (dma_spec->args_count != 2)
+>  		return NULL;
+> @@ -732,7 +734,7 @@ static struct dma_chan *fsl_edma_xlate(struct of_phandle_args *dma_spec,
+>  	list_for_each_entry_safe(chan, _chan, &fsl_edma->dma_dev.channels, device_node) {
+>  		if (chan->client_count)
+>  			continue;
+> -		if ((chan->chan_id / DMAMUX_NR) == dma_spec->args[0]) {
+> +		if ((chan->chan_id / chans_per_mux) == dma_spec->args[0]) {
+>  			chan = dma_get_slave_channel(chan);
+>  			if (chan) {
+>  				chan->device->privatecnt++;
+> -- 
+> 1.8.0
+> 
+> --
+> To unsubscribe from this list: send the line "unsubscribe dmaengine" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+
+-- 
