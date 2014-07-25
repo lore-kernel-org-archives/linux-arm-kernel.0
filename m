@@ -1,127 +1,99 @@
 From: nicolas.pitre@linaro.org (Nicolas Pitre)
-Date: Fri, 25 Jul 2014 16:05:30 -0400
-Subject: [PATCH v2 2/5] tracepoint: add generic tracepoint definitions for IPI
- tracing
+Date: Fri, 25 Jul 2014 16:05:33 -0400
+Subject: [PATCH v2 5/5] X86: add IPI tracepoints
 In-Reply-To: <1406318733-26754-1-git-send-email-nicolas.pitre@linaro.org>
 References: <1406318733-26754-1-git-send-email-nicolas.pitre@linaro.org>
-Message-ID: <1406318733-26754-3-git-send-email-nicolas.pitre@linaro.org>
+Message-ID: <1406318733-26754-6-git-send-email-nicolas.pitre@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The Inter Processor Interrupt is used to make another processor do a
-specific action such as rescheduling tasks, signal a timer event or
-execute something in another CPU's context. IRQs are already traceable
-but IPIs were not. Tracing them is useful for monitoring IPI latency,
-or to verify when they are the source of CPU wake-ups with power
-management implications.
+On X86 there are already tracepoints for IRQ vectors through which IPIs
+are handled.  However this is highly X86 specific, and the IPI signaling
+is not currently traced.
 
-Three trace hooks are defined: ipi_raise, ipi_entry and ipi_exit. To make
-them portable, a string is used to identify them and correlate related
-events. Additionally, ipi_raise records a bitmask representing targeted
-CPUs.
+This is an attempt at adding generic IPI tracepoints to X86.
 
 Signed-off-by: Nicolas Pitre <nico@linaro.org>
-Acked-by: Steven Rostedt <rostedt@goodmis.org>
-Acked-by: Daniel Lezcano <daniel.lezcano@linaro.org>
 ---
- include/trace/events/ipi.h | 89 ++++++++++++++++++++++++++++++++++++++++++++++
- 1 file changed, 89 insertions(+)
- create mode 100644 include/trace/events/ipi.h
+ arch/x86/kernel/smp.c | 20 ++++++++++++++++++++
+ 1 file changed, 20 insertions(+)
 
-diff --git a/include/trace/events/ipi.h b/include/trace/events/ipi.h
-new file mode 100644
-index 0000000000..834a7362a6
---- /dev/null
-+++ b/include/trace/events/ipi.h
-@@ -0,0 +1,89 @@
-+#undef TRACE_SYSTEM
-+#define TRACE_SYSTEM ipi
+diff --git a/arch/x86/kernel/smp.c b/arch/x86/kernel/smp.c
+index be8e1bde07..d193609bea 100644
+--- a/arch/x86/kernel/smp.c
++++ b/arch/x86/kernel/smp.c
+@@ -31,6 +31,16 @@
+ #include <asm/apic.h>
+ #include <asm/nmi.h>
+ #include <asm/trace/irq_vectors.h>
 +
-+#if !defined(_TRACE_IPI_H) || defined(TRACE_HEADER_MULTI_READ)
-+#define _TRACE_IPI_H
-+
-+#include <linux/tracepoint.h>
-+
-+/**
-+ * ipi_raise - called when a smp cross call is made
-+ *
-+ * @mask: mask of recipient CPUs for the IPI
-+ * @reason: string identifying the IPI purpose
-+ *
-+ * It is necessary for @reason to be a static string declared with
-+ * __tracepoint_string.
++#define CREATE_TRACE_POINTS
++/*
++ * Those were defined in <asm/trace/irq_vectors.h> and cause problems
++ * when including <trace/events/ipi.h>.
 + */
-+TRACE_EVENT(ipi_raise,
++#undef TRACE_INCLUDE_PATH
++#undef TRACE_INCLUDE_FILE
++#include <trace/events/ipi.h>
 +
-+	TP_PROTO(const struct cpumask *mask, const char *reason),
+ /*
+  *	Some notes on x86 processor bugs affecting SMP operation:
+  *
+@@ -124,11 +134,13 @@ static void native_smp_send_reschedule(int cpu)
+ 		WARN_ON(1);
+ 		return;
+ 	}
++	trace_ipi_raise(cpumask_of(cpu), tracepoint_string("RESCHEDULE"));
+ 	apic->send_IPI_mask(cpumask_of(cpu), RESCHEDULE_VECTOR);
+ }
+ 
+ void native_send_call_func_single_ipi(int cpu)
+ {
++	trace_ipi_raise(cpumask_of(cpu), tracepoint_string("CALL_FUNCTION_SINGLE"));
+ 	apic->send_IPI_mask(cpumask_of(cpu), CALL_FUNCTION_SINGLE_VECTOR);
+ }
+ 
+@@ -136,6 +148,8 @@ void native_send_call_func_ipi(const struct cpumask *mask)
+ {
+ 	cpumask_var_t allbutself;
+ 
++	trace_ipi_raise(mask, tracepoint_string("CALL_FUNCTION"));
 +
-+	TP_ARGS(mask, reason),
-+
-+	TP_STRUCT__entry(
-+		__bitmask(target_cpus, nr_cpumask_bits)
-+		__field(const char *, reason)
-+	),
-+
-+	TP_fast_assign(
-+		__assign_bitmask(target_cpus, cpumask_bits(mask), nr_cpumask_bits);
-+		__entry->reason = reason;
-+	),
-+
-+	TP_printk("target_mask=%s (%s)", __get_bitmask(target_cpus), __entry->reason)
-+);
-+
-+DECLARE_EVENT_CLASS(ipi_handler,
-+
-+	TP_PROTO(const char *reason),
-+
-+	TP_ARGS(reason),
-+
-+	TP_STRUCT__entry(
-+		__field(const char *, reason)
-+	),
-+
-+	TP_fast_assign(
-+		__entry->reason = reason;
-+	),
-+
-+	TP_printk("(%s)", __entry->reason)
-+);
-+
-+/**
-+ * ipi_entry - called immediately before the IPI handler
-+ *
-+ * @reason: string identifying the IPI purpose
-+ *
-+ * It is necessary for @reason to be a static string declared with
-+ * __tracepoint_string, ideally the same as used with trace_ipi_raise
-+ * for that IPI.
-+ */
-+DEFINE_EVENT(ipi_handler, ipi_entry,
-+
-+	TP_PROTO(const char *reason),
-+
-+	TP_ARGS(reason)
-+);
-+
-+/**
-+ * ipi_exit - called immediately after the IPI handler returns
-+ *
-+ * @reason: string identifying the IPI purpose
-+ *
-+ * It is necessary for @reason to be a static string declared with
-+ * __tracepoint_string, ideally the same as used with trace_ipi_raise for
-+ * that IPI.
-+ */
-+DEFINE_EVENT(ipi_handler, ipi_exit,
-+
-+	TP_PROTO(const char *reason),
-+
-+	TP_ARGS(reason)
-+);
-+
-+#endif /* _TRACE_IPI_H */
-+
-+/* This part must be outside protection */
-+#include <trace/define_trace.h>
+ 	if (!alloc_cpumask_var(&allbutself, GFP_ATOMIC)) {
+ 		apic->send_IPI_mask(mask, CALL_FUNCTION_VECTOR);
+ 		return;
+@@ -252,8 +266,10 @@ finish:
+  */
+ static inline void __smp_reschedule_interrupt(void)
+ {
++	trace_ipi_entry(tracepoint_string("RESCHEDULE"));
+ 	inc_irq_stat(irq_resched_count);
+ 	scheduler_ipi();
++	trace_ipi_exit(tracepoint_string("RESCHEDULE"));
+ }
+ 
+ __visible void smp_reschedule_interrupt(struct pt_regs *regs)
+@@ -291,8 +307,10 @@ __visible void smp_trace_reschedule_interrupt(struct pt_regs *regs)
+ 
+ static inline void __smp_call_function_interrupt(void)
+ {
++	trace_ipi_entry(tracepoint_string("CALL_FUNCTION"));
+ 	generic_smp_call_function_interrupt();
+ 	inc_irq_stat(irq_call_count);
++	trace_ipi_exit(tracepoint_string("CALL_FUNCTION"));
+ }
+ 
+ __visible void smp_call_function_interrupt(struct pt_regs *regs)
+@@ -313,8 +331,10 @@ __visible void smp_trace_call_function_interrupt(struct pt_regs *regs)
+ 
+ static inline void __smp_call_function_single_interrupt(void)
+ {
++	trace_ipi_entry(tracepoint_string("CALL_FUNCTION_SINGLE"));
+ 	generic_smp_call_function_single_interrupt();
+ 	inc_irq_stat(irq_call_count);
++	trace_ipi_exit(tracepoint_string("CALL_FUNCTION_SINGLE"));
+ }
+ 
+ __visible void smp_call_function_single_interrupt(struct pt_regs *regs)
 -- 
 1.8.4.108.g55ea5f6
