@@ -1,54 +1,41 @@
-From: afaerber@suse.de (=?ISO-8859-1?Q?Andreas_F=E4rber?=)
-Date: Fri, 25 Jul 2014 12:32:43 +0200
-Subject: [PATCH v2 09/11] Documentation: devicetree: Fix ADI AXI SPDIF
- specification
-In-Reply-To: <20140725101815.GO17528@sirena.org.uk>
-References: <1406242820-20140-1-git-send-email-afaerber@suse.de>
- <1406242820-20140-10-git-send-email-afaerber@suse.de>
- <53D20A61.1050506@metafoo.de> <53D21066.8000905@monstr.eu>
- <20140725101815.GO17528@sirena.org.uk>
-Message-ID: <53D2324B.4070602@suse.de>
+From: hanjun.guo@linaro.org (Hanjun Guo)
+Date: Fri, 25 Jul 2014 18:32:14 +0800
+Subject: [PATCH 04/19] ARM64 / ACPI: Introduce arch_fix_phys_package_id()
+ for cpu topology
+In-Reply-To: <20140724144327.GJ17528@sirena.org.uk>
+References: <1406206825-15590-1-git-send-email-hanjun.guo@linaro.org>
+ <1406206825-15590-5-git-send-email-hanjun.guo@linaro.org>
+ <20140724144327.GJ17528@sirena.org.uk>
+Message-ID: <53D2322E.9010802@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
------BEGIN PGP SIGNED MESSAGE-----
-Hash: SHA1
-
-Am 25.07.2014 12:18, schrieb Mark Brown:
-> On Fri, Jul 25, 2014 at 10:08:06AM +0200, Michal Simek wrote:
+On 2014-7-24 22:43, Mark Brown wrote:
+> On Thu, Jul 24, 2014 at 09:00:10PM +0800, Hanjun Guo wrote:
 > 
->> All these patches have been added through your tree that's why I
->> think you should take this fix through his tree.
+>> +/*
+>> + * Use the CPU slot number provided by ACPI to update the physical
+>> + * package id when cpuid_topo->cluster_id is not available, then we
+>> + * can get the right value in the "physical id" field of /proc/cpuinfo.
+>> + */
+>> +void arch_fix_phys_package_id(int num, u32 slot)
+>> +{
+>> +	struct cpu_topology *cpuid_topo = &cpu_topology[num];
+>> +
+>> +	if (cpuid_topo->cluster_id == -1)
+>> +		cpuid_topo->cluster_id = slot;
+>> +}
+>> +EXPORT_SYMBOL_GPL(arch_fix_phys_package_id);
 > 
-> If someone could send me patches I'll take a look at them.
+> As I said on the previous version of this patch are you sure this runs
+> at a point between the cluster ID getting initialized to -1 and the slot
+> being initialized (bear in mind that we now use MPIDR information if
+> availabe).  I don't understand why we don't just unconditionally use the
+> value given.
 
-I used scripts/get_maintainer.pl --nogit-fallback. If you were not
-CC'ed and need to be, please submit a MAINTAINERS patch. :)
+Ah, sorry, it should be unconditionally used as you said, and I remember
+the comments in last version, but the patch shows not, must be something
+wrong, will update it in next version.
 
-Maybe this works for you?
-https://patchwork.kernel.org/patch/4620191/
-
-Otherwise I can resend with Ab/Rb.
-
-Andreas
-
-- -- 
-SUSE LINUX Products GmbH, Maxfeldstr. 5, 90409 N?rnberg, Germany
-GF: Jeff Hawn, Jennifer Guild, Felix Imend?rffer; HRB 16746 AG N?rnberg
------BEGIN PGP SIGNATURE-----
-Version: GnuPG v2.0.22 (GNU/Linux)
-
-iQIcBAEBAgAGBQJT0jJLAAoJEPou0S0+fgE/od0QAItNVBWohkpacvB5M+Oh0x5H
-40aYXWOPVrAHRfXlh5SsSQyba/2P6q719meJL3FseU7Jj+rbkPnICf3q5KWgN3Vb
-iXoO+UQPn/gvredRql9g5eUj0xeh6j3bIAmEYmmme3opg0siKV1Gd6D9vEezjL8x
-M3xroJ05EbhjAd1UrgW/xEINAfDExLXbUQhsbls1tzL7WL9Cx4Obi7/KWiAVATMU
-RPNQiz8zyVXoJq0i596fAKX+EPaID2ztr26IQtpH+vOJOpRhtQeX+B+HBxTm89yO
-mg7ZnklhXFFaAYhXKEm1itMbi8OnCUzDuk5hPklCJF+WgzBbyq29erx53VaRQAij
-jrebNU4UB0/si7Gnl/XwvRMDUaVDkF6OaeeSjwKZvk0R6o02lperM51gKOgsDdC9
-G9VPb9AoNvbebEaNvonU22gB81RWg1MFkW7XF1Enj0C+xINePG86TXpWNiNUPfdV
-QAyYhwrAlePV4tKYqnyDd1d8orPs5TySVt3tuloUTB17IpYXM7OWj7db5so5V6O2
-99m2rrcMCP5SxDiuB0LUbKxrBoIhGH2kZ0k476Xb/YOYgpBskOxFLqZ+ptzZDW7K
-a3frjJ98QKjb5z9fZ1qZBzbegggAEvXlhpIgcaWAkT1wV3vmZhQjycpDHNWuahsu
-ybMjvgNj/YiougCN+7bf
-=zr8g
------END PGP SIGNATURE-----
+Thanks
+Hanjun
