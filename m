@@ -1,25 +1,35 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Fri, 25 Jul 2014 14:45:21 +0100
-Subject: arm64 Kernel is overly verbose on user faults
-In-Reply-To: <CAAqcGHkjgOfs1Yj3SNmjpzE2cdGTh4EQ0njyka6UaeVVnbvQGw@mail.gmail.com>
-References: <CAAqcGHkjgOfs1Yj3SNmjpzE2cdGTh4EQ0njyka6UaeVVnbvQGw@mail.gmail.com>
-Message-ID: <20140725134520.GJ24268@arm.com>
+From: festevam@gmail.com (Fabio Estevam)
+Date: Fri, 25 Jul 2014 10:48:46 -0300
+Subject: [PATCH 2/3] ARM: dts: nitrogen6x: add hdmi
+In-Reply-To: <1406285393-23545-2-git-send-email-l.stach@pengutronix.de>
+References: <1406285393-23545-1-git-send-email-l.stach@pengutronix.de>
+ <1406285393-23545-2-git-send-email-l.stach@pengutronix.de>
+Message-ID: <CAOMZO5BUDMfwDi944brOQoiNkWG_5yBn0XPTPYsLh8_cpyDc3w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jul 25, 2014 at 01:22:49PM +0100, Riku Voipio wrote:
-> Arm64 kernel dmesg will print out a multiline message if any user
-> binary segfaults. We get "unhandled level X translation fault" with
-> pr_info, show_pte() with pr_alert and show_regs with default kernel
-> level:
+Hi Lucas,
 
-I agree show_pte() is not useful for user debugging but I'm not sure
-about show_regs(), it may come in handy when debugging some user
-application.
+On Fri, Jul 25, 2014 at 7:49 AM, Lucas Stach <l.stach@pengutronix.de> wrote:
+> From: Michael Olbrich <m.olbrich@pengutronix.de>
+>
+> Signed-off-by: Michael Olbrich <m.olbrich@pengutronix.de>
+> Signed-off-by: Lucas Stach <l.stach@pengutronix.de>
+> ---
+>  arch/arm/boot/dts/imx6qdl-nitrogen6x.dtsi | 6 ++++++
+>  1 file changed, 6 insertions(+)
+>
+> diff --git a/arch/arm/boot/dts/imx6qdl-nitrogen6x.dtsi b/arch/arm/boot/dts/imx6qdl-nitrogen6x.dtsi
+> index 3362d2600d85..4e27cf9f3d2e 100644
+> --- a/arch/arm/boot/dts/imx6qdl-nitrogen6x.dtsi
+> +++ b/arch/arm/boot/dts/imx6qdl-nitrogen6x.dtsi
+> @@ -174,6 +174,12 @@
+>         status = "okay";
+>  };
+>
+> +&hdmi {
+> +       ddc-i2c-bus = <&i2c2>;
+> +       hpd-unreliable;
 
-We could hide the extra information like show_pte behind a
-CONFIG_DEBUG_USER while keeping the short reporting as it currently is
-(based on show_unhandled_signals).
-
--- 
-Catalin
+I don't see this property available in linux-next yet. Are we missing
+the patch that adds it?
