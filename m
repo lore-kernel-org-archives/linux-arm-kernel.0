@@ -1,145 +1,144 @@
-From: hanjun.guo@linaro.org (Hanjun Guo)
-Date: Fri, 25 Jul 2014 08:46:39 +0800
-Subject: [PATCH 00/19] Introduce ACPI for ARM64 based on ACPI 5.1
-In-Reply-To: <1406206825-15590-1-git-send-email-hanjun.guo@linaro.org>
-References: <1406206825-15590-1-git-send-email-hanjun.guo@linaro.org>
-Message-ID: <53D1A8EF.60807@linaro.org>
+From: m.smarduch@samsung.com (Mario Smarduch)
+Date: Thu, 24 Jul 2014 17:56:05 -0700
+Subject: [PATCH v9 1/4] arm: add ARMv7 HYP API to flush VM TLBs,
+ change generic TLB flush to support arch flush
+In-Reply-To: <1406249768-25315-1-git-send-email-m.smarduch@samsung.com>
+References: <1406249768-25315-1-git-send-email-m.smarduch@samsung.com>
+Message-ID: <1406249768-25315-2-git-send-email-m.smarduch@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi folks,
+Patch adds HYP interface for global VM TLB invalidation without address
+parameter. Generic VM TLB flush calls ARMv7 arch defined TLB flush function.
 
-I included the linaro-acpi-private mail list wrongly when I was sending them
-out, it will cause Delivery Status Notification (Failure) when you are not
-in that mail list, sorry for the messed up, it was a little bit late for me
-last night, and little bit dottiness for me too, I must be tired :(
+Signed-off-by: Mario Smarduch <m.smarduch@samsung.com>
+---
+ arch/arm/include/asm/kvm_asm.h  |    1 +
+ arch/arm/include/asm/kvm_host.h |    1 +
+ arch/arm/kvm/Kconfig            |    1 +
+ arch/arm/kvm/interrupts.S       |   12 ++++++++++++
+ arch/arm/kvm/mmu.c              |   17 +++++++++++++++++
+ virt/kvm/Kconfig                |    3 +++
+ virt/kvm/kvm_main.c             |    4 ++++
+ 7 files changed, 39 insertions(+)
 
-please remove the linaro-acpi-private mail list when you replied, Thanks.
-
-Best Regards
-Hanjun
-
-On 2014-7-24 21:00, Hanjun Guo wrote:
-> ACPI 5.1 was released [1] and it fixed some major gaps to run ACPI
-> on ARM, this patch just follow the ACPI 5.1 spec and prepare the
-> code to run ACPI on ARM64.
-> 
-> ACPI 5.1 has some major changes for the following tables and
-> method which are essential for ARM platforms:
-> 
-> 1) MADT table updates.
-> New fields were introduced to cover MPIDR and virtualization in
-> GICC, and introduce GICR and GIC MSI frame structure to cover
-> GICv3 and GICv2m (this patch set only cover GICv2).
-> 
-> 2) FADT updates for PSCI
-> New fields were introduced to cover PSCI and ACPI can use psci
-> to boot SMP and other PSCI related functions.
-> 
-> 3) GTDT
-> GTDT was updated to support arch timer, memory-mapped tiemr,
-> SBSA watchdog timer, in this patch, only arch timer tested on
-> Juno board, so only arch timer init is available.
-> 
-> 4) _DSD
-> _DSD (Device Specific Data) will provide some key values which
-> presented by FDT before, it makes possible that some devices can
-> be emumerated in ACPI way, please refer to the document provided
-> in this patch set for detail.
-> 
-> This patch set is the ARM64 ACPI core patches covered MADT, FADT
-> and GTDT, _DSD is not covered in this patch set. We first introduce
-> acpi.c and its related head file which are needed by ACPI core, and
-> then get RSDP to extract all the ACPI boot-time tables.
-> 
-> When all the boot-time tables (FADT, MADT, GTDT) are ready, then
-> parse them to init the sytem when booted. Specifically, 
-> a) we use FADT to init PSCI and use PSCI to boot SMP;
-> b) Use MADT for GIC init and SMP init;
-> c) GTDT for arch timer init.
-> 
-> This patch set is based on the former ACPICA patches I sent, and I
-> already compiled it OK with:
-> a) each patch applied on ARM64 with CONFIG_ACPI=y;
-> b) CONFIG_ACPI=n on ARM64;
-> c) CONFIG_ACPI=y on x86.
-> 
-> Also this patch set was tested by Graeme on ARM64 Juno platform, it
-> boot successfully with ACPI only (no device tree).
-> 
-> [1]
-> You can download ACPI 5.1 from http://www.uefi.org/specifications
-> 
-> Al Stone (3):
->   ARM64 / ACPI: Get RSDP and ACPI boot-time tables
->   ARM64 / ACPI: Introduce early_param for "acpi"
->   ARM64 / ACPI: Select ACPI_REDUCED_HARDWARE_ONLY if ACPI is enabled on
->     ARM64
-> 
-> Ashwin Chaugule (1):
->   ACPI / table: Add new function to get table entries
-> 
-> Graeme Gregory (4):
->   ARM64 / ACPI: Introduce lowlevel suspend function
->   ARM64 / ACPI: If we chose to boot from acpi then disable FDT
->   ARM64 / ACPI: Enable ARM64 in Kconfig
->   Documentation: ACPI for ARM64
-> 
-> Hanjun Guo (10):
->   ARM64 / ACPI: Introduce arch_fix_phys_package_id() for cpu topology
->   ARM64 / ACPI: Make PCI optional for ACPI on ARM64
->   ARM64 / ACPI: Parse FADT table to get PSCI flags for PSCI init
->   ARM64 / ACPI: Parse MADT to map logical cpu to MPIDR and get
->     cpu_possible/present_map
->   ACPI / table: Print GIC information when MADT is parsed
->   ARM64 / ACPI: Move the initialization of cpu_logical_map(0) before
->     acpi_boot_init()
->   ARM64 / ACPI: Get the enable method for SMP initialization in ACPI
->     way
->   ACPI / processor: Make it possible to get CPU hardware ID via GICC
->   ARM64 / ACPI: Introduce ACPI_IRQ_MODEL_GIC and register device's gsi
->   ARM64 / ACPI: Parse GTDT to initialize arch timer
-> 
-> Tomasz Nowicki (1):
->   ARM64 / ACPI: Add GICv2 specific ACPI boot support
-> 
->  Documentation/arm64/arm-acpi.txt     |  240 ++++++++++++++++++++
->  Documentation/kernel-parameters.txt  |    3 +-
->  arch/arm64/Kconfig                   |    3 +
->  arch/arm64/include/asm/acenv.h       |   18 ++
->  arch/arm64/include/asm/acpi.h        |   90 ++++++++
->  arch/arm64/include/asm/cpu.h         |   11 +
->  arch/arm64/include/asm/cpu_ops.h     |    9 +-
->  arch/arm64/include/asm/pci.h         |   11 +
->  arch/arm64/include/asm/smp.h         |    2 +-
->  arch/arm64/include/asm/topology.h    |    2 +
->  arch/arm64/kernel/Makefile           |    1 +
->  arch/arm64/kernel/acpi.c             |  403 ++++++++++++++++++++++++++++++++++
->  arch/arm64/kernel/cpu_ops.c          |   52 ++++-
->  arch/arm64/kernel/irq.c              |    5 +
->  arch/arm64/kernel/psci.c             |   95 +++++---
->  arch/arm64/kernel/setup.c            |   11 +-
->  arch/arm64/kernel/smp.c              |   39 +++-
->  arch/arm64/kernel/time.c             |    7 +
->  arch/arm64/kernel/topology.c         |   14 ++
->  drivers/acpi/Kconfig                 |    6 +-
->  drivers/acpi/Makefile                |    2 +-
->  drivers/acpi/bus.c                   |    3 +
->  drivers/acpi/internal.h              |    5 +
->  drivers/acpi/processor_core.c        |   36 +++
->  drivers/acpi/tables.c                |  109 +++++++--
->  drivers/clocksource/arm_arch_timer.c |  117 ++++++++--
->  drivers/irqchip/irq-gic.c            |  114 ++++++++++
->  include/linux/acpi.h                 |    5 +
->  include/linux/clocksource.h          |    6 +
->  include/linux/irqchip/arm-gic-acpi.h |   36 +++
->  include/linux/pci.h                  |   37 +++-
->  31 files changed, 1397 insertions(+), 95 deletions(-)
->  create mode 100644 Documentation/arm64/arm-acpi.txt
->  create mode 100644 arch/arm64/include/asm/acenv.h
->  create mode 100644 arch/arm64/include/asm/acpi.h
->  create mode 100644 arch/arm64/include/asm/cpu.h
->  create mode 100644 arch/arm64/include/asm/pci.h
->  create mode 100644 arch/arm64/kernel/acpi.c
->  create mode 100644 include/linux/irqchip/arm-gic-acpi.h
-> 
+diff --git a/arch/arm/include/asm/kvm_asm.h b/arch/arm/include/asm/kvm_asm.h
+index 53b3c4a..21bc519 100644
+--- a/arch/arm/include/asm/kvm_asm.h
++++ b/arch/arm/include/asm/kvm_asm.h
+@@ -78,6 +78,7 @@ extern char __kvm_hyp_code_end[];
+ 
+ extern void __kvm_flush_vm_context(void);
+ extern void __kvm_tlb_flush_vmid_ipa(struct kvm *kvm, phys_addr_t ipa);
++extern void __kvm_tlb_flush_vmid(struct kvm *kvm);
+ 
+ extern int __kvm_vcpu_run(struct kvm_vcpu *vcpu);
+ #endif
+diff --git a/arch/arm/include/asm/kvm_host.h b/arch/arm/include/asm/kvm_host.h
+index 193ceaf..042206f 100644
+--- a/arch/arm/include/asm/kvm_host.h
++++ b/arch/arm/include/asm/kvm_host.h
+@@ -230,5 +230,6 @@ int kvm_perf_teardown(void);
+ 
+ u64 kvm_arm_timer_get_reg(struct kvm_vcpu *, u64 regid);
+ int kvm_arm_timer_set_reg(struct kvm_vcpu *, u64 regid, u64 value);
++void kvm_arch_flush_remote_tlbs(struct kvm *);
+ 
+ #endif /* __ARM_KVM_HOST_H__ */
+diff --git a/arch/arm/kvm/Kconfig b/arch/arm/kvm/Kconfig
+index 466bd29..44d3b6f 100644
+--- a/arch/arm/kvm/Kconfig
++++ b/arch/arm/kvm/Kconfig
+@@ -22,6 +22,7 @@ config KVM
+ 	select ANON_INODES
+ 	select HAVE_KVM_CPU_RELAX_INTERCEPT
+ 	select KVM_MMIO
++	select HAVE_KVM_ARCH_TLB_FLUSH_ALL
+ 	select KVM_ARM_HOST
+ 	depends on ARM_VIRT_EXT && ARM_LPAE
+ 	---help---
+diff --git a/arch/arm/kvm/interrupts.S b/arch/arm/kvm/interrupts.S
+index 0d68d40..1258d46 100644
+--- a/arch/arm/kvm/interrupts.S
++++ b/arch/arm/kvm/interrupts.S
+@@ -66,6 +66,18 @@ ENTRY(__kvm_tlb_flush_vmid_ipa)
+ 	bx	lr
+ ENDPROC(__kvm_tlb_flush_vmid_ipa)
+ 
++/**
++ * void __kvm_tlb_flush_vmid(struct kvm *kvm) - Flush per-VMID TLBs
++ *
++ * Reuses __kvm_tlb_flush_vmid_ipa() for ARMv7, without passing address
++ * parameter
++ */
++
++ENTRY(__kvm_tlb_flush_vmid)
++	b	__kvm_tlb_flush_vmid_ipa
++ENDPROC(__kvm_tlb_flush_vmid)
++
++
+ /********************************************************************
+  * Flush TLBs and instruction caches of all CPUs inside the inner-shareable
+  * domain, for all VMIDs
+diff --git a/arch/arm/kvm/mmu.c b/arch/arm/kvm/mmu.c
+index 2ac9588..35254c6 100644
+--- a/arch/arm/kvm/mmu.c
++++ b/arch/arm/kvm/mmu.c
+@@ -56,6 +56,23 @@ static void kvm_tlb_flush_vmid_ipa(struct kvm *kvm, phys_addr_t ipa)
+ 		kvm_call_hyp(__kvm_tlb_flush_vmid_ipa, kvm, ipa);
+ }
+ 
++#ifdef CONFIG_ARM
++/**
++ * kvm_arch_flush_remote_tlbs() - flush all VM TLB entries
++ * @kvm:       pointer to kvm structure.
++ *
++ * Interface to HYP function to flush all VM TLB entries without address
++ * parameter. In HYP mode reuses __kvm_tlb_flush_vmid_ipa() function used by
++ * kvm_tlb_flush_vmid_ipa().
++ */
++void kvm_arch_flush_remote_tlbs(struct kvm *kvm)
++{
++	if (kvm)
++		kvm_call_hyp(__kvm_tlb_flush_vmid, kvm);
++}
++
++#endif
++
+ static int mmu_topup_memory_cache(struct kvm_mmu_memory_cache *cache,
+ 				  int min, int max)
+ {
+diff --git a/virt/kvm/Kconfig b/virt/kvm/Kconfig
+index 13f2d19..f1efaa5 100644
+--- a/virt/kvm/Kconfig
++++ b/virt/kvm/Kconfig
+@@ -34,3 +34,6 @@ config HAVE_KVM_CPU_RELAX_INTERCEPT
+ 
+ config KVM_VFIO
+        bool
++
++config HAVE_KVM_ARCH_TLB_FLUSH_ALL
++       bool
+diff --git a/virt/kvm/kvm_main.c b/virt/kvm/kvm_main.c
+index fa70c6e..258f3d9 100644
+--- a/virt/kvm/kvm_main.c
++++ b/virt/kvm/kvm_main.c
+@@ -186,12 +186,16 @@ static bool make_all_cpus_request(struct kvm *kvm, unsigned int req)
+ 
+ void kvm_flush_remote_tlbs(struct kvm *kvm)
+ {
++#ifdef CONFIG_HAVE_KVM_ARCH_TLB_FLUSH_ALL
++	kvm_arch_flush_remote_tlbs(kvm);
++#else
+ 	long dirty_count = kvm->tlbs_dirty;
+ 
+ 	smp_mb();
+ 	if (make_all_cpus_request(kvm, KVM_REQ_TLB_FLUSH))
+ 		++kvm->stat.remote_tlb_flush;
+ 	cmpxchg(&kvm->tlbs_dirty, dirty_count, 0);
++#endif
+ }
+ EXPORT_SYMBOL_GPL(kvm_flush_remote_tlbs);
+ 
+-- 
+1.7.9.5
