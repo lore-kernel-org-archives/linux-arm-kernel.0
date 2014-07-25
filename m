@@ -1,43 +1,21 @@
 From: shawn.guo@freescale.com (Shawn Guo)
-Date: Fri, 25 Jul 2014 16:09:49 +0800
-Subject: [PATCH v2 1/2] ARM: smp_scu: use macro for SCU enable bit
-In-Reply-To: <1406275790-18617-1-git-send-email-shawn.guo@freescale.com>
-References: <1406275790-18617-1-git-send-email-shawn.guo@freescale.com>
-Message-ID: <1406275790-18617-2-git-send-email-shawn.guo@freescale.com>
+Date: Fri, 25 Jul 2014 16:09:48 +0800
+Subject: [PATCH v2 0/2] Enable SCU standby support at core level
+Message-ID: <1406275790-18617-1-git-send-email-shawn.guo@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Use macro instead of magic number for SCU enable bit.
+Changes since v1:
+ - Check earlier revsions of Cortex-A9 and skip setting standby bit
+ - Drop i.MX platform patch, which will be handled after core change
+   gets accepted
 
-Signed-off-by: Shawn Guo <shawn.guo@freescale.com>
----
- arch/arm/kernel/smp_scu.c | 5 +++--
- 1 file changed, 3 insertions(+), 2 deletions(-)
+Shawn Guo (2):
+  ARM: smp_scu: use macro for SCU enable bit
+  ARM: smp_scu: enable SCU standby support
 
-diff --git a/arch/arm/kernel/smp_scu.c b/arch/arm/kernel/smp_scu.c
-index 1aafa0d785eb..c947508f84e6 100644
---- a/arch/arm/kernel/smp_scu.c
-+++ b/arch/arm/kernel/smp_scu.c
-@@ -17,6 +17,7 @@
- #include <asm/cputype.h>
- 
- #define SCU_CTRL		0x00
-+#define SCU_ENABLE		(1 << 0)
- #define SCU_CONFIG		0x04
- #define SCU_CPU_STATUS		0x08
- #define SCU_INVALIDATE		0x0c
-@@ -50,10 +51,10 @@ void scu_enable(void __iomem *scu_base)
- 
- 	scu_ctrl = readl_relaxed(scu_base + SCU_CTRL);
- 	/* already enabled? */
--	if (scu_ctrl & 1)
-+	if (scu_ctrl & SCU_ENABLE)
- 		return;
- 
--	scu_ctrl |= 1;
-+	scu_ctrl |= SCU_ENABLE;
- 	writel_relaxed(scu_ctrl, scu_base + SCU_CTRL);
- 
- 	/*
+ arch/arm/kernel/smp_scu.c | 12 ++++++++++--
+ 1 file changed, 10 insertions(+), 2 deletions(-)
+
 -- 
 1.9.1
