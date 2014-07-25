@@ -1,135 +1,70 @@
-From: jiri.prchal@aksignal.cz (=?UTF-8?B?SmnFmcOtIFByY2hhbA==?=)
-Date: Fri, 25 Jul 2014 10:33:22 +0200
-Subject: [PATCH] ARM: at91: at91sam9x5: sets NPCS0 (PA14) back to GPIO
-In-Reply-To: <20140725095319.16a8465c@bbrezillon>
-References: <1405074175-22444-1-git-send-email-voice.shen@atmel.com>	<53D10C50.50305@aksignal.cz>	<20140724162645.4e19c26c@bbrezillon>	<53D12103.3020103@aksignal.cz>	<20140724175848.44f5da10@bbrezillon>	<53D1F5D0.1080006@aksignal.cz>
- <20140725095319.16a8465c@bbrezillon>
-Message-ID: <53D21652.7050808@aksignal.cz>
+From: michal.simek@xilinx.com (Michal Simek)
+Date: Fri, 25 Jul 2014 10:36:03 +0200
+Subject: [PATCH v2 06/11] ARM: dts: zynq: Add DMAC for Parallella
+In-Reply-To: <53D21458.3060403@suse.de>
+References: <1406242820-20140-1-git-send-email-afaerber@suse.de>
+ <1406242820-20140-7-git-send-email-afaerber@suse.de>
+ <bc390439-9a5b-43a1-a70c-a4c6517a6cb6@BN1AFFO11FD005.protection.gbl>
+ <53D20F2A.5020209@monstr.eu> <53D21458.3060403@suse.de>
+Message-ID: <42796bf5-b27c-4009-894d-9462c85e2bc2@BY2FFO11FD025.protection.gbl>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-I changed manually .config,
-now it's there:
-[    1.195312] spi spi0.0: gpio_request: 23
-[    1.195312] spi spi0.1: gpio_request: 22
-[    1.199218] spi spi0.2: gpio_request: 93
-[    1.203125] spi spi0.3: gpio_request: 14
-
-But still not working.
-
-Dne 25.7.2014 v 09:53 Boris BREZILLON napsal(a):
-> On Fri, 25 Jul 2014 08:14:40 +0200
-> Ji?? Prchal <jiri.prchal@aksignal.cz> wrote:
->
->>
->>
->> Dne 24.7.2014 v 17:58 Boris BREZILLON napsal(a):
->>> On Thu, 24 Jul 2014 17:06:43 +0200
->>> Ji?? Prchal <jiri.prchal@aksignal.cz> wrote:
->>>
->>>> Hi,
+On 07/25/2014 10:24 AM, Andreas F?rber wrote:
+> Am 25.07.2014 10:02, schrieb Michal Simek:
+>> On 07/25/2014 01:28 AM, S?ren Brinkmann wrote:
+>>> On Fri, 2014-07-25 at 01:00AM +0200, Andreas F?rber wrote:
+>>>> Signed-off-by: Andreas F?rber <afaerber@suse.de>
+>>>> ---
+>>>>  v2: New
+>>>>  
+>>>>  arch/arm/boot/dts/zynq-7000.dtsi      | 17 +++++++++++++++++
+>>>>  arch/arm/boot/dts/zynq-parallella.dts |  4 ++++
+>>>>  2 files changed, 21 insertions(+)
 >>>>
->>>> Dne 24.7.2014 v 16:26 Boris BREZILLON napsal(a):
->>>>> Hello Ji??,
->>>>>
->>>>> First of all, please try to use git format-patch when submitting a
->>>>> patch to any kernel mailing list.
->>>> Sorry for that.
->>>>>
->>>>> On Thu, 24 Jul 2014 15:38:24 +0200
->>>>> Ji?? Prchal <jiri.prchal@aksignal.cz> wrote:
->>>>>
->>>>>> After ROMBOOT tries boot from flash on SPI0 NPCS0, this NPCS0 (PA14) remains set to PERIPH_A.
->>>>>> Because of that, this pin is unusable to something else.
->>>>>> This patch sets it back to GPIO.
->>>>>
->>>>> The policy is to leave pins in an unknown state till some peripheral
->>>>> need them.
->>>>>
->>>>> What are you trying to use this pin for ?
->>>> For chip select, but #3. And when SPI communicate with cs0 (PA22), it goes down too (PA14), so 2 devices on bus were
->>>> selected.
->>>
->>> Are you using a 9x5ek board or a custom one, in the latter case could
->>> you paste your spi0 node definition ?
->> I'm using custom board. My spi node:
->> 			spi0: spi at f0000000 {
->> 				status = "okay";
->> 				cs-gpios = <&pioA 23 0
->> 					    &pioA 22 0
->> 					    &pioC 29 0
->> 					    &pioA 14 0>;
+>>>> diff --git a/arch/arm/boot/dts/zynq-7000.dtsi b/arch/arm/boot/dts/zynq-7000.dtsi
+>>>> index eed3df0..1a70277 100644
+>>>> --- a/arch/arm/boot/dts/zynq-7000.dtsi
+>>>> +++ b/arch/arm/boot/dts/zynq-7000.dtsi
+>>>> @@ -223,6 +223,23 @@
+>>>>  			};
+>>>>  		};
+>>>>  
+>>>> +		dmac_s: dmac at f8003000 {
+>>>> +			compatible = "arm,pl330", "arm,primecell";
+>>>> +			reg = <0xf8003000 0x1000>;
+>>>> +			status = "disabled";
+>>> I think for this IP we can omit the 'status' property since it is always
+>>> enabled. I don't see a reason to override it in each board DT.
 >>
->> 				fm25 at 0 {
->> 					compatible = "cypress,fm25";
->> 					spi-max-frequency = <40000000>;
->> 					reg = <0>;
->> 					pagesize = <256>;
->> 					size = <131072>;
->> 					address-width = <24>;
->> 				};
->> 				/* ADC */
->> 				spidev at 1 {
->> 					compatible = "spidev";
->> 					reg = <1>;
->> 					spi-max-frequency = <1000000>;
->> 				};
->> 				/* IO expander for busaddr */
->> 				spidev at 2 {
->> 					compatible = "spidev";
->> 					reg = <2>;
->> 					label = "busaddr";
->> 					spi-max-frequency = <10000000>;
->> 				};
->> 				/* audio codec */
->> 				codec: codec at 3 {
->> 					compatible = "ti,tlv320aic3x";
->> 					spi-max-frequency = <1000000>;
->> 					reg = <3>;
->> 				};
->> 			};
->>
->> This does not work without patch, because of 2 chips selected at one time because of PA14 is periph_a. Probably ROMBOOT
->> changes that.
->
-> Yes, boot code stored in ROM probably mux PA14 to periph A function,
-> but with your definition PA 14 should be set GPIO mode when the codec
-> device is created.
->
-> I don't see any obvious error in your definition, could you add a trace
-> there [1] to see if the gpio is successfully requested ?
-> Could you also paste the content of /sys/kernel/debug/gpio ?
->
->>>
->>>>> If you just want to use it as a chip select for an spi device, take a
->>>>> look at [1].
->>>> At [1] it's OK until as cs0 is for example PA22 and cs1 is PA14.
->>>
->>> If you want PA14 to control cs1 and PA22 to control cs0 (both
->>> configured as GPIOs), you'll have the following definition:
->>>
->>> cs-gpios = <&pioA 22 0>, <&pioA 14 0>, <0>, <0>;
->> See my node.
->>>
->>>>>
->>>>> Here the gpio is requested by the spi core when defining the cs-gpios
->>>>> property. The gpio controller then request the listed pins to the pin
->>>>> controller (pinctrl driver).
->>>> GPIO is not set in driver as GPIO, at least I didn't find it.
->>>
->>> Take a look at [1], which is set as the gpio_request_enable callback,
->>> called by pinctrl core when a gpio is requested.
->> But is this called from spi driver when requesting gpios as cs?
->
-> Yes, it's part of the gpio_request process:
-> gpio_request calls request method on at91 gpio_chip which in turn
-> calls pinctrl_request_gpio which then calls the gpio_request_enable
-> method I previously mentioned.
->
->
-> Best Regards,
->
-> Boris
->
-> [1]http://lxr.free-electrons.com/source/drivers/spi/spi-atmel.c#L1031
->
+>> Done this change myself
+> 
+> Fine with me, but allow me to point out that the TRM documents the DMAC
+> being mapped as DMAC S at the above address, and as DMAC NS at F800_4000
+> (secure vs. non-secure, ch. 4.6, p. 116). Not sure how this would be
+> handled driver-wise if not through alternative dt nodes?
+
+Kernel on zynq runs in secure world. All the sw on zynq from beginning runs in secure world.
+I haven't had any time to look at switching kernel to NS.
+That's why having dmac in this dts as default configuration in secure world
+is fine.
+
+It is not about how driver will handle - driver shouldn't care.
+It is how users will handle that kernel runs in non secure
+and how to change DTS to reflect this.
+Bootloader can do this change for example. Or if there is an option
+to detect at run time by kernel that we are in NS than kernel itself can
+patch dmac node and use different address.
+Definitely bootloader or setup correct address by user is preferred way.
+
+Thanks,
+Michal
+
+
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 263 bytes
+Desc: OpenPGP digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140725/ab55f6cc/attachment.sig>
