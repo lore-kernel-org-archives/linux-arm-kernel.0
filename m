@@ -1,67 +1,100 @@
-From: achandran@mvista.com (Arun Chandran)
-Date: Fri, 25 Jul 2014 16:01:04 +0530
-Subject: Kexec on arm64
-In-Reply-To: <1406247468.4062.59.camel@smoke>
-References: <CAFdej006OSyhgDcJ2iZdbjt+PtysN=i_+9Dr4GTmr=+t5yg4Kw@mail.gmail.com>
- <1405443898.22585.7.camel@smoke>
- <CAL85gmC9LLcN_uxMY1bM5kLx=N7rZGdGO3bmGHeUVo=Rqgk8uw@mail.gmail.com>
- <1405551861.7262.26.camel@smoke>
- <CAFdej03nixSU=3h+HYk2E3Onb2P3--Di0GM+wCwLS6ZNH7UjEQ@mail.gmail.com>
- <CAFdej00J2mJwcg2Cy6CHVuuQZ4uQ2zZg8oErGPi0uPejievB+Q@mail.gmail.com>
- <1406162287.4062.39.camel@smoke>
- <20140724093603.GC4079@leverpostej>
- <1406247468.4062.59.camel@smoke>
-Message-ID: <CAFdej003xnY7TO0+Q7muuDSbeqopx7GVTiXSfO-QiyzMw_Kynw@mail.gmail.com>
+From: harini.katakam@xilinx.com (Harini Katakam)
+Date: Fri, 25 Jul 2014 10:31:08 +0000
+Subject: [PATCH v2 05/11] ARM: dts: zynq: Add QSPI for Parallella
+In-Reply-To: <53D2258B.9000609@xilinx.com>
+References: <1406242820-20140-1-git-send-email-afaerber@suse.de>
+ <1406242820-20140-6-git-send-email-afaerber@suse.de>
+ <ddb38ce5-9e31-4c94-967c-7784c7fba75c@BN1BFFO11FD028.protection.gbl>
+ <53D20E5B.9070501@monstr.eu> <53D21887.2020305@suse.de>
+ <53D2258B.9000609@xilinx.com>
+Message-ID: <7aabd35a-0b4a-4d03-9976-ef3926929ddc@BL2FFO11FD027.protection.gbl>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jul 25, 2014 at 5:47 AM, Geoff Levand <geoff@infradead.org> wrote:
-> Hi,
->
-> On Thu, 2014-07-24 at 10:36 +0100, Mark Rutland wrote:
->> On Thu, Jul 24, 2014 at 01:38:07AM +0100, Geoff Levand wrote:
->
->> > All memory management for the main cpu is done by the arch code.  Kexec
->> > and cpu hot plug only work with the secondary cpus, so the problem would
->> > be in the arch memory code, either in setup_restart() for shutdown, or
->> > in the startup code.
->>
->> It's possible that soft_restart and setup_restart are a little dodgy, as
->> they also rely on the compiler being smart and not touching the stack
->> after setup_restart().
->>
->> However, they provide absolutely no guarantee that any data has been
->> flushed out to the PoC [1]. If you require any data to be flushed out to the
->> PoC so as to be visible to noncacheable accesses, you will need to
->> ensure that this is flushed by VA before soft_restart is called. Data
->> may have migrated to another cache (e.g. another CPU, or the L3) where
->> it is not visible.
->
-> OK, kexec's reset routine relocate_new_kernel does use a few global
-> variables that are set by the main kexec routines.  I added a call to
-> __flush_dcache_area(), which uses 'dc civac' for those.
->
-> I had thought the call to __flush_dcache_all, which uses 'dc cisw', in
-> flush_cache_all() would be enough.
->
-> Arun, I also fixed UP builds.  Could you pull my latest and try with L3
-> enabled?
+Hi,
 
-I tried it but kexeced kernel fails to boot.
-Ran the code with and without the call to cpu_cache_off();
-in arch/arm64/kernel/process.c. I have put more details
-in another mail. Please see that.
+> -----Original Message-----
+> From: Michal Simek [mailto:michal.simek at xilinx.com]
+> Sent: Friday, July 25, 2014 3:08 PM
+> To: Andreas F?rber; monstr at monstr.eu; Soren Brinkmann
+> Cc: Harini Katakam; Michal Simek; Andreas Olofsson; Matteo Vit; Sean
+> Rickerd; devicetree at vger.kernel.org; linux-arm-kernel at lists.infradead.org;
+> linux-kernel at vger.kernel.org; Rob Herring; Pawel Moll; Mark Rutland; Ian
+> Campbell; Kumar Gala; Russell King
+> Subject: Re: [PATCH v2 05/11] ARM: dts: zynq: Add QSPI for Parallella
+> 
+> On 07/25/2014 10:42 AM, Andreas F?rber wrote:
+> > Am 25.07.2014 09:59, schrieb Michal Simek:
+> >> On 07/25/2014 01:18 AM, S?ren Brinkmann wrote:
+> >>> On Fri, 2014-07-25 at 01:00AM +0200, Andreas F?rber wrote:
+> >>>> Prepare SPI0 and SPI1 while at it.
+> >
+> >> Patch subject is incorrect. You are adding SPI and QSPI.
+> >
+> > Yes, it originally added only QSPI, but I considered it a good deed to
+> > add SPI as well while already reading that part of the TRM. :)
+> >
+> >>>>
+> >>>> Signed-off-by: Andreas F?rber <afaerber@suse.de> --- v2: New
+> >>>>
+> >>>> arch/arm/boot/dts/zynq-7000.dtsi      | 37
+> >>>> +++++++++++++++++++++++++++++++++++
+> >>>> arch/arm/boot/dts/zynq-parallella.dts |  4 ++++ 2 files
+> >>>> changed, 41 insertions(+)
+> >>>>
+> >>>> diff --git a/arch/arm/boot/dts/zynq-7000.dtsi
+> >>>> b/arch/arm/boot/dts/zynq-7000.dtsi index 8fd826a..eed3df0
+> >>>> 100644 --- a/arch/arm/boot/dts/zynq-7000.dtsi +++
+> >>>> b/arch/arm/boot/dts/zynq-7000.dtsi @@ -122,6 +122,30 @@
+> >>>> interrupts = <0 50 4>; };
+> >>>>
+> >>>> +		spi0: spi at e0006000 { +			compatible =
+> "xlnx,zynq-spi-r1p6";
+> >>>> +			reg = <0xe0006000 0x1000>; +			status
+> = "disabled"; +
+> >>>> interrupt-parent = <&intc>; +			interrupts = <0 26 4>;
+> +
+> >>>> clocks = <&clkc 25>, <&clkc 34>; +			clock-names =
+> "ref_clk",
+> >>>> "pclk"; +			#address-cells = <1>; +			#size-
+> cells = <0>; +		};
+> >>>> + +		spi1: spi at e0007000 { +			compatible =
+> >>>> "xlnx,zynq-spi-r1p6"; +			reg = <0xe0007000 0x1000>; +
+> 			status
+> >>>> = "disabled"; +			interrupt-parent = <&intc>; +
+> 		interrupts =
+> >>>> <0 49 4>; +			clocks = <&clkc 26>, <&clkc 35>; +
+> 		clock-names
+> >>>> = "ref_clk", "pclk"; +			#address-cells = <1>; +
+> 		#size-cells
+> >>>> = <0>; +		}; +
+> >>> Until here things look good.
+> >>>
+> >>>> gem0: ethernet at e000b000 { compatible = "cdns,gem"; reg =
+> >>>> <0xe000b000 0x4000>; @@ -140,6 +164,19 @@ clock-names = "pclk",
+> >>>> "hclk", "tx_clk"; };
+> >>>>
+> >>>> +		qspi: qspi at e000d000 { +			compatible =
+> >>>> "xlnx,zynq-spi-r1p6"; +			reg = <0xe000d000 0x1000>; +
+> 			status
+> >>>> = "disabled"; +			interrupt-parent = <&intc>; +
+> 		interrupts =
+> >>>> <0 19 4>; +			clocks = <&clkc 10>, <&clkc 43>; +
+> 		clock-names
+> >>>> = "ref_clk", "pclk"; +			num-cs = <1>; +
+> 	#address-cells =
+> >>>> <1>; +			#size-cells = <0>; +		}; +
+> >>> I'm not sure what the status of this driver is. I think QSPI is
+> >>> still under review on the mailing lists and I don't think we
+> >>> should add this yet.
+> >
+> >> Driver for qspi is not in the mainline yet but it doesn't mean that
+> >> this fragment won't work. Harini: Can you please correct me if I am
+> >> wrong?
+> >
 
---Arun
+It can be added but it will have to be disabled as there is no qspi driver
+at the moment in mainline.
 
-
-
-
-
-
-
-
-
->
-> -Geoff
->
+Regards,
+Harini
