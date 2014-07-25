@@ -1,66 +1,36 @@
-From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
-Date: Fri, 25 Jul 2014 14:21:55 +0200
-Subject: [PATCH v2 2/3] ARM: remove remaining definitions of
- PLAT_PHYS_OFFSET from <mach/memory.h>
-In-Reply-To: <20140725090912.GC6146@pengutronix.de>
-References: <1404295043-6661-2-git-send-email-u.kleine-koenig@pengutronix.de>
- <1404717185-10010-1-git-send-email-u.kleine-koenig@pengutronix.de>
- <20140725000621.GO21766@n2100.arm.linux.org.uk>
- <20140725090912.GC6146@pengutronix.de>
-Message-ID: <20140725122155.GD6146@pengutronix.de>
+From: riku.voipio@linaro.org (Riku Voipio)
+Date: Fri, 25 Jul 2014 15:22:49 +0300
+Subject: arm64 Kernel is overly verbose on user faults
+Message-ID: <CAAqcGHkjgOfs1Yj3SNmjpzE2cdGTh4EQ0njyka6UaeVVnbvQGw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Russell,
+Hi,
 
-On Fri, Jul 25, 2014 at 11:09:12AM +0200, Uwe Kleine-K?nig wrote:
-> On Fri, Jul 25, 2014 at 01:06:22AM +0100, Russell King - ARM Linux wrote:
-> > On Mon, Jul 07, 2014 at 09:13:05AM +0200, Uwe Kleine-K?nig wrote:
-> > > The platforms selecting NEED_MACH_MEMORY_H defined the start address of
-> > > their physical memory in the respective <mach/memory.h>. With
-> > > ARM_PATCH_PHYS_VIRT=y (which is quite common today) this is useless
-> > > though because the definition isn't used but determined dynamically.
-> > > 
-> > > So remove the definitions from all <mach/memory.h> and provide the
-> > > Kconfig symbol PHYS_OFFSET with the respective defaults in case
-> > > ARM_PATCH_PHYS_VIRT isn't enabled.
-> > > 
-> > > This allows to drop the dependency of PHYS_OFFSET on !NEED_MACH_MEMORY_H
-> > > which prevents compiling an integrator nommu-kernel.
-> > > (CONFIG_PAGE_OFFSET which has "default PHYS_OFFSET if !MMU" expanded to
-> > > "0x" because CONFIG_PHYS_OFFSET doesn't exist as INTEGRATOR selects
-> > > NEED_MACH_MEMORY_H.)
-> > 
-> > Should I assume that this hasn't been build tested?
-> darn, I admit being guilty not retesting it after rebasing to 3.16-rc. I
-> think I did test it when I wrote the patch the first time, but you made
-> me unsure if I tested all relevant cases. Working on a follow-up patch.
-The following patch fixes all defconfigs:
+Arm64 kernel dmesg will print out a multiline message if any user
+binary segfaults. We get "unhandled level X translation fault" with
+pr_info, show_pte() with pr_alert and show_regs with default kernel
+level:
 
-diff --git a/arch/arm/mach-realview/include/mach/memory.h b/arch/arm/mach-realview/include/mach/memory.h
-index eb69feb3b804..23e7a313f75d 100644
---- a/arch/arm/mach-realview/include/mach/memory.h
-+++ b/arch/arm/mach-realview/include/mach/memory.h
-@@ -20,6 +20,8 @@
- #ifndef __ASM_ARCH_MEMORY_H
- #define __ASM_ARCH_MEMORY_H
- 
-+#ifdef CONFIG_SPARSEMEM
-+
- /*
-  * Sparsemem definitions for RealView PBX.
-  *
+https://git.kernel.org/cgit/linux/kernel/git/torvalds/linux.git/tree/arch/arm64/mm/fault.c#n111
 
-PLAT_PHYS_OFFSET then still has this strange value on builds with
-ARM_PATCH_PHYS_VIRT=y, but this doesn't matter as the value is unused
-then.
+Contrast to arm32 version, where it is only done if CONFIG_DEBUG_USER
+is selected and user_debug=N is passed down from kernel command line:
 
-Do you squash this into the faulty patch or should I follow up with a
-proper patch to repair the mess?
+https://git.kernel.org/cgit/linux/kernel/git/torvalds/linux.git/tree/arch/arm/mm/fault.c#n161
 
-Sorry again
-Uwe
+The verboseness was useful in early platform bringup, but now it is
+now a more source of confusion (people google for unhandled level
+translation fault and find old linaro bugs..) . For end users pov, the
+x86 version with single line on INFO level would probably be good:
 
--- 
-Pengutronix e.K.                           | Uwe Kleine-K?nig            |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+https://git.kernel.org/cgit/linux/kernel/git/torvalds/linux.git/tree/arch/x86/mm/fault.c#n729
+
+example:
+
+test[8901]: segfault at 0 ip 00007fe456a4621f sp 00007ffffd465a90
+error 6 in libc-2.19.so[7fe4569db000+19f000]
+
+Could the arm64 behavior be changed to match arm or x86 printouts?
+
+Riku
