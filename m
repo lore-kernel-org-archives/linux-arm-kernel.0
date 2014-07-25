@@ -1,37 +1,68 @@
-From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
-Date: Fri, 25 Jul 2014 11:02:06 +0200
-Subject: [PATCH] ARM: at91: at91sam9x5: sets NPCS0 (PA14) back to GPIO
-In-Reply-To: <53D21C57.3010805@aksignal.cz>
-References: <1405074175-22444-1-git-send-email-voice.shen@atmel.com>
- <53D10C50.50305@aksignal.cz> <20140724162645.4e19c26c@bbrezillon>
- <53D12103.3020103@aksignal.cz> <20140724175848.44f5da10@bbrezillon>
- <53D1F5D0.1080006@aksignal.cz> <20140725083053.GD9532@piout.net>
- <53D2174B.4020403@aksignal.cz> <20140725085436.GF9532@piout.net>
- <53D21C57.3010805@aksignal.cz>
-Message-ID: <20140725090206.GG9532@piout.net>
+From: mika.westerberg@linux.intel.com (Mika Westerberg)
+Date: Fri, 25 Jul 2014 12:07:14 +0300
+Subject: [PATCH] spi/pxa2xx-pci: Enable DMA binding through device name
+In-Reply-To: <7309109.iKHmHOxjzD@wuerfel>
+References: <1406196111-22861-1-git-send-email-hock.leong.kweh@intel.com>
+ <5574058.fMy2hcvT92@wuerfel>
+ <20140725082249.GX1857@lahna.fi.intel.com>
+ <7309109.iKHmHOxjzD@wuerfel>
+Message-ID: <20140725090714.GY1857@lahna.fi.intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 25/07/2014 at 10:59:03 +0200, Ji?? Prchal wrote :
-> >>Of course, it's the way, but in all other drivers, for example LEDS,
-> >>it's not needed. And in other way, if I will not use PA14 at all,
-> >>the pin will goes down every spi transfer.
-> >
-> >You must not assumed that the pins are muxed to their default state
-> >which is gpio and you should set the pinctrl accordingly for each
-> >device.
-> >
-> >If you don't use PA14 at all, then you don't really care about its
-> >state...
-> Yes and no, what about on board is populated some chip on PA14, but
-> for some reason at this time I don't need it and not defined in DT?
-> >
+On Fri, Jul 25, 2014 at 10:38:36AM +0200, Arnd Bergmann wrote:
+> On Friday 25 July 2014 11:22:49 Mika Westerberg wrote:
+> > > All you need to do is change your filter function to take the
+> > > slave id from pxa_spi_info and stick it in there, e.g.
+> > > 
+> > > static bool pxa2xx_spi_dw_dma_filter(struct dma_chan *chan, void *param)
+> > > {       
+> > >         const struct pxa2xx_spi_master *pdata = param;
+> > >         struct dw_dma_chan *dwc = to_dw_dma_chan(chan);
+> > >         
+> > >         dwc->request_line = fargs->req;
+> > >         dwc->src_master = 0;
+> > >         dwc->dst_master = 0;
+> > >         
+> > >         return 1;
+> > > }           
+> > 
+> > Oh man. That makes pxa2xx_spi dependent on a certain specific DMA engine
+> > driver.
+> 
+> I think you can improve this by putting the filter function (and a pointer
+> to it) into the pxa2xx_spi_master data provided by the PCI driver.
 
-If this is really an issue for that chip, I would think that you will
-change the bootloader to not mux PA14 to periph A and stop it from
-trying to read it like an spi flash ?
+Indeed, that looks better. It still makes the PCI part of the driver
+dependent on a particular DMA engine driver but is certainly better than
+the core pxa2xx_spi driver.
 
--- 
-Alexandre Belloni, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
+> On ARM, we usually provide those pointers through platform_data from
+> the board file.
+> 
+> > > Note that the filter function by definition is specific to the dma
+> > > controller, not the dma slave (that's why most people define it in
+> > > the dmaengine driver), and the pxa2xx_spi_dma_filter() function used
+> > > in spi-pxa2xx-dma.c looks like it was written for another dma engine:
+> > 
+> > I wonder what's the rationale that passing slave_id with
+> > dma_slave_config is wrong? The current code works fine with that and is
+> > is independent of the DMA engine driver (even though we know that it is
+> > going to be dw-dma).
+> > 
+> > The dw-dma handles slave_id in its implementation of
+> > dmaengine_slave_config().
+> 
+> The main point is that a single 'slave_id' is not actually enough to
+> identify what a slave needs. In case of dw_dma, the dma engine actually
+> requires three numbers (request line, source master, destination master)
+> to identify it, and there is no good way to put all that information into
+> a single integer. Other dma engines require a different set of data.
+> 
+> There are only two drivers left that actually use slave_id in this way,
+> and only for the legacy (no DT or ACPI) case, every other driver uses
+> either DT or a filter function. I believe the shmobile part will soon
+> be done with, after shmobile has been converted to DT, and after that
+> we should remove the slave_id field from the dma_slave_config interface.
+
+OK, thanks for the explanation.
