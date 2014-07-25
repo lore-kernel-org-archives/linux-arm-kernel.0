@@ -1,61 +1,64 @@
-From: dongas86@gmail.com (Dong Aisheng)
-Date: Fri, 25 Jul 2014 19:53:53 +0800
-Subject: [PATCH v5 1/2] can: m_can: add device tree binding documentation
-In-Reply-To: <20140716104054.GB20184@shlinux1.ap.freescale.net>
-References: <1405503050-16796-1-git-send-email-b29396@freescale.com>
- <53C64E51.9050606@pengutronix.de>
- <20140716104054.GB20184@shlinux1.ap.freescale.net>
-Message-ID: <CAA+hA=QNDGrO679GBi5oR=KnLZbBh9A+A12QfCG-=Ak_D78rAw@mail.gmail.com>
+From: jszhang@marvell.com (Jisheng Zhang)
+Date: Fri, 25 Jul 2014 19:57:46 +0800
+Subject: [PATCH v2] i2c: pca954x: put the mux to disconnected state after
+ resume
+Message-ID: <1406289466-936-1-git-send-email-jszhang@marvell.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Ping...
+pca954x may be power lost during suspend, so after resume we also suffer
+the issue fixed by commit cd823db8b1161ef0d756514d280715a576d65cc3,
 
-On Wed, Jul 16, 2014 at 6:40 PM, Dong Aisheng <b29396@freescale.com> wrote:
-> On Wed, Jul 16, 2014 at 12:05:05PM +0200, Marc Kleine-Budde wrote:
->> On 07/16/2014 11:30 AM, Dong Aisheng wrote:
->> > add M_CAN device tree binding documentation
->> >
->> > Cc: Wolfgang Grandegger <wg@grandegger.com>
->> > Cc: Marc Kleine-Budde <mkl@pengutronix.de>
->> > Cc: Mark Rutland <mark.rutland@arm.com>
->> > Cc: Oliver Hartkopp <socketcan@hartkopp.net>
->> > Cc: Varka Bhadram <varkabhadram@gmail.com>
->> > Signed-off-by: Dong Aisheng <b29396@freescale.com>
->> > ---
->> > Changes since v4:
->> > - change the name of board dtsi to board dts which is more common
->> >
->> > Changes since v3:
->> > - change mram-cfg property name to bosch,mram-cfg
->> > - indent change
->> > ---
->> >  .../devicetree/bindings/net/can/m_can.txt          |   67 ++++++++++++++++++++
->> >  1 files changed, 67 insertions(+), 0 deletions(-)
->> >  create mode 100644 Documentation/devicetree/bindings/net/can/m_can.txt
->>
->> I'll apply this series once we've got an Ack for the DT folks.
->>
->
-> Okay, thanks!
->
-> Copy Grant, Rob and Mark in case they have comments.
->
-> Regards
-> Dong Aisheng
->
->> Marc
->>
->> --
->> Pengutronix e.K.                  | Marc Kleine-Budde           |
->> Industrial Linux Solutions        | Phone: +49-231-2826-924     |
->> Vertretung West/Dortmund          | Fax:   +49-5121-206917-5555 |
->> Amtsgericht Hildesheim, HRA 2686  | http://www.pengutronix.de   |
->>
->
->
->
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+ "pca954x power-on default is channel 0 connected. If multiple pca954x
+ muxes are connected to the same physical I2C bus, the parent bus will
+ see channel 0 devices behind both muxes by default."
+
+What's more, when resume bootloader may also operate the mux, so the
+the channel connected after that may not be the one driver thought.
+
+We fix this problem by putting the mux to disconnected state and
+clearing last_chan in the resume hook.
+
+Signed-off-by: Jisheng Zhang <jszhang@marvell.com>
+---
+ drivers/i2c/muxes/i2c-mux-pca954x.c | 15 +++++++++++++++
+ 1 file changed, 15 insertions(+)
+
+diff --git a/drivers/i2c/muxes/i2c-mux-pca954x.c b/drivers/i2c/muxes/i2c-mux-pca954x.c
+index 9bd4212..ec11b40 100644
+--- a/drivers/i2c/muxes/i2c-mux-pca954x.c
++++ b/drivers/i2c/muxes/i2c-mux-pca954x.c
+@@ -41,6 +41,7 @@
+ #include <linux/i2c-mux.h>
+ #include <linux/i2c/pca954x.h>
+ #include <linux/module.h>
++#include <linux/pm.h>
+ #include <linux/slab.h>
+ 
+ #define PCA954X_MAX_NCHANS 8
+@@ -273,9 +274,23 @@ static int pca954x_remove(struct i2c_client *client)
+ 	return 0;
+ }
+ 
++#ifdef CONFIG_PM_SLEEP
++static int pca954x_resume(struct device *dev)
++{
++	struct i2c_client *client = to_i2c_client(dev);
++	struct pca954x *data = i2c_get_clientdata(client);
++
++	data->last_chan = 0;
++	return i2c_smbus_write_byte(client, 0);
++}
++#endif
++
++static SIMPLE_DEV_PM_OPS(pca954x_pm, NULL, pca954x_resume);
++
+ static struct i2c_driver pca954x_driver = {
+ 	.driver		= {
+ 		.name	= "pca954x",
++		.pm	= &pca954x_pm,
+ 		.owner	= THIS_MODULE,
+ 	},
+ 	.probe		= pca954x_probe,
+-- 
+2.0.1
