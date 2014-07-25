@@ -1,102 +1,31 @@
-From: jiri.prchal@aksignal.cz (=?UTF-8?B?SmnFmcOtIFByY2hhbA==?=)
-Date: Fri, 25 Jul 2014 11:13:51 +0200
-Subject: [PATCH] ARM: at91: at91sam9x5: sets NPCS0 (PA14) back to GPIO
-In-Reply-To: <20140725110124.3f0dce6c@bbrezillon>
-References: <1405074175-22444-1-git-send-email-voice.shen@atmel.com>	<53D10C50.50305@aksignal.cz>	<20140724162645.4e19c26c@bbrezillon>	<53D12103.3020103@aksignal.cz>	<20140724175848.44f5da10@bbrezillon>	<53D1F5D0.1080006@aksignal.cz>	<20140725095319.16a8465c@bbrezillon>	<53D214E1.4050105@aksignal.cz>	<20140725104553.403921b1@bbrezillon>	<53D21B3F.7060006@aksignal.cz>
- <20140725110124.3f0dce6c@bbrezillon>
-Message-ID: <53D21FCF.7010402@aksignal.cz>
+From: wens@csie.org (Chen-Yu Tsai)
+Date: Fri, 25 Jul 2014 17:13:27 +0800
+Subject: [PATCH v3 5/6] ARM: sunxi: Add A31 RTC driver to sunxi_defconfig
+In-Reply-To: <1406279608-489-1-git-send-email-wens@csie.org>
+References: <1406279608-489-1-git-send-email-wens@csie.org>
+Message-ID: <1406279608-489-6-git-send-email-wens@csie.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Now that we have a driver for A31's RTC, enable it
+in the default sunxi config.
 
+Signed-off-by: Chen-Yu Tsai <wens@csie.org>
+---
+ arch/arm/configs/sunxi_defconfig | 1 +
+ 1 file changed, 1 insertion(+)
 
-Dne 25.7.2014 v 11:01 Boris BREZILLON napsal(a):
-> On Fri, 25 Jul 2014 10:54:23 +0200
-> Ji?? Prchal <jiri.prchal@aksignal.cz> wrote:
->
->> Here it is:
->> cat /sys/kernel/debug/gpio
->> GPIOs 0-31, platform/fffff400.gpio, fffff400.gpio:
->> [in20] GPIOfffff400.gpio3: [gpio] set
->> [spi0.3] GPIOfffff400.gpio14: [gpio] set
->> [in19] GPIOfffff400.gpio21: [gpio] set
->> [spi0.1] GPIOfffff400.gpio22: [gpio] set
->> [spi0.0] GPIOfffff400.gpio23: [gpio] set
->> [in18] GPIOfffff400.gpio28: [gpio] set
->> [out20] GPIOfffff400.gpio29: [gpio] clear
->> [out18] GPIOfffff400.gpio30: [gpio] clear
->> [out19] GPIOfffff400.gpio31: [gpio] clear
->>
->> GPIOs 32-50, platform/fffff600.gpio, fffff600.gpio:
->> [blue] GPIOfffff600.gpio12: [gpio] set
->> [gsm_on] GPIOfffff600.gpio13: [gpio] clear
->> [yellow] GPIOfffff600.gpio14: [gpio] clear
->> [gsm_rst] GPIOfffff600.gpio15: [gpio] clear
->> [green] GPIOfffff600.gpio16: [gpio] clear
->> [red] GPIOfffff600.gpio18: [gpio] clear
->>
->> GPIOs 64-95, platform/fffff800.gpio, fffff800.gpio:
->> [in17] GPIOfffff800.gpio16: [gpio] set
->> [in13] GPIOfffff800.gpio18: [gpio] set
->> [in14] GPIOfffff800.gpio20: [gpio] set
->> [por] GPIOfffff800.gpio25: [gpio] clear
->> [out16] GPIOfffff800.gpio26: [gpio] clear
->> [out15] GPIOfffff800.gpio28: [gpio] clear
->> [spi0.2] GPIOfffff800.gpio29: [gpio] set
->> [out17] GPIOfffff800.gpio30: [gpio] clear
->>
->> GPIOs 96-117, platform/fffffa00.gpio, fffffa00.gpio:
->> [nand_enable] GPIOfffffa00.gpio4: [gpio] set
->> [nand_rdy] GPIOfffffa00.gpio5: [gpio] set
->> [atmel_usba_udc] GPIOfffffa00.gpio21: [gpio] clear
->>
->
-> Every thing seems in place.
-> Could you enable CONFIG_DEBUG_PINCTRL and grep on "enable pin" ?
-/ # dmesg | grep "enable pin"
-[    0.968750] pinctrl-at91 ahb:apb:pinctrl at fffff400: enable pin 101 as GPIO
-[    0.968750] pinctrl-at91 ahb:apb:pinctrl at fffff400: enable pin 101 as PIOD5 0x20
-[    0.968750] pinctrl-at91 ahb:apb:pinctrl at fffff400: enable pin 100 as GPIO
-[    0.968750] pinctrl-at91 ahb:apb:pinctrl at fffff400: enable pin 100 as PIOD4 0x10
-[    1.238281] pinctrl-at91 ahb:apb:pinctrl at fffff400: enable pin 23 as GPIO
-[    1.238281] pinctrl-at91 ahb:apb:pinctrl at fffff400: enable pin 23 as PIOA23 0x800000
-[    1.238281] pinctrl-at91 ahb:apb:pinctrl at fffff400: enable pin 22 as GPIO
-[    1.238281] pinctrl-at91 ahb:apb:pinctrl at fffff400: enable pin 22 as PIOA22 0x400000
-[    1.242187] pinctrl-at91 ahb:apb:pinctrl at fffff400: enable pin 93 as GPIO
-[    1.242187] pinctrl-at91 ahb:apb:pinctrl at fffff400: enable pin 93 as PIOC29 0x20000000
-[    1.246093] pinctrl-at91 ahb:apb:pinctrl at fffff400: enable pin 14 as GPIO
-[    1.246093] pinctrl-at91 ahb:apb:pinctrl at fffff400: enable pin 14 as PIOA14 0x4000
-[    1.652343] pinctrl-at91 ahb:apb:pinctrl at fffff400: enable pin 117 as GPIO
-[    1.652343] pinctrl-at91 ahb:apb:pinctrl at fffff400: enable pin 117 as PIOD21 0x200000
-[    1.742187] pinctrl-at91 ahb:apb:pinctrl at fffff400: enable pin 50 as GPIO
-[    1.742187] pinctrl-at91 ahb:apb:pinctrl at fffff400: enable pin 50 as PIOB18 0x40000
-[    1.742187] pinctrl-at91 ahb:apb:pinctrl at fffff400: enable pin 48 as GPIO
-[    1.742187] pinctrl-at91 ahb:apb:pinctrl at fffff400: enable pin 48 as PIOB16 0x10000
-[    1.746093] pinctrl-at91 ahb:apb:pinctrl at fffff400: enable pin 46 as GPIO
-[    1.746093] pinctrl-at91 ahb:apb:pinctrl at fffff400: enable pin 46 as PIOB14 0x4000
-[    1.746093] pinctrl-at91 ahb:apb:pinctrl at fffff400: enable pin 44 as GPIO
-[    1.746093] pinctrl-at91 ahb:apb:pinctrl at fffff400: enable pin 44 as PIOB12 0x1000
-
->
->>
->> Dne 25.7.2014 v 10:45 Boris BREZILLON napsal(a):
->>> On Fri, 25 Jul 2014 10:27:13 +0200
->>> Ji?? Prchal <jiri.prchal@aksignal.cz> wrote:
->>>
->>> [...]
->>>>
->>>>
->>>>> Could you also paste the content of /sys/kernel/debug/gpio ?
->>>> The /sys/kernel/debug/ is empty.
->>>
->>> You have to enable CONFIG_DEBUG_FS in your config and then mount the
->>> debug file system:
->>>
->>> #mount -t debugfs dbg /sys/kernel/debug
->>>
->>>
->>>
->>>
->
->
->
+diff --git a/arch/arm/configs/sunxi_defconfig b/arch/arm/configs/sunxi_defconfig
+index 7209bfd..0abc2ab 100644
+--- a/arch/arm/configs/sunxi_defconfig
++++ b/arch/arm/configs/sunxi_defconfig
+@@ -93,6 +93,7 @@ CONFIG_LEDS_TRIGGER_DEFAULT_ON=y
+ CONFIG_RTC_CLASS=y
+ # CONFIG_RTC_INTF_SYSFS is not set
+ # CONFIG_RTC_INTF_PROC is not set
++CONFIG_RTC_DRV_SUN6I=y
+ CONFIG_RTC_DRV_SUNXI=y
+ # CONFIG_IOMMU_SUPPORT is not set
+ CONFIG_PHY_SUN4I_USB=y
+-- 
+2.0.1
