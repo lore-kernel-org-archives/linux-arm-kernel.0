@@ -1,77 +1,79 @@
-From: mika.westerberg@linux.intel.com (Mika Westerberg)
-Date: Fri, 25 Jul 2014 11:22:49 +0300
-Subject: [PATCH] spi/pxa2xx-pci: Enable DMA binding through device name
-In-Reply-To: <5574058.fMy2hcvT92@wuerfel>
-References: <1406196111-22861-1-git-send-email-hock.leong.kweh@intel.com>
- <20140724140620.GP1857@lahna.fi.intel.com>
- <20140725071138.GU1857@lahna.fi.intel.com>
- <5574058.fMy2hcvT92@wuerfel>
-Message-ID: <20140725082249.GX1857@lahna.fi.intel.com>
+From: afaerber@suse.de (=?UTF-8?B?QW5kcmVhcyBGw6RyYmVy?=)
+Date: Fri, 25 Jul 2014 10:24:56 +0200
+Subject: [PATCH v2 06/11] ARM: dts: zynq: Add DMAC for Parallella
+In-Reply-To: <53D20F2A.5020209@monstr.eu>
+References: <1406242820-20140-1-git-send-email-afaerber@suse.de>
+ <1406242820-20140-7-git-send-email-afaerber@suse.de>
+ <bc390439-9a5b-43a1-a70c-a4c6517a6cb6@BN1AFFO11FD005.protection.gbl>
+ <53D20F2A.5020209@monstr.eu>
+Message-ID: <53D21458.3060403@suse.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jul 25, 2014 at 09:58:42AM +0200, Arnd Bergmann wrote:
-> On Friday 25 July 2014 10:11:38 Mika Westerberg wrote:
-> > On Thu, Jul 24, 2014 at 05:06:20PM +0300, Mika Westerberg wrote:
-> > > > On a related note, there seems to be a bug in this driver, which
-> > > > attempts to set the slave_id through dmaengine_slave_config(), which
-> > > > is wrong in both cases, ACPI and filter functions.
-> > > 
-> > > Good point. We will fix this, thanks.
-> > 
-> > I take that back. How we are supposed to set the slave_id if we don't
-> > have request line information available (from ACPI or DT)?
+Am 25.07.2014 10:02, schrieb Michal Simek:
+> On 07/25/2014 01:28 AM, S?ren Brinkmann wrote:
+>> On Fri, 2014-07-25 at 01:00AM +0200, Andreas F?rber wrote:
+>>> Signed-off-by: Andreas F?rber <afaerber@suse.de>
+>>> ---
+>>>  v2: New
+>>>  
+>>>  arch/arm/boot/dts/zynq-7000.dtsi      | 17 +++++++++++++++++
+>>>  arch/arm/boot/dts/zynq-parallella.dts |  4 ++++
+>>>  2 files changed, 21 insertions(+)
+>>>
+>>> diff --git a/arch/arm/boot/dts/zynq-7000.dtsi b/arch/arm/boot/dts/zynq-7000.dtsi
+>>> index eed3df0..1a70277 100644
+>>> --- a/arch/arm/boot/dts/zynq-7000.dtsi
+>>> +++ b/arch/arm/boot/dts/zynq-7000.dtsi
+>>> @@ -223,6 +223,23 @@
+>>>  			};
+>>>  		};
+>>>  
+>>> +		dmac_s: dmac at f8003000 {
+>>> +			compatible = "arm,pl330", "arm,primecell";
+>>> +			reg = <0xf8003000 0x1000>;
+>>> +			status = "disabled";
+>> I think for this IP we can omit the 'status' property since it is always
+>> enabled. I don't see a reason to override it in each board DT.
 > 
-> If you don't have the request line information, you are screwed and you
-> can't set it from either the filter function or slave_config.
+> Done this change myself
+
+Fine with me, but allow me to point out that the TRM documents the DMAC
+being mapped as DMAC S at the above address, and as DMAC NS at F800_4000
+(secure vs. non-secure, ch. 4.6, p. 116). Not sure how this would be
+handled driver-wise if not through alternative dt nodes?
+
+>>> +			interrupt-parent = <&intc>;
+>>> +			interrupts = <0 13 4>,
+>>> +			             <0 14 4>, <0 15 4>,
+>>> +			             <0 16 4>, <0 17 4>,
+>>> +			             <0 40 4>, <0 41 4>,
+>>> +			             <0 42 4>, <0 43 4>;
+>>> +			#dma-cells = <1>;
+>>> +			#dma-channels = <8>;
+>>> +			#dma-requests = <4>;
+>>> +			clocks = <&clkc 27>;
+>>> +			clock-names = "apb_pclk";
+>>> +		};
+>>> +
+>>
+>> Acked-by: Soren Brinkmann <soren.brinkmann@xilinx.com>
 > 
-> However, it looks like you do have it, at least this is what the
-> code tells me:
 > 
-> static struct pxa_spi_info spi_info_configs[] = {
->         [PORT_CE4100] = {
-> 		...
->         },
->         [PORT_BYT] = {
->                 .type = LPSS_SSP,
->                 .port_id = 0,
->                 .num_chipselect = 1,
->                 .tx_slave_id = 0,
->                 .tx_chan_id = 0,
->                 .rx_slave_id = 1,
->                 .rx_chan_id = 1,
->         },
-> };
+> Applied to zynq/dt branch.
+> https://github.com/Xilinx/linux-xlnx/commits/zynq/dt
 
-That's right we do have it.
+Thanks,
+Andreas
 
-> All you need to do is change your filter function to take the
-> slave id from pxa_spi_info and stick it in there, e.g.
-> 
-> static bool pxa2xx_spi_dw_dma_filter(struct dma_chan *chan, void *param)
-> {       
->         const struct pxa2xx_spi_master *pdata = param;
->         struct dw_dma_chan *dwc = to_dw_dma_chan(chan);
->         
->         dwc->request_line = fargs->req;
->         dwc->src_master = 0;
->         dwc->dst_master = 0;
->         
->         return 1;
-> }           
+-- 
+SUSE LINUX Products GmbH, Maxfeldstr. 5, 90409 N?rnberg, Germany
+GF: Jeff Hawn, Jennifer Guild, Felix Imend?rffer; HRB 16746 AG N?rnberg
 
-Oh man. That makes pxa2xx_spi dependent on a certain specific DMA engine
-driver.
-
-> Note that the filter function by definition is specific to the dma
-> controller, not the dma slave (that's why most people define it in
-> the dmaengine driver), and the pxa2xx_spi_dma_filter() function used
-> in spi-pxa2xx-dma.c looks like it was written for another dma engine:
-
-I wonder what's the rationale that passing slave_id with
-dma_slave_config is wrong? The current code works fine with that and is
-is independent of the DMA engine driver (even though we know that it is
-going to be dw-dma).
-
-The dw-dma handles slave_id in its implementation of
-dmaengine_slave_config().
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: OpenPGP digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140725/a57e71e3/attachment-0001.sig>
