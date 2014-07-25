@@ -1,34 +1,43 @@
 From: pawel.moll@arm.com (Pawel Moll)
-Date: Fri, 25 Jul 2014 15:23:50 +0100
-Subject: [PATCH 2/5] char: tile-srom: Remove reference to platform_bus
+Date: Fri, 25 Jul 2014 15:23:52 +0100
+Subject: [PATCH 4/5] [SCSI] Do not use platform_bus as a parent
 In-Reply-To: <1406298233-27876-1-git-send-email-pawel.moll@arm.com>
 References: <1406298233-27876-1-git-send-email-pawel.moll@arm.com>
-Message-ID: <1406298233-27876-2-git-send-email-pawel.moll@arm.com>
+Message-ID: <1406298233-27876-4-git-send-email-pawel.moll@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The code was creating "srom" class devices using
-platform_bus as a parent. As they are not really
-platform devices, make them virtual, using NULL instead.
+The host devices without a parent were "forcefully adopted"
+by platform bus. This patch removes this assignment. In
+effect the dev_dev may be NULL now, which means ISA.
 
-Cc: Chris Metcalf <cmetcalf@tilera.com>
+Cc: James E.J. Bottomley <JBottomley@parallels.com>
+Cc: linux-scsi at vger.kernel.org
 Signed-off-by: Pawel Moll <pawel.moll@arm.com>
 ---
- drivers/char/tile-srom.c | 2 +-
+
+This patch is a part of effort to remove references to platform_bus
+and make it static.
+
+James, could you please have a look and advice if the change is
+correct? Would you happen to know the "real reasons" behind
+using the root platform_bus device a parent?
+
+ drivers/scsi/hosts.c | 2 +-
  1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/drivers/char/tile-srom.c b/drivers/char/tile-srom.c
-index bd37747..be88699 100644
---- a/drivers/char/tile-srom.c
-+++ b/drivers/char/tile-srom.c
-@@ -350,7 +350,7 @@ static int srom_setup_minor(struct srom_dev *srom, int index)
- 		       SROM_PAGE_SIZE_OFF, sizeof(srom->page_size)) < 0)
- 		return -EIO;
+diff --git a/drivers/scsi/hosts.c b/drivers/scsi/hosts.c
+index 3cbb57a..0c7389f 100644
+--- a/drivers/scsi/hosts.c
++++ b/drivers/scsi/hosts.c
+@@ -218,7 +218,7 @@ int scsi_add_host_with_dma(struct Scsi_Host *shost, struct device *dev,
+ 		goto fail;
  
--	dev = device_create(srom_class, &platform_bus,
-+	dev = device_create(srom_class, NULL,
- 			    MKDEV(srom_major, index), srom, "%d", index);
- 	return PTR_ERR_OR_ZERO(dev);
- }
+ 	if (!shost->shost_gendev.parent)
+-		shost->shost_gendev.parent = dev ? dev : &platform_bus;
++		shost->shost_gendev.parent = dev;
+ 	if (!dma_dev)
+ 		dma_dev = shost->shost_gendev.parent;
+ 
 -- 
 1.9.1
