@@ -1,133 +1,38 @@
-From: paul@pwsan.com (Paul Walmsley)
-Date: Fri, 25 Jul 2014 19:14:20 +0000 (UTC)
-Subject: OMAP baseline test results for v3.16-rc4
-In-Reply-To: <20140707080238.GF28884@atomide.com>
-References: <alpine.DEB.2.02.1407062339420.15016@utopia.booyaka.com>
- <20140707080238.GF28884@atomide.com>
-Message-ID: <alpine.DEB.2.02.1407251857480.5875@utopia.booyaka.com>
+From: mturquette@linaro.org (Mike Turquette)
+Date: Fri, 25 Jul 2014 12:39:06 -0700
+Subject: [PATCH v2 6/7] ARM: dts: rockchip: add core rk3288 dtsi
+In-Reply-To: <CAD=FV=X9Ym_1-mweR2fBNwPhfbMVUu+EKO+qsY=te+=-pUDhcw@mail.gmail.com>
+References: <4868343.UFgjaXesOn@diego> <14646641.DlFrJR068n@diego>
+ <CAD=FV=X9Ym_1-mweR2fBNwPhfbMVUu+EKO+qsY=te+=-pUDhcw@mail.gmail.com>
+Message-ID: <20140725193906.22930.61548@quantum>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 7 Jul 2014, Tony Lindgren wrote:
+Quoting Doug Anderson (2014-07-24 16:06:34)
+> > +       xin24m: xin24m {
+> > +               compatible = "fixed-clock";
+> > +               clock-frequency = <24000000>;
+> > +               #clock-cells = <0>;
+> > +       };
+> 
+> I'm no expert, but strangely every other .dts seems to have the clocks
+> under a "clocks" node.  That seems to contradict the suggestion made
+> previously that things should not be on the top level, though.
 
-> With v3.16-rc4 the PM features for omap3 should be working
-> finally for device tree based booting. At lest beaglexm and
-> 3xxevm should work.
+That usually happens when there is a clock controller (e.g. "clocks")
+that has multiple clock signals coming out of it. Typically this is for
+a clock generator IP within a SoC or other chip.
 
-Just to follow up briefly on this: there was indeed a bug in the OMAP3 
-test scripts here that resulted in the UART wakeup not being enabled.
+However for a single board-level clock such as an osc then it is common
+to put it at a top-level for that board since these can change from
+board to board.
 
-Once that was fixed, system suspend-based chip-retention and chip-off 
-modes work.
+> 
+> Also, _I think_ device tree suggests a more generic name for the node
+> like "oscillator".  You could use "xin24m" as an output name, I think.
+> Mike could correct me if I'm wrong.
 
-However, scheduler-idle based chip-retention and chip-off still are not
-working.  Looking at the logs, it appears that some domains are not 
-dynamically going idle.  For example, looking at:
+You are correct.
 
-http://www.pwsan.com/omap/testlogs/test_v3.16-rc6/20140724142225/pm/37xxevm/37xxevm_log.txt
-
-it can be seen that core_pwrdm's retention count doesn't increase between 
-the two PM debug dumps.  The important lines are:
-
-core_pwrdm (ON),OFF:0,RET:2,INA:0,ON:3,RET-LOGIC-OFF:0,RET-MEMBANK1-OFF:0,RET-MEMBANK2-OFF:0
-
-and 
-
-core_pwrdm (ON),OFF:0,RET:2,INA:0,ON:3,RET-LOGIC-OFF:0,RET-MEMBANK1-OFF:0,RET-MEMBANK2-OFF:0
-
-That's why the test reports mark the dynamic PM modes as failing.
-
-...
-
-Here's an example where things worked:
-
-http://www.pwsan.com/omap/testlogs/test_v3.10/20130717134228/pm/3530es3beagle/3530es3beagle_log.txt
-
-In this one, it can be seen that the CORE counts transitioned from:
-
-core_pwrdm (ON),OFF:0,RET:2,INA:0,ON:3,RET-LOGIC-OFF:0,RET-MEMBANK1-OFF:0,RET-MEMBANK2-OFF:0
-
-to
-
-core_pwrdm (ON),OFF:0,RET:10,INA:0,ON:11,RET-LOGIC-OFF:0,RET-MEMBANK1-OFF:0,RET-MEMBANK2-OFF:0
-
-between the retention suspend/resume test ending and the dynamic 
-retention idle test ending.
-
-
-- Paul
-
-
-
-# # cat /debug/pm_debug/count
-
-
-
-usbhost_pwrdm (ON),OFF:0,RET:333,INA:0,ON:334,RET-LOGIC-OFF:0,RET-MEMBANK1-OFF:0
-sgx_pwrdm (OFF),OFF:1,RET:0,INA:0,ON:1,RET-LOGIC-OFF:0,RET-MEMBANK1-OFF:0
-core_pwrdm (ON),OFF:0,RET:2,INA:0,ON:3,RET-LOGIC-OFF:0,RET-MEMBANK1-OFF:0,RET-MEMBANK2-OFF:0
-per_pwrdm (ON),OFF:0,RET:2,INA:0,ON:3,RET-LOGIC-OFF:0,RET-MEMBANK1-OFF:0
-dss_pwrdm (ON),OFF:0,RET:333,INA:0,ON:334,RET-LOGIC-OFF:0,RET-MEMBANK1-OFF:0
-cam_pwrdm (RET),OFF:0,RET:1,INA:0,ON:1,RET-LOGIC-OFF:0,RET-MEMBANK1-OFF:0
-neon_pwrdm (ON),OFF:0,RET:297,INA:36,ON:334,RET-LOGIC-OFF:0
-mpu_pwrdm (ON),OFF:0,RET:297,INA:36,ON:334,RET-LOGIC-OFF:0,RET-MEMBANK1-OFF:0
-iva2_pwrdm (RET),OFF:0,RET:1,INA:0,ON:1,RET-LOGIC-OFF:0,RET-MEMBANK1-OFF:0,RET-MEMBANK2-OFF:0,RET-MEMBANK3-OFF:0,RET-MEMBANK4-OFF:0
-usbhost_clkdm->usbhost_pwrdm (1)
-sgx_clkdm->sgx_pwrdm (0)
-per_clkdm->per_pwrdm (15)
-cam_clkdm->cam_pwrdm (0)
-dss_clkdm->dss_pwrdm (1)
-d2d_clkdm->core_pwrdm (0)
-iva2_clkdm->iva2_pwrdm (0)
-mpu_clkdm->mpu_pwrdm (0)
-core_l4_clkdm->core_pwrdm (22)
-core_l3_clkdm->core_pwrdm (1)
-neon_clkdm->neon_pwrdm (0)
-# # # # ./test_rootfs_access_nonexistent_file__ret_susp
-
-/bin/sh: 32: ./test_rootfs_access_nonexistent_file__ret_susp: not found
-# # 
-%% End retention double suspend/resume UART wakeup test
-
-
-%% Start retention dynamic idle UART wakeup test
-
-for u in `ls -1d /sys/bus/platform/drivers/omap_uart/*.serial | paste -s 
--d' '`; do echo 3000 >  $u/power/autosuspend_delay_ms; done
-
-# # 
-
-# # 
-
-# # cat /debug/pm_debug/count
-
-usbhost_pwrdm (ON),OFF:0,RET:433,INA:0,ON:434,RET-LOGIC-OFF:0,RET-MEMBANK1-OFF:0
-sgx_pwrdm (OFF),OFF:1,RET:0,INA:0,ON:1,RET-LOGIC-OFF:0,RET-MEMBANK1-OFF:0
-core_pwrdm (ON),OFF:0,RET:2,INA:0,ON:3,RET-LOGIC-OFF:0,RET-MEMBANK1-OFF:0,RET-MEMBANK2-OFF:0
-per_pwrdm (ON),OFF:0,RET:23,INA:0,ON:24,RET-LOGIC-OFF:0,RET-MEMBANK1-OFF:0
-dss_pwrdm (ON),OFF:0,RET:433,INA:0,ON:434,RET-LOGIC-OFF:0,RET-MEMBANK1-OFF:0
-cam_pwrdm (RET),OFF:0,RET:1,INA:0,ON:1,RET-LOGIC-OFF:0,RET-MEMBANK1-OFF:0
-neon_pwrdm (ON),OFF:0,RET:393,INA:40,ON:434,RET-LOGIC-OFF:0
-mpu_pwrdm (ON),OFF:0,RET:393,INA:40,ON:434,RET-LOGIC-OFF:0,RET-MEMBANK1-OFF:0
-iva2_pwrdm (RET),OFF:0,RET:1,INA:0,ON:1,RET-LOGIC-OFF:0,RET-MEMBANK1-OFF:0,RET-MEMBANK2-OFF:0,RET-MEMBANK3-OFF:0,RET-MEMBANK4-OFF:0
-usbhost_clkdm->usbhost_pwrdm (1)
-sgx_clkdm->sgx_pwrdm (0)
-per_clkdm->per_pwrdm (13)
-cam_clkdm->cam_pwrdm (0)
-dss_clkdm->dss_pwrdm (1)
-d2d_clkdm->core_pwrdm (0)
-iva2_clkdm->iva2_pwrdm (0)
-mpu_clkdm->mpu_pwrdm (0)
-core_l4_clkdm->core_pwrdm (21)
-core_l3_clkdm->core_pwrdm (1)
-neon_clkdm->neon_pwrdm (0)
-# # 
-
-# # ./test_rootfs_access_nonexistent_file__ret_dyn
-
-/bin/sh: 44: ./test_rootfs_access_nonexistent_file__ret_dyn: not found
-# # for u in `ls -1d /sys/bus/platform/drivers/omap_uart/*.serial | paste 
--s -d' '`; do echo -1 >  $u/power/autosuspend_delay_ms; done
-
-# # 
-%% End retention dynamic idle UART wakeup test
+Regards,
+Mike
