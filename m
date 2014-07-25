@@ -1,47 +1,64 @@
 From: pawel.moll@arm.com (Pawel Moll)
-Date: Fri, 25 Jul 2014 15:23:49 +0100
-Subject: [PATCH 1/5] ARM: imx: Remove references to platform_bus in mxc code
-Message-ID: <1406298233-27876-1-git-send-email-pawel.moll@arm.com>
+Date: Fri, 25 Jul 2014 15:23:51 +0100
+Subject: [PATCH 3/5] mmc: sdhci-pltfm: Do not use parent as the host's device
+In-Reply-To: <1406298233-27876-1-git-send-email-pawel.moll@arm.com>
+References: <1406298233-27876-1-git-send-email-pawel.moll@arm.com>
+Message-ID: <1406298233-27876-3-git-send-email-pawel.moll@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The bus devices created to be parents for other peripherals
-were using platform_bus as a parent, not being platform
-devices themselves. Remove the references, making them
-virtual devices instead.
+The code selecting a device for the sdhci host has been
+continuously tweaked (4b711cb13843f5082e82970dd1e8031383134a65
+"mmc: sdhci-pltfm: Add structure for host-specific data" and
+a4d2177f00a5252d825236c5124bc1e9918bdb41 "mmc: sdhci-pltfm: dt
+device does not pass parent to sdhci_alloc_host") while there
+does not seem to be any reason to use platform device's parent
+in the first place.
 
-Cc: Shawn Guo <shawn.guo@freescale.com>
-Cc: Sascha Hauer <kernel@pengutronix.de>
-Cc: Russell King <linux@arm.linux.org.uk>
-Cc: linux-arm-kernel at lists.infradead.org
+The comment saying "Some PCI-based MFD need the parent here"
+seem to refer to Timberdale FPGA driver (the only MFD driver
+registering SDHCI cell, drivers/mfd/timberdale.c) but again,
+the only situation when parent device matter is runtime PM,
+which is not implemented for Timberdale.
+
+Cc: Chris Ball <chris@printf.net>
+Cc: Anton Vorontsov <anton@enomsg.org>
+Cc: Ulf Hansson <ulf.hansson@linaro.org>
+Cc: linux-mmc at vger.kernel.org
+Cc: linuxppc-dev at lists.ozlabs.org
 Signed-off-by: Pawel Moll <pawel.moll@arm.com>
 ---
 
 This patch is a part of effort to remove references to platform_bus
 and make it static.
 
-Shawn, Sascha - could you, please, have a look if such change
-is acceptable for you?
+Chris, Anton, Ulf - could you please advise if the assumptions
+above are correct or if I'm completely wrong? Do you know what
+where the real reasons to use parent originally? The PCI comment
+seems like a red herring to me...
 
- arch/arm/mach-imx/devices/devices.c | 2 --
- 1 file changed, 2 deletions(-)
+ drivers/mmc/host/sdhci-pltfm.c | 9 ++-------
+ 1 file changed, 2 insertions(+), 7 deletions(-)
 
-diff --git a/arch/arm/mach-imx/devices/devices.c b/arch/arm/mach-imx/devices/devices.c
-index 1b4366a..8eab544 100644
---- a/arch/arm/mach-imx/devices/devices.c
-+++ b/arch/arm/mach-imx/devices/devices.c
-@@ -24,12 +24,10 @@
+diff --git a/drivers/mmc/host/sdhci-pltfm.c b/drivers/mmc/host/sdhci-pltfm.c
+index 7e834fb..4996112 100644
+--- a/drivers/mmc/host/sdhci-pltfm.c
++++ b/drivers/mmc/host/sdhci-pltfm.c
+@@ -136,13 +136,8 @@ struct sdhci_host *sdhci_pltfm_init(struct platform_device *pdev,
+ 	if (resource_size(iomem) < 0x100)
+ 		dev_err(&pdev->dev, "Invalid iomem size!\n");
  
- struct device mxc_aips_bus = {
- 	.init_name	= "mxc_aips",
--	.parent		= &platform_bus,
- };
+-	/* Some PCI-based MFD need the parent here */
+-	if (pdev->dev.parent != &platform_bus && !np)
+-		host = sdhci_alloc_host(pdev->dev.parent,
+-			sizeof(struct sdhci_pltfm_host) + priv_size);
+-	else
+-		host = sdhci_alloc_host(&pdev->dev,
+-			sizeof(struct sdhci_pltfm_host) + priv_size);
++	host = sdhci_alloc_host(&pdev->dev,
++		sizeof(struct sdhci_pltfm_host) + priv_size);
  
- struct device mxc_ahb_bus = {
- 	.init_name	= "mxc_ahb",
--	.parent		= &platform_bus,
- };
- 
- int __init mxc_device_init(void)
+ 	if (IS_ERR(host)) {
+ 		ret = PTR_ERR(host);
 -- 
 1.9.1
