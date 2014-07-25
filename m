@@ -1,54 +1,59 @@
-From: soren.brinkmann@xilinx.com (=?utf-8?B?U8O2cmVu?= Brinkmann)
-Date: Fri, 25 Jul 2014 08:00:17 -0700
-Subject: [PATCH v2] ARM: zynq: DT: Add CAN node
-In-Reply-To: <56bf20294d106e0fc9c23a70cd991a50b441d0aa.1406271138.git.michal.simek@xilinx.com>
-References: <56bf20294d106e0fc9c23a70cd991a50b441d0aa.1406271138.git.michal.simek@xilinx.com>
-Message-ID: <bed4104c-c177-4c6d-bffe-3535b9c0d354@BN1AFFO11FD029.protection.gbl>
+From: dianders@chromium.org (Doug Anderson)
+Date: Fri, 25 Jul 2014 08:08:27 -0700
+Subject: [PATCH v2 1/4] ARM: dts: exynos5250: max77686 is Snow only
+In-Reply-To: <08fe01cfa7c9$341cc700$9c565500$@samsung.com>
+References: <1405704009-8430-1-git-send-email-afaerber@suse.de>
+ <1405704009-8430-2-git-send-email-afaerber@suse.de>
+ <08fe01cfa7c9$341cc700$9c565500$@samsung.com>
+Message-ID: <CAD=FV=VUkU7HWjwCKO=WOrKosUtmv3YE_8pxc5uoQg0cHr-AKQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 2014-07-25 at 08:52AM +0200, Michal Simek wrote:
-> Add node describing Zynq's CAN controller.
-> 
-> Signed-off-by: Michal Simek <michal.simek@xilinx.com>
-> ---
-> 
-> Changes in v2:
-> - Add can1
-> - Enable can0 for zc702
-> - Use status property
-> 
->  arch/arm/boot/dts/zynq-7000.dtsi | 26 +++++++++++++++++++++++++-
->  arch/arm/boot/dts/zynq-zc702.dts |  4 ++++
->  2 files changed, 29 insertions(+), 1 deletion(-)
-> 
-> diff --git a/arch/arm/boot/dts/zynq-7000.dtsi b/arch/arm/boot/dts/zynq-7000.dtsi
-> index 366ca6434f54..983148111e3a 100644
-> --- a/arch/arm/boot/dts/zynq-7000.dtsi
-> +++ b/arch/arm/boot/dts/zynq-7000.dtsi
-> @@ -71,7 +71,31 @@
->  			interrupts = <0 7 4>;
->  			interrupt-parent = <&intc>;
->  			clocks = <&clkc 12>;
-> -		};
-> +		};
-> +
-> +		can0: can at e0008000 {
-> +			compatible = "xlnx,zynq-can-1.0";
-> +			status = "disabled";
-> +			clocks = <&clkc 19>, <&clkc 36>;
-> +			clock-names = "can_clk", "pclk";
-> +			reg = <0xe0008000 0x1000>;
-> +			interrupts = <0 28 4>;
-> +			interrupt-parent = <&intc>;
-> +			tx-fifo-depth = <0x40>;
-> +			rx-fifo-depth = <0x40>;
-> +		};
-> +
-> +		can1: can at e0009000 {
-> +			compatible = "xlnx,zynq-can-1.0";
-> +			status = "disabled";
-> +			clocks = <&clkc 19>, <&clkc 36>;
-The clocks for CAN1 must be outputs 20 and 37 of the clkc.
+Hi,
 
-	S?ren
+On Thu, Jul 24, 2014 at 10:28 PM, Kukjin Kim <kgene.kim@samsung.com> wrote:
+> Andreas F?rber wrote:
+>>
+>> Move it from exynos5250-cros-common.dtsi to exynos5250-snow.dts.
+>> Spring does not need it, it uses an s5m8767 instead.
+>>
+>> Signed-off-by: Andreas F?rber <afaerber@suse.de>
+>> ---
+>
+> Hi Andreas,
+>
+> I think this should be reviewed by chrome guys.
+>
+>
+> Doug, can you have a look this series for exynos5250-chromebook?
+> I'm not sure exynos5250-cros-common is still useful for exynos5250-spring...
+
+Sorry, I've been on vacation and am now playing catchup.
+
+Right.  The current suggestion is to rework to just duplicate things
+and don't use exynos5250-cros-common.  I would structure the series
+as:
+
+1. Fold the current exynos5250-cros-common directly into the snow
+device tree file.
+
+2. If desired, cleanup the snow device tree file.
+
+3. Create the spring device tree file based on snow.  There will be
+duplication, but so be it.  Please try to minimize diffs between the
+snow ad spring device tree files.
+
+4. If possible, identify "fragments" like "cros-ec-keyboard.dtsi" and
+factor them out of both spring and snow device tree files.
+
+
+You could certainly reorder some of the above steps if you wish (you
+could split out fragments before creating the spring device tree, for
+instance).
+
+
+Please make sure to CC Javier (now on CC) since he's helping with
+Chromebook upstreaming and he may have a lower latency in responding
+than I do.
+
+-Doug
