@@ -1,33 +1,24 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Fri, 25 Jul 2014 12:10:10 +0200
-Subject: [PATCH v4 2/3] ARM: sunxi: dt: Add DT bindings documentation for
- SUNXI Security System
-In-Reply-To: <1405169953-13695-3-git-send-email-clabbe.montjoie@gmail.com>
-References: <1405169953-13695-1-git-send-email-clabbe.montjoie@gmail.com>
- <1405169953-13695-3-git-send-email-clabbe.montjoie@gmail.com>
-Message-ID: <20140725101010.GA20328@lukather>
+From: broonie@kernel.org (Mark Brown)
+Date: Fri, 25 Jul 2014 11:16:43 +0100
+Subject: [PATCH] exynos: Support big endian mode in secondary_startup
+In-Reply-To: <073c01cfa7c3$39ec6a10$adc53e30$@samsung.com>
+References: <1405958507-8606-1-git-send-email-broonie@kernel.org>
+ <073c01cfa7c3$39ec6a10$adc53e30$@samsung.com>
+Message-ID: <20140725101643.GN17528@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Jul 12, 2014 at 02:59:12PM +0200, LABBE Corentin wrote:
-> This patch adds documentation for Device-Tree bindings for the Security
-> System cryptographic accelerator driver.
-> 
-> Signed-off-by: LABBE Corentin <clabbe.montjoie@gmail.com>
+On Fri, Jul 25, 2014 at 01:45:14PM +0900, Kukjin Kim wrote:
 
-Acked-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+> Basically, I have no objection on this, BTW is there any requirement to support
+> big endian on exynos stuff? Just wondering...
 
-Thanks!
-Maxime
-
--- 
-Maxime Ripard, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
+We've been using it for testing within Linaro.  I don't know of any real
+world users.
 -------------- next part --------------
 A non-text attachment was scrubbed...
 Name: signature.asc
 Type: application/pgp-signature
 Size: 819 bytes
 Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140725/7621f030/attachment.sig>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140725/d9825cfb/attachment.sig>
