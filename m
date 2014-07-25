@@ -1,45 +1,47 @@
-From: jason@lakedaemon.net (Jason Cooper)
-Date: Thu, 24 Jul 2014 20:15:06 -0400
-Subject: [PATCH 0/2] ARM: Marvell Armada XP datasheet publicly available
-In-Reply-To: <1406227593-29749-1-git-send-email-thomas.petazzoni@free-electrons.com>
-References: <1406227593-29749-1-git-send-email-thomas.petazzoni@free-electrons.com>
-Message-ID: <20140725001506.GC23220@titan.lakedaemon.net>
+From: geoff@infradead.org (Geoff Levand)
+Date: Thu, 24 Jul 2014 17:17:48 -0700
+Subject: Kexec on arm64
+In-Reply-To: <20140724093603.GC4079@leverpostej>
+References: <CAFdej006OSyhgDcJ2iZdbjt+PtysN=i_+9Dr4GTmr=+t5yg4Kw@mail.gmail.com>
+ <1405443898.22585.7.camel@smoke>
+ <CAL85gmC9LLcN_uxMY1bM5kLx=N7rZGdGO3bmGHeUVo=Rqgk8uw@mail.gmail.com>
+ <1405551861.7262.26.camel@smoke>
+ <CAFdej03nixSU=3h+HYk2E3Onb2P3--Di0GM+wCwLS6ZNH7UjEQ@mail.gmail.com>
+ <CAFdej00J2mJwcg2Cy6CHVuuQZ4uQ2zZg8oErGPi0uPejievB+Q@mail.gmail.com>
+ <1406162287.4062.39.camel@smoke> <20140724093603.GC4079@leverpostej>
+Message-ID: <1406247468.4062.59.camel@smoke>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jul 24, 2014 at 08:46:31PM +0200, Thomas Petazzoni wrote:
-> Hello,
-> 
-> This series of two patches make a few updates to the README file of
-> the kernel documentation related to Marvell ARM platforms in the
-> kernel.
-> 
-> The most important announcement is the public release by Marvell of
-> the datasheet for the Armada XP SoC. It follows the publication, a few
-> weeks ago, of the Armada 370 datasheet.
+Hi,
 
-Great work Thomas!  Please extend a Thank You to the folks at Marvell.
+On Thu, 2014-07-24 at 10:36 +0100, Mark Rutland wrote:
+> On Thu, Jul 24, 2014 at 01:38:07AM +0100, Geoff Levand wrote:
+ 
+> > All memory management for the main cpu is done by the arch code.  Kexec
+> > and cpu hot plug only work with the secondary cpus, so the problem would
+> > be in the arch memory code, either in setup_restart() for shutdown, or
+> > in the startup code.
+> 
+> It's possible that soft_restart and setup_restart are a little dodgy, as
+> they also rely on the compiler being smart and not touching the stack
+> after setup_restart().
+> 
+> However, they provide absolutely no guarantee that any data has been
+> flushed out to the PoC [1]. If you require any data to be flushed out to the
+> PoC so as to be visible to noncacheable accesses, you will need to
+> ensure that this is flushed by VA before soft_restart is called. Data
+> may have migrated to another cache (e.g. another CPU, or the L3) where
+> it is not visible.
 
-> The second patch makes a few other updates to the same documentation,
-> taking into account recent movements in the support for Marvell SoCs
-> in the kernel.
-> 
-> The series is based on top of Jason's mvebu/soc branch.
-> 
-> Thanks,
-> 
-> Thomas
-> 
-> Thomas Petazzoni (2):
->   Documentation: arm: add URLs to public datasheets for the Marvell
->     Armada XP SoC
->   Documentation: arm: misc updates to Marvell EBU SoC status
-> 
->  Documentation/arm/Marvell/README | 19 ++++++++++---------
->  1 file changed, 10 insertions(+), 9 deletions(-)
+OK, kexec's reset routine relocate_new_kernel does use a few global
+variables that are set by the main kexec routines.  I added a call to
+__flush_dcache_area(), which uses 'dc civac' for those.
 
-Applied to mvebu/soc with Sebastian's and Andrew's Acks.
+I had thought the call to __flush_dcache_all, which uses 'dc cisw', in
+flush_cache_all() would be enough.
 
-thx,
+Arun, I also fixed UP builds.  Could you pull my latest and try with L3
+enabled?
 
-Jason.
+-Geoff
