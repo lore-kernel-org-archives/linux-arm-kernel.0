@@ -1,81 +1,15 @@
-From: pawel.moll@arm.com (Pawel Moll)
-Date: Fri, 25 Jul 2014 15:23:53 +0100
-Subject: [PATCH 5/5] platform: Make platform_bus device a platform device
-In-Reply-To: <1406298233-27876-1-git-send-email-pawel.moll@arm.com>
-References: <1406298233-27876-1-git-send-email-pawel.moll@arm.com>
-Message-ID: <1406298233-27876-5-git-send-email-pawel.moll@arm.com>
+From: soren.brinkmann@xilinx.com (=?utf-8?B?U8O2cmVu?= Brinkmann)
+Date: Fri, 25 Jul 2014 07:42:23 -0700
+Subject: [PATCH v3] ARM: dts: zynq: Add SPI
+In-Reply-To: <1406286752-8905-1-git-send-email-afaerber@suse.de>
+References: <1cf9126b-c5e4-4ae7-a294-071584857d6c@BN1AFFO11FD052.protection.gbl>
+ <1406286752-8905-1-git-send-email-afaerber@suse.de>
+Message-ID: <8c1308c6-e42f-412d-bbdb-2ab52e3bedaa@BN1BFFO11FD018.protection.gbl>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-... describing the root of the device tree, so one can write
-a platform driver initializing the platform.
+On Fri, 2014-07-25 at 01:12PM +0200, Andreas F?rber wrote:
+> Signed-off-by: Andreas F?rber <afaerber@suse.de>
+Reviewed-by: Soren Brinkmann <soren.brinkmann@xilinx.com>
 
-Signed-off-by: Pawel Moll <pawel.moll@arm.com>
----
- drivers/base/platform.c         | 20 ++++++++++++++------
- include/linux/platform_device.h |  2 +-
- 2 files changed, 15 insertions(+), 7 deletions(-)
-
-diff --git a/drivers/base/platform.c b/drivers/base/platform.c
-index eee48c4..9caffa7 100644
---- a/drivers/base/platform.c
-+++ b/drivers/base/platform.c
-@@ -30,8 +30,8 @@
- /* For automatically allocated device IDs */
- static DEFINE_IDA(platform_devid_ida);
- 
--struct device platform_bus = {
--	.init_name	= "platform",
-+struct platform_device platform_bus = {
-+	.name	= "platform",
- };
- EXPORT_SYMBOL_GPL(platform_bus);
- 
-@@ -300,7 +300,7 @@ int platform_device_add(struct platform_device *pdev)
- 		return -EINVAL;
- 
- 	if (!pdev->dev.parent)
--		pdev->dev.parent = &platform_bus;
-+		pdev->dev.parent = &platform_bus.dev;
- 
- 	pdev->dev.bus = &platform_bus_type;
- 
-@@ -946,12 +946,20 @@ int __init platform_bus_init(void)
- 
- 	early_platform_cleanup();
- 
--	error = device_register(&platform_bus);
-+	dev_set_name(&platform_bus.dev, "%s", platform_bus.name);
-+	error = device_register(&platform_bus.dev);
- 	if (error)
- 		return error;
- 	error =  bus_register(&platform_bus_type);
--	if (error)
--		device_unregister(&platform_bus);
-+	if (!error) {
-+#ifdef CONFIG_OF
-+		platform_bus.dev.of_node = of_allnodes;
-+#endif
-+		platform_bus.dev.bus = &platform_bus_type;
-+		bus_add_device(&platform_bus.dev);
-+	} else {
-+		device_unregister(&platform_bus.dev);
-+	}
- 	return error;
- }
- 
-diff --git a/include/linux/platform_device.h b/include/linux/platform_device.h
-index 16f6654..a99032a 100644
---- a/include/linux/platform_device.h
-+++ b/include/linux/platform_device.h
-@@ -44,7 +44,7 @@ extern int platform_device_register(struct platform_device *);
- extern void platform_device_unregister(struct platform_device *);
- 
- extern struct bus_type platform_bus_type;
--extern struct device platform_bus;
-+extern struct platform_device platform_bus;
- 
- extern void arch_setup_pdev_archdata(struct platform_device *);
- extern struct resource *platform_get_resource(struct platform_device *,
--- 
-1.9.1
+	S?ren
