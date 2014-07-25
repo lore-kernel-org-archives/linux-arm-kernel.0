@@ -1,48 +1,43 @@
-From: monstr@monstr.eu (Michal Simek)
-Date: Fri, 25 Jul 2014 10:08:06 +0200
-Subject: [PATCH v2 09/11] Documentation: devicetree: Fix ADI AXI SPDIF
- specification
-In-Reply-To: <53D20A61.1050506@metafoo.de>
-References: <1406242820-20140-1-git-send-email-afaerber@suse.de>
- <1406242820-20140-10-git-send-email-afaerber@suse.de>
- <53D20A61.1050506@metafoo.de>
-Message-ID: <53D21066.8000905@monstr.eu>
+From: shawn.guo@freescale.com (Shawn Guo)
+Date: Fri, 25 Jul 2014 16:09:49 +0800
+Subject: [PATCH v2 1/2] ARM: smp_scu: use macro for SCU enable bit
+In-Reply-To: <1406275790-18617-1-git-send-email-shawn.guo@freescale.com>
+References: <1406275790-18617-1-git-send-email-shawn.guo@freescale.com>
+Message-ID: <1406275790-18617-2-git-send-email-shawn.guo@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Mark,
+Use macro instead of magic number for SCU enable bit.
 
-On 07/25/2014 09:42 AM, Lars-Peter Clausen wrote:
-> On 07/25/2014 01:00 AM, Andreas F?rber wrote:
->> The specification requires compatible = "adi,axi-spdif-1.00.a" but
->> driver and example and file name indicate "adi,axi-spdif-tx-1.00.a".
->> Change the specification to match the implementation.
->>
->> Signed-off-by: Andreas F?rber <afaerber@suse.de>
-> 
-> Acked-by: Lars-Peter Clausen <lars@metafoo.de>
+Signed-off-by: Shawn Guo <shawn.guo@freescale.com>
+---
+ arch/arm/kernel/smp_scu.c | 5 +++--
+ 1 file changed, 3 insertions(+), 2 deletions(-)
 
-All these patches have been added through your tree that's why I think
-you should take this fix through his tree.
-
-Here is my:
-Reviewed-by: Michal Simek <michal.simek@xilinx.com>
-
-Thanks,
-Michal
-
+diff --git a/arch/arm/kernel/smp_scu.c b/arch/arm/kernel/smp_scu.c
+index 1aafa0d785eb..c947508f84e6 100644
+--- a/arch/arm/kernel/smp_scu.c
++++ b/arch/arm/kernel/smp_scu.c
+@@ -17,6 +17,7 @@
+ #include <asm/cputype.h>
+ 
+ #define SCU_CTRL		0x00
++#define SCU_ENABLE		(1 << 0)
+ #define SCU_CONFIG		0x04
+ #define SCU_CPU_STATUS		0x08
+ #define SCU_INVALIDATE		0x0c
+@@ -50,10 +51,10 @@ void scu_enable(void __iomem *scu_base)
+ 
+ 	scu_ctrl = readl_relaxed(scu_base + SCU_CTRL);
+ 	/* already enabled? */
+-	if (scu_ctrl & 1)
++	if (scu_ctrl & SCU_ENABLE)
+ 		return;
+ 
+-	scu_ctrl |= 1;
++	scu_ctrl |= SCU_ENABLE;
+ 	writel_relaxed(scu_ctrl, scu_base + SCU_CTRL);
+ 
+ 	/*
 -- 
-Michal Simek, Ing. (M.Eng), OpenPGP -> KeyID: FE3D1F91
-w: www.monstr.eu p: +42-0-721842854
-Maintainer of Linux kernel - Microblaze cpu - http://www.monstr.eu/fdt/
-Maintainer of Linux kernel - Xilinx Zynq ARM architecture
-Microblaze U-BOOT custodian and responsible for u-boot arm zynq platform
-
-
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 263 bytes
-Desc: OpenPGP digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140725/3f7f6506/attachment.sig>
+1.9.1
