@@ -1,29 +1,66 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Fri, 25 Jul 2014 13:18:39 +0100
-Subject: [PATCH 09/19] ARM64 / ACPI: Move the initialization of
- cpu_logical_map(0) before acpi_boot_init()
-In-Reply-To: <53D233CC.1070006@linaro.org>
-References: <1406206825-15590-1-git-send-email-hanjun.guo@linaro.org>
- <1406206825-15590-10-git-send-email-hanjun.guo@linaro.org>
- <20140724152103.GB26190@leverpostej> <53D233CC.1070006@linaro.org>
-Message-ID: <20140725121839.GC19632@leverpostej>
+From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
+Date: Fri, 25 Jul 2014 14:21:55 +0200
+Subject: [PATCH v2 2/3] ARM: remove remaining definitions of
+ PLAT_PHYS_OFFSET from <mach/memory.h>
+In-Reply-To: <20140725090912.GC6146@pengutronix.de>
+References: <1404295043-6661-2-git-send-email-u.kleine-koenig@pengutronix.de>
+ <1404717185-10010-1-git-send-email-u.kleine-koenig@pengutronix.de>
+ <20140725000621.GO21766@n2100.arm.linux.org.uk>
+ <20140725090912.GC6146@pengutronix.de>
+Message-ID: <20140725122155.GD6146@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jul 25, 2014 at 11:39:08AM +0100, Hanjun Guo wrote:
-> On 2014-7-24 23:21, Mark Rutland wrote:
-> > On Thu, Jul 24, 2014 at 02:00:15PM +0100, Hanjun Guo wrote:
-> >> Move the initialization of cpu_logical_map(0) before acpi_boot_init()
-> >> to remove the duplicated initialization of cpu_logical_map(0).
+Hello Russell,
+
+On Fri, Jul 25, 2014 at 11:09:12AM +0200, Uwe Kleine-K?nig wrote:
+> On Fri, Jul 25, 2014 at 01:06:22AM +0100, Russell King - ARM Linux wrote:
+> > On Mon, Jul 07, 2014 at 09:13:05AM +0200, Uwe Kleine-K?nig wrote:
+> > > The platforms selecting NEED_MACH_MEMORY_H defined the start address of
+> > > their physical memory in the respective <mach/memory.h>. With
+> > > ARM_PATCH_PHYS_VIRT=y (which is quite common today) this is useless
+> > > though because the definition isn't used but determined dynamically.
+> > > 
+> > > So remove the definitions from all <mach/memory.h> and provide the
+> > > Kconfig symbol PHYS_OFFSET with the respective defaults in case
+> > > ARM_PATCH_PHYS_VIRT isn't enabled.
+> > > 
+> > > This allows to drop the dependency of PHYS_OFFSET on !NEED_MACH_MEMORY_H
+> > > which prevents compiling an integrator nommu-kernel.
+> > > (CONFIG_PAGE_OFFSET which has "default PHYS_OFFSET if !MMU" expanded to
+> > > "0x" because CONFIG_PHYS_OFFSET doesn't exist as INTEGRATOR selects
+> > > NEED_MACH_MEMORY_H.)
 > > 
-> > It always make sense to initialise CPU0's logical map entry from the
-> > hardware values, so you could do this earlier in the series, before you
-> > introduce any ACPI code. Then you don't have the churn in acpi.c
-> 
-> ok, I will prepare a separate patch to do this before ACPI code, does it
-> make sense to you?
+> > Should I assume that this hasn't been build tested?
+> darn, I admit being guilty not retesting it after rebasing to 3.16-rc. I
+> think I did test it when I wrote the patch the first time, but you made
+> me unsure if I tested all relevant cases. Working on a follow-up patch.
+The following patch fixes all defconfigs:
 
-Yes. Just put that at the start of the series.
+diff --git a/arch/arm/mach-realview/include/mach/memory.h b/arch/arm/mach-realview/include/mach/memory.h
+index eb69feb3b804..23e7a313f75d 100644
+--- a/arch/arm/mach-realview/include/mach/memory.h
++++ b/arch/arm/mach-realview/include/mach/memory.h
+@@ -20,6 +20,8 @@
+ #ifndef __ASM_ARCH_MEMORY_H
+ #define __ASM_ARCH_MEMORY_H
+ 
++#ifdef CONFIG_SPARSEMEM
++
+ /*
+  * Sparsemem definitions for RealView PBX.
+  *
 
-Thanks,
-Mark.
+PLAT_PHYS_OFFSET then still has this strange value on builds with
+ARM_PATCH_PHYS_VIRT=y, but this doesn't matter as the value is unused
+then.
+
+Do you squash this into the faulty patch or should I follow up with a
+proper patch to repair the mess?
+
+Sorry again
+Uwe
+
+-- 
+Pengutronix e.K.                           | Uwe Kleine-K?nig            |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
