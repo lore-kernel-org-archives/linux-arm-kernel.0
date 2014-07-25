@@ -1,68 +1,42 @@
-From: mika.westerberg@linux.intel.com (Mika Westerberg)
-Date: Fri, 25 Jul 2014 12:07:14 +0300
-Subject: [PATCH] spi/pxa2xx-pci: Enable DMA binding through device name
-In-Reply-To: <7309109.iKHmHOxjzD@wuerfel>
-References: <1406196111-22861-1-git-send-email-hock.leong.kweh@intel.com>
- <5574058.fMy2hcvT92@wuerfel>
- <20140725082249.GX1857@lahna.fi.intel.com>
- <7309109.iKHmHOxjzD@wuerfel>
-Message-ID: <20140725090714.GY1857@lahna.fi.intel.com>
+From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
+Date: Fri, 25 Jul 2014 11:09:12 +0200
+Subject: [PATCH v2 2/3] ARM: remove remaining definitions of
+ PLAT_PHYS_OFFSET from <mach/memory.h>
+In-Reply-To: <20140725000621.GO21766@n2100.arm.linux.org.uk>
+References: <1404295043-6661-2-git-send-email-u.kleine-koenig@pengutronix.de>
+ <1404717185-10010-1-git-send-email-u.kleine-koenig@pengutronix.de>
+ <20140725000621.GO21766@n2100.arm.linux.org.uk>
+Message-ID: <20140725090912.GC6146@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jul 25, 2014 at 10:38:36AM +0200, Arnd Bergmann wrote:
-> On Friday 25 July 2014 11:22:49 Mika Westerberg wrote:
-> > > All you need to do is change your filter function to take the
-> > > slave id from pxa_spi_info and stick it in there, e.g.
-> > > 
-> > > static bool pxa2xx_spi_dw_dma_filter(struct dma_chan *chan, void *param)
-> > > {       
-> > >         const struct pxa2xx_spi_master *pdata = param;
-> > >         struct dw_dma_chan *dwc = to_dw_dma_chan(chan);
-> > >         
-> > >         dwc->request_line = fargs->req;
-> > >         dwc->src_master = 0;
-> > >         dwc->dst_master = 0;
-> > >         
-> > >         return 1;
-> > > }           
-> > 
-> > Oh man. That makes pxa2xx_spi dependent on a certain specific DMA engine
-> > driver.
-> 
-> I think you can improve this by putting the filter function (and a pointer
-> to it) into the pxa2xx_spi_master data provided by the PCI driver.
+Hello Russell,
 
-Indeed, that looks better. It still makes the PCI part of the driver
-dependent on a particular DMA engine driver but is certainly better than
-the core pxa2xx_spi driver.
-
-> On ARM, we usually provide those pointers through platform_data from
-> the board file.
-> 
-> > > Note that the filter function by definition is specific to the dma
-> > > controller, not the dma slave (that's why most people define it in
-> > > the dmaengine driver), and the pxa2xx_spi_dma_filter() function used
-> > > in spi-pxa2xx-dma.c looks like it was written for another dma engine:
+On Fri, Jul 25, 2014 at 01:06:22AM +0100, Russell King - ARM Linux wrote:
+> On Mon, Jul 07, 2014 at 09:13:05AM +0200, Uwe Kleine-K?nig wrote:
+> > The platforms selecting NEED_MACH_MEMORY_H defined the start address of
+> > their physical memory in the respective <mach/memory.h>. With
+> > ARM_PATCH_PHYS_VIRT=y (which is quite common today) this is useless
+> > though because the definition isn't used but determined dynamically.
 > > 
-> > I wonder what's the rationale that passing slave_id with
-> > dma_slave_config is wrong? The current code works fine with that and is
-> > is independent of the DMA engine driver (even though we know that it is
-> > going to be dw-dma).
+> > So remove the definitions from all <mach/memory.h> and provide the
+> > Kconfig symbol PHYS_OFFSET with the respective defaults in case
+> > ARM_PATCH_PHYS_VIRT isn't enabled.
 > > 
-> > The dw-dma handles slave_id in its implementation of
-> > dmaengine_slave_config().
+> > This allows to drop the dependency of PHYS_OFFSET on !NEED_MACH_MEMORY_H
+> > which prevents compiling an integrator nommu-kernel.
+> > (CONFIG_PAGE_OFFSET which has "default PHYS_OFFSET if !MMU" expanded to
+> > "0x" because CONFIG_PHYS_OFFSET doesn't exist as INTEGRATOR selects
+> > NEED_MACH_MEMORY_H.)
 > 
-> The main point is that a single 'slave_id' is not actually enough to
-> identify what a slave needs. In case of dw_dma, the dma engine actually
-> requires three numbers (request line, source master, destination master)
-> to identify it, and there is no good way to put all that information into
-> a single integer. Other dma engines require a different set of data.
-> 
-> There are only two drivers left that actually use slave_id in this way,
-> and only for the legacy (no DT or ACPI) case, every other driver uses
-> either DT or a filter function. I believe the shmobile part will soon
-> be done with, after shmobile has been converted to DT, and after that
-> we should remove the slave_id field from the dma_slave_config interface.
+> Should I assume that this hasn't been build tested?
+darn, I admit being guilty not retesting it after rebasing to 3.16-rc. I
+think I did test it when I wrote the patch the first time, but you made
+me unsure if I tested all relevant cases. Working on a follow-up patch.
 
-OK, thanks for the explanation.
+Mea culpa
+Uwe
+
+-- 
+Pengutronix e.K.                           | Uwe Kleine-K?nig            |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
