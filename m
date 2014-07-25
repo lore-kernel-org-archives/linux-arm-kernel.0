@@ -1,41 +1,69 @@
-From: vinod.koul@intel.com (Vinod Koul)
-Date: Fri, 25 Jul 2014 11:43:20 +0530
-Subject: [PATCH v11 0/2] Add support for the Allwinner A31 DMA Controller
-In-Reply-To: <20140725061130.GF8181@intel.com>
-References: <1405626376-471-1-git-send-email-maxime.ripard@free-electrons.com>
- <20140724121315.GV20328@lukather>
- <20140724164420.d7c58c9b5f6bf3e06137494f@linux-foundation.org>
- <20140725061130.GF8181@intel.com>
-Message-ID: <20140725061320.GG8181@intel.com>
+From: shawn.guo@freescale.com (Shawn Guo)
+Date: Fri, 25 Jul 2014 14:20:40 +0800
+Subject: [PATCH v2] imx-drm: imx-drm-core: add suspend/resume support
+Message-ID: <1406269240-24622-1-git-send-email-shawn.guo@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jul 25, 2014 at 11:41:30AM +0530, Vinod Koul wrote:
-> On Thu, Jul 24, 2014 at 04:44:20PM -0700, Andrew Morton wrote:
-> > On Thu, 24 Jul 2014 14:13:15 +0200 Maxime Ripard <maxime.ripard@free-electrons.com> wrote:
-> > 
-> > > On Thu, Jul 17, 2014 at 09:46:14PM +0200, Maxime Ripard wrote:
-> > > > Hi,
-> > > > 
-> > > > This patchset adds support for the DMA controller found in the
-> > > > Allwinner A31 and A23 SoCs.
-> > > > 
-> > > > This has been tested using the newly introduced SPI driver on an A31
-> > > > EVK. Support for DMA-driven SPI transfers will be the subject of
-> > > > another patch serie.
-> > > > 
-> > > > This has been around for around 5 monthes now, and didn't get any
-> > > > review but nitpicks for three versions, so I feel like it could be
-> > > > merged quite quickly.
-> > > 
-> > > Ok, so, who should I bribe to get this merged?
-> > 
-> > Turns out I'm easily bribed.  The code looks pretty clean and simple
-> > and is refreshingly free of comments, which only confuse people anyway.
-> Sorry for the delay, I will get this done today and merge to slave-dmaengine
-> next
-And looks like Andrew merged them. Do you mind if I take these up thru
-dmaengine tree?
+HDMI currently stops working after a system suspend/resume cycle.  The
+cause is that the mode setting states in hardware gets lost and isn't
+restored across the suspend/resume cycle.
 
+The patch adds a very basic suspend/resume support to imx-drm driver,
+and calls drm_helper_resume_force_mode() in .resume hook to restore the
+mode setting states, so that HDMI can continue working after a system
+suspend/resume cycle.
+
+Signed-off-by: Shawn Guo <shawn.guo@freescale.com>
+---
+Changs since v1:
+ - Do not walk through connector->funcs->dpms() but only call
+   drm_helper_resume_force_mode() in .resume.
+
+ drivers/staging/imx-drm/imx-drm-core.c | 24 ++++++++++++++++++++++++
+ 1 file changed, 24 insertions(+)
+
+diff --git a/drivers/staging/imx-drm/imx-drm-core.c b/drivers/staging/imx-drm/imx-drm-core.c
+index def8280d7ee6..ab41152089a3 100644
+--- a/drivers/staging/imx-drm/imx-drm-core.c
++++ b/drivers/staging/imx-drm/imx-drm-core.c
+@@ -696,6 +696,29 @@ static int imx_drm_platform_remove(struct platform_device *pdev)
+ 	return 0;
+ }
+ 
++#ifdef CONFIG_PM_SLEEP
++static int imx_drm_suspend(struct device *dev)
++{
++	struct drm_device *drm_dev = dev_get_drvdata(dev);
++
++	drm_kms_helper_poll_disable(drm_dev);
++
++	return 0;
++}
++
++static int imx_drm_resume(struct device *dev)
++{
++	struct drm_device *drm_dev = dev_get_drvdata(dev);
++
++	drm_helper_resume_force_mode(drm_dev);
++	drm_kms_helper_poll_enable(drm_dev);
++
++	return 0;
++}
++#endif
++
++static SIMPLE_DEV_PM_OPS(imx_drm_pm_ops, imx_drm_suspend, imx_drm_resume);
++
+ static const struct of_device_id imx_drm_dt_ids[] = {
+ 	{ .compatible = "fsl,imx-display-subsystem", },
+ 	{ /* sentinel */ },
+@@ -708,6 +731,7 @@ static struct platform_driver imx_drm_pdrv = {
+ 	.driver		= {
+ 		.owner	= THIS_MODULE,
+ 		.name	= "imx-drm",
++		.pm	= &imx_drm_pm_ops,
+ 		.of_match_table = imx_drm_dt_ids,
+ 	},
+ };
 -- 
-~Vinod
+1.9.1
