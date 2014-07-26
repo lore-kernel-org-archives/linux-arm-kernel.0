@@ -1,23 +1,56 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Sat, 26 Jul 2014 11:08:11 +0200
-Subject: [PATCH v3 0/8] ARM: rockchip: add initial support for rk3288
-In-Reply-To: <1406324980-2450-1-git-send-email-heiko@sntech.de>
-References: <1406324980-2450-1-git-send-email-heiko@sntech.de>
-Message-ID: <4952360.Q1n75UemR2@wuerfel>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Sat, 26 Jul 2014 10:18:17 +0100
+Subject: [PATCH] iommu/arm-smmu: avoid calling request_irq in atomic
+ context
+In-Reply-To: <1406330819-25323-1-git-send-email-mitchelh@codeaurora.org>
+References: <1406330819-25323-1-git-send-email-mitchelh@codeaurora.org>
+Message-ID: <20140726091817.GA20396@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday 25 July 2014 23:49:32 Heiko Stuebner wrote:
-> This series adds the initial support for Rockchip rk3288 socs including
-> debug uart and devicetree files for the rk3288 evaluation board and
-> enables these boards to boot into an initramfs.
-> 
-> Boards using uboot need an updated bootloader, which must start the timer
-> supplying the architected timer, while the coreboot bootloader already does
-> this. It also depends on the patch
->     "irqchip: gic: Add binding probe for ARM GIC400"
-> which should have made it into the irqchip tree today.
+On Fri, Jul 25, 2014 at 04:26:59PM -0700, Mitchel Humpherys wrote:
+> -	irq = smmu->irqs[smmu->num_global_irqs + cfg->irptndx];
+> -	ret = request_irq(irq, arm_smmu_context_fault, IRQF_SHARED,
+> -			  "arm-smmu-context-fault", domain);
+> -	if (IS_ERR_VALUE(ret)) {
+> -		dev_err(smmu->dev, "failed to request context IRQ %d (%u)\n",
+> -			cfg->irptndx, irq);
+> -		cfg->irptndx = INVALID_IRPTNDX;
+> -		goto out_free_context;
+> -	}
+> -
+>  	smmu_domain->smmu = smmu;
+>  	arm_smmu_init_context_bank(smmu_domain);
+>  	return 0;
+> -
+> -out_free_context:
+> -	__arm_smmu_free_bitmap(smmu->context_map, cfg->cbndx);
+> -	return ret;
 
-Looks all good to me,
+This returns 'ret' from request_irq.
 
-Acked-by: Arnd Bergmann <arnd@arndb.de>
+> +	ret = request_irq(irq, arm_smmu_context_fault, IRQF_SHARED,
+> +			  "arm-smmu-context-fault", domain);
+> +	if (IS_ERR_VALUE(ret)) {
+> +		dev_err(smmu->dev, "failed to request context IRQ %d (%u)\n",
+> +			cfg->irptndx, irq);
+> +		cfg->irptndx = INVALID_IRPTNDX;
+> +		return -ENODEV;
+
+This returns -ENODEV instead.
+
+> +	}
+> +
+>  	/* Looks ok, so add the device to the domain */
+> -	cfg = find_smmu_master_cfg(smmu_domain->smmu, dev);
+> -	if (!cfg)
+> +	master_cfg = find_smmu_master_cfg(smmu_domain->smmu, dev);
+> +	if (!master_cfg)
+>  		return -ENODEV;
+
+If this fails, we exit leaving the interrupt registered.  This is a
+bug introduced by this change.
+
+-- 
+FTTC broadband for 0.8mile line: currently at 9.5Mbps down 400kbps up
+according to speedtest.net.
