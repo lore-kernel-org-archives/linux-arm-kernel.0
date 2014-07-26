@@ -1,42 +1,57 @@
-From: shawn.guo@freescale.com (Shawn Guo)
-Date: Sat, 26 Jul 2014 11:07:15 +0800
-Subject: [PATCH] ARM: imx: fix TLB missing of IOMUXC base address during
- suspend
-Message-ID: <1406344035-7836-1-git-send-email-shawn.guo@freescale.com>
+From: robert.jarzmik@free.fr (Robert Jarzmik)
+Date: Sat, 26 Jul 2014 10:52:49 +0200
+Subject: [PATCH v2 0/6] Migrate PXA27x platforms to clock framework
+In-Reply-To: <20140726004212.4791.52407@quantum> (Mike Turquette's message of
+ "Fri, 25 Jul 2014 17:42:12 -0700")
+References: <1405353263-13424-1-git-send-email-robert.jarzmik@free.fr>
+ <87k376vadk.fsf@free.fr> <20140726004212.4791.52407@quantum>
+Message-ID: <87k370o61q.fsf@free.fr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-After the suspend routine running in OCRAM puts DDR into self-refresh,
-it will access IOMUXC block to float DDR IO for power saving.  A TLB
-missing of IOMUXC base address may happen in this case, and triggers an
-access to DDR, and thus hangs the system.
+Mike Turquette <mturquette@linaro.org> writes:
 
-The failure is discovered by running suspend/resume on a Cubox-i board.
-Though the issue is not Cubox-i specific, it can be hit the on the board
-quite easily with the 3.15 or 3.16 kernel.
+> Quoting Robert Jarzmik (2014-07-21 11:23:51)
+>> Robert Jarzmik <robert.jarzmik@free.fr> writes:
+>> 
+>> > This is the second opus of this serie.
+>> 
+>> Ping ?
+>
+> Hi Robert,
+>
+> Overall the series looks good to me. The only problem I see is that
+> somewhere in the use of the PARENTS() macro there is a section mismatch
+> introduced. I spent about 5 minutes looking at it and gave up. This
+> problem introduces 26 section mismatch warnings building
+> colibri_pxa270_defconfig.
+OK Mike, I'll fix this. This is probably because pxa27x_clocks array is not
+__init, and it references parents which are __init. I was lazy letting
+pxa27x_clocks not __init because I reuse the internal fields "hw" and "gate->hw"
+later (hence I didn't leave the __init).
+This is a bit dirty and I'll launder it.
 
-Fix the issue with a dummy access to IOMUXC block at the beginning of
-suspend routine, so that the address translation can be filled into TLB
-before DDR is put into self-refresh.
+Moreover, I have one fix which I had fixed wrt boot ordering : the
+postcore_init() must die. The reason behind is that I have no guarantee of
+ordering between clocks init and clocksource init, and clocksource relies on
+clocks.
 
-Signed-off-by: Shawn Guo <shawn.guo@freescale.com>
-Cc: <stable@vger.kernel.org>
----
- arch/arm/mach-imx/suspend-imx6.S | 2 ++
- 1 file changed, 2 insertions(+)
+The right way will be AFAIK to call the core clocks init :
+ - within the device-tree initialization function : pxa27x_dt_clocks_init()
+ calls pxa27x_clocks_init9)
+ - directly from pxa27x_init() or pxa_timer_init() in non-device tree setup
 
-diff --git a/arch/arm/mach-imx/suspend-imx6.S b/arch/arm/mach-imx/suspend-imx6.S
-index fe123b079c05..87bdf7a629a5 100644
---- a/arch/arm/mach-imx/suspend-imx6.S
-+++ b/arch/arm/mach-imx/suspend-imx6.S
-@@ -172,6 +172,8 @@ ENTRY(imx6_suspend)
- 	ldr	r6, [r11, #0x0]
- 	ldr	r11, [r0, #PM_INFO_MX6Q_GPC_V_OFFSET]
- 	ldr	r6, [r11, #0x0]
-+	ldr	r11, [r0, #PM_INFO_MX6Q_IOMUXC_V_OFFSET]
-+	ldr	r6, [r11, #0x0]
- 
- 	/* use r11 to store the IO address */
- 	ldr	r11, [r0, #PM_INFO_MX6Q_SRC_V_OFFSET]
+> Once those are fixed up then I will be happy to take this series. Do you
+> want me to take all six patches through the clk tree, including the
+> arm/arm stuff?
+I would feel more comfortable if :
+ - you take the 4 first ones (3 clock ones + 1 arm pxa header bit definitions)
+ - Haojian takes the last 2 ones (pxa ones)
+
+I will check that taking only the first 4 ones doesn't break anything, in case
+there is a merge window hipcup.
+
+Cheers.
+
 -- 
-1.9.1
+Robert
