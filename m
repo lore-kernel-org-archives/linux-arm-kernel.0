@@ -1,639 +1,145 @@
 From: heiko@sntech.de (Heiko Stuebner)
-Date: Sun, 27 Jul 2014 01:18:19 +0200
-Subject: [PATCH v2 03/15] arm: dts: rockchip: remove obsolete clock gate
- definitions
+Date: Sun, 27 Jul 2014 01:18:27 +0200
+Subject: [PATCH v2 11/15] ARM: dts: add i2c and regulator nodes to
+ rk3188-radxarock
 In-Reply-To: <1406416711-28006-1-git-send-email-heiko@sntech.de>
 References: <1406416711-28006-1-git-send-email-heiko@sntech.de>
-Message-ID: <1406416711-28006-4-git-send-email-heiko@sntech.de>
+Message-ID: <1406416711-28006-12-git-send-email-heiko@sntech.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The clock and reset unit is now provided by the rk3188-cru clock driver and thus
-the old style definitions of the gate clocks can go away.
+From: Beniamino Galvani <b.galvani@gmail.com>
 
+This enables the 2nd i2c bus and adds the act8846 pmic as device.
+
+Signed-off-by: Beniamino Galvani <b.galvani@gmail.com>
 Signed-off-by: Heiko Stuebner <heiko@sntech.de>
-Acked-by: Max Schwarz <max.schwarz@online.de>
-Tested-by: Max Schwarz <max.schwarz@online.de>
 ---
- arch/arm/boot/dts/rk3066a-clocks.dtsi | 293 ----------------------------------
- arch/arm/boot/dts/rk3066a.dtsi        |   1 -
- arch/arm/boot/dts/rk3188-clocks.dtsi  | 283 --------------------------------
- arch/arm/boot/dts/rk3188.dtsi         |   1 -
- 4 files changed, 578 deletions(-)
- delete mode 100644 arch/arm/boot/dts/rk3066a-clocks.dtsi
- delete mode 100644 arch/arm/boot/dts/rk3188-clocks.dtsi
+ arch/arm/boot/dts/rk3188-radxarock.dts | 112 +++++++++++++++++++++++++++++++++
+ 1 file changed, 112 insertions(+)
 
-diff --git a/arch/arm/boot/dts/rk3066a-clocks.dtsi b/arch/arm/boot/dts/rk3066a-clocks.dtsi
-deleted file mode 100644
-index 0d4d667..0000000
---- a/arch/arm/boot/dts/rk3066a-clocks.dtsi
-+++ /dev/null
-@@ -1,293 +0,0 @@
--/*
-- * Copyright (c) 2013 MundoReader S.L.
-- * Author: Heiko Stuebner <heiko@sntech.de>
-- *
-- * This program is free software; you can redistribute it and/or modify
-- * it under the terms of the GNU General Public License as published by
-- * the Free Software Foundation; either version 2 of the License, or
-- * (at your option) any later version.
-- *
-- * This program is distributed in the hope that it will be useful,
-- * but WITHOUT ANY WARRANTY; without even the implied warranty of
-- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-- * GNU General Public License for more details.
-- */
--
--/ {
--	clocks {
--		#address-cells = <1>;
--		#size-cells = <1>;
--		ranges;
--
--		/*
--		 * This is a dummy clock, to be used as placeholder on
--		 * other mux clocks when a specific parent clock is not
--		 * yet implemented. It should be dropped when the driver
--		 * is complete.
--		 */
--		dummy: dummy {
--			compatible = "fixed-clock";
--			clock-frequency = <0>;
--			#clock-cells = <0>;
--		};
--
--		dummy48m: dummy48m {
--			compatible = "fixed-clock";
--			clock-frequency = <48000000>;
--			#clock-cells = <0>;
--		};
--
--		dummy150m: dummy150m {
--			compatible = "fixed-clock";
--			clock-frequency = <150000000>;
--			#clock-cells = <0>;
--		};
--
--		clk_gates0: gate-clk at 200000d0 {
--			compatible = "rockchip,rk2928-gate-clk";
--			reg = <0x200000d0 0x4>;
--			clocks = <&dummy>, <&dummy>,
--				 <&dummy>, <&dummy>,
--				 <&dummy>, <&dummy>,
--				 <&dummy>, <&dummy>,
--				 <&dummy>, <&dummy>,
--				 <&dummy>, <&dummy>,
--				 <&dummy>, <&dummy>,
--				 <&dummy>, <&dummy>;
--
--			clock-output-names =
--				"gate_core_periph", "gate_cpu_gpll",
--				"gate_ddrphy", "gate_aclk_cpu",
--				"gate_hclk_cpu", "gate_pclk_cpu",
--				"gate_atclk_cpu", "gate_i2s0",
--				"gate_i2s0_frac", "gate_i2s1",
--				"gate_i2s1_frac", "gate_i2s2",
--				"gate_i2s2_frac", "gate_spdif",
--				"gate_spdif_frac", "gate_testclk";
--
--			#clock-cells = <1>;
--		};
--
--		clk_gates1: gate-clk at 200000d4 {
--			compatible = "rockchip,rk2928-gate-clk";
--			reg = <0x200000d4 0x4>;
--			clocks = <&xin24m>, <&xin24m>,
--				 <&xin24m>, <&dummy>,
--				 <&dummy>, <&xin24m>,
--				 <&xin24m>, <&dummy>,
--				 <&xin24m>, <&dummy>,
--				 <&xin24m>, <&dummy>,
--				 <&xin24m>, <&dummy>,
--				 <&xin24m>, <&dummy>;
--
--			clock-output-names =
--				"gate_timer0", "gate_timer1",
--				"gate_timer2", "gate_jtag",
--				"gate_aclk_lcdc1_src", "gate_otgphy0",
--				"gate_otgphy1", "gate_ddr_gpll",
--				"gate_uart0", "gate_frac_uart0",
--				"gate_uart1", "gate_frac_uart1",
--				"gate_uart2", "gate_frac_uart2",
--				"gate_uart3", "gate_frac_uart3";
--
--			#clock-cells = <1>;
--		};
--
--		clk_gates2: gate-clk at 200000d8 {
--			compatible = "rockchip,rk2928-gate-clk";
--			reg = <0x200000d8 0x4>;
--			clocks = <&clk_gates2 1>, <&dummy>,
--				 <&dummy>, <&dummy>,
--				 <&dummy>, <&dummy>,
--				 <&clk_gates2 3>, <&dummy>,
--				 <&dummy>, <&dummy>,
--				 <&dummy>, <&dummy48m>,
--				 <&dummy>, <&dummy48m>,
--				 <&dummy>, <&dummy>;
--
--			clock-output-names =
--				"gate_periph_src", "gate_aclk_periph",
--				"gate_hclk_periph", "gate_pclk_periph",
--				"gate_smc", "gate_mac",
--				"gate_hsadc", "gate_hsadc_frac",
--				"gate_saradc", "gate_spi0",
--				"gate_spi1", "gate_mmc0",
--				"gate_mac_lbtest", "gate_mmc1",
--				"gate_emmc", "gate_tsadc";
--
--			#clock-cells = <1>;
--		};
--
--		clk_gates3: gate-clk at 200000dc {
--			compatible = "rockchip,rk2928-gate-clk";
--			reg = <0x200000dc 0x4>;
--			clocks = <&dummy>, <&dummy>,
--				 <&dummy>, <&dummy>,
--				 <&dummy>, <&dummy>,
--				 <&dummy>, <&dummy>,
--				 <&dummy>, <&dummy>,
--				 <&dummy>, <&dummy>,
--				 <&dummy>, <&dummy>,
--				 <&dummy>, <&dummy>;
--
--			clock-output-names =
--				"gate_aclk_lcdc0_src", "gate_dclk_lcdc0",
--				"gate_dclk_lcdc1", "gate_pclkin_cif0",
--				"gate_pclkin_cif1", "reserved",
--				"reserved", "gate_cif0_out",
--				"gate_cif1_out", "gate_aclk_vepu",
--				"gate_hclk_vepu", "gate_aclk_vdpu",
--				"gate_hclk_vdpu", "gate_gpu_src",
--				"reserved", "gate_xin27m";
--
--			#clock-cells = <1>;
--		};
--
--		clk_gates4: gate-clk at 200000e0 {
--			compatible = "rockchip,rk2928-gate-clk";
--			reg = <0x200000e0 0x4>;
--			clocks = <&clk_gates2 2>, <&clk_gates2 3>,
--				 <&clk_gates2 1>, <&clk_gates2 1>,
--				 <&clk_gates2 1>, <&clk_gates2 2>,
--				 <&clk_gates2 2>, <&clk_gates2 2>,
--				 <&clk_gates0 4>, <&clk_gates0 4>,
--				 <&clk_gates0 3>, <&clk_gates0 3>,
--				 <&clk_gates0 3>, <&clk_gates2 3>,
--				 <&clk_gates0 4>;
--
--			clock-output-names =
--				"gate_hclk_peri_axi_matrix", "gate_pclk_peri_axi_matrix",
--				"gate_aclk_cpu_peri", "gate_aclk_peri_axi_matrix",
--				"gate_aclk_pei_niu", "gate_hclk_usb_peri",
--				"gate_hclk_peri_ahb_arbi", "gate_hclk_emem_peri",
--				"gate_hclk_cpubus", "gate_hclk_ahb2apb",
--				"gate_aclk_strc_sys", "gate_aclk_l2mem_con",
--				"gate_aclk_intmem", "gate_pclk_tsadc",
--				"gate_hclk_hdmi";
--
--			#clock-cells = <1>;
--		};
--
--		clk_gates5: gate-clk at 200000e4 {
--			compatible = "rockchip,rk2928-gate-clk";
--			reg = <0x200000e4 0x4>;
--			clocks = <&clk_gates0 3>, <&clk_gates2 1>,
--				 <&clk_gates0 5>, <&clk_gates0 5>,
--				 <&clk_gates0 5>, <&clk_gates0 5>,
--				 <&clk_gates0 4>, <&clk_gates0 5>,
--				 <&clk_gates2 1>, <&clk_gates2 2>,
--				 <&clk_gates2 2>, <&clk_gates2 2>,
--				 <&clk_gates2 2>, <&clk_gates4 5>,
--				 <&clk_gates4 5>, <&dummy>;
--
--			clock-output-names =
--				"gate_aclk_dmac1", "gate_aclk_dmac2",
--				"gate_pclk_efuse", "gate_pclk_tzpc",
--				"gate_pclk_grf", "gate_pclk_pmu",
--				"gate_hclk_rom", "gate_pclk_ddrupctl",
--				"gate_aclk_smc", "gate_hclk_nandc",
--				"gate_hclk_mmc0", "gate_hclk_mmc1",
--				"gate_hclk_emmc", "gate_hclk_otg0",
--				"gate_hclk_otg1", "gate_aclk_gpu";
--
--			#clock-cells = <1>;
--		};
--
--		clk_gates6: gate-clk at 200000e8 {
--			compatible = "rockchip,rk2928-gate-clk";
--			reg = <0x200000e8 0x4>;
--			clocks = <&clk_gates3 0>, <&clk_gates0 4>,
--				 <&clk_gates0 4>, <&clk_gates1 4>,
--				 <&clk_gates0 4>, <&clk_gates3 0>,
--				 <&clk_gates0 4>, <&clk_gates1 4>,
--				 <&clk_gates3 0>, <&clk_gates0 4>,
--				 <&clk_gates0 4>, <&clk_gates1 4>,
--				 <&clk_gates0 4>, <&clk_gates3 0>,
--				 <&dummy>, <&dummy>;
--
--			clock-output-names =
--				"gate_aclk_lcdc0", "gate_hclk_lcdc0",
--				"gate_hclk_lcdc1", "gate_aclk_lcdc1",
--				"gate_hclk_cif0", "gate_aclk_cif0",
--				"gate_hclk_cif1", "gate_aclk_cif1",
--				"gate_aclk_ipp", "gate_hclk_ipp",
--				"gate_hclk_rga", "gate_aclk_rga",
--				"gate_hclk_vio_bus", "gate_aclk_vio0",
--				"gate_aclk_vcodec", "gate_shclk_vio_h2h";
--
--			#clock-cells = <1>;
--		};
--
--		clk_gates7: gate-clk at 200000ec {
--			compatible = "rockchip,rk2928-gate-clk";
--			reg = <0x200000ec 0x4>;
--			clocks = <&clk_gates2 2>, <&clk_gates0 4>,
--				 <&clk_gates0 4>, <&clk_gates0 4>,
--				 <&clk_gates0 4>, <&clk_gates2 2>,
--				 <&clk_gates2 2>, <&clk_gates0 5>,
--				 <&clk_gates0 5>, <&clk_gates0 5>,
--				 <&clk_gates0 5>, <&clk_gates2 3>,
--				 <&clk_gates2 3>, <&clk_gates2 3>,
--				 <&clk_gates2 3>, <&clk_gates2 3>;
--
--			clock-output-names =
--				"gate_hclk_emac", "gate_hclk_spdif",
--				"gate_hclk_i2s0_2ch", "gate_hclk_i2s1_2ch",
--				"gate_hclk_i2s_8ch", "gate_hclk_hsadc",
--				"gate_hclk_pidf", "gate_pclk_timer0",
--				"gate_pclk_timer1", "gate_pclk_timer2",
--				"gate_pclk_pwm01", "gate_pclk_pwm23",
--				"gate_pclk_spi0", "gate_pclk_spi1",
--				"gate_pclk_saradc", "gate_pclk_wdt";
--
--			#clock-cells = <1>;
--		};
--
--		clk_gates8: gate-clk at 200000f0 {
--			compatible = "rockchip,rk2928-gate-clk";
--			reg = <0x200000f0 0x4>;
--			clocks = <&clk_gates0 5>, <&clk_gates0 5>,
--				 <&clk_gates2 3>, <&clk_gates2 3>,
--				 <&clk_gates0 5>, <&clk_gates0 5>,
--				 <&clk_gates2 3>, <&clk_gates2 3>,
--				 <&clk_gates2 3>, <&clk_gates0 5>,
--				 <&clk_gates0 5>, <&clk_gates0 5>,
--				 <&clk_gates2 3>, <&clk_gates2 3>,
--				 <&dummy>, <&clk_gates0 5>;
--
--			clock-output-names =
--				"gate_pclk_uart0", "gate_pclk_uart1",
--				"gate_pclk_uart2", "gate_pclk_uart3",
--				"gate_pclk_i2c0", "gate_pclk_i2c1",
--				"gate_pclk_i2c2", "gate_pclk_i2c3",
--				"gate_pclk_i2c4", "gate_pclk_gpio0",
--				"gate_pclk_gpio1", "gate_pclk_gpio2",
--				"gate_pclk_gpio3", "gate_pclk_gpio4",
--				"reserved", "gate_pclk_gpio6";
--
--			#clock-cells = <1>;
--		};
--
--		clk_gates9: gate-clk at 200000f4 {
--			compatible = "rockchip,rk2928-gate-clk";
--			reg = <0x200000f4 0x4>;
--			clocks = <&dummy>, <&clk_gates0 5>,
--				 <&dummy>, <&dummy>,
--				 <&dummy>, <&clk_gates1 4>,
--				 <&clk_gates0 5>, <&dummy>,
--				 <&dummy>, <&dummy>,
--				 <&dummy>;
--
--			clock-output-names =
--				"gate_clk_core_dbg", "gate_pclk_dbg",
--				"gate_clk_trace", "gate_atclk",
--				"gate_clk_l2c", "gate_aclk_vio1",
--				"gate_pclk_publ", "gate_aclk_intmem0",
--				"gate_aclk_intmem1", "gate_aclk_intmem2",
--				"gate_aclk_intmem3";
--
--			#clock-cells = <1>;
--		};
--	};
--
--};
-diff --git a/arch/arm/boot/dts/rk3066a.dtsi b/arch/arm/boot/dts/rk3066a.dtsi
-index 15c81d2..6476ce7 100644
---- a/arch/arm/boot/dts/rk3066a.dtsi
-+++ b/arch/arm/boot/dts/rk3066a.dtsi
-@@ -17,7 +17,6 @@
- #include <dt-bindings/pinctrl/rockchip.h>
- #include <dt-bindings/clock/rk3066a-cru.h>
- #include "rk3xxx.dtsi"
--#include "rk3066a-clocks.dtsi"
+diff --git a/arch/arm/boot/dts/rk3188-radxarock.dts b/arch/arm/boot/dts/rk3188-radxarock.dts
+index 241e2a4..a281293 100644
+--- a/arch/arm/boot/dts/rk3188-radxarock.dts
++++ b/arch/arm/boot/dts/rk3188-radxarock.dts
+@@ -59,6 +59,118 @@
+ 	};
+ };
  
- / {
- 	compatible = "rockchip,rk3066a";
-diff --git a/arch/arm/boot/dts/rk3188-clocks.dtsi b/arch/arm/boot/dts/rk3188-clocks.dtsi
-deleted file mode 100644
-index 6bc0373..0000000
---- a/arch/arm/boot/dts/rk3188-clocks.dtsi
-+++ /dev/null
-@@ -1,283 +0,0 @@
--/*
-- * Copyright (c) 2013 MundoReader S.L.
-- * Author: Heiko Stuebner <heiko@sntech.de>
-- *
-- * This program is free software; you can redistribute it and/or modify
-- * it under the terms of the GNU General Public License as published by
-- * the Free Software Foundation; either version 2 of the License, or
-- * (at your option) any later version.
-- *
-- * This program is distributed in the hope that it will be useful,
-- * but WITHOUT ANY WARRANTY; without even the implied warranty of
-- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-- * GNU General Public License for more details.
-- */
--
--/ {
--	clocks {
--		#address-cells = <1>;
--		#size-cells = <1>;
--		ranges;
--
--		/*
--		 * This is a dummy clock, to be used as placeholder on
--		 * other mux clocks when a specific parent clock is not
--		 * yet implemented. It should be dropped when the driver
--		 * is complete.
--		 */
--		dummy: dummy {
--			compatible = "fixed-clock";
--			clock-frequency = <0>;
--			#clock-cells = <0>;
--		};
--
--		dummy48m: dummy48m {
--			compatible = "fixed-clock";
--			clock-frequency = <48000000>;
--			#clock-cells = <0>;
--		};
--
--		dummy150m: dummy150m {
--			compatible = "fixed-clock";
--			clock-frequency = <150000000>;
--			#clock-cells = <0>;
--		};
--
--		clk_gates0: gate-clk at 200000d0 {
--			compatible = "rockchip,rk2928-gate-clk";
--			reg = <0x200000d0 0x4>;
--			clocks = <&dummy150m>, <&dummy>,
--				 <&dummy>, <&dummy>,
--				 <&dummy>, <&dummy>,
--				 <&dummy>, <&dummy>,
--				 <&dummy>, <&dummy>,
--				 <&dummy>, <&dummy>,
--				 <&dummy>, <&dummy>,
--				 <&dummy>, <&dummy>;
--
--			clock-output-names =
--				"gate_core_periph", "gate_cpu_gpll",
--				"gate_ddrphy", "gate_aclk_cpu",
--				"gate_hclk_cpu", "gate_pclk_cpu",
--				"gate_atclk_cpu", "gate_aclk_core",
--				"reserved", "gate_i2s0",
--				"gate_i2s0_frac", "reserved",
--				"reserved", "gate_spdif",
--				"gate_spdif_frac", "gate_testclk";
--
--			#clock-cells = <1>;
--		};
--
--		clk_gates1: gate-clk at 200000d4 {
--			compatible = "rockchip,rk2928-gate-clk";
--			reg = <0x200000d4 0x4>;
--			clocks = <&xin24m>, <&xin24m>,
--				 <&xin24m>, <&dummy>,
--				 <&dummy>, <&xin24m>,
--				 <&xin24m>, <&dummy>,
--				 <&xin24m>, <&dummy>,
--				 <&xin24m>, <&dummy>,
--				 <&xin24m>, <&dummy>,
--				 <&xin24m>, <&dummy>;
--
--			clock-output-names =
--				"gate_timer0", "gate_timer1",
--				"gate_timer3", "gate_jtag",
--				"gate_aclk_lcdc1_src", "gate_otgphy0",
--				"gate_otgphy1", "gate_ddr_gpll",
--				"gate_uart0", "gate_frac_uart0",
--				"gate_uart1", "gate_frac_uart1",
--				"gate_uart2", "gate_frac_uart2",
--				"gate_uart3", "gate_frac_uart3";
--
--			#clock-cells = <1>;
--		};
--
--		clk_gates2: gate-clk at 200000d8 {
--			compatible = "rockchip,rk2928-gate-clk";
--			reg = <0x200000d8 0x4>;
--			clocks = <&clk_gates2 1>, <&dummy>,
--				 <&dummy>, <&dummy>,
--				 <&dummy>, <&dummy>,
--				 <&clk_gates2 3>, <&dummy>,
--				 <&dummy>, <&dummy>,
--				 <&dummy>, <&dummy48m>,
--				 <&dummy>, <&dummy48m>,
--				 <&dummy>, <&dummy>;
--
--			clock-output-names =
--				"gate_periph_src", "gate_aclk_periph",
--				"gate_hclk_periph", "gate_pclk_periph",
--				"gate_smc", "gate_mac",
--				"gate_hsadc", "gate_hsadc_frac",
--				"gate_saradc", "gate_spi0",
--				"gate_spi1", "gate_mmc0",
--				"gate_mac_lbtest", "gate_mmc1",
--				"gate_emmc", "reserved";
--
--			#clock-cells = <1>;
--		};
--
--		clk_gates3: gate-clk at 200000dc {
--			compatible = "rockchip,rk2928-gate-clk";
--			reg = <0x200000dc 0x4>;
--			clocks = <&dummy>, <&dummy>,
--				 <&dummy>, <&dummy>,
--				 <&xin24m>, <&xin24m>,
--				 <&dummy>, <&dummy>,
--				 <&xin24m>, <&dummy>,
--				 <&dummy>, <&dummy>,
--				 <&dummy>, <&dummy>,
--				 <&xin24m>, <&dummy>;
--
--			clock-output-names =
--				"gate_aclk_lcdc0_src", "gate_dclk_lcdc0",
--				"gate_dclk_lcdc1", "gate_pclkin_cif0",
--				"gate_timer2", "gate_timer4",
--				"gate_hsicphy", "gate_cif0_out",
--				"gate_timer5", "gate_aclk_vepu",
--				"gate_hclk_vepu", "gate_aclk_vdpu",
--				"gate_hclk_vdpu", "reserved",
--				"gate_timer6", "gate_aclk_gpu_src";
--
--			#clock-cells = <1>;
--		};
--
--		clk_gates4: gate-clk at 200000e0 {
--			compatible = "rockchip,rk2928-gate-clk";
--			reg = <0x200000e0 0x4>;
--			clocks = <&clk_gates2 2>, <&clk_gates2 3>,
--				 <&clk_gates2 1>, <&clk_gates2 1>,
--				 <&clk_gates2 1>, <&clk_gates2 2>,
--				 <&clk_gates2 2>, <&clk_gates2 2>,
--				 <&clk_gates0 4>, <&clk_gates0 4>,
--				 <&clk_gates0 3>, <&dummy>,
--				 <&clk_gates0 3>, <&dummy>,
--				 <&dummy>, <&dummy>;
--
--			clock-output-names =
--				"gate_hclk_peri_axi_matrix", "gate_pclk_peri_axi_matrix",
--				"gate_aclk_cpu_peri", "gate_aclk_peri_axi_matrix",
--				"gate_aclk_pei_niu", "gate_hclk_usb_peri",
--				"gate_hclk_peri_ahb_arbi", "gate_hclk_emem_peri",
--				"gate_hclk_cpubus", "gate_hclk_ahb2apb",
--				"gate_aclk_strc_sys", "reserved",
--				"gate_aclk_intmem", "reserved",
--				"gate_hclk_imem1", "gate_hclk_imem0";
--
--			#clock-cells = <1>;
--		};
--
--		clk_gates5: gate-clk at 200000e4 {
--			compatible = "rockchip,rk2928-gate-clk";
--			reg = <0x200000e4 0x4>;
--			clocks = <&clk_gates0 3>, <&clk_gates2 1>,
--				 <&clk_gates0 5>, <&clk_gates0 5>,
--				 <&clk_gates0 5>, <&clk_gates0 5>,
--				 <&clk_gates0 4>, <&clk_gates0 5>,
--				 <&clk_gates2 1>, <&clk_gates2 2>,
--				 <&clk_gates2 2>, <&clk_gates2 2>,
--				 <&clk_gates2 2>, <&clk_gates4 5>;
--
--			clock-output-names =
--				"gate_aclk_dmac1", "gate_aclk_dmac2",
--				"gate_pclk_efuse", "gate_pclk_tzpc",
--				"gate_pclk_grf", "gate_pclk_pmu",
--				"gate_hclk_rom", "gate_pclk_ddrupctl",
--				"gate_aclk_smc", "gate_hclk_nandc",
--				"gate_hclk_mmc0", "gate_hclk_mmc1",
--				"gate_hclk_emmc", "gate_hclk_otg0";
--
--			#clock-cells = <1>;
--		};
--
--		clk_gates6: gate-clk at 200000e8 {
--			compatible = "rockchip,rk2928-gate-clk";
--			reg = <0x200000e8 0x4>;
--			clocks = <&clk_gates3 0>, <&clk_gates0 4>,
--				 <&clk_gates0 4>, <&clk_gates1 4>,
--				 <&clk_gates0 4>, <&clk_gates3 0>,
--				 <&dummy>, <&dummy>,
--				 <&clk_gates3 0>, <&clk_gates0 4>,
--				 <&clk_gates0 4>, <&clk_gates1 4>,
--				 <&clk_gates0 4>, <&clk_gates3 0>;
--
--			clock-output-names =
--				"gate_aclk_lcdc0", "gate_hclk_lcdc0",
--				"gate_hclk_lcdc1", "gate_aclk_lcdc1",
--				"gate_hclk_cif0", "gate_aclk_cif0",
--				"reserved", "reserved",
--				"gate_aclk_ipp", "gate_hclk_ipp",
--				"gate_hclk_rga", "gate_aclk_rga",
--				"gate_hclk_vio_bus", "gate_aclk_vio0";
--
--			#clock-cells = <1>;
--		};
--
--		clk_gates7: gate-clk at 200000ec {
--			compatible = "rockchip,rk2928-gate-clk";
--			reg = <0x200000ec 0x4>;
--			clocks = <&clk_gates2 2>, <&clk_gates0 4>,
--				 <&clk_gates0 4>, <&dummy>,
--				 <&dummy>, <&clk_gates2 2>,
--				 <&clk_gates2 2>, <&clk_gates0 5>,
--				 <&dummy>, <&clk_gates0 5>,
--				 <&clk_gates0 5>, <&clk_gates2 3>,
--				 <&clk_gates2 3>, <&clk_gates2 3>,
--				 <&clk_gates2 3>, <&clk_gates2 3>;
--
--			clock-output-names =
--				"gate_hclk_emac", "gate_hclk_spdif",
--				"gate_hclk_i2s0_2ch", "gate_hclk_otg1",
--				"gate_hclk_hsic", "gate_hclk_hsadc",
--				"gate_hclk_pidf", "gate_pclk_timer0",
--				"reserved", "gate_pclk_timer2",
--				"gate_pclk_pwm01", "gate_pclk_pwm23",
--				"gate_pclk_spi0", "gate_pclk_spi1",
--				"gate_pclk_saradc", "gate_pclk_wdt";
--
--			#clock-cells = <1>;
--		};
--
--		clk_gates8: gate-clk at 200000f0 {
--			compatible = "rockchip,rk2928-gate-clk";
--			reg = <0x200000f0 0x4>;
--			clocks = <&clk_gates0 5>, <&clk_gates0 5>,
--				 <&clk_gates2 3>, <&clk_gates2 3>,
--				 <&clk_gates0 5>, <&clk_gates0 5>,
--				 <&clk_gates2 3>, <&clk_gates2 3>,
--				 <&clk_gates2 3>, <&clk_gates0 5>,
--				 <&clk_gates0 5>, <&clk_gates0 5>,
--				 <&clk_gates2 3>, <&dummy>;
--
--			clock-output-names =
--				"gate_pclk_uart0", "gate_pclk_uart1",
--				"gate_pclk_uart2", "gate_pclk_uart3",
--				"gate_pclk_i2c0", "gate_pclk_i2c1",
--				"gate_pclk_i2c2", "gate_pclk_i2c3",
--				"gate_pclk_i2c4", "gate_pclk_gpio0",
--				"gate_pclk_gpio1", "gate_pclk_gpio2",
--				"gate_pclk_gpio3", "gate_aclk_gps";
--
--			#clock-cells = <1>;
--		};
--
--		clk_gates9: gate-clk at 200000f4 {
--			compatible = "rockchip,rk2928-gate-clk";
--			reg = <0x200000f4 0x4>;
--			clocks = <&dummy>, <&dummy>,
--				 <&dummy>, <&dummy>,
--				 <&dummy>, <&dummy>,
--				 <&dummy>, <&dummy>;
--
--			clock-output-names =
--				"gate_clk_core_dbg", "gate_pclk_dbg",
--				"gate_clk_trace", "gate_atclk",
--				"gate_clk_l2c", "gate_aclk_vio1",
--				"gate_pclk_publ", "gate_aclk_gpu";
--
--			#clock-cells = <1>;
--		};
--	};
--
--};
-diff --git a/arch/arm/boot/dts/rk3188.dtsi b/arch/arm/boot/dts/rk3188.dtsi
-index bf0741a..0db541c 100644
---- a/arch/arm/boot/dts/rk3188.dtsi
-+++ b/arch/arm/boot/dts/rk3188.dtsi
-@@ -17,7 +17,6 @@
- #include <dt-bindings/pinctrl/rockchip.h>
- #include <dt-bindings/clock/rk3188-cru.h>
- #include "rk3xxx.dtsi"
--#include "rk3188-clocks.dtsi"
- 
- / {
- 	compatible = "rockchip,rk3188";
++&i2c1 {
++	status = "okay";
++	clock-frequency = <400000>;
++
++	act8846: act8846 at 5a {
++		compatible = "active-semi,act8846";
++		reg = <0x5a>;
++		status = "okay";
++
++		pinctrl-names = "default";
++		pinctrl-0 = <&act8846_dvs0_ctl>;
++
++		regulators {
++			vcc_ddr: REG1 {
++				regulator-name = "VCC_DDR";
++				regulator-min-microvolt = <1200000>;
++				regulator-max-microvolt = <1200000>;
++				regulator-always-on;
++			};
++
++			vdd_log: REG2 {
++				regulator-name = "VDD_LOG";
++				regulator-min-microvolt = <1000000>;
++				regulator-max-microvolt = <1000000>;
++				regulator-always-on;
++			};
++
++			vdd_arm: REG3 {
++				regulator-name = "VDD_ARM";
++				regulator-min-microvolt = <875000>;
++				regulator-max-microvolt = <1300000>;
++				regulator-always-on;
++			};
++
++			vcc_io: REG4 {
++				regulator-name = "VCC_IO";
++				regulator-min-microvolt = <3300000>;
++				regulator-max-microvolt = <3300000>;
++				regulator-always-on;
++			};
++
++			vdd_10: REG5 {
++				regulator-name = "VDD_10";
++				regulator-min-microvolt = <1000000>;
++				regulator-max-microvolt = <1000000>;
++				regulator-always-on;
++			};
++
++			vdd_hdmi: REG6 {
++				regulator-name = "VDD_HDMI";
++				regulator-min-microvolt = <2500000>;
++				regulator-max-microvolt = <2500000>;
++				regulator-always-on;
++			};
++
++			vcc18: REG7 {
++				regulator-name = "VCC_18";
++				regulator-min-microvolt = <1800000>;
++				regulator-max-microvolt = <1800000>;
++				regulator-always-on;
++			};
++
++			vcca_33: REG8 {
++				regulator-name = "VCCA_33";
++				regulator-min-microvolt = <3300000>;
++				regulator-max-microvolt = <3300000>;
++				regulator-always-on;
++			};
++
++			vcc_rmii: REG9 {
++				regulator-name = "VCC_RMII";
++				regulator-min-microvolt = <3300000>;
++				regulator-max-microvolt = <3300000>;
++				regulator-always-on;
++			};
++
++			vccio_wl: REG10 {
++				regulator-name = "VCCIO_WL";
++				regulator-min-microvolt = <3300000>;
++				regulator-max-microvolt = <3300000>;
++				regulator-always-on;
++			};
++
++			vcc_18: REG11 {
++				regulator-name = "VCC18_IO";
++				regulator-min-microvolt = <1800000>;
++				regulator-max-microvolt = <1800000>;
++				regulator-always-on;
++			};
++
++			vcc28: REG12 {
++				regulator-name = "VCC_28";
++				regulator-min-microvolt = <2800000>;
++				regulator-max-microvolt = <2800000>;
++				regulator-always-on;
++			};
++		};
++	};
++};
++
++&pinctrl {
++	pcfg_output_low: pcfg-output-low {
++		output-low;
++	};
++
++	act8846 {
++		act8846_dvs0_ctl: act8846-dvs0-ctl {
++			rockchip,pins = <RK_GPIO3 27 RK_FUNC_GPIO &pcfg_output_low>;
++		};
++	};
++};
++
+ &uart0 {
+ 	status = "okay";
+ };
 -- 
 2.0.1
