@@ -1,32 +1,31 @@
-From: robert.jarzmik@free.fr (Robert Jarzmik)
-Date: Sat, 26 Jul 2014 23:17:55 +0200
-Subject: [PATCH ] ARM: pxa: fix section mismatch warning for
- pxa_timer_nodt_init
-In-Reply-To: <12220413.BdRleC0Xf5@wuerfel> (Arnd Bergmann's message of "Sat,
- 26 Jul 2014 20:50:36 +0200")
-References: <1405356724-32207-1-git-send-email-robert.jarzmik@free.fr>
- <53CD25A4.7030606@linaro.org> <87oawivarv.fsf@free.fr>
- <12220413.BdRleC0Xf5@wuerfel>
-Message-ID: <871tt7om4c.fsf@free.fr>
+From: robherring2@gmail.com (Rob Herring)
+Date: Sat, 26 Jul 2014 16:20:03 -0500
+Subject: [RESEND][PATCHv2 0/3] Fix for buggy u-boot memory banks
+In-Reply-To: <1405443816-29917-1-git-send-email-lauraa@codeaurora.org>
+References: <1405443816-29917-1-git-send-email-lauraa@codeaurora.org>
+Message-ID: <CAL_JsqJv2_UHxHGFF=nFKQRiEwfFtH_7PhMPS=W=APyzc-yiTQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Arnd Bergmann <arnd@arndb.de> writes:
-
-> commit a38b1f60b5245a3 ("ARM: pxa: Add non device-tree timer link to
-> clocksource") introduced a harmless section mismatch warning for
-> all pxa platforms, by introducing a new pxa_timer_init() function
-> that is not marked __init but that calls pxa_timer_nodt_init(),
-> which is. The function is only called at init time, so it is safe
-> to also annotate it this way.
+On Tue, Jul 15, 2014 at 12:03 PM, Laura Abbott <lauraa@codeaurora.org> wrote:
+> Hi,
 >
-> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+> This is a resend of the series to fix the uboot bug exposed by the removal
+> of meminfo. I haven't gotten any acks though.
 
-Indeed.
+Is the bug with ATAGs that get converted to DT in the decompressor or
+u-boot puts the wrong info in DT directly?
 
-Acked-by: Robert Jarzmik <robert.jarzmik@free.fr>
+Rob
 
-Cheers.
-
---
-Robert
+>
+> Please help with review/acks. Grant/Rob, I'd still like this to go through
+> the devicetree tree if possible.
+>
+> Thanks,
+> Laura
+>
+> --
+> The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
+> hosted by The Linux Foundation
+>
