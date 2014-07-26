@@ -1,34 +1,45 @@
-From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
-Date: Sun, 27 Jul 2014 00:06:56 +0400
-Subject: [PATCH] ARM: at91/dt: sam9x5: fix ADC compatible string
-In-Reply-To: <1406038067-14697-1-git-send-email-alexandre.belloni@free-electrons.com>
-References: <1406038067-14697-1-git-send-email-alexandre.belloni@free-electrons.com>
-Message-ID: <53D40A60.2060100@cogentembedded.com>
+From: gregkh@linuxfoundation.org (Greg Kroah-Hartman)
+Date: Sat, 26 Jul 2014 13:11:50 -0700
+Subject: [PATCH 4/5] [SCSI] Do not use platform_bus as a parent
+In-Reply-To: <1406299616.1789.13.camel@jarvis.lan>
+References: <1406298233-27876-1-git-send-email-pawel.moll@arm.com>
+ <1406298233-27876-4-git-send-email-pawel.moll@arm.com>
+ <1406299616.1789.13.camel@jarvis.lan>
+Message-ID: <20140726201150.GA21870@kroah.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello.
+On Fri, Jul 25, 2014 at 07:46:56AM -0700, James Bottomley wrote:
+> On Fri, 2014-07-25 at 15:23 +0100, Pawel Moll wrote:
+> > The host devices without a parent were "forcefully adopted"
+> > by platform bus. This patch removes this assignment. In
+> > effect the dev_dev may be NULL now, which means ISA.
+> > 
+> > Cc: James E.J. Bottomley <JBottomley@parallels.com>
+> > Cc: linux-scsi at vger.kernel.org
+> > Signed-off-by: Pawel Moll <pawel.moll@arm.com>
+> > ---
+> > 
+> > This patch is a part of effort to remove references to platform_bus
+> > and make it static.
+> > 
+> > James, could you please have a look and advice if the change is
+> > correct? Would you happen to know the "real reasons" behind
+> > using the root platform_bus device a parent?
+> 
+> Yes, for DMA purposes, the parent cannot now be NULL; we'll get a panic
+> in the DMA transfers if it is.  A lot of the legacy ISA device on x86
+> and I thought some ARM SOC devices don't pass in the parent device, so
+> we hang them off a known parent.
 
-On 07/22/2014 06:07 PM, Alexandre Belloni wrote:
+The "generic" platform bus device is not a "known parent".  I don't
+understand the difference between just setting the parent to be NULL,
+which will then have a "proper" parent pointer filled in by the driver
+core when the device is registered, or faking it out here.  What is the
+difference?
 
-> Use the correct compatible string for the ADC of the at91sam9x5 family of SoCs.
+In the end, the device always ends up with a parent pointer, right?
 
-> Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
-> ---
->   arch/arm/boot/dts/at91sam9x5.dtsi | 2 +-
->   1 file changed, 1 insertion(+), 1 deletion(-)
+thanks,
 
-> diff --git a/arch/arm/boot/dts/at91sam9x5.dtsi b/arch/arm/boot/dts/at91sam9x5.dtsi
-> index 2c0d6ea3ab41..5d7cf394f537 100644
-> --- a/arch/arm/boot/dts/at91sam9x5.dtsi
-> +++ b/arch/arm/boot/dts/at91sam9x5.dtsi
-> @@ -964,7 +964,7 @@
->   			adc0: adc at f804c000 {
->   				#address-cells = <1>;
->   				#size-cells = <0>;
-> -				compatible = "atmel,at91sam9260-adc";
-> +				compatible = "atmel,at91sam9x5-adc";
-
-    Actually, wildcards are not allowed in the "compatible" prop.
-
-WBR, Sergei
+greg k-h
