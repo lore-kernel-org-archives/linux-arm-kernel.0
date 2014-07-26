@@ -1,344 +1,112 @@
 From: andrew@lunn.ch (Andrew Lunn)
-Date: Sat, 26 Jul 2014 19:26:14 +0200
-Subject: [PATCH 2/2] ARM: mvebu: Added dts defintion for Lenovo Iomega
- ix4-300d NAS
-In-Reply-To: <1406155973-13657-1-git-send-email-yahoo@perenite.com>
-References: <1406155973-13657-1-git-send-email-yahoo@perenite.com>
-Message-ID: <20140726172614.GA29849@lunn.ch>
+Date: Sat, 26 Jul 2014 19:45:06 +0200
+Subject: [PATCH] fix for certain sequnce of request_irq can cause irq storm
+In-Reply-To: <20140726155659.GA22977@fifteen>
+References: <20140726155659.GA22977@fifteen>
+Message-ID: <20140726174506.GB29849@lunn.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jul 23, 2014 at 03:52:53PM -0700, Benoit Masson wrote:
-> The Lenovo Iomega ix4-300d is a 4-Bay sata NAS with dual Gb,
->  USB2.0 & 3.0, powered by a Marvell Armada XP MV78230 dual core CPU.
+On Sat, Jul 26, 2014 at 07:56:59PM +0400, Evgeniy Dushistov wrote:
+> The problem is that hardware handled by arm/plat-orion/gpio.c,
+> require ack for edge irq, and no ack for level irq.
+> 
+> The code handle this issue, by two "struct irq_chip_type" per
+> one "struct irq_chip_generic". For one "struct irq_chip_generic"
+> irq_ack pointer is setted, for another it is NULL.
+> 
+> But we have only one mask_cache per two "struct irq_chip_type".
+> So if we 
+> 1)unmask interrupt A for "edge type" trigger,
+> 2)unmask interrupt B for "level type" trigger,
+> 3)unmask interrupt C for "edge type",
+> 
+> we, because of usage of generic irq_gc_mask_clr_bit/irq_gc_mask_set_bit,
+> have hardware configured to trigger interrupt B on "edge type",
+> because of shared mask_cache. But kernel think that B is "level type",
+> so when interrupt B occur via "edge" reason, we don't ack it,
+> and B triggered again and again.
 
-Hi Benoit
+Hi Evgeniy
 
-Please could you change the i2c compatible string, and retest
-including the two patches i just sent.
-
-Once that is done, i think your patch is ready for acceptance. It is
-however a bit late for this cycle, so i guess Jason will keep hold of
-it until the next cycle.
+Did you look at the way gpio-mvebu.c handles this? It is a little bit
+different from your solution. I'm wondering if gpio-mvebu.c is just
+different, or wrong? It does seem to be using one mask_cache for both
+edge and level trigger.
 
 Thanks
 	Andrew
 
 
 > 
-> http://shop.lenovo.com/fr/fr/servers/network-storage/lenovoemc/ix4-300d/
-> Signed-off-by: Benoit Masson <yahoo@perenite.com>
+> Signed-off-by: Evgeniy A. Dushistov <dushistov@mail.ru>
 > ---
->  arch/arm/boot/dts/Makefile                      |   3 +-
->  arch/arm/boot/dts/armada-xp-lenovo-ix4-300d.dts | 284 ++++++++++++++++++++++++
->  2 files changed, 286 insertions(+), 1 deletion(-)
->  create mode 100644 arch/arm/boot/dts/armada-xp-lenovo-ix4-300d.dts
+>  arch/arm/plat-orion/gpio.c | 36 ++++++++++++++++++++++++++++++++----
+>  1 file changed, 32 insertions(+), 4 deletions(-)
 > 
-> diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
-> index adb5ed9..4429495 100644
-> --- a/arch/arm/boot/dts/Makefile
-> +++ b/arch/arm/boot/dts/Makefile
-> @@ -437,8 +437,9 @@ dtb-$(CONFIG_MACH_ARMADA_XP) += \
->  	armada-xp-axpwifiap.dtb \
->  	armada-xp-db.dtb \
->  	armada-xp-gp.dtb \
-> -	armada-xp-netgear-rn2120.dtb \
-> +	armada-xp-lenovo-ix4-300d.dtb \
->  	armada-xp-matrix.dtb \
-> +	armada-xp-netgear-rn2120.dtb \
->  	armada-xp-openblocks-ax3-4.dtb
->  dtb-$(CONFIG_MACH_DOVE) += dove-cm-a510.dtb \
->  	dove-cubox.dtb \
-> diff --git a/arch/arm/boot/dts/armada-xp-lenovo-ix4-300d.dts b/arch/arm/boot/dts/armada-xp-lenovo-ix4-300d.dts
-> new file mode 100644
-> index 0000000..1f33cbc
-> --- /dev/null
-> +++ b/arch/arm/boot/dts/armada-xp-lenovo-ix4-300d.dts
-> @@ -0,0 +1,284 @@
-> +/*
-> + * Device Tree file for Lenovo Iomega ix4-300d
-> + *
-> + * Copyright (C) 2014, Benoit Masson <yahoo@perenite.com>
-> + *
-> + * This program is free software; you can redistribute it and/or
-> + * modify it under the terms of the GNU General Public License
-> + * as published by the Free Software Foundation; either version
-> + * 2 of the License, or (at your option) any later version.
-> + */
+> diff --git a/arch/arm/plat-orion/gpio.c b/arch/arm/plat-orion/gpio.c
+> index b61a3bc..e048f61 100644
+> --- a/arch/arm/plat-orion/gpio.c
+> +++ b/arch/arm/plat-orion/gpio.c
+> @@ -497,6 +497,34 @@ static void orion_gpio_dbg_show(struct seq_file *s, struct gpio_chip *chip)
+>  #define orion_gpio_dbg_show NULL
+>  #endif
+>  
+> +static void orion_gpio_unmask_irq(struct irq_data *d)
+> +{
+> +	struct irq_chip_generic *gc = irq_data_get_irq_chip_data(d);
+> +	struct irq_chip_type *ct = irq_data_get_chip_type(d);
+> +	u32 reg_val;
+> +	u32 mask = d->mask;
 > +
-> +/dts-v1/;
+> +	irq_gc_lock(gc);
+> +	reg_val = irq_reg_readl(gc->reg_base + ct->regs.mask);
+> +	reg_val |= mask;
+> +	irq_reg_writel(reg_val, gc->reg_base + ct->regs.mask);
+> +	irq_gc_unlock(gc);
+> +}
 > +
-> +#include <dt-bindings/input/input.h>
-> +#include <dt-bindings/gpio/gpio.h>
-> +#include "armada-xp-mv78230.dtsi"
+> +static void orion_gpio_mask_irq(struct irq_data *d)
+> +{
+> +	struct irq_chip_generic *gc = irq_data_get_irq_chip_data(d);
+> +	struct irq_chip_type *ct = irq_data_get_chip_type(d);
+> +	u32 mask = d->mask;
+> +	u32 reg_val;
 > +
-> +/ {
-> +	model = "Lenovo Iomega ix4-300d";
-> +	compatible = "lenovo,ix4-300d", "marvell,armadaxp-mv78230",
-> +		     "marvell,armadaxp", "marvell,armada-370-xp";
+> +	irq_gc_lock(gc);
+> +	reg_val = irq_reg_readl(gc->reg_base + ct->regs.mask);
+> +	reg_val &= ~mask;
+> +	irq_reg_writel(reg_val, gc->reg_base + ct->regs.mask);
+> +	irq_gc_unlock(gc);
+> +}
 > +
-> +	chosen {
-> +		bootargs = "console=ttyS0,115200 earlyprintk";
-> +		stdout-path = "/soc/internal-regs/serial at 12000";
-> +	};
-> +
-> +	memory {
-> +		device_type = "memory";
-> +		reg = <0 0x00000000 0 0x20000000>; /* 512MB */
-> +	};
-> +
-> +	soc {
-> +		ranges = <MBUS_ID(0xf0, 0x01) 0 0 0xd0000000 0x100000
-> +			MBUS_ID(0x01, 0x1d) 0 0 0xfff00000 0x100000>;
-> +
-> +		pcie-controller {
-> +			status = "okay";
-> +
-> +			/* Quad port sata: Marvell 88SX7042 */
-> +			pcie at 1,0 {
-> +				/* Port 0, Lane 0 */
-> +				status = "okay";
-> +			};
-> +
-> +			/* USB 3.0 xHCI controller: NEC D720200F1 */
-> +			pcie at 5,0 {
-> +				/* Port 1, Lane 0 */
-> +				status = "okay";
-> +			};
-> +		};
-> +
-> +		internal-regs {
-> +			pinctrl {
-> +				poweroff_pin: poweroff-pin {
-> +					marvell,pins = "mpp24";
-> +					marvell,function = "gpio";
-> +				};
-> +
-> +				power_button_pin: power-button-pin {
-> +					marvell,pins = "mpp44";
-> +					marvell,function = "gpio";
-> +				};
-> +
-> +				reset_button_pin: reset-button-pin {
-> +					marvell,pins = "mpp45";
-> +					marvell,function = "gpio";
-> +				};
-> +				select_button_pin: select-button-pin {
-> +					marvell,pins = "mpp41";
-> +					marvell,function = "gpio";
-> +				};
-> +
-> +				scroll_button_pin: scroll-button-pin {
-> +					marvell,pins = "mpp42";
-> +					marvell,function = "gpio";
-> +				};
-> +
-> +				hdd_led_pin: hdd-led-pin {
-> +					marvell,pins = "mpp26";
-> +					marvell,function = "gpio";
-> +				};
-> +			};
-> +
-> +			serial at 12000 {
-> +				status = "okay";
-> +			};
-> +
-> +			mdio {
-> +				phy0: ethernet-phy at 0 { /* Marvell 88E1318 */
-> +					reg = <0>;
-> +				};
-> +
-> +				phy1: ethernet-phy at 1 { /* Marvell 88E1318 */
-> +					reg = <1>;
-> +				};
-> +			};
-> +
-> +			ethernet at 70000 {
-> +				status = "okay";
-> +				phy = <&phy0>;
-> +				phy-mode = "rgmii-id";
-> +			};
-> +
-> +			ethernet at 74000 {
-> +				status = "okay";
-> +				phy = <&phy1>;
-> +				phy-mode = "rgmii-id";
-> +			};
-> +
-> +			usb at 50000 {
-> +				status = "okay";
-> +			};
-> +
-> +			usb at 51000 {
-> +				status = "okay";
-> +			};
-> +
-> +			i2c at 11000 {
-> +				compatible = "marvell,mv78230-a0-i2c",
-> +					"marvell,mv64xxx-i2c";
-> +				clock-frequency = <400000>;
-> +				status = "okay";
-> +
-> +				adt7473 at 2e {
-> +					compatible = "adi,adt7473";
-> +					reg = <0x2e>;
-> +				};
-> +
-> +				pcf8563 at 51 {
-> +					compatible = "nxp,pcf8563";
-> +					reg = <0x51>;
-> +				};
-> +
-> +			};
-> +
-> +			nand at d0000 {
-> +				status = "okay";
-> +				num-cs = <1>;
-> +				marvell,nand-keep-config;
-> +				marvell,nand-enable-arbiter;
-> +				nand-on-flash-bbt;
-> +
-> +				partition at 0 {
-> +					label = "u-boot";
-> +					reg = <0x0000000 0xe0000>;
-> +					read-only;
-> +				};
-> +
-> +				partition at e0000 {
-> +					label = "u-boot-env";
-> +					reg = <0xe0000 0x20000>;
-> +					read-only;
-> +				};
-> +
-> +				partition at 100000 {
-> +					label = "u-boot-env2";
-> +					reg = <0x100000 0x20000>;
-> +					read-only;
-> +				};
-> +
-> +				partition at 120000 {
-> +					label = "zImage";
-> +					reg = <0x120000 0x400000>;
-> +				};
-> +
-> +				partition at 520000 {
-> +					label = "initrd";
-> +					reg = <0x520000 0x400000>;
-> +				};
-> +
-> +				partition at xE00000 {
-> +					label = "boot";
-> +					reg = <0xE00000 0x3F200000>;
-> +				};
-> +
-> +				partition at flash {
-> +					label = "flash";
-> +					reg = <0x0 0x40000000>;
-> +				};
-> +			};
-> +		};
-> +	};
-> +
-> +	gpio-keys {
-> +		compatible = "gpio-keys";
-> +		pinctrl-0 = <&power_button_pin &reset_button_pin
-> +			&select_button_pin &scroll_button_pin>;
-> +		pinctrl-names = "default";
-> +
-> +		power-button {
-> +			label = "Power Button";
-> +			linux,code = <KEY_POWER>;
-> +			gpios = <&gpio1 12 GPIO_ACTIVE_HIGH>;
-> +		};
-> +
-> +		reset-button {
-> +			label = "Reset Button";
-> +			linux,code = <KEY_RESTART>;
-> +			gpios = <&gpio1 13 GPIO_ACTIVE_LOW>;
-> +		};
-> +
-> +		select-button {
-> +			label = "Select Button";
-> +			linux,code = <BTN_SELECT>;
-> +			gpios = <&gpio1 9 GPIO_ACTIVE_LOW>;
-> +		};
-> +
-> +		scroll-button {
-> +			label = "Scroll Button";
-> +			linux,code = <KEY_SCROLLDOWN>;
-> +			gpios = <&gpio1 10 GPIO_ACTIVE_LOW>;
-> +		};
-> +	};
-> +
-> +	spi3 {
-> +		compatible = "spi-gpio";
-> +		status = "okay";
-> +		gpio-sck = <&gpio0 25 0>;
-> +		gpio-mosi = <&gpio1 15 0>; /*gpio 47*/
-> +		cs-gpios = <&gpio0 27 0 >;
-> +		num-chipselects = <1>;
-> +		#address-cells = <1>;
-> +		#size-cells = <0>;
-> +
-> +		gpio2: gpio2 at 0 {
-> +			compatible = "fairchild,74hc595";
-> +			gpio-controller;
-> +			#gpio-cells = <2>;
-> +			reg = <0>;
-> +			registers-number = <2>;
-> +			spi-max-frequency = <100000>;
-> +		};
-> +	};
-> +
-> +	gpio-leds {
-> +		compatible = "gpio-leds";
-> +		pinctrl-0 = <&hdd_led_pin>;
-> +		pinctrl-names = "default";
-> +
-> +		hdd-led {
-> +			label = "ix4-300d:hdd:blue";
-> +			gpios = <&gpio0 26 GPIO_ACTIVE_HIGH>;
-> +			default-state = "off";
-> +		};
-> +
-> +		power-led {
-> +			label = "ix4-300d:power:white";
-> +			gpios = <&gpio2 1 GPIO_ACTIVE_LOW>;
-> +			/* init blinking while booting */
-> +			linux,default-trigger = "timer";
-> +			default-state = "on";
-> +		};
-> +
-> +		sysfail-led {
-> +			label = "ix4-300d:sysfail:red";
-> +			gpios = <&gpio2 2 GPIO_ACTIVE_HIGH>;
-> +			default-state = "off";
-> +		};
-> +
-> +		sys-led {
-> +			label = "ix4-300d:sys:blue";
-> +			gpios = <&gpio2 3 GPIO_ACTIVE_HIGH>;
-> +			default-state = "off";
-> +		};
-> +
-> +		hddfail-led {
-> +			label = "ix4-300d:hddfail:red";
-> +			gpios = <&gpio2 4 GPIO_ACTIVE_HIGH>;
-> +			default-state = "off";
-> +		};
-> +
-> +	};
-> +
-> +	/* Warning: you need both eth1 & 0 PHY initialized
-> +		(i.e having them up does the tweak)
-> +		for poweroff to shutdown otherwise it reboots */
-> +	gpio-poweroff {
-> +		compatible = "gpio-poweroff";
-> +		pinctrl-0 = <&poweroff_pin>;
-> +		pinctrl-names = "default";
-> +		gpios = <&gpio0 24 GPIO_ACTIVE_HIGH>;
-> +	};
-> +};
+>  void __init orion_gpio_init(struct device_node *np,
+>  			    int gpio_base, int ngpio,
+>  			    void __iomem *base, int mask_offset,
+> @@ -565,8 +593,8 @@ void __init orion_gpio_init(struct device_node *np,
+>  	ct = gc->chip_types;
+>  	ct->regs.mask = ochip->mask_offset + GPIO_LEVEL_MASK_OFF;
+>  	ct->type = IRQ_TYPE_LEVEL_HIGH | IRQ_TYPE_LEVEL_LOW;
+> -	ct->chip.irq_mask = irq_gc_mask_clr_bit;
+> -	ct->chip.irq_unmask = irq_gc_mask_set_bit;
+> +	ct->chip.irq_mask = orion_gpio_mask_irq;
+> +	ct->chip.irq_unmask = orion_gpio_unmask_irq;
+>  	ct->chip.irq_set_type = gpio_irq_set_type;
+>  	ct->chip.name = ochip->chip.label;
+>  
+> @@ -575,8 +603,8 @@ void __init orion_gpio_init(struct device_node *np,
+>  	ct->regs.ack = GPIO_EDGE_CAUSE_OFF;
+>  	ct->type = IRQ_TYPE_EDGE_RISING | IRQ_TYPE_EDGE_FALLING;
+>  	ct->chip.irq_ack = irq_gc_ack_clr_bit;
+> -	ct->chip.irq_mask = irq_gc_mask_clr_bit;
+> -	ct->chip.irq_unmask = irq_gc_mask_set_bit;
+> +	ct->chip.irq_mask = orion_gpio_mask_irq;
+> +	ct->chip.irq_unmask = orion_gpio_unmask_irq;
+>  	ct->chip.irq_set_type = gpio_irq_set_type;
+>  	ct->handler = handle_edge_irq;
+>  	ct->chip.name = ochip->chip.label;
 > -- 
-> 1.9.1
+> 1.8.5.5
 > 
+> -- 
+> /Evgeniy
