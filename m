@@ -1,24 +1,76 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Sat, 26 Jul 2014 12:33:48 +0200
-Subject: [GIT PULL][for 3.17] pull request for adding Hisilicon SoC
- MAINTAINERS
-In-Reply-To: <53D1F235.2080607@hisilicon.com>
-References: <53D1F235.2080607@hisilicon.com>
-Message-ID: <6537586.3oPDKE8ex5@wuerfel>
+From: stefan@agner.ch (Stefan Agner)
+Date: Sat, 26 Jul 2014 14:08:38 +0200
+Subject: =?UTF-8?Q?fsl=5Flpuart/VF=36=31=30=3A=20Division=20by=20zero?=
+ =?UTF-8?Q?=2E?=
+In-Reply-To: <87d2ct6p77.fsf@nbsps.com>
+References: <87ha256q8l.fsf@nbsps.com> <87d2ct6p77.fsf@nbsps.com>
+Message-ID: <1aa4c71fa7441f217f33e7be9a8fa1b9@agner.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday 25 July 2014 13:59:17 xuwei wrote:
-> Hi Olof, Hi Kevin, Hi Arnd,
+Hi Bill,
+
+Am 2014-07-26 00:36, schrieb Bill Pringlemeir:
+> On 25 Jul 2014, bpringlemeir at nbsps.com wrote:
 > 
-> Resend it again and add arm at kernel.org into the CC list.
-> Please help to merge pull request for adding Hisilicon SoC maintainer. 
-> 
+>> I have this 'dmesg' with ttyLP1,
+>>
+>> Division by zero in kernel.  CPU: 0 PID: 187 Comm: getty Not tainted
+>> 3.15.0-rc8-04600-ge74a685-dirty #465 [<80013b18>] (unwind_backtrace)
+>> from [<80011e3c>] (show_stack+0x10/0x14) [<80011e3c>] (show_stack)
+>> from [<8019a11c>] (Ldiv0+0x8/0x10) [<8019a11c>] (Ldiv0) from
+>> [<801f0ad4>] (lpuart_startup+0x1e4/0x398) [<801f0ad4>]
+>> (lpuart_startup) from [<801ef2e8>] (uart_startup.part.18+0x84/0x1e8)
+>> [<801ef2e8>] (uart_startup.part.18) from [<801efd40>]
+>> (uart_open+0xe4/0x14c) [<801efd40>] (uart_open) from [<801d586c>]
+>> (tty_open+0x1a0/0x5d0) [<801d586c>] (tty_open) from [<800a1008>]
+>> (chrdev_open+0x9c/0x160) [<800a1008>] (chrdev_open) from [<8009bd0c>]
+>> (do_dentry_open.isra.15+0x1b4/0x270) [<8009bd0c>]
+>> (do_dentry_open.isra.15) from [<8009be98>] (finish_open+0x20/0x3c)
+>> [<8009be98>] (finish_open) from [<800a8bfc>]
+>> (do_last.isra.66+0x404/0xc60) [<800a8bfc>] (do_last.isra.66) from
+>> [<800a950c>] (path_openat+0xb4/0x5b0) [<800a950c>] (path_openat) from
+>> [<800aa900>] (do_filp_open+0x2c/0x80) [<800aa900>] (do_filp_open) from
+>> [<8009ce50>] (do_sys_open+0x120/0x1e0) [<8009ce50>] (do_sys_open) from
+>> [<8000ed80>] (ret_fast_syscall+0x0/0x30) random: nonblocking pool is
+>> initialized
+>>
+>> I looked at the vmlinux objdump and it is here,
+>>
+>> static int lpuart_dma_rx_request(struct uart_port *port)
+>> {
+>> ...
+>> 	sport->dma_rx_timeout = (sport->port.timeout - HZ / 50) *
+>> 				FSL_UART_RX_DMA_BUFFER_SIZE * 3 /
+>> 				sport->rxfifo_size / 2;
+>>
+>> The variable 'sport->rxfifo_size' is set in lpuart_setup_watermark()
+>> and this is called after lpuart_dma_rx_request() in lpuart_startup().
 
-Merged into next/soc, thanks!
+I observed this division by zero too, I recently sent a patch for that.
+http://lists.infradead.org/pipermail/linux-arm-kernel/2014-July/268772.html
 
-I think Olof's previous comment was that this didn't need to be
-a separate pull request but could just be part of the "pull
-request for hisilicon soc".
+Greg already added that to his tty-next tree:
+https://git.kernel.org/cgit/linux/kernel/git/gregkh/tty.git/tree/drivers/tty/serial/fsl_lpuart.c?h=tty-next#n1309
 
-	Arnd
+I also observed that DMA did not work yet, hence I a created a second
+patch:
+http://lists.infradead.org/pipermail/linux-arm-kernel/2014-July/268773.html
+
+But eDMA in general was broken too,  this patch solved that, hence you
+might want apply that patch too:
+http://lists.infradead.org/pipermail/linux-arm-kernel/2014-July/268199.html
+
+All patches are lined up for 3.17, so things should be smooth from that
+release on.
+
+In my last tests the driver worked more or less reliable, as is, however
+I think the RX path still has some problems regarding DMA: The function
+lpuart_dma_rx_complete never gets called, 
+lpuart_timer_func receives the data later on. When setting
+FSL_UART_RX_DMA_BUFFER_SIZE to 16 bytes (for UART0),
+lpuart_dma_rx_complete was called, but then receive did not work
+reliable anymore. I had not yet the time to investigate this further.
+
+--
+Stefan
