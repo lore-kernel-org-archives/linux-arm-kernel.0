@@ -1,42 +1,35 @@
-From: dushistov@mail.ru (Evgeniy Dushistov)
-Date: Sat, 26 Jul 2014 22:48:53 +0400
-Subject: [PATCH] fix for certain sequnce of request_irq can cause irq storm
-In-Reply-To: <20140726174506.GB29849@lunn.ch>
-References: <20140726155659.GA22977@fifteen> <20140726174506.GB29849@lunn.ch>
-Message-ID: <20140726184853.GA6730@fifteen>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Sat, 26 Jul 2014 20:50:36 +0200
+Subject: [PATCH ] ARM: pxa: fix section mismatch warning for
+ pxa_timer_nodt_init
+In-Reply-To: <87oawivarv.fsf@free.fr>
+References: <1405356724-32207-1-git-send-email-robert.jarzmik@free.fr>
+ <53CD25A4.7030606@linaro.org> <87oawivarv.fsf@free.fr>
+Message-ID: <12220413.BdRleC0Xf5@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Jul 26, 2014 at 07:45:06PM +0200, Andrew Lunn wrote:
-> 
-> Did you look at the way gpio-mvebu.c handles this? It is a little bit
-> different from your solution. I'm wondering if gpio-mvebu.c is just
-> different, or wrong? It does seem to be using one mask_cache for both
-> edge and level trigger.
-> 
+commit a38b1f60b5245a3 ("ARM: pxa: Add non device-tree timer link to
+clocksource") introduced a harmless section mismatch warning for
+all pxa platforms, by introducing a new pxa_timer_init() function
+that is not marked __init but that calls pxa_timer_nodt_init(),
+which is. The function is only called at init time, so it is safe
+to also annotate it this way.
 
-Looks wrong to me. I don't look at irq handling, just unmask.
-Consider the same scenario.
-1)unmask interrupt A for "edge type" trigger
-call mvebu_gpio_edge_irq_unmask and now CPU trigger interrupt A
-if edge changed
+Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+---
+Daniel, please apply on top of Robert's patch series.
 
-2)unmask interupt B for "level type" trigger
-call mvebu_gpio_level_irq_unmask,
-gc->mask_cache have interrupt A,
-so we unmask A and B for "level type" trigger.
-
-So  expected result:
-A edge type interrupt
-B level type iterrupt
-
-Actual result:
-A edge type interrupt
-A and B level type interrupt.
-
-This may cause many funny things,
-for example drivers may works or not works depending
-on loading order.
-
--- 
-/Evgeniy
+diff --git a/arch/arm/mach-pxa/generic.c b/arch/arm/mach-pxa/generic.c
+index 630fa916bbc6..04b013fbc98f 100644
+--- a/arch/arm/mach-pxa/generic.c
++++ b/arch/arm/mach-pxa/generic.c
+@@ -61,7 +61,7 @@ EXPORT_SYMBOL(get_clock_tick_rate);
+ /*
+  * For non device-tree builds, keep legacy timer init
+  */
+-void pxa_timer_init(void)
++void __init pxa_timer_init(void)
+ {
+ 	pxa_timer_nodt_init(IRQ_OST0, io_p2v(0x40a00000),
+ 			    get_clock_tick_rate());
