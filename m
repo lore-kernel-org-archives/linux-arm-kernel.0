@@ -1,125 +1,71 @@
-From: gregkh@linuxfoundation.org (Greg Kroah-Hartman)
-Date: Sat, 26 Jul 2014 12:03:02 -0700
-Subject: [PATCH 3.15 100/109] locking/mutex: Disable optimistic spinning on
- some architectures
-In-Reply-To: <20140726190223.834037485@linuxfoundation.org>
-References: <20140726190223.834037485@linuxfoundation.org>
-Message-ID: <20140726190226.856788942@linuxfoundation.org>
+From: marek.belisko@gmail.com (Belisko Marek)
+Date: Sat, 26 Jul 2014 21:48:38 +0200
+Subject: [PATCH 1/2] mmc: hsmmc: Add reset gpio configuration option.
+In-Reply-To: <20140703230113.GR3705@n2100.arm.linux.org.uk>
+References: <1404420564-30245-1-git-send-email-marek@goldelico.com>
+ <20140703230113.GR3705@n2100.arm.linux.org.uk>
+Message-ID: <CAAfyv34tH-A=9vjis3_y613mNpvGGO2O82M9porWJwms9-PFFQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-3.15-stable review patch.  If anyone has any objections, please let me know.
+Hi Russel,
 
-------------------
+On Fri, Jul 4, 2014 at 1:01 AM, Russell King - ARM Linux
+<linux@arm.linux.org.uk> wrote:
+> On Thu, Jul 03, 2014 at 10:49:23PM +0200, Marek Belisko wrote:
+>> From: NeilBrown <neilb@suse.de>
+>>
+>> If a 'gpio_reset' is specified, then hold it low while
+>> turning the power regulator on.
+>> This is needed for some wi2wi wireless modules, particularly
+>> when the regulator is held active by some other client.
+>> The wi2wi needs to be reset if power isn't actually removed, and
+>> the gpio can be used to do this.
+>>
+>> Signed-off-by: NeilBrown <neilb@suse.de>
+>
+> Obvious statement knowing what's been going on elsewhere...
+>
+> A while back, Olof produced a couple of patches to add /generic/ support
+> to deal with power and reset controls for SDIO WIFI cards.  Patches
+> were posted to linux-arm-kernel and other places around January time
+> this year.
+>
+> No real conclusion came out of it, and it kind of died.  The point here
+> is that this is not an OMAP problem.  We have this very same problem
+> on different platforms and different SoCs.
+Thanks for pointing me to Olof's patches. I pick first + update secod
+for omap_hcmmc.
+I use only card-reset-gios property and it works fine. As you stated
+it's kind of died discussion?
+Sorry for noise and not using more googling on linux-arm ML.
+>
+> Why should we have N different solutions to the same problem.  Why can't
+> we have one solution to fix this issue, rather than having every host
+> driver implement some different solution to what's a common problem.
+>
+> If everyone is going to run away from generic problems and continue
+> inventing their own private solutions to generic problems, the kernel
+> is just going to become severely bloated and unmaintainable...
+>
+> Please, sort out generic problems with generic solutions.
+>
+> --
+> FTTC broadband for 0.8mile line: now at 9.7Mbps down 460kbps up... slowly
+> improving, and getting towards what was expected from it.
 
-From: Peter Zijlstra <peterz@infradead.org>
+BR,
 
-commit 4badad352a6bb202ec68afa7a574c0bb961e5ebc upstream.
+marek
 
-The optimistic spin code assumes regular stores and cmpxchg() play nice;
-this is found to not be true for at least: parisc, sparc32, tile32,
-metag-lock1, arc-!llsc and hexagon.
+-- 
+as simple and primitive as possible
+-------------------------------------------------
+Marek Belisko - OPEN-NANDRA
+Freelance Developer
 
-There is further wreckage, but this in particular seemed easy to
-trigger, so blacklist this.
-
-Opt in for known good archs.
-
-Signed-off-by: Peter Zijlstra <peterz@infradead.org>
-Reported-by: Mikulas Patocka <mpatocka@redhat.com>
-Cc: David Miller <davem@davemloft.net>
-Cc: Chris Metcalf <cmetcalf@tilera.com>
-Cc: James Bottomley <James.Bottomley@hansenpartnership.com>
-Cc: Vineet Gupta <vgupta@synopsys.com>
-Cc: Jason Low <jason.low2@hp.com>
-Cc: Waiman Long <waiman.long@hp.com>
-Cc: "James E.J. Bottomley" <jejb@parisc-linux.org>
-Cc: Paul McKenney <paulmck@linux.vnet.ibm.com>
-Cc: John David Anglin <dave.anglin@bell.net>
-Cc: James Hogan <james.hogan@imgtec.com>
-Cc: Linus Torvalds <torvalds@linux-foundation.org>
-Cc: Davidlohr Bueso <davidlohr@hp.com>
-Cc: Benjamin Herrenschmidt <benh@kernel.crashing.org>
-Cc: Catalin Marinas <catalin.marinas@arm.com>
-Cc: Russell King <linux@arm.linux.org.uk>
-Cc: Will Deacon <will.deacon@arm.com>
-Cc: linux-arm-kernel at lists.infradead.org
-Cc: linux-kernel at vger.kernel.org
-Cc: linuxppc-dev at lists.ozlabs.org
-Cc: sparclinux at vger.kernel.org
-Link: http://lkml.kernel.org/r/20140606175316.GV13930 at laptop.programming.kicks-ass.net
-Signed-off-by: Ingo Molnar <mingo@kernel.org>
-Signed-off-by: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
-
----
- arch/arm/Kconfig     |    1 +
- arch/arm64/Kconfig   |    1 +
- arch/powerpc/Kconfig |    1 +
- arch/sparc/Kconfig   |    1 +
- arch/x86/Kconfig     |    1 +
- kernel/Kconfig.locks |    5 ++++-
- 6 files changed, 9 insertions(+), 1 deletion(-)
-
---- a/arch/arm/Kconfig
-+++ b/arch/arm/Kconfig
-@@ -6,6 +6,7 @@ config ARM
- 	select ARCH_HAS_TICK_BROADCAST if GENERIC_CLOCKEVENTS_BROADCAST
- 	select ARCH_HAVE_CUSTOM_GPIO_H
- 	select ARCH_MIGHT_HAVE_PC_PARPORT
-+	select ARCH_SUPPORTS_ATOMIC_RMW
- 	select ARCH_USE_BUILTIN_BSWAP
- 	select ARCH_USE_CMPXCHG_LOCKREF
- 	select ARCH_WANT_IPC_PARSE_VERSION
---- a/arch/arm64/Kconfig
-+++ b/arch/arm64/Kconfig
-@@ -2,6 +2,7 @@ config ARM64
- 	def_bool y
- 	select ARCH_HAS_ATOMIC64_DEC_IF_POSITIVE
- 	select ARCH_USE_CMPXCHG_LOCKREF
-+	select ARCH_SUPPORTS_ATOMIC_RMW
- 	select ARCH_HAS_TICK_BROADCAST if GENERIC_CLOCKEVENTS_BROADCAST
- 	select ARCH_WANT_OPTIONAL_GPIOLIB
- 	select ARCH_WANT_COMPAT_IPC_PARSE_VERSION
---- a/arch/powerpc/Kconfig
-+++ b/arch/powerpc/Kconfig
-@@ -145,6 +145,7 @@ config PPC
- 	select HAVE_IRQ_EXIT_ON_IRQ_STACK
- 	select ARCH_USE_CMPXCHG_LOCKREF if PPC64
- 	select HAVE_ARCH_AUDITSYSCALL
-+	select ARCH_SUPPORTS_ATOMIC_RMW
- 
- config GENERIC_CSUM
- 	def_bool CPU_LITTLE_ENDIAN
---- a/arch/sparc/Kconfig
-+++ b/arch/sparc/Kconfig
-@@ -78,6 +78,7 @@ config SPARC64
- 	select HAVE_C_RECORDMCOUNT
- 	select NO_BOOTMEM
- 	select HAVE_ARCH_AUDITSYSCALL
-+	select ARCH_SUPPORTS_ATOMIC_RMW
- 
- config ARCH_DEFCONFIG
- 	string
---- a/arch/x86/Kconfig
-+++ b/arch/x86/Kconfig
-@@ -130,6 +130,7 @@ config X86
- 	select HAVE_CC_STACKPROTECTOR
- 	select GENERIC_CPU_AUTOPROBE
- 	select HAVE_ARCH_AUDITSYSCALL
-+	select ARCH_SUPPORTS_ATOMIC_RMW
- 
- config INSTRUCTION_DECODER
- 	def_bool y
---- a/kernel/Kconfig.locks
-+++ b/kernel/Kconfig.locks
-@@ -220,6 +220,9 @@ config INLINE_WRITE_UNLOCK_IRQRESTORE
- 
- endif
- 
-+config ARCH_SUPPORTS_ATOMIC_RMW
-+	bool
-+
- config MUTEX_SPIN_ON_OWNER
- 	def_bool y
--	depends on SMP && !DEBUG_MUTEXES
-+	depends on SMP && !DEBUG_MUTEXES && ARCH_SUPPORTS_ATOMIC_RMW
+Ruska Nova Ves 219 | Presov, 08005 Slovak Republic
+Tel: +421 915 052 184
+skype: marekwhite
+twitter: #opennandra
+web: http://open-nandra.com
