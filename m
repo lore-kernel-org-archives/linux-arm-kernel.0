@@ -1,22 +1,55 @@
 From: andrew@lunn.ch (Andrew Lunn)
-Date: Sat, 26 Jul 2014 19:20:36 +0200
-Subject: [Patch V2 0/2] Generalize use of i2c quirk for Armada XP
-Message-ID: <1406395238-29758-1-git-send-email-andrew@lunn.ch>
+Date: Sat, 26 Jul 2014 19:20:37 +0200
+Subject: [Patch V2 1/2] ARM: mvebu: armada xp: Generalize use of i2c quirk
+In-Reply-To: <1406395238-29758-1-git-send-email-andrew@lunn.ch>
+References: <1406395238-29758-1-git-send-email-andrew@lunn.ch>
+Message-ID: <1406395238-29758-2-git-send-email-andrew@lunn.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-As requested by Arnd, a second patch now removes the documentation of
-the -a0 compatibility string.
+A second product has come to light which makes use of the A0 stepping
+of the Armada XP SoC. A0 stepping has a hardware bug in the i2c core
+meaning that hardware offload does not work, resulting in the kernel
+failing to boot. The quirk detects that the kernel is running on an A0
+stepping SoC and disables the use of hardware offload.
 
-Acked-by's have been added to the first patch, and a minor nit fixed.
+Currently the quirk is only enabled for PlatHome Openblocks AX3. The
+AX3 has been produced with both A0 and B0 stepping SoCs. The second
+product is the Lenovo Iomega IX4-300d. It seems likely that this
+device will also swap from A0 to B0 SoC sometime during its life.
 
-Andrew Lunn (2):
-  ARM: mvebu: armada xp: Generalize use of i2c quirk
-  i2c: mv64xxx: Remove internal compatible string from Documentation
+If there are two products using A0, it seems likely there are more
+products with A0. Also, since the number of A0 SoCs is limited, these
+products are also likely to transition to B0. Hence detecting at run
+time is the safest option. So enable the quirk for all Armada XP
+boards.
 
- Documentation/devicetree/bindings/i2c/i2c-mv64xxx.txt | 5 -----
- arch/arm/mach-mvebu/board-v7.c                        | 2 +-
- 2 files changed, 1 insertion(+), 6 deletions(-)
+Tested on an AX3 with A0 stepping.
 
+Signed-off-by: Andrew Lunn <andrew@lunn.ch>
+Acked-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
+Acked-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
+---
+
+V2:
+Added two Acked-by:
+s/B1/B0
+---
+ arch/arm/mach-mvebu/board-v7.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/arch/arm/mach-mvebu/board-v7.c b/arch/arm/mach-mvebu/board-v7.c
+index 8bb742fdf5ca..be080cff98d2 100644
+--- a/arch/arm/mach-mvebu/board-v7.c
++++ b/arch/arm/mach-mvebu/board-v7.c
+@@ -167,7 +167,7 @@ static void __init thermal_quirk(void)
+ 
+ static void __init mvebu_dt_init(void)
+ {
+-	if (of_machine_is_compatible("plathome,openblocks-ax3-4"))
++	if (of_machine_is_compatible("marvell,armadaxp"))
+ 		i2c_quirk();
+ 	if (of_machine_is_compatible("marvell,a375-db"))
+ 		thermal_quirk();
 -- 
 2.0.1
