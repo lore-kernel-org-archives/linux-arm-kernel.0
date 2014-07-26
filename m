@@ -1,125 +1,35 @@
-From: gregkh@linuxfoundation.org (Greg Kroah-Hartman)
-Date: Sat, 26 Jul 2014 12:02:47 -0700
-Subject: [PATCH 3.10 54/56] locking/mutex: Disable optimistic spinning on some
- architectures
-In-Reply-To: <20140726190200.061512159@linuxfoundation.org>
-References: <20140726190200.061512159@linuxfoundation.org>
-Message-ID: <20140726190201.843883600@linuxfoundation.org>
+From: afaerber@suse.de (=?ISO-8859-15?Q?Andreas_F=E4rber?=)
+Date: Sat, 26 Jul 2014 21:03:56 +0200
+Subject: [RESEND][PATCHv2 0/3] Fix for buggy u-boot memory banks
+In-Reply-To: <1405443816-29917-1-git-send-email-lauraa@codeaurora.org>
+References: <1405443816-29917-1-git-send-email-lauraa@codeaurora.org>
+Message-ID: <53D3FB9C.9080908@suse.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-3.10-stable review patch.  If anyone has any objections, please let me know.
+Hi Laura,
 
-------------------
+Am 15.07.2014 19:03, schrieb Laura Abbott:
+> This is a resend of the series to fix the uboot bug exposed by the removal
+> of meminfo. I haven't gotten any acks though.
+> 
+> Please help with review/acks. Grant/Rob, I'd still like this to go through
+> the devicetree tree if possible.
 
-From: Peter Zijlstra <peterz@infradead.org>
+Sorry for the delay in testing.
 
-commit 4badad352a6bb202ec68afa7a574c0bb961e5ebc upstream.
+With this v2 applied on top of kgene's for-next branch (plus
+https://patchwork.kernel.org/patch/4297431/ as build fix) I get:
 
-The optimistic spin code assumes regular stores and cmpxchg() play nice;
-this is found to not be true for at least: parisc, sparc32, tile32,
-metag-lock1, arc-!llsc and hexagon.
+[    9.699985] Unhandled fault: asynchronous external abort (0x211) at
+0x00000000
 
-There is further wreckage, but this in particular seemed easy to
-trigger, so blacklist this.
+Same for v1 that had worked okay before, so it's not your series, but it
+may explain why you haven't heard on v2 from the others yet.
 
-Opt in for known good archs.
+Regards,
+Andreas
 
-Signed-off-by: Peter Zijlstra <peterz@infradead.org>
-Reported-by: Mikulas Patocka <mpatocka@redhat.com>
-Cc: David Miller <davem@davemloft.net>
-Cc: Chris Metcalf <cmetcalf@tilera.com>
-Cc: James Bottomley <James.Bottomley@hansenpartnership.com>
-Cc: Vineet Gupta <vgupta@synopsys.com>
-Cc: Jason Low <jason.low2@hp.com>
-Cc: Waiman Long <waiman.long@hp.com>
-Cc: "James E.J. Bottomley" <jejb@parisc-linux.org>
-Cc: Paul McKenney <paulmck@linux.vnet.ibm.com>
-Cc: John David Anglin <dave.anglin@bell.net>
-Cc: James Hogan <james.hogan@imgtec.com>
-Cc: Linus Torvalds <torvalds@linux-foundation.org>
-Cc: Davidlohr Bueso <davidlohr@hp.com>
-Cc: Benjamin Herrenschmidt <benh@kernel.crashing.org>
-Cc: Catalin Marinas <catalin.marinas@arm.com>
-Cc: Russell King <linux@arm.linux.org.uk>
-Cc: Will Deacon <will.deacon@arm.com>
-Cc: linux-arm-kernel at lists.infradead.org
-Cc: linux-kernel at vger.kernel.org
-Cc: linuxppc-dev at lists.ozlabs.org
-Cc: sparclinux at vger.kernel.org
-Link: http://lkml.kernel.org/r/20140606175316.GV13930 at laptop.programming.kicks-ass.net
-Signed-off-by: Ingo Molnar <mingo@kernel.org>
-Signed-off-by: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
-
----
- arch/arm/Kconfig     |    1 +
- arch/arm64/Kconfig   |    1 +
- arch/powerpc/Kconfig |    1 +
- arch/sparc/Kconfig   |    1 +
- arch/x86/Kconfig     |    1 +
- kernel/Kconfig.locks |    5 ++++-
- 6 files changed, 9 insertions(+), 1 deletion(-)
-
---- a/arch/arm/Kconfig
-+++ b/arch/arm/Kconfig
-@@ -4,6 +4,7 @@ config ARM
- 	select ARCH_BINFMT_ELF_RANDOMIZE_PIE
- 	select ARCH_HAS_ATOMIC64_DEC_IF_POSITIVE
- 	select ARCH_HAVE_CUSTOM_GPIO_H
-+	select ARCH_SUPPORTS_ATOMIC_RMW
- 	select ARCH_HAS_TICK_BROADCAST if GENERIC_CLOCKEVENTS_BROADCAST
- 	select ARCH_WANT_IPC_PARSE_VERSION
- 	select BUILDTIME_EXTABLE_SORT if MMU
---- a/arch/arm64/Kconfig
-+++ b/arch/arm64/Kconfig
-@@ -1,6 +1,7 @@
- config ARM64
- 	def_bool y
- 	select ARCH_HAS_ATOMIC64_DEC_IF_POSITIVE
-+	select ARCH_SUPPORTS_ATOMIC_RMW
- 	select ARCH_WANT_OPTIONAL_GPIOLIB
- 	select ARCH_WANT_COMPAT_IPC_PARSE_VERSION
- 	select ARCH_WANT_FRAME_POINTERS
---- a/arch/powerpc/Kconfig
-+++ b/arch/powerpc/Kconfig
-@@ -138,6 +138,7 @@ config PPC
- 	select ARCH_USE_BUILTIN_BSWAP
- 	select OLD_SIGSUSPEND
- 	select OLD_SIGACTION if PPC32
-+	select ARCH_SUPPORTS_ATOMIC_RMW
- 
- config EARLY_PRINTK
- 	bool
---- a/arch/sparc/Kconfig
-+++ b/arch/sparc/Kconfig
-@@ -77,6 +77,7 @@ config SPARC64
- 	select ARCH_HAVE_NMI_SAFE_CMPXCHG
- 	select HAVE_C_RECORDMCOUNT
- 	select NO_BOOTMEM
-+	select ARCH_SUPPORTS_ATOMIC_RMW
- 
- config ARCH_DEFCONFIG
- 	string
---- a/arch/x86/Kconfig
-+++ b/arch/x86/Kconfig
-@@ -121,6 +121,7 @@ config X86
- 	select OLD_SIGACTION if X86_32
- 	select COMPAT_OLD_SIGACTION if IA32_EMULATION
- 	select RTC_LIB
-+	select ARCH_SUPPORTS_ATOMIC_RMW
- 
- config INSTRUCTION_DECODER
- 	def_bool y
---- a/kernel/Kconfig.locks
-+++ b/kernel/Kconfig.locks
-@@ -220,6 +220,9 @@ config INLINE_WRITE_UNLOCK_IRQRESTORE
- 
- endif
- 
-+config ARCH_SUPPORTS_ATOMIC_RMW
-+	bool
-+
- config MUTEX_SPIN_ON_OWNER
- 	def_bool y
--	depends on SMP && !DEBUG_MUTEXES
-+	depends on SMP && !DEBUG_MUTEXES && ARCH_SUPPORTS_ATOMIC_RMW
+-- 
+SUSE LINUX Products GmbH, Maxfeldstr. 5, 90409 N?rnberg, Germany
+GF: Jeff Hawn, Jennifer Guild, Felix Imend?rffer; HRB 16746 AG N?rnberg
