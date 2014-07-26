@@ -1,128 +1,63 @@
 From: heiko@sntech.de (Heiko Stuebner)
-Date: Sun, 27 Jul 2014 01:18:26 +0200
-Subject: [PATCH v2 10/15] ARM: dts: rockchip: add tps65910 regulator for
- bqcurie2
+Date: Sun, 27 Jul 2014 01:18:29 +0200
+Subject: [PATCH v2 13/15] ARM: dts: rockchip: add both clocks to uart nodes
 In-Reply-To: <1406416711-28006-1-git-send-email-heiko@sntech.de>
 References: <1406416711-28006-1-git-send-email-heiko@sntech.de>
-Message-ID: <1406416711-28006-11-git-send-email-heiko@sntech.de>
+Message-ID: <1406416711-28006-14-git-send-email-heiko@sntech.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The Curie2 uses a tps659102 as its main pmic, so add the i2c1 and tps65910
-node as well as define the used voltages and regulator-names according to
-the schematics.
-
-Also fix the supply of the sd0 regulator, as it is supplied by the vio reg.
+Use the newly ammended dw_8250 clock binding to define both the baudclk as
+well as the pclk supplying the ip.
 
 Signed-off-by: Heiko Stuebner <heiko@sntech.de>
 ---
- arch/arm/boot/dts/rk3066a-bqcurie2.dts | 87 ++++++++++++++++++++++++++++++++++
- 1 file changed, 87 insertions(+)
+ arch/arm/boot/dts/rk3xxx.dtsi | 12 ++++++++----
+ 1 file changed, 8 insertions(+), 4 deletions(-)
 
-diff --git a/arch/arm/boot/dts/rk3066a-bqcurie2.dts b/arch/arm/boot/dts/rk3066a-bqcurie2.dts
-index 38910f6..8b479f7 100644
---- a/arch/arm/boot/dts/rk3066a-bqcurie2.dts
-+++ b/arch/arm/boot/dts/rk3066a-bqcurie2.dts
-@@ -31,6 +31,7 @@
- 		regulator-max-microvolt = <3000000>;
- 		gpio = <&gpio3 7 GPIO_ACTIVE_LOW>;
- 		startup-delay-us = <100000>;
-+		vin-supply = <&vcc_io>;
+diff --git a/arch/arm/boot/dts/rk3xxx.dtsi b/arch/arm/boot/dts/rk3xxx.dtsi
+index d3fa4d1..989c337 100644
+--- a/arch/arm/boot/dts/rk3xxx.dtsi
++++ b/arch/arm/boot/dts/rk3xxx.dtsi
+@@ -75,7 +75,8 @@
+ 		interrupts = <GIC_SPI 34 IRQ_TYPE_LEVEL_HIGH>;
+ 		reg-shift = <2>;
+ 		reg-io-width = <1>;
+-		clocks = <&cru SCLK_UART0>;
++		clock-names = "baudclk", "apb_pclk";
++		clocks = <&cru SCLK_UART0>, <&cru PCLK_UART0>;
+ 		status = "disabled";
  	};
  
- 	gpio-keys {
-@@ -59,6 +60,92 @@
+@@ -85,7 +86,8 @@
+ 		interrupts = <GIC_SPI 35 IRQ_TYPE_LEVEL_HIGH>;
+ 		reg-shift = <2>;
+ 		reg-io-width = <1>;
+-		clocks = <&cru SCLK_UART1>;
++		clock-names = "baudclk", "apb_pclk";
++		clocks = <&cru SCLK_UART1>, <&cru PCLK_UART1>;
+ 		status = "disabled";
+ 	};
+ 
+@@ -207,7 +209,8 @@
+ 		interrupts = <GIC_SPI 36 IRQ_TYPE_LEVEL_HIGH>;
+ 		reg-shift = <2>;
+ 		reg-io-width = <1>;
+-		clocks = <&cru SCLK_UART2>;
++		clock-names = "baudclk", "apb_pclk";
++		clocks = <&cru SCLK_UART2>, <&cru PCLK_UART2>;
+ 		status = "disabled";
+ 	};
+ 
+@@ -217,7 +220,8 @@
+ 		interrupts = <GIC_SPI 37 IRQ_TYPE_LEVEL_HIGH>;
+ 		reg-shift = <2>;
+ 		reg-io-width = <1>;
+-		clocks = <&cru SCLK_UART3>;
++		clock-names = "baudclk", "apb_pclk";
++		clocks = <&cru SCLK_UART3>, <&cru PCLK_UART3>;
+ 		status = "disabled";
  	};
  };
- 
-+&i2c1 {
-+	status = "okay";
-+	clock-frequency = <400000>;
-+
-+	tps: tps at 2d {
-+		reg = <0x2d>;
-+
-+		interrupt-parent = <&gpio6>;
-+		interrupts = <6 IRQ_TYPE_LEVEL_LOW>;
-+
-+		vcc5-supply = <&vcc_io>;
-+		vcc6-supply = <&vcc_io>;
-+
-+		regulators {
-+			vcc_rtc: regulator at 0 {
-+				regulator-name = "vcc_rtc";
-+				regulator-always-on;
-+			};
-+
-+			vcc_io: regulator at 1 {
-+				regulator-name = "vcc_io";
-+				regulator-always-on;
-+			};
-+
-+			vdd_arm: regulator at 2 {
-+				regulator-name = "vdd_arm";
-+				regulator-min-microvolt = <600000>;
-+				regulator-max-microvolt = <1500000>;
-+				regulator-boot-on;
-+				regulator-always-on;
-+			};
-+
-+			vcc_ddr: regulator at 3 {
-+				regulator-name = "vcc_ddr";
-+				regulator-min-microvolt = <600000>;
-+				regulator-max-microvolt = <1500000>;
-+				regulator-boot-on;
-+				regulator-always-on;
-+			};
-+
-+			vcc18_cif: regulator at 5 {
-+				regulator-name = "vcc18_cif";
-+				regulator-always-on;
-+			};
-+
-+			vdd_11: regulator at 6 {
-+				regulator-name = "vdd_11";
-+				regulator-always-on;
-+			};
-+
-+			vcc_25: regulator at 7 {
-+				regulator-name = "vcc_25";
-+				regulator-always-on;
-+			};
-+
-+			vcc_18: regulator at 8 {
-+				regulator-name = "vcc_18";
-+				regulator-always-on;
-+			};
-+
-+			vcc25_hdmi: regulator at 9 {
-+				regulator-name = "vcc25_hdmi";
-+				regulator-always-on;
-+			};
-+
-+			vcca_33: regulator at 10 {
-+				regulator-name = "vcca_33";
-+				regulator-always-on;
-+			};
-+
-+			vcc_tp: regulator at 11 {
-+				regulator-name = "vcc_tp";
-+				regulator-always-on;
-+			};
-+
-+			vcc28_cif: regulator at 12 {
-+				regulator-name = "vcc28_cif";
-+				regulator-always-on;
-+			};
-+		};
-+	};
-+};
-+
-+/* must be included after &tps gets defined */
-+#include "tps65910.dtsi"
-+
- &mmc0 { /* sdmmc */
- 	num-slots = <1>;
- 	status = "okay";
 -- 
 2.0.1
