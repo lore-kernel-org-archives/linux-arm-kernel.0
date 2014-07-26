@@ -1,55 +1,40 @@
 From: andrew@lunn.ch (Andrew Lunn)
-Date: Sat, 26 Jul 2014 19:20:37 +0200
-Subject: [Patch V2 1/2] ARM: mvebu: armada xp: Generalize use of i2c quirk
+Date: Sat, 26 Jul 2014 19:20:38 +0200
+Subject: [Patch V2 2/2] i2c: mv64xxx: Remove internal compatible string from
+ Documentation
 In-Reply-To: <1406395238-29758-1-git-send-email-andrew@lunn.ch>
 References: <1406395238-29758-1-git-send-email-andrew@lunn.ch>
-Message-ID: <1406395238-29758-2-git-send-email-andrew@lunn.ch>
+Message-ID: <1406395238-29758-3-git-send-email-andrew@lunn.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-A second product has come to light which makes use of the A0 stepping
-of the Armada XP SoC. A0 stepping has a hardware bug in the i2c core
-meaning that hardware offload does not work, resulting in the kernel
-failing to boot. The quirk detects that the kernel is running on an A0
-stepping SoC and disables the use of hardware offload.
+The compatible string "marvell,mv78230-a0-i2c" should only be used
+internally when at run time we detect an Armada XP with broken
+hardware offload. This string should never appear in DT blobs passed
+to the kernel. Hence remove it from the binding Documentation.
 
-Currently the quirk is only enabled for PlatHome Openblocks AX3. The
-AX3 has been produced with both A0 and B0 stepping SoCs. The second
-product is the Lenovo Iomega IX4-300d. It seems likely that this
-device will also swap from A0 to B0 SoC sometime during its life.
-
-If there are two products using A0, it seems likely there are more
-products with A0. Also, since the number of A0 SoCs is limited, these
-products are also likely to transition to B0. Hence detecting at run
-time is the safest option. So enable the quirk for all Armada XP
-boards.
-
-Tested on an AX3 with A0 stepping.
+Patch proposed by Arnd Bergmann <arnd@arndb.de>
 
 Signed-off-by: Andrew Lunn <andrew@lunn.ch>
-Acked-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
-Acked-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
 ---
+ Documentation/devicetree/bindings/i2c/i2c-mv64xxx.txt | 5 -----
+ 1 file changed, 5 deletions(-)
 
-V2:
-Added two Acked-by:
-s/B1/B0
----
- arch/arm/mach-mvebu/board-v7.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
-
-diff --git a/arch/arm/mach-mvebu/board-v7.c b/arch/arm/mach-mvebu/board-v7.c
-index 8bb742fdf5ca..be080cff98d2 100644
---- a/arch/arm/mach-mvebu/board-v7.c
-+++ b/arch/arm/mach-mvebu/board-v7.c
-@@ -167,7 +167,7 @@ static void __init thermal_quirk(void)
+diff --git a/Documentation/devicetree/bindings/i2c/i2c-mv64xxx.txt b/Documentation/devicetree/bindings/i2c/i2c-mv64xxx.txt
+index 5c30026921ae..6eb6f6e40ba1 100644
+--- a/Documentation/devicetree/bindings/i2c/i2c-mv64xxx.txt
++++ b/Documentation/devicetree/bindings/i2c/i2c-mv64xxx.txt
+@@ -9,11 +9,6 @@ Required properties :
+                      - "allwinner,sun6i-a31-i2c"
+                      - "marvell,mv64xxx-i2c"
+                      - "marvell,mv78230-i2c"
+-                     - "marvell,mv78230-a0-i2c"
+-                       * Note: Only use "marvell,mv78230-a0-i2c" for a
+-                         very rare, initial version of the SoC which
+-                         had broken offload support.  Linux
+-                         auto-detects this and sets it appropriately.
+  - interrupts      : The interrupt number
  
- static void __init mvebu_dt_init(void)
- {
--	if (of_machine_is_compatible("plathome,openblocks-ax3-4"))
-+	if (of_machine_is_compatible("marvell,armadaxp"))
- 		i2c_quirk();
- 	if (of_machine_is_compatible("marvell,a375-db"))
- 		thermal_quirk();
+ Optional properties :
 -- 
 2.0.1
