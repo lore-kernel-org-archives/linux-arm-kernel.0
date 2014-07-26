@@ -1,97 +1,87 @@
-From: dushistov@mail.ru (Evgeniy Dushistov)
-Date: Sat, 26 Jul 2014 19:56:59 +0400
-Subject: [PATCH] fix for certain sequnce of request_irq can cause irq storm
-Message-ID: <20140726155659.GA22977@fifteen>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Sat, 26 Jul 2014 17:21:43 +0100
+Subject: [BUG] nfs3_list_one_acl oops
+Message-ID: <20140726162143.GB20396@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The problem is that hardware handled by arm/plat-orion/gpio.c,
-require ack for edge irq, and no ack for level irq.
+Today, I got a nice oops while trying to update my initramfs:
 
-The code handle this issue, by two "struct irq_chip_type" per
-one "struct irq_chip_generic". For one "struct irq_chip_generic"
-irq_ack pointer is setted, for another it is NULL.
+Alignment trap: not handling instruction e1901f9f at [<c020b8ec>]
+Unhandled fault: alignment exception (0x001) at 0xffffffa1
+Internal error: : 1 [#1] SMP ARM
+Modules linked in: bnep rfcomm bluetooth nfsd exportfs hid_cypress brcmfmac brcmutil snd_soc_fsl_spdif imx_pcm_dma imx2_wdt imx_thermal imx_sdma snd_soc_imx_spdif
+CPU: 2 PID: 1704 Comm: cp Not tainted 3.16.0-rc6+ #1281
+task: e9be5580 ti: e3ce6000 task.ti: e3ce6000
+PC is at nfs3_list_one_acl+0x38/0xa0
+LR is at get_acl+0x4c/0x60
+pc : [<c020b8f0>]    lr : [<c0144774>]    psr: a00d0013
+sp : e3ce7f08  ip : e3ce7ee8  fp : e3ce7f2c
+r10: 00000000  r9 : e3ce6000  r8 : 00000000
+r7 : 00000000  r6 : c06d728c  r5 : 00000000  r4 : e3ce7f3c
+r3 : 00000000  r2 : e3ce7ea4  r1 : 00003fe7  r0 : ffffffa1
+Flags: NzCv  IRQs on  FIQs on  Mode SVC_32  ISA ARM  Segment user
+Control: 10c5387d  Table: 33dec04a  DAC: 00000015
+Process cp (pid: 1704, stack limit = 0xe3ce6248)
+Stack: (0xe3ce7f08 to 0xe3ce8000)
+7f00:                   00000000 e3ce7f3c 00000000 e9ff3858 00000000 00000000
+7f20: e3ce7f5c e3ce7f30 c020c0f8 c020b8c4 00000000 e3ce7f3c 00000000 00000000
+7f40: 00000000 c020c0b4 00000000 e8c05198 e3ce7f84 e3ce7f60 c011a0d0 c020c0c0
+7f60: e3d04600 e3d04600 00000000 00000000 c000ec04 00000000 e3ce7fa4 e3ce7f88
+7f80: c011aed8 c011a07c 00008000 be9995a8 b6f756db 000000ea 00000000 e3ce7fa8
+7fa0: c000ea80 c011aeb0 00008000 be9995a8 00000003 00000000 00000000 00022150
+7fc0: 00008000 be9995a8 b6f756db 000000ea be9994d8 b6f10d99 00000003 be9995a8
+7fe0: be9993a0 be999390 b6f105db b6ea8ca0 800d0010 00000003 6f74616c 69662d72
+Backtrace: 
+[<c020b8b8>] (nfs3_list_one_acl) from [<c020c0f8>] (nfs3_listxattr+0x44/0x80)
+[<c020c0b4>] (nfs3_listxattr) from [<c011a0d0>] (listxattr+0x60/0x11c)
+[<c011a070>] (listxattr) from [<c011aed8>] (SyS_flistxattr+0x34/0x58)
+[<c011aea4>] (SyS_flistxattr) from [<c000ea80>] (ret_fast_syscall+0x0/0x30)
+Code: 0a000016 f57ff05b f590f000 e1901f9f (e2411001) 
+---[ end trace 05ecbdab16531f0b ]---
 
-But we have only one mask_cache per two "struct irq_chip_type".
-So if we 
-1)unmask interrupt A for "edge type" trigger,
-2)unmask interrupt B for "level type" trigger,
-3)unmask interrupt C for "edge type",
+The problem is that get_acl() does *not* return NULL on error, it returns
+an error code.  Hence this:
 
-we, because of usage of generic irq_gc_mask_clr_bit/irq_gc_mask_set_bit,
-have hardware configured to trigger interrupt B on "edge type",
-because of shared mask_cache. But kernel think that B is "level type",
-so when interrupt B occur via "edge" reason, we don't ack it,
-and B triggered again and again.
++	acl = get_acl(inode, type);
++	if (!acl)
++		return 0;
 
-Signed-off-by: Evgeniy A. Dushistov <dushistov@mail.ru>
+introduced by 74adf83f5d77 ("nfs: only show Posix ACLs in listxattr if
+actually present") ends up breaking when get_acl() fails (as is the case
+if NFS is used against a server with ACL support disabled.)
+
+The original commit was marked for stable, which means that this brokenness
+is going to spread to all stable kernels.
+
+Fixes: 74adf83f5d77 ("nfs: only show Posix ACLs in listxattr if actually present")
+Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
+Cc: <stable@vger.kernel.org>
+Cc: Trond Myklebust <trond.myklebust@primarydata.com>
 ---
- arch/arm/plat-orion/gpio.c | 36 ++++++++++++++++++++++++++++++++----
- 1 file changed, 32 insertions(+), 4 deletions(-)
 
-diff --git a/arch/arm/plat-orion/gpio.c b/arch/arm/plat-orion/gpio.c
-index b61a3bc..e048f61 100644
---- a/arch/arm/plat-orion/gpio.c
-+++ b/arch/arm/plat-orion/gpio.c
-@@ -497,6 +497,34 @@ static void orion_gpio_dbg_show(struct seq_file *s, struct gpio_chip *chip)
- #define orion_gpio_dbg_show NULL
- #endif
+I've included <stable@vger.kernel.org> in the Cc list so they can hold off
+spreading the broken patch further into stable trees until this issue is
+resolved.
+
+ fs/nfs/nfs3acl.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/fs/nfs/nfs3acl.c b/fs/nfs/nfs3acl.c
+index 8f854dde4150..ada8c66aa9e5 100644
+--- a/fs/nfs/nfs3acl.c
++++ b/fs/nfs/nfs3acl.c
+@@ -256,7 +256,7 @@ nfs3_list_one_acl(struct inode *inode, int type, const char *name, void *data,
+ 	char *p = data + *result;
  
-+static void orion_gpio_unmask_irq(struct irq_data *d)
-+{
-+	struct irq_chip_generic *gc = irq_data_get_irq_chip_data(d);
-+	struct irq_chip_type *ct = irq_data_get_chip_type(d);
-+	u32 reg_val;
-+	u32 mask = d->mask;
-+
-+	irq_gc_lock(gc);
-+	reg_val = irq_reg_readl(gc->reg_base + ct->regs.mask);
-+	reg_val |= mask;
-+	irq_reg_writel(reg_val, gc->reg_base + ct->regs.mask);
-+	irq_gc_unlock(gc);
-+}
-+
-+static void orion_gpio_mask_irq(struct irq_data *d)
-+{
-+	struct irq_chip_generic *gc = irq_data_get_irq_chip_data(d);
-+	struct irq_chip_type *ct = irq_data_get_chip_type(d);
-+	u32 mask = d->mask;
-+	u32 reg_val;
-+
-+	irq_gc_lock(gc);
-+	reg_val = irq_reg_readl(gc->reg_base + ct->regs.mask);
-+	reg_val &= ~mask;
-+	irq_reg_writel(reg_val, gc->reg_base + ct->regs.mask);
-+	irq_gc_unlock(gc);
-+}
-+
- void __init orion_gpio_init(struct device_node *np,
- 			    int gpio_base, int ngpio,
- 			    void __iomem *base, int mask_offset,
-@@ -565,8 +593,8 @@ void __init orion_gpio_init(struct device_node *np,
- 	ct = gc->chip_types;
- 	ct->regs.mask = ochip->mask_offset + GPIO_LEVEL_MASK_OFF;
- 	ct->type = IRQ_TYPE_LEVEL_HIGH | IRQ_TYPE_LEVEL_LOW;
--	ct->chip.irq_mask = irq_gc_mask_clr_bit;
--	ct->chip.irq_unmask = irq_gc_mask_set_bit;
-+	ct->chip.irq_mask = orion_gpio_mask_irq;
-+	ct->chip.irq_unmask = orion_gpio_unmask_irq;
- 	ct->chip.irq_set_type = gpio_irq_set_type;
- 	ct->chip.name = ochip->chip.label;
+ 	acl = get_acl(inode, type);
+-	if (!acl)
++	if (IS_ERR(acl))
+ 		return 0;
  
-@@ -575,8 +603,8 @@ void __init orion_gpio_init(struct device_node *np,
- 	ct->regs.ack = GPIO_EDGE_CAUSE_OFF;
- 	ct->type = IRQ_TYPE_EDGE_RISING | IRQ_TYPE_EDGE_FALLING;
- 	ct->chip.irq_ack = irq_gc_ack_clr_bit;
--	ct->chip.irq_mask = irq_gc_mask_clr_bit;
--	ct->chip.irq_unmask = irq_gc_mask_set_bit;
-+	ct->chip.irq_mask = orion_gpio_mask_irq;
-+	ct->chip.irq_unmask = orion_gpio_unmask_irq;
- 	ct->chip.irq_set_type = gpio_irq_set_type;
- 	ct->handler = handle_edge_irq;
- 	ct->chip.name = ochip->chip.label;
--- 
-1.8.5.5
+ 	posix_acl_release(acl);
+
 
 -- 
-/Evgeniy
+FTTC broadband for 0.8mile line: currently at 9.5Mbps down 400kbps up
+according to speedtest.net.
