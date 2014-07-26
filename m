@@ -1,35 +1,72 @@
 From: mturquette@linaro.org (Mike Turquette)
-Date: Fri, 25 Jul 2014 17:42:12 -0700
-Subject: [PATCH v2 0/6] Migrate PXA27x platforms to clock framework
-In-Reply-To: <87k376vadk.fsf@free.fr>
-References: <1405353263-13424-1-git-send-email-robert.jarzmik@free.fr>
- <87k376vadk.fsf@free.fr>
-Message-ID: <20140726004212.4791.52407@quantum>
+Date: Fri, 25 Jul 2014 17:59:28 -0700
+Subject: [GIT PULL] Allwinner clocks additions for 3.17
+In-Reply-To: <20140718211335.GA29677@lukather>
+References: <20140718211335.GA29677@lukather>
+Message-ID: <20140726005928.4791.5056@quantum>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Quoting Robert Jarzmik (2014-07-21 11:23:51)
-> Robert Jarzmik <robert.jarzmik@free.fr> writes:
+Quoting Maxime Ripard (2014-07-18 14:13:35)
+> Hi Mike,
 > 
-> > This is the second opus of this serie.
+> Here is the first pull request for the Allwinner clocks changes 
 > 
-> Ping ?
+> Unless something major comes up, or we agree quickly on the MMC
+> changes I posted yesterday, there shouldn't be any follow up for the
+> 3.17 relaese cycle.
 
-Hi Robert,
-
-Overall the series looks good to me. The only problem I see is that
-somewhere in the use of the PARENTS() macro there is a section mismatch
-introduced. I spent about 5 minutes looking at it and gave up. This
-problem introduces 26 section mismatch warnings building
-colibri_pxa270_defconfig.
-
-Once those are fixed up then I will be happy to take this series. Do you
-want me to take all six patches through the clk tree, including the
-arm/arm stuff?
+Pull. I haven't had time to go through the MMC series yet but I will
+prioritise reviewing it. I guess that stuff will go in after 3.17.
 
 Regards,
 Mike
 
 > 
-> --
-> Robert
+> Thanks!
+> Maxime
+> 
+> The following changes since commit 7171511eaec5bf23fb06078f59784a3a0626b38f:
+> 
+>   Linux 3.16-rc1 (2014-06-15 17:45:28 -1000)
+> 
+> are available in the git repository at:
+> 
+>   git://git.kernel.org/pub/scm/linux/kernel/git/mripard/linux.git tags/sunxi-clocks-for-3.17
+> 
+> for you to fetch changes up to 6c1d66f0da59362cb33ce37d436cd28c77c2b2cb:
+> 
+>   clk: sunxi: sun6i-a31-apb0-gates: Add A23 APB0 support (2014-07-15 08:53:24 +0200)
+> 
+> ----------------------------------------------------------------
+> Allwinner clocks additions for 3.17
+> 
+> This pull request adds support for the clocks found in the newly supported
+> Allwinner A23 clocks.
+> 
+> ----------------------------------------------------------------
+> Chen-Yu Tsai (9):
+>       clk: sunxi: register clock gates with clkdev
+>       clk: sunxi: move "ahb_sdram" to protected clock list
+>       clk: sunxi: Support factor clocks with N factor starting not from 0
+>       clk: sunxi: Add support for table-based divider clocks
+>       clk: sunxi: Add A23 clocks support
+>       clk: sunxi: Add A23 APB0 divider clock support
+>       clk: sunxi: Fix gate indexing for sun6i-a31-apb0-gates
+>       clk: sunxi: sun6i-apb0-gates: use bitmaps for valid gate indices
+>       clk: sunxi: sun6i-a31-apb0-gates: Add A23 APB0 support
+> 
+>  Documentation/devicetree/bindings/clock/sunxi.txt |   7 ++
+>  drivers/clk/sunxi/Makefile                        |   4 +-
+>  drivers/clk/sunxi/clk-factors.c                   |   2 +-
+>  drivers/clk/sunxi/clk-factors.h                   |   1 +
+>  drivers/clk/sunxi/clk-sun6i-apb0-gates.c          |  76 ++++++++------
+>  drivers/clk/sunxi/clk-sun8i-apb0.c                |  68 +++++++++++++
+>  drivers/clk/sunxi/clk-sunxi.c                     | 119 ++++++++++++++++++++--
+>  7 files changed, 234 insertions(+), 43 deletions(-)
+>  create mode 100644 drivers/clk/sunxi/clk-sun8i-apb0.c
+> 
+> -- 
+> Maxime Ripard, Free Electrons
+> Embedded Linux, Kernel and Android engineering
+> http://free-electrons.com
