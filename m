@@ -1,14 +1,14 @@
 From: gregkh@linuxfoundation.org (Greg Kroah-Hartman)
-Date: Sat, 26 Jul 2014 12:02:55 -0700
-Subject: [PATCH 3.14 81/87] locking/mutex: Disable optimistic spinning on some
- architectures
-In-Reply-To: <20140726190214.530473925@linuxfoundation.org>
-References: <20140726190214.530473925@linuxfoundation.org>
-Message-ID: <20140726190217.233358653@linuxfoundation.org>
+Date: Sat, 26 Jul 2014 12:03:02 -0700
+Subject: [PATCH 3.15 100/109] locking/mutex: Disable optimistic spinning on
+ some architectures
+In-Reply-To: <20140726190223.834037485@linuxfoundation.org>
+References: <20140726190223.834037485@linuxfoundation.org>
+Message-ID: <20140726190226.856788942@linuxfoundation.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-3.14-stable review patch.  If anyone has any objections, please let me know.
+3.15-stable review patch.  If anyone has any objections, please let me know.
 
 ------------------
 
@@ -82,30 +82,30 @@ Signed-off-by: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
  	select ARCH_WANT_COMPAT_IPC_PARSE_VERSION
 --- a/arch/powerpc/Kconfig
 +++ b/arch/powerpc/Kconfig
-@@ -141,6 +141,7 @@ config PPC
- 	select HAVE_DEBUG_STACKOVERFLOW
+@@ -145,6 +145,7 @@ config PPC
  	select HAVE_IRQ_EXIT_ON_IRQ_STACK
  	select ARCH_USE_CMPXCHG_LOCKREF if PPC64
+ 	select HAVE_ARCH_AUDITSYSCALL
 +	select ARCH_SUPPORTS_ATOMIC_RMW
  
  config GENERIC_CSUM
  	def_bool CPU_LITTLE_ENDIAN
 --- a/arch/sparc/Kconfig
 +++ b/arch/sparc/Kconfig
-@@ -77,6 +77,7 @@ config SPARC64
- 	select ARCH_HAVE_NMI_SAFE_CMPXCHG
+@@ -78,6 +78,7 @@ config SPARC64
  	select HAVE_C_RECORDMCOUNT
  	select NO_BOOTMEM
+ 	select HAVE_ARCH_AUDITSYSCALL
 +	select ARCH_SUPPORTS_ATOMIC_RMW
  
  config ARCH_DEFCONFIG
  	string
 --- a/arch/x86/Kconfig
 +++ b/arch/x86/Kconfig
-@@ -127,6 +127,7 @@ config X86
- 	select HAVE_DEBUG_STACKOVERFLOW
- 	select HAVE_IRQ_EXIT_ON_IRQ_STACK if X86_64
+@@ -130,6 +130,7 @@ config X86
  	select HAVE_CC_STACKPROTECTOR
+ 	select GENERIC_CPU_AUTOPROBE
+ 	select HAVE_ARCH_AUDITSYSCALL
 +	select ARCH_SUPPORTS_ATOMIC_RMW
  
  config INSTRUCTION_DECODER
