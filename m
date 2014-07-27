@@ -1,126 +1,54 @@
-From: afaerber@suse.de (=?ISO-8859-1?Q?Andreas_F=E4rber?=)
-Date: Sun, 27 Jul 2014 05:33:19 +0200
-Subject: [PATCH v7 1/4] ARM: EXYNOS: Add support for mapping PMU base
- address via DT
-In-Reply-To: <02d701cf9c45$ce481260$6ad83720$@samsung.com>
-References: <1404878455-31518-1-git-send-email-pankaj.dubey@samsung.com>
- <1404878455-31518-2-git-send-email-pankaj.dubey@samsung.com>
- <02d701cf9c45$ce481260$6ad83720$@samsung.com>
-Message-ID: <53D472FF.60009@suse.de>
+From: James.Bottomley@HansenPartnership.com (James Bottomley)
+Date: Sun, 27 Jul 2014 07:52:57 +0400
+Subject: [PATCH 4/5] [SCSI] Do not use platform_bus as a parent
+In-Reply-To: <20140726201150.GA21870@kroah.com>
+References: <1406298233-27876-1-git-send-email-pawel.moll@arm.com>
+ <1406298233-27876-4-git-send-email-pawel.moll@arm.com>
+ <1406299616.1789.13.camel@jarvis.lan> <20140726201150.GA21870@kroah.com>
+Message-ID: <1406433177.11069.3.camel@jarvis>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am 10.07.2014 15:49, schrieb Kukjin Kim:
-> Pankaj Dubey wrote:
->>
->> Add support for mapping Samsung Power Management Unit (PMU)
->> base address from device tree.
->>
->> Signed-off-by: Pankaj Dubey <pankaj.dubey@samsung.com>
->> Reviewed-by: Tomasz Figa <t.figa@samsung.com>
->> ---
->>  arch/arm/mach-exynos/common.h |    1 +
->>  arch/arm/mach-exynos/exynos.c |   37 +++++++++++++++++++++++++++++++++++++
->>  2 files changed, 38 insertions(+)
->>
->> diff --git a/arch/arm/mach-exynos/common.h b/arch/arm/mach-exynos/common.h
->> index 152b464..f8daa9c 100644
->> --- a/arch/arm/mach-exynos/common.h
->> +++ b/arch/arm/mach-exynos/common.h
->> @@ -113,6 +113,7 @@ IS_SAMSUNG_CPU(exynos5800, EXYNOS5800_SOC_ID, EXYNOS5_SOC_MASK)
->>
->>  extern void __iomem *sysram_ns_base_addr;
->>  extern void __iomem *sysram_base_addr;
->> +extern void __iomem *pmu_base_addr;
->>  void exynos_sysram_init(void);
->>
->>  void exynos_firmware_init(void);
->> diff --git a/arch/arm/mach-exynos/exynos.c b/arch/arm/mach-exynos/exynos.c
->> index 186f35d..173aac8 100644
->> --- a/arch/arm/mach-exynos/exynos.c
->> +++ b/arch/arm/mach-exynos/exynos.c
->> @@ -19,6 +19,7 @@
->>  #include <linux/of_platform.h>
->>  #include <linux/platform_device.h>
->>  #include <linux/pm_domain.h>
->> +#include <linux/irqchip.h>
->>
->>  #include <asm/cacheflush.h>
->>  #include <asm/hardware/cache-l2x0.h>
->> @@ -31,6 +32,8 @@
->>  #include "regs-pmu.h"
->>  #include "regs-sys.h"
->>
->> +void __iomem *pmu_base_addr;
->> +
->>  static struct map_desc exynos4_iodesc[] __initdata = {
->>  	{
->>  		.virtual	= (unsigned long)S3C_VA_SYS,
->> @@ -253,6 +256,39 @@ static void __init exynos_init_io(void)
->>  	exynos_map_io();
->>  }
->>
->> +static const struct of_device_id exynos_dt_pmu_match[] = {
->> +	{ .compatible = "samsung,exynos3250-pmu" },
->> +	{ .compatible = "samsung,exynos4210-pmu" },
->> +	{ .compatible = "samsung,exynos4212-pmu" },
->> +	{ .compatible = "samsung,exynos4412-pmu" },
->> +	{ .compatible = "samsung,exynos5250-pmu" },
->> +	{ .compatible = "samsung,exynos5420-pmu" },
->> +	{ /*sentinel*/ },
->> +};
->> +
->> +static void exynos_map_pmu(void)
->> +{
->> +	struct device_node *np;
->> +
->> +	np = of_find_matching_node(NULL, exynos_dt_pmu_match);
->> +	if (np)
->> +		pmu_base_addr = of_iomap(np, 0);
->> +
->> +	if (!pmu_base_addr)
->> +		panic("failed to find exynos pmu register\n");
->> +}
->> +
->> +static void __init exynos_init_irq(void)
->> +{
->> +	irqchip_init();
->> +	/*
->> +	 * Since platsmp.c needs pmu base address by the time
->> +	 * DT is not unflatten so we can't use DT APIs before
-
-Either "Since platsmp.c needs ... unflattened, we can't ..."
-or "platsmp.c needs ... unflattened, so we can't ..."
-
->> +	 * init_irq
->> +	 */
->> +	exynos_map_pmu();
->> +}
->> +
->>  static void __init exynos_dt_machine_init(void)
->>  {
->>  	struct device_node *i2c_np;
->> @@ -336,6 +372,7 @@ DT_MACHINE_START(EXYNOS_DT, "SAMSUNG EXYNOS (Flattened Device Tree)")
->>  	.smp		= smp_ops(exynos_smp_ops),
->>  	.map_io		= exynos_init_io,
->>  	.init_early	= exynos_firmware_init,
->> +	.init_irq	= exynos_init_irq,
->>  	.init_machine	= exynos_dt_machine_init,
->>  	.init_late	= exynos_init_late,
->>  	.dt_compat	= exynos_dt_compat,
->> --
->> 1.7.9.5
+On Sat, 2014-07-26 at 13:11 -0700, Greg Kroah-Hartman wrote:
+> On Fri, Jul 25, 2014 at 07:46:56AM -0700, James Bottomley wrote:
+> > On Fri, 2014-07-25 at 15:23 +0100, Pawel Moll wrote:
+> > > The host devices without a parent were "forcefully adopted"
+> > > by platform bus. This patch removes this assignment. In
+> > > effect the dev_dev may be NULL now, which means ISA.
+> > > 
+> > > Cc: James E.J. Bottomley <JBottomley@parallels.com>
+> > > Cc: linux-scsi at vger.kernel.org
+> > > Signed-off-by: Pawel Moll <pawel.moll@arm.com>
+> > > ---
+> > > 
+> > > This patch is a part of effort to remove references to platform_bus
+> > > and make it static.
+> > > 
+> > > James, could you please have a look and advice if the change is
+> > > correct? Would you happen to know the "real reasons" behind
+> > > using the root platform_bus device a parent?
+> > 
+> > Yes, for DMA purposes, the parent cannot now be NULL; we'll get a panic
+> > in the DMA transfers if it is.  A lot of the legacy ISA device on x86
+> > and I thought some ARM SOC devices don't pass in the parent device, so
+> > we hang them off a known parent.
 > 
-> Looks good to me, will apply.
+> The "generic" platform bus device is not a "known parent".  I don't
+> understand the difference between just setting the parent to be NULL,
+> which will then have a "proper" parent pointer filled in by the driver
+> core when the device is registered, or faking it out here.  What is the
+> difference?
 
-Unfortunately this broke the boot on ODROID-XU: Neither is there a
-exynos_dt_pmu_match[] entry for 5410 nor is such a node defined in
-exynos5410.dtsi. Not having access to a TRM, should 5410 get a node like
-5420? Might SoCs beyond 5420 also require changes?
+If you set the parent to NULL, the host template dma_dev will end up
+NULL as well and that will trigger a NULL deref panic in the dma segment
+routines.
 
-Regards,
-Andreas
+If you want to remove platform_bus, we have to have a well known device
+to set dma_dev to at scsi_host_add time.
 
--- 
-SUSE LINUX Products GmbH, Maxfeldstr. 5, 90409 N?rnberg, Germany
-GF: Jeff Hawn, Jennifer Guild, Felix Imend?rffer; HRB 16746 AG N?rnberg
+> In the end, the device always ends up with a parent pointer, right?
+
+The parent pointer isn't the problem ... assigning the correct dma
+device is.
+
+James
