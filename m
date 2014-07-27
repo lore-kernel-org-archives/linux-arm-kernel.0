@@ -1,33 +1,31 @@
-From: heiko@sntech.de (Heiko =?ISO-8859-1?Q?St=FCbner?=)
-Date: Sun, 27 Jul 2014 23:50:51 +0200
-Subject: [PATCH v2] iio: exynos-adc: add experimental touchscreen support
-In-Reply-To: <53D56ABD.8080808@gmx.de>
-References: <5068889.1KfVx3ksNo@wuerfel> <53D56ABD.8080808@gmx.de>
-Message-ID: <1743122.0WWLup698P@diego>
+From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
+Date: Sun, 27 Jul 2014 23:53:18 +0200
+Subject: [PATCH 0/2] spi-orion: one fix and one improvement
+Message-ID: <1406498000-13079-1-git-send-email-thomas.petazzoni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am Sonntag, 27. Juli 2014, 23:10:21 schrieb Hartmut Knaack:
-> Arnd Bergmann schrieb:
-> > @@ -205,6 +217,9 @@ static void exynos_adc_v1_init_hw(struct exynos_adc
-> > *info)> 
-> >  	/* Enable 12-bit ADC resolution */
-> >  	con1 |= ADC_V1_CON_RES;
-> >  	writel(con1, ADC_V1_CON(info->regs));
-> > 
-> > +
-> > +	/* set default touchscreen delay */
-> 
-> Any information about how many ?s/ms it is actually set with this value?
+Hello,
 
-"ADC conversion is delayed by counting this value. Counting clock is pclk."
-So, I guess here 10000 pclk ticks.
+This is a small patch series agains the spi-orion driver. The first
+patch fixes a problem with the handling of the cell-index DT property,
+and should be merged for 3.16 as well as backported to -stable.
 
+The second patch adds the support for multiple chip selects, but there
+might be some discussion needed on what is the best approach to
+describe that in the DT. Suggestions welcome.
 
-Heiko
+Best regards,
 
-> 
-> > +	writel(10000, ADC_V1_DLY(info->regs));
-> > 
-> >  }
-> >  
+Thomas
+
+Thomas Petazzoni (2):
+  spi: orion: fix incorrect handling of cell-index DT property
+  spi: orion: add support for multiple chip selects
+
+ .../devicetree/bindings/spi/spi-orion.txt          |  3 +++
+ drivers/spi/spi-orion.c                            | 26 +++++++++++++++-------
+ 2 files changed, 21 insertions(+), 8 deletions(-)
+
+-- 
+2.0.0
