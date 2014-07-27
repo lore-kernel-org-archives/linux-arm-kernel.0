@@ -1,83 +1,235 @@
-From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Sun, 27 Jul 2014 22:32:58 +0200
-Subject: [PATCH 2/2] V3 ARM: mvebu: Added dts defintion for Lenovo
- Iomega ix4-300d NAS
-In-Reply-To: <1406418490-61502-1-git-send-email-yahoo@perenite.com>
-References: <1406418490-61502-1-git-send-email-yahoo@perenite.com>
-Message-ID: <20140727223258.36b050b9@free-electrons.com>
+From: knaack.h@gmx.de (Hartmut Knaack)
+Date: Sun, 27 Jul 2014 22:35:57 +0200
+Subject: [PATCH 2/2] iio: adc: exynos_adc: Add support for S3C24xx ADC
+In-Reply-To: <1405995074-3271-3-git-send-email-cw00.choi@samsung.com>
+References: <1405995074-3271-1-git-send-email-cw00.choi@samsung.com>
+ <1405995074-3271-3-git-send-email-cw00.choi@samsung.com>
+Message-ID: <53D562AD.4090706@gmx.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear Benoit Masson,
-
-On Sat, 26 Jul 2014 16:48:10 -0700, Benoit Masson wrote:
-
-> +	gpio-keys {
-> +		compatible = "gpio-keys";
-> +		pinctrl-0 = <&power_button_pin &reset_button_pin
-> +			&select_button_pin &scroll_button_pin>;
-> +		pinctrl-names = "default";
+Chanwoo Choi schrieb:
+> This patch add support for s3c2410/s3c2416/s3c2440/s3c2443 ADC. The s3c24xx
+> is alomost same as ADCv1. But, There are a little difference as following:
+> - ADCMUX register address to select channel
+> - ADCDAT mask (10bit or 12bit ADC resolution according to SoC version)
+Hi, just some style issues: better separate things like 10bit with a space to 10 bit, there are some instances of this type in your code. Another issue inline.
+>
+> Signed-off-by: Chanwoo Choi <cw00.choi@samsung.com>
+> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+> ---
+>  .../devicetree/bindings/arm/samsung/exynos-adc.txt | 10 ++-
+>  drivers/iio/adc/exynos_adc.c                       | 89 +++++++++++++++++++++-
+>  2 files changed, 96 insertions(+), 3 deletions(-)
+>
+> diff --git a/Documentation/devicetree/bindings/arm/samsung/exynos-adc.txt b/Documentation/devicetree/bindings/arm/samsung/exynos-adc.txt
+> index b6e3989..fe34c76 100644
+> --- a/Documentation/devicetree/bindings/arm/samsung/exynos-adc.txt
+> +++ b/Documentation/devicetree/bindings/arm/samsung/exynos-adc.txt
+> @@ -11,11 +11,19 @@ New driver handles the following
+>  
+>  Required properties:
+>  - compatible:		Must be "samsung,exynos-adc-v1"
+> -				for exynos4412/5250 controllers.
+> +				for exynos4412/5250 and s5pv210 controllers.
+>  			Must be "samsung,exynos-adc-v2" for
+>  				future controllers.
+>  			Must be "samsung,exynos3250-adc" for
+>  				controllers compatible with ADC of Exynos3250.
+> +			Must be "samsung,s3c2410-adc" for
+> +				the ADC in s3c2410 and compatibles
+> +			Must be "samsung,s3c2416-adc" for
+> +				the ADC in s3c2416 and compatibles
+> +			Must be "samsung,s3c2440-adc" for
+> +				the ADC in s3c2440 and compatibles
+> +			Must be "samsung,s3c2443-adc" for
+> +				the ADC in s3c2443 and compatibles
+>  			Must be "samsung,s3c6410-adc" for
+>  				the ADC in s3c6410 and compatibles
+>  - reg:			Contains ADC register address range (base address and
+> diff --git a/drivers/iio/adc/exynos_adc.c b/drivers/iio/adc/exynos_adc.c
+> index 05bdd2f12..7d28032 100644
+> --- a/drivers/iio/adc/exynos_adc.c
+> +++ b/drivers/iio/adc/exynos_adc.c
+> @@ -51,6 +51,9 @@
+>  #define ADC_V1_MUX(x)		((x) + 0x1c)
+>  #define ADC_V1_CLRINTPNDNUP(x)	((x) + 0x20)
+>  
+> +/* S3C2410 ADC registers definitions */
+> +#define ADC_S3C2410_MUX(x)	((x) + 0x18)
 > +
-> +		power-button {
-> +			label = "Power Button";
-> +			linux,code = <KEY_POWER>;
-> +			gpios = <&gpio1 12 GPIO_ACTIVE_HIGH>;
-> +		};
+>  /* Future ADC_V2 registers definitions */
+>  #define ADC_V2_CON1(x)		((x) + 0x00)
+>  #define ADC_V2_CON2(x)		((x) + 0x04)
+> @@ -67,6 +70,8 @@
+>  
+>  /* Bit definitions for S3C2410 ADC */
+>  #define ADC_S3C2410_CON_SELMUX(x) (((x) & 7) <<3)
+> +#define ADC_S3C2410_DATX_MASK	0x3FF
+> +#define ADC_S3C2416_CON_RES_SEL	(1 << 3)
+Since it is done this way in this driver, better use (1u << 3) here.
+>  
+>  /* Bit definitions for ADC_V2 */
+>  #define ADC_V2_CON1_SOFT_RESET	(1u << 2)
+> @@ -84,6 +89,7 @@
+>  
+>  /* Bit definitions common for ADC_V1 and ADC_V2 */
+>  #define ADC_CON_EN_START	(1u << 0)
+> +#define ADC_CON_EN_START_MASK	(0x3 << 0)
+>  #define ADC_DATX_MASK		0xFFF
+>  
+>  #define EXYNOS_ADC_TIMEOUT	(msecs_to_jiffies(100))
+> @@ -101,12 +107,14 @@ struct exynos_adc {
+>  	struct completion	completion;
+>  
+>  	u32			value;
+> +	u32			value2;
+>  	unsigned int            version;
+>  };
+>  
+>  struct exynos_adc_data {
+>  	int num_channels;
+>  	bool needs_sclk;
+> +	u32 mask;
+>  
+>  	void (*init_hw)(struct exynos_adc *info);
+>  	void (*exit_hw)(struct exynos_adc *info);
+> @@ -217,6 +225,17 @@ static void exynos_adc_v1_start_conv(struct exynos_adc *info,
+>  
+>  static const struct exynos_adc_data const exynos_adc_v1_data = {
+>  	.num_channels	= MAX_ADC_V1_CHANNELS,
+> +	.mask		= ADC_DATX_MASK, /* 12bit ADC resolution */
 > +
-> +		reset-button {
-> +			label = "Reset Button";
-> +			linux,code = <KEY_RESTART>;
-> +			gpios = <&gpio1 13 GPIO_ACTIVE_LOW>;
-> +		};
+> +	.init_hw	= exynos_adc_v1_init_hw,
+> +	.exit_hw	= exynos_adc_v1_exit_hw,
+> +	.clear_irq	= exynos_adc_v1_clear_irq,
+> +	.start_conv	= exynos_adc_v1_start_conv,
+> +};
 > +
-> +		select-button {
-> +			label = "Select Button";
-> +			linux,code = <BTN_SELECT>;
-> +			gpios = <&gpio1 9 GPIO_ACTIVE_LOW>;
-> +		};
+> +static struct exynos_adc_data const exynos_adc_s3c24xx_data = {
+> +	.num_channels	= MAX_ADC_V1_CHANNELS,
+> +	.mask		= ADC_S3C2410_DATX_MASK, /* 10bit ADC resolution */
+>  
+>  	.init_hw	= exynos_adc_v1_init_hw,
+>  	.exit_hw	= exynos_adc_v1_exit_hw,
+> @@ -224,6 +243,55 @@ static const struct exynos_adc_data const exynos_adc_v1_data = {
+>  	.start_conv	= exynos_adc_v1_start_conv,
+>  };
+>  
+> +static void exynos_adc_s3c2416_start_conv(struct exynos_adc *info,
+> +					  unsigned long addr)
+> +{
+> +	u32 con1;
 > +
-> +		scroll-button {
-> +			label = "Scroll Button";
-> +			linux,code = <KEY_SCROLLDOWN>;
-> +			gpios = <&gpio1 10 GPIO_ACTIVE_LOW>;
-
-So you're using the GPIO_ACTIVE_<foo> defines here.
-
-> +		};
-> +	};
+> +	/* Enable 12bit ADC resolution */
+> +	con1 = readl(ADC_V1_CON(info->regs));
+> +	con1 |= ADC_S3C2416_CON_RES_SEL;
+> +	writel(con1, ADC_V1_CON(info->regs));
 > +
-> +	spi3 {
-> +		compatible = "spi-gpio";
-> +		status = "okay";
-> +		gpio-sck = <&gpio0 25 0>;
-> +		gpio-mosi = <&gpio1 15 0>; /*gpio 47*/
-> +		cs-gpios = <&gpio0 27 0 >;
-
-But not here. Any reason?
-
-Also, nitpick: unneeded space in <&gpio0 27 0 > (i.e the space right
-before the closing >).
-
-> +		num-chipselects = <1>;
-> +		#address-cells = <1>;
-> +		#size-cells = <0>;
+> +	/* Select channel for S3C2416 */
+> +	writel(addr, ADC_S3C2410_MUX(info->regs));
 > +
-> +		gpio2: gpio2 at 0 {
-> +			compatible = "fairchild,74hc595";
-> +			gpio-controller;
-> +			#gpio-cells = <2>;
-> +			reg = <0>;
-> +			registers-number = <2>;
-> +			spi-max-frequency = <100000>;
-> +		};
-
-I'm not sure "gpio2" is a good name, as we might think of it as being
-the third GPIO controller internal to the SoC.
-
-Thanks,
-
-Thomas
--- 
-Thomas Petazzoni, CTO, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
+> +	con1 = readl(ADC_V1_CON(info->regs));
+> +	writel(con1 | ADC_CON_EN_START, ADC_V1_CON(info->regs));
+> +}
+> +
+> +static struct exynos_adc_data const exynos_adc_s3c2416_data = {
+> +	.num_channels	= MAX_ADC_V1_CHANNELS,
+> +	.mask		= ADC_DATX_MASK, /* 12bit ADC resolution */
+> +
+> +	.init_hw	= exynos_adc_v1_init_hw,
+> +	.exit_hw	= exynos_adc_v1_exit_hw,
+> +	.clear_irq	= exynos_adc_v1_clear_irq,
+> +	.start_conv	= exynos_adc_s3c2416_start_conv,
+> +};
+> +
+> +static void exynos_adc_s3c2443_start_conv(struct exynos_adc *info,
+> +					  unsigned long addr)
+> +{
+> +	u32 con1;
+> +
+> +	/* Select channel for S3C2433 */
+> +	writel(addr, ADC_S3C2410_MUX(info->regs));
+> +
+> +	con1 = readl(ADC_V1_CON(info->regs));
+> +	writel(con1 | ADC_CON_EN_START, ADC_V1_CON(info->regs));
+> +}
+> +
+> +static struct exynos_adc_data const exynos_adc_s3c2443_data = {
+> +	.num_channels	= MAX_ADC_V1_CHANNELS,
+> +	.mask		= ADC_S3C2410_DATX_MASK, /* 10bit ADC resolution */
+> +
+> +	.init_hw	= exynos_adc_v1_init_hw,
+> +	.exit_hw	= exynos_adc_v1_exit_hw,
+> +	.clear_irq	= exynos_adc_v1_clear_irq,
+> +	.start_conv	= exynos_adc_s3c2443_start_conv,
+> +};
+> +
+>  static void exynos_adc_s3c64xx_start_conv(struct exynos_adc *info,
+>  					  unsigned long addr)
+>  {
+> @@ -237,6 +305,7 @@ static void exynos_adc_s3c64xx_start_conv(struct exynos_adc *info,
+>  
+>  static struct exynos_adc_data const exynos_adc_s3c64xx_data = {
+>  	.num_channels	= MAX_ADC_V1_CHANNELS,
+> +	.mask		= ADC_DATX_MASK, /* 12bit ADC resolution */
+>  
+>  	.init_hw	= exynos_adc_v1_init_hw,
+>  	.exit_hw	= exynos_adc_v1_exit_hw,
+> @@ -293,6 +362,7 @@ static void exynos_adc_v2_start_conv(struct exynos_adc *info,
+>  
+>  static const struct exynos_adc_data const exynos_adc_v2_data = {
+>  	.num_channels	= MAX_ADC_V2_CHANNELS,
+> +	.mask		= ADC_DATX_MASK, /* 12bit ADC resolution */
+>  
+>  	.init_hw	= exynos_adc_v2_init_hw,
+>  	.exit_hw	= exynos_adc_v2_exit_hw,
+> @@ -302,6 +372,7 @@ static const struct exynos_adc_data const exynos_adc_v2_data = {
+>  
+>  static const struct exynos_adc_data const exynos3250_adc_data = {
+>  	.num_channels	= MAX_EXYNOS3250_ADC_CHANNELS,
+> +	.mask		= ADC_DATX_MASK, /* 12bit ADC resolution */
+>  	.needs_sclk	= true,
+>  
+>  	.init_hw	= exynos_adc_v2_init_hw,
+> @@ -312,6 +383,18 @@ static const struct exynos_adc_data const exynos3250_adc_data = {
+>  
+>  static const struct of_device_id exynos_adc_match[] = {
+>  	{
+> +		.compatible = "samsung,s3c2410-adc",
+> +		.data = &exynos_adc_s3c24xx_data,
+> +	}, {
+> +		.compatible = "samsung,s3c2416-adc",
+> +		.data = &exynos_adc_s3c2416_data,
+> +	}, {
+> +		.compatible = "samsung,s3c2440-adc",
+> +		.data = &exynos_adc_s3c24xx_data,
+> +	}, {
+> +		.compatible = "samsung,s3c2443-adc",
+> +		.data = &exynos_adc_s3c2443_data,
+> +	}, {
+>  		.compatible = "samsung,s3c6410-adc",
+>  		.data = &exynos_adc_s3c64xx_data,
+>  	}, {
+> @@ -365,7 +448,7 @@ static int exynos_read_raw(struct iio_dev *indio_dev,
+>  		ret = -ETIMEDOUT;
+>  	} else {
+>  		*val = info->value;
+> -		*val2 = 0;
+> +		*val2 = info->value2;
+>  		ret = IIO_VAL_INT;
+>  	}
+>  
+> @@ -377,9 +460,11 @@ static int exynos_read_raw(struct iio_dev *indio_dev,
+>  static irqreturn_t exynos_adc_isr(int irq, void *dev_id)
+>  {
+>  	struct exynos_adc *info = (struct exynos_adc *)dev_id;
+> +	u32 mask = info->data->mask;
+>  
+>  	/* Read value */
+> -	info->value = readl(ADC_V1_DATX(info->regs)) & ADC_DATX_MASK;
+> +	info->value = readl(ADC_V1_DATX(info->regs)) & mask;
+> +	info->value2 = readl(ADC_V1_DATY(info->regs)) & mask;
+>  
+>  	/* clear irq */
+>  	if (info->data->clear_irq)
