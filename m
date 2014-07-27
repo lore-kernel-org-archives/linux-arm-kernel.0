@@ -1,54 +1,67 @@
-From: James.Bottomley@HansenPartnership.com (James Bottomley)
-Date: Sun, 27 Jul 2014 07:52:57 +0400
-Subject: [PATCH 4/5] [SCSI] Do not use platform_bus as a parent
-In-Reply-To: <20140726201150.GA21870@kroah.com>
-References: <1406298233-27876-1-git-send-email-pawel.moll@arm.com>
- <1406298233-27876-4-git-send-email-pawel.moll@arm.com>
- <1406299616.1789.13.camel@jarvis.lan> <20140726201150.GA21870@kroah.com>
-Message-ID: <1406433177.11069.3.camel@jarvis>
+From: afaerber@suse.de (=?UTF-8?B?QW5kcmVhcyBGw6RyYmVy?=)
+Date: Sun, 27 Jul 2014 07:39:48 +0200
+Subject: [RESEND][PATCHv2 0/3] Fix for buggy u-boot memory banks
+In-Reply-To: <CAK5sBcFeaHrLLoSYCvrSMBX+eGYWoGPrCH0Uxy3Ao2OAYXoTNA@mail.gmail.com>
+References: <1405443816-29917-1-git-send-email-lauraa@codeaurora.org>	<53D3FB9C.9080908@suse.de>
+ <CAK5sBcFeaHrLLoSYCvrSMBX+eGYWoGPrCH0Uxy3Ao2OAYXoTNA@mail.gmail.com>
+Message-ID: <53D490A4.1060302@suse.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, 2014-07-26 at 13:11 -0700, Greg Kroah-Hartman wrote:
-> On Fri, Jul 25, 2014 at 07:46:56AM -0700, James Bottomley wrote:
-> > On Fri, 2014-07-25 at 15:23 +0100, Pawel Moll wrote:
-> > > The host devices without a parent were "forcefully adopted"
-> > > by platform bus. This patch removes this assignment. In
-> > > effect the dev_dev may be NULL now, which means ISA.
-> > > 
-> > > Cc: James E.J. Bottomley <JBottomley@parallels.com>
-> > > Cc: linux-scsi at vger.kernel.org
-> > > Signed-off-by: Pawel Moll <pawel.moll@arm.com>
-> > > ---
-> > > 
-> > > This patch is a part of effort to remove references to platform_bus
-> > > and make it static.
-> > > 
-> > > James, could you please have a look and advice if the change is
-> > > correct? Would you happen to know the "real reasons" behind
-> > > using the root platform_bus device a parent?
-> > 
-> > Yes, for DMA purposes, the parent cannot now be NULL; we'll get a panic
-> > in the DMA transfers if it is.  A lot of the legacy ISA device on x86
-> > and I thought some ARM SOC devices don't pass in the parent device, so
-> > we hang them off a known parent.
+Am 27.07.2014 06:28, schrieb Sachin Kamat:
 > 
-> The "generic" platform bus device is not a "known parent".  I don't
-> understand the difference between just setting the parent to be NULL,
-> which will then have a "proper" parent pointer filled in by the driver
-> core when the device is registered, or faking it out here.  What is the
-> difference?
+> 
+> On Sunday, July 27, 2014, Andreas F?rber <afaerber@suse.de
+> <mailto:afaerber@suse.de>> wrote:
+> 
+>     Hi Laura,
+> 
+>     Am 15.07.2014 19:03, schrieb Laura Abbott:
+>     > This is a resend of the series to fix the uboot bug exposed by the
+>     removal
+>     > of meminfo. I haven't gotten any acks though.
+>     >
+>     > Please help with review/acks. Grant/Rob, I'd still like this to go
+>     through
+>     > the devicetree tree if possible.
+> 
+>     Sorry for the delay in testing.
+> 
+>     With this v2 applied on top of kgene's for-next branch (plus
+>     https://patchwork.kernel.org/patch/4297431/ as build fix) I get:
+> 
+>     [    9.699985] Unhandled fault: asynchronous external abort (0x211) at
+>     0x00000000
+> 
+> 
+> If this is on Arndale octa board,
 
-If you set the parent to NULL, the host template dma_dev will end up
-NULL as well and that will trigger a NULL deref panic in the dma segment
-routines.
+It is, sorry, that was the board that prompted the series.
 
-If you want to remove platform_bus, we have to have a well known device
-to set dma_dev to at scsi_host_add time.
+> please try disabling MCPM option.
 
-> In the end, the device always ends up with a parent pointer, right?
+Interestingly without MCPM I then get:
 
-The parent pointer isn't the problem ... assigning the correct dma
-device is.
+drivers/built-in.o: In function `bl_enter_powerdown':
+/home/andreas/linux/drivers/cpuidle/cpuidle-big_little.c:134: undefined
+reference to `mcpm_cpu_powered_up'
+drivers/built-in.o: In function `bl_powerdown_finisher':
+/home/andreas/linux/drivers/cpuidle/cpuidle-big_little.c:104: undefined
+reference to `mcpm_set_entry_vector'
+/home/andreas/linux/drivers/cpuidle/cpuidle-big_little.c:111: undefined
+reference to `mcpm_cpu_suspend'
+Makefile:885: recipe for target 'vmlinux' failed
+make: *** [vmlinux] Error 1
 
-James
+ARM_BIG_LITTLE_CPUIDLE seems to be lacking a dependency on MCPM.
+
+Together they resolved the issue, thanks!
+
+Tested-by: Andreas F?rber <afaerber@suse.de>
+
+Cheers,
+Andreas
+
+-- 
+SUSE LINUX Products GmbH, Maxfeldstr. 5, 90409 N?rnberg, Germany
+GF: Jeff Hawn, Jennifer Guild, Felix Imend?rffer; HRB 16746 AG N?rnberg
