@@ -1,327 +1,102 @@
-From: yahoo@perenite.com (Benoit Masson)
-Date: Sun, 27 Jul 2014 16:30:39 -0700
-Subject: [PATCH 2/2] V4 ARM: mvebu: Added dts defintion for Lenovo Iomega
+From: benoitm@perenite.com (Benoit Masson)
+Date: Mon, 28 Jul 2014 01:35:35 +0200
+Subject: [PATCH 2/2] V3 ARM: mvebu: Added dts defintion for Lenovo Iomega
  ix4-300d NAS
-Message-ID: <1406503839-4662-1-git-send-email-yahoo@perenite.com>
+In-Reply-To: <20140727223258.36b050b9@free-electrons.com>
+References: <1406418490-61502-1-git-send-email-yahoo@perenite.com>
+ <20140727223258.36b050b9@free-electrons.com>
+Message-ID: <C2BE2F4B-1045-484F-9E12-A757EE3CD1F6@perenite.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The Lenovo Iomega ix4-300d is a 4-Bay sata NAS with dual Gb,
- USB2.0 & 3.0, powered by a Marvell Armada XP MV78230 dual core CPU.
+ 
+Le 27 juil. 2014 ? 22:32, Thomas Petazzoni <thomas.petazzoni@free-electrons.com> a ?crit :
 
-http://shop.lenovo.com/us/en/servers/network-storage/lenovoemc/ix4-300d/
-Signed-off-by: Benoit Masson <yahoo@perenite.com>
----
- arch/arm/boot/dts/Makefile                      |   3 +-
- arch/arm/boot/dts/armada-xp-lenovo-ix4-300d.dts | 285 ++++++++++++++++++++++++
- 2 files changed, 287 insertions(+), 1 deletion(-)
- create mode 100644 arch/arm/boot/dts/armada-xp-lenovo-ix4-300d.dts
+> Dear Benoit Masson,
+> 
 
-diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
-index adb5ed9..4429495 100644
---- a/arch/arm/boot/dts/Makefile
-+++ b/arch/arm/boot/dts/Makefile
-@@ -437,8 +437,9 @@ dtb-$(CONFIG_MACH_ARMADA_XP) += \
- 	armada-xp-axpwifiap.dtb \
- 	armada-xp-db.dtb \
- 	armada-xp-gp.dtb \
--	armada-xp-netgear-rn2120.dtb \
-+	armada-xp-lenovo-ix4-300d.dtb \
- 	armada-xp-matrix.dtb \
-+	armada-xp-netgear-rn2120.dtb \
- 	armada-xp-openblocks-ax3-4.dtb
- dtb-$(CONFIG_MACH_DOVE) += dove-cm-a510.dtb \
- 	dove-cubox.dtb \
-diff --git a/arch/arm/boot/dts/armada-xp-lenovo-ix4-300d.dts b/arch/arm/boot/dts/armada-xp-lenovo-ix4-300d.dts
-new file mode 100644
-index 0000000..6d5782b
---- /dev/null
-+++ b/arch/arm/boot/dts/armada-xp-lenovo-ix4-300d.dts
-@@ -0,0 +1,285 @@
-+/*
-+ * Device Tree file for Lenovo Iomega ix4-300d
-+ *
-+ * Copyright (C) 2014, Benoit Masson <yahoo@perenite.com>
-+ *
-+ * This program is free software; you can redistribute it and/or
-+ * modify it under the terms of the GNU General Public License
-+ * as published by the Free Software Foundation; either version
-+ * 2 of the License, or (at your option) any later version.
-+ */
-+
-+/dts-v1/;
-+
-+#include <dt-bindings/input/input.h>
-+#include <dt-bindings/gpio/gpio.h>
-+#include "armada-xp-mv78230.dtsi"
-+
-+/ {
-+	model = "Lenovo Iomega ix4-300d";
-+	compatible = "lenovo,ix4-300d", "marvell,armadaxp-mv78230",
-+		     "marvell,armadaxp", "marvell,armada-370-xp";
-+
-+	chosen {
-+		bootargs = "console=ttyS0,115200 earlyprintk";
-+		stdout-path = "/soc/internal-regs/serial at 12000";
-+	};
-+
-+	memory {
-+		device_type = "memory";
-+		reg = <0 0x00000000 0 0x20000000>; /* 512MB */
-+	};
-+
-+	soc {
-+		ranges = <MBUS_ID(0xf0, 0x01) 0 0 0xd0000000 0x100000
-+			MBUS_ID(0x01, 0x1d) 0 0 0xfff00000 0x100000>;
-+
-+		pcie-controller {
-+			status = "okay";
-+
-+			/* Quad port sata: Marvell 88SX7042 */
-+			pcie at 1,0 {
-+				/* Port 0, Lane 0 */
-+				status = "okay";
-+			};
-+
-+			/* USB 3.0 xHCI controller: NEC D720200F1 */
-+			pcie at 5,0 {
-+				/* Port 1, Lane 0 */
-+				status = "okay";
-+			};
-+		};
-+
-+		internal-regs {
-+			pinctrl {
-+				poweroff_pin: poweroff-pin {
-+					marvell,pins = "mpp24";
-+					marvell,function = "gpio";
-+				};
-+
-+				power_button_pin: power-button-pin {
-+					marvell,pins = "mpp44";
-+					marvell,function = "gpio";
-+				};
-+
-+				reset_button_pin: reset-button-pin {
-+					marvell,pins = "mpp45";
-+					marvell,function = "gpio";
-+				};
-+				select_button_pin: select-button-pin {
-+					marvell,pins = "mpp41";
-+					marvell,function = "gpio";
-+				};
-+
-+				scroll_button_pin: scroll-button-pin {
-+					marvell,pins = "mpp42";
-+					marvell,function = "gpio";
-+				};
-+
-+				hdd_led_pin: hdd-led-pin {
-+					marvell,pins = "mpp26";
-+					marvell,function = "gpio";
-+				};
-+			};
-+
-+			serial at 12000 {
-+				status = "okay";
-+			};
-+
-+			mdio {
-+				phy0: ethernet-phy at 0 { /* Marvell 88E1318 */
-+					reg = <0>;
-+				};
-+
-+				phy1: ethernet-phy at 1 { /* Marvell 88E1318 */
-+					reg = <1>;
-+				};
-+			};
-+
-+			ethernet at 70000 {
-+				status = "okay";
-+				phy = <&phy0>;
-+				phy-mode = "rgmii-id";
-+			};
-+
-+			ethernet at 74000 {
-+				status = "okay";
-+				phy = <&phy1>;
-+				phy-mode = "rgmii-id";
-+			};
-+
-+			usb at 50000 {
-+				status = "okay";
-+			};
-+
-+			usb at 51000 {
-+				status = "okay";
-+			};
-+
-+			i2c at 11000 {
-+				compatible = "marvell,mv64xxx-i2c";
-+				clock-frequency = <400000>;
-+				status = "okay";
-+
-+				adt7473 at 2e {
-+					compatible = "adi,adt7473";
-+					reg = <0x2e>;
-+				};
-+
-+				pcf8563 at 51 {
-+					compatible = "nxp,pcf8563";
-+					reg = <0x51>;
-+				};
-+
-+			};
-+
-+			nand at d0000 {
-+				status = "okay";
-+				num-cs = <1>;
-+				marvell,nand-keep-config;
-+				marvell,nand-enable-arbiter;
-+				nand-on-flash-bbt;
-+
-+				partition at 0 {
-+					label = "u-boot";
-+					reg = <0x0000000 0xe0000>;
-+					read-only;
-+				};
-+
-+				partition at e0000 {
-+					label = "u-boot-env";
-+					reg = <0xe0000 0x20000>;
-+					read-only;
-+				};
-+
-+				partition at 100000 {
-+					label = "u-boot-env2";
-+					reg = <0x100000 0x20000>;
-+					read-only;
-+				};
-+
-+				partition at 120000 {
-+					label = "zImage";
-+					reg = <0x120000 0x400000>;
-+				};
-+
-+				partition at 520000 {
-+					label = "initrd";
-+					reg = <0x520000 0x400000>;
-+				};
-+
-+				partition at xE00000 {
-+					label = "boot";
-+					reg = <0xE00000 0x3F200000>;
-+				};
-+
-+				partition at flash {
-+					label = "flash";
-+					reg = <0x0 0x40000000>;
-+				};
-+			};
-+		};
-+	};
-+
-+	gpio-keys {
-+		compatible = "gpio-keys";
-+		pinctrl-0 = <&power_button_pin &reset_button_pin
-+			&select_button_pin &scroll_button_pin>;
-+		pinctrl-names = "default";
-+
-+		power-button {
-+			label = "Power Button";
-+			linux,code = <KEY_POWER>;
-+			gpios = <&gpio1 12 GPIO_ACTIVE_HIGH>;
-+		};
-+
-+		reset-button {
-+			label = "Reset Button";
-+			linux,code = <KEY_RESTART>;
-+			gpios = <&gpio1 13 GPIO_ACTIVE_LOW>;
-+		};
-+
-+		select-button {
-+			label = "Select Button";
-+			linux,code = <BTN_SELECT>;
-+			gpios = <&gpio1 9 GPIO_ACTIVE_LOW>;
-+		};
-+
-+		scroll-button {
-+			label = "Scroll Button";
-+			linux,code = <KEY_SCROLLDOWN>;
-+			gpios = <&gpio1 10 GPIO_ACTIVE_LOW>;
-+		};
-+	};
-+
-+	spi3 {
-+		compatible = "spi-gpio";
-+		status = "okay";
-+		gpio-sck = <&gpio0 25 GPIO_ACTIVE_LOW>;
-+		gpio-mosi = <&gpio1 15 GPIO_ACTIVE_LOW>; /*gpio 47*/
-+		cs-gpios = <&gpio0 27 GPIO_ACTIVE_LOW>;
-+		num-chipselects = <1>;
-+		#address-cells = <1>;
-+		#size-cells = <0>;
-+
-+		gpio_spi: gpio_spi at 0 {
-+			compatible = "fairchild,74hc595";
-+			gpio-controller;
-+			#gpio-cells = <2>;
-+			reg = <0>;
-+			registers-number = <2>;
-+			spi-max-frequency = <100000>;
-+		};
-+	};
-+
-+	gpio-leds {
-+		compatible = "gpio-leds";
-+		pinctrl-0 = <&hdd_led_pin>;
-+		pinctrl-names = "default";
-+
-+		hdd-led {
-+			label = "ix4-300d:hdd:blue";
-+			gpios = <&gpio0 26 GPIO_ACTIVE_HIGH>;
-+			default-state = "off";
-+		};
-+
-+		power-led {
-+			label = "ix4-300d:power:white";
-+			gpios = <&gpio_spi 1 GPIO_ACTIVE_LOW>;
-+			/* init blinking while booting */
-+			linux,default-trigger = "timer";
-+			default-state = "on";
-+		};
-+
-+		sysfail-led {
-+			label = "ix4-300d:sysfail:red";
-+			gpios = <&gpio_spi 2 GPIO_ACTIVE_HIGH>;
-+			default-state = "off";
-+		};
-+
-+		sys-led {
-+			label = "ix4-300d:sys:blue";
-+			gpios = <&gpio_spi 3 GPIO_ACTIVE_HIGH>;
-+			default-state = "off";
-+		};
-+
-+		hddfail-led {
-+			label = "ix4-300d:hddfail:red";
-+			gpios = <&gpio_spi 4 GPIO_ACTIVE_HIGH>;
-+			default-state = "off";
-+		};
-+
-+	};
-+
-+	/* 
-+	 * Warning: you need both eth1 & 0 PHY initialized (i.e having
-+	 * them up does the tweak) for poweroff to shutdown otherwise it
-+	 * reboots 
-+	 */
-+	gpio-poweroff {
-+		compatible = "gpio-poweroff";
-+		pinctrl-0 = <&poweroff_pin>;
-+		pinctrl-names = "default";
-+		gpios = <&gpio0 24 GPIO_ACTIVE_HIGH>;
-+	};
-+};
--- 
-1.9.1
+Dear Thomas,
+
+> On Sat, 26 Jul 2014 16:48:10 -0700, Benoit Masson wrote:
+> 
+>> +	gpio-keys {
+>> +		compatible = "gpio-keys";
+>> +		pinctrl-0 = <&power_button_pin &reset_button_pin
+>> +			&select_button_pin &scroll_button_pin>;
+>> +		pinctrl-names = "default";
+>> +
+>> +		power-button {
+>> +			label = "Power Button";
+>> +			linux,code = <KEY_POWER>;
+>> +			gpios = <&gpio1 12 GPIO_ACTIVE_HIGH>;
+>> +		};
+>> +
+>> +		reset-button {
+>> +			label = "Reset Button";
+>> +			linux,code = <KEY_RESTART>;
+>> +			gpios = <&gpio1 13 GPIO_ACTIVE_LOW>;
+>> +		};
+>> +
+>> +		select-button {
+>> +			label = "Select Button";
+>> +			linux,code = <BTN_SELECT>;
+>> +			gpios = <&gpio1 9 GPIO_ACTIVE_LOW>;
+>> +		};
+>> +
+>> +		scroll-button {
+>> +			label = "Scroll Button";
+>> +			linux,code = <KEY_SCROLLDOWN>;
+>> +			gpios = <&gpio1 10 GPIO_ACTIVE_LOW>;
+> 
+> So you're using the GPIO_ACTIVE_<foo> defines here.
+> 
+>> +		};
+>> +	};
+>> +
+>> +	spi3 {
+>> +		compatible = "spi-gpio";
+>> +		status = "okay";
+>> +		gpio-sck = <&gpio0 25 0>;
+>> +		gpio-mosi = <&gpio1 15 0>; /*gpio 47*/
+>> +		cs-gpios = <&gpio0 27 0 >;
+> 
+> But not here. Any reason?
+
+Indeed I think Jason made this comment already and I seem to have missed -> Corrected in V4
+
+> 
+> Also, nitpick: unneeded space in <&gpio0 27 0 > (i.e the space right
+> before the closing >).
+> 
+
+-> Corrected in V4
+
+>> +		num-chipselects = <1>;
+>> +		#address-cells = <1>;
+>> +		#size-cells = <0>;
+>> +
+>> +		gpio2: gpio2 at 0 {
+>> +			compatible = "fairchild,74hc595";
+>> +			gpio-controller;
+>> +			#gpio-cells = <2>;
+>> +			reg = <0>;
+>> +			registers-number = <2>;
+>> +			spi-max-frequency = <100000>;
+>> +		};
+> 
+> I'm not sure "gpio2" is a good name, as we might think of it as being
+> the third GPIO controller internal to the SoC.
+> 
+
+Renamed to gpio_spi, tested ok  -> Corrected in V4
+
+> Thanks,
+> 
+
+You're welcome, patch issued as V4 just now.
+
+> Thomas
+> -- 
+> Thomas Petazzoni, CTO, Free Electrons
+> Embedded Linux, Kernel and Android engineering
+> http://free-electrons.com
