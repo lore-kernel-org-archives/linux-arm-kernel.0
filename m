@@ -1,65 +1,38 @@
 From: broonie@kernel.org (Mark Brown)
-Date: Sun, 27 Jul 2014 17:57:04 +0100
-Subject: [PATCH] irqchip: gic-v3: Only define gic_peek_irq() when building SMP
-Message-ID: <1406480224-24628-1-git-send-email-broonie@kernel.org>
+Date: Sun, 27 Jul 2014 18:04:18 +0100
+Subject: [PATCH] video: clcd-versatile: Depend on ARM
+Message-ID: <1406480658-27243-1-git-send-email-broonie@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Mark Brown <broonie@linaro.org>
 
-If building with CONFIG_SMP disbled (for example, with allnoconfig) then
-GCC complains that the static function gic_peek_irq() is defined but not
-used since the only reference is in the SMP initialisation code. Fix this
-by moving the function definition inside the ifdef.
+The Versatile CLCD helpers call dma_alloc_writecombine() which is only
+available on ARM and AVR32, meaning they won't build on other platforms
+including arm64. Unfortunately the current Kconfig enables the symbol
+by default if ARCH_VEXPRESS is defined which means that it is enabled on
+arm64 when building for the ARM reference platforms and models for ARMv8
+since they have many hardware similarities with their pre-ARMv8 systems.
+
+Since all the systems that need the helpers are ARM systems fix this by
+adding a dependency on ARM.
 
 Signed-off-by: Mark Brown <broonie@linaro.org>
 ---
- drivers/irqchip/irq-gic-v3.c | 26 +++++++++++++-------------
- 1 file changed, 13 insertions(+), 13 deletions(-)
+ drivers/video/fbdev/Kconfig | 1 +
+ 1 file changed, 1 insertion(+)
 
-diff --git a/drivers/irqchip/irq-gic-v3.c b/drivers/irqchip/irq-gic-v3.c
-index 81519bae0453..30130f955151 100644
---- a/drivers/irqchip/irq-gic-v3.c
-+++ b/drivers/irqchip/irq-gic-v3.c
-@@ -200,19 +200,6 @@ static void gic_poke_irq(struct irq_data *d, u32 offset)
- 	rwp_wait();
- }
+diff --git a/drivers/video/fbdev/Kconfig b/drivers/video/fbdev/Kconfig
+index e83ed760141b..ce7c76676a70 100644
+--- a/drivers/video/fbdev/Kconfig
++++ b/drivers/video/fbdev/Kconfig
+@@ -293,6 +293,7 @@ config FB_ARMCLCD
+ # Helper logic selected only by the ARM Versatile platform family.
+ config PLAT_VERSATILE_CLCD
+ 	def_bool ARCH_VERSATILE || ARCH_REALVIEW || ARCH_VEXPRESS
++	depends on ARM
+ 	depends on FB_ARMCLCD && FB=y
  
--static int gic_peek_irq(struct irq_data *d, u32 offset)
--{
--	u32 mask = 1 << (gic_irq(d) % 32);
--	void __iomem *base;
--
--	if (gic_irq_in_rdist(d))
--		base = gic_data_rdist_sgi_base();
--	else
--		base = gic_data.dist_base;
--
--	return !!(readl_relaxed(base + offset + (gic_irq(d) / 32) * 4) & mask);
--}
--
- static void gic_mask_irq(struct irq_data *d)
- {
- 	gic_poke_irq(d, GICD_ICENABLER);
-@@ -401,6 +388,19 @@ static void gic_cpu_init(void)
- }
- 
- #ifdef CONFIG_SMP
-+static int gic_peek_irq(struct irq_data *d, u32 offset)
-+{
-+	u32 mask = 1 << (gic_irq(d) % 32);
-+	void __iomem *base;
-+
-+	if (gic_irq_in_rdist(d))
-+		base = gic_data_rdist_sgi_base();
-+	else
-+		base = gic_data.dist_base;
-+
-+	return !!(readl_relaxed(base + offset + (gic_irq(d) / 32) * 4) & mask);
-+}
-+
- static int gic_secondary_init(struct notifier_block *nfb,
- 			      unsigned long action, void *hcpu)
- {
+ config FB_ACORN
 -- 
 2.0.1
