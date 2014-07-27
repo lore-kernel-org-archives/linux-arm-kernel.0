@@ -1,38 +1,33 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Sun, 27 Jul 2014 18:04:18 +0100
-Subject: [PATCH] video: clcd-versatile: Depend on ARM
-Message-ID: <1406480658-27243-1-git-send-email-broonie@kernel.org>
+From: sam@ravnborg.org (Sam Ravnborg)
+Date: Sun, 27 Jul 2014 20:40:10 +0200
+Subject: [PATCH] arm64/crypto: fix makefile rule for aes-glue-%.o
+In-Reply-To: <CAKv+Gu9S8vVALGFR1qL+sFfnUuYR9pkkwy0t6NuJHrs9bVxdBw@mail.gmail.com>
+References: <CAKv+Gu96k7GOVR85EXtro3Lt0jjiJqxyvT9cwJZ1qc6uzq97bw@mail.gmail.com>
+ <mvmvbqmj3b2.fsf@hawking.suse.de>
+ <CAKv+Gu_9HRwAxkJjT3KRvDbupp0yzstyq1dXsXkTu9M6swdCKQ@mail.gmail.com>
+ <mvmr41aj2ob.fsf@hawking.suse.de>
+ <CAKv+Gu_z4VTssLDhiQxi8DRJNEUgzrM5bFzje8NXEmBiA2vqeg@mail.gmail.com>
+ <CAKv+Gu-B9_sgGgw9obrBGNUFSS1JcskN34s1X4PU8F5bauHT1Q@mail.gmail.com>
+ <20140724161225.GA11204@ravnborg.org>
+ <CAKv+Gu8ikMGNVHeuujSf4eaK+LOFKMWxKF8i76VthnKYgvOcYQ@mail.gmail.com>
+ <20140724204526.GA11754@ravnborg.org>
+ <CAKv+Gu9S8vVALGFR1qL+sFfnUuYR9pkkwy0t6NuJHrs9bVxdBw@mail.gmail.com>
+Message-ID: <20140727184010.GA26029@ravnborg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Mark Brown <broonie@linaro.org>
+> 
+> > Btw. the current solution is already faulty - even with the fix.
+> > There are no support for make C=2 arch/.../crypto/
+> >
+> 
+> So can you elaborate on how it is faulty?
 
-The Versatile CLCD helpers call dma_alloc_writecombine() which is only
-available on ARM and AVR32, meaning they won't build on other platforms
-including arm64. Unfortunately the current Kconfig enables the symbol
-by default if ARCH_VEXPRESS is defined which means that it is enabled on
-arm64 when building for the ARM reference platforms and models for ARMv8
-since they have many hardware similarities with their pre-ARMv8 systems.
+When you run "make C=2 arch/.../crypto/" then sparse shall be run
+for all .c files also if they are already built.
+But due to the re-implementation of some parts of the kbuild logic
+in the makefile this does not happen with the -glue file.
 
-Since all the systems that need the helpers are ARM systems fix this by
-adding a dependency on ARM.
+A minor detail - but this may not be the only wreckage we see over time.
 
-Signed-off-by: Mark Brown <broonie@linaro.org>
----
- drivers/video/fbdev/Kconfig | 1 +
- 1 file changed, 1 insertion(+)
-
-diff --git a/drivers/video/fbdev/Kconfig b/drivers/video/fbdev/Kconfig
-index e83ed760141b..ce7c76676a70 100644
---- a/drivers/video/fbdev/Kconfig
-+++ b/drivers/video/fbdev/Kconfig
-@@ -293,6 +293,7 @@ config FB_ARMCLCD
- # Helper logic selected only by the ARM Versatile platform family.
- config PLAT_VERSATILE_CLCD
- 	def_bool ARCH_VERSATILE || ARCH_REALVIEW || ARCH_VEXPRESS
-+	depends on ARM
- 	depends on FB_ARMCLCD && FB=y
- 
- config FB_ACORN
--- 
-2.0.1
+	Sam
