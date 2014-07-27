@@ -1,108 +1,42 @@
-From: knaack.h@gmx.de (Hartmut Knaack)
-Date: Sun, 27 Jul 2014 20:49:06 +0200
-Subject: [PATCH 1/2] iio: adc: exynos_adc: add support for s3c64xx adc
-In-Reply-To: <1405995074-3271-2-git-send-email-cw00.choi@samsung.com>
-References: <1405995074-3271-1-git-send-email-cw00.choi@samsung.com>
- <1405995074-3271-2-git-send-email-cw00.choi@samsung.com>
-Message-ID: <53D549A2.1000900@gmx.de>
+From: broonie@kernel.org (Mark Brown)
+Date: Sun, 27 Jul 2014 19:49:42 +0100
+Subject: [PATCH v10 2/2] dmaengine: sun6i: Add driver for the Allwinner
+ A31 DMA controller
+In-Reply-To: <20140701124852.GB6064@leverpostej>
+References: <1404134454-25513-1-git-send-email-maxime.ripard@free-electrons.com>
+ <1404134454-25513-3-git-send-email-maxime.ripard@free-electrons.com>
+ <20140630142054.GA8756@leverpostej>
+ <20140630151906.GG28647@lukather>
+ <20140630153305.GA28740@leverpostej>
+ <20140701072119.GH28647@lukather>
+ <20140701124852.GB6064@leverpostej>
+Message-ID: <20140727184942.GL17528@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Chanwoo Choi schrieb:
-> From: Arnd Bergmann <arnd@arndb.de>
->
-> The ADC in s3c64xx is almost the same as exynosv1, but
-> has a different 'select' method. Adding this here will be
-> helpful to move over the existing s3c64xx platform from the
-> legacy plat-samsung/adc driver to the new exynos-adc.
->
-> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-> Signed-off-by: Chanwoo Choi <cw00.choi@samsung.com>
-> ---
->  .../devicetree/bindings/arm/samsung/exynos-adc.txt |  2 ++
->  drivers/iio/adc/exynos_adc.c                       | 32 +++++++++++++++++++++-
->  2 files changed, 33 insertions(+), 1 deletion(-)
->
-> diff --git a/Documentation/devicetree/bindings/arm/samsung/exynos-adc.txt b/Documentation/devicetree/bindings/arm/samsung/exynos-adc.txt
-> index 6d34891..b6e3989 100644
-> --- a/Documentation/devicetree/bindings/arm/samsung/exynos-adc.txt
-> +++ b/Documentation/devicetree/bindings/arm/samsung/exynos-adc.txt
-> @@ -16,6 +16,8 @@ Required properties:
->  				future controllers.
->  			Must be "samsung,exynos3250-adc" for
->  				controllers compatible with ADC of Exynos3250.
-> +			Must be "samsung,s3c6410-adc" for
-> +				the ADC in s3c6410 and compatibles
->  - reg:			Contains ADC register address range (base address and
->  			length) and the address of the phy enable register.
->  - interrupts: 		Contains the interrupt information for the timer. The
-> diff --git a/drivers/iio/adc/exynos_adc.c b/drivers/iio/adc/exynos_adc.c
-> index 87e0895..05bdd2f12 100644
-> --- a/drivers/iio/adc/exynos_adc.c
-> +++ b/drivers/iio/adc/exynos_adc.c
-> @@ -40,12 +40,16 @@
->  #include <linux/iio/machine.h>
->  #include <linux/iio/driver.h>
->  
-> -/* EXYNOS4412/5250 ADC_V1 registers definitions */
-> +/* S3C/EXYNOS4412/5250 ADC_V1 registers definitions */
->  #define ADC_V1_CON(x)		((x) + 0x00)
-> +#define ADC_V1_TSC(x)		((x) + 0x04)
->  #define ADC_V1_DLY(x)		((x) + 0x08)
->  #define ADC_V1_DATX(x)		((x) + 0x0C)
-> +#define ADC_V1_DATY(x)		((x) + 0x10)
-> +#define ADC_V1_UPDN(x)		((x) + 0x14)
->  #define ADC_V1_INTCLR(x)	((x) + 0x18)
->  #define ADC_V1_MUX(x)		((x) + 0x1c)
-> +#define ADC_V1_CLRINTPNDNUP(x)	((x) + 0x20)
->  
->  /* Future ADC_V2 registers definitions */
->  #define ADC_V2_CON1(x)		((x) + 0x00)
-> @@ -61,6 +65,9 @@
->  #define ADC_V1_CON_PRSCLV(x)	(((x) & 0xFF) << 6)
->  #define ADC_V1_CON_STANDBY	(1u << 2)
->  
-> +/* Bit definitions for S3C2410 ADC */
-> +#define ADC_S3C2410_CON_SELMUX(x) (((x) & 7) <<3)
-There is a whitespace missing.
-> +
->  /* Bit definitions for ADC_V2 */
->  #define ADC_V2_CON1_SOFT_RESET	(1u << 2)
->  
-> @@ -217,6 +224,26 @@ static const struct exynos_adc_data const exynos_adc_v1_data = {
->  	.start_conv	= exynos_adc_v1_start_conv,
->  };
->  
-> +static void exynos_adc_s3c64xx_start_conv(struct exynos_adc *info,
-> +					  unsigned long addr)
-> +{
-> +	u32 con1;
-> +
-> +	con1 = readl(ADC_V1_CON(info->regs));
-> +	con1 &= ~ADC_S3C2410_CON_SELMUX(7);
-> +	con1 |= ADC_S3C2410_CON_SELMUX(addr);
-> +	writel(con1 | ADC_CON_EN_START, ADC_V1_CON(info->regs));
-> +}
-> +
-> +static struct exynos_adc_data const exynos_adc_s3c64xx_data = {
-> +	.num_channels	= MAX_ADC_V1_CHANNELS,
-> +
-> +	.init_hw	= exynos_adc_v1_init_hw,
-> +	.exit_hw	= exynos_adc_v1_exit_hw,
-> +	.clear_irq	= exynos_adc_v1_clear_irq,
-> +	.start_conv	= exynos_adc_s3c64xx_start_conv,
-> +};
-> +
->  static void exynos_adc_v2_init_hw(struct exynos_adc *info)
->  {
->  	u32 con1, con2;
-> @@ -285,6 +312,9 @@ static const struct exynos_adc_data const exynos3250_adc_data = {
->  
->  static const struct of_device_id exynos_adc_match[] = {
->  	{
-> +		.compatible = "samsung,s3c6410-adc",
-> +		.data = &exynos_adc_s3c64xx_data,
-> +	}, {
->  		.compatible = "samsung,exynos-adc-v1",
->  		.data = &exynos_adc_v1_data,
->  	}, {
+On Tue, Jul 01, 2014 at 01:48:52PM +0100, Mark Rutland wrote:
+> On Tue, Jul 01, 2014 at 08:21:19AM +0100, Maxime Ripard wrote:
+
+> > > It feels a little fragile to rely on the organisation of the clock tree
+> > > and the naming thereof. If the IP block is ever reused on an SoC with a
+> > > different clock tree layout then we have to handle things differently.
+> > 
+> > What do you suggest then?
+> 
+> I will admit that I don't have a better suggestion.
+> 
+> Without knowing which particular constraint on the mux parent clock we
+> care about it's difficult to suggest anything useful.
+
+There's supposed to be facilities appearing in the generic clock code
+for specifying default clock tree configurations via the DT - it's quite
+a common requirement after all.  It sounds like that should be able to
+do the job here.  Not sure if these have gone in yet or not but there's
+quite a bit of demand.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140727/4cb178f7/attachment.sig>
