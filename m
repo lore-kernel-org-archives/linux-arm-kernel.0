@@ -1,42 +1,83 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Sun, 27 Jul 2014 19:49:42 +0100
-Subject: [PATCH v10 2/2] dmaengine: sun6i: Add driver for the Allwinner
- A31 DMA controller
-In-Reply-To: <20140701124852.GB6064@leverpostej>
-References: <1404134454-25513-1-git-send-email-maxime.ripard@free-electrons.com>
- <1404134454-25513-3-git-send-email-maxime.ripard@free-electrons.com>
- <20140630142054.GA8756@leverpostej>
- <20140630151906.GG28647@lukather>
- <20140630153305.GA28740@leverpostej>
- <20140701072119.GH28647@lukather>
- <20140701124852.GB6064@leverpostej>
-Message-ID: <20140727184942.GL17528@sirena.org.uk>
+From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
+Date: Sun, 27 Jul 2014 22:32:58 +0200
+Subject: [PATCH 2/2] V3 ARM: mvebu: Added dts defintion for Lenovo
+ Iomega ix4-300d NAS
+In-Reply-To: <1406418490-61502-1-git-send-email-yahoo@perenite.com>
+References: <1406418490-61502-1-git-send-email-yahoo@perenite.com>
+Message-ID: <20140727223258.36b050b9@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jul 01, 2014 at 01:48:52PM +0100, Mark Rutland wrote:
-> On Tue, Jul 01, 2014 at 08:21:19AM +0100, Maxime Ripard wrote:
+Dear Benoit Masson,
 
-> > > It feels a little fragile to rely on the organisation of the clock tree
-> > > and the naming thereof. If the IP block is ever reused on an SoC with a
-> > > different clock tree layout then we have to handle things differently.
-> > 
-> > What do you suggest then?
-> 
-> I will admit that I don't have a better suggestion.
-> 
-> Without knowing which particular constraint on the mux parent clock we
-> care about it's difficult to suggest anything useful.
+On Sat, 26 Jul 2014 16:48:10 -0700, Benoit Masson wrote:
 
-There's supposed to be facilities appearing in the generic clock code
-for specifying default clock tree configurations via the DT - it's quite
-a common requirement after all.  It sounds like that should be able to
-do the job here.  Not sure if these have gone in yet or not but there's
-quite a bit of demand.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140727/4cb178f7/attachment.sig>
+> +	gpio-keys {
+> +		compatible = "gpio-keys";
+> +		pinctrl-0 = <&power_button_pin &reset_button_pin
+> +			&select_button_pin &scroll_button_pin>;
+> +		pinctrl-names = "default";
+> +
+> +		power-button {
+> +			label = "Power Button";
+> +			linux,code = <KEY_POWER>;
+> +			gpios = <&gpio1 12 GPIO_ACTIVE_HIGH>;
+> +		};
+> +
+> +		reset-button {
+> +			label = "Reset Button";
+> +			linux,code = <KEY_RESTART>;
+> +			gpios = <&gpio1 13 GPIO_ACTIVE_LOW>;
+> +		};
+> +
+> +		select-button {
+> +			label = "Select Button";
+> +			linux,code = <BTN_SELECT>;
+> +			gpios = <&gpio1 9 GPIO_ACTIVE_LOW>;
+> +		};
+> +
+> +		scroll-button {
+> +			label = "Scroll Button";
+> +			linux,code = <KEY_SCROLLDOWN>;
+> +			gpios = <&gpio1 10 GPIO_ACTIVE_LOW>;
+
+So you're using the GPIO_ACTIVE_<foo> defines here.
+
+> +		};
+> +	};
+> +
+> +	spi3 {
+> +		compatible = "spi-gpio";
+> +		status = "okay";
+> +		gpio-sck = <&gpio0 25 0>;
+> +		gpio-mosi = <&gpio1 15 0>; /*gpio 47*/
+> +		cs-gpios = <&gpio0 27 0 >;
+
+But not here. Any reason?
+
+Also, nitpick: unneeded space in <&gpio0 27 0 > (i.e the space right
+before the closing >).
+
+> +		num-chipselects = <1>;
+> +		#address-cells = <1>;
+> +		#size-cells = <0>;
+> +
+> +		gpio2: gpio2 at 0 {
+> +			compatible = "fairchild,74hc595";
+> +			gpio-controller;
+> +			#gpio-cells = <2>;
+> +			reg = <0>;
+> +			registers-number = <2>;
+> +			spi-max-frequency = <100000>;
+> +		};
+
+I'm not sure "gpio2" is a good name, as we might think of it as being
+the third GPIO controller internal to the SoC.
+
+Thanks,
+
+Thomas
+-- 
+Thomas Petazzoni, CTO, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
