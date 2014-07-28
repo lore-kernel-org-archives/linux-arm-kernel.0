@@ -1,48 +1,55 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Mon, 28 Jul 2014 13:20:42 +0100
-Subject: [PATCH v2 09/11] Documentation: devicetree: Fix ADI AXI SPDIF
- specification
-In-Reply-To: <53D63746.3000905@suse.de>
-References: <1406242820-20140-1-git-send-email-afaerber@suse.de>
- <1406242820-20140-10-git-send-email-afaerber@suse.de>
- <53D20A61.1050506@metafoo.de> <53D21066.8000905@monstr.eu>
- <20140725101815.GO17528@sirena.org.uk> <53D2324B.4070602@suse.de>
- <20140725103905.GP17528@sirena.org.uk> <53D63746.3000905@suse.de>
-Message-ID: <20140728122042.GR17528@sirena.org.uk>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Mon, 28 Jul 2014 14:25:12 +0200
+Subject: [GIT PULL 1/2] ARM: dts: support for Rockchip RK3288
+In-Reply-To: <1467661.LyyKQKsLpv@diego>
+References: <2320363.GkHcuEZQtr@diego> <5365614.PZrHpVmkns@wuerfel>
+ <1467661.LyyKQKsLpv@diego>
+Message-ID: <6059627.rt9koUc5IL@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jul 28, 2014 at 01:43:02PM +0200, Andreas F?rber wrote:
-> Am 25.07.2014 12:39, schrieb Mark Brown:
-> > On Fri, Jul 25, 2014 at 12:32:43PM +0200, Andreas F?rber wrote:
+On Monday 28 July 2014 13:59:41 Heiko St?bner wrote:
+> Am Montag, 28. Juli 2014, 13:55:38 schrieb Arnd Bergmann:
+> > On Monday 28 July 2014 13:48:45 Heiko St?bner wrote:
+> > > The following changes since commit 
+> 1fe69496cf463b654d2d6e1a9a10fb8d99f10831:
+> > >   ARM: rockchip: Select ARCH_HAS_RESET_CONTROLLER (2014-07-13 12:17:11
+> > >   -0700)
+> > > 
+> > > are available in the git repository at:
+> > >   git://git.kernel.org/pub/scm/linux/kernel/git/mmind/linux-rockchip.git
+> > >   tags/v3.17-rockchip-rk3288> 
+> > > for you to fetch changes up to b1db66b818a4cb1a654ae51a5ca32a09d1ccd825:
+> > >   ARM: dts: Build dtbs for Rockchip boards (2014-07-26 13:07:27 +0200)
+> > 
+> > Hi Heiko,
+> > 
+> > I don't seem to have 1fe69496cf463b654 ("ARM: rockchip: Select
+> > ARCH_HAS_RESET_CONTROLLER") in arm-soc. Any idea what is going
+> > on?
+> > 
+> > Did I miss another pull request, or did you rebased your patches
+> > on the wrong branch?
+> 
+> hmm, the cover-letter was meant to explain this 
+> 
+> aka both requests need
+> 
+>  git://git.linaro.org/people/mike.turquette/linux.git clk-rockchip
+> 
+> as dependency
+> 
 
-> >> Maybe this works for you?
-> >> https://patchwork.kernel.org/patch/4620191/
+Ok, got it. Thanks for the quick reply. Everything pulled.
 
-> >> Otherwise I can resend with Ab/Rb.
+The way I dealt with the dependency on our end was to merge the
+clk-rockchip branch into both next/soc and next/dt, and merge
+both your branches on top, in next/dt.
 
-> > Documentation/SubmittingPatches.
+This way, the clk changes end up in the soc branch if we are
+sending our stuff before Mike sends his tree, and the next/dt
+branch is for DT-changes only.
 
-> Not helpful here, nor is
-> Documentation/devicetree/bindings/submitting-patches.txt. It's separate
-> from code changes, sent via git-send-email, has a Sob, went to LKML and
-> LAKML and DTML. I could add a Fixes: header and CC trivial for this
-> one-line fix IIUC.
+Olof, watch out for this in case it confuses your scripts.
 
-It's telling you that the kernel process is to review patches sent via
-e-mail, not random links to web appliations - notice the context to
-which I'm replying, I'm saying that sending a link to something on the
-web isn't a good way of submitting a patch.
-
-> Doesn't tell me which patches I should CC you on in the future though.
-> Therefore my request to fix the false negative in MAINTAINERS so that me
-> and other kernel newbies don't run into it again.
-
-Feel free to submit patches if you want to see changes.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140728/fe57ca1d/attachment.sig>
+	Arnd
