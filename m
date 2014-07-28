@@ -1,29 +1,30 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Mon, 28 Jul 2014 10:49:39 +0200
-Subject: [PATCH 2/2] ARM: mvebu: Added dts defintion for Lenovo Iomega
- ix4-300d NAS
-In-Reply-To: <20140727015244.GA31974@lunn.ch>
-References: <1406418436-61452-1-git-send-email-yahoo@perenite.com>
- <20140727015244.GA31974@lunn.ch>
-Message-ID: <5442226.1WCY4fjGCy@wuerfel>
+Date: Mon, 28 Jul 2014 10:54:34 +0200
+Subject: [PATCH] video: clcd-versatile: Depend on ARM
+In-Reply-To: <1406480658-27243-1-git-send-email-broonie@kernel.org>
+References: <1406480658-27243-1-git-send-email-broonie@kernel.org>
+Message-ID: <5789388.BhevNhh9tO@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sunday 27 July 2014 03:52:44 Andrew Lunn wrote:
-> Hi Benoit
+On Sunday 27 July 2014 18:04:18 Mark Brown wrote:
+> From: Mark Brown <broonie@linaro.org>
 > 
-> > +                     i2c at 11000 {
-> > +                             compatible = "marvell,mv78230-a0-i2c",
-> > +                                     "marvell,mv64xxx-i2c";
+> The Versatile CLCD helpers call dma_alloc_writecombine() which is only
+> available on ARM and AVR32, meaning they won't build on other platforms
+> including arm64. Unfortunately the current Kconfig enables the symbol
+> by default if ARCH_VEXPRESS is defined which means that it is enabled on
+> arm64 when building for the ARM reference platforms and models for ARMv8
+> since they have many hardware similarities with their pre-ARMv8 systems.
 > 
-> The point of my patches is that you don't need the
-> "marvell,mv78230-a0-i2c". It will work out at runtime if the SoC is A0
-> stepping and automatically enable the workaround. Please test with
-> only "marvell,mv64xxx-i2c";
+> Since all the systems that need the helpers are ARM systems fix this by
+> adding a dependency on ARM.
 > 
+> Signed-off-by: Mark Brown <broonie@linaro.org>
 
-It should still list both "marvell,mv78230-i2c" and "marvell,mv64xxx-i2c",
-as the generic name may not be enough to describe the register layout
-correctly.
+I guess this one is for me, as the bug only exists in linux-next through
+arm-soc, introduced by my previous fix for another bug.
+
+Applied to next/cleanup, thanks a lot for fixing it!
 
 	Arnd
