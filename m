@@ -1,77 +1,36 @@
 From: wens@csie.org (Chen-Yu Tsai)
-Date: Mon, 28 Jul 2014 16:20:55 +0800
-Subject: [PATCH v4 0/6] ARM: sunxi: RTC support for A31/A23
-Message-ID: <1406535661-25072-1-git-send-email-wens@csie.org>
+Date: Mon, 28 Jul 2014 16:20:58 +0800
+Subject: [PATCH v4 3/6] ARM: dts: sun6i: add rtc device node
+In-Reply-To: <1406535661-25072-1-git-send-email-wens@csie.org>
+References: <1406535661-25072-1-git-send-email-wens@csie.org>
+Message-ID: <1406535661-25072-4-git-send-email-wens@csie.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi everyone,
+Now that we have a driver for sun6i's rtc hardware, add a device node
+for it so we can use it.
 
-This is v3 of the sun6i RTC series. This series adds support for
-the RTC in A31 and A23 SoCs. The series applies to sunxi-next.
+Signed-off-by: Chen-Yu Tsai <wens@csie.org>
+---
+ arch/arm/boot/dts/sun6i-a31.dtsi | 6 ++++++
+ 1 file changed, 6 insertions(+)
 
-The A31 has a new RTC block that is separate from the timer block.
-It has separate interrupts for each of the alarms, and a different
-format for the counter alarm. The driver has been tested on the
-A31 Hummingbird, and the A23 tablet I'm using to work on sun8i
-support.
-
-Patch 1 adds the driver for the RTC.
-
-Patch 2 is a minor cleanup. This makes rtc-sunxi depend on sun4i or
-sun7i, the 2 platforms the driver is actually used on.
-
-Patch 3 adds the RTC device node to the sun6i DTSI.
-
-Patch 4 adds the RTC device node to the sun8i DTSI.
-
-Patch 5 adds enables rtc-sun6i in the sunxi defconfig.
-
-Patch 6 adds enables rtc-sun6i in the multi_v7 defconfig.
-This patch applies to arm-soc/next/defconfig (e9a86d96)
-
-Changes since v3:
-  - reformatted all multi-line function calls to have
-    indentation match open parenthesis
-
-Changes since v2:
-  - fixed indentation in DT binding docs
-  - have function argument indentation match open parenthesis
-  - drop driver owner field
-
-Changes since v1:
-  - Enable rtc-sun6i in multi_v7_defconfig
-  - Cleanup the time/date GET/SET macros
-  - Use GENMASK for control register mask
-  - Change Kconfig option to show 'A31'
-  - Remove leftover comment from rtc-sun4i
-  - Remove extra newline
-
-
-Cheers
-ChenYu
-
-
-
-Chen-Yu Tsai (6):
-  rtc: sun6i: Add sun6i RTC driver
-  rtc: sunxi: Depend on platforms sun4i/sun7i that actually have the rtc
-  ARM: dts: sun6i: add rtc device node
-  ARM: dts: sun8i: add rtc device node
-  ARM: sunxi: Add A31 RTC driver to sunxi_defconfig
-  ARM: sunxi: Add A31 RTC driver to multi_v7_defconfig
-
- .../devicetree/bindings/rtc/sun6i-rtc.txt          |  17 +
- arch/arm/boot/dts/sun6i-a31.dtsi                   |   6 +
- arch/arm/boot/dts/sun8i-a23.dtsi                   |   6 +
- arch/arm/configs/multi_v7_defconfig                |   1 +
- arch/arm/configs/sunxi_defconfig                   |   1 +
- drivers/rtc/Kconfig                                |   9 +-
- drivers/rtc/Makefile                               |   1 +
- drivers/rtc/rtc-sun6i.c                            | 447 +++++++++++++++++++++
- 8 files changed, 487 insertions(+), 1 deletion(-)
- create mode 100644 Documentation/devicetree/bindings/rtc/sun6i-rtc.txt
- create mode 100644 drivers/rtc/rtc-sun6i.c
-
+diff --git a/arch/arm/boot/dts/sun6i-a31.dtsi b/arch/arm/boot/dts/sun6i-a31.dtsi
+index 44b07e5..6a16019 100644
+--- a/arch/arm/boot/dts/sun6i-a31.dtsi
++++ b/arch/arm/boot/dts/sun6i-a31.dtsi
+@@ -779,6 +779,12 @@
+ 			interrupts = <1 9 0xf04>;
+ 		};
+ 
++		rtc: rtc at 01f00000 {
++			compatible = "allwinner,sun6i-a31-rtc";
++			reg = <0x01f00000 0x54>;
++			interrupts = <0 40 4>;
++		};
++
+ 		nmi_intc: interrupt-controller at 01f00c0c {
+ 			compatible = "allwinner,sun6i-a31-sc-nmi";
+ 			interrupt-controller;
 -- 
 2.0.1
