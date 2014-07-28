@@ -1,67 +1,61 @@
-From: b08248@gmail.com (Stuart Yoder)
-Date: Mon, 28 Jul 2014 13:40:27 -0500
-Subject: EL3 firmware init of cores ( was Re: [PATCH] arm64: Flush the
- process's mm context TLB entries when switching)
-Message-ID: <CALRxmdCxnOmZdY=_CCYRT8YYBkVdS-ch6RRbkfZa2B-sF_FkKg@mail.gmail.com>
+From: koct9i@gmail.com (Konstantin Khlebnikov)
+Date: Mon, 28 Jul 2014 22:40:58 +0400
+Subject: [PATCH 1/2] ARM: LPAE: load upper bits of early TTBR0/TTBR1
+In-Reply-To: <20140728181224.GN15536@arm.com>
+References: <20140722153623.25088.37742.stgit@buzz>
+ <20140728181224.GN15536@arm.com>
+Message-ID: <CALYGNiNrK1d32ecz4rw0sgn0GyN-M6hTBuTLGQV53Z4Br-bpYQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Apr 15, 2014 at 3:02 AM, Will Deacon <will.deacon@arm.com> wrote:
-> On Tue, Apr 15, 2014 at 03:00:24AM +0100, Ding Tianhong wrote:
->> On 2014/4/14 21:01, Will Deacon wrote:
->> > Hi Ding,
->> >
->> > On Mon, Apr 14, 2014 at 01:03:12PM +0100, Ding Tianhong wrote:
->> >> I met a problem when migrating process by following steps:
->> >>
->> >> 1) The process was already running on core 0.
->> >> 2) Set the CPU affinity of the process to 0x02 and move it to core 1,
->> >>    it could work well.
->> >> 3) Set the CPU affinity of the process to 0x01 and move it to core 0 again,
->> >>    the problem occurs and the process was killed.
->> >
->> > [...]
->> >
->> >> It was a very strange problem that the PC and LR are both 0, and the esr is
->> >> 0x83000006, it means that the used for instruction access generated MMU faults
->> >> and synchronous external aborts, including synchronous parity errors.
->> >>
->> >> I try to fix the problem by invalidating the process's TLB entries when switching,
->> >> it will make the context stale and pick new one, and then it could work well.
->> >>
->> >> So I think in some situation that after the process switching, the modification of
->> >> the TLB entries in the new core didn't inform all other cores to invalidate the old
->> >> TLB entries which was in the inner shareable caches, and then if the process schedule
->> >> to another core, the old TLB entries may occur MMU faults.
->> >
->> > Yes, it sounds like you don't have your TLBs configured correctly. Can you
->> > confirm that your EL3 firmware is configuring TLB broadcasting correctly
->> > please?
->> >
+On Mon, Jul 28, 2014 at 10:12 PM, Will Deacon <will.deacon@arm.com> wrote:
+> On Tue, Jul 22, 2014 at 04:36:23PM +0100, Konstantin Khlebnikov wrote:
+>> This patch fixes booting when idmap pgd lays above 4gb. Commit
+>> 4756dcbfd37 mostly had fixed this, but it'd failed to load upper bits.
 >>
->> Hi will:
+>> Also this fixes adding TTBR1_OFFSET to TTRR1: if lower part overflows
+>> carry flag must be added to the upper part.
 >>
->> Do you mean the SCR_EL3.NS?
+>> Signed-off-by: Konstantin Khlebnikov <k.khlebnikov@samsung.com>
+>> Cc: Cyril Chemparathy <cyril@ti.com>
+>> Cc: Vitaly Andrianov <vitalya@ti.com>
+>> ---
+>>  arch/arm/mm/proc-v7-3level.S |    7 +++----
+>>  1 file changed, 3 insertions(+), 4 deletions(-)
+>>
+>> diff --git a/arch/arm/mm/proc-v7-3level.S b/arch/arm/mm/proc-v7-3level.S
+>> index 22e3ad6..f0481dd 100644
+>> --- a/arch/arm/mm/proc-v7-3level.S
+>> +++ b/arch/arm/mm/proc-v7-3level.S
+>> @@ -140,12 +140,11 @@ ENDPROC(cpu_v7_set_pte_ext)
+>>       mov     \tmp, \ttbr1, lsr #(32 - ARCH_PGD_SHIFT)        @ upper bits
+>>       mov     \ttbr1, \ttbr1, lsl #ARCH_PGD_SHIFT             @ lower bits
+>>       addls   \ttbr1, \ttbr1, #TTBR1_OFFSET
+>> -     mcrr    p15, 1, \ttbr1, \zero, c2                       @ load TTBR1
+>> +     adcls   \tmp, \tmp, #0
+>> +     mcrr    p15, 1, \ttbr1, \tmp, c2                        @ load TTBR1
+>>       mov     \tmp, \ttbr0, lsr #(32 - ARCH_PGD_SHIFT)        @ upper bits
+>>       mov     \ttbr0, \ttbr0, lsl #ARCH_PGD_SHIFT             @ lower bits
+>> -     mcrr    p15, 0, \ttbr0, \zero, c2                       @ load TTBR0
+>> -     mcrr    p15, 1, \ttbr1, \zero, c2                       @ load TTBR1
+>> -     mcrr    p15, 0, \ttbr0, \zero, c2                       @ load TTBR0
+>> +     mcrr    p15, 0, \ttbr0, \tmp, c2                        @ load TTBR0
 >
-> No, there's usually a CPU-specific register (called something like actlr or
-> ectlr) which contains bit(s) to enable TLB broadcasting in hardware. Which
-> CPU are you using?
+> I must admit, the code you are removing here looks really strange. Was there
+> a badly resolved conflict somewhere along the way? It would be nice to see
+> if your fix (which seems ok to me) was actually present in the mailing list
+> posting of the patch that ended in the above mess.
 
-Hi Will,
+Nope, no merge conflicts, source in original patch
+https://lkml.org/lkml/2012/9/11/346
 
-We ran into this same issue as well for an A57-based system.  We are using
-u-boot and it seems that some early EL3 init was missing the setting of the
-SMPEN bit.
+That mess completely harmless, this code is used only once on boot.
+I don't have that email, so replying isn't trivial for me.
 
-I'm concerned now that there may be other bits we have missed as well.  Is
-there any documentation you know of that details A57 initialization or do we
-just have to extract that from the reference manual?
-
-Also, for ARM development systems like the Versatile Express or fast model
-is there existing "EL3 firmware" source available that shows how to properly
-initialize an A57 that we can refer to?    Any pointer to reference code doing
-this initialization would be really appreciated.
-
-Thanks,
-Stuart Yoder
-Freescale
+>
+> Will
+>
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
