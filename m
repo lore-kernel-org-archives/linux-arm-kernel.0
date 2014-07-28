@@ -1,58 +1,53 @@
 From: balbi@ti.com (Felipe Balbi)
-Date: Mon, 28 Jul 2014 16:16:08 -0500
-Subject: [PATCH 20/35] arm: boot: dts: omap2/3/am33xx: drop ti,intc-size
+Date: Mon, 28 Jul 2014 16:16:02 -0500
+Subject: [PATCH 14/35] arm: omap: irq: use IRQCHIP_DECLARE macro
 In-Reply-To: <1406582183-696-1-git-send-email-balbi@ti.com>
 References: <1406582183-696-1-git-send-email-balbi@ti.com>
-Message-ID: <1406582183-696-21-git-send-email-balbi@ti.com>
+Message-ID: <1406582183-696-15-git-send-email-balbi@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-we are now infering number of IRQ lines based
-on correct compatible flag, which renders this
-binding completely useless.
+IRQCHIP_DECLARE macro is used to declare the same
+of_device_id structure for irqchips, it's just
+a helper. No functional changes.
+
+Note that we're temporarily including irqchip.h
+with its full path, until we move this driver
+to drivers/irqchip/.
 
 Signed-off-by: Felipe Balbi <balbi@ti.com>
 ---
- arch/arm/boot/dts/am33xx.dtsi | 1 -
- arch/arm/boot/dts/omap2.dtsi  | 1 -
- arch/arm/boot/dts/omap3.dtsi  | 1 -
- 3 files changed, 3 deletions(-)
+ arch/arm/mach-omap2/irq.c | 8 +++-----
+ 1 file changed, 3 insertions(+), 5 deletions(-)
 
-diff --git a/arch/arm/boot/dts/am33xx.dtsi b/arch/arm/boot/dts/am33xx.dtsi
-index ddaa4ae..1f8b836 100644
---- a/arch/arm/boot/dts/am33xx.dtsi
-+++ b/arch/arm/boot/dts/am33xx.dtsi
-@@ -136,7 +136,6 @@
- 			compatible = "ti,am33xx-intc";
- 			interrupt-controller;
- 			#interrupt-cells = <1>;
--			ti,intc-size = <128>;
- 			reg = <0x48200000 0x1000>;
- 		};
+diff --git a/arch/arm/mach-omap2/irq.c b/arch/arm/mach-omap2/irq.c
+index e452411..2801243 100644
+--- a/arch/arm/mach-omap2/irq.c
++++ b/arch/arm/mach-omap2/irq.c
+@@ -26,6 +26,7 @@
+ #include "soc.h"
+ #include "iomap.h"
+ #include "common.h"
++#include "../../drivers/irqchip/irqchip.h"
  
-diff --git a/arch/arm/boot/dts/omap2.dtsi b/arch/arm/boot/dts/omap2.dtsi
-index 8f8c07d..59d1c29 100644
---- a/arch/arm/boot/dts/omap2.dtsi
-+++ b/arch/arm/boot/dts/omap2.dtsi
-@@ -75,7 +75,6 @@
- 			compatible = "ti,omap2-intc";
- 			interrupt-controller;
- 			#interrupt-cells = <1>;
--			ti,intc-size = <96>;
- 			reg = <0x480FE000 0x1000>;
- 		};
+ /* selected INTC register offsets */
  
-diff --git a/arch/arm/boot/dts/omap3.dtsi b/arch/arm/boot/dts/omap3.dtsi
-index b693929..ff953c9 100644
---- a/arch/arm/boot/dts/omap3.dtsi
-+++ b/arch/arm/boot/dts/omap3.dtsi
-@@ -143,7 +143,6 @@
- 			compatible = "ti,omap3-intc";
- 			interrupt-controller;
- 			#interrupt-cells = <1>;
--			ti,intc-size = <96>;
- 			reg = <0x48200000 0x1000>;
- 		};
+@@ -319,14 +320,11 @@ static int __init intc_of_init(struct device_node *node,
+ 	return 0;
+ }
  
+-static struct of_device_id irq_match[] __initdata = {
+-	{ .compatible = "ti,omap2-intc", .data = intc_of_init, },
+-	{ }
+-};
++IRQCHIP_DECLARE(omap_intc, "ti,omap2-intc", intc_of_init);
+ 
+ void __init omap_intc_of_init(void)
+ {
+-	of_irq_init(irq_match);
++	of_irq_init(&irqchip_of_match_omap_intc);
+ }
+ 
+ asmlinkage void __exception_irq_entry omap3_intc_handle_irq(struct pt_regs *regs)
 -- 
 2.0.1.563.g66f467c
