@@ -1,48 +1,68 @@
-From: oleg@redhat.com (Oleg Nesterov)
-Date: Mon, 28 Jul 2014 20:58:03 +0200
-Subject: TIF_NOHZ can escape nonhz mask? (Was: [PATCH v3 6/8] x86: Split
- syscall_trace_enter into two phases)
-In-Reply-To: <20140728173723.GA20993@redhat.com>
-References: <cover.1405992946.git.luto@amacapital.net>
- <3f649f5658a163645e3ce15156176c325283762e.1405992946.git.luto@amacapital.net>
- <20140728173723.GA20993@redhat.com>
-Message-ID: <20140728185803.GA24663@redhat.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Mon, 28 Jul 2014 20:03:27 +0100
+Subject: [PATCH v2] iommu/arm-smmu: avoid calling request_irq in atomic
+ context
+In-Reply-To: <1406572692-27460-1-git-send-email-mitchelh@codeaurora.org>
+References: <1406572692-27460-1-git-send-email-mitchelh@codeaurora.org>
+Message-ID: <20140728190327.GU15536@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Off-topic, but...
+Hi Mitchel,
 
-On 07/28, Oleg Nesterov wrote:
->
-> But we should always call user_exit() unconditionally?
+Thanks for the quick v2, but now I spotted a problem :)
 
-Frederic, don't we need the patch below? In fact clear_() can be moved
-under "if ()" too. and probably copy_process() should clear this flag...
+On Mon, Jul 28, 2014 at 07:38:12PM +0100, Mitchel Humpherys wrote:
+>  static void arm_smmu_destroy_domain_context(struct iommu_domain *domain)
+> @@ -1172,10 +1158,11 @@ static void arm_smmu_domain_remove_master(struct arm_smmu_domain *smmu_domain,
+>  
+>  static int arm_smmu_attach_dev(struct iommu_domain *domain, struct device *dev)
+>  {
+> -	int ret = -EINVAL;
+> +	int irq, ret = -EINVAL;
+>  	struct arm_smmu_domain *smmu_domain = domain->priv;
+>  	struct arm_smmu_device *smmu;
+> -	struct arm_smmu_master_cfg *cfg;
+> +	struct arm_smmu_master_cfg *master_cfg;
+> +	struct arm_smmu_cfg *cfg = &smmu_domain->cfg;
+>  	unsigned long flags;
+>  
+>  	smmu = dev_get_master_dev(dev)->archdata.iommu;
+> @@ -1203,12 +1190,22 @@ static int arm_smmu_attach_dev(struct iommu_domain *domain, struct device *dev)
+>  	}
+>  	spin_unlock_irqrestore(&smmu_domain->lock, flags);
+>  
+> +	irq = smmu->irqs[smmu->num_global_irqs + cfg->irptndx];
+> +	ret = request_irq(irq, arm_smmu_context_fault, IRQF_SHARED,
+> +			  "arm-smmu-context-fault", domain);
+> +	if (IS_ERR_VALUE(ret)) {
+> +		dev_err(smmu->dev, "failed to request context IRQ %d (%u)\n",
+> +			cfg->irptndx, irq);
+> +		cfg->irptndx = INVALID_IRPTNDX;
+> +		return ret;
+> +	}
 
-Or. __context_tracking_task_switch() can simply do
+This changes the driver behaviour, so we'll request an IRQ for the domain
+*every* time a master is successfuly added to the domain, as opposed to
+the first time a master is added (when we can do the lazy init).
 
-	 if (context_tracking_cpu_is_enabled())
-	 	set_tsk_thread_flag(next, TIF_NOHZ);
-	 else
-	 	clear_tsk_thread_flag(next, TIF_NOHZ);
+Maybe we could rework the code so that it looks like:
 
-and then we can forget about copy_process(). Or I am totally confused?
+  dom_smmu = ACCESS_ONCE(&smmu_domain->smmu);
 
+  if (!dom_smmu) {
+	/* Take spinlock and re-check the smmu */
+	/* Initialise domain */
+	/* Drop lock */
+	/* Request IRQ */
+  }
 
-I am also wondering if we can extend user_return_notifier to handle
-enter/exit and kill TIF_NOHZ.
+  if (dom_smmu != smmu) {
+	/* Fail attach */
+  }
 
-Oleg.
+  /* Add master to domain */
 
---- x/kernel/context_tracking.c
-+++ x/kernel/context_tracking.c
-@@ -202,7 +202,8 @@ void __context_tracking_task_switch(stru
- 				    struct task_struct *next)
- {
- 	clear_tsk_thread_flag(prev, TIF_NOHZ);
--	set_tsk_thread_flag(next, TIF_NOHZ);
-+	if (context_tracking_cpu_is_enabled())
-+		set_tsk_thread_flag(next, TIF_NOHZ);
- }
- 
- #ifdef CONFIG_CONTEXT_TRACKING_FORCE
+Do you think that would work?
+
+Will
