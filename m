@@ -1,26 +1,19 @@
-From: paul@pwsan.com (Paul Walmsley)
-Date: Mon, 28 Jul 2014 05:29:56 +0000 (UTC)
-Subject: [PATCH v2 1/2] ARM: DRA7: Add support for soc_is_dra74x() and
- soc_is_dra72x() variants
-In-Reply-To: <1406523237-6905-2-git-send-email-lokeshvutla@ti.com>
-References: <1406523237-6905-1-git-send-email-lokeshvutla@ti.com>
- <1406523237-6905-2-git-send-email-lokeshvutla@ti.com>
-Message-ID: <alpine.DEB.2.02.1407280529320.24161@utopia.booyaka.com>
+From: computersforpeace@gmail.com (Brian Norris)
+Date: Sun, 27 Jul 2014 22:31:15 -0700
+Subject: [PATCHv4 0/5] mtd: gpmi: make blockmark swapping optional
+In-Reply-To: <1402579245-13377-1-git-send-email-LW@KARO-electronics.de>
+References: <1402579245-13377-1-git-send-email-LW@KARO-electronics.de>
+Message-ID: <20140728053115.GB3095@norris-Latitude-E6410>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 28 Jul 2014, Lokesh Vutla wrote:
+On Thu, Jun 12, 2014 at 03:20:40PM +0200, Lothar Wa?mann wrote:
+> With a flash-based BBT there is no reason to move the Factory Bad
+> Block Marker from the data area buffer (to where it is mapped by the
+> GPMI NAND controller) to the OOB buffer. Thus, make this feature
+> configurable via DT. This is required for the Ka-Ro electronics
+> i.MX6 platforms.
 
-> From: Rajendra Nayak <rnayak@ti.com>
-> 
-> Use the corresponding compatibles to identify the devices.
-> 
-> Signed-off-by: Rajendra Nayak <rnayak@ti.com>
-> Signed-off-by: Lokesh Vutla <lokeshvutla@ti.com>
-> Acked-by: Nishanth Menon <nm@ti.com>
-> Tested-by: Nishanth Menon <nm@ti.com>
+Pushed patches 1-3 to l2-mtd.git. Thanks!
 
-Thanks, queued for (hopefully) early v3.17-rc.
-
-
-- Paul
+Brian
