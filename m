@@ -1,244 +1,260 @@
-From: vinod.koul@intel.com (Vinod Koul)
-Date: Mon, 28 Jul 2014 22:17:50 +0530
-Subject: [PATCH v3 1/2] dma: at_xdmac: creation of the atmel eXtended
- DMA Controller driver
-In-Reply-To: <20140728155431.GV2349@ldesroches-Latitude-E6320>
-References: <1404825096-15724-1-git-send-email-ludovic.desroches@atmel.com>
- <1404825096-15724-2-git-send-email-ludovic.desroches@atmel.com>
- <20140725071631.GH8181@intel.com>
- <20140728155431.GV2349@ldesroches-Latitude-E6320>
-Message-ID: <20140728164750.GH8181@intel.com>
+From: punnaia@xilinx.com (punnaiah choudary kalluri)
+Date: Mon, 28 Jul 2014 22:53:26 +0530
+Subject: [RFC PATCH v3] edac: synps: Added EDAC support for zynq ddr ecc
+ controller
+In-Reply-To: <20140728113446.GA5350@pd.tnic>
+References: <64d65965-45a3-41c3-9b04-9743b8b1e49c@BL2FFO11FD025.protection.gbl>
+ <20140728113446.GA5350@pd.tnic>
+Message-ID: <CAGnW=BaEn7mjW3fmCcuyqgsgG=L_j_1zwK9kXAsx9GsBbOXXfA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jul 28, 2014 at 05:54:31PM +0200, Ludovic Desroches wrote:
-> > > +{
-> > > +	struct at_xdmac_desc	*desc = txd_to_at_desc(tx);
-> > > +	struct at_xdmac_chan	*atchan = to_at_xdmac_chan(tx->chan);
-> > > +	dma_cookie_t		cookie;
-> > > +	unsigned long		flags;
-> > > +
-> > > +	spin_lock_irqsave(&atchan->lock, flags);
-> > > +	cookie = dma_cookie_assign(tx);
-> > > +
-> > > +	dev_vdbg(chan2dev(tx->chan), "%s: atchan 0x%p, add desc 0x%p to xfers_list\n",
-> > > +		 __func__, atchan, desc);
-> > > +	list_add_tail(&desc->xfer_node, &atchan->xfers_list);
-> > > +	if (list_is_singular(&atchan->xfers_list))
-> > > +		at_xdmac_start_xfer(atchan, desc);
-> > so you dont start if list has more than 1 descriptors, why?
-> Because I will let at_xdmac_advance_work managing the queue if not
-> empty. So the only moment when I have to start the transfer in tx_submit
-> is when I have only one transfer in the queue.
-So xfers_list is current active descriptors right and if it is always going
-to be singular why bother with a list?
+Hi Boris,
 
-> > > +static struct dma_async_tx_descriptor *
-> > > +at_xdmac_prep_dma_memcpy(struct dma_chan *chan, dma_addr_t dest, dma_addr_t src,
-> > > +			 size_t len, unsigned long flags)
-> > > +{
-> > > +	struct at_xdmac_chan 	*atchan = to_at_xdmac_chan(chan);
-> > > +	struct at_xdmac_desc	*first = NULL, *prev = NULL;
-> > > +	size_t			remaining_size = len, xfer_size = 0, ublen;
-> > > +	dma_addr_t		src_addr = src, dst_addr = dest;
-> > > +	u32			dwidth;
-> > > +	/*
-> > > +	 * WARNING: The channel configuration is set here since there is no
-> > > +	 * dmaengine_slave_config call in this case. Moreover we don't know the
-> > > +	 * direction, it involves we can't dynamically set the source and dest
-> > > +	 * interface so we have to use the same one. Only interface 0 allows EBI
-> > > +	 * access. Hopefully we can access DDR through both ports (at least on
-> > > +	 * SAMA5D4x), so we can use the same interface for source and dest,
-> > > +	 * that solves the fact we don't know the direction.
-> > and why do you need slave config for memcpy?
-> Maybe the comments is not clear. With slave config we have the direction
-> per to mem or mem to per. Of course when doing memcpy we don't need this
-> information. But I use this information not only to set the transfer
-> direction but also to set the interfaces to use for the source and dest
-> (these interfaces depend on the connection on the matrix).
-> So slave config was useful due to direction field  to tell which interface
-> to use as source and which one as dest.
-> I am lucky because NAND and DDR are on the same interfaces so it's not a
-> problem.
-> 
-> This comment is more a warning for myself to keep in mind this possible 
-> issue in order to not have a device with NAND and DDR on different
-> interfaces because it will be difficult to tell which interface is the
-> source and which one is the dest.
-Well in that case shouldnt NAND be treated like periphral and not memory?
+On Mon, Jul 28, 2014 at 5:04 PM, Borislav Petkov <bp@alien8.de> wrote:
+> On Sun, Jul 27, 2014 at 12:10:52AM +0530, Punnaiah Choudary Kalluri wrote:
+>> Added EDAC support for reporting the ecc errors of synopsys ddr controller.
+>> The ddr ecc controller corrects single bit errors and detects double bit
+>> errors.
+>>
+>> Signed-off-by: Punnaiah Choudary Kalluri <punnaia@xilinx.com>
+>> ---
+>> Changes for v3:
+>> - Updated maintainer information
+>> - Driver cleanup as per the review comments
+>> - Shortened the prefix "sysnopsys" to "synps"
+>
+> This is not a good idea, IMO. "synopsys" is much more understandable
+> instead of "synps". And synopsys-edac is just fine.
 
-> > > +static enum dma_status
-> > > +at_xdmac_tx_status(struct dma_chan *chan, dma_cookie_t cookie,
-> > > +		struct dma_tx_state *txstate)
-> > > +{
-> > > +	struct at_xdmac_chan 	*atchan = to_at_xdmac_chan(chan);
-> > > +	struct at_xdmac		*atxdmac = to_at_xdmac(atchan->chan.device);
-> > > +	struct at_xdmac_desc	*desc, *_desc;
-> > > +	unsigned long		flags;
-> > > +	enum dma_status		ret;
-> > > +	int			residue;
-> > > +	u32			cur_nda;
-> > > +
-> > > +	ret = dma_cookie_status(chan, cookie, txstate);
-> > > +	if (ret == DMA_COMPLETE)
-> > > +		return ret;
-> > > +
-> > > +	spin_lock_irqsave(&atchan->lock, flags);
-> > > +
-> > > +	desc = list_first_entry(&atchan->xfers_list, struct at_xdmac_desc, xfer_node);
-> > > +
-> > > +	if (!desc->active_xfer)
-> > > +		dev_err(chan2dev(chan),
-> > > +			"something goes wrong, there is no active transfer\n");
-> > We can query resiude even when tx_submit hasnt been invoked. You need to
-> > return the full length in that case.
-> 
-> Ok, I was not aware about this case.
-> 
-> > > +
-> > > +	residue = desc->xfer_size;
-> > 
-> > Also do check if txsate is NULL, in case just bail out here.
-> 
-> Return value will be the one returned by dma_cookie_status?
-Yes
+Ok. I thought of keeping file name and function name prefixes in sync
+will be good and shortening
+the prefix would save alignment issues at some places.
 
-> > > +	 */
-> > > +	list_del(&desc->xfer_node);
-> > > +	list_splice_init(&desc->descs_list, &atchan->free_descs_list);
-> > shouldnt you move all the desc in active list in one shot ?
-> > 
-> 
-> Sorry I don't get it. What are you suggesting by one shot?
-Rather than invoking this per descriptor moving descriptors to
-free_desc_list one by one, we can move all descriptors togther.
+As you said i will revert the file name and still i will use "synps"
+as prefix for functions.
+Hope this will be ok for you.
 
-> 
-> > > +static void at_xdmac_tasklet(unsigned long data)
-> > > +{
-> > > +	struct at_xdmac_chan	*atchan = (struct at_xdmac_chan *)data;
-> > > +	struct at_xdmac_desc	*desc;
-> > > +	u32			error_mask;
-> > > +
-> > > +	dev_dbg(chan2dev(&atchan->chan), "%s: status=0x%08lx\n",
-> > > +		 __func__, atchan->status);
-> > > +
-> > > +	error_mask = AT_XDMAC_CIS_RBEIS
-> > > +		     | AT_XDMAC_CIS_WBEIS
-> > > +		     | AT_XDMAC_CIS_ROIS;
-> > > +
-> > > +	if (at_xdmac_chan_is_cyclic(atchan)) {
-> > > +		at_xdmac_handle_cyclic(atchan);
-> > > +	} else if ((atchan->status & AT_XDMAC_CIS_LIS)
-> > > +		   || (atchan->status & error_mask)) {
-> > > +		struct dma_async_tx_descriptor  *txd;
-> > > +
-> > > +		if (atchan->status & AT_XDMAC_CIS_RBEIS)
-> > > +			dev_err(chan2dev(&atchan->chan), "read bus error!!!");
-> > > +		else if (atchan->status & AT_XDMAC_CIS_WBEIS)
-> > > +			dev_err(chan2dev(&atchan->chan), "write bus error!!!");
-> > > +		else if (atchan->status & AT_XDMAC_CIS_ROIS)
-> > > +			dev_err(chan2dev(&atchan->chan), "request overflow error!!!");
-> > > +
-> > > +		desc = list_first_entry(&atchan->xfers_list,
-> > > +					struct at_xdmac_desc,
-> > > +					xfer_node);
-> > > +		dev_vdbg(chan2dev(&atchan->chan), "%s: desc 0x%p\n", __func__, desc);
-> > > +		BUG_ON(!desc->active_xfer);
-> > > +
-> > > +		txd = &desc->tx_dma_desc;
-> > > +
-> > > +		at_xdmac_terminate_xfer(atchan, desc);
-> > why terminate here? This looks wrong
-> 
-> Why? What do you have in mind? It is not obvious for me that it is the
-> wrong place.
-The descriptor has completed. The terminate has special meaning. The user
-can cancel all transactions by invoking terminate_all(). That implies to
-clean up the channel and abort the transfers. The transfer is done so what
-does it mean to terminate.
+>
+>> Changes for v2:
+>> - Updated the commit header and message
+>> - Renamed the filenames to synopsys_edac
+>> - Corrected the compatilble string, commnets
+>> - Renamed the macros,fucntions and data structures
+>> ---
+>>
+>>  .../devicetree/bindings/edac/synps_edac.txt        |   18 +
+>>  MAINTAINERS                                        |    1 +
+>>  drivers/edac/Kconfig                               |    7 +
+>>  drivers/edac/Makefile                              |    1 +
+>>  drivers/edac/synps_edac.c                          |  554 ++++++++++++++++++++
+>>  5 files changed, 581 insertions(+), 0 deletions(-)
+>>  create mode 100644 Documentation/devicetree/bindings/edac/synps_edac.txt
+>>  create mode 100644 drivers/edac/synps_edac.c
+>>
+>> diff --git a/Documentation/devicetree/bindings/edac/synps_edac.txt b/Documentation/devicetree/bindings/edac/synps_edac.txt
+>> new file mode 100644
+>> index 0000000..c4a559b
+>> --- /dev/null
+>> +++ b/Documentation/devicetree/bindings/edac/synps_edac.txt
+>> @@ -0,0 +1,18 @@
+>> +Synopsys EDAC driver, it does reports the DDR ECC single bit errors that are
+>> +corrected and double bit ecc errors that are detected by the DDR ECC controller.
+>> +ECC support for DDR is available in half-bus width(16 bit) configuration only.
+>> +
+>> +Required properties:
+>> +- compatible: Should be "xlnx,zynq-ddrc-1.04"
+>> +- reg: Should contain DDR controller registers location and length.
+>> +
+>> +Example:
+>> +++++++++
+>> +
+>> +ddrc0: ddrc at f8006000 {
+>> +     compatible = "xlnx,zynq-ddrc-1.04";
+>> +     reg = <0xf8006000 0x1000>;
+>> +};
+>
+> I'd need an ack from device tree people about the DT bits.
+>
+>> +
+>> +Synopsys EDAC driver detects the DDR ECC enable state by reading the appropriate
+>> +control register.
+>> diff --git a/MAINTAINERS b/MAINTAINERS
+>> index d76e077..984b5a7 100644
+>> --- a/MAINTAINERS
+>> +++ b/MAINTAINERS
+>> @@ -1479,6 +1479,7 @@ N:      xilinx
+>>  F:   drivers/clocksource/cadence_ttc_timer.c
+>>  F:   drivers/i2c/busses/i2c-cadence.c
+>>  F:   drivers/mmc/host/sdhci-of-arasan.c
+>> +F:   drivers/edac/synps_edac.c
+>>
+>>  ARM SMMU DRIVER
+>>  M:   Will Deacon <will.deacon@arm.com>
+>> diff --git a/drivers/edac/Kconfig b/drivers/edac/Kconfig
+>> index 878f090..f628a2b 100644
+>> --- a/drivers/edac/Kconfig
+>> +++ b/drivers/edac/Kconfig
+>> @@ -368,4 +368,11 @@ config EDAC_OCTEON_PCI
+>>         Support for error detection and correction on the
+>>         Cavium Octeon family of SOCs.
+>>
+>> +config EDAC_SYNPS
+>> +     tristate "Synopsys DDR Memory Controller"
+>> +     depends on EDAC_MM_EDAC && ARCH_ZYNQ
+>> +     help
+>> +       Support for EDAC on the ECC memory used with the Synopsys DDR
+>> +       memory controller.
+>> +
+>>  endif # EDAC
+>> diff --git a/drivers/edac/Makefile b/drivers/edac/Makefile
+>> index 4154ed6..0af900f 100644
+>> --- a/drivers/edac/Makefile
+>> +++ b/drivers/edac/Makefile
+>> @@ -64,3 +64,4 @@ obj-$(CONFIG_EDAC_OCTEON_PC)                += octeon_edac-pc.o
+>>  obj-$(CONFIG_EDAC_OCTEON_L2C)                += octeon_edac-l2c.o
+>>  obj-$(CONFIG_EDAC_OCTEON_LMC)                += octeon_edac-lmc.o
+>>  obj-$(CONFIG_EDAC_OCTEON_PCI)                += octeon_edac-pci.o
+>> +obj-$(CONFIG_EDAC_SYNPS)             += synps_edac.o
+>> diff --git a/drivers/edac/synps_edac.c b/drivers/edac/synps_edac.c
+>> new file mode 100644
+>> index 0000000..a9417fe
+>> --- /dev/null
+>> +++ b/drivers/edac/synps_edac.c
+>> @@ -0,0 +1,554 @@
+>> +/*
+>> + * Synopsys DDR ECC Driver
+>> + * This driver is based on ppc4xx_edac.c drivers
+>> + *
+>> + * Copyright (C) 2012 - 2014 Xilinx, Inc.
+>> + *
+>> + * This program is free software: you can redistribute it and/or modify
+>> + * it under the terms of the GNU General Public License as published by
+>> + * the Free Software Foundation, either version 2 of the License, or
+>> + * (at your option) any later version.
+>> + *
+>> + * This program is distributed in the hope that it will be useful,
+>> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
+>> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+>> + * GNU General Public License for more details.
+>> + *
+>> + * This file is subject to the terms and conditions of the GNU General Public
+>> + * License.  See the file "COPYING" in the main directory of this archive
+>> + * for more details
+>> + */
+>> +
+>> +#include <linux/edac.h>
+>> +#include <linux/module.h>
+>> +#include <linux/platform_device.h>
+>> +
+>> +#include "edac_core.h"
+>> +
+>> +/* Number of cs_rows needed per memory controller */
+>> +#define SYNPS_EDAC_NR_CSROWS 1
+>> +
+>> +/* Number of channels per memory controller */
+>> +#define SYNPS_EDAC_NR_CHANS  1
+>> +
+>> +/* Granularity of reported error in bytes */
+>> +#define SYNPS_EDAC_ERR_GRAIN 1
+>> +
+>> +#define SYNPS_EDAC_MSG_SIZE  256
+>> +
+>> +#define SYNPS_EDAC_MOD_STRING        "synps_edac"
+>> +#define SYNPS_EDAC_MOD_VER   "1"
+>> +
+>> +/* Synopsys DDR memory controller registers that are relevant to ECC */
+>> +#define SYNPS_DDRC_CTRL_REG_OFST     0x0
+>> +#define SYNPS_DDRC_T_ZQ_REG_OFST     0xA4
+>> +
+>> +/* ECC control register */
+>> +#define SYNPS_DDRC_ECC_CTRL_REG_OFST         0xC4
+>> +/* ECC log register */
+>> +#define SYNPS_DDRC_ECC_CE_LOG_REG_OFST               0xC8
+>> +/* ECC address register */
+>> +#define SYNPS_DDRC_ECC_CE_ADDR_REG_OFST              0xCC
+>> +/* ECC data[31:0] register */
+>> +#define SYNPS_DDRC_ECC_CE_DATA_31_0_REG_OFST 0xD0
+>> +
+>> +/* Uncorrectable error info regsisters */
+>> +#define SYNPS_DDRC_ECC_UE_LOG_REG_OFST               0xDC
+>> +#define SYNPS_DDRC_ECC_UE_ADDR_REG_OFST              0xE0
+>> +#define SYNPS_DDRC_ECC_UE_DATA_31_0_REG_OFST 0xE4
+>> +
+>> +#define SYNPS_DDRC_ECC_STAT_REG_OFST         0xF0
+>> +#define SYNPS_DDRC_ECC_SCRUB_REG_OFST                0xF4
+>> +
+>> +/* Control regsiter bitfield definitions */
+>> +#define SYNPS_DDRC_CTRLREG_BUSWIDTH_MASK     0xC
+>> +#define SYNPS_DDRC_CTRLREG_BUSWIDTH_SHIFT    2
+>> +
+>> +#define SYNPS_DDRCTL_WDTH_16 1
+>> +#define SYNPS_DDRCTL_WDTH_32 0
+>> +
+>> +/* ZQ register bitfield definitions */
+>> +#define SYNPS_DDRC_T_ZQ_REG_DDRMODE_MASK     0x2
+>> +
+>> +/* ECC control register bitfield definitions */
+>> +#define SYNPS_DDRC_ECCCTRL_CLR_CE_ERR                0x2
+>> +#define SYNPS_DDRC_ECCCTRL_CLR_UE_ERR                0x1
+>> +
+>> +/* ECC correctable/uncorrectable error log register definitions */
+>> +#define SYNPS_DDRC_ECC_CE_LOGREG_VALID               0x1
+>> +#define SYNPS_DDRC_ECC_CE_LOGREG_BITPOS_MASK 0xFE
+>> +#define SYNPS_DDRC_ECC_CE_LOGREG_BITPOS_SHIFT        1
+>> +
+>> +/* ECC correctable/uncorrectable error address register definitions */
+>> +#define SYNPS_DDRC_ECC_ADDRREG_COL_MASK              0xFFF
+>> +#define SYNPS_DDRC_ECC_ADDRREG_ROW_MASK              0xFFFF000
+>> +#define SYNPS_DDRC_ECC_ADDRREG_ROW_SHIFT     12
+>> +#define SYNPS_DDRC_ECC_ADDRREG_BANK_MASK     0x70000000
+>> +#define SYNPS_DDRC_ECC_ADDRREG_BANK_SHIFT    28
+>> +
+>> +/* ECC statistic regsiter definitions */
+>> +#define SYNPS_DDRC_ECC_STATREG_UECNT_MASK    0xFF
+>> +#define SYNPS_DDRC_ECC_STATREG_CECNT_MASK    0xFF00
+>> +#define SYNPS_DDRC_ECC_STATREG_CECNT_SHIFT   8
+>> +
+>> +/* ECC scrub regsiter definitions */
+>> +#define SYNPS_DDRC_ECC_SCRUBREG_ECC_MODE_MASK        0x7
+>> +#define SYNPS_DDRC_ECC_SCRUBREG_ECCMODE_SECDED       0x4
+>
+> Now those are certainly too long: having the
+> SYNPS_EDAC/SYNPS_DDRC{,_ECC}* prefix for defines used only in this file
+> is certainly making the code unreadable. Here's what it could look like,
+> for example:
+>
+>      regval = readl(base + STAT_OFST) & (STAT_UECNT_MASK | STAT_CECNT_MASK);
+>
+> so you have STAT which is the register name, followed by a name of the
+> bit or bits. I think this is perfectly fine instead of those heavy names
+> which all start with the same prefix and you have to go look at the end
+> to find out what they actually are.
 
-> > > +	if (!atxdmac) {
-> > > +		dev_err(&pdev->dev, "can't allocate at_xdmac structure\n");
-> > > +		return -ENOMEM;
-> > > +	}
-> > > +
-> > > +	atxdmac->regs = base;
-> > > +	atxdmac->irq = irq;
-> > > +
-> > > +	ret = devm_request_irq(&pdev->dev, atxdmac->irq, at_xdmac_interrupt, 0,
-> > > +			       "at_xdmac", atxdmac);
-> > and this can invoke your irq handler and you may not be ready. Second this
-> > cause races with tasklet, so usualy recommednation is to use regular
-> > request_irq()
-> 
-> You mean it is specific to devm variant, isn't it?
-Yes.
+I can agree with you that we can use shorter names.But ZYNQ has
+programmable logic next to
+processing system where one can add soft memory controller in the same
+system and may use
+different driver. So, the edac driver for zynq may include multiple
+drivers for different
+memory controllers in the same file. In this case it is difficult to
+maintain generic macros as you
+suggested above.
 
-> > > +	dma_cap_set(DMA_CYCLIC, atxdmac->dma.cap_mask);
-> > > +	dma_cap_set(DMA_MEMCPY, atxdmac->dma.cap_mask);
-> > > +	dma_cap_set(DMA_SLAVE, atxdmac->dma.cap_mask);
-> > > +	atxdmac->dma.dev				= &pdev->dev;
-> > > +	atxdmac->dma.device_alloc_chan_resources	= at_xdmac_alloc_chan_resources;
-> > > +	atxdmac->dma.device_free_chan_resources		= at_xdmac_free_chan_resources;
-> > > +	atxdmac->dma.device_tx_status			= at_xdmac_tx_status;
-> > > +	atxdmac->dma.device_issue_pending		= at_xdmac_issue_pending;
-> > > +	atxdmac->dma.device_prep_dma_cyclic		= at_xdmac_prep_dma_cyclic;
-> > > +	atxdmac->dma.device_prep_dma_memcpy		= at_xdmac_prep_dma_memcpy;
-> > > +	atxdmac->dma.device_prep_slave_sg		= at_xdmac_prep_slave_sg;
-> > > +	atxdmac->dma.device_control			= at_xdmac_control;
-> > > +	atxdmac->dma.chancnt				= nr_channels;
-> > no caps, pls do implement that as you have cyclic dma too
-> 
-> Sorry I don't understand what you mean here.
-pls implement .device_slave_caps
+Also the current edac framework for edac memory controllers is
+expecting the mc_num from the
+driver while allocating the memory controller instance using the
+edac_mc_alloc function. This
+requirement mandates that if the system contains two different memory
+controllers then the
+corresponding  edac drivers should be in single file.
 
-> > > +static int at_xdmac_remove(struct platform_device *pdev)
-> > > +{
-> > > +	struct at_xdmac	*atxdmac = (struct at_xdmac*)platform_get_drvdata(pdev);
-> > > +	int		i;
-> > > +
-> > > +	at_xdmac_off(atxdmac);
-> > > +	of_dma_controller_free(pdev->dev.of_node);
-> > > +	dma_async_device_unregister(&atxdmac->dma);
-> > > +	clk_disable_unprepare(atxdmac->clk);
-> > > +
-> > > +	synchronize_irq(atxdmac->irq);
-> > > +
-> > > +	for (i = 0; i < atxdmac->dma.chancnt; i++) {
-> > > +		struct at_xdmac_chan *atchan = &atxdmac->chan[i];
-> > > +
-> > > +		tasklet_kill(&atchan->tasklet);
-> > > +		at_xdmac_free_chan_resources(&atchan->chan);
-> > > +	}
-> > and you can still get irq!
-> 
-> Why? I thought deactivating irq on device side and calling synchronize
-> irq will do the stuff.
-what if we have buggy hardware or spurious interrupt!
-
-> 
-> > > +
-> > > +	return 0;
-> > > +}
-> > > +
-> > > +static const struct dev_pm_ops atmel_xdmac_dev_pm_ops = {
-> > > +	.prepare	= atmel_xdmac_prepare,
-> > > +	.suspend_noirq	= atmel_xdmac_suspend_noirq,
-> > > +	.resume_noirq	= atmel_xdmac_resume_noirq,
-> > > +};
-> > no ifdef CONFIG_PM?
-> 
-> I'll add it.
-> 
-> > You might want to make them late_suspend and early_resume to allow
-> > clients suspending first
-> 
-> Ok, as I told before I was wondering which variant to use. For my
-> knowledge, it will be the case also with noirq, isn't it? It is called
-> after suspend_late.
-Yes, thats why it makes sense for dmaengine drivers to use only late_suspend
-and ealy_resume
-
--- 
-~Vinod
+Regards,
+Punnaiah
+>
+> --
+> Regards/Gruss,
+>     Boris.
+>
+> Sent from a fat crate under my desk. Formatting is fine.
+> --
