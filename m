@@ -1,26 +1,33 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Mon, 28 Jul 2014 13:37:32 +0200
-Subject: [PATCH 2/2] ARM: mvebu: Added dts defintion for Lenovo Iomega
- ix4-300d NAS
-In-Reply-To: <78E68BC6-1D2C-4B75-93BA-5414A358B90D@perenite.com>
-References: <1406418436-61452-1-git-send-email-yahoo@perenite.com>
- <6028388.mjACYPxFta@wuerfel>
- <78E68BC6-1D2C-4B75-93BA-5414A358B90D@perenite.com>
-Message-ID: <9654351.pgAIO1YYYY@wuerfel>
+From: haojian.zhuang@linaro.org (Haojian Zhuang)
+Date: Mon, 28 Jul 2014 19:41:03 +0800
+Subject: [PATCH v10 04/11] ARM: hisi: enable HiP04
+In-Reply-To: <201407281308.49775.arnd@arndb.de>
+References: <1404957850-13340-1-git-send-email-haojian.zhuang@linaro.org>
+ <1404957850-13340-5-git-send-email-haojian.zhuang@linaro.org>
+ <201407281308.49775.arnd@arndb.de>
+Message-ID: <CAD6h2NTx5k0VuTiwkCSzyB9rvekvLLS0rp_sCLzoAwyKq0PaOQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday 28 July 2014 13:17:56 Benoit Masson wrote:
-> 
-> Ok then does this mean I can simply remove the "compatible" line to only inherits from armada-xp-dtsi ?
-> 
-> "i2c at 11000 {
->                                 clock-frequency = <400000>;
->                                 status = "okay";
-> "
-> 
-> Would this be enough ?
+On 28 July 2014 19:08, Arnd Bergmann <arnd@arndb.de> wrote:
+> On Thursday 10 July 2014, Haojian Zhuang wrote:
+>> --- a/arch/arm/mach-hisi/platmcpm.c
+>> +++ b/arch/arm/mach-hisi/platmcpm.c
+>> @@ -116,7 +116,6 @@ static int hip04_mcpm_power_up(unsigned int cpu, unsigned int cluster)
+>>                CORE_DEBUG_RESET_BIT(cpu);
+>>         writel_relaxed(data, sysctrl + SC_CPU_RESET_DREQ(cluster));
+>>         spin_unlock_irq(&boot_lock);
+>> -       msleep(POLL_MSEC);
+>>
+>>         return 0;
+>>  }
+>
+> Is this change intentional? It seems like it should belong into the earlier patch
+> that introduces this file.
+>
+>         Arnd
 
-Yes, this looks ideal.
+Yes, it should belong to the earlier patch. And it's fixed in v12 or v13.
 
-	Arnd
+Regards
+Haojian
