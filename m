@@ -1,90 +1,64 @@
-From: mika.westerberg@linux.intel.com (Mika Westerberg)
-Date: Mon, 28 Jul 2014 12:28:08 +0300
-Subject: [PATCH] spi/pxa2xx-pci: Enable DMA binding through device name
-In-Reply-To: <5426556.OzZIXLrofJ@wuerfel>
-References: <1406196111-22861-1-git-send-email-hock.leong.kweh@intel.com>
- <20140725090714.GY1857@lahna.fi.intel.com>
- <20140725095559.GA1857@lahna.fi.intel.com>
- <5426556.OzZIXLrofJ@wuerfel>
-Message-ID: <20140728092808.GI1857@lahna.fi.intel.com>
+From: javier.martinez@collabora.co.uk (Javier Martinez Canillas)
+Date: Mon, 28 Jul 2014 11:29:06 +0200
+Subject: [PATCH v8 00/13] Add Maxim 77802 PMIC support
+In-Reply-To: <20140725223140.4791.61816@quantum>
+References: <1405337769-3741-1-git-send-email-javier.martinez@collabora.co.uk>
+ <20140725223140.4791.61816@quantum>
+Message-ID: <53D617E2.3070803@collabora.co.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jul 25, 2014 at 12:19:02PM +0200, Arnd Bergmann wrote:
-> On Friday 25 July 2014 12:55:59 Mika Westerberg wrote:
-> > On Fri, Jul 25, 2014 at 12:07:14PM +0300, Mika Westerberg wrote:
-> > > On Fri, Jul 25, 2014 at 10:38:36AM +0200, Arnd Bergmann wrote:
-> > > > On Friday 25 July 2014 11:22:49 Mika Westerberg wrote:
-> > > > > > All you need to do is change your filter function to take the
-> > > > > > slave id from pxa_spi_info and stick it in there, e.g.
-> > > > > > 
-> > > > > > static bool pxa2xx_spi_dw_dma_filter(struct dma_chan *chan, void *param)
-> > > > > > {       
-> > > > > >         const struct pxa2xx_spi_master *pdata = param;
-> > > > > >         struct dw_dma_chan *dwc = to_dw_dma_chan(chan);
-> > > > > >         
-> > > > > >         dwc->request_line = fargs->req;
-> > > > > >         dwc->src_master = 0;
-> > > > > >         dwc->dst_master = 0;
-> > > > > >         
-> > > > > >         return 1;
-> > > > > > }           
-> > > > > 
-> > > > > Oh man. That makes pxa2xx_spi dependent on a certain specific DMA engine
-> > > > > driver.
-> > > > 
-> > > > I think you can improve this by putting the filter function (and a pointer
-> > > > to it) into the pxa2xx_spi_master data provided by the PCI driver.
-> > > 
-> > > Indeed, that looks better. It still makes the PCI part of the driver
-> > > dependent on a particular DMA engine driver but is certainly better than
-> > > the core pxa2xx_spi driver.
-> > 
-> > Something like this?
-> > 
-> > Hock Leong / Chiaue Ee, are you able to check if this works on your BYT
-> > machines?
-> 
-> I think I found a small bug, and one detail that could be improved.
-> 
-> > @@ -321,12 +310,14 @@ int pxa2xx_spi_dma_setup(struct driver_data *drv_data)
-> >  		return -ENOMEM;
-> >  
-> >  	drv_data->tx_chan = dma_request_slave_channel_compat(mask,
-> > -				pxa2xx_spi_dma_filter, pdata, dev, "tx");
-> > +				pdata->dma_filter, pdata->dma_filter_param,
-> > +				dev, "tx");
-> >  	if (!drv_data->tx_chan)
-> >  		return -ENODEV;
-> 
-> If you change this part to pass '(void *)info->tx_slave_id' rather than
-> pdata->dma_filter_param, you can simplify the next code:
+Hello Mike,
 
-OK
-
-> > +static bool pxa2xx_spi_pci_dma_filter(struct dma_chan *chan, void *param)
-> > +{
-> > +	struct dw_dma_chan *dwc = to_dw_dma_chan(chan);
-> > +	const struct pxa_spi_info *info = param;
-> > +
-> > +	if (chan->chan_id == info->tx_chan_id)
-> > +		dwc->request_line = info->tx_slave_id;
-> > +	else if (chan->chan_id == info->rx_chan_id)
-> > +		dwc->request_line = info->rx_slave_id;
-> > +	else
-> > +		return false;
-> > +
-> > +	dwc->src_master = 0;
-> > +	dwc->dst_master = 0;
-> > +
-> > +	return true;
-> > +}
+On 07/26/2014 12:31 AM, Mike Turquette wrote:
+> Quoting Javier Martinez Canillas (2014-07-14 04:35:56)
+>> This series are based on drivers added by Simon Glass to the Chrome OS
+>> kernel and adds support for the Maxim 77802 Power Management IC, their
+>> regulators, clocks, RTC and i2c interface.
+>> 
+>> This is a v8 of the patch-set that addresses issues pointed out in v7.
+>> Individual changes are added on each patch but the biggest changes are:
+>> 
+>> * Patches 1-7 from v7 are not included since those were improvements to
+>> the max77686 mfd driver and can be applied independently. Lee Jones said
+>> that he is going to pick them from the posted v7 series.
+>> 
+>> I've created a patchwork bundle with 1-7 from v7 to make it easy to apply:
+>> 
+>> https://patchwork.kernel.org/bundle/javier/max77686-improvements/
+>> 
+>> * The Dynamic Voltage Scaling support has been removed since that can be
+>> added in a follow up series and shouldn't block the minimum PMIC support.
+>> 
+>> The patch-set has been tested on both Daisy/Snow (max77686) and Peach
+>> Pit (max77802) Chromebooks and it's composed of the following patches:
+>> 
+>> [PATCH v8 01/13] mfd: max77686: Add Maxim 77802 PMIC support
+>> [PATCH v8 02/13] mfd: max77802: Add DT binding documentation
+>> [PATCH v8 03/13] regulator: Add driver for Maxim 77802 PMIC regulators
+>> [PATCH v8 04/13] clk: max77686: Add DT include for MAX77686 PMIC clock
+>> [PATCH v8 05/13] clk: Add generic driver for Maxim PMIC clocks
+>> [PATCH v8 06/13] clk: max77686: Convert to the generic max clock driver
+>> [PATCH v8 07/13] clk: max77686: Improve Maxim 77686 PMIC clocks binding
+>> [PATCH v8 08/13] clk: Add driver for Maxim 77802 PMIC clocks
+>> [PATCH v8 09/13] clk: max77802: Add DT binding documentation
 > 
-> to disregard the tx_chan_id, which is really arbitrary as far as I can tell.
+> For patches 4-9:
 > 
-> What I think you got wrong here (by following my bad advice) is the master
-> number. Looking at the code for dw_dma, I think src_master needs to be '1'
-> for your driver.
+> Acked-by: Mike Turquette <mturquette@linaro.org>
+> 
 
-Right, I just copied your example. I'll change it to '1' in the next
-revision.
+Thanks a lot for your ack!
+
+Since the merge window is just around the corner, Lee merged the mfd max77686
+headers changes to split the dependencies around kernel releases.
+
+So after the merge windows, I'll resend the clock driver (and the other drivers
+fwiw) as a separate series so you can merge it through your tree for 3.18.
+
+> Regards,
+> Mike
+> 
+
+Best regards,
+Javier
