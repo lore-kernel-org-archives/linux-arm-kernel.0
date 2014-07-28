@@ -1,151 +1,45 @@
 From: daniel.lezcano@linaro.org (Daniel Lezcano)
-Date: Mon, 28 Jul 2014 07:34:50 +0200
-Subject: [PATCH v2 3/5] ARM: add IPI tracepoints
-In-Reply-To: <1406318733-26754-4-git-send-email-nicolas.pitre@linaro.org>
-References: <1406318733-26754-1-git-send-email-nicolas.pitre@linaro.org>
- <1406318733-26754-4-git-send-email-nicolas.pitre@linaro.org>
-Message-ID: <53D5E0FA.6030809@linaro.org>
+Date: Mon, 28 Jul 2014 07:39:51 +0200
+Subject: [PATCH ] ARM: pxa: fix section mismatch warning for
+ pxa_timer_nodt_init
+In-Reply-To: <12220413.BdRleC0Xf5@wuerfel>
+References: <1405356724-32207-1-git-send-email-robert.jarzmik@free.fr>
+ <53CD25A4.7030606@linaro.org> <87oawivarv.fsf@free.fr>
+ <12220413.BdRleC0Xf5@wuerfel>
+Message-ID: <53D5E227.6090900@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/25/2014 10:05 PM, Nicolas Pitre wrote:
-> The strings used to list IPIs in /proc/interrupts are reused for tracing
-> purposes.
+On 07/26/2014 08:50 PM, Arnd Bergmann wrote:
+> commit a38b1f60b5245a3 ("ARM: pxa: Add non device-tree timer link to
+> clocksource") introduced a harmless section mismatch warning for
+> all pxa platforms, by introducing a new pxa_timer_init() function
+> that is not marked __init but that calls pxa_timer_nodt_init(),
+> which is. The function is only called at init time, so it is safe
+> to also annotate it this way.
 >
-> While at it, prevent a negative ipinr from escaping the range check
-> in handle_IPI().
->
-> Signed-off-by: Nicolas Pitre <nico@linaro.org>
-> Acked-by: Steven Rostedt <rostedt@goodmis.org>
-
-Acked-by: Daniel Lezcano <daniel.lezcano@linaro.org>
-
+> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
 > ---
->   arch/arm/kernel/smp.c | 70 ++++++++++++++++++++++++++++++---------------------
->   1 file changed, 42 insertions(+), 28 deletions(-)
+> Daniel, please apply on top of Robert's patch series.
+
+Applied thanks!
+
+   -- Daniel
+
 >
-> diff --git a/arch/arm/kernel/smp.c b/arch/arm/kernel/smp.c
-> index 7c4fada440..9388a3d479 100644
-> --- a/arch/arm/kernel/smp.c
-> +++ b/arch/arm/kernel/smp.c
-> @@ -47,6 +47,9 @@
->   #include <asm/mach/arch.h>
->   #include <asm/mpu.h>
->
-> +#define CREATE_TRACE_POINTS
-> +#include <trace/events/ipi.h>
-> +
+> diff --git a/arch/arm/mach-pxa/generic.c b/arch/arm/mach-pxa/generic.c
+> index 630fa916bbc6..04b013fbc98f 100644
+> --- a/arch/arm/mach-pxa/generic.c
+> +++ b/arch/arm/mach-pxa/generic.c
+> @@ -61,7 +61,7 @@ EXPORT_SYMBOL(get_clock_tick_rate);
 >   /*
->    * as from 2.5, kernels no longer have an init_tasks structure
->    * so we need some other way of telling a new secondary core
-> @@ -430,38 +433,15 @@ void __init smp_prepare_cpus(unsigned int max_cpus)
->   	}
->   }
->
-> -static void (*smp_cross_call)(const struct cpumask *, unsigned int);
-> +static void (*__smp_cross_call)(const struct cpumask *, unsigned int);
->
->   void __init set_smp_cross_call(void (*fn)(const struct cpumask *, unsigned int))
+>    * For non device-tree builds, keep legacy timer init
+>    */
+> -void pxa_timer_init(void)
+> +void __init pxa_timer_init(void)
 >   {
-> -	if (!smp_cross_call)
-> -		smp_cross_call = fn;
-> -}
-> -
-> -void arch_send_call_function_ipi_mask(const struct cpumask *mask)
-> -{
-> -	smp_cross_call(mask, IPI_CALL_FUNC);
-> -}
-> -
-> -void arch_send_wakeup_ipi_mask(const struct cpumask *mask)
-> -{
-> -	smp_cross_call(mask, IPI_WAKEUP);
-> -}
-> -
-> -void arch_send_call_function_single_ipi(int cpu)
-> -{
-> -	smp_cross_call(cpumask_of(cpu), IPI_CALL_FUNC_SINGLE);
-> +	if (!__smp_cross_call)
-> +		__smp_cross_call = fn;
->   }
->
-> -#ifdef CONFIG_IRQ_WORK
-> -void arch_irq_work_raise(void)
-> -{
-> -	if (is_smp())
-> -		smp_cross_call(cpumask_of(smp_processor_id()), IPI_IRQ_WORK);
-> -}
-> -#endif
-> -
-> -static const char *ipi_types[NR_IPI] = {
-> +static const char *ipi_types[NR_IPI] __tracepoint_string = {
->   #define S(x,s)	[x] = s
->   	S(IPI_WAKEUP, "CPU wakeup interrupts"),
->   	S(IPI_TIMER, "Timer broadcast interrupts"),
-> @@ -473,6 +453,12 @@ static const char *ipi_types[NR_IPI] = {
->   	S(IPI_COMPLETION, "completion interrupts"),
->   };
->
-> +static void smp_cross_call(const struct cpumask *target, unsigned int ipinr)
-> +{
-> +	trace_ipi_raise(target, ipi_types[ipinr]);
-> +	__smp_cross_call(target, ipinr);
-> +}
-> +
->   void show_ipi_list(struct seq_file *p, int prec)
->   {
->   	unsigned int cpu, i;
-> @@ -499,6 +485,29 @@ u64 smp_irq_stat_cpu(unsigned int cpu)
->   	return sum;
->   }
->
-> +void arch_send_call_function_ipi_mask(const struct cpumask *mask)
-> +{
-> +	smp_cross_call(mask, IPI_CALL_FUNC);
-> +}
-> +
-> +void arch_send_wakeup_ipi_mask(const struct cpumask *mask)
-> +{
-> +	smp_cross_call(mask, IPI_WAKEUP);
-> +}
-> +
-> +void arch_send_call_function_single_ipi(int cpu)
-> +{
-> +	smp_cross_call(cpumask_of(cpu), IPI_CALL_FUNC_SINGLE);
-> +}
-> +
-> +#ifdef CONFIG_IRQ_WORK
-> +void arch_irq_work_raise(void)
-> +{
-> +	if (is_smp())
-> +		smp_cross_call(cpumask_of(smp_processor_id()), IPI_IRQ_WORK);
-> +}
-> +#endif
-> +
->   #ifdef CONFIG_GENERIC_CLOCKEVENTS_BROADCAST
->   void tick_broadcast(const struct cpumask *mask)
->   {
-> @@ -556,8 +565,10 @@ void handle_IPI(int ipinr, struct pt_regs *regs)
->   	unsigned int cpu = smp_processor_id();
->   	struct pt_regs *old_regs = set_irq_regs(regs);
->
-> -	if (ipinr < NR_IPI)
-> +	if ((unsigned)ipinr < NR_IPI) {
-> +		trace_ipi_entry(ipi_types[ipinr]);
->   		__inc_irq_stat(cpu, ipi_irqs[ipinr]);
-> +	}
->
->   	switch (ipinr) {
->   	case IPI_WAKEUP:
-> @@ -612,6 +623,9 @@ void handle_IPI(int ipinr, struct pt_regs *regs)
->   		       cpu, ipinr);
->   		break;
->   	}
-> +
-> +	if ((unsigned)ipinr < NR_IPI)
-> +		trace_ipi_exit(ipi_types[ipinr]);
->   	set_irq_regs(old_regs);
->   }
->
+>   	pxa_timer_nodt_init(IRQ_OST0, io_p2v(0x40a00000),
+>   			    get_clock_tick_rate());
 >
 
 
