@@ -1,41 +1,58 @@
 From: balbi@ti.com (Felipe Balbi)
-Date: Mon, 28 Jul 2014 16:15:57 -0500
-Subject: [PATCH 09/35] arm: omap: irq: rename omap3_intc_regs
+Date: Mon, 28 Jul 2014 16:16:08 -0500
+Subject: [PATCH 20/35] arm: boot: dts: omap2/3/am33xx: drop ti,intc-size
 In-Reply-To: <1406582183-696-1-git-send-email-balbi@ti.com>
 References: <1406582183-696-1-git-send-email-balbi@ti.com>
-Message-ID: <1406582183-696-10-git-send-email-balbi@ti.com>
+Message-ID: <1406582183-696-21-git-send-email-balbi@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-just to make it clearer that it can
-be used on all omaps.
+we are now infering number of IRQ lines based
+on correct compatible flag, which renders this
+binding completely useless.
 
 Signed-off-by: Felipe Balbi <balbi@ti.com>
 ---
- arch/arm/mach-omap2/irq.c | 4 ++--
- 1 file changed, 2 insertions(+), 2 deletions(-)
+ arch/arm/boot/dts/am33xx.dtsi | 1 -
+ arch/arm/boot/dts/omap2.dtsi  | 1 -
+ arch/arm/boot/dts/omap3.dtsi  | 1 -
+ 3 files changed, 3 deletions(-)
 
-diff --git a/arch/arm/mach-omap2/irq.c b/arch/arm/mach-omap2/irq.c
-index 38007b3..93fe0be 100644
---- a/arch/arm/mach-omap2/irq.c
-+++ b/arch/arm/mach-omap2/irq.c
-@@ -62,7 +62,7 @@ static void __iomem *omap_irq_base;
- static int omap_nr_irqs = 96;
+diff --git a/arch/arm/boot/dts/am33xx.dtsi b/arch/arm/boot/dts/am33xx.dtsi
+index ddaa4ae..1f8b836 100644
+--- a/arch/arm/boot/dts/am33xx.dtsi
++++ b/arch/arm/boot/dts/am33xx.dtsi
+@@ -136,7 +136,6 @@
+ 			compatible = "ti,am33xx-intc";
+ 			interrupt-controller;
+ 			#interrupt-cells = <1>;
+-			ti,intc-size = <128>;
+ 			reg = <0x48200000 0x1000>;
+ 		};
  
- /* Structure to save interrupt controller context */
--struct omap3_intc_regs {
-+struct omap_intc_regs {
- 	u32 sysconfig;
- 	u32 protection;
- 	u32 idle;
-@@ -266,7 +266,7 @@ void __init omap_intc_of_init(void)
- }
+diff --git a/arch/arm/boot/dts/omap2.dtsi b/arch/arm/boot/dts/omap2.dtsi
+index 8f8c07d..59d1c29 100644
+--- a/arch/arm/boot/dts/omap2.dtsi
++++ b/arch/arm/boot/dts/omap2.dtsi
+@@ -75,7 +75,6 @@
+ 			compatible = "ti,omap2-intc";
+ 			interrupt-controller;
+ 			#interrupt-cells = <1>;
+-			ti,intc-size = <96>;
+ 			reg = <0x480FE000 0x1000>;
+ 		};
  
- #if defined(CONFIG_ARCH_OMAP3) || defined(CONFIG_SOC_AM33XX)
--static struct omap3_intc_regs intc_context;
-+static struct omap_intc_regs intc_context;
+diff --git a/arch/arm/boot/dts/omap3.dtsi b/arch/arm/boot/dts/omap3.dtsi
+index b693929..ff953c9 100644
+--- a/arch/arm/boot/dts/omap3.dtsi
++++ b/arch/arm/boot/dts/omap3.dtsi
+@@ -143,7 +143,6 @@
+ 			compatible = "ti,omap3-intc";
+ 			interrupt-controller;
+ 			#interrupt-cells = <1>;
+-			ti,intc-size = <96>;
+ 			reg = <0x48200000 0x1000>;
+ 		};
  
- void omap_intc_save_context(void)
- {
 -- 
 2.0.1.563.g66f467c
