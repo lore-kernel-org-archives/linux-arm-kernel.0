@@ -1,51 +1,47 @@
-From: jason@lakedaemon.net (Jason Cooper)
-Date: Mon, 28 Jul 2014 09:30:05 -0400
-Subject: [PATCH 2/2] V3 ARM: mvebu: Added dts defintion for Lenovo
- Iomega ix4-300d NAS
-In-Reply-To: <20140727015509.GB31974@lunn.ch>
-References: <1406418490-61502-1-git-send-email-yahoo@perenite.com>
- <20140727015509.GB31974@lunn.ch>
-Message-ID: <20140728133005.GO23220@titan.lakedaemon.net>
+From: andrew@lunn.ch (Andrew Lunn)
+Date: Mon, 28 Jul 2014 15:27:16 +0200
+Subject: [Patch V2 2/2] i2c: mv64xxx: Remove internal compatible string
+ from Documentation
+In-Reply-To: <20140728132251.GN23220@titan.lakedaemon.net>
+References: <1406395238-29758-1-git-send-email-andrew@lunn.ch>
+ <1406395238-29758-3-git-send-email-andrew@lunn.ch>
+ <20140728132251.GN23220@titan.lakedaemon.net>
+Message-ID: <20140728132716.GC2891@lunn.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Andrew,
-
-On Sun, Jul 27, 2014 at 03:55:09AM +0200, Andrew Lunn wrote:
-> On Sat, Jul 26, 2014 at 04:48:10PM -0700, Benoit Masson wrote:
-> > The Lenovo Iomega ix4-300d is a 4-Bay sata NAS with dual Gb,
-> >  USB2.0 & 3.0, powered by a Marvell Armada XP MV78230 dual core CPU.
-> > 
-> > http://shop.lenovo.com/us/en/servers/network-storage/lenovoemc/ix4-300d/
-> > Signed-off-by: Benoit Masson <yahoo@perenite.com>
-> > ---
-> >  arch/arm/boot/dts/Makefile                      |   3 +-
-> >  arch/arm/boot/dts/armada-xp-lenovo-ix4-300d.dts | 285 ++++++++++++++++++++++++
-> >  2 files changed, 287 insertions(+), 1 deletion(-)
-> >  create mode 100644 arch/arm/boot/dts/armada-xp-lenovo-ix4-300d.dts
-> > 
-...
-> > diff --git a/arch/arm/boot/dts/armada-xp-lenovo-ix4-300d.dts b/arch/arm/boot/dts/armada-xp-lenovo-ix4-300d.dts
-> > new file mode 100644
-> > index 0000000..c82a8e3
-> > --- /dev/null
-> > +++ b/arch/arm/boot/dts/armada-xp-lenovo-ix4-300d.dts
-...
-> > +			i2c at 11000 {
-> > +				compatible = "marvell,mv64xxx-i2c";
+> > diff --git a/Documentation/devicetree/bindings/i2c/i2c-mv64xxx.txt b/Documentation/devicetree/bindings/i2c/i2c-mv64xxx.txt
+> > index 5c30026921ae..6eb6f6e40ba1 100644
+> > --- a/Documentation/devicetree/bindings/i2c/i2c-mv64xxx.txt
+> > +++ b/Documentation/devicetree/bindings/i2c/i2c-mv64xxx.txt
+> > @@ -9,11 +9,6 @@ Required properties :
+> >                       - "allwinner,sun6i-a31-i2c"
+> >                       - "marvell,mv64xxx-i2c"
+> >                       - "marvell,mv78230-i2c"
+> > -                     - "marvell,mv78230-a0-i2c"
+> > -                       * Note: Only use "marvell,mv78230-a0-i2c" for a
+> > -                         very rare, initial version of the SoC which
+> > -                         had broken offload support.  Linux
+> > -                         auto-detects this and sets it appropriately.
 > 
-> O.K, this version is good.
+> I think we're losing knowledge here.  *We* know that attempting to
+> enable transaction offload on A0 SoCs is bad news.  Other OS's would now
+> need to dig through the Linux kernel code for clues as to what's
+> happening.
+> 
+> Perhaps we should retain the info in the form of a note at the bottom of
+> this file?
 
-Is it?  As Arnd mentioned against the previous version, this overrides
-the default compatible property inherited from the dtsi.  Since this is
-also compatible with "marvell,mv78230-i2c", I think we should just
-delete this line.
+Hi Jason
 
-Benoit, this is still in V4.  If Andrew agrees, I'll just remove the
-line when I apply V4.
+I did wounder about this a bit. I've not looked, but now that XP
+datasheets are public, i assume there is an errata for this, so it at
+least should be documented by Marvell. But anybody looking in
+/proc/device-tree on an A0 is going to see this undocumented string
+which might raise questions.
 
-> Acked-by: Andrew Lunn <andrew@lunn.ch>
+So i'm happy to document it at the end of the binding.
 
-thx,
+Arnd, what do you say?
 
-Jason.
+      Andrew
