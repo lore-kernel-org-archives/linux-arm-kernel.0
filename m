@@ -1,33 +1,56 @@
-From: weiyj_lk@163.com (weiyj_lk at 163.com)
-Date: Mon, 28 Jul 2014 21:27:43 +0800
-Subject: [PATCH -next] clk: sunxi: sun6i-apb0: fix sparse non static symbol
- warning
-Message-ID: <1406554063-30350-1-git-send-email-weiyj_lk@163.com>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Mon, 28 Jul 2014 15:25:24 +0200
+Subject: [RFC 8/8] ARM: sun7i: Add mod1 clock nodes
+In-Reply-To: <1406519386-4902-9-git-send-email-emilio@elopez.com.ar>
+References: <1406519386-4902-1-git-send-email-emilio@elopez.com.ar>
+ <1406519386-4902-9-git-send-email-emilio@elopez.com.ar>
+Message-ID: <20140728132524.GM3952@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Wei Yongjun <yongjun_wei@trendmicro.com.cn>
+On Mon, Jul 28, 2014 at 12:49:46AM -0300, Emilio L?pez wrote:
+> This commit adds all the mod1 clocks available on A20 to its device
+> tree. This list was created by looking at the A20 user manual.
+> 
+> Not-signed-off-by: Emilio L?pez <emilio@elopez.com.ar>
+> ---
+> 
+> As mentioned on an earlier patch, note that this is untested, and I 
+> only added them to sun7i. It'd be great if actual users of these clocks 
+> could comment :)
+> 
+>  arch/arm/boot/dts/sun7i-a20.dtsi | 39 +++++++++++++++++++++++++++++++++++++++
+>  1 file changed, 39 insertions(+)
+> 
+> diff --git a/arch/arm/boot/dts/sun7i-a20.dtsi b/arch/arm/boot/dts/sun7i-a20.dtsi
+> index 5d0265a..c57f7ad 100644
+> --- a/arch/arm/boot/dts/sun7i-a20.dtsi
+> +++ b/arch/arm/boot/dts/sun7i-a20.dtsi
+> @@ -335,6 +335,29 @@
+>  			clock-output-names = "ir1";
+>  		};
+>  
+> +		iis0_clk: clk at 01c200b8 {
+> +			#clock-cells = <0>;
+> +			compatible = "allwinner,sun4i-a10-mod1-clk";
+> +			reg = <0x01c200b8 0x4>;
+> +			clocks = <&pll2 0>, <&pll2 1>, <&pll2 2>, <&pll2 3>;
+> +			clock-output-names = "iis0";
 
-Fixes the following sparse warnings:
+Usually, it's called i2s.
 
-drivers/clk/sunxi/clk-sun6i-apb0.c:60:27: warning:
- symbol 'sun6i_a31_apb0_clk_dt_ids' was not declared. Should it be static?
+Otherwise, beside Chen-Yu's comment, it looks fine.
 
-Signed-off-by: Wei Yongjun <yongjun_wei@trendmicro.com.cn>
----
- drivers/clk/sunxi/clk-sun6i-apb0.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+Maxime
 
-diff --git a/drivers/clk/sunxi/clk-sun6i-apb0.c b/drivers/clk/sunxi/clk-sun6i-apb0.c
-index 11f17c3..1fa2337 100644
---- a/drivers/clk/sunxi/clk-sun6i-apb0.c
-+++ b/drivers/clk/sunxi/clk-sun6i-apb0.c
-@@ -57,7 +57,7 @@ static int sun6i_a31_apb0_clk_probe(struct platform_device *pdev)
- 	return of_clk_add_provider(np, of_clk_src_simple_get, clk);
- }
- 
--const struct of_device_id sun6i_a31_apb0_clk_dt_ids[] = {
-+static const struct of_device_id sun6i_a31_apb0_clk_dt_ids[] = {
- 	{ .compatible = "allwinner,sun6i-a31-apb0-clk" },
- 	{ /* sentinel */ }
- };
+-- 
+Maxime Ripard, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140728/f025e41c/attachment.sig>
