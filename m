@@ -1,102 +1,108 @@
-From: benoitm@perenite.com (Benoit Masson)
-Date: Mon, 28 Jul 2014 01:35:35 +0200
-Subject: [PATCH 2/2] V3 ARM: mvebu: Added dts defintion for Lenovo Iomega
- ix4-300d NAS
-In-Reply-To: <20140727223258.36b050b9@free-electrons.com>
-References: <1406418490-61502-1-git-send-email-yahoo@perenite.com>
- <20140727223258.36b050b9@free-electrons.com>
-Message-ID: <C2BE2F4B-1045-484F-9E12-A757EE3CD1F6@perenite.com>
+From: paul@pwsan.com (Paul Walmsley)
+Date: Mon, 28 Jul 2014 00:34:10 +0000 (UTC)
+Subject: OMAP baseline test results for v3.16-rc7
+Message-ID: <alpine.DEB.2.02.1407280033050.24161@utopia.booyaka.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
- 
-Le 27 juil. 2014 ? 22:32, Thomas Petazzoni <thomas.petazzoni@free-electrons.com> a ?crit :
 
-> Dear Benoit Masson,
-> 
+Here are some basic OMAP test results for Linux v3.16-rc7.
+Logs and other details at:
 
-Dear Thomas,
+    http://www.pwsan.com/omap/testlogs/test_v3.16-rc7/20140727174803/
 
-> On Sat, 26 Jul 2014 16:48:10 -0700, Benoit Masson wrote:
-> 
->> +	gpio-keys {
->> +		compatible = "gpio-keys";
->> +		pinctrl-0 = <&power_button_pin &reset_button_pin
->> +			&select_button_pin &scroll_button_pin>;
->> +		pinctrl-names = "default";
->> +
->> +		power-button {
->> +			label = "Power Button";
->> +			linux,code = <KEY_POWER>;
->> +			gpios = <&gpio1 12 GPIO_ACTIVE_HIGH>;
->> +		};
->> +
->> +		reset-button {
->> +			label = "Reset Button";
->> +			linux,code = <KEY_RESTART>;
->> +			gpios = <&gpio1 13 GPIO_ACTIVE_LOW>;
->> +		};
->> +
->> +		select-button {
->> +			label = "Select Button";
->> +			linux,code = <BTN_SELECT>;
->> +			gpios = <&gpio1 9 GPIO_ACTIVE_LOW>;
->> +		};
->> +
->> +		scroll-button {
->> +			label = "Scroll Button";
->> +			linux,code = <KEY_SCROLLDOWN>;
->> +			gpios = <&gpio1 10 GPIO_ACTIVE_LOW>;
-> 
-> So you're using the GPIO_ACTIVE_<foo> defines here.
-> 
->> +		};
->> +	};
->> +
->> +	spi3 {
->> +		compatible = "spi-gpio";
->> +		status = "okay";
->> +		gpio-sck = <&gpio0 25 0>;
->> +		gpio-mosi = <&gpio1 15 0>; /*gpio 47*/
->> +		cs-gpios = <&gpio0 27 0 >;
-> 
-> But not here. Any reason?
 
-Indeed I think Jason made this comment already and I seem to have missed -> Corrected in V4
+Test summary
+------------
 
-> 
-> Also, nitpick: unneeded space in <&gpio0 27 0 > (i.e the space right
-> before the closing >).
-> 
+Build: zImage:
+    Pass (16/16): multi_v7_defconfig, omap2plus_defconfig,
+		  omap2plus_defconfig_am33xx_only,
+		  omap2plus_defconfig_am43xx_only,
+		  omap2plus_defconfig_2430sdp_only,
+		  omap2plus_defconfig_cpupm, omap2plus_defconfig_no_pm,
+		  omap2plus_defconfig_n800_only_a,
+		  omap2plus_defconfig_n800_multi_omap2xxx,
+		  omap2plus_defconfig_omap2_4_only,
+		  omap2plus_defconfig_omap3_4_only,
+		  omap2plus_defconfig_dra7xx_only,
+		  rmk_omap3430_ldp_allnoconfig,
+		  rmk_omap3430_ldp_oldconfig,
+		  rmk_omap4430_sdp_allnoconfig,
+		  rmk_omap4430_sdp_oldconfig
 
--> Corrected in V4
+Build: uImage:
+    Pass ( 3/ 3): omap1_defconfig, omap1_defconfig_1510innovator_only,
+		  omap1_defconfig_5912osk_only
 
->> +		num-chipselects = <1>;
->> +		#address-cells = <1>;
->> +		#size-cells = <0>;
->> +
->> +		gpio2: gpio2 at 0 {
->> +			compatible = "fairchild,74hc595";
->> +			gpio-controller;
->> +			#gpio-cells = <2>;
->> +			reg = <0>;
->> +			registers-number = <2>;
->> +			spi-max-frequency = <100000>;
->> +		};
-> 
-> I'm not sure "gpio2" is a good name, as we might think of it as being
-> the third GPIO controller internal to the SoC.
-> 
+Build: uImage+dtb:
+    Pass (10/10): omap2plus_defconfig_am33xx_only/am335x-bone,
+		  omap2plus_defconfig/omap4-panda,
+		  omap2plus_defconfig/omap4-panda-es,
+		  omap2plus_defconfig/am3517-evm,
+		  omap2plus_defconfig/omap2430-sdp,
+		  omap2plus_defconfig/omap3-beagle,
+		  omap2plus_defconfig/omap3-beagle-xm,
+		  omap2plus_defconfig/omap3-evm-37xx,
+		  omap2plus_defconfig/omap4-var-som,
+		  omap2plus_defconfig/omap5-uevm
 
-Renamed to gpio_spi, tested ok  -> Corrected in V4
+Boot to userspace:
+    FAIL ( 1/14): 2430sdp
+    skip ( 1/14): 5912osk
+    Pass (12/14): 2420n800, 3517evm, 3530es3beagle, 3730beaglexm,
+		  37xxevm, 4430es2panda, 4460pandaes, am335xbone,
+		  am335xbonelt, cmt3517, 4460varsomom, 5430es2uevm
 
-> Thanks,
-> 
+PM: chip retention via suspend:
+    FAIL ( 3/ 7): 2430sdp, 4430es2panda, 4460varsomom
+    Pass ( 4/ 7): 3530es3beagle, 3730beaglexm, 37xxevm, 4460pandaes
 
-You're welcome, patch issued as V4 just now.
+PM: chip retention via dynamic idle:
+    FAIL ( 7/ 7): 2430sdp, 3530es3beagle, 3730beaglexm, 37xxevm,
+		  4430es2panda, 4460pandaes, 4460varsomom
 
-> Thomas
-> -- 
-> Thomas Petazzoni, CTO, Free Electrons
-> Embedded Linux, Kernel and Android engineering
-> http://free-electrons.com
+PM: chip off except CORE via suspend:
+    Pass ( 1/ 1): 3730beaglexm
+
+PM: chip off except CORE via dynamic idle:
+    FAIL ( 1/ 1): 3730beaglexm
+
+PM: chip off via suspend:
+    FAIL ( 4/ 5): 3530es3beagle, 4430es2panda, 4460pandaes,
+		  4460varsomom
+    Pass ( 1/ 5): 37xxevm
+
+PM: chip off via dynamic idle:
+    FAIL ( 5/ 5): 3530es3beagle, 37xxevm, 4430es2panda, 4460pandaes,
+		  4460varsomom
+
+
+vmlinux object size
+(delta in bytes from test_v3.16-rc6 (9a3c4145af32125c5ee39c0272662b47307a8323)):
+   text     data      bss    total  kernel
+   +380      +24        0     +404  omap1_defconfig
+   +380        0        0     +380  omap1_defconfig_1510innovator_only
+   +348       -8        0     +340  omap1_defconfig_5912osk_only
+   +412      +16        0     +428  multi_v7_defconfig
+    +96      -16        0      +80  omap2plus_defconfig
+   +704      -16      +32     +720  omap2plus_defconfig_2430sdp_only
+    +96      -16        0      +80  omap2plus_defconfig_am33xx_only
+    +96      +16        0     +112  omap2plus_defconfig_am43xx_only
+    +96      +16        0     +112  omap2plus_defconfig_cpupm
+    +96      +16        0     +112  omap2plus_defconfig_dra7xx_only
+   +232       -8        0     +224  omap2plus_defconfig_n800_multi_omap2xxx
+   +232        0        0     +232  omap2plus_defconfig_n800_only_a
+    +96      +48        0     +144  omap2plus_defconfig_no_pm
+   +160      +16        0     +176  omap2plus_defconfig_omap2_4_only
+    +96      -16        0      +80  omap2plus_defconfig_omap3_4_only
+   +160      -16        0     +144  omap2plus_defconfig_omap5_only
+    +40        0      +12      +52  rmk_omap3430_ldp_allnoconfig
+   +256        0        0     +256  rmk_omap3430_ldp_oldconfig
+    +24        0      +28      +52  rmk_omap4430_sdp_allnoconfig
+   +288        0      +64     +352  rmk_omap4430_sdp_oldconfig
+
+Boot-time memory difference
+(delta in bytes from test_v3.16-rc6 (9a3c4145af32125c5ee39c0272662b47307a8323))
+  avail  rsrvd   high  freed  board          kconfig
+  (no differences)
