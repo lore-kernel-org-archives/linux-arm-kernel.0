@@ -1,261 +1,421 @@
-From: stefan@agner.ch (Stefan Agner)
-Date: Mon, 28 Jul 2014 18:20:02 +0200
-Subject: [PATCH v3 4/4] can: flexcan: add vf610 support for FlexCAN
-In-Reply-To: <53D25C9D.5080803@pengutronix.de>
-References: <cover.1405428166.git.stefan@agner.ch>
- <ff2ea1726b13dc2ffa3519ce9244f3633cf1420d.1405428166.git.stefan@agner.ch>
- <53C5398F.2000005@pengutronix.de>
- <1b8a8ca03b4a160027a79b722f697e25@agner.ch>
- <601adb6fe47279c115c1cc607365a00e@agner.ch>
- <53D25C9D.5080803@pengutronix.de>
-Message-ID: <e88108c655e2c16dc9cf6c4194547e73@agner.ch>
+From: olof@lixom.net (Olof Johansson)
+Date: Mon, 28 Jul 2014 09:23:40 -0700
+Subject: [PATCH 19/19] Documentation: ACPI for ARM64
+In-Reply-To: <53D60D11.8050205@linaro.org>
+References: <1406206825-15590-1-git-send-email-hanjun.guo@linaro.org>
+ <1406206825-15590-20-git-send-email-hanjun.guo@linaro.org>
+ <CAOesGMhKHGkVK3dOLXXx9GQBMxDmjBu1WDBgHmwdGe1UK3jfcg@mail.gmail.com>
+ <53D60D11.8050205@linaro.org>
+Message-ID: <20140728162340.GA32359@quad.lixom.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am 2014-07-25 15:33, schrieb Marc Kleine-Budde:
-> On 07/25/2014 12:50 PM, Stefan Agner wrote:
->> Am 2014-07-16 08:43, schrieb Stefan Agner:
->>> Am 2014-07-15 16:24, schrieb Marc Kleine-Budde:
->>> <snip>
->>>>> @@ -150,18 +171,20 @@
->>>>>   * FLEXCAN hardware feature flags
->>>>>   *
->>>>>   * Below is some version info we got:
->>>>> - *    SOC   Version   IP-Version  Glitch-  [TR]WRN_INT
->>>>> - *                                Filter?   connected?
->>>>> - *   MX25  FlexCAN2  03.00.00.00     no         no
->>>>> - *   MX28  FlexCAN2  03.00.04.00    yes        yes
->>>>> - *   MX35  FlexCAN2  03.00.00.00     no         no
->>>>> - *   MX53  FlexCAN2  03.00.00.00    yes         no
->>>>> - *   MX6s  FlexCAN3  10.00.12.00    yes        yes
->>>>> + *    SOC   Version   IP-Version  Glitch-  [TR]WRN_INT  Memory err
->>>>> + *                                Filter?   connected?  detection
->>>>> + *   MX25  FlexCAN2  03.00.00.00     no         no         no
->>>>> + *   MX28  FlexCAN2  03.00.04.00    yes        yes         no
->>>>> + *   MX35  FlexCAN2  03.00.00.00     no         no         no
->>>>> + *   MX53  FlexCAN2  03.00.00.00    yes         no         no
->>>>> + *   MX6s  FlexCAN3  10.00.12.00    yes        yes         no
->>>>> + *   VF610 FlexCAN3  ?               no         no        yes
->>>>                                         ^^         ^^
->>>>
->>>> Can you check the datasheet if the flexcan core has a "Glitch Filter
->>>> Width Register (FLEXCANx_GFWR)"
->>>
->>>
->>> There is no such register called GFWR/Glitch Filter or similar.
->>>
->>>> Can you check if the core generates a warning interrupt with the current
->>>> setup, if you don't switch on bus error reporting? This means internally
->>>> the [TR]WRN_INT is connected and works as specified.
->>>
->>> Ok, so I disabled TWRNMSK (Bit 11) in the control register and printed
->>> out the error and status register (ESR1), this is what I get:
->>> [  191.285295] flexcan_irq, esr=00040080
->>> [  191.288996] flexcan_irq, ctrl=17092051
->>>
->>> Bit 17 (TWRNINT) is not set while TWRNMSK is disabled. Hence [TR]WRN_INT
->>> is not connected?
->>
->> Ping. Anything open/to do from my side?
+On Mon, Jul 28, 2014 at 09:42:57AM +0100, Graeme Gregory wrote:
 > 
-> Please keep the printing of esr and ctrl in the interrupt handler, add a
-> #define DEBUG in the driver, but do not change anything else. Then:
+> On 27/07/2014 03:34, Olof Johansson wrote:
+> >On Thu, Jul 24, 2014 at 6:00 AM, Hanjun Guo <hanjun.guo@linaro.org> wrote:
+> >>From: Graeme Gregory <graeme.gregory@linaro.org>
+> >>
+> >>Add documentation for the guidelines of how to use ACPI
+> >>on ARM64.
+> >As the most vocal participant against ACPI being adopted, I would have
+> >appreciated a cc on this patch set -- it's not like you were going for
+> >a minimal set of cc recipients already. It makes it seem like you're
+> >trying to sneak it past me for comments. Not cool. I know that's
+> >probably not your intent, but still.
+> >
+> >Some comments below. Overall the doc looks pretty good, but the
+> >details about _DSD and clocks are somewhat worrisome.
+> >
+> >>Signed-off-by: Graeme Gregory <graeme.gregory@linaro.org>
+> >>Signed-off-by: Hanjun Guo <hanjun.guo@linaro.org>
+> >>---
+> >>  Documentation/arm64/arm-acpi.txt |  240 ++++++++++++++++++++++++++++++++++++++
+> >>  1 file changed, 240 insertions(+)
+> >>  create mode 100644 Documentation/arm64/arm-acpi.txt
+> >>
+> >>diff --git a/Documentation/arm64/arm-acpi.txt b/Documentation/arm64/arm-acpi.txt
+> >>new file mode 100644
+> >>index 0000000..12cd550
+> >>--- /dev/null
+> >>+++ b/Documentation/arm64/arm-acpi.txt
+> >>@@ -0,0 +1,240 @@
+> >>+ACPI on ARMv8 Servers
+> >>+---------------------
+> >>+
+> >>+ACPI will be used for ARMv8 general purpose servers designed to follow
+> >"ACPI might be used"    or     "can be used"
+> >
+> >>+the SBSA specification (currently available to people with an ARM login at
+> >>+http://silver.arm.com)
+> >>+
+> >>+The implemented ACPI version is 5.1 + errata as released by the UEFI Forum,
+> >>+which is available at <http://www.uefi.org/acpi/specs>.
+> >The implemented version where? The kernel implements that version?
+> >Worth clarifying.
+> ok
 > 
-
-Ok, my changes look like this:
-
-diff --git a/drivers/net/can/flexcan.c b/drivers/net/can/flexcan.c
-index 1c31a5d..fe8b81c 100644
---- a/drivers/net/can/flexcan.c
-+++ b/drivers/net/can/flexcan.c
-@@ -19,6 +19,7 @@
-  *
-  */
- 
-+#define DEBUG
- #include <linux/netdevice.h>
- #include <linux/can.h>
- #include <linux/can/dev.h>
-@@ -743,6 +744,9 @@ static irqreturn_t flexcan_irq(int irq, void
-*dev_id)
- 
-        reg_iflag1 = flexcan_read(&regs->iflag1);
-        reg_esr = flexcan_read(&regs->esr);
-+
-+       printk("flexcan_irq, esr=%08x\n", reg_esr);
-+       printk("flexcan_irq, ctrl=%08x\n", flexcan_read(&regs->ctrl));
-        /* ACK all bus error and state change IRQ sources */
-        if (reg_esr & FLEXCAN_ESR_ALL_INT)
-                flexcan_write(reg_esr & FLEXCAN_ESR_ALL_INT,
-&regs->esr);
-@@ -885,8 +889,8 @@ static int flexcan_chip_start(struct net_device
-*dev)
-         */
-        reg_ctrl = flexcan_read(&regs->ctrl);
-        reg_ctrl &= ~FLEXCAN_CTRL_TSYN;
--       reg_ctrl |= FLEXCAN_CTRL_BOFF_REC | FLEXCAN_CTRL_LBUF |
--               FLEXCAN_CTRL_ERR_STATE;
-+       reg_ctrl |= FLEXCAN_CTRL_BOFF_REC | FLEXCAN_CTRL_LBUF;// |
-+               //FLEXCAN_CTRL_ERR_STATE;
-        /*
-         * enable the "error interrupt" (FLEXCAN_CTRL_ERR_MSK),
-         * on most Flexcan cores, too. Otherwise we don't get
-
-I'm not sure whether you really want to keep the FLEXCAN_CTRL_ERR_STATE
-commented out...
-
-
-> start the driver as usual:
-> - configure bitrate
-> - ifconfig can0 up
-> - _do_not_ enable bit error reporint
-> - start candump from gitorious with:
->   candump -e any,0:0,#FFFFFFFF
-> - short circuit CAN-High and CAN-Low
-> - send a CAN frame
-
-
-root at colibri-vf:~# ip link set can0 type can bitrate 500000
-[  146.140862] flexcan 40020000.flexcan can0: bitrate error 0.7%
-root at colibri-vf:~# ip link set can0 up
-[  146.661430] flexcan 40020000.flexcan can0: writing ctrl=0x17092001
-[  146.667902] flexcan 40020000.flexcan can0: flexcan_set_bittiming:
-mcr=0x5980000f ctrl=0x17092001
-[  146.676790] flexcan 40020000.flexcan can0: flexcan_chip_start:
-writing mcr=0x79a20208
-[  146.684709] flexcan 40020000.flexcan can0: flexcan_chip_start:
-writing ctrl=0x17092051
-[  146.698228] flexcan 40020000.flexcan can0: flexcan_chip_start:
-reading mcr=0x60a20208 ctrl=0x1709205
-
-# cansend can0 1F334455#1122334455667788
-interface = can0, family = 29, type = 3, proto = 
-
-Nothing happens on candump.
- 
-> Another test is to setup a proper CAN bus, but configure the a second
-> CAN node with a different bitrate. Start the can0 on vf610 as usual,
-> then candump -e any,0:0,#FFFFFFFF, but do not send any CAN frames on the
-> vf610. Then on the other system keep sending CAN frames, you might have
-> to restart the CAN on the second system....
-
-I'm using a PCAN-USB from Peak System for this test. When running with
-the same bitrates on both sides (500000, things work smoothly as
-expected:
-
-# ip link set can0 type can bitrate 500000
-# ip link set can0 up
-# cansend can0 1F334455#1122334455667788
-
-root at colibri-vf:~# ./candump -e any,0:0,#FFFFFFFF
-  can0  1F334455   [8]  11 22 33 44 55 66 77 88
-
-dmesg:
-[  541.772502] flexcan_irq, esr=00040180
-[  541.776207] flexcan_irq, ctrl=17092051
-
-Then I reconfigure the system on my host:
-# ip link set can0 down
-# ip link set can0 type can bitrate 1000000
-# ip link set can0 up
-# cansend can0 1F334455#1122334455667788
-
-Nothing happens on Vybrid side.
-
-
-However, I got once this Kernel panic after I reconfigured to normal
-mode. But I could not reproduce this.
-
-[  461.954394] flexcan_irq, esr=00059d82
-[  461.958093] flexcan_irq, ctrl=17092051
-[  461.961873] ------------[ cut here ]------------
-[  461.966536] WARNING: CPU: 0 PID: 0 at kernel/locking/mutex.c:826
-mutex_trylock+0x1b0/0x208()
-[  461.974982] DEBUG_LOCKS_WARN_ON(in_interrupt())
-[  461.979347] Modules linked in:
-[  461.982621] CPU: 0 PID: 0 Comm: swapper/0 Not tainted
-3.16.0-rc4-00017-ge9a974f-dirty #215
-[  461.990896] Backtrace:
-[  461.993412] [<80011e1c>] (dump_backtrace) from [<80011fb8>]
-(show_stack+0x18/0x1c)
-[  462.000991]  r6:806718ec r5:00000000 r4:00000000 r3:00000000
-[  462.006836] [<80011fa0>] (show_stack) from [<8066e160>]
-(dump_stack+0x88/0xa4)
-[  462.014143] [<8066e0d8>] (dump_stack) from [<80028f48>]
-(warn_slowpath_common+0x70/0x94)
-[  462.022280]  r5:00000009 r4:808f9d50
-[  462.025920] [<80028ed8>] (warn_slowpath_common) from [<80029010>]
-(warn_slowpath_fmt+0x38/0x40)
-[  462.034666]  r8:808f9e14 r7:8110cf7c r6:804c2fa0 r5:8e9ee000
-r4:8094cdcc
-[  462.041478] [<80028fdc>] (warn_slowpath_fmt) from [<806718ec>]
-(mutex_trylock+0x1b0/0x208)
-[  462.049792]  r3:807e3f6c r2:807e1b8c
-[  462.053466] [<8067173c>] (mutex_trylock) from [<804c2fa0>]
-(clk_prepare_lock+0x14/0xec)
-[  462.061479]  r7:90880000 r6:8e81f800 r5:8e9ee000 r4:8e81f800
-[  462.067280] [<804c2f8c>] (clk_prepare_lock) from [<804c50d0>]
-(clk_prepare+0x14/0x2c)
-[  462.075158]  r6:8e81f800 r5:8e9ee000 r4:8e81f800 r3:00000000
-[  462.080918] [<804c50bc>] (clk_prepare) from [<803e7a50>]
-(flexcan_get_berr_counter+0x24/0xd0)
-[  462.089487]  r4:00000001 r3:00000000
-[  462.093156] [<803e7a2c>] (flexcan_get_berr_counter) from [<803e895c>]
-(flexcan_poll+0x40c/0x58c)
-[  462.101992]  r8:0000000a r7:0000000a r6:8e372388 r5:8e172a80
-r4:00000001 r3:00000000
-[  462.109843] [<803e8550>] (flexcan_poll) from [<80511f90>]
-(net_rx_action+0xcc/0x1b4)
-[  462.117630]  r10:8e9ee6c0 r9:00000003 r8:0000000a r7:8fdde188
-r6:808fa0c0 r5:8fdde180
-[  462.125587]  r4:0000012c
-[  462.128164] [<80511ec4>] (net_rx_action) from [<8002d290>]
-(__do_softirq+0x120/0x26c)
-[  462.136038]  r10:808fa080 r9:00000003 r8:00000100 r7:00000003
-r6:808f8000 r5:808fa08c
-[  462.143994]  r4:00000000
-[  462.146566] [<8002d170>] (__do_softirq) from [<8002d6d4>]
-(irq_exit+0xb0/0x104)
-[  462.153923]  r10:806788ac r9:808f8000 r8:00000000 r7:0000005a
-r6:808f8000 r5:808f5e2c
-[  462.161877]  r4:808f8000
-[  462.164459] [<8002d624>] (irq_exit) from [<8000f4bc>]
-(handle_IRQ+0x58/0xb8)
-[  462.171520]  r4:80900d2c r3:000000a0
-[  462.175200] [<8000f464>] (handle_IRQ) from [<800086c0>]
-(gic_handle_irq+0x30/0x68)
-[  462.182818]  r8:8095c587 r7:90802100 r6:808f9f28 r5:80900ea0
-r4:9080210c r3:000000a0
-[  462.190671] [<80008690>] (gic_handle_irq) from [<80012ae4>]
-(__irq_svc+0x44/0x5c)
-[  462.198203] Exception stack(0x808f9f28 to 0x808f9f70)
-[  462.203315] 9f20:                   00000001 00000001 00000000
-80904070 8090098c 80900938
-[  462.211517] 9f40: 8095c587 00000000 8095c587 808f8000 806788ac
-808f9f7c 808f9f40 808f9f70
-[  462.219746] 9f60: 80066a98 8000f834 20000013 ffffffff
-[  462.224852]  r7:808f9f5c r6:ffffffff r5:20000013 r4:8000f834
-[  462.230621] [<8000f80c>] (arch_cpu_idle) from [<8005fba4>]
-(cpu_startup_entry+0x104/0x16c)
-[  462.238964] [<8005faa0>] (cpu_startup_entry) from [<80668cf8>]
-(rest_init+0xb0/0xd8)
-[  462.246757]  r7:8ffffcc0 r3:00000000
-[  462.250419] [<80668c48>] (rest_init) from [<808a5bf8>]
-(start_kernel+0x340/0x3ac)
-[  462.257979]  r5:8095c7c0 r4:80900a38
-[  462.261620] [<808a58b8>] (start_kernel) from [<80008074>]
-(0x80008074)
-[  462.268204] ---[ end trace c9c9dee0ce2272a7 ]---
-[  462.272899] flexcan 40020000.flexcan can0: Error Warning IRQ
-
-candump showed this:
-  can0  20000004   [8]  00 04 00 00 00 00 00 00   ERRORFRAME
-	controller-problem{rx-error-warning}
-
+> the tables passed must be acpi 5.1+, the kernel must then obviously
+> implement the 5.1 features, will clarify.
+> >>+If the machine does not meet these requirements then it is likely that Device
+> >>+Tree (DT) is more suitable for the hardware.
+> >This is should be a very clear statement that is currently vague
+> >w.r.t. which requirements are met or not, especially based on the
+> >sentence above.
+> The SBSA is the set of requirements, will clarify.
 > 
-> Please send the outputs of candump and demsg to the list. It should
-> generate a warning, error passive and finally a busoff message.
+> >>+Relationship with Device Tree
+> >>+-----------------------------
+> >>+
+> >>+ACPI support in drivers and subsystems for ARMv8 should never be mutually
+> >>+exclusive with DT support at compile time.
+> >>+
+> >>+At boot time the kernel will only use one description method depending on
+> >>+parameters passed from the bootloader.
+> >Possibly overriden by kernel bootargs. And as debated for quite a
+> >while earlier this year, acpi should still default to off -- if a DT
+> >and ACPI are both passed in, DT should at this time be given priority.
+> This does not work due to DT being misused as the kernel/bootloader
+> communication layer as well. So a DT is always passed to the kernel.
+> We cannot tell whether this is a useful DT without unpacking it and
+> trying to boot platform from it.
 > 
+> There is an acpi=off parameter that can be passed to always disable
+> acpi runtime.
 
---
-Stefan
+Right, but the agreement we had from earlier this year was to keep ACPI
+default off until we've seen at least the first generation of real hardware,
+since we have no confidence that the system vendors will do sane things with
+ACPI yet. If they completely mess it up, we at least will retain basic
+functionality without accuring huge technical debt dealing with the messed up
+ACPI tables forever.
+
+In other words, to boot with ACPI enabled, the requrement is that you have to
+pass 'acpi' or 'acpi=on' on the command line (or equivalent). Not the other way
+around -- to have it on by default and give an option to turn it off.
+
+If you need a refresher: http://www.secretlab.ca/archives/27
+
+> >(Where can I learn more about how the boot loaders currently handle
+> >this? Do some of them pass in both DT and ACPI on some platforms, for
+> >example?)
+> Currently only one bootloader protocol is supported for ACPI and
+> thats UEFI. As noted above due to abuse of DT in the /chosen/ node a
+> DT is always passed to the kernel.
+
+The above is hard to understand. I suppose I should restate my question:
+I presume actual end users will use something like Grub2 to load
+a kernel/ramdisk/dtb. Where can I learn more about how it handles ACPI?
+
+> >>+Regardless of whether DT or ACPI is used, the kernel must always be capable
+> >>+of booting with either scheme.
+> >It should always be possible to compile out ACPI. There will be plenty
+> >of platforms that will not implement it, so disabling CONFIG_ACPI
+> >needs to be possible.
+> This will always be possible!
+
+Yes, I commented because it should also be clear in the doc.
+
+> >>+When booting using ACPI tables the /chosen node in DT will still be parsed
+> >>+to extract the kernel command line and initrd path. No other section of
+> >>+the DT will be used.
+> >>+
+> >>+Booting using ACPI tables
+> >>+-------------------------
+> >>+
+> >>+Currently, the only defined method to pass ACPI tables to the kernel on ARMv8
+> >>+is via the UEFI system configuration table.
+> >>+
+> >>+The UEFI implementation MUST set the ACPI_20_TABLE_GUID to point to the
+> >>+RSDP table (the table with the ACPI signature "RSD PTR ").
+> >>+
+> >>+The pointer to the RSDP table will be retrieved from EFI by the ACPI core.
+> >>+
+> >>+Processing of ACPI tables may be disabled by passing acpi=off on the kernel
+> >>+command line.
+> >>+
+> >>+DO use an XSDT, RSDTs are deprecated and should not be used on arm64. They
+> >>+only allow for 32bit addresses.
+> >>+
+> >>+DO NOT use the 32-bit address fields in the FADT, they are deprecated, the
+> >>+64-bit alternatives MUST be used.
+> >>+
+> >>+The minimum set of tables MUST include RSDP, XSDT, FACS, FADT, DSDT, MADT
+> >>+and GTDT. If PCI is used the MCFG table MUST also be present.
+> >>+
+> >>+ACPI Detection
+> >>+--------------
+> >>+
+> >>+Drivers should determine their probe() type by checking for ACPI_HANDLE,
+> >>+or .of_node, or other information in the device structure. This is
+> >>+detailed further in the "Driver Recomendations" section.
+> >>+
+> >>+If the presence of ACPI needs to be detected at runtime, then check the value
+> >>+of acpi_disabled. If CONFIG_ACPI not being set acpi_disabled will always be 1.
+> >Just to make sure, if acpi_disabled is 0, then there will be no acpi
+> >handle associated with the device, right? I.e. there should be no need
+> >to have every single driver check for whether ACPI is disabled, the
+> >handle check should just fail instead.
+> I need to clarify this obviously, I meant for the second paragraph
+> for that to be for code outside driver probing. Inside drivers they
+> should only check for ACPI_HANDLE presence. But other bits of code
+> espcially bits parsing tables for information in early boot should
+> check for acpi_disabled before hunting for the tables etc.
+
+Yep, that sounds sane.
+
+> >>+Device Enumeration
+> >>+------------------
+> >>+
+> >>+Device descriptions in ACPI should use standard recognised ACPI interfaces.
+> >>+These are far simpler than the information provided via Device Tree. Drivers
+> >>+should take into account this simplicity and work with sensible defaults.
+> >>+
+> >>+On no account should a Device Tree attempt to be replicated in ASL using such
+> >>+constructs as Name(KEY0, "Value1") type constructs. Additional driver specific
+> >>+data should be passed in the appropriate _DSM (ACPI Section 9.14.1) method or
+> >>+_DSD (ACPI Section 6.2.5). This data should be rare and not OS specific.
+> >I see these two sentences as contradictory, given that the _DSD doc
+> >linked below contains examples that mirror over several properties,
+> >such as "linux,default-trigger" and other LED-specific properties.
+> >(section 2.4.2 in the below doc). "default-state" seems to come from
+> >DT too?
+> >
+> >Care to elaborate and explain what the intention here is? This could
+> >worst case turn into quite a mess.
+> >
+> >Given that ACPI can present completely different data based on what OS
+> >is running, it's quite common to indeed have OS specific data in
+> >there. How does that relate to this document and these practices?
+> OS specific data has traditionally not worked out well for ACPI, I
+> would like to "persuade" people not to use it on ARM.
+
+It hasn't? I think Microsoft disagrees. It's also how vendors have been able to
+present an older machine description to keep their newer hardware compatible
+with older software, isn't it? How do you expect to handle that if you can
+only present one table? It's the same challenge that DT has.
+
+> The _DSD was quite late to the standards process and the supporting
+> documentation is still catching up. We are working with ARM to bring
+> these issues up and to define proper OS agnostic bindings for ARM.
+
+I'm guessing that the first ARM should be ACPI? Or is ARM Ltd on critical path
+on this?!
+
+> >>+Common _DSD bindings should be submitted to ASWG to be included in the
+> >>+document :-
+> >>+
+> >>+http://www.uefi.org/sites/default/files/resources/_DSD-implementation-guide-toplevel.htm
+> >So, for these that are a mirror of the device tree bindings, there
+> >needs to be a wording here around reviewing the DT binding first so we
+> >don't get diverging bindings.
+> >
+> >>+TODO: Clarification and examples from Juno implementation.
+> >>+
+> >>+Programmable Power Control Resources
+> >>+------------------------------------
+> >>+
+> >>+Programmable power control resources include such resources as voltage/current
+> >>+providers (regulators) and clock sources.
+> >>+
+> >>+For power control of these resources they should be represented with Power
+> >>+Resource Objects (ACPI Section 7.1). The ACPI core will then handle correctly
+> >>+enabling/disabling of resources as they are needed.
+> >>+
+> >>+There exists in the ACPI 5.1 specification no standard binding for these objects
+> >>+to enable programmable levels or rates so this should be avoid if possible and
+> >>+the resources set to appropriate level by the firmware. If this is not possible
+> >>+then any manipulation should be abstracted in ASL.
+> >>+
+> >>+Each device in ACPI has D-states and these can be controlled through
+> >>+the optional methods _PS0..._PS3 where _PS0 is full on and _PS3 is full off.
+> >>+
+> >>+If either _PS0 or _PS3 is implemented, then the other method must also be
+> >>+implemented.
+> >>+
+> >>+If a device requires usage or setup of a power resource when on, the ASL
+> >>+should organise that it is allocated/enabled using the _PS0 method.
+> >>+
+> >>+Resources allocated/enabled in the _PS0 method should be disabled/de-allocated
+> >>+in the _PS3 method.
+> >>+
+> >>+Such code in _PS? methods will of course be very platform specific but
+> >>+should allow the driver to operate the device without special non standard
+> >>+values being read from ASL. Further, abstracting the use of these resources
+> >>+allows hardware revisions without requiring updates to the kernel.
+> >>+
+> >>+TODO: Clarification and examples from Juno implementation.
+> >>+
+> >>+Clocks
+> >>+------
+> >>+
+> >>+Like clocks that are part of the power resources there is no standard way
+> >>+to represent a clock tree in ACPI 5.1 in a similar manner to how it is
+> >>+described in DT.
+> >>+
+> >>+Devices affected by this include things like UARTs, SoC driven LCD displays,
+> >>+etc.
+> >>+
+> >>+The firmware for example UEFI should initialise these clocks to fixed working
+> >Odd wording.  Maube "The firmware (for example UEFI) should..."
+> agreed!
+> >>+values before the kernel is executed. If a driver requires to know rates of
+> >>+clocks set by firmware then they can be passed to kernel using _DSD.
+> >>+
+> >>+example :-
+> >>+
+> >>+Device (CLK0) {
+> >>+       ...
+> >>+
+> >>+       Name (_DSD, Package() {
+> >>+               ToUUID("XXXXX"),
+> >>+               Package() {
+> >>+                       Package(2) {"#clock-cells", 0},
+> >Clock-cells? What do they mean here? Is this specified in the ACPI
+> >standards? I had to register to get access to it, and didn't feel like
+> >doing that right now. I guess it's not _all_ that open a spec. :(
+> >
+> >>+                       Package(2) {"clock-frequency", "10000"}
+> >>+               }
+> >>+       })
+> >>+
+> >>+       ...
+> >>+}
+> >>+
+> >>+Device (USR1) {
+> >>+       ...
+> >>+
+> >>+       Name (_DSD, Package() {
+> >>+               ToUUID("XXXXX"),
+> >>+               Package() {
+> >>+                       Package(2) {"clocks", Package() {1, ^CLK0}}},
+> >A clock is a device in the ACPI model? Why not just provide the rate
+> >as data into the device here? You said you're not trying to model the
+> >clock tree, so why reference an external node for it?
+> This section is still a bit WIP due to the above noted issues with
+> _DSD documentation catching up with the standards process. I will
+> need to work with the clock maintainers to see if we can agree a
+> proper set of bindings for this. #blah-cells always was my least
+> favorite DT feature.
+
+Ok, work in progress is fine with me. But it is the reason for why we need to
+continue defaulting to ACPI off for now -- just because we don't want to have
+to support it in case some vendor picks up and use something half-baked while
+it's still being worked on.
+
+> >>+               }
+> >>+       })
+> >>+
+> >>+       ...
+> >>+}
+> >>+
+> >>+Driver Recommendations
+> >>+----------------------
+> >>+
+> >>+DO NOT remove any FDT handling when adding ACPI support for a driver, different
+> >>+systems may use the same device.
+> >>+
+> >>+DO try and keep complex sections of ACPI and DT functionality seperate. This
+> >>+may mean a patch to break out some complex DT to another function before
+> >>+the patch to add ACPI. This may happen in other functions but is most likely
+> >>+in probe function. This gives a clearer flow of data for reviewing driver
+> >>+source.
+> >>+
+> >>+probe() :-
+> >>+
+> >>+TODO: replace this with a specific real example from Juno?
+> >>+
+> >>+static int device_probe_dt(struct platform_device *pdev)
+> >>+{
+> >>+       /* DT specific functionality */
+> >>+       ...
+> >>+}
+> >>+
+> >>+static int device_probe_acpi(struct platform_device *pdev)
+> >>+{
+> >>+       /* ACPI specific functionality */
+> >>+       ...
+> >>+}
+> >>+
+> >>+static int device_probe(stuct platform_device *pdev)
+> >>+{
+> >>+       ...
+> >>+       acpi_handle handle = ACPI_HANDLE(&pdev->dev);
+> >>+       struct device_node node = pdev->dev.of_node;
+> >>+       ...
+> >>+
+> >>+       if (node)
+> >>+               ret = device_probe_dt(pdev);
+> >>+       else if (handle)
+> >>+               ret = device_probe_acpi(pdev);
+> >>+       else
+> >>+               /* other initialisation */
+> >>+               ...
+> >>+       /* Continue with any generic probe operations */
+> >>+       ...
+> >>+}
+> >This looks good to me, and it's also my preferred way of ACPI-enabling
+> >drivers. I guess we might discuss this at KS since it was a proposed
+> >topic there, and others will object. :)
+> Hopefully someone can summarise the discussion at KS for me, I will
+> not be there.
+
+LWN.net usually has good summaries. I hope they'll be in the room this
+time too. If not, we'll send out a summary separately.
+
+> >>+
+> >>+DO keep the MODULE_DEVICE_TABLE entries together in the driver to make it clear
+> >>+the different names the driver is probed for, both from DT and from ACPI.
+> >>+
+> >>+module device tables :-
+> >>+
+> >>+static struct of_device_id virtio_mmio_match[] = {
+> >>+        { .compatible = "virtio,mmio", },
+> >>+        {},
+> >>+};
+> >>+MODULE_DEVICE_TABLE(of, virtio_mmio_match);
+> >>+
+> >>+static const struct acpi_device_id virtio_mmio_acpi_match[] = {
+> >>+        { "LNRO0005", },
+> >>+        { }
+> >No comma here, but a comma on DT. Probably make them equivalent for
+> >consistency (including space between the braces).
+> ok
+> >>+};
+> >>+MODULE_DEVICE_TABLE(acpi, virtio_mmio_acpi_match);
+> >>+
+> >>+TODO: Add any other helpful rules that develop from Juno ACPI work.
+> >Looks like this should be fixed before the patch is merged, or this
+> >TODO removed.
+> The plan is to fix these TODOs with actual data from Juno as that
+> will be in the UEFI for Juno.
+> >>+
+> >>+ASWG
+> >>+----
+> >>+
+> >>+The following areas are not yet well defined for ARM in the current ACPI
+> >>+specification and are expected to be worked through in the UEFI ACPI
+> >>+Specification Working Group (ASWG) <http://www.uefi.org/workinggroups>.
+> >>+Participation in this group is open to all UEFI members.
+> >>+
+> >>+       - ACPI based CPU topology
+> >>+       - ACPI based Power management
+> >>+       - CPU idle control based on PSCI
+> >>+       - CPU performance control (CPPC)
+> >>+
+> >>+No code shall be accepted into the kernel unless it complies with the released
+> >>+standards from UEFI ASWG. If there are features missing from ACPI to make it
+> >>+function on a platform ECRs should be submitted to ASWG and go through the
+> >>+approval process.
+> >Thanks for listing the things that are not in place yet. Please keep
+> >this doc up to date as new areas are discovered.
+> >
+> >
+> >-Olof
+> Thanks for the feedback, we shall work to incorporate it into the document.
+
+Happy to help. Besides readiness to flip ACPI on by default, I don't
+think we're in substantial technical disagreements here.
+
+
+-Olof
