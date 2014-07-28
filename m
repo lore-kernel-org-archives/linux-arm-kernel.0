@@ -1,52 +1,51 @@
-From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Tue, 29 Jul 2014 06:25:58 +0900
-Subject: [RESEND][PATCH 1/2] ARM: DTS: Add PMU DT node for exynos5260 SoC
-In-Reply-To: <53D6B2AD.7070404@suse.de>
-References: <1406551080-14821-1-git-send-email-vikas.sajjan@samsung.com>	<1406551080-14821-2-git-send-email-vikas.sajjan@samsung.com>
- <CAK5sBcHdsDF60JTv7ugC4m=A-5Lmr2rDwizhkCLEyYGRio-2-Q@mail.gmail.com>
- <53D6B2AD.7070404@suse.de>
-Message-ID: <53D6BFE6.10303@samsung.com>
+From: broonie@kernel.org (Mark Brown)
+Date: Mon, 28 Jul 2014 22:28:31 +0100
+Subject: [PATCH v2 09/11] Documentation: devicetree: Fix ADI AXI SPDIF
+ specification
+In-Reply-To: <53D66EC2.1050408@suse.de>
+References: <53D20A61.1050506@metafoo.de> <53D21066.8000905@monstr.eu>
+ <20140725101815.GO17528@sirena.org.uk> <53D2324B.4070602@suse.de>
+ <20140725103905.GP17528@sirena.org.uk> <53D63746.3000905@suse.de>
+ <20140728122042.GR17528@sirena.org.uk> <53D641DC.4020804@suse.de>
+ <20140728134420.GU17528@sirena.org.uk> <53D66EC2.1050408@suse.de>
+Message-ID: <20140728212831.GF17528@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/29/14 05:29, Andreas F?rber wrote:
-> Hi Vikas and Sachin,
->
-> Am 28.07.2014 17:26, schrieb Sachin Kamat:
->> On Mon, Jul 28, 2014 at 6:07 PM, Vikas Sajjan<vikas.sajjan@samsung.com>  wrote:
->>> Adds PMU DT node for exynos5260 SoC.
->>>
->>> Signed-off-by: Vikas Sajjan<vikas.sajjan@samsung.com>
->>> ---
->>>   .../devicetree/bindings/arm/samsung/pmu.txt        |    1 +
->>>   arch/arm/boot/dts/exynos5260.dtsi                  |    5 +++++
->>>   2 files changed, 6 insertions(+)
->>>
->>> diff --git a/Documentation/devicetree/bindings/arm/samsung/pmu.txt b/Documentation/devicetree/bindings/arm/samsung/pmu.txt
->>> index 2a4ab04..c038628 100644
->>> --- a/Documentation/devicetree/bindings/arm/samsung/pmu.txt
->>> +++ b/Documentation/devicetree/bindings/arm/samsung/pmu.txt
->>> @@ -8,6 +8,7 @@ Properties:
->>>                     - "samsung,exynos4412-pmu" - for Exynos4412 SoC,
->>>                     - "samsung,exynos5250-pmu" - for Exynos5250 SoC,
->>>                     - "samsung,exynos5420-pmu" - for Exynos5420 SoC.
->>> +                  - "samsung,exynos5260-pmu" - for Exynos5260 SoC.
->>
->> nit: This line should come after 5250 entry to preserve the order.
->>
->> Otherwise, looks good.
->
-> Earlier today, Kukjin indicated he would apply my corresponding 5410
-> series [*], but he hasn't pushed yet. It adds a 5410 entry before 5420,
-> which will conflict with adding 5260 in the same place.
->
-> Regards,
-> Andreas
->
-> [*]
-> http://www.mail-archive.com/linux-samsung-soc at vger.kernel.org/msg34686.html
->
-Thanks for you guys' comments, and I've applied this whole series with 
-some handy modification ;)
+On Mon, Jul 28, 2014 at 05:39:46PM +0200, Andreas F?rber wrote:
 
-- Kukjin
+> Similarly, your statement about false negatives didn't really help in
+> resolving the not-CC'ed problem. I now know to CC you if I ever have
+> something for adi,axi-spdif-tx.txt again, but the next person might make
+> you grumpy again and potentially demotivates new contributors, so
+> certainly worth fixing.
+
+> Regmap, SPI, regulators, touchscreen MAINTAINERS entries seem unrelated.
+> Should your "SOUND - SOC LAYER / DYNAMIC AUDIO POWER MANAGEMENT (ASoC)"
+> MAINTAINERS entry get an
+> F: Documentation/devicetree/bindings/sound/
+> or is the "ANALOG DEVICES Inc ASOC DRIVERS" entry missing a line
+> F: sound/soc/adi/
+> F: Documentation/devicetree/bindings/sound/adi,axi-spdif-tx.txt
+> (which would then still not CC you)
+> or is a new MAINTAINERS section needed that CCs specifically Lars-Peter
+> and you on the latter?
+
+What you're really talking about is making MAINTAINERS complete which is
+a very big job; even if only looking at the DT bindings you'd need to go
+through every binding and make sure that MAINTAINERS says the same
+things as it does for the matching driver code, and where there are
+missing entries add them.  In the immediate case both bits are missing.
+
+Really as with so much else it's much better advice to ask people to
+look and think about what they're doing; it's the same thing as ensuring
+that commit logs match the standard style for the thing being edited
+(especially the subject lines) and that if there's people who normally
+apply patches and work on the code they're included.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140728/f5f09457/attachment.sig>
