@@ -1,64 +1,36 @@
 From: balbi@ti.com (Felipe Balbi)
-Date: Mon, 28 Jul 2014 16:16:23 -0500
-Subject: [PATCH 35/35] irq: intc: enable IP protection
+Date: Mon, 28 Jul 2014 16:16:04 -0500
+Subject: [PATCH 16/35] arm: omap: irq: add specific compatibles for omap3 and
+ am33xx devices
 In-Reply-To: <1406582183-696-1-git-send-email-balbi@ti.com>
 References: <1406582183-696-1-git-send-email-balbi@ti.com>
-Message-ID: <1406582183-696-36-git-send-email-balbi@ti.com>
+Message-ID: <1406582183-696-17-git-send-email-balbi@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-When PROTECTION bit in enabled in PROTECTION
-register, INTC's registers are only accessible
-from privileged mode.
+with this, we can use a compatible flag to figure
+out how many irq lines are wired up, no need for
+our TI-specific ti,intc-size binding.
 
 Signed-off-by: Felipe Balbi <balbi@ti.com>
 ---
- drivers/irqchip/irq-omap-intc.c | 22 ++++++++++++++++++++--
- 1 file changed, 20 insertions(+), 2 deletions(-)
+ arch/arm/mach-omap2/irq.c | 4 +++-
+ 1 file changed, 3 insertions(+), 1 deletion(-)
 
-diff --git a/drivers/irqchip/irq-omap-intc.c b/drivers/irqchip/irq-omap-intc.c
-index 371ff5e..28c8b6d 100644
---- a/drivers/irqchip/irq-omap-intc.c
-+++ b/drivers/irqchip/irq-omap-intc.c
-@@ -52,6 +52,8 @@
- #define INTCPS_NR_ILR_REGS	128
- #define INTCPS_NR_MIR_REGS	3
- 
-+#define INTC_PROTECTION_ENABLE	(1 << 0)
-+
- /*
-  * OMAP2 has a number of different interrupt controllers, each interrupt
-  * controller is identified as its own "bank". Register definitions are
-@@ -291,12 +293,28 @@ static int __init omap_init_irq_legacy(u32 base)
+diff --git a/arch/arm/mach-omap2/irq.c b/arch/arm/mach-omap2/irq.c
+index 465d725..97845df 100644
+--- a/arch/arm/mach-omap2/irq.c
++++ b/arch/arm/mach-omap2/irq.c
+@@ -320,7 +320,9 @@ static int __init intc_of_init(struct device_node *node,
  	return 0;
  }
  
-+static void __init omap_irq_enable_protection(void)
-+{
-+	u32 reg;
-+
-+	reg = intc_readl(INTC_PROTECTION);
-+	reg |= INTC_PROTECTION_ENABLE;
-+	intc_writel(INTC_PROTECTION, reg);
-+}
-+
- static int __init omap_init_irq(u32 base, struct device_node *node)
- {
-+	int ret;
-+
- 	if (node)
--		return omap_init_irq_of(node);
-+		ret = omap_init_irq_of(node);
- 	else
--		return omap_init_irq_legacy(base);
-+		ret = omap_init_irq_legacy(base);
-+
-+	if (ret == 0)
-+		omap_irq_enable_protection();
-+
-+	return ret;
- }
+-IRQCHIP_DECLARE(omap_intc, "ti,omap2-intc", intc_of_init);
++IRQCHIP_DECLARE(omap2_intc, "ti,omap2-intc", intc_of_init);
++IRQCHIP_DECLARE(omap3_intc, "ti,omap3-intc", intc_of_init);
++IRQCHIP_DECLARE(am33xx_intc, "ti,am33xx-intc", intc_of_init);
  
- static asmlinkage void __exception_irq_entry
+ asmlinkage void __exception_irq_entry omap3_intc_handle_irq(struct pt_regs *regs)
+ {
 -- 
 2.0.1.563.g66f467c
