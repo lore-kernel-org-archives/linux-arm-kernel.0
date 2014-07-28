@@ -1,38 +1,37 @@
 From: balbi@ti.com (Felipe Balbi)
-Date: Mon, 28 Jul 2014 16:16:20 -0500
-Subject: [PATCH 32/35] irq: intc: minor improvement to omap_irq_pending()
+Date: Mon, 28 Jul 2014 16:16:21 -0500
+Subject: [PATCH 33/35] irq: intc: comment style cleanup
 In-Reply-To: <1406582183-696-1-git-send-email-balbi@ti.com>
 References: <1406582183-696-1-git-send-email-balbi@ti.com>
-Message-ID: <1406582183-696-33-git-send-email-balbi@ti.com>
+Message-ID: <1406582183-696-34-git-send-email-balbi@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-We already hold the number of Pending registers
-in omap_nr_pending. Let's use that instead.
+no functional changes, just making sure comment
+follows Coding Style.
 
 Signed-off-by: Felipe Balbi <balbi@ti.com>
 ---
- drivers/irqchip/irq-omap-intc.c | 7 +++----
- 1 file changed, 3 insertions(+), 4 deletions(-)
+ drivers/irqchip/irq-omap-intc.c | 6 ++++--
+ 1 file changed, 4 insertions(+), 2 deletions(-)
 
 diff --git a/drivers/irqchip/irq-omap-intc.c b/drivers/irqchip/irq-omap-intc.c
-index 30f5fa0..c9ba502 100644
+index c9ba502..342e0ab 100644
 --- a/drivers/irqchip/irq-omap-intc.c
 +++ b/drivers/irqchip/irq-omap-intc.c
-@@ -175,11 +175,10 @@ static void __init omap_irq_soft_reset(void)
+@@ -327,9 +327,11 @@ out:
+ 		}
+ 	} while (irqnr);
  
- int omap_irq_pending(void)
- {
--	int irq;
-+	int i;
- 
--	for (irq = 0; irq < omap_nr_irqs; irq += 32)
--		if (intc_readl(INTC_PENDING_IRQ0 +
--					((irq >> 5) << 5)))
-+	for (i = 0; i < omap_nr_pending; i++)
-+		if (intc_readl(INTC_PENDING_IRQ0 + (0x20 * i)))
- 			return 1;
- 	return 0;
+-	/* If an irq is masked or deasserted while active, we will
++	/*
++	 * If an irq is masked or deasserted while active, we will
+ 	 * keep ending up here with no irq handled. So remove it from
+-	 * the INTC with an ack.*/
++	 * the INTC with an ack.
++	 */
+ 	if (!handled_irq)
+ 		omap_ack_irq(NULL);
  }
 -- 
 2.0.1.563.g66f467c
