@@ -1,77 +1,76 @@
-From: grant.likely@linaro.org (Grant Likely)
-Date: Mon, 28 Jul 2014 08:17:00 -0600
-Subject: [PATCH v2 RESEND 2/4] drivers: of: initialize and assign
- reserved memory to newly created devices
-In-Reply-To: <1405326487-15346-3-git-send-email-m.szyprowski@samsung.com>
-References: <1405326487-15346-1-git-send-email-m.szyprowski@samsung.com>
- <1405326487-15346-3-git-send-email-m.szyprowski@samsung.com>
-Message-ID: <20140728141700.55FC4C408EA@trevor.secretlab.ca>
+From: andrew@lunn.ch (Andrew Lunn)
+Date: Mon, 28 Jul 2014 16:12:17 +0200
+Subject: [Patch V2 2/2] i2c: mv64xxx: Remove internal compatible string
+ from Documentation
+In-Reply-To: <5514427.elClhaDPhf@wuerfel>
+References: <1406395238-29758-1-git-send-email-andrew@lunn.ch>
+ <20140728132251.GN23220@titan.lakedaemon.net>
+ <20140728132716.GC2891@lunn.ch> <5514427.elClhaDPhf@wuerfel>
+Message-ID: <20140728141217.GE2891@lunn.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 14 Jul 2014 10:28:05 +0200, Marek Szyprowski <m.szyprowski@samsung.com> wrote:
-> Use recently introduced of_reserved_mem_device_init() function to
-> automatically assign respective reserved memory region to the newly created
-> platform and amba device.
+On Mon, Jul 28, 2014 at 03:51:27PM +0200, Arnd Bergmann wrote:
+> On Monday 28 July 2014 15:27:16 Andrew Lunn wrote:
+> > > > diff --git a/Documentation/devicetree/bindings/i2c/i2c-mv64xxx.txt b/Documentation/devicetree/bindings/i2c/i2c-mv64xxx.txt
+> > > > index 5c30026921ae..6eb6f6e40ba1 100644
+> > > > --- a/Documentation/devicetree/bindings/i2c/i2c-mv64xxx.txt
+> > > > +++ b/Documentation/devicetree/bindings/i2c/i2c-mv64xxx.txt
+> > > > @@ -9,11 +9,6 @@ Required properties :
+> > > >                       - "allwinner,sun6i-a31-i2c"
+> > > >                       - "marvell,mv64xxx-i2c"
+> > > >                       - "marvell,mv78230-i2c"
+> > > > -                     - "marvell,mv78230-a0-i2c"
+> > > > -                       * Note: Only use "marvell,mv78230-a0-i2c" for a
+> > > > -                         very rare, initial version of the SoC which
+> > > > -                         had broken offload support.  Linux
+> > > > -                         auto-detects this and sets it appropriately.
+> > > 
+> > > I think we're losing knowledge here.  *We* know that attempting to
+> > > enable transaction offload on A0 SoCs is bad news.  Other OS's would now
+> > > need to dig through the Linux kernel code for clues as to what's
+> > > happening.
+> > > 
+> > > Perhaps we should retain the info in the form of a note at the bottom of
+> > > this file?
+> > 
+> > Hi Jason
+> > 
+> > I did wounder about this a bit. I've not looked, but now that XP
+> > datasheets are public, i assume there is an errata for this, so it at
+> > least should be documented by Marvell. But anybody looking in
+> > /proc/device-tree on an A0 is going to see this undocumented string
+> > which might raise questions.
+> > 
+> > So i'm happy to document it at the end of the binding.
+> > 
+> > Arnd, what do you say?
 > 
-> Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
-
-I'm still not okay with this patch. I don't think it is appropriate to
-add the hook into the generic path that gets used for every platform
-device. The devices that need reserved memory should explicitly request
-it, and any setup be done at that time.
-
-g.
-
-> ---
->  drivers/of/platform.c | 7 +++++++
->  1 file changed, 7 insertions(+)
+> The final consequence of the API change would be to no longer
+> change the compatible string in the fixup, but instead to call an
+> API from the driver to find out the SoC revision when it encounters
+> an mv78230-i2c.
 > 
-> diff --git a/drivers/of/platform.c b/drivers/of/platform.c
-> index 500436f9be7f..a9055d3da5c2 100644
-> --- a/drivers/of/platform.c
-> +++ b/drivers/of/platform.c
-> @@ -21,6 +21,7 @@
->  #include <linux/of_device.h>
->  #include <linux/of_irq.h>
->  #include <linux/of_platform.h>
-> +#include <linux/of_reserved_mem.h>
->  #include <linux/platform_device.h>
->  
->  const struct of_device_id of_default_bus_match_table[] = {
-> @@ -233,12 +234,15 @@ static struct platform_device *of_platform_device_create_pdata(
->  	dev->dev.bus = &platform_bus_type;
->  	dev->dev.platform_data = platform_data;
->  
-> +	of_reserved_mem_device_init(&dev->dev);
-> +
->  	/* We do not fill the DMA ops for platform devices by default.
->  	 * This is currently the responsibility of the platform code
->  	 * to do such, possibly using a device notifier
->  	 */
->  
->  	if (of_device_add(dev) != 0) {
-> +		of_reserved_mem_device_release(&dev->dev);
->  		platform_device_put(dev);
->  		goto err_clear_flag;
->  	}
-> @@ -300,6 +304,8 @@ static struct amba_device *of_amba_device_create(struct device_node *node,
->  	else
->  		of_device_make_bus_id(&dev->dev);
->  
-> +	of_reserved_mem_device_init(&dev->dev);
-> +
->  	/* Allow the HW Peripheral ID to be overridden */
->  	prop = of_get_property(node, "arm,primecell-periphid", NULL);
->  	if (prop)
-> @@ -326,6 +332,7 @@ static struct amba_device *of_amba_device_create(struct device_node *node,
->  	return dev;
->  
->  err_free:
-> +	of_reserved_mem_device_release(&dev->dev);
->  	amba_device_put(dev);
->  err_clear_flag:
->  	of_node_clear_flag(node, OF_POPULATED);
-> -- 
-> 1.9.2
+> I remember this being discussed when the quirk was initially added,
+> but it seemed cleaner to handle this in the platform code at the time
+> when it was just for one particular board. Now that it's basically
+> an accepted feature of the i2c device that you have to know the
+> SoC version, that should probably become a proper API.
 > 
+> Also, we now have drivers/soc/ and can move the soc-id code there
+> with a publically documented API.
+
+Getting the SoC ID and revision seems like something that should be
+generic. Would it be better to make this part of drivers/base/soc.c?
+mvebu already does a soc_device_register() with the relevant
+information.
+
+Add a call something like:
+
+/*
+ * Return the soc device attributes for a given soc_dev. If soc_dev is NULL,
+ * the first device on the soc bus is returned.
+ */
+struct soc_device_attribute *soc_attribute_get(struct soc_device * soc_dev);
+
+       Andrew
