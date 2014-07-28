@@ -1,331 +1,86 @@
 From: balbi@ti.com (Felipe Balbi)
-Date: Mon, 28 Jul 2014 16:16:18 -0500
-Subject: [PATCH 30/35] irqchip: add irq-omap-intc.h header
+Date: Mon, 28 Jul 2014 16:16:12 -0500
+Subject: [PATCH 24/35] arm: omap: irq: drop omap2_intc_handle_irq()
 In-Reply-To: <1406582183-696-1-git-send-email-balbi@ti.com>
 References: <1406582183-696-1-git-send-email-balbi@ti.com>
-Message-ID: <1406582183-696-31-git-send-email-balbi@ti.com>
+Message-ID: <1406582183-696-25-git-send-email-balbi@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-OMAP INTC irqchip driver will be moved under
-drivers/irqchip/ soon but we still have a dependency
-with mach-omap2 when it comes to idle functions.
-
-In order to make it easy to share those function
-prototypes with OMAP PM code, we introduce this new
-header.
+that was just a no-op wrapper around omap_intc_handle_irq
+anyway.
 
 Signed-off-by: Felipe Balbi <balbi@ti.com>
 ---
- arch/arm/mach-omap2/board-3430sdp.c        |  1 +
- arch/arm/mach-omap2/board-am3517crane.c    |  1 +
- arch/arm/mach-omap2/board-am3517evm.c      |  1 +
- arch/arm/mach-omap2/board-cm-t35.c         |  1 +
- arch/arm/mach-omap2/board-cm-t3517.c       |  1 +
- arch/arm/mach-omap2/board-devkit8000.c     |  1 +
- arch/arm/mach-omap2/board-ldp.c            |  1 +
- arch/arm/mach-omap2/board-omap3beagle.c    |  1 +
- arch/arm/mach-omap2/board-omap3logic.c     |  1 +
- arch/arm/mach-omap2/board-omap3pandora.c   |  1 +
- arch/arm/mach-omap2/board-omap3stalker.c   |  1 +
- arch/arm/mach-omap2/board-omap3touchbook.c |  1 +
- arch/arm/mach-omap2/board-overo.c          |  1 +
- arch/arm/mach-omap2/board-rx51.c           |  1 +
- arch/arm/mach-omap2/board-ti8168evm.c      |  1 +
- arch/arm/mach-omap2/common.h               |  9 ---------
- arch/arm/mach-omap2/cpuidle34xx.c          |  1 +
- arch/arm/mach-omap2/irq.c                  |  1 +
- arch/arm/mach-omap2/pm24xx.c               |  1 +
- arch/arm/mach-omap2/pm34xx.c               |  1 +
- include/linux/irqchip/irq-omap-intc.h      | 32 ++++++++++++++++++++++++++++++
- 21 files changed, 51 insertions(+), 9 deletions(-)
- create mode 100644 include/linux/irqchip/irq-omap-intc.h
+ arch/arm/mach-omap2/common.h |  1 -
+ arch/arm/mach-omap2/irq.c    | 16 ++++++----------
+ 2 files changed, 6 insertions(+), 11 deletions(-)
 
-diff --git a/arch/arm/mach-omap2/board-3430sdp.c b/arch/arm/mach-omap2/board-3430sdp.c
-index d21a304..bd79a51 100644
---- a/arch/arm/mach-omap2/board-3430sdp.c
-+++ b/arch/arm/mach-omap2/board-3430sdp.c
-@@ -27,6 +27,7 @@
- #include <linux/platform_data/spi-omap2-mcspi.h>
- #include <linux/platform_data/omap-twl4030.h>
- #include <linux/usb/phy.h>
-+#include <linux/irqchip/irq-omap-intc.h>
- 
- #include <asm/mach-types.h>
- #include <asm/mach/arch.h>
-diff --git a/arch/arm/mach-omap2/board-am3517crane.c b/arch/arm/mach-omap2/board-am3517crane.c
-index 212c316..1fdcd67 100644
---- a/arch/arm/mach-omap2/board-am3517crane.c
-+++ b/arch/arm/mach-omap2/board-am3517crane.c
-@@ -24,6 +24,7 @@
- #include <linux/mtd/mtd.h>
- #include <linux/mtd/nand.h>
- #include <linux/mtd/partitions.h>
-+#include <linux/irqchip/irq-omap-intc.h>
- 
- #include <asm/mach-types.h>
- #include <asm/mach/arch.h>
-diff --git a/arch/arm/mach-omap2/board-am3517evm.c b/arch/arm/mach-omap2/board-am3517evm.c
-index 1c091b3..117c07a 100644
---- a/arch/arm/mach-omap2/board-am3517evm.c
-+++ b/arch/arm/mach-omap2/board-am3517evm.c
-@@ -27,6 +27,7 @@
- #include <linux/mmc/host.h>
- #include <linux/usb/musb.h>
- #include <linux/platform_data/gpio-omap.h>
-+#include <linux/irqchip/irq-omap-intc.h>
- 
- #include "am35xx.h"
- #include <asm/mach-types.h>
-diff --git a/arch/arm/mach-omap2/board-cm-t35.c b/arch/arm/mach-omap2/board-cm-t35.c
-index c6df8ee..0e3e447 100644
---- a/arch/arm/mach-omap2/board-cm-t35.c
-+++ b/arch/arm/mach-omap2/board-cm-t35.c
-@@ -26,6 +26,7 @@
- #include <linux/delay.h>
- #include <linux/gpio.h>
- #include <linux/platform_data/gpio-omap.h>
-+#include <linux/irqchip/irq-omap-intc.h>
- 
- #include <linux/platform_data/at24.h>
- #include <linux/i2c/twl.h>
-diff --git a/arch/arm/mach-omap2/board-cm-t3517.c b/arch/arm/mach-omap2/board-cm-t3517.c
-index 8a2c167..8854878 100644
---- a/arch/arm/mach-omap2/board-cm-t3517.c
-+++ b/arch/arm/mach-omap2/board-cm-t3517.c
-@@ -34,6 +34,7 @@
- #include <linux/mtd/partitions.h>
- #include <linux/mmc/host.h>
- #include <linux/can/platform/ti_hecc.h>
-+#include <linux/irqchip/irq-omap-intc.h>
- 
- #include <asm/mach-types.h>
- #include <asm/mach/arch.h>
-diff --git a/arch/arm/mach-omap2/board-devkit8000.c b/arch/arm/mach-omap2/board-devkit8000.c
-index d8e4f34..be05a3e 100644
---- a/arch/arm/mach-omap2/board-devkit8000.c
-+++ b/arch/arm/mach-omap2/board-devkit8000.c
-@@ -24,6 +24,7 @@
- #include <linux/gpio.h>
- #include <linux/input.h>
- #include <linux/gpio_keys.h>
-+#include <linux/irqchip/irq-omap-intc.h>
- 
- #include <linux/mtd/mtd.h>
- #include <linux/mtd/partitions.h>
-diff --git a/arch/arm/mach-omap2/board-ldp.c b/arch/arm/mach-omap2/board-ldp.c
-index c2975af..4c010c2 100644
---- a/arch/arm/mach-omap2/board-ldp.c
-+++ b/arch/arm/mach-omap2/board-ldp.c
-@@ -30,6 +30,7 @@
- #include <linux/mmc/host.h>
- #include <linux/usb/phy.h>
- #include <linux/platform_data/spi-omap2-mcspi.h>
-+#include <linux/irqchip/irq-omap-intc.h>
- 
- #include <asm/mach-types.h>
- #include <asm/mach/arch.h>
-diff --git a/arch/arm/mach-omap2/board-omap3beagle.c b/arch/arm/mach-omap2/board-omap3beagle.c
-index 81de1c6..26c3232 100644
---- a/arch/arm/mach-omap2/board-omap3beagle.c
-+++ b/arch/arm/mach-omap2/board-omap3beagle.c
-@@ -27,6 +27,7 @@
- #include <linux/gpio_keys.h>
- #include <linux/pm_opp.h>
- #include <linux/cpu.h>
-+#include <linux/irqchip/irq-omap-intc.h>
- 
- #include <linux/mtd/mtd.h>
- #include <linux/mtd/partitions.h>
-diff --git a/arch/arm/mach-omap2/board-omap3logic.c b/arch/arm/mach-omap2/board-omap3logic.c
-index 6049f60..cd1bc90 100644
---- a/arch/arm/mach-omap2/board-omap3logic.c
-+++ b/arch/arm/mach-omap2/board-omap3logic.c
-@@ -23,6 +23,7 @@
- #include <linux/clk.h>
- #include <linux/io.h>
- #include <linux/gpio.h>
-+#include <linux/irqchip/irq-omap-intc.h>
- 
- #include <linux/regulator/fixed.h>
- #include <linux/regulator/machine.h>
-diff --git a/arch/arm/mach-omap2/board-omap3pandora.c b/arch/arm/mach-omap2/board-omap3pandora.c
-index f322016..72a3fae 100644
---- a/arch/arm/mach-omap2/board-omap3pandora.c
-+++ b/arch/arm/mach-omap2/board-omap3pandora.c
-@@ -20,6 +20,7 @@
- #include <linux/init.h>
- #include <linux/kernel.h>
- #include <linux/platform_device.h>
-+#include <linux/irqchip/irq-omap-intc.h>
- 
- #include <linux/spi/spi.h>
- #include <linux/regulator/machine.h>
-diff --git a/arch/arm/mach-omap2/board-omap3stalker.c b/arch/arm/mach-omap2/board-omap3stalker.c
-index 6311f4b..8e93215 100644
---- a/arch/arm/mach-omap2/board-omap3stalker.c
-+++ b/arch/arm/mach-omap2/board-omap3stalker.c
-@@ -23,6 +23,7 @@
- #include <linux/gpio.h>
- #include <linux/input.h>
- #include <linux/gpio_keys.h>
-+#include <linux/irqchip/irq-omap-intc.h>
- 
- #include <linux/regulator/fixed.h>
- #include <linux/regulator/machine.h>
-diff --git a/arch/arm/mach-omap2/board-omap3touchbook.c b/arch/arm/mach-omap2/board-omap3touchbook.c
-index d454508..c86927b 100644
---- a/arch/arm/mach-omap2/board-omap3touchbook.c
-+++ b/arch/arm/mach-omap2/board-omap3touchbook.c
-@@ -23,6 +23,7 @@
- #include <linux/gpio.h>
- #include <linux/input.h>
- #include <linux/gpio_keys.h>
-+#include <linux/irqchip/irq-omap-intc.h>
- 
- #include <linux/mtd/mtd.h>
- #include <linux/mtd/partitions.h>
-diff --git a/arch/arm/mach-omap2/board-overo.c b/arch/arm/mach-omap2/board-overo.c
-index 2dae6cc..628c96c 100644
---- a/arch/arm/mach-omap2/board-overo.c
-+++ b/arch/arm/mach-omap2/board-overo.c
-@@ -31,6 +31,7 @@
- #include <linux/regulator/machine.h>
- #include <linux/regulator/fixed.h>
- #include <linux/spi/spi.h>
-+#include <linux/irqchip/irq-omap-intc.h>
- 
- #include <linux/mtd/mtd.h>
- #include <linux/mtd/nand.h>
-diff --git a/arch/arm/mach-omap2/board-rx51.c b/arch/arm/mach-omap2/board-rx51.c
-index 2d1e5a6..d0b05e0 100644
---- a/arch/arm/mach-omap2/board-rx51.c
-+++ b/arch/arm/mach-omap2/board-rx51.c
-@@ -22,6 +22,7 @@
- #include <linux/usb/phy.h>
- #include <linux/usb/musb.h>
- #include <linux/platform_data/spi-omap2-mcspi.h>
-+#include <linux/irqchip/irq-omap-intc.h>
- 
- #include <asm/mach-types.h>
- #include <asm/mach/arch.h>
-diff --git a/arch/arm/mach-omap2/board-ti8168evm.c b/arch/arm/mach-omap2/board-ti8168evm.c
-index 6273c28..2707593 100644
---- a/arch/arm/mach-omap2/board-ti8168evm.c
-+++ b/arch/arm/mach-omap2/board-ti8168evm.c
-@@ -15,6 +15,7 @@
- #include <linux/kernel.h>
- #include <linux/init.h>
- #include <linux/platform_device.h>
-+#include <linux/irqchip/irq-omap-intc.h>
- #include <linux/usb/musb.h>
- 
- #include <asm/mach-types.h>
 diff --git a/arch/arm/mach-omap2/common.h b/arch/arm/mach-omap2/common.h
-index 1dd0021..7df6efd 100644
+index bc3208b..1dd0021 100644
 --- a/arch/arm/mach-omap2/common.h
 +++ b/arch/arm/mach-omap2/common.h
-@@ -210,15 +210,6 @@ extern struct device *omap2_get_iva_device(void);
- extern struct device *omap2_get_l3_device(void);
- extern struct device *omap4_get_dsp_device(void);
- 
--void omap2_init_irq(void);
--void omap3_init_irq(void);
--void ti81xx_init_irq(void);
--extern int omap_irq_pending(void);
--void omap_intc_save_context(void);
--void omap_intc_restore_context(void);
--void omap3_intc_suspend(void);
--void omap3_intc_prepare_idle(void);
--void omap3_intc_resume_idle(void);
+@@ -219,7 +219,6 @@ void omap_intc_restore_context(void);
+ void omap3_intc_suspend(void);
+ void omap3_intc_prepare_idle(void);
+ void omap3_intc_resume_idle(void);
+-void omap2_intc_handle_irq(struct pt_regs *regs);
  void omap_gic_of_init(void);
  
  #ifdef CONFIG_CACHE_L2X0
-diff --git a/arch/arm/mach-omap2/cpuidle34xx.c b/arch/arm/mach-omap2/cpuidle34xx.c
-index e18709d..8f03ac0 100644
---- a/arch/arm/mach-omap2/cpuidle34xx.c
-+++ b/arch/arm/mach-omap2/cpuidle34xx.c
-@@ -27,6 +27,7 @@
- #include <linux/export.h>
- #include <linux/cpu_pm.h>
- #include <asm/cpuidle.h>
-+#include <linux/irqchip/irq-omap-intc.h>
- 
- #include "powerdomain.h"
- #include "clockdomain.h"
 diff --git a/arch/arm/mach-omap2/irq.c b/arch/arm/mach-omap2/irq.c
-index b2993e4..ed249c7 100644
+index 4dfeac6..14716a8 100644
 --- a/arch/arm/mach-omap2/irq.c
 +++ b/arch/arm/mach-omap2/irq.c
-@@ -22,6 +22,7 @@
- #include <linux/of.h>
- #include <linux/of_address.h>
- #include <linux/of_irq.h>
-+#include <linux/irqchip/irq-omap-intc.h>
+@@ -234,7 +234,8 @@ static void __init omap_init_irq(u32 base, int nr_irqs,
+ 		omap_alloc_gc(omap_irq_base + j, j + irq_base, 32);
+ }
  
- #include "soc.h"
- #include "common.h"
-diff --git a/arch/arm/mach-omap2/pm24xx.c b/arch/arm/mach-omap2/pm24xx.c
-index a5ea988..b912a84 100644
---- a/arch/arm/mach-omap2/pm24xx.c
-+++ b/arch/arm/mach-omap2/pm24xx.c
-@@ -30,6 +30,7 @@
- #include <linux/time.h>
- #include <linux/gpio.h>
- #include <linux/platform_data/gpio-omap.h>
-+#include <linux/irqchip/irq-omap-intc.h>
+-static inline void omap_intc_handle_irq(struct pt_regs *regs)
++static asmlinkage void __exception_irq_entry
++omap_intc_handle_irq(struct pt_regs *regs)
+ {
+ 	u32 irqnr;
+ 	int handled_irq = 0;
+@@ -276,27 +277,22 @@ out:
+ 		omap_ack_irq(NULL);
+ }
  
- #include <asm/fncpy.h>
+-asmlinkage void __exception_irq_entry omap2_intc_handle_irq(struct pt_regs *regs)
+-{
+-	omap_intc_handle_irq(regs);
+-}
+-
+ void __init omap2_init_irq(void)
+ {
+ 	omap_init_irq(OMAP24XX_IC_BASE, 96, NULL);
+-	set_handle_irq(omap2_intc_handle_irq);
++	set_handle_irq(omap_intc_handle_irq);
+ }
  
-diff --git a/arch/arm/mach-omap2/pm34xx.c b/arch/arm/mach-omap2/pm34xx.c
-index 507d8ee..320e7f2 100644
---- a/arch/arm/mach-omap2/pm34xx.c
-+++ b/arch/arm/mach-omap2/pm34xx.c
-@@ -30,6 +30,7 @@
- #include <linux/slab.h>
- #include <linux/omap-dma.h>
- #include <linux/platform_data/gpio-omap.h>
-+#include <linux/irqchip/irq-omap-intc.h>
+ void __init omap3_init_irq(void)
+ {
+ 	omap_init_irq(OMAP34XX_IC_BASE, 96, NULL);
+-	set_handle_irq(omap2_intc_handle_irq);
++	set_handle_irq(omap_intc_handle_irq);
+ }
  
- #include <trace/events/power.h>
+ void __init ti81xx_init_irq(void)
+ {
+ 	omap_init_irq(OMAP34XX_IC_BASE, 128, NULL);
+-	set_handle_irq(omap2_intc_handle_irq);
++	set_handle_irq(omap_intc_handle_irq);
+ }
  
-diff --git a/include/linux/irqchip/irq-omap-intc.h b/include/linux/irqchip/irq-omap-intc.h
-new file mode 100644
-index 0000000..e06b370
---- /dev/null
-+++ b/include/linux/irqchip/irq-omap-intc.h
-@@ -0,0 +1,32 @@
-+/**
-+ * irq-omap-intc.h - INTC Idle Functions
-+ *
-+ * Copyright (C) 2014 Texas Instruments Incorporated - http://www.ti.com
-+ *
-+ * Author: Felipe Balbi <balbi@ti.com>
-+ *
-+ * This program is free software: you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2  of
-+ * the License as published by the Free Software Foundation.
-+ *
-+ * This program is distributed in the hope that it will be useful,
-+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ * GNU General Public License for more details.
-+ */
-+
-+#ifndef __INCLUDE_LINUX_IRQCHIP_IRQ_OMAP_INTC_H
-+#define __INCLUDE_LINUX_IRQCHIP_IRQ_OMAP_INTC_H
-+
-+void omap2_init_irq(void);
-+void omap3_init_irq(void);
-+void ti81xx_init_irq(void);
-+
-+int omap_irq_pending(void);
-+void omap_intc_save_context(void);
-+void omap_intc_restore_context(void);
-+void omap3_intc_suspend(void);
-+void omap3_intc_prepare_idle(void);
-+void omap3_intc_resume_idle(void);
-+
-+#endif /* __INCLUDE_LINUX_IRQCHIP_IRQ_OMAP_INTC_H */
+ static int __init intc_of_init(struct device_node *node,
+@@ -318,7 +314,7 @@ static int __init intc_of_init(struct device_node *node,
+ 
+ 	omap_init_irq(res.start, nr_irq, of_node_get(node));
+ 
+-	set_handle_irq(omap2_intc_handle_irq);
++	set_handle_irq(omap_intc_handle_irq);
+ 
+ 	return 0;
+ }
 -- 
 2.0.1.563.g66f467c
