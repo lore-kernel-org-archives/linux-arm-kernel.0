@@ -1,28 +1,31 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Mon, 28 Jul 2014 15:11:02 +0200
-Subject: [PATCH v5 0/8] enable Hisilicon HIX5HD2 SoC
-In-Reply-To: <1406551883-26154-1-git-send-email-haojian.zhuang@linaro.org>
-References: <1406551883-26154-1-git-send-email-haojian.zhuang@linaro.org>
-Message-ID: <6493871.xlAJItBgfy@wuerfel>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Mon, 28 Jul 2014 15:19:43 +0200
+Subject: [RFC 2/8] clk: sunxi: codec clock support
+In-Reply-To: <1406519386-4902-3-git-send-email-emilio@elopez.com.ar>
+References: <1406519386-4902-1-git-send-email-emilio@elopez.com.ar>
+ <1406519386-4902-3-git-send-email-emilio@elopez.com.ar>
+Message-ID: <20140728131943.GI3952@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday 28 July 2014 20:51:15 Haojian Zhuang wrote:
-> Changelog:
-> v5:
->   * Use CPU_OF_DECLARE_METHOD().
->   * State "hisilicon,cpuctrl" in documents.
->   * Set PL310 L2 aux value in machine descriptor.
->   * Use enable-method property for smp in dts file.
->   * Move reset code from machine platform driver into power reset driver.
->   * Move HIP04 debug uart into another patch series.
+On Mon, Jul 28, 2014 at 12:49:40AM -0300, Emilio L?pez wrote:
+> The codec clock on sun4i, sun5i and sun7i is a simple gate with PLL2 as
+> parent.
+> 
+> Signed-off-by: Emilio L?pez <emilio@elopez.com.ar>
 
-Looks ok for the most part. I have a trivial comment on patch 8/8,
-please correct that.
+Acked-by: Maxime Ripard <maxime.ripard@free-electrons.com>
 
-The comment on patch 7/8 is more severe. Depending on the hardware
-requirements, this may end up being much harder to fix, but it
-needs some discussion. Adding the values only for hi3620 in the
-meantime should be ok.
+Maxime
 
-	Arnd
+-- 
+Maxime Ripard, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140728/9ca4709e/attachment.sig>
