@@ -1,76 +1,121 @@
-From: monstr@monstr.eu (Michal Simek)
-Date: Mon, 28 Jul 2014 11:18:05 +0200
-Subject: [PATCH v2] ARM: zynq: DT: Add CAN node
-In-Reply-To: <20140725150017.GE16049@xsjandreislx>
-References: <56bf20294d106e0fc9c23a70cd991a50b441d0aa.1406271138.git.michal.simek@xilinx.com>
- <20140725150017.GE16049@xsjandreislx>
-Message-ID: <53D6154D.3060107@monstr.eu>
+From: graeme.gregory@linaro.org (Graeme Gregory)
+Date: Mon, 28 Jul 2014 10:23:57 +0100
+Subject: [PATCH 19/19] Documentation: ACPI for ARM64
+In-Reply-To: <5014834.k6eecMddPC@wuerfel>
+References: <1406206825-15590-1-git-send-email-hanjun.guo@linaro.org>
+ <1406206825-15590-20-git-send-email-hanjun.guo@linaro.org>
+ <CAOesGMhKHGkVK3dOLXXx9GQBMxDmjBu1WDBgHmwdGe1UK3jfcg@mail.gmail.com>
+ <5014834.k6eecMddPC@wuerfel>
+Message-ID: <53D616AD.2090501@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/25/2014 05:00 PM, S?ren Brinkmann wrote:
-> On Fri, 2014-07-25 at 08:52AM +0200, Michal Simek wrote:
->> Add node describing Zynq's CAN controller.
->>
->> Signed-off-by: Michal Simek <michal.simek@xilinx.com>
->> ---
->>
->> Changes in v2:
->> - Add can1
->> - Enable can0 for zc702
->> - Use status property
->>
->>  arch/arm/boot/dts/zynq-7000.dtsi | 26 +++++++++++++++++++++++++-
->>  arch/arm/boot/dts/zynq-zc702.dts |  4 ++++
->>  2 files changed, 29 insertions(+), 1 deletion(-)
->>
->> diff --git a/arch/arm/boot/dts/zynq-7000.dtsi b/arch/arm/boot/dts/zynq-7000.dtsi
->> index 366ca6434f54..983148111e3a 100644
->> --- a/arch/arm/boot/dts/zynq-7000.dtsi
->> +++ b/arch/arm/boot/dts/zynq-7000.dtsi
->> @@ -71,7 +71,31 @@
->>  			interrupts = <0 7 4>;
->>  			interrupt-parent = <&intc>;
->>  			clocks = <&clkc 12>;
->> -		};
->> +		};
->> +
->> +		can0: can at e0008000 {
->> +			compatible = "xlnx,zynq-can-1.0";
->> +			status = "disabled";
->> +			clocks = <&clkc 19>, <&clkc 36>;
->> +			clock-names = "can_clk", "pclk";
->> +			reg = <0xe0008000 0x1000>;
->> +			interrupts = <0 28 4>;
->> +			interrupt-parent = <&intc>;
->> +			tx-fifo-depth = <0x40>;
->> +			rx-fifo-depth = <0x40>;
->> +		};
->> +
->> +		can1: can at e0009000 {
->> +			compatible = "xlnx,zynq-can-1.0";
->> +			status = "disabled";
->> +			clocks = <&clkc 19>, <&clkc 36>;
-> The clocks for CAN1 must be outputs 20 and 37 of the clkc.
 
-Fixed in v3.
+On 28/07/2014 10:07, Arnd Bergmann wrote:
+> On Saturday 26 July 2014 19:34:48 Olof Johansson wrote:
+>> On Thu, Jul 24, 2014 at 6:00 AM, Hanjun Guo <hanjun.guo@linaro.org> wrote:
+>>> +Relationship with Device Tree
+>>> +-----------------------------
+>>> +
+>>> +ACPI support in drivers and subsystems for ARMv8 should never be mutually
+>>> +exclusive with DT support at compile time.
+>>> +
+>>> +At boot time the kernel will only use one description method depending on
+>>> +parameters passed from the bootloader.
+>> Possibly overriden by kernel bootargs. And as debated for quite a
+>> while earlier this year, acpi should still default to off -- if a DT
+>> and ACPI are both passed in, DT should at this time be given priority.
+> I think this would be harder to do with the way that ACPI is passed in
+> to the kernel. IIRC, you always have a minimal DT information based on
+> the ARM64 boot protocol, but in the case of ACPI, this contains pointers
+> to the ACPI tables, which are then used for populating the Linux platform
+> devices (unless acpi=disabled is set), while the other contents of the
+> DTB may be present but we skip the of_platform_populate state.
+>
+> If this is correct, then replacing the firmware-generated dtb with a
+> user-provided on would implicitly remove the ACPI tables from visibility,
+> which is exactly what we want.
+>
+> It's possible that I'm misremembering it though, and it should be
+> documented better.
+>
+>>> +Regardless of whether DT or ACPI is used, the kernel must always be capable
+>>> +of booting with either scheme.
+>> It should always be possible to compile out ACPI. There will be plenty
+>> of platforms that will not implement it, so disabling CONFIG_ACPI
+>> needs to be possible.
+> Right.
+>
+>>> +Clocks
+>>> +------
+>>> +
+>>> +Like clocks that are part of the power resources there is no standard way
+>>> +to represent a clock tree in ACPI 5.1 in a similar manner to how it is
+>>> +described in DT.
+>>> +
+>>> +Devices affected by this include things like UARTs, SoC driven LCD displays,
+>>> +etc.
+>>> +
+>>> +The firmware for example UEFI should initialise these clocks to fixed working
+>>> +values before the kernel is executed. If a driver requires to know rates of
+>>> +clocks set by firmware then they can be passed to kernel using _DSD.
+>>> +
+>>> +example :-
+>>> +
+>>> +Device (CLK0) {
+>>> +       ...
+>>> +
+>>> +       Name (_DSD, Package() {
+>>> +               ToUUID("XXXXX"),
+>>> +               Package() {
+>>> +                       Package(2) {"#clock-cells", 0},
+>> Clock-cells? What do they mean here? Is this specified in the ACPI
+>> standards? I had to register to get access to it, and didn't feel like
+>> doing that right now. I guess it's not _all_ that open a spec. :(
+> ...
+>>> +                       Package(2) {"clock-frequency", "10000"}
+>>> +               }
+>>> +       })
+>>> +
+>>> +       ...
+>>> +}
+>>> +
+>>> +Device (USR1) {
+>>> +       ...
+>>> +
+>>> +       Name (_DSD, Package() {
+>>> +               ToUUID("XXXXX"),
+>>> +               Package() {
+>>> +                       Package(2) {"clocks", Package() {1, ^CLK0}}},
+>> A clock is a device in the ACPI model? Why not just provide the rate
+>> as data into the device here? You said you're not trying to model the
+>> clock tree, so why reference an external node for it?
+> Exactly. I think what is going on here is a conflict of interests between
+> Intel's embedded ACPI uses and the ARM64 server requirements. The above
+> closely resembles what we do in DT, and that makes perfect sense for
+> Intel's machines so they can reuse a lot of the infrastructure we put
+> in place for DT. I also suspect it will take a few more years before
+> this actually gets accepted into both an ACPI specification and the
+> common operating systems (no point doing it if only Linux is going to
+> adopt it).
+>
+> For the servers, I don't see how it makes any sense at all, independent
+> of the architecture, and relying on a feature like this would only serve
+> to delay the adoption of ACPI (whether that is a good or bad thing
+> may be a matter of perspective).
+>
+> Maybe Graeme or others can comment on where this is coming from. What kind
+> of driver would actually need to find out the clock rate of a device on
+> an arm64 server? The examples above list "UARTs, SoC driven LCD displays,
+> etc.". For all I know, the UART is required to be PL01x (without DMA)
+> compatible, which should be fully described in ACPI, and I don't see why
+> a server would come with an LCD.
+>
+>
+The PL011 UART is the use-case I keep hitting, that IP block has a 
+variable input clock on pretty much everything I have seen in the wild. 
+I really hope that this use does not spread beyond a few essential 
+devices like the UART. IMO all real hardware should be the other side of 
+a PCIe bridge.
 
-Thanks,
-Michal
-
-
--- 
-Michal Simek, Ing. (M.Eng), OpenPGP -> KeyID: FE3D1F91
-w: www.monstr.eu p: +42-0-721842854
-Maintainer of Linux kernel - Microblaze cpu - http://www.monstr.eu/fdt/
-Maintainer of Linux kernel - Xilinx Zynq ARM architecture
-Microblaze U-BOOT custodian and responsible for u-boot arm zynq platform
-
-
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 263 bytes
-Desc: OpenPGP digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140728/a1e9978d/attachment.sig>
+Graeme
