@@ -1,35 +1,29 @@
-From: tj@kernel.org (Tejun Heo)
-Date: Mon, 28 Jul 2014 13:27:24 -0400
-Subject: [PATCH v11 4/8] ata: libahci: allow to use multiple PHYs
-In-Reply-To: <53D62624.6070502@redhat.com>
-References: <1406193450-17283-1-git-send-email-antoine.tenart@free-electrons.com>
- <1406193450-17283-5-git-send-email-antoine.tenart@free-electrons.com>
- <53D62624.6070502@redhat.com>
-Message-ID: <20140728172724.GA7462@htj.dyndns.org>
+From: afaerber@suse.de (=?UTF-8?q?Andreas=20F=C3=A4rber?=)
+Date: Mon, 28 Jul 2014 19:30:42 +0200
+Subject: [PATCH] MAINTAINERS: Update Tegra Git URL
+Message-ID: <1406568643-2047-1-git-send-email-afaerber@suse.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jul 28, 2014 at 12:29:56PM +0200, Hans de Goede wrote:
-...
-> > +		if (!enabled_ports) {
-> > +			dev_warn(dev, "No port enabled\n");
-> > +			return ERR_PTR(-ENODEV);
-> 
-> This should be:
-> 			rc = -ENODEV;
-> 			goto err_out;
-> 
-> Sorry for not catching that sooner.
-> 
-> Other then that the entire series looks good and is:
-> 
-> Acked-by: Hans de Goede <hdegoede@redhat.com>
+swarren/linux-tegra.git does not exist, it's tegra/linux.git.
 
-Antoine, can you please post an updated version of this patch?  No
-need to repost the whole series.  Also, how should the series be
-routed?
+Signed-off-by: Andreas F?rber <afaerber@suse.de>
+---
+ MAINTAINERS | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-Thanks.
-
+diff --git a/MAINTAINERS b/MAINTAINERS
+index 86efa7e..dcda974 100644
+--- a/MAINTAINERS
++++ b/MAINTAINERS
+@@ -8922,7 +8922,7 @@ M:	Stephen Warren <swarren@wwwdotorg.org>
+ M:	Thierry Reding <thierry.reding@gmail.com>
+ L:	linux-tegra at vger.kernel.org
+ Q:	http://patchwork.ozlabs.org/project/linux-tegra/list/
+-T:	git git://git.kernel.org/pub/scm/linux/kernel/git/swarren/linux-tegra.git
++T:	git git://git.kernel.org/pub/scm/linux/kernel/git/tegra/linux.git
+ S:	Supported
+ N:	[^a-z]tegra
+ 
 -- 
-tejun
+2.0.1
