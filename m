@@ -1,41 +1,79 @@
-From: pwalmsley@nvidia.com (Paul Walmsley)
-Date: Mon, 28 Jul 2014 11:35:49 -0700
-Subject: Tegra baseline test results for v3.16-rc7
-Message-ID: <53D69805.3040508@nvidia.com>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Mon, 28 Jul 2014 19:37:29 +0100
+Subject: [PATCH 19/19] Documentation: ACPI for ARM64
+In-Reply-To: <20140728163313.GC32359@quad.lixom.net>
+References: <1406206825-15590-1-git-send-email-hanjun.guo@linaro.org>
+ <1406206825-15590-20-git-send-email-hanjun.guo@linaro.org>
+ <CAOesGMhKHGkVK3dOLXXx9GQBMxDmjBu1WDBgHmwdGe1UK3jfcg@mail.gmail.com>
+ <5014834.k6eecMddPC@wuerfel> <20140728101229.GD24078@leverpostej>
+ <20140728163313.GC32359@quad.lixom.net>
+Message-ID: <20140728183729.GG2576@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Here are some basic Tegra test results for Linux v3.16-rc7.
-Logs and other details at:
+On Mon, Jul 28, 2014 at 05:33:13PM +0100, Olof Johansson wrote:
+> On Mon, Jul 28, 2014 at 11:12:29AM +0100, Mark Rutland wrote:
+> > On Mon, Jul 28, 2014 at 10:07:50AM +0100, Arnd Bergmann wrote:
+> > > On Saturday 26 July 2014 19:34:48 Olof Johansson wrote:
+> > > > On Thu, Jul 24, 2014 at 6:00 AM, Hanjun Guo <hanjun.guo@linaro.org> wrote:
+> > > > > +Relationship with Device Tree
+> > > > > +-----------------------------
+> > > > > +
+> > > > > +ACPI support in drivers and subsystems for ARMv8 should never be mutually
+> > > > > +exclusive with DT support at compile time.
+> > > > > +
+> > > > > +At boot time the kernel will only use one description method depending on
+> > > > > +parameters passed from the bootloader.
+> > > > 
+> > > > Possibly overriden by kernel bootargs. And as debated for quite a
+> > > > while earlier this year, acpi should still default to off -- if a DT
+> > > > and ACPI are both passed in, DT should at this time be given priority.
+> > > 
+> > > I think this would be harder to do with the way that ACPI is passed in
+> > > to the kernel. IIRC, you always have a minimal DT information based on
+> > > the ARM64 boot protocol, but in the case of ACPI, this contains pointers
+> > > to the ACPI tables, which are then used for populating the Linux platform
+> > > devices (unless acpi=disabled is set), while the other contents of the
+> > > DTB may be present but we skip the of_platform_populate state.
+> > > 
+> > > If this is correct, then replacing the firmware-generated dtb with a
+> > > user-provided on would implicitly remove the ACPI tables from visibility,
+> > > which is exactly what we want.
+> > 
+> > That's not quite true.
+> > 
+> > There might not be any DTB, or the user might have provided a DTB with
+> > only /chosen/bootargs. Trying to distinguish the many cases of possible
+> > DTB is broken as a concept.
+> > 
+> > The EFI stub will attempt to get a DTB from somewhere (provided by
+> > filename or as a system table with a magic UUID), and if it can't find
+> > one will generate an empty stub DTB.
+> > 
+> > Then it will go and perform some EFI memory setup, placing some
+> > properties in the DTB (which might be a stub) describing the EFI memory
+> > map.
+> > 
+> > Then we boot the kernel proper, which sees the EFI pointers and looks
+> > for an ACPI table. If they are found, ACPI is used. Otherwise we attempt
+> > to use the DTB (which might be a stub).
+> > 
+> > Unless ACPI is explcitly disabled, ACPI will be used if present.
+> 
+> Ah, I saw this after I replied to Arnd's email.
+> 
+> The above sounds more like how I envisioned things working, so based on that,
+> the default just needs to be flipped and we should be fine (i.e. ACPI needs to
+> be explicitly enabled).
 
-     http://nvt.pwsan.com/pub/linux/testlogs/test_v3.16-rc7/20140727130104/
+Sorry, but I don't follow your reasoning. What is the rationale for
+disabling ACPI by default?
 
+That's not going to work for ACPI-only systems which may not have any HW
+described in a DTB. I fear it will result in more pain on any systems
+which try to ship both ACPI and DT, where ACPI will not get the testing
+it requires, leading to a greater possibility of quirks/workarounds
+being required later.
 
-Test summary
-------------
-
-Build: zImage:
-     Pass: ( 2/ 2): multi_v7_defconfig, tegra_defconfig
-
-Boot to userspace: multi_v7_defconfig:
-     Pass: ( 2/ 2): tegra114-dalmore-a04, tegra30-beaver
-
-Boot to userspace: tegra_defconfig:
-     Pass: ( 2/ 2): tegra114-dalmore-a04, tegra30-beaver
-
-
-
-vmlinux object size
-(delta in bytes from test_v3.16-rc6 (9a3c4145af32125c5ee39c0272662b47307a8323)):
-    text     data      bss    total  kernel
-    +128       -8        0     +120  multi_v7_defconfig
-     -28      -24        0      -52  tegra_defconfig
-
-
-Boot-time memory difference
-(delta in bytes from test_v3.16-rc6 (9a3c4145af32125c5ee39c0272662b47307a8323))
-     avail    rsrvd     high    freed                board              kconfig                  dtb
-         .        .        .        . tegra114-dalmore-a04   multi_v7_defconfig     tegra114-dalmore
-         .        .        .        . tegra114-dalmore-a04      tegra_defconfig     tegra114-dalmore
-         .        .        .        .       tegra30-beaver   multi_v7_defconfig       tegra30-beaver
-         .        .        .        .       tegra30-beaver      tegra_defconfig       tegra30-beaver
+Thanks,
+Mark.
