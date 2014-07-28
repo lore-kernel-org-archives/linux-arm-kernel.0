@@ -1,68 +1,64 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Mon, 28 Jul 2014 20:03:27 +0100
-Subject: [PATCH v2] iommu/arm-smmu: avoid calling request_irq in atomic
- context
-In-Reply-To: <1406572692-27460-1-git-send-email-mitchelh@codeaurora.org>
-References: <1406572692-27460-1-git-send-email-mitchelh@codeaurora.org>
-Message-ID: <20140728190327.GU15536@arm.com>
+From: riel@redhat.com (Rik van Riel)
+Date: Mon, 28 Jul 2014 14:43:10 -0400
+Subject: [PATCH v4 08/12] sched: move cfs task on a CPU with higher
+ capacity
+In-Reply-To: <1406569906-9763-9-git-send-email-vincent.guittot@linaro.org>
+References: <1406569906-9763-1-git-send-email-vincent.guittot@linaro.org>
+ <1406569906-9763-9-git-send-email-vincent.guittot@linaro.org>
+Message-ID: <53D699BE.90208@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Mitchel,
+-----BEGIN PGP SIGNED MESSAGE-----
+Hash: SHA1
 
-Thanks for the quick v2, but now I spotted a problem :)
+On 07/28/2014 01:51 PM, Vincent Guittot wrote:
+> If the CPU is used for handling lot of IRQs, trig a load balance to
+> check if it's worth moving its tasks on another CPU that has more
+> capacity.
+> 
+> As a sidenote, this will note generate more spurious ilb because we
+> already trig an ilb if there is more than 1 busy cpu. If this cpu
+> is the only one that has a task, we will trig the ilb once for
+> migrating the task.
+> 
+> The nohz_kick_needed function has been cleaned up a bit while
+> adding the new test
+> 
+> Signed-off-by: Vincent Guittot <vincent.guittot@linaro.org> --- 
+> kernel/sched/fair.c | 69
+> +++++++++++++++++++++++++++++++++++++---------------- 1 file
+> changed, 49 insertions(+), 20 deletions(-)
+> 
+> diff --git a/kernel/sched/fair.c b/kernel/sched/fair.c index
+> 6843016..1cde8dd 100644 --- a/kernel/sched/fair.c +++
+> b/kernel/sched/fair.c @@ -5969,6 +5969,14 @@ static bool
+> update_sd_pick_busiest(struct lb_env *env, return true; }
+> 
+> +	/* +	 * The group capacity is reduced probably because of
+> activity from other +	 * sched class or interrupts which use part
+> of the available capacity +	 */ +	if ((sg->sgc->capacity_orig *
+> 100) > (sgs->group_capacity * +				env->sd->imbalance_pct)) +
+> return true; + return false; }
 
-On Mon, Jul 28, 2014 at 07:38:12PM +0100, Mitchel Humpherys wrote:
->  static void arm_smmu_destroy_domain_context(struct iommu_domain *domain)
-> @@ -1172,10 +1158,11 @@ static void arm_smmu_domain_remove_master(struct arm_smmu_domain *smmu_domain,
->  
->  static int arm_smmu_attach_dev(struct iommu_domain *domain, struct device *dev)
->  {
-> -	int ret = -EINVAL;
-> +	int irq, ret = -EINVAL;
->  	struct arm_smmu_domain *smmu_domain = domain->priv;
->  	struct arm_smmu_device *smmu;
-> -	struct arm_smmu_master_cfg *cfg;
-> +	struct arm_smmu_master_cfg *master_cfg;
-> +	struct arm_smmu_cfg *cfg = &smmu_domain->cfg;
->  	unsigned long flags;
->  
->  	smmu = dev_get_master_dev(dev)->archdata.iommu;
-> @@ -1203,12 +1190,22 @@ static int arm_smmu_attach_dev(struct iommu_domain *domain, struct device *dev)
->  	}
->  	spin_unlock_irqrestore(&smmu_domain->lock, flags);
->  
-> +	irq = smmu->irqs[smmu->num_global_irqs + cfg->irptndx];
-> +	ret = request_irq(irq, arm_smmu_context_fault, IRQF_SHARED,
-> +			  "arm-smmu-context-fault", domain);
-> +	if (IS_ERR_VALUE(ret)) {
-> +		dev_err(smmu->dev, "failed to request context IRQ %d (%u)\n",
-> +			cfg->irptndx, irq);
-> +		cfg->irptndx = INVALID_IRPTNDX;
-> +		return ret;
-> +	}
+Isn't this already reflected in avg_load, by having avg_load increase
+due to the capacity decreasing when a cpu is busy with non-CFS loads?
 
-This changes the driver behaviour, so we'll request an IRQ for the domain
-*every* time a master is successfuly added to the domain, as opposed to
-the first time a master is added (when we can do the lazy init).
+Also, this part of update_sd_pick_busiest will not be reached in the
+!SD_ASYM_PACKING case once my patch is applied, so this is a small
+conflict between our series :)
 
-Maybe we could rework the code so that it looks like:
+- -- 
+All rights reversed
+-----BEGIN PGP SIGNATURE-----
+Version: GnuPG v1
+Comment: Using GnuPG with Thunderbird - http://www.enigmail.net/
 
-  dom_smmu = ACCESS_ONCE(&smmu_domain->smmu);
-
-  if (!dom_smmu) {
-	/* Take spinlock and re-check the smmu */
-	/* Initialise domain */
-	/* Drop lock */
-	/* Request IRQ */
-  }
-
-  if (dom_smmu != smmu) {
-	/* Fail attach */
-  }
-
-  /* Add master to domain */
-
-Do you think that would work?
-
-Will
+iQEcBAEBAgAGBQJT1pm+AAoJEM553pKExN6DysEH/1/s2dY0EWM4mVctRAcyASc+
+qD5yQgDZEbnIzuUldtTRNwlAxHSaexLI7oF418RAaUV3oue+OQIesJPhKDVrR2+J
+fLo4fhtutuF1SHJ5Zo2fiGBIUI+GuLspT2fXiG2UxXQXtYioVdDeB+cjo6H3xQ3D
+R2hR+WeSsLznwFhRnufI1neleIRpqk/Nw1wfdXCyE03kM478rCQjlygMUx6eqURn
+jblr7GY7jmtzhYFPY9qnE0za/WHWUVAf4RXSjCcuYwZqdhbzmHPKpJyiC3cl9XGz
+kNzAjqVzvSyCBblaOnJfrRyCWmBdatp5eZQCzZK9/l+YpbkkzQJNlUMAAVV1eNw=
+=qD2A
+-----END PGP SIGNATURE-----
