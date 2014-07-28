@@ -1,67 +1,53 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Mon, 28 Jul 2014 20:11:12 +0100
-Subject: [PATCH v3 1/1] iommu-api: Add map_sg/unmap_sg functions
-In-Reply-To: <1406572731-6216-2-git-send-email-ohaugan@codeaurora.org>
-References: <1406572731-6216-1-git-send-email-ohaugan@codeaurora.org>
- <1406572731-6216-2-git-send-email-ohaugan@codeaurora.org>
-Message-ID: <20140728191111.GW15536@arm.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Mon, 28 Jul 2014 20:13:05 +0100
+Subject: [PATCH 2/2] ARM: LPAE: reduce damage caused by idmap to
+ virtual memory layout
+In-Reply-To: <CALYGNiNaMMv9itJ_+cvPDn1_Yo4GTPQJ-Cy9zBzJzfaDLfkvmg@mail.gmail.com>
+References: <20140722153623.25088.37742.stgit@buzz>
+ <20140722153635.25088.14197.stgit@buzz> <20140728181456.GO15536@arm.com>
+ <CALYGNiNJDHfQm2yk067hh-Wywsb_Ki5AEE_sTMkYegJi9spSzw@mail.gmail.com>
+ <20140728184107.GR15536@arm.com>
+ <CALYGNiNaMMv9itJ_+cvPDn1_Yo4GTPQJ-Cy9zBzJzfaDLfkvmg@mail.gmail.com>
+Message-ID: <20140728191305.GA30282@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Olav,
+On Mon, Jul 28, 2014 at 10:57:00PM +0400, Konstantin Khlebnikov wrote:
+> Also I seen comment somewhere in the code which tells that idrmap pgd is
+> always below 4gb which isn't quite true.
 
-On Mon, Jul 28, 2014 at 07:38:51PM +0100, Olav Haugan wrote:
-> Mapping and unmapping are more often than not in the critical path.
-> map_sg and unmap_sg allows IOMMU driver implementations to optimize
-> the process of mapping and unmapping buffers into the IOMMU page tables.
-> 
-> Instead of mapping a buffer one page at a time and requiring potentially
-> expensive TLB operations for each page, this function allows the driver
-> to map all pages in one go and defer TLB maintenance until after all
-> pages have been mapped.
-> 
-> Additionally, the mapping operation would be faster in general since
-> clients does not have to keep calling map API over and over again for
-> each physically contiguous chunk of memory that needs to be mapped to a
-> virtually contiguous region.
-> 
-> Signed-off-by: Olav Haugan <ohaugan@codeaurora.org>
-> ---
->  drivers/iommu/iommu.c | 48 ++++++++++++++++++++++++++++++++++++++++++++++++
->  include/linux/iommu.h | 28 ++++++++++++++++++++++++++++
->  2 files changed, 76 insertions(+)
-> 
-> diff --git a/drivers/iommu/iommu.c b/drivers/iommu/iommu.c
-> index 1698360..cd65511 100644
-> --- a/drivers/iommu/iommu.c
-> +++ b/drivers/iommu/iommu.c
-> @@ -1088,6 +1088,54 @@ size_t iommu_unmap(struct iommu_domain *domain, unsigned long iova, size_t size)
->  }
->  EXPORT_SYMBOL_GPL(iommu_unmap);
->  
-> +int iommu_map_sg(struct iommu_domain *domain, unsigned long iova,
-> +			struct scatterlist *sg, unsigned int nents,
-> +			int prot, unsigned long flags)
-> +{
-> +	int ret = 0;
-> +	unsigned long offset = 0;
-> +
-> +	BUG_ON(iova & (~PAGE_MASK));
-> +
-> +	if (unlikely(domain->ops->map_sg == NULL)) {
-> +		unsigned int i;
-> +		struct scatterlist *s;
-> +
-> +		for_each_sg(sg, s, nents, i) {
-> +			phys_addr_t phys = page_to_phys(sg_page(s));
-> +			u32 page_len = PAGE_ALIGN(s->offset + s->length);
+"idmap" means "identity map".  It's a region which maps the same value of
+physical address to the same value of virtual address.
 
-Hmm, this is a pretty horrible place where CPU page size (from the sg list)
-meets the IOMMU and I think we need to do something better to avoid spurious
-failures. In other words, the sg list should be iterated in such a way that
-we always pass a multiple of a supported iommu page size to iommu_map.
+Since the virtual address space is limited to 4GB, there is /no way/ that
+the physical address can be above 4GB, and it still be called an
+"identity map".
 
-All the code using PAGE_MASK and PAGE_ALIGN needn't match what is supported
-by the IOMMU hardware.
+The reason for this is that code in the identity map will be fetched with
+the MMU off.  While this code is running, it will enable the MMU using the
+identity map page table pointer, and the CPU must see _no_ change in the
+instructions/data fetched from that region.  It will then branch to the
+kernel proper, and the kernel will then switch away from the identity page
+table.
 
-Will
+Once the kernel has switched away from the identity page table, interrupts
+and other exceptions can then be taken on the CPU - but not before.
+Neither is it expected that the CPU will access any devices until it has
+switched away from the identity page table.
+
+What this also means is that the code in the identity map must remain
+visible in the low 4GB of physical address space.
+
+> Moreover, I had some experiments with
+> mapping ram to random places in qemu and seen that kernel cannot boot if
+> PHYS_OFFSET isn't alligned to 128mb which is strange.
+
+That is intentional.  PHYS_OFFSET has a number of restrictions, one of
+them is indeed that the physical offset /will/ be aligned to 128MB.
+That was decided after looking at the platforms we have and is now
+fixed at that value with platform-breaking consequences if it needs
+changing.
+
+-- 
+FTTC broadband for 0.8mile line: currently at 9.5Mbps down 400kbps up
+according to speedtest.net.
