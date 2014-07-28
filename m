@@ -1,42 +1,36 @@
-From: jason@lakedaemon.net (Jason Cooper)
-Date: Mon, 28 Jul 2014 09:43:47 -0400
-Subject: [PATCH 1/2] Adding Lenovo - Lenovo Group Ltd. to the
- vendor-prefixes list.
-In-Reply-To: <1406154923-13612-1-git-send-email-yahoo@perenite.com>
-References: <1406154923-13612-1-git-send-email-yahoo@perenite.com>
-Message-ID: <20140728134347.GP23220@titan.lakedaemon.net>
+From: broonie@kernel.org (Mark Brown)
+Date: Mon, 28 Jul 2014 14:44:20 +0100
+Subject: [PATCH v2 09/11] Documentation: devicetree: Fix ADI AXI SPDIF
+ specification
+In-Reply-To: <53D641DC.4020804@suse.de>
+References: <1406242820-20140-1-git-send-email-afaerber@suse.de>
+ <1406242820-20140-10-git-send-email-afaerber@suse.de>
+ <53D20A61.1050506@metafoo.de> <53D21066.8000905@monstr.eu>
+ <20140725101815.GO17528@sirena.org.uk> <53D2324B.4070602@suse.de>
+ <20140725103905.GP17528@sirena.org.uk> <53D63746.3000905@suse.de>
+ <20140728122042.GR17528@sirena.org.uk> <53D641DC.4020804@suse.de>
+Message-ID: <20140728134420.GU17528@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Benoit,
+On Mon, Jul 28, 2014 at 02:28:12PM +0200, Andreas F?rber wrote:
 
-On Wed, Jul 23, 2014 at 03:35:22PM -0700, Benoit Masson wrote:
-> Lenovo Group Ltd. (stylized as lenovo) is a Chinese multinational
-> computer technology company with headquarters in Beijing, China, and
-> Morrisville, North Carolina, United States.
-> 
-> http://www.lenovo.com/
-> Signed-off-by: Benoit Masson <yahoo@perenite.com>
-> ---
->  Documentation/devicetree/bindings/vendor-prefixes.txt | 1 +
->  1 file changed, 1 insertion(+)
+> Dude, this patch *was* submitted and has been reviewed by two people.
+> Don't pretend I didn't follow the SubmittingPatches workflow.
 
-Applied to mvebu/dt with a few minor style changes to the commit log.
+> The link I gave you contains an mbox-format link that can be used with
+> wget and git-am to *apply* the patch if you apparently missed it on the
+> mailing lists.
 
-  - Added a blank line between the URL and the S-o-B.
-  - Reflowed the paragraph to wrap at >80 chars
-  - Changed subject to match other changes to vendor-prefixes.txt
+> I will *re*-submit it for your convenience.
 
-The Subject line now reads:
-
-  of: Add Lenovo Group Ltd. to the vendor-prefixes list.
-
-You can view the patch here:
-
-  http://git.infradead.org/linux-mvebu.git/commitdiff/74e025501bb834000b3c7eceab69383806520a36
-
-Next, it'll go to arm-soc.  Then, Linus' tree.
-
-thx,
-
-Jason.
+Which is what I originally requested when I got CCed into the thread -
+I'm being grumpy because instead of getting the patch sent to me as
+requested I got sent a link to patchwork.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140728/fbaec500/attachment.sig>
