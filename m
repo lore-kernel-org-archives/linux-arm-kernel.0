@@ -1,69 +1,40 @@
-From: sebastian.hesselbarth@gmail.com (Sebastian Hesselbarth)
-Date: Mon, 28 Jul 2014 08:27:28 +0200
-Subject: [PATCH 1/2] spi: orion: fix incorrect handling of cell-index
- DT property
-In-Reply-To: <1406498000-13079-2-git-send-email-thomas.petazzoni@free-electrons.com>
-References: <1406498000-13079-1-git-send-email-thomas.petazzoni@free-electrons.com>
- <1406498000-13079-2-git-send-email-thomas.petazzoni@free-electrons.com>
-Message-ID: <53D5ED50.2070809@gmail.com>
+From: nsekhar@ti.com (Sekhar Nori)
+Date: Mon, 28 Jul 2014 12:02:17 +0530
+Subject: [PATCH 0/3] ARM/dma: edma: Serve cyclic clients via high priority
+ queue
+In-Reply-To: <53D5E9CF.10706@ti.com>
+References: <1404816398-12338-1-git-send-email-peter.ujfalusi@ti.com>
+ <53D5E9CF.10706@ti.com>
+Message-ID: <53D5EE71.3040707@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/27/2014 11:53 PM, Thomas Petazzoni wrote:
-> In commit f814f9ac5a81 ("spi/orion: add device tree binding"), Device
-> Tree support was added to the spi-orion driver. However, this commit
-> reads the "cell-index" property, without taking into account the fact
-> that DT properties are big-endian encoded.
-> 
-> Since most of the platforms using spi-orion with DT have apparently
-> not used anything but cell-index = <0>, the problem was not
-> visible. But as soon as one starts using cell-index = <1>, the problem
-> becomes clearly visible, as the master->bus_num gets a wrong value
-> (actually it gets the value 0, which conflicts with the first bus that
-> has cell-index = <0>).
-> 
-> This commit fixes that by using of_property_read_u32() to read the
-> property value, which does the appropriate endianness conversion when
-> needed.
-> 
-> Fixes: f814f9ac5a81 ("spi/orion: add device tree binding")
-> Cc: <stable@vger.kernel.org> # v3.6+
-> Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
+On Monday 28 July 2014 11:42 AM, Peter Ujfalusi wrote:
+> On 07/08/2014 01:46 PM, Peter Ujfalusi wrote:
+>> Hi,
+>>
+>> It is preferred that audio is served with the highest priority queue in order to
+>> avoid delays in data transfer between memory and audio IP.
+>>
+>> The following series will add an API to arch code to assign a channel to a given
+>> queue.
+>> The default queue is changed from 0 (highest priority) to lowest priority.
 
-For MVEBU,
+This should not really change any performance behavior as everything at
+highest priority is same as everything at lowest priority.
 
-Acked-by: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
+>> In the dmaengine driver we move the cyclic channel to queue0 (highest priority)
+>> and move it back to default queue when the channel is terminated.
+> 
+> ping?
 
-> ---
->  drivers/spi/spi-orion.c | 10 ++++------
->  1 file changed, 4 insertions(+), 6 deletions(-)
-> 
-> diff --git a/drivers/spi/spi-orion.c b/drivers/spi/spi-orion.c
-> index d018a4a..c206a4a 100644
-> --- a/drivers/spi/spi-orion.c
-> +++ b/drivers/spi/spi-orion.c
-> @@ -346,8 +346,6 @@ static int orion_spi_probe(struct platform_device *pdev)
->  	struct resource *r;
->  	unsigned long tclk_hz;
->  	int status = 0;
-> -	const u32 *iprop;
-> -	int size;
->  
->  	master = spi_alloc_master(&pdev->dev, sizeof(*spi));
->  	if (master == NULL) {
-> @@ -358,10 +356,10 @@ static int orion_spi_probe(struct platform_device *pdev)
->  	if (pdev->id != -1)
->  		master->bus_num = pdev->id;
->  	if (pdev->dev.of_node) {
-> -		iprop = of_get_property(pdev->dev.of_node, "cell-index",
-> -					&size);
-> -		if (iprop && size == sizeof(*iprop))
-> -			master->bus_num = *iprop;
-> +		u32 cell_index;
-> +		if (!of_property_read_u32(pdev->dev.of_node, "cell-index",
-> +					  &cell_index))
-> +			master->bus_num = cell_index;
->  	}
->  
->  	/* we support only mode 0, and no options */
-> 
+For 1/3 and 2/3:
+
+Acked-by: Sekhar Nori <nsekhar@ti.com>
+
+Vinod, can you take the series together with your tree (if you are happy
+with the series, that is)? I don't have anything else queued for this
+merge window.
+
+Thanks,
+Sekhar
