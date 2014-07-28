@@ -1,68 +1,49 @@
-From: luto@amacapital.net (Andy Lutomirski)
-Date: Mon, 28 Jul 2014 13:23:13 -0700
-Subject: [PATCH v3 6/8] x86: Split syscall_trace_enter into two phases
-In-Reply-To: <20140728173723.GA20993@redhat.com>
-References: <cover.1405992946.git.luto@amacapital.net>
- <3f649f5658a163645e3ce15156176c325283762e.1405992946.git.luto@amacapital.net>
- <20140728173723.GA20993@redhat.com>
-Message-ID: <CALCETrWUFo_zXcAZja-vdL4_MgJDd=1ed5Vt54eyUuim930xAw@mail.gmail.com>
+From: afaerber@suse.de (=?UTF-8?B?QW5kcmVhcyBGw6RyYmVy?=)
+Date: Mon, 28 Jul 2014 22:29:33 +0200
+Subject: [RESEND][PATCH 1/2] ARM: DTS: Add PMU DT node for exynos5260 SoC
+In-Reply-To: <CAK5sBcHdsDF60JTv7ugC4m=A-5Lmr2rDwizhkCLEyYGRio-2-Q@mail.gmail.com>
+References: <1406551080-14821-1-git-send-email-vikas.sajjan@samsung.com>	<1406551080-14821-2-git-send-email-vikas.sajjan@samsung.com>
+ <CAK5sBcHdsDF60JTv7ugC4m=A-5Lmr2rDwizhkCLEyYGRio-2-Q@mail.gmail.com>
+Message-ID: <53D6B2AD.7070404@suse.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jul 28, 2014 at 10:37 AM, Oleg Nesterov <oleg@redhat.com> wrote:
-> Hi Andy,
->
-> I am really sorry for delay.
->
-> This is on top of the recent change from Kees, right? Could me remind me
-> where can I found the tree this series based on? So that I could actually
-> apply these changes...
+Hi Vikas and Sachin,
 
-https://git.kernel.org/cgit/linux/kernel/git/kees/linux.git/log/?h=seccomp/fastpath
-
-The first four patches are already applied there.
-
->
-> On 07/21, Andy Lutomirski wrote:
+Am 28.07.2014 17:26, schrieb Sachin Kamat:
+> On Mon, Jul 28, 2014 at 6:07 PM, Vikas Sajjan <vikas.sajjan@samsung.com> wrote:
+>> Adds PMU DT node for exynos5260 SoC.
 >>
->> +long syscall_trace_enter_phase2(struct pt_regs *regs, u32 arch,
->> +                             unsigned long phase1_result)
->>  {
->>       long ret = 0;
->> +     u32 work = ACCESS_ONCE(current_thread_info()->flags) &
->> +             _TIF_WORK_SYSCALL_ENTRY;
->> +
->> +     BUG_ON(regs != task_pt_regs(current));
+>> Signed-off-by: Vikas Sajjan <vikas.sajjan@samsung.com>
+>> ---
+>>  .../devicetree/bindings/arm/samsung/pmu.txt        |    1 +
+>>  arch/arm/boot/dts/exynos5260.dtsi                  |    5 +++++
+>>  2 files changed, 6 insertions(+)
 >>
->>       user_exit();
->>
->> @@ -1458,17 +1562,20 @@ long syscall_trace_enter(struct pt_regs *regs)
->>        * do_debug() and we need to set it again to restore the user
->>        * state.  If we entered on the slow path, TF was already set.
->>        */
->> -     if (test_thread_flag(TIF_SINGLESTEP))
->> +     if (work & _TIF_SINGLESTEP)
->>               regs->flags |= X86_EFLAGS_TF;
->
-> This looks suspicious, but perhaps I misread this change.
->
-> If I understand correctly, syscall_trace_enter() can avoid _phase2() above.
-> But we should always call user_exit() unconditionally?
+>> diff --git a/Documentation/devicetree/bindings/arm/samsung/pmu.txt b/Documentation/devicetree/bindings/arm/samsung/pmu.txt
+>> index 2a4ab04..c038628 100644
+>> --- a/Documentation/devicetree/bindings/arm/samsung/pmu.txt
+>> +++ b/Documentation/devicetree/bindings/arm/samsung/pmu.txt
+>> @@ -8,6 +8,7 @@ Properties:
+>>                    - "samsung,exynos4412-pmu" - for Exynos4412 SoC,
+>>                    - "samsung,exynos5250-pmu" - for Exynos5250 SoC,
+>>                    - "samsung,exynos5420-pmu" - for Exynos5420 SoC.
+>> +                  - "samsung,exynos5260-pmu" - for Exynos5260 SoC.
+> 
+> nit: This line should come after 5250 entry to preserve the order.
+> 
+> Otherwise, looks good.
 
-Damnit.  I read that every function called by user_exit, and none of
-them give any indication of why they're needed for traced syscalls but
-not for untraced syscalls.  On a second look, it seems that TIF_NOHZ
-controls it.  I'll update the code to call user_exit iff TIF_NOHZ is
-set.  If that's still wrong, then I don't see how the current code is
-correct either.
+Earlier today, Kukjin indicated he would apply my corresponding 5410
+series [*], but he hasn't pushed yet. It adds a 5410 entry before 5420,
+which will conflict with adding 5260 in the same place.
 
->
-> And we should always set X86_EFLAGS_TF if TIF_SINGLESTEP? IIRC, TF can be
-> actually cleared on a 32bit kernel if we step over sysenter insn?
+Regards,
+Andreas
 
-I don't follow.  If TIF_SINGLESTEP, then phase1 will return a nonzero
-value, and phase2 will set TF.
+[*]
+http://www.mail-archive.com/linux-samsung-soc at vger.kernel.org/msg34686.html
 
-I admit I don't really understand all the TF machinations.
-
---Andy
+-- 
+SUSE LINUX Products GmbH, Maxfeldstr. 5, 90409 N?rnberg, Germany
+GF: Jeff Hawn, Jennifer Guild, Felix Imend?rffer; HRB 16746 AG N?rnberg
