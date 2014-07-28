@@ -1,43 +1,32 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Mon, 28 Jul 2014 17:47:50 +0200
-Subject: [Patch V2 2/2] i2c: mv64xxx: Remove internal compatible string
- from Documentation
-In-Reply-To: <20140728152506.GF2891@lunn.ch>
-References: <1406395238-29758-1-git-send-email-andrew@lunn.ch>
- <6346429.sjQYojn1ot@wuerfel> <20140728152506.GF2891@lunn.ch>
-Message-ID: <30588206.eyRbtryspM@wuerfel>
+From: emilio@elopez.com.ar (=?windows-1252?Q?Emilio_L=F3pez?=)
+Date: Mon, 28 Jul 2014 12:50:13 -0300
+Subject: [PATCH -next] clk: sunxi: sun6i-apb0: fix sparse non static symbol
+ warning
+In-Reply-To: <1406554063-30350-1-git-send-email-weiyj_lk@163.com>
+References: <1406554063-30350-1-git-send-email-weiyj_lk@163.com>
+Message-ID: <53D67135.1060801@elopez.com.ar>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday 28 July 2014 17:25:06 Andrew Lunn wrote:
-> > > Add a call something like:
-> > > 
-> > > /*
-> > >  * Return the soc device attributes for a given soc_dev. If soc_dev is NULL,
-> > >  * the first device on the soc bus is returned.
-> > >  */
-> > > struct soc_device_attribute *soc_attribute_get(struct soc_device * soc_dev);
-> > 
-> > Interesting idea, yes.
-> 
-> O.K, i will take a shot of implementing this sometime in the next few
-> weeks. Bit busy at the moment.
->  
-> > There could also be a higher-level function that does a strcmp() in addition,
-> > so that a driver can do some variation of
-> > 
-> >       if (soc_name_is("Armada XP") && soc_revision_is("A0"))
-> 
-> We don't translate into 'Marketing names'. We just turn the register
-> values into a stringified number. So it would have to be something
-> like:
-> 
->         if (soc_name_is("7826") && soc_revision_is("1"))
+Hi,
 
-Hmm, I think that is inconsistent with how the strings are used
-on other platforms, where you want something that uniquely identifies
-the device in user-readable strings.
+El 28/07/14 a las 10:27, weiyj_lk at 163.com escibi?:
+> From: Wei Yongjun <yongjun_wei@trendmicro.com.cn>
+>
+> Fixes the following sparse warnings:
+>
+> drivers/clk/sunxi/clk-sun6i-apb0.c:60:27: warning:
+>   symbol 'sun6i_a31_apb0_clk_dt_ids' was not declared. Should it be static?
+>
+> Signed-off-by: Wei Yongjun <yongjun_wei@trendmicro.com.cn>
 
-I haven't checked how all the others are doing it though.
 
-	Arnd
+I sent patches earlier today to fix this and other sparse warnings, 
+please see
+
+http://lists.infradead.org/pipermail/linux-arm-kernel/2014-July/275680.html
+http://lists.infradead.org/pipermail/linux-arm-kernel/2014-July/275681.html
+
+Cheers,
+
+Emilio
