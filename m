@@ -1,62 +1,56 @@
 From: haojian.zhuang@linaro.org (Haojian Zhuang)
-Date: Mon, 28 Jul 2014 21:57:49 +0800
-Subject: [PATCH v15 05/12] document: dt: add the binding on HiP04
+Date: Mon, 28 Jul 2014 21:57:48 +0800
+Subject: [PATCH v15 04/12] ARM: hisi: enable HiP04
 In-Reply-To: <1406555876-11989-1-git-send-email-haojian.zhuang@linaro.org>
 References: <1406555876-11989-1-git-send-email-haojian.zhuang@linaro.org>
-Message-ID: <1406555876-11989-6-git-send-email-haojian.zhuang@linaro.org>
+Message-ID: <1406555876-11989-5-git-send-email-haojian.zhuang@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add bootwrapper-phys, bootwrapper-size, bootwrapper-magic properties for
-Hisilicon HiP04 SoC.
+Support HiP04 SoC what supports 16 cores. And it relies on MCPM
+framework.
 
 Signed-off-by: Haojian Zhuang <haojian.zhuang@linaro.org>
 ---
- .../devicetree/bindings/arm/hisilicon/hisilicon.txt | 21 +++++++++++++++++++++
- 1 file changed, 21 insertions(+)
+ arch/arm/mach-hisi/Kconfig     | 8 ++++++++
+ arch/arm/mach-hisi/hisilicon.c | 9 +++++++++
+ 2 files changed, 17 insertions(+)
 
-diff --git a/Documentation/devicetree/bindings/arm/hisilicon/hisilicon.txt b/Documentation/devicetree/bindings/arm/hisilicon/hisilicon.txt
-index 934f000..eca605a 100644
---- a/Documentation/devicetree/bindings/arm/hisilicon/hisilicon.txt
-+++ b/Documentation/devicetree/bindings/arm/hisilicon/hisilicon.txt
-@@ -5,6 +5,11 @@ Hi4511 Board
- Required root node properties:
- 	- compatible = "hisilicon,hi3620-hi4511";
+diff --git a/arch/arm/mach-hisi/Kconfig b/arch/arm/mach-hisi/Kconfig
+index 9848829..2a36fb7 100644
+--- a/arch/arm/mach-hisi/Kconfig
++++ b/arch/arm/mach-hisi/Kconfig
+@@ -22,6 +22,14 @@ config ARCH_HI3xxx
+ 	help
+ 	  Support for Hisilicon Hi36xx SoC family
  
-+HiP04 D01 Board
-+Required root node properties:
-+	- compatible = "hisilicon,hip04-d01";
++config ARCH_HIP04
++	bool "Hisilicon HiP04 Cortex A15 family" if ARCH_MULTI_V7
++	select HAVE_ARM_ARCH_TIMER
++	select MCPM if SMP
++	select MCPM_QUAD_CLUSTER if SMP
++	help
++	  Support for Hisilicon HiP04 SoC family
 +
+ config ARCH_HIX5HD2
+ 	bool "Hisilicon X5HD2 family" if ARCH_MULTI_V7
+ 	select CACHE_L2X0
+diff --git a/arch/arm/mach-hisi/hisilicon.c b/arch/arm/mach-hisi/hisilicon.c
+index f37fb65..5b8c11f 100644
+--- a/arch/arm/mach-hisi/hisilicon.c
++++ b/arch/arm/mach-hisi/hisilicon.c
+@@ -65,3 +65,12 @@ static const char *hix5hd2_compat[] __initconst = {
+ DT_MACHINE_START(HIX5HD2_DT, "Hisilicon HIX5HD2 (Flattened Device Tree)")
+ 	.dt_compat	= hix5hd2_compat,
+ MACHINE_END
 +
- Hisilicon system controller
- 
- Required properties:
-@@ -19,6 +24,15 @@ Optional properties:
- 		If reg value is not zero, cpun exit wfi and go
- - resume-offset : offset in sysctrl for notifying cpu0 when resume
- - reboot-offset : offset in sysctrl for system reboot
-+- relocation-entry : relocation address of secondary cpu boot code
-+- relocation-size : relocation size of secondary cpu boot code
-+- bootwrapper-phys : physical address of boot wrapper
-+- bootwrapper-size : size of boot wrapper
-+- bootwrapper-magic : magic number for secondary cpu in boot wrapper
-+The memory area of [bootwrapper-phys : bootwrapper-phys+bootwrapper-size]
-+should be reserved. This should be set in /memreserve/ node in DTS file.
-+bootwrapper-phys, bootwrapper-size, bootwrapper-magic is used in HiP04
-+DTS file.
- 
- Example:
- 
-@@ -55,3 +69,10 @@ Example:
- 		compatible = "hisilicon,pctrl";
- 		reg = <0xfca09000 0x1000>;
- 	};
++static const char *hip04_compat[] __initconst = {
++	"hisilicon,hip04-d01",
++	NULL,
++};
 +
-+-----------------------------------------------------------------------
-+Fabric:
-+
-+Required Properties:
-+- compatible: "hisilicon,hip04-fabric";
-+- reg: Address and size of Fabric
++DT_MACHINE_START(HIP04, "Hisilicon HiP04 (Flattened Device Tree)")
++	.dt_compat	= hip04_compat,
++MACHINE_END
 -- 
 1.9.1
