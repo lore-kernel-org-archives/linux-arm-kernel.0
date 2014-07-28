@@ -1,48 +1,59 @@
-From: oleg@redhat.com (Oleg Nesterov)
-Date: Mon, 28 Jul 2014 19:37:23 +0200
-Subject: [PATCH v3 6/8] x86: Split syscall_trace_enter into two phases
-In-Reply-To: <3f649f5658a163645e3ce15156176c325283762e.1405992946.git.luto@amacapital.net>
-References: <cover.1405992946.git.luto@amacapital.net>
- <3f649f5658a163645e3ce15156176c325283762e.1405992946.git.luto@amacapital.net>
-Message-ID: <20140728173723.GA20993@redhat.com>
+From: broonie@kernel.org (Mark Brown)
+Date: Mon, 28 Jul 2014 18:44:10 +0100
+Subject: [PATCH 19/19] Documentation: ACPI for ARM64
+In-Reply-To: <20140728162340.GA32359@quad.lixom.net>
+References: <1406206825-15590-1-git-send-email-hanjun.guo@linaro.org>
+ <1406206825-15590-20-git-send-email-hanjun.guo@linaro.org>
+ <CAOesGMhKHGkVK3dOLXXx9GQBMxDmjBu1WDBgHmwdGe1UK3jfcg@mail.gmail.com>
+ <53D60D11.8050205@linaro.org>
+ <20140728162340.GA32359@quad.lixom.net>
+Message-ID: <20140728174410.GD17528@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Andy,
+On Mon, Jul 28, 2014 at 09:23:40AM -0700, Olof Johansson wrote:
+> On Mon, Jul 28, 2014 at 09:42:57AM +0100, Graeme Gregory wrote:
 
-I am really sorry for delay.
+> > >>+On no account should a Device Tree attempt to be replicated in ASL using such
+> > >>+constructs as Name(KEY0, "Value1") type constructs. Additional driver specific
+> > >>+data should be passed in the appropriate _DSM (ACPI Section 9.14.1) method or
+> > >>+_DSD (ACPI Section 6.2.5). This data should be rare and not OS specific.
 
-This is on top of the recent change from Kees, right? Could me remind me
-where can I found the tree this series based on? So that I could actually
-apply these changes...
+...
 
-On 07/21, Andy Lutomirski wrote:
->
-> +long syscall_trace_enter_phase2(struct pt_regs *regs, u32 arch,
-> +				unsigned long phase1_result)
->  {
->  	long ret = 0;
-> +	u32 work = ACCESS_ONCE(current_thread_info()->flags) &
-> +		_TIF_WORK_SYSCALL_ENTRY;
-> +
-> +	BUG_ON(regs != task_pt_regs(current));
->  
->  	user_exit();
->  
-> @@ -1458,17 +1562,20 @@ long syscall_trace_enter(struct pt_regs *regs)
->  	 * do_debug() and we need to set it again to restore the user
->  	 * state.  If we entered on the slow path, TF was already set.
->  	 */
-> -	if (test_thread_flag(TIF_SINGLESTEP))
-> +	if (work & _TIF_SINGLESTEP)
->  		regs->flags |= X86_EFLAGS_TF;
+> > >I see these two sentences as contradictory, given that the _DSD doc
+> > >worst case turn into quite a mess.
 
-This looks suspicious, but perhaps I misread this change.
+> > >Given that ACPI can present completely different data based on what OS
+> > >is running, it's quite common to indeed have OS specific data in
+> > >there. How does that relate to this document and these practices?
 
-If I understand correctly, syscall_trace_enter() can avoid _phase2() above.
-But we should always call user_exit() unconditionally?
+> > OS specific data has traditionally not worked out well for ACPI, I
+> > would like to "persuade" people not to use it on ARM.
 
-And we should always set X86_EFLAGS_TF if TIF_SINGLESTEP? IIRC, TF can be
-actually cleared on a 32bit kernel if we step over sysenter insn?
+> It hasn't? I think Microsoft disagrees. It's also how vendors have been able to
+> present an older machine description to keep their newer hardware compatible
+> with older software, isn't it? How do you expect to handle that if you can
+> only present one table? It's the same challenge that DT has.
 
-Oleg.
+It seems sensible to recommend against using OS specifics if possible if
+only from the point of view of improving the robustness of the system -
+the less paths there are to test in the BIOS the more likely it is that
+the active path is one that's been well tested.  It's legal in the spec
+and you can do it but encouraging people not to do it will hopefully
+make life easier down the line.  Similarly encouraging people to put as
+little as possible in there should reduce the opportunities they have to
+get things wrong.
+
+The best use case for OS testing is to enable a non-default workaround
+for older versions of the OS but in the case of Linux that's a bit
+tricky since we don't have clear versions to test against - even with
+the kernel version number it's never clear if it's been patched by a
+distro or something.  Windows is a much more fixed target here.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140728/2f24bc2a/attachment.sig>
