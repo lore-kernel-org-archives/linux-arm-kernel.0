@@ -1,19 +1,41 @@
-From: computersforpeace@gmail.com (Brian Norris)
-Date: Sun, 27 Jul 2014 22:31:15 -0700
-Subject: [PATCHv4 0/5] mtd: gpmi: make blockmark swapping optional
-In-Reply-To: <1402579245-13377-1-git-send-email-LW@KARO-electronics.de>
-References: <1402579245-13377-1-git-send-email-LW@KARO-electronics.de>
-Message-ID: <20140728053115.GB3095@norris-Latitude-E6410>
+From: paul@pwsan.com (Paul Walmsley)
+Date: Mon, 28 Jul 2014 05:31:43 +0000 (UTC)
+Subject: [PATCH v2 2/2] ARM: DRA7: hwmod: Add dra74x and dra72x specific
+ ocp interface lists
+In-Reply-To: <1406523237-6905-3-git-send-email-lokeshvutla@ti.com>
+References: <1406523237-6905-1-git-send-email-lokeshvutla@ti.com>
+ <1406523237-6905-3-git-send-email-lokeshvutla@ti.com>
+Message-ID: <alpine.DEB.2.02.1407280530090.24161@utopia.booyaka.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jun 12, 2014 at 03:20:40PM +0200, Lothar Wa?mann wrote:
-> With a flash-based BBT there is no reason to move the Factory Bad
-> Block Marker from the data area buffer (to where it is mapped by the
-> GPMI NAND controller) to the OOB buffer. Thus, make this feature
-> configurable via DT. This is required for the Ka-Ro electronics
-> i.MX6 platforms.
+On Mon, 28 Jul 2014, Lokesh Vutla wrote:
 
-Pushed patches 1-3 to l2-mtd.git. Thanks!
+> From: Rajendra Nayak <rnayak@ti.com>
+> 
+> To deal with IPs which are specific to dra74x and dra72x, maintain seperate
+> ocp interface lists, while keeping the common list for all common IPs.
+> 
+> Move USB OTG SS4 to dra74x only list since its unavailable in
+> dra72x and is giving an abort during boot. The dra72x only list
+> is empty for now and a placeholder for future hwmod additions which
+> are specific to dra72x.
+> 
+> Fixes: d904b38df0db13 ("ARM: DRA7: hwmod: Add SYSCONFIG for usb_otg_ss")
+> Reported-by: Keerthy <j-keerthy@ti.com>
+> Signed-off-by: Rajendra Nayak <rnayak@ti.com>
+> Signed-off-by: Lokesh Vutla <lokeshvutla@ti.com>
+> Tested-by: Nishanth Menon <nm@ti.com>
 
-Brian
+Queued with a fix for the comment style - i.e.,
+
++       if (ois[0] == NULL) /* Empty list */
+
+rather than 
+
++       if (ois[0] == NULL) /* Empty list*/
+
+Please keep an eye out for this.
+
+
+- Paul
