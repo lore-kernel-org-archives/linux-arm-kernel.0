@@ -1,29 +1,20 @@
-From: varkabhadram@gmail.com (Varka Bhadram)
-Date: Mon, 28 Jul 2014 14:37:28 +0530
-Subject: [PATCH v4 1/6] rtc: sun6i: Add sun6i RTC driver
-In-Reply-To: <1406535661-25072-2-git-send-email-wens@csie.org>
-References: <1406535661-25072-1-git-send-email-wens@csie.org>
- <1406535661-25072-2-git-send-email-wens@csie.org>
-Message-ID: <53D612D0.6030404@gmail.com>
+From: michal.simek@xilinx.com (Michal Simek)
+Date: Mon, 28 Jul 2014 11:11:21 +0200
+Subject: [PATCH v3] ARM: dts: zynq: Add SPI
+In-Reply-To: <20140725144223.GB16049@xsjandreislx>
+References: <1cf9126b-c5e4-4ae7-a294-071584857d6c@BN1AFFO11FD052.protection.gbl>
+ <1406286752-8905-1-git-send-email-afaerber@suse.de>
+ <20140725144223.GB16049@xsjandreislx>
+Message-ID: <0e263e03-a371-4751-8c43-6c198c57ae81@BN1AFFO11FD035.protection.gbl>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/28/2014 01:50 PM, Chen-Yu Tsai wrote:
-> This patch introduces the driver for the RTC in the Allwinner A31 and
-> A23 SoCs.
->
-> Unlike the RTC found in A10/A20 SoCs, which was part of the timer, the
-> RTC in A31/A23 are a separate hardware block, which also contain a few
-> controls for the RTC block hardware (a regulator and RTC block GPIO pin
-> latches), while also having separate interrupts for the alarms.
->
-> The hardware is different enough to make a different driver for it.
->
-> Signed-off-by: Chen-Yu Tsai <wens@csie.org>
-> ---
+On 07/25/2014 04:42 PM, S?ren Brinkmann wrote:
+> On Fri, 2014-07-25 at 01:12PM +0200, Andreas F?rber wrote:
+>> Signed-off-by: Andreas F?rber <afaerber@suse.de>
+> Reviewed-by: Soren Brinkmann <soren.brinkmann@xilinx.com>
 
-Reviewed-by: Varka Bhadram <varkabhadram@gmail.com>
+Applied to zynq/dt.
 
--- 
-Regards,
-Varka Bhadram.
+Thanks,
+Michal
