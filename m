@@ -1,80 +1,83 @@
-From: cw00.choi@samsung.com (Chanwoo Choi)
-Date: Mon, 28 Jul 2014 20:03:33 +0900
-Subject: [PATCH 2/2] iio: adc: exynos_adc: Add support for S3C24xx ADC
-In-Reply-To: <53D562AD.4090706@gmx.de>
-References: <1405995074-3271-1-git-send-email-cw00.choi@samsung.com>
- <1405995074-3271-3-git-send-email-cw00.choi@samsung.com>
- <53D562AD.4090706@gmx.de>
-Message-ID: <53D62E05.3080803@samsung.com>
+From: andriy.shevchenko@linux.intel.com (Andy Shevchenko)
+Date: Mon, 28 Jul 2014 14:06:20 +0300
+Subject: [PATCH] spi/pxa2xx-pci: Enable DMA binding through device name
+In-Reply-To: <5237362.DJsH7MtqlU@wuerfel>
+References: <1406196111-22861-1-git-send-email-hock.leong.kweh@intel.com>
+ <5426556.OzZIXLrofJ@wuerfel> <1406285147.8530.13.camel@smile.fi.intel.com>
+ <5237362.DJsH7MtqlU@wuerfel>
+Message-ID: <1406545580.8530.28.camel@smile.fi.intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/28/2014 05:35 AM, Hartmut Knaack wrote:
-> Chanwoo Choi schrieb:
->> This patch add support for s3c2410/s3c2416/s3c2440/s3c2443 ADC. The s3c24xx
->> is alomost same as ADCv1. But, There are a little difference as following:
->> - ADCMUX register address to select channel
->> - ADCDAT mask (10bit or 12bit ADC resolution according to SoC version)
-> Hi, just some style issues: better separate things like 10bit with a space to 10 bit, there are some instances of this type in your code. Another issue inline.
+On Fri, 2014-07-25 at 17:55 +0200, Arnd Bergmann wrote:
+> On Friday 25 July 2014 13:45:47 Andy Shevchenko wrote:
+> > On Fri, 2014-07-25 at 12:19 +0200, Arnd Bergmann wrote:
+> > > On Friday 25 July 2014 12:55:59 Mika Westerberg wrote:
+> > > > On Fri, Jul 25, 2014 at 12:07:14PM +0300, Mika Westerberg wrote:
+> > > > > On Fri, Jul 25, 2014 at 10:38:36AM +0200, Arnd Bergmann wrote:
+> > > > > > On Friday 25 July 2014 11:22:49 Mika Westerberg wrote:
+> > 
+> > []
+> > 
+> > > > Something like this?
+> > 
+> > Arnd, this dependency to certain DMA driver looks really bad.
+> > 
+> > If we go that way, can we split that part to [another] module and make
+> > it dependent to DW_DMAC?
+> 
+> I don't see what you gain from that. The PCI ID will tell you which DMA
+> engine is being used. The driver already hardcodes a slave_id based on
+> the PCI ID today, and the 
 
-OK I'll fix it.
+"...and the..."?
 
->>
->> Signed-off-by: Chanwoo Choi <cw00.choi@samsung.com>
->> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
->> ---
->>  .../devicetree/bindings/arm/samsung/exynos-adc.txt | 10 ++-
->>  drivers/iio/adc/exynos_adc.c                       | 89 +++++++++++++++++++++-
->>  2 files changed, 96 insertions(+), 3 deletions(-)
->>
->> diff --git a/Documentation/devicetree/bindings/arm/samsung/exynos-adc.txt b/Documentation/devicetree/bindings/arm/samsung/exynos-adc.txt
->> index b6e3989..fe34c76 100644
->> --- a/Documentation/devicetree/bindings/arm/samsung/exynos-adc.txt
->> +++ b/Documentation/devicetree/bindings/arm/samsung/exynos-adc.txt
->> @@ -11,11 +11,19 @@ New driver handles the following
->>  
->>  Required properties:
->>  - compatible:		Must be "samsung,exynos-adc-v1"
->> -				for exynos4412/5250 controllers.
->> +				for exynos4412/5250 and s5pv210 controllers.
->>  			Must be "samsung,exynos-adc-v2" for
->>  				future controllers.
->>  			Must be "samsung,exynos3250-adc" for
->>  				controllers compatible with ADC of Exynos3250.
->> +			Must be "samsung,s3c2410-adc" for
->> +				the ADC in s3c2410 and compatibles
->> +			Must be "samsung,s3c2416-adc" for
->> +				the ADC in s3c2416 and compatibles
->> +			Must be "samsung,s3c2440-adc" for
->> +				the ADC in s3c2440 and compatibles
->> +			Must be "samsung,s3c2443-adc" for
->> +				the ADC in s3c2443 and compatibles
->>  			Must be "samsung,s3c6410-adc" for
->>  				the ADC in s3c6410 and compatibles
->>  - reg:			Contains ADC register address range (base address and
->> diff --git a/drivers/iio/adc/exynos_adc.c b/drivers/iio/adc/exynos_adc.c
->> index 05bdd2f12..7d28032 100644
->> --- a/drivers/iio/adc/exynos_adc.c
->> +++ b/drivers/iio/adc/exynos_adc.c
->> @@ -51,6 +51,9 @@
->>  #define ADC_V1_MUX(x)		((x) + 0x1c)
->>  #define ADC_V1_CLRINTPNDNUP(x)	((x) + 0x20)
->>  
->> +/* S3C2410 ADC registers definitions */
->> +#define ADC_S3C2410_MUX(x)	((x) + 0x18)
->> +
->>  /* Future ADC_V2 registers definitions */
->>  #define ADC_V2_CON1(x)		((x) + 0x00)
->>  #define ADC_V2_CON2(x)		((x) + 0x04)
->> @@ -67,6 +70,8 @@
->>  
->>  /* Bit definitions for S3C2410 ADC */
->>  #define ADC_S3C2410_CON_SELMUX(x) (((x) & 7) <<3)
->> +#define ADC_S3C2410_DATX_MASK	0x3FF
->> +#define ADC_S3C2416_CON_RES_SEL	(1 << 3)
-> Since it is done this way in this driver, better use (1u << 3) here.
+> 
+> > Or shall we introduce a dmaengine type field in the platform data and
+> > dynamically choose proper filter-whatever-function to get the channel?
+> 
+> We already have an interface for this, in the form of
+> dma_request_slave_channel(), which takes a string identifier that
+> is used to look up all that information in either device tree or
+> ACPI. It wouldn't be unreasonable to add a third path in there
+> to handle hardcoded platform devices, but that's a lot of work.
+> Note that you still need to encode a reference to the dma engine
+> in some way to do this right. The current code (with or without Mika's
+> patch) will break as soon as you have multiple DMA engine devices.
 
-OK, I'll fix it.
+What about to keep PCI case still valid? We can pass struct pci_dev (or
+actual struct device) of DMA controller to filter proper device.
 
-Best Regards,
-Chanwoo Choi
+> The current plan I think is to convert all platforms to use DT
+> or ACPI so they get the right data from tables passed by the
+> platform.
+
+Good to know the road map.
+
+[]
+
+> > > What I think you got wrong here (by following my bad advice) is the master
+> > > number. Looking at the code for dw_dma, I think src_master needs to be '1'
+> > > for your driver.
+> > 
+> > On some SoCs we have up to 4 masters. It's blurry for me how the SPI
+> > should choose those masters. Currently it works fine, but I suspect
+> > there are [might be] performance issues.
+> 
+> I think it works because the dw-dma defaults to the values used by
+> the specific implementation in your hardware.
+
+
+
+> > What about AVR32 case? We have to fix drivers as well there.
+
+> which ones?
+
+arch/avr32/mach-at32ap/at32ap700x.c:1332:at32_add_device_mci
+
+It seems opaque for me if it's used anywhere.
+
+
+-- 
+Andy Shevchenko <andriy.shevchenko@intel.com>
+Intel Finland Oy
