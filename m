@@ -1,245 +1,121 @@
-From: stefan@agner.ch (Stefan Agner)
-Date: Mon, 28 Jul 2014 16:57:31 +0200
-Subject: [PATCH v2 5/7] chipidea: usbmisc_imx: Add USB support for VF610 SoCs
-In-Reply-To: <cover.1406558450.git.stefan@agner.ch>
-References: <cover.1406558450.git.stefan@agner.ch>
-Message-ID: <4ec2e6b9477f346cc6e10f5c5079e0f4ca276a77.1406558450.git.stefan@agner.ch>
+From: achandran@mvista.com (Arun Chandran)
+Date: Mon, 28 Jul 2014 20:30:18 +0530
+Subject: Kexec on arm64
+In-Reply-To: <1406333901.4062.69.camel@smoke>
+References: <CAFdej006OSyhgDcJ2iZdbjt+PtysN=i_+9Dr4GTmr=+t5yg4Kw@mail.gmail.com>
+ <1405443898.22585.7.camel@smoke>
+ <CAL85gmC9LLcN_uxMY1bM5kLx=N7rZGdGO3bmGHeUVo=Rqgk8uw@mail.gmail.com>
+ <1405551861.7262.26.camel@smoke>
+ <CAFdej03nixSU=3h+HYk2E3Onb2P3--Di0GM+wCwLS6ZNH7UjEQ@mail.gmail.com>
+ <CAFdej00J2mJwcg2Cy6CHVuuQZ4uQ2zZg8oErGPi0uPejievB+Q@mail.gmail.com>
+ <1406162287.4062.39.camel@smoke>
+ <20140724093603.GC4079@leverpostej>
+ <1406247468.4062.59.camel@smoke>
+ <CAFdej01w_pE6vv+13cCCyfDs4Rbdkzx4CMUj9q97HBKV0B53ow@mail.gmail.com>
+ <1406333901.4062.69.camel@smoke>
+Message-ID: <CAFdej014ohCFYvoUAXWiYGb4_4UmSY2G1MH-NEE_cF1cC-6Mow@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This adds Vybrid VF610 SoC support. The IP is very similar to i.MX6,
-however, the non-core registers are spread in two different register
-areas. Hence we support multiple instances of the USB misc driver
-and add the driver instance to the imx_usbmisc_data structure.
+Hi Geoff
 
-Signed-off-by: Stefan Agner <stefan@agner.ch>
----
-In the end, I decieded against the advice of Peter to integrate the
-multi-instance functionality in a second driver. To support multiple
-instances, I needed to extend the imx_usbmisc_data to point to the
-instance. Since this is part of the ci_hdrc_imx driver, I feel it's
-cleaner to extend the current driver rather to add a second driver
-and implement two different handlings in the ci_hdrc_imx driver.
+On Sat, Jul 26, 2014 at 5:48 AM, Geoff Levand <geoff@infradead.org> wrote:
+> Hi Arun,
+>
+> On Fri, 2014-07-25 at 17:18 +0530, Arun Chandran wrote:
+>> I got this working. As 'Mark Rutland' pointed in another mail that
+>> it could be problem with flushing the cache; I did a read of
+>> 1GB data from start of RAM to a volatile var. I assume that
+>> this will clear and invalidate all that in cache (L1=32K, L2=256 K, L3=8M)
+>
+> I wasn't flushing out all the data used by relocate_new_kernel.  I added
+> a routine that should flush all the pages in the kimage list out to PoC.
+> Please try a UP build with L3 enabled.
+>
 
-Also, the current approach has a slight advantage for current users
-too: EPROBE_DEFER is returned earlier, when initializing the
-imx_usbmisc_data structure rather than later on, when accessing
-the driver by using imx_usbmisc_init/imx_usbmisc_init_post.
+Yes I verified this new kernel by stopping just before jumping to the
+kexeced kernel and taking the memory dump for the kernel
+and dtb.
 
-As a free bonus, this driver would now also support the mixed case:
-multiple non-core registers in different areas which each support
-multiple USB controllers...
+CPU#0>dump 0x0000004000080000 0x7F2000 uImage
+CPU#0>rd
+GPR00: 0000004000880000 0000000000000000 0000000000000000 0000000000000000
+GPR04: 0000004000080004 000000000000001b 0000000000000000 ffffffffffffffff
+GPR08: 0000000000000020 ffffffffffffffff 0000000000000004 0000000000000002
+GPR12: 00000043ea439fd8 0000004000883000 00000043ea631000 ffffffffffffffff
+GPR16: ffffffc0000cc31c 0000000000435260 0000007fe9328b90 00000043eaddc002
+GPR20: 0000004000883000 00000043ea632000 0000000000000000 0000000000000000
+GPR24: 0000000000000000 0000000000000000 0000000000000000 0000000000000000
+GPR28: 0000000000000000 0000000000000000 ffffffc000085074 ffffffc3eae53d00
 
-Tell me if this is ok for you too.
+And compared this image with the one taken after booting with
+my working one(The one with 1GB read of RAM). Both are Identical.
+That means kexec code now flushes data properly. Note that in both
+cases I used the same secondary kernel.
 
- .../devicetree/bindings/usb/usbmisc-imx.txt        |  1 +
- drivers/usb/chipidea/ci_hdrc_imx.c                 |  8 ++++
- drivers/usb/chipidea/ci_hdrc_imx.h                 |  1 +
- drivers/usb/chipidea/usbmisc_imx.c                 | 52 +++++++++++++++++-----
- 4 files changed, 51 insertions(+), 11 deletions(-)
+But It fails to boot kexeced kernel. If I break the target I can see
+CPU#0>h
+    Core number       : 0
+    Core state        : debug (AArch64 EL1)
+    Debug entry cause : External Debug Request
+    Current PC        : 0xffffffc000083200
+    Current CPSR      : 0x600003c5 (EL1h)
 
-diff --git a/Documentation/devicetree/bindings/usb/usbmisc-imx.txt b/Documentation/devicetree/bindings/usb/usbmisc-imx.txt
-index 97ce94e..c101a4b 100644
---- a/Documentation/devicetree/bindings/usb/usbmisc-imx.txt
-+++ b/Documentation/devicetree/bindings/usb/usbmisc-imx.txt
-@@ -4,6 +4,7 @@ Required properties:
- - #index-cells: Cells used to descibe usb controller index. Should be <1>
- - compatible: Should be one of below:
- 	"fsl,imx6q-usbmisc" for imx6q
-+	"fsl,vf610-usbmisc" for Vybrid vf610
- - reg: Should contain registers location and length
- 
- Examples:
-diff --git a/drivers/usb/chipidea/ci_hdrc_imx.c b/drivers/usb/chipidea/ci_hdrc_imx.c
-index 2e58f8d..9af12b4 100644
---- a/drivers/usb/chipidea/ci_hdrc_imx.c
-+++ b/drivers/usb/chipidea/ci_hdrc_imx.c
-@@ -54,6 +54,7 @@ struct ci_hdrc_imx_data {
- 
- static struct imx_usbmisc_data *usbmisc_get_init_data(struct device *dev)
+
+So I guess there may be something wrong with
+the booting of kernel.
+
+I have these changes to the code.
+1)
+#########
+diff --git a/arch/arm64/kernel/machine_kexec.c
+b/arch/arm64/kernel/machine_kexec.c
+index 00cfbd6..da3672b 100644
+--- a/arch/arm64/kernel/machine_kexec.c
++++ b/arch/arm64/kernel/machine_kexec.c
+@@ -684,7 +691,7 @@ void machine_kexec(struct kimage *image)
+        /* Flush the reboot_code_buffer in preparation for its execution. */
+
+        flush_icache_range((unsigned long)reboot_code_buffer,
+-               relocate_new_kernel_size);
++               (unsigned long)(reboot_code_buffer + relocate_new_kernel_size));
+
+        /*
+         * Flush any data used by relocate_new_kernel in preparation for
+#########
+Passing of second variable to flush_icache_range() is wrong
+it expects an address not length.
+
+2)
+
+#######
+diff --git a/arch/arm64/kernel/process.c b/arch/arm64/kernel/process.c
+index 9ed7327..e3fc8d6 100644
+--- a/arch/arm64/kernel/process.c
++++ b/arch/arm64/kernel/process.c
+
+@@ -84,12 +91,17 @@ void soft_restart(unsigned long addr)
  {
-+	struct platform_device *misc_pdev;
- 	struct device_node *np = dev->of_node;
- 	struct of_phandle_args args;
- 	struct imx_usbmisc_data *data;
-@@ -79,8 +80,15 @@ static struct imx_usbmisc_data *usbmisc_get_init_data(struct device *dev)
- 	}
- 
- 	data->index = args.args[0];
+        typedef void (*phys_reset_t)(unsigned long);
+        phys_reset_t phys_reset;
++       unsigned long jump_addr = addr;
 +
-+	misc_pdev = of_find_device_by_node(args.np);
- 	of_node_put(args.np);
- 
-+	if (!misc_pdev)
-+		return ERR_PTR(-EPROBE_DEFER);
++       phys_reset = (phys_reset_t)virt_to_phys(cpu_reset);
 +
-+	data->dev = &misc_pdev->dev;
-+
- 	if (of_find_property(np, "disable-over-current", NULL))
- 		data->disable_oc = 1;
- 
-diff --git a/drivers/usb/chipidea/ci_hdrc_imx.h b/drivers/usb/chipidea/ci_hdrc_imx.h
-index 996ec93..4ed828f 100644
---- a/drivers/usb/chipidea/ci_hdrc_imx.h
-+++ b/drivers/usb/chipidea/ci_hdrc_imx.h
-@@ -13,6 +13,7 @@
- #define __DRIVER_USB_CHIPIDEA_CI_HDRC_IMX_H
- 
- struct imx_usbmisc_data {
-+	struct device *dev;
- 	int index;
- 
- 	unsigned int disable_oc:1; /* over current detect disabled */
-diff --git a/drivers/usb/chipidea/usbmisc_imx.c b/drivers/usb/chipidea/usbmisc_imx.c
-index 85293b8..926c997 100644
---- a/drivers/usb/chipidea/usbmisc_imx.c
-+++ b/drivers/usb/chipidea/usbmisc_imx.c
-@@ -57,6 +57,8 @@
- 
- #define MX6_BM_OVER_CUR_DIS		BIT(7)
- 
-+#define VF610_OVER_CUR_DIS		BIT(7)
-+
- struct usbmisc_ops {
- 	/* It's called once when probe a usb device */
- 	int (*init)(struct imx_usbmisc_data *data);
-@@ -71,10 +73,9 @@ struct imx_usbmisc {
- 	const struct usbmisc_ops *ops;
- };
- 
--static struct imx_usbmisc *usbmisc;
--
- static int usbmisc_imx25_init(struct imx_usbmisc_data *data)
- {
-+	struct imx_usbmisc *usbmisc = dev_get_drvdata(data->dev);
- 	unsigned long flags;
- 	u32 val = 0;
- 
-@@ -108,6 +109,7 @@ static int usbmisc_imx25_init(struct imx_usbmisc_data *data)
- 
- static int usbmisc_imx25_post(struct imx_usbmisc_data *data)
- {
-+	struct imx_usbmisc *usbmisc = dev_get_drvdata(data->dev);
- 	void __iomem *reg;
- 	unsigned long flags;
- 	u32 val;
-@@ -130,6 +132,7 @@ static int usbmisc_imx25_post(struct imx_usbmisc_data *data)
- 
- static int usbmisc_imx27_init(struct imx_usbmisc_data *data)
- {
-+	struct imx_usbmisc *usbmisc = dev_get_drvdata(data->dev);
- 	unsigned long flags;
- 	u32 val;
- 
-@@ -160,6 +163,7 @@ static int usbmisc_imx27_init(struct imx_usbmisc_data *data)
- 
- static int usbmisc_imx53_init(struct imx_usbmisc_data *data)
- {
-+	struct imx_usbmisc *usbmisc = dev_get_drvdata(data->dev);
- 	void __iomem *reg = NULL;
- 	unsigned long flags;
- 	u32 val = 0;
-@@ -204,6 +208,7 @@ static int usbmisc_imx53_init(struct imx_usbmisc_data *data)
- 
- static int usbmisc_imx6q_init(struct imx_usbmisc_data *data)
- {
-+	struct imx_usbmisc *usbmisc = dev_get_drvdata(data->dev);
- 	unsigned long flags;
- 	u32 reg;
- 
-@@ -221,6 +226,26 @@ static int usbmisc_imx6q_init(struct imx_usbmisc_data *data)
- 	return 0;
- }
- 
-+static int usbmisc_vf610_init(struct imx_usbmisc_data *data)
-+{
-+	struct imx_usbmisc *usbmisc = dev_get_drvdata(data->dev);
-+	u32 reg;
-+
-+	/*
-+	 * Vybrid only has one misc register set, but in two different
-+	 * areas. These is reflected in two instances of this driver.
-+	 */
-+	if (data->index >= 1)
-+		return -EINVAL;
-+
-+	if (data->disable_oc) {
-+		reg = readl(usbmisc->base);
-+		writel(reg | VF610_OVER_CUR_DIS, usbmisc->base);
-+	}
-+
-+	return 0;
-+}
-+
- static const struct usbmisc_ops imx25_usbmisc_ops = {
- 	.init = usbmisc_imx25_init,
- 	.post = usbmisc_imx25_post,
-@@ -238,10 +263,14 @@ static const struct usbmisc_ops imx6q_usbmisc_ops = {
- 	.init = usbmisc_imx6q_init,
- };
- 
-+static const struct usbmisc_ops vf610_usbmisc_ops = {
-+	.init = usbmisc_vf610_init,
-+};
-+
- int imx_usbmisc_init(struct imx_usbmisc_data *data)
- {
--	if (!usbmisc)
--		return -EPROBE_DEFER;
-+	struct imx_usbmisc *usbmisc = dev_get_drvdata(data->dev);
-+
- 	if (!usbmisc->ops->init)
- 		return 0;
- 	return usbmisc->ops->init(data);
-@@ -250,8 +279,8 @@ EXPORT_SYMBOL_GPL(imx_usbmisc_init);
- 
- int imx_usbmisc_init_post(struct imx_usbmisc_data *data)
- {
--	if (!usbmisc)
--		return -EPROBE_DEFER;
-+	struct imx_usbmisc *usbmisc = dev_get_drvdata(data->dev);
-+
- 	if (!usbmisc->ops->post)
- 		return 0;
- 	return usbmisc->ops->post(data);
-@@ -283,6 +312,10 @@ static const struct of_device_id usbmisc_imx_dt_ids[] = {
- 		.compatible = "fsl,imx6q-usbmisc",
- 		.data = &imx6q_usbmisc_ops,
- 	},
-+	{
-+		.compatible = "fsl,vf610-usbmisc",
-+		.data = &vf610_usbmisc_ops,
-+	},
- 	{ /* sentinel */ }
- };
- MODULE_DEVICE_TABLE(of, usbmisc_imx_dt_ids);
-@@ -294,9 +327,6 @@ static int usbmisc_imx_probe(struct platform_device *pdev)
- 	int ret;
- 	struct of_device_id *tmp_dev;
- 
--	if (usbmisc)
--		return -EBUSY;
--
- 	data = devm_kzalloc(&pdev->dev, sizeof(*data), GFP_KERNEL);
- 	if (!data)
- 		return -ENOMEM;
-@@ -325,15 +355,15 @@ static int usbmisc_imx_probe(struct platform_device *pdev)
- 	tmp_dev = (struct of_device_id *)
- 		of_match_device(usbmisc_imx_dt_ids, &pdev->dev);
- 	data->ops = (const struct usbmisc_ops *)tmp_dev->data;
--	usbmisc = data;
-+	platform_set_drvdata(pdev, data);
- 
- 	return 0;
- }
- 
- static int usbmisc_imx_remove(struct platform_device *pdev)
- {
-+	struct imx_usbmisc *usbmisc = dev_get_drvdata(&pdev->dev);
- 	clk_disable_unprepare(usbmisc->clk);
--	usbmisc = NULL;
- 	return 0;
- }
- 
--- 
-2.0.2
++       __flush_dcache_area(&jump_addr, 8);
++       __flush_dcache_area(&phys_reset, 8);
+
+        setup_restart();
+
+        /* Switch to the identity mapping */
+-       phys_reset = (phys_reset_t)virt_to_phys(cpu_reset);
+-       phys_reset(addr);
++       phys_reset(jump_addr);
+
+        /* Should never get here */
+        BUG();
+########
+
+Without this flushing it will jump to wrong addr.
+
+--Arun
