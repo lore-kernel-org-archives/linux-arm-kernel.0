@@ -1,139 +1,62 @@
 From: haojian.zhuang@linaro.org (Haojian Zhuang)
-Date: Mon, 28 Jul 2014 21:57:44 +0800
-Subject: [PATCH v15 00/12] enable Hisilicon HiP04
-Message-ID: <1406555876-11989-1-git-send-email-haojian.zhuang@linaro.org>
+Date: Mon, 28 Jul 2014 21:57:49 +0800
+Subject: [PATCH v15 05/12] document: dt: add the binding on HiP04
+In-Reply-To: <1406555876-11989-1-git-send-email-haojian.zhuang@linaro.org>
+References: <1406555876-11989-1-git-send-email-haojian.zhuang@linaro.org>
+Message-ID: <1406555876-11989-6-git-send-email-haojian.zhuang@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Changelog:
-v15:
-  * Add p04 debug uart back.
-  * Refresh since hix5hd2 code updated.
+Add bootwrapper-phys, bootwrapper-size, bootwrapper-magic properties for
+Hisilicon HiP04 SoC.
 
-v14:
-  * Mount function pointers to different implementation on standard
-    GICv2 and Hisilicon HiP04 GIC.
+Signed-off-by: Haojian Zhuang <haojian.zhuang@linaro.org>
+---
+ .../devicetree/bindings/arm/hisilicon/hisilicon.txt | 21 +++++++++++++++++++++
+ 1 file changed, 21 insertions(+)
 
-v13:
-  * Restore power down operation in MCPM.
-  * Fix disabling snoop filter issue in MCPM.
-
-v12:
-  * Use wfi as power down state in MCPM.
-  * Remove wait_for_powerdown() in MCPM because wfi is used now.
-
-v11:
-  * Fix the protection issue on mcpm power down.
-  * Clean assembly code in mcpm power up.
-
-v10:
-  * Move snoop filter code to be executed on secondary cores. And change
-    it to assembly code since MMU isn't enabled at that time.
-  * Rebase irq gic patch on latest gic patch.
-  * Use global variable in irq gic patch.
-  * Use global variable in vgic patch.
-  * Drop debug uart patch since it's in another patch set.
-  * Remove some ARCHs from multi_v7_lpae_defconfig.
-
-v9:
-  * Remove delay workaround in mcpm implementation.
-  * Clean in gic.
-  * Rename vgic_cpu_nr_lr to vgic_cpu_hw_cfg in vgic driver.
-  * Always use high word of vgic_cpu_hw_cfg for GICH_APR offset. So the
-    implementation of arm64 is also updated.
-  * Drop "irq: gic: use mask field in GICC_IAR" patch since it's merged.
-
-v7:
-  * Remove hip04_smp_init_ops().
-  * Remove CONFIG_ARCH_HIP04 in hisilicn.c since hip04_smp_init_ops() is
-    removed.
-
-v6:
-  * Split HiP04 enabling patch into patches on document, mcpm & hiP04.
-  * Move reset operation in HiP04 MCPM implementation.
-  * Remove ARCH_MULTI_V7_NONLPAE & ARCH_MULTI_V7_LPAE according to olof's
-    comment.
-
-v5:
-  * Add ARCH_MULTI_V7_NONLPAE to avoid change too much things in Kconfig.
-  * Use memreserve in DTS.
-  * Remove L2 reset operation in mcpm implementation.
-  * Re-use nr_lr field to cover HIP04 GICH_APR implementation.
-  * Add more comments.
-
-v4:
-  * Add multi_v7_lpae_defconfig.
-  * Select CONFIG_ARCH_MULTI_V7_LPAE if CONFIG_ARCH_MULTI_V7 is selected.
-  * Only ARMADA_XP is ARCH_MULTI_V7_LPAE, other ARMADA chips are ARCH_MULTI_V7.
-  * Remove gich_lr0 variable since we can calculate offset of GICH_LR0 from
-    GICH_APR.
-  * Cleanup GIC driver to support HiP04 GIC.
-  * Cleanup HiP04 mcpm implementation.
-
-v3:
-  * Replace CONFIG_ARCH_MULTI_V7 by CONFIG_ARCH_MULTI_V7_LPAE in some SoC.
-  * Update MCPM code based on Dave's patch.
-  * Remove MCPM node in DTS file. Use sysctrl & fabric node instead.
-  * Move hardcoding on bootwrapper into DTS file.
-  * Append the CONFIG_MCPM_QUAD_CLUSTER for HiP04.
-  * Fix the return value from gic_get_cpumask() if it's used in standard gic.
-  * Add the vgic support on HiP04 GIC.
-  * Add virtualization support in HiP04 defconfig.
-
-v2:
-  * Append ARCH_MULTI_V7_LPAE configuration. Define ARCH_MULTI_V7 to only
-    support non-LPAE platform.
-  * Append document of DT supporting.
-  * Append ARCH_HISI in hi3xxx_defconfig.
-  * Enable errata 798181 for HiP04 SoC.
-  * Add PMU support.
-
-Haojian Zhuang (11):
-  irq: gic: support hip04 gic
-  ARM: mcpm: support 4 clusters
-  ARM: hisi: enable MCPM implementation
-  ARM: hisi: enable HiP04
-  document: dt: add the binding on HiP04
-  document: dt: add the binding on HiP04 clock
-  ARM: dts: append hip04 dts
-  ARM: config: append lpae configuration
-  ARM: config: append hip04_defconfig
-  virt: arm: support hip04 gic
-  ARM: debug: add HiP04 debug uart
-
-Kefeng Wang (1):
-  ARM: hisi: enable erratum 798181 of A15 on HiP04
-
- Documentation/devicetree/bindings/arm/gic.txt      |   1 +
- .../bindings/arm/hisilicon/hisilicon.txt           |  21 +
- .../devicetree/bindings/clock/hip04-clock.txt      |  20 +
- arch/arm/Kconfig                                   |   9 +
- arch/arm/Kconfig.debug                             |  10 +
- arch/arm/boot/dts/Makefile                         |   1 +
- arch/arm/boot/dts/hip04-d01.dts                    |  39 ++
- arch/arm/boot/dts/hip04.dtsi                       | 267 +++++++++++++
- arch/arm/configs/hip04_defconfig                   |  74 ++++
- arch/arm/configs/multi_v7_lpae_defconfig           | 343 ++++++++++++++++
- arch/arm/include/asm/mcpm.h                        |   5 +
- arch/arm/kernel/asm-offsets.c                      |   2 +-
- arch/arm/kvm/interrupts_head.S                     |  29 +-
- arch/arm/mach-hisi/Kconfig                         |   9 +
- arch/arm/mach-hisi/Makefile                        |   1 +
- arch/arm/mach-hisi/hisilicon.c                     |   9 +
- arch/arm/mach-hisi/platmcpm.c                      | 366 +++++++++++++++++
- arch/arm64/kernel/asm-offsets.c                    |   2 +-
- arch/arm64/kvm/hyp.S                               |   4 +-
- drivers/irqchip/irq-gic.c                          | 436 +++++++++++++++++----
- include/kvm/arm_vgic.h                             |   7 +-
- include/linux/irqchip/arm-gic.h                    |   6 +
- virt/kvm/arm/vgic.c                                |  37 +-
- 23 files changed, 1588 insertions(+), 110 deletions(-)
- create mode 100644 Documentation/devicetree/bindings/clock/hip04-clock.txt
- create mode 100644 arch/arm/boot/dts/hip04-d01.dts
- create mode 100644 arch/arm/boot/dts/hip04.dtsi
- create mode 100644 arch/arm/configs/hip04_defconfig
- create mode 100644 arch/arm/configs/multi_v7_lpae_defconfig
- create mode 100644 arch/arm/mach-hisi/platmcpm.c
-
+diff --git a/Documentation/devicetree/bindings/arm/hisilicon/hisilicon.txt b/Documentation/devicetree/bindings/arm/hisilicon/hisilicon.txt
+index 934f000..eca605a 100644
+--- a/Documentation/devicetree/bindings/arm/hisilicon/hisilicon.txt
++++ b/Documentation/devicetree/bindings/arm/hisilicon/hisilicon.txt
+@@ -5,6 +5,11 @@ Hi4511 Board
+ Required root node properties:
+ 	- compatible = "hisilicon,hi3620-hi4511";
+ 
++HiP04 D01 Board
++Required root node properties:
++	- compatible = "hisilicon,hip04-d01";
++
++
+ Hisilicon system controller
+ 
+ Required properties:
+@@ -19,6 +24,15 @@ Optional properties:
+ 		If reg value is not zero, cpun exit wfi and go
+ - resume-offset : offset in sysctrl for notifying cpu0 when resume
+ - reboot-offset : offset in sysctrl for system reboot
++- relocation-entry : relocation address of secondary cpu boot code
++- relocation-size : relocation size of secondary cpu boot code
++- bootwrapper-phys : physical address of boot wrapper
++- bootwrapper-size : size of boot wrapper
++- bootwrapper-magic : magic number for secondary cpu in boot wrapper
++The memory area of [bootwrapper-phys : bootwrapper-phys+bootwrapper-size]
++should be reserved. This should be set in /memreserve/ node in DTS file.
++bootwrapper-phys, bootwrapper-size, bootwrapper-magic is used in HiP04
++DTS file.
+ 
+ Example:
+ 
+@@ -55,3 +69,10 @@ Example:
+ 		compatible = "hisilicon,pctrl";
+ 		reg = <0xfca09000 0x1000>;
+ 	};
++
++-----------------------------------------------------------------------
++Fabric:
++
++Required Properties:
++- compatible: "hisilicon,hip04-fabric";
++- reg: Address and size of Fabric
 -- 
 1.9.1
