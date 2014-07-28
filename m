@@ -1,40 +1,31 @@
-From: afaerber@suse.de (=?UTF-8?q?Andreas=20F=C3=A4rber?=)
-Date: Mon, 28 Jul 2014 15:05:03 +0200
-Subject: [PATCH v3] Documentation: devicetree: Fix ADI AXI SPDIF specification
-Message-ID: <1406552704-6736-1-git-send-email-afaerber@suse.de>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Mon, 28 Jul 2014 15:04:49 +0200
+Subject: [PATCH v5 5/8] power: reset: move hisilicon reboot code
+In-Reply-To: <1406551883-26154-6-git-send-email-haojian.zhuang@linaro.org>
+References: <1406551883-26154-1-git-send-email-haojian.zhuang@linaro.org>
+ <1406551883-26154-6-git-send-email-haojian.zhuang@linaro.org>
+Message-ID: <5372764.rLStIIsI33@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The specification requires compatible = "adi,axi-spdif-1.00.a" but
-driver and example and file name indicate "adi,axi-spdif-tx-1.00.a".
-Change the specification to match the implementation.
+On Monday 28 July 2014 20:51:20 Haojian Zhuang wrote:
+> +
+> +static struct of_device_id hisi_reboot_of_match[] = {
+> +       { .compatible = "hisilicon,sysctrl" },
+> +       {}
+> +};
+> +
+> +static struct platform_driver hisi_reboot_driver = {
+> +       .probe = hisi_reboot_probe,
+> +       .driver = {
+> +               .name = "hisi-reboot",
+> +               .of_match_table = hisi_reboot_of_match,
+> +       },
+> +};
+> +module_platform_driver(hisi_reboot_driver);
 
-Acked-by: Lars-Peter Clausen <lars@metafoo.de>
-Reviewed-by: Michal Simek <michal.simek@xilinx.com>
-Fixes: d7b528eff927 ("dt: Add bindings documentation for the ADI AXI-SPDIF audio controller")
-Signed-off-by: Andreas F?rber <afaerber@suse.de>
----
- v2 -> v3:
- * Added Fixes header
- * CC broonie (Mark Brown)
- 
- v2: New
- 
- Documentation/devicetree/bindings/sound/adi,axi-spdif-tx.txt | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+I think this will get you into trouble if anything else starts
+using the "hisilicon,sysctrl" device node. But as long as nothing
+does, this seems fine.
 
-diff --git a/Documentation/devicetree/bindings/sound/adi,axi-spdif-tx.txt b/Documentation/devicetree/bindings/sound/adi,axi-spdif-tx.txt
-index 46f344965313..4eb7997674a0 100644
---- a/Documentation/devicetree/bindings/sound/adi,axi-spdif-tx.txt
-+++ b/Documentation/devicetree/bindings/sound/adi,axi-spdif-tx.txt
-@@ -1,7 +1,7 @@
- ADI AXI-SPDIF controller
- 
- Required properties:
-- - compatible : Must be "adi,axi-spdif-1.00.a"
-+ - compatible : Must be "adi,axi-spdif-tx-1.00.a"
-  - reg : Must contain SPDIF core's registers location and length
-  - clocks : Pairs of phandle and specifier referencing the controller's clocks.
-    The controller expects two clocks, the clock used for the AXI interface and
--- 
-1.9.3
+	Arnd
