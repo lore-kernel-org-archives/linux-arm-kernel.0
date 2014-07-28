@@ -1,149 +1,94 @@
-From: bpringlemeir@nbsps.com (Bill Pringlemeir)
-Date: Mon, 28 Jul 2014 18:38:39 -0400
-Subject: fsl_lpuart/VF610: Division by zero.
-In-Reply-To: <1aa4c71fa7441f217f33e7be9a8fa1b9@agner.ch> (Stefan Agner's
- message of "Sat, 26 Jul 2014 14:08:38 +0200")
-References: <87ha256q8l.fsf@nbsps.com> <87d2ct6p77.fsf@nbsps.com>
- <1aa4c71fa7441f217f33e7be9a8fa1b9@agner.ch>
-Message-ID: <87zjftaz2o.fsf@nbsps.com>
+From: geoff@infradead.org (Geoff Levand)
+Date: Mon, 28 Jul 2014 15:55:59 -0700
+Subject: [PATCH] arm64: Fix UP build warning in gic-v3
+Message-ID: <1406588159.28348.41.camel@smoke>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 26 Jul 2014, stefan at agner.ch wrote:
+The static routines gic_write_sgi1r() and gic_peek_irq() are only used for SMP
+builds, so move those two routines to within the defined(CONFIG_SMP)
+preprocessor conditional.
 
-> Hi Bill,
->
-> Am 2014-07-26 00:36, schrieb Bill Pringlemeir:
->> On 25 Jul 2014, bpringlemeir at nbsps.com wrote:
->
->>> I looked at the vmlinux objdump and it is here,
->>>
->>> static int lpuart_dma_rx_request(struct uart_port *port)
->>> {
->>> ...
->>> 	sport->dma_rx_timeout = (sport->port.timeout - HZ / 50) *
->>> 				FSL_UART_RX_DMA_BUFFER_SIZE * 3 /
->>> 				sport->rxfifo_size / 2;
->>>
->>> The variable 'sport->rxfifo_size' is set in lpuart_setup_watermark()
->>> and this is called after lpuart_dma_rx_request() in
->>> lpuart_startup().
+Fixes build warnings like these when CONFIG_SMP=n:
 
-> I observed this division by zero too, I recently sent a patch for
-> that.
-> http://lists.infradead.org/pipermail/linux-arm-kernel/2014-July/268772.html
+  drivers/irqchip/irq-gic-v3.c: warning: ?gic_write_sgi1r? defined but not used
+  drivers/irqchip/irq-gic-v3.c: warning: ?gic_peek_irq? defined but not used
 
-> Greg already added that to his tty-next tree:
-> https://git.kernel.org/cgit/linux/kernel/git/gregkh/tty.git/tree/drivers/tty/serial/fsl_lpuart.c?h=tty-next#n1309
+Signed-off-by: Geoff Levand <geoff@infradead.org>
+---
+Hi Marc,
 
-> I also observed that DMA did not work yet, hence I a created a second
-> patch:
-> http://lists.infradead.org/pipermail/linux-arm-kernel/2014-July/268773.html
->
-> But eDMA in general was broken too, this patch solved that, hence you
-> might want apply that patch too:
-> http://lists.infradead.org/pipermail/linux-arm-kernel/2014-July/268199.html
->
-> All patches are lined up for 3.17, so things should be smooth from
-> that release on.
+I'm not sure if this has gone upstream yet, but I get these warnings
+with Catalin's current arm64/for-next/core branch.
 
-Thanks, I applied all three patches to the arm-soc 'for-next' and now
-the serial ports seems to be working.  I am using the Tower board and
-they have a 'TWR-SER2' card.
+Feel free to just fold this into your gic-v3 patch if you'll be sending out
+a new version.
 
-http://www.freescale.com/webapp/sps/site/prod_summary.jsp?code=TWR-SER2
+-Geoff
 
-Unfortunately, the IOMUX conflicts with the Audio daughter-board in
-vf610-twr.dts.   The I/O conflicts are,
+ drivers/irqchip/irq-gic-v3.c | 36 ++++++++++++++++++------------------
+ 1 file changed, 18 insertions(+), 18 deletions(-)
 
-	VF610_PAD_PTB6__FTM0_CH6
-	VF610_PAD_PTB7__FTM0_CH7
-versus
-        VF610_PAD_PTB6__UART2_TX
-        VF610_PAD_PTB7__UART2_RX
-
-Below are the DT changes to get two 'ttyLP' working with the Tower
-System which probably will never apply cleanly, but are just meant for
-reference.
-
---- a/arch/arm/boot/dts/vf610-twr.dts
-+++ b/arch/arm/boot/dts/vf610-twr.dts
-@@ -58,7 +59,7 @@
-                        regulator-max-microvolt = <3300000>;
-                };
-        };
--
-+/*
-        sound {
-                compatible = "simple-audio-card";
-                simple-audio-card,format = "i2s";
-@@ -87,6 +88,7 @@
-                        bitclock-master;
-                };
-        };
-+*/
- };
+diff --git a/drivers/irqchip/irq-gic-v3.c b/drivers/irqchip/irq-gic-v3.c
+index 57eaa5a..e9ee18a 100644
+--- a/drivers/irqchip/irq-gic-v3.c
++++ b/drivers/irqchip/irq-gic-v3.c
+@@ -129,11 +129,6 @@ static void gic_write_grpen1(u64 val)
+ 	isb();
+ }
  
- &adc0 {
-@@ -241,7 +243,7 @@
-                };
+-static void gic_write_sgi1r(u64 val)
+-{
+-	asm volatile("msr_s " __stringify(ICC_SGI1R_EL1) ", %0" : : "r" (val));
+-}
 -
-+/*
-                pinctrl_pwm0: pwm0grp {
-                        fsl,pins = <
-                                VF610_PAD_PTB0__FTM0_CH0                0x1582
-@@ -252,7 +254,7 @@
-                                VF610_PAD_PTB7__FTM0_CH7                0x1582
-                        >;
-                };
+ static void gic_enable_sre(void)
+ {
+ 	u64 val;
+@@ -200,19 +195,6 @@ static void gic_poke_irq(struct irq_data *d, u32 offset)
+ 	rwp_wait();
+ }
+ 
+-static int gic_peek_irq(struct irq_data *d, u32 offset)
+-{
+-	u32 mask = 1 << (gic_irq(d) % 32);
+-	void __iomem *base;
 -
-+*/
-                pinctrl_sai2: sai2grp {
-                        fsl,pins = <
-                                VF610_PAD_PTA16__SAI2_TX_BCLK           0x02ed
-@@ -271,6 +273,13 @@
-                                VF610_PAD_PTB5__UART1_RX                0x21a1
-                        >;
-                };
+-	if (gic_irq_in_rdist(d))
+-		base = gic_data_rdist_sgi_base();
+-	else
+-		base = gic_data.dist_base;
+-
+-	return !!(readl_relaxed(base + offset + (gic_irq(d) / 32) * 4) & mask);
+-}
+-
+ static void gic_mask_irq(struct irq_data *d)
+ {
+ 	gic_poke_irq(d, GICD_ICENABLER);
+@@ -401,6 +383,24 @@ static void gic_cpu_init(void)
+ }
+ 
+ #ifdef CONFIG_SMP
++static void gic_write_sgi1r(u64 val)
++{
++	asm volatile("msr_s " __stringify(ICC_SGI1R_EL1) ", %0" : : "r" (val));
++}
 +
-+               pinctrl_uart2: uart2grp {
-+                       fsl,pins = <
-+                                VF610_PAD_PTB6__UART2_TX                0x21a2
-+                                VF610_PAD_PTB7__UART2_RX                0x21a1
-+                       >;
-+               };
-        };
- };
- 
-@@ -284,21 +293,31 @@
-        status = "okay";
- };
- 
-+/*
- &pwm0 {
-        pinctrl-names = "default";
-        pinctrl-0 = <&pinctrl_pwm0>;
-        status = "okay";
- };
--
- &sai2 {
-        #sound-dai-cells = <0>;
-        pinctrl-names = "default";
-        pinctrl-0 = <&pinctrl_sai2>;
-        status = "okay";
- };
--
-+*/
-+&uart2 {
-+       pinctrl-names = "default";
-+       pinctrl-0 = <&pinctrl_uart2>;
-+       status = "okay";
-+};
-
-The standard jumpers on the Tower will either route ttyLP1 to the 'USB'
-or to the 'serial board'; ttyLP2 will be the opposite with the 'serial
-board' or the 'USB'.
-
-Thanks again.  I should have read the linux-arm list more diligently.
-
-Bill Pringlemeir.
++static int gic_peek_irq(struct irq_data *d, u32 offset)
++{
++	u32 mask = 1 << (gic_irq(d) % 32);
++	void __iomem *base;
++
++	if (gic_irq_in_rdist(d))
++		base = gic_data_rdist_sgi_base();
++	else
++		base = gic_data.dist_base;
++
++	return !!(readl_relaxed(base + offset + (gic_irq(d) / 32) * 4) & mask);
++}
++
+ static int gic_secondary_init(struct notifier_block *nfb,
+ 			      unsigned long action, void *hcpu)
+ {
+-- 
+1.9.1
