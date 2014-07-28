@@ -1,56 +1,45 @@
 From: haojian.zhuang@linaro.org (Haojian Zhuang)
-Date: Mon, 28 Jul 2014 21:57:48 +0800
-Subject: [PATCH v15 04/12] ARM: hisi: enable HiP04
+Date: Mon, 28 Jul 2014 21:57:50 +0800
+Subject: [PATCH v15 06/12] document: dt: add the binding on HiP04 clock
 In-Reply-To: <1406555876-11989-1-git-send-email-haojian.zhuang@linaro.org>
 References: <1406555876-11989-1-git-send-email-haojian.zhuang@linaro.org>
-Message-ID: <1406555876-11989-5-git-send-email-haojian.zhuang@linaro.org>
+Message-ID: <1406555876-11989-7-git-send-email-haojian.zhuang@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Support HiP04 SoC what supports 16 cores. And it relies on MCPM
-framework.
+The DT binding for Hisilicon HiP04 clock driver.
 
 Signed-off-by: Haojian Zhuang <haojian.zhuang@linaro.org>
 ---
- arch/arm/mach-hisi/Kconfig     | 8 ++++++++
- arch/arm/mach-hisi/hisilicon.c | 9 +++++++++
- 2 files changed, 17 insertions(+)
+ .../devicetree/bindings/clock/hip04-clock.txt        | 20 ++++++++++++++++++++
+ 1 file changed, 20 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/clock/hip04-clock.txt
 
-diff --git a/arch/arm/mach-hisi/Kconfig b/arch/arm/mach-hisi/Kconfig
-index 9848829..2a36fb7 100644
---- a/arch/arm/mach-hisi/Kconfig
-+++ b/arch/arm/mach-hisi/Kconfig
-@@ -22,6 +22,14 @@ config ARCH_HI3xxx
- 	help
- 	  Support for Hisilicon Hi36xx SoC family
- 
-+config ARCH_HIP04
-+	bool "Hisilicon HiP04 Cortex A15 family" if ARCH_MULTI_V7
-+	select HAVE_ARM_ARCH_TIMER
-+	select MCPM if SMP
-+	select MCPM_QUAD_CLUSTER if SMP
-+	help
-+	  Support for Hisilicon HiP04 SoC family
+diff --git a/Documentation/devicetree/bindings/clock/hip04-clock.txt b/Documentation/devicetree/bindings/clock/hip04-clock.txt
+new file mode 100644
+index 0000000..4d31ae3
+--- /dev/null
++++ b/Documentation/devicetree/bindings/clock/hip04-clock.txt
+@@ -0,0 +1,20 @@
++* Hisilicon HiP04 Clock Controller
 +
- config ARCH_HIX5HD2
- 	bool "Hisilicon X5HD2 family" if ARCH_MULTI_V7
- 	select CACHE_L2X0
-diff --git a/arch/arm/mach-hisi/hisilicon.c b/arch/arm/mach-hisi/hisilicon.c
-index f37fb65..5b8c11f 100644
---- a/arch/arm/mach-hisi/hisilicon.c
-+++ b/arch/arm/mach-hisi/hisilicon.c
-@@ -65,3 +65,12 @@ static const char *hix5hd2_compat[] __initconst = {
- DT_MACHINE_START(HIX5HD2_DT, "Hisilicon HIX5HD2 (Flattened Device Tree)")
- 	.dt_compat	= hix5hd2_compat,
- MACHINE_END
++The HiP04 clock controller generates and supplies clock to various
++controllers within the HiP04 SoC.
 +
-+static const char *hip04_compat[] __initconst = {
-+	"hisilicon,hip04-d01",
-+	NULL,
-+};
++Required Properties:
 +
-+DT_MACHINE_START(HIP04, "Hisilicon HiP04 (Flattened Device Tree)")
-+	.dt_compat	= hip04_compat,
-+MACHINE_END
++- compatible: should be one of the following.
++  - "hisilicon,hip04-clock" - controller compatible with HiP04 SoC.
++
++- reg: physical base address of the controller and length of memory mapped
++  region.
++
++- #clock-cells: should be 1.
++
++
++Each clock is assigned an identifier and client nodes use this identifier
++to specify the clock which they consume.
++
++All these identifier could be found in <dt-bindings/clock/hip04-clock.h>.
 -- 
 1.9.1
