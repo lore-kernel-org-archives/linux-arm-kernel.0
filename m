@@ -1,37 +1,37 @@
-From: spk.linux@gmail.com (Sachin Kamat)
-Date: Mon, 28 Jul 2014 20:57:35 +0530
-Subject: [RESEND][PATCH 2/2] ARM: EXYNOS: Add exynos5260 PMU compatible
- string to DT match table
-In-Reply-To: <1406551080-14821-3-git-send-email-vikas.sajjan@samsung.com>
-References: <1406551080-14821-1-git-send-email-vikas.sajjan@samsung.com>
- <1406551080-14821-3-git-send-email-vikas.sajjan@samsung.com>
-Message-ID: <CAK5sBcEjgUAJEDHfFadaQ63j8W=Nggav1ZZzQjm-MdnAx7nJ4g@mail.gmail.com>
+From: andrew@lunn.ch (Andrew Lunn)
+Date: Mon, 28 Jul 2014 17:25:06 +0200
+Subject: [Patch V2 2/2] i2c: mv64xxx: Remove internal compatible string
+ from Documentation
+In-Reply-To: <6346429.sjQYojn1ot@wuerfel>
+References: <1406395238-29758-1-git-send-email-andrew@lunn.ch>
+ <5514427.elClhaDPhf@wuerfel> <20140728141217.GE2891@lunn.ch>
+ <6346429.sjQYojn1ot@wuerfel>
+Message-ID: <20140728152506.GF2891@lunn.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
- Hi Vikas,
+> > Add a call something like:
+> > 
+> > /*
+> >  * Return the soc device attributes for a given soc_dev. If soc_dev is NULL,
+> >  * the first device on the soc bus is returned.
+> >  */
+> > struct soc_device_attribute *soc_attribute_get(struct soc_device * soc_dev);
+> 
+> Interesting idea, yes.
 
-On Mon, Jul 28, 2014 at 6:08 PM, Vikas Sajjan <vikas.sajjan@samsung.com> wrote:
-> Exynos initialisation code now relies on obtaining the PMU address via
-> DT, so add the exynos5260 PMU compatible string to DT match table.
->
-> Signed-off-by: Vikas Sajjan <vikas.sajjan@samsung.com>
-> ---
->  arch/arm/mach-exynos/exynos.c |    1 +
->  1 file changed, 1 insertion(+)
->
-> diff --git a/arch/arm/mach-exynos/exynos.c b/arch/arm/mach-exynos/exynos.c
-> index df41bd1..e4f7270 100644
-> --- a/arch/arm/mach-exynos/exynos.c
-> +++ b/arch/arm/mach-exynos/exynos.c
-> @@ -253,6 +253,7 @@ static const struct of_device_id exynos_dt_pmu_match[] = {
->         { .compatible = "samsung,exynos4412-pmu" },
->         { .compatible = "samsung,exynos5250-pmu" },
->         { .compatible = "samsung,exynos5420-pmu" },
-> +       { .compatible = "samsung,exynos5260-pmu" },
+O.K, i will take a shot of implementing this sometime in the next few
+weeks. Bit busy at the moment.
+ 
+> There could also be a higher-level function that does a strcmp() in addition,
+> so that a driver can do some variation of
+> 
+> 	if (soc_name_is("Armada XP") && soc_revision_is("A0"))
 
-Same comment as previous patch regarding order.
+We don't translate into 'Marketing names'. We just turn the register
+values into a stringified number. So it would have to be something
+like:
 
--- 
-Regards,
-Sachin.
+	if (soc_name_is("7826") && soc_revision_is("1"))
+
+	Andrew
