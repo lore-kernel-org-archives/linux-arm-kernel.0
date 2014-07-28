@@ -1,58 +1,198 @@
-From: afaerber@suse.de (=?ISO-8859-15?Q?Andreas_F=E4rber?=)
-Date: Mon, 28 Jul 2014 13:43:02 +0200
-Subject: [PATCH v2 09/11] Documentation: devicetree: Fix ADI AXI SPDIF
- specification
-In-Reply-To: <20140725103905.GP17528@sirena.org.uk>
-References: <1406242820-20140-1-git-send-email-afaerber@suse.de>
- <1406242820-20140-10-git-send-email-afaerber@suse.de>
- <53D20A61.1050506@metafoo.de> <53D21066.8000905@monstr.eu>
- <20140725101815.GO17528@sirena.org.uk> <53D2324B.4070602@suse.de>
- <20140725103905.GP17528@sirena.org.uk>
-Message-ID: <53D63746.3000905@suse.de>
+From: jiri.prchal@aksignal.cz (Jiri Prchal)
+Date: Mon, 28 Jul 2014 13:43:40 +0200
+Subject: [PATCH] ARM: at91: spi: request all csgpio in spi probe
+Message-ID: <b033d16ec31d26a895726ee72ec89b43943dfbae.1406547656.git.jiri.prchal@aksignal.cz>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Mark,
+This fix problem with PA14 set as periph A left from ROMBOOT and need it
+to be set to gpio before spi bus communicate with chip on CS0 on other
+gpio. As I reported a week ago.
+Request all csgpios in spi_probe since cs depends on each other and must
+be all of them in right state before any communication on bus. They are
+part of bus, like miso, mosi, clk, not part of chips, they are defined
+in parent spi node, not in child chip node.
+Csgpio moved to atmel_spi struct as part of master bus.
 
-Am 25.07.2014 12:39, schrieb Mark Brown:
-> On Fri, Jul 25, 2014 at 12:32:43PM +0200, Andreas F?rber wrote:
-> 
->> I used scripts/get_maintainer.pl --nogit-fallback. If you were not
->> CC'ed and need to be, please submit a MAINTAINERS patch. :)
-> 
-> You need to think about what you're doing when you use get_maintainer,
-> it gives both false positives and false negatives.
-> 
->> Maybe this works for you?
->> https://patchwork.kernel.org/patch/4620191/
-> 
->> Otherwise I can resend with Ab/Rb.
-> 
-> Documentation/SubmittingPatches.
+Signed-off-by: Jiri Prchal <jiri.prchal@aksignal.cz>
+---
+ drivers/spi/spi-atmel.c | 68 +++++++++++++++++++++++++++++--------------------
+ 1 file changed, 41 insertions(+), 27 deletions(-)
 
-Not helpful here, nor is
-Documentation/devicetree/bindings/submitting-patches.txt. It's separate
-from code changes, sent via git-send-email, has a Sob, went to LKML and
-LAKML and DTML. I could add a Fixes: header and CC trivial for this
-one-line fix IIUC.
-Doesn't tell me which patches I should CC you on in the future though.
-Therefore my request to fix the false negative in MAINTAINERS so that me
-and other kernel newbies don't run into it again.
-
-I'll simply interpret your reply as "yes, please resend with
-broonie at kernel.org CC'ed" then.
-
-Regards,
-Andreas
-
+diff --git a/drivers/spi/spi-atmel.c b/drivers/spi/spi-atmel.c
+index 92a6f0d..1fb7bb9 100644
+--- a/drivers/spi/spi-atmel.c
++++ b/drivers/spi/spi-atmel.c
+@@ -22,11 +22,14 @@
+ #include <linux/platform_data/atmel.h>
+ #include <linux/platform_data/dma-atmel.h>
+ #include <linux/of.h>
++#include <linux/of_gpio.h>
+ 
+ #include <linux/io.h>
+ #include <linux/gpio.h>
+ #include <linux/pinctrl/consumer.h>
+ 
++#define DRIVER_NAME "atmel-spi"
++
+ /* SPI register offsets */
+ #define SPI_CR					0x0000
+ #define SPI_MR					0x0004
+@@ -242,11 +245,13 @@ struct atmel_spi {
+ 
+ 	bool			keep_cs;
+ 	bool			cs_active;
++
++	/* chip selects */
++	unsigned int		csgpio[];
+ };
+ 
+ /* Controller-specific per-slave state */
+ struct atmel_spi_device {
+-	unsigned int		npcs_pin;
+ 	u32			csr;
+ };
+ 
+@@ -312,7 +317,7 @@ static void cs_activate(struct atmel_spi *as, struct spi_device *spi)
+ 		}
+ 
+ 		mr = spi_readl(as, MR);
+-		gpio_set_value(asd->npcs_pin, active);
++		gpio_set_value(as->csgpio[spi->chip_select], active);
+ 	} else {
+ 		u32 cpol = (spi->mode & SPI_CPOL) ? SPI_BIT(CPOL) : 0;
+ 		int i;
+@@ -329,18 +334,16 @@ static void cs_activate(struct atmel_spi *as, struct spi_device *spi)
+ 		mr = spi_readl(as, MR);
+ 		mr = SPI_BFINS(PCS, ~(1 << spi->chip_select), mr);
+ 		if (spi->chip_select != 0)
+-			gpio_set_value(asd->npcs_pin, active);
++			gpio_set_value(as->csgpio[spi->chip_select], active);
+ 		spi_writel(as, MR, mr);
+ 	}
+ 
+ 	dev_dbg(&spi->dev, "activate %u%s, mr %08x\n",
+-			asd->npcs_pin, active ? " (high)" : "",
+-			mr);
++		as->csgpio[spi->chip_select], active ? " (high)" : "", mr);
+ }
+ 
+ static void cs_deactivate(struct atmel_spi *as, struct spi_device *spi)
+ {
+-	struct atmel_spi_device *asd = spi->controller_state;
+ 	unsigned active = spi->mode & SPI_CS_HIGH;
+ 	u32 mr;
+ 
+@@ -354,11 +357,10 @@ static void cs_deactivate(struct atmel_spi *as, struct spi_device *spi)
+ 	}
+ 
+ 	dev_dbg(&spi->dev, "DEactivate %u%s, mr %08x\n",
+-			asd->npcs_pin, active ? " (low)" : "",
+-			mr);
++		as->csgpio[spi->chip_select], active ? " (low)" : "", mr);
+ 
+ 	if (atmel_spi_is_v2(as) || spi->chip_select != 0)
+-		gpio_set_value(asd->npcs_pin, !active);
++		gpio_set_value(as->csgpio[spi->chip_select], !active);
+ }
+ 
+ static void atmel_spi_lock(struct atmel_spi *as) __acquires(&as->lock)
+@@ -989,8 +991,6 @@ static int atmel_spi_setup(struct spi_device *spi)
+ 	struct atmel_spi_device	*asd;
+ 	u32			csr;
+ 	unsigned int		bits = spi->bits_per_word;
+-	unsigned int		npcs_pin;
+-	int			ret;
+ 
+ 	as = spi_master_get_devdata(spi->master);
+ 
+@@ -1017,27 +1017,13 @@ static int atmel_spi_setup(struct spi_device *spi)
+ 	csr |= SPI_BF(DLYBS, 0);
+ 	csr |= SPI_BF(DLYBCT, 0);
+ 
+-	/* chipselect must have been muxed as GPIO (e.g. in board setup) */
+-	npcs_pin = (unsigned int)spi->controller_data;
+-
+-	if (gpio_is_valid(spi->cs_gpio))
+-		npcs_pin = spi->cs_gpio;
+-
+ 	asd = spi->controller_state;
+ 	if (!asd) {
+ 		asd = kzalloc(sizeof(struct atmel_spi_device), GFP_KERNEL);
+ 		if (!asd)
+ 			return -ENOMEM;
+ 
+-		ret = gpio_request(npcs_pin, dev_name(&spi->dev));
+-		if (ret) {
+-			kfree(asd);
+-			return ret;
+-		}
+-
+-		asd->npcs_pin = npcs_pin;
+ 		spi->controller_state = asd;
+-		gpio_direction_output(npcs_pin, !(spi->mode & SPI_CS_HIGH));
+ 	}
+ 
+ 	asd->csr = csr;
+@@ -1290,6 +1276,15 @@ static int atmel_spi_probe(struct platform_device *pdev)
+ 	int			ret;
+ 	struct spi_master	*master;
+ 	struct atmel_spi	*as;
++	struct device_node *np = pdev->dev.of_node;
++	int num_cs, i;
++
++	if (!np)
++		return -EINVAL;
++
++	num_cs = of_gpio_named_count(np, "cs-gpios");
++	if (num_cs < 0)
++		return num_cs;
+ 
+ 	/* Select default pin state */
+ 	pinctrl_pm_select_default_state(&pdev->dev);
+@@ -1308,7 +1303,7 @@ static int atmel_spi_probe(struct platform_device *pdev)
+ 
+ 	/* setup spi core then atmel-specific driver state */
+ 	ret = -ENOMEM;
+-	master = spi_alloc_master(&pdev->dev, sizeof(*as));
++	master = spi_alloc_master(&pdev->dev, sizeof(*as) + num_cs * sizeof(unsigned));
+ 	if (!master)
+ 		goto out_free;
+ 
+@@ -1317,7 +1312,7 @@ static int atmel_spi_probe(struct platform_device *pdev)
+ 	master->bits_per_word_mask = SPI_BPW_RANGE_MASK(8, 16);
+ 	master->dev.of_node = pdev->dev.of_node;
+ 	master->bus_num = pdev->id;
+-	master->num_chipselect = master->dev.of_node ? 0 : 4;
++	master->num_chipselect = num_cs;
+ 	master->setup = atmel_spi_setup;
+ 	master->transfer_one_message = atmel_spi_transfer_one_message;
+ 	master->cleanup = atmel_spi_cleanup;
+@@ -1325,6 +1320,25 @@ static int atmel_spi_probe(struct platform_device *pdev)
+ 
+ 	as = spi_master_get_devdata(master);
+ 
++	for (i = 0; i < master->num_chipselect; ++i) {
++		ret = of_get_named_gpio(np, "cs-gpios", i);
++		if (ret < 0) {
++			dev_err(&pdev->dev, "failed to get csgpio#%u (%d)\n",
++				i, ret);
++			goto out_free;
++		}
++		as->csgpio[i] = ret;
++		dev_dbg(&pdev->dev, "csgpio#%u = %u\n", i, as->csgpio[i]);
++		ret = devm_gpio_request_one(&pdev->dev, as->csgpio[i],
++					    GPIOF_OUT_INIT_HIGH, DRIVER_NAME);
++		if (ret < 0) {
++			dev_err(&pdev->dev,
++				"failed to configure csgpio#%u (%d)\n",
++				i, ret);
++			goto out_free;
++		}
++	}
++
+ 	/*
+ 	 * Scratch buffer is used for throwaway rx and tx data.
+ 	 * It's coherent to minimize dcache pollution.
 -- 
-SUSE LINUX Products GmbH, Maxfeldstr. 5, 90409 N?rnberg, Germany
-GF: Jeff Hawn, Jennifer Guild, Felix Imend?rffer; HRB 16746 AG N?rnberg
-
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: OpenPGP digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140728/844b92cc/attachment.sig>
+1.9.1
