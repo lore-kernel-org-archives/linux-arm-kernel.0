@@ -1,76 +1,71 @@
-From: fweisbec@gmail.com (Frederic Weisbecker)
-Date: Mon, 28 Jul 2014 21:22:13 +0200
-Subject: TIF_NOHZ can escape nonhz mask? (Was: [PATCH v3 6/8] x86: Split
- syscall_trace_enter into two phases)
-In-Reply-To: <20140728185803.GA24663@redhat.com>
-References: <cover.1405992946.git.luto@amacapital.net>
- <3f649f5658a163645e3ce15156176c325283762e.1405992946.git.luto@amacapital.net>
- <20140728173723.GA20993@redhat.com>
- <20140728185803.GA24663@redhat.com>
-Message-ID: <20140728192209.GA26017@localhost.localdomain>
+From: koct9i@gmail.com (Konstantin Khlebnikov)
+Date: Mon, 28 Jul 2014 23:29:39 +0400
+Subject: [PATCH 2/2] ARM: LPAE: reduce damage caused by idmap to virtual
+ memory layout
+In-Reply-To: <20140728191305.GA30282@n2100.arm.linux.org.uk>
+References: <20140722153623.25088.37742.stgit@buzz>
+ <20140722153635.25088.14197.stgit@buzz>
+ <20140728181456.GO15536@arm.com>
+ <CALYGNiNJDHfQm2yk067hh-Wywsb_Ki5AEE_sTMkYegJi9spSzw@mail.gmail.com>
+ <20140728184107.GR15536@arm.com>
+ <CALYGNiNaMMv9itJ_+cvPDn1_Yo4GTPQJ-Cy9zBzJzfaDLfkvmg@mail.gmail.com>
+ <20140728191305.GA30282@n2100.arm.linux.org.uk>
+Message-ID: <CALYGNiNVduTK8MXt8VJyiqdsB0mA_OnC0hLOB-WzgAEMZyu9sg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jul 28, 2014 at 08:58:03PM +0200, Oleg Nesterov wrote:
-> Off-topic, but...
-> 
-> On 07/28, Oleg Nesterov wrote:
-> >
-> > But we should always call user_exit() unconditionally?
-> 
-> Frederic, don't we need the patch below? In fact clear_() can be moved
-> under "if ()" too. and probably copy_process() should clear this flag...
-> 
-> Or. __context_tracking_task_switch() can simply do
-> 
-> 	 if (context_tracking_cpu_is_enabled())
-> 	 	set_tsk_thread_flag(next, TIF_NOHZ);
-> 	 else
-> 	 	clear_tsk_thread_flag(next, TIF_NOHZ);
-> 
-> and then we can forget about copy_process(). Or I am totally confused?
-> 
-> 
-> I am also wondering if we can extend user_return_notifier to handle
-> enter/exit and kill TIF_NOHZ.
-> 
-> Oleg.
-> 
-> --- x/kernel/context_tracking.c
-> +++ x/kernel/context_tracking.c
-> @@ -202,7 +202,8 @@ void __context_tracking_task_switch(stru
->  				    struct task_struct *next)
->  {
->  	clear_tsk_thread_flag(prev, TIF_NOHZ);
-> -	set_tsk_thread_flag(next, TIF_NOHZ);
-> +	if (context_tracking_cpu_is_enabled())
-> +		set_tsk_thread_flag(next, TIF_NOHZ);
->  }
->  
->  #ifdef CONFIG_CONTEXT_TRACKING_FORCE
+On Mon, Jul 28, 2014 at 11:13 PM, Russell King - ARM Linux
+<linux@arm.linux.org.uk> wrote:
+> On Mon, Jul 28, 2014 at 10:57:00PM +0400, Konstantin Khlebnikov wrote:
+>> Also I seen comment somewhere in the code which tells that idrmap pgd is
+>> always below 4gb which isn't quite true.
+>
+> "idmap" means "identity map".  It's a region which maps the same value of
+> physical address to the same value of virtual address.
+>
+> Since the virtual address space is limited to 4GB, there is /no way/ that
+> the physical address can be above 4GB, and it still be called an
+> "identity map".
+>
+> The reason for this is that code in the identity map will be fetched with
+> the MMU off.  While this code is running, it will enable the MMU using the
+> identity map page table pointer, and the CPU must see _no_ change in the
+> instructions/data fetched from that region.  It will then branch to the
+> kernel proper, and the kernel will then switch away from the identity page
+> table.
+>
+> Once the kernel has switched away from the identity page table, interrupts
+> and other exceptions can then be taken on the CPU - but not before.
+> Neither is it expected that the CPU will access any devices until it has
+> switched away from the identity page table.
+>
+> What this also means is that the code in the identity map must remain
+> visible in the low 4GB of physical address space.
 
-Unfortunately, as long as tasks can migrate in and out a context tracked CPU, we
-need to track all CPUs.
+Ok, before switching from identity mapping to normal mapping kernel must
+switch instruction pointer from physical address to virtual. It's a long jump
+out idmap code section to some normal kernel function.
+__secondary_switched in my case. And both physical source and virtual
+destination addresses must present in one same mapping (idmap).
 
-This is because there is always a small shift between hard and soft kernelspace
-boundaries.
+idmap pgd starts as copy of pgd from init_mm, it points to the same pmd pages.
+When it populates identical mapping for that special code section it allocates
+new pages from pmd entries (which covers 1Gb of vm layout) but only few of
+them are filled. In case 3/1GB split If idmap touches somehing above 3Gb it
+kills whole kernel vm layout and as result kernel cannot jump to any
+virtual address.
 
-Hard boundaries are the real strict boundaries: between "int", "iret" or faulting
-instructions for example.
-
-Soft boundaries are the place where we put our context tracking probes. They
-are just function calls and a distance between them and hard boundaries is inevitable.
-
-So here is a scenario where this is a problem: a task runs on CPU 0, passes the context
-tracking call before returning from a syscall to userspace, and gets an interrupt. The
-interrupt preempts the task and it moves to CPU 1. So it returns from preempt_schedule_irq()
-after which it is going to resume to userspace.
-
-In this scenario, if context tracking is only enabled on CPU 1, we have no way to know that
-the task is resuming to userspace, because we passed through the context tracking probe
-already and it was ignored on CPU 0.
-
-This might be hackbable by ensuring that irqs are disabled between context tracking
-calls and actual returns to userspace. It's a nightmare to audit on all archs though,
-and it makes the context tracking callers less flexible also that only solve the issue
-for irqs. Exception have a similar problem and we can't mask them.
+>
+>> Moreover, I had some experiments with
+>> mapping ram to random places in qemu and seen that kernel cannot boot if
+>> PHYS_OFFSET isn't alligned to 128mb which is strange.
+>
+> That is intentional.  PHYS_OFFSET has a number of restrictions, one of
+> them is indeed that the physical offset /will/ be aligned to 128MB.
+> That was decided after looking at the platforms we have and is now
+> fixed at that value with platform-breaking consequences if it needs
+> changing.
+>
+> --
+> FTTC broadband for 0.8mile line: currently at 9.5Mbps down 400kbps up
+> according to speedtest.net.
