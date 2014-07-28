@@ -1,41 +1,30 @@
-From: riel@redhat.com (Rik van Riel)
-Date: Mon, 28 Jul 2014 14:52:18 -0400
-Subject: [PATCH v4 00/12] sched: consolidation of cpu_capacity
-In-Reply-To: <1406569906-9763-1-git-send-email-vincent.guittot@linaro.org>
-References: <1406569906-9763-1-git-send-email-vincent.guittot@linaro.org>
-Message-ID: <53D69BE2.9010605@redhat.com>
+From: lauraa@codeaurora.org (Laura Abbott)
+Date: Mon, 28 Jul 2014 11:56:42 -0700
+Subject: [RESEND][PATCHv2 0/3] Fix for buggy u-boot memory banks
+In-Reply-To: <CAL_JsqJv2_UHxHGFF=nFKQRiEwfFtH_7PhMPS=W=APyzc-yiTQ@mail.gmail.com>
+References: <1405443816-29917-1-git-send-email-lauraa@codeaurora.org>
+ <CAL_JsqJv2_UHxHGFF=nFKQRiEwfFtH_7PhMPS=W=APyzc-yiTQ@mail.gmail.com>
+Message-ID: <53D69CEA.3060206@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
------BEGIN PGP SIGNED MESSAGE-----
-Hash: SHA1
-
-On 07/28/2014 01:51 PM, Vincent Guittot wrote:
-
-> The usage_avg_contrib is based on the current implementation of
-> the load avg tracking. I also have a version of the
-> usage_avg_contrib that is based on the new implementation [3] but
-> haven't provide the patches and results as [3] is still under
-> review. I can provide change above [3] to change how 
-> usage_avg_contrib is computed and adapt to new mecanism.
+On 7/26/2014 2:20 PM, Rob Herring wrote:
+> On Tue, Jul 15, 2014 at 12:03 PM, Laura Abbott <lauraa@codeaurora.org> wrote:
+>> Hi,
+>>
+>> This is a resend of the series to fix the uboot bug exposed by the removal
+>> of meminfo. I haven't gotten any acks though.
 > 
-> TODO: manage conflict with the next version of [4]
+> Is the bug with ATAGs that get converted to DT in the decompressor or
+> u-boot puts the wrong info in DT directly?
+> 
 
-FWIW, your series makes sense to me, and only the first hunk of patch
-8/12 looks like it would conflict with my patches, in that your patch
-changes code that will only be reached in exceptional circumstances.
+I believe it's u-boot putting the wrong info in DT directly. See
+http://lists.infradead.org/pipermail/linux-arm-kernel/2014-June/266782.html
 
-- -- 
-All rights reversed
------BEGIN PGP SIGNATURE-----
-Version: GnuPG v1
-Comment: Using GnuPG with Thunderbird - http://www.enigmail.net/
+Thanks,
+Laura
 
-iQEcBAEBAgAGBQJT1pviAAoJEM553pKExN6D4IoH/3Ou8H8kM5zhgDc4sDY5h+0F
-qFDZIwdCWtKL36QfuZXIS/SXzikzs8XjxG7PIDj/sIEcpzs5jzGvlqAr/nTbQGlo
-2ONnXobwSYSPbf8tEKrX4sdPS4YH1sd8+DgHC9TdYOgnWhdjpvfrwA9vFHmsZZvC
-SxlLKCwqdWgtQPCJiGGJGdQOaB+OsNAJcoyo8OyokdOUrpMX30bfLT+8TiAiB/zS
-uKrjzj3yZbrd/CRgpTSYopZgtzxHciZLLuIAurw7BJrUPL8Q1SL1HQ5eC5q/eS07
-hXJrD6/o2DDfWoyeT2eDdJ9QkZKxT3vDKqC4WyVYn/2JZMzD5C+PY3XmQk7uYbU=
-=zV+U
------END PGP SIGNATURE-----
+-- 
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+hosted by The Linux Foundation
