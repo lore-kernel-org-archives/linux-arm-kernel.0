@@ -1,85 +1,130 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Mon, 28 Jul 2014 14:42:08 +0200
-Subject: [RFC 0/8] Audio clocks for sun[457]i, SoC revision detection
-In-Reply-To: <1406519386-4902-1-git-send-email-emilio@elopez.com.ar>
-References: <1406519386-4902-1-git-send-email-emilio@elopez.com.ar>
-Message-ID: <20140728124208.GH3952@lukather>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Mon, 28 Jul 2014 14:47:56 +0200
+Subject: [PATCH] spi/pxa2xx-pci: Enable DMA binding through device name
+In-Reply-To: <1406545580.8530.28.camel@smile.fi.intel.com>
+References: <1406196111-22861-1-git-send-email-hock.leong.kweh@intel.com>
+ <5237362.DJsH7MtqlU@wuerfel> <1406545580.8530.28.camel@smile.fi.intel.com>
+Message-ID: <5712887.nI9VbeNx2r@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Emilio,
-
-On Mon, Jul 28, 2014 at 12:49:38AM -0300, Emilio L?pez wrote:
-> Hi everyone,
+On Monday 28 July 2014 14:06:20 Andy Shevchenko wrote:
+> On Fri, 2014-07-25 at 17:55 +0200, Arnd Bergmann wrote:
+> > On Friday 25 July 2014 13:45:47 Andy Shevchenko wrote:
+> > > On Fri, 2014-07-25 at 12:19 +0200, Arnd Bergmann wrote:
+> > > > On Friday 25 July 2014 12:55:59 Mika Westerberg wrote:
+> > > > > On Fri, Jul 25, 2014 at 12:07:14PM +0300, Mika Westerberg wrote:
+> > > > > > On Fri, Jul 25, 2014 at 10:38:36AM +0200, Arnd Bergmann wrote:
+> > > > > > > On Friday 25 July 2014 11:22:49 Mika Westerberg wrote:
+> > > 
+> > > []
+> > > 
+> > > > > Something like this?
+> > > 
+> > > Arnd, this dependency to certain DMA driver looks really bad.
+> > > 
+> > > If we go that way, can we split that part to [another] module and make
+> > > it dependent to DW_DMAC?
+> > 
+> > I don't see what you gain from that. The PC ID will tell you which DMA
+> > engine is being used. The driver already hardcodes a slave_id based on
+> > the PCI ID today, and the 
 > 
-> This series adds support for PLL2 on A10 rev B and higher, A10S, A13 
-> and A20. It also includes support for the codec clock as well as
-> module 1 clocks, used in the audio blocks. There's also two patches
-> fixing sparse warnings on the driver.
+> "...and the..."?
 
-And where is the SoC revision detection you were talking about ? :)
+Sorry for missing that.
 
-> I'm sending this as RFC as this does not support the A10 rev A PLL2
-> clock. It seems from the Allwinner code that rev A has a different
-> register layout, and is programmed with different values. Unfortunately
-> there's no mention of this on the User Manual, so I'm left to guess
-> for the most part.
+the slave ID only makes sense in combination with the master device
+it is used in, so the dependency exists already.
 
-Do you have any reference pointing this out?
-
-> The clock code is not the only part in where rev A is special cased;
-> there's some register writes just for it on the analog audio driver
-> as well, so we probably need a way to support this in a generic way.
+> > > Or shall we introduce a dmaengine type field in the platform data and
+> > > dynamically choose proper filter-whatever-function to get the channel?
+> > 
+> > We already have an interface for this, in the form of
+> > dma_request_slave_channel(), which takes a string identifier that
+> > is used to look up all that information in either device tree or
+> > ACPI. It wouldn't be unreasonable to add a third path in there
+> > to handle hardcoded platform devices, but that's a lot of work.
+> > Note that you still need to encode a reference to the dma engine
+> > in some way to do this right. The current code (with or without Mika's
+> > patch) will break as soon as you have multiple DMA engine devices.
 > 
-> So, how should we proceed with this? Here are some ideas:
->   * Make different device trees with different compatibles. Pros:
->     not much extra code. Cons: we don't know the SoC revision on
->     devices and/or they may change during the product lifecycle.
+> What about to keep PCI case still valid? We can pass struct pci_dev (or
+> actual struct device) of DMA controller to filter proper device.
 
-Which makes it a pretty poor solution :)
+Yes, that would be best. IIRC you have a single PCI device that instantiates
+both the SPI and the DMA engine as subdevices (I haven't looked at the
+code again), so that information would be readily available.
+ 
+> > > > What I think you got wrong here (by following my bad advice) is the master
+> > > > number. Looking at the code for dw_dma, I think src_master needs to be '1'
+> > > > for your driver.
+> > > 
+> > > On some SoCs we have up to 4 masters. It's blurry for me how the SPI
+> > > should choose those masters. Currently it works fine, but I suspect
+> > > there are [might be] performance issues.
+> > 
+> > I think it works because the dw-dma defaults to the values used by
+> > the specific implementation in your hardware.
+> 
+> 
+> 
+> > > What about AVR32 case? We have to fix drivers as well there.
+> 
+> > which ones?
+> 
+> arch/avr32/mach-at32ap/at32ap700x.c:1332:at32_add_device_mci
+> 
+> It seems opaque for me if it's used anywhere.
 
->   * Use different compatibles and change them on U-Boot. Pros: it
->     keeps Linux simple. Cons: dependency on a newer bootloader.
+It seems correct to me. This is the filter function used by atmel_mci:
 
-Which is a no-go.
+static bool atmci_filter(struct dma_chan *chan, void *pdata)
+{
+        struct mci_platform_data *sl_pdata = pdata;
+        struct mci_dma_data *sl;
 
->   * Use different compatibles and change them on early boot.
->     Pros: compatibility with existing bootloaders. Cons: Need
->     code in Linux to fixup the DT
+        if (!sl_pdata)
+                return false;
 
-Plus, we don't need to care about having different DT, and let the
-user indentify which revision it has. I'm very much in favor of this
-solution. And it works for all the boards.
+        sl = sl_pdata->dma_slave;
+        if (sl && find_slave_dev(sl) == chan->device->dev) {
+                chan->private = slave_data_ptr(sl);
+                return true;
+        } else {
+                return false;
+        }
+}
 
->   * Have a function "int sunxi_soc_revision(void)" that drivers
->     can use to check which SoC revision they're running on.
->     Pros: no DT fixup. Cons: ugly and less portable if the driver
->     ever needs to run on a non-sunxi platform.
+It sets the dw_dma_slave information from  slave_data_ptr(sl) here,
+and does not attempt to set a slave_id at all, the slave_config
+call only sets the required fields.
 
-Yep.
+Do you still see a problem here?
 
-> I'd like to hear everyone's thoughts on this. From what I've seen
-> around on LAKML, it seems the last option is the one in widest use, but
-> I'd appreciate a confirmation.
+> Actually the defaults came from original driver for AVR32 case.
+> 
+> Regarding to DW DMA databook the AHB masters could be used each by any
+> channel, though it depends on what AHB layer is bound to (and
+> corresponding peripheral device).
+> 
+> Thus, like I said we might have the [minor] performance issues if we
+> use, for example, two out of four masters.
 
-Mostly for historical reason I'd say. All the newer platforms seem to
-handle this by fixing up the DT at the early stages.
+I don't see how: We have four cases that I am aware of, and all seem
+to handle this right:
 
-> If this is the way forward, where should the code live in? The SoC
-> detection is done by reading a register on the timer block on sun4i,
-> and SID on sun5i.
+a) request line and masters are all configured from device-tree.
+b) request line is configured from ACPI, masters are autoconfigured
+c) request line and masters are all configured from avr32/arm32
+   platform data.
+d) request line and masters are all configured from Bay Trail
+   PCI ID (Implemented by Mika's patch)
 
-In mach-sunxi I'd say. I've started working on it a few weeks back, in
-order to use soc-device too, but it's pretty much wip for now.
+The ACPI case could be extended if we ever get an ACPI based system
+that has more than two masters.
+In the other cases, the same source of information that configures
+the request line also configures the masters, so it's up to the
+system integration to pick the best setting.
 
--- 
-Maxime Ripard, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140728/1a7acfd7/attachment-0001.sig>
+	Arnd
