@@ -1,34 +1,52 @@
-From: cw00.choi@samsung.com (Chanwoo Choi)
-Date: Mon, 28 Jul 2014 20:18:02 +0900
-Subject: [PATCH 2/2] iio: adc: exynos_adc: Add support for S3C24xx ADC
-In-Reply-To: <5954793.q4YDWmuNDB@wuerfel>
-References: <1405995074-3271-1-git-send-email-cw00.choi@samsung.com>
- <1405995074-3271-3-git-send-email-cw00.choi@samsung.com>
- <5954793.q4YDWmuNDB@wuerfel>
-Message-ID: <53D6316A.2010007@samsung.com>
+From: benoitm@perenite.com (Benoit Masson)
+Date: Mon, 28 Jul 2014 13:17:56 +0200
+Subject: [PATCH 2/2] ARM: mvebu: Added dts defintion for Lenovo Iomega
+ ix4-300d NAS
+In-Reply-To: <6028388.mjACYPxFta@wuerfel>
+References: <1406418436-61452-1-git-send-email-yahoo@perenite.com>
+ <5442226.1WCY4fjGCy@wuerfel>
+ <78788908-DDB5-46F8-83C1-FAE312D7BFB2@perenite.com>
+ <6028388.mjACYPxFta@wuerfel>
+Message-ID: <78E68BC6-1D2C-4B75-93BA-5414A358B90D@perenite.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/22/2014 09:59 PM, Arnd Bergmann wrote:
-> On Tuesday 22 July 2014 11:11:14 Chanwoo Choi wrote:
->> This patch add support for s3c2410/s3c2416/s3c2440/s3c2443 ADC. The s3c24xx
->> is alomost same as ADCv1. But, There are a little difference as following:
->> - ADCMUX register address to select channel
->> - ADCDAT mask (10bit or 12bit ADC resolution according to SoC version)
->>
->> Signed-off-by: Chanwoo Choi <cw00.choi@samsung.com>
->> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
->>
-> 
-> While looking at the driver again to see if the touchscreen patch needs
-> an update for this, I noticed that the s3c24xx variants don't have the
-> ADC_V1_INTCLR and ADC_V1_CLRINTPNDNUP registers, so I assume your patch
-> will have to be updated not to acknowledge the interrupts.
-> 
-> It's possible that writing to the missing registers is harmless though and
-> that you don't need that change.
 
-OK, I'll remove the function pointer of clear_irq for s3c24xx.
+Le 28 juil. 2014 ? 13:02, Arnd Bergmann <arnd@arndb.de> a ?crit :
 
-Best Regards,
-Chanwoo Choi
+> On Monday 28 July 2014 12:50:47 Benoit Masson wrote:
+>>> 
+>>> It should still list both "marvell,mv78230-i2c" and "marvell,mv64xxx-i2c",
+>>> as the generic name may not be enough to describe the register layout
+>>> correctly.
+>> 
+>> I tend to disagree since the dts include the armada-xp.dtsi, which already declare
+>> 
+>> "i2c0: i2c at 11000 {
+>>                                compatible = "marvell,mv78230-i2c", "marvell,mv64xxx-i2c";
+>>                                reg = <0x11000 0x100>;
+>>                        };
+>> "
+>> 
+>> I tested the dts on the device and it does inherits the i2c declaration, did I miss something here ?
+>> 
+> 
+> Inheriting from armada-xp.dtsi is fine, but if you manually set
+> "marvell,mv64xxx-i2c", that will override the old setting
+> and drop the "marvell,mv78230-i2c" part, which is bad because
+> it may break things later if it turns out that the mv78230
+> variant is not completely compatible with the old
+> mv64xxx variant.
+
+Ok then does this mean I can simply remove the "compatible" line to only inherits from armada-xp-dtsi ?
+
+"i2c at 11000 {
+                                clock-frequency = <400000>;
+                                status = "okay";
+"
+
+Would this be enough ?
+
+Benoit
+> 
+> 	Arnd
