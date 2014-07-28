@@ -1,46 +1,38 @@
 From: balbi@ti.com (Felipe Balbi)
-Date: Mon, 28 Jul 2014 16:16:22 -0500
-Subject: [PATCH 34/35] irq: intc: remove unnecesary of_address_to_resource()
- call
+Date: Mon, 28 Jul 2014 16:16:20 -0500
+Subject: [PATCH 32/35] irq: intc: minor improvement to omap_irq_pending()
 In-Reply-To: <1406582183-696-1-git-send-email-balbi@ti.com>
 References: <1406582183-696-1-git-send-email-balbi@ti.com>
-Message-ID: <1406582183-696-35-git-send-email-balbi@ti.com>
+Message-ID: <1406582183-696-33-git-send-email-balbi@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-of_iomap(), which is called from omap_init_irq_of(),
-already takes care of making sure we have a valid
-resource to deal with. Because of that, we can
-safely remove our explicit call to of_address_to_resource().
+We already hold the number of Pending registers
+in omap_nr_pending. Let's use that instead.
 
 Signed-off-by: Felipe Balbi <balbi@ti.com>
 ---
- drivers/irqchip/irq-omap-intc.c | 6 ------
- 1 file changed, 6 deletions(-)
+ drivers/irqchip/irq-omap-intc.c | 7 +++----
+ 1 file changed, 3 insertions(+), 4 deletions(-)
 
 diff --git a/drivers/irqchip/irq-omap-intc.c b/drivers/irqchip/irq-omap-intc.c
-index 342e0ab..371ff5e 100644
+index 30f5fa0..c9ba502 100644
 --- a/drivers/irqchip/irq-omap-intc.c
 +++ b/drivers/irqchip/irq-omap-intc.c
-@@ -363,7 +363,6 @@ void __init ti81xx_init_irq(void)
- static int __init intc_of_init(struct device_node *node,
- 			     struct device_node *parent)
+@@ -175,11 +175,10 @@ static void __init omap_irq_soft_reset(void)
+ 
+ int omap_irq_pending(void)
  {
--	struct resource res;
- 	int ret;
+-	int irq;
++	int i;
  
- 	omap_nr_pending = 3;
-@@ -372,11 +371,6 @@ static int __init intc_of_init(struct device_node *node,
- 	if (WARN_ON(!node))
- 		return -ENODEV;
- 
--	if (of_address_to_resource(node, 0, &res)) {
--		WARN(1, "unable to get intc registers\n");
--		return -EINVAL;
--	}
--
- 	if (of_device_is_compatible(node, "ti,am33xx-intc")) {
- 		omap_nr_irqs = 128;
- 		omap_nr_pending = 4;
+-	for (irq = 0; irq < omap_nr_irqs; irq += 32)
+-		if (intc_readl(INTC_PENDING_IRQ0 +
+-					((irq >> 5) << 5)))
++	for (i = 0; i < omap_nr_pending; i++)
++		if (intc_readl(INTC_PENDING_IRQ0 + (0x20 * i)))
+ 			return 1;
+ 	return 0;
+ }
 -- 
 2.0.1.563.g66f467c
