@@ -1,64 +1,79 @@
-From: riel@redhat.com (Rik van Riel)
-Date: Mon, 28 Jul 2014 14:43:10 -0400
-Subject: [PATCH v4 08/12] sched: move cfs task on a CPU with higher
- capacity
-In-Reply-To: <1406569906-9763-9-git-send-email-vincent.guittot@linaro.org>
-References: <1406569906-9763-1-git-send-email-vincent.guittot@linaro.org>
- <1406569906-9763-9-git-send-email-vincent.guittot@linaro.org>
-Message-ID: <53D699BE.90208@redhat.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Mon, 28 Jul 2014 20:06:09 +0100
+Subject: [PATCH 2/2] ARM: LPAE: reduce damage caused by idmap to virtual
+ memory layout
+In-Reply-To: <CALYGNiNaMMv9itJ_+cvPDn1_Yo4GTPQJ-Cy9zBzJzfaDLfkvmg@mail.gmail.com>
+References: <20140722153623.25088.37742.stgit@buzz>
+ <20140722153635.25088.14197.stgit@buzz>
+ <20140728181456.GO15536@arm.com>
+ <CALYGNiNJDHfQm2yk067hh-Wywsb_Ki5AEE_sTMkYegJi9spSzw@mail.gmail.com>
+ <20140728184107.GR15536@arm.com>
+ <CALYGNiNaMMv9itJ_+cvPDn1_Yo4GTPQJ-Cy9zBzJzfaDLfkvmg@mail.gmail.com>
+Message-ID: <20140728190609.GV15536@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
------BEGIN PGP SIGNED MESSAGE-----
-Hash: SHA1
-
-On 07/28/2014 01:51 PM, Vincent Guittot wrote:
-> If the CPU is used for handling lot of IRQs, trig a load balance to
-> check if it's worth moving its tasks on another CPU that has more
-> capacity.
+On Mon, Jul 28, 2014 at 07:57:00PM +0100, Konstantin Khlebnikov wrote:
+> On Mon, Jul 28, 2014 at 10:41 PM, Will Deacon <will.deacon@arm.com> wrote:
+> > On Mon, Jul 28, 2014 at 07:25:14PM +0100, Konstantin Khlebnikov wrote:
+> >> On Mon, Jul 28, 2014 at 10:14 PM, Will Deacon <will.deacon@arm.com> wrote:
+> >> > On Tue, Jul 22, 2014 at 04:36:35PM +0100, Konstantin Khlebnikov wrote:
+> >> >> idmap layout combines both phisical and virtual addresses.
+> >> >> Everything works fine if ram physically lays below PAGE_OFFSET.
+> >> >> Otherwise idmap starts punching huge holes in virtual memory layout.
+> >> >> It maps ram by 2MiB sections, but when it allocates new pmd page it
+> >> >> cuts 1GiB at once.
+> >> >>
+> >> >> This patch makes a copy of all affected pmds from init_mm.
+> >> >> Only few (usually one) 2MiB sections will be lost.
+> >> >> This is not eliminates problem but makes it 512 times less likely.
+> >> >
+> >> > I'm struggling to understand your commit message, but making a problem `512
+> >> > times less likely' does sound like a bit of a hack to me. Can't we fix this
+> >> > properly instead?
+> >>
+> >> Yep, my comment sucks.
+> >>
+> >> Usually idmap looks like this:
+> >>
+> >> |0x00000000 -- <chunk of physical memory in identical mapping > --- |
+> >> TASK_SIZE -- <kernel space vm layoyt> --- 0xFFFFFFFF |
+> >>
+> >> But when that physical memory chunk starts from 0xE8000000 or even
+> >> 0xF2000000 evenything becomes very complicated.
+> >
+> > Why? As long as we don't clobber the kernel text (which would require
+> > PHYS_OFFSET to be at a really weird alignment and very close to
+> > PAGE_OFFSET), then you should be alright. Sure, you'll lose things like your
+> > stack and the vmalloc area etc, but you're running in the idmap, so don't
+> > use those things.
 > 
-> As a sidenote, this will note generate more spurious ilb because we
-> already trig an ilb if there is more than 1 busy cpu. If this cpu
-> is the only one that has a task, we will trig the ilb once for
-> migrating the task.
+> Yep, we have piece of hardware with really weird aligned PHYS_OFFSET,
+> mostly all ram is above 4gb and we was lucky enough to get into the trouble.
 > 
-> The nohz_kick_needed function has been cleaned up a bit while
-> adding the new test
+> It seems keystone has all memory above 4gb but small piece is mapped below
+> especially for booting. I suppose it's below PAGE_OFFSET so Cyril
+> hadn't seen that problem.
+
+Sure, I remember when the keystone support was merged. There's a low alias
+of memory which isn't I/O coherent, so when we enable the MMU we rewrite the
+page tables to use the high alias (which is also broken, as I pointed out on
+the list today).
+
+> Also I seen comment somewhere in the code which tells that idrmap pgd is
+> always below 4gb which isn't quite true. Moreover, I had some experiments with
+> mapping ram to random places in qemu and seen that kernel cannot boot if
+> PHYS_OFFSET isn't alligned to 128mb which is strange.
+> So, it seems there is plenty bugs anound.
 > 
-> Signed-off-by: Vincent Guittot <vincent.guittot@linaro.org> --- 
-> kernel/sched/fair.c | 69
-> +++++++++++++++++++++++++++++++++++++---------------- 1 file
-> changed, 49 insertions(+), 20 deletions(-)
+> >
+> > soft_restart is an example of code that deals with these issues. Which code
+> > is causing you problems?
 > 
-> diff --git a/kernel/sched/fair.c b/kernel/sched/fair.c index
-> 6843016..1cde8dd 100644 --- a/kernel/sched/fair.c +++
-> b/kernel/sched/fair.c @@ -5969,6 +5969,14 @@ static bool
-> update_sd_pick_busiest(struct lb_env *env, return true; }
-> 
-> +	/* +	 * The group capacity is reduced probably because of
-> activity from other +	 * sched class or interrupts which use part
-> of the available capacity +	 */ +	if ((sg->sgc->capacity_orig *
-> 100) > (sgs->group_capacity * +				env->sd->imbalance_pct)) +
-> return true; + return false; }
+> That was booting of secondary cpus, all of them.
 
-Isn't this already reflected in avg_load, by having avg_load increase
-due to the capacity decreasing when a cpu is busy with non-CFS loads?
+Ok. I think we need more specifics to progress with this patch. It's not
+clear to me what's going wrong or why your platform is causing the issues
+you're seeing.
 
-Also, this part of update_sd_pick_busiest will not be reached in the
-!SD_ASYM_PACKING case once my patch is applied, so this is a small
-conflict between our series :)
-
-- -- 
-All rights reversed
------BEGIN PGP SIGNATURE-----
-Version: GnuPG v1
-Comment: Using GnuPG with Thunderbird - http://www.enigmail.net/
-
-iQEcBAEBAgAGBQJT1pm+AAoJEM553pKExN6DysEH/1/s2dY0EWM4mVctRAcyASc+
-qD5yQgDZEbnIzuUldtTRNwlAxHSaexLI7oF418RAaUV3oue+OQIesJPhKDVrR2+J
-fLo4fhtutuF1SHJ5Zo2fiGBIUI+GuLspT2fXiG2UxXQXtYioVdDeB+cjo6H3xQ3D
-R2hR+WeSsLznwFhRnufI1neleIRpqk/Nw1wfdXCyE03kM478rCQjlygMUx6eqURn
-jblr7GY7jmtzhYFPY9qnE0za/WHWUVAf4RXSjCcuYwZqdhbzmHPKpJyiC3cl9XGz
-kNzAjqVzvSyCBblaOnJfrRyCWmBdatp5eZQCzZK9/l+YpbkkzQJNlUMAAVV1eNw=
-=qD2A
------END PGP SIGNATURE-----
+Will
