@@ -1,37 +1,196 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Mon, 28 Jul 2014 12:06:26 -0600
-Subject: [PATCH] MAINTAINERS: Update Tegra Git URL
-Message-ID: <1406570786-10432-1-git-send-email-swarren@wwwdotorg.org>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Mon, 28 Jul 2014 19:06:09 +0100
+Subject: [PATCH v15 07/12] ARM: dts: append hip04 dts
+In-Reply-To: <1406555876-11989-8-git-send-email-haojian.zhuang@linaro.org>
+References: <1406555876-11989-1-git-send-email-haojian.zhuang@linaro.org>
+ <1406555876-11989-8-git-send-email-haojian.zhuang@linaro.org>
+Message-ID: <20140728180609.GE2576@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Andreas F?rber <afaerber@suse.de>
+On Mon, Jul 28, 2014 at 02:57:51PM +0100, Haojian Zhuang wrote:
+> Add hip04-d01.dts & hip04.dtsi for hip04 SoC platform.
+> 
+> Signed-off-by: Haojian Zhuang <haojian.zhuang@linaro.org>
+> ---
+>  arch/arm/boot/dts/Makefile      |   1 +
+>  arch/arm/boot/dts/hip04-d01.dts |  39 ++++++
+>  arch/arm/boot/dts/hip04.dtsi    | 267 ++++++++++++++++++++++++++++++++++++++++
+>  3 files changed, 307 insertions(+)
+>  create mode 100644 arch/arm/boot/dts/hip04-d01.dts
+>  create mode 100644 arch/arm/boot/dts/hip04.dtsi
+> 
+> diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
+> index 721525e..6587bbf 100644
+> --- a/arch/arm/boot/dts/Makefile
+> +++ b/arch/arm/boot/dts/Makefile
+> @@ -86,6 +86,7 @@ dtb-$(CONFIG_ARCH_HI3xxx) += hi3620-hi4511.dtb
+>  dtb-$(CONFIG_ARCH_HIX5HD2) += hix5hd2-dkb.dtb
+>  dtb-$(CONFIG_ARCH_HIGHBANK) += highbank.dtb \
+>         ecx-2000.dtb
+> +dtb-$(CONFIG_ARCH_HIP04) += hip04-d01.dtb
+>  dtb-$(CONFIG_ARCH_INTEGRATOR) += integratorap.dtb \
+>         integratorcp.dtb
+>  dtb-$(CONFIG_ARCH_KEYSTONE) += k2hk-evm.dtb \
+> diff --git a/arch/arm/boot/dts/hip04-d01.dts b/arch/arm/boot/dts/hip04-d01.dts
+> new file mode 100644
+> index 0000000..661c8e5
+> --- /dev/null
+> +++ b/arch/arm/boot/dts/hip04-d01.dts
+> @@ -0,0 +1,39 @@
+> +/*
+> + *  Copyright (C) 2013-2014 Linaro Ltd.
+> + *  Author: Haojian Zhuang <haojian.zhuang@linaro.org>
+> + *
+> + *  This program is free software; you can redistribute it and/or modify
+> + *  it under the terms of the GNU General Public License version 2 as
+> + *  publishhed by the Free Software Foundation.
+> + */
+> +
+> +/dts-v1/;
+> +
+> +/* For bootwrapper */
+> +/memreserve/ 0x10c00000 0x00010000;
 
-swarren/linux-tegra.git is a stale location; it has moved to
-tegra/linux.git.
+How exactly is this bootwrapper used? Is the kernel compiled into it?
 
-While the git protocol re-directs to the new location, HTTP does not.
-Besides, MAINTAINERS should contain the canonical URL.
+It might make more sense for the wrapper build system to inject
+bootwrapper-related properties. Then the DTB is less likely to
+amalgamate hacks to workaround differences between versions, and can be
+used on systems without a wrapper without throwing away some memory.
 
-Signed-off-by: Andreas F?rber <afaerber@suse.de>
-[swarren, updated commit message]
-Signed-off-by: Stephen Warren <swarren@nvidia.com>
----
- MAINTAINERS | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+> +
+> +#include "hip04.dtsi"
+> +
+> +/ {
+> +       /* memory bus is 64-bit */
+> +       #address-cells = <2>;
+> +       #size-cells = <2>;
+> +       model = "Hisilicon D01 Development Board";
+> +       compatible = "hisilicon,hip04-d01";
+> +
+> +       memory at 00000000,10000000 {
+> +               device_type = "memory";
+> +               reg = <0x00000000 0x10000000 0x00000000 0xc0000000>;
+> +       };
+> +
+> +       memory at 00000004,c0000000 {
+> +               device_type = "memory";
+> +               reg = <0x00000004 0xc0000000 0x00000003 0x40000000>;
+> +       };
 
-diff --git a/MAINTAINERS b/MAINTAINERS
-index 86efa7e213c2..dcda974bd7ec 100644
---- a/MAINTAINERS
-+++ b/MAINTAINERS
-@@ -8922,7 +8922,7 @@ M:	Stephen Warren <swarren@wwwdotorg.org>
- M:	Thierry Reding <thierry.reding@gmail.com>
- L:	linux-tegra at vger.kernel.org
- Q:	http://patchwork.ozlabs.org/project/linux-tegra/list/
--T:	git git://git.kernel.org/pub/scm/linux/kernel/git/swarren/linux-tegra.git
-+T:	git git://git.kernel.org/pub/scm/linux/kernel/git/tegra/linux.git
- S:	Supported
- N:	[^a-z]tegra
- 
--- 
-1.9.1
+You can fold these into a single node.
+
+> +
+> +       soc {
+> +               uart0: uart at 4007000 {
+> +                       status = "ok";
+> +               };
+> +       };
+> +};
+> diff --git a/arch/arm/boot/dts/hip04.dtsi b/arch/arm/boot/dts/hip04.dtsi
+> new file mode 100644
+> index 0000000..30942be
+> --- /dev/null
+> +++ b/arch/arm/boot/dts/hip04.dtsi
+> @@ -0,0 +1,267 @@
+> +/*
+> + * Hisilicon Ltd. HiP04 SoC
+> + *
+> + * Copyright (C) 2013-2014 Hisilicon Ltd.
+> + * Copyright (C) 2013-2014 Linaro Ltd.
+> + *
+> + * Author: Haojian Zhuang <haojian.zhuang@linaro.org>
+> + *
+> + * This program is free software; you can redistribute it and/or modify
+> + * it under the terms of the GNU General Public License version 2 as
+> + * publishhed by the Free Software Foundation.
+
+s/hh/h/
+
+[...]
+
+> +       clock: clock {
+> +               compatible = "hisilicon,hip04-clock";
+> +               /* dummy register.
+> +                * Don't need to access clock registers since they're
+> +                * configured in firmware already.
+> +                */
+> +               reg = <0 0 0 0x1000>;
+
+Huh? Whether or not you need to access the registers should be up to the
+kernel, not the DT.
+
+Why can the kernel not access these? This sounds like a hack.
+
+> +               #clock-cells = <1>;
+> +       };
+> +
+> +       timer {
+> +               compatible = "arm,armv7-timer";
+> +               interrupt-parent = <&gic>;
+> +               interrupts = <1 13 0xf08>,
+> +                            <1 14 0xf08>,
+> +                            <1 11 0xf08>,
+> +                            <1 10 0xf08>;
+> +       };
+> +
+> +       soc {
+> +               /* It's a 32-bit SoC. */
+> +               #address-cells = <1>;
+> +               #size-cells = <1>;
+> +               compatible = "simple-bus";
+> +               interrupt-parent = <&gic>;
+> +               ranges = <0 0 0xe0000000 0x10000000>;
+> +
+> +               gic: interrupt-controller at c01000 {
+> +                       compatible = "hisilicon,hip04-gic";
+> +                       #interrupt-cells = <3>;
+> +                       #address-cells = <0>;
+> +                       interrupt-controller;
+> +                       interrupts = <1 9 0xf04>;
+> +
+> +                       reg = <0xc01000 0x1000>, <0xc02000 0x1000>,
+> +                             <0xc04000 0x2000>, <0xc06000 0x2000>;
+
+Please place these on separate lines. It's easier to read and will match
+what you've done for every other node.
+
+> +               };
+> +
+> +               sysctrl: sysctrl {
+> +                       compatible = "hisilicon,sysctrl";
+> +                       reg = <0x3e00000 0x00100000>;
+> +                       relocation-entry = <0xe0000100>;
+> +                       relocation-size = <0x1000>;
+> +                       bootwrapper-phys = <0x10c00000>;
+> +                       bootwrapper-size = <0x10000>;
+> +                       bootwrapper-magic = <0xa5a5a5a5>;
+
+Are these absolute addresses, or translated per ranges above?
+
+Why are they related to the system controller?
+
+> +               };
+> +
+> +               fabric: fabric {
+> +                       compatible = "hisilicon,hip04-fabric";
+> +                       reg = <0x302a000 0x1000>;
+
+How is this going to be used?
+
+> +               };
+> +
+> +               dual_timer0: dual_timer at 3000000 {
+> +                       compatible = "arm,sp804", "arm,primecell";
+> +                       reg = <0x3000000 0x1000>;
+> +                       interrupts = <0 224 4>;
+> +                       clocks = <&clock HIP04_CLK_50M>;
+> +                       clock-names = "apb_pclk";
+> +               };
+
+I thought sp804 had two clocks (one for AMBA and one for the actual
+timer). What's going on here?
+
+Cheers,
+Mark.
