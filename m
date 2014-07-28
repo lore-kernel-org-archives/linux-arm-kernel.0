@@ -1,40 +1,63 @@
 From: will.deacon@arm.com (Will Deacon)
-Date: Mon, 28 Jul 2014 19:46:04 +0100
-Subject: EL3 firmware init of cores ( was Re: [PATCH] arm64: Flush the
- process's mm context TLB entries when switching)
-In-Reply-To: <CALRxmdCxnOmZdY=_CCYRT8YYBkVdS-ch6RRbkfZa2B-sF_FkKg@mail.gmail.com>
-References: <CALRxmdCxnOmZdY=_CCYRT8YYBkVdS-ch6RRbkfZa2B-sF_FkKg@mail.gmail.com>
-Message-ID: <20140728184604.GS15536@arm.com>
+Date: Mon, 28 Jul 2014 19:47:41 +0100
+Subject: [PATCH 1/2] ARM: LPAE: load upper bits of early TTBR0/TTBR1
+In-Reply-To: <CALYGNiNrK1d32ecz4rw0sgn0GyN-M6hTBuTLGQV53Z4Br-bpYQ@mail.gmail.com>
+References: <20140722153623.25088.37742.stgit@buzz>
+ <20140728181224.GN15536@arm.com>
+ <CALYGNiNrK1d32ecz4rw0sgn0GyN-M6hTBuTLGQV53Z4Br-bpYQ@mail.gmail.com>
+Message-ID: <20140728184741.GT15536@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Stuart,
-
-On Mon, Jul 28, 2014 at 07:40:27PM +0100, Stuart Yoder wrote:
-> On Tue, Apr 15, 2014 at 3:02 AM, Will Deacon <will.deacon@arm.com> wrote:
-> > No, there's usually a CPU-specific register (called something like actlr or
-> > ectlr) which contains bit(s) to enable TLB broadcasting in hardware. Which
-> > CPU are you using?
+On Mon, Jul 28, 2014 at 07:40:58PM +0100, Konstantin Khlebnikov wrote:
+> On Mon, Jul 28, 2014 at 10:12 PM, Will Deacon <will.deacon@arm.com> wrote:
+> > On Tue, Jul 22, 2014 at 04:36:23PM +0100, Konstantin Khlebnikov wrote:
+> >> This patch fixes booting when idmap pgd lays above 4gb. Commit
+> >> 4756dcbfd37 mostly had fixed this, but it'd failed to load upper bits.
+> >>
+> >> Also this fixes adding TTBR1_OFFSET to TTRR1: if lower part overflows
+> >> carry flag must be added to the upper part.
+> >>
+> >> Signed-off-by: Konstantin Khlebnikov <k.khlebnikov@samsung.com>
+> >> Cc: Cyril Chemparathy <cyril@ti.com>
+> >> Cc: Vitaly Andrianov <vitalya@ti.com>
+> >> ---
+> >>  arch/arm/mm/proc-v7-3level.S |    7 +++----
+> >>  1 file changed, 3 insertions(+), 4 deletions(-)
+> >>
+> >> diff --git a/arch/arm/mm/proc-v7-3level.S b/arch/arm/mm/proc-v7-3level.S
+> >> index 22e3ad6..f0481dd 100644
+> >> --- a/arch/arm/mm/proc-v7-3level.S
+> >> +++ b/arch/arm/mm/proc-v7-3level.S
+> >> @@ -140,12 +140,11 @@ ENDPROC(cpu_v7_set_pte_ext)
+> >>       mov     \tmp, \ttbr1, lsr #(32 - ARCH_PGD_SHIFT)        @ upper bits
+> >>       mov     \ttbr1, \ttbr1, lsl #ARCH_PGD_SHIFT             @ lower bits
+> >>       addls   \ttbr1, \ttbr1, #TTBR1_OFFSET
+> >> -     mcrr    p15, 1, \ttbr1, \zero, c2                       @ load TTBR1
+> >> +     adcls   \tmp, \tmp, #0
+> >> +     mcrr    p15, 1, \ttbr1, \tmp, c2                        @ load TTBR1
+> >>       mov     \tmp, \ttbr0, lsr #(32 - ARCH_PGD_SHIFT)        @ upper bits
+> >>       mov     \ttbr0, \ttbr0, lsl #ARCH_PGD_SHIFT             @ lower bits
+> >> -     mcrr    p15, 0, \ttbr0, \zero, c2                       @ load TTBR0
+> >> -     mcrr    p15, 1, \ttbr1, \zero, c2                       @ load TTBR1
+> >> -     mcrr    p15, 0, \ttbr0, \zero, c2                       @ load TTBR0
+> >> +     mcrr    p15, 0, \ttbr0, \tmp, c2                        @ load TTBR0
+> >
+> > I must admit, the code you are removing here looks really strange. Was there
+> > a badly resolved conflict somewhere along the way? It would be nice to see
+> > if your fix (which seems ok to me) was actually present in the mailing list
+> > posting of the patch that ended in the above mess.
 > 
-> We ran into this same issue as well for an A57-based system.  We are using
-> u-boot and it seems that some early EL3 init was missing the setting of the
-> SMPEN bit.
+> Nope, no merge conflicts, source in original patch
+> https://lkml.org/lkml/2012/9/11/346
 > 
-> I'm concerned now that there may be other bits we have missed as well.  Is
-> there any documentation you know of that details A57 initialization or do we
-> just have to extract that from the reference manual?
-> 
-> Also, for ARM development systems like the Versatile Express or fast model
-> is there existing "EL3 firmware" source available that shows how to properly
-> initialize an A57 that we can refer to?    Any pointer to reference code doing
-> this initialization would be really appreciated.
+> That mess completely harmless, this code is used only once on boot.
+> I don't have that email, so replying isn't trivial for me.
 
-Sure, take a look at the ARM trusted firmware:
+How bizarre. Also, Cyril doesn't work for TI anymore (his email is
+bouncing), so it's tricky to know what he meant here.
 
-  https://github.com/ARM-software/arm-trusted-firmware
-
-That's actually the firmware that runs on Juno at EL3 and provides a bunch
-of stuff as well as initialising the platform (PSCI etc). For example, the
-SMP bit is set in lib/aarch64/cpu_helpers.S
+Your patch looks better than what we currently have though. Have you managed
+to test it on a keystone platform (I don't have one)?
 
 Will
