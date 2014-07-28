@@ -1,98 +1,57 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Mon, 28 Jul 2014 14:54:24 +0100
-Subject: [GIT PULL][for 3.17] pull request for hisilicon soc
-In-Reply-To: <20140728130526.GM23220@titan.lakedaemon.net>
-References: <53D1F2B0.1020603@hisilicon.com> <19341047.6Jx15lyPBg@wuerfel>
- <CAD6h2NRaR+JoAsQt_0uwP5hacqKzFnTUbqToGj6JfEyACoZc+A@mail.gmail.com>
- <5326154.xHtqUP4l2C@wuerfel> <20140728130526.GM23220@titan.lakedaemon.net>
-Message-ID: <53D65610.9030401@arm.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Mon, 28 Jul 2014 15:57:18 +0200
+Subject: [linux-devel:devel-athens-arm-201407281729 9/13] ERROR:
+ "dw_pcie_host_init" [drivers/pci/host/pcie-spear13xx.ko] undefined!
+In-Reply-To: <53d65148.2/x780FfPLEYMqov%fengguang.wu@intel.com>
+References: <53d65148.2/x780FfPLEYMqov%fengguang.wu@intel.com>
+Message-ID: <5266883.bDcz9kd6ee@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Jason,
-
-On 28/07/14 14:05, Jason Cooper wrote:
-> Arnd, Marc,
+On Monday 28 July 2014 21:34:00 kbuild test robot wrote:
+> Hi Wu,
 > 
-> On Mon, Jul 28, 2014 at 01:35:50PM +0200, Arnd Bergmann wrote:
->> On Sunday 27 July 2014 09:57:22 Haojian Zhuang wrote:
->>> On 26 July 2014 23:30, Arnd Bergmann <arnd@arndb.de> wrote:
->>>> On Friday 25 July 2014 14:01:20 xuwei wrote:
->>>>
->>>>> ----------------------------------------------------------------
->>>>> Haifeng Yan (3):
->>>>>       ARM: debug: Rename Hi3716 to HI5XHD2
->>>>
->>>> This one had me confused for a while, because it seems like
->>>> you are breaking support for hi3xxx, but instead it's just
->>>> a different name for the same chip if I see this right.
->>>>
->>>> An easier approach would actually be to remove DEBUG_HI3716_UART
->>>> completely: the setting is exactly the same for
->>>> HI3716, HI3620 and HIX5HD2, so you can simply keep the name
->>>> for the oldest chip here and change the help text to reflect
->>>> which products it works on.
->>>
->>> The physical address of hi3xxx uart is different from x5hd2.
->>>
->>> Since hi3620 & hix5hd2 could be built into one image. If I don't use the
->>> DEBUG_HIX5HD2_UART to mark, I can't distinguish the right UART
->>> physical address only by ARCH_HI3xxx or ARCH_HIX5HD2.
->>
->> Ah, you are right, I misread the source code. I saw that the
->> virtual address is the same for both but didn't notice that
->> the physical address is not.
->>
->> So this patch is ok after all, please just clarify in the changelog
->> that it is actually the same chip.
->>
->>>> Finally, it's not clear why you need a new Kconfig symbol. It seems
->>>> that all code you have is compiled independent of these, except for
->>>> the dtb files and the DEBUG_LL setting.
->>>>
->>>
->>> Actually it's nearly same except for headsmp.S.
->>>
->>> Hisilicon guys think that hix5hd2 belongs to another group. They don't
->>> want to totally share their code base with hi3xxx.
->>
->> This doesn't seem like a technical reason to me at all. I would
->> much prefer if you and Xu Wei as maintainers were able to describe
->> (in the changelog) the underlying technical reasons for decisions
->> coming from management if it makes sense, or otherwise explain to
->> them that we don't want those patches upstream if it doesn't make
->> sense.
->>
->> It's not a show-stopper this way, and I'd still pull the branches
->> with this, but you should be aware that it does not help your
->> reputation.
->>
->>>> What happened to HiP04 support? I thought that would arrive
->>>> in time for 3.17.
->>>>
->>>
->>> I just sent v14 in this week. I already updated gic & mcpm according
->>> to comments. But I haven't gotten any comments & Ack yet. So I don't
->>> know whether we could send the pull request of HiP04 in 3.17.
->>
->> I don't see anything beyond v10 in my email, and that had a few
->> outstanding comments but otherwise looked almost ready to me.
->> Can you find out what happened?
+> FYI, this happens on a merge commit, which indicates conflicting changes with one of the below merged branches.
 > 
-> I'd like Marc to review the newest version of the changes to the GIC and
-> Ack before I'll pull them in.  He was on vacation up until today.
-> You'll be able to pull in a tag on irqchip/gic and base off of that if
-> needed.
+> 46b7e36 Merge 'arm-soc/for-next' into devel-athens-arm-201407281729
+> ed67b70 Merge 'sound/for-next' into devel-athens-arm-201407281729
+> df8c9cc Merge 's390/features' into devel-athens-arm-201407281729
+> a97b04d Merge 'powerpc/test' into devel-athens-arm-201407281729
+> 6baf298 Merge 'powerpc/next' into devel-athens-arm-201407281729
+> e216a37 Merge 'tip/sched/core' into devel-athens-arm-201407281729
+> 6c9d717 Merge 'tip/perf/core' into devel-athens-arm-201407281729
+> ab83da1 Merge 'ath6kl/ath-next-test' into devel-athens-arm-201407281729
+> 86fc732 0day base guard for 'devel-athens-arm-201407281729'
+> 64aa90f Linux 3.16-rc7
+> 
+> 
+> tree:   git://internal_merge_and_test_tree devel-athens-arm-201407281729
+> head:   ed9c75e87f52f14597c4db2ba5b45950f2e09c1a
+> commit: 46b7e363b2006f212f930aa284b0ad3ca6d3fe48 [9/13] Merge 'arm-soc/for-next' into devel-athens-arm-201407281729
+> config: make ARCH=arm allmodconfig
+> 
+> All error/warnings:
+> 
+> >> ERROR: "dw_pcie_host_init" [drivers/pci/host/pcie-spear13xx.ko] undefined!
+> >> ERROR: "dw_handle_msi_irq" [drivers/pci/host/pcie-spear13xx.ko] undefined!
+> >> ERROR: "dw_pcie_msi_init" [drivers/pci/host/pcie-spear13xx.ko] undefined!
+> >> ERROR: "dw_pcie_cfg_write" [drivers/pci/host/pcie-spear13xx.ko] undefined!
+> >> ERROR: "dw_pcie_cfg_read" [drivers/pci/host/pcie-spear13xx.ko] undefined!
+> >> ERROR: "dw_pcie_setup_rc" [drivers/pci/host/pcie-spear13xx.ko] undefined!
+> >> ERROR: "dw_pcie_link_up" [drivers/pci/host/pcie-spear13xx.ko] undefined!
 
-Which series is the last one? I have a single v14 patch in my Inbox
-(01/11, sent on the 23rd), and nothing follows it (and no cover-letter
-either).
+I submitted a patch for this already:
 
-The archive seems to agree with the state of my Inbox... Did something
-go horribly wrong?
+http://patchwork.ozlabs.org/patch/373209/
 
-Thanks,
+Not sure how to deal with that, as Lucas indicated that it conflicts with
+another patch of his. I guess I could just apply my patch as-is to fix the
+current bug and let Linus deal with the merge conflict later.
 
-	M.
--- 
-Jazz is not dead. It just smells funny...
+Alternatively, we can turn this driver into builtin-only like some of
+the other PCI host controllers. Not as nice, but gets rid of the bug
+without introducing a conflict.
+
+Jingoo, Mohit, Bjorn, any other opinions?
+
+	Arnd
