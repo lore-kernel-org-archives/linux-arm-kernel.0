@@ -1,55 +1,37 @@
-From: leif.lindholm@linaro.org (Leif Lindholm)
-Date: Mon, 28 Jul 2014 19:03:03 +0100
-Subject: [PATCH] arm64: ignore DT memreserve entries when booting in UEFI mode
-Message-ID: <1406570583-22848-1-git-send-email-leif.lindholm@linaro.org>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Mon, 28 Jul 2014 12:06:26 -0600
+Subject: [PATCH] MAINTAINERS: Update Tegra Git URL
+Message-ID: <1406570786-10432-1-git-send-email-swarren@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-UEFI provides its own method for marking regions to reserve, via the
-memory map which is also used to initialise memblock. So when using the
-UEFI memory map, ignore any memreserve entries present in the DT.
+From: Andreas F?rber <afaerber@suse.de>
 
-Reported-by: Mark Rutland <mark.rutland@arm.com>
-Signed-off-by: Leif Lindholm <leif.lindholm@linaro.org>
+swarren/linux-tegra.git is a stale location; it has moved to
+tegra/linux.git.
+
+While the git protocol re-directs to the new location, HTTP does not.
+Besides, MAINTAINERS should contain the canonical URL.
+
+Signed-off-by: Andreas F?rber <afaerber@suse.de>
+[swarren, updated commit message]
+Signed-off-by: Stephen Warren <swarren@nvidia.com>
 ---
- arch/arm64/kernel/efi.c |    2 ++
- arch/arm64/mm/init.c    |    4 +++-
- 2 files changed, 5 insertions(+), 1 deletion(-)
+ MAINTAINERS | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/arch/arm64/kernel/efi.c b/arch/arm64/kernel/efi.c
-index 14db1f6..7ad17b2 100644
---- a/arch/arm64/kernel/efi.c
-+++ b/arch/arm64/kernel/efi.c
-@@ -188,6 +188,8 @@ static __init void reserve_regions(void)
- 		if (uefi_debug)
- 			pr_cont("\n");
- 	}
-+
-+	set_bit(EFI_MEMMAP, &efi.flags);
- }
+diff --git a/MAINTAINERS b/MAINTAINERS
+index 86efa7e213c2..dcda974bd7ec 100644
+--- a/MAINTAINERS
++++ b/MAINTAINERS
+@@ -8922,7 +8922,7 @@ M:	Stephen Warren <swarren@wwwdotorg.org>
+ M:	Thierry Reding <thierry.reding@gmail.com>
+ L:	linux-tegra at vger.kernel.org
+ Q:	http://patchwork.ozlabs.org/project/linux-tegra/list/
+-T:	git git://git.kernel.org/pub/scm/linux/kernel/git/swarren/linux-tegra.git
++T:	git git://git.kernel.org/pub/scm/linux/kernel/git/tegra/linux.git
+ S:	Supported
+ N:	[^a-z]tegra
  
- 
-diff --git a/arch/arm64/mm/init.c b/arch/arm64/mm/init.c
-index e90c542..58dbf2e 100644
---- a/arch/arm64/mm/init.c
-+++ b/arch/arm64/mm/init.c
-@@ -32,6 +32,7 @@
- #include <linux/of_fdt.h>
- #include <linux/dma-mapping.h>
- #include <linux/dma-contiguous.h>
-+#include <linux/efi.h>
- 
- #include <asm/sections.h>
- #include <asm/setup.h>
-@@ -151,7 +152,8 @@ void __init arm64_memblock_init(void)
- 	memblock_reserve(__pa(swapper_pg_dir), SWAPPER_DIR_SIZE);
- 	memblock_reserve(__pa(idmap_pg_dir), IDMAP_DIR_SIZE);
- 
--	early_init_fdt_scan_reserved_mem();
-+	if (!efi_enabled(EFI_MEMMAP))
-+		early_init_fdt_scan_reserved_mem();
- 
- 	/* 4GB maximum for 32-bit only capable devices */
- 	if (IS_ENABLED(CONFIG_ZONE_DMA))
 -- 
-1.7.10.4
+1.9.1
