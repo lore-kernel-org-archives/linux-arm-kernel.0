@@ -1,411 +1,139 @@
 From: haojian.zhuang@linaro.org (Haojian Zhuang)
-Date: Mon, 28 Jul 2014 21:57:47 +0800
-Subject: [PATCH v15 03/12] ARM: hisi: enable MCPM implementation
-In-Reply-To: <1406555876-11989-1-git-send-email-haojian.zhuang@linaro.org>
-References: <1406555876-11989-1-git-send-email-haojian.zhuang@linaro.org>
-Message-ID: <1406555876-11989-4-git-send-email-haojian.zhuang@linaro.org>
+Date: Mon, 28 Jul 2014 21:57:44 +0800
+Subject: [PATCH v15 00/12] enable Hisilicon HiP04
+Message-ID: <1406555876-11989-1-git-send-email-haojian.zhuang@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Multiple CPU clusters are used in Hisilicon HiP04 SoC. Now use MCPM
-framework to manage power on HiP04 SoC.
-
 Changelog:
+v15:
+  * Add p04 debug uart back.
+  * Refresh since hix5hd2 code updated.
+
+v14:
+  * Mount function pointers to different implementation on standard
+    GICv2 and Hisilicon HiP04 GIC.
+
 v13:
   * Restore power down operation in MCPM.
   * Fix disabling snoop filter issue in MCPM.
+
 v12:
   * Use wfi as power down state in MCPM.
   * Remove wait_for_powerdown() in MCPM because wfi is used now.
 
-Signed-off-by: Haojian Zhuang <haojian.zhuang@linaro.org>
----
- arch/arm/mach-hisi/Makefile   |   1 +
- arch/arm/mach-hisi/platmcpm.c | 366 ++++++++++++++++++++++++++++++++++++++++++
- 2 files changed, 367 insertions(+)
+v11:
+  * Fix the protection issue on mcpm power down.
+  * Clean assembly code in mcpm power up.
+
+v10:
+  * Move snoop filter code to be executed on secondary cores. And change
+    it to assembly code since MMU isn't enabled at that time.
+  * Rebase irq gic patch on latest gic patch.
+  * Use global variable in irq gic patch.
+  * Use global variable in vgic patch.
+  * Drop debug uart patch since it's in another patch set.
+  * Remove some ARCHs from multi_v7_lpae_defconfig.
+
+v9:
+  * Remove delay workaround in mcpm implementation.
+  * Clean in gic.
+  * Rename vgic_cpu_nr_lr to vgic_cpu_hw_cfg in vgic driver.
+  * Always use high word of vgic_cpu_hw_cfg for GICH_APR offset. So the
+    implementation of arm64 is also updated.
+  * Drop "irq: gic: use mask field in GICC_IAR" patch since it's merged.
+
+v7:
+  * Remove hip04_smp_init_ops().
+  * Remove CONFIG_ARCH_HIP04 in hisilicn.c since hip04_smp_init_ops() is
+    removed.
+
+v6:
+  * Split HiP04 enabling patch into patches on document, mcpm & hiP04.
+  * Move reset operation in HiP04 MCPM implementation.
+  * Remove ARCH_MULTI_V7_NONLPAE & ARCH_MULTI_V7_LPAE according to olof's
+    comment.
+
+v5:
+  * Add ARCH_MULTI_V7_NONLPAE to avoid change too much things in Kconfig.
+  * Use memreserve in DTS.
+  * Remove L2 reset operation in mcpm implementation.
+  * Re-use nr_lr field to cover HIP04 GICH_APR implementation.
+  * Add more comments.
+
+v4:
+  * Add multi_v7_lpae_defconfig.
+  * Select CONFIG_ARCH_MULTI_V7_LPAE if CONFIG_ARCH_MULTI_V7 is selected.
+  * Only ARMADA_XP is ARCH_MULTI_V7_LPAE, other ARMADA chips are ARCH_MULTI_V7.
+  * Remove gich_lr0 variable since we can calculate offset of GICH_LR0 from
+    GICH_APR.
+  * Cleanup GIC driver to support HiP04 GIC.
+  * Cleanup HiP04 mcpm implementation.
+
+v3:
+  * Replace CONFIG_ARCH_MULTI_V7 by CONFIG_ARCH_MULTI_V7_LPAE in some SoC.
+  * Update MCPM code based on Dave's patch.
+  * Remove MCPM node in DTS file. Use sysctrl & fabric node instead.
+  * Move hardcoding on bootwrapper into DTS file.
+  * Append the CONFIG_MCPM_QUAD_CLUSTER for HiP04.
+  * Fix the return value from gic_get_cpumask() if it's used in standard gic.
+  * Add the vgic support on HiP04 GIC.
+  * Add virtualization support in HiP04 defconfig.
+
+v2:
+  * Append ARCH_MULTI_V7_LPAE configuration. Define ARCH_MULTI_V7 to only
+    support non-LPAE platform.
+  * Append document of DT supporting.
+  * Append ARCH_HISI in hi3xxx_defconfig.
+  * Enable errata 798181 for HiP04 SoC.
+  * Add PMU support.
+
+Haojian Zhuang (11):
+  irq: gic: support hip04 gic
+  ARM: mcpm: support 4 clusters
+  ARM: hisi: enable MCPM implementation
+  ARM: hisi: enable HiP04
+  document: dt: add the binding on HiP04
+  document: dt: add the binding on HiP04 clock
+  ARM: dts: append hip04 dts
+  ARM: config: append lpae configuration
+  ARM: config: append hip04_defconfig
+  virt: arm: support hip04 gic
+  ARM: debug: add HiP04 debug uart
+
+Kefeng Wang (1):
+  ARM: hisi: enable erratum 798181 of A15 on HiP04
+
+ Documentation/devicetree/bindings/arm/gic.txt      |   1 +
+ .../bindings/arm/hisilicon/hisilicon.txt           |  21 +
+ .../devicetree/bindings/clock/hip04-clock.txt      |  20 +
+ arch/arm/Kconfig                                   |   9 +
+ arch/arm/Kconfig.debug                             |  10 +
+ arch/arm/boot/dts/Makefile                         |   1 +
+ arch/arm/boot/dts/hip04-d01.dts                    |  39 ++
+ arch/arm/boot/dts/hip04.dtsi                       | 267 +++++++++++++
+ arch/arm/configs/hip04_defconfig                   |  74 ++++
+ arch/arm/configs/multi_v7_lpae_defconfig           | 343 ++++++++++++++++
+ arch/arm/include/asm/mcpm.h                        |   5 +
+ arch/arm/kernel/asm-offsets.c                      |   2 +-
+ arch/arm/kvm/interrupts_head.S                     |  29 +-
+ arch/arm/mach-hisi/Kconfig                         |   9 +
+ arch/arm/mach-hisi/Makefile                        |   1 +
+ arch/arm/mach-hisi/hisilicon.c                     |   9 +
+ arch/arm/mach-hisi/platmcpm.c                      | 366 +++++++++++++++++
+ arch/arm64/kernel/asm-offsets.c                    |   2 +-
+ arch/arm64/kvm/hyp.S                               |   4 +-
+ drivers/irqchip/irq-gic.c                          | 436 +++++++++++++++++----
+ include/kvm/arm_vgic.h                             |   7 +-
+ include/linux/irqchip/arm-gic.h                    |   6 +
+ virt/kvm/arm/vgic.c                                |  37 +-
+ 23 files changed, 1588 insertions(+), 110 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/clock/hip04-clock.txt
+ create mode 100644 arch/arm/boot/dts/hip04-d01.dts
+ create mode 100644 arch/arm/boot/dts/hip04.dtsi
+ create mode 100644 arch/arm/configs/hip04_defconfig
+ create mode 100644 arch/arm/configs/multi_v7_lpae_defconfig
  create mode 100644 arch/arm/mach-hisi/platmcpm.c
 
-diff --git a/arch/arm/mach-hisi/Makefile b/arch/arm/mach-hisi/Makefile
-index ee2506b..d64831e 100644
---- a/arch/arm/mach-hisi/Makefile
-+++ b/arch/arm/mach-hisi/Makefile
-@@ -3,4 +3,5 @@
- #
- 
- obj-y	+= hisilicon.o
-+obj-$(CONFIG_MCPM)		+= platmcpm.o
- obj-$(CONFIG_SMP)		+= platsmp.o hotplug.o headsmp.o
-diff --git a/arch/arm/mach-hisi/platmcpm.c b/arch/arm/mach-hisi/platmcpm.c
-new file mode 100644
-index 0000000..9538ba3
---- /dev/null
-+++ b/arch/arm/mach-hisi/platmcpm.c
-@@ -0,0 +1,366 @@
-+/*
-+ * Copyright (c) 2013-2014 Linaro Ltd.
-+ * Copyright (c) 2013-2014 Hisilicon Limited.
-+ *
-+ * This program is free software; you can redistribute it and/or modify it
-+ * under the terms and conditions of the GNU General Public License,
-+ * version 2, as published by the Free Software Foundation.
-+ */
-+#include <linux/delay.h>
-+#include <linux/io.h>
-+#include <linux/of_address.h>
-+
-+#include <asm/cputype.h>
-+#include <asm/cp15.h>
-+#include <asm/mcpm.h>
-+
-+#include "core.h"
-+
-+/* bits definition in SC_CPU_RESET_REQ[x]/SC_CPU_RESET_DREQ[x]
-+ * 1 -- unreset; 0 -- reset
-+ */
-+#define CORE_RESET_BIT(x)		(1 << x)
-+#define NEON_RESET_BIT(x)		(1 << (x + 4))
-+#define CORE_DEBUG_RESET_BIT(x)		(1 << (x + 9))
-+#define CLUSTER_L2_RESET_BIT		(1 << 8)
-+#define CLUSTER_DEBUG_RESET_BIT		(1 << 13)
-+
-+/*
-+ * bits definition in SC_CPU_RESET_STATUS[x]
-+ * 1 -- reset status; 0 -- unreset status
-+ */
-+#define CORE_RESET_STATUS(x)		(1 << x)
-+#define NEON_RESET_STATUS(x)		(1 << (x + 4))
-+#define CORE_DEBUG_RESET_STATUS(x)	(1 << (x + 9))
-+#define CLUSTER_L2_RESET_STATUS		(1 << 8)
-+#define CLUSTER_DEBUG_RESET_STATUS	(1 << 13)
-+#define CORE_WFI_STATUS(x)		(1 << (x + 16))
-+#define CORE_WFE_STATUS(x)		(1 << (x + 20))
-+#define CORE_DEBUG_ACK(x)		(1 << (x + 24))
-+
-+#define SC_CPU_RESET_REQ(x)		(0x520 + (x << 3))	/* reset */
-+#define SC_CPU_RESET_DREQ(x)		(0x524 + (x << 3))	/* unreset */
-+#define SC_CPU_RESET_STATUS(x)		(0x1520 + (x << 3))
-+
-+#define FAB_SF_MODE			0x0c
-+#define FAB_SF_INVLD			0x10
-+
-+/* bits definition in FB_SF_INVLD */
-+#define FB_SF_INVLD_START		(1 << 8)
-+
-+#define HIP04_MAX_CLUSTERS		4
-+#define HIP04_MAX_CPUS_PER_CLUSTER	4
-+
-+#define POLL_MSEC	10
-+#define TIMEOUT_MSEC	1000
-+
-+struct hip04_secondary_cpu_data {
-+	u32	bootwrapper_phys;
-+	u32	bootwrapper_size;
-+	u32	bootwrapper_magic;
-+	u32	relocation_entry;
-+	u32	relocation_size;
-+};
-+
-+static void __iomem *relocation, *sysctrl, *fabric;
-+static int hip04_cpu_table[HIP04_MAX_CLUSTERS][HIP04_MAX_CPUS_PER_CLUSTER];
-+static DEFINE_SPINLOCK(boot_lock);
-+static struct hip04_secondary_cpu_data hip04_boot;
-+static u32 fabric_phys_addr;
-+
-+static bool hip04_cluster_down(unsigned int cluster)
-+{
-+	int i;
-+
-+	for (i = 0; i < HIP04_MAX_CPUS_PER_CLUSTER; i++)
-+		if (hip04_cpu_table[cluster][i])
-+			return false;
-+	return true;
-+}
-+
-+static void hip04_set_snoop_filter(unsigned int cluster, unsigned int on)
-+{
-+	unsigned long data;
-+
-+	if (!fabric)
-+		BUG();
-+	data = readl_relaxed(fabric + FAB_SF_MODE);
-+	if (on)
-+		data |= 1 << cluster;
-+	else
-+		data &= ~(1 << cluster);
-+	writel_relaxed(data, fabric + FAB_SF_MODE);
-+	while (1) {
-+		if (data == readl_relaxed(fabric + FAB_SF_MODE))
-+			break;
-+	}
-+	return;
-+}
-+
-+static int hip04_mcpm_power_up(unsigned int cpu, unsigned int cluster)
-+{
-+	unsigned long data, mask;
-+
-+	if (!relocation || !sysctrl)
-+		return -ENODEV;
-+	if (cluster >= HIP04_MAX_CLUSTERS || cpu >= HIP04_MAX_CPUS_PER_CLUSTER)
-+		return -EINVAL;
-+
-+	spin_lock_irq(&boot_lock);
-+
-+	if (hip04_cpu_table[cluster][cpu])
-+		goto out;
-+
-+	/* Make secondary core out of reset. */
-+	writel_relaxed(hip04_boot.bootwrapper_phys, relocation);
-+	writel_relaxed(hip04_boot.bootwrapper_magic, relocation + 4);
-+	writel_relaxed(virt_to_phys(mcpm_entry_point), relocation + 8);
-+	writel_relaxed(0, relocation + 12);
-+
-+	if (hip04_cluster_down(cluster)) {
-+		data = CLUSTER_DEBUG_RESET_BIT;
-+		writel_relaxed(data, sysctrl + SC_CPU_RESET_DREQ(cluster));
-+		do {
-+			mask = CLUSTER_DEBUG_RESET_STATUS;
-+			data = readl_relaxed(sysctrl + \
-+					     SC_CPU_RESET_STATUS(cluster));
-+		} while (data & mask);
-+	}
-+
-+	data = CORE_RESET_BIT(cpu) | NEON_RESET_BIT(cpu) | \
-+	       CORE_DEBUG_RESET_BIT(cpu);
-+	writel_relaxed(data, sysctrl + SC_CPU_RESET_DREQ(cluster));
-+out:
-+	hip04_cpu_table[cluster][cpu]++;
-+	spin_unlock_irq(&boot_lock);
-+
-+	return 0;
-+}
-+
-+static void hip04_mcpm_power_down(void)
-+{
-+	unsigned int mpidr, cpu, cluster;
-+	bool skip_wfi = false;
-+
-+	mpidr = read_cpuid_mpidr();
-+	cpu = MPIDR_AFFINITY_LEVEL(mpidr, 0);
-+	cluster = MPIDR_AFFINITY_LEVEL(mpidr, 1);
-+
-+	__mcpm_cpu_going_down(cpu, cluster);
-+
-+	spin_lock(&boot_lock);
-+	BUG_ON(__mcpm_cluster_state(cluster) != CLUSTER_UP);
-+	hip04_cpu_table[cluster][cpu]--;
-+	if (hip04_cpu_table[cluster][cpu] == 1) {
-+		/* A power_up request went ahead of us. */
-+		skip_wfi = true;
-+	} else if (hip04_cpu_table[cluster][cpu] > 1) {
-+		pr_err("Cluster %d CPU%d boots multiple times\n", cluster, cpu);
-+		BUG();
-+	}
-+	spin_unlock(&boot_lock);
-+
-+	v7_exit_coherency_flush(louis);
-+
-+	__mcpm_cpu_down(cpu, cluster);
-+
-+	if (!skip_wfi)
-+		wfi();
-+}
-+
-+static int hip04_mcpm_wait_for_powerdown(unsigned int cpu, unsigned int cluster)
-+{
-+	unsigned int data, tries, count;
-+
-+	BUG_ON(cluster >= HIP04_MAX_CLUSTERS ||
-+	       cpu >= HIP04_MAX_CPUS_PER_CLUSTER);
-+
-+	count = TIMEOUT_MSEC / POLL_MSEC;
-+	spin_lock(&boot_lock);
-+	for (tries = 0; tries < count; tries++) {
-+		data = readl_relaxed(sysctrl + SC_CPU_RESET_STATUS(cluster));
-+		if (!(data & CORE_WFI_STATUS(cpu))) {
-+			msleep(POLL_MSEC);
-+			continue;
-+		}
-+	}
-+	if (tries >= count)
-+		goto err;
-+	data = CORE_RESET_BIT(cpu) | NEON_RESET_BIT(cpu) | \
-+	       CORE_DEBUG_RESET_BIT(cpu);
-+	writel_relaxed(data, sysctrl + SC_CPU_RESET_REQ(cluster));
-+	for (tries = 0; tries < count; tries++) {
-+		data = readl_relaxed(sysctrl + SC_CPU_RESET_STATUS(cluster));
-+		if (!(data & CORE_RESET_STATUS(cpu))) {
-+			msleep(POLL_MSEC);
-+			continue;
-+		}
-+	}
-+	if (tries >= count)
-+		goto err;
-+	if (hip04_cluster_down(cluster))
-+		hip04_set_snoop_filter(cluster, 0);
-+	spin_unlock(&boot_lock);
-+	return 0;
-+err:
-+	spin_unlock(&boot_lock);
-+	return -ETIMEDOUT;
-+}
-+
-+static void hip04_mcpm_powered_up(void)
-+{
-+	if (!relocation)
-+		return;
-+	spin_lock(&boot_lock);
-+	writel_relaxed(0, relocation);
-+	writel_relaxed(0, relocation + 4);
-+	writel_relaxed(0, relocation + 8);
-+	writel_relaxed(0, relocation + 12);
-+	spin_unlock(&boot_lock);
-+}
-+
-+static void __naked hip04_mcpm_power_up_setup(unsigned int affinity_level)
-+{
-+	asm volatile ("			\n"
-+"	cmp	r0, #0			\n"
-+"	bxeq	lr			\n"
-+	/* calculate fabric phys address */
-+"	adr	r2, 2f			\n"
-+"	ldmia	r2, {r1, r3}		\n"
-+"	sub	r0, r2, r1		\n"
-+"	ldr	r2, [r0, r3]		\n"
-+	/* get cluster id from MPIDR */
-+"	mrc	p15, 0, r0, c0, c0, 5	\n"
-+"	ubfx	r1, r0, #8, #8		\n"
-+	/* 1 << cluster id */
-+"	mov	r0, #1			\n"
-+"	mov	r3, r0, lsl r1		\n"
-+"	ldr	r0, [r2, #"__stringify(FAB_SF_MODE)"]	\n"
-+"	tst	r0, r3			\n"
-+"	bxne	lr			\n"
-+"	orr	r1, r0, r3		\n"
-+"	str	r1, [r2, #"__stringify(FAB_SF_MODE)"]	\n"
-+"1:	ldr	r0, [r2, #"__stringify(FAB_SF_MODE)"]	\n"
-+"	tst	r0, r3			\n"
-+"	beq	1b			\n"
-+"	bx	lr			\n"
-+
-+"	.align	2			\n"
-+"2:	.word	.			\n"
-+"	.word	fabric_phys_addr	\n"
-+	);
-+}
-+
-+static const struct mcpm_platform_ops hip04_mcpm_ops = {
-+	.power_up		= hip04_mcpm_power_up,
-+	.power_down		= hip04_mcpm_power_down,
-+	.wait_for_powerdown	= hip04_mcpm_wait_for_powerdown,
-+	.powered_up		= hip04_mcpm_powered_up,
-+};
-+
-+static bool __init hip04_cpu_table_init(void)
-+{
-+	unsigned int mpidr, cpu, cluster;
-+
-+	mpidr = read_cpuid_mpidr();
-+	cpu = MPIDR_AFFINITY_LEVEL(mpidr, 0);
-+	cluster = MPIDR_AFFINITY_LEVEL(mpidr, 1);
-+
-+	if (cluster >= HIP04_MAX_CLUSTERS ||
-+	    cpu >= HIP04_MAX_CPUS_PER_CLUSTER) {
-+		pr_err("%s: boot CPU is out of bound!\n", __func__);
-+		return false;
-+	}
-+	hip04_set_snoop_filter(0, 1);
-+	hip04_cpu_table[cluster][cpu] = 1;
-+	return true;
-+}
-+
-+static int __init hip04_mcpm_init(void)
-+{
-+	struct device_node *np, *np_fab;
-+	struct resource fab_res;
-+	int ret = -ENODEV;
-+
-+	np = of_find_compatible_node(NULL, NULL, "hisilicon,sysctrl");
-+	if (!np)
-+		goto err;
-+	np_fab = of_find_compatible_node(NULL, NULL, "hisilicon,hip04-fabric");
-+	if (!np_fab)
-+		goto err;
-+
-+	if (of_property_read_u32(np, "bootwrapper-phys",
-+				 &hip04_boot.bootwrapper_phys)) {
-+		pr_err("failed to get bootwrapper-phys\n");
-+		ret = -EINVAL;
-+		goto err;
-+	}
-+	if (of_property_read_u32(np, "bootwrapper-size",
-+				 &hip04_boot.bootwrapper_size)) {
-+		pr_err("failed to get bootwrapper-size\n");
-+		ret = -EINVAL;
-+		goto err;
-+	}
-+	if (of_property_read_u32(np, "bootwrapper-magic",
-+				 &hip04_boot.bootwrapper_magic)) {
-+		pr_err("failed to get bootwrapper-magic\n");
-+		ret = -EINVAL;
-+		goto err;
-+	}
-+	if (of_property_read_u32(np, "relocation-entry",
-+				 &hip04_boot.relocation_entry)) {
-+		pr_err("failed to get relocation-entry\n");
-+		ret = -EINVAL;
-+		goto err;
-+	}
-+	if (of_property_read_u32(np, "relocation-size",
-+				 &hip04_boot.relocation_size)) {
-+		pr_err("failed to get relocation-size\n");
-+		ret = -EINVAL;
-+		goto err;
-+	}
-+
-+	relocation = ioremap(hip04_boot.relocation_entry,
-+			     hip04_boot.relocation_size);
-+	if (!relocation) {
-+		pr_err("failed to map relocation space\n");
-+		ret = -ENOMEM;
-+		goto err;
-+	}
-+	sysctrl = of_iomap(np, 0);
-+	if (!sysctrl) {
-+		pr_err("failed to get sysctrl base\n");
-+		ret = -ENOMEM;
-+		goto err_sysctrl;
-+	}
-+	ret = of_address_to_resource(np_fab, 0, &fab_res);
-+	if (ret) {
-+		pr_err("failed to get fabric base phys\n");
-+		goto err_fabric;
-+	}
-+	fabric_phys_addr = fab_res.start;
-+	sync_cache_w(&fabric_phys_addr);
-+	fabric = of_iomap(np_fab, 0);
-+	if (!fabric) {
-+		pr_err("failed to get fabric base\n");
-+		ret = -ENOMEM;
-+		goto err_fabric;
-+	}
-+
-+	if (!hip04_cpu_table_init())
-+		return -EINVAL;
-+	ret = mcpm_platform_register(&hip04_mcpm_ops);
-+	if (!ret) {
-+		mcpm_sync_init(hip04_mcpm_power_up_setup);
-+		pr_info("HiP04 MCPM initialized\n");
-+	}
-+	mcpm_smp_set_ops();
-+	return ret;
-+err_fabric:
-+	iounmap(sysctrl);
-+err_sysctrl:
-+	iounmap(relocation);
-+err:
-+	return ret;
-+}
-+early_initcall(hip04_mcpm_init);
 -- 
 1.9.1
