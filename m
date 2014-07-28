@@ -1,77 +1,68 @@
-From: jh80.chung@samsung.com (Jaehoon Chung)
-Date: Mon, 28 Jul 2014 11:29:39 +0900
-Subject: [PATCHv7 5/5] mmc: dw_mmc: replace "disable-wp" from slot's quirk to
- host's quirk
-In-Reply-To: <1406514579-3769-1-git-send-email-jh80.chung@samsung.com>
-References: <1406514579-3769-1-git-send-email-jh80.chung@samsung.com>
-Message-ID: <1406514579-3769-6-git-send-email-jh80.chung@samsung.com>
+From: pankaj.dubey@samsung.com (Pankaj Dubey)
+Date: Mon, 28 Jul 2014 08:40:52 +0530
+Subject: [PATCH v7 3/4] ARM: EXYNOS: Add platform driver support for Exynos
+ PMU
+In-Reply-To: <53D238E1.3030901@gmail.com>
+References: <1404878455-31518-1-git-send-email-pankaj.dubey@samsung.com>
+ <1404878455-31518-4-git-send-email-pankaj.dubey@samsung.com>
+ <067501cfa7bd$8e6cb460$ab461d20$@samsung.com>
+ <000501cfa7c9$e59f4840$b0ddd8c0$@samsung.com> <53D238E1.3030901@gmail.com>
+Message-ID: <002601cfaa11$93de5060$bb9af120$@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Replaced the "disable-wp" into host's quirks.
-(Because the slot-node is removed at dt-file.)
+Hi Tomasz,
 
-Signed-off-by: Jaehoon Chung <jh80.chung@samsung.com>
-Tested-by: Sachin Kamat <sachin.kamat@samsung.com>
-Acked-by: Seungwon Jeon <tgih.jun@samsung.com>
----
- drivers/mmc/host/dw_mmc.c  |   12 +++++-------
- include/linux/mmc/dw_mmc.h |    6 ++----
- 2 files changed, 7 insertions(+), 11 deletions(-)
+On Friday, July 25, 2014 Tomasz Figa wrote:
 
-diff --git a/drivers/mmc/host/dw_mmc.c b/drivers/mmc/host/dw_mmc.c
-index 1ac227c..4a4f66f 100644
---- a/drivers/mmc/host/dw_mmc.c
-+++ b/drivers/mmc/host/dw_mmc.c
-@@ -997,7 +997,7 @@ static int dw_mci_get_ro(struct mmc_host *mmc)
- 	int gpio_ro = mmc_gpio_get_ro(mmc);
- 
- 	/* Use platform get_ro function, else try on board write protect */
--	if (slot->quirks & DW_MCI_SLOT_QUIRK_NO_WRITE_PROTECT)
-+	if (slot->host->quirks & DW_MCI_QUIRK_NO_WRITE_PROTECT)
- 		read_only = 0;
- 	else if (!IS_ERR_VALUE(gpio_ro))
- 		read_only = gpio_ro;
-@@ -2006,12 +2006,7 @@ static struct device_node *dw_mci_of_find_slot_node(struct device *dev, u8 slot)
- static struct dw_mci_of_slot_quirks {
- 	char *quirk;
- 	int id;
--} of_slot_quirks[] = {
--	{
--		.quirk	= "disable-wp",
--		.id	= DW_MCI_SLOT_QUIRK_NO_WRITE_PROTECT,
--	},
--};
-+} of_slot_quirks[] = {};
- 
- static int dw_mci_of_get_slot_quirks(struct device *dev, u8 slot)
- {
-@@ -2238,6 +2233,9 @@ static struct dw_mci_of_quirks {
- 	{
- 		.quirk	= "broken-cd",
- 		.id	= DW_MCI_QUIRK_BROKEN_CARD_DETECTION,
-+	}, {
-+		.quirk	= "disable-wp",
-+		.id	= DW_MCI_QUIRK_NO_WRITE_PROTECT,
- 	},
- };
- 
-diff --git a/include/linux/mmc/dw_mmc.h b/include/linux/mmc/dw_mmc.h
-index babaea9..8b4b2d8 100644
---- a/include/linux/mmc/dw_mmc.h
-+++ b/include/linux/mmc/dw_mmc.h
-@@ -213,10 +213,8 @@ struct dw_mci_dma_ops {
- #define DW_MCI_QUIRK_HIGHSPEED			BIT(2)
- /* Unreliable card detection */
- #define DW_MCI_QUIRK_BROKEN_CARD_DETECTION	BIT(3)
--
--/* Slot level quirks */
--/* This slot has no write protect */
--#define DW_MCI_SLOT_QUIRK_NO_WRITE_PROTECT	BIT(0)
-+/* No write protect */
-+#define DW_MCI_QUIRK_NO_WRITE_PROTECT		BIT(4)
- 
- struct dma_pdata;
- 
--- 
-1.7.9.5
+> To: Pankaj Dubey; 'Kukjin Kim'; linux-arm-kernel at lists.infradead.org;
+linux-
+> samsung-soc at vger.kernel.org; linux-kernel at vger.kernel.org
+> Cc: linux at arm.linux.org.uk; t.figa at samsung.com; vikas.sajjan at samsung.com;
+> joshi at samsung.com; naushad at samsung.com; thomas.ab at samsung.com;
+> chow.kim at samsung.com
+> Subject: Re: [PATCH v7 3/4] ARM: EXYNOS: Add platform driver support for
+> Exynos PMU
+> 
+> Hi Pankaj, Kukjin,
+> 
+> On 25.07.2014 07:32, Pankaj Dubey wrote:
+> > Hi Kukjin,
+> >
+> > On Friday, July 25, 2014 Kukjin Kim wrote:
+> 
+> [snip]
+> 
+> >>>
+> >> Looks good to me, will apply this and 4/4.
+> >>
+> >
+> > We need to hold these two patches until dependent patch [1] from
+> > Tomasz Figa gets merged.
+> >
+> > [1]: mfd: syscon: Decouple syscon interface from syscon devices
+> >       https://lkml.org/lkml/2014/6/24/188
+> 
+> That RFC patch had few comments from Arnd needed to be addressed, so it
+needs a
+> new revision.
+> 
+> Pankaj, If I remember correctly, we had talked about this and the
+conclusion was that
+> you would take care of addressing the comments and sending new version of
+the
+> patch. Any update on this or have I missed something?
+> 
+
+Well, I don't think we concluded as such anything.
+Since this patch needs to get in so that Exynos PMU and PM related changes
+can go in,
+I discussed with you saying that I am not able to understand about Arnd's
+comments and
+if possible and time permits I will look into it. Meanwhile I got busy with
+some other
+official work, so could not get time to look into it.
+
+
+> Best regards,
+> Tomasz
