@@ -1,74 +1,73 @@
 From: cw00.choi@samsung.com (Chanwoo Choi)
-Date: Mon, 28 Jul 2014 20:18:43 +0900
-Subject: [PATCH 1/2] iio: adc: exynos_adc: add support for s3c64xx adc
-In-Reply-To: <53D549A2.1000900@gmx.de>
+Date: Mon, 28 Jul 2014 20:20:13 +0900
+Subject: [PATCH 2/2] iio: adc: exynos_adc: Add support for S3C24xx ADC
+In-Reply-To: <5200888.DXoC06U953@wuerfel>
 References: <1405995074-3271-1-git-send-email-cw00.choi@samsung.com>
- <1405995074-3271-2-git-send-email-cw00.choi@samsung.com>
- <53D549A2.1000900@gmx.de>
-Message-ID: <53D63193.1020506@samsung.com>
+ <1405995074-3271-3-git-send-email-cw00.choi@samsung.com>
+ <5200888.DXoC06U953@wuerfel>
+Message-ID: <53D631ED.40803@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/28/2014 03:49 AM, Hartmut Knaack wrote:
-> Chanwoo Choi schrieb:
->> From: Arnd Bergmann <arnd@arndb.de>
->>
->> The ADC in s3c64xx is almost the same as exynosv1, but
->> has a different 'select' method. Adding this here will be
->> helpful to move over the existing s3c64xx platform from the
->> legacy plat-samsung/adc driver to the new exynos-adc.
->>
->> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
->> Signed-off-by: Chanwoo Choi <cw00.choi@samsung.com>
->> ---
->>  .../devicetree/bindings/arm/samsung/exynos-adc.txt |  2 ++
->>  drivers/iio/adc/exynos_adc.c                       | 32 +++++++++++++++++++++-
->>  2 files changed, 33 insertions(+), 1 deletion(-)
->>
->> diff --git a/Documentation/devicetree/bindings/arm/samsung/exynos-adc.txt b/Documentation/devicetree/bindings/arm/samsung/exynos-adc.txt
->> index 6d34891..b6e3989 100644
->> --- a/Documentation/devicetree/bindings/arm/samsung/exynos-adc.txt
->> +++ b/Documentation/devicetree/bindings/arm/samsung/exynos-adc.txt
->> @@ -16,6 +16,8 @@ Required properties:
->>  				future controllers.
->>  			Must be "samsung,exynos3250-adc" for
->>  				controllers compatible with ADC of Exynos3250.
->> +			Must be "samsung,s3c6410-adc" for
->> +				the ADC in s3c6410 and compatibles
->>  - reg:			Contains ADC register address range (base address and
->>  			length) and the address of the phy enable register.
->>  - interrupts: 		Contains the interrupt information for the timer. The
->> diff --git a/drivers/iio/adc/exynos_adc.c b/drivers/iio/adc/exynos_adc.c
->> index 87e0895..05bdd2f12 100644
->> --- a/drivers/iio/adc/exynos_adc.c
->> +++ b/drivers/iio/adc/exynos_adc.c
->> @@ -40,12 +40,16 @@
->>  #include <linux/iio/machine.h>
->>  #include <linux/iio/driver.h>
+On 07/22/2014 05:39 PM, Arnd Bergmann wrote:
+> On Tuesday 22 July 2014 11:11:14 Chanwoo Choi wrote:
+>> This patch add support for s3c2410/s3c2416/s3c2440/s3c2443 ADC. The s3c24xx
+>> is alomost same as ADCv1. But, There are a little difference as following:
+>> - ADCMUX register address to select channel
+>> - ADCDAT mask (10bit or 12bit ADC resolution according to SoC version)
+> 
+> Very good, thanks for doing this patch!
+> 
+> (adding Heiko to Cc, he's probably interested in seeing this as well.
+> 
+> One comment:
+>  
+>> @@ -101,12 +107,14 @@ struct exynos_adc {
+>>  	struct completion	completion;
 >>  
->> -/* EXYNOS4412/5250 ADC_V1 registers definitions */
->> +/* S3C/EXYNOS4412/5250 ADC_V1 registers definitions */
->>  #define ADC_V1_CON(x)		((x) + 0x00)
->> +#define ADC_V1_TSC(x)		((x) + 0x04)
->>  #define ADC_V1_DLY(x)		((x) + 0x08)
->>  #define ADC_V1_DATX(x)		((x) + 0x0C)
->> +#define ADC_V1_DATY(x)		((x) + 0x10)
->> +#define ADC_V1_UPDN(x)		((x) + 0x14)
->>  #define ADC_V1_INTCLR(x)	((x) + 0x18)
->>  #define ADC_V1_MUX(x)		((x) + 0x1c)
->> +#define ADC_V1_CLRINTPNDNUP(x)	((x) + 0x20)
+>>  	u32			value;
+>> +	u32			value2;
+>>  	unsigned int            version;
+>>  };
+>> ...
+>> @@ -365,7 +448,7 @@ static int exynos_read_raw(struct iio_dev *indio_dev,
+>>  		ret = -ETIMEDOUT;
+>>  	} else {
+>>  		*val = info->value;
+>> -		*val2 = 0;
+>> +		*val2 = info->value2;
+>>  		ret = IIO_VAL_INT;
+>>  	}
 >>  
->>  /* Future ADC_V2 registers definitions */
->>  #define ADC_V2_CON1(x)		((x) + 0x00)
->> @@ -61,6 +65,9 @@
->>  #define ADC_V1_CON_PRSCLV(x)	(((x) & 0xFF) << 6)
->>  #define ADC_V1_CON_STANDBY	(1u << 2)
+>> @@ -377,9 +460,11 @@ static int exynos_read_raw(struct iio_dev *indio_dev,
+>>  static irqreturn_t exynos_adc_isr(int irq, void *dev_id)
+>>  {
+>>  	struct exynos_adc *info = (struct exynos_adc *)dev_id;
+>> +	u32 mask = info->data->mask;
 >>  
->> +/* Bit definitions for S3C2410 ADC */
->> +#define ADC_S3C2410_CON_SELMUX(x) (((x) & 7) <<3)
-> There is a whitespace missing.
+>>  	/* Read value */
+>> -	info->value = readl(ADC_V1_DATX(info->regs)) & ADC_DATX_MASK;
+>> +	info->value = readl(ADC_V1_DATX(info->regs)) & mask;
+>> +	info->value2 = readl(ADC_V1_DATY(info->regs)) & mask;
+>>  
+>>  	/* clear irq */
+>>  	if (info->data->clear_irq)
+> 
+> If I understand it right, this would only be necessary if we want
+> to do the touchscreen driver as a separate iio client using the
+> in-kernel interfaces. As Jonathan Cameron commented, we probably
+> don't want to do that though. Even if we do, it should be a separate
+> patch and not mixed in with the s3c24xx support.
 
-OK, I'll fix it.
+OK, I'll drop this sentence which reading DATY register.
 
 Best Regards,
 Chanwoo Choi
+
+> 
+> Aside from this:
+> 
+> Acked-by: Arnd Bergmann <arnd@arndb.de>
+> 
+> 	Arnd
+> 
