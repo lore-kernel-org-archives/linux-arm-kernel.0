@@ -1,59 +1,82 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Mon, 28 Jul 2014 09:27:50 -0700
-Subject: [PATCH 19/19] Documentation: ACPI for ARM64
-In-Reply-To: <5014834.k6eecMddPC@wuerfel>
-References: <1406206825-15590-1-git-send-email-hanjun.guo@linaro.org>
- <1406206825-15590-20-git-send-email-hanjun.guo@linaro.org>
- <CAOesGMhKHGkVK3dOLXXx9GQBMxDmjBu1WDBgHmwdGe1UK3jfcg@mail.gmail.com>
- <5014834.k6eecMddPC@wuerfel>
-Message-ID: <20140728162750.GB32359@quad.lixom.net>
+From: mkl@pengutronix.de (Marc Kleine-Budde)
+Date: Mon, 28 Jul 2014 18:28:54 +0200
+Subject: [PATCH v3 4/4] can: flexcan: add vf610 support for FlexCAN
+In-Reply-To: <e88108c655e2c16dc9cf6c4194547e73@agner.ch>
+References: <cover.1405428166.git.stefan@agner.ch>
+ <ff2ea1726b13dc2ffa3519ce9244f3633cf1420d.1405428166.git.stefan@agner.ch>
+ <53C5398F.2000005@pengutronix.de> <1b8a8ca03b4a160027a79b722f697e25@agner.ch>
+ <601adb6fe47279c115c1cc607365a00e@agner.ch> <53D25C9D.5080803@pengutronix.de>
+ <e88108c655e2c16dc9cf6c4194547e73@agner.ch>
+Message-ID: <53D67A46.3060202@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jul 28, 2014 at 11:07:50AM +0200, Arnd Bergmann wrote:
-> On Saturday 26 July 2014 19:34:48 Olof Johansson wrote:
-> > On Thu, Jul 24, 2014 at 6:00 AM, Hanjun Guo <hanjun.guo@linaro.org> wrote:
-> > > +Relationship with Device Tree
-> > > +-----------------------------
-> > > +
-> > > +ACPI support in drivers and subsystems for ARMv8 should never be mutually
-> > > +exclusive with DT support at compile time.
-> > > +
-> > > +At boot time the kernel will only use one description method depending on
-> > > +parameters passed from the bootloader.
-> > 
-> > Possibly overriden by kernel bootargs. And as debated for quite a
-> > while earlier this year, acpi should still default to off -- if a DT
-> > and ACPI are both passed in, DT should at this time be given priority.
+On 07/28/2014 06:20 PM, Stefan Agner wrote:
+>>> Ping. Anything open/to do from my side?
+>>
+>> Please keep the printing of esr and ctrl in the interrupt handler, add a
+>> #define DEBUG in the driver, but do not change anything else. Then:
+                                    ^^^^^^^^^^^^^^^^^^^^^^^^^^^
 > 
-> I think this would be harder to do with the way that ACPI is passed in
-> to the kernel. IIRC, you always have a minimal DT information based on
-> the ARM64 boot protocol, but in the case of ACPI, this contains pointers
-> to the ACPI tables, which are then used for populating the Linux platform
-> devices (unless acpi=disabled is set), while the other contents of the
-> DTB may be present but we skip the of_platform_populate state.
+> diff --git a/drivers/net/can/flexcan.c b/drivers/net/can/flexcan.c
+> index 1c31a5d..fe8b81c 100644
+> --- a/drivers/net/can/flexcan.c
+> +++ b/drivers/net/can/flexcan.c
+> @@ -19,6 +19,7 @@
+>   *
+>   */
+>  
+> +#define DEBUG
 
-How can it be harder to do? If you support acpi=off, then you should support
-acpi=on.
+keep
 
-Another alternative would be to have an early fixup that stubs out
-the acpi properties from the DTB unless there's an 'acpi' or 'acpi=on'
-argument on the cmdline. Not quite as tidy a solution, though.
+>  #include <linux/netdevice.h>
+>  #include <linux/can.h>
+>  #include <linux/can/dev.h>
+> @@ -743,6 +744,9 @@ static irqreturn_t flexcan_irq(int irq, void
+> *dev_id)
+>  
+>         reg_iflag1 = flexcan_read(&regs->iflag1);
+>         reg_esr = flexcan_read(&regs->esr);
+> +
+> +       printk("flexcan_irq, esr=%08x\n", reg_esr);
+> +       printk("flexcan_irq, ctrl=%08x\n", flexcan_read(&regs->ctrl));
 
-> If this is correct, then replacing the firmware-generated dtb with a
-> user-provided on would implicitly remove the ACPI tables from visibility,
-> which is exactly what we want.
+keep
 
-I was of the impression that firmware patches in the ACPI entries into either
-device-tree before launching the kernel. Is that not the case? And what if
-some bootloader chooses to do it that way in the future? It's better to not
-assume that they get it right.
+>         /* ACK all bus error and state change IRQ sources */
+>         if (reg_esr & FLEXCAN_ESR_ALL_INT)
+>                 flexcan_write(reg_esr & FLEXCAN_ESR_ALL_INT,
+> &regs->esr);
+> @@ -885,8 +889,8 @@ static int flexcan_chip_start(struct net_device
+> *dev)
+>          */
+>         reg_ctrl = flexcan_read(&regs->ctrl);
+>         reg_ctrl &= ~FLEXCAN_CTRL_TSYN;
+> -       reg_ctrl |= FLEXCAN_CTRL_BOFF_REC | FLEXCAN_CTRL_LBUF |
+> -               FLEXCAN_CTRL_ERR_STATE;
+> +       reg_ctrl |= FLEXCAN_CTRL_BOFF_REC | FLEXCAN_CTRL_LBUF;// |
+> +               //FLEXCAN_CTRL_ERR_STATE;
+>         /*
+>          * enable the "error interrupt" (FLEXCAN_CTRL_ERR_MSK),
+>          * on most Flexcan cores, too. Otherwise we don't get
+> 
+> I'm not sure whether you really want to keep the FLEXCAN_CTRL_ERR_STATE
+> commented out...
 
-> It's possible that I'm misremembering it though, and it should be
-> documented better.
+No, please remove this change and redo the test.
 
-Yes, definitely needs to be documented to not leave room for random
-interpretation later on.
+Marc
+-- 
+Pengutronix e.K.                  | Marc Kleine-Budde           |
+Industrial Linux Solutions        | Phone: +49-231-2826-924     |
+Vertretung West/Dortmund          | Fax:   +49-5121-206917-5555 |
+Amtsgericht Hildesheim, HRA 2686  | http://www.pengutronix.de   |
 
-
--Olof
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 242 bytes
+Desc: OpenPGP digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140728/af1eab34/attachment.sig>
