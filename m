@@ -1,33 +1,27 @@
-From: andrew@lunn.ch (Andrew Lunn)
-Date: Mon, 28 Jul 2014 17:52:56 +0200
-Subject: [Patch V2 2/2] i2c: mv64xxx: Remove internal compatible string
- from Documentation
-In-Reply-To: <30588206.eyRbtryspM@wuerfel>
-References: <1406395238-29758-1-git-send-email-andrew@lunn.ch>
- <6346429.sjQYojn1ot@wuerfel> <20140728152506.GF2891@lunn.ch>
- <30588206.eyRbtryspM@wuerfel>
-Message-ID: <20140728155256.GH2891@lunn.ch>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Mon, 28 Jul 2014 17:01:13 +0100
+Subject: [PATCH] irqchip: gic-v3: Only define gic_peek_irq() when building
+ SMP
+In-Reply-To: <1406480224-24628-1-git-send-email-broonie@kernel.org>
+References: <1406480224-24628-1-git-send-email-broonie@kernel.org>
+Message-ID: <53D673C9.2070005@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> > We don't translate into 'Marketing names'. We just turn the register
-> > values into a stringified number. So it would have to be something
-> > like:
-> > 
-> >         if (soc_name_is("7826") && soc_revision_is("1"))
+On 27/07/14 17:57, Mark Brown wrote:
+> From: Mark Brown <broonie@linaro.org>
 > 
-> Hmm, I think that is inconsistent with how the strings are used
-> on other platforms, where you want something that uniquely identifies
-> the device in user-readable strings.
+> If building with CONFIG_SMP disbled (for example, with allnoconfig) then
+> GCC complains that the static function gic_peek_irq() is defined but not
+> used since the only reference is in the SMP initialisation code. Fix this
+> by moving the function definition inside the ifdef.
+> 
+> Signed-off-by: Mark Brown <broonie@linaro.org>
 
-Unfortunately, it is not so simple. There are a few different Armada
-XP SoCs. E.g. dual core and quad core. And this is pretty normal for
-Marvell. There are maybe 5 different Kirkwoods, a few different
-Orion5x etc. So at minimum it would of had to be e.g. "Armada XP
-7826".
+Looks sane to me.
 
-However, it is too late now. This is part of the ABI, and Debian's
-flash-kernel is making use of this in order to get the right DT blob.
-So we cannot change it.
+Acked-by: Marc Zyngier <marc.zyngier@arm.com>
 
-   Andrew
+	M.
+-- 
+Jazz is not dead. It just smells funny...
