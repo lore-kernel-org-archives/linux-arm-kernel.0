@@ -1,136 +1,60 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Mon, 28 Jul 2014 16:38:12 +0100
-Subject: Kexec on arm64
-In-Reply-To: <CAFdej014ohCFYvoUAXWiYGb4_4UmSY2G1MH-NEE_cF1cC-6Mow@mail.gmail.com>
-References: <CAL85gmC9LLcN_uxMY1bM5kLx=N7rZGdGO3bmGHeUVo=Rqgk8uw@mail.gmail.com>
- <1405551861.7262.26.camel@smoke>
- <CAFdej03nixSU=3h+HYk2E3Onb2P3--Di0GM+wCwLS6ZNH7UjEQ@mail.gmail.com>
- <CAFdej00J2mJwcg2Cy6CHVuuQZ4uQ2zZg8oErGPi0uPejievB+Q@mail.gmail.com>
- <1406162287.4062.39.camel@smoke>
- <20140724093603.GC4079@leverpostej>
- <1406247468.4062.59.camel@smoke>
- <CAFdej01w_pE6vv+13cCCyfDs4Rbdkzx4CMUj9q97HBKV0B53ow@mail.gmail.com>
- <1406333901.4062.69.camel@smoke>
- <CAFdej014ohCFYvoUAXWiYGb4_4UmSY2G1MH-NEE_cF1cC-6Mow@mail.gmail.com>
-Message-ID: <20140728153812.GA2576@leverpostej>
+From: afaerber@suse.de (=?ISO-8859-1?Q?Andreas_F=E4rber?=)
+Date: Mon, 28 Jul 2014 17:39:46 +0200
+Subject: [PATCH v2 09/11] Documentation: devicetree: Fix ADI AXI SPDIF
+ specification
+In-Reply-To: <20140728134420.GU17528@sirena.org.uk>
+References: <1406242820-20140-1-git-send-email-afaerber@suse.de>
+ <1406242820-20140-10-git-send-email-afaerber@suse.de>
+ <53D20A61.1050506@metafoo.de> <53D21066.8000905@monstr.eu>
+ <20140725101815.GO17528@sirena.org.uk> <53D2324B.4070602@suse.de>
+ <20140725103905.GP17528@sirena.org.uk> <53D63746.3000905@suse.de>
+ <20140728122042.GR17528@sirena.org.uk> <53D641DC.4020804@suse.de>
+ <20140728134420.GU17528@sirena.org.uk>
+Message-ID: <53D66EC2.1050408@suse.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jul 28, 2014 at 04:00:18PM +0100, Arun Chandran wrote:
-> Hi Geoff
+Am 28.07.2014 15:44, schrieb Mark Brown:
+> On Mon, Jul 28, 2014 at 02:28:12PM +0200, Andreas F?rber wrote:
 > 
-> On Sat, Jul 26, 2014 at 5:48 AM, Geoff Levand <geoff@infradead.org> wrote:
-> > Hi Arun,
-> >
-> > On Fri, 2014-07-25 at 17:18 +0530, Arun Chandran wrote:
-> >> I got this working. As 'Mark Rutland' pointed in another mail that
-> >> it could be problem with flushing the cache; I did a read of
-> >> 1GB data from start of RAM to a volatile var. I assume that
-> >> this will clear and invalidate all that in cache (L1=32K, L2=256 K, L3=8M)
-> >
-> > I wasn't flushing out all the data used by relocate_new_kernel.  I added
-> > a routine that should flush all the pages in the kimage list out to PoC.
-> > Please try a UP build with L3 enabled.
-> >
+>> I will *re*-submit it for your convenience.
 > 
-> Yes I verified this new kernel by stopping just before jumping to the
-> kexeced kernel and taking the memory dump for the kernel
-> and dtb.
-> 
-> CPU#0>dump 0x0000004000080000 0x7F2000 uImage
-> CPU#0>rd
-> GPR00: 0000004000880000 0000000000000000 0000000000000000 0000000000000000
-> GPR04: 0000004000080004 000000000000001b 0000000000000000 ffffffffffffffff
-> GPR08: 0000000000000020 ffffffffffffffff 0000000000000004 0000000000000002
-> GPR12: 00000043ea439fd8 0000004000883000 00000043ea631000 ffffffffffffffff
-> GPR16: ffffffc0000cc31c 0000000000435260 0000007fe9328b90 00000043eaddc002
-> GPR20: 0000004000883000 00000043ea632000 0000000000000000 0000000000000000
-> GPR24: 0000000000000000 0000000000000000 0000000000000000 0000000000000000
-> GPR28: 0000000000000000 0000000000000000 ffffffc000085074 ffffffc3eae53d00
-> 
-> And compared this image with the one taken after booting with
-> my working one(The one with 1GB read of RAM). Both are Identical.
-> That means kexec code now flushes data properly. Note that in both
-> cases I used the same secondary kernel.
-> 
-> But It fails to boot kexeced kernel. If I break the target I can see
-> CPU#0>h
->     Core number       : 0
->     Core state        : debug (AArch64 EL1)
->     Debug entry cause : External Debug Request
->     Current PC        : 0xffffffc000083200
->     Current CPSR      : 0x600003c5 (EL1h)
-> 
-> 
-> So I guess there may be something wrong with
-> the booting of kernel.
-> 
-> I have these changes to the code.
-> 1)
-> #########
-> diff --git a/arch/arm64/kernel/machine_kexec.c
-> b/arch/arm64/kernel/machine_kexec.c
-> index 00cfbd6..da3672b 100644
-> --- a/arch/arm64/kernel/machine_kexec.c
-> +++ b/arch/arm64/kernel/machine_kexec.c
-> @@ -684,7 +691,7 @@ void machine_kexec(struct kimage *image)
->         /* Flush the reboot_code_buffer in preparation for its execution. */
-> 
->         flush_icache_range((unsigned long)reboot_code_buffer,
-> -               relocate_new_kernel_size);
-> +               (unsigned long)(reboot_code_buffer + relocate_new_kernel_size));
-> 
->         /*
->          * Flush any data used by relocate_new_kernel in preparation for
-> #########
-> Passing of second variable to flush_icache_range() is wrong
-> it expects an address not length.
+> Which is what I originally requested when I got CCed into the thread -
+> I'm being grumpy because instead of getting the patch sent to me as
+> requested I got sent a link to patchwork.
 
-A simpler option would be to nuke the entire icache before branching to
-the new image.
+Hindsight, had you simply replied with "Yes, please." instead of the
+non-telling "Documentation/SubmittingPatches.", you would've spared
+yourself keystrokes and us four mailing list messages. ;)
 
-> 
-> 2)
-> 
-> #######
-> diff --git a/arch/arm64/kernel/process.c b/arch/arm64/kernel/process.c
-> index 9ed7327..e3fc8d6 100644
-> --- a/arch/arm64/kernel/process.c
-> +++ b/arch/arm64/kernel/process.c
-> 
-> @@ -84,12 +91,17 @@ void soft_restart(unsigned long addr)
->  {
->         typedef void (*phys_reset_t)(unsigned long);
->         phys_reset_t phys_reset;
-> +       unsigned long jump_addr = addr;
-> +
-> +       phys_reset = (phys_reset_t)virt_to_phys(cpu_reset);
-> +
-> +       __flush_dcache_area(&jump_addr, 8);
-> +       __flush_dcache_area(&phys_reset, 8);
+Similarly, your statement about false negatives didn't really help in
+resolving the not-CC'ed problem. I now know to CC you if I ever have
+something for adi,axi-spdif-tx.txt again, but the next person might make
+you grumpy again and potentially demotivates new contributors, so
+certainly worth fixing.
 
-Are these values really not getting stashed in registers?
+Regmap, SPI, regulators, touchscreen MAINTAINERS entries seem unrelated.
+Should your "SOUND - SOC LAYER / DYNAMIC AUDIO POWER MANAGEMENT (ASoC)"
+MAINTAINERS entry get an
+F: Documentation/devicetree/bindings/sound/
+or is the "ANALOG DEVICES Inc ASOC DRIVERS" entry missing a line
+F: sound/soc/adi/
+F: Documentation/devicetree/bindings/sound/adi,axi-spdif-tx.txt
+(which would then still not CC you)
+or is a new MAINTAINERS section needed that CCs specifically Lars-Peter
+and you on the latter?
 
-If the compiler is spilling, then we have absolutely no guarantee about
-any part of the stack. If that's the case, then we can't use the stack
-at all. These need to be rewritten in asm if the compiler is spilling.
+Regards,
+Andreas
 
-Thanks,
-Mark.
+-- 
+SUSE LINUX Products GmbH, Maxfeldstr. 5, 90409 N?rnberg, Germany
+GF: Jeff Hawn, Jennifer Guild, Felix Imend?rffer; HRB 16746 AG N?rnberg
 
-> 
->         setup_restart();
-> 
->         /* Switch to the identity mapping */
-> -       phys_reset = (phys_reset_t)virt_to_phys(cpu_reset);
-> -       phys_reset(addr);
-> +       phys_reset(jump_addr);
-> 
->         /* Should never get here */
->         BUG();
-> ########
-> 
-> Without this flushing it will jump to wrong addr.
-> 
-> --Arun
-> 
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: OpenPGP digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140728/ba5abc57/attachment.sig>
