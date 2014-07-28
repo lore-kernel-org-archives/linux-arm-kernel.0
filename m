@@ -1,352 +1,299 @@
 From: haojian.zhuang@linaro.org (Haojian Zhuang)
-Date: Mon, 28 Jul 2014 21:57:51 +0800
-Subject: [PATCH v15 07/12] ARM: dts: append hip04 dts
+Date: Mon, 28 Jul 2014 21:57:55 +0800
+Subject: [PATCH v15 11/12] virt: arm: support hip04 gic
 In-Reply-To: <1406555876-11989-1-git-send-email-haojian.zhuang@linaro.org>
 References: <1406555876-11989-1-git-send-email-haojian.zhuang@linaro.org>
-Message-ID: <1406555876-11989-8-git-send-email-haojian.zhuang@linaro.org>
+Message-ID: <1406555876-11989-12-git-send-email-haojian.zhuang@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add hip04-d01.dts & hip04.dtsi for hip04 SoC platform.
+In ARM standard GIC, GICH_APR offset is 0xf0 & GICH_LR0 offset is 0x100.
+In HiP04 GIC, GICH_APR offset is 0x70 & GICH_LR0 offset is 0x80.
+
+Now reuse the nr_lr field in struct vgic_cpu. Bit[31:16] is used to store
+GICH_APR offset in HiP04, and bit[15:0] is used to store real nr_lr
+variable. In ARM standard GIC, don't set bit[31:16]. So we could avoid
+to change the VGIC implementation in arm64.
 
 Signed-off-by: Haojian Zhuang <haojian.zhuang@linaro.org>
 ---
- arch/arm/boot/dts/Makefile      |   1 +
- arch/arm/boot/dts/hip04-d01.dts |  39 ++++++
- arch/arm/boot/dts/hip04.dtsi    | 267 ++++++++++++++++++++++++++++++++++++++++
- 3 files changed, 307 insertions(+)
- create mode 100644 arch/arm/boot/dts/hip04-d01.dts
- create mode 100644 arch/arm/boot/dts/hip04.dtsi
+ arch/arm/kernel/asm-offsets.c   |  2 +-
+ arch/arm/kvm/interrupts_head.S  | 29 +++++++++++++++++++++++------
+ arch/arm64/kernel/asm-offsets.c |  2 +-
+ arch/arm64/kvm/hyp.S            |  4 ++--
+ include/kvm/arm_vgic.h          |  7 +++++--
+ include/linux/irqchip/arm-gic.h |  6 ++++++
+ virt/kvm/arm/vgic.c             | 37 ++++++++++++++++++++++++++-----------
+ 7 files changed, 64 insertions(+), 23 deletions(-)
 
-diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
-index 721525e..6587bbf 100644
---- a/arch/arm/boot/dts/Makefile
-+++ b/arch/arm/boot/dts/Makefile
-@@ -86,6 +86,7 @@ dtb-$(CONFIG_ARCH_HI3xxx) += hi3620-hi4511.dtb
- dtb-$(CONFIG_ARCH_HIX5HD2) += hix5hd2-dkb.dtb
- dtb-$(CONFIG_ARCH_HIGHBANK) += highbank.dtb \
- 	ecx-2000.dtb
-+dtb-$(CONFIG_ARCH_HIP04) += hip04-d01.dtb
- dtb-$(CONFIG_ARCH_INTEGRATOR) += integratorap.dtb \
- 	integratorcp.dtb
- dtb-$(CONFIG_ARCH_KEYSTONE) += k2hk-evm.dtb \
-diff --git a/arch/arm/boot/dts/hip04-d01.dts b/arch/arm/boot/dts/hip04-d01.dts
-new file mode 100644
-index 0000000..661c8e5
---- /dev/null
-+++ b/arch/arm/boot/dts/hip04-d01.dts
-@@ -0,0 +1,39 @@
-+/*
-+ *  Copyright (C) 2013-2014 Linaro Ltd.
-+ *  Author: Haojian Zhuang <haojian.zhuang@linaro.org>
-+ *
-+ *  This program is free software; you can redistribute it and/or modify
-+ *  it under the terms of the GNU General Public License version 2 as
-+ *  publishhed by the Free Software Foundation.
-+ */
+diff --git a/arch/arm/kernel/asm-offsets.c b/arch/arm/kernel/asm-offsets.c
+index 85598b5..166cc98 100644
+--- a/arch/arm/kernel/asm-offsets.c
++++ b/arch/arm/kernel/asm-offsets.c
+@@ -189,7 +189,7 @@ int main(void)
+   DEFINE(VGIC_CPU_ELRSR,	offsetof(struct vgic_cpu, vgic_elrsr));
+   DEFINE(VGIC_CPU_APR,		offsetof(struct vgic_cpu, vgic_apr));
+   DEFINE(VGIC_CPU_LR,		offsetof(struct vgic_cpu, vgic_lr));
+-  DEFINE(VGIC_CPU_NR_LR,	offsetof(struct vgic_cpu, nr_lr));
++  DEFINE(VGIC_CPU_HW_CFG,	offsetof(struct vgic_cpu, hw_cfg));
+ #ifdef CONFIG_KVM_ARM_TIMER
+   DEFINE(VCPU_TIMER_CNTV_CTL,	offsetof(struct kvm_vcpu, arch.timer_cpu.cntv_ctl));
+   DEFINE(VCPU_TIMER_CNTV_CVAL,	offsetof(struct kvm_vcpu, arch.timer_cpu.cntv_cval));
+diff --git a/arch/arm/kvm/interrupts_head.S b/arch/arm/kvm/interrupts_head.S
+index 76af9302..9fbbf99 100644
+--- a/arch/arm/kvm/interrupts_head.S
++++ b/arch/arm/kvm/interrupts_head.S
+@@ -419,7 +419,9 @@ vcpu	.req	r0		@ vcpu pointer always in r0
+ 	ldr	r7, [r2, #GICH_EISR1]
+ 	ldr	r8, [r2, #GICH_ELRSR0]
+ 	ldr	r9, [r2, #GICH_ELRSR1]
+-	ldr	r10, [r2, #GICH_APR]
++	ldr	r10, [r11, #VGIC_CPU_HW_CFG]
++	mov	r10, r10, lsr #HWCFG_APR_SHIFT
++	ldr	r10, [r2, r10]
+ 
+ 	str	r3, [r11, #VGIC_CPU_HCR]
+ 	str	r4, [r11, #VGIC_CPU_VMCR]
+@@ -435,9 +437,15 @@ vcpu	.req	r0		@ vcpu pointer always in r0
+ 	str	r5, [r2, #GICH_HCR]
+ 
+ 	/* Save list registers */
+-	add	r2, r2, #GICH_LR0
++	ldr	r4, [r11, #VGIC_CPU_HW_CFG]
++	mov	r10, r4, lsr #HWCFG_APR_SHIFT
++	/* the offset between GICH_APR & GICH_LR0 is 0x10 */
++	add	r10, r10, #0x10
++	add	r2, r2, r10
+ 	add	r3, r11, #VGIC_CPU_LR
+-	ldr	r4, [r11, #VGIC_CPU_NR_LR]
++	/* Get NR_LR from VGIC_CPU_HW_CFG */
++	ldr	r6, =HWCFG_NR_LR_MASK
++	and	r4, r4, r6
+ 1:	ldr	r6, [r2], #4
+ 	str	r6, [r3], #4
+ 	subs	r4, r4, #1
+@@ -469,12 +477,21 @@ vcpu	.req	r0		@ vcpu pointer always in r0
+ 
+ 	str	r3, [r2, #GICH_HCR]
+ 	str	r4, [r2, #GICH_VMCR]
+-	str	r8, [r2, #GICH_APR]
++	ldr	r6, [r11, #VGIC_CPU_HW_CFG]
++	mov	r6, r6, lsr #HWCFG_APR_SHIFT
++	str	r8, [r2, r6]
+ 
+ 	/* Restore list registers */
+-	add	r2, r2, #GICH_LR0
++	ldr	r4, [r11, #VGIC_CPU_HW_CFG]
++	mov	r6, r4, lsr #HWCFG_APR_SHIFT
++	/* the offset between GICH_APR & GICH_LR0 is 0x10 */
++	add	r6, r6, #0x10
++	/* get offset of GICH_LR0 */
++	add	r2, r2, r6
++	/* Get NR_LR from VGIC_CPU_HW_CFG */
+ 	add	r3, r11, #VGIC_CPU_LR
+-	ldr	r4, [r11, #VGIC_CPU_NR_LR]
++	ldr	r6, =HWCFG_NR_LR_MASK
++	and	r4, r4, r6
+ 1:	ldr	r6, [r3], #4
+ 	str	r6, [r2], #4
+ 	subs	r4, r4, #1
+diff --git a/arch/arm64/kernel/asm-offsets.c b/arch/arm64/kernel/asm-offsets.c
+index 646f888..2422358 100644
+--- a/arch/arm64/kernel/asm-offsets.c
++++ b/arch/arm64/kernel/asm-offsets.c
+@@ -136,7 +136,7 @@ int main(void)
+   DEFINE(VGIC_CPU_ELRSR,	offsetof(struct vgic_cpu, vgic_elrsr));
+   DEFINE(VGIC_CPU_APR,		offsetof(struct vgic_cpu, vgic_apr));
+   DEFINE(VGIC_CPU_LR,		offsetof(struct vgic_cpu, vgic_lr));
+-  DEFINE(VGIC_CPU_NR_LR,	offsetof(struct vgic_cpu, nr_lr));
++  DEFINE(VGIC_CPU_HW_CFG,	offsetof(struct vgic_cpu, hw_cfg));
+   DEFINE(KVM_VTTBR,		offsetof(struct kvm, arch.vttbr));
+   DEFINE(KVM_VGIC_VCTRL,	offsetof(struct kvm, arch.vgic.vctrl_base));
+ #endif
+diff --git a/arch/arm64/kvm/hyp.S b/arch/arm64/kvm/hyp.S
+index b0d1512..2dbe337 100644
+--- a/arch/arm64/kvm/hyp.S
++++ b/arch/arm64/kvm/hyp.S
+@@ -426,7 +426,7 @@ CPU_BE(	rev	w11, w11 )
+ 
+ 	/* Save list registers */
+ 	add	x2, x2, #GICH_LR0
+-	ldr	w4, [x3, #VGIC_CPU_NR_LR]
++	ldr	w4, [x3, #VGIC_CPU_HW_CFG]
+ 	add	x3, x3, #VGIC_CPU_LR
+ 1:	ldr	w5, [x2], #4
+ CPU_BE(	rev	w5, w5 )
+@@ -465,7 +465,7 @@ CPU_BE(	rev	w6, w6 )
+ 
+ 	/* Restore list registers */
+ 	add	x2, x2, #GICH_LR0
+-	ldr	w4, [x3, #VGIC_CPU_NR_LR]
++	ldr	w4, [x3, #VGIC_CPU_HW_CFG]
+ 	add	x3, x3, #VGIC_CPU_LR
+ 1:	ldr	w5, [x3], #4
+ CPU_BE(	rev	w5, w5 )
+diff --git a/include/kvm/arm_vgic.h b/include/kvm/arm_vgic.h
+index f27000f..eba4b51 100644
+--- a/include/kvm/arm_vgic.h
++++ b/include/kvm/arm_vgic.h
+@@ -122,8 +122,11 @@ struct vgic_cpu {
+ 	/* Bitmap of used/free list registers */
+ 	DECLARE_BITMAP(	lr_used, VGIC_MAX_LRS);
+ 
+-	/* Number of list registers on this CPU */
+-	int		nr_lr;
++	/*
++	 * bit[31:16]: GICH_APR offset
++	 * bit[15:0]:  Number of list registers on this CPU
++	 */
++	u32		hw_cfg;
+ 
+ 	/* CPU vif control registers for world switch */
+ 	u32		vgic_hcr;
+diff --git a/include/linux/irqchip/arm-gic.h b/include/linux/irqchip/arm-gic.h
+index 45e2d8c..b055f92 100644
+--- a/include/linux/irqchip/arm-gic.h
++++ b/include/linux/irqchip/arm-gic.h
+@@ -49,6 +49,8 @@
+ #define GICH_ELRSR1 			0x34
+ #define GICH_APR			0xf0
+ #define GICH_LR0			0x100
++#define HIP04_GICH_APR			0x70
++/* GICH_LR0 offset in HiP04 is 0x80 */
+ 
+ #define GICH_HCR_EN			(1 << 0)
+ #define GICH_HCR_UIE			(1 << 1)
+@@ -73,6 +75,10 @@
+ #define GICH_MISR_EOI			(1 << 0)
+ #define GICH_MISR_U			(1 << 1)
+ 
++#define HWCFG_NR_LR_MASK	0xffff
++#define HWCFG_APR_SHIFT		16
++#define HWCFG_APR_MASK		(0xffff << HWCFG_APR_SHIFT)
 +
-+/dts-v1/;
-+
-+/* For bootwrapper */
-+/memreserve/ 0x10c00000 0x00010000;
-+
-+#include "hip04.dtsi"
-+
-+/ {
-+	/* memory bus is 64-bit */
-+	#address-cells = <2>;
-+	#size-cells = <2>;
-+	model = "Hisilicon D01 Development Board";
-+	compatible = "hisilicon,hip04-d01";
-+
-+	memory at 00000000,10000000 {
-+		device_type = "memory";
-+		reg = <0x00000000 0x10000000 0x00000000 0xc0000000>;
-+	};
-+
-+	memory at 00000004,c0000000 {
-+		device_type = "memory";
-+		reg = <0x00000004 0xc0000000 0x00000003 0x40000000>;
-+	};
-+
-+	soc {
-+		uart0: uart at 4007000 {
-+			status = "ok";
-+		};
-+	};
+ #ifndef __ASSEMBLY__
+ 
+ struct device_node;
+diff --git a/virt/kvm/arm/vgic.c b/virt/kvm/arm/vgic.c
+index 56ff9be..6c0ee89 100644
+--- a/virt/kvm/arm/vgic.c
++++ b/virt/kvm/arm/vgic.c
+@@ -97,7 +97,7 @@ static void vgic_retire_disabled_irqs(struct kvm_vcpu *vcpu);
+ static void vgic_update_state(struct kvm *kvm);
+ static void vgic_kick_vcpus(struct kvm *kvm);
+ static void vgic_dispatch_sgi(struct kvm_vcpu *vcpu, u32 reg);
+-static u32 vgic_nr_lr;
++static u32 vgic_hw_cfg, vgic_nr_lr;
+ 
+ static unsigned int vgic_maint_irq;
+ 
+@@ -625,7 +625,7 @@ static void vgic_unqueue_irqs(struct kvm_vcpu *vcpu)
+ 	int i, irq, source_cpu;
+ 	u32 *lr;
+ 
+-	for_each_set_bit(i, vgic_cpu->lr_used, vgic_cpu->nr_lr) {
++	for_each_set_bit(i, vgic_cpu->lr_used, vgic_nr_lr) {
+ 		lr = &vgic_cpu->vgic_lr[i];
+ 		irq = LR_IRQID(*lr);
+ 		source_cpu = LR_CPUID(*lr);
+@@ -1006,7 +1006,7 @@ static void vgic_retire_disabled_irqs(struct kvm_vcpu *vcpu)
+ 	struct vgic_cpu *vgic_cpu = &vcpu->arch.vgic_cpu;
+ 	int lr;
+ 
+-	for_each_set_bit(lr, vgic_cpu->lr_used, vgic_cpu->nr_lr) {
++	for_each_set_bit(lr, vgic_cpu->lr_used, vgic_nr_lr) {
+ 		int irq = vgic_cpu->vgic_lr[lr] & GICH_LR_VIRTUALID;
+ 
+ 		if (!vgic_irq_is_enabled(vcpu, irq)) {
+@@ -1047,8 +1047,8 @@ static bool vgic_queue_irq(struct kvm_vcpu *vcpu, u8 sgi_source_id, int irq)
+ 
+ 	/* Try to use another LR for this interrupt */
+ 	lr = find_first_zero_bit((unsigned long *)vgic_cpu->lr_used,
+-			       vgic_cpu->nr_lr);
+-	if (lr >= vgic_cpu->nr_lr)
++				 vgic_nr_lr);
++	if (lr >= vgic_nr_lr)
+ 		return false;
+ 
+ 	kvm_debug("LR%d allocated for IRQ%d %x\n", lr, irq, sgi_source_id);
+@@ -1183,7 +1183,7 @@ static bool vgic_process_maintenance(struct kvm_vcpu *vcpu)
+ 		int lr, irq;
+ 
+ 		for_each_set_bit(lr, (unsigned long *)vgic_cpu->vgic_eisr,
+-				 vgic_cpu->nr_lr) {
++				 vgic_nr_lr) {
+ 			irq = vgic_cpu->vgic_lr[lr] & GICH_LR_VIRTUALID;
+ 
+ 			vgic_irq_clear_active(vcpu, irq);
+@@ -1227,7 +1227,7 @@ static void __kvm_vgic_sync_hwstate(struct kvm_vcpu *vcpu)
+ 
+ 	/* Clear mappings for empty LRs */
+ 	for_each_set_bit(lr, (unsigned long *)vgic_cpu->vgic_elrsr,
+-			 vgic_cpu->nr_lr) {
++			 vgic_nr_lr) {
+ 		int irq;
+ 
+ 		if (!test_and_clear_bit(lr, vgic_cpu->lr_used))
+@@ -1241,8 +1241,8 @@ static void __kvm_vgic_sync_hwstate(struct kvm_vcpu *vcpu)
+ 
+ 	/* Check if we still have something up our sleeve... */
+ 	pending = find_first_zero_bit((unsigned long *)vgic_cpu->vgic_elrsr,
+-				      vgic_cpu->nr_lr);
+-	if (level_pending || pending < vgic_cpu->nr_lr)
++				      vgic_nr_lr);
++	if (level_pending || pending < vgic_nr_lr)
+ 		set_bit(vcpu->vcpu_id, &dist->irq_pending_on_cpu);
+ }
+ 
+@@ -1438,7 +1438,7 @@ int kvm_vgic_vcpu_init(struct kvm_vcpu *vcpu)
+ 	 */
+ 	vgic_cpu->vgic_vmcr = 0;
+ 
+-	vgic_cpu->nr_lr = vgic_nr_lr;
++	vgic_cpu->hw_cfg = vgic_hw_cfg;
+ 	vgic_cpu->vgic_hcr = GICH_HCR_EN; /* Get the show on the road... */
+ 
+ 	return 0;
+@@ -1470,17 +1470,31 @@ static struct notifier_block vgic_cpu_nb = {
+ 	.notifier_call = vgic_cpu_notify,
+ };
+ 
++static const struct of_device_id of_vgic_ids[] = {
++	{
++		.compatible = "arm,cortex-a15-gic",
++		.data = (void *)GICH_APR,
++	}, {
++		.compatible = "hisilicon,hip04-gic",
++		.data = (void *)HIP04_GICH_APR,
++	}, {
++	},
 +};
-diff --git a/arch/arm/boot/dts/hip04.dtsi b/arch/arm/boot/dts/hip04.dtsi
-new file mode 100644
-index 0000000..30942be
---- /dev/null
-+++ b/arch/arm/boot/dts/hip04.dtsi
-@@ -0,0 +1,267 @@
-+/*
-+ * Hisilicon Ltd. HiP04 SoC
-+ *
-+ * Copyright (C) 2013-2014 Hisilicon Ltd.
-+ * Copyright (C) 2013-2014 Linaro Ltd.
-+ *
-+ * Author: Haojian Zhuang <haojian.zhuang@linaro.org>
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * publishhed by the Free Software Foundation.
-+ */
 +
-+#include <dt-bindings/clock/hip04-clock.h>
-+
-+/ {
-+	/* memory bus is 64-bit */
-+	#address-cells = <2>;
-+	#size-cells = <2>;
-+
-+	aliases {
-+		serial0 = &uart0;
-+	};
-+
-+	cpus {
-+		#address-cells = <1>;
-+		#size-cells = <0>;
-+
-+		cpu-map {
-+			cluster0 {
-+				core0 {
-+					cpu = <&CPU0>;
-+				};
-+				core1 {
-+					cpu = <&CPU1>;
-+				};
-+				core2 {
-+					cpu = <&CPU2>;
-+				};
-+				core3 {
-+					cpu = <&CPU3>;
-+				};
-+			};
-+			cluster1 {
-+				core0 {
-+					cpu = <&CPU4>;
-+				};
-+				core1 {
-+					cpu = <&CPU5>;
-+				};
-+				core2 {
-+					cpu = <&CPU6>;
-+				};
-+				core3 {
-+					cpu = <&CPU7>;
-+				};
-+			};
-+			cluster2 {
-+				core0 {
-+					cpu = <&CPU8>;
-+				};
-+				core1 {
-+					cpu = <&CPU9>;
-+				};
-+				core2 {
-+					cpu = <&CPU10>;
-+				};
-+				core3 {
-+					cpu = <&CPU11>;
-+				};
-+			};
-+			cluster3 {
-+				core0 {
-+					cpu = <&CPU12>;
-+				};
-+				core1 {
-+					cpu = <&CPU13>;
-+				};
-+				core2 {
-+					cpu = <&CPU14>;
-+				};
-+				core3 {
-+					cpu = <&CPU15>;
-+				};
-+			};
-+		};
-+		CPU0: cpu at 0 {
-+			device_type = "cpu";
-+			compatible = "arm,cortex-a15";
-+			reg = <0>;
-+		};
-+		CPU1: cpu at 1 {
-+			device_type = "cpu";
-+			compatible = "arm,cortex-a15";
-+			reg = <1>;
-+		};
-+		CPU2: cpu at 2 {
-+			device_type = "cpu";
-+			compatible = "arm,cortex-a15";
-+			reg = <2>;
-+		};
-+		CPU3: cpu at 3 {
-+			device_type = "cpu";
-+			compatible = "arm,cortex-a15";
-+			reg = <3>;
-+		};
-+		CPU4: cpu at 100 {
-+			device_type = "cpu";
-+			compatible = "arm,cortex-a15";
-+			reg = <0x100>;
-+		};
-+		CPU5: cpu at 101 {
-+			device_type = "cpu";
-+			compatible = "arm,cortex-a15";
-+			reg = <0x101>;
-+		};
-+		CPU6: cpu at 102 {
-+			device_type = "cpu";
-+			compatible = "arm,cortex-a15";
-+			reg = <0x102>;
-+		};
-+		CPU7: cpu at 103 {
-+			device_type = "cpu";
-+			compatible = "arm,cortex-a15";
-+			reg = <0x103>;
-+		};
-+		CPU8: cpu at 200 {
-+			device_type = "cpu";
-+			compatible = "arm,cortex-a15";
-+			reg = <0x200>;
-+		};
-+		CPU9: cpu at 201 {
-+			device_type = "cpu";
-+			compatible = "arm,cortex-a15";
-+			reg = <0x201>;
-+		};
-+		CPU10: cpu at 202 {
-+			device_type = "cpu";
-+			compatible = "arm,cortex-a15";
-+			reg = <0x202>;
-+		};
-+		CPU11: cpu at 203 {
-+			device_type = "cpu";
-+			compatible = "arm,cortex-a15";
-+			reg = <0x203>;
-+		};
-+		CPU12: cpu at 300 {
-+			device_type = "cpu";
-+			compatible = "arm,cortex-a15";
-+			reg = <0x300>;
-+		};
-+		CPU13: cpu at 301 {
-+			device_type = "cpu";
-+			compatible = "arm,cortex-a15";
-+			reg = <0x301>;
-+		};
-+		CPU14: cpu at 302 {
-+			device_type = "cpu";
-+			compatible = "arm,cortex-a15";
-+			reg = <0x302>;
-+		};
-+		CPU15: cpu at 303 {
-+			device_type = "cpu";
-+			compatible = "arm,cortex-a15";
-+			reg = <0x303>;
-+		};
-+	};
-+
-+	clock: clock {
-+		compatible = "hisilicon,hip04-clock";
-+		/* dummy register.
-+		 * Don't need to access clock registers since they're
-+		 * configured in firmware already.
-+		 */
-+		reg = <0 0 0 0x1000>;
-+		#clock-cells = <1>;
-+	};
-+
-+	timer {
-+		compatible = "arm,armv7-timer";
-+		interrupt-parent = <&gic>;
-+		interrupts = <1 13 0xf08>,
-+			     <1 14 0xf08>,
-+			     <1 11 0xf08>,
-+			     <1 10 0xf08>;
-+	};
-+
-+	soc {
-+		/* It's a 32-bit SoC. */
-+		#address-cells = <1>;
-+		#size-cells = <1>;
-+		compatible = "simple-bus";
-+		interrupt-parent = <&gic>;
-+		ranges = <0 0 0xe0000000 0x10000000>;
-+
-+		gic: interrupt-controller at c01000 {
-+			compatible = "hisilicon,hip04-gic";
-+			#interrupt-cells = <3>;
-+			#address-cells = <0>;
-+			interrupt-controller;
-+			interrupts = <1 9 0xf04>;
-+
-+			reg = <0xc01000 0x1000>, <0xc02000 0x1000>,
-+			      <0xc04000 0x2000>, <0xc06000 0x2000>;
-+		};
-+
-+		sysctrl: sysctrl {
-+			compatible = "hisilicon,sysctrl";
-+			reg = <0x3e00000 0x00100000>;
-+			relocation-entry = <0xe0000100>;
-+			relocation-size = <0x1000>;
-+			bootwrapper-phys = <0x10c00000>;
-+			bootwrapper-size = <0x10000>;
-+			bootwrapper-magic = <0xa5a5a5a5>;
-+		};
-+
-+		fabric: fabric {
-+			compatible = "hisilicon,hip04-fabric";
-+			reg = <0x302a000 0x1000>;
-+		};
-+
-+		dual_timer0: dual_timer at 3000000 {
-+			compatible = "arm,sp804", "arm,primecell";
-+			reg = <0x3000000 0x1000>;
-+			interrupts = <0 224 4>;
-+			clocks = <&clock HIP04_CLK_50M>;
-+			clock-names = "apb_pclk";
-+		};
-+
-+		arm-pmu {
-+			compatible = "arm,cortex-a15-pmu";
-+			interrupts = <0 64 4>,
-+				     <0 65 4>,
-+				     <0 66 4>,
-+				     <0 67 4>,
-+				     <0 68 4>,
-+				     <0 69 4>,
-+				     <0 70 4>,
-+				     <0 71 4>,
-+				     <0 72 4>,
-+				     <0 73 4>,
-+				     <0 74 4>,
-+				     <0 75 4>,
-+				     <0 76 4>,
-+				     <0 77 4>,
-+				     <0 78 4>,
-+				     <0 79 4>;
-+		};
-+
-+		uart0: uart at 4007000 {
-+			compatible = "snps,dw-apb-uart";
-+			reg = <0x4007000 0x1000>;
-+			interrupts = <0 381 4>;
-+			clocks = <&clock HIP04_CLK_168M>;
-+			clock-names = "uartclk";
-+			reg-shift = <2>;
-+			status = "disabled";
-+		};
-+
-+		sata0: sata at a000000 {
-+			compatible = "hisilicon,hisi-ahci";
-+			reg = <0xa000000 0x1000000>;
-+			interrupts = <0 372 4>;
-+		};
-+
-+	};
-+};
+ int kvm_vgic_hyp_init(void)
+ {
+ 	int ret;
+ 	struct resource vctrl_res;
+ 	struct resource vcpu_res;
++	const struct of_device_id *match;
+ 
+-	vgic_node = of_find_compatible_node(NULL, NULL, "arm,cortex-a15-gic");
++	vgic_node = of_find_matching_node_and_match(NULL, of_vgic_ids, &match);
+ 	if (!vgic_node) {
+ 		kvm_err("error: no compatible vgic node in DT\n");
+ 		return -ENODEV;
+ 	}
++	/* High word of vgic_hw_cfg is the offset of GICH_APR. */
++	vgic_hw_cfg = (unsigned long)match->data << HWCFG_APR_SHIFT;
+ 
+ 	vgic_maint_irq = irq_of_parse_and_map(vgic_node, 0);
+ 	if (!vgic_maint_irq) {
+@@ -1517,6 +1531,7 @@ int kvm_vgic_hyp_init(void)
+ 
+ 	vgic_nr_lr = readl_relaxed(vgic_vctrl_base + GICH_VTR);
+ 	vgic_nr_lr = (vgic_nr_lr & 0x3f) + 1;
++	vgic_hw_cfg |= vgic_nr_lr;
+ 
+ 	ret = create_hyp_io_mappings(vgic_vctrl_base,
+ 				     vgic_vctrl_base + resource_size(&vctrl_res),
 -- 
 1.9.1
