@@ -1,79 +1,41 @@
-From: sudeep.holla@arm.com (Sudeep Holla)
-Date: Mon, 28 Jul 2014 19:51:31 +0100
-Subject: [PATCH 04/19] ARM64 / ACPI: Introduce arch_fix_phys_package_id()
- for cpu topology
-In-Reply-To: <1406206825-15590-5-git-send-email-hanjun.guo@linaro.org>
-References: <1406206825-15590-1-git-send-email-hanjun.guo@linaro.org>
- <1406206825-15590-5-git-send-email-hanjun.guo@linaro.org>
-Message-ID: <53D69BB3.8040106@arm.com>
+From: riel@redhat.com (Rik van Riel)
+Date: Mon, 28 Jul 2014 14:52:18 -0400
+Subject: [PATCH v4 00/12] sched: consolidation of cpu_capacity
+In-Reply-To: <1406569906-9763-1-git-send-email-vincent.guittot@linaro.org>
+References: <1406569906-9763-1-git-send-email-vincent.guittot@linaro.org>
+Message-ID: <53D69BE2.9010605@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+-----BEGIN PGP SIGNED MESSAGE-----
+Hash: SHA1
 
+On 07/28/2014 01:51 PM, Vincent Guittot wrote:
 
-On 24/07/14 14:00, Hanjun Guo wrote:
-> arch_fix_phys_package_id() will be called in ACPI core to use
-> the slot number provided by ACPI to update the physical package
-> id, then we can get the right value in the "physical id" field
-> of /proc/cpuinfo.
->
-> Signed-off-by: Hanjun Guo <hanjun.guo@linaro.org>
-> ---
->   arch/arm64/include/asm/topology.h |    2 ++
->   arch/arm64/kernel/topology.c      |   14 ++++++++++++++
->   2 files changed, 16 insertions(+)
->
-> diff --git a/arch/arm64/include/asm/topology.h b/arch/arm64/include/asm/topology.h
-> index 7ebcd31..2b216d4 100644
-> --- a/arch/arm64/include/asm/topology.h
-> +++ b/arch/arm64/include/asm/topology.h
-> @@ -23,11 +23,13 @@ extern struct cpu_topology cpu_topology[NR_CPUS];
->   void init_cpu_topology(void);
->   void store_cpu_topology(unsigned int cpuid);
->   const struct cpumask *cpu_coregroup_mask(int cpu);
-> +void arch_fix_phys_package_id(int num, u32 slot);
->
->   #else
->
->   static inline void init_cpu_topology(void) { }
->   static inline void store_cpu_topology(unsigned int cpuid) { }
-> +static inline void arch_fix_phys_package_id(int num, u32 slot) { }
->
->   #endif
->
-> diff --git a/arch/arm64/kernel/topology.c b/arch/arm64/kernel/topology.c
-> index 43514f9..c547885 100644
-> --- a/arch/arm64/kernel/topology.c
-> +++ b/arch/arm64/kernel/topology.c
-> @@ -281,3 +281,17 @@ void __init init_cpu_topology(void)
->   	if (parse_dt_topology())
->   		reset_cpu_topology();
->   }
-> +
-> +/*
-> + * Use the CPU slot number provided by ACPI to update the physical
-> + * package id when cpuid_topo->cluster_id is not available, then we
-> + * can get the right value in the "physical id" field of /proc/cpuinfo.
-> + */
+> The usage_avg_contrib is based on the current implementation of
+> the load avg tracking. I also have a version of the
+> usage_avg_contrib that is based on the new implementation [3] but
+> haven't provide the patches and results as [3] is still under
+> review. I can provide change above [3] to change how 
+> usage_avg_contrib is computed and adapt to new mecanism.
+> 
+> TODO: manage conflict with the next version of [4]
 
-We don't have "physical id" field in /proc/cpuinfo on ARM64.
+FWIW, your series makes sense to me, and only the first hunk of patch
+8/12 looks like it would conflict with my patches, in that your patch
+changes code that will only be reached in exceptional circumstances.
 
-> +void arch_fix_phys_package_id(int num, u32 slot)
-> +{
-> +	struct cpu_topology *cpuid_topo = &cpu_topology[num];
-> +
-> +	if (cpuid_topo->cluster_id == -1)
-> +		cpuid_topo->cluster_id = slot;
-> +}
-> +EXPORT_SYMBOL_GPL(arch_fix_phys_package_id);
->
+- -- 
+All rights reversed
+-----BEGIN PGP SIGNATURE-----
+Version: GnuPG v1
+Comment: Using GnuPG with Thunderbird - http://www.enigmail.net/
 
-The ACPI core uses this function to set the package id as read from
-_SUN from the device. As per spec, _SUN is used by OSPM UI to identify
-slots for the user. Do we know how will this be used on ARM64 ?
-
-If not clear at this time, better to define it or keep it empty. I see
-even x86 does nothing in that function.
-
-Regards,
-Sudeep
+iQEcBAEBAgAGBQJT1pviAAoJEM553pKExN6D4IoH/3Ou8H8kM5zhgDc4sDY5h+0F
+qFDZIwdCWtKL36QfuZXIS/SXzikzs8XjxG7PIDj/sIEcpzs5jzGvlqAr/nTbQGlo
+2ONnXobwSYSPbf8tEKrX4sdPS4YH1sd8+DgHC9TdYOgnWhdjpvfrwA9vFHmsZZvC
+SxlLKCwqdWgtQPCJiGGJGdQOaB+OsNAJcoyo8OyokdOUrpMX30bfLT+8TiAiB/zS
+uKrjzj3yZbrd/CRgpTSYopZgtzxHciZLLuIAurw7BJrUPL8Q1SL1HQ5eC5q/eS07
+hXJrD6/o2DDfWoyeT2eDdJ9QkZKxT3vDKqC4WyVYn/2JZMzD5C+PY3XmQk7uYbU=
+=zV+U
+-----END PGP SIGNATURE-----
