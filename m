@@ -1,25 +1,25 @@
 From: wens@csie.org (Chen-Yu Tsai)
-Date: Mon, 28 Jul 2014 16:20:58 +0800
-Subject: [PATCH v4 3/6] ARM: dts: sun6i: add rtc device node
+Date: Mon, 28 Jul 2014 16:20:59 +0800
+Subject: [PATCH v4 4/6] ARM: dts: sun8i: add rtc device node
 In-Reply-To: <1406535661-25072-1-git-send-email-wens@csie.org>
 References: <1406535661-25072-1-git-send-email-wens@csie.org>
-Message-ID: <1406535661-25072-4-git-send-email-wens@csie.org>
+Message-ID: <1406535661-25072-5-git-send-email-wens@csie.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Now that we have a driver for sun6i's rtc hardware, add a device node
-for it so we can use it.
+sun8i shares the same rtc hardware as sun6i. Now that we have a driver
+for it, add a device node to the DTSI for it so we can use it.
 
 Signed-off-by: Chen-Yu Tsai <wens@csie.org>
 ---
- arch/arm/boot/dts/sun6i-a31.dtsi | 6 ++++++
+ arch/arm/boot/dts/sun8i-a23.dtsi | 6 ++++++
  1 file changed, 6 insertions(+)
 
-diff --git a/arch/arm/boot/dts/sun6i-a31.dtsi b/arch/arm/boot/dts/sun6i-a31.dtsi
-index 44b07e5..6a16019 100644
---- a/arch/arm/boot/dts/sun6i-a31.dtsi
-+++ b/arch/arm/boot/dts/sun6i-a31.dtsi
-@@ -779,6 +779,12 @@
+diff --git a/arch/arm/boot/dts/sun8i-a23.dtsi b/arch/arm/boot/dts/sun8i-a23.dtsi
+index 54ac0787..e0d1048 100644
+--- a/arch/arm/boot/dts/sun8i-a23.dtsi
++++ b/arch/arm/boot/dts/sun8i-a23.dtsi
+@@ -285,6 +285,12 @@
  			interrupts = <1 9 0xf04>;
  		};
  
@@ -29,8 +29,8 @@ index 44b07e5..6a16019 100644
 +			interrupts = <0 40 4>;
 +		};
 +
- 		nmi_intc: interrupt-controller at 01f00c0c {
- 			compatible = "allwinner,sun6i-a31-sc-nmi";
- 			interrupt-controller;
+ 		prcm at 01f01400 {
+ 			compatible = "allwinner,sun8i-a23-prcm";
+ 			reg = <0x01f01400 0x200>;
 -- 
 2.0.1
