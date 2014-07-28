@@ -1,69 +1,84 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Mon, 28 Jul 2014 18:46:49 +0100
-Subject: [PATCH 0/3] ARM: mvebu: disable I/O coherency on !SMP
-In-Reply-To: <20140717142720.GM21153@arm.com>
-References: <1404318070-8503-1-git-send-email-thomas.petazzoni@free-electrons.com>
- <20140717102425.34fe0181@free-electrons.com>
- <20140717083342.GS21766@n2100.arm.linux.org.uk>
- <6510599.Qoc205T3v7@wuerfel>
- <20140717131224.GW21766@n2100.arm.linux.org.uk>
- <20140717142720.GM21153@arm.com>
-Message-ID: <20140728174649.GL15536@arm.com>
+From: vincent.guittot@linaro.org (Vincent Guittot)
+Date: Mon, 28 Jul 2014 19:51:35 +0200
+Subject: [PATCH v4 01/12] sched: fix imbalance flag reset
+In-Reply-To: <1406569906-9763-1-git-send-email-vincent.guittot@linaro.org>
+References: <1406569906-9763-1-git-send-email-vincent.guittot@linaro.org>
+Message-ID: <1406569906-9763-2-git-send-email-vincent.guittot@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jul 17, 2014 at 03:27:20PM +0100, Will Deacon wrote:
-> On Thu, Jul 17, 2014 at 02:12:24PM +0100, Russell King - ARM Linux wrote:
-> > On Thu, Jul 17, 2014 at 02:39:42PM +0200, Arnd Bergmann wrote:
-> > > On Thursday 17 July 2014 09:33:42 Russell King - ARM Linux wrote:
-> > > > No - the problem is that we're running from the page table in question
-> > > > with global mappings, and we need to switch all these mappings, including
-> > > > the ones we're currently using to execute from.
-> > > > 
-> > > > We can't even create a new page table and switch to it because the
-> > > > mappings in question are global mappings.
-> > > > 
-> > > > The only way to do that safely from an architectural point of view would
-> > > > be to turn the MMU off, and drop back to assembly code to change the
-> > > > page tables, and re-enable the MMU.  For something as obscure as Marvell's
-> > > > coherency stuff, that's not something I want to see in core code.
-> > > 
-> > > Is this different from what we do in the LPAE version of
-> > > early_paging_init()? That code already adjusts all the page
-> > > table entries on a per-platform setting and should be very
-> > > easy to extend for a modified procinfo->__cpu_mm_mmu_flags,
-> > > and possibly able to extend for traditional (non-LPAE)
-> > > page tables without a lot of duplication.
-> > 
-> > I'm going to have to profess no knowledge of how the LPAE stuff works.
-> > LPAE is something I can't run, and something that I was not involved
-> > in its creation.  Therefore, I know very little about it and zero
-> > experience thereof.
-> > 
-> > From a glance over that function, I think that is unsafe for all the
-> > reasons I've stated.  However, I'll pass this over to Will Deacon
-> > to comment further on.
-> 
-> Just an FYI, but I've had to check internally to clarify the behaviour
-> around TLB conflict aborts. We're changing live page tables here, but the
-> *only* thing to differ is the output address, which I would hope is ok but
-> need to check to be sure.
-> 
-> The ARM ARM recommends always going via an invalid mapping, but that's not
-> always the most practical thing to do.
+The imbalance flag can stay set whereas there is no imbalance.
 
-Ok, the answer from the architects is that we really shouldn't be doing
-this. If we have two mappings for the same VA, then we run the risk of a
-TLB conflict abort on implementations that can detect it. If we don't get
-the abort, we can still have other things silently go wrong like exclusive
-accesses, memory-ordering but, more importantly, it places us square in
-UNPREDICTABLE territory, which isn't a friendly place to be.
+Let assume that we have 3 tasks that run on a dual cores /dual cluster system.
+We will have some idle load balance which are triggered during tick.
+Unfortunately, the tick is also used to queue background work so we can reach
+the situation where short work has been queued on a CPU which already runs a
+task. The load balance will detect this imbalance (2 tasks on 1 CPU and an idle
+CPU) and will try to pull the waiting task on the idle CPU. The waiting task is
+a worker thread that is pinned on a CPU so an imbalance due to pinned task is
+detected and the imbalance flag is set.
+Then, we will not be able to clear the flag because we have at most 1 task on
+each CPU but the imbalance flag will trig to useless active load balance
+between the idle CPU and the busy CPU.
 
-So, we should fix the code we currently have for keystone so that it avoids
-this possibility and avoid duplicating it elsewhere before we've done that.
+We need to reset of the imbalance flag as soon as we have reached a balanced
+state. If all tasks are pinned, we don't consider that as a balanced state and
+let the imbalance flag set.
 
-I think Russell had a patch adding a comment, but I'd go further and add a
-WARN_ON(1) because this is only going to be a source of subtle,
-hard-to-debug issues that we'll really struggle to get to the bottom of.
+Reviewed-by: Preeti U Murthy <preeti@linux.vnet.ibm.com>
+Signed-off-by: Vincent Guittot <vincent.guittot@linaro.org>
+---
+ kernel/sched/fair.c | 23 +++++++++++++++++++----
+ 1 file changed, 19 insertions(+), 4 deletions(-)
 
-Will
+diff --git a/kernel/sched/fair.c b/kernel/sched/fair.c
+index 923fe32..7eb9126 100644
+--- a/kernel/sched/fair.c
++++ b/kernel/sched/fair.c
+@@ -6672,10 +6672,8 @@ static int load_balance(int this_cpu, struct rq *this_rq,
+ 		if (sd_parent) {
+ 			int *group_imbalance = &sd_parent->groups->sgc->imbalance;
+ 
+-			if ((env.flags & LBF_SOME_PINNED) && env.imbalance > 0) {
++			if ((env.flags & LBF_SOME_PINNED) && env.imbalance > 0)
+ 				*group_imbalance = 1;
+-			} else if (*group_imbalance)
+-				*group_imbalance = 0;
+ 		}
+ 
+ 		/* All tasks on this runqueue were pinned by CPU affinity */
+@@ -6686,7 +6684,7 @@ static int load_balance(int this_cpu, struct rq *this_rq,
+ 				env.loop_break = sched_nr_migrate_break;
+ 				goto redo;
+ 			}
+-			goto out_balanced;
++			goto out_all_pinned;
+ 		}
+ 	}
+ 
+@@ -6760,6 +6758,23 @@ static int load_balance(int this_cpu, struct rq *this_rq,
+ 	goto out;
+ 
+ out_balanced:
++	/*
++	 * We reach balance although we may have faced some affinity
++	 * constraints. Clear the imbalance flag if it was set.
++	 */
++	if (sd_parent) {
++		int *group_imbalance = &sd_parent->groups->sgc->imbalance;
++
++		if (*group_imbalance)
++			*group_imbalance = 0;
++	}
++
++out_all_pinned:
++	/*
++	 * We reach balance because all tasks are pinned at this level so
++	 * we can't migrate them. Let the imbalance flag set so parent level
++	 * can try to migrate them.
++	 */
+ 	schedstat_inc(sd, lb_balanced[idle]);
+ 
+ 	sd->nr_balance_failed = 0;
+-- 
+1.9.1
