@@ -1,42 +1,31 @@
 From: vincent.guittot@linaro.org (Vincent Guittot)
-Date: Mon, 28 Jul 2014 19:51:39 +0200
-Subject: [PATCH v4 05/12] ARM: topology: use new cpu_capacity interface
+Date: Mon, 28 Jul 2014 19:51:46 +0200
+Subject: [PATCH v4 12/12] sched: add SD_PREFER_SIBLING for SMT level
 In-Reply-To: <1406569906-9763-1-git-send-email-vincent.guittot@linaro.org>
 References: <1406569906-9763-1-git-send-email-vincent.guittot@linaro.org>
-Message-ID: <1406569906-9763-6-git-send-email-vincent.guittot@linaro.org>
+Message-ID: <1406569906-9763-13-git-send-email-vincent.guittot@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Use the new arch_scale_cpu_capacity in order to reflect the original capacity
-of a CPU instead of arch_scale_freq_capacity which is more linked to a scaling
-of the capacity linked to the frequency.
+add the SD_PREFER_SIBLING flag for SMT level in order to ensure that
+the scheduler will put at least 1 task per core.
 
 Signed-off-by: Vincent Guittot <vincent.guittot@linaro.org>
 ---
- arch/arm/kernel/topology.c | 4 ++--
- 1 file changed, 2 insertions(+), 2 deletions(-)
+ kernel/sched/core.c | 1 +
+ 1 file changed, 1 insertion(+)
 
-diff --git a/arch/arm/kernel/topology.c b/arch/arm/kernel/topology.c
-index e35d880..89cfdd6 100644
---- a/arch/arm/kernel/topology.c
-+++ b/arch/arm/kernel/topology.c
-@@ -42,7 +42,7 @@
-  */
- static DEFINE_PER_CPU(unsigned long, cpu_scale);
+diff --git a/kernel/sched/core.c b/kernel/sched/core.c
+index fc5a275..3e4eea4 100644
+--- a/kernel/sched/core.c
++++ b/kernel/sched/core.c
+@@ -6080,6 +6080,7 @@ sd_init(struct sched_domain_topology_level *tl, int cpu)
+ 	 */
  
--unsigned long arch_scale_freq_capacity(struct sched_domain *sd, int cpu)
-+unsigned long arch_scale_cpu_capacity(struct sched_domain *sd, int cpu)
- {
- 	return per_cpu(cpu_scale, cpu);
- }
-@@ -166,7 +166,7 @@ static void update_cpu_capacity(unsigned int cpu)
- 	set_capacity_scale(cpu, cpu_capacity(cpu) / middle_capacity);
+ 	if (sd->flags & SD_SHARE_CPUCAPACITY) {
++		sd->flags |= SD_PREFER_SIBLING;
+ 		sd->imbalance_pct = 110;
+ 		sd->smt_gain = 1178; /* ~15% */
  
- 	printk(KERN_INFO "CPU%u: update cpu_capacity %lu\n",
--		cpu, arch_scale_freq_capacity(NULL, cpu));
-+		cpu, arch_scale_cpu_capacity(NULL, cpu));
- }
- 
- #else
 -- 
 1.9.1
