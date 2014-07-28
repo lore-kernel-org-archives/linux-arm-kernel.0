@@ -1,63 +1,79 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Mon, 28 Jul 2014 19:47:41 +0100
-Subject: [PATCH 1/2] ARM: LPAE: load upper bits of early TTBR0/TTBR1
-In-Reply-To: <CALYGNiNrK1d32ecz4rw0sgn0GyN-M6hTBuTLGQV53Z4Br-bpYQ@mail.gmail.com>
-References: <20140722153623.25088.37742.stgit@buzz>
- <20140728181224.GN15536@arm.com>
- <CALYGNiNrK1d32ecz4rw0sgn0GyN-M6hTBuTLGQV53Z4Br-bpYQ@mail.gmail.com>
-Message-ID: <20140728184741.GT15536@arm.com>
+From: sudeep.holla@arm.com (Sudeep Holla)
+Date: Mon, 28 Jul 2014 19:51:31 +0100
+Subject: [PATCH 04/19] ARM64 / ACPI: Introduce arch_fix_phys_package_id()
+ for cpu topology
+In-Reply-To: <1406206825-15590-5-git-send-email-hanjun.guo@linaro.org>
+References: <1406206825-15590-1-git-send-email-hanjun.guo@linaro.org>
+ <1406206825-15590-5-git-send-email-hanjun.guo@linaro.org>
+Message-ID: <53D69BB3.8040106@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jul 28, 2014 at 07:40:58PM +0100, Konstantin Khlebnikov wrote:
-> On Mon, Jul 28, 2014 at 10:12 PM, Will Deacon <will.deacon@arm.com> wrote:
-> > On Tue, Jul 22, 2014 at 04:36:23PM +0100, Konstantin Khlebnikov wrote:
-> >> This patch fixes booting when idmap pgd lays above 4gb. Commit
-> >> 4756dcbfd37 mostly had fixed this, but it'd failed to load upper bits.
-> >>
-> >> Also this fixes adding TTBR1_OFFSET to TTRR1: if lower part overflows
-> >> carry flag must be added to the upper part.
-> >>
-> >> Signed-off-by: Konstantin Khlebnikov <k.khlebnikov@samsung.com>
-> >> Cc: Cyril Chemparathy <cyril@ti.com>
-> >> Cc: Vitaly Andrianov <vitalya@ti.com>
-> >> ---
-> >>  arch/arm/mm/proc-v7-3level.S |    7 +++----
-> >>  1 file changed, 3 insertions(+), 4 deletions(-)
-> >>
-> >> diff --git a/arch/arm/mm/proc-v7-3level.S b/arch/arm/mm/proc-v7-3level.S
-> >> index 22e3ad6..f0481dd 100644
-> >> --- a/arch/arm/mm/proc-v7-3level.S
-> >> +++ b/arch/arm/mm/proc-v7-3level.S
-> >> @@ -140,12 +140,11 @@ ENDPROC(cpu_v7_set_pte_ext)
-> >>       mov     \tmp, \ttbr1, lsr #(32 - ARCH_PGD_SHIFT)        @ upper bits
-> >>       mov     \ttbr1, \ttbr1, lsl #ARCH_PGD_SHIFT             @ lower bits
-> >>       addls   \ttbr1, \ttbr1, #TTBR1_OFFSET
-> >> -     mcrr    p15, 1, \ttbr1, \zero, c2                       @ load TTBR1
-> >> +     adcls   \tmp, \tmp, #0
-> >> +     mcrr    p15, 1, \ttbr1, \tmp, c2                        @ load TTBR1
-> >>       mov     \tmp, \ttbr0, lsr #(32 - ARCH_PGD_SHIFT)        @ upper bits
-> >>       mov     \ttbr0, \ttbr0, lsl #ARCH_PGD_SHIFT             @ lower bits
-> >> -     mcrr    p15, 0, \ttbr0, \zero, c2                       @ load TTBR0
-> >> -     mcrr    p15, 1, \ttbr1, \zero, c2                       @ load TTBR1
-> >> -     mcrr    p15, 0, \ttbr0, \zero, c2                       @ load TTBR0
-> >> +     mcrr    p15, 0, \ttbr0, \tmp, c2                        @ load TTBR0
-> >
-> > I must admit, the code you are removing here looks really strange. Was there
-> > a badly resolved conflict somewhere along the way? It would be nice to see
-> > if your fix (which seems ok to me) was actually present in the mailing list
-> > posting of the patch that ended in the above mess.
-> 
-> Nope, no merge conflicts, source in original patch
-> https://lkml.org/lkml/2012/9/11/346
-> 
-> That mess completely harmless, this code is used only once on boot.
-> I don't have that email, so replying isn't trivial for me.
 
-How bizarre. Also, Cyril doesn't work for TI anymore (his email is
-bouncing), so it's tricky to know what he meant here.
 
-Your patch looks better than what we currently have though. Have you managed
-to test it on a keystone platform (I don't have one)?
+On 24/07/14 14:00, Hanjun Guo wrote:
+> arch_fix_phys_package_id() will be called in ACPI core to use
+> the slot number provided by ACPI to update the physical package
+> id, then we can get the right value in the "physical id" field
+> of /proc/cpuinfo.
+>
+> Signed-off-by: Hanjun Guo <hanjun.guo@linaro.org>
+> ---
+>   arch/arm64/include/asm/topology.h |    2 ++
+>   arch/arm64/kernel/topology.c      |   14 ++++++++++++++
+>   2 files changed, 16 insertions(+)
+>
+> diff --git a/arch/arm64/include/asm/topology.h b/arch/arm64/include/asm/topology.h
+> index 7ebcd31..2b216d4 100644
+> --- a/arch/arm64/include/asm/topology.h
+> +++ b/arch/arm64/include/asm/topology.h
+> @@ -23,11 +23,13 @@ extern struct cpu_topology cpu_topology[NR_CPUS];
+>   void init_cpu_topology(void);
+>   void store_cpu_topology(unsigned int cpuid);
+>   const struct cpumask *cpu_coregroup_mask(int cpu);
+> +void arch_fix_phys_package_id(int num, u32 slot);
+>
+>   #else
+>
+>   static inline void init_cpu_topology(void) { }
+>   static inline void store_cpu_topology(unsigned int cpuid) { }
+> +static inline void arch_fix_phys_package_id(int num, u32 slot) { }
+>
+>   #endif
+>
+> diff --git a/arch/arm64/kernel/topology.c b/arch/arm64/kernel/topology.c
+> index 43514f9..c547885 100644
+> --- a/arch/arm64/kernel/topology.c
+> +++ b/arch/arm64/kernel/topology.c
+> @@ -281,3 +281,17 @@ void __init init_cpu_topology(void)
+>   	if (parse_dt_topology())
+>   		reset_cpu_topology();
+>   }
+> +
+> +/*
+> + * Use the CPU slot number provided by ACPI to update the physical
+> + * package id when cpuid_topo->cluster_id is not available, then we
+> + * can get the right value in the "physical id" field of /proc/cpuinfo.
+> + */
 
-Will
+We don't have "physical id" field in /proc/cpuinfo on ARM64.
+
+> +void arch_fix_phys_package_id(int num, u32 slot)
+> +{
+> +	struct cpu_topology *cpuid_topo = &cpu_topology[num];
+> +
+> +	if (cpuid_topo->cluster_id == -1)
+> +		cpuid_topo->cluster_id = slot;
+> +}
+> +EXPORT_SYMBOL_GPL(arch_fix_phys_package_id);
+>
+
+The ACPI core uses this function to set the package id as read from
+_SUN from the device. As per spec, _SUN is used by OSPM UI to identify
+slots for the user. Do we know how will this be used on ARM64 ?
+
+If not clear at this time, better to define it or keep it empty. I see
+even x86 does nothing in that function.
+
+Regards,
+Sudeep
