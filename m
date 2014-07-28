@@ -1,47 +1,59 @@
-From: vikas.sajjan@samsung.com (Vikas Sajjan)
-Date: Mon, 28 Jul 2014 17:45:25 +0530
-Subject: [PATCH 1/2] ARM: EXYNOS: Add PMU DT node for exynos5260 SoC
-In-Reply-To: <1406549726-10452-1-git-send-email-vikas.sajjan@samsung.com>
-References: <1406549726-10452-1-git-send-email-vikas.sajjan@samsung.com>
-Message-ID: <1406549726-10452-2-git-send-email-vikas.sajjan@samsung.com>
+From: afaerber@suse.de (=?UTF-8?q?Andreas=20F=C3=A4rber?=)
+Date: Mon, 28 Jul 2014 14:18:12 +0200
+Subject: [RFC 5/5] ARM: dts: exynos5410: Add ODROID-XU LEDs
+In-Reply-To: <1406549892-5558-1-git-send-email-afaerber@suse.de>
+References: <1406549892-5558-1-git-send-email-afaerber@suse.de>
+Message-ID: <1406549892-5558-6-git-send-email-afaerber@suse.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Addd PMU DT node for exynos5260 SoC.
-
-Signed-off-by: Vikas Sajjan <vikas.sajjan@samsung.com>
+Signed-off-by: Andreas F?rber <afaerber@suse.de>
 ---
- .../devicetree/bindings/arm/samsung/pmu.txt        |    1 +
- arch/arm/boot/dts/exynos5260.dtsi                  |    5 +++++
- 2 files changed, 6 insertions(+)
+ arch/arm/boot/dts/exynos5410-odroidxu.dts | 25 +++++++++++++++++++++++++
+ 1 file changed, 25 insertions(+)
 
-diff --git a/Documentation/devicetree/bindings/arm/samsung/pmu.txt b/Documentation/devicetree/bindings/arm/samsung/pmu.txt
-index 2a4ab04..c038628 100644
---- a/Documentation/devicetree/bindings/arm/samsung/pmu.txt
-+++ b/Documentation/devicetree/bindings/arm/samsung/pmu.txt
-@@ -8,6 +8,7 @@ Properties:
- 		   - "samsung,exynos4412-pmu" - for Exynos4412 SoC,
- 		   - "samsung,exynos5250-pmu" - for Exynos5250 SoC,
- 		   - "samsung,exynos5420-pmu" - for Exynos5420 SoC.
-+		   - "samsung,exynos5260-pmu" - for Exynos5260 SoC.
- 		second value must be always "syscon".
+diff --git a/arch/arm/boot/dts/exynos5410-odroidxu.dts b/arch/arm/boot/dts/exynos5410-odroidxu.dts
+index b67112bf062a..f6e7555feeff 100644
+--- a/arch/arm/boot/dts/exynos5410-odroidxu.dts
++++ b/arch/arm/boot/dts/exynos5410-odroidxu.dts
+@@ -15,6 +15,7 @@
  
-  - reg : offset and length of the register set.
-diff --git a/arch/arm/boot/dts/exynos5260.dtsi b/arch/arm/boot/dts/exynos5260.dtsi
-index 5398a60..4f2fabe 100644
---- a/arch/arm/boot/dts/exynos5260.dtsi
-+++ b/arch/arm/boot/dts/exynos5260.dtsi
-@@ -227,6 +227,11 @@
- 			interrupts = <0 243 0>;
- 		};
+ /dts-v1/;
+ #include "exynos5410.dtsi"
++#include <dt-bindings/gpio/gpio.h>
+ / {
+ 	model = "ODROID-XU based on EXYNOS5410";
+ 	compatible = "hardkernel,odroid-xu", "samsung,exynos5410", "samsung,exynos5";
+@@ -39,6 +40,30 @@
+ 		reg = <0x02037000 0x1000>;
+ 	};
  
-+		pmu_system_controller: system-controller at 10D50000 {
-+			compatible = "samsung,exynos5260-pmu", "syscon";
-+			reg = <0x10D50000 0x10000>;
++	leds {
++		compatible = "gpio-leds";
++
++		blue {
++			label = "blue:heartbeat";
++			gpios = <&gpb2 2 GPIO_ACTIVE_HIGH>;
++			default-state = "off";
++			linux,default-trigger = "heartbeat";
 +		};
 +
- 		uart0: serial at 12C00000 {
- 			compatible = "samsung,exynos4210-uart";
- 			reg = <0x12C00000 0x100>;
++		green {
++			label = "green:activity";
++			gpios = <&gpb2 1 GPIO_ACTIVE_HIGH>;
++			default-state = "off";
++			linux,default-trigger = "mmc0";
++		};
++
++		red {
++			label = "red:activity";
++			gpios = <&gpx2 3 GPIO_ACTIVE_HIGH>;
++			default-state = "off";
++			linux,default-trigger = "mmc1";
++		};
++	};
+ };
+ 
+ &mmc_0 {
 -- 
-1.7.9.5
+1.9.3
