@@ -1,25 +1,44 @@
-From: mporter@linaro.org (Matt Porter)
-Date: Mon, 28 Jul 2014 10:27:38 -0400
-Subject: [PATCH] devicetree: bindings: document Broadcom CPU enable method
-In-Reply-To: <1404166185-4168-1-git-send-email-elder@linaro.org>
-References: <1404166185-4168-1-git-send-email-elder@linaro.org>
-Message-ID: <20140728142738.GA2593@beef>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Mon, 28 Jul 2014 16:35:29 +0200
+Subject: [Patch V2 2/2] i2c: mv64xxx: Remove internal compatible string
+ from Documentation
+In-Reply-To: <20140728141217.GE2891@lunn.ch>
+References: <1406395238-29758-1-git-send-email-andrew@lunn.ch>
+ <5514427.elClhaDPhf@wuerfel> <20140728141217.GE2891@lunn.ch>
+Message-ID: <6346429.sjQYojn1ot@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jun 30, 2014 at 05:09:45PM -0500, Alex Elder wrote:
-> Broadcom mobile SoCs use a ROM-implemented holding pen for
-> controlled boot of secondary cores.  A special register is
-> used to communicate to the ROM that a secondary core should
-> start executing kernel code.  This enable method is currently
-> used for members of the bcm281xx and bcm21664 SoC families.
+On Monday 28 July 2014 16:12:17 Andrew Lunn wrote:
+> > 
+> > I remember this being discussed when the quirk was initially added,
+> > but it seemed cleaner to handle this in the platform code at the time
+> > when it was just for one particular board. Now that it's basically
+> > an accepted feature of the i2c device that you have to know the
+> > SoC version, that should probably become a proper API.
+> > 
+> > Also, we now have drivers/soc/ and can move the soc-id code there
+> > with a publically documented API.
 > 
-> The use of an enable method also allows the SMP operation vector to
-> be assigned as a result of device tree content for these SoCs.
+> Getting the SoC ID and revision seems like something that should be
+> generic. Would it be better to make this part of drivers/base/soc.c?
+> mvebu already does a soc_device_register() with the relevant
+> information.
 > 
-> Signed-off-by: Alex Elder <elder@linaro.org>
+> Add a call something like:
+> 
+> /*
+>  * Return the soc device attributes for a given soc_dev. If soc_dev is NULL,
+>  * the first device on the soc bus is returned.
+>  */
+> struct soc_device_attribute *soc_attribute_get(struct soc_device * soc_dev);
 
-Applied to mach-bcm for-3.17/dt
+Interesting idea, yes.
 
-Thanks,
-Matt
+There could also be a higher-level function that does a strcmp() in addition,
+so that a driver can do some variation of
+
+	if (soc_name_is("Armada XP") && soc_revision_is("A0"))
+		...
+
+	Arnd
