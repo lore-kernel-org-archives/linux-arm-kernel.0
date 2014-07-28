@@ -1,39 +1,41 @@
 From: balbi@ti.com (Felipe Balbi)
-Date: Mon, 28 Jul 2014 16:15:49 -0500
-Subject: [PATCH 01/35] arm: omap: irq: make omap_irq_base global
+Date: Mon, 28 Jul 2014 16:15:57 -0500
+Subject: [PATCH 09/35] arm: omap: irq: rename omap3_intc_regs
 In-Reply-To: <1406582183-696-1-git-send-email-balbi@ti.com>
 References: <1406582183-696-1-git-send-email-balbi@ti.com>
-Message-ID: <1406582183-696-2-git-send-email-balbi@ti.com>
+Message-ID: <1406582183-696-10-git-send-email-balbi@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This is in preparation for removing the pointless
-irq_banks array.
+just to make it clearer that it can
+be used on all omaps.
 
 Signed-off-by: Felipe Balbi <balbi@ti.com>
 ---
- arch/arm/mach-omap2/irq.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+ arch/arm/mach-omap2/irq.c | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
 
 diff --git a/arch/arm/mach-omap2/irq.c b/arch/arm/mach-omap2/irq.c
-index 35b8590..7b2cf9a 100644
+index 38007b3..93fe0be 100644
 --- a/arch/arm/mach-omap2/irq.c
 +++ b/arch/arm/mach-omap2/irq.c
-@@ -68,6 +68,7 @@ static struct omap_irq_bank {
- };
- 
- static struct irq_domain *domain;
-+static void __iomem *omap_irq_base;
+@@ -62,7 +62,7 @@ static void __iomem *omap_irq_base;
+ static int omap_nr_irqs = 96;
  
  /* Structure to save interrupt controller context */
- struct omap3_intc_regs {
-@@ -161,7 +162,6 @@ omap_alloc_gc(void __iomem *base, unsigned int irq_start, unsigned int num)
- static void __init omap_init_irq(u32 base, int nr_irqs,
- 				 struct device_node *node)
+-struct omap3_intc_regs {
++struct omap_intc_regs {
+ 	u32 sysconfig;
+ 	u32 protection;
+ 	u32 idle;
+@@ -266,7 +266,7 @@ void __init omap_intc_of_init(void)
+ }
+ 
+ #if defined(CONFIG_ARCH_OMAP3) || defined(CONFIG_SOC_AM33XX)
+-static struct omap3_intc_regs intc_context;
++static struct omap_intc_regs intc_context;
+ 
+ void omap_intc_save_context(void)
  {
--	void __iomem *omap_irq_base;
- 	unsigned long nr_of_irqs = 0;
- 	unsigned int nr_banks = 0;
- 	int i, j, irq_base;
 -- 
 2.0.1.563.g66f467c
