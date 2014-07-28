@@ -1,29 +1,65 @@
-From: haojian.zhuang@linaro.org (Haojian Zhuang)
-Date: Mon, 28 Jul 2014 21:48:34 +0800
-Subject: [GIT PULL][for 3.17] pull request for hisilicon soc
-In-Reply-To: <5326154.xHtqUP4l2C@wuerfel>
-References: <53D1F2B0.1020603@hisilicon.com> <19341047.6Jx15lyPBg@wuerfel>
- <CAD6h2NRaR+JoAsQt_0uwP5hacqKzFnTUbqToGj6JfEyACoZc+A@mail.gmail.com>
- <5326154.xHtqUP4l2C@wuerfel>
-Message-ID: <CAD6h2NTr_XbDsHgqLuB_o0egF98iJFZGvAqnYz0rs5zi=_yD9A@mail.gmail.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Mon, 28 Jul 2014 15:51:27 +0200
+Subject: [Patch V2 2/2] i2c: mv64xxx: Remove internal compatible string
+ from Documentation
+In-Reply-To: <20140728132716.GC2891@lunn.ch>
+References: <1406395238-29758-1-git-send-email-andrew@lunn.ch>
+ <20140728132251.GN23220@titan.lakedaemon.net> <20140728132716.GC2891@lunn.ch>
+Message-ID: <5514427.elClhaDPhf@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 28 July 2014 19:35, Arnd Bergmann <arnd@arndb.de> wrote:
-> On Sunday 27 July 2014 09:57:22 Haojian Zhuang wrote:
->>
->> I just sent v14 in this week. I already updated gic & mcpm according
->> to comments. But I haven't gotten any comments & Ack yet. So I don't
->> know whether we could send the pull request of HiP04 in 3.17.
->
-> I don't see anything beyond v10 in my email, and that had a few
-> outstanding comments but otherwise looked almost ready to me.
-> Can you find out what happened?
->
->         Arnd
+On Monday 28 July 2014 15:27:16 Andrew Lunn wrote:
+> > > diff --git a/Documentation/devicetree/bindings/i2c/i2c-mv64xxx.txt b/Documentation/devicetree/bindings/i2c/i2c-mv64xxx.txt
+> > > index 5c30026921ae..6eb6f6e40ba1 100644
+> > > --- a/Documentation/devicetree/bindings/i2c/i2c-mv64xxx.txt
+> > > +++ b/Documentation/devicetree/bindings/i2c/i2c-mv64xxx.txt
+> > > @@ -9,11 +9,6 @@ Required properties :
+> > >                       - "allwinner,sun6i-a31-i2c"
+> > >                       - "marvell,mv64xxx-i2c"
+> > >                       - "marvell,mv78230-i2c"
+> > > -                     - "marvell,mv78230-a0-i2c"
+> > > -                       * Note: Only use "marvell,mv78230-a0-i2c" for a
+> > > -                         very rare, initial version of the SoC which
+> > > -                         had broken offload support.  Linux
+> > > -                         auto-detects this and sets it appropriately.
+> > 
+> > I think we're losing knowledge here.  *We* know that attempting to
+> > enable transaction offload on A0 SoCs is bad news.  Other OS's would now
+> > need to dig through the Linux kernel code for clues as to what's
+> > happening.
+> > 
+> > Perhaps we should retain the info in the form of a note at the bottom of
+> > this file?
+> 
+> Hi Jason
+> 
+> I did wounder about this a bit. I've not looked, but now that XP
+> datasheets are public, i assume there is an errata for this, so it at
+> least should be documented by Marvell. But anybody looking in
+> /proc/device-tree on an A0 is going to see this undocumented string
+> which might raise questions.
+> 
+> So i'm happy to document it at the end of the binding.
+> 
+> Arnd, what do you say?
 
-I'll send v15 patch set since the code base of HiP04 relies on HIX5HD2.
-It's only refreshed because of code base updated.
+The final consequence of the API change would be to no longer
+change the compatible string in the fixup, but instead to call an
+API from the driver to find out the SoC revision when it encounters
+an mv78230-i2c.
 
-Best Regards
-Haojian
+I remember this being discussed when the quirk was initially added,
+but it seemed cleaner to handle this in the platform code at the time
+when it was just for one particular board. Now that it's basically
+an accepted feature of the i2c device that you have to know the
+SoC version, that should probably become a proper API.
+
+Also, we now have drivers/soc/ and can move the soc-id code there
+with a publically documented API.
+
+I agree it's sad to lose the knowledge about the revision, but we
+already have that as we now accept the generic string even on the
+a0 machines other than ax3.
+
+	Arnd
