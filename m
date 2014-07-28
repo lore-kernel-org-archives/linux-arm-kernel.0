@@ -1,61 +1,60 @@
 From: balbi@ti.com (Felipe Balbi)
-Date: Mon, 28 Jul 2014 16:15:56 -0500
-Subject: [PATCH 08/35] arm: omap: irq: remove unnecessary base_addr argument
+Date: Mon, 28 Jul 2014 16:16:16 -0500
+Subject: [PATCH 28/35] arm: omap: irq: get rid of ifdef hack
 In-Reply-To: <1406582183-696-1-git-send-email-balbi@ti.com>
 References: <1406582183-696-1-git-send-email-balbi@ti.com>
-Message-ID: <1406582183-696-9-git-send-email-balbi@ti.com>
+Message-ID: <1406582183-696-29-git-send-email-balbi@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-omap_intc_handle_irq now had an unnecessary
-base_addr argument. Let's remove it and fix
-all callers.
+we don't need the ifdef if we have omap_nr_pending
+telling us how many pending registers we have
+on current platform. This solves a possible
+problem where we could try to handle bogus
+interrupts on OMAP2 and OMAP3 if using single
+zImage kernel, because we would end up reading
+the following pending FIQ register.
 
 Signed-off-by: Felipe Balbi <balbi@ti.com>
 ---
- arch/arm/mach-omap2/irq.c | 10 +++-------
- 1 file changed, 3 insertions(+), 7 deletions(-)
+ arch/arm/mach-omap2/irq.c | 22 +++++++---------------
+ 1 file changed, 7 insertions(+), 15 deletions(-)
 
 diff --git a/arch/arm/mach-omap2/irq.c b/arch/arm/mach-omap2/irq.c
-index 88bba9e..38007b3 100644
+index 583a1c7..43785ee 100644
 --- a/arch/arm/mach-omap2/irq.c
 +++ b/arch/arm/mach-omap2/irq.c
-@@ -46,8 +46,6 @@
- #define INTC_PENDING_IRQ3	0x00f8
- #define INTC_ILR0		0x0100
- 
--#define OMAP2_IRQ_BASE		OMAP2_L4_IO_ADDRESS(OMAP24XX_IC_BASE)
--#define OMAP3_IRQ_BASE		OMAP2_L4_IO_ADDRESS(OMAP34XX_IC_BASE)
- #define ACTIVEIRQ_MASK		0x7f	/* omap2/3 active interrupt bits */
- #define INTCPS_NR_ILR_REGS	128
- #define INTCPS_NR_MIR_REGS	3
-@@ -188,7 +186,7 @@ void __init ti81xx_init_irq(void)
- 	omap_init_irq(OMAP34XX_IC_BASE, 128, NULL);
- }
- 
--static inline void omap_intc_handle_irq(void __iomem *base_addr, struct pt_regs *regs)
-+static inline void omap_intc_handle_irq(struct pt_regs *regs)
+@@ -234,24 +234,16 @@ static void __init omap_init_irq(u32 base, struct device_node *node)
+ static asmlinkage void __exception_irq_entry
+ omap_intc_handle_irq(struct pt_regs *regs)
  {
- 	u32 irqnr;
+-	u32 irqnr;
++	u32 irqnr = 0;
  	int handled_irq = 0;
-@@ -232,8 +230,7 @@ out:
++	int i;
  
- asmlinkage void __exception_irq_entry omap2_intc_handle_irq(struct pt_regs *regs)
- {
--	void __iomem *base_addr = OMAP2_IRQ_BASE;
--	omap_intc_handle_irq(base_addr, regs);
-+	omap_intc_handle_irq(regs);
- }
+ 	do {
+-		irqnr = intc_readl(INTC_PENDING_IRQ0);
+-		if (irqnr)
+-			goto out;
+-
+-		irqnr = intc_readl(INTC_PENDING_IRQ1);
+-		if (irqnr)
+-			goto out;
+-
+-		irqnr = intc_readl(INTC_PENDING_IRQ2);
+-#if IS_ENABLED(CONFIG_SOC_TI81XX) || IS_ENABLED(CONFIG_SOC_AM33XX)
+-		if (irqnr)
+-			goto out;
+-		irqnr = intc_readl(INTC_PENDING_IRQ3);
+-#endif
++		for (i = 0; i < omap_nr_pending; i++) {
++			irqnr = intc_readl(INTC_PENDING_IRQ0 + (0x20 * i));
++			if (irqnr)
++				goto out;
++		}
  
- int __init intc_of_init(struct device_node *node,
-@@ -334,7 +331,6 @@ void omap3_intc_resume_idle(void)
- 
- asmlinkage void __exception_irq_entry omap3_intc_handle_irq(struct pt_regs *regs)
- {
--	void __iomem *base_addr = OMAP3_IRQ_BASE;
--	omap_intc_handle_irq(base_addr, regs);
-+	omap_intc_handle_irq(regs);
- }
- #endif /* CONFIG_ARCH_OMAP3 */
+ out:
+ 		if (!irqnr)
 -- 
 2.0.1.563.g66f467c
