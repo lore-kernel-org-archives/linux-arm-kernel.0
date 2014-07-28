@@ -1,104 +1,47 @@
-From: hns@goldelico.com (Dr. H. Nikolaus Schaller)
-Date: Mon, 28 Jul 2014 22:42:50 +0200
-Subject: [PATCH 3/3] arm: dts: Add gta04a5 model
-In-Reply-To: <CAOf5uw=Fm9FXEH5ESqDC8pGjMbn5VQ1+MyPJVXSqGh_9+JRLHw@mail.gmail.com>
-References: <1406577213-9642-1-git-send-email-marek@goldelico.com>
- <1406577213-9642-4-git-send-email-marek@goldelico.com>
- <CAOf5uwk=ctww=pP4Ae+1C6i-oOtiYTv2NJbj1GpuPwVSKXB4Hw@mail.gmail.com>
- <CAAfyv35jvhzvjCKMwrpa=RQ1JkfcmthCsGDzwLW9Y6bq3Ww_fg@mail.gmail.com>
- <CAOf5uw=Fm9FXEH5ESqDC8pGjMbn5VQ1+MyPJVXSqGh_9+JRLHw@mail.gmail.com>
-Message-ID: <1FA8171E-1B7A-4684-887E-11593BB9C29E@goldelico.com>
+From: mturquette@linaro.org (Mike Turquette)
+Date: Mon, 28 Jul 2014 14:13:57 -0700
+Subject: [GIT PULL] qcom clock changes for 3.17
+In-Reply-To: <20140728175702.GB19933@codeaurora.org>
+References: <20140721212635.GA19933@codeaurora.org>
+ <1CE3FA09-3ED6-4C21-B9B5-F5E43E146BDB@codeaurora.org>
+ <20140728175702.GB19933@codeaurora.org>
+Message-ID: <20140728211357.4906.1815@quantum>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-Am 28.07.2014 um 22:04 schrieb Michael Trimarchi:
-
-> Hi
+Quoting Stephen Boyd (2014-07-28 10:57:02)
+> On 07/28, Kumar Gala wrote:
+> > 
+> > On Jul 21, 2014, at 4:26 PM, Stephen Boyd <sboyd@codeaurora.org> wrote:
+> > 
+> > > Hi Mike,
+> > > 
+> > > The following changes since commit a497c3ba1d97fc69c1e78e7b96435ba8c2cb42ee:
+> > > 
+> > >  Linux 3.16-rc2 (2014-06-21 19:02:54 -1000)
+> > > 
+> > > are available in the git repository at:
+> > > 
+> > >  git://git.kernel.org/pub/scm/linux/kernel/git/galak/linux-qcom.git tags/qcom-clocks-for-3.17
+> > > 
+> > > for you to fetch changes up to e216ce60a9e05ab399d098f05cd86fd95c9da8d5:
+> > > 
+> > >  clk: qcom: Add support for APQ8064 multimedia clocks (2014-07-15 16:39:03 -0700)
+> > 
+> > Mike,
+> > 
+> > Any update on this pull request?
+> > 
 > 
-> Il 28/lug/2014 22:02 "Belisko Marek" <marek.belisko@gmail.com> ha scritto:
-> >
-> > Hi Michael,
-> >
-> > On Mon, Jul 28, 2014 at 9:56 PM, Michael Trimarchi
-> > <michael@amarulasolutions.com> wrote:
-> > > Hi Marek
-> > >
-> > > Il 28/lug/2014 21:54 "Marek Belisko" <marek@goldelico.com> ha scritto:
-> > >
-> > >
-> > >>
-> > >> Add model a5 which have additional jack detection.
-> > >>
-> > >> Signed-off-by: Marek Belisko <marek@goldelico.com>
-> > >> ---
-> > >>  arch/arm/boot/dts/Makefile          |  1 +
-> > >>  arch/arm/boot/dts/omap3-gta04a5.dts | 17 +++++++++++++++++
-> > >>  2 files changed, 18 insertions(+)
-> > >>  create mode 100644 arch/arm/boot/dts/omap3-gta04a5.dts
-> > >>
-> > >> diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
-> > >> index 7d45fde..576c595 100644
-> > >> --- a/arch/arm/boot/dts/Makefile
-> > >> +++ b/arch/arm/boot/dts/Makefile
-> > >> @@ -285,6 +285,7 @@ dtb-$(CONFIG_ARCH_OMAP3) += am3517-craneboard.dtb \
-> > >>         omap3-evm-37xx.dtb \
-> > >>         omap3-gta04a3.dtb \
-> > >>         omap3-gta04a4.dtb \
-> > >> +       omap3-gta04a5.dtb \
-> > >>         omap3-igep0020.dtb \
-> > >>         omap3-igep0030.dtb \
-> > >>         omap3-ldp.dtb \
-> > >> diff --git a/arch/arm/boot/dts/omap3-gta04a5.dts
-> > >> b/arch/arm/boot/dts/omap3-gta04a5.dts
-> > >> new file mode 100644
-> > >> index 0000000..210317c3
-> > >> --- /dev/null
-> > >> +++ b/arch/arm/boot/dts/omap3-gta04a5.dts
-> > >> @@ -0,0 +1,17 @@
-> > >> +/*
-> > >> + * Copyright (C) 2014 H. Nikolaus Schaller <hns@goldelico.com>
-> > >> + *
-> > >> + * This program is free software; you can redistribute it and/or modify
-> > >> + * it under the terms of the GNU General Public License version 2 as
-> > >> + * published by the Free Software Foundation.
-> > >> + */
-> > >> +
-> > >> +#include "omap3-gta04.dtsi"
-> > >> +
-> > >> +/ {
-> > >> +       model = "Goldelico GTA04A5;
-> > >> +
-> > >> +       sound {
-> > >> +               ti,jack-det-gpio = <&twl_gpio 2 0>;    /* GTA04A5 only */
-> > >> +       };
-> > >> +};
-> > >> --
-> > >> 1.9.1
-> > >>
-> > >
-> > > Can we have only one dts with status enabled/disabled?
-> > Do you mean to define this node it gta04.dtsi disabled and enable only
-> > for a5 model?
-> > >
+> I think Mike picked it up already but I don't see it pushed out
+> to clk-next so far.
+
+Stephen is correct. I'll push out the latest commits later today.
+
+Regards,
+Mike
+
 > 
-> This should be possible in the bootloader
-> 
-
-Yes,
-the boot loader either loads gta04a3.dtb gta04.dtb or gta05.dtb
-depending on board revision.
-
-Therefore we have multiple device tree files to represent such hardware
-differences. Like Gumstix Overo variants (using a  omap3-overo-base.dtsi)
-
-And, this difference is not the only one. Other are to come later.
-
-Unfortunately we were recommend to submit only DT nodes that already
-have drivers. Therefore, the "big picture" of the device variants support
-may not yet be visible from this patch.
-
-I hope this gives a little background.
-
-BR,
-Nikolaus
+> -- 
+> Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+> hosted by The Linux Foundation
