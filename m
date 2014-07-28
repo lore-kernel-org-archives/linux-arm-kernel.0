@@ -1,86 +1,81 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Mon, 28 Jul 2014 19:14:49 +0100
-Subject: [PATCH] arm64: ignore DT memreserve entries when booting in UEFI
- mode
-In-Reply-To: <1406570583-22848-1-git-send-email-leif.lindholm@linaro.org>
-References: <1406570583-22848-1-git-send-email-leif.lindholm@linaro.org>
-Message-ID: <20140728181449.GF2576@leverpostej>
+From: vincent.guittot@linaro.org (Vincent Guittot)
+Date: Mon, 28 Jul 2014 19:51:44 +0200
+Subject: [PATCH v4 10/12] sched: get CPU's utilization statistic
+In-Reply-To: <1406569906-9763-1-git-send-email-vincent.guittot@linaro.org>
+References: <1406569906-9763-1-git-send-email-vincent.guittot@linaro.org>
+Message-ID: <1406569906-9763-11-git-send-email-vincent.guittot@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jul 28, 2014 at 07:03:03PM +0100, Leif Lindholm wrote:
-> UEFI provides its own method for marking regions to reserve, via the
-> memory map which is also used to initialise memblock. So when using the
-> UEFI memory map, ignore any memreserve entries present in the DT.
+Monitor the utilization level of each group of each sched_domain level. The
+utilization is the amount of cpu_capacity that is currently used on a CPU or
+group of CPUs. We use the usage_load_avg to evaluate this utilization level.
+In the special use case where the CPU is fully loaded by more than 1 task,
+the activity level is set above the cpu_capacity in order to reflect the overload
+of the CPU
 
-It's worth noting that no-one is relying on this at present, and were
-they it would imply that their UEFI implementation is broken (providing
-a dodgy memory map).
+Signed-off-by: Vincent Guittot <vincent.guittot@linaro.org>
+---
+ kernel/sched/fair.c | 19 ++++++++++++++++++-
+ 1 file changed, 18 insertions(+), 1 deletion(-)
 
-So before people start doing dodgy things, let's, close that hole. If we
-need a way of modifying the memory map we should come up with a more
-general plan.
-
-> Reported-by: Mark Rutland <mark.rutland@arm.com>
-> Signed-off-by: Leif Lindholm <leif.lindholm@linaro.org>
-> ---
->  arch/arm64/kernel/efi.c |    2 ++
->  arch/arm64/mm/init.c    |    4 +++-
->  2 files changed, 5 insertions(+), 1 deletion(-)
-> 
-> diff --git a/arch/arm64/kernel/efi.c b/arch/arm64/kernel/efi.c
-> index 14db1f6..7ad17b2 100644
-> --- a/arch/arm64/kernel/efi.c
-> +++ b/arch/arm64/kernel/efi.c
-> @@ -188,6 +188,8 @@ static __init void reserve_regions(void)
->  		if (uefi_debug)
->  			pr_cont("\n");
->  	}
-> +
-> +	set_bit(EFI_MEMMAP, &efi.flags);
-
-Nothing outside of arch/x86 seems to hang off this, so using it here
-looks fine.
-
->  }
->  
->  
-> diff --git a/arch/arm64/mm/init.c b/arch/arm64/mm/init.c
-> index e90c542..58dbf2e 100644
-> --- a/arch/arm64/mm/init.c
-> +++ b/arch/arm64/mm/init.c
-> @@ -32,6 +32,7 @@
->  #include <linux/of_fdt.h>
->  #include <linux/dma-mapping.h>
->  #include <linux/dma-contiguous.h>
-> +#include <linux/efi.h>
->  
->  #include <asm/sections.h>
->  #include <asm/setup.h>
-> @@ -151,7 +152,8 @@ void __init arm64_memblock_init(void)
->  	memblock_reserve(__pa(swapper_pg_dir), SWAPPER_DIR_SIZE);
->  	memblock_reserve(__pa(idmap_pg_dir), IDMAP_DIR_SIZE);
->  
-> -	early_init_fdt_scan_reserved_mem();
-> +	if (!efi_enabled(EFI_MEMMAP))
-> +		early_init_fdt_scan_reserved_mem();
-
-And this is a false stub for !EFI, so that looks fine.
-
-FWIW:
-
-Reviewed-by: Mark Rutland <mark.rutland@arm.com>
-
-I wonder if we have any other flat tree uses we need to be careful of
-when booting via EFI.
-
-Thanks
-Mark.
-
->  
->  	/* 4GB maximum for 32-bit only capable devices */
->  	if (IS_ENABLED(CONFIG_ZONE_DMA))
-> -- 
-> 1.7.10.4
-> 
-> 
+diff --git a/kernel/sched/fair.c b/kernel/sched/fair.c
+index 8bd57df..8524760 100644
+--- a/kernel/sched/fair.c
++++ b/kernel/sched/fair.c
+@@ -4129,6 +4129,11 @@ static unsigned long capacity_of(int cpu)
+ 	return cpu_rq(cpu)->cpu_capacity;
+ }
+ 
++static unsigned long capacity_orig_of(int cpu)
++{
++	return cpu_rq(cpu)->cpu_capacity_orig;
++}
++
+ static unsigned long cpu_avg_load_per_task(int cpu)
+ {
+ 	struct rq *rq = cpu_rq(cpu);
+@@ -4517,6 +4522,17 @@ static int select_idle_sibling(struct task_struct *p, int target)
+ 	return target;
+ }
+ 
++static int get_cpu_utilization(int cpu)
++{
++	unsigned long usage = cpu_rq(cpu)->cfs.usage_load_avg;
++	unsigned long capacity = capacity_of(cpu);
++
++	if (usage >= SCHED_LOAD_SCALE)
++		return capacity + 1;
++
++	return (usage * capacity) >> SCHED_LOAD_SHIFT;
++}
++
+ /*
+  * select_task_rq_fair: Select target runqueue for the waking task in domains
+  * that have the 'sd_flag' flag set. In practice, this is SD_BALANCE_WAKE,
+@@ -5596,6 +5612,7 @@ struct sg_lb_stats {
+ 	unsigned long sum_weighted_load; /* Weighted load of group's tasks */
+ 	unsigned long load_per_task;
+ 	unsigned long group_capacity;
++	unsigned long group_utilization; /* Total utilization of the group */
+ 	unsigned int sum_nr_running; /* Nr tasks running in the group */
+ 	unsigned int group_capacity_factor;
+ 	unsigned int idle_cpus;
+@@ -5935,6 +5952,7 @@ static inline void update_sg_lb_stats(struct lb_env *env,
+ 			load = source_load(i, load_idx);
+ 
+ 		sgs->group_load += load;
++		sgs->group_utilization += get_cpu_utilization(i);
+ 		sgs->sum_nr_running += rq->cfs.h_nr_running;
+ 
+ 		if (rq->nr_running > 1)
+@@ -6108,7 +6126,6 @@ static inline void update_sd_lb_stats(struct lb_env *env, struct sd_lb_stats *sd
+ 		/* Now, start updating sd_lb_stats */
+ 		sds->total_load += sgs->group_load;
+ 		sds->total_capacity += sgs->group_capacity;
+-
+ 		sg = sg->next;
+ 	} while (sg != env->sd->groups);
+ 
+-- 
+1.9.1
