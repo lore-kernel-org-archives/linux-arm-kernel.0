@@ -1,72 +1,95 @@
-From: cw00.choi@samsung.com (Chanwoo Choi)
-Date: Mon, 28 Jul 2014 21:08:28 +0900
-Subject: [PATCH 2/2] iio: adc: exynos_adc: Add support for S3C24xx ADC
-In-Reply-To: <175757227.TPQdXAQiJt@diego>
-References: <1405995074-3271-1-git-send-email-cw00.choi@samsung.com>
- <1405995074-3271-3-git-send-email-cw00.choi@samsung.com>
- <5200888.DXoC06U953@wuerfel> <175757227.TPQdXAQiJt@diego>
-Message-ID: <53D63D3C.7000401@samsung.com>
+From: sthokal@xilinx.com (Srikanth Thokala)
+Date: Mon, 28 Jul 2014 17:47:48 +0530
+Subject: [PATCH v3 1/2] dma: Add Xilinx AXI DMA DT Binding Documentation
+Message-ID: <1406549869-24422-1-git-send-email-sthokal@xilinx.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/22/2014 07:44 PM, Heiko St?bner wrote:
-> Am Dienstag, 22. Juli 2014, 10:39:38 schrieb Arnd Bergmann:
->> On Tuesday 22 July 2014 11:11:14 Chanwoo Choi wrote:
->>> This patch add support for s3c2410/s3c2416/s3c2440/s3c2443 ADC. The
->>> s3c24xx
->>> is alomost same as ADCv1. But, There are a little difference as following:
->>> - ADCMUX register address to select channel
->>> - ADCDAT mask (10bit or 12bit ADC resolution according to SoC version)
->>
->> Very good, thanks for doing this patch!
->>
->> (adding Heiko to Cc, he's probably interested in seeing this as well.
-> 
-> indeed. Thanks for implementing this.
-> 
-> While trying to build a test setup for this, I noticed two points:
-> 
-> (1) I'm not sure what the second register (a "phy enable register" according
-> to the binding) is supposed to be.
-> According to binding and adc code it is mandatory, but I didn't find any
-> lone adc register in the s3c2416 manual.
+Device-tree binding documentation of Xilinx DMA Engine
 
-You're right. I don't find ADC_PHY_CONTROL register on s3c2410 datasheet.
-So, if 'needs_adc_phy' field is true, exynos-adc would only get 'phy enable register'
-from dt node.
+Signed-off-by: Srikanth Thokala <sthokal@xilinx.com>
+---
+Changes in v3:
+- Change property 'xlnx,data-width' to 'xlnx,datawidth' in the description
+  to match the implementation.
 
--       mem = platform_get_resource(pdev, IORESOURCE_MEM, 1);
--       info->enable_reg = devm_ioremap_resource(&pdev->dev, mem);
--       if (IS_ERR(info->enable_reg))
--               return PTR_ERR(info->enable_reg);
+Changes in v2:
+None
+---
+ .../devicetree/bindings/dma/xilinx/xilinx_dma.txt  |   65 ++++++++++++++++++++
+ 1 file changed, 65 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/dma/xilinx/xilinx_dma.txt
+
+diff --git a/Documentation/devicetree/bindings/dma/xilinx/xilinx_dma.txt b/Documentation/devicetree/bindings/dma/xilinx/xilinx_dma.txt
+new file mode 100644
+index 0000000..18e8bcc
+--- /dev/null
++++ b/Documentation/devicetree/bindings/dma/xilinx/xilinx_dma.txt
+@@ -0,0 +1,65 @@
++Xilinx AXI DMA engine, it does transfers between memory and AXI4 stream
++target devices. It can be configured to have one channel or two channels.
++If configured as two channels, one is to transmit to the device and another
++is to receive from the device.
 +
-+       if (info->data->needs_adc_phy) {
-+               mem = platform_get_resource(pdev, IORESOURCE_MEM, 1);
-+               info->enable_reg = devm_ioremap_resource(&pdev->dev, mem);
-+               if (IS_ERR(info->enable_reg))
-+                       return PTR_ERR(info->enable_reg);
-+       }
-
-
-> 
-> 
-> (2) You might need something along the lines of:
-> 
-> diff --git a/drivers/iio/adc/Kconfig b/drivers/iio/adc/Kconfig
-> index 11b048a..088c99a 100644
-> --- a/drivers/iio/adc/Kconfig
-> +++ b/drivers/iio/adc/Kconfig
-> @@ -129,7 +129,7 @@ config AT91_ADC
->  
->  config EXYNOS_ADC
->         tristate "Exynos ADC driver support"
-> -       depends on ARCH_EXYNOS || (OF && COMPILE_TEST)
-> +       depends on ARCH_EXYNOS || ARCH_S3C24XX || ARCH_S3C64XX || (OF && COMPILE_TEST)
->         help
->           Core support for the ADC block found in the Samsung EXYNOS series
->           of SoCs for drivers such as the touchscreen and hwmon to use to share
-
-OK, I'll modify it as your comment.
-
-Best Regards,
-Chanwoo Choi
++Required properties:
++- compatible: Should be "xlnx,axi-dma-1.00.a"
++- #dma-cells: Should be <1>, see "dmas" property below
++- reg: Should contain DMA registers location and length.
++- dma-channel child node: Should have atleast one channel and can have upto
++	two channels per device. This node specifies the properties of each
++	DMA channel (see child node properties below).
++
++Optional properties:
++- xlnx,include-sg: Tells whether configured for Scatter-mode in
++	the hardware.
++
++Required child node properties:
++- compatible: It should be either "xlnx,axi-dma-mm2s-channel" or
++	"xlnx,axi-dma-s2mm-channel".
++- interrupts: Should contain per channel DMA interrupts.
++- xlnx,datawidth: Should contain the stream data width, take values
++	{32,64...1024}.
++
++Option child node properties:
++- xlnx,include-dre: Tells whether hardware is configured for Data
++	Realignment Engine.
++
++Example:
++++++++++
++
++axi_dma_0: axidma at 40400000 {
++	compatible = "xlnx,axi-dma-1.00.a";
++	#dma_cells = <1>;
++	reg = < 0x40400000 0x10000 >;
++	dma-channel at 40400000 {
++		compatible = "xlnx,axi-dma-mm2s-channel";
++		interrupts = < 0 59 4 >;
++		xlnx,datawidth = <0x40>;
++	} ;
++	dma-channel at 40400030 {
++		compatible = "xlnx,axi-dma-s2mm-channel";
++		interrupts = < 0 58 4 >;
++		xlnx,datawidth = <0x40>;
++	} ;
++} ;
++
++
++* DMA client
++
++Required properties:
++- dmas: a list of <[DMA device phandle] [Channel ID]> pairs,
++	where Channel ID is '0' for write/tx and '1' for read/rx
++	channel.
++- dma-names: a list of DMA channel names, one per "dmas" entry
++
++Example:
++++++++++
++
++dmatest_0: dmatest at 0 {
++	compatible ="xlnx,axi-dma-test-1.00.a";
++	dmas = <&axi_dma_0 0
++		&axi_dma_0 1>;
++	dma-names = "dma0", "dma1";
++} ;
+-- 
+1.7.9.5
