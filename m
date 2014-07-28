@@ -1,65 +1,55 @@
-From: jonsmirl@gmail.com (jonsmirl at gmail.com)
-Date: Mon, 28 Jul 2014 10:47:16 -0400
-Subject: [RFC 8/8] ARM: sun7i: Add mod1 clock nodes
-In-Reply-To: <20140728132524.GM3952@lukather>
-References: <1406519386-4902-1-git-send-email-emilio@elopez.com.ar>
- <1406519386-4902-9-git-send-email-emilio@elopez.com.ar>
- <20140728132524.GM3952@lukather>
-Message-ID: <CAKON4OwRUg6aBHzuKemDExbuFpJT_h8Y=vaG_q3SBmEf-j55=Q@mail.gmail.com>
+From: mporter@linaro.org (Matt Porter)
+Date: Mon, 28 Jul 2014 10:48:25 -0400
+Subject: [GIT PULL] ARM: mach-bcm: dt updates for 3.17
+Message-ID: <20140728144825.GA9030@beef>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jul 28, 2014 at 9:25 AM, Maxime Ripard
-<maxime.ripard@free-electrons.com> wrote:
-> On Mon, Jul 28, 2014 at 12:49:46AM -0300, Emilio L?pez wrote:
->> This commit adds all the mod1 clocks available on A20 to its device
->> tree. This list was created by looking at the A20 user manual.
->>
->> Not-signed-off-by: Emilio L?pez <emilio@elopez.com.ar>
->> ---
->>
->> As mentioned on an earlier patch, note that this is untested, and I
->> only added them to sun7i. It'd be great if actual users of these clocks
->> could comment :)
->>
->>  arch/arm/boot/dts/sun7i-a20.dtsi | 39 +++++++++++++++++++++++++++++++++++++++
->>  1 file changed, 39 insertions(+)
->>
->> diff --git a/arch/arm/boot/dts/sun7i-a20.dtsi b/arch/arm/boot/dts/sun7i-a20.dtsi
->> index 5d0265a..c57f7ad 100644
->> --- a/arch/arm/boot/dts/sun7i-a20.dtsi
->> +++ b/arch/arm/boot/dts/sun7i-a20.dtsi
->> @@ -335,6 +335,29 @@
->>                       clock-output-names = "ir1";
->>               };
->>
->> +             iis0_clk: clk at 01c200b8 {
->> +                     #clock-cells = <0>;
->> +                     compatible = "allwinner,sun4i-a10-mod1-clk";
->> +                     reg = <0x01c200b8 0x4>;
->> +                     clocks = <&pll2 0>, <&pll2 1>, <&pll2 2>, <&pll2 3>;
->> +                     clock-output-names = "iis0";
->
-> Usually, it's called i2s.
+Please consider pulling the following mach-bcm dt updates for 3.16.
 
-I'd preferred i2s, but Allwinner used iis everywhere in the manual. So
-which wins in the device tree?
+-Matt
 
-Same issue happens with twi vs i2c.
+The following changes since commit 9a3c4145af32125c5ee39c0272662b47307a8323:
 
+  Linux 3.16-rc6 (2014-07-20 21:04:16 -0700)
 
->
-> Otherwise, beside Chen-Yu's comment, it looks fine.
->
-> Maxime
->
-> --
-> Maxime Ripard, Free Electrons
-> Embedded Linux, Kernel and Android engineering
-> http://free-electrons.com
+are available in the git repository at:
 
+  git://github.com/broadcom/mach-bcm tags/for-3.17/bcm-dt
 
+for you to fetch changes up to 79187a8e242046a0525a296509e80c5ee24fbaf1:
 
--- 
-Jon Smirl
-jonsmirl at gmail.com
+  ARM: brcmstb: dts: add a reference DTS for Broadcom 7445 (2014-07-28 10:01:46 -0400)
+
+----------------------------------------------------------------
+ARM: mach-bcm: dt updatees for 3.17
+
+- BCM Mobile SMP support
+- BRCM STB platform support
+
+----------------------------------------------------------------
+Alex Elder (3):
+      devicetree: bindings: document Broadcom CPU enable method
+      ARM: dts: enable SMP support for bcm28155
+      ARM: dts: enable SMP support for bcm21664
+
+Marc Carino (4):
+      ARM: brcmstb: add CPU binding for Broadcom Brahma15
+      ARM: brcmstb: add misc. DT bindings for brcmstb
+      ARM: brcmstb: gic: add compatible string for Broadcom Brahma15
+      ARM: brcmstb: dts: add a reference DTS for Broadcom 7445
+
+ .../bindings/arm/bcm/brcm,bcm11351-cpu-method      |  36 +++++++
+ .../devicetree/bindings/arm/brcm-brcmstb.txt       |  95 ++++++++++++++++++
+ Documentation/devicetree/bindings/arm/cpus.txt     |   2 +
+ Documentation/devicetree/bindings/arm/gic.txt      |   1 +
+ arch/arm/boot/dts/Makefile                         |   2 +
+ arch/arm/boot/dts/bcm11351.dtsi                    |  19 ++++
+ arch/arm/boot/dts/bcm21664.dtsi                    |  19 ++++
+ arch/arm/boot/dts/bcm7445-bcm97445svmb.dts         |  14 +++
+ arch/arm/boot/dts/bcm7445.dtsi                     | 111 +++++++++++++++++++++
+ 9 files changed, 299 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/arm/bcm/brcm,bcm11351-cpu-method
+ create mode 100644 Documentation/devicetree/bindings/arm/brcm-brcmstb.txt
+ create mode 100644 arch/arm/boot/dts/bcm7445-bcm97445svmb.dts
+ create mode 100644 arch/arm/boot/dts/bcm7445.dtsi
