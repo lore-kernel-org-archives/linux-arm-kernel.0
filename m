@@ -1,27 +1,86 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Mon, 28 Jul 2014 19:14:56 +0100
-Subject: [PATCH 2/2] ARM: LPAE: reduce damage caused by idmap to virtual
- memory layout
-In-Reply-To: <20140722153635.25088.14197.stgit@buzz>
-References: <20140722153623.25088.37742.stgit@buzz>
- <20140722153635.25088.14197.stgit@buzz>
-Message-ID: <20140728181456.GO15536@arm.com>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Mon, 28 Jul 2014 19:14:49 +0100
+Subject: [PATCH] arm64: ignore DT memreserve entries when booting in UEFI
+ mode
+In-Reply-To: <1406570583-22848-1-git-send-email-leif.lindholm@linaro.org>
+References: <1406570583-22848-1-git-send-email-leif.lindholm@linaro.org>
+Message-ID: <20140728181449.GF2576@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jul 22, 2014 at 04:36:35PM +0100, Konstantin Khlebnikov wrote:
-> idmap layout combines both phisical and virtual addresses.
-> Everything works fine if ram physically lays below PAGE_OFFSET.
-> Otherwise idmap starts punching huge holes in virtual memory layout.
-> It maps ram by 2MiB sections, but when it allocates new pmd page it
-> cuts 1GiB at once.
+On Mon, Jul 28, 2014 at 07:03:03PM +0100, Leif Lindholm wrote:
+> UEFI provides its own method for marking regions to reserve, via the
+> memory map which is also used to initialise memblock. So when using the
+> UEFI memory map, ignore any memreserve entries present in the DT.
+
+It's worth noting that no-one is relying on this at present, and were
+they it would imply that their UEFI implementation is broken (providing
+a dodgy memory map).
+
+So before people start doing dodgy things, let's, close that hole. If we
+need a way of modifying the memory map we should come up with a more
+general plan.
+
+> Reported-by: Mark Rutland <mark.rutland@arm.com>
+> Signed-off-by: Leif Lindholm <leif.lindholm@linaro.org>
+> ---
+>  arch/arm64/kernel/efi.c |    2 ++
+>  arch/arm64/mm/init.c    |    4 +++-
+>  2 files changed, 5 insertions(+), 1 deletion(-)
 > 
-> This patch makes a copy of all affected pmds from init_mm.
-> Only few (usually one) 2MiB sections will be lost.
-> This is not eliminates problem but makes it 512 times less likely.
+> diff --git a/arch/arm64/kernel/efi.c b/arch/arm64/kernel/efi.c
+> index 14db1f6..7ad17b2 100644
+> --- a/arch/arm64/kernel/efi.c
+> +++ b/arch/arm64/kernel/efi.c
+> @@ -188,6 +188,8 @@ static __init void reserve_regions(void)
+>  		if (uefi_debug)
+>  			pr_cont("\n");
+>  	}
+> +
+> +	set_bit(EFI_MEMMAP, &efi.flags);
 
-I'm struggling to understand your commit message, but making a problem `512
-times less likely' does sound like a bit of a hack to me. Can't we fix this
-properly instead?
+Nothing outside of arch/x86 seems to hang off this, so using it here
+looks fine.
 
-Will
+>  }
+>  
+>  
+> diff --git a/arch/arm64/mm/init.c b/arch/arm64/mm/init.c
+> index e90c542..58dbf2e 100644
+> --- a/arch/arm64/mm/init.c
+> +++ b/arch/arm64/mm/init.c
+> @@ -32,6 +32,7 @@
+>  #include <linux/of_fdt.h>
+>  #include <linux/dma-mapping.h>
+>  #include <linux/dma-contiguous.h>
+> +#include <linux/efi.h>
+>  
+>  #include <asm/sections.h>
+>  #include <asm/setup.h>
+> @@ -151,7 +152,8 @@ void __init arm64_memblock_init(void)
+>  	memblock_reserve(__pa(swapper_pg_dir), SWAPPER_DIR_SIZE);
+>  	memblock_reserve(__pa(idmap_pg_dir), IDMAP_DIR_SIZE);
+>  
+> -	early_init_fdt_scan_reserved_mem();
+> +	if (!efi_enabled(EFI_MEMMAP))
+> +		early_init_fdt_scan_reserved_mem();
+
+And this is a false stub for !EFI, so that looks fine.
+
+FWIW:
+
+Reviewed-by: Mark Rutland <mark.rutland@arm.com>
+
+I wonder if we have any other flat tree uses we need to be careful of
+when booting via EFI.
+
+Thanks
+Mark.
+
+>  
+>  	/* 4GB maximum for 32-bit only capable devices */
+>  	if (IS_ENABLED(CONFIG_ZONE_DMA))
+> -- 
+> 1.7.10.4
+> 
+> 
