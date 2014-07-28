@@ -1,85 +1,96 @@
-From: koct9i@gmail.com (Konstantin Khlebnikov)
-Date: Mon, 28 Jul 2014 23:57:16 +0400
-Subject: [PATCH 2/2] ARM: LPAE: reduce damage caused by idmap to virtual
- memory layout
-In-Reply-To: <20140728194251.GB30282@n2100.arm.linux.org.uk>
-References: <20140722153623.25088.37742.stgit@buzz>
- <20140722153635.25088.14197.stgit@buzz>
- <20140728181456.GO15536@arm.com>
- <CALYGNiNJDHfQm2yk067hh-Wywsb_Ki5AEE_sTMkYegJi9spSzw@mail.gmail.com>
- <20140728184107.GR15536@arm.com>
- <CALYGNiNaMMv9itJ_+cvPDn1_Yo4GTPQJ-Cy9zBzJzfaDLfkvmg@mail.gmail.com>
- <20140728191305.GA30282@n2100.arm.linux.org.uk>
- <CALYGNiNVduTK8MXt8VJyiqdsB0mA_OnC0hLOB-WzgAEMZyu9sg@mail.gmail.com>
- <20140728194251.GB30282@n2100.arm.linux.org.uk>
-Message-ID: <CALYGNiO6PEPoHDrcLRZxQVT2=-1upyh6E-TWBCMB0MR8u5Sx6w@mail.gmail.com>
+From: marek.belisko@gmail.com (Belisko Marek)
+Date: Mon, 28 Jul 2014 22:02:50 +0200
+Subject: [PATCH 3/3] arm: dts: Add gta04a5 model
+In-Reply-To: <CAOf5uwk=ctww=pP4Ae+1C6i-oOtiYTv2NJbj1GpuPwVSKXB4Hw@mail.gmail.com>
+References: <1406577213-9642-1-git-send-email-marek@goldelico.com>
+ <1406577213-9642-4-git-send-email-marek@goldelico.com>
+ <CAOf5uwk=ctww=pP4Ae+1C6i-oOtiYTv2NJbj1GpuPwVSKXB4Hw@mail.gmail.com>
+Message-ID: <CAAfyv35jvhzvjCKMwrpa=RQ1JkfcmthCsGDzwLW9Y6bq3Ww_fg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jul 28, 2014 at 11:42 PM, Russell King - ARM Linux
-<linux@arm.linux.org.uk> wrote:
-> On Mon, Jul 28, 2014 at 11:29:39PM +0400, Konstantin Khlebnikov wrote:
->> Ok, before switching from identity mapping to normal mapping kernel must
->> switch instruction pointer from physical address to virtual.
->
-> "switch instruction pointer from physical address to virtual."
->
-> There's no such distinction for the instruction pointer.
+Hi Michael,
 
-I know. I mean "logically".
+On Mon, Jul 28, 2014 at 9:56 PM, Michael Trimarchi
+<michael@amarulasolutions.com> wrote:
+> Hi Marek
+>
+> Il 28/lug/2014 21:54 "Marek Belisko" <marek@goldelico.com> ha scritto:
+>
+>
+>>
+>> Add model a5 which have additional jack detection.
+>>
+>> Signed-off-by: Marek Belisko <marek@goldelico.com>
+>> ---
+>>  arch/arm/boot/dts/Makefile          |  1 +
+>>  arch/arm/boot/dts/omap3-gta04a5.dts | 17 +++++++++++++++++
+>>  2 files changed, 18 insertions(+)
+>>  create mode 100644 arch/arm/boot/dts/omap3-gta04a5.dts
+>>
+>> diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
+>> index 7d45fde..576c595 100644
+>> --- a/arch/arm/boot/dts/Makefile
+>> +++ b/arch/arm/boot/dts/Makefile
+>> @@ -285,6 +285,7 @@ dtb-$(CONFIG_ARCH_OMAP3) += am3517-craneboard.dtb \
+>>         omap3-evm-37xx.dtb \
+>>         omap3-gta04a3.dtb \
+>>         omap3-gta04a4.dtb \
+>> +       omap3-gta04a5.dtb \
+>>         omap3-igep0020.dtb \
+>>         omap3-igep0030.dtb \
+>>         omap3-ldp.dtb \
+>> diff --git a/arch/arm/boot/dts/omap3-gta04a5.dts
+>> b/arch/arm/boot/dts/omap3-gta04a5.dts
+>> new file mode 100644
+>> index 0000000..210317c3
+>> --- /dev/null
+>> +++ b/arch/arm/boot/dts/omap3-gta04a5.dts
+>> @@ -0,0 +1,17 @@
+>> +/*
+>> + * Copyright (C) 2014 H. Nikolaus Schaller <hns@goldelico.com>
+>> + *
+>> + * This program is free software; you can redistribute it and/or modify
+>> + * it under the terms of the GNU General Public License version 2 as
+>> + * published by the Free Software Foundation.
+>> + */
+>> +
+>> +#include "omap3-gta04.dtsi"
+>> +
+>> +/ {
+>> +       model = "Goldelico GTA04A5;
+>> +
+>> +       sound {
+>> +               ti,jack-det-gpio = <&twl_gpio 2 0>;    /* GTA04A5 only */
+>> +       };
+>> +};
+>> --
+>> 1.9.1
+>>
+>
+> Can we have only one dts with status enabled/disabled?
+Do you mean to define this node it gta04.dtsi disabled and enable only
+for a5 model?
+>
+> Michael
+>
+>> --
+>> To unsubscribe from this list: send the line "unsubscribe linux-omap" in
+>> the body of a message to majordomo at vger.kernel.org
+>> More majordomo info at  http://vger.kernel.org/majordomo-info.html
 
->
-> There is the mode where the MMU is disabled.  The CPU fetches from the
-> address in the program counter.  The instructions it fetches will
-> instruct it to perform operations to enable the MMU.
->
-> The CPU itself continues fetching instructions (with an unpredictable
-> number of instructions in the CPU's pipeline) across this boundary.
->
-> Hence, it is _impossible_ to know which exact instructions are fetched
-> with the MMU off, and which are fetched with the MMU on.
->
-> This is why we need the identity mapping: so that the CPU's instruction
-> fetches can continue unaffected by turning the MMU on.
->
-> Before the MMU is on, the CPU is fetching from an untranslated (== physical)
-> view of the address space, which is limited to 4GB in size.
->
-> After the MMU is on, the CPU is fetching from a translated (== virtual)
-> view of the address space, which and the translated version is also
-> limited to 4GB in size.
+BR,
 
-Sorry but I'm really look so dumb? Maybe it's true, it's almost
-midnight at my side.
+marek
 
->
->> It's a long jump
->> out idmap code section to some normal kernel function.
->> __secondary_switched in my case. And both physical source and virtual
->> destination addresses must present in one same mapping (idmap).
->
-> ... one which the code already caters for.
->
->> idmap pgd starts as copy of pgd from init_mm, it points to the same pmd pages.
->> When it populates identical mapping for that special code section it allocates
->> new pages from pmd entries (which covers 1Gb of vm layout) but only few of
->> them are filled. In case 3/1GB split If idmap touches somehing above 3Gb it
->> kills whole kernel vm layout and as result kernel cannot jump to any
->> virtual address.
->
-> It doesn't matter, provided the kernel text and data in the virtual
-> address space are not overwritten by the identity mapping.  If it
-> ends up in the vmalloc or IO space, that should not be a problem.
+-- 
+as simple and primitive as possible
+-------------------------------------------------
+Marek Belisko - OPEN-NANDRA
+Freelance Developer
 
-In my case it's been overwritten.
-And it always happens when PHYS_OFFSET >= PAGE_OFFSET
-because in case of LPAE idmap always overwrites 1Gb at once.
-
->
-> It also should not be a problem if the physical memory starts at
-> PAGE_OFFSET (iow, PHYS_OFFSET == PAGE_OFFSET).  Indeed, we have
-> some platforms where that is true.
->
-> --
-> FTTC broadband for 0.8mile line: currently at 9.5Mbps down 400kbps up
-> according to speedtest.net.
+Ruska Nova Ves 219 | Presov, 08005 Slovak Republic
+Tel: +421 915 052 184
+skype: marekwhite
+twitter: #opennandra
+web: http://open-nandra.com
