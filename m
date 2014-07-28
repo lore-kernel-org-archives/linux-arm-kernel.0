@@ -1,59 +1,32 @@
-From: afaerber@suse.de (=?UTF-8?q?Andreas=20F=C3=A4rber?=)
-Date: Mon, 28 Jul 2014 14:18:12 +0200
-Subject: [RFC 5/5] ARM: dts: exynos5410: Add ODROID-XU LEDs
-In-Reply-To: <1406549892-5558-1-git-send-email-afaerber@suse.de>
-References: <1406549892-5558-1-git-send-email-afaerber@suse.de>
-Message-ID: <1406549892-5558-6-git-send-email-afaerber@suse.de>
+From: vikas.sajjan@samsung.com (Vikas Sajjan)
+Date: Mon, 28 Jul 2014 17:45:26 +0530
+Subject: [PATCH 2/2] ARM: EXYNOS: Add exynos5260 PMU compatible string to DT
+ match table
+In-Reply-To: <1406549726-10452-1-git-send-email-vikas.sajjan@samsung.com>
+References: <1406549726-10452-1-git-send-email-vikas.sajjan@samsung.com>
+Message-ID: <1406549726-10452-3-git-send-email-vikas.sajjan@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Signed-off-by: Andreas F?rber <afaerber@suse.de>
----
- arch/arm/boot/dts/exynos5410-odroidxu.dts | 25 +++++++++++++++++++++++++
- 1 file changed, 25 insertions(+)
+Exynos initialisation code now relies on obtaining the PMU address via
+DT node, so add the exynos5260 PMU compatible string to DT match table.
 
-diff --git a/arch/arm/boot/dts/exynos5410-odroidxu.dts b/arch/arm/boot/dts/exynos5410-odroidxu.dts
-index b67112bf062a..f6e7555feeff 100644
---- a/arch/arm/boot/dts/exynos5410-odroidxu.dts
-+++ b/arch/arm/boot/dts/exynos5410-odroidxu.dts
-@@ -15,6 +15,7 @@
- 
- /dts-v1/;
- #include "exynos5410.dtsi"
-+#include <dt-bindings/gpio/gpio.h>
- / {
- 	model = "ODROID-XU based on EXYNOS5410";
- 	compatible = "hardkernel,odroid-xu", "samsung,exynos5410", "samsung,exynos5";
-@@ -39,6 +40,30 @@
- 		reg = <0x02037000 0x1000>;
- 	};
- 
-+	leds {
-+		compatible = "gpio-leds";
-+
-+		blue {
-+			label = "blue:heartbeat";
-+			gpios = <&gpb2 2 GPIO_ACTIVE_HIGH>;
-+			default-state = "off";
-+			linux,default-trigger = "heartbeat";
-+		};
-+
-+		green {
-+			label = "green:activity";
-+			gpios = <&gpb2 1 GPIO_ACTIVE_HIGH>;
-+			default-state = "off";
-+			linux,default-trigger = "mmc0";
-+		};
-+
-+		red {
-+			label = "red:activity";
-+			gpios = <&gpx2 3 GPIO_ACTIVE_HIGH>;
-+			default-state = "off";
-+			linux,default-trigger = "mmc1";
-+		};
-+	};
+Signed-off-by: Vikas Sajjan <vikas.sajjan@samsung.com>
+---
+ arch/arm/mach-exynos/exynos.c |    1 +
+ 1 file changed, 1 insertion(+)
+
+diff --git a/arch/arm/mach-exynos/exynos.c b/arch/arm/mach-exynos/exynos.c
+index df41bd1..e4f7270 100644
+--- a/arch/arm/mach-exynos/exynos.c
++++ b/arch/arm/mach-exynos/exynos.c
+@@ -253,6 +253,7 @@ static const struct of_device_id exynos_dt_pmu_match[] = {
+ 	{ .compatible = "samsung,exynos4412-pmu" },
+ 	{ .compatible = "samsung,exynos5250-pmu" },
+ 	{ .compatible = "samsung,exynos5420-pmu" },
++	{ .compatible = "samsung,exynos5260-pmu" },
+ 	{ /*sentinel*/ },
  };
  
- &mmc_0 {
 -- 
-1.9.3
+1.7.9.5
