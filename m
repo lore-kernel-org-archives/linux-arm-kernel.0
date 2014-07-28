@@ -1,42 +1,87 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Mon, 28 Jul 2014 18:03:40 +0200
-Subject: [Patch V2 2/2] i2c: mv64xxx: Remove internal compatible string
- from Documentation
-In-Reply-To: <20140728155256.GH2891@lunn.ch>
-References: <1406395238-29758-1-git-send-email-andrew@lunn.ch>
- <30588206.eyRbtryspM@wuerfel> <20140728155256.GH2891@lunn.ch>
-Message-ID: <5484382.ltXF4cCzA4@wuerfel>
+From: andre.przywara@arm.com (Andre Przywara)
+Date: Mon, 28 Jul 2014 17:14:59 +0100
+Subject: [PATCH 19/19] Documentation: ACPI for ARM64
+In-Reply-To: <13731398.6CtXoCyCVq@wuerfel>
+References: <1406206825-15590-1-git-send-email-hanjun.guo@linaro.org>
+ <5959830.lpqeqL7HbK@wuerfel> <53D65C16.2050202@arm.com>
+ <13731398.6CtXoCyCVq@wuerfel>
+Message-ID: <53D67703.7090306@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday 28 July 2014 17:52:56 Andrew Lunn wrote:
-> > > We don't translate into 'Marketing names'. We just turn the register
-> > > values into a stringified number. So it would have to be something
-> > > like:
-> > > 
-> > >         if (soc_name_is("7826") && soc_revision_is("1"))
-> > 
-> > Hmm, I think that is inconsistent with how the strings are used
-> > on other platforms, where you want something that uniquely identifies
-> > the device in user-readable strings.
-> 
-> Unfortunately, it is not so simple. There are a few different Armada
-> XP SoCs. E.g. dual core and quad core. And this is pretty normal for
-> Marvell. There are maybe 5 different Kirkwoods, a few different
-> Orion5x etc. So at minimum it would of had to be e.g. "Armada XP
-> 7826".
-> 
-> However, it is too late now. This is part of the ABI, and Debian's
-> flash-kernel is making use of this in order to get the right DT blob.
-> So we cannot change it.
-> 
 
-Ok, I see. Let's hope then that "Marvell" as a family name in combination
-with those numbers remains unique. A driver will probably have to
-check all three, but it could be combined into a single function that
-takes NULL as a don't care argument:
 
-	if (soc_is("Marvell", "7826", NULL))
-		...
+On 28/07/14 16:23, Arnd Bergmann wrote:
+> On Monday 28 July 2014 15:20:06 Andre Przywara wrote:
+>> On 28/07/14 11:46, Arnd Bergmann wrote:
+>>> On Monday 28 July 2014 10:23:57 Graeme Gregory wrote:
+>>>> The PL011 UART is the use-case I keep hitting, that IP block has a 
+>>>> variable input clock on pretty much everything I have seen in the wild. 
+>>>
+>>> Ok, I see. What does ACPI-5.1 say about pl011?
+>>>
+>>> Interestingly, the subset of pl011 that is specified by SBSA does not
+>>> contain the IBRD/FBRD registers, effectively making it a fixed-rated
+>>> UART (I guess that would be a ART, without the U then), and you
+>>> consequently don't even need to know the clock rate.
+>>
+>> The idea of this was probably to let the baudrate set by some firmware
+>> code to the "right" value and the spec just didn't want to expose the
+>> details for the generic UART:
+>> "This specification does not cover registers needed to configure the
+>> UART as these are considered hardware-specific and will be set up by
+>> hardware-specific software."
+>> To me that reads like the SBSA UART is just for debugging, and you are
+>> expected just to access the data register.
+> 
+> Right, makes sense. It also avoids the case where Linux for some reason
+> ends up using a different line rate than the firmware, which can
+> cause a lot of unnecessary pain.
+> 
+>>> However, my guess is that most hardware in the real world contains
+>>> an actual pl011 and it does make a lot of sense to allow setting
+>>> the baud rate on it, which then requires knowing the input clock.
+>>>
+>>> If there is any hardware that implements just the SBSA-mandated subset
+>>> rather than the full pl011, we should probably implement both
+>>> in the kernel: a dumb driver that can only send and receive, and the
+>>> more complex one that can set the bit rates and flow-control but that
+>>> requires a standardized ACPI table with the input clock rate.
+>>
+>> The fast model I use can be switched to use the SBSA restricted PL011,
+>> and as expected the Linux kernel crashes at the device doesn't support
+>> DMA (and a lot more stuff) - but the current code requires it.
+> 
+> It does? We have a lot of platforms that don't have DMA support for
+> pl011.
 
-	Arnd
+Well, to be honest I just booted the full featured kernel with the
+changed fast model config, so the platform and the DT claimed DMA
+support, just the emulated hardware doesn't implement it ;-)
+And beside that a whole lot of other PL011 registers are not available,
+so the crash could be caused by anything. I didn't look to closely why
+it broke.
+
+>> So I am about to implement a new driver for that SBSA subset. So far
+>> this will be a separate driver, starting from a copy of amba-pl011.c,
+>> but removing most of the code ;-)
+> 
+> Ok. You might want to consider starting from a different base though.
+> IIRC, pl011 uses uart_port as the basic abstraction, while the
+> new driver should probably use the raw tty_port instead.
+> drivers/tty/goldfish.c is probably a good example to look at for
+> that.
+
+Good hint, will look at this.
+
+Cheers,
+Andre.
+
+> 
+> You could also make it a hvc_driver like drivers/tty/hvc/hvc_vio.c,
+> but I'm not sure if that model seen favorable by the tty maintainers.
+> It would probably be the shortest driver though.
+> 
+> 	Arnd
+> 
+> 
