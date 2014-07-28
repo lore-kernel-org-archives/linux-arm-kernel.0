@@ -1,34 +1,40 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Mon, 28 Jul 2014 15:02:52 +0200
-Subject: [PATCH v5] pcie: Add Xilinx PCIe Host Bridge IP driver
-In-Reply-To: <CA+mB=1JhDF=BBXcyTbgVB8S7qH=Mb1JH78HLL4pA9OBH19hQvA@mail.gmail.com>
-References: <1406131381-25577-1-git-send-email-sthokal@xilinx.com>
- <CA+mB=1JhDF=BBXcyTbgVB8S7qH=Mb1JH78HLL4pA9OBH19hQvA@mail.gmail.com>
-Message-ID: <8258903.Rn4s07GKGV@wuerfel>
+From: afaerber@suse.de (=?UTF-8?q?Andreas=20F=C3=A4rber?=)
+Date: Mon, 28 Jul 2014 15:05:03 +0200
+Subject: [PATCH v3] Documentation: devicetree: Fix ADI AXI SPDIF specification
+Message-ID: <1406552704-6736-1-git-send-email-afaerber@suse.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday 28 July 2014 18:04:34 Srikanth Thokala wrote:
-> Hi Arnd and Rob,
-> 
-> I discussed with Bjorn and we believe this patch is in good shape to
-> apply.  And Bjorn requires ACKs to apply this patch.  So, could you
-> guys please review this patch and provided your ACKs to this patch.
+The specification requires compatible = "adi,axi-spdif-1.00.a" but
+driver and example and file name indicate "adi,axi-spdif-tx-1.00.a".
+Change the specification to match the implementation.
 
-Looks great for the most part. I've looked through the whole driver
-again, and I have two small issues remaining:
+Acked-by: Lars-Peter Clausen <lars@metafoo.de>
+Reviewed-by: Michal Simek <michal.simek@xilinx.com>
+Fixes: d7b528eff927 ("dt: Add bindings documentation for the ADI AXI-SPDIF audio controller")
+Signed-off-by: Andreas F?rber <afaerber@suse.de>
+---
+ v2 -> v3:
+ * Added Fixes header
+ * CC broonie (Mark Brown)
+ 
+ v2: New
+ 
+ Documentation/devicetree/bindings/sound/adi,axi-spdif-tx.txt | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-a) Please clarify in the changeset description why there is no support
-   for PCI I/O space. 
-
-b) I think you should use the 'msi-parent' property, and the
-   of_pci_find_msi_chip_by_node() to find the msi_chip for the
-   PCI controller. This will make it possible to forward MSIs
-   to the main interrupt controller in the system, which is more
-   efficient. See the pcie-mvebu driver for an example of this.
-
-Other than these:
-
-Acked-by: Arnd Bergmann <arnd@arndb.de>
-
-	Arnd
+diff --git a/Documentation/devicetree/bindings/sound/adi,axi-spdif-tx.txt b/Documentation/devicetree/bindings/sound/adi,axi-spdif-tx.txt
+index 46f344965313..4eb7997674a0 100644
+--- a/Documentation/devicetree/bindings/sound/adi,axi-spdif-tx.txt
++++ b/Documentation/devicetree/bindings/sound/adi,axi-spdif-tx.txt
+@@ -1,7 +1,7 @@
+ ADI AXI-SPDIF controller
+ 
+ Required properties:
+- - compatible : Must be "adi,axi-spdif-1.00.a"
++ - compatible : Must be "adi,axi-spdif-tx-1.00.a"
+  - reg : Must contain SPDIF core's registers location and length
+  - clocks : Pairs of phandle and specifier referencing the controller's clocks.
+    The controller expects two clocks, the clock used for the AXI interface and
+-- 
+1.9.3
