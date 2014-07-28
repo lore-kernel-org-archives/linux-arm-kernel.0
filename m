@@ -1,72 +1,62 @@
 From: haojian.zhuang@linaro.org (Haojian Zhuang)
-Date: Mon, 28 Jul 2014 20:51:15 +0800
-Subject: [PATCH v5 0/8] enable Hisilicon HIX5HD2 SoC
-Message-ID: <1406551883-26154-1-git-send-email-haojian.zhuang@linaro.org>
+Date: Mon, 28 Jul 2014 20:51:16 +0800
+Subject: [PATCH v5 1/8] ARM: debug: Rename Hi3716 to HI5XHD2
+In-Reply-To: <1406551883-26154-1-git-send-email-haojian.zhuang@linaro.org>
+References: <1406551883-26154-1-git-send-email-haojian.zhuang@linaro.org>
+Message-ID: <1406551883-26154-2-git-send-email-haojian.zhuang@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Changelog:
-v5:
-  * Use CPU_OF_DECLARE_METHOD().
-  * State "hisilicon,cpuctrl" in documents.
-  * Set PL310 L2 aux value in machine descriptor.
-  * Use enable-method property for smp in dts file.
-  * Move reset code from machine platform driver into power reset driver.
-  * Move HIP04 debug uart into another patch series.
+From: Haifeng Yan <yanhaifeng@gmail.com>
 
-v4:
-  * Move CONFIG_ARCH_HISI from HiP04 SoC patch series to here.
-  * Rename x5hd2. Always use HIX5HD2 or hix5hd2 instead.
-  * Move HIP04 debug uart into this patch series.
+Rename Hisilicon HI3716 to HI5XHD2. And it relies on ARCH_HI5XHD2
+instead.
 
-v3:
-  * Clean in headsmp.S.
-  * Remove CONFIG_ARCH_HIX5HD2 in Makefile for headsmp.o. Use
-    CONFIG_SMP instead.
+Hi5XHD2 is a SoC with dual Cortex A9 cores.
 
-v2:
-  * Add document on DT binding.
-  * Clean DTS file.
-  * Avoid to parse DT binding in restart function.
-  * Fix the hotplug issue.
-  * Remove hardcoding in platsmp.
+Signed-off-by: Haifeng Yan <yanhaifeng@gmail.com>
+Signed-off-by: Jiancheng Xue <jchxue@gmail.com>
+Signed-off-by: Haojian Zhuang <haojian.zhuang@linaro.org>
+---
+ arch/arm/Kconfig.debug | 12 ++++++++++--
+ 1 file changed, 10 insertions(+), 2 deletions(-)
 
-Haifeng Yan (3):
-  ARM: debug: Rename Hi3716 to HI5XHD2
-  ARM: hisi: enable hix5hd2 SoC
-  ARM: dts: Add hix5hd2-dkb dts file.
-
-Haojian Zhuang (5):
-  ARM: hisi: add ARCH_HISI
-  power: reset: move hisilicon reboot code
-  ARM: config: enable ARCH_HIX5HD2
-  ARM: hisi: set l2 aux for pl310
-  ARM: hisi: remove smp from machine descriptor
-
- .../bindings/arm/hisilicon/hisilicon.txt           |  11 ++
- arch/arm/Kconfig.debug                             |  12 +-
- arch/arm/Makefile                                  |   2 +-
- arch/arm/boot/dts/Makefile                         |   1 +
- arch/arm/boot/dts/hi3620.dtsi                      |   1 +
- arch/arm/boot/dts/hix5hd2-dkb.dts                  |  53 +++++++
- arch/arm/boot/dts/hix5hd2.dtsi                     | 170 +++++++++++++++++++++
- arch/arm/configs/hi3xxx_defconfig                  |   2 +
- arch/arm/configs/multi_v7_defconfig                |   1 +
- arch/arm/mach-hisi/Kconfig                         |  30 +++-
- arch/arm/mach-hisi/Makefile                        |   2 +-
- arch/arm/mach-hisi/core.h                          |   5 +
- arch/arm/mach-hisi/headsmp.S                       |  16 ++
- arch/arm/mach-hisi/hisilicon.c                     |  47 ++----
- arch/arm/mach-hisi/hotplug.c                       |  58 +++++++
- arch/arm/mach-hisi/platsmp.c                       |  53 ++++++-
- drivers/power/reset/Kconfig                        |   6 +
- drivers/power/reset/Makefile                       |   1 +
- drivers/power/reset/hisi-reboot.c                  |  67 ++++++++
- 19 files changed, 494 insertions(+), 44 deletions(-)
- create mode 100644 arch/arm/boot/dts/hix5hd2-dkb.dts
- create mode 100644 arch/arm/boot/dts/hix5hd2.dtsi
- create mode 100644 arch/arm/mach-hisi/headsmp.S
- create mode 100644 drivers/power/reset/hisi-reboot.c
-
+diff --git a/arch/arm/Kconfig.debug b/arch/arm/Kconfig.debug
+index 8f90595..d061de0 100644
+--- a/arch/arm/Kconfig.debug
++++ b/arch/arm/Kconfig.debug
+@@ -223,6 +223,14 @@ choice
+ 		  Say Y here if you want kernel low-level debugging support
+ 		  on HI3716 UART.
+ 
++	config DEBUG_HIX5HD2_UART
++		bool "Hisilicon Hix5hd2 Debug UART"
++		depends on ARCH_HIX5HD2
++		select DEBUG_UART_PL01X
++		help
++		  Say Y here if you want kernel low-level debugging support
++		  on Hix5hd2 UART.
++
+ 	config DEBUG_HIGHBANK_UART
+ 		bool "Kernel low-level debugging messages via Highbank UART"
+ 		depends on ARCH_HIGHBANK
+@@ -1092,7 +1100,7 @@ config DEBUG_UART_PHYS
+ 	default 0xf1012000 if ARCH_DOVE || ARCH_KIRKWOOD || ARCH_MV78XX0 || \
+ 				ARCH_ORION5X
+ 	default 0xf7fc9000 if DEBUG_BERLIN_UART
+-	default 0xf8b00000 if DEBUG_HI3716_UART
++	default 0xf8b00000 if DEBUG_HIX5HD2_UART
+ 	default 0xf991e000 if DEBUG_QCOM_UARTDM
+ 	default 0xfcb00000 if DEBUG_HI3620_UART
+ 	default 0xfe800000 if ARCH_IOP32X
+@@ -1144,7 +1152,7 @@ config DEBUG_UART_VIRT
+ 	default 0xfe230000 if DEBUG_PICOXCELL_UART
+ 	default 0xfe300000 if DEBUG_BCM_KONA_UART
+ 	default 0xfe800000 if ARCH_IOP32X
+-	default 0xfeb00000 if DEBUG_HI3620_UART || DEBUG_HI3716_UART
++	default 0xfeb00000 if DEBUG_HI3620_UART || DEBUG_HIX5HD2_UART
+ 	default 0xfeb24000 if DEBUG_RK3X_UART0
+ 	default 0xfeb26000 if DEBUG_RK3X_UART1
+ 	default 0xfeb30c00 if DEBUG_KEYSTONE_UART0
 -- 
 1.9.1
