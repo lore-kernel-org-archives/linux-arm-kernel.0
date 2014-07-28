@@ -1,29 +1,46 @@
-From: afaerber@suse.de (=?UTF-8?B?QW5kcmVhcyBGw6RyYmVy?=)
-Date: Mon, 28 Jul 2014 18:33:00 +0200
-Subject: [LINUX PATCH] ARM: zynq: DT: Remove DMA from board DTs
-In-Reply-To: <1406564643-10417-1-git-send-email-soren.brinkmann@xilinx.com>
-References: <1406564643-10417-1-git-send-email-soren.brinkmann@xilinx.com>
-Message-ID: <53D67B3C.3050401@suse.de>
+From: lars@metafoo.de (Lars-Peter Clausen)
+Date: Mon, 28 Jul 2014 18:39:46 +0200
+Subject: [PATCH v2 00/11] ARM: dts: zynq: Prepare Parallella
+In-Reply-To: <53D677B1.2000700@suse.de>
+References: <1406242820-20140-1-git-send-email-afaerber@suse.de>
+ <53D677B1.2000700@suse.de>
+Message-ID: <53D67CD2.9040200@metafoo.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am 28.07.2014 18:24, schrieb Soren Brinkmann:
-> The DMA engine is enabled for all DTs that derive from zynq-7000.dtsi.
-> There is no need to override the 'status' property in board DTs.
-> 
-> Cc: Andreas F?rber <afaerber@suse.de>
-> Signed-off-by: Soren Brinkmann <soren.brinkmann@xilinx.com>
-> ---
-> When the 'status' property was removed from the DMA node, this had been
-> overlooked.
+On 07/28/2014 06:17 PM, Andreas F?rber wrote:
+> Hi Lars-Peter,
+>
+> Am 25.07.2014 01:00, schrieb Andreas F?rber:
+>> most notably I'm missing
+>> ADI ADV7513 and AXI-HDMI support
+> [...]
+>> Cc: Lars-Peter Clausen <lars@metafoo.de> (HDMI)
+>
+> Could you please enlighten us what the status of upstreaming
+> ADV7511/ADV7513 support is? It is declared "work in progress" here:
+>
+> http://wiki.analog.com/resources/tools-software/linux-drivers/drm/adv7511
+>
+> I see some adv7511 V4L bits in drivers/media/i2c/adv7511.c, but no
+> drivers/gpu/drm/i2c/adv7511_{core,audio}.c as on the xcomm_zynq branch,
+> nor any devicetree documentation. Patchwork doesn't show any recent
+> submissions to LKML.
+>
+> Is any major rework needed for you to get the 3.14.12 based driver upstream?
+>
 
-Indeed,
+It's complicated. The plan for the driver was to wait for the common display 
+framework (CDF) and convert it to use CDF and then submit it upstream. The 
+CDF has been rejected though. Meanwhile the V4L2 adv7511 driver has been 
+merged. So now we are in the ugly situation that we have two different 
+drivers for two different frameworks. To fix this we need to merge these two 
+drivers while still exposing the interfaces to both frameworks.
 
-Reviewed-by: Andreas F?rber <afaerber@suse.de>
+> AXI SPDIF I found in 3.16, as you noticed; what about AXI HDMI? [*]
+> Is there any work ongoing to get that upstream as well?
 
-Thanks,
-Andreas
+We need to teach the DMAengine framework about cyclic interleaved transfers 
+before the AXI HDMI driver can be submitted upstream.
 
--- 
-SUSE LINUX Products GmbH, Maxfeldstr. 5, 90409 N?rnberg, Germany
-GF: Jeff Hawn, Jennifer Guild, Felix Imend?rffer; HRB 16746 AG N?rnberg
+- Lars
