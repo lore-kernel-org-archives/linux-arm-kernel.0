@@ -1,196 +1,47 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Mon, 28 Jul 2014 19:06:09 +0100
-Subject: [PATCH v15 07/12] ARM: dts: append hip04 dts
-In-Reply-To: <1406555876-11989-8-git-send-email-haojian.zhuang@linaro.org>
-References: <1406555876-11989-1-git-send-email-haojian.zhuang@linaro.org>
- <1406555876-11989-8-git-send-email-haojian.zhuang@linaro.org>
-Message-ID: <20140728180609.GE2576@leverpostej>
+From: will.deacon@arm.com (Will Deacon)
+Date: Mon, 28 Jul 2014 19:12:24 +0100
+Subject: [PATCH 1/2] ARM: LPAE: load upper bits of early TTBR0/TTBR1
+In-Reply-To: <20140722153623.25088.37742.stgit@buzz>
+References: <20140722153623.25088.37742.stgit@buzz>
+Message-ID: <20140728181224.GN15536@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jul 28, 2014 at 02:57:51PM +0100, Haojian Zhuang wrote:
-> Add hip04-d01.dts & hip04.dtsi for hip04 SoC platform.
+On Tue, Jul 22, 2014 at 04:36:23PM +0100, Konstantin Khlebnikov wrote:
+> This patch fixes booting when idmap pgd lays above 4gb. Commit
+> 4756dcbfd37 mostly had fixed this, but it'd failed to load upper bits.
 > 
-> Signed-off-by: Haojian Zhuang <haojian.zhuang@linaro.org>
+> Also this fixes adding TTBR1_OFFSET to TTRR1: if lower part overflows
+> carry flag must be added to the upper part.
+> 
+> Signed-off-by: Konstantin Khlebnikov <k.khlebnikov@samsung.com>
+> Cc: Cyril Chemparathy <cyril@ti.com>
+> Cc: Vitaly Andrianov <vitalya@ti.com>
 > ---
->  arch/arm/boot/dts/Makefile      |   1 +
->  arch/arm/boot/dts/hip04-d01.dts |  39 ++++++
->  arch/arm/boot/dts/hip04.dtsi    | 267 ++++++++++++++++++++++++++++++++++++++++
->  3 files changed, 307 insertions(+)
->  create mode 100644 arch/arm/boot/dts/hip04-d01.dts
->  create mode 100644 arch/arm/boot/dts/hip04.dtsi
+>  arch/arm/mm/proc-v7-3level.S |    7 +++----
+>  1 file changed, 3 insertions(+), 4 deletions(-)
 > 
-> diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
-> index 721525e..6587bbf 100644
-> --- a/arch/arm/boot/dts/Makefile
-> +++ b/arch/arm/boot/dts/Makefile
-> @@ -86,6 +86,7 @@ dtb-$(CONFIG_ARCH_HI3xxx) += hi3620-hi4511.dtb
->  dtb-$(CONFIG_ARCH_HIX5HD2) += hix5hd2-dkb.dtb
->  dtb-$(CONFIG_ARCH_HIGHBANK) += highbank.dtb \
->         ecx-2000.dtb
-> +dtb-$(CONFIG_ARCH_HIP04) += hip04-d01.dtb
->  dtb-$(CONFIG_ARCH_INTEGRATOR) += integratorap.dtb \
->         integratorcp.dtb
->  dtb-$(CONFIG_ARCH_KEYSTONE) += k2hk-evm.dtb \
-> diff --git a/arch/arm/boot/dts/hip04-d01.dts b/arch/arm/boot/dts/hip04-d01.dts
-> new file mode 100644
-> index 0000000..661c8e5
-> --- /dev/null
-> +++ b/arch/arm/boot/dts/hip04-d01.dts
-> @@ -0,0 +1,39 @@
-> +/*
-> + *  Copyright (C) 2013-2014 Linaro Ltd.
-> + *  Author: Haojian Zhuang <haojian.zhuang@linaro.org>
-> + *
-> + *  This program is free software; you can redistribute it and/or modify
-> + *  it under the terms of the GNU General Public License version 2 as
-> + *  publishhed by the Free Software Foundation.
-> + */
-> +
-> +/dts-v1/;
-> +
-> +/* For bootwrapper */
-> +/memreserve/ 0x10c00000 0x00010000;
+> diff --git a/arch/arm/mm/proc-v7-3level.S b/arch/arm/mm/proc-v7-3level.S
+> index 22e3ad6..f0481dd 100644
+> --- a/arch/arm/mm/proc-v7-3level.S
+> +++ b/arch/arm/mm/proc-v7-3level.S
+> @@ -140,12 +140,11 @@ ENDPROC(cpu_v7_set_pte_ext)
+>  	mov	\tmp, \ttbr1, lsr #(32 - ARCH_PGD_SHIFT)	@ upper bits
+>  	mov	\ttbr1, \ttbr1, lsl #ARCH_PGD_SHIFT		@ lower bits
+>  	addls	\ttbr1, \ttbr1, #TTBR1_OFFSET
+> -	mcrr	p15, 1, \ttbr1, \zero, c2			@ load TTBR1
+> +	adcls	\tmp, \tmp, #0
+> +	mcrr	p15, 1, \ttbr1, \tmp, c2			@ load TTBR1
+>  	mov	\tmp, \ttbr0, lsr #(32 - ARCH_PGD_SHIFT)	@ upper bits
+>  	mov	\ttbr0, \ttbr0, lsl #ARCH_PGD_SHIFT		@ lower bits
+> -	mcrr	p15, 0, \ttbr0, \zero, c2			@ load TTBR0
+> -	mcrr	p15, 1, \ttbr1, \zero, c2			@ load TTBR1
+> -	mcrr	p15, 0, \ttbr0, \zero, c2			@ load TTBR0
+> +	mcrr	p15, 0, \ttbr0, \tmp, c2			@ load TTBR0
 
-How exactly is this bootwrapper used? Is the kernel compiled into it?
+I must admit, the code you are removing here looks really strange. Was there
+a badly resolved conflict somewhere along the way? It would be nice to see
+if your fix (which seems ok to me) was actually present in the mailing list
+posting of the patch that ended in the above mess.
 
-It might make more sense for the wrapper build system to inject
-bootwrapper-related properties. Then the DTB is less likely to
-amalgamate hacks to workaround differences between versions, and can be
-used on systems without a wrapper without throwing away some memory.
-
-> +
-> +#include "hip04.dtsi"
-> +
-> +/ {
-> +       /* memory bus is 64-bit */
-> +       #address-cells = <2>;
-> +       #size-cells = <2>;
-> +       model = "Hisilicon D01 Development Board";
-> +       compatible = "hisilicon,hip04-d01";
-> +
-> +       memory at 00000000,10000000 {
-> +               device_type = "memory";
-> +               reg = <0x00000000 0x10000000 0x00000000 0xc0000000>;
-> +       };
-> +
-> +       memory at 00000004,c0000000 {
-> +               device_type = "memory";
-> +               reg = <0x00000004 0xc0000000 0x00000003 0x40000000>;
-> +       };
-
-You can fold these into a single node.
-
-> +
-> +       soc {
-> +               uart0: uart at 4007000 {
-> +                       status = "ok";
-> +               };
-> +       };
-> +};
-> diff --git a/arch/arm/boot/dts/hip04.dtsi b/arch/arm/boot/dts/hip04.dtsi
-> new file mode 100644
-> index 0000000..30942be
-> --- /dev/null
-> +++ b/arch/arm/boot/dts/hip04.dtsi
-> @@ -0,0 +1,267 @@
-> +/*
-> + * Hisilicon Ltd. HiP04 SoC
-> + *
-> + * Copyright (C) 2013-2014 Hisilicon Ltd.
-> + * Copyright (C) 2013-2014 Linaro Ltd.
-> + *
-> + * Author: Haojian Zhuang <haojian.zhuang@linaro.org>
-> + *
-> + * This program is free software; you can redistribute it and/or modify
-> + * it under the terms of the GNU General Public License version 2 as
-> + * publishhed by the Free Software Foundation.
-
-s/hh/h/
-
-[...]
-
-> +       clock: clock {
-> +               compatible = "hisilicon,hip04-clock";
-> +               /* dummy register.
-> +                * Don't need to access clock registers since they're
-> +                * configured in firmware already.
-> +                */
-> +               reg = <0 0 0 0x1000>;
-
-Huh? Whether or not you need to access the registers should be up to the
-kernel, not the DT.
-
-Why can the kernel not access these? This sounds like a hack.
-
-> +               #clock-cells = <1>;
-> +       };
-> +
-> +       timer {
-> +               compatible = "arm,armv7-timer";
-> +               interrupt-parent = <&gic>;
-> +               interrupts = <1 13 0xf08>,
-> +                            <1 14 0xf08>,
-> +                            <1 11 0xf08>,
-> +                            <1 10 0xf08>;
-> +       };
-> +
-> +       soc {
-> +               /* It's a 32-bit SoC. */
-> +               #address-cells = <1>;
-> +               #size-cells = <1>;
-> +               compatible = "simple-bus";
-> +               interrupt-parent = <&gic>;
-> +               ranges = <0 0 0xe0000000 0x10000000>;
-> +
-> +               gic: interrupt-controller at c01000 {
-> +                       compatible = "hisilicon,hip04-gic";
-> +                       #interrupt-cells = <3>;
-> +                       #address-cells = <0>;
-> +                       interrupt-controller;
-> +                       interrupts = <1 9 0xf04>;
-> +
-> +                       reg = <0xc01000 0x1000>, <0xc02000 0x1000>,
-> +                             <0xc04000 0x2000>, <0xc06000 0x2000>;
-
-Please place these on separate lines. It's easier to read and will match
-what you've done for every other node.
-
-> +               };
-> +
-> +               sysctrl: sysctrl {
-> +                       compatible = "hisilicon,sysctrl";
-> +                       reg = <0x3e00000 0x00100000>;
-> +                       relocation-entry = <0xe0000100>;
-> +                       relocation-size = <0x1000>;
-> +                       bootwrapper-phys = <0x10c00000>;
-> +                       bootwrapper-size = <0x10000>;
-> +                       bootwrapper-magic = <0xa5a5a5a5>;
-
-Are these absolute addresses, or translated per ranges above?
-
-Why are they related to the system controller?
-
-> +               };
-> +
-> +               fabric: fabric {
-> +                       compatible = "hisilicon,hip04-fabric";
-> +                       reg = <0x302a000 0x1000>;
-
-How is this going to be used?
-
-> +               };
-> +
-> +               dual_timer0: dual_timer at 3000000 {
-> +                       compatible = "arm,sp804", "arm,primecell";
-> +                       reg = <0x3000000 0x1000>;
-> +                       interrupts = <0 224 4>;
-> +                       clocks = <&clock HIP04_CLK_50M>;
-> +                       clock-names = "apb_pclk";
-> +               };
-
-I thought sp804 had two clocks (one for AMBA and one for the actual
-timer). What's going on here?
-
-Cheers,
-Mark.
+Will
