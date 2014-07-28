@@ -1,118 +1,46 @@
 From: balbi@ti.com (Felipe Balbi)
-Date: Mon, 28 Jul 2014 16:16:03 -0500
-Subject: [PATCH 15/35] arm: omap: irq: drop .handle_irq and .init_irq fields
+Date: Mon, 28 Jul 2014 16:16:06 -0500
+Subject: [PATCH 18/35] arm: boot: dts: am33xx/omap3: fix intc compatible flag
 In-Reply-To: <1406582183-696-1-git-send-email-balbi@ti.com>
 References: <1406582183-696-1-git-send-email-balbi@ti.com>
-Message-ID: <1406582183-696-16-git-send-email-balbi@ti.com>
+Message-ID: <1406582183-696-19-git-send-email-balbi@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-now we can safely drop those fields from our machine_desc.
-
-While at that, also drop the now unused omap_intc_of_init()
-definition.
+that way, our intc driver can figure out how
+many IRQ lines INTC has.
 
 Signed-off-by: Felipe Balbi <balbi@ti.com>
 ---
- arch/arm/mach-omap2/board-generic.c | 14 --------------
- arch/arm/mach-omap2/common.h        |  1 -
- arch/arm/mach-omap2/irq.c           |  5 -----
- 3 files changed, 20 deletions(-)
+ arch/arm/boot/dts/am33xx.dtsi | 2 +-
+ arch/arm/boot/dts/omap3.dtsi  | 2 +-
+ 2 files changed, 2 insertions(+), 2 deletions(-)
 
-diff --git a/arch/arm/mach-omap2/board-generic.c b/arch/arm/mach-omap2/board-generic.c
-index 9480997..2e32939 100644
---- a/arch/arm/mach-omap2/board-generic.c
-+++ b/arch/arm/mach-omap2/board-generic.c
-@@ -52,8 +52,6 @@ DT_MACHINE_START(OMAP242X_DT, "Generic OMAP2420 (Flattened Device Tree)")
- 	.reserve	= omap_reserve,
- 	.map_io		= omap242x_map_io,
- 	.init_early	= omap2420_init_early,
--	.init_irq	= omap_intc_of_init,
--	.handle_irq	= omap2_intc_handle_irq,
- 	.init_machine	= omap_generic_init,
- 	.init_time	= omap2_sync32k_timer_init,
- 	.dt_compat	= omap242x_boards_compat,
-@@ -71,8 +69,6 @@ DT_MACHINE_START(OMAP243X_DT, "Generic OMAP2430 (Flattened Device Tree)")
- 	.reserve	= omap_reserve,
- 	.map_io		= omap243x_map_io,
- 	.init_early	= omap2430_init_early,
--	.init_irq	= omap_intc_of_init,
--	.handle_irq	= omap2_intc_handle_irq,
- 	.init_machine	= omap_generic_init,
- 	.init_time	= omap2_sync32k_timer_init,
- 	.dt_compat	= omap243x_boards_compat,
-@@ -91,8 +87,6 @@ DT_MACHINE_START(OMAP3_DT, "Generic OMAP3 (Flattened Device Tree)")
- 	.reserve	= omap_reserve,
- 	.map_io		= omap3_map_io,
- 	.init_early	= omap3430_init_early,
--	.init_irq	= omap_intc_of_init,
--	.handle_irq	= omap3_intc_handle_irq,
- 	.init_machine	= omap_generic_init,
- 	.init_late	= omap3_init_late,
- 	.init_time	= omap3_sync32k_timer_init,
-@@ -109,8 +103,6 @@ DT_MACHINE_START(OMAP36XX_DT, "Generic OMAP36xx (Flattened Device Tree)")
- 	.reserve	= omap_reserve,
- 	.map_io		= omap3_map_io,
- 	.init_early	= omap3630_init_early,
--	.init_irq	= omap_intc_of_init,
--	.handle_irq	= omap3_intc_handle_irq,
- 	.init_machine	= omap_generic_init,
- 	.init_late	= omap3_init_late,
- 	.init_time	= omap3_sync32k_timer_init,
-@@ -128,8 +120,6 @@ DT_MACHINE_START(OMAP3_GP_DT, "Generic OMAP3-GP (Flattened Device Tree)")
- 	.reserve	= omap_reserve,
- 	.map_io		= omap3_map_io,
- 	.init_early	= omap3430_init_early,
--	.init_irq	= omap_intc_of_init,
--	.handle_irq	= omap3_intc_handle_irq,
- 	.init_machine	= omap_generic_init,
- 	.init_late	= omap3_init_late,
- 	.init_time	= omap3_secure_sync32k_timer_init,
-@@ -146,8 +136,6 @@ DT_MACHINE_START(AM3517_DT, "Generic AM3517 (Flattened Device Tree)")
- 	.reserve	= omap_reserve,
- 	.map_io		= omap3_map_io,
- 	.init_early	= am35xx_init_early,
--	.init_irq	= omap_intc_of_init,
--	.handle_irq	= omap3_intc_handle_irq,
- 	.init_machine	= omap_generic_init,
- 	.init_late	= omap3_init_late,
- 	.init_time	= omap3_gptimer_timer_init,
-@@ -166,8 +154,6 @@ DT_MACHINE_START(AM33XX_DT, "Generic AM33XX (Flattened Device Tree)")
- 	.reserve	= omap_reserve,
- 	.map_io		= am33xx_map_io,
- 	.init_early	= am33xx_init_early,
--	.init_irq	= omap_intc_of_init,
--	.handle_irq	= omap3_intc_handle_irq,
- 	.init_machine	= omap_generic_init,
- 	.init_late	= am33xx_init_late,
- 	.init_time	= omap3_gptimer_timer_init,
-diff --git a/arch/arm/mach-omap2/common.h b/arch/arm/mach-omap2/common.h
-index bbb0623..d3a205d 100644
---- a/arch/arm/mach-omap2/common.h
-+++ b/arch/arm/mach-omap2/common.h
-@@ -221,7 +221,6 @@ void omap3_intc_prepare_idle(void);
- void omap3_intc_resume_idle(void);
- void omap2_intc_handle_irq(struct pt_regs *regs);
- void omap3_intc_handle_irq(struct pt_regs *regs);
--void omap_intc_of_init(void);
- void omap_gic_of_init(void);
+diff --git a/arch/arm/boot/dts/am33xx.dtsi b/arch/arm/boot/dts/am33xx.dtsi
+index 4a4e02d..ddaa4ae 100644
+--- a/arch/arm/boot/dts/am33xx.dtsi
++++ b/arch/arm/boot/dts/am33xx.dtsi
+@@ -133,7 +133,7 @@
+ 		};
  
- #ifdef CONFIG_CACHE_L2X0
-diff --git a/arch/arm/mach-omap2/irq.c b/arch/arm/mach-omap2/irq.c
-index 2801243..465d725 100644
---- a/arch/arm/mach-omap2/irq.c
-+++ b/arch/arm/mach-omap2/irq.c
-@@ -322,11 +322,6 @@ static int __init intc_of_init(struct device_node *node,
+ 		intc: interrupt-controller at 48200000 {
+-			compatible = "ti,omap2-intc";
++			compatible = "ti,am33xx-intc";
+ 			interrupt-controller;
+ 			#interrupt-cells = <1>;
+ 			ti,intc-size = <128>;
+diff --git a/arch/arm/boot/dts/omap3.dtsi b/arch/arm/boot/dts/omap3.dtsi
+index b2891a9..b693929 100644
+--- a/arch/arm/boot/dts/omap3.dtsi
++++ b/arch/arm/boot/dts/omap3.dtsi
+@@ -140,7 +140,7 @@
+ 		};
  
- IRQCHIP_DECLARE(omap_intc, "ti,omap2-intc", intc_of_init);
- 
--void __init omap_intc_of_init(void)
--{
--	of_irq_init(&irqchip_of_match_omap_intc);
--}
--
- asmlinkage void __exception_irq_entry omap3_intc_handle_irq(struct pt_regs *regs)
- {
- 	omap_intc_handle_irq(regs);
+ 		intc: interrupt-controller at 48200000 {
+-			compatible = "ti,omap2-intc";
++			compatible = "ti,omap3-intc";
+ 			interrupt-controller;
+ 			#interrupt-cells = <1>;
+ 			ti,intc-size = <96>;
 -- 
 2.0.1.563.g66f467c
