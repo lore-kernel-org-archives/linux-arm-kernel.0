@@ -1,69 +1,48 @@
-From: koct9i@gmail.com (Konstantin Khlebnikov)
-Date: Mon, 28 Jul 2014 22:57:00 +0400
-Subject: [PATCH 2/2] ARM: LPAE: reduce damage caused by idmap to virtual
- memory layout
-In-Reply-To: <20140728184107.GR15536@arm.com>
-References: <20140722153623.25088.37742.stgit@buzz>
- <20140722153635.25088.14197.stgit@buzz>
- <20140728181456.GO15536@arm.com>
- <CALYGNiNJDHfQm2yk067hh-Wywsb_Ki5AEE_sTMkYegJi9spSzw@mail.gmail.com>
- <20140728184107.GR15536@arm.com>
-Message-ID: <CALYGNiNaMMv9itJ_+cvPDn1_Yo4GTPQJ-Cy9zBzJzfaDLfkvmg@mail.gmail.com>
+From: oleg@redhat.com (Oleg Nesterov)
+Date: Mon, 28 Jul 2014 20:58:03 +0200
+Subject: TIF_NOHZ can escape nonhz mask? (Was: [PATCH v3 6/8] x86: Split
+ syscall_trace_enter into two phases)
+In-Reply-To: <20140728173723.GA20993@redhat.com>
+References: <cover.1405992946.git.luto@amacapital.net>
+ <3f649f5658a163645e3ce15156176c325283762e.1405992946.git.luto@amacapital.net>
+ <20140728173723.GA20993@redhat.com>
+Message-ID: <20140728185803.GA24663@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jul 28, 2014 at 10:41 PM, Will Deacon <will.deacon@arm.com> wrote:
-> On Mon, Jul 28, 2014 at 07:25:14PM +0100, Konstantin Khlebnikov wrote:
->> On Mon, Jul 28, 2014 at 10:14 PM, Will Deacon <will.deacon@arm.com> wrote:
->> > On Tue, Jul 22, 2014 at 04:36:35PM +0100, Konstantin Khlebnikov wrote:
->> >> idmap layout combines both phisical and virtual addresses.
->> >> Everything works fine if ram physically lays below PAGE_OFFSET.
->> >> Otherwise idmap starts punching huge holes in virtual memory layout.
->> >> It maps ram by 2MiB sections, but when it allocates new pmd page it
->> >> cuts 1GiB at once.
->> >>
->> >> This patch makes a copy of all affected pmds from init_mm.
->> >> Only few (usually one) 2MiB sections will be lost.
->> >> This is not eliminates problem but makes it 512 times less likely.
->> >
->> > I'm struggling to understand your commit message, but making a problem `512
->> > times less likely' does sound like a bit of a hack to me. Can't we fix this
->> > properly instead?
->>
->> Yep, my comment sucks.
->>
->> Usually idmap looks like this:
->>
->> |0x00000000 -- <chunk of physical memory in identical mapping > --- |
->> TASK_SIZE -- <kernel space vm layoyt> --- 0xFFFFFFFF |
->>
->> But when that physical memory chunk starts from 0xE8000000 or even
->> 0xF2000000 evenything becomes very complicated.
+Off-topic, but...
+
+On 07/28, Oleg Nesterov wrote:
 >
-> Why? As long as we don't clobber the kernel text (which would require
-> PHYS_OFFSET to be at a really weird alignment and very close to
-> PAGE_OFFSET), then you should be alright. Sure, you'll lose things like your
-> stack and the vmalloc area etc, but you're running in the idmap, so don't
-> use those things.
+> But we should always call user_exit() unconditionally?
 
-Yep, we have piece of hardware with really weird aligned PHYS_OFFSET,
-mostly all ram is above 4gb and we was lucky enough to get into the trouble.
+Frederic, don't we need the patch below? In fact clear_() can be moved
+under "if ()" too. and probably copy_process() should clear this flag...
 
-It seems keystone has all memory above 4gb but small piece is mapped below
-especially for booting. I suppose it's below PAGE_OFFSET so Cyril
-hadn't seen that problem.
+Or. __context_tracking_task_switch() can simply do
 
-Also I seen comment somewhere in the code which tells that idrmap pgd is
-always below 4gb which isn't quite true. Moreover, I had some experiments with
-mapping ram to random places in qemu and seen that kernel cannot boot if
-PHYS_OFFSET isn't alligned to 128mb which is strange.
-So, it seems there is plenty bugs anound.
+	 if (context_tracking_cpu_is_enabled())
+	 	set_tsk_thread_flag(next, TIF_NOHZ);
+	 else
+	 	clear_tsk_thread_flag(next, TIF_NOHZ);
 
->
-> soft_restart is an example of code that deals with these issues. Which code
-> is causing you problems?
+and then we can forget about copy_process(). Or I am totally confused?
 
-That was booting of secondary cpus, all of them.
 
->
-> Will
+I am also wondering if we can extend user_return_notifier to handle
+enter/exit and kill TIF_NOHZ.
+
+Oleg.
+
+--- x/kernel/context_tracking.c
++++ x/kernel/context_tracking.c
+@@ -202,7 +202,8 @@ void __context_tracking_task_switch(stru
+ 				    struct task_struct *next)
+ {
+ 	clear_tsk_thread_flag(prev, TIF_NOHZ);
+-	set_tsk_thread_flag(next, TIF_NOHZ);
++	if (context_tracking_cpu_is_enabled())
++		set_tsk_thread_flag(next, TIF_NOHZ);
+ }
+ 
+ #ifdef CONFIG_CONTEXT_TRACKING_FORCE
