@@ -1,79 +1,125 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Mon, 28 Jul 2014 19:37:29 +0100
-Subject: [PATCH 19/19] Documentation: ACPI for ARM64
-In-Reply-To: <20140728163313.GC32359@quad.lixom.net>
-References: <1406206825-15590-1-git-send-email-hanjun.guo@linaro.org>
- <1406206825-15590-20-git-send-email-hanjun.guo@linaro.org>
- <CAOesGMhKHGkVK3dOLXXx9GQBMxDmjBu1WDBgHmwdGe1UK3jfcg@mail.gmail.com>
- <5014834.k6eecMddPC@wuerfel> <20140728101229.GD24078@leverpostej>
- <20140728163313.GC32359@quad.lixom.net>
-Message-ID: <20140728183729.GG2576@leverpostej>
+From: mitchelh@codeaurora.org (Mitchel Humpherys)
+Date: Mon, 28 Jul 2014 11:38:12 -0700
+Subject: [PATCH v2] iommu/arm-smmu: avoid calling request_irq in atomic context
+Message-ID: <1406572692-27460-1-git-send-email-mitchelh@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jul 28, 2014 at 05:33:13PM +0100, Olof Johansson wrote:
-> On Mon, Jul 28, 2014 at 11:12:29AM +0100, Mark Rutland wrote:
-> > On Mon, Jul 28, 2014 at 10:07:50AM +0100, Arnd Bergmann wrote:
-> > > On Saturday 26 July 2014 19:34:48 Olof Johansson wrote:
-> > > > On Thu, Jul 24, 2014 at 6:00 AM, Hanjun Guo <hanjun.guo@linaro.org> wrote:
-> > > > > +Relationship with Device Tree
-> > > > > +-----------------------------
-> > > > > +
-> > > > > +ACPI support in drivers and subsystems for ARMv8 should never be mutually
-> > > > > +exclusive with DT support at compile time.
-> > > > > +
-> > > > > +At boot time the kernel will only use one description method depending on
-> > > > > +parameters passed from the bootloader.
-> > > > 
-> > > > Possibly overriden by kernel bootargs. And as debated for quite a
-> > > > while earlier this year, acpi should still default to off -- if a DT
-> > > > and ACPI are both passed in, DT should at this time be given priority.
-> > > 
-> > > I think this would be harder to do with the way that ACPI is passed in
-> > > to the kernel. IIRC, you always have a minimal DT information based on
-> > > the ARM64 boot protocol, but in the case of ACPI, this contains pointers
-> > > to the ACPI tables, which are then used for populating the Linux platform
-> > > devices (unless acpi=disabled is set), while the other contents of the
-> > > DTB may be present but we skip the of_platform_populate state.
-> > > 
-> > > If this is correct, then replacing the firmware-generated dtb with a
-> > > user-provided on would implicitly remove the ACPI tables from visibility,
-> > > which is exactly what we want.
-> > 
-> > That's not quite true.
-> > 
-> > There might not be any DTB, or the user might have provided a DTB with
-> > only /chosen/bootargs. Trying to distinguish the many cases of possible
-> > DTB is broken as a concept.
-> > 
-> > The EFI stub will attempt to get a DTB from somewhere (provided by
-> > filename or as a system table with a magic UUID), and if it can't find
-> > one will generate an empty stub DTB.
-> > 
-> > Then it will go and perform some EFI memory setup, placing some
-> > properties in the DTB (which might be a stub) describing the EFI memory
-> > map.
-> > 
-> > Then we boot the kernel proper, which sees the EFI pointers and looks
-> > for an ACPI table. If they are found, ACPI is used. Otherwise we attempt
-> > to use the DTB (which might be a stub).
-> > 
-> > Unless ACPI is explcitly disabled, ACPI will be used if present.
-> 
-> Ah, I saw this after I replied to Arnd's email.
-> 
-> The above sounds more like how I envisioned things working, so based on that,
-> the default just needs to be flipped and we should be fine (i.e. ACPI needs to
-> be explicitly enabled).
+request_irq shouldn't be called from atomic context since it might
+sleep, but we're calling it with a spinlock held, resulting in:
 
-Sorry, but I don't follow your reasoning. What is the rationale for
-disabling ACPI by default?
+    [    9.172202] BUG: sleeping function called from invalid context at kernel/mm/slub.c:926
+    [    9.182989] in_atomic(): 1, irqs_disabled(): 128, pid: 1, name: swapper/0
+    [    9.189762] CPU: 1 PID: 1 Comm: swapper/0 Tainted: G        W    3.10.40-gbc1b510b-38437-g55831d3bd9-dirty #97
+    [    9.199757] [<c020c448>] (unwind_backtrace+0x0/0x11c) from [<c02097d0>] (show_stack+0x10/0x14)
+    [    9.208346] [<c02097d0>] (show_stack+0x10/0x14) from [<c0301d74>] (kmem_cache_alloc_trace+0x3c/0x210)
+    [    9.217543] [<c0301d74>] (kmem_cache_alloc_trace+0x3c/0x210) from [<c0276a48>] (request_threaded_irq+0x88/0x11c)
+    [    9.227702] [<c0276a48>] (request_threaded_irq+0x88/0x11c) from [<c0931ca4>] (arm_smmu_attach_dev+0x188/0x858)
+    [    9.237686] [<c0931ca4>] (arm_smmu_attach_dev+0x188/0x858) from [<c0212cd8>] (arm_iommu_attach_device+0x18/0xd0)
+    [    9.247837] [<c0212cd8>] (arm_iommu_attach_device+0x18/0xd0) from [<c093314c>] (arm_smmu_test_probe+0x68/0xd4)
+    [    9.257823] [<c093314c>] (arm_smmu_test_probe+0x68/0xd4) from [<c05aadd0>] (driver_probe_device+0x12c/0x330)
+    [    9.267629] [<c05aadd0>] (driver_probe_device+0x12c/0x330) from [<c05ab080>] (__driver_attach+0x68/0x8c)
+    [    9.277090] [<c05ab080>] (__driver_attach+0x68/0x8c) from [<c05a92d4>] (bus_for_each_dev+0x70/0x84)
+    [    9.286118] [<c05a92d4>] (bus_for_each_dev+0x70/0x84) from [<c05aa3b0>] (bus_add_driver+0x100/0x244)
+    [    9.295233] [<c05aa3b0>] (bus_add_driver+0x100/0x244) from [<c05ab5d0>] (driver_register+0x9c/0x124)
+    [    9.304347] [<c05ab5d0>] (driver_register+0x9c/0x124) from [<c0933088>] (arm_smmu_test_init+0x14/0x38)
+    [    9.313635] [<c0933088>] (arm_smmu_test_init+0x14/0x38) from [<c0200618>] (do_one_initcall+0xb8/0x160)
+    [    9.322926] [<c0200618>] (do_one_initcall+0xb8/0x160) from [<c1200b7c>] (kernel_init_freeable+0x108/0x1cc)
+    [    9.332564] [<c1200b7c>] (kernel_init_freeable+0x108/0x1cc) from [<c0b924b0>] (kernel_init+0xc/0xe4)
+    [    9.341675] [<c0b924b0>] (kernel_init+0xc/0xe4) from [<c0205e38>] (ret_from_fork+0x14/0x3c)
 
-That's not going to work for ACPI-only systems which may not have any HW
-described in a DTB. I fear it will result in more pain on any systems
-which try to ship both ACPI and DT, where ACPI will not get the testing
-it requires, leading to a greater possibility of quirks/workarounds
-being required later.
+Fix this by moving the request_irq out of the critical section. This
+should be okay since smmu_domain->smmu is still being protected by the
+critical section. Also, we still don't program the Stream Match Register
+until after registering our interrupt handler so we shouldn't be missing
+any interrupts.
 
-Thanks,
-Mark.
+Signed-off-by: Mitchel Humpherys <mitchelh@codeaurora.org>
+---
+Changelog:
+
+  - v2: return error code from request_irq on failure
+---
+ drivers/iommu/arm-smmu.c | 37 +++++++++++++++++--------------------
+ 1 file changed, 17 insertions(+), 20 deletions(-)
+---
+diff --git a/drivers/iommu/arm-smmu.c b/drivers/iommu/arm-smmu.c
+index f3f66416e2..8e17f8d2e4 100644
+--- a/drivers/iommu/arm-smmu.c
++++ b/drivers/iommu/arm-smmu.c
+@@ -868,7 +868,7 @@ static void arm_smmu_init_context_bank(struct arm_smmu_domain *smmu_domain)
+ static int arm_smmu_init_domain_context(struct iommu_domain *domain,
+ 					struct arm_smmu_device *smmu)
+ {
+-	int irq, ret, start;
++	int ret, start;
+ 	struct arm_smmu_domain *smmu_domain = domain->priv;
+ 	struct arm_smmu_cfg *cfg = &smmu_domain->cfg;
+ 
+@@ -900,23 +900,9 @@ static int arm_smmu_init_domain_context(struct iommu_domain *domain,
+ 		cfg->irptndx = cfg->cbndx;
+ 	}
+ 
+-	irq = smmu->irqs[smmu->num_global_irqs + cfg->irptndx];
+-	ret = request_irq(irq, arm_smmu_context_fault, IRQF_SHARED,
+-			  "arm-smmu-context-fault", domain);
+-	if (IS_ERR_VALUE(ret)) {
+-		dev_err(smmu->dev, "failed to request context IRQ %d (%u)\n",
+-			cfg->irptndx, irq);
+-		cfg->irptndx = INVALID_IRPTNDX;
+-		goto out_free_context;
+-	}
+-
+ 	smmu_domain->smmu = smmu;
+ 	arm_smmu_init_context_bank(smmu_domain);
+ 	return 0;
+-
+-out_free_context:
+-	__arm_smmu_free_bitmap(smmu->context_map, cfg->cbndx);
+-	return ret;
+ }
+ 
+ static void arm_smmu_destroy_domain_context(struct iommu_domain *domain)
+@@ -1172,10 +1158,11 @@ static void arm_smmu_domain_remove_master(struct arm_smmu_domain *smmu_domain,
+ 
+ static int arm_smmu_attach_dev(struct iommu_domain *domain, struct device *dev)
+ {
+-	int ret = -EINVAL;
++	int irq, ret = -EINVAL;
+ 	struct arm_smmu_domain *smmu_domain = domain->priv;
+ 	struct arm_smmu_device *smmu;
+-	struct arm_smmu_master_cfg *cfg;
++	struct arm_smmu_master_cfg *master_cfg;
++	struct arm_smmu_cfg *cfg = &smmu_domain->cfg;
+ 	unsigned long flags;
+ 
+ 	smmu = dev_get_master_dev(dev)->archdata.iommu;
+@@ -1203,12 +1190,22 @@ static int arm_smmu_attach_dev(struct iommu_domain *domain, struct device *dev)
+ 	}
+ 	spin_unlock_irqrestore(&smmu_domain->lock, flags);
+ 
++	irq = smmu->irqs[smmu->num_global_irqs + cfg->irptndx];
++	ret = request_irq(irq, arm_smmu_context_fault, IRQF_SHARED,
++			  "arm-smmu-context-fault", domain);
++	if (IS_ERR_VALUE(ret)) {
++		dev_err(smmu->dev, "failed to request context IRQ %d (%u)\n",
++			cfg->irptndx, irq);
++		cfg->irptndx = INVALID_IRPTNDX;
++		return ret;
++	}
++
+ 	/* Looks ok, so add the device to the domain */
+-	cfg = find_smmu_master_cfg(smmu_domain->smmu, dev);
+-	if (!cfg)
++	master_cfg = find_smmu_master_cfg(smmu_domain->smmu, dev);
++	if (!master_cfg)
+ 		return -ENODEV;
+ 
+-	return arm_smmu_domain_add_master(smmu_domain, cfg);
++	return arm_smmu_domain_add_master(smmu_domain, master_cfg);
+ 
+ err_unlock:
+ 	spin_unlock_irqrestore(&smmu_domain->lock, flags);
+-- 
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
+hosted by The Linux Foundation
