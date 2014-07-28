@@ -1,71 +1,67 @@
-From: sam@ravnborg.org (Sam Ravnborg)
-Date: Mon, 28 Jul 2014 21:06:52 +0200
-Subject: [PATCH] arm64/crypto: fix makefile rule for aes-glue-%.o
-In-Reply-To: <CAKv+Gu_1FXj8fOckrFbxEz7figdKmcvN+gnpvBC8g8QArpO+3Q@mail.gmail.com>
-References: <CAKv+Gu_9HRwAxkJjT3KRvDbupp0yzstyq1dXsXkTu9M6swdCKQ@mail.gmail.com>
- <mvmr41aj2ob.fsf@hawking.suse.de>
- <CAKv+Gu_z4VTssLDhiQxi8DRJNEUgzrM5bFzje8NXEmBiA2vqeg@mail.gmail.com>
- <CAKv+Gu-B9_sgGgw9obrBGNUFSS1JcskN34s1X4PU8F5bauHT1Q@mail.gmail.com>
- <20140724161225.GA11204@ravnborg.org>
- <CAKv+Gu8ikMGNVHeuujSf4eaK+LOFKMWxKF8i76VthnKYgvOcYQ@mail.gmail.com>
- <20140724204526.GA11754@ravnborg.org>
- <CAKv+Gu9S8vVALGFR1qL+sFfnUuYR9pkkwy0t6NuJHrs9bVxdBw@mail.gmail.com>
- <20140727184010.GA26029@ravnborg.org>
- <CAKv+Gu_1FXj8fOckrFbxEz7figdKmcvN+gnpvBC8g8QArpO+3Q@mail.gmail.com>
-Message-ID: <20140728190652.GB366@ravnborg.org>
+From: will.deacon@arm.com (Will Deacon)
+Date: Mon, 28 Jul 2014 20:11:12 +0100
+Subject: [PATCH v3 1/1] iommu-api: Add map_sg/unmap_sg functions
+In-Reply-To: <1406572731-6216-2-git-send-email-ohaugan@codeaurora.org>
+References: <1406572731-6216-1-git-send-email-ohaugan@codeaurora.org>
+ <1406572731-6216-2-git-send-email-ohaugan@codeaurora.org>
+Message-ID: <20140728191111.GW15536@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jul 28, 2014 at 07:00:17PM +0200, Ard Biesheuvel wrote:
-> On 27 July 2014 20:40, Sam Ravnborg <sam@ravnborg.org> wrote:
-> >>
-> >> > Btw. the current solution is already faulty - even with the fix.
-> >> > There are no support for make C=2 arch/.../crypto/
-> >> >
-> >>
-> >> So can you elaborate on how it is faulty?
-> >
-> > When you run "make C=2 arch/.../crypto/" then sparse shall be run
-> > for all .c files also if they are already built.
-> > But due to the re-implementation of some parts of the kbuild logic
-> > in the makefile this does not happen with the -glue file.
-> >
-> > A minor detail - but this may not be the only wreckage we see over time.
-> >
+Hi Olav,
+
+On Mon, Jul 28, 2014 at 07:38:51PM +0100, Olav Haugan wrote:
+> Mapping and unmapping are more often than not in the critical path.
+> map_sg and unmap_sg allows IOMMU driver implementations to optimize
+> the process of mapping and unmapping buffers into the IOMMU page tables.
 > 
-> I agree. Any suggestions for a generic way to solve this?
-Yes - two small .c file that each include the same glue file.
-Anything else is over-engineering.
-
-> BTW, while looking into this issue, I noticed something else that is strange:
-> after touch'ing sha1-ce-glue.c in arch/arm64/crypto and re-executing
-> 'make V=2', this is what I get
+> Instead of mapping a buffer one page at a time and requiring potentially
+> expensive TLB operations for each page, this function allows the driver
+> to map all pages in one go and defer TLB maintenance until after all
+> pages have been mapped.
 > 
-> make[1]: Entering directory `/home/ard/linux-arm64-build'
->   CHK     include/config/kernel.release
->   Using /home/ard/linux-2.6 as source for kernel
->   GEN     ./Makefile
->   CHK     include/generated/uapi/linux/version.h
->   CHK     include/generated/utsrelease.h
->   CALL    /home/ard/linux-2.6/scripts/checksyscalls.sh - due to target missing
->   CHK     include/generated/compile.h
->   CC      arch/arm64/crypto/sha1-ce-glue.o - due to:
-> /home/ard/linux-2.6/arch/arm64/crypto/sha1-ce-glue.c
->   LD      arch/arm64/crypto/sha1-ce.o - due to: arch/arm64/crypto/sha1-ce-glue.o
->   LD      arch/arm64/crypto/sha2-ce.o - due to: arch/arm64/crypto/sha1-ce-glue.o
->   LD      arch/arm64/crypto/ghash-ce.o - due to:
-> arch/arm64/crypto/sha1-ce-glue.o
->   LD      arch/arm64/crypto/aes-ce-ccm.o - due to:
-> arch/arm64/crypto/sha1-ce-glue.o
->   LD      arch/arm64/crypto/built-in.o - due to:
-> arch/arm64/crypto/sha1-ce.o arch/arm64/crypto/sha2-ce.o
-> arch/arm64/crypto/ghash-ce.o arch/arm64/crypto/aes-ce-ccm.o
->   CHK     kernel/config_data.h
->   LINK    vmlinux - due to: arch/arm64/crypto/built-in.o
+> Additionally, the mapping operation would be faster in general since
+> clients does not have to keep calling map API over and over again for
+> each physically contiguous chunk of memory that needs to be mapped to a
+> virtually contiguous region.
+> 
+> Signed-off-by: Olav Haugan <ohaugan@codeaurora.org>
+> ---
+>  drivers/iommu/iommu.c | 48 ++++++++++++++++++++++++++++++++++++++++++++++++
+>  include/linux/iommu.h | 28 ++++++++++++++++++++++++++++
+>  2 files changed, 76 insertions(+)
+> 
+> diff --git a/drivers/iommu/iommu.c b/drivers/iommu/iommu.c
+> index 1698360..cd65511 100644
+> --- a/drivers/iommu/iommu.c
+> +++ b/drivers/iommu/iommu.c
+> @@ -1088,6 +1088,54 @@ size_t iommu_unmap(struct iommu_domain *domain, unsigned long iova, size_t size)
+>  }
+>  EXPORT_SYMBOL_GPL(iommu_unmap);
+>  
+> +int iommu_map_sg(struct iommu_domain *domain, unsigned long iova,
+> +			struct scatterlist *sg, unsigned int nents,
+> +			int prot, unsigned long flags)
+> +{
+> +	int ret = 0;
+> +	unsigned long offset = 0;
+> +
+> +	BUG_ON(iova & (~PAGE_MASK));
+> +
+> +	if (unlikely(domain->ops->map_sg == NULL)) {
+> +		unsigned int i;
+> +		struct scatterlist *s;
+> +
+> +		for_each_sg(sg, s, nents, i) {
+> +			phys_addr_t phys = page_to_phys(sg_page(s));
+> +			u32 page_len = PAGE_ALIGN(s->offset + s->length);
 
-Just from inspecting the above I have no idea.
-And I have no arm64 toolchain installed to test myself.
+Hmm, this is a pretty horrible place where CPU page size (from the sg list)
+meets the IOMMU and I think we need to do something better to avoid spurious
+failures. In other words, the sg list should be iterated in such a way that
+we always pass a multiple of a supported iommu page size to iommu_map.
 
-So for now no clue - sorry.
+All the code using PAGE_MASK and PAGE_ALIGN needn't match what is supported
+by the IOMMU hardware.
 
-	Sam
+Will
