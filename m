@@ -1,57 +1,65 @@
-From: mporter@linaro.org (Matt Porter)
-Date: Mon, 28 Jul 2014 10:44:18 -0400
-Subject: [GIT PULL] ARM: mach-bcm: soc updates for 3.17
-Message-ID: <20140728144418.GA8885@beef>
+From: jonsmirl@gmail.com (jonsmirl at gmail.com)
+Date: Mon, 28 Jul 2014 10:47:16 -0400
+Subject: [RFC 8/8] ARM: sun7i: Add mod1 clock nodes
+In-Reply-To: <20140728132524.GM3952@lukather>
+References: <1406519386-4902-1-git-send-email-emilio@elopez.com.ar>
+ <1406519386-4902-9-git-send-email-emilio@elopez.com.ar>
+ <20140728132524.GM3952@lukather>
+Message-ID: <CAKON4OwRUg6aBHzuKemDExbuFpJT_h8Y=vaG_q3SBmEf-j55=Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Please consider pulling the following mach-bcm soc updates for 3.17.
+On Mon, Jul 28, 2014 at 9:25 AM, Maxime Ripard
+<maxime.ripard@free-electrons.com> wrote:
+> On Mon, Jul 28, 2014 at 12:49:46AM -0300, Emilio L?pez wrote:
+>> This commit adds all the mod1 clocks available on A20 to its device
+>> tree. This list was created by looking at the A20 user manual.
+>>
+>> Not-signed-off-by: Emilio L?pez <emilio@elopez.com.ar>
+>> ---
+>>
+>> As mentioned on an earlier patch, note that this is untested, and I
+>> only added them to sun7i. It'd be great if actual users of these clocks
+>> could comment :)
+>>
+>>  arch/arm/boot/dts/sun7i-a20.dtsi | 39 +++++++++++++++++++++++++++++++++++++++
+>>  1 file changed, 39 insertions(+)
+>>
+>> diff --git a/arch/arm/boot/dts/sun7i-a20.dtsi b/arch/arm/boot/dts/sun7i-a20.dtsi
+>> index 5d0265a..c57f7ad 100644
+>> --- a/arch/arm/boot/dts/sun7i-a20.dtsi
+>> +++ b/arch/arm/boot/dts/sun7i-a20.dtsi
+>> @@ -335,6 +335,29 @@
+>>                       clock-output-names = "ir1";
+>>               };
+>>
+>> +             iis0_clk: clk at 01c200b8 {
+>> +                     #clock-cells = <0>;
+>> +                     compatible = "allwinner,sun4i-a10-mod1-clk";
+>> +                     reg = <0x01c200b8 0x4>;
+>> +                     clocks = <&pll2 0>, <&pll2 1>, <&pll2 2>, <&pll2 3>;
+>> +                     clock-output-names = "iis0";
+>
+> Usually, it's called i2s.
 
--Matt
+I'd preferred i2s, but Allwinner used iis everywhere in the manual. So
+which wins in the device tree?
 
-The following changes since commit 9a3c4145af32125c5ee39c0272662b47307a8323:
+Same issue happens with twi vs i2c.
 
-  Linux 3.16-rc6 (2014-07-20 21:04:16 -0700)
 
-are available in the git repository at:
+>
+> Otherwise, beside Chen-Yu's comment, it looks fine.
+>
+> Maxime
+>
+> --
+> Maxime Ripard, Free Electrons
+> Embedded Linux, Kernel and Android engineering
+> http://free-electrons.com
 
-  git://github.com/broadcom/mach-bcm tags/for-3.17/bcm-soc
 
-for you to fetch changes up to 2df94fd66a1135f887bfabef413b568969f5d77b:
 
-  MAINTAINERS: add entry for Broadcom ARM STB architecture (2014-07-28 09:59:59 -0400)
-
-----------------------------------------------------------------
-ARM: mach-bcm: soc updates for 3.17
-
-- BCM Mobile SMP support
-- BRCM STB platform support
-
-----------------------------------------------------------------
-Alex Elder (2):
-      ARM: add SMP support for Broadcom mobile SoCs
-      ARM: configs: enable SMP in bcm_defconfig
-
-Brian Norris (2):
-      ARM: brcmstb: select GISB arbiter and interrupt drivers
-      MAINTAINERS: add entry for Broadcom ARM STB architecture
-
-Marc Carino (1):
-      ARM: brcmstb: add infrastructure for ARM-based Broadcom STB SoCs
-
- MAINTAINERS                         |   8 +
- arch/arm/configs/bcm_defconfig      |   1 +
- arch/arm/configs/multi_v7_defconfig |   1 +
- arch/arm/mach-bcm/Kconfig           |  34 +++-
- arch/arm/mach-bcm/Makefile          |   8 +
- arch/arm/mach-bcm/brcmstb.c         |  28 +++
- arch/arm/mach-bcm/brcmstb.h         |  19 ++
- arch/arm/mach-bcm/headsmp-brcmstb.S |  33 ++++
- arch/arm/mach-bcm/kona_smp.c        | 202 ++++++++++++++++++++
- arch/arm/mach-bcm/platsmp-brcmstb.c | 363 ++++++++++++++++++++++++++++++++++++
- 10 files changed, 694 insertions(+), 3 deletions(-)
- create mode 100644 arch/arm/mach-bcm/brcmstb.c
- create mode 100644 arch/arm/mach-bcm/brcmstb.h
- create mode 100644 arch/arm/mach-bcm/headsmp-brcmstb.S
- create mode 100644 arch/arm/mach-bcm/kona_smp.c
- create mode 100644 arch/arm/mach-bcm/platsmp-brcmstb.c
+-- 
+Jon Smirl
+jonsmirl at gmail.com
