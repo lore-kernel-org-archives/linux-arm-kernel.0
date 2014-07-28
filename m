@@ -1,272 +1,203 @@
 From: haojian.zhuang@linaro.org (Haojian Zhuang)
-Date: Mon, 28 Jul 2014 20:51:19 +0800
-Subject: [PATCH v5 4/8] ARM: dts: Add hix5hd2-dkb dts file.
+Date: Mon, 28 Jul 2014 20:51:20 +0800
+Subject: [PATCH v5 5/8] power: reset: move hisilicon reboot code
 In-Reply-To: <1406551883-26154-1-git-send-email-haojian.zhuang@linaro.org>
 References: <1406551883-26154-1-git-send-email-haojian.zhuang@linaro.org>
-Message-ID: <1406551883-26154-5-git-send-email-haojian.zhuang@linaro.org>
+Message-ID: <1406551883-26154-6-git-send-email-haojian.zhuang@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Haifeng Yan <yanhaifeng@gmail.com>
+Move reboot code from hisilicon platform driver into reset driver.
 
-Add dts file for Hisilicon x5hd2 development kit board.
-
-Signed-off-by: Haifeng Yan <yanhaifeng@gmail.com>
-Signed-off-by: Jiancheng Xue <jchxue@gmail.com>
 Signed-off-by: Haojian Zhuang <haojian.zhuang@linaro.org>
 ---
- arch/arm/boot/dts/Makefile        |   1 +
- arch/arm/boot/dts/hix5hd2-dkb.dts |  52 ++++++++++++
- arch/arm/boot/dts/hix5hd2.dtsi    | 170 ++++++++++++++++++++++++++++++++++++++
- 3 files changed, 223 insertions(+)
- create mode 100644 arch/arm/boot/dts/hix5hd2-dkb.dts
- create mode 100644 arch/arm/boot/dts/hix5hd2.dtsi
+ arch/arm/mach-hisi/Kconfig        |  3 ++
+ arch/arm/mach-hisi/hisilicon.c    | 33 -------------------
+ drivers/power/reset/Kconfig       |  6 ++++
+ drivers/power/reset/Makefile      |  1 +
+ drivers/power/reset/hisi-reboot.c | 67 +++++++++++++++++++++++++++++++++++++++
+ 5 files changed, 77 insertions(+), 33 deletions(-)
+ create mode 100644 drivers/power/reset/hisi-reboot.c
 
-diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
-index 5986ff6..721525e 100644
---- a/arch/arm/boot/dts/Makefile
-+++ b/arch/arm/boot/dts/Makefile
-@@ -83,6 +83,7 @@ dtb-$(CONFIG_ARCH_EXYNOS) += exynos4210-origen.dtb \
- 	exynos5440-ssdk5440.dtb \
- 	exynos5800-peach-pi.dtb
- dtb-$(CONFIG_ARCH_HI3xxx) += hi3620-hi4511.dtb
-+dtb-$(CONFIG_ARCH_HIX5HD2) += hix5hd2-dkb.dtb
- dtb-$(CONFIG_ARCH_HIGHBANK) += highbank.dtb \
- 	ecx-2000.dtb
- dtb-$(CONFIG_ARCH_INTEGRATOR) += integratorap.dtb \
-diff --git a/arch/arm/boot/dts/hix5hd2-dkb.dts b/arch/arm/boot/dts/hix5hd2-dkb.dts
+diff --git a/arch/arm/mach-hisi/Kconfig b/arch/arm/mach-hisi/Kconfig
+index 90fdbb4..9848829 100644
+--- a/arch/arm/mach-hisi/Kconfig
++++ b/arch/arm/mach-hisi/Kconfig
+@@ -4,6 +4,9 @@ config ARCH_HISI
+ 	select ARM_AMBA
+ 	select ARM_GIC
+ 	select ARM_TIMER_SP804
++	select POWER_RESET
++	select POWER_RESET_HISI
++	select POWER_SUPPLY
+ 
+ if ARCH_HISI
+ 
+diff --git a/arch/arm/mach-hisi/hisilicon.c b/arch/arm/mach-hisi/hisilicon.c
+index 2bfbe3f..7996c6b 100644
+--- a/arch/arm/mach-hisi/hisilicon.c
++++ b/arch/arm/mach-hisi/hisilicon.c
+@@ -14,10 +14,6 @@
+ #include <linux/clk-provider.h>
+ #include <linux/clocksource.h>
+ #include <linux/irqchip.h>
+-#include <linux/of_address.h>
+-#include <linux/of_platform.h>
+-
+-#include <asm/proc-fns.h>
+ 
+ #include <asm/mach/arch.h>
+ #include <asm/mach/map.h>
+@@ -51,32 +47,6 @@ static void __init hi3620_map_io(void)
+ 	iotable_init(hi3620_io_desc, ARRAY_SIZE(hi3620_io_desc));
+ }
+ 
+-static void hi3xxx_restart(enum reboot_mode mode, const char *cmd)
+-{
+-	struct device_node *np;
+-	void __iomem *base;
+-	int offset;
+-
+-	np = of_find_compatible_node(NULL, NULL, "hisilicon,sysctrl");
+-	if (!np) {
+-		pr_err("failed to find hisilicon,sysctrl node\n");
+-		return;
+-	}
+-	base = of_iomap(np, 0);
+-	if (!base) {
+-		pr_err("failed to map address in hisilicon,sysctrl node\n");
+-		return;
+-	}
+-	if (of_property_read_u32(np, "reboot-offset", &offset) < 0) {
+-		pr_err("failed to find reboot-offset property\n");
+-		return;
+-	}
+-	writel_relaxed(0xdeadbeef, base + offset);
+-
+-	while (1)
+-		cpu_do_idle();
+-}
+-
+ static const char *hi3xxx_compat[] __initconst = {
+ 	"hisilicon,hi3620-hi4511",
+ 	NULL,
+@@ -86,7 +56,6 @@ DT_MACHINE_START(HI3620, "Hisilicon Hi3620 (Flattened Device Tree)")
+ 	.map_io		= hi3620_map_io,
+ 	.dt_compat	= hi3xxx_compat,
+ 	.smp		= smp_ops(hi3xxx_smp_ops),
+-	.restart	= hi3xxx_restart,
+ MACHINE_END
+ 
+ static const char *hix5hd2_compat[] __initconst = {
+@@ -96,7 +65,5 @@ static const char *hix5hd2_compat[] __initconst = {
+ 
+ DT_MACHINE_START(HIX5HD2_DT, "Hisilicon HIX5HD2 (Flattened Device Tree)")
+ 	.dt_compat	= hix5hd2_compat,
+-	.init_late	= hi3xxx_init_late,
+ 	.smp		= smp_ops(hix5hd2_smp_ops),
+-	.restart	= hi3xxx_restart,
+ MACHINE_END
+diff --git a/drivers/power/reset/Kconfig b/drivers/power/reset/Kconfig
+index bdcf517..4127f49 100644
+--- a/drivers/power/reset/Kconfig
++++ b/drivers/power/reset/Kconfig
+@@ -28,6 +28,12 @@ config POWER_RESET_GPIO
+ 	  If your board needs a GPIO high/low to power down, say Y and
+ 	  create a binding in your devicetree.
+ 
++config POWER_RESET_HISI
++	bool "Hisilicon power-off driver"
++	depends on POWER_RESET && ARCH_HISI
++	help
++	  Reboot support for Hisilicon boards.
++
+ config POWER_RESET_MSM
+ 	bool "Qualcomm MSM power-off driver"
+ 	depends on POWER_RESET && ARCH_QCOM
+diff --git a/drivers/power/reset/Makefile b/drivers/power/reset/Makefile
+index dde2e8b..fe0f228 100644
+--- a/drivers/power/reset/Makefile
++++ b/drivers/power/reset/Makefile
+@@ -1,6 +1,7 @@
+ obj-$(CONFIG_POWER_RESET_AS3722) += as3722-poweroff.o
+ obj-$(CONFIG_POWER_RESET_AXXIA) += axxia-reset.o
+ obj-$(CONFIG_POWER_RESET_GPIO) += gpio-poweroff.o
++obj-$(CONFIG_POWER_RESET_HISI) += hisi-reboot.o
+ obj-$(CONFIG_POWER_RESET_MSM) += msm-poweroff.o
+ obj-$(CONFIG_POWER_RESET_QNAP) += qnap-poweroff.o
+ obj-$(CONFIG_POWER_RESET_RESTART) += restart-poweroff.o
+diff --git a/drivers/power/reset/hisi-reboot.c b/drivers/power/reset/hisi-reboot.c
 new file mode 100644
-index 0000000..32c7fd1
+index 0000000..0c91d02
 --- /dev/null
-+++ b/arch/arm/boot/dts/hix5hd2-dkb.dts
-@@ -0,0 +1,52 @@
++++ b/drivers/power/reset/hisi-reboot.c
+@@ -0,0 +1,67 @@
 +/*
-+ * Copyright (c) 2013-2014 Linaro Ltd.
-+ * Copyright (c) 2013-2014 Hisilicon Limited.
++ * Hisilicon SoC reset code
 + *
-+ *  This program is free software; you can redistribute it and/or modify
-+ *  it under the terms of the GNU General Public License version 2 as
-+ *  publishhed by the Free Software Foundation.
-+ */
-+
-+/dts-v1/;
-+#include "hix5hd2.dtsi"
-+
-+/ {
-+	model = "Hisilicon HIX5HD2 Development Board";
-+	compatible = "hisilicon,hix5hd2";
-+
-+	chosen {
-+		bootargs = "console=ttyAMA0,115200 earlyprintk";
-+	};
-+
-+	cpus {
-+		#address-cells = <1>;
-+		#size-cells = <0>;
-+
-+		cpu at 0 {
-+			compatible = "arm,cortex-a9";
-+			device_type = "cpu";
-+			reg = <0>;
-+			next-level-cache = <&l2>;
-+		};
-+
-+		cpu at 1 {
-+			compatible = "arm,cortex-a9";
-+			device_type = "cpu";
-+			reg = <1>;
-+			next-level-cache = <&l2>;
-+		};
-+	};
-+
-+	memory {
-+		device_type = "memory";
-+		reg = <0x00000000 0x80000000>;
-+	};
-+};
-+
-+&timer0 {
-+	status = "okay";
-+};
-+
-+&uart0 {
-+	status = "okay";
-+};
-diff --git a/arch/arm/boot/dts/hix5hd2.dtsi b/arch/arm/boot/dts/hix5hd2.dtsi
-new file mode 100644
-index 0000000..f85ba29
---- /dev/null
-+++ b/arch/arm/boot/dts/hix5hd2.dtsi
-@@ -0,0 +1,170 @@
-+/*
-+ * Copyright (c) 2013-2014 Linaro Ltd.
-+ * Copyright (c) 2013-2014 Hisilicon Limited.
++ * Copyright (c) 2014 Hisilicon Ltd.
++ * Copyright (c) 2014 Linaro Ltd.
++ *
++ * Author: Haojian Zhuang <haojian.zhuang@linaro.org>
 + *
 + * This program is free software; you can redistribute it and/or modify
 + * it under the terms of the GNU General Public License version 2 as
-+ * publishhed by the Free Software Foundation.
++ * published by the Free Software Foundation.
 + */
 +
-+#include "skeleton.dtsi"
-+#include <dt-bindings/clock/hix5hd2-clock.h>
++#include <linux/delay.h>
++#include <linux/io.h>
++#include <linux/module.h>
++#include <linux/of_address.h>
++#include <linux/platform_device.h>
++#include <linux/reboot.h>
 +
-+/ {
-+	aliases {
-+		serial0 = &uart0;
-+	};
++#include <asm/proc-fns.h>
++#include <asm/system_misc.h>
 +
-+	gic: interrupt-controller at f8a01000 {
-+		compatible = "arm,cortex-a9-gic";
-+		#interrupt-cells = <3>;
-+		#address-cells = <0>;
-+		interrupt-controller;
-+		/* gic dist base, gic cpu base */
-+		reg = <0xf8a01000 0x1000>, <0xf8a00100 0x100>;
-+	};
++static void __iomem *base;
++static u32 reboot_offset;
 +
-+	soc {
-+		#address-cells = <1>;
-+		#size-cells = <1>;
-+		compatible = "simple-bus";
-+		interrupt-parent = <&gic>;
-+		ranges = <0 0xf8000000 0x8000000>;
++static void hisi_restart(enum reboot_mode mode, const char *cmd)
++{
++	writel_relaxed(0xdeadbeef, base + reboot_offset);
 +
-+		amba {
-+			#address-cells = <1>;
-+			#size-cells = <1>;
-+			compatible = "arm,amba-bus";
-+			ranges;
++	while (1)
++		cpu_do_idle();
++}
 +
-+			timer0: timer at 00002000 {
-+				compatible = "arm,sp804", "arm,primecell";
-+				reg = <0x00002000 0x1000>;
-+				/* timer00 & timer01 */
-+				interrupts = <0 24 4>;
-+				clocks = <&clock HIX5HD2_FIXED_24M>;
-+				status = "disabled";
-+			};
++static int hisi_reboot_probe(struct platform_device *pdev)
++{
++	struct device_node *np = pdev->dev.of_node;
 +
-+			timer1: timer at 00a29000 {
-+				/*
-+				 * Only used in NORMAL state, not available ins
-+				 * SLOW or DOZE state.
-+				 * The rate is fixed in 24MHz.
-+				 */
-+				compatible = "arm,sp804", "arm,primecell";
-+				reg = <0x00a29000 0x1000>;
-+				/* timer10 & timer11 */
-+				interrupts = <0 25 4>;
-+				clocks = <&clock HIX5HD2_FIXED_24M>;
-+				status = "disabled";
-+			};
++	base = of_iomap(np, 0);
++	if (!base) {
++		WARN(1, "failed to map base address");
++		return -ENODEV;
++	}
 +
-+			timer2: timer at 00a2a000 {
-+				compatible = "arm,sp804", "arm,primecell";
-+				reg = <0x00a2a000 0x1000>;
-+				/* timer20 & timer21 */
-+				interrupts = <0 26 4>;
-+				clocks = <&clock HIX5HD2_FIXED_24M>;
-+				status = "disabled";
-+			};
++	if (of_property_read_u32(np, "reboot-offset", &reboot_offset) < 0) {
++		pr_err("failed to find reboot-offset property\n");
++		return -EINVAL;
++	}
 +
-+			timer3: timer at 00a2b000 {
-+				compatible = "arm,sp804", "arm,primecell";
-+				reg = <0x00a2b000 0x1000>;
-+				/* timer30 & timer31 */
-+				interrupts = <0 27 4>;
-+				clocks = <&clock HIX5HD2_FIXED_24M>;
-+				status = "disabled";
-+			};
++	arm_pm_restart = hisi_restart;
 +
-+			timer4: timer at 00a81000 {
-+				compatible = "arm,sp804", "arm,primecell";
-+				reg = <0x00a81000 0x1000>;
-+				/* timer30 & timer31 */
-+				interrupts = <0 28 4>;
-+				clocks = <&clock HIX5HD2_FIXED_24M>;
-+				status = "disabled";
-+			};
++	return 0;
++}
 +
-+			uart0: uart at 00b00000 {
-+				compatible = "arm,pl011", "arm,primecell";
-+				reg = <0x00b00000 0x1000>;
-+				interrupts = <0 49 4>;
-+				clocks = <&clock HIX5HD2_FIXED_83M>;
-+				clock-names = "apb_pclk";
-+				status = "disabled";
-+			};
-+
-+			uart1: uart at 00006000 {
-+				compatible = "arm,pl011", "arm,primecell";
-+				reg = <0x00006000 0x1000>;
-+				interrupts = <0 50 4>;
-+				clocks = <&clock HIX5HD2_FIXED_83M>;
-+				clock-names = "apb_pclk";
-+				status = "disabled";
-+			};
-+
-+			uart2: uart at 00b02000 {
-+				compatible = "arm,pl011", "arm,primecell";
-+				reg = <0x00b02000 0x1000>;
-+				interrupts = <0 51 4>;
-+				clocks = <&clock HIX5HD2_FIXED_83M>;
-+				clock-names = "apb_pclk";
-+				status = "disabled";
-+			};
-+
-+			uart3: uart at 00b03000 {
-+				compatible = "arm,pl011", "arm,primecell";
-+				reg = <0x00b03000 0x1000>;
-+				interrupts = <0 52 4>;
-+				clocks = <&clock HIX5HD2_FIXED_83M>;
-+				clock-names = "apb_pclk";
-+				status = "disabled";
-+			};
-+
-+			uart4: uart at 00b04000 {
-+				compatible = "arm,pl011", "arm,primecell";
-+				reg = <0xb04000 0x1000>;
-+				interrupts = <0 53 4>;
-+				clocks = <&clock HIX5HD2_FIXED_83M>;
-+				clock-names = "apb_pclk";
-+				status = "disabled";
-+			};
-+		};
-+
-+		local_timer at 00a00600 {
-+			compatible = "arm,cortex-a9-twd-timer";
-+			reg = <0x00a00600 0x20>;
-+			interrupts = <1 13 0xf01>;
-+		};
-+
-+		l2: l2-cache {
-+			compatible = "arm,pl310-cache";
-+			reg = <0x00a10000 0x100000>;
-+			interrupts = <0 15 4>;
-+			cache-unified;
-+			cache-level = <2>;
-+		};
-+
-+		sysctrl: system-controller at 00000000 {
-+			compatible = "hisilicon,sysctrl";
-+			reg = <0x00000000 0x1000>;
-+			reboot-offset = <0x4>;
-+		};
-+
-+		cpuctrl at 00a22000 {
-+			compatible = "hisilicon,cpuctrl";
-+			#address-cells = <1>;
-+			#size-cells = <1>;
-+			reg = <0x00a22000 0x2000>;
-+			ranges = <0 0x00a22000 0x2000>;
-+
-+			clock: clock at 0 {
-+				compatible = "hisilicon,hix5hd2-clock";
-+				reg = <0 0x2000>;
-+				#clock-cells = <1>;
-+			};
-+		};
-+	};
++static struct of_device_id hisi_reboot_of_match[] = {
++	{ .compatible = "hisilicon,sysctrl" },
++	{}
 +};
++
++static struct platform_driver hisi_reboot_driver = {
++	.probe = hisi_reboot_probe,
++	.driver = {
++		.name = "hisi-reboot",
++		.of_match_table = hisi_reboot_of_match,
++	},
++};
++module_platform_driver(hisi_reboot_driver);
 -- 
 1.9.1
