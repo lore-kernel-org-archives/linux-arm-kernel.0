@@ -1,43 +1,23 @@
-From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Mon, 28 Jul 2014 09:39:53 +0900
-Subject: [PATCH 0/3] ARM: EXYNOS: Fix Exynos5410 boot
-In-Reply-To: <53D4EFBB.6000404@suse.de>
-References: <1406463725-4208-1-git-send-email-afaerber@suse.de>
- <53D4EFBB.6000404@suse.de>
-Message-ID: <00c901cfa9fc$727b4e10$5771ea30$@samsung.com>
+From: shawn.guo@freescale.com (Shawn Guo)
+Date: Mon, 28 Jul 2014 09:45:40 +0800
+Subject: [PATCH 1/5] ARM: imx: Remove references to platform_bus in mxc
+ code
+In-Reply-To: <1406298233-27876-1-git-send-email-pawel.moll@arm.com>
+References: <1406298233-27876-1-git-send-email-pawel.moll@arm.com>
+Message-ID: <20140728014538.GH8821@dragon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Andreas F?rber wrote:
+On Fri, Jul 25, 2014 at 03:23:49PM +0100, Pawel Moll wrote:
+> The bus devices created to be parents for other peripherals
+> were using platform_bus as a parent, not being platform
+> devices themselves. Remove the references, making them
+> virtual devices instead.
 > 
-> Am 27.07.2014 14:22, schrieb Andreas F?rber:
-> > Hello,
-> >
-> > This mini-series unbreaks booting on 5410 based ODROID-XU.
-> >
-> > Since I do not have access to a TRM, the address is a guess based on
-> > 5250 and 5410. Such a node was not present in the 3.14 downstream tree.
-> 
-> s/5410/5420/
-> 
-OK.
+> Cc: Shawn Guo <shawn.guo@freescale.com>
+> Cc: Sascha Hauer <kernel@pengutronix.de>
+> Cc: Russell King <linux@arm.linux.org.uk>
+> Cc: linux-arm-kernel at lists.infradead.org
+> Signed-off-by: Pawel Moll <pawel.moll@arm.com>
 
-> >
-> > Regards,
-> > Andreas
-> >
-> > Andreas F?rber (3):
-> >   Documentation: devicetree: Document exynos5410 PMU
-> >   ARM: dts: exynos: Add PMU to Exynos5410
-> >   ARM: EXYNOS: Add support for Exynos5410 PMU
-> >
-> >  Documentation/devicetree/bindings/arm/samsung/pmu.txt | 1 +
-> >  arch/arm/boot/dts/exynos5410.dtsi                     | 5 +++++
-> >  arch/arm/mach-exynos/exynos.c                         | 1 +
-> >  3 files changed, 7 insertions(+)
-> 
-Andreas, thanks.
-
-I'll apply this whole series.
-
-- Kukjin
+Acked-by: Shawn Guo <shawn.guo@freescale.com>
