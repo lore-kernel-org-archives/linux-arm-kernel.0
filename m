@@ -1,101 +1,96 @@
-From: wens@csie.org (Chen-Yu Tsai)
-Date: Mon, 28 Jul 2014 12:28:13 +0800
-Subject: [RFC 8/8] ARM: sun7i: Add mod1 clock nodes
-In-Reply-To: <1406519386-4902-9-git-send-email-emilio@elopez.com.ar>
-References: <1406519386-4902-1-git-send-email-emilio@elopez.com.ar>
- <1406519386-4902-9-git-send-email-emilio@elopez.com.ar>
-Message-ID: <CAGb2v64Gg4E5QJOZJjWezG2BNzD6iOnBvT6EYq=8AcTXGqrvsQ@mail.gmail.com>
+From: lokeshvutla@ti.com (Lokesh Vutla)
+Date: Mon, 28 Jul 2014 10:23:57 +0530
+Subject: [PATCH v2 2/2] ARM: DRA7: hwmod: Add dra74x and dra72x specific ocp
+ interface lists
+In-Reply-To: <1406523237-6905-1-git-send-email-lokeshvutla@ti.com>
+References: <1406523237-6905-1-git-send-email-lokeshvutla@ti.com>
+Message-ID: <1406523237-6905-3-git-send-email-lokeshvutla@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+From: Rajendra Nayak <rnayak@ti.com>
 
-First I suggest adding "DT: " to the commit line of all the DT patches.
+To deal with IPs which are specific to dra74x and dra72x, maintain seperate
+ocp interface lists, while keeping the common list for all common IPs.
 
-On Mon, Jul 28, 2014 at 11:49 AM, Emilio L?pez <emilio@elopez.com.ar> wrote:
-> This commit adds all the mod1 clocks available on A20 to its device
-> tree. This list was created by looking at the A20 user manual.
->
-> Not-signed-off-by: Emilio L?pez <emilio@elopez.com.ar>
-> ---
->
-> As mentioned on an earlier patch, note that this is untested, and I
-> only added them to sun7i. It'd be great if actual users of these clocks
-> could comment :)
->
->  arch/arm/boot/dts/sun7i-a20.dtsi | 39 +++++++++++++++++++++++++++++++++++++++
->  1 file changed, 39 insertions(+)
->
-> diff --git a/arch/arm/boot/dts/sun7i-a20.dtsi b/arch/arm/boot/dts/sun7i-a20.dtsi
-> index 5d0265a..c57f7ad 100644
-> --- a/arch/arm/boot/dts/sun7i-a20.dtsi
-> +++ b/arch/arm/boot/dts/sun7i-a20.dtsi
-> @@ -335,6 +335,29 @@
->                         clock-output-names = "ir1";
->                 };
->
-> +               iis0_clk: clk at 01c200b8 {
-> +                       #clock-cells = <0>;
-> +                       compatible = "allwinner,sun4i-a10-mod1-clk";
-> +                       reg = <0x01c200b8 0x4>;
-> +                       clocks = <&pll2 0>, <&pll2 1>, <&pll2 2>, <&pll2 3>;
+Move USB OTG SS4 to dra74x only list since its unavailable in
+dra72x and is giving an abort during boot. The dra72x only list
+is empty for now and a placeholder for future hwmod additions which
+are specific to dra72x.
 
-User manual says pll2x8, pll2x4, pll2x2, pll2 for all the the clocks.
-So the order here should be reversed. Same for the others.
+Fixes: d904b38df0db13 ("ARM: DRA7: hwmod: Add SYSCONFIG for usb_otg_ss")
+Reported-by: Keerthy <j-keerthy@ti.com>
+Signed-off-by: Rajendra Nayak <rnayak@ti.com>
+Signed-off-by: Lokesh Vutla <lokeshvutla@ti.com>
+Tested-by: Nishanth Menon <nm@ti.com>
+---
+Changes Since V1:
+	- Updated commit log as suggested by Nishanth.
+ arch/arm/mach-omap2/omap_hwmod.c          |  3 +++
+ arch/arm/mach-omap2/omap_hwmod_7xx_data.c | 22 ++++++++++++++++++++--
+ 2 files changed, 23 insertions(+), 2 deletions(-)
 
-> +                       clock-output-names = "iis0";
-> +               };
-> +
-> +               ac97_clk: clk at 01c200bc {
-> +                       #clock-cells = <0>;
-> +                       compatible = "allwinner,sun4i-a10-mod1-clk";
-> +                       reg = <0x01c200bc 0x4>;
-> +                       clocks = <&pll2 3>, <&pll2 2>, <&pll2 1>, <&pll2 0>;
-> +                       clock-output-names = "ac97";
-> +               };
-> +
-> +               spdif_clk: clk at 01c200c0 {
-> +                       #clock-cells = <0>;
-> +                       compatible = "allwinner,sun4i-a10-mod1-clk";
-> +                       reg = <0x01c200c0 0x4>;
-> +                       clocks = <&pll2 0>, <&pll2 1>, <&pll2 2>, <&pll2 3>;
-> +                       clock-output-names = "spdif";
-> +               };
-
-Newline. And the manuals don't have anything on the SPDIF clock,
-so I can't comment on it.
-
->                 usb_clk: clk at 01c200cc {
->                         #clock-cells = <1>;
->                         #reset-cells = <1>;
-> @@ -352,6 +375,22 @@
->                         clock-output-names = "spi3";
->                 };
->
-> +               iis1_clk: clk at 01c200d8 {
-> +                       #clock-cells = <0>;
-> +                       compatible = "allwinner,sun4i-a10-mod1-clk";
-> +                       reg = <0x01c200d8 0x4>;
-> +                       clocks = <&pll2 0>, <&pll2 1>, <&pll2 2>, <&pll2 3>;
-> +                       clock-output-names = "iis1";
-> +               };
-> +
-> +               iis2_clk: clk at 01c200dc {
-> +                       #clock-cells = <0>;
-> +                       compatible = "allwinner,sun4i-a10-mod1-clk";
-> +                       reg = <0x01c200dc 0x4>;
-> +                       clocks = <&pll2 0>, <&pll2 1>, <&pll2 2>, <&pll2 3>;
-> +                       clock-output-names = "iis2";
-> +               };
-> +
->                 codec_clk: clk at 01c20140 {
->                         #clock-cells = <0>;
->                         compatible = "allwinner,sun4i-a10-codec-clk";
-> --
-
-Apart from the title and the clock orders, everything looks good.
-Jon should test this with the above corrected.
-
-
-Cheers
-ChenYu
+diff --git a/arch/arm/mach-omap2/omap_hwmod.c b/arch/arm/mach-omap2/omap_hwmod.c
+index 6c074f3..ec0389f 100644
+--- a/arch/arm/mach-omap2/omap_hwmod.c
++++ b/arch/arm/mach-omap2/omap_hwmod.c
+@@ -3345,6 +3345,9 @@ int __init omap_hwmod_register_links(struct omap_hwmod_ocp_if **ois)
+ 	if (!ois)
+ 		return 0;
+ 
++	if (ois[0] == NULL) /* Empty list*/
++		return 0;
++
+ 	if (!linkspace) {
+ 		if (_alloc_linkspace(ois)) {
+ 			pr_err("omap_hwmod: could not allocate link space\n");
+diff --git a/arch/arm/mach-omap2/omap_hwmod_7xx_data.c b/arch/arm/mach-omap2/omap_hwmod_7xx_data.c
+index 284324f..c95033c 100644
+--- a/arch/arm/mach-omap2/omap_hwmod_7xx_data.c
++++ b/arch/arm/mach-omap2/omap_hwmod_7xx_data.c
+@@ -35,6 +35,7 @@
+ #include "i2c.h"
+ #include "mmc.h"
+ #include "wd_timer.h"
++#include "soc.h"
+ 
+ /* Base offset for all DRA7XX interrupts external to MPUSS */
+ #define DRA7XX_IRQ_GIC_START	32
+@@ -2705,7 +2706,6 @@ static struct omap_hwmod_ocp_if *dra7xx_hwmod_ocp_ifs[] __initdata = {
+ 	&dra7xx_l4_per3__usb_otg_ss1,
+ 	&dra7xx_l4_per3__usb_otg_ss2,
+ 	&dra7xx_l4_per3__usb_otg_ss3,
+-	&dra7xx_l4_per3__usb_otg_ss4,
+ 	&dra7xx_l3_main_1__vcp1,
+ 	&dra7xx_l4_per2__vcp1,
+ 	&dra7xx_l3_main_1__vcp2,
+@@ -2714,8 +2714,26 @@ static struct omap_hwmod_ocp_if *dra7xx_hwmod_ocp_ifs[] __initdata = {
+ 	NULL,
+ };
+ 
++static struct omap_hwmod_ocp_if *dra74x_hwmod_ocp_ifs[] __initdata = {
++	&dra7xx_l4_per3__usb_otg_ss4,
++	NULL,
++};
++
++static struct omap_hwmod_ocp_if *dra72x_hwmod_ocp_ifs[] __initdata = {
++	NULL,
++};
++
+ int __init dra7xx_hwmod_init(void)
+ {
++	int ret;
++
+ 	omap_hwmod_init();
+-	return omap_hwmod_register_links(dra7xx_hwmod_ocp_ifs);
++	ret = omap_hwmod_register_links(dra7xx_hwmod_ocp_ifs);
++
++	if (!ret && soc_is_dra74x())
++		return omap_hwmod_register_links(dra74x_hwmod_ocp_ifs);
++	else if (!ret && soc_is_dra72x())
++		return omap_hwmod_register_links(dra72x_hwmod_ocp_ifs);
++
++	return ret;
+ }
+-- 
+1.9.1
