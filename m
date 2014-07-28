@@ -1,121 +1,275 @@
-From: achandran@mvista.com (Arun Chandran)
-Date: Mon, 28 Jul 2014 20:30:18 +0530
-Subject: Kexec on arm64
-In-Reply-To: <1406333901.4062.69.camel@smoke>
-References: <CAFdej006OSyhgDcJ2iZdbjt+PtysN=i_+9Dr4GTmr=+t5yg4Kw@mail.gmail.com>
- <1405443898.22585.7.camel@smoke>
- <CAL85gmC9LLcN_uxMY1bM5kLx=N7rZGdGO3bmGHeUVo=Rqgk8uw@mail.gmail.com>
- <1405551861.7262.26.camel@smoke>
- <CAFdej03nixSU=3h+HYk2E3Onb2P3--Di0GM+wCwLS6ZNH7UjEQ@mail.gmail.com>
- <CAFdej00J2mJwcg2Cy6CHVuuQZ4uQ2zZg8oErGPi0uPejievB+Q@mail.gmail.com>
- <1406162287.4062.39.camel@smoke>
- <20140724093603.GC4079@leverpostej>
- <1406247468.4062.59.camel@smoke>
- <CAFdej01w_pE6vv+13cCCyfDs4Rbdkzx4CMUj9q97HBKV0B53ow@mail.gmail.com>
- <1406333901.4062.69.camel@smoke>
-Message-ID: <CAFdej014ohCFYvoUAXWiYGb4_4UmSY2G1MH-NEE_cF1cC-6Mow@mail.gmail.com>
+From: boris.brezillon@free-electrons.com (Boris BREZILLON)
+Date: Mon, 28 Jul 2014 17:06:53 +0200
+Subject: [PATCH] ARM: at91: spi: request all csgpio in spi probe
+In-Reply-To: <b033d16ec31d26a895726ee72ec89b43943dfbae.1406547656.git.jiri.prchal@aksignal.cz>
+References: <b033d16ec31d26a895726ee72ec89b43943dfbae.1406547656.git.jiri.prchal@aksignal.cz>
+Message-ID: <20140728170653.087dfbfd@bbrezillon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Geoff
+Hello Jiri,
 
-On Sat, Jul 26, 2014 at 5:48 AM, Geoff Levand <geoff@infradead.org> wrote:
-> Hi Arun,
+The least you can do when someone helps you debugging something is to
+keep him in Cc of the following versions of your patch...
+
+On Mon, 28 Jul 2014 13:43:40 +0200
+Jiri Prchal <jiri.prchal@aksignal.cz> wrote:
+
+> This fix problem with PA14 set as periph A left from ROMBOOT and need it
+> to be set to gpio before spi bus communicate with chip on CS0 on other
+> gpio. As I reported a week ago.
+> Request all csgpios in spi_probe since cs depends on each other and must
+> be all of them in right state before any communication on bus. They are
+> part of bus, like miso, mosi, clk, not part of chips, they are defined
+> in parent spi node, not in child chip node.
+> Csgpio moved to atmel_spi struct as part of master bus.
+> 
+> Signed-off-by: Jiri Prchal <jiri.prchal@aksignal.cz>
+> ---
+>  drivers/spi/spi-atmel.c | 68 +++++++++++++++++++++++++++++--------------------
+>  1 file changed, 41 insertions(+), 27 deletions(-)
+> 
+> diff --git a/drivers/spi/spi-atmel.c b/drivers/spi/spi-atmel.c
+> index 92a6f0d..1fb7bb9 100644
+> --- a/drivers/spi/spi-atmel.c
+> +++ b/drivers/spi/spi-atmel.c
+> @@ -22,11 +22,14 @@
+>  #include <linux/platform_data/atmel.h>
+>  #include <linux/platform_data/dma-atmel.h>
+>  #include <linux/of.h>
+> +#include <linux/of_gpio.h>
+>  
+>  #include <linux/io.h>
+>  #include <linux/gpio.h>
+>  #include <linux/pinctrl/consumer.h>
+>  
+> +#define DRIVER_NAME "atmel-spi"
+> +
+>  /* SPI register offsets */
+>  #define SPI_CR					0x0000
+>  #define SPI_MR					0x0004
+> @@ -242,11 +245,13 @@ struct atmel_spi {
+>  
+>  	bool			keep_cs;
+>  	bool			cs_active;
+> +
+> +	/* chip selects */
+> +	unsigned int		csgpio[];
+
+Do you really need to store these gpio ids in atmel_spi struct (they
+are already stored in the spi_master).
+
+>  };
+>  
+>  /* Controller-specific per-slave state */
+>  struct atmel_spi_device {
+> -	unsigned int		npcs_pin;
+
+Keep this field to handle both DT and non-DT cases.
+
+>  	u32			csr;
+>  };
+>  
+> @@ -312,7 +317,7 @@ static void cs_activate(struct atmel_spi *as, struct spi_device *spi)
+>  		}
+>  
+>  		mr = spi_readl(as, MR);
+> -		gpio_set_value(asd->npcs_pin, active);
+> +		gpio_set_value(as->csgpio[spi->chip_select], active);
+
+Drop this change.
+
+>  	} else {
+>  		u32 cpol = (spi->mode & SPI_CPOL) ? SPI_BIT(CPOL) : 0;
+>  		int i;
+> @@ -329,18 +334,16 @@ static void cs_activate(struct atmel_spi *as, struct spi_device *spi)
+>  		mr = spi_readl(as, MR);
+>  		mr = SPI_BFINS(PCS, ~(1 << spi->chip_select), mr);
+>  		if (spi->chip_select != 0)
+> -			gpio_set_value(asd->npcs_pin, active);
+> +			gpio_set_value(as->csgpio[spi->chip_select], active);
+
+Ditto.
+
+>  		spi_writel(as, MR, mr);
+>  	}
+>  
+>  	dev_dbg(&spi->dev, "activate %u%s, mr %08x\n",
+> -			asd->npcs_pin, active ? " (high)" : "",
+> -			mr);
+> +		as->csgpio[spi->chip_select], active ? " (high)" : "", mr);
+
+Ditto.
+
+>  }
+>  
+>  static void cs_deactivate(struct atmel_spi *as, struct spi_device *spi)
+>  {
+> -	struct atmel_spi_device *asd = spi->controller_state;
+>  	unsigned active = spi->mode & SPI_CS_HIGH;
+>  	u32 mr;
+>  
+> @@ -354,11 +357,10 @@ static void cs_deactivate(struct atmel_spi *as, struct spi_device *spi)
+>  	}
+>  
+>  	dev_dbg(&spi->dev, "DEactivate %u%s, mr %08x\n",
+> -			asd->npcs_pin, active ? " (low)" : "",
+> -			mr);
+> +		as->csgpio[spi->chip_select], active ? " (low)" : "", mr);
+>  
+>  	if (atmel_spi_is_v2(as) || spi->chip_select != 0)
+> -		gpio_set_value(asd->npcs_pin, !active);
+> +		gpio_set_value(as->csgpio[spi->chip_select], !active);
+
+Ditto.
+
+>  }
+>  
+>  static void atmel_spi_lock(struct atmel_spi *as) __acquires(&as->lock)
+> @@ -989,8 +991,6 @@ static int atmel_spi_setup(struct spi_device *spi)
+>  	struct atmel_spi_device	*asd;
+>  	u32			csr;
+>  	unsigned int		bits = spi->bits_per_word;
+> -	unsigned int		npcs_pin;
+> -	int			ret;
+>  
+>  	as = spi_master_get_devdata(spi->master);
+>  
+> @@ -1017,27 +1017,13 @@ static int atmel_spi_setup(struct spi_device *spi)
+>  	csr |= SPI_BF(DLYBS, 0);
+>  	csr |= SPI_BF(DLYBCT, 0);
+>  
+> -	/* chipselect must have been muxed as GPIO (e.g. in board setup) */
+> -	npcs_pin = (unsigned int)spi->controller_data;
+> -
+> -	if (gpio_is_valid(spi->cs_gpio))
+> -		npcs_pin = spi->cs_gpio;
+> -
+
+Keep this block and just add:
+
+	else {
+		ret = gpio_request(npcs_pin, dev_name(&spi->dev));
+		if (ret) {
+			kfree(asd);
+			return ret;
+		}
+		gpio_direction_output(npcs_pin,
+				      !(spi->mode & SPI_CS_HIGH));
+	}
+		
+
+>  	asd = spi->controller_state;
+>  	if (!asd) {
+>  		asd = kzalloc(sizeof(struct atmel_spi_device), GFP_KERNEL);
+>  		if (!asd)
+>  			return -ENOMEM;
+>  
+> -		ret = gpio_request(npcs_pin, dev_name(&spi->dev));
+> -		if (ret) {
+> -			kfree(asd);
+> -			return ret;
+> -		}
+> -
+> -		asd->npcs_pin = npcs_pin;
+
+Keep this line.
+
+>  		spi->controller_state = asd;
+> -		gpio_direction_output(npcs_pin, !(spi->mode & SPI_CS_HIGH));
+>  	}
+>  
+>  	asd->csr = csr;
+> @@ -1290,6 +1276,15 @@ static int atmel_spi_probe(struct platform_device *pdev)
+>  	int			ret;
+>  	struct spi_master	*master;
+>  	struct atmel_spi	*as;
+> +	struct device_node *np = pdev->dev.of_node;
+> +	int num_cs, i;
+> +
+> +	if (!np)
+> +		return -EINVAL;
+> +
+> +	num_cs = of_gpio_named_count(np, "cs-gpios");
+> +	if (num_cs < 0)
+> +		return num_cs;
+
+As stated by Alexandre, you cannot do this, because it will break
+non-DT board support.
+
+This should do the trick:
+
+	int num_cs = 0;
+
+	if (np) {
+		num_cs = of_gpio_named_count(np, "cs-gpios");
+		if (num_cs < 0)
+			return num_cs;
+	}
+
+>  
+>  	/* Select default pin state */
+>  	pinctrl_pm_select_default_state(&pdev->dev);
+> @@ -1308,7 +1303,7 @@ static int atmel_spi_probe(struct platform_device *pdev)
+>  
+>  	/* setup spi core then atmel-specific driver state */
+>  	ret = -ENOMEM;
+> -	master = spi_alloc_master(&pdev->dev, sizeof(*as));
+> +	master = spi_alloc_master(&pdev->dev, sizeof(*as) + num_cs * sizeof(unsigned));
+
+Drop this change.
+
+>  	if (!master)
+>  		goto out_free;
+>  
+> @@ -1317,7 +1312,7 @@ static int atmel_spi_probe(struct platform_device *pdev)
+>  	master->bits_per_word_mask = SPI_BPW_RANGE_MASK(8, 16);
+>  	master->dev.of_node = pdev->dev.of_node;
+>  	master->bus_num = pdev->id;
+> -	master->num_chipselect = master->dev.of_node ? 0 : 4;
+> +	master->num_chipselect = num_cs;
+>  	master->setup = atmel_spi_setup;
+>  	master->transfer_one_message = atmel_spi_transfer_one_message;
+>  	master->cleanup = atmel_spi_cleanup;
+> @@ -1325,6 +1320,25 @@ static int atmel_spi_probe(struct platform_device *pdev)
+>  
+>  	as = spi_master_get_devdata(master);
 >
-> On Fri, 2014-07-25 at 17:18 +0530, Arun Chandran wrote:
->> I got this working. As 'Mark Rutland' pointed in another mail that
->> it could be problem with flushing the cache; I did a read of
->> 1GB data from start of RAM to a volatile var. I assume that
->> this will clear and invalidate all that in cache (L1=32K, L2=256 K, L3=8M)
->
-> I wasn't flushing out all the data used by relocate_new_kernel.  I added
-> a routine that should flush all the pages in the kimage list out to PoC.
-> Please try a UP build with L3 enabled.
->
+> +	for (i = 0; i < master->num_chipselect; ++i) {
+> +		ret = of_get_named_gpio(np, "cs-gpios", i);
+> +		if (ret < 0) {
+> +			dev_err(&pdev->dev, "failed to get csgpio#%u (%d)\n",
+> +				i, ret);
+> +			goto out_free;
+> +		}
+> +		as->csgpio[i] = ret;
+> +		dev_dbg(&pdev->dev, "csgpio#%u = %u\n", i, as->csgpio[i]);
+> +		ret = devm_gpio_request_one(&pdev->dev, as->csgpio[i],
+> +					    GPIOF_OUT_INIT_HIGH, DRIVER_NAME);
 
-Yes I verified this new kernel by stopping just before jumping to the
-kexeced kernel and taking the memory dump for the kernel
-and dtb.
+Are you sure we always want to initialize this gpio to high ?
+What if SPI_CS_HIGH is set ?
 
-CPU#0>dump 0x0000004000080000 0x7F2000 uImage
-CPU#0>rd
-GPR00: 0000004000880000 0000000000000000 0000000000000000 0000000000000000
-GPR04: 0000004000080004 000000000000001b 0000000000000000 ffffffffffffffff
-GPR08: 0000000000000020 ffffffffffffffff 0000000000000004 0000000000000002
-GPR12: 00000043ea439fd8 0000004000883000 00000043ea631000 ffffffffffffffff
-GPR16: ffffffc0000cc31c 0000000000435260 0000007fe9328b90 00000043eaddc002
-GPR20: 0000004000883000 00000043ea632000 0000000000000000 0000000000000000
-GPR24: 0000000000000000 0000000000000000 0000000000000000 0000000000000000
-GPR28: 0000000000000000 0000000000000000 ffffffc000085074 ffffffc3eae53d00
+> +		if (ret < 0) {
+> +			dev_err(&pdev->dev,
+> +				"failed to configure csgpio#%u (%d)\n",
+> +				i, ret);
+> +			goto out_free;
+> +		}
+> +	}
+> +
 
-And compared this image with the one taken after booting with
-my working one(The one with 1GB read of RAM). Both are Identical.
-That means kexec code now flushes data properly. Note that in both
-cases I used the same secondary kernel.
+You could move this block in a dt specific function (how about
+naming it of_atmel_spi_init ?) and test np availability before calling
+this function.
 
-But It fails to boot kexeced kernel. If I break the target I can see
-CPU#0>h
-    Core number       : 0
-    Core state        : debug (AArch64 EL1)
-    Debug entry cause : External Debug Request
-    Current PC        : 0xffffffc000083200
-    Current CPSR      : 0x600003c5 (EL1h)
+My suggestions are far from perfect, but at least it fixes the DT case
+and keep the non-DT in a working state.
 
+Best Regards,
 
-So I guess there may be something wrong with
-the booting of kernel.
-
-I have these changes to the code.
-1)
-#########
-diff --git a/arch/arm64/kernel/machine_kexec.c
-b/arch/arm64/kernel/machine_kexec.c
-index 00cfbd6..da3672b 100644
---- a/arch/arm64/kernel/machine_kexec.c
-+++ b/arch/arm64/kernel/machine_kexec.c
-@@ -684,7 +691,7 @@ void machine_kexec(struct kimage *image)
-        /* Flush the reboot_code_buffer in preparation for its execution. */
-
-        flush_icache_range((unsigned long)reboot_code_buffer,
--               relocate_new_kernel_size);
-+               (unsigned long)(reboot_code_buffer + relocate_new_kernel_size));
-
-        /*
-         * Flush any data used by relocate_new_kernel in preparation for
-#########
-Passing of second variable to flush_icache_range() is wrong
-it expects an address not length.
-
-2)
-
-#######
-diff --git a/arch/arm64/kernel/process.c b/arch/arm64/kernel/process.c
-index 9ed7327..e3fc8d6 100644
---- a/arch/arm64/kernel/process.c
-+++ b/arch/arm64/kernel/process.c
-
-@@ -84,12 +91,17 @@ void soft_restart(unsigned long addr)
- {
-        typedef void (*phys_reset_t)(unsigned long);
-        phys_reset_t phys_reset;
-+       unsigned long jump_addr = addr;
-+
-+       phys_reset = (phys_reset_t)virt_to_phys(cpu_reset);
-+
-+       __flush_dcache_area(&jump_addr, 8);
-+       __flush_dcache_area(&phys_reset, 8);
-
-        setup_restart();
-
-        /* Switch to the identity mapping */
--       phys_reset = (phys_reset_t)virt_to_phys(cpu_reset);
--       phys_reset(addr);
-+       phys_reset(jump_addr);
-
-        /* Should never get here */
-        BUG();
-########
-
-Without this flushing it will jump to wrong addr.
-
---Arun
+Boris
+-- 
+Boris Brezillon, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
