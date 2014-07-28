@@ -1,64 +1,244 @@
-From: grygorii.strashko@ti.com (Grygorii Strashko)
-Date: Mon, 28 Jul 2014 20:47:48 +0300
-Subject: [RFC PATCH 2/2] of/clk: use "clkops-clocks" to specify clocks
- handled by clock_ops domain
-In-Reply-To: <20140728140533.6E916C4116F@trevor.secretlab.ca>
-References: <1398334403-26181-1-git-send-email-geert+renesas@glider.be>	<1402592023-13416-1-git-send-email-grygorii.strashko@ti.com>	<1402592023-13416-3-git-send-email-grygorii.strashko@ti.com>
- <20140728140533.6E916C4116F@trevor.secretlab.ca>
-Message-ID: <53D68CC4.1010704@ti.com>
+From: vinod.koul@intel.com (Vinod Koul)
+Date: Mon, 28 Jul 2014 22:17:50 +0530
+Subject: [PATCH v3 1/2] dma: at_xdmac: creation of the atmel eXtended
+ DMA Controller driver
+In-Reply-To: <20140728155431.GV2349@ldesroches-Latitude-E6320>
+References: <1404825096-15724-1-git-send-email-ludovic.desroches@atmel.com>
+ <1404825096-15724-2-git-send-email-ludovic.desroches@atmel.com>
+ <20140725071631.GH8181@intel.com>
+ <20140728155431.GV2349@ldesroches-Latitude-E6320>
+Message-ID: <20140728164750.GH8181@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Grant.
+On Mon, Jul 28, 2014 at 05:54:31PM +0200, Ludovic Desroches wrote:
+> > > +{
+> > > +	struct at_xdmac_desc	*desc = txd_to_at_desc(tx);
+> > > +	struct at_xdmac_chan	*atchan = to_at_xdmac_chan(tx->chan);
+> > > +	dma_cookie_t		cookie;
+> > > +	unsigned long		flags;
+> > > +
+> > > +	spin_lock_irqsave(&atchan->lock, flags);
+> > > +	cookie = dma_cookie_assign(tx);
+> > > +
+> > > +	dev_vdbg(chan2dev(tx->chan), "%s: atchan 0x%p, add desc 0x%p to xfers_list\n",
+> > > +		 __func__, atchan, desc);
+> > > +	list_add_tail(&desc->xfer_node, &atchan->xfers_list);
+> > > +	if (list_is_singular(&atchan->xfers_list))
+> > > +		at_xdmac_start_xfer(atchan, desc);
+> > so you dont start if list has more than 1 descriptors, why?
+> Because I will let at_xdmac_advance_work managing the queue if not
+> empty. So the only moment when I have to start the transfer in tx_submit
+> is when I have only one transfer in the queue.
+So xfers_list is current active descriptors right and if it is always going
+to be singular why bother with a list?
 
-On 07/28/2014 05:05 PM, Grant Likely wrote:
-> On Thu, 12 Jun 2014 19:53:43 +0300, Grygorii Strashko <grygorii.strashko@ti.com> wrote:
->> Use "clkops-clocks" property to specify clocks handled by
->> clock_ops domain PM domain. Only clocks defined in "clkops-clocks"
->> set of clocks will be handled by Runtime PM through clock_ops
->> Pm domain.
->>
->> Signed-off-by: Grygorii Strashko <grygorii.strashko@ti.com>
->> ---
->>   drivers/of/of_clk.c |    7 ++-----
->>   1 file changed, 2 insertions(+), 5 deletions(-)
->>
->> diff --git a/drivers/of/of_clk.c b/drivers/of/of_clk.c
->> index 35f5e9f..5f9b90e 100644
->> --- a/drivers/of/of_clk.c
->> +++ b/drivers/of/of_clk.c
->> @@ -86,11 +86,8 @@ int of_clk_register_runtime_pm_clocks(struct device_node *np,
->>   	struct clk *clk;
->>   	int error;
->>   
->> -	for (i = 0; (clk = of_clk_get(np, i)) && !IS_ERR(clk); i++) {
->> -		if (!clk_may_runtime_pm(clk)) {
->> -			clk_put(clk);
->> -			continue;
->> -		}
->> +	for (i = 0; (clk = of_clk_get_from_set(np, "clkops", i)) &&
->> +		     !IS_ERR(clk); i++) {
+> > > +static struct dma_async_tx_descriptor *
+> > > +at_xdmac_prep_dma_memcpy(struct dma_chan *chan, dma_addr_t dest, dma_addr_t src,
+> > > +			 size_t len, unsigned long flags)
+> > > +{
+> > > +	struct at_xdmac_chan 	*atchan = to_at_xdmac_chan(chan);
+> > > +	struct at_xdmac_desc	*first = NULL, *prev = NULL;
+> > > +	size_t			remaining_size = len, xfer_size = 0, ublen;
+> > > +	dma_addr_t		src_addr = src, dst_addr = dest;
+> > > +	u32			dwidth;
+> > > +	/*
+> > > +	 * WARNING: The channel configuration is set here since there is no
+> > > +	 * dmaengine_slave_config call in this case. Moreover we don't know the
+> > > +	 * direction, it involves we can't dynamically set the source and dest
+> > > +	 * interface so we have to use the same one. Only interface 0 allows EBI
+> > > +	 * access. Hopefully we can access DDR through both ports (at least on
+> > > +	 * SAMA5D4x), so we can use the same interface for source and dest,
+> > > +	 * that solves the fact we don't know the direction.
+> > and why do you need slave config for memcpy?
+> Maybe the comments is not clear. With slave config we have the direction
+> per to mem or mem to per. Of course when doing memcpy we don't need this
+> information. But I use this information not only to set the transfer
+> direction but also to set the interfaces to use for the source and dest
+> (these interfaces depend on the connection on the matrix).
+> So slave config was useful due to direction field  to tell which interface
+> to use as source and which one as dest.
+> I am lucky because NAND and DDR are on the same interfaces so it's not a
+> problem.
 > 
-> This really looks like an ABI break to me. What happens to all the
-> existing platforms who don't have this new clkops-clocks in their device
-> tree?
+> This comment is more a warning for myself to keep in mind this possible 
+> issue in order to not have a device with NAND and DDR on different
+> interfaces because it will be difficult to tell which interface is the
+> source and which one is the dest.
+Well in that case shouldnt NAND be treated like periphral and not memory?
 
-Agree. This patch as is will break such platforms.
-As possible solution for above problem - the NULL can be used as clock's prefix
-by default and platform code can configure new value of clock's prefix during
-initialization.
-In addition, to make this solution full the of_clk_get_by_name() will
-need to be modified too.
+> > > +static enum dma_status
+> > > +at_xdmac_tx_status(struct dma_chan *chan, dma_cookie_t cookie,
+> > > +		struct dma_tx_state *txstate)
+> > > +{
+> > > +	struct at_xdmac_chan 	*atchan = to_at_xdmac_chan(chan);
+> > > +	struct at_xdmac		*atxdmac = to_at_xdmac(atchan->chan.device);
+> > > +	struct at_xdmac_desc	*desc, *_desc;
+> > > +	unsigned long		flags;
+> > > +	enum dma_status		ret;
+> > > +	int			residue;
+> > > +	u32			cur_nda;
+> > > +
+> > > +	ret = dma_cookie_status(chan, cookie, txstate);
+> > > +	if (ret == DMA_COMPLETE)
+> > > +		return ret;
+> > > +
+> > > +	spin_lock_irqsave(&atchan->lock, flags);
+> > > +
+> > > +	desc = list_first_entry(&atchan->xfers_list, struct at_xdmac_desc, xfer_node);
+> > > +
+> > > +	if (!desc->active_xfer)
+> > > +		dev_err(chan2dev(chan),
+> > > +			"something goes wrong, there is no active transfer\n");
+> > We can query resiude even when tx_submit hasnt been invoked. You need to
+> > return the full length in that case.
+> 
+> Ok, I was not aware about this case.
+> 
+> > > +
+> > > +	residue = desc->xfer_size;
+> > 
+> > Also do check if txsate is NULL, in case just bail out here.
+> 
+> Return value will be the one returned by dma_cookie_status?
+Yes
 
-But note pls, this is pure RFC patches which I did to find out the answer on questions:
-- What is better: maintain Runtime PM clocks configuration in DT or in code?
+> > > +	 */
+> > > +	list_del(&desc->xfer_node);
+> > > +	list_splice_init(&desc->descs_list, &atchan->free_descs_list);
+> > shouldnt you move all the desc in active list in one shot ?
+> > 
+> 
+> Sorry I don't get it. What are you suggesting by one shot?
+Rather than invoking this per descriptor moving descriptors to
+free_desc_list one by one, we can move all descriptors togther.
 
-- Where and when to call of_clk_register_runtime_pm_clocks()?
-  Bus notifier/ platform core/ device drivers
+> 
+> > > +static void at_xdmac_tasklet(unsigned long data)
+> > > +{
+> > > +	struct at_xdmac_chan	*atchan = (struct at_xdmac_chan *)data;
+> > > +	struct at_xdmac_desc	*desc;
+> > > +	u32			error_mask;
+> > > +
+> > > +	dev_dbg(chan2dev(&atchan->chan), "%s: status=0x%08lx\n",
+> > > +		 __func__, atchan->status);
+> > > +
+> > > +	error_mask = AT_XDMAC_CIS_RBEIS
+> > > +		     | AT_XDMAC_CIS_WBEIS
+> > > +		     | AT_XDMAC_CIS_ROIS;
+> > > +
+> > > +	if (at_xdmac_chan_is_cyclic(atchan)) {
+> > > +		at_xdmac_handle_cyclic(atchan);
+> > > +	} else if ((atchan->status & AT_XDMAC_CIS_LIS)
+> > > +		   || (atchan->status & error_mask)) {
+> > > +		struct dma_async_tx_descriptor  *txd;
+> > > +
+> > > +		if (atchan->status & AT_XDMAC_CIS_RBEIS)
+> > > +			dev_err(chan2dev(&atchan->chan), "read bus error!!!");
+> > > +		else if (atchan->status & AT_XDMAC_CIS_WBEIS)
+> > > +			dev_err(chan2dev(&atchan->chan), "write bus error!!!");
+> > > +		else if (atchan->status & AT_XDMAC_CIS_ROIS)
+> > > +			dev_err(chan2dev(&atchan->chan), "request overflow error!!!");
+> > > +
+> > > +		desc = list_first_entry(&atchan->xfers_list,
+> > > +					struct at_xdmac_desc,
+> > > +					xfer_node);
+> > > +		dev_vdbg(chan2dev(&atchan->chan), "%s: desc 0x%p\n", __func__, desc);
+> > > +		BUG_ON(!desc->active_xfer);
+> > > +
+> > > +		txd = &desc->tx_dma_desc;
+> > > +
+> > > +		at_xdmac_terminate_xfer(atchan, desc);
+> > why terminate here? This looks wrong
+> 
+> Why? What do you have in mind? It is not obvious for me that it is the
+> wrong place.
+The descriptor has completed. The terminate has special meaning. The user
+can cancel all transactions by invoking terminate_all(). That implies to
+clean up the channel and abort the transfers. The transfer is done so what
+does it mean to terminate.
 
-Also, May be platform dependent solution [1] can be acceptable for now?
+> > > +	if (!atxdmac) {
+> > > +		dev_err(&pdev->dev, "can't allocate at_xdmac structure\n");
+> > > +		return -ENOMEM;
+> > > +	}
+> > > +
+> > > +	atxdmac->regs = base;
+> > > +	atxdmac->irq = irq;
+> > > +
+> > > +	ret = devm_request_irq(&pdev->dev, atxdmac->irq, at_xdmac_interrupt, 0,
+> > > +			       "at_xdmac", atxdmac);
+> > and this can invoke your irq handler and you may not be ready. Second this
+> > cause races with tasklet, so usualy recommednation is to use regular
+> > request_irq()
+> 
+> You mean it is specific to devm variant, isn't it?
+Yes.
 
-[1] https://lkml.org/lkml/2014/7/25/630
+> > > +	dma_cap_set(DMA_CYCLIC, atxdmac->dma.cap_mask);
+> > > +	dma_cap_set(DMA_MEMCPY, atxdmac->dma.cap_mask);
+> > > +	dma_cap_set(DMA_SLAVE, atxdmac->dma.cap_mask);
+> > > +	atxdmac->dma.dev				= &pdev->dev;
+> > > +	atxdmac->dma.device_alloc_chan_resources	= at_xdmac_alloc_chan_resources;
+> > > +	atxdmac->dma.device_free_chan_resources		= at_xdmac_free_chan_resources;
+> > > +	atxdmac->dma.device_tx_status			= at_xdmac_tx_status;
+> > > +	atxdmac->dma.device_issue_pending		= at_xdmac_issue_pending;
+> > > +	atxdmac->dma.device_prep_dma_cyclic		= at_xdmac_prep_dma_cyclic;
+> > > +	atxdmac->dma.device_prep_dma_memcpy		= at_xdmac_prep_dma_memcpy;
+> > > +	atxdmac->dma.device_prep_slave_sg		= at_xdmac_prep_slave_sg;
+> > > +	atxdmac->dma.device_control			= at_xdmac_control;
+> > > +	atxdmac->dma.chancnt				= nr_channels;
+> > no caps, pls do implement that as you have cyclic dma too
+> 
+> Sorry I don't understand what you mean here.
+pls implement .device_slave_caps
 
-Best regards,
--grygorii
+> > > +static int at_xdmac_remove(struct platform_device *pdev)
+> > > +{
+> > > +	struct at_xdmac	*atxdmac = (struct at_xdmac*)platform_get_drvdata(pdev);
+> > > +	int		i;
+> > > +
+> > > +	at_xdmac_off(atxdmac);
+> > > +	of_dma_controller_free(pdev->dev.of_node);
+> > > +	dma_async_device_unregister(&atxdmac->dma);
+> > > +	clk_disable_unprepare(atxdmac->clk);
+> > > +
+> > > +	synchronize_irq(atxdmac->irq);
+> > > +
+> > > +	for (i = 0; i < atxdmac->dma.chancnt; i++) {
+> > > +		struct at_xdmac_chan *atchan = &atxdmac->chan[i];
+> > > +
+> > > +		tasklet_kill(&atchan->tasklet);
+> > > +		at_xdmac_free_chan_resources(&atchan->chan);
+> > > +	}
+> > and you can still get irq!
+> 
+> Why? I thought deactivating irq on device side and calling synchronize
+> irq will do the stuff.
+what if we have buggy hardware or spurious interrupt!
+
+> 
+> > > +
+> > > +	return 0;
+> > > +}
+> > > +
+> > > +static const struct dev_pm_ops atmel_xdmac_dev_pm_ops = {
+> > > +	.prepare	= atmel_xdmac_prepare,
+> > > +	.suspend_noirq	= atmel_xdmac_suspend_noirq,
+> > > +	.resume_noirq	= atmel_xdmac_resume_noirq,
+> > > +};
+> > no ifdef CONFIG_PM?
+> 
+> I'll add it.
+> 
+> > You might want to make them late_suspend and early_resume to allow
+> > clients suspending first
+> 
+> Ok, as I told before I was wondering which variant to use. For my
+> knowledge, it will be the case also with noirq, isn't it? It is called
+> after suspend_late.
+Yes, thats why it makes sense for dmaengine drivers to use only late_suspend
+and ealy_resume
+
+-- 
+~Vinod
