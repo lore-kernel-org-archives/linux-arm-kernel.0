@@ -1,259 +1,149 @@
-From: graeme.gregory@linaro.org (Graeme Gregory)
-Date: Mon, 28 Jul 2014 23:49:53 +0100
-Subject: [PATCH 01/19] ARM64 / ACPI: Get RSDP and ACPI boot-time tables
-In-Reply-To: <53D69678.20002@arm.com>
-References: <1406206825-15590-1-git-send-email-hanjun.guo@linaro.org>
- <1406206825-15590-2-git-send-email-hanjun.guo@linaro.org>
- <53D69678.20002@arm.com>
-Message-ID: <53D6D391.8090907@linaro.org>
+From: bpringlemeir@nbsps.com (Bill Pringlemeir)
+Date: Mon, 28 Jul 2014 18:38:39 -0400
+Subject: fsl_lpuart/VF610: Division by zero.
+In-Reply-To: <1aa4c71fa7441f217f33e7be9a8fa1b9@agner.ch> (Stefan Agner's
+ message of "Sat, 26 Jul 2014 14:08:38 +0200")
+References: <87ha256q8l.fsf@nbsps.com> <87d2ct6p77.fsf@nbsps.com>
+ <1aa4c71fa7441f217f33e7be9a8fa1b9@agner.ch>
+Message-ID: <87zjftaz2o.fsf@nbsps.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On 26 Jul 2014, stefan at agner.ch wrote:
 
-On 28/07/2014 19:29, Sudeep Holla wrote:
+> Hi Bill,
 >
+> Am 2014-07-26 00:36, schrieb Bill Pringlemeir:
+>> On 25 Jul 2014, bpringlemeir at nbsps.com wrote:
 >
-> On 24/07/14 14:00, Hanjun Guo wrote:
->> From: Al Stone <al.stone@linaro.org>
->>
->> As we want to get ACPI tables to parse and then use the information
->> for system initialization, we should get the RSDP (Root System
->> Description Pointer) first, it then locates Extended Root Description
->> Table (XSDT) which contains all the 64-bit physical address that
->> pointer to other boot-time tables.
->>
->> Introduce acpi.c and its related head file in this patch to provide
->> fundamental needs of extern variables and functions for ACPI core,
->> and then get boot-time tables as needed.
->>    - asm/cpu.h need for ACPI core and will be updated in the future to
->>      add definitions for arch_(un)register_cpu which are required for
->>      ACPI based physical CPU hotplug;
->>    - asm/acenv.h for arch specific ACPICA environments and
->>      implementation;
->>    - asm/acpi.h for arch specific variables and functions needed by
->>      ACPI driver core;
->>    - acpi.c for ARM64 related ACPI implementation for ACPI driver
->>      core;
->>
->> acpi_boot_table_init() is introduced to get RSDP and boot-time tables,
->> it will be called in setup_arch() before paging_init(), so we should
->> use eary_memremap() mechanism here to get the RSDP and all the table
->> pointers.
->>
->> Signed-off-by: Al Stone <al.stone@linaro.org>
->> Signed-off-by: Graeme Gregory <graeme.gregory@linaro.org>
->> Signed-off-by: Tomasz Nowicki <tomasz.nowicki@linaro.org>
->> Signed-off-by: Hanjun Guo <hanjun.guo@linaro.org>
->> ---
->>   arch/arm64/include/asm/acenv.h |   18 ++++++++++
->>   arch/arm64/include/asm/acpi.h  |   41 ++++++++++++++++++++++
->>   arch/arm64/include/asm/cpu.h   |   11 ++++++
->>   arch/arm64/kernel/Makefile     |    1 +
->>   arch/arm64/kernel/acpi.c       |   76 
->> ++++++++++++++++++++++++++++++++++++++++
->>   arch/arm64/kernel/setup.c      |    4 +++
->>   6 files changed, 151 insertions(+)
->>   create mode 100644 arch/arm64/include/asm/acenv.h
->>   create mode 100644 arch/arm64/include/asm/acpi.h
->>   create mode 100644 arch/arm64/include/asm/cpu.h
->>   create mode 100644 arch/arm64/kernel/acpi.c
->>
->> diff --git a/arch/arm64/include/asm/acenv.h 
->> b/arch/arm64/include/asm/acenv.h
->> new file mode 100644
->> index 0000000..3899ee6
->> --- /dev/null
->> +++ b/arch/arm64/include/asm/acenv.h
->> @@ -0,0 +1,18 @@
->> +/*
->> + * ARM64 specific ACPICA environments and implementation
->> + *
->> + * Copyright (C) 2014, Linaro Ltd.
->> + *   Author: Hanjun Guo <hanjun.guo@linaro.org>
->> + *   Author: Graeme Gregory <graeme.gregory@linaro.org>
->> + *
->> + * This program is free software; you can redistribute it and/or modify
->> + * it under the terms of the GNU General Public License version 2 as
->> + * published by the Free Software Foundation.
->> + */
->> +
->> +#ifndef _ASM_ACENV_H
->> +#define _ASM_ACENV_H
->> +
->> +#define ACPI_FLUSH_CPU_CACHE() WARN_ONCE(1, "Not currently supported 
->> on ARM64")
->> +
->> +#endif /* _ASM_ACENV_H */
->> diff --git a/arch/arm64/include/asm/acpi.h 
->> b/arch/arm64/include/asm/acpi.h
->> new file mode 100644
->> index 0000000..e8581ea
->> --- /dev/null
->> +++ b/arch/arm64/include/asm/acpi.h
->> @@ -0,0 +1,41 @@
->> +/*
->> + *  Copyright (C) 2013-2014, Linaro Ltd.
->> + *     Author: Al Stone <al.stone@linaro.org>
->> + *     Author: Graeme Gregory <graeme.gregory@linaro.org>
->> + *     Author: Hanjun Guo <hanjun.guo@linaro.org>
->> + *
->> + *  This program is free software; you can redistribute it and/or 
->> modify
->> + *  it under the terms of the GNU General Public License version 2 as
->> + *  published by the Free Software Foundation;
->> + */
->> +
->> +#ifndef _ASM_ACPI_H
->> +#define _ASM_ACPI_H
->> +
->> +/* Basic configuration for ACPI */
->> +#ifdef CONFIG_ACPI
->> +extern int acpi_disabled;
->> +extern int acpi_noirq;
->> +extern int acpi_pci_disabled;
->> +extern int acpi_strict;
->
-> Until we need to enable workarounds, we should have acpi_strict
-> as macro rather than variable similar to IA64.
->
->> +
->> +static inline void disable_acpi(void)
->> +{
->> +       acpi_disabled = 1;
->> +       acpi_pci_disabled = 1;
->> +       acpi_noirq = 1;
->> +}
->> +
->> +/*
->> + * MADT must provide at least one GICC structure
->> + * for GIC initialization, so CPU will be
->> + * always available in MADT on ARM64
->> + */
->> +static inline bool acpi_has_cpu_in_madt(void)
->> +{
->> +       return 1;
->> +}
->> +
->
-> I don't see the user of this function in the series, it's better to
-> remove. Moreover the comment is so misleading. We will have CPU UID
-> not the CPU itself in MADT.
->
-This is actually required for a patch that is now upstreamed. Comment 
-should actually say that its checking for the posibility that the CPU 
-can be initialised from the MADT. Its used from core in crash kernel 
-case where boot CPU is not necessarily CPU0 like spec demands.
+>>> I looked at the vmlinux objdump and it is here,
+>>>
+>>> static int lpuart_dma_rx_request(struct uart_port *port)
+>>> {
+>>> ...
+>>> 	sport->dma_rx_timeout = (sport->port.timeout - HZ / 50) *
+>>> 				FSL_UART_RX_DMA_BUFFER_SIZE * 3 /
+>>> 				sport->rxfifo_size / 2;
+>>>
+>>> The variable 'sport->rxfifo_size' is set in lpuart_setup_watermark()
+>>> and this is called after lpuart_dma_rx_request() in
+>>> lpuart_startup().
 
-Graeme
+> I observed this division by zero too, I recently sent a patch for
+> that.
+> http://lists.infradead.org/pipermail/linux-arm-kernel/2014-July/268772.html
 
->> +#endif /* CONFIG_ACPI */
->> +
->> +#endif /*_ASM_ACPI_H*/
->> diff --git a/arch/arm64/include/asm/cpu.h b/arch/arm64/include/asm/cpu.h
->> new file mode 100644
->> index 0000000..cee7d3f
->> --- /dev/null
->> +++ b/arch/arm64/include/asm/cpu.h
->> @@ -0,0 +1,11 @@
->> +/*
->> + *  Copyright (C) 2013-2014 ARM Ltd.
->> + *
->> + * This program is free software; you can redistribute it and/or modify
->> + * it under the terms of the GNU General Public License version 2 as
->> + * published by the Free Software Foundation.
->> + */
->> +#ifndef __ASM_CPU_H
->> +#define __ASM_CPU_H
->> +
->> +#endif
->> diff --git a/arch/arm64/kernel/Makefile b/arch/arm64/kernel/Makefile
->> index cdaedad..b568c26 100644
->> --- a/arch/arm64/kernel/Makefile
->> +++ b/arch/arm64/kernel/Makefile
->> @@ -29,6 +29,7 @@ arm64-obj-$(CONFIG_ARM64_CPU_SUSPEND) += sleep.o 
->> suspend.o
->>   arm64-obj-$(CONFIG_JUMP_LABEL)         += jump_label.o
->>   arm64-obj-$(CONFIG_KGDB)               += kgdb.o
->>   arm64-obj-$(CONFIG_EFI)                        += efi.o efi-stub.o 
->> efi-entry.o
->> +arm64-obj-$(CONFIG_ACPI)               += acpi.o
->>
->>   obj-y                                  += $(arm64-obj-y) vdso/
->>   obj-m                                  += $(arm64-obj-m)
->> diff --git a/arch/arm64/kernel/acpi.c b/arch/arm64/kernel/acpi.c
->> new file mode 100644
->> index 0000000..c62fce6
->> --- /dev/null
->> +++ b/arch/arm64/kernel/acpi.c
->> @@ -0,0 +1,76 @@
->> +/*
->> + *  ARM64 Specific Low-Level ACPI Boot Support
->> + *
->> + *  Copyright (C) 2013-2014, Linaro Ltd.
->> + *     Author: Al Stone <al.stone@linaro.org>
->> + *     Author: Graeme Gregory <graeme.gregory@linaro.org>
->> + *     Author: Hanjun Guo <hanjun.guo@linaro.org>
->> + *
->> + *  This program is free software; you can redistribute it and/or 
->> modify
->> + *  it under the terms of the GNU General Public License version 2 as
->> + *  published by the Free Software Foundation.
->> + */
->> +
->> +#include <linux/init.h>
->> +#include <linux/acpi.h>
->> +#include <linux/cpumask.h>
->> +#include <linux/memblock.h>
->> +#include <linux/irq.h>
->> +#include <linux/irqdomain.h>
->> +#include <linux/bootmem.h>
->> +#include <linux/smp.h>
->> +
->> +/*
->> + * We never plan to use RSDT on arm/arm64 as its deprecated in spec 
->> but this
->> + * variable is still required by the ACPI core
->> + */
->> +u32 acpi_rsdt_forced;
+> Greg already added that to his tty-next tree:
+> https://git.kernel.org/cgit/linux/kernel/git/gregkh/tty.git/tree/drivers/tty/serial/fsl_lpuart.c?h=tty-next#n1309
+
+> I also observed that DMA did not work yet, hence I a created a second
+> patch:
+> http://lists.infradead.org/pipermail/linux-arm-kernel/2014-July/268773.html
 >
-> This looks like yet another stray variable not used anywhere including
-> core ACPI
+> But eDMA in general was broken too, this patch solved that, hence you
+> might want apply that patch too:
+> http://lists.infradead.org/pipermail/linux-arm-kernel/2014-July/268199.html
 >
->> +
->> +int acpi_noirq;                        /* skip ACPI IRQ 
->> initialization */
->> +int acpi_strict;
->> +int acpi_disabled;
->> +EXPORT_SYMBOL(acpi_disabled);
->> +
->> +int acpi_pci_disabled;         /* skip ACPI PCI scan and IRQ 
->> initialization */
->> +EXPORT_SYMBOL(acpi_pci_disabled);
->> +
->> +/*
->> + * __acpi_map_table() will be called before page_init(), so 
->> early_ioremap()
->> + * or early_memremap() should be called here to for ACPI table mapping.
->> + */
->> +char *__init __acpi_map_table(unsigned long phys, unsigned long size)
->> +{
->> +       if (!phys || !size)
->> +               return NULL;
->> +
->> +       return early_memremap(phys, size);
->> +}
->> +
->> +void __init __acpi_unmap_table(char *map, unsigned long size)
->> +{
->> +       if (!map || !size)
->> +               return;
->> +
->> +       early_iounmap(map, size);
->
-> Why not early_memunmap for consistency ?
-> Also now there's generic implementation of early mappings does it make
-> sense to move this also to acpi core ?
->
-> Regards,
-> Sudeep
->
+> All patches are lined up for 3.17, so things should be smooth from
+> that release on.
+
+Thanks, I applied all three patches to the arm-soc 'for-next' and now
+the serial ports seems to be working.  I am using the Tower board and
+they have a 'TWR-SER2' card.
+
+http://www.freescale.com/webapp/sps/site/prod_summary.jsp?code=TWR-SER2
+
+Unfortunately, the IOMUX conflicts with the Audio daughter-board in
+vf610-twr.dts.   The I/O conflicts are,
+
+	VF610_PAD_PTB6__FTM0_CH6
+	VF610_PAD_PTB7__FTM0_CH7
+versus
+        VF610_PAD_PTB6__UART2_TX
+        VF610_PAD_PTB7__UART2_RX
+
+Below are the DT changes to get two 'ttyLP' working with the Tower
+System which probably will never apply cleanly, but are just meant for
+reference.
+
+--- a/arch/arm/boot/dts/vf610-twr.dts
++++ b/arch/arm/boot/dts/vf610-twr.dts
+@@ -58,7 +59,7 @@
+                        regulator-max-microvolt = <3300000>;
+                };
+        };
+-
++/*
+        sound {
+                compatible = "simple-audio-card";
+                simple-audio-card,format = "i2s";
+@@ -87,6 +88,7 @@
+                        bitclock-master;
+                };
+        };
++*/
+ };
+ 
+ &adc0 {
+@@ -241,7 +243,7 @@
+                };
+-
++/*
+                pinctrl_pwm0: pwm0grp {
+                        fsl,pins = <
+                                VF610_PAD_PTB0__FTM0_CH0                0x1582
+@@ -252,7 +254,7 @@
+                                VF610_PAD_PTB7__FTM0_CH7                0x1582
+                        >;
+                };
+-
++*/
+                pinctrl_sai2: sai2grp {
+                        fsl,pins = <
+                                VF610_PAD_PTA16__SAI2_TX_BCLK           0x02ed
+@@ -271,6 +273,13 @@
+                                VF610_PAD_PTB5__UART1_RX                0x21a1
+                        >;
+                };
++
++               pinctrl_uart2: uart2grp {
++                       fsl,pins = <
++                                VF610_PAD_PTB6__UART2_TX                0x21a2
++                                VF610_PAD_PTB7__UART2_RX                0x21a1
++                       >;
++               };
+        };
+ };
+ 
+@@ -284,21 +293,31 @@
+        status = "okay";
+ };
+ 
++/*
+ &pwm0 {
+        pinctrl-names = "default";
+        pinctrl-0 = <&pinctrl_pwm0>;
+        status = "okay";
+ };
+-
+ &sai2 {
+        #sound-dai-cells = <0>;
+        pinctrl-names = "default";
+        pinctrl-0 = <&pinctrl_sai2>;
+        status = "okay";
+ };
+-
++*/
++&uart2 {
++       pinctrl-names = "default";
++       pinctrl-0 = <&pinctrl_uart2>;
++       status = "okay";
++};
+
+The standard jumpers on the Tower will either route ttyLP1 to the 'USB'
+or to the 'serial board'; ttyLP2 will be the opposite with the 'serial
+board' or the 'USB'.
+
+Thanks again.  I should have read the linux-arm list more diligently.
+
+Bill Pringlemeir.
