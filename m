@@ -1,33 +1,47 @@
-From: haojian.zhuang@linaro.org (Haojian Zhuang)
-Date: Mon, 28 Jul 2014 19:41:03 +0800
-Subject: [PATCH v10 04/11] ARM: hisi: enable HiP04
-In-Reply-To: <201407281308.49775.arnd@arndb.de>
-References: <1404957850-13340-1-git-send-email-haojian.zhuang@linaro.org>
- <1404957850-13340-5-git-send-email-haojian.zhuang@linaro.org>
- <201407281308.49775.arnd@arndb.de>
-Message-ID: <CAD6h2NTx5k0VuTiwkCSzyB9rvekvLLS0rp_sCLzoAwyKq0PaOQ@mail.gmail.com>
+From: vinod.koul@intel.com (Vinod Koul)
+Date: Mon, 28 Jul 2014 17:04:46 +0530
+Subject: [PATCH 0/3] ARM/dma: edma: Serve cyclic clients via high
+ priority queue
+In-Reply-To: <1404816398-12338-1-git-send-email-peter.ujfalusi@ti.com>
+References: <1404816398-12338-1-git-send-email-peter.ujfalusi@ti.com>
+Message-ID: <20140728113446.GB8181@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 28 July 2014 19:08, Arnd Bergmann <arnd@arndb.de> wrote:
-> On Thursday 10 July 2014, Haojian Zhuang wrote:
->> --- a/arch/arm/mach-hisi/platmcpm.c
->> +++ b/arch/arm/mach-hisi/platmcpm.c
->> @@ -116,7 +116,6 @@ static int hip04_mcpm_power_up(unsigned int cpu, unsigned int cluster)
->>                CORE_DEBUG_RESET_BIT(cpu);
->>         writel_relaxed(data, sysctrl + SC_CPU_RESET_DREQ(cluster));
->>         spin_unlock_irq(&boot_lock);
->> -       msleep(POLL_MSEC);
->>
->>         return 0;
->>  }
->
-> Is this change intentional? It seems like it should belong into the earlier patch
-> that introduces this file.
->
->         Arnd
+On Tue, Jul 08, 2014 at 01:46:35PM +0300, Peter Ujfalusi wrote:
+> Hi,
+> 
+> It is preferred that audio is served with the highest priority queue in order to
+> avoid delays in data transfer between memory and audio IP.
+> 
+> The following series will add an API to arch code to assign a channel to a given
+> queue.
+> The default queue is changed from 0 (highest priority) to lowest priority.
+> In the dmaengine driver we move the cyclic channel to queue0 (highest priority)
+> and move it back to default queue when the channel is terminated.
 
-Yes, it should belong to the earlier patch. And it's fixed in v12 or v13.
+Applied, thanks
 
-Regards
-Haojian
+-- 
+~Vinod
+
+> 
+> Regards,
+> Peter
+> ---
+> Peter Ujfalusi (3):
+>   ARM: edma: Set default queue to lowest priority
+>   ARM: edma: Add edma_assign_channel_eventq() to move channel to a give
+>     queue
+>   dma: edma: Serve cyclic (audio) channels with high priority queue
+> 
+>  arch/arm/common/edma.c             | 31 ++++++++++++++++++++++++++++++-
+>  drivers/dma/edma.c                 |  8 ++++++++
+>  include/linux/platform_data/edma.h |  2 ++
+>  3 files changed, 40 insertions(+), 1 deletion(-)
+> 
+> -- 
+> 2.0.0
+> 
+
+-- 
