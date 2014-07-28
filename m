@@ -1,76 +1,29 @@
-From: andrew@lunn.ch (Andrew Lunn)
-Date: Mon, 28 Jul 2014 16:12:17 +0200
-Subject: [Patch V2 2/2] i2c: mv64xxx: Remove internal compatible string
- from Documentation
-In-Reply-To: <5514427.elClhaDPhf@wuerfel>
-References: <1406395238-29758-1-git-send-email-andrew@lunn.ch>
- <20140728132251.GN23220@titan.lakedaemon.net>
- <20140728132716.GC2891@lunn.ch> <5514427.elClhaDPhf@wuerfel>
-Message-ID: <20140728141217.GE2891@lunn.ch>
+From: svarbanov@mm-sol.com (Stanimir Varbanov)
+Date: Mon, 28 Jul 2014 17:20:28 +0300
+Subject: [PATCH v3 0/4] Support for Qualcomm QPNP PMIC's
+In-Reply-To: <1406205921-7452-1-git-send-email-svarbanov@mm-sol.com>
+References: <1406205921-7452-1-git-send-email-svarbanov@mm-sol.com>
+Message-ID: <53D65C2C.5020305@mm-sol.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jul 28, 2014 at 03:51:27PM +0200, Arnd Bergmann wrote:
-> On Monday 28 July 2014 15:27:16 Andrew Lunn wrote:
-> > > > diff --git a/Documentation/devicetree/bindings/i2c/i2c-mv64xxx.txt b/Documentation/devicetree/bindings/i2c/i2c-mv64xxx.txt
-> > > > index 5c30026921ae..6eb6f6e40ba1 100644
-> > > > --- a/Documentation/devicetree/bindings/i2c/i2c-mv64xxx.txt
-> > > > +++ b/Documentation/devicetree/bindings/i2c/i2c-mv64xxx.txt
-> > > > @@ -9,11 +9,6 @@ Required properties :
-> > > >                       - "allwinner,sun6i-a31-i2c"
-> > > >                       - "marvell,mv64xxx-i2c"
-> > > >                       - "marvell,mv78230-i2c"
-> > > > -                     - "marvell,mv78230-a0-i2c"
-> > > > -                       * Note: Only use "marvell,mv78230-a0-i2c" for a
-> > > > -                         very rare, initial version of the SoC which
-> > > > -                         had broken offload support.  Linux
-> > > > -                         auto-detects this and sets it appropriately.
-> > > 
-> > > I think we're losing knowledge here.  *We* know that attempting to
-> > > enable transaction offload on A0 SoCs is bad news.  Other OS's would now
-> > > need to dig through the Linux kernel code for clues as to what's
-> > > happening.
-> > > 
-> > > Perhaps we should retain the info in the form of a note at the bottom of
-> > > this file?
-> > 
-> > Hi Jason
-> > 
-> > I did wounder about this a bit. I've not looked, but now that XP
-> > datasheets are public, i assume there is an errata for this, so it at
-> > least should be documented by Marvell. But anybody looking in
-> > /proc/device-tree on an A0 is going to see this undocumented string
-> > which might raise questions.
-> > 
-> > So i'm happy to document it at the end of the binding.
-> > 
-> > Arnd, what do you say?
+Hi all,
+
+On 07/24/2014 03:45 PM, Stanimir Varbanov wrote:
+> Hello all,
 > 
-> The final consequence of the API change would be to no longer
-> change the compatible string in the fixup, but instead to call an
-> API from the driver to find out the SoC revision when it encounters
-> an mv78230-i2c.
+> Changes since v2:
+>  - 1/4 - added new line, signed-off-by / acked-by and module_authors.
+>  - 3/4 - the subject has been changed.
 > 
-> I remember this being discussed when the quirk was initially added,
-> but it seemed cleaner to handle this in the platform code at the time
-> when it was just for one particular board. Now that it's basically
-> an accepted feature of the i2c device that you have to know the
-> SoC version, that should probably become a proper API.
+> The previous v2 can be found at [1].
 > 
-> Also, we now have drivers/soc/ and can move the soc-id code there
-> with a publically documented API.
+> I'm still waiting Acks for:
+>  - 4/4 from Qualcomm folks.
+>  - 2/4 and 3/4 from DT folks.
 
-Getting the SoC ID and revision seems like something that should be
-generic. Would it be better to make this part of drivers/base/soc.c?
-mvebu already does a soc_device_register() with the relevant
-information.
+Can you look at these patches, please.
 
-Add a call something like:
-
-/*
- * Return the soc device attributes for a given soc_dev. If soc_dev is NULL,
- * the first device on the soc bus is returned.
- */
-struct soc_device_attribute *soc_attribute_get(struct soc_device * soc_dev);
-
-       Andrew
+-- 
+regards,
+Stan
