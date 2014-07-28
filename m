@@ -1,33 +1,36 @@
-From: weiyj_lk@163.com (weiyj_lk at 163.com)
-Date: Mon, 28 Jul 2014 21:27:14 +0800
-Subject: [PATCH -next] clk: sunxi: sun6i-apb0-gates: fix sparse non static
- symbol warning
-Message-ID: <1406554034-30266-1-git-send-email-weiyj_lk@163.com>
+From: haojian.zhuang@linaro.org (Haojian Zhuang)
+Date: Mon, 28 Jul 2014 21:27:59 +0800
+Subject: [PATCH v5 0/8] enable Hisilicon HIX5HD2 SoC
+In-Reply-To: <6493871.xlAJItBgfy@wuerfel>
+References: <1406551883-26154-1-git-send-email-haojian.zhuang@linaro.org>
+ <6493871.xlAJItBgfy@wuerfel>
+Message-ID: <CAD6h2NReFUYdydMqNYfE1LbWM_r-5mdT9GOGcj1v2fnzrT=ZAg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Wei Yongjun <yongjun_wei@trendmicro.com.cn>
+On 28 July 2014 21:11, Arnd Bergmann <arnd@arndb.de> wrote:
+> On Monday 28 July 2014 20:51:15 Haojian Zhuang wrote:
+>> Changelog:
+>> v5:
+>>   * Use CPU_OF_DECLARE_METHOD().
+>>   * State "hisilicon,cpuctrl" in documents.
+>>   * Set PL310 L2 aux value in machine descriptor.
+>>   * Use enable-method property for smp in dts file.
+>>   * Move reset code from machine platform driver into power reset driver.
+>>   * Move HIP04 debug uart into another patch series.
+>
+> Looks ok for the most part. I have a trivial comment on patch 8/8,
+> please correct that.
+>
+> The comment on patch 7/8 is more severe. Depending on the hardware
+> requirements, this may end up being much harder to fix, but it
+> needs some discussion. Adding the values only for hi3620 in the
+> meantime should be ok.
+>
+>         Arnd
 
-Fixes the following sparse warnings:
+OK. I'll remove the l2c aux value of hix5hd2 on patch 7/8. And I'll
+use hi3620-smp in patch 8/8.
 
-drivers/clk/sunxi/clk-sun6i-apb0-gates.c:82:27: warning:
- symbol 'sun6i_a31_apb0_gates_clk_dt_ids' was not declared. Should it be static?
-
-Signed-off-by: Wei Yongjun <yongjun_wei@trendmicro.com.cn>
----
- drivers/clk/sunxi/clk-sun6i-apb0-gates.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
-
-diff --git a/drivers/clk/sunxi/clk-sun6i-apb0-gates.c b/drivers/clk/sunxi/clk-sun6i-apb0-gates.c
-index ef5e419..e10d052 100644
---- a/drivers/clk/sunxi/clk-sun6i-apb0-gates.c
-+++ b/drivers/clk/sunxi/clk-sun6i-apb0-gates.c
-@@ -29,7 +29,7 @@ static const struct gates_data sun8i_a23_apb0_gates __initconst = {
- 	.mask = {0x5D},
- };
- 
--const struct of_device_id sun6i_a31_apb0_gates_clk_dt_ids[] = {
-+static const struct of_device_id sun6i_a31_apb0_gates_clk_dt_ids[] = {
- 	{ .compatible = "allwinner,sun6i-a31-apb0-gates-clk", .data = &sun6i_a31_apb0_gates },
- 	{ .compatible = "allwinner,sun8i-a23-apb0-gates-clk", .data = &sun8i_a23_apb0_gates },
- 	{ /* sentinel */ }
+Regards
+Haojian
