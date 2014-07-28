@@ -1,121 +1,90 @@
-From: graeme.gregory@linaro.org (Graeme Gregory)
-Date: Mon, 28 Jul 2014 10:23:57 +0100
-Subject: [PATCH 19/19] Documentation: ACPI for ARM64
-In-Reply-To: <5014834.k6eecMddPC@wuerfel>
-References: <1406206825-15590-1-git-send-email-hanjun.guo@linaro.org>
- <1406206825-15590-20-git-send-email-hanjun.guo@linaro.org>
- <CAOesGMhKHGkVK3dOLXXx9GQBMxDmjBu1WDBgHmwdGe1UK3jfcg@mail.gmail.com>
- <5014834.k6eecMddPC@wuerfel>
-Message-ID: <53D616AD.2090501@linaro.org>
+From: mika.westerberg@linux.intel.com (Mika Westerberg)
+Date: Mon, 28 Jul 2014 12:28:08 +0300
+Subject: [PATCH] spi/pxa2xx-pci: Enable DMA binding through device name
+In-Reply-To: <5426556.OzZIXLrofJ@wuerfel>
+References: <1406196111-22861-1-git-send-email-hock.leong.kweh@intel.com>
+ <20140725090714.GY1857@lahna.fi.intel.com>
+ <20140725095559.GA1857@lahna.fi.intel.com>
+ <5426556.OzZIXLrofJ@wuerfel>
+Message-ID: <20140728092808.GI1857@lahna.fi.intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Fri, Jul 25, 2014 at 12:19:02PM +0200, Arnd Bergmann wrote:
+> On Friday 25 July 2014 12:55:59 Mika Westerberg wrote:
+> > On Fri, Jul 25, 2014 at 12:07:14PM +0300, Mika Westerberg wrote:
+> > > On Fri, Jul 25, 2014 at 10:38:36AM +0200, Arnd Bergmann wrote:
+> > > > On Friday 25 July 2014 11:22:49 Mika Westerberg wrote:
+> > > > > > All you need to do is change your filter function to take the
+> > > > > > slave id from pxa_spi_info and stick it in there, e.g.
+> > > > > > 
+> > > > > > static bool pxa2xx_spi_dw_dma_filter(struct dma_chan *chan, void *param)
+> > > > > > {       
+> > > > > >         const struct pxa2xx_spi_master *pdata = param;
+> > > > > >         struct dw_dma_chan *dwc = to_dw_dma_chan(chan);
+> > > > > >         
+> > > > > >         dwc->request_line = fargs->req;
+> > > > > >         dwc->src_master = 0;
+> > > > > >         dwc->dst_master = 0;
+> > > > > >         
+> > > > > >         return 1;
+> > > > > > }           
+> > > > > 
+> > > > > Oh man. That makes pxa2xx_spi dependent on a certain specific DMA engine
+> > > > > driver.
+> > > > 
+> > > > I think you can improve this by putting the filter function (and a pointer
+> > > > to it) into the pxa2xx_spi_master data provided by the PCI driver.
+> > > 
+> > > Indeed, that looks better. It still makes the PCI part of the driver
+> > > dependent on a particular DMA engine driver but is certainly better than
+> > > the core pxa2xx_spi driver.
+> > 
+> > Something like this?
+> > 
+> > Hock Leong / Chiaue Ee, are you able to check if this works on your BYT
+> > machines?
+> 
+> I think I found a small bug, and one detail that could be improved.
+> 
+> > @@ -321,12 +310,14 @@ int pxa2xx_spi_dma_setup(struct driver_data *drv_data)
+> >  		return -ENOMEM;
+> >  
+> >  	drv_data->tx_chan = dma_request_slave_channel_compat(mask,
+> > -				pxa2xx_spi_dma_filter, pdata, dev, "tx");
+> > +				pdata->dma_filter, pdata->dma_filter_param,
+> > +				dev, "tx");
+> >  	if (!drv_data->tx_chan)
+> >  		return -ENODEV;
+> 
+> If you change this part to pass '(void *)info->tx_slave_id' rather than
+> pdata->dma_filter_param, you can simplify the next code:
 
-On 28/07/2014 10:07, Arnd Bergmann wrote:
-> On Saturday 26 July 2014 19:34:48 Olof Johansson wrote:
->> On Thu, Jul 24, 2014 at 6:00 AM, Hanjun Guo <hanjun.guo@linaro.org> wrote:
->>> +Relationship with Device Tree
->>> +-----------------------------
->>> +
->>> +ACPI support in drivers and subsystems for ARMv8 should never be mutually
->>> +exclusive with DT support at compile time.
->>> +
->>> +At boot time the kernel will only use one description method depending on
->>> +parameters passed from the bootloader.
->> Possibly overriden by kernel bootargs. And as debated for quite a
->> while earlier this year, acpi should still default to off -- if a DT
->> and ACPI are both passed in, DT should at this time be given priority.
-> I think this would be harder to do with the way that ACPI is passed in
-> to the kernel. IIRC, you always have a minimal DT information based on
-> the ARM64 boot protocol, but in the case of ACPI, this contains pointers
-> to the ACPI tables, which are then used for populating the Linux platform
-> devices (unless acpi=disabled is set), while the other contents of the
-> DTB may be present but we skip the of_platform_populate state.
->
-> If this is correct, then replacing the firmware-generated dtb with a
-> user-provided on would implicitly remove the ACPI tables from visibility,
-> which is exactly what we want.
->
-> It's possible that I'm misremembering it though, and it should be
-> documented better.
->
->>> +Regardless of whether DT or ACPI is used, the kernel must always be capable
->>> +of booting with either scheme.
->> It should always be possible to compile out ACPI. There will be plenty
->> of platforms that will not implement it, so disabling CONFIG_ACPI
->> needs to be possible.
-> Right.
->
->>> +Clocks
->>> +------
->>> +
->>> +Like clocks that are part of the power resources there is no standard way
->>> +to represent a clock tree in ACPI 5.1 in a similar manner to how it is
->>> +described in DT.
->>> +
->>> +Devices affected by this include things like UARTs, SoC driven LCD displays,
->>> +etc.
->>> +
->>> +The firmware for example UEFI should initialise these clocks to fixed working
->>> +values before the kernel is executed. If a driver requires to know rates of
->>> +clocks set by firmware then they can be passed to kernel using _DSD.
->>> +
->>> +example :-
->>> +
->>> +Device (CLK0) {
->>> +       ...
->>> +
->>> +       Name (_DSD, Package() {
->>> +               ToUUID("XXXXX"),
->>> +               Package() {
->>> +                       Package(2) {"#clock-cells", 0},
->> Clock-cells? What do they mean here? Is this specified in the ACPI
->> standards? I had to register to get access to it, and didn't feel like
->> doing that right now. I guess it's not _all_ that open a spec. :(
-> ...
->>> +                       Package(2) {"clock-frequency", "10000"}
->>> +               }
->>> +       })
->>> +
->>> +       ...
->>> +}
->>> +
->>> +Device (USR1) {
->>> +       ...
->>> +
->>> +       Name (_DSD, Package() {
->>> +               ToUUID("XXXXX"),
->>> +               Package() {
->>> +                       Package(2) {"clocks", Package() {1, ^CLK0}}},
->> A clock is a device in the ACPI model? Why not just provide the rate
->> as data into the device here? You said you're not trying to model the
->> clock tree, so why reference an external node for it?
-> Exactly. I think what is going on here is a conflict of interests between
-> Intel's embedded ACPI uses and the ARM64 server requirements. The above
-> closely resembles what we do in DT, and that makes perfect sense for
-> Intel's machines so they can reuse a lot of the infrastructure we put
-> in place for DT. I also suspect it will take a few more years before
-> this actually gets accepted into both an ACPI specification and the
-> common operating systems (no point doing it if only Linux is going to
-> adopt it).
->
-> For the servers, I don't see how it makes any sense at all, independent
-> of the architecture, and relying on a feature like this would only serve
-> to delay the adoption of ACPI (whether that is a good or bad thing
-> may be a matter of perspective).
->
-> Maybe Graeme or others can comment on where this is coming from. What kind
-> of driver would actually need to find out the clock rate of a device on
-> an arm64 server? The examples above list "UARTs, SoC driven LCD displays,
-> etc.". For all I know, the UART is required to be PL01x (without DMA)
-> compatible, which should be fully described in ACPI, and I don't see why
-> a server would come with an LCD.
->
->
-The PL011 UART is the use-case I keep hitting, that IP block has a 
-variable input clock on pretty much everything I have seen in the wild. 
-I really hope that this use does not spread beyond a few essential 
-devices like the UART. IMO all real hardware should be the other side of 
-a PCIe bridge.
+OK
 
-Graeme
+> > +static bool pxa2xx_spi_pci_dma_filter(struct dma_chan *chan, void *param)
+> > +{
+> > +	struct dw_dma_chan *dwc = to_dw_dma_chan(chan);
+> > +	const struct pxa_spi_info *info = param;
+> > +
+> > +	if (chan->chan_id == info->tx_chan_id)
+> > +		dwc->request_line = info->tx_slave_id;
+> > +	else if (chan->chan_id == info->rx_chan_id)
+> > +		dwc->request_line = info->rx_slave_id;
+> > +	else
+> > +		return false;
+> > +
+> > +	dwc->src_master = 0;
+> > +	dwc->dst_master = 0;
+> > +
+> > +	return true;
+> > +}
+> 
+> to disregard the tx_chan_id, which is really arbitrary as far as I can tell.
+> 
+> What I think you got wrong here (by following my bad advice) is the master
+> number. Looking at the code for dw_dma, I think src_master needs to be '1'
+> for your driver.
+
+Right, I just copied your example. I'll change it to '1' in the next
+revision.
