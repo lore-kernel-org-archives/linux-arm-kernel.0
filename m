@@ -1,42 +1,47 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Mon, 28 Jul 2014 12:46:17 +0200
-Subject: [PATCH 19/19] Documentation: ACPI for ARM64
-In-Reply-To: <53D616AD.2090501@linaro.org>
-References: <1406206825-15590-1-git-send-email-hanjun.guo@linaro.org>
- <5014834.k6eecMddPC@wuerfel> <53D616AD.2090501@linaro.org>
-Message-ID: <5959830.lpqeqL7HbK@wuerfel>
+From: benoitm@perenite.com (Benoit Masson)
+Date: Mon, 28 Jul 2014 12:50:47 +0200
+Subject: [PATCH 2/2] ARM: mvebu: Added dts defintion for Lenovo Iomega
+ ix4-300d NAS
+In-Reply-To: <5442226.1WCY4fjGCy@wuerfel>
+References: <1406418436-61452-1-git-send-email-yahoo@perenite.com>
+ <20140727015244.GA31974@lunn.ch> <5442226.1WCY4fjGCy@wuerfel>
+Message-ID: <78788908-DDB5-46F8-83C1-FAE312D7BFB2@perenite.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday 28 July 2014 10:23:57 Graeme Gregory wrote:
-> The PL011 UART is the use-case I keep hitting, that IP block has a 
-> variable input clock on pretty much everything I have seen in the wild. 
 
-Ok, I see. What does ACPI-5.1 say about pl011?
+Le 28 juil. 2014 ? 10:49, Arnd Bergmann <arnd@arndb.de> a ?crit :
 
-Interestingly, the subset of pl011 that is specified by SBSA does not
-contain the IBRD/FBRD registers, effectively making it a fixed-rated
-UART (I guess that would be a ART, without the U then), and you
-consequently don't even need to know the clock rate.
+> On Sunday 27 July 2014 03:52:44 Andrew Lunn wrote:
+>> Hi Benoit
 
-However, my guess is that most hardware in the real world contains
-an actual pl011 and it does make a lot of sense to allow setting
-the baud rate on it, which then requires knowing the input clock.
+Hi Arnd,
 
-If there is any hardware that implements just the SBSA-mandated subset
-rather than the full pl011, we should probably implement both
-in the kernel: a dumb driver that can only send and receive, and the
-more complex one that can set the bit rates and flow-control but that
-requires a standardized ACPI table with the input clock rate.
+>> 
+>>> +                     i2c at 11000 {
+>>> +                             compatible = "marvell,mv78230-a0-i2c",
+>>> +                                     "marvell,mv64xxx-i2c";
+>> 
+>> The point of my patches is that you don't need the
+>> "marvell,mv78230-a0-i2c". It will work out at runtime if the SoC is A0
+>> stepping and automatically enable the workaround. Please test with
+>> only "marvell,mv64xxx-i2c";
+>> 
+> 
+> It should still list both "marvell,mv78230-i2c" and "marvell,mv64xxx-i2c",
+> as the generic name may not be enough to describe the register layout
+> correctly.
 
-Whether the two would belong into one file or two separate driver
-modules is something I can't tell, it would be up to the serial
-maintainers to decide.
+I tend to disagree since the dts include the armada-xp.dtsi, which already declare
 
-> I really hope that this use does not spread beyond a few essential 
-> devices like the UART. IMO all real hardware should be the other side of 
-> a PCIe bridge.
+"i2c0: i2c at 11000 {
+				compatible = "marvell,mv78230-i2c", "marvell,mv64xxx-i2c";
+				reg = <0x11000 0x100>;
+			};
+"
 
-I would definitely agree with that.
+I tested the dts on the device and it does inherits the i2c declaration, did I miss something here ?
 
-	Arnd
+Benoit
+
+> 	Arnd
