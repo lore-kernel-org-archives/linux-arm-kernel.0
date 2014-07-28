@@ -1,117 +1,210 @@
 From: josh.wu@atmel.com (Josh Wu)
-Date: Mon, 28 Jul 2014 15:22:47 +0800
-Subject: [PATCH v4 2/3] media: atmel-isi: convert the pdata from pointer to
- structure
+Date: Mon, 28 Jul 2014 15:25:17 +0800
+Subject: [PATCH v4 3/3] media: atmel-isi: add primary DT support
 In-Reply-To: <1406532167-32655-1-git-send-email-josh.wu@atmel.com>
 References: <1406532167-32655-1-git-send-email-josh.wu@atmel.com>
-Message-ID: <1406532167-32655-3-git-send-email-josh.wu@atmel.com>
+Message-ID: <1406532317-32701-1-git-send-email-josh.wu@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Now the platform data is initialized by allocation of isi
-structure. In the future, we use pdata to store the dt parameters.
+This patch add the DT support for Atmel ISI driver.
+It use the same v4l2 DT interface that defined in video-interfaces.txt.
 
 Signed-off-by: Josh Wu <josh.wu@atmel.com>
+Cc: devicetree at vger.kernel.org
+Reviewed-by: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
 ---
 v3 -> v4:
-  no change.
+  When bus width is 10, we support both 8 & 10 bits.
+  Use of_match_ptr().
+  refine the error message.
 
 v2 -> v3:
-  use sizeof(isi->pdata) instead of using sizeof(struct).
+  add bus-width property support.
+  add error handling when calling atmel_isi_probe_dt().
 
- drivers/media/platform/soc_camera/atmel-isi.c | 22 +++++++++++-----------
- 1 file changed, 11 insertions(+), 11 deletions(-)
+v1 -> v2:
+  refine the binding document.
+  add port node description.
+  removed the optional property.
 
+ .../devicetree/bindings/media/atmel-isi.txt        | 51 +++++++++++++++++
+ drivers/media/platform/soc_camera/atmel-isi.c      | 65 +++++++++++++++++++++-
+ 2 files changed, 114 insertions(+), 2 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/media/atmel-isi.txt
+
+diff --git a/Documentation/devicetree/bindings/media/atmel-isi.txt b/Documentation/devicetree/bindings/media/atmel-isi.txt
+new file mode 100644
+index 0000000..17e71b7
+--- /dev/null
++++ b/Documentation/devicetree/bindings/media/atmel-isi.txt
+@@ -0,0 +1,51 @@
++Atmel Image Sensor Interface (ISI) SoC Camera Subsystem
++----------------------------------------------
++
++Required properties:
++- compatible: must be "atmel,at91sam9g45-isi"
++- reg: physical base address and length of the registers set for the device;
++- interrupts: should contain IRQ line for the ISI;
++- clocks: list of clock specifiers, corresponding to entries in
++          the clock-names property;
++- clock-names: must contain "isi_clk", which is the isi peripherial clock.
++
++ISI supports a single port node with parallel bus. It should contain one
++'port' child node with child 'endpoint' node. Please refer to the bindings
++defined in Documentation/devicetree/bindings/media/video-interfaces.txt.
++
++Example:
++	isi: isi at f0034000 {
++		compatible = "atmel,at91sam9g45-isi";
++		reg = <0xf0034000 0x4000>;
++		interrupts = <37 IRQ_TYPE_LEVEL_HIGH 5>;
++
++		clocks = <&isi_clk>;
++		clock-names = "isi_clk";
++
++		pinctrl-names = "default";
++		pinctrl-0 = <&pinctrl_isi>;
++
++		port {
++			#address-cells = <1>;
++			#size-cells = <0>;
++
++			isi_0: endpoint {
++				remote-endpoint = <&ov2640_0>;
++				bus-width = <8>;
++			};
++		};
++	};
++
++	i2c1: i2c at f0018000 {
++		ov2640: camera at 0x30 {
++			compatible = "omnivision,ov2640";
++			reg = <0x30>;
++
++			port {
++				ov2640_0: endpoint {
++					remote-endpoint = <&isi_0>;
++					bus-width = <8>;
++				};
++			};
++		};
++	};
 diff --git a/drivers/media/platform/soc_camera/atmel-isi.c b/drivers/media/platform/soc_camera/atmel-isi.c
-index 802c203..74af560 100644
+index 74af560..e5c1fcf 100644
 --- a/drivers/media/platform/soc_camera/atmel-isi.c
 +++ b/drivers/media/platform/soc_camera/atmel-isi.c
-@@ -84,7 +84,7 @@ struct atmel_isi {
- 	struct clk			*mck;
- 	unsigned int			irq;
+@@ -25,6 +25,7 @@
+ #include <media/atmel-isi.h>
+ #include <media/soc_camera.h>
+ #include <media/soc_mediabus.h>
++#include <media/v4l2-of.h>
+ #include <media/videobuf2-dma-contig.h>
  
--	struct isi_platform_data	*pdata;
-+	struct isi_platform_data	pdata;
- 	u16				width_flags;	/* max 12 bits */
+ #define MAX_BUFFER_NUM			32
+@@ -33,6 +34,7 @@
+ #define VID_LIMIT_BYTES			(16 * 1024 * 1024)
+ #define MIN_FRAME_RATE			15
+ #define FRAME_INTERVAL_MILLI_SEC	(1000 / MIN_FRAME_RATE)
++#define ISI_DEFAULT_MCLK_FREQ		25000000
  
- 	struct list_head		video_buffer_list;
-@@ -350,7 +350,7 @@ static void start_dma(struct atmel_isi *isi, struct frame_buffer *buffer)
+ /* Frame buffer descriptor */
+ struct fbd {
+@@ -883,6 +885,51 @@ static int atmel_isi_remove(struct platform_device *pdev)
+ 	return 0;
+ }
  
- 	cfg1 &= ~ISI_CFG1_FRATE_DIV_MASK;
- 	/* Enable linked list */
--	cfg1 |= isi->pdata->frate | ISI_CFG1_DISCR;
-+	cfg1 |= isi->pdata.frate | ISI_CFG1_DISCR;
++static int atmel_isi_probe_dt(struct atmel_isi *isi,
++			struct platform_device *pdev)
++{
++	struct device_node *np= pdev->dev.of_node;
++	struct v4l2_of_endpoint ep;
++	int err;
++
++	/* Default settings for ISI */
++	isi->pdata.full_mode = 1;
++	isi->pdata.mck_hz = ISI_DEFAULT_MCLK_FREQ;
++	isi->pdata.frate = ISI_CFG1_FRATE_CAPTURE_ALL;
++
++	np = of_graph_get_next_endpoint(np, NULL);
++	if (!np) {
++		dev_err(&pdev->dev, "Could not find the endpoint\n");
++		return -EINVAL;
++	}
++
++	err = v4l2_of_parse_endpoint(np, &ep);
++	if (err) {
++		dev_err(&pdev->dev, "Could not parse the endpoint\n");
++		goto err_probe_dt;
++	}
++
++	switch (ep.bus.parallel.bus_width) {
++	case 8:
++		isi->pdata.data_width_flags = ISI_DATAWIDTH_8;
++		break;
++	case 10:
++		isi->pdata.data_width_flags =
++				ISI_DATAWIDTH_8 | ISI_DATAWIDTH_10;
++		break;
++	default:
++		dev_err(&pdev->dev, "Unsupported bus width: %d\n",
++				ep.bus.parallel.bus_width);
++		err = -EINVAL;
++		goto err_probe_dt;
++	}
++
++err_probe_dt:
++	of_node_put(np);
++
++	return err;
++}
++
+ static int atmel_isi_probe(struct platform_device *pdev)
+ {
+ 	unsigned int irq;
+@@ -894,7 +941,7 @@ static int atmel_isi_probe(struct platform_device *pdev)
+ 	struct isi_platform_data *pdata;
  
- 	/* Enable codec path and ISI */
- 	ctrl = ISI_CTRL_CDC | ISI_CTRL_EN;
-@@ -795,7 +795,7 @@ static int isi_camera_set_bus_param(struct soc_camera_device *icd)
- 	/* Make choises, based on platform preferences */
- 	if ((common_flags & V4L2_MBUS_HSYNC_ACTIVE_HIGH) &&
- 	    (common_flags & V4L2_MBUS_HSYNC_ACTIVE_LOW)) {
--		if (isi->pdata->hsync_act_low)
-+		if (isi->pdata.hsync_act_low)
- 			common_flags &= ~V4L2_MBUS_HSYNC_ACTIVE_HIGH;
- 		else
- 			common_flags &= ~V4L2_MBUS_HSYNC_ACTIVE_LOW;
-@@ -803,7 +803,7 @@ static int isi_camera_set_bus_param(struct soc_camera_device *icd)
- 
- 	if ((common_flags & V4L2_MBUS_VSYNC_ACTIVE_HIGH) &&
- 	    (common_flags & V4L2_MBUS_VSYNC_ACTIVE_LOW)) {
--		if (isi->pdata->vsync_act_low)
-+		if (isi->pdata.vsync_act_low)
- 			common_flags &= ~V4L2_MBUS_VSYNC_ACTIVE_HIGH;
- 		else
- 			common_flags &= ~V4L2_MBUS_VSYNC_ACTIVE_LOW;
-@@ -811,7 +811,7 @@ static int isi_camera_set_bus_param(struct soc_camera_device *icd)
- 
- 	if ((common_flags & V4L2_MBUS_PCLK_SAMPLE_RISING) &&
- 	    (common_flags & V4L2_MBUS_PCLK_SAMPLE_FALLING)) {
--		if (isi->pdata->pclk_act_falling)
-+		if (isi->pdata.pclk_act_falling)
- 			common_flags &= ~V4L2_MBUS_PCLK_SAMPLE_RISING;
- 		else
- 			common_flags &= ~V4L2_MBUS_PCLK_SAMPLE_FALLING;
-@@ -833,9 +833,9 @@ static int isi_camera_set_bus_param(struct soc_camera_device *icd)
- 	if (common_flags & V4L2_MBUS_PCLK_SAMPLE_FALLING)
- 		cfg1 |= ISI_CFG1_PIXCLK_POL_ACTIVE_FALLING;
- 
--	if (isi->pdata->has_emb_sync)
-+	if (isi->pdata.has_emb_sync)
- 		cfg1 |= ISI_CFG1_EMB_SYNC;
--	if (isi->pdata->full_mode)
-+	if (isi->pdata.full_mode)
- 		cfg1 |= ISI_CFG1_FULL_MODE;
- 
- 	isi_writel(isi, ISI_CTRL, ISI_CTRL_DIS);
-@@ -910,7 +910,7 @@ static int atmel_isi_probe(struct platform_device *pdev)
+ 	pdata = dev->platform_data;
+-	if (!pdata || !pdata->data_width_flags) {
++	if ((!pdata || !pdata->data_width_flags) && !pdev->dev.of_node) {
+ 		dev_err(&pdev->dev,
+ 			"No config available for Atmel ISI\n");
+ 		return -EINVAL;
+@@ -910,7 +957,14 @@ static int atmel_isi_probe(struct platform_device *pdev)
  	if (IS_ERR(isi->pclk))
  		return PTR_ERR(isi->pclk);
  
--	isi->pdata = pdata;
-+	memcpy(&isi->pdata, pdata, sizeof(isi->pdata));
+-	memcpy(&isi->pdata, pdata, sizeof(isi->pdata));
++	if (pdata) {
++		memcpy(&isi->pdata, pdata, sizeof(isi->pdata));
++	} else {
++		ret = atmel_isi_probe_dt(isi, pdev);
++		if (ret)
++			return ret;
++	}
++
  	isi->active = NULL;
  	spin_lock_init(&isi->lock);
  	INIT_LIST_HEAD(&isi->video_buffer_list);
-@@ -926,7 +926,7 @@ static int atmel_isi_probe(struct platform_device *pdev)
- 		/* Set ISI_MCK's frequency, it should be faster than pixel
- 		 * clock.
- 		 */
--		ret = clk_set_rate(isi->mck, pdata->mck_hz);
-+		ret = clk_set_rate(isi->mck, isi->pdata.mck_hz);
- 		if (ret < 0)
- 			return ret;
- 	}
-@@ -960,9 +960,9 @@ static int atmel_isi_probe(struct platform_device *pdev)
- 		goto err_ioremap;
- 	}
+@@ -1012,11 +1066,18 @@ err_alloc_ctx:
+ 	return ret;
+ }
  
--	if (pdata->data_width_flags & ISI_DATAWIDTH_8)
-+	if (isi->pdata.data_width_flags & ISI_DATAWIDTH_8)
- 		isi->width_flags = 1 << 7;
--	if (pdata->data_width_flags & ISI_DATAWIDTH_10)
-+	if (isi->pdata.data_width_flags & ISI_DATAWIDTH_10)
- 		isi->width_flags |= 1 << 9;
++static const struct of_device_id atmel_isi_of_match[] = {
++	{ .compatible = "atmel,at91sam9g45-isi" },
++	{ }
++};
++MODULE_DEVICE_TABLE(of, atmel_isi_of_match);
++
+ static struct platform_driver atmel_isi_driver = {
+ 	.remove		= atmel_isi_remove,
+ 	.driver		= {
+ 		.name = "atmel_isi",
+ 		.owner = THIS_MODULE,
++		.of_match_table = of_match_ptr(atmel_isi_of_match),
+ 	},
+ };
  
- 	isi_writel(isi, ISI_CTRL, ISI_CTRL_DIS);
 -- 
 1.9.1
