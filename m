@@ -1,40 +1,33 @@
-From: nsekhar@ti.com (Sekhar Nori)
-Date: Mon, 28 Jul 2014 12:02:17 +0530
-Subject: [PATCH 0/3] ARM/dma: edma: Serve cyclic clients via high priority
- queue
-In-Reply-To: <53D5E9CF.10706@ti.com>
-References: <1404816398-12338-1-git-send-email-peter.ujfalusi@ti.com>
- <53D5E9CF.10706@ti.com>
-Message-ID: <53D5EE71.3040707@ti.com>
+From: josh.wu@atmel.com (Josh Wu)
+Date: Mon, 28 Jul 2014 15:22:45 +0800
+Subject: [PATCH v4 0/3] media: atmel-isi: Add DT support for Atmel ISI driver
+Message-ID: <1406532167-32655-1-git-send-email-josh.wu@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday 28 July 2014 11:42 AM, Peter Ujfalusi wrote:
-> On 07/08/2014 01:46 PM, Peter Ujfalusi wrote:
->> Hi,
->>
->> It is preferred that audio is served with the highest priority queue in order to
->> avoid delays in data transfer between memory and audio IP.
->>
->> The following series will add an API to arch code to assign a channel to a given
->> queue.
->> The default queue is changed from 0 (highest priority) to lowest priority.
+This patch series add DT support for atmel ISI driver. It can support the
+common v4l2 DT interfaces.
 
-This should not really change any performance behavior as everything at
-highest priority is same as everything at lowest priority.
+v3 -> v4:
+  if bus-width set to 10, then we support both 8 bits and 10 bits.
+  misc fix according to Guennadi.
 
->> In the dmaengine driver we move the cyclic channel to queue0 (highest priority)
->> and move it back to default queue when the channel is terminated.
-> 
-> ping?
+v2 -> v3:
+  support bus-width property for atmel-isi endpoint.
 
-For 1/3 and 2/3:
+v1 -> v2:
+  modified the device tree binding document to remove an optonal property.
 
-Acked-by: Sekhar Nori <nsekhar@ti.com>
+Josh Wu (3):
+  atmel-isi: add v4l2 async probe support
+  atmel-isi: convert the pdata from pointer to structure
+  atmel-isi: add primary DT support
 
-Vinod, can you take the series together with your tree (if you are happy
-with the series, that is)? I don't have anything else queued for this
-merge window.
+ .../devicetree/bindings/media/atmel-isi.txt        | 51 ++++++++++++
+ drivers/media/platform/soc_camera/atmel-isi.c      | 90 +++++++++++++++++++---
+ include/media/atmel-isi.h                          |  4 +
+ 3 files changed, 133 insertions(+), 12 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/media/atmel-isi.txt
 
-Thanks,
-Sekhar
+-- 
+1.9.1
