@@ -1,35 +1,61 @@
-From: haojian.zhuang@linaro.org (Haojian Zhuang)
-Date: Mon, 28 Jul 2014 22:02:32 +0800
-Subject: [GIT PULL][for 3.17] pull request for hisilicon soc
-In-Reply-To: <20140728130526.GM23220@titan.lakedaemon.net>
-References: <53D1F2B0.1020603@hisilicon.com> <19341047.6Jx15lyPBg@wuerfel>
- <CAD6h2NRaR+JoAsQt_0uwP5hacqKzFnTUbqToGj6JfEyACoZc+A@mail.gmail.com>
- <5326154.xHtqUP4l2C@wuerfel>
- <20140728130526.GM23220@titan.lakedaemon.net>
-Message-ID: <CAD6h2NQOGy0BeLHjQ4jv-kN74B-DHz5jCwXyo6rgs=WM1rXMiQ@mail.gmail.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Mon, 28 Jul 2014 16:02:47 +0200
+Subject: [PATCH] spi/pxa2xx-pci: Enable DMA binding through device name
+In-Reply-To: <1406554444.8530.45.camel@smile.fi.intel.com>
+References: <1406196111-22861-1-git-send-email-hock.leong.kweh@intel.com>
+ <5712887.nI9VbeNx2r@wuerfel> <1406554444.8530.45.camel@smile.fi.intel.com>
+Message-ID: <120751941.rzCjA94qJu@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 28 July 2014 21:05, Jason Cooper <jason@lakedaemon.net> wrote:
-> Arnd, Marc,
->
->
-> I'd like Marc to review the newest version of the changes to the GIC and
-> Ack before I'll pull them in.  He was on vacation up until today.
-> You'll be able to pull in a tag on irqchip/gic and base off of that if
-> needed.
->
-> Conversely, if you were to move the HiP04 to a separate file, like I
-> asked, (using Mark's suggestion of function pointers, which you've
-> done), I could probably Ack it to go through arm-soc.  There are simply
-> too many changes to irq-gic.c this time around...
->
-> thx,
->
-> Jason.
+On Monday 28 July 2014 16:34:04 Andy Shevchenko wrote:
+> On Mon, 2014-07-28 at 14:47 +0200, Arnd Bergmann wrote:
+> > On Monday 28 July 2014 14:06:20 Andy Shevchenko wrote:
+> > static bool atmci_filter(struct dma_chan *chan, void *pdata)
+> > {
+> >         struct mci_platform_data *sl_pdata = pdata;
+> >         struct mci_dma_data *sl;
+> > 
+> >         if (!sl_pdata)
+> >                 return false;
+> > 
+> >         sl = sl_pdata->dma_slave;
+> >         if (sl && find_slave_dev(sl) == chan->device->dev) {
+> >                 chan->private = slave_data_ptr(sl);
+> >                 return true;
+> >         } else {
+> >                 return false;
+> >         }
+> > }
+> > 
+> > It sets the dw_dma_slave information from  slave_data_ptr(sl) here,
+> > and does not attempt to set a slave_id at all, the slave_config
+> > call only sets the required fields.
+> > 
+> > Do you still see a problem here?
+> 
+> Sorry, I was talking about master defaults regarding to your patch that
+> proposes to remove that part from dw_dmac. I mean it should be set in
+> function mentioned early.
 
-Only the 1/11 (irq patch) is based on your git tree because of GICv3.
-If you could merge it into your git tree, it would be great.
+Ok. So atmci_filter is still correct because chan->private contains
+a pointer to a structure with both request and master settings, right?
 
-Best Regards
-Haojian
+> > c) request line and masters are all configured from avr32/arm32
+> >    platform data.
+> > d) request line and masters are all configured from Bay Trail
+> >    PCI ID (Implemented by Mika's patch)
+> 
+> Actually here I just recall the case when we might have different number
+> of masters and use the same IP block [of SPI controller], how could you
+> distinguish that case? How to provide proper masters?
+> 
+> It's luckily not a problem right now, but still potential one in some
+> cases.
+
+Do you mean case d? I think for each PCI ID, you will have to add the
+correct settings to some table that is used in the filter function.
+
+Are there any cases you know where we can't hardcode them?
+
+	Arnd
