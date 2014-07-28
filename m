@@ -1,69 +1,77 @@
-From: daniel.lezcano@linaro.org (Daniel Lezcano)
-Date: Mon, 28 Jul 2014 09:43:02 +0200
-Subject: [PATCH v3 0/4] ARM: EXYNOS: cpuidle: fix AFTR mode on boards
- with secure firmware enabled
-In-Reply-To: <1404926274-18411-1-git-send-email-b.zolnierkie@samsung.com>
-References: <1404926274-18411-1-git-send-email-b.zolnierkie@samsung.com>
-Message-ID: <53D5FF06.6080904@linaro.org>
+From: wens@csie.org (Chen-Yu Tsai)
+Date: Mon, 28 Jul 2014 16:20:55 +0800
+Subject: [PATCH v4 0/6] ARM: sunxi: RTC support for A31/A23
+Message-ID: <1406535661-25072-1-git-send-email-wens@csie.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/09/2014 07:17 PM, Bartlomiej Zolnierkiewicz wrote:
-> Hi,
->
-> This patch series adds support for AFTR idle mode on boards with
-> secure firmware enabled and allows EXYNOS cpuidle driver usage on
-> Exynos4x12 SoCs.
->
-> It has been tested on Trats2 board (using Exynos4412 SoC with secure
-> firmware enabled) on which AFTR mode reduces power consumption by ~12%
-> when EXYNOS cpuidle driver is enabled (in both cases the default
-> exynos_defconfig config is used and CPU1-3 are offlined).
+Hi everyone,
+
+This is v3 of the sun6i RTC series. This series adds support for
+the RTC in A31 and A23 SoCs. The series applies to sunxi-next.
+
+The A31 has a new RTC block that is separate from the timer block.
+It has separate interrupts for each of the alarms, and a different
+format for the counter alarm. The driver has been tested on the
+A31 Hummingbird, and the A23 tablet I'm using to work on sun8i
+support.
+
+Patch 1 adds the driver for the RTC.
+
+Patch 2 is a minor cleanup. This makes rtc-sunxi depend on sun4i or
+sun7i, the 2 platforms the driver is actually used on.
+
+Patch 3 adds the RTC device node to the sun6i DTSI.
+
+Patch 4 adds the RTC device node to the sun8i DTSI.
+
+Patch 5 adds enables rtc-sun6i in the sunxi defconfig.
+
+Patch 6 adds enables rtc-sun6i in the multi_v7 defconfig.
+This patch applies to arm-soc/next/defconfig (e9a86d96)
+
+Changes since v3:
+  - reformatted all multi-line function calls to have
+    indentation match open parenthesis
+
+Changes since v2:
+  - fixed indentation in DT binding docs
+  - have function argument indentation match open parenthesis
+  - drop driver owner field
+
+Changes since v1:
+  - Enable rtc-sun6i in multi_v7_defconfig
+  - Cleanup the time/date GET/SET macros
+  - Use GENMASK for control register mask
+  - Change Kconfig option to show 'A31'
+  - Remove leftover comment from rtc-sun4i
+  - Remove extra newline
 
 
-Hi Bartlomiej,
+Cheers
+ChenYu
 
-what is the status of this patchset ? Is it supposed to land for 3.17 ?
 
-Thanks
 
-   -- Daniel
+Chen-Yu Tsai (6):
+  rtc: sun6i: Add sun6i RTC driver
+  rtc: sunxi: Depend on platforms sun4i/sun7i that actually have the rtc
+  ARM: dts: sun6i: add rtc device node
+  ARM: dts: sun8i: add rtc device node
+  ARM: sunxi: Add A31 RTC driver to sunxi_defconfig
+  ARM: sunxi: Add A31 RTC driver to multi_v7_defconfig
 
-> v3:
-> - rebased on top of next-20140708 +
->    http://www.mail-archive.com/linux-samsung-soc at vger.kernel.org/msg32809.html
->    (with rejects fixed)
->    http://www.mail-archive.com/linux-samsung-soc at vger.kernel.org/msg32808.html
->    http://www.mail-archive.com/linux-samsung-soc at vger.kernel.org/msg32991.html
->    (with rejects fixed in patch #2)
-> - addressed review comments from Tomasz Figa and Daniel Lezcano
->
-> Best regards,
-> --
-> Bartlomiej Zolnierkiewicz
-> Samsung R&D Institute Poland
-> Samsung Electronics
->
->
-> Bartlomiej Zolnierkiewicz (4):
->    ARM: EXYNOS: PM: replace EXYNOS_BOOT_VECTOR_* macros by static inlines
->    ARM: EXYNOS: add AFTR mode support to firmware do_idle method
->    ARM: EXYNOS: cpuidle: add secure firmware support to AFTR mode code
->    ARM: EXYNOS: cpuidle: allow driver usage on Exynos4x12 SoCs
->
->   arch/arm/include/asm/firmware.h  |  2 +-
->   arch/arm/mach-exynos/common.h    |  7 ++++++-
->   arch/arm/mach-exynos/exynos.c    |  3 ++-
->   arch/arm/mach-exynos/firmware.c  | 36 ++++++++++++++++++++++++++----------
->   arch/arm/mach-exynos/pm.c        | 39 +++++++++++++++++++++++++++++----------
->   drivers/cpuidle/cpuidle-exynos.c |  6 +++---
->   6 files changed, 67 insertions(+), 26 deletions(-)
->
-
+ .../devicetree/bindings/rtc/sun6i-rtc.txt          |  17 +
+ arch/arm/boot/dts/sun6i-a31.dtsi                   |   6 +
+ arch/arm/boot/dts/sun8i-a23.dtsi                   |   6 +
+ arch/arm/configs/multi_v7_defconfig                |   1 +
+ arch/arm/configs/sunxi_defconfig                   |   1 +
+ drivers/rtc/Kconfig                                |   9 +-
+ drivers/rtc/Makefile                               |   1 +
+ drivers/rtc/rtc-sun6i.c                            | 447 +++++++++++++++++++++
+ 8 files changed, 487 insertions(+), 1 deletion(-)
+ create mode 100644 Documentation/devicetree/bindings/rtc/sun6i-rtc.txt
+ create mode 100644 drivers/rtc/rtc-sun6i.c
 
 -- 
-  <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
-
-Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
-<http://twitter.com/#!/linaroorg> Twitter |
-<http://www.linaro.org/linaro-blog/> Blog
+2.0.1
