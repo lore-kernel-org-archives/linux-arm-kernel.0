@@ -1,29 +1,22 @@
-From: sthokal@xilinx.com (Srikanth Thokala)
-Date: Mon, 28 Jul 2014 18:07:03 +0530
-Subject: [PATCH v3 1/2] dma: Add Xilinx AXI DMA DT Binding Documentation
-In-Reply-To: <5511649.HfVoeApiug@wuerfel>
-References: <1406549869-24422-1-git-send-email-sthokal@xilinx.com>
- <5511649.HfVoeApiug@wuerfel>
-Message-ID: <CA+mB=1+cx5VwZZ4iA2UHLjtjJ8tpdXvZCNsZGiB2rNi7SMxW7w@mail.gmail.com>
+From: vikas.sajjan@samsung.com (Vikas Sajjan)
+Date: Mon, 28 Jul 2014 18:07:58 +0530
+Subject: [RESEND][PATCH 0/2] Add support to get PMU address via DT for
+ exynos5260
+Message-ID: <1406551080-14821-1-git-send-email-vikas.sajjan@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jul 28, 2014 at 5:58 PM, Arnd Bergmann <arnd@arndb.de> wrote:
-> On Monday 28 July 2014 17:47:48 Srikanth Thokala wrote:
->> Device-tree binding documentation of Xilinx DMA Engine
->>
->> Signed-off-by: Srikanth Thokala <sthokal@xilinx.com>
->
-> Looks ok to me,
->
-> Acked-by: Arnd Bergmann <arnd@arndb.de>
+rebased on kgene tree for-next branch
+https://git.kernel.org/cgit/linux/kernel/git/kgene/linux-samsung.git/log/?h=for-next
 
-Thanks Arnd.
+Vikas Sajjan (2):
+  ARM: DTS: Add PMU DT node for exynos5260 SoC
+  ARM: EXYNOS: Add exynos5260 PMU compatible string to DT match table
 
-Srikanth
+ .../devicetree/bindings/arm/samsung/pmu.txt        |    1 +
+ arch/arm/boot/dts/exynos5260.dtsi                  |    5 +++++
+ arch/arm/mach-exynos/exynos.c                      |    1 +
+ 3 files changed, 7 insertions(+)
 
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-kernel" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
-> Please read the FAQ at  http://www.tux.org/lkml/
+-- 
+1.7.9.5
