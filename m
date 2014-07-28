@@ -1,16 +1,42 @@
-From: soren.brinkmann@xilinx.com (=?utf-8?B?U8O2cmVu?= Brinkmann)
-Date: Mon, 28 Jul 2014 09:02:35 -0700
-Subject: [PATCH v3] ARM: zynq: DT: Add CAN node
-In-Reply-To: <e3f45b291bb1247787d1092dbe191e852e1758f3.1406539042.git.michal.simek@xilinx.com>
-References: <e3f45b291bb1247787d1092dbe191e852e1758f3.1406539042.git.michal.simek@xilinx.com>
-Message-ID: <61754322-a8f3-4863-8f23-9ca39a4b27fe@BN1BFFO11FD049.protection.gbl>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Mon, 28 Jul 2014 18:03:40 +0200
+Subject: [Patch V2 2/2] i2c: mv64xxx: Remove internal compatible string
+ from Documentation
+In-Reply-To: <20140728155256.GH2891@lunn.ch>
+References: <1406395238-29758-1-git-send-email-andrew@lunn.ch>
+ <30588206.eyRbtryspM@wuerfel> <20140728155256.GH2891@lunn.ch>
+Message-ID: <5484382.ltXF4cCzA4@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 2014-07-28 at 11:17AM +0200, Michal Simek wrote:
-> Add node describing Zynq's CAN controller.
+On Monday 28 July 2014 17:52:56 Andrew Lunn wrote:
+> > > We don't translate into 'Marketing names'. We just turn the register
+> > > values into a stringified number. So it would have to be something
+> > > like:
+> > > 
+> > >         if (soc_name_is("7826") && soc_revision_is("1"))
+> > 
+> > Hmm, I think that is inconsistent with how the strings are used
+> > on other platforms, where you want something that uniquely identifies
+> > the device in user-readable strings.
 > 
-> Signed-off-by: Michal Simek <michal.simek@xilinx.com>
-Reviewed-by: Soren Brinkmann <soren.brinkmann@xilinx.com>
+> Unfortunately, it is not so simple. There are a few different Armada
+> XP SoCs. E.g. dual core and quad core. And this is pretty normal for
+> Marvell. There are maybe 5 different Kirkwoods, a few different
+> Orion5x etc. So at minimum it would of had to be e.g. "Armada XP
+> 7826".
+> 
+> However, it is too late now. This is part of the ABI, and Debian's
+> flash-kernel is making use of this in order to get the right DT blob.
+> So we cannot change it.
+> 
 
-	S?ren
+Ok, I see. Let's hope then that "Marvell" as a family name in combination
+with those numbers remains unique. A driver will probably have to
+check all three, but it could be combined into a single function that
+takes NULL as a don't care argument:
+
+	if (soc_is("Marvell", "7826", NULL))
+		...
+
+	Arnd
