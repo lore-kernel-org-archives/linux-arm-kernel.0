@@ -1,15 +1,14 @@
 From: emilio@elopez.com.ar (=?UTF-8?q?Emilio=20L=C3=B3pez?=)
-Date: Mon, 28 Jul 2014 00:49:42 -0300
-Subject: [RFC 4/8] clk: sunxi: add __iomem markings to MMIO pointers
+Date: Mon, 28 Jul 2014 00:49:43 -0300
+Subject: [RFC 5/8] clk: sunxi: staticize structures and arrays
 In-Reply-To: <1406519386-4902-1-git-send-email-emilio@elopez.com.ar>
 References: <1406519386-4902-1-git-send-email-emilio@elopez.com.ar>
-Message-ID: <1406519386-4902-5-git-send-email-emilio@elopez.com.ar>
+Message-ID: <1406519386-4902-6-git-send-email-emilio@elopez.com.ar>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This commit adds __iomem thoughout the sunxi clock driver, in places
-where it was ommited. This cleans most of the sparse warnings we
-are getting here.
+There are some structs and arrays on the driver that are not used
+anywhere else. Let's mark them as static.
 
 Signed-off-by: Emilio L?pez <emilio@elopez.com.ar>
 ---
@@ -17,71 +16,72 @@ Signed-off-by: Emilio L?pez <emilio@elopez.com.ar>
 These are just non-critical fixes, they can wait until the next release
 if desired, although I feel they're trivial enough to go on -rc1 as well.
 
- drivers/clk/sunxi/clk-a20-gmac.c |  2 +-
- drivers/clk/sunxi/clk-sunxi.c    | 10 +++++-----
- 2 files changed, 6 insertions(+), 6 deletions(-)
+ drivers/clk/sunxi/clk-sun6i-apb0-gates.c | 2 +-
+ drivers/clk/sunxi/clk-sun6i-apb0.c       | 2 +-
+ drivers/clk/sunxi/clk-sun6i-ar100.c      | 4 ++--
+ drivers/clk/sunxi/clk-sun8i-apb0.c       | 2 +-
+ 4 files changed, 5 insertions(+), 5 deletions(-)
 
-diff --git a/drivers/clk/sunxi/clk-a20-gmac.c b/drivers/clk/sunxi/clk-a20-gmac.c
-index 633ddc4..5296fd6 100644
---- a/drivers/clk/sunxi/clk-a20-gmac.c
-+++ b/drivers/clk/sunxi/clk-a20-gmac.c
-@@ -60,7 +60,7 @@ static void __init sun7i_a20_gmac_clk_setup(struct device_node *node)
- 	struct clk_gate *gate;
- 	const char *clk_name = node->name;
- 	const char *parents[SUN7I_A20_GMAC_PARENTS];
--	void *reg;
-+	void __iomem *reg;
+diff --git a/drivers/clk/sunxi/clk-sun6i-apb0-gates.c b/drivers/clk/sunxi/clk-sun6i-apb0-gates.c
+index ef5e419..e10d052 100644
+--- a/drivers/clk/sunxi/clk-sun6i-apb0-gates.c
++++ b/drivers/clk/sunxi/clk-sun6i-apb0-gates.c
+@@ -29,7 +29,7 @@ static const struct gates_data sun8i_a23_apb0_gates __initconst = {
+ 	.mask = {0x5D},
+ };
  
- 	if (of_property_read_string(node, "clock-output-names", &clk_name))
- 		return;
-diff --git a/drivers/clk/sunxi/clk-sunxi.c b/drivers/clk/sunxi/clk-sunxi.c
-index 8975972..b654b7b 100644
---- a/drivers/clk/sunxi/clk-sunxi.c
-+++ b/drivers/clk/sunxi/clk-sunxi.c
-@@ -593,7 +593,7 @@ static struct clk * __init sunxi_factors_clk_setup(struct device_node *node,
- 	struct clk_hw *mux_hw = NULL;
- 	const char *clk_name = node->name;
- 	const char *parents[SUNXI_MAX_PARENTS];
--	void *reg;
-+	void __iomem *reg;
- 	int i = 0;
+-const struct of_device_id sun6i_a31_apb0_gates_clk_dt_ids[] = {
++static const struct of_device_id sun6i_a31_apb0_gates_clk_dt_ids[] = {
+ 	{ .compatible = "allwinner,sun6i-a31-apb0-gates-clk", .data = &sun6i_a31_apb0_gates },
+ 	{ .compatible = "allwinner,sun8i-a23-apb0-gates-clk", .data = &sun8i_a23_apb0_gates },
+ 	{ /* sentinel */ }
+diff --git a/drivers/clk/sunxi/clk-sun6i-apb0.c b/drivers/clk/sunxi/clk-sun6i-apb0.c
+index 11f17c3..1fa2337 100644
+--- a/drivers/clk/sunxi/clk-sun6i-apb0.c
++++ b/drivers/clk/sunxi/clk-sun6i-apb0.c
+@@ -57,7 +57,7 @@ static int sun6i_a31_apb0_clk_probe(struct platform_device *pdev)
+ 	return of_clk_add_provider(np, of_clk_src_simple_get, clk);
+ }
  
- 	reg = of_iomap(node, 0);
-@@ -698,7 +698,7 @@ static void __init sunxi_mux_clk_setup(struct device_node *node,
- 	struct clk *clk;
- 	const char *clk_name = node->name;
- 	const char *parents[SUNXI_MAX_PARENTS];
--	void *reg;
-+	void __iomem *reg;
- 	int i = 0;
+-const struct of_device_id sun6i_a31_apb0_clk_dt_ids[] = {
++static const struct of_device_id sun6i_a31_apb0_clk_dt_ids[] = {
+ 	{ .compatible = "allwinner,sun6i-a31-apb0-clk" },
+ 	{ /* sentinel */ }
+ };
+diff --git a/drivers/clk/sunxi/clk-sun6i-ar100.c b/drivers/clk/sunxi/clk-sun6i-ar100.c
+index f73cc05..eca8ca0 100644
+--- a/drivers/clk/sunxi/clk-sun6i-ar100.c
++++ b/drivers/clk/sunxi/clk-sun6i-ar100.c
+@@ -160,7 +160,7 @@ static int ar100_set_rate(struct clk_hw *hw, unsigned long rate,
+ 	return 0;
+ }
  
- 	reg = of_iomap(node, 0);
-@@ -780,7 +780,7 @@ static void __init sunxi_divider_clk_setup(struct device_node *node,
- 	struct clk *clk;
- 	const char *clk_name = node->name;
- 	const char *clk_parent;
--	void *reg;
-+	void __iomem *reg;
+-struct clk_ops ar100_ops = {
++static struct clk_ops ar100_ops = {
+ 	.recalc_rate = ar100_recalc_rate,
+ 	.determine_rate = ar100_determine_rate,
+ 	.set_parent = ar100_set_parent,
+@@ -213,7 +213,7 @@ static int sun6i_a31_ar100_clk_probe(struct platform_device *pdev)
+ 	return of_clk_add_provider(np, of_clk_src_simple_get, clk);
+ }
  
- 	reg = of_iomap(node, 0);
+-const struct of_device_id sun6i_a31_ar100_clk_dt_ids[] = {
++static const struct of_device_id sun6i_a31_ar100_clk_dt_ids[] = {
+ 	{ .compatible = "allwinner,sun6i-a31-ar100-clk" },
+ 	{ /* sentinel */ }
+ };
+diff --git a/drivers/clk/sunxi/clk-sun8i-apb0.c b/drivers/clk/sunxi/clk-sun8i-apb0.c
+index 196a499..1f5ba9b 100644
+--- a/drivers/clk/sunxi/clk-sun8i-apb0.c
++++ b/drivers/clk/sunxi/clk-sun8i-apb0.c
+@@ -48,7 +48,7 @@ static int sun8i_a23_apb0_clk_probe(struct platform_device *pdev)
+ 	return of_clk_add_provider(np, of_clk_src_simple_get, clk);
+ }
  
-@@ -962,7 +962,7 @@ static void __init sunxi_gates_clk_setup(struct device_node *node,
- 	struct gates_reset_data *reset_data;
- 	const char *clk_parent;
- 	const char *clk_name;
--	void *reg;
-+	void __iomem *reg;
- 	int qty;
- 	int i = 0;
- 	int j = 0;
-@@ -1084,7 +1084,7 @@ static void __init sunxi_divs_clk_setup(struct device_node *node,
- 	struct clk_gate *gate = NULL;
- 	struct clk_fixed_factor *fix_factor;
- 	struct clk_divider *divider;
--	void *reg;
-+	void __iomem *reg;
- 	int i = 0;
- 	int flags, clkflags;
- 
+-const struct of_device_id sun8i_a23_apb0_clk_dt_ids[] = {
++static const struct of_device_id sun8i_a23_apb0_clk_dt_ids[] = {
+ 	{ .compatible = "allwinner,sun8i-a23-apb0-clk" },
+ 	{ /* sentinel */ }
+ };
 -- 
 2.0.3
