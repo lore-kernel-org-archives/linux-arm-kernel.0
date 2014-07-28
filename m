@@ -1,118 +1,29 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Mon, 28 Jul 2014 11:07:50 +0200
-Subject: [PATCH 19/19] Documentation: ACPI for ARM64
-In-Reply-To: <CAOesGMhKHGkVK3dOLXXx9GQBMxDmjBu1WDBgHmwdGe1UK3jfcg@mail.gmail.com>
-References: <1406206825-15590-1-git-send-email-hanjun.guo@linaro.org>
- <1406206825-15590-20-git-send-email-hanjun.guo@linaro.org>
- <CAOesGMhKHGkVK3dOLXXx9GQBMxDmjBu1WDBgHmwdGe1UK3jfcg@mail.gmail.com>
-Message-ID: <5014834.k6eecMddPC@wuerfel>
+From: varkabhadram@gmail.com (Varka Bhadram)
+Date: Mon, 28 Jul 2014 14:37:28 +0530
+Subject: [PATCH v4 1/6] rtc: sun6i: Add sun6i RTC driver
+In-Reply-To: <1406535661-25072-2-git-send-email-wens@csie.org>
+References: <1406535661-25072-1-git-send-email-wens@csie.org>
+ <1406535661-25072-2-git-send-email-wens@csie.org>
+Message-ID: <53D612D0.6030404@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Saturday 26 July 2014 19:34:48 Olof Johansson wrote:
-> On Thu, Jul 24, 2014 at 6:00 AM, Hanjun Guo <hanjun.guo@linaro.org> wrote:
-> > +Relationship with Device Tree
-> > +-----------------------------
-> > +
-> > +ACPI support in drivers and subsystems for ARMv8 should never be mutually
-> > +exclusive with DT support at compile time.
-> > +
-> > +At boot time the kernel will only use one description method depending on
-> > +parameters passed from the bootloader.
-> 
-> Possibly overriden by kernel bootargs. And as debated for quite a
-> while earlier this year, acpi should still default to off -- if a DT
-> and ACPI are both passed in, DT should at this time be given priority.
+On 07/28/2014 01:50 PM, Chen-Yu Tsai wrote:
+> This patch introduces the driver for the RTC in the Allwinner A31 and
+> A23 SoCs.
+>
+> Unlike the RTC found in A10/A20 SoCs, which was part of the timer, the
+> RTC in A31/A23 are a separate hardware block, which also contain a few
+> controls for the RTC block hardware (a regulator and RTC block GPIO pin
+> latches), while also having separate interrupts for the alarms.
+>
+> The hardware is different enough to make a different driver for it.
+>
+> Signed-off-by: Chen-Yu Tsai <wens@csie.org>
+> ---
 
-I think this would be harder to do with the way that ACPI is passed in
-to the kernel. IIRC, you always have a minimal DT information based on
-the ARM64 boot protocol, but in the case of ACPI, this contains pointers
-to the ACPI tables, which are then used for populating the Linux platform
-devices (unless acpi=disabled is set), while the other contents of the
-DTB may be present but we skip the of_platform_populate state.
+Reviewed-by: Varka Bhadram <varkabhadram@gmail.com>
 
-If this is correct, then replacing the firmware-generated dtb with a
-user-provided on would implicitly remove the ACPI tables from visibility,
-which is exactly what we want.
-
-It's possible that I'm misremembering it though, and it should be
-documented better.
-
-> > +Regardless of whether DT or ACPI is used, the kernel must always be capable
-> > +of booting with either scheme.
-> 
-> It should always be possible to compile out ACPI. There will be plenty
-> of platforms that will not implement it, so disabling CONFIG_ACPI
-> needs to be possible.
-
-Right.
-
-> > +Clocks
-> > +------
-> > +
-> > +Like clocks that are part of the power resources there is no standard way
-> > +to represent a clock tree in ACPI 5.1 in a similar manner to how it is
-> > +described in DT.
-> > +
-> > +Devices affected by this include things like UARTs, SoC driven LCD displays,
-> > +etc.
-> > +
-> > +The firmware for example UEFI should initialise these clocks to fixed working
-> > +values before the kernel is executed. If a driver requires to know rates of
-> > +clocks set by firmware then they can be passed to kernel using _DSD.
-> > +
-> > +example :-
-> > +
-> > +Device (CLK0) {
-> > +       ...
-> > +
-> > +       Name (_DSD, Package() {
-> > +               ToUUID("XXXXX"),
-> > +               Package() {
-> > +                       Package(2) {"#clock-cells", 0},
-> 
-> Clock-cells? What do they mean here? Is this specified in the ACPI
-> standards? I had to register to get access to it, and didn't feel like
-> doing that right now. I guess it's not _all_ that open a spec. :(
-...
-> > +                       Package(2) {"clock-frequency", "10000"}
-> > +               }
-> > +       })
-> > +
-> > +       ...
-> > +}
-> > +
-> > +Device (USR1) {
-> > +       ...
-> > +
-> > +       Name (_DSD, Package() {
-> > +               ToUUID("XXXXX"),
-> > +               Package() {
-> > +                       Package(2) {"clocks", Package() {1, ^CLK0}}},
-> 
-> A clock is a device in the ACPI model? Why not just provide the rate
-> as data into the device here? You said you're not trying to model the
-> clock tree, so why reference an external node for it?
-
-Exactly. I think what is going on here is a conflict of interests between
-Intel's embedded ACPI uses and the ARM64 server requirements. The above
-closely resembles what we do in DT, and that makes perfect sense for
-Intel's machines so they can reuse a lot of the infrastructure we put
-in place for DT. I also suspect it will take a few more years before
-this actually gets accepted into both an ACPI specification and the
-common operating systems (no point doing it if only Linux is going to
-adopt it).
-
-For the servers, I don't see how it makes any sense at all, independent
-of the architecture, and relying on a feature like this would only serve
-to delay the adoption of ACPI (whether that is a good or bad thing
-may be a matter of perspective).
-
-Maybe Graeme or others can comment on where this is coming from. What kind
-of driver would actually need to find out the clock rate of a device on
-an arm64 server? The examples above list "UARTs, SoC driven LCD displays,
-etc.". For all I know, the UART is required to be PL01x (without DMA)
-compatible, which should be fully described in ACPI, and I don't see why
-a server would come with an LCD.
-
-	Arnd
+-- 
+Regards,
+Varka Bhadram.
