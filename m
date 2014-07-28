@@ -1,327 +1,57 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Mon, 28 Jul 2014 19:00:54 +0100
-Subject: [PATCH v15 11/12] virt: arm: support hip04 gic
-In-Reply-To: <1406555876-11989-12-git-send-email-haojian.zhuang@linaro.org>
- (Haojian Zhuang's message of "Mon, 28 Jul 2014 14:57:55 +0100")
-References: <1406555876-11989-1-git-send-email-haojian.zhuang@linaro.org>
- <1406555876-11989-12-git-send-email-haojian.zhuang@linaro.org>
-Message-ID: <8761ihnz1l.fsf@approximate.cambridge.arm.com>
+From: bp@alien8.de (Borislav Petkov)
+Date: Mon, 28 Jul 2014 20:01:36 +0200
+Subject: [RFC PATCH v3] edac: synps: Added EDAC support for zynq ddr ecc
+ controller
+In-Reply-To: <CAGnW=BaEn7mjW3fmCcuyqgsgG=L_j_1zwK9kXAsx9GsBbOXXfA@mail.gmail.com>
+References: <64d65965-45a3-41c3-9b04-9743b8b1e49c@BL2FFO11FD025.protection.gbl>
+ <20140728113446.GA5350@pd.tnic>
+ <CAGnW=BaEn7mjW3fmCcuyqgsgG=L_j_1zwK9kXAsx9GsBbOXXfA@mail.gmail.com>
+Message-ID: <20140728180136.GB7100@pd.tnic>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jul 28 2014 at  2:57:55 pm BST, Haojian Zhuang <haojian.zhuang@linaro.org> wrote:
-> In ARM standard GIC, GICH_APR offset is 0xf0 & GICH_LR0 offset is 0x100.
-> In HiP04 GIC, GICH_APR offset is 0x70 & GICH_LR0 offset is 0x80.
->
-> Now reuse the nr_lr field in struct vgic_cpu. Bit[31:16] is used to store
-> GICH_APR offset in HiP04, and bit[15:0] is used to store real nr_lr
-> variable. In ARM standard GIC, don't set bit[31:16]. So we could avoid
-> to change the VGIC implementation in arm64.
->
-> Signed-off-by: Haojian Zhuang <haojian.zhuang@linaro.org>
-> ---
->  arch/arm/kernel/asm-offsets.c   |  2 +-
->  arch/arm/kvm/interrupts_head.S  | 29 +++++++++++++++++++++++------
->  arch/arm64/kernel/asm-offsets.c |  2 +-
->  arch/arm64/kvm/hyp.S            |  4 ++--
->  include/kvm/arm_vgic.h          |  7 +++++--
->  include/linux/irqchip/arm-gic.h |  6 ++++++
->  virt/kvm/arm/vgic.c             | 37 ++++++++++++++++++++++++++-----------
->  7 files changed, 64 insertions(+), 23 deletions(-)
->
-> diff --git a/arch/arm/kernel/asm-offsets.c b/arch/arm/kernel/asm-offsets.c
-> index 85598b5..166cc98 100644
-> --- a/arch/arm/kernel/asm-offsets.c
-> +++ b/arch/arm/kernel/asm-offsets.c
-> @@ -189,7 +189,7 @@ int main(void)
->    DEFINE(VGIC_CPU_ELRSR,	offsetof(struct vgic_cpu, vgic_elrsr));
->    DEFINE(VGIC_CPU_APR,		offsetof(struct vgic_cpu, vgic_apr));
->    DEFINE(VGIC_CPU_LR,		offsetof(struct vgic_cpu, vgic_lr));
-> -  DEFINE(VGIC_CPU_NR_LR,	offsetof(struct vgic_cpu, nr_lr));
-> +  DEFINE(VGIC_CPU_HW_CFG,	offsetof(struct vgic_cpu, hw_cfg));
->  #ifdef CONFIG_KVM_ARM_TIMER
->    DEFINE(VCPU_TIMER_CNTV_CTL,	offsetof(struct kvm_vcpu, arch.timer_cpu.cntv_ctl));
->    DEFINE(VCPU_TIMER_CNTV_CVAL,	offsetof(struct kvm_vcpu, arch.timer_cpu.cntv_cval));
-> diff --git a/arch/arm/kvm/interrupts_head.S b/arch/arm/kvm/interrupts_head.S
-> index 76af9302..9fbbf99 100644
-> --- a/arch/arm/kvm/interrupts_head.S
-> +++ b/arch/arm/kvm/interrupts_head.S
-> @@ -419,7 +419,9 @@ vcpu	.req	r0		@ vcpu pointer always in r0
->  	ldr	r7, [r2, #GICH_EISR1]
->  	ldr	r8, [r2, #GICH_ELRSR0]
->  	ldr	r9, [r2, #GICH_ELRSR1]
-> -	ldr	r10, [r2, #GICH_APR]
-> +	ldr	r10, [r11, #VGIC_CPU_HW_CFG]
-> +	mov	r10, r10, lsr #HWCFG_APR_SHIFT
-> +	ldr	r10, [r2, r10]
->  
->  	str	r3, [r11, #VGIC_CPU_HCR]
->  	str	r4, [r11, #VGIC_CPU_VMCR]
-> @@ -435,9 +437,15 @@ vcpu	.req	r0		@ vcpu pointer always in r0
->  	str	r5, [r2, #GICH_HCR]
->  
->  	/* Save list registers */
-> -	add	r2, r2, #GICH_LR0
-> +	ldr	r4, [r11, #VGIC_CPU_HW_CFG]
-> +	mov	r10, r4, lsr #HWCFG_APR_SHIFT
-> +	/* the offset between GICH_APR & GICH_LR0 is 0x10 */
-> +	add	r10, r10, #0x10
-> +	add	r2, r2, r10
->  	add	r3, r11, #VGIC_CPU_LR
-> -	ldr	r4, [r11, #VGIC_CPU_NR_LR]
-> +	/* Get NR_LR from VGIC_CPU_HW_CFG */
-> +	ldr	r6, =HWCFG_NR_LR_MASK
-> +	and	r4, r4, r6
+On Mon, Jul 28, 2014 at 10:53:26PM +0530, punnaiah choudary kalluri wrote:
+> I can agree with you that we can use shorter names.But ZYNQ has
+> programmable logic next to processing system where one can add soft
+> memory controller in the same system and may use different driver. So,
+> the edac driver for zynq may include multiple drivers for different
+> memory controllers in the same file. In this case it is difficult to
+> maintain generic macros as you suggested above.
 
-Use "ubfx r4, r4, #0, #16" instead (with the proper symbolic constants,
-of course). It will save loading this mask from the constant pool. For
-consistency, you can also replace the above mov+lsr with the same
-mechanism.
+So?
 
->  1:	ldr	r6, [r2], #4
->  	str	r6, [r3], #4
->  	subs	r4, r4, #1
-> @@ -469,12 +477,21 @@ vcpu	.req	r0		@ vcpu pointer always in r0
->  
->  	str	r3, [r2, #GICH_HCR]
->  	str	r4, [r2, #GICH_VMCR]
-> -	str	r8, [r2, #GICH_APR]
-> +	ldr	r6, [r11, #VGIC_CPU_HW_CFG]
-> +	mov	r6, r6, lsr #HWCFG_APR_SHIFT
-> +	str	r8, [r2, r6]
->  
->  	/* Restore list registers */
-> -	add	r2, r2, #GICH_LR0
-> +	ldr	r4, [r11, #VGIC_CPU_HW_CFG]
-> +	mov	r6, r4, lsr #HWCFG_APR_SHIFT
-> +	/* the offset between GICH_APR & GICH_LR0 is 0x10 */
-> +	add	r6, r6, #0x10
-> +	/* get offset of GICH_LR0 */
-> +	add	r2, r2, r6
-> +	/* Get NR_LR from VGIC_CPU_HW_CFG */
->  	add	r3, r11, #VGIC_CPU_LR
-> -	ldr	r4, [r11, #VGIC_CPU_NR_LR]
-> +	ldr	r6, =HWCFG_NR_LR_MASK
-> +	and	r4, r4, r6
+You can still shorten them a bit - the current names are awfully long.
+SYNPS_DDRC_ECC_ is too much information, for example. We know it is DDR
+and we know it is about ECC. So do SYNPS and ZYNQ or OTHER or whatever
+you wanna call it prefix and then the rest. I.e.,
 
-Same here.
+    SYNPS_<reg>_<bits*>
+    ZYNQ_<reg>_bits*>
 
->  1:	ldr	r6, [r3], #4
->  	str	r6, [r2], #4
->  	subs	r4, r4, #1
-> diff --git a/arch/arm64/kernel/asm-offsets.c b/arch/arm64/kernel/asm-offsets.c
-> index 646f888..2422358 100644
-> --- a/arch/arm64/kernel/asm-offsets.c
-> +++ b/arch/arm64/kernel/asm-offsets.c
-> @@ -136,7 +136,7 @@ int main(void)
->    DEFINE(VGIC_CPU_ELRSR,	offsetof(struct vgic_cpu, vgic_elrsr));
->    DEFINE(VGIC_CPU_APR,		offsetof(struct vgic_cpu, vgic_apr));
->    DEFINE(VGIC_CPU_LR,		offsetof(struct vgic_cpu, vgic_lr));
-> -  DEFINE(VGIC_CPU_NR_LR,	offsetof(struct vgic_cpu, nr_lr));
-> +  DEFINE(VGIC_CPU_HW_CFG,	offsetof(struct vgic_cpu, hw_cfg));
->    DEFINE(KVM_VTTBR,		offsetof(struct kvm, arch.vttbr));
->    DEFINE(KVM_VGIC_VCTRL,	offsetof(struct kvm, arch.vgic.vctrl_base));
->  #endif
-> diff --git a/arch/arm64/kvm/hyp.S b/arch/arm64/kvm/hyp.S
-> index b0d1512..2dbe337 100644
-> --- a/arch/arm64/kvm/hyp.S
-> +++ b/arch/arm64/kvm/hyp.S
-> @@ -426,7 +426,7 @@ CPU_BE(	rev	w11, w11 )
->  
->  	/* Save list registers */
->  	add	x2, x2, #GICH_LR0
-> -	ldr	w4, [x3, #VGIC_CPU_NR_LR]
-> +	ldr	w4, [x3, #VGIC_CPU_HW_CFG]
+You can even use single letter prefixes like S_ and Z_ and add a comment
+explaining what those mean. Still much more readable than the long
+repeating prefixes currently.
 
-Have you tested this? It looks to me that you're not dropping the top
-bits, so you're going to end-up with 0x1000004 list registers instead of
-the expected 4 with GIC-400...
+> Also the current edac framework for edac memory controllers is
+> expecting the mc_num from the driver while allocating the memory
+> controller instance using the edac_mc_alloc function. This requirement
+> mandates that if the system contains two different memory controllers
+> then the corresponding edac drivers should be in single file.
 
->  	add	x3, x3, #VGIC_CPU_LR
->  1:	ldr	w5, [x2], #4
->  CPU_BE(	rev	w5, w5 )
-> @@ -465,7 +465,7 @@ CPU_BE(	rev	w6, w6 )
->  
->  	/* Restore list registers */
->  	add	x2, x2, #GICH_LR0
-> -	ldr	w4, [x3, #VGIC_CPU_NR_LR]
-> +	ldr	w4, [x3, #VGIC_CPU_HW_CFG]
+So you're telling me that you want one edac driver for *two* memory
+controllers which can be present on a single system *at* *the* *same*
+*time*? Is that it?
 
-Same here.
+How exactly is that topology supposed to look like, work, etc, etc? What
+kind of error reporting do you imagine you want to do with EDAC?
 
->  	add	x3, x3, #VGIC_CPU_LR
->  1:	ldr	w5, [x3], #4
->  CPU_BE(	rev	w5, w5 )
-> diff --git a/include/kvm/arm_vgic.h b/include/kvm/arm_vgic.h
-> index f27000f..eba4b51 100644
-> --- a/include/kvm/arm_vgic.h
-> +++ b/include/kvm/arm_vgic.h
-> @@ -122,8 +122,11 @@ struct vgic_cpu {
->  	/* Bitmap of used/free list registers */
->  	DECLARE_BITMAP(	lr_used, VGIC_MAX_LRS);
->  
-> -	/* Number of list registers on this CPU */
-> -	int		nr_lr;
-> +	/*
-> +	 * bit[31:16]: GICH_APR offset
-> +	 * bit[15:0]:  Number of list registers on this CPU
-> +	 */
-> +	u32		hw_cfg;
->  
->  	/* CPU vif control registers for world switch */
->  	u32		vgic_hcr;
-> diff --git a/include/linux/irqchip/arm-gic.h b/include/linux/irqchip/arm-gic.h
-> index 45e2d8c..b055f92 100644
-> --- a/include/linux/irqchip/arm-gic.h
-> +++ b/include/linux/irqchip/arm-gic.h
-> @@ -49,6 +49,8 @@
->  #define GICH_ELRSR1 			0x34
->  #define GICH_APR			0xf0
->  #define GICH_LR0			0x100
-> +#define HIP04_GICH_APR			0x70
-> +/* GICH_LR0 offset in HiP04 is 0x80 */
->  
->  #define GICH_HCR_EN			(1 << 0)
->  #define GICH_HCR_UIE			(1 << 1)
-> @@ -73,6 +75,10 @@
->  #define GICH_MISR_EOI			(1 << 0)
->  #define GICH_MISR_U			(1 << 1)
->  
-> +#define HWCFG_NR_LR_MASK	0xffff
-> +#define HWCFG_APR_SHIFT		16
-> +#define HWCFG_APR_MASK		(0xffff << HWCFG_APR_SHIFT)
-> +
->  #ifndef __ASSEMBLY__
->  
->  struct device_node;
-> diff --git a/virt/kvm/arm/vgic.c b/virt/kvm/arm/vgic.c
-> index 56ff9be..6c0ee89 100644
-> --- a/virt/kvm/arm/vgic.c
-> +++ b/virt/kvm/arm/vgic.c
-> @@ -97,7 +97,7 @@ static void vgic_retire_disabled_irqs(struct kvm_vcpu *vcpu);
->  static void vgic_update_state(struct kvm *kvm);
->  static void vgic_kick_vcpus(struct kvm *kvm);
->  static void vgic_dispatch_sgi(struct kvm_vcpu *vcpu, u32 reg);
-> -static u32 vgic_nr_lr;
-> +static u32 vgic_hw_cfg, vgic_nr_lr;
->  
->  static unsigned int vgic_maint_irq;
->  
-> @@ -625,7 +625,7 @@ static void vgic_unqueue_irqs(struct kvm_vcpu *vcpu)
->  	int i, irq, source_cpu;
->  	u32 *lr;
->  
-> -	for_each_set_bit(i, vgic_cpu->lr_used, vgic_cpu->nr_lr) {
-> +	for_each_set_bit(i, vgic_cpu->lr_used, vgic_nr_lr) {
->  		lr = &vgic_cpu->vgic_lr[i];
->  		irq = LR_IRQID(*lr);
->  		source_cpu = LR_CPUID(*lr);
-> @@ -1006,7 +1006,7 @@ static void vgic_retire_disabled_irqs(struct kvm_vcpu *vcpu)
->  	struct vgic_cpu *vgic_cpu = &vcpu->arch.vgic_cpu;
->  	int lr;
->  
-> -	for_each_set_bit(lr, vgic_cpu->lr_used, vgic_cpu->nr_lr) {
-> +	for_each_set_bit(lr, vgic_cpu->lr_used, vgic_nr_lr) {
->  		int irq = vgic_cpu->vgic_lr[lr] & GICH_LR_VIRTUALID;
->  
->  		if (!vgic_irq_is_enabled(vcpu, irq)) {
-> @@ -1047,8 +1047,8 @@ static bool vgic_queue_irq(struct kvm_vcpu *vcpu, u8 sgi_source_id, int irq)
->  
->  	/* Try to use another LR for this interrupt */
->  	lr = find_first_zero_bit((unsigned long *)vgic_cpu->lr_used,
-> -			       vgic_cpu->nr_lr);
-> -	if (lr >= vgic_cpu->nr_lr)
-> +				 vgic_nr_lr);
-> +	if (lr >= vgic_nr_lr)
->  		return false;
->  
->  	kvm_debug("LR%d allocated for IRQ%d %x\n", lr, irq, sgi_source_id);
-> @@ -1183,7 +1183,7 @@ static bool vgic_process_maintenance(struct kvm_vcpu *vcpu)
->  		int lr, irq;
->  
->  		for_each_set_bit(lr, (unsigned long *)vgic_cpu->vgic_eisr,
-> -				 vgic_cpu->nr_lr) {
-> +				 vgic_nr_lr) {
->  			irq = vgic_cpu->vgic_lr[lr] & GICH_LR_VIRTUALID;
->  
->  			vgic_irq_clear_active(vcpu, irq);
-> @@ -1227,7 +1227,7 @@ static void __kvm_vgic_sync_hwstate(struct kvm_vcpu *vcpu)
->  
->  	/* Clear mappings for empty LRs */
->  	for_each_set_bit(lr, (unsigned long *)vgic_cpu->vgic_elrsr,
-> -			 vgic_cpu->nr_lr) {
-> +			 vgic_nr_lr) {
->  		int irq;
->  
->  		if (!test_and_clear_bit(lr, vgic_cpu->lr_used))
-> @@ -1241,8 +1241,8 @@ static void __kvm_vgic_sync_hwstate(struct kvm_vcpu *vcpu)
->  
->  	/* Check if we still have something up our sleeve... */
->  	pending = find_first_zero_bit((unsigned long *)vgic_cpu->vgic_elrsr,
-> -				      vgic_cpu->nr_lr);
-> -	if (level_pending || pending < vgic_cpu->nr_lr)
-> +				      vgic_nr_lr);
-> +	if (level_pending || pending < vgic_nr_lr)
->  		set_bit(vcpu->vcpu_id, &dist->irq_pending_on_cpu);
->  }
->  
-> @@ -1438,7 +1438,7 @@ int kvm_vgic_vcpu_init(struct kvm_vcpu *vcpu)
->  	 */
->  	vgic_cpu->vgic_vmcr = 0;
->  
-> -	vgic_cpu->nr_lr = vgic_nr_lr;
-> +	vgic_cpu->hw_cfg = vgic_hw_cfg;
->  	vgic_cpu->vgic_hcr = GICH_HCR_EN; /* Get the show on the road... */
->  
->  	return 0;
-> @@ -1470,17 +1470,31 @@ static struct notifier_block vgic_cpu_nb = {
->  	.notifier_call = vgic_cpu_notify,
->  };
->  
-> +static const struct of_device_id of_vgic_ids[] = {
-> +	{
-> +		.compatible = "arm,cortex-a15-gic",
-> +		.data = (void *)GICH_APR,
-> +	}, {
-> +		.compatible = "hisilicon,hip04-gic",
-> +		.data = (void *)HIP04_GICH_APR,
-> +	}, {
-> +	},
-> +};
-> +
->  int kvm_vgic_hyp_init(void)
->  {
->  	int ret;
->  	struct resource vctrl_res;
->  	struct resource vcpu_res;
-> +	const struct of_device_id *match;
->  
-> -	vgic_node = of_find_compatible_node(NULL, NULL, "arm,cortex-a15-gic");
-> +	vgic_node = of_find_matching_node_and_match(NULL, of_vgic_ids, &match);
->  	if (!vgic_node) {
->  		kvm_err("error: no compatible vgic node in DT\n");
->  		return -ENODEV;
->  	}
-> +	/* High word of vgic_hw_cfg is the offset of GICH_APR. */
-> +	vgic_hw_cfg = (unsigned long)match->data << HWCFG_APR_SHIFT;
->  
->  	vgic_maint_irq = irq_of_parse_and_map(vgic_node, 0);
->  	if (!vgic_maint_irq) {
-> @@ -1517,6 +1531,7 @@ int kvm_vgic_hyp_init(void)
->  
->  	vgic_nr_lr = readl_relaxed(vgic_vctrl_base + GICH_VTR);
->  	vgic_nr_lr = (vgic_nr_lr & 0x3f) + 1;
-> +	vgic_hw_cfg |= vgic_nr_lr;
->  
->  	ret = create_hyp_io_mappings(vgic_vctrl_base,
->  				     vgic_vctrl_base + resource_size(&vctrl_res),
+IOW, more info would be appreciated.
 
-Most of this is going to conflict very badly with the rest of the GICv3
-patch series which is already queued for 3.17. You'll have to rebase it
-on top of the current kvmarm/queue branch.
+Thanks.
 
-Thanks,
-
-	M.
 -- 
-Jazz is not dead. It just smells funny.
+Regards/Gruss,
+    Boris.
+
+Sent from a fat crate under my desk. Formatting is fine.
+--
