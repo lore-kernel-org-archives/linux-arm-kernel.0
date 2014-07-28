@@ -1,31 +1,55 @@
-From: afaerber@suse.de (=?UTF-8?B?QW5kcmVhcyBGw6RyYmVy?=)
-Date: Mon, 28 Jul 2014 20:02:28 +0200
-Subject: [PATCH] MAINTAINERS: Update Tegra Git URL
-In-Reply-To: <53D68F5F.6050109@wwwdotorg.org>
-References: <1406568643-2047-1-git-send-email-afaerber@suse.de>
- <53D68F5F.6050109@wwwdotorg.org>
-Message-ID: <53D69034.6080302@suse.de>
+From: leif.lindholm@linaro.org (Leif Lindholm)
+Date: Mon, 28 Jul 2014 19:03:03 +0100
+Subject: [PATCH] arm64: ignore DT memreserve entries when booting in UEFI mode
+Message-ID: <1406570583-22848-1-git-send-email-leif.lindholm@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am 28.07.2014 19:58, schrieb Stephen Warren:
-> On 07/28/2014 11:30 AM, Andreas F?rber wrote:
->> swarren/linux-tegra.git does not exist, it's tegra/linux.git.
-> 
-> FWIW, there is a redirect in place, so "git clone" on the old URL works
-> fine. Still, we should indeed update the MAINTAINERS entry to point at
-> the correct location.
+UEFI provides its own method for marking regions to reserve, via the
+memory map which is also used to initialise memblock. So when using the
+UEFI memory map, ignore any memreserve entries present in the DT.
 
-http://git.kernel.org/cgit/linux/kernel/git/swarren/linux-tegra.git does
-not redirect unfortunately.
+Reported-by: Mark Rutland <mark.rutland@arm.com>
+Signed-off-by: Leif Lindholm <leif.lindholm@linaro.org>
+---
+ arch/arm64/kernel/efi.c |    2 ++
+ arch/arm64/mm/init.c    |    4 +++-
+ 2 files changed, 5 insertions(+), 1 deletion(-)
 
-> I'll forward this on to arm at kernel.org to be applied.
-
-Feel free to edit the commit message to your liking.
-
-Thanks,
-Andreas
-
+diff --git a/arch/arm64/kernel/efi.c b/arch/arm64/kernel/efi.c
+index 14db1f6..7ad17b2 100644
+--- a/arch/arm64/kernel/efi.c
++++ b/arch/arm64/kernel/efi.c
+@@ -188,6 +188,8 @@ static __init void reserve_regions(void)
+ 		if (uefi_debug)
+ 			pr_cont("\n");
+ 	}
++
++	set_bit(EFI_MEMMAP, &efi.flags);
+ }
+ 
+ 
+diff --git a/arch/arm64/mm/init.c b/arch/arm64/mm/init.c
+index e90c542..58dbf2e 100644
+--- a/arch/arm64/mm/init.c
++++ b/arch/arm64/mm/init.c
+@@ -32,6 +32,7 @@
+ #include <linux/of_fdt.h>
+ #include <linux/dma-mapping.h>
+ #include <linux/dma-contiguous.h>
++#include <linux/efi.h>
+ 
+ #include <asm/sections.h>
+ #include <asm/setup.h>
+@@ -151,7 +152,8 @@ void __init arm64_memblock_init(void)
+ 	memblock_reserve(__pa(swapper_pg_dir), SWAPPER_DIR_SIZE);
+ 	memblock_reserve(__pa(idmap_pg_dir), IDMAP_DIR_SIZE);
+ 
+-	early_init_fdt_scan_reserved_mem();
++	if (!efi_enabled(EFI_MEMMAP))
++		early_init_fdt_scan_reserved_mem();
+ 
+ 	/* 4GB maximum for 32-bit only capable devices */
+ 	if (IS_ENABLED(CONFIG_ZONE_DMA))
 -- 
-SUSE LINUX Products GmbH, Maxfeldstr. 5, 90409 N?rnberg, Germany
-GF: Jeff Hawn, Jennifer Guild, Felix Imend?rffer; HRB 16746 AG N?rnberg
+1.7.10.4
