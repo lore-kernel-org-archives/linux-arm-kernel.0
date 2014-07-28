@@ -1,120 +1,68 @@
-From: mkl@pengutronix.de (Marc Kleine-Budde)
-Date: Mon, 28 Jul 2014 18:31:17 +0200
-Subject: [PATCH v3 4/4] can: flexcan: add vf610 support for FlexCAN
-In-Reply-To: <e88108c655e2c16dc9cf6c4194547e73@agner.ch>
-References: <cover.1405428166.git.stefan@agner.ch>
- <ff2ea1726b13dc2ffa3519ce9244f3633cf1420d.1405428166.git.stefan@agner.ch>
- <53C5398F.2000005@pengutronix.de> <1b8a8ca03b4a160027a79b722f697e25@agner.ch>
- <601adb6fe47279c115c1cc607365a00e@agner.ch> <53D25C9D.5080803@pengutronix.de>
- <e88108c655e2c16dc9cf6c4194547e73@agner.ch>
-Message-ID: <53D67AD5.2000500@pengutronix.de>
+From: olof@lixom.net (Olof Johansson)
+Date: Mon, 28 Jul 2014 09:33:13 -0700
+Subject: [PATCH 19/19] Documentation: ACPI for ARM64
+In-Reply-To: <20140728101229.GD24078@leverpostej>
+References: <1406206825-15590-1-git-send-email-hanjun.guo@linaro.org>
+ <1406206825-15590-20-git-send-email-hanjun.guo@linaro.org>
+ <CAOesGMhKHGkVK3dOLXXx9GQBMxDmjBu1WDBgHmwdGe1UK3jfcg@mail.gmail.com>
+ <5014834.k6eecMddPC@wuerfel> <20140728101229.GD24078@leverpostej>
+Message-ID: <20140728163313.GC32359@quad.lixom.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/28/2014 06:20 PM, Stefan Agner wrote:
-[...]
-
-> However, I got once this Kernel panic after I reconfigured to normal
-> mode. But I could not reproduce this.
+On Mon, Jul 28, 2014 at 11:12:29AM +0100, Mark Rutland wrote:
+> On Mon, Jul 28, 2014 at 10:07:50AM +0100, Arnd Bergmann wrote:
+> > On Saturday 26 July 2014 19:34:48 Olof Johansson wrote:
+> > > On Thu, Jul 24, 2014 at 6:00 AM, Hanjun Guo <hanjun.guo@linaro.org> wrote:
+> > > > +Relationship with Device Tree
+> > > > +-----------------------------
+> > > > +
+> > > > +ACPI support in drivers and subsystems for ARMv8 should never be mutually
+> > > > +exclusive with DT support at compile time.
+> > > > +
+> > > > +At boot time the kernel will only use one description method depending on
+> > > > +parameters passed from the bootloader.
+> > > 
+> > > Possibly overriden by kernel bootargs. And as debated for quite a
+> > > while earlier this year, acpi should still default to off -- if a DT
+> > > and ACPI are both passed in, DT should at this time be given priority.
+> > 
+> > I think this would be harder to do with the way that ACPI is passed in
+> > to the kernel. IIRC, you always have a minimal DT information based on
+> > the ARM64 boot protocol, but in the case of ACPI, this contains pointers
+> > to the ACPI tables, which are then used for populating the Linux platform
+> > devices (unless acpi=disabled is set), while the other contents of the
+> > DTB may be present but we skip the of_platform_populate state.
+> > 
+> > If this is correct, then replacing the firmware-generated dtb with a
+> > user-provided on would implicitly remove the ACPI tables from visibility,
+> > which is exactly what we want.
 > 
-> [  461.954394] flexcan_irq, esr=00059d82
-> [  461.958093] flexcan_irq, ctrl=17092051
-> [  461.961873] ------------[ cut here ]------------
-> [  461.966536] WARNING: CPU: 0 PID: 0 at kernel/locking/mutex.c:826
-> mutex_trylock+0x1b0/0x208()
-> [  461.974982] DEBUG_LOCKS_WARN_ON(in_interrupt())
+> That's not quite true.
+> 
+> There might not be any DTB, or the user might have provided a DTB with
+> only /chosen/bootargs. Trying to distinguish the many cases of possible
+> DTB is broken as a concept.
+> 
+> The EFI stub will attempt to get a DTB from somewhere (provided by
+> filename or as a system table with a magic UUID), and if it can't find
+> one will generate an empty stub DTB.
+> 
+> Then it will go and perform some EFI memory setup, placing some
+> properties in the DTB (which might be a stub) describing the EFI memory
+> map.
+> 
+> Then we boot the kernel proper, which sees the EFI pointers and looks
+> for an ACPI table. If they are found, ACPI is used. Otherwise we attempt
+> to use the DTB (which might be a stub).
+> 
+> Unless ACPI is explcitly disabled, ACPI will be used if present.
 
-Please use this updated version of your patch:
+Ah, I saw this after I replied to Arnd's email.
 
-Marc
+The above sounds more like how I envisioned things working, so based on that,
+the default just needs to be flipped and we should be fine (i.e. ACPI needs to
+be explicitly enabled).
 
----
 
->From b6b8ae7cdb04f1a3b9d3a6dd83f8146bfaf48553 Mon Sep 17 00:00:00 2001
-From: Stefan Agner <stefan@agner.ch>
-Date: Tue, 15 Jul 2014 14:56:20 +0200
-Subject: [PATCH] can: flexcan: flexcan_get_berr_counter(): switch on clocks
- before accessing ecr register
-
-The funcion flexcan_get_berr_counter() may be called from userspace even if the
-interface is down, this the clocks are disabled. This patch switches on the
-clocks before accessing the ecr register.
-
-Reported-by: Ashutosh Singh <ashuleapyear@gmail.com>
-Signed-off-by: Stefan Agner <stefan@agner.ch>
-Signed-off-by: Marc Kleine-Budde <mkl@pengutronix.de>
----
- drivers/net/can/flexcan.c | 30 +++++++++++++++++++++++++++---
- 1 file changed, 27 insertions(+), 3 deletions(-)
-
-diff --git a/drivers/net/can/flexcan.c b/drivers/net/can/flexcan.c
-index f425ec2..6bfe24a 100644
---- a/drivers/net/can/flexcan.c
-+++ b/drivers/net/can/flexcan.c
-@@ -378,8 +378,9 @@ static int flexcan_chip_softreset(struct flexcan_priv *priv)
- 	return 0;
- }
- 
--static int flexcan_get_berr_counter(const struct net_device *dev,
--				    struct can_berr_counter *bec)
-+
-+static int __flexcan_get_berr_counter(const struct net_device *dev,
-+				      struct can_berr_counter *bec)
- {
- 	const struct flexcan_priv *priv = netdev_priv(dev);
- 	struct flexcan_regs __iomem *regs = priv->base;
-@@ -391,6 +392,29 @@ static int flexcan_get_berr_counter(const struct net_device *dev,
- 	return 0;
- }
- 
-+static int flexcan_get_berr_counter(const struct net_device *dev,
-+				    struct can_berr_counter *bec)
-+{
-+	const struct flexcan_priv *priv = netdev_priv(dev);
-+	int err;
-+
-+	err = clk_prepare_enable(priv->clk_ipg);
-+	if (err)
-+		return err;
-+
-+	err = clk_prepare_enable(priv->clk_per);
-+	if (err)
-+		goto out_disable_ipg;
-+
-+	err = __flexcan_get_berr_counter(dev, bec);
-+
-+	clk_disable_unprepare(priv->clk_per);
-+ out_disable_ipg:
-+	clk_disable_unprepare(priv->clk_ipg);
-+
-+	return err;
-+}
-+
- static int flexcan_start_xmit(struct sk_buff *skb, struct net_device *dev)
- {
- 	const struct flexcan_priv *priv = netdev_priv(dev);
-@@ -503,7 +527,7 @@ static void do_state(struct net_device *dev,
- 	struct flexcan_priv *priv = netdev_priv(dev);
- 	struct can_berr_counter bec;
- 
--	flexcan_get_berr_counter(dev, &bec);
-+	__flexcan_get_berr_counter(dev, &bec);
- 
- 	switch (priv->can.state) {
- 	case CAN_STATE_ERROR_ACTIVE:
--- 
-2.0.1
-
--- 
-Pengutronix e.K.                  | Marc Kleine-Budde           |
-Industrial Linux Solutions        | Phone: +49-231-2826-924     |
-Vertretung West/Dortmund          | Fax:   +49-5121-206917-5555 |
-Amtsgericht Hildesheim, HRA 2686  | http://www.pengutronix.de   |
-
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 242 bytes
-Desc: OpenPGP digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140728/a980ea01/attachment.sig>
+-Olof
