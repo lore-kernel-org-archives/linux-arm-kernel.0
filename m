@@ -1,36 +1,35 @@
 From: wens@csie.org (Chen-Yu Tsai)
-Date: Mon, 28 Jul 2014 16:20:59 +0800
-Subject: [PATCH v4 4/6] ARM: dts: sun8i: add rtc device node
+Date: Mon, 28 Jul 2014 16:20:57 +0800
+Subject: [PATCH v4 2/6] rtc: sunxi: Depend on platforms sun4i/sun7i that
+ actually have the rtc
 In-Reply-To: <1406535661-25072-1-git-send-email-wens@csie.org>
 References: <1406535661-25072-1-git-send-email-wens@csie.org>
-Message-ID: <1406535661-25072-5-git-send-email-wens@csie.org>
+Message-ID: <1406535661-25072-3-git-send-email-wens@csie.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-sun8i shares the same rtc hardware as sun6i. Now that we have a driver
-for it, add a device node to the DTSI for it so we can use it.
+Now that we have Kconfig options for individual sunxi platforms, let
+the rtc-sunxi driver depend on the platforms that actually have this
+hardware, sun4i and sun7i.
 
 Signed-off-by: Chen-Yu Tsai <wens@csie.org>
+Acked-by: Maxime Ripard <maxime.ripard@free-electrons.com>
 ---
- arch/arm/boot/dts/sun8i-a23.dtsi | 6 ++++++
- 1 file changed, 6 insertions(+)
+ drivers/rtc/Kconfig | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/arch/arm/boot/dts/sun8i-a23.dtsi b/arch/arm/boot/dts/sun8i-a23.dtsi
-index 54ac0787..e0d1048 100644
---- a/arch/arm/boot/dts/sun8i-a23.dtsi
-+++ b/arch/arm/boot/dts/sun8i-a23.dtsi
-@@ -285,6 +285,12 @@
- 			interrupts = <1 9 0xf04>;
- 		};
+diff --git a/drivers/rtc/Kconfig b/drivers/rtc/Kconfig
+index dde2b57..f933b4b 100644
+--- a/drivers/rtc/Kconfig
++++ b/drivers/rtc/Kconfig
+@@ -1176,7 +1176,7 @@ config RTC_DRV_SUN6I
  
-+		rtc: rtc at 01f00000 {
-+			compatible = "allwinner,sun6i-a31-rtc";
-+			reg = <0x01f00000 0x54>;
-+			interrupts = <0 40 4>;
-+		};
-+
- 		prcm at 01f01400 {
- 			compatible = "allwinner,sun8i-a23-prcm";
- 			reg = <0x01f01400 0x200>;
+ config RTC_DRV_SUNXI
+ 	tristate "Allwinner sun4i/sun7i RTC"
+-	depends on ARCH_SUNXI
++	depends on MACH_SUN4I || MACH_SUN7I
+ 	help
+ 	  If you say Y here you will get support for the RTC found on
+ 	  Allwinner A10/A20.
 -- 
 2.0.1
