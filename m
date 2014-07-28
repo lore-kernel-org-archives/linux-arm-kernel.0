@@ -1,30 +1,69 @@
-From: lauraa@codeaurora.org (Laura Abbott)
-Date: Mon, 28 Jul 2014 11:56:42 -0700
-Subject: [RESEND][PATCHv2 0/3] Fix for buggy u-boot memory banks
-In-Reply-To: <CAL_JsqJv2_UHxHGFF=nFKQRiEwfFtH_7PhMPS=W=APyzc-yiTQ@mail.gmail.com>
-References: <1405443816-29917-1-git-send-email-lauraa@codeaurora.org>
- <CAL_JsqJv2_UHxHGFF=nFKQRiEwfFtH_7PhMPS=W=APyzc-yiTQ@mail.gmail.com>
-Message-ID: <53D69CEA.3060206@codeaurora.org>
+From: koct9i@gmail.com (Konstantin Khlebnikov)
+Date: Mon, 28 Jul 2014 22:57:00 +0400
+Subject: [PATCH 2/2] ARM: LPAE: reduce damage caused by idmap to virtual
+ memory layout
+In-Reply-To: <20140728184107.GR15536@arm.com>
+References: <20140722153623.25088.37742.stgit@buzz>
+ <20140722153635.25088.14197.stgit@buzz>
+ <20140728181456.GO15536@arm.com>
+ <CALYGNiNJDHfQm2yk067hh-Wywsb_Ki5AEE_sTMkYegJi9spSzw@mail.gmail.com>
+ <20140728184107.GR15536@arm.com>
+Message-ID: <CALYGNiNaMMv9itJ_+cvPDn1_Yo4GTPQJ-Cy9zBzJzfaDLfkvmg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 7/26/2014 2:20 PM, Rob Herring wrote:
-> On Tue, Jul 15, 2014 at 12:03 PM, Laura Abbott <lauraa@codeaurora.org> wrote:
->> Hi,
+On Mon, Jul 28, 2014 at 10:41 PM, Will Deacon <will.deacon@arm.com> wrote:
+> On Mon, Jul 28, 2014 at 07:25:14PM +0100, Konstantin Khlebnikov wrote:
+>> On Mon, Jul 28, 2014 at 10:14 PM, Will Deacon <will.deacon@arm.com> wrote:
+>> > On Tue, Jul 22, 2014 at 04:36:35PM +0100, Konstantin Khlebnikov wrote:
+>> >> idmap layout combines both phisical and virtual addresses.
+>> >> Everything works fine if ram physically lays below PAGE_OFFSET.
+>> >> Otherwise idmap starts punching huge holes in virtual memory layout.
+>> >> It maps ram by 2MiB sections, but when it allocates new pmd page it
+>> >> cuts 1GiB at once.
+>> >>
+>> >> This patch makes a copy of all affected pmds from init_mm.
+>> >> Only few (usually one) 2MiB sections will be lost.
+>> >> This is not eliminates problem but makes it 512 times less likely.
+>> >
+>> > I'm struggling to understand your commit message, but making a problem `512
+>> > times less likely' does sound like a bit of a hack to me. Can't we fix this
+>> > properly instead?
 >>
->> This is a resend of the series to fix the uboot bug exposed by the removal
->> of meminfo. I haven't gotten any acks though.
-> 
-> Is the bug with ATAGs that get converted to DT in the decompressor or
-> u-boot puts the wrong info in DT directly?
-> 
+>> Yep, my comment sucks.
+>>
+>> Usually idmap looks like this:
+>>
+>> |0x00000000 -- <chunk of physical memory in identical mapping > --- |
+>> TASK_SIZE -- <kernel space vm layoyt> --- 0xFFFFFFFF |
+>>
+>> But when that physical memory chunk starts from 0xE8000000 or even
+>> 0xF2000000 evenything becomes very complicated.
+>
+> Why? As long as we don't clobber the kernel text (which would require
+> PHYS_OFFSET to be at a really weird alignment and very close to
+> PAGE_OFFSET), then you should be alright. Sure, you'll lose things like your
+> stack and the vmalloc area etc, but you're running in the idmap, so don't
+> use those things.
 
-I believe it's u-boot putting the wrong info in DT directly. See
-http://lists.infradead.org/pipermail/linux-arm-kernel/2014-June/266782.html
+Yep, we have piece of hardware with really weird aligned PHYS_OFFSET,
+mostly all ram is above 4gb and we was lucky enough to get into the trouble.
 
-Thanks,
-Laura
+It seems keystone has all memory above 4gb but small piece is mapped below
+especially for booting. I suppose it's below PAGE_OFFSET so Cyril
+hadn't seen that problem.
 
--- 
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-hosted by The Linux Foundation
+Also I seen comment somewhere in the code which tells that idrmap pgd is
+always below 4gb which isn't quite true. Moreover, I had some experiments with
+mapping ram to random places in qemu and seen that kernel cannot boot if
+PHYS_OFFSET isn't alligned to 128mb which is strange.
+So, it seems there is plenty bugs anound.
+
+>
+> soft_restart is an example of code that deals with these issues. Which code
+> is causing you problems?
+
+That was booting of secondary cpus, all of them.
+
+>
+> Will
