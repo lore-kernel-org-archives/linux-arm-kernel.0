@@ -1,55 +1,121 @@
-From: mporter@linaro.org (Matt Porter)
-Date: Mon, 28 Jul 2014 10:48:25 -0400
-Subject: [GIT PULL] ARM: mach-bcm: dt updates for 3.17
-Message-ID: <20140728144825.GA9030@beef>
+From: jonsmirl@gmail.com (jonsmirl at gmail.com)
+Date: Mon, 28 Jul 2014 10:51:06 -0400
+Subject: [RFC 8/8] ARM: sun7i: Add mod1 clock nodes
+In-Reply-To: <CAGb2v64Gg4E5QJOZJjWezG2BNzD6iOnBvT6EYq=8AcTXGqrvsQ@mail.gmail.com>
+References: <1406519386-4902-1-git-send-email-emilio@elopez.com.ar>
+ <1406519386-4902-9-git-send-email-emilio@elopez.com.ar>
+ <CAGb2v64Gg4E5QJOZJjWezG2BNzD6iOnBvT6EYq=8AcTXGqrvsQ@mail.gmail.com>
+Message-ID: <CAKON4OzRmMrsjPwxF0pW50MihbTsAOuex7vzNprUV2nu=J4z_w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Please consider pulling the following mach-bcm dt updates for 3.16.
+On Mon, Jul 28, 2014 at 12:28 AM, Chen-Yu Tsai <wens@csie.org> wrote:
+> Hi,
+>
+> First I suggest adding "DT: " to the commit line of all the DT patches.
+>
+> On Mon, Jul 28, 2014 at 11:49 AM, Emilio L?pez <emilio@elopez.com.ar> wrote:
+>> This commit adds all the mod1 clocks available on A20 to its device
+>> tree. This list was created by looking at the A20 user manual.
+>>
+>> Not-signed-off-by: Emilio L?pez <emilio@elopez.com.ar>
+>> ---
+>>
+>> As mentioned on an earlier patch, note that this is untested, and I
+>> only added them to sun7i. It'd be great if actual users of these clocks
+>> could comment :)
+>>
+>>  arch/arm/boot/dts/sun7i-a20.dtsi | 39 +++++++++++++++++++++++++++++++++++++++
+>>  1 file changed, 39 insertions(+)
+>>
+>> diff --git a/arch/arm/boot/dts/sun7i-a20.dtsi b/arch/arm/boot/dts/sun7i-a20.dtsi
+>> index 5d0265a..c57f7ad 100644
+>> --- a/arch/arm/boot/dts/sun7i-a20.dtsi
+>> +++ b/arch/arm/boot/dts/sun7i-a20.dtsi
+>> @@ -335,6 +335,29 @@
+>>                         clock-output-names = "ir1";
+>>                 };
+>>
+>> +               iis0_clk: clk at 01c200b8 {
+>> +                       #clock-cells = <0>;
+>> +                       compatible = "allwinner,sun4i-a10-mod1-clk";
+>> +                       reg = <0x01c200b8 0x4>;
+>> +                       clocks = <&pll2 0>, <&pll2 1>, <&pll2 2>, <&pll2 3>;
+>
+> User manual says pll2x8, pll2x4, pll2x2, pll2 for all the the clocks.
+> So the order here should be reversed. Same for the others.
+>
+>> +                       clock-output-names = "iis0";
+>> +               };
+>> +
+>> +               ac97_clk: clk at 01c200bc {
+>> +                       #clock-cells = <0>;
+>> +                       compatible = "allwinner,sun4i-a10-mod1-clk";
+>> +                       reg = <0x01c200bc 0x4>;
+>> +                       clocks = <&pll2 3>, <&pll2 2>, <&pll2 1>, <&pll2 0>;
+>> +                       clock-output-names = "ac97";
+>> +               };
+>> +
+>> +               spdif_clk: clk at 01c200c0 {
+>> +                       #clock-cells = <0>;
+>> +                       compatible = "allwinner,sun4i-a10-mod1-clk";
+>> +                       reg = <0x01c200c0 0x4>;
+>> +                       clocks = <&pll2 0>, <&pll2 1>, <&pll2 2>, <&pll2 3>;
+>> +                       clock-output-names = "spdif";
+>> +               };
+>
+> Newline. And the manuals don't have anything on the SPDIF clock,
+> so I can't comment on it.
 
--Matt
+We do have this much SPDIF doc.
+http://linux-sunxi.org/SPDIF
 
-The following changes since commit 9a3c4145af32125c5ee39c0272662b47307a8323:
+Based on the Allwinner code I see no reason to think that the SPDIF
+clock varies from any of the other audio clocks.  Who knows why they
+left SPDIF out of the manual.
 
-  Linux 3.16-rc6 (2014-07-20 21:04:16 -0700)
 
-are available in the git repository at:
+>
+>>                 usb_clk: clk at 01c200cc {
+>>                         #clock-cells = <1>;
+>>                         #reset-cells = <1>;
+>> @@ -352,6 +375,22 @@
+>>                         clock-output-names = "spi3";
+>>                 };
+>>
+>> +               iis1_clk: clk at 01c200d8 {
+>> +                       #clock-cells = <0>;
+>> +                       compatible = "allwinner,sun4i-a10-mod1-clk";
+>> +                       reg = <0x01c200d8 0x4>;
+>> +                       clocks = <&pll2 0>, <&pll2 1>, <&pll2 2>, <&pll2 3>;
+>> +                       clock-output-names = "iis1";
+>> +               };
+>> +
+>> +               iis2_clk: clk at 01c200dc {
+>> +                       #clock-cells = <0>;
+>> +                       compatible = "allwinner,sun4i-a10-mod1-clk";
+>> +                       reg = <0x01c200dc 0x4>;
+>> +                       clocks = <&pll2 0>, <&pll2 1>, <&pll2 2>, <&pll2 3>;
+>> +                       clock-output-names = "iis2";
+>> +               };
+>> +
+>>                 codec_clk: clk at 01c20140 {
+>>                         #clock-cells = <0>;
+>>                         compatible = "allwinner,sun4i-a10-codec-clk";
+>> --
+>
+> Apart from the title and the clock orders, everything looks good.
+> Jon should test this with the above corrected.
 
-  git://github.com/broadcom/mach-bcm tags/for-3.17/bcm-dt
+I don't have i2s hardware available yet. Maybe by end of the week.
 
-for you to fetch changes up to 79187a8e242046a0525a296509e80c5ee24fbaf1:
+>
+>
+> Cheers
+> ChenYu
 
-  ARM: brcmstb: dts: add a reference DTS for Broadcom 7445 (2014-07-28 10:01:46 -0400)
 
-----------------------------------------------------------------
-ARM: mach-bcm: dt updatees for 3.17
 
-- BCM Mobile SMP support
-- BRCM STB platform support
-
-----------------------------------------------------------------
-Alex Elder (3):
-      devicetree: bindings: document Broadcom CPU enable method
-      ARM: dts: enable SMP support for bcm28155
-      ARM: dts: enable SMP support for bcm21664
-
-Marc Carino (4):
-      ARM: brcmstb: add CPU binding for Broadcom Brahma15
-      ARM: brcmstb: add misc. DT bindings for brcmstb
-      ARM: brcmstb: gic: add compatible string for Broadcom Brahma15
-      ARM: brcmstb: dts: add a reference DTS for Broadcom 7445
-
- .../bindings/arm/bcm/brcm,bcm11351-cpu-method      |  36 +++++++
- .../devicetree/bindings/arm/brcm-brcmstb.txt       |  95 ++++++++++++++++++
- Documentation/devicetree/bindings/arm/cpus.txt     |   2 +
- Documentation/devicetree/bindings/arm/gic.txt      |   1 +
- arch/arm/boot/dts/Makefile                         |   2 +
- arch/arm/boot/dts/bcm11351.dtsi                    |  19 ++++
- arch/arm/boot/dts/bcm21664.dtsi                    |  19 ++++
- arch/arm/boot/dts/bcm7445-bcm97445svmb.dts         |  14 +++
- arch/arm/boot/dts/bcm7445.dtsi                     | 111 +++++++++++++++++++++
- 9 files changed, 299 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/arm/bcm/brcm,bcm11351-cpu-method
- create mode 100644 Documentation/devicetree/bindings/arm/brcm-brcmstb.txt
- create mode 100644 arch/arm/boot/dts/bcm7445-bcm97445svmb.dts
- create mode 100644 arch/arm/boot/dts/bcm7445.dtsi
+-- 
+Jon Smirl
+jonsmirl at gmail.com
