@@ -1,81 +1,79 @@
-From: emilio@elopez.com.ar (=?UTF-8?q?Emilio=20L=C3=B3pez?=)
-Date: Mon, 28 Jul 2014 00:49:46 -0300
-Subject: [RFC 8/8] ARM: sun7i: Add mod1 clock nodes
-In-Reply-To: <1406519386-4902-1-git-send-email-emilio@elopez.com.ar>
-References: <1406519386-4902-1-git-send-email-emilio@elopez.com.ar>
-Message-ID: <1406519386-4902-9-git-send-email-emilio@elopez.com.ar>
+From: pankaj.dubey@samsung.com (Pankaj Dubey)
+Date: Mon, 28 Jul 2014 09:45:01 +0530
+Subject: [PATCH RFC] mfd: syscon: Decouple syscon interface from syscon
+ devices
+In-Reply-To: <5537724.LlmJ2hxcKn@wuerfel>
+References: <53A05E2D.6020702@samsung.com> <5027740.B7iVUcUX2T@wuerfel>
+ <53A0B27E.5010708@gmail.com> <5537724.LlmJ2hxcKn@wuerfel>
+Message-ID: <002701cfaa1a$82b42770$881c7650$@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This commit adds all the mod1 clocks available on A20 to its device
-tree. This list was created by looking at the A20 user manual.
+Hi Arnd,
 
-Not-signed-off-by: Emilio L?pez <emilio@elopez.com.ar>
----
+On Wednesday, June 18, 2014 Arnd wrote:
+> To: Tomasz Figa
+> Cc: linux-arm-kernel at lists.infradead.org; mark.brown at linaro.org; Tomasz
+Figa;
+> linux-samsung-soc at vger.kernel.org; Kukjin Kim; Russell King - ARM Linux;
+Samuel
+> Ortiz; Pankaj Dubey; linux-kernel at vger.kernel.org; joshi at samsung.com;
+> vikas.sajjan at samsung.com; chow.kim at samsung.com; Lee Jones
+> Subject: Re: [PATCH RFC] mfd: syscon: Decouple syscon interface from
+syscon
+> devices
+> 
+> On Tuesday 17 June 2014 23:26:22 Tomasz Figa wrote:
+> > On 17.06.2014 17:42, Arnd Bergmann wrote:
+> > > This seems like a reasonable way of solving the problem, but I think
+> > > there is an even better one that we have about in the past: if we
+> > > promote syscon from a platform driver into a a drivers/base/ helper
+> > > that is independent of the platform device matching, we can use call
+> > > syscon_regmap_lookup_* for any device node, whether it's already
+> > > bound to a driver or not, which do what you need. It would also make
+> > > it easier to call the syscon code before the platform_device
+> > > infrastructure gets initialized, which is something a number of
+> > > people have asked for, e.g. for using regmap to do SMP bringup or
+> > > for clock registration.
+> >
+> > Basically, unless I'm missing your point, this is what my patch does,
+> > except that I don't move it to drivers/base/ and the registration
+> > function I added require a pointer to struct device. Indeed,
+> > decoupling it further from the driver model, by adding
+> > of_syscon_register() should be useful for early users.
+> 
+> I believe the part you are missing is that with the approach I suggested,
+there would
+> be no registration function at all. You can easily do the lookup from the
+client drivers
+> using the DT data structures, with no need for the device at all. 
 
-As mentioned on an earlier patch, note that this is untested, and I 
-only added them to sun7i. It'd be great if actual users of these clocks 
-could comment :)
+Will you please elaborate more on this? 
 
- arch/arm/boot/dts/sun7i-a20.dtsi | 39 +++++++++++++++++++++++++++++++++++++++
- 1 file changed, 39 insertions(+)
+The only exception
+> today is the clps711x platform using syscon_regmap_lookup_by_pdevname(),
+but
+> that should be solved in 3.17 when clps711x becomes DT-only.
+> 
 
-diff --git a/arch/arm/boot/dts/sun7i-a20.dtsi b/arch/arm/boot/dts/sun7i-a20.dtsi
-index 5d0265a..c57f7ad 100644
---- a/arch/arm/boot/dts/sun7i-a20.dtsi
-+++ b/arch/arm/boot/dts/sun7i-a20.dtsi
-@@ -335,6 +335,29 @@
- 			clock-output-names = "ir1";
- 		};
- 
-+		iis0_clk: clk at 01c200b8 {
-+			#clock-cells = <0>;
-+			compatible = "allwinner,sun4i-a10-mod1-clk";
-+			reg = <0x01c200b8 0x4>;
-+			clocks = <&pll2 0>, <&pll2 1>, <&pll2 2>, <&pll2 3>;
-+			clock-output-names = "iis0";
-+		};
-+
-+		ac97_clk: clk at 01c200bc {
-+			#clock-cells = <0>;
-+			compatible = "allwinner,sun4i-a10-mod1-clk";
-+			reg = <0x01c200bc 0x4>;
-+			clocks = <&pll2 3>, <&pll2 2>, <&pll2 1>, <&pll2 0>;
-+			clock-output-names = "ac97";
-+		};
-+
-+		spdif_clk: clk at 01c200c0 {
-+			#clock-cells = <0>;
-+			compatible = "allwinner,sun4i-a10-mod1-clk";
-+			reg = <0x01c200c0 0x4>;
-+			clocks = <&pll2 0>, <&pll2 1>, <&pll2 2>, <&pll2 3>;
-+			clock-output-names = "spdif";
-+		};
- 		usb_clk: clk at 01c200cc {
- 			#clock-cells = <1>;
- 		        #reset-cells = <1>;
-@@ -352,6 +375,22 @@
- 			clock-output-names = "spi3";
- 		};
- 
-+		iis1_clk: clk at 01c200d8 {
-+			#clock-cells = <0>;
-+			compatible = "allwinner,sun4i-a10-mod1-clk";
-+			reg = <0x01c200d8 0x4>;
-+			clocks = <&pll2 0>, <&pll2 1>, <&pll2 2>, <&pll2 3>;
-+			clock-output-names = "iis1";
-+		};
-+
-+		iis2_clk: clk at 01c200dc {
-+			#clock-cells = <0>;
-+			compatible = "allwinner,sun4i-a10-mod1-clk";
-+			reg = <0x01c200dc 0x4>;
-+			clocks = <&pll2 0>, <&pll2 1>, <&pll2 2>, <&pll2 3>;
-+			clock-output-names = "iis2";
-+		};
-+
- 		codec_clk: clk at 01c20140 {
- 			#clock-cells = <0>;
- 			compatible = "allwinner,sun4i-a10-codec-clk";
--- 
-2.0.3
+Does it mean that this may become a blocking issue for this patch to go
+before 3.17?
+If yes, isn't it will be good to accept this patch as it is if it's not
+causing issue or breaking
+anything with existing users of syscon. At least for our use of converting
+Exynos PMU and
+PM related consolidation this change is working fine and we have verified
+it.
+
+> > Should I move this to drivers/base/, even though from current location
+> > it can be used outside the platform driver anyway?
+> 
+> Thinking about it some more, drivers/of might be better than drivers/base.
+> It depends a bit where we are heading with this, in particular if we
+expect to see non-
+> DT users in the future.
+> 
+> 	Arnd
+
+Thanks,
+Pankaj Dubey
