@@ -1,47 +1,58 @@
-From: vinod.koul@intel.com (Vinod Koul)
-Date: Mon, 28 Jul 2014 17:04:46 +0530
-Subject: [PATCH 0/3] ARM/dma: edma: Serve cyclic clients via high
- priority queue
-In-Reply-To: <1404816398-12338-1-git-send-email-peter.ujfalusi@ti.com>
-References: <1404816398-12338-1-git-send-email-peter.ujfalusi@ti.com>
-Message-ID: <20140728113446.GB8181@intel.com>
+From: afaerber@suse.de (=?ISO-8859-15?Q?Andreas_F=E4rber?=)
+Date: Mon, 28 Jul 2014 13:43:02 +0200
+Subject: [PATCH v2 09/11] Documentation: devicetree: Fix ADI AXI SPDIF
+ specification
+In-Reply-To: <20140725103905.GP17528@sirena.org.uk>
+References: <1406242820-20140-1-git-send-email-afaerber@suse.de>
+ <1406242820-20140-10-git-send-email-afaerber@suse.de>
+ <53D20A61.1050506@metafoo.de> <53D21066.8000905@monstr.eu>
+ <20140725101815.GO17528@sirena.org.uk> <53D2324B.4070602@suse.de>
+ <20140725103905.GP17528@sirena.org.uk>
+Message-ID: <53D63746.3000905@suse.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jul 08, 2014 at 01:46:35PM +0300, Peter Ujfalusi wrote:
-> Hi,
-> 
-> It is preferred that audio is served with the highest priority queue in order to
-> avoid delays in data transfer between memory and audio IP.
-> 
-> The following series will add an API to arch code to assign a channel to a given
-> queue.
-> The default queue is changed from 0 (highest priority) to lowest priority.
-> In the dmaengine driver we move the cyclic channel to queue0 (highest priority)
-> and move it back to default queue when the channel is terminated.
+Mark,
 
-Applied, thanks
+Am 25.07.2014 12:39, schrieb Mark Brown:
+> On Fri, Jul 25, 2014 at 12:32:43PM +0200, Andreas F?rber wrote:
+> 
+>> I used scripts/get_maintainer.pl --nogit-fallback. If you were not
+>> CC'ed and need to be, please submit a MAINTAINERS patch. :)
+> 
+> You need to think about what you're doing when you use get_maintainer,
+> it gives both false positives and false negatives.
+> 
+>> Maybe this works for you?
+>> https://patchwork.kernel.org/patch/4620191/
+> 
+>> Otherwise I can resend with Ab/Rb.
+> 
+> Documentation/SubmittingPatches.
 
--- 
-~Vinod
+Not helpful here, nor is
+Documentation/devicetree/bindings/submitting-patches.txt. It's separate
+from code changes, sent via git-send-email, has a Sob, went to LKML and
+LAKML and DTML. I could add a Fixes: header and CC trivial for this
+one-line fix IIUC.
+Doesn't tell me which patches I should CC you on in the future though.
+Therefore my request to fix the false negative in MAINTAINERS so that me
+and other kernel newbies don't run into it again.
 
-> 
-> Regards,
-> Peter
-> ---
-> Peter Ujfalusi (3):
->   ARM: edma: Set default queue to lowest priority
->   ARM: edma: Add edma_assign_channel_eventq() to move channel to a give
->     queue
->   dma: edma: Serve cyclic (audio) channels with high priority queue
-> 
->  arch/arm/common/edma.c             | 31 ++++++++++++++++++++++++++++++-
->  drivers/dma/edma.c                 |  8 ++++++++
->  include/linux/platform_data/edma.h |  2 ++
->  3 files changed, 40 insertions(+), 1 deletion(-)
-> 
-> -- 
-> 2.0.0
-> 
+I'll simply interpret your reply as "yes, please resend with
+broonie at kernel.org CC'ed" then.
+
+Regards,
+Andreas
 
 -- 
+SUSE LINUX Products GmbH, Maxfeldstr. 5, 90409 N?rnberg, Germany
+GF: Jeff Hawn, Jennifer Guild, Felix Imend?rffer; HRB 16746 AG N?rnberg
+
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: OpenPGP digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140728/844b92cc/attachment.sig>
