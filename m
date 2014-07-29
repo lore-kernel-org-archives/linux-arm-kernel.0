@@ -1,84 +1,64 @@
-From: dianders@chromium.org (Doug Anderson)
-Date: Tue, 29 Jul 2014 08:27:13 -0700
-Subject: [PATCH v2 3/4] ARM: dts: exynos5250: Fold common ChromeOS parts
- into Snow
-In-Reply-To: <53D79AD3.8020700@suse.de>
-References: <1405704009-8430-1-git-send-email-afaerber@suse.de>
- <1405704009-8430-4-git-send-email-afaerber@suse.de>
- <CABxcv=kP2PCcNCtM1WUXx5wGG4m-jdw-P1dw0boaSwdJpoX=jQ@mail.gmail.com>
- <CAD=FV=V-7+Jj7b8-fQL1PiQhNmhiGOPJzitGd__OUQLDteO_8g@mail.gmail.com>
- <CABxcv=nDsKSdDtVZKpcTP+=3pbeTswJRCUvvXVx98p+1Zzz0Bg@mail.gmail.com>
- <53D79AD3.8020700@suse.de>
-Message-ID: <CAD=FV=VMuP3necmUqpzd2igvkr3BDcf_01b-0vuDvyQpsNxoRw@mail.gmail.com>
+From: msalter@redhat.com (Mark Salter)
+Date: Tue, 29 Jul 2014 11:29:16 -0400
+Subject: [PATCH 3/3] arm64/efi: efistub: don't abort if base of DRAM is
+ occupied
+In-Reply-To: <1406630950-32432-4-git-send-email-ard.biesheuvel@linaro.org>
+References: <1406630950-32432-1-git-send-email-ard.biesheuvel@linaro.org>
+ <1406630950-32432-4-git-send-email-ard.biesheuvel@linaro.org>
+Message-ID: <1406647756.753.11.camel@deneb.redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Andreas,
+On Tue, 2014-07-29 at 12:49 +0200, Ard Biesheuvel wrote:
+> If we cannot relocate the kernel Image to its preferred offset of base of DRAM
+> plus TEXT_OFFSET, instead relocate it to the lowest available 2 MB boundary plus
+> TEXT_OFFSET. We may lose a bit of memory at the low end, but we can still
+> proceed normally otherwise.
+> 
+> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+> ---
+>  arch/arm64/kernel/efi-stub.c | 16 ++++++----------
+>  1 file changed, 6 insertions(+), 10 deletions(-)
 
-On Tue, Jul 29, 2014 at 6:00 AM, Andreas F?rber <afaerber@suse.de> wrote:
-> Hi Javier and Doug,
->
-> Am 25.07.2014 19:02, schrieb Javier Martinez Canillas:
->> On Fri, Jul 25, 2014 at 6:43 PM, Doug Anderson <dianders@chromium.org> wrote:
->>> On Fri, Jul 25, 2014 at 9:35 AM, Javier Martinez Canillas
->>> <javier@dowhile0.org> wrote:
->>>> Hello Andreas,
->>>>
->>>> On Fri, Jul 18, 2014 at 7:20 PM, Andreas F?rber <afaerber@suse.de> wrote:
->>>>>
->>>>> +       memory {
->>>>> +               reg = <0x40000000 0x80000000>;
->>>>> +       };
->>>>> +
->>>>> +       chosen {
->>>>> +       };
->>>>> +
->>>>
->>>> Is there a reason for an empty chosen node? Same for the Spring DTS.
->>>
->>> I know that the bootloader (U-Boot) fills this in.  I'd have to double
->>> check how the bootloader handles the node not being there to begin
->>> with.
->>
->> Yes, U-Boot fills this but if the node does not exist in the FDT, it
->> creates one. Take a look at fdt_chosen() in common/fdt_support.c [0].
->>
->> So I think it's better to just remove it since is empty.
->
-> Hm, in different context it was stated that device trees shouldn't rely
-> on bootloader behavior (for a /memory node on Zynq we ended up
-> specifying the size cell with the real value despite U-Boot overriding
-> it to a lesser value).
->
-> Can we instead settle on filling this node with defaults? :)
-> bootargs = "console=tty1"; would be my choice for Spring. Would that be
-> applicable for Snow as well?
+Tested on Mustang (with loss of 2MB free memory).
 
-Personally I think that there's not a lot of use for including
-bootargs.  Every single person will need different bootargs since
-everyone will have a different boot source (eMMC partitioin 0, eMMC
-partition3, SD card, USB, etc).  You have to rely on the bootloader
-for _something_.
+> 
+> diff --git a/arch/arm64/kernel/efi-stub.c b/arch/arm64/kernel/efi-stub.c
+> index 60e98a639ac5..460c00c41e57 100644
+> --- a/arch/arm64/kernel/efi-stub.c
+> +++ b/arch/arm64/kernel/efi-stub.c
+> @@ -60,20 +60,16 @@ static efi_status_t handle_kernel_image(efi_system_table_t *sys_table,
+>  	kernel_size = _edata - _text;
+>  	if (*image_addr != (dram_base + TEXT_OFFSET)) {
+>  		kernel_memsize = kernel_size + (_end - _edata);
+> -		status = efi_relocate_kernel(sys_table, image_addr,
+> -					     kernel_size, kernel_memsize,
+> -					     dram_base + TEXT_OFFSET,
+> -					     PAGE_SIZE);
 
+Can we make efi_relocate_kernel static inline to get rid
+of the "defined but unused" warning?
 
-> Not sure how to specify that via linux,stdout-path property.
->
-> I believe this would be a follow-up patch either way.
+Otherwise:
 
-Right
+Acked-by: Mark Salter <msalter@redhat.com>
 
-
-> Since there's at least two series out there trying to fiddle with
-> -cros-common.dtsi, including one that drops the slot sub-node of the MMC
-> and one that adds CPU power supply, it would be nice if we can get the
-> -cros-common parts sorted out and applied. Can you ack/review 1-2?
-> Should I squash them in a v3?
-
-Yeah, it will be a fight to see who gets landed first...  :-P
-
-I was thinking you were going to spin the patches and I'd do another
-batch of review, but I think I can mark the first two as Reveiwed-by
-if it's helpful to you.  Let me do one more double-check when I get to
-my desk.
-
--Doug
+> +		status = efi_low_alloc(sys_table, kernel_memsize + TEXT_OFFSET,
+> +				       SZ_2M, reserve_addr);
+>  		if (status != EFI_SUCCESS) {
+>  			pr_efi_err(sys_table, "Failed to relocate kernel\n");
+>  			return status;
+>  		}
+> -		if (*image_addr != (dram_base + TEXT_OFFSET)) {
+> -			pr_efi_err(sys_table, "Failed to alloc kernel memory\n");
+> -			efi_free(sys_table, kernel_memsize, *image_addr);
+> -			return EFI_ERROR;
+> -		}
+> -		*image_size = kernel_memsize;
+> +		memcpy((void *)*reserve_addr + TEXT_OFFSET, (void *)*image_addr,
+> +		       kernel_size);
+> +		*image_addr = *reserve_addr + TEXT_OFFSET;
+> +		*reserve_size = kernel_memsize + TEXT_OFFSET;
+>  	}
+>  
+> 
