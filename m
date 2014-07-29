@@ -1,79 +1,44 @@
-From: grant.likely@secretlab.ca (Grant Likely)
-Date: Mon, 28 Jul 2014 23:52:34 -0600
-Subject: [RFC PATCH 2/2] of/clk: use "clkops-clocks" to specify clocks
- handled by clock_ops domain
-In-Reply-To: <53D68CC4.1010704@ti.com>
-References: <1398334403-26181-1-git-send-email-geert+renesas@glider.be>
- <1402592023-13416-1-git-send-email-grygorii.strashko@ti.com>
- <1402592023-13416-3-git-send-email-grygorii.strashko@ti.com>
- <20140728140533.6E916C4116F@trevor.secretlab.ca> <53D68CC4.1010704@ti.com>
-Message-ID: <CACxGe6uMke5vgzcNC9xUqjr2bHJ4QFHD6YjocSZWq8Ccx8Mm6A@mail.gmail.com>
+From: sfr@canb.auug.org.au (Stephen Rothwell)
+Date: Tue, 29 Jul 2014 15:53:02 +1000
+Subject: linux-next: manual merge of the irqchip tree with the arm-soc tree
+Message-ID: <20140729155302.3c1d5437@canb.auug.org.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jul 28, 2014 at 11:47 AM, Grygorii Strashko
-<grygorii.strashko@ti.com> wrote:
-> Hi Grant.
->
-> On 07/28/2014 05:05 PM, Grant Likely wrote:
->> On Thu, 12 Jun 2014 19:53:43 +0300, Grygorii Strashko <grygorii.strashko@ti.com> wrote:
->>> Use "clkops-clocks" property to specify clocks handled by
->>> clock_ops domain PM domain. Only clocks defined in "clkops-clocks"
->>> set of clocks will be handled by Runtime PM through clock_ops
->>> Pm domain.
->>>
->>> Signed-off-by: Grygorii Strashko <grygorii.strashko@ti.com>
->>> ---
->>>   drivers/of/of_clk.c |    7 ++-----
->>>   1 file changed, 2 insertions(+), 5 deletions(-)
->>>
->>> diff --git a/drivers/of/of_clk.c b/drivers/of/of_clk.c
->>> index 35f5e9f..5f9b90e 100644
->>> --- a/drivers/of/of_clk.c
->>> +++ b/drivers/of/of_clk.c
->>> @@ -86,11 +86,8 @@ int of_clk_register_runtime_pm_clocks(struct device_node *np,
->>>      struct clk *clk;
->>>      int error;
->>>
->>> -    for (i = 0; (clk = of_clk_get(np, i)) && !IS_ERR(clk); i++) {
->>> -            if (!clk_may_runtime_pm(clk)) {
->>> -                    clk_put(clk);
->>> -                    continue;
->>> -            }
->>> +    for (i = 0; (clk = of_clk_get_from_set(np, "clkops", i)) &&
->>> +                 !IS_ERR(clk); i++) {
->>
->> This really looks like an ABI break to me. What happens to all the
->> existing platforms who don't have this new clkops-clocks in their device
->> tree?
->
-> Agree. This patch as is will break such platforms.
-> As possible solution for above problem - the NULL can be used as clock's prefix
-> by default and platform code can configure new value of clock's prefix during
-> initialization.
-> In addition, to make this solution full the of_clk_get_by_name() will
-> need to be modified too.
->
-> But note pls, this is pure RFC patches which I did to find out the answer on questions:
-> - What is better: maintain Runtime PM clocks configuration in DT or in code?
+Hi Jason,
 
-In code. I don't think it is workable to embed runtime PM behaviour
-into the DT bindings. I think there will be too much variance in what
-hardware requires. We can create helpers to make this simpler, but I
-don't think it is a good idea to set it up automatically without any
-control from the driver itself.
+Today's linux-next merge of the irqchip tree got a conflict in
+Documentation/devicetree/bindings/arm/gic.txt between commit
+f80b71397d09 ("ARM: brcmstb: gic: add compatible string for Broadcom
+Brahma15") from the arm-soc tree and commit 3e44358c12cc ("") from the
+irqchip tree.
 
->
-> - Where and when to call of_clk_register_runtime_pm_clocks()?
->   Bus notifier/ platform core/ device drivers
+I fixed it up (see below) and can carry the fix as necessary (no action
+is required).
 
-I would say in device drivers.
+-- 
+Cheers,
+Stephen Rothwell                    sfr at canb.auug.org.au
 
-> Also, May be platform dependent solution [1] can be acceptable for now?
->
-> [1] https://lkml.org/lkml/2014/7/25/630
-
-I need to look at the series before I comment. I've flagged it and
-will hopefully look at it tomorrow.
-
-g.
+diff --cc Documentation/devicetree/bindings/arm/gic.txt
+index c7d2fa156678,d2eea0b75580..000000000000
+--- a/Documentation/devicetree/bindings/arm/gic.txt
++++ b/Documentation/devicetree/bindings/arm/gic.txt
+@@@ -16,8 -17,9 +17,10 @@@ Main node required properties
+  	"arm,cortex-a9-gic"
+  	"arm,cortex-a7-gic"
+  	"arm,arm11mp-gic"
+ +	"brcm,brahma-b15-gic"
++ 
+  - interrupt-controller : Identifies the node as an interrupt controller
++ 
+  - #interrupt-cells : Specifies the number of cells needed to encode an
+    interrupt source.  The type shall be a <u32> and the value shall be 3.
+  
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140729/caaf7c4e/attachment.sig>
