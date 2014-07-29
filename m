@@ -1,64 +1,70 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Tue, 29 Jul 2014 18:03:09 +0200
-Subject: [PATCH v11 0/2] Add support for the Allwinner A31 DMA Controller
-In-Reply-To: <20140728141812.GE8181@intel.com>
-References: <1405626376-471-1-git-send-email-maxime.ripard@free-electrons.com>
- <20140725131217.GS8181@intel.com> <20140725163746.GC20328@lukather>
- <20140725164218.GW8181@intel.com> <20140728101402.GD3952@lukather>
- <20140728141812.GE8181@intel.com>
-Message-ID: <20140729160309.GS3952@lukather>
+From: s-anna@ti.com (Suman Anna)
+Date: Tue, 29 Jul 2014 11:10:17 -0500
+Subject: [PATCH 1/2] remoteproc: use a flag to detect the presence of IOMMU
+In-Reply-To: <CAK=Wgbawdik3ZB0Zbeaa7eXd7M+9ev9u713GcfOc4Gy0+O80Dg@mail.gmail.com>
+References: <1404836521-59637-1-git-send-email-s-anna@ti.com>
+ <1404836521-59637-2-git-send-email-s-anna@ti.com>
+ <CAK=Wgbawdik3ZB0Zbeaa7eXd7M+9ev9u713GcfOc4Gy0+O80Dg@mail.gmail.com>
+Message-ID: <53D7C769.6080500@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jul 28, 2014 at 07:48:12PM +0530, Vinod Koul wrote:
-> On Mon, Jul 28, 2014 at 12:14:02PM +0200, Maxime Ripard wrote:
-> > On Fri, Jul 25, 2014 at 10:12:18PM +0530, Vinod Koul wrote:
-> > > On Fri, Jul 25, 2014 at 06:37:46PM +0200, Maxime Ripard wrote:
-> > > > > Can you please send follow patches for these:
-> > > > > - don't recall if I pointed earlier, but can we use direct conversion for
-> > > > >   calculating convert_burst() and convert_buswidth(), latter one at least
-> > > > >   seem doable
-> > > > 
-> > > > Ok. Do you still want the error reporting for the invalid width and
-> > > > burst size?
-> > > I think for convert_buswidth() we can do away with a switch case and convert
-> > > the numbers directly
-> > 
-> > Well, it's already using a switch. Do you want me to remove completely
-> > the function and move the switch where it's used? It's used two times
-> > now, so I'd like to avoid duplicating it.
-> You can probably remove switch in these function by converting them
-> arithmetically..
+Hi Ohad,
+
+On 07/29/2014 05:57 AM, Ohad Ben-Cohen wrote:
+> Hi Suman,
 > 
-> > > > > - don't use devm_request_irq(). You have irq enabled and you have killed
-> > > > >   tasklet. This is too racy. You need to ensure no irqs can be generated before killing
-> > > > >   tasklets.
-> > > > 
-> > > > Ok, would calling disable_irq before killing the tasklet an option for
-> > > > you ? that would allow to keep the devm_request_irq.
-> > > disable_irq also does syncronize, so it might work. But then again if the
-> > > probe fails after registering irq due to some other reason, and you get into
-> > > races with unitialized driver as well.
-> > > 
-> > > I think it might be easier to amnge by working with plain old request_irq()
-> > 
-> > Yes, devm_free_irq like Russell suggested seems to both address your
-> > concerns, while not having to care about it at probe.
-> OK, pls send the fix
+> On Tue, Jul 8, 2014 at 7:22 PM, Suman Anna <s-anna@ti.com> wrote:
+>> The remoteproc driver core currently relies on iommu_present() on
+>> the bus the device is on, to perform MMU management. However, this
+>> logic doesn't scale for multi-arch, especially for processors that
+>> do not have an IOMMU.
+> 
+> Is there a specific hw/scenario where you need this? Can you please
+> provide more details about it?
 
-Ok, will do tomorrow.
+We are trying to add a remoteproc driver for a small Cortex M3 called
+the WkupM3 used for suspend/resume management on TI AM335/AM437x SoCs.
+This processor does not have an MMU. Same is the case with another
+processor subsystem PRU-ICSS on AM335/AM437x. All these are platform
+devices, and the current iommu_present check will not scale for the same
+kernel image to support OMAP4/OMAP5 and AM335/AM437x.
 
-Thanks!
-Maxime
+This patch mainly addresses the existing comments in the code,
+-	 * This works for simple cases, but will easily fail with
+-	 * platforms that do have an IOMMU, but not for this specific
+-	 * rproc.
+-	 *
+-	 * This will be easily solved by introducing hw capabilities
+-	 * that will be set by the remoteproc driver.
 
--- 
-Maxime Ripard, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140729/e24cf17c/attachment.sig>
+> 
+> Ideally we should add them to the commit log as well.
+> 
+>> The individual platform implementations are required to set this
+>> flag appropriately. The default setting is to not have an MMU.
+> 
+> Let's explicitly set the default please so this would be clear for
+> users reading the code.
+
+OK, I can update the existing drivers to explicitly set this field.
+
+> 
+>> Cc: Sjur Br?ndeland <sjur.brandeland@stericsson.com>
+> 
+> Sjur is no longer with STE, so no point in cc'ing his old email address.
+
+Yeah, I wasn't aware until I got a bounced email.
+
+> 
+>> +       /*
+>> +        * All existing OMAP IPU and DSP processors do have an MMU, and
+>> +        * are expected to use MMU, so this statement suffices.
+>> +        * XXX: Replace this logic if and when a need arises.
+> 
+> The last XXX comment is always true for any kernel code, so I'd drop it.
+
+Sure.
+
+regards
+Suman
