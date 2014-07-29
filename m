@@ -1,33 +1,40 @@
-From: pawel.moll@arm.com (Pawel Moll)
-Date: Tue, 29 Jul 2014 12:06:27 +0100
-Subject: [PATCH v9] video: ARM CLCD: Add DT support
-In-Reply-To: <1406023366.25343.44.camel@hornet>
-References: <1403610911-31491-1-git-send-email-pawel.moll@arm.com>
- <1404824767.21897.7.camel@hornet> <1406023366.25343.44.camel@hornet>
-Message-ID: <1406631987.17155.0.camel@hornet>
+From: tony@atomide.com (Tony Lindgren)
+Date: Tue, 29 Jul 2014 04:07:54 -0700
+Subject: [PATCH v2] ARM: AM43xx: hwmod: add DSS hwmod data
+In-Reply-To: <20140725165304.GD29132@saruman.home>
+References: <1402994233-22599-1-git-send-email-tomi.valkeinen@ti.com>
+ <alpine.DEB.2.02.1407222110260.25593@utopia.booyaka.com>
+ <20140725165304.GD29132@saruman.home>
+Message-ID: <20140729110754.GN29045@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 2014-07-22 at 11:02 +0100, Pawel Moll wrote:
-> On Tue, 2014-07-08 at 14:06 +0100, Pawel Moll wrote:
-> > On Tue, 2014-06-24 at 12:55 +0100, Pawel Moll wrote:
-> > > This patch adds basic DT bindings for the PL11x CLCD cells
-> > > and make their fbdev driver use them.
+* Felipe Balbi <balbi@ti.com> [140725 09:55]:
+> On Tue, Jul 22, 2014 at 09:14:20PM +0000, Paul Walmsley wrote:
+> > On Tue, 17 Jun 2014, Tomi Valkeinen wrote:
+> > 
+> > > From: Sathya Prakash M R <sathyap@ti.com>
 > > > 
-> > > Signed-off-by: Pawel Moll <pawel.moll@arm.com>
+> > > Add DSS hwmod data for AM43xx.
+> > > 
+> > > Signed-off-by: Sathya Prakash M R <sathyap@ti.com>
+> > > [tomi.valkeinen at ti.com: added missing dispc flags]
+> > > Signed-off-by: Tomi Valkeinen <tomi.valkeinen@ti.com>
+> > > Acked-by: Rajendra Nayak <rnayak@ti.com>
 > > 
-> > As two weeks passed without any further comment, I'm assuming that there
-> > are no more obstacles for this patch to be merged.
+> > This one didn't compile on an AM43xx-only build:
 > > 
-> > Tomi, will you pick it up for 3.17, as you offered? Russell, if you
-> > prefer to take it via your tree, it's in your system as 8005/4.
+> > ----
+> > arch/arm/mach-omap2/built-in.o:(.data+0x3f2c): undefined reference to `omap2_dss_hwmod_class'
+> > arch/arm/mach-omap2/built-in.o:(.data+0x405c): undefined reference to `omap2_rfbi_hwmod_class'
+> > make: *** [vmlinux] Error 1
+> > test_build: Tue Jul 22 13:48:50 MDT 2014: FAILED on omap2plus_defconfig_am43xx_only hwmod-a-v3.17
+> > ----
+> > 
+> > Have queued the following patch instead.
 > 
-> Ping...
-> 
-> Tomi?
+> queued for v3.17, I assume. Still not available from linux-next though.
 
-... and again...
+Should be in linux-next now.
 
-Regards
-
-Pawel
+Tony
