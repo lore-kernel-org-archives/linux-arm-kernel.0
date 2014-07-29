@@ -1,53 +1,72 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 29 Jul 2014 12:56:04 +0200
-Subject: [GIT PULL v2][for 3.17] pull request for hisilicon terminal soc
-In-Reply-To: <53D750CA.5090405@hisilicon.com>
-References: <53D750CA.5090405@hisilicon.com>
-Message-ID: <9329037.jXTZlWzWep@wuerfel>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Tue, 29 Jul 2014 11:57:17 +0100
+Subject: [PATCH 2/2] ARM: LPAE: reduce damage caused by idmap to
+ virtual memory layout
+In-Reply-To: <CALYGNiO6PEPoHDrcLRZxQVT2=-1upyh6E-TWBCMB0MR8u5Sx6w@mail.gmail.com>
+References: <20140722153623.25088.37742.stgit@buzz>
+ <20140722153635.25088.14197.stgit@buzz> <20140728181456.GO15536@arm.com>
+ <CALYGNiNJDHfQm2yk067hh-Wywsb_Ki5AEE_sTMkYegJi9spSzw@mail.gmail.com>
+ <20140728184107.GR15536@arm.com>
+ <CALYGNiNaMMv9itJ_+cvPDn1_Yo4GTPQJ-Cy9zBzJzfaDLfkvmg@mail.gmail.com>
+ <20140728191305.GA30282@n2100.arm.linux.org.uk>
+ <CALYGNiNVduTK8MXt8VJyiqdsB0mA_OnC0hLOB-WzgAEMZyu9sg@mail.gmail.com>
+ <20140728194251.GB30282@n2100.arm.linux.org.uk>
+ <CALYGNiO6PEPoHDrcLRZxQVT2=-1upyh6E-TWBCMB0MR8u5Sx6w@mail.gmail.com>
+Message-ID: <20140729105717.GC30282@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 29 July 2014 15:44:10 xuwei wrote:
-> Hi Olof, Hi Kevin, Hi Arnd,
+On Mon, Jul 28, 2014 at 11:57:16PM +0400, Konstantin Khlebnikov wrote:
+> On Mon, Jul 28, 2014 at 11:42 PM, Russell King - ARM Linux
+> <linux@arm.linux.org.uk> wrote:
+> > On Mon, Jul 28, 2014 at 11:29:39PM +0400, Konstantin Khlebnikov wrote:
+> >> Ok, before switching from identity mapping to normal mapping kernel must
+> >> switch instruction pointer from physical address to virtual.
+> >
+> > "switch instruction pointer from physical address to virtual."
+> >
+> > There's no such distinction for the instruction pointer.
 > 
-> Please help to merge pull request for hisilicon terminal soc. 
+> I know. I mean "logically".
 > 
-> Best Regards,
-> Wei
+...
 > 
-> 
-> The following changes since commit 7171511eaec5bf23fb06078f59784a3a0626b38f:
-> 
->   Linux 3.16-rc1 (2014-06-15 17:45:28 -1000)
-> 
-> are available in the git repository at:
-> 
->   git://github.com/hisilicon/linux-hisi.git tags/hix5hd2-for-3.17-v2
-> 
-> for you to fetch changes up to eeea1ab9b53f311f634e87d9208daa564a97dbba:
-> 
->   ARM: hisi: remove smp from machine descriptor (2014-07-29 14:54:11 +0800)
-> 
-> ----------------------------------------------------------------
-> ARM: mach-hisi: Hisilicon teminal soc udaptes for 3.17
-> 
-> - Rename Hi3716 to HiX5HD2
-> HiX5HD2 is a SoC with dual Cortex A9 cores for STB market.
-> And original Hi3xxx SoC is for mobile market.
-> To avoid confusing the two types of SoCs and also because of
-> different implementation(SMP, IPs integarted and earlycon configure),
-> rename Hi3716 to HIX5HD2 ann add ARCH_HIX5HD2.
-> 
-> - Add HiX5HD2 STB SoC and development kit board support
-> - Change to use power reset driver to reboot for HiX5HD2
-> - Add ARCH_HISI for the common configure of hisilicon SoCs
-> - Change to use CPU_METHOD_OF_DECLARE for SMP on HiX5HD2 and hi3xxx
-> - Enable L2 aux value for Hi3620
-> 
+> Sorry but I'm really look so dumb? Maybe it's true, it's almost
+> midnight at my side.
 
-Looks all good to me now. I'll wait for Olof to take a second look,
-since he had comments as well, and will let him pull it.
+When you use language which suggests a lack of understanding, then
+I will explain things.
 
-Thanks for updating it this quickly to address all my comments!
+> > It doesn't matter, provided the kernel text and data in the virtual
+> > address space are not overwritten by the identity mapping.  If it
+> > ends up in the vmalloc or IO space, that should not be a problem.
+> 
+> In my case it's been overwritten.
+> And it always happens when PHYS_OFFSET >= PAGE_OFFSET
+> because in case of LPAE idmap always overwrites 1Gb at once.
 
-	Arnd
+Right, I now see what you're getting at.  Here's a better description
+which I've used when committing your patch.  I've only taken patch 2
+at the present time.
+
+
+
+On LPAE, each level 1 (pgd) page table entry maps 1GiB, and the level 2
+(pmd) entries map 2MiB.
+
+When the identity mapping is created on LPAE, the pgd pointers are copied
+from the swapper_pg_dir.  If we find that we need to modify the contents
+of a pmd, we allocate a new empty pmd table and insert it into the
+appropriate 1GB slot, before then filling it with the identity mapping.
+
+However, if the 1GB slot covers the kernel lowmem mappings, we obliterate
+those mappings.
+
+When replacing a PMD, first copy the old PMD contents to the new PMD, so
+that we preserve the existing mappings in the 1GiB region, particularly
+the mappings of the kernel itself.
+
+
+-- 
+FTTC broadband for 0.8mile line: currently at 9.5Mbps down 400kbps up
+according to speedtest.net.
