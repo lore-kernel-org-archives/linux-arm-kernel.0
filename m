@@ -1,96 +1,96 @@
-From: koct9i@gmail.com (Konstantin Khlebnikov)
-Date: Tue, 29 Jul 2014 16:29:49 +0400
-Subject: [PATCH 1/2] ARM: LPAE: load upper bits of early TTBR0/TTBR1
-In-Reply-To: <20140728184741.GT15536@arm.com>
-References: <20140722153623.25088.37742.stgit@buzz>
- <20140728181224.GN15536@arm.com>
- <CALYGNiNrK1d32ecz4rw0sgn0GyN-M6hTBuTLGQV53Z4Br-bpYQ@mail.gmail.com>
- <20140728184741.GT15536@arm.com>
-Message-ID: <CALYGNiOd+Dy-2q_woZ9UDbMO24q58jN1Nsq7E8cJMMg_YBK9pA@mail.gmail.com>
+From: paul@pwsan.com (Paul Walmsley)
+Date: Tue, 29 Jul 2014 12:32:08 +0000 (UTC)
+Subject: OMAP baseline test results for v3.16-rc4
+In-Reply-To: <20140729084930.GH29045@atomide.com>
+References: <alpine.DEB.2.02.1407062339420.15016@utopia.booyaka.com>
+ <20140707080238.GF28884@atomide.com>
+ <alpine.DEB.2.02.1407251857480.5875@utopia.booyaka.com>
+ <20140729064243.GF29045@atomide.com>
+ <alpine.DEB.2.02.1407290810160.22957@utopia.booyaka.com>
+ <20140729084930.GH29045@atomide.com>
+Message-ID: <alpine.DEB.2.02.1407291225070.13035@utopia.booyaka.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jul 28, 2014 at 10:47 PM, Will Deacon <will.deacon@arm.com> wrote:
-> On Mon, Jul 28, 2014 at 07:40:58PM +0100, Konstantin Khlebnikov wrote:
->> On Mon, Jul 28, 2014 at 10:12 PM, Will Deacon <will.deacon@arm.com> wrote:
->> > On Tue, Jul 22, 2014 at 04:36:23PM +0100, Konstantin Khlebnikov wrote:
->> >> This patch fixes booting when idmap pgd lays above 4gb. Commit
->> >> 4756dcbfd37 mostly had fixed this, but it'd failed to load upper bits.
->> >>
->> >> Also this fixes adding TTBR1_OFFSET to TTRR1: if lower part overflows
->> >> carry flag must be added to the upper part.
->> >>
->> >> Signed-off-by: Konstantin Khlebnikov <k.khlebnikov@samsung.com>
->> >> Cc: Cyril Chemparathy <cyril@ti.com>
->> >> Cc: Vitaly Andrianov <vitalya@ti.com>
->> >> ---
->> >>  arch/arm/mm/proc-v7-3level.S |    7 +++----
->> >>  1 file changed, 3 insertions(+), 4 deletions(-)
->> >>
->> >> diff --git a/arch/arm/mm/proc-v7-3level.S b/arch/arm/mm/proc-v7-3level.S
->> >> index 22e3ad6..f0481dd 100644
->> >> --- a/arch/arm/mm/proc-v7-3level.S
->> >> +++ b/arch/arm/mm/proc-v7-3level.S
->> >> @@ -140,12 +140,11 @@ ENDPROC(cpu_v7_set_pte_ext)
->> >>       mov     \tmp, \ttbr1, lsr #(32 - ARCH_PGD_SHIFT)        @ upper bits
->> >>       mov     \ttbr1, \ttbr1, lsl #ARCH_PGD_SHIFT             @ lower bits
->> >>       addls   \ttbr1, \ttbr1, #TTBR1_OFFSET
->> >> -     mcrr    p15, 1, \ttbr1, \zero, c2                       @ load TTBR1
->> >> +     adcls   \tmp, \tmp, #0
->> >> +     mcrr    p15, 1, \ttbr1, \tmp, c2                        @ load TTBR1
->> >>       mov     \tmp, \ttbr0, lsr #(32 - ARCH_PGD_SHIFT)        @ upper bits
->> >>       mov     \ttbr0, \ttbr0, lsl #ARCH_PGD_SHIFT             @ lower bits
->> >> -     mcrr    p15, 0, \ttbr0, \zero, c2                       @ load TTBR0
->> >> -     mcrr    p15, 1, \ttbr1, \zero, c2                       @ load TTBR1
->> >> -     mcrr    p15, 0, \ttbr0, \zero, c2                       @ load TTBR0
->> >> +     mcrr    p15, 0, \ttbr0, \tmp, c2                        @ load TTBR0
->> >
->> > I must admit, the code you are removing here looks really strange. Was there
->> > a badly resolved conflict somewhere along the way? It would be nice to see
->> > if your fix (which seems ok to me) was actually present in the mailing list
->> > posting of the patch that ended in the above mess.
->>
->> Nope, no merge conflicts, source in original patch
->> https://lkml.org/lkml/2012/9/11/346
->>
->> That mess completely harmless, this code is used only once on boot.
->> I don't have that email, so replying isn't trivial for me.
->
-> How bizarre. Also, Cyril doesn't work for TI anymore (his email is
-> bouncing), so it's tricky to know what he meant here.
->
-> Your patch looks better than what we currently have though. Have you managed
-> to test it on a keystone platform (I don't have one)?
+On Tue, 29 Jul 2014, Tony Lindgren wrote:
 
-No, I don't have it too. As well as I don't have direct access to the
-platform where
-problem was found. I've debugged this in patched qemu.
+> * Paul Walmsley <paul@pwsan.com> [140729 01:27]:
+> > On Mon, 28 Jul 2014, Tony Lindgren wrote:
+> > 
+> > > Hmm I think the difference with the working v3.10 one is that you have
+> > > root=/dev/mmcblk0p2 instead of root=/dev/nfs. As the Ethernet on beagle
+> > > is on the USB EHCI, this is still blocking the deeper idle states AFAIK.
+> > 
+> > Hmm?  There's no Ethernet on the 3530 Beagle.
+> > 
+> > The hardware configuration on those two boards - the 37xxevm and 
+> > the 3530es3beagle - hasn't changed between the two test runs, AFAIK.
+> 
+> Oh it's the original beagle, sorry. In that case the uart wake interrupts
+> need to be enabled for the serial wake to work. I did not do that as
+> I don't have one. I guess that might explain why it fails? Or are you
+> using RTC wake for your test?
+
+Serial wake works fine.  But the chip never enters dynamic retention idle 
+as measured by the pm_debug/count differential for CORE powerdomain.
+Works OK with static suspend.
+
+> Wrong link here :) It should be:
+> 
+> http://www.pwsan.com/omap/testlogs/test_v3.16-rc7/20140727174803/pm/37xxevm/37xxevm_log.txt
+
+Oops indeed :-)
+
+> > I should probably read back those writes to autosuspend_delay_ms, just to 
+> > make sure they are reaching the right destinations.  But you might want to 
+> > confirm that you can see the CORE RET count increasing during dynamic idle 
+> > on your 37xxevm.
+> 
+> Hmm seems to work on 37xxevm for me with my retention test script:
+> 
+> uarts=$(find /sys/class/tty/ttyO*/device/power/ -type d)
+> for uart in $uarts; do
+>         echo 3000 > $uart/autosuspend_delay_ms
+> done
+> 
+> uarts=$(find /sys/class/tty/ttyO*/power/ -type d)
+> for uart in $uarts; do
+>         echo enabled > $uart/wakeup
+>         echo auto > $uart/control
+> done
+> 
+> echo 0 > /sys/kernel/debug/pm_debug/enable_off_mode
+> 
+> Which produces:
+> 
+> core_pwrdm (ON),OFF:0,RET:7,INA:0,ON:8,RET-LOGIC-OFF:0,RET-MEMBANK1-OFF:0,RET-MEMBANK2-OFF:0
+> 
+> And then setting enable_off_mode:
+> 
+> core_pwrdm (ON),OFF:15,RET:100,INA:8,ON:124,RET-LOGIC-OFF:0,RET-MEMBANK1-OFF:0,RET-MEMBANK2-OFF:0
+
+OK thanks for the point of comparison.
+
+> And I'm using UART3 like I mentioned earlier, but I doubt that
+> makes a difference.
+> 
+> Are you maybe missing "echo auto > $uart/control"?
+
+It should be doing both of those things, according to the logs:
+
+--------
+# # for u in `ls -1d /sys/class/tty/ttyO* | paste -s -d' '`; do echo 
+enabled >  $u/power/wakeup; done
+
+#
+%% Start retention double suspend/resume UART wakeup test
+
+ # for u in `ls -1d /sys/class/tty/ttyO* | paste -s -d' '`; do echo auto >  
+$u/power/control; done
+--------
+
+I will add code to read back the values from the sysfs files, just to make 
+sure they are being set.
 
 
-Also this commit has wrong assumptions about idmap pgd address.
-(at least in the commit message)
-
-Probably suspend/resume path is affected too. I'll try to check it.
-
-commit f3db3f4389dbd9a8c2b4477f37a6ebddfd670ad8
-Author: Mahesh Sivasubramanian <msivasub@codeaurora.org>
-Date:   Fri Nov 8 23:25:20 2013 +0100
-
-    ARM: 7885/1: Save/Restore 64-bit TTBR registers on LPAE suspend/resume
-
-    LPAE enabled kernels use the 64-bit version of TTBR0 and TTBR1
-    registers. If we're running an LPAE kernel, fill the upper half
-    of TTBR0 with 0 because we're setting it to the idmap here (the
-    idmap is guaranteed to be < 4Gb) and fully restore TTBR1 instead
-    of just restoring the lower 32 bits. Failure to do so can cause
-    failures on resume from suspend when these registers are only
-    half restored.
-
-    Signed-off-by: Mahesh Sivasubramanian <msivasub@codeaurora.org>
-    Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
-    Acked-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
-    Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
-
-
->
-> Will
+- Paul
