@@ -1,47 +1,55 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 29 Jul 2014 12:07:05 +0200
-Subject: [PATCH 19/19] Documentation: ACPI for ARM64
-In-Reply-To: <53D766A2.1070004@linaro.org>
-References: <1406206825-15590-1-git-send-email-hanjun.guo@linaro.org>
- <53D67703.7090306@arm.com> <53D766A2.1070004@linaro.org>
-Message-ID: <5204108.U2T4GFhQeP@wuerfel>
+From: tomasz.figa@gmail.com (Tomasz Figa)
+Date: Tue, 29 Jul 2014 12:13:46 +0200
+Subject: [PATCH v8 2/6] clk: samsung: add cpu clock configuration data
+ and instantiate cpu clock
+In-Reply-To: <1406611711-25112-3-git-send-email-thomas.ab@samsung.com>
+References: <1406611711-25112-1-git-send-email-thomas.ab@samsung.com>
+ <1406611711-25112-3-git-send-email-thomas.ab@samsung.com>
+Message-ID: <53D773DA.6050003@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 29 July 2014 10:17:22 Graeme Gregory wrote:
-> On 28/07/2014 17:14, Andre Przywara wrote:
-> >
-> > On 28/07/14 16:23, Arnd Bergmann wrote:
-> >> On Monday 28 July 2014 15:20:06 Andre Przywara wrote:
-> >>> On 28/07/14 11:46, Arnd Bergmann wrote:
-> >>>> On Monday 28 July 2014 10:23:57 Graeme Gregory wrote:
-> >>>>> The PL011 UART is the use-case I keep hitting, that IP block has a
-> >>>>> variable input clock on pretty much everything I have seen in the wild.
-> >>>> Ok, I see. What does ACPI-5.1 say about pl011?
-> >>>>
-> >>>> Interestingly, the subset of pl011 that is specified by SBSA does not
-> >>>> contain the IBRD/FBRD registers, effectively making it a fixed-rated
-> >>>> UART (I guess that would be a ART, without the U then), and you
-> >>>> consequently don't even need to know the clock rate.
-> >>> The idea of this was probably to let the baudrate set by some firmware
-> >>> code to the "right" value and the spec just didn't want to expose the
-> >>> details for the generic UART:
-> >>> "This specification does not cover registers needed to configure the
-> >>> UART as these are considered hardware-specific and will be set up by
-> >>> hardware-specific software."
-> >>> To me that reads like the SBSA UART is just for debugging, and you are
-> >>> expected just to access the data register.
-> >> Right, makes sense. It also avoids the case where Linux for some reason
-> >> ends up using a different line rate than the firmware, which can
-> >> cause a lot of unnecessary pain.
-> I must be suffering snow blindness reading specs, I totally missed that 
-> the pl011 subset does not allow baud setting. This means that my current 
-> test hardware "Juno" does not actually need any clocks defined in DSDT 
-> at this stage (given that this new driver is created).
-> 
-> I may then return to my original opinion of not defining clocks in the 
-> DSDT at all.
+Hi Thomas,
 
-Ok, that certainly simplifies it a lot, thanks!
+Just few minor comments for things I probably missed before.
 
-	Arnd
+On 29.07.2014 07:28, Thomas Abraham wrote:
+
+[snip]
+
+> @@ -1356,6 +1357,16 @@ static struct samsung_pll_clock exynos4x12_plls[nr_plls] __initdata = {
+>  			VPLL_LOCK, VPLL_CON0, NULL),
+>  };
+>  
+> +static const struct exynos_cpuclk_cfg_data e4210_armclk_d[] __initconst = {
+> +	{ 1200000, E4210_CPU_DIV0(7, 1, 4, 3, 7, 3), E4210_CPU_DIV1(0, 5), },
+> +	{ 1000000, E4210_CPU_DIV0(7, 1, 4, 3, 7, 3), E4210_CPU_DIV1(0, 4), },
+> +	{  800000, E4210_CPU_DIV0(7, 1, 3, 3, 7, 3), E4210_CPU_DIV1(0, 3), },
+> +	{  500000, E4210_CPU_DIV0(7, 1, 3, 3, 7, 3), E4210_CPU_DIV1(0, 3), },
+> +	{  400000, E4210_CPU_DIV0(7, 1, 3, 3, 7, 3), E4210_CPU_DIV1(0, 3), },
+
+I have noticed that the old driver does not have this operating point.
+While it is probably OK to add this one and even few more for all
+possible APLL settings, I am interested in how you obtained the values
+for DIV0 and DIV1 registers for this configuration.
+
+> +	{  200000, E4210_CPU_DIV0(0, 1, 1, 1, 3, 1), E4210_CPU_DIV1(0, 3), },
+> +	{  0 },
+> +};
+
+[snip]
+
+> diff --git a/include/dt-bindings/clock/exynos5250.h b/include/dt-bindings/clock/exynos5250.h
+> index 4273891..855d809 100644
+> --- a/include/dt-bindings/clock/exynos5250.h
+> +++ b/include/dt-bindings/clock/exynos5250.h
+> @@ -21,6 +21,7 @@
+>  #define CLK_FOUT_CPLL		6
+>  #define CLK_FOUT_EPLL		7
+>  #define CLK_FOUT_VPLL		8
+> +#define CLK_ARM_CLK		12
+
+Why 12 not 9?
+
+Best regards,
+Tomasz
