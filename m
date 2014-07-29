@@ -1,27 +1,26 @@
 From: tj@kernel.org (Tejun Heo)
-Date: Tue, 29 Jul 2014 10:34:38 -0400
-Subject: [PATCH v12 4/8] ata: libahci: allow to use multiple PHYs
-In-Reply-To: <1406618447-25499-1-git-send-email-antoine.tenart@free-electrons.com>
-References: <1406618447-25499-1-git-send-email-antoine.tenart@free-electrons.com>
-Message-ID: <20140729143438.GB4791@htj.dyndns.org>
+Date: Tue, 29 Jul 2014 10:36:44 -0400
+Subject: [PATCH v4 0/4]ata: Fixes related to APM X-Gene SATA host
+ controller driver.
+In-Reply-To: <CAOHikRCPY__5zTch--G3yTCdfdb=_NNoBB2tu_fANBm4JipBPw@mail.gmail.com>
+References: <1406616892-30273-1-git-send-email-stripathi@apm.com>
+ <20140729142648.GA4791@htj.dyndns.org>
+ <CAOHikRCPY__5zTch--G3yTCdfdb=_NNoBB2tu_fANBm4JipBPw@mail.gmail.com>
+Message-ID: <20140729143644.GC4791@htj.dyndns.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jul 29, 2014 at 09:20:47AM +0200, Antoine T?nart wrote:
-> The current implementation of the libahci does not allow to use multiple
-> PHYs. This patch adds the support of multiple PHYs by the libahci while
-> keeping the old bindings valid for device tree compatibility.
+On Tue, Jul 29, 2014 at 08:05:45PM +0530, Suman Tripathi wrote:
+> Hi,
 > 
-> This introduce a new way of defining SATA ports in the device tree, with
-> one port per sub-node. This as the advantage of allowing a per port
-> configuration. Because some ports may be accessible but disabled in the
-> device tree, the port_map mask is computed automatically when using
-> this.
+> Applied 1 and 3 to libata/for-3.17.  4 doesn't apply.  Also, please
+> prefix the patches with "ahci_xgene: " from now on.
 > 
-> Signed-off-by: Antoine T?nart <antoine.tenart@free-electrons.com>
-> Acked-by: Hans de Goede <hdegoede@redhat.com>
+> [suman] : You mean the "Remove NCQ patch" is not applied. Any reason for
+> that ?
 
-Patch doesn't apply to libata/for-3.17.  Please refresh.
+I meant that the patch doesn't apply to libata/for-3.17.  Please
+always generate patches against the current devel branch.
 
 Thanks.
 
