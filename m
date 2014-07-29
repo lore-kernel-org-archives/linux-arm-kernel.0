@@ -1,49 +1,55 @@
-From: andrea.adami@gmail.com (Andrea Adami)
-Date: Tue, 29 Jul 2014 18:13:06 +0200
-Subject: [PATCH v2] spi/pxa2xx-pci: Add common clock framework support in
- PCI glue layer
-In-Reply-To: <20140725053230.GT1857@lahna.fi.intel.com>
-References: <1406221854-12828-1-git-send-email-chiau.ee.chew@intel.com>
- <20140725053230.GT1857@lahna.fi.intel.com>
-Message-ID: <CAAQYJAtM79NJJtfNYda-yFk113nm-2D8gZE5x=gbnLt2_eUdzQ@mail.gmail.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Tue, 29 Jul 2014 18:13:07 +0200
+Subject: [PATCH 1/3] arm64: spin-table: handle unmapped cpu-release-addrs
+In-Reply-To: <20140729160303.GA32108@leverpostej>
+References: <1406630950-32432-1-git-send-email-ard.biesheuvel@linaro.org>
+ <2385684.COvj9k7y2z@wuerfel> <20140729160303.GA32108@leverpostej>
+Message-ID: <11934363.ljlrQOGpcO@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jul 25, 2014 at 7:32 AM, Mika Westerberg
-<mika.westerberg@linux.intel.com> wrote:
-> On Fri, Jul 25, 2014 at 01:10:54AM +0800, chiau.ee.chew at intel.com wrote:
->> From: Chew, Chiau Ee <chiau.ee.chew@intel.com>
->>
->> SPI PXA2XX core layer has dependency on common clock framework
->> to obtain information on host supported clock rate. Thus, we
->> setup the clock device in the PCI glue layer to enable PCI mode
->> host pass in the clock rate information.
->>
->> Signed-off-by: Chew, Chiau Ee <chiau.ee.chew@intel.com>
->> Acked-by: Kweh, Hock Leong <hock.leong.kweh@intel.com>
->
-> Looks reasonable,
->
-> Acked-by: Mika Westerberg <mika.westerberg@linux.intel.com>
->
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+On Tuesday 29 July 2014 17:03:03 Mark Rutland wrote:
+> On Tue, Jul 29, 2014 at 04:20:46PM +0100, Arnd Bergmann wrote:
+> > On Tuesday 29 July 2014 11:15:45 Mark Salter wrote:
+> > > > -
+> > > > -     __flush_dcache_area(release_addr, sizeof(release_addr[0]));
+> > > > +     writeq_relaxed(__pa(secondary_holding_pen), release_addr);
+> > > > +     __flush_dcache_area(release_addr, sizeof(*release_addr));
+> > > 
+> > >        __flush_dcache_area((__force void *)release_addr, ... 
+> > > 
+> > > to avoid sparse warning.
+> 
+> Presumably we'd get this for the write_relaxed too?
 
-Hi,
+writeq_relaxed() actually expects an __iomem  pointer
 
-note that a previous version of the patch breaks spi on pxa machines:
-tested on pxa250 poodle and pxa255 corgi.
-The patch is included in linux-Yocto since 3.14.
+> > 
+> > I think it would be cleaner to drop the __iomem annotation and use vmap()
+> > rather than ioremap(). That requires having a 'struct page' though, which
+> > I'm not sure you have.
+> 
+> As far as I am aware, we'd only have a struct page for memory falling in
+> the linear map, so for the cases this patch is actually required we
+> wouldn't have a struct page.
+> 
+> So it looks like I should just make release_addr a void __iomem *. Then
+> this line can just be:
 
-The evident error is the absence of the touchscreen and on corgi a total crash.
-pxa2xx-spi: probe of pxa2xx-spi.1 failed with error -2
+You mean make it a 'void *' instead of 'void __iomem *', right?
 
-I sent the full logs to the pxa maintainers.
-Please let me know if there are any trivial fixes to apply on the top
-of this patch for the non-pci, non-DT boards or better workarounds.
+> __flush_dcache_area(release_addr, 8);
+> 
+> Where we could replace 8 with sizeof(u64), sizeof(__le64), etc if 8 is
+> too magic.
+> 
+> How does that sound?
 
-Thanks
+Not sure where you're getting at. Using a regular pointer sounds fine,
+but then you have to cast the result of ioremap and do a manual
+cpu_to_le64 conversion on the assignment.
 
-Andrea
+Keeping the iomem annotation will also work,a nd then we only need
+the cast in the __flush_dcache_area call.
+
+	Arnd
