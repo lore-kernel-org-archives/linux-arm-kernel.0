@@ -1,64 +1,44 @@
-From: msalter@redhat.com (Mark Salter)
-Date: Tue, 29 Jul 2014 11:29:16 -0400
-Subject: [PATCH 3/3] arm64/efi: efistub: don't abort if base of DRAM is
- occupied
-In-Reply-To: <1406630950-32432-4-git-send-email-ard.biesheuvel@linaro.org>
-References: <1406630950-32432-1-git-send-email-ard.biesheuvel@linaro.org>
- <1406630950-32432-4-git-send-email-ard.biesheuvel@linaro.org>
-Message-ID: <1406647756.753.11.camel@deneb.redhat.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Tue, 29 Jul 2014 08:28:38 -0700
+Subject: [PATCH 30/35] irqchip: add irq-omap-intc.h header
+In-Reply-To: <20140729151936.GC17808@saruman.home>
+References: <1406582183-696-1-git-send-email-balbi@ti.com>
+ <1406582183-696-31-git-send-email-balbi@ti.com>
+ <20140729120133.GQ29045@atomide.com>
+ <20140729141045.GA17808@saruman.home>
+ <20140729150655.GU29045@atomide.com>
+ <20140729151936.GC17808@saruman.home>
+Message-ID: <20140729152838.GW29045@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 2014-07-29 at 12:49 +0200, Ard Biesheuvel wrote:
-> If we cannot relocate the kernel Image to its preferred offset of base of DRAM
-> plus TEXT_OFFSET, instead relocate it to the lowest available 2 MB boundary plus
-> TEXT_OFFSET. We may lose a bit of memory at the low end, but we can still
-> proceed normally otherwise.
+* Felipe Balbi <balbi@ti.com> [140729 08:22]:
+> On Tue, Jul 29, 2014 at 08:06:55AM -0700, Tony Lindgren wrote:
+> > * Felipe Balbi <balbi@ti.com> [140729 07:13]:
+> > > This is the third time I rebase the series after a long hiatus and it
+> > > always comes out to the same result -> "let's wait some more".
+> > 
+> > Nope, it's always been "this series causes PM regressions"
 > 
-> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
-> ---
->  arch/arm64/kernel/efi-stub.c | 16 ++++++----------
->  1 file changed, 6 insertions(+), 10 deletions(-)
+> you just said that we haven't been in any position to really test this,
+> so can it be that the status has always been "this series causes PM
+> regressions". We couldn't test that before, right ?
 
-Tested on Mustang (with loss of 2MB free memory).
-
+It's been working for legacy booting for years with the mainline
+kernel, but not for device tree based booting until with v3.16-rc4.
+I believe I tested your earlier series with my pending DT patches
+though.
+ 
+> > and few other minor comments. And we have not been in any
+> > position to really test that until with v3.16-rc4. And then
+> > you always run out of time and nobody else does anything :)
 > 
-> diff --git a/arch/arm64/kernel/efi-stub.c b/arch/arm64/kernel/efi-stub.c
-> index 60e98a639ac5..460c00c41e57 100644
-> --- a/arch/arm64/kernel/efi-stub.c
-> +++ b/arch/arm64/kernel/efi-stub.c
-> @@ -60,20 +60,16 @@ static efi_status_t handle_kernel_image(efi_system_table_t *sys_table,
->  	kernel_size = _edata - _text;
->  	if (*image_addr != (dram_base + TEXT_OFFSET)) {
->  		kernel_memsize = kernel_size + (_end - _edata);
-> -		status = efi_relocate_kernel(sys_table, image_addr,
-> -					     kernel_size, kernel_memsize,
-> -					     dram_base + TEXT_OFFSET,
-> -					     PAGE_SIZE);
+> sure, I have other stuff to do as well.
 
-Can we make efi_relocate_kernel static inline to get rid
-of the "defined but unused" warning?
+Right :) I and others can provide some help here, but it's
+the mr. patch author that needs to follow up on this series
+too :p
 
-Otherwise:
+Regards,
 
-Acked-by: Mark Salter <msalter@redhat.com>
-
-> +		status = efi_low_alloc(sys_table, kernel_memsize + TEXT_OFFSET,
-> +				       SZ_2M, reserve_addr);
->  		if (status != EFI_SUCCESS) {
->  			pr_efi_err(sys_table, "Failed to relocate kernel\n");
->  			return status;
->  		}
-> -		if (*image_addr != (dram_base + TEXT_OFFSET)) {
-> -			pr_efi_err(sys_table, "Failed to alloc kernel memory\n");
-> -			efi_free(sys_table, kernel_memsize, *image_addr);
-> -			return EFI_ERROR;
-> -		}
-> -		*image_size = kernel_memsize;
-> +		memcpy((void *)*reserve_addr + TEXT_OFFSET, (void *)*image_addr,
-> +		       kernel_size);
-> +		*image_addr = *reserve_addr + TEXT_OFFSET;
-> +		*reserve_size = kernel_memsize + TEXT_OFFSET;
->  	}
->  
-> 
+Tony
