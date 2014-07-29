@@ -1,52 +1,59 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Tue, 29 Jul 2014 15:04:12 +0100
-Subject: [PATCH 19/19] Documentation: ACPI for ARM64
-In-Reply-To: <CAMJs5B8uk7GDfEOEuY8RWDxzhzTRBGszRDN+JRKwG-D_rgzFrw@mail.gmail.com>
-References: <1406206825-15590-1-git-send-email-hanjun.guo@linaro.org>
- <20140729112824.GM2576@leverpostej>
- <CAMJs5B_Ye1eXsvJAKWnHRxC4jnpcXMcqHE+GgOGO7MHtPcsSQA@mail.gmail.com>
- <351673188.FxXsM7MvdA@wuerfel> <20140729130823.GP2576@leverpostej>
- <CAMJs5B8uk7GDfEOEuY8RWDxzhzTRBGszRDN+JRKwG-D_rgzFrw@mail.gmail.com>
-Message-ID: <20140729140412.GR2576@leverpostej>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Tue, 29 Jul 2014 15:05:41 +0100
+Subject: [PATCH 3/6] irqchip: irq-st: Add documentation for STi based syscfg
+ IRQs
+In-Reply-To: <1406642744-22589-1-git-send-email-lee.jones@linaro.org>
+References: <1406642744-22589-1-git-send-email-lee.jones@linaro.org>
+Message-ID: <1406642744-22589-4-git-send-email-lee.jones@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jul 29, 2014 at 02:31:16PM +0100, Christoffer Dall wrote:
-> On 29 July 2014 15:08, Mark Rutland <mark.rutland@arm.com> wrote:
-> > On Tue, Jul 29, 2014 at 01:52:40PM +0100, Arnd Bergmann wrote:
-> >> On Tuesday 29 July 2014 14:37:38 Christoffer Dall wrote:
-> >> >
-> >> > For reference, Red Hat's current arguing point for ACPI in VMs is
-> >> > hotplug of things like CPUs and memory for very large VMs, but I
-> >> > haven't thought too carefully about this just yet, as I don't have a
-> >> > 100+ core ARM 64-bit hardware lying around...
-> >>
-> >> I thought you could run guests with more virtual CPUs that you have
-> >> physical CPUs on the host.
-> >>
-> >> Regarding CPU and memory hotplug, don't we already have PSCI and
-> >> xen-balloon/virtio-balloon for that?
-> >
-> > PSCI (0.1) was there for guests from the start, and ACPI doesn't do
-> > anything different w.r.t. PSCI other than requiring PSCI 0.2 (which can
-> > be used by guests supporting only PSCI 0.1). So there's no magic for
-> > CPU hotplug provided by ACPI.
-> 
-> With PSCI you can only provide your VM a bunch of CPUs and say that
-> they're all turned off, and then turn some of them on later.  I
-> honestly don't know if you can do proper CPU hotplug with ACPI, but
-> the RH guys seem to argue that you can.  Again, I didn't think too
-> carefully about this.
+Signed-off-by: Lee Jones <lee.jones@linaro.org>
+---
+ .../interrupt-controller/st,sti-irq-syscfg.txt     | 35 ++++++++++++++++++++++
+ 1 file changed, 35 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/interrupt-controller/st,sti-irq-syscfg.txt
 
-Ah, I see. That would make some sense.
-
-> >
-> > Do either of the balloon drivers allow for memory to be hot-added to a
-> > system initially provisioned with less?
-> >
-> No, it's just about reclaiming memory.  Same argument as above.
-
-Ok. Thanks for the clarifications.
-
-Cheers,
-Mark.
+diff --git a/Documentation/devicetree/bindings/interrupt-controller/st,sti-irq-syscfg.txt b/Documentation/devicetree/bindings/interrupt-controller/st,sti-irq-syscfg.txt
+new file mode 100644
+index 0000000..ced6014
+--- /dev/null
++++ b/Documentation/devicetree/bindings/interrupt-controller/st,sti-irq-syscfg.txt
+@@ -0,0 +1,35 @@
++STMicroelectronics STi System Configuration Controlled IRQs
++-----------------------------------------------------------
++
++On STi based systems; External, CTI (Core Sight), PMU (Performance Management),
++and PL310 L2 Cache IRQs are controlled using System Configuration registers.
++This driver is used to unmask them prior to use.
++
++Required properties:
++- compatible	: Should be set to one of:
++			"st,stih415-irq-syscfg"
++			"st,stih416-irq-syscfg"
++			"st,stih407-irq-syscfg"
++			"st,stid127-irq-syscfg"
++- st,syscfg	: Phandle to Cortex-A9 IRQ system config registers
++- st,irq-device	: Array of IRQs to enable - should be 2 in length
++- st,fiq-device	: Array of FIQs to enable - should be 2 in length
++
++Optional properties:
++- st,invert-ext	: External IRQs can be inverted at will.  This property inverts
++		  these IRQs using bitwise logic.  A number of defines have been
++		  provided for convenience:
++			ST_IRQ_SYSCFG_EXT_1_INV
++			ST_IRQ_SYSCFG_EXT_2_INV
++			ST_IRQ_SYSCFG_EXT_3_INV
++Example:
++
++irq-syscfg {
++	compatible    = "st,stih416-irq-syscfg";
++	st,syscfg     = <&syscfg_cpu>;
++	st,irq-device = <ST_IRQ_SYSCFG_PMU_0>,
++			<ST_IRQ_SYSCFG_PMU_1>;
++	st,fiq-device = <ST_IRQ_SYSCFG_DISABLED>,
++			<ST_IRQ_SYSCFG_DISABLED>;
++	st,invert-ext = <(ST_IRQ_SYSCFG_EXT_1_INV | ST_IRQ_SYSCFG_EXT_3_INV)>;
++};
+-- 
+1.9.1
