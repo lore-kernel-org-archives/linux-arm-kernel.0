@@ -1,83 +1,139 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Tue, 29 Jul 2014 08:06:55 -0700
-Subject: [PATCH 30/35] irqchip: add irq-omap-intc.h header
-In-Reply-To: <20140729141045.GA17808@saruman.home>
-References: <1406582183-696-1-git-send-email-balbi@ti.com>
- <1406582183-696-31-git-send-email-balbi@ti.com>
- <20140729120133.GQ29045@atomide.com>
- <20140729141045.GA17808@saruman.home>
-Message-ID: <20140729150655.GU29045@atomide.com>
+From: jslaby@suse.cz (Jiri Slaby)
+Date: Tue, 29 Jul 2014 17:09:32 +0200
+Subject: [patch added to the 3.12 stable tree] locking/mutex: Disable
+ optimistic spinning on some architectures
+In-Reply-To: <1406646576-1299-1-git-send-email-jslaby@suse.cz>
+References: <1406646576-1299-1-git-send-email-jslaby@suse.cz>
+Message-ID: <1406646576-1299-52-git-send-email-jslaby@suse.cz>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Felipe Balbi <balbi@ti.com> [140729 07:13]:
-> On Tue, Jul 29, 2014 at 05:01:33AM -0700, Tony Lindgren wrote:
-> > * Felipe Balbi <balbi@ti.com> [140728 14:19]:
-> > > OMAP INTC irqchip driver will be moved under
-> > > drivers/irqchip/ soon but we still have a dependency
-> > > with mach-omap2 when it comes to idle functions.
-> > > 
-> > > In order to make it easy to share those function
-> > > prototypes with OMAP PM code, we introduce this new
-> > > header.
-> > > 
-> > > Signed-off-by: Felipe Balbi <balbi@ti.com>
-> > > ---
-> > >  arch/arm/mach-omap2/board-3430sdp.c        |  1 +
-> > >  arch/arm/mach-omap2/board-am3517crane.c    |  1 +
-> > >  arch/arm/mach-omap2/board-am3517evm.c      |  1 +
-> > >  arch/arm/mach-omap2/board-cm-t35.c         |  1 +
-> > >  arch/arm/mach-omap2/board-cm-t3517.c       |  1 +
-> > >  arch/arm/mach-omap2/board-devkit8000.c     |  1 +
-> > >  arch/arm/mach-omap2/board-ldp.c            |  1 +
-> > >  arch/arm/mach-omap2/board-omap3beagle.c    |  1 +
-> > >  arch/arm/mach-omap2/board-omap3logic.c     |  1 +
-> > >  arch/arm/mach-omap2/board-omap3pandora.c   |  1 +
-> > >  arch/arm/mach-omap2/board-omap3stalker.c   |  1 +
-> > >  arch/arm/mach-omap2/board-omap3touchbook.c |  1 +
-> > >  arch/arm/mach-omap2/board-overo.c          |  1 +
-> > >  arch/arm/mach-omap2/board-rx51.c           |  1 +
-> > >  arch/arm/mach-omap2/board-ti8168evm.c      |  1 +
-> > >  arch/arm/mach-omap2/common.h               |  9 ---------
-> > >  arch/arm/mach-omap2/cpuidle34xx.c          |  1 +
-> > >  arch/arm/mach-omap2/irq.c                  |  1 +
-> > >  arch/arm/mach-omap2/pm24xx.c               |  1 +
-> > >  arch/arm/mach-omap2/pm34xx.c               |  1 +
-> > >  include/linux/irqchip/irq-omap-intc.h      | 32 ++++++++++++++++++++++++++++++
-> > ...
-> > 
-> > > +void omap2_init_irq(void);
-> > > +void omap3_init_irq(void);
-> > > +void ti81xx_init_irq(void);
-> > 
-> > I think these will all go away with DT based booting?
-> > So it might be worth waiting for that rather than churn
-> > all these files, or..
-> 
-> you just asked me to rebase this series because now we had OMAP3 idle
-> working with DT. And now, you're asking me to hold on to this series
-> because not everything is DT-based yet.
+From: Peter Zijlstra <peterz@infradead.org>
 
-I just don't like the idea of patching all these board files that
-are going away anyways. If we need to do that, let's just add it
-to common.h that's already included by all the remaining board-*.c
-files. I know we should rather include the files directly, but in
-this case that's just extra churn.
+This patch has been added to the 3.12 stable tree. If you have any
+objections, please let us know.
 
-The real problem is how to properly deal with the save and
-restore calls that idle code needs.
+===============
 
-In any case, it seems we can merge quite a bit of this series
-already and then deal with the problem parts.
+commit 4badad352a6bb202ec68afa7a574c0bb961e5ebc upstream.
+
+The optimistic spin code assumes regular stores and cmpxchg() play nice;
+this is found to not be true for at least: parisc, sparc32, tile32,
+metag-lock1, arc-!llsc and hexagon.
+
+There is further wreckage, but this in particular seemed easy to
+trigger, so blacklist this.
+
+Opt in for known good archs.
+
+Signed-off-by: Peter Zijlstra <peterz@infradead.org>
+Reported-by: Mikulas Patocka <mpatocka@redhat.com>
+Cc: David Miller <davem@davemloft.net>
+Cc: Chris Metcalf <cmetcalf@tilera.com>
+Cc: James Bottomley <James.Bottomley@hansenpartnership.com>
+Cc: Vineet Gupta <vgupta@synopsys.com>
+Cc: Jason Low <jason.low2@hp.com>
+Cc: Waiman Long <waiman.long@hp.com>
+Cc: "James E.J. Bottomley" <jejb@parisc-linux.org>
+Cc: Paul McKenney <paulmck@linux.vnet.ibm.com>
+Cc: John David Anglin <dave.anglin@bell.net>
+Cc: James Hogan <james.hogan@imgtec.com>
+Cc: Linus Torvalds <torvalds@linux-foundation.org>
+Cc: Davidlohr Bueso <davidlohr@hp.com>
+Cc: Benjamin Herrenschmidt <benh@kernel.crashing.org>
+Cc: Catalin Marinas <catalin.marinas@arm.com>
+Cc: Russell King <linux@arm.linux.org.uk>
+Cc: Will Deacon <will.deacon@arm.com>
+Cc: linux-arm-kernel at lists.infradead.org
+Cc: linux-kernel at vger.kernel.org
+Cc: linuxppc-dev at lists.ozlabs.org
+Cc: sparclinux at vger.kernel.org
+Link: http://lkml.kernel.org/r/20140606175316.GV13930 at laptop.programming.kicks-ass.net
+Signed-off-by: Ingo Molnar <mingo@kernel.org>
+Signed-off-by: Jiri Slaby <jslaby@suse.cz>
+---
+ arch/arm/Kconfig     | 1 +
+ arch/arm64/Kconfig   | 1 +
+ arch/powerpc/Kconfig | 1 +
+ arch/sparc/Kconfig   | 1 +
+ arch/x86/Kconfig     | 1 +
+ kernel/Kconfig.locks | 5 ++++-
+ 6 files changed, 9 insertions(+), 1 deletion(-)
+
+diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+index e47fcd1e9645..99e1ce978cf9 100644
+--- a/arch/arm/Kconfig
++++ b/arch/arm/Kconfig
+@@ -5,6 +5,7 @@ config ARM
+ 	select ARCH_HAS_ATOMIC64_DEC_IF_POSITIVE
+ 	select ARCH_HAS_TICK_BROADCAST if GENERIC_CLOCKEVENTS_BROADCAST
+ 	select ARCH_HAVE_CUSTOM_GPIO_H
++	select ARCH_SUPPORTS_ATOMIC_RMW
+ 	select ARCH_WANT_IPC_PARSE_VERSION
+ 	select BUILDTIME_EXTABLE_SORT if MMU
+ 	select CLONE_BACKWARDS
+diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
+index c04454876bcb..fe70eaea0e28 100644
+--- a/arch/arm64/Kconfig
++++ b/arch/arm64/Kconfig
+@@ -1,6 +1,7 @@
+ config ARM64
+ 	def_bool y
+ 	select ARCH_HAS_ATOMIC64_DEC_IF_POSITIVE
++	select ARCH_SUPPORTS_ATOMIC_RMW
+ 	select ARCH_WANT_OPTIONAL_GPIOLIB
+ 	select ARCH_WANT_COMPAT_IPC_PARSE_VERSION
+ 	select ARCH_WANT_FRAME_POINTERS
+diff --git a/arch/powerpc/Kconfig b/arch/powerpc/Kconfig
+index d5d026b6d237..2e0ddfadc0b9 100644
+--- a/arch/powerpc/Kconfig
++++ b/arch/powerpc/Kconfig
+@@ -138,6 +138,7 @@ config PPC
+ 	select OLD_SIGSUSPEND
+ 	select OLD_SIGACTION if PPC32
+ 	select HAVE_DEBUG_STACKOVERFLOW
++	select ARCH_SUPPORTS_ATOMIC_RMW
  
-> This is the third time I rebase the series after a long hiatus and it
-> always comes out to the same result -> "let's wait some more".
-
-Nope, it's always been "this series causes PM regressions"
-and few other minor comments. And we have not been in any
-position to really test that until with v3.16-rc4. And then
-you always run out of time and nobody else does anything :)
-
-Regards,
-
-Tony
+ config EARLY_PRINTK
+ 	bool
+diff --git a/arch/sparc/Kconfig b/arch/sparc/Kconfig
+index 4e5683877b93..d60f34dbae89 100644
+--- a/arch/sparc/Kconfig
++++ b/arch/sparc/Kconfig
+@@ -75,6 +75,7 @@ config SPARC64
+ 	select ARCH_HAVE_NMI_SAFE_CMPXCHG
+ 	select HAVE_C_RECORDMCOUNT
+ 	select NO_BOOTMEM
++	select ARCH_SUPPORTS_ATOMIC_RMW
+ 
+ config ARCH_DEFCONFIG
+ 	string
+diff --git a/arch/x86/Kconfig b/arch/x86/Kconfig
+index eb2dfa61eabe..9dc1a24d41b8 100644
+--- a/arch/x86/Kconfig
++++ b/arch/x86/Kconfig
+@@ -123,6 +123,7 @@ config X86
+ 	select COMPAT_OLD_SIGACTION if IA32_EMULATION
+ 	select RTC_LIB
+ 	select HAVE_DEBUG_STACKOVERFLOW
++	select ARCH_SUPPORTS_ATOMIC_RMW
+ 
+ config INSTRUCTION_DECODER
+ 	def_bool y
+diff --git a/kernel/Kconfig.locks b/kernel/Kconfig.locks
+index d2b32ac27a39..ecee67a00f5f 100644
+--- a/kernel/Kconfig.locks
++++ b/kernel/Kconfig.locks
+@@ -220,6 +220,9 @@ config INLINE_WRITE_UNLOCK_IRQRESTORE
+ 
+ endif
+ 
++config ARCH_SUPPORTS_ATOMIC_RMW
++	bool
++
+ config MUTEX_SPIN_ON_OWNER
+ 	def_bool y
+-	depends on SMP && !DEBUG_MUTEXES
++	depends on SMP && !DEBUG_MUTEXES && ARCH_SUPPORTS_ATOMIC_RMW
+-- 
+2.0.1
