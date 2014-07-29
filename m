@@ -1,36 +1,66 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Tue, 29 Jul 2014 14:08:23 +0100
-Subject: [PATCH 19/19] Documentation: ACPI for ARM64
-In-Reply-To: <351673188.FxXsM7MvdA@wuerfel>
+From: hanjun.guo@linaro.org (Hanjun Guo)
+Date: Tue, 29 Jul 2014 21:08:40 +0800
+Subject: [PATCH 01/19] ARM64 / ACPI: Get RSDP and ACPI boot-time tables
+In-Reply-To: <53D69678.20002@arm.com>
 References: <1406206825-15590-1-git-send-email-hanjun.guo@linaro.org>
- <20140729112824.GM2576@leverpostej>
- <CAMJs5B_Ye1eXsvJAKWnHRxC4jnpcXMcqHE+GgOGO7MHtPcsSQA@mail.gmail.com>
- <351673188.FxXsM7MvdA@wuerfel>
-Message-ID: <20140729130823.GP2576@leverpostej>
+ <1406206825-15590-2-git-send-email-hanjun.guo@linaro.org>
+ <53D69678.20002@arm.com>
+Message-ID: <53D79CD8.9050709@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jul 29, 2014 at 01:52:40PM +0100, Arnd Bergmann wrote:
-> On Tuesday 29 July 2014 14:37:38 Christoffer Dall wrote:
-> > 
-> > For reference, Red Hat's current arguing point for ACPI in VMs is
-> > hotplug of things like CPUs and memory for very large VMs, but I
-> > haven't thought too carefully about this just yet, as I don't have a
-> > 100+ core ARM 64-bit hardware lying around...
+On 2014-7-29 2:29, Sudeep Holla wrote:
+[...]
+>> +
+>> +/*
+>> + * We never plan to use RSDT on arm/arm64 as its deprecated in spec but this
+>> + * variable is still required by the ACPI core
+>> + */
+>> +u32 acpi_rsdt_forced;
 > 
-> I thought you could run guests with more virtual CPUs that you have
-> physical CPUs on the host.
+> This looks like yet another stray variable not used anywhere including
+> core ACPI
+
+It will be used by ACPICA to get the RSDP in acpi_tb_parse_root_table()
+in tbutils.c.
+
 > 
-> Regarding CPU and memory hotplug, don't we already have PSCI and
-> xen-balloon/virtio-balloon for that?
+>> +
+>> +int acpi_noirq;                        /* skip ACPI IRQ initialization */
+>> +int acpi_strict;
+>> +int acpi_disabled;
+>> +EXPORT_SYMBOL(acpi_disabled);
+>> +
+>> +int acpi_pci_disabled;         /* skip ACPI PCI scan and IRQ initialization */
+>> +EXPORT_SYMBOL(acpi_pci_disabled);
+>> +
+>> +/*
+>> + * __acpi_map_table() will be called before page_init(), so early_ioremap()
+>> + * or early_memremap() should be called here to for ACPI table mapping.
+>> + */
+>> +char *__init __acpi_map_table(unsigned long phys, unsigned long size)
+>> +{
+>> +       if (!phys || !size)
+>> +               return NULL;
+>> +
+>> +       return early_memremap(phys, size);
+>> +}
+>> +
+>> +void __init __acpi_unmap_table(char *map, unsigned long size)
+>> +{
+>> +       if (!map || !size)
+>> +               return;
+>> +
+>> +       early_iounmap(map, size);
+> 
+> Why not early_memunmap for consistency ?
 
-PSCI (0.1) was there for guests from the start, and ACPI doesn't do
-anything different w.r.t. PSCI other than requiring PSCI 0.2 (which can
-be used by guests supporting only PSCI 0.1). So there's no magic for
-CPU hotplug provided by ACPI.
+ok.
 
-Do either of the balloon drivers allow for memory to be hot-added to a
-system initially provisioned with less?
+> Also now there's generic implementation of early mappings does it make
+> sense to move this also to acpi core ?
 
-Thanks,
-Mark.
+Good point, how about clean it up after this patch set is merged?
+
+Thanks
+Hanjun
