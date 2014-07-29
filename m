@@ -1,62 +1,109 @@
-From: bpringlemeir@nbsps.com (Bill Pringlemeir)
-Date: Tue, 29 Jul 2014 14:56:41 -0400
-Subject: [PATCHv2 2/3] ARM: dts: vf610-twr: Add PWM0's pinctrl node
-In-Reply-To: <1395627736-5338-3-git-send-email-Li.Xiubo@freescale.com> (Xiubo
- Li's message of "Mon, 24 Mar 2014 10:22:15 +0800")
-References: <1395627736-5338-1-git-send-email-Li.Xiubo@freescale.com>
- <1395627736-5338-3-git-send-email-Li.Xiubo@freescale.com>
-Message-ID: <8738dkuh7a.fsf@nbsps.com>
+From: heiko@sntech.de (Heiko Stuebner)
+Date: Tue, 29 Jul 2014 21:12:05 +0200
+Subject: [PATCH 1/4] clk: rockchip: protect critical clocks from getting
+ disabled
+In-Reply-To: <1406661128-7614-1-git-send-email-heiko@sntech.de>
+References: <1406661128-7614-1-git-send-email-heiko@sntech.de>
+Message-ID: <1406661128-7614-2-git-send-email-heiko@sntech.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 23 Mar 2014, Li.Xiubo at freescale.com wrote:
+The clock-tree contains clocks that should never get disabled automatically.
+One example are the base ACLKs, the base supplies for all peripherals.
 
-> Signed-off-by: Xiubo Li <Li.Xiubo@freescale.com>
-> ---
-> arch/arm/boot/dts/vf610-twr.dts | 11 +++++++++++
-> 1 file changed, 11 insertions(+)
->
-> diff --git a/arch/arm/boot/dts/vf610-twr.dts
-> b/arch/arm/boot/dts/vf610-twr.dts index f3af8ea..3fabdb5 100644 ---
-> a/arch/arm/boot/dts/vf610-twr.dts +++
-> b/arch/arm/boot/dts/vf610-twr.dts @@ -213,6 +213,17 @@
-> 			>;
-> 		};
->
-> + pinctrl_pwm0: pwm0grp { + fsl,pins = < + VF610_PAD_PTB0__FTM0_CH0
+Therefore add a structure similar to the sunxi clock-tree to protect these
+special clocks from being disabled.
 
-Hi Xiubo,
+Signed-off-by: Heiko Stuebner <heiko@sntech.de>
+---
+ drivers/clk/rockchip/clk-rk3188.c |  7 +++++++
+ drivers/clk/rockchip/clk-rk3288.c |  7 +++++++
+ drivers/clk/rockchip/clk.c        | 13 +++++++++++++
+ drivers/clk/rockchip/clk.h        |  1 +
+ 4 files changed, 28 insertions(+)
 
-I think you added this for the tower audio board?  Maybe the beeper?
-Are these lines needed?
-
-+	VF610_PAD_PTB6__FTM0_CH6		0x1582
-+	VF610_PAD_PTB7__FTM0_CH7		0x1582
-
-According to my tower schematics, PTB6 routes to the Primary B35/GPIO4,
-and B40/FTM0CH6/PWM4 and to the jumpers J23.  PTB7 routes to
-B39/FTM0CH7/PWM5, EIRQ3/B55/B56, and jumper J24.  I think that most
-people have some tower serial card which can also route these lines
-and/or they are sent to the OpenSDA chip which does a ttyACM (USB
-serial) on all Tower main boards.
-
-Did you just add all FTM channels 0-7 in the DTS?  Or are each and every
-one mapped to a pin on the expansion/riser boards.  Could we remove the
-two lines above and use,
-
-	pinctrl_uart2: uart2grp {
-		fsl,pins = <
-                        VF610_PAD_PTB6__UART2_TX                0x21a2
-                        VF610_PAD_PTB7__UART2_RX                0x21a1
-		>;
-	};
-
-So that the PTB6/7 map to UART2?  Or are these indeed a conflict with
-some audio board (or other)?  I think it might be valuable to add the
-'ttyLP2' to the vf610-twr.  An MMC image could echo 'wrong serial port,
-set J23/24' for instance to tell people that the serial console was not
-connected properly (or something else).  People may also wish to use a
-serial interface for other peripherals or as a 2nd debug port.
-
-Thanks,
-Bill Pringlemeir.
+diff --git a/drivers/clk/rockchip/clk-rk3188.c b/drivers/clk/rockchip/clk-rk3188.c
+index a83a6d8..5aef277 100644
+--- a/drivers/clk/rockchip/clk-rk3188.c
++++ b/drivers/clk/rockchip/clk-rk3188.c
+@@ -599,6 +599,11 @@ static struct rockchip_clk_branch rk3188_clk_branches[] __initdata = {
+ 	GATE(ACLK_GPS, "aclk_gps", "aclk_peri", 0, RK2928_CLKGATE_CON(8), 13, GFLAGS),
+ };
+ 
++static const char *rk3188_critical_clocks[] __initconst = {
++	"aclk_cpu",
++	"aclk_peri",
++};
++
+ static void __init rk3188_common_clk_init(struct device_node *np)
+ {
+ 	void __iomem *reg_base;
+@@ -628,6 +633,8 @@ static void __init rk3188_common_clk_init(struct device_node *np)
+ 				   RK3188_GRF_SOC_STATUS);
+ 	rockchip_clk_register_branches(common_clk_branches,
+ 				  ARRAY_SIZE(common_clk_branches));
++	rockchip_clk_protect_critical(rk3188_critical_clocks,
++				      ARRAY_SIZE(rk3188_critical_clocks));
+ 
+ 	rockchip_register_softrst(np, 9, reg_base + RK2928_SOFTRST_CON(0),
+ 				  ROCKCHIP_SOFTRST_HIWORD_MASK);
+diff --git a/drivers/clk/rockchip/clk-rk3288.c b/drivers/clk/rockchip/clk-rk3288.c
+index 0d8c6c5..6c6f954 100644
+--- a/drivers/clk/rockchip/clk-rk3288.c
++++ b/drivers/clk/rockchip/clk-rk3288.c
+@@ -680,6 +680,11 @@ static struct rockchip_clk_branch rk3288_clk_branches[] __initdata = {
+ 	GATE(0, "pclk_isp_in", "ext_isp", 0, RK3288_CLKGATE_CON(16), 3, GFLAGS),
+ };
+ 
++static const char *rk3288_critical_clocks[] __initconst = {
++	"aclk_cpu",
++	"aclk_peri",
++};
++
+ static void __init rk3288_clk_init(struct device_node *np)
+ {
+ 	void __iomem *reg_base;
+@@ -710,6 +715,8 @@ static void __init rk3288_clk_init(struct device_node *np)
+ 				   RK3288_GRF_SOC_STATUS);
+ 	rockchip_clk_register_branches(rk3288_clk_branches,
+ 				  ARRAY_SIZE(rk3288_clk_branches));
++	rockchip_clk_protect_critical(rk3288_critical_clocks,
++				      ARRAY_SIZE(rk3288_critical_clocks));
+ 
+ 	rockchip_register_softrst(np, 9, reg_base + RK3288_SOFTRST_CON(0),
+ 				  ROCKCHIP_SOFTRST_HIWORD_MASK);
+diff --git a/drivers/clk/rockchip/clk.c b/drivers/clk/rockchip/clk.c
+index 278cf9d..9189f1b 100644
+--- a/drivers/clk/rockchip/clk.c
++++ b/drivers/clk/rockchip/clk.c
+@@ -242,3 +242,16 @@ void __init rockchip_clk_register_branches(
+ 		rockchip_clk_add_lookup(clk, list->id);
+ 	}
+ }
++
++void __init rockchip_clk_protect_critical(const char *clocks[], int nclocks)
++{
++	int i;
++
++	/* Protect the clocks that needs to stay on */
++	for (i = 0; i < nclocks; i++) {
++		struct clk *clk = __clk_lookup(clocks[i]);
++
++		if (clk)
++			clk_prepare_enable(clk);
++	}
++}
+diff --git a/drivers/clk/rockchip/clk.h b/drivers/clk/rockchip/clk.h
+index 887cbde..2b0bca1 100644
+--- a/drivers/clk/rockchip/clk.h
++++ b/drivers/clk/rockchip/clk.h
+@@ -329,6 +329,7 @@ void rockchip_clk_register_branches(struct rockchip_clk_branch *clk_list,
+ 				    unsigned int nr_clk);
+ void rockchip_clk_register_plls(struct rockchip_pll_clock *pll_list,
+ 				unsigned int nr_pll, int grf_lock_offset);
++void rockchip_clk_protect_critical(const char *clocks[], int nclocks);
+ 
+ #define ROCKCHIP_SOFTRST_HIWORD_MASK	BIT(0)
+ 
+-- 
+2.0.1
