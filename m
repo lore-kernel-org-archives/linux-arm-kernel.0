@@ -1,89 +1,72 @@
-From: ohaugan@codeaurora.org (Olav Haugan)
-Date: Mon, 28 Jul 2014 17:50:08 -0700
-Subject: [PATCH v3 1/1] iommu-api: Add map_sg/unmap_sg functions
-In-Reply-To: <20140728191111.GW15536@arm.com>
-References: <1406572731-6216-1-git-send-email-ohaugan@codeaurora.org>
- <1406572731-6216-2-git-send-email-ohaugan@codeaurora.org>
- <20140728191111.GW15536@arm.com>
-Message-ID: <53D6EFC0.1060308@codeaurora.org>
+From: ken.wilson@opengear.com (Ken Wilson)
+Date: Tue, 29 Jul 2014 11:14:12 +1000
+Subject: CPU1 fails to boot on Armada 375 DB with 3.16.0-rc6
+Message-ID: <53D6F564.5070803@opengear.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Will,
+Hi Thomas,
+We're running 3.16.0-rc6 on our Rev 2 Armada 375 DB, and we've found 
+that the second CPU is not coming up.
+Are there any known issues here?
 
-On 7/28/2014 12:11 PM, Will Deacon wrote:
-> Hi Olav,
-> 
-> On Mon, Jul 28, 2014 at 07:38:51PM +0100, Olav Haugan wrote:
->> Mapping and unmapping are more often than not in the critical path.
->> map_sg and unmap_sg allows IOMMU driver implementations to optimize
->> the process of mapping and unmapping buffers into the IOMMU page tables.
->>
->> Instead of mapping a buffer one page at a time and requiring potentially
->> expensive TLB operations for each page, this function allows the driver
->> to map all pages in one go and defer TLB maintenance until after all
->> pages have been mapped.
->>
->> Additionally, the mapping operation would be faster in general since
->> clients does not have to keep calling map API over and over again for
->> each physically contiguous chunk of memory that needs to be mapped to a
->> virtually contiguous region.
->>
->> Signed-off-by: Olav Haugan <ohaugan@codeaurora.org>
->> ---
->>  drivers/iommu/iommu.c | 48 ++++++++++++++++++++++++++++++++++++++++++++++++
->>  include/linux/iommu.h | 28 ++++++++++++++++++++++++++++
->>  2 files changed, 76 insertions(+)
->>
->> diff --git a/drivers/iommu/iommu.c b/drivers/iommu/iommu.c
->> index 1698360..cd65511 100644
->> --- a/drivers/iommu/iommu.c
->> +++ b/drivers/iommu/iommu.c
->> @@ -1088,6 +1088,54 @@ size_t iommu_unmap(struct iommu_domain *domain, unsigned long iova, size_t size)
->>  }
->>  EXPORT_SYMBOL_GPL(iommu_unmap);
->>  
->> +int iommu_map_sg(struct iommu_domain *domain, unsigned long iova,
->> +			struct scatterlist *sg, unsigned int nents,
->> +			int prot, unsigned long flags)
->> +{
->> +	int ret = 0;
->> +	unsigned long offset = 0;
->> +
->> +	BUG_ON(iova & (~PAGE_MASK));
->> +
->> +	if (unlikely(domain->ops->map_sg == NULL)) {
->> +		unsigned int i;
->> +		struct scatterlist *s;
->> +
->> +		for_each_sg(sg, s, nents, i) {
->> +			phys_addr_t phys = page_to_phys(sg_page(s));
->> +			u32 page_len = PAGE_ALIGN(s->offset + s->length);
-> 
-> Hmm, this is a pretty horrible place where CPU page size (from the sg list)
-> meets the IOMMU and I think we need to do something better to avoid spurious
-> failures. In other words, the sg list should be iterated in such a way that
-> we always pass a multiple of a supported iommu page size to iommu_map.
-> 
-> All the code using PAGE_MASK and PAGE_ALIGN needn't match what is supported
-> by the IOMMU hardware.
+I've also tried starting the 2nd CPU after boot using the sysfs 
+interface, but I get the same error.
+We're tftpbooting the kernel, using an in-memory ramdisk
 
-I am not sure what you mean. How can we iterate over the sg list in a
-different way to ensure we pass a multiple of a supported iommu page
-size? Each entry in the sg list are physically discontinuous from each
-other. If the page is too big iommu_map will take care of it for us. It
-already finds the biggest supported page size and splits up the calls to
-domain->ops->map(). Also, whoever allocates memory for use by IOMMU
-needs to be aware of what the supported minimum size is or else they
-would get mapping failures anyway.
+Snip from dmesg:
 
-(The code in __map_sg_chunk in arch/arm/mm/dma-mapping.c does the same
-thing btw.)
-
-Thanks,
-
-Olav
-
--- 
-The Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-hosted by The Linux Foundation
+Uncompressing Linux... done, booting the kernel.
+Booting Linux on physical CPU 0x0
+Linux version 3.16.0-rc6-dirty (kenw at build-ken) (gcc version 4.8.1 (GCC) 
+) #7 SMP Tue Jul 29 09:47:30 EST 2014
+CPU: ARMv7 Processor [414fc091] revision 1 (ARMv7), cr=10c5387d
+CPU: PIPT / VIPT nonaliasing data cache, VIPT aliasing instruction cache
+Machine model: Marvell Armada 375 Development Board
+bootconsole [earlycon0] enabled
+Memory policy: Data cache writeback
+BUG: mapping for 0xf1012000 at 0xfff12000 out of vmalloc space
+CPU: All CPU(s) started in SVC mode.
+PERCPU: Embedded 7 pages/cpu @ee7d5000 s7680 r8192 d12800 u32768
+Built 1 zonelists in Zone order, mobility grouping on.  Total pages: 522768
+Kernel command line: console=ttyS0,115200 earlyprintk root=/dev/ram
+PID hash table entries: 4096 (order: 2, 16384 bytes)
+Dentry cache hash table entries: 131072 (order: 7, 524288 bytes)
+Inode-cache hash table entries: 65536 (order: 6, 262144 bytes)
+Memory: 2063736K/2097152K available (4932K kernel code, 259K rwdata, 
+1324K rodata, 235K init, 205K bss, 33416K reserved, 1318912K highmem)
+Virtual kernel memory layout:
+     vector  : 0xffff0000 - 0xffff1000   (   4 kB)
+     fixmap  : 0xffc00000 - 0xffe00000   (2048 kB)
+     vmalloc : 0xf0000000 - 0xff000000   ( 240 MB)
+     lowmem  : 0xc0000000 - 0xef800000   ( 760 MB)
+     pkmap   : 0xbfe00000 - 0xc0000000   (   2 MB)
+     modules : 0xbf000000 - 0xbfe00000   (  14 MB)
+       .text : 0xc0008000 - 0xc06242d0   (6257 kB)
+       .init : 0xc0625000 - 0xc065fe00   ( 236 kB)
+       .data : 0xc0660000 - 0xc06a0e80   ( 260 kB)
+        .bss : 0xc06a0e80 - 0xc06d43c0   ( 206 kB)
+Hierarchical RCU implementation.
+     RCU restricting CPUs from NR_CPUS=4 to nr_cpu_ids=2.
+RCU: Adjusting geometry for rcu_fanout_leaf=16, nr_cpu_ids=2
+NR_IRQS:16 nr_irqs:16 16
+L2C-310 enabling early BRESP for Cortex-A9
+L2C-310 full line of zeros enabled for Cortex-A9
+L2C-310 dynamic clock gating enabled, standby mode enabled
+L2C-310 cache controller enabled, 8 ways, 256 kB
+L2C-310: CACHE_ID 0x410054c9, AUX_CTRL 0x46040001
+sched_clock: 32 bits at 6MHz, resolution 160ns, wraps every 687194767200ns
+Console: colour dummy device 80x30
+Calibrating delay loop... 1594.16 BogoMIPS (lpj=7970816)
+pid_max: default: 32768 minimum: 301
+Mount-cache hash table entries: 2048 (order: 1, 8192 bytes)
+Mountpoint-cache hash table entries: 2048 (order: 1, 8192 bytes)
+CPU: Testing write buffer coherency: ok
+CPU0: thread -1, cpu 0, socket 0, mpidr 80000000
+Setting up static identity map for 0x4af758 - 0x4af7b0
+mvebu-soc-id: MVEBU SoC ID=0x6720, Rev=0x3
+Booting CPU 1
+CPU1: failed to come online
+Brought up 1 CPUs
+SMP: Total of 1 processors activated.
+CPU: All CPU(s) started in SVC mode.
