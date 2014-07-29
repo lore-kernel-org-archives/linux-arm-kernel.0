@@ -1,93 +1,68 @@
-From: balbi@ti.com (Felipe Balbi)
-Date: Tue, 29 Jul 2014 11:39:35 -0500
-Subject: [PATCH v3 0/2] usb: fix controller-PHY binding for OMAP3 platform
-In-Reply-To: <14357891.vooz1N5zDC@avalon>
-References: <1387209225-11520-1-git-send-email-kishon@ti.com>
- <20140721151557.GH6852@saruman.home> <53CF7978.4090709@ti.com>
- <14357891.vooz1N5zDC@avalon>
-Message-ID: <20140729163935.GH17808@saruman.home>
+From: mfuzzey@parkeon.com (Martin Fuzzey)
+Date: Tue, 29 Jul 2014 18:40:46 +0200
+Subject: [PATCH  0/4] ARM: perf: Support i.MX53
+In-Reply-To: <20140729125231.GM9245@arm.com>
+References: <20140729123256.13347.79778.stgit@localhost>
+ <20140729125231.GM9245@arm.com>
+Message-ID: <53D7CE8E.70103@parkeon.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Hi Will ,
 
-On Tue, Jul 29, 2014 at 02:38:24PM +0200, Laurent Pinchart wrote:
-> On Wednesday 23 July 2014 14:29:36 Kishon Vijay Abraham I wrote:
-> > On Monday 21 July 2014 08:45 PM, Felipe Balbi wrote:
-> > > On Mon, Jul 21, 2014 at 05:04:57PM +0200, Laurent Pinchart wrote:
-> > >> Hi Felipe,
-> > >> 
-> > >> What happened to these two patches ?
-> > > 
-> > > looks like I lost them.
-> > > 
-> > >> On Monday 16 December 2013 17:48:29 Felipe Balbi wrote:
-> > >>> On Mon, Dec 16, 2013 at 02:38:27PM -0800, Tony Lindgren wrote:
-> > >>>> * Felipe Balbi <balbi@ti.com> [131216 13:31]:
-> > >>>>> On Mon, Dec 16, 2013 at 09:23:43PM +0530, Kishon Vijay Abraham I 
-> wrote:
-> > >>>>>> After the platform devices are created using PLATFORM_DEVID_AUTO, the
-> > >>>>>> device names given in usb_bind_phy (in board file) does not match
-> > >>>>>> with the actual device name causing the USB PHY library not to return
-> > >>>>>> the PHY reference when the MUSB controller request for the PHY in the
-> > >>>>>> non-dt boot case.
-> > >>>>>> So removed creating platform devices using PLATFORM_DEVID_AUTO in
-> > >>>>>> omap2430.c.
-> > >>>>>> 
-> > >>>>>> Did enumeration testing in omap3 beagle.
-> > >>>>>> 
-> > >>>>>> Changes from v2:
-> > >>>>>> * Fixed the commit log
-> > >>>>>> 
-> > >>>>>> Changes from v1:
-> > >>>>>> * refreshed to the latested mainline kernel
-> > >>>>>> * added musb_put_id from omap2430 remove.
-> > >>>>> 
-> > >>>>> Tony, how do you want to handle this ? You want me to provide you a
-> > >>>>> branch which we both merge ?
-> > >>>> 
-> > >>>> Yes that would be great thanks. For the mach-omap2 touching parts:
-> > >>>> 
-> > >>>> Acked-by: Tony Lindgren <tony@atomide.com>
-> > >>> 
-> > >>> Here it is, let me know if you prefer a signed tag:
-> > >>> 
-> > >>> The following changes since commit 
-> 6ce4eac1f600b34f2f7f58f9cd8f0503d79e42ae:
-> > >>>   Linux 3.13-rc1 (2013-11-22 11:30:55 -0800)
-> > >>> 
-> > >>> are available in the git repository at:
-> > >>>   git://git.kernel.org/pub/scm/linux/kernel/git/balbi/usb.git
-> > >>> 
-> > >>> usb-phy-binding-omap3
-> > >>> 
-> > >>> for you to fetch changes up to 23ada3130cf4e56acb86fdff4c26113188d52d18:
-> > >>>   arm: omap: remove *.auto* from device names given in usb_bind_phy
-> > >>> 
-> > >>> (2013-12-16 17:44:43 -0600)
-> > >>> 
-> > >>> ----------------------------------------------------------------
-> > >>> 
-> > >>> Kishon Vijay Abraham I (2):
-> > >>>       usb: musb: omap: remove using PLATFORM_DEVID_AUTO in omap2430.c
-> > >>>       arm: omap: remove *.auto* from device names given in usb_bind_phy
-> > > 
-> > > Kishon, are these still valid ?
-> > 
-> > Looks like board-2430sdp.c got removed. Apart from that the reset of the
-> > patch series is still applicable for non-dt boot.
-> 
-> Felipe, do you plan to apply the patch without the baord-2430sdp.c change, or 
-> would you like Kishon to rebase and resubmit it ?
+thanks for your reply.
 
-Not sure if Tony still wants board-* modifications. Tony ?
+On 29/07/14 14:52, Will Deacon wrote:
+> Hi Martin,
+>
+> On Tue, Jul 29, 2014 at 01:32:56PM +0100, Martin Fuzzey wrote:
+>> This series enables hardware performance counters on the i.MX53 SoC
+>>
+>> This requires setting registers at both the ARM V7 core level
+>> and the i.MX53 SoC level.
+>  From a quick look at the patches, it sounds like you're booting in secure
+> mode and are trying to use perf there. Whilst I understand that you may want
+> to do this, I don't think the code you currently have is quite right:
+Yes that's what I'm doing (I'm not doing any security stuff at all so 
+the SoC is coming up in secure mode)
+>   - It accesses the SDER unconditionally, which is undefined for non-secure
+>     modes.
+Ah yes I see what you mean that is a problem...
 
--- 
-balbi
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140729/c83e2bbf/attachment.sig>
+>   - It adds yet more callbacks to arm_pmu_platdata
+>
+> Instead, how about we add a new property on the PMU node that says it
+> requires secure access, then we use that to configuer SDER in the perf code.
+
+Ok but how would the new property be used?
+Do you just mean making the code that sets the SUNIDEN bit conditional 
+on this property?
+
+So a DT for a board booting in secure mode would have the property set 
+and one booting in non secure mode would not?
+
+But is it the DT's business to know how the kernel has been booted?
+
+What happens in non secure mode?
+I presume the kernel won't touch SDER in that case (so avoiding an 
+exception) but the counters will only work if code outside the kernel 
+(bootloader, secure monitor?)  has already set things up correctly?
+
+Wouldn't it be possible to detect if the kernel is in secure mode and 
+use that instead of a DT property?
+Does the kernel have that information?
+
+> Then you can do your SoC-specific magic as part of the runtime PM hooks we
+> already have (it looks like enabled/disabling a clock really).
+This is orthogonal to the above right?
+
+Indeed, I've tried that and it works without any extra hooks.
+
+But what happens if we don't have CONFIG_PM_RUNTIME ?
+
+Is "we don't care, enable it if you want perf to work" an acceptable answer?
+
+
+Regards,
+
+Martin
