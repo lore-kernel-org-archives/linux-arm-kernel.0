@@ -1,79 +1,112 @@
-From: koct9i@gmail.com (Konstantin Khlebnikov)
-Date: Tue, 29 Jul 2014 16:37:08 +0400
-Subject: [PATCH 2/2] ARM: LPAE: reduce damage caused by idmap to virtual
- memory layout
-In-Reply-To: <20140729105717.GC30282@n2100.arm.linux.org.uk>
-References: <20140722153623.25088.37742.stgit@buzz>
- <20140722153635.25088.14197.stgit@buzz>
- <20140728181456.GO15536@arm.com>
- <CALYGNiNJDHfQm2yk067hh-Wywsb_Ki5AEE_sTMkYegJi9spSzw@mail.gmail.com>
- <20140728184107.GR15536@arm.com>
- <CALYGNiNaMMv9itJ_+cvPDn1_Yo4GTPQJ-Cy9zBzJzfaDLfkvmg@mail.gmail.com>
- <20140728191305.GA30282@n2100.arm.linux.org.uk>
- <CALYGNiNVduTK8MXt8VJyiqdsB0mA_OnC0hLOB-WzgAEMZyu9sg@mail.gmail.com>
- <20140728194251.GB30282@n2100.arm.linux.org.uk>
- <CALYGNiO6PEPoHDrcLRZxQVT2=-1upyh6E-TWBCMB0MR8u5Sx6w@mail.gmail.com>
- <20140729105717.GC30282@n2100.arm.linux.org.uk>
-Message-ID: <CALYGNiMPnyq_kWFRRX0vsMMxekNmc26HnwbNXpTe7Ks+b8HMQg@mail.gmail.com>
+From: christoffer.dall@linaro.org (Christoffer Dall)
+Date: Tue, 29 Jul 2014 14:37:38 +0200
+Subject: [PATCH 19/19] Documentation: ACPI for ARM64
+In-Reply-To: <20140729112824.GM2576@leverpostej>
+References: <1406206825-15590-1-git-send-email-hanjun.guo@linaro.org>
+ <1406206825-15590-20-git-send-email-hanjun.guo@linaro.org>
+ <CAOesGMhKHGkVK3dOLXXx9GQBMxDmjBu1WDBgHmwdGe1UK3jfcg@mail.gmail.com>
+ <20140728100654.GC24078@leverpostej>
+ <20140728164459.GD32359@quad.lixom.net>
+ <20140729102940.GB18250@cbox> <20140729105543.GL2576@leverpostej>
+ <20140729112824.GM2576@leverpostej>
+Message-ID: <CAMJs5B_Ye1eXsvJAKWnHRxC4jnpcXMcqHE+GgOGO7MHtPcsSQA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jul 29, 2014 at 2:57 PM, Russell King - ARM Linux
-<linux@arm.linux.org.uk> wrote:
-> On Mon, Jul 28, 2014 at 11:57:16PM +0400, Konstantin Khlebnikov wrote:
->> On Mon, Jul 28, 2014 at 11:42 PM, Russell King - ARM Linux
->> <linux@arm.linux.org.uk> wrote:
->> > On Mon, Jul 28, 2014 at 11:29:39PM +0400, Konstantin Khlebnikov wrote:
->> >> Ok, before switching from identity mapping to normal mapping kernel must
->> >> switch instruction pointer from physical address to virtual.
+On 29 July 2014 13:28, Mark Rutland <mark.rutland@arm.com> wrote:
+> On Tue, Jul 29, 2014 at 11:55:43AM +0100, Mark Rutland wrote:
+>> On Tue, Jul 29, 2014 at 11:29:40AM +0100, Christoffer Dall wrote:
+>> > On Mon, Jul 28, 2014 at 09:44:59AM -0700, Olof Johansson wrote:
+>> > > On Mon, Jul 28, 2014 at 11:06:54AM +0100, Mark Rutland wrote:
 >> >
->> > "switch instruction pointer from physical address to virtual."
+>> > [...]
 >> >
->> > There's no such distinction for the instruction pointer.
+>> > > > >
+>> > > > > > +Relationship with Device Tree
+>> > > > > > +-----------------------------
+>> > > > > > +
+>> > > > > > +ACPI support in drivers and subsystems for ARMv8 should never be mutually
+>> > > > > > +exclusive with DT support at compile time.
+>> > > > > > +
+>> > > > > > +At boot time the kernel will only use one description method depending on
+>> > > > > > +parameters passed from the bootloader.
+>> > > > >
+>> > > > > Possibly overriden by kernel bootargs. And as debated for quite a
+>> > > > > while earlier this year, acpi should still default to off -- if a DT
+>> > > > > and ACPI are both passed in, DT should at this time be given priority.
+>> > > >
+>> > > > Why? I really don't see the logic in doing that.
+>> > >
+>> > > Seems like I am replying to your emails in reverse order.
+>> > >
+>> > > > Currently the kernel can only boot using DT, so DT will be used even if
+>> > > > ACPI is present. In the presence of ACPI support in the kernel, ACPI
+>> > > > would be used on said systems.
+>> > >
+>> > > For all the reasons we hashed out earlier this year: We can't trust that
+>> > > vendors will know how to do ACPI from day one, so instead of loading up the
+>> > > kernel with lots of quirks and workarounds, we'll default to not using it until
+>> > > we're at a point where things look mature enough.
+>> > >
+>> > > The alternative is to keep this patch set out of the kernel. We can do that
+>> > > too, but I don't think that really helps anyone.
+>> > >
+>> > > > From the discussions at the last Linaro Connect, this was seen as
+>> > > > important for virtual machines which want to provide ACPI services to
+>> > > > guests while still being able to boot DT-only kernels. I'll leave it to
+>> > > > Grant, Rob, and Christoffer to cover that.
+>> > >
+>> > > Ok, waiting to see what they have to say then.
+>> > >
+>> >
+>> > Hmm, a virtual machine implementaion may provide either a DT or ACPI (or
+>> > both).  I think the point at Linaro Connect was that for a first cut,
+>> > there is no obvious need to provide ACPI to VMs and to be spec
+>> > compliant, server kernels must be able to boot with DT-only.  In most
+>> > cases such systems will only access a few limited emulated devices
+>> > (UART, GIC, RTC, flash controller) and VirtIO devices, which should just
+>> > work using DT only.
+>> >
+>> > People are talking about adding ACPI for VM guests as well for various
+>> > reasons (device passthrough for example) in which case I would always
+>> > expect people to run UEFI inside their guests too (perhaps this is not
+>> > 100% true in the case of Xen fast-boot scenarios though) and I would
+>> > expect Linux to only see the little stub DT and ACPI.
+>> >
+>> > Does this clarify anything or add futher to the confusion?
 >>
->> I know. I mean "logically".
+>> I was under the impression that there was a case where we'd have a DT
+>> with HW description in a VM which also had ACPI tables, to enable a
+>> kernel without ACPI support to boot in said VM (albeit with reduced
+>> functionality).
 >>
-> ...
->>
->> Sorry but I'm really look so dumb? Maybe it's true, it's almost
->> midnight at my side.
+>> I may have got confused since the VM standards discussion at LCA-14.
 >
-> When you use language which suggests a lack of understanding, then
-> I will explain things.
+> I took a look at the video [1,2] of said session [3], and it looks like
+> I was the one arguing for the case of full description in both DT and
+> ACPI, so either I was confused or I've forgotten some hallway
+> discussion.
 >
->> > It doesn't matter, provided the kernel text and data in the virtual
->> > address space are not overwritten by the identity mapping.  If it
->> > ends up in the vmalloc or IO space, that should not be a problem.
->>
->> In my case it's been overwritten.
->> And it always happens when PHYS_OFFSET >= PAGE_OFFSET
->> because in case of LPAE idmap always overwrites 1Gb at once.
+> I think my reasoning was somewhat flawed; if the hypervisor defaults to
+> providing DT, with an option to use ACPI in certain cases (where not all
+> guests would be expected to work), then that would cover the "grab an
+> iso, it just works?" use case for Linux images while allowing for
+> the cases where people want ACPI in the VM.
 >
-> Right, I now see what you're getting at.  Here's a better description
-> which I've used when committing your patch.  I've only taken patch 2
-> at the present time.
+> The only issue with that would be catering for OSs which support ACPI
+> but not DT or whose DT support is not Linux-compatible.
 >
->
+So I think this is where the spec is really useful.  Either you're
+spec compliant or you're not.  Distro images will need to support DT
+if they're spec compliant to v1 of the spec (yes, it's on my todo list
+to publish this properly, but the hold up is not all my fault).
 
-Ok. Thank you for your time.
+A v2 of the spec may mention ACPI, and it may not, and we can deal
+with that problem then.
 
->
-> On LPAE, each level 1 (pgd) page table entry maps 1GiB, and the level 2
-> (pmd) entries map 2MiB.
->
-> When the identity mapping is created on LPAE, the pgd pointers are copied
-> from the swapper_pg_dir.  If we find that we need to modify the contents
-> of a pmd, we allocate a new empty pmd table and insert it into the
-> appropriate 1GB slot, before then filling it with the identity mapping.
->
-> However, if the 1GB slot covers the kernel lowmem mappings, we obliterate
-> those mappings.
->
-> When replacing a PMD, first copy the old PMD contents to the new PMD, so
-> that we preserve the existing mappings in the 1GiB region, particularly
-> the mappings of the kernel itself.
->
->
-> --
-> FTTC broadband for 0.8mile line: currently at 9.5Mbps down 400kbps up
-> according to speedtest.net.
+For reference, Red Hat's current arguing point for ACPI in VMs is
+hotplug of things like CPUs and memory for very large VMs, but I
+haven't thought too carefully about this just yet, as I don't have a
+100+ core ARM 64-bit hardware lying around...
+
+-Christoffer
