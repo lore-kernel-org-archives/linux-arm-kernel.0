@@ -1,102 +1,44 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Tue, 29 Jul 2014 12:28:24 +0100
-Subject: [PATCH 19/19] Documentation: ACPI for ARM64
-In-Reply-To: <20140729105543.GL2576@leverpostej>
-References: <1406206825-15590-1-git-send-email-hanjun.guo@linaro.org>
- <1406206825-15590-20-git-send-email-hanjun.guo@linaro.org>
- <CAOesGMhKHGkVK3dOLXXx9GQBMxDmjBu1WDBgHmwdGe1UK3jfcg@mail.gmail.com>
- <20140728100654.GC24078@leverpostej>
- <20140728164459.GD32359@quad.lixom.net>
- <20140729102940.GB18250@cbox> <20140729105543.GL2576@leverpostej>
-Message-ID: <20140729112824.GM2576@leverpostej>
+From: haojian.zhuang@linaro.org (Haojian Zhuang)
+Date: Tue, 29 Jul 2014 19:32:09 +0800
+Subject: [PATCH v15 07/12] ARM: dts: append hip04 dts
+In-Reply-To: <20140729111213.GE9245@arm.com>
+References: <1406555876-11989-1-git-send-email-haojian.zhuang@linaro.org>
+ <1406555876-11989-8-git-send-email-haojian.zhuang@linaro.org>
+ <20140728180609.GE2576@leverpostej>
+ <CAD6h2NQLgB1=8+WznE19rjsFwm3XWPUYEbDuPCbKbWjseRCBDg@mail.gmail.com>
+ <20140729035321.GA8430@quad.lixom.net>
+ <20140729111213.GE9245@arm.com>
+Message-ID: <CAD6h2NRuOe9piWOTU7xoaD-0DOceq20SD-XCqygLyQUFVCnsNQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jul 29, 2014 at 11:55:43AM +0100, Mark Rutland wrote:
-> On Tue, Jul 29, 2014 at 11:29:40AM +0100, Christoffer Dall wrote:
-> > On Mon, Jul 28, 2014 at 09:44:59AM -0700, Olof Johansson wrote:
-> > > On Mon, Jul 28, 2014 at 11:06:54AM +0100, Mark Rutland wrote:
-> > 
-> > [...]
-> > 
-> > > > >
-> > > > > > +Relationship with Device Tree
-> > > > > > +-----------------------------
-> > > > > > +
-> > > > > > +ACPI support in drivers and subsystems for ARMv8 should never be mutually
-> > > > > > +exclusive with DT support at compile time.
-> > > > > > +
-> > > > > > +At boot time the kernel will only use one description method depending on
-> > > > > > +parameters passed from the bootloader.
-> > > > >
-> > > > > Possibly overriden by kernel bootargs. And as debated for quite a
-> > > > > while earlier this year, acpi should still default to off -- if a DT
-> > > > > and ACPI are both passed in, DT should at this time be given priority.
-> > > > 
-> > > > Why? I really don't see the logic in doing that.
-> > > 
-> > > Seems like I am replying to your emails in reverse order.
-> > > 
-> > > > Currently the kernel can only boot using DT, so DT will be used even if
-> > > > ACPI is present. In the presence of ACPI support in the kernel, ACPI
-> > > > would be used on said systems.
-> > > 
-> > > For all the reasons we hashed out earlier this year: We can't trust that
-> > > vendors will know how to do ACPI from day one, so instead of loading up the
-> > > kernel with lots of quirks and workarounds, we'll default to not using it until
-> > > we're at a point where things look mature enough.
-> > > 
-> > > The alternative is to keep this patch set out of the kernel. We can do that
-> > > too, but I don't think that really helps anyone.
-> > > 
-> > > > From the discussions at the last Linaro Connect, this was seen as
-> > > > important for virtual machines which want to provide ACPI services to
-> > > > guests while still being able to boot DT-only kernels. I'll leave it to
-> > > > Grant, Rob, and Christoffer to cover that.
-> > > 
-> > > Ok, waiting to see what they have to say then.
-> > > 
-> > 
-> > Hmm, a virtual machine implementaion may provide either a DT or ACPI (or
-> > both).  I think the point at Linaro Connect was that for a first cut,
-> > there is no obvious need to provide ACPI to VMs and to be spec
-> > compliant, server kernels must be able to boot with DT-only.  In most
-> > cases such systems will only access a few limited emulated devices
-> > (UART, GIC, RTC, flash controller) and VirtIO devices, which should just
-> > work using DT only.
-> > 
-> > People are talking about adding ACPI for VM guests as well for various
-> > reasons (device passthrough for example) in which case I would always
-> > expect people to run UEFI inside their guests too (perhaps this is not
-> > 100% true in the case of Xen fast-boot scenarios though) and I would
-> > expect Linux to only see the little stub DT and ACPI.
-> > 
-> > Does this clarify anything or add futher to the confusion?
-> 
-> I was under the impression that there was a case where we'd have a DT
-> with HW description in a VM which also had ACPI tables, to enable a
-> kernel without ACPI support to boot in said VM (albeit with reduced
-> functionality).
-> 
-> I may have got confused since the VM standards discussion at LCA-14.
+On 29 July 2014 19:12, Will Deacon <will.deacon@arm.com> wrote:
+> On Tue, Jul 29, 2014 at 04:53:21AM +0100, Olof Johansson wrote:
+>> On Tue, Jul 29, 2014 at 10:44:40AM +0800, Haojian Zhuang wrote:
+>> > Because I didn't get these materials yet. All clocks are enabled in bootloader.
+>>
+>> What materials? Technical documentation for the CPU you're upstreaming?
+>>
+>> It seems like a very bad idea to upstream a DT for a CPU that you don't
+>> have documentation for. It seems appropriate to wait until you have
+>> documentation so you can make sure that the hardware you're describing
+>> is actually what is there, and not something made-up or misdescribed.
+>
+> I completely agree. Furthermore, given that this SoC implements a dodgy
+> custom GIC, I don't think it's unreasonable for us to ask for documentation
+> describing that too, otherwise it's going to make maintaining a complicated
+> irqchip driver that much worse.
+>
+> Will
 
-I took a look at the video [1,2] of said session [3], and it looks like
-I was the one arguing for the case of full description in both DT and
-ACPI, so either I was confused or I've forgotten some hallway
-discussion.
+I don't have enough documents on clocks. And all clocks are already
+enabled in UEFI. There're also no requirement on change the clock
+frequency & disable them. So I set all these clocks as fixed rate.
 
-I think my reasoning was somewhat flawed; if the hypervisor defaults to
-providing DT, with an option to use ACPI in certain cases (where not all
-guests would be expected to work), then that would cover the "grab an
-iso, it just works?" use case for Linux images while allowing for
-the cases where people want ACPI in the VM.
+It's different from GIC. If I don't have documents on GIC, I can't
+write code for HIP04 GIC. HiP04 GIC supports 16-cores. ARM GICv2
+supports 8-cores. So some registers offsets and bit fields are
+different from GICv2.
 
-The only issue with that would be catering for OSs which support ACPI
-but not DT or whose DT support is not Linux-compatible.
-
-Thanks,
-Mark.
-
-[1] http://www.youtube.com/watch?v=Qh3SX3p3B74
-[2] http://people.linaro.org/linaro-connect/lca14/videos/03-03-Monday/LCA14-101-%20ARM%20VM%20Standards.mp4
-[3] http://lca-14.zerista.com/event/member/102395
+Regards
+Haojian
