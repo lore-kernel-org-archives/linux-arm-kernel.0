@@ -1,28 +1,67 @@
-From: dianders@chromium.org (Doug Anderson)
-Date: Tue, 29 Jul 2014 09:16:11 -0700
-Subject: [PATCH v2 2/4] ARM: dts: exynos5250: cypress,cyapa trackpad is
- Snow only
-In-Reply-To: <1405704009-8430-3-git-send-email-afaerber@suse.de>
-References: <1405704009-8430-1-git-send-email-afaerber@suse.de>
- <1405704009-8430-3-git-send-email-afaerber@suse.de>
-Message-ID: <CAD=FV=VAWG=H9=mwKZfip9zvAROU3aVXihnaBUBr0GNSzDoWFw@mail.gmail.com>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Tue, 29 Jul 2014 17:18:52 +0100
+Subject: [PATCH 1/3] arm64: spin-table: handle unmapped cpu-release-addrs
+In-Reply-To: <11934363.ljlrQOGpcO@wuerfel>
+References: <1406630950-32432-1-git-send-email-ard.biesheuvel@linaro.org>
+ <2385684.COvj9k7y2z@wuerfel> <20140729160303.GA32108@leverpostej>
+ <11934363.ljlrQOGpcO@wuerfel>
+Message-ID: <20140729161852.GC32108@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Andreas,
+On Tue, Jul 29, 2014 at 05:13:07PM +0100, Arnd Bergmann wrote:
+> On Tuesday 29 July 2014 17:03:03 Mark Rutland wrote:
+> > On Tue, Jul 29, 2014 at 04:20:46PM +0100, Arnd Bergmann wrote:
+> > > On Tuesday 29 July 2014 11:15:45 Mark Salter wrote:
+> > > > > -
+> > > > > -     __flush_dcache_area(release_addr, sizeof(release_addr[0]));
+> > > > > +     writeq_relaxed(__pa(secondary_holding_pen), release_addr);
+> > > > > +     __flush_dcache_area(release_addr, sizeof(*release_addr));
+> > > > 
+> > > >        __flush_dcache_area((__force void *)release_addr, ... 
+> > > > 
+> > > > to avoid sparse warning.
+> > 
+> > Presumably we'd get this for the write_relaxed too?
+> 
+> writeq_relaxed() actually expects an __iomem  pointer
 
-On Fri, Jul 18, 2014 at 10:20 AM, Andreas F?rber <afaerber@suse.de> wrote:
-> Move it from exynos5250-cros-common.dtsi to exynos5250-snow.dts.
-> Spring does not need it, it uses an Atmel maXTouch instead.
->
-> Signed-off-by: Andreas F?rber <afaerber@suse.de>
-> ---
->  v2: New (Doug Anderson)
->
->  arch/arm/boot/dts/exynos5250-cros-common.dtsi |  8 --------
->  arch/arm/boot/dts/exynos5250-snow.dts         | 10 ++++++++++
->  2 files changed, 10 insertions(+), 8 deletions(-)
+Ah. I was being thick and thought this was about the underlying type of
+release_addr (le64 * vs void *) rather than the __iomem annotation.
 
-Reviewed-by: Doug Anderson <dianders@chromium.org>
+> > > 
+> > > I think it would be cleaner to drop the __iomem annotation and use vmap()
+> > > rather than ioremap(). That requires having a 'struct page' though, which
+> > > I'm not sure you have.
+> > 
+> > As far as I am aware, we'd only have a struct page for memory falling in
+> > the linear map, so for the cases this patch is actually required we
+> > wouldn't have a struct page.
+> > 
+> > So it looks like I should just make release_addr a void __iomem *. Then
+> > this line can just be:
+> 
+> You mean make it a 'void *' instead of 'void __iomem *', right?
+> 
+> > __flush_dcache_area(release_addr, 8);
+> > 
+> > Where we could replace 8 with sizeof(u64), sizeof(__le64), etc if 8 is
+> > too magic.
+> > 
+> > How does that sound?
+> 
+> Not sure where you're getting at. Using a regular pointer sounds fine,
+> but then you have to cast the result of ioremap and do a manual
+> cpu_to_le64 conversion on the assignment.
+> 
+> Keeping the iomem annotation will also work,a nd then we only need
+> the cast in the __flush_dcache_area call.
 
-Kukjin could apply this now if he wanted to avoid future conflicts.
+Sorry, I'd misunderstood the problem and my suggestion was nonsense
+deriving from that.
+
+Having the (__force void *) cast in the call to __flush_dcache_area
+sounds like the right solution to me.
+
+Thanks,
+Mark.
