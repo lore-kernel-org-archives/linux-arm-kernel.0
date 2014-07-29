@@ -1,38 +1,47 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Tue, 29 Jul 2014 13:05:56 +0100
-Subject: [PATCH v10 2/2] dmaengine: sun6i: Add driver for the Allwinner
- A31 DMA controller
-In-Reply-To: <20140728150911.GN3952@lukather>
-References: <1404134454-25513-1-git-send-email-maxime.ripard@free-electrons.com>
- <1404134454-25513-3-git-send-email-maxime.ripard@free-electrons.com>
- <20140630142054.GA8756@leverpostej>
- <20140630151906.GG28647@lukather>
- <20140630153305.GA28740@leverpostej>
- <20140701072119.GH28647@lukather>
- <20140701124852.GB6064@leverpostej>
- <20140727184942.GL17528@sirena.org.uk>
- <20140728150911.GN3952@lukather>
-Message-ID: <20140729120556.GS17528@sirena.org.uk>
+From: afaerber@suse.de (=?ISO-8859-15?Q?Andreas_F=E4rber?=)
+Date: Tue, 29 Jul 2014 14:08:51 +0200
+Subject: [PATCH v8 3/6] ARM: dts: Exynos: add CPU OPP and regulator supply
+ property
+In-Reply-To: <1406611711-25112-4-git-send-email-thomas.ab@samsung.com>
+References: <1406611711-25112-1-git-send-email-thomas.ab@samsung.com>
+ <1406611711-25112-4-git-send-email-thomas.ab@samsung.com>
+Message-ID: <53D78ED3.9090703@suse.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jul 28, 2014 at 05:09:11PM +0200, Maxime Ripard wrote:
-> On Sun, Jul 27, 2014 at 07:49:42PM +0100, Mark Brown wrote:
+Hi Thomas,
 
-> > There's supposed to be facilities appearing in the generic clock code
-> > for specifying default clock tree configurations via the DT - it's quite
-> > a common requirement after all.  It sounds like that should be able to
-> > do the job here.  Not sure if these have gone in yet or not but there's
-> > quite a bit of demand.
+Am 29.07.2014 07:28, schrieb Thomas Abraham:
+> diff --git a/arch/arm/boot/dts/exynos5250-cros-common.dtsi b/arch/arm/boot/dts/exynos5250-cros-common.dtsi
+> index 89ac90f..34bb31c 100644
+> --- a/arch/arm/boot/dts/exynos5250-cros-common.dtsi
+> +++ b/arch/arm/boot/dts/exynos5250-cros-common.dtsi
+> @@ -19,6 +19,12 @@
+>  	chosen {
+>  	};
+>  
+> +	cpus {
+> +		cpu at 0 {
+> +			cpu0-supply = <&buck2_reg>;
+> +		};
+> +	};
+> +
+>  	pinctrl at 11400000 {
+>  		/*
+>  		 * Disabled pullups since external part has its own pullups and
 
-> As far as I'm aware, it's not been merged yet.
+I've been instructed to dismantle this .dtsi file, so please place this
+into exynos5250-snow.dts. It's probably wrong here anyway, since Spring
+doesn't use the max77686 but an s5m6787 PMIC.
 
-Well, another reason to push Mike about it then I guess - there are a
-lot of these case cropping up.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140729/d7dcd600/attachment.sig>
+How do I find out which -supply to specify here for Spring?
+
+Also, wouldn't it make sense to assign a cpu0 label in exynos????.dtsi
+to override it via &cpu0 { ... };?
+
+Regards,
+Andreas
+
+-- 
+SUSE LINUX Products GmbH, Maxfeldstr. 5, 90409 N?rnberg, Germany
+GF: Jeff Hawn, Jennifer Guild, Felix Imend?rffer; HRB 16746 AG N?rnberg
