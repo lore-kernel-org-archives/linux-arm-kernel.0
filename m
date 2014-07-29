@@ -1,42 +1,30 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Tue, 29 Jul 2014 04:11:34 -0700
-Subject: [GIT PULL] omap n900 regression fix for v3.16 rc series
-In-Reply-To: <3734846.Lhxg9X6PO8@wuerfel>
-References: <20140729103223.GK29045@atomide.com> <3734846.Lhxg9X6PO8@wuerfel>
-Message-ID: <20140729111134.GO29045@atomide.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Tue, 29 Jul 2014 12:12:13 +0100
+Subject: [PATCH v15 07/12] ARM: dts: append hip04 dts
+In-Reply-To: <20140729035321.GA8430@quad.lixom.net>
+References: <1406555876-11989-1-git-send-email-haojian.zhuang@linaro.org>
+ <1406555876-11989-8-git-send-email-haojian.zhuang@linaro.org>
+ <20140728180609.GE2576@leverpostej>
+ <CAD6h2NQLgB1=8+WznE19rjsFwm3XWPUYEbDuPCbKbWjseRCBDg@mail.gmail.com>
+ <20140729035321.GA8430@quad.lixom.net>
+Message-ID: <20140729111213.GE9245@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Arnd Bergmann <arnd@arndb.de> [140729 04:08]:
-> On Tuesday 29 July 2014 03:32:24 Tony Lindgren wrote:
-> > The following changes since commit 33753cd2ba41c72a0756edc5dc094d91602deda5:
-> > 
-> >   ARM: OMAP2+: gpmc: fix gpmc_hwecc_bch_capable() (2014-07-23 01:48:24 -0700)
-> > 
-> > are available in the git repository at:
-> > 
-> >   git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap tags/omap-for-v3.16/n900-regression
-> > 
-> > for you to fetch changes up to d937678ab625b0f63ce54b2b9b3e1cbd1b4a1b15:
-> > 
-> >   ARM: dts: Revert enabling of twl configuration for n900 (2014-07-29 00:16:25 -0700)
-> > 
-> > ----------------------------------------------------------------
-> > Minimal regression fix for n900 display that got broken with
-> > enabling of twl4030 PM features. Turns out more work is needed
-> > before we can enable twl4030 PM on n900.
-> > 
-> > I did not notice this earlier as I have my n900 in a rack
-> > and the display did not get enabled for device tree based booting
-> > until for v3.16.
-> > 
-> > 
+On Tue, Jul 29, 2014 at 04:53:21AM +0100, Olof Johansson wrote:
+> On Tue, Jul 29, 2014 at 10:44:40AM +0800, Haojian Zhuang wrote:
+> > Because I didn't get these materials yet. All clocks are enabled in bootloader.
 > 
-> Pulled into fixes branch, which I expect to send out later today.
+> What materials? Technical documentation for the CPU you're upstreaming?
+> 
+> It seems like a very bad idea to upstream a DT for a CPU that you don't
+> have documentation for. It seems appropriate to wait until you have
+> documentation so you can make sure that the hardware you're describing
+> is actually what is there, and not something made-up or misdescribed.
 
-Great thanks. No other fixes coming for the -rc series from me that
-I'm aware of.
+I completely agree. Furthermore, given that this SoC implements a dodgy
+custom GIC, I don't think it's unreasonable for us to ask for documentation
+describing that too, otherwise it's going to make maintaining a complicated
+irqchip driver that much worse.
 
-Regards,
-
-Tony
+Will
