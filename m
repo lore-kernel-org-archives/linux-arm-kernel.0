@@ -1,23 +1,29 @@
-From: shawn.guo@freescale.com (Shawn Guo)
-Date: Tue, 29 Jul 2014 17:22:37 +0800
-Subject: [PATCH v2 0/7] vf610: Add USB support
-In-Reply-To: <cover.1406558450.git.stefan@agner.ch>
-References: <cover.1406558450.git.stefan@agner.ch>
-Message-ID: <20140729092236.GH24750@dragon>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Tue, 29 Jul 2014 11:23:56 +0200
+Subject: [PATCH v4 2/4] arm64: Remove the clock and PHY reference from the
+ APM X-Gene SoC AHCI SATA Host controller dts node.
+In-Reply-To: <1406616892-30273-3-git-send-email-stripathi@apm.com>
+References: <1406616892-30273-1-git-send-email-stripathi@apm.com>
+ <1406616892-30273-3-git-send-email-stripathi@apm.com>
+Message-ID: <4479076.DG8ITD3De2@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jul 28, 2014 at 04:57:26PM +0200, Stefan Agner wrote:
-> Stefan Agner (7):
->   ARM: dts: vf610: Add USB PHY and controller
->   ARM: imx: clk-vf610: Add USBPHY clocks
-...
->   ARM: dts: vf610: Add usbmisc for non-core registers
-...
->   ARM: dts: vf610-colibri: Add USB support
->   ARM: dts: vf610-twr: Add USB support
+On Tuesday 29 July 2014 12:24:50 Suman Tripathi wrote:
+> This patch removes all clocks and PHY references from the APM X-Gene
+> SoC AHCI SATA host controller and PHY DTS nodes. The clock and PHY
+> are no longer needed as they are handled by the firmware. By removing
+> only the reference is not enough as any un-used clock entry will get
+> disabled by the clock framework.
+> 
+> Signed-off-by: Loc Ho <lho@apm.com>
+> Signed-off-by: Suman Tripathi <stripathi@apm.com>
+> 
 
-These 'ARM: ...' patches look fine to me, and I will apply them on IMX
-tree once the driver changes are accepted.
+This will break booting on older firmware versions I guess, and
+it does not confirm to the binding that lists the phy and clock
+properties as "required".
 
-Shawn
+It doesn't sound like a good idea to apply it.
+
+	Arnd
