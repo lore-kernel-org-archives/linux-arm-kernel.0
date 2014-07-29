@@ -1,55 +1,89 @@
-From: dianders@chromium.org (Doug Anderson)
-Date: Tue, 29 Jul 2014 08:11:59 -0700
-Subject: [PATCH v2 3/4] ARM: dts: exynos5250: Fold common ChromeOS parts
- into Snow
-In-Reply-To: <53D79771.1020406@suse.de>
-References: <1405704009-8430-1-git-send-email-afaerber@suse.de>
- <1405704009-8430-4-git-send-email-afaerber@suse.de>
- <CAD=FV=VK0KJknJ2099S7fEDzBnpPCrpSZ36WPkJB156GpcyEfg@mail.gmail.com>
- <53D79771.1020406@suse.de>
-Message-ID: <CAD=FV=UR5NWXCpK3zB-NSnkMUgKaYAHV1YLdPAvP83JMqekk0Q@mail.gmail.com>
+From: msalter@redhat.com (Mark Salter)
+Date: Tue, 29 Jul 2014 11:15:45 -0400
+Subject: [PATCH 1/3] arm64: spin-table: handle unmapped cpu-release-addrs
+In-Reply-To: <1406630950-32432-2-git-send-email-ard.biesheuvel@linaro.org>
+References: <1406630950-32432-1-git-send-email-ard.biesheuvel@linaro.org>
+ <1406630950-32432-2-git-send-email-ard.biesheuvel@linaro.org>
+Message-ID: <1406646945.753.5.camel@deneb.redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Andreas,
+On Tue, 2014-07-29 at 12:49 +0200, Ard Biesheuvel wrote:
+> From: Mark Rutland <mark.rutland@arm.com>
+> 
+> In certain cases the cpu-release-addr of a CPU may not fall in the
+> linear mapping (e.g. when the kernel is loaded above this address due to
+> the presence of other images in memory). This is problematic for the
+> spin-table code as it assumes that it can trivially convert a
+> cpu-release-addr to a valid VA in the linear map.
+> 
+> This patch modifies the spin-table code to use a temporary cached
+> mapping to write to a given cpu-release-addr, enabling us to support
+> addresses regardless of whether they are covered by the linear mapping.
+> 
+> Signed-off-by: Mark Rutland <mark.rutland@arm.com>
+> ---
+>  arch/arm64/kernel/smp_spin_table.c | 21 ++++++++++++++++-----
+>  1 file changed, 16 insertions(+), 5 deletions(-)
+> 
+> diff --git a/arch/arm64/kernel/smp_spin_table.c b/arch/arm64/kernel/smp_spin_table.c
+> index 0347d38eea29..70181c1bf42d 100644
+> --- a/arch/arm64/kernel/smp_spin_table.c
+> +++ b/arch/arm64/kernel/smp_spin_table.c
+> @@ -20,6 +20,7 @@
+>  #include <linux/init.h>
+>  #include <linux/of.h>
+>  #include <linux/smp.h>
+> +#include <linux/types.h>
+>  
+>  #include <asm/cacheflush.h>
+>  #include <asm/cpu_ops.h>
+> @@ -65,12 +66,21 @@ static int smp_spin_table_cpu_init(struct device_node *dn, unsigned int cpu)
+>  
+>  static int smp_spin_table_cpu_prepare(unsigned int cpu)
+>  {
+> -	void **release_addr;
+> +	__le64 __iomem *release_addr;
+>  
+>  	if (!cpu_release_addr[cpu])
+>  		return -ENODEV;
+>  
+> -	release_addr = __va(cpu_release_addr[cpu]);
+> +	/*
+> +	 * The cpu-release-addr may or may not be inside the linear mapping.
+> +	 * As ioremap_cache will either give us a new mapping or reuse the
+> +	 * existing linear mapping, we can use it to cover both cases. In
+> +	 * either case the memory will be MT_NORMAL.
+> +	 */
+> +	release_addr = ioremap_cache(cpu_release_addr[cpu],
+> +				     sizeof(*release_addr));
+> +	if (!release_addr)
+> +		return -ENOMEM;
+>  
+>  	/*
+>  	 * We write the release address as LE regardless of the native
+> @@ -79,15 +89,16 @@ static int smp_spin_table_cpu_prepare(unsigned int cpu)
+>  	 * boot-loader's endianess before jumping. This is mandated by
+>  	 * the boot protocol.
+>  	 */
+> -	release_addr[0] = (void *) cpu_to_le64(__pa(secondary_holding_pen));
+> -
+> -	__flush_dcache_area(release_addr, sizeof(release_addr[0]));
+> +	writeq_relaxed(__pa(secondary_holding_pen), release_addr);
+> +	__flush_dcache_area(release_addr, sizeof(*release_addr));
 
-On Tue, Jul 29, 2014 at 5:45 AM, Andreas F?rber <afaerber@suse.de> wrote:
-> Doug,
->
-> Am 25.07.2014 18:02, schrieb Doug Anderson:
->> On Fri, Jul 18, 2014 at 10:20 AM, Andreas F?rber <afaerber@suse.de> wrote:
->>> +/*
->>> + * On Snow we've got SIP WiFi and so can keep drive strengths low to
->>> + * reduce EMI.
->>> + */
->>> +&mmc_3 {
->>> +       status = "okay";
->>> +       num-slots = <1>;
->>> +       supports-highspeed;
->>> +       broken-cd;
->>> +       card-detect-delay = <200>;
->>> +       samsung,dw-mshc-ciu-div = <3>;
->>> +       samsung,dw-mshc-sdr-timing = <2 3>;
->>> +       samsung,dw-mshc-ddr-timing = <1 2>;
->>> +
->>> +       slot at 0 {
->>> +               reg = <0>;
->>> +               bus-width = <4>;
->>> +               pinctrl-names = "default";
->>> +               pinctrl-0 = <&sd3_clk &sd3_cmd &sd3_bus4>;
->>
->> This actually looks like a bug on snow.  I don't think these pinctrl
->> statements are taking effect and I think they belong at the mmc level,
->> not the slot level.  That's not a new bug introduced by you, though.
->> Mind fixing it?  You've already got it right for Spring mmc_1.
->
-> I was taught never to mix code movements with functional changes, as it
-> hides them even if mentioned in the commit message. Would you like me to
-> fix it pre- or post-move? Post-move would be easiest for me. ;)
+       __flush_dcache_area((__force void *)release_addr, ... 
 
-Agreed.  Sorry for implying that it belonged as part of this patch.
-I'd be happy if it was somewhere in the series, ideally before you
-introduce the Spring device tree so diffs are cleaner for it.  I don't
-care if it's pre-move or post-move.
+to avoid sparse warning.
 
--Doug
+>  
+>  	/*
+>  	 * Send an event to wake up the secondary CPU.
+>  	 */
+>  	sev();
+>  
+> +	iounmap(release_addr);
+> +
+>  	return 0;
+>  }
+>  
