@@ -1,27 +1,55 @@
-From: joel.schopp@amd.com (Joel Schopp)
-Date: Tue, 29 Jul 2014 09:19:38 -0500
-Subject: [PATCH v7 07/11] arm64: mm: Implement 4 levels of translation
- tables
-In-Reply-To: <ACF42928-55EE-4466-B217-982839BB98C4@gmail.com>
-References: <CAGoO6fLT6B_vx+Wtm6bKHD6YkjQcM8f=deD7SDP3BR_uC+1c5w@mail.gmail.com>
- <ACF42928-55EE-4466-B217-982839BB98C4@gmail.com>
-Message-ID: <53D7AD7A.8050706@amd.com>
+From: thierry.reding@gmail.com (Thierry Reding)
+Date: Tue, 29 Jul 2014 16:25:34 +0200
+Subject: [PATCH] ARM: tegra: Move AHB Kconfig to drivers/amba
+Message-ID: <1406643934-16301-1-git-send-email-thierry.reding@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+From: Thierry Reding <treding@nvidia.com>
 
->> Here's a good example of where we run into trouble equating page table
->> addressable bits with hardware addressable bits.  If VA_BITS is 48 due
->> to 4K 4 level page tables but is running on a 42 bit system this will
->> end up being out of range.
-> Is your concern that CPU issues 48-bit address to MMU on 42-bit hardware?
-> Have you tested this patch series on your hardware?
->
-> - Jungseok Lee
+This will allow the Kconfig option to be shared among 32-bit and 64-bit
+ARM.
 
-That is my concern.  I did test the patch on my hardware with the
-following results:
-64k pages, 2 levels 42 bit VA - worked (no regression)
-64k pages, 3 levels 48 bit VA- didn't boot
-4k pages, 4 levels 42 bit VA - didn't boot
-4k pages, 4 levels 48 bit VA - didn't boot
+Signed-off-by: Thierry Reding <treding@nvidia.com>
+---
+ arch/arm/mach-tegra/Kconfig |  8 --------
+ drivers/amba/Kconfig        | 11 +++++++++++
+ 2 files changed, 11 insertions(+), 8 deletions(-)
+ create mode 100644 drivers/amba/Kconfig
+
+diff --git a/arch/arm/mach-tegra/Kconfig b/arch/arm/mach-tegra/Kconfig
+index 052fba07a3cb..fae2eb2f52ea 100644
+--- a/arch/arm/mach-tegra/Kconfig
++++ b/arch/arm/mach-tegra/Kconfig
+@@ -64,12 +64,4 @@ config ARCH_TEGRA_124_SOC
+ 	  Support for NVIDIA Tegra T124 processor family, based on the
+ 	  ARM CortexA15MP CPU
+ 
+-config TEGRA_AHB
+-	bool "Enable AHB driver for NVIDIA Tegra SoCs"
+-	default y
+-	help
+-	  Adds AHB configuration functionality for NVIDIA Tegra SoCs,
+-	  which controls AHB bus master arbitration and some
+-	  performance parameters(priority, prefech size).
+-
+ endif
+diff --git a/drivers/amba/Kconfig b/drivers/amba/Kconfig
+new file mode 100644
+index 000000000000..3f7350a03708
+--- /dev/null
++++ b/drivers/amba/Kconfig
+@@ -0,0 +1,11 @@
++if ARM_AMBA
++
++config TEGRA_AHB
++	bool "Enable AHB driver for NVIDIA Tegra SoCs"
++	default y if ARCH_TEGRA
++	help
++	  Adds AHB configuration functionality for NVIDIA Tegra SoCs,
++	  which controls AHB bus master arbitration and some performance
++	  parameters (priority, prefetch size).
++
++endif
+-- 
+2.0.2
