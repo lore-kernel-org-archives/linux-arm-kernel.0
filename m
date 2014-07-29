@@ -1,73 +1,81 @@
-From: luto@amacapital.net (Andy Lutomirski)
-Date: Tue, 29 Jul 2014 11:22:31 -0700
-Subject: [PATCH v3 6/8] x86: Split syscall_trace_enter into two phases
-In-Reply-To: <20140729181615.GA4950@redhat.com>
-References: <cover.1405992946.git.luto@amacapital.net>
- <3f649f5658a163645e3ce15156176c325283762e.1405992946.git.luto@amacapital.net>
- <20140728173723.GA20993@redhat.com>
- <CALCETrWUFo_zXcAZja-vdL4_MgJDd=1ed5Vt54eyUuim930xAw@mail.gmail.com>
- <20140729165416.GA967@redhat.com>
- <CALCETrWBU-=zqLTCP7B1feZ9J-e4u-Boic+e1EEn1rL-ijeEKg@mail.gmail.com>
- <20140729173136.GA2808@redhat.com>
- <CALCETrVP-P+EJ6YJ=CZL_gyA1r8O9eogUNTik7_31_SA+Pj3pg@mail.gmail.com>
- <20140729181615.GA4950@redhat.com>
-Message-ID: <CALCETrVWOOs3HCnQNaqmnn480oQYn3scrWUfR4JJX9+zTxUDRw@mail.gmail.com>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Tue, 29 Jul 2014 20:17:38 +0200
+Subject: [PATCH 3/3] arm64/efi: efistub: don't abort if base of DRAM is
+ occupied
+In-Reply-To: <1406647756.753.11.camel@deneb.redhat.com>
+References: <1406630950-32432-1-git-send-email-ard.biesheuvel@linaro.org>
+ <1406630950-32432-4-git-send-email-ard.biesheuvel@linaro.org>
+ <1406647756.753.11.camel@deneb.redhat.com>
+Message-ID: <CAKv+Gu8Pwi6GuGq9jbGfHyALcJKtAG+KVDcVwpYVCG9ZKrhaPA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jul 29, 2014 at 11:16 AM, Oleg Nesterov <oleg@redhat.com> wrote:
-> On 07/29, Andy Lutomirski wrote:
+On 29 July 2014 17:29, Mark Salter <msalter@redhat.com> wrote:
+> On Tue, 2014-07-29 at 12:49 +0200, Ard Biesheuvel wrote:
+>> If we cannot relocate the kernel Image to its preferred offset of base of DRAM
+>> plus TEXT_OFFSET, instead relocate it to the lowest available 2 MB boundary plus
+>> TEXT_OFFSET. We may lose a bit of memory at the low end, but we can still
+>> proceed normally otherwise.
 >>
->> On Tue, Jul 29, 2014 at 10:31 AM, Oleg Nesterov <oleg@redhat.com> wrote:
->> >
->> > I don't think so (unless I am confused again), note that user_exit() uses
->> > jump label. But this doesn't matter. I meant that we should avoid TIF_NOHZ
->> > if possible because I think it should die somehow (currently I do not know
->> > how ;). And because it is ugly to check the same condition twice:
->> >
->> >         if (work & TIF_NOHZ) {
->> >                 // user_exit()
->> >                 if (context_tracking_is_enabled())
->> >                         context_tracking_user_exit();
->> >         }
->> >
->> > TIF_NOHZ is set if and only if context_tracking_is_enabled() is true.
->> > So I think that
->> >
->> >         work = current_thread_info()->flags & (_TIF_WORK_SYSCALL_ENTRY & ~TIF_NOHZ);
->> >
->> >         user_exit();
->> >
->> > looks a bit better. But I won't argue.
+>> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+>> ---
+>>  arch/arm64/kernel/efi-stub.c | 16 ++++++----------
+>>  1 file changed, 6 insertions(+), 10 deletions(-)
+>
+> Tested on Mustang (with loss of 2MB free memory).
+>
+
+Great, thanks!
+
 >>
->> I don't get it.
+>> diff --git a/arch/arm64/kernel/efi-stub.c b/arch/arm64/kernel/efi-stub.c
+>> index 60e98a639ac5..460c00c41e57 100644
+>> --- a/arch/arm64/kernel/efi-stub.c
+>> +++ b/arch/arm64/kernel/efi-stub.c
+>> @@ -60,20 +60,16 @@ static efi_status_t handle_kernel_image(efi_system_table_t *sys_table,
+>>       kernel_size = _edata - _text;
+>>       if (*image_addr != (dram_base + TEXT_OFFSET)) {
+>>               kernel_memsize = kernel_size + (_end - _edata);
+>> -             status = efi_relocate_kernel(sys_table, image_addr,
+>> -                                          kernel_size, kernel_memsize,
+>> -                                          dram_base + TEXT_OFFSET,
+>> -                                          PAGE_SIZE);
 >
-> Don't worry, you are not alone.
+> Can we make efi_relocate_kernel static inline to get rid
+> of the "defined but unused" warning?
 >
->> context_tracking_is_enabled is global, and TIF_NOHZ
->> is per-task.  Isn't this stuff determined per-task or per-cpu or
->> something?
+
+I have some patches pending in the EFI tree to turn the stub into a
+static library, and that already takes care of this issue.
+
+> Otherwise:
+>
+> Acked-by: Mark Salter <msalter@redhat.com>
+>
+
+Cheers,
+Ard.
+
+
+
+>> +             status = efi_low_alloc(sys_table, kernel_memsize + TEXT_OFFSET,
+>> +                                    SZ_2M, reserve_addr);
+>>               if (status != EFI_SUCCESS) {
+>>                       pr_efi_err(sys_table, "Failed to relocate kernel\n");
+>>                       return status;
+>>               }
+>> -             if (*image_addr != (dram_base + TEXT_OFFSET)) {
+>> -                     pr_efi_err(sys_table, "Failed to alloc kernel memory\n");
+>> -                     efi_free(sys_table, kernel_memsize, *image_addr);
+>> -                     return EFI_ERROR;
+>> -             }
+>> -             *image_size = kernel_memsize;
+>> +             memcpy((void *)*reserve_addr + TEXT_OFFSET, (void *)*image_addr,
+>> +                    kernel_size);
+>> +             *image_addr = *reserve_addr + TEXT_OFFSET;
+>> +             *reserve_size = kernel_memsize + TEXT_OFFSET;
+>>       }
 >>
->> IOW, if one CPU is running something that's very heavily
->> userspace-oriented and another CPU is doing something syscall- or
->> sleep-heavy, then shouldn't only the first CPU end up paying the price
->> of context tracking?
+>>
 >
-> Please see another email I sent to Frederic.
 >
-
-I'll add at least this argument in favor of my approach: if context
-tracking works at all, then it had better not demand that syscall
-entry call user_exit if TIF_NOHZ is *not* set.  So adding the
-condition ought to be safe, barring dumb bugs in my code.
-
---Andy
-
-> Oleg.
->
-
-
-
--- 
-Andy Lutomirski
-AMA Capital Management, LLC
