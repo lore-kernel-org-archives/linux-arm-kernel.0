@@ -1,32 +1,25 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Tue, 29 Jul 2014 13:52:31 +0100
-Subject: [PATCH  0/4] ARM: perf: Support i.MX53
-In-Reply-To: <20140729123256.13347.79778.stgit@localhost>
-References: <20140729123256.13347.79778.stgit@localhost>
-Message-ID: <20140729125231.GM9245@arm.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Tue, 29 Jul 2014 14:52:40 +0200
+Subject: [PATCH 19/19] Documentation: ACPI for ARM64
+In-Reply-To: <CAMJs5B_Ye1eXsvJAKWnHRxC4jnpcXMcqHE+GgOGO7MHtPcsSQA@mail.gmail.com>
+References: <1406206825-15590-1-git-send-email-hanjun.guo@linaro.org>
+ <20140729112824.GM2576@leverpostej>
+ <CAMJs5B_Ye1eXsvJAKWnHRxC4jnpcXMcqHE+GgOGO7MHtPcsSQA@mail.gmail.com>
+Message-ID: <351673188.FxXsM7MvdA@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Martin,
-
-On Tue, Jul 29, 2014 at 01:32:56PM +0100, Martin Fuzzey wrote:
-> This series enables hardware performance counters on the i.MX53 SoC
+On Tuesday 29 July 2014 14:37:38 Christoffer Dall wrote:
 > 
-> This requires setting registers at both the ARM V7 core level
-> and the i.MX53 SoC level.
+> For reference, Red Hat's current arguing point for ACPI in VMs is
+> hotplug of things like CPUs and memory for very large VMs, but I
+> haven't thought too carefully about this just yet, as I don't have a
+> 100+ core ARM 64-bit hardware lying around...
 
->From a quick look at the patches, it sounds like you're booting in secure
-mode and are trying to use perf there. Whilst I understand that you may want
-to do this, I don't think the code you currently have is quite right:
+I thought you could run guests with more virtual CPUs that you have
+physical CPUs on the host.
 
- - It accesses the SDER unconditionally, which is undefined for non-secure
-   modes.
+Regarding CPU and memory hotplug, don't we already have PSCI and
+xen-balloon/virtio-balloon for that?
 
- - It adds yet more callbacks to arm_pmu_platdata
-
-Instead, how about we add a new property on the PMU node that says it
-requires secure access, then we use that to configuer SDER in the perf code.
-Then you can do your SoC-specific magic as part of the runtime PM hooks we
-already have (it looks like enabled/disabling a clock really).
-
-Will
+	Arnd
