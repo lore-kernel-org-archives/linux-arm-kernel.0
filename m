@@ -1,27 +1,31 @@
-From: andrea.adami@gmail.com (Andrea Adami)
-Date: Wed, 30 Jul 2014 00:06:38 +0200
-Subject: [PATCH v2] spi/pxa2xx-pci: Add common clock framework support in
- PCI glue layer
-In-Reply-To: <20140729185529.GG17528@sirena.org.uk>
-References: <1406221854-12828-1-git-send-email-chiau.ee.chew@intel.com>
- <20140725053230.GT1857@lahna.fi.intel.com>
- <CAAQYJAtM79NJJtfNYda-yFk113nm-2D8gZE5x=gbnLt2_eUdzQ@mail.gmail.com>
- <20140729185529.GG17528@sirena.org.uk>
-Message-ID: <CAAQYJAtLVgqbs=n2gxyemDAoHhM=7PFJy9bqKUExTbC+1rSNMg@mail.gmail.com>
+From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
+Date: Wed, 30 Jul 2014 00:09:48 +0200
+Subject: CPU1 fails to boot on Armada 375 DB with 3.16.0-rc6
+In-Reply-To: <53D80EF9.8010909@opengear.com>
+References: <53D6F564.5070803@opengear.com>
+ <20140729114816.72bb556d@free-electrons.com>
+ <20140729120033.7e0f8d8b@free-electrons.com>
+ <EB433C0C-2EB5-4639-98BD-9D78F446497A@opengear.com>
+ <53D80EF9.8010909@opengear.com>
+Message-ID: <20140730000948.745f82f5@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jul 29, 2014 at 8:55 PM, Mark Brown <broonie@kernel.org> wrote:
-> On Tue, Jul 29, 2014 at 06:13:06PM +0200, Andrea Adami wrote:
->
->> note that a previous version of the patch breaks spi on pxa machines:
->> tested on pxa250 poodle and pxa255 corgi.
->> The patch is included in linux-Yocto since 3.14.
->
-> The interesting question is if this version works...
+Dear Ken Wilson,
 
-Happy to report that I could finally test on poodle/pxa250 the current
-v2 and the patch doesn't seem to disturb the probe.
-Sorry for the noise.
+On Wed, 30 Jul 2014 07:15:37 +1000, Ken Wilson wrote:
 
-Andrea
+> Hi Thomas,
+> The patch solved the issue
+
+Cool. Let us know if you encounter any issue while testing/using
+mainline on 375, or if there are some features of the SoC not supported
+in mainline that you are interested in.
+
+Thanks!
+
+Thomas
+-- 
+Thomas Petazzoni, CTO, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
