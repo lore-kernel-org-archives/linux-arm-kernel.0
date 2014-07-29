@@ -1,47 +1,64 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Tue, 29 Jul 2014 17:03:03 +0100
-Subject: [PATCH 1/3] arm64: spin-table: handle unmapped cpu-release-addrs
-In-Reply-To: <2385684.COvj9k7y2z@wuerfel>
-References: <1406630950-32432-1-git-send-email-ard.biesheuvel@linaro.org>
- <1406630950-32432-2-git-send-email-ard.biesheuvel@linaro.org>
- <1406646945.753.5.camel@deneb.redhat.com>
- <2385684.COvj9k7y2z@wuerfel>
-Message-ID: <20140729160303.GA32108@leverpostej>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Tue, 29 Jul 2014 18:03:09 +0200
+Subject: [PATCH v11 0/2] Add support for the Allwinner A31 DMA Controller
+In-Reply-To: <20140728141812.GE8181@intel.com>
+References: <1405626376-471-1-git-send-email-maxime.ripard@free-electrons.com>
+ <20140725131217.GS8181@intel.com> <20140725163746.GC20328@lukather>
+ <20140725164218.GW8181@intel.com> <20140728101402.GD3952@lukather>
+ <20140728141812.GE8181@intel.com>
+Message-ID: <20140729160309.GS3952@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jul 29, 2014 at 04:20:46PM +0100, Arnd Bergmann wrote:
-> On Tuesday 29 July 2014 11:15:45 Mark Salter wrote:
-> > > -
-> > > -     __flush_dcache_area(release_addr, sizeof(release_addr[0]));
-> > > +     writeq_relaxed(__pa(secondary_holding_pen), release_addr);
-> > > +     __flush_dcache_area(release_addr, sizeof(*release_addr));
+On Mon, Jul 28, 2014 at 07:48:12PM +0530, Vinod Koul wrote:
+> On Mon, Jul 28, 2014 at 12:14:02PM +0200, Maxime Ripard wrote:
+> > On Fri, Jul 25, 2014 at 10:12:18PM +0530, Vinod Koul wrote:
+> > > On Fri, Jul 25, 2014 at 06:37:46PM +0200, Maxime Ripard wrote:
+> > > > > Can you please send follow patches for these:
+> > > > > - don't recall if I pointed earlier, but can we use direct conversion for
+> > > > >   calculating convert_burst() and convert_buswidth(), latter one at least
+> > > > >   seem doable
+> > > > 
+> > > > Ok. Do you still want the error reporting for the invalid width and
+> > > > burst size?
+> > > I think for convert_buswidth() we can do away with a switch case and convert
+> > > the numbers directly
 > > 
-> >        __flush_dcache_area((__force void *)release_addr, ... 
-> > 
-> > to avoid sparse warning.
-
-Presumably we'd get this for the write_relaxed too?
-
-> > 
+> > Well, it's already using a switch. Do you want me to remove completely
+> > the function and move the switch where it's used? It's used two times
+> > now, so I'd like to avoid duplicating it.
+> You can probably remove switch in these function by converting them
+> arithmetically..
 > 
-> I think it would be cleaner to drop the __iomem annotation and use vmap()
-> rather than ioremap(). That requires having a 'struct page' though, which
-> I'm not sure you have.
+> > > > > - don't use devm_request_irq(). You have irq enabled and you have killed
+> > > > >   tasklet. This is too racy. You need to ensure no irqs can be generated before killing
+> > > > >   tasklets.
+> > > > 
+> > > > Ok, would calling disable_irq before killing the tasklet an option for
+> > > > you ? that would allow to keep the devm_request_irq.
+> > > disable_irq also does syncronize, so it might work. But then again if the
+> > > probe fails after registering irq due to some other reason, and you get into
+> > > races with unitialized driver as well.
+> > > 
+> > > I think it might be easier to amnge by working with plain old request_irq()
+> > 
+> > Yes, devm_free_irq like Russell suggested seems to both address your
+> > concerns, while not having to care about it at probe.
+> OK, pls send the fix
 
-As far as I am aware, we'd only have a struct page for memory falling in
-the linear map, so for the cases this patch is actually required we
-wouldn't have a struct page.
+Ok, will do tomorrow.
 
-So it looks like I should just make release_addr a void __iomem *. Then
-this line can just be:
+Thanks!
+Maxime
 
-__flush_dcache_area(release_addr, 8);
-
-Where we could replace 8 with sizeof(u64), sizeof(__le64), etc if 8 is
-too magic.
-
-How does that sound?
-
-Thanks,
-Mark.
+-- 
+Maxime Ripard, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140729/e24cf17c/attachment.sig>
