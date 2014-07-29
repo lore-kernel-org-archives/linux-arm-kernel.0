@@ -1,76 +1,66 @@
-From: afaerber@suse.de (=?UTF-8?B?QW5kcmVhcyBGw6RyYmVy?=)
-Date: Tue, 29 Jul 2014 14:42:51 +0200
-Subject: [PATCH v8 3/6] ARM: dts: Exynos: add CPU OPP and regulator supply
- property
-In-Reply-To: <CAJuA9ag1xHm=vaXxXzj7ykKxYHxBndDsOTwN0vRdXvhb_DtQ2g@mail.gmail.com>
-References: <1406611711-25112-1-git-send-email-thomas.ab@samsung.com>	<1406611711-25112-4-git-send-email-thomas.ab@samsung.com>	<53D78ED3.9090703@suse.de>
- <CAJuA9ag1xHm=vaXxXzj7ykKxYHxBndDsOTwN0vRdXvhb_DtQ2g@mail.gmail.com>
-Message-ID: <53D796CB.5020805@suse.de>
+From: shawn.guo@freescale.com (Shawn Guo)
+Date: Tue, 29 Jul 2014 20:44:11 +0800
+Subject: [PATCH v2 2/2] ARM: smp_scu: enable SCU standby support
+In-Reply-To: <1406275790-18617-3-git-send-email-shawn.guo@freescale.com>
+References: <1406275790-18617-1-git-send-email-shawn.guo@freescale.com>
+ <1406275790-18617-3-git-send-email-shawn.guo@freescale.com>
+Message-ID: <20140729124410.GI24750@dragon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Thomas,
-
-Am 29.07.2014 14:35, schrieb Thomas Abraham:
-> On Tue, Jul 29, 2014 at 5:38 PM, Andreas F?rber <afaerber@suse.de> wrote:
->> Am 29.07.2014 07:28, schrieb Thomas Abraham:
->>> diff --git a/arch/arm/boot/dts/exynos5250-cros-common.dtsi b/arch/arm/boot/dts/exynos5250-cros-common.dtsi
->>> index 89ac90f..34bb31c 100644
->>> --- a/arch/arm/boot/dts/exynos5250-cros-common.dtsi
->>> +++ b/arch/arm/boot/dts/exynos5250-cros-common.dtsi
->>> @@ -19,6 +19,12 @@
->>>       chosen {
->>>       };
->>>
->>> +     cpus {
->>> +             cpu at 0 {
->>> +                     cpu0-supply = <&buck2_reg>;
->>> +             };
->>> +     };
->>> +
->>>       pinctrl at 11400000 {
->>>               /*
->>>                * Disabled pullups since external part has its own pullups and
->>
->> I've been instructed to dismantle this .dtsi file, so please place this
->> into exynos5250-snow.dts. It's probably wrong here anyway, since Spring
->> doesn't use the max77686 but an s5m6787 PMIC.
+On Fri, Jul 25, 2014 at 04:09:50PM +0800, Shawn Guo wrote:
+> With SCU standby enabled, SCU CLK will be turned off when all processors
+> are in WFI mode.  And the clock will be turned on when any processor
+> leaves WFI mode.
 > 
-> Ok, I will move this to exynos5250-snow.dts.
+> This behavior should be preferable in terms of power efficiency of
+> system idle.  So let's set the SCU standby bit to enable the support in
+> function scu_enable().
 > 
->>
->> How do I find out which -supply to specify here for Spring?
+> Cortex-A9 earlier than r2p0 has no standby bit in SCU, so we need to
+> skip setting the bit for those.
 > 
-> This information can be found in the Spring board schematic.
+> Signed-off-by: Shawn Guo <shawn.guo@freescale.com>
 
-Are those available publicly somewhere? I guess not...
+If there is no objection on the patch, I will put it into patch tracker
+soon.
 
->> Also, wouldn't it make sense to assign a cpu0 label in exynos????.dtsi
->> to override it via &cpu0 { ... };?
+Russell,
+
+I know it's late for 3.17 at this point, and I'm fine that you queue it
+for 3.18.
+
+Shawn
+
+> ---
+>  arch/arm/kernel/smp_scu.c | 7 +++++++
+>  1 file changed, 7 insertions(+)
 > 
-> Sorry, I did not understand the question.
-
-Instead of adding
-
-cpus { cpu at 0 { ... }; };
-
-to the board's / node, I am suggesting you do in the SoC's .dtsi:
-
-- cpu at 0 {
-+ cpu0: cpu at 0 {
-
-and then in the board's file after / { ... }; add the following:
-
-&cpu0 {
-	cpu0-supply = <&buck2_reg>;
-};
-
-This is the new preferred way to override or extend inherited nodes, I
-am told. (&cpu0 should be inserted in alphabetical order then.)
-
-Cheers,
-Andreas
-
--- 
-SUSE LINUX Products GmbH, Maxfeldstr. 5, 90409 N?rnberg, Germany
-GF: Jeff Hawn, Jennifer Guild, Felix Imend?rffer; HRB 16746 AG N?rnberg
+> diff --git a/arch/arm/kernel/smp_scu.c b/arch/arm/kernel/smp_scu.c
+> index c947508f84e6..72f9241ad5db 100644
+> --- a/arch/arm/kernel/smp_scu.c
+> +++ b/arch/arm/kernel/smp_scu.c
+> @@ -18,6 +18,7 @@
+>  
+>  #define SCU_CTRL		0x00
+>  #define SCU_ENABLE		(1 << 0)
+> +#define SCU_STANDBY_ENABLE	(1 << 5)
+>  #define SCU_CONFIG		0x04
+>  #define SCU_CPU_STATUS		0x08
+>  #define SCU_INVALIDATE		0x0c
+> @@ -55,6 +56,12 @@ void scu_enable(void __iomem *scu_base)
+>  		return;
+>  
+>  	scu_ctrl |= SCU_ENABLE;
+> +
+> +	/* Cortex-A9 earlier than r2p0 has no standby bit in SCU */
+> +	if ((read_cpuid_id() & 0xff0ffff0) == 0x410fc090 &&
+> +	    (read_cpuid_id() & 0x00f0000f) >= 0x00200000)
+> +		scu_ctrl |= SCU_STANDBY_ENABLE;
+> +
+>  	writel_relaxed(scu_ctrl, scu_base + SCU_CTRL);
+>  
+>  	/*
+> -- 
+> 1.9.1
+> 
