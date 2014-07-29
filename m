@@ -1,119 +1,60 @@
-From: msalter@redhat.com (Mark Salter)
-Date: Tue, 29 Jul 2014 15:20:21 -0400
-Subject: [PATCH 3/3] arm64/efi: efistub: don't abort if base of DRAM is
- occupied
-In-Reply-To: <CAKv+Gu-3J+1u1vcCAOgfq6JRfSc7_pykaV2OwGRNSOORTS1=1A@mail.gmail.com>
-References: <1406630950-32432-1-git-send-email-ard.biesheuvel@linaro.org>
- <1406630950-32432-4-git-send-email-ard.biesheuvel@linaro.org>
- <1406647756.753.11.camel@deneb.redhat.com>
- <CAKv+Gu8Pwi6GuGq9jbGfHyALcJKtAG+KVDcVwpYVCG9ZKrhaPA@mail.gmail.com>
- <1406658428.753.22.camel@deneb.redhat.com>
- <CAKv+Gu-3J+1u1vcCAOgfq6JRfSc7_pykaV2OwGRNSOORTS1=1A@mail.gmail.com>
-Message-ID: <1406661621.753.34.camel@deneb.redhat.com>
+From: oleg@redhat.com (Oleg Nesterov)
+Date: Tue, 29 Jul 2014 21:20:56 +0200
+Subject: [PATCH v4 0/5] x86: two-phase syscall tracing and seccomp fastpath
+In-Reply-To: <cover.1406604806.git.luto@amacapital.net>
+References: <cover.1406604806.git.luto@amacapital.net>
+Message-ID: <20140729192056.GA6308@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 2014-07-29 at 20:46 +0200, Ard Biesheuvel wrote:
-> On 29 July 2014 20:27, Mark Salter <msalter@redhat.com> wrote:
-> > On Tue, 2014-07-29 at 20:17 +0200, Ard Biesheuvel wrote:
-> >> On 29 July 2014 17:29, Mark Salter <msalter@redhat.com> wrote:
-> >> > On Tue, 2014-07-29 at 12:49 +0200, Ard Biesheuvel wrote:
-> >> >> If we cannot relocate the kernel Image to its preferred offset of base of DRAM
-> >> >> plus TEXT_OFFSET, instead relocate it to the lowest available 2 MB boundary plus
-> >> >> TEXT_OFFSET. We may lose a bit of memory at the low end, but we can still
-> >> >> proceed normally otherwise.
-> >> >>
-> >> >> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
-> >> >> ---
-> >> >>  arch/arm64/kernel/efi-stub.c | 16 ++++++----------
-> >> >>  1 file changed, 6 insertions(+), 10 deletions(-)
-> >> >
-> >> > Tested on Mustang (with loss of 2MB free memory).
-> >> >
-> >>
-> >> Great, thanks!
-> >>
-> >> >>
-> >> >> diff --git a/arch/arm64/kernel/efi-stub.c b/arch/arm64/kernel/efi-stub.c
-> >> >> index 60e98a639ac5..460c00c41e57 100644
-> >> >> --- a/arch/arm64/kernel/efi-stub.c
-> >> >> +++ b/arch/arm64/kernel/efi-stub.c
-> >> >> @@ -60,20 +60,16 @@ static efi_status_t handle_kernel_image(efi_system_table_t *sys_table,
-> >> >>       kernel_size = _edata - _text;
-> >> >>       if (*image_addr != (dram_base + TEXT_OFFSET)) {
-> >> >>               kernel_memsize = kernel_size + (_end - _edata);
-> >> >> -             status = efi_relocate_kernel(sys_table, image_addr,
-> >> >> -                                          kernel_size, kernel_memsize,
-> >> >> -                                          dram_base + TEXT_OFFSET,
-> >> >> -                                          PAGE_SIZE);
-> >> >
-> >> > Can we make efi_relocate_kernel static inline to get rid
-> >> > of the "defined but unused" warning?
-> >> >
-> >>
-> >> I have some patches pending in the EFI tree to turn the stub into a
-> >> static library, and that already takes care of this issue.
-> >
-> > That's fine if the static library stub patch goes in first. If this
-> > patch goes in first, then let's avoid the warning since it is easy
-> > to do.
-> >
-> 
-> My idea was to ask Matt to take patches #2 and #3. I may have to fix
-> them up slightly to apply correctly, but that's fine. Changing
-> efi_relocate_kernel to static inline would need to go through Matt's
-> tree as well, so there's probably no point in doing that in any case.
+Andy, to avoid the confusion: I am not trying to review this changes.
+As you probably know my understanding of asm code in entry.S is very
+limited.
 
-I'm not following. I would say there is no point in not doing that.
-You have a patch which causes a build warning. Let's avoid that
-unless there's a good reason not too. In this case, it seems easy
-enough to avoid unless I'm missing something.
+Just a couple of questions to ensure I understand this correctly.
 
-> 
-> Patch #1 needs to go through the arm64, I guess. This means UEFI boot
-> on APM Mustang will be broken during the short time between the
-> x86/tip tree and the arm64 tree being merged for 3.17 (assuming 3.17
-> is still open). I think we should be able to tolerate that, right?
+On 07/28, Andy Lutomirski wrote:
+>
+> This is both a cleanup and a speedup.  It reduces overhead due to
+> installing a trivial seccomp filter by 87%.  The speedup comes from
+> avoiding the full syscall tracing mechanism for filters that don't
+> return SECCOMP_RET_TRACE.
 
-Breaking bisect would be really bad. I think all three should be
-pulled from the same tree. What's wrong with getting an ack from
-Catalin or Will on the first patch and having all three go through
-tip? Patch one is needed for EFI boot functionality even if it isn't
-specifically EFI code. This won't be the last time this sort of 
-situation arises.
+And only after I look at 5/5 I _seem_ to actually understand where
+this speedup comes from.
 
-> 
-> >>
-> >> > Otherwise:
-> >> >
-> >> > Acked-by: Mark Salter <msalter@redhat.com>
-> >> >
-> >>
-> >> Cheers,
-> >> Ard.
-> >>
-> >>
-> >>
-> >> >> +             status = efi_low_alloc(sys_table, kernel_memsize + TEXT_OFFSET,
-> >> >> +                                    SZ_2M, reserve_addr);
-> >> >>               if (status != EFI_SUCCESS) {
-> >> >>                       pr_efi_err(sys_table, "Failed to relocate kernel\n");
-> >> >>                       return status;
-> >> >>               }
-> >> >> -             if (*image_addr != (dram_base + TEXT_OFFSET)) {
-> >> >> -                     pr_efi_err(sys_table, "Failed to alloc kernel memory\n");
-> >> >> -                     efi_free(sys_table, kernel_memsize, *image_addr);
-> >> >> -                     return EFI_ERROR;
-> >> >> -             }
-> >> >> -             *image_size = kernel_memsize;
-> >> >> +             memcpy((void *)*reserve_addr + TEXT_OFFSET, (void *)*image_addr,
-> >> >> +                    kernel_size);
-> >> >> +             *image_addr = *reserve_addr + TEXT_OFFSET;
-> >> >> +             *reserve_size = kernel_memsize + TEXT_OFFSET;
-> >> >>       }
-> >> >>
-> >> >>
-> >> >
-> >> >
-> >
-> >
+So. Currently tracesys: path always lead to "iret" after syscall, with
+this change we can avoid it if phase_1() returns zero, correct?
+
+And, this also removes the special TIF_SYSCALL_AUDIT-only case in entry.S,
+cool.
+
+I am wondering if we can do something similar with do_notify_resume() ?
+
+
+Stupid question. To simplify, lets forget that syscall_trace_enter()
+already returns the value. Can't we simplify the asm code if we do
+not export 2 functions, but make syscall_trace_enter() return
+"bool slow_path_is_needed". So that "tracesys:" could do
+
+	// pseudo code
+
+tracesys:
+	SAVE_REST
+	FIXUP_TOP_OF_STACK
+
+	call syscall_trace_enter
+
+	if (!slow_path_is_needed) {
+		addq REST_SKIP, %rsp
+		jmp system_call_fastpath
+	}
+	
+	...
+
+?
+
+Once again, I am just curious, it is not that I actually suggest to consider
+this option.
+
+Oleg.
