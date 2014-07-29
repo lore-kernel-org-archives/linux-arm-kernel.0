@@ -1,47 +1,57 @@
-From: christoffer.dall@linaro.org (Christoffer Dall)
-Date: Tue, 29 Jul 2014 12:30:47 +0200
-Subject: [PATCH 19/19] Documentation: ACPI for ARM64
-In-Reply-To: <1406206825-15590-20-git-send-email-hanjun.guo@linaro.org>
-References: <1406206825-15590-1-git-send-email-hanjun.guo@linaro.org>
- <1406206825-15590-20-git-send-email-hanjun.guo@linaro.org>
-Message-ID: <20140729103047.GC18250@cbox>
+From: will.deacon@arm.com (Will Deacon)
+Date: Tue, 29 Jul 2014 11:31:19 +0100
+Subject: [PATCH v2] iommu/arm-smmu: avoid calling request_irq in atomic
+ context
+In-Reply-To: <vnkwoaw9oxje.fsf@mitchelh-linux.qualcomm.com>
+References: <1406572692-27460-1-git-send-email-mitchelh@codeaurora.org>
+ <20140728190327.GU15536@arm.com>
+ <vnkwoaw9oxje.fsf@mitchelh-linux.qualcomm.com>
+Message-ID: <20140729103119.GC9245@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jul 24, 2014 at 09:00:25PM +0800, Hanjun Guo wrote:
-> From: Graeme Gregory <graeme.gregory@linaro.org>
+On Tue, Jul 29, 2014 at 12:48:05AM +0100, Mitchel Humpherys wrote:
+> On Mon, Jul 28 2014 at 12:03:27 PM, Will Deacon <will.deacon@arm.com> wrote:
+> >> @@ -1203,12 +1190,22 @@ static int arm_smmu_attach_dev(struct iommu_domain *domain, struct device *dev)
+> >>  	}
+> >>  	spin_unlock_irqrestore(&smmu_domain->lock, flags);
+> >>  
+> >> +	irq = smmu->irqs[smmu->num_global_irqs + cfg->irptndx];
+> >> +	ret = request_irq(irq, arm_smmu_context_fault, IRQF_SHARED,
+> >> +			  "arm-smmu-context-fault", domain);
+> >> +	if (IS_ERR_VALUE(ret)) {
+> >> +		dev_err(smmu->dev, "failed to request context IRQ %d (%u)\n",
+> >> +			cfg->irptndx, irq);
+> >> +		cfg->irptndx = INVALID_IRPTNDX;
+> >> +		return ret;
+> >> +	}
+> >
+> > This changes the driver behaviour, so we'll request an IRQ for the domain
+> > *every* time a master is successfuly added to the domain, as opposed to
+> > the first time a master is added (when we can do the lazy init).
 > 
-> Add documentation for the guidelines of how to use ACPI
-> on ARM64.
+> Woops, you're absolutely right. Good catch.
 > 
-> Signed-off-by: Graeme Gregory <graeme.gregory@linaro.org>
-> Signed-off-by: Hanjun Guo <hanjun.guo@linaro.org>
-> ---
->  Documentation/arm64/arm-acpi.txt |  240 ++++++++++++++++++++++++++++++++++++++
->  1 file changed, 240 insertions(+)
->  create mode 100644 Documentation/arm64/arm-acpi.txt
+> >
+> > Maybe we could rework the code so that it looks like:
+> >
+> >   dom_smmu = ACCESS_ONCE(&smmu_domain->smmu);
 > 
-> diff --git a/Documentation/arm64/arm-acpi.txt b/Documentation/arm64/arm-acpi.txt
-> new file mode 100644
-> index 0000000..12cd550
-> --- /dev/null
-> +++ b/Documentation/arm64/arm-acpi.txt
-> @@ -0,0 +1,240 @@
-> +ACPI on ARMv8 Servers
-> +---------------------
+> Why do we need an ACCESS_ONCE here? I thought the purpose of ACCESS_ONCE
+> was to prevent the compiler from optimizing away the access (like a
+> variable being pulled out of a for-loop because it's not modified within
+> the loop (but could be modified on another thread)), but since we
+> haven't accessed smmu_domain->smmu before this point and your proposed
+> re-check below will be on the other side of a spinlock how could the
+> compiler optimize it away?
 
-[...]
+The issue is that we have a reader and a writer for the smmu pointer
+operating concurrently. For that to work, we need single-copy atomicity
+and we also need to suppress some GCC optimisations (for example, the case
+where it can move an assignment clause from an else block before the if).
 
-> +
-> +
-> +There exists in the ACPI 5.1 specification no standard binding for these objects
-> +to enable programmable levels or rates so this should be avoid if possible and
-> +the resources set to appropriate level by the firmware. If this is not possible
-> +then any manipulation should be abstracted in ASL.
-> +
+In this case, we're probably alright but I think we should keep this
+ACCESS_ONCE and also add one to arm_smmu_init_domain_context on the
+assignment side.
 
-I'm not a native English speaker, but this wording sounds strange to me.
-I would suggest "There exists no specification in the the..." or more
-simply "The ACPI 5.1 specification does not contain any standard...".
-
--Christoffer
+Will
