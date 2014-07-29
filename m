@@ -1,50 +1,54 @@
 From: vbridgers2013@gmail.com (Vince Bridgers)
-Date: Tue, 29 Jul 2014 17:06:41 -0500
-Subject: [PATCH net v3 0/6] net: stmmac: Improve mcast/ucast filter for snps
-Message-ID: <1406671607-27368-1-git-send-email-vbridgers2013@gmail.com>
+Date: Tue, 29 Jul 2014 17:06:44 -0500
+Subject: [PATCH net v3 3/6] dts: Add bindings for multicast hash bins and
+ perfect filter entries
+In-Reply-To: <1406671607-27368-1-git-send-email-vbridgers2013@gmail.com>
+References: <1406671607-27368-1-git-send-email-vbridgers2013@gmail.com>
+Message-ID: <1406671607-27368-4-git-send-email-vbridgers2013@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch series adds Synopsys specific bindings for the Synopsys EMAC
-filter characteristics since those are implementation dependent. The
-multicast and unicast filtering code was improved to handle different
-configuration variations based on device tree settings. 
+This change adds bindings for the number of multicast hash bins and perfect
+filter entries supported by the Synopsys EMAC. The Synopsys EMAC core is
+configurable at device creation time, and can be configured for a different
+number of multicast hash bins and a different number of perfect filter
+entries. The device does not provide a way to query these parameters,
+therefore parameters are required. The Altera Cyclone V SOC has support for
+256 multicast hash bins and 128 perfect filter entries, and is different
+than what's currently provided in the stmmac driver.
 
-I verified the operation of the multicast and unicast filters through 
-Synopsys support as requested during the V1 review, and tested the GMAC
-configuration on an Altera Cyclone 5 SOC (which supports 256 multicast
-bins and 128 Unicast addresses). The 10/100 variant of this driver
-modification was not tested, although it was compile tested. I shared
-the email thread results of the investigation through Synopsys with the
-stmmac maintainer.
-
+Signed-off-by: Vince Bridgers <vbridgers2013@gmail.com>
+Acked-by: Rob Herring <robh@kernel.org>
 ---
-V3: Break up the patch into interface and functional change patches
-    per review comments
-V2: Confirm with Synopsys methods to determine number of Multicast bins
-    and Unicast address filter entries per first round review comments.
+V3: No changes
+V2: No changes
+---
+ Documentation/devicetree/bindings/net/stmmac.txt |    6 ++++++
+ 1 file changed, 6 insertions(+)
 
-Vince Bridgers (6):
-  net: stmmac: Change MAC interface to support multiple filter
-    configurations
-  net: stmmac: Correct set_filter for multicast and unicast cases
-  dts: Add bindings for multicast hash bins and perfect filter entries
-  ARM: socfpga: Add socfpga Ethernet filter attributes entries
-  net: stmmac: Support devicetree configs for mcast and ucast filter
-    entries
-  net: stmmac: squelch sparse warning with casts
-
- Documentation/devicetree/bindings/net/stmmac.txt   |    6 +
- arch/arm/boot/dts/socfpga.dtsi                     |    4 +
- drivers/net/ethernet/stmicro/stmmac/common.h       |   47 ++++---
- drivers/net/ethernet/stmicro/stmmac/dwmac1000.h    |    3 +-
- .../net/ethernet/stmicro/stmmac/dwmac1000_core.c   |  131 ++++++++++++++------
- .../net/ethernet/stmicro/stmmac/dwmac100_core.c    |   27 ++--
- .../net/ethernet/stmicro/stmmac/stmmac_ethtool.c   |    6 +-
- drivers/net/ethernet/stmicro/stmmac/stmmac_main.c  |   38 +++---
- .../net/ethernet/stmicro/stmmac/stmmac_platform.c  |   71 ++++++++++-
- include/linux/stmmac.h                             |    2 +
- 10 files changed, 240 insertions(+), 95 deletions(-)
-
+diff --git a/Documentation/devicetree/bindings/net/stmmac.txt b/Documentation/devicetree/bindings/net/stmmac.txt
+index a2acd2b..9b03c57 100644
+--- a/Documentation/devicetree/bindings/net/stmmac.txt
++++ b/Documentation/devicetree/bindings/net/stmmac.txt
+@@ -25,6 +25,10 @@ Required properties:
+ - snps,force_sf_dma_mode	Force DMA to use the Store and Forward
+ 				mode for both tx and rx. This flag is
+ 				ignored if force_thresh_dma_mode is set.
++- snps,multicast-filter-bins:	Number of multicast filter hash bins
++				supported by this device instance
++- snps,perfect-filter-entries:	Number of perfect filter entries supported
++				by this device instance
+ 
+ Optional properties:
+ - resets: Should contain a phandle to the STMMAC reset signal, if any
+@@ -47,6 +51,8 @@ Examples:
+ 		mac-address = [000000000000]; /* Filled in by U-Boot */
+ 		max-frame-size = <3800>;
+ 		phy-mode = "gmii";
++		snps,multicast-filter-bins = <256>;
++		snps,perfect-filter-entries = <128>;
+ 		clocks = <&clock>;
+ 		clock-names = "stmmaceth">;
+ 	};
 -- 
 1.7.9.5
