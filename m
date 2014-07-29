@@ -1,44 +1,58 @@
-From: sfr@canb.auug.org.au (Stephen Rothwell)
-Date: Tue, 29 Jul 2014 15:53:02 +1000
-Subject: linux-next: manual merge of the irqchip tree with the arm-soc tree
-Message-ID: <20140729155302.3c1d5437@canb.auug.org.au>
+From: ta.omasab@gmail.com (Thomas Abraham)
+Date: Tue, 29 Jul 2014 11:23:20 +0530
+Subject: [PATCH v7 6/6] cpufreq: exynos: remove exynos4210/5250 specific
+ cpufreq driver support
+In-Reply-To: <53CA72CC.7010505@gmail.com>
+References: <1405345118-4269-1-git-send-email-thomas.ab@samsung.com>
+ <1405345118-4269-7-git-send-email-thomas.ab@samsung.com>
+ <53CA72CC.7010505@gmail.com>
+Message-ID: <CAJuA9agfpQ7oyfZ99qSDj7EbsFk6dMnxxu5=P=vJYzTpAAUEuQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Jason,
+Hi Tomasz,
 
-Today's linux-next merge of the irqchip tree got a conflict in
-Documentation/devicetree/bindings/arm/gic.txt between commit
-f80b71397d09 ("ARM: brcmstb: gic: add compatible string for Broadcom
-Brahma15") from the arm-soc tree and commit 3e44358c12cc ("") from the
-irqchip tree.
+On Sat, Jul 19, 2014 at 6:59 PM, Tomasz Figa <tomasz.figa@gmail.com> wrote:
+> Hi,
+>
+> On 14.07.2014 15:38, Thomas Abraham wrote:
+>> From: Thomas Abraham <thomas.ab@samsung.com>
+>>
+>> Exynos4210 and Exynos5250 based platforms have switched over to use generic
+>> cpufreq drivers for cpufreq functionality. So the Exynos specific cpufreq
+>> drivers for these platforms can be removed.
+>>
+>> Signed-off-by: Thomas Abraham <thomas.ab@samsung.com>
+>> Acked-by: Viresh Kumar <viresh.kumar@linaro.org>
+>> Reviewed-by: Amit Daniel Kachhap <amit.daniel@samsung.com>
+>> Tested-by: Arjun K.V <arjun.kv@samsung.com>
+>> ---
+>>  drivers/cpufreq/Kconfig.arm          |   22 ----
+>>  drivers/cpufreq/Makefile             |    2 -
+>>  drivers/cpufreq/exynos4210-cpufreq.c |  184 -----------------------------
+>>  drivers/cpufreq/exynos5250-cpufreq.c |  210 ----------------------------------
+>>  4 files changed, 418 deletions(-)
+>>  delete mode 100644 drivers/cpufreq/exynos4210-cpufreq.c
+>>  delete mode 100644 drivers/cpufreq/exynos5250-cpufreq.c
+>>
+>
+> I would hesitate with removing this driver straightaway and replacing it
+> with a new one that isn't yet well tested. For at least one release I
+> would keep the old code in place with the possibility of switching
+> between old and new one in Kconfig.
 
-I fixed it up (see below) and can carry the fix as necessary (no action
-is required).
+The new drivers have been tested for three days on
+Exynos4210/5250/5420 based boards. So I am fairly confident that there
+will be no issues in switching to the generic drivers and the old
+drivers have not been retained in the next version.
 
--- 
-Cheers,
-Stephen Rothwell                    sfr at canb.auug.org.au
+Thanks,
+Thomas.
 
-diff --cc Documentation/devicetree/bindings/arm/gic.txt
-index c7d2fa156678,d2eea0b75580..000000000000
---- a/Documentation/devicetree/bindings/arm/gic.txt
-+++ b/Documentation/devicetree/bindings/arm/gic.txt
-@@@ -16,8 -17,9 +17,10 @@@ Main node required properties
-  	"arm,cortex-a9-gic"
-  	"arm,cortex-a7-gic"
-  	"arm,arm11mp-gic"
- +	"brcm,brahma-b15-gic"
-+ 
-  - interrupt-controller : Identifies the node as an interrupt controller
-+ 
-  - #interrupt-cells : Specifies the number of cells needed to encode an
-    interrupt source.  The type shall be a <u32> and the value shall be 3.
-  
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140729/caaf7c4e/attachment.sig>
+>
+> Best regards,
+> Tomasz
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-pm" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
