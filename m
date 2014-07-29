@@ -1,75 +1,29 @@
-From: rob.herring@linaro.org (Rob Herring)
-Date: Tue, 29 Jul 2014 10:29:50 -0500
-Subject: use IORESOURCE_REG resource type for non-translatable addresses
- in DT
-In-Reply-To: <53D7AA72.6010309@mm-sol.com>
-References: <53D788A7.4020303@mm-sol.com> <3794875.CZFbAag5Sv@wuerfel>
- <53D7AA72.6010309@mm-sol.com>
-Message-ID: <CABGGisy6_TOkT7fHp049rwH_FhQxCRGQqGBCsODUFTTchhsLvg@mail.gmail.com>
+From: msalter@redhat.com (Mark Salter)
+Date: Tue, 29 Jul 2014 11:30:24 -0400
+Subject: [PATCH 1/3] arm64: spin-table: handle unmapped cpu-release-addrs
+In-Reply-To: <2385684.COvj9k7y2z@wuerfel>
+References: <1406630950-32432-1-git-send-email-ard.biesheuvel@linaro.org>
+ <1406630950-32432-2-git-send-email-ard.biesheuvel@linaro.org>
+ <1406646945.753.5.camel@deneb.redhat.com> <2385684.COvj9k7y2z@wuerfel>
+Message-ID: <1406647824.753.12.camel@deneb.redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jul 29, 2014 at 9:06 AM, Stanimir Varbanov <svarbanov@mm-sol.com> wrote:
-> Arnd, thanks for the comments.
->
-> On 07/29/2014 03:00 PM, Arnd Bergmann wrote:
->> On Tuesday 29 July 2014 14:42:31 Stanimir Varbanov wrote:
->>>         taddr = of_translate_address(dev, addrp);
->>> -       if (taddr == OF_BAD_ADDR)
->>> -               return -EINVAL;
->>> +       /*
->>> +        * if the address is non-translatable to cpu physical address
->>> +        * fallback to a IORESOURCE_REG resource.
->>> +        */
->>> +       if (taddr == OF_BAD_ADDR) {
->>> +               memset(r, 0, sizeof(*r));
->>> +               taddr = of_read_number(addrp, 1);
->>> +               if (taddr == OF_BAD_ADDR)
->>> +                       return -EINVAL;
->>> +               r->start = taddr;
->>> +               r->end = taddr + size - 1;
->>> +               r->flags = IORESOURCE_REG;
->>> +               r->name = name ? name : dev->full_name;
->>> +               return 0;
->>> +       }
->>> +
->>
->> I don't think that everything returning OF_BAD_ADDR makes sense
->> to turn into IORESOURCE_REG. It could be an e.g. invalid DT
->> representation, a node with #size-cells=<0>, or it could be
->> something that gets translated one or more nodes up in the
->> tree before it reaches a bus without a ranges property.
->>
->> Also, you should not rely on #address-cells being hardcoded
->> to <1> above.
->>
->
-> This was just an example. Of course it has many issues and probaly it is
-> wrong:) The main goal was to understand does IORESOURCE_REG resource
-> type and parsing the *reg* properties for non-translatable addresses are
-> feasible. And also does it acceptable by community and OF platform
-> maintainers.
+On Tue, 2014-07-29 at 17:20 +0200, Arnd Bergmann wrote:
+> On Tuesday 29 July 2014 11:15:45 Mark Salter wrote:
+> > > -
+> > > -     __flush_dcache_area(release_addr, sizeof(release_addr[0]));
+> > > +     writeq_relaxed(__pa(secondary_holding_pen), release_addr);
+> > > +     __flush_dcache_area(release_addr, sizeof(*release_addr));
+> > 
+> >        __flush_dcache_area((__force void *)release_addr, ... 
+> > 
+> > to avoid sparse warning.
+> > 
+> 
+> I think it would be cleaner to drop the __iomem annotation and use vmap()
+> rather than ioremap(). That requires having a 'struct page' though, which
+> I'm not sure you have.
+> 
 
-I guess the question I have is what is the advantage of making this a
-resource? You can't really pass it to other functions.
-
-We're moving in the opposite direction for IRQs as now
-platform_get_irq translates the IRQ directly rather than using the
-resource (but the resource is still there just to avoid potentially
-breaking things for now).
-
->> How about modifying of_get_address() rather than
->> __of_address_to_resource() instead? You could introduce
->> a new of_bus entry for each bus you expect to return
->> an IORESOURCE_REG, or you could change of_bus_default_get_flags
->> to return IORESOURCE_REG if the parent node has no ranges property
->> and is not the root node.
->
-> IMO the clearer solution is to introduce a new of_bus bus. In that case
-> one possible problem will be how to distinguish the non-translatable and
-> the other buses. Also the *device_type* property is deprecated for non
-> PCI devices.
-
-You would have to look for the presence or absence of ranges property.
-
-Rob
+You won't. If you did have a struct page, then __va() would work.
