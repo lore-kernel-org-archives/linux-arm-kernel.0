@@ -1,96 +1,74 @@
-From: ta.omasab@gmail.com (Thomas Abraham)
-Date: Tue, 29 Jul 2014 11:07:44 +0530
-Subject: [PATCH v7 5/6] ARM: Exynos: switch to using generic cpufreq
- driver for exynos4210/5250/5420
-In-Reply-To: <53CA7247.1080009@gmail.com>
-References: <1405345118-4269-1-git-send-email-thomas.ab@samsung.com>
- <1405345118-4269-6-git-send-email-thomas.ab@samsung.com>
- <53CA7247.1080009@gmail.com>
-Message-ID: <CAJuA9ai=Dw0QN+KR7XQAP93R3+78ndzYNpJKwtAn-Nr6dffTXg@mail.gmail.com>
+From: mturquette@linaro.org (Mike Turquette)
+Date: Mon, 28 Jul 2014 22:44:36 -0700
+Subject: [PATCH v3 00/15] Add Flexgen Clock support
+In-Reply-To: <1405437631-23623-1-git-send-email-gabriel.fernandez@linaro.org>
+References: <1405437631-23623-1-git-send-email-gabriel.fernandez@linaro.org>
+Message-ID: <20140729054436.4906.44690@quantum>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Jul 19, 2014 at 6:57 PM, Tomasz Figa <tomasz.figa@gmail.com> wrote:
-> On 14.07.2014 15:38, Thomas Abraham wrote:
->> From: Thomas Abraham <thomas.ab@samsung.com>
->>
->> Remove the platform device instantiation for exynos cpufreq driver and add the
->> platform device for generic cpufreq drivers.
->>
->> Cc: Kukjin Kim <kgene.kim@samsung.com>
->> Signed-off-by: Thomas Abraham <thomas.ab@samsung.com>
->> Acked-by: Viresh Kumar <viresh.kumar@linaro.org>
->> Reviewed-by: Amit Daniel Kachhap <amit.daniel@samsung.com>
->> Tested-by: Arjun K.V <arjun.kv@samsung.com>
->> ---
->>  arch/arm/mach-exynos/exynos.c |   15 ++++++++++++++-
->>  1 file changed, 14 insertions(+), 1 deletion(-)
->>
->> diff --git a/arch/arm/mach-exynos/exynos.c b/arch/arm/mach-exynos/exynos.c
->> index 2a43a17..5028b35 100644
->> --- a/arch/arm/mach-exynos/exynos.c
->> +++ b/arch/arm/mach-exynos/exynos.c
->> @@ -183,7 +183,20 @@ void __init exynos_cpuidle_init(void)
->>
->>  void __init exynos_cpufreq_init(void)
->>  {
->> -     platform_device_register_simple("exynos-cpufreq", -1, NULL, 0);
->> +     char *dev_name;
->> +
->> +     if (of_machine_is_compatible("samsung,exynos5440"))
->> +             return;
->
-> The original code registers the device unconditionally. Why Exynos5440
-> is excluded now?
->
->> +     if (of_machine_is_compatible("samsung,exynos5420"))
->> +             dev_name = "arm-bL-cpufreq-dt";
->> +     else
->> +             if (of_machine_is_compatible("samsung,exynos4412") ||
->> +                     of_machine_is_compatible("samsung,exynos4212"))
->> +                     dev_name = "exynos-cpufreq";
->> +             else
->> +                     dev_name = "cpufreq-cpu0";
->> +
->> +     platform_device_register_simple(dev_name, -1, NULL, 0);
->>  }
->
-> How about rewriting this to:
->
-> static const struct of_device_id exynos_cpufreq_matches[] = {
->         { .compatible = "samsung,exynos5420",
->                         .data = "arm-bL-cpufreq-dt" },
->         { .compatible = "samsung,exynos5250",
->                         .data = "cpufreq-cpu0" },
->         { .compatible = "samsung,exynos4210",
->                         .data = "cpufreq-cpu0" },
->         { /* sentinel */ }
-> };
->
-> void __init exynos_cpufreq_init(void)
-> {
->         struct device_node *root = of_find_node_by_path("/");
->         const struct of_device_id *match;
->
->         match = of_match_node(exynos_cpufreq_matches, root);
->         if (!match) {
->                 platform_device_register_simple("exynos-cpufreq", -1,
->                                                 NULL, 0);
->                 return;
->         }
->
->         platform_device_register_simple(match->data, -1, NULL, 0);
-> }
->
-> This way it is much more readable and original behavior is preserved for
-> any SoCs not supported by new drivers.
+Quoting Gabriel FERNANDEZ (2014-07-15 08:20:16)
+> Changes in v3:
+>  - Change commit message
+>  - Remove uncessary (void *) cast
+>  - add a block diagram for flexgen clock binding documentation
+> 
+> Changes in v2:
+>  - use static const for clkgen_pll_data and stm_fs tables (from
+>    Peter Griffin review)
+>  - add 326 and 333 Mhz frequencies
+>  - cosmetic correction in st,clkgen-vcc.txt
+>  - use of kcalloc instead of kzalloc in drivers/clk/st/clk-flexgen.c
+> 
+> The goal of this series is to add Flexgen clock support to ST SoCs.
+> 
+> A Flexgen clock is composed by:
+>   - a clock cross bar (represented by a mux element)
+>   - a pre and final dividers (represented by a divider and gate elements)
 
-Thanks for the suggestion Tomasz.
+Applied to clk-next! I performed 's/drivers: //' on the $SUBJECT for
+most of the patches.
 
->
-> Best regards,
-> Tomasz
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-pm" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+Regards,
+Mike
+
+> 
+> Tested on B2120 board.
+> 
+> Gabriel Fernandez (15):
+>   clk: st: Update ST clock binding documentation
+>   drivers: clk: st: use static const for stm_fs tables
+>   drivers: clk: st: use static const for clkgen_pll_data tables
+>   drivers: clk: st: Remove uncessary (void *) cast
+>   clk: st: Adds Flexgen clock binding
+>   drivers: clk: st: STiH407: Support for Flexgen Clocks
+>   drivers: clk: st: STiH407: Support for A9 MUX Clocks
+>   drivers: clk: st: STiH407: Support for clockgenA0
+>   drivers: clk: st: Add polarity bit indication
+>   drivers: clk: st: Add quadfs reset handling
+>   drivers: clk: st: STiH407: Support for clockgenC0
+>   drivers: clk: st: STiH407: Support for clockgenD0/D2/D3
+>   drivers: clk: st: STiH407: Support for clockgenA9
+>   drivers: clk: st: Update frequency tables for fs660c32 and fs432c65
+>   drivers: clk: st: Use round to closest divider flag
+> 
+>  .../bindings/clock/st/st,clkgen-divmux.txt         |  28 +-
+>  .../devicetree/bindings/clock/st/st,clkgen-mux.txt |   6 +-
+>  .../devicetree/bindings/clock/st/st,clkgen-pll.txt |  17 +-
+>  .../bindings/clock/st/st,clkgen-prediv.txt         |   8 +-
+>  .../devicetree/bindings/clock/st/st,clkgen-vcc.txt |  34 ++-
+>  .../devicetree/bindings/clock/st/st,clkgen.txt     |  59 ++--
+>  .../devicetree/bindings/clock/st/st,flexgen.txt    | 119 ++++++++
+>  .../devicetree/bindings/clock/st/st,quadfs.txt     |  15 +-
+>  drivers/clk/st/Makefile                            |   2 +-
+>  drivers/clk/st/clk-flexgen.c                       | 331 +++++++++++++++++++++
+>  drivers/clk/st/clkgen-fsyn.c                       | 223 +++++++++++---
+>  drivers/clk/st/clkgen-mux.c                        |  12 +-
+>  drivers/clk/st/clkgen-pll.c                        |  94 +++++-
+>  13 files changed, 828 insertions(+), 120 deletions(-)
+>  create mode 100644 Documentation/devicetree/bindings/clock/st/st,flexgen.txt
+>  create mode 100644 drivers/clk/st/clk-flexgen.c
+> 
+> -- 
+> 1.9.1
+> 
