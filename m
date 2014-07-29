@@ -1,55 +1,39 @@
-From: tomasz.figa@gmail.com (Tomasz Figa)
-Date: Tue, 29 Jul 2014 12:13:46 +0200
-Subject: [PATCH v8 2/6] clk: samsung: add cpu clock configuration data
- and instantiate cpu clock
-In-Reply-To: <1406611711-25112-3-git-send-email-thomas.ab@samsung.com>
-References: <1406611711-25112-1-git-send-email-thomas.ab@samsung.com>
- <1406611711-25112-3-git-send-email-thomas.ab@samsung.com>
-Message-ID: <53D773DA.6050003@gmail.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Tue, 29 Jul 2014 12:21:56 +0200
+Subject: [Patch V2 2/2] i2c: mv64xxx: Remove internal compatible string
+ from Documentation
+In-Reply-To: <20140728182913.GB3708@obsidianresearch.com>
+References: <1406395238-29758-1-git-send-email-andrew@lunn.ch>
+ <5514427.elClhaDPhf@wuerfel> <20140728182913.GB3708@obsidianresearch.com>
+Message-ID: <1475790.KgkjDRevPy@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Thomas,
+On Monday 28 July 2014 12:29:13 Jason Gunthorpe wrote:
+> On Mon, Jul 28, 2014 at 03:51:27PM +0200, Arnd Bergmann wrote:
+> 
+> > I remember this being discussed when the quirk was initially added,
+> > but it seemed cleaner to handle this in the platform code at the time
+> > when it was just for one particular board. Now that it's basically
+> > an accepted feature of the i2c device that you have to know the
+> > SoC version, that should probably become a proper API.
+> 
+> Reading the SOC ID (which has to come from a PCI-E controller) is
+> already known to mess up PCI-E. IMHO, reading it should be minimized,
+> unless we can figure out how to fix that.
+> 
+> At some point we need to push back on the bootloader situation and
+> require the kernel to be booted with a correct DT.
+> 
+> All the infrastructure was already provided for this, I'm not sure how
+> we got into the situation where it was OK for bootloaders to ignore
+> the DT requirements and it is the kernel's job to fix it 
 
-Just few minor comments for things I probably missed before.
+Thomas argued that it's always possible to identify the revision
+and that we already need that anyway to work around broken dts file
+for ax3, so it would be easier to generalize that hack.
 
-On 29.07.2014 07:28, Thomas Abraham wrote:
+Everybody else (except me) seemed happy with that idea, so I eventually
+gave up arguing against it.
 
-[snip]
-
-> @@ -1356,6 +1357,16 @@ static struct samsung_pll_clock exynos4x12_plls[nr_plls] __initdata = {
->  			VPLL_LOCK, VPLL_CON0, NULL),
->  };
->  
-> +static const struct exynos_cpuclk_cfg_data e4210_armclk_d[] __initconst = {
-> +	{ 1200000, E4210_CPU_DIV0(7, 1, 4, 3, 7, 3), E4210_CPU_DIV1(0, 5), },
-> +	{ 1000000, E4210_CPU_DIV0(7, 1, 4, 3, 7, 3), E4210_CPU_DIV1(0, 4), },
-> +	{  800000, E4210_CPU_DIV0(7, 1, 3, 3, 7, 3), E4210_CPU_DIV1(0, 3), },
-> +	{  500000, E4210_CPU_DIV0(7, 1, 3, 3, 7, 3), E4210_CPU_DIV1(0, 3), },
-> +	{  400000, E4210_CPU_DIV0(7, 1, 3, 3, 7, 3), E4210_CPU_DIV1(0, 3), },
-
-I have noticed that the old driver does not have this operating point.
-While it is probably OK to add this one and even few more for all
-possible APLL settings, I am interested in how you obtained the values
-for DIV0 and DIV1 registers for this configuration.
-
-> +	{  200000, E4210_CPU_DIV0(0, 1, 1, 1, 3, 1), E4210_CPU_DIV1(0, 3), },
-> +	{  0 },
-> +};
-
-[snip]
-
-> diff --git a/include/dt-bindings/clock/exynos5250.h b/include/dt-bindings/clock/exynos5250.h
-> index 4273891..855d809 100644
-> --- a/include/dt-bindings/clock/exynos5250.h
-> +++ b/include/dt-bindings/clock/exynos5250.h
-> @@ -21,6 +21,7 @@
->  #define CLK_FOUT_CPLL		6
->  #define CLK_FOUT_EPLL		7
->  #define CLK_FOUT_VPLL		8
-> +#define CLK_ARM_CLK		12
-
-Why 12 not 9?
-
-Best regards,
-Tomasz
+	Arnd
