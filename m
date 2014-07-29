@@ -1,75 +1,34 @@
 From: dianders@chromium.org (Doug Anderson)
-Date: Tue, 29 Jul 2014 13:31:53 -0700
-Subject: [PATCH 2/5] ARM: dts: Enable emmc and sdmmc on the rk3288-evb boards
+Date: Tue, 29 Jul 2014 13:31:54 -0700
+Subject: [PATCH 3/5] ARM: dts: Enable DDR50 mode on the eMMC
 In-Reply-To: <1406665916-23396-1-git-send-email-dianders@chromium.org>
 References: <1406665916-23396-1-git-send-email-dianders@chromium.org>
-Message-ID: <1406665916-23396-3-git-send-email-dianders@chromium.org>
+Message-ID: <1406665916-23396-4-git-send-email-dianders@chromium.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This adds support for the sdmmc and emmc ports on the rk3288 using the
-currently posted driver from Addy at:
-  https://patchwork.kernel.org/patch/4520631/
+DDR50 mode now works on the rockchip driver, so enable it.
 
-This enables basic SD and eMMC support.  Things are not yet running at
-the fastest speed and we don't have the regulators specified, but we
-can at least use the eMMC and SD cards now.
-
-A few notes:
-* Doesn't enable DDR mode from eMMC since it didn't work on Addy's
-  patch.  A future patch enables it.
-* This is not baesd on Jaehoon's patch series removing the slot node,
-  but it does use new syntax like putting the bus width at the top
-  level and using the new cap-mmc-highspeed / cap-sd-highspeed.  A
-  future patch will modify this one to remove the slot node.
+NOTE: if Addy spins (mmc: dw_mmc: add support for RK3288) before it
+lands then we could squash this into my (ARM: dts: Enable emmc and
+sdmmc on the rk3288-evb boards).
 
 Signed-off-by: Doug Anderson <dianders@chromium.org>
 ---
- arch/arm/boot/dts/rk3288-evb.dtsi | 32 ++++++++++++++++++++++++++++++++
- 1 file changed, 32 insertions(+)
+ arch/arm/boot/dts/rk3288-evb.dtsi | 1 +
+ 1 file changed, 1 insertion(+)
 
 diff --git a/arch/arm/boot/dts/rk3288-evb.dtsi b/arch/arm/boot/dts/rk3288-evb.dtsi
-index 749e20d..e44e34f 100644
+index e44e34f..ec580fa 100644
 --- a/arch/arm/boot/dts/rk3288-evb.dtsi
 +++ b/arch/arm/boot/dts/rk3288-evb.dtsi
-@@ -37,6 +37,38 @@
- 	};
- };
- 
-+&emmc {
-+	broken-cd;
-+	bus-width = <8>;
-+	cap-mmc-highspeed;
-+	non-removable;
-+	num-slots = <1>;
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&emmc_clk &emmc_cmd &emmc_pwr &emmc_bus8>;
-+	status = "okay";
-+
-+	slot at 0 {
-+		reg = <0>;
-+		disable-wp;
-+	};
-+};
-+
-+&sdmmc {
-+	bus-width = <4>;
-+	cap-mmc-highspeed;
-+	cap-sd-highspeed;
-+	card-detect-delay = <200>;
-+	num-slots = <1>;
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&sdmmc_clk &sdmmc_cmd &sdmmc_cd &sdmmc_bus4>;
-+	status = "okay";
-+
-+	slot at 0 {
-+		reg = <0>;
-+		disable-wp;		/* wp not hooked up */
-+	};
-+};
-+
- &i2c0 {
- 	status = "okay";
- };
+@@ -41,6 +41,7 @@
+ 	broken-cd;
+ 	bus-width = <8>;
+ 	cap-mmc-highspeed;
++	mmc-ddr-1_8v;
+ 	non-removable;
+ 	num-slots = <1>;
+ 	pinctrl-names = "default";
 -- 
 2.0.0.526.g5318336
