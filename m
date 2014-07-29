@@ -1,115 +1,63 @@
-From: luto@amacapital.net (Andy Lutomirski)
-Date: Tue, 29 Jul 2014 13:54:10 -0700
-Subject: [PATCH v4 0/5] x86: two-phase syscall tracing and seccomp fastpath
-In-Reply-To: <20140729192056.GA6308@redhat.com>
-References: <cover.1406604806.git.luto@amacapital.net>
- <20140729192056.GA6308@redhat.com>
-Message-ID: <CALCETrX6P7SJQdgc0gTM7FLdwyT_Ld1MWvkLYpTO_2xsvBC9sA@mail.gmail.com>
+From: ken.wilson@opengear.com (Ken Wilson)
+Date: Wed, 30 Jul 2014 07:15:37 +1000
+Subject: CPU1 fails to boot on Armada 375 DB with 3.16.0-rc6
+In-Reply-To: <EB433C0C-2EB5-4639-98BD-9D78F446497A@opengear.com>
+References: <53D6F564.5070803@opengear.com>
+ <20140729114816.72bb556d@free-electrons.com>
+ <20140729120033.7e0f8d8b@free-electrons.com>
+ <EB433C0C-2EB5-4639-98BD-9D78F446497A@opengear.com>
+Message-ID: <53D80EF9.8010909@opengear.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Jul 29, 2014 12:22 PM, "Oleg Nesterov" <oleg@redhat.com> wrote:
->
-> Andy, to avoid the confusion: I am not trying to review this changes.
-> As you probably know my understanding of asm code in entry.S is very
-> limited.
->
-> Just a couple of questions to ensure I understand this correctly.
->
-> On 07/28, Andy Lutomirski wrote:
-> >
-> > This is both a cleanup and a speedup.  It reduces overhead due to
-> > installing a trivial seccomp filter by 87%.  The speedup comes from
-> > avoiding the full syscall tracing mechanism for filters that don't
-> > return SECCOMP_RET_TRACE.
->
-> And only after I look at 5/5 I _seem_ to actually understand where
-> this speedup comes from.
->
-> So. Currently tracesys: path always lead to "iret" after syscall, with
-> this change we can avoid it if phase_1() returns zero, correct?
->
-> And, this also removes the special TIF_SYSCALL_AUDIT-only case in entry.S,
-> cool.
->
-> I am wondering if we can do something similar with do_notify_resume() ?
->
->
-> Stupid question. To simplify, lets forget that syscall_trace_enter()
-> already returns the value. Can't we simplify the asm code if we do
-> not export 2 functions, but make syscall_trace_enter() return
-> "bool slow_path_is_needed". So that "tracesys:" could do
->
->         // pseudo code
->
-> tracesys:
->         SAVE_REST
->         FIXUP_TOP_OF_STACK
->
->         call syscall_trace_enter
->
->         if (!slow_path_is_needed) {
->                 addq REST_SKIP, %rsp
->                 jmp system_call_fastpath
->         }
->
->         ...
->
-> ?
->
-> Once again, I am just curious, it is not that I actually suggest to consider
-> this option.
+Hi Thomas,
+The patch solved the issue
 
-We could, but this would lose a decent amount of the speedup.  I could
-try it and benchmark it, but I'm guessing that the save and restore is
-kind of expensive.  This will make audit slower than it currently is,
-which may also annoy some people.  (Not me.)
+Thanks!
+Ken
 
-I'm also not convinced that it would be much simpler.  My code is currently:
 
-tracesys:
-    leaq -REST_SKIP(%rsp), %rdi
-    movq $AUDIT_ARCH_X86_64, %rsi
-    call syscall_trace_enter_phase1
-    test %rax, %rax
-    jnz tracesys_phase2        /* if needed, run the slow path */
-    LOAD_ARGS 0            /* else restore clobbered regs */
-    jmp system_call_fastpath    /*      and return to the fast path */
-
-tracesys_phase2:
-    SAVE_REST
-    FIXUP_TOP_OF_STACK %rdi
-    movq %rsp, %rdi
-    movq $AUDIT_ARCH_X86_64, %rsi
-    movq %rax,%rdx
-    call syscall_trace_enter_phase2
-
-    LOAD_ARGS ARGOFFSET, 1
-    RESTORE_REST
-
-    ... slow path here ...
-
-It would end up looking more like (totally untested):
-
-tracesys:
-    SAVE_REST
-    FIXUP_TOP_OF_STACK %rdi
-    mov %rsp, %rdi
-    movq $AUDIT_ARCH_X86_64, %rsi
-    call syscall_trace_enter
-    LOAD_ARGS
-    RESTORE_REST
-    test [whatever condition]
-    j[cond] system_call_fastpath
-
-    ... slow path here ...
-
-So it's a bit simpler.  Oddly, the ia32entry code doesn't have this
-multiple syscall path distinction.
-
-SAVE_REST is 6 movq instructions and a subq.  FIXUP_TOP_OF_STACK is 7
-movqs (and 8 if I ever get my way).  RESTORE_TOP_OF_STACK is 4.
-RESTORE_REST is 6 movqs and an adsq.  So we're talking about avoiding
-21 movqs, and addq, and a subq.  That may be significant.  (And I
-suspect that the difference is much larger on platforms like arm64,
-but that's a separate issue.)
+On 29/07/14 20:48, Ken Wilson wrote:
+> No worries, sorry I forgot.
+> This counts as a very timely reply from my perspective.
+>
+> I?ll apply the patch tomorrow and let you know how I go.
+>
+> Thanks,
+> Ken
+>
+> On 29 Jul 2014, at 8:00 pm, Thomas Petazzoni <thomas.petazzoni@free-electrons.com> wrote:
+>
+>> Hello,
+>>
+>> On Tue, 29 Jul 2014 11:48:16 +0200, Thomas Petazzoni wrote:
+>>
+>>> On Tue, 29 Jul 2014 11:14:12 +1000, Ken Wilson wrote:
+>>>> Hi Thomas,
+>>> Hello. Please Cc: me next time if you want to reply.
+>> Sorry, was a bit too harsh. I wanted to say: "Next time, try to Cc me
+>> if you want to raise my attention and get a timely reply."
+>>
+>>> Let me know if that fix the problem for you. Of course, the above hack
+>>> is not upstreamable, and not meant to be upstreamed in any way.
+>> And of course, I forgot to thank you for testing mainline on Armada
+>> 375. We're definitely interested in hearing more about the results of
+>> your tests, and maybe some code contributions!
+>>
+>> Thanks!
+>>
+>> Thomas
+>> -- 
+>> Thomas Petazzoni, CTO, Free Electrons
+>> Embedded Linux, Kernel and Android engineering
+>> http://free-electrons.com
+>>
+>> _______________________________________________
+>> linux-arm-kernel mailing list
+>> linux-arm-kernel at lists.infradead.org
+>> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+>
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
