@@ -1,63 +1,47 @@
-From: takahiro.akashi@linaro.org (AKASHI Takahiro)
-Date: Tue, 29 Jul 2014 15:49:47 +0900
-Subject: [PATCH v5 1/3] arm64: ptrace: reload a syscall number after ptrace
- operations
-In-Reply-To: <20140725110342.GD5269@arm.com>
-References: <1406020499-5537-1-git-send-email-takahiro.akashi@linaro.org>
- <1406020499-5537-2-git-send-email-takahiro.akashi@linaro.org>
- <53D08358.4020902@amacapital.net> <53D0A037.2060308@linaro.org>
- <CALCETrU9_sdODRz-xZ4bouq+anHhmfx2tkr7hg00RVf_bBBJwg@mail.gmail.com>
- <53D23341.4040403@linaro.org> <20140725110342.GD5269@arm.com>
-Message-ID: <53D7440B.10006@linaro.org>
+From: Anson.Huang@freescale.com (Anson.Huang at freescale.com)
+Date: Tue, 29 Jul 2014 06:55:30 +0000
+Subject: [PATCH] ARM: imx: fix TLB missing of IOMUXC base address during
+ suspend
+In-Reply-To: <1406344035-7836-1-git-send-email-shawn.guo@freescale.com>
+References: <1406344035-7836-1-git-send-email-shawn.guo@freescale.com>
+Message-ID: <c7eb55963a674527bd5d95791f1f4e56@BN1PR0301MB0628.namprd03.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/25/2014 08:03 PM, Will Deacon wrote:
-> On Fri, Jul 25, 2014 at 11:36:49AM +0100, AKASHI Takahiro wrote:
->> On 07/25/2014 12:01 AM, Andy Lutomirski wrote:
->>>>> If so, then you risk (at least) introducing
->>>>>
->>>>> a nice user-triggerable OOPS if audit is enabled.
->>>>
->>>>
->>>> Can you please elaborate this?
->>>> Since I didn't find any definition of audit's behavior when syscall is
->>>> rewritten to -1, I thought it is reasonable to skip "exit tracing" of
->>>> "skipped" syscall.
->>>> (otherwise, "fake" seems to be more appropriate :)
->>>
->>> The audit entry hook will oops if you call it twice in a row without
->>> calling the exit hook in between.
->>
->> Thank you, I could reproduce this problem which hits BUG(in_syscall) in
->> audit_syscall_entry(). Really bad, and I fixed it in my next version and
->> now a "skipped" system call is also traced by audit.
->
-> Can you reproduce this on arch/arm/ too? If so, we should also fix the code
-> there.
+Acked.
 
-As far as I tried on arm with syscall auditing enabled,
+-----Original Message-----
+From: Shawn Guo [mailto:shawn.guo at freescale.com] 
+Sent: 2014-07-26 11:07 AM
+To: linux-arm-kernel at lists.infradead.org
+Cc: Russell King; Huang Yongcai-B20788; kernel at pengutronix.de; Guo Shawn-R65073; stable at vger.kernel.org
+Subject: [PATCH] ARM: imx: fix TLB missing of IOMUXC base address during suspend
 
-1) Changing a syscall number to -1 under seccomp doesn't hit BUG_ON(in_syscall).
-2) But, in fact, audit_syscall_entry() is NOT called in this case because
-    __secure_computing() returns -1 and then it causes the succeeding tracing
-    in syscall_trace_enter(), including audit_syscall_entry(), skipped.
-3) On the other hand, calling syscall(-1) from userspace hits BUG_ON because
-    the return path, ret_slow_syscall, doesn't contain syscall_trace_exit().
-4) When we re-write a syscall number to -1 without seccomp, we will also see
-    BUG_ON hit, although I didn't try yet.
+After the suspend routine running in OCRAM puts DDR into self-refresh, it will access IOMUXC block to float DDR IO for power saving.  A TLB missing of IOMUXC base address may happen in this case, and triggers an access to DDR, and thus hangs the system.
 
-Fixing case 3 is easy, but should we also fix case 2?
+The failure is discovered by running suspend/resume on a Cubox-i board.
+Though the issue is not Cubox-i specific, it can be hit the on the board quite easily with the 3.15 or 3.16 kernel.
 
-Please note that, even if we call audit_syscall_exit() in case 2 or 3, no log against
-syscall -1 will be recorded because audit_filter_syscall() doesn't allow logging
-for any syscall number which is greater than 2048.
-This behavior was introduced by Andy's patch, a3c54931, in v3.16-rc.
-If the intention of "-1" is to fake a system call, this behavior seems to be a bit odd.
+Fix the issue with a dummy access to IOMUXC block at the beginning of suspend routine, so that the address translation can be filled into TLB before DDR is put into self-refresh.
 
-Thanks,
--Takahiro AKASHI
+Signed-off-by: Shawn Guo <shawn.guo@freescale.com>
+Cc: <stable@vger.kernel.org>
+---
+ arch/arm/mach-imx/suspend-imx6.S | 2 ++
+ 1 file changed, 2 insertions(+)
 
-
-> Will
->
+diff --git a/arch/arm/mach-imx/suspend-imx6.S b/arch/arm/mach-imx/suspend-imx6.S
+index fe123b079c05..87bdf7a629a5 100644
+--- a/arch/arm/mach-imx/suspend-imx6.S
++++ b/arch/arm/mach-imx/suspend-imx6.S
+@@ -172,6 +172,8 @@ ENTRY(imx6_suspend)
+ 	ldr	r6, [r11, #0x0]
+ 	ldr	r11, [r0, #PM_INFO_MX6Q_GPC_V_OFFSET]
+ 	ldr	r6, [r11, #0x0]
++	ldr	r11, [r0, #PM_INFO_MX6Q_IOMUXC_V_OFFSET]
++	ldr	r6, [r11, #0x0]
+ 
+ 	/* use r11 to store the IO address */
+ 	ldr	r11, [r0, #PM_INFO_MX6Q_SRC_V_OFFSET]
+--
+1.9.1
