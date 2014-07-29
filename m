@@ -1,41 +1,47 @@
-From: tomasz.figa@gmail.com (Tomasz Figa)
-Date: Tue, 29 Jul 2014 14:11:09 +0200
-Subject: [PATCH v8 6/6] clk: samsung: remove unused clock aliases and
- update clock flags
-In-Reply-To: <CAJuA9ahgOS7ccqiaMHn9rTS4tY3ah64rzbmQugWmL3s6HXFZVQ@mail.gmail.com>
-References: <1406611711-25112-1-git-send-email-thomas.ab@samsung.com>	<1406611711-25112-7-git-send-email-thomas.ab@samsung.com>	<53D77B01.40702@gmail.com>
- <CAJuA9ahgOS7ccqiaMHn9rTS4tY3ah64rzbmQugWmL3s6HXFZVQ@mail.gmail.com>
-Message-ID: <53D78F5D.60500@gmail.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Tue, 29 Jul 2014 13:13:01 +0100
+Subject: [PATCH v15 07/12] ARM: dts: append hip04 dts
+In-Reply-To: <CAD6h2NRuOe9piWOTU7xoaD-0DOceq20SD-XCqygLyQUFVCnsNQ@mail.gmail.com>
+References: <1406555876-11989-1-git-send-email-haojian.zhuang@linaro.org>
+ <1406555876-11989-8-git-send-email-haojian.zhuang@linaro.org>
+ <20140728180609.GE2576@leverpostej>
+ <CAD6h2NQLgB1=8+WznE19rjsFwm3XWPUYEbDuPCbKbWjseRCBDg@mail.gmail.com>
+ <20140729035321.GA8430@quad.lixom.net>
+ <20140729111213.GE9245@arm.com>
+ <CAD6h2NRuOe9piWOTU7xoaD-0DOceq20SD-XCqygLyQUFVCnsNQ@mail.gmail.com>
+Message-ID: <20140729121300.GH9245@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 29.07.2014 14:04, Thomas Abraham wrote:
-> Hi Tomasz,
+On Tue, Jul 29, 2014 at 12:32:09PM +0100, Haojian Zhuang wrote:
+> On 29 July 2014 19:12, Will Deacon <will.deacon@arm.com> wrote:
+> > On Tue, Jul 29, 2014 at 04:53:21AM +0100, Olof Johansson wrote:
+> >> On Tue, Jul 29, 2014 at 10:44:40AM +0800, Haojian Zhuang wrote:
+> >> > Because I didn't get these materials yet. All clocks are enabled in bootloader.
+> >>
+> >> What materials? Technical documentation for the CPU you're upstreaming?
+> >>
+> >> It seems like a very bad idea to upstream a DT for a CPU that you don't
+> >> have documentation for. It seems appropriate to wait until you have
+> >> documentation so you can make sure that the hardware you're describing
+> >> is actually what is there, and not something made-up or misdescribed.
+> >
+> > I completely agree. Furthermore, given that this SoC implements a dodgy
+> > custom GIC, I don't think it's unreasonable for us to ask for documentation
+> > describing that too, otherwise it's going to make maintaining a complicated
+> > irqchip driver that much worse.
+> >
+> I don't have enough documents on clocks. And all clocks are already
+> enabled in UEFI. There're also no requirement on change the clock
+> frequency & disable them. So I set all these clocks as fixed rate.
 > 
-> On Tue, Jul 29, 2014 at 4:14 PM, Tomasz Figa <tomasz.figa@gmail.com> wrote:
->> Hi Thomas,
->>
->> You can find few comments inline.
->>
->> On 29.07.2014 07:28, Thomas Abraham wrote:
->>
->> [snip]
->>
->>> @@ -714,15 +715,24 @@ static struct samsung_div_clock exynos4_div_clks[] __initdata = {
->>                                                         ^^^
->>
->> Keep in mind that following clocks are common for Exynos4210 and
->> Exynos4x12. Have you tested this series on a board based on Exynos4212
->> or 4412 to verify that it does not break the legacy driver? (I would
->> test it myself, but I am on holidays at the moment.)
-> 
-> Thanks for taking time to have a look at this series. I have tested
-> this series with the old cpufreq driver for Exynos4412 on an
-> Origen4412 board and it works fine. These divider clocks are not
-> directly used or referenced by the legacy cpufreq driver. So I marked
-> them as read-only here.
+> It's different from GIC. If I don't have documents on GIC, I can't
+> write code for HIP04 GIC. HiP04 GIC supports 16-cores. ARM GICv2
+> supports 8-cores. So some registers offsets and bit fields are
+> different from GICv2.
 
-OK.
+Sure, and I'm asking for those documents to be made publicly available
+somewhere so that we can refer to them if we need to change this code in
+future.
 
-Best regards,
-Tomasz
+Will
