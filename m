@@ -1,108 +1,27 @@
-From: balbi@ti.com (Felipe Balbi)
-Date: Tue, 29 Jul 2014 10:19:36 -0500
-Subject: [PATCH 30/35] irqchip: add irq-omap-intc.h header
-In-Reply-To: <20140729150655.GU29045@atomide.com>
-References: <1406582183-696-1-git-send-email-balbi@ti.com>
- <1406582183-696-31-git-send-email-balbi@ti.com>
- <20140729120133.GQ29045@atomide.com>
- <20140729141045.GA17808@saruman.home>
- <20140729150655.GU29045@atomide.com>
-Message-ID: <20140729151936.GC17808@saruman.home>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Tue, 29 Jul 2014 17:20:46 +0200
+Subject: [PATCH 1/3] arm64: spin-table: handle unmapped cpu-release-addrs
+In-Reply-To: <1406646945.753.5.camel@deneb.redhat.com>
+References: <1406630950-32432-1-git-send-email-ard.biesheuvel@linaro.org>
+ <1406630950-32432-2-git-send-email-ard.biesheuvel@linaro.org>
+ <1406646945.753.5.camel@deneb.redhat.com>
+Message-ID: <2385684.COvj9k7y2z@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jul 29, 2014 at 08:06:55AM -0700, Tony Lindgren wrote:
-> * Felipe Balbi <balbi@ti.com> [140729 07:13]:
-> > On Tue, Jul 29, 2014 at 05:01:33AM -0700, Tony Lindgren wrote:
-> > > * Felipe Balbi <balbi@ti.com> [140728 14:19]:
-> > > > OMAP INTC irqchip driver will be moved under
-> > > > drivers/irqchip/ soon but we still have a dependency
-> > > > with mach-omap2 when it comes to idle functions.
-> > > > 
-> > > > In order to make it easy to share those function
-> > > > prototypes with OMAP PM code, we introduce this new
-> > > > header.
-> > > > 
-> > > > Signed-off-by: Felipe Balbi <balbi@ti.com>
-> > > > ---
-> > > >  arch/arm/mach-omap2/board-3430sdp.c        |  1 +
-> > > >  arch/arm/mach-omap2/board-am3517crane.c    |  1 +
-> > > >  arch/arm/mach-omap2/board-am3517evm.c      |  1 +
-> > > >  arch/arm/mach-omap2/board-cm-t35.c         |  1 +
-> > > >  arch/arm/mach-omap2/board-cm-t3517.c       |  1 +
-> > > >  arch/arm/mach-omap2/board-devkit8000.c     |  1 +
-> > > >  arch/arm/mach-omap2/board-ldp.c            |  1 +
-> > > >  arch/arm/mach-omap2/board-omap3beagle.c    |  1 +
-> > > >  arch/arm/mach-omap2/board-omap3logic.c     |  1 +
-> > > >  arch/arm/mach-omap2/board-omap3pandora.c   |  1 +
-> > > >  arch/arm/mach-omap2/board-omap3stalker.c   |  1 +
-> > > >  arch/arm/mach-omap2/board-omap3touchbook.c |  1 +
-> > > >  arch/arm/mach-omap2/board-overo.c          |  1 +
-> > > >  arch/arm/mach-omap2/board-rx51.c           |  1 +
-> > > >  arch/arm/mach-omap2/board-ti8168evm.c      |  1 +
-> > > >  arch/arm/mach-omap2/common.h               |  9 ---------
-> > > >  arch/arm/mach-omap2/cpuidle34xx.c          |  1 +
-> > > >  arch/arm/mach-omap2/irq.c                  |  1 +
-> > > >  arch/arm/mach-omap2/pm24xx.c               |  1 +
-> > > >  arch/arm/mach-omap2/pm34xx.c               |  1 +
-> > > >  include/linux/irqchip/irq-omap-intc.h      | 32 ++++++++++++++++++++++++++++++
-> > > ...
-> > > 
-> > > > +void omap2_init_irq(void);
-> > > > +void omap3_init_irq(void);
-> > > > +void ti81xx_init_irq(void);
-> > > 
-> > > I think these will all go away with DT based booting?
-> > > So it might be worth waiting for that rather than churn
-> > > all these files, or..
-> > 
-> > you just asked me to rebase this series because now we had OMAP3 idle
-> > working with DT. And now, you're asking me to hold on to this series
-> > because not everything is DT-based yet.
+On Tuesday 29 July 2014 11:15:45 Mark Salter wrote:
+> > -
+> > -     __flush_dcache_area(release_addr, sizeof(release_addr[0]));
+> > +     writeq_relaxed(__pa(secondary_holding_pen), release_addr);
+> > +     __flush_dcache_area(release_addr, sizeof(*release_addr));
 > 
-> I just don't like the idea of patching all these board files that
-> are going away anyways. If we need to do that, let's just add it
-
-when are they going away ? Are we really gonna delay this series until
-those board-files eventually vanish ?
-
-> to common.h that's already included by all the remaining board-*.c
-> files. I know we should rather include the files directly, but in
-> this case that's just extra churn.
+>        __flush_dcache_area((__force void *)release_addr, ... 
 > 
-> The real problem is how to properly deal with the save and
-> restore calls that idle code needs.
-
-well, for system sleep we have callbacks from irq generic itself. The
-real problem is just with runtime PM.
-
-> In any case, it seems we can merge quite a bit of this series
-> already and then deal with the problem parts.
-
-sure, it at least some of those patches get merged, then it's less crap
-for me to rebase every now and again.
-
-> > This is the third time I rebase the series after a long hiatus and it
-> > always comes out to the same result -> "let's wait some more".
+> to avoid sparse warning.
 > 
-> Nope, it's always been "this series causes PM regressions"
 
-you just said that we haven't been in any position to really test this,
-so can it be that the status has always been "this series causes PM
-regressions". We couldn't test that before, right ?
+I think it would be cleaner to drop the __iomem annotation and use vmap()
+rather than ioremap(). That requires having a 'struct page' though, which
+I'm not sure you have.
 
-> and few other minor comments. And we have not been in any
-> position to really test that until with v3.16-rc4. And then
-> you always run out of time and nobody else does anything :)
-
-sure, I have other stuff to do as well.
-
--- 
-balbi
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140729/bfeb0b8f/attachment.sig>
+	Arnd
