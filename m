@@ -1,66 +1,83 @@
 From: hanjun.guo@linaro.org (Hanjun Guo)
-Date: Tue, 29 Jul 2014 21:08:40 +0800
-Subject: [PATCH 01/19] ARM64 / ACPI: Get RSDP and ACPI boot-time tables
-In-Reply-To: <53D69678.20002@arm.com>
+Date: Tue, 29 Jul 2014 21:10:21 +0800
+Subject: [PATCH 02/19] ARM64 / ACPI: Introduce early_param for "acpi"
+In-Reply-To: <53D69801.9090901@arm.com>
 References: <1406206825-15590-1-git-send-email-hanjun.guo@linaro.org>
- <1406206825-15590-2-git-send-email-hanjun.guo@linaro.org>
- <53D69678.20002@arm.com>
-Message-ID: <53D79CD8.9050709@linaro.org>
+ <1406206825-15590-3-git-send-email-hanjun.guo@linaro.org>
+ <53D69801.9090901@arm.com>
+Message-ID: <53D79D3D.9040305@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2014-7-29 2:29, Sudeep Holla wrote:
-[...]
->> +
->> +/*
->> + * We never plan to use RSDT on arm/arm64 as its deprecated in spec but this
->> + * variable is still required by the ACPI core
->> + */
->> +u32 acpi_rsdt_forced;
+On 2014-7-29 2:35, Sudeep Holla wrote:
 > 
-> This looks like yet another stray variable not used anywhere including
-> core ACPI
-
-It will be used by ACPICA to get the RSDP in acpi_tb_parse_root_table()
-in tbutils.c.
-
 > 
+> On 24/07/14 14:00, Hanjun Guo wrote:
+>> From: Al Stone <al.stone@linaro.org>
+>>
+>> Introduce two early parameters for "acpi", one is the parameter
+>> to disable ACPI on ARM64 and another one is acpi=strict to disable
+>> out-of-spec workarounds.
+>>
+>> Reviewed-by: Grant Likely <grant.likely@linaro.org>
+>> Signed-off-by: Al Stone <al.stone@linaro.org>
+>> Signed-off-by: Graeme Gregory <graeme.gregory@linaro.org>
+>> Signed-off-by: Hanjun Guo <hanjun.guo@linaro.org>
+>> ---
+>>   Documentation/kernel-parameters.txt |    3 ++-
+>>   arch/arm64/kernel/acpi.c            |   21 +++++++++++++++++++++
+>>   2 files changed, 23 insertions(+), 1 deletion(-)
+>>
+>> diff --git a/Documentation/kernel-parameters.txt
+>> b/Documentation/kernel-parameters.txt
+>> index b7fa2f5..d130bd5 100644
+>> --- a/Documentation/kernel-parameters.txt
+>> +++ b/Documentation/kernel-parameters.txt
+>> @@ -165,7 +165,7 @@ multipliers 'Kilo', 'Mega', and 'Giga', equalling 2^10,
+>> 2^20, and 2^30
+>>   bytes respectively. Such letter suffixes can also be entirely omitted.
+>>
+>>
+>> -    acpi=        [HW,ACPI,X86]
+>> +    acpi=        [HW,ACPI,X86,ARM]
+>>               Advanced Configuration and Power Interface
+>>               Format: { force | off | strict | noirq | rsdt }
+>>               force -- enable ACPI if default was off
+>> @@ -175,6 +175,7 @@ bytes respectively. Such letter suffixes can also be
+>> entirely omitted.
+>>                   strictly ACPI specification compliant.
+>>               rsdt -- prefer RSDT over (default) XSDT
+>>               copy_dsdt -- copy DSDT to memory
+>> +            For ARM64, ONLY "off" and "strict" are available.
+>>
+>>               See also Documentation/power/runtime_pm.txt, pci=noacpi
+>>
+>> diff --git a/arch/arm64/kernel/acpi.c b/arch/arm64/kernel/acpi.c
+>> index c62fce6..ac78e4e 100644
+>> --- a/arch/arm64/kernel/acpi.c
+>> +++ b/arch/arm64/kernel/acpi.c
+>> @@ -74,3 +74,24 @@ void __init acpi_boot_table_init(void)
+>>           return;
+>>       }
+>>   }
 >> +
->> +int acpi_noirq;                        /* skip ACPI IRQ initialization */
->> +int acpi_strict;
->> +int acpi_disabled;
->> +EXPORT_SYMBOL(acpi_disabled);
->> +
->> +int acpi_pci_disabled;         /* skip ACPI PCI scan and IRQ initialization */
->> +EXPORT_SYMBOL(acpi_pci_disabled);
->> +
->> +/*
->> + * __acpi_map_table() will be called before page_init(), so early_ioremap()
->> + * or early_memremap() should be called here to for ACPI table mapping.
->> + */
->> +char *__init __acpi_map_table(unsigned long phys, unsigned long size)
+>> +static int __init parse_acpi(char *arg)
 >> +{
->> +       if (!phys || !size)
->> +               return NULL;
+>> +    if (!arg)
+>> +        return -EINVAL;
 >> +
->> +       return early_memremap(phys, size);
->> +}
->> +
->> +void __init __acpi_unmap_table(char *map, unsigned long size)
->> +{
->> +       if (!map || !size)
->> +               return;
->> +
->> +       early_iounmap(map, size);
+>> +    /* "acpi=off" disables both ACPI table parsing and interpreter */
+>> +    if (strcmp(arg, "off") == 0) {
+>> +        disable_acpi();
+>> +    }
+>> +    /* acpi=strict disables out-of-spec workarounds */
+>> +    else if (strcmp(arg, "strict") == 0) {
+>> +        acpi_strict = 1;
 > 
-> Why not early_memunmap for consistency ?
+> This should be default set as I mentioned in patch#1. We can introduce
+> this option if required in future.
 
-ok.
-
-> Also now there's generic implementation of early mappings does it make
-> sense to move this also to acpi core ?
-
-Good point, how about clean it up after this patch set is merged?
+Agreed, Let's keep it strict in the beginning to support ACPI.
 
 Thanks
 Hanjun
