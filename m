@@ -1,57 +1,155 @@
-From: oleg@redhat.com (Oleg Nesterov)
-Date: Tue, 29 Jul 2014 19:31:36 +0200
-Subject: [PATCH v3 6/8] x86: Split syscall_trace_enter into two phases
-In-Reply-To: <CALCETrWBU-=zqLTCP7B1feZ9J-e4u-Boic+e1EEn1rL-ijeEKg@mail.gmail.com>
-References: <cover.1405992946.git.luto@amacapital.net>
- <3f649f5658a163645e3ce15156176c325283762e.1405992946.git.luto@amacapital.net>
- <20140728173723.GA20993@redhat.com>
- <CALCETrWUFo_zXcAZja-vdL4_MgJDd=1ed5Vt54eyUuim930xAw@mail.gmail.com>
- <20140729165416.GA967@redhat.com>
- <CALCETrWBU-=zqLTCP7B1feZ9J-e4u-Boic+e1EEn1rL-ijeEKg@mail.gmail.com>
-Message-ID: <20140729173136.GA2808@redhat.com>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Tue, 29 Jul 2014 18:33:37 +0100
+Subject: [PATCH v15 07/12] ARM: dts: append hip04 dts
+In-Reply-To: <CAOesGMi6xLwFkjctNJsJ63WYaMhrJgjNyST4qiUpa42e4biBjQ@mail.gmail.com>
+References: <1406555876-11989-1-git-send-email-haojian.zhuang@linaro.org>
+ <1406555876-11989-8-git-send-email-haojian.zhuang@linaro.org>
+ <20140728180609.GE2576@leverpostej>
+ <CAD6h2NQLgB1=8+WznE19rjsFwm3XWPUYEbDuPCbKbWjseRCBDg@mail.gmail.com>
+ <20140729123221.GN2576@leverpostej>
+ <CAOesGMi6xLwFkjctNJsJ63WYaMhrJgjNyST4qiUpa42e4biBjQ@mail.gmail.com>
+Message-ID: <20140729173336.GA748@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/29, Andy Lutomirski wrote:
->
-> On Tue, Jul 29, 2014 at 9:54 AM, Oleg Nesterov <oleg@redhat.com> wrote:
+On Tue, Jul 29, 2014 at 06:01:48PM +0100, Olof Johansson wrote:
+> On Tue, Jul 29, 2014 at 5:32 AM, Mark Rutland <mark.rutland@arm.com> wrote:
+> > On Tue, Jul 29, 2014 at 03:44:40AM +0100, Haojian Zhuang wrote:
+> >> On 29 July 2014 02:06, Mark Rutland <mark.rutland@arm.com> wrote:
+> >> > On Mon, Jul 28, 2014 at 02:57:51PM +0100, Haojian Zhuang wrote:
+> >> >> Add hip04-d01.dts & hip04.dtsi for hip04 SoC platform.
+> >> >>
+> >> >> Signed-off-by: Haojian Zhuang <haojian.zhuang@linaro.org>
+> >> >> ---
+> >> >>  arch/arm/boot/dts/Makefile      |   1 +
+> >> >>  arch/arm/boot/dts/hip04-d01.dts |  39 ++++++
+> >> >>  arch/arm/boot/dts/hip04.dtsi    | 267 ++++++++++++++++++++++++++++++++++++++++
+> >> >>  3 files changed, 307 insertions(+)
+> >> >>  create mode 100644 arch/arm/boot/dts/hip04-d01.dts
+> >> >>  create mode 100644 arch/arm/boot/dts/hip04.dtsi
+> >> >>
+> >> >> diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
+> >> >> index 721525e..6587bbf 100644
+> >> >> --- a/arch/arm/boot/dts/Makefile
+> >> >> +++ b/arch/arm/boot/dts/Makefile
+> >> >> @@ -86,6 +86,7 @@ dtb-$(CONFIG_ARCH_HI3xxx) += hi3620-hi4511.dtb
+> >> >>  dtb-$(CONFIG_ARCH_HIX5HD2) += hix5hd2-dkb.dtb
+> >> >>  dtb-$(CONFIG_ARCH_HIGHBANK) += highbank.dtb \
+> >> >>         ecx-2000.dtb
+> >> >> +dtb-$(CONFIG_ARCH_HIP04) += hip04-d01.dtb
+> >> >>  dtb-$(CONFIG_ARCH_INTEGRATOR) += integratorap.dtb \
+> >> >>         integratorcp.dtb
+> >> >>  dtb-$(CONFIG_ARCH_KEYSTONE) += k2hk-evm.dtb \
+> >> >> diff --git a/arch/arm/boot/dts/hip04-d01.dts b/arch/arm/boot/dts/hip04-d01.dts
+> >> >> new file mode 100644
+> >> >> index 0000000..661c8e5
+> >> >> --- /dev/null
+> >> >> +++ b/arch/arm/boot/dts/hip04-d01.dts
+> >> >> @@ -0,0 +1,39 @@
+> >> >> +/*
+> >> >> + *  Copyright (C) 2013-2014 Linaro Ltd.
+> >> >> + *  Author: Haojian Zhuang <haojian.zhuang@linaro.org>
+> >> >> + *
+> >> >> + *  This program is free software; you can redistribute it and/or modify
+> >> >> + *  it under the terms of the GNU General Public License version 2 as
+> >> >> + *  publishhed by the Free Software Foundation.
+> >> >> + */
+> >> >> +
+> >> >> +/dts-v1/;
+> >> >> +
+> >> >> +/* For bootwrapper */
+> >> >> +/memreserve/ 0x10c00000 0x00010000;
+> >> >
+> >> > How exactly is this bootwrapper used? Is the kernel compiled into it?
+> >> >
+> >> > It might make more sense for the wrapper build system to inject
+> >> > bootwrapper-related properties. Then the DTB is less likely to
+> >> > amalgamate hacks to workaround differences between versions, and can be
+> >> > used on systems without a wrapper without throwing away some memory.
+> >> >
+> >>
+> >> In this platform, we relied on the bootwrapper. If I discard this,
+> >> I'll fail to bring up all secondary cores.
 > >
-> > Yes, just to trigger the slow path, I guess.
+> > What loads the boot wrapper into memory, and from where?
 > >
-> >> I'll update the code to call user_exit iff TIF_NOHZ is
-> >> set.
+> > In another reply you mentioned you're using UEFI. Is this wrapper
+> > considered part of your UEFI implementation? If so it should be reserved
+> > in the UEFI memory map, and there should be no need of memory nodes or
+> > memreserves -- all that should come from UEFI.
+> 
+> There's no UEFI memory map parsing on 32-bit, is there?
+
+Apparently not, so this can be ignored. Sorry for the noise.
+
+That said I'm slightly confused by the decision to use UEFI given that
+we can't use the standard EFI boot mechanism and services on 32-bit.
+
+> > What exactly is the boot wrapper in charge of?
 > >
-> > Or perhaps it would be better to not add another user of this (strange) flag
-> > and just call user_exit() unconditionally(). But, yes, you need to use
-> > from "work = flags & (_TIF_WORK_SYSCALL_ENTRY & ~TIF_NOHZ)" then.\
->
-> user_exit looks slow enough to me that a branch to try to avoid it may
-> be worthwhile.  I bet that explicitly checking the flag is
-> actually both faster and clearer.
+> > What is the split in responsiblity between the wrapper and the kernel?
+> 
+> Sounds like it's just the trampoline code that's executed at CPU
+> spin-up time. I wouldn't be surprised if there's a register somewhere
+> on the same controller that you poke the cpu to life that you can
+> write what address for it to start executing at, or at least some
+> other location where it can be redirected somewhere else. It's very
+> unlikely a wired-in address in hardware. Or so I hope. :-)
 
-I don't think so (unless I am confused again), note that user_exit() uses
-jump label. But this doesn't matter. I meant that we should avoid TIF_NOHZ
-if possible because I think it should die somehow (currently I do not know
-how ;). And because it is ugly to check the same condition twice:
+Me too.
 
-	if (work & TIF_NOHZ) {
-		// user_exit()
-		if (context_tracking_is_enabled())
-			context_tracking_user_exit();
-	}
+> >> >> +               };
+> >> >> +
+> >> >> +               fabric: fabric {
+> >> >> +                       compatible = "hisilicon,hip04-fabric";
+> >> >> +                       reg = <0x302a000 0x1000>;
+> >> >
+> >> > How is this going to be used?
+> >> >
+> >>
+> >> Fabric could configure snoop filter of multiple cluster. I don't have
+> >> the manual. I only know this.
+> >
+> > Is this accessible to the non-secure side?
+> >
+> > If the firmware is currently programming things correctly then we
+> > shouldn't need this for now.
+> 
+> with MCPM clusters get powered up and down, it's not uncommon to have
+> to take them out of coherence domains.
 
-TIF_NOHZ is set if and only if context_tracking_is_enabled() is true.
-So I think that
+Sure, but that won't be possible if those registers are secure-only
+given the comments that secondaries are demoted to hyp by the wrapper.
+That might be possible to work around, but we might be in for further
+pain given the primary is already in a non-secure mode.
 
-	work = current_thread_info()->flags & (_TIF_WORK_SYSCALL_ENTRY & ~TIF_NOHZ);
+It might be that this is useful for performance monitoring on the
+non-secure side anyway, but without a user it might make more sense to
+just drop the node for now.
 
-	user_exit();
+> >> >> +               };
+> >> >> +
+> >> >> +               dual_timer0: dual_timer at 3000000 {
+> >> >> +                       compatible = "arm,sp804", "arm,primecell";
+> >> >> +                       reg = <0x3000000 0x1000>;
+> >> >> +                       interrupts = <0 224 4>;
+> >> >> +                       clocks = <&clock HIP04_CLK_50M>;
+> >> >> +                       clock-names = "apb_pclk";
+> >> >> +               };
+> >> >
+> >> > I thought sp804 had two clocks (one for AMBA and one for the actual
+> >> > timer). What's going on here?
+> >> >
+> >>
+> >> If only one clock is configured at here, sp804 driver believes that
+> >> clk2 is same as clk1.
+> >
+> > I'm not keen on relying on that. It's arguably a bug in the driver.
+> 
+> The driver should warn, but we can't make it fail on it now. :(
 
-looks a bit better. But I won't argue.
+Yeah. I should revive my series for that. So far everyone seems to be
+happy with just hacking around it :(
 
-> That's what I did for v4.
-
-I am going to read it today. Not that I think I can help or find something
-wrong.
-
-Oleg.
+Thanks,
+Mark.
