@@ -1,96 +1,161 @@
-From: paul@pwsan.com (Paul Walmsley)
-Date: Tue, 29 Jul 2014 12:32:08 +0000 (UTC)
-Subject: OMAP baseline test results for v3.16-rc4
-In-Reply-To: <20140729084930.GH29045@atomide.com>
-References: <alpine.DEB.2.02.1407062339420.15016@utopia.booyaka.com>
- <20140707080238.GF28884@atomide.com>
- <alpine.DEB.2.02.1407251857480.5875@utopia.booyaka.com>
- <20140729064243.GF29045@atomide.com>
- <alpine.DEB.2.02.1407290810160.22957@utopia.booyaka.com>
- <20140729084930.GH29045@atomide.com>
-Message-ID: <alpine.DEB.2.02.1407291225070.13035@utopia.booyaka.com>
+From: achandran@mvista.com (Arun Chandran)
+Date: Tue, 29 Jul 2014 18:02:23 +0530
+Subject: Kexec on arm64
+In-Reply-To: <1406592548.28348.49.camel@smoke>
+References: <CAL85gmC9LLcN_uxMY1bM5kLx=N7rZGdGO3bmGHeUVo=Rqgk8uw@mail.gmail.com>
+ <1405551861.7262.26.camel@smoke>
+ <CAFdej03nixSU=3h+HYk2E3Onb2P3--Di0GM+wCwLS6ZNH7UjEQ@mail.gmail.com>
+ <CAFdej00J2mJwcg2Cy6CHVuuQZ4uQ2zZg8oErGPi0uPejievB+Q@mail.gmail.com>
+ <1406162287.4062.39.camel@smoke>
+ <20140724093603.GC4079@leverpostej>
+ <1406247468.4062.59.camel@smoke>
+ <CAFdej01w_pE6vv+13cCCyfDs4Rbdkzx4CMUj9q97HBKV0B53ow@mail.gmail.com>
+ <1406333901.4062.69.camel@smoke>
+ <CAFdej014ohCFYvoUAXWiYGb4_4UmSY2G1MH-NEE_cF1cC-6Mow@mail.gmail.com>
+ <20140728153812.GA2576@leverpostej>
+ <1406592548.28348.49.camel@smoke>
+Message-ID: <CAFdej00is0kC-1q5uMNJL5APL1WezdNBg0jASgwYamsg5NO_Tg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 29 Jul 2014, Tony Lindgren wrote:
+Hi Geoff,
 
-> * Paul Walmsley <paul@pwsan.com> [140729 01:27]:
-> > On Mon, 28 Jul 2014, Tony Lindgren wrote:
-> > 
-> > > Hmm I think the difference with the working v3.10 one is that you have
-> > > root=/dev/mmcblk0p2 instead of root=/dev/nfs. As the Ethernet on beagle
-> > > is on the USB EHCI, this is still blocking the deeper idle states AFAIK.
-> > 
-> > Hmm?  There's no Ethernet on the 3530 Beagle.
-> > 
-> > The hardware configuration on those two boards - the 37xxevm and 
-> > the 3530es3beagle - hasn't changed between the two test runs, AFAIK.
-> 
-> Oh it's the original beagle, sorry. In that case the uart wake interrupts
-> need to be enabled for the serial wake to work. I did not do that as
-> I don't have one. I guess that might explain why it fails? Or are you
-> using RTC wake for your test?
+On Tue, Jul 29, 2014 at 5:39 AM, Geoff Levand <geoff@infradead.org> wrote:
+> Hi,
+>
+> On Mon, 2014-07-28 at 16:38 +0100, Mark Rutland wrote:
+>> On Mon, Jul 28, 2014 at 04:00:18PM +0100, Arun Chandran wrote:
+>> > I have these changes to the code.
+>> >         flush_icache_range((unsigned long)reboot_code_buffer,
+>> > -               relocate_new_kernel_size);
+>> > +               (unsigned long)(reboot_code_buffer + relocate_new_kernel_size));
+>
+> Thanks, I introduced this in my last version in an attempt to clean up
+> the code, but on studying setup_restart(), I wonder if we even need to
+> do this icache flush here (see below).
+>
+>> >         /*
+>> >          * Flush any data used by relocate_new_kernel in preparation for
+>> > #########
+>> > Passing of second variable to flush_icache_range() is wrong
+>> > it expects an address not length.
+>>
+>> A simpler option would be to nuke the entire icache before branching to
+>> the new image.
+>
+> flush_cache_all(), which is called by setup_restart(), does a 'ic
+> ialluis'.  The ARM says that this will invalidate all instruction caches
+> for the inner shareable domain.  Do we need something more?
+>
+>> > 2)
+>> >
+>> > #######
+>> > diff --git a/arch/arm64/kernel/process.c b/arch/arm64/kernel/process.c
+>> > index 9ed7327..e3fc8d6 100644
+>> > --- a/arch/arm64/kernel/process.c
+>> > +++ b/arch/arm64/kernel/process.c
+>> >
+>> > @@ -84,12 +91,17 @@ void soft_restart(unsigned long addr)
+>> >  {
+>> >         typedef void (*phys_reset_t)(unsigned long);
+>> >         phys_reset_t phys_reset;
+>> > +       unsigned long jump_addr = addr;
+>> > +
+>> > +       phys_reset = (phys_reset_t)virt_to_phys(cpu_reset);
+>> > +
+>> > +       __flush_dcache_area(&jump_addr, 8);
+>> > +       __flush_dcache_area(&phys_reset, 8);
+>>
+>> Are these values really not getting stashed in registers?
+>
+> Looking at the disassembled code of soft_restart() from my compiler,
+> addr is being saved on the stack over the call to setup_restart(), which
+> I would expect it to do.
+>
+Yes my compiler also saves this in stack
 
-Serial wake works fine.  But the chip never enters dynamic retention idle 
-as measured by the pm_debug/count differential for CORE powerdomain.
-Works OK with static suspend.
+>> If the compiler is spilling, then we have absolutely no guarantee about
+>> any part of the stack. If that's the case, then we can't use the stack
+>> at all. These need to be rewritten in asm if the compiler is spilling.
+>
+> I think we just need to put the restart addr in a variable and flush
+> that to the PoC.
+>
+> Arun, I pushed out a fixed version of soft_restart(), so please try
+> another UP + L3 boot.
+>
 
-> Wrong link here :) It should be:
-> 
-> http://www.pwsan.com/omap/testlogs/test_v3.16-rc7/20140727174803/pm/37xxevm/37xxevm_log.txt
+The default code did not work.
 
-Oops indeed :-)
+It is working with the change below
 
-> > I should probably read back those writes to autosuspend_delay_ms, just to 
-> > make sure they are reaching the right destinations.  But you might want to 
-> > confirm that you can see the CORE RET count increasing during dynamic idle 
-> > on your 37xxevm.
-> 
-> Hmm seems to work on 37xxevm for me with my retention test script:
-> 
-> uarts=$(find /sys/class/tty/ttyO*/device/power/ -type d)
-> for uart in $uarts; do
->         echo 3000 > $uart/autosuspend_delay_ms
-> done
-> 
-> uarts=$(find /sys/class/tty/ttyO*/power/ -type d)
-> for uart in $uarts; do
->         echo enabled > $uart/wakeup
->         echo auto > $uart/control
-> done
-> 
-> echo 0 > /sys/kernel/debug/pm_debug/enable_off_mode
-> 
-> Which produces:
-> 
-> core_pwrdm (ON),OFF:0,RET:7,INA:0,ON:8,RET-LOGIC-OFF:0,RET-MEMBANK1-OFF:0,RET-MEMBANK2-OFF:0
-> 
-> And then setting enable_off_mode:
-> 
-> core_pwrdm (ON),OFF:15,RET:100,INA:8,ON:124,RET-LOGIC-OFF:0,RET-MEMBANK1-OFF:0,RET-MEMBANK2-OFF:0
+###############
+diff --git a/arch/arm64/kernel/machine_kexec.c
+b/arch/arm64/kernel/machine_kexec.c
+index 5632473..7c5f859 100644
+--- a/arch/arm64/kernel/machine_kexec.c
++++ b/arch/arm64/kernel/machine_kexec.c
+@@ -147,12 +147,17 @@ static bool kexec_is_dtb_user(const dtb_t *dtb)
+ /**
+  * kexec_list_walk - Helper to walk the kimage page list.
+  */
+-
++static int kexec_kernel_size;
++#define IMG_SIZE_NONE  0
++#define KERN_SIZE_FLAG 1
++#define DTB_SIZE_FLAG  2
+ static void kexec_list_walk(void *ctx, unsigned long kimage_head,
+        void (*cb)(void *ctx, unsigned int flag, void *addr, void *dest))
+ {
+        void *dest;
+        unsigned long *entry;
++       int imgsize_flag = IMG_SIZE_NONE;
++
 
-OK thanks for the point of comparison.
+        for (entry = &kimage_head, dest = NULL; ; entry++) {
+                unsigned int flag = *entry & IND_FLAGS;
+@@ -164,10 +169,18 @@ static void kexec_list_walk(void *ctx, unsigned
+long kimage_head,
+                        cb(ctx, flag, addr, NULL);
+                        break;
+                case IND_DESTINATION:
++                       if (imgsize_flag == IMG_SIZE_NONE) {
++                               kexec_kernel_size = 0;
++                               imgsize_flag = KERN_SIZE_FLAG;
++                       } else if (imgsize_flag == KERN_SIZE_FLAG) {
++                               imgsize_flag = DTB_SIZE_FLAG;
++                       }
+                        dest = addr;
+                        cb(ctx, flag, addr, NULL);
+                        break;
+                case IND_SOURCE:
++                       if (imgsize_flag == KERN_SIZE_FLAG)
++                               kexec_kernel_size++;
+                        cb(ctx, flag, addr, dest);
+                        dest += PAGE_SIZE;
+                        break;
+@@ -693,5 +706,20 @@ void machine_kexec(struct kimage *image)
 
-> And I'm using UART3 like I mentioned earlier, but I doubt that
-> makes a difference.
-> 
-> Are you maybe missing "echo auto > $uart/control"?
+        kexec_list_walk(NULL, image->head, kexec_list_flush_cb);
 
-It should be doing both of those things, according to the logs:
++       /*
++        * Make sure virtual addresses of new kernel are flushed
++        * SZ_512K = TEXT_OFFSET
++        * kexec_kernel = kexec_kernel_size * PAGE_SIZE
++        * Don't know = (SZ_4M + SZ_1M)
++        * SZ_4M = not working
++        * SZ_6M = working
++        * SZ_8M = working
++        *
++        * so chose SZ_4M + SZ_1M; Don't know why this is required
++        * BSS, stack ??
++        *
++        */
++       __flush_dcache_area((void *)PAGE_OFFSET, SZ_512K +
+(kexec_kernel_size * PAGE_SIZE) + SZ_4M + SZ_1M);
++
+        soft_restart(reboot_code_buffer_phys);
+ }
 
---------
-# # for u in `ls -1d /sys/class/tty/ttyO* | paste -s -d' '`; do echo 
-enabled >  $u/power/wakeup; done
 
-#
-%% Start retention double suspend/resume UART wakeup test
-
- # for u in `ls -1d /sys/class/tty/ttyO* | paste -s -d' '`; do echo auto >  
-$u/power/control; done
---------
-
-I will add code to read back the values from the sysfs files, just to make 
-sure they are being set.
-
-
-- Paul
+--Arun
