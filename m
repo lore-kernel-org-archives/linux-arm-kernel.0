@@ -1,26 +1,26 @@
 From: broonie@kernel.org (Mark Brown)
-Date: Tue, 29 Jul 2014 19:55:29 +0100
-Subject: [PATCH v2] spi/pxa2xx-pci: Add common clock framework support in
- PCI glue layer
-In-Reply-To: <CAAQYJAtM79NJJtfNYda-yFk113nm-2D8gZE5x=gbnLt2_eUdzQ@mail.gmail.com>
-References: <1406221854-12828-1-git-send-email-chiau.ee.chew@intel.com>
- <20140725053230.GT1857@lahna.fi.intel.com>
- <CAAQYJAtM79NJJtfNYda-yFk113nm-2D8gZE5x=gbnLt2_eUdzQ@mail.gmail.com>
-Message-ID: <20140729185529.GG17528@sirena.org.uk>
+Date: Tue, 29 Jul 2014 19:56:09 +0100
+Subject: [PATCH -next] ASoC: samsung: Fix return value check in
+ s3c2412_iis_dev_probe()
+In-Reply-To: <1405827787-26055-1-git-send-email-weiyj_lk@163.com>
+References: <1405827787-26055-1-git-send-email-weiyj_lk@163.com>
+Message-ID: <20140729185609.GH17528@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jul 29, 2014 at 06:13:06PM +0200, Andrea Adami wrote:
+On Sun, Jul 20, 2014 at 11:43:07AM +0800, weiyj_lk at 163.com wrote:
+> From: Wei Yongjun <yongjun_wei@trendmicro.com.cn>
+> 
+> In case of error, the function devm_ioremap_resource() returns ERR_PTR()
+> and never returns NULL. The NULL test in the return value check should be
+> replaced with IS_ERR(). Also remove redundant return value check of
+> platform_get_resource().
 
-> note that a previous version of the patch breaks spi on pxa machines:
-> tested on pxa250 poodle and pxa255 corgi.
-> The patch is included in linux-Yocto since 3.14.
-
-The interesting question is if this version works...
+Applied, thanks.
 -------------- next part --------------
 A non-text attachment was scrubbed...
 Name: signature.asc
 Type: application/pgp-signature
 Size: 819 bytes
 Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140729/46e3c43f/attachment.sig>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140729/6d57e706/attachment.sig>
