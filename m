@@ -1,31 +1,41 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 29 Jul 2014 16:44:31 +0200
-Subject: [PATCH] ARM: imx: clk-vf610: introduce clks_init_on
-In-Reply-To: <1406643628-4061-1-git-send-email-stefan@agner.ch>
-References: <1406643628-4061-1-git-send-email-stefan@agner.ch>
-Message-ID: <2815679.ZycfkLhBgI@wuerfel>
+From: m.szyprowski@samsung.com (Marek Szyprowski)
+Date: Tue, 29 Jul 2014 16:47:04 +0200
+Subject: [PATCH v2 RESEND 2/4] drivers: of: initialize and assign reserved
+ memory to newly created devices
+In-Reply-To: <20140728141700.55FC4C408EA@trevor.secretlab.ca>
+References: <1405326487-15346-1-git-send-email-m.szyprowski@samsung.com>
+ <1405326487-15346-3-git-send-email-m.szyprowski@samsung.com>
+ <20140728141700.55FC4C408EA@trevor.secretlab.ca>
+Message-ID: <53D7B3E8.6070906@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 29 July 2014 16:20:28 Stefan Agner wrote:
-> At the end of the boot process, the clock framework might disable
-> required main PLL's. So far, this was no issue since drivers
-> requested clocks, which are descended of the main PLL's (e.g.
-> pll1_pfd1, which provides the system clock).
-> 
-> To archive the full 500MHz system clock, DDR clock need to be a
-> descendant of PLL2 rather than PLL1 (DDRC_CLK_SEL set to 0). The
-> bootloader sets up the clocks accordingly before making use of
-> DDR at all. However, in Linux, there is no driver using PLL2,
-> which lead to PLL2 being disabled by the clock framework.
-> 
-> With this patch, we make sure that the main system clock and the
-> DDR clock are initially enabled and are kept enabled.
-> 
-> Signed-off-by: Stefan Agner <stefan@agner.ch>
-> 
+Hello,
 
-Wouldn't it be better to list this in the DT as a default for
-the respective clocks?
+On 2014-07-28 16:17, Grant Likely wrote:
+> On Mon, 14 Jul 2014 10:28:05 +0200, Marek Szyprowski <m.szyprowski@samsung.com> wrote:
+>> Use recently introduced of_reserved_mem_device_init() function to
+>> automatically assign respective reserved memory region to the newly created
+>> platform and amba device.
+>>
+>> Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
+> I'm still not okay with this patch. I don't think it is appropriate to
+> add the hook into the generic path that gets used for every platform
+> device. The devices that need reserved memory should explicitly request
+> it, and any setup be done at that time.
 
-	Arnd
+Okay... I thought that it will be easier to have it done in generic 
+code, if You don't
+think so, then I give up and we will add it in all drivers requiring 
+such memory regions.
+
+What about patch 3/4 and 4/4? Would it be possible to have your ack to 
+get them merged?
+Right now patch 4/4 depends on changes from akpm tree, so it will be 
+best to merge them
+to akpm tree.
+
+Best regards
+-- 
+Marek Szyprowski, PhD
+Samsung R&D Institute Poland
