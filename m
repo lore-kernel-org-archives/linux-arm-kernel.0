@@ -1,55 +1,37 @@
-From: thierry.reding@gmail.com (Thierry Reding)
-Date: Tue, 29 Jul 2014 16:25:34 +0200
-Subject: [PATCH] ARM: tegra: Move AHB Kconfig to drivers/amba
-Message-ID: <1406643934-16301-1-git-send-email-thierry.reding@gmail.com>
+From: tj@kernel.org (Tejun Heo)
+Date: Tue, 29 Jul 2014 10:26:48 -0400
+Subject: [PATCH v4 0/4]ata: Fixes related to APM X-Gene SATA host
+ controller driver.
+In-Reply-To: <1406616892-30273-1-git-send-email-stripathi@apm.com>
+References: <1406616892-30273-1-git-send-email-stripathi@apm.com>
+Message-ID: <20140729142648.GA4791@htj.dyndns.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Thierry Reding <treding@nvidia.com>
+On Tue, Jul 29, 2014 at 12:24:48PM +0530, Suman Tripathi wrote:
+> This patch set contains a couple of fixes related to APM X-Gene SATA
+> controller driver.
+> 
+> v2 Change:
+>    1. Drop the Link down retry patch from this patch set.
+> 
+> v4 Change:
+>    1. Drop the patch to fix the csr-mask in dts for PHY clock
+>      node of SATA Host Controller 1.
+>    2. Add the patch to correct the OOB tunning parameters for
+>      the COMINIT/COMWAKE parameters.
+>    3. Add the patch to remove the NCQ support from the APM
+>      X-Gene AHCI SATA Host controller driver.
+>    4. Add the patch to remove the clock and PHY reference nodes
+>      from the APM X-Gene Host controller dts node.
+> 
+> Signed-off-by: Loc Ho <lho@apm.com>
+> Signed-off-by: Suman Tripathi <stripathi@apm.com>
 
-This will allow the Kconfig option to be shared among 32-bit and 64-bit
-ARM.
+Applied 1 and 3 to libata/for-3.17.  4 doesn't apply.  Also, please
+prefix the patches with "ahci_xgene: " from now on.
 
-Signed-off-by: Thierry Reding <treding@nvidia.com>
----
- arch/arm/mach-tegra/Kconfig |  8 --------
- drivers/amba/Kconfig        | 11 +++++++++++
- 2 files changed, 11 insertions(+), 8 deletions(-)
- create mode 100644 drivers/amba/Kconfig
+Thanks.
 
-diff --git a/arch/arm/mach-tegra/Kconfig b/arch/arm/mach-tegra/Kconfig
-index 052fba07a3cb..fae2eb2f52ea 100644
---- a/arch/arm/mach-tegra/Kconfig
-+++ b/arch/arm/mach-tegra/Kconfig
-@@ -64,12 +64,4 @@ config ARCH_TEGRA_124_SOC
- 	  Support for NVIDIA Tegra T124 processor family, based on the
- 	  ARM CortexA15MP CPU
- 
--config TEGRA_AHB
--	bool "Enable AHB driver for NVIDIA Tegra SoCs"
--	default y
--	help
--	  Adds AHB configuration functionality for NVIDIA Tegra SoCs,
--	  which controls AHB bus master arbitration and some
--	  performance parameters(priority, prefech size).
--
- endif
-diff --git a/drivers/amba/Kconfig b/drivers/amba/Kconfig
-new file mode 100644
-index 000000000000..3f7350a03708
---- /dev/null
-+++ b/drivers/amba/Kconfig
-@@ -0,0 +1,11 @@
-+if ARM_AMBA
-+
-+config TEGRA_AHB
-+	bool "Enable AHB driver for NVIDIA Tegra SoCs"
-+	default y if ARCH_TEGRA
-+	help
-+	  Adds AHB configuration functionality for NVIDIA Tegra SoCs,
-+	  which controls AHB bus master arbitration and some performance
-+	  parameters (priority, prefetch size).
-+
-+endif
 -- 
-2.0.2
+tejun
