@@ -1,57 +1,111 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Tue, 29 Jul 2014 11:31:19 +0100
-Subject: [PATCH v2] iommu/arm-smmu: avoid calling request_irq in atomic
- context
-In-Reply-To: <vnkwoaw9oxje.fsf@mitchelh-linux.qualcomm.com>
-References: <1406572692-27460-1-git-send-email-mitchelh@codeaurora.org>
- <20140728190327.GU15536@arm.com>
- <vnkwoaw9oxje.fsf@mitchelh-linux.qualcomm.com>
-Message-ID: <20140729103119.GC9245@arm.com>
+From: tomasz.figa@gmail.com (Tomasz Figa)
+Date: Tue, 29 Jul 2014 12:31:51 +0200
+Subject: [PATCH v8 3/6] ARM: dts: Exynos: add CPU OPP and regulator supply
+ property
+In-Reply-To: <1406611711-25112-4-git-send-email-thomas.ab@samsung.com>
+References: <1406611711-25112-1-git-send-email-thomas.ab@samsung.com>
+ <1406611711-25112-4-git-send-email-thomas.ab@samsung.com>
+Message-ID: <53D77817.7030605@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jul 29, 2014 at 12:48:05AM +0100, Mitchel Humpherys wrote:
-> On Mon, Jul 28 2014 at 12:03:27 PM, Will Deacon <will.deacon@arm.com> wrote:
-> >> @@ -1203,12 +1190,22 @@ static int arm_smmu_attach_dev(struct iommu_domain *domain, struct device *dev)
-> >>  	}
-> >>  	spin_unlock_irqrestore(&smmu_domain->lock, flags);
-> >>  
-> >> +	irq = smmu->irqs[smmu->num_global_irqs + cfg->irptndx];
-> >> +	ret = request_irq(irq, arm_smmu_context_fault, IRQF_SHARED,
-> >> +			  "arm-smmu-context-fault", domain);
-> >> +	if (IS_ERR_VALUE(ret)) {
-> >> +		dev_err(smmu->dev, "failed to request context IRQ %d (%u)\n",
-> >> +			cfg->irptndx, irq);
-> >> +		cfg->irptndx = INVALID_IRPTNDX;
-> >> +		return ret;
-> >> +	}
-> >
-> > This changes the driver behaviour, so we'll request an IRQ for the domain
-> > *every* time a master is successfuly added to the domain, as opposed to
-> > the first time a master is added (when we can do the lazy init).
-> 
-> Woops, you're absolutely right. Good catch.
-> 
-> >
-> > Maybe we could rework the code so that it looks like:
-> >
-> >   dom_smmu = ACCESS_ONCE(&smmu_domain->smmu);
-> 
-> Why do we need an ACCESS_ONCE here? I thought the purpose of ACCESS_ONCE
-> was to prevent the compiler from optimizing away the access (like a
-> variable being pulled out of a for-loop because it's not modified within
-> the loop (but could be modified on another thread)), but since we
-> haven't accessed smmu_domain->smmu before this point and your proposed
-> re-check below will be on the other side of a spinlock how could the
-> compiler optimize it away?
+Hi Thomas,
 
-The issue is that we have a reader and a writer for the smmu pointer
-operating concurrently. For that to work, we need single-copy atomicity
-and we also need to suppress some GCC optimisations (for example, the case
-where it can move an assignment clause from an else block before the if).
+Other than the same question about 400 MHz OPP for Exynos4210, I have
+also few more inline.
 
-In this case, we're probably alright but I think we should keep this
-ACCESS_ONCE and also add one to arm_smmu_init_domain_context on the
-assignment side.
+On 29.07.2014 07:28, Thomas Abraham wrote:
+> For Exynos 4210/5250/5420 based platforms, add CPU operating points and CPU
+> regulator supply properties for migrating from Exynos specific cpufreq driver
+> to using generic cpufreq drivers.
+> 
+> Cc: Kukjin Kim <kgene.kim@samsung.com>
+> Signed-off-by: Thomas Abraham <thomas.ab@samsung.com>
+> ---
+>  arch/arm/boot/dts/exynos4210-origen.dts         |    6 ++++
+>  arch/arm/boot/dts/exynos4210-trats.dts          |    6 ++++
+>  arch/arm/boot/dts/exynos4210-universal_c210.dts |    6 ++++
+>  arch/arm/boot/dts/exynos4210.dtsi               |   12 +++++++
+>  arch/arm/boot/dts/exynos5250-arndale.dts        |    6 ++++
+>  arch/arm/boot/dts/exynos5250-cros-common.dtsi   |    6 ++++
+>  arch/arm/boot/dts/exynos5250-smdk5250.dts       |    6 ++++
+>  arch/arm/boot/dts/exynos5250.dtsi               |   23 ++++++++++++++
+>  arch/arm/boot/dts/exynos5420-smdk5420.dts       |    6 ++++
 
-Will
+There are more Exynos5420-based boards supported in mainline. If you do
+not have necessary data and/or hardware to fully enable the new driver
+on them, you should add responsible people on Cc list, so at least they
+know they have one more item on their TODO list. Added them for you.
+
+>  arch/arm/boot/dts/exynos5420.dtsi               |   38 +++++++++++++++++++++++
+>  10 files changed, 115 insertions(+)
+
+[snip]
+
+> diff --git a/arch/arm/boot/dts/exynos5250.dtsi b/arch/arm/boot/dts/exynos5250.dtsi
+> index 492e1ef..876247a 100644
+> --- a/arch/arm/boot/dts/exynos5250.dtsi
+> +++ b/arch/arm/boot/dts/exynos5250.dtsi
+> @@ -63,6 +63,29 @@
+>  			compatible = "arm,cortex-a15";
+>  			reg = <0>;
+>  			clock-frequency = <1700000000>;
+> +
+> +			clocks = <&clock CLK_ARM_CLK>;
+> +			clock-names = "cpu";
+> +			clock-latency = <200000>;
+
+Where does this latency value comes from? How did you calculate it?
+
+For example, on Exynos4210, for all operating points added by your
+patches, the highest PLL locking latency will be 60uS, because the
+highest PDIV value would be 6 and PLL lock time is PDIV*240 ticks of 24
+MHz reference clock.
+
+> +
+> +			operating-points = <
+> +				1700000 1300000
+> +				1600000 1250000
+
+[snip]
+
+> diff --git a/arch/arm/boot/dts/exynos5420-smdk5420.dts b/arch/arm/boot/dts/exynos5420-smdk5420.dts
+> index 6052aa9..084e587 100644
+> --- a/arch/arm/boot/dts/exynos5420-smdk5420.dts
+> +++ b/arch/arm/boot/dts/exynos5420-smdk5420.dts
+> @@ -24,6 +24,12 @@
+>  		bootargs = "console=ttySAC2,115200 init=/linuxrc";
+>  	};
+>  
+> +	cpus {
+
+Is there no regulator for cpu0?
+
+> +		cpu at 4 {
+> +			cpu0-supply = <&buck6_reg>;
+> +		};
+> +	};
+> +
+>  	fixed-rate-clocks {
+>  		oscclk {
+>  			compatible = "samsung,exynos5420-oscclk";
+> diff --git a/arch/arm/boot/dts/exynos5420.dtsi b/arch/arm/boot/dts/exynos5420.dtsi
+> index cb2b70e..1116d55 100644
+> --- a/arch/arm/boot/dts/exynos5420.dtsi
+> +++ b/arch/arm/boot/dts/exynos5420.dtsi
+
+[snip]
+
+>  
+>  		cpu1: cpu at 1 {
+> @@ -69,6 +87,7 @@
+>  			reg = <0x1>;
+>  			clock-frequency = <1800000000>;
+>  			cci-control-port = <&cci_control1>;
+> +			clock-latency = <200000>;
+
+Do you need to specify this property for every CPU or rather just for
+those which have operating points specified?
+
+Best regards,
+Tomasz
