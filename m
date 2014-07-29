@@ -1,112 +1,82 @@
-From: christoffer.dall@linaro.org (Christoffer Dall)
-Date: Tue, 29 Jul 2014 14:37:38 +0200
-Subject: [PATCH 19/19] Documentation: ACPI for ARM64
-In-Reply-To: <20140729112824.GM2576@leverpostej>
-References: <1406206825-15590-1-git-send-email-hanjun.guo@linaro.org>
- <1406206825-15590-20-git-send-email-hanjun.guo@linaro.org>
- <CAOesGMhKHGkVK3dOLXXx9GQBMxDmjBu1WDBgHmwdGe1UK3jfcg@mail.gmail.com>
- <20140728100654.GC24078@leverpostej>
- <20140728164459.GD32359@quad.lixom.net>
- <20140729102940.GB18250@cbox> <20140729105543.GL2576@leverpostej>
- <20140729112824.GM2576@leverpostej>
-Message-ID: <CAMJs5B_Ye1eXsvJAKWnHRxC4jnpcXMcqHE+GgOGO7MHtPcsSQA@mail.gmail.com>
+From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
+Date: Tue, 29 Jul 2014 14:38:24 +0200
+Subject: [PATCH v3 0/2] usb: fix controller-PHY binding for OMAP3 platform
+In-Reply-To: <53CF7978.4090709@ti.com>
+References: <1387209225-11520-1-git-send-email-kishon@ti.com>
+ <20140721151557.GH6852@saruman.home> <53CF7978.4090709@ti.com>
+Message-ID: <14357891.vooz1N5zDC@avalon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 29 July 2014 13:28, Mark Rutland <mark.rutland@arm.com> wrote:
-> On Tue, Jul 29, 2014 at 11:55:43AM +0100, Mark Rutland wrote:
->> On Tue, Jul 29, 2014 at 11:29:40AM +0100, Christoffer Dall wrote:
->> > On Mon, Jul 28, 2014 at 09:44:59AM -0700, Olof Johansson wrote:
->> > > On Mon, Jul 28, 2014 at 11:06:54AM +0100, Mark Rutland wrote:
->> >
->> > [...]
->> >
->> > > > >
->> > > > > > +Relationship with Device Tree
->> > > > > > +-----------------------------
->> > > > > > +
->> > > > > > +ACPI support in drivers and subsystems for ARMv8 should never be mutually
->> > > > > > +exclusive with DT support at compile time.
->> > > > > > +
->> > > > > > +At boot time the kernel will only use one description method depending on
->> > > > > > +parameters passed from the bootloader.
->> > > > >
->> > > > > Possibly overriden by kernel bootargs. And as debated for quite a
->> > > > > while earlier this year, acpi should still default to off -- if a DT
->> > > > > and ACPI are both passed in, DT should at this time be given priority.
->> > > >
->> > > > Why? I really don't see the logic in doing that.
->> > >
->> > > Seems like I am replying to your emails in reverse order.
->> > >
->> > > > Currently the kernel can only boot using DT, so DT will be used even if
->> > > > ACPI is present. In the presence of ACPI support in the kernel, ACPI
->> > > > would be used on said systems.
->> > >
->> > > For all the reasons we hashed out earlier this year: We can't trust that
->> > > vendors will know how to do ACPI from day one, so instead of loading up the
->> > > kernel with lots of quirks and workarounds, we'll default to not using it until
->> > > we're at a point where things look mature enough.
->> > >
->> > > The alternative is to keep this patch set out of the kernel. We can do that
->> > > too, but I don't think that really helps anyone.
->> > >
->> > > > From the discussions at the last Linaro Connect, this was seen as
->> > > > important for virtual machines which want to provide ACPI services to
->> > > > guests while still being able to boot DT-only kernels. I'll leave it to
->> > > > Grant, Rob, and Christoffer to cover that.
->> > >
->> > > Ok, waiting to see what they have to say then.
->> > >
->> >
->> > Hmm, a virtual machine implementaion may provide either a DT or ACPI (or
->> > both).  I think the point at Linaro Connect was that for a first cut,
->> > there is no obvious need to provide ACPI to VMs and to be spec
->> > compliant, server kernels must be able to boot with DT-only.  In most
->> > cases such systems will only access a few limited emulated devices
->> > (UART, GIC, RTC, flash controller) and VirtIO devices, which should just
->> > work using DT only.
->> >
->> > People are talking about adding ACPI for VM guests as well for various
->> > reasons (device passthrough for example) in which case I would always
->> > expect people to run UEFI inside their guests too (perhaps this is not
->> > 100% true in the case of Xen fast-boot scenarios though) and I would
->> > expect Linux to only see the little stub DT and ACPI.
->> >
->> > Does this clarify anything or add futher to the confusion?
->>
->> I was under the impression that there was a case where we'd have a DT
->> with HW description in a VM which also had ACPI tables, to enable a
->> kernel without ACPI support to boot in said VM (albeit with reduced
->> functionality).
->>
->> I may have got confused since the VM standards discussion at LCA-14.
->
-> I took a look at the video [1,2] of said session [3], and it looks like
-> I was the one arguing for the case of full description in both DT and
-> ACPI, so either I was confused or I've forgotten some hallway
-> discussion.
->
-> I think my reasoning was somewhat flawed; if the hypervisor defaults to
-> providing DT, with an option to use ACPI in certain cases (where not all
-> guests would be expected to work), then that would cover the "grab an
-> iso, it just works?" use case for Linux images while allowing for
-> the cases where people want ACPI in the VM.
->
-> The only issue with that would be catering for OSs which support ACPI
-> but not DT or whose DT support is not Linux-compatible.
->
-So I think this is where the spec is really useful.  Either you're
-spec compliant or you're not.  Distro images will need to support DT
-if they're spec compliant to v1 of the spec (yes, it's on my todo list
-to publish this properly, but the hold up is not all my fault).
+On Wednesday 23 July 2014 14:29:36 Kishon Vijay Abraham I wrote:
+> On Monday 21 July 2014 08:45 PM, Felipe Balbi wrote:
+> > On Mon, Jul 21, 2014 at 05:04:57PM +0200, Laurent Pinchart wrote:
+> >> Hi Felipe,
+> >> 
+> >> What happened to these two patches ?
+> > 
+> > looks like I lost them.
+> > 
+> >> On Monday 16 December 2013 17:48:29 Felipe Balbi wrote:
+> >>> On Mon, Dec 16, 2013 at 02:38:27PM -0800, Tony Lindgren wrote:
+> >>>> * Felipe Balbi <balbi@ti.com> [131216 13:31]:
+> >>>>> On Mon, Dec 16, 2013 at 09:23:43PM +0530, Kishon Vijay Abraham I 
+wrote:
+> >>>>>> After the platform devices are created using PLATFORM_DEVID_AUTO, the
+> >>>>>> device names given in usb_bind_phy (in board file) does not match
+> >>>>>> with the actual device name causing the USB PHY library not to return
+> >>>>>> the PHY reference when the MUSB controller request for the PHY in the
+> >>>>>> non-dt boot case.
+> >>>>>> So removed creating platform devices using PLATFORM_DEVID_AUTO in
+> >>>>>> omap2430.c.
+> >>>>>> 
+> >>>>>> Did enumeration testing in omap3 beagle.
+> >>>>>> 
+> >>>>>> Changes from v2:
+> >>>>>> * Fixed the commit log
+> >>>>>> 
+> >>>>>> Changes from v1:
+> >>>>>> * refreshed to the latested mainline kernel
+> >>>>>> * added musb_put_id from omap2430 remove.
+> >>>>> 
+> >>>>> Tony, how do you want to handle this ? You want me to provide you a
+> >>>>> branch which we both merge ?
+> >>>> 
+> >>>> Yes that would be great thanks. For the mach-omap2 touching parts:
+> >>>> 
+> >>>> Acked-by: Tony Lindgren <tony@atomide.com>
+> >>> 
+> >>> Here it is, let me know if you prefer a signed tag:
+> >>> 
+> >>> The following changes since commit 
+6ce4eac1f600b34f2f7f58f9cd8f0503d79e42ae:
+> >>>   Linux 3.13-rc1 (2013-11-22 11:30:55 -0800)
+> >>> 
+> >>> are available in the git repository at:
+> >>>   git://git.kernel.org/pub/scm/linux/kernel/git/balbi/usb.git
+> >>> 
+> >>> usb-phy-binding-omap3
+> >>> 
+> >>> for you to fetch changes up to 23ada3130cf4e56acb86fdff4c26113188d52d18:
+> >>>   arm: omap: remove *.auto* from device names given in usb_bind_phy
+> >>> 
+> >>> (2013-12-16 17:44:43 -0600)
+> >>> 
+> >>> ----------------------------------------------------------------
+> >>> 
+> >>> Kishon Vijay Abraham I (2):
+> >>>       usb: musb: omap: remove using PLATFORM_DEVID_AUTO in omap2430.c
+> >>>       arm: omap: remove *.auto* from device names given in usb_bind_phy
+> > 
+> > Kishon, are these still valid ?
+> 
+> Looks like board-2430sdp.c got removed. Apart from that the reset of the
+> patch series is still applicable for non-dt boot.
 
-A v2 of the spec may mention ACPI, and it may not, and we can deal
-with that problem then.
+Felipe, do you plan to apply the patch without the baord-2430sdp.c change, or 
+would you like Kishon to rebase and resubmit it ?
 
-For reference, Red Hat's current arguing point for ACPI in VMs is
-hotplug of things like CPUs and memory for very large VMs, but I
-haven't thought too carefully about this just yet, as I don't have a
-100+ core ARM 64-bit hardware lying around...
+-- 
+Regards,
 
--Christoffer
+Laurent Pinchart
