@@ -1,59 +1,62 @@
-From: haojian.zhuang@gmail.com (Haojian Zhuang)
-Date: Tue, 29 Jul 2014 09:25:11 +0800
-Subject: [PATCH v2 0/6] Migrate PXA27x platforms to clock framework
-In-Reply-To: <87k370o61q.fsf@free.fr>
-References: <1405353263-13424-1-git-send-email-robert.jarzmik@free.fr>
- <87k376vadk.fsf@free.fr> <20140726004212.4791.52407@quantum>
- <87k370o61q.fsf@free.fr>
-Message-ID: <CAN1soZyk_2pd97XU9_n-W1cGst0-rORNMNQpUB5gOVO2hqqSOg@mail.gmail.com>
+From: mturquette@linaro.org (Mike Turquette)
+Date: Mon, 28 Jul 2014 18:27:53 -0700
+Subject: [PATCH RFC 2/2] regulator: twl: Re-add clk32kg to get wifi working
+In-Reply-To: <53D12044.1060500@kpanic.de>
+References: <1405338655-18415-1-git-send-email-sassmann@kpanic.de>
+ <1405338655-18415-3-git-send-email-sassmann@kpanic.de>
+ <20140714120051.GF6800@sirena.org.uk> <53C3C77F.7080208@kpanic.de>
+ <20140714181338.GR6800@sirena.org.uk> <53C525A2.8080609@kpanic.de>
+ <20140716212340.GZ17528@sirena.org.uk> <53D12044.1060500@kpanic.de>
+Message-ID: <20140729012753.4906.94396@quantum>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Jul 26, 2014 at 4:52 PM, Robert Jarzmik <robert.jarzmik@free.fr> wrote:
-> Mike Turquette <mturquette@linaro.org> writes:
->
->> Quoting Robert Jarzmik (2014-07-21 11:23:51)
->>> Robert Jarzmik <robert.jarzmik@free.fr> writes:
->>>
->>> > This is the second opus of this serie.
->>>
->>> Ping ?
->>
->> Hi Robert,
->>
->> Overall the series looks good to me. The only problem I see is that
->> somewhere in the use of the PARENTS() macro there is a section mismatch
->> introduced. I spent about 5 minutes looking at it and gave up. This
->> problem introduces 26 section mismatch warnings building
->> colibri_pxa270_defconfig.
-> OK Mike, I'll fix this. This is probably because pxa27x_clocks array is not
-> __init, and it references parents which are __init. I was lazy letting
-> pxa27x_clocks not __init because I reuse the internal fields "hw" and "gate->hw"
-> later (hence I didn't leave the __init).
-> This is a bit dirty and I'll launder it.
->
-> Moreover, I have one fix which I had fixed wrt boot ordering : the
-> postcore_init() must die. The reason behind is that I have no guarantee of
-> ordering between clocks init and clocksource init, and clocksource relies on
-> clocks.
->
-> The right way will be AFAIK to call the core clocks init :
->  - within the device-tree initialization function : pxa27x_dt_clocks_init()
->  calls pxa27x_clocks_init9)
->  - directly from pxa27x_init() or pxa_timer_init() in non-device tree setup
->
->> Once those are fixed up then I will be happy to take this series. Do you
->> want me to take all six patches through the clk tree, including the
->> arm/arm stuff?
-> I would feel more comfortable if :
->  - you take the 4 first ones (3 clock ones + 1 arm pxa header bit definitions)
->  - Haojian takes the last 2 ones (pxa ones)
->
-I prefer that all these patches could go through clock tree. I just
-want to avoid
-build issue.
+Quoting Stefan Assmann (2014-07-24 08:03:32)
+> +#define to_twl6030_desc(_hw) container_of(_hw, struct twl6030_desc, hw)
+> +
+> +static int twl6030_clk32kg_enable(struct clk_hw *hw)
+> +{
+> +       struct twl6030_desc *desc = to_twl6030_desc(hw);
+> +       int ret;
+> +
+> +       ret = twl_i2c_write_u8(TWL_MODULE_PM_RECEIVER,
+> +                              TWL6030_GRP_CON << TWL6030_CFG_STATE_GRP_SHIFT |
+> +                              TWL6030_CFG_STATE_ON,
+> +                              TWL6030_PM_RECEIVER_CLK32KG_CFG_STATE);
+> +       if (ret == 0)
+> +               desc->enabled = true;
+> +
+> +       return ret;
+> +}
+> +void twl6030_clk32kg_disable(struct clk_hw *hw)
+> +{
+> +       struct twl6030_desc *desc = to_twl6030_desc(hw);
+> +
+> +       twl_i2c_write_u8(TWL_MODULE_PM_RECEIVER,
+> +                        TWL6030_GRP_CON << TWL6030_CFG_STATE_GRP_SHIFT |
+> +                        TWL6030_CFG_STATE_OFF,
+> +                        TWL6030_PM_RECEIVER_CLK32KG_CFG_STATE);
+> +       desc->enabled = false;
+> +}
+> +
+> +static int twl6030_clk32kg_is_enabled(struct clk_hw *hw)
+> +{
+> +       struct twl6030_desc *desc = to_twl6030_desc(hw);
+> +
+> +       return desc->enabled;
+> +}
+> +
+> +static const struct clk_ops twl6030_clk32kg_ops = {
+> +       .enable         = twl6030_clk32kg_enable,
+> +       .disable        = twl6030_clk32kg_disable,
+> +       .is_enabled     = twl6030_clk32kg_is_enabled,
+> +};
 
-Acked-by: Haojian Zhuang <haojian.zhuang@gmail.com>
+All three above need to be converted from {en|dis}able to {un}prepare.
+The reason is that clk_enable/clk_disable must not sleep and of course
+i2c transactions might do just that.
 
-Regards
-Haojian
+Please Cc me on the next version :-)
+
+Regards,
+Mike
