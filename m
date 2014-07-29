@@ -1,57 +1,46 @@
-From: l.stach@pengutronix.de (Lucas Stach)
-Date: Tue, 29 Jul 2014 10:14:51 +0200
-Subject: [PATCH 2/3] ARM: dts: nitrogen6x: add hdmi
-In-Reply-To: <20140729074833.GD24750@dragon>
-References: <1406285393-23545-1-git-send-email-l.stach@pengutronix.de>
- <1406285393-23545-2-git-send-email-l.stach@pengutronix.de>
- <CAOMZO5BUDMfwDi944brOQoiNkWG_5yBn0XPTPYsLh8_cpyDc3w@mail.gmail.com>
- <1406296528.4643.22.camel@weser.hi.pengutronix.de>
- <20140729074833.GD24750@dragon>
-Message-ID: <1406621691.4565.1.camel@weser.hi.pengutronix.de>
+From: sfr@canb.auug.org.au (Stephen Rothwell)
+Date: Tue, 29 Jul 2014 18:19:49 +1000
+Subject: linux-next: manual merge of the gpio tree with the arm-soc tree
+Message-ID: <20140729181949.427a7fb5@canb.auug.org.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am Dienstag, den 29.07.2014, 15:48 +0800 schrieb Shawn Guo:
-> On Fri, Jul 25, 2014 at 03:55:28PM +0200, Lucas Stach wrote:
-> > Am Freitag, den 25.07.2014, 10:48 -0300 schrieb Fabio Estevam:
-> > > Hi Lucas,
-> > > 
-> > > On Fri, Jul 25, 2014 at 7:49 AM, Lucas Stach <l.stach@pengutronix.de> wrote:
-> > > > From: Michael Olbrich <m.olbrich@pengutronix.de>
-> > > >
-> > > > Signed-off-by: Michael Olbrich <m.olbrich@pengutronix.de>
-> > > > Signed-off-by: Lucas Stach <l.stach@pengutronix.de>
-> > > > ---
-> > > >  arch/arm/boot/dts/imx6qdl-nitrogen6x.dtsi | 6 ++++++
-> > > >  1 file changed, 6 insertions(+)
-> > > >
-> > > > diff --git a/arch/arm/boot/dts/imx6qdl-nitrogen6x.dtsi b/arch/arm/boot/dts/imx6qdl-nitrogen6x.dtsi
-> > > > index 3362d2600d85..4e27cf9f3d2e 100644
-> > > > --- a/arch/arm/boot/dts/imx6qdl-nitrogen6x.dtsi
-> > > > +++ b/arch/arm/boot/dts/imx6qdl-nitrogen6x.dtsi
-> > > > @@ -174,6 +174,12 @@
-> > > >         status = "okay";
-> > > >  };
-> > > >
-> > > > +&hdmi {
-> > > > +       ddc-i2c-bus = <&i2c2>;
-> > > > +       hpd-unreliable;
-> > > 
-> > > I don't see this property available in linux-next yet. Are we missing
-> > > the patch that adds it?
-> > > 
-> > Right, we are missing a patch here. It already has been posted to the
-> > list long time ago, but obviously fell through the cracks. Thanks for
-> > spotting.
-> 
-> So should I drop the property and apply the patches or just ignore the
-> series?
-> 
-Please drop the property and apply. I'll take care of re-adding this
-when the relevant imx-drm patches are in.
+Hi Linus,
 
-Regards,
-Lucas
+Today's linux-next merge of the gpio tree got a conflict in
+arch/arm/mach-tegra/board-paz00.c between commit a0524acc94c9 ("ARM:
+tegra: Sort includes alphabetically") from the arm-soc tree and commit
+0a6d315827ee ("gpio: split gpiod board registration into machine
+header") from the gpio tree.
+
+I fixed it up (see below) and can carry the fix as necessary (no action
+is required).
+
 -- 
-Pengutronix e.K.             | Lucas Stach                 |
-Industrial Linux Solutions   | http://www.pengutronix.de/  |
+Cheers,
+Stephen Rothwell                    sfr at canb.auug.org.au
+
+diff --cc arch/arm/mach-tegra/board-paz00.c
+index bb4782a32713,91fd858ced0d..000000000000
+--- a/arch/arm/mach-tegra/board-paz00.c
++++ b/arch/arm/mach-tegra/board-paz00.c
+@@@ -17,10 -17,9 +17,10 @@@
+   *
+   */
+  
+- #include <linux/gpio/driver.h>
+ -#include <linux/platform_device.h>
++ #include <linux/gpio/machine.h>
+ +#include <linux/platform_device.h>
+  #include <linux/rfkill-gpio.h>
+ +
+  #include "board.h"
+  
+  static struct rfkill_gpio_platform_data wifi_rfkill_platform_data = {
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140729/f81142a9/attachment.sig>
