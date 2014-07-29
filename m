@@ -1,138 +1,48 @@
-From: ta.omasab@gmail.com (Thomas Abraham)
-Date: Tue, 29 Jul 2014 17:30:20 +0530
-Subject: [PATCH v8 3/6] ARM: dts: Exynos: add CPU OPP and regulator supply
- property
-In-Reply-To: <53D77817.7030605@gmail.com>
-References: <1406611711-25112-1-git-send-email-thomas.ab@samsung.com>
- <1406611711-25112-4-git-send-email-thomas.ab@samsung.com>
- <53D77817.7030605@gmail.com>
-Message-ID: <CAJuA9ahAmPytu0Oncnj7Ytm+UFCfiekdFnsHu1N6js=NNsypJQ@mail.gmail.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Tue, 29 Jul 2014 14:00:50 +0200
+Subject: use IORESOURCE_REG resource type for non-translatable addresses
+ in DT
+In-Reply-To: <53D788A7.4020303@mm-sol.com>
+References: <53D788A7.4020303@mm-sol.com>
+Message-ID: <3794875.CZFbAag5Sv@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Tomasz,
+On Tuesday 29 July 2014 14:42:31 Stanimir Varbanov wrote:
+>         taddr = of_translate_address(dev, addrp);
+> -       if (taddr == OF_BAD_ADDR)
+> -               return -EINVAL;
+> +       /*
+> +        * if the address is non-translatable to cpu physical address
+> +        * fallback to a IORESOURCE_REG resource.
+> +        */
+> +       if (taddr == OF_BAD_ADDR) {
+> +               memset(r, 0, sizeof(*r));
+> +               taddr = of_read_number(addrp, 1);
+> +               if (taddr == OF_BAD_ADDR)
+> +                       return -EINVAL;
+> +               r->start = taddr;
+> +               r->end = taddr + size - 1;
+> +               r->flags = IORESOURCE_REG;
+> +               r->name = name ? name : dev->full_name;
+> +               return 0;
+> +       }
+> +
 
-On Tue, Jul 29, 2014 at 4:01 PM, Tomasz Figa <tomasz.figa@gmail.com> wrote:
-> Hi Thomas,
->
-> Other than the same question about 400 MHz OPP for Exynos4210, I have
-> also few more inline.
->
-> On 29.07.2014 07:28, Thomas Abraham wrote:
->> For Exynos 4210/5250/5420 based platforms, add CPU operating points and CPU
->> regulator supply properties for migrating from Exynos specific cpufreq driver
->> to using generic cpufreq drivers.
->>
->> Cc: Kukjin Kim <kgene.kim@samsung.com>
->> Signed-off-by: Thomas Abraham <thomas.ab@samsung.com>
->> ---
->>  arch/arm/boot/dts/exynos4210-origen.dts         |    6 ++++
->>  arch/arm/boot/dts/exynos4210-trats.dts          |    6 ++++
->>  arch/arm/boot/dts/exynos4210-universal_c210.dts |    6 ++++
->>  arch/arm/boot/dts/exynos4210.dtsi               |   12 +++++++
->>  arch/arm/boot/dts/exynos5250-arndale.dts        |    6 ++++
->>  arch/arm/boot/dts/exynos5250-cros-common.dtsi   |    6 ++++
->>  arch/arm/boot/dts/exynos5250-smdk5250.dts       |    6 ++++
->>  arch/arm/boot/dts/exynos5250.dtsi               |   23 ++++++++++++++
->>  arch/arm/boot/dts/exynos5420-smdk5420.dts       |    6 ++++
->
-> There are more Exynos5420-based boards supported in mainline. If you do
-> not have necessary data and/or hardware to fully enable the new driver
-> on them, you should add responsible people on Cc list, so at least they
-> know they have one more item on their TODO list. Added them for you.
+I don't think that everything returning OF_BAD_ADDR makes sense
+to turn into IORESOURCE_REG. It could be an e.g. invalid DT
+representation, a node with #size-cells=<0>, or it could be
+something that gets translated one or more nodes up in the
+tree before it reaches a bus without a ranges property.
 
-Thanks!. Will do that next time.
+Also, you should not rely on #address-cells being hardcoded
+to <1> above.
 
->
->>  arch/arm/boot/dts/exynos5420.dtsi               |   38 +++++++++++++++++++++++
->>  10 files changed, 115 insertions(+)
->
-> [snip]
->
->> diff --git a/arch/arm/boot/dts/exynos5250.dtsi b/arch/arm/boot/dts/exynos5250.dtsi
->> index 492e1ef..876247a 100644
->> --- a/arch/arm/boot/dts/exynos5250.dtsi
->> +++ b/arch/arm/boot/dts/exynos5250.dtsi
->> @@ -63,6 +63,29 @@
->>                       compatible = "arm,cortex-a15";
->>                       reg = <0>;
->>                       clock-frequency = <1700000000>;
->> +
->> +                     clocks = <&clock CLK_ARM_CLK>;
->> +                     clock-names = "cpu";
->> +                     clock-latency = <200000>;
->
-> Where does this latency value comes from? How did you calculate it?
->
-> For example, on Exynos4210, for all operating points added by your
-> patches, the highest PLL locking latency will be 60uS, because the
-> highest PDIV value would be 6 and PLL lock time is PDIV*240 ticks of 24
-> MHz reference clock.
+How about modifying of_get_address() rather than
+__of_address_to_resource() instead? You could introduce
+a new of_bus entry for each bus you expect to return
+an IORESOURCE_REG, or you could change of_bus_default_get_flags
+to return IORESOURCE_REG if the parent node has no ranges property
+and is not the root node.
 
-Since the CPU clock is a composite clock with dividers and muxes, the
-latency includes the settling time for these clock blocks as well. I
-have not made any measurements of the clock transition latency.
-
->
->> +
->> +                     operating-points = <
->> +                             1700000 1300000
->> +                             1600000 1250000
->
-> [snip]
->
->> diff --git a/arch/arm/boot/dts/exynos5420-smdk5420.dts b/arch/arm/boot/dts/exynos5420-smdk5420.dts
->> index 6052aa9..084e587 100644
->> --- a/arch/arm/boot/dts/exynos5420-smdk5420.dts
->> +++ b/arch/arm/boot/dts/exynos5420-smdk5420.dts
->> @@ -24,6 +24,12 @@
->>               bootargs = "console=ttySAC2,115200 init=/linuxrc";
->>       };
->>
->> +     cpus {
->
-> Is there no regulator for cpu0?
-
-This was a mistake. I did not intend to add regulator for cpu4 as well
-but somehow I missed it. I will remove it in the next version.
-
->
->> +             cpu at 4 {
->> +                     cpu0-supply = <&buck6_reg>;
->> +             };
->> +     };
->> +
->>       fixed-rate-clocks {
->>               oscclk {
->>                       compatible = "samsung,exynos5420-oscclk";
->> diff --git a/arch/arm/boot/dts/exynos5420.dtsi b/arch/arm/boot/dts/exynos5420.dtsi
->> index cb2b70e..1116d55 100644
->> --- a/arch/arm/boot/dts/exynos5420.dtsi
->> +++ b/arch/arm/boot/dts/exynos5420.dtsi
->
-> [snip]
->
->>
->>               cpu1: cpu at 1 {
->> @@ -69,6 +87,7 @@
->>                       reg = <0x1>;
->>                       clock-frequency = <1800000000>;
->>                       cci-control-port = <&cci_control1>;
->> +                     clock-latency = <200000>;
->
-> Do you need to specify this property for every CPU or rather just for
-> those which have operating points specified?
-
-The big.little cpufreq driver expects each CPU to have the clock
-latency specified.
-
-Thanks,
-Thomas.
-
->
-> Best regards,
-> Tomasz
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-pm" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+	Arnd
