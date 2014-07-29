@@ -1,161 +1,120 @@
-From: achandran@mvista.com (Arun Chandran)
-Date: Tue, 29 Jul 2014 18:02:23 +0530
-Subject: Kexec on arm64
-In-Reply-To: <1406592548.28348.49.camel@smoke>
-References: <CAL85gmC9LLcN_uxMY1bM5kLx=N7rZGdGO3bmGHeUVo=Rqgk8uw@mail.gmail.com>
- <1405551861.7262.26.camel@smoke>
- <CAFdej03nixSU=3h+HYk2E3Onb2P3--Di0GM+wCwLS6ZNH7UjEQ@mail.gmail.com>
- <CAFdej00J2mJwcg2Cy6CHVuuQZ4uQ2zZg8oErGPi0uPejievB+Q@mail.gmail.com>
- <1406162287.4062.39.camel@smoke>
- <20140724093603.GC4079@leverpostej>
- <1406247468.4062.59.camel@smoke>
- <CAFdej01w_pE6vv+13cCCyfDs4Rbdkzx4CMUj9q97HBKV0B53ow@mail.gmail.com>
- <1406333901.4062.69.camel@smoke>
- <CAFdej014ohCFYvoUAXWiYGb4_4UmSY2G1MH-NEE_cF1cC-6Mow@mail.gmail.com>
- <20140728153812.GA2576@leverpostej>
- <1406592548.28348.49.camel@smoke>
-Message-ID: <CAFdej00is0kC-1q5uMNJL5APL1WezdNBg0jASgwYamsg5NO_Tg@mail.gmail.com>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Tue, 29 Jul 2014 13:32:21 +0100
+Subject: [PATCH v15 07/12] ARM: dts: append hip04 dts
+In-Reply-To: <CAD6h2NQLgB1=8+WznE19rjsFwm3XWPUYEbDuPCbKbWjseRCBDg@mail.gmail.com>
+References: <1406555876-11989-1-git-send-email-haojian.zhuang@linaro.org>
+ <1406555876-11989-8-git-send-email-haojian.zhuang@linaro.org>
+ <20140728180609.GE2576@leverpostej>
+ <CAD6h2NQLgB1=8+WznE19rjsFwm3XWPUYEbDuPCbKbWjseRCBDg@mail.gmail.com>
+Message-ID: <20140729123221.GN2576@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Geoff,
+On Tue, Jul 29, 2014 at 03:44:40AM +0100, Haojian Zhuang wrote:
+> On 29 July 2014 02:06, Mark Rutland <mark.rutland@arm.com> wrote:
+> > On Mon, Jul 28, 2014 at 02:57:51PM +0100, Haojian Zhuang wrote:
+> >> Add hip04-d01.dts & hip04.dtsi for hip04 SoC platform.
+> >>
+> >> Signed-off-by: Haojian Zhuang <haojian.zhuang@linaro.org>
+> >> ---
+> >>  arch/arm/boot/dts/Makefile      |   1 +
+> >>  arch/arm/boot/dts/hip04-d01.dts |  39 ++++++
+> >>  arch/arm/boot/dts/hip04.dtsi    | 267 ++++++++++++++++++++++++++++++++++++++++
+> >>  3 files changed, 307 insertions(+)
+> >>  create mode 100644 arch/arm/boot/dts/hip04-d01.dts
+> >>  create mode 100644 arch/arm/boot/dts/hip04.dtsi
+> >>
+> >> diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
+> >> index 721525e..6587bbf 100644
+> >> --- a/arch/arm/boot/dts/Makefile
+> >> +++ b/arch/arm/boot/dts/Makefile
+> >> @@ -86,6 +86,7 @@ dtb-$(CONFIG_ARCH_HI3xxx) += hi3620-hi4511.dtb
+> >>  dtb-$(CONFIG_ARCH_HIX5HD2) += hix5hd2-dkb.dtb
+> >>  dtb-$(CONFIG_ARCH_HIGHBANK) += highbank.dtb \
+> >>         ecx-2000.dtb
+> >> +dtb-$(CONFIG_ARCH_HIP04) += hip04-d01.dtb
+> >>  dtb-$(CONFIG_ARCH_INTEGRATOR) += integratorap.dtb \
+> >>         integratorcp.dtb
+> >>  dtb-$(CONFIG_ARCH_KEYSTONE) += k2hk-evm.dtb \
+> >> diff --git a/arch/arm/boot/dts/hip04-d01.dts b/arch/arm/boot/dts/hip04-d01.dts
+> >> new file mode 100644
+> >> index 0000000..661c8e5
+> >> --- /dev/null
+> >> +++ b/arch/arm/boot/dts/hip04-d01.dts
+> >> @@ -0,0 +1,39 @@
+> >> +/*
+> >> + *  Copyright (C) 2013-2014 Linaro Ltd.
+> >> + *  Author: Haojian Zhuang <haojian.zhuang@linaro.org>
+> >> + *
+> >> + *  This program is free software; you can redistribute it and/or modify
+> >> + *  it under the terms of the GNU General Public License version 2 as
+> >> + *  publishhed by the Free Software Foundation.
+> >> + */
+> >> +
+> >> +/dts-v1/;
+> >> +
+> >> +/* For bootwrapper */
+> >> +/memreserve/ 0x10c00000 0x00010000;
+> >
+> > How exactly is this bootwrapper used? Is the kernel compiled into it?
+> >
+> > It might make more sense for the wrapper build system to inject
+> > bootwrapper-related properties. Then the DTB is less likely to
+> > amalgamate hacks to workaround differences between versions, and can be
+> > used on systems without a wrapper without throwing away some memory.
+> >
+> 
+> In this platform, we relied on the bootwrapper. If I discard this,
+> I'll fail to bring up all secondary cores.
 
-On Tue, Jul 29, 2014 at 5:39 AM, Geoff Levand <geoff@infradead.org> wrote:
-> Hi,
->
-> On Mon, 2014-07-28 at 16:38 +0100, Mark Rutland wrote:
->> On Mon, Jul 28, 2014 at 04:00:18PM +0100, Arun Chandran wrote:
->> > I have these changes to the code.
->> >         flush_icache_range((unsigned long)reboot_code_buffer,
->> > -               relocate_new_kernel_size);
->> > +               (unsigned long)(reboot_code_buffer + relocate_new_kernel_size));
->
-> Thanks, I introduced this in my last version in an attempt to clean up
-> the code, but on studying setup_restart(), I wonder if we even need to
-> do this icache flush here (see below).
->
->> >         /*
->> >          * Flush any data used by relocate_new_kernel in preparation for
->> > #########
->> > Passing of second variable to flush_icache_range() is wrong
->> > it expects an address not length.
->>
->> A simpler option would be to nuke the entire icache before branching to
->> the new image.
->
-> flush_cache_all(), which is called by setup_restart(), does a 'ic
-> ialluis'.  The ARM says that this will invalidate all instruction caches
-> for the inner shareable domain.  Do we need something more?
->
->> > 2)
->> >
->> > #######
->> > diff --git a/arch/arm64/kernel/process.c b/arch/arm64/kernel/process.c
->> > index 9ed7327..e3fc8d6 100644
->> > --- a/arch/arm64/kernel/process.c
->> > +++ b/arch/arm64/kernel/process.c
->> >
->> > @@ -84,12 +91,17 @@ void soft_restart(unsigned long addr)
->> >  {
->> >         typedef void (*phys_reset_t)(unsigned long);
->> >         phys_reset_t phys_reset;
->> > +       unsigned long jump_addr = addr;
->> > +
->> > +       phys_reset = (phys_reset_t)virt_to_phys(cpu_reset);
->> > +
->> > +       __flush_dcache_area(&jump_addr, 8);
->> > +       __flush_dcache_area(&phys_reset, 8);
->>
->> Are these values really not getting stashed in registers?
->
-> Looking at the disassembled code of soft_restart() from my compiler,
-> addr is being saved on the stack over the call to setup_restart(), which
-> I would expect it to do.
->
-Yes my compiler also saves this in stack
+What loads the boot wrapper into memory, and from where?
 
->> If the compiler is spilling, then we have absolutely no guarantee about
->> any part of the stack. If that's the case, then we can't use the stack
->> at all. These need to be rewritten in asm if the compiler is spilling.
->
-> I think we just need to put the restart addr in a variable and flush
-> that to the PoC.
->
-> Arun, I pushed out a fixed version of soft_restart(), so please try
-> another UP + L3 boot.
->
+In another reply you mentioned you're using UEFI. Is this wrapper
+considered part of your UEFI implementation? If so it should be reserved
+in the UEFI memory map, and there should be no need of memory nodes or
+memreserves -- all that should come from UEFI.
 
-The default code did not work.
+What exactly is the boot wrapper in charge of?
 
-It is working with the change below
+What is the split in responsiblity between the wrapper and the kernel?
 
-###############
-diff --git a/arch/arm64/kernel/machine_kexec.c
-b/arch/arm64/kernel/machine_kexec.c
-index 5632473..7c5f859 100644
---- a/arch/arm64/kernel/machine_kexec.c
-+++ b/arch/arm64/kernel/machine_kexec.c
-@@ -147,12 +147,17 @@ static bool kexec_is_dtb_user(const dtb_t *dtb)
- /**
-  * kexec_list_walk - Helper to walk the kimage page list.
-  */
--
-+static int kexec_kernel_size;
-+#define IMG_SIZE_NONE  0
-+#define KERN_SIZE_FLAG 1
-+#define DTB_SIZE_FLAG  2
- static void kexec_list_walk(void *ctx, unsigned long kimage_head,
-        void (*cb)(void *ctx, unsigned int flag, void *addr, void *dest))
- {
-        void *dest;
-        unsigned long *entry;
-+       int imgsize_flag = IMG_SIZE_NONE;
-+
+[...]
 
-        for (entry = &kimage_head, dest = NULL; ; entry++) {
-                unsigned int flag = *entry & IND_FLAGS;
-@@ -164,10 +169,18 @@ static void kexec_list_walk(void *ctx, unsigned
-long kimage_head,
-                        cb(ctx, flag, addr, NULL);
-                        break;
-                case IND_DESTINATION:
-+                       if (imgsize_flag == IMG_SIZE_NONE) {
-+                               kexec_kernel_size = 0;
-+                               imgsize_flag = KERN_SIZE_FLAG;
-+                       } else if (imgsize_flag == KERN_SIZE_FLAG) {
-+                               imgsize_flag = DTB_SIZE_FLAG;
-+                       }
-                        dest = addr;
-                        cb(ctx, flag, addr, NULL);
-                        break;
-                case IND_SOURCE:
-+                       if (imgsize_flag == KERN_SIZE_FLAG)
-+                               kexec_kernel_size++;
-                        cb(ctx, flag, addr, dest);
-                        dest += PAGE_SIZE;
-                        break;
-@@ -693,5 +706,20 @@ void machine_kexec(struct kimage *image)
+> >> +               };
+> >> +
+> >> +               fabric: fabric {
+> >> +                       compatible = "hisilicon,hip04-fabric";
+> >> +                       reg = <0x302a000 0x1000>;
+> >
+> > How is this going to be used?
+> >
+> 
+> Fabric could configure snoop filter of multiple cluster. I don't have
+> the manual. I only know this.
 
-        kexec_list_walk(NULL, image->head, kexec_list_flush_cb);
+Is this accessible to the non-secure side?
 
-+       /*
-+        * Make sure virtual addresses of new kernel are flushed
-+        * SZ_512K = TEXT_OFFSET
-+        * kexec_kernel = kexec_kernel_size * PAGE_SIZE
-+        * Don't know = (SZ_4M + SZ_1M)
-+        * SZ_4M = not working
-+        * SZ_6M = working
-+        * SZ_8M = working
-+        *
-+        * so chose SZ_4M + SZ_1M; Don't know why this is required
-+        * BSS, stack ??
-+        *
-+        */
-+       __flush_dcache_area((void *)PAGE_OFFSET, SZ_512K +
-(kexec_kernel_size * PAGE_SIZE) + SZ_4M + SZ_1M);
-+
-        soft_restart(reboot_code_buffer_phys);
- }
+If the firmware is currently programming things correctly then we
+shouldn't need this for now.
 
+> >> +               };
+> >> +
+> >> +               dual_timer0: dual_timer at 3000000 {
+> >> +                       compatible = "arm,sp804", "arm,primecell";
+> >> +                       reg = <0x3000000 0x1000>;
+> >> +                       interrupts = <0 224 4>;
+> >> +                       clocks = <&clock HIP04_CLK_50M>;
+> >> +                       clock-names = "apb_pclk";
+> >> +               };
+> >
+> > I thought sp804 had two clocks (one for AMBA and one for the actual
+> > timer). What's going on here?
+> >
+> 
+> If only one clock is configured at here, sp804 driver believes that
+> clk2 is same as clk1.
 
---Arun
+I'm not keen on relying on that. It's arguably a bug in the driver.
+
+Thanks,
+Mark.
