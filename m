@@ -1,81 +1,82 @@
-From: mpa@pengutronix.de (Markus Pargmann)
-Date: Tue, 29 Jul 2014 09:24:46 +0200
-Subject: [PATCH 4/4] gpio: pca953x: Add DT binding for reset gpio
-In-Reply-To: <1406618686-22385-1-git-send-email-mpa@pengutronix.de>
-References: <1406618686-22385-1-git-send-email-mpa@pengutronix.de>
-Message-ID: <1406618686-22385-5-git-send-email-mpa@pengutronix.de>
+From: stefan@agner.ch (Stefan Agner)
+Date: Tue, 29 Jul 2014 09:29:13 +0200
+Subject: [PATCH v3 4/4] can: flexcan: add vf610 support for FlexCAN
+In-Reply-To: <53D67A46.3060202@pengutronix.de>
+References: <cover.1405428166.git.stefan@agner.ch>
+ <ff2ea1726b13dc2ffa3519ce9244f3633cf1420d.1405428166.git.stefan@agner.ch>
+ <53C5398F.2000005@pengutronix.de>
+ <1b8a8ca03b4a160027a79b722f697e25@agner.ch>
+ <601adb6fe47279c115c1cc607365a00e@agner.ch>
+ <53D25C9D.5080803@pengutronix.de>
+ <e88108c655e2c16dc9cf6c4194547e73@agner.ch>
+ <53D67A46.3060202@pengutronix.de>
+Message-ID: <b815c5c1f7faed334d1ed5370d51c180@agner.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The pca953x has a negated reset input. This patch adds a DT binding for
-the reset gpio and resets the chip when it is probed. This will reset
-the device and leave the gpio in the correct state so reset is not
-triggered.
+Am 2014-07-28 18:28, schrieb Marc Kleine-Budde:
+> On 07/28/2014 06:20 PM, Stefan Agner wrote:
+>> I'm not sure whether you really want to keep the FLEXCAN_CTRL_ERR_STATE
+>> commented out...
+> 
+> No, please remove this change and redo the test.
+> 
 
-Signed-off-by: Markus Pargmann <mpa@pengutronix.de>
----
- .../devicetree/bindings/gpio/gpio-pca953x.txt          |  5 +++++
- drivers/gpio/gpio-pca953x.c                            | 18 ++++++++++++++++++
- 2 files changed, 23 insertions(+)
+Ok, removed that change and did the tests again:
 
-diff --git a/Documentation/devicetree/bindings/gpio/gpio-pca953x.txt b/Documentation/devicetree/bindings/gpio/gpio-pca953x.txt
-index eb65157d47f6..57e31414f74d 100644
---- a/Documentation/devicetree/bindings/gpio/gpio-pca953x.txt
-+++ b/Documentation/devicetree/bindings/gpio/gpio-pca953x.txt
-@@ -27,6 +27,10 @@ Required properties:
- 	ti,tca6424
- 	exar,xra1202
- 
-+Optional properties:
-+ - reset-gpios: phandle with arguments identifying the reset gpio. See
-+   Documentation/devicetree/bindings/gpio/gpio.txt for more information
-+
- Example:
- 
- 
-@@ -37,4 +41,5 @@ Example:
- 		pinctrl-0 = <&pinctrl_pca9505>;
- 		interrupt-parent = <&gpio3>;
- 		interrupts = <23 IRQ_TYPE_LEVEL_LOW>;
-+		reset-gpios = <&gpio3 24 GPIO_ACTIVE_LOW>;
- 	};
-diff --git a/drivers/gpio/gpio-pca953x.c b/drivers/gpio/gpio-pca953x.c
-index df5eb6e6be1e..053d8b4702e6 100644
---- a/drivers/gpio/gpio-pca953x.c
-+++ b/drivers/gpio/gpio-pca953x.c
-@@ -11,6 +11,7 @@
-  *  the Free Software Foundation; version 2 of the License.
-  */
- 
-+#include <linux/delay.h>
- #include <linux/module.h>
- #include <linux/init.h>
- #include <linux/gpio.h>
-@@ -660,8 +661,25 @@ static int pca953x_probe(struct i2c_client *client,
- 		invert = pdata->invert;
- 		chip->names = pdata->names;
- 	} else {
-+		struct gpio_desc *reset;
-+
- 		chip->gpio_start = -1;
- 		irq_base = 0;
-+
-+		reset = devm_gpiod_get(&client->dev, "reset");
-+		if (IS_ERR(reset)) {
-+			if (PTR_ERR(reset) == -EPROBE_DEFER)
-+				return -EPROBE_DEFER;
-+			else
-+				dev_info(&client->dev, "Did not find/get a gpio for reset (%ld)\n",
-+						PTR_ERR(reset));
-+		} else {
-+			/* Reset the chip if the reset is wired */
-+			gpiod_direction_output(reset, 0);
-+			udelay(100);
-+			gpiod_set_value(reset, 1);
-+			udelay(100);
-+		}
- 	}
- 
- 	chip->client = client;
--- 
-2.0.1
+== Wrong Bitrate test
+
+[  146.485022] flexcan 40020000.flexcan can0: bitrate error 0.7%
+[  148.401793] flexcan 40020000.flexcan can0: writing ctrl=0x17092001
+[  148.408263] flexcan 40020000.flexcan can0: flexcan_set_bittiming:
+mcr=0x5980000f ctrl=0x17092001
+[  148.408298] flexcan 40020000.flexcan can0: flexcan_chip_start:
+writing mcr=0x79a20208
+[  148.408328] flexcan 40020000.flexcan can0: flexcan_chip_start:
+writing ctrl=0x1709ac51
+[  148.414373] flexcan 40020000.flexcan can0: flexcan_chip_start:
+reading mcr=0x60a20208 ctrl=0x1709ac51
+^---- Initialization
+[  152.968685] flexcan_irq, esr=00040080
+[  152.972386] flexcan_irq, ctrl=1709ac51
+[  155.488623] flexcan_irq, esr=00040080
+[  155.492326] flexcan_irq, ctrl=1709ac51
+^---- Two messages with right bitrate
+[  171.014124] flexcan_irq, esr=00058d0a
+[  171.017823] flexcan_irq, ctrl=1709ac51
+^---- One message with wrong bitrate
+[  171.021631] flexcan 40020000.flexcan can0: Error Warning IRQ
+[  171.021660] flexcan 40020000.flexcan can0: Error Passive IRQ
+
+# ./candump -e any,0:0,#FFFFFFFF
+  can0  1F334455   [8]  11 22 33 44 55 66 77 88
+  can0  1F334455   [8]  11 22 33 44 55 66 77 88
+  can0  20000004   [8]  00 10 00 00 00 00 00 00   ERRORFRAME
+	controller-problem{rx-error-passive}
+
+== Loopback test
+
+[  464.003776] flexcan 40020000.flexcan can0: writing ctrl=0x17092051
+[  464.010005] flexcan 40020000.flexcan can0: flexcan_set_bittiming:
+mcr=0x5980000f ctrl=0x17092051
+[  464.010035] flexcan 40020000.flexcan can0: flexcan_chip_start:
+writing mcr=0x79a20208
+[  464.010064] flexcan 40020000.flexcan can0: flexcan_chip_start:
+writing ctrl=0x1709ac51
+[  464.010199] flexcan 40020000.flexcan can0: flexcan_chip_start:
+reading mcr=0x60a20208 ctrl=0x1709ac51
+[  464.011682] IPv6: ADDRCONF(NETDEV_CHANGE): can0: link becomes ready
+[  470.970133] flexcan_irq, esr=00064252
+[  470.974833] flexcan_irq, ctrl=1709ac51
+[  470.980171] flexcan 40020000.flexcan can0: Error Warning IRQ
+[  470.980203] flexcan 40020000.flexcan can0: Error Passive IRQ
+[  470.980328] flexcan_irq, esr=00000034
+[  470.984998] flexcan_irq, ctrl=1709ac51
+
+# ./candump -e any,0:0,#FFFFFFFF
+  can0  20000044   [8]  00 10 00 00 00 00 00 00   ERRORFRAME
+	controller-problem{rx-error-passive}
+	bus-off
+
+--
+Stefan
