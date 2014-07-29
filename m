@@ -1,64 +1,58 @@
-From: msalter@redhat.com (Mark Salter)
-Date: Tue, 29 Jul 2014 11:36:52 -0400
-Subject: [PATCH 2/3] arm64/efi: efistub: cover entire static mem
- footprint in PE/COFF .text
-In-Reply-To: <1406630950-32432-3-git-send-email-ard.biesheuvel@linaro.org>
-References: <1406630950-32432-1-git-send-email-ard.biesheuvel@linaro.org>
- <1406630950-32432-3-git-send-email-ard.biesheuvel@linaro.org>
-Message-ID: <1406648212.753.13.camel@deneb.redhat.com>
+From: balbi@ti.com (Felipe Balbi)
+Date: Tue, 29 Jul 2014 10:36:49 -0500
+Subject: [PATCH 13/35] arm: omap: irq: call set_handle_irq() from
+ intc_of_init
+In-Reply-To: <20140729022019.GB4421@earth.universe>
+References: <1406582183-696-1-git-send-email-balbi@ti.com>
+ <1406582183-696-14-git-send-email-balbi@ti.com>
+ <20140729022019.GB4421@earth.universe>
+Message-ID: <20140729153649.GD17808@saruman.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 2014-07-29 at 12:49 +0200, Ard Biesheuvel wrote:
-> The static memory footprint of a kernel Image at boot is larger than the
-> Image file itself. Things like .bss data and initial page tables are allocated
-> statically but populated dynamically so their content is not contained in the
-> Image file.
+On Tue, Jul 29, 2014 at 04:20:20AM +0200, Sebastian Reichel wrote:
+> Hi,
 > 
-> However, if EFI (or GRUB) has loaded the Image at precisely the desired offset
-> of base of DRAM + TEXT_OFFSET, the Image will be booted in place, and we have
-> to make sure that the allocation done by the PE/COFF loader is large enough.
+> On Mon, Jul 28, 2014 at 04:16:01PM -0500, Felipe Balbi wrote:
+> > this will let us drop .handle_irq and .init_irq fields
+> > from our generic machine_descs.
+> > 
+> > Signed-off-by: Felipe Balbi <balbi@ti.com>
+> > ---
+> >  arch/arm/mach-omap2/irq.c | 2 ++
+> >  1 file changed, 2 insertions(+)
+> > 
+> > diff --git a/arch/arm/mach-omap2/irq.c b/arch/arm/mach-omap2/irq.c
+> > index e6997c5..e452411 100644
+> > --- a/arch/arm/mach-omap2/irq.c
+> > +++ b/arch/arm/mach-omap2/irq.c
+> > @@ -314,6 +314,8 @@ static int __init intc_of_init(struct device_node *node,
+> >  
+> >  	omap_init_irq(res.start, nr_irq, of_node_get(node));
+> >  
+> > +	set_handle_irq(omap2_intc_handle_irq);
+> > +
+> >  	return 0;
+> >  }
+> >
 > 
-> Fix this by growing the PE/COFF .text section to cover the entire static
-> memory footprint. The part of the section that is not covered by the payload
-> will be zero initialised by the PE/COFF loader.
+> if you respin the patchset you may want to call omap_intc_handle_irq
+> directly. It makes the review of the patchset less confusing.
 > 
-> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
-> ---
->  arch/arm64/kernel/head.S | 6 +++---
->  1 file changed, 3 insertions(+), 3 deletions(-)
+> (I was wondering why omap3 can call omap2_intc_handle_irq until I
+> noticed, that your previous changes made both functions simple
+> wrapper functions for omap_intc_handle_irq)
 
-Acked-by: Mark Salter <msalter@redhat.com>
+this is done later for a reason. At this point, omap_intc_handle_irq()
+still misses proper annotations for asmlinkage and
+__exception_irq_entry.
 
-> 
-> diff --git a/arch/arm64/kernel/head.S b/arch/arm64/kernel/head.S
-> index 69dafe9621fd..dafc4f2c1ade 100644
-> --- a/arch/arm64/kernel/head.S
-> +++ b/arch/arm64/kernel/head.S
-> @@ -148,7 +148,7 @@ optional_header:
->  	.short	0x20b				// PE32+ format
->  	.byte	0x02				// MajorLinkerVersion
->  	.byte	0x14				// MinorLinkerVersion
-> -	.long	_edata - stext			// SizeOfCode
-> +	.long	_end - stext			// SizeOfCode
->  	.long	0				// SizeOfInitializedData
->  	.long	0				// SizeOfUninitializedData
->  	.long	efi_stub_entry - efi_head	// AddressOfEntryPoint
-> @@ -166,7 +166,7 @@ extra_header_fields:
->  	.short	0				// MinorSubsystemVersion
->  	.long	0				// Win32VersionValue
->  
-> -	.long	_edata - efi_head		// SizeOfImage
-> +	.long	_end - efi_head			// SizeOfImage
->  
->  	// Everything before the kernel image is considered part of the header
->  	.long	stext - efi_head		// SizeOfHeaders
-> @@ -213,7 +213,7 @@ section_table:
->  	.byte	0
->  	.byte	0
->  	.byte	0        		// end of 0 padding of section name
-> -	.long	_edata - stext		// VirtualSize
-> +	.long	_end - stext		// VirtualSize
->  	.long	stext - efi_head	// VirtualAddress
->  	.long	_edata - stext		// SizeOfRawData
->  	.long	stext - efi_head	// PointerToRawData
+-- 
+balbi
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140729/32c7ddf7/attachment.sig>
