@@ -1,36 +1,28 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 29 Jul 2014 22:42:51 +0200
-Subject: [PATCH 0/5] Add eMMC and SD card support for rk3288-evb
-In-Reply-To: <1406665916-23396-1-git-send-email-dianders@chromium.org>
-References: <1406665916-23396-1-git-send-email-dianders@chromium.org>
-Message-ID: <2167758.ZBctteP0VZ@wuerfel>
+From: andrew@lunn.ch (Andrew Lunn)
+Date: Tue, 29 Jul 2014 22:48:53 +0200
+Subject: [PATCH v2 03/12] ASoC: kirkwood: Remove unused drivers
+In-Reply-To: <20140729193509.GK17528@sirena.org.uk>
+References: <1405028192-9623-1-git-send-email-andrew@lunn.ch>
+ <1405028192-9623-4-git-send-email-andrew@lunn.ch>
+ <20140729193509.GK17528@sirena.org.uk>
+Message-ID: <20140729204853.GC17763@lunn.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 29 July 2014 13:31:51 Doug Anderson wrote:
-> This series adds basic eMMC and SD card support for the rk3288-evb
-> board based on Addy's posted dw_mmc patch from:
->   https://patchwork.kernel.org/patch/4520631/
+On Tue, Jul 29, 2014 at 08:35:09PM +0100, Mark Brown wrote:
+> On Thu, Jul 10, 2014 at 11:36:23PM +0200, Andrew Lunn wrote:
+> > Both kirkwood-openrd and kirkwood-t5325 drivers have been replaced
+> > with DT based simple-card equivelents. So remove these drivers.
 > 
-> The series is a little tricky because:
-> * Addy's patch has a bug w/ DDR50 (see my response there), so I've
->   posted the original support without DDR50 and then a fix (that could
->   be squashed) enabling DDR50.
-> * Jaehoon has some outstanding patches to remove the slot node.  Since
->   those haven't landed yet, I've posted my original patch with the
->   slot node and then some future patches that can land with Jaehoon's
->   patches.
-> 
-> Note that we don't have regulators specified yet (no regulator driver
-> for rk808-based board).  We also don't yet support UHS modes (which
-> require regulator support plus dw_mmc driver support for tuning).
-> Those features can come later.
+> Applied.  Please send patches against current code, I needed to hand
+> apply this.
 
-Looks good to me,
+Hi Mark
 
-Acked-by: Arnd Bergmann <arnd@arndb.de>
+By current do you mean asoc-next? That would not be very easy, since
+i'm patching a large number of subsystems here. I don't think the
+gpio, or the libata, or the led maintainer would be too happy if i
+based the patches on asoc-next! So i picked a plain -rcX kernel,
+something neutral to everybody.
 
-I wonder whether something can be done to generalize the tuning
-support. Is this just about the clock phase, or something else?
-
-	Arnd
+	  Andrew
