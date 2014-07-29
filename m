@@ -1,69 +1,83 @@
-From: christoffer.dall@linaro.org (Christoffer Dall)
-Date: Tue, 29 Jul 2014 17:01:28 +0200
-Subject: [PATCH 19/19] Documentation: ACPI for ARM64
-In-Reply-To: <2361920.ZXE2KPy98s@wuerfel>
-References: <1406206825-15590-1-git-send-email-hanjun.guo@linaro.org>
- <20140729130823.GP2576@leverpostej>
- <CAMJs5B8uk7GDfEOEuY8RWDxzhzTRBGszRDN+JRKwG-D_rgzFrw@mail.gmail.com>
- <2361920.ZXE2KPy98s@wuerfel>
-Message-ID: <CAMJs5B-WKQ2DjWsSzMYNUHanp9jQvzArVvizwZSsO6ScjCpSvQ@mail.gmail.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Tue, 29 Jul 2014 08:06:55 -0700
+Subject: [PATCH 30/35] irqchip: add irq-omap-intc.h header
+In-Reply-To: <20140729141045.GA17808@saruman.home>
+References: <1406582183-696-1-git-send-email-balbi@ti.com>
+ <1406582183-696-31-git-send-email-balbi@ti.com>
+ <20140729120133.GQ29045@atomide.com>
+ <20140729141045.GA17808@saruman.home>
+Message-ID: <20140729150655.GU29045@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 29 July 2014 16:41, Arnd Bergmann <arnd@arndb.de> wrote:
-> On Tuesday 29 July 2014 15:31:16 Christoffer Dall wrote:
->> On 29 July 2014 15:08, Mark Rutland <mark.rutland@arm.com> wrote:
->> > On Tue, Jul 29, 2014 at 01:52:40PM +0100, Arnd Bergmann wrote:
->> >> On Tuesday 29 July 2014 14:37:38 Christoffer Dall wrote:
->> >> >
->> >> > For reference, Red Hat's current arguing point for ACPI in VMs is
->> >> > hotplug of things like CPUs and memory for very large VMs, but I
->> >> > haven't thought too carefully about this just yet, as I don't have a
->> >> > 100+ core ARM 64-bit hardware lying around...
->> >>
->> >> I thought you could run guests with more virtual CPUs that you have
->> >> physical CPUs on the host.
->> >>
->> >> Regarding CPU and memory hotplug, don't we already have PSCI and
->> >> xen-balloon/virtio-balloon for that?
->> >
->> > PSCI (0.1) was there for guests from the start, and ACPI doesn't do
->> > anything different w.r.t. PSCI other than requiring PSCI 0.2 (which can
->> > be used by guests supporting only PSCI 0.1). So there's no magic for
->> > CPU hotplug provided by ACPI.
->>
->> With PSCI you can only provide your VM a bunch of CPUs and say that
->> they're all turned off, and then turn some of them on later.  I
->> honestly don't know if you can do proper CPU hotplug with ACPI, but
->> the RH guys seem to argue that you can.  Again, I didn't think too
->> carefully about this.
->
-> Xen does this in drivers/xen/cpu_hotplug.c, acpi does it in
-> drivers/acpi/acpi_processor.c.
->
->> > Do either of the balloon drivers allow for memory to be hot-added to a
->> > system initially provisioned with less?
->> >
->> No, it's just about reclaiming memory.  Same argument as above.
->
-> Again, Xen seems to be able to add more memory:
->
-> config XEN_BALLOON_MEMORY_HOTPLUG
->         bool "Memory hotplug support for Xen balloon driver"
->         default n
->         depends on XEN_BALLOON && MEMORY_HOTPLUG
->         help
->           Memory hotplug support for Xen balloon driver allows expanding memory
->           available for the system above limit declared at system startup.
->           It is very useful on critical systems which require long
->           run without rebooting.
->           ...
->
-> The same goes for hyperv, s390 and vmware. It should not be hard to add it
-> for KVM.
->
-Absolutely, and I would prefer doing that over adding ACPI in guests
-as things stand right now.  We can have another fun discussion about
-this at LCU...
+* Felipe Balbi <balbi@ti.com> [140729 07:13]:
+> On Tue, Jul 29, 2014 at 05:01:33AM -0700, Tony Lindgren wrote:
+> > * Felipe Balbi <balbi@ti.com> [140728 14:19]:
+> > > OMAP INTC irqchip driver will be moved under
+> > > drivers/irqchip/ soon but we still have a dependency
+> > > with mach-omap2 when it comes to idle functions.
+> > > 
+> > > In order to make it easy to share those function
+> > > prototypes with OMAP PM code, we introduce this new
+> > > header.
+> > > 
+> > > Signed-off-by: Felipe Balbi <balbi@ti.com>
+> > > ---
+> > >  arch/arm/mach-omap2/board-3430sdp.c        |  1 +
+> > >  arch/arm/mach-omap2/board-am3517crane.c    |  1 +
+> > >  arch/arm/mach-omap2/board-am3517evm.c      |  1 +
+> > >  arch/arm/mach-omap2/board-cm-t35.c         |  1 +
+> > >  arch/arm/mach-omap2/board-cm-t3517.c       |  1 +
+> > >  arch/arm/mach-omap2/board-devkit8000.c     |  1 +
+> > >  arch/arm/mach-omap2/board-ldp.c            |  1 +
+> > >  arch/arm/mach-omap2/board-omap3beagle.c    |  1 +
+> > >  arch/arm/mach-omap2/board-omap3logic.c     |  1 +
+> > >  arch/arm/mach-omap2/board-omap3pandora.c   |  1 +
+> > >  arch/arm/mach-omap2/board-omap3stalker.c   |  1 +
+> > >  arch/arm/mach-omap2/board-omap3touchbook.c |  1 +
+> > >  arch/arm/mach-omap2/board-overo.c          |  1 +
+> > >  arch/arm/mach-omap2/board-rx51.c           |  1 +
+> > >  arch/arm/mach-omap2/board-ti8168evm.c      |  1 +
+> > >  arch/arm/mach-omap2/common.h               |  9 ---------
+> > >  arch/arm/mach-omap2/cpuidle34xx.c          |  1 +
+> > >  arch/arm/mach-omap2/irq.c                  |  1 +
+> > >  arch/arm/mach-omap2/pm24xx.c               |  1 +
+> > >  arch/arm/mach-omap2/pm34xx.c               |  1 +
+> > >  include/linux/irqchip/irq-omap-intc.h      | 32 ++++++++++++++++++++++++++++++
+> > ...
+> > 
+> > > +void omap2_init_irq(void);
+> > > +void omap3_init_irq(void);
+> > > +void ti81xx_init_irq(void);
+> > 
+> > I think these will all go away with DT based booting?
+> > So it might be worth waiting for that rather than churn
+> > all these files, or..
+> 
+> you just asked me to rebase this series because now we had OMAP3 idle
+> working with DT. And now, you're asking me to hold on to this series
+> because not everything is DT-based yet.
 
--Christoffer
+I just don't like the idea of patching all these board files that
+are going away anyways. If we need to do that, let's just add it
+to common.h that's already included by all the remaining board-*.c
+files. I know we should rather include the files directly, but in
+this case that's just extra churn.
+
+The real problem is how to properly deal with the save and
+restore calls that idle code needs.
+
+In any case, it seems we can merge quite a bit of this series
+already and then deal with the problem parts.
+ 
+> This is the third time I rebase the series after a long hiatus and it
+> always comes out to the same result -> "let's wait some more".
+
+Nope, it's always been "this series causes PM regressions"
+and few other minor comments. And we have not been in any
+position to really test that until with v3.16-rc4. And then
+you always run out of time and nobody else does anything :)
+
+Regards,
+
+Tony
