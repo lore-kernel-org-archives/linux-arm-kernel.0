@@ -1,22 +1,27 @@
 From: olof@lixom.net (Olof Johansson)
-Date: Mon, 28 Jul 2014 21:05:31 -0700
-Subject: [PATCH v15 08/12] ARM: config: append lpae configuration
-In-Reply-To: <1406555876-11989-9-git-send-email-haojian.zhuang@linaro.org>
+Date: Mon, 28 Jul 2014 21:07:40 -0700
+Subject: [PATCH v15 09/12] ARM: config: append hip04_defconfig
+In-Reply-To: <1406555876-11989-10-git-send-email-haojian.zhuang@linaro.org>
 References: <1406555876-11989-1-git-send-email-haojian.zhuang@linaro.org>
- <1406555876-11989-9-git-send-email-haojian.zhuang@linaro.org>
-Message-ID: <20140729040531.GB8430@quad.lixom.net>
+ <1406555876-11989-10-git-send-email-haojian.zhuang@linaro.org>
+Message-ID: <20140729040740.GC8430@quad.lixom.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jul 28, 2014 at 09:57:52PM +0800, Haojian Zhuang wrote:
-> Append multi_v7_lpae_config. In this default configuration,
-> CONFIG_ARCH_MULTI_V6 is disabled. CONFIG_ARM_LPAE is enabled.
+On Mon, Jul 28, 2014 at 09:57:53PM +0800, Haojian Zhuang wrote:
+> Select HiP04 SoC configuration by hip04_defconfig.
 
-NACK. This is the nth time I have had to nack this patch.
+Your subject says "append hip04_defconfig", but this adds it.
 
-You are enabling platforms here that don't have LPAE. Don't do that.
+Also, the one-sentence description doesn't quite make sense.
 
-It's trivial to create a LPAE version of multi_v7 defconfig locally.
+We normally keep one defconfig per vendors these days. For server platforms,
+having per-vendor configs doesn't make sense in the same way as embedded
+platforms, since enabling a few extra platforms and drivers isn't nearly as big
+a deal with you have 12.5GB RAM.
+
+So, please just enable your drivers in multi_v7 and don't add a
+hip04_defconfig.
 
 
 -Olof
