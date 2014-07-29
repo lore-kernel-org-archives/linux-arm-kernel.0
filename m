@@ -1,71 +1,63 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Mon, 28 Jul 2014 23:42:43 -0700
-Subject: OMAP baseline test results for v3.16-rc4
-In-Reply-To: <alpine.DEB.2.02.1407251857480.5875@utopia.booyaka.com>
-References: <alpine.DEB.2.02.1407062339420.15016@utopia.booyaka.com>
- <20140707080238.GF28884@atomide.com>
- <alpine.DEB.2.02.1407251857480.5875@utopia.booyaka.com>
-Message-ID: <20140729064243.GF29045@atomide.com>
+From: takahiro.akashi@linaro.org (AKASHI Takahiro)
+Date: Tue, 29 Jul 2014 15:49:47 +0900
+Subject: [PATCH v5 1/3] arm64: ptrace: reload a syscall number after ptrace
+ operations
+In-Reply-To: <20140725110342.GD5269@arm.com>
+References: <1406020499-5537-1-git-send-email-takahiro.akashi@linaro.org>
+ <1406020499-5537-2-git-send-email-takahiro.akashi@linaro.org>
+ <53D08358.4020902@amacapital.net> <53D0A037.2060308@linaro.org>
+ <CALCETrU9_sdODRz-xZ4bouq+anHhmfx2tkr7hg00RVf_bBBJwg@mail.gmail.com>
+ <53D23341.4040403@linaro.org> <20140725110342.GD5269@arm.com>
+Message-ID: <53D7440B.10006@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Paul Walmsley <paul@pwsan.com> [140725 12:16]:
-> On Mon, 7 Jul 2014, Tony Lindgren wrote:
-> 
-> > With v3.16-rc4 the PM features for omap3 should be working
-> > finally for device tree based booting. At lest beaglexm and
-> > 3xxevm should work.
-> 
-> Just to follow up briefly on this: there was indeed a bug in the OMAP3 
-> test scripts here that resulted in the UART wakeup not being enabled.
-> 
-> Once that was fixed, system suspend-based chip-retention and chip-off 
-> modes work.
+On 07/25/2014 08:03 PM, Will Deacon wrote:
+> On Fri, Jul 25, 2014 at 11:36:49AM +0100, AKASHI Takahiro wrote:
+>> On 07/25/2014 12:01 AM, Andy Lutomirski wrote:
+>>>>> If so, then you risk (at least) introducing
+>>>>>
+>>>>> a nice user-triggerable OOPS if audit is enabled.
+>>>>
+>>>>
+>>>> Can you please elaborate this?
+>>>> Since I didn't find any definition of audit's behavior when syscall is
+>>>> rewritten to -1, I thought it is reasonable to skip "exit tracing" of
+>>>> "skipped" syscall.
+>>>> (otherwise, "fake" seems to be more appropriate :)
+>>>
+>>> The audit entry hook will oops if you call it twice in a row without
+>>> calling the exit hook in between.
+>>
+>> Thank you, I could reproduce this problem which hits BUG(in_syscall) in
+>> audit_syscall_entry(). Really bad, and I fixed it in my next version and
+>> now a "skipped" system call is also traced by audit.
+>
+> Can you reproduce this on arch/arm/ too? If so, we should also fix the code
+> there.
 
-OK
- 
-> However, scheduler-idle based chip-retention and chip-off still are not
-> working.  Looking at the logs, it appears that some domains are not 
-> dynamically going idle.  For example, looking at:
-> 
-> http://www.pwsan.com/omap/testlogs/test_v3.16-rc6/20140724142225/pm/37xxevm/37xxevm_log.txt
-> 
-> it can be seen that core_pwrdm's retention count doesn't increase between 
-> the two PM debug dumps.  The important lines are:
-> 
-> core_pwrdm (ON),OFF:0,RET:2,INA:0,ON:3,RET-LOGIC-OFF:0,RET-MEMBANK1-OFF:0,RET-MEMBANK2-OFF:0
-> 
-> and 
-> 
-> core_pwrdm (ON),OFF:0,RET:2,INA:0,ON:3,RET-LOGIC-OFF:0,RET-MEMBANK1-OFF:0,RET-MEMBANK2-OFF:0
-> 
-> That's why the test reports mark the dynamic PM modes as failing.
-> 
-> ...
-> 
-> Here's an example where things worked:
-> 
-> http://www.pwsan.com/omap/testlogs/test_v3.10/20130717134228/pm/3530es3beagle/3530es3beagle_log.txt
-> 
-> In this one, it can be seen that the CORE counts transitioned from:
-> 
-> core_pwrdm (ON),OFF:0,RET:2,INA:0,ON:3,RET-LOGIC-OFF:0,RET-MEMBANK1-OFF:0,RET-MEMBANK2-OFF:0
-> 
-> to
-> 
-> core_pwrdm (ON),OFF:0,RET:10,INA:0,ON:11,RET-LOGIC-OFF:0,RET-MEMBANK1-OFF:0,RET-MEMBANK2-OFF:0
-> 
-> between the retention suspend/resume test ending and the dynamic 
-> retention idle test ending.
+As far as I tried on arm with syscall auditing enabled,
 
-Hmm I think the difference with the working v3.10 one is that you have
-root=/dev/mmcblk0p2 instead of root=/dev/nfs. As the Ethernet on beagle
-is on the USB EHCI, this is still blocking the deeper idle states AFAIK.
+1) Changing a syscall number to -1 under seccomp doesn't hit BUG_ON(in_syscall).
+2) But, in fact, audit_syscall_entry() is NOT called in this case because
+    __secure_computing() returns -1 and then it causes the succeeding tracing
+    in syscall_trace_enter(), including audit_syscall_entry(), skipped.
+3) On the other hand, calling syscall(-1) from userspace hits BUG_ON because
+    the return path, ret_slow_syscall, doesn't contain syscall_trace_exit().
+4) When we re-write a syscall number to -1 without seccomp, we will also see
+    BUG_ON hit, although I didn't try yet.
 
-Care to test -rc7 with root=/dev/mmcblk0p2 to see if that works?
+Fixing case 3 is easy, but should we also fix case 2?
 
-On the am37xx-evm nfsroot will work as it's on the GPMC bus.
+Please note that, even if we call audit_syscall_exit() in case 2 or 3, no log against
+syscall -1 will be recorded because audit_filter_syscall() doesn't allow logging
+for any syscall number which is greater than 2048.
+This behavior was introduced by Andy's patch, a3c54931, in v3.16-rc.
+If the intention of "-1" is to fake a system call, this behavior seems to be a bit odd.
 
-Regards,
+Thanks,
+-Takahiro AKASHI
 
-Tony
+
+> Will
+>
