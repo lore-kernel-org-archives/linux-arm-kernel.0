@@ -1,32 +1,68 @@
-From: mfuzzey@parkeon.com (Martin Fuzzey)
-Date: Tue, 29 Jul 2014 14:33:05 +0200
-Subject: [PATCH 4/4] ARM: dts: i.MX53: Add PMU DT entry
-In-Reply-To: <20140729123256.13347.79778.stgit@localhost>
-References: <20140729123256.13347.79778.stgit@localhost>
-Message-ID: <20140729123305.13347.28161.stgit@localhost>
+From: ta.omasab@gmail.com (Thomas Abraham)
+Date: Tue, 29 Jul 2014 18:05:18 +0530
+Subject: [PATCH v8 3/6] ARM: dts: Exynos: add CPU OPP and regulator supply
+ property
+In-Reply-To: <53D78ED3.9090703@suse.de>
+References: <1406611711-25112-1-git-send-email-thomas.ab@samsung.com>
+ <1406611711-25112-4-git-send-email-thomas.ab@samsung.com>
+ <53D78ED3.9090703@suse.de>
+Message-ID: <CAJuA9ag1xHm=vaXxXzj7ykKxYHxBndDsOTwN0vRdXvhb_DtQ2g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add device tree node for PMU on i.MX53
+Hi Andreas,
 
-Signed-off-by: Martin Fuzzey <mfuzzey@parkeon.com>
----
- arch/arm/boot/dts/imx53.dtsi |    5 +++++
- 1 file changed, 5 insertions(+)
+On Tue, Jul 29, 2014 at 5:38 PM, Andreas F?rber <afaerber@suse.de> wrote:
+> Hi Thomas,
+>
+> Am 29.07.2014 07:28, schrieb Thomas Abraham:
+>> diff --git a/arch/arm/boot/dts/exynos5250-cros-common.dtsi b/arch/arm/boot/dts/exynos5250-cros-common.dtsi
+>> index 89ac90f..34bb31c 100644
+>> --- a/arch/arm/boot/dts/exynos5250-cros-common.dtsi
+>> +++ b/arch/arm/boot/dts/exynos5250-cros-common.dtsi
+>> @@ -19,6 +19,12 @@
+>>       chosen {
+>>       };
+>>
+>> +     cpus {
+>> +             cpu at 0 {
+>> +                     cpu0-supply = <&buck2_reg>;
+>> +             };
+>> +     };
+>> +
+>>       pinctrl at 11400000 {
+>>               /*
+>>                * Disabled pullups since external part has its own pullups and
+>
+> I've been instructed to dismantle this .dtsi file, so please place this
+> into exynos5250-snow.dts. It's probably wrong here anyway, since Spring
+> doesn't use the max77686 but an s5m6787 PMIC.
 
-diff --git a/arch/arm/boot/dts/imx53.dtsi b/arch/arm/boot/dts/imx53.dtsi
-index 6456a00..ab3afe0 100644
---- a/arch/arm/boot/dts/imx53.dtsi
-+++ b/arch/arm/boot/dts/imx53.dtsi
-@@ -101,6 +101,11 @@
- 		interrupt-parent = <&tzic>;
- 		ranges;
- 
-+		pmu {
-+			compatible = "arm,cortex-a8-pmu";
-+			interrupts = <77>;
-+		};
-+
- 		sata: sata at 10000000 {
- 			compatible = "fsl,imx53-ahci";
- 			reg = <0x10000000 0x1000>;
+Ok, I will move this to exynos5250-snow.dts.
+
+>
+> How do I find out which -supply to specify here for Spring?
+
+This information can be found in the Spring board schematic.
+
+>
+> Also, wouldn't it make sense to assign a cpu0 label in exynos????.dtsi
+> to override it via &cpu0 { ... };?
+
+Sorry, I did not understand the question.
+
+Thanks,
+Thomas.
+
+>
+> Regards,
+> Andreas
+>
+> --
+> SUSE LINUX Products GmbH, Maxfeldstr. 5, 90409 N?rnberg, Germany
+> GF: Jeff Hawn, Jennifer Guild, Felix Imend?rffer; HRB 16746 AG N?rnberg
+>
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
