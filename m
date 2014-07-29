@@ -1,97 +1,57 @@
-From: hanjun.guo@linaro.org (Hanjun Guo)
-Date: Tue, 29 Jul 2014 16:12:19 +0800
-Subject: [PATCH 10/19] ARM64 / ACPI: Get the enable method for SMP
- initialization in ACPI way
-In-Reply-To: <20140725122424.GD19632@leverpostej>
-References: <1406206825-15590-1-git-send-email-hanjun.guo@linaro.org>
- <1406206825-15590-11-git-send-email-hanjun.guo@linaro.org>
- <20140724154745.GD26190@leverpostej> <53D236B9.7000302@linaro.org>
- <20140725122424.GD19632@leverpostej>
-Message-ID: <53D75763.1090601@linaro.org>
+From: l.stach@pengutronix.de (Lucas Stach)
+Date: Tue, 29 Jul 2014 10:14:51 +0200
+Subject: [PATCH 2/3] ARM: dts: nitrogen6x: add hdmi
+In-Reply-To: <20140729074833.GD24750@dragon>
+References: <1406285393-23545-1-git-send-email-l.stach@pengutronix.de>
+ <1406285393-23545-2-git-send-email-l.stach@pengutronix.de>
+ <CAOMZO5BUDMfwDi944brOQoiNkWG_5yBn0XPTPYsLh8_cpyDc3w@mail.gmail.com>
+ <1406296528.4643.22.camel@weser.hi.pengutronix.de>
+ <20140729074833.GD24750@dragon>
+Message-ID: <1406621691.4565.1.camel@weser.hi.pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2014-7-25 20:24, Mark Rutland wrote:
-> On Fri, Jul 25, 2014 at 11:51:37AM +0100, Hanjun Guo wrote:
->> On 2014-7-24 23:47, Mark Rutland wrote:
->>> On Thu, Jul 24, 2014 at 02:00:16PM +0100, Hanjun Guo wrote:
->>>> ACPI 5.1 only has two explicit methods to boot up SMP,
->>>> PSCI and Parking protocol, but the Parking protocol is
->>>> only suitable for ARMv7 now, so make PSCI as the only way
->>>> for the SMP boot protocol before some updates for the
->>>> ACPI spec or the Parking protocol spec.
->>>>
-[...]
->>>> -#include <asm/cpu_ops.h>
->>>> -#include <asm/smp_plat.h>
->>>>  #include <linux/errno.h>
->>>>  #include <linux/of.h>
->>>>  #include <linux/string.h>
->>>> +#include <linux/acpi.h>
->>>> +
->>>> +#include <asm/cpu_ops.h>
->>>> +#include <asm/smp_plat.h>
->>>
->>> Was the header move just for consistency with other files, or is there
->>> some ordering requirement here?
->>
->> Ordering requirement, it will meet compile error for "return -ENODEV;"
->> in the head file which I introduced, I know I can include the right
->> head file in asm/cpu_ops.h, but I think move the asm/xx.h after the
->> include of linux/xx.h would be fine.
+Am Dienstag, den 29.07.2014, 15:48 +0800 schrieb Shawn Guo:
+> On Fri, Jul 25, 2014 at 03:55:28PM +0200, Lucas Stach wrote:
+> > Am Freitag, den 25.07.2014, 10:48 -0300 schrieb Fabio Estevam:
+> > > Hi Lucas,
+> > > 
+> > > On Fri, Jul 25, 2014 at 7:49 AM, Lucas Stach <l.stach@pengutronix.de> wrote:
+> > > > From: Michael Olbrich <m.olbrich@pengutronix.de>
+> > > >
+> > > > Signed-off-by: Michael Olbrich <m.olbrich@pengutronix.de>
+> > > > Signed-off-by: Lucas Stach <l.stach@pengutronix.de>
+> > > > ---
+> > > >  arch/arm/boot/dts/imx6qdl-nitrogen6x.dtsi | 6 ++++++
+> > > >  1 file changed, 6 insertions(+)
+> > > >
+> > > > diff --git a/arch/arm/boot/dts/imx6qdl-nitrogen6x.dtsi b/arch/arm/boot/dts/imx6qdl-nitrogen6x.dtsi
+> > > > index 3362d2600d85..4e27cf9f3d2e 100644
+> > > > --- a/arch/arm/boot/dts/imx6qdl-nitrogen6x.dtsi
+> > > > +++ b/arch/arm/boot/dts/imx6qdl-nitrogen6x.dtsi
+> > > > @@ -174,6 +174,12 @@
+> > > >         status = "okay";
+> > > >  };
+> > > >
+> > > > +&hdmi {
+> > > > +       ddc-i2c-bus = <&i2c2>;
+> > > > +       hpd-unreliable;
+> > > 
+> > > I don't see this property available in linux-next yet. Are we missing
+> > > the patch that adds it?
+> > > 
+> > Right, we are missing a patch here. It already has been posted to the
+> > list long time ago, but obviously fell through the cracks. Thanks for
+> > spotting.
 > 
-> If a file uses something defined in a header, it should include that
-> header. So if you need ENODEV in cpu_ops.h, make cpu_ops.h include
-> <linux/errno.h>. It is not fine to deliberately rely on implicit
-> includes.
-
-ok, will fix that in next version.
-
+> So should I drop the property and apply the patches or just ignore the
+> series?
 > 
-> Moving the headers around is a separate issue. I have no problem with
-> doing that for consistency with other files.
-> 
->>
->>>
->>>>
->>>>  extern const struct cpu_operations smp_spin_table_ops;
->>>>  extern const struct cpu_operations cpu_psci_ops;
->>>> @@ -52,7 +54,7 @@ static const struct cpu_operations * __init cpu_get_ops(const char *name)
->>>>  /*
->>>>   * Read a cpu's enable method from the device tree and record it in cpu_ops.
->>>>   */
->>>> -int __init cpu_read_ops(struct device_node *dn, int cpu)
->>>> +int __init cpu_of_read_ops(struct device_node *dn, int cpu)
->>>>  {
->>>>         const char *enable_method = of_get_property(dn, "enable-method", NULL);
->>>>         if (!enable_method) {
->>>> @@ -76,12 +78,52 @@ int __init cpu_read_ops(struct device_node *dn, int cpu)
->>>>         return 0;
->>>>  }
->>>>
->>>> +#ifdef CONFIG_ACPI
->>>> +/*
->>>> + * Read a cpu's enable method in the ACPI way and record it in cpu_ops.
->>>> + */
->>>> +int __init cpu_acpi_read_ops(int cpu)
->>>> +{
->>>> +       /*
->>>> +        * For ACPI 5.1, only two kind of methods are provided,
->>>> +        * Parking protocol and PSCI, but Parking protocol is
->>>> +        * used on ARMv7 only, so make PSCI as the only method
->>>> +        * for SMP initialization before the ACPI spec or Parking
->>>> +        * protocol spec is updated.
->>>> +        */
->>>
->>> That comment is a little misleading. The parking protocol is _specified_
->>> for ARMv7 only.
->>
->> Agreed. But I'm just wondering if the Parking protocol is modified and
->> then support ARMv8, how to describe it in the comments?
-> 
-> We update the comments if and when that happens.
+Please drop the property and apply. I'll take care of re-adding this
+when the relevant imx-drm patches are in.
 
-Ok.
-
-Thanks
-Hanjun
+Regards,
+Lucas
+-- 
+Pengutronix e.K.             | Lucas Stach                 |
+Industrial Linux Solutions   | http://www.pengutronix.de/  |
