@@ -1,108 +1,73 @@
-From: svarbanov@mm-sol.com (Stanimir Varbanov)
-Date: Tue, 29 Jul 2014 14:42:31 +0300
-Subject: use IORESOURCE_REG resource type for non-translatable addresses in DT
-Message-ID: <53D788A7.4020303@mm-sol.com>
+From: ta.omasab@gmail.com (Thomas Abraham)
+Date: Tue, 29 Jul 2014 17:16:49 +0530
+Subject: [PATCH v8 2/6] clk: samsung: add cpu clock configuration data and
+ instantiate cpu clock
+In-Reply-To: <53D773DA.6050003@gmail.com>
+References: <1406611711-25112-1-git-send-email-thomas.ab@samsung.com>
+ <1406611711-25112-3-git-send-email-thomas.ab@samsung.com>
+ <53D773DA.6050003@gmail.com>
+Message-ID: <CAJuA9ahuch8c9CzVwO7pf8Chf0G3coNH4KLOF29Sj7dQ9gqO_Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Hi Tomasz,
 
-While looking in MFD drivers I saw that few of them (88pm860x-core,
-max8925-core and wm831x-core) allow use of IORESOURCE_REG as resource
-type when calling  platform_get_resource() by their child drivers. The
-resources for these child devices are filled by core MFD driver manually
-and then passed to mfd_add_devices() as mfd_cells.
+On Tue, Jul 29, 2014 at 3:43 PM, Tomasz Figa <tomasz.figa@gmail.com> wrote:
+> Hi Thomas,
+>
+> Just few minor comments for things I probably missed before.
+>
+> On 29.07.2014 07:28, Thomas Abraham wrote:
+>
+> [snip]
+>
+>> @@ -1356,6 +1357,16 @@ static struct samsung_pll_clock exynos4x12_plls[nr_plls] __initdata = {
+>>                       VPLL_LOCK, VPLL_CON0, NULL),
+>>  };
+>>
+>> +static const struct exynos_cpuclk_cfg_data e4210_armclk_d[] __initconst = {
+>> +     { 1200000, E4210_CPU_DIV0(7, 1, 4, 3, 7, 3), E4210_CPU_DIV1(0, 5), },
+>> +     { 1000000, E4210_CPU_DIV0(7, 1, 4, 3, 7, 3), E4210_CPU_DIV1(0, 4), },
+>> +     {  800000, E4210_CPU_DIV0(7, 1, 3, 3, 7, 3), E4210_CPU_DIV1(0, 3), },
+>> +     {  500000, E4210_CPU_DIV0(7, 1, 3, 3, 7, 3), E4210_CPU_DIV1(0, 3), },
+>> +     {  400000, E4210_CPU_DIV0(7, 1, 3, 3, 7, 3), E4210_CPU_DIV1(0, 3), },
+>
+> I have noticed that the old driver does not have this operating point.
+> While it is probably OK to add this one and even few more for all
+> possible APLL settings, I am interested in how you obtained the values
+> for DIV0 and DIV1 registers for this configuration.
 
-During development and review comments of the MFD core driver for
-Qualcomm SPMI PMICs we came down to a need to describe PMIC peripheral
-addresses (the PMIC sub-functions) through *reg* property in DT. The
-PMIC peripheral drivers will be scattered over the /drivers and they
-will call platform_get_resource() to extract their peripheral base
-addresses from resource->start. The issue we have encountered is that
-these addresses are non-translatable thus of_address_to_resource returns
-OF_BAD_ADDR.
+I found these values from an old internal repo. So far no trouble seen
+with these values in all the testing.
 
-Stephen Boyd have made a suggestion to solve the issue here [1].
+>
+>> +     {  200000, E4210_CPU_DIV0(0, 1, 1, 1, 3, 1), E4210_CPU_DIV1(0, 3), },
+>> +     {  0 },
+>> +};
+>
+> [snip]
+>
+>> diff --git a/include/dt-bindings/clock/exynos5250.h b/include/dt-bindings/clock/exynos5250.h
+>> index 4273891..855d809 100644
+>> --- a/include/dt-bindings/clock/exynos5250.h
+>> +++ b/include/dt-bindings/clock/exynos5250.h
+>> @@ -21,6 +21,7 @@
+>>  #define CLK_FOUT_CPLL                6
+>>  #define CLK_FOUT_EPLL                7
+>>  #define CLK_FOUT_VPLL                8
+>> +#define CLK_ARM_CLK          12
+>
+> Why 12 not 9?
 
-Is that approach acceptable? Or do we have better way? How similar
-issues could be solved.
+Exynos4 uses 12 and so just wanted to keep it same for Exynos5250 as well.
 
-Our DT node for SPMI PMICs can be seen below [2].
+Thanks,
+Thomas.
 
-Please do comment.
-
-PS: I have made a little change in __of_address_to_resource() to
-illustrate what I meant above.
-
-diff --git a/drivers/of/address.c b/drivers/of/address.c
-index 5edfcb0..898741e 100644
---- a/drivers/of/address.c
-+++ b/drivers/of/address.c
-@@ -617,9 +617,24 @@ static int __of_address_to_resource(struct
-device_node *dev,
-
-        if ((flags & (IORESOURCE_IO | IORESOURCE_MEM)) == 0)
-                return -EINVAL;
-+
-        taddr = of_translate_address(dev, addrp);
--       if (taddr == OF_BAD_ADDR)
--               return -EINVAL;
-+       /*
-+        * if the address is non-translatable to cpu physical address
-+        * fallback to a IORESOURCE_REG resource.
-+        */
-+       if (taddr == OF_BAD_ADDR) {
-+               memset(r, 0, sizeof(*r));
-+               taddr = of_read_number(addrp, 1);
-+               if (taddr == OF_BAD_ADDR)
-+                       return -EINVAL;
-+               r->start = taddr;
-+               r->end = taddr + size - 1;
-+               r->flags = IORESOURCE_REG;
-+               r->name = name ? name : dev->full_name;
-+               return 0;
-+       }
-+
-        memset(r, 0, sizeof(struct resource));
-        if (flags & IORESOURCE_IO) {
-                unsigned long port;
-
-[1] https://lkml.org/lkml/2014/7/17/680
-
-[2] Simplistic PMIC DT node.
-
-spmi at fc4cf000 {
-	compatible = "qcom,spmi-pmic-arb";
-	reg = <0xfc4cf000 0x1000>,
-	      <0xfc4cb000 0x1000>,
-	      <0xfc4ca000 0x1000>;
-	reg-names = "core", "intr", "cnfg";
-	#address-cells = <2>;
-	#size-cells = <0>;
-	interrupt-controller;
-	#interrupt-cells = <4>;
-
-	pm8941 at 0 {
-		compatible = "qcom,pm8941";
-		reg = <0x0 SPMI_USID>;
-		#size-cells = <1>;
-		#address-cells = <1>;
-
-		rtc {
-			compatible = "qcom,pm8941-rtc";
-			reg = <0x6000 0x100>, <0x6100 0x100>;
-			reg-names = "rtc", "alarm";
-			interrupts = <0x0 0x61 0x1 0>;
-			interrupt-names = "alarm";
-		};
-	};
-
-	pm8941 at 1 {
-		compatible = "qcom,pm8941";
-		reg = <0x1 SPMI_USID>;
-	};
-}
-
--- 
-regards,
-Stan
+>
+> Best regards,
+> Tomasz
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-samsung-soc" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
