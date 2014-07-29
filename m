@@ -1,58 +1,80 @@
 From: bigeasy@linutronix.de (Sebastian Andrzej Siewior)
-Date: Tue, 29 Jul 2014 20:58:59 +0200
-Subject: [PATCH 2/7] dmaengine: omap-dma: complete the transfer on
- terminate_all
+Date: Tue, 29 Jul 2014 20:59:01 +0200
+Subject: [RFC PATCH 4/7] serial: 8250_dma: enqueue RX dma again on completion.
 In-Reply-To: <1406660344-25307-1-git-send-email-bigeasy@linutronix.de>
 References: <1406660344-25307-1-git-send-email-bigeasy@linutronix.de>
-Message-ID: <1406660344-25307-3-git-send-email-bigeasy@linutronix.de>
+Message-ID: <1406660344-25307-5-git-send-email-bigeasy@linutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The rx path of the 8250_dma user in the RX-timeout case:
-- it starts the RX transfer
-- if the rx-timeout interrupt occures, it dmaengine_pause() the transfer
-- step two is dmaengine_terminate_all() on this channel.
-- the rx interrupt occures, it does not start the RX-transfer because
-  according to dmaengine_tx_status() the status of the current transfer
-  is still DMA_IN_PROGRESS because the earlier dmaengine_terminate_all()
-  did not reset this.
+The omap needs a DMA request pending right away. If it is enqueued once
+the bytes are in the FIFO then nothing will happen and the FIFO will be
+later purged via RX-timeout interrupt.
+This patch requeues RX-DMA request on completion but not if it was
+canceled due to the RX-timeout.
 
-To fix this problem, the patch adds dma_cookie_complete() "complete" the
-current cookie.
-
-Cc: Russell King <rmk+kernel@arm.linux.org.uk>
-Cc: Vinod Koul <vinod.koul@intel.com> 
-Cc: Dan Williams <dan.j.williams@intel.com> 
-Cc: dmaengine at vger.kernel.org 
+Cc: Heikki Krogerus <heikki.krogerus@linux.intel.com>
 Signed-off-by: Sebastian Andrzej Siewior <bigeasy@linutronix.de>
 ---
- drivers/dma/omap-dma.c | 7 +++++++
- 1 file changed, 7 insertions(+)
+ drivers/tty/serial/8250/8250_core.c |  3 +++
+ drivers/tty/serial/8250/8250_dma.c  | 12 +++++++++---
+ 2 files changed, 12 insertions(+), 3 deletions(-)
 
-diff --git a/drivers/dma/omap-dma.c b/drivers/dma/omap-dma.c
-index b19f04f..81ede01 100644
---- a/drivers/dma/omap-dma.c
-+++ b/drivers/dma/omap-dma.c
-@@ -970,6 +970,12 @@ static int omap_dma_terminate_all(struct omap_chan *c)
+diff --git a/drivers/tty/serial/8250/8250_core.c b/drivers/tty/serial/8250/8250_core.c
+index 7a33c30..098ff02 100644
+--- a/drivers/tty/serial/8250/8250_core.c
++++ b/drivers/tty/serial/8250/8250_core.c
+@@ -1556,6 +1556,9 @@ int serial8250_handle_irq(struct uart_port *port, unsigned int iir)
  
- 	/* Prevent this channel being scheduled */
- 	spin_lock(&d->lock);
-+	if (!c->desc && !list_empty(&c->node)) {
-+		struct virt_dma_desc *vd = vchan_next_desc(&c->vc);
+ 		if (!up->dma || dma_err)
+ 			status = serial8250_rx_chars(up, status);
 +
-+		if (vd)
-+			dma_cookie_complete(&vd->tx);
-+	}
- 	list_del_init(&c->node);
- 	spin_unlock(&d->lock);
++		if (dma_err == -ETIMEDOUT && port->type == PORT_OMAP_16750)
++			serial8250_rx_dma(up, 0);
+ 	}
+ 	serial8250_modem_status(up);
+ 	if (!up->dma && (status & UART_LSR_THRE))
+diff --git a/drivers/tty/serial/8250/8250_dma.c b/drivers/tty/serial/8250/8250_dma.c
+index f9ef69f..acb0a87 100644
+--- a/drivers/tty/serial/8250/8250_dma.c
++++ b/drivers/tty/serial/8250/8250_dma.c
+@@ -49,9 +49,8 @@ static void __dma_tx_complete(void *param)
+ 	spin_unlock_irqrestore(&p->port.lock, flags);
+ }
  
-@@ -979,6 +985,7 @@ static int omap_dma_terminate_all(struct omap_chan *c)
- 	 * c->desc is NULL and exit.)
- 	 */
- 	if (c->desc) {
-+		dma_cookie_complete(&c->desc->vd.tx);
- 		c->desc = NULL;
- 		/* Avoid stopping the dma twice */
- 		if (!c->paused)
+-static void __dma_rx_complete(void *param)
++static void __dma_rx_do_complete(struct uart_8250_port *p, bool timeout)
+ {
+-	struct uart_8250_port	*p = param;
+ 	struct uart_8250_dma	*dma = p->dma;
+ 	struct tty_port		*tty_port = &p->port.state->port;
+ 	struct dma_tx_state	state;
+@@ -67,10 +66,17 @@ static void __dma_rx_complete(void *param)
+ 
+ 	tty_insert_flip_string(tty_port, dma->rx_buf, count);
+ 	p->port.icount.rx += count;
++	if (!timeout && p->port.type == PORT_OMAP_16750)
++		serial8250_rx_dma(p, 0);
+ 
+ 	tty_flip_buffer_push(tty_port);
+ }
+ 
++static void __dma_rx_complete(void *param)
++{
++	__dma_rx_do_complete(param, false);
++}
++
+ int serial8250_tx_dma(struct uart_8250_port *p)
+ {
+ 	struct uart_8250_dma		*dma = p->dma;
+@@ -126,7 +132,7 @@ int serial8250_rx_dma(struct uart_8250_port *p, unsigned int iir)
+ 		 */
+ 		if (dma_status == DMA_IN_PROGRESS) {
+ 			dmaengine_pause(dma->rxchan);
+-			__dma_rx_complete(p);
++			__dma_rx_do_complete(p, true);
+ 		}
+ 		return -ETIMEDOUT;
+ 	default:
 -- 
 2.0.1
