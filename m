@@ -1,92 +1,32 @@
-From: ta.omasab@gmail.com (Thomas Abraham)
-Date: Tue, 29 Jul 2014 18:21:42 +0530
-Subject: [PATCH v8 3/6] ARM: dts: Exynos: add CPU OPP and regulator supply
- property
-In-Reply-To: <53D796CB.5020805@suse.de>
-References: <1406611711-25112-1-git-send-email-thomas.ab@samsung.com>
- <1406611711-25112-4-git-send-email-thomas.ab@samsung.com>
- <53D78ED3.9090703@suse.de>
- <CAJuA9ag1xHm=vaXxXzj7ykKxYHxBndDsOTwN0vRdXvhb_DtQ2g@mail.gmail.com>
- <53D796CB.5020805@suse.de>
-Message-ID: <CAJuA9aiwWm-egBdiHhNVtkgC9k_J4qL6fumuFuNvkePVmHY-hw@mail.gmail.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Tue, 29 Jul 2014 13:52:31 +0100
+Subject: [PATCH  0/4] ARM: perf: Support i.MX53
+In-Reply-To: <20140729123256.13347.79778.stgit@localhost>
+References: <20140729123256.13347.79778.stgit@localhost>
+Message-ID: <20140729125231.GM9245@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Andreas,
+Hi Martin,
 
-On Tue, Jul 29, 2014 at 6:12 PM, Andreas F?rber <afaerber@suse.de> wrote:
-> Hi Thomas,
->
-> Am 29.07.2014 14:35, schrieb Thomas Abraham:
->> On Tue, Jul 29, 2014 at 5:38 PM, Andreas F?rber <afaerber@suse.de> wrote:
->>> Am 29.07.2014 07:28, schrieb Thomas Abraham:
->>>> diff --git a/arch/arm/boot/dts/exynos5250-cros-common.dtsi b/arch/arm/boot/dts/exynos5250-cros-common.dtsi
->>>> index 89ac90f..34bb31c 100644
->>>> --- a/arch/arm/boot/dts/exynos5250-cros-common.dtsi
->>>> +++ b/arch/arm/boot/dts/exynos5250-cros-common.dtsi
->>>> @@ -19,6 +19,12 @@
->>>>       chosen {
->>>>       };
->>>>
->>>> +     cpus {
->>>> +             cpu at 0 {
->>>> +                     cpu0-supply = <&buck2_reg>;
->>>> +             };
->>>> +     };
->>>> +
->>>>       pinctrl at 11400000 {
->>>>               /*
->>>>                * Disabled pullups since external part has its own pullups and
->>>
->>> I've been instructed to dismantle this .dtsi file, so please place this
->>> into exynos5250-snow.dts. It's probably wrong here anyway, since Spring
->>> doesn't use the max77686 but an s5m6787 PMIC.
->>
->> Ok, I will move this to exynos5250-snow.dts.
->>
->>>
->>> How do I find out which -supply to specify here for Spring?
->>
->> This information can be found in the Spring board schematic.
->
-> Are those available publicly somewhere? I guess not...
+On Tue, Jul 29, 2014 at 01:32:56PM +0100, Martin Fuzzey wrote:
+> This series enables hardware performance counters on the i.MX53 SoC
+> 
+> This requires setting registers at both the ARM V7 core level
+> and the i.MX53 SoC level.
 
-I am not sure if it is available publicly. Doug (Cc'ed on this email)
-might have it.
+>From a quick look at the patches, it sounds like you're booting in secure
+mode and are trying to use perf there. Whilst I understand that you may want
+to do this, I don't think the code you currently have is quite right:
 
->
->>> Also, wouldn't it make sense to assign a cpu0 label in exynos????.dtsi
->>> to override it via &cpu0 { ... };?
->>
->> Sorry, I did not understand the question.
->
-> Instead of adding
->
-> cpus { cpu at 0 { ... }; };
->
-> to the board's / node, I am suggesting you do in the SoC's .dtsi:
->
-> - cpu at 0 {
-> + cpu0: cpu at 0 {
->
-> and then in the board's file after / { ... }; add the following:
->
-> &cpu0 {
->         cpu0-supply = <&buck2_reg>;
-> };
->
-> This is the new preferred way to override or extend inherited nodes, I
-> am told. (&cpu0 should be inserted in alphabetical order then.)
+ - It accesses the SDER unconditionally, which is undefined for non-secure
+   modes.
 
-Okay, thanks for the clarification. I will update as per the preferred way.
+ - It adds yet more callbacks to arm_pmu_platdata
 
-Thanks,
-Thomas.
+Instead, how about we add a new property on the PMU node that says it
+requires secure access, then we use that to configuer SDER in the perf code.
+Then you can do your SoC-specific magic as part of the runtime PM hooks we
+already have (it looks like enabled/disabling a clock really).
 
->
-> Cheers,
-> Andreas
->
-> --
-> SUSE LINUX Products GmbH, Maxfeldstr. 5, 90409 N?rnberg, Germany
-> GF: Jeff Hawn, Jennifer Guild, Felix Imend?rffer; HRB 16746 AG N?rnberg
+Will
