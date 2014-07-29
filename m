@@ -1,43 +1,40 @@
-From: hns@goldelico.com (Dr. H. Nikolaus Schaller)
-Date: Tue, 29 Jul 2014 15:03:42 +0200
-Subject: [PATCH 3/3] arm: dts: Add gta04a5 model
-In-Reply-To: <20140729124120.GS29045@atomide.com>
-References: <1406577213-9642-1-git-send-email-marek@goldelico.com>
- <1406577213-9642-4-git-send-email-marek@goldelico.com>
- <CAOf5uwk=ctww=pP4Ae+1C6i-oOtiYTv2NJbj1GpuPwVSKXB4Hw@mail.gmail.com>
- <CAAfyv35jvhzvjCKMwrpa=RQ1JkfcmthCsGDzwLW9Y6bq3Ww_fg@mail.gmail.com>
- <CAOf5uw=Fm9FXEH5ESqDC8pGjMbn5VQ1+MyPJVXSqGh_9+JRLHw@mail.gmail.com>
- <1FA8171E-1B7A-4684-887E-11593BB9C29E@goldelico.com>
- <20140729124120.GS29045@atomide.com>
-Message-ID: <589F7CA3-F245-4299-8E39-36A7FA9F3CBD@goldelico.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Tue, 29 Jul 2014 15:05:06 +0200
+Subject: [PATCH v15 01/12] irq: gic: support hip04 gic
+In-Reply-To: <87a97to025.fsf@approximate.cambridge.arm.com>
+References: <1406555876-11989-1-git-send-email-haojian.zhuang@linaro.org>
+ <1406555876-11989-2-git-send-email-haojian.zhuang@linaro.org>
+ <87a97to025.fsf@approximate.cambridge.arm.com>
+Message-ID: <2455679.mpY3ZEfao6@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-
-Am 29.07.2014 um 14:41 schrieb Tony Lindgren:
-
-> * Dr. H. Nikolaus Schaller <hns@goldelico.com> [140728 13:45]:
->> 
->> Yes,
->> the boot loader either loads gta04a3.dtb gta04.dtb or gta05.dtb
->> depending on board revision.
->> 
->> Therefore we have multiple device tree files to represent such hardware
->> differences. Like Gumstix Overo variants (using a  omap3-overo-base.dtsi)
->> 
->> And, this difference is not the only one. Other are to come later.
->> 
->> Unfortunately we were recommend to submit only DT nodes that already
->> have drivers. Therefore, the "big picture" of the device variants support
->> may not yet be visible from this patch.
->> 
->> I hope this gives a little background.
+On Monday 28 July 2014 18:38:58 Marc Zyngier wrote:
+> Overall, this code should be able to sitting within a #ifdef/#endif
+> block, only selected if this platform is enabled, and possibly find a
+> way not to impact all the other platforms when this is not selected.
 > 
-> So what's the conclusion? Are changes needed to this patch
-> series or not?
+> Finally, I'd like to outline how much I dislike the way the GIC
+> architecture has been abused here. Yes, this solves a particular
+> problem, at a given point in time, but this also feels extremely short
+> sighted from whoever has put this thing together. This really feels like
+> a short-term HW hack that is already addressed by GICv3. Merging support
+> for non architecture compliant HW is never the best solution.
 
-I advocate that no changes are needed.
+Not merging support for shipping hardware is also not a solution,
+and we already support any number of irqchip drivers and have all
+the logic we need to sort that out at runtime.
 
-BR,
-Nikolaus
+My feeling is that the original approach taken in the early version
+of the patch set was actually better, given all the problems with
+integrating this nicely into the gic driver.
+
+Would you be happier with that? The downside of that would be
+that some driver bugs would get fixed in one driver but not the
+other one, which is why we normally try to avoid it. On the other
+hand, it means that the normal GIC driver does not get polluted
+with hacks that are only needed for the hip04 version and there
+is an obvious way to disable the driver at compile time when you
+build for other platforms.
+
+	Arnd
