@@ -1,55 +1,54 @@
-From: sre@kernel.org (Sebastian Reichel)
-Date: Tue, 29 Jul 2014 04:12:51 +0200
-Subject: [PATCH 19/35] arm: omap: irq: drop ti,intc-size support
-In-Reply-To: <1406582183-696-20-git-send-email-balbi@ti.com>
-References: <1406582183-696-1-git-send-email-balbi@ti.com>
- <1406582183-696-20-git-send-email-balbi@ti.com>
-Message-ID: <20140729021251.GA4421@earth.universe>
+From: ken.wilson@opengear.com (Ken Wilson)
+Date: Tue, 29 Jul 2014 12:13:51 +1000
+Subject: CPU1 fails to boot on Armada 375 DB with 3.16.0-rc6
+In-Reply-To: <20140729015352.GC12303@lunn.ch>
+References: <53D6F564.5070803@opengear.com> <20140729015352.GC12303@lunn.ch>
+Message-ID: <53D7035F.40803@opengear.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On 29/07/14 11:53, Andrew Lunn wrote:
+> On Tue, Jul 29, 2014 at 11:14:12AM +1000, Ken Wilson wrote:
+>> Hi Thomas,
+>> We're running 3.16.0-rc6 on our Rev 2 Armada 375 DB, and we've found
+>> that the second CPU is not coming up.
+>> Are there any known issues here?
+>>
+>> I've also tried starting the 2nd CPU after boot using the sysfs
+>> interface, but I get the same error.
+>> We're tftpbooting the kernel, using an in-memory ramdisk
+>>
+>> Snip from dmesg:
+>>
+>> Uncompressing Linux... done, booting the kernel.
+>> Booting Linux on physical CPU 0x0
+>> Linux version 3.16.0-rc6-dirty (kenw at build-ken) (gcc version 4.8.1
+>> (GCC) ) #7 SMP Tue Jul 29 09:47:30 EST 2014
+>> CPU: ARMv7 Processor [414fc091] revision 1 (ARMv7), cr=10c5387d
+>> CPU: PIPT / VIPT nonaliasing data cache, VIPT aliasing instruction cache
+>> Machine model: Marvell Armada 375 Development Board
+>> bootconsole [earlycon0] enabled
+>> Memory policy: Data cache writeback
+>> BUG: mapping for 0xf1012000 at 0xfff12000 out of vmalloc space
+> Humm, is that the serial port? Do you get a working serial port?
+Good catch, I had an incorrect virtual address in the Kconfig - that is 
+fixed as per default now, and I no-longer get the "BUG" statement
+The serial port was working before, and this has not had any effect on CPU1.
+>
+>> CPU: All CPU(s) started in SVC mode.
+>> PERCPU: Embedded 7 pages/cpu @ee7d5000 s7680 r8192 d12800 u32768
+>> Built 1 zonelists in Zone order, mobility grouping on.  Total pages: 522768
+>> Kernel command line: console=ttyS0,115200 earlyprintk root=/dev/ram
+>> PID hash table entries: 4096 (order: 2, 16384 bytes)
+>> Dentry cache hash table entries: 131072 (order: 7, 524288 bytes)
+>> Inode-cache hash table entries: 65536 (order: 6, 262144 bytes)
+>> Memory: 2063736K/2097152K available (4932K kernel code, 259K rwdata,
+> Do you have 2G RAM? The DTS file indicates DB has 1G RAM. But if
+> u-boot is passing the right stuff to the kernel, that should not
+> matter.
+>
+> 	Andrew
+The Rev 2 dev board comes with 2G of RAM.
 
-On Mon, Jul 28, 2014 at 04:16:07PM -0500, Felipe Balbi wrote:
-> we don't need that anymore since specific
-> devices are passing correct compatible flags.
-> 
-> Signed-off-by: Felipe Balbi <balbi@ti.com>
-> ---
->  arch/arm/mach-omap2/irq.c | 3 ---
->  1 file changed, 3 deletions(-)
-> 
-> diff --git a/arch/arm/mach-omap2/irq.c b/arch/arm/mach-omap2/irq.c
-> index 7a4ead3..e70c26e 100644
-> --- a/arch/arm/mach-omap2/irq.c
-> +++ b/arch/arm/mach-omap2/irq.c
-> @@ -313,9 +313,6 @@ static int __init intc_of_init(struct device_node *node,
->  	if (of_device_is_compatible(node, "ti,am33xx-intc"))
->  		nr_irq = 128;
->  
-> -	if (of_property_read_u32(node, "ti,intc-size", &nr_irq))
-> -		pr_warn("unable to get intc-size, default to %d\n", nr_irq);
-> -
-
-keeping this code would avoid breaking the DT API. I suggest to
-change it to something like the following:
-
-if (!of_property_read_u32(...))
-    dev_warn(dev, "ti,intc-size is deprecated, please update your DT file");
-
-Apart from that the Documentation [0] should be updated (add
-deprecation notice for ti,intc-size and add new compatible values)
-and maybe moved to [1] (where other SoCs put their irq controller
-binding docs).
-
-[0] Documentation/devicetree/bindings/arm/omap/intc.txt
-[1] Documentation/devicetree/bindings/interrupt-controller/
-
--- Sebastian
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140729/ba474f43/attachment.sig>
+Thanks,
+Ken
