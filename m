@@ -1,48 +1,46 @@
 From: vbridgers2013@gmail.com (Vince Bridgers)
-Date: Tue, 29 Jul 2014 17:06:47 -0500
-Subject: [PATCH net v3 6/6] net: stmmac: squelch sparse warning with casts
+Date: Tue, 29 Jul 2014 17:06:45 -0500
+Subject: [PATCH net v3 4/6] ARM: socfpga: Add socfpga Ethernet filter
+ attributes entries
 In-Reply-To: <1406671607-27368-1-git-send-email-vbridgers2013@gmail.com>
 References: <1406671607-27368-1-git-send-email-vbridgers2013@gmail.com>
-Message-ID: <1406671607-27368-7-git-send-email-vbridgers2013@gmail.com>
+Message-ID: <1406671607-27368-5-git-send-email-vbridgers2013@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add casts to squelch the following sparse warnings so we can see
-the ones that matter when they occur.
-
-stmmac_platform.c:260:20: warning: incorrect type in argument 1
-			  (different address spaces)
-stmmac_platform.c:260:20:    expected void const *static extern
-			  [signed] [long] [typedef] [tls] inline [safe] ptr
-stmmac_platform.c:260:20:    got void [noderef] <asn:2>*[assigned] addr
-stmmac_platform.c:261:32: warning: incorrect type in argument 1
-			  (different address spaces)
-stmmac_platform.c:261:32:    expected void const *static extern
-			  [signed] [long] [typedef] [tls] inline [safe] ptr
-stmmac_platform.c:261:32:    got void [noderef] <asn:2>*[assigned] addr
+This patch adds socfpga Ethernet filter attributes for multicast
+and unicast filters per Synopsys Ethernet IP configuration chosen
+by Altera for the Cyclone 5 and Arria SOC FPGAs.
 
 Signed-off-by: Vince Bridgers <vbridgers2013@gmail.com>
 ---
-V3: Add minor sparse warning correction as part of series
-V2: Not present in prior submissions
+V3: No changes
+V2: No changes
 ---
- .../net/ethernet/stmicro/stmmac/stmmac_platform.c  |    4 ++--
- 1 file changed, 2 insertions(+), 2 deletions(-)
+ arch/arm/boot/dts/socfpga.dtsi |    4 ++++
+ 1 file changed, 4 insertions(+)
 
-diff --git a/drivers/net/ethernet/stmicro/stmmac/stmmac_platform.c b/drivers/net/ethernet/stmicro/stmmac/stmmac_platform.c
-index bb524a9..228003b 100644
---- a/drivers/net/ethernet/stmicro/stmmac/stmmac_platform.c
-+++ b/drivers/net/ethernet/stmicro/stmmac/stmmac_platform.c
-@@ -257,8 +257,8 @@ static int stmmac_pltfr_probe(struct platform_device *pdev)
+diff --git a/arch/arm/boot/dts/socfpga.dtsi b/arch/arm/boot/dts/socfpga.dtsi
+index 4676f25..70fdd20 100644
+--- a/arch/arm/boot/dts/socfpga.dtsi
++++ b/arch/arm/boot/dts/socfpga.dtsi
+@@ -486,6 +486,8 @@
+ 			clock-names = "stmmaceth";
+ 			resets = <&rst EMAC0_RESET>;
+ 			reset-names = "stmmaceth";
++			snps,multicast-filter-bins = <256>;
++			snps,perfect-filter-entries = <128>;
+ 			status = "disabled";
+ 		};
  
- 	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
- 	addr = devm_ioremap_resource(dev, res);
--	if (IS_ERR(addr))
--		return PTR_ERR(addr);
-+	if (IS_ERR((void __force *)addr))
-+		return PTR_ERR((void __force *)addr);
+@@ -500,6 +502,8 @@
+ 			clock-names = "stmmaceth";
+ 			resets = <&rst EMAC1_RESET>;
+ 			reset-names = "stmmaceth";
++			snps,multicast-filter-bins = <256>;
++			snps,perfect-filter-entries = <128>;
+ 			status = "disabled";
+ 		};
  
- 	plat_dat = dev_get_platdata(&pdev->dev);
- 	if (pdev->dev.of_node) {
 -- 
 1.7.9.5
