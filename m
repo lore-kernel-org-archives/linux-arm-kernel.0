@@ -1,73 +1,108 @@
-From: ta.omasab@gmail.com (Thomas Abraham)
-Date: Tue, 29 Jul 2014 17:16:49 +0530
-Subject: [PATCH v8 2/6] clk: samsung: add cpu clock configuration data and
- instantiate cpu clock
-In-Reply-To: <53D773DA.6050003@gmail.com>
-References: <1406611711-25112-1-git-send-email-thomas.ab@samsung.com>
- <1406611711-25112-3-git-send-email-thomas.ab@samsung.com>
- <53D773DA.6050003@gmail.com>
-Message-ID: <CAJuA9ahuch8c9CzVwO7pf8Chf0G3coNH4KLOF29Sj7dQ9gqO_Q@mail.gmail.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Tue, 29 Jul 2014 12:57:16 +0100
+Subject: [PATCH] arm64: Fix UP build warning in gic-v3
+In-Reply-To: <1406588159.28348.41.camel@smoke> (Geoff Levand's message of
+ "Mon, 28 Jul 2014 23:55:59 +0100")
+References: <1406588159.28348.41.camel@smoke>
+Message-ID: <878uncml7n.fsf@approximate.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Tomasz,
+On Mon, Jul 28 2014 at 11:55:59 pm BST, Geoff Levand <geoff@infradead.org> wrote:
+> The static routines gic_write_sgi1r() and gic_peek_irq() are only used for SMP
+> builds, so move those two routines to within the defined(CONFIG_SMP)
+> preprocessor conditional.
+>
+> Fixes build warnings like these when CONFIG_SMP=n:
+>
+>   drivers/irqchip/irq-gic-v3.c: warning: ?gic_write_sgi1r? defined but not used
+>   drivers/irqchip/irq-gic-v3.c: warning: ?gic_peek_irq? defined but not used
+>
+> Signed-off-by: Geoff Levand <geoff@infradead.org>
+> ---
+> Hi Marc,
+>
+> I'm not sure if this has gone upstream yet, but I get these warnings
+> with Catalin's current arm64/for-next/core branch.
+>
+> Feel free to just fold this into your gic-v3 patch if you'll be
+> sending out a new version.
 
-On Tue, Jul 29, 2014 at 3:43 PM, Tomasz Figa <tomasz.figa@gmail.com> wrote:
-> Hi Thomas,
->
-> Just few minor comments for things I probably missed before.
->
-> On 29.07.2014 07:28, Thomas Abraham wrote:
->
-> [snip]
->
->> @@ -1356,6 +1357,16 @@ static struct samsung_pll_clock exynos4x12_plls[nr_plls] __initdata = {
->>                       VPLL_LOCK, VPLL_CON0, NULL),
->>  };
->>
->> +static const struct exynos_cpuclk_cfg_data e4210_armclk_d[] __initconst = {
->> +     { 1200000, E4210_CPU_DIV0(7, 1, 4, 3, 7, 3), E4210_CPU_DIV1(0, 5), },
->> +     { 1000000, E4210_CPU_DIV0(7, 1, 4, 3, 7, 3), E4210_CPU_DIV1(0, 4), },
->> +     {  800000, E4210_CPU_DIV0(7, 1, 3, 3, 7, 3), E4210_CPU_DIV1(0, 3), },
->> +     {  500000, E4210_CPU_DIV0(7, 1, 3, 3, 7, 3), E4210_CPU_DIV1(0, 3), },
->> +     {  400000, E4210_CPU_DIV0(7, 1, 3, 3, 7, 3), E4210_CPU_DIV1(0, 3), },
->
-> I have noticed that the old driver does not have this operating point.
-> While it is probably OK to add this one and even few more for all
-> possible APLL settings, I am interested in how you obtained the values
-> for DIV0 and DIV1 registers for this configuration.
+Hi Geof,
 
-I found these values from an old internal repo. So far no trouble seen
-with these values in all the testing.
-
->
->> +     {  200000, E4210_CPU_DIV0(0, 1, 1, 1, 3, 1), E4210_CPU_DIV1(0, 3), },
->> +     {  0 },
->> +};
->
-> [snip]
->
->> diff --git a/include/dt-bindings/clock/exynos5250.h b/include/dt-bindings/clock/exynos5250.h
->> index 4273891..855d809 100644
->> --- a/include/dt-bindings/clock/exynos5250.h
->> +++ b/include/dt-bindings/clock/exynos5250.h
->> @@ -21,6 +21,7 @@
->>  #define CLK_FOUT_CPLL                6
->>  #define CLK_FOUT_EPLL                7
->>  #define CLK_FOUT_VPLL                8
->> +#define CLK_ARM_CLK          12
->
-> Why 12 not 9?
-
-Exynos4 uses 12 and so just wanted to keep it same for Exynos5250 as well.
+There is a similar patch from Mark Brown on its way (not addressing
+gic_write_sgi1r though).
 
 Thanks,
-Thomas.
 
+	M.
 >
-> Best regards,
-> Tomasz
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-samsung-soc" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> -Geoff
+>
+>  drivers/irqchip/irq-gic-v3.c | 36 ++++++++++++++++++------------------
+>  1 file changed, 18 insertions(+), 18 deletions(-)
+>
+> diff --git a/drivers/irqchip/irq-gic-v3.c b/drivers/irqchip/irq-gic-v3.c
+> index 57eaa5a..e9ee18a 100644
+> --- a/drivers/irqchip/irq-gic-v3.c
+> +++ b/drivers/irqchip/irq-gic-v3.c
+> @@ -129,11 +129,6 @@ static void gic_write_grpen1(u64 val)
+>  	isb();
+>  }
+>  
+> -static void gic_write_sgi1r(u64 val)
+> -{
+> -	asm volatile("msr_s " __stringify(ICC_SGI1R_EL1) ", %0" : : "r" (val));
+> -}
+> -
+>  static void gic_enable_sre(void)
+>  {
+>  	u64 val;
+> @@ -200,19 +195,6 @@ static void gic_poke_irq(struct irq_data *d, u32 offset)
+>  	rwp_wait();
+>  }
+>  
+> -static int gic_peek_irq(struct irq_data *d, u32 offset)
+> -{
+> -	u32 mask = 1 << (gic_irq(d) % 32);
+> -	void __iomem *base;
+> -
+> -	if (gic_irq_in_rdist(d))
+> -		base = gic_data_rdist_sgi_base();
+> -	else
+> -		base = gic_data.dist_base;
+> -
+> -	return !!(readl_relaxed(base + offset + (gic_irq(d) / 32) * 4) & mask);
+> -}
+> -
+>  static void gic_mask_irq(struct irq_data *d)
+>  {
+>  	gic_poke_irq(d, GICD_ICENABLER);
+> @@ -401,6 +383,24 @@ static void gic_cpu_init(void)
+>  }
+>  
+>  #ifdef CONFIG_SMP
+> +static void gic_write_sgi1r(u64 val)
+> +{
+> +	asm volatile("msr_s " __stringify(ICC_SGI1R_EL1) ", %0" : : "r" (val));
+> +}
+> +
+> +static int gic_peek_irq(struct irq_data *d, u32 offset)
+> +{
+> +	u32 mask = 1 << (gic_irq(d) % 32);
+> +	void __iomem *base;
+> +
+> +	if (gic_irq_in_rdist(d))
+> +		base = gic_data_rdist_sgi_base();
+> +	else
+> +		base = gic_data.dist_base;
+> +
+> +	return !!(readl_relaxed(base + offset + (gic_irq(d) / 32) * 4) & mask);
+> +}
+> +
+>  static int gic_secondary_init(struct notifier_block *nfb,
+>  			      unsigned long action, void *hcpu)
+>  {
+
+-- 
+Jazz is not dead. It just smells funny.
