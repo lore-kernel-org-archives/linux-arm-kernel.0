@@ -1,82 +1,73 @@
-From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
-Date: Tue, 29 Jul 2014 14:38:24 +0200
-Subject: [PATCH v3 0/2] usb: fix controller-PHY binding for OMAP3 platform
-In-Reply-To: <53CF7978.4090709@ti.com>
-References: <1387209225-11520-1-git-send-email-kishon@ti.com>
- <20140721151557.GH6852@saruman.home> <53CF7978.4090709@ti.com>
-Message-ID: <14357891.vooz1N5zDC@avalon>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Tue, 29 Jul 2014 13:38:00 +0100
+Subject: [PATCH v15 06/12] document: dt: add the binding on HiP04 clock
+In-Reply-To: <CAD6h2NS4GqxyFBE0+nq6Phxy0j6J74M5+N5DOEPSOYfB4+7Wxg@mail.gmail.com>
+References: <1406555876-11989-1-git-send-email-haojian.zhuang@linaro.org>
+ <1406555876-11989-7-git-send-email-haojian.zhuang@linaro.org>
+ <20140728175418.GD2576@leverpostej>
+ <CAD6h2NS4GqxyFBE0+nq6Phxy0j6J74M5+N5DOEPSOYfB4+7Wxg@mail.gmail.com>
+Message-ID: <20140729123800.GO2576@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 23 July 2014 14:29:36 Kishon Vijay Abraham I wrote:
-> On Monday 21 July 2014 08:45 PM, Felipe Balbi wrote:
-> > On Mon, Jul 21, 2014 at 05:04:57PM +0200, Laurent Pinchart wrote:
-> >> Hi Felipe,
-> >> 
-> >> What happened to these two patches ?
-> > 
-> > looks like I lost them.
-> > 
-> >> On Monday 16 December 2013 17:48:29 Felipe Balbi wrote:
-> >>> On Mon, Dec 16, 2013 at 02:38:27PM -0800, Tony Lindgren wrote:
-> >>>> * Felipe Balbi <balbi@ti.com> [131216 13:31]:
-> >>>>> On Mon, Dec 16, 2013 at 09:23:43PM +0530, Kishon Vijay Abraham I 
-wrote:
-> >>>>>> After the platform devices are created using PLATFORM_DEVID_AUTO, the
-> >>>>>> device names given in usb_bind_phy (in board file) does not match
-> >>>>>> with the actual device name causing the USB PHY library not to return
-> >>>>>> the PHY reference when the MUSB controller request for the PHY in the
-> >>>>>> non-dt boot case.
-> >>>>>> So removed creating platform devices using PLATFORM_DEVID_AUTO in
-> >>>>>> omap2430.c.
-> >>>>>> 
-> >>>>>> Did enumeration testing in omap3 beagle.
-> >>>>>> 
-> >>>>>> Changes from v2:
-> >>>>>> * Fixed the commit log
-> >>>>>> 
-> >>>>>> Changes from v1:
-> >>>>>> * refreshed to the latested mainline kernel
-> >>>>>> * added musb_put_id from omap2430 remove.
-> >>>>> 
-> >>>>> Tony, how do you want to handle this ? You want me to provide you a
-> >>>>> branch which we both merge ?
-> >>>> 
-> >>>> Yes that would be great thanks. For the mach-omap2 touching parts:
-> >>>> 
-> >>>> Acked-by: Tony Lindgren <tony@atomide.com>
-> >>> 
-> >>> Here it is, let me know if you prefer a signed tag:
-> >>> 
-> >>> The following changes since commit 
-6ce4eac1f600b34f2f7f58f9cd8f0503d79e42ae:
-> >>>   Linux 3.13-rc1 (2013-11-22 11:30:55 -0800)
-> >>> 
-> >>> are available in the git repository at:
-> >>>   git://git.kernel.org/pub/scm/linux/kernel/git/balbi/usb.git
-> >>> 
-> >>> usb-phy-binding-omap3
-> >>> 
-> >>> for you to fetch changes up to 23ada3130cf4e56acb86fdff4c26113188d52d18:
-> >>>   arm: omap: remove *.auto* from device names given in usb_bind_phy
-> >>> 
-> >>> (2013-12-16 17:44:43 -0600)
-> >>> 
-> >>> ----------------------------------------------------------------
-> >>> 
-> >>> Kishon Vijay Abraham I (2):
-> >>>       usb: musb: omap: remove using PLATFORM_DEVID_AUTO in omap2430.c
-> >>>       arm: omap: remove *.auto* from device names given in usb_bind_phy
-> > 
-> > Kishon, are these still valid ?
+On Tue, Jul 29, 2014 at 03:25:49AM +0100, Haojian Zhuang wrote:
+> On 29 July 2014 01:54, Mark Rutland <mark.rutland@arm.com> wrote:
+> > On Mon, Jul 28, 2014 at 02:57:50PM +0100, Haojian Zhuang wrote:
+> >> The DT binding for Hisilicon HiP04 clock driver.
+> >>
+> >> Signed-off-by: Haojian Zhuang <haojian.zhuang@linaro.org>
+> >> ---
+> >>  .../devicetree/bindings/clock/hip04-clock.txt        | 20 ++++++++++++++++++++
+> >>  1 file changed, 20 insertions(+)
+> >>  create mode 100644 Documentation/devicetree/bindings/clock/hip04-clock.txt
+> >>
+> >> diff --git a/Documentation/devicetree/bindings/clock/hip04-clock.txt b/Documentation/devicetree/bindings/clock/hip04-clock.txt
+> >> new file mode 100644
+> >> index 0000000..4d31ae3
+> >> --- /dev/null
+> >> +++ b/Documentation/devicetree/bindings/clock/hip04-clock.txt
+> >> @@ -0,0 +1,20 @@
+> >> +* Hisilicon HiP04 Clock Controller
+> >> +
+> >> +The HiP04 clock controller generates and supplies clock to various
+> >> +controllers within the HiP04 SoC.
+> >> +
+> >> +Required Properties:
+> >> +
+> >> +- compatible: should be one of the following.
+> >> +  - "hisilicon,hip04-clock" - controller compatible with HiP04 SoC.
+> >
+> > There's only one clock controller on-board and it's custom for HiP04?
+> >
 > 
-> Looks like board-2430sdp.c got removed. Apart from that the reset of the
-> patch series is still applicable for non-dt boot.
+> Since all those PLL settings are configured in bootloader, kernel
+> don't need to configure it again.
+> 
+> By the way, I don't have the manual to configure those PLLs. All the clocks
+> are defined as fixed in kernel side.
 
-Felipe, do you plan to apply the patch without the baord-2430sdp.c change, or 
-would you like Kishon to rebase and resubmit it ?
+Given that, per Arnd's suggestion these should probably just be
+fixed-clock nodes, and we don't need the driver at all until we know how
+to handle these PLLs and their parents.
 
--- 
-Regards,
+> >> +
+> >> +- reg: physical base address of the controller and length of memory mapped
+> >> +  region.
+> >> +
+> >> +- #clock-cells: should be 1.
+> >> +
+> >> +
+> >> +Each clock is assigned an identifier and client nodes use this identifier
+> >> +to specify the clock which they consume.
+> >> +
+> >> +All these identifier could be found in <dt-bindings/clock/hip04-clock.h>.
+> >
+> > This must come in the same patch.
+> >
+> > Mark.
+> 
+> HiP04 clock driver is already merged into mainline.
 
-Laurent Pinchart
+I see. This was not obvious from the commit message.
+
+Mark.
