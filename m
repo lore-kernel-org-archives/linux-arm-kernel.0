@@ -1,52 +1,46 @@
 From: luto@amacapital.net (Andy Lutomirski)
-Date: Mon, 28 Jul 2014 20:38:28 -0700
-Subject: [PATCH v4 1/5] x86,x32,audit: Fix x32's AUDIT_ARCH wrt audit
+Date: Mon, 28 Jul 2014 20:38:29 -0700
+Subject: [PATCH v4 2/5] x86,entry: Only call user_exit if TIF_NOHZ
 In-Reply-To: <cover.1406604806.git.luto@amacapital.net>
 References: <cover.1406604806.git.luto@amacapital.net>
-Message-ID: <ed503c590487ac761b9bf39dac4fe26c64022962.1406604806.git.luto@amacapital.net>
+Message-ID: <7123b2489cc5d1d5abb7bcf1364ca729cab3e6ca.1406604806.git.luto@amacapital.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-is_compat_task() is the wrong check for audit arch; the check should
-be is_ia32_task(): x32 syscalls should be AUDIT_ARCH_X86_64, not
-AUDIT_ARCH_I386.
+The RCU context tracking code requires that arch code call
+user_exit() on any entry into kernel code if TIF_NOHZ is set.  This
+patch adds a check for TIF_NOHZ and a comment to the syscall entry
+tracing code.
 
-CONFIG_AUDITSYSCALL is currently incompatible with x32, so this has
-no visible effect.
+The main purpose of this patch is to make the code easier to follow:
+one can read the body of user_exit and of every function it calls
+without finding any explanation of why it's called for traced
+syscalls but not for untraced syscalls.  This makes it clear when
+user_exit() is necessary.
 
+Cc: Frederic Weisbecker <fweisbec@gmail.com>
 Signed-off-by: Andy Lutomirski <luto@amacapital.net>
 ---
- arch/x86/kernel/ptrace.c | 11 +----------
- 1 file changed, 1 insertion(+), 10 deletions(-)
+ arch/x86/kernel/ptrace.c | 7 ++++++-
+ 1 file changed, 6 insertions(+), 1 deletion(-)
 
 diff --git a/arch/x86/kernel/ptrace.c b/arch/x86/kernel/ptrace.c
-index 93c182a..39296d2 100644
+index 39296d2..bbf338a 100644
 --- a/arch/x86/kernel/ptrace.c
 +++ b/arch/x86/kernel/ptrace.c
-@@ -1441,15 +1441,6 @@ void send_sigtrap(struct task_struct *tsk, struct pt_regs *regs,
- 	force_sig_info(SIGTRAP, &info, tsk);
- }
+@@ -1449,7 +1449,12 @@ long syscall_trace_enter(struct pt_regs *regs)
+ {
+ 	long ret = 0;
  
--
--#ifdef CONFIG_X86_32
--# define IS_IA32	1
--#elif defined CONFIG_IA32_EMULATION
--# define IS_IA32	is_compat_task()
--#else
--# define IS_IA32	0
--#endif
--
- /*
-  * We must return the syscall number to actually look up in the table.
-  * This can be -1L to skip running any syscall at all.
-@@ -1487,7 +1478,7 @@ long syscall_trace_enter(struct pt_regs *regs)
- 	if (unlikely(test_thread_flag(TIF_SYSCALL_TRACEPOINT)))
- 		trace_sys_enter(regs, regs->orig_ax);
+-	user_exit();
++	/*
++	 * If TIF_NOHZ is set, we are required to call user_exit() before
++	 * doing anything that could touch RCU.
++	 */
++	if (test_thread_flag(TIF_NOHZ))
++		user_exit();
  
--	if (IS_IA32)
-+	if (is_ia32_task())
- 		audit_syscall_entry(AUDIT_ARCH_I386,
- 				    regs->orig_ax,
- 				    regs->bx, regs->cx,
+ 	/*
+ 	 * If we stepped into a sysenter/syscall insn, it trapped in
 -- 
 1.9.3
