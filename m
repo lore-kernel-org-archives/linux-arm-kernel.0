@@ -1,54 +1,56 @@
-From: punit.agrawal@arm.com (Punit Agrawal)
-Date: Tue, 29 Jul 2014 12:34:17 +0100
-Subject: [PATCH] drivers: CCI: Correct use of ! and &
-In-Reply-To: <20140723150518.GD27677@arm.com> (Will Deacon's message of "Wed,
- 23 Jul 2014 16:05:18 +0100")
-References: <20140707140538.GA4204@himangi-Dell> <9hhwqb42k63.fsf@arm.com>
- <20140723150518.GD27677@arm.com>
-Message-ID: <9hhvbqg1jra.fsf@arm.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Tue, 29 Jul 2014 04:39:18 -0700
+Subject: [GIT PULL] late omap mailbox clean-up, driver parts
+Message-ID: <20140729113917.GP29045@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Arnd,
+The following changes since commit cbf14f3ab9bd6295b345fc812f08ddd844fb183e:
 
-Will Deacon <will.deacon@arm.com> writes:
+  ARM: AM33xx: hwmod_data: Remove legacy mailbox addrs (2014-07-15 05:08:56 -0700)
 
-> On Wed, Jul 23, 2014 at 04:01:56PM +0100, Punit Agrawal wrote:
->> > diff --git a/drivers/bus/arm-cci.c b/drivers/bus/arm-cci.c
->> > index 5a86da9..7af78df 100644
->> > --- a/drivers/bus/arm-cci.c
->> > +++ b/drivers/bus/arm-cci.c
->> > @@ -397,7 +397,8 @@ static irqreturn_t pmu_handle_irq(int irq_num, void *dev)
->> >  		hw_counter = &event->hw;
->> >  
->> >  		/* Did this counter overflow? */
->> > -		if (!pmu_read_register(idx, CCI_PMU_OVRFLW) & CCI_PMU_OVRFLW_FLAG)
->> > +		if (!(pmu_read_register(idx, CCI_PMU_OVRFLW) &
->> > +		      CCI_PMU_OVRFLW_FLAG))
->> >  			continue;
->> 
->> 
->> Going back to the manual, this fix looks correct.
->> 
->> Acked-by: Punit Agrawal <punit.agrawal@arm.com>
->> 
->> Will, would this go via your tree?
->
-> Given that you're happy with it, I don't mind which tree it goes in.
-> Probably deserves a CC stable on it too.
+are available in the git repository at:
 
-The CCI PMU patches went via arm-soc. Are you happy to pick this fix with
-the Ack and a Cc to stable.
+  git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap tags/omap-for-v3.17/mailbox-cleanup
 
-Cheers,
-Punit
+for you to fetch changes up to 72c1c8179cdc5ba7208d375bd3f104659fc50ad0:
 
->
-> If you get stuck, put it in rmk's patch system.
->
-> Will
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-kernel" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
-> Please read the FAQ at  http://www.tux.org/lkml/
+  mailbox/omap: add a parent structure for every IP instance (2014-07-29 01:57:25 -0700)
+
+----------------------------------------------------------------
+Driver specific omap mailbox cleanup. Mostly to remove
+broken legacy code for omap1 and move things towards
+device tree.
+
+These patches were posted a while back, but I did not
+realize I was supposed to merge the driver related
+parts too. So apologies for a late pull request on
+these changes.
+
+----------------------------------------------------------------
+
+Note that these are based on the SoC related changes already
+pulled.
+
+----------------------------------------------------------------
+
+Suman Anna (7):
+      mailbox/omap: use devm_* interfaces
+      mailbox/omap: remove OMAP1 mailbox driver
+      mailbox/omap: remove omap_mbox_type_t from mailbox ops
+      mailbox/omap: simplify the fifo assignment by using macros
+      mailbox/omap: consolidate OMAP mailbox driver
+      mailbox/omap: remove the private mailbox structure
+      mailbox/omap: add a parent structure for every IP instance
+
+ arch/arm/configs/omap1_defconfig |   2 -
+ drivers/mailbox/Kconfig          |  19 +-
+ drivers/mailbox/Makefile         |   6 +-
+ drivers/mailbox/mailbox-omap1.c  | 203 ------------------
+ drivers/mailbox/mailbox-omap2.c  | 357 -------------------------------
+ drivers/mailbox/omap-mailbox.c   | 444 +++++++++++++++++++++++++++++++--------
+ drivers/mailbox/omap-mbox.h      |  67 ------
+ 7 files changed, 360 insertions(+), 738 deletions(-)
+ delete mode 100644 drivers/mailbox/mailbox-omap1.c
+ delete mode 100644 drivers/mailbox/mailbox-omap2.c
+ delete mode 100644 drivers/mailbox/omap-mbox.h
