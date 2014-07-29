@@ -1,58 +1,67 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Tue, 29 Jul 2014 16:14:44 -0600
-Subject: [PATCH 8/8] clk: tegra: Add EMC clock driver
-In-Reply-To: <20140729201939.4627.79710@quantum>
-References: <1405088313-20048-1-git-send-email-mperttunen@nvidia.com>
- <1405088313-20048-9-git-send-email-mperttunen@nvidia.com>
- <53CE97F2.80300@wwwdotorg.org> <53D75FA7.1030300@nvidia.com>
- <20140729201939.4627.79710@quantum>
-Message-ID: <53D81CD4.5010307@wwwdotorg.org>
+From: collinsd@codeaurora.org (David Collins)
+Date: Tue, 29 Jul 2014 15:23:29 -0700
+Subject: [PATCH v3 2/4] mfd: pm8xxx-spmi: document DT bindings for Qualcomm
+ SPMI PMICs
+In-Reply-To: <1406205921-7452-3-git-send-email-svarbanov@mm-sol.com>
+References: <1406205921-7452-1-git-send-email-svarbanov@mm-sol.com>
+ <1406205921-7452-3-git-send-email-svarbanov@mm-sol.com>
+Message-ID: <53D81EE1.7040309@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/29/2014 02:19 PM, Mike Turquette wrote:
-> Quoting Mikko Perttunen (2014-07-29 01:47:35)
->> On 22/07/14 19:57, Stephen Warren wrote:
->>> On 07/11/2014 08:18 AM, Mikko Perttunen wrote:
->>>> +static int emc_debug_rate_set(void *data, u64 rate)
->>>> +{
->>>> +    struct tegra_emc *tegra = data;
->>>> +
->>>> +    return clk_set_rate(tegra->hw.clk, rate);
->>>> +}
->>>> +
->>>> +DEFINE_SIMPLE_ATTRIBUTE(emc_debug_rate_fops, emc_debug_rate_get,
->>>> +                    emc_debug_rate_set, "%lld\n");
->>>
->>> I think the rate can already be obtained through
->>> ...debug/clock/clock_summary. I'm not sure about changing the rate, but
->>> shouldn't that be a feature of the common clock core, not individual
->>> drivers?
->>
->> The core doesn't allow writing to the rate debugfs files, so this is the
->> only way to trigger an EMC clock change for now. I agree that the core
->> might be a better place. I don't know if there are any philosophical
->> objections to that. I'd like to keep this in until a possible core
->> feature addition. Mike, any comments?
->
-> Yes, there is a philosophical rejection to exposing rate-change knobs to
-> userspace through debugfs. These can and will ship in real products
-> (typically Android) with lots of nasty userspace hacks, and also
-> represent pretty dangerous things to expose to userspace. I have always
-> maintained that such knobs should remain out of tree or, with the advent
-> of the custom debugfs entries, should be burden of the clock drivers.
+On 07/24/2014 05:45 AM, Stanimir Varbanov wrote:
+> Document DT bindings used to describe the Qualcomm SPMI PMICs.
+> Currently the SPMI PMICs supported are pm8941, pm8841 and pma8084.
+> 
+> Signed-off-by: Stanimir Varbanov <svarbanov@mm-sol.com>
 
-That argument seems a bit inconsistent.
+(...)
+> +Required properties for peripheral child nodes:
+> +- compatible:      Should contain "qcom,pm8xxx-xxx", where "xxx" is
+> +                   peripheral name. The "pm8xxx" can be any of supported PMICs,
+> +                   see example below.
 
-I can see the argument to disallow code that lets user-space fiddle with 
-clocks. However, if that argument holds, then surely it must apply to 
-either the clock core *or* a clock driver; the end effect of allowing 
-the code in either place is that people will be able to implement the 
-user-space hacks you want to avoid. Yet, if we allow the code because 
-it's a useful debug tool, then surely it should be in the clock core so 
-we don't implement it redundantly in each clock driver.
+I don't think that this binding document should be imposing any formatting
+restrictions on the compatible strings for QPNP peripheral drivers.  The
+QPNP peripheral drivers in the downstream msm-3.10 tree [1] do not specify
+per-PMIC compatible strings.  This is because ideally, a given QPNP
+peripheral represents a hardware block that is identical in interface and
+operation between PMICs.
 
-We could always taint the kernel if the feature is used. Admittedly that 
-wouldn't stop people using the feature as a hack in Android/product 
-kernels, but at least nobody would have to unknowingly debug problems 
-due to such manipulation, in the context of an upstream kernel.
+These peripheral drivers determine the base address for a given device
+instance via device tree reg and reg-names properties.  In order for this
+to continue to work with the pm8xxx-spmi driver, some mechanism will need
+to be introduced which creates resource structs for the
+non-memory-mappable SPMI base addresses.  One possible solution is
+currently being discussed in another thread [2].  This document will need
+to be updated to show the child node reg property scheme once a solution
+is reached.
+
+(...)
+> +Example:
+> +
+> +	pm8941 at 0 {
+> +		compatible = "qcom,pm8941";
+> +		reg = <0x0 SPMI_USID>;
+> +
+> +		rtc {
+> +			compatible = "qcom,pm8941-rtc";
+> +			interrupts = <0x0 0x61 0x1 IRQ_TYPE_EDGE_RISING>;
+> +			interrupt-names = "alarm";
+> +		};
+> +	};
+
+Can you please expand your example to include the second SID for the
+PM8941 chip?  That way, it will be clear that each PMIC needs two DT
+nodes; one for each SID.
+
+Thanks,
+David Collins
+
+[1]: https://www.codeaurora.org/cgit/quic/la/kernel/msm-3.10/tree/?h=msm-3.10
+
+[2]: https://lkml.org/lkml/2014/7/29/252
+
+-- 
+The Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+hosted by The Linux Foundation
