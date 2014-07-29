@@ -1,68 +1,27 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Tue, 29 Jul 2014 05:01:33 -0700
-Subject: [PATCH 30/35] irqchip: add irq-omap-intc.h header
-In-Reply-To: <1406582183-696-31-git-send-email-balbi@ti.com>
-References: <1406582183-696-1-git-send-email-balbi@ti.com>
- <1406582183-696-31-git-send-email-balbi@ti.com>
-Message-ID: <20140729120133.GQ29045@atomide.com>
+From: broonie@kernel.org (Mark Brown)
+Date: Tue, 29 Jul 2014 13:03:17 +0100
+Subject: [PATCH] arm64: Fix UP build warning in gic-v3
+In-Reply-To: <878uncml7n.fsf@approximate.cambridge.arm.com>
+References: <1406588159.28348.41.camel@smoke>
+ <878uncml7n.fsf@approximate.cambridge.arm.com>
+Message-ID: <20140729120317.GP17528@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Felipe Balbi <balbi@ti.com> [140728 14:19]:
-> OMAP INTC irqchip driver will be moved under
-> drivers/irqchip/ soon but we still have a dependency
-> with mach-omap2 when it comes to idle functions.
-> 
-> In order to make it easy to share those function
-> prototypes with OMAP PM code, we introduce this new
-> header.
-> 
-> Signed-off-by: Felipe Balbi <balbi@ti.com>
-> ---
->  arch/arm/mach-omap2/board-3430sdp.c        |  1 +
->  arch/arm/mach-omap2/board-am3517crane.c    |  1 +
->  arch/arm/mach-omap2/board-am3517evm.c      |  1 +
->  arch/arm/mach-omap2/board-cm-t35.c         |  1 +
->  arch/arm/mach-omap2/board-cm-t3517.c       |  1 +
->  arch/arm/mach-omap2/board-devkit8000.c     |  1 +
->  arch/arm/mach-omap2/board-ldp.c            |  1 +
->  arch/arm/mach-omap2/board-omap3beagle.c    |  1 +
->  arch/arm/mach-omap2/board-omap3logic.c     |  1 +
->  arch/arm/mach-omap2/board-omap3pandora.c   |  1 +
->  arch/arm/mach-omap2/board-omap3stalker.c   |  1 +
->  arch/arm/mach-omap2/board-omap3touchbook.c |  1 +
->  arch/arm/mach-omap2/board-overo.c          |  1 +
->  arch/arm/mach-omap2/board-rx51.c           |  1 +
->  arch/arm/mach-omap2/board-ti8168evm.c      |  1 +
->  arch/arm/mach-omap2/common.h               |  9 ---------
->  arch/arm/mach-omap2/cpuidle34xx.c          |  1 +
->  arch/arm/mach-omap2/irq.c                  |  1 +
->  arch/arm/mach-omap2/pm24xx.c               |  1 +
->  arch/arm/mach-omap2/pm34xx.c               |  1 +
->  include/linux/irqchip/irq-omap-intc.h      | 32 ++++++++++++++++++++++++++++++
-...
+On Tue, Jul 29, 2014 at 12:57:16PM +0100, Marc Zyngier wrote:
 
-> +void omap2_init_irq(void);
-> +void omap3_init_irq(void);
-> +void ti81xx_init_irq(void);
+> There is a similar patch from Mark Brown on its way (not addressing
+> gic_write_sgi1r though).
 
-I think these will all go away with DT based booting?
-So it might be worth waiting for that rather than churn
-all these files, or..
-
-> +int omap_irq_pending(void);
-> +void omap_intc_save_context(void);
-> +void omap_intc_restore_context(void);
-> +void omap3_intc_suspend(void);
-> +void omap3_intc_prepare_idle(void);
-> +void omap3_intc_resume_idle(void);
-
-..how about we pass something like struct omap_intc_data
-as pdata and let the intc driver populate function pointers
-for these if runtime PM calls are not enough here?
-
-That way we could have just minimal pdata header file.
-
-Regards,
-
-Tony
+Right, I was thinking that was better fixed by making all those
+access functions static inline instead, I didn't get round to looking at
+that properly yet though so didn't send a patch.  Moving the one
+accessor function felt like it was the wrong way to go but that's just
+taste.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140729/47b161a0/attachment.sig>
