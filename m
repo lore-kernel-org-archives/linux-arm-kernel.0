@@ -1,43 +1,102 @@
-From: hanjun.guo@linaro.org (Hanjun Guo)
-Date: Tue, 29 Jul 2014 22:07:40 +0800
-Subject: [PATCH 01/19] ARM64 / ACPI: Get RSDP and ACPI boot-time tables
-In-Reply-To: <53D7A6A2.9020005@arm.com>
-References: <1406206825-15590-1-git-send-email-hanjun.guo@linaro.org>
- <1406206825-15590-2-git-send-email-hanjun.guo@linaro.org>
- <53D69678.20002@arm.com> <53D79CD8.9050709@linaro.org>
- <53D7A6A2.9020005@arm.com>
-Message-ID: <53D7AAAC.6070606@linaro.org>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Tue, 29 Jul 2014 16:08:27 +0200
+Subject: [RFC PATCH 00/11] Refactor MSI to support Non-PCI device
+In-Reply-To: <1406344128-27055-1-git-send-email-wangyijing@huawei.com>
+References: <1406344128-27055-1-git-send-email-wangyijing@huawei.com>
+Message-ID: <1748052.OMBQJiOLYT@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2014?07?29? 21:50, Sudeep Holla wrote:
->
-> On 29/07/14 14:08, Hanjun Guo wrote:
->> On 2014-7-29 2:29, Sudeep Holla wrote:
->> [...]
->>>> +
->>>> +/*
->>>> + * We never plan to use RSDT on arm/arm64 as its deprecated in spec but this
->>>> + * variable is still required by the ACPI core
->>>> + */
->>>> +u32 acpi_rsdt_forced;
->>>
->>> This looks like yet another stray variable not used anywhere including
->>> core ACPI
->>
->> It will be used by ACPICA to get the RSDP in acpi_tb_parse_root_table()
->> in tbutils.c.
->>
->
-> No I couldn't find it in mainline/acpica/linux-next(pm tree).
->
-> On further digging found that commit fab461058385("ACPICA: Cleanup the
-> option of forcing the use of the RSDT") has renamed it to
-> acpi_gbl_do_not_use_xsdt and moved it into acpica with default false.
-> So you can remove this.
+On Saturday 26 July 2014 11:08:37 Yijing Wang wrote:
+>         The series is a draft of generic MSI driver that supports PCI
+> and Non-PCI device which have MSI capability. If you're not interested
+> it, sorry for the noise.
 
-Ah, my bad. I grepped it in another version of kernel and found the outdated
-result, I will update this patch.
+I've finally managed to take some time to look at the series. Overall,
+the concept looks good to me, and the patches look very well implemented.
 
-Thanks
-Hanjun
+The part I'm not sure about is the interface we want to end up with
+at the end of the series. More on that below
+
+> The series is based on Linux-3.16-rc1.
+> 
+> MSI was introduced in PCI Spec 2.2. Currently, kernel MSI 
+> driver codes are bonding with PCI device. Because MSI has a lot
+> advantages in design. More and more non-PCI devices want to
+> use MSI as their default interrupt. The existing MSI device
+> include HPET. HPET driver provide its own MSI code to initialize
+> and process MSI interrupts. In the latest GIC v3 spec, legacy device
+> can deliver MSI by the help of a relay device named consolidator.
+> Consolidator can translate the legacy interrupts connected to it
+> to MSI/MSI-X. And new non-PCI device will be designed to 
+> support MSI in future. So make the MSI driver code be generic will 
+> help the non-PCI device use MSI more simply.
+> 
+> The new data struct for generic MSI driver.
+> struct msi_irqs {
+>         u8 msi_enabled:1; /* Enable flag */
+>         u8 msix_enabled:1;
+>         struct list_head msi_list; /* MSI desc list */
+>         void *data;     /* help to find the MSI device */
+>         struct msi_ops *ops; /* MSI device specific hook */
+> };
+> struct msi_irqs is used to manage MSI related informations. Every device supports
+> MSI should contain this data struct and allocate it.
+
+I think you should have a stronger association with the 'struct
+device' here. Can you replace the 'void *data' with 'struct device *dev'?
+
+The other part I'm not completely sure about is how you want to
+have MSIs map into normal IRQ descriptors. At the moment, all
+MSI users are based on IRQ numbers, but this has known scalability
+problems. I wonder if we can do the interface in a way that
+hides the interrupt number from generic device drivers and just
+passes a 'struct irq_desc'. Note that there are long-term plans to
+get rid of IRQ numbers entirely, but those plans have existed for
+a long time already without anybody seriously addressing the device
+driver interfaces so far, so it might never really happen.
+
+> struct msi_ops {
+>         struct msi_desc *(*msi_setup_entry)(struct msi_irqs *msi, struct msi_desc *entry);
+>         int msix_setup_entries(struct msi_irqs *msi, struct msix_entry *entries);
+>         u32 (*msi_mask_irq)(struct msi_desc *desc, u32 mask, u32 flag);
+>         u32 (*msix_mask_irq)(struct msi_desc *desc, u32 flag);
+>         void (*msi_read_message)(struct msi_desc *desc, struct msi_msg *msg);
+>         void (*msi_write_message)(struct msi_desc *desc, struct msi_msg *msg);
+>         void (*msi_set_intx)(struct msi_irqs *msi, int enable);
+> };
+> struct msi_ops provides several hook functions, generic MSI driver will call
+> the hook functions to access device specific registers. PCI devices will share
+> the same msi_ops, because they have the same way to access MSI hardware registers.
+> 
+> Generic MSI layer export msi_capability_init() and msix_capability_init() functions
+> to drivers. msi/x_capability_init() will initialize MSI capability data struct msi_desc
+> and alloc the irq, then write the msi address/data value to hardware registers.
+> 
+> This series only did compile test, we will test it in x86 and arm platform later.
+
+For the generic drivers, I don't see much point in differentiating between
+MSI and MSI-X, as I believe the difference is something internal to the PCI
+implementation.
+
+With the other operations, I think they should all take a 'struct device *'
+as the first argument for convenience and consistency. I don't think you actually
+need msi_read_message(), and we could avoid msi_write_message() by doing it
+the other way round.
+
+What I'd envision as the API from the device driver perspective is something
+as simple like this:
+
+struct msi_desc *msi_request(struct msi_chip *chip, irq_handler_t handler,
+			unsigned long flags, const char *name, struct device *dev);
+
+which would get an msi descriptor that is valid for this device (dev)
+connected to a particular msi_chip, and associate a handler function
+with it. The device driver can call that function and retrieve the
+address/message pair from the msi_desc in order to store it in its own
+device specific registers. The request_irq() can be handled internally
+to msi_request().
+
+Would that work for you?
+
+	Arnd
