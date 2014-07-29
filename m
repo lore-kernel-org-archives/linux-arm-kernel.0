@@ -1,39 +1,86 @@
-From: geoff@infradead.org (Geoff Levand)
-Date: Tue, 29 Jul 2014 14:19:01 -0700
-Subject: Kexec on arm64
-In-Reply-To: <20140729133557.GQ2576@leverpostej>
-References: <CAFdej00J2mJwcg2Cy6CHVuuQZ4uQ2zZg8oErGPi0uPejievB+Q@mail.gmail.com>
- <1406162287.4062.39.camel@smoke> <20140724093603.GC4079@leverpostej>
- <1406247468.4062.59.camel@smoke>
- <CAFdej01w_pE6vv+13cCCyfDs4Rbdkzx4CMUj9q97HBKV0B53ow@mail.gmail.com>
- <1406333901.4062.69.camel@smoke>
- <CAFdej014ohCFYvoUAXWiYGb4_4UmSY2G1MH-NEE_cF1cC-6Mow@mail.gmail.com>
- <20140728153812.GA2576@leverpostej> <1406592548.28348.49.camel@smoke>
- <CAFdej00is0kC-1q5uMNJL5APL1WezdNBg0jASgwYamsg5NO_Tg@mail.gmail.com>
- <20140729133557.GQ2576@leverpostej>
-Message-ID: <1406668741.28348.75.camel@smoke>
+From: collinsd@codeaurora.org (David Collins)
+Date: Tue, 29 Jul 2014 14:54:50 -0700
+Subject: [PATCH v3 1/4] mfd: pm8xxx-spmi: add support for Qualcomm SPMI
+ PMICs
+In-Reply-To: <1406205921-7452-2-git-send-email-svarbanov@mm-sol.com>
+References: <1406205921-7452-1-git-send-email-svarbanov@mm-sol.com>
+ <1406205921-7452-2-git-send-email-svarbanov@mm-sol.com>
+Message-ID: <53D8182A.5050204@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Mark,
-
-On Tue, 2014-07-29 at 14:35 +0100, Mark Rutland wrote:
-> Since c218bca74eea (arm64: Relax the kernel cache requirements for
-> boot), the kernel will flush the cache for anything outside of the Image
-> that it writes to before enabling the MMU and caches (e.g. the idmap and
-> swapper page tables). Once caches are up we shouldn't care.
+On 07/24/2014 05:45 AM, Stanimir Varbanov wrote:
+> From: Josh Cartwright <joshc@codeaurora.org>
 > 
-> Assuming that the existing kernel code is correct, the only region we
-> should need to flush out to the PoC is the region from _text to _edata
-> (i.e. just the contents of the Image).
+> The Qualcomm SPMI PMIC chips are components used with the
+> Snapdragon 800 series SoC family.  This driver exists
+> largely as a glue mfd component, it exists to be an owner
+> of an SPMI regmap for children devices described in
+> device tree.
+> 
+> Signed-off-by: Josh Cartwright <joshc@codeaurora.org>
+> Signed-off-by: Stanimir Varbanov <svarbanov@mm-sol.com>
+> Acked-by: Lee Jones <lee.jones@linaro.org>
+> ---
+>  drivers/mfd/Kconfig       |   16 +++++++++++
+>  drivers/mfd/Makefile      |    1 +
+>  drivers/mfd/pm8xxx-spmi.c |   65 +++++++++++++++++++++++++++++++++++++++++++++
 
-If the new kernel will overwrite the old one, then we do the final copy
-of the new kernel in the relocate_new_kernel routine.  relocate_new_kernel
-is executed after the dcache is disabled, so that should write it directly
-to the PoC.  It seems the protocol expects us to invalidate the dcache
-for that range though, so I added code to do this, essentially what Arun
-had added.
+Would it be possible to rename this driver: qcom-spmi-pmic.c?  The driver
+will be supporting several PMICs that do not fit the pm8xxx naming scheme.
+ One of which is even specified in the compatible list of this driver
+(pma8084).  There is presently downstream support for the following PMICs:
+PM8019, PM8110, PM8226, PM8841, PM8916, PM8941, PM8994, PMA8084, PMD9635,
+PMI8962, and PMI8994 [1].  Four of these do not fit the "PM8XXX" template.
 
-Arun, please try.
+If we can agree on changing the file name for the driver, then all other
+instances of "pm8xxx" would need to be renamed in this patch series (e.g.
+config options, function names, struct names, DT binding documentation, etc.)
 
--Geoff
+It would probably be good to rename pm8xxx-ssbi.c to qcom-ssbi-pmic.c as
+well in order to maintain consistency.
+
+(...)
+> +static const struct regmap_config pm8xxx_regmap_config = {
+> +	.reg_bits	= 16,
+> +	.val_bits	= 8,
+> +	.max_register	= 0xffff,
+
+Can you please add the following line here?
+
+	.fast_io	= true;
+
+This will cause a spinlock to be held during SPMI transactions instead of
+a mutex lock.  This is needed because several downstream peripheral
+drivers need to make SPMI read and write calls from atomic context.  I
+have commented on this point in a previous thread with specific examples [2].
+
+> +};
+
+(...)
+> +static const struct of_device_id pm8xxx_id_table[] = {
+> +	{ .compatible = "qcom,pm8941" },
+> +	{ .compatible = "qcom,pm8841" },
+> +	{ .compatible = "qcom,pma8084" },
+
+Would it be possible to add a generic compatible string as well?  Perhaps
+something like "qcom,spmi-pmic" could be used.  This driver is not doing
+anything with the PMIC specific compatible strings.  The generic
+compatible string could be specified in device tree in conjunction a PMIC
+specific string that is not present in this list.  That way, this driver
+file would not need to be touched as new PMIC chips are introduced unless
+some weird workaround is needed.  In that case, the PMIC specific
+compatible string could be added to the list along with whatever special
+function is needed to handle it.
+
+Take care,
+David Collins
+
+[1]:
+https://www.codeaurora.org/cgit/quic/la/kernel/msm-3.10/tree/arch/arm/boot/dts/qcom?h=msm-3.10
+
+[2]: https://lkml.org/lkml/2014/4/25/720
+
+-- 
+The Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+hosted by The Linux Foundation
