@@ -1,87 +1,53 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Tue, 29 Jul 2014 11:55:43 +0100
-Subject: [PATCH 19/19] Documentation: ACPI for ARM64
-In-Reply-To: <20140729102940.GB18250@cbox>
-References: <1406206825-15590-1-git-send-email-hanjun.guo@linaro.org>
- <1406206825-15590-20-git-send-email-hanjun.guo@linaro.org>
- <CAOesGMhKHGkVK3dOLXXx9GQBMxDmjBu1WDBgHmwdGe1UK3jfcg@mail.gmail.com>
- <20140728100654.GC24078@leverpostej>
- <20140728164459.GD32359@quad.lixom.net>
- <20140729102940.GB18250@cbox>
-Message-ID: <20140729105543.GL2576@leverpostej>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Tue, 29 Jul 2014 12:56:04 +0200
+Subject: [GIT PULL v2][for 3.17] pull request for hisilicon terminal soc
+In-Reply-To: <53D750CA.5090405@hisilicon.com>
+References: <53D750CA.5090405@hisilicon.com>
+Message-ID: <9329037.jXTZlWzWep@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jul 29, 2014 at 11:29:40AM +0100, Christoffer Dall wrote:
-> On Mon, Jul 28, 2014 at 09:44:59AM -0700, Olof Johansson wrote:
-> > On Mon, Jul 28, 2014 at 11:06:54AM +0100, Mark Rutland wrote:
+On Tuesday 29 July 2014 15:44:10 xuwei wrote:
+> Hi Olof, Hi Kevin, Hi Arnd,
 > 
-> [...]
+> Please help to merge pull request for hisilicon terminal soc. 
 > 
-> > > >
-> > > > > +Relationship with Device Tree
-> > > > > +-----------------------------
-> > > > > +
-> > > > > +ACPI support in drivers and subsystems for ARMv8 should never be mutually
-> > > > > +exclusive with DT support at compile time.
-> > > > > +
-> > > > > +At boot time the kernel will only use one description method depending on
-> > > > > +parameters passed from the bootloader.
-> > > >
-> > > > Possibly overriden by kernel bootargs. And as debated for quite a
-> > > > while earlier this year, acpi should still default to off -- if a DT
-> > > > and ACPI are both passed in, DT should at this time be given priority.
-> > > 
-> > > Why? I really don't see the logic in doing that.
-> > 
-> > Seems like I am replying to your emails in reverse order.
-> > 
-> > > Currently the kernel can only boot using DT, so DT will be used even if
-> > > ACPI is present. In the presence of ACPI support in the kernel, ACPI
-> > > would be used on said systems.
-> > 
-> > For all the reasons we hashed out earlier this year: We can't trust that
-> > vendors will know how to do ACPI from day one, so instead of loading up the
-> > kernel with lots of quirks and workarounds, we'll default to not using it until
-> > we're at a point where things look mature enough.
-> > 
-> > The alternative is to keep this patch set out of the kernel. We can do that
-> > too, but I don't think that really helps anyone.
-> > 
-> > > From the discussions at the last Linaro Connect, this was seen as
-> > > important for virtual machines which want to provide ACPI services to
-> > > guests while still being able to boot DT-only kernels. I'll leave it to
-> > > Grant, Rob, and Christoffer to cover that.
-> > 
-> > Ok, waiting to see what they have to say then.
-> > 
+> Best Regards,
+> Wei
 > 
-> Hmm, a virtual machine implementaion may provide either a DT or ACPI (or
-> both).  I think the point at Linaro Connect was that for a first cut,
-> there is no obvious need to provide ACPI to VMs and to be spec
-> compliant, server kernels must be able to boot with DT-only.  In most
-> cases such systems will only access a few limited emulated devices
-> (UART, GIC, RTC, flash controller) and VirtIO devices, which should just
-> work using DT only.
 > 
-> People are talking about adding ACPI for VM guests as well for various
-> reasons (device passthrough for example) in which case I would always
-> expect people to run UEFI inside their guests too (perhaps this is not
-> 100% true in the case of Xen fast-boot scenarios though) and I would
-> expect Linux to only see the little stub DT and ACPI.
+> The following changes since commit 7171511eaec5bf23fb06078f59784a3a0626b38f:
 > 
-> Does this clarify anything or add futher to the confusion?
+>   Linux 3.16-rc1 (2014-06-15 17:45:28 -1000)
+> 
+> are available in the git repository at:
+> 
+>   git://github.com/hisilicon/linux-hisi.git tags/hix5hd2-for-3.17-v2
+> 
+> for you to fetch changes up to eeea1ab9b53f311f634e87d9208daa564a97dbba:
+> 
+>   ARM: hisi: remove smp from machine descriptor (2014-07-29 14:54:11 +0800)
+> 
+> ----------------------------------------------------------------
+> ARM: mach-hisi: Hisilicon teminal soc udaptes for 3.17
+> 
+> - Rename Hi3716 to HiX5HD2
+> HiX5HD2 is a SoC with dual Cortex A9 cores for STB market.
+> And original Hi3xxx SoC is for mobile market.
+> To avoid confusing the two types of SoCs and also because of
+> different implementation(SMP, IPs integarted and earlycon configure),
+> rename Hi3716 to HIX5HD2 ann add ARCH_HIX5HD2.
+> 
+> - Add HiX5HD2 STB SoC and development kit board support
+> - Change to use power reset driver to reboot for HiX5HD2
+> - Add ARCH_HISI for the common configure of hisilicon SoCs
+> - Change to use CPU_METHOD_OF_DECLARE for SMP on HiX5HD2 and hi3xxx
+> - Enable L2 aux value for Hi3620
+> 
 
-I was under the impression that there was a case where we'd have a DT
-with HW description in a VM which also had ACPI tables, to enable a
-kernel without ACPI support to boot in said VM (albeit with reduced
-functionality).
+Looks all good to me now. I'll wait for Olof to take a second look,
+since he had comments as well, and will let him pull it.
 
-I may have got confused since the VM standards discussion at LCA-14.
+Thanks for updating it this quickly to address all my comments!
 
-If we we expect a hypervisor to provide DT only by default (for
-compatibility), and ACPI only when the user has explicitly enabled it
-for an ACPI-specific feature, then that sounds OK.
-
-Thanks,
-Mark.
+	Arnd
