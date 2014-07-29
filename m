@@ -1,39 +1,73 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 29 Jul 2014 12:21:56 +0200
-Subject: [Patch V2 2/2] i2c: mv64xxx: Remove internal compatible string
- from Documentation
-In-Reply-To: <20140728182913.GB3708@obsidianresearch.com>
-References: <1406395238-29758-1-git-send-email-andrew@lunn.ch>
- <5514427.elClhaDPhf@wuerfel> <20140728182913.GB3708@obsidianresearch.com>
-Message-ID: <1475790.KgkjDRevPy@wuerfel>
+From: christoffer.dall@linaro.org (Christoffer Dall)
+Date: Tue, 29 Jul 2014 12:29:40 +0200
+Subject: [PATCH 19/19] Documentation: ACPI for ARM64
+In-Reply-To: <20140728164459.GD32359@quad.lixom.net>
+References: <1406206825-15590-1-git-send-email-hanjun.guo@linaro.org>
+ <1406206825-15590-20-git-send-email-hanjun.guo@linaro.org>
+ <CAOesGMhKHGkVK3dOLXXx9GQBMxDmjBu1WDBgHmwdGe1UK3jfcg@mail.gmail.com>
+ <20140728100654.GC24078@leverpostej>
+ <20140728164459.GD32359@quad.lixom.net>
+Message-ID: <20140729102940.GB18250@cbox>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday 28 July 2014 12:29:13 Jason Gunthorpe wrote:
-> On Mon, Jul 28, 2014 at 03:51:27PM +0200, Arnd Bergmann wrote:
-> 
-> > I remember this being discussed when the quirk was initially added,
-> > but it seemed cleaner to handle this in the platform code at the time
-> > when it was just for one particular board. Now that it's basically
-> > an accepted feature of the i2c device that you have to know the
-> > SoC version, that should probably become a proper API.
-> 
-> Reading the SOC ID (which has to come from a PCI-E controller) is
-> already known to mess up PCI-E. IMHO, reading it should be minimized,
-> unless we can figure out how to fix that.
-> 
-> At some point we need to push back on the bootloader situation and
-> require the kernel to be booted with a correct DT.
-> 
-> All the infrastructure was already provided for this, I'm not sure how
-> we got into the situation where it was OK for bootloaders to ignore
-> the DT requirements and it is the kernel's job to fix it 
+On Mon, Jul 28, 2014 at 09:44:59AM -0700, Olof Johansson wrote:
+> On Mon, Jul 28, 2014 at 11:06:54AM +0100, Mark Rutland wrote:
 
-Thomas argued that it's always possible to identify the revision
-and that we already need that anyway to work around broken dts file
-for ax3, so it would be easier to generalize that hack.
+[...]
 
-Everybody else (except me) seemed happy with that idea, so I eventually
-gave up arguing against it.
+> > >
+> > > > +Relationship with Device Tree
+> > > > +-----------------------------
+> > > > +
+> > > > +ACPI support in drivers and subsystems for ARMv8 should never be mutually
+> > > > +exclusive with DT support at compile time.
+> > > > +
+> > > > +At boot time the kernel will only use one description method depending on
+> > > > +parameters passed from the bootloader.
+> > >
+> > > Possibly overriden by kernel bootargs. And as debated for quite a
+> > > while earlier this year, acpi should still default to off -- if a DT
+> > > and ACPI are both passed in, DT should at this time be given priority.
+> > 
+> > Why? I really don't see the logic in doing that.
+> 
+> Seems like I am replying to your emails in reverse order.
+> 
+> > Currently the kernel can only boot using DT, so DT will be used even if
+> > ACPI is present. In the presence of ACPI support in the kernel, ACPI
+> > would be used on said systems.
+> 
+> For all the reasons we hashed out earlier this year: We can't trust that
+> vendors will know how to do ACPI from day one, so instead of loading up the
+> kernel with lots of quirks and workarounds, we'll default to not using it until
+> we're at a point where things look mature enough.
+> 
+> The alternative is to keep this patch set out of the kernel. We can do that
+> too, but I don't think that really helps anyone.
+> 
+> > From the discussions at the last Linaro Connect, this was seen as
+> > important for virtual machines which want to provide ACPI services to
+> > guests while still being able to boot DT-only kernels. I'll leave it to
+> > Grant, Rob, and Christoffer to cover that.
+> 
+> Ok, waiting to see what they have to say then.
+> 
 
-	Arnd
+Hmm, a virtual machine implementaion may provide either a DT or ACPI (or
+both).  I think the point at Linaro Connect was that for a first cut,
+there is no obvious need to provide ACPI to VMs and to be spec
+compliant, server kernels must be able to boot with DT-only.  In most
+cases such systems will only access a few limited emulated devices
+(UART, GIC, RTC, flash controller) and VirtIO devices, which should just
+work using DT only.
+
+People are talking about adding ACPI for VM guests as well for various
+reasons (device passthrough for example) in which case I would always
+expect people to run UEFI inside their guests too (perhaps this is not
+100% true in the case of Xen fast-boot scenarios though) and I would
+expect Linux to only see the little stub DT and ACPI.
+
+Does this clarify anything or add futher to the confusion?
+
+-Christoffer
