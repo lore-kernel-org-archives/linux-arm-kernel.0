@@ -1,42 +1,62 @@
-From: iamjoonsoo.kim@lge.com (Joonsoo Kim)
-Date: Tue, 29 Jul 2014 17:06:59 +0900
-Subject: [linux-3.10.17] Could not allocate memory from free CMA areas
-In-Reply-To: <dsqnq2i1mer1r7kpvuflt0k9.1406214301636@email.android.com>
-References: <dsqnq2i1mer1r7kpvuflt0k9.1406214301636@email.android.com>
-Message-ID: <010401cfab04$1536b740$3fa425c0$@lge.com>
+From: xuwei5@hisilicon.com (xuwei)
+Date: Tue, 29 Jul 2014 16:09:24 +0800
+Subject: [PATCH v5 0/8] enable Hisilicon HIX5HD2 SoC
+In-Reply-To: <20140729064027.GE32359@quad.lixom.net>
+References: <1406551883-26154-1-git-send-email-haojian.zhuang@linaro.org>
+ <20140729064027.GE32359@quad.lixom.net>
+Message-ID: <53D756B4.50907@hisilicon.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 
 
-From: pintu_agarwal [mailto:pintu_agarwal at yahoo.com] 
-Sent: Friday, July 25, 2014 12:15 AM
-To: PINTU KUMAR; linux-mm at kvack.org; linux-arm-kernel at lists.infradead.org; linaro-mm-sig at lists.linaro.org; iamjoonsoo.kim at lge.com; ritesh.list at gmail.com
-Cc: pintu.k at outlook.com; pintu.k at samsung.com; vishu_1385 at yahoo.com; m.szyprowski at samsung.com; mina86 at mina86.com; ngupta at vflare.org; iqbalblr at gmail.com
-Subject: RE: [linux-3.10.17] Could not allocate memory from free CMA areas
+On 2014/7/29 14:40, Olof Johansson wrote:
+> On Mon, Jul 28, 2014 at 08:51:15PM +0800, Haojian Zhuang wrote:
+>> Changelog:
+>> v5:
+>>   * Use CPU_OF_DECLARE_METHOD().
+>>   * State "hisilicon,cpuctrl" in documents.
+>>   * Set PL310 L2 aux value in machine descriptor.
+>>   * Use enable-method property for smp in dts file.
+>>   * Move reset code from machine platform driver into power reset driver.
+>>   * Move HIP04 debug uart into another patch series.
+> 
+> Usually there's some more description in the cover letter than just the
+> changelog.
 
-Dear joonsoo kim,
+Hi Olof,
 
-> I have your patches for: Aggressively allocate memory from cma ....
-> We are facing almost similar problem here.
-> If any of your patches still working for you please let us know here.
-> I would like to try those approach.
+> Anyway, my question is this: what's the plan for upstreaming of this SoC? Is it
+> a mobile-only SoC, or has it been used (or will it be used) in other embedded
+> use cases, public development boards and the like?
 
+HiX5HD2 is for the STB market.
+Hisilicon has already made some public development boards for Linaro and hope
+it could be used in Linaro Home Group.
+And if you are interesting about it, we could send one to you.
 
-Hello,
+There are several phases for upstreaming of this SoC.
+At the first phase, it includes the basic SoC(earlycon, gic, timer, L2 cache, 
+SMP and reboot), net, emc, USB and clock.
 
-I stopped to implement it, because there are other bugs on CMA related codes.
-Although aggressively allocate... doesn't have bugs itself, it enlarges
-existing freepage counting bugs significantly so I'm first trying to fix
-those bugs. See the below link.
+> If it is a mobile-targeted product, what is the plan and rough timeline
+> for upstreaming things such as display/graphics and power management
+> components?
 
-https://lkml.org/lkml/2014/7/4/79
+About the display/graphics/video/audio, we are still discussing how to upstream.
+There are two limitations. One is the code we have now does not adapt with kernel.
+The other is the policy of company which part is allowed to upstream.
 
-I will restart to implement aggressively... after fixing these bugs.
+But anyway, we hope we could do upstreaming.
 
-If you have interest on next version of aggressively allocate..., see the
-following link.
+Best Regards,
+Wei
 
-https://github.com/JoonsooKim/linux/tree/cma-fix-up-v3.0-next-20140625
-
-Thanks.
+> 
+> Thanks!
+> 
+> 
+> -Olof
+> 
+> 
+> 
