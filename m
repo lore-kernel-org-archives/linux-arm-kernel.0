@@ -1,72 +1,42 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Tue, 29 Jul 2014 11:57:17 +0100
-Subject: [PATCH 2/2] ARM: LPAE: reduce damage caused by idmap to
- virtual memory layout
-In-Reply-To: <CALYGNiO6PEPoHDrcLRZxQVT2=-1upyh6E-TWBCMB0MR8u5Sx6w@mail.gmail.com>
-References: <20140722153623.25088.37742.stgit@buzz>
- <20140722153635.25088.14197.stgit@buzz> <20140728181456.GO15536@arm.com>
- <CALYGNiNJDHfQm2yk067hh-Wywsb_Ki5AEE_sTMkYegJi9spSzw@mail.gmail.com>
- <20140728184107.GR15536@arm.com>
- <CALYGNiNaMMv9itJ_+cvPDn1_Yo4GTPQJ-Cy9zBzJzfaDLfkvmg@mail.gmail.com>
- <20140728191305.GA30282@n2100.arm.linux.org.uk>
- <CALYGNiNVduTK8MXt8VJyiqdsB0mA_OnC0hLOB-WzgAEMZyu9sg@mail.gmail.com>
- <20140728194251.GB30282@n2100.arm.linux.org.uk>
- <CALYGNiO6PEPoHDrcLRZxQVT2=-1upyh6E-TWBCMB0MR8u5Sx6w@mail.gmail.com>
-Message-ID: <20140729105717.GC30282@n2100.arm.linux.org.uk>
+From: ohad@wizery.com (Ohad Ben-Cohen)
+Date: Tue, 29 Jul 2014 13:57:10 +0300
+Subject: [PATCH 1/2] remoteproc: use a flag to detect the presence of IOMMU
+In-Reply-To: <1404836521-59637-2-git-send-email-s-anna@ti.com>
+References: <1404836521-59637-1-git-send-email-s-anna@ti.com>
+ <1404836521-59637-2-git-send-email-s-anna@ti.com>
+Message-ID: <CAK=Wgbawdik3ZB0Zbeaa7eXd7M+9ev9u713GcfOc4Gy0+O80Dg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jul 28, 2014 at 11:57:16PM +0400, Konstantin Khlebnikov wrote:
-> On Mon, Jul 28, 2014 at 11:42 PM, Russell King - ARM Linux
-> <linux@arm.linux.org.uk> wrote:
-> > On Mon, Jul 28, 2014 at 11:29:39PM +0400, Konstantin Khlebnikov wrote:
-> >> Ok, before switching from identity mapping to normal mapping kernel must
-> >> switch instruction pointer from physical address to virtual.
-> >
-> > "switch instruction pointer from physical address to virtual."
-> >
-> > There's no such distinction for the instruction pointer.
-> 
-> I know. I mean "logically".
-> 
-...
-> 
-> Sorry but I'm really look so dumb? Maybe it's true, it's almost
-> midnight at my side.
+Hi Suman,
 
-When you use language which suggests a lack of understanding, then
-I will explain things.
+On Tue, Jul 8, 2014 at 7:22 PM, Suman Anna <s-anna@ti.com> wrote:
+> The remoteproc driver core currently relies on iommu_present() on
+> the bus the device is on, to perform MMU management. However, this
+> logic doesn't scale for multi-arch, especially for processors that
+> do not have an IOMMU.
 
-> > It doesn't matter, provided the kernel text and data in the virtual
-> > address space are not overwritten by the identity mapping.  If it
-> > ends up in the vmalloc or IO space, that should not be a problem.
-> 
-> In my case it's been overwritten.
-> And it always happens when PHYS_OFFSET >= PAGE_OFFSET
-> because in case of LPAE idmap always overwrites 1Gb at once.
+Is there a specific hw/scenario where you need this? Can you please
+provide more details about it?
 
-Right, I now see what you're getting at.  Here's a better description
-which I've used when committing your patch.  I've only taken patch 2
-at the present time.
+Ideally we should add them to the commit log as well.
 
+> The individual platform implementations are required to set this
+> flag appropriately. The default setting is to not have an MMU.
 
+Let's explicitly set the default please so this would be clear for
+users reading the code.
 
-On LPAE, each level 1 (pgd) page table entry maps 1GiB, and the level 2
-(pmd) entries map 2MiB.
+> Cc: Sjur Br?ndeland <sjur.brandeland@stericsson.com>
 
-When the identity mapping is created on LPAE, the pgd pointers are copied
-from the swapper_pg_dir.  If we find that we need to modify the contents
-of a pmd, we allocate a new empty pmd table and insert it into the
-appropriate 1GB slot, before then filling it with the identity mapping.
+Sjur is no longer with STE, so no point in cc'ing his old email address.
 
-However, if the 1GB slot covers the kernel lowmem mappings, we obliterate
-those mappings.
+> +       /*
+> +        * All existing OMAP IPU and DSP processors do have an MMU, and
+> +        * are expected to use MMU, so this statement suffices.
+> +        * XXX: Replace this logic if and when a need arises.
 
-When replacing a PMD, first copy the old PMD contents to the new PMD, so
-that we preserve the existing mappings in the 1GiB region, particularly
-the mappings of the kernel itself.
+The last XXX comment is always true for any kernel code, so I'd drop it.
 
-
--- 
-FTTC broadband for 0.8mile line: currently at 9.5Mbps down 400kbps up
-according to speedtest.net.
+Thanks,
+Ohad.
