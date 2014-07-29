@@ -1,37 +1,31 @@
-From: tj@kernel.org (Tejun Heo)
-Date: Tue, 29 Jul 2014 10:26:48 -0400
-Subject: [PATCH v4 0/4]ata: Fixes related to APM X-Gene SATA host
- controller driver.
-In-Reply-To: <1406616892-30273-1-git-send-email-stripathi@apm.com>
-References: <1406616892-30273-1-git-send-email-stripathi@apm.com>
-Message-ID: <20140729142648.GA4791@htj.dyndns.org>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Tue, 29 Jul 2014 15:28:25 +0100
+Subject: [PATCH 00/15] arm/arm64: fix use of irq_find_mapping outside of
+ legal RCU context
+In-Reply-To: <53C04B3E.20908@codeaurora.org> (Christopher Covington's message
+ of "Fri, 11 Jul 2014 21:38:22 +0100")
+References: <1404825038-547-1-git-send-email-marc.zyngier@arm.com>
+ <53C04B3E.20908@codeaurora.org>
+Message-ID: <87mwbskzna.fsf@approximate.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jul 29, 2014 at 12:24:48PM +0530, Suman Tripathi wrote:
-> This patch set contains a couple of fixes related to APM X-Gene SATA
-> controller driver.
-> 
-> v2 Change:
->    1. Drop the Link down retry patch from this patch set.
-> 
-> v4 Change:
->    1. Drop the patch to fix the csr-mask in dts for PHY clock
->      node of SATA Host Controller 1.
->    2. Add the patch to correct the OOB tunning parameters for
->      the COMINIT/COMWAKE parameters.
->    3. Add the patch to remove the NCQ support from the APM
->      X-Gene AHCI SATA Host controller driver.
->    4. Add the patch to remove the clock and PHY reference nodes
->      from the APM X-Gene Host controller dts node.
-> 
-> Signed-off-by: Loc Ho <lho@apm.com>
-> Signed-off-by: Suman Tripathi <stripathi@apm.com>
+On Fri, Jul 11 2014 at  9:38:22 pm BST, Christopher Covington <cov@codeaurora.org> wrote:
+> Hi Mark,
+>
+> On 07/08/2014 09:10 AM, Marc Zyngier wrote:
+>> A number of irqchip drivers are directly calling irq_find_mapping,
+>> which may use a rcu_read_lock call when walking the radix tree.
+>
+> If this happens to be easy for you to determine: do direct callers of
+> irq_find_host such as irq_create_of_mapping have a similar problem with
+> irq_domain_mutex?
 
-Applied 1 and 3 to libata/for-3.17.  4 doesn't apply.  Also, please
-prefix the patches with "ahci_xgene: " from now on.
+Definitely not from this problem. irq_find_host doesn't use RCU at all,
+so it shouldn't be an issue.
 
-Thanks.
+Thanks,
 
+	M.
 -- 
-tejun
+Jazz is not dead. It just smells funny.
