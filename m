@@ -1,52 +1,86 @@
 From: grant.likely@linaro.org (Grant Likely)
-Date: Tue, 29 Jul 2014 13:46:46 -0600
-Subject: [PATCH v2 RESEND 2/4] drivers: of: initialize and assign
- reserved memory to newly created devices
-In-Reply-To: <53D7B3E8.6070906@samsung.com>
-References: <1405326487-15346-1-git-send-email-m.szyprowski@samsung.com>
- <1405326487-15346-3-git-send-email-m.szyprowski@samsung.com>
- <20140728141700.55FC4C408EA@trevor.secretlab.ca>
- <53D7B3E8.6070906@samsung.com>
-Message-ID: <20140729194646.D9764C40685@trevor.secretlab.ca>
+Date: Tue, 29 Jul 2014 17:45:22 -0600
+Subject: use IORESOURCE_REG resource type for non-translatable addresses
+ in DT
+In-Reply-To: <53D7AA72.6010309@mm-sol.com>
+References: <53D788A7.4020303@mm-sol.com> <3794875.CZFbAag5Sv@wuerfel>
+ <53D7AA72.6010309@mm-sol.com>
+Message-ID: <20140729234522.E9FF1C40738@trevor.secretlab.ca>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 29 Jul 2014 16:47:04 +0200, Marek Szyprowski <m.szyprowski@samsung.com> wrote:
-> Hello,
+On Tue, 29 Jul 2014 17:06:42 +0300, Stanimir Varbanov <svarbanov@mm-sol.com> wrote:
+> Arnd, thanks for the comments.
 > 
-> On 2014-07-28 16:17, Grant Likely wrote:
-> > On Mon, 14 Jul 2014 10:28:05 +0200, Marek Szyprowski <m.szyprowski@samsung.com> wrote:
-> >> Use recently introduced of_reserved_mem_device_init() function to
-> >> automatically assign respective reserved memory region to the newly created
-> >> platform and amba device.
-> >>
-> >> Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
-> > I'm still not okay with this patch. I don't think it is appropriate to
-> > add the hook into the generic path that gets used for every platform
-> > device. The devices that need reserved memory should explicitly request
-> > it, and any setup be done at that time.
+> On 07/29/2014 03:00 PM, Arnd Bergmann wrote:
+> > On Tuesday 29 July 2014 14:42:31 Stanimir Varbanov wrote:
+> >>         taddr = of_translate_address(dev, addrp);
+> >> -       if (taddr == OF_BAD_ADDR)
+> >> -               return -EINVAL;
+> >> +       /*
+> >> +        * if the address is non-translatable to cpu physical address
+> >> +        * fallback to a IORESOURCE_REG resource.
+> >> +        */
+> >> +       if (taddr == OF_BAD_ADDR) {
+> >> +               memset(r, 0, sizeof(*r));
+> >> +               taddr = of_read_number(addrp, 1);
+> >> +               if (taddr == OF_BAD_ADDR)
+> >> +                       return -EINVAL;
+> >> +               r->start = taddr;
+> >> +               r->end = taddr + size - 1;
+> >> +               r->flags = IORESOURCE_REG;
+> >> +               r->name = name ? name : dev->full_name;
+> >> +               return 0;
+> >> +       }
+> >> +
+> > 
+> > I don't think that everything returning OF_BAD_ADDR makes sense
+> > to turn into IORESOURCE_REG. It could be an e.g. invalid DT
+> > representation, a node with #size-cells=<0>, or it could be
+> > something that gets translated one or more nodes up in the
+> > tree before it reaches a bus without a ranges property.
+> > 
+> > Also, you should not rely on #address-cells being hardcoded
+> > to <1> above.
+> > 
 > 
-> Okay... I thought that it will be easier to have it done in generic 
-> code, if You don't
-> think so, then I give up and we will add it in all drivers requiring 
-> such memory regions.
+> This was just an example. Of course it has many issues and probaly it is
+> wrong:) The main goal was to understand does IORESOURCE_REG resource
+> type and parsing the *reg* properties for non-translatable addresses are
+> feasible. And also does it acceptable by community and OF platform
+> maintainers.
 
-The problem is that it makes the big assumption that every device is
-going to conform to the pattern without any recourse if something
-special needs to be done (such as to handle quirks). It also puts this
-code into the probe path of every device, when the vast majority of
-device drivers just don't care. When code like this is run
-unconditionally from generic code, it becomes really difficult to
-override when needed.
+The use case is actually very different from of_address_to_resource or
+of_get_address() because those APIs explicitly return physical memory
+addresses from the CPU perspective. It makes more sense to create a new
+API that doesn't attempt to translate the reg address. Alternately, a
+new API that only translates upto a given parent node.
 
-I've made the same comment on the PM clock domain patches.
-
-> What about patch 3/4 and 4/4? Would it be possible to have your ack to 
-> get them merged?
-> Right now patch 4/4 depends on changes from akpm tree, so it will be 
-> best to merge them
-> to akpm tree.
-
-I'll take a look.
+You don't want to automagically translate as far up the tree as
+possible because the code won't know what node the address is associated
+with. Translated addresses only make sense if the node it was translated
+to as also known.
 
 g.
+
+> 
+> > How about modifying of_get_address() rather than
+> > __of_address_to_resource() instead? You could introduce
+> > a new of_bus entry for each bus you expect to return
+> > an IORESOURCE_REG, or you could change of_bus_default_get_flags
+> > to return IORESOURCE_REG if the parent node has no ranges property
+> > and is not the root node.
+> 
+> IMO the clearer solution is to introduce a new of_bus bus. In that case
+> one possible problem will be how to distinguish the non-translatable and
+> the other buses. Also the *device_type* property is deprecated for non
+> PCI devices.
+> 
+> The second option will need to change the prototype of .get_flags method
+> to receive device_node structure.
+> 
+> Thoughts?
+> 
+> -- 
+> regards,
+> Stan
