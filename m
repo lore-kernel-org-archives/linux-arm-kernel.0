@@ -1,122 +1,119 @@
-From: balbi@ti.com (Felipe Balbi)
-Date: Tue, 29 Jul 2014 11:33:45 -0500
-Subject: [PATCH 29/35] arm: omap: intc: switch over to linear irq domain
-In-Reply-To: <20140729154057.GE17808@saruman.home>
-References: <1406582183-696-1-git-send-email-balbi@ti.com>
- <1406582183-696-30-git-send-email-balbi@ti.com>
- <20140729121425.GR29045@atomide.com>
- <20140729141522.GB17808@saruman.home>
- <20140729152052.GV29045@atomide.com>
- <20140729154057.GE17808@saruman.home>
-Message-ID: <20140729163345.GF17808@saruman.home>
+From: sudeep.holla@arm.com (Sudeep Holla)
+Date: Tue, 29 Jul 2014 17:40:15 +0100
+Subject: [PATCH 06/19] ARM64 / ACPI: Parse FADT table to get PSCI flags
+ for PSCI init
+In-Reply-To: <1406206825-15590-7-git-send-email-hanjun.guo@linaro.org>
+References: <1406206825-15590-1-git-send-email-hanjun.guo@linaro.org>
+ <1406206825-15590-7-git-send-email-hanjun.guo@linaro.org>
+Message-ID: <53D7CE6F.1050407@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
 
-On Tue, Jul 29, 2014 at 10:40:57AM -0500, Felipe Balbi wrote:
-> On Tue, Jul 29, 2014 at 08:20:52AM -0700, Tony Lindgren wrote:
-> > * Felipe Balbi <balbi@ti.com> [140729 07:18]:
-> > > Hi,
-> > > 
-> > > On Tue, Jul 29, 2014 at 05:14:25AM -0700, Tony Lindgren wrote:
-> > > > * Felipe Balbi <balbi@ti.com> [140728 14:19]:
-> > > > > now that we don't need to support legacy board-files,
-> > > > > we can completely switch over to a linear irq domain
-> > > > > and make use of irq_alloc_domain_generic_chips() to
-> > > > > allocate all generic irq chips for us.
-> > > > 
-> > > > This patch seems to somehow break off-idle for omap3 
-> > > > where it no longer wakes up.
-> > > 
-> > > Sure your bisection is correct ? This patch just switches from legacy
-> > > irq domain to linear irq domain.
-> > 
-> > Yes, I tried it a few times. Just enabling
-> > retention idle hangs too with this patch.
-> > 
-> > Maybe it's omap3_prcm_irq_setup that relies on
-> > 11 + OMAP_INTC_START? There may be other such issues
-> 
-> lol.
-> 
-> OMAP4 has the same nonsense.
 
-made me think why (if) OMAP4 works with that same setup. Does wake from
-OFF work with OMAP4 ?
+On 24/07/14 14:00, Hanjun Guo wrote:
+> There are two flags: PSCI_COMPLIANT and PSCI_USE_HVC. When set,
+> the former signals to the OS that the hardware is PSCI compliant.
+> The latter selects the appropriate conduit for PSCI calls by
+> toggling between Hypervisor Calls (HVC) and Secure Monitor Calls
+> (SMC).
+>
+> FADT table contains such information, parse FADT to get the flags
+> for PSCI init. Since ACPI 5.1 doesn't support self defined PSCI
+> function IDs, which means that only PSCI 0.2+ is supported in ACPI.
+>
+> At the same time, only ACPI 5.1 or higher verison supports PSCI,
+> and FADT Major.Minor version was introduced in ACPI 5.1, so we
+> will check the version and only parse FADT table with version >= 5.1.
+>
+> If firmware provides ACPI tables with ACPI version less than 5.1,
+> OS will be messed up with those information and have no way to
+> bring up secondery CPUs, so disable ACPI if we get an FADT table
+> with version less that 5.1.
+>
+> Signed-off-by: Hanjun Guo <hanjun.guo@linaro.org>
+> Signed-off-by: Graeme Gregory <graeme.gregory@linaro.org>
+> ---
+>   arch/arm64/include/asm/acpi.h |    2 +
+>   arch/arm64/kernel/acpi.c      |   50 ++++++++++++++++++++++
+>   arch/arm64/kernel/psci.c      |   95 +++++++++++++++++++++++++++++------------
+>   arch/arm64/kernel/setup.c     |    2 +
+>   4 files changed, 121 insertions(+), 28 deletions(-)
+>
+> diff --git a/arch/arm64/include/asm/acpi.h b/arch/arm64/include/asm/acpi.h
+> index 44b617f..67dac90 100644
+> --- a/arch/arm64/include/asm/acpi.h
+> +++ b/arch/arm64/include/asm/acpi.h
+> @@ -18,6 +18,8 @@ extern int acpi_disabled;
+>   extern int acpi_noirq;
+>   extern int acpi_pci_disabled;
+>   extern int acpi_strict;
+> +extern int acpi_psci_present;
+> +extern int acpi_psci_use_hvc;
+>
+>   static inline void disable_acpi(void)
+>   {
+> diff --git a/arch/arm64/kernel/acpi.c b/arch/arm64/kernel/acpi.c
+> index f5a10b5..374926f 100644
+> --- a/arch/arm64/kernel/acpi.c
+> +++ b/arch/arm64/kernel/acpi.c
+> @@ -11,6 +11,8 @@
+>    *  published by the Free Software Foundation.
+>    */
+>
+> +#define pr_fmt(fmt) "ACPI: " fmt
+> +
+>   #include <linux/init.h>
+>   #include <linux/acpi.h>
+>   #include <linux/cpumask.h>
+> @@ -34,6 +36,12 @@ EXPORT_SYMBOL(acpi_disabled);
+>   int acpi_pci_disabled;		/* skip ACPI PCI scan and IRQ initialization */
+>   EXPORT_SYMBOL(acpi_pci_disabled);
+>
+> +/* 1 to indicate PSCI is implemented */
+> +int acpi_psci_present;
+> +
+> +/* 1 to indicate HVC must be used instead of SMC as the PSCI conduit */
+> +int acpi_psci_use_hvc;
+> +
 
-Anyway, here's a quick little hack to check if that's the reason for the
-regression:
+These can be boolean but can be removed IMO, see below.
 
-diff --git a/arch/arm/boot/dts/omap3.dtsi b/arch/arm/boot/dts/omap3.dtsi
-index ff953c9..c234b98 100644
---- a/arch/arm/boot/dts/omap3.dtsi
-+++ b/arch/arm/boot/dts/omap3.dtsi
-@@ -97,6 +97,7 @@
- 		prm: prm at 48306000 {
- 			compatible = "ti,omap3-prm";
- 			reg = <0x48306000 0x4000>;
-+			interrupts = <11>;
- 
- 			prm_clocks: clocks {
- 				#address-cells = <1>;
-diff --git a/arch/arm/mach-omap2/prm_common.c b/arch/arm/mach-omap2/prm_common.c
-index 25e8b82..3d11377 100644
---- a/arch/arm/mach-omap2/prm_common.c
-+++ b/arch/arm/mach-omap2/prm_common.c
-@@ -242,6 +242,11 @@ void omap_prcm_irq_complete(void)
- 	prcm_irq_setup->restore_irqen(prcm_irq_setup->saved_mask);
- }
- 
-+static struct of_device_id tmp[] = {
-+	{ .compatible = "ti,omap3-prm" },
-+	{ }
-+};
-+
- /**
-  * omap_prcm_register_chain_handler - initializes the prcm chained interrupt
-  * handler based on provided parameters
-@@ -254,17 +259,24 @@ void omap_prcm_irq_complete(void)
-  */
- int omap_prcm_register_chain_handler(struct omap_prcm_irq_setup *irq_setup)
- {
-+	struct device_node *node;
- 	int nr_regs;
- 	u32 mask[OMAP_PRCM_MAX_NR_PENDING_REG];
- 	int offset, i;
-+	int irq;
- 	struct irq_chip_generic *gc;
- 	struct irq_chip_type *ct;
- 
- 	if (!irq_setup)
- 		return -EINVAL;
- 
-+	irq = irq_setup->irq;
- 	nr_regs = irq_setup->nr_regs;
- 
-+	node = of_find_matching_node(NULL, tmp);
-+	if (node)
-+		irq = of_irq_get(node, 0);
-+
- 	if (prcm_irq_setup) {
- 		pr_err("PRCM: already initialized; won't reinitialize\n");
- 		return -EINVAL;
-@@ -298,7 +310,7 @@ int omap_prcm_register_chain_handler(struct omap_prcm_irq_setup *irq_setup)
- 				1 << (offset & 0x1f);
- 	}
- 
--	irq_set_chained_handler(irq_setup->irq, omap_prcm_irq_handler);
-+	irq_set_chained_handler(irq, omap_prcm_irq_handler);
- 
- 	irq_setup->base_irq = irq_alloc_descs(-1, 0, irq_setup->nr_regs * 32,
- 		0);
+>   /*
+>    * __acpi_map_table() will be called before page_init(), so early_ioremap()
+>    * or early_memremap() should be called here to for ACPI table mapping.
+> @@ -54,6 +62,33 @@ void __init __acpi_unmap_table(char *map, unsigned long size)
+>   	early_iounmap(map, size);
+>   }
+>
+> +static int __init acpi_parse_fadt(struct acpi_table_header *table)
+> +{
+> +	struct acpi_table_fadt *fadt = (struct acpi_table_fadt *)table;
+> +
+> +	/*
+> +	 * Revision in table header is the FADT Major version,
+> +	 * and there is a minor version of FADT which was introduced
+> +	 * by ACPI 5.1, we only deal with ACPI 5.1 or higher version
+> +	 * to get arm boot flags, or we will disable ACPI.
+> +	 */
+> +	if (table->revision < 5 || fadt->minor_version < 1) {
+> +		pr_info("FADT version is %d.%d, no PSCI support, should be 5.1 or higher\n",
+> +			table->revision, fadt->minor_version);
+> +		acpi_psci_present = 0;
+> +		disable_acpi();
+> +		return -EINVAL;
+> +	}
+> +
+> +	if (acpi_gbl_FADT.arm_boot_flags & ACPI_FADT_PSCI_COMPLIANT)
+> +		acpi_psci_present = 1;
+> +
+> +	if (acpi_gbl_FADT.arm_boot_flags & ACPI_FADT_PSCI_USE_HVC)
+> +		acpi_psci_use_hvc = 1;
+> +
 
--- 
-balbi
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140729/4ebf1683/attachment.sig>
+Why not make this macros instead of global variables as I suggested in
+previous version. acpi_gbl_FADT is already global and you can avoid
+creating new one especially they are just used on boot/init.
+
+Regards,
+Sudeep
