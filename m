@@ -1,67 +1,72 @@
-From: collinsd@codeaurora.org (David Collins)
-Date: Tue, 29 Jul 2014 15:23:29 -0700
-Subject: [PATCH v3 2/4] mfd: pm8xxx-spmi: document DT bindings for Qualcomm
- SPMI PMICs
-In-Reply-To: <1406205921-7452-3-git-send-email-svarbanov@mm-sol.com>
-References: <1406205921-7452-1-git-send-email-svarbanov@mm-sol.com>
- <1406205921-7452-3-git-send-email-svarbanov@mm-sol.com>
-Message-ID: <53D81EE1.7040309@codeaurora.org>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Tue, 29 Jul 2014 23:35:43 +0100
+Subject: [GIT PULL v2] nommu fixes for 3.17-rc1
+In-Reply-To: <20140722074246.GA28538@pengutronix.de>
+References: <20140630144355.GH14781@pengutronix.de>
+ <20140701094159.GM14781@pengutronix.de>
+ <20140711073054.GI11056@pengutronix.de>
+ <20140722074246.GA28538@pengutronix.de>
+Message-ID: <20140729223543.GF30282@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/24/2014 05:45 AM, Stanimir Varbanov wrote:
-> Document DT bindings used to describe the Qualcomm SPMI PMICs.
-> Currently the SPMI PMICs supported are pm8941, pm8841 and pma8084.
+On Tue, Jul 22, 2014 at 09:42:46AM +0200, Uwe Kleine-K?nig wrote:
+> Hi Russell,
 > 
-> Signed-off-by: Stanimir Varbanov <svarbanov@mm-sol.com>
+> On Fri, Jul 11, 2014 at 09:30:54AM +0200, Uwe Kleine-K?nig wrote:
+> > On Tue, Jul 01, 2014 at 11:41:59AM +0200, Uwe Kleine-K?nig wrote:
+> > > I updated my tag to pull to not include the commit that drops ARM740T,
+> > > ARM940T and ARM946E-S because of Arnd's concerns. Also the two cleanups
+> > > that depended on this one are dropped.
+> > > 
+> > > (As before) I picked -rc3 as base because 1c2f87c22566..6980c3e2514e~ is
+> > > broken on nommu. 
+> > > 
+> > > The following changes since commit 4c834452aad01531db949414f94f817a86348d59:
+> > > 
+> > >   Linux 3.16-rc3 (2014-06-29 14:11:36 -0700)
+> > > 
+> > > are available in the git repository at:
+> > > 
+> > >   git://git.pengutronix.de/git/ukl/linux.git tags/nommu-for-rmk
+> > > 
+> > > for you to fetch changes up to 83de911cf897a4317147dd9cb379378c2c4abf4c:
+> > > 
+> > >   ARM: make user_addr_max more robust (2014-07-01 11:12:09 +0200)
+> > > 
+> > > ----------------------------------------------------------------
+> > > Two different fixes for the same problem making some ARM nommu configurations
+> > > not boot since 3.6-rc1. The problem is that user_addr_max returned the biggest
+> > > available RAM address which makes some copy_from_user variants fail to read
+> > > from XIP memory.
+> > > 
+> > > Even in the presence of one of the two fixes the other still makes sense, so
+> > > both patches are included here.
+> > > 
+> > > This problem was the last one preventing efm32 boot to a prompt with mainline.
+> > You neither commented nor pulled this request (at least I didn't find it
+> > in your repository). Is it still on your radar?
+> I'd really like to have this in 3.17. Any chances? Would you prefer to
+> get these patches into your patch tracker?
 
-(...)
-> +Required properties for peripheral child nodes:
-> +- compatible:      Should contain "qcom,pm8xxx-xxx", where "xxx" is
-> +                   peripheral name. The "pm8xxx" can be any of supported PMICs,
-> +                   see example below.
+Hmm, the key thing for pull requests that you want me to pull is to send
+them to linux+pull at ... rather than plain linux at ... for the simple reason
+that most people are incapable of addressing their emails correctly.
 
-I don't think that this binding document should be imposing any formatting
-restrictions on the compatible strings for QPNP peripheral drivers.  The
-QPNP peripheral drivers in the downstream msm-3.10 tree [1] do not specify
-per-PMIC compatible strings.  This is because ideally, a given QPNP
-peripheral represents a hardware block that is identical in interface and
-operation between PMICs.
+It is very difficult to sort out which messages that contain "GIT PULL"
+are meant for me - especially when people put me in the To: field of
+all sorts of random emails with very little thought.  Because of that
+behaviour, which has recently spread to replies by various mailers too,
+I no longer take any notice of which header field my email address
+appears in any message.
 
-These peripheral drivers determine the base address for a given device
-instance via device tree reg and reg-names properties.  In order for this
-to continue to work with the pm8xxx-spmi driver, some mechanism will need
-to be introduced which creates resource structs for the
-non-memory-mappable SPMI base addresses.  One possible solution is
-currently being discussed in another thread [2].  This document will need
-to be updated to show the child node reg property scheme once a solution
-is reached.
+The actions of various people and various email programs which don't
+understand the meaning of To: and Cc: has made this much harder than
+it otherwise needs to be, so now we need to invent new ways to work
+around that "bug" in many humans on this planet.
 
-(...)
-> +Example:
-> +
-> +	pm8941 at 0 {
-> +		compatible = "qcom,pm8941";
-> +		reg = <0x0 SPMI_USID>;
-> +
-> +		rtc {
-> +			compatible = "qcom,pm8941-rtc";
-> +			interrupts = <0x0 0x61 0x1 IRQ_TYPE_EDGE_RISING>;
-> +			interrupt-names = "alarm";
-> +		};
-> +	};
-
-Can you please expand your example to include the second SID for the
-PM8941 chip?  That way, it will be clear that each PMIC needs two DT
-nodes; one for each SID.
-
-Thanks,
-David Collins
-
-[1]: https://www.codeaurora.org/cgit/quic/la/kernel/msm-3.10/tree/?h=msm-3.10
-
-[2]: https://lkml.org/lkml/2014/7/29/252
+Based on your subject line, I'm queuing this for the merge window.
 
 -- 
-The Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-hosted by The Linux Foundation
+FTTC broadband for 0.8mile line: currently at 9.5Mbps down 400kbps up
+according to speedtest.net.
