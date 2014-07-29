@@ -1,21 +1,48 @@
 From: cw00.choi@samsung.com (Chanwoo Choi)
-Date: Tue, 29 Jul 2014 11:17:09 +0900
-Subject: [PATCH 0/3] ARM: dts: Add TMU dt node and missing data for Exynos3250
-Message-ID: <1406600232-31033-1-git-send-email-cw00.choi@samsung.com>
+Date: Tue, 29 Jul 2014 11:17:10 +0900
+Subject: [PATCH 1/3] ARM: dts: Add TMU dt node to monitor the temperature for
+ Exynos3250
+In-Reply-To: <1406600232-31033-1-git-send-email-cw00.choi@samsung.com>
+References: <1406600232-31033-1-git-send-email-cw00.choi@samsung.com>
+Message-ID: <1406600232-31033-2-git-send-email-cw00.choi@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patchset add TMU (Thermal Management Unit) dt node and missing pinctrl
-property of uart0/1. Also, this patchset remove duplcate 'interrupt-parent'
-property for code clean.
+This patch add TMU (Thermal Management Unit) dt node to monitor the high
+temperature for Exynos3250.
 
-Chanwoo Choi (3):
-  ARM: dts: Add TMU dt node to monitor the temperature for Exynos3250
-  ARM: dts: Remove duplicate 'interrput-parent' property for Exynos3250
-  ARM: dts: Add missing pinctrl for uart0/1 for Exynos3250
+Signed-off-by: Chanwoo Choi <cw00.choi@samsung.com>
+Acked-by: Kyungmin Park <kyungmin.park@samsung.com>
+---
+This patch has a dependency on following patch [1] which supporting the TMU
+of Exynos3250:
+ [1] https://git.kernel.org/cgit/linux/kernel/git/rzhang/linux.git/commit/?h=next&id=1fe56dc16a3dab400206443f70ae158c8f595c42
 
- arch/arm/boot/dts/exynos3250.dtsi | 15 +++++++++++++--
- 1 file changed, 13 insertions(+), 2 deletions(-)
+Changes from v1:
+- Remove duplicate 'interrupt-parent' property.
 
+ arch/arm/boot/dts/exynos3250.dtsi | 9 +++++++++
+ 1 file changed, 9 insertions(+)
+
+diff --git a/arch/arm/boot/dts/exynos3250.dtsi b/arch/arm/boot/dts/exynos3250.dtsi
+index 77a06df..41a260a 100644
+--- a/arch/arm/boot/dts/exynos3250.dtsi
++++ b/arch/arm/boot/dts/exynos3250.dtsi
+@@ -168,6 +168,15 @@
+ 			status = "disabled";
+ 		};
+ 
++		tmu: tmu at 100C0000 {
++			compatible = "samsung,exynos3250-tmu";
++			reg = <0x100C0000 0x100>;
++			interrupts = <0 216 0>;
++			clocks = <&cmu CLK_TMU_APBIF>;
++			clock-names = "tmu_apbif";
++			status = "disabled";
++		};
++
+ 		gic: interrupt-controller at 10481000 {
+ 			compatible = "arm,cortex-a15-gic";
+ 			#interrupt-cells = <3>;
 -- 
 1.8.0
