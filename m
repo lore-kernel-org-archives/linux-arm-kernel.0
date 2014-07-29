@@ -1,80 +1,59 @@
 From: bigeasy@linutronix.de (Sebastian Andrzej Siewior)
-Date: Tue, 29 Jul 2014 20:59:01 +0200
-Subject: [RFC PATCH 4/7] serial: 8250_dma: enqueue RX dma again on completion.
+Date: Tue, 29 Jul 2014 20:58:58 +0200
+Subject: [PATCH 1/7] dmaengine: edma: fix two faults which happen with the
+ 8250_dma user
 In-Reply-To: <1406660344-25307-1-git-send-email-bigeasy@linutronix.de>
 References: <1406660344-25307-1-git-send-email-bigeasy@linutronix.de>
-Message-ID: <1406660344-25307-5-git-send-email-bigeasy@linutronix.de>
+Message-ID: <1406660344-25307-2-git-send-email-bigeasy@linutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The omap needs a DMA request pending right away. If it is enqueued once
-the bytes are in the FIFO then nothing will happen and the FIFO will be
-later purged via RX-timeout interrupt.
-This patch requeues RX-DMA request on completion but not if it was
-canceled due to the RX-timeout.
+The rx path of the 8250_dma user in the RX-timeout case:
+- it starts the RX transfer
+- if the rx-timeout interrupt occures, it dmaengine_pause() the transfer
+- step two is dmaengine_terminate_all() on this channel.
+- based on dmaengine_tx_status() it learns the number of transfered
+  bytes.
+- the rx interrupt occures, it does not start the RX-transfer because
+  according to dmaengine_tx_status() the status of the current transfer
+  is still DMA_IN_PROGRESS because the earlier dmaengine_terminate_all()
+  did not reset this.
+- on rx-timeout it invokes dmaengine_pause() again. This time, it
+  segfaults because the channel has no descriptor yet.
 
-Cc: Heikki Krogerus <heikki.krogerus@linux.intel.com>
+To make the upper case work better, this patch adds dma_cookie_complete()
+to complete the cookie. Also it adds is an additional check for echan->edesc
+in case the channel has no descriptor assigned.
+
+Cc: Joel Fernandes <joelf@ti.com>
+Cc: Vinod Koul <vinod.koul@intel.com>
+Cc: Dan Williams <dan.j.williams@intel.com>
+Cc: dmaengine at vger.kernel.org
 Signed-off-by: Sebastian Andrzej Siewior <bigeasy@linutronix.de>
 ---
- drivers/tty/serial/8250/8250_core.c |  3 +++
- drivers/tty/serial/8250/8250_dma.c  | 12 +++++++++---
- 2 files changed, 12 insertions(+), 3 deletions(-)
+ drivers/dma/edma.c | 3 ++-
+ 1 file changed, 2 insertions(+), 1 deletion(-)
 
-diff --git a/drivers/tty/serial/8250/8250_core.c b/drivers/tty/serial/8250/8250_core.c
-index 7a33c30..098ff02 100644
---- a/drivers/tty/serial/8250/8250_core.c
-+++ b/drivers/tty/serial/8250/8250_core.c
-@@ -1556,6 +1556,9 @@ int serial8250_handle_irq(struct uart_port *port, unsigned int iir)
- 
- 		if (!up->dma || dma_err)
- 			status = serial8250_rx_chars(up, status);
-+
-+		if (dma_err == -ETIMEDOUT && port->type == PORT_OMAP_16750)
-+			serial8250_rx_dma(up, 0);
+diff --git a/drivers/dma/edma.c b/drivers/dma/edma.c
+index d08c4de..ff05dd4 100644
+--- a/drivers/dma/edma.c
++++ b/drivers/dma/edma.c
+@@ -256,6 +256,7 @@ static int edma_terminate_all(struct edma_chan *echan)
+ 	 * echan->edesc is NULL and exit.)
+ 	 */
+ 	if (echan->edesc) {
++		dma_cookie_complete(&echan->edesc->vdesc.tx);
+ 		echan->edesc = NULL;
+ 		edma_stop(echan->ch_num);
  	}
- 	serial8250_modem_status(up);
- 	if (!up->dma && (status & UART_LSR_THRE))
-diff --git a/drivers/tty/serial/8250/8250_dma.c b/drivers/tty/serial/8250/8250_dma.c
-index f9ef69f..acb0a87 100644
---- a/drivers/tty/serial/8250/8250_dma.c
-+++ b/drivers/tty/serial/8250/8250_dma.c
-@@ -49,9 +49,8 @@ static void __dma_tx_complete(void *param)
- 	spin_unlock_irqrestore(&p->port.lock, flags);
- }
- 
--static void __dma_rx_complete(void *param)
-+static void __dma_rx_do_complete(struct uart_8250_port *p, bool timeout)
+@@ -282,7 +283,7 @@ static int edma_slave_config(struct edma_chan *echan,
+ static int edma_dma_pause(struct edma_chan *echan)
  {
--	struct uart_8250_port	*p = param;
- 	struct uart_8250_dma	*dma = p->dma;
- 	struct tty_port		*tty_port = &p->port.state->port;
- 	struct dma_tx_state	state;
-@@ -67,10 +66,17 @@ static void __dma_rx_complete(void *param)
+ 	/* Pause/Resume only allowed with cyclic mode */
+-	if (!echan->edesc->cyclic)
++	if (!echan->edesc || !echan->edesc->cyclic)
+ 		return -EINVAL;
  
- 	tty_insert_flip_string(tty_port, dma->rx_buf, count);
- 	p->port.icount.rx += count;
-+	if (!timeout && p->port.type == PORT_OMAP_16750)
-+		serial8250_rx_dma(p, 0);
- 
- 	tty_flip_buffer_push(tty_port);
- }
- 
-+static void __dma_rx_complete(void *param)
-+{
-+	__dma_rx_do_complete(param, false);
-+}
-+
- int serial8250_tx_dma(struct uart_8250_port *p)
- {
- 	struct uart_8250_dma		*dma = p->dma;
-@@ -126,7 +132,7 @@ int serial8250_rx_dma(struct uart_8250_port *p, unsigned int iir)
- 		 */
- 		if (dma_status == DMA_IN_PROGRESS) {
- 			dmaengine_pause(dma->rxchan);
--			__dma_rx_complete(p);
-+			__dma_rx_do_complete(p, true);
- 		}
- 		return -ETIMEDOUT;
- 	default:
+ 	edma_pause(echan->ch_num);
 -- 
 2.0.1
