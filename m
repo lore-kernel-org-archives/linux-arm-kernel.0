@@ -1,84 +1,87 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Tue, 29 Jul 2014 12:49:08 +0200
-Subject: [PATCH 1/3] arm64: spin-table: handle unmapped cpu-release-addrs
-In-Reply-To: <1406630950-32432-1-git-send-email-ard.biesheuvel@linaro.org>
-References: <1406630950-32432-1-git-send-email-ard.biesheuvel@linaro.org>
-Message-ID: <1406630950-32432-2-git-send-email-ard.biesheuvel@linaro.org>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Tue, 29 Jul 2014 11:55:43 +0100
+Subject: [PATCH 19/19] Documentation: ACPI for ARM64
+In-Reply-To: <20140729102940.GB18250@cbox>
+References: <1406206825-15590-1-git-send-email-hanjun.guo@linaro.org>
+ <1406206825-15590-20-git-send-email-hanjun.guo@linaro.org>
+ <CAOesGMhKHGkVK3dOLXXx9GQBMxDmjBu1WDBgHmwdGe1UK3jfcg@mail.gmail.com>
+ <20140728100654.GC24078@leverpostej>
+ <20140728164459.GD32359@quad.lixom.net>
+ <20140729102940.GB18250@cbox>
+Message-ID: <20140729105543.GL2576@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Mark Rutland <mark.rutland@arm.com>
+On Tue, Jul 29, 2014 at 11:29:40AM +0100, Christoffer Dall wrote:
+> On Mon, Jul 28, 2014 at 09:44:59AM -0700, Olof Johansson wrote:
+> > On Mon, Jul 28, 2014 at 11:06:54AM +0100, Mark Rutland wrote:
+> 
+> [...]
+> 
+> > > >
+> > > > > +Relationship with Device Tree
+> > > > > +-----------------------------
+> > > > > +
+> > > > > +ACPI support in drivers and subsystems for ARMv8 should never be mutually
+> > > > > +exclusive with DT support at compile time.
+> > > > > +
+> > > > > +At boot time the kernel will only use one description method depending on
+> > > > > +parameters passed from the bootloader.
+> > > >
+> > > > Possibly overriden by kernel bootargs. And as debated for quite a
+> > > > while earlier this year, acpi should still default to off -- if a DT
+> > > > and ACPI are both passed in, DT should at this time be given priority.
+> > > 
+> > > Why? I really don't see the logic in doing that.
+> > 
+> > Seems like I am replying to your emails in reverse order.
+> > 
+> > > Currently the kernel can only boot using DT, so DT will be used even if
+> > > ACPI is present. In the presence of ACPI support in the kernel, ACPI
+> > > would be used on said systems.
+> > 
+> > For all the reasons we hashed out earlier this year: We can't trust that
+> > vendors will know how to do ACPI from day one, so instead of loading up the
+> > kernel with lots of quirks and workarounds, we'll default to not using it until
+> > we're at a point where things look mature enough.
+> > 
+> > The alternative is to keep this patch set out of the kernel. We can do that
+> > too, but I don't think that really helps anyone.
+> > 
+> > > From the discussions at the last Linaro Connect, this was seen as
+> > > important for virtual machines which want to provide ACPI services to
+> > > guests while still being able to boot DT-only kernels. I'll leave it to
+> > > Grant, Rob, and Christoffer to cover that.
+> > 
+> > Ok, waiting to see what they have to say then.
+> > 
+> 
+> Hmm, a virtual machine implementaion may provide either a DT or ACPI (or
+> both).  I think the point at Linaro Connect was that for a first cut,
+> there is no obvious need to provide ACPI to VMs and to be spec
+> compliant, server kernels must be able to boot with DT-only.  In most
+> cases such systems will only access a few limited emulated devices
+> (UART, GIC, RTC, flash controller) and VirtIO devices, which should just
+> work using DT only.
+> 
+> People are talking about adding ACPI for VM guests as well for various
+> reasons (device passthrough for example) in which case I would always
+> expect people to run UEFI inside their guests too (perhaps this is not
+> 100% true in the case of Xen fast-boot scenarios though) and I would
+> expect Linux to only see the little stub DT and ACPI.
+> 
+> Does this clarify anything or add futher to the confusion?
 
-In certain cases the cpu-release-addr of a CPU may not fall in the
-linear mapping (e.g. when the kernel is loaded above this address due to
-the presence of other images in memory). This is problematic for the
-spin-table code as it assumes that it can trivially convert a
-cpu-release-addr to a valid VA in the linear map.
+I was under the impression that there was a case where we'd have a DT
+with HW description in a VM which also had ACPI tables, to enable a
+kernel without ACPI support to boot in said VM (albeit with reduced
+functionality).
 
-This patch modifies the spin-table code to use a temporary cached
-mapping to write to a given cpu-release-addr, enabling us to support
-addresses regardless of whether they are covered by the linear mapping.
+I may have got confused since the VM standards discussion at LCA-14.
 
-Signed-off-by: Mark Rutland <mark.rutland@arm.com>
----
- arch/arm64/kernel/smp_spin_table.c | 21 ++++++++++++++++-----
- 1 file changed, 16 insertions(+), 5 deletions(-)
+If we we expect a hypervisor to provide DT only by default (for
+compatibility), and ACPI only when the user has explicitly enabled it
+for an ACPI-specific feature, then that sounds OK.
 
-diff --git a/arch/arm64/kernel/smp_spin_table.c b/arch/arm64/kernel/smp_spin_table.c
-index 0347d38eea29..70181c1bf42d 100644
---- a/arch/arm64/kernel/smp_spin_table.c
-+++ b/arch/arm64/kernel/smp_spin_table.c
-@@ -20,6 +20,7 @@
- #include <linux/init.h>
- #include <linux/of.h>
- #include <linux/smp.h>
-+#include <linux/types.h>
- 
- #include <asm/cacheflush.h>
- #include <asm/cpu_ops.h>
-@@ -65,12 +66,21 @@ static int smp_spin_table_cpu_init(struct device_node *dn, unsigned int cpu)
- 
- static int smp_spin_table_cpu_prepare(unsigned int cpu)
- {
--	void **release_addr;
-+	__le64 __iomem *release_addr;
- 
- 	if (!cpu_release_addr[cpu])
- 		return -ENODEV;
- 
--	release_addr = __va(cpu_release_addr[cpu]);
-+	/*
-+	 * The cpu-release-addr may or may not be inside the linear mapping.
-+	 * As ioremap_cache will either give us a new mapping or reuse the
-+	 * existing linear mapping, we can use it to cover both cases. In
-+	 * either case the memory will be MT_NORMAL.
-+	 */
-+	release_addr = ioremap_cache(cpu_release_addr[cpu],
-+				     sizeof(*release_addr));
-+	if (!release_addr)
-+		return -ENOMEM;
- 
- 	/*
- 	 * We write the release address as LE regardless of the native
-@@ -79,15 +89,16 @@ static int smp_spin_table_cpu_prepare(unsigned int cpu)
- 	 * boot-loader's endianess before jumping. This is mandated by
- 	 * the boot protocol.
- 	 */
--	release_addr[0] = (void *) cpu_to_le64(__pa(secondary_holding_pen));
--
--	__flush_dcache_area(release_addr, sizeof(release_addr[0]));
-+	writeq_relaxed(__pa(secondary_holding_pen), release_addr);
-+	__flush_dcache_area(release_addr, sizeof(*release_addr));
- 
- 	/*
- 	 * Send an event to wake up the secondary CPU.
- 	 */
- 	sev();
- 
-+	iounmap(release_addr);
-+
- 	return 0;
- }
- 
--- 
-1.8.3.2
+Thanks,
+Mark.
