@@ -1,88 +1,57 @@
-From: ohaugan@codeaurora.org (Olav Haugan)
-Date: Tue, 29 Jul 2014 10:21:48 -0700
-Subject: [PATCH v3 1/1] iommu-api: Add map_sg/unmap_sg functions
-In-Reply-To: <20140729092547.GB9245@arm.com>
-References: <1406572731-6216-1-git-send-email-ohaugan@codeaurora.org>
- <1406572731-6216-2-git-send-email-ohaugan@codeaurora.org>
- <20140728191111.GW15536@arm.com> <53D6EFC0.1060308@codeaurora.org>
- <20140729092547.GB9245@arm.com>
-Message-ID: <53D7D82C.2080201@codeaurora.org>
+From: oleg@redhat.com (Oleg Nesterov)
+Date: Tue, 29 Jul 2014 19:31:36 +0200
+Subject: [PATCH v3 6/8] x86: Split syscall_trace_enter into two phases
+In-Reply-To: <CALCETrWBU-=zqLTCP7B1feZ9J-e4u-Boic+e1EEn1rL-ijeEKg@mail.gmail.com>
+References: <cover.1405992946.git.luto@amacapital.net>
+ <3f649f5658a163645e3ce15156176c325283762e.1405992946.git.luto@amacapital.net>
+ <20140728173723.GA20993@redhat.com>
+ <CALCETrWUFo_zXcAZja-vdL4_MgJDd=1ed5Vt54eyUuim930xAw@mail.gmail.com>
+ <20140729165416.GA967@redhat.com>
+ <CALCETrWBU-=zqLTCP7B1feZ9J-e4u-Boic+e1EEn1rL-ijeEKg@mail.gmail.com>
+Message-ID: <20140729173136.GA2808@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 7/29/2014 2:25 AM, Will Deacon wrote:
-> Hi Olav,
-> 
-> On Tue, Jul 29, 2014 at 01:50:08AM +0100, Olav Haugan wrote:
->> On 7/28/2014 12:11 PM, Will Deacon wrote:
->>> On Mon, Jul 28, 2014 at 07:38:51PM +0100, Olav Haugan wrote:
->>>> +int iommu_map_sg(struct iommu_domain *domain, unsigned long iova,
->>>> +			struct scatterlist *sg, unsigned int nents,
->>>> +			int prot, unsigned long flags)
->>>> +{
->>>> +	int ret = 0;
->>>> +	unsigned long offset = 0;
->>>> +
->>>> +	BUG_ON(iova & (~PAGE_MASK));
->>>> +
->>>> +	if (unlikely(domain->ops->map_sg == NULL)) {
->>>> +		unsigned int i;
->>>> +		struct scatterlist *s;
->>>> +
->>>> +		for_each_sg(sg, s, nents, i) {
->>>> +			phys_addr_t phys = page_to_phys(sg_page(s));
->>>> +			u32 page_len = PAGE_ALIGN(s->offset + s->length);
->>>
->>> Hmm, this is a pretty horrible place where CPU page size (from the sg list)
->>> meets the IOMMU and I think we need to do something better to avoid spurious
->>> failures. In other words, the sg list should be iterated in such a way that
->>> we always pass a multiple of a supported iommu page size to iommu_map.
->>>
->>> All the code using PAGE_MASK and PAGE_ALIGN needn't match what is supported
->>> by the IOMMU hardware.
->>
->> I am not sure what you mean. How can we iterate over the sg list in a
->> different way to ensure we pass a multiple of a supported iommu page
->> size? Each entry in the sg list are physically discontinuous from each
->> other. If the page is too big iommu_map will take care of it for us. It
->> already finds the biggest supported page size and splits up the calls to
->> domain->ops->map(). Also, whoever allocates memory for use by IOMMU
->> needs to be aware of what the supported minimum size is or else they
->> would get mapping failures anyway.
-> 
-> I agree that we can't handle IOMMUs that have a minimum page size larger
-> than the CPU page size, but we should be able to handle the case where the
-> maximum supported page size on the IOMMU is smaller than the CPU page size
-> (e.g. 4k IOMMU with 64k pages on the CPU). I think that could trip a BUG_ON
-> with your patch, although the alignment would be ok in iommu_map because
-> page sizes are always a power-of-2. You also end up rounding the size to
-> 64k, which could lead to mapping more than you really need to.
+On 07/29, Andy Lutomirski wrote:
+>
+> On Tue, Jul 29, 2014 at 9:54 AM, Oleg Nesterov <oleg@redhat.com> wrote:
+> >
+> > Yes, just to trigger the slow path, I guess.
+> >
+> >> I'll update the code to call user_exit iff TIF_NOHZ is
+> >> set.
+> >
+> > Or perhaps it would be better to not add another user of this (strange) flag
+> > and just call user_exit() unconditionally(). But, yes, you need to use
+> > from "work = flags & (_TIF_WORK_SYSCALL_ENTRY & ~TIF_NOHZ)" then.\
+>
+> user_exit looks slow enough to me that a branch to try to avoid it may
+> be worthwhile.  I bet that explicitly checking the flag is
+> actually both faster and clearer.
 
-Which BUG_ON would I trip? If the supported IOMMU page size is less than
-the CPU supported page size then iommu_map will nicely take care of
-splitting up the mapping calls into sizes supported by the IOMMU (taken
-care of by iommu_pgsize()). However, I see you point regarding the
-PAGE_ALIGN of the offset+length that can cause overmapping which you
-don't really want. What is the alternative here? Just leave it and do
-not align at all? That is how iommu_map() currently works. It will
-return error if the iova|phys|size is not aligned to the minimum pgsize
-supported by the IOMMU. So I would not change the behavior if I just
-left it without trying to align.
+I don't think so (unless I am confused again), note that user_exit() uses
+jump label. But this doesn't matter. I meant that we should avoid TIF_NOHZ
+if possible because I think it should die somehow (currently I do not know
+how ;). And because it is ugly to check the same condition twice:
 
-I will remove the BUG_ON for (iova & (~PAGE_MASK)).
+	if (work & TIF_NOHZ) {
+		// user_exit()
+		if (context_tracking_is_enabled())
+			context_tracking_user_exit();
+	}
 
->> (The code in __map_sg_chunk in arch/arm/mm/dma-mapping.c does the same
->> thing btw.)
-> 
-> I have the same objection to that code :)
+TIF_NOHZ is set if and only if context_tracking_is_enabled() is true.
+So I think that
 
-I am hoping we can remove/simplify some of that code when we have the
-iommmu_map_sg API available....
+	work = current_thread_info()->flags & (_TIF_WORK_SYSCALL_ENTRY & ~TIF_NOHZ);
 
-Thanks,
+	user_exit();
 
-Olav
+looks a bit better. But I won't argue.
 
--- 
-The Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-hosted by The Linux Foundation
+> That's what I did for v4.
+
+I am going to read it today. Not that I think I can help or find something
+wrong.
+
+Oleg.
