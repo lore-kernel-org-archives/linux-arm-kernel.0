@@ -1,60 +1,32 @@
 From: haojian.zhuang@linaro.org (Haojian Zhuang)
-Date: Tue, 29 Jul 2014 18:40:18 +0800
-Subject: [PATCH v15 06/12] document: dt: add the binding on HiP04 clock
-In-Reply-To: <2049238.Bp7AxcFkea@wuerfel>
+Date: Tue, 29 Jul 2014 18:41:06 +0800
+Subject: [PATCH v15 10/12] ARM: hisi: enable erratum 798181 of A15 on HiP04
+In-Reply-To: <20140729040837.GD8430@quad.lixom.net>
 References: <1406555876-11989-1-git-send-email-haojian.zhuang@linaro.org>
- <20140728175418.GD2576@leverpostej>
- <CAD6h2NS4GqxyFBE0+nq6Phxy0j6J74M5+N5DOEPSOYfB4+7Wxg@mail.gmail.com>
- <2049238.Bp7AxcFkea@wuerfel>
-Message-ID: <CAD6h2NSwZ=g_g56iBY8_1HXau_-1b5TE42Lm8gGM0ZvMbwhu2w@mail.gmail.com>
+ <1406555876-11989-11-git-send-email-haojian.zhuang@linaro.org>
+ <20140729040837.GD8430@quad.lixom.net>
+Message-ID: <CAD6h2NR0vK4RdZ70naLGtWhRs36J--O1nxqoqf18JjoF3GRc=A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 29 July 2014 17:55, Arnd Bergmann <arnd@arndb.de> wrote:
-> On Tuesday 29 July 2014 10:25:49 Haojian Zhuang wrote:
->> On 29 July 2014 01:54, Mark Rutland <mark.rutland@arm.com> wrote:
->> > On Mon, Jul 28, 2014 at 02:57:50PM +0100, Haojian Zhuang wrote:
->> >> The DT binding for Hisilicon HiP04 clock driver.
->> >>
->> >> Signed-off-by: Haojian Zhuang <haojian.zhuang@linaro.org>
->> >> ---
->> >>  .../devicetree/bindings/clock/hip04-clock.txt        | 20 ++++++++++++++++++++
->> >>  1 file changed, 20 insertions(+)
->> >>  create mode 100644 Documentation/devicetree/bindings/clock/hip04-clock.txt
->> >>
->> >> diff --git a/Documentation/devicetree/bindings/clock/hip04-clock.txt b/Documentation/devicetree/bindings/clock/hip04-clock.txt
->> >> new file mode 100644
->> >> index 0000000..4d31ae3
->> >> --- /dev/null
->> >> +++ b/Documentation/devicetree/bindings/clock/hip04-clock.txt
->> >> @@ -0,0 +1,20 @@
->> >> +* Hisilicon HiP04 Clock Controller
->> >> +
->> >> +The HiP04 clock controller generates and supplies clock to various
->> >> +controllers within the HiP04 SoC.
->> >> +
->> >> +Required Properties:
->> >> +
->> >> +- compatible: should be one of the following.
->> >> +  - "hisilicon,hip04-clock" - controller compatible with HiP04 SoC.
->> >
->> > There's only one clock controller on-board and it's custom for HiP04?
->> >
+On 29 July 2014 12:08, Olof Johansson <olof@lixom.net> wrote:
+> On Mon, Jul 28, 2014 at 09:57:54PM +0800, Haojian Zhuang wrote:
+>> From: Kefeng Wang <kefeng.wang@linaro.org>
 >>
->> Since all those PLL settings are configured in bootloader, kernel
->> don't need to configure it again.
+>> The commit 93dc688 (ARM: 7684/1: errata: Workaround for Cortex-A15
+>> erratum 798181 (TLBI/DSB operations)) introduced a workaround for
+>> Cortex-A15 erratum 798181. Enable it for HIP04(Cortex-a15 r3p2).
 >>
->> By the way, I don't have the manual to configure those PLLs. All the clocks
->> are defined as fixed in kernel side.
->>
+>> Signed-off-by: Kefeng Wang <kefeng.wang@linaro.org>
+>> Singed-off-by: Haojian Zhuang <haojian.zhuang@linaro.org>
 >
-> If all the clocks are fixed-rate, you don't actually need a driver
-> for them, just use the regular fixed-rate clock and define one
-> node per clock.
+> There's no need to do this as a separate patch if you just added this entry in
+> a different patch in the same series -- just fold this in with that.
 >
->         Arnd
+>
+> -Olof
 
-OK. I'll update it.
+OK
 
 Regards
 Haojian
