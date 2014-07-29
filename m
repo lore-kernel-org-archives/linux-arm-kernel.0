@@ -1,25 +1,31 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Mon, 28 Jul 2014 21:08:37 -0700
-Subject: [PATCH v15 10/12] ARM: hisi: enable erratum 798181 of A15 on HiP04
-In-Reply-To: <1406555876-11989-11-git-send-email-haojian.zhuang@linaro.org>
-References: <1406555876-11989-1-git-send-email-haojian.zhuang@linaro.org>
- <1406555876-11989-11-git-send-email-haojian.zhuang@linaro.org>
-Message-ID: <20140729040837.GD8430@quad.lixom.net>
+From: thomas.ab@samsung.com (Thomas Abraham)
+Date: Tue, 29 Jul 2014 09:57:09 +0530
+Subject: [PATCH] ARM: dts: smdk5250: Specify MAX77686 pmic interrupt
+Message-ID: <1406608029-8538-1-git-send-email-thomas.ab@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jul 28, 2014 at 09:57:54PM +0800, Haojian Zhuang wrote:
-> From: Kefeng Wang <kefeng.wang@linaro.org>
-> 
-> The commit 93dc688 (ARM: 7684/1: errata: Workaround for Cortex-A15
-> erratum 798181 (TLBI/DSB operations)) introduced a workaround for
-> Cortex-A15 erratum 798181. Enable it for HIP04(Cortex-a15 r3p2).
-> 
-> Signed-off-by: Kefeng Wang <kefeng.wang@linaro.org>
-> Singed-off-by: Haojian Zhuang <haojian.zhuang@linaro.org>
+The IRQB interrupt pin of MAX77686 PMIC is connected to GPX3[2] pin of
+Exynos5250 on the Exynos5250 SMDK board. Specify this connection using
+interrupts property for the max77686 pmic node.
 
-There's no need to do this as a separate patch if you just added this entry in
-a different patch in the same series -- just fold this in with that.
+Signed-off-by: Thomas Abraham <thomas.ab@samsung.com>
+---
+ arch/arm/boot/dts/exynos5250-smdk5250.dts |    2 ++
+ 1 file changed, 2 insertions(+)
 
-
--Olof
+diff --git a/arch/arm/boot/dts/exynos5250-smdk5250.dts b/arch/arm/boot/dts/exynos5250-smdk5250.dts
+index 695f5ad..cf38808 100644
+--- a/arch/arm/boot/dts/exynos5250-smdk5250.dts
++++ b/arch/arm/boot/dts/exynos5250-smdk5250.dts
+@@ -50,6 +50,8 @@
+ 		max77686 at 09 {
+ 			compatible = "maxim,max77686";
+ 			reg = <0x09>;
++			interrupt-parent = <&gpx3>;
++			interrupts = <2 0>;
+ 
+ 			voltage-regulators {
+ 				ldo1_reg: LDO1 {
+-- 
+1.7.9.5
