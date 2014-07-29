@@ -1,35 +1,71 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Mon, 28 Jul 2014 23:40:27 -0700
-Subject: [PATCH v5 0/8] enable Hisilicon HIX5HD2 SoC
-In-Reply-To: <1406551883-26154-1-git-send-email-haojian.zhuang@linaro.org>
-References: <1406551883-26154-1-git-send-email-haojian.zhuang@linaro.org>
-Message-ID: <20140729064027.GE32359@quad.lixom.net>
+From: tony@atomide.com (Tony Lindgren)
+Date: Mon, 28 Jul 2014 23:42:43 -0700
+Subject: OMAP baseline test results for v3.16-rc4
+In-Reply-To: <alpine.DEB.2.02.1407251857480.5875@utopia.booyaka.com>
+References: <alpine.DEB.2.02.1407062339420.15016@utopia.booyaka.com>
+ <20140707080238.GF28884@atomide.com>
+ <alpine.DEB.2.02.1407251857480.5875@utopia.booyaka.com>
+Message-ID: <20140729064243.GF29045@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jul 28, 2014 at 08:51:15PM +0800, Haojian Zhuang wrote:
-> Changelog:
-> v5:
->   * Use CPU_OF_DECLARE_METHOD().
->   * State "hisilicon,cpuctrl" in documents.
->   * Set PL310 L2 aux value in machine descriptor.
->   * Use enable-method property for smp in dts file.
->   * Move reset code from machine platform driver into power reset driver.
->   * Move HIP04 debug uart into another patch series.
+* Paul Walmsley <paul@pwsan.com> [140725 12:16]:
+> On Mon, 7 Jul 2014, Tony Lindgren wrote:
+> 
+> > With v3.16-rc4 the PM features for omap3 should be working
+> > finally for device tree based booting. At lest beaglexm and
+> > 3xxevm should work.
+> 
+> Just to follow up briefly on this: there was indeed a bug in the OMAP3 
+> test scripts here that resulted in the UART wakeup not being enabled.
+> 
+> Once that was fixed, system suspend-based chip-retention and chip-off 
+> modes work.
 
-Usually there's some more description in the cover letter than just the
-changelog.
+OK
+ 
+> However, scheduler-idle based chip-retention and chip-off still are not
+> working.  Looking at the logs, it appears that some domains are not 
+> dynamically going idle.  For example, looking at:
+> 
+> http://www.pwsan.com/omap/testlogs/test_v3.16-rc6/20140724142225/pm/37xxevm/37xxevm_log.txt
+> 
+> it can be seen that core_pwrdm's retention count doesn't increase between 
+> the two PM debug dumps.  The important lines are:
+> 
+> core_pwrdm (ON),OFF:0,RET:2,INA:0,ON:3,RET-LOGIC-OFF:0,RET-MEMBANK1-OFF:0,RET-MEMBANK2-OFF:0
+> 
+> and 
+> 
+> core_pwrdm (ON),OFF:0,RET:2,INA:0,ON:3,RET-LOGIC-OFF:0,RET-MEMBANK1-OFF:0,RET-MEMBANK2-OFF:0
+> 
+> That's why the test reports mark the dynamic PM modes as failing.
+> 
+> ...
+> 
+> Here's an example where things worked:
+> 
+> http://www.pwsan.com/omap/testlogs/test_v3.10/20130717134228/pm/3530es3beagle/3530es3beagle_log.txt
+> 
+> In this one, it can be seen that the CORE counts transitioned from:
+> 
+> core_pwrdm (ON),OFF:0,RET:2,INA:0,ON:3,RET-LOGIC-OFF:0,RET-MEMBANK1-OFF:0,RET-MEMBANK2-OFF:0
+> 
+> to
+> 
+> core_pwrdm (ON),OFF:0,RET:10,INA:0,ON:11,RET-LOGIC-OFF:0,RET-MEMBANK1-OFF:0,RET-MEMBANK2-OFF:0
+> 
+> between the retention suspend/resume test ending and the dynamic 
+> retention idle test ending.
 
-Anyway, my question is this: what's the plan for upstreaming of this SoC? Is it
-a mobile-only SoC, or has it been used (or will it be used) in other embedded
-use cases, public development boards and the like?
+Hmm I think the difference with the working v3.10 one is that you have
+root=/dev/mmcblk0p2 instead of root=/dev/nfs. As the Ethernet on beagle
+is on the USB EHCI, this is still blocking the deeper idle states AFAIK.
 
-If it is a mobile-targeted product, what is the plan and rough timeline
-for upstreaming things such as display/graphics and power management
-components?
+Care to test -rc7 with root=/dev/mmcblk0p2 to see if that works?
 
+On the am37xx-evm nfsroot will work as it's on the GPMC bus.
 
-Thanks!
+Regards,
 
-
--Olof
+Tony
