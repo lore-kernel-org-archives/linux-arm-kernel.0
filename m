@@ -1,43 +1,66 @@
-From: sre@kernel.org (Sebastian Reichel)
-Date: Tue, 29 Jul 2014 04:25:37 +0200
-Subject: [PATCH 00/35] arm: omap: move intc to drivers/irqchip/
-In-Reply-To: <1406582183-696-1-git-send-email-balbi@ti.com>
-References: <1406582183-696-1-git-send-email-balbi@ti.com>
-Message-ID: <20140729022536.GC4421@earth.universe>
+From: haojian.zhuang@linaro.org (Haojian Zhuang)
+Date: Tue, 29 Jul 2014 10:25:49 +0800
+Subject: [PATCH v15 06/12] document: dt: add the binding on HiP04 clock
+In-Reply-To: <20140728175418.GD2576@leverpostej>
+References: <1406555876-11989-1-git-send-email-haojian.zhuang@linaro.org>
+ <1406555876-11989-7-git-send-email-haojian.zhuang@linaro.org>
+ <20140728175418.GD2576@leverpostej>
+Message-ID: <CAD6h2NS4GqxyFBE0+nq6Phxy0j6J74M5+N5DOEPSOYfB4+7Wxg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On 29 July 2014 01:54, Mark Rutland <mark.rutland@arm.com> wrote:
+> On Mon, Jul 28, 2014 at 02:57:50PM +0100, Haojian Zhuang wrote:
+>> The DT binding for Hisilicon HiP04 clock driver.
+>>
+>> Signed-off-by: Haojian Zhuang <haojian.zhuang@linaro.org>
+>> ---
+>>  .../devicetree/bindings/clock/hip04-clock.txt        | 20 ++++++++++++++++++++
+>>  1 file changed, 20 insertions(+)
+>>  create mode 100644 Documentation/devicetree/bindings/clock/hip04-clock.txt
+>>
+>> diff --git a/Documentation/devicetree/bindings/clock/hip04-clock.txt b/Documentation/devicetree/bindings/clock/hip04-clock.txt
+>> new file mode 100644
+>> index 0000000..4d31ae3
+>> --- /dev/null
+>> +++ b/Documentation/devicetree/bindings/clock/hip04-clock.txt
+>> @@ -0,0 +1,20 @@
+>> +* Hisilicon HiP04 Clock Controller
+>> +
+>> +The HiP04 clock controller generates and supplies clock to various
+>> +controllers within the HiP04 SoC.
+>> +
+>> +Required Properties:
+>> +
+>> +- compatible: should be one of the following.
+>> +  - "hisilicon,hip04-clock" - controller compatible with HiP04 SoC.
+>
+> There's only one clock controller on-board and it's custom for HiP04?
+>
 
-On Mon, Jul 28, 2014 at 04:15:48PM -0500, Felipe Balbi wrote:
-> here's another rebase of the original series moving INTC
-> to drivers.
-> 
-> There aren't many changes, only some fixes here and there
-> because of recent changes to irq_domain and irqchip.
-> 
-> I have also added a patch to enable INTC address space
-> protection so that only privileged modes can access
-> INTC's address space.
-> 
-> Patches tested on top of v3.17-rc7 with a beagle bone black,
-> the only plataform I have which still uses INTC.
-> 
-> Tony, if you can run your PM test cases on your side, I'd
-> be really glad.
+Since all those PLL settings are configured in bootloader, kernel
+don't need to configure it again.
 
-Reviewed-By: Sebastian Reichel <sre@kernel.org>
+By the way, I don't have the manual to configure those PLLs. All the clocks
+are defined as fixed in kernel side.
 
-for the whole series except of "drop ti,intc-size support",
-which breaks the DT API.
+>> +
+>> +- reg: physical base address of the controller and length of memory mapped
+>> +  region.
+>> +
+>> +- #clock-cells: should be 1.
+>> +
+>> +
+>> +Each clock is assigned an identifier and client nodes use this identifier
+>> +to specify the clock which they consume.
+>> +
+>> +All these identifier could be found in <dt-bindings/clock/hip04-clock.h>.
+>
+> This must come in the same patch.
+>
+> Mark.
 
-I will give this a try on my N900 in the next days.
+HiP04 clock driver is already merged into mainline.
 
--- Sebastian
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140729/765a4b58/attachment.sig>
+Regards
+Haojian
