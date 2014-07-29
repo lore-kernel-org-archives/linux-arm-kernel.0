@@ -1,61 +1,47 @@
-From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
-Date: Tue, 29 Jul 2014 23:55:08 +0400
-Subject: [PATCH 4/4] ARM: dts: rockchip: add rk3188 dma controllers
-In-Reply-To: <1406661128-7614-5-git-send-email-heiko@sntech.de>
-References: <1406661128-7614-1-git-send-email-heiko@sntech.de>
- <1406661128-7614-5-git-send-email-heiko@sntech.de>
-Message-ID: <53D7FC1C.10607@cogentembedded.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Tue, 29 Jul 2014 20:55:47 +0100
+Subject: Bad Page dump (help)
+In-Reply-To: <20140729190700.GN17808@saruman.home>
+References: <20140729190700.GN17808@saruman.home>
+Message-ID: <20140729195547.GE30282@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello.
+On Tue, Jul 29, 2014 at 02:07:01PM -0500, Felipe Balbi wrote:
+> I'm bringing up a new board on today's linux-next but I'm having a bunch
+> of bad_page() calls due to _mapcount not being zero (full logs
+> attached). What could cause that ? Any hints on how to debug ? It's as
+> if page_mapcount_reset() wasn't called for the pages which are causing
+> issues.
 
-On 07/29/2014 11:12 PM, Heiko Stuebner wrote:
+Hmm... are you using sparsemem?  I suspect sparsemem hasn't been tested
+for a while now.
+ 
+> [    0.000000] BUG: Bad page state in process swapper  pfn:8136d
+> [    0.000000] page:ee017da0 count:0 mapcount:-1048576 mapping:  (null) index:0x0
 
-> Add both the cpu and peripheral pl330 dma controllers present in rk3188 socs.
-> The first dma controller can change between secure and non-secure mode and is
-> left by the bootloader in secure mode, which gets added here.
+So the page pointer was 0xee017da0 for pfn 0x8136d.  The mem map array
+starts at 0xedff1000, which makes this index 0x136d, or 4973, which
+looks fine.
 
-> Signed-off-by: Heiko Stuebner <heiko@sntech.de>
-> ---
->   arch/arm/boot/dts/rk3xxx.dtsi | 27 +++++++++++++++++++++++++++
->   1 file changed, 27 insertions(+)
+1520 pages are used for the mem_map, so that covers 0xedff1000 to
+0xee5e100.  So, the struct page is well within the allocation for the
+mem map array.
 
-> diff --git a/arch/arm/boot/dts/rk3xxx.dtsi b/arch/arm/boot/dts/rk3xxx.dtsi
-> index c6f0561..a6c2860 100644
-> --- a/arch/arm/boot/dts/rk3xxx.dtsi
-> +++ b/arch/arm/boot/dts/rk3xxx.dtsi
-> @@ -28,6 +28,33 @@
->   		i2c4 = &i2c4;
->   	};
->
-> +	amba {
-> +		compatible = "arm,amba-bus";
-> +		#address-cells = <1>;
-> +		#size-cells = <1>;
-> +		ranges;
-> +
-> +		dmac1: dma at 20018000 {
+The mapcount equates to 0xfff00000, which looks to be a suggestive value,
+but it doesn't really help much.
 
-    The ePAPR standard [1] says:
+Looking at free_pages_check(), we can say that all the other checks
+that the function did succeeded (if any of them had failed, we would
+have seen a different reason.)
 
-The name of a node should be somewhat generic, reflecting the function of the 
-device and not its precise programming model. If appropriate, the name should 
-be one of the following choices:
+Hmm.
 
-[...]
-    ? dma-controller
+Can you enable memblock debugging by passing memblock=debug on the kernel
+command line please, and re-send the kernel output?
 
-> +			compatible = "arm,pl330", "arm,primecell";
-> +			reg = <0x20018000 0x4000>;
-> +			interrupts = <GIC_SPI 0 IRQ_TYPE_LEVEL_HIGH>,
-> +				     <GIC_SPI 1 IRQ_TYPE_LEVEL_HIGH>;
-> +			#dma-cells = <1>;
-> +			clocks = <&cru ACLK_DMA1>;
-> +			clock-names = "apb_pclk";
-> +		};
-[...]
+Thanks.
 
-[1] http://www.power.org/resources/downloads/Power_ePAPR_APPROVED_v1.0.pdf
-
-WBR, Sergei
+-- 
+FTTC broadband for 0.8mile line: currently at 9.5Mbps down 400kbps up
+according to speedtest.net.
