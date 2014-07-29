@@ -1,52 +1,59 @@
 From: will.deacon@arm.com (Will Deacon)
-Date: Tue, 29 Jul 2014 14:19:51 +0100
-Subject: [PATCH v15 01/12] irq: gic: support hip04 gic
-In-Reply-To: <2455679.mpY3ZEfao6@wuerfel>
-References: <1406555876-11989-1-git-send-email-haojian.zhuang@linaro.org>
- <1406555876-11989-2-git-send-email-haojian.zhuang@linaro.org>
- <87a97to025.fsf@approximate.cambridge.arm.com>
- <2455679.mpY3ZEfao6@wuerfel>
-Message-ID: <20140729131951.GQ9245@arm.com>
+Date: Tue, 29 Jul 2014 14:26:59 +0100
+Subject: [PATCH v5 1/3] arm64: ptrace: reload a syscall number after
+ ptrace operations
+In-Reply-To: <53D7440B.10006@linaro.org>
+References: <1406020499-5537-1-git-send-email-takahiro.akashi@linaro.org>
+ <1406020499-5537-2-git-send-email-takahiro.akashi@linaro.org>
+ <53D08358.4020902@amacapital.net> <53D0A037.2060308@linaro.org>
+ <CALCETrU9_sdODRz-xZ4bouq+anHhmfx2tkr7hg00RVf_bBBJwg@mail.gmail.com>
+ <53D23341.4040403@linaro.org> <20140725110342.GD5269@arm.com>
+ <53D7440B.10006@linaro.org>
+Message-ID: <20140729132659.GR9245@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jul 29, 2014 at 02:05:06PM +0100, Arnd Bergmann wrote:
-> On Monday 28 July 2014 18:38:58 Marc Zyngier wrote:
-> > Overall, this code should be able to sitting within a #ifdef/#endif
-> > block, only selected if this platform is enabled, and possibly find a
-> > way not to impact all the other platforms when this is not selected.
-> > 
-> > Finally, I'd like to outline how much I dislike the way the GIC
-> > architecture has been abused here. Yes, this solves a particular
-> > problem, at a given point in time, but this also feels extremely short
-> > sighted from whoever has put this thing together. This really feels like
-> > a short-term HW hack that is already addressed by GICv3. Merging support
-> > for non architecture compliant HW is never the best solution.
+On Tue, Jul 29, 2014 at 07:49:47AM +0100, AKASHI Takahiro wrote:
+> On 07/25/2014 08:03 PM, Will Deacon wrote:
+> > On Fri, Jul 25, 2014 at 11:36:49AM +0100, AKASHI Takahiro wrote:
+> >> On 07/25/2014 12:01 AM, Andy Lutomirski wrote:
+> >>>>> If so, then you risk (at least) introducing
+> >>>>>
+> >>>>> a nice user-triggerable OOPS if audit is enabled.
+> >>>>
+> >>>>
+> >>>> Can you please elaborate this?
+> >>>> Since I didn't find any definition of audit's behavior when syscall is
+> >>>> rewritten to -1, I thought it is reasonable to skip "exit tracing" of
+> >>>> "skipped" syscall.
+> >>>> (otherwise, "fake" seems to be more appropriate :)
+> >>>
+> >>> The audit entry hook will oops if you call it twice in a row without
+> >>> calling the exit hook in between.
+> >>
+> >> Thank you, I could reproduce this problem which hits BUG(in_syscall) in
+> >> audit_syscall_entry(). Really bad, and I fixed it in my next version and
+> >> now a "skipped" system call is also traced by audit.
+> >
+> > Can you reproduce this on arch/arm/ too? If so, we should also fix the code
+> > there.
 > 
-> Not merging support for shipping hardware is also not a solution,
-> and we already support any number of irqchip drivers and have all
-> the logic we need to sort that out at runtime.
+> As far as I tried on arm with syscall auditing enabled,
 > 
-> My feeling is that the original approach taken in the early version
-> of the patch set was actually better, given all the problems with
-> integrating this nicely into the gic driver.
-> 
-> Would you be happier with that? The downside of that would be
-> that some driver bugs would get fixed in one driver but not the
-> other one, which is why we normally try to avoid it. On the other
-> hand, it means that the normal GIC driver does not get polluted
-> with hacks that are only needed for the hip04 version and there
-> is an obvious way to disable the driver at compile time when you
-> build for other platforms.
+> 1) Changing a syscall number to -1 under seccomp doesn't hit BUG_ON(in_syscall).
+> 2) But, in fact, audit_syscall_entry() is NOT called in this case because
+>     __secure_computing() returns -1 and then it causes the succeeding tracing
+>     in syscall_trace_enter(), including audit_syscall_entry(), skipped.
 
-Yeah, I think after all this, you're right and keeping the two drivers
-strictly separate is probably the best thing after all. That also allows
-the vgic and gicv3 work to continue regardless of the hip04 driver,
-especially since we don't have any useful documentation for the hardware
-itself.
+What happens if CONFIG_SECCOMP=n?
 
-As for the KVM side, I think we should treat this as something totally
-separate to the GIC and *not* instantiate a vgic in response to
-KVM_CREATE_IRQCHIP on systems with this hardware.
+> 3) On the other hand, calling syscall(-1) from userspace hits BUG_ON because
+>     the return path, ret_slow_syscall, doesn't contain syscall_trace_exit().
+> 4) When we re-write a syscall number to -1 without seccomp, we will also see
+>     BUG_ON hit, although I didn't try yet.
+> 
+> Fixing case 3 is easy, but should we also fix case 2?
+
+I think so.
 
 Will
