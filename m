@@ -1,63 +1,31 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 29 Jul 2014 16:41:57 +0200
-Subject: [PATCH 19/19] Documentation: ACPI for ARM64
-In-Reply-To: <CAMJs5B8uk7GDfEOEuY8RWDxzhzTRBGszRDN+JRKwG-D_rgzFrw@mail.gmail.com>
-References: <1406206825-15590-1-git-send-email-hanjun.guo@linaro.org>
- <20140729130823.GP2576@leverpostej>
- <CAMJs5B8uk7GDfEOEuY8RWDxzhzTRBGszRDN+JRKwG-D_rgzFrw@mail.gmail.com>
-Message-ID: <2361920.ZXE2KPy98s@wuerfel>
+Date: Tue, 29 Jul 2014 16:44:31 +0200
+Subject: [PATCH] ARM: imx: clk-vf610: introduce clks_init_on
+In-Reply-To: <1406643628-4061-1-git-send-email-stefan@agner.ch>
+References: <1406643628-4061-1-git-send-email-stefan@agner.ch>
+Message-ID: <2815679.ZycfkLhBgI@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 29 July 2014 15:31:16 Christoffer Dall wrote:
-> On 29 July 2014 15:08, Mark Rutland <mark.rutland@arm.com> wrote:
-> > On Tue, Jul 29, 2014 at 01:52:40PM +0100, Arnd Bergmann wrote:
-> >> On Tuesday 29 July 2014 14:37:38 Christoffer Dall wrote:
-> >> >
-> >> > For reference, Red Hat's current arguing point for ACPI in VMs is
-> >> > hotplug of things like CPUs and memory for very large VMs, but I
-> >> > haven't thought too carefully about this just yet, as I don't have a
-> >> > 100+ core ARM 64-bit hardware lying around...
-> >>
-> >> I thought you could run guests with more virtual CPUs that you have
-> >> physical CPUs on the host.
-> >>
-> >> Regarding CPU and memory hotplug, don't we already have PSCI and
-> >> xen-balloon/virtio-balloon for that?
-> >
-> > PSCI (0.1) was there for guests from the start, and ACPI doesn't do
-> > anything different w.r.t. PSCI other than requiring PSCI 0.2 (which can
-> > be used by guests supporting only PSCI 0.1). So there's no magic for
-> > CPU hotplug provided by ACPI.
+On Tuesday 29 July 2014 16:20:28 Stefan Agner wrote:
+> At the end of the boot process, the clock framework might disable
+> required main PLL's. So far, this was no issue since drivers
+> requested clocks, which are descended of the main PLL's (e.g.
+> pll1_pfd1, which provides the system clock).
 > 
-> With PSCI you can only provide your VM a bunch of CPUs and say that
-> they're all turned off, and then turn some of them on later.  I
-> honestly don't know if you can do proper CPU hotplug with ACPI, but
-> the RH guys seem to argue that you can.  Again, I didn't think too
-> carefully about this.
+> To archive the full 500MHz system clock, DDR clock need to be a
+> descendant of PLL2 rather than PLL1 (DDRC_CLK_SEL set to 0). The
+> bootloader sets up the clocks accordingly before making use of
+> DDR at all. However, in Linux, there is no driver using PLL2,
+> which lead to PLL2 being disabled by the clock framework.
+> 
+> With this patch, we make sure that the main system clock and the
+> DDR clock are initially enabled and are kept enabled.
+> 
+> Signed-off-by: Stefan Agner <stefan@agner.ch>
+> 
 
-Xen does this in drivers/xen/cpu_hotplug.c, acpi does it in
-drivers/acpi/acpi_processor.c.
-
-> > Do either of the balloon drivers allow for memory to be hot-added to a
-> > system initially provisioned with less?
-> >
-> No, it's just about reclaiming memory.  Same argument as above.
-
-Again, Xen seems to be able to add more memory:
-
-config XEN_BALLOON_MEMORY_HOTPLUG
-        bool "Memory hotplug support for Xen balloon driver"
-        default n
-        depends on XEN_BALLOON && MEMORY_HOTPLUG
-        help
-          Memory hotplug support for Xen balloon driver allows expanding memory
-          available for the system above limit declared at system startup.
-          It is very useful on critical systems which require long
-          run without rebooting.
-	  ...
-
-The same goes for hyperv, s390 and vmware. It should not be hard to add it
-for KVM.
+Wouldn't it be better to list this in the DT as a default for
+the respective clocks?
 
 	Arnd
