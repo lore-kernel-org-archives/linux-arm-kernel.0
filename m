@@ -1,86 +1,20 @@
-From: grant.likely@linaro.org (Grant Likely)
-Date: Tue, 29 Jul 2014 17:45:22 -0600
-Subject: use IORESOURCE_REG resource type for non-translatable addresses
- in DT
-In-Reply-To: <53D7AA72.6010309@mm-sol.com>
-References: <53D788A7.4020303@mm-sol.com> <3794875.CZFbAag5Sv@wuerfel>
- <53D7AA72.6010309@mm-sol.com>
-Message-ID: <20140729234522.E9FF1C40738@trevor.secretlab.ca>
+From: davem@davemloft.net (David Miller)
+Date: Tue, 29 Jul 2014 16:48:11 -0700 (PDT)
+Subject: [PATCH 2/2] net: mvpp2: implement ioctl() operation for PHY ioctls
+In-Reply-To: <1406496096-11039-2-git-send-email-thomas.petazzoni@free-electrons.com>
+References: <1406496096-11039-1-git-send-email-thomas.petazzoni@free-electrons.com>
+ <1406496096-11039-2-git-send-email-thomas.petazzoni@free-electrons.com>
+Message-ID: <20140729.164811.301176869068457588.davem@davemloft.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 29 Jul 2014 17:06:42 +0300, Stanimir Varbanov <svarbanov@mm-sol.com> wrote:
-> Arnd, thanks for the comments.
-> 
-> On 07/29/2014 03:00 PM, Arnd Bergmann wrote:
-> > On Tuesday 29 July 2014 14:42:31 Stanimir Varbanov wrote:
-> >>         taddr = of_translate_address(dev, addrp);
-> >> -       if (taddr == OF_BAD_ADDR)
-> >> -               return -EINVAL;
-> >> +       /*
-> >> +        * if the address is non-translatable to cpu physical address
-> >> +        * fallback to a IORESOURCE_REG resource.
-> >> +        */
-> >> +       if (taddr == OF_BAD_ADDR) {
-> >> +               memset(r, 0, sizeof(*r));
-> >> +               taddr = of_read_number(addrp, 1);
-> >> +               if (taddr == OF_BAD_ADDR)
-> >> +                       return -EINVAL;
-> >> +               r->start = taddr;
-> >> +               r->end = taddr + size - 1;
-> >> +               r->flags = IORESOURCE_REG;
-> >> +               r->name = name ? name : dev->full_name;
-> >> +               return 0;
-> >> +       }
-> >> +
-> > 
-> > I don't think that everything returning OF_BAD_ADDR makes sense
-> > to turn into IORESOURCE_REG. It could be an e.g. invalid DT
-> > representation, a node with #size-cells=<0>, or it could be
-> > something that gets translated one or more nodes up in the
-> > tree before it reaches a bus without a ranges property.
-> > 
-> > Also, you should not rely on #address-cells being hardcoded
-> > to <1> above.
-> > 
-> 
-> This was just an example. Of course it has many issues and probaly it is
-> wrong:) The main goal was to understand does IORESOURCE_REG resource
-> type and parsing the *reg* properties for non-translatable addresses are
-> feasible. And also does it acceptable by community and OF platform
-> maintainers.
+From: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
+Date: Sun, 27 Jul 2014 23:21:36 +0200
 
-The use case is actually very different from of_address_to_resource or
-of_get_address() because those APIs explicitly return physical memory
-addresses from the CPU perspective. It makes more sense to create a new
-API that doesn't attempt to translate the reg address. Alternately, a
-new API that only translates upto a given parent node.
+> This commit implements the ->ndo_do_ioctl() operation so that the
+> PHY-related ioctl() calls can work from userspace, which allows
+> applications like mii-tool or mii-diag to do their job.
+> 
+> Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
 
-You don't want to automagically translate as far up the tree as
-possible because the code won't know what node the address is associated
-with. Translated addresses only make sense if the node it was translated
-to as also known.
-
-g.
-
-> 
-> > How about modifying of_get_address() rather than
-> > __of_address_to_resource() instead? You could introduce
-> > a new of_bus entry for each bus you expect to return
-> > an IORESOURCE_REG, or you could change of_bus_default_get_flags
-> > to return IORESOURCE_REG if the parent node has no ranges property
-> > and is not the root node.
-> 
-> IMO the clearer solution is to introduce a new of_bus bus. In that case
-> one possible problem will be how to distinguish the non-translatable and
-> the other buses. Also the *device_type* property is deprecated for non
-> PCI devices.
-> 
-> The second option will need to change the prototype of .get_flags method
-> to receive device_node structure.
-> 
-> Thoughts?
-> 
-> -- 
-> regards,
-> Stan
+Applied.
