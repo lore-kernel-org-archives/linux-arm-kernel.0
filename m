@@ -1,44 +1,63 @@
-From: mturquette@linaro.org (Mike Turquette)
-Date: Tue, 29 Jul 2014 13:19:39 -0700
-Subject: [PATCH 8/8] clk: tegra: Add EMC clock driver
-In-Reply-To: <53D75FA7.1030300@nvidia.com>
-References: <1405088313-20048-1-git-send-email-mperttunen@nvidia.com>
- <1405088313-20048-9-git-send-email-mperttunen@nvidia.com>
- <53CE97F2.80300@wwwdotorg.org> <53D75FA7.1030300@nvidia.com>
-Message-ID: <20140729201939.4627.79710@quantum>
+From: dianders@chromium.org (Doug Anderson)
+Date: Tue, 29 Jul 2014 13:31:55 -0700
+Subject: [PATCH 4/5] ARM: dts: Take the mmc slot node out of rk3288-evb
+In-Reply-To: <1406665916-23396-1-git-send-email-dianders@chromium.org>
+References: <1406665916-23396-1-git-send-email-dianders@chromium.org>
+Message-ID: <1406665916-23396-5-git-send-email-dianders@chromium.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Quoting Mikko Perttunen (2014-07-29 01:47:35)
-> On 22/07/14 19:57, Stephen Warren wrote:
-> > On 07/11/2014 08:18 AM, Mikko Perttunen wrote:
-> >> +static int emc_debug_rate_set(void *data, u64 rate)
-> >> +{
-> >> +    struct tegra_emc *tegra = data;
-> >> +
-> >> +    return clk_set_rate(tegra->hw.clk, rate);
-> >> +}
-> >> +
-> >> +DEFINE_SIMPLE_ATTRIBUTE(emc_debug_rate_fops, emc_debug_rate_get,
-> >> +                    emc_debug_rate_set, "%lld\n");
-> >
-> > I think the rate can already be obtained through
-> > ...debug/clock/clock_summary. I'm not sure about changing the rate, but
-> > shouldn't that be a feature of the common clock core, not individual
-> > drivers?
-> 
-> The core doesn't allow writing to the rate debugfs files, so this is the 
-> only way to trigger an EMC clock change for now. I agree that the core 
-> might be a better place. I don't know if there are any philosophical 
-> objections to that. I'd like to keep this in until a possible core 
-> feature addition. Mike, any comments?
+In Jaehoon's (mmc: dw_mmc: replace "disable-wp" from slot's quirk to
+host's quirk) the slot node is no longer used.  Remove it.
 
-Yes, there is a philosophical rejection to exposing rate-change knobs to
-userspace through debugfs. These can and will ship in real products
-(typically Android) with lots of nasty userspace hacks, and also
-represent pretty dangerous things to expose to userspace. I have always
-maintained that such knobs should remain out of tree or, with the advent
-of the custom debugfs entries, should be burden of the clock drivers.
+Note that if Jaehoon's patch lands before my (ARM: dts: Enable emmc
+and sdmmc on the rk3288-evb boards) then this could be squashed into
+the later.
 
-Regards,
-Mike
+Signed-off-by: Doug Anderson <dianders@chromium.org>
+---
+ arch/arm/boot/dts/rk3288-evb.dtsi | 12 ++----------
+ 1 file changed, 2 insertions(+), 10 deletions(-)
+
+diff --git a/arch/arm/boot/dts/rk3288-evb.dtsi b/arch/arm/boot/dts/rk3288-evb.dtsi
+index ec580fa..b69008f 100644
+--- a/arch/arm/boot/dts/rk3288-evb.dtsi
++++ b/arch/arm/boot/dts/rk3288-evb.dtsi
+@@ -41,17 +41,13 @@
+ 	broken-cd;
+ 	bus-width = <8>;
+ 	cap-mmc-highspeed;
++	disable-wp;
+ 	mmc-ddr-1_8v;
+ 	non-removable;
+ 	num-slots = <1>;
+ 	pinctrl-names = "default";
+ 	pinctrl-0 = <&emmc_clk &emmc_cmd &emmc_pwr &emmc_bus8>;
+ 	status = "okay";
+-
+-	slot at 0 {
+-		reg = <0>;
+-		disable-wp;
+-	};
+ };
+ 
+ &sdmmc {
+@@ -59,15 +55,11 @@
+ 	cap-mmc-highspeed;
+ 	cap-sd-highspeed;
+ 	card-detect-delay = <200>;
++	disable-wp;			/* wp not hooked up */
+ 	num-slots = <1>;
+ 	pinctrl-names = "default";
+ 	pinctrl-0 = <&sdmmc_clk &sdmmc_cmd &sdmmc_cd &sdmmc_bus4>;
+ 	status = "okay";
+-
+-	slot at 0 {
+-		reg = <0>;
+-		disable-wp;		/* wp not hooked up */
+-	};
+ };
+ 
+ &i2c0 {
+-- 
+2.0.0.526.g5318336
