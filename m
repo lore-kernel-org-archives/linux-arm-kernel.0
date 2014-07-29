@@ -1,69 +1,102 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Tue, 29 Jul 2014 12:15:57 +0100
-Subject: [PATCH 1/2] ARM: LPAE: load upper bits of early TTBR0/TTBR1
-In-Reply-To: <20140728184741.GT15536@arm.com>
-References: <20140722153623.25088.37742.stgit@buzz>
- <20140728181224.GN15536@arm.com>
- <CALYGNiNrK1d32ecz4rw0sgn0GyN-M6hTBuTLGQV53Z4Br-bpYQ@mail.gmail.com>
- <20140728184741.GT15536@arm.com>
-Message-ID: <20140729111557.GF9245@arm.com>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Tue, 29 Jul 2014 12:28:24 +0100
+Subject: [PATCH 19/19] Documentation: ACPI for ARM64
+In-Reply-To: <20140729105543.GL2576@leverpostej>
+References: <1406206825-15590-1-git-send-email-hanjun.guo@linaro.org>
+ <1406206825-15590-20-git-send-email-hanjun.guo@linaro.org>
+ <CAOesGMhKHGkVK3dOLXXx9GQBMxDmjBu1WDBgHmwdGe1UK3jfcg@mail.gmail.com>
+ <20140728100654.GC24078@leverpostej>
+ <20140728164459.GD32359@quad.lixom.net>
+ <20140729102940.GB18250@cbox> <20140729105543.GL2576@leverpostej>
+Message-ID: <20140729112824.GM2576@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jul 28, 2014 at 07:47:41PM +0100, Will Deacon wrote:
-> On Mon, Jul 28, 2014 at 07:40:58PM +0100, Konstantin Khlebnikov wrote:
-> > On Mon, Jul 28, 2014 at 10:12 PM, Will Deacon <will.deacon@arm.com> wrote:
-> > > On Tue, Jul 22, 2014 at 04:36:23PM +0100, Konstantin Khlebnikov wrote:
-> > >> This patch fixes booting when idmap pgd lays above 4gb. Commit
-> > >> 4756dcbfd37 mostly had fixed this, but it'd failed to load upper bits.
-> > >>
-> > >> Also this fixes adding TTBR1_OFFSET to TTRR1: if lower part overflows
-> > >> carry flag must be added to the upper part.
-> > >>
-> > >> Signed-off-by: Konstantin Khlebnikov <k.khlebnikov@samsung.com>
-> > >> Cc: Cyril Chemparathy <cyril@ti.com>
-> > >> Cc: Vitaly Andrianov <vitalya@ti.com>
-> > >> ---
-> > >>  arch/arm/mm/proc-v7-3level.S |    7 +++----
-> > >>  1 file changed, 3 insertions(+), 4 deletions(-)
-> > >>
-> > >> diff --git a/arch/arm/mm/proc-v7-3level.S b/arch/arm/mm/proc-v7-3level.S
-> > >> index 22e3ad6..f0481dd 100644
-> > >> --- a/arch/arm/mm/proc-v7-3level.S
-> > >> +++ b/arch/arm/mm/proc-v7-3level.S
-> > >> @@ -140,12 +140,11 @@ ENDPROC(cpu_v7_set_pte_ext)
-> > >>       mov     \tmp, \ttbr1, lsr #(32 - ARCH_PGD_SHIFT)        @ upper bits
-> > >>       mov     \ttbr1, \ttbr1, lsl #ARCH_PGD_SHIFT             @ lower bits
-> > >>       addls   \ttbr1, \ttbr1, #TTBR1_OFFSET
-> > >> -     mcrr    p15, 1, \ttbr1, \zero, c2                       @ load TTBR1
-> > >> +     adcls   \tmp, \tmp, #0
-> > >> +     mcrr    p15, 1, \ttbr1, \tmp, c2                        @ load TTBR1
-> > >>       mov     \tmp, \ttbr0, lsr #(32 - ARCH_PGD_SHIFT)        @ upper bits
-> > >>       mov     \ttbr0, \ttbr0, lsl #ARCH_PGD_SHIFT             @ lower bits
-> > >> -     mcrr    p15, 0, \ttbr0, \zero, c2                       @ load TTBR0
-> > >> -     mcrr    p15, 1, \ttbr1, \zero, c2                       @ load TTBR1
-> > >> -     mcrr    p15, 0, \ttbr0, \zero, c2                       @ load TTBR0
-> > >> +     mcrr    p15, 0, \ttbr0, \tmp, c2                        @ load TTBR0
-> > >
-> > > I must admit, the code you are removing here looks really strange. Was there
-> > > a badly resolved conflict somewhere along the way? It would be nice to see
-> > > if your fix (which seems ok to me) was actually present in the mailing list
-> > > posting of the patch that ended in the above mess.
+On Tue, Jul 29, 2014 at 11:55:43AM +0100, Mark Rutland wrote:
+> On Tue, Jul 29, 2014 at 11:29:40AM +0100, Christoffer Dall wrote:
+> > On Mon, Jul 28, 2014 at 09:44:59AM -0700, Olof Johansson wrote:
+> > > On Mon, Jul 28, 2014 at 11:06:54AM +0100, Mark Rutland wrote:
 > > 
-> > Nope, no merge conflicts, source in original patch
-> > https://lkml.org/lkml/2012/9/11/346
+> > [...]
 > > 
-> > That mess completely harmless, this code is used only once on boot.
-> > I don't have that email, so replying isn't trivial for me.
+> > > > >
+> > > > > > +Relationship with Device Tree
+> > > > > > +-----------------------------
+> > > > > > +
+> > > > > > +ACPI support in drivers and subsystems for ARMv8 should never be mutually
+> > > > > > +exclusive with DT support at compile time.
+> > > > > > +
+> > > > > > +At boot time the kernel will only use one description method depending on
+> > > > > > +parameters passed from the bootloader.
+> > > > >
+> > > > > Possibly overriden by kernel bootargs. And as debated for quite a
+> > > > > while earlier this year, acpi should still default to off -- if a DT
+> > > > > and ACPI are both passed in, DT should at this time be given priority.
+> > > > 
+> > > > Why? I really don't see the logic in doing that.
+> > > 
+> > > Seems like I am replying to your emails in reverse order.
+> > > 
+> > > > Currently the kernel can only boot using DT, so DT will be used even if
+> > > > ACPI is present. In the presence of ACPI support in the kernel, ACPI
+> > > > would be used on said systems.
+> > > 
+> > > For all the reasons we hashed out earlier this year: We can't trust that
+> > > vendors will know how to do ACPI from day one, so instead of loading up the
+> > > kernel with lots of quirks and workarounds, we'll default to not using it until
+> > > we're at a point where things look mature enough.
+> > > 
+> > > The alternative is to keep this patch set out of the kernel. We can do that
+> > > too, but I don't think that really helps anyone.
+> > > 
+> > > > From the discussions at the last Linaro Connect, this was seen as
+> > > > important for virtual machines which want to provide ACPI services to
+> > > > guests while still being able to boot DT-only kernels. I'll leave it to
+> > > > Grant, Rob, and Christoffer to cover that.
+> > > 
+> > > Ok, waiting to see what they have to say then.
+> > > 
+> > 
+> > Hmm, a virtual machine implementaion may provide either a DT or ACPI (or
+> > both).  I think the point at Linaro Connect was that for a first cut,
+> > there is no obvious need to provide ACPI to VMs and to be spec
+> > compliant, server kernels must be able to boot with DT-only.  In most
+> > cases such systems will only access a few limited emulated devices
+> > (UART, GIC, RTC, flash controller) and VirtIO devices, which should just
+> > work using DT only.
+> > 
+> > People are talking about adding ACPI for VM guests as well for various
+> > reasons (device passthrough for example) in which case I would always
+> > expect people to run UEFI inside their guests too (perhaps this is not
+> > 100% true in the case of Xen fast-boot scenarios though) and I would
+> > expect Linux to only see the little stub DT and ACPI.
+> > 
+> > Does this clarify anything or add futher to the confusion?
 > 
-> How bizarre. Also, Cyril doesn't work for TI anymore (his email is
-> bouncing), so it's tricky to know what he meant here.
+> I was under the impression that there was a case where we'd have a DT
+> with HW description in a VM which also had ACPI tables, to enable a
+> kernel without ACPI support to boot in said VM (albeit with reduced
+> functionality).
 > 
-> Your patch looks better than what we currently have though. Have you managed
-> to test it on a keystone platform (I don't have one)?
+> I may have got confused since the VM standards discussion at LCA-14.
 
-Given that:
+I took a look at the video [1,2] of said session [3], and it looks like
+I was the one arguing for the case of full description in both DT and
+ACPI, so either I was confused or I've forgotten some hallway
+discussion.
 
-  Acked-by: Will Deacon <will.deacon@arm.com>
+I think my reasoning was somewhat flawed; if the hypervisor defaults to
+providing DT, with an option to use ACPI in certain cases (where not all
+guests would be expected to work), then that would cover the "grab an
+iso, it just works?" use case for Linux images while allowing for
+the cases where people want ACPI in the VM.
 
-Will
+The only issue with that would be catering for OSs which support ACPI
+but not DT or whose DT support is not Linux-compatible.
+
+Thanks,
+Mark.
+
+[1] http://www.youtube.com/watch?v=Qh3SX3p3B74
+[2] http://people.linaro.org/linaro-connect/lca14/videos/03-03-Monday/LCA14-101-%20ARM%20VM%20Standards.mp4
+[3] http://lca-14.zerista.com/event/member/102395
