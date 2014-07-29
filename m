@@ -1,139 +1,55 @@
-From: jslaby@suse.cz (Jiri Slaby)
-Date: Tue, 29 Jul 2014 17:09:32 +0200
-Subject: [patch added to the 3.12 stable tree] locking/mutex: Disable
- optimistic spinning on some architectures
-In-Reply-To: <1406646576-1299-1-git-send-email-jslaby@suse.cz>
-References: <1406646576-1299-1-git-send-email-jslaby@suse.cz>
-Message-ID: <1406646576-1299-52-git-send-email-jslaby@suse.cz>
+From: dianders@chromium.org (Doug Anderson)
+Date: Tue, 29 Jul 2014 08:11:59 -0700
+Subject: [PATCH v2 3/4] ARM: dts: exynos5250: Fold common ChromeOS parts
+ into Snow
+In-Reply-To: <53D79771.1020406@suse.de>
+References: <1405704009-8430-1-git-send-email-afaerber@suse.de>
+ <1405704009-8430-4-git-send-email-afaerber@suse.de>
+ <CAD=FV=VK0KJknJ2099S7fEDzBnpPCrpSZ36WPkJB156GpcyEfg@mail.gmail.com>
+ <53D79771.1020406@suse.de>
+Message-ID: <CAD=FV=UR5NWXCpK3zB-NSnkMUgKaYAHV1YLdPAvP83JMqekk0Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Peter Zijlstra <peterz@infradead.org>
+Andreas,
 
-This patch has been added to the 3.12 stable tree. If you have any
-objections, please let us know.
+On Tue, Jul 29, 2014 at 5:45 AM, Andreas F?rber <afaerber@suse.de> wrote:
+> Doug,
+>
+> Am 25.07.2014 18:02, schrieb Doug Anderson:
+>> On Fri, Jul 18, 2014 at 10:20 AM, Andreas F?rber <afaerber@suse.de> wrote:
+>>> +/*
+>>> + * On Snow we've got SIP WiFi and so can keep drive strengths low to
+>>> + * reduce EMI.
+>>> + */
+>>> +&mmc_3 {
+>>> +       status = "okay";
+>>> +       num-slots = <1>;
+>>> +       supports-highspeed;
+>>> +       broken-cd;
+>>> +       card-detect-delay = <200>;
+>>> +       samsung,dw-mshc-ciu-div = <3>;
+>>> +       samsung,dw-mshc-sdr-timing = <2 3>;
+>>> +       samsung,dw-mshc-ddr-timing = <1 2>;
+>>> +
+>>> +       slot at 0 {
+>>> +               reg = <0>;
+>>> +               bus-width = <4>;
+>>> +               pinctrl-names = "default";
+>>> +               pinctrl-0 = <&sd3_clk &sd3_cmd &sd3_bus4>;
+>>
+>> This actually looks like a bug on snow.  I don't think these pinctrl
+>> statements are taking effect and I think they belong at the mmc level,
+>> not the slot level.  That's not a new bug introduced by you, though.
+>> Mind fixing it?  You've already got it right for Spring mmc_1.
+>
+> I was taught never to mix code movements with functional changes, as it
+> hides them even if mentioned in the commit message. Would you like me to
+> fix it pre- or post-move? Post-move would be easiest for me. ;)
 
-===============
+Agreed.  Sorry for implying that it belonged as part of this patch.
+I'd be happy if it was somewhere in the series, ideally before you
+introduce the Spring device tree so diffs are cleaner for it.  I don't
+care if it's pre-move or post-move.
 
-commit 4badad352a6bb202ec68afa7a574c0bb961e5ebc upstream.
-
-The optimistic spin code assumes regular stores and cmpxchg() play nice;
-this is found to not be true for at least: parisc, sparc32, tile32,
-metag-lock1, arc-!llsc and hexagon.
-
-There is further wreckage, but this in particular seemed easy to
-trigger, so blacklist this.
-
-Opt in for known good archs.
-
-Signed-off-by: Peter Zijlstra <peterz@infradead.org>
-Reported-by: Mikulas Patocka <mpatocka@redhat.com>
-Cc: David Miller <davem@davemloft.net>
-Cc: Chris Metcalf <cmetcalf@tilera.com>
-Cc: James Bottomley <James.Bottomley@hansenpartnership.com>
-Cc: Vineet Gupta <vgupta@synopsys.com>
-Cc: Jason Low <jason.low2@hp.com>
-Cc: Waiman Long <waiman.long@hp.com>
-Cc: "James E.J. Bottomley" <jejb@parisc-linux.org>
-Cc: Paul McKenney <paulmck@linux.vnet.ibm.com>
-Cc: John David Anglin <dave.anglin@bell.net>
-Cc: James Hogan <james.hogan@imgtec.com>
-Cc: Linus Torvalds <torvalds@linux-foundation.org>
-Cc: Davidlohr Bueso <davidlohr@hp.com>
-Cc: Benjamin Herrenschmidt <benh@kernel.crashing.org>
-Cc: Catalin Marinas <catalin.marinas@arm.com>
-Cc: Russell King <linux@arm.linux.org.uk>
-Cc: Will Deacon <will.deacon@arm.com>
-Cc: linux-arm-kernel at lists.infradead.org
-Cc: linux-kernel at vger.kernel.org
-Cc: linuxppc-dev at lists.ozlabs.org
-Cc: sparclinux at vger.kernel.org
-Link: http://lkml.kernel.org/r/20140606175316.GV13930 at laptop.programming.kicks-ass.net
-Signed-off-by: Ingo Molnar <mingo@kernel.org>
-Signed-off-by: Jiri Slaby <jslaby@suse.cz>
----
- arch/arm/Kconfig     | 1 +
- arch/arm64/Kconfig   | 1 +
- arch/powerpc/Kconfig | 1 +
- arch/sparc/Kconfig   | 1 +
- arch/x86/Kconfig     | 1 +
- kernel/Kconfig.locks | 5 ++++-
- 6 files changed, 9 insertions(+), 1 deletion(-)
-
-diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-index e47fcd1e9645..99e1ce978cf9 100644
---- a/arch/arm/Kconfig
-+++ b/arch/arm/Kconfig
-@@ -5,6 +5,7 @@ config ARM
- 	select ARCH_HAS_ATOMIC64_DEC_IF_POSITIVE
- 	select ARCH_HAS_TICK_BROADCAST if GENERIC_CLOCKEVENTS_BROADCAST
- 	select ARCH_HAVE_CUSTOM_GPIO_H
-+	select ARCH_SUPPORTS_ATOMIC_RMW
- 	select ARCH_WANT_IPC_PARSE_VERSION
- 	select BUILDTIME_EXTABLE_SORT if MMU
- 	select CLONE_BACKWARDS
-diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
-index c04454876bcb..fe70eaea0e28 100644
---- a/arch/arm64/Kconfig
-+++ b/arch/arm64/Kconfig
-@@ -1,6 +1,7 @@
- config ARM64
- 	def_bool y
- 	select ARCH_HAS_ATOMIC64_DEC_IF_POSITIVE
-+	select ARCH_SUPPORTS_ATOMIC_RMW
- 	select ARCH_WANT_OPTIONAL_GPIOLIB
- 	select ARCH_WANT_COMPAT_IPC_PARSE_VERSION
- 	select ARCH_WANT_FRAME_POINTERS
-diff --git a/arch/powerpc/Kconfig b/arch/powerpc/Kconfig
-index d5d026b6d237..2e0ddfadc0b9 100644
---- a/arch/powerpc/Kconfig
-+++ b/arch/powerpc/Kconfig
-@@ -138,6 +138,7 @@ config PPC
- 	select OLD_SIGSUSPEND
- 	select OLD_SIGACTION if PPC32
- 	select HAVE_DEBUG_STACKOVERFLOW
-+	select ARCH_SUPPORTS_ATOMIC_RMW
- 
- config EARLY_PRINTK
- 	bool
-diff --git a/arch/sparc/Kconfig b/arch/sparc/Kconfig
-index 4e5683877b93..d60f34dbae89 100644
---- a/arch/sparc/Kconfig
-+++ b/arch/sparc/Kconfig
-@@ -75,6 +75,7 @@ config SPARC64
- 	select ARCH_HAVE_NMI_SAFE_CMPXCHG
- 	select HAVE_C_RECORDMCOUNT
- 	select NO_BOOTMEM
-+	select ARCH_SUPPORTS_ATOMIC_RMW
- 
- config ARCH_DEFCONFIG
- 	string
-diff --git a/arch/x86/Kconfig b/arch/x86/Kconfig
-index eb2dfa61eabe..9dc1a24d41b8 100644
---- a/arch/x86/Kconfig
-+++ b/arch/x86/Kconfig
-@@ -123,6 +123,7 @@ config X86
- 	select COMPAT_OLD_SIGACTION if IA32_EMULATION
- 	select RTC_LIB
- 	select HAVE_DEBUG_STACKOVERFLOW
-+	select ARCH_SUPPORTS_ATOMIC_RMW
- 
- config INSTRUCTION_DECODER
- 	def_bool y
-diff --git a/kernel/Kconfig.locks b/kernel/Kconfig.locks
-index d2b32ac27a39..ecee67a00f5f 100644
---- a/kernel/Kconfig.locks
-+++ b/kernel/Kconfig.locks
-@@ -220,6 +220,9 @@ config INLINE_WRITE_UNLOCK_IRQRESTORE
- 
- endif
- 
-+config ARCH_SUPPORTS_ATOMIC_RMW
-+	bool
-+
- config MUTEX_SPIN_ON_OWNER
- 	def_bool y
--	depends on SMP && !DEBUG_MUTEXES
-+	depends on SMP && !DEBUG_MUTEXES && ARCH_SUPPORTS_ATOMIC_RMW
--- 
-2.0.1
+-Doug
