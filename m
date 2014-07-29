@@ -1,34 +1,51 @@
-From: haojian.zhuang@linaro.org (Haojian Zhuang)
-Date: Tue, 29 Jul 2014 18:43:27 +0800
-Subject: [PATCH v15 08/12] ARM: config: append lpae configuration
-In-Reply-To: <20140729040531.GB8430@quad.lixom.net>
-References: <1406555876-11989-1-git-send-email-haojian.zhuang@linaro.org>
- <1406555876-11989-9-git-send-email-haojian.zhuang@linaro.org>
- <20140729040531.GB8430@quad.lixom.net>
-Message-ID: <CAD6h2NQ-+t0=XvMWR54tzpvkMe+JT4FcLvQFPNJuUea32GDS8g@mail.gmail.com>
+From: tomasz.figa@gmail.com (Tomasz Figa)
+Date: Tue, 29 Jul 2014 12:44:17 +0200
+Subject: [PATCH v8 6/6] clk: samsung: remove unused clock aliases and
+ update clock flags
+In-Reply-To: <1406611711-25112-7-git-send-email-thomas.ab@samsung.com>
+References: <1406611711-25112-1-git-send-email-thomas.ab@samsung.com>
+ <1406611711-25112-7-git-send-email-thomas.ab@samsung.com>
+Message-ID: <53D77B01.40702@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 29 July 2014 12:05, Olof Johansson <olof@lixom.net> wrote:
-> On Mon, Jul 28, 2014 at 09:57:52PM +0800, Haojian Zhuang wrote:
->> Append multi_v7_lpae_config. In this default configuration,
->> CONFIG_ARCH_MULTI_V6 is disabled. CONFIG_ARM_LPAE is enabled.
->
-> NACK. This is the nth time I have had to nack this patch.
->
-> You are enabling platforms here that don't have LPAE. Don't do that.
->
-> It's trivial to create a LPAE version of multi_v7 defconfig locally.
->
->
-> -Olof
+Hi Thomas,
 
-I tried to remove those SoCs that can't support LPAE. But I don't know
-every platform in details.
+You can find few comments inline.
 
-How about that I only enable HIP04 in multi_v7_lpae_defconfig. If you
-think any platform could be added, please help to list it. Then I
-could append them into the multi_v7_lpae_defconfig.
+On 29.07.2014 07:28, Thomas Abraham wrote:
 
-Regards
-Haojian
+[snip]
+
+> @@ -714,15 +715,24 @@ static struct samsung_div_clock exynos4_div_clks[] __initdata = {
+                                                        ^^^
+
+Keep in mind that following clocks are common for Exynos4210 and
+Exynos4x12. Have you tested this series on a board based on Exynos4212
+or 4412 to verify that it does not break the legacy driver? (I would
+test it myself, but I am on holidays at the moment.)
+
+>  	DIV(0, "div_clkout_rightbus", "mout_clkout_rightbus",
+>  			CLKOUT_CMU_RIGHTBUS, 8, 6),
+>  
+> -	DIV(0, "div_core", "mout_core", DIV_CPU0, 0, 3),
+> -	DIV(0, "div_corem0", "div_core2", DIV_CPU0, 4, 3),
+> -	DIV(0, "div_corem1", "div_core2", DIV_CPU0, 8, 3),
+> -	DIV(0, "div_periph", "div_core2", DIV_CPU0, 12, 3),
+
+[snip]
+
+> @@ -1501,7 +1507,7 @@ static void __init exynos4_clk_init(struct device_node *np,
+>  		exynos4_soc == EXYNOS4210 ? "Exynos4210" : "Exynos4x12",
+>  		_get_rate("sclk_apll"),	_get_rate("sclk_mpll"),
+>  		_get_rate("sclk_epll"), _get_rate("sclk_vpll"),
+> -		_get_rate("arm_clk"));
+> +		_get_rate("armclk"));
+
+This will not work on Exynos4412, because there is no "armclk" added for
+this SoC. My suggestion is to simply keep name of the clock as is, move
+current "arm_clk" divider to Exynos4x12-specific clocks and register
+Exynos4210 CPU clock as "arm_clk".
+
+Best regards,
+Tomasz
