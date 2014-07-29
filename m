@@ -1,30 +1,44 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Tue, 29 Jul 2014 12:12:13 +0100
-Subject: [PATCH v15 07/12] ARM: dts: append hip04 dts
-In-Reply-To: <20140729035321.GA8430@quad.lixom.net>
-References: <1406555876-11989-1-git-send-email-haojian.zhuang@linaro.org>
- <1406555876-11989-8-git-send-email-haojian.zhuang@linaro.org>
- <20140728180609.GE2576@leverpostej>
- <CAD6h2NQLgB1=8+WznE19rjsFwm3XWPUYEbDuPCbKbWjseRCBDg@mail.gmail.com>
- <20140729035321.GA8430@quad.lixom.net>
-Message-ID: <20140729111213.GE9245@arm.com>
+From: tomi.valkeinen@ti.com (Tomi Valkeinen)
+Date: Tue, 29 Jul 2014 14:15:40 +0300
+Subject: [PATCH v9] video: ARM CLCD: Add DT support
+In-Reply-To: <1406631987.17155.0.camel@hornet>
+References: <1403610911-31491-1-git-send-email-pawel.moll@arm.com>	
+ <1404824767.21897.7.camel@hornet> <1406023366.25343.44.camel@hornet>
+ <1406631987.17155.0.camel@hornet>
+Message-ID: <53D7825C.2020900@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jul 29, 2014 at 04:53:21AM +0100, Olof Johansson wrote:
-> On Tue, Jul 29, 2014 at 10:44:40AM +0800, Haojian Zhuang wrote:
-> > Because I didn't get these materials yet. All clocks are enabled in bootloader.
-> 
-> What materials? Technical documentation for the CPU you're upstreaming?
-> 
-> It seems like a very bad idea to upstream a DT for a CPU that you don't
-> have documentation for. It seems appropriate to wait until you have
-> documentation so you can make sure that the hardware you're describing
-> is actually what is there, and not something made-up or misdescribed.
+Hi,
 
-I completely agree. Furthermore, given that this SoC implements a dodgy
-custom GIC, I don't think it's unreasonable for us to ask for documentation
-describing that too, otherwise it's going to make maintaining a complicated
-irqchip driver that much worse.
+On 29/07/14 14:06, Pawel Moll wrote:
+> On Tue, 2014-07-22 at 11:02 +0100, Pawel Moll wrote:
+>> On Tue, 2014-07-08 at 14:06 +0100, Pawel Moll wrote:
+>>> On Tue, 2014-06-24 at 12:55 +0100, Pawel Moll wrote:
+>>>> This patch adds basic DT bindings for the PL11x CLCD cells
+>>>> and make their fbdev driver use them.
+>>>>
+>>>> Signed-off-by: Pawel Moll <pawel.moll@arm.com>
+>>>
+>>> As two weeks passed without any further comment, I'm assuming that there
+>>> are no more obstacles for this patch to be merged.
+>>>
+>>> Tomi, will you pick it up for 3.17, as you offered? Russell, if you
+>>> prefer to take it via your tree, it's in your system as 8005/4.
+>>
+>> Ping...
+>>
+>> Tomi?
 
-Will
+Yep, I've queued it now for 3.17.
+
+ Tomi
+
+
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: OpenPGP digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140729/b37aedc0/attachment-0001.sig>
