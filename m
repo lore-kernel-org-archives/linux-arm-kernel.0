@@ -1,108 +1,93 @@
-From: sudeep.holla@arm.com (Sudeep Holla)
-Date: Tue, 29 Jul 2014 17:40:25 +0100
-Subject: [PATCH 05/19] ARM64 / ACPI: Make PCI optional for ACPI on ARM64
-In-Reply-To: <1406206825-15590-6-git-send-email-hanjun.guo@linaro.org>
-References: <1406206825-15590-1-git-send-email-hanjun.guo@linaro.org>
- <1406206825-15590-6-git-send-email-hanjun.guo@linaro.org>
-Message-ID: <53D7CE79.1080809@arm.com>
+From: balbi@ti.com (Felipe Balbi)
+Date: Tue, 29 Jul 2014 11:39:35 -0500
+Subject: [PATCH v3 0/2] usb: fix controller-PHY binding for OMAP3 platform
+In-Reply-To: <14357891.vooz1N5zDC@avalon>
+References: <1387209225-11520-1-git-send-email-kishon@ti.com>
+ <20140721151557.GH6852@saruman.home> <53CF7978.4090709@ti.com>
+ <14357891.vooz1N5zDC@avalon>
+Message-ID: <20140729163935.GH17808@saruman.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi,
 
+On Tue, Jul 29, 2014 at 02:38:24PM +0200, Laurent Pinchart wrote:
+> On Wednesday 23 July 2014 14:29:36 Kishon Vijay Abraham I wrote:
+> > On Monday 21 July 2014 08:45 PM, Felipe Balbi wrote:
+> > > On Mon, Jul 21, 2014 at 05:04:57PM +0200, Laurent Pinchart wrote:
+> > >> Hi Felipe,
+> > >> 
+> > >> What happened to these two patches ?
+> > > 
+> > > looks like I lost them.
+> > > 
+> > >> On Monday 16 December 2013 17:48:29 Felipe Balbi wrote:
+> > >>> On Mon, Dec 16, 2013 at 02:38:27PM -0800, Tony Lindgren wrote:
+> > >>>> * Felipe Balbi <balbi@ti.com> [131216 13:31]:
+> > >>>>> On Mon, Dec 16, 2013 at 09:23:43PM +0530, Kishon Vijay Abraham I 
+> wrote:
+> > >>>>>> After the platform devices are created using PLATFORM_DEVID_AUTO, the
+> > >>>>>> device names given in usb_bind_phy (in board file) does not match
+> > >>>>>> with the actual device name causing the USB PHY library not to return
+> > >>>>>> the PHY reference when the MUSB controller request for the PHY in the
+> > >>>>>> non-dt boot case.
+> > >>>>>> So removed creating platform devices using PLATFORM_DEVID_AUTO in
+> > >>>>>> omap2430.c.
+> > >>>>>> 
+> > >>>>>> Did enumeration testing in omap3 beagle.
+> > >>>>>> 
+> > >>>>>> Changes from v2:
+> > >>>>>> * Fixed the commit log
+> > >>>>>> 
+> > >>>>>> Changes from v1:
+> > >>>>>> * refreshed to the latested mainline kernel
+> > >>>>>> * added musb_put_id from omap2430 remove.
+> > >>>>> 
+> > >>>>> Tony, how do you want to handle this ? You want me to provide you a
+> > >>>>> branch which we both merge ?
+> > >>>> 
+> > >>>> Yes that would be great thanks. For the mach-omap2 touching parts:
+> > >>>> 
+> > >>>> Acked-by: Tony Lindgren <tony@atomide.com>
+> > >>> 
+> > >>> Here it is, let me know if you prefer a signed tag:
+> > >>> 
+> > >>> The following changes since commit 
+> 6ce4eac1f600b34f2f7f58f9cd8f0503d79e42ae:
+> > >>>   Linux 3.13-rc1 (2013-11-22 11:30:55 -0800)
+> > >>> 
+> > >>> are available in the git repository at:
+> > >>>   git://git.kernel.org/pub/scm/linux/kernel/git/balbi/usb.git
+> > >>> 
+> > >>> usb-phy-binding-omap3
+> > >>> 
+> > >>> for you to fetch changes up to 23ada3130cf4e56acb86fdff4c26113188d52d18:
+> > >>>   arm: omap: remove *.auto* from device names given in usb_bind_phy
+> > >>> 
+> > >>> (2013-12-16 17:44:43 -0600)
+> > >>> 
+> > >>> ----------------------------------------------------------------
+> > >>> 
+> > >>> Kishon Vijay Abraham I (2):
+> > >>>       usb: musb: omap: remove using PLATFORM_DEVID_AUTO in omap2430.c
+> > >>>       arm: omap: remove *.auto* from device names given in usb_bind_phy
+> > > 
+> > > Kishon, are these still valid ?
+> > 
+> > Looks like board-2430sdp.c got removed. Apart from that the reset of the
+> > patch series is still applicable for non-dt boot.
+> 
+> Felipe, do you plan to apply the patch without the baord-2430sdp.c change, or 
+> would you like Kishon to rebase and resubmit it ?
 
-On 24/07/14 14:00, Hanjun Guo wrote:
-> As PCI for ARM64 is not ready, so introduce some stub functions
-> to make PCI optional for ACPI, and make ACPI core run without
-> CONFIG_PCI on ARM64.
->
-> Since ACPI on X86 and IA64 depends on PCI and this patch only makes
-> PCI optinal for ARM64, it will not break anything on X86 and IA64.
->
-> Signed-off-by: Hanjun Guo <hanjun.guo@linaro.org>
-> ---
->   arch/arm64/include/asm/pci.h |   11 +++++++++++
->   drivers/acpi/Makefile        |    2 +-
->   drivers/acpi/internal.h      |    5 +++++
->   include/linux/pci.h          |   37 +++++++++++++++++++++++++++----------
->   4 files changed, 44 insertions(+), 11 deletions(-)
->   create mode 100644 arch/arm64/include/asm/pci.h
->
-> diff --git a/arch/arm64/include/asm/pci.h b/arch/arm64/include/asm/pci.h
-> new file mode 100644
-> index 0000000..250cd24
-> --- /dev/null
-> +++ b/arch/arm64/include/asm/pci.h
-> @@ -0,0 +1,11 @@
-> +#ifndef __ASM_PCI_H
-> +#define __ASM_PCI_H
-> +#ifdef __KERNEL__
-> +
-> +/*
-> + * PCI address space differs from physical memory address space
-> + */
-> +#define PCI_DMA_BUS_IS_PHYS	(0)
-> +
-> +#endif  /* __KERNEL__ */
-> +#endif  /* __ASM_PCI_H */
-> diff --git a/drivers/acpi/Makefile b/drivers/acpi/Makefile
-> index 505d4d7..8e9bbe6 100644
-> --- a/drivers/acpi/Makefile
-> +++ b/drivers/acpi/Makefile
-> @@ -39,7 +39,7 @@ acpi-y				+= processor_core.o
->   acpi-$(CONFIG_ARCH_MIGHT_HAVE_ACPI_PDC) += processor_pdc.o
->   acpi-y				+= ec.o
->   acpi-$(CONFIG_ACPI_DOCK)	+= dock.o
-> -acpi-y				+= pci_root.o pci_link.o pci_irq.o
-> +acpi-$(CONFIG_PCI)		+= pci_root.o pci_link.o pci_irq.o
->   acpi-y				+= acpi_lpss.o
->   acpi-y				+= acpi_platform.o
->   acpi-y				+= acpi_pnp.o
-> diff --git a/drivers/acpi/internal.h b/drivers/acpi/internal.h
-> index 4c5cf77..e1e6487 100644
-> --- a/drivers/acpi/internal.h
-> +++ b/drivers/acpi/internal.h
-> @@ -26,8 +26,13 @@
->   acpi_status acpi_os_initialize1(void);
->   int init_acpi_device_notify(void);
->   int acpi_scan_init(void);
-> +#ifdef CONFIG_PCI
->   void acpi_pci_root_init(void);
->   void acpi_pci_link_init(void);
-> +#else
-> +static inline void acpi_pci_root_init(void) {}
-> +static inline void acpi_pci_link_init(void) {}
-> +#endif
->   void acpi_processor_init(void);
->   void acpi_platform_init(void);
->   void acpi_pnp_init(void);
-> diff --git a/include/linux/pci.h b/include/linux/pci.h
-> index 466bcd1..27d7354 100644
-> --- a/include/linux/pci.h
-> +++ b/include/linux/pci.h
+Not sure if Tony still wants board-* modifications. Tony ?
 
-[...]
-
-> @@ -1394,6 +1395,23 @@ static inline struct pci_dev *pci_get_bus_and_slot(unsigned int bus,
->   						unsigned int devfn)
->   { return NULL; }
->
-> +static inline struct pci_bus *pci_find_bus(int domain, int busnr)
-> +{ return NULL; }
-> +
-> +static inline int pci_bus_write_config_byte(struct pci_bus *bus,
-> +				unsigned int devfn, int where, u8 val)
-> +{ return -ENODEV; }
-> +
-> +static inline int raw_pci_read(unsigned int domain, unsigned int bus,
-> +			unsigned int devfn, int reg, int len, u32 *val)
-> +{ return -EINVAL; }
-> +
-> +static inline int raw_pci_write(unsigned int domain, unsigned int bus,
-> +			unsigned int devfn, int reg, int len, u32 val)
-> +{ return -EINVAL; }
-
-IMO -ENOSYS is more suitable as these functions are not implemented
-for !CONFIG_PCI
-
-Regards,
-Sudeep
+-- 
+balbi
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140729/c83e2bbf/attachment.sig>
