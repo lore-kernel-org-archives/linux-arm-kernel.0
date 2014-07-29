@@ -1,37 +1,76 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Tue, 29 Jul 2014 05:41:20 -0700
-Subject: [PATCH 3/3] arm: dts: Add gta04a5 model
-In-Reply-To: <1FA8171E-1B7A-4684-887E-11593BB9C29E@goldelico.com>
-References: <1406577213-9642-1-git-send-email-marek@goldelico.com>
- <1406577213-9642-4-git-send-email-marek@goldelico.com>
- <CAOf5uwk=ctww=pP4Ae+1C6i-oOtiYTv2NJbj1GpuPwVSKXB4Hw@mail.gmail.com>
- <CAAfyv35jvhzvjCKMwrpa=RQ1JkfcmthCsGDzwLW9Y6bq3Ww_fg@mail.gmail.com>
- <CAOf5uw=Fm9FXEH5ESqDC8pGjMbn5VQ1+MyPJVXSqGh_9+JRLHw@mail.gmail.com>
- <1FA8171E-1B7A-4684-887E-11593BB9C29E@goldelico.com>
-Message-ID: <20140729124120.GS29045@atomide.com>
+From: afaerber@suse.de (=?UTF-8?B?QW5kcmVhcyBGw6RyYmVy?=)
+Date: Tue, 29 Jul 2014 14:42:51 +0200
+Subject: [PATCH v8 3/6] ARM: dts: Exynos: add CPU OPP and regulator supply
+ property
+In-Reply-To: <CAJuA9ag1xHm=vaXxXzj7ykKxYHxBndDsOTwN0vRdXvhb_DtQ2g@mail.gmail.com>
+References: <1406611711-25112-1-git-send-email-thomas.ab@samsung.com>	<1406611711-25112-4-git-send-email-thomas.ab@samsung.com>	<53D78ED3.9090703@suse.de>
+ <CAJuA9ag1xHm=vaXxXzj7ykKxYHxBndDsOTwN0vRdXvhb_DtQ2g@mail.gmail.com>
+Message-ID: <53D796CB.5020805@suse.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Dr. H. Nikolaus Schaller <hns@goldelico.com> [140728 13:45]:
-> 
-> Yes,
-> the boot loader either loads gta04a3.dtb gta04.dtb or gta05.dtb
-> depending on board revision.
-> 
-> Therefore we have multiple device tree files to represent such hardware
-> differences. Like Gumstix Overo variants (using a  omap3-overo-base.dtsi)
-> 
-> And, this difference is not the only one. Other are to come later.
-> 
-> Unfortunately we were recommend to submit only DT nodes that already
-> have drivers. Therefore, the "big picture" of the device variants support
-> may not yet be visible from this patch.
-> 
-> I hope this gives a little background.
+Hi Thomas,
 
-So what's the conclusion? Are changes needed to this patch
-series or not?
+Am 29.07.2014 14:35, schrieb Thomas Abraham:
+> On Tue, Jul 29, 2014 at 5:38 PM, Andreas F?rber <afaerber@suse.de> wrote:
+>> Am 29.07.2014 07:28, schrieb Thomas Abraham:
+>>> diff --git a/arch/arm/boot/dts/exynos5250-cros-common.dtsi b/arch/arm/boot/dts/exynos5250-cros-common.dtsi
+>>> index 89ac90f..34bb31c 100644
+>>> --- a/arch/arm/boot/dts/exynos5250-cros-common.dtsi
+>>> +++ b/arch/arm/boot/dts/exynos5250-cros-common.dtsi
+>>> @@ -19,6 +19,12 @@
+>>>       chosen {
+>>>       };
+>>>
+>>> +     cpus {
+>>> +             cpu at 0 {
+>>> +                     cpu0-supply = <&buck2_reg>;
+>>> +             };
+>>> +     };
+>>> +
+>>>       pinctrl at 11400000 {
+>>>               /*
+>>>                * Disabled pullups since external part has its own pullups and
+>>
+>> I've been instructed to dismantle this .dtsi file, so please place this
+>> into exynos5250-snow.dts. It's probably wrong here anyway, since Spring
+>> doesn't use the max77686 but an s5m6787 PMIC.
+> 
+> Ok, I will move this to exynos5250-snow.dts.
+> 
+>>
+>> How do I find out which -supply to specify here for Spring?
+> 
+> This information can be found in the Spring board schematic.
 
-Regards,
+Are those available publicly somewhere? I guess not...
 
-Tony
+>> Also, wouldn't it make sense to assign a cpu0 label in exynos????.dtsi
+>> to override it via &cpu0 { ... };?
+> 
+> Sorry, I did not understand the question.
+
+Instead of adding
+
+cpus { cpu at 0 { ... }; };
+
+to the board's / node, I am suggesting you do in the SoC's .dtsi:
+
+- cpu at 0 {
++ cpu0: cpu at 0 {
+
+and then in the board's file after / { ... }; add the following:
+
+&cpu0 {
+	cpu0-supply = <&buck2_reg>;
+};
+
+This is the new preferred way to override or extend inherited nodes, I
+am told. (&cpu0 should be inserted in alphabetical order then.)
+
+Cheers,
+Andreas
+
+-- 
+SUSE LINUX Products GmbH, Maxfeldstr. 5, 90409 N?rnberg, Germany
+GF: Jeff Hawn, Jennifer Guild, Felix Imend?rffer; HRB 16746 AG N?rnberg
