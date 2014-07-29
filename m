@@ -1,39 +1,56 @@
-From: paul@pwsan.com (Paul Walmsley)
-Date: Tue, 29 Jul 2014 08:25:19 +0000 (UTC)
-Subject: OMAP baseline test results for v3.16-rc4
-In-Reply-To: <20140729064243.GF29045@atomide.com>
-References: <alpine.DEB.2.02.1407062339420.15016@utopia.booyaka.com>
- <20140707080238.GF28884@atomide.com>
- <alpine.DEB.2.02.1407251857480.5875@utopia.booyaka.com>
- <20140729064243.GF29045@atomide.com>
-Message-ID: <alpine.DEB.2.02.1407290810160.22957@utopia.booyaka.com>
+From: treding@nvidia.com (Thierry Reding)
+Date: Tue, 29 Jul 2014 10:26:46 +0200
+Subject: linux-next: manual merge of the gpio tree with the arm-soc tree
+In-Reply-To: <20140729181949.427a7fb5@canb.auug.org.au>
+References: <20140729181949.427a7fb5@canb.auug.org.au>
+Message-ID: <20140729082645.GC31360@ulmo.nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 28 Jul 2014, Tony Lindgren wrote:
+On Tue, Jul 29, 2014 at 10:19:49AM +0200, Stephen Rothwell wrote:
+> * PGP Signed by an unknown key
+> 
+> Hi Linus,
+> 
+> Today's linux-next merge of the gpio tree got a conflict in
+> arch/arm/mach-tegra/board-paz00.c between commit a0524acc94c9 ("ARM:
+> tegra: Sort includes alphabetically") from the arm-soc tree and commit
+> 0a6d315827ee ("gpio: split gpiod board registration into machine
+> header") from the gpio tree.
+> 
+> I fixed it up (see below) and can carry the fix as necessary (no action
+> is required).
+> 
+> -- 
+> Cheers,
+> Stephen Rothwell                    sfr at canb.auug.org.au
+> 
+> diff --cc arch/arm/mach-tegra/board-paz00.c
+> index bb4782a32713,91fd858ced0d..000000000000
+> --- a/arch/arm/mach-tegra/board-paz00.c
+> +++ b/arch/arm/mach-tegra/board-paz00.c
+> @@@ -17,10 -17,9 +17,10 @@@
+>    *
+>    */
+>   
+> - #include <linux/gpio/driver.h>
+>  -#include <linux/platform_device.h>
+> + #include <linux/gpio/machine.h>
+>  +#include <linux/platform_device.h>
+>   #include <linux/rfkill-gpio.h>
+>  +
+>   #include "board.h"
+>   
+>   static struct rfkill_gpio_platform_data wifi_rfkill_platform_data = {
 
-> Hmm I think the difference with the working v3.10 one is that you have
-> root=/dev/mmcblk0p2 instead of root=/dev/nfs. As the Ethernet on beagle
-> is on the USB EHCI, this is still blocking the deeper idle states AFAIK.
+Looks good to me.
 
-Hmm?  There's no Ethernet on the 3530 Beagle.
-
-The hardware configuration on those two boards - the 37xxevm and 
-the 3530es3beagle - hasn't changed between the two test runs, AFAIK.
-
-Just to take the Beagle out of the equation, here's a test with the 
-37xxevm on 3.11 where it passes the dynamic idle tests:
-
-http://www.pwsan.com/omap/testlogs/test_v3.11/20130902150604/pm/37xxevm/37xxevm_log.txt
-
-And here's one on the 37xxevm on 3.16-rc7 where it fails:
-
-http://www.pwsan.com/omap/testlogs/test_v3.11/20130902150604/pm/37xxevm/37xxevm_log.txt
-
-I should probably read back those writes to autosuspend_delay_ms, just to 
-make sure they are reaching the right destinations.  But you might want to 
-confirm that you can see the CORE RET count increasing during dynamic idle 
-on your 37xxevm.
-
-
-- Paul
+Thanks,
+Thierry
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: not available
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140729/f74a1cb2/attachment.sig>
