@@ -1,102 +1,70 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 29 Jul 2014 16:08:27 +0200
-Subject: [RFC PATCH 00/11] Refactor MSI to support Non-PCI device
-In-Reply-To: <1406344128-27055-1-git-send-email-wangyijing@huawei.com>
-References: <1406344128-27055-1-git-send-email-wangyijing@huawei.com>
-Message-ID: <1748052.OMBQJiOLYT@wuerfel>
+From: balbi@ti.com (Felipe Balbi)
+Date: Tue, 29 Jul 2014 09:10:45 -0500
+Subject: [PATCH 30/35] irqchip: add irq-omap-intc.h header
+In-Reply-To: <20140729120133.GQ29045@atomide.com>
+References: <1406582183-696-1-git-send-email-balbi@ti.com>
+ <1406582183-696-31-git-send-email-balbi@ti.com>
+ <20140729120133.GQ29045@atomide.com>
+Message-ID: <20140729141045.GA17808@saruman.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Saturday 26 July 2014 11:08:37 Yijing Wang wrote:
->         The series is a draft of generic MSI driver that supports PCI
-> and Non-PCI device which have MSI capability. If you're not interested
-> it, sorry for the noise.
-
-I've finally managed to take some time to look at the series. Overall,
-the concept looks good to me, and the patches look very well implemented.
-
-The part I'm not sure about is the interface we want to end up with
-at the end of the series. More on that below
-
-> The series is based on Linux-3.16-rc1.
+On Tue, Jul 29, 2014 at 05:01:33AM -0700, Tony Lindgren wrote:
+> * Felipe Balbi <balbi@ti.com> [140728 14:19]:
+> > OMAP INTC irqchip driver will be moved under
+> > drivers/irqchip/ soon but we still have a dependency
+> > with mach-omap2 when it comes to idle functions.
+> > 
+> > In order to make it easy to share those function
+> > prototypes with OMAP PM code, we introduce this new
+> > header.
+> > 
+> > Signed-off-by: Felipe Balbi <balbi@ti.com>
+> > ---
+> >  arch/arm/mach-omap2/board-3430sdp.c        |  1 +
+> >  arch/arm/mach-omap2/board-am3517crane.c    |  1 +
+> >  arch/arm/mach-omap2/board-am3517evm.c      |  1 +
+> >  arch/arm/mach-omap2/board-cm-t35.c         |  1 +
+> >  arch/arm/mach-omap2/board-cm-t3517.c       |  1 +
+> >  arch/arm/mach-omap2/board-devkit8000.c     |  1 +
+> >  arch/arm/mach-omap2/board-ldp.c            |  1 +
+> >  arch/arm/mach-omap2/board-omap3beagle.c    |  1 +
+> >  arch/arm/mach-omap2/board-omap3logic.c     |  1 +
+> >  arch/arm/mach-omap2/board-omap3pandora.c   |  1 +
+> >  arch/arm/mach-omap2/board-omap3stalker.c   |  1 +
+> >  arch/arm/mach-omap2/board-omap3touchbook.c |  1 +
+> >  arch/arm/mach-omap2/board-overo.c          |  1 +
+> >  arch/arm/mach-omap2/board-rx51.c           |  1 +
+> >  arch/arm/mach-omap2/board-ti8168evm.c      |  1 +
+> >  arch/arm/mach-omap2/common.h               |  9 ---------
+> >  arch/arm/mach-omap2/cpuidle34xx.c          |  1 +
+> >  arch/arm/mach-omap2/irq.c                  |  1 +
+> >  arch/arm/mach-omap2/pm24xx.c               |  1 +
+> >  arch/arm/mach-omap2/pm34xx.c               |  1 +
+> >  include/linux/irqchip/irq-omap-intc.h      | 32 ++++++++++++++++++++++++++++++
+> ...
 > 
-> MSI was introduced in PCI Spec 2.2. Currently, kernel MSI 
-> driver codes are bonding with PCI device. Because MSI has a lot
-> advantages in design. More and more non-PCI devices want to
-> use MSI as their default interrupt. The existing MSI device
-> include HPET. HPET driver provide its own MSI code to initialize
-> and process MSI interrupts. In the latest GIC v3 spec, legacy device
-> can deliver MSI by the help of a relay device named consolidator.
-> Consolidator can translate the legacy interrupts connected to it
-> to MSI/MSI-X. And new non-PCI device will be designed to 
-> support MSI in future. So make the MSI driver code be generic will 
-> help the non-PCI device use MSI more simply.
+> > +void omap2_init_irq(void);
+> > +void omap3_init_irq(void);
+> > +void ti81xx_init_irq(void);
 > 
-> The new data struct for generic MSI driver.
-> struct msi_irqs {
->         u8 msi_enabled:1; /* Enable flag */
->         u8 msix_enabled:1;
->         struct list_head msi_list; /* MSI desc list */
->         void *data;     /* help to find the MSI device */
->         struct msi_ops *ops; /* MSI device specific hook */
-> };
-> struct msi_irqs is used to manage MSI related informations. Every device supports
-> MSI should contain this data struct and allocate it.
+> I think these will all go away with DT based booting?
+> So it might be worth waiting for that rather than churn
+> all these files, or..
 
-I think you should have a stronger association with the 'struct
-device' here. Can you replace the 'void *data' with 'struct device *dev'?
+you just asked me to rebase this series because now we had OMAP3 idle
+working with DT. And now, you're asking me to hold on to this series
+because not everything is DT-based yet.
 
-The other part I'm not completely sure about is how you want to
-have MSIs map into normal IRQ descriptors. At the moment, all
-MSI users are based on IRQ numbers, but this has known scalability
-problems. I wonder if we can do the interface in a way that
-hides the interrupt number from generic device drivers and just
-passes a 'struct irq_desc'. Note that there are long-term plans to
-get rid of IRQ numbers entirely, but those plans have existed for
-a long time already without anybody seriously addressing the device
-driver interfaces so far, so it might never really happen.
+This is the third time I rebase the series after a long hiatus and it
+always comes out to the same result -> "let's wait some more".
 
-> struct msi_ops {
->         struct msi_desc *(*msi_setup_entry)(struct msi_irqs *msi, struct msi_desc *entry);
->         int msix_setup_entries(struct msi_irqs *msi, struct msix_entry *entries);
->         u32 (*msi_mask_irq)(struct msi_desc *desc, u32 mask, u32 flag);
->         u32 (*msix_mask_irq)(struct msi_desc *desc, u32 flag);
->         void (*msi_read_message)(struct msi_desc *desc, struct msi_msg *msg);
->         void (*msi_write_message)(struct msi_desc *desc, struct msi_msg *msg);
->         void (*msi_set_intx)(struct msi_irqs *msi, int enable);
-> };
-> struct msi_ops provides several hook functions, generic MSI driver will call
-> the hook functions to access device specific registers. PCI devices will share
-> the same msi_ops, because they have the same way to access MSI hardware registers.
-> 
-> Generic MSI layer export msi_capability_init() and msix_capability_init() functions
-> to drivers. msi/x_capability_init() will initialize MSI capability data struct msi_desc
-> and alloc the irq, then write the msi address/data value to hardware registers.
-> 
-> This series only did compile test, we will test it in x86 and arm platform later.
-
-For the generic drivers, I don't see much point in differentiating between
-MSI and MSI-X, as I believe the difference is something internal to the PCI
-implementation.
-
-With the other operations, I think they should all take a 'struct device *'
-as the first argument for convenience and consistency. I don't think you actually
-need msi_read_message(), and we could avoid msi_write_message() by doing it
-the other way round.
-
-What I'd envision as the API from the device driver perspective is something
-as simple like this:
-
-struct msi_desc *msi_request(struct msi_chip *chip, irq_handler_t handler,
-			unsigned long flags, const char *name, struct device *dev);
-
-which would get an msi descriptor that is valid for this device (dev)
-connected to a particular msi_chip, and associate a handler function
-with it. The device driver can call that function and retrieve the
-address/message pair from the msi_desc in order to store it in its own
-device specific registers. The request_irq() can be handled internally
-to msi_request().
-
-Would that work for you?
-
-	Arnd
+-- 
+balbi
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140729/66ce25ba/attachment.sig>
