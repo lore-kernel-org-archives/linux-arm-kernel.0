@@ -1,70 +1,43 @@
-From: svarbanov@mm-sol.com (Stanimir Varbanov)
-Date: Tue, 29 Jul 2014 17:06:42 +0300
-Subject: use IORESOURCE_REG resource type for non-translatable addresses
- in DT
-In-Reply-To: <3794875.CZFbAag5Sv@wuerfel>
-References: <53D788A7.4020303@mm-sol.com> <3794875.CZFbAag5Sv@wuerfel>
-Message-ID: <53D7AA72.6010309@mm-sol.com>
+From: hanjun.guo@linaro.org (Hanjun Guo)
+Date: Tue, 29 Jul 2014 22:07:40 +0800
+Subject: [PATCH 01/19] ARM64 / ACPI: Get RSDP and ACPI boot-time tables
+In-Reply-To: <53D7A6A2.9020005@arm.com>
+References: <1406206825-15590-1-git-send-email-hanjun.guo@linaro.org>
+ <1406206825-15590-2-git-send-email-hanjun.guo@linaro.org>
+ <53D69678.20002@arm.com> <53D79CD8.9050709@linaro.org>
+ <53D7A6A2.9020005@arm.com>
+Message-ID: <53D7AAAC.6070606@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Arnd, thanks for the comments.
+On 2014?07?29? 21:50, Sudeep Holla wrote:
+>
+> On 29/07/14 14:08, Hanjun Guo wrote:
+>> On 2014-7-29 2:29, Sudeep Holla wrote:
+>> [...]
+>>>> +
+>>>> +/*
+>>>> + * We never plan to use RSDT on arm/arm64 as its deprecated in spec but this
+>>>> + * variable is still required by the ACPI core
+>>>> + */
+>>>> +u32 acpi_rsdt_forced;
+>>>
+>>> This looks like yet another stray variable not used anywhere including
+>>> core ACPI
+>>
+>> It will be used by ACPICA to get the RSDP in acpi_tb_parse_root_table()
+>> in tbutils.c.
+>>
+>
+> No I couldn't find it in mainline/acpica/linux-next(pm tree).
+>
+> On further digging found that commit fab461058385("ACPICA: Cleanup the
+> option of forcing the use of the RSDT") has renamed it to
+> acpi_gbl_do_not_use_xsdt and moved it into acpica with default false.
+> So you can remove this.
 
-On 07/29/2014 03:00 PM, Arnd Bergmann wrote:
-> On Tuesday 29 July 2014 14:42:31 Stanimir Varbanov wrote:
->>         taddr = of_translate_address(dev, addrp);
->> -       if (taddr == OF_BAD_ADDR)
->> -               return -EINVAL;
->> +       /*
->> +        * if the address is non-translatable to cpu physical address
->> +        * fallback to a IORESOURCE_REG resource.
->> +        */
->> +       if (taddr == OF_BAD_ADDR) {
->> +               memset(r, 0, sizeof(*r));
->> +               taddr = of_read_number(addrp, 1);
->> +               if (taddr == OF_BAD_ADDR)
->> +                       return -EINVAL;
->> +               r->start = taddr;
->> +               r->end = taddr + size - 1;
->> +               r->flags = IORESOURCE_REG;
->> +               r->name = name ? name : dev->full_name;
->> +               return 0;
->> +       }
->> +
-> 
-> I don't think that everything returning OF_BAD_ADDR makes sense
-> to turn into IORESOURCE_REG. It could be an e.g. invalid DT
-> representation, a node with #size-cells=<0>, or it could be
-> something that gets translated one or more nodes up in the
-> tree before it reaches a bus without a ranges property.
-> 
-> Also, you should not rely on #address-cells being hardcoded
-> to <1> above.
-> 
+Ah, my bad. I grepped it in another version of kernel and found the outdated
+result, I will update this patch.
 
-This was just an example. Of course it has many issues and probaly it is
-wrong:) The main goal was to understand does IORESOURCE_REG resource
-type and parsing the *reg* properties for non-translatable addresses are
-feasible. And also does it acceptable by community and OF platform
-maintainers.
-
-> How about modifying of_get_address() rather than
-> __of_address_to_resource() instead? You could introduce
-> a new of_bus entry for each bus you expect to return
-> an IORESOURCE_REG, or you could change of_bus_default_get_flags
-> to return IORESOURCE_REG if the parent node has no ranges property
-> and is not the root node.
-
-IMO the clearer solution is to introduce a new of_bus bus. In that case
-one possible problem will be how to distinguish the non-translatable and
-the other buses. Also the *device_type* property is deprecated for non
-PCI devices.
-
-The second option will need to change the prototype of .get_flags method
-to receive device_node structure.
-
-Thoughts?
-
--- 
-regards,
-Stan
+Thanks
+Hanjun
