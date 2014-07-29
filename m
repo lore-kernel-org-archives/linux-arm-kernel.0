@@ -1,36 +1,26 @@
 From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Wed, 30 Jul 2014 08:01:24 +0900
-Subject: [PATCH] ARM: dts: smdk5250: Specify MAX77686 pmic interrupt
-In-Reply-To: <1406608029-8538-1-git-send-email-thomas.ab@samsung.com>
-References: <1406608029-8538-1-git-send-email-thomas.ab@samsung.com>
-Message-ID: <53D827C4.1000708@samsung.com>
+Date: Wed, 30 Jul 2014 08:02:27 +0900
+Subject: [PATCH 0/3] ARM: dts: Add TMU dt node and missing data for
+ Exynos3250
+In-Reply-To: <1406600232-31033-1-git-send-email-cw00.choi@samsung.com>
+References: <1406600232-31033-1-git-send-email-cw00.choi@samsung.com>
+Message-ID: <53D82803.9060804@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/29/14 13:27, Thomas Abraham wrote:
-> The IRQB interrupt pin of MAX77686 PMIC is connected to GPX3[2] pin of
-> Exynos5250 on the Exynos5250 SMDK board. Specify this connection using
-> interrupts property for the max77686 pmic node.
+On 07/29/14 11:17, Chanwoo Choi wrote:
+> This patchset add TMU (Thermal Management Unit) dt node and missing pinctrl
+> property of uart0/1. Also, this patchset remove duplcate 'interrupt-parent'
+> property for code clean.
 >
-> Signed-off-by: Thomas Abraham<thomas.ab@samsung.com>
-> ---
->   arch/arm/boot/dts/exynos5250-smdk5250.dts |    2 ++
->   1 file changed, 2 insertions(+)
+> Chanwoo Choi (3):
+>    ARM: dts: Add TMU dt node to monitor the temperature for Exynos3250
+>    ARM: dts: Remove duplicate 'interrput-parent' property for Exynos3250
+>    ARM: dts: Add missing pinctrl for uart0/1 for Exynos3250
 >
-> diff --git a/arch/arm/boot/dts/exynos5250-smdk5250.dts b/arch/arm/boot/dts/exynos5250-smdk5250.dts
-> index 695f5ad..cf38808 100644
-> --- a/arch/arm/boot/dts/exynos5250-smdk5250.dts
-> +++ b/arch/arm/boot/dts/exynos5250-smdk5250.dts
-> @@ -50,6 +50,8 @@
->   		max77686 at 09 {
->   			compatible = "maxim,max77686";
->   			reg =<0x09>;
-> +			interrupt-parent =<&gpx3>;
-> +			interrupts =<2 0>;
+>   arch/arm/boot/dts/exynos3250.dtsi | 15 +++++++++++++--
+>   1 file changed, 13 insertions(+), 2 deletions(-)
 >
->   			voltage-regulators {
->   				ldo1_reg: LDO1 {
-
-Applied, thanks.
+Applied this whole series, thanks.
 
 - Kukjin
