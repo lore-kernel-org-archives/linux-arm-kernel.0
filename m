@@ -1,55 +1,33 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 29 Jul 2014 18:13:07 +0200
-Subject: [PATCH 1/3] arm64: spin-table: handle unmapped cpu-release-addrs
-In-Reply-To: <20140729160303.GA32108@leverpostej>
-References: <1406630950-32432-1-git-send-email-ard.biesheuvel@linaro.org>
- <2385684.COvj9k7y2z@wuerfel> <20140729160303.GA32108@leverpostej>
-Message-ID: <11934363.ljlrQOGpcO@wuerfel>
+From: dianders@chromium.org (Doug Anderson)
+Date: Tue, 29 Jul 2014 09:15:29 -0700
+Subject: [PATCH v2 1/4] ARM: dts: exynos5250: max77686 is Snow only
+In-Reply-To: <1405704009-8430-2-git-send-email-afaerber@suse.de>
+References: <1405704009-8430-1-git-send-email-afaerber@suse.de>
+ <1405704009-8430-2-git-send-email-afaerber@suse.de>
+Message-ID: <CAD=FV=Xnb12GM-miAbA-6fmAbBCRiW2ejs=Veep+TQakv3MgZQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 29 July 2014 17:03:03 Mark Rutland wrote:
-> On Tue, Jul 29, 2014 at 04:20:46PM +0100, Arnd Bergmann wrote:
-> > On Tuesday 29 July 2014 11:15:45 Mark Salter wrote:
-> > > > -
-> > > > -     __flush_dcache_area(release_addr, sizeof(release_addr[0]));
-> > > > +     writeq_relaxed(__pa(secondary_holding_pen), release_addr);
-> > > > +     __flush_dcache_area(release_addr, sizeof(*release_addr));
-> > > 
-> > >        __flush_dcache_area((__force void *)release_addr, ... 
-> > > 
-> > > to avoid sparse warning.
-> 
-> Presumably we'd get this for the write_relaxed too?
+Andreas,
 
-writeq_relaxed() actually expects an __iomem  pointer
+On Fri, Jul 18, 2014 at 10:20 AM, Andreas F?rber <afaerber@suse.de> wrote:
+> Move it from exynos5250-cros-common.dtsi to exynos5250-snow.dts.
+> Spring does not need it, it uses an s5m8767 instead.
+>
+> Signed-off-by: Andreas F?rber <afaerber@suse.de>
+> ---
+>  v2: New (Doug Anderson)
+>
+>  arch/arm/boot/dts/exynos5250-cros-common.dtsi | 151 -------------------------
+>  arch/arm/boot/dts/exynos5250-snow.dts         | 155 ++++++++++++++++++++++++++
+>  2 files changed, 155 insertions(+), 151 deletions(-)
 
-> > 
-> > I think it would be cleaner to drop the __iomem annotation and use vmap()
-> > rather than ioremap(). That requires having a 'struct page' though, which
-> > I'm not sure you have.
-> 
-> As far as I am aware, we'd only have a struct page for memory falling in
-> the linear map, so for the cases this patch is actually required we
-> wouldn't have a struct page.
-> 
-> So it looks like I should just make release_addr a void __iomem *. Then
-> this line can just be:
+Personally I would have squashed patches 1-3, but I don't have a
+problem with it being broken up and it does mean that the mondo patch
+is smaller, so...
 
-You mean make it a 'void *' instead of 'void __iomem *', right?
+Reviewed-by: Doug Anderson <dianders@chromium.org>
 
-> __flush_dcache_area(release_addr, 8);
-> 
-> Where we could replace 8 with sizeof(u64), sizeof(__le64), etc if 8 is
-> too magic.
-> 
-> How does that sound?
+Kukjin could apply this now if he wanted to avoid future conflicts.
 
-Not sure where you're getting at. Using a regular pointer sounds fine,
-but then you have to cast the result of ioremap and do a manual
-cpu_to_le64 conversion on the assignment.
-
-Keeping the iomem annotation will also work,a nd then we only need
-the cast in the __flush_dcache_area call.
-
-	Arnd
+-Doug
