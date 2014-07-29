@@ -1,97 +1,108 @@
-From: msalter@redhat.com (Mark Salter)
-Date: Tue, 29 Jul 2014 11:17:59 -0400
-Subject: [PATCH 1/3] arm64: spin-table: handle unmapped cpu-release-addrs
-In-Reply-To: <1406646945.753.5.camel@deneb.redhat.com>
-References: <1406630950-32432-1-git-send-email-ard.biesheuvel@linaro.org>
- <1406630950-32432-2-git-send-email-ard.biesheuvel@linaro.org>
- <1406646945.753.5.camel@deneb.redhat.com>
-Message-ID: <1406647079.753.6.camel@deneb.redhat.com>
+From: balbi@ti.com (Felipe Balbi)
+Date: Tue, 29 Jul 2014 10:19:36 -0500
+Subject: [PATCH 30/35] irqchip: add irq-omap-intc.h header
+In-Reply-To: <20140729150655.GU29045@atomide.com>
+References: <1406582183-696-1-git-send-email-balbi@ti.com>
+ <1406582183-696-31-git-send-email-balbi@ti.com>
+ <20140729120133.GQ29045@atomide.com>
+ <20140729141045.GA17808@saruman.home>
+ <20140729150655.GU29045@atomide.com>
+Message-ID: <20140729151936.GC17808@saruman.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 2014-07-29 at 11:15 -0400, Mark Salter wrote:
-> On Tue, 2014-07-29 at 12:49 +0200, Ard Biesheuvel wrote:
-> > From: Mark Rutland <mark.rutland@arm.com>
+On Tue, Jul 29, 2014 at 08:06:55AM -0700, Tony Lindgren wrote:
+> * Felipe Balbi <balbi@ti.com> [140729 07:13]:
+> > On Tue, Jul 29, 2014 at 05:01:33AM -0700, Tony Lindgren wrote:
+> > > * Felipe Balbi <balbi@ti.com> [140728 14:19]:
+> > > > OMAP INTC irqchip driver will be moved under
+> > > > drivers/irqchip/ soon but we still have a dependency
+> > > > with mach-omap2 when it comes to idle functions.
+> > > > 
+> > > > In order to make it easy to share those function
+> > > > prototypes with OMAP PM code, we introduce this new
+> > > > header.
+> > > > 
+> > > > Signed-off-by: Felipe Balbi <balbi@ti.com>
+> > > > ---
+> > > >  arch/arm/mach-omap2/board-3430sdp.c        |  1 +
+> > > >  arch/arm/mach-omap2/board-am3517crane.c    |  1 +
+> > > >  arch/arm/mach-omap2/board-am3517evm.c      |  1 +
+> > > >  arch/arm/mach-omap2/board-cm-t35.c         |  1 +
+> > > >  arch/arm/mach-omap2/board-cm-t3517.c       |  1 +
+> > > >  arch/arm/mach-omap2/board-devkit8000.c     |  1 +
+> > > >  arch/arm/mach-omap2/board-ldp.c            |  1 +
+> > > >  arch/arm/mach-omap2/board-omap3beagle.c    |  1 +
+> > > >  arch/arm/mach-omap2/board-omap3logic.c     |  1 +
+> > > >  arch/arm/mach-omap2/board-omap3pandora.c   |  1 +
+> > > >  arch/arm/mach-omap2/board-omap3stalker.c   |  1 +
+> > > >  arch/arm/mach-omap2/board-omap3touchbook.c |  1 +
+> > > >  arch/arm/mach-omap2/board-overo.c          |  1 +
+> > > >  arch/arm/mach-omap2/board-rx51.c           |  1 +
+> > > >  arch/arm/mach-omap2/board-ti8168evm.c      |  1 +
+> > > >  arch/arm/mach-omap2/common.h               |  9 ---------
+> > > >  arch/arm/mach-omap2/cpuidle34xx.c          |  1 +
+> > > >  arch/arm/mach-omap2/irq.c                  |  1 +
+> > > >  arch/arm/mach-omap2/pm24xx.c               |  1 +
+> > > >  arch/arm/mach-omap2/pm34xx.c               |  1 +
+> > > >  include/linux/irqchip/irq-omap-intc.h      | 32 ++++++++++++++++++++++++++++++
+> > > ...
+> > > 
+> > > > +void omap2_init_irq(void);
+> > > > +void omap3_init_irq(void);
+> > > > +void ti81xx_init_irq(void);
+> > > 
+> > > I think these will all go away with DT based booting?
+> > > So it might be worth waiting for that rather than churn
+> > > all these files, or..
 > > 
-> > In certain cases the cpu-release-addr of a CPU may not fall in the
-> > linear mapping (e.g. when the kernel is loaded above this address due to
-> > the presence of other images in memory). This is problematic for the
-> > spin-table code as it assumes that it can trivially convert a
-> > cpu-release-addr to a valid VA in the linear map.
-> > 
-> > This patch modifies the spin-table code to use a temporary cached
-> > mapping to write to a given cpu-release-addr, enabling us to support
-> > addresses regardless of whether they are covered by the linear mapping.
-> > 
-> > Signed-off-by: Mark Rutland <mark.rutland@arm.com>
+> > you just asked me to rebase this series because now we had OMAP3 idle
+> > working with DT. And now, you're asking me to hold on to this series
+> > because not everything is DT-based yet.
+> 
+> I just don't like the idea of patching all these board files that
+> are going away anyways. If we need to do that, let's just add it
 
-Oops, forgot:
+when are they going away ? Are we really gonna delay this series until
+those board-files eventually vanish ?
 
-Tested-by: Mark Salter <msalter@redhat.com>
+> to common.h that's already included by all the remaining board-*.c
+> files. I know we should rather include the files directly, but in
+> this case that's just extra churn.
+> 
+> The real problem is how to properly deal with the save and
+> restore calls that idle code needs.
 
-> > ---
-> >  arch/arm64/kernel/smp_spin_table.c | 21 ++++++++++++++++-----
-> >  1 file changed, 16 insertions(+), 5 deletions(-)
-> > 
-> > diff --git a/arch/arm64/kernel/smp_spin_table.c b/arch/arm64/kernel/smp_spin_table.c
-> > index 0347d38eea29..70181c1bf42d 100644
-> > --- a/arch/arm64/kernel/smp_spin_table.c
-> > +++ b/arch/arm64/kernel/smp_spin_table.c
-> > @@ -20,6 +20,7 @@
-> >  #include <linux/init.h>
-> >  #include <linux/of.h>
-> >  #include <linux/smp.h>
-> > +#include <linux/types.h>
-> >  
-> >  #include <asm/cacheflush.h>
-> >  #include <asm/cpu_ops.h>
-> > @@ -65,12 +66,21 @@ static int smp_spin_table_cpu_init(struct device_node *dn, unsigned int cpu)
-> >  
-> >  static int smp_spin_table_cpu_prepare(unsigned int cpu)
-> >  {
-> > -	void **release_addr;
-> > +	__le64 __iomem *release_addr;
-> >  
-> >  	if (!cpu_release_addr[cpu])
-> >  		return -ENODEV;
-> >  
-> > -	release_addr = __va(cpu_release_addr[cpu]);
-> > +	/*
-> > +	 * The cpu-release-addr may or may not be inside the linear mapping.
-> > +	 * As ioremap_cache will either give us a new mapping or reuse the
-> > +	 * existing linear mapping, we can use it to cover both cases. In
-> > +	 * either case the memory will be MT_NORMAL.
-> > +	 */
-> > +	release_addr = ioremap_cache(cpu_release_addr[cpu],
-> > +				     sizeof(*release_addr));
-> > +	if (!release_addr)
-> > +		return -ENOMEM;
-> >  
-> >  	/*
-> >  	 * We write the release address as LE regardless of the native
-> > @@ -79,15 +89,16 @@ static int smp_spin_table_cpu_prepare(unsigned int cpu)
-> >  	 * boot-loader's endianess before jumping. This is mandated by
-> >  	 * the boot protocol.
-> >  	 */
-> > -	release_addr[0] = (void *) cpu_to_le64(__pa(secondary_holding_pen));
-> > -
-> > -	__flush_dcache_area(release_addr, sizeof(release_addr[0]));
-> > +	writeq_relaxed(__pa(secondary_holding_pen), release_addr);
-> > +	__flush_dcache_area(release_addr, sizeof(*release_addr));
+well, for system sleep we have callbacks from irq generic itself. The
+real problem is just with runtime PM.
+
+> In any case, it seems we can merge quite a bit of this series
+> already and then deal with the problem parts.
+
+sure, it at least some of those patches get merged, then it's less crap
+for me to rebase every now and again.
+
+> > This is the third time I rebase the series after a long hiatus and it
+> > always comes out to the same result -> "let's wait some more".
 > 
->        __flush_dcache_area((__force void *)release_addr, ... 
-> 
-> to avoid sparse warning.
-> 
-> >  
-> >  	/*
-> >  	 * Send an event to wake up the secondary CPU.
-> >  	 */
-> >  	sev();
-> >  
-> > +	iounmap(release_addr);
-> > +
-> >  	return 0;
-> >  }
-> >  
-> 
+> Nope, it's always been "this series causes PM regressions"
+
+you just said that we haven't been in any position to really test this,
+so can it be that the status has always been "this series causes PM
+regressions". We couldn't test that before, right ?
+
+> and few other minor comments. And we have not been in any
+> position to really test that until with v3.16-rc4. And then
+> you always run out of time and nobody else does anything :)
+
+sure, I have other stuff to do as well.
+
+-- 
+balbi
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140729/bfeb0b8f/attachment.sig>
