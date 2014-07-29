@@ -1,26 +1,47 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Tue, 29 Jul 2014 19:56:09 +0100
-Subject: [PATCH -next] ASoC: samsung: Fix return value check in
- s3c2412_iis_dev_probe()
-In-Reply-To: <1405827787-26055-1-git-send-email-weiyj_lk@163.com>
-References: <1405827787-26055-1-git-send-email-weiyj_lk@163.com>
-Message-ID: <20140729185609.GH17528@sirena.org.uk>
+From: bigeasy@linutronix.de (Sebastian Andrzej Siewior)
+Date: Tue, 29 Jul 2014 20:59:02 +0200
+Subject: [RFC PATCH 5/7] arm: dts: am33xx: add DMA properties for UART
+In-Reply-To: <1406660344-25307-1-git-send-email-bigeasy@linutronix.de>
+References: <1406660344-25307-1-git-send-email-bigeasy@linutronix.de>
+Message-ID: <1406660344-25307-6-git-send-email-bigeasy@linutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Jul 20, 2014 at 11:43:07AM +0800, weiyj_lk at 163.com wrote:
-> From: Wei Yongjun <yongjun_wei@trendmicro.com.cn>
-> 
-> In case of error, the function devm_ioremap_resource() returns ERR_PTR()
-> and never returns NULL. The NULL test in the return value check should be
-> replaced with IS_ERR(). Also remove redundant return value check of
-> platform_get_resource().
+Signed-off-by: Sebastian Andrzej Siewior <bigeasy@linutronix.de>
+---
+ arch/arm/boot/dts/am33xx.dtsi | 6 ++++++
+ 1 file changed, 6 insertions(+)
 
-Applied, thanks.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140729/6d57e706/attachment.sig>
+diff --git a/arch/arm/boot/dts/am33xx.dtsi b/arch/arm/boot/dts/am33xx.dtsi
+index 4a4e02d..cdccbd6 100644
+--- a/arch/arm/boot/dts/am33xx.dtsi
++++ b/arch/arm/boot/dts/am33xx.dtsi
+@@ -200,6 +200,8 @@
+ 			reg = <0x44e09000 0x2000>;
+ 			interrupts = <72>;
+ 			status = "disabled";
++			dmas = <&edma 26>, <&edma 27>;
++			dma-names = "tx", "rx";
+ 		};
+ 
+ 		uart1: serial at 48022000 {
+@@ -209,6 +211,8 @@
+ 			reg = <0x48022000 0x2000>;
+ 			interrupts = <73>;
+ 			status = "disabled";
++			dmas = <&edma 28>, <&edma 29>;
++			dma-names = "tx", "rx";
+ 		};
+ 
+ 		uart2: serial at 48024000 {
+@@ -218,6 +222,8 @@
+ 			reg = <0x48024000 0x2000>;
+ 			interrupts = <74>;
+ 			status = "disabled";
++			dmas = <&edma 30>, <&edma 31>;
++			dma-names = "tx", "rx";
+ 		};
+ 
+ 		uart3: serial at 481a6000 {
+-- 
+2.0.1
