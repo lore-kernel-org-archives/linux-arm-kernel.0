@@ -1,57 +1,88 @@
-From: soren.brinkmann@xilinx.com (Soren Brinkmann)
-Date: Tue, 29 Jul 2014 10:21:03 -0700
-Subject: [PATCH] ARM: smp_scu: Enable standby mode
-Message-ID: <1406654463-15475-1-git-send-email-soren.brinkmann@xilinx.com>
+From: ohaugan@codeaurora.org (Olav Haugan)
+Date: Tue, 29 Jul 2014 10:21:48 -0700
+Subject: [PATCH v3 1/1] iommu-api: Add map_sg/unmap_sg functions
+In-Reply-To: <20140729092547.GB9245@arm.com>
+References: <1406572731-6216-1-git-send-email-ohaugan@codeaurora.org>
+ <1406572731-6216-2-git-send-email-ohaugan@codeaurora.org>
+ <20140728191111.GW15536@arm.com> <53D6EFC0.1060308@codeaurora.org>
+ <20140729092547.GB9245@arm.com>
+Message-ID: <53D7D82C.2080201@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Enable the SCU standby mode.
->From documentation:
-  When set, SCU CLK is turned off when all processors are in WFI mode,
-  there is no pending request on the ACP (if implemented), and there is
-  no remaining activity in the SCU.
+On 7/29/2014 2:25 AM, Will Deacon wrote:
+> Hi Olav,
+> 
+> On Tue, Jul 29, 2014 at 01:50:08AM +0100, Olav Haugan wrote:
+>> On 7/28/2014 12:11 PM, Will Deacon wrote:
+>>> On Mon, Jul 28, 2014 at 07:38:51PM +0100, Olav Haugan wrote:
+>>>> +int iommu_map_sg(struct iommu_domain *domain, unsigned long iova,
+>>>> +			struct scatterlist *sg, unsigned int nents,
+>>>> +			int prot, unsigned long flags)
+>>>> +{
+>>>> +	int ret = 0;
+>>>> +	unsigned long offset = 0;
+>>>> +
+>>>> +	BUG_ON(iova & (~PAGE_MASK));
+>>>> +
+>>>> +	if (unlikely(domain->ops->map_sg == NULL)) {
+>>>> +		unsigned int i;
+>>>> +		struct scatterlist *s;
+>>>> +
+>>>> +		for_each_sg(sg, s, nents, i) {
+>>>> +			phys_addr_t phys = page_to_phys(sg_page(s));
+>>>> +			u32 page_len = PAGE_ALIGN(s->offset + s->length);
+>>>
+>>> Hmm, this is a pretty horrible place where CPU page size (from the sg list)
+>>> meets the IOMMU and I think we need to do something better to avoid spurious
+>>> failures. In other words, the sg list should be iterated in such a way that
+>>> we always pass a multiple of a supported iommu page size to iommu_map.
+>>>
+>>> All the code using PAGE_MASK and PAGE_ALIGN needn't match what is supported
+>>> by the IOMMU hardware.
+>>
+>> I am not sure what you mean. How can we iterate over the sg list in a
+>> different way to ensure we pass a multiple of a supported iommu page
+>> size? Each entry in the sg list are physically discontinuous from each
+>> other. If the page is too big iommu_map will take care of it for us. It
+>> already finds the biggest supported page size and splits up the calls to
+>> domain->ops->map(). Also, whoever allocates memory for use by IOMMU
+>> needs to be aware of what the supported minimum size is or else they
+>> would get mapping failures anyway.
+> 
+> I agree that we can't handle IOMMUs that have a minimum page size larger
+> than the CPU page size, but we should be able to handle the case where the
+> maximum supported page size on the IOMMU is smaller than the CPU page size
+> (e.g. 4k IOMMU with 64k pages on the CPU). I think that could trip a BUG_ON
+> with your patch, although the alignment would be ok in iommu_map because
+> page sizes are always a power-of-2. You also end up rounding the size to
+> 64k, which could lead to mapping more than you really need to.
 
-  When SCU CLK is off, ARREADYS, AWREADYS and WREADYS on the ACP are forced
-  LOW. The clock is turned on when any processor leaves WFI mode, or if
-  there is a new request on the ACP.
+Which BUG_ON would I trip? If the supported IOMMU page size is less than
+the CPU supported page size then iommu_map will nicely take care of
+splitting up the mapping calls into sizes supported by the IOMMU (taken
+care of by iommu_pgsize()). However, I see you point regarding the
+PAGE_ALIGN of the offset+length that can cause overmapping which you
+don't really want. What is the alternative here? Just leave it and do
+not align at all? That is how iommu_map() currently works. It will
+return error if the iova|phys|size is not aligned to the minimum pgsize
+supported by the IOMMU. So I would not change the behavior if I just
+left it without trying to align.
 
-Signed-off-by: Soren Brinkmann <soren.brinkmann@xilinx.com>
----
-Hi,
+I will remove the BUG_ON for (iova & (~PAGE_MASK)).
 
-I am working on some PM related patches for Zynq. One of them is
-enabling the SCU standby mode. I was wondering whether this is probably
-something that I should not do in platform specific code, but rather in
-the common code for everybody?
+>> (The code in __map_sg_chunk in arch/arm/mm/dma-mapping.c does the same
+>> thing btw.)
+> 
+> I have the same objection to that code :)
 
-	Thanks,
-	S?ren
----
- arch/arm/kernel/smp_scu.c | 5 ++++-
- 1 file changed, 4 insertions(+), 1 deletion(-)
+I am hoping we can remove/simplify some of that code when we have the
+iommmu_map_sg API available....
 
-diff --git a/arch/arm/kernel/smp_scu.c b/arch/arm/kernel/smp_scu.c
-index 1aafa0d785eb..82548a76740d 100644
---- a/arch/arm/kernel/smp_scu.c
-+++ b/arch/arm/kernel/smp_scu.c
-@@ -22,6 +22,9 @@
- #define SCU_INVALIDATE		0x0c
- #define SCU_FPGA_REVISION	0x10
- 
-+#define SCU_CTRL_ENABLE		BIT(0)
-+#define SCU_CTRL_STANDBY_ENABLE	BIT(5)
-+
- #ifdef CONFIG_SMP
- /*
-  * Get the number of CPU cores from the SCU configuration
-@@ -53,7 +56,7 @@ void scu_enable(void __iomem *scu_base)
- 	if (scu_ctrl & 1)
- 		return;
- 
--	scu_ctrl |= 1;
-+	scu_ctrl |= SCU_CTRL_ENABLE | SCU_CTRL_STANDBY_ENABLE;
- 	writel_relaxed(scu_ctrl, scu_base + SCU_CTRL);
- 
- 	/*
+Thanks,
+
+Olav
+
 -- 
-2.0.1.1.gfbfc394
+The Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+hosted by The Linux Foundation
