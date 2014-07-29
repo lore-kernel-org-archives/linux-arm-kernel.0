@@ -1,68 +1,42 @@
-From: boris.brezillon@free-electrons.com (Boris BREZILLON)
-Date: Tue, 29 Jul 2014 10:00:17 +0200
-Subject: [PATCH] ARM: at91: spi: request all csgpio in spi probe
-In-Reply-To: <20140728223859.GA3214@piout.net>
-References: <b033d16ec31d26a895726ee72ec89b43943dfbae.1406547656.git.jiri.prchal@aksignal.cz>
- <20140728122103.GR9532@piout.net> <53D64ADA.1000102@aksignal.cz>
- <20140728223859.GA3214@piout.net>
-Message-ID: <20140729100017.31f0b1be@bbrezillon>
+From: iamjoonsoo.kim@lge.com (Joonsoo Kim)
+Date: Tue, 29 Jul 2014 17:06:59 +0900
+Subject: [linux-3.10.17] Could not allocate memory from free CMA areas
+In-Reply-To: <dsqnq2i1mer1r7kpvuflt0k9.1406214301636@email.android.com>
+References: <dsqnq2i1mer1r7kpvuflt0k9.1406214301636@email.android.com>
+Message-ID: <010401cfab04$1536b740$3fa425c0$@lge.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Alexandre,
 
-On Tue, 29 Jul 2014 00:38:59 +0200
-Alexandre Belloni <alexandre.belloni@free-electrons.com> wrote:
 
-> 
-> > >>+		if (ret < 0) {
-> > >>+			dev_err(&pdev->dev,
-> > >>+				"failed to configure csgpio#%u (%d)\n",
-> > >>+				i, ret);
-> > >>+			goto out_free;
-> > >>+		}
-> > >>+	}
-> > >>+
-> 
-> Mark: maybe it would make sense to do devm_gpio_request_one() in
-> of_spi_register_master(), after of_get_named_gpio.
+From: pintu_agarwal [mailto:pintu_agarwal at yahoo.com] 
+Sent: Friday, July 25, 2014 12:15 AM
+To: PINTU KUMAR; linux-mm at kvack.org; linux-arm-kernel at lists.infradead.org; linaro-mm-sig at lists.linaro.org; iamjoonsoo.kim at lge.com; ritesh.list at gmail.com
+Cc: pintu.k at outlook.com; pintu.k at samsung.com; vishu_1385 at yahoo.com; m.szyprowski at samsung.com; mina86 at mina86.com; ngupta at vflare.org; iqbalblr at gmail.com
+Subject: RE: [linux-3.10.17] Could not allocate memory from free CMA areas
 
-Might be the cleanest way to solve this issue, but you'll have to modify
-all the drivers that request cs_gpio in their setup method/callback.
+Dear joonsoo kim,
 
-> 
-> While this solves the particular issue Ji?? is seeing, this will not
-> solve the case where PA14 (CS0) is not used by the spi driver at all. It
-> will remained muxed as CS0 and toggle when the spi master needs to
-> access CS0 until another driver muxes it to something else. I still
-> believe we should explicitly ask pinctrl to mux them as gpios.
-> 
+> I have your patches for: Aggressively allocate memory from cma ....
+> We are facing almost similar problem here.
+> If any of your patches still working for you please let us know here.
+> I would like to try those approach.
 
-Do we really care about this case ?
-After all, if a given pin needs a specific muxing during kernel boot
-(i.e. a pin connected to a gpio-led that needs to stay in its previous
-state or a pin connected to the reset line of a device that needs to
-stay up and running during kernel boot) the bootloader/bootstrap should
-have muxed this pin appropriately before booting the kernel.
 
-What do you mean by "we should explicitly ask pinctrl to mux them as
-gpios" ?
-Do you mean configuring all the pins as GPIOs when the pin controller is
-probed, or just adding a new pinctrl state configuring the pin as an
-output GPIO and reference it in the pinctrl-0 property of the spi
-controller.
+Hello,
 
-If the former, you'll break devices that needs their pins to stay in
-the state they were during the bootloader/boostrap phase.
-The latter won't work if the pin you request as GPIO is later requested
-by another device (which, if I'm correct, is exactly the case you're
-trying to solve).
+I stopped to implement it, because there are other bugs on CMA related codes.
+Although aggressively allocate... doesn't have bugs itself, it enlarges
+existing freepage counting bugs significantly so I'm first trying to fix
+those bugs. See the below link.
 
-Best Regards,
+https://lkml.org/lkml/2014/7/4/79
 
-Boris
+I will restart to implement aggressively... after fixing these bugs.
 
--- 
-Boris Brezillon, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
+If you have interest on next version of aggressively allocate..., see the
+following link.
+
+https://github.com/JoonsooKim/linux/tree/cma-fix-up-v3.0-next-20140625
+
+Thanks.
