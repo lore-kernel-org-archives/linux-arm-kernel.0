@@ -1,76 +1,93 @@
-From: luto@amacapital.net (Andy Lutomirski)
-Date: Tue, 29 Jul 2014 10:55:46 -0700
-Subject: [PATCH v3 6/8] x86: Split syscall_trace_enter into two phases
-In-Reply-To: <20140729173136.GA2808@redhat.com>
+From: oleg@redhat.com (Oleg Nesterov)
+Date: Tue, 29 Jul 2014 19:54:14 +0200
+Subject: TIF_NOHZ can escape nonhz mask? (Was: [PATCH v3 6/8] x86:
+ Split syscall_trace_enter into two phases)
+In-Reply-To: <20140728192209.GA26017@localhost.localdomain>
 References: <cover.1405992946.git.luto@amacapital.net>
  <3f649f5658a163645e3ce15156176c325283762e.1405992946.git.luto@amacapital.net>
- <20140728173723.GA20993@redhat.com>
- <CALCETrWUFo_zXcAZja-vdL4_MgJDd=1ed5Vt54eyUuim930xAw@mail.gmail.com>
- <20140729165416.GA967@redhat.com>
- <CALCETrWBU-=zqLTCP7B1feZ9J-e4u-Boic+e1EEn1rL-ijeEKg@mail.gmail.com>
- <20140729173136.GA2808@redhat.com>
-Message-ID: <CALCETrVP-P+EJ6YJ=CZL_gyA1r8O9eogUNTik7_31_SA+Pj3pg@mail.gmail.com>
+ <20140728173723.GA20993@redhat.com> <20140728185803.GA24663@redhat.com>
+ <20140728192209.GA26017@localhost.localdomain>
+Message-ID: <20140729175414.GA3289@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jul 29, 2014 at 10:31 AM, Oleg Nesterov <oleg@redhat.com> wrote:
-> On 07/29, Andy Lutomirski wrote:
->>
->> On Tue, Jul 29, 2014 at 9:54 AM, Oleg Nesterov <oleg@redhat.com> wrote:
->> >
->> > Yes, just to trigger the slow path, I guess.
->> >
->> >> I'll update the code to call user_exit iff TIF_NOHZ is
->> >> set.
->> >
->> > Or perhaps it would be better to not add another user of this (strange) flag
->> > and just call user_exit() unconditionally(). But, yes, you need to use
->> > from "work = flags & (_TIF_WORK_SYSCALL_ENTRY & ~TIF_NOHZ)" then.\
->>
->> user_exit looks slow enough to me that a branch to try to avoid it may
->> be worthwhile.  I bet that explicitly checking the flag is
->> actually both faster and clearer.
+On 07/28, Frederic Weisbecker wrote:
 >
-> I don't think so (unless I am confused again), note that user_exit() uses
-> jump label. But this doesn't matter. I meant that we should avoid TIF_NOHZ
-> if possible because I think it should die somehow (currently I do not know
-> how ;). And because it is ugly to check the same condition twice:
+> On Mon, Jul 28, 2014 at 08:58:03PM +0200, Oleg Nesterov wrote:
+> >
+> > Frederic, don't we need the patch below? In fact clear_() can be moved
+> > under "if ()" too. and probably copy_process() should clear this flag...
+> >
+> > Or. __context_tracking_task_switch() can simply do
+> >
+> > 	 if (context_tracking_cpu_is_enabled())
+> > 	 	set_tsk_thread_flag(next, TIF_NOHZ);
+> > 	 else
+> > 	 	clear_tsk_thread_flag(next, TIF_NOHZ);
+> >
+> > and then we can forget about copy_process(). Or I am totally confused?
+> >
+> >
+> > I am also wondering if we can extend user_return_notifier to handle
+> > enter/exit and kill TIF_NOHZ.
+> >
+> > Oleg.
+> >
+> > --- x/kernel/context_tracking.c
+> > +++ x/kernel/context_tracking.c
+> > @@ -202,7 +202,8 @@ void __context_tracking_task_switch(stru
+> >  				    struct task_struct *next)
+> >  {
+> >  	clear_tsk_thread_flag(prev, TIF_NOHZ);
+> > -	set_tsk_thread_flag(next, TIF_NOHZ);
+> > +	if (context_tracking_cpu_is_enabled())
+> > +		set_tsk_thread_flag(next, TIF_NOHZ);
+> >  }
+> >
+> >  #ifdef CONFIG_CONTEXT_TRACKING_FORCE
 >
->         if (work & TIF_NOHZ) {
->                 // user_exit()
->                 if (context_tracking_is_enabled())
->                         context_tracking_user_exit();
->         }
->
-> TIF_NOHZ is set if and only if context_tracking_is_enabled() is true.
-> So I think that
->
->         work = current_thread_info()->flags & (_TIF_WORK_SYSCALL_ENTRY & ~TIF_NOHZ);
->
->         user_exit();
->
-> looks a bit better. But I won't argue.
+> Unfortunately, as long as tasks can migrate in and out a context tracked CPU, we
+> need to track all CPUs.
 
-I don't get it.  context_tracking_is_enabled is global, and TIF_NOHZ
-is per-task.  Isn't this stuff determined per-task or per-cpu or
-something?
+Thanks Frederic for your explanations. Yes, I was confused. But cough, now I am
+even more confused.
 
-IOW, if one CPU is running something that's very heavily
-userspace-oriented and another CPU is doing something syscall- or
-sleep-heavy, then shouldn't only the first CPU end up paying the price
-of context tracking?
+I didn't even try to read this code, perhaps I'll try later, but let me ask
+another question while you are here ;)
 
+The comment above __context_tracking_task_switch() says:
+
+	 * The context tracking uses the syscall slow path to implement its user-kernel
+	 * boundaries probes on syscalls. This way it doesn't impact the syscall fast
+	 * path on CPUs that don't do context tracking.
+	        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+How? Every running task should have TIF_NOHZ set if context_tracking_is_enabled() ?
+
+	 * But we need to clear the flag on the previous task because it may later
+	 * migrate to some CPU that doesn't do the context tracking. As such the TIF
+	 * flag may not be desired there.
+
+For what? How this can help? This flag will be set again when we switch to this
+task again?
+
+Looks like, we can kill context_tracking_task_switch() and simply change the
+"__init" callers of context_tracking_cpu_set() to do set_thread_flag(TIF_NOHZ) ?
+Then this flag will be propagated by copy_process().
+
+Or I am totally confused? (quite possible).
+
+> So here is a scenario where this is a problem: a task runs on CPU 0, passes the context
+> tracking call before returning from a syscall to userspace, and gets an interrupt. The
+> interrupt preempts the task and it moves to CPU 1. So it returns from preempt_schedule_irq()
+> after which it is going to resume to userspace.
 >
->> That's what I did for v4.
->
-> I am going to read it today. Not that I think I can help or find something
-> wrong.
->
-> Oleg.
->
+> In this scenario, if context tracking is only enabled on CPU 1, we have no way to know that
+> the task is resuming to userspace, because we passed through the context tracking probe
+> already and it was ignored on CPU 0.
 
+Thanks. But I still can't understand... So if we only track CPU 1, then in this
+case context_tracking.state == IN_USER on CPU 0, but it can be IN_USER or IN_KERNEL
+on CPU 1.
 
-
--- 
-Andy Lutomirski
-AMA Capital Management, LLC
+Oleg.
