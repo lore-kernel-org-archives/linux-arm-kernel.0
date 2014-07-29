@@ -1,37 +1,54 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Tue, 29 Jul 2014 12:32:36 +0100
-Subject: [PATCH] ARM: at91: spi: request all csgpio in spi probe
-In-Reply-To: <20140728223859.GA3214@piout.net>
-References: <b033d16ec31d26a895726ee72ec89b43943dfbae.1406547656.git.jiri.prchal@aksignal.cz>
- <20140728122103.GR9532@piout.net> <53D64ADA.1000102@aksignal.cz>
- <20140728223859.GA3214@piout.net>
-Message-ID: <20140729113236.GM17528@sirena.org.uk>
+From: punit.agrawal@arm.com (Punit Agrawal)
+Date: Tue, 29 Jul 2014 12:34:17 +0100
+Subject: [PATCH] drivers: CCI: Correct use of ! and &
+In-Reply-To: <20140723150518.GD27677@arm.com> (Will Deacon's message of "Wed,
+ 23 Jul 2014 16:05:18 +0100")
+References: <20140707140538.GA4204@himangi-Dell> <9hhwqb42k63.fsf@arm.com>
+ <20140723150518.GD27677@arm.com>
+Message-ID: <9hhvbqg1jra.fsf@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jul 29, 2014 at 12:38:59AM +0200, Alexandre Belloni wrote:
+Hi Arnd,
 
-> Mark: maybe it would make sense to do devm_gpio_request_one() in
-> of_spi_register_master(), after of_get_named_gpio.
+Will Deacon <will.deacon@arm.com> writes:
 
-You need to transition all the drivers doing things manually but yes.
-As I keep saying all the GPIO handling needs to be completely
-refactored.
+> On Wed, Jul 23, 2014 at 04:01:56PM +0100, Punit Agrawal wrote:
+>> > diff --git a/drivers/bus/arm-cci.c b/drivers/bus/arm-cci.c
+>> > index 5a86da9..7af78df 100644
+>> > --- a/drivers/bus/arm-cci.c
+>> > +++ b/drivers/bus/arm-cci.c
+>> > @@ -397,7 +397,8 @@ static irqreturn_t pmu_handle_irq(int irq_num, void *dev)
+>> >  		hw_counter = &event->hw;
+>> >  
+>> >  		/* Did this counter overflow? */
+>> > -		if (!pmu_read_register(idx, CCI_PMU_OVRFLW) & CCI_PMU_OVRFLW_FLAG)
+>> > +		if (!(pmu_read_register(idx, CCI_PMU_OVRFLW) &
+>> > +		      CCI_PMU_OVRFLW_FLAG))
+>> >  			continue;
+>> 
+>> 
+>> Going back to the manual, this fix looks correct.
+>> 
+>> Acked-by: Punit Agrawal <punit.agrawal@arm.com>
+>> 
+>> Will, would this go via your tree?
+>
+> Given that you're happy with it, I don't mind which tree it goes in.
+> Probably deserves a CC stable on it too.
 
-> While this solves the particular issue Ji?? is seeing, this will not
-> solve the case where PA14 (CS0) is not used by the spi driver at all. It
-> will remained muxed as CS0 and toggle when the spi master needs to
-> access CS0 until another driver muxes it to something else. I still
-> believe we should explicitly ask pinctrl to mux them as gpios.
+The CCI PMU patches went via arm-soc. Are you happy to pick this fix with
+the Ack and a Cc to stable.
 
-I'm just guessing as to what the issue that he's seeing is but isn't
-this just saying that the board pinmuxing is wrong?  If the board
-doesn't want the pin to be used by the SPI controller it shouldn't be 
-configuring it that way.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140729/77c3082f/attachment.sig>
+Cheers,
+Punit
+
+>
+> If you get stuck, put it in rmk's patch system.
+>
+> Will
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-kernel" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> Please read the FAQ at  http://www.tux.org/lkml/
