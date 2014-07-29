@@ -1,184 +1,127 @@
-From: mturquette@linaro.org (Mike Turquette)
-Date: Mon, 28 Jul 2014 23:05:29 -0700
-Subject: [RFC/PATCH 02/12] clk: Add safe switch hook
-In-Reply-To: <1403654783-7176-3-git-send-email-sboyd@codeaurora.org>
-References: <1403654783-7176-1-git-send-email-sboyd@codeaurora.org>
- <1403654783-7176-3-git-send-email-sboyd@codeaurora.org>
-Message-ID: <20140729060529.4906.66639@quantum>
+From: LW@KARO-electronics.de (Lothar =?UTF-8?B?V2HDn21hbm4=?=)
+Date: Tue, 29 Jul 2014 08:31:45 +0200
+Subject: [PATCHv4 5/5] mtd: gpmi: prevent creating a new BBT when
+ blockmark swapping is disabled
+In-Reply-To: <20140728052906.GA3095@norris-Latitude-E6410>
+References: <1402579245-13377-1-git-send-email-LW@KARO-electronics.de>
+ <1402579245-13377-2-git-send-email-LW@KARO-electronics.de>
+ <1402579245-13377-3-git-send-email-LW@KARO-electronics.de>
+ <1402579245-13377-4-git-send-email-LW@KARO-electronics.de>
+ <1402579245-13377-5-git-send-email-LW@KARO-electronics.de>
+ <1402579245-13377-6-git-send-email-LW@KARO-electronics.de>
+ <20140728052906.GA3095@norris-Latitude-E6410>
+Message-ID: <20140729083145.647b77fc@ipc1.ka-ro>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Quoting Stephen Boyd (2014-06-24 17:06:13)
-> Sometimes clocks can't accept their parent source turning off
-> while the source is reprogrammed to a different rate. Most
-> notably some CPU clocks require a way to switch away from the
-> current PLL they're running on, reprogram that PLL to a new rate,
-> and then switch back to the PLL with the new rate once they're
-> done.  Add a hook that drivers can implement allowing them to
-> return a 'safe parent' that they can switch their parent to while
-> the upstream source is reprogrammed.
+Hi,
 
-Adding Thomas to Cc.
-
-Thomas,
-
-Does this generic hook help you out at all with your CPU frequency
-transitions? I remember in my discussions with Chander K. that you have
-something like safe dividers, safe parents and safe voltages to take
-into account (but I might be misremembering some of that).
-
-Stephen,
-
-For reference, recent patches from Samsung to introduce cpu clocks[1]
-which I am not wild about, but the generic infrastructure isn't really
-there yet in the framework core to manage complex, pre-defined,
-multi-clock transitions gracefully.
-
-Regards,
-Mike
-
-[1] http://www.spinics.net/lists/arm-kernel/msg351137.html
-
+Brian Norris wrote:
+> Hi Lothar,
 > 
-> Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
-> ---
->  drivers/clk/clk.c            | 53 ++++++++++++++++++++++++++++++++++++++------
->  include/linux/clk-private.h  |  2 ++
->  include/linux/clk-provider.h |  1 +
->  3 files changed, 49 insertions(+), 7 deletions(-)
+> On Thu, Jun 12, 2014 at 03:20:45PM +0200, Lothar Wa?mann wrote:
+> > Without blockmark swapping, there is no use in creating a BBT from
+> > scratch, so use a BBT descriptor with NAND_BBT_CREATE unset in this
+> > case.
 > 
-> diff --git a/drivers/clk/clk.c b/drivers/clk/clk.c
-> index 8b73edef151d..5e32fa55032b 100644
-> --- a/drivers/clk/clk.c
-> +++ b/drivers/clk/clk.c
-> @@ -1367,6 +1367,7 @@ static void clk_calc_subtree(struct clk *clk, unsigned long new_rate,
->                              struct clk *new_parent, u8 p_index)
->  {
->         struct clk *child;
-> +       struct clk *parent;
->  
->         clk->new_rate = new_rate;
->         clk->new_parent = new_parent;
-> @@ -1376,6 +1377,17 @@ static void clk_calc_subtree(struct clk *clk, unsigned long new_rate,
->         if (new_parent && new_parent != clk->parent)
->                 new_parent->new_child = clk;
->  
-> +       if (clk->ops->get_safe_parent) {
-> +               parent = clk->ops->get_safe_parent(clk->hw);
-> +               if (parent) {
-> +                       p_index = clk_fetch_parent_index(clk, parent);
-> +                       clk->safe_parent_index = p_index;
-> +                       clk->safe_parent = parent;
-> +               }
-> +       } else {
-> +               clk->safe_parent = NULL;
-> +       }
-> +
->         hlist_for_each_entry(child, &clk->children, child_node) {
->                 child->new_rate = clk_recalc(child, new_rate);
->                 clk_calc_subtree(child, child->new_rate, NULL, 0);
-> @@ -1458,14 +1470,42 @@ out:
->  static struct clk *clk_propagate_rate_change(struct clk *clk, unsigned long event)
->  {
->         struct clk *child, *tmp_clk, *fail_clk = NULL;
-> +       struct clk *old_parent;
->         int ret = NOTIFY_DONE;
->  
-> -       if (clk->rate == clk->new_rate)
-> +       if (clk->rate == clk->new_rate && event != POST_RATE_CHANGE)
->                 return NULL;
->  
-> +       switch (event) {
-> +       case PRE_RATE_CHANGE:
-> +               if (clk->safe_parent)
-> +                       clk->ops->set_parent(clk->hw, clk->safe_parent_index);
-> +               break;
-> +       case POST_RATE_CHANGE:
-> +               if (clk->safe_parent) {
-> +                       old_parent = __clk_set_parent_before(clk,
-> +                                                            clk->new_parent);
-> +                       if (clk->ops->set_rate_and_parent) {
-> +                               clk->ops->set_rate_and_parent(clk->hw,
-> +                                               clk->new_rate,
-> +                                               clk->new_parent ?
-> +                                               clk->new_parent->rate : 0,
-> +                                               clk->new_parent_index);
-> +                       } else if (clk->ops->set_parent) {
-> +                               clk->ops->set_parent(clk->hw,
-> +                                               clk->new_parent_index);
-> +                       }
-> +                       __clk_set_parent_after(clk, clk->new_parent,
-> +                                              old_parent);
-> +               }
-> +               break;
-> +       }
-> +
->         if (clk->notifier_count) {
-> -               ret = __clk_notify(clk, event, clk->rate, clk->new_rate);
-> -               if (ret & NOTIFY_STOP_MASK)
-> +               if (event != POST_RATE_CHANGE)
-> +                       ret = __clk_notify(clk, event, clk->rate,
-> +                                          clk->new_rate);
-> +               if (ret & NOTIFY_STOP_MASK && event != POST_RATE_CHANGE)
->                         fail_clk = clk;
->         }
->  
-> @@ -1507,7 +1547,8 @@ static void clk_change_rate(struct clk *clk)
->         else if (clk->parent)
->                 best_parent_rate = clk->parent->rate;
->  
-> -       if (clk->new_parent && clk->new_parent != clk->parent) {
-> +       if (clk->new_parent && clk->new_parent != clk->parent &&
-> +                       !clk->safe_parent) {
->                 old_parent = __clk_set_parent_before(clk, clk->new_parent);
->  
->                 if (clk->ops->set_rate_and_parent) {
-> @@ -1527,9 +1568,6 @@ static void clk_change_rate(struct clk *clk)
->  
->         clk->rate = clk_recalc(clk, best_parent_rate);
->  
-> -       if (clk->notifier_count && old_rate != clk->rate)
-> -               __clk_notify(clk, POST_RATE_CHANGE, old_rate, clk->rate);
-> -
->         hlist_for_each_entry(child, &clk->children, child_node) {
->                 /* Skip children who will be reparented to another clock */
->                 if (child->new_parent && child->new_parent != clk)
-> @@ -1603,6 +1641,7 @@ int clk_set_rate(struct clk *clk, unsigned long rate)
->         /* change the rates */
->         clk_change_rate(top);
->  
-> +       clk_propagate_rate_change(top, POST_RATE_CHANGE);
->  out:
->         clk_prepare_unlock();
->  
-> diff --git a/include/linux/clk-private.h b/include/linux/clk-private.h
-> index efbf70b9fd84..f48684af4d8f 100644
-> --- a/include/linux/clk-private.h
-> +++ b/include/linux/clk-private.h
-> @@ -38,8 +38,10 @@ struct clk {
->         struct clk              **parents;
->         u8                      num_parents;
->         u8                      new_parent_index;
-> +       u8                      safe_parent_index;
->         unsigned long           rate;
->         unsigned long           new_rate;
-> +       struct clk              *safe_parent;
->         struct clk              *new_parent;
->         struct clk              *new_child;
->         unsigned long           flags;
-> diff --git a/include/linux/clk-provider.h b/include/linux/clk-provider.h
-> index 0c287dbbb144..7485911df4b6 100644
-> --- a/include/linux/clk-provider.h
-> +++ b/include/linux/clk-provider.h
-> @@ -170,6 +170,7 @@ struct clk_ops {
->                                         struct clk **best_parent_clk);
->         int             (*set_parent)(struct clk_hw *hw, u8 index);
->         u8              (*get_parent)(struct clk_hw *hw);
-> +       struct clk      *(*get_safe_parent)(struct clk_hw *hw);
->         int             (*set_rate)(struct clk_hw *hw, unsigned long rate,
->                                     unsigned long parent_rate);
->         int             (*set_rate_and_parent)(struct clk_hw *hw,
-> -- 
-> The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
-> hosted by The Linux Foundation
+> I'm curious: what is your plan if there is no BBT available on your
+> device, or if it ever gets corrupted? IIUC, nand_bbt will just assume
+> you have no bad blocks, and it will never write a bad block table to
+> flash. This also means no subsequent discoverable bad blocks can be
+> recorded across power cycles, I believe.
 > 
+That won't happen (unless it's not possible to create a BBT because all
+the possible blocks for the BBT are bad), because the bootloader will
+have created one before Linux is started.
+
+> Maybe you don't want to specify your own nand_bbt_descr's at all, but
+> you just need to set:
+> 
+> 	chip->bbt_options |= NAND_BBT_CREATE_EMPTY | NAND_BBT_NO_OOB;
+> 
+> (Note: there's a little bit of fuzziness about NAND_BBT_* flags, where
+> some are targeted for the nand_chip::bbt_options field, and others
+> belong in struct nand_bbt_descr::options.)
+> 
+> But if for some reason we need to keep this patch, a comment below:
+> 
+> > Signed-off-by: Lothar Wa?mann <LW@KARO-electronics.de>
+> > ---
+> >  drivers/mtd/nand/gpmi-nand/gpmi-nand.c |   28 +++++++++++++++++++++++++++-
+> >  1 file changed, 27 insertions(+), 1 deletion(-)
+> > 
+> > diff --git a/drivers/mtd/nand/gpmi-nand/gpmi-nand.c b/drivers/mtd/nand/gpmi-nand/gpmi-nand.c
+> > index 37537b4..fc710d7 100644
+> > --- a/drivers/mtd/nand/gpmi-nand/gpmi-nand.c
+> > +++ b/drivers/mtd/nand/gpmi-nand/gpmi-nand.c
+> > @@ -43,6 +43,29 @@ static struct nand_bbt_descr gpmi_bbt_descr = {
+> >  	.pattern	= scan_ff_pattern
+> >  };
+> >  
+> > +static uint8_t bbt_pattern[] = {'B', 'b', 't', '0' };
+> > +static uint8_t mirror_pattern[] = {'1', 't', 'b', 'B' };
+> > +
+> > +static struct nand_bbt_descr bbt_main_no_oob_descr = {
+> > +	.options = NAND_BBT_LASTBLOCK | NAND_BBT_WRITE |
+> > +	NAND_BBT_2BIT | NAND_BBT_VERSION | NAND_BBT_PERCHIP |
+> > +	NAND_BBT_NO_OOB,
+> 
+> Please indent the above two lines a bit, preferably matching the
+> indentation of NAND_BBT_LASTBLOCK. It should be clear that this is a
+> continuation of the '.options' initialization.
+> 
+OK.
+
+> > +	.len = 4,
+> > +	.veroffs = 4,
+> > +	.maxblocks = NAND_BBT_SCAN_MAXBLOCKS,
+> > +	.pattern = bbt_pattern,
+> > +};
+> > +
+> > +static struct nand_bbt_descr bbt_mirror_no_oob_descr = {
+> > +	.options = NAND_BBT_LASTBLOCK | NAND_BBT_WRITE |
+> > +	NAND_BBT_2BIT | NAND_BBT_VERSION | NAND_BBT_PERCHIP |
+> > +	NAND_BBT_NO_OOB,
+> 
+> Same here.
+> 
+> > +	.len = 4,
+> > +	.veroffs = 4,
+> > +	.maxblocks = NAND_BBT_SCAN_MAXBLOCKS,
+> > +	.pattern = mirror_pattern,
+> > +};
+> > +
+> >  /*
+> >   * We may change the layout if we can get the ECC info from the datasheet,
+> >   * else we will use all the (page + OOB).
+> > @@ -1728,8 +1751,11 @@ static int gpmi_nand_init(struct gpmi_nand_data *this)
+> >  			chip->bbt_options |= NAND_BBT_NO_OOB_BBM;
+> >  
+> >  		if (of_property_read_bool(this->dev->of_node,
+> > -						"fsl,no-blockmark-swap"))
+> > +						"fsl,no-blockmark-swap")) {
+> >  			this->swap_block_mark = false;
+> > +			chip->bbt_td = &bbt_main_no_oob_descr;
+> > +			chip->bbt_md = &bbt_mirror_no_oob_descr;
+> 
+> My initial recommendation for this patch and the previous patch means
+> that you could just drop both patches and replace them with the
+> following:
+> 
+> 			/* Comment here to explain why... */
+> 			chip->bbt_options |= NAND_BBT_CREATE_EMPTY |
+> 					     NAND_BBT_NO_OOB |
+> 					     NAND_BBT_NO_OOB_BBM;
+OK.
+
+Lothar Wa?mann
+-- 
+___________________________________________________________
+
+Ka-Ro electronics GmbH | Pascalstra?e 22 | D - 52076 Aachen
+Phone: +49 2408 1402-0 | Fax: +49 2408 1402-10
+Gesch?ftsf?hrer: Matthias Kaussen
+Handelsregistereintrag: Amtsgericht Aachen, HRB 4996
+
+www.karo-electronics.de | info at karo-electronics.de
+___________________________________________________________
