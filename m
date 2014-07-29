@@ -1,49 +1,86 @@
-From: balbi@ti.com (Felipe Balbi)
-Date: Tue, 29 Jul 2014 10:40:57 -0500
-Subject: [PATCH 29/35] arm: omap: intc: switch over to linear irq domain
-In-Reply-To: <20140729152052.GV29045@atomide.com>
-References: <1406582183-696-1-git-send-email-balbi@ti.com>
- <1406582183-696-30-git-send-email-balbi@ti.com>
- <20140729121425.GR29045@atomide.com>
- <20140729141522.GB17808@saruman.home>
- <20140729152052.GV29045@atomide.com>
-Message-ID: <20140729154057.GE17808@saruman.home>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Tue, 29 Jul 2014 09:49:10 -0600
+Subject: [PATCH 5/8] of: Add Tegra124 EMC bindings
+In-Reply-To: <53D75B90.7050501@nvidia.com>
+References: <1405088313-20048-1-git-send-email-mperttunen@nvidia.com>	<1405088313-20048-6-git-send-email-mperttunen@nvidia.com>	<CAL1qeaGHfjQhLHvgzt85hmbuY4FOG5-k=f80=CNvzPDEgi9_6w@mail.gmail.com>	<53CD860B.7030800@wwwdotorg.org>	<CAL1qeaHtGQxCO3cGdeCRUYuk6mxei6z1B63-iZdBECEbFqGhHw@mail.gmail.com>	<53CE9514.1050903@wwwdotorg.org>
+ <CAL1qeaEkL+mxb0S4JhQbXBjyNyKJndffTSjMaAFQD6ooDJPd+Q@mail.gmail.com>
+ <53CEA093.6060106@wwwdotorg.org> <53D75B90.7050501@nvidia.com>
+Message-ID: <53D7C276.2080204@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jul 29, 2014 at 08:20:52AM -0700, Tony Lindgren wrote:
-> * Felipe Balbi <balbi@ti.com> [140729 07:18]:
-> > Hi,
-> > 
-> > On Tue, Jul 29, 2014 at 05:14:25AM -0700, Tony Lindgren wrote:
-> > > * Felipe Balbi <balbi@ti.com> [140728 14:19]:
-> > > > now that we don't need to support legacy board-files,
-> > > > we can completely switch over to a linear irq domain
-> > > > and make use of irq_alloc_domain_generic_chips() to
-> > > > allocate all generic irq chips for us.
-> > > 
-> > > This patch seems to somehow break off-idle for omap3 
-> > > where it no longer wakes up.
-> > 
-> > Sure your bisection is correct ? This patch just switches from legacy
-> > irq domain to linear irq domain.
-> 
-> Yes, I tried it a few times. Just enabling
-> retention idle hangs too with this patch.
-> 
-> Maybe it's omap3_prcm_irq_setup that relies on
-> 11 + OMAP_INTC_START? There may be other such issues
+On 07/29/2014 02:30 AM, Mikko Perttunen wrote:
+> Looks like the TRM doesn't document this either. I'll add an option
+> ("nvidia,short-ram-code" ?) for the next version.
 
-lol.
+Using the 2-bit RAM code field as the RAM code is normal operation, so I 
+wouldn't call this "short".
 
-OMAP4 has the same nonsense.
+Using the 2-bit boot device code field as extra RAM code bits is 
+non-standard.
 
--- 
-balbi
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140729/e8707058/attachment.sig>
+I would suggest nvidia,use-4-bit-ram-code or 
+nvidia,use-boot-device-code-as-ram-code-msbs(!) as the property.
+
+I see that the TRM implies the whole 4-bit field is RAM code, rather 
+than there being 2 separate 2-bit fields for RAM code and boot device 
+code. Can you please file a bug against the TRM to document this 
+correctly? (The details of which bits are which are visible on the 
+Jetson TK1 schematics for example).
+
+> On 22/07/14 20:34, Stephen Warren wrote:
+>> On 07/22/2014 11:22 AM, Andrew Bresticker wrote:
+>>> On Tue, Jul 22, 2014 at 9:45 AM, Stephen Warren
+>>> <swarren@wwwdotorg.org> wrote:
+>>>>
+>>>> Does the bootloader adjust the DT that's passed to the kernel so that
+>>>> only the relevant single set of EMC timings is contained in the DT?
+>>>
+>>> No, the DT contains all possible EMC timings for that board.
+>>>
+>>>> On a system where the boot ROM initializes RAM, and where the HW design
+>>>> might have multiple SDRAM configuration, here's what usually happens:
+>>>>
+>>>> a) The BCT contains N sets of SDRAM configurations.
+>>>>
+>>>> b) The boot ROM reads the SDRAM strapping bits, and uses them to pick
+>>>> the correct SDRAM configuration from the N sets in the BCT.
+>>>>
+>>>> c) The kernel DT has N sets of SDRAM configurations.
+>>>>
+>>>> d) The kernel reads the SDRAM strapping bits, and uses them to pick the
+>>>> correct SDRAM configuration from the N sets in the DT.
+>>>>
+>>>> On the ChromeOS boards (so (a) and (b) above are irrelevant) where N is
+>>>> too large to fit into APBDEV_PMC_STRAPPING_OPT_A_0[7:4], (c) and (d)
+>>>> won't work. I assume the kernel DT therefore must be adjusted to only
+>>>> contain the single SDRAM configuration that is relevant for the
+>>>> current HW?
+>>>>
+>>>> (isn't STRAPPING_OPT_A split into 2 2-bit fields; 2 bits for SDRAM
+>>>> index
+>>>> and 2 bits for boot flash index, so max N is quite small?)
+>>>
+>>> Right, there are normally only 2 SDRAM strapping bits available.
+>>> ChromeOS gets around this by having 4 identical boot device entries in
+>>> the BCT, so all possible values of STRAPPING_OPT_A[7:6] map to the
+>>> same boot device.  This allows us to use all 4 strapping bits in
+>>> coreboot to pick the SDRAM configuration.
+>>
+>> OK, that explains how it works.
+>>
+>> But that means that when the kernel reads the strapping options, it will
+>> have to know if it uses just 2 bits (standard) or all 4 bits
+>> (non-standard) to index into the DT's array of SDRAM configurations.
+>> We'll need a DT property to represent that.
+>> --
+>> To unsubscribe from this list: send the line "unsubscribe linux-tegra" in
+>> the body of a message to majordomo at vger.kernel.org
+>> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+>>
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-kernel" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> Please read the FAQ at  http://www.tux.org/lkml/
+>
