@@ -1,44 +1,75 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Tue, 29 Jul 2014 08:28:38 -0700
-Subject: [PATCH 30/35] irqchip: add irq-omap-intc.h header
-In-Reply-To: <20140729151936.GC17808@saruman.home>
-References: <1406582183-696-1-git-send-email-balbi@ti.com>
- <1406582183-696-31-git-send-email-balbi@ti.com>
- <20140729120133.GQ29045@atomide.com>
- <20140729141045.GA17808@saruman.home>
- <20140729150655.GU29045@atomide.com>
- <20140729151936.GC17808@saruman.home>
-Message-ID: <20140729152838.GW29045@atomide.com>
+From: rob.herring@linaro.org (Rob Herring)
+Date: Tue, 29 Jul 2014 10:29:50 -0500
+Subject: use IORESOURCE_REG resource type for non-translatable addresses
+ in DT
+In-Reply-To: <53D7AA72.6010309@mm-sol.com>
+References: <53D788A7.4020303@mm-sol.com> <3794875.CZFbAag5Sv@wuerfel>
+ <53D7AA72.6010309@mm-sol.com>
+Message-ID: <CABGGisy6_TOkT7fHp049rwH_FhQxCRGQqGBCsODUFTTchhsLvg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Felipe Balbi <balbi@ti.com> [140729 08:22]:
-> On Tue, Jul 29, 2014 at 08:06:55AM -0700, Tony Lindgren wrote:
-> > * Felipe Balbi <balbi@ti.com> [140729 07:13]:
-> > > This is the third time I rebase the series after a long hiatus and it
-> > > always comes out to the same result -> "let's wait some more".
-> > 
-> > Nope, it's always been "this series causes PM regressions"
-> 
-> you just said that we haven't been in any position to really test this,
-> so can it be that the status has always been "this series causes PM
-> regressions". We couldn't test that before, right ?
+On Tue, Jul 29, 2014 at 9:06 AM, Stanimir Varbanov <svarbanov@mm-sol.com> wrote:
+> Arnd, thanks for the comments.
+>
+> On 07/29/2014 03:00 PM, Arnd Bergmann wrote:
+>> On Tuesday 29 July 2014 14:42:31 Stanimir Varbanov wrote:
+>>>         taddr = of_translate_address(dev, addrp);
+>>> -       if (taddr == OF_BAD_ADDR)
+>>> -               return -EINVAL;
+>>> +       /*
+>>> +        * if the address is non-translatable to cpu physical address
+>>> +        * fallback to a IORESOURCE_REG resource.
+>>> +        */
+>>> +       if (taddr == OF_BAD_ADDR) {
+>>> +               memset(r, 0, sizeof(*r));
+>>> +               taddr = of_read_number(addrp, 1);
+>>> +               if (taddr == OF_BAD_ADDR)
+>>> +                       return -EINVAL;
+>>> +               r->start = taddr;
+>>> +               r->end = taddr + size - 1;
+>>> +               r->flags = IORESOURCE_REG;
+>>> +               r->name = name ? name : dev->full_name;
+>>> +               return 0;
+>>> +       }
+>>> +
+>>
+>> I don't think that everything returning OF_BAD_ADDR makes sense
+>> to turn into IORESOURCE_REG. It could be an e.g. invalid DT
+>> representation, a node with #size-cells=<0>, or it could be
+>> something that gets translated one or more nodes up in the
+>> tree before it reaches a bus without a ranges property.
+>>
+>> Also, you should not rely on #address-cells being hardcoded
+>> to <1> above.
+>>
+>
+> This was just an example. Of course it has many issues and probaly it is
+> wrong:) The main goal was to understand does IORESOURCE_REG resource
+> type and parsing the *reg* properties for non-translatable addresses are
+> feasible. And also does it acceptable by community and OF platform
+> maintainers.
 
-It's been working for legacy booting for years with the mainline
-kernel, but not for device tree based booting until with v3.16-rc4.
-I believe I tested your earlier series with my pending DT patches
-though.
- 
-> > and few other minor comments. And we have not been in any
-> > position to really test that until with v3.16-rc4. And then
-> > you always run out of time and nobody else does anything :)
-> 
-> sure, I have other stuff to do as well.
+I guess the question I have is what is the advantage of making this a
+resource? You can't really pass it to other functions.
 
-Right :) I and others can provide some help here, but it's
-the mr. patch author that needs to follow up on this series
-too :p
+We're moving in the opposite direction for IRQs as now
+platform_get_irq translates the IRQ directly rather than using the
+resource (but the resource is still there just to avoid potentially
+breaking things for now).
 
-Regards,
+>> How about modifying of_get_address() rather than
+>> __of_address_to_resource() instead? You could introduce
+>> a new of_bus entry for each bus you expect to return
+>> an IORESOURCE_REG, or you could change of_bus_default_get_flags
+>> to return IORESOURCE_REG if the parent node has no ranges property
+>> and is not the root node.
+>
+> IMO the clearer solution is to introduce a new of_bus bus. In that case
+> one possible problem will be how to distinguish the non-translatable and
+> the other buses. Also the *device_type* property is deprecated for non
+> PCI devices.
 
-Tony
+You would have to look for the presence or absence of ranges property.
+
+Rob
