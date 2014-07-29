@@ -1,27 +1,38 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 29 Jul 2014 17:20:46 +0200
-Subject: [PATCH 1/3] arm64: spin-table: handle unmapped cpu-release-addrs
-In-Reply-To: <1406646945.753.5.camel@deneb.redhat.com>
-References: <1406630950-32432-1-git-send-email-ard.biesheuvel@linaro.org>
- <1406630950-32432-2-git-send-email-ard.biesheuvel@linaro.org>
- <1406646945.753.5.camel@deneb.redhat.com>
-Message-ID: <2385684.COvj9k7y2z@wuerfel>
+From: tony@atomide.com (Tony Lindgren)
+Date: Tue, 29 Jul 2014 08:20:52 -0700
+Subject: [PATCH 29/35] arm: omap: intc: switch over to linear irq domain
+In-Reply-To: <20140729141522.GB17808@saruman.home>
+References: <1406582183-696-1-git-send-email-balbi@ti.com>
+ <1406582183-696-30-git-send-email-balbi@ti.com>
+ <20140729121425.GR29045@atomide.com>
+ <20140729141522.GB17808@saruman.home>
+Message-ID: <20140729152052.GV29045@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 29 July 2014 11:15:45 Mark Salter wrote:
-> > -
-> > -     __flush_dcache_area(release_addr, sizeof(release_addr[0]));
-> > +     writeq_relaxed(__pa(secondary_holding_pen), release_addr);
-> > +     __flush_dcache_area(release_addr, sizeof(*release_addr));
+* Felipe Balbi <balbi@ti.com> [140729 07:18]:
+> Hi,
 > 
->        __flush_dcache_area((__force void *)release_addr, ... 
+> On Tue, Jul 29, 2014 at 05:14:25AM -0700, Tony Lindgren wrote:
+> > * Felipe Balbi <balbi@ti.com> [140728 14:19]:
+> > > now that we don't need to support legacy board-files,
+> > > we can completely switch over to a linear irq domain
+> > > and make use of irq_alloc_domain_generic_chips() to
+> > > allocate all generic irq chips for us.
+> > 
+> > This patch seems to somehow break off-idle for omap3 
+> > where it no longer wakes up.
 > 
-> to avoid sparse warning.
-> 
+> Sure your bisection is correct ? This patch just switches from legacy
+> irq domain to linear irq domain.
 
-I think it would be cleaner to drop the __iomem annotation and use vmap()
-rather than ioremap(). That requires having a 'struct page' though, which
-I'm not sure you have.
+Yes, I tried it a few times. Just enabling
+retention idle hangs too with this patch.
 
-	Arnd
+Maybe it's omap3_prcm_irq_setup that relies on
+11 + OMAP_INTC_START? There may be other such issues
+remaining too but most should be already fixed up.
+
+Regards,
+
+Tony
