@@ -1,48 +1,32 @@
-From: shawn.guo@freescale.com (Shawn Guo)
-Date: Tue, 29 Jul 2014 15:48:34 +0800
-Subject: [PATCH 2/3] ARM: dts: nitrogen6x: add hdmi
-In-Reply-To: <1406296528.4643.22.camel@weser.hi.pengutronix.de>
-References: <1406285393-23545-1-git-send-email-l.stach@pengutronix.de>
- <1406285393-23545-2-git-send-email-l.stach@pengutronix.de>
- <CAOMZO5BUDMfwDi944brOQoiNkWG_5yBn0XPTPYsLh8_cpyDc3w@mail.gmail.com>
- <1406296528.4643.22.camel@weser.hi.pengutronix.de>
-Message-ID: <20140729074833.GD24750@dragon>
+From: hanjun.guo@linaro.org (Hanjun Guo)
+Date: Tue, 29 Jul 2014 15:58:38 +0800
+Subject: [PATCH 19/19] Documentation: ACPI for ARM64
+In-Reply-To: <CAOesGMhKHGkVK3dOLXXx9GQBMxDmjBu1WDBgHmwdGe1UK3jfcg@mail.gmail.com>
+References: <1406206825-15590-1-git-send-email-hanjun.guo@linaro.org>	<1406206825-15590-20-git-send-email-hanjun.guo@linaro.org>
+ <CAOesGMhKHGkVK3dOLXXx9GQBMxDmjBu1WDBgHmwdGe1UK3jfcg@mail.gmail.com>
+Message-ID: <53D7542E.7060103@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jul 25, 2014 at 03:55:28PM +0200, Lucas Stach wrote:
-> Am Freitag, den 25.07.2014, 10:48 -0300 schrieb Fabio Estevam:
-> > Hi Lucas,
-> > 
-> > On Fri, Jul 25, 2014 at 7:49 AM, Lucas Stach <l.stach@pengutronix.de> wrote:
-> > > From: Michael Olbrich <m.olbrich@pengutronix.de>
-> > >
-> > > Signed-off-by: Michael Olbrich <m.olbrich@pengutronix.de>
-> > > Signed-off-by: Lucas Stach <l.stach@pengutronix.de>
-> > > ---
-> > >  arch/arm/boot/dts/imx6qdl-nitrogen6x.dtsi | 6 ++++++
-> > >  1 file changed, 6 insertions(+)
-> > >
-> > > diff --git a/arch/arm/boot/dts/imx6qdl-nitrogen6x.dtsi b/arch/arm/boot/dts/imx6qdl-nitrogen6x.dtsi
-> > > index 3362d2600d85..4e27cf9f3d2e 100644
-> > > --- a/arch/arm/boot/dts/imx6qdl-nitrogen6x.dtsi
-> > > +++ b/arch/arm/boot/dts/imx6qdl-nitrogen6x.dtsi
-> > > @@ -174,6 +174,12 @@
-> > >         status = "okay";
-> > >  };
-> > >
-> > > +&hdmi {
-> > > +       ddc-i2c-bus = <&i2c2>;
-> > > +       hpd-unreliable;
-> > 
-> > I don't see this property available in linux-next yet. Are we missing
-> > the patch that adds it?
-> > 
-> Right, we are missing a patch here. It already has been posted to the
-> list long time ago, but obviously fell through the cracks. Thanks for
-> spotting.
+On 2014-7-27 10:34, Olof Johansson wrote:
+> On Thu, Jul 24, 2014 at 6:00 AM, Hanjun Guo <hanjun.guo@linaro.org> wrote:
+>> From: Graeme Gregory <graeme.gregory@linaro.org>
+>>
+>> Add documentation for the guidelines of how to use ACPI
+>> on ARM64.
+> 
+> As the most vocal participant against ACPI being adopted, I would have
+> appreciated a cc on this patch set -- it's not like you were going for
+> a minimal set of cc recipients already. It makes it seem like you're
+> trying to sneak it past me for comments. Not cool. I know that's
+> probably not your intent, but still.
 
-So should I drop the property and apply the patches or just ignore the
-series?
+My bad, I'm sorry for that. Actually it was not my intention, I was not
+playing with a full deck when I sent this patch set out, I missed someone
+else (such as Rob) in the CC list and I even added private mailing list
+in CC.
 
-Shawn
+I'm sure you will in the CC list with next version.
+
+Thanks
+Hanjun
