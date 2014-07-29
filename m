@@ -1,56 +1,108 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Tue, 29 Jul 2014 04:39:18 -0700
-Subject: [GIT PULL] late omap mailbox clean-up, driver parts
-Message-ID: <20140729113917.GP29045@atomide.com>
+From: svarbanov@mm-sol.com (Stanimir Varbanov)
+Date: Tue, 29 Jul 2014 14:42:31 +0300
+Subject: use IORESOURCE_REG resource type for non-translatable addresses in DT
+Message-ID: <53D788A7.4020303@mm-sol.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The following changes since commit cbf14f3ab9bd6295b345fc812f08ddd844fb183e:
+Hi,
 
-  ARM: AM33xx: hwmod_data: Remove legacy mailbox addrs (2014-07-15 05:08:56 -0700)
+While looking in MFD drivers I saw that few of them (88pm860x-core,
+max8925-core and wm831x-core) allow use of IORESOURCE_REG as resource
+type when calling  platform_get_resource() by their child drivers. The
+resources for these child devices are filled by core MFD driver manually
+and then passed to mfd_add_devices() as mfd_cells.
 
-are available in the git repository at:
+During development and review comments of the MFD core driver for
+Qualcomm SPMI PMICs we came down to a need to describe PMIC peripheral
+addresses (the PMIC sub-functions) through *reg* property in DT. The
+PMIC peripheral drivers will be scattered over the /drivers and they
+will call platform_get_resource() to extract their peripheral base
+addresses from resource->start. The issue we have encountered is that
+these addresses are non-translatable thus of_address_to_resource returns
+OF_BAD_ADDR.
 
-  git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap tags/omap-for-v3.17/mailbox-cleanup
+Stephen Boyd have made a suggestion to solve the issue here [1].
 
-for you to fetch changes up to 72c1c8179cdc5ba7208d375bd3f104659fc50ad0:
+Is that approach acceptable? Or do we have better way? How similar
+issues could be solved.
 
-  mailbox/omap: add a parent structure for every IP instance (2014-07-29 01:57:25 -0700)
+Our DT node for SPMI PMICs can be seen below [2].
 
-----------------------------------------------------------------
-Driver specific omap mailbox cleanup. Mostly to remove
-broken legacy code for omap1 and move things towards
-device tree.
+Please do comment.
 
-These patches were posted a while back, but I did not
-realize I was supposed to merge the driver related
-parts too. So apologies for a late pull request on
-these changes.
+PS: I have made a little change in __of_address_to_resource() to
+illustrate what I meant above.
 
-----------------------------------------------------------------
+diff --git a/drivers/of/address.c b/drivers/of/address.c
+index 5edfcb0..898741e 100644
+--- a/drivers/of/address.c
++++ b/drivers/of/address.c
+@@ -617,9 +617,24 @@ static int __of_address_to_resource(struct
+device_node *dev,
 
-Note that these are based on the SoC related changes already
-pulled.
+        if ((flags & (IORESOURCE_IO | IORESOURCE_MEM)) == 0)
+                return -EINVAL;
++
+        taddr = of_translate_address(dev, addrp);
+-       if (taddr == OF_BAD_ADDR)
+-               return -EINVAL;
++       /*
++        * if the address is non-translatable to cpu physical address
++        * fallback to a IORESOURCE_REG resource.
++        */
++       if (taddr == OF_BAD_ADDR) {
++               memset(r, 0, sizeof(*r));
++               taddr = of_read_number(addrp, 1);
++               if (taddr == OF_BAD_ADDR)
++                       return -EINVAL;
++               r->start = taddr;
++               r->end = taddr + size - 1;
++               r->flags = IORESOURCE_REG;
++               r->name = name ? name : dev->full_name;
++               return 0;
++       }
++
+        memset(r, 0, sizeof(struct resource));
+        if (flags & IORESOURCE_IO) {
+                unsigned long port;
 
-----------------------------------------------------------------
+[1] https://lkml.org/lkml/2014/7/17/680
 
-Suman Anna (7):
-      mailbox/omap: use devm_* interfaces
-      mailbox/omap: remove OMAP1 mailbox driver
-      mailbox/omap: remove omap_mbox_type_t from mailbox ops
-      mailbox/omap: simplify the fifo assignment by using macros
-      mailbox/omap: consolidate OMAP mailbox driver
-      mailbox/omap: remove the private mailbox structure
-      mailbox/omap: add a parent structure for every IP instance
+[2] Simplistic PMIC DT node.
 
- arch/arm/configs/omap1_defconfig |   2 -
- drivers/mailbox/Kconfig          |  19 +-
- drivers/mailbox/Makefile         |   6 +-
- drivers/mailbox/mailbox-omap1.c  | 203 ------------------
- drivers/mailbox/mailbox-omap2.c  | 357 -------------------------------
- drivers/mailbox/omap-mailbox.c   | 444 +++++++++++++++++++++++++++++++--------
- drivers/mailbox/omap-mbox.h      |  67 ------
- 7 files changed, 360 insertions(+), 738 deletions(-)
- delete mode 100644 drivers/mailbox/mailbox-omap1.c
- delete mode 100644 drivers/mailbox/mailbox-omap2.c
- delete mode 100644 drivers/mailbox/omap-mbox.h
+spmi at fc4cf000 {
+	compatible = "qcom,spmi-pmic-arb";
+	reg = <0xfc4cf000 0x1000>,
+	      <0xfc4cb000 0x1000>,
+	      <0xfc4ca000 0x1000>;
+	reg-names = "core", "intr", "cnfg";
+	#address-cells = <2>;
+	#size-cells = <0>;
+	interrupt-controller;
+	#interrupt-cells = <4>;
+
+	pm8941 at 0 {
+		compatible = "qcom,pm8941";
+		reg = <0x0 SPMI_USID>;
+		#size-cells = <1>;
+		#address-cells = <1>;
+
+		rtc {
+			compatible = "qcom,pm8941-rtc";
+			reg = <0x6000 0x100>, <0x6100 0x100>;
+			reg-names = "rtc", "alarm";
+			interrupts = <0x0 0x61 0x1 0>;
+			interrupt-names = "alarm";
+		};
+	};
+
+	pm8941 at 1 {
+		compatible = "qcom,pm8941";
+		reg = <0x1 SPMI_USID>;
+	};
+}
+
+-- 
+regards,
+Stan
