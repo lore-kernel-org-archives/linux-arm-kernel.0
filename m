@@ -1,31 +1,29 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Tue, 29 Jul 2014 15:28:25 +0100
-Subject: [PATCH 00/15] arm/arm64: fix use of irq_find_mapping outside of
- legal RCU context
-In-Reply-To: <53C04B3E.20908@codeaurora.org> (Christopher Covington's message
- of "Fri, 11 Jul 2014 21:38:22 +0100")
-References: <1404825038-547-1-git-send-email-marc.zyngier@arm.com>
- <53C04B3E.20908@codeaurora.org>
-Message-ID: <87mwbskzna.fsf@approximate.cambridge.arm.com>
+From: tj@kernel.org (Tejun Heo)
+Date: Tue, 29 Jul 2014 10:34:38 -0400
+Subject: [PATCH v12 4/8] ata: libahci: allow to use multiple PHYs
+In-Reply-To: <1406618447-25499-1-git-send-email-antoine.tenart@free-electrons.com>
+References: <1406618447-25499-1-git-send-email-antoine.tenart@free-electrons.com>
+Message-ID: <20140729143438.GB4791@htj.dyndns.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jul 11 2014 at  9:38:22 pm BST, Christopher Covington <cov@codeaurora.org> wrote:
-> Hi Mark,
->
-> On 07/08/2014 09:10 AM, Marc Zyngier wrote:
->> A number of irqchip drivers are directly calling irq_find_mapping,
->> which may use a rcu_read_lock call when walking the radix tree.
->
-> If this happens to be easy for you to determine: do direct callers of
-> irq_find_host such as irq_create_of_mapping have a similar problem with
-> irq_domain_mutex?
+On Tue, Jul 29, 2014 at 09:20:47AM +0200, Antoine T?nart wrote:
+> The current implementation of the libahci does not allow to use multiple
+> PHYs. This patch adds the support of multiple PHYs by the libahci while
+> keeping the old bindings valid for device tree compatibility.
+> 
+> This introduce a new way of defining SATA ports in the device tree, with
+> one port per sub-node. This as the advantage of allowing a per port
+> configuration. Because some ports may be accessible but disabled in the
+> device tree, the port_map mask is computed automatically when using
+> this.
+> 
+> Signed-off-by: Antoine T?nart <antoine.tenart@free-electrons.com>
+> Acked-by: Hans de Goede <hdegoede@redhat.com>
 
-Definitely not from this problem. irq_find_host doesn't use RCU at all,
-so it shouldn't be an issue.
+Patch doesn't apply to libata/for-3.17.  Please refresh.
 
-Thanks,
+Thanks.
 
-	M.
 -- 
-Jazz is not dead. It just smells funny.
+tejun
