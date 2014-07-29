@@ -1,28 +1,57 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Tue, 29 Jul 2014 18:20:05 +0100
-Subject: [RFC 5/5] ARM: dts: Improve Peach Pit and Pi power scheme model
-In-Reply-To: <1406651339-28901-6-git-send-email-javier.martinez@collabora.co.uk>
-References: <1406651339-28901-1-git-send-email-javier.martinez@collabora.co.uk>
- <1406651339-28901-6-git-send-email-javier.martinez@collabora.co.uk>
-Message-ID: <20140729172005.GW17528@sirena.org.uk>
+From: soren.brinkmann@xilinx.com (Soren Brinkmann)
+Date: Tue, 29 Jul 2014 10:21:03 -0700
+Subject: [PATCH] ARM: smp_scu: Enable standby mode
+Message-ID: <1406654463-15475-1-git-send-email-soren.brinkmann@xilinx.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jul 29, 2014 at 06:28:59PM +0200, Javier Martinez Canillas wrote:
-> The DeviceTree files for the Peach Pit and Pi machines have
-> a simplistic model of the connections between the different
-> regulators since not all the tps65090 regulators get their
-> input supply voltage from the VDC. DCDC1-3, LD0-1 and fet7
-> parent supply is indded VDC but the fet1-6 get their input
-> supply from the DCDC1 and DCDC2 output voltage rails.
+Enable the SCU standby mode.
+>From documentation:
+  When set, SCU CLK is turned off when all processors are in WFI mode,
+  there is no pending request on the ACP (if implemented), and there is
+  no remaining activity in the SCU.
 
-Acked-by: Mark Brown <broonie@linaro.org>
+  When SCU CLK is off, ARREADYS, AWREADYS and WREADYS on the ACP are forced
+  LOW. The clock is turned on when any processor leaves WFI mode, or if
+  there is a new request on the ACP.
 
-This *should* be independent of the rest of this series.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140729/374fee28/attachment-0001.sig>
+Signed-off-by: Soren Brinkmann <soren.brinkmann@xilinx.com>
+---
+Hi,
+
+I am working on some PM related patches for Zynq. One of them is
+enabling the SCU standby mode. I was wondering whether this is probably
+something that I should not do in platform specific code, but rather in
+the common code for everybody?
+
+	Thanks,
+	S?ren
+---
+ arch/arm/kernel/smp_scu.c | 5 ++++-
+ 1 file changed, 4 insertions(+), 1 deletion(-)
+
+diff --git a/arch/arm/kernel/smp_scu.c b/arch/arm/kernel/smp_scu.c
+index 1aafa0d785eb..82548a76740d 100644
+--- a/arch/arm/kernel/smp_scu.c
++++ b/arch/arm/kernel/smp_scu.c
+@@ -22,6 +22,9 @@
+ #define SCU_INVALIDATE		0x0c
+ #define SCU_FPGA_REVISION	0x10
+ 
++#define SCU_CTRL_ENABLE		BIT(0)
++#define SCU_CTRL_STANDBY_ENABLE	BIT(5)
++
+ #ifdef CONFIG_SMP
+ /*
+  * Get the number of CPU cores from the SCU configuration
+@@ -53,7 +56,7 @@ void scu_enable(void __iomem *scu_base)
+ 	if (scu_ctrl & 1)
+ 		return;
+ 
+-	scu_ctrl |= 1;
++	scu_ctrl |= SCU_CTRL_ENABLE | SCU_CTRL_STANDBY_ENABLE;
+ 	writel_relaxed(scu_ctrl, scu_base + SCU_CTRL);
+ 
+ 	/*
+-- 
+2.0.1.1.gfbfc394
