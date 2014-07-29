@@ -1,58 +1,39 @@
-From: ta.omasab@gmail.com (Thomas Abraham)
-Date: Tue, 29 Jul 2014 11:23:20 +0530
-Subject: [PATCH v7 6/6] cpufreq: exynos: remove exynos4210/5250 specific
- cpufreq driver support
-In-Reply-To: <53CA72CC.7010505@gmail.com>
-References: <1405345118-4269-1-git-send-email-thomas.ab@samsung.com>
- <1405345118-4269-7-git-send-email-thomas.ab@samsung.com>
- <53CA72CC.7010505@gmail.com>
-Message-ID: <CAJuA9agfpQ7oyfZ99qSDj7EbsFk6dMnxxu5=P=vJYzTpAAUEuQ@mail.gmail.com>
+From: computersforpeace@gmail.com (Brian Norris)
+Date: Mon, 28 Jul 2014 23:02:07 -0700
+Subject: [GIT PULL] mach-bcm: brcmstb platform support for 3.17
+In-Reply-To: <20140728143126.GB2593@beef>
+References: <20140722232552.GJ28323@ld-irv-0074> <20140728143126.GB2593@beef>
+Message-ID: <20140729060207.GB11952@brian-ubuntu>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Tomasz,
+On Mon, Jul 28, 2014 at 10:31:26AM -0400, Matt Porter wrote:
+> I applied all but "ARM: brcmstb: add debug UART for earlyprintk support"
+> to mach-bcm for-3.17/[soc|dt]. That patch should also go through
+> Russell.
 
-On Sat, Jul 19, 2014 at 6:59 PM, Tomasz Figa <tomasz.figa@gmail.com> wrote:
-> Hi,
->
-> On 14.07.2014 15:38, Thomas Abraham wrote:
->> From: Thomas Abraham <thomas.ab@samsung.com>
->>
->> Exynos4210 and Exynos5250 based platforms have switched over to use generic
->> cpufreq drivers for cpufreq functionality. So the Exynos specific cpufreq
->> drivers for these platforms can be removed.
->>
->> Signed-off-by: Thomas Abraham <thomas.ab@samsung.com>
->> Acked-by: Viresh Kumar <viresh.kumar@linaro.org>
->> Reviewed-by: Amit Daniel Kachhap <amit.daniel@samsung.com>
->> Tested-by: Arjun K.V <arjun.kv@samsung.com>
->> ---
->>  drivers/cpufreq/Kconfig.arm          |   22 ----
->>  drivers/cpufreq/Makefile             |    2 -
->>  drivers/cpufreq/exynos4210-cpufreq.c |  184 -----------------------------
->>  drivers/cpufreq/exynos5250-cpufreq.c |  210 ----------------------------------
->>  4 files changed, 418 deletions(-)
->>  delete mode 100644 drivers/cpufreq/exynos4210-cpufreq.c
->>  delete mode 100644 drivers/cpufreq/exynos5250-cpufreq.c
->>
->
-> I would hesitate with removing this driver straightaway and replacing it
-> with a new one that isn't yet well tested. For at least one release I
-> would keep the old code in place with the possibility of switching
-> between old and new one in Kconfig.
+Thanks for the tip. I just submitted the earlyprintk patch to Russel.
 
-The new drivers have been tested for three days on
-Exynos4210/5250/5420 based boards. So I am fairly confident that there
-will be no issues in switching to the generic drivers and the old
-drivers have not been retained in the next version.
+> Also, pull requests are fine, but it will help greatly to have pull
+> requests split into the appropriate arm-soc categories next time. I
+> split these into soc and dt as that is how they need to go to the
+> arm-soc team.
+
+Sure thing. In the future, I may just stick with patches, and you can
+queue them how you'd like.
+
+Is the arm-soc development process documented somewhere? Like an FAQ, or
+ANNOUNCEMENT? [1] I understand that it's a large and noisy subsystem
+that warrants some additional processes of its own (beyond what I've
+seen in other subsystems), but as a relative newcomer to participating
+in it, I've only been able to glean a few bits of info from searching
+the LKML/linux-arm-kernel archives.
+
+If not, I'm sure I'll figure things out eventually.
 
 Thanks,
-Thomas.
+Brian
 
->
-> Best regards,
-> Tomasz
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-pm" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+[1] This comes close. At least it captures the history:
+
+      http://elinux.org/images/a/ad/Arm-soc-checklist.pdf
