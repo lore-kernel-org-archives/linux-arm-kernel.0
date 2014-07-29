@@ -1,56 +1,39 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Tue, 29 Jul 2014 15:05:39 +0100
-Subject: [PATCH 1/6] dt: bindings: Supply shared ST IRQ defines
-In-Reply-To: <1406642744-22589-1-git-send-email-lee.jones@linaro.org>
-References: <1406642744-22589-1-git-send-email-lee.jones@linaro.org>
-Message-ID: <1406642744-22589-2-git-send-email-lee.jones@linaro.org>
+From: balbi@ti.com (Felipe Balbi)
+Date: Tue, 29 Jul 2014 09:15:22 -0500
+Subject: [PATCH 29/35] arm: omap: intc: switch over to linear irq domain
+In-Reply-To: <20140729121425.GR29045@atomide.com>
+References: <1406582183-696-1-git-send-email-balbi@ti.com>
+ <1406582183-696-30-git-send-email-balbi@ti.com>
+ <20140729121425.GR29045@atomide.com>
+Message-ID: <20140729141522.GB17808@saruman.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-These defines are used to allow values used for configuration to be
-easily human readable and will lessen the chance of logical mistakes.
+Hi,
 
-Signed-off-by: Lee Jones <lee.jones@linaro.org>
----
- include/dt-bindings/interrupt-controller/irq-st.h | 30 +++++++++++++++++++++++
- 1 file changed, 30 insertions(+)
- create mode 100644 include/dt-bindings/interrupt-controller/irq-st.h
+On Tue, Jul 29, 2014 at 05:14:25AM -0700, Tony Lindgren wrote:
+> * Felipe Balbi <balbi@ti.com> [140728 14:19]:
+> > now that we don't need to support legacy board-files,
+> > we can completely switch over to a linear irq domain
+> > and make use of irq_alloc_domain_generic_chips() to
+> > allocate all generic irq chips for us.
+> 
+> This patch seems to somehow break off-idle for omap3 
+> where it no longer wakes up.
 
-diff --git a/include/dt-bindings/interrupt-controller/irq-st.h b/include/dt-bindings/interrupt-controller/irq-st.h
-new file mode 100644
-index 0000000..4c59ace
---- /dev/null
-+++ b/include/dt-bindings/interrupt-controller/irq-st.h
-@@ -0,0 +1,30 @@
-+/*
-+ *  include/linux/irqchip/irq-st.h
-+ *
-+ *  Copyright (C) 2014 STMicroelectronics ? All Rights Reserved
-+ *
-+ *  Author: Lee Jones <lee.jones@linaro.org>
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+ */
-+
-+#ifndef _DT_BINDINGS_INTERRUPT_CONTROLLER_ST_H
-+#define _DT_BINDINGS_INTERRUPT_CONTROLLER_ST_H
-+
-+#define ST_IRQ_SYSCFG_EXT_0		0
-+#define ST_IRQ_SYSCFG_EXT_1		1
-+#define ST_IRQ_SYSCFG_EXT_2		2
-+#define ST_IRQ_SYSCFG_CTI_0		3
-+#define ST_IRQ_SYSCFG_CTI_1		4
-+#define ST_IRQ_SYSCFG_PMU_0		5
-+#define ST_IRQ_SYSCFG_PMU_1		6
-+#define ST_IRQ_SYSCFG_pl310_L2		7
-+#define ST_IRQ_SYSCFG_DISABLED		0xFFFFFFFF
-+
-+#define ST_IRQ_SYSCFG_EXT_1_INV		0x1
-+#define ST_IRQ_SYSCFG_EXT_2_INV		0x2
-+#define ST_IRQ_SYSCFG_EXT_3_INV		0x4
-+
-+#endif
+Sure your bisection is correct ? This patch just switches from legacy
+irq domain to linear irq domain.
+
+> Other than that, this whole series boots fine for me.
+
+good
+
 -- 
-1.9.1
+balbi
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140729/536d4ba2/attachment.sig>
