@@ -1,64 +1,98 @@
 From: mpa@pengutronix.de (Markus Pargmann)
-Date: Tue, 29 Jul 2014 09:24:44 +0200
-Subject: [PATCH 2/4] gpio: pca953x: Add DT binding documentation
+Date: Tue, 29 Jul 2014 09:24:43 +0200
+Subject: [PATCH 1/4] gpio: pca953x: Drop deprecated DT bindings
 In-Reply-To: <1406618686-22385-1-git-send-email-mpa@pengutronix.de>
 References: <1406618686-22385-1-git-send-email-mpa@pengutronix.de>
-Message-ID: <1406618686-22385-3-git-send-email-mpa@pengutronix.de>
+Message-ID: <1406618686-22385-2-git-send-email-mpa@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add a devicetree binding documentation for the pca953x driver.
+Drop deprecated DT bindings and use automaticly assigned gpio and irq
+bases.
 
 Signed-off-by: Markus Pargmann <mpa@pengutronix.de>
 ---
- .../devicetree/bindings/gpio/gpio-pca953x.txt      | 39 ++++++++++++++++++++++
- 1 file changed, 39 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/gpio/gpio-pca953x.txt
+ drivers/gpio/gpio-pca953x.c | 54 +++------------------------------------------
+ 1 file changed, 3 insertions(+), 51 deletions(-)
 
-diff --git a/Documentation/devicetree/bindings/gpio/gpio-pca953x.txt b/Documentation/devicetree/bindings/gpio/gpio-pca953x.txt
-new file mode 100644
-index 000000000000..b9a42f294dd0
---- /dev/null
-+++ b/Documentation/devicetree/bindings/gpio/gpio-pca953x.txt
-@@ -0,0 +1,39 @@
-+* NXP PCA953x I2C GPIO multiplexer
-+
-+Required properties:
-+ - compatible: Has to contain one of the following:
-+	nxp,pca9505
-+	nxp,pca9534
-+	nxp,pca9535
-+	nxp,pca9536
-+	nxp,pca9537
-+	nxp,pca9538
-+	nxp,pca9539
-+	nxp,pca9554
-+	nxp,pca9555
-+	nxp,pca9556
-+	nxp,pca9557
-+	nxp,pca9574
-+	nxp,pca9575
-+	nxp,pca9698
-+	maxim,max7310
-+	maxim,max7312
-+	maxim,max7313
-+	maxim,max7315
-+	ti,pca6107
-+	ti,tca6408
-+	ti,tca6416
-+	ti,tca6424
-+	exar,xra1202
-+
-+Example:
-+
-+
-+	gpio at 20 {
-+		compatible = "nxp,pca9505";
-+		reg = <0x20>;
-+		pinctrl-names = "default";
-+		pinctrl-0 = <&pinctrl_pca9505>;
-+		interrupt-parent = <&gpio3>;
-+		interrupts = <23 IRQ_TYPE_LEVEL_LOW>;
-+	};
+diff --git a/drivers/gpio/gpio-pca953x.c b/drivers/gpio/gpio-pca953x.c
+index e721a37c3473..fda3eae835d0 100644
+--- a/drivers/gpio/gpio-pca953x.c
++++ b/drivers/gpio/gpio-pca953x.c
+@@ -520,7 +520,7 @@ static int pca953x_irq_setup(struct pca953x_chip *chip,
+ 	struct i2c_client *client = chip->client;
+ 	int ret, i, offset = 0;
+ 
+-	if (irq_base != -1
++	if (client->irq && irq_base != -1
+ 			&& (id->driver_data & PCA_INT)) {
+ 
+ 		switch (chip->chip_type) {
+@@ -586,50 +586,6 @@ static int pca953x_irq_setup(struct pca953x_chip *chip,
+ }
+ #endif
+ 
+-/*
+- * Handlers for alternative sources of platform_data
+- */
+-#ifdef CONFIG_OF_GPIO
+-/*
+- * Translate OpenFirmware node properties into platform_data
+- * WARNING: This is DEPRECATED and will be removed eventually!
+- */
+-static void
+-pca953x_get_alt_pdata(struct i2c_client *client, int *gpio_base, u32 *invert)
+-{
+-	struct device_node *node;
+-	const __be32 *val;
+-	int size;
+-
+-	*gpio_base = -1;
+-
+-	node = client->dev.of_node;
+-	if (node == NULL)
+-		return;
+-
+-	val = of_get_property(node, "linux,gpio-base", &size);
+-	WARN(val, "%s: device-tree property 'linux,gpio-base' is deprecated!", __func__);
+-	if (val) {
+-		if (size != sizeof(*val))
+-			dev_warn(&client->dev, "%s: wrong linux,gpio-base\n",
+-				 node->full_name);
+-		else
+-			*gpio_base = be32_to_cpup(val);
+-	}
+-
+-	val = of_get_property(node, "polarity", NULL);
+-	WARN(val, "%s: device-tree property 'polarity' is deprecated!", __func__);
+-	if (val)
+-		*invert = *val;
+-}
+-#else
+-static void
+-pca953x_get_alt_pdata(struct i2c_client *client, int *gpio_base, u32 *invert)
+-{
+-	*gpio_base = -1;
+-}
+-#endif
+-
+ static int device_pca953x_init(struct pca953x_chip *chip, u32 invert)
+ {
+ 	int ret;
+@@ -704,12 +660,8 @@ static int pca953x_probe(struct i2c_client *client,
+ 		invert = pdata->invert;
+ 		chip->names = pdata->names;
+ 	} else {
+-		pca953x_get_alt_pdata(client, &chip->gpio_start, &invert);
+-#ifdef CONFIG_OF_GPIO
+-		/* If I2C node has no interrupts property, disable GPIO interrupts */
+-		if (of_find_property(client->dev.of_node, "interrupts", NULL) == NULL)
+-			irq_base = -1;
+-#endif
++		chip->gpio_start = -1;
++		irq_base = 0;
+ 	}
+ 
+ 	chip->client = client;
 -- 
 2.0.1
