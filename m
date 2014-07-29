@@ -1,65 +1,57 @@
-From: oleg@redhat.com (Oleg Nesterov)
-Date: Tue, 29 Jul 2014 20:44:11 +0200
-Subject: [PATCH v3 6/8] x86: Split syscall_trace_enter into two phases
-In-Reply-To: <CALCETrVWOOs3HCnQNaqmnn480oQYn3scrWUfR4JJX9+zTxUDRw@mail.gmail.com>
-References: <cover.1405992946.git.luto@amacapital.net>
- <3f649f5658a163645e3ce15156176c325283762e.1405992946.git.luto@amacapital.net>
- <20140728173723.GA20993@redhat.com>
- <CALCETrWUFo_zXcAZja-vdL4_MgJDd=1ed5Vt54eyUuim930xAw@mail.gmail.com>
- <20140729165416.GA967@redhat.com>
- <CALCETrWBU-=zqLTCP7B1feZ9J-e4u-Boic+e1EEn1rL-ijeEKg@mail.gmail.com>
- <20140729173136.GA2808@redhat.com>
- <CALCETrVP-P+EJ6YJ=CZL_gyA1r8O9eogUNTik7_31_SA+Pj3pg@mail.gmail.com>
- <20140729181615.GA4950@redhat.com>
- <CALCETrVWOOs3HCnQNaqmnn480oQYn3scrWUfR4JJX9+zTxUDRw@mail.gmail.com>
-Message-ID: <20140729184411.GA6035@redhat.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Tue, 29 Jul 2014 20:47:06 +0200
+Subject: [PATCH] ARM: imx: clk-vf610: introduce clks_init_on
+In-Reply-To: <2a672a5d28af5425e1c406b0607befd5@agner.ch>
+References: <1406643628-4061-1-git-send-email-stefan@agner.ch>
+ <2815679.ZycfkLhBgI@wuerfel> <2a672a5d28af5425e1c406b0607befd5@agner.ch>
+Message-ID: <4686885.gCEsaTZ3ps@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/29, Andy Lutomirski wrote:
->
-> On Tue, Jul 29, 2014 at 11:16 AM, Oleg Nesterov <oleg@redhat.com> wrote:
-> > On 07/29, Andy Lutomirski wrote:
+On Tuesday 29 July 2014 20:39:20 Stefan Agner wrote:
+> Am 2014-07-29 16:44, schrieb Arnd Bergmann:
+> > On Tuesday 29 July 2014 16:20:28 Stefan Agner wrote:
+> >> At the end of the boot process, the clock framework might disable
+> >> required main PLL's. So far, this was no issue since drivers
+> >> requested clocks, which are descended of the main PLL's (e.g.
+> >> pll1_pfd1, which provides the system clock).
 > >>
-> >> On Tue, Jul 29, 2014 at 10:31 AM, Oleg Nesterov <oleg@redhat.com> wrote:
-> >> >
-> >> > TIF_NOHZ is set if and only if context_tracking_is_enabled() is true.
-> >> > So I think that
-> >> >
-> >> >         work = current_thread_info()->flags & (_TIF_WORK_SYSCALL_ENTRY & ~TIF_NOHZ);
-> >> >
-> >> >         user_exit();
-> >> >
-> >> > looks a bit better. But I won't argue.
+> >> To archive the full 500MHz system clock, DDR clock need to be a
+> >> descendant of PLL2 rather than PLL1 (DDRC_CLK_SEL set to 0). The
+> >> bootloader sets up the clocks accordingly before making use of
+> >> DDR at all. However, in Linux, there is no driver using PLL2,
+> >> which lead to PLL2 being disabled by the clock framework.
 > >>
-> >> I don't get it.
-> >
-> > Don't worry, you are not alone.
-> >
-> >> context_tracking_is_enabled is global, and TIF_NOHZ
-> >> is per-task.  Isn't this stuff determined per-task or per-cpu or
-> >> something?
+> >> With this patch, we make sure that the main system clock and the
+> >> DDR clock are initially enabled and are kept enabled.
 > >>
-> >> IOW, if one CPU is running something that's very heavily
-> >> userspace-oriented and another CPU is doing something syscall- or
-> >> sleep-heavy, then shouldn't only the first CPU end up paying the price
-> >> of context tracking?
-> >
-> > Please see another email I sent to Frederic.
-> >
-> I'll add at least this argument in favor of my approach: if context
-> tracking works at all, then it had better not demand that syscall
-> entry call user_exit if TIF_NOHZ is *not* set.
+> >> Signed-off-by: Stefan Agner <stefan@agner.ch>
+> >>
+> > 
+> > Wouldn't it be better to list this in the DT as a default for
+> > the respective clocks?
+> > 
+> 
+> What do you mean by that exactly? Creating a driver for the main PLL's
+> and add device tree entries to instantiate them, along with a property
+> like "boot-enabled" or similar?
 
-I disagree. At least I disagree with that you should enforce this in
-syscall_trace_enter() paths, and in any case this has nothing to do with
-these changes.
+I was under the assumption that you already have a driver for the main PLL,
+I think most other SoCs have that.
 
-But again, I won't insist, so please forget.
+We talked about the general problem at some point during a conference
+and the conclusion was that it makes most sense to have defaults encoded
+as properties in the device node of the clock controller. If you don't
+have a device node for that, it won't work.
 
-> So adding the
-> condition ought to be safe, barring dumb bugs in my code.
+> The approach chosen in this patch is aligned the way it's done for i.MX6
+> (see arch/arm/mach-imx/clk-imx6q.c). The whole clock module(s) in Vybrid
+> are slightly striped variants found in i.MX6. For now, I would prefer to
+> leave it that way. 
 
-Yes, I think it is technically correct.
+Ok, makes sense. Just leave it like this then. I believe i.MX is a bit
+different from other SoCs, because it adopted some concepts like common
+clk earlier than the rest, but consistency within the family is more
+important than consistency across SoC families.
 
-Oleg.
+	Arnd
