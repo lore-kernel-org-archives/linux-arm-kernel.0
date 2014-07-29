@@ -1,86 +1,74 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Tue, 29 Jul 2014 09:49:10 -0600
-Subject: [PATCH 5/8] of: Add Tegra124 EMC bindings
-In-Reply-To: <53D75B90.7050501@nvidia.com>
-References: <1405088313-20048-1-git-send-email-mperttunen@nvidia.com>	<1405088313-20048-6-git-send-email-mperttunen@nvidia.com>	<CAL1qeaGHfjQhLHvgzt85hmbuY4FOG5-k=f80=CNvzPDEgi9_6w@mail.gmail.com>	<53CD860B.7030800@wwwdotorg.org>	<CAL1qeaHtGQxCO3cGdeCRUYuk6mxei6z1B63-iZdBECEbFqGhHw@mail.gmail.com>	<53CE9514.1050903@wwwdotorg.org>
- <CAL1qeaEkL+mxb0S4JhQbXBjyNyKJndffTSjMaAFQD6ooDJPd+Q@mail.gmail.com>
- <53CEA093.6060106@wwwdotorg.org> <53D75B90.7050501@nvidia.com>
-Message-ID: <53D7C276.2080204@wwwdotorg.org>
+From: s-anna@ti.com (Suman Anna)
+Date: Tue, 29 Jul 2014 10:53:52 -0500
+Subject: [PATCH 0/7] OMAP mailbox cleanup
+In-Reply-To: <20140729085947.GI29045@atomide.com>
+References: <1403657023-53897-1-git-send-email-s-anna@ti.com>
+ <20140729085947.GI29045@atomide.com>
+Message-ID: <53D7C390.10500@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/29/2014 02:30 AM, Mikko Perttunen wrote:
-> Looks like the TRM doesn't document this either. I'll add an option
-> ("nvidia,short-ram-code" ?) for the next version.
-
-Using the 2-bit RAM code field as the RAM code is normal operation, so I 
-wouldn't call this "short".
-
-Using the 2-bit boot device code field as extra RAM code bits is 
-non-standard.
-
-I would suggest nvidia,use-4-bit-ram-code or 
-nvidia,use-boot-device-code-as-ram-code-msbs(!) as the property.
-
-I see that the TRM implies the whole 4-bit field is RAM code, rather 
-than there being 2 separate 2-bit fields for RAM code and boot device 
-code. Can you please file a bug against the TRM to document this 
-correctly? (The details of which bits are which are visible on the 
-Jetson TK1 schematics for example).
-
-> On 22/07/14 20:34, Stephen Warren wrote:
->> On 07/22/2014 11:22 AM, Andrew Bresticker wrote:
->>> On Tue, Jul 22, 2014 at 9:45 AM, Stephen Warren
->>> <swarren@wwwdotorg.org> wrote:
->>>>
->>>> Does the bootloader adjust the DT that's passed to the kernel so that
->>>> only the relevant single set of EMC timings is contained in the DT?
->>>
->>> No, the DT contains all possible EMC timings for that board.
->>>
->>>> On a system where the boot ROM initializes RAM, and where the HW design
->>>> might have multiple SDRAM configuration, here's what usually happens:
->>>>
->>>> a) The BCT contains N sets of SDRAM configurations.
->>>>
->>>> b) The boot ROM reads the SDRAM strapping bits, and uses them to pick
->>>> the correct SDRAM configuration from the N sets in the BCT.
->>>>
->>>> c) The kernel DT has N sets of SDRAM configurations.
->>>>
->>>> d) The kernel reads the SDRAM strapping bits, and uses them to pick the
->>>> correct SDRAM configuration from the N sets in the DT.
->>>>
->>>> On the ChromeOS boards (so (a) and (b) above are irrelevant) where N is
->>>> too large to fit into APBDEV_PMC_STRAPPING_OPT_A_0[7:4], (c) and (d)
->>>> won't work. I assume the kernel DT therefore must be adjusted to only
->>>> contain the single SDRAM configuration that is relevant for the
->>>> current HW?
->>>>
->>>> (isn't STRAPPING_OPT_A split into 2 2-bit fields; 2 bits for SDRAM
->>>> index
->>>> and 2 bits for boot flash index, so max N is quite small?)
->>>
->>> Right, there are normally only 2 SDRAM strapping bits available.
->>> ChromeOS gets around this by having 4 identical boot device entries in
->>> the BCT, so all possible values of STRAPPING_OPT_A[7:6] map to the
->>> same boot device.  This allows us to use all 4 strapping bits in
->>> coreboot to pick the SDRAM configuration.
+On 07/29/2014 03:59 AM, Tony Lindgren wrote:
+> * Suman Anna <s-anna@ti.com> [140624 17:45]:
+>> Hi,
 >>
->> OK, that explains how it works.
+>> This patch series is mainly a cleanup of the current OMAP mailbox drivers
+>> in preparation for adding DT support and adoption to the upcoming mailbox
+>> framework from Jassi Brar [1]. It removes the OMAP1 mailbox driver as there
+>> are no users for it in the kernel, and consolidates the previous OMAP
+>> mailbox framework and the OMAP2+ mailbox driver into a single OMAP mailbox
+>> driver. 
 >>
->> But that means that when the kernel reads the strapping options, it will
->> have to know if it uses just 2 bits (standard) or all 4 bits
->> (non-standard) to index into the DT's array of SDRAM configurations.
->> We'll need a DT property to represent that.
->> --
->> To unsubscribe from this list: send the line "unsubscribe linux-tegra" in
->> the body of a message to majordomo at vger.kernel.org
->> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+>> The last patch also allows the OMAP mailbox driver to support multiple
+>> instances of the IP (for DRA7xx, which is the first SoC in the OMAP family
+>> to have more than one System Mailbox IP).
 >>
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-kernel" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
-> Please read the FAQ at  http://www.tux.org/lkml/
->
+>> The patches are based on 3.16-rc2 and do not change any of the functional
+>> behavior on any OMAP2+ SoCs. The boot logs on various OMAP platforms with
+>> these patches are at:
+>>   OMAP2 (SDP2430)           : http://slexy.org/view/s20rOAReeS
+>>   OMAP3 (BeagleXM)          : http://slexy.org/view/s2QITyvzH9
+>>   OMAP4 (PandaBoard)        : http://slexy.org/view/s2X9jdZ9Wh
+>>   OMAP5 (OMAP5 uEVM)        : http://slexy.org/view/s21hZUTYwm
+>>   DRA7  (DRA7 EVM)          : http://slexy.org/view/s213K7f87s
+>>   AM33xx (BeagleBone Black) : http://slexy.org/view/s2vB7oxbix
+>>   AM43xx (AM437x GP EVM)    : http://slexy.org/view/s21rMlUWMg
+>>
+>> [1] https://lkml.org/lkml/2014/6/12/470
+>>
+>> Suman Anna (7):
+>>   mailbox/omap: use devm_* interfaces
+>>   mailbox/omap: remove OMAP1 mailbox driver
+>>   mailbox/omap: remove omap_mbox_type_t from mailbox ops
+>>   mailbox/omap: simplify the fifo assignment by using macros
+>>   mailbox/omap: consolidate OMAP mailbox driver
+>>   mailbox/omap: remove the private mailbox structure
+>>   mailbox/omap: add a parent structure for every IP instance
+>>
+>>  arch/arm/configs/omap1_defconfig |   2 -
+>>  drivers/mailbox/Kconfig          |  19 +-
+>>  drivers/mailbox/Makefile         |   6 +-
+>>  drivers/mailbox/mailbox-omap1.c  | 203 ------------------
+>>  drivers/mailbox/mailbox-omap2.c  | 357 -------------------------------
+>>  drivers/mailbox/omap-mailbox.c   | 444 +++++++++++++++++++++++++++++++--------
+>>  drivers/mailbox/omap-mbox.h      |  67 ------
+>>  7 files changed, 360 insertions(+), 738 deletions(-)
+>>  delete mode 100644 drivers/mailbox/mailbox-omap1.c
+>>  delete mode 100644 drivers/mailbox/mailbox-omap2.c
+>>  delete mode 100644 drivers/mailbox/omap-mbox.h
+> 
+> I'll apply these on into omap-for-v3.17/mailbox. Might be a bit
+> too late for v3.17 so no guarantees these will get merged. 
+
+Understood. Thanks Tony. I will repost them once rc1 is out _if_ they
+don't make it.
+
+regards
+Suman
+
+> But it removes some old dead code, so that's nice ;)
+> 
+> Regards,
+> 
+> Tony
+> 
