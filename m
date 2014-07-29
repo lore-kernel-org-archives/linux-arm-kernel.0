@@ -1,134 +1,223 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Tue, 29 Jul 2014 10:01:48 -0700
-Subject: [PATCH v15 07/12] ARM: dts: append hip04 dts
-In-Reply-To: <20140729123221.GN2576@leverpostej>
-References: <1406555876-11989-1-git-send-email-haojian.zhuang@linaro.org>
- <1406555876-11989-8-git-send-email-haojian.zhuang@linaro.org>
- <20140728180609.GE2576@leverpostej>
- <CAD6h2NQLgB1=8+WznE19rjsFwm3XWPUYEbDuPCbKbWjseRCBDg@mail.gmail.com>
- <20140729123221.GN2576@leverpostej>
-Message-ID: <CAOesGMi6xLwFkjctNJsJ63WYaMhrJgjNyST4qiUpa42e4biBjQ@mail.gmail.com>
+From: hdegoede@redhat.com (Hans de Goede)
+Date: Tue, 29 Jul 2014 19:02:28 +0200
+Subject: [PATCH] ARM: dt: sun7i: Add Banana Pi board
+Message-ID: <1406653348-16638-1-git-send-email-hdegoede@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jul 29, 2014 at 5:32 AM, Mark Rutland <mark.rutland@arm.com> wrote:
-> On Tue, Jul 29, 2014 at 03:44:40AM +0100, Haojian Zhuang wrote:
->> On 29 July 2014 02:06, Mark Rutland <mark.rutland@arm.com> wrote:
->> > On Mon, Jul 28, 2014 at 02:57:51PM +0100, Haojian Zhuang wrote:
->> >> Add hip04-d01.dts & hip04.dtsi for hip04 SoC platform.
->> >>
->> >> Signed-off-by: Haojian Zhuang <haojian.zhuang@linaro.org>
->> >> ---
->> >>  arch/arm/boot/dts/Makefile      |   1 +
->> >>  arch/arm/boot/dts/hip04-d01.dts |  39 ++++++
->> >>  arch/arm/boot/dts/hip04.dtsi    | 267 ++++++++++++++++++++++++++++++++++++++++
->> >>  3 files changed, 307 insertions(+)
->> >>  create mode 100644 arch/arm/boot/dts/hip04-d01.dts
->> >>  create mode 100644 arch/arm/boot/dts/hip04.dtsi
->> >>
->> >> diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
->> >> index 721525e..6587bbf 100644
->> >> --- a/arch/arm/boot/dts/Makefile
->> >> +++ b/arch/arm/boot/dts/Makefile
->> >> @@ -86,6 +86,7 @@ dtb-$(CONFIG_ARCH_HI3xxx) += hi3620-hi4511.dtb
->> >>  dtb-$(CONFIG_ARCH_HIX5HD2) += hix5hd2-dkb.dtb
->> >>  dtb-$(CONFIG_ARCH_HIGHBANK) += highbank.dtb \
->> >>         ecx-2000.dtb
->> >> +dtb-$(CONFIG_ARCH_HIP04) += hip04-d01.dtb
->> >>  dtb-$(CONFIG_ARCH_INTEGRATOR) += integratorap.dtb \
->> >>         integratorcp.dtb
->> >>  dtb-$(CONFIG_ARCH_KEYSTONE) += k2hk-evm.dtb \
->> >> diff --git a/arch/arm/boot/dts/hip04-d01.dts b/arch/arm/boot/dts/hip04-d01.dts
->> >> new file mode 100644
->> >> index 0000000..661c8e5
->> >> --- /dev/null
->> >> +++ b/arch/arm/boot/dts/hip04-d01.dts
->> >> @@ -0,0 +1,39 @@
->> >> +/*
->> >> + *  Copyright (C) 2013-2014 Linaro Ltd.
->> >> + *  Author: Haojian Zhuang <haojian.zhuang@linaro.org>
->> >> + *
->> >> + *  This program is free software; you can redistribute it and/or modify
->> >> + *  it under the terms of the GNU General Public License version 2 as
->> >> + *  publishhed by the Free Software Foundation.
->> >> + */
->> >> +
->> >> +/dts-v1/;
->> >> +
->> >> +/* For bootwrapper */
->> >> +/memreserve/ 0x10c00000 0x00010000;
->> >
->> > How exactly is this bootwrapper used? Is the kernel compiled into it?
->> >
->> > It might make more sense for the wrapper build system to inject
->> > bootwrapper-related properties. Then the DTB is less likely to
->> > amalgamate hacks to workaround differences between versions, and can be
->> > used on systems without a wrapper without throwing away some memory.
->> >
->>
->> In this platform, we relied on the bootwrapper. If I discard this,
->> I'll fail to bring up all secondary cores.
->
-> What loads the boot wrapper into memory, and from where?
->
-> In another reply you mentioned you're using UEFI. Is this wrapper
-> considered part of your UEFI implementation? If so it should be reserved
-> in the UEFI memory map, and there should be no need of memory nodes or
-> memreserves -- all that should come from UEFI.
+The Banana Pi is an A20 based development board using Raspberry Pi compatible
+IO headers. It comes with 1 GB RAM, 1 Gb ethernet, 2x USB host, sata, hdmi
+and stereo audio out + various expenansion headers:
 
-There's no UEFI memory map parsing on 32-bit, is there?
+http://www.bananapi.org/
 
-> What exactly is the boot wrapper in charge of?
->
-> What is the split in responsiblity between the wrapper and the kernel?
+Signed-off-by: Hans de Goede <hdegoede@redhat.com>
+---
+ arch/arm/boot/dts/Makefile               |   1 +
+ arch/arm/boot/dts/sun7i-a20-bananapi.dts | 183 +++++++++++++++++++++++++++++++
+ 2 files changed, 184 insertions(+)
+ create mode 100644 arch/arm/boot/dts/sun7i-a20-bananapi.dts
 
-Sounds like it's just the trampoline code that's executed at CPU
-spin-up time. I wouldn't be surprised if there's a register somewhere
-on the same controller that you poke the cpu to life that you can
-write what address for it to start executing at, or at least some
-other location where it can be redirected somewhere else. It's very
-unlikely a wired-in address in hardware. Or so I hope. :-)
-
->> >> +               };
->> >> +
->> >> +               fabric: fabric {
->> >> +                       compatible = "hisilicon,hip04-fabric";
->> >> +                       reg = <0x302a000 0x1000>;
->> >
->> > How is this going to be used?
->> >
->>
->> Fabric could configure snoop filter of multiple cluster. I don't have
->> the manual. I only know this.
->
-> Is this accessible to the non-secure side?
->
-> If the firmware is currently programming things correctly then we
-> shouldn't need this for now.
-
-with MCPM clusters get powered up and down, it's not uncommon to have
-to take them out of coherence domains.
-
->> >> +               };
->> >> +
->> >> +               dual_timer0: dual_timer at 3000000 {
->> >> +                       compatible = "arm,sp804", "arm,primecell";
->> >> +                       reg = <0x3000000 0x1000>;
->> >> +                       interrupts = <0 224 4>;
->> >> +                       clocks = <&clock HIP04_CLK_50M>;
->> >> +                       clock-names = "apb_pclk";
->> >> +               };
->> >
->> > I thought sp804 had two clocks (one for AMBA and one for the actual
->> > timer). What's going on here?
->> >
->>
->> If only one clock is configured at here, sp804 driver believes that
->> clk2 is same as clk1.
->
-> I'm not keen on relying on that. It's arguably a bug in the driver.
-
-The driver should warn, but we can't make it fail on it now. :(
-
-
--Olof
+diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
+index bdbc84a..440e037 100644
+--- a/arch/arm/boot/dts/Makefile
++++ b/arch/arm/boot/dts/Makefile
+@@ -379,6 +379,7 @@ dtb-$(CONFIG_MACH_SUN6I) += \
+ 	sun6i-a31-hummingbird.dtb \
+ 	sun6i-a31-m9.dtb
+ dtb-$(CONFIG_MACH_SUN7I) += \
++	sun7i-a20-bananapi.dtb \
+ 	sun7i-a20-cubieboard2.dtb \
+ 	sun7i-a20-cubietruck.dtb \
+ 	sun7i-a20-i12-tvbox.dtb \
+diff --git a/arch/arm/boot/dts/sun7i-a20-bananapi.dts b/arch/arm/boot/dts/sun7i-a20-bananapi.dts
+new file mode 100644
+index 0000000..0332b82
+--- /dev/null
++++ b/arch/arm/boot/dts/sun7i-a20-bananapi.dts
+@@ -0,0 +1,183 @@
++/*
++ * Copyright 2014 Hans de Goede <hdegoede@redhat.com>
++ *
++ * The code contained herein is licensed under the GNU General Public
++ * License. You may obtain a copy of the GNU General Public License
++ * Version 2 or later at the following locations:
++ *
++ * http://www.opensource.org/licenses/gpl-license.html
++ * http://www.gnu.org/copyleft/gpl.html
++ */
++
++/dts-v1/;
++/include/ "sun7i-a20.dtsi"
++/include/ "sunxi-common-regulators.dtsi"
++
++/ {
++	model = "LeMaker Banana Pi";
++	compatible = "lemaker,bananapi", "allwinner,sun7i-a20";
++
++	soc at 01c00000 {
++		spi0: spi at 01c05000 {
++			pinctrl-names = "default";
++			pinctrl-0 = <&spi0_pins_a>;
++			status = "okay";
++		};
++
++		mmc0: mmc at 01c0f000 {
++			pinctrl-names = "default";
++			pinctrl-0 = <&mmc0_pins_a>, <&mmc0_cd_pin_bananapi>;
++			vmmc-supply = <&reg_vcc3v3>;
++			bus-width = <4>;
++			cd-gpios = <&pio 7 10 0>; /* PH10 */
++			cd-inverted;
++			status = "okay";
++		};
++
++		usbphy: phy at 01c13400 {
++			usb1_vbus-supply = <&reg_usb1_vbus>;
++			usb2_vbus-supply = <&reg_usb2_vbus>;
++			status = "okay";
++		};
++
++		ehci0: usb at 01c14000 {
++			status = "okay";
++		};
++
++		ohci0: usb at 01c14400 {
++			status = "okay";
++		};
++
++		ahci: sata at 01c18000 {
++			status = "okay";
++		};
++
++		ehci1: usb at 01c1c000 {
++			status = "okay";
++		};
++
++		ohci1: usb at 01c1c400 {
++			status = "okay";
++		};
++
++		pinctrl at 01c20800 {
++			uart3_pins_bananapi: uart3_pin at 0 {
++				allwinner,pins = "PH0", "PH1";
++				allwinner,function = "uart3";
++				allwinner,drive = <0>;
++				allwinner,pull = <0>;
++			};
++
++			mmc0_cd_pin_bananapi: mmc0_cd_pin at 0 {
++				allwinner,pins = "PH10";
++				allwinner,function = "gpio_in";
++				allwinner,drive = <0>;
++				allwinner,pull = <1>;
++			};
++
++			gmac_power_pin_bananapi: gmac_power_pin at 0 {
++				allwinner,pins = "PH23";
++				allwinner,function = "gpio_out";
++				allwinner,drive = <0>;
++				allwinner,pull = <0>;
++			};
++
++			led_pins_bananapi: led_pins at 0 {
++				allwinner,pins = "PH24";
++				allwinner,function = "gpio_out";
++				allwinner,drive = <0>;
++				allwinner,pull = <0>;
++			};
++		};
++
++		ir0: ir at 01c21800 {
++			pinctrl-names = "default";
++			pinctrl-0 = <&ir0_pins_a>;
++			status = "okay";
++		};
++
++		uart0: serial at 01c28000 {
++			pinctrl-names = "default";
++			pinctrl-0 = <&uart0_pins_a>;
++			status = "okay";
++		};
++
++		uart3: serial at 01c28c00 {
++			pinctrl-names = "default";
++			pinctrl-0 = <&uart3_pins_bananapi>;
++			status = "okay";
++		};
++
++		uart7: serial at 01c29c00 {
++			pinctrl-names = "default";
++			pinctrl-0 = <&uart7_pins_a>;
++			status = "okay";
++		};
++
++		i2c0: i2c at 01c2ac00 {
++			pinctrl-names = "default";
++			pinctrl-0 = <&i2c0_pins_a>;
++			status = "okay";
++
++			axp209: pmic at 34 {
++				compatible = "x-powers,axp209";
++				reg = <0x34>;
++				interrupt-parent = <&nmi_intc>;
++				interrupts = <0 8>;
++
++				interrupt-controller;
++				#interrupt-cells = <1>;
++			};
++		};
++
++		i2c2: i2c at 01c2b400 {
++			pinctrl-names = "default";
++			pinctrl-0 = <&i2c2_pins_a>;
++			status = "okay";
++		};
++
++		gmac: ethernet at 01c50000 {
++			pinctrl-names = "default";
++			pinctrl-0 = <&gmac_pins_rgmii_a>;
++			phy = <&phy1>;
++			phy-mode = "rgmii";
++			phy-supply = <&reg_gmac_3v3>;
++			status = "okay";
++
++			phy1: ethernet-phy at 1 {
++				reg = <1>;
++			};
++		};
++	};
++
++	leds {
++		compatible = "gpio-leds";
++		pinctrl-names = "default";
++		pinctrl-0 = <&led_pins_bananapi>;
++
++		green {
++			label = "bananapi:green:usr";
++			gpios = <&pio 7 24 0>;
++		};
++	};
++
++	reg_usb1_vbus: usb1-vbus {
++		status = "okay";
++	};
++
++	reg_usb2_vbus: usb2-vbus {
++		status = "okay";
++	};
++
++	reg_gmac_3v3: gmac-3v3 {
++		compatible = "regulator-fixed";
++		pinctrl-names = "default";
++		pinctrl-0 = <&gmac_power_pin_bananapi>;
++		regulator-name = "gmac-3v3";
++		regulator-min-microvolt = <3300000>;
++		regulator-max-microvolt = <3300000>;
++		startup-delay-us = <50000>;
++		enable-active-high;
++		gpio = <&pio 7 23 0>;
++	};
++};
+-- 
+2.0.0
