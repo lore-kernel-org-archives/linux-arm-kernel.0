@@ -1,37 +1,22 @@
 From: shawn.guo@freescale.com (Shawn Guo)
-Date: Tue, 29 Jul 2014 15:32:24 +0800
-Subject: [PATCH] ARM: imx: remove unnecessary ARCH_HAS_OPP select
-Message-ID: <1406619144-20095-1-git-send-email-shawn.guo@freescale.com>
+Date: Tue, 29 Jul 2014 15:36:41 +0800
+Subject: [PATCH] ARM: dts: imx6qdl-sabresd: add always on pcie regulator
+In-Reply-To: <1406136551-8015-1-git-send-email-l.stach@pengutronix.de>
+References: <1406136551-8015-1-git-send-email-l.stach@pengutronix.de>
+Message-ID: <20140729073640.GB24750@dragon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Since ARCH_MXC already selects ARCH_HAS_OPP, it's really unnecessary for
-SOC_IMX27 and SOC_IMX5 to select it again.
+On Wed, Jul 23, 2014 at 07:29:11PM +0200, Lucas Stach wrote:
+> Everything in the PCI specification assumes devices to be
+> enumerable on startup. This is only possible if they have
+> power available.
+> 
+> A future improvement may allow this regulator to be switched
+> off for D3hot and D3cold power states, but there is a lot
+> of work to do the pcie host controller side for this to work.
+> To keep things simple always enable the regulator for now.
+> 
+> Signed-off-by: Lucas Stach <l.stach@pengutronix.de>
 
-Signed-off-by: Shawn Guo <shawn.guo@freescale.com>
----
- arch/arm/mach-imx/Kconfig | 2 --
- 1 file changed, 2 deletions(-)
-
-diff --git a/arch/arm/mach-imx/Kconfig b/arch/arm/mach-imx/Kconfig
-index 2bc7b97861b4..aab4e7718791 100644
---- a/arch/arm/mach-imx/Kconfig
-+++ b/arch/arm/mach-imx/Kconfig
-@@ -86,7 +86,6 @@ config SOC_IMX25
- 
- config SOC_IMX27
- 	bool
--	select ARCH_HAS_OPP
- 	select CPU_ARM926T
- 	select IMX_HAVE_IOMUX_V1
- 	select MXC_AVIC
-@@ -660,7 +659,6 @@ comment "Device tree only"
- 
- config SOC_IMX5
- 	bool
--	select ARCH_HAS_OPP
- 	select HAVE_IMX_SRC
- 	select MXC_TZIC
- 
--- 
-1.9.1
+Applied, thanks.
