@@ -1,83 +1,52 @@
-From: hanjun.guo@linaro.org (Hanjun Guo)
-Date: Tue, 29 Jul 2014 21:10:21 +0800
-Subject: [PATCH 02/19] ARM64 / ACPI: Introduce early_param for "acpi"
-In-Reply-To: <53D69801.9090901@arm.com>
-References: <1406206825-15590-1-git-send-email-hanjun.guo@linaro.org>
- <1406206825-15590-3-git-send-email-hanjun.guo@linaro.org>
- <53D69801.9090901@arm.com>
-Message-ID: <53D79D3D.9040305@linaro.org>
+From: will.deacon@arm.com (Will Deacon)
+Date: Tue, 29 Jul 2014 14:19:51 +0100
+Subject: [PATCH v15 01/12] irq: gic: support hip04 gic
+In-Reply-To: <2455679.mpY3ZEfao6@wuerfel>
+References: <1406555876-11989-1-git-send-email-haojian.zhuang@linaro.org>
+ <1406555876-11989-2-git-send-email-haojian.zhuang@linaro.org>
+ <87a97to025.fsf@approximate.cambridge.arm.com>
+ <2455679.mpY3ZEfao6@wuerfel>
+Message-ID: <20140729131951.GQ9245@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2014-7-29 2:35, Sudeep Holla wrote:
+On Tue, Jul 29, 2014 at 02:05:06PM +0100, Arnd Bergmann wrote:
+> On Monday 28 July 2014 18:38:58 Marc Zyngier wrote:
+> > Overall, this code should be able to sitting within a #ifdef/#endif
+> > block, only selected if this platform is enabled, and possibly find a
+> > way not to impact all the other platforms when this is not selected.
+> > 
+> > Finally, I'd like to outline how much I dislike the way the GIC
+> > architecture has been abused here. Yes, this solves a particular
+> > problem, at a given point in time, but this also feels extremely short
+> > sighted from whoever has put this thing together. This really feels like
+> > a short-term HW hack that is already addressed by GICv3. Merging support
+> > for non architecture compliant HW is never the best solution.
 > 
+> Not merging support for shipping hardware is also not a solution,
+> and we already support any number of irqchip drivers and have all
+> the logic we need to sort that out at runtime.
 > 
-> On 24/07/14 14:00, Hanjun Guo wrote:
->> From: Al Stone <al.stone@linaro.org>
->>
->> Introduce two early parameters for "acpi", one is the parameter
->> to disable ACPI on ARM64 and another one is acpi=strict to disable
->> out-of-spec workarounds.
->>
->> Reviewed-by: Grant Likely <grant.likely@linaro.org>
->> Signed-off-by: Al Stone <al.stone@linaro.org>
->> Signed-off-by: Graeme Gregory <graeme.gregory@linaro.org>
->> Signed-off-by: Hanjun Guo <hanjun.guo@linaro.org>
->> ---
->>   Documentation/kernel-parameters.txt |    3 ++-
->>   arch/arm64/kernel/acpi.c            |   21 +++++++++++++++++++++
->>   2 files changed, 23 insertions(+), 1 deletion(-)
->>
->> diff --git a/Documentation/kernel-parameters.txt
->> b/Documentation/kernel-parameters.txt
->> index b7fa2f5..d130bd5 100644
->> --- a/Documentation/kernel-parameters.txt
->> +++ b/Documentation/kernel-parameters.txt
->> @@ -165,7 +165,7 @@ multipliers 'Kilo', 'Mega', and 'Giga', equalling 2^10,
->> 2^20, and 2^30
->>   bytes respectively. Such letter suffixes can also be entirely omitted.
->>
->>
->> -    acpi=        [HW,ACPI,X86]
->> +    acpi=        [HW,ACPI,X86,ARM]
->>               Advanced Configuration and Power Interface
->>               Format: { force | off | strict | noirq | rsdt }
->>               force -- enable ACPI if default was off
->> @@ -175,6 +175,7 @@ bytes respectively. Such letter suffixes can also be
->> entirely omitted.
->>                   strictly ACPI specification compliant.
->>               rsdt -- prefer RSDT over (default) XSDT
->>               copy_dsdt -- copy DSDT to memory
->> +            For ARM64, ONLY "off" and "strict" are available.
->>
->>               See also Documentation/power/runtime_pm.txt, pci=noacpi
->>
->> diff --git a/arch/arm64/kernel/acpi.c b/arch/arm64/kernel/acpi.c
->> index c62fce6..ac78e4e 100644
->> --- a/arch/arm64/kernel/acpi.c
->> +++ b/arch/arm64/kernel/acpi.c
->> @@ -74,3 +74,24 @@ void __init acpi_boot_table_init(void)
->>           return;
->>       }
->>   }
->> +
->> +static int __init parse_acpi(char *arg)
->> +{
->> +    if (!arg)
->> +        return -EINVAL;
->> +
->> +    /* "acpi=off" disables both ACPI table parsing and interpreter */
->> +    if (strcmp(arg, "off") == 0) {
->> +        disable_acpi();
->> +    }
->> +    /* acpi=strict disables out-of-spec workarounds */
->> +    else if (strcmp(arg, "strict") == 0) {
->> +        acpi_strict = 1;
+> My feeling is that the original approach taken in the early version
+> of the patch set was actually better, given all the problems with
+> integrating this nicely into the gic driver.
 > 
-> This should be default set as I mentioned in patch#1. We can introduce
-> this option if required in future.
+> Would you be happier with that? The downside of that would be
+> that some driver bugs would get fixed in one driver but not the
+> other one, which is why we normally try to avoid it. On the other
+> hand, it means that the normal GIC driver does not get polluted
+> with hacks that are only needed for the hip04 version and there
+> is an obvious way to disable the driver at compile time when you
+> build for other platforms.
 
-Agreed, Let's keep it strict in the beginning to support ACPI.
+Yeah, I think after all this, you're right and keeping the two drivers
+strictly separate is probably the best thing after all. That also allows
+the vgic and gicv3 work to continue regardless of the hip04 driver,
+especially since we don't have any useful documentation for the hardware
+itself.
 
-Thanks
-Hanjun
+As for the KVM side, I think we should treat this as something totally
+separate to the GIC and *not* instantiate a vgic in response to
+KVM_CREATE_IRQCHIP on systems with this hardware.
+
+Will
