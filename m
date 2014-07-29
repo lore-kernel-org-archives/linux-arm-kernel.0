@@ -1,108 +1,138 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Tue, 29 Jul 2014 12:57:16 +0100
-Subject: [PATCH] arm64: Fix UP build warning in gic-v3
-In-Reply-To: <1406588159.28348.41.camel@smoke> (Geoff Levand's message of
- "Mon, 28 Jul 2014 23:55:59 +0100")
-References: <1406588159.28348.41.camel@smoke>
-Message-ID: <878uncml7n.fsf@approximate.cambridge.arm.com>
+From: ta.omasab@gmail.com (Thomas Abraham)
+Date: Tue, 29 Jul 2014 17:30:20 +0530
+Subject: [PATCH v8 3/6] ARM: dts: Exynos: add CPU OPP and regulator supply
+ property
+In-Reply-To: <53D77817.7030605@gmail.com>
+References: <1406611711-25112-1-git-send-email-thomas.ab@samsung.com>
+ <1406611711-25112-4-git-send-email-thomas.ab@samsung.com>
+ <53D77817.7030605@gmail.com>
+Message-ID: <CAJuA9ahAmPytu0Oncnj7Ytm+UFCfiekdFnsHu1N6js=NNsypJQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jul 28 2014 at 11:55:59 pm BST, Geoff Levand <geoff@infradead.org> wrote:
-> The static routines gic_write_sgi1r() and gic_peek_irq() are only used for SMP
-> builds, so move those two routines to within the defined(CONFIG_SMP)
-> preprocessor conditional.
->
-> Fixes build warnings like these when CONFIG_SMP=n:
->
->   drivers/irqchip/irq-gic-v3.c: warning: ?gic_write_sgi1r? defined but not used
->   drivers/irqchip/irq-gic-v3.c: warning: ?gic_peek_irq? defined but not used
->
-> Signed-off-by: Geoff Levand <geoff@infradead.org>
-> ---
-> Hi Marc,
->
-> I'm not sure if this has gone upstream yet, but I get these warnings
-> with Catalin's current arm64/for-next/core branch.
->
-> Feel free to just fold this into your gic-v3 patch if you'll be
-> sending out a new version.
+Hi Tomasz,
 
-Hi Geof,
+On Tue, Jul 29, 2014 at 4:01 PM, Tomasz Figa <tomasz.figa@gmail.com> wrote:
+> Hi Thomas,
+>
+> Other than the same question about 400 MHz OPP for Exynos4210, I have
+> also few more inline.
+>
+> On 29.07.2014 07:28, Thomas Abraham wrote:
+>> For Exynos 4210/5250/5420 based platforms, add CPU operating points and CPU
+>> regulator supply properties for migrating from Exynos specific cpufreq driver
+>> to using generic cpufreq drivers.
+>>
+>> Cc: Kukjin Kim <kgene.kim@samsung.com>
+>> Signed-off-by: Thomas Abraham <thomas.ab@samsung.com>
+>> ---
+>>  arch/arm/boot/dts/exynos4210-origen.dts         |    6 ++++
+>>  arch/arm/boot/dts/exynos4210-trats.dts          |    6 ++++
+>>  arch/arm/boot/dts/exynos4210-universal_c210.dts |    6 ++++
+>>  arch/arm/boot/dts/exynos4210.dtsi               |   12 +++++++
+>>  arch/arm/boot/dts/exynos5250-arndale.dts        |    6 ++++
+>>  arch/arm/boot/dts/exynos5250-cros-common.dtsi   |    6 ++++
+>>  arch/arm/boot/dts/exynos5250-smdk5250.dts       |    6 ++++
+>>  arch/arm/boot/dts/exynos5250.dtsi               |   23 ++++++++++++++
+>>  arch/arm/boot/dts/exynos5420-smdk5420.dts       |    6 ++++
+>
+> There are more Exynos5420-based boards supported in mainline. If you do
+> not have necessary data and/or hardware to fully enable the new driver
+> on them, you should add responsible people on Cc list, so at least they
+> know they have one more item on their TODO list. Added them for you.
 
-There is a similar patch from Mark Brown on its way (not addressing
-gic_write_sgi1r though).
+Thanks!. Will do that next time.
+
+>
+>>  arch/arm/boot/dts/exynos5420.dtsi               |   38 +++++++++++++++++++++++
+>>  10 files changed, 115 insertions(+)
+>
+> [snip]
+>
+>> diff --git a/arch/arm/boot/dts/exynos5250.dtsi b/arch/arm/boot/dts/exynos5250.dtsi
+>> index 492e1ef..876247a 100644
+>> --- a/arch/arm/boot/dts/exynos5250.dtsi
+>> +++ b/arch/arm/boot/dts/exynos5250.dtsi
+>> @@ -63,6 +63,29 @@
+>>                       compatible = "arm,cortex-a15";
+>>                       reg = <0>;
+>>                       clock-frequency = <1700000000>;
+>> +
+>> +                     clocks = <&clock CLK_ARM_CLK>;
+>> +                     clock-names = "cpu";
+>> +                     clock-latency = <200000>;
+>
+> Where does this latency value comes from? How did you calculate it?
+>
+> For example, on Exynos4210, for all operating points added by your
+> patches, the highest PLL locking latency will be 60uS, because the
+> highest PDIV value would be 6 and PLL lock time is PDIV*240 ticks of 24
+> MHz reference clock.
+
+Since the CPU clock is a composite clock with dividers and muxes, the
+latency includes the settling time for these clock blocks as well. I
+have not made any measurements of the clock transition latency.
+
+>
+>> +
+>> +                     operating-points = <
+>> +                             1700000 1300000
+>> +                             1600000 1250000
+>
+> [snip]
+>
+>> diff --git a/arch/arm/boot/dts/exynos5420-smdk5420.dts b/arch/arm/boot/dts/exynos5420-smdk5420.dts
+>> index 6052aa9..084e587 100644
+>> --- a/arch/arm/boot/dts/exynos5420-smdk5420.dts
+>> +++ b/arch/arm/boot/dts/exynos5420-smdk5420.dts
+>> @@ -24,6 +24,12 @@
+>>               bootargs = "console=ttySAC2,115200 init=/linuxrc";
+>>       };
+>>
+>> +     cpus {
+>
+> Is there no regulator for cpu0?
+
+This was a mistake. I did not intend to add regulator for cpu4 as well
+but somehow I missed it. I will remove it in the next version.
+
+>
+>> +             cpu at 4 {
+>> +                     cpu0-supply = <&buck6_reg>;
+>> +             };
+>> +     };
+>> +
+>>       fixed-rate-clocks {
+>>               oscclk {
+>>                       compatible = "samsung,exynos5420-oscclk";
+>> diff --git a/arch/arm/boot/dts/exynos5420.dtsi b/arch/arm/boot/dts/exynos5420.dtsi
+>> index cb2b70e..1116d55 100644
+>> --- a/arch/arm/boot/dts/exynos5420.dtsi
+>> +++ b/arch/arm/boot/dts/exynos5420.dtsi
+>
+> [snip]
+>
+>>
+>>               cpu1: cpu at 1 {
+>> @@ -69,6 +87,7 @@
+>>                       reg = <0x1>;
+>>                       clock-frequency = <1800000000>;
+>>                       cci-control-port = <&cci_control1>;
+>> +                     clock-latency = <200000>;
+>
+> Do you need to specify this property for every CPU or rather just for
+> those which have operating points specified?
+
+The big.little cpufreq driver expects each CPU to have the clock
+latency specified.
 
 Thanks,
+Thomas.
 
-	M.
 >
-> -Geoff
->
->  drivers/irqchip/irq-gic-v3.c | 36 ++++++++++++++++++------------------
->  1 file changed, 18 insertions(+), 18 deletions(-)
->
-> diff --git a/drivers/irqchip/irq-gic-v3.c b/drivers/irqchip/irq-gic-v3.c
-> index 57eaa5a..e9ee18a 100644
-> --- a/drivers/irqchip/irq-gic-v3.c
-> +++ b/drivers/irqchip/irq-gic-v3.c
-> @@ -129,11 +129,6 @@ static void gic_write_grpen1(u64 val)
->  	isb();
->  }
->  
-> -static void gic_write_sgi1r(u64 val)
-> -{
-> -	asm volatile("msr_s " __stringify(ICC_SGI1R_EL1) ", %0" : : "r" (val));
-> -}
-> -
->  static void gic_enable_sre(void)
->  {
->  	u64 val;
-> @@ -200,19 +195,6 @@ static void gic_poke_irq(struct irq_data *d, u32 offset)
->  	rwp_wait();
->  }
->  
-> -static int gic_peek_irq(struct irq_data *d, u32 offset)
-> -{
-> -	u32 mask = 1 << (gic_irq(d) % 32);
-> -	void __iomem *base;
-> -
-> -	if (gic_irq_in_rdist(d))
-> -		base = gic_data_rdist_sgi_base();
-> -	else
-> -		base = gic_data.dist_base;
-> -
-> -	return !!(readl_relaxed(base + offset + (gic_irq(d) / 32) * 4) & mask);
-> -}
-> -
->  static void gic_mask_irq(struct irq_data *d)
->  {
->  	gic_poke_irq(d, GICD_ICENABLER);
-> @@ -401,6 +383,24 @@ static void gic_cpu_init(void)
->  }
->  
->  #ifdef CONFIG_SMP
-> +static void gic_write_sgi1r(u64 val)
-> +{
-> +	asm volatile("msr_s " __stringify(ICC_SGI1R_EL1) ", %0" : : "r" (val));
-> +}
-> +
-> +static int gic_peek_irq(struct irq_data *d, u32 offset)
-> +{
-> +	u32 mask = 1 << (gic_irq(d) % 32);
-> +	void __iomem *base;
-> +
-> +	if (gic_irq_in_rdist(d))
-> +		base = gic_data_rdist_sgi_base();
-> +	else
-> +		base = gic_data.dist_base;
-> +
-> +	return !!(readl_relaxed(base + offset + (gic_irq(d) / 32) * 4) & mask);
-> +}
-> +
->  static int gic_secondary_init(struct notifier_block *nfb,
->  			      unsigned long action, void *hcpu)
->  {
-
--- 
-Jazz is not dead. It just smells funny.
+> Best regards,
+> Tomasz
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-pm" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
