@@ -1,27 +1,72 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Tue, 29 Jul 2014 13:03:17 +0100
-Subject: [PATCH] arm64: Fix UP build warning in gic-v3
-In-Reply-To: <878uncml7n.fsf@approximate.cambridge.arm.com>
-References: <1406588159.28348.41.camel@smoke>
- <878uncml7n.fsf@approximate.cambridge.arm.com>
-Message-ID: <20140729120317.GP17528@sirena.org.uk>
+From: ta.omasab@gmail.com (Thomas Abraham)
+Date: Tue, 29 Jul 2014 17:34:05 +0530
+Subject: [PATCH v8 6/6] clk: samsung: remove unused clock aliases and
+ update clock flags
+In-Reply-To: <53D77B01.40702@gmail.com>
+References: <1406611711-25112-1-git-send-email-thomas.ab@samsung.com>
+ <1406611711-25112-7-git-send-email-thomas.ab@samsung.com>
+ <53D77B01.40702@gmail.com>
+Message-ID: <CAJuA9ahgOS7ccqiaMHn9rTS4tY3ah64rzbmQugWmL3s6HXFZVQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jul 29, 2014 at 12:57:16PM +0100, Marc Zyngier wrote:
+Hi Tomasz,
 
-> There is a similar patch from Mark Brown on its way (not addressing
-> gic_write_sgi1r though).
+On Tue, Jul 29, 2014 at 4:14 PM, Tomasz Figa <tomasz.figa@gmail.com> wrote:
+> Hi Thomas,
+>
+> You can find few comments inline.
+>
+> On 29.07.2014 07:28, Thomas Abraham wrote:
+>
+> [snip]
+>
+>> @@ -714,15 +715,24 @@ static struct samsung_div_clock exynos4_div_clks[] __initdata = {
+>                                                         ^^^
+>
+> Keep in mind that following clocks are common for Exynos4210 and
+> Exynos4x12. Have you tested this series on a board based on Exynos4212
+> or 4412 to verify that it does not break the legacy driver? (I would
+> test it myself, but I am on holidays at the moment.)
 
-Right, I was thinking that was better fixed by making all those
-access functions static inline instead, I didn't get round to looking at
-that properly yet though so didn't send a patch.  Moving the one
-accessor function felt like it was the wrong way to go but that's just
-taste.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140729/47b161a0/attachment.sig>
+Thanks for taking time to have a look at this series. I have tested
+this series with the old cpufreq driver for Exynos4412 on an
+Origen4412 board and it works fine. These divider clocks are not
+directly used or referenced by the legacy cpufreq driver. So I marked
+them as read-only here.
+
+>
+>>       DIV(0, "div_clkout_rightbus", "mout_clkout_rightbus",
+>>                       CLKOUT_CMU_RIGHTBUS, 8, 6),
+>>
+>> -     DIV(0, "div_core", "mout_core", DIV_CPU0, 0, 3),
+>> -     DIV(0, "div_corem0", "div_core2", DIV_CPU0, 4, 3),
+>> -     DIV(0, "div_corem1", "div_core2", DIV_CPU0, 8, 3),
+>> -     DIV(0, "div_periph", "div_core2", DIV_CPU0, 12, 3),
+>
+> [snip]
+>
+>> @@ -1501,7 +1507,7 @@ static void __init exynos4_clk_init(struct device_node *np,
+>>               exynos4_soc == EXYNOS4210 ? "Exynos4210" : "Exynos4x12",
+>>               _get_rate("sclk_apll"), _get_rate("sclk_mpll"),
+>>               _get_rate("sclk_epll"), _get_rate("sclk_vpll"),
+>> -             _get_rate("arm_clk"));
+>> +             _get_rate("armclk"));
+>
+> This will not work on Exynos4412, because there is no "armclk" added for
+> this SoC. My suggestion is to simply keep name of the clock as is, move
+> current "arm_clk" divider to Exynos4x12-specific clocks and register
+> Exynos4210 CPU clock as "arm_clk".
+
+Ok. Will do this in the next version.
+
+Thanks,
+Thomas.
+
+>
+> Best regards,
+> Tomasz
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-pm" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
