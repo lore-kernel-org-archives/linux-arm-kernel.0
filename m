@@ -1,50 +1,92 @@
-From: afaerber@suse.de (=?UTF-8?B?QW5kcmVhcyBGw6RyYmVy?=)
-Date: Tue, 29 Jul 2014 14:45:37 +0200
-Subject: [PATCH v2 3/4] ARM: dts: exynos5250: Fold common ChromeOS parts
- into Snow
-In-Reply-To: <CAD=FV=VK0KJknJ2099S7fEDzBnpPCrpSZ36WPkJB156GpcyEfg@mail.gmail.com>
-References: <1405704009-8430-1-git-send-email-afaerber@suse.de>	<1405704009-8430-4-git-send-email-afaerber@suse.de>
- <CAD=FV=VK0KJknJ2099S7fEDzBnpPCrpSZ36WPkJB156GpcyEfg@mail.gmail.com>
-Message-ID: <53D79771.1020406@suse.de>
+From: ta.omasab@gmail.com (Thomas Abraham)
+Date: Tue, 29 Jul 2014 18:21:42 +0530
+Subject: [PATCH v8 3/6] ARM: dts: Exynos: add CPU OPP and regulator supply
+ property
+In-Reply-To: <53D796CB.5020805@suse.de>
+References: <1406611711-25112-1-git-send-email-thomas.ab@samsung.com>
+ <1406611711-25112-4-git-send-email-thomas.ab@samsung.com>
+ <53D78ED3.9090703@suse.de>
+ <CAJuA9ag1xHm=vaXxXzj7ykKxYHxBndDsOTwN0vRdXvhb_DtQ2g@mail.gmail.com>
+ <53D796CB.5020805@suse.de>
+Message-ID: <CAJuA9aiwWm-egBdiHhNVtkgC9k_J4qL6fumuFuNvkePVmHY-hw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Doug,
+Hi Andreas,
 
-Am 25.07.2014 18:02, schrieb Doug Anderson:
-> On Fri, Jul 18, 2014 at 10:20 AM, Andreas F?rber <afaerber@suse.de> wrote:
->> +/*
->> + * On Snow we've got SIP WiFi and so can keep drive strengths low to
->> + * reduce EMI.
->> + */
->> +&mmc_3 {
->> +       status = "okay";
->> +       num-slots = <1>;
->> +       supports-highspeed;
->> +       broken-cd;
->> +       card-detect-delay = <200>;
->> +       samsung,dw-mshc-ciu-div = <3>;
->> +       samsung,dw-mshc-sdr-timing = <2 3>;
->> +       samsung,dw-mshc-ddr-timing = <1 2>;
->> +
->> +       slot at 0 {
->> +               reg = <0>;
->> +               bus-width = <4>;
->> +               pinctrl-names = "default";
->> +               pinctrl-0 = <&sd3_clk &sd3_cmd &sd3_bus4>;
-> 
-> This actually looks like a bug on snow.  I don't think these pinctrl
-> statements are taking effect and I think they belong at the mmc level,
-> not the slot level.  That's not a new bug introduced by you, though.
-> Mind fixing it?  You've already got it right for Spring mmc_1.
+On Tue, Jul 29, 2014 at 6:12 PM, Andreas F?rber <afaerber@suse.de> wrote:
+> Hi Thomas,
+>
+> Am 29.07.2014 14:35, schrieb Thomas Abraham:
+>> On Tue, Jul 29, 2014 at 5:38 PM, Andreas F?rber <afaerber@suse.de> wrote:
+>>> Am 29.07.2014 07:28, schrieb Thomas Abraham:
+>>>> diff --git a/arch/arm/boot/dts/exynos5250-cros-common.dtsi b/arch/arm/boot/dts/exynos5250-cros-common.dtsi
+>>>> index 89ac90f..34bb31c 100644
+>>>> --- a/arch/arm/boot/dts/exynos5250-cros-common.dtsi
+>>>> +++ b/arch/arm/boot/dts/exynos5250-cros-common.dtsi
+>>>> @@ -19,6 +19,12 @@
+>>>>       chosen {
+>>>>       };
+>>>>
+>>>> +     cpus {
+>>>> +             cpu at 0 {
+>>>> +                     cpu0-supply = <&buck2_reg>;
+>>>> +             };
+>>>> +     };
+>>>> +
+>>>>       pinctrl at 11400000 {
+>>>>               /*
+>>>>                * Disabled pullups since external part has its own pullups and
+>>>
+>>> I've been instructed to dismantle this .dtsi file, so please place this
+>>> into exynos5250-snow.dts. It's probably wrong here anyway, since Spring
+>>> doesn't use the max77686 but an s5m6787 PMIC.
+>>
+>> Ok, I will move this to exynos5250-snow.dts.
+>>
+>>>
+>>> How do I find out which -supply to specify here for Spring?
+>>
+>> This information can be found in the Spring board schematic.
+>
+> Are those available publicly somewhere? I guess not...
 
-I was taught never to mix code movements with functional changes, as it
-hides them even if mentioned in the commit message. Would you like me to
-fix it pre- or post-move? Post-move would be easiest for me. ;)
+I am not sure if it is available publicly. Doug (Cc'ed on this email)
+might have it.
 
-Regards,
-Andreas
+>
+>>> Also, wouldn't it make sense to assign a cpu0 label in exynos????.dtsi
+>>> to override it via &cpu0 { ... };?
+>>
+>> Sorry, I did not understand the question.
+>
+> Instead of adding
+>
+> cpus { cpu at 0 { ... }; };
+>
+> to the board's / node, I am suggesting you do in the SoC's .dtsi:
+>
+> - cpu at 0 {
+> + cpu0: cpu at 0 {
+>
+> and then in the board's file after / { ... }; add the following:
+>
+> &cpu0 {
+>         cpu0-supply = <&buck2_reg>;
+> };
+>
+> This is the new preferred way to override or extend inherited nodes, I
+> am told. (&cpu0 should be inserted in alphabetical order then.)
 
--- 
-SUSE LINUX Products GmbH, Maxfeldstr. 5, 90409 N?rnberg, Germany
-GF: Jeff Hawn, Jennifer Guild, Felix Imend?rffer; HRB 16746 AG N?rnberg
+Okay, thanks for the clarification. I will update as per the preferred way.
+
+Thanks,
+Thomas.
+
+>
+> Cheers,
+> Andreas
+>
+> --
+> SUSE LINUX Products GmbH, Maxfeldstr. 5, 90409 N?rnberg, Germany
+> GF: Jeff Hawn, Jennifer Guild, Felix Imend?rffer; HRB 16746 AG N?rnberg
