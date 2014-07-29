@@ -1,28 +1,34 @@
-From: tomasz.figa@gmail.com (Tomasz Figa)
-Date: Tue, 29 Jul 2014 12:32:38 +0200
-Subject: [PATCH v8 4/6] ARM: Exynos: switch to using generic cpufreq driver
- for Exynos4210/5250/5420
-In-Reply-To: <1406611711-25112-5-git-send-email-thomas.ab@samsung.com>
-References: <1406611711-25112-1-git-send-email-thomas.ab@samsung.com>
- <1406611711-25112-5-git-send-email-thomas.ab@samsung.com>
-Message-ID: <53D77846.4060700@gmail.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Tue, 29 Jul 2014 03:32:24 -0700
+Subject: [GIT PULL] omap n900 regression fix for v3.16 rc series
+Message-ID: <20140729103223.GK29045@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 29.07.2014 07:28, Thomas Abraham wrote:
-> The new CPU clock type allows the use of generic CPUfreq drivers. So for
-> Exynos4210/5250, switch to using generic cpufreq driver. For Exynos5420,
-> which did not have CPUfreq driver support, enable the use of generic
-> CPUfreq driver.
-> 
-> Suggested-by: Tomasz Figa <t.figa@samsung.com>
-> Cc: Kukjin Kim <kgene.kim@samsung.com>
-> Signed-off-by: Thomas Abraham <thomas.ab@samsung.com>
-> ---
->  arch/arm/mach-exynos/exynos.c |   24 +++++++++++++++++++++++-
->  1 file changed, 23 insertions(+), 1 deletion(-)
+The following changes since commit 33753cd2ba41c72a0756edc5dc094d91602deda5:
 
-Reviewed-by: Tomasz Figa <t.figa@samsung.com>
+  ARM: OMAP2+: gpmc: fix gpmc_hwecc_bch_capable() (2014-07-23 01:48:24 -0700)
 
-Best regards,
-Tomasz
+are available in the git repository at:
+
+  git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap tags/omap-for-v3.16/n900-regression
+
+for you to fetch changes up to d937678ab625b0f63ce54b2b9b3e1cbd1b4a1b15:
+
+  ARM: dts: Revert enabling of twl configuration for n900 (2014-07-29 00:16:25 -0700)
+
+----------------------------------------------------------------
+Minimal regression fix for n900 display that got broken with
+enabling of twl4030 PM features. Turns out more work is needed
+before we can enable twl4030 PM on n900.
+
+I did not notice this earlier as I have my n900 in a rack
+and the display did not get enabled for device tree based booting
+until for v3.16.
+
+----------------------------------------------------------------
+Tony Lindgren (1):
+      ARM: dts: Revert enabling of twl configuration for n900
+
+ arch/arm/boot/dts/omap3-n900.dts | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
