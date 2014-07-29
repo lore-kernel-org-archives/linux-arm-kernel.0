@@ -1,68 +1,79 @@
-From: ta.omasab@gmail.com (Thomas Abraham)
-Date: Tue, 29 Jul 2014 18:05:18 +0530
-Subject: [PATCH v8 3/6] ARM: dts: Exynos: add CPU OPP and regulator supply
- property
-In-Reply-To: <53D78ED3.9090703@suse.de>
-References: <1406611711-25112-1-git-send-email-thomas.ab@samsung.com>
- <1406611711-25112-4-git-send-email-thomas.ab@samsung.com>
- <53D78ED3.9090703@suse.de>
-Message-ID: <CAJuA9ag1xHm=vaXxXzj7ykKxYHxBndDsOTwN0vRdXvhb_DtQ2g@mail.gmail.com>
+From: koct9i@gmail.com (Konstantin Khlebnikov)
+Date: Tue, 29 Jul 2014 16:37:08 +0400
+Subject: [PATCH 2/2] ARM: LPAE: reduce damage caused by idmap to virtual
+ memory layout
+In-Reply-To: <20140729105717.GC30282@n2100.arm.linux.org.uk>
+References: <20140722153623.25088.37742.stgit@buzz>
+ <20140722153635.25088.14197.stgit@buzz>
+ <20140728181456.GO15536@arm.com>
+ <CALYGNiNJDHfQm2yk067hh-Wywsb_Ki5AEE_sTMkYegJi9spSzw@mail.gmail.com>
+ <20140728184107.GR15536@arm.com>
+ <CALYGNiNaMMv9itJ_+cvPDn1_Yo4GTPQJ-Cy9zBzJzfaDLfkvmg@mail.gmail.com>
+ <20140728191305.GA30282@n2100.arm.linux.org.uk>
+ <CALYGNiNVduTK8MXt8VJyiqdsB0mA_OnC0hLOB-WzgAEMZyu9sg@mail.gmail.com>
+ <20140728194251.GB30282@n2100.arm.linux.org.uk>
+ <CALYGNiO6PEPoHDrcLRZxQVT2=-1upyh6E-TWBCMB0MR8u5Sx6w@mail.gmail.com>
+ <20140729105717.GC30282@n2100.arm.linux.org.uk>
+Message-ID: <CALYGNiMPnyq_kWFRRX0vsMMxekNmc26HnwbNXpTe7Ks+b8HMQg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Andreas,
-
-On Tue, Jul 29, 2014 at 5:38 PM, Andreas F?rber <afaerber@suse.de> wrote:
-> Hi Thomas,
->
-> Am 29.07.2014 07:28, schrieb Thomas Abraham:
->> diff --git a/arch/arm/boot/dts/exynos5250-cros-common.dtsi b/arch/arm/boot/dts/exynos5250-cros-common.dtsi
->> index 89ac90f..34bb31c 100644
->> --- a/arch/arm/boot/dts/exynos5250-cros-common.dtsi
->> +++ b/arch/arm/boot/dts/exynos5250-cros-common.dtsi
->> @@ -19,6 +19,12 @@
->>       chosen {
->>       };
+On Tue, Jul 29, 2014 at 2:57 PM, Russell King - ARM Linux
+<linux@arm.linux.org.uk> wrote:
+> On Mon, Jul 28, 2014 at 11:57:16PM +0400, Konstantin Khlebnikov wrote:
+>> On Mon, Jul 28, 2014 at 11:42 PM, Russell King - ARM Linux
+>> <linux@arm.linux.org.uk> wrote:
+>> > On Mon, Jul 28, 2014 at 11:29:39PM +0400, Konstantin Khlebnikov wrote:
+>> >> Ok, before switching from identity mapping to normal mapping kernel must
+>> >> switch instruction pointer from physical address to virtual.
+>> >
+>> > "switch instruction pointer from physical address to virtual."
+>> >
+>> > There's no such distinction for the instruction pointer.
 >>
->> +     cpus {
->> +             cpu at 0 {
->> +                     cpu0-supply = <&buck2_reg>;
->> +             };
->> +     };
->> +
->>       pinctrl at 11400000 {
->>               /*
->>                * Disabled pullups since external part has its own pullups and
+>> I know. I mean "logically".
+>>
+> ...
+>>
+>> Sorry but I'm really look so dumb? Maybe it's true, it's almost
+>> midnight at my side.
 >
-> I've been instructed to dismantle this .dtsi file, so please place this
-> into exynos5250-snow.dts. It's probably wrong here anyway, since Spring
-> doesn't use the max77686 but an s5m6787 PMIC.
-
-Ok, I will move this to exynos5250-snow.dts.
-
+> When you use language which suggests a lack of understanding, then
+> I will explain things.
 >
-> How do I find out which -supply to specify here for Spring?
-
-This information can be found in the Spring board schematic.
-
+>> > It doesn't matter, provided the kernel text and data in the virtual
+>> > address space are not overwritten by the identity mapping.  If it
+>> > ends up in the vmalloc or IO space, that should not be a problem.
+>>
+>> In my case it's been overwritten.
+>> And it always happens when PHYS_OFFSET >= PAGE_OFFSET
+>> because in case of LPAE idmap always overwrites 1Gb at once.
 >
-> Also, wouldn't it make sense to assign a cpu0 label in exynos????.dtsi
-> to override it via &cpu0 { ... };?
+> Right, I now see what you're getting at.  Here's a better description
+> which I've used when committing your patch.  I've only taken patch 2
+> at the present time.
+>
+>
 
-Sorry, I did not understand the question.
-
-Thanks,
-Thomas.
+Ok. Thank you for your time.
 
 >
-> Regards,
-> Andreas
+> On LPAE, each level 1 (pgd) page table entry maps 1GiB, and the level 2
+> (pmd) entries map 2MiB.
+>
+> When the identity mapping is created on LPAE, the pgd pointers are copied
+> from the swapper_pg_dir.  If we find that we need to modify the contents
+> of a pmd, we allocate a new empty pmd table and insert it into the
+> appropriate 1GB slot, before then filling it with the identity mapping.
+>
+> However, if the 1GB slot covers the kernel lowmem mappings, we obliterate
+> those mappings.
+>
+> When replacing a PMD, first copy the old PMD contents to the new PMD, so
+> that we preserve the existing mappings in the 1GiB region, particularly
+> the mappings of the kernel itself.
+>
 >
 > --
-> SUSE LINUX Products GmbH, Maxfeldstr. 5, 90409 N?rnberg, Germany
-> GF: Jeff Hawn, Jennifer Guild, Felix Imend?rffer; HRB 16746 AG N?rnberg
->
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+> FTTC broadband for 0.8mile line: currently at 9.5Mbps down 400kbps up
+> according to speedtest.net.
