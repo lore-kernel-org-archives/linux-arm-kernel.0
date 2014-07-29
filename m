@@ -1,35 +1,33 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Tue, 29 Jul 2014 04:04:50 -0700
-Subject: [GIT PULL] ARM: OMAP2+: PLL rounding change for v3.17
-In-Reply-To: <alpine.DEB.2.02.1407251254540.18958@utopia.booyaka.com>
-References: <alpine.DEB.2.02.1407251254540.18958@utopia.booyaka.com>
-Message-ID: <20140729110449.GM29045@atomide.com>
+From: pawel.moll@arm.com (Pawel Moll)
+Date: Tue, 29 Jul 2014 12:06:27 +0100
+Subject: [PATCH v9] video: ARM CLCD: Add DT support
+In-Reply-To: <1406023366.25343.44.camel@hornet>
+References: <1403610911-31491-1-git-send-email-pawel.moll@arm.com>
+ <1404824767.21897.7.camel@hornet> <1406023366.25343.44.camel@hornet>
+Message-ID: <1406631987.17155.0.camel@hornet>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Paul Walmsley <paul@pwsan.com> [140725 05:58]:
-> Hi Tony
+On Tue, 2014-07-22 at 11:02 +0100, Pawel Moll wrote:
+> On Tue, 2014-07-08 at 14:06 +0100, Pawel Moll wrote:
+> > On Tue, 2014-06-24 at 12:55 +0100, Pawel Moll wrote:
+> > > This patch adds basic DT bindings for the PL11x CLCD cells
+> > > and make their fbdev driver use them.
+> > > 
+> > > Signed-off-by: Pawel Moll <pawel.moll@arm.com>
+> > 
+> > As two weeks passed without any further comment, I'm assuming that there
+> > are no more obstacles for this patch to be merged.
+> > 
+> > Tomi, will you pick it up for 3.17, as you offered? Russell, if you
+> > prefer to take it via your tree, it's in your system as 8005/4.
 > 
-> The following changes since commit a497c3ba1d97fc69c1e78e7b96435ba8c2cb42ee:
+> Ping...
 > 
->   Linux 3.16-rc2 (2014-06-21 19:02:54 -1000)
-> 
-> are available in the git repository at:
-> 
->   git://git.kernel.org/pub/scm/linux/kernel/git/pjw/omap-pending.git tags/for-v3.17/omap-clock-b
-> 
-> for you to fetch changes up to 0a26344440b5f9940c99112fdc3804f073b1f5a7:
-> 
->   ARM: OMAP2+: clock: allow omap2_dpll_round_rate() to round to next-lowest rate (2014-07-25 06:11:15 -0600)
-> 
-> ----------------------------------------------------------------
-> Modify OMAP PLL rate rounding function to round to the exact rate requested
-> or the next one below it.  This is intended to resolve some DSS problems.
-> 
-> Basic build, boot, and PM test results are available here:
-> 
-> http://www.pwsan.com/omap/testlogs/clock-b-v3.17/20140725061121/
+> Tomi?
 
-Pulling into omap-for-v3.17/soc thanks.
+... and again...
 
-Tony
+Regards
+
+Pawel
