@@ -1,83 +1,58 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Wed, 30 Jul 2014 19:35:14 +0100
-Subject: [PATCH 2/5] arm64, thunder: Add initial dts for Cavium Thunder SoC
-In-Reply-To: <CAOesGMj9PnfddJO7PorZ7U2OoBFBe4LqONRnbJeMiEkQV1mmWw@mail.gmail.com>
-References: <1406732794-20920-1-git-send-email-rric@kernel.org>
- <1406732794-20920-3-git-send-email-rric@kernel.org>
- <CAOesGMj9PnfddJO7PorZ7U2OoBFBe4LqONRnbJeMiEkQV1mmWw@mail.gmail.com>
-Message-ID: <20140730183514.GH20162@leverpostej>
+From: Paul.Zimmerman@synopsys.com (Paul Zimmerman)
+Date: Wed, 30 Jul 2014 18:53:38 +0000
+Subject: [PATCH 1/4] Documentation: dt-bindings: add dt binding info for
+ Rockchip dwc2
+In-Reply-To: <1406683873-18194-2-git-send-email-kever.yang@rock-chips.com>
+References: <963258>
+ <1406683873-18194-1-git-send-email-kever.yang@rock-chips.com>
+ <1406683873-18194-2-git-send-email-kever.yang@rock-chips.com>
+Message-ID: <A2CA0424C0A6F04399FB9E1CD98E0304844C2F5B@US01WEMBX2.internal.synopsys.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jul 30, 2014 at 07:12:17PM +0100, Olof Johansson wrote:
-> On Wed, Jul 30, 2014 at 8:06 AM, Robert Richter <rric@kernel.org> wrote:
-> > From: Radha Mohan Chintakuntla <rchintakuntla@cavium.com>
-> >
-> > Add initial device tree nodes for Cavium Thunder SoCs with support of
-> > 48 cores and gicv3. The dts file requires further changes, esp. for
-> > pci, gicv3-its and smmu. This changes will be added later together
-> > with the device drivers.
-> >
-> > Signed-off-by: Radha Mohan Chintakuntla <rchintakuntla@cavium.com>
-> > Signed-off-by: Robert Richter <rrichter@cavium.com>
-> > ---
-> >  arch/arm64/boot/dts/Makefile         |   1 +
-> >  arch/arm64/boot/dts/thunder-88xx.dts | 387 +++++++++++++++++++++++++++++++++++
-> >  2 files changed, 388 insertions(+)
-> >  create mode 100644 arch/arm64/boot/dts/thunder-88xx.dts
-> >
-> > diff --git a/arch/arm64/boot/dts/Makefile b/arch/arm64/boot/dts/Makefile
-> > index c52bdb051f66..f8001a62029c 100644
-> > --- a/arch/arm64/boot/dts/Makefile
-> > +++ b/arch/arm64/boot/dts/Makefile
-> > @@ -1,3 +1,4 @@
-> > +dtb-$(CONFIG_ARCH_THUNDER) += thunder-88xx.dtb
-> >  dtb-$(CONFIG_ARCH_VEXPRESS) += rtsm_ve-aemv8a.dtb foundation-v8.dtb
-> >  dtb-$(CONFIG_ARCH_XGENE) += apm-mustang.dtb
-> >
-> > diff --git a/arch/arm64/boot/dts/thunder-88xx.dts b/arch/arm64/boot/dts/thunder-88xx.dts
-> > new file mode 100644
-> > index 000000000000..4cf20ac9138b
-> > --- /dev/null
-> > +++ b/arch/arm64/boot/dts/thunder-88xx.dts
-> > @@ -0,0 +1,387 @@
-> > +/*
-> > + * Cavium Thunder DTS file
-> > + *
-> > + * Copyright (C) 2013, Cavium Inc.
-> > + *
-> > + * This program is free software; you can redistribute it and/or
-> > + * modify it under the terms of the GNU General Public License as
-> > + * published by the Free Software Foundation; either version 2 of
-> > + * the License, or (at your option) any later version.
-> > + */
-> > +/dts-v1/;
-> > +
-> > +/* Reserving first 12MB of DDR for firmware */
-> > +/memreserve/ 0x00000000 0x00c00000;
-> > +
-> > +/ {
-> > +       model = "Cavium ThunderX CN88XX Family";
-> > +       compatible = "cavium,thunder-88xx";
+> From: Kever Yang [mailto:kever.yang at rock-chips.com]
+> Sent: Tuesday, July 29, 2014 6:31 PM
 > 
-> Hmm. I take it this platform is compliant with some level of SBSA? We
-> should probably have a compatible value for that so that platforms can
-> communicate it.
+> This add necessary dwc2 binding documentation for Rockchip socs:
+> rk3066, rk3188 and rk3288
 > 
-> Mark, are there already plans for this?
+> add dr_mode as optional properties.
+> 
+> Signed-off-by: Kever Yang <kever.yang@rock-chips.com>
+> ---
+>  Documentation/devicetree/bindings/usb/dwc2.txt |    5 +++++
+>  1 file changed, 5 insertions(+)
+> 
+> diff --git a/Documentation/devicetree/bindings/usb/dwc2.txt
+> b/Documentation/devicetree/bindings/usb/dwc2.txt
+> index aa91034..eb80d7b 100644
+> --- a/Documentation/devicetree/bindings/usb/dwc2.txt
+> +++ b/Documentation/devicetree/bindings/usb/dwc2.txt
+> @@ -4,6 +4,9 @@ Platform DesignWare HS OTG USB 2.0 controller
+>  Required properties:
+>  - compatible : One of:
+>    - brcm,bcm2835-usb: The DWC2 USB controller instance in the BCM2835 SoC.
+> +  - rockchip,rk3066-usb: The DWC2 USB controller instance in the rk3066 Soc;
+> +  - "rockchip,rk3188-usb","rockchip,rk3066-usb": for rk3188 Soc;
+> +  - "rockchip,rk3288-usb","rockchip,rk3066-usb": for rk3288 Soc;
+>    - snps,dwc2: A generic DWC2 USB controller with default parameters.
 
-Not so far, but my monitor now has a sticky note telling me to look into
-it. :)
+Do you really need three different bindings here? I believe the 
+recommended approach is to define one binding for the common case, and
+reuse it for similar SOCs. Additional bindings should only be added if
+there is some difference in the SOC that requires it.
 
-Many of the useful properties provided by SBSA are already described
-elsewhere (e.g. page and ASID size can be found in ID registers), and
-hardware properties it mandates (e.g. PPI assignment for level 2
-compliant systems) will be described elsewhere.
+>  - reg : Should contain 1 register range (address and length)
+>  - interrupts : Should contain 1 interrupt
+> @@ -15,6 +18,8 @@ Optional properties:
+>  - phys: phy provider specifier
+>  - phy-names: shall be "usb2-phy"
+>  Refer to phy/phy-bindings.txt for generic phy consumer properties
+> +- dr_mode: shall be one of "host", "peripheral" and "otg"
 
-I'll have to read the spec in more detail to figure out what we can
-derive from an SBSA compliance property. Regardless it probably makes
-sense to have a compatible string or other property on the root node; at
-worst it only costs us a few bytes.
+I don't see where you use 'dr_mode' in any of the DTS files. Are you
+going to add the uses later? And please us a more descriptive name,
+such as 'dual-role-mode'.
 
-Thanks,
-Mark.
+-- 
+Paul
