@@ -1,34 +1,44 @@
 From: rric@kernel.org (Robert Richter)
-Date: Wed, 30 Jul 2014 17:06:33 +0200
-Subject: [PATCH 4/5] arm64, defconfig: Enable Cavium Thunder SoC in defconfig
-In-Reply-To: <1406732794-20920-1-git-send-email-rric@kernel.org>
-References: <1406732794-20920-1-git-send-email-rric@kernel.org>
-Message-ID: <1406732794-20920-5-git-send-email-rric@kernel.org>
+Date: Wed, 30 Jul 2014 17:06:29 +0200
+Subject: [PATCH 0/5] arm64, thunder: Enable Cavium Thunder SoC Family
+Message-ID: <1406732794-20920-1-git-send-email-rric@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Robert Richter <rrichter@cavium.com>
 
-This patch enables Thunder SoCs in the arm64 defconfig. This is
-esp. useful to add Thunder platforms to automated builds based on
-arm64 defconfig.
+This initial patches enable Cavium Thunder SoC Family. The patches add
+Kconfig and devicetree support and then add Thunder to the defconfig.
+The last patch is unrelated to Thunder and enables the tmpfs mount
+option for a more convinient use of defconfig with distros.
 
-Signed-off-by: Robert Richter <rrichter@cavium.com>
----
- arch/arm64/configs/defconfig | 1 +
- 1 file changed, 1 insertion(+)
+The Thunder system needs more enablement patches for subsystems and
+devices, this includes network, ahci, gicv3/gicv3-its, pci, smmu, kvm.
+We will send separate patch sets for these. All of them base on this
+initial patches.
 
-diff --git a/arch/arm64/configs/defconfig b/arch/arm64/configs/defconfig
-index 3421f316f5dc..26c3ab582db5 100644
---- a/arch/arm64/configs/defconfig
-+++ b/arch/arm64/configs/defconfig
-@@ -32,6 +32,7 @@ CONFIG_MODULES=y
- CONFIG_MODULE_UNLOAD=y
- # CONFIG_BLK_DEV_BSG is not set
- # CONFIG_IOSCHED_DEADLINE is not set
-+CONFIG_ARCH_THUNDER=y
- CONFIG_ARCH_VEXPRESS=y
- CONFIG_ARCH_XGENE=y
- CONFIG_SMP=y
+Patches are available here:
+
+ git://git.kernel.org/pub/scm/linux/kernel/git/rric/linux.git thunder/init
+
+Radha Mohan Chintakuntla (3):
+  arm64, thunder: Add Kconfig option for Cavium Thunder SoC Family
+  arm64, thunder: Add initial dts for Cavium Thunder SoC
+  arm64, thunder: document devicetree bindings for Cavium Thunder SoC
+
+Robert Richter (2):
+  arm64, defconfig: Enable Cavium Thunder SoC in defconfig
+  arm64, defconfig: Enable tmpfs mount option
+
+ .../devicetree/bindings/arm/cavium-thunder.txt     |  10 +
+ Documentation/devicetree/bindings/arm/cpus.txt     |   1 +
+ arch/arm64/Kconfig                                 |   6 +
+ arch/arm64/boot/dts/Makefile                       |   1 +
+ arch/arm64/boot/dts/thunder-88xx.dts               | 387 +++++++++++++++++++++
+ arch/arm64/configs/defconfig                       |   2 +
+ 6 files changed, 407 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/arm/cavium-thunder.txt
+ create mode 100644 arch/arm64/boot/dts/thunder-88xx.dts
+
 -- 
 2.0.1
