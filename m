@@ -1,65 +1,118 @@
-From: hanjun.guo@linaro.org (Hanjun Guo)
-Date: Wed, 30 Jul 2014 14:47:12 +0800
-Subject: [PATCH 19/19] Documentation: ACPI for ARM64
-In-Reply-To: <CAMJs5B8uk7GDfEOEuY8RWDxzhzTRBGszRDN+JRKwG-D_rgzFrw@mail.gmail.com>
-References: <1406206825-15590-1-git-send-email-hanjun.guo@linaro.org>	<20140729112824.GM2576@leverpostej>	<CAMJs5B_Ye1eXsvJAKWnHRxC4jnpcXMcqHE+GgOGO7MHtPcsSQA@mail.gmail.com>	<351673188.FxXsM7MvdA@wuerfel>	<20140729130823.GP2576@leverpostej>
- <CAMJs5B8uk7GDfEOEuY8RWDxzhzTRBGszRDN+JRKwG-D_rgzFrw@mail.gmail.com>
-Message-ID: <53D894F0.1060102@linaro.org>
+From: achandran@mvista.com (Arun Chandran)
+Date: Wed, 30 Jul 2014 12:31:40 +0530
+Subject: Kexec on arm64
+In-Reply-To: <20140729133557.GQ2576@leverpostej>
+References: <CAFdej00J2mJwcg2Cy6CHVuuQZ4uQ2zZg8oErGPi0uPejievB+Q@mail.gmail.com>
+ <1406162287.4062.39.camel@smoke>
+ <20140724093603.GC4079@leverpostej>
+ <1406247468.4062.59.camel@smoke>
+ <CAFdej01w_pE6vv+13cCCyfDs4Rbdkzx4CMUj9q97HBKV0B53ow@mail.gmail.com>
+ <1406333901.4062.69.camel@smoke>
+ <CAFdej014ohCFYvoUAXWiYGb4_4UmSY2G1MH-NEE_cF1cC-6Mow@mail.gmail.com>
+ <20140728153812.GA2576@leverpostej>
+ <1406592548.28348.49.camel@smoke>
+ <CAFdej00is0kC-1q5uMNJL5APL1WezdNBg0jASgwYamsg5NO_Tg@mail.gmail.com>
+ <20140729133557.GQ2576@leverpostej>
+Message-ID: <CAFdej03wBf1JszKX-vUrFKxvk0kCAOAfZarWOzkwJ097Y0-SSg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2014-7-29 21:31, Christoffer Dall wrote:
-> On 29 July 2014 15:08, Mark Rutland <mark.rutland@arm.com> wrote:
->> On Tue, Jul 29, 2014 at 01:52:40PM +0100, Arnd Bergmann wrote:
->>> On Tuesday 29 July 2014 14:37:38 Christoffer Dall wrote:
->>>>
->>>> For reference, Red Hat's current arguing point for ACPI in VMs is
->>>> hotplug of things like CPUs and memory for very large VMs, but I
->>>> haven't thought too carefully about this just yet, as I don't have a
->>>> 100+ core ARM 64-bit hardware lying around...
->>>
->>> I thought you could run guests with more virtual CPUs that you have
->>> physical CPUs on the host.
->>>
->>> Regarding CPU and memory hotplug, don't we already have PSCI and
->>> xen-balloon/virtio-balloon for that?
+On Tue, Jul 29, 2014 at 7:05 PM, Mark Rutland <mark.rutland@arm.com> wrote:
+> [...]
+>
+>> The default code did not work.
 >>
->> PSCI (0.1) was there for guests from the start, and ACPI doesn't do
->> anything different w.r.t. PSCI other than requiring PSCI 0.2 (which can
->> be used by guests supporting only PSCI 0.1). So there's no magic for
->> CPU hotplug provided by ACPI.
-> 
-> With PSCI you can only provide your VM a bunch of CPUs and say that
-> they're all turned off, and then turn some of them on later.  
+>> It is working with the change below
+>>
+>> ###############
+>> diff --git a/arch/arm64/kernel/machine_kexec.c
+>> b/arch/arm64/kernel/machine_kexec.c
+>> index 5632473..7c5f859 100644
+>> --- a/arch/arm64/kernel/machine_kexec.c
+>> +++ b/arch/arm64/kernel/machine_kexec.c
+>> @@ -147,12 +147,17 @@ static bool kexec_is_dtb_user(const dtb_t *dtb)
+>>  /**
+>>   * kexec_list_walk - Helper to walk the kimage page list.
+>>   */
+>> -
+>> +static int kexec_kernel_size;
+>> +#define IMG_SIZE_NONE  0
+>> +#define KERN_SIZE_FLAG 1
+>> +#define DTB_SIZE_FLAG  2
+>>  static void kexec_list_walk(void *ctx, unsigned long kimage_head,
+>>         void (*cb)(void *ctx, unsigned int flag, void *addr, void *dest))
+>>  {
+>>         void *dest;
+>>         unsigned long *entry;
+>> +       int imgsize_flag = IMG_SIZE_NONE;
+>> +
+>>
+>>         for (entry = &kimage_head, dest = NULL; ; entry++) {
+>>                 unsigned int flag = *entry & IND_FLAGS;
+>> @@ -164,10 +169,18 @@ static void kexec_list_walk(void *ctx, unsigned
+>> long kimage_head,
+>>                         cb(ctx, flag, addr, NULL);
+>>                         break;
+>>                 case IND_DESTINATION:
+>> +                       if (imgsize_flag == IMG_SIZE_NONE) {
+>> +                               kexec_kernel_size = 0;
+>> +                               imgsize_flag = KERN_SIZE_FLAG;
+>> +                       } else if (imgsize_flag == KERN_SIZE_FLAG) {
+>> +                               imgsize_flag = DTB_SIZE_FLAG;
+>> +                       }
+>>                         dest = addr;
+>>                         cb(ctx, flag, addr, NULL);
+>>                         break;
+>>                 case IND_SOURCE:
+>> +                       if (imgsize_flag == KERN_SIZE_FLAG)
+>> +                               kexec_kernel_size++;
+>>                         cb(ctx, flag, addr, dest);
+>>                         dest += PAGE_SIZE;
+>>                         break;
+>> @@ -693,5 +706,20 @@ void machine_kexec(struct kimage *image)
+>>
+>>         kexec_list_walk(NULL, image->head, kexec_list_flush_cb);
+>>
+>> +       /*
+>> +        * Make sure virtual addresses of new kernel are flushed
+>> +        * SZ_512K = TEXT_OFFSET
+>
+> TEXT_OFFSET is not guaranteed to be 512K. The TEXT_OFFSET area also
+> shouldn't need to be flushed.
+>
+> Since c218bca74eea (arm64: Relax the kernel cache requirements for
+> boot), the kernel will flush the cache for anything outside of the Image
+> that it writes to before enabling the MMU and caches (e.g. the idmap and
+> swapper page tables). Once caches are up we shouldn't care.
+>
+> Assuming that the existing kernel code is correct, the only region we
+> should need to flush out to the PoC is the region from _text to _edata
+> (i.e. just the contents of the Image).
 
-Yes, agreed.
+I think we missed the dtb part. dtb is placed below the
+kernel. We need to flush that also.
 
-> I honestly don't know if you can do proper CPU hotplug with ACPI, but
-> the RH guys seem to argue that you can.  Again, I didn't think too
-> carefully about this.
+Geoff's new code manages that also. It is now
+working for me.
 
-Yes, we can do proper CPU hotplug with ACPI based physical hotplug (named
-dynamic device configuration in ACPI spec), you can refer to section 6.3
-"Device Insertion, Removal, and Status Objects" in ACPI 5.1.
-
-There are mechanisms for handling dynamic insertion and removal of devices
-and for determining device and notification processing status. When removing
-a processor,
-
-a) we will call PSCI or similar interface to offline a CPU from OS, then
-   OS will not use it any more;
-
-b) call ACPI API to trim the resources that allocated during device
-   enumeration;
-
-c) Call ACPI method _EJ0 and then will notify firmware or hypervisor device
-   will be removed, jump to firmware or hypervisor to remove the device
-   from that level;
-
-CPU hotplug with ACPI is pretty mature on x86 and it works on VM too. I prepared
-some patches to support CPU hotplug on ARM64 and simulated the hot add/remove
-notify to test those patches, it worked as expected, I will send them out
-when this patchset is ready for mainline.
-
-Thanks
-Hanjun
+--Arun
+>
+>> +        * kexec_kernel = kexec_kernel_size * PAGE_SIZE
+>> +        * Don't know = (SZ_4M + SZ_1M)
+>> +        * SZ_4M = not working
+>> +        * SZ_6M = working
+>> +        * SZ_8M = working
+>> +        *
+>> +        * so chose SZ_4M + SZ_1M; Don't know why this is required
+>> +        * BSS, stack ??
+>> +        *
+>> +        */
+>> +       __flush_dcache_area((void *)PAGE_OFFSET, SZ_512K +
+>> (kexec_kernel_size * PAGE_SIZE) + SZ_4M + SZ_1M);
+>> +
+>>         soft_restart(reboot_code_buffer_phys);
+>>  }
+>
+> How big exactly is the kernel Image you're trying to kexec?
+>
+> Mark.
