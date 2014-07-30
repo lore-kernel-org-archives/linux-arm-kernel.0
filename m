@@ -1,287 +1,31 @@
-From: grant.likely@linaro.org (Grant Likely)
-Date: Wed, 30 Jul 2014 17:49:25 -0600
-Subject: [PATCH v2 RESEND 3/4] drivers: dma-coherent: add initialization
- from device tree
-In-Reply-To: <53D883AE.6030209@samsung.com>
-References: <1405326487-15346-1-git-send-email-m.szyprowski@samsung.com>
- <1405326487-15346-4-git-send-email-m.szyprowski@samsung.com>
- <20140729215432.4B73FC40738@trevor.secretlab.ca>
- <53D883AE.6030209@samsung.com>
-Message-ID: <CACxGe6s2G_vEnmo5LwK79bwkEWSNsegfiojDAdQZV01Wapo0eg@mail.gmail.com>
+From: behanw@converseincode.com (behanw at converseincode.com)
+Date: Wed, 30 Jul 2014 16:57:25 -0700
+Subject: [PATCH 0/4] LLVMLinux: Patches to enable the kernel to be compiled
+ with clang/LLVM
+Message-ID: <1406764649-20326-1-git-send-email-behanw@converseincode.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jul 29, 2014 at 11:33 PM, Marek Szyprowski
-<m.szyprowski@samsung.com> wrote:
-> Hello,
->
->
-> On 2014-07-29 23:54, Grant Likely wrote:
->>
->> On Mon, 14 Jul 2014 10:28:06 +0200, Marek Szyprowski
->> <m.szyprowski@samsung.com> wrote:
->>>
->>> Initialization procedure of dma coherent pool has been split into two
->>> parts, so memory pool can now be initialized without assigning to
->>> particular struct device. Then initialized region can be assigned to
->>> more than one struct device. To protect from concurent allocations from
->>> different devices, a spinlock has been added to dma_coherent_mem
->>> structure. The last part of this patch adds support for handling
->>> 'shared-dma-pool' reserved-memory device tree nodes.
->>>
->>> Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
->>
->> I think this looks okay. It isn't in my area of expertise though.
->> Comments below.
->>
->>> ---
->>>   drivers/base/dma-coherent.c | 137
->>> ++++++++++++++++++++++++++++++++++++++------
->>>   1 file changed, 118 insertions(+), 19 deletions(-)
->>>
->>> diff --git a/drivers/base/dma-coherent.c b/drivers/base/dma-coherent.c
->>> index 7d6e84a51424..7185a4f247e1 100644
->>> --- a/drivers/base/dma-coherent.c
->>> +++ b/drivers/base/dma-coherent.c
->>> @@ -14,11 +14,14 @@ struct dma_coherent_mem {
->>>         int             size;
->>>         int             flags;
->>>         unsigned long   *bitmap;
->>> +       spinlock_t      spinlock;
->>>   };
->>>   -int dma_declare_coherent_memory(struct device *dev, phys_addr_t
->>> phys_addr,
->>> -                               dma_addr_t device_addr, size_t size, int
->>> flags)
->>> +static int dma_init_coherent_memory(phys_addr_t phys_addr, dma_addr_t
->>> device_addr,
->>> +                            size_t size, int flags,
->>> +                            struct dma_coherent_mem **mem)
->>
->> This is a bit odd. Why wouldn't you return the dma_mem pointer directly
->> instead of passing in a **mem argument?
->
->
-> Because this function (as a direct successor of dma_declare_coherent_memory)
-> doesn't
-> return typical error codes, but some custom values like DMA_MEMORY_MAP,
-> DMA_MEMORY_IO
-> or zero (which means failure). I wanted to avoid confusion with typical
-> error
-> handling path and IS_ERR/ERR_PTR usage used widely in other functions. This
-> probably
-> should be unified with the rest of kernel some day, but right now I wanted
-> to keep
-> the patch simple and easy to review.
->
->
->>>   {
->>> +       struct dma_coherent_mem *dma_mem = NULL;
->>>         void __iomem *mem_base = NULL;
->>>         int pages = size >> PAGE_SHIFT;
->>>         int bitmap_size = BITS_TO_LONGS(pages) * sizeof(long);
->>> @@ -27,27 +30,26 @@ int dma_declare_coherent_memory(struct device *dev,
->>> phys_addr_t phys_addr,
->>>                 goto out;
->>>         if (!size)
->>>                 goto out;
->>> -       if (dev->dma_mem)
->>> -               goto out;
->>> -
->>> -       /* FIXME: this routine just ignores DMA_MEMORY_INCLUDES_CHILDREN
->>> */
->>>         mem_base = ioremap(phys_addr, size);
->>>         if (!mem_base)
->>>                 goto out;
->>>   -     dev->dma_mem = kzalloc(sizeof(struct dma_coherent_mem),
->>> GFP_KERNEL);
->>> -       if (!dev->dma_mem)
->>> +       dma_mem = kzalloc(sizeof(struct dma_coherent_mem), GFP_KERNEL);
->>> +       if (!dma_mem)
->>>                 goto out;
->>> -       dev->dma_mem->bitmap = kzalloc(bitmap_size, GFP_KERNEL);
->>> -       if (!dev->dma_mem->bitmap)
->>> +       dma_mem->bitmap = kzalloc(bitmap_size, GFP_KERNEL);
->>> +       if (!dma_mem->bitmap)
->>>                 goto free1_out;
->>>   -     dev->dma_mem->virt_base = mem_base;
->>> -       dev->dma_mem->device_base = device_addr;
->>> -       dev->dma_mem->pfn_base = PFN_DOWN(phys_addr);
->>> -       dev->dma_mem->size = pages;
->>> -       dev->dma_mem->flags = flags;
->>> +       dma_mem->virt_base = mem_base;
->>> +       dma_mem->device_base = device_addr;
->>> +       dma_mem->pfn_base = PFN_DOWN(phys_addr);
->>> +       dma_mem->size = pages;
->>> +       dma_mem->flags = flags;
->>> +       spin_lock_init(&dma_mem->spinlock);
->>> +
->>> +       *mem = dma_mem;
->>>         if (flags & DMA_MEMORY_MAP)
->>>                 return DMA_MEMORY_MAP;
->>> @@ -55,12 +57,51 @@ int dma_declare_coherent_memory(struct device *dev,
->>> phys_addr_t phys_addr,
->>>         return DMA_MEMORY_IO;
->>>      free1_out:
->>> -       kfree(dev->dma_mem);
->>> +       kfree(dma_mem);
->>>    out:
->>>         if (mem_base)
->>>                 iounmap(mem_base);
->>>         return 0;
->>>   }
->>> +
->>> +static void dma_release_coherent_memory(struct dma_coherent_mem *mem)
->>> +{
->>> +       if (!mem)
->>> +               return;
->>> +       iounmap(mem->virt_base);
->>> +       kfree(mem->bitmap);
->>> +       kfree(mem);
->>> +}
->>> +
->>> +static int dma_assign_coherent_memory(struct device *dev,
->>> +                                     struct dma_coherent_mem *mem)
->>> +{
->>> +       if (dev->dma_mem)
->>> +               return -EBUSY;
->>> +
->>> +       dev->dma_mem = mem;
->>> +       /* FIXME: this routine just ignores DMA_MEMORY_INCLUDES_CHILDREN
->>> */
->>> +
->>> +       return 0;
->>> +}
->>> +
->>> +int dma_declare_coherent_memory(struct device *dev, phys_addr_t
->>> phys_addr,
->>> +                               dma_addr_t device_addr, size_t size, int
->>> flags)
->>> +{
->>> +       struct dma_coherent_mem *mem;
->>> +       int ret;
->>> +
->>> +       ret = dma_init_coherent_memory(phys_addr, device_addr, size,
->>> flags,
->>> +                                      &mem);
->>> +       if (ret == 0)
->>> +               return 0;
->>> +
->>> +       if (dma_assign_coherent_memory(dev, mem) == 0)
->>> +               return ret;
->>> +
->>> +       dma_release_coherent_memory(mem);
->>> +       return 0;
->>> +}
->>>   EXPORT_SYMBOL(dma_declare_coherent_memory);
->>>     void dma_release_declared_memory(struct device *dev)
->>> @@ -69,10 +110,8 @@ void dma_release_declared_memory(struct device *dev)
->>>         if (!mem)
->>>                 return;
->>> +       dma_release_coherent_memory(mem);
->>>         dev->dma_mem = NULL;
->>> -       iounmap(mem->virt_base);
->>> -       kfree(mem->bitmap);
->>> -       kfree(mem);
->>>   }
->>>   EXPORT_SYMBOL(dma_release_declared_memory);
->>>   @@ -80,6 +119,7 @@ void *dma_mark_declared_memory_occupied(struct
->>> device *dev,
->>>                                         dma_addr_t device_addr, size_t
->>> size)
->>>   {
->>>         struct dma_coherent_mem *mem = dev->dma_mem;
->>> +       unsigned long flags;
->>>         int pos, err;
->>>         size += device_addr & ~PAGE_MASK;
->>> @@ -87,8 +127,11 @@ void *dma_mark_declared_memory_occupied(struct device
->>> *dev,
->>>         if (!mem)
->>>                 return ERR_PTR(-EINVAL);
->>>   +     spin_lock_irqsave(&mem->spinlock, flags);
->>>         pos = (device_addr - mem->device_base) >> PAGE_SHIFT;
->>>         err = bitmap_allocate_region(mem->bitmap, pos, get_order(size));
->>> +       spin_unlock_irqrestore(&mem->spinlock, flags);
->>> +
->>>         if (err != 0)
->>>                 return ERR_PTR(err);
->>>         return mem->virt_base + (pos << PAGE_SHIFT);
->>> @@ -115,6 +158,7 @@ int dma_alloc_from_coherent(struct device *dev,
->>> ssize_t size,
->>>   {
->>>         struct dma_coherent_mem *mem;
->>>         int order = get_order(size);
->>> +       unsigned long flags;
->>>         int pageno;
->>>         if (!dev)
->>> @@ -124,6 +168,7 @@ int dma_alloc_from_coherent(struct device *dev,
->>> ssize_t size,
->>>                 return 0;
->>>         *ret = NULL;
->>> +       spin_lock_irqsave(&mem->spinlock, flags);
->>>         if (unlikely(size > (mem->size << PAGE_SHIFT)))
->>>                 goto err;
->>> @@ -138,10 +183,12 @@ int dma_alloc_from_coherent(struct device *dev,
->>> ssize_t size,
->>>         *dma_handle = mem->device_base + (pageno << PAGE_SHIFT);
->>>         *ret = mem->virt_base + (pageno << PAGE_SHIFT);
->>>         memset(*ret, 0, size);
->>> +       spin_unlock_irqrestore(&mem->spinlock, flags);
->>>         return 1;
->>>     err:
->>> +       spin_unlock_irqrestore(&mem->spinlock, flags);
->>>         /*
->>>          * In the case where the allocation can not be satisfied from the
->>>          * per-device area, try to fall back to generic memory if the
->>> @@ -171,8 +218,11 @@ int dma_release_from_coherent(struct device *dev,
->>> int order, void *vaddr)
->>>         if (mem && vaddr >= mem->virt_base && vaddr <
->>>                    (mem->virt_base + (mem->size << PAGE_SHIFT))) {
->>>                 int page = (vaddr - mem->virt_base) >> PAGE_SHIFT;
->>> +               unsigned long flags;
->>>   +             spin_lock_irqsave(&mem->spinlock, flags);
->>>                 bitmap_release_region(mem->bitmap, page, order);
->>> +               spin_unlock_irqrestore(&mem->spinlock, flags);
->>>                 return 1;
->>>         }
->>>         return 0;
->>> @@ -218,3 +268,52 @@ int dma_mmap_from_coherent(struct device *dev,
->>> struct vm_area_struct *vma,
->>>         return 0;
->>>   }
->>>   EXPORT_SYMBOL(dma_mmap_from_coherent);
->>> +
->>> +/*
->>> + * Support for reserved memory regions defined in device tree
->>> + */
->>> +#ifdef CONFIG_OF_RESERVED_MEM
->>> +#include <linux/of.h>
->>> +#include <linux/of_fdt.h>
->>> +#include <linux/of_reserved_mem.h>
->>> +
->>> +static void rmem_dma_device_init(struct reserved_mem *rmem, struct
->>> device *dev)
->>> +{
->>> +       struct dma_coherent_mem *mem = rmem->priv;
->>
->> Will the reserved_mem->priv pointer ever point to some other kind of
->> structure? How do we know that the pointer here is always a
->> dma_coherent_mem struct (if there are other uses of priv, what is the
->> guarantee against another user assigning something to it?) Is it the
->> reserved_mem_ops below that provide the guarantee?
->
->
-> reserved_mem_ops are set by the given reserved memory driver and access to
-> priv
-> pointer is limited only to that driver. This pattern is used widely across
-> the
-> whole kernel, so I don't think that a separate pointer to particular
-> structure
-> type is needed.
+From: Behan Webster <behanw@converseincode.com>
 
-Yup, that's fine. I wanted to make sure.
+This patch set moves from using locally defined named registers to access the
+stack pointer to using a globally defined named register. This allows the code
+to work both with gcc and clang.
 
-Do I need to be taking these patches through the DT tree? Do patches 3
-& 4 make sense without patch 2?
+The LLVMLinux project aims to fully build the Linux kernel using both gcc and
+clang (the C front end for the LLVM compiler infrastructure project). 
 
-g.
+Behan Webster (4):
+  arm64: LLVMLinux: Add current_stack_pointer() for arm64
+  arm64: LLVMLinux: Use current_stack_pointer in save_stack_trace_tsk
+  arm64: LLVMLinux: Calculate current_thread_info from
+    current_stack_pointer
+  arm64: LLVMLinux: Use current_stack_pointer in kernel/traps.c
+
+ arch/arm64/include/asm/thread_info.h | 9 +++++++--
+ arch/arm64/kernel/stacktrace.c       | 3 +--
+ arch/arm64/kernel/traps.c            | 3 +--
+ 3 files changed, 9 insertions(+), 6 deletions(-)
+
+-- 
+1.9.1
