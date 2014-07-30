@@ -1,80 +1,45 @@
-From: afaerber@suse.de (=?ISO-8859-15?Q?Andreas_F=E4rber?=)
-Date: Wed, 30 Jul 2014 14:08:14 +0200
-Subject: [PATCHv7 0/5] ARM: remove the sub-node and deprecate
- supports-highspeed property for dwmmc.
-In-Reply-To: <1406514579-3769-1-git-send-email-jh80.chung@samsung.com>
-References: <1406514579-3769-1-git-send-email-jh80.chung@samsung.com>
-Message-ID: <53D8E02E.2070007@suse.de>
+From: tomi.valkeinen@ti.com (Tomi Valkeinen)
+Date: Wed, 30 Jul 2014 15:09:42 +0300
+Subject: [PATCH v2] ARM: AM43xx: hwmod: add DSS hwmod data
+In-Reply-To: <alpine.DEB.2.02.1407222110260.25593@utopia.booyaka.com>
+References: <1402994233-22599-1-git-send-email-tomi.valkeinen@ti.com>
+ <alpine.DEB.2.02.1407222110260.25593@utopia.booyaka.com>
+Message-ID: <53D8E086.9070206@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am 28.07.2014 04:29, schrieb Jaehoon Chung:
-> Since used the mmc_of_parse(), didn't parse the sub-node.
-> So we can remove the sub-node, because almost SoC used the only one card per a host.
-> And supports-highspeed can be replaced to "cap-mmc/sd-highspeed" property.
+On 23/07/14 00:14, Paul Walmsley wrote:
+> On Tue, 17 Jun 2014, Tomi Valkeinen wrote:
 > 
-> Chnagelog V7:
-> 	- Fixed typo and modified the commit message.
-> Changelog V6:
-> 	- Fixed Wrong bit control for host's quirks and rename.
-> 	- Add "Acked-by" for each SoC maintainers.
-> Changelog V5:
-> 	- Rebased on v3.16-rc4.
-> 	- Add Acked-by.
-> Changelog V4:
-> 	- Fix the checkpatch error.
-> Changelog V3:
-> 	- Fix the wrong bus-width value.
-> 	- Use the slot->host->quirks instead of brq->quirks.
-> 	- Add tested-by and reviewd-by.
-> Changelog V2:
-> 	- Add the "mmc: dw_mmc: replace "disable-wp" from slot's quirks to host's quirk"
+>> From: Sathya Prakash M R <sathyap@ti.com>
+>>
+>> Add DSS hwmod data for AM43xx.
+>>
+>> Signed-off-by: Sathya Prakash M R <sathyap@ti.com>
+>> [tomi.valkeinen at ti.com: added missing dispc flags]
+>> Signed-off-by: Tomi Valkeinen <tomi.valkeinen@ti.com>
+>> Acked-by: Rajendra Nayak <rnayak@ti.com>
 > 
+> This one didn't compile on an AM43xx-only build:
 > 
-> Jaehoon Chung (5):
->   mmc: dw_mmc: modify the dt-binding for removing slot-node and
->     supports-highspeed
->   ARM: dts: exynos: unuse the slot-node and deprecated the
->     supports-highspeed for dw-mmc
->   ARM: dts: socfpga: unuse the slot-node and deprecated the
->     supports-highspeed for dw-mmc
->   ARM: dts: rockchip: unuse the slot-node and deprecated the
->     supports-highspeed for dw-mmc
+> ----
+> arch/arm/mach-omap2/built-in.o:(.data+0x3f2c): undefined reference to `omap2_dss_hwmod_class'
+> arch/arm/mach-omap2/built-in.o:(.data+0x405c): undefined reference to `omap2_rfbi_hwmod_class'
+> make: *** [vmlinux] Error 1
+> test_build: Tue Jul 22 13:48:50 MDT 2014: FAILED on omap2plus_defconfig_am43xx_only hwmod-a-v3.17
+> ----
+> 
+> Have queued the following patch instead.
 
-Nit: 3x s/deprecated/deprecate/g to align tenses? (Sorry, I got
-interrupted during previous review pass.)
+Thanks. Tested on AM437x GP EVM with today's linux-next. Works fine for me.
 
-Regards,
-Andreas
-
->   mmc: dw_mmc: replace "disable-wp" from slot's quirk to host's quirk
-> 
->  .../devicetree/bindings/mmc/exynos-dw-mshc.txt     |   17 ++++---------
->  .../devicetree/bindings/mmc/k3-dw-mshc.txt         |   12 ++++-----
->  .../devicetree/bindings/mmc/synopsys-dw-mshc.txt   |   12 ++++-----
->  arch/arm/boot/dts/exynos4412-odroidx.dts           |    8 ++----
->  arch/arm/boot/dts/exynos4412-origen.dts            |    8 ++----
->  arch/arm/boot/dts/exynos4412-trats2.dts            |    8 ++----
->  arch/arm/boot/dts/exynos5250-arndale.dts           |   18 ++++----------
->  arch/arm/boot/dts/exynos5250-cros-common.dtsi      |   26 ++++++--------------
->  arch/arm/boot/dts/exynos5250-smdk5250.dts          |   18 ++++----------
->  arch/arm/boot/dts/exynos5250-snow.dts              |    6 ++---
->  arch/arm/boot/dts/exynos5260-xyref5260.dts         |   18 ++++----------
->  arch/arm/boot/dts/exynos5410-smdk5410.dts          |   18 ++++----------
->  arch/arm/boot/dts/exynos5420-arndale-octa.dts      |   16 +++---------
->  arch/arm/boot/dts/exynos5420-peach-pit.dts         |   16 +++---------
->  arch/arm/boot/dts/exynos5420-smdk5420.dts          |   16 +++---------
->  arch/arm/boot/dts/exynos5800-peach-pi.dts          |   16 +++---------
->  arch/arm/boot/dts/rk3066a-bqcurie2.dts             |   16 +++---------
->  arch/arm/boot/dts/socfpga_arria5.dtsi              |    9 +++----
->  arch/arm/boot/dts/socfpga_cyclone5.dtsi            |    9 +++----
->  arch/arm/boot/dts/socfpga_vt.dts                   |    9 +++----
->  drivers/mmc/host/dw_mmc.c                          |   12 ++++-----
->  include/linux/mmc/dw_mmc.h                         |    6 ++---
->  22 files changed, 86 insertions(+), 208 deletions(-)
-> 
+ Tomi
 
 
--- 
-SUSE LINUX Products GmbH, Maxfeldstr. 5, 90409 N?rnberg, Germany
-GF: Jeff Hawn, Jennifer Guild, Felix Imend?rffer; HRB 16746 AG N?rnberg
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: OpenPGP digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140730/5a588b73/attachment.sig>
