@@ -1,35 +1,33 @@
-From: heiko@sntech.de (Heiko =?ISO-8859-1?Q?St=FCbner?=)
-Date: Wed, 30 Jul 2014 13:26:38 +0200
-Subject: [PATCH 3/3] ARM: dts: Enable USB host0 (EHCI) on rk3288-evb
-In-Reply-To: <1406676273-20701-4-git-send-email-dianders@chromium.org>
-References: <1406676273-20701-1-git-send-email-dianders@chromium.org>
- <1406676273-20701-4-git-send-email-dianders@chromium.org>
-Message-ID: <4280303.LVm1cg0Iss@diego>
+From: leif.lindholm@linaro.org (Leif Lindholm)
+Date: Wed, 30 Jul 2014 12:26:00 +0100
+Subject: [PATCH v15 07/12] ARM: dts: append hip04 dts
+In-Reply-To: <CAOesGMi6xLwFkjctNJsJ63WYaMhrJgjNyST4qiUpa42e4biBjQ@mail.gmail.com>
+References: <1406555876-11989-1-git-send-email-haojian.zhuang@linaro.org>
+ <1406555876-11989-8-git-send-email-haojian.zhuang@linaro.org>
+ <20140728180609.GE2576@leverpostej>
+ <CAD6h2NQLgB1=8+WznE19rjsFwm3XWPUYEbDuPCbKbWjseRCBDg@mail.gmail.com>
+ <20140729123221.GN2576@leverpostej>
+ <CAOesGMi6xLwFkjctNJsJ63WYaMhrJgjNyST4qiUpa42e4biBjQ@mail.gmail.com>
+Message-ID: <20140730112559.GG4179@bivouac.eciton.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am Dienstag, 29. Juli 2014, 16:24:33 schrieb Doug Anderson:
-> This is the top USB port on the evb (the one closest to the Ethernet
-> connector).
+On Tue, Jul 29, 2014 at 10:01:48AM -0700, Olof Johansson wrote:
+> >> In this platform, we relied on the bootwrapper. If I discard this,
+> >> I'll fail to bring up all secondary cores.
+> >
+> > What loads the boot wrapper into memory, and from where?
+> >
+> > In another reply you mentioned you're using UEFI. Is this wrapper
+> > considered part of your UEFI implementation? If so it should be reserved
+> > in the UEFI memory map, and there should be no need of memory nodes or
+> > memreserves -- all that should come from UEFI.
 > 
-> Signed-off-by: Doug Anderson <dianders@chromium.org>
-> Signed-off-by: Kever Yang <kever.yang@rock-chips.com>
+> There's no UEFI memory map parsing on 32-bit, is there?
 
-shouldn't the signed-offs be the other way around, like in patch 2/3?
-
-> ---
->  arch/arm/boot/dts/rk3288-evb.dtsi | 4 ++++
->  1 file changed, 4 insertions(+)
-> 
-> diff --git a/arch/arm/boot/dts/rk3288-evb.dtsi
-> b/arch/arm/boot/dts/rk3288-evb.dtsi index efd625e..fcdc64e 100644
-> --- a/arch/arm/boot/dts/rk3288-evb.dtsi
-> +++ b/arch/arm/boot/dts/rk3288-evb.dtsi
-> @@ -90,3 +90,7 @@
->  		};
->  	};
->  };
-> +
-> +&usb_host0_ehci {
-> +	status = "okay";
-> +};
+There is in my patch set, but that is still dependent on the
+early_ioremap support, which needs someone to comment on the "use
+generic fixmap on ARM" bit.
+ 
+/
+    Leif
