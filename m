@@ -1,62 +1,56 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Wed, 30 Jul 2014 20:23:14 +0100
-Subject: [PATCH] irq: gic-v3: Tag all low level accessors __maybey_unused
-Message-ID: <1406748194-21094-1-git-send-email-broonie@kernel.org>
+From: m-karicheri2@ti.com (Murali Karicheri)
+Date: Wed, 30 Jul 2014 15:34:44 -0400
+Subject: [PATCH v7 4/5] PCI: add PCI controller for keystone PCIe h/w
+In-Reply-To: <20140723174228.GB11270@obsidianresearch.com>
+References: <1405961925-27248-1-git-send-email-m-karicheri2@ti.com>
+ <1405961925-27248-5-git-send-email-m-karicheri2@ti.com>
+ <20140722223527.GA27965@google.com> <53CEEB1C.9020202@ti.com>
+ <20140722235200.GC27965@google.com>
+ <20140723174228.GB11270@obsidianresearch.com>
+Message-ID: <53D948D4.6080603@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Mark Brown <broonie@linaro.org>
+On 07/23/2014 01:42 PM, Jason Gunthorpe wrote:
+> On Tue, Jul 22, 2014 at 05:52:00PM -0600, Bjorn Helgaas wrote:
+>> If there is a hardware defect, a PCI quirk is a reasonable way to work
+>> around it, since that's the main purpose of quirks.  fixup_mpss_256()
+>> is an example of something that sounds superficially similar.
+>
+> It was my suggestion to engage the PCI-E tuning code. By my
+> understanding the HW bug is that read response segmentation at the
+> host bridge does not work - so all read requests from any downstream
+> device must have responses that fit within a single packet.
+>
 
-This is only really needed for gic_write_sgi1r in the !SMP case since it
-is only referenced in the SMP initialisation code but it seems better to
-have these functions all next to each other and declared consistently.
+In the case of Keystone PCI, when I set the MRSS to 256 in the EP, PCI 
+controller is able to function properly. Keystone spec says.
 
-Signed-off-by: Mark Brown <broonie@linaro.org>
----
- drivers/irqchip/irq-gic-v3.c | 10 +++++-----
- 1 file changed, 5 insertions(+), 5 deletions(-)
+? Maximum outbound payload size of 128 bytes
+? Maximum inbound payload size of 256 bytes
+? Maximum remote read request size of 256 bytes
 
-diff --git a/drivers/irqchip/irq-gic-v3.c b/drivers/irqchip/irq-gic-v3.c
-index 41b98ba7ffd1..f1ba38f11f7a 100644
---- a/drivers/irqchip/irq-gic-v3.c
-+++ b/drivers/irqchip/irq-gic-v3.c
-@@ -104,7 +104,7 @@ static void gic_redist_wait_for_rwp(void)
- }
- 
- /* Low level accessors */
--static u64 gic_read_iar(void)
-+static u64 __maybe_unused gic_read_iar(void)
- {
- 	u64 irqstat;
- 
-@@ -112,24 +112,24 @@ static u64 gic_read_iar(void)
- 	return irqstat;
- }
- 
--static void gic_write_pmr(u64 val)
-+static void __maybe_unused gic_write_pmr(u64 val)
- {
- 	asm volatile("msr_s " __stringify(ICC_PMR_EL1) ", %0" : : "r" (val));
- }
- 
--static void gic_write_ctlr(u64 val)
-+static void __maybe_unused gic_write_ctlr(u64 val)
- {
- 	asm volatile("msr_s " __stringify(ICC_CTLR_EL1) ", %0" : : "r" (val));
- 	isb();
- }
- 
--static void gic_write_grpen1(u64 val)
-+static void __maybe_unused gic_write_grpen1(u64 val)
- {
- 	asm volatile("msr_s " __stringify(ICC_GRPEN1_EL1) ", %0" : : "r" (val));
- 	isb();
- }
- 
--static void gic_write_sgi1r(u64 val)
-+static void __maybe_unused gic_write_sgi1r(u64 val)
- {
- 	asm volatile("msr_s " __stringify(ICC_SGI1R_EL1) ", %0" : : "r" (val));
- }
--- 
-2.0.1
+I am interpreting the "Maximum remote read request size" to indicate it 
+can's handle if it exceeds the limit. It has an outbound payload size of 
+128 bytes. So in this case a read request would results in 2 completion 
+packets. So it seems to be able to segment up to maximum 256 bytes of 
+read request. Where do I find the requirement in PCI spec that "read 
+response segmentation at the host bridge does not work" ?
+
+> This is completely against how the spec envisions things working,
+> segmentation is a mandatory function. As you point out there is no
+> parameter bounding the maximum read request size that a completer will
+> accept.
+>
+> So, the only fix is that every downstream device must always have a
+> MRSS set to less than the MPS of the host bridge.
+
+Why this can't be the default behavior in the PCI core? Any cons?
+
+Murali
+>
+> Which means the tuning code must be involved somehow, as that code
+> controls the MRSS of unrelated devices...
+>
+> Regards,
+> Jason
