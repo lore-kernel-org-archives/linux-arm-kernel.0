@@ -1,53 +1,35 @@
-From: sthokal@xilinx.com (Srikanth Thokala)
-Date: Wed, 30 Jul 2014 16:54:49 +0530
-Subject: [PATCH v5] pcie: Add Xilinx PCIe Host Bridge IP driver
-In-Reply-To: <8258903.Rn4s07GKGV@wuerfel>
-References: <1406131381-25577-1-git-send-email-sthokal@xilinx.com>
- <CA+mB=1JhDF=BBXcyTbgVB8S7qH=Mb1JH78HLL4pA9OBH19hQvA@mail.gmail.com>
- <8258903.Rn4s07GKGV@wuerfel>
-Message-ID: <CA+mB=1LeZn1k2VHNby2TRBcb1xuFFTQio=C845_xe2A=ZciYqg@mail.gmail.com>
+From: heiko@sntech.de (Heiko =?ISO-8859-1?Q?St=FCbner?=)
+Date: Wed, 30 Jul 2014 13:26:38 +0200
+Subject: [PATCH 3/3] ARM: dts: Enable USB host0 (EHCI) on rk3288-evb
+In-Reply-To: <1406676273-20701-4-git-send-email-dianders@chromium.org>
+References: <1406676273-20701-1-git-send-email-dianders@chromium.org>
+ <1406676273-20701-4-git-send-email-dianders@chromium.org>
+Message-ID: <4280303.LVm1cg0Iss@diego>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Arnd,
+Am Dienstag, 29. Juli 2014, 16:24:33 schrieb Doug Anderson:
+> This is the top USB port on the evb (the one closest to the Ethernet
+> connector).
+> 
+> Signed-off-by: Doug Anderson <dianders@chromium.org>
+> Signed-off-by: Kever Yang <kever.yang@rock-chips.com>
 
-On Mon, Jul 28, 2014 at 6:32 PM, Arnd Bergmann <arnd@arndb.de> wrote:
-> On Monday 28 July 2014 18:04:34 Srikanth Thokala wrote:
->> Hi Arnd and Rob,
->>
->> I discussed with Bjorn and we believe this patch is in good shape to
->> apply.  And Bjorn requires ACKs to apply this patch.  So, could you
->> guys please review this patch and provided your ACKs to this patch.
->
-> Looks great for the most part. I've looked through the whole driver
-> again, and I have two small issues remaining:
->
-> a) Please clarify in the changeset description why there is no support
->    for PCI I/O space.
+shouldn't the signed-offs be the other way around, like in patch 2/3?
 
-Sure, I will add to my changeset.
-
->
-> b) I think you should use the 'msi-parent' property, and the
->    of_pci_find_msi_chip_by_node() to find the msi_chip for the
->    PCI controller. This will make it possible to forward MSIs
->    to the main interrupt controller in the system, which is more
->    efficient. See the pcie-mvebu driver for an example of this.
-
-Ok, I need to look into this and I will plan to implement on top of this patch.
-
->
-> Other than these:
->
-> Acked-by: Arnd Bergmann <arnd@arndb.de>
-
-Thanks Arnd for the Ack.
-
-Srikanth
-
->
->         Arnd
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-pci" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> ---
+>  arch/arm/boot/dts/rk3288-evb.dtsi | 4 ++++
+>  1 file changed, 4 insertions(+)
+> 
+> diff --git a/arch/arm/boot/dts/rk3288-evb.dtsi
+> b/arch/arm/boot/dts/rk3288-evb.dtsi index efd625e..fcdc64e 100644
+> --- a/arch/arm/boot/dts/rk3288-evb.dtsi
+> +++ b/arch/arm/boot/dts/rk3288-evb.dtsi
+> @@ -90,3 +90,7 @@
+>  		};
+>  	};
+>  };
+> +
+> +&usb_host0_ehci {
+> +	status = "okay";
+> +};
