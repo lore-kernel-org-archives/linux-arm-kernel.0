@@ -1,17 +1,50 @@
-From: pawel.moll@arm.com (Pawel Moll)
-Date: Wed, 30 Jul 2014 14:57:56 +0100
-Subject: [PATCH v9] video: ARM CLCD: Add DT support
-In-Reply-To: <53D7825C.2020900@ti.com>
-References: <1403610911-31491-1-git-send-email-pawel.moll@arm.com>
- <1404824767.21897.7.camel@hornet> <1406023366.25343.44.camel@hornet>
- <1406631987.17155.0.camel@hornet> <53D7825C.2020900@ti.com>
-Message-ID: <1406728676.17155.22.camel@hornet>
+From: achandran@mvista.com (Arun Chandran)
+Date: Wed, 30 Jul 2014 19:31:35 +0530
+Subject: [PATCH] Arm64: Fix build error while switching from LE to BE
+In-Reply-To: <1403775963-9785-1-git-send-email-achandran@mvista.com>
+References: <1403775963-9785-1-git-send-email-achandran@mvista.com>
+Message-ID: <CAFdej004ma0xyzBHCmijx1r3iQFiWPRMLRgi20ryZDJz5iJZGw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 2014-07-29 at 14:15 +0300, Tomi Valkeinen wrote:
-> Yep, I've queued it now for 3.17.
+On Thu, Jun 26, 2014 at 3:16 PM, Arun Chandran <achandran@mvista.com> wrote:
+> Building a kernel with CPU_BIG_ENDIAN fails if there are stale objects
+> from a !CPU_BIG_ENDIAN build. Due to a missing FORCE prerequisite on an
+> if_changed rule in the VDSO Makefile, we attempt to link a stale LE
+> object into the new BE kernel. According to Documentation/kbuild/makefiles.txt
+> FORCE is required for if_changed rules, and forgetting it is a common mistake
+>
+> So fix it by 'Forcing' the build of vdso.  Fixes build errors like these:
+>
+> arch/arm64/kernel/vdso/note.o: compiled for a little endian system and target is big endian
+> failed to merge target specific data of file arch/arm64/kernel/vdso/note.o
+>
+> arch/arm64/kernel/vdso/sigreturn.o: compiled for a little endian system and target is big endian
+> failed to merge target specific data of file arch/arm64/kernel/vdso/sigreturn.o
+>
+> Signed-off-by: Arun Chandran <achandran@mvista.com>
+> Tested-by: Mark Rutland <mark.rutland@arm.com>
+> ---
+>  arch/arm64/kernel/vdso/Makefile |    2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
+>
+> diff --git a/arch/arm64/kernel/vdso/Makefile b/arch/arm64/kernel/vdso/Makefile
+> index 6d20b7d..a268a9a 100644
+> --- a/arch/arm64/kernel/vdso/Makefile
+> +++ b/arch/arm64/kernel/vdso/Makefile
+> @@ -43,7 +43,7 @@ $(obj)/vdso-offsets.h: $(obj)/vdso.so.dbg FORCE
+>         $(call if_changed,vdsosym)
+>
+>  # Assembly rules for the .S files
+> -$(obj-vdso): %.o: %.S
+> +$(obj-vdso): %.o: %.S FORCE
+>         $(call if_changed_dep,vdsoas)
+>
+>  # Actual build commands
+> --
+> 1.7.9.5
+>
 
-Awesome, thanks!
+Any update on this?
 
-Pawel
+--Arun
