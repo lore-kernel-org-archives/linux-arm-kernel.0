@@ -1,52 +1,36 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Wed, 30 Jul 2014 08:52:56 +0100
-Subject: [GIT PULL v2] nommu fixes for 3.17-rc1
-In-Reply-To: <20140730070610.GL6146@pengutronix.de>
-References: <20140630144355.GH14781@pengutronix.de>
- <20140701094159.GM14781@pengutronix.de>
- <20140711073054.GI11056@pengutronix.de>
- <20140722074246.GA28538@pengutronix.de>
- <20140729223543.GF30282@n2100.arm.linux.org.uk>
- <20140730070610.GL6146@pengutronix.de>
-Message-ID: <20140730075256.GG30282@n2100.arm.linux.org.uk>
+From: paul@pwsan.com (Paul Walmsley)
+Date: Wed, 30 Jul 2014 07:53:08 +0000 (UTC)
+Subject: OMAP baseline test results for v3.16-rc4
+In-Reply-To: <20140730053940.GX29045@atomide.com>
+References: <alpine.DEB.2.02.1407062339420.15016@utopia.booyaka.com>
+ <20140707080238.GF28884@atomide.com>
+ <alpine.DEB.2.02.1407251857480.5875@utopia.booyaka.com>
+ <20140729064243.GF29045@atomide.com>
+ <alpine.DEB.2.02.1407290810160.22957@utopia.booyaka.com>
+ <20140729084930.GH29045@atomide.com>
+ <alpine.DEB.2.02.1407291225070.13035@utopia.booyaka.com>
+ <alpine.DEB.2.02.1407291256270.13035@utopia.booyaka.com>
+ <20140729145312.GT29045@atomide.com>
+ <alpine.DEB.2.02.1407291922370.13035@utopia.booyaka.com>
+ <20140730053940.GX29045@atomide.com>
+Message-ID: <alpine.DEB.2.02.1407300725290.4477@utopia.booyaka.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jul 30, 2014 at 09:06:10AM +0200, Uwe Kleine-K?nig wrote:
-> Hi Russell,
->...
-> Mine was sent to rmk+linux at ..., but I assume that's just an alias for
-> linux at ... and I noted to use the new address in the future.
+On Tue, 29 Jul 2014, Tony Lindgren wrote:
 
-It isn't, it's an alias for rmk at ...
+> The following patch should fix the tests above for 3530es3beagle.
+> Care to test and ack as I don't have one?
 
-> On Tue, Jul 29, 2014 at 11:35:43PM +0100, Russell King - ARM Linux wrote:
-> > It is very difficult to sort out which messages that contain "GIT PULL"
-> > are meant for me - especially when people put me in the To: field of
-> > all sorts of random emails with very little thought.  Because of that
-> > behaviour, which has recently spread to replies by various mailers too,
-> > I no longer take any notice of which header field my email address
-> > appears in any message.
-> 
-> You could make life easier for contributors (and maybe also yourself) by
-> assuming that a mail that lists only you in To: was sent by someone
-> who got the difference between To and Cc and put it into your linux+pull
-> folder. Just a suggestion.
+3530es3beagle retention dynamic idle tests hang on next-20140729.  (Maybe 
+other boards fail too - haven't tested any others).  
 
-How about people making my life easier by following the Internet RFCs
-when it comes to which addresses should be in To: and Cc: ?
+http://www.pwsan.com/omap/testlogs/next_20140729/20140730010841/pm/3530es3beagle/3530es3beagle_log.txt
 
-Then I can follow the information which my mail client gives me - that
-is, the marking of each message which indicates whether I'm listed in
-the To: header or the Cc: header, or indeed not listed at all.
+Adding the patch you sent doesn't change that, but now some extra warning 
+messages appear ("PRM: I/O chain clock line assertion timed out"):
 
-Right now, scanning my mailbox for messages with me in the To: header
-leads to /lots/ of crap.  This is precisely why I stated a while back
-that I want pull requests for me to pull to go to linux+pull at ...  I
-can then get my mail client to filter the mailbox for messages addressed
-"To:" that address, which then gives me all the pull requests that people
-want me to action.
+http://www.pwsan.com/omap/testlogs/next_20140729_beagle_pm/20140730004856/pm/3530es3beagle/3530es3beagle_log.txt
 
--- 
-FTTC broadband for 0.8mile line: currently at 9.5Mbps down 400kbps up
-according to speedtest.net.
+
+- Paul
