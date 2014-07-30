@@ -1,39 +1,40 @@
 From: behanw@converseincode.com (behanw at converseincode.com)
-Date: Wed, 30 Jul 2014 16:57:26 -0700
-Subject: [PATCH 1/4] arm64: LLVMLinux: Add current_stack_pointer() for arm64
+Date: Wed, 30 Jul 2014 16:57:27 -0700
+Subject: [PATCH 2/4] arm64: LLVMLinux: Use current_stack_pointer in
+ save_stack_trace_tsk
 In-Reply-To: <1406764649-20326-1-git-send-email-behanw@converseincode.com>
 References: <1406764649-20326-1-git-send-email-behanw@converseincode.com>
-Message-ID: <1406764649-20326-2-git-send-email-behanw@converseincode.com>
+Message-ID: <1406764649-20326-3-git-send-email-behanw@converseincode.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Behan Webster <behanw@converseincode.com>
 
-Define a global named register for current_stack_pointer. The use of this new
-variable guarantees that both gcc and clang can access this register in C code.
+Use the global current_stack_pointer to get the value of the stack pointer.
+This change supports being able to compile the kernel with both gcc and clang.
 
 Signed-off-by: Behan Webster <behanw@converseincode.com>
-Reviewed-by: Jan-Simon M?ller <dl9pf@gmx.de>
-Reviewed-by: Mark Charlebois <charlebm@gmail.com>
+Signed-off-by: Mark Charlebois <charlebm@gmail.com>
+Reviewed-by: Jan-Simon M??ller <dl9pf@gmx.de>
 ---
- arch/arm64/include/asm/thread_info.h | 5 +++++
- 1 file changed, 5 insertions(+)
+ arch/arm64/kernel/stacktrace.c | 3 +--
+ 1 file changed, 1 insertion(+), 2 deletions(-)
 
-diff --git a/arch/arm64/include/asm/thread_info.h b/arch/arm64/include/asm/thread_info.h
-index e40b6d0..e6b6094 100644
---- a/arch/arm64/include/asm/thread_info.h
-+++ b/arch/arm64/include/asm/thread_info.h
-@@ -69,6 +69,11 @@ struct thread_info {
- #define init_stack		(init_thread_union.stack)
+diff --git a/arch/arm64/kernel/stacktrace.c b/arch/arm64/kernel/stacktrace.c
+index 55437ba..407991b 100644
+--- a/arch/arm64/kernel/stacktrace.c
++++ b/arch/arm64/kernel/stacktrace.c
+@@ -111,10 +111,9 @@ void save_stack_trace_tsk(struct task_struct *tsk, struct stack_trace *trace)
+ 		frame.sp = thread_saved_sp(tsk);
+ 		frame.pc = thread_saved_pc(tsk);
+ 	} else {
+-		register unsigned long current_sp asm("sp");
+ 		data.no_sched_functions = 0;
+ 		frame.fp = (unsigned long)__builtin_frame_address(0);
+-		frame.sp = current_sp;
++		frame.sp = current_stack_pointer;
+ 		frame.pc = (unsigned long)save_stack_trace_tsk;
+ 	}
  
- /*
-+ * how to get the current stack pointer from C
-+ */
-+register unsigned long current_stack_pointer asm ("sp");
-+
-+/*
-  * how to get the thread information struct from C
-  */
- static inline struct thread_info *current_thread_info(void) __attribute_const__;
 -- 
 1.9.1
