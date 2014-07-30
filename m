@@ -1,61 +1,62 @@
 From: jh80.chung@samsung.com (Jaehoon Chung)
-Date: Wed, 30 Jul 2014 20:05:09 +0900
-Subject: [PATCHv8 4/5] ARM: dts: rockchip: unuse the slot-node and deprecated
- the supports-highspeed for dw-mmc
+Date: Wed, 30 Jul 2014 20:05:10 +0900
+Subject: [PATCHv8 5/5] mmc: dw_mmc: replace "disable-wp" from slot's quirk to
+ host's quirk
 In-Reply-To: <1406718310-32078-1-git-send-email-jh80.chung@samsung.com>
 References: <1406718310-32078-1-git-send-email-jh80.chung@samsung.com>
-Message-ID: <1406718310-32078-5-git-send-email-jh80.chung@samsung.com>
+Message-ID: <1406718310-32078-6-git-send-email-jh80.chung@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-dw-mmc controller can support multiple slots.
-But, there are no use-cases anywhere. So we don't need to support the
-slot-node for dw-mmc controller.
-And "supports-highspeed" property in dw-mmc is deprecated.
-"supports-highspeed" property can be replaced to "cap-sd/mmc-highspeed".
+Replaced the "disable-wp" into host's quirks.
+(Because the slot-node is removed at dt-file.)
 
 Signed-off-by: Jaehoon Chung <jh80.chung@samsung.com>
-Reviewed-by: Tushar Behera <trblinux@gmail.com>
-Reviewed-by: Ulf Hansson <ulf.hansson@linaro.org>
-Reviewed-by: Heiko Stuebner <heiko@sntech.de>
+Tested-by: Sachin Kamat <sachin.kamat@samsung.com>
 Acked-by: Seungwon Jeon <tgih.jun@samsung.com>
 ---
- arch/arm/boot/dts/rk3066a-bqcurie2.dts |   16 ++++------------
- 1 file changed, 4 insertions(+), 12 deletions(-)
+ drivers/mmc/host/dw_mmc.c  |    8 +++++++-
+ include/linux/mmc/dw_mmc.h |    2 ++
+ 2 files changed, 9 insertions(+), 1 deletion(-)
 
-diff --git a/arch/arm/boot/dts/rk3066a-bqcurie2.dts b/arch/arm/boot/dts/rk3066a-bqcurie2.dts
-index afb3273..ecea889 100644
---- a/arch/arm/boot/dts/rk3066a-bqcurie2.dts
-+++ b/arch/arm/boot/dts/rk3066a-bqcurie2.dts
-@@ -59,12 +59,8 @@
- 			pinctrl-names = "default";
- 			pinctrl-0 = <&sd0_clk &sd0_cmd &sd0_cd &sd0_bus4>;
- 			vmmc-supply = <&vcc_sd0>;
--
--			slot at 0 {
--				reg = <0>;
--				bus-width = <4>;
--				disable-wp;
--			};
-+			bus-width = <4>;
-+			disable-wp;
- 		};
+diff --git a/drivers/mmc/host/dw_mmc.c b/drivers/mmc/host/dw_mmc.c
+index 1ac227c..8d9edc6 100644
+--- a/drivers/mmc/host/dw_mmc.c
++++ b/drivers/mmc/host/dw_mmc.c
+@@ -997,7 +997,10 @@ static int dw_mci_get_ro(struct mmc_host *mmc)
+ 	int gpio_ro = mmc_gpio_get_ro(mmc);
  
- 		dwmmc at 10218000 { /* wifi */
-@@ -74,12 +70,8 @@
+ 	/* Use platform get_ro function, else try on board write protect */
+-	if (slot->quirks & DW_MCI_SLOT_QUIRK_NO_WRITE_PROTECT)
++	if (slot->quirks & DW_MCI_SLOT_QUIRK_NO_WRITE_PROTECT) {
++		dev_warn(slot->host->dev, "Recommend not to use 'disable-wp'"
++				"into slot-node. Change your dt-file!!");
++	} else if (slot->host->quirks & DW_MCI_QUIRK_NO_WRITE_PROTECT)
+ 		read_only = 0;
+ 	else if (!IS_ERR_VALUE(gpio_ro))
+ 		read_only = gpio_ro;
+@@ -2238,6 +2241,9 @@ static struct dw_mci_of_quirks {
+ 	{
+ 		.quirk	= "broken-cd",
+ 		.id	= DW_MCI_QUIRK_BROKEN_CARD_DETECTION,
++	}, {
++		.quirk	= "disable-wp",
++		.id	= DW_MCI_QUIRK_NO_WRITE_PROTECT,
+ 	},
+ };
  
- 			pinctrl-names = "default";
- 			pinctrl-0 = <&sd1_clk &sd1_cmd &sd1_bus4>;
--
--			slot at 0 {
--				reg = <0>;
--				bus-width = <4>;
--				disable-wp;
--			};
-+			bus-width = <4>;
-+			disable-wp;
- 		};
+diff --git a/include/linux/mmc/dw_mmc.h b/include/linux/mmc/dw_mmc.h
+index babaea9..29ce014 100644
+--- a/include/linux/mmc/dw_mmc.h
++++ b/include/linux/mmc/dw_mmc.h
+@@ -213,6 +213,8 @@ struct dw_mci_dma_ops {
+ #define DW_MCI_QUIRK_HIGHSPEED			BIT(2)
+ /* Unreliable card detection */
+ #define DW_MCI_QUIRK_BROKEN_CARD_DETECTION	BIT(3)
++/* No write protect */
++#define DW_MCI_QUIRK_NO_WRITE_PROTECT		BIT(4)
  
- 		gpio-keys {
+ /* Slot level quirks */
+ /* This slot has no write protect */
 -- 
 1.7.9.5
