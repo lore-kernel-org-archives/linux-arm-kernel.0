@@ -1,65 +1,87 @@
-From: mpa@pengutronix.de (Markus Pargmann)
-Date: Wed, 30 Jul 2014 15:09:30 +0200
-Subject: [PATCH 3/4] gpio: pca953x: Add pca9506 as DT compatible
-In-Reply-To: <20140730125216.GI13842@pengutronix.de>
-References: <1406618686-22385-1-git-send-email-mpa@pengutronix.de>
- <1406618686-22385-4-git-send-email-mpa@pengutronix.de>
- <20140730125216.GI13842@pengutronix.de>
-Message-ID: <20140730130930.GJ13842@pengutronix.de>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Wed, 30 Jul 2014 15:10:04 +0200
+Subject: [PATCH v2 1/3] arm64: spin-table: handle unmapped
+ cpu-release-addrs
+In-Reply-To: <20140730124908.GB20162@leverpostej>
+References: <1406717944-24725-1-git-send-email-ard.biesheuvel@linaro.org>
+ <1406717944-24725-2-git-send-email-ard.biesheuvel@linaro.org>
+ <20140730113013.GL12239@arm.com>
+ <CAKv+Gu-891BPCMCB2xnhsaUHxz_BCMkwbbwQ76kmK=JsUdifHQ@mail.gmail.com>
+ <20140730123029.GA20162@leverpostej>
+ <20140730124258.GP12239@arm.com>
+ <20140730124908.GB20162@leverpostej>
+Message-ID: <CAKv+Gu-OunL2FdzvZ6y95cKaewOyFaoCgX+Rqsg4R92yLAg=tQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jul 30, 2014 at 02:52:16PM +0200, Markus Pargmann wrote:
-> On Tue, Jul 29, 2014 at 09:24:45AM +0200, Markus Pargmann wrote:
-> > This driver can also be used for the nxp,pca9506 device.
-> > 
-> > Signed-off-by: Markus Pargmann <mpa@pengutronix.de>
-> > ---
-> >  Documentation/devicetree/bindings/gpio/gpio-pca953x.txt | 1 +
-> >  drivers/gpio/gpio-pca953x.c                             | 1 +
-> >  2 files changed, 2 insertions(+)
-> > 
-> > diff --git a/Documentation/devicetree/bindings/gpio/gpio-pca953x.txt b/Documentation/devicetree/bindings/gpio/gpio-pca953x.txt
-> > index b9a42f294dd0..eb65157d47f6 100644
-> > --- a/Documentation/devicetree/bindings/gpio/gpio-pca953x.txt
-> > +++ b/Documentation/devicetree/bindings/gpio/gpio-pca953x.txt
-> > @@ -3,6 +3,7 @@
-> >  Required properties:
-> >   - compatible: Has to contain one of the following:
-> >  	nxp,pca9505
-> > +	nxp,pca9506
-> >  	nxp,pca9534
-> >  	nxp,pca9535
-> >  	nxp,pca9536
-> > diff --git a/drivers/gpio/gpio-pca953x.c b/drivers/gpio/gpio-pca953x.c
-> > index fda3eae835d0..df5eb6e6be1e 100644
-> > --- a/drivers/gpio/gpio-pca953x.c
-> > +++ b/drivers/gpio/gpio-pca953x.c
-> > @@ -729,6 +729,7 @@ static int pca953x_remove(struct i2c_client *client)
-> >  
-> >  static const struct of_device_id pca953x_dt_ids[] = {
-> >  	{ .compatible = "nxp,pca9505", },
-> > +	{ .compatible = "nxp,pca9506", },
-> 
-> The item for the i2c_device_id table is missing in this patch. I will
-> send a v2.
+On 30 July 2014 14:49, Mark Rutland <mark.rutland@arm.com> wrote:
+> On Wed, Jul 30, 2014 at 01:42:58PM +0100, Will Deacon wrote:
+>> On Wed, Jul 30, 2014 at 01:30:29PM +0100, Mark Rutland wrote:
+>> > On Wed, Jul 30, 2014 at 01:00:40PM +0100, Ard Biesheuvel wrote:
+>> > > On 30 July 2014 13:30, Will Deacon <will.deacon@arm.com> wrote:
+>> > > > On Wed, Jul 30, 2014 at 11:59:02AM +0100, Ard Biesheuvel wrote:
+>> > > >> From: Mark Rutland <mark.rutland@arm.com>
+>> > > >>
+>> > > >> In certain cases the cpu-release-addr of a CPU may not fall in the
+>> > > >> linear mapping (e.g. when the kernel is loaded above this address due to
+>> > > >> the presence of other images in memory). This is problematic for the
+>> > > >> spin-table code as it assumes that it can trivially convert a
+>> > > >> cpu-release-addr to a valid VA in the linear map.
+>> > > >>
+>> > > >> This patch modifies the spin-table code to use a temporary cached
+>> > > >> mapping to write to a given cpu-release-addr, enabling us to support
+>> > > >> addresses regardless of whether they are covered by the linear mapping.
+>> > > >>
+>> > > >> Signed-off-by: Mark Rutland <mark.rutland@arm.com>
+>> > > >> Tested-by: Mark Salter <msalter@redhat.com>
+>> > > >> [ardb: added (__force void *) cast]
+>> > > >> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+>> > > >> ---
+>> > > >>  arch/arm64/kernel/smp_spin_table.c | 22 +++++++++++++++++-----
+>> > > >>  1 file changed, 17 insertions(+), 5 deletions(-)
+>> > > >
+>> > > > I'm nervous about this. What if the spin table sits in the same physical 64k
+>> > > > frame as a read-sensitive device and we're running with 64k pages?
+>> > > >
+>> > >
+>> > > I see what you mean. This is potentially hairy, as EFI already
+>> > > ioremap_cache()s everything known to it as normal DRAM, so using plain
+>> > > ioremap() here if pfn_valid() returns false for cpu-release-addr's PFN
+>> > > may still result in mappings with different attributes for the same
+>> > > region. So how should we decide whether to call ioremap() or
+>> > > ioremap_cache() in this case?
+>> >
+>> > If we're careful about handling mismatched attributes we might be able
+>> > to get away with always using a device mapping.
+>>
+>> Even then, I think ioremap hits a WARN_ON if pfn_valid.
+>
+> Ok, that's that idea dead then.
+>
+>> > I'll need to have a think about that, I'm not sure on the architected
+>> > cache behaviour in such a case.
+>>
+>> Of we just skip the cache flush if !pfn_valid.
+>
+> I don't think that's always safe given Ard's comment that the EFI code
+> will possibly have a mapping covering the region created by
+> ioremap_cache.
+>
+> Ard, what exactly does the EFI code map with ioremap_cache, and why?
+>
 
-This patch can actually be dropped. There is no difference between
-pca9505 and pca9506 so it doesn't make sense to add pca9506.
+Actually, after re-reading the spec and the code, perhaps this is not an issue.
+The EFI __init code calls ioremap_cache() for all regions described by
+the UEFI memory map as requiring a virtual mapping
+(EFI_MEMORY_RUNTIME): this is primarily runtime services code and data
+regions and perhaps some I/O mappings for flash or other peripherals
+that UEFI owns and needs to access during Runtime Services calls.
 
-Regards,
-
-Markus
+Mark Salter mentioned that APM Mustang's spin table lives in an
+EFI_RESERVED_TYPE region, which presumably would not have the
+EFI_MEMORY_RUNTIME attribute set, as it has nothing to do with the
+UEFI Runtime Services. This means that no cached mapping should
+already exist for that region.
 
 -- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140730/2b146029/attachment-0001.sig>
+Ard.
