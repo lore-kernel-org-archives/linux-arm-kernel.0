@@ -1,52 +1,47 @@
-From: rjw@rjwysocki.net (Rafael J. Wysocki)
-Date: Wed, 30 Jul 2014 02:29:11 +0200
-Subject: [PATCH v4 0/5] Simplify hotplug/suspend handling
-In-Reply-To: <1406250448-470-1-git-send-email-skannan@codeaurora.org>
-References: <1406250448-470-1-git-send-email-skannan@codeaurora.org>
-Message-ID: <1667655.2j1xLy7HXa@vostro.rjw.lan>
+From: afaerber@suse.de (=?UTF-8?B?QW5kcmVhcyBGw6RyYmVy?=)
+Date: Wed, 30 Jul 2014 02:21:53 +0200
+Subject: [PATCH v2 2/4] ARM: dts: exynos5250: cypress,cyapa trackpad is
+ Snow only
+In-Reply-To: <53D82900.1050409@samsung.com>
+References: <1405704009-8430-1-git-send-email-afaerber@suse.de>	<1405704009-8430-3-git-send-email-afaerber@suse.de>
+ <CAD=FV=VAWG=H9=mwKZfip9zvAROU3aVXihnaBUBr0GNSzDoWFw@mail.gmail.com>
+ <53D82900.1050409@samsung.com>
+Message-ID: <53D83AA1.7080607@suse.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday, July 24, 2014 06:07:23 PM Saravana Kannan wrote:
-> Series of patchs to simplify policy/sysfs/kobj/locking handling across
-> suspend/resume
+Am 30.07.2014 01:06, schrieb Kukjin Kim:
+> On 07/30/14 01:16, Doug Anderson wrote:
+>> On Fri, Jul 18, 2014 at 10:20 AM, Andreas F?rber<afaerber@suse.de> 
+>> wrote:
+>>> Move it from exynos5250-cros-common.dtsi to exynos5250-snow.dts.
+>>> Spring does not need it, it uses an Atmel maXTouch instead.
+>>>
+>>> Signed-off-by: Andreas F?rber<afaerber@suse.de>
+>>> ---
+>>>   v2: New (Doug Anderson)
+>>>
+>>>   arch/arm/boot/dts/exynos5250-cros-common.dtsi |  8 --------
+>>>   arch/arm/boot/dts/exynos5250-snow.dts         | 10 ++++++++++
+>>>   2 files changed, 10 insertions(+), 8 deletions(-)
+>>
+>> Reviewed-by: Doug Anderson<dianders@chromium.org>
+>>
+>> Kukjin could apply this now if he wanted to avoid future conflicts.
+> 
+> OK, I read your comments on another this series and I've applied 1/4 and
+> 2/4 as per your suggestion with your reviewed by tag ;)
 
-I need someone to review this series for me.  Viresh or Srivatsa, preferably
-both.
+Thanks.
 
-Thanks!
+> And I think, Andreas is going to re-spin remains for exynos5250-spring
+> based on updated my -next?
 
-> The following have been tested so far on a 2x2 cluster environment:
-> - Boot with 2 cpus and no cpufreq driver.
-> - mod probe driver and see cpufreq sysfs files show up only for the 1st cluster.
-> - Online the rest of the 2 CPUs and have files show up correctly.
-> - rmmod the driver and see the files go away.
-> - modprobe again (or back and forth multiples times) and see it work.
-> - suspend/resume works as expected.
-> - When a cluster is offline, all read/writes to its sysfs files return an error
-> 
-> v4
-> - Split it up into smaller patches
-> - Will handle physical CPU removal correctly
-> - Fixed earlier mistake of deleting code under !recover_policy
-> - Dropped some code refactor that reuses a lot of code between add/remove
-> - Dropped fix for exiting hotplug race with cpufreq driver probe/rmmod
-> - Dropped changes will come later once this series is acked.
-> 
-> 
-> Saravana Kannan (5):
->   cpufreq: Don't wait for CPU to going offline to restart governor
->   cpufreq: Keep track of which CPU owns the kobj/sysfs nodes separately
->   cpufreq: Don't destroy/realloc policy/sysfs on hotplug/suspend
->   cpufreq: Properly handle physical CPU hot-add/hot-remove
->   cpufreq: Delete dead code related to policy save/restore
-> 
->  drivers/cpufreq/cpufreq.c | 238 ++++++++++++++++++----------------------------
->  include/linux/cpufreq.h   |   1 +
->  2 files changed, 93 insertions(+), 146 deletions(-)
-> 
-> 
+Yes. Please don't apply 3/4, I'm fixing a duplicate hdmi node.
+
+Regards,
+Andreas
 
 -- 
-I speak only for myself.
-Rafael J. Wysocki, Intel Open Source Technology Center.
+SUSE LINUX Products GmbH, Maxfeldstr. 5, 90409 N?rnberg, Germany
+GF: Jeff Hawn, Jennifer Guild, Felix Imend?rffer; HRB 16746 AG N?rnberg
