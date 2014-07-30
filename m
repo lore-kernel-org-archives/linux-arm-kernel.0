@@ -1,62 +1,301 @@
-From: monstr@monstr.eu (Michal Simek)
-Date: Wed, 30 Jul 2014 13:27:51 +0200
-Subject: [PATCH] ARM: zynq: DT: Clarify Xilinx Zynq platform
-In-Reply-To: <7153c8eded88751e7637f08f2bfe9cb6a65036e7.1406275971.git.michal.simek@xilinx.com>
-References: <7153c8eded88751e7637f08f2bfe9cb6a65036e7.1406275971.git.michal.simek@xilinx.com>
-Message-ID: <53D8D6B7.5030309@monstr.eu>
+From: afaerber@suse.de (=?ISO-8859-15?Q?Andreas_F=E4rber?=)
+Date: Wed, 30 Jul 2014 13:28:47 +0200
+Subject: [PATCH v9 3/6] ARM: dts: Exynos: add CPU OPP and regulator supply
+ property
+In-Reply-To: <1406707663-16656-4-git-send-email-thomas.ab@samsung.com>
+References: <1406707663-16656-1-git-send-email-thomas.ab@samsung.com>
+ <1406707663-16656-4-git-send-email-thomas.ab@samsung.com>
+Message-ID: <53D8D6EF.8010503@suse.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/25/2014 10:15 AM, Michal Simek wrote:
-> ep107 was emulation platform and compatible string
-> have been changed long time ago.
+Am 30.07.2014 10:07, schrieb Thomas Abraham:
+> For Exynos 4210/5250/5420 based platforms, add CPU operating points and CPU
+> regulator supply properties for migrating from Exynos specific cpufreq driver
+> to using generic cpufreq drivers.
 > 
-> "ARM: zynq: dts: split up device tree"
-> (sha1: e06f1a9ed7ebff170ba05d2606d079fb36c6a52d)
-> 
-> Signed-off-by: Michal Simek <michal.simek@xilinx.com>
+> Cc: Kukjin Kim <kgene.kim@samsung.com>
+> Cc: Doug Anderson <dianders@chromium.org>
+> Cc: Javier Martinez Canillas <javier.martinez@collabora.co.uk>
+> Cc: Andreas Faerber <afaerber@suse.de>
+> Cc: Sachin Kamat <sachin.kamat@linaro.org>
+> Signed-off-by: Thomas Abraham <thomas.ab@samsung.com>
 > ---
+>  arch/arm/boot/dts/exynos4210-origen.dts         |    4 +++
+>  arch/arm/boot/dts/exynos4210-trats.dts          |    4 +++
+>  arch/arm/boot/dts/exynos4210-universal_c210.dts |    4 +++
+>  arch/arm/boot/dts/exynos4210.dtsi               |   14 ++++++++-
+>  arch/arm/boot/dts/exynos5250-arndale.dts        |    4 +++
+>  arch/arm/boot/dts/exynos5250-smdk5250.dts       |    4 +++
+>  arch/arm/boot/dts/exynos5250-snow.dts           |    4 +++
+>  arch/arm/boot/dts/exynos5250.dtsi               |   25 ++++++++++++++-
+>  arch/arm/boot/dts/exynos5420.dtsi               |   38 +++++++++++++++++++++++
+>  9 files changed, 99 insertions(+), 2 deletions(-)
 > 
->  Documentation/devicetree/bindings/arm/xilinx.txt | 8 ++++----
->  1 file changed, 4 insertions(+), 4 deletions(-)
-> 
-> diff --git a/Documentation/devicetree/bindings/arm/xilinx.txt b/Documentation/devicetree/bindings/arm/xilinx.txt
-> index 6f1ed830b4f7..1f7995357888 100644
-> --- a/Documentation/devicetree/bindings/arm/xilinx.txt
-> +++ b/Documentation/devicetree/bindings/arm/xilinx.txt
-> @@ -1,7 +1,7 @@
-> -Xilinx Zynq EP107 Emulation Platform board
-> +Xilinx Zynq Platforms Device Tree Bindings
-> 
-> -This board is an emulation platform for the Zynq product which is
-> -based on an ARM Cortex A9 processor.
-> +Boards with Zynq-7000 SOC based on an ARM Cortex A9 processor
-> +shall have the following properties.
-> 
->  Required root node properties:
-> -    - compatible = "xlnx,zynq-ep107";
-> +    - compatible = "xlnx,zynq-7000";
-> --
-> 1.8.2.3
-> 
+> diff --git a/arch/arm/boot/dts/exynos4210-origen.dts b/arch/arm/boot/dts/exynos4210-origen.dts
+> index f767c42..887dded 100644
+> --- a/arch/arm/boot/dts/exynos4210-origen.dts
+> +++ b/arch/arm/boot/dts/exynos4210-origen.dts
+> @@ -334,3 +334,7 @@
+>  		};
+>  	};
+>  };
+> +
+> +&cpu0 {
+> +	cpu0-supply = <&buck1_reg>;
+> +};
+> diff --git a/arch/arm/boot/dts/exynos4210-trats.dts b/arch/arm/boot/dts/exynos4210-trats.dts
+> index f516da9..66119dd 100644
+> --- a/arch/arm/boot/dts/exynos4210-trats.dts
+> +++ b/arch/arm/boot/dts/exynos4210-trats.dts
+> @@ -446,3 +446,7 @@
+>  		};
+>  	};
+>  };
+> +
+> +&cpu0 {
+> +	cpu0-supply = <&varm_breg>;
+> +};
+> diff --git a/arch/arm/boot/dts/exynos4210-universal_c210.dts b/arch/arm/boot/dts/exynos4210-universal_c210.dts
+> index d50eb3a..bf0a39c 100644
+> --- a/arch/arm/boot/dts/exynos4210-universal_c210.dts
+> +++ b/arch/arm/boot/dts/exynos4210-universal_c210.dts
+> @@ -492,3 +492,7 @@
+>  &mdma1 {
+>  	reg = <0x12840000 0x1000>;
+>  };
+> +
+> +&cpu0 {
+> +	cpu0-supply = <&vdd_arm_reg>;
+> +};
+> diff --git a/arch/arm/boot/dts/exynos4210.dtsi b/arch/arm/boot/dts/exynos4210.dtsi
+> index bcc9e63..69bac07 100644
+> --- a/arch/arm/boot/dts/exynos4210.dtsi
+> +++ b/arch/arm/boot/dts/exynos4210.dtsi
+> @@ -35,10 +35,22 @@
+>  		#address-cells = <1>;
+>  		#size-cells = <0>;
+>  
+> -		cpu at 900 {
+> +		cpu0: cpu at 900 {
+>  			device_type = "cpu";
+>  			compatible = "arm,cortex-a9";
+>  			reg = <0x900>;
+> +			clocks = <&clock CLK_ARM_CLK>;
+> +			clock-names = "cpu";
+> +			clock-latency = <160000>;
+> +
+> +			operating-points = <
+> +				1200000 1250000
+> +				1000000 1150000
+> +				800000	1075000
+> +				500000	975000
+> +				400000	975000
+> +				200000	950000
 
-Applied to zynq/dt.
+Nit: Here you left-align the columns ...
 
-Thanks,
-Michal
+> +			>;
+>  		};
+>  
+>  		cpu at 901 {
+> diff --git a/arch/arm/boot/dts/exynos5250-arndale.dts b/arch/arm/boot/dts/exynos5250-arndale.dts
+> index d0de1f5..3b12a97 100644
+> --- a/arch/arm/boot/dts/exynos5250-arndale.dts
+> +++ b/arch/arm/boot/dts/exynos5250-arndale.dts
+> @@ -575,3 +575,7 @@
+>  		usb-phy = <&usb2_phy>;
+>  	};
+>  };
+> +
+> +&cpu0 {
+> +	cpu0-supply = <&buck2_reg>;
+> +};
+> diff --git a/arch/arm/boot/dts/exynos5250-smdk5250.dts b/arch/arm/boot/dts/exynos5250-smdk5250.dts
+> index b4b35ad..f07e834 100644
+> --- a/arch/arm/boot/dts/exynos5250-smdk5250.dts
+> +++ b/arch/arm/boot/dts/exynos5250-smdk5250.dts
+> @@ -414,3 +414,7 @@
+>  		};
+>  	};
+>  };
+> +
+> +&cpu0 {
+> +	cpu0-supply = <&buck2_reg>;
+> +};
+> diff --git a/arch/arm/boot/dts/exynos5250-snow.dts b/arch/arm/boot/dts/exynos5250-snow.dts
+> index f2b8c41..91acca7 100644
+> --- a/arch/arm/boot/dts/exynos5250-snow.dts
+> +++ b/arch/arm/boot/dts/exynos5250-snow.dts
+> @@ -509,4 +509,8 @@
+>  	};
+>  };
+>  
+> +&cpu0 {
+> +	cpu0-supply = <&buck2_reg>;
+> +};
+> +
+>  #include "cros-ec-keyboard.dtsi"
+> diff --git a/arch/arm/boot/dts/exynos5250.dtsi b/arch/arm/boot/dts/exynos5250.dtsi
+> index 492e1ef..97b282c 100644
+> --- a/arch/arm/boot/dts/exynos5250.dtsi
+> +++ b/arch/arm/boot/dts/exynos5250.dtsi
+> @@ -58,11 +58,34 @@
+>  		#address-cells = <1>;
+>  		#size-cells = <0>;
+>  
+> -		cpu at 0 {
+> +		cpu0: cpu at 0 {
+>  			device_type = "cpu";
+>  			compatible = "arm,cortex-a15";
+>  			reg = <0>;
+>  			clock-frequency = <1700000000>;
+> +
+> +			clocks = <&clock CLK_ARM_CLK>;
+> +			clock-names = "cpu";
+> +			clock-latency = <140000>;
+> +
+> +			operating-points = <
+> +				1700000 1300000
+> +				1600000 1250000
+> +				1500000 1225000
+> +				1400000 1200000
+> +				1300000 1150000
+> +				1200000 1125000
+> +				1100000 1100000
+> +				1000000 1075000
+> +				 900000 1050000
+> +				 800000 1025000
+> +				 700000 1012500
+> +				 600000 1000000
+> +				 500000  975000
+> +				 400000  950000
+> +				 300000  937500
+> +				 200000  925000
+
+... here you right-align both ...
+
+> +			>;
+>  		};
+>  		cpu at 1 {
+>  			device_type = "cpu";
+> diff --git a/arch/arm/boot/dts/exynos5420.dtsi b/arch/arm/boot/dts/exynos5420.dtsi
+> index cb2b70e..3154b4c 100644
+> --- a/arch/arm/boot/dts/exynos5420.dtsi
+> +++ b/arch/arm/boot/dts/exynos5420.dtsi
+> @@ -59,8 +59,26 @@
+>  			device_type = "cpu";
+>  			compatible = "arm,cortex-a15";
+>  			reg = <0x0>;
+> +			clocks = <&clock CLK_ARM_CLK>;
+> +			clock-names = "cpu-cluster.0";
+>  			clock-frequency = <1800000000>;
+>  			cci-control-port = <&cci_control1>;
+> +			clock-latency = <140000>;
+> +
+> +			operating-points = <
+> +				1800000 1250000
+> +				1700000 1212500
+> +				1600000 1175000
+> +				1500000 1137500
+> +				1400000 1112500
+> +				1300000 1062500
+> +				1200000 1037500
+> +				1100000 1012500
+> +				1000000 987500
+> +				 900000 962500
+> +				 800000 937500
+> +				 700000 912500
+
+... but here only the left column.
+
+> +			>;
+>  		};
+>  
+>  		cpu1: cpu at 1 {
+> @@ -69,6 +87,7 @@
+>  			reg = <0x1>;
+>  			clock-frequency = <1800000000>;
+>  			cci-control-port = <&cci_control1>;
+> +			clock-latency = <140000>;
+>  		};
+>  
+>  		cpu2: cpu at 2 {
+> @@ -77,6 +96,7 @@
+>  			reg = <0x2>;
+>  			clock-frequency = <1800000000>;
+>  			cci-control-port = <&cci_control1>;
+> +			clock-latency = <140000>;
+>  		};
+>  
+>  		cpu3: cpu at 3 {
+> @@ -85,14 +105,29 @@
+>  			reg = <0x3>;
+>  			clock-frequency = <1800000000>;
+>  			cci-control-port = <&cci_control1>;
+> +			clock-latency = <140000>;
+>  		};
+>  
+>  		cpu4: cpu at 100 {
+>  			device_type = "cpu";
+>  			compatible = "arm,cortex-a7";
+>  			reg = <0x100>;
+> +			clocks = <&clock CLK_KFC_CLK>;
+> +			clock-names = "cpu-cluster.1";
+>  			clock-frequency = <1000000000>;
+>  			cci-control-port = <&cci_control0>;
+> +			clock-latency = <140000>;
+> +
+> +			operating-points = <
+> +				1300000 1275000
+> +				1200000 1212500
+> +				1100000 1162500
+> +				1000000 1112500
+> +				 900000 1062500
+> +				 800000 1025000
+> +				 700000 975000
+> +				 600000 937500
+
+Dito.
+
+> +			>;
+>  		};
+>  
+>  		cpu5: cpu at 101 {
+> @@ -101,6 +136,7 @@
+>  			reg = <0x101>;
+>  			clock-frequency = <1000000000>;
+>  			cci-control-port = <&cci_control0>;
+> +			clock-latency = <140000>;
+>  		};
+>  
+>  		cpu6: cpu at 102 {
+> @@ -109,6 +145,7 @@
+>  			reg = <0x102>;
+>  			clock-frequency = <1000000000>;
+>  			cci-control-port = <&cci_control0>;
+> +			clock-latency = <140000>;
+>  		};
+>  
+>  		cpu7: cpu at 103 {
+> @@ -117,6 +154,7 @@
+>  			reg = <0x103>;
+>  			clock-frequency = <1000000000>;
+>  			cci-control-port = <&cci_control0>;
+> +			clock-latency = <140000>;
+>  		};
+>  	};
+>  
+
+Since I don't really care which template you choose and can't judge most
+numbers, FWIW
+
+Reviewed-by: Andreas F?rber <afaerber@suse.de>
+
+Thanks for resolving the conflict,
+
+Andreas
 
 -- 
-Michal Simek, Ing. (M.Eng), OpenPGP -> KeyID: FE3D1F91
-w: www.monstr.eu p: +42-0-721842854
-Maintainer of Linux kernel - Microblaze cpu - http://www.monstr.eu/fdt/
-Maintainer of Linux kernel - Xilinx Zynq ARM architecture
-Microblaze U-BOOT custodian and responsible for u-boot arm zynq platform
-
-
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 263 bytes
-Desc: OpenPGP digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140730/08c84e53/attachment.sig>
+SUSE LINUX Products GmbH, Maxfeldstr. 5, 90409 N?rnberg, Germany
+GF: Jeff Hawn, Jennifer Guild, Felix Imend?rffer; HRB 16746 AG N?rnberg
