@@ -1,37 +1,41 @@
-From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Wed, 30 Jul 2014 13:18:56 -0700
-Subject: [PATCH v5 1/7] kernel: Add support for kernel restart handler
- call chain
-In-Reply-To: <1405668856-13738-2-git-send-email-linux@roeck-us.net>
-References: <1405668856-13738-1-git-send-email-linux@roeck-us.net>
- <1405668856-13738-2-git-send-email-linux@roeck-us.net>
-Message-ID: <53D95330.1050904@codeaurora.org>
+From: robert.jarzmik@free.fr (Robert Jarzmik)
+Date: Wed, 30 Jul 2014 22:51:01 +0200
+Subject: [PATCH v3 3/6] arm: pxa: add clock pll selection bits
+In-Reply-To: <1406753464-15000-1-git-send-email-robert.jarzmik@free.fr>
+References: <1406753464-15000-1-git-send-email-robert.jarzmik@free.fr>
+Message-ID: <1406753464-15000-4-git-send-email-robert.jarzmik@free.fr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/18/14 00:34, Guenter Roeck wrote:
-> +/**
-> + *	do_kernel_restart - Execute kernel restart handler call chain
-> + *
-> + *	Calls functions registered with register_restart_handler.
-> + *
-> + *	Expected to be called from machine_restart as last step of the restart
-> + *	sequence.
-> + *
-> + *	Restarts the system immediately if a restart handler function has been
-> + *	registered. Otherwise does nothing.
-> + */
-> +void do_kernel_restart(char *cmd)
-> +{
-> +	blocking_notifier_call_chain(&restart_handler_list, reboot_mode, cmd);
-> +}
+Add missing bits for CCCR and CCSR :
+ - CPLL and PPLL selection, either full speed or 13MHz
+ - CPSR masks
 
-Has this been tested with scheduling while atomic checking
-(CONFIG_DEBUG_ATOMIC_SLEEP) or lockdep (CONFIG_PROVE_LOCKING)? ARM would
-call this with irqs disabled and blocking_notifier_call_chain() would
-spit out a warning when it tries to down_read() on it's semaphore. This
-should probably be an atomic notifier chain instead.
+Signed-off-by: Robert Jarzmik <robert.jarzmik@free.fr>
+---
+ arch/arm/mach-pxa/include/mach/pxa2xx-regs.h | 10 ++++++++++
+ 1 file changed, 10 insertions(+)
 
+diff --git a/arch/arm/mach-pxa/include/mach/pxa2xx-regs.h b/arch/arm/mach-pxa/include/mach/pxa2xx-regs.h
+index ee6ced1..f1dd629 100644
+--- a/arch/arm/mach-pxa/include/mach/pxa2xx-regs.h
++++ b/arch/arm/mach-pxa/include/mach/pxa2xx-regs.h
+@@ -143,6 +143,16 @@
+ #define CCCR_M_MASK	0x0060	/* Memory Frequency to Run Mode Frequency Multiplier */
+ #define CCCR_L_MASK	0x001f	/* Crystal Frequency to Memory Frequency Multiplier */
+ 
++#define CCCR_CPDIS_BIT	(31)
++#define CCCR_PPDIS_BIT	(30)
++#define CCCR_LCD_26_BIT	(27)
++#define CCCR_A_BIT	(25)
++
++#define CCSR_N2_MASK	CCCR_N_MASK
++#define CCSR_M_MASK	CCCR_M_MASK
++#define CCSR_L_MASK	CCCR_L_MASK
++#define CCSR_N2_SHIFT	7
++
+ #define CKEN_AC97CONF   (31)    /* AC97 Controller Configuration */
+ #define CKEN_CAMERA	(24)	/* Camera Interface Clock Enable */
+ #define CKEN_SSP1	(23)	/* SSP1 Unit Clock Enable */
 -- 
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-hosted by The Linux Foundation
+2.0.0.rc2
