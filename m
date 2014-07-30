@@ -1,55 +1,66 @@
-From: grant.likely@secretlab.ca (Grant Likely)
-Date: Wed, 30 Jul 2014 08:52:43 -0600
-Subject: [GIT PULL] Last minute bug fix for Exynos platform
-Message-ID: <CACxGe6vLUtEGAFs+cx4KxwXyXwrTo4Ksw36wLeBnWc8GMBxwfw@mail.gmail.com>
+From: dinguyen@altera.com (Dinh Nguyen)
+Date: Wed, 30 Jul 2014 09:52:45 -0500
+Subject: [PATCH net v3 6/6] net: stmmac: squelch sparse warning with casts
+In-Reply-To: <1406671607-27368-7-git-send-email-vbridgers2013@gmail.com>
+References: <1406671607-27368-1-git-send-email-vbridgers2013@gmail.com>
+ <1406671607-27368-7-git-send-email-vbridgers2013@gmail.com>
+Message-ID: <1406731965.23841.2.camel@linux-builds1>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Linus,
+Hi Vince,
 
-This bug fix has been brewing for a while. I hate sending it to you so
-late, but I only got confirmation that it solves the problem this past
-weekend. The diff looks big for a bug fix, but the majority of it is
-only executed in the Exynos quirk case. Unfortunately it required
-splitting early_init_dt_scan() in two and adding quirk handling in the
-middle of it on ARM.
+On Tue, 2014-07-29 at 17:06 -0500, Vince Bridgers wrote:
+> Add casts to squelch the following sparse warnings so we can see
+> the ones that matter when they occur.
+> 
+> stmmac_platform.c:260:20: warning: incorrect type in argument 1
+> 			  (different address spaces)
+> stmmac_platform.c:260:20:    expected void const *static extern
+> 			  [signed] [long] [typedef] [tls] inline [safe] ptr
+> stmmac_platform.c:260:20:    got void [noderef] <asn:2>*[assigned] addr
+> stmmac_platform.c:261:32: warning: incorrect type in argument 1
+> 			  (different address spaces)
+> stmmac_platform.c:261:32:    expected void const *static extern
+> 			  [signed] [long] [typedef] [tls] inline [safe] ptr
+> stmmac_platform.c:261:32:    got void [noderef] <asn:2>*[assigned] addr
+> 
 
-If you're not happy pulling at this late stage then I'll add it to my
-v3.17 merge queue and ask Greg to pull it into stable.
 
-g.
+I think you should update your sparse. I have 0.5.0 and the only sparse
+warnings for stmmac are:
 
-The following changes since commit 64aa90f26c06e1cb2aacfb98a7d0eccfbd6c1a91:
+drivers/net/ethernet/stmicro/stmmac/enh_desc.c:381:30: warning: symbol
+'enh_desc_ops' was not declared. Should it be static?
+drivers/net/ethernet/stmicro/stmmac/norm_desc.c:253:30: warning: symbol
+'ndesc_ops' was not declared. Should it be static?
+drivers/net/ethernet/stmicro/stmmac/dwmac-socfpga.c:128:29: warning:
+symbol 'socfpga_gmac_data' was not declared. Should it be static?
+drivers/net/ethernet/stmicro/stmmac/stmmac_hwtstamp.c:141:33: warning:
+symbol 'stmmac_ptp' was not declared. Should it be static?
 
-  Linux 3.16-rc7 (2014-07-27 12:41:55 -0700)
 
-are available in the git repository at:
-
-  git://git.secretlab.ca/git/linux tags/devicetree-for-linus
-
-for you to fetch changes up to 5a12a597a8627b91fd9d94365853f9f69a4f399c:
-
-  arm: Add devicetree fixup machine function (2014-07-29 21:26:49 -0600)
-
-----------------------------------------------------------------
-Device tree Exynos bug fix for v3.16-rc7
-
-Exynos has buggy firmware that puts bad data into the memory node. Commit
-1c2f87c2 (ARM: Get rid of meminfo) exposed the bug by dropping the artificial
-upper bound on the number of memory banks that can be added. Exynos fails to
-boot after that commit. This branch fixes it by splitting the early DT parse
-function and inserting a fixup hook. Exynos uses the hook to correct the DT
-before parsing memory regions.
-
-----------------------------------------------------------------
-Laura Abbott (3):
-      of: Split early_init_dt_scan into two parts
-      of: Add memory limiting function for flattened devicetrees
-      arm: Add devicetree fixup machine function
-
- arch/arm/include/asm/mach/arch.h |  1 +
- arch/arm/kernel/devtree.c        |  8 ++++-
- arch/arm/mach-exynos/exynos.c    | 10 ++++++
- drivers/of/fdt.c                 | 66 +++++++++++++++++++++++++++++++++++++++-
- include/linux/of_fdt.h           |  3 ++
- 5 files changed, 86 insertions(+), 2 deletions(-)
+Dinh
+> Signed-off-by: Vince Bridgers <vbridgers2013@gmail.com>
+> ---
+> V3: Add minor sparse warning correction as part of series
+> V2: Not present in prior submissions
+> ---
+>  .../net/ethernet/stmicro/stmmac/stmmac_platform.c  |    4 ++--
+>  1 file changed, 2 insertions(+), 2 deletions(-)
+> 
+> diff --git a/drivers/net/ethernet/stmicro/stmmac/stmmac_platform.c b/drivers/net/ethernet/stmicro/stmmac/stmmac_platform.c
+> index bb524a9..228003b 100644
+> --- a/drivers/net/ethernet/stmicro/stmmac/stmmac_platform.c
+> +++ b/drivers/net/ethernet/stmicro/stmmac/stmmac_platform.c
+> @@ -257,8 +257,8 @@ static int stmmac_pltfr_probe(struct platform_device *pdev)
+>  
+>  	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+>  	addr = devm_ioremap_resource(dev, res);
+> -	if (IS_ERR(addr))
+> -		return PTR_ERR(addr);
+> +	if (IS_ERR((void __force *)addr))
+> +		return PTR_ERR((void __force *)addr);
+>  
+>  	plat_dat = dev_get_platdata(&pdev->dev);
+>  	if (pdev->dev.of_node) {
