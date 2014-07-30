@@ -1,59 +1,72 @@
-From: jh80.chung@samsung.com (Jaehoon Chung)
-Date: Wed, 30 Jul 2014 11:47:26 +0900
-Subject: [PATCHv7 5/5] mmc: dw_mmc: replace "disable-wp" from slot's quirk
- to host's quirk
-In-Reply-To: <CAD=FV=VnP7q0UE0uP_8Hzbhtu6qJqz2kUR9E_sfk4wHbBH_7cg@mail.gmail.com>
-References: <1406514579-3769-1-git-send-email-jh80.chung@samsung.com>
- <1406514579-3769-6-git-send-email-jh80.chung@samsung.com>
- <CAD=FV=VnP7q0UE0uP_8Hzbhtu6qJqz2kUR9E_sfk4wHbBH_7cg@mail.gmail.com>
-Message-ID: <53D85CBE.8090104@samsung.com>
+From: robherring2@gmail.com (Rob Herring)
+Date: Tue, 29 Jul 2014 21:53:42 -0500
+Subject: use IORESOURCE_REG resource type for non-translatable addresses
+ in DT
+In-Reply-To: <53D84558.7060406@codeaurora.org>
+References: <53D788A7.4020303@mm-sol.com> <3794875.CZFbAag5Sv@wuerfel>
+ <53D7AA72.6010309@mm-sol.com> <20140729234522.E9FF1C40738@trevor.secretlab.ca>
+ <53D84558.7060406@codeaurora.org>
+Message-ID: <CAL_JsqJjH0OH+X=fzwqAPeWarjoLev7v6Nv_QhAa+nZyztMnFA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi, Doug.
+On Tue, Jul 29, 2014 at 8:07 PM, Stephen Boyd <sboyd@codeaurora.org> wrote:
+> On 07/29/14 16:45, Grant Likely wrote:
+>> On Tue, 29 Jul 2014 17:06:42 +0300, Stanimir Varbanov <svarbanov@mm-sol.com> wrote:
+>>>
+>>> This was just an example. Of course it has many issues and probaly it is
+>>> wrong:) The main goal was to understand does IORESOURCE_REG resource
+>>> type and parsing the *reg* properties for non-translatable addresses are
+>>> feasible. And also does it acceptable by community and OF platform
+>>> maintainers.
+>> The use case is actually very different from of_address_to_resource or
+>> of_get_address() because those APIs explicitly return physical memory
+>> addresses from the CPU perspective. It makes more sense to create a new
+>> API that doesn't attempt to translate the reg address. Alternately, a
+>> new API that only translates upto a given parent node.
+>
+> The most important thing is that platform_get_resource{_by_name}(&pdev,
+> IORESOURCE_REG, n) returns the reg property and optional size encoded
+> into a struct resource. I think Rob is suggesting we circumvent the
+> entire of_address_to_resource() path and do some if
+> (IS_ENABLED(CONFIG_OF) && type == IORESOURCE_REG) check in
+> platform_get_resource() to package up the reg property into a struct
+> resource. That should work.
 
-Thanks for review.
+No, I'm saying why are you using platform_get_resource at all and
+adding a new resource type? I don't see any advantage.
 
-On 07/30/2014 03:01 AM, Doug Anderson wrote:
-> Jaehoon,
-> 
-> On Sun, Jul 27, 2014 at 7:29 PM, Jaehoon Chung <jh80.chung@samsung.com> wrote:
->> Replaced the "disable-wp" into host's quirks.
->> (Because the slot-node is removed at dt-file.)
->>
->> Signed-off-by: Jaehoon Chung <jh80.chung@samsung.com>
->> Tested-by: Sachin Kamat <sachin.kamat@samsung.com>
->> Acked-by: Seungwon Jeon <tgih.jun@samsung.com>
->> ---
->>  drivers/mmc/host/dw_mmc.c  |   12 +++++-------
->>  include/linux/mmc/dw_mmc.h |    6 ++----
->>  2 files changed, 7 insertions(+), 11 deletions(-)
->>
->> diff --git a/drivers/mmc/host/dw_mmc.c b/drivers/mmc/host/dw_mmc.c
->> index 1ac227c..4a4f66f 100644
->> --- a/drivers/mmc/host/dw_mmc.c
->> +++ b/drivers/mmc/host/dw_mmc.c
->> @@ -997,7 +997,7 @@ static int dw_mci_get_ro(struct mmc_host *mmc)
->>         int gpio_ro = mmc_gpio_get_ro(mmc);
->>
->>         /* Use platform get_ro function, else try on board write protect */
->> -       if (slot->quirks & DW_MCI_SLOT_QUIRK_NO_WRITE_PROTECT)
->> +       if (slot->host->quirks & DW_MCI_QUIRK_NO_WRITE_PROTECT)
-> 
-> It doesn't seem like it would be hard to include support for the old
-> binding (and just print a warning).  Then this could land ahead of the
-> device tree changes.
-> 
-> Generally I think we're supposed to keep support for old device trees
-> if possible (except in extreme cases).
-Ok, I see. I will add the Warning message like this. ("Recommend not to use the slot-node...")
-Then Developers can change the device-tree, right.
+You might as well do of_property_read_u32 in the below example.
 
-Today, i will send the patch. If you have any other comment, let me know, plz.
-I want to merge this patch-set into 3.16.
+Rob
 
-Best Regards,
-Jaehoon Chung
-> 
-> -Doug
-> 
+> It sounds like you think partially translating addresses is risky
+> though. Fair enough. Perhaps we should call WARN() if someone tries to
+> call platform_get_resource() with IORESOURCE_REG and the parent node has
+> a ranges property that isn't a one-to-one conversion. That way if we
+> want to do something like this we can.
+>
+> pmic at 0 {
+>     #address-cells = <1>;
+>     #size-cells = <0>;
+>     reg = <0>;
+>
+>     regulators {
+>         ranges;
+>         #address-cells = <1>;
+>         #size-cells = <0>;
+>
+>         regulator at 40 {
+>             reg = <0x40>;
+>         };
+>
+>         regulator at 50 {
+>             reg = <0x50>;
+>         }
+>     };
+> };
+>
+> --
+> Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+> hosted by The Linux Foundation
+>
