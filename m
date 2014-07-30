@@ -1,45 +1,50 @@
 From: olof@lixom.net (Olof Johansson)
-Date: Wed, 30 Jul 2014 12:43:55 -0700
-Subject: [GIT PULL] Third Round of Renesas ARM Based SoC Clock Updates
- for v3.17
-In-Reply-To: <cover.1406164563.git.horms+renesas@verge.net.au>
-References: <cover.1406164563.git.horms+renesas@verge.net.au>
-Message-ID: <20140730194355.GB18384@quad.lixom.net>
+Date: Wed, 30 Jul 2014 12:45:21 -0700
+Subject: [GIT PULL v2] Renesas ARM Based SoC Boards Cleanups for v3.17
+In-Reply-To: <cover.1406166426.git.horms+renesas@verge.net.au>
+References: <cover.1406166426.git.horms+renesas@verge.net.au>
+Message-ID: <20140730194521.GC18384@quad.lixom.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jul 24, 2014 at 10:57:33AM +0900, Simon Horman wrote:
+On Thu, Jul 24, 2014 at 10:57:54AM +0900, Simon Horman wrote:
 > Hi Olof, Hi Kevin, Hi Arnd,
 > 
-> Please consider these third round of Renesas ARM based SoC clock updates for v3.17.
-> 
-> This pull request is based on the previous round of
-> such requests, tagged as renesas-clock2-for-v3.17,
-> which has already been pulled into the next/soc branch of arm-soc.
-> 
-> I apologise that this is being sent after the release of v3.16-rc6.
-> It has been queued up in next since well before then and not
-> sending this pull-request was an oversight on my part.
-> 
-> The now-tagged branch of this pull-requests is one of the branched merged
-> to form a base for "Renesas ARM Based SoC DT Timers Updates for v3.17". And
-> I believe its absence is the cause of the problem you flagged with regards
-> to the presence of changes outside of those listed for that pull-request.
+> Please consider these Renesas ARM based SoC boards cleanups for v3.17.
 > 
 > 
-> The following changes since commit ff4ce48e1f163d945c037c1c90ce12950961d91d:
+> This pull request is based on
+> "Renesas ARM Based SoC DT Timers Updates for v3.17",
+> tagged as renesas-dt-timers-for-v3.17,
+> which I have sent a pull request for.
 > 
->   ARM: shmobile: sh73a0: add SCI clock support for DT (2014-07-12 15:15:39 +0200)
+> In this pull-request cleanups are added on top of new development
+> due to the order in which the code was developed. In general
+> we prefer the reverse ordering.
+> 
+> 
+> v2 of this pull request is a rebase of v1 removing
+> a merge of defconfig changes at the base of the pull-request.
+> The motivation for that was to avoid attempts to use
+> genmai_defconfig after the board code it relies on has been removed.
+> Olof indicated he would prefer not to add that dependency.
+> 
+> 
+> The following changes since commit 9394af4314554d15762585a3464cefaa2e6d0420:
+> 
+>   ARM: shmobile: genmai-reference: Enable MTU2 in device tree (2014-07-15 21:26:42 +0900)
 > 
 > are available in the git repository at:
 > 
->   git://git.kernel.org/pub/scm/linux/kernel/git/horms/renesas.git tags/renesas-clock3-for-v3.17
+>   git://git.kernel.org/pub/scm/linux/kernel/git/horms/renesas.git tags/renesas-cleanup-boards-for-v3.17
 > 
-> for you to fetch changes up to a0f7e7496d56ac2da7c684e2035815318c17973a:
+> for you to fetch changes up to d2904bb7cd21844ff5e720083b59a344487fcc9b:
 > 
->   ARM: shmobile: sh73a0: add CMT1 clock support for DT (2014-07-15 13:34:17 +0900)
+>   ARM: shmobile: r7s72100: Remove legacy board support (2014-07-24 10:32:53 +0900)
 
-Merged.
+Given timing and dependencies here, please resend this for 3.18 instead as
+a base cleanup branch. It doesn't do any harm to leave this in there until
+then.
 
 
 -Olof
