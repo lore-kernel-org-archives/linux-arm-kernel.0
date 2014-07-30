@@ -1,101 +1,142 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Tue, 29 Jul 2014 22:39:40 -0700
-Subject: OMAP baseline test results for v3.16-rc4
-In-Reply-To: <alpine.DEB.2.02.1407291922370.13035@utopia.booyaka.com>
-References: <alpine.DEB.2.02.1407062339420.15016@utopia.booyaka.com>
- <20140707080238.GF28884@atomide.com>
- <alpine.DEB.2.02.1407251857480.5875@utopia.booyaka.com>
- <20140729064243.GF29045@atomide.com>
- <alpine.DEB.2.02.1407290810160.22957@utopia.booyaka.com>
- <20140729084930.GH29045@atomide.com>
- <alpine.DEB.2.02.1407291225070.13035@utopia.booyaka.com>
- <alpine.DEB.2.02.1407291256270.13035@utopia.booyaka.com>
- <20140729145312.GT29045@atomide.com>
- <alpine.DEB.2.02.1407291922370.13035@utopia.booyaka.com>
-Message-ID: <20140730053940.GX29045@atomide.com>
+From: achandran@mvista.com (Arun Chandran)
+Date: Wed, 30 Jul 2014 11:16:39 +0530
+Subject: Kexec on arm64
+In-Reply-To: <20140729133557.GQ2576@leverpostej>
+References: <CAFdej00J2mJwcg2Cy6CHVuuQZ4uQ2zZg8oErGPi0uPejievB+Q@mail.gmail.com>
+ <1406162287.4062.39.camel@smoke>
+ <20140724093603.GC4079@leverpostej>
+ <1406247468.4062.59.camel@smoke>
+ <CAFdej01w_pE6vv+13cCCyfDs4Rbdkzx4CMUj9q97HBKV0B53ow@mail.gmail.com>
+ <1406333901.4062.69.camel@smoke>
+ <CAFdej014ohCFYvoUAXWiYGb4_4UmSY2G1MH-NEE_cF1cC-6Mow@mail.gmail.com>
+ <20140728153812.GA2576@leverpostej>
+ <1406592548.28348.49.camel@smoke>
+ <CAFdej00is0kC-1q5uMNJL5APL1WezdNBg0jASgwYamsg5NO_Tg@mail.gmail.com>
+ <20140729133557.GQ2576@leverpostej>
+Message-ID: <CAFdej02R=3bq9n0ic5AZHwRjGT21fZ7S2ouuXZNevjdRsxmUNA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Paul Walmsley <paul@pwsan.com> [140729 12:39]:
-> On Tue, 29 Jul 2014, Tony Lindgren wrote:
-> 
-> > Hmm maybe different u-boot version then? I'm using
-> > 2014.04-00001-g5f09f5b.
-> >  
-> > > Are you using NFS root on 37xxevm or MMC root?
-> > 
-> > Using nfsroot and omap2plus_defconfig. My dmesg attached
-> > in case it provides some clues. I don't have console=ttyO
-> > here, but I've verified that it works with that too.
-> 
-> Walked through the PM test script by hand, and the proximal cause of the 
-> problem became obvious...
-> 
-> Turns out a five-second delay for a three-second autosuspend_delay_ms is 
-> no longer sufficient time for kernels to enter idle.  A ten-second sleep 
-> seems to be long enough.
+On Tue, Jul 29, 2014 at 7:05 PM, Mark Rutland <mark.rutland@arm.com> wrote:
+> [...]
+>
+>> The default code did not work.
+>>
+>> It is working with the change below
+>>
+>> ###############
+>> diff --git a/arch/arm64/kernel/machine_kexec.c
+>> b/arch/arm64/kernel/machine_kexec.c
+>> index 5632473..7c5f859 100644
+>> --- a/arch/arm64/kernel/machine_kexec.c
+>> +++ b/arch/arm64/kernel/machine_kexec.c
+>> @@ -147,12 +147,17 @@ static bool kexec_is_dtb_user(const dtb_t *dtb)
+>>  /**
+>>   * kexec_list_walk - Helper to walk the kimage page list.
+>>   */
+>> -
+>> +static int kexec_kernel_size;
+>> +#define IMG_SIZE_NONE  0
+>> +#define KERN_SIZE_FLAG 1
+>> +#define DTB_SIZE_FLAG  2
+>>  static void kexec_list_walk(void *ctx, unsigned long kimage_head,
+>>         void (*cb)(void *ctx, unsigned int flag, void *addr, void *dest))
+>>  {
+>>         void *dest;
+>>         unsigned long *entry;
+>> +       int imgsize_flag = IMG_SIZE_NONE;
+>> +
+>>
+>>         for (entry = &kimage_head, dest = NULL; ; entry++) {
+>>                 unsigned int flag = *entry & IND_FLAGS;
+>> @@ -164,10 +169,18 @@ static void kexec_list_walk(void *ctx, unsigned
+>> long kimage_head,
+>>                         cb(ctx, flag, addr, NULL);
+>>                         break;
+>>                 case IND_DESTINATION:
+>> +                       if (imgsize_flag == IMG_SIZE_NONE) {
+>> +                               kexec_kernel_size = 0;
+>> +                               imgsize_flag = KERN_SIZE_FLAG;
+>> +                       } else if (imgsize_flag == KERN_SIZE_FLAG) {
+>> +                               imgsize_flag = DTB_SIZE_FLAG;
+>> +                       }
+>>                         dest = addr;
+>>                         cb(ctx, flag, addr, NULL);
+>>                         break;
+>>                 case IND_SOURCE:
+>> +                       if (imgsize_flag == KERN_SIZE_FLAG)
+>> +                               kexec_kernel_size++;
+>>                         cb(ctx, flag, addr, dest);
+>>                         dest += PAGE_SIZE;
+>>                         break;
+>> @@ -693,5 +706,20 @@ void machine_kexec(struct kimage *image)
+>>
+>>         kexec_list_walk(NULL, image->head, kexec_list_flush_cb);
+>>
+>> +       /*
+>> +        * Make sure virtual addresses of new kernel are flushed
+>> +        * SZ_512K = TEXT_OFFSET
+>
+> TEXT_OFFSET is not guaranteed to be 512K. The TEXT_OFFSET area also
+> shouldn't need to be flushed.
+>
+> Since c218bca74eea (arm64: Relax the kernel cache requirements for
+> boot), the kernel will flush the cache for anything outside of the Image
+> that it writes to before enabling the MMU and caches (e.g. the idmap and
+> swapper page tables). Once caches are up we shouldn't care.
+>
 
-Oh OK.
- 
-> Not sure what exactly is causing that weirdness yet, or when that started 
-> happening.  Am suspecting it could be some of the RCU changes over the 
-> past couple of years.  We don't have RCU_FAST_NO_HZ enabled in 
-> omap2plus_defconfig; we should probably switch that on.
+Ok. TEXT_OFFSET macro is not exported, that's why I used SZ_512K.
+Any particular reason for not exporting it?
 
-OK
- 
-> Now 37xxevm and the 3730beaglexm are entering idle as they should be.  
-> Test report below; logs etc. have been uploaded.  Thanks for the debug 
-> discussion,
+> Assuming that the existing kernel code is correct, the only region we
+> should need to flush out to the PoC is the region from _text to _edata
+> (i.e. just the contents of the Image).
+>
+>> +        * kexec_kernel = kexec_kernel_size * PAGE_SIZE
+>> +        * Don't know = (SZ_4M + SZ_1M)
+>> +        * SZ_4M = not working
+>> +        * SZ_6M = working
+>> +        * SZ_8M = working
+>> +        *
+>> +        * so chose SZ_4M + SZ_1M; Don't know why this is required
+>> +        * BSS, stack ??
+>> +        *
+>> +        */
+>> +       __flush_dcache_area((void *)PAGE_OFFSET, SZ_512K +
+>> (kexec_kernel_size * PAGE_SIZE) + SZ_4M + SZ_1M);
+>> +
+>>         soft_restart(reboot_code_buffer_phys);
+>>  }
+>
+> How big exactly is the kernel Image you're trying to kexec?
 
-Great, good to hear you found what caused it :)
- 
-> PM: chip retention via dynamic idle:
->     FAIL ( 5/ 7): 2430sdp, 3530es3beagle, 4430es2panda, 4460pandaes,
-> 		  4460varsomom
->     Pass ( 2/ 7): 3730beaglexm, 37xxevm
-> 
-> PM: chip off except CORE via suspend:
->     Pass ( 1/ 1): 3730beaglexm
-> 
-> PM: chip off except CORE via dynamic idle:
->     Pass ( 1/ 1): 3730beaglexm
-> 
-> PM: chip off via suspend:
->     FAIL ( 4/ 5): 3530es3beagle, 4430es2panda, 4460pandaes,
-> 		  4460varsomom
->     Pass ( 1/ 5): 37xxevm
-> 
-> PM: chip off via dynamic idle:
->     FAIL ( 4/ 5): 3530es3beagle, 4430es2panda, 4460pandaes,
-> 		  4460varsomom
->     Pass ( 1/ 5): 37xxevm
+For the 1st and second stage I use the same kernel as they
+are combined with intramfs final image size varies.
 
-The following patch should fix the tests above for 3530es3beagle.
-Care to test and ack as I don't have one?
+1st stage
+-------------
+$ls -l arch/arm64/boot/uImage
+-rw-rw-r-- 1 arun arun 12895544 Jul 30 10:57 arch/arm64/boot/uImage
 
-Regards,
+It will boot to intramfs
 
-Tony
+$ls /
+bin  dtb.dtb  home  lib    linuxrc  mnt  proc  run   share  tmp  var
+dev  etc      init  lib64  media    opt  root  sbin  sys    usr  vmlinux.strip
 
-8< -----------------------------------
-From: Tony Lindgren <tony@atomide.com>
-Date: Tue, 29 Jul 2014 22:36:59 -0700
-Subject: [PATCH] ARM: dts: Enable UART wake-up events for beagleboard
+kexec will boot vmlinux.strip
+$ls -l vmlinux.strip
+-rwxrwxr-x 1 arun arun 8194760 Jul 30 10:55 vmlinux.strip
 
-For device tree based booting, we need to use wake-up
-interrupts like we already do for some omaps. This fixes
-a PM regression on beagleboard compared to legacy booting.
+2nd stage
+--------------
+$ls -l arch/arm64/boot/uImage
+-rw-rw-r-- 1 arun arun 8127800 Jul 30 10:54 arch/arm64/boot/uImage
 
-Signed-off-by: Tony Lindgren <tony@atomide.com>
+The corresponding vmlinux is converted to vmlinux.strip
 
---- a/arch/arm/boot/dts/omap3-beagle.dts
-+++ b/arch/arm/boot/dts/omap3-beagle.dts
-@@ -292,6 +292,7 @@
- &uart3 {
- 	pinctrl-names = "default";
- 	pinctrl-0 = <&uart3_pins>;
-+	interrupts-extended = <&intc 74 &omap3_pmx_core OMAP3_UART3_RX>;
- };
- 
- &gpio1 {
+$aarch64-linux-gnu-strip vmlinux -o vmlinux.strip
+$cp vmlinux.strip /ramfs/aarch64_le_rootfs/
+
+--Arun
