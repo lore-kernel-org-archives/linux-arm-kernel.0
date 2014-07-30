@@ -1,69 +1,45 @@
-From: antoine.tenart@free-electrons.com (=?UTF-8?q?Antoine=20T=C3=A9nart?=)
-Date: Wed, 30 Jul 2014 20:14:00 +0200
-Subject: [PATCH v14 7/8] ARM: berlin: add the AHCI node for the BG2Q
-In-Reply-To: <1406744041-1269-1-git-send-email-antoine.tenart@free-electrons.com>
-References: <1406744041-1269-1-git-send-email-antoine.tenart@free-electrons.com>
-Message-ID: <1406744041-1269-8-git-send-email-antoine.tenart@free-electrons.com>
+From: olof@lixom.net (Olof Johansson)
+Date: Wed, 30 Jul 2014 11:14:23 -0700
+Subject: [PATCH 2/5] arm64, thunder: Add initial dts for Cavium Thunder SoC
+In-Reply-To: <1406732794-20920-3-git-send-email-rric@kernel.org>
+References: <1406732794-20920-1-git-send-email-rric@kernel.org>
+ <1406732794-20920-3-git-send-email-rric@kernel.org>
+Message-ID: <CAOesGMh9KkdKB_ytJ7CCbkPW7dHTX91NdfDMsMNfbmOBVOJ8PQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The BG2Q has an AHCI SATA controller. Add the corresponding nodes
-(AHCI, PHY) into its device tree.
+On Wed, Jul 30, 2014 at 8:06 AM, Robert Richter <rric@kernel.org> wrote:
+> From: Radha Mohan Chintakuntla <rchintakuntla@cavium.com>
+>
+> Add initial device tree nodes for Cavium Thunder SoCs with support of
+> 48 cores and gicv3. The dts file requires further changes, esp. for
+> pci, gicv3-its and smmu. This changes will be added later together
+> with the device drivers.
+>
+> Signed-off-by: Radha Mohan Chintakuntla <rchintakuntla@cavium.com>
+> Signed-off-by: Robert Richter <rrichter@cavium.com>
+> ---
+>  arch/arm64/boot/dts/Makefile         |   1 +
+>  arch/arm64/boot/dts/thunder-88xx.dts | 387 +++++++++++++++++++++++++++++++++++
+>  2 files changed, 388 insertions(+)
+>  create mode 100644 arch/arm64/boot/dts/thunder-88xx.dts
+>
+> diff --git a/arch/arm64/boot/dts/Makefile b/arch/arm64/boot/dts/Makefile
+> index c52bdb051f66..f8001a62029c 100644
+> --- a/arch/arm64/boot/dts/Makefile
+> +++ b/arch/arm64/boot/dts/Makefile
+> @@ -1,3 +1,4 @@
+> +dtb-$(CONFIG_ARCH_THUNDER) += thunder-88xx.dtb
+>  dtb-$(CONFIG_ARCH_VEXPRESS) += rtsm_ve-aemv8a.dtb foundation-v8.dtb
+>  dtb-$(CONFIG_ARCH_XGENE) += apm-mustang.dtb
 
-Signed-off-by: Antoine T?nart <antoine.tenart@free-electrons.com>
----
- arch/arm/boot/dts/berlin2q.dtsi | 39 +++++++++++++++++++++++++++++++++++++++
- 1 file changed, 39 insertions(+)
+Oh, and:
 
-diff --git a/arch/arm/boot/dts/berlin2q.dtsi b/arch/arm/boot/dts/berlin2q.dtsi
-index 635a16a64cb4..658975d22df7 100644
---- a/arch/arm/boot/dts/berlin2q.dtsi
-+++ b/arch/arm/boot/dts/berlin2q.dtsi
-@@ -303,6 +303,45 @@
- 			clock-names = "refclk";
- 		};
- 
-+		ahci: sata at e90000 {
-+			compatible = "marvell,berlin2q-ahci", "generic-ahci";
-+			reg = <0xe90000 0x1000>;
-+			interrupts = <GIC_SPI 7 IRQ_TYPE_LEVEL_HIGH>;
-+			clocks = <&chip CLKID_SATA>;
-+			#address-cells = <1>;
-+			#size-cells = <0>;
-+
-+			sata0: sata-port at 0 {
-+				reg = <0>;
-+				phys = <&sata_phy 0>;
-+				status = "disabled";
-+			};
-+
-+			sata1: sata-port at 1 {
-+				reg = <1>;
-+				phys = <&sata_phy 1>;
-+				status = "disabled";
-+			};
-+		};
-+
-+		sata_phy: phy at e900a0 {
-+			compatible = "marvell,berlin2q-sata-phy";
-+			reg = <0xe900a0 0x200>;
-+			clocks = <&chip CLKID_SATA>;
-+			#address-cells = <1>;
-+			#size-cells = <0>;
-+			#phy-cells = <1>;
-+			status = "disabled";
-+
-+			sata-phy at 0 {
-+				reg = <0>;
-+			};
-+
-+			sata-phy at 1 {
-+				reg = <1>;
-+			};
-+		};
-+
- 		apb at fc0000 {
- 			compatible = "simple-bus";
- 			#address-cells = <1>;
--- 
-1.9.1
+Let's fix the mistake we made on 32-bit here (that we can't undo
+unless we move all dts files now, which is too much churn), and put
+each SoC vendor in its own subdirectory.
+
+So, please add a arch/arm64/boot/dts/cavium/ directory, add a Makefile
+and the dts there.
+
+We should move vexpress under arm/   and xgene under apm/ too.
