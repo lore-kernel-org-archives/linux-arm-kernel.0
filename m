@@ -1,324 +1,155 @@
-From: kishon@ti.com (Kishon Vijay Abraham I)
-Date: Wed, 30 Jul 2014 14:42:41 +0530
-Subject: [PATCH v11 4/8] ata: libahci: allow to use multiple PHYs
-In-Reply-To: <1406193450-17283-5-git-send-email-antoine.tenart@free-electrons.com>
-References: <1406193450-17283-1-git-send-email-antoine.tenart@free-electrons.com>
- <1406193450-17283-5-git-send-email-antoine.tenart@free-electrons.com>
-Message-ID: <53D8B709.9000703@ti.com>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Wed, 30 Jul 2014 10:16:37 +0100
+Subject: Kexec on arm64
+In-Reply-To: <CAFdej02R=3bq9n0ic5AZHwRjGT21fZ7S2ouuXZNevjdRsxmUNA@mail.gmail.com>
+References: <20140724093603.GC4079@leverpostej>
+ <1406247468.4062.59.camel@smoke>
+ <CAFdej01w_pE6vv+13cCCyfDs4Rbdkzx4CMUj9q97HBKV0B53ow@mail.gmail.com>
+ <1406333901.4062.69.camel@smoke>
+ <CAFdej014ohCFYvoUAXWiYGb4_4UmSY2G1MH-NEE_cF1cC-6Mow@mail.gmail.com>
+ <20140728153812.GA2576@leverpostej>
+ <1406592548.28348.49.camel@smoke>
+ <CAFdej00is0kC-1q5uMNJL5APL1WezdNBg0jASgwYamsg5NO_Tg@mail.gmail.com>
+ <20140729133557.GQ2576@leverpostej>
+ <CAFdej02R=3bq9n0ic5AZHwRjGT21fZ7S2ouuXZNevjdRsxmUNA@mail.gmail.com>
+Message-ID: <20140730091637.GB748@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Wed, Jul 30, 2014 at 06:46:39AM +0100, Arun Chandran wrote:
+> On Tue, Jul 29, 2014 at 7:05 PM, Mark Rutland <mark.rutland@arm.com> wrote:
+> > [...]
+> >
+> >> The default code did not work.
+> >>
+> >> It is working with the change below
+> >>
+> >> ###############
+> >> diff --git a/arch/arm64/kernel/machine_kexec.c
+> >> b/arch/arm64/kernel/machine_kexec.c
+> >> index 5632473..7c5f859 100644
+> >> --- a/arch/arm64/kernel/machine_kexec.c
+> >> +++ b/arch/arm64/kernel/machine_kexec.c
+> >> @@ -147,12 +147,17 @@ static bool kexec_is_dtb_user(const dtb_t *dtb)
+> >>  /**
+> >>   * kexec_list_walk - Helper to walk the kimage page list.
+> >>   */
+> >> -
+> >> +static int kexec_kernel_size;
+> >> +#define IMG_SIZE_NONE  0
+> >> +#define KERN_SIZE_FLAG 1
+> >> +#define DTB_SIZE_FLAG  2
+> >>  static void kexec_list_walk(void *ctx, unsigned long kimage_head,
+> >>         void (*cb)(void *ctx, unsigned int flag, void *addr, void *dest))
+> >>  {
+> >>         void *dest;
+> >>         unsigned long *entry;
+> >> +       int imgsize_flag = IMG_SIZE_NONE;
+> >> +
+> >>
+> >>         for (entry = &kimage_head, dest = NULL; ; entry++) {
+> >>                 unsigned int flag = *entry & IND_FLAGS;
+> >> @@ -164,10 +169,18 @@ static void kexec_list_walk(void *ctx, unsigned
+> >> long kimage_head,
+> >>                         cb(ctx, flag, addr, NULL);
+> >>                         break;
+> >>                 case IND_DESTINATION:
+> >> +                       if (imgsize_flag == IMG_SIZE_NONE) {
+> >> +                               kexec_kernel_size = 0;
+> >> +                               imgsize_flag = KERN_SIZE_FLAG;
+> >> +                       } else if (imgsize_flag == KERN_SIZE_FLAG) {
+> >> +                               imgsize_flag = DTB_SIZE_FLAG;
+> >> +                       }
+> >>                         dest = addr;
+> >>                         cb(ctx, flag, addr, NULL);
+> >>                         break;
+> >>                 case IND_SOURCE:
+> >> +                       if (imgsize_flag == KERN_SIZE_FLAG)
+> >> +                               kexec_kernel_size++;
+> >>                         cb(ctx, flag, addr, dest);
+> >>                         dest += PAGE_SIZE;
+> >>                         break;
+> >> @@ -693,5 +706,20 @@ void machine_kexec(struct kimage *image)
+> >>
+> >>         kexec_list_walk(NULL, image->head, kexec_list_flush_cb);
+> >>
+> >> +       /*
+> >> +        * Make sure virtual addresses of new kernel are flushed
+> >> +        * SZ_512K = TEXT_OFFSET
+> >
+> > TEXT_OFFSET is not guaranteed to be 512K. The TEXT_OFFSET area also
+> > shouldn't need to be flushed.
+> >
+> > Since c218bca74eea (arm64: Relax the kernel cache requirements for
+> > boot), the kernel will flush the cache for anything outside of the Image
+> > that it writes to before enabling the MMU and caches (e.g. the idmap and
+> > swapper page tables). Once caches are up we shouldn't care.
+> >
+> 
+> Ok. TEXT_OFFSET macro is not exported, that's why I used SZ_512K.
+> Any particular reason for not exporting it?
 
+The TEXT_OFFSET of the kernel you intend to execute can be found in its
+Image header. Take a look at Documentation/arm64/booting.txt. This may
+be different from the TEXT_OFFSET of the current kernel.
 
-On Thursday 24 July 2014 02:47 PM, Antoine T?nart wrote:
-> The current implementation of the libahci does not allow to use multiple
-> PHYs. This patch adds the support of multiple PHYs by the libahci while
-> keeping the old bindings valid for device tree compatibility.
-> 
-> This introduce a new way of defining SATA ports in the device tree, with
-> one port per sub-node. This as the advantage of allowing a per port
-> configuration. Because some ports may be accessible but disabled in the
-> device tree, the port_map mask is computed automatically when using
-> this.
-> 
-> Signed-off-by: Antoine T?nart <antoine.tenart@free-electrons.com>
+As of v3.17 all fields in the header will be little-endian, and
+booting.txt has been updated for this. You can check the image_size
+field to determine whether the fields are all little-endian. Only when
+image_size is zero can TEXT_OFFSET be assumed to be 0x80000.
 
-FWIW:
-Acked-by: Kishon Vijay Abraham I <kishon@ti.com>
-> ---
->  drivers/ata/ahci.h             |   7 +-
->  drivers/ata/libahci_platform.c | 190 ++++++++++++++++++++++++++++++++---------
->  2 files changed, 157 insertions(+), 40 deletions(-)
 > 
-> diff --git a/drivers/ata/ahci.h b/drivers/ata/ahci.h
-> index cb8d58926851..47de53284ad7 100644
-> --- a/drivers/ata/ahci.h
-> +++ b/drivers/ata/ahci.h
-> @@ -332,7 +332,12 @@ struct ahci_host_priv {
->  	bool			got_runtime_pm; /* Did we do pm_runtime_get? */
->  	struct clk		*clks[AHCI_MAX_CLKS]; /* Optional */
->  	struct regulator	*target_pwr;	/* Optional */
-> -	struct phy		*phy;		/* If platform uses phy */
-> +	/*
-> +	 * If platform uses PHYs. There is a 1:1 relation between the port number and
-> +	 * the PHY position in this array.
-> +	 */
-> +	struct phy		**phys;
-> +	unsigned		nports;		/* Number of ports */
->  	void			*plat_data;	/* Other platform data */
->  	/*
->  	 * Optional ahci_start_engine override, if not set this gets set to the
-> diff --git a/drivers/ata/libahci_platform.c b/drivers/ata/libahci_platform.c
-> index db9b90d876dd..095df56432d9 100644
-> --- a/drivers/ata/libahci_platform.c
-> +++ b/drivers/ata/libahci_platform.c
-> @@ -39,6 +39,67 @@ static struct scsi_host_template ahci_platform_sht = {
->  };
->  
->  /**
-> + * ahci_platform_enable_phys - Enable PHYs
-> + * @hpriv: host private area to store config values
-> + *
-> + * This function enables all the PHYs found in hpriv->phys, if any.
-> + * If a PHY fails to be enabled, it disables all the PHYs already
-> + * enabled in reverse order and returns an error.
-> + *
-> + * RETURNS:
-> + * 0 on success otherwise a negative error code
-> + */
-> +int ahci_platform_enable_phys(struct ahci_host_priv *hpriv)
-> +{
-> +	int rc, i;
-> +
-> +	for (i = 0; i < hpriv->nports; i++) {
-> +		if (!hpriv->phys[i])
-> +			continue;
-> +
-> +		rc = phy_init(hpriv->phys[i]);
-> +		if (rc)
-> +			goto disable_phys;
-> +
-> +		rc = phy_power_on(hpriv->phys[i]);
-> +		if (rc) {
-> +			phy_exit(hpriv->phys[i]);
-> +			goto disable_phys;
-> +		}
-> +	}
-> +
-> +	return 0;
-> +
-> +disable_phys:
-> +	while (--i >= 0) {
-> +		phy_power_off(hpriv->phys[i]);
-> +		phy_exit(hpriv->phys[i]);
-> +	}
-> +	return rc;
-> +}
-> +EXPORT_SYMBOL_GPL(ahci_platform_enable_phys);
-> +
-> +/**
-> + * ahci_platform_disable_phys - Enable PHYs
-> + * @hpriv: host private area to store config values
-> + *
-> + * This function disables all PHYs found in hpriv->phys.
-> + */
-> +void ahci_platform_disable_phys(struct ahci_host_priv *hpriv)
-> +{
-> +	int i;
-> +
-> +	for (i = 0; i < hpriv->nports; i++) {
-> +		if (!hpriv->phys[i])
-> +			continue;
-> +
-> +		phy_power_off(hpriv->phys[i]);
-> +		phy_exit(hpriv->phys[i]);
-> +	}
-> +}
-> +EXPORT_SYMBOL_GPL(ahci_platform_disable_phys);
-> +
-> +/**
->   * ahci_platform_enable_clks - Enable platform clocks
->   * @hpriv: host private area to store config values
->   *
-> @@ -92,7 +153,7 @@ EXPORT_SYMBOL_GPL(ahci_platform_disable_clks);
->   * following order:
->   * 1) Regulator
->   * 2) Clocks (through ahci_platform_enable_clks)
-> - * 3) Phy
-> + * 3) Phys
->   *
->   * If resource enabling fails at any point the previous enabled resources
->   * are disabled in reverse order.
-> @@ -114,17 +175,9 @@ int ahci_platform_enable_resources(struct ahci_host_priv *hpriv)
->  	if (rc)
->  		goto disable_regulator;
->  
-> -	if (hpriv->phy) {
-> -		rc = phy_init(hpriv->phy);
-> -		if (rc)
-> -			goto disable_clks;
-> -
-> -		rc = phy_power_on(hpriv->phy);
-> -		if (rc) {
-> -			phy_exit(hpriv->phy);
-> -			goto disable_clks;
-> -		}
-> -	}
-> +	rc = ahci_platform_enable_phys(hpriv);
-> +	if (rc)
-> +		goto disable_clks;
->  
->  	return 0;
->  
-> @@ -144,16 +197,13 @@ EXPORT_SYMBOL_GPL(ahci_platform_enable_resources);
->   *
->   * This function disables all ahci_platform managed resources in the
->   * following order:
-> - * 1) Phy
-> + * 1) Phys
->   * 2) Clocks (through ahci_platform_disable_clks)
->   * 3) Regulator
->   */
->  void ahci_platform_disable_resources(struct ahci_host_priv *hpriv)
->  {
-> -	if (hpriv->phy) {
-> -		phy_power_off(hpriv->phy);
-> -		phy_exit(hpriv->phy);
-> -	}
-> +	ahci_platform_disable_phys(hpriv);
->  
->  	ahci_platform_disable_clks(hpriv);
->  
-> @@ -187,7 +237,7 @@ static void ahci_platform_put_resources(struct device *dev, void *res)
->   * 2) regulator for controlling the targets power (optional)
->   * 3) 0 - AHCI_MAX_CLKS clocks, as specified in the devs devicetree node,
->   *    or for non devicetree enabled platforms a single clock
-> - *	4) phy (optional)
-> + *	4) phys (optional)
->   *
->   * RETURNS:
->   * The allocated ahci_host_priv on success, otherwise an ERR_PTR value
-> @@ -197,7 +247,9 @@ struct ahci_host_priv *ahci_platform_get_resources(struct platform_device *pdev)
->  	struct device *dev = &pdev->dev;
->  	struct ahci_host_priv *hpriv;
->  	struct clk *clk;
-> -	int i, rc = -ENOMEM;
-> +	struct device_node *child;
-> +	int i, enabled_ports = 0, rc = -ENOMEM;
-> +	u32 mask_port_map = 0;
->  
->  	if (!devres_open_group(dev, NULL, GFP_KERNEL))
->  		return ERR_PTR(-ENOMEM);
-> @@ -246,27 +298,87 @@ struct ahci_host_priv *ahci_platform_get_resources(struct platform_device *pdev)
->  		hpriv->clks[i] = clk;
->  	}
->  
-> -	hpriv->phy = devm_phy_get(dev, "sata-phy");
-> -	if (IS_ERR(hpriv->phy)) {
-> -		rc = PTR_ERR(hpriv->phy);
-> -		switch (rc) {
-> -		case -ENOSYS:
-> -			/* No PHY support. Check if PHY is required. */
-> -			if (of_find_property(dev->of_node, "phys", NULL)) {
-> -				dev_err(dev, "couldn't get sata-phy: ENOSYS\n");
-> +	hpriv->nports = of_get_child_count(dev->of_node);
-> +
-> +	if (hpriv->nports) {
-> +		hpriv->phys = devm_kzalloc(dev,
-> +					   hpriv->nports * sizeof(*hpriv->phys),
-> +					   GFP_KERNEL);
-> +		if (!hpriv->phys) {
-> +			rc = -ENOMEM;
-> +			goto err_out;
-> +		}
-> +
-> +		for_each_child_of_node(dev->of_node, child) {
-> +			u32 port;
-> +
-> +			if (!of_device_is_available(child))
-> +				continue;
-> +
-> +			if (of_property_read_u32(child, "reg", &port)) {
-> +				rc = -EINVAL;
->  				goto err_out;
->  			}
-> -		case -ENODEV:
-> -			/* continue normally */
-> -			hpriv->phy = NULL;
-> -			break;
->  
-> -		case -EPROBE_DEFER:
-> -			goto err_out;
-> +			if (port >= hpriv->nports) {
-> +				dev_warn(dev, "invalid port number %d\n", port);
-> +				continue;
-> +			}
->  
-> -		default:
-> -			dev_err(dev, "couldn't get sata-phy\n");
-> -			goto err_out;
-> +			mask_port_map |= BIT(port);
-> +
-> +			hpriv->phys[port] = devm_of_phy_get(dev, child, NULL);
-> +			if (IS_ERR(hpriv->phys[port])) {
-> +				rc = PTR_ERR(hpriv->phys[port]);
-> +				dev_err(dev,
-> +					"couldn't get PHY in node %s: %d\n",
-> +					child->name, rc);
-> +				goto err_out;
-> +			}
-> +
-> +			enabled_ports++;
-> +		}
-> +		if (!enabled_ports) {
-> +			dev_warn(dev, "No port enabled\n");
-> +			return ERR_PTR(-ENODEV);
-> +		}
-> +
-> +		if (!hpriv->mask_port_map)
-> +			hpriv->mask_port_map = mask_port_map;
-> +	} else {
-> +		/*
-> +		 * If no sub-node was found, keep this for device tree
-> +		 * compatibility
-> +		 */
-> +		struct phy *phy = devm_phy_get(dev, "sata-phy");
-> +		if (!IS_ERR(phy)) {
-> +			hpriv->phys = devm_kzalloc(dev, sizeof(*hpriv->phys),
-> +						   GFP_KERNEL);
-> +			if (!hpriv->phys) {
-> +				rc = -ENOMEM;
-> +				goto err_out;
-> +			}
-> +
-> +			hpriv->phys[0] = phy;
-> +			hpriv->nports = 1;
-> +		} else {
-> +			rc = PTR_ERR(phy);
-> +			switch (rc) {
-> +				case -ENOSYS:
-> +					/* No PHY support. Check if PHY is required. */
-> +					if (of_find_property(dev->of_node, "phys", NULL)) {
-> +						dev_err(dev, "couldn't get sata-phy: ENOSYS\n");
-> +						goto err_out;
-> +					}
-> +				case -ENODEV:
-> +					/* continue normally */
-> +					hpriv->phys = NULL;
-> +					break;
-> +
-> +				default:
-> +					goto err_out;
-> +
-> +			}
->  		}
->  	}
->  
-> @@ -291,7 +403,7 @@ EXPORT_SYMBOL_GPL(ahci_platform_get_resources);
->   * @host_flags: ahci host flags used in ahci_host_priv
->   *
->   * This function does all the usual steps needed to bring up an
-> - * ahci-platform host, note any necessary resources (ie clks, phy, etc.)
-> + * ahci-platform host, note any necessary resources (ie clks, phys, etc.)
->   * must be initialized / enabled before calling this.
->   *
->   * RETURNS:
-> @@ -395,7 +507,7 @@ static void ahci_host_stop(struct ata_host *host)
->   * @dev: device pointer for the host
->   *
->   * This function does all the usual steps needed to suspend an
-> - * ahci-platform host, note any necessary resources (ie clks, phy, etc.)
-> + * ahci-platform host, note any necessary resources (ie clks, phys, etc.)
->   * must be disabled after calling this.
->   *
->   * RETURNS:
-> @@ -432,7 +544,7 @@ EXPORT_SYMBOL_GPL(ahci_platform_suspend_host);
->   * @dev: device pointer for the host
->   *
->   * This function does all the usual steps needed to resume an ahci-platform
-> - * host, note any necessary resources (ie clks, phy, etc.)  must be
-> + * host, note any necessary resources (ie clks, phys, etc.)  must be
->   * initialized / enabled before calling this.
->   *
->   * RETURNS:
+> > Assuming that the existing kernel code is correct, the only region we
+> > should need to flush out to the PoC is the region from _text to _edata
+> > (i.e. just the contents of the Image).
+> >
+> >> +        * kexec_kernel = kexec_kernel_size * PAGE_SIZE
+> >> +        * Don't know = (SZ_4M + SZ_1M)
+> >> +        * SZ_4M = not working
+> >> +        * SZ_6M = working
+> >> +        * SZ_8M = working
+> >> +        *
+> >> +        * so chose SZ_4M + SZ_1M; Don't know why this is required
+> >> +        * BSS, stack ??
+> >> +        *
+> >> +        */
+> >> +       __flush_dcache_area((void *)PAGE_OFFSET, SZ_512K +
+> >> (kexec_kernel_size * PAGE_SIZE) + SZ_4M + SZ_1M);
+> >> +
+> >>         soft_restart(reboot_code_buffer_phys);
+> >>  }
+> >
+> > How big exactly is the kernel Image you're trying to kexec?
 > 
+> For the 1st and second stage I use the same kernel as they
+> are combined with intramfs final image size varies.
+> 
+> 1st stage
+> -------------
+> $ls -l arch/arm64/boot/uImage
+> -rw-rw-r-- 1 arun arun 12895544 Jul 30 10:57 arch/arm64/boot/uImage
+> 
+> It will boot to intramfs
+> 
+> $ls /
+> bin  dtb.dtb  home  lib    linuxrc  mnt  proc  run   share  tmp  var
+> dev  etc      init  lib64  media    opt  root  sbin  sys    usr  vmlinux.strip
+> 
+> kexec will boot vmlinux.strip
+> $ls -l vmlinux.strip
+> -rwxrwxr-x 1 arun arun 8194760 Jul 30 10:55 vmlinux.strip
+> 
+> 2nd stage
+> --------------
+> $ls -l arch/arm64/boot/uImage
+> -rw-rw-r-- 1 arun arun 8127800 Jul 30 10:54 arch/arm64/boot/uImage
+> 
+> The corresponding vmlinux is converted to vmlinux.strip
+> 
+> $aarch64-linux-gnu-strip vmlinux -o vmlinux.strip
+> $cp vmlinux.strip /ramfs/aarch64_le_rootfs/
+
+OK, thanks for the info.
+
+Cheers,
+Mark.
