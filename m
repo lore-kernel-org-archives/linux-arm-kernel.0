@@ -1,73 +1,101 @@
-From: heiko@sntech.de (Heiko =?ISO-8859-1?Q?St=FCbner?=)
-Date: Wed, 30 Jul 2014 13:24:17 +0200
-Subject: [PATCH 1/3] ARM: dts: Turn on USB host vbus on rk3288-evb
-In-Reply-To: <1406676273-20701-2-git-send-email-dianders@chromium.org>
-References: <1406676273-20701-1-git-send-email-dianders@chromium.org>
- <1406676273-20701-2-git-send-email-dianders@chromium.org>
-Message-ID: <1836225.xQCoI7eRWl@diego>
+From: will.deacon@arm.com (Will Deacon)
+Date: Wed, 30 Jul 2014 12:24:14 +0100
+Subject: [PATCH] ARM/ARM64: don't enter kgdb when userspace executes a
+ kgdb break instruction.
+In-Reply-To: <20140730071245.GA8954@mew.web-pass.com>
+References: <20140730071245.GA8954@mew.web-pass.com>
+Message-ID: <20140730112414.GJ12239@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am Dienstag, 29. Juli 2014, 16:24:31 schrieb Doug Anderson:
-> There is no phy driver that works on the Rockchip board for either USB
-> host port yet.  For now just hardcode the vbus signal to be on all the
-> time which makes both the dwc2 host and the EHCI port work.
+Hello,
+
+On Wed, Jul 30, 2014 at 08:12:45AM +0100, Omar Sandoval wrote:
+> The kgdb breakpoint hooks (kgdb_brk_fn and kgdb_compiled_brk_fn) should only be
+> entered when a kgdb break instruction is executed from the kernel. Otherwise,
+> if kgdb is enabled, a userspace program can cause the kernel to drop into the
+> debugger by executing either KGDB_BREAKINST or KGDB_COMPILED_BREAK on ARM, or
+> brk #KGDB_{DYN,COMPILED}_DGB_BRK_IMM on ARM64.
 > 
-> Signed-off-by: Doug Anderson <dianders@chromium.org>
+> Signed-off-by: Omar Sandoval <osandov@osandov.com>
 > ---
->  arch/arm/boot/dts/rk3288-evb.dtsi | 18 ++++++++++++++++++
->  1 file changed, 18 insertions(+)
+> The following program reproduces the fixed problem on ARM:
+> .globl _start
+> _start:
+> 	udf	#65006	@ KGDB_BREAKINST
 > 
-> diff --git a/arch/arm/boot/dts/rk3288-evb.dtsi
-> b/arch/arm/boot/dts/rk3288-evb.dtsi index 749e20d..efd625e 100644
-> --- a/arch/arm/boot/dts/rk3288-evb.dtsi
-> +++ b/arch/arm/boot/dts/rk3288-evb.dtsi
-> @@ -35,6 +35,18 @@
->  			debounce-interval = <100>;
->  		};
->  	};
-> +
-> +	/* This turns on vbus for both host0 (ehci) and host1 (dwc2) */
-> +	usb_host_vbus_regulator: usb-host-vbus-regulator {
-> +		compatible = "regulator-fixed";
-> +		enable-active-high;
-> +		gpio = <&gpio0 14 GPIO_ACTIVE_HIGH>;
-> +		pinctrl-names = "default";
-> +		pinctrl-0 = <&usb_host_vbus>;
-> +		regulator-name = "usb-host-vbus";
-> +		regulator-always-on;
-> +		regulator-boot-on;
-> +	};
->  };
-
-It seems I have a slightly outdated schematics pdf for the evb ... and only 
-see the OTG vbus pin, on <&gpio0 12>, but am missing the whole host vbus.
-
-Could you think about finding another name for the handle? For example, in my 
-incomplete evb-schematics the supply coming from the otg regulator is called 
-vcc50_usb and there should be something similar for the host supply, so I'd 
-like something like
-
-	vcc50_usbhost: usb-host-vbus-regulator { /* or whatever it gets called */
-	...
-	};
-
-simply to keep with the supply names defined in the schematics - makes reading 
-easier.
-
-
-Heiko
-
+> And on ARM64:
+> .globl _start
+> _start:
+>         brk     #0x400	@ KGDB_DYN_DGB_BRK_IMM
 > 
->  &i2c0 {
-> @@ -71,4 +83,10 @@
->  			rockchip,pins = <0 5 RK_FUNC_GPIO &pcfg_pull_up>;
->  		};
->  	};
-> +
-> +	usb-host {
-> +		usb_host_vbus: usb-host-vbus {
-> +			rockchip,pins = <0 14 RK_FUNC_GPIO &pcfg_pull_none>;
-> +		};
-> +	};
->  };
+>  arch/arm/kernel/kgdb.c                  | 4 ++++
+>  arch/arm64/include/asm/debug-monitors.h | 4 +++-
+>  arch/arm64/kernel/debug-monitors.c      | 3 ++-
+>  arch/arm64/kernel/kgdb.c                | 4 ++++
+>  4 files changed, 13 insertions(+), 2 deletions(-)
+
+Whilst this sounds like a worrying problem, I've failed to reproduce it
+on arm64.  Executing a brk instruction with either KGDB_DYN_DGB_BRK_IMM or
+KDBG_COMPILED_DBG_BRK_IMM immediates from userspace results in a SIGTRAP being
+delivered, assumedly because kgdb_handle_exception simply returns when kgdb
+isn't active.
+
+> diff --git a/arch/arm64/include/asm/debug-monitors.h b/arch/arm64/include/asm/debug-monitors.h
+> index 6e9b5b3..e1d27ce 100644
+> --- a/arch/arm64/include/asm/debug-monitors.h
+> +++ b/arch/arm64/include/asm/debug-monitors.h
+> @@ -105,8 +105,10 @@ void unregister_step_hook(struct step_hook *hook);
+>  
+>  struct break_hook {
+>  	struct list_head node;
+> -	u32 esr_val;
+>  	u32 esr_mask;
+> +	u32 esr_val;
+> +	u64 pstate_mask;
+> +	u64 pstate_val;
+
+The following (totally untested) diff is simpler for arm64, but again, I'm
+not sure we even have a problem here.
+
+On which systems have you managed to reproduce this and how?
+
+Will
+
+--->8
+
+diff --git a/arch/arm64/kernel/debug-monitors.c b/arch/arm64/kernel/debug-monitors.c
+index a7fb874b595e..fe5b94078d82 100644
+--- a/arch/arm64/kernel/debug-monitors.c
++++ b/arch/arm64/kernel/debug-monitors.c
+@@ -315,20 +315,20 @@ static int brk_handler(unsigned long addr, unsigned int esr,
+ {
+        siginfo_t info;
+ 
+-       if (call_break_hook(regs, esr) == DBG_HOOK_HANDLED)
+-               return 0;
++       if (user_mode(regs)) {
++               info = (siginfo_t) {
++                       .si_signo = SIGTRAP,
++                       .si_errno = 0,
++                       .si_code  = TRAP_BRKPT,
++                       .si_addr  = (void __user *)instruction_pointer(regs),
++               };
+ 
+-       if (!user_mode(regs))
++               force_sig_info(SIGTRAP, &info, current);
++       } else if (call_break_hook(regs, esr) != DBG_HOOK_HANDLED) {
++               pr_warning("Unexpected kernel BRK exception at EL1\n");
+                return -EFAULT;
++       }
+ 
+-       info = (siginfo_t) {
+-               .si_signo = SIGTRAP,
+-               .si_errno = 0,
+-               .si_code  = TRAP_BRKPT,
+-               .si_addr  = (void __user *)instruction_pointer(regs),
+-       };
+-
+-       force_sig_info(SIGTRAP, &info, current);
+        return 0;
+ }
