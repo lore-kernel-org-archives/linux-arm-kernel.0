@@ -1,36 +1,82 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Wed, 30 Jul 2014 12:30:13 +0100
-Subject: [PATCH v2 1/3] arm64: spin-table: handle unmapped
- cpu-release-addrs
-In-Reply-To: <1406717944-24725-2-git-send-email-ard.biesheuvel@linaro.org>
-References: <1406717944-24725-1-git-send-email-ard.biesheuvel@linaro.org>
- <1406717944-24725-2-git-send-email-ard.biesheuvel@linaro.org>
-Message-ID: <20140730113013.GL12239@arm.com>
+From: monstr@monstr.eu (Michal Simek)
+Date: Wed, 30 Jul 2014 13:39:12 +0200
+Subject: [GIT PULL] Xilinx Zynq dt changes for v3.17 - third pull request
+Message-ID: <53D8D960.3030302@monstr.eu>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jul 30, 2014 at 11:59:02AM +0100, Ard Biesheuvel wrote:
-> From: Mark Rutland <mark.rutland@arm.com>
-> 
-> In certain cases the cpu-release-addr of a CPU may not fall in the
-> linear mapping (e.g. when the kernel is loaded above this address due to
-> the presence of other images in memory). This is problematic for the
-> spin-table code as it assumes that it can trivially convert a
-> cpu-release-addr to a valid VA in the linear map.
-> 
-> This patch modifies the spin-table code to use a temporary cached
-> mapping to write to a given cpu-release-addr, enabling us to support
-> addresses regardless of whether they are covered by the linear mapping.
-> 
-> Signed-off-by: Mark Rutland <mark.rutland@arm.com>
-> Tested-by: Mark Salter <msalter@redhat.com>
-> [ardb: added (__force void *) cast]
-> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
-> ---
->  arch/arm64/kernel/smp_spin_table.c | 22 +++++++++++++++++-----
->  1 file changed, 17 insertions(+), 5 deletions(-)
+Hi Olof,
 
-I'm nervous about this. What if the spin table sits in the same physical 64k
-frame as a read-sensitive device and we're running with 64k pages?
+I didn't expect that I will get patches for Parallella board
+but it will be worth to have them in. That's why please consider
+to pull these patches to your arm-soc trees.
 
-Will
+The branch is based on zynq/dt2 branch in arm-soc git repo
+http://git.kernel.org/cgit/linux/kernel/git/arm/arm-soc.git/log/?h=zynq/dt2
+
+Thanks,
+Michal
+
+
+The following changes since commit e0a5c552caf7a4865f3d5aa077003ef2d35217db:
+
+  ARM: zynq: DT: Add GPIO node (2014-07-23 14:05:56 +0200)
+
+are available in the git repository at:
+
+  git://git.xilinx.com/linux-xlnx.git tags/zynq-dt-for-3.17-3
+
+for you to fetch changes up to 6a3246c02e7bcb16a58f3fcee4662a9b36ea80e9:
+
+  ARM: zynq: DT: Clarify Xilinx Zynq platform (2014-07-30 13:26:54 +0200)
+
+----------------------------------------------------------------
+arm: Xilinx Zynq dt patches for v3.17 third pull request
+
+- Add Adapteva Parallella board/DT
+- Add SPI nodes
+- Add CAN nodes
+- Clean Zynq description
+
+----------------------------------------------------------------
+Andreas F?rber (5):
+      Documentation: devicetree: Adapteva vendor prefix
+      Documentation: devicetree: Adapteva boards
+      ARM: dts: zynq: Add Parallella device tree
+      ARM: dts: zynq: Add DMAC for Parallella
+      ARM: dts: zynq: Add SPI
+
+Michal Simek (2):
+      ARM: zynq: DT: Add CAN node
+      ARM: zynq: DT: Clarify Xilinx Zynq platform
+
+Soren Brinkmann (1):
+      ARM: zynq: DT: Remove DMA from board DTs
+
+ Documentation/devicetree/bindings/arm/adapteva.txt    |  7 +++++++
+ Documentation/devicetree/bindings/arm/xilinx.txt      |  8 ++++----
+ Documentation/devicetree/bindings/vendor-prefixes.txt |  1 +
+ arch/arm/boot/dts/Makefile                            |  4 +++-
+ arch/arm/boot/dts/zynq-7000.dtsi                      | 66 +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++-
+ arch/arm/boot/dts/zynq-parallella.dts                 | 64 ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+ arch/arm/boot/dts/zynq-zc702.dts                      |  4 ++++
+ 7 files changed, 148 insertions(+), 6 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/arm/adapteva.txt
+ create mode 100644 arch/arm/boot/dts/zynq-parallella.dts
+
+
+-- 
+Michal Simek, Ing. (M.Eng), OpenPGP -> KeyID: FE3D1F91
+w: www.monstr.eu p: +42-0-721842854
+Maintainer of Linux kernel - Microblaze cpu - http://www.monstr.eu/fdt/
+Maintainer of Linux kernel - Xilinx Zynq ARM architecture
+Microblaze U-BOOT custodian and responsible for u-boot arm zynq platform
+
+
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 263 bytes
+Desc: OpenPGP digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140730/068b39da/attachment.sig>
