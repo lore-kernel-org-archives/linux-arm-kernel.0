@@ -1,73 +1,76 @@
 From: dianders@chromium.org (Doug Anderson)
-Date: Tue, 29 Jul 2014 21:03:28 -0700
-Subject: [PATCH 2/4] ARM: dts: add rk3288 dwc2 controller support
-In-Reply-To: <1406684075-18271-1-git-send-email-kever.yang@rock-chips.com>
+Date: Tue, 29 Jul 2014 21:21:37 -0700
+Subject: [PATCH 3/4] usb: dwc2: add compatible data for rockchip soc
+In-Reply-To: <1406684102-18313-1-git-send-email-kever.yang@rock-chips.com>
 References: <1406683873-18194-1-git-send-email-kever.yang@rock-chips.com>
- <1406684075-18271-1-git-send-email-kever.yang@rock-chips.com>
-Message-ID: <CAD=FV=VrFpQ_-1Dzk1kMypDjtj7ZFihEVjbt5sNETg=-Fc5jNg@mail.gmail.com>
+ <1406684102-18313-1-git-send-email-kever.yang@rock-chips.com>
+Message-ID: <CAD=FV=Wqr0C7gj89DVof=gBo4mxvqqz0or7_vkdad==CkzzrPg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Kever,
 
-On Tue, Jul 29, 2014 at 6:34 PM, Kever Yang <kever.yang@rock-chips.com> wrote:
-> rk3288 has two kind of usb controller, this add the dwc2 controller
-> for otg and host1.
->
-> Controller can works with usb PHY default setting and Vbus on.
+On Tue, Jul 29, 2014 at 6:35 PM, Kever Yang <kever.yang@rock-chips.com> wrote:
+> This patch add compatible data for dwc2 controller found on
+> rk3066, rk3188 and rk3288 processors from rockchip.
 >
 > Signed-off-by: Kever Yang <kever.yang@rock-chips.com>
 > ---
->  arch/arm/boot/dts/rk3288.dtsi |   20 ++++++++++++++++++++
->  1 file changed, 20 insertions(+)
->
-> diff --git a/arch/arm/boot/dts/rk3288.dtsi b/arch/arm/boot/dts/rk3288.dtsi
-> index abc51f5..4309c4f 100644
-> --- a/arch/arm/boot/dts/rk3288.dtsi
-> +++ b/arch/arm/boot/dts/rk3288.dtsi
+>  drivers/usb/dwc2/platform.c |   29 +++++++++++++++++++++++++++++
+>  1 file changed, 29 insertions(+)
 
-Maybe move the dtsi patch to the 3rd or 4th patch in the series?
-Things won't work super well without patch #3, right?
-
-Also: do you want to add a 5th patch in the series that enables the
-ports like <https://chromium-review.googlesource.com/#/c/210066/>
+I'm nowhere an expert here, but...
 
 
-> @@ -646,5 +646,25 @@
->                         clock-names = "baudclk", "apb_pclk";
->                         status = "disabled";
->                 };
-> +
-> +               usb_otg: dwc2 at ff580000 {
-> +                       compatible = "rockchip,rk3288-usb", "rockchip,rk3066-usb",
-> +                                       "snps,dwc2";
-
-You included the snps,dwc2 (at my request) here.  ...but you didn't
-add it to the bindings (patch #1).  You should probably add it to the
-bindings in the next version unless someone else thinks it shouldn't
-be here.
-
-
-> +                       reg = <0xff580000 0x40000>;
-> +                       interrupts = <GIC_SPI 23 IRQ_TYPE_LEVEL_HIGH>;
-> +                       clocks = <&cru HCLK_OTG0>;
-> +                       clock-names = "otg";
-> +                       status = "disabled";
-> +               };
-> +
-> +               usb_host1: dwc2 at ff540000 {
-
-Please sort by base address.  ...and if Heiko Acks my EHCI device tree
-patches maybe rebase atop my patches to avoid merge conflicts?
-
-
-> +                       compatible = "rockchip,rk3288-usb", "rockchip,rk3066-usb",
-> +                                       "snps,dwc2";
-> +                       reg = <0xff540000 0x40000>;
-> +                       interrupts = <GIC_SPI 25 IRQ_TYPE_LEVEL_HIGH>;
-> +                       clocks = <&cru HCLK_USBHOST1>;
-> +                       clock-names = "otg";
-> +                       status = "disabled";
-> +               };
->         };
+> diff --git a/drivers/usb/dwc2/platform.c b/drivers/usb/dwc2/platform.c
+> index a10e7a3..cc5983c 100644
+> --- a/drivers/usb/dwc2/platform.c
+> +++ b/drivers/usb/dwc2/platform.c
+> @@ -75,6 +75,34 @@ static const struct dwc2_core_params params_bcm2835 = {
+>         .uframe_sched                   = 0,
 >  };
+>
+> +static const struct dwc2_core_params params_rk3066 = {
+> +       .otg_cap                        = 2,    /* no HNP/SRP capable */
+
+Are you sure HNP/SRP is not available?  Do things break if you leave this at 0?
+
+
+> +       .otg_ver                        = 0,    /* 1.3 */
+> +       .dma_enable                     = 1,
+> +       .dma_desc_enable                = 0,
+> +       .speed                          = 0,    /* High Speed */
+> +       .enable_dynamic_fifo            = 1,
+> +       .en_multiple_tx_fifo            = 1,
+> +       .host_rx_fifo_size              = 520,  /* 520 DWORDs */
+> +       .host_nperio_tx_fifo_size       = 128,  /* 128 DWORDs */
+> +       .host_perio_tx_fifo_size        = 256,  /* 256 DWORDs */
+> +       .max_transfer_size              = 65536,
+> +       .max_packet_count               = 512,
+
+Header file says max_packet_count should be max of 511.
+
+
+> +       .host_channels                  = 9,
+> +       .phy_type                       = 1,    /* UTMI */
+> +       .phy_utmi_width                 = 16,   /* 8 bits */
+
+Either comment or value is wrong since 16 != 8 bits.
+
+
+> +       .phy_ulpi_ddr                   = 0,    /* Single */
+> +       .phy_ulpi_ext_vbus              = 0,
+> +       .i2c_enable                     = 0,
+> +       .ulpi_fs_ls                     = 0,
+> +       .host_support_fs_ls_low_power   = 0,
+> +       .host_ls_low_power_phy_clk      = 0,    /* 48 MHz */
+> +       .ts_dline                       = 0,
+> +       .reload_ctl                     = 1,
+> +       .ahbcfg                         = 0x17, /* dma enable &  INCR16 */
+> +       .uframe_sched                   = 1,
+> +};
+
+Many of these values could just be -1 to autodetect / use default.
+Should we consider doing that?
+
+-Doug
