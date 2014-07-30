@@ -1,82 +1,204 @@
-From: rjw@rjwysocki.net (Rafael J. Wysocki)
-Date: Wed, 30 Jul 2014 14:55:04 +0200
-Subject: linux-next: manual merge of the pm tree with the arm-soc tree
-In-Reply-To: <20140730122305.7b1b7838@canb.auug.org.au>
-References: <20140730122305.7b1b7838@canb.auug.org.au>
-Message-ID: <2943176.NOpchz9a7V@vostro.rjw.lan>
+From: grygorii.strashko@ti.com (Grygorii Strashko)
+Date: Wed, 30 Jul 2014 16:25:31 +0300
+Subject: [RFC PATCH 2/2] of/clk: use "clkops-clocks" to specify clocks
+ handled by clock_ops domain
+In-Reply-To: <2717555.fiA6A86F65@avalon>
+References: <1398334403-26181-1-git-send-email-geert+renesas@glider.be>
+ <53D68CC4.1010704@ti.com>
+ <CACxGe6uMke5vgzcNC9xUqjr2bHJ4QFHD6YjocSZWq8Ccx8Mm6A@mail.gmail.com>
+ <2717555.fiA6A86F65@avalon>
+Message-ID: <53D8F24B.7010104@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday, July 30, 2014 12:23:05 PM Stephen Rothwell wrote:
-> 
-> --Sig_/ACOdpNyKdCGq/4_bRoeLLze
-> Content-Type: text/plain; charset=US-ASCII
-> Content-Transfer-Encoding: quoted-printable
-> 
-> Hi Rafael,
+Hi Laurent,
 
-Hi Stephen,
+On 07/30/2014 03:06 AM, Laurent Pinchart wrote:
+> Hi Grygorii and Grant,
+> 
+> On Monday 28 July 2014 23:52:34 Grant Likely wrote:
+>> On Mon, Jul 28, 2014 at 11:47 AM, Grygorii Strashko wrote:
+>>> On 07/28/2014 05:05 PM, Grant Likely wrote:
+>>>> On Thu, 12 Jun 2014 19:53:43 +0300, Grygorii Strashko wrote:
+>>>>> Use "clkops-clocks" property to specify clocks handled by
+>>>>> clock_ops domain PM domain. Only clocks defined in "clkops-clocks"
+>>>>> set of clocks will be handled by Runtime PM through clock_ops
+>>>>> Pm domain.
+>>>>>
+>>>>> Signed-off-by: Grygorii Strashko <grygorii.strashko@ti.com>
+>>>>> ---
+>>>>>
+>>>>>    drivers/of/of_clk.c |    7 ++-----
+>>>>>    1 file changed, 2 insertions(+), 5 deletions(-)
+>>>>>
+>>>>> diff --git a/drivers/of/of_clk.c b/drivers/of/of_clk.c
+>>>>> index 35f5e9f..5f9b90e 100644
+>>>>> --- a/drivers/of/of_clk.c
+>>>>> +++ b/drivers/of/of_clk.c
+>>>>> @@ -86,11 +86,8 @@ int of_clk_register_runtime_pm_clocks(struct
+>>>>> device_node *np,>>>
+>>>>>       struct clk *clk;
+>>>>>       int error;
+>>>>>
+>>>>> -    for (i = 0; (clk = of_clk_get(np, i)) && !IS_ERR(clk); i++) {
+>>>>> -            if (!clk_may_runtime_pm(clk)) {
+>>>>> -                    clk_put(clk);
+>>>>> -                    continue;
+>>>>> -            }
+>>>>> +    for (i = 0; (clk = of_clk_get_from_set(np, "clkops", i)) &&
+>>>>> +                 !IS_ERR(clk); i++) {
+>>>>
+>>>> This really looks like an ABI break to me. What happens to all the
+>>>> existing platforms who don't have this new clkops-clocks in their device
+>>>> tree?
+>>>
+>>> Agree. This patch as is will break such platforms.
+>>> As possible solution for above problem - the NULL can be used as clock's
+>>> prefix by default and platform code can configure new value of clock's
+>>> prefix during initialization.
+>>> In addition, to make this solution full the of_clk_get_by_name() will
+>>> need to be modified too.
+>>>
+>>> But note pls, this is pure RFC patches which I did to find out the answer
+>>> on questions: - What is better: maintain Runtime PM clocks configuration
+>>> in DT or in code?
+>>
+>> In code. I don't think it is workable to embed runtime PM behaviour
+>> into the DT bindings. I think there will be too much variance in what
+>> hardware requires. We can create helpers to make this simpler, but I
+>> don't think it is a good idea to set it up automatically without any
+>> control from the driver itself.
+>>
+>>> - Where and when to call of_clk_register_runtime_pm_clocks()?
+>>>
+>>>    Bus notifier/ platform core/ device drivers
+>>
+>> I would say in device drivers.
+> 
+> I tend to agree with that.
+> 
+> It will help here to take a step back and remember what the problem we're
+> trying to solve is.
+> 
+> At the root is clock management. Our system comprise many clocks, and they
+> need to be handled. The Common Clock Framework nicely models the clocks, and
+> offers an API for drivers to retrieve device clocks and control them. Drivers
+> can thus implement clock management manually without much pain.
+> 
+> A clock can be managed in roughly three different ways :
+> 
+> - it can be enabled at probe time and disabled at remove time ;
+> 
+> - it can be enabled right before the device leaves its idle state and disabled
+> when the device goes back to idle ; or
+> 
+> - it can be enabled and disabled in a more fine-grained, device-specific
+> manner.
+> 
+> The selected clock management granularity depends on constraints specific to
+> the device and on how aggressive power saving needs to be. Enabling the clocks
+> at probe time and disabling them at remove time is enough for most devices,
+> but leads to a high power consumption. For that reason the second clock
+> management scheme is often desired.
+> 
+> Managing clocks manually in the driver is a valid option. However, when adding
+> runtime PM to the equation, and realizing that the clocks need to be enabled
+> in the runtime PM resume handler and disabled in the suspend handler, the
+> clock management code starts looking very similar in most drivers. We're thus
+> tempted to factorize it away from the drivers into a shared location.
+> 
+> It's important to note at this point that the goal here is only to simplify
+> drivers. Moving clock management code out of the drivers doesn't (unless I'm
+> missing something) open the door to new possibilities, it just serves as a
+> simplification.
+> 
+> Now, as Grygorii mentioned, differences between how a given IP core is
+> integrated in various SoCs can make clock management SoC-dependent. In the
+> vast majority of cases (which is really what we need to target, given that our
+> target is simplifying drivers) SoC integration can be described as a list of
+> clocks that must be managed. That list can be common to all devices in a given
+> SoC, or can be device-dependent as well.
 
-> Today's linux-next merge of the pm tree got a conflict in
-> drivers/cpuidle/Kconfig.arm between commit 2aaafcdb6883 ("cpuidle:
-> big.LITTLE: Add ARCH_EXYNOS entry in config") from the arm-soc tree and
-> commit 6ee7f5dd57fc ("cpuidle: big_little: Fix build error") from the
-> pm tree.
-> 
-> I fixed it up (see below) and can carry the fix as necessary (no action
-> is required).
+That's actually a problem - now we have static list of managed clocks per-SoC and
+not per device.
 
-Thanks for the fix!
+> 
+> Few locations can be used to express a per-device list of per-SoC clocks. We
+> can have clocks lists in a per-SoC and per-device location, per-device clocks
+> lists in an SoC-specific location, or per-SoC clocks lists in a device-
+> specific location.
+> 
+> The first option would require listing clocks to be managed by runtime PM in
+> DT nodes, as proposed by this patch set. I don't think this is the best
+> option, as that information is a mix of hardware description and software
+> policy, with the hardware description part being already present in DT in the
+> clocks property.
+
+I'm not fully agree here. The clock is "functional clock" If It's managed by runtime PM.
+And all such clocks need to be enabled/disabled always when device is powered on/off.
+So, from my point of view it's HW description and it follows TRM. 
+Other clocks are optional and only drivers should control them.
+And question is how to define sets of such clocks in the best way?
+
+> 
+> The second option calls for storing the lists in SoC code under arch/. As
+> we're trying to minimize the amount of SoC code there (and even remove SoC
+> code completely when possible) I don't think that's a good option.
+> 
+> The third option would require storing the clocks lists in device drivers. I
+> believe this is our best option, as a trade-off between simplicity and
+> versatility. Drivers that use runtime PM already need to enable it explicitly
+> when probing devices. Passing a list of clock names to runtime PM at that
+> point wouldn't complicate drivers much. When the clocks list isn't SoC-
+> dependent it could be stored as static information. Otherwise it could be
+> derived from DT (or any other source of hardware description) using C code,
+> offering all the versatility we need.
+
+Ok. if I understand right, you propose smth like this:
+1) DT based solution:
+
+devA {
+	clocks = <&clkpa>, <&clkcpgmac>, <&chipclk12>;
+	rpm-clocks = <&clkpa>, <&clkcpgmac>;
+- or -
+	clocks = <&clkpa>, <&clkcpgmac>, <&chipclk12>;
+	clock-names = "clk_pa", "clk_cpgmac", "cpsw_cpts_rft_clk";
+	rpm-clocks =  "clk_pa", "clk_cpgmac";
+}
+
+in driver:
+ pm_runtime_enable();
+  |- of_clk_register_runtime_pm_clocks()
+- or -
+ of_clk_register_runtime_pm_clocks()
+ pm_runtime_enable();
 
 
-> diff --cc drivers/cpuidle/Kconfig.arm
-> index 33fc0ff0af1c,a186dec8e5df..000000000000
-> --- a/drivers/cpuidle/Kconfig.arm
-> +++ b/drivers/cpuidle/Kconfig.arm
-> @@@ -1,9 -1,16 +1,10 @@@
->   #
->   # ARM CPU Idle drivers
->   #
->  -config ARM_ARMADA_370_XP_CPUIDLE
->  -	bool "CPU Idle Driver for Armada 370/XP family processors"
->  -	depends on ARCH_MVEBU
->  -	help
->  -	  Select this to enable cpuidle on Armada 370/XP processors.
->  -
->   config ARM_BIG_LITTLE_CPUIDLE
->   	bool "Support for ARM big.LITTLE processors"
->  -	depends on ARCH_VEXPRESS_TC2_PM
->  +	depends on ARCH_VEXPRESS_TC2_PM || ARCH_EXYNOS
-> + 	depends on MCPM
->   	select ARM_CPU_SUSPEND
->   	select CPU_IDLE_MULTIPLE_DRIVERS
->   	help
+2) Static solution:
+char *con_ids_davinci[] =
+    { "fck", "master", "slave", NULL };
+char *con_ids_keystone[] =
+    { "clk_pa", "clk_cpgmac" };
+
+static struct of_device_id of_match[] = {
+	{ .compatible = "ti,keystone", con_ids_keystone},
+	{ .compatible = "ti,davinci", con_ids_davinci},
+	{},
+};
+
+Personally, I like option 1 and, seems, it will not break ABI. 
+
 > 
-> --Sig_/ACOdpNyKdCGq/4_bRoeLLze
-> Content-Type: application/pgp-signature; name=signature.asc
-> Content-Disposition: attachment; filename=signature.asc
-> 
-> -----BEGIN PGP SIGNATURE-----
-> Version: GnuPG v2
-> 
-> iQIcBAEBCAAGBQJT2FcWAAoJEMDTa8Ir7ZwVpXAP/i6U5VfuEjywNOnyq2GF13qx
-> gpKWy6BNWg6TACRERzfngwOBID7nUVeQH3ksri2ReiDJkjM655dOnR2T1d4q+Txc
-> CYc+TYp1x37ErXOVarlrnoVSqeNKSiARQdKLSE0ztLWfg/s+zmAuCjznbbBkFwyo
-> tEbfa7kkMRo6TBopPVHevQ/Pe/s0ZVFXqS8KNyd5XImgeEmUAnvGl0KBSetA+b8u
-> 1zB/U8V7d4cnWH6jRiijVDOBBs1RlmTJHV12NeKWzukjjEWd8QJ2cQHLRo/aS/js
-> AVwCMUE5Q5AFAOj+aLtETpo2wc3VPNkq6QwFk4sJgmizvISQ5l/8nveBJgGU457m
-> XQAHlgvhWAArtD2uowLP/aGhUJE3D3MBDs/6r/eMxfYeTBJSgfLllz9jXTayfshM
-> 7saBQtwh+npKK2M4tDivUGE0zFoRj/qcCdiSB/+r0XYGaFwGIqoqEHnlsS/YElUF
-> HJBCQgUPpzv832JXuJUuR5RnCOiGYiWlTGBs+WHoWXgVpVyIpZOfOPGinTbaOgIa
-> 23OHAdHLTdWTg+adfKmrTGPu++OTxI985oooYhqHsmpp6MPLxC6ABgqlWlUh15zb
-> sNs02B6XLBvm6Sa4v3w2anYAZCtwrO3TcihsL5mFhLHxForyq+U45qbktcZ6CBbF
-> xI0c32N77d98oZMV81vN
-> =U/IC
-> -----END PGP SIGNATURE-----
-> 
-> --Sig_/ACOdpNyKdCGq/4_bRoeLLze--
+> The only drawback of this solution I can think of right now is that the
+> runtime PM core couldn't manage device clocks before probing the device.
+> Specifically device clocks couldn't be managed if no driver is loaded for that
+> device. I somehow recall that someone raised this as being a problem, but I
+> can't remember why.
 > 
 
--- 
-I speak only for myself.
-Rafael J. Wysocki, Intel Open Source Technology Center.
+I can recollect only OMAP2+ SoCs where some abstraction called HW_MOD is used 
+during platform initialization to reset all devices and turn off unused ones
+before probing the devices. But clock_ops are not used by OMAP2+:)
+
+regards,
+-grygorii
