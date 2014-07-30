@@ -1,50 +1,130 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Wed, 30 Jul 2014 12:04:25 +0100
-Subject: [PATCH v4] devicetree: Add generic IOMMU device tree bindings
-In-Reply-To: <1404487757-18829-1-git-send-email-thierry.reding@gmail.com>
-References: <1404487757-18829-1-git-send-email-thierry.reding@gmail.com>
-Message-ID: <20140730110425.GI12239@arm.com>
+From: stwiss.opensource@diasemi.com (Opensource [Steve Twiss])
+Date: Wed, 30 Jul 2014 11:05:01 +0000
+Subject: [RESEND RFC V2] devicetree: Dialog Semiconductor consolidate
+ existing vendor prefixes to standardise on 'dlg'
+In-Reply-To: <20140730023725.GA23224@verge.net.au>
+References: <201407241554.s6OFsqbW031651@swsrvapps-01.diasemi.com>
+ <20140725070002.GH7063@lee--X1>
+ <6ED8E3B22081A4459DAC7699F3695FB7D0B28E95@SW-EX-MBX02.diasemi.com>
+ <20140730023725.GA23224@verge.net.au>
+Message-ID: <6ED8E3B22081A4459DAC7699F3695FB7D0B2910C@SW-EX-MBX02.diasemi.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi all,
 
-On Fri, Jul 04, 2014 at 04:29:17PM +0100, Thierry Reding wrote:
-> From: Thierry Reding <treding@nvidia.com>
-> 
-> This commit introduces a generic device tree binding for IOMMU devices.
-> Only a very minimal subset is described here, but it is enough to cover
-> the requirements of both the Exynos System MMU and Tegra SMMU as
-> discussed here:
-> 
->     https://lkml.org/lkml/2014/4/27/346
-> 
-> Signed-off-by: Thierry Reding <treding@nvidia.com>
-> ---
-> Changes in v4:
-> - clarify that disabling an IOMMU DT node may not disable translation
-> - be more explicit that examples are only examples
-> - add multi-ID master example
-> 
-> Changes in v3:
-> - use #iommu-cells instead of #address-cells/#size-cells
-> - drop optional iommu-names property
-> 
-> Changes in v2:
-> - add notes about "dma-ranges" property (drop note from commit message)
-> - document priorities of "iommus" property vs. "dma-ranges" property
-> - drop #iommu-cells in favour of #address-cells and #size-cells
-> - remove multiple-master device example
-> 
->  Documentation/devicetree/bindings/iommu/iommu.txt | 172 ++++++++++++++++++++++
->  1 file changed, 172 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/iommu/iommu.txt
+On 30 July 2014 03:37 Simon Horman wrote:
+>On Mon, Jul 28, 2014 at 09:53:56AM +0000, Opensource [Steve Twiss] wrote:
+>> On 25 July 2014 08:00, Lee Jones wrote:
+>>
+>> >On Thu, 24 Jul 2014, Opensource [Steve Twiss] wrote:
+>> >> From: Steve Twiss <stwiss.opensource@diasemi.com>
+>> >>
+>> >> This patch series updates the device tree vendor prefix for
+>> >> Dialog Semiconductor.
+>> >>
+>> >> Various methods are currently used throughout the kernel: 'diasemi',
+>> >> 'dialog' and 'dlg'. Others have also been suggested.
+>> >>
+>> >> This patch set aims to consolidate the usage of the vendor prefix to
+>> >> use a common standard. The prefix 'dlg' is used.
+>> >>
+>> >>
+>> >> Signed-off-by: Steve Twiss <stwiss.opensource@diasemi.com>
+>> >
+>> >Didn't I Ack the MFD parts already?
+>> >
+>>
+>> Yes -- certainly.
+>>  (I should have put them in the main body of the e-mail shouldn't I ..?)
+>>
+>> I just need the SHMobile responses now.
+>> I will try to make contact with those guys this week.
+>
+>Hi Steve,
+>
+>I apologise for not noticing this earlier:
+>I am entirely unsure how I missed it.
 
-I'm concerned that this patch hasn't been picked up for 3.17 (I can't see it
-in -next). If we want to move the ARM SMMU driver over to this new binding,
-we can't keep dragging our feet for much longer as I *really* don't plan to
-support two bindings in parallel (one is complicated enough already).
+Hi Simon,
 
-Any chance we can see this merged, please?
+Thank you for responding to this. No problem.
 
-Will
+>
+>In principle I am fine with this change so long as it does not
+>introduce any backwards-compatibility problems. In particular removing
+>compatibility strings that may already be in use by DTB blobs in the wild.
+>
+>For SH Mobile it seems that Lager and Koelsch were using "diasemi,da9210"
+>which is unsupported by the driver at this time. So it seems there is no
+>backwards-compatibility problem there. I'm less sure about other aspects of
+>the patch. And I'm also less concerned about them.
+>
+>I do have a slight preference for SH Mobile changes to go through my
+>renesas tree rather than elsewhere (as part of a more global change)
+>principally to try to avoid the possibility of conflicts. The SH Mobile dts
+>files in question are often updated. And for example I notice some fuzz
+>when applying this patch on top of the next-20140729 tag of linux-next.
+
+I have applied the patch to linux-next/next-20140729 and the patch
+program does throw some warnings,
+
+patching file arch/arm/boot/dts/r8a7790-lager.dts
+Hunk #1 succeeded at 378 (offset 4 lines).
+patching file arch/arm/boot/dts/r8a7791-koelsch.dts
+Hunk #1 succeeded at 430 (offset 4 lines).
+
+But when I checked the output, the patch was applied correctly.
+They are one-line changes in both cases:
+
+diff --git a/arch/arm/boot/dts/r8a7790-lager.dts b/arch/arm/boot/dts/r8a7790-lager.dts
+index 7853c2c..becaaab 100644
+--- a/arch/arm/boot/dts/r8a7790-lager.dts
++++ b/arch/arm/boot/dts/r8a7790-lager.dts
+@@ -378,7 +378,7 @@
+        status = "okay";
+ 
+        vdd_dvfs: regulator at 68 {
+-               compatible = "diasemi,da9210";
++               compatible = "dlg,da9210";
+                reg = <0x68>;
+ 
+                regulator-min-microvolt = <1000000>;
+diff --git a/arch/arm/boot/dts/r8a7791-koelsch.dts b/arch/arm/boot/dts/r8a7791-koelsch.dts
+index 8f36d4f..684fc44 100644
+--- a/arch/arm/boot/dts/r8a7791-koelsch.dts
++++ b/arch/arm/boot/dts/r8a7791-koelsch.dts
+@@ -430,7 +430,7 @@
+        clock-frequency = <100000>;
+ 
+        vdd_dvfs: regulator at 68 {
+-               compatible = "diasemi,da9210";
++               compatible = "dlg,da9210";
+                reg = <0x68>;
+ 
+                regulator-min-microvolt = <1000000>;
+
+
+>
+>If you were to break out the SH Mobile portion of this patch I would be
+>happy to take it once the driver portion is accepted.  That said, I do see
+>that everyone else has acked the change so clearly this is not an issue
+>from their point of view. So I will not complain if you decide not to break
+>the patch up (though please note my warning about possible conflicts).
+
+I have been trying to get Acked-by: tags for a while now, and it has taken a
+fair amount of time to get everybody's responses. For that reason and
+because the patch managed to be applied cleanly to next-20140729 (despite
+4 line offsets) I would like to resend this patch with your Acked-by: applied
+instead of splitting up the patch into several sections and then touting
+for new Acked-by: all over again.
+
+I realise that your DTS files are updated constantly -- I do hope this will
+not cause any problems with the merge.
+
+>
+>In the case where you do not want to split up the patch:
+>Acked-by: Simon Horman <horms+renesas@verge.net.au>
+
+Thank you.
+Regards,
+Steve.
