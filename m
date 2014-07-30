@@ -1,40 +1,39 @@
-From: oleg@redhat.com (Oleg Nesterov)
-Date: Wed, 30 Jul 2014 17:32:59 +0200
-Subject: [PATCH v4 0/5] x86: two-phase syscall tracing and seccomp fastpath
-In-Reply-To: <CALCETrXHF5YzPQDvnJs=mFNm2Ff_FekGu_Y8-JyMaWh2hctR7A@mail.gmail.com>
-References: <cover.1406604806.git.luto@amacapital.net>
- <20140729192056.GA6308@redhat.com>
- <CALCETrX6P7SJQdgc0gTM7FLdwyT_Ld1MWvkLYpTO_2xsvBC9sA@mail.gmail.com>
- <CALCETrXHF5YzPQDvnJs=mFNm2Ff_FekGu_Y8-JyMaWh2hctR7A@mail.gmail.com>
-Message-ID: <20140730153259.GA25478@redhat.com>
+From: tj@kernel.org (Tejun Heo)
+Date: Wed, 30 Jul 2014 11:35:26 -0400
+Subject: [PATCH v11 3/8] ata: libahci_platform: move port_map parameters
+ into the AHCI structure
+In-Reply-To: <20140730082038.GB29900@kwain>
+References: <1406193450-17283-1-git-send-email-antoine.tenart@free-electrons.com>
+ <1406193450-17283-4-git-send-email-antoine.tenart@free-electrons.com>
+ <20140729144042.GD4791@htj.dyndns.org>
+ <20140730082038.GB29900@kwain>
+Message-ID: <20140730153526.GB23734@htj.dyndns.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/29, Andy Lutomirski wrote:
->
-> > SAVE_REST is 6 movq instructions and a subq.  FIXUP_TOP_OF_STACK is 7
-> > movqs (and 8 if I ever get my way).  RESTORE_TOP_OF_STACK is 4.
-> > RESTORE_REST is 6 movqs and an adsq.  So we're talking about avoiding
-> > 21 movqs, and addq, and a subq.  That may be significant.  (And I
-> > suspect that the difference is much larger on platforms like arm64,
-> > but that's a separate issue.)
+Hello,
 
-OK, thanks. We could probably simplify the logic in phase1 + phase2 if
-it was a single function though.
+On Wed, Jul 30, 2014 at 10:20:38AM +0200, Antoine T?nart wrote:
+> How do you want me to send the series? There is two conflicts when
+> applying to libata/for-3.17:
+> - patch 4/8: it takes into account a patch not in libata/for-3.17 but
+>   added before rc7. It should be better to first merge rc7, otherwise
+>   some modifications won't make sense.
+> - patch 6/8: "fsl,imx53-ahci" was removed from the documentation in
+>   libata/for-3.17 but not in rc7. Resolving the conflict is really
+>   simple.
+> 
+> I think it's better to apply the whole thing after merging rc7 into
+> libata/for-3.17, because it will only have a really simple conflict to
+> resolve.
+> 
+> Please tell me what do you prefer before I send the updated version.
 
-> To put some more options on the table: there's an argument to be made
-> that the whole fast-path/slow-path split isn't worth it.  We could
-> unconditionally set up a full frame for all syscalls.  This means:
+Hmmm... does pulling in libata/for-3.16-fixes into libata/for-3.17
+resolves the conflict?  If so, please send the patch on top of the
+merged branch.  I wanna avoid pulling in -rc7 wholesale at this point.
 
-Or, at least, can't we allocate the full frame and avoid "add/sub %rsp"?
+Thanks.
 
-> This means:
-...
-> On the
-> other hand, there's zero chance that this would be ready for 3.17.
->
-> I'd tend to advocate for keeping the approach in my patches for now.
-
-Yes, sure, I didn't try to convince you to change this code. Thanks.
-
-Oleg.
+-- 
+tejun
