@@ -1,102 +1,249 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Wed, 30 Jul 2014 19:18:42 +0100
-Subject: [PATCH v4] devicetree: Add generic IOMMU device tree bindings
-In-Reply-To: <CAOesGMi3zM1-cqmeGddJ69RNXx0ktFm_zXO_yq7N0EeA3HNrUQ@mail.gmail.com>
-References: <1404487757-18829-1-git-send-email-thierry.reding@gmail.com>
- <20140730152646.GC20162@leverpostej>
- <CAOesGMi3zM1-cqmeGddJ69RNXx0ktFm_zXO_yq7N0EeA3HNrUQ@mail.gmail.com>
-Message-ID: <20140730181842.GG20162@leverpostej>
+From: sudeep.holla@arm.com (Sudeep Holla)
+Date: Wed, 30 Jul 2014 19:20:27 +0100
+Subject: [PATCH 07/19] ARM64 / ACPI: Parse MADT to map logical cpu to
+ MPIDR and get cpu_possible/present_map
+In-Reply-To: <1406206825-15590-8-git-send-email-hanjun.guo@linaro.org>
+References: <1406206825-15590-1-git-send-email-hanjun.guo@linaro.org>
+ <1406206825-15590-8-git-send-email-hanjun.guo@linaro.org>
+Message-ID: <53D9376B.5080609@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-[...]
 
-> >> +Multiple-master IOMMU:
-> >> +----------------------
-> >> +
-> >> +     iommu {
-> >> +             /* the specifier represents the ID of the master */
-> >> +             #iommu-cells = <1>;
-> >> +     };
-> >> +
-> >> +     master at 1 {
-> >> +             /* device has master ID 42 in the IOMMU */
-> >> +             iommus = <&/iommu 42>;
-> >> +     };
-> >> +
-> >> +     master at 2 {
-> >> +             /* device has master IDs 23 and 24 in the IOMMU */
-> >> +             iommus = <&/iommu 23>, <&/iommu 24>;
-> >> +     };
-> >
-> > In future I suspect master will need to be able to identify which master
-> > IDs correspond to which of their master ports (where each port might
-> > have an arbitrary number of master IDs).
-> >
-> > While we don't need that for the first run, it would be nice to have
-> > that looked into so master bindings don't come up with arbitrarily
-> > different ways of doing that.
-> 
-> iommu-names would be the logical extension to handle that, just like
-> we do with other resources, right?
 
-Possibly. If the master has multiple IDs assigned to transactions from a
-single master port then it depends on how the master wants to group
-those for the sake of the binding. If it's per-port then you'd need the
-same name multiple times:
+On 24/07/14 14:00, Hanjun Guo wrote:
+> MADT contains the information for MPIDR which is essential for
+> SMP initialization, parse the GIC cpu interface structures to
+> get the MPIDR value and map it to cpu_logical_map(), and add
+> enabled cpu with valid MPIDR into cpu_possible_map and
+> cpu_present_map.
+>
+> Signed-off-by: Hanjun Guo <hanjun.guo@linaro.org>
+> Signed-off-by: Tomasz Nowicki <tomasz.nowicki@linaro.org>
+> ---
+>   arch/arm64/include/asm/acpi.h |    2 +
+>   arch/arm64/kernel/acpi.c      |  127 +++++++++++++++++++++++++++++++++++++++++
+>   arch/arm64/kernel/smp.c       |   10 +++-
+>   3 files changed, 138 insertions(+), 1 deletion(-)
+>
+> diff --git a/arch/arm64/include/asm/acpi.h b/arch/arm64/include/asm/acpi.h
+> index 67dac90..5ce85f8 100644
+> --- a/arch/arm64/include/asm/acpi.h
+> +++ b/arch/arm64/include/asm/acpi.h
+> @@ -50,6 +50,8 @@ static inline bool acpi_has_cpu_in_madt(void)
+>   extern int (*acpi_suspend_lowlevel)(void);
+>   #define acpi_wakeup_address 0
+>
+> +#define MAX_GIC_CPU_INTERFACE 65535
+> +
 
-iommus = <&iommu 0>, <&iommu 4>, <&iommu 17>, <&iommu 25>;
-iommu-names = "video", "video", "dram", dram";
+Can this me made something like MAX_MADT_INTERRUPT_CONTROLLER_ENTRIES ?
+And assuming each entry to be at-least 4 or 8 bytes, it can be reduced.
 
-This is really specific to a given master, so we can table that until
-the first master appears which needs to distinguish between IDs.
+>   #endif /* CONFIG_ACPI */
+>
+>   #endif /*_ASM_ACPI_H*/
+> diff --git a/arch/arm64/kernel/acpi.c b/arch/arm64/kernel/acpi.c
+> index 374926f..801e268 100644
+> --- a/arch/arm64/kernel/acpi.c
+> +++ b/arch/arm64/kernel/acpi.c
+> @@ -22,6 +22,9 @@
+>   #include <linux/bootmem.h>
+>   #include <linux/smp.h>
+>
+> +#include <asm/smp_plat.h>
+> +#include <asm/cputype.h>
+> +
+>   /*
+>    * We never plan to use RSDT on arm/arm64 as its deprecated in spec but this
+>    * variable is still required by the ACPI core
+> @@ -42,6 +45,9 @@ int acpi_psci_present;
+>   /* 1 to indicate HVC must be used instead of SMC as the PSCI conduit */
+>   int acpi_psci_use_hvc;
+>
+> +/* Processors (GICC) with enabled flag in MADT */
+> +static int enabled_cpus;
+> +
+>   /*
+>    * __acpi_map_table() will be called before page_init(), so early_ioremap()
+>    * or early_memremap() should be called here to for ACPI table mapping.
+> @@ -62,6 +68,122 @@ void __init __acpi_unmap_table(char *map, unsigned long size)
+>   	early_iounmap(map, size);
+>   }
+>
+> +/**
+> + * acpi_register_gic_cpu_interface - register a gic cpu interface and
+> + * generates a logic cpu number
+> + * @mpidr: CPU's hardware id to register, MPIDR represented in MADT
+> + * @enabled: this cpu is enabled or not
+> + *
+> + * Returns the logic cpu number which maps to the gic cpu interface
+> + */
+> +static int acpi_register_gic_cpu_interface(u64 mpidr, u8 enabled)
 
-> >> +
-> >> +Multiple-master IOMMU with configurable DMA window:
-> >> +---------------------------------------------------
-> >> +
-> >> +     / {
-> >> +             #address-cells = <1>;
-> >> +             #size-cells = <1>;
-> >> +
-> >> +             iommu {
-> >> +                     /* master ID, address and length of DMA window */
-> >> +                     #iommu-cells = <4>;
-> >> +             };
-> >> +
-> >> +             master {
-> >> +                     /* master ID 42, 4 GiB DMA window starting at 0 */
-> >> +                     iommus = <&/iommu  42  0  0x1 0x0>;
-> >
-> > Is this that window is from the POV of the master, i.e. the master can
-> > address 0x0 to 0xffffffff when generating transactions, and these get
-> > translated somehow?
-> >
-> > Or is this the physical addresses to allocate to the master?
-> 
-> It needs to be clarified in the documentation, but as far as I know it
-> is the DMA address space that is used.
+Honestly this function doesn't deal anything with GIC cpu interface.
 
-Ok. So that's pre-translation, from the POV of the master?
+> +{
+> +	int cpu;
+> +
+> +	if (mpidr == INVALID_HWID) {
+> +		pr_info("Skip invalid cpu hardware ID\n");
+> +		return -EINVAL;
+> +	}
+> +
+> +	total_cpus++;
+> +	if (!enabled)
+> +		return -EINVAL;
+> +
+> +	if (enabled_cpus >=  NR_CPUS) {
+> +		pr_warn("NR_CPUS limit of %d reached, Processor %d/0x%llx ignored.\n",
+> +			NR_CPUS, total_cpus, mpidr);
+> +		return -EINVAL;
+> +	}
+> +
+> +	/* If it is the first CPU, no need to check duplicate MPIDRs */
+> +	if (!enabled_cpus)
+> +		goto skip_mpidr_check;
+> +
+> +	/*
+> +	 * Duplicate MPIDRs are a recipe for disaster. Scan
+> +	 * all initialized entries and check for
+> +	 * duplicates. If any is found just ignore the CPU.
+> +	 */
+> +	for_each_present_cpu(cpu) {
+> +		if (cpu_logical_map(cpu) == mpidr) {
+> +			pr_err("Firmware bug, duplicate CPU MPIDR: 0x%llx in MADT\n",
+> +			       mpidr);
+> +			return -EINVAL;
+> +		}
+> +	}
+> +
+> +skip_mpidr_check:
+> +	enabled_cpus++;
+> +
+> +	/* allocate a logic cpu id for the new comer */
+> +	if (cpu_logical_map(0) == mpidr) {
+> +		/*
+> +		 * boot_cpu_init() already hold bit 0 in cpu_present_mask
+> +		 * for BSP, no need to allocte again.
+> +		 */
+> +		cpu = 0;
+> +	} else {
+> +		cpu = cpumask_next_zero(-1, cpu_present_mask);
+> +	}
+> +
+> +	/* map the logic cpu id to cpu MPIDR */
+> +	cpu_logical_map(cpu) = mpidr;
+> +
+> +	set_cpu_possible(cpu, true);
+> +	set_cpu_present(cpu, true);
+> +
 
-If we don't have that knowledge about the master already (e.g. based on
-the compatible string), surely we always need that information in a
-given iommu-specifier format? Otherwise certain iommus won't be able to
-handle masters with limited addressing only due to limitations of their
-binding.
+I need to think more about this function and will comment later but I
+think these cpumasks should be set only if SMP and probably belong to smp.c
 
-> It is somewhat confusing to have size-cells = 1 and then use 2 cells
-> for size in the iommu property. It's legal and expected, but having
-> size-cells in the example adds a little confusion.
-> 
-> Either way, I'm OK with fixing the above with an incremental patch,
-> assuming there is no disagreements on what's said above.
+> +	return cpu;
+> +}
+> +
+> +static int __init
+> +acpi_parse_gic_cpu_interface(struct acpi_subtable_header *header,
+> +				const unsigned long end)
+> +{
+> +	struct acpi_madt_generic_interrupt *processor;
+> +
+> +	processor = (struct acpi_madt_generic_interrupt *)header;
+> +
+> +	if (BAD_MADT_ENTRY(processor, end))
+> +		return -EINVAL;
+> +
+> +	acpi_table_print_madt_entry(header);
+> +
+> +	acpi_register_gic_cpu_interface(processor->mpidr,
+> +		processor->flags & ACPI_MADT_ENABLED);
+> +
+> +	return 0;
+> +}
+> +
+> +/*
+> + * Parse GIC cpu interface related entries in MADT
+> + * returns 0 on success, < 0 on error
+> + */
+> +static int __init acpi_parse_madt_gic_cpu_interface_entries(void)
+> +{
+> +	int count;
+> +
+> +	/*
+> +	 * do a partial walk of MADT to determine how many CPUs
+> +	 * we have including disabled CPUs, and get information
+> +	 * we need for SMP init
+> +	 */
+> +	count = acpi_table_parse_madt(ACPI_MADT_TYPE_GENERIC_INTERRUPT,
+> +			acpi_parse_gic_cpu_interface, MAX_GIC_CPU_INTERFACE);
+> +
+> +	if (!count) {
+> +		pr_err("No GIC CPU interface entries present\n");
+> +		return -ENODEV;
+> +	} else if (count < 0) {
+> +		pr_err("Error parsing GIC CPU interface entry\n");
+> +		return count;
+> +	}
+> +
+> +	/* Make boot-up look pretty */
+> +	pr_info("%d CPUs enabled, %d CPUs total\n", enabled_cpus, total_cpus);
+> +
+> +	return 0;
+> +}
+> +
+>   static int __init acpi_parse_fadt(struct acpi_table_header *table)
+>   {
+>   	struct acpi_table_fadt *fadt = (struct acpi_table_fadt *)table;
+> @@ -122,6 +244,11 @@ int __init acpi_boot_init(void)
+>   	if (err)
+>   		pr_err("Can't find FADT\n");
+>
+> +	/* Get the boot CPU's MPIDR before MADT parsing */
+> +	cpu_logical_map(0) = read_cpuid_mpidr() & MPIDR_HWID_BITMASK;
+> +
 
-I like the general idea.
+As Mark suggested better to move this prior to ACPI changes.
 
-Given my concerns are to do with implementation details I'm happy to
-have this go through and fix it up as the first implementations of the
-binding take shape.
+> +	err = acpi_parse_madt_gic_cpu_interface_entries();
+> +
 
-Thanks,
-Mark.
+OK, so now you ignore if there was any FADT error if MADT is
+successfully parsed ?
+
+>   	return err;
+>   }
+>
+> diff --git a/arch/arm64/kernel/smp.c b/arch/arm64/kernel/smp.c
+> index 40f38f4..8f1d37c 100644
+> --- a/arch/arm64/kernel/smp.c
+> +++ b/arch/arm64/kernel/smp.c
+> @@ -36,6 +36,7 @@
+>   #include <linux/completion.h>
+>   #include <linux/of.h>
+>   #include <linux/irq_work.h>
+> +#include <linux/acpi.h>
+>
+>   #include <asm/atomic.h>
+>   #include <asm/cacheflush.h>
+> @@ -458,7 +459,14 @@ void __init smp_prepare_cpus(unsigned int max_cpus)
+>   		if (err)
+>   			continue;
+>
+> -		set_cpu_present(cpu, true);
+> +		/*
+> +		 * In ACPI mode, cpu_present_map was initialised when
+> +		 * MADT table was parsed which before this function
+> +		 * is called.
+> +		 */
+> +		if (acpi_disabled)
+> +			set_cpu_present(cpu, true);
+> +
+
+This is what I said above, it belongs here and we need to see how we do
+that. I will give it a thought.
+
+Regards,
+Sudeep
