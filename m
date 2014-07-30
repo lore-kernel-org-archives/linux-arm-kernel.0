@@ -1,243 +1,315 @@
-From: computersforpeace@gmail.com (Brian Norris)
-Date: Tue, 29 Jul 2014 22:08:43 -0700
-Subject: [PATCH v2 03/10] mtd: spi-nor: add DDR quad read support
-In-Reply-To: <1398657227-20721-4-git-send-email-b32955@freescale.com>
-References: <1398657227-20721-1-git-send-email-b32955@freescale.com>
- <1398657227-20721-4-git-send-email-b32955@freescale.com>
-Message-ID: <20140730050843.GE11952@brian-ubuntu>
+From: m.szyprowski@samsung.com (Marek Szyprowski)
+Date: Wed, 30 Jul 2014 07:33:34 +0200
+Subject: [PATCH v2 RESEND 3/4] drivers: dma-coherent: add initialization
+ from device tree
+In-Reply-To: <20140729215432.4B73FC40738@trevor.secretlab.ca>
+References: <1405326487-15346-1-git-send-email-m.szyprowski@samsung.com>
+ <1405326487-15346-4-git-send-email-m.szyprowski@samsung.com>
+ <20140729215432.4B73FC40738@trevor.secretlab.ca>
+Message-ID: <53D883AE.6030209@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Huang,
+Hello,
 
-Sorry to address this series so late.
+On 2014-07-29 23:54, Grant Likely wrote:
+> On Mon, 14 Jul 2014 10:28:06 +0200, Marek Szyprowski <m.szyprowski@samsung.com> wrote:
+>> Initialization procedure of dma coherent pool has been split into two
+>> parts, so memory pool can now be initialized without assigning to
+>> particular struct device. Then initialized region can be assigned to
+>> more than one struct device. To protect from concurent allocations from
+>> different devices, a spinlock has been added to dma_coherent_mem
+>> structure. The last part of this patch adds support for handling
+>> 'shared-dma-pool' reserved-memory device tree nodes.
+>>
+>> Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
+> I think this looks okay. It isn't in my area of expertise though.
+> Comments below.
+>
+>> ---
+>>   drivers/base/dma-coherent.c | 137 ++++++++++++++++++++++++++++++++++++++------
+>>   1 file changed, 118 insertions(+), 19 deletions(-)
+>>
+>> diff --git a/drivers/base/dma-coherent.c b/drivers/base/dma-coherent.c
+>> index 7d6e84a51424..7185a4f247e1 100644
+>> --- a/drivers/base/dma-coherent.c
+>> +++ b/drivers/base/dma-coherent.c
+>> @@ -14,11 +14,14 @@ struct dma_coherent_mem {
+>>   	int		size;
+>>   	int		flags;
+>>   	unsigned long	*bitmap;
+>> +	spinlock_t	spinlock;
+>>   };
+>>   
+>> -int dma_declare_coherent_memory(struct device *dev, phys_addr_t phys_addr,
+>> -				dma_addr_t device_addr, size_t size, int flags)
+>> +static int dma_init_coherent_memory(phys_addr_t phys_addr, dma_addr_t device_addr,
+>> +			     size_t size, int flags,
+>> +			     struct dma_coherent_mem **mem)
+> This is a bit odd. Why wouldn't you return the dma_mem pointer directly
+> instead of passing in a **mem argument?
 
-I have a few questions about how you determine support for these DDR
-modes.
+Because this function (as a direct successor of 
+dma_declare_coherent_memory) doesn't
+return typical error codes, but some custom values like DMA_MEMORY_MAP, 
+DMA_MEMORY_IO
+or zero (which means failure). I wanted to avoid confusion with typical 
+error
+handling path and IS_ERR/ERR_PTR usage used widely in other functions. 
+This probably
+should be unified with the rest of kernel some day, but right now I 
+wanted to keep
+the patch simple and easy to review.
 
-On Mon, Apr 28, 2014 at 11:53:40AM +0800, Huang Shijie wrote:
-> This patch adds the DDR quad read support by the following:
+>>   {
+>> +	struct dma_coherent_mem *dma_mem = NULL;
+>>   	void __iomem *mem_base = NULL;
+>>   	int pages = size >> PAGE_SHIFT;
+>>   	int bitmap_size = BITS_TO_LONGS(pages) * sizeof(long);
+>> @@ -27,27 +30,26 @@ int dma_declare_coherent_memory(struct device *dev, phys_addr_t phys_addr,
+>>   		goto out;
+>>   	if (!size)
+>>   		goto out;
+>> -	if (dev->dma_mem)
+>> -		goto out;
+>> -
+>> -	/* FIXME: this routine just ignores DMA_MEMORY_INCLUDES_CHILDREN */
+>>   
+>>   	mem_base = ioremap(phys_addr, size);
+>>   	if (!mem_base)
+>>   		goto out;
+>>   
+>> -	dev->dma_mem = kzalloc(sizeof(struct dma_coherent_mem), GFP_KERNEL);
+>> -	if (!dev->dma_mem)
+>> +	dma_mem = kzalloc(sizeof(struct dma_coherent_mem), GFP_KERNEL);
+>> +	if (!dma_mem)
+>>   		goto out;
+>> -	dev->dma_mem->bitmap = kzalloc(bitmap_size, GFP_KERNEL);
+>> -	if (!dev->dma_mem->bitmap)
+>> +	dma_mem->bitmap = kzalloc(bitmap_size, GFP_KERNEL);
+>> +	if (!dma_mem->bitmap)
+>>   		goto free1_out;
+>>   
+>> -	dev->dma_mem->virt_base = mem_base;
+>> -	dev->dma_mem->device_base = device_addr;
+>> -	dev->dma_mem->pfn_base = PFN_DOWN(phys_addr);
+>> -	dev->dma_mem->size = pages;
+>> -	dev->dma_mem->flags = flags;
+>> +	dma_mem->virt_base = mem_base;
+>> +	dma_mem->device_base = device_addr;
+>> +	dma_mem->pfn_base = PFN_DOWN(phys_addr);
+>> +	dma_mem->size = pages;
+>> +	dma_mem->flags = flags;
+>> +	spin_lock_init(&dma_mem->spinlock);
+>> +
+>> +	*mem = dma_mem;
+>>   
+>>   	if (flags & DMA_MEMORY_MAP)
+>>   		return DMA_MEMORY_MAP;
+>> @@ -55,12 +57,51 @@ int dma_declare_coherent_memory(struct device *dev, phys_addr_t phys_addr,
+>>   	return DMA_MEMORY_IO;
+>>   
+>>    free1_out:
+>> -	kfree(dev->dma_mem);
+>> +	kfree(dma_mem);
+>>    out:
+>>   	if (mem_base)
+>>   		iounmap(mem_base);
+>>   	return 0;
+>>   }
+>> +
+>> +static void dma_release_coherent_memory(struct dma_coherent_mem *mem)
+>> +{
+>> +	if (!mem)
+>> +		return;
+>> +	iounmap(mem->virt_base);
+>> +	kfree(mem->bitmap);
+>> +	kfree(mem);
+>> +}
+>> +
+>> +static int dma_assign_coherent_memory(struct device *dev,
+>> +				      struct dma_coherent_mem *mem)
+>> +{
+>> +	if (dev->dma_mem)
+>> +		return -EBUSY;
+>> +
+>> +	dev->dma_mem = mem;
+>> +	/* FIXME: this routine just ignores DMA_MEMORY_INCLUDES_CHILDREN */
+>> +
+>> +	return 0;
+>> +}
+>> +
+>> +int dma_declare_coherent_memory(struct device *dev, phys_addr_t phys_addr,
+>> +				dma_addr_t device_addr, size_t size, int flags)
+>> +{
+>> +	struct dma_coherent_mem *mem;
+>> +	int ret;
+>> +
+>> +	ret = dma_init_coherent_memory(phys_addr, device_addr, size, flags,
+>> +				       &mem);
+>> +	if (ret == 0)
+>> +		return 0;
+>> +
+>> +	if (dma_assign_coherent_memory(dev, mem) == 0)
+>> +		return ret;
+>> +
+>> +	dma_release_coherent_memory(mem);
+>> +	return 0;
+>> +}
+>>   EXPORT_SYMBOL(dma_declare_coherent_memory);
+>>   
+>>   void dma_release_declared_memory(struct device *dev)
+>> @@ -69,10 +110,8 @@ void dma_release_declared_memory(struct device *dev)
+>>   
+>>   	if (!mem)
+>>   		return;
+>> +	dma_release_coherent_memory(mem);
+>>   	dev->dma_mem = NULL;
+>> -	iounmap(mem->virt_base);
+>> -	kfree(mem->bitmap);
+>> -	kfree(mem);
+>>   }
+>>   EXPORT_SYMBOL(dma_release_declared_memory);
+>>   
+>> @@ -80,6 +119,7 @@ void *dma_mark_declared_memory_occupied(struct device *dev,
+>>   					dma_addr_t device_addr, size_t size)
+>>   {
+>>   	struct dma_coherent_mem *mem = dev->dma_mem;
+>> +	unsigned long flags;
+>>   	int pos, err;
+>>   
+>>   	size += device_addr & ~PAGE_MASK;
+>> @@ -87,8 +127,11 @@ void *dma_mark_declared_memory_occupied(struct device *dev,
+>>   	if (!mem)
+>>   		return ERR_PTR(-EINVAL);
+>>   
+>> +	spin_lock_irqsave(&mem->spinlock, flags);
+>>   	pos = (device_addr - mem->device_base) >> PAGE_SHIFT;
+>>   	err = bitmap_allocate_region(mem->bitmap, pos, get_order(size));
+>> +	spin_unlock_irqrestore(&mem->spinlock, flags);
+>> +
+>>   	if (err != 0)
+>>   		return ERR_PTR(err);
+>>   	return mem->virt_base + (pos << PAGE_SHIFT);
+>> @@ -115,6 +158,7 @@ int dma_alloc_from_coherent(struct device *dev, ssize_t size,
+>>   {
+>>   	struct dma_coherent_mem *mem;
+>>   	int order = get_order(size);
+>> +	unsigned long flags;
+>>   	int pageno;
+>>   
+>>   	if (!dev)
+>> @@ -124,6 +168,7 @@ int dma_alloc_from_coherent(struct device *dev, ssize_t size,
+>>   		return 0;
+>>   
+>>   	*ret = NULL;
+>> +	spin_lock_irqsave(&mem->spinlock, flags);
+>>   
+>>   	if (unlikely(size > (mem->size << PAGE_SHIFT)))
+>>   		goto err;
+>> @@ -138,10 +183,12 @@ int dma_alloc_from_coherent(struct device *dev, ssize_t size,
+>>   	*dma_handle = mem->device_base + (pageno << PAGE_SHIFT);
+>>   	*ret = mem->virt_base + (pageno << PAGE_SHIFT);
+>>   	memset(*ret, 0, size);
+>> +	spin_unlock_irqrestore(&mem->spinlock, flags);
+>>   
+>>   	return 1;
+>>   
+>>   err:
+>> +	spin_unlock_irqrestore(&mem->spinlock, flags);
+>>   	/*
+>>   	 * In the case where the allocation can not be satisfied from the
+>>   	 * per-device area, try to fall back to generic memory if the
+>> @@ -171,8 +218,11 @@ int dma_release_from_coherent(struct device *dev, int order, void *vaddr)
+>>   	if (mem && vaddr >= mem->virt_base && vaddr <
+>>   		   (mem->virt_base + (mem->size << PAGE_SHIFT))) {
+>>   		int page = (vaddr - mem->virt_base) >> PAGE_SHIFT;
+>> +		unsigned long flags;
+>>   
+>> +		spin_lock_irqsave(&mem->spinlock, flags);
+>>   		bitmap_release_region(mem->bitmap, page, order);
+>> +		spin_unlock_irqrestore(&mem->spinlock, flags);
+>>   		return 1;
+>>   	}
+>>   	return 0;
+>> @@ -218,3 +268,52 @@ int dma_mmap_from_coherent(struct device *dev, struct vm_area_struct *vma,
+>>   	return 0;
+>>   }
+>>   EXPORT_SYMBOL(dma_mmap_from_coherent);
+>> +
+>> +/*
+>> + * Support for reserved memory regions defined in device tree
+>> + */
+>> +#ifdef CONFIG_OF_RESERVED_MEM
+>> +#include <linux/of.h>
+>> +#include <linux/of_fdt.h>
+>> +#include <linux/of_reserved_mem.h>
+>> +
+>> +static void rmem_dma_device_init(struct reserved_mem *rmem, struct device *dev)
+>> +{
+>> +	struct dma_coherent_mem *mem = rmem->priv;
+> Will the reserved_mem->priv pointer ever point to some other kind of
+> structure? How do we know that the pointer here is always a
+> dma_coherent_mem struct (if there are other uses of priv, what is the
+> guarantee against another user assigning something to it?) Is it the
+> reserved_mem_ops below that provide the guarantee?
 
-To Mark / linux-spi:
+reserved_mem_ops are set by the given reserved memory driver and access 
+to priv
+pointer is limited only to that driver. This pattern is used widely 
+across the
+whole kernel, so I don't think that a separate pointer to particular 
+structure
+type is needed.
 
-Are DDR modes in the scope of drivers/spi/ at all, so that we could
-someday wire it up through m25p80.c? Or is 'DDR' such a distortion of
-the meaning of 'SPI' such that it will be restricted only to SPI NOR
-dedicated controllers?
+> If it is a risk, then the alternative would be to put an explicit
+> dma_coherent_mem pointer into the reserved_mem structure.
 
->   [1] add SPI_NOR_DDR_QUAD read mode.
-> 
->   [2] add DDR Quad read opcodes:
->        SPINOR_OP_READ_1_4_4_D / SPINOR_OP_READ4_1_4_4_D
-> 
->   [3] add set_ddr_quad_mode() to initialize for the DDR quad read.
->       Currently it only works for Spansion NOR.
-> 
->   [3] about the dummy cycles.
->       We set the dummy with 8 for DDR quad read by default.
+If one messes with priv pointers, he should expect serious problems and 
+we really
+cannot prevent him anyway.
 
-Why? That seems wrong. You need to know for sure how many cycles should
-be used, not just guess a default.
+>> +	if (!mem &&
+>> +	    dma_init_coherent_memory(rmem->base, rmem->base, rmem->size,
+>> +				     DMA_MEMORY_MAP | DMA_MEMORY_EXCLUSIVE,
+>> +				     &mem) != DMA_MEMORY_MAP) {
+>> +		pr_info("Reserved memory: failed to init DMA memory pool at %pa, size %ld MiB\n",
+>> +			&rmem->base, (unsigned long)rmem->size / SZ_1M);
+>> +		return;
+>> +	}
+>> +	rmem->priv = mem;
+>> +	dma_assign_coherent_memory(dev, mem);
+>> +}
+>> +
+>> +static void rmem_dma_device_release(struct reserved_mem *rmem,
+>> +				    struct device *dev)
+>> +{
+>> +	dev->dma_mem = NULL;
+>> +}
+>> +
+>> +static const struct reserved_mem_ops rmem_dma_ops = {
+>> +	.device_init	= rmem_dma_device_init,
+>> +	.device_release	= rmem_dma_device_release,
+>> +};
+>> +
+>> +static int __init rmem_dma_setup(struct reserved_mem *rmem)
+>> +{
+>> +	unsigned long node = rmem->fdt_node;
+>> +
+>> +	if (of_get_flat_dt_prop(node, "reusable", NULL))
+>> +		return -EINVAL;
+>> +
+>> +	rmem->ops = &rmem_dma_ops;
+>> +	pr_info("Reserved memory: created DMA memory pool at %pa, size %ld MiB\n",
+>> +		&rmem->base, (unsigned long)rmem->size / SZ_1M);
+>> +	return 0;
+>> +}
+>> +RESERVEDMEM_OF_DECLARE(dma, "shared-dma-pool", rmem_dma_setup);
+>> +#endif
+>> -- 
+>> 1.9.2
 
->       The m25p80.c can not support the DDR quad read, but the SPI NOR controller
->       can set the dummy value in its child DT node, and the SPI NOR framework
->       can parse it out.
-
-Why does the dummy value belong in device tree? I think this can be
-handled in software. You might, however, want a few other hardware
-description parameters in device tree to help you.
-
-So I think spi-nor.c needs to know a few things:
-
- 1. Does the hardware/driver support DDR clocking?
- 2. What granularity of dummy cycles are supported? So m25p80.c needs to
-    communicate that it only supports dummy cycles of multiples of 8,
-    and fsl-quadspi supports single clock cycles.
-
-And spi-nor.c should be able to do the following:
-
- 3. Set how many dummy cycles should be used.
- 4. Write to the configuration register, to choose a Latency Code
-    according to what the flash supports. I see modes that support 3, 6,
-    7, or 8. We'd probably just go for the fastest mode, which requires
-    8, right?
-
-So far, none of this seems to require a DT binding, unless there's
-something I'm missing about your fsl-quadspi controller.
-
-> Test this patch for Spansion s25fl128s NOR flash.
-> 
-> Signed-off-by: Huang Shijie <b32955@freescale.com>
-> ---
->  drivers/mtd/spi-nor/spi-nor.c |   54 +++++++++++++++++++++++++++++++++++++++-
->  include/linux/mtd/spi-nor.h   |    8 ++++-
->  2 files changed, 58 insertions(+), 4 deletions(-)
-> 
-> diff --git a/drivers/mtd/spi-nor/spi-nor.c b/drivers/mtd/spi-nor/spi-nor.c
-> index f374e44..e0bc11a 100644
-> --- a/drivers/mtd/spi-nor/spi-nor.c
-> +++ b/drivers/mtd/spi-nor/spi-nor.c
-> @@ -73,7 +73,20 @@ static int read_cr(struct spi_nor *nor)
->   */
->  static inline int spi_nor_read_dummy_cycles(struct spi_nor *nor)
->  {
-> +	u32 dummy;
-> +
->  	switch (nor->flash_read) {
-> +	case SPI_NOR_DDR_QUAD:
-> +		/*
-> +		 * The m25p80.c can not support the DDR quad read.
-> +		 * We set the dummy cycles to 8 by default. The SPI NOR
-> +		 * controller driver can set it in its child DT node.
-> +		 * We parse it out here.
-> +		 */
-> +		if (nor->np && !of_property_read_u32(nor->np,
-> +				"spi-nor,ddr-quad-read-dummy", &dummy)) {
-> +			return dummy;
-> +		}
->  	case SPI_NOR_FAST:
->  	case SPI_NOR_DUAL:
->  	case SPI_NOR_QUAD:
-> @@ -402,6 +415,7 @@ struct flash_info {
->  #define	SECT_4K_PMC		0x10	/* SPINOR_OP_BE_4K_PMC works uniformly */
->  #define	SPI_NOR_DUAL_READ	0x20    /* Flash supports Dual Read */
->  #define	SPI_NOR_QUAD_READ	0x40    /* Flash supports Quad Read */
-> +#define	SPI_NOR_DDR_QUAD_READ	0x80    /* Flash supports DDR Quad Read */
->  };
->  
->  #define INFO(_jedec_id, _ext_id, _sector_size, _n_sectors, _flags)	\
-> @@ -846,6 +860,24 @@ static int spansion_quad_enable(struct spi_nor *nor)
->  	return 0;
->  }
->  
-> +static int set_ddr_quad_mode(struct spi_nor *nor, u32 jedec_id)
-> +{
-> +	int status;
-> +
-> +	switch (JEDEC_MFR(jedec_id)) {
-> +	case CFI_MFR_AMD: /* Spansion, actually */
-> +		status = spansion_quad_enable(nor);
-> +		if (status) {
-> +			dev_err(nor->dev,
-> +				"Spansion DDR quad-read not enabled\n");
-> +			return status;
-> +		}
-> +		return status;
-> +	default:
-> +		return -EINVAL;
-> +	}
-> +}
-> +
->  static int set_quad_mode(struct spi_nor *nor, u32 jedec_id)
->  {
->  	int status;
-> @@ -1016,8 +1048,15 @@ int spi_nor_scan(struct spi_nor *nor, const struct spi_device_id *id,
->  	if (info->flags & SPI_NOR_NO_FR)
->  		nor->flash_read = SPI_NOR_NORMAL;
->  
-> -	/* Quad/Dual-read mode takes precedence over fast/normal */
-> -	if (mode == SPI_NOR_QUAD && info->flags & SPI_NOR_QUAD_READ) {
-> +	/* DDR Quad/Quad/Dual-read mode takes precedence over fast/normal */
-> +	if (mode == SPI_NOR_DDR_QUAD && info->flags & SPI_NOR_DDR_QUAD_READ) {
-
-Hmm, I think I should probably take another look at the design of
-spi-nor.c... Why does spi_nor_scan() take a single 'mode' argument? The
-driver should be communicating which (multiple) modes it supports, not
-selecting a single mode. spi-nor.c is the only one which knows what the
-*flash* supports, so it should be combining knowledge from the
-controller driver with its own knowledge of the flash.
-
-> +		ret = set_ddr_quad_mode(nor, info->jedec_id);
-> +		if (ret) {
-> +			dev_err(dev, "DDR quad mode not supported\n");
-> +			return ret;
-
-A ramification of my comment above is that we should not be returning an
-error in a situation like this; we should be able to fall back to
-another known-supported mode, like SDR QUAD, SDR DUAL, or just plain
-SPI -- if they're supported by the driver -- and spi-nor.c doesn't
-currently have enough information to do this.
-
-> +		}
-> +		nor->flash_read = SPI_NOR_DDR_QUAD;
-> +	} else if (mode == SPI_NOR_QUAD && info->flags & SPI_NOR_QUAD_READ) {
->  		ret = set_quad_mode(nor, info->jedec_id);
->  		if (ret) {
->  			dev_err(dev, "quad mode not supported\n");
-> @@ -1030,6 +1069,14 @@ int spi_nor_scan(struct spi_nor *nor, const struct spi_device_id *id,
->  
->  	/* Default commands */
->  	switch (nor->flash_read) {
-> +	case SPI_NOR_DDR_QUAD:
-> +		if (JEDEC_MFR(info->jedec_id) == CFI_MFR_AMD) { /* Spansion */
-> +			nor->read_opcode = SPINOR_OP_READ_1_4_4_D;
-> +		} else {
-> +			dev_err(dev, "DDR Quad Read is not supported.\n");
-> +			return -EINVAL;
-> +		}
-> +		break;
->  	case SPI_NOR_QUAD:
->  		nor->read_opcode = SPINOR_OP_READ_1_1_4;
->  		break;
-> @@ -1057,6 +1104,9 @@ int spi_nor_scan(struct spi_nor *nor, const struct spi_device_id *id,
->  		if (JEDEC_MFR(info->jedec_id) == CFI_MFR_AMD) {
->  			/* Dedicated 4-byte command set */
->  			switch (nor->flash_read) {
-> +			case SPI_NOR_DDR_QUAD:
-> +				nor->read_opcode = SPINOR_OP_READ4_1_4_4_D;
-> +				break;
->  			case SPI_NOR_QUAD:
->  				nor->read_opcode = SPINOR_OP_READ4_1_1_4;
->  				break;
-> diff --git a/include/linux/mtd/spi-nor.h b/include/linux/mtd/spi-nor.h
-> index 48fe9fc..d191a6b 100644
-> --- a/include/linux/mtd/spi-nor.h
-> +++ b/include/linux/mtd/spi-nor.h
-> @@ -12,10 +12,11 @@
->  
->  /*
->   * Note on opcode nomenclature: some opcodes have a format like
-> - * SPINOR_OP_FUNCTION{4,}_x_y_z. The numbers x, y, and z stand for the number
-> + * SPINOR_OP_FUNCTION{4,}_x_y_z{_D}. The numbers x, y, and z stand for the number
->   * of I/O lines used for the opcode, address, and data (respectively). The
->   * FUNCTION has an optional suffix of '4', to represent an opcode which
-> - * requires a 4-byte (32-bit) address.
-> + * requires a 4-byte (32-bit) address. The suffix of 'D' stands for the
-> + * DDR mode.
->   */
->  
->  /* Flash opcodes. */
-> @@ -26,6 +27,7 @@
->  #define SPINOR_OP_READ_FAST	0x0b	/* Read data bytes (high frequency) */
->  #define SPINOR_OP_READ_1_1_2	0x3b	/* Read data bytes (Dual SPI) */
->  #define SPINOR_OP_READ_1_1_4	0x6b	/* Read data bytes (Quad SPI) */
-> +#define SPINOR_OP_READ_1_4_4_D	0xed	/* Read data bytes (DDR Quad SPI) */
->  #define SPINOR_OP_PP		0x02	/* Page program (up to 256 bytes) */
->  #define SPINOR_OP_BE_4K		0x20	/* Erase 4KiB block */
->  #define SPINOR_OP_BE_4K_PMC	0xd7	/* Erase 4KiB block on PMC chips */
-> @@ -40,6 +42,7 @@
->  #define SPINOR_OP_READ4_FAST	0x0c	/* Read data bytes (high frequency) */
->  #define SPINOR_OP_READ4_1_1_2	0x3c	/* Read data bytes (Dual SPI) */
->  #define SPINOR_OP_READ4_1_1_4	0x6c	/* Read data bytes (Quad SPI) */
-> +#define SPINOR_OP_READ4_1_4_4_D	0xee	/* Read data bytes (DDR Quad SPI) */
->  #define SPINOR_OP_PP_4B		0x12	/* Page program (up to 256 bytes) */
->  #define SPINOR_OP_SE_4B		0xdc	/* Sector erase (usually 64KiB) */
->  
-> @@ -74,6 +77,7 @@ enum read_mode {
->  	SPI_NOR_FAST,
->  	SPI_NOR_DUAL,
->  	SPI_NOR_QUAD,
-> +	SPI_NOR_DDR_QUAD,
->  };
->  
->  /**
-
-So, I'll have to take another hard look at spi-nor.c soon. I think we
-may need to work on the abstractions here a bit more before I merge any
-new features like this.
-
-Regards,
-Brian
-
-P.S. Is there a good reason we've defined a whole read_xfer/write_xfer
-API that is completely unused?
+Best regards
+-- 
+Marek Szyprowski, PhD
+Samsung R&D Institute Poland
