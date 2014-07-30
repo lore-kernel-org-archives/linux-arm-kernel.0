@@ -1,94 +1,65 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Tue, 29 Jul 2014 23:46:05 -0700
-Subject: [PATCH v3 0/2] usb: fix controller-PHY binding for OMAP3 platform
-In-Reply-To: <20140729163935.GH17808@saruman.home>
-References: <1387209225-11520-1-git-send-email-kishon@ti.com>
- <20140721151557.GH6852@saruman.home> <53CF7978.4090709@ti.com>
- <14357891.vooz1N5zDC@avalon> <20140729163935.GH17808@saruman.home>
-Message-ID: <20140730064605.GZ29045@atomide.com>
+From: hanjun.guo@linaro.org (Hanjun Guo)
+Date: Wed, 30 Jul 2014 14:47:12 +0800
+Subject: [PATCH 19/19] Documentation: ACPI for ARM64
+In-Reply-To: <CAMJs5B8uk7GDfEOEuY8RWDxzhzTRBGszRDN+JRKwG-D_rgzFrw@mail.gmail.com>
+References: <1406206825-15590-1-git-send-email-hanjun.guo@linaro.org>	<20140729112824.GM2576@leverpostej>	<CAMJs5B_Ye1eXsvJAKWnHRxC4jnpcXMcqHE+GgOGO7MHtPcsSQA@mail.gmail.com>	<351673188.FxXsM7MvdA@wuerfel>	<20140729130823.GP2576@leverpostej>
+ <CAMJs5B8uk7GDfEOEuY8RWDxzhzTRBGszRDN+JRKwG-D_rgzFrw@mail.gmail.com>
+Message-ID: <53D894F0.1060102@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Felipe Balbi <balbi@ti.com> [140729 09:42]:
-> Hi,
+On 2014-7-29 21:31, Christoffer Dall wrote:
+> On 29 July 2014 15:08, Mark Rutland <mark.rutland@arm.com> wrote:
+>> On Tue, Jul 29, 2014 at 01:52:40PM +0100, Arnd Bergmann wrote:
+>>> On Tuesday 29 July 2014 14:37:38 Christoffer Dall wrote:
+>>>>
+>>>> For reference, Red Hat's current arguing point for ACPI in VMs is
+>>>> hotplug of things like CPUs and memory for very large VMs, but I
+>>>> haven't thought too carefully about this just yet, as I don't have a
+>>>> 100+ core ARM 64-bit hardware lying around...
+>>>
+>>> I thought you could run guests with more virtual CPUs that you have
+>>> physical CPUs on the host.
+>>>
+>>> Regarding CPU and memory hotplug, don't we already have PSCI and
+>>> xen-balloon/virtio-balloon for that?
+>>
+>> PSCI (0.1) was there for guests from the start, and ACPI doesn't do
+>> anything different w.r.t. PSCI other than requiring PSCI 0.2 (which can
+>> be used by guests supporting only PSCI 0.1). So there's no magic for
+>> CPU hotplug provided by ACPI.
 > 
-> On Tue, Jul 29, 2014 at 02:38:24PM +0200, Laurent Pinchart wrote:
-> > On Wednesday 23 July 2014 14:29:36 Kishon Vijay Abraham I wrote:
-> > > On Monday 21 July 2014 08:45 PM, Felipe Balbi wrote:
-> > > > On Mon, Jul 21, 2014 at 05:04:57PM +0200, Laurent Pinchart wrote:
-> > > >> Hi Felipe,
-> > > >> 
-> > > >> What happened to these two patches ?
-> > > > 
-> > > > looks like I lost them.
-> > > > 
-> > > >> On Monday 16 December 2013 17:48:29 Felipe Balbi wrote:
-> > > >>> On Mon, Dec 16, 2013 at 02:38:27PM -0800, Tony Lindgren wrote:
-> > > >>>> * Felipe Balbi <balbi@ti.com> [131216 13:31]:
-> > > >>>>> On Mon, Dec 16, 2013 at 09:23:43PM +0530, Kishon Vijay Abraham I 
-> > wrote:
-> > > >>>>>> After the platform devices are created using PLATFORM_DEVID_AUTO, the
-> > > >>>>>> device names given in usb_bind_phy (in board file) does not match
-> > > >>>>>> with the actual device name causing the USB PHY library not to return
-> > > >>>>>> the PHY reference when the MUSB controller request for the PHY in the
-> > > >>>>>> non-dt boot case.
-> > > >>>>>> So removed creating platform devices using PLATFORM_DEVID_AUTO in
-> > > >>>>>> omap2430.c.
-> > > >>>>>> 
-> > > >>>>>> Did enumeration testing in omap3 beagle.
-> > > >>>>>> 
-> > > >>>>>> Changes from v2:
-> > > >>>>>> * Fixed the commit log
-> > > >>>>>> 
-> > > >>>>>> Changes from v1:
-> > > >>>>>> * refreshed to the latested mainline kernel
-> > > >>>>>> * added musb_put_id from omap2430 remove.
-> > > >>>>> 
-> > > >>>>> Tony, how do you want to handle this ? You want me to provide you a
-> > > >>>>> branch which we both merge ?
-> > > >>>> 
-> > > >>>> Yes that would be great thanks. For the mach-omap2 touching parts:
-> > > >>>> 
-> > > >>>> Acked-by: Tony Lindgren <tony@atomide.com>
-> > > >>> 
-> > > >>> Here it is, let me know if you prefer a signed tag:
-> > > >>> 
-> > > >>> The following changes since commit 
-> > 6ce4eac1f600b34f2f7f58f9cd8f0503d79e42ae:
-> > > >>>   Linux 3.13-rc1 (2013-11-22 11:30:55 -0800)
-> > > >>> 
-> > > >>> are available in the git repository at:
-> > > >>>   git://git.kernel.org/pub/scm/linux/kernel/git/balbi/usb.git
-> > > >>> 
-> > > >>> usb-phy-binding-omap3
-> > > >>> 
-> > > >>> for you to fetch changes up to 23ada3130cf4e56acb86fdff4c26113188d52d18:
-> > > >>>   arm: omap: remove *.auto* from device names given in usb_bind_phy
-> > > >>> 
-> > > >>> (2013-12-16 17:44:43 -0600)
-> > > >>> 
-> > > >>> ----------------------------------------------------------------
-> > > >>> 
-> > > >>> Kishon Vijay Abraham I (2):
-> > > >>>       usb: musb: omap: remove using PLATFORM_DEVID_AUTO in omap2430.c
-> > > >>>       arm: omap: remove *.auto* from device names given in usb_bind_phy
-> > > > 
-> > > > Kishon, are these still valid ?
-> > > 
-> > > Looks like board-2430sdp.c got removed. Apart from that the reset of the
-> > > patch series is still applicable for non-dt boot.
-> > 
-> > Felipe, do you plan to apply the patch without the baord-2430sdp.c change, or 
-> > would you like Kishon to rebase and resubmit it ?
-> 
-> Not sure if Tony still wants board-* modifications. Tony ?
+> With PSCI you can only provide your VM a bunch of CPUs and say that
+> they're all turned off, and then turn some of them on later.  
 
-Well omap2 is DT only already, so sounds like you can just ignore
-board-2430sdp.c as it no longer exists.
+Yes, agreed.
 
-If there are other minimal board-*.c file changes needed, then that's
-fine as long as they fix things or are needed to keep things working.
+> I honestly don't know if you can do proper CPU hotplug with ACPI, but
+> the RH guys seem to argue that you can.  Again, I didn't think too
+> carefully about this.
 
-Regards,
+Yes, we can do proper CPU hotplug with ACPI based physical hotplug (named
+dynamic device configuration in ACPI spec), you can refer to section 6.3
+"Device Insertion, Removal, and Status Objects" in ACPI 5.1.
 
-Tony
+There are mechanisms for handling dynamic insertion and removal of devices
+and for determining device and notification processing status. When removing
+a processor,
+
+a) we will call PSCI or similar interface to offline a CPU from OS, then
+   OS will not use it any more;
+
+b) call ACPI API to trim the resources that allocated during device
+   enumeration;
+
+c) Call ACPI method _EJ0 and then will notify firmware or hypervisor device
+   will be removed, jump to firmware or hypervisor to remove the device
+   from that level;
+
+CPU hotplug with ACPI is pretty mature on x86 and it works on VM too. I prepared
+some patches to support CPU hotplug on ARM64 and simulated the hot add/remove
+notify to test those patches, it worked as expected, I will send them out
+when this patchset is ready for mainline.
+
+Thanks
+Hanjun
