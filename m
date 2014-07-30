@@ -1,24 +1,29 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Wed, 30 Jul 2014 12:58:21 -0700
-Subject: [GIT PULL] Xilinx Zynq dt changes for v3.17 - third pull request
-In-Reply-To: <53D8D960.3030302@monstr.eu>
-References: <53D8D960.3030302@monstr.eu>
-Message-ID: <20140730195821.GH18384@quad.lixom.net>
+From: dianders@chromium.org (Doug Anderson)
+Date: Wed, 30 Jul 2014 13:00:09 -0700
+Subject: [PATCH v2 0/3] Enable EHCI port on rk3288-evb
+Message-ID: <1406750412-15592-1-git-send-email-dianders@chromium.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jul 30, 2014 at 01:39:12PM +0200, Michal Simek wrote:
-> Hi Olof,
-> 
-> I didn't expect that I will get patches for Parallella board
-> but it will be worth to have them in. That's why please consider
-> to pull these patches to your arm-soc trees.
-> 
-> The branch is based on zynq/dt2 branch in arm-soc git repo
-> http://git.kernel.org/cgit/linux/kernel/git/arm/arm-soc.git/log/?h=zynq/dt2
+This series enables the EHCI port on the rk3288-evb boards.  A later
+patch series (from Kever) will enable the dwc2 ports.
 
-Yep, looks like it's fairly low risk to pick this up late, so I've merged it
-now. Thanks!
+Changes in v2:
+- usb_host_vbus => vcc_host to match supply name, not pin name.
+- pin name now matches in name in schematic
+- Kever is now the author
+- Node is now named usb
 
+Doug Anderson (2):
+  ARM: dts: Turn on USB host vbus on rk3288-evb
+  ARM: dts: Enable USB host0 (EHCI) on rk3288-evb
 
--Olof
+Kever Yang (1):
+  ARM: dts: add rk3288 ehci usb devices
+
+ arch/arm/boot/dts/rk3288-evb.dtsi | 22 ++++++++++++++++++++++
+ arch/arm/boot/dts/rk3288.dtsi     | 20 ++++++++++++++++++++
+ 2 files changed, 42 insertions(+)
+
+-- 
+2.0.0.526.g5318336
