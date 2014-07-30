@@ -1,46 +1,56 @@
-From: pbonzini@redhat.com (Paolo Bonzini)
-Date: Wed, 30 Jul 2014 15:34:11 +0200
-Subject: [GIT PULL] KVM/ARM Urgent fix for 3.16
-In-Reply-To: <1406724941-4283-1-git-send-email-christoffer.dall@linaro.org>
-References: <1406724941-4283-1-git-send-email-christoffer.dall@linaro.org>
-Message-ID: <53D8F453.9010101@redhat.com>
+From: afaerber@suse.de (=?UTF-8?q?Andreas=20F=C3=A4rber?=)
+Date: Wed, 30 Jul 2014 15:50:40 +0200
+Subject: [PATCH v3 0/4] ARM: dts: exynos: Prepare Spring
+Message-ID: <1406728244-5105-1-git-send-email-afaerber@suse.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Il 30/07/2014 14:55, Christoffer Dall ha scritto:
-> Hi Paolo and Gleb,
-> 
-> Is there any chance you can get this urgent fix (which allows KVM guest
-> to bring down the entire system on some 64K enabled ARM64 hosts) merged
-> for 3.16?
-> 
-> The following changes since commit bb18b526a9d8d4a3fe56f234d5013b9f6036978d:
-> 
->   Merge tag 'signed-for-3.16' of git://github.com/agraf/linux-2.6 into kvm-master (2014-07-08 12:08:58 +0200)
-> 
-> are available in the git repository at:
-> 
-> 
->   git://git.kernel.org/pub/scm/linux/kernel/git/kvmarm/kvmarm.git tags/kvm-arm-for-3.16-rc7
-> 
-> for you to fetch changes up to 63afbe7a0ac184ef8485dac4914e87b211b5bfaa:
-> 
->   kvm: arm64: vgic: fix hyp panic with 64k pages on juno platform (2014-07-30 14:35:42 +0200)
-> 
-> ---
-> Will Deacon (1):
->   kvm: arm64: vgic: fix hyp panic with 64k pages on juno platform
-> 
->  virt/kvm/arm/vgic.c | 24 ++++++++++++++++++++----
->  1 file changed, 20 insertions(+), 4 deletions(-)
-> 
+Hello,
 
-I think Gleb is on vacation now, but unfortunately I've already had
-enough this year.
+Based on the preinstalled 3.8 based ChromeOS kernel and previous 3.15 
+based attempts by Stephan and me that broke for 3.16, I've prepared a 
+device tree for the HP Chromebook 11 aka Google Spring.
 
-I resent the pull request from
-git://git.kernel.org/pub/scm/virt/kvm/kvm.git, even though you had CCed
-Linus here already.
+v3 mainly does style cleanups, aligning Snow and Spring better.
+
+Not yet enabled are trackpad, Wifi and sound.
+
+My rebasing branch for testing is here:
+https://github.com/afaerber/linux/commits/spring-next
+
+Regards,
+Andreas
+
+v1 -> v2:
+* Dropped 3 documentation patches from series:
+  2 picked up,
+  https://patchwork.kernel.org/patch/4397271/
+  https://patchwork.kernel.org/patch/4397291/
+  1 already sent separately as v2, pending.
+  https://patchwork.kernel.org/patch/4424881/
+* Minimized and beautified Spring device tree and to some degree Snow as well.
+  See individual patches.
+
+v2 -> v3:
+* Rebased: Two -cros-common cleanup patches were already applied
+* Lots of small cleanups for both Snow and Spring
+* Enabled I2S in Spring for symmetry
+* Added lid-switch and gpio-keys pinctrls to Spring
 
 
-Paolo
+Andreas F?rber (4):
+  ARM: dts: Fix MMC pinctrl for exynos5250-snow
+  ARM: dts: Fold exynos5250-cros-common into exynos5250-snow
+  ARM: dts: Clean up exynos5250-snow
+  ARM: dts: Add exynos5250-spring device tree
+
+ arch/arm/boot/dts/Makefile                    |   1 +
+ arch/arm/boot/dts/exynos5250-cros-common.dtsi | 164 --------
+ arch/arm/boot/dts/exynos5250-snow.dts         | 338 ++++++++++------
+ arch/arm/boot/dts/exynos5250-spring.dts       | 539 ++++++++++++++++++++++++++
+ 4 files changed, 770 insertions(+), 272 deletions(-)
+ delete mode 100644 arch/arm/boot/dts/exynos5250-cros-common.dtsi
+ create mode 100644 arch/arm/boot/dts/exynos5250-spring.dts
+
+-- 
+1.9.3
