@@ -1,96 +1,183 @@
-From: fweisbec@gmail.com (Frederic Weisbecker)
-Date: Wed, 30 Jul 2014 18:35:21 +0200
-Subject: TIF_NOHZ can escape nonhz mask? (Was: [PATCH v3 6/8] x86: Split
- syscall_trace_enter into two phases)
-In-Reply-To: <20140729175414.GA3289@redhat.com>
-References: <cover.1405992946.git.luto@amacapital.net>
- <3f649f5658a163645e3ce15156176c325283762e.1405992946.git.luto@amacapital.net>
- <20140728173723.GA20993@redhat.com>
- <20140728185803.GA24663@redhat.com>
- <20140728192209.GA26017@localhost.localdomain>
- <20140729175414.GA3289@redhat.com>
-Message-ID: <20140730163516.GC18158@localhost.localdomain>
+From: robherring2@gmail.com (Rob Herring)
+Date: Wed, 30 Jul 2014 11:37:38 -0500
+Subject: [PATCH 2/5] arm64, thunder: Add initial dts for Cavium Thunder SoC
+In-Reply-To: <20140730154626.GD20162@leverpostej>
+References: <1406732794-20920-1-git-send-email-rric@kernel.org>
+ <1406732794-20920-3-git-send-email-rric@kernel.org>
+ <20140730154626.GD20162@leverpostej>
+Message-ID: <CAL_JsqLJ_W34XTF2aMOW9z+Gq4oxbrX1RztyJN8Mi0OFPeNxfg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jul 29, 2014 at 07:54:14PM +0200, Oleg Nesterov wrote:
-> Thanks Frederic for your explanations. Yes, I was confused. But cough, now I am
-> even more confused.
-> 
-> I didn't even try to read this code, perhaps I'll try later, but let me ask
-> another question while you are here ;)
-> 
-> The comment above __context_tracking_task_switch() says:
-> 
-> 	 * The context tracking uses the syscall slow path to implement its user-kernel
-> 	 * boundaries probes on syscalls. This way it doesn't impact the syscall fast
-> 	 * path on CPUs that don't do context tracking.
-> 	        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+On Wed, Jul 30, 2014 at 10:46 AM, Mark Rutland <mark.rutland@arm.com> wrote:
+> Hi,
+>
+> On Wed, Jul 30, 2014 at 04:06:31PM +0100, Robert Richter wrote:
+>> From: Radha Mohan Chintakuntla <rchintakuntla@cavium.com>
+>>
+>> Add initial device tree nodes for Cavium Thunder SoCs with support of
+>> 48 cores and gicv3. The dts file requires further changes, esp. for
+>> pci, gicv3-its and smmu. This changes will be added later together
+>> with the device drivers.
+>>
+>> Signed-off-by: Radha Mohan Chintakuntla <rchintakuntla@cavium.com>
+>> Signed-off-by: Robert Richter <rrichter@cavium.com>
+>> ---
+>>  arch/arm64/boot/dts/Makefile         |   1 +
+>>  arch/arm64/boot/dts/thunder-88xx.dts | 387 +++++++++++++++++++++++++++++++++++
+>>  2 files changed, 388 insertions(+)
+>>  create mode 100644 arch/arm64/boot/dts/thunder-88xx.dts
+>>
+>> diff --git a/arch/arm64/boot/dts/Makefile b/arch/arm64/boot/dts/Makefile
+>> index c52bdb051f66..f8001a62029c 100644
+>> --- a/arch/arm64/boot/dts/Makefile
+>> +++ b/arch/arm64/boot/dts/Makefile
+>> @@ -1,3 +1,4 @@
+>> +dtb-$(CONFIG_ARCH_THUNDER) += thunder-88xx.dtb
+>>  dtb-$(CONFIG_ARCH_VEXPRESS) += rtsm_ve-aemv8a.dtb foundation-v8.dtb
+>>  dtb-$(CONFIG_ARCH_XGENE) += apm-mustang.dtb
+>>
+>> diff --git a/arch/arm64/boot/dts/thunder-88xx.dts b/arch/arm64/boot/dts/thunder-88xx.dts
+>> new file mode 100644
+>> index 000000000000..4cf20ac9138b
+>> --- /dev/null
+>> +++ b/arch/arm64/boot/dts/thunder-88xx.dts
+>> @@ -0,0 +1,387 @@
+>> +/*
+>> + * Cavium Thunder DTS file
+>> + *
+>> + * Copyright (C) 2013, Cavium Inc.
+>> + *
+>> + * This program is free software; you can redistribute it and/or
+>> + * modify it under the terms of the GNU General Public License as
+>> + * published by the Free Software Foundation; either version 2 of
+>> + * the License, or (at your option) any later version.
+>> + */
 
-Indeed, in fact the comment is confusing the way it explain things. It suggests that
-some CPUs maybe doing context tracking while some other can choose not to context track.
+You may want to reconsider if this should be BSD.
 
-It's rather all or nothing. Actually TIF_NOHZ optimize systems that have CONFIG_CONTEXT_TRACKING=y
-and that don't need context tracking. In this case TIF_NOHZ is cleared and thus the syscall
-fastpath has no overhead.
+>> +/dts-v1/;
+>> +
+>> +/* Reserving first 12MB of DDR for firmware */
+>> +/memreserve/ 0x00000000 0x00c00000;
+>
+> What exactly is this memreserve intended to protect at runtime?
+>
+> The only item of runtime firmware I see in use below is PSCI on the
+> secure side.
+>
+> How is the kernel booted on this platform? UEFI?
+>
+>> +/ {
+>> +     model = "Cavium ThunderX CN88XX Family";
+>> +     compatible = "cavium,thunder-88xx";
+>
+> Please don't use wildcards in compatible strings. Give this an absolute
+> name, and override as necessary.
+>
+>> +     interrupt-parent = <&gic0>;
+>> +     #address-cells = <2>;
+>> +     #size-cells = <2>;
+>> +
+>> +     aliases {
+>> +             serial0 = &uaa0;
+>> +             serial1 = &uaa1;
+>> +     };
+>> +
+>> +     psci {
+>> +             compatible = "arm,psci-0.2";
+>> +             method = "smc";
+>> +     };
+>
+> Nice!
+>
+>> +
+>> +     cpus {
+>> +             #address-cells = <2>;
+>> +             #size-cells = <0>;
+>> +
+>> +             cpu at 000 {
+>> +                     device_type = "cpu";
+>> +                     compatible = "cavium,thunder", "arm,armv8";
+>> +                     reg = <0x0 0x000>;
+>> +                     enable-method = "psci";
+>> +             };
+>
+> Just to check: both the SoC and CPU are called thunder?
+>
+> [...]
+>
+>> +
+>> +     memory at 00000000 {
+>> +             device_type = "memory";
+>> +             reg = <0x0 0x00000000 0x0 0x80000000>;
+>> +     };
+>> +
+>> +     gic0: interrupt-controller at 801000000000 {
+>
+> To make this easier to read, please place a comma between 32-bit
+> portions of the unit address (e.g. here have 8010,00000000).
 
-So I should rephrase it that way:
+Mark, perhaps a dtc or checkpatch.pl check for this?
 
-        * The context tracking uses the syscall slow path to implement its user-kernel
-        * boundaries probes on syscalls. This way it doesn't impact the syscall fast
-        * path when context tracking is globally disabled.
+This should also be under a bus node.
 
-> 
-> How? Every running task should have TIF_NOHZ set if context_tracking_is_enabled() ?
-> 
-> 	 * But we need to clear the flag on the previous task because it may later
-> 	 * migrate to some CPU that doesn't do the context tracking. As such the TIF
-> 	 * flag may not be desired there.
-> 
-> For what? How this can help? This flag will be set again when we switch to this
-> task again?
+>> +             compatible = "arm,gic-v3";
+>> +             #interrupt-cells = <3>;
+>> +             #address-cells = <2>;
+>> +             #size-cells = <2>;
+>> +             ranges;
+>
+> This has no children, so why have ranges, #address-cells, and
+> #size-cells?
+>
+>> +             interrupt-controller;
+>> +             reg = <0x8010 0x00000000 0x0 0x010000>, /* GICD */
+>> +                   <0x8010 0x80000000 0x0 0x200000>; /* GICR */
+>> +             interrupts = <1 9 0xf04>;
+>> +     };
+>> +
+>> +     timer {
+>> +             compatible = "arm,armv8-timer";
+>> +             interrupts = <1 13 0xff01>,
+>> +                          <1 14 0xff01>,
+>> +                          <1 11 0xff01>,
+>> +                          <1 10 0xff01>;
+>> +     };
+>> +
+>> +     soc {
+>> +             compatible = "simple-bus";
+>> +             #address-cells = <2>;
+>> +             #size-cells = <2>;
+>> +             ranges;
+>> +
+>> +             clocks {
+>> +                     #address-cells = <2>;
+>> +                     #size-cells = <2>;
+>> +                     ranges;
+>> +
+>> +                     refclk50mhz: refclk50mhz {
+>> +                             compatible = "fixed-clock";
+>> +                             #clock-cells = <0>;
+>> +                             clock-frequency = <50000000>;
+>> +                             clock-output-names = "refclk50mhz";
+>> +                     };
+>> +             };
+>
+> Please get rid of the clocks node and just put the clocks here.
+>
+>> +
+>> +             uaa0: serial at 87e024000000 {
+>> +                     compatible = "arm,pl011", "arm,primecell";
+>> +                     reg = <0x87e0 0x24000000 0x0 0x1000>;
+>> +                     interrupts = <1 21 4>;
+>> +                     clocks = <&refclk50mhz>;
+>> +                     clock-names = "apb_pclk";
+>
+> Is this actually the apb_pclk, or is the the uartclk? I assume it's the
+> latter.
 
-That is indeed a stale comment from aborted early design.
+Shouldn't new bindings have both clocks here? A single clock was a
+mistake I think (mine in fact).
 
-> 
-> Looks like, we can kill context_tracking_task_switch() and simply change the
-> "__init" callers of context_tracking_cpu_set() to do set_thread_flag(TIF_NOHZ) ?
-> Then this flag will be propagated by copy_process().
-
-Right, that would be much better. Good catch! context tracking is enabled from
-tick_nohz_init(). This is the init 0 task so the flag should be propagated from there.
-
-I still think we need a for_each_process_thread() set as well though because some
-kernel threads may well have been created at this stage already.
-
-> 
-> Or I am totally confused? (quite possible).
-> 
-> > So here is a scenario where this is a problem: a task runs on CPU 0, passes the context
-> > tracking call before returning from a syscall to userspace, and gets an interrupt. The
-> > interrupt preempts the task and it moves to CPU 1. So it returns from preempt_schedule_irq()
-> > after which it is going to resume to userspace.
-> >
-> > In this scenario, if context tracking is only enabled on CPU 1, we have no way to know that
-> > the task is resuming to userspace, because we passed through the context tracking probe
-> > already and it was ignored on CPU 0.
-> 
-> Thanks. But I still can't understand... So if we only track CPU 1, then in this
-> case context_tracking.state == IN_USER on CPU 0, but it can be IN_USER or IN_KERNEL
-> on CPU 1.
-
-I'm not sure I understand your question. Context tracking is either enabled everywhere or
-nowhere.
-
-I need to say though that there is a per CPU context tracking state named context_tracking.active.
-It's confusing because it suggests that context tracking is active per CPU. Actually it's tracked
-everywhere when globally enabled, but active determines if we call the RCU and vtime callbacks or
-not.
-
-So only nohz full CPUs have context_tracking.active set because only these need to call the RCU
-and vtime callbacks. Other CPUs still do the context tracking but they won't call rcu and vtime
-functions.
-
-> 
-> Oleg.
-> 
+Rob
