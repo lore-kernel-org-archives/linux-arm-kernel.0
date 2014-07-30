@@ -1,130 +1,143 @@
-From: joonwoop@codeaurora.org (Joonwoo Park)
-Date: Tue, 29 Jul 2014 23:28:26 -0700
-Subject: [PATCH] arm64: optimize memcpy_{from,to}io() and memset_io()
-Message-ID: <1406701706-12808-1-git-send-email-joonwoop@codeaurora.org>
+From: shijie.huang@intel.com (Huang Shijie)
+Date: Wed, 30 Jul 2014 14:44:13 +0800
+Subject: [PATCH v2 03/10] mtd: spi-nor: add DDR quad read support
+In-Reply-To: <20140730050843.GE11952@brian-ubuntu>
+References: <1398657227-20721-1-git-send-email-b32955@freescale.com>
+ <1398657227-20721-4-git-send-email-b32955@freescale.com>
+ <20140730050843.GE11952@brian-ubuntu>
+Message-ID: <20140730064413.GA15547@shldeISGChi005.sh.intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Optimize memcpy_{from,to}io() and memset_io() by transferring in 64 bit
-as much as possible with minimized barrier usage.  This simplest optimization
-brings faster throughput compare to current byte-by-byte read and write with
-barrier in the loop.  Code's skeleton is taken from the powerpc.
+On Tue, Jul 29, 2014 at 10:08:43PM -0700, Brian Norris wrote:
+> 
+> On Mon, Apr 28, 2014 at 11:53:40AM +0800, Huang Shijie wrote:
+> > This patch adds the DDR quad read support by the following:
+> 
+> To Mark / linux-spi:
+> 
+> Are DDR modes in the scope of drivers/spi/ at all, so that we could
+> someday wire it up through m25p80.c? Or is 'DDR' such a distortion of
+> the meaning of 'SPI' such that it will be restricted only to SPI NOR
+> dedicated controllers?
 
-Signed-off-by: Joonwoo Park <joonwoop@codeaurora.org>
-Acked-by: Trilok Soni <tsoni@codeaurora.org>
----
- arch/arm64/kernel/io.c | 72 +++++++++++++++++++++++++++++++++++++++++++-------
- 1 file changed, 62 insertions(+), 10 deletions(-)
+IMHO, the DDR modes can _NOT_ be handled by the driver/spi/*.
+The SPI can only handles the byte streams. But the DDR mode may need to
+handle the cycles(such as the dummy cycles could be 7 cycles) which is not byte.
 
-diff --git a/arch/arm64/kernel/io.c b/arch/arm64/kernel/io.c
-index 7d37ead..c0e3ab1 100644
---- a/arch/arm64/kernel/io.c
-+++ b/arch/arm64/kernel/io.c
-@@ -20,18 +20,34 @@
- #include <linux/types.h>
- #include <linux/io.h>
- 
-+#define IO_CHECK_ALIGN(v, a) ((((unsigned long)(v)) & ((a) - 1)) == 0)
-+
- /*
-  * Copy data from IO memory space to "real" memory space.
-  */
- void __memcpy_fromio(void *to, const volatile void __iomem *from, size_t count)
- {
--	unsigned char *t = to;
--	while (count) {
-+	while (count && (!IO_CHECK_ALIGN(from, 8) || !IO_CHECK_ALIGN(to, 8))) {
-+		*(u8 *)to = readb_relaxed(from);
-+		from++;
-+		to++;
- 		count--;
--		*t = readb(from);
--		t++;
-+	}
-+
-+	while (count >= 8) {
-+		*(u64 *)to = readq_relaxed(from);
-+		from += 8;
-+		to += 8;
-+		count -= 8;
-+	}
-+
-+	while (count) {
-+		*(u8 *)to = readb_relaxed(from);
- 		from++;
-+		to++;
-+		count--;
- 	}
-+	__iormb();
- }
- EXPORT_SYMBOL(__memcpy_fromio);
- 
-@@ -40,12 +56,28 @@ EXPORT_SYMBOL(__memcpy_fromio);
-  */
- void __memcpy_toio(volatile void __iomem *to, const void *from, size_t count)
- {
--	const unsigned char *f = from;
-+	void *p = (void __force *)from;
-+
-+	__iowmb();
-+	while (count && (!IO_CHECK_ALIGN(p, 8) || !IO_CHECK_ALIGN(from, 8))) {
-+		writeb_relaxed(*(volatile u8 *)from, p);
-+		from++;
-+		p++;
-+		count--;
-+	}
-+
-+	while (count >= 8) {
-+		writeq_relaxed(*(volatile u64 *)from, p);
-+		from += 8;
-+		p += 8;
-+		count -= 8;
-+	}
-+
- 	while (count) {
-+		writeb_relaxed(*(volatile u8 *)from, p);
-+		from++;
-+		p++;
- 		count--;
--		writeb(*f, to);
--		f++;
--		to++;
- 	}
- }
- EXPORT_SYMBOL(__memcpy_toio);
-@@ -55,10 +87,30 @@ EXPORT_SYMBOL(__memcpy_toio);
-  */
- void __memset_io(volatile void __iomem *dst, int c, size_t count)
- {
-+	void *p = (void __force *)dst;
-+	u64 qc = c;
-+
-+	qc |= qc << 8;
-+	qc |= qc << 16;
-+	qc |= qc << 32;
-+
-+	__iowmb();
-+	while (count && !IO_CHECK_ALIGN(p, 8)) {
-+		writeb_relaxed(c, p);
-+		p++;
-+		count--;
-+	}
-+
-+	while (count >= 8) {
-+		writeq_relaxed(c, p);
-+		p += 8;
-+		count -= 8;
-+	}
-+
- 	while (count) {
-+		writeb_relaxed(c, p);
-+		p++;
- 		count--;
--		writeb(c, dst);
--		dst++;
- 	}
- }
- EXPORT_SYMBOL(__memset_io);
--- 
-The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
-hosted by The Linux Foundation
+So the DDR mode is handled by the SPI NOR controller now.
+
+Please correct me if I am wrong. :)
+
+> 
+> >   [1] add SPI_NOR_DDR_QUAD read mode.
+> > 
+> >   [2] add DDR Quad read opcodes:
+> >        SPINOR_OP_READ_1_4_4_D / SPINOR_OP_READ4_1_4_4_D
+> > 
+> >   [3] add set_ddr_quad_mode() to initialize for the DDR quad read.
+> >       Currently it only works for Spansion NOR.
+> > 
+> >   [3] about the dummy cycles.
+> >       We set the dummy with 8 for DDR quad read by default.
+> 
+> Why? That seems wrong. You need to know for sure how many cycles should
+> be used, not just guess a default.
+
+Do you mean that if people do not set the DT node for dummy, we should
+return an -EINVAL immediately?
+
+
+> 
+> >       The m25p80.c can not support the DDR quad read, but the SPI NOR controller
+> >       can set the dummy value in its child DT node, and the SPI NOR framework
+> >       can parse it out.
+> 
+> Why does the dummy value belong in device tree? I think this can be
+> handled in software. You might, however, want a few other hardware
+> description parameters in device tree to help you.
+> 
+> So I think spi-nor.c needs to know a few things:
+> 
+>  1. Does the hardware/driver support DDR clocking?
+>  2. What granularity of dummy cycles are supported? So m25p80.c needs to
+>     communicate that it only supports dummy cycles of multiples of 8,
+>     and fsl-quadspi supports single clock cycles.
+
+I think you can send patches for these features. I does not clear about:
+  for what does the spi-nor needs to know the above things.
+
+> And spi-nor.c should be able to do the following:
+> 
+>  3. Set how many dummy cycles should be used.
+where can we get the number of the cycles? 
+
+
+>  4. Write to the configuration register, to choose a Latency Code
+>     according to what the flash supports. I see modes that support 3, 6,
+>     7, or 8. We'd probably just go for the fastest mode, which requires
+>     8, right?
+not right.
+
+The DDR mode can not work if we set a wrong dummy cycles for the flash.
+
+for some chips, the fastest mode may need 6 cycles, not 8. 
+
+> 
+> So far, none of this seems to require a DT binding, unless there's
+> something I'm missing about your fsl-quadspi controller.
+> 
+> > Test this patch for Spansion s25fl128s NOR flash.
+> > 
+> > Signed-off-by: Huang Shijie <b32955@freescale.com>
+> > ---
+> > +	/* DDR Quad/Quad/Dual-read mode takes precedence over fast/normal */
+> > +	if (mode == SPI_NOR_DDR_QUAD && info->flags & SPI_NOR_DDR_QUAD_READ) {
+> 
+> Hmm, I think I should probably take another look at the design of
+> spi-nor.c... Why does spi_nor_scan() take a single 'mode' argument? The
+> driver should be communicating which (multiple) modes it supports, not
+> selecting a single mode. spi-nor.c is the only one which knows what the
+> *flash* supports, so it should be combining knowledge from the
+> controller driver with its own knowledge of the flash.
+
+It is okay for me to add multiples modes for the spi_nor_scan().
+I added the single mode for spi_nor_scan is because that the fsl-quadspi
+does not want to support the low speed modes. (Of course, the fsl-quadspi
+controller does support the low speed modes.)
+
+> 
+> > +		ret = set_ddr_quad_mode(nor, info->jedec_id);
+> > +		if (ret) {
+> > +			dev_err(dev, "DDR quad mode not supported\n");
+> > +			return ret;
+> 
+> A ramification of my comment above is that we should not be returning an
+> error in a situation like this; we should be able to fall back to
+> another known-supported mode, like SDR QUAD, SDR DUAL, or just plain
+> SPI -- if they're supported by the driver -- and spi-nor.c doesn't
+> currently have enough information to do this.
+ok.
+> 
+> > +		}
+> > +		nor->flash_read = SPI_NOR_DDR_QUAD;
+> >  
+> >  /**
+> 
+> So, I'll have to take another hard look at spi-nor.c soon. I think we
+> may need to work on the abstractions here a bit more before I merge any
+> new features like this.
+
+okay.  no problem.
+
+> 
+> Regards,
+> Brian
+> 
+> P.S. Is there a good reason we've defined a whole read_xfer/write_xfer
+> API that is completely unused?
+These hooks are designed for other SPI NOR drivers, the fsl-quadspi does
+not use them.
+
+thanks
+Huang Shijie
