@@ -1,50 +1,37 @@
 From: olof@lixom.net (Olof Johansson)
-Date: Wed, 30 Jul 2014 12:45:21 -0700
-Subject: [GIT PULL v2] Renesas ARM Based SoC Boards Cleanups for v3.17
-In-Reply-To: <cover.1406166426.git.horms+renesas@verge.net.au>
-References: <cover.1406166426.git.horms+renesas@verge.net.au>
-Message-ID: <20140730194521.GC18384@quad.lixom.net>
+Date: Wed, 30 Jul 2014 12:48:05 -0700
+Subject: [PATCH] ARM: nomadik: fix up double inversion in DT
+In-Reply-To: <1406283522-6764-1-git-send-email-linus.walleij@linaro.org>
+References: <1406283522-6764-1-git-send-email-linus.walleij@linaro.org>
+Message-ID: <20140730194805.GD18384@quad.lixom.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jul 24, 2014 at 10:57:54AM +0900, Simon Horman wrote:
-> Hi Olof, Hi Kevin, Hi Arnd,
+On Fri, Jul 25, 2014 at 12:18:42PM +0200, Linus Walleij wrote:
+> The GPIO pin connected to card detect was inverted twice: once by
+> the argument to the GPIO line itself where it was magically marked
+> as active low by the flag GPIO_ACTIVE_LOW (0x01) in the third cell,
+> and also marked active low AGAIN by explicitly stating
+> "cd-inverted" (a deprecated method).
 > 
-> Please consider these Renesas ARM based SoC boards cleanups for v3.17.
+> After commit 78f87df2b4f8760954d7d80603d0cfcbd4759683
+> "mmc: mmci: Use the common mmc DT parser" this results in the
+> line being inverted twice so it was effectively uninverted, while
+> the old code would not have this effect, instead disregarding the
+> flag on the GPIO line altogether, which is a bug. I admit the
+> semantics may be unclear but inverting twice is as good a
+> definition as any on how this should work.
 > 
+> So fix up the buggy device tree. Use proper #includes so the DTS
+> is clear and readable.
 > 
-> This pull request is based on
-> "Renesas ARM Based SoC DT Timers Updates for v3.17",
-> tagged as renesas-dt-timers-for-v3.17,
-> which I have sent a pull request for.
-> 
-> In this pull-request cleanups are added on top of new development
-> due to the order in which the code was developed. In general
-> we prefer the reverse ordering.
-> 
-> 
-> v2 of this pull request is a rebase of v1 removing
-> a merge of defconfig changes at the base of the pull-request.
-> The motivation for that was to avoid attempts to use
-> genmai_defconfig after the board code it relies on has been removed.
-> Olof indicated he would prefer not to add that dependency.
-> 
-> 
-> The following changes since commit 9394af4314554d15762585a3464cefaa2e6d0420:
-> 
->   ARM: shmobile: genmai-reference: Enable MTU2 in device tree (2014-07-15 21:26:42 +0900)
-> 
-> are available in the git repository at:
-> 
->   git://git.kernel.org/pub/scm/linux/kernel/git/horms/renesas.git tags/renesas-cleanup-boards-for-v3.17
-> 
-> for you to fetch changes up to d2904bb7cd21844ff5e720083b59a344487fcc9b:
-> 
->   ARM: shmobile: r7s72100: Remove legacy board support (2014-07-24 10:32:53 +0900)
+> Cc: Ulf Hansson <ulf.hansson@linaro.org>
+> Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
+> ---
+> ARM SoC folks: please either apply this directly for fixes, and if
+> that is too late, tag it for v3.16+ stable.
 
-Given timing and dependencies here, please resend this for 3.18 instead as
-a base cleanup branch. It doesn't do any harm to leave this in there until
-then.
+Applied to fixes, Arnd must have missed it earlier.
 
 
 -Olof
