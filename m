@@ -1,82 +1,92 @@
-From: monstr@monstr.eu (Michal Simek)
-Date: Wed, 30 Jul 2014 13:39:12 +0200
-Subject: [GIT PULL] Xilinx Zynq dt changes for v3.17 - third pull request
-Message-ID: <53D8D960.3030302@monstr.eu>
+From: mkl@pengutronix.de (Marc Kleine-Budde)
+Date: Wed, 30 Jul 2014 13:47:09 +0200
+Subject: [PATCH v3 4/4] can: flexcan: add vf610 support for FlexCAN
+In-Reply-To: <b815c5c1f7faed334d1ed5370d51c180@agner.ch>
+References: <cover.1405428166.git.stefan@agner.ch>
+ <ff2ea1726b13dc2ffa3519ce9244f3633cf1420d.1405428166.git.stefan@agner.ch>
+ <53C5398F.2000005@pengutronix.de> <1b8a8ca03b4a160027a79b722f697e25@agner.ch>
+ <601adb6fe47279c115c1cc607365a00e@agner.ch> <53D25C9D.5080803@pengutronix.de>
+ <e88108c655e2c16dc9cf6c4194547e73@agner.ch> <53D67A46.3060202@pengutronix.de>
+ <b815c5c1f7faed334d1ed5370d51c180@agner.ch>
+Message-ID: <53D8DB3D.7030403@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Olof,
+On 07/29/2014 09:29 AM, Stefan Agner wrote:
+> Am 2014-07-28 18:28, schrieb Marc Kleine-Budde:
+>> On 07/28/2014 06:20 PM, Stefan Agner wrote:
+>>> I'm not sure whether you really want to keep the FLEXCAN_CTRL_ERR_STATE
+>>> commented out...
+>>
+>> No, please remove this change and redo the test.
+>>
+> 
+> Ok, removed that change and did the tests again:
+> 
+> == Wrong Bitrate test
+> 
+> [  146.485022] flexcan 40020000.flexcan can0: bitrate error 0.7%
+> [  148.401793] flexcan 40020000.flexcan can0: writing ctrl=0x17092001
+> [  148.408263] flexcan 40020000.flexcan can0: flexcan_set_bittiming:
+> mcr=0x5980000f ctrl=0x17092001
+> [  148.408298] flexcan 40020000.flexcan can0: flexcan_chip_start:
+> writing mcr=0x79a20208
+> [  148.408328] flexcan 40020000.flexcan can0: flexcan_chip_start:
+> writing ctrl=0x1709ac51
+> [  148.414373] flexcan 40020000.flexcan can0: flexcan_chip_start:
+> reading mcr=0x60a20208 ctrl=0x1709ac51
+> ^---- Initialization
+> [  152.968685] flexcan_irq, esr=00040080
+> [  152.972386] flexcan_irq, ctrl=1709ac51
+> [  155.488623] flexcan_irq, esr=00040080
+> [  155.492326] flexcan_irq, ctrl=1709ac51
+> ^---- Two messages with right bitrate
+> [  171.014124] flexcan_irq, esr=00058d0a
+> [  171.017823] flexcan_irq, ctrl=1709ac51
+> ^---- One message with wrong bitrate
+> [  171.021631] flexcan 40020000.flexcan can0: Error Warning IRQ
+> [  171.021660] flexcan 40020000.flexcan can0: Error Passive IRQ
 
-I didn't expect that I will get patches for Parallella board
-but it will be worth to have them in. That's why please consider
-to pull these patches to your arm-soc trees.
+Thanks for the test, so far looks promising :) With this setup the other
+CAN node repeats the CAN frame until it's ACKed. Because there is no
+node with a compatible bitrate, there is no ACking CAN node.
 
-The branch is based on zynq/dt2 branch in arm-soc git repo
-http://git.kernel.org/cgit/linux/kernel/git/arm/arm-soc.git/log/?h=zynq/dt2
+Can you add a third CAN node to the network. The second and third node
+should use the same bitrate, while your vf610 uses a different one. With
+the new setup it should take more than one frame until the vf610 goes
+into error warning and even more frames to error passive. This way we
+can see it the error warning interrupt is connected or not. The error
+counters should increase with each "wrong" bitrate frame it sees, you
+can check with:
 
-Thanks,
-Michal
+    ip -details link show can0
 
+The output looks like this:
 
-The following changes since commit e0a5c552caf7a4865f3d5aa077003ef2d35217db:
+> 4: can0: <NOARP,UP,LOWER_UP,ECHO> mtu 16 qdisc pfifo_fast state UNKNOWN mode DEFAULT qlen 10
+>     link/can
+>     can state ERROR-ACTIVE (berr-counter tx 0 rx 0) restart-ms 0
+                              ^^^^^^^^^^^^^^^^^^^^^^
+>     bitrate 1000000 sample-point 0.750
+>     tq 125 prop-seg 2 phase-seg1 3 phase-seg2 2 sjw 1
+>     sja1000: tseg1 1..16 tseg2 1..8 sjw 1..4 brp 1..64 brp-inc 1
+>     clock 8000000
 
-  ARM: zynq: DT: Add GPIO node (2014-07-23 14:05:56 +0200)
+When one of the berr-counter crosses 96 (and stays below 128) a warning
+interrupt should be generated.
 
-are available in the git repository at:
-
-  git://git.xilinx.com/linux-xlnx.git tags/zynq-dt-for-3.17-3
-
-for you to fetch changes up to 6a3246c02e7bcb16a58f3fcee4662a9b36ea80e9:
-
-  ARM: zynq: DT: Clarify Xilinx Zynq platform (2014-07-30 13:26:54 +0200)
-
-----------------------------------------------------------------
-arm: Xilinx Zynq dt patches for v3.17 third pull request
-
-- Add Adapteva Parallella board/DT
-- Add SPI nodes
-- Add CAN nodes
-- Clean Zynq description
-
-----------------------------------------------------------------
-Andreas F?rber (5):
-      Documentation: devicetree: Adapteva vendor prefix
-      Documentation: devicetree: Adapteva boards
-      ARM: dts: zynq: Add Parallella device tree
-      ARM: dts: zynq: Add DMAC for Parallella
-      ARM: dts: zynq: Add SPI
-
-Michal Simek (2):
-      ARM: zynq: DT: Add CAN node
-      ARM: zynq: DT: Clarify Xilinx Zynq platform
-
-Soren Brinkmann (1):
-      ARM: zynq: DT: Remove DMA from board DTs
-
- Documentation/devicetree/bindings/arm/adapteva.txt    |  7 +++++++
- Documentation/devicetree/bindings/arm/xilinx.txt      |  8 ++++----
- Documentation/devicetree/bindings/vendor-prefixes.txt |  1 +
- arch/arm/boot/dts/Makefile                            |  4 +++-
- arch/arm/boot/dts/zynq-7000.dtsi                      | 66 +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++-
- arch/arm/boot/dts/zynq-parallella.dts                 | 64 ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
- arch/arm/boot/dts/zynq-zc702.dts                      |  4 ++++
- 7 files changed, 148 insertions(+), 6 deletions(-)
- create mode 100644 Documentation/devicetree/bindings/arm/adapteva.txt
- create mode 100644 arch/arm/boot/dts/zynq-parallella.dts
-
+Marc
 
 -- 
-Michal Simek, Ing. (M.Eng), OpenPGP -> KeyID: FE3D1F91
-w: www.monstr.eu p: +42-0-721842854
-Maintainer of Linux kernel - Microblaze cpu - http://www.monstr.eu/fdt/
-Maintainer of Linux kernel - Xilinx Zynq ARM architecture
-Microblaze U-BOOT custodian and responsible for u-boot arm zynq platform
-
+Pengutronix e.K.                  | Marc Kleine-Budde           |
+Industrial Linux Solutions        | Phone: +49-231-2826-924     |
+Vertretung West/Dortmund          | Fax:   +49-5121-206917-5555 |
+Amtsgericht Hildesheim, HRA 2686  | http://www.pengutronix.de   |
 
 -------------- next part --------------
 A non-text attachment was scrubbed...
 Name: signature.asc
 Type: application/pgp-signature
-Size: 263 bytes
+Size: 242 bytes
 Desc: OpenPGP digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140730/068b39da/attachment.sig>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140730/26fb27c6/attachment.sig>
