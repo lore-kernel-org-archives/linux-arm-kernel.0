@@ -1,225 +1,56 @@
-From: s-anna@ti.com (Suman Anna)
-Date: Tue, 29 Jul 2014 19:34:39 -0500
-Subject: [PATCHv3 5/5] ARM: dts: OMAP2+: Add #mbox-cells property to all
- mailbox nodes
-In-Reply-To: <1406680479-18446-1-git-send-email-s-anna@ti.com>
-References: <1406680479-18446-1-git-send-email-s-anna@ti.com>
-Message-ID: <1406680479-18446-6-git-send-email-s-anna@ti.com>
+From: grant.likely@linaro.org (Grant Likely)
+Date: Tue, 29 Jul 2014 18:56:23 -0600
+Subject: [PATCH v2 0/4] Support for Qualcomm QPNP PMIC's
+In-Reply-To: <53C947C0.5020604@mm-sol.com>
+References: <1405613855-27572-1-git-send-email-svarbanov@mm-sol.com>
+ <53C857DE.7030507@codeaurora.org> <53C947C0.5020604@mm-sol.com>
+Message-ID: <20140730005623.EA57CC4062A@trevor.secretlab.ca>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The '#mbox-cells' property is added to all the OMAP mailbox
-nodes. This property is mandatory with the new mailbox framework.
+On Fri, 18 Jul 2014 19:13:52 +0300, Stanimir Varbanov <svarbanov@mm-sol.com> wrote:
+> On 07/18/2014 02:10 AM, Stephen Boyd wrote:
+> > On 07/17/14 09:17, Stanimir Varbanov wrote:
+> >> Hello everyone,
+> >>
+> >> Here is the continuation of patch sets sent recently about Qualcomm
+> >> QPNP SPMI PMICs.
+> >>
+> >> The previous version of the patch set can be found at [1].
+> >>
+> >> Changes since v1:
+> >>  - removed completely custom *of* parser
+> >>  - renamed the mfd driver from qpnp-spmi to pm8xxx-spmi
+> >>  - now MFD_PM8XXX_SPMI Kconfig option depends on SPMI
+> >>
+> >> Removing of the custom *of* parser leads to that that the *reg* devicetree
+> >> property cannot exist and therefore cannot be parsed to get PMIC peripheral
+> >> resources. I took this step aside because no one from mfd drivers does this
+> >> parsing. This will lead to inconvenience in the peripheral drivers to define
+> >> internally the SPMI base addresses depending on the compatible property
+> >> i.e. PMIC version. 
+> > 
+> > We should teach the of platform layer to translate reg properties up
+> > until the point that they can't be translated anymore. If they can't be
+> > translated all the way back to cpu addresses we can make the resource
+> > have IORESOURCE_REG instead of IORESOURCE_MEM and then said pmic
+> > platform drivers can use platform_get_resource() with IORESOURCE_REG
+> > instead of IORESOURCE_MEM to get the addresses.
+> > 
+> 
+> I considered this as an option, if it is acceptable by OF maintainers it
+> will be awesome.
+> 
+> Rob, Grant, is that feasible?
 
-Cc: "Beno?t Cousson" <bcousson@baylibre.com>
-Cc: Rob Herring <robh+dt@kernel.org>
-Cc: Pawel Moll <pawel.moll@arm.com>
-Cc: Mark Rutland <mark.rutland@arm.com>
-Cc: Ian Campbell <ijc+devicetree@hellion.org.uk>
-Cc: Kumar Gala <galak@codeaurora.org>
-Signed-off-by: Suman Anna <s-anna@ti.com>
----
- arch/arm/boot/dts/am33xx.dtsi   |  1 +
- arch/arm/boot/dts/am4372.dtsi   |  1 +
- arch/arm/boot/dts/dra7.dtsi     | 13 +++++++++++++
- arch/arm/boot/dts/omap2420.dtsi |  1 +
- arch/arm/boot/dts/omap2430.dtsi |  1 +
- arch/arm/boot/dts/omap3.dtsi    |  1 +
- arch/arm/boot/dts/omap4.dtsi    |  1 +
- arch/arm/boot/dts/omap5.dtsi    |  1 +
- 8 files changed, 20 insertions(+)
+It doesn't really make sense to do that kind of translation because the
+resulting address only makes sense if you also know which node the
+translation stopped at.
 
-diff --git a/arch/arm/boot/dts/am33xx.dtsi b/arch/arm/boot/dts/am33xx.dtsi
-index e4f165a..5663ff5 100644
---- a/arch/arm/boot/dts/am33xx.dtsi
-+++ b/arch/arm/boot/dts/am33xx.dtsi
-@@ -352,6 +352,7 @@
- 			reg = <0x480C8000 0x200>;
- 			interrupts = <77>;
- 			ti,hwmods = "mailbox";
-+			#mbox-cells = <1>;
- 			ti,mbox-num-users = <4>;
- 			ti,mbox-num-fifos = <8>;
- 			mbox_wkupm3: wkup_m3 {
-diff --git a/arch/arm/boot/dts/am4372.dtsi b/arch/arm/boot/dts/am4372.dtsi
-index 3be2a87..8619519 100644
---- a/arch/arm/boot/dts/am4372.dtsi
-+++ b/arch/arm/boot/dts/am4372.dtsi
-@@ -166,6 +166,7 @@
- 			reg = <0x480C8000 0x200>;
- 			interrupts = <GIC_SPI 77 IRQ_TYPE_LEVEL_HIGH>;
- 			ti,hwmods = "mailbox";
-+			#mbox-cells = <1>;
- 			ti,mbox-num-users = <4>;
- 			ti,mbox-num-fifos = <8>;
- 			mbox_wkupm3: wkup_m3 {
-diff --git a/arch/arm/boot/dts/dra7.dtsi b/arch/arm/boot/dts/dra7.dtsi
-index 99c40d4..626137f 100644
---- a/arch/arm/boot/dts/dra7.dtsi
-+++ b/arch/arm/boot/dts/dra7.dtsi
-@@ -342,6 +342,7 @@
- 			compatible = "ti,omap4-mailbox";
- 			reg = <0x4a0f4000 0x200>;
- 			ti,hwmods = "mailbox1";
-+			#mbox-cells = <1>;
- 			ti,mbox-num-users = <3>;
- 			ti,mbox-num-fifos = <8>;
- 			status = "disabled";
-@@ -351,6 +352,7 @@
- 			compatible = "ti,omap4-mailbox";
- 			reg = <0x4883a000 0x200>;
- 			ti,hwmods = "mailbox2";
-+			#mbox-cells = <1>;
- 			ti,mbox-num-users = <4>;
- 			ti,mbox-num-fifos = <12>;
- 			status = "disabled";
-@@ -360,6 +362,7 @@
- 			compatible = "ti,omap4-mailbox";
- 			reg = <0x4883c000 0x200>;
- 			ti,hwmods = "mailbox3";
-+			#mbox-cells = <1>;
- 			ti,mbox-num-users = <4>;
- 			ti,mbox-num-fifos = <12>;
- 			status = "disabled";
-@@ -369,6 +372,7 @@
- 			compatible = "ti,omap4-mailbox";
- 			reg = <0x4883e000 0x200>;
- 			ti,hwmods = "mailbox4";
-+			#mbox-cells = <1>;
- 			ti,mbox-num-users = <4>;
- 			ti,mbox-num-fifos = <12>;
- 			status = "disabled";
-@@ -378,6 +382,7 @@
- 			compatible = "ti,omap4-mailbox";
- 			reg = <0x48840000 0x200>;
- 			ti,hwmods = "mailbox5";
-+			#mbox-cells = <1>;
- 			ti,mbox-num-users = <4>;
- 			ti,mbox-num-fifos = <12>;
- 			status = "disabled";
-@@ -387,6 +392,7 @@
- 			compatible = "ti,omap4-mailbox";
- 			reg = <0x48842000 0x200>;
- 			ti,hwmods = "mailbox6";
-+			#mbox-cells = <1>;
- 			ti,mbox-num-users = <4>;
- 			ti,mbox-num-fifos = <12>;
- 			status = "disabled";
-@@ -396,6 +402,7 @@
- 			compatible = "ti,omap4-mailbox";
- 			reg = <0x48844000 0x200>;
- 			ti,hwmods = "mailbox7";
-+			#mbox-cells = <1>;
- 			ti,mbox-num-users = <4>;
- 			ti,mbox-num-fifos = <12>;
- 			status = "disabled";
-@@ -405,6 +412,7 @@
- 			compatible = "ti,omap4-mailbox";
- 			reg = <0x48846000 0x200>;
- 			ti,hwmods = "mailbox8";
-+			#mbox-cells = <1>;
- 			ti,mbox-num-users = <4>;
- 			ti,mbox-num-fifos = <12>;
- 			status = "disabled";
-@@ -414,6 +422,7 @@
- 			compatible = "ti,omap4-mailbox";
- 			reg = <0x4885e000 0x200>;
- 			ti,hwmods = "mailbox9";
-+			#mbox-cells = <1>;
- 			ti,mbox-num-users = <4>;
- 			ti,mbox-num-fifos = <12>;
- 			status = "disabled";
-@@ -423,6 +432,7 @@
- 			compatible = "ti,omap4-mailbox";
- 			reg = <0x48860000 0x200>;
- 			ti,hwmods = "mailbox10";
-+			#mbox-cells = <1>;
- 			ti,mbox-num-users = <4>;
- 			ti,mbox-num-fifos = <12>;
- 			status = "disabled";
-@@ -432,6 +442,7 @@
- 			compatible = "ti,omap4-mailbox";
- 			reg = <0x48862000 0x200>;
- 			ti,hwmods = "mailbox11";
-+			#mbox-cells = <1>;
- 			ti,mbox-num-users = <4>;
- 			ti,mbox-num-fifos = <12>;
- 			status = "disabled";
-@@ -441,6 +452,7 @@
- 			compatible = "ti,omap4-mailbox";
- 			reg = <0x48864000 0x200>;
- 			ti,hwmods = "mailbox12";
-+			#mbox-cells = <1>;
- 			ti,mbox-num-users = <4>;
- 			ti,mbox-num-fifos = <12>;
- 			status = "disabled";
-@@ -450,6 +462,7 @@
- 			compatible = "ti,omap4-mailbox";
- 			reg = <0x48802000 0x200>;
- 			ti,hwmods = "mailbox13";
-+			#mbox-cells = <1>;
- 			ti,mbox-num-users = <4>;
- 			ti,mbox-num-fifos = <12>;
- 			status = "disabled";
-diff --git a/arch/arm/boot/dts/omap2420.dtsi b/arch/arm/boot/dts/omap2420.dtsi
-index d14f16c..bea6f07 100644
---- a/arch/arm/boot/dts/omap2420.dtsi
-+++ b/arch/arm/boot/dts/omap2420.dtsi
-@@ -157,6 +157,7 @@
- 			interrupts = <26>, <34>;
- 			interrupt-names = "dsp", "iva";
- 			ti,hwmods = "mailbox";
-+			#mbox-cells = <1>;
- 			ti,mbox-num-users = <4>;
- 			ti,mbox-num-fifos = <6>;
- 			mbox_dsp: dsp {
-diff --git a/arch/arm/boot/dts/omap2430.dtsi b/arch/arm/boot/dts/omap2430.dtsi
-index db02be2..689bd08 100644
---- a/arch/arm/boot/dts/omap2430.dtsi
-+++ b/arch/arm/boot/dts/omap2430.dtsi
-@@ -247,6 +247,7 @@
- 			reg = <0x48094000 0x200>;
- 			interrupts = <26>;
- 			ti,hwmods = "mailbox";
-+			#mbox-cells = <1>;
- 			ti,mbox-num-users = <4>;
- 			ti,mbox-num-fifos = <6>;
- 			mbox_dsp: dsp {
-diff --git a/arch/arm/boot/dts/omap3.dtsi b/arch/arm/boot/dts/omap3.dtsi
-index b2ae8b8..75c290f 100644
---- a/arch/arm/boot/dts/omap3.dtsi
-+++ b/arch/arm/boot/dts/omap3.dtsi
-@@ -332,6 +332,7 @@
- 			ti,hwmods = "mailbox";
- 			reg = <0x48094000 0x200>;
- 			interrupts = <26>;
-+			#mbox-cells = <1>;
- 			ti,mbox-num-users = <2>;
- 			ti,mbox-num-fifos = <2>;
- 			mbox_dsp: dsp {
-diff --git a/arch/arm/boot/dts/omap4.dtsi b/arch/arm/boot/dts/omap4.dtsi
-index bc54d66..d08b98a 100644
---- a/arch/arm/boot/dts/omap4.dtsi
-+++ b/arch/arm/boot/dts/omap4.dtsi
-@@ -654,6 +654,7 @@
- 			reg = <0x4a0f4000 0x200>;
- 			interrupts = <GIC_SPI 26 IRQ_TYPE_LEVEL_HIGH>;
- 			ti,hwmods = "mailbox";
-+			#mbox-cells = <1>;
- 			ti,mbox-num-users = <3>;
- 			ti,mbox-num-fifos = <8>;
- 			mbox_ipu: mbox_ipu {
-diff --git a/arch/arm/boot/dts/omap5.dtsi b/arch/arm/boot/dts/omap5.dtsi
-index f7ec4cd..0b8cf23 100644
---- a/arch/arm/boot/dts/omap5.dtsi
-+++ b/arch/arm/boot/dts/omap5.dtsi
-@@ -641,6 +641,7 @@
- 			reg = <0x4a0f4000 0x200>;
- 			interrupts = <GIC_SPI 26 IRQ_TYPE_LEVEL_HIGH>;
- 			ti,hwmods = "mailbox";
-+			#mbox-cells = <1>;
- 			ti,mbox-num-users = <3>;
- 			ti,mbox-num-fifos = <8>;
- 			mbox_ipu: mbox_ipu {
--- 
-2.0.0
+A better solution is a new api for retrieving bus-local addresses
+instead of a global physical address. That would requires passing in a
+node or device to use as the translation root. If the child isn't a
+descended of that node, or if translation isn't possible then it should
+straight out fail instead of providing a partially translated value.
+
+g.
