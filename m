@@ -1,62 +1,92 @@
 From: jh80.chung@samsung.com (Jaehoon Chung)
-Date: Wed, 30 Jul 2014 20:05:10 +0900
-Subject: [PATCHv8 5/5] mmc: dw_mmc: replace "disable-wp" from slot's quirk to
- host's quirk
+Date: Wed, 30 Jul 2014 20:05:08 +0900
+Subject: [PATCHv8 3/5] ARM: dts: socfpga: unuse the slot-node and deprecated
+ the supports-highspeed for dw-mmc
 In-Reply-To: <1406718310-32078-1-git-send-email-jh80.chung@samsung.com>
 References: <1406718310-32078-1-git-send-email-jh80.chung@samsung.com>
-Message-ID: <1406718310-32078-6-git-send-email-jh80.chung@samsung.com>
+Message-ID: <1406718310-32078-4-git-send-email-jh80.chung@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Replaced the "disable-wp" into host's quirks.
-(Because the slot-node is removed at dt-file.)
+dw-mmc controller can support multiple slots.
+But, there are no use-cases anywhere. So we don't need to support the
+slot-node for dw-mmc controller.
+And "supports-highspeed" property in dw-mmc is deprecated.
+"supports-highspeed" property can be replaced to "cap-sd/mmc-highspeed".
 
 Signed-off-by: Jaehoon Chung <jh80.chung@samsung.com>
-Tested-by: Sachin Kamat <sachin.kamat@samsung.com>
+Reviewed-by: Tushar Behera <trblinux@gmail.com>
+Reviewed-by: Ulf Hansson <ulf.hansson@linaro.org>
 Acked-by: Seungwon Jeon <tgih.jun@samsung.com>
+Acked-by: Dinh Nguyen <dinguyen@altera.com>
 ---
- drivers/mmc/host/dw_mmc.c  |    8 +++++++-
- include/linux/mmc/dw_mmc.h |    2 ++
- 2 files changed, 9 insertions(+), 1 deletion(-)
+ arch/arm/boot/dts/socfpga_arria5.dtsi   |    9 +++------
+ arch/arm/boot/dts/socfpga_cyclone5.dtsi |    9 +++------
+ arch/arm/boot/dts/socfpga_vt.dts        |    9 +++------
+ 3 files changed, 9 insertions(+), 18 deletions(-)
 
-diff --git a/drivers/mmc/host/dw_mmc.c b/drivers/mmc/host/dw_mmc.c
-index 1ac227c..8d9edc6 100644
---- a/drivers/mmc/host/dw_mmc.c
-+++ b/drivers/mmc/host/dw_mmc.c
-@@ -997,7 +997,10 @@ static int dw_mci_get_ro(struct mmc_host *mmc)
- 	int gpio_ro = mmc_gpio_get_ro(mmc);
+diff --git a/arch/arm/boot/dts/socfpga_arria5.dtsi b/arch/arm/boot/dts/socfpga_arria5.dtsi
+index 12d1c2c..468fc4c 100644
+--- a/arch/arm/boot/dts/socfpga_arria5.dtsi
++++ b/arch/arm/boot/dts/socfpga_arria5.dtsi
+@@ -29,13 +29,10 @@
  
- 	/* Use platform get_ro function, else try on board write protect */
--	if (slot->quirks & DW_MCI_SLOT_QUIRK_NO_WRITE_PROTECT)
-+	if (slot->quirks & DW_MCI_SLOT_QUIRK_NO_WRITE_PROTECT) {
-+		dev_warn(slot->host->dev, "Recommend not to use 'disable-wp'"
-+				"into slot-node. Change your dt-file!!");
-+	} else if (slot->host->quirks & DW_MCI_QUIRK_NO_WRITE_PROTECT)
- 		read_only = 0;
- 	else if (!IS_ERR_VALUE(gpio_ro))
- 		read_only = gpio_ro;
-@@ -2238,6 +2241,9 @@ static struct dw_mci_of_quirks {
- 	{
- 		.quirk	= "broken-cd",
- 		.id	= DW_MCI_QUIRK_BROKEN_CARD_DETECTION,
-+	}, {
-+		.quirk	= "disable-wp",
-+		.id	= DW_MCI_QUIRK_NO_WRITE_PROTECT,
- 	},
- };
+ 		dwmmc0 at ff704000 {
+ 			num-slots = <1>;
+-			supports-highspeed;
+ 			broken-cd;
+-
+-			slot at 0 {
+-				reg = <0>;
+-				bus-width = <4>;
+-			};
++			bus-width = <4>;
++			cap-mmc-highspeed;
++			cap-sd-highspeed;
+ 		};
  
-diff --git a/include/linux/mmc/dw_mmc.h b/include/linux/mmc/dw_mmc.h
-index babaea9..29ce014 100644
---- a/include/linux/mmc/dw_mmc.h
-+++ b/include/linux/mmc/dw_mmc.h
-@@ -213,6 +213,8 @@ struct dw_mci_dma_ops {
- #define DW_MCI_QUIRK_HIGHSPEED			BIT(2)
- /* Unreliable card detection */
- #define DW_MCI_QUIRK_BROKEN_CARD_DETECTION	BIT(3)
-+/* No write protect */
-+#define DW_MCI_QUIRK_NO_WRITE_PROTECT		BIT(4)
+ 		sysmgr at ffd08000 {
+diff --git a/arch/arm/boot/dts/socfpga_cyclone5.dtsi b/arch/arm/boot/dts/socfpga_cyclone5.dtsi
+index bf51182..1ee03c4 100644
+--- a/arch/arm/boot/dts/socfpga_cyclone5.dtsi
++++ b/arch/arm/boot/dts/socfpga_cyclone5.dtsi
+@@ -30,13 +30,10 @@
  
- /* Slot level quirks */
- /* This slot has no write protect */
+ 		dwmmc0 at ff704000 {
+ 			num-slots = <1>;
+-			supports-highspeed;
+ 			broken-cd;
+-
+-			slot at 0 {
+-				reg = <0>;
+-				bus-width = <4>;
+-			};
++			bus-width = <4>;
++			cap-mmc-highspeed;
++			cap-sd-highspeed;
+ 		};
+ 
+ 		ethernet at ff702000 {
+diff --git a/arch/arm/boot/dts/socfpga_vt.dts b/arch/arm/boot/dts/socfpga_vt.dts
+index 09792b4..f9345e0 100644
+--- a/arch/arm/boot/dts/socfpga_vt.dts
++++ b/arch/arm/boot/dts/socfpga_vt.dts
+@@ -43,13 +43,10 @@
+ 
+ 		dwmmc0 at ff704000 {
+ 			num-slots = <1>;
+-			supports-highspeed;
+ 			broken-cd;
+-
+-			slot at 0 {
+-				reg = <0>;
+-				bus-width = <4>;
+-			};
++			bus-width = <4>;
++			cap-mmc-highspeed;
++			cap-sd-highspeed;
+ 		};
+ 
+ 		ethernet at ff700000 {
 -- 
 1.7.9.5
