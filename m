@@ -1,75 +1,55 @@
-From: heiko@sntech.de (Heiko =?ISO-8859-1?Q?St=FCbner?=)
-Date: Wed, 30 Jul 2014 14:23:03 +0200
-Subject: [PATCHv8 4/5] ARM: dts: rockchip: unuse the slot-node and
- deprecated the supports-highspeed for dw-mmc
-In-Reply-To: <1406718310-32078-5-git-send-email-jh80.chung@samsung.com>
-References: <1406718310-32078-1-git-send-email-jh80.chung@samsung.com>
- <1406718310-32078-5-git-send-email-jh80.chung@samsung.com>
-Message-ID: <2543771.WCP4tgxD8T@diego>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Wed, 30 Jul 2014 13:30:29 +0100
+Subject: [PATCH v2 1/3] arm64: spin-table: handle unmapped
+ cpu-release-addrs
+In-Reply-To: <CAKv+Gu-891BPCMCB2xnhsaUHxz_BCMkwbbwQ76kmK=JsUdifHQ@mail.gmail.com>
+References: <1406717944-24725-1-git-send-email-ard.biesheuvel@linaro.org>
+ <1406717944-24725-2-git-send-email-ard.biesheuvel@linaro.org>
+ <20140730113013.GL12239@arm.com>
+ <CAKv+Gu-891BPCMCB2xnhsaUHxz_BCMkwbbwQ76kmK=JsUdifHQ@mail.gmail.com>
+Message-ID: <20140730123029.GA20162@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-
-Am Mittwoch, 30. Juli 2014, 20:05:09 schrieb Jaehoon Chung:
-> dw-mmc controller can support multiple slots.
-> But, there are no use-cases anywhere. So we don't need to support the
-> slot-node for dw-mmc controller.
-> And "supports-highspeed" property in dw-mmc is deprecated.
-> "supports-highspeed" property can be replaced to "cap-sd/mmc-highspeed".
+On Wed, Jul 30, 2014 at 01:00:40PM +0100, Ard Biesheuvel wrote:
+> On 30 July 2014 13:30, Will Deacon <will.deacon@arm.com> wrote:
+> > On Wed, Jul 30, 2014 at 11:59:02AM +0100, Ard Biesheuvel wrote:
+> >> From: Mark Rutland <mark.rutland@arm.com>
+> >>
+> >> In certain cases the cpu-release-addr of a CPU may not fall in the
+> >> linear mapping (e.g. when the kernel is loaded above this address due to
+> >> the presence of other images in memory). This is problematic for the
+> >> spin-table code as it assumes that it can trivially convert a
+> >> cpu-release-addr to a valid VA in the linear map.
+> >>
+> >> This patch modifies the spin-table code to use a temporary cached
+> >> mapping to write to a given cpu-release-addr, enabling us to support
+> >> addresses regardless of whether they are covered by the linear mapping.
+> >>
+> >> Signed-off-by: Mark Rutland <mark.rutland@arm.com>
+> >> Tested-by: Mark Salter <msalter@redhat.com>
+> >> [ardb: added (__force void *) cast]
+> >> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+> >> ---
+> >>  arch/arm64/kernel/smp_spin_table.c | 22 +++++++++++++++++-----
+> >>  1 file changed, 17 insertions(+), 5 deletions(-)
+> >
+> > I'm nervous about this. What if the spin table sits in the same physical 64k
+> > frame as a read-sensitive device and we're running with 64k pages?
+> >
 > 
-> Signed-off-by: Jaehoon Chung <jh80.chung@samsung.com>
-> Reviewed-by: Tushar Behera <trblinux@gmail.com>
-> Reviewed-by: Ulf Hansson <ulf.hansson@linaro.org>
-> Reviewed-by: Heiko Stuebner <heiko@sntech.de>
-> Acked-by: Seungwon Jeon <tgih.jun@samsung.com>
+> I see what you mean. This is potentially hairy, as EFI already
+> ioremap_cache()s everything known to it as normal DRAM, so using plain
+> ioremap() here if pfn_valid() returns false for cpu-release-addr's PFN
+> may still result in mappings with different attributes for the same
+> region. So how should we decide whether to call ioremap() or
+> ioremap_cache() in this case?
 
-we might get a conflict, with recent Rockchip-specific devicetree changes [0].
-So depending on when the core changes of this series land, this patch
-might use a respin.
+If we're careful about handling mismatched attributes we might be able
+to get away with always using a device mapping.
 
+I'll need to have a think about that, I'm not sure on the architected
+cache behaviour in such a case.
 
-Heiko
-
-
-[0] https://git.kernel.org/cgit/linux/kernel/git/arm/arm-soc.git/commit/?h=rockchip/dt&id=fcbbf965254ff1693c26a5646e4e62adc3a6118d
-https://git.kernel.org/cgit/linux/kernel/git/arm/arm-soc.git/commit/?h=rockchip/dt&id=b09e35a388ad23eb90497a352b8e5e5cb4b97bf2
-
-> ---
->  arch/arm/boot/dts/rk3066a-bqcurie2.dts |   16 ++++------------
->  1 file changed, 4 insertions(+), 12 deletions(-)
-> 
-> diff --git a/arch/arm/boot/dts/rk3066a-bqcurie2.dts
-> b/arch/arm/boot/dts/rk3066a-bqcurie2.dts index afb3273..ecea889 100644
-> --- a/arch/arm/boot/dts/rk3066a-bqcurie2.dts
-> +++ b/arch/arm/boot/dts/rk3066a-bqcurie2.dts
-> @@ -59,12 +59,8 @@
->  			pinctrl-names = "default";
->  			pinctrl-0 = <&sd0_clk &sd0_cmd &sd0_cd &sd0_bus4>;
->  			vmmc-supply = <&vcc_sd0>;
-> -
-> -			slot at 0 {
-> -				reg = <0>;
-> -				bus-width = <4>;
-> -				disable-wp;
-> -			};
-> +			bus-width = <4>;
-> +			disable-wp;
->  		};
-> 
->  		dwmmc at 10218000 { /* wifi */
-> @@ -74,12 +70,8 @@
-> 
->  			pinctrl-names = "default";
->  			pinctrl-0 = <&sd1_clk &sd1_cmd &sd1_bus4>;
-> -
-> -			slot at 0 {
-> -				reg = <0>;
-> -				bus-width = <4>;
-> -				disable-wp;
-> -			};
-> +			bus-width = <4>;
-> +			disable-wp;
->  		};
-> 
->  		gpio-keys {
+Thanks,
+Mark.
