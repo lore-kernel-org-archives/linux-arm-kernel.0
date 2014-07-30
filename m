@@ -1,34 +1,72 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Wed, 30 Jul 2014 11:42:53 +0100
-Subject: [RFC 3/5] regulator: core: Only apply constraints if available
- on list voltage
-In-Reply-To: <53D8B195.4050003@collabora.co.uk>
-References: <1406651339-28901-1-git-send-email-javier.martinez@collabora.co.uk>
- <1406651339-28901-4-git-send-email-javier.martinez@collabora.co.uk>
- <20140729171857.GV17528@sirena.org.uk>
- <53D8B195.4050003@collabora.co.uk>
-Message-ID: <20140730104253.GP17528@sirena.org.uk>
+From: will.deacon@arm.com (Will Deacon)
+Date: Wed, 30 Jul 2014 11:46:04 +0100
+Subject: [PATCH  0/4] ARM: perf: Support i.MX53
+In-Reply-To: <53D7CE8E.70103@parkeon.com>
+References: <20140729123256.13347.79778.stgit@localhost>
+ <20140729125231.GM9245@arm.com> <53D7CE8E.70103@parkeon.com>
+Message-ID: <20140730104604.GG12239@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jul 30, 2014 at 10:49:25AM +0200, Javier Martinez Canillas wrote:
-> On 07/29/2014 07:18 PM, Mark Brown wrote:
+On Tue, Jul 29, 2014 at 05:40:46PM +0100, Martin Fuzzey wrote:
+> On 29/07/14 14:52, Will Deacon wrote:
+> > Instead, how about we add a new property on the PMU node that says it
+> > requires secure access, then we use that to configuer SDER in the perf code.
+> 
+> Ok but how would the new property be used?
+> Do you just mean making the code that sets the SUNIDEN bit conditional 
+> on this property?
 
-> > I would also expect any regulator where the supplied devices are able to
-> > vary the voltage to explicitly provide a constraint even if the
-> > implementation is done in a parent regulator.  There may be constraints
-> > on the child supply which aren't directly present on the parent supply
-> > and can be ignored if the child supply is turned off.
+We'd add a property to the PMU, so it would look something like:
 
-> Agreed, if I explicitly set the voltage constraints on the child supply then
-> this patch is indeed not needed.
+pmu {
+	compatible = "arm,cortex-a8-pmu";
+	interrupts = < ... >;
+	secure-reg-access;
+};
 
-We will, however, need some code to pass the child supply constraints on
-to the parent.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140730/3d8206bc/attachment.sig>
+Then we can match that last property in the driver and only configure the
+SDER if it's present.
+
+> So a DT for a board booting in secure mode would have the property set 
+> and one booting in non secure mode would not?
+
+Yes. It's also slightly more general in that you can set the property for
+any PMU that requires SDER configuration. In practice, that probable means
+`booted in secure mode' but you never know what people build.
+
+> But is it the DT's business to know how the kernel has been booted?
+
+I don't have an alternative other than only supporting perf in non-secure
+mode.
+
+> What happens in non secure mode?
+
+Exactly the same as what happens now; the property would be absent so
+existing behaviour would be preserved.
+
+> I presume the kernel won't touch SDER in that case (so avoiding an 
+> exception) but the counters will only work if code outside the kernel 
+> (bootloader, secure monitor?)  has already set things up correctly?
+
+Right. Secure software could restrict non-secure debug visibility, but
+that's not something Linux can do anything about.
+
+> Wouldn't it be possible to detect if the kernel is in secure mode and 
+> use that instead of a DT property?
+> Does the kernel have that information?
+
+No, you can't reliably detect that in the architecture.
+
+> > Then you can do your SoC-specific magic as part of the runtime PM hooks we
+> > already have (it looks like enabled/disabling a clock really).
+> This is orthogonal to the above right?
+> 
+> Indeed, I've tried that and it works without any extra hooks.
+> 
+> But what happens if we don't have CONFIG_PM_RUNTIME ?
+
+Then you don't get perf unless you configure things correctly in your
+firmware. This is just like configuring clocks.
+
+Will
