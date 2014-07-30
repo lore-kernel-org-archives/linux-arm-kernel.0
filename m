@@ -1,58 +1,52 @@
-From: Paul.Zimmerman@synopsys.com (Paul Zimmerman)
-Date: Wed, 30 Jul 2014 18:53:38 +0000
-Subject: [PATCH 1/4] Documentation: dt-bindings: add dt binding info for
- Rockchip dwc2
-In-Reply-To: <1406683873-18194-2-git-send-email-kever.yang@rock-chips.com>
-References: <963258>
- <1406683873-18194-1-git-send-email-kever.yang@rock-chips.com>
- <1406683873-18194-2-git-send-email-kever.yang@rock-chips.com>
-Message-ID: <A2CA0424C0A6F04399FB9E1CD98E0304844C2F5B@US01WEMBX2.internal.synopsys.com>
+From: christoffer.dall@linaro.org (Christoffer Dall)
+Date: Wed, 30 Jul 2014 20:54:47 +0200
+Subject: [GIT PULL] KVM/ARM Urgent fix for 3.16
+In-Reply-To: <53D8F453.9010101@redhat.com>
+References: <1406724941-4283-1-git-send-email-christoffer.dall@linaro.org>
+ <53D8F453.9010101@redhat.com>
+Message-ID: <20140730185447.GF11610@cbox>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> From: Kever Yang [mailto:kever.yang at rock-chips.com]
-> Sent: Tuesday, July 29, 2014 6:31 PM
+On Wed, Jul 30, 2014 at 03:34:11PM +0200, Paolo Bonzini wrote:
+> Il 30/07/2014 14:55, Christoffer Dall ha scritto:
+> > Hi Paolo and Gleb,
+> > 
+> > Is there any chance you can get this urgent fix (which allows KVM guest
+> > to bring down the entire system on some 64K enabled ARM64 hosts) merged
+> > for 3.16?
+> > 
+> > The following changes since commit bb18b526a9d8d4a3fe56f234d5013b9f6036978d:
+> > 
+> >   Merge tag 'signed-for-3.16' of git://github.com/agraf/linux-2.6 into kvm-master (2014-07-08 12:08:58 +0200)
+> > 
+> > are available in the git repository at:
+> > 
+> > 
+> >   git://git.kernel.org/pub/scm/linux/kernel/git/kvmarm/kvmarm.git tags/kvm-arm-for-3.16-rc7
+> > 
+> > for you to fetch changes up to 63afbe7a0ac184ef8485dac4914e87b211b5bfaa:
+> > 
+> >   kvm: arm64: vgic: fix hyp panic with 64k pages on juno platform (2014-07-30 14:35:42 +0200)
+> > 
+> > ---
+> > Will Deacon (1):
+> >   kvm: arm64: vgic: fix hyp panic with 64k pages on juno platform
+> > 
+> >  virt/kvm/arm/vgic.c | 24 ++++++++++++++++++++----
+> >  1 file changed, 20 insertions(+), 4 deletions(-)
+> > 
 > 
-> This add necessary dwc2 binding documentation for Rockchip socs:
-> rk3066, rk3188 and rk3288
+> I think Gleb is on vacation now, but unfortunately I've already had
+> enough this year.
 > 
-> add dr_mode as optional properties.
+> I resent the pull request from
+> git://git.kernel.org/pub/scm/virt/kvm/kvm.git, even though you had CCed
+> Linus here already.
 > 
-> Signed-off-by: Kever Yang <kever.yang@rock-chips.com>
-> ---
->  Documentation/devicetree/bindings/usb/dwc2.txt |    5 +++++
->  1 file changed, 5 insertions(+)
-> 
-> diff --git a/Documentation/devicetree/bindings/usb/dwc2.txt
-> b/Documentation/devicetree/bindings/usb/dwc2.txt
-> index aa91034..eb80d7b 100644
-> --- a/Documentation/devicetree/bindings/usb/dwc2.txt
-> +++ b/Documentation/devicetree/bindings/usb/dwc2.txt
-> @@ -4,6 +4,9 @@ Platform DesignWare HS OTG USB 2.0 controller
->  Required properties:
->  - compatible : One of:
->    - brcm,bcm2835-usb: The DWC2 USB controller instance in the BCM2835 SoC.
-> +  - rockchip,rk3066-usb: The DWC2 USB controller instance in the rk3066 Soc;
-> +  - "rockchip,rk3188-usb","rockchip,rk3066-usb": for rk3188 Soc;
-> +  - "rockchip,rk3288-usb","rockchip,rk3066-usb": for rk3288 Soc;
->    - snps,dwc2: A generic DWC2 USB controller with default parameters.
+I cc'ed Linus in case you were on vacation and since this is urgent and
+last minute.
 
-Do you really need three different bindings here? I believe the 
-recommended approach is to define one binding for the common case, and
-reuse it for similar SOCs. Additional bindings should only be added if
-there is some difference in the SOC that requires it.
+In any case, thanks to all for dealing with this quickly.
 
->  - reg : Should contain 1 register range (address and length)
->  - interrupts : Should contain 1 interrupt
-> @@ -15,6 +18,8 @@ Optional properties:
->  - phys: phy provider specifier
->  - phy-names: shall be "usb2-phy"
->  Refer to phy/phy-bindings.txt for generic phy consumer properties
-> +- dr_mode: shall be one of "host", "peripheral" and "otg"
-
-I don't see where you use 'dr_mode' in any of the DTS files. Are you
-going to add the uses later? And please us a more descriptive name,
-such as 'dual-role-mode'.
-
--- 
-Paul
+-Christoffer
