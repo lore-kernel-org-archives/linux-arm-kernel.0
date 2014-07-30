@@ -1,82 +1,187 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Wed, 30 Jul 2014 13:30:29 +0100
-Subject: [PATCH] ARM64: KVM: Nuke EL2 mode tlbs before enabling MMU for EL2
-In-Reply-To: <CAAHg+Hjo12X3_X+NXNb9+-+Xj2hetkEx+RihdRap9szLWvUd_w@mail.gmail.com>
- (Pranavkumar Sawargaonkar's message of "Wed, 30 Jul 2014 12:13:19
- +0100")
-References: <1406713607-27150-1-git-send-email-pranavkumar@linaro.org>
- <87k36vjela.fsf@approximate.cambridge.arm.com>
- <CAAHg+Hjo12X3_X+NXNb9+-+Xj2hetkEx+RihdRap9szLWvUd_w@mail.gmail.com>
-Message-ID: <878unbjafu.fsf@approximate.cambridge.arm.com>
+From: afaerber@suse.de (=?ISO-8859-15?Q?Andreas_F=E4rber?=)
+Date: Wed, 30 Jul 2014 14:33:29 +0200
+Subject: [PATCHv7 2/5] ARM: dts: exynos: unuse the slot-node and deprecated
+ the supports-highspeed for dw-mmc
+In-Reply-To: <1406514579-3769-3-git-send-email-jh80.chung@samsung.com>
+References: <1406514579-3769-1-git-send-email-jh80.chung@samsung.com>
+ <1406514579-3769-3-git-send-email-jh80.chung@samsung.com>
+Message-ID: <53D8E619.90601@suse.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jul 30 2014 at 12:13:19 pm BST, Pranavkumar Sawargaonkar <pranavkumar@linaro.org> wrote:
-> Hi Marc,
->
-> On 30 July 2014 16:30, Marc Zyngier <marc.zyngier@arm.com> wrote:
->
->     Hi Pranav,
->    
->     On Wed, Jul 30 2014 at 10:46:47 am BST, Pranavkumar Sawargaonkar <
->     pranavkumar at linaro.org> wrote:
->     > X-Gene u-boot runs in EL2 mode with MMU enabled hence we might
->     > have stale EL2 tlb enteris when we enable EL2 MMU on each host CPU.
->     >
->     > This can happen on any ARM64 board running bootloader in EL2
->     > with MMU enabled.
->     >
->     > This patch ensures that we flush all EL2 TLBs on each host CPU
->     > before enabling EL2 MMU. This is very similar to what we do
->     > for EL1 TLBs before enabling EL1 MMU.
->     > (Refer __cpu_setup() of arch/arm64/mm/proc.S)
->     >
->     > Signed-off-by: Pranavkumar Sawargaonkar <pranavkumar@linaro.org>
->     > Signed-off-by: Anup Patel <anup.patel@linaro.org>
->     > ---
->     > ?arch/arm64/kvm/hyp-init.S | ? ?4 ++++
->     > ?1 file changed, 4 insertions(+)
->     >
->     > diff --git a/arch/arm64/kvm/hyp-init.S b/arch/arm64/kvm/hyp-init.S
->     > index d968796..c319116 100644
->     > --- a/arch/arm64/kvm/hyp-init.S
->     > +++ b/arch/arm64/kvm/hyp-init.S
->     > @@ -80,6 +80,10 @@ __do_hyp_init:
->     > ? ? ? msr ? ? mair_el2, x4
->     > ? ? ? isb
->     >
->     > + ? ? /* Invalidate the stale TLBs from Bootloader */
->     > + ? ? tlbi ? ?alle2
->     > + ? ? dsb ? ? sy
->     > +
->     > ? ? ? mrs ? ? x4, sctlr_el2
->     > ? ? ? and ? ? x4, x4, #SCTLR_EL2_EE ? // preserve endianness of EL2
->     > ? ? ? ldr ? ? x5, =SCTLR_EL2_FLAGS
->    
->     This looks like a valid fix. But I wonder if it wouldn't be better
->     located in kernel/head.S::el2_setup?
->
-> Sure, I can try this on one of my flaky setup where I see this issue :)
-> One question is , if someone tries to do load/unload KVM module frequently
-> then do "__do_hyp_init" will require the flushing again ?
+Am 28.07.2014 04:29, schrieb Jaehoon Chung:
+> dw-mmc controller can support multiple slots.
+> But, there are no use-cases anywhere. So we don't need to support the
+> slot-node for dw-mmc controller.
+> And "supports-highspeed" property in dw-mmc is deprecated.
+> "supports-highspeed" property can be replaced to "cap-sd/mmc-highspeed".
 
-Well, we can't really "unload" KVM, it is not a module. But CPU hotplug
-could trigger something similar (though I'd expect it to come back
-through el2_setup anyway).
+s/replaced to/replaced with/
 
-Anyway, we can probably keep it in KVM, and revisit that later if that
-makes sense.
+> Signed-off-by: Jaehoon Chung <jh80.chung@samsung.com>
+> Reviewed-by: Tushar Behera <trblinux@gmail.com>
+> Reviewed-by: Ulf Hansson <ulf.hansson@linaro.org>
+> Tested-by: Sachin Kamat <sachin.kamat@samsung.com>
+> Acked-by: Seungwon Jeon <tgih.jun@samsung.com>
+> Acked-by: Kukjin Kim <kgene.kim@samsung.com>
+> ---
+>  arch/arm/boot/dts/exynos4412-odroidx.dts      |    8 ++------
+>  arch/arm/boot/dts/exynos4412-origen.dts       |    8 ++------
+>  arch/arm/boot/dts/exynos4412-trats2.dts       |    8 ++------
+>  arch/arm/boot/dts/exynos5250-arndale.dts      |   18 +++++------------
+>  arch/arm/boot/dts/exynos5250-cros-common.dtsi |   26 +++++++------------------
+>  arch/arm/boot/dts/exynos5250-smdk5250.dts     |   18 +++++------------
+>  arch/arm/boot/dts/exynos5250-snow.dts         |    6 ++----
+>  arch/arm/boot/dts/exynos5260-xyref5260.dts    |   18 +++++------------
+>  arch/arm/boot/dts/exynos5410-smdk5410.dts     |   18 +++++------------
+>  arch/arm/boot/dts/exynos5420-arndale-octa.dts |   16 ++++-----------
+>  arch/arm/boot/dts/exynos5420-peach-pit.dts    |   16 ++++-----------
+>  arch/arm/boot/dts/exynos5420-smdk5420.dts     |   16 ++++-----------
+>  arch/arm/boot/dts/exynos5800-peach-pi.dts     |   16 ++++-----------
+>  13 files changed, 51 insertions(+), 141 deletions(-)
+[...]
+> diff --git a/arch/arm/boot/dts/exynos5250-cros-common.dtsi b/arch/arm/boot/dts/exynos5250-cros-common.dtsi
+> index 89ac90f..af51361 100644
+> --- a/arch/arm/boot/dts/exynos5250-cros-common.dtsi
+> +++ b/arch/arm/boot/dts/exynos5250-cros-common.dtsi
+> @@ -248,7 +248,6 @@
+>  
+>  	mmc at 12200000 {
+>  		num-slots = <1>;
+> -		supports-highspeed;
+>  		broken-cd;
+>  		card-detect-delay = <200>;
+>  		samsung,dw-mshc-ciu-div = <3>;
+> @@ -256,44 +255,33 @@
+>  		samsung,dw-mshc-ddr-timing = <1 2>;
+>  		pinctrl-names = "default";
+>  		pinctrl-0 = <&sd0_clk &sd0_cmd &sd0_cd &sd0_bus4 &sd0_bus8>;
+> -
+> -		slot at 0 {
+> -			reg = <0>;
+> -			bus-width = <8>;
+> -		};
+> +		bus-width = <8>;
+> +		cap-mmc-highspeed;
+>  	};
+>  
+>  	mmc at 12220000 {
+>  		num-slots = <1>;
+> -		supports-highspeed;
+>  		card-detect-delay = <200>;
+>  		samsung,dw-mshc-ciu-div = <3>;
+>  		samsung,dw-mshc-sdr-timing = <2 3>;
+>  		samsung,dw-mshc-ddr-timing = <1 2>;
+>  		pinctrl-names = "default";
+>  		pinctrl-0 = <&sd2_clk &sd2_cmd &sd2_cd &sd2_bus4>;
+> -
+> -		slot at 0 {
+> -			reg = <0>;
+> -			bus-width = <4>;
+> -			wp-gpios = <&gpc2 1 0>;
+> -		};
+> +		bus-width = <4>;
+> +		wp-gpios = <&gpc2 1 0>;
+> +		cap-sd-highspeed;
+>  	};
+>  
+>  	mmc at 12230000 {
+>  		num-slots = <1>;
+> -		supports-highspeed;
+>  		broken-cd;
+>  		card-detect-delay = <200>;
+>  		samsung,dw-mshc-ciu-div = <3>;
+>  		samsung,dw-mshc-sdr-timing = <2 3>;
+>  		samsung,dw-mshc-ddr-timing = <1 2>;
+>  		/* See board-specific dts files for pin setup */
+> -
+> -		slot at 0 {
+> -			reg = <0>;
+> -			bus-width = <4>;
+> -		};
+> +		bus-width = <4>;
+> +		cap-sd-highspeed;
+>  	};
+>  
+>  	spi_1: spi at 12d30000 {
+[...]
+> diff --git a/arch/arm/boot/dts/exynos5250-snow.dts b/arch/arm/boot/dts/exynos5250-snow.dts
+> index 079fdf9..17d8f53 100644
+> --- a/arch/arm/boot/dts/exynos5250-snow.dts
+> +++ b/arch/arm/boot/dts/exynos5250-snow.dts
+> @@ -329,10 +329,8 @@
+>  	 */
+>  	mmc at 12230000 {
+>  		status = "okay";
+> -		slot at 0 {
+> -			pinctrl-names = "default";
+> -			pinctrl-0 = <&sd3_clk &sd3_cmd &sd3_bus4>;
+> -		};
+> +		pinctrl-names = "default";
+> +		pinctrl-0 = <&sd3_clk &sd3_cmd &sd3_bus4>;
+>  	};
+>  
+>  	i2c at 12CD0000 {
 
-> ?
->
->     Also, the 32bit code seems to suffer from the same issue. Care to fix it
->     as well?
->
-> I am fine with this but as I do not have arm32 board to test it
-> somebody will need to add tested-by.
+Since you said you are targeting 3.16 still, FYI Doug asked me to do the
+same change for 3.17 in my Spring series for correctness reasons. So we
+shouldn't have merge conflict there.
 
-Sure. Fire away!
+However, we are also dropping exynos5250-cros-common.dtsi, so at some
+point the above changes will need to be merged into -snow.dts as
+conflict resolution.
 
-	M.
+[...]
+> diff --git a/arch/arm/boot/dts/exynos5410-smdk5410.dts b/arch/arm/boot/dts/exynos5410-smdk5410.dts
+> index 7275bbd..be3e025 100644
+> --- a/arch/arm/boot/dts/exynos5410-smdk5410.dts
+> +++ b/arch/arm/boot/dts/exynos5410-smdk5410.dts
+> @@ -40,33 +40,25 @@
+>  &mmc_0 {
+>  	status = "okay";
+>  	num-slots = <1>;
+> -	supports-highspeed;
+> +	cap-mmc-highspeed;
+>  	broken-cd;
+>  	card-detect-delay = <200>;
+>  	samsung,dw-mshc-ciu-div = <3>;
+>  	samsung,dw-mshc-sdr-timing = <2 3>;
+>  	samsung,dw-mshc-ddr-timing = <1 2>;
+> -
+> -	slot at 0 {
+> -		reg = <0>;
+> -		bus-width = <8>;
+> -	};
+> +	bus-width = <8>;
+>  };
+>  
+>  &mmc_2 {
+>  	status = "okay";
+>  	num-slots = <1>;
+> -	supports-highspeed;
+> +	cap-sd-highspeed;
+>  	card-detect-delay = <200>;
+>  	samsung,dw-mshc-ciu-div = <3>;
+>  	samsung,dw-mshc-sdr-timing = <2 3>;
+>  	samsung,dw-mshc-ddr-timing = <1 2>;
+> -
+> -	slot at 0 {
+> -		reg = <0>;
+> -		bus-width = <4>;
+> -		disable-wp;
+> -	};
+> +	bus-width = <4>;
+> +	disable-wp;
+>  };
+>  
+>  &uart0 {
+
+Similarly here, I am adding an exynos5410-odroidxu.dts file that will
+need to get the same changes as -smdk5410.dts then.
+
+Regards,
+Andreas
+
 -- 
-Jazz is not dead. It just smells funny.
+SUSE LINUX Products GmbH, Maxfeldstr. 5, 90409 N?rnberg, Germany
+GF: Jeff Hawn, Jennifer Guild, Felix Imend?rffer; HRB 16746 AG N?rnberg
