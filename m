@@ -1,37 +1,25 @@
 From: olof@lixom.net (Olof Johansson)
-Date: Wed, 30 Jul 2014 12:48:05 -0700
-Subject: [PATCH] ARM: nomadik: fix up double inversion in DT
-In-Reply-To: <1406283522-6764-1-git-send-email-linus.walleij@linaro.org>
-References: <1406283522-6764-1-git-send-email-linus.walleij@linaro.org>
-Message-ID: <20140730194805.GD18384@quad.lixom.net>
+Date: Wed, 30 Jul 2014 12:49:11 -0700
+Subject: [PATCH 0/2] ARM: tegra: a couple of late DT patches
+In-Reply-To: <1406313603-11893-1-git-send-email-swarren@wwwdotorg.org>
+References: <1406313603-11893-1-git-send-email-swarren@wwwdotorg.org>
+Message-ID: <20140730194911.GE18384@quad.lixom.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jul 25, 2014 at 12:18:42PM +0200, Linus Walleij wrote:
-> The GPIO pin connected to card detect was inverted twice: once by
-> the argument to the GPIO line itself where it was magically marked
-> as active low by the flag GPIO_ACTIVE_LOW (0x01) in the third cell,
-> and also marked active low AGAIN by explicitly stating
-> "cd-inverted" (a deprecated method).
+On Fri, Jul 25, 2014 at 12:40:01PM -0600, Stephen Warren wrote:
+> From: Stephen Warren <swarren@nvidia.com>
 > 
-> After commit 78f87df2b4f8760954d7d80603d0cfcbd4759683
-> "mmc: mmci: Use the common mmc DT parser" this results in the
-> line being inverted twice so it was effectively uninverted, while
-> the old code would not have this effect, instead disregarding the
-> flag on the GPIO line altogether, which is a bug. I admit the
-> semantics may be unclear but inverting twice is as good a
-> definition as any on how this should work.
+> Here are a couple of fixe/cleanup patches to Tegra DT files that came in
+> late. They're based on top of Tegra's for-3.17/dt branch/pull-request.
 > 
-> So fix up the buggy device tree. Use proper #includes so the DTS
-> is clear and readable.
+> Marcel Ziswiler (1):
+>   ARM: tegra: apalis t30: fix device tree compatible node
 > 
-> Cc: Ulf Hansson <ulf.hansson@linaro.org>
-> Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
-> ---
-> ARM SoC folks: please either apply this directly for fixes, and if
-> that is too late, tag it for v3.16+ stable.
+> Thierry Reding (1):
+>   ARM: tegra: paz00: Fix some indentation inconsistencies
 
-Applied to fixes, Arnd must have missed it earlier.
+Both applied to next/dt. Thanks.
 
 
 -Olof
