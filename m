@@ -1,35 +1,33 @@
-From: soren.brinkmann@xilinx.com (=?utf-8?B?U8O2cmVu?= Brinkmann)
-Date: Wed, 30 Jul 2014 08:40:52 -0700
-Subject: [PATCH v2 1/2] ARM: smp_scu: use macro for SCU enable bit
-In-Reply-To: <1406275790-18617-2-git-send-email-shawn.guo@freescale.com>
-References: <1406275790-18617-1-git-send-email-shawn.guo@freescale.com>
- <1406275790-18617-2-git-send-email-shawn.guo@freescale.com>
-Message-ID: <f3845882-dc51-432c-a774-97c389769fe6@BN1AFFO11FD034.protection.gbl>
+From: dianders@chromium.org (Doug Anderson)
+Date: Wed, 30 Jul 2014 08:45:29 -0700
+Subject: [PATCH 3/4] usb: dwc2: add compatible data for rockchip soc
+In-Reply-To: <53D8934E.9040807@rock-chips.com>
+References: <1406683873-18194-1-git-send-email-kever.yang@rock-chips.com>
+ <1406684102-18313-1-git-send-email-kever.yang@rock-chips.com>
+ <CAD=FV=Wqr0C7gj89DVof=gBo4mxvqqz0or7_vkdad==CkzzrPg@mail.gmail.com>
+ <53D8934E.9040807@rock-chips.com>
+Message-ID: <CAD=FV=UiY3gCFf17PXEMzVJmjYjDV=chA+tx=dA0uPJ46L6J=Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Shawn,
+Kever,
 
-On Fri, 2014-07-25 at 04:09PM +0800, Shawn Guo wrote:
-> Use macro instead of magic number for SCU enable bit.
-> 
-> Signed-off-by: Shawn Guo <shawn.guo@freescale.com>
-> ---
->  arch/arm/kernel/smp_scu.c | 5 +++--
->  1 file changed, 3 insertions(+), 2 deletions(-)
-> 
-> diff --git a/arch/arm/kernel/smp_scu.c b/arch/arm/kernel/smp_scu.c
-> index 1aafa0d785eb..c947508f84e6 100644
-> --- a/arch/arm/kernel/smp_scu.c
-> +++ b/arch/arm/kernel/smp_scu.c
-> @@ -17,6 +17,7 @@
->  #include <asm/cputype.h>
->  
->  #define SCU_CTRL		0x00
-> +#define SCU_ENABLE		(1 << 0)
-I'd prefer using 'BIT(0)' here (and accordingly in the second patch).
+On Tue, Jul 29, 2014 at 11:40 PM, Kever Yang <kever.yang@rock-chips.com> wrote:
+>> Are you sure HNP/SRP is not available?  Do things break if you leave this
+>> at 0?
+>
+> 1. HNP/SRP is not need right now, I didn't see it used in mobile devices.
+> 2. If HNP/SRP is enabled, the controller will monitor the otg_vbus about 5V,
+>     overcurrent change will happen if vbus not detect after switch to host
+>     for a period of time.
+>     If not, the controller will monitor b_valid signal about 3V instead of
+> 5V vbus,
+>     which match the hardware reference design from Rockchip.
 
-For both patches:
-Acked-by: Soren Brinkmann <soren.brinkmann@xilinx.com>
+OK.  USB is pretty far away from my realm of expertise and I knew even
+less about OTG/gadget.  It does sound like there's no fundamental
+issue with HNP/SRP on the SoC itself but that we're working around an
+issue with the board, though.  If that's true, then perhaps we need
+another device tree property?
 
-	S?ren
+-Doug
