@@ -1,106 +1,69 @@
-From: osandov@osandov.com (Omar Sandoval)
-Date: Wed, 30 Jul 2014 00:12:45 -0700
-Subject: [PATCH] ARM/ARM64: don't enter kgdb when userspace executes a kgdb
- break instruction.
-Message-ID: <20140730071245.GA8954@mew.web-pass.com>
+From: christoffer.dall@linaro.org (Christoffer Dall)
+Date: Wed, 30 Jul 2014 09:14:39 +0200
+Subject: [PATCH 19/19] Documentation: ACPI for ARM64
+In-Reply-To: <53D894F0.1060102@linaro.org>
+References: <1406206825-15590-1-git-send-email-hanjun.guo@linaro.org>
+ <20140729112824.GM2576@leverpostej>
+ <CAMJs5B_Ye1eXsvJAKWnHRxC4jnpcXMcqHE+GgOGO7MHtPcsSQA@mail.gmail.com>
+ <351673188.FxXsM7MvdA@wuerfel> <20140729130823.GP2576@leverpostej>
+ <CAMJs5B8uk7GDfEOEuY8RWDxzhzTRBGszRDN+JRKwG-D_rgzFrw@mail.gmail.com>
+ <53D894F0.1060102@linaro.org>
+Message-ID: <CAMJs5B8L8GBsYOUMvu36fNQDv+fEXrBYQYDhkAtJkFzS3VsdPQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The kgdb breakpoint hooks (kgdb_brk_fn and kgdb_compiled_brk_fn) should only be
-entered when a kgdb break instruction is executed from the kernel. Otherwise,
-if kgdb is enabled, a userspace program can cause the kernel to drop into the
-debugger by executing either KGDB_BREAKINST or KGDB_COMPILED_BREAK on ARM, or
-brk #KGDB_{DYN,COMPILED}_DGB_BRK_IMM on ARM64.
+On 30 July 2014 08:47, Hanjun Guo <hanjun.guo@linaro.org> wrote:
+> On 2014-7-29 21:31, Christoffer Dall wrote:
+>> On 29 July 2014 15:08, Mark Rutland <mark.rutland@arm.com> wrote:
+>>> On Tue, Jul 29, 2014 at 01:52:40PM +0100, Arnd Bergmann wrote:
+>>>> On Tuesday 29 July 2014 14:37:38 Christoffer Dall wrote:
+>>>>>
+>>>>> For reference, Red Hat's current arguing point for ACPI in VMs is
+>>>>> hotplug of things like CPUs and memory for very large VMs, but I
+>>>>> haven't thought too carefully about this just yet, as I don't have a
+>>>>> 100+ core ARM 64-bit hardware lying around...
+>>>>
+>>>> I thought you could run guests with more virtual CPUs that you have
+>>>> physical CPUs on the host.
+>>>>
+>>>> Regarding CPU and memory hotplug, don't we already have PSCI and
+>>>> xen-balloon/virtio-balloon for that?
+>>>
+>>> PSCI (0.1) was there for guests from the start, and ACPI doesn't do
+>>> anything different w.r.t. PSCI other than requiring PSCI 0.2 (which can
+>>> be used by guests supporting only PSCI 0.1). So there's no magic for
+>>> CPU hotplug provided by ACPI.
+>>
+>> With PSCI you can only provide your VM a bunch of CPUs and say that
+>> they're all turned off, and then turn some of them on later.
+>
+> Yes, agreed.
+>
+>> I honestly don't know if you can do proper CPU hotplug with ACPI, but
+>> the RH guys seem to argue that you can.  Again, I didn't think too
+>> carefully about this.
+>
+> Yes, we can do proper CPU hotplug with ACPI based physical hotplug (named
+> dynamic device configuration in ACPI spec), you can refer to section 6.3
+> "Device Insertion, Removal, and Status Objects" in ACPI 5.1.
+>
+> There are mechanisms for handling dynamic insertion and removal of devices
+> and for determining device and notification processing status. When removing
+> a processor,
+>
+> a) we will call PSCI or similar interface to offline a CPU from OS, then
+>    OS will not use it any more;
+>
+> b) call ACPI API to trim the resources that allocated during device
+>    enumeration;
+>
+> c) Call ACPI method _EJ0 and then will notify firmware or hypervisor device
+>    will be removed, jump to firmware or hypervisor to remove the device
+>    from that level;
 
-Signed-off-by: Omar Sandoval <osandov@osandov.com>
----
-The following program reproduces the fixed problem on ARM:
-.globl _start
-_start:
-	udf	#65006	@ KGDB_BREAKINST
+When you say notify hypervisor, would we really need a
+hypervisor-specific interface if you're running UEFI as your firmware?
+ Can you not just call whatever UEFI service to remove a CPU and let
+that UEFI implementation deal with the hypervisor/hardware interface?
 
-And on ARM64:
-.globl _start
-_start:
-        brk     #0x400	@ KGDB_DYN_DGB_BRK_IMM
-
- arch/arm/kernel/kgdb.c                  | 4 ++++
- arch/arm64/include/asm/debug-monitors.h | 4 +++-
- arch/arm64/kernel/debug-monitors.c      | 3 ++-
- arch/arm64/kernel/kgdb.c                | 4 ++++
- 4 files changed, 13 insertions(+), 2 deletions(-)
-
-diff --git a/arch/arm/kernel/kgdb.c b/arch/arm/kernel/kgdb.c
-index 778c2f7..a74b53c 100644
---- a/arch/arm/kernel/kgdb.c
-+++ b/arch/arm/kernel/kgdb.c
-@@ -160,12 +160,16 @@ static int kgdb_compiled_brk_fn(struct pt_regs *regs, unsigned int instr)
- static struct undef_hook kgdb_brkpt_hook = {
- 	.instr_mask		= 0xffffffff,
- 	.instr_val		= KGDB_BREAKINST,
-+	.cpsr_mask		= MODE_MASK,
-+	.cpsr_val		= SVC_MODE,
- 	.fn			= kgdb_brk_fn
- };
- 
- static struct undef_hook kgdb_compiled_brkpt_hook = {
- 	.instr_mask		= 0xffffffff,
- 	.instr_val		= KGDB_COMPILED_BREAK,
-+	.cpsr_mask		= MODE_MASK,
-+	.cpsr_val		= SVC_MODE,
- 	.fn			= kgdb_compiled_brk_fn
- };
- 
-diff --git a/arch/arm64/include/asm/debug-monitors.h b/arch/arm64/include/asm/debug-monitors.h
-index 6e9b5b3..e1d27ce 100644
---- a/arch/arm64/include/asm/debug-monitors.h
-+++ b/arch/arm64/include/asm/debug-monitors.h
-@@ -105,8 +105,10 @@ void unregister_step_hook(struct step_hook *hook);
- 
- struct break_hook {
- 	struct list_head node;
--	u32 esr_val;
- 	u32 esr_mask;
-+	u32 esr_val;
-+	u64 pstate_mask;
-+	u64 pstate_val;
- 	int (*fn)(struct pt_regs *regs, unsigned int esr);
- };
- 
-diff --git a/arch/arm64/kernel/debug-monitors.c b/arch/arm64/kernel/debug-monitors.c
-index a7fb874..594fac4 100644
---- a/arch/arm64/kernel/debug-monitors.c
-+++ b/arch/arm64/kernel/debug-monitors.c
-@@ -303,7 +303,8 @@ static int call_break_hook(struct pt_regs *regs, unsigned int esr)
- 
- 	read_lock(&break_hook_lock);
- 	list_for_each_entry(hook, &break_hook, node)
--		if ((esr & hook->esr_mask) == hook->esr_val)
-+		if ((esr & hook->esr_mask) == hook->esr_val &&
-+		    (regs->pstate & hook->pstate_mask) == hook->pstate_val)
- 			fn = hook->fn;
- 	read_unlock(&break_hook_lock);
- 
-diff --git a/arch/arm64/kernel/kgdb.c b/arch/arm64/kernel/kgdb.c
-index 75c9cf1..80eb035 100644
---- a/arch/arm64/kernel/kgdb.c
-+++ b/arch/arm64/kernel/kgdb.c
-@@ -236,12 +236,16 @@ static int kgdb_step_brk_fn(struct pt_regs *regs, unsigned int esr)
- static struct break_hook kgdb_brkpt_hook = {
- 	.esr_mask	= 0xffffffff,
- 	.esr_val	= DBG_ESR_VAL_BRK(KGDB_DYN_DGB_BRK_IMM),
-+	.pstate_mask	= PSR_MODE_MASK,
-+	.pstate_val	= PSR_MODE_EL1h,
- 	.fn		= kgdb_brk_fn
- };
- 
- static struct break_hook kgdb_compiled_brkpt_hook = {
- 	.esr_mask	= 0xffffffff,
- 	.esr_val	= DBG_ESR_VAL_BRK(KDBG_COMPILED_DBG_BRK_IMM),
-+	.pstate_mask	= PSR_MODE_MASK,
-+	.pstate_val	= PSR_MODE_EL1h,
- 	.fn		= kgdb_compiled_brk_fn
- };
- 
--- 
-2.0.3
+-Christoffer
