@@ -1,33 +1,90 @@
-From: dianders@chromium.org (Doug Anderson)
-Date: Wed, 30 Jul 2014 08:45:29 -0700
-Subject: [PATCH 3/4] usb: dwc2: add compatible data for rockchip soc
-In-Reply-To: <53D8934E.9040807@rock-chips.com>
-References: <1406683873-18194-1-git-send-email-kever.yang@rock-chips.com>
- <1406684102-18313-1-git-send-email-kever.yang@rock-chips.com>
- <CAD=FV=Wqr0C7gj89DVof=gBo4mxvqqz0or7_vkdad==CkzzrPg@mail.gmail.com>
- <53D8934E.9040807@rock-chips.com>
-Message-ID: <CAD=FV=UiY3gCFf17PXEMzVJmjYjDV=chA+tx=dA0uPJ46L6J=Q@mail.gmail.com>
+From: nm@ti.com (Nishanth Menon)
+Date: Wed, 30 Jul 2014 10:45:41 -0500
+Subject: [PATCH 29/35] arm: omap: intc: switch over to linear irq domain
+In-Reply-To: <20140730144059.GA7272@saruman.home>
+References: <1406582183-696-1-git-send-email-balbi@ti.com>
+ <1406582183-696-30-git-send-email-balbi@ti.com>
+ <20140729121425.GR29045@atomide.com>
+ <20140729141522.GB17808@saruman.home>
+ <20140729152052.GV29045@atomide.com>
+ <20140729154057.GE17808@saruman.home>
+ <20140729163345.GF17808@saruman.home>
+ <20140730060420.GY29045@atomide.com>
+ <20140730144059.GA7272@saruman.home>
+Message-ID: <CAGo_u6ou+MoKOE_tTTmjxyFNW=jTaN9vnTsHrxR6sQHsieJyLA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Kever,
-
-On Tue, Jul 29, 2014 at 11:40 PM, Kever Yang <kever.yang@rock-chips.com> wrote:
->> Are you sure HNP/SRP is not available?  Do things break if you leave this
->> at 0?
+On Wed, Jul 30, 2014 at 9:40 AM, Felipe Balbi <balbi@ti.com> wrote:
+> HI,
 >
-> 1. HNP/SRP is not need right now, I didn't see it used in mobile devices.
-> 2. If HNP/SRP is enabled, the controller will monitor the otg_vbus about 5V,
->     overcurrent change will happen if vbus not detect after switch to host
->     for a period of time.
->     If not, the controller will monitor b_valid signal about 3V instead of
-> 5V vbus,
->     which match the hardware reference design from Rockchip.
+> On Tue, Jul 29, 2014 at 11:04:21PM -0700, Tony Lindgren wrote:
+>> * Felipe Balbi <balbi@ti.com> [140729 09:36]:
+>> > Hi,
+>> >
+>> > On Tue, Jul 29, 2014 at 10:40:57AM -0500, Felipe Balbi wrote:
+>> > > On Tue, Jul 29, 2014 at 08:20:52AM -0700, Tony Lindgren wrote:
+>> > > > * Felipe Balbi <balbi@ti.com> [140729 07:18]:
+>> > > > > Hi,
+>> > > > >
+>> > > > > On Tue, Jul 29, 2014 at 05:14:25AM -0700, Tony Lindgren wrote:
+>> > > > > > * Felipe Balbi <balbi@ti.com> [140728 14:19]:
+>> > > > > > > now that we don't need to support legacy board-files,
+>> > > > > > > we can completely switch over to a linear irq domain
+>> > > > > > > and make use of irq_alloc_domain_generic_chips() to
+>> > > > > > > allocate all generic irq chips for us.
+>> > > > > >
+>> > > > > > This patch seems to somehow break off-idle for omap3
+>> > > > > > where it no longer wakes up.
+>> > > > >
+>> > > > > Sure your bisection is correct ? This patch just switches from legacy
+>> > > > > irq domain to linear irq domain.
+>> > > >
+>> > > > Yes, I tried it a few times. Just enabling
+>> > > > retention idle hangs too with this patch.
+>> > > >
+>> > > > Maybe it's omap3_prcm_irq_setup that relies on
+>> > > > 11 + OMAP_INTC_START? There may be other such issues
+>> > >
+>> > > lol.
+>> > >
+>> > > OMAP4 has the same nonsense.
+>> >
+>> > made me think why (if) OMAP4 works with that same setup. Does wake from
+>> > OFF work with OMAP4 ?
+>>
+>> Not without similar changes, omap4+ has the same issue.. There's a RFC
+>> series from Nishant to fix some of this, and Tero is moving the PRCM
+>> into a driver.
+>>
+>> > Anyway, here's a quick little hack to check if that's the reason for the
+>> > regression:
+>>
+>> OK yeah that's along the same lines with Nishant's RFC series in thread
+>> "[RFC PATCH 0/7] ARM: OMAP4+: PRM: minor cleanups and dt support of
+>> interrupts"
+>>
+>> FYI, it did not compile, needs to include linux/of_irq.h. But yes,
+>
+> I might have sent the wrong version as I had that same build error and
+> fixed it localy.
+>
+>> it fixes the regression for me, Also now the whole series works for
+>> me :)
+>
+> good to know.
+>
+> What do you want to do now ? Wait for PRCM to become a driver ? Wait for
+> Nishanth's series to get accepted ? I guess the same thing could be done
+> for OMAP3 and AM33, then we would have a chance of having working wake
+> from idle with the new irqchip.
 
-OK.  USB is pretty far away from my realm of expertise and I knew even
-less about OTG/gadget.  It does sound like there's no fundamental
-issue with HNP/SRP on the SoC itself but that we're working around an
-issue with the board, though.  If that's true, then perhaps we need
-another device tree property?
+I can repost the current series as it stands now once 17-rc1 comes out
+(without the build failure ofcourse).. if that helps to move it out of
+RFC status.
 
--Doug
+
+-- 
+---
+Regards,
+Nishanth Menon
