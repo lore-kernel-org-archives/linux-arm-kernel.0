@@ -1,30 +1,37 @@
-From: grant.likely@linaro.org (Grant Likely)
-Date: Tue, 29 Jul 2014 21:24:38 -0600
-Subject: [RESEND][PATCHv2 0/3] Fix for buggy u-boot memory banks
-In-Reply-To: <53D69CEA.3060206@codeaurora.org>
-References: <1405443816-29917-1-git-send-email-lauraa@codeaurora.org>
- <CAL_JsqJv2_UHxHGFF=nFKQRiEwfFtH_7PhMPS=W=APyzc-yiTQ@mail.gmail.com>
- <53D69CEA.3060206@codeaurora.org>
-Message-ID: <20140730032438.948EAC408F6@trevor.secretlab.ca>
+From: fkan@apm.com (Feng Kan)
+Date: Tue, 29 Jul 2014 20:26:34 -0700
+Subject: Kexec on arm64
+In-Reply-To: <CAFdej00J2mJwcg2Cy6CHVuuQZ4uQ2zZg8oErGPi0uPejievB+Q@mail.gmail.com>
+References: <CAFdej006OSyhgDcJ2iZdbjt+PtysN=i_+9Dr4GTmr=+t5yg4Kw@mail.gmail.com>
+ <1405443898.22585.7.camel@smoke>
+ <CAL85gmC9LLcN_uxMY1bM5kLx=N7rZGdGO3bmGHeUVo=Rqgk8uw@mail.gmail.com>
+ <1405551861.7262.26.camel@smoke>
+ <CAFdej03nixSU=3h+HYk2E3Onb2P3--Di0GM+wCwLS6ZNH7UjEQ@mail.gmail.com>
+ <CAFdej00J2mJwcg2Cy6CHVuuQZ4uQ2zZg8oErGPi0uPejievB+Q@mail.gmail.com>
+Message-ID: <CAL85gmAjcnh77CfuRiHsiD8SdJFsQfm=+kM-AuvxVb_gKMiOyA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 28 Jul 2014 11:56:42 -0700, Laura Abbott <lauraa@codeaurora.org> wrote:
-> On 7/26/2014 2:20 PM, Rob Herring wrote:
-> > On Tue, Jul 15, 2014 at 12:03 PM, Laura Abbott <lauraa@codeaurora.org> wrote:
-> >> Hi,
-> >>
-> >> This is a resend of the series to fix the uboot bug exposed by the removal
-> >> of meminfo. I haven't gotten any acks though.
-> > 
-> > Is the bug with ATAGs that get converted to DT in the decompressor or
-> > u-boot puts the wrong info in DT directly?
-> > 
-> 
-> I believe it's u-boot putting the wrong info in DT directly. See
-> http://lists.infradead.org/pipermail/linux-arm-kernel/2014-June/266782.html
+>
+> But I had some luck when I did the same steps with L3 cache
+> disabled. According to http://www.spinics.net/lists/arm-kernel/msg329541.html
+> it has an L3 cache. Luckily I was able to disable it in u-boot.
+>
+> With the L3 cache disabled configuration I am able to
+> do "kexec -e". Please see the log attached.
+>
+> Feng,
+> I doubt kernel is unaware of the presence of L3 cache, this subsequently
+> makes "kexec -e" to fail.
+Yes, L3 is turned on prior to entering Linux. It is used when Linux
+enable cache in
+the MMU.
 
-I've picked up this series with some very minor changes. I'll ask Linus
-to pull it into v3.16 as a last minute fix.
+>
+> Do you have any idea how to make the kernel to take control of L3 cache?
+We don't have this code. Using address 0 to get back to spin address would
+require you to disable cache prior to jump.
 
-g.
+
+>
+> --Arun
