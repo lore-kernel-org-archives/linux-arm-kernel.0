@@ -1,129 +1,138 @@
-From: heiko@sntech.de (Heiko =?ISO-8859-1?Q?St=FCbner?=)
-Date: Wed, 30 Jul 2014 14:16:03 +0200
-Subject: [PATCH v5 0/7] kernel: Add support for restart handler call chain
-In-Reply-To: <53D84F77.2050401@roeck-us.net>
-References: <1405668856-13738-1-git-send-email-linux@roeck-us.net>
- <53D84F77.2050401@roeck-us.net>
-Message-ID: <1705554.pBhZQ0Icu9@diego>
+From: jslaby@suse.cz (Jiri Slaby)
+Date: Wed, 30 Jul 2014 14:15:00 +0200
+Subject: [PATCH 3.12 71/94] locking/mutex: Disable optimistic spinning on some
+ architectures
+In-Reply-To: <e43bbc2c2b44d8f0bd0b7f65d6fd50ef738c57aa.1406722270.git.jslaby@suse.cz>
+References: <e43bbc2c2b44d8f0bd0b7f65d6fd50ef738c57aa.1406722270.git.jslaby@suse.cz>
+Message-ID: <91b2716ab0210733b2e26fbe9d490e9136b79672.1406722270.git.jslaby@suse.cz>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Guenter,
+From: Peter Zijlstra <peterz@infradead.org>
 
-Am Dienstag, 29. Juli 2014, 18:50:47 schrieb Guenter Roeck:
-> On 07/18/2014 12:34 AM, Guenter Roeck wrote:
-> > Various drivers implement architecture and/or device specific means
-> > to restart (reset) the system. Various mechanisms have been implemented
-> > to support those schemes. The best known mechanism is arm_pm_restart,
-> > which is a function pointer to be set either from platform specific code
-> > or from drivers. Another mechanism is to use hardware watchdogs to issue
-> > a reset; this mechanism is used if there is no other method available
-> > to reset a board or system. Two examples are alim7101_wdt, which currently
-> > uses the reboot notifier to trigger a reset, and moxart_wdt, which
-> > registers the arm_pm_restart function. Several other restart drivers for
-> > arm, all directly calling arm_pm_restart, are in the process of being
-> > integrated into the kernel. All those drivers would benefit from the new
-> > API.
-> > 
-> > The existing mechanisms have a number of drawbacks. Typically only one
-> > scheme to restart the system is supported (at least if arm_pm_restart is
-> > used). At least in theory there can be multiple means to restart the
-> > system, some of which may be less desirable (for example one mechanism
-> > may only reset the CPU, while another may reset the entire system). Using
-> > arm_pm_restart can also be racy if the function pointer is set from a
-> > driver, as the driver may be in the process of being unloaded when
-> > arm_pm_restart is called.
-> > Using the reboot notifier is always racy, as it is unknown if and when
-> > other functions using the reboot notifier have completed execution
-> > by the time the watchdog fires.
-> > 
-> > Introduce a system restart handler call chain to solve the described
-> > problems. This call chain is expected to be executed from the
-> > architecture specific machine_restart() function. Drivers providing
-> > system restart functionality (such as the watchdog drivers mentioned
-> > above) are expected to register with this call chain. By using the
-> > priority field in the notifier block, callers can control restart handler
-> > execution sequence and thus ensure that the restart handler with the
-> > optimal restart capabilities for a given system is called first.
-> > 
-> > Since the first revision of this patchset, a number of separate patch
-> > submissions have been made which either depend on it or could make use of
-> > it.
-> > 
-> > http://www.spinics.net/linux/lists/arm-kernel/msg344796.html
-> > 
-> > 	registers three notifiers.
-> > 
-> > https://lkml.org/lkml/2014/7/8/962
-> > 
-> > 	would benefit from it.
-> > 
-> > Patch 1 of this series implements the restart handler function. Patches 2
-> > and 3 implement calling the restart handler chain from arm and arm64
-> > restart code.
-> > 
-> > Patch 4 modifies the restart-poweroff driver to no longer call
-> > arm_pm_restart directly but machine_restart. This is done to avoid
-> > calling arm_pm_restart from more than one place. The change makes the
-> > driver architecture independent, so it would be possible to drop the arm
-> > dependency from its Kconfig entry.
-> > 
-> > Patch 5 and 6 convert existing restart handlers in the watchdog subsystem
-> > to use the restart handler. Patch 7 unexports arm_pm_restart to ensure
-> > that no one gets the idea to implement a restart handler as module.
-> > 
-> > ---
-> > v5: Rebased series to v3.16-rc5
-> > 
-> >      Function renames:
-> >      register_restart_notifier -> register_restart_handler
-> >      unregister_restart_notifier -> unregister_restart_handler
-> >      kernel_restart_notify -> do_kernel_restart
-> > 
-> > v4: Document restart notifier priorities
-> > 
-> >      Select 128 as default priority for newly introduced notifiers
-> >      Fix checkpatch warning (line too long) in moxart patch
-> > 
-> > v3: Drop RFC.
-> > 
-> >      Add kernel_restart_notify wrapper function to execute notifier
-> >      Improve documentation.
-> >      Move restart_notifier_list into kernel/reboot.c and make it static.
-> > 
-> > v2: Add patch 4.
-> > 
-> >      Only call blocking notifier call chain if arm_pm_restart was not set.
-> > 
-> > --
-> 
-> To get more test coverage, this series plus a few add-on patches which
-> depend on it are now available in the restart-staging branch of my
-> repository at kernel.org [1]. The branch is currently based on 3.16-rc7.
-> Extensive build test results are available at [2]; look for the column
-> marked 'restart-staging' on the far right of the tables.
-> 
-> I would encourage everyone interested in this series to send me Reviewed-by:
-> or at least Acked-by: tags. Note that I removed all of the earlier tags
-> since I feel that the changes made subsequently warrant updated tags. An
-> Acked-by: from affected maintainers would also be very helpful.
+3.12-stable review patch.  If anyone has any objections, please let me know.
 
-Thanks for adapting my Samsung restart-patches to the API changes.
+===============
 
-The one thing I found is, in
-	"clk: samsung: register restart handlers for s3c2412 and s3c2443"
-you seem to have forgotten the priority in the clk-s3c2443.c part while in 
-clk-s3c2412.c it is present.
+commit 4badad352a6bb202ec68afa7a574c0bb961e5ebc upstream.
 
-And I'm not sure if there shouldn't be some sort of delay, to give the 
-watchdog some time to work, as Tomasz suggested in my initial submission?
+The optimistic spin code assumes regular stores and cmpxchg() play nice;
+this is found to not be true for at least: parisc, sparc32, tile32,
+metag-lock1, arc-!llsc and hexagon.
 
+There is further wreckage, but this in particular seemed easy to
+trigger, so blacklist this.
 
-I'll update the Rockchip specific restart-patches after the merge window, when 
-the core clock support has landed.
+Opt in for known good archs.
 
-And I still like the whole concept very much, so
-Acked-by: Heiko Stuebner <heiko@sntech.de>
+Signed-off-by: Peter Zijlstra <peterz@infradead.org>
+Reported-by: Mikulas Patocka <mpatocka@redhat.com>
+Cc: David Miller <davem@davemloft.net>
+Cc: Chris Metcalf <cmetcalf@tilera.com>
+Cc: James Bottomley <James.Bottomley@hansenpartnership.com>
+Cc: Vineet Gupta <vgupta@synopsys.com>
+Cc: Jason Low <jason.low2@hp.com>
+Cc: Waiman Long <waiman.long@hp.com>
+Cc: "James E.J. Bottomley" <jejb@parisc-linux.org>
+Cc: Paul McKenney <paulmck@linux.vnet.ibm.com>
+Cc: John David Anglin <dave.anglin@bell.net>
+Cc: James Hogan <james.hogan@imgtec.com>
+Cc: Linus Torvalds <torvalds@linux-foundation.org>
+Cc: Davidlohr Bueso <davidlohr@hp.com>
+Cc: Benjamin Herrenschmidt <benh@kernel.crashing.org>
+Cc: Catalin Marinas <catalin.marinas@arm.com>
+Cc: Russell King <linux@arm.linux.org.uk>
+Cc: Will Deacon <will.deacon@arm.com>
+Cc: linux-arm-kernel at lists.infradead.org
+Cc: linux-kernel at vger.kernel.org
+Cc: linuxppc-dev at lists.ozlabs.org
+Cc: sparclinux at vger.kernel.org
+Link: http://lkml.kernel.org/r/20140606175316.GV13930 at laptop.programming.kicks-ass.net
+Signed-off-by: Ingo Molnar <mingo@kernel.org>
+Signed-off-by: Jiri Slaby <jslaby@suse.cz>
+---
+ arch/arm/Kconfig     | 1 +
+ arch/arm64/Kconfig   | 1 +
+ arch/powerpc/Kconfig | 1 +
+ arch/sparc/Kconfig   | 1 +
+ arch/x86/Kconfig     | 1 +
+ kernel/Kconfig.locks | 5 ++++-
+ 6 files changed, 9 insertions(+), 1 deletion(-)
 
-
-Heiko
+diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+index e47fcd1e9645..99e1ce978cf9 100644
+--- a/arch/arm/Kconfig
++++ b/arch/arm/Kconfig
+@@ -5,6 +5,7 @@ config ARM
+ 	select ARCH_HAS_ATOMIC64_DEC_IF_POSITIVE
+ 	select ARCH_HAS_TICK_BROADCAST if GENERIC_CLOCKEVENTS_BROADCAST
+ 	select ARCH_HAVE_CUSTOM_GPIO_H
++	select ARCH_SUPPORTS_ATOMIC_RMW
+ 	select ARCH_WANT_IPC_PARSE_VERSION
+ 	select BUILDTIME_EXTABLE_SORT if MMU
+ 	select CLONE_BACKWARDS
+diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
+index c04454876bcb..fe70eaea0e28 100644
+--- a/arch/arm64/Kconfig
++++ b/arch/arm64/Kconfig
+@@ -1,6 +1,7 @@
+ config ARM64
+ 	def_bool y
+ 	select ARCH_HAS_ATOMIC64_DEC_IF_POSITIVE
++	select ARCH_SUPPORTS_ATOMIC_RMW
+ 	select ARCH_WANT_OPTIONAL_GPIOLIB
+ 	select ARCH_WANT_COMPAT_IPC_PARSE_VERSION
+ 	select ARCH_WANT_FRAME_POINTERS
+diff --git a/arch/powerpc/Kconfig b/arch/powerpc/Kconfig
+index d5d026b6d237..2e0ddfadc0b9 100644
+--- a/arch/powerpc/Kconfig
++++ b/arch/powerpc/Kconfig
+@@ -138,6 +138,7 @@ config PPC
+ 	select OLD_SIGSUSPEND
+ 	select OLD_SIGACTION if PPC32
+ 	select HAVE_DEBUG_STACKOVERFLOW
++	select ARCH_SUPPORTS_ATOMIC_RMW
+ 
+ config EARLY_PRINTK
+ 	bool
+diff --git a/arch/sparc/Kconfig b/arch/sparc/Kconfig
+index 4e5683877b93..d60f34dbae89 100644
+--- a/arch/sparc/Kconfig
++++ b/arch/sparc/Kconfig
+@@ -75,6 +75,7 @@ config SPARC64
+ 	select ARCH_HAVE_NMI_SAFE_CMPXCHG
+ 	select HAVE_C_RECORDMCOUNT
+ 	select NO_BOOTMEM
++	select ARCH_SUPPORTS_ATOMIC_RMW
+ 
+ config ARCH_DEFCONFIG
+ 	string
+diff --git a/arch/x86/Kconfig b/arch/x86/Kconfig
+index eb2dfa61eabe..9dc1a24d41b8 100644
+--- a/arch/x86/Kconfig
++++ b/arch/x86/Kconfig
+@@ -123,6 +123,7 @@ config X86
+ 	select COMPAT_OLD_SIGACTION if IA32_EMULATION
+ 	select RTC_LIB
+ 	select HAVE_DEBUG_STACKOVERFLOW
++	select ARCH_SUPPORTS_ATOMIC_RMW
+ 
+ config INSTRUCTION_DECODER
+ 	def_bool y
+diff --git a/kernel/Kconfig.locks b/kernel/Kconfig.locks
+index d2b32ac27a39..ecee67a00f5f 100644
+--- a/kernel/Kconfig.locks
++++ b/kernel/Kconfig.locks
+@@ -220,6 +220,9 @@ config INLINE_WRITE_UNLOCK_IRQRESTORE
+ 
+ endif
+ 
++config ARCH_SUPPORTS_ATOMIC_RMW
++	bool
++
+ config MUTEX_SPIN_ON_OWNER
+ 	def_bool y
+-	depends on SMP && !DEBUG_MUTEXES
++	depends on SMP && !DEBUG_MUTEXES && ARCH_SUPPORTS_ATOMIC_RMW
+-- 
+2.0.1
