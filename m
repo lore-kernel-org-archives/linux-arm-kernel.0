@@ -1,301 +1,36 @@
-From: afaerber@suse.de (=?ISO-8859-15?Q?Andreas_F=E4rber?=)
-Date: Wed, 30 Jul 2014 13:28:47 +0200
-Subject: [PATCH v9 3/6] ARM: dts: Exynos: add CPU OPP and regulator supply
- property
-In-Reply-To: <1406707663-16656-4-git-send-email-thomas.ab@samsung.com>
-References: <1406707663-16656-1-git-send-email-thomas.ab@samsung.com>
- <1406707663-16656-4-git-send-email-thomas.ab@samsung.com>
-Message-ID: <53D8D6EF.8010503@suse.de>
+From: will.deacon@arm.com (Will Deacon)
+Date: Wed, 30 Jul 2014 12:30:13 +0100
+Subject: [PATCH v2 1/3] arm64: spin-table: handle unmapped
+ cpu-release-addrs
+In-Reply-To: <1406717944-24725-2-git-send-email-ard.biesheuvel@linaro.org>
+References: <1406717944-24725-1-git-send-email-ard.biesheuvel@linaro.org>
+ <1406717944-24725-2-git-send-email-ard.biesheuvel@linaro.org>
+Message-ID: <20140730113013.GL12239@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am 30.07.2014 10:07, schrieb Thomas Abraham:
-> For Exynos 4210/5250/5420 based platforms, add CPU operating points and CPU
-> regulator supply properties for migrating from Exynos specific cpufreq driver
-> to using generic cpufreq drivers.
+On Wed, Jul 30, 2014 at 11:59:02AM +0100, Ard Biesheuvel wrote:
+> From: Mark Rutland <mark.rutland@arm.com>
 > 
-> Cc: Kukjin Kim <kgene.kim@samsung.com>
-> Cc: Doug Anderson <dianders@chromium.org>
-> Cc: Javier Martinez Canillas <javier.martinez@collabora.co.uk>
-> Cc: Andreas Faerber <afaerber@suse.de>
-> Cc: Sachin Kamat <sachin.kamat@linaro.org>
-> Signed-off-by: Thomas Abraham <thomas.ab@samsung.com>
+> In certain cases the cpu-release-addr of a CPU may not fall in the
+> linear mapping (e.g. when the kernel is loaded above this address due to
+> the presence of other images in memory). This is problematic for the
+> spin-table code as it assumes that it can trivially convert a
+> cpu-release-addr to a valid VA in the linear map.
+> 
+> This patch modifies the spin-table code to use a temporary cached
+> mapping to write to a given cpu-release-addr, enabling us to support
+> addresses regardless of whether they are covered by the linear mapping.
+> 
+> Signed-off-by: Mark Rutland <mark.rutland@arm.com>
+> Tested-by: Mark Salter <msalter@redhat.com>
+> [ardb: added (__force void *) cast]
+> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
 > ---
->  arch/arm/boot/dts/exynos4210-origen.dts         |    4 +++
->  arch/arm/boot/dts/exynos4210-trats.dts          |    4 +++
->  arch/arm/boot/dts/exynos4210-universal_c210.dts |    4 +++
->  arch/arm/boot/dts/exynos4210.dtsi               |   14 ++++++++-
->  arch/arm/boot/dts/exynos5250-arndale.dts        |    4 +++
->  arch/arm/boot/dts/exynos5250-smdk5250.dts       |    4 +++
->  arch/arm/boot/dts/exynos5250-snow.dts           |    4 +++
->  arch/arm/boot/dts/exynos5250.dtsi               |   25 ++++++++++++++-
->  arch/arm/boot/dts/exynos5420.dtsi               |   38 +++++++++++++++++++++++
->  9 files changed, 99 insertions(+), 2 deletions(-)
-> 
-> diff --git a/arch/arm/boot/dts/exynos4210-origen.dts b/arch/arm/boot/dts/exynos4210-origen.dts
-> index f767c42..887dded 100644
-> --- a/arch/arm/boot/dts/exynos4210-origen.dts
-> +++ b/arch/arm/boot/dts/exynos4210-origen.dts
-> @@ -334,3 +334,7 @@
->  		};
->  	};
->  };
-> +
-> +&cpu0 {
-> +	cpu0-supply = <&buck1_reg>;
-> +};
-> diff --git a/arch/arm/boot/dts/exynos4210-trats.dts b/arch/arm/boot/dts/exynos4210-trats.dts
-> index f516da9..66119dd 100644
-> --- a/arch/arm/boot/dts/exynos4210-trats.dts
-> +++ b/arch/arm/boot/dts/exynos4210-trats.dts
-> @@ -446,3 +446,7 @@
->  		};
->  	};
->  };
-> +
-> +&cpu0 {
-> +	cpu0-supply = <&varm_breg>;
-> +};
-> diff --git a/arch/arm/boot/dts/exynos4210-universal_c210.dts b/arch/arm/boot/dts/exynos4210-universal_c210.dts
-> index d50eb3a..bf0a39c 100644
-> --- a/arch/arm/boot/dts/exynos4210-universal_c210.dts
-> +++ b/arch/arm/boot/dts/exynos4210-universal_c210.dts
-> @@ -492,3 +492,7 @@
->  &mdma1 {
->  	reg = <0x12840000 0x1000>;
->  };
-> +
-> +&cpu0 {
-> +	cpu0-supply = <&vdd_arm_reg>;
-> +};
-> diff --git a/arch/arm/boot/dts/exynos4210.dtsi b/arch/arm/boot/dts/exynos4210.dtsi
-> index bcc9e63..69bac07 100644
-> --- a/arch/arm/boot/dts/exynos4210.dtsi
-> +++ b/arch/arm/boot/dts/exynos4210.dtsi
-> @@ -35,10 +35,22 @@
->  		#address-cells = <1>;
->  		#size-cells = <0>;
->  
-> -		cpu at 900 {
-> +		cpu0: cpu at 900 {
->  			device_type = "cpu";
->  			compatible = "arm,cortex-a9";
->  			reg = <0x900>;
-> +			clocks = <&clock CLK_ARM_CLK>;
-> +			clock-names = "cpu";
-> +			clock-latency = <160000>;
-> +
-> +			operating-points = <
-> +				1200000 1250000
-> +				1000000 1150000
-> +				800000	1075000
-> +				500000	975000
-> +				400000	975000
-> +				200000	950000
+>  arch/arm64/kernel/smp_spin_table.c | 22 +++++++++++++++++-----
+>  1 file changed, 17 insertions(+), 5 deletions(-)
 
-Nit: Here you left-align the columns ...
+I'm nervous about this. What if the spin table sits in the same physical 64k
+frame as a read-sensitive device and we're running with 64k pages?
 
-> +			>;
->  		};
->  
->  		cpu at 901 {
-> diff --git a/arch/arm/boot/dts/exynos5250-arndale.dts b/arch/arm/boot/dts/exynos5250-arndale.dts
-> index d0de1f5..3b12a97 100644
-> --- a/arch/arm/boot/dts/exynos5250-arndale.dts
-> +++ b/arch/arm/boot/dts/exynos5250-arndale.dts
-> @@ -575,3 +575,7 @@
->  		usb-phy = <&usb2_phy>;
->  	};
->  };
-> +
-> +&cpu0 {
-> +	cpu0-supply = <&buck2_reg>;
-> +};
-> diff --git a/arch/arm/boot/dts/exynos5250-smdk5250.dts b/arch/arm/boot/dts/exynos5250-smdk5250.dts
-> index b4b35ad..f07e834 100644
-> --- a/arch/arm/boot/dts/exynos5250-smdk5250.dts
-> +++ b/arch/arm/boot/dts/exynos5250-smdk5250.dts
-> @@ -414,3 +414,7 @@
->  		};
->  	};
->  };
-> +
-> +&cpu0 {
-> +	cpu0-supply = <&buck2_reg>;
-> +};
-> diff --git a/arch/arm/boot/dts/exynos5250-snow.dts b/arch/arm/boot/dts/exynos5250-snow.dts
-> index f2b8c41..91acca7 100644
-> --- a/arch/arm/boot/dts/exynos5250-snow.dts
-> +++ b/arch/arm/boot/dts/exynos5250-snow.dts
-> @@ -509,4 +509,8 @@
->  	};
->  };
->  
-> +&cpu0 {
-> +	cpu0-supply = <&buck2_reg>;
-> +};
-> +
->  #include "cros-ec-keyboard.dtsi"
-> diff --git a/arch/arm/boot/dts/exynos5250.dtsi b/arch/arm/boot/dts/exynos5250.dtsi
-> index 492e1ef..97b282c 100644
-> --- a/arch/arm/boot/dts/exynos5250.dtsi
-> +++ b/arch/arm/boot/dts/exynos5250.dtsi
-> @@ -58,11 +58,34 @@
->  		#address-cells = <1>;
->  		#size-cells = <0>;
->  
-> -		cpu at 0 {
-> +		cpu0: cpu at 0 {
->  			device_type = "cpu";
->  			compatible = "arm,cortex-a15";
->  			reg = <0>;
->  			clock-frequency = <1700000000>;
-> +
-> +			clocks = <&clock CLK_ARM_CLK>;
-> +			clock-names = "cpu";
-> +			clock-latency = <140000>;
-> +
-> +			operating-points = <
-> +				1700000 1300000
-> +				1600000 1250000
-> +				1500000 1225000
-> +				1400000 1200000
-> +				1300000 1150000
-> +				1200000 1125000
-> +				1100000 1100000
-> +				1000000 1075000
-> +				 900000 1050000
-> +				 800000 1025000
-> +				 700000 1012500
-> +				 600000 1000000
-> +				 500000  975000
-> +				 400000  950000
-> +				 300000  937500
-> +				 200000  925000
-
-... here you right-align both ...
-
-> +			>;
->  		};
->  		cpu at 1 {
->  			device_type = "cpu";
-> diff --git a/arch/arm/boot/dts/exynos5420.dtsi b/arch/arm/boot/dts/exynos5420.dtsi
-> index cb2b70e..3154b4c 100644
-> --- a/arch/arm/boot/dts/exynos5420.dtsi
-> +++ b/arch/arm/boot/dts/exynos5420.dtsi
-> @@ -59,8 +59,26 @@
->  			device_type = "cpu";
->  			compatible = "arm,cortex-a15";
->  			reg = <0x0>;
-> +			clocks = <&clock CLK_ARM_CLK>;
-> +			clock-names = "cpu-cluster.0";
->  			clock-frequency = <1800000000>;
->  			cci-control-port = <&cci_control1>;
-> +			clock-latency = <140000>;
-> +
-> +			operating-points = <
-> +				1800000 1250000
-> +				1700000 1212500
-> +				1600000 1175000
-> +				1500000 1137500
-> +				1400000 1112500
-> +				1300000 1062500
-> +				1200000 1037500
-> +				1100000 1012500
-> +				1000000 987500
-> +				 900000 962500
-> +				 800000 937500
-> +				 700000 912500
-
-... but here only the left column.
-
-> +			>;
->  		};
->  
->  		cpu1: cpu at 1 {
-> @@ -69,6 +87,7 @@
->  			reg = <0x1>;
->  			clock-frequency = <1800000000>;
->  			cci-control-port = <&cci_control1>;
-> +			clock-latency = <140000>;
->  		};
->  
->  		cpu2: cpu at 2 {
-> @@ -77,6 +96,7 @@
->  			reg = <0x2>;
->  			clock-frequency = <1800000000>;
->  			cci-control-port = <&cci_control1>;
-> +			clock-latency = <140000>;
->  		};
->  
->  		cpu3: cpu at 3 {
-> @@ -85,14 +105,29 @@
->  			reg = <0x3>;
->  			clock-frequency = <1800000000>;
->  			cci-control-port = <&cci_control1>;
-> +			clock-latency = <140000>;
->  		};
->  
->  		cpu4: cpu at 100 {
->  			device_type = "cpu";
->  			compatible = "arm,cortex-a7";
->  			reg = <0x100>;
-> +			clocks = <&clock CLK_KFC_CLK>;
-> +			clock-names = "cpu-cluster.1";
->  			clock-frequency = <1000000000>;
->  			cci-control-port = <&cci_control0>;
-> +			clock-latency = <140000>;
-> +
-> +			operating-points = <
-> +				1300000 1275000
-> +				1200000 1212500
-> +				1100000 1162500
-> +				1000000 1112500
-> +				 900000 1062500
-> +				 800000 1025000
-> +				 700000 975000
-> +				 600000 937500
-
-Dito.
-
-> +			>;
->  		};
->  
->  		cpu5: cpu at 101 {
-> @@ -101,6 +136,7 @@
->  			reg = <0x101>;
->  			clock-frequency = <1000000000>;
->  			cci-control-port = <&cci_control0>;
-> +			clock-latency = <140000>;
->  		};
->  
->  		cpu6: cpu at 102 {
-> @@ -109,6 +145,7 @@
->  			reg = <0x102>;
->  			clock-frequency = <1000000000>;
->  			cci-control-port = <&cci_control0>;
-> +			clock-latency = <140000>;
->  		};
->  
->  		cpu7: cpu at 103 {
-> @@ -117,6 +154,7 @@
->  			reg = <0x103>;
->  			clock-frequency = <1000000000>;
->  			cci-control-port = <&cci_control0>;
-> +			clock-latency = <140000>;
->  		};
->  	};
->  
-
-Since I don't really care which template you choose and can't judge most
-numbers, FWIW
-
-Reviewed-by: Andreas F?rber <afaerber@suse.de>
-
-Thanks for resolving the conflict,
-
-Andreas
-
--- 
-SUSE LINUX Products GmbH, Maxfeldstr. 5, 90409 N?rnberg, Germany
-GF: Jeff Hawn, Jennifer Guild, Felix Imend?rffer; HRB 16746 AG N?rnberg
+Will
