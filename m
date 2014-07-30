@@ -1,35 +1,36 @@
 From: wens@csie.org (Chen-Yu Tsai)
-Date: Wed, 30 Jul 2014 20:56:05 +0800
-Subject: [PATCH v5 2/6] rtc: sunxi: Depend on platforms sun4i/sun7i that
- actually have the rtc
+Date: Wed, 30 Jul 2014 20:56:07 +0800
+Subject: [PATCH v5 4/6] ARM: dts: sun8i: add rtc device node
 In-Reply-To: <1406724969-2482-1-git-send-email-wens@csie.org>
 References: <1406724969-2482-1-git-send-email-wens@csie.org>
-Message-ID: <1406724969-2482-3-git-send-email-wens@csie.org>
+Message-ID: <1406724969-2482-5-git-send-email-wens@csie.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Now that we have Kconfig options for individual sunxi platforms, let
-the rtc-sunxi driver depend on the platforms that actually have this
-hardware, sun4i and sun7i.
+sun8i shares the same rtc hardware as sun6i. Now that we have a driver
+for it, add a device node to the DTSI for it so we can use it.
 
 Signed-off-by: Chen-Yu Tsai <wens@csie.org>
-Acked-by: Maxime Ripard <maxime.ripard@free-electrons.com>
 ---
- drivers/rtc/Kconfig | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+ arch/arm/boot/dts/sun8i-a23.dtsi | 6 ++++++
+ 1 file changed, 6 insertions(+)
 
-diff --git a/drivers/rtc/Kconfig b/drivers/rtc/Kconfig
-index dde2b57..f933b4b 100644
---- a/drivers/rtc/Kconfig
-+++ b/drivers/rtc/Kconfig
-@@ -1176,7 +1176,7 @@ config RTC_DRV_SUN6I
+diff --git a/arch/arm/boot/dts/sun8i-a23.dtsi b/arch/arm/boot/dts/sun8i-a23.dtsi
+index 54ac0787..62f002e 100644
+--- a/arch/arm/boot/dts/sun8i-a23.dtsi
++++ b/arch/arm/boot/dts/sun8i-a23.dtsi
+@@ -285,6 +285,12 @@
+ 			interrupts = <1 9 0xf04>;
+ 		};
  
- config RTC_DRV_SUNXI
- 	tristate "Allwinner sun4i/sun7i RTC"
--	depends on ARCH_SUNXI
-+	depends on MACH_SUN4I || MACH_SUN7I
- 	help
- 	  If you say Y here you will get support for the RTC found on
- 	  Allwinner A10/A20.
++		rtc: rtc at 01f00000 {
++			compatible = "allwinner,sun6i-a31-rtc";
++			reg = <0x01f00000 0x54>;
++			interrupts = <0 40 4>, <0 41 4>;
++		};
++
+ 		prcm at 01f01400 {
+ 			compatible = "allwinner,sun8i-a23-prcm";
+ 			reg = <0x01f01400 0x200>;
 -- 
 2.0.1
