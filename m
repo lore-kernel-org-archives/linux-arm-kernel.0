@@ -1,53 +1,80 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Wed, 30 Jul 2014 14:05:08 +0200
-Subject: [PATCH v2 1/3] arm64: spin-table: handle unmapped
- cpu-release-addrs
-In-Reply-To: <CAKv+Gu-891BPCMCB2xnhsaUHxz_BCMkwbbwQ76kmK=JsUdifHQ@mail.gmail.com>
-References: <1406717944-24725-1-git-send-email-ard.biesheuvel@linaro.org>
- <1406717944-24725-2-git-send-email-ard.biesheuvel@linaro.org>
- <20140730113013.GL12239@arm.com>
- <CAKv+Gu-891BPCMCB2xnhsaUHxz_BCMkwbbwQ76kmK=JsUdifHQ@mail.gmail.com>
-Message-ID: <CAKv+Gu8rg=Th0OggHggSFEpLq5buR3vsCwR74TeyO5g85pt2Hw@mail.gmail.com>
+From: afaerber@suse.de (=?ISO-8859-15?Q?Andreas_F=E4rber?=)
+Date: Wed, 30 Jul 2014 14:08:14 +0200
+Subject: [PATCHv7 0/5] ARM: remove the sub-node and deprecate
+ supports-highspeed property for dwmmc.
+In-Reply-To: <1406514579-3769-1-git-send-email-jh80.chung@samsung.com>
+References: <1406514579-3769-1-git-send-email-jh80.chung@samsung.com>
+Message-ID: <53D8E02E.2070007@suse.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 30 July 2014 14:00, Ard Biesheuvel <ard.biesheuvel@linaro.org> wrote:
-> On 30 July 2014 13:30, Will Deacon <will.deacon@arm.com> wrote:
->> On Wed, Jul 30, 2014 at 11:59:02AM +0100, Ard Biesheuvel wrote:
->>> From: Mark Rutland <mark.rutland@arm.com>
->>>
->>> In certain cases the cpu-release-addr of a CPU may not fall in the
->>> linear mapping (e.g. when the kernel is loaded above this address due to
->>> the presence of other images in memory). This is problematic for the
->>> spin-table code as it assumes that it can trivially convert a
->>> cpu-release-addr to a valid VA in the linear map.
->>>
->>> This patch modifies the spin-table code to use a temporary cached
->>> mapping to write to a given cpu-release-addr, enabling us to support
->>> addresses regardless of whether they are covered by the linear mapping.
->>>
->>> Signed-off-by: Mark Rutland <mark.rutland@arm.com>
->>> Tested-by: Mark Salter <msalter@redhat.com>
->>> [ardb: added (__force void *) cast]
->>> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
->>> ---
->>>  arch/arm64/kernel/smp_spin_table.c | 22 +++++++++++++++++-----
->>>  1 file changed, 17 insertions(+), 5 deletions(-)
->>
->> I'm nervous about this. What if the spin table sits in the same physical 64k
->> frame as a read-sensitive device and we're running with 64k pages?
->>
->
-> I see what you mean. This is potentially hairy, as EFI already
-> ioremap_cache()s everything known to it as normal DRAM, so using plain
+Am 28.07.2014 04:29, schrieb Jaehoon Chung:
+> Since used the mmc_of_parse(), didn't parse the sub-node.
+> So we can remove the sub-node, because almost SoC used the only one card per a host.
+> And supports-highspeed can be replaced to "cap-mmc/sd-highspeed" property.
+> 
+> Chnagelog V7:
+> 	- Fixed typo and modified the commit message.
+> Changelog V6:
+> 	- Fixed Wrong bit control for host's quirks and rename.
+> 	- Add "Acked-by" for each SoC maintainers.
+> Changelog V5:
+> 	- Rebased on v3.16-rc4.
+> 	- Add Acked-by.
+> Changelog V4:
+> 	- Fix the checkpatch error.
+> Changelog V3:
+> 	- Fix the wrong bus-width value.
+> 	- Use the slot->host->quirks instead of brq->quirks.
+> 	- Add tested-by and reviewd-by.
+> Changelog V2:
+> 	- Add the "mmc: dw_mmc: replace "disable-wp" from slot's quirks to host's quirk"
+> 
+> 
+> Jaehoon Chung (5):
+>   mmc: dw_mmc: modify the dt-binding for removing slot-node and
+>     supports-highspeed
+>   ARM: dts: exynos: unuse the slot-node and deprecated the
+>     supports-highspeed for dw-mmc
+>   ARM: dts: socfpga: unuse the slot-node and deprecated the
+>     supports-highspeed for dw-mmc
+>   ARM: dts: rockchip: unuse the slot-node and deprecated the
+>     supports-highspeed for dw-mmc
 
-Clarification: every Runtime Services region known to it as being
-normal DRAM, which may cover this area
+Nit: 3x s/deprecated/deprecate/g to align tenses? (Sorry, I got
+interrupted during previous review pass.)
 
-> ioremap() here if pfn_valid() returns false for cpu-release-addr's PFN
-> may still result in mappings with different attributes for the same
-> region. So how should we decide whether to call ioremap() or
-> ioremap_cache() in this case?
->
-> --
-> Ard.
+Regards,
+Andreas
+
+>   mmc: dw_mmc: replace "disable-wp" from slot's quirk to host's quirk
+> 
+>  .../devicetree/bindings/mmc/exynos-dw-mshc.txt     |   17 ++++---------
+>  .../devicetree/bindings/mmc/k3-dw-mshc.txt         |   12 ++++-----
+>  .../devicetree/bindings/mmc/synopsys-dw-mshc.txt   |   12 ++++-----
+>  arch/arm/boot/dts/exynos4412-odroidx.dts           |    8 ++----
+>  arch/arm/boot/dts/exynos4412-origen.dts            |    8 ++----
+>  arch/arm/boot/dts/exynos4412-trats2.dts            |    8 ++----
+>  arch/arm/boot/dts/exynos5250-arndale.dts           |   18 ++++----------
+>  arch/arm/boot/dts/exynos5250-cros-common.dtsi      |   26 ++++++--------------
+>  arch/arm/boot/dts/exynos5250-smdk5250.dts          |   18 ++++----------
+>  arch/arm/boot/dts/exynos5250-snow.dts              |    6 ++---
+>  arch/arm/boot/dts/exynos5260-xyref5260.dts         |   18 ++++----------
+>  arch/arm/boot/dts/exynos5410-smdk5410.dts          |   18 ++++----------
+>  arch/arm/boot/dts/exynos5420-arndale-octa.dts      |   16 +++---------
+>  arch/arm/boot/dts/exynos5420-peach-pit.dts         |   16 +++---------
+>  arch/arm/boot/dts/exynos5420-smdk5420.dts          |   16 +++---------
+>  arch/arm/boot/dts/exynos5800-peach-pi.dts          |   16 +++---------
+>  arch/arm/boot/dts/rk3066a-bqcurie2.dts             |   16 +++---------
+>  arch/arm/boot/dts/socfpga_arria5.dtsi              |    9 +++----
+>  arch/arm/boot/dts/socfpga_cyclone5.dtsi            |    9 +++----
+>  arch/arm/boot/dts/socfpga_vt.dts                   |    9 +++----
+>  drivers/mmc/host/dw_mmc.c                          |   12 ++++-----
+>  include/linux/mmc/dw_mmc.h                         |    6 ++---
+>  22 files changed, 86 insertions(+), 208 deletions(-)
+> 
+
+
+-- 
+SUSE LINUX Products GmbH, Maxfeldstr. 5, 90409 N?rnberg, Germany
+GF: Jeff Hawn, Jennifer Guild, Felix Imend?rffer; HRB 16746 AG N?rnberg
