@@ -1,43 +1,46 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Wed, 30 Jul 2014 11:46:07 +0100
-Subject: [PATCH v2 03/10] mtd: spi-nor: add DDR quad read support
-In-Reply-To: <20140730074500.GF11952@brian-ubuntu>
-References: <1398657227-20721-1-git-send-email-b32955@freescale.com>
- <1398657227-20721-4-git-send-email-b32955@freescale.com>
- <20140730050843.GE11952@brian-ubuntu>
- <20140730064413.GA15547@shldeISGChi005.sh.intel.com>
- <20140730074500.GF11952@brian-ubuntu>
-Message-ID: <20140730104607.GQ17528@sirena.org.uk>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Wed, 30 Jul 2014 12:59:01 +0200
+Subject: [PATCH 0/3 v2] arm64/efi: improve TEXT_OFFSET handling
+Message-ID: <1406717944-24725-1-git-send-email-ard.biesheuvel@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jul 30, 2014 at 12:45:00AM -0700, Brian Norris wrote:
-> On Wed, Jul 30, 2014 at 02:44:13PM +0800, Huang Shijie wrote:
-> > On Tue, Jul 29, 2014 at 10:08:43PM -0700, Brian Norris wrote:
-> > > On Mon, Apr 28, 2014 at 11:53:40AM +0800, Huang Shijie wrote:
-> > > > This patch adds the DDR quad read support by the following:
+Resending this series sent out yesterday with only minor changes and acks etc
+added.
 
-> > > Are DDR modes in the scope of drivers/spi/ at all, so that we could
-> > > someday wire it up through m25p80.c? Or is 'DDR' such a distortion of
-> > > the meaning of 'SPI' such that it will be restricted only to SPI NOR
-> > > dedicated controllers?
+In summary: patch #3 relaxes the requirements imposed by the EFI stub on where
+Image may be loaded, but this breaks APM Mustang (if booting via UEFI) if patch
+#1 does not go in first. Patch #2 prevents potential boot issues when Image is
+loaded such that the stub does not have to relocate it.
 
-> > IMHO, the DDR modes can _NOT_ be handled by the driver/spi/*.
+@Will: as discussed on the list yesterday, these patches should be kept in
+sequence when going upstream, so it is best to take them through a single tree.
+However, patch #3 will not apply cleanly to the arm64 tree until after 3.16-rc1
+is released as it depends on a trivial change going in through x86/tip [efi].
+[https://git.kernel.org/cgit/linux/kernel/git/mfleming/efi.git/commit/?h=next&id=6091c9c447370c4717ec9975813c874af490eb36]
 
-> I agree to some extent, but I wanted to confirm with the SPI guys that
-> DDR is truly unique to SPI NOR. (I know it doesn't currently support
-> it.)
+If you are ok with these patches, how would you like to proceed? Patches #1 and
+#2 could go in straight away (through arm64), and I can send Catalin and you a
+gentle reminder once -rc1 is released to take #3? Or instead, ack them and ask
+Matt to queue them for 3.17-late? It would be nice if this makes 3.17 as it
+fixes actual boot problems on hardware that is under development.
 
-I don't know what DDR is in this context, sorry.  I'm guessing you're
-right since it sounds like something to do with extra clocks and this is
-probably not something used by generic SPI devices at present (if it
-ends up being widely implemented by sufficiently generic controllers
-that might change but the trend seems to be to flash specific
-controllers).
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140730/fc997013/attachment-0001.sig>
+Changes in v2:
+- add (__force void *) cast to patch #1, as suggested in LAKML discussion
+- add tested-by/acked-by lines
+- rebased patch #3 onto efi-next
+
+Mark Rutland (1):
+  arm64: spin-table: handle unmapped cpu-release-addrs
+
+Ard Biesheuvel (2):
+  arm64/efi: efistub: cover entire static mem footprint in PE/COFF .text
+  arm64/efi: efistub: don't abort if base of DRAM is occupied
+
+ arch/arm64/kernel/efi-stub.c       | 18 ++++++------------
+ arch/arm64/kernel/head.S           |  6 +++---
+ arch/arm64/kernel/smp_spin_table.c | 21 ++++++++++++++++-----
+ 3 files changed, 25 insertions(+), 20 deletions(-)
+
+-- 
+1.8.3.2
