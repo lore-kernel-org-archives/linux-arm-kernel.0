@@ -1,48 +1,53 @@
 From: rric@kernel.org (Robert Richter)
-Date: Wed, 30 Jul 2014 17:06:30 +0200
-Subject: [PATCH 1/5] arm64,
- thunder: Add Kconfig option for Cavium Thunder SoC Family
+Date: Wed, 30 Jul 2014 17:06:32 +0200
+Subject: [PATCH 3/5] arm64,
+ thunder: document devicetree bindings for Cavium Thunder SoC
 In-Reply-To: <1406732794-20920-1-git-send-email-rric@kernel.org>
 References: <1406732794-20920-1-git-send-email-rric@kernel.org>
-Message-ID: <1406732794-20920-2-git-send-email-rric@kernel.org>
+Message-ID: <1406732794-20920-4-git-send-email-rric@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Radha Mohan Chintakuntla <rchintakuntla@cavium.com>
 
-Increase maximum numbers of cpus to 32. This relates to current
-maximal possible cpu number. Increasing this to 64 cpus will be a
-separate patch not part of this enablement patches.
+This patch adds documentation for the devicetree bindings used by the
+DT files of Cavium Thunder SoC platforms.
 
 Signed-off-by: Radha Mohan Chintakuntla <rchintakuntla@cavium.com>
 Signed-off-by: Robert Richter <rrichter@cavium.com>
 ---
- arch/arm64/Kconfig | 6 ++++++
- 1 file changed, 6 insertions(+)
+ Documentation/devicetree/bindings/arm/cavium-thunder.txt | 10 ++++++++++
+ Documentation/devicetree/bindings/arm/cpus.txt           |  1 +
+ 2 files changed, 11 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/arm/cavium-thunder.txt
 
-diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
-index a474de346be6..e989d8cab8c7 100644
---- a/arch/arm64/Kconfig
-+++ b/arch/arm64/Kconfig
-@@ -128,6 +128,11 @@ source "kernel/Kconfig.freezer"
- 
- menu "Platform selection"
- 
-+config ARCH_THUNDER
-+	bool "Cavium Inc. Thunder SoC Family"
-+	help
-+	  This enables support for Cavium's Thunder Family of SoCs.
+diff --git a/Documentation/devicetree/bindings/arm/cavium-thunder.txt b/Documentation/devicetree/bindings/arm/cavium-thunder.txt
+new file mode 100644
+index 000000000000..6f63a5866902
+--- /dev/null
++++ b/Documentation/devicetree/bindings/arm/cavium-thunder.txt
+@@ -0,0 +1,10 @@
++Cavium Thunder platform device tree bindings
++--------------------------------------------
 +
- config ARCH_VEXPRESS
- 	bool "ARMv8 software model (Versatile Express)"
- 	select ARCH_REQUIRE_GPIOLIB
-@@ -201,6 +206,7 @@ config NR_CPUS
- 	range 2 32
- 	depends on SMP
- 	# These have to remain sorted largest to smallest
-+	default "32" if ARCH_THUNDER
- 	default "8"
- 
- config HOTPLUG_CPU
++Boards with Cavium's Thunder SoC shall have following properties.
++
++Root Node
++---------
++Required root node properties:
++
++  - compatible = "cavium,thunder-88xx";
+diff --git a/Documentation/devicetree/bindings/arm/cpus.txt b/Documentation/devicetree/bindings/arm/cpus.txt
+index 1fe72a0778cd..922e4970309d 100644
+--- a/Documentation/devicetree/bindings/arm/cpus.txt
++++ b/Documentation/devicetree/bindings/arm/cpus.txt
+@@ -163,6 +163,7 @@ nodes to be present and contain the properties described below.
+ 			    "arm,cortex-r4"
+ 			    "arm,cortex-r5"
+ 			    "arm,cortex-r7"
++			    "cavium,thunder"
+ 			    "faraday,fa526"
+ 			    "intel,sa110"
+ 			    "intel,sa1100"
 -- 
 2.0.1
