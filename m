@@ -1,96 +1,95 @@
-From: linux@roeck-us.net (Guenter Roeck)
-Date: Tue, 29 Jul 2014 18:50:47 -0700
-Subject: [PATCH v5 0/7] kernel: Add support for restart handler call chain
-In-Reply-To: <1405668856-13738-1-git-send-email-linux@roeck-us.net>
-References: <1405668856-13738-1-git-send-email-linux@roeck-us.net>
-Message-ID: <53D84F77.2050401@roeck-us.net>
+From: kever.yang@rock-chips.com (Kever Yang)
+Date: Tue, 29 Jul 2014 18:35:29 -0700
+Subject: [PATCH 4/4] usb: dwc2: add dr_mode support for dwc2
+In-Reply-To: <1406683873-18194-1-git-send-email-kever.yang@rock-chips.com>
+References: <1406683873-18194-1-git-send-email-kever.yang@rock-chips.com>
+Message-ID: <1406684129-18352-1-git-send-email-kever.yang@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/18/2014 12:34 AM, Guenter Roeck wrote:
-> Various drivers implement architecture and/or device specific means
-> to restart (reset) the system. Various mechanisms have been implemented
-> to support those schemes. The best known mechanism is arm_pm_restart,
-> which is a function pointer to be set either from platform specific code
-> or from drivers. Another mechanism is to use hardware watchdogs to issue
-> a reset; this mechanism is used if there is no other method available
-> to reset a board or system. Two examples are alim7101_wdt, which currently
-> uses the reboot notifier to trigger a reset, and moxart_wdt, which registers
-> the arm_pm_restart function. Several other restart drivers for arm, all
-> directly calling arm_pm_restart, are in the process of being integrated
-> into the kernel. All those drivers would benefit from the new API.
->
-> The existing mechanisms have a number of drawbacks. Typically only one scheme
-> to restart the system is supported (at least if arm_pm_restart is used).
-> At least in theory there can be multiple means to restart the system, some of
-> which may be less desirable (for example one mechanism may only reset the CPU,
-> while another may reset the entire system). Using arm_pm_restart can also be
-> racy if the function pointer is set from a driver, as the driver may be in
-> the process of being unloaded when arm_pm_restart is called.
-> Using the reboot notifier is always racy, as it is unknown if and when
-> other functions using the reboot notifier have completed execution
-> by the time the watchdog fires.
->
-> Introduce a system restart handler call chain to solve the described problems.
-> This call chain is expected to be executed from the architecture specific
-> machine_restart() function. Drivers providing system restart functionality
-> (such as the watchdog drivers mentioned above) are expected to register
-> with this call chain. By using the priority field in the notifier block,
-> callers can control restart handler execution sequence and thus ensure that
-> the restart handler with the optimal restart capabilities for a given system
-> is called first.
->
-> Since the first revision of this patchset, a number of separate patch
-> submissions have been made which either depend on it or could make use of it.
->
-> http://www.spinics.net/linux/lists/arm-kernel/msg344796.html
-> 	registers three notifiers.
-> https://lkml.org/lkml/2014/7/8/962
-> 	would benefit from it.
->
-> Patch 1 of this series implements the restart handler function. Patches 2 and 3
-> implement calling the restart handler chain from arm and arm64 restart code.
->
-> Patch 4 modifies the restart-poweroff driver to no longer call arm_pm_restart
-> directly but machine_restart. This is done to avoid calling arm_pm_restart
-> from more than one place. The change makes the driver architecture independent,
-> so it would be possible to drop the arm dependency from its Kconfig entry.
->
-> Patch 5 and 6 convert existing restart handlers in the watchdog subsystem
-> to use the restart handler. Patch 7 unexports arm_pm_restart to ensure
-> that no one gets the idea to implement a restart handler as module.
->
-> ---
-> v5: Rebased series to v3.16-rc5
->      Function renames:
->      register_restart_notifier -> register_restart_handler
->      unregister_restart_notifier -> unregister_restart_handler
->      kernel_restart_notify -> do_kernel_restart
-> v4: Document restart notifier priorities
->      Select 128 as default priority for newly introduced notifiers
->      Fix checkpatch warning (line too long) in moxart patch
-> v3: Drop RFC.
->      Add kernel_restart_notify wrapper function to execute notifier
->      Improve documentation.
->      Move restart_notifier_list into kernel/reboot.c and make it static.
-> v2: Add patch 4.
->      Only call blocking notifier call chain if arm_pm_restart was not set.
-> --
+Some devices with A female host port and without use of usb_id pin
+will need this for the otg controller works as device role
+during firmware period and works as host role in rich os.
 
-To get more test coverage, this series plus a few add-on patches which
-depend on it are now available in the restart-staging branch of my
-repository at kernel.org [1]. The branch is currently based on 3.16-rc7.
-Extensive build test results are available at [2]; look for the column
-marked 'restart-staging' on the far right of the tables.
-
-I would encourage everyone interested in this series to send me Reviewed-by:
-or at least Acked-by: tags. Note that I removed all of the earlier tags since
-I feel that the changes made subsequently warrant updated tags. An Acked-by:
-from affected maintainers would also be very helpful.
-
-Thanks,
-Guenter
-
+Signed-off-by: Kever Yang <kever.yang@rock-chips.com>
 ---
-[1] https://git.kernel.org/cgit/linux/kernel/git/groeck/linux-staging.git/
-[2] http://server.roeck-us.net:8010/builders
+ drivers/usb/dwc2/core.c     |   13 +++++++++++++
+ drivers/usb/dwc2/core.h     |    2 ++
+ drivers/usb/dwc2/platform.c |    4 ++++
+ 3 files changed, 19 insertions(+)
+
+diff --git a/drivers/usb/dwc2/core.c b/drivers/usb/dwc2/core.c
+index 27d2c9b..6688951 100644
+--- a/drivers/usb/dwc2/core.c
++++ b/drivers/usb/dwc2/core.c
+@@ -118,6 +118,7 @@ static int dwc2_core_reset(struct dwc2_hsotg *hsotg)
+ {
+ 	u32 greset;
+ 	int count = 0;
++	u32 gusbcfg;
+ 
+ 	dev_vdbg(hsotg->dev, "%s()\n", __func__);
+ 
+@@ -148,6 +149,18 @@ static int dwc2_core_reset(struct dwc2_hsotg *hsotg)
+ 		}
+ 	} while (greset & GRSTCTL_CSFTRST);
+ 
++	if (hsotg->dr_mode == USB_DR_MODE_HOST) {
++		gusbcfg = readl(hsotg->regs+GUSBCFG);
++		gusbcfg &= ~GUSBCFG_FORCEDEVMODE;
++		gusbcfg |= GUSBCFG_FORCEHOSTMODE;
++		writel(gusbcfg, hsotg->regs+GUSBCFG);
++	} else if (hsotg->dr_mode == USB_DR_MODE_PERIPHERAL) {
++		gusbcfg = readl(hsotg->regs+GUSBCFG);
++		gusbcfg &= ~GUSBCFG_FORCEHOSTMODE;
++		gusbcfg |= GUSBCFG_FORCEDEVMODE;
++		writel(gusbcfg, hsotg->regs+GUSBCFG);
++	}
++
+ 	/*
+ 	 * NOTE: This long sleep is _very_ important, otherwise the core will
+ 	 * not stay in host mode after a connector ID change!
+diff --git a/drivers/usb/dwc2/core.h b/drivers/usb/dwc2/core.h
+index 1efd10c..9fe960b 100644
+--- a/drivers/usb/dwc2/core.h
++++ b/drivers/usb/dwc2/core.h
+@@ -501,6 +501,7 @@ struct dwc2_hw_params {
+  *                      a_peripheral and b_device=>b_host) this may not match
+  *                      the core, but allows the software to determine
+  *                      transitions
++ * @dr_mode:            requested mode of operation
+  * @queuing_high_bandwidth: True if multiple packets of a high-bandwidth
+  *                      transfer are in process of being queued
+  * @srp_success:        Stores status of SRP request in the case of a FS PHY
+@@ -592,6 +593,7 @@ struct dwc2_hsotg {
+ 	/** Params to actually use */
+ 	struct dwc2_core_params *core_params;
+ 	enum usb_otg_state op_state;
++	enum usb_dr_mode        dr_mode;
+ 
+ 	unsigned int queuing_high_bandwidth:1;
+ 	unsigned int srp_success:1;
+diff --git a/drivers/usb/dwc2/platform.c b/drivers/usb/dwc2/platform.c
+index cc5983c..a2ac1ea 100644
+--- a/drivers/usb/dwc2/platform.c
++++ b/drivers/usb/dwc2/platform.c
+@@ -42,6 +42,8 @@
+ #include <linux/of_device.h>
+ #include <linux/platform_device.h>
+ 
++#include <linux/usb/of.h>
++
+ #include "core.h"
+ #include "hcd.h"
+ 
+@@ -200,6 +202,8 @@ static int dwc2_driver_probe(struct platform_device *dev)
+ 	dev_dbg(&dev->dev, "mapped PA %08lx to VA %p\n",
+ 		(unsigned long)res->start, hsotg->regs);
+ 
++	hsotg->dr_mode = of_usb_get_dr_mode(dev->dev.of_node);
++
+ 	retval = dwc2_hcd_init(hsotg, irq, params);
+ 	if (retval)
+ 		return retval;
+-- 
+1.7.9.5
