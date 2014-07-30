@@ -1,27 +1,46 @@
-From: joro@8bytes.org (Joerg Roedel)
-Date: Wed, 30 Jul 2014 15:33:09 +0200
-Subject: [PATCH v4] devicetree: Add generic IOMMU device tree bindings
-In-Reply-To: <20140730132348.GM29590@ulmo>
-References: <1404487757-18829-1-git-send-email-thierry.reding@gmail.com>
- <20140730110425.GI12239@arm.com> <20140730132348.GM29590@ulmo>
-Message-ID: <20140730133309.GF9809@8bytes.org>
+From: pbonzini@redhat.com (Paolo Bonzini)
+Date: Wed, 30 Jul 2014 15:34:11 +0200
+Subject: [GIT PULL] KVM/ARM Urgent fix for 3.16
+In-Reply-To: <1406724941-4283-1-git-send-email-christoffer.dall@linaro.org>
+References: <1406724941-4283-1-git-send-email-christoffer.dall@linaro.org>
+Message-ID: <53D8F453.9010101@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jul 30, 2014 at 03:23:50PM +0200, Thierry Reding wrote:
-> I think there weren't any comments left for me to address and I've
-> mostly been waiting for Joerg to pick it up.
+Il 30/07/2014 14:55, Christoffer Dall ha scritto:
+> Hi Paolo and Gleb,
 > 
-> Joerg, can you take this through the iommu tree for 3.17? Will acked
-> this, but perhaps you were waiting for an ACK from the device tree
-> bindings maintainers?
+> Is there any chance you can get this urgent fix (which allows KVM guest
+> to bring down the entire system on some 64K enabled ARM64 hosts) merged
+> for 3.16?
 > 
-> Will, perhaps you can get Pawel or Mark to look at this?
+> The following changes since commit bb18b526a9d8d4a3fe56f234d5013b9f6036978d:
 > 
-> Arnd, I'm sure if we had your Acked-by that would go a long way too.
+>   Merge tag 'signed-for-3.16' of git://github.com/agraf/linux-2.6 into kvm-master (2014-07-08 12:08:58 +0200)
+> 
+> are available in the git repository at:
+> 
+> 
+>   git://git.kernel.org/pub/scm/linux/kernel/git/kvmarm/kvmarm.git tags/kvm-arm-for-3.16-rc7
+> 
+> for you to fetch changes up to 63afbe7a0ac184ef8485dac4914e87b211b5bfaa:
+> 
+>   kvm: arm64: vgic: fix hyp panic with 64k pages on juno platform (2014-07-30 14:35:42 +0200)
+> 
+> ---
+> Will Deacon (1):
+>   kvm: arm64: vgic: fix hyp panic with 64k pages on juno platform
+> 
+>  virt/kvm/arm/vgic.c | 24 ++++++++++++++++++++----
+>  1 file changed, 20 insertions(+), 4 deletions(-)
+> 
 
-Yes, as Arnd requested this generic binding it would be good to have his
-Acked-by before proceeding. Arnd?
+I think Gleb is on vacation now, but unfortunately I've already had
+enough this year.
+
+I resent the pull request from
+git://git.kernel.org/pub/scm/virt/kvm/kvm.git, even though you had CCed
+Linus here already.
 
 
-	Joerg
+Paolo
