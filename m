@@ -1,79 +1,38 @@
-From: achandran@mvista.com (Arun Chandran)
-Date: Wed, 30 Jul 2014 12:52:33 +0530
-Subject: Kexec on arm64
-In-Reply-To: <1406668741.28348.75.camel@smoke>
-References: <CAFdej00J2mJwcg2Cy6CHVuuQZ4uQ2zZg8oErGPi0uPejievB+Q@mail.gmail.com>
- <1406162287.4062.39.camel@smoke>
- <20140724093603.GC4079@leverpostej>
- <1406247468.4062.59.camel@smoke>
- <CAFdej01w_pE6vv+13cCCyfDs4Rbdkzx4CMUj9q97HBKV0B53ow@mail.gmail.com>
- <1406333901.4062.69.camel@smoke>
- <CAFdej014ohCFYvoUAXWiYGb4_4UmSY2G1MH-NEE_cF1cC-6Mow@mail.gmail.com>
- <20140728153812.GA2576@leverpostej>
- <1406592548.28348.49.camel@smoke>
- <CAFdej00is0kC-1q5uMNJL5APL1WezdNBg0jASgwYamsg5NO_Tg@mail.gmail.com>
- <20140729133557.GQ2576@leverpostej>
- <1406668741.28348.75.camel@smoke>
-Message-ID: <CAFdej02sTBsjHz+FCqjKkY9pF5sPF6n6QUtEadHi0hK3MxRxGA@mail.gmail.com>
+From: antoine.tenart@free-electrons.com (Antoine =?iso-8859-1?Q?T=E9nart?=)
+Date: Wed, 30 Jul 2014 09:38:16 +0200
+Subject: [PATCH v12 4/8] ata: libahci: allow to use multiple PHYs
+In-Reply-To: <20140729143438.GB4791@htj.dyndns.org>
+References: <1406618447-25499-1-git-send-email-antoine.tenart@free-electrons.com>
+ <20140729143438.GB4791@htj.dyndns.org>
+Message-ID: <20140730073816.GA29900@kwain>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jul 30, 2014 at 2:49 AM, Geoff Levand <geoff@infradead.org> wrote:
-> Hi Mark,
->
-> On Tue, 2014-07-29 at 14:35 +0100, Mark Rutland wrote:
->> Since c218bca74eea (arm64: Relax the kernel cache requirements for
->> boot), the kernel will flush the cache for anything outside of the Image
->> that it writes to before enabling the MMU and caches (e.g. the idmap and
->> swapper page tables). Once caches are up we shouldn't care.
->>
->> Assuming that the existing kernel code is correct, the only region we
->> should need to flush out to the PoC is the region from _text to _edata
->> (i.e. just the contents of the Image).
->
-> If the new kernel will overwrite the old one, then we do the final copy
-> of the new kernel in the relocate_new_kernel routine.  relocate_new_kernel
-> is executed after the dcache is disabled, so that should write it directly
-> to the PoC.  It seems the protocol expects us to invalidate the dcache
-> for that range though, so I added code to do this, essentially what Arun
-> had added.
->
-> Arun, please try.
->
-It works without any hiccups :)..
-I have attached the log.
+On Tue, Jul 29, 2014 at 10:34:38AM -0400, Tejun Heo wrote:
+> On Tue, Jul 29, 2014 at 09:20:47AM +0200, Antoine T?nart wrote:
+> > The current implementation of the libahci does not allow to use multiple
+> > PHYs. This patch adds the support of multiple PHYs by the libahci while
+> > keeping the old bindings valid for device tree compatibility.
+> > 
+> > This introduce a new way of defining SATA ports in the device tree, with
+> > one port per sub-node. This as the advantage of allowing a per port
+> > configuration. Because some ports may be accessible but disabled in the
+> > device tree, the port_map mask is computed automatically when using
+> > this.
+> > 
+> > Signed-off-by: Antoine T?nart <antoine.tenart@free-electrons.com>
+> > Acked-by: Hans de Goede <hdegoede@redhat.com>
+> 
+> Patch doesn't apply to libata/for-3.17.  Please refresh.
 
-I will try with big-endian UP configuration next.
+This patch is base on top of v3.16-rc7, taking in account a patch[1]
+introduced after rc1 modifying this same file.
 
-Just had to comment the crashdump code to compile with
-defconfig.
+[1] https://lkml.org/lkml/2014/6/6/75
 
-diff --git a/arch/arm64/kernel/setup.c b/arch/arm64/kernel/setup.c
-index 233cd04..6f4ebd8 100644
---- a/arch/arm64/kernel/setup.c
-+++ b/arch/arm64/kernel/setup.c
-@@ -377,6 +377,7 @@ static void __init __maybe_unused reserve_crashkernel(void)
-        insert_resource(&iomem_resource, &crashk_res);
- }
+Antoine
 
-+#ifdef CONFIG_CRASH_DUMP
- static void __init __maybe_unused reserve_elfcorehdr(void)
- {
-        struct resource res;
-@@ -402,6 +403,7 @@ static void __init __maybe_unused reserve_elfcorehdr(void)
-        res.end = elfcorehdr_addr + elfcorehdr_size - 1;
-        insert_resource(&iomem_resource, &res);
- }
-+#endif
-
- static void __init request_standard_resources(void)
- {
-
---Arun
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: kexec_log
-Type: application/octet-stream
-Size: 15206 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140730/b4be6f8b/attachment-0001.obj>
+-- 
+Antoine T?nart, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
