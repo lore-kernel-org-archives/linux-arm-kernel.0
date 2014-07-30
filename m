@@ -1,45 +1,36 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Wed, 30 Jul 2014 11:14:23 -0700
-Subject: [PATCH 2/5] arm64, thunder: Add initial dts for Cavium Thunder SoC
-In-Reply-To: <1406732794-20920-3-git-send-email-rric@kernel.org>
-References: <1406732794-20920-1-git-send-email-rric@kernel.org>
- <1406732794-20920-3-git-send-email-rric@kernel.org>
-Message-ID: <CAOesGMh9KkdKB_ytJ7CCbkPW7dHTX91NdfDMsMNfbmOBVOJ8PQ@mail.gmail.com>
+From: tthayer@opensource.altera.com (tthayer at opensource.altera.com)
+Date: Wed, 30 Jul 2014 13:22:50 -0500
+Subject: [PATCHv9 0/3] Addition of Altera EDAC support.
+Message-ID: <1406744573-609-1-git-send-email-tthayer@opensource.altera.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jul 30, 2014 at 8:06 AM, Robert Richter <rric@kernel.org> wrote:
-> From: Radha Mohan Chintakuntla <rchintakuntla@cavium.com>
->
-> Add initial device tree nodes for Cavium Thunder SoCs with support of
-> 48 cores and gicv3. The dts file requires further changes, esp. for
-> pci, gicv3-its and smmu. This changes will be added later together
-> with the device drivers.
->
-> Signed-off-by: Radha Mohan Chintakuntla <rchintakuntla@cavium.com>
-> Signed-off-by: Robert Richter <rrichter@cavium.com>
-> ---
->  arch/arm64/boot/dts/Makefile         |   1 +
->  arch/arm64/boot/dts/thunder-88xx.dts | 387 +++++++++++++++++++++++++++++++++++
->  2 files changed, 388 insertions(+)
->  create mode 100644 arch/arm64/boot/dts/thunder-88xx.dts
->
-> diff --git a/arch/arm64/boot/dts/Makefile b/arch/arm64/boot/dts/Makefile
-> index c52bdb051f66..f8001a62029c 100644
-> --- a/arch/arm64/boot/dts/Makefile
-> +++ b/arch/arm64/boot/dts/Makefile
-> @@ -1,3 +1,4 @@
-> +dtb-$(CONFIG_ARCH_THUNDER) += thunder-88xx.dtb
->  dtb-$(CONFIG_ARCH_VEXPRESS) += rtsm_ve-aemv8a.dtb foundation-v8.dtb
->  dtb-$(CONFIG_ARCH_XGENE) += apm-mustang.dtb
+From: Thor Thayer <tthayer@opensource.altera.com>
 
-Oh, and:
+The Altera SDRAM controller and EDAC support are added in this
+patch series. The SDRAM controller is an MFD so that multiple
+drivers can access it's registers.
 
-Let's fix the mistake we made on 32-bit here (that we can't undo
-unless we move all dts files now, which is too much churn), and put
-each SoC vendor in its own subdirectory.
+Thor Thayer (3):
+  mfd: altera: Add Altera SDRAM Controller
+  edac: altera: Add Altera EDAC support.
+  arm: dts: Add Altera SDRAM controller bindings
 
-So, please add a arch/arm64/boot/dts/cavium/ directory, add a Makefile
-and the dts there.
+ .../devicetree/bindings/arm/altera/socfpga-sdr.txt |   13 +
+ MAINTAINERS                                        |    6 +
+ arch/arm/boot/dts/socfpga.dtsi                     |   10 +
+ drivers/edac/Kconfig                               |   10 +
+ drivers/edac/Makefile                              |    2 +
+ drivers/edac/altera_edac.c                         |  293 ++++++++++++++++++++
+ drivers/mfd/Kconfig                                |    7 +
+ drivers/mfd/Makefile                               |    1 +
+ drivers/mfd/altera-sdr.c                           |  162 +++++++++++
+ include/linux/mfd/altera-sdr.h                     |  102 +++++++
+ 10 files changed, 606 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/arm/altera/socfpga-sdr.txt
+ create mode 100644 drivers/edac/altera_edac.c
+ create mode 100644 drivers/mfd/altera-sdr.c
+ create mode 100644 include/linux/mfd/altera-sdr.h
 
-We should move vexpress under arm/   and xgene under apm/ too.
+-- 
+1.7.9.5
