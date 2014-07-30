@@ -1,60 +1,375 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Wed, 30 Jul 2014 13:42:58 +0100
-Subject: [PATCH v2 1/3] arm64: spin-table: handle unmapped
- cpu-release-addrs
-In-Reply-To: <20140730123029.GA20162@leverpostej>
-References: <1406717944-24725-1-git-send-email-ard.biesheuvel@linaro.org>
- <1406717944-24725-2-git-send-email-ard.biesheuvel@linaro.org>
- <20140730113013.GL12239@arm.com>
- <CAKv+Gu-891BPCMCB2xnhsaUHxz_BCMkwbbwQ76kmK=JsUdifHQ@mail.gmail.com>
- <20140730123029.GA20162@leverpostej>
-Message-ID: <20140730124258.GP12239@arm.com>
+From: stwiss.opensource@diasemi.com (Opensource [Steve Twiss])
+Date: Wed, 30 Jul 2014 13:40:44 +0100
+Subject: [PATCH V2] devicetree: Dialog Semiconductor consolidate existing
+ vendor prefixes to standardise on 'dlg'
+Message-ID: <201407301246.s6UCkMtb022411@swsrvapps-01.diasemi.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jul 30, 2014 at 01:30:29PM +0100, Mark Rutland wrote:
-> On Wed, Jul 30, 2014 at 01:00:40PM +0100, Ard Biesheuvel wrote:
-> > On 30 July 2014 13:30, Will Deacon <will.deacon@arm.com> wrote:
-> > > On Wed, Jul 30, 2014 at 11:59:02AM +0100, Ard Biesheuvel wrote:
-> > >> From: Mark Rutland <mark.rutland@arm.com>
-> > >>
-> > >> In certain cases the cpu-release-addr of a CPU may not fall in the
-> > >> linear mapping (e.g. when the kernel is loaded above this address due to
-> > >> the presence of other images in memory). This is problematic for the
-> > >> spin-table code as it assumes that it can trivially convert a
-> > >> cpu-release-addr to a valid VA in the linear map.
-> > >>
-> > >> This patch modifies the spin-table code to use a temporary cached
-> > >> mapping to write to a given cpu-release-addr, enabling us to support
-> > >> addresses regardless of whether they are covered by the linear mapping.
-> > >>
-> > >> Signed-off-by: Mark Rutland <mark.rutland@arm.com>
-> > >> Tested-by: Mark Salter <msalter@redhat.com>
-> > >> [ardb: added (__force void *) cast]
-> > >> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
-> > >> ---
-> > >>  arch/arm64/kernel/smp_spin_table.c | 22 +++++++++++++++++-----
-> > >>  1 file changed, 17 insertions(+), 5 deletions(-)
-> > >
-> > > I'm nervous about this. What if the spin table sits in the same physical 64k
-> > > frame as a read-sensitive device and we're running with 64k pages?
-> > >
-> > 
-> > I see what you mean. This is potentially hairy, as EFI already
-> > ioremap_cache()s everything known to it as normal DRAM, so using plain
-> > ioremap() here if pfn_valid() returns false for cpu-release-addr's PFN
-> > may still result in mappings with different attributes for the same
-> > region. So how should we decide whether to call ioremap() or
-> > ioremap_cache() in this case?
-> 
-> If we're careful about handling mismatched attributes we might be able
-> to get away with always using a device mapping.
+From: Steve Twiss <stwiss.opensource@diasemi.com>
 
-Even then, I think ioremap hits a WARN_ON if pfn_valid.
+This patch series updates the device tree vendor prefix for
+Dialog Semiconductor.
 
-> I'll need to have a think about that, I'm not sure on the architected
-> cache behaviour in such a case.
+Various methods are currently used throughout the kernel: 'diasemi',
+'dialog' and 'dlg'. Others have also been suggested.
 
-Of we just skip the cache flush if !pfn_valid.
+This patch set aims to consolidate the usage of the vendor prefix to
+use a common standard. The prefix 'dlg' is used.
 
-Will
+
+Signed-off-by: Steve Twiss <stwiss.opensource@diasemi.com>
+Acked-by: Simon Horman <horms+renesas@verge.net.au>
+Acked-by: Rob Herring <robh@kernel.org>
+Acked-by: Shawn Guo <shawn.guo@freescale.com>
+Acked-by: Lee Jones <lee.jones@linaro.org>
+Acked-by: Philipp Zabel <p.zabel@pengutronix.de>
+
+---
+Checks performed with linux-next/next-20140715/scripts/checkpatch.pl
+ trivial-devices.txt       total: 0 errors, 0 warnings, 89 lines checked
+ da9210.txt                total: 0 errors, 0 warnings, 21 lines checked
+ vendor-prefixes.txt       total: 0 errors, 0 warnings, 149 lines checked
+ imx53-smd.dts             total: 0 errors, 2 warnings, 279 lines checked
+ imx6qdl-phytec-pfla02.dtsi total: 0 errors, 2 warnings, 357 lines checked
+ r8a7790-lager.dts         total: 0 errors, 3 warnings, 403 lines checked
+ r8a7791-koelsch.dts       total: 0 errors, 4 warnings, 461 lines checked
+ da9055-core.c             total: 0 errors, 0 warnings, 428 lines checked
+
+This is a resend with appropriate Acked-by: and Signed-off-by: tags.
+There have been no patch alterations since my PATCH RFC V2 sent
+on 2014-07-15.
+See here: http://comments.gmane.org/gmane.linux.ports.arm.kernel/341694
+
+This e-mail is in response to the previous threads here:
+ - https://lkml.org/lkml/2014/6/11/262
+ - http://comments.gmane.org/gmane.linux.ports.arm.kernel/341358
+ - https://lkml.org/lkml/2014/7/29/767
+
+
+This patch has been Acked-by the following people:
+
+- Rob Herring
+  http://www.spinics.net/lists/arm-kernel/msg349289.html
+
+- Lee Jones
+  For the MFD changes:
+  http://www.spinics.net/lists/arm-kernel/msg349457.html
+
+- Shawn Guo
+  arch/arm/boot/dts/imx53-smd.dts                    |  2 +-
+  arch/arm/boot/dts/imx6qdl-phytec-pfla02.dtsi       |  2 +-
+  http://www.spinics.net/lists/arm-kernel/msg349398.html	
+
+- Simon Horman
+  arch/arm/boot/dts/r8a7790-lager.dts   | 2 +-
+  arch/arm/boot/dts/r8a7791-koelsch.dts | 2 +-
+  https://lkml.org/lkml/2014/7/29/767
+
+
+
+Here is my working for justifying this change:
+
+./arch/arm/boot/dts/imx6qdl-phytec-pfla02.dtsi
+	Has the following entry:
+	compatible = "dialog,da9063";
+	However the DA9063 driver does not support device tree yet so
+	it would be safe to rename this.
+
+./arch/arm/boot/dts/imx53-smd.dts
+	Has the following entry:
+	compatible = "dialog,da9053", "dialog,da9052";
+	However, the existing driver files for DA9053 define a different
+	compatible string with the "dlg" prefix. See the entries below.
+	None of these would have allowed the "dialog" prefix.
+	{ .compatible = "dlg,da9052", .data = &da9052_i2c_id[0] },
+	{ .compatible = "dlg,da9053-aa", .data = &da9052_i2c_id[1] },
+	{ .compatible = "dlg,da9053-ba", .data = &da9052_i2c_id[2] },
+	{ .compatible = "dlg,da9053-bb", .data = &da9052_i2c_id[3] },
+	{ .compatible = "dlg,da9053-bc", .data = &da9052_i2c_id[4] },
+	In this particular case the change for DA9053 did not match up
+	with the expected compatibility strings and therefore I have
+	retained the more general "dlg,da9053" because I do not know
+	which silicon variant (-aa, -ba, -bb, or -bc) is the correct
+	one to use.
+
+./devicetree/bindings/i2c/trivial-devices.txt
+	Has the following entry:
+	dialog,da9053  DA9053: flexible system level PMIC with multicore support
+	Instead of depreciating this "dialog" line am just replacing it
+	with a "dlg" because the existing driver DA9053 does not support
+	the dialog keyword.
+
+./drivers/mfd/da9055-core.c
+	Has the following entries for the mfd cells 
+		.of_compatible = "dialog,da9055-gpio", etc...
+	In this case, the driver does not actually pass in any platform data
+	to any of the mfd cells and so they are not actually used
+	yet in the driver. Nobody else references this information
+	so they can safely be changed.
+
+./devicetree/bindings/regulator/da9210.txt
+	Has the following two entries in the binding file:
+	- compatible:	must be "diasemi,da9210"
+	compatible = "diasemi,da9210";
+	However the DA9210 driver does not support device tree.
+
+./arch/arm/boot/dts/r8a7790-lager.dts
+./arch/arm/boot/dts/r8a7791-koelsch.dts
+	These two files have the following entries:
+	compatible = "diasemi,da9210";
+	These both reference the "diasemi,da9210" but the device
+	driver does not support device tree
+
+The remaining files in the kernel I have found correctly references
+the driver files compatibility information and so did not need to
+be changed.
+
+./devicetree/bindings/mfd/da9052-i2c.txt
+	- compatible : Should be "dlg,da9052", "dlg,da9053-aa",
+		 "dlg,da9053-ab", or "dlg,da9053-bb"
+
+./devicetree/bindings/mfd/da9055.txt
+	compatible = "dlg,da9055-pmic";
+
+./arch/arm/boot/dts/imx53-voipac-dmm-668.dtsi
+	compatible = "dlg,da9053-aa", "dlg,da9052";
+
+./arch/arm/boot/dts/imx53-qsb.dts
+	compatible = "dlg,da9053-aa", "dlg,da9052";
+
+./devicetree/bindings/sound/da9055.txt
+	- compatible: "dlg,da9055-codec"
+	compatible = "dlg,da9055-codec";
+
+
+ 
+Changes since RFC V1
+- addition of changes to DTS files referencing "diasemi,da9210"
+   arch/arm/boot/dts/r8a7790-lager.dts
+   arch/arm/boot/dts/r8a7791-koelsch.dts
+
+Changes to e-mail content (no patch changes) since RFC V2
+- reformatted e-mail according to comments
+  http://www.spinics.net/lists/arm-kernel/msg349289.html
+  http://www.spinics.net/lists/arm-kernel/msg349809.html
+
+Changes since RESEND RFC V2
+- Reformatted e-mail content (no change to patch submission)
+- Added Acks into main body of e-mail from the following people 
+     Simon Horman, Rob Herring, Shawn Guo, Lee Jones,
+     and Philipp Zabel.
+
+This RFC V2 resend does not answer the response to RFC V1
+from Mark Brown:
+http://www.spinics.net/lists/arm-kernel/msg347615.html
+
+This patch applies against linux-next and next-20140715 
+
+Regards,
+Steve Twiss, Dialog Semiconductor Ltd.
+
+
+
+ .../devicetree/bindings/i2c/trivial-devices.txt    |  2 +-
+ .../devicetree/bindings/regulator/da9210.txt       |  4 ++--
+ .../devicetree/bindings/vendor-prefixes.txt        |  1 +
+ arch/arm/boot/dts/imx53-smd.dts                    |  2 +-
+ arch/arm/boot/dts/imx6qdl-phytec-pfla02.dtsi       |  2 +-
+ arch/arm/boot/dts/r8a7790-lager.dts                |  2 +-
+ arch/arm/boot/dts/r8a7791-koelsch.dts              |  2 +-
+ drivers/mfd/da9055-core.c                          | 26 +++++++++++-----------
+ 8 files changed, 21 insertions(+), 20 deletions(-)
+
+diff --git a/Documentation/devicetree/bindings/i2c/trivial-devices.txt b/Documentation/devicetree/bindings/i2c/trivial-devices.txt
+index 37803eb..a02b8a1 100644
+--- a/Documentation/devicetree/bindings/i2c/trivial-devices.txt
++++ b/Documentation/devicetree/bindings/i2c/trivial-devices.txt
+@@ -44,7 +44,7 @@ dallas,ds1775		Tiny Digital Thermometer and Thermostat
+ dallas,ds3232		Extremely Accurate I??C RTC with Integrated Crystal and SRAM
+ dallas,ds4510		CPU Supervisor with Nonvolatile Memory and Programmable I/O
+ dallas,ds75		Digital Thermometer and Thermostat
+-dialog,da9053		DA9053: flexible system level PMIC with multicore support
++dlg,da9053		DA9053: flexible system level PMIC with multicore support
+ epson,rx8025		High-Stability. I2C-Bus INTERFACE REAL TIME CLOCK MODULE
+ epson,rx8581		I2C-BUS INTERFACE REAL TIME CLOCK MODULE
+ fsl,mag3110		MAG3110: Xtrinsic High Accuracy, 3D Magnetometer
+diff --git a/Documentation/devicetree/bindings/regulator/da9210.txt b/Documentation/devicetree/bindings/regulator/da9210.txt
+index f120f22..3297c53 100644
+--- a/Documentation/devicetree/bindings/regulator/da9210.txt
++++ b/Documentation/devicetree/bindings/regulator/da9210.txt
+@@ -2,7 +2,7 @@
+ 
+ Required properties:
+ 
+-- compatible:	must be "diasemi,da9210"
++- compatible:	must be "dlg,da9210"
+ - reg:		the i2c slave address of the regulator. It should be 0x68.
+ 
+ Any standard regulator properties can be used to configure the single da9210
+@@ -11,7 +11,7 @@ DCDC.
+ Example:
+ 
+ 	da9210 at 68 {
+-		compatible = "diasemi,da9210";
++		compatible = "dlg,da9210";
+ 		reg = <0x68>;
+ 
+ 		regulator-min-microvolt = <900000>;
+diff --git a/Documentation/devicetree/bindings/vendor-prefixes.txt b/Documentation/devicetree/bindings/vendor-prefixes.txt
+index 5d27e5a..35a833e 100644
+--- a/Documentation/devicetree/bindings/vendor-prefixes.txt
++++ b/Documentation/devicetree/bindings/vendor-prefixes.txt
+@@ -37,6 +37,7 @@ dallas	Maxim Integrated Products (formerly Dallas Semiconductor)
+ davicom	DAVICOM Semiconductor, Inc.
+ denx	Denx Software Engineering
+ digi	Digi International Inc.
++dlg	Dialog Semiconductor
+ dlink	D-Link Corporation
+ dmo	Data Modul AG
+ ebv	EBV Elektronik
+diff --git a/arch/arm/boot/dts/imx53-smd.dts b/arch/arm/boot/dts/imx53-smd.dts
+index 5ec1590..1d32557 100644
+--- a/arch/arm/boot/dts/imx53-smd.dts
++++ b/arch/arm/boot/dts/imx53-smd.dts
+@@ -265,7 +265,7 @@
+ 	};
+ 
+ 	pmic: dialog at 48 {
+-		compatible = "dialog,da9053", "dialog,da9052";
++		compatible = "dlg,da9053", "dlg,da9052";
+ 		reg = <0x48>;
+ 	};
+ };
+diff --git a/arch/arm/boot/dts/imx6qdl-phytec-pfla02.dtsi b/arch/arm/boot/dts/imx6qdl-phytec-pfla02.dtsi
+index 2694aa8..0e50bb0 100644
+--- a/arch/arm/boot/dts/imx6qdl-phytec-pfla02.dtsi
++++ b/arch/arm/boot/dts/imx6qdl-phytec-pfla02.dtsi
+@@ -83,7 +83,7 @@
+ 	};
+ 
+ 	pmic at 58 {
+-		compatible = "dialog,da9063";
++		compatible = "dlg,da9063";
+ 		reg = <0x58>;
+ 		interrupt-parent = <&gpio4>;
+ 		interrupts = <17 0x8>; /* active-low GPIO4_17 */
+diff --git a/arch/arm/boot/dts/r8a7790-lager.dts b/arch/arm/boot/dts/r8a7790-lager.dts
+index 856b423..e3db105 100644
+--- a/arch/arm/boot/dts/r8a7790-lager.dts
++++ b/arch/arm/boot/dts/r8a7790-lager.dts
+@@ -374,7 +374,7 @@
+ 	status = "okay";
+ 
+ 	vdd_dvfs: regulator at 68 {
+-		compatible = "diasemi,da9210";
++		compatible = "dlg,da9210";
+ 		reg = <0x68>;
+ 
+ 		regulator-min-microvolt = <1000000>;
+diff --git a/arch/arm/boot/dts/r8a7791-koelsch.dts b/arch/arm/boot/dts/r8a7791-koelsch.dts
+index 23486c0..33b9532 100644
+--- a/arch/arm/boot/dts/r8a7791-koelsch.dts
++++ b/arch/arm/boot/dts/r8a7791-koelsch.dts
+@@ -426,7 +426,7 @@
+ 	clock-frequency = <100000>;
+ 
+ 	vdd_dvfs: regulator at 68 {
+-		compatible = "diasemi,da9210";
++		compatible = "dlg,da9210";
+ 		reg = <0x68>;
+ 
+ 		regulator-min-microvolt = <1000000>;
+diff --git a/drivers/mfd/da9055-core.c b/drivers/mfd/da9055-core.c
+index caf8dcf..b4d920c 100644
+--- a/drivers/mfd/da9055-core.c
++++ b/drivers/mfd/da9055-core.c
+@@ -296,73 +296,73 @@ static struct resource da9055_ld05_6_resource = {
+ 
+ static const struct mfd_cell da9055_devs[] = {
+ 	{
+-		.of_compatible = "dialog,da9055-gpio",
++		.of_compatible = "dlg,da9055-gpio",
+ 		.name = "da9055-gpio",
+ 	},
+ 	{
+-		.of_compatible = "dialog,da9055-regulator",
++		.of_compatible = "dlg,da9055-regulator",
+ 		.name = "da9055-regulator",
+ 		.id = 1,
+ 	},
+ 	{
+-		.of_compatible = "dialog,da9055-regulator",
++		.of_compatible = "dlg,da9055-regulator",
+ 		.name = "da9055-regulator",
+ 		.id = 2,
+ 	},
+ 	{
+-		.of_compatible = "dialog,da9055-regulator",
++		.of_compatible = "dlg,da9055-regulator",
+ 		.name = "da9055-regulator",
+ 		.id = 3,
+ 	},
+ 	{
+-		.of_compatible = "dialog,da9055-regulator",
++		.of_compatible = "dlg,da9055-regulator",
+ 		.name = "da9055-regulator",
+ 		.id = 4,
+ 	},
+ 	{
+-		.of_compatible = "dialog,da9055-regulator",
++		.of_compatible = "dlg,da9055-regulator",
+ 		.name = "da9055-regulator",
+ 		.id = 5,
+ 	},
+ 	{
+-		.of_compatible = "dialog,da9055-regulator",
++		.of_compatible = "dlg,da9055-regulator",
+ 		.name = "da9055-regulator",
+ 		.id = 6,
+ 	},
+ 	{
+-		.of_compatible = "dialog,da9055-regulator",
++		.of_compatible = "dlg,da9055-regulator",
+ 		.name = "da9055-regulator",
+ 		.id = 7,
+ 		.resources = &da9055_ld05_6_resource,
+ 		.num_resources = 1,
+ 	},
+ 	{
+-		.of_compatible = "dialog,da9055-regulator",
++		.of_compatible = "dlg,da9055-regulator",
+ 		.name = "da9055-regulator",
+ 		.resources = &da9055_ld05_6_resource,
+ 		.num_resources = 1,
+ 		.id = 8,
+ 	},
+ 	{
+-		.of_compatible = "dialog,da9055-onkey",
++		.of_compatible = "dlg,da9055-onkey",
+ 		.name = "da9055-onkey",
+ 		.resources = &da9055_onkey_resource,
+ 		.num_resources = 1,
+ 	},
+ 	{
+-		.of_compatible = "dialog,da9055-rtc",
++		.of_compatible = "dlg,da9055-rtc",
+ 		.name = "da9055-rtc",
+ 		.resources = da9055_rtc_resource,
+ 		.num_resources = ARRAY_SIZE(da9055_rtc_resource),
+ 	},
+ 	{
+-		.of_compatible = "dialog,da9055-hwmon",
++		.of_compatible = "dlg,da9055-hwmon",
+ 		.name = "da9055-hwmon",
+ 		.resources = &da9055_hwmon_resource,
+ 		.num_resources = 1,
+ 	},
+ 	{
+-		.of_compatible = "dialog,da9055-watchdog",
++		.of_compatible = "dlg,da9055-watchdog",
+ 		.name = "da9055-watchdog",
+ 	},
+ };
+-- 
+end-of-patch for PATCH V2
