@@ -1,47 +1,33 @@
-From: jgunthorpe@obsidianresearch.com (Jason Gunthorpe)
-Date: Wed, 30 Jul 2014 14:05:13 -0600
-Subject: [PATCH v7 4/5] PCI: add PCI controller for keystone PCIe h/w
-In-Reply-To: <53D948D4.6080603@ti.com>
-References: <1405961925-27248-1-git-send-email-m-karicheri2@ti.com>
- <1405961925-27248-5-git-send-email-m-karicheri2@ti.com>
- <20140722223527.GA27965@google.com> <53CEEB1C.9020202@ti.com>
- <20140722235200.GC27965@google.com>
- <20140723174228.GB11270@obsidianresearch.com>
- <53D948D4.6080603@ti.com>
-Message-ID: <20140730200513.GA11918@obsidianresearch.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Wed, 30 Jul 2014 22:11:14 +0200
+Subject: [PATCH v4] devicetree: Add generic IOMMU device tree bindings
+In-Reply-To: <20140730132348.GM29590@ulmo>
+References: <1404487757-18829-1-git-send-email-thierry.reding@gmail.com>
+ <20140730110425.GI12239@arm.com> <20140730132348.GM29590@ulmo>
+Message-ID: <201407302211.14342.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jul 30, 2014 at 03:34:44PM -0400, Murali Karicheri wrote:
-
-> ? Maximum remote read request size of 256 bytes
-
-The PCI spec simply does not permit a completer to impose this
-limitation.
-
-See spec 2.3.1.1
-
-It is not an option to error a read request because it is too
-long. All requests must be completed. All completions must be segmented
-according to the RCB and Max_Payload_Size.
-
-> completion packets. So it seems to be able to segment up to maximum
-> 256 bytes of read request. Where do I find the requirement in PCI
-> spec that "read response segmentation at the host bridge does not
-> work" ?
-
-You just said it. Segmenting up to only 256 bytes is not a limitation
-the completer can impose. Such a device is non-conformant.
-
-> >So, the only fix is that every downstream device must always have a
-> >MRSS set to less than the MPS of the host bridge.
+On Wednesday 30 July 2014, Thierry Reding wrote:
+se?
 > 
-> Why this can't be the default behavior in the PCI core? Any cons?
+> I think there weren't any comments left for me to address and I've
+> mostly been waiting for Joerg to pick it up.
+> 
+> Joerg, can you take this through the iommu tree for 3.17? Will acked
+> this, but perhaps you were waiting for an ACK from the device tree
+> bindings maintainers?
+> 
+> Will, perhaps you can get Pawel or Mark to look at this?
+> 
+> Arnd, I'm sure if we had your Acked-by that would go a long way too.
 
-It increases read request traffic and read response latency on the bus
-for large transfers.
 
-The MRSS is intented as a performance tuning knob, it is not something
-that ever needs to be set properly for correct bus operation.
+Sorry for missing this before my vacation.
 
-Jason
+Reviewed-by: Arnd Bergmann <arnd@arndb.de>
+
+Olof, please merge it into arm-soc so we can finally build on top
+of this!
+
+	Arnd
