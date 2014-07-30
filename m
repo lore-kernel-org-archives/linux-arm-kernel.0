@@ -1,58 +1,44 @@
-From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
-Date: Wed, 30 Jul 2014 19:18:28 +0400
-Subject: [PATCH 2/4] ARM: dts: add rk3288 dwc2 controller support
-In-Reply-To: <1406684075-18271-1-git-send-email-kever.yang@rock-chips.com>
-References: <1406683873-18194-1-git-send-email-kever.yang@rock-chips.com>
- <1406684075-18271-1-git-send-email-kever.yang@rock-chips.com>
-Message-ID: <53D90CC4.9070009@cogentembedded.com>
+From: dianders@chromium.org (Doug Anderson)
+Date: Wed, 30 Jul 2014 08:22:10 -0700
+Subject: [PATCH 3/3] ARM: dts: Enable USB host0 (EHCI) on rk3288-evb
+In-Reply-To: <4280303.LVm1cg0Iss@diego>
+References: <1406676273-20701-1-git-send-email-dianders@chromium.org>
+ <1406676273-20701-4-git-send-email-dianders@chromium.org>
+ <4280303.LVm1cg0Iss@diego>
+Message-ID: <CAD=FV=W1HGxTDx6k7tizZ_Ez3GsxmwV0t5gJx0fanAQ2t_fnuQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello.
+Heiko,
 
-On 07/30/2014 05:34 AM, Kever Yang wrote:
+On Wed, Jul 30, 2014 at 4:26 AM, Heiko St?bner <heiko@sntech.de> wrote:
+> Am Dienstag, 29. Juli 2014, 16:24:33 schrieb Doug Anderson:
+>> This is the top USB port on the evb (the one closest to the Ethernet
+>> connector).
+>>
+>> Signed-off-by: Doug Anderson <dianders@chromium.org>
+>> Signed-off-by: Kever Yang <kever.yang@rock-chips.com>
+>
+> shouldn't the signed-offs be the other way around, like in patch 2/3?
 
-> rk3288 has two kind of usb controller, this add the dwc2 controller
-> for otg and host1.
+I wasn't aware that the order was too relevant, but I'll happily swap
+them.  I generally try to list them based on contribution.  Things get
+complicated when lots of WIP patches are sent around and then someone
+eventually puts things together.  My work enabling the EHCI port was
+based on something Kever sent me in email, so I felt he should have
+SoB.  ...but cleaning it up / organizing was done by me.  Probably
+should be this to get it totally right:
 
-> Controller can works with usb PHY default setting and Vbus on.
+* Patch #1: Author and SoB are me, since Kever just pointed me to the
+GPIO number
+* Patch #2: Probably should be author Kever, first SoB Kever, second SoB me
+* Patch #3: Probably should be author me, first SoB me, second SoB Kever
 
-> Signed-off-by: Kever Yang <kever.yang@rock-chips.com>
-> ---
->   arch/arm/boot/dts/rk3288.dtsi |   20 ++++++++++++++++++++
->   1 file changed, 20 insertions(+)
+...in that case I just need to tweak the author of Patch #2 and leave
+everything else the same.  I'll plan to do that when I repost.
 
-> diff --git a/arch/arm/boot/dts/rk3288.dtsi b/arch/arm/boot/dts/rk3288.dtsi
-> index abc51f5..4309c4f 100644
-> --- a/arch/arm/boot/dts/rk3288.dtsi
-> +++ b/arch/arm/boot/dts/rk3288.dtsi
-> @@ -646,5 +646,25 @@
->   			clock-names = "baudclk", "apb_pclk";
->   			status = "disabled";
->   		};
-> +
-> +		usb_otg: dwc2 at ff580000 {
+...but I don't really care a whole lot and I'm OK with any authorship
+of patch set #2/#3 and any SoB order of patch set #2/#3.  Just let me
+know which you prefer!  :)
 
-    The ePAPR standard [1] says:
-
-The name of a node should be somewhat generic, reflecting the function of the 
-device and not its precise programming model. If appropriate, the name should 
-be one of the following choices:
-
-[...]
-    ? usb
-
-> +			compatible = "rockchip,rk3288-usb", "rockchip,rk3066-usb",
-> +					"snps,dwc2";
-> +			reg = <0xff580000 0x40000>;
-> +			interrupts = <GIC_SPI 23 IRQ_TYPE_LEVEL_HIGH>;
-> +			clocks = <&cru HCLK_OTG0>;
-> +			clock-names = "otg";
-> +			status = "disabled";
-> +		};
-> +
-> +		usb_host1: dwc2 at ff540000 {
-
-    Same here.
-
-WBR, Sergei
+-Doug
