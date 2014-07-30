@@ -1,10 +1,10 @@
 From: behanw@converseincode.com (behanw at converseincode.com)
-Date: Wed, 30 Jul 2014 16:57:27 -0700
-Subject: [PATCH 2/4] arm64: LLVMLinux: Use current_stack_pointer in
- save_stack_trace_tsk
+Date: Wed, 30 Jul 2014 16:57:28 -0700
+Subject: [PATCH 3/4] arm64: LLVMLinux: Calculate current_thread_info from
+ current_stack_pointer
 In-Reply-To: <1406764649-20326-1-git-send-email-behanw@converseincode.com>
 References: <1406764649-20326-1-git-send-email-behanw@converseincode.com>
-Message-ID: <1406764649-20326-3-git-send-email-behanw@converseincode.com>
+Message-ID: <1406764649-20326-4-git-send-email-behanw@converseincode.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -17,24 +17,23 @@ Signed-off-by: Behan Webster <behanw@converseincode.com>
 Signed-off-by: Mark Charlebois <charlebm@gmail.com>
 Reviewed-by: Jan-Simon M??ller <dl9pf@gmx.de>
 ---
- arch/arm64/kernel/stacktrace.c | 3 +--
- 1 file changed, 1 insertion(+), 2 deletions(-)
+ arch/arm64/include/asm/thread_info.h | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
 
-diff --git a/arch/arm64/kernel/stacktrace.c b/arch/arm64/kernel/stacktrace.c
-index 55437ba..407991b 100644
---- a/arch/arm64/kernel/stacktrace.c
-+++ b/arch/arm64/kernel/stacktrace.c
-@@ -111,10 +111,9 @@ void save_stack_trace_tsk(struct task_struct *tsk, struct stack_trace *trace)
- 		frame.sp = thread_saved_sp(tsk);
- 		frame.pc = thread_saved_pc(tsk);
- 	} else {
--		register unsigned long current_sp asm("sp");
- 		data.no_sched_functions = 0;
- 		frame.fp = (unsigned long)__builtin_frame_address(0);
--		frame.sp = current_sp;
-+		frame.sp = current_stack_pointer;
- 		frame.pc = (unsigned long)save_stack_trace_tsk;
- 	}
+diff --git a/arch/arm64/include/asm/thread_info.h b/arch/arm64/include/asm/thread_info.h
+index e6b6094..c2432d2 100644
+--- a/arch/arm64/include/asm/thread_info.h
++++ b/arch/arm64/include/asm/thread_info.h
+@@ -80,8 +80,8 @@ static inline struct thread_info *current_thread_info(void) __attribute_const__;
  
+ static inline struct thread_info *current_thread_info(void)
+ {
+-	register unsigned long sp asm ("sp");
+-	return (struct thread_info *)(sp & ~(THREAD_SIZE - 1));
++	return (struct thread_info *) \
++		(current_stack_pointer & ~(THREAD_SIZE - 1));
+ }
+ 
+ #define thread_saved_pc(tsk)	\
 -- 
 1.9.1
