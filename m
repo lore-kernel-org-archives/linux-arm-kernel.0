@@ -1,143 +1,88 @@
-From: shijie.huang@intel.com (Huang Shijie)
-Date: Wed, 30 Jul 2014 14:44:13 +0800
-Subject: [PATCH v2 03/10] mtd: spi-nor: add DDR quad read support
-In-Reply-To: <20140730050843.GE11952@brian-ubuntu>
-References: <1398657227-20721-1-git-send-email-b32955@freescale.com>
- <1398657227-20721-4-git-send-email-b32955@freescale.com>
- <20140730050843.GE11952@brian-ubuntu>
-Message-ID: <20140730064413.GA15547@shldeISGChi005.sh.intel.com>
+From: kever.yang@rock-chips.com (Kever Yang)
+Date: Tue, 29 Jul 2014 23:40:14 -0700
+Subject: [PATCH 3/4] usb: dwc2: add compatible data for rockchip soc
+In-Reply-To: <CAD=FV=Wqr0C7gj89DVof=gBo4mxvqqz0or7_vkdad==CkzzrPg@mail.gmail.com>
+References: <1406683873-18194-1-git-send-email-kever.yang@rock-chips.com>	<1406684102-18313-1-git-send-email-kever.yang@rock-chips.com>
+ <CAD=FV=Wqr0C7gj89DVof=gBo4mxvqqz0or7_vkdad==CkzzrPg@mail.gmail.com>
+Message-ID: <53D8934E.9040807@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jul 29, 2014 at 10:08:43PM -0700, Brian Norris wrote:
-> 
-> On Mon, Apr 28, 2014 at 11:53:40AM +0800, Huang Shijie wrote:
-> > This patch adds the DDR quad read support by the following:
-> 
-> To Mark / linux-spi:
-> 
-> Are DDR modes in the scope of drivers/spi/ at all, so that we could
-> someday wire it up through m25p80.c? Or is 'DDR' such a distortion of
-> the meaning of 'SPI' such that it will be restricted only to SPI NOR
-> dedicated controllers?
+Hi Doug:
 
-IMHO, the DDR modes can _NOT_ be handled by the driver/spi/*.
-The SPI can only handles the byte streams. But the DDR mode may need to
-handle the cycles(such as the dummy cycles could be 7 cycles) which is not byte.
-
-So the DDR mode is handled by the SPI NOR controller now.
-
-Please correct me if I am wrong. :)
-
-> 
-> >   [1] add SPI_NOR_DDR_QUAD read mode.
-> > 
-> >   [2] add DDR Quad read opcodes:
-> >        SPINOR_OP_READ_1_4_4_D / SPINOR_OP_READ4_1_4_4_D
-> > 
-> >   [3] add set_ddr_quad_mode() to initialize for the DDR quad read.
-> >       Currently it only works for Spansion NOR.
-> > 
-> >   [3] about the dummy cycles.
-> >       We set the dummy with 8 for DDR quad read by default.
-> 
-> Why? That seems wrong. You need to know for sure how many cycles should
-> be used, not just guess a default.
-
-Do you mean that if people do not set the DT node for dummy, we should
-return an -EINVAL immediately?
-
-
-> 
-> >       The m25p80.c can not support the DDR quad read, but the SPI NOR controller
-> >       can set the dummy value in its child DT node, and the SPI NOR framework
-> >       can parse it out.
-> 
-> Why does the dummy value belong in device tree? I think this can be
-> handled in software. You might, however, want a few other hardware
-> description parameters in device tree to help you.
-> 
-> So I think spi-nor.c needs to know a few things:
-> 
->  1. Does the hardware/driver support DDR clocking?
->  2. What granularity of dummy cycles are supported? So m25p80.c needs to
->     communicate that it only supports dummy cycles of multiples of 8,
->     and fsl-quadspi supports single clock cycles.
-
-I think you can send patches for these features. I does not clear about:
-  for what does the spi-nor needs to know the above things.
-
-> And spi-nor.c should be able to do the following:
-> 
->  3. Set how many dummy cycles should be used.
-where can we get the number of the cycles? 
-
-
->  4. Write to the configuration register, to choose a Latency Code
->     according to what the flash supports. I see modes that support 3, 6,
->     7, or 8. We'd probably just go for the fastest mode, which requires
->     8, right?
-not right.
-
-The DDR mode can not work if we set a wrong dummy cycles for the flash.
-
-for some chips, the fastest mode may need 6 cycles, not 8. 
-
-> 
-> So far, none of this seems to require a DT binding, unless there's
-> something I'm missing about your fsl-quadspi controller.
-> 
-> > Test this patch for Spansion s25fl128s NOR flash.
-> > 
-> > Signed-off-by: Huang Shijie <b32955@freescale.com>
-> > ---
-> > +	/* DDR Quad/Quad/Dual-read mode takes precedence over fast/normal */
-> > +	if (mode == SPI_NOR_DDR_QUAD && info->flags & SPI_NOR_DDR_QUAD_READ) {
-> 
-> Hmm, I think I should probably take another look at the design of
-> spi-nor.c... Why does spi_nor_scan() take a single 'mode' argument? The
-> driver should be communicating which (multiple) modes it supports, not
-> selecting a single mode. spi-nor.c is the only one which knows what the
-> *flash* supports, so it should be combining knowledge from the
-> controller driver with its own knowledge of the flash.
-
-It is okay for me to add multiples modes for the spi_nor_scan().
-I added the single mode for spi_nor_scan is because that the fsl-quadspi
-does not want to support the low speed modes. (Of course, the fsl-quadspi
-controller does support the low speed modes.)
-
-> 
-> > +		ret = set_ddr_quad_mode(nor, info->jedec_id);
-> > +		if (ret) {
-> > +			dev_err(dev, "DDR quad mode not supported\n");
-> > +			return ret;
-> 
-> A ramification of my comment above is that we should not be returning an
-> error in a situation like this; we should be able to fall back to
-> another known-supported mode, like SDR QUAD, SDR DUAL, or just plain
-> SPI -- if they're supported by the driver -- and spi-nor.c doesn't
-> currently have enough information to do this.
-ok.
-> 
-> > +		}
-> > +		nor->flash_read = SPI_NOR_DDR_QUAD;
-> >  
-> >  /**
-> 
-> So, I'll have to take another hard look at spi-nor.c soon. I think we
-> may need to work on the abstractions here a bit more before I merge any
-> new features like this.
-
-okay.  no problem.
-
-> 
-> Regards,
-> Brian
-> 
-> P.S. Is there a good reason we've defined a whole read_xfer/write_xfer
-> API that is completely unused?
-These hooks are designed for other SPI NOR drivers, the fsl-quadspi does
-not use them.
-
-thanks
-Huang Shijie
+On 07/29/2014 09:21 PM, Doug Anderson wrote:
+> Kever,
+>
+> On Tue, Jul 29, 2014 at 6:35 PM, Kever Yang <kever.yang@rock-chips.com> wrote:
+>> This patch add compatible data for dwc2 controller found on
+>> rk3066, rk3188 and rk3288 processors from rockchip.
+>>
+>> Signed-off-by: Kever Yang <kever.yang@rock-chips.com>
+>> ---
+>>   drivers/usb/dwc2/platform.c |   29 +++++++++++++++++++++++++++++
+>>   1 file changed, 29 insertions(+)
+> I'm nowhere an expert here, but...
+>
+>
+>> diff --git a/drivers/usb/dwc2/platform.c b/drivers/usb/dwc2/platform.c
+>> index a10e7a3..cc5983c 100644
+>> --- a/drivers/usb/dwc2/platform.c
+>> +++ b/drivers/usb/dwc2/platform.c
+>> @@ -75,6 +75,34 @@ static const struct dwc2_core_params params_bcm2835 = {
+>>          .uframe_sched                   = 0,
+>>   };
+>>
+>> +static const struct dwc2_core_params params_rk3066 = {
+>> +       .otg_cap                        = 2,    /* no HNP/SRP capable */
+> Are you sure HNP/SRP is not available?  Do things break if you leave this at 0?
+1. HNP/SRP is not need right now, I didn't see it used in mobile devices.
+2. If HNP/SRP is enabled, the controller will monitor the otg_vbus about 5V,
+     overcurrent change will happen if vbus not detect after switch to host
+     for a period of time.
+     If not, the controller will monitor b_valid signal about 3V instead 
+of 5V vbus,
+     which match the hardware reference design from Rockchip.
+>
+>
+>> +       .otg_ver                        = 0,    /* 1.3 */
+>> +       .dma_enable                     = 1,
+>> +       .dma_desc_enable                = 0,
+>> +       .speed                          = 0,    /* High Speed */
+>> +       .enable_dynamic_fifo            = 1,
+>> +       .en_multiple_tx_fifo            = 1,
+>> +       .host_rx_fifo_size              = 520,  /* 520 DWORDs */
+>> +       .host_nperio_tx_fifo_size       = 128,  /* 128 DWORDs */
+>> +       .host_perio_tx_fifo_size        = 256,  /* 256 DWORDs */
+>> +       .max_transfer_size              = 65536,
+>> +       .max_packet_count               = 512,
+> Header file says max_packet_count should be max of 511.
+Yeap, you are right, I will fix this.
+>
+>
+>> +       .host_channels                  = 9,
+>> +       .phy_type                       = 1,    /* UTMI */
+>> +       .phy_utmi_width                 = 16,   /* 8 bits */
+> Either comment or value is wrong since 16 != 8 bits.
+I will change this to auto detect.
+>
+>
+>> +       .phy_ulpi_ddr                   = 0,    /* Single */
+>> +       .phy_ulpi_ext_vbus              = 0,
+>> +       .i2c_enable                     = 0,
+>> +       .ulpi_fs_ls                     = 0,
+>> +       .host_support_fs_ls_low_power   = 0,
+>> +       .host_ls_low_power_phy_clk      = 0,    /* 48 MHz */
+>> +       .ts_dline                       = 0,
+>> +       .reload_ctl                     = 1,
+>> +       .ahbcfg                         = 0x17, /* dma enable &  INCR16 */
+>> +       .uframe_sched                   = 1,
+>> +};
+> Many of these values could just be -1 to autodetect / use default.
+> Should we consider doing that?
+Most of the parameter can be auto-detect right except some have more than
+one choice, so I will leave the parameters to driver if it can do it right.
+>
+> -Doug
+>
+>
+>
