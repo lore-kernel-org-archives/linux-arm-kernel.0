@@ -1,43 +1,52 @@
 From: robert.jarzmik@free.fr (Robert Jarzmik)
-Date: Wed, 30 Jul 2014 22:51:00 +0200
-Subject: [PATCH v3 2/6] clk: dts: document pxa clock binding
+Date: Wed, 30 Jul 2014 22:51:03 +0200
+Subject: [PATCH v3 5/6] dts: add devicetree bindings for pxa27x clocks
 In-Reply-To: <1406753464-15000-1-git-send-email-robert.jarzmik@free.fr>
 References: <1406753464-15000-1-git-send-email-robert.jarzmik@free.fr>
-Message-ID: <1406753464-15000-3-git-send-email-robert.jarzmik@free.fr>
+Message-ID: <1406753464-15000-6-git-send-email-robert.jarzmik@free.fr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Document the device-tree binding of Marvell PXA based SoCs.
-PXA clocks are mostly fixed rate and fixed ratio clocks derived from an
-external oscillator, and gated by a register set (CKEN or CKEN*).
+Add the clock tree description for the PXA27x based boards.
 
 Signed-off-by: Robert Jarzmik <robert.jarzmik@free.fr>
 ---
- Documentation/devicetree/bindings/clock/pxa-clock.txt | 16 ++++++++++++++++
- 1 file changed, 16 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/clock/pxa-clock.txt
+ arch/arm/boot/dts/pxa27x.dtsi | 20 +++++++++++++++++++-
+ 1 file changed, 19 insertions(+), 1 deletion(-)
 
-diff --git a/Documentation/devicetree/bindings/clock/pxa-clock.txt b/Documentation/devicetree/bindings/clock/pxa-clock.txt
-new file mode 100644
-index 0000000..4b4a902
---- /dev/null
-+++ b/Documentation/devicetree/bindings/clock/pxa-clock.txt
-@@ -0,0 +1,16 @@
-+* Clock bindings for Marvell PXA chips
+diff --git a/arch/arm/boot/dts/pxa27x.dtsi b/arch/arm/boot/dts/pxa27x.dtsi
+index a705469..80fc5d7 100644
+--- a/arch/arm/boot/dts/pxa27x.dtsi
++++ b/arch/arm/boot/dts/pxa27x.dtsi
+@@ -1,5 +1,6 @@
+ /* The pxa3xx skeleton simply augments the 2xx version */
+-/include/ "pxa2xx.dtsi"
++#include "pxa2xx.dtsi"
++#include "dt-bindings/clock/pxa2xx-clock.h"
+ 
+ / {
+ 	model = "Marvell PXA27x familiy SoC";
+@@ -35,4 +36,21 @@
+ 			#pwm-cells = <1>;
+ 		};
+ 	};
 +
-+Required properties:
-+- compatible: Should be "marvell,pxa-clocks"
-+- #clock-cells: Should be <1>
++	clocks {
++	       /*
++		* The muxing of external clocks/internal dividers for osc* clock
++		* sources has been hidden under the carpet by now.
++		*/
++		#address-cells = <1>;
++		#size-cells = <1>;
++		ranges;
 +
-+The clock consumer should specify the desired clock by having the clock
-+ID in its "clocks" phandle cell (see include/.../pxa-clock.h).
++		pxa2xx_clks: pxa2xx_clks at 41300004 {
++			compatible = "marvell,pxa-clocks";
++			#clock-cells = <1>;
++			status = "okay";
++		};
++	};
 +
-+Examples:
-+
-+pxa2xx_clks: pxa2xx_clks at 41300004 {
-+        compatible = "marvell,pxa-clocks";
-+        #clock-cells = <1>;
-+        status = "okay";
-+};
+ };
 -- 
 2.0.0.rc2
