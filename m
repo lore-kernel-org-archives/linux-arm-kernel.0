@@ -1,55 +1,82 @@
-From: mark.rutland@arm.com (Mark Rutland)
+From: marc.zyngier@arm.com (Marc Zyngier)
 Date: Wed, 30 Jul 2014 13:30:29 +0100
-Subject: [PATCH v2 1/3] arm64: spin-table: handle unmapped
- cpu-release-addrs
-In-Reply-To: <CAKv+Gu-891BPCMCB2xnhsaUHxz_BCMkwbbwQ76kmK=JsUdifHQ@mail.gmail.com>
-References: <1406717944-24725-1-git-send-email-ard.biesheuvel@linaro.org>
- <1406717944-24725-2-git-send-email-ard.biesheuvel@linaro.org>
- <20140730113013.GL12239@arm.com>
- <CAKv+Gu-891BPCMCB2xnhsaUHxz_BCMkwbbwQ76kmK=JsUdifHQ@mail.gmail.com>
-Message-ID: <20140730123029.GA20162@leverpostej>
+Subject: [PATCH] ARM64: KVM: Nuke EL2 mode tlbs before enabling MMU for EL2
+In-Reply-To: <CAAHg+Hjo12X3_X+NXNb9+-+Xj2hetkEx+RihdRap9szLWvUd_w@mail.gmail.com>
+ (Pranavkumar Sawargaonkar's message of "Wed, 30 Jul 2014 12:13:19
+ +0100")
+References: <1406713607-27150-1-git-send-email-pranavkumar@linaro.org>
+ <87k36vjela.fsf@approximate.cambridge.arm.com>
+ <CAAHg+Hjo12X3_X+NXNb9+-+Xj2hetkEx+RihdRap9szLWvUd_w@mail.gmail.com>
+Message-ID: <878unbjafu.fsf@approximate.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jul 30, 2014 at 01:00:40PM +0100, Ard Biesheuvel wrote:
-> On 30 July 2014 13:30, Will Deacon <will.deacon@arm.com> wrote:
-> > On Wed, Jul 30, 2014 at 11:59:02AM +0100, Ard Biesheuvel wrote:
-> >> From: Mark Rutland <mark.rutland@arm.com>
-> >>
-> >> In certain cases the cpu-release-addr of a CPU may not fall in the
-> >> linear mapping (e.g. when the kernel is loaded above this address due to
-> >> the presence of other images in memory). This is problematic for the
-> >> spin-table code as it assumes that it can trivially convert a
-> >> cpu-release-addr to a valid VA in the linear map.
-> >>
-> >> This patch modifies the spin-table code to use a temporary cached
-> >> mapping to write to a given cpu-release-addr, enabling us to support
-> >> addresses regardless of whether they are covered by the linear mapping.
-> >>
-> >> Signed-off-by: Mark Rutland <mark.rutland@arm.com>
-> >> Tested-by: Mark Salter <msalter@redhat.com>
-> >> [ardb: added (__force void *) cast]
-> >> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
-> >> ---
-> >>  arch/arm64/kernel/smp_spin_table.c | 22 +++++++++++++++++-----
-> >>  1 file changed, 17 insertions(+), 5 deletions(-)
-> >
-> > I'm nervous about this. What if the spin table sits in the same physical 64k
-> > frame as a read-sensitive device and we're running with 64k pages?
-> >
-> 
-> I see what you mean. This is potentially hairy, as EFI already
-> ioremap_cache()s everything known to it as normal DRAM, so using plain
-> ioremap() here if pfn_valid() returns false for cpu-release-addr's PFN
-> may still result in mappings with different attributes for the same
-> region. So how should we decide whether to call ioremap() or
-> ioremap_cache() in this case?
+On Wed, Jul 30 2014 at 12:13:19 pm BST, Pranavkumar Sawargaonkar <pranavkumar@linaro.org> wrote:
+> Hi Marc,
+>
+> On 30 July 2014 16:30, Marc Zyngier <marc.zyngier@arm.com> wrote:
+>
+>     Hi Pranav,
+>    
+>     On Wed, Jul 30 2014 at 10:46:47 am BST, Pranavkumar Sawargaonkar <
+>     pranavkumar at linaro.org> wrote:
+>     > X-Gene u-boot runs in EL2 mode with MMU enabled hence we might
+>     > have stale EL2 tlb enteris when we enable EL2 MMU on each host CPU.
+>     >
+>     > This can happen on any ARM64 board running bootloader in EL2
+>     > with MMU enabled.
+>     >
+>     > This patch ensures that we flush all EL2 TLBs on each host CPU
+>     > before enabling EL2 MMU. This is very similar to what we do
+>     > for EL1 TLBs before enabling EL1 MMU.
+>     > (Refer __cpu_setup() of arch/arm64/mm/proc.S)
+>     >
+>     > Signed-off-by: Pranavkumar Sawargaonkar <pranavkumar@linaro.org>
+>     > Signed-off-by: Anup Patel <anup.patel@linaro.org>
+>     > ---
+>     > ?arch/arm64/kvm/hyp-init.S | ? ?4 ++++
+>     > ?1 file changed, 4 insertions(+)
+>     >
+>     > diff --git a/arch/arm64/kvm/hyp-init.S b/arch/arm64/kvm/hyp-init.S
+>     > index d968796..c319116 100644
+>     > --- a/arch/arm64/kvm/hyp-init.S
+>     > +++ b/arch/arm64/kvm/hyp-init.S
+>     > @@ -80,6 +80,10 @@ __do_hyp_init:
+>     > ? ? ? msr ? ? mair_el2, x4
+>     > ? ? ? isb
+>     >
+>     > + ? ? /* Invalidate the stale TLBs from Bootloader */
+>     > + ? ? tlbi ? ?alle2
+>     > + ? ? dsb ? ? sy
+>     > +
+>     > ? ? ? mrs ? ? x4, sctlr_el2
+>     > ? ? ? and ? ? x4, x4, #SCTLR_EL2_EE ? // preserve endianness of EL2
+>     > ? ? ? ldr ? ? x5, =SCTLR_EL2_FLAGS
+>    
+>     This looks like a valid fix. But I wonder if it wouldn't be better
+>     located in kernel/head.S::el2_setup?
+>
+> Sure, I can try this on one of my flaky setup where I see this issue :)
+> One question is , if someone tries to do load/unload KVM module frequently
+> then do "__do_hyp_init" will require the flushing again ?
 
-If we're careful about handling mismatched attributes we might be able
-to get away with always using a device mapping.
+Well, we can't really "unload" KVM, it is not a module. But CPU hotplug
+could trigger something similar (though I'd expect it to come back
+through el2_setup anyway).
 
-I'll need to have a think about that, I'm not sure on the architected
-cache behaviour in such a case.
+Anyway, we can probably keep it in KVM, and revisit that later if that
+makes sense.
 
-Thanks,
-Mark.
+> ?
+>
+>     Also, the 32bit code seems to suffer from the same issue. Care to fix it
+>     as well?
+>
+> I am fine with this but as I do not have arm32 board to test it
+> somebody will need to add tested-by.
+
+Sure. Fire away!
+
+	M.
+-- 
+Jazz is not dead. It just smells funny.
