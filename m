@@ -1,79 +1,70 @@
-From: thierry.reding@gmail.com (Thierry Reding)
-Date: Wed, 30 Jul 2014 11:34:57 +0200
-Subject: [PATCH 8/8] clk: tegra: Add EMC clock driver
-In-Reply-To: <53D81CD4.5010307@wwwdotorg.org>
-References: <1405088313-20048-1-git-send-email-mperttunen@nvidia.com>
- <1405088313-20048-9-git-send-email-mperttunen@nvidia.com>
- <53CE97F2.80300@wwwdotorg.org> <53D75FA7.1030300@nvidia.com>
- <20140729201939.4627.79710@quantum>
- <53D81CD4.5010307@wwwdotorg.org>
-Message-ID: <20140730093456.GA29590@ulmo>
+From: hanjun.guo@linaro.org (Hanjun Guo)
+Date: Wed, 30 Jul 2014 17:36:34 +0800
+Subject: [PATCH 19/19] Documentation: ACPI for ARM64
+In-Reply-To: <CAMJs5B8L8GBsYOUMvu36fNQDv+fEXrBYQYDhkAtJkFzS3VsdPQ@mail.gmail.com>
+References: <1406206825-15590-1-git-send-email-hanjun.guo@linaro.org>	<20140729112824.GM2576@leverpostej>	<CAMJs5B_Ye1eXsvJAKWnHRxC4jnpcXMcqHE+GgOGO7MHtPcsSQA@mail.gmail.com>	<351673188.FxXsM7MvdA@wuerfel>	<20140729130823.GP2576@leverpostej>	<CAMJs5B8uk7GDfEOEuY8RWDxzhzTRBGszRDN+JRKwG-D_rgzFrw@mail.gmail.com>	<53D894F0.1060102@linaro.org>
+ <CAMJs5B8L8GBsYOUMvu36fNQDv+fEXrBYQYDhkAtJkFzS3VsdPQ@mail.gmail.com>
+Message-ID: <53D8BCA2.5020007@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jul 29, 2014 at 04:14:44PM -0600, Stephen Warren wrote:
-> On 07/29/2014 02:19 PM, Mike Turquette wrote:
-> >Quoting Mikko Perttunen (2014-07-29 01:47:35)
-> >>On 22/07/14 19:57, Stephen Warren wrote:
-> >>>On 07/11/2014 08:18 AM, Mikko Perttunen wrote:
-> >>>>+static int emc_debug_rate_set(void *data, u64 rate)
-> >>>>+{
-> >>>>+    struct tegra_emc *tegra = data;
-> >>>>+
-> >>>>+    return clk_set_rate(tegra->hw.clk, rate);
-> >>>>+}
-> >>>>+
-> >>>>+DEFINE_SIMPLE_ATTRIBUTE(emc_debug_rate_fops, emc_debug_rate_get,
-> >>>>+                    emc_debug_rate_set, "%lld\n");
-> >>>
-> >>>I think the rate can already be obtained through
-> >>>...debug/clock/clock_summary. I'm not sure about changing the rate, but
-> >>>shouldn't that be a feature of the common clock core, not individual
-> >>>drivers?
-> >>
-> >>The core doesn't allow writing to the rate debugfs files, so this is the
-> >>only way to trigger an EMC clock change for now. I agree that the core
-> >>might be a better place. I don't know if there are any philosophical
-> >>objections to that. I'd like to keep this in until a possible core
-> >>feature addition. Mike, any comments?
-> >
-> >Yes, there is a philosophical rejection to exposing rate-change knobs to
-> >userspace through debugfs. These can and will ship in real products
-> >(typically Android) with lots of nasty userspace hacks, and also
-> >represent pretty dangerous things to expose to userspace. I have always
-> >maintained that such knobs should remain out of tree or, with the advent
-> >of the custom debugfs entries, should be burden of the clock drivers.
+On 2014-7-30 15:14, Christoffer Dall wrote:
+> On 30 July 2014 08:47, Hanjun Guo <hanjun.guo@linaro.org> wrote:
+>> On 2014-7-29 21:31, Christoffer Dall wrote:
+>>> On 29 July 2014 15:08, Mark Rutland <mark.rutland@arm.com> wrote:
+>>>> On Tue, Jul 29, 2014 at 01:52:40PM +0100, Arnd Bergmann wrote:
+>>>>> On Tuesday 29 July 2014 14:37:38 Christoffer Dall wrote:
+>>>>>>
+>>>>>> For reference, Red Hat's current arguing point for ACPI in VMs is
+>>>>>> hotplug of things like CPUs and memory for very large VMs, but I
+>>>>>> haven't thought too carefully about this just yet, as I don't have a
+>>>>>> 100+ core ARM 64-bit hardware lying around...
+>>>>>
+>>>>> I thought you could run guests with more virtual CPUs that you have
+>>>>> physical CPUs on the host.
+>>>>>
+>>>>> Regarding CPU and memory hotplug, don't we already have PSCI and
+>>>>> xen-balloon/virtio-balloon for that?
+>>>>
+>>>> PSCI (0.1) was there for guests from the start, and ACPI doesn't do
+>>>> anything different w.r.t. PSCI other than requiring PSCI 0.2 (which can
+>>>> be used by guests supporting only PSCI 0.1). So there's no magic for
+>>>> CPU hotplug provided by ACPI.
+>>>
+>>> With PSCI you can only provide your VM a bunch of CPUs and say that
+>>> they're all turned off, and then turn some of them on later.
+>>
+>> Yes, agreed.
+>>
+>>> I honestly don't know if you can do proper CPU hotplug with ACPI, but
+>>> the RH guys seem to argue that you can.  Again, I didn't think too
+>>> carefully about this.
+>>
+>> Yes, we can do proper CPU hotplug with ACPI based physical hotplug (named
+>> dynamic device configuration in ACPI spec), you can refer to section 6.3
+>> "Device Insertion, Removal, and Status Objects" in ACPI 5.1.
+>>
+>> There are mechanisms for handling dynamic insertion and removal of devices
+>> and for determining device and notification processing status. When removing
+>> a processor,
+>>
+>> a) we will call PSCI or similar interface to offline a CPU from OS, then
+>>    OS will not use it any more;
+>>
+>> b) call ACPI API to trim the resources that allocated during device
+>>    enumeration;
+>>
+>> c) Call ACPI method _EJ0 and then will notify firmware or hypervisor device
+>>    will be removed, jump to firmware or hypervisor to remove the device
+>>    from that level;
 > 
-> That argument seems a bit inconsistent.
-> 
-> I can see the argument to disallow code that lets user-space fiddle with
-> clocks. However, if that argument holds, then surely it must apply to either
-> the clock core *or* a clock driver; the end effect of allowing the code in
-> either place is that people will be able to implement the user-space hacks
-> you want to avoid. Yet, if we allow the code because it's a useful debug
-> tool, then surely it should be in the clock core so we don't implement it
-> redundantly in each clock driver.
-> 
-> We could always taint the kernel if the feature is used. Admittedly that
-> wouldn't stop people using the feature as a hack in Android/product kernels,
-> but at least nobody would have to unknowingly debug problems due to such
-> manipulation, in the context of an upstream kernel.
+> When you say notify hypervisor, would we really need a
+> hypervisor-specific interface if you're running UEFI as your firmware?
+>  Can you not just call whatever UEFI service to remove a CPU and let
+> that UEFI implementation deal with the hypervisor/hardware interface?
 
-Not merging this feature upstream won't stop anybody from implementing
-it as a hack in Android/product kernels either. If it's useful then
-somebody will implement it in whatever downstream kernel they use. And
-if it's useful to more than one vendor then we'll end up with a copy of
-the implementation (and derivations on top) in each vendor's tree.
+Yes, it should work as you said, OS will notfy UEFI and then UEFI deal with
+hypervisor interface, sorry, I didn't describe it clearly.
 
-debugfs requires superuser privileges anyway, in which case you could
-equally well write userspace software that directly bangs on the clock
-controller registers.
-
-Thierry
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: not available
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140730/656bf6d5/attachment.sig>
+Thanks
+Hanjun
