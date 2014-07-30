@@ -1,39 +1,35 @@
-From: tj@kernel.org (Tejun Heo)
-Date: Wed, 30 Jul 2014 11:35:26 -0400
-Subject: [PATCH v11 3/8] ata: libahci_platform: move port_map parameters
- into the AHCI structure
-In-Reply-To: <20140730082038.GB29900@kwain>
-References: <1406193450-17283-1-git-send-email-antoine.tenart@free-electrons.com>
- <1406193450-17283-4-git-send-email-antoine.tenart@free-electrons.com>
- <20140729144042.GD4791@htj.dyndns.org>
- <20140730082038.GB29900@kwain>
-Message-ID: <20140730153526.GB23734@htj.dyndns.org>
+From: soren.brinkmann@xilinx.com (=?utf-8?B?U8O2cmVu?= Brinkmann)
+Date: Wed, 30 Jul 2014 08:40:52 -0700
+Subject: [PATCH v2 1/2] ARM: smp_scu: use macro for SCU enable bit
+In-Reply-To: <1406275790-18617-2-git-send-email-shawn.guo@freescale.com>
+References: <1406275790-18617-1-git-send-email-shawn.guo@freescale.com>
+ <1406275790-18617-2-git-send-email-shawn.guo@freescale.com>
+Message-ID: <f3845882-dc51-432c-a774-97c389769fe6@BN1AFFO11FD034.protection.gbl>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+Hi Shawn,
 
-On Wed, Jul 30, 2014 at 10:20:38AM +0200, Antoine T?nart wrote:
-> How do you want me to send the series? There is two conflicts when
-> applying to libata/for-3.17:
-> - patch 4/8: it takes into account a patch not in libata/for-3.17 but
->   added before rc7. It should be better to first merge rc7, otherwise
->   some modifications won't make sense.
-> - patch 6/8: "fsl,imx53-ahci" was removed from the documentation in
->   libata/for-3.17 but not in rc7. Resolving the conflict is really
->   simple.
+On Fri, 2014-07-25 at 04:09PM +0800, Shawn Guo wrote:
+> Use macro instead of magic number for SCU enable bit.
 > 
-> I think it's better to apply the whole thing after merging rc7 into
-> libata/for-3.17, because it will only have a really simple conflict to
-> resolve.
+> Signed-off-by: Shawn Guo <shawn.guo@freescale.com>
+> ---
+>  arch/arm/kernel/smp_scu.c | 5 +++--
+>  1 file changed, 3 insertions(+), 2 deletions(-)
 > 
-> Please tell me what do you prefer before I send the updated version.
+> diff --git a/arch/arm/kernel/smp_scu.c b/arch/arm/kernel/smp_scu.c
+> index 1aafa0d785eb..c947508f84e6 100644
+> --- a/arch/arm/kernel/smp_scu.c
+> +++ b/arch/arm/kernel/smp_scu.c
+> @@ -17,6 +17,7 @@
+>  #include <asm/cputype.h>
+>  
+>  #define SCU_CTRL		0x00
+> +#define SCU_ENABLE		(1 << 0)
+I'd prefer using 'BIT(0)' here (and accordingly in the second patch).
 
-Hmmm... does pulling in libata/for-3.16-fixes into libata/for-3.17
-resolves the conflict?  If so, please send the patch on top of the
-merged branch.  I wanna avoid pulling in -rc7 wholesale at this point.
+For both patches:
+Acked-by: Soren Brinkmann <soren.brinkmann@xilinx.com>
 
-Thanks.
-
--- 
-tejun
+	S?ren
