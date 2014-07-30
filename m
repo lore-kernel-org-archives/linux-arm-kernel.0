@@ -1,34 +1,52 @@
-From: weiyj_lk@163.com (weiyj_lk at 163.com)
-Date: Wed, 30 Jul 2014 08:04:12 +0800
-Subject: [PATCH] ASoC: sirf-audio-codec: Fix return value check in
- sirf_audio_codec_driver_probe()
-Message-ID: <1406678652-31950-1-git-send-email-weiyj_lk@163.com>
+From: rjw@rjwysocki.net (Rafael J. Wysocki)
+Date: Wed, 30 Jul 2014 02:29:11 +0200
+Subject: [PATCH v4 0/5] Simplify hotplug/suspend handling
+In-Reply-To: <1406250448-470-1-git-send-email-skannan@codeaurora.org>
+References: <1406250448-470-1-git-send-email-skannan@codeaurora.org>
+Message-ID: <1667655.2j1xLy7HXa@vostro.rjw.lan>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Wei Yongjun <yongjun_wei@trendmicro.com.cn>
+On Thursday, July 24, 2014 06:07:23 PM Saravana Kannan wrote:
+> Series of patchs to simplify policy/sysfs/kobj/locking handling across
+> suspend/resume
 
-In case of error, the function devm_ioremap_resource() returns ERR_PTR()
-and never returns NULL. The NULL test in the return value check should
-be replaced with IS_ERR().
+I need someone to review this series for me.  Viresh or Srivatsa, preferably
+both.
 
-Signed-off-by: Wei Yongjun <yongjun_wei@trendmicro.com.cn>
----
- sound/soc/codecs/sirf-audio-codec.c | 4 ++--
- 1 file changed, 2 insertions(+), 2 deletions(-)
+Thanks!
 
-diff --git a/sound/soc/codecs/sirf-audio-codec.c b/sound/soc/codecs/sirf-audio-codec.c
-index d90cb0f..06ba492 100644
---- a/sound/soc/codecs/sirf-audio-codec.c
-+++ b/sound/soc/codecs/sirf-audio-codec.c
-@@ -471,8 +471,8 @@ static int sirf_audio_codec_driver_probe(struct platform_device *pdev)
- 
- 	mem_res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
- 	base = devm_ioremap_resource(&pdev->dev, mem_res);
--	if (base == NULL)
--		return -ENOMEM;
-+	if (IS_ERR(base))
-+		return PTR_ERR(base);
- 
- 	sirf_audio_codec->regmap = devm_regmap_init_mmio(&pdev->dev, base,
- 					    &sirf_audio_codec_regmap_config);
+> The following have been tested so far on a 2x2 cluster environment:
+> - Boot with 2 cpus and no cpufreq driver.
+> - mod probe driver and see cpufreq sysfs files show up only for the 1st cluster.
+> - Online the rest of the 2 CPUs and have files show up correctly.
+> - rmmod the driver and see the files go away.
+> - modprobe again (or back and forth multiples times) and see it work.
+> - suspend/resume works as expected.
+> - When a cluster is offline, all read/writes to its sysfs files return an error
+> 
+> v4
+> - Split it up into smaller patches
+> - Will handle physical CPU removal correctly
+> - Fixed earlier mistake of deleting code under !recover_policy
+> - Dropped some code refactor that reuses a lot of code between add/remove
+> - Dropped fix for exiting hotplug race with cpufreq driver probe/rmmod
+> - Dropped changes will come later once this series is acked.
+> 
+> 
+> Saravana Kannan (5):
+>   cpufreq: Don't wait for CPU to going offline to restart governor
+>   cpufreq: Keep track of which CPU owns the kobj/sysfs nodes separately
+>   cpufreq: Don't destroy/realloc policy/sysfs on hotplug/suspend
+>   cpufreq: Properly handle physical CPU hot-add/hot-remove
+>   cpufreq: Delete dead code related to policy save/restore
+> 
+>  drivers/cpufreq/cpufreq.c | 238 ++++++++++++++++++----------------------------
+>  include/linux/cpufreq.h   |   1 +
+>  2 files changed, 93 insertions(+), 146 deletions(-)
+> 
+> 
+
+-- 
+I speak only for myself.
+Rafael J. Wysocki, Intel Open Source Technology Center.
