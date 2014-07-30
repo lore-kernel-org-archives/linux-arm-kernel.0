@@ -1,47 +1,91 @@
 From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Wed, 30 Jul 2014 10:30:21 +0200
-Subject: [PATCH 1/3] dmaengine: sun6i: Remove switch statement from buswidth
- convertion routine
+Date: Wed, 30 Jul 2014 10:30:23 +0200
+Subject: [PATCH 3/3] dmaengine: sun6i: Fix memory leaks
 In-Reply-To: <1406709023-7650-1-git-send-email-maxime.ripard@free-electrons.com>
 References: <1406709023-7650-1-git-send-email-maxime.ripard@free-electrons.com>
-Message-ID: <1406709023-7650-2-git-send-email-maxime.ripard@free-electrons.com>
+Message-ID: <1406709023-7650-4-git-send-email-maxime.ripard@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Since the conversion routine is quite trivial, we don't need this switch, and
-we can just use a simple calculation.
+The sun6i_dma_prep_memcpy and sun6i_dma_prep_slave_sg functions were both
+leaking the descriptor they allocated if an  error was happening after a
+successful dma_pool_alloc call.
 
+It also fixes a memleak that was happening in the scatter gather list
+traversal, that was allocating as much descriptor as there was scatter gather
+items, but only freeing the current descriptor if an error was to arise.
+
+Reported-by: Dan Carpenter <dan.carpenter@oracle.com>
 Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
 ---
- drivers/dma/sun6i-dma.c | 15 +++------------
- 1 file changed, 3 insertions(+), 12 deletions(-)
+ drivers/dma/sun6i-dma.c | 21 ++++++++++++---------
+ 1 file changed, 12 insertions(+), 9 deletions(-)
 
 diff --git a/drivers/dma/sun6i-dma.c b/drivers/dma/sun6i-dma.c
-index c771d90b8ded..609c5d8cb947 100644
+index 63a1db38894e..1f92a56fd2b6 100644
 --- a/drivers/dma/sun6i-dma.c
 +++ b/drivers/dma/sun6i-dma.c
-@@ -248,20 +248,11 @@ static inline int convert_burst(u32 maxburst, u8 *burst)
+@@ -562,8 +562,7 @@ static struct dma_async_tx_descriptor *sun6i_dma_prep_dma_memcpy(
+ 	v_lli = dma_pool_alloc(sdev->pool, GFP_NOWAIT, &p_lli);
+ 	if (!v_lli) {
+ 		dev_err(sdev->slave.dev, "Failed to alloc lli memory\n");
+-		kfree(txd);
+-		return NULL;
++		goto err_txd_free;
+ 	}
  
- static inline int convert_buswidth(enum dma_slave_buswidth addr_width, u8 *width)
- {
--	switch (addr_width) {
--	case DMA_SLAVE_BUSWIDTH_1_BYTE:
--		*width = 0;
--		break;
--	case DMA_SLAVE_BUSWIDTH_2_BYTES:
--		*width = 1;
--		break;
--	case DMA_SLAVE_BUSWIDTH_4_BYTES:
--		*width = 2;
--		break;
--	default:
-+	if ((addr_width < DMA_SLAVE_BUSWIDTH_1_BYTE) ||
-+	    (addr_width > DMA_SLAVE_BUSWIDTH_4_BYTES))
- 		return -EINVAL;
--	}
+ 	ret = sun6i_dma_cfg_lli(v_lli, src, dest, len, sconfig);
+@@ -583,6 +582,8 @@ static struct dma_async_tx_descriptor *sun6i_dma_prep_dma_memcpy(
  
-+	*width = addr_width >> 1;
- 	return 0;
+ err_dma_free:
+ 	dma_pool_free(sdev->pool, v_lli, p_lli);
++err_txd_free:
++	kfree(txd);
+ 	return NULL;
+ }
+ 
+@@ -614,17 +615,15 @@ static struct dma_async_tx_descriptor *sun6i_dma_prep_slave_sg(
+ 
+ 	for_each_sg(sgl, sg, sg_len, i) {
+ 		v_lli = dma_pool_alloc(sdev->pool, GFP_NOWAIT, &p_lli);
+-		if (!v_lli) {
+-			kfree(txd);
+-			return NULL;
+-		}
++		if (!v_lli)
++			goto err_lli_free;
+ 
+ 		if (dir == DMA_MEM_TO_DEV) {
+ 			ret = sun6i_dma_cfg_lli(v_lli, sg_dma_address(sg),
+ 						sconfig->dst_addr, sg_dma_len(sg),
+ 						sconfig);
+ 			if (ret)
+-				goto err_dma_free;
++				goto err_cur_lli_free;
+ 
+ 			v_lli->cfg |= DMA_CHAN_CFG_DST_IO_MODE |
+ 				DMA_CHAN_CFG_SRC_LINEAR_MODE |
+@@ -642,7 +641,7 @@ static struct dma_async_tx_descriptor *sun6i_dma_prep_slave_sg(
+ 						sg_dma_address(sg), sg_dma_len(sg),
+ 						sconfig);
+ 			if (ret)
+-				goto err_dma_free;
++				goto err_cur_lli_free;
+ 
+ 			v_lli->cfg |= DMA_CHAN_CFG_DST_LINEAR_MODE |
+ 				DMA_CHAN_CFG_SRC_IO_MODE |
+@@ -665,8 +664,12 @@ static struct dma_async_tx_descriptor *sun6i_dma_prep_slave_sg(
+ 
+ 	return vchan_tx_prep(&vchan->vc, &txd->vd, flags);
+ 
+-err_dma_free:
++err_cur_lli_free:
+ 	dma_pool_free(sdev->pool, v_lli, p_lli);
++err_lli_free:
++	for (prev = txd->v_lli; prev; prev = prev->v_lli_next)
++		dma_pool_free(sdev->pool, prev, virt_to_phys(prev));
++	kfree(txd);
+ 	return NULL;
  }
  
 -- 
