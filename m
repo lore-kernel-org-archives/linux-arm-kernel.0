@@ -1,52 +1,63 @@
-From: christoffer.dall@linaro.org (Christoffer Dall)
-Date: Wed, 30 Jul 2014 20:54:47 +0200
-Subject: [GIT PULL] KVM/ARM Urgent fix for 3.16
-In-Reply-To: <53D8F453.9010101@redhat.com>
-References: <1406724941-4283-1-git-send-email-christoffer.dall@linaro.org>
- <53D8F453.9010101@redhat.com>
-Message-ID: <20140730185447.GF11610@cbox>
+From: Paul.Zimmerman@synopsys.com (Paul Zimmerman)
+Date: Wed, 30 Jul 2014 19:00:50 +0000
+Subject: [PATCH 3/4] usb: dwc2: add compatible data for rockchip soc
+In-Reply-To: <1406684102-18313-1-git-send-email-kever.yang@rock-chips.com>
+References: <1406683873-18194-1-git-send-email-kever.yang@rock-chips.com>
+ <1406684102-18313-1-git-send-email-kever.yang@rock-chips.com>
+Message-ID: <A2CA0424C0A6F04399FB9E1CD98E0304844C2F88@US01WEMBX2.internal.synopsys.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jul 30, 2014 at 03:34:11PM +0200, Paolo Bonzini wrote:
-> Il 30/07/2014 14:55, Christoffer Dall ha scritto:
-> > Hi Paolo and Gleb,
-> > 
-> > Is there any chance you can get this urgent fix (which allows KVM guest
-> > to bring down the entire system on some 64K enabled ARM64 hosts) merged
-> > for 3.16?
-> > 
-> > The following changes since commit bb18b526a9d8d4a3fe56f234d5013b9f6036978d:
-> > 
-> >   Merge tag 'signed-for-3.16' of git://github.com/agraf/linux-2.6 into kvm-master (2014-07-08 12:08:58 +0200)
-> > 
-> > are available in the git repository at:
-> > 
-> > 
-> >   git://git.kernel.org/pub/scm/linux/kernel/git/kvmarm/kvmarm.git tags/kvm-arm-for-3.16-rc7
-> > 
-> > for you to fetch changes up to 63afbe7a0ac184ef8485dac4914e87b211b5bfaa:
-> > 
-> >   kvm: arm64: vgic: fix hyp panic with 64k pages on juno platform (2014-07-30 14:35:42 +0200)
-> > 
-> > ---
-> > Will Deacon (1):
-> >   kvm: arm64: vgic: fix hyp panic with 64k pages on juno platform
-> > 
-> >  virt/kvm/arm/vgic.c | 24 ++++++++++++++++++++----
-> >  1 file changed, 20 insertions(+), 4 deletions(-)
-> > 
+> From: Kever Yang [mailto:kever.yang at rock-chips.com]
+> Sent: Tuesday, July 29, 2014 6:35 PM
 > 
-> I think Gleb is on vacation now, but unfortunately I've already had
-> enough this year.
+> This patch add compatible data for dwc2 controller found on
+> rk3066, rk3188 and rk3288 processors from rockchip.
 > 
-> I resent the pull request from
-> git://git.kernel.org/pub/scm/virt/kvm/kvm.git, even though you had CCed
-> Linus here already.
+> Signed-off-by: Kever Yang <kever.yang@rock-chips.com>
+> ---
+>  drivers/usb/dwc2/platform.c |   29 +++++++++++++++++++++++++++++
+>  1 file changed, 29 insertions(+)
 > 
-I cc'ed Linus in case you were on vacation and since this is urgent and
-last minute.
+> diff --git a/drivers/usb/dwc2/platform.c b/drivers/usb/dwc2/platform.c
+> index a10e7a3..cc5983c 100644
+> --- a/drivers/usb/dwc2/platform.c
+> +++ b/drivers/usb/dwc2/platform.c
+> @@ -75,6 +75,34 @@ static const struct dwc2_core_params params_bcm2835 = {
+>  	.uframe_sched			= 0,
+>  };
+> 
+> +static const struct dwc2_core_params params_rk3066 = {
+> +	.otg_cap			= 2,	/* no HNP/SRP capable */
+> +	.otg_ver			= 0,	/* 1.3 */
+> +	.dma_enable			= 1,
+> +	.dma_desc_enable		= 0,
+> +	.speed				= 0,	/* High Speed */
+> +	.enable_dynamic_fifo		= 1,
+> +	.en_multiple_tx_fifo		= 1,
+> +	.host_rx_fifo_size		= 520,	/* 520 DWORDs */
+> +	.host_nperio_tx_fifo_size	= 128,	/* 128 DWORDs */
+> +	.host_perio_tx_fifo_size	= 256,	/* 256 DWORDs */
+> +	.max_transfer_size		= 65536,
+> +	.max_packet_count		= 512,
+> +	.host_channels			= 9,
+> +	.phy_type			= 1,	/* UTMI */
+> +	.phy_utmi_width			= 16,	/* 8 bits */
 
-In any case, thanks to all for dealing with this quickly.
+The comment doesn't match the value.
 
--Christoffer
+> +	.phy_ulpi_ddr			= 0,	/* Single */
+> +	.phy_ulpi_ext_vbus		= 0,
+> +	.i2c_enable			= 0,
+> +	.ulpi_fs_ls			= 0,
+> +	.host_support_fs_ls_low_power	= 0,
+> +	.host_ls_low_power_phy_clk	= 0,	/* 48 MHz */
+> +	.ts_dline			= 0,
+> +	.reload_ctl			= 1,
+> +	.ahbcfg				= 0x17, /* dma enable &  INCR16 */
+
+Don't set the dma enable bit here, the driver will set that bit
+according to the '.dma_enable' member above.
+
+-- 
+Paul
