@@ -1,46 +1,88 @@
 From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Wed, 30 Jul 2014 12:59:01 +0200
-Subject: [PATCH 0/3 v2] arm64/efi: improve TEXT_OFFSET handling
-Message-ID: <1406717944-24725-1-git-send-email-ard.biesheuvel@linaro.org>
+Date: Wed, 30 Jul 2014 12:59:02 +0200
+Subject: [PATCH v2 1/3] arm64: spin-table: handle unmapped cpu-release-addrs
+In-Reply-To: <1406717944-24725-1-git-send-email-ard.biesheuvel@linaro.org>
+References: <1406717944-24725-1-git-send-email-ard.biesheuvel@linaro.org>
+Message-ID: <1406717944-24725-2-git-send-email-ard.biesheuvel@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Resending this series sent out yesterday with only minor changes and acks etc
-added.
+From: Mark Rutland <mark.rutland@arm.com>
 
-In summary: patch #3 relaxes the requirements imposed by the EFI stub on where
-Image may be loaded, but this breaks APM Mustang (if booting via UEFI) if patch
-#1 does not go in first. Patch #2 prevents potential boot issues when Image is
-loaded such that the stub does not have to relocate it.
+In certain cases the cpu-release-addr of a CPU may not fall in the
+linear mapping (e.g. when the kernel is loaded above this address due to
+the presence of other images in memory). This is problematic for the
+spin-table code as it assumes that it can trivially convert a
+cpu-release-addr to a valid VA in the linear map.
 
-@Will: as discussed on the list yesterday, these patches should be kept in
-sequence when going upstream, so it is best to take them through a single tree.
-However, patch #3 will not apply cleanly to the arm64 tree until after 3.16-rc1
-is released as it depends on a trivial change going in through x86/tip [efi].
-[https://git.kernel.org/cgit/linux/kernel/git/mfleming/efi.git/commit/?h=next&id=6091c9c447370c4717ec9975813c874af490eb36]
+This patch modifies the spin-table code to use a temporary cached
+mapping to write to a given cpu-release-addr, enabling us to support
+addresses regardless of whether they are covered by the linear mapping.
 
-If you are ok with these patches, how would you like to proceed? Patches #1 and
-#2 could go in straight away (through arm64), and I can send Catalin and you a
-gentle reminder once -rc1 is released to take #3? Or instead, ack them and ask
-Matt to queue them for 3.17-late? It would be nice if this makes 3.17 as it
-fixes actual boot problems on hardware that is under development.
+Signed-off-by: Mark Rutland <mark.rutland@arm.com>
+Tested-by: Mark Salter <msalter@redhat.com>
+[ardb: added (__force void *) cast]
+Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+---
+ arch/arm64/kernel/smp_spin_table.c | 22 +++++++++++++++++-----
+ 1 file changed, 17 insertions(+), 5 deletions(-)
 
-Changes in v2:
-- add (__force void *) cast to patch #1, as suggested in LAKML discussion
-- add tested-by/acked-by lines
-- rebased patch #3 onto efi-next
-
-Mark Rutland (1):
-  arm64: spin-table: handle unmapped cpu-release-addrs
-
-Ard Biesheuvel (2):
-  arm64/efi: efistub: cover entire static mem footprint in PE/COFF .text
-  arm64/efi: efistub: don't abort if base of DRAM is occupied
-
- arch/arm64/kernel/efi-stub.c       | 18 ++++++------------
- arch/arm64/kernel/head.S           |  6 +++---
- arch/arm64/kernel/smp_spin_table.c | 21 ++++++++++++++++-----
- 3 files changed, 25 insertions(+), 20 deletions(-)
-
+diff --git a/arch/arm64/kernel/smp_spin_table.c b/arch/arm64/kernel/smp_spin_table.c
+index 0347d38eea29..4f93c67e63de 100644
+--- a/arch/arm64/kernel/smp_spin_table.c
++++ b/arch/arm64/kernel/smp_spin_table.c
+@@ -20,6 +20,7 @@
+ #include <linux/init.h>
+ #include <linux/of.h>
+ #include <linux/smp.h>
++#include <linux/types.h>
+ 
+ #include <asm/cacheflush.h>
+ #include <asm/cpu_ops.h>
+@@ -65,12 +66,21 @@ static int smp_spin_table_cpu_init(struct device_node *dn, unsigned int cpu)
+ 
+ static int smp_spin_table_cpu_prepare(unsigned int cpu)
+ {
+-	void **release_addr;
++	__le64 __iomem *release_addr;
+ 
+ 	if (!cpu_release_addr[cpu])
+ 		return -ENODEV;
+ 
+-	release_addr = __va(cpu_release_addr[cpu]);
++	/*
++	 * The cpu-release-addr may or may not be inside the linear mapping.
++	 * As ioremap_cache will either give us a new mapping or reuse the
++	 * existing linear mapping, we can use it to cover both cases. In
++	 * either case the memory will be MT_NORMAL.
++	 */
++	release_addr = ioremap_cache(cpu_release_addr[cpu],
++				     sizeof(*release_addr));
++	if (!release_addr)
++		return -ENOMEM;
+ 
+ 	/*
+ 	 * We write the release address as LE regardless of the native
+@@ -79,15 +89,17 @@ static int smp_spin_table_cpu_prepare(unsigned int cpu)
+ 	 * boot-loader's endianess before jumping. This is mandated by
+ 	 * the boot protocol.
+ 	 */
+-	release_addr[0] = (void *) cpu_to_le64(__pa(secondary_holding_pen));
+-
+-	__flush_dcache_area(release_addr, sizeof(release_addr[0]));
++	writeq_relaxed(__pa(secondary_holding_pen), release_addr);
++	__flush_dcache_area((__force void *)release_addr,
++			    sizeof(*release_addr));
+ 
+ 	/*
+ 	 * Send an event to wake up the secondary CPU.
+ 	 */
+ 	sev();
+ 
++	iounmap(release_addr);
++
+ 	return 0;
+ }
+ 
 -- 
 1.8.3.2
