@@ -1,41 +1,43 @@
 From: robert.jarzmik@free.fr (Robert Jarzmik)
-Date: Wed, 30 Jul 2014 22:51:01 +0200
-Subject: [PATCH v3 3/6] arm: pxa: add clock pll selection bits
+Date: Wed, 30 Jul 2014 22:51:00 +0200
+Subject: [PATCH v3 2/6] clk: dts: document pxa clock binding
 In-Reply-To: <1406753464-15000-1-git-send-email-robert.jarzmik@free.fr>
 References: <1406753464-15000-1-git-send-email-robert.jarzmik@free.fr>
-Message-ID: <1406753464-15000-4-git-send-email-robert.jarzmik@free.fr>
+Message-ID: <1406753464-15000-3-git-send-email-robert.jarzmik@free.fr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add missing bits for CCCR and CCSR :
- - CPLL and PPLL selection, either full speed or 13MHz
- - CPSR masks
+Document the device-tree binding of Marvell PXA based SoCs.
+PXA clocks are mostly fixed rate and fixed ratio clocks derived from an
+external oscillator, and gated by a register set (CKEN or CKEN*).
 
 Signed-off-by: Robert Jarzmik <robert.jarzmik@free.fr>
 ---
- arch/arm/mach-pxa/include/mach/pxa2xx-regs.h | 10 ++++++++++
- 1 file changed, 10 insertions(+)
+ Documentation/devicetree/bindings/clock/pxa-clock.txt | 16 ++++++++++++++++
+ 1 file changed, 16 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/clock/pxa-clock.txt
 
-diff --git a/arch/arm/mach-pxa/include/mach/pxa2xx-regs.h b/arch/arm/mach-pxa/include/mach/pxa2xx-regs.h
-index ee6ced1..f1dd629 100644
---- a/arch/arm/mach-pxa/include/mach/pxa2xx-regs.h
-+++ b/arch/arm/mach-pxa/include/mach/pxa2xx-regs.h
-@@ -143,6 +143,16 @@
- #define CCCR_M_MASK	0x0060	/* Memory Frequency to Run Mode Frequency Multiplier */
- #define CCCR_L_MASK	0x001f	/* Crystal Frequency to Memory Frequency Multiplier */
- 
-+#define CCCR_CPDIS_BIT	(31)
-+#define CCCR_PPDIS_BIT	(30)
-+#define CCCR_LCD_26_BIT	(27)
-+#define CCCR_A_BIT	(25)
+diff --git a/Documentation/devicetree/bindings/clock/pxa-clock.txt b/Documentation/devicetree/bindings/clock/pxa-clock.txt
+new file mode 100644
+index 0000000..4b4a902
+--- /dev/null
++++ b/Documentation/devicetree/bindings/clock/pxa-clock.txt
+@@ -0,0 +1,16 @@
++* Clock bindings for Marvell PXA chips
 +
-+#define CCSR_N2_MASK	CCCR_N_MASK
-+#define CCSR_M_MASK	CCCR_M_MASK
-+#define CCSR_L_MASK	CCCR_L_MASK
-+#define CCSR_N2_SHIFT	7
++Required properties:
++- compatible: Should be "marvell,pxa-clocks"
++- #clock-cells: Should be <1>
 +
- #define CKEN_AC97CONF   (31)    /* AC97 Controller Configuration */
- #define CKEN_CAMERA	(24)	/* Camera Interface Clock Enable */
- #define CKEN_SSP1	(23)	/* SSP1 Unit Clock Enable */
++The clock consumer should specify the desired clock by having the clock
++ID in its "clocks" phandle cell (see include/.../pxa-clock.h).
++
++Examples:
++
++pxa2xx_clks: pxa2xx_clks at 41300004 {
++        compatible = "marvell,pxa-clocks";
++        #clock-cells = <1>;
++        status = "okay";
++};
 -- 
 2.0.0.rc2
