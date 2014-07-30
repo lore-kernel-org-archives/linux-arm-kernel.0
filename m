@@ -1,38 +1,44 @@
-From: fweisbec@gmail.com (Frederic Weisbecker)
-Date: Wed, 30 Jul 2014 18:43:46 +0200
-Subject: [PATCH v4 2/5] x86,entry: Only call user_exit if TIF_NOHZ
-In-Reply-To: <20140729193232.GA8153@redhat.com>
-References: <cover.1406604806.git.luto@amacapital.net>
- <7123b2489cc5d1d5abb7bcf1364ca729cab3e6ca.1406604806.git.luto@amacapital.net>
- <20140729193232.GA8153@redhat.com>
-Message-ID: <20140730164344.GA27954@localhost.localdomain>
+From: antoine.tenart@free-electrons.com (Antoine =?iso-8859-1?Q?T=E9nart?=)
+Date: Wed, 30 Jul 2014 18:47:21 +0200
+Subject: [PATCH v11 3/8] ata: libahci_platform: move port_map parameters
+ into the AHCI structure
+In-Reply-To: <20140730153526.GB23734@htj.dyndns.org>
+References: <1406193450-17283-1-git-send-email-antoine.tenart@free-electrons.com>
+ <1406193450-17283-4-git-send-email-antoine.tenart@free-electrons.com>
+ <20140729144042.GD4791@htj.dyndns.org>
+ <20140730082038.GB29900@kwain>
+ <20140730153526.GB23734@htj.dyndns.org>
+Message-ID: <20140730164721.GA15772@kwain>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jul 29, 2014 at 09:32:32PM +0200, Oleg Nesterov wrote:
-> On 07/28, Andy Lutomirski wrote:
-> >
-> > @@ -1449,7 +1449,12 @@ long syscall_trace_enter(struct pt_regs *regs)
-> >  {
-> >  	long ret = 0;
-> >  
-> > -	user_exit();
-> > +	/*
-> > +	 * If TIF_NOHZ is set, we are required to call user_exit() before
-> > +	 * doing anything that could touch RCU.
-> > +	 */
-> > +	if (test_thread_flag(TIF_NOHZ))
-> > +		user_exit();
+On Wed, Jul 30, 2014 at 11:35:26AM -0400, Tejun Heo wrote:
+> On Wed, Jul 30, 2014 at 10:20:38AM +0200, Antoine T?nart wrote:
+> > How do you want me to send the series? There is two conflicts when
+> > applying to libata/for-3.17:
+> > - patch 4/8: it takes into account a patch not in libata/for-3.17 but
+> >   added before rc7. It should be better to first merge rc7, otherwise
+> >   some modifications won't make sense.
+> > - patch 6/8: "fsl,imx53-ahci" was removed from the documentation in
+> >   libata/for-3.17 but not in rc7. Resolving the conflict is really
+> >   simple.
+> > 
+> > I think it's better to apply the whole thing after merging rc7 into
+> > libata/for-3.17, because it will only have a really simple conflict to
+> > resolve.
+> > 
+> > Please tell me what do you prefer before I send the updated version.
 > 
-> Personally I still think this change just adds more confusion, but I leave
-> this to you and Frederic.
-> 
-> It is not that "If TIF_NOHZ is set, we are required to call user_exit()", we
-> need to call user_exit() just because we enter the kernel. TIF_NOHZ is just
-> the implementation detail which triggers this slow path.
-> 
-> At least it should be correct, unless I am confused even more than I think.
+> Hmmm... does pulling in libata/for-3.16-fixes into libata/for-3.17
+> resolves the conflict?  If so, please send the patch on top of the
+> merged branch.  I wanna avoid pulling in -rc7 wholesale at this point.
 
-Agreed, Perhaps the confusion is on the syscall_trace_enter() name which suggests
-this is only about tracing? syscall_slowpath_enter() could be an alternative.
-But that's still tracing in a general sense so...
+Works for me. I'll cook and send a series based on top of
+libata/for-3.16-fixes merged into libata/for-3.17.
+
+Antoine
+
+-- 
+Antoine T?nart, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
