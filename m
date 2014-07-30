@@ -1,139 +1,51 @@
-From: linux@roeck-us.net (Guenter Roeck)
-Date: Wed, 30 Jul 2014 07:28:27 -0700
-Subject: [PATCH v5 0/7] kernel: Add support for restart handler call chain
-In-Reply-To: <53D8FCEA.9020506@roeck-us.net>
-References: <1405668856-13738-1-git-send-email-linux@roeck-us.net>
- <53D84F77.2050401@roeck-us.net> <1705554.pBhZQ0Icu9@diego>
- <53D8FCEA.9020506@roeck-us.net>
-Message-ID: <53D9010B.7070700@roeck-us.net>
+From: afaerber@suse.de (=?ISO-8859-1?Q?Andreas_F=E4rber?=)
+Date: Wed, 30 Jul 2014 16:29:45 +0200
+Subject: [PATCH 2/2] clk: initial clock driver for TWL6030
+In-Reply-To: <1406728949-7560-3-git-send-email-sassmann@kpanic.de>
+References: <1406728949-7560-1-git-send-email-sassmann@kpanic.de>
+ <1406728949-7560-3-git-send-email-sassmann@kpanic.de>
+Message-ID: <53D90159.7040307@suse.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/30/2014 07:10 AM, Guenter Roeck wrote:
-> On 07/30/2014 05:16 AM, Heiko St?bner wrote:
->> Hi Guenter,
->>
->> Am Dienstag, 29. Juli 2014, 18:50:47 schrieb Guenter Roeck:
->>> On 07/18/2014 12:34 AM, Guenter Roeck wrote:
->>>> Various drivers implement architecture and/or device specific means
->>>> to restart (reset) the system. Various mechanisms have been implemented
->>>> to support those schemes. The best known mechanism is arm_pm_restart,
->>>> which is a function pointer to be set either from platform specific code
->>>> or from drivers. Another mechanism is to use hardware watchdogs to issue
->>>> a reset; this mechanism is used if there is no other method available
->>>> to reset a board or system. Two examples are alim7101_wdt, which currently
->>>> uses the reboot notifier to trigger a reset, and moxart_wdt, which
->>>> registers the arm_pm_restart function. Several other restart drivers for
->>>> arm, all directly calling arm_pm_restart, are in the process of being
->>>> integrated into the kernel. All those drivers would benefit from the new
->>>> API.
->>>>
->>>> The existing mechanisms have a number of drawbacks. Typically only one
->>>> scheme to restart the system is supported (at least if arm_pm_restart is
->>>> used). At least in theory there can be multiple means to restart the
->>>> system, some of which may be less desirable (for example one mechanism
->>>> may only reset the CPU, while another may reset the entire system). Using
->>>> arm_pm_restart can also be racy if the function pointer is set from a
->>>> driver, as the driver may be in the process of being unloaded when
->>>> arm_pm_restart is called.
->>>> Using the reboot notifier is always racy, as it is unknown if and when
->>>> other functions using the reboot notifier have completed execution
->>>> by the time the watchdog fires.
->>>>
->>>> Introduce a system restart handler call chain to solve the described
->>>> problems. This call chain is expected to be executed from the
->>>> architecture specific machine_restart() function. Drivers providing
->>>> system restart functionality (such as the watchdog drivers mentioned
->>>> above) are expected to register with this call chain. By using the
->>>> priority field in the notifier block, callers can control restart handler
->>>> execution sequence and thus ensure that the restart handler with the
->>>> optimal restart capabilities for a given system is called first.
->>>>
->>>> Since the first revision of this patchset, a number of separate patch
->>>> submissions have been made which either depend on it or could make use of
->>>> it.
->>>>
->>>> http://www.spinics.net/linux/lists/arm-kernel/msg344796.html
->>>>
->>>>     registers three notifiers.
->>>>
->>>> https://lkml.org/lkml/2014/7/8/962
->>>>
->>>>     would benefit from it.
->>>>
->>>> Patch 1 of this series implements the restart handler function. Patches 2
->>>> and 3 implement calling the restart handler chain from arm and arm64
->>>> restart code.
->>>>
->>>> Patch 4 modifies the restart-poweroff driver to no longer call
->>>> arm_pm_restart directly but machine_restart. This is done to avoid
->>>> calling arm_pm_restart from more than one place. The change makes the
->>>> driver architecture independent, so it would be possible to drop the arm
->>>> dependency from its Kconfig entry.
->>>>
->>>> Patch 5 and 6 convert existing restart handlers in the watchdog subsystem
->>>> to use the restart handler. Patch 7 unexports arm_pm_restart to ensure
->>>> that no one gets the idea to implement a restart handler as module.
->>>>
->>>> ---
->>>> v5: Rebased series to v3.16-rc5
->>>>
->>>>       Function renames:
->>>>       register_restart_notifier -> register_restart_handler
->>>>       unregister_restart_notifier -> unregister_restart_handler
->>>>       kernel_restart_notify -> do_kernel_restart
->>>>
->>>> v4: Document restart notifier priorities
->>>>
->>>>       Select 128 as default priority for newly introduced notifiers
->>>>       Fix checkpatch warning (line too long) in moxart patch
->>>>
->>>> v3: Drop RFC.
->>>>
->>>>       Add kernel_restart_notify wrapper function to execute notifier
->>>>       Improve documentation.
->>>>       Move restart_notifier_list into kernel/reboot.c and make it static.
->>>>
->>>> v2: Add patch 4.
->>>>
->>>>       Only call blocking notifier call chain if arm_pm_restart was not set.
->>>>
->>>> --
->>>
->>> To get more test coverage, this series plus a few add-on patches which
->>> depend on it are now available in the restart-staging branch of my
->>> repository at kernel.org [1]. The branch is currently based on 3.16-rc7.
->>> Extensive build test results are available at [2]; look for the column
->>> marked 'restart-staging' on the far right of the tables.
->>>
->>> I would encourage everyone interested in this series to send me Reviewed-by:
->>> or at least Acked-by: tags. Note that I removed all of the earlier tags
->>> since I feel that the changes made subsequently warrant updated tags. An
->>> Acked-by: from affected maintainers would also be very helpful.
->>
->> Thanks for adapting my Samsung restart-patches to the API changes.
->>
->> The one thing I found is, in
->>     "clk: samsung: register restart handlers for s3c2412 and s3c2443"
->> you seem to have forgotten the priority in the clk-s3c2443.c part while in
->> clk-s3c2412.c it is present.
->>
-> Yes, you are correct. I fixed that after I got the message from Fengguang's
-> robot. Which means that my auto-builder misses to build that file. Too bad
-> that arm:allmodconfig fails with other errors and is unusable. Do you know
-> if there is a defconfig which builds clk-s3c2443.c ?
->
->> And I'm not sure if there shouldn't be some sort of delay, to give the
->> watchdog some time to work, as Tomasz suggested in my initial submission?
->>
-> In your case the reset handler is in the clock code, itn's it ? Question
-> would be if the write to SWRST results in an immediate reset or if it needs
-> a delay. From the context, it looks to me as if reaction would be immediate,
-> but obviously I don't have the specification so that is just a wild guess.
->
+Hi Stefan,
 
-After re-reading your patches, I guess you refer to the s3c2410 changes.
-Yes, that could use a delay. Care to send an updated patch ?
+Glad you got it working. :)
 
-Thanks,
-Guenter
+Small nit below:
+
+Am 30.07.2014 16:02, schrieb Stefan Assmann:
+> diff --git a/drivers/clk/ti/clk-6030.c b/drivers/clk/ti/clk-6030.c
+> new file mode 100644
+> index 0000000..baa965b
+> --- /dev/null
+> +++ b/drivers/clk/ti/clk-6030.c
+> @@ -0,0 +1,141 @@
+> +/*
+> + * drivers/clk/ti/clk-6030.c
+> + *
+> + *  Copyright (C) 2014 Stefan Assmann <sassmann@kpanic.de>
+> + *
+> + * This program is free software; you can redistribute it and/or modify
+> + * it under the terms of the GNU General Public License version 2 as
+> + * published by the Free Software Foundation.
+
+Here you say version 2 ...
+
+> + *
+> + * Clock driver for ti twl6030.
+> + */
+[...]
+> +MODULE_AUTHOR("Stefan Assmann <sassmann@kpanic.de>");
+> +MODULE_DESCRIPTION("clock driver for TI SoC based boards with twl6030");
+> +MODULE_LICENSE("GPL");
+
+... but down here it's "GPL". Either use "GPL v2" here, or IIUC use the
+"or (at your option) any later version" license above if you can.
+
+Cheers,
+Andreas
+
+-- 
+SUSE LINUX Products GmbH, Maxfeldstr. 5, 90409 N?rnberg, Germany
+GF: Jeff Hawn, Jennifer Guild, Felix Imend?rffer; HRB 16746 AG N?rnberg
