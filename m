@@ -1,63 +1,34 @@
 From: dianders@chromium.org (Doug Anderson)
-Date: Wed, 30 Jul 2014 13:00:11 -0700
-Subject: [PATCH v2 2/3] ARM: dts: add rk3288 ehci usb devices
+Date: Wed, 30 Jul 2014 13:00:12 -0700
+Subject: [PATCH v2 3/3] ARM: dts: Enable USB host0 (EHCI) on rk3288-evb
 In-Reply-To: <1406750412-15592-1-git-send-email-dianders@chromium.org>
 References: <1406750412-15592-1-git-send-email-dianders@chromium.org>
-Message-ID: <1406750412-15592-3-git-send-email-dianders@chromium.org>
+Message-ID: <1406750412-15592-4-git-send-email-dianders@chromium.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Kever Yang <kever.yang@rock-chips.com>
+This is the top USB port on the evb (the one closest to the Ethernet
+connector).
 
-rk3288 has two kind of usb controller; this adds the ehci variant for
-host0 and hsic.
-
-At the moment we don't add any phys for these controllers, but the
-default settings seem to work OK.
-
-There is a hardware problem in ohci controller which make it
-unavailable and host0 controller can only support high-speed devices.
-
-Signed-off-by: Kever Yang <kever.yang@rock-chips.com>
 Signed-off-by: Doug Anderson <dianders@chromium.org>
+Signed-off-by: Kever Yang <kever.yang@rock-chips.com>
 ---
-Changes in v2:
-- Kever is now the author
-- Node is now named usb
+Changes in v2: None
 
- arch/arm/boot/dts/rk3288.dtsi | 20 ++++++++++++++++++++
- 1 file changed, 20 insertions(+)
+ arch/arm/boot/dts/rk3288-evb.dtsi | 4 ++++
+ 1 file changed, 4 insertions(+)
 
-diff --git a/arch/arm/boot/dts/rk3288.dtsi b/arch/arm/boot/dts/rk3288.dtsi
-index 3ef8951..e7cb008 100644
---- a/arch/arm/boot/dts/rk3288.dtsi
-+++ b/arch/arm/boot/dts/rk3288.dtsi
-@@ -251,6 +251,26 @@
- 		status = "disabled";
+diff --git a/arch/arm/boot/dts/rk3288-evb.dtsi b/arch/arm/boot/dts/rk3288-evb.dtsi
+index e6c5b03..4f57209 100644
+--- a/arch/arm/boot/dts/rk3288-evb.dtsi
++++ b/arch/arm/boot/dts/rk3288-evb.dtsi
+@@ -90,3 +90,7 @@
+ 		};
  	};
- 
-+	usb_host0_ehci: usb at ff500000 {
-+		compatible = "generic-ehci";
-+		reg = <0xff500000 0x100>;
-+		interrupts = <GIC_SPI 24 IRQ_TYPE_LEVEL_HIGH>;
-+		clocks = <&cru HCLK_USBHOST0>;
-+		clock-names = "usbhost";
-+		status = "disabled";
-+	};
+ };
 +
-+	/* NOTE: ohci at ff520000 doesn't actually work on hardware */
-+
-+	usb_hsic: usb at ff5c0000 {
-+		compatible = "generic-ehci";
-+		reg = <0xff5c0000 0x100>;
-+		interrupts = <GIC_SPI 26 IRQ_TYPE_LEVEL_HIGH>;
-+		clocks = <&cru HCLK_HSIC>;
-+		clock-names = "usbhost";
-+		status = "disabled";
-+	};
-+
- 	gic: interrupt-controller at ffc01000 {
- 		compatible = "arm,gic-400";
- 		interrupt-controller;
++&usb_host0_ehci {
++	status = "okay";
++};
 -- 
 2.0.0.526.g5318336
