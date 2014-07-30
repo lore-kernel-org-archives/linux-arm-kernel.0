@@ -1,94 +1,27 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Wed, 30 Jul 2014 15:28:57 +0200
-Subject: [PATCH v2 1/3] arm64: spin-table: handle unmapped
- cpu-release-addrs
-In-Reply-To: <CAKv+Gu-OunL2FdzvZ6y95cKaewOyFaoCgX+Rqsg4R92yLAg=tQ@mail.gmail.com>
-References: <1406717944-24725-1-git-send-email-ard.biesheuvel@linaro.org>
- <1406717944-24725-2-git-send-email-ard.biesheuvel@linaro.org>
- <20140730113013.GL12239@arm.com>
- <CAKv+Gu-891BPCMCB2xnhsaUHxz_BCMkwbbwQ76kmK=JsUdifHQ@mail.gmail.com>
- <20140730123029.GA20162@leverpostej>
- <20140730124258.GP12239@arm.com>
- <20140730124908.GB20162@leverpostej>
- <CAKv+Gu-OunL2FdzvZ6y95cKaewOyFaoCgX+Rqsg4R92yLAg=tQ@mail.gmail.com>
-Message-ID: <CAKv+Gu8b3Lfh9dL8_ttu5n5wus4d3K6CNcfKpuju-pe3zM2KHA@mail.gmail.com>
+From: joro@8bytes.org (Joerg Roedel)
+Date: Wed, 30 Jul 2014 15:33:09 +0200
+Subject: [PATCH v4] devicetree: Add generic IOMMU device tree bindings
+In-Reply-To: <20140730132348.GM29590@ulmo>
+References: <1404487757-18829-1-git-send-email-thierry.reding@gmail.com>
+ <20140730110425.GI12239@arm.com> <20140730132348.GM29590@ulmo>
+Message-ID: <20140730133309.GF9809@8bytes.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 30 July 2014 15:10, Ard Biesheuvel <ard.biesheuvel@linaro.org> wrote:
-> On 30 July 2014 14:49, Mark Rutland <mark.rutland@arm.com> wrote:
->> On Wed, Jul 30, 2014 at 01:42:58PM +0100, Will Deacon wrote:
->>> On Wed, Jul 30, 2014 at 01:30:29PM +0100, Mark Rutland wrote:
->>> > On Wed, Jul 30, 2014 at 01:00:40PM +0100, Ard Biesheuvel wrote:
->>> > > On 30 July 2014 13:30, Will Deacon <will.deacon@arm.com> wrote:
->>> > > > On Wed, Jul 30, 2014 at 11:59:02AM +0100, Ard Biesheuvel wrote:
->>> > > >> From: Mark Rutland <mark.rutland@arm.com>
->>> > > >>
->>> > > >> In certain cases the cpu-release-addr of a CPU may not fall in the
->>> > > >> linear mapping (e.g. when the kernel is loaded above this address due to
->>> > > >> the presence of other images in memory). This is problematic for the
->>> > > >> spin-table code as it assumes that it can trivially convert a
->>> > > >> cpu-release-addr to a valid VA in the linear map.
->>> > > >>
->>> > > >> This patch modifies the spin-table code to use a temporary cached
->>> > > >> mapping to write to a given cpu-release-addr, enabling us to support
->>> > > >> addresses regardless of whether they are covered by the linear mapping.
->>> > > >>
->>> > > >> Signed-off-by: Mark Rutland <mark.rutland@arm.com>
->>> > > >> Tested-by: Mark Salter <msalter@redhat.com>
->>> > > >> [ardb: added (__force void *) cast]
->>> > > >> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
->>> > > >> ---
->>> > > >>  arch/arm64/kernel/smp_spin_table.c | 22 +++++++++++++++++-----
->>> > > >>  1 file changed, 17 insertions(+), 5 deletions(-)
->>> > > >
->>> > > > I'm nervous about this. What if the spin table sits in the same physical 64k
->>> > > > frame as a read-sensitive device and we're running with 64k pages?
->>> > > >
->>> > >
->>> > > I see what you mean. This is potentially hairy, as EFI already
->>> > > ioremap_cache()s everything known to it as normal DRAM, so using plain
->>> > > ioremap() here if pfn_valid() returns false for cpu-release-addr's PFN
->>> > > may still result in mappings with different attributes for the same
->>> > > region. So how should we decide whether to call ioremap() or
->>> > > ioremap_cache() in this case?
->>> >
->>> > If we're careful about handling mismatched attributes we might be able
->>> > to get away with always using a device mapping.
->>>
->>> Even then, I think ioremap hits a WARN_ON if pfn_valid.
->>
->> Ok, that's that idea dead then.
->>
->>> > I'll need to have a think about that, I'm not sure on the architected
->>> > cache behaviour in such a case.
->>>
->>> Of we just skip the cache flush if !pfn_valid.
->>
->> I don't think that's always safe given Ard's comment that the EFI code
->> will possibly have a mapping covering the region created by
->> ioremap_cache.
->>
->> Ard, what exactly does the EFI code map with ioremap_cache, and why?
->>
->
-> Actually, after re-reading the spec and the code, perhaps this is not an issue.
-> The EFI __init code calls ioremap_cache() for all regions described by
-> the UEFI memory map as requiring a virtual mapping
-> (EFI_MEMORY_RUNTIME): this is primarily runtime services code and data
-> regions and perhaps some I/O mappings for flash or other peripherals
-> that UEFI owns and needs to access during Runtime Services calls.
->
-> Mark Salter mentioned that APM Mustang's spin table lives in an
-> EFI_RESERVED_TYPE region, which presumably would not have the
-> EFI_MEMORY_RUNTIME attribute set, as it has nothing to do with the
-> UEFI Runtime Services. This means that no cached mapping should
-> already exist for that region.
->
+On Wed, Jul 30, 2014 at 03:23:50PM +0200, Thierry Reding wrote:
+> I think there weren't any comments left for me to address and I've
+> mostly been waiting for Joerg to pick it up.
+> 
+> Joerg, can you take this through the iommu tree for 3.17? Will acked
+> this, but perhaps you were waiting for an ACK from the device tree
+> bindings maintainers?
+> 
+> Will, perhaps you can get Pawel or Mark to look at this?
+> 
+> Arnd, I'm sure if we had your Acked-by that would go a long way too.
 
-That said, there is another potential snag: the UEFI spec for AArch64
-does not allow regions residing in the same 64k phys frame to have
-different memory attributes, and in order to meet this requirement, an
-EFI_RESERVED_TYPE region could supposedly still be described with a
-EFI_MEMORY_WB (cacheable) attribute set (e.g. if it shares the 64k
-phys frame with Runtime Services Code or Data)
+Yes, as Arnd requested this generic binding it would be good to have his
+Acked-by before proceeding. Arnd?
+
+
+	Joerg
