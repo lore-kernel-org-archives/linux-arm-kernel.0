@@ -1,187 +1,51 @@
-From: afaerber@suse.de (=?ISO-8859-15?Q?Andreas_F=E4rber?=)
-Date: Wed, 30 Jul 2014 14:33:29 +0200
-Subject: [PATCHv7 2/5] ARM: dts: exynos: unuse the slot-node and deprecated
- the supports-highspeed for dw-mmc
-In-Reply-To: <1406514579-3769-3-git-send-email-jh80.chung@samsung.com>
-References: <1406514579-3769-1-git-send-email-jh80.chung@samsung.com>
- <1406514579-3769-3-git-send-email-jh80.chung@samsung.com>
-Message-ID: <53D8E619.90601@suse.de>
+From: ronald.wahl@raritan.com (Ronald Wahl)
+Date: Wed, 30 Jul 2014 14:24:10 +0200
+Subject: BUG: sleeping function called from invalid context at
+ include/linux/clk.h:117
+Message-ID: <53D8E3EA.70500@raritan.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am 28.07.2014 04:29, schrieb Jaehoon Chung:
-> dw-mmc controller can support multiple slots.
-> But, there are no use-cases anywhere. So we don't need to support the
-> slot-node for dw-mmc controller.
-> And "supports-highspeed" property in dw-mmc is deprecated.
-> "supports-highspeed" property can be replaced to "cap-sd/mmc-highspeed".
+Hi,
 
-s/replaced to/replaced with/
+after updating from 3.10.44 to 3.14.14 I get the following trace:
 
-> Signed-off-by: Jaehoon Chung <jh80.chung@samsung.com>
-> Reviewed-by: Tushar Behera <trblinux@gmail.com>
-> Reviewed-by: Ulf Hansson <ulf.hansson@linaro.org>
-> Tested-by: Sachin Kamat <sachin.kamat@samsung.com>
-> Acked-by: Seungwon Jeon <tgih.jun@samsung.com>
-> Acked-by: Kukjin Kim <kgene.kim@samsung.com>
-> ---
->  arch/arm/boot/dts/exynos4412-odroidx.dts      |    8 ++------
->  arch/arm/boot/dts/exynos4412-origen.dts       |    8 ++------
->  arch/arm/boot/dts/exynos4412-trats2.dts       |    8 ++------
->  arch/arm/boot/dts/exynos5250-arndale.dts      |   18 +++++------------
->  arch/arm/boot/dts/exynos5250-cros-common.dtsi |   26 +++++++------------------
->  arch/arm/boot/dts/exynos5250-smdk5250.dts     |   18 +++++------------
->  arch/arm/boot/dts/exynos5250-snow.dts         |    6 ++----
->  arch/arm/boot/dts/exynos5260-xyref5260.dts    |   18 +++++------------
->  arch/arm/boot/dts/exynos5410-smdk5410.dts     |   18 +++++------------
->  arch/arm/boot/dts/exynos5420-arndale-octa.dts |   16 ++++-----------
->  arch/arm/boot/dts/exynos5420-peach-pit.dts    |   16 ++++-----------
->  arch/arm/boot/dts/exynos5420-smdk5420.dts     |   16 ++++-----------
->  arch/arm/boot/dts/exynos5800-peach-pi.dts     |   16 ++++-----------
->  13 files changed, 51 insertions(+), 141 deletions(-)
-[...]
-> diff --git a/arch/arm/boot/dts/exynos5250-cros-common.dtsi b/arch/arm/boot/dts/exynos5250-cros-common.dtsi
-> index 89ac90f..af51361 100644
-> --- a/arch/arm/boot/dts/exynos5250-cros-common.dtsi
-> +++ b/arch/arm/boot/dts/exynos5250-cros-common.dtsi
-> @@ -248,7 +248,6 @@
->  
->  	mmc at 12200000 {
->  		num-slots = <1>;
-> -		supports-highspeed;
->  		broken-cd;
->  		card-detect-delay = <200>;
->  		samsung,dw-mshc-ciu-div = <3>;
-> @@ -256,44 +255,33 @@
->  		samsung,dw-mshc-ddr-timing = <1 2>;
->  		pinctrl-names = "default";
->  		pinctrl-0 = <&sd0_clk &sd0_cmd &sd0_cd &sd0_bus4 &sd0_bus8>;
-> -
-> -		slot at 0 {
-> -			reg = <0>;
-> -			bus-width = <8>;
-> -		};
-> +		bus-width = <8>;
-> +		cap-mmc-highspeed;
->  	};
->  
->  	mmc at 12220000 {
->  		num-slots = <1>;
-> -		supports-highspeed;
->  		card-detect-delay = <200>;
->  		samsung,dw-mshc-ciu-div = <3>;
->  		samsung,dw-mshc-sdr-timing = <2 3>;
->  		samsung,dw-mshc-ddr-timing = <1 2>;
->  		pinctrl-names = "default";
->  		pinctrl-0 = <&sd2_clk &sd2_cmd &sd2_cd &sd2_bus4>;
-> -
-> -		slot at 0 {
-> -			reg = <0>;
-> -			bus-width = <4>;
-> -			wp-gpios = <&gpc2 1 0>;
-> -		};
-> +		bus-width = <4>;
-> +		wp-gpios = <&gpc2 1 0>;
-> +		cap-sd-highspeed;
->  	};
->  
->  	mmc at 12230000 {
->  		num-slots = <1>;
-> -		supports-highspeed;
->  		broken-cd;
->  		card-detect-delay = <200>;
->  		samsung,dw-mshc-ciu-div = <3>;
->  		samsung,dw-mshc-sdr-timing = <2 3>;
->  		samsung,dw-mshc-ddr-timing = <1 2>;
->  		/* See board-specific dts files for pin setup */
-> -
-> -		slot at 0 {
-> -			reg = <0>;
-> -			bus-width = <4>;
-> -		};
-> +		bus-width = <4>;
-> +		cap-sd-highspeed;
->  	};
->  
->  	spi_1: spi at 12d30000 {
-[...]
-> diff --git a/arch/arm/boot/dts/exynos5250-snow.dts b/arch/arm/boot/dts/exynos5250-snow.dts
-> index 079fdf9..17d8f53 100644
-> --- a/arch/arm/boot/dts/exynos5250-snow.dts
-> +++ b/arch/arm/boot/dts/exynos5250-snow.dts
-> @@ -329,10 +329,8 @@
->  	 */
->  	mmc at 12230000 {
->  		status = "okay";
-> -		slot at 0 {
-> -			pinctrl-names = "default";
-> -			pinctrl-0 = <&sd3_clk &sd3_cmd &sd3_bus4>;
-> -		};
-> +		pinctrl-names = "default";
-> +		pinctrl-0 = <&sd3_clk &sd3_cmd &sd3_bus4>;
->  	};
->  
->  	i2c at 12CD0000 {
+[ 9957.810964] BUG: sleeping function called from invalid context at include/linux/clk.h:117
+[ 9957.819069] in_atomic(): 1, irqs_disabled(): 128, pid: 0, name: swapper
+[ 9957.825640] CPU: 0 PID: 0 Comm: swapper Tainted: G           O 3.14.14+ #2
+[ 9957.832514] [<c000e790>] (unwind_backtrace) from [<c000cb10>] (show_stack+0x20/0x24)
+[ 9957.840194] [<c000cb10>] (show_stack) from [<c0456d40>] (dump_stack+0x20/0x28)
+[ 9957.847357] [<c0456d40>] (dump_stack) from [<c00432f4>] (__might_sleep+0xf8/0x118)
+[ 9957.854880] [<c00432f4>] (__might_sleep) from [<c02aef0c>] (clk_on+0x44/0xa0)
+[ 9957.861963] [<c02aef0c>] (clk_on) from [<c02afa18>] (pullup+0x74/0x11c)
+[ 9957.868528] [<c02afa18>] (pullup) from [<c02afb2c>] (at91_vbus_session+0x6c/0xa0)
+[ 9957.875958] [<c02afb2c>] (at91_vbus_session) from [<c02afbb4>] (at91_vbus_irq+0x54/0x64)
+[ 9957.883997] [<c02afbb4>] (at91_vbus_irq) from [<c0054084>] (handle_irq_event_percpu+0xa8/0x28c)
+[ 9957.892632] [<c0054084>] (handle_irq_event_percpu) from [<c00542b8>] (handle_irq_event+0x50/0x6c)
+[ 9957.901445] [<c00542b8>] (handle_irq_event) from [<c00568e4>] (handle_simple_irq+0xb0/0xc8)
+[ 9957.909739] [<c00568e4>] (handle_simple_irq) from [<c00537f4>] (generic_handle_irq+0x30/0x40)
+[ 9957.918212] [<c00537f4>] (generic_handle_irq) from [<c0015f6c>] (gpio_irq_handler+0xb4/0xe4)
+[ 9957.926586] [<c0015f6c>] (gpio_irq_handler) from [<c00537f4>] (generic_handle_irq+0x30/0x40)
+[ 9957.934964] [<c00537f4>] (generic_handle_irq) from [<c0009fec>] (handle_IRQ+0x70/0x90)
+[ 9957.942824] [<c0009fec>] (handle_IRQ) from [<c0008710>] (at91_aic_handle_irq+0x44/0x4c)
+[ 9957.950773] [<c0008710>] (at91_aic_handle_irq) from [<c045caa4>] (__irq_svc+0x44/0x54)
+[ 9957.958617] Exception stack(0xc06bff38 to 0xc06bff80)
+[ 9957.963633] ff20:                                                       00000000 0005317f
+[ 9957.971772] ff40: 00000000 60000013 c06be010 ffffffff c06be000 c06c6000 c3ff88a0 41069265
+[ 9957.979895] ff60: 2069be8c c06bff8c c06bff80 c06bff80 c000a1c8 c000a1d4 60000013 ffffffff
+[ 9957.988013] [<c045caa4>] (__irq_svc) from [<c000a1d4>] (arch_cpu_idle+0x40/0x48)
+[ 9957.995358] [<c000a1d4>] (arch_cpu_idle) from [<c005372c>] (cpu_startup_entry+0x168/0x1d8)
+[ 9958.003565] [<c005372c>] (cpu_startup_entry) from [<c0451fc8>] (rest_init+0x84/0x9c)
+[ 9958.011266] [<c0451fc8>] (rest_init) from [<c0667a60>] (start_kernel+0x2c0/0x30c)
 
-Since you said you are targeting 3.16 still, FYI Doug asked me to do the
-same change for 3.17 in my Spring series for correctness reasons. So we
-shouldn't have merge conflict there.
+Would be nice if this can be fixed quickly.
 
-However, we are also dropping exynos5250-cros-common.dtsi, so at some
-point the above changes will need to be merged into -snow.dts as
-conflict resolution.
-
-[...]
-> diff --git a/arch/arm/boot/dts/exynos5410-smdk5410.dts b/arch/arm/boot/dts/exynos5410-smdk5410.dts
-> index 7275bbd..be3e025 100644
-> --- a/arch/arm/boot/dts/exynos5410-smdk5410.dts
-> +++ b/arch/arm/boot/dts/exynos5410-smdk5410.dts
-> @@ -40,33 +40,25 @@
->  &mmc_0 {
->  	status = "okay";
->  	num-slots = <1>;
-> -	supports-highspeed;
-> +	cap-mmc-highspeed;
->  	broken-cd;
->  	card-detect-delay = <200>;
->  	samsung,dw-mshc-ciu-div = <3>;
->  	samsung,dw-mshc-sdr-timing = <2 3>;
->  	samsung,dw-mshc-ddr-timing = <1 2>;
-> -
-> -	slot at 0 {
-> -		reg = <0>;
-> -		bus-width = <8>;
-> -	};
-> +	bus-width = <8>;
->  };
->  
->  &mmc_2 {
->  	status = "okay";
->  	num-slots = <1>;
-> -	supports-highspeed;
-> +	cap-sd-highspeed;
->  	card-detect-delay = <200>;
->  	samsung,dw-mshc-ciu-div = <3>;
->  	samsung,dw-mshc-sdr-timing = <2 3>;
->  	samsung,dw-mshc-ddr-timing = <1 2>;
-> -
-> -	slot at 0 {
-> -		reg = <0>;
-> -		bus-width = <4>;
-> -		disable-wp;
-> -	};
-> +	bus-width = <4>;
-> +	disable-wp;
->  };
->  
->  &uart0 {
-
-Similarly here, I am adding an exynos5410-odroidxu.dts file that will
-need to get the same changes as -smdk5410.dts then.
-
-Regards,
-Andreas
+thx,
+ron
 
 -- 
-SUSE LINUX Products GmbH, Maxfeldstr. 5, 90409 N?rnberg, Germany
-GF: Jeff Hawn, Jennifer Guild, Felix Imend?rffer; HRB 16746 AG N?rnberg
+Ronald Wahl - ronald.wahl at raritan.com - Phone +49 375271349-0 Fax -99
+Raritan Deutschland GmbH, Kornmarkt 7, 08056 Zwickau, Germany
+USt-IdNr. DE813094160, Steuer-Nr. 227/117/01749
+Amtsgericht Chemnitz HRB 23605
+Gesch?ftsf?hrung: Stuart Hopper, Ralf Ploenes
