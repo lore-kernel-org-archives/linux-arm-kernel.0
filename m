@@ -1,61 +1,72 @@
-From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
-Date: Wed, 30 Jul 2014 21:55:38 +0400
-Subject: [PATCH 2/4] ARM: dts: add rk3288 dwc2 controller support
-In-Reply-To: <53D90CC4.9070009@cogentembedded.com>
-References: <1406683873-18194-1-git-send-email-kever.yang@rock-chips.com>
- <1406684075-18271-1-git-send-email-kever.yang@rock-chips.com>
- <53D90CC4.9070009@cogentembedded.com>
-Message-ID: <53D9319A.9060407@cogentembedded.com>
+From: robherring2@gmail.com (Rob Herring)
+Date: Wed, 30 Jul 2014 13:08:23 -0500
+Subject: [PATCH v4] devicetree: Add generic IOMMU device tree bindings
+In-Reply-To: <20140730143037.GD8989@arm.com>
+References: <1404487757-18829-1-git-send-email-thierry.reding@gmail.com>
+ <20140730110425.GI12239@arm.com> <20140730132348.GM29590@ulmo>
+ <20140730143037.GD8989@arm.com>
+Message-ID: <CAL_JsqLXKer_PAaYNakB9LDNuyQUZLOCHWry4FbybK3KpDZSDg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/30/2014 07:18 PM, Sergei Shtylyov wrote:
+On Wed, Jul 30, 2014 at 9:30 AM, Will Deacon <will.deacon@arm.com> wrote:
+> On Wed, Jul 30, 2014 at 02:23:50PM +0100, Thierry Reding wrote:
+>> On Wed, Jul 30, 2014 at 12:04:25PM +0100, Will Deacon wrote:
+>> > On Fri, Jul 04, 2014 at 04:29:17PM +0100, Thierry Reding wrote:
+>> > > From: Thierry Reding <treding@nvidia.com>
+>> > >
+>> > > This commit introduces a generic device tree binding for IOMMU devices.
+>> > > Only a very minimal subset is described here, but it is enough to cover
+>> > > the requirements of both the Exynos System MMU and Tegra SMMU as
+>> > > discussed here:
+>> > >
+>> > >     https://lkml.org/lkml/2014/4/27/346
+>> > >
+>> > > Signed-off-by: Thierry Reding <treding@nvidia.com>
+>> > > ---
+>> > > Changes in v4:
+>> > > - clarify that disabling an IOMMU DT node may not disable translation
+>> > > - be more explicit that examples are only examples
+>> > > - add multi-ID master example
+>> > >
+>> > > Changes in v3:
+>> > > - use #iommu-cells instead of #address-cells/#size-cells
+>> > > - drop optional iommu-names property
+>> > >
+>> > > Changes in v2:
+>> > > - add notes about "dma-ranges" property (drop note from commit message)
+>> > > - document priorities of "iommus" property vs. "dma-ranges" property
+>> > > - drop #iommu-cells in favour of #address-cells and #size-cells
+>> > > - remove multiple-master device example
+>> > >
+>> > >  Documentation/devicetree/bindings/iommu/iommu.txt | 172 ++++++++++++++++++++++
+>> > >  1 file changed, 172 insertions(+)
+>> > >  create mode 100644 Documentation/devicetree/bindings/iommu/iommu.txt
+>> >
+>> > I'm concerned that this patch hasn't been picked up for 3.17 (I can't see it
+>> > in -next). If we want to move the ARM SMMU driver over to this new binding,
+>> > we can't keep dragging our feet for much longer as I *really* don't plan to
+>> > support two bindings in parallel (one is complicated enough already).
+>> >
+>> > Any chance we can see this merged, please?
+>>
+>> I think there weren't any comments left for me to address and I've
+>> mostly been waiting for Joerg to pick it up.
+>>
+>> Joerg, can you take this through the iommu tree for 3.17? Will acked
+>> this, but perhaps you were waiting for an ACK from the device tree
+>> bindings maintainers?
+>
+> Rob, Mark: can one or both of you take a look at this please?
 
->> rk3288 has two kind of usb controller, this add the dwc2 controller
->> for otg and host1.
+I've been quiet on this round, but I think prior input I've had has
+been addressed. If we believe this will work for ARM SMMU and MSM
+IOMMU and some of the crazy chaining scenarios, then I'm fine with the
+binding.
 
->> Controller can works with usb PHY default setting and Vbus on.
+Acked-by: Rob Herring <robh@kernel.org>
 
->> Signed-off-by: Kever Yang <kever.yang@rock-chips.com>
->> ---
->>   arch/arm/boot/dts/rk3288.dtsi |   20 ++++++++++++++++++++
->>   1 file changed, 20 insertions(+)
+Rob
 
->> diff --git a/arch/arm/boot/dts/rk3288.dtsi b/arch/arm/boot/dts/rk3288.dtsi
->> index abc51f5..4309c4f 100644
->> --- a/arch/arm/boot/dts/rk3288.dtsi
->> +++ b/arch/arm/boot/dts/rk3288.dtsi
->> @@ -646,5 +646,25 @@
->>               clock-names = "baudclk", "apb_pclk";
->>               status = "disabled";
->>           };
->> +
->> +        usb_otg: dwc2 at ff580000 {
-
->     The ePAPR standard [1] says:
-
-> The name of a node should be somewhat generic, reflecting the function of the
-> device and not its precise programming model. If appropriate, the name should
-> be one of the following choices:
-
-> [...]
->     ? usb
-
->> +            compatible = "rockchip,rk3288-usb", "rockchip,rk3066-usb",
->> +                    "snps,dwc2";
->> +            reg = <0xff580000 0x40000>;
->> +            interrupts = <GIC_SPI 23 IRQ_TYPE_LEVEL_HIGH>;
->> +            clocks = <&cru HCLK_OTG0>;
->> +            clock-names = "otg";
->> +            status = "disabled";
->> +        };
->> +
->> +        usb_host1: dwc2 at ff540000 {
-
->     Same here.
-
-    Oops, forgot to give the ePAPR link:
-
-[1] http://www.power.org/resources/downloads/Power_ePAPR_APPROVED_v1.0.pdf
-
-WBR, Sergei
+P.S. Thankfully, there are no Calxeda systems with the SMMU enabled,
+so a binding change should not cause much pain.
