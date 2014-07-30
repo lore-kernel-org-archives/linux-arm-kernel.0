@@ -1,50 +1,62 @@
 From: thomas.ab@samsung.com (Thomas Abraham)
-Date: Wed, 30 Jul 2014 13:25:32 +0530
-Subject: [PATCH] clk: exynos4: remove duplicate div_core2 divider clock
- instantiation
-Message-ID: <1406706932-10527-1-git-send-email-thomas.ab@samsung.com>
+Date: Wed, 30 Jul 2014 13:37:37 +0530
+Subject: [PATCH v9 0/6] cpufreq: use generic cpufreq drivers for exynos
+ platforms
+Message-ID: <1406707663-16656-1-git-send-email-thomas.ab@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The 'div_core2' clock and the 'arm_clk' divider clocks are instances of
-the same divider clock. So remove the 'arm_clk' clock instance.
+Changes since v8:
+- Fixes suggested by Tomasz Figa.
 
-Signed-off-by: Thomas Abraham <thomas.ab@samsung.com>
----
-This patch is based on for-next branch of Samsung clock tree.
+This patch series removes the use of Exynos4210 and Exynos5250 specific cpufreq
+drivers and enables the use of cpufreq-cpu0 driver for these platforms. This
+series also enables cpufreq support for Exynos5420 using arm_big_little cpufreq
+driver.
 
- drivers/clk/samsung/clk-exynos4.c |    5 ++---
- 1 file changed, 2 insertions(+), 3 deletions(-)
+This patch series is dependent on two other patches
+1. ARM: dts: add CPU nodes for Exynos4 SoCs
+   - https://lkml.org/lkml/2014/7/21/315
+2. ARM: dts: smdk5250: Specify MAX77686 pmic interrupt
+   - http://www.spinics.net/lists/arm-kernel/msg351134.html
+3. clk: exynos4: remove duplicate div_core2 divider clock instantiation
+   - http://www.mail-archive.com/linux-samsung-soc at vger.kernel.org/msg34859.html
 
-diff --git a/drivers/clk/samsung/clk-exynos4.c b/drivers/clk/samsung/clk-exynos4.c
-index ac163d7..8617f49 100644
---- a/drivers/clk/samsung/clk-exynos4.c
-+++ b/drivers/clk/samsung/clk-exynos4.c
-@@ -719,7 +719,7 @@ static struct samsung_div_clock exynos4_div_clks[] __initdata = {
- 	DIV(0, "div_periph", "div_core2", DIV_CPU0, 12, 3),
- 	DIV(0, "div_atb", "mout_core", DIV_CPU0, 16, 3),
- 	DIV(0, "div_pclk_dbg", "div_atb", DIV_CPU0, 20, 3),
--	DIV(0, "div_core2", "div_core", DIV_CPU0, 28, 3),
-+	DIV(CLK_ARM_CLK, "div_core2", "div_core", DIV_CPU0, 28, 3),
- 	DIV(0, "div_copy", "mout_hpm", DIV_CPU1, 0, 3),
- 	DIV(0, "div_hpm", "div_copy", DIV_CPU1, 4, 3),
- 	DIV(0, "div_clkout_cpu", "mout_clkout_cpu", CLKOUT_CMU_CPU, 8, 6),
-@@ -769,7 +769,6 @@ static struct samsung_div_clock exynos4_div_clks[] __initdata = {
- 	DIV(0, "div_spi_pre2", "div_spi2", DIV_PERIL2, 8, 8),
- 	DIV(0, "div_audio1", "mout_audio1", DIV_PERIL4, 0, 4),
- 	DIV(0, "div_audio2", "mout_audio2", DIV_PERIL4, 16, 4),
--	DIV(CLK_ARM_CLK, "arm_clk", "div_core2", DIV_CPU0, 28, 3),
- 	DIV(CLK_SCLK_APLL, "sclk_apll", "mout_apll", DIV_CPU0, 24, 3),
- 	DIV_F(0, "div_mipi_pre0", "div_mipi0", DIV_LCD0, 20, 4,
- 			CLK_SET_RATE_PARENT, 0),
-@@ -1486,7 +1485,7 @@ static void __init exynos4_clk_init(struct device_node *np,
- 		exynos4_soc == EXYNOS4210 ? "Exynos4210" : "Exynos4x12",
- 		_get_rate("sclk_apll"),	_get_rate("sclk_mpll"),
- 		_get_rate("sclk_epll"), _get_rate("sclk_vpll"),
--		_get_rate("arm_clk"));
-+		_get_rate("div_core2"));
- }
- 
- 
+Thomas Abraham (6):
+  clk: samsung: add infrastructure to register cpu clocks
+  clk: samsung: add cpu clock configuration data and instantiate cpu clock
+  ARM: dts: Exynos: add CPU OPP and regulator supply property
+  ARM: Exynos: switch to using generic cpufreq driver for Exynos4210/5250/5420
+  cpufreq: exynos: remove exynos4210/5250 specific cpufreq driver support
+  clk: samsung: remove unused clock aliases and update clock flags
+
+ arch/arm/boot/dts/exynos4210-origen.dts         |    4 +
+ arch/arm/boot/dts/exynos4210-trats.dts          |    4 +
+ arch/arm/boot/dts/exynos4210-universal_c210.dts |    4 +
+ arch/arm/boot/dts/exynos4210.dtsi               |   14 +-
+ arch/arm/boot/dts/exynos5250-arndale.dts        |    4 +
+ arch/arm/boot/dts/exynos5250-smdk5250.dts       |    4 +
+ arch/arm/boot/dts/exynos5250-snow.dts           |    4 +
+ arch/arm/boot/dts/exynos5250.dtsi               |   25 +-
+ arch/arm/boot/dts/exynos5420.dtsi               |   38 +++
+ arch/arm/mach-exynos/exynos.c                   |   24 +-
+ drivers/clk/samsung/Makefile                    |    2 +-
+ drivers/clk/samsung/clk-cpu.c                   |  335 +++++++++++++++++++++++
+ drivers/clk/samsung/clk-cpu.h                   |   91 ++++++
+ drivers/clk/samsung/clk-exynos4.c               |   63 +++--
+ drivers/clk/samsung/clk-exynos5250.c            |   44 ++-
+ drivers/clk/samsung/clk-exynos5420.c            |   72 ++++-
+ drivers/cpufreq/Kconfig.arm                     |   22 --
+ drivers/cpufreq/Makefile                        |    2 -
+ drivers/cpufreq/exynos4210-cpufreq.c            |  184 -------------
+ drivers/cpufreq/exynos5250-cpufreq.c            |  210 --------------
+ include/dt-bindings/clock/exynos5250.h          |    1 +
+ include/dt-bindings/clock/exynos5420.h          |    2 +
+ 22 files changed, 690 insertions(+), 463 deletions(-)
+ create mode 100644 drivers/clk/samsung/clk-cpu.c
+ create mode 100644 drivers/clk/samsung/clk-cpu.h
+ delete mode 100644 drivers/cpufreq/exynos4210-cpufreq.c
+ delete mode 100644 drivers/cpufreq/exynos5250-cpufreq.c
+
 -- 
 1.7.9.5
