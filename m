@@ -1,68 +1,60 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Wed, 30 Jul 2014 11:12:17 -0700
-Subject: [PATCH 2/5] arm64, thunder: Add initial dts for Cavium Thunder SoC
-In-Reply-To: <1406732794-20920-3-git-send-email-rric@kernel.org>
-References: <1406732794-20920-1-git-send-email-rric@kernel.org>
- <1406732794-20920-3-git-send-email-rric@kernel.org>
-Message-ID: <CAOesGMj9PnfddJO7PorZ7U2OoBFBe4LqONRnbJeMiEkQV1mmWw@mail.gmail.com>
+From: antoine.tenart@free-electrons.com (=?UTF-8?q?Antoine=20T=C3=A9nart?=)
+Date: Wed, 30 Jul 2014 20:13:55 +0200
+Subject: [PATCH v14 2/8] Documentation: bindings: add the Berlin SATA PHY
+In-Reply-To: <1406744041-1269-1-git-send-email-antoine.tenart@free-electrons.com>
+References: <1406744041-1269-1-git-send-email-antoine.tenart@free-electrons.com>
+Message-ID: <1406744041-1269-3-git-send-email-antoine.tenart@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jul 30, 2014 at 8:06 AM, Robert Richter <rric@kernel.org> wrote:
-> From: Radha Mohan Chintakuntla <rchintakuntla@cavium.com>
->
-> Add initial device tree nodes for Cavium Thunder SoCs with support of
-> 48 cores and gicv3. The dts file requires further changes, esp. for
-> pci, gicv3-its and smmu. This changes will be added later together
-> with the device drivers.
->
-> Signed-off-by: Radha Mohan Chintakuntla <rchintakuntla@cavium.com>
-> Signed-off-by: Robert Richter <rrichter@cavium.com>
-> ---
->  arch/arm64/boot/dts/Makefile         |   1 +
->  arch/arm64/boot/dts/thunder-88xx.dts | 387 +++++++++++++++++++++++++++++++++++
->  2 files changed, 388 insertions(+)
->  create mode 100644 arch/arm64/boot/dts/thunder-88xx.dts
->
-> diff --git a/arch/arm64/boot/dts/Makefile b/arch/arm64/boot/dts/Makefile
-> index c52bdb051f66..f8001a62029c 100644
-> --- a/arch/arm64/boot/dts/Makefile
-> +++ b/arch/arm64/boot/dts/Makefile
-> @@ -1,3 +1,4 @@
-> +dtb-$(CONFIG_ARCH_THUNDER) += thunder-88xx.dtb
->  dtb-$(CONFIG_ARCH_VEXPRESS) += rtsm_ve-aemv8a.dtb foundation-v8.dtb
->  dtb-$(CONFIG_ARCH_XGENE) += apm-mustang.dtb
->
-> diff --git a/arch/arm64/boot/dts/thunder-88xx.dts b/arch/arm64/boot/dts/thunder-88xx.dts
-> new file mode 100644
-> index 000000000000..4cf20ac9138b
-> --- /dev/null
-> +++ b/arch/arm64/boot/dts/thunder-88xx.dts
-> @@ -0,0 +1,387 @@
-> +/*
-> + * Cavium Thunder DTS file
-> + *
-> + * Copyright (C) 2013, Cavium Inc.
-> + *
-> + * This program is free software; you can redistribute it and/or
-> + * modify it under the terms of the GNU General Public License as
-> + * published by the Free Software Foundation; either version 2 of
-> + * the License, or (at your option) any later version.
-> + */
-> +/dts-v1/;
-> +
-> +/* Reserving first 12MB of DDR for firmware */
-> +/memreserve/ 0x00000000 0x00c00000;
-> +
-> +/ {
-> +       model = "Cavium ThunderX CN88XX Family";
-> +       compatible = "cavium,thunder-88xx";
+The Berlin SATA PHY drives the PHY related to the SATA interface. Add
+the corresponding documentation.
 
-Hmm. I take it this platform is compliant with some level of SBSA? We
-should probably have a compatible value for that so that platforms can
-communicate it.
+Signed-off-by: Antoine T?nart <antoine.tenart@free-electrons.com>
+---
+ .../devicetree/bindings/phy/berlin-sata-phy.txt    | 34 ++++++++++++++++++++++
+ 1 file changed, 34 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/phy/berlin-sata-phy.txt
 
-Mark, are there already plans for this?
-
-
--Olof
+diff --git a/Documentation/devicetree/bindings/phy/berlin-sata-phy.txt b/Documentation/devicetree/bindings/phy/berlin-sata-phy.txt
+new file mode 100644
+index 000000000000..cda4a100b00f
+--- /dev/null
++++ b/Documentation/devicetree/bindings/phy/berlin-sata-phy.txt
+@@ -0,0 +1,34 @@
++Berlin SATA PHY
++---------------
++
++Required properties:
++- compatible: should be "marvell,berlin2q-sata-phy"
++- #address-cells: should be 1
++- #size-cells: should be 0
++- #phy-cells: from the generic PHY bindings, must be 1
++- reg: address and length of the register
++- clocks: reference to the clock entry
++
++Sub-nodes:
++Each PHY should be represented as a sub-node.
++
++Sub-nodes required properties:
++- reg: the PHY number
++
++Example:
++	sata_phy: phy at f7e900a0 {
++		compatible = "marvell,berlin2q-sata-phy";
++		reg = <0xf7e900a0 0x200>;
++		clocks = <&chip CLKID_SATA>;
++		#address-cells = <1>;
++		#size-cells = <0>;
++		#phy-cells = <1>;
++
++		sata-phy at 0 {
++			reg = <0>;
++		};
++
++		sata-phy at 1 {
++			reg = <1>;
++		};
++	};
+-- 
+1.9.1
