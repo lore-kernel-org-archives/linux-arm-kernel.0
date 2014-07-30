@@ -1,62 +1,50 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Wed, 30 Jul 2014 15:30:37 +0100
-Subject: [PATCH v4] devicetree: Add generic IOMMU device tree bindings
-In-Reply-To: <20140730132348.GM29590@ulmo>
-References: <1404487757-18829-1-git-send-email-thierry.reding@gmail.com>
- <20140730110425.GI12239@arm.com> <20140730132348.GM29590@ulmo>
-Message-ID: <20140730143037.GD8989@arm.com>
+From: sassmann@kpanic.de (Stefan Assmann)
+Date: Wed, 30 Jul 2014 16:36:24 +0200
+Subject: [PATCH 2/2] clk: initial clock driver for TWL6030
+In-Reply-To: <53D90159.7040307@suse.de>
+References: <1406728949-7560-1-git-send-email-sassmann@kpanic.de>
+ <1406728949-7560-3-git-send-email-sassmann@kpanic.de>
+ <53D90159.7040307@suse.de>
+Message-ID: <53D902E8.1030008@kpanic.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jul 30, 2014 at 02:23:50PM +0100, Thierry Reding wrote:
-> On Wed, Jul 30, 2014 at 12:04:25PM +0100, Will Deacon wrote:
-> > On Fri, Jul 04, 2014 at 04:29:17PM +0100, Thierry Reding wrote:
-> > > From: Thierry Reding <treding@nvidia.com>
-> > > 
-> > > This commit introduces a generic device tree binding for IOMMU devices.
-> > > Only a very minimal subset is described here, but it is enough to cover
-> > > the requirements of both the Exynos System MMU and Tegra SMMU as
-> > > discussed here:
-> > > 
-> > >     https://lkml.org/lkml/2014/4/27/346
-> > > 
-> > > Signed-off-by: Thierry Reding <treding@nvidia.com>
-> > > ---
-> > > Changes in v4:
-> > > - clarify that disabling an IOMMU DT node may not disable translation
-> > > - be more explicit that examples are only examples
-> > > - add multi-ID master example
-> > > 
-> > > Changes in v3:
-> > > - use #iommu-cells instead of #address-cells/#size-cells
-> > > - drop optional iommu-names property
-> > > 
-> > > Changes in v2:
-> > > - add notes about "dma-ranges" property (drop note from commit message)
-> > > - document priorities of "iommus" property vs. "dma-ranges" property
-> > > - drop #iommu-cells in favour of #address-cells and #size-cells
-> > > - remove multiple-master device example
-> > > 
-> > >  Documentation/devicetree/bindings/iommu/iommu.txt | 172 ++++++++++++++++++++++
-> > >  1 file changed, 172 insertions(+)
-> > >  create mode 100644 Documentation/devicetree/bindings/iommu/iommu.txt
-> > 
-> > I'm concerned that this patch hasn't been picked up for 3.17 (I can't see it
-> > in -next). If we want to move the ARM SMMU driver over to this new binding,
-> > we can't keep dragging our feet for much longer as I *really* don't plan to
-> > support two bindings in parallel (one is complicated enough already).
-> > 
-> > Any chance we can see this merged, please?
-> 
-> I think there weren't any comments left for me to address and I've
-> mostly been waiting for Joerg to pick it up.
-> 
-> Joerg, can you take this through the iommu tree for 3.17? Will acked
-> this, but perhaps you were waiting for an ACK from the device tree
-> bindings maintainers?
+On 30.07.2014 16:29, Andreas F?rber wrote:
+> Hi Stefan,
+>
+> Glad you got it working. :)
+>
+> Small nit below:
+>
+> Am 30.07.2014 16:02, schrieb Stefan Assmann:
+>> diff --git a/drivers/clk/ti/clk-6030.c b/drivers/clk/ti/clk-6030.c
+>> new file mode 100644
+>> index 0000000..baa965b
+>> --- /dev/null
+>> +++ b/drivers/clk/ti/clk-6030.c
+>> @@ -0,0 +1,141 @@
+>> +/*
+>> + * drivers/clk/ti/clk-6030.c
+>> + *
+>> + *  Copyright (C) 2014 Stefan Assmann <sassmann@kpanic.de>
+>> + *
+>> + * This program is free software; you can redistribute it and/or modify
+>> + * it under the terms of the GNU General Public License version 2 as
+>> + * published by the Free Software Foundation.
+>
+> Here you say version 2 ...
+>
+>> + *
+>> + * Clock driver for ti twl6030.
+>> + */
+> [...]
+>> +MODULE_AUTHOR("Stefan Assmann <sassmann@kpanic.de>");
+>> +MODULE_DESCRIPTION("clock driver for TI SoC based boards with twl6030");
+>> +MODULE_LICENSE("GPL");
+>
+> ... but down here it's "GPL". Either use "GPL v2" here, or IIUC use the
+> "or (at your option) any later version" license above if you can.
 
-Rob, Mark: can one or both of you take a look at this please?
+Thanks for the hint. I'll fix it in the next version. :)
 
-Cheers,
-
-Will
+   Stefan
