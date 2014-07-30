@@ -1,425 +1,296 @@
 From: afaerber@suse.de (=?UTF-8?q?Andreas=20F=C3=A4rber?=)
-Date: Wed, 30 Jul 2014 15:50:42 +0200
-Subject: [PATCH v3 2/4] ARM: dts: Fold exynos5250-cros-common into
- exynos5250-snow
+Date: Wed, 30 Jul 2014 15:50:43 +0200
+Subject: [PATCH v3 3/4] ARM: dts: Clean up exynos5250-snow
 In-Reply-To: <1406728244-5105-1-git-send-email-afaerber@suse.de>
 References: <1406728244-5105-1-git-send-email-afaerber@suse.de>
-Message-ID: <1406728244-5105-3-git-send-email-afaerber@suse.de>
+Message-ID: <1406728244-5105-4-git-send-email-afaerber@suse.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The remaining common ChromeOS pieces are fairly minor.
+Use the new style of referencing inherited nodes and use symbolic names.
 
 Suggested-by: Doug Anderson <dianders@chromium.org>
 Signed-off-by: Andreas F?rber <afaerber@suse.de>
 ---
- v2 -> v3:
- * Renamed subject to match Kukjin's style
- * Rebased onto MMC pinctrl bug fix (Doug Anderson)
- 
- v2: New (Doug Anderson)
+ v3: New (Doug Anderson)
 
- arch/arm/boot/dts/exynos5250-cros-common.dtsi | 164 --------------------------
- arch/arm/boot/dts/exynos5250-snow.dts         | 164 +++++++++++++++++++++++---
- 2 files changed, 145 insertions(+), 183 deletions(-)
- delete mode 100644 arch/arm/boot/dts/exynos5250-cros-common.dtsi
+ arch/arm/boot/dts/exynos5250-snow.dts | 182 +++++++++++++++++-----------------
+ 1 file changed, 90 insertions(+), 92 deletions(-)
 
-diff --git a/arch/arm/boot/dts/exynos5250-cros-common.dtsi b/arch/arm/boot/dts/exynos5250-cros-common.dtsi
-deleted file mode 100644
-index e603e9c70142..000000000000
---- a/arch/arm/boot/dts/exynos5250-cros-common.dtsi
-+++ /dev/null
-@@ -1,164 +0,0 @@
--/*
-- * Common device tree include for all Exynos 5250 boards based off of Daisy.
-- *
-- * Copyright (c) 2012 Google, Inc
-- *
-- * This program is free software; you can redistribute it and/or modify
-- * it under the terms of the GNU General Public License version 2 as
-- * published by the Free Software Foundation.
--*/
--
--/ {
--	aliases {
--	};
--
--	memory {
--		reg = <0x40000000 0x80000000>;
--	};
--
--	chosen {
--	};
--
--	pinctrl at 11400000 {
--		/*
--		 * Disabled pullups since external part has its own pullups and
--		 * double-pulling gets us out of spec in some cases.
--		 */
--		i2c2_bus: i2c2-bus {
--			samsung,pin-pud = <0>;
--		};
--	};
--
--	i2c at 12C60000 {
--		status = "okay";
--		samsung,i2c-sda-delay = <100>;
--		samsung,i2c-max-bus-freq = <378000>;
--	};
--
--	i2c at 12C70000 {
--		status = "okay";
--		samsung,i2c-sda-delay = <100>;
--		samsung,i2c-max-bus-freq = <378000>;
--	};
--
--	i2c at 12C80000 {
--		status = "okay";
--		samsung,i2c-sda-delay = <100>;
--		samsung,i2c-max-bus-freq = <66000>;
--
--		hdmiddc at 50 {
--			compatible = "samsung,exynos4210-hdmiddc";
--			reg = <0x50>;
--		};
--	};
--
--	i2c at 12C90000 {
--		status = "okay";
--		samsung,i2c-sda-delay = <100>;
--		samsung,i2c-max-bus-freq = <66000>;
--	};
--
--	i2c at 12CA0000 {
--		status = "okay";
--		samsung,i2c-sda-delay = <100>;
--		samsung,i2c-max-bus-freq = <66000>;
--	};
--
--	i2c at 12CB0000 {
--		status = "okay";
--		samsung,i2c-sda-delay = <100>;
--		samsung,i2c-max-bus-freq = <66000>;
--	};
--
--	i2c at 12CD0000 {
--		status = "okay";
--		samsung,i2c-sda-delay = <100>;
--		samsung,i2c-max-bus-freq = <66000>;
--	};
--
--	i2c at 12CE0000 {
--		status = "okay";
--		samsung,i2c-sda-delay = <100>;
--		samsung,i2c-max-bus-freq = <378000>;
--
--		hdmiphy: hdmiphy at 38 {
--			compatible = "samsung,exynos4212-hdmiphy";
--			reg = <0x38>;
--		};
--	};
--
--	mmc at 12200000 {
--		num-slots = <1>;
--		supports-highspeed;
--		broken-cd;
--		card-detect-delay = <200>;
--		samsung,dw-mshc-ciu-div = <3>;
--		samsung,dw-mshc-sdr-timing = <2 3>;
--		samsung,dw-mshc-ddr-timing = <1 2>;
--		pinctrl-names = "default";
--		pinctrl-0 = <&sd0_clk &sd0_cmd &sd0_cd &sd0_bus4 &sd0_bus8>;
--
--		slot at 0 {
--			reg = <0>;
--			bus-width = <8>;
--		};
--	};
--
--	mmc at 12220000 {
--		num-slots = <1>;
--		supports-highspeed;
--		card-detect-delay = <200>;
--		samsung,dw-mshc-ciu-div = <3>;
--		samsung,dw-mshc-sdr-timing = <2 3>;
--		samsung,dw-mshc-ddr-timing = <1 2>;
--		pinctrl-names = "default";
--		pinctrl-0 = <&sd2_clk &sd2_cmd &sd2_cd &sd2_bus4>;
--
--		slot at 0 {
--			reg = <0>;
--			bus-width = <4>;
--			wp-gpios = <&gpc2 1 0>;
--		};
--	};
--
--	mmc at 12230000 {
--		num-slots = <1>;
--		supports-highspeed;
--		broken-cd;
--		card-detect-delay = <200>;
--		samsung,dw-mshc-ciu-div = <3>;
--		samsung,dw-mshc-sdr-timing = <2 3>;
--		samsung,dw-mshc-ddr-timing = <1 2>;
--		/* See board-specific dts files for pin setup */
--
--		slot at 0 {
--			reg = <0>;
--			bus-width = <4>;
--		};
--	};
--
--	spi_1: spi at 12d30000 {
--		status = "okay";
--		samsung,spi-src-clk = <0>;
--		num-cs = <1>;
--	};
--
--	hdmi {
--		hpd-gpio = <&gpx3 7 0>;
--		pinctrl-names = "default";
--		pinctrl-0 = <&hdmi_hpd_irq>;
--		phy = <&hdmiphy>;
--		ddc = <&i2c_2>;
--	};
--
--	gpio-keys {
--		compatible = "gpio-keys";
--
--		power {
--			label = "Power";
--			gpios = <&gpx1 3 1>;
--			linux,code = <116>; /* KEY_POWER */
--			gpio-key,wakeup;
--		};
--	};
--};
 diff --git a/arch/arm/boot/dts/exynos5250-snow.dts b/arch/arm/boot/dts/exynos5250-snow.dts
-index eb437f6afec1..1c36cd72905f 100644
+index 1c36cd72905f..2ed6cb04a2db 100644
 --- a/arch/arm/boot/dts/exynos5250-snow.dts
 +++ b/arch/arm/boot/dts/exynos5250-snow.dts
-@@ -10,7 +10,6 @@
+@@ -9,6 +9,8 @@
+ */
  
  /dts-v1/;
++#include <dt-bindings/gpio/gpio.h>
++#include <dt-bindings/input/input.h>
  #include "exynos5250.dtsi"
--#include "exynos5250-cros-common.dtsi"
  
  / {
- 	model = "Google Snow";
-@@ -20,6 +19,13 @@
- 		i2c104 = &i2c_104;
- 	};
- 
-+	memory {
-+		reg = <0x40000000 0x80000000>;
-+	};
-+
-+	chosen {
-+	};
-+
- 	rtc at 101E0000 {
+@@ -30,85 +32,19 @@
  		status = "okay";
  	};
-@@ -93,6 +99,13 @@
+ 
+-	pinctrl at 11400000 {
+-		ec_irq: ec-irq {
+-			samsung,pins = "gpx1-6";
+-			samsung,pin-function = <0>;
+-			samsung,pin-pud = <0>;
+-			samsung,pin-drv = <0>;
+-		};
+-
+-		sd3_clk: sd3-clk {
+-			samsung,pin-drv = <0>;
+-		};
+-
+-		sd3_cmd: sd3-cmd {
+-			samsung,pin-pud = <3>;
+-			samsung,pin-drv = <0>;
+-		};
+-
+-		sd3_bus4: sd3-bus-width4 {
+-			samsung,pin-drv = <0>;
+-		};
+-
+-		max98095_en: max98095-en {
+-			samsung,pins = "gpx1-7";
+-			samsung,pin-function = <0>;
+-			samsung,pin-pud = <3>;
+-			samsung,pin-drv = <0>;
+-		};
+-
+-		tps65090_irq: tps65090-irq {
+-			samsung,pins = "gpx2-6";
+-			samsung,pin-function = <0>;
+-			samsung,pin-pud = <0>;
+-			samsung,pin-drv = <0>;
+-		};
+-
+-		usb3_vbus_en: usb3-vbus-en {
+-			samsung,pins = "gpx2-7";
+-			samsung,pin-function = <1>;
+-			samsung,pin-pud = <0>;
+-			samsung,pin-drv = <0>;
+-		};
+-
+-		hdmi_hpd_irq: hdmi-hpd-irq {
+-			samsung,pins = "gpx3-7";
+-			samsung,pin-function = <0>;
+-			samsung,pin-pud = <1>;
+-			samsung,pin-drv = <0>;
+-		};
+-	};
+-
+-	pinctrl at 13400000 {
+-		arb_their_claim: arb-their-claim {
+-			samsung,pins = "gpe0-4";
+-			samsung,pin-function = <0>;
+-			samsung,pin-pud = <3>;
+-			samsung,pin-drv = <0>;
+-		};
+-
+-		arb_our_claim: arb-our-claim {
+-			samsung,pins = "gpf0-3";
+-			samsung,pin-function = <1>;
+-			samsung,pin-pud = <0>;
+-			samsung,pin-drv = <0>;
+-		};
+-	};
+-
  	gpio-keys {
  		compatible = "gpio-keys";
  
-+		power {
-+			label = "Power";
-+			gpios = <&gpx1 3 1>;
-+			linux,code = <116>; /* KEY_POWER */
-+			gpio-key,wakeup;
-+		};
-+
+ 		power {
+ 			label = "Power";
+-			gpios = <&gpx1 3 1>;
+-			linux,code = <116>; /* KEY_POWER */
++			gpios = <&gpx1 3 GPIO_ACTIVE_LOW>;
++			linux,code = <KEY_POWER>;
+ 			gpio-key,wakeup;
+ 		};
+ 
  		lid-switch {
  			label = "Lid";
- 			gpios = <&gpx3 5 1>;
-@@ -226,24 +239,6 @@
+-			gpios = <&gpx3 5 1>;
++			gpios = <&gpx3 5 GPIO_ACTIVE_LOW>;
+ 			linux,input-type = <5>; /* EV_SW */
+ 			linux,code = <0>; /* SW_LID */
+ 			debounce-interval = <1>;
+@@ -129,8 +65,8 @@
+ 
+ 		i2c-parent = <&{/i2c@12CA0000}>;
+ 
+-		our-claim-gpio = <&gpf0 3 1>;
+-		their-claim-gpios = <&gpe0 4 1>;
++		our-claim-gpio = <&gpf0 3 GPIO_ACTIVE_LOW>;
++		their-claim-gpios = <&gpe0 4 GPIO_ACTIVE_LOW>;
+ 		slew-delay-us = <10>;
+ 		wait-retry-us = <3000>;
+ 		wait-free-us = <50000>;
+@@ -239,19 +175,6 @@
  		};
  	};
  
--	mmc at 12200000 {
+-	i2c at 12CD0000 {
+-		max98095: codec at 11 {
+-			compatible = "maxim,max98095";
+-			reg = <0x11>;
+-			pinctrl-0 = <&max98095_en>;
+-			pinctrl-names = "default";
+-		};
+-	};
+-
+-	i2s0: i2s at 03830000 {
 -		status = "okay";
 -	};
 -
--	mmc at 12220000 {
--		status = "okay";
+ 	sound {
+ 		compatible = "google,snow-audio-max98095";
+ 
+@@ -265,18 +188,14 @@
+ 		regulator-name = "P5.0V_USB3CON";
+ 		regulator-min-microvolt = <5000000>;
+ 		regulator-max-microvolt = <5000000>;
+-		gpio = <&gpx2 7 0>;
++		gpio = <&gpx2 7 GPIO_ACTIVE_HIGH>;
+ 		pinctrl-names = "default";
+ 		pinctrl-0 = <&usb3_vbus_en>;
+ 		enable-active-high;
+ 	};
+ 
+-	phy at 12100000 {
+-		vbus-supply = <&usb3_vbus_reg>;
 -	};
 -
--	/*
--	 * On Snow we've got SIP WiFi and so can keep drive strengths low to
--	 * reduce EMI.
--	 */
--	mmc at 12230000 {
--		status = "okay";
--		pinctrl-names = "default";
--		pinctrl-0 = <&sd3_clk &sd3_cmd &sd3_bus4>;
--	};
--
- 	i2c at 12CD0000 {
- 		max98095: codec at 11 {
- 			compatible = "maxim,max98095";
-@@ -292,6 +287,11 @@
+ 	usb at 12110000 {
+-		samsung,vbus-gpio = <&gpx1 1 0>;
++		samsung,vbus-gpio = <&gpx1 1 GPIO_ACTIVE_HIGH>;
+ 	};
+ 
+ 	fixed-rate-clocks {
+@@ -287,7 +206,7 @@
  	};
  
  	hdmi {
-+		hpd-gpio = <&gpx3 7 0>;
+-		hpd-gpio = <&gpx3 7 0>;
++		hpd-gpio = <&gpx3 7 GPIO_ACTIVE_HIGH>;
+ 		pinctrl-names = "default";
+ 		pinctrl-0 = <&hdmi_hpd_irq>;
+ 		phy = <&hdmiphy>;
+@@ -322,7 +241,7 @@
+ 		samsung,color-depth = <1>;
+ 		samsung,link-rate = <0x0a>;
+ 		samsung,lane-count = <2>;
+-		samsung,hpd-gpio = <&gpx0 7 0>;
++		samsung,hpd-gpio = <&gpx0 7 GPIO_ACTIVE_HIGH>;
+ 
+ 		display-timings {
+ 			native-mode = <&timing1>;
+@@ -547,6 +466,13 @@
+ 	status = "okay";
+ 	samsung,i2c-sda-delay = <100>;
+ 	samsung,i2c-max-bus-freq = <66000>;
++
++	max98095: codec at 11 {
++		compatible = "maxim,max98095";
++		reg = <0x11>;
++		pinctrl-0 = <&max98095_en>;
 +		pinctrl-names = "default";
-+		pinctrl-0 = <&hdmi_hpd_irq>;
-+		phy = <&hdmiphy>;
-+		ddc = <&i2c_2>;
- 		hdmi-en-supply = <&tps65090_fet7>;
- 		vdd-supply = <&ldo8_reg>;
- 		vdd_osc-supply = <&ldo10_reg>;
-@@ -343,6 +343,10 @@
++	};
  };
  
- &i2c_0 {
-+	status = "okay";
-+	samsung,i2c-sda-delay = <100>;
-+	samsung,i2c-max-bus-freq = <378000>;
-+
- 	max77686 at 09 {
- 		compatible = "maxim,max77686";
- 		interrupt-parent = <&gpx3>;
-@@ -489,6 +493,10 @@
- };
- 
- &i2c_1 {
-+	status = "okay";
-+	samsung,i2c-sda-delay = <100>;
-+	samsung,i2c-max-bus-freq = <378000>;
-+
- 	trackpad {
- 		reg = <0x67>;
- 		compatible = "cypress,cyapa";
-@@ -498,6 +506,118 @@
+ &i2c_8 {
+@@ -560,6 +486,10 @@
  	};
  };
  
-+/*
-+ * Disabled pullups since external part has its own pullups and
-+ * double-pulling gets us out of spec in some cases.
-+ */
-+&i2c2_bus {
-+	samsung,pin-pud = <0>;
-+};
-+
-+&i2c_2 {
++&i2s0 {
 +	status = "okay";
-+	samsung,i2c-sda-delay = <100>;
-+	samsung,i2c-max-bus-freq = <66000>;
-+
-+	hdmiddc at 50 {
-+		compatible = "samsung,exynos4210-hdmiddc";
-+		reg = <0x50>;
-+	};
 +};
 +
-+&i2c_3 {
-+	status = "okay";
-+	samsung,i2c-sda-delay = <100>;
-+	samsung,i2c-max-bus-freq = <66000>;
-+};
-+
-+&i2c_4 {
-+	status = "okay";
-+	samsung,i2c-sda-delay = <100>;
-+	samsung,i2c-max-bus-freq = <66000>;
-+};
-+
-+&i2c_5 {
-+	status = "okay";
-+	samsung,i2c-sda-delay = <100>;
-+	samsung,i2c-max-bus-freq = <66000>;
-+};
-+
-+&i2c_7 {
-+	status = "okay";
-+	samsung,i2c-sda-delay = <100>;
-+	samsung,i2c-max-bus-freq = <66000>;
-+};
-+
-+&i2c_8 {
-+	status = "okay";
-+	samsung,i2c-sda-delay = <100>;
-+	samsung,i2c-max-bus-freq = <378000>;
-+
-+	hdmiphy: hdmiphy at 38 {
-+		compatible = "samsung,exynos4212-hdmiphy";
-+		reg = <0x38>;
-+	};
-+};
-+
-+&mmc_0 {
-+	status = "okay";
-+	num-slots = <1>;
-+	supports-highspeed;
-+	broken-cd;
-+	card-detect-delay = <200>;
-+	samsung,dw-mshc-ciu-div = <3>;
-+	samsung,dw-mshc-sdr-timing = <2 3>;
-+	samsung,dw-mshc-ddr-timing = <1 2>;
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&sd0_clk &sd0_cmd &sd0_cd &sd0_bus4 &sd0_bus8>;
-+
-+	slot at 0 {
-+		reg = <0>;
-+		bus-width = <8>;
-+	};
-+};
-+
-+&mmc_2 {
-+	status = "okay";
-+	num-slots = <1>;
-+	supports-highspeed;
-+	card-detect-delay = <200>;
-+	samsung,dw-mshc-ciu-div = <3>;
-+	samsung,dw-mshc-sdr-timing = <2 3>;
-+	samsung,dw-mshc-ddr-timing = <1 2>;
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&sd2_clk &sd2_cmd &sd2_cd &sd2_bus4>;
-+
-+	slot at 0 {
-+		reg = <0>;
-+		bus-width = <4>;
-+		wp-gpios = <&gpc2 1 0>;
-+	};
-+};
-+
-+/*
-+ * On Snow we've got SIP WiFi and so can keep drive strengths low to
-+ * reduce EMI.
-+ */
-+&mmc_3 {
-+	status = "okay";
-+	num-slots = <1>;
-+	supports-highspeed;
-+	broken-cd;
-+	card-detect-delay = <200>;
-+	samsung,dw-mshc-ciu-div = <3>;
-+	samsung,dw-mshc-sdr-timing = <2 3>;
-+	samsung,dw-mshc-ddr-timing = <1 2>;
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&sd3_clk &sd3_cmd &sd3_bus4>;
-+
-+	slot at 0 {
-+		reg = <0>;
-+		bus-width = <4>;
-+	};
-+};
-+
- &pinctrl_0 {
- 	max77686_irq: max77686-irq {
- 		samsung,pins = "gpx3-2";
-@@ -507,4 +627,10 @@
+ &mmc_0 {
+ 	status = "okay";
+ 	num-slots = <1>;
+@@ -625,6 +555,70 @@
+ 		samsung,pin-pud = <0>;
+ 		samsung,pin-drv = <0>;
  	};
++
++	ec_irq: ec-irq {
++		samsung,pins = "gpx1-6";
++		samsung,pin-function = <0>;
++		samsung,pin-pud = <0>;
++		samsung,pin-drv = <0>;
++	};
++
++	max98095_en: max98095-en {
++		samsung,pins = "gpx1-7";
++		samsung,pin-function = <0>;
++		samsung,pin-pud = <3>;
++		samsung,pin-drv = <0>;
++	};
++
++	tps65090_irq: tps65090-irq {
++		samsung,pins = "gpx2-6";
++		samsung,pin-function = <0>;
++		samsung,pin-pud = <0>;
++		samsung,pin-drv = <0>;
++	};
++
++	usb3_vbus_en: usb3-vbus-en {
++		samsung,pins = "gpx2-7";
++		samsung,pin-function = <1>;
++		samsung,pin-pud = <0>;
++		samsung,pin-drv = <0>;
++	};
++
++	hdmi_hpd_irq: hdmi-hpd-irq {
++		samsung,pins = "gpx3-7";
++		samsung,pin-function = <0>;
++		samsung,pin-pud = <1>;
++		samsung,pin-drv = <0>;
++	};
++};
++
++&pinctrl_1 {
++	arb_their_claim: arb-their-claim {
++		samsung,pins = "gpe0-4";
++		samsung,pin-function = <0>;
++		samsung,pin-pud = <3>;
++		samsung,pin-drv = <0>;
++	};
++
++	arb_our_claim: arb-our-claim {
++		samsung,pins = "gpf0-3";
++		samsung,pin-function = <1>;
++		samsung,pin-pud = <0>;
++		samsung,pin-drv = <0>;
++	};
++};
++
++&sd3_clk {
++	samsung,pin-drv = <0>;
++};
++
++&sd3_cmd {
++	samsung,pin-pud = <3>;
++	samsung,pin-drv = <0>;
++};
++
++&sd3_bus4 {
++	samsung,pin-drv = <0>;
  };
  
-+&spi_1 {
-+	status = "okay";
-+	samsung,spi-src-clk = <0>;
-+	num-cs = <1>;
+ &spi_1 {
+@@ -633,4 +627,8 @@
+ 	num-cs = <1>;
+ };
+ 
++&usbdrd_phy {
++	vbus-supply = <&usb3_vbus_reg>;
 +};
 +
  #include "cros-ec-keyboard.dtsi"
