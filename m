@@ -1,23 +1,38 @@
 From: olof@lixom.net (Olof Johansson)
-Date: Wed, 30 Jul 2014 12:52:42 -0700
-Subject: [PATCH] ARM: multi_v7_defconfig: Enable TI PIPE3 PHY driver
-In-Reply-To: <1406625328-26112-1-git-send-email-rogerq@ti.com>
-References: <1406540737-9493-1-git-send-email-rogerq@ti.com>
- <1406625328-26112-1-git-send-email-rogerq@ti.com>
-Message-ID: <20140730195242.GF18384@quad.lixom.net>
+Date: Wed, 30 Jul 2014 12:54:24 -0700
+Subject: [PATCH] drivers: CCI: Correct use of ! and &
+In-Reply-To: <1406716655-32494-1-git-send-email-punit.agrawal@arm.com>
+References: <1406716655-32494-1-git-send-email-punit.agrawal@arm.com>
+Message-ID: <20140730195424.GG18384@quad.lixom.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jul 29, 2014 at 12:15:28PM +0300, Roger Quadros wrote:
-> This driver is needed by SATA, PCIe and USB modules on TI SoCs.
+On Wed, Jul 30, 2014 at 11:37:35AM +0100, Punit Agrawal wrote:
+> From: Himangi Saraogi <himangi774@gmail.com>
 > 
-> Signed-off-by: Roger Quadros <rogerq@ti.com>
-> Acked-by: Tony Lindgren <tony@atomide.com>
+> In commit ae91d60ba88ef0bdb1b5e9b2363bd52fc45d2af7, a bug was fixed that
+> involved converting !x & y to !(x & y).  The code below shows the same
+> pattern, and thus should perhaps be fixed in the same way.
+> 
+> The Coccinelle semantic patch that makes this change is as follows:
+> 
+> // <smpl>
+> @@ expression E1,E2; @@
+> (
+>   !E1 & !E2
+> |
+> - !E1 & E2
+> + !(E1 & E2)
+> )
+> // </smpl>
+> 
+> Cc: stable at vger.kernel.org
+> Signed-off-by: Himangi Saraogi <himangi774@gmail.com>
+> Acked-by: Julia Lawall <julia.lawall@lip6.fr>
+> Acked-by: Punit Agrawal <punit.agrawal@arm.com>
+> ---
 
-What's this based on? It doesn't apply on top of next/defconfig. Please
-base it on there and resend. (or linux-next or our for-next branch, which
-should be all the same).
+Thanks, applied (adding a Fixes: tag, please use those in the future)
 
-Thanks,
 
 -Olof
