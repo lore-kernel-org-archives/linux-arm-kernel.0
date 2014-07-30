@@ -1,169 +1,250 @@
-From: shijie8@gmail.com (Huang Shijie)
-Date: Wed, 30 Jul 2014 23:23:37 +0800
-Subject: [PATCH v2 03/10] mtd: spi-nor: add DDR quad read support
-In-Reply-To: <20140730074500.GF11952@brian-ubuntu>
-References: <1398657227-20721-1-git-send-email-b32955@freescale.com>
- <1398657227-20721-4-git-send-email-b32955@freescale.com>
- <20140730050843.GE11952@brian-ubuntu>
- <20140730064413.GA15547@shldeISGChi005.sh.intel.com>
- <20140730074500.GF11952@brian-ubuntu>
-Message-ID: <20140730152335.GA1941@localhost.localdomain>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Wed, 30 Jul 2014 16:26:47 +0100
+Subject: [PATCH v4] devicetree: Add generic IOMMU device tree bindings
+In-Reply-To: <1404487757-18829-1-git-send-email-thierry.reding@gmail.com>
+References: <1404487757-18829-1-git-send-email-thierry.reding@gmail.com>
+Message-ID: <20140730152646.GC20162@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jul 30, 2014 at 12:45:00AM -0700, Brian Norris wrote:
+Hi Thierry,
+
+This looks sane to me.
+
+I just have a few questions below which are hopefully simple/stupid.
+
+On Fri, Jul 04, 2014 at 04:29:17PM +0100, Thierry Reding wrote:
+> From: Thierry Reding <treding@nvidia.com>
 > 
-> BTW, does your quadspi controller unconditionally support DDR, or is
-> there any dependency on board/clock configuration? I'm just curious
-> whether you need a DT binding to describe DDR support, or if (as long as
-> the flash supports it, and we get the dummy cycles right) you can always
-> use DDR QUAD.
-The fsl-quadspi controller can support the DDR quad mode unconditionally.
-In the other word, this controller is _designed_ for the DDR quad mode.
-
-the driver does not needs a DT binding for the DDR. thanks.
-
-
+> This commit introduces a generic device tree binding for IOMMU devices.
+> Only a very minimal subset is described here, but it is enough to cover
+> the requirements of both the Exynos System MMU and Tegra SMMU as
+> discussed here:
 > 
-> > Please correct me if I am wrong. :)
-> > 
-> > > >   [1] add SPI_NOR_DDR_QUAD read mode.
-> > > > 
-> > > >   [2] add DDR Quad read opcodes:
-> > > >        SPINOR_OP_READ_1_4_4_D / SPINOR_OP_READ4_1_4_4_D
-> > > > 
-> > > >   [3] add set_ddr_quad_mode() to initialize for the DDR quad read.
-> > > >       Currently it only works for Spansion NOR.
-> > > > 
-> > > >   [3] about the dummy cycles.
-> > > >       We set the dummy with 8 for DDR quad read by default.
-> > > 
-> > > Why? That seems wrong. You need to know for sure how many cycles should
-> > > be used, not just guess a default.
-> > 
-> > Do you mean that if people do not set the DT node for dummy, we should
-> > return an -EINVAL immediately?
+>     https://lkml.org/lkml/2014/4/27/346
 > 
-> Possibly. But I actually don't think this belongs in DT at all. See
-> below.
+> Signed-off-by: Thierry Reding <treding@nvidia.com>
+> ---
+> Changes in v4:
+> - clarify that disabling an IOMMU DT node may not disable translation
+> - be more explicit that examples are only examples
+> - add multi-ID master example
 > 
-> > > >       The m25p80.c can not support the DDR quad read, but the SPI NOR controller
-> > > >       can set the dummy value in its child DT node, and the SPI NOR framework
-> > > >       can parse it out.
-> > > 
-> > > Why does the dummy value belong in device tree? I think this can be
-> > > handled in software.
-
-We can not handle it in the software way.
-Why? since there are too many modes,and each mode needs different dummy
-cycles. Even the same chips, different versions may uses different dummy
-cycles in the same mode. ..
-
-You can refer to the Spansion's  S25fs128s.
-
-If you want to put these dummy cycles in the device ID, it will make you
-crazy in the end. :)
+> Changes in v3:
+> - use #iommu-cells instead of #address-cells/#size-cells
+> - drop optional iommu-names property
 > 
-> Can you answer me this question?
+> Changes in v2:
+> - add notes about "dma-ranges" property (drop note from commit message)
+> - document priorities of "iommus" property vs. "dma-ranges" property
+> - drop #iommu-cells in favour of #address-cells and #size-cells
+> - remove multiple-master device example
 > 
-> > > You might, however, want a few other hardware
-> > > description parameters in device tree to help you.
-> > > 
-> > > So I think spi-nor.c needs to know a few things:
-> > > 
-> > >  1. Does the hardware/driver support DDR clocking?
-> > >  2. What granularity of dummy cycles are supported? So m25p80.c needs to
-> > >     communicate that it only supports dummy cycles of multiples of 8,
-> > >     and fsl-quadspi supports single clock cycles.
-> > 
-> > I think you can send patches for these features. I does not clear about:
-> >   for what does the spi-nor needs to know the above things.
+>  Documentation/devicetree/bindings/iommu/iommu.txt | 172 ++++++++++++++++++++++
+>  1 file changed, 172 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/iommu/iommu.txt
 > 
-> To properly abstract features between a driver and the spi-nor
-> "library." For example, we need to make sure we don't try to use a
-> command mode with 7 dummy cycles on m25p80.c; right now, each driver has
-> to (implicitly) know the details of dummy cycles when selecting a 'mode'
-> parameter for spi_nor_scan(). spi-nor.c should be selecting this for us,
-> not forcing the driver to make the selection.
-> 
-> > > And spi-nor.c should be able to do the following:
-> > > 
-> > >  3. Set how many dummy cycles should be used.
-> > where can we get the number of the cycles? 
-> 
-> This should be a property of the flash device, just like everything else
-> we detect in spi-nor.c.
-This is indeed a probably of the flash device.
-and this is why I add a new DT binding file for the flash.
+> diff --git a/Documentation/devicetree/bindings/iommu/iommu.txt b/Documentation/devicetree/bindings/iommu/iommu.txt
+> new file mode 100644
+> index 000000000000..464a81eaaf61
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/iommu/iommu.txt
+> @@ -0,0 +1,172 @@
+> +This document describes the generic device tree binding for IOMMUs and their
+> +master(s).
+> +
+> +
+> +IOMMU device node:
+> +==================
+> +
+> +An IOMMU can provide the following services:
+> +
+> +* Remap address space to allow devices to access physical memory ranges that
+> +  they otherwise wouldn't be capable of accessing.
+> +
+> +  Example: 32-bit DMA to 64-bit physical addresses
+> +
+> +* Implement scatter-gather at page level granularity so that the device does
+> +  not have to.
+> +
+> +* Provide system protection against "rogue" DMA by forcing all accesses to go
+> +  through the IOMMU and faulting when encountering accesses to unmapped
+> +  address regions.
+> +
+> +* Provide address space isolation between multiple contexts.
+> +
+> +  Example: Virtualization
+> +
+> +Device nodes compatible with this binding represent hardware with some of the
+> +above capabilities.
+> +
+> +IOMMUs can be single-master or multiple-master. Single-master IOMMU devices
+> +typically have a fixed association to the master device, whereas multiple-
+> +master IOMMU devices can translate accesses from more than one master.
+> +
+> +The device tree node of the IOMMU device's parent bus must contain a valid
+> +"dma-ranges" property that describes how the physical address space of the
+> +IOMMU maps to memory. An empty "dma-ranges" property means that there is a
+> +1:1 mapping from IOMMU to memory.
+> +
+> +Required properties:
+> +--------------------
+> +- #iommu-cells: The number of cells in an IOMMU specifier needed to encode an
+> +  address.
+> +
+> +The meaning of the IOMMU specifier is defined by the device tree binding of
+> +the specific IOMMU. Below are a few examples of typical use-cases:
+> +
+> +- #iommu-cells = <0>: Single master IOMMU devices are not configurable and
+> +  therefore no additional information needs to be encoded in the specifier.
+> +  This may also apply to multiple master IOMMU devices that do not allow the
+> +  association of masters to be configured. Note that an IOMMU can by design
+> +  be multi-master yet only expose a single master in a given configuration.
+> +  In such cases the number of cells will usually be 1 as in the next case.
+> +- #iommu-cells = <1>: Multiple master IOMMU devices may need to be configured
+> +  in order to enable translation for a given master. In such cases the single
+> +  address cell corresponds to the master device's ID. In some cases more than
+> +  one cell can be required to represent a single master ID.
+> +- #iommu-cells = <4>: Some IOMMU devices allow the DMA window for masters to
+> +  be configured. The first cell of the address in this may contain the master
+> +  device's ID for example, while the second cell could contain the start of
+> +  the DMA window for the given device. The length of the DMA window is given
+> +  by the third and fourth cells.
+> +
+> +Note that these are merely examples and real-world use-cases may use different
+> +definitions to represent their individual needs. Always refer to the specific
+> +IOMMU binding for the exact meaning of the cells that make up the specifier.
+> +
+> +
+> +IOMMU master node:
+> +==================
+> +
+> +Devices that access memory through an IOMMU are called masters. A device can
+> +have multiple master interfaces (to one or more IOMMU devices).
+> +
+> +Required properties:
+> +--------------------
+> +- iommus: A list of phandle and IOMMU specifier pairs that describe the IOMMU
+> +  master interfaces of the device. One entry in the list describes one master
+> +  interface of the device.
+> +
+> +When an "iommus" property is specified in a device tree node, the IOMMU will
+> +be used for address translation. If a "dma-ranges" property exists in the
+> +device's parent node it will be ignored. An exception to this rule is if the
+> +referenced IOMMU is disabled, in which case the "dma-ranges" property of the
+> +parent shall take effect. Note that merely disabling a device tree node does
+> +not guarantee that the IOMMU is really disabled since the hardware may not
+> +have a means to turn off translation.
+> +
+> +
+> +Notes:
+> +======
+> +
+> +One possible extension to the above is to use an "iommus" property along with
+> +a "dma-ranges" property in a bus device node (such as PCI host bridges). This
+> +can be useful to describe how children on the bus relate to the IOMMU if they
+> +are not explicitly listed in the device tree (e.g. PCI devices). However, the
+> +requirements of that use-case haven't been fully determined yet. Implementing
+> +this is therefore not recommended without further discussion and extension of
+> +this binding.
+> +
+> +
+> +Examples:
+> +=========
+> +
+> +Single-master IOMMU:
+> +--------------------
+> +
+> +	iommu {
+> +		#iommu-cells = <0>;
+> +	};
+> +
+> +	master {
+> +		iommus = <&/iommu>;
 
-> 
-> > >  4. Write to the configuration register, to choose a Latency Code
-> > >     according to what the flash supports. I see modes that support 3, 6,
-> > >     7, or 8. We'd probably just go for the fastest mode, which requires
-> > >     8, right?
-> > not right.
-> > 
-> > The DDR mode can not work if we set a wrong dummy cycles for the flash.
-> > 
-> > for some chips, the fastest mode may need 6 cycles, not 8. 
-> 
-> OK, but can spi-nor.c detect this instead of putting this in DT? e.g.,
-> associate this with the device ID?
+Nit: this should be iommus = <&{/iommu}>, or it's not valid dts syntax.
 
-see the my comment above.
-> 
-> Or even better, we can support CFI detection for SPI NOR flash. I notice
-> the datasheet for your Spansion flash [1] has an extensive set of CFI
-> parameters defined, including the dummy cycle information. I think it
-> might be more sustainable to try to support CFI [2] and SFDP [3] for
-> detecting new flash, rather than adding new table entries ad-hoc.
-I think different chip vendors may have different format to store the
-info, just like the read-retry for nand chips.
+> +	};
+> +
+> +Multiple-master IOMMU with fixed associations:
+> +----------------------------------------------
+> +
+> +	/* multiple-master IOMMU */
+> +	iommu {
+> +		/*
+> +		 * Masters are statically associated with this IOMMU and
+> +		 * address translation is always enabled.
+> +		 */
+> +		#iommu-cells = <0>;
 
-do you want to add the code only available for Spansion?
-What's more the code will be very long, i think.
+I don't follow why translation being always enabled is relevant to the
+example; that would seem to be independent from the binding.
 
-Add a new DT binding file for the flash maybe is the simplest way.
+Surely the key point is that with no way to distinguish devices, they
+presumably share the same translations?
 
+> +	};
+> +
+> +	/* static association with IOMMU */
+> +	master at 1 {
+> +		reg = <1>;
+> +		iommus = <&/iommu>;
+> +	};
+> +
+> +	/* static association with IOMMU */
+> +	master at 2 {
+> +		reg = <2>;
+> +		iommus = <&/iommu>;
+> +	};
+> +
+> +Multiple-master IOMMU:
+> +----------------------
+> +
+> +	iommu {
+> +		/* the specifier represents the ID of the master */
+> +		#iommu-cells = <1>;
+> +	};
+> +
+> +	master at 1 {
+> +		/* device has master ID 42 in the IOMMU */
+> +		iommus = <&/iommu 42>;
+> +	};
+> +
+> +	master at 2 {
+> +		/* device has master IDs 23 and 24 in the IOMMU */
+> +		iommus = <&/iommu 23>, <&/iommu 24>;
+> +	};
 
-> 
-> > > So far, none of this seems to require a DT binding, unless there's
-> > > something I'm missing about your fsl-quadspi controller.
-> > > 
-> > > > Test this patch for Spansion s25fl128s NOR flash.
-> > > > 
-> > > > Signed-off-by: Huang Shijie <b32955@freescale.com>
-> > > > ---
-> > > > +	/* DDR Quad/Quad/Dual-read mode takes precedence over fast/normal */
-> > > > +	if (mode == SPI_NOR_DDR_QUAD && info->flags & SPI_NOR_DDR_QUAD_READ) {
-> > > 
-> > > Hmm, I think I should probably take another look at the design of
-> > > spi-nor.c... Why does spi_nor_scan() take a single 'mode' argument? The
-> > > driver should be communicating which (multiple) modes it supports, not
-> > > selecting a single mode. spi-nor.c is the only one which knows what the
-> > > *flash* supports, so it should be combining knowledge from the
-> > > controller driver with its own knowledge of the flash.
-> > 
-> > It is okay for me to add multiples modes for the spi_nor_scan().
-> > I added the single mode for spi_nor_scan is because that the fsl-quadspi
-> > does not want to support the low speed modes. (Of course, the fsl-quadspi
-> > controller does support the low speed modes.)
-> 
-> Right, fsl-quadspi only supports one mode. But m25p80.c is more
-> flexible, and I think we might have broken some of it in the process
-> (e.g., if the SPI controller supports single/dual/quad but the flash
-> only supports single, then we might fail to probe).
-> 
-> I can take a look at this problem if you don't. I'd just recommend that
-> we might take a step back on a few of these issues before blazing ahead
-> with something irrevocable, like a DT binding.
+In future I suspect master will need to be able to identify which master
+IDs correspond to which of their master ports (where each port might
+have an arbitrary number of master IDs).
 
-I am glad you can spend some time on this issue. 
+While we don't need that for the first run, it would be nice to have
+that looked into so master bindings don't come up with arbitrarily
+different ways of doing that.
 
+> +
+> +Multiple-master IOMMU with configurable DMA window:
+> +---------------------------------------------------
+> +
+> +	/ {
+> +		#address-cells = <1>;
+> +		#size-cells = <1>;
+> +
+> +		iommu {
+> +			/* master ID, address and length of DMA window */
+> +			#iommu-cells = <4>;
+> +		};
+> +
+> +		master {
+> +			/* master ID 42, 4 GiB DMA window starting at 0 */
+> +			iommus = <&/iommu  42  0  0x1 0x0>;
 
-Could you please also read this patch ?:
+Is this that window is from the POV of the master, i.e. the master can
+address 0x0 to 0xffffffff when generating transactions, and these get
+translated somehow?
 
-http://lists.infradead.org/pipermail/linux-mtd/2014-May/054108.html
+Or is this the physical addresses to allocate to the master?
 
-thanks
-Huang Shijie
+Cheers,
+Mark.
