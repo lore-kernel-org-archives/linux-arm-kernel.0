@@ -1,58 +1,141 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Wed, 30 Jul 2014 15:09:35 +0100
-Subject: [PATCH] Arm64: Fix build error while switching from LE to BE
-In-Reply-To: <CAFdej004ma0xyzBHCmijx1r3iQFiWPRMLRgi20ryZDJz5iJZGw@mail.gmail.com>
-References: <1403775963-9785-1-git-send-email-achandran@mvista.com>
- <CAFdej004ma0xyzBHCmijx1r3iQFiWPRMLRgi20ryZDJz5iJZGw@mail.gmail.com>
-Message-ID: <20140730140935.GA8989@arm.com>
+From: linux@roeck-us.net (Guenter Roeck)
+Date: Wed, 30 Jul 2014 07:10:50 -0700
+Subject: [PATCH v5 0/7] kernel: Add support for restart handler call chain
+In-Reply-To: <1705554.pBhZQ0Icu9@diego>
+References: <1405668856-13738-1-git-send-email-linux@roeck-us.net>
+ <53D84F77.2050401@roeck-us.net> <1705554.pBhZQ0Icu9@diego>
+Message-ID: <53D8FCEA.9020506@roeck-us.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jul 30, 2014 at 03:01:35PM +0100, Arun Chandran wrote:
-> On Thu, Jun 26, 2014 at 3:16 PM, Arun Chandran <achandran@mvista.com> wrote:
-> > Building a kernel with CPU_BIG_ENDIAN fails if there are stale objects
-> > from a !CPU_BIG_ENDIAN build. Due to a missing FORCE prerequisite on an
-> > if_changed rule in the VDSO Makefile, we attempt to link a stale LE
-> > object into the new BE kernel. According to Documentation/kbuild/makefiles.txt
-> > FORCE is required for if_changed rules, and forgetting it is a common mistake
-> >
-> > So fix it by 'Forcing' the build of vdso.  Fixes build errors like these:
-> >
-> > arch/arm64/kernel/vdso/note.o: compiled for a little endian system and target is big endian
-> > failed to merge target specific data of file arch/arm64/kernel/vdso/note.o
-> >
-> > arch/arm64/kernel/vdso/sigreturn.o: compiled for a little endian system and target is big endian
-> > failed to merge target specific data of file arch/arm64/kernel/vdso/sigreturn.o
-> >
-> > Signed-off-by: Arun Chandran <achandran@mvista.com>
-> > Tested-by: Mark Rutland <mark.rutland@arm.com>
-> > ---
-> >  arch/arm64/kernel/vdso/Makefile |    2 +-
-> >  1 file changed, 1 insertion(+), 1 deletion(-)
-> >
-> > diff --git a/arch/arm64/kernel/vdso/Makefile b/arch/arm64/kernel/vdso/Makefile
-> > index 6d20b7d..a268a9a 100644
-> > --- a/arch/arm64/kernel/vdso/Makefile
-> > +++ b/arch/arm64/kernel/vdso/Makefile
-> > @@ -43,7 +43,7 @@ $(obj)/vdso-offsets.h: $(obj)/vdso.so.dbg FORCE
-> >         $(call if_changed,vdsosym)
-> >
-> >  # Assembly rules for the .S files
-> > -$(obj-vdso): %.o: %.S
-> > +$(obj-vdso): %.o: %.S FORCE
-> >         $(call if_changed_dep,vdsoas)
-> >
-> >  # Actual build commands
-> > --
-> > 1.7.9.5
-> >
-> 
-> Any update on this?
+On 07/30/2014 05:16 AM, Heiko St?bner wrote:
+> Hi Guenter,
+>
+> Am Dienstag, 29. Juli 2014, 18:50:47 schrieb Guenter Roeck:
+>> On 07/18/2014 12:34 AM, Guenter Roeck wrote:
+>>> Various drivers implement architecture and/or device specific means
+>>> to restart (reset) the system. Various mechanisms have been implemented
+>>> to support those schemes. The best known mechanism is arm_pm_restart,
+>>> which is a function pointer to be set either from platform specific code
+>>> or from drivers. Another mechanism is to use hardware watchdogs to issue
+>>> a reset; this mechanism is used if there is no other method available
+>>> to reset a board or system. Two examples are alim7101_wdt, which currently
+>>> uses the reboot notifier to trigger a reset, and moxart_wdt, which
+>>> registers the arm_pm_restart function. Several other restart drivers for
+>>> arm, all directly calling arm_pm_restart, are in the process of being
+>>> integrated into the kernel. All those drivers would benefit from the new
+>>> API.
+>>>
+>>> The existing mechanisms have a number of drawbacks. Typically only one
+>>> scheme to restart the system is supported (at least if arm_pm_restart is
+>>> used). At least in theory there can be multiple means to restart the
+>>> system, some of which may be less desirable (for example one mechanism
+>>> may only reset the CPU, while another may reset the entire system). Using
+>>> arm_pm_restart can also be racy if the function pointer is set from a
+>>> driver, as the driver may be in the process of being unloaded when
+>>> arm_pm_restart is called.
+>>> Using the reboot notifier is always racy, as it is unknown if and when
+>>> other functions using the reboot notifier have completed execution
+>>> by the time the watchdog fires.
+>>>
+>>> Introduce a system restart handler call chain to solve the described
+>>> problems. This call chain is expected to be executed from the
+>>> architecture specific machine_restart() function. Drivers providing
+>>> system restart functionality (such as the watchdog drivers mentioned
+>>> above) are expected to register with this call chain. By using the
+>>> priority field in the notifier block, callers can control restart handler
+>>> execution sequence and thus ensure that the restart handler with the
+>>> optimal restart capabilities for a given system is called first.
+>>>
+>>> Since the first revision of this patchset, a number of separate patch
+>>> submissions have been made which either depend on it or could make use of
+>>> it.
+>>>
+>>> http://www.spinics.net/linux/lists/arm-kernel/msg344796.html
+>>>
+>>> 	registers three notifiers.
+>>>
+>>> https://lkml.org/lkml/2014/7/8/962
+>>>
+>>> 	would benefit from it.
+>>>
+>>> Patch 1 of this series implements the restart handler function. Patches 2
+>>> and 3 implement calling the restart handler chain from arm and arm64
+>>> restart code.
+>>>
+>>> Patch 4 modifies the restart-poweroff driver to no longer call
+>>> arm_pm_restart directly but machine_restart. This is done to avoid
+>>> calling arm_pm_restart from more than one place. The change makes the
+>>> driver architecture independent, so it would be possible to drop the arm
+>>> dependency from its Kconfig entry.
+>>>
+>>> Patch 5 and 6 convert existing restart handlers in the watchdog subsystem
+>>> to use the restart handler. Patch 7 unexports arm_pm_restart to ensure
+>>> that no one gets the idea to implement a restart handler as module.
+>>>
+>>> ---
+>>> v5: Rebased series to v3.16-rc5
+>>>
+>>>       Function renames:
+>>>       register_restart_notifier -> register_restart_handler
+>>>       unregister_restart_notifier -> unregister_restart_handler
+>>>       kernel_restart_notify -> do_kernel_restart
+>>>
+>>> v4: Document restart notifier priorities
+>>>
+>>>       Select 128 as default priority for newly introduced notifiers
+>>>       Fix checkpatch warning (line too long) in moxart patch
+>>>
+>>> v3: Drop RFC.
+>>>
+>>>       Add kernel_restart_notify wrapper function to execute notifier
+>>>       Improve documentation.
+>>>       Move restart_notifier_list into kernel/reboot.c and make it static.
+>>>
+>>> v2: Add patch 4.
+>>>
+>>>       Only call blocking notifier call chain if arm_pm_restart was not set.
+>>>
+>>> --
+>>
+>> To get more test coverage, this series plus a few add-on patches which
+>> depend on it are now available in the restart-staging branch of my
+>> repository at kernel.org [1]. The branch is currently based on 3.16-rc7.
+>> Extensive build test results are available at [2]; look for the column
+>> marked 'restart-staging' on the far right of the tables.
+>>
+>> I would encourage everyone interested in this series to send me Reviewed-by:
+>> or at least Acked-by: tags. Note that I removed all of the earlier tags
+>> since I feel that the changes made subsequently warrant updated tags. An
+>> Acked-by: from affected maintainers would also be very helpful.
+>
+> Thanks for adapting my Samsung restart-patches to the API changes.
+>
+> The one thing I found is, in
+> 	"clk: samsung: register restart handlers for s3c2412 and s3c2443"
+> you seem to have forgotten the priority in the clk-s3c2443.c part while in
+> clk-s3c2412.c it is present.
+>
+Yes, you are correct. I fixed that after I got the message from Fengguang's
+robot. Which means that my auto-builder misses to build that file. Too bad
+that arm:allmodconfig fails with other errors and is unusable. Do you know
+if there is a defconfig which builds clk-s3c2443.c ?
 
-Sorry, this slipped through the cracks (neither myself or Catalin were on CC
-and we didn't spot it on the list).
+> And I'm not sure if there shouldn't be some sort of delay, to give the
+> watchdog some time to work, as Tomasz suggested in my initial submission?
+>
+In your case the reset handler is in the clock code, itn's it ? Question
+would be if the write to SWRST results in an immediate reset or if it needs
+a delay. From the context, it looks to me as if reaction would be immediate,
+but obviously I don't have the specification so that is just a wild guess.
 
-I've applied it to our for-next branch targetting 3.17 and will push out
-after a bit of testing.
+>
+> I'll update the Rockchip specific restart-patches after the merge window, when
+> the core clock support has landed.
+>
+> And I still like the whole concept very much, so
+> Acked-by: Heiko Stuebner <heiko@sntech.de>
 
-Will
+Thanks!
+
+Guenter
