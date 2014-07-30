@@ -1,31 +1,80 @@
 From: wens@csie.org (Chen-Yu Tsai)
-Date: Wed, 30 Jul 2014 20:56:08 +0800
-Subject: [PATCH v5 5/6] ARM: sunxi: Add A31 RTC driver to sunxi_defconfig
-In-Reply-To: <1406724969-2482-1-git-send-email-wens@csie.org>
-References: <1406724969-2482-1-git-send-email-wens@csie.org>
-Message-ID: <1406724969-2482-6-git-send-email-wens@csie.org>
+Date: Wed, 30 Jul 2014 20:56:03 +0800
+Subject: [PATCH v5 0/6] ARM: sunxi: RTC support for A31/A23
+Message-ID: <1406724969-2482-1-git-send-email-wens@csie.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Now that we have a driver for A31's RTC, enable it
-in the default sunxi config.
+Hi everyone,
 
-Signed-off-by: Chen-Yu Tsai <wens@csie.org>
----
- arch/arm/configs/sunxi_defconfig | 1 +
- 1 file changed, 1 insertion(+)
+This is v5 of the sun6i RTC series. This series adds support for
+the RTC in A31 and A23 SoCs. The series applies to sunxi-next.
 
-diff --git a/arch/arm/configs/sunxi_defconfig b/arch/arm/configs/sunxi_defconfig
-index 7209bfd..0abc2ab 100644
---- a/arch/arm/configs/sunxi_defconfig
-+++ b/arch/arm/configs/sunxi_defconfig
-@@ -93,6 +93,7 @@ CONFIG_LEDS_TRIGGER_DEFAULT_ON=y
- CONFIG_RTC_CLASS=y
- # CONFIG_RTC_INTF_SYSFS is not set
- # CONFIG_RTC_INTF_PROC is not set
-+CONFIG_RTC_DRV_SUN6I=y
- CONFIG_RTC_DRV_SUNXI=y
- # CONFIG_IOMMU_SUPPORT is not set
- CONFIG_PHY_SUN4I_USB=y
+The A31 has a new RTC block that is separate from the timer block.
+It has separate interrupts for each of the alarms, and a different
+format for the counter alarm. The driver has been tested on the
+A31 Hummingbird, and the A23 tablet I'm using to work on sun8i
+support.
+
+Patch 1 adds the driver for the RTC.
+
+Patch 2 is a minor cleanup. This makes rtc-sunxi depend on sun4i or
+sun7i, the 2 platforms the driver is actually used on.
+
+Patch 3 adds the RTC device node to the sun6i DTSI.
+
+Patch 4 adds the RTC device node to the sun8i DTSI.
+
+Patch 5 adds enables rtc-sun6i in the sunxi defconfig.
+
+Patch 6 adds enables rtc-sun6i in the multi_v7 defconfig.
+This patch applies to arm-soc/next/defconfig (e9a86d96)
+
+Changes since v4:
+  - Added interrupt for alarm 1 to DT bindings for completeness
+
+Changes since v3:
+  - reformatted all multi-line function calls to have
+    indentation match open parenthesis
+
+Changes since v2:
+  - fixed indentation in DT binding docs
+  - have function argument indentation match open parenthesis
+  - drop driver owner field
+
+Changes since v1:
+  - Enable rtc-sun6i in multi_v7_defconfig
+  - Cleanup the time/date GET/SET macros
+  - Use GENMASK for control register mask
+  - Change Kconfig option to show 'A31'
+  - Remove leftover comment from rtc-sun4i
+  - Remove extra newline
+
+
+Cheers
+ChenYu
+
+
+
+Chen-Yu Tsai (6):
+  rtc: sun6i: Add sun6i RTC driver
+  rtc: sunxi: Depend on platforms sun4i/sun7i that actually have the rtc
+  ARM: dts: sun6i: add rtc device node
+  ARM: dts: sun8i: add rtc device node
+  ARM: sunxi: Add A31 RTC driver to sunxi_defconfig
+  ARM: sunxi: Add A31 RTC driver to multi_v7_defconfig
+
+ .../devicetree/bindings/rtc/sun6i-rtc.txt          |  17 +
+ arch/arm/boot/dts/sun6i-a31.dtsi                   |   6 +
+ arch/arm/boot/dts/sun8i-a23.dtsi                   |   6 +
+ arch/arm/configs/multi_v7_defconfig                |   1 +
+ arch/arm/configs/sunxi_defconfig                   |   1 +
+ drivers/rtc/Kconfig                                |   9 +-
+ drivers/rtc/Makefile                               |   1 +
+ drivers/rtc/rtc-sun6i.c                            | 447 +++++++++++++++++++++
+ 8 files changed, 487 insertions(+), 1 deletion(-)
+ create mode 100644 Documentation/devicetree/bindings/rtc/sun6i-rtc.txt
+ create mode 100644 drivers/rtc/rtc-sun6i.c
+
 -- 
 2.0.1
