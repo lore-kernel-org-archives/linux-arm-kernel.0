@@ -1,81 +1,51 @@
-From: Li.Xiubo@freescale.com (Li.Xiubo at freescale.com)
-Date: Wed, 30 Jul 2014 02:11:48 +0000
-Subject: [PATCHv2 2/3] ARM: dts: vf610-twr: Add PWM0's pinctrl node
-In-Reply-To: <8738dkuh7a.fsf@nbsps.com>
-References: <1395627736-5338-1-git-send-email-Li.Xiubo@freescale.com>
- <1395627736-5338-3-git-send-email-Li.Xiubo@freescale.com>
- <8738dkuh7a.fsf@nbsps.com>
-Message-ID: <4eb97d0849cd4a4787d8405df7391816@BN1PR0301MB0609.namprd03.prod.outlook.com>
+From: sfr@canb.auug.org.au (Stephen Rothwell)
+Date: Wed, 30 Jul 2014 12:23:05 +1000
+Subject: linux-next: manual merge of the pm tree with the arm-soc tree
+Message-ID: <20140730122305.7b1b7838@canb.auug.org.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Bill Pringlemeir,
+Hi Rafael,
 
-> > diff --git a/arch/arm/boot/dts/vf610-twr.dts
-> > b/arch/arm/boot/dts/vf610-twr.dts index f3af8ea..3fabdb5 100644 ---
-> > a/arch/arm/boot/dts/vf610-twr.dts +++
-> > b/arch/arm/boot/dts/vf610-twr.dts @@ -213,6 +213,17 @@
-> > 			>;
-> > 		};
-> >
-> > + pinctrl_pwm0: pwm0grp { + fsl,pins = < + VF610_PAD_PTB0__FTM0_CH0
-> 
-> Hi Xiubo,
-> 
-> I think you added this for the tower audio board?  Maybe the beeper?
+Today's linux-next merge of the pm tree got a conflict in
+drivers/cpuidle/Kconfig.arm between commit 2aaafcdb6883 ("cpuidle:
+big.LITTLE: Add ARCH_EXYNOS entry in config") from the arm-soc tree and
+commit 6ee7f5dd57fc ("cpuidle: big_little: Fix build error") from the
+pm tree.
 
-For the PWM leds and beepers, for now only the ch0~ch3 are used here.
+I fixed it up (see below) and can carry the fix as necessary (no action
+is required).
 
-> Are these lines needed?
-> 
-> +	VF610_PAD_PTB6__FTM0_CH6		0x1582
-> +	VF610_PAD_PTB7__FTM0_CH7		0x1582
-> 
-> According to my tower schematics, PTB6 routes to the Primary B35/GPIO4,
-> and B40/FTM0CH6/PWM4 and to the jumpers J23.  PTB7 routes to
-> B39/FTM0CH7/PWM5, EIRQ3/B55/B56, and jumper J24.  I think that most
-> people have some tower serial card which can also route these lines
-> and/or they are sent to the OpenSDA chip which does a ttyACM (USB
-> serial) on all Tower main boards.
-> 
-> Did you just add all FTM channels 0-7 in the DTS?  Or are each and every
-> one mapped to a pin on the expansion/riser boards.  Could we remove the
-> two lines above and use,
-> 
-> 	pinctrl_uart2: uart2grp {
-> 		fsl,pins = <
->                         VF610_PAD_PTB6__UART2_TX                0x21a2
->                         VF610_PAD_PTB7__UART2_RX                0x21a1
-> 		>;
-> 	};
-> 
-> So that the PTB6/7 map to UART2?  Or are these indeed a conflict with
-> some audio board (or other)? 
+-- 
+Cheers,
+Stephen Rothwell                    sfr at canb.auug.org.au
 
-There hasn't any confliction with audio board as far as I know.
-I think they can be removed.
-
-
-> I think it might be valuable to add the
-> 'ttyLP2' to the vf610-twr.  An MMC image could echo 'wrong serial port,
-> set J23/24' for instance to tell people that the serial console was not
-> connected properly (or something else).  People may also wish to use a
-> serial interface for other peripherals or as a 2nd debug port.
-> 
-
-Hum, if so I think it's okay.
-
-@Shawn,
-
-Do you have any comments here ?
-
-
-Thanks,
-
-BRs
-Xiubo
-
-
-
-> Thanks,
-> Bill Pringlemeir.
+diff --cc drivers/cpuidle/Kconfig.arm
+index 33fc0ff0af1c,a186dec8e5df..000000000000
+--- a/drivers/cpuidle/Kconfig.arm
++++ b/drivers/cpuidle/Kconfig.arm
+@@@ -1,9 -1,16 +1,10 @@@
+  #
+  # ARM CPU Idle drivers
+  #
+ -config ARM_ARMADA_370_XP_CPUIDLE
+ -	bool "CPU Idle Driver for Armada 370/XP family processors"
+ -	depends on ARCH_MVEBU
+ -	help
+ -	  Select this to enable cpuidle on Armada 370/XP processors.
+ -
+  config ARM_BIG_LITTLE_CPUIDLE
+  	bool "Support for ARM big.LITTLE processors"
+ -	depends on ARCH_VEXPRESS_TC2_PM
+ +	depends on ARCH_VEXPRESS_TC2_PM || ARCH_EXYNOS
++ 	depends on MCPM
+  	select ARM_CPU_SUSPEND
+  	select CPU_IDLE_MULTIPLE_DRIVERS
+  	help
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140730/683fcf92/attachment.sig>
