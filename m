@@ -1,101 +1,53 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Wed, 30 Jul 2014 12:24:14 +0100
-Subject: [PATCH] ARM/ARM64: don't enter kgdb when userspace executes a
- kgdb break instruction.
-In-Reply-To: <20140730071245.GA8954@mew.web-pass.com>
-References: <20140730071245.GA8954@mew.web-pass.com>
-Message-ID: <20140730112414.GJ12239@arm.com>
+From: sthokal@xilinx.com (Srikanth Thokala)
+Date: Wed, 30 Jul 2014 16:54:49 +0530
+Subject: [PATCH v5] pcie: Add Xilinx PCIe Host Bridge IP driver
+In-Reply-To: <8258903.Rn4s07GKGV@wuerfel>
+References: <1406131381-25577-1-git-send-email-sthokal@xilinx.com>
+ <CA+mB=1JhDF=BBXcyTbgVB8S7qH=Mb1JH78HLL4pA9OBH19hQvA@mail.gmail.com>
+ <8258903.Rn4s07GKGV@wuerfel>
+Message-ID: <CA+mB=1LeZn1k2VHNby2TRBcb1xuFFTQio=C845_xe2A=ZciYqg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+Hi Arnd,
 
-On Wed, Jul 30, 2014 at 08:12:45AM +0100, Omar Sandoval wrote:
-> The kgdb breakpoint hooks (kgdb_brk_fn and kgdb_compiled_brk_fn) should only be
-> entered when a kgdb break instruction is executed from the kernel. Otherwise,
-> if kgdb is enabled, a userspace program can cause the kernel to drop into the
-> debugger by executing either KGDB_BREAKINST or KGDB_COMPILED_BREAK on ARM, or
-> brk #KGDB_{DYN,COMPILED}_DGB_BRK_IMM on ARM64.
-> 
-> Signed-off-by: Omar Sandoval <osandov@osandov.com>
-> ---
-> The following program reproduces the fixed problem on ARM:
-> .globl _start
-> _start:
-> 	udf	#65006	@ KGDB_BREAKINST
-> 
-> And on ARM64:
-> .globl _start
-> _start:
->         brk     #0x400	@ KGDB_DYN_DGB_BRK_IMM
-> 
->  arch/arm/kernel/kgdb.c                  | 4 ++++
->  arch/arm64/include/asm/debug-monitors.h | 4 +++-
->  arch/arm64/kernel/debug-monitors.c      | 3 ++-
->  arch/arm64/kernel/kgdb.c                | 4 ++++
->  4 files changed, 13 insertions(+), 2 deletions(-)
+On Mon, Jul 28, 2014 at 6:32 PM, Arnd Bergmann <arnd@arndb.de> wrote:
+> On Monday 28 July 2014 18:04:34 Srikanth Thokala wrote:
+>> Hi Arnd and Rob,
+>>
+>> I discussed with Bjorn and we believe this patch is in good shape to
+>> apply.  And Bjorn requires ACKs to apply this patch.  So, could you
+>> guys please review this patch and provided your ACKs to this patch.
+>
+> Looks great for the most part. I've looked through the whole driver
+> again, and I have two small issues remaining:
+>
+> a) Please clarify in the changeset description why there is no support
+>    for PCI I/O space.
 
-Whilst this sounds like a worrying problem, I've failed to reproduce it
-on arm64.  Executing a brk instruction with either KGDB_DYN_DGB_BRK_IMM or
-KDBG_COMPILED_DBG_BRK_IMM immediates from userspace results in a SIGTRAP being
-delivered, assumedly because kgdb_handle_exception simply returns when kgdb
-isn't active.
+Sure, I will add to my changeset.
 
-> diff --git a/arch/arm64/include/asm/debug-monitors.h b/arch/arm64/include/asm/debug-monitors.h
-> index 6e9b5b3..e1d27ce 100644
-> --- a/arch/arm64/include/asm/debug-monitors.h
-> +++ b/arch/arm64/include/asm/debug-monitors.h
-> @@ -105,8 +105,10 @@ void unregister_step_hook(struct step_hook *hook);
->  
->  struct break_hook {
->  	struct list_head node;
-> -	u32 esr_val;
->  	u32 esr_mask;
-> +	u32 esr_val;
-> +	u64 pstate_mask;
-> +	u64 pstate_val;
+>
+> b) I think you should use the 'msi-parent' property, and the
+>    of_pci_find_msi_chip_by_node() to find the msi_chip for the
+>    PCI controller. This will make it possible to forward MSIs
+>    to the main interrupt controller in the system, which is more
+>    efficient. See the pcie-mvebu driver for an example of this.
 
-The following (totally untested) diff is simpler for arm64, but again, I'm
-not sure we even have a problem here.
+Ok, I need to look into this and I will plan to implement on top of this patch.
 
-On which systems have you managed to reproduce this and how?
+>
+> Other than these:
+>
+> Acked-by: Arnd Bergmann <arnd@arndb.de>
 
-Will
+Thanks Arnd for the Ack.
 
---->8
+Srikanth
 
-diff --git a/arch/arm64/kernel/debug-monitors.c b/arch/arm64/kernel/debug-monitors.c
-index a7fb874b595e..fe5b94078d82 100644
---- a/arch/arm64/kernel/debug-monitors.c
-+++ b/arch/arm64/kernel/debug-monitors.c
-@@ -315,20 +315,20 @@ static int brk_handler(unsigned long addr, unsigned int esr,
- {
-        siginfo_t info;
- 
--       if (call_break_hook(regs, esr) == DBG_HOOK_HANDLED)
--               return 0;
-+       if (user_mode(regs)) {
-+               info = (siginfo_t) {
-+                       .si_signo = SIGTRAP,
-+                       .si_errno = 0,
-+                       .si_code  = TRAP_BRKPT,
-+                       .si_addr  = (void __user *)instruction_pointer(regs),
-+               };
- 
--       if (!user_mode(regs))
-+               force_sig_info(SIGTRAP, &info, current);
-+       } else if (call_break_hook(regs, esr) != DBG_HOOK_HANDLED) {
-+               pr_warning("Unexpected kernel BRK exception at EL1\n");
-                return -EFAULT;
-+       }
- 
--       info = (siginfo_t) {
--               .si_signo = SIGTRAP,
--               .si_errno = 0,
--               .si_code  = TRAP_BRKPT,
--               .si_addr  = (void __user *)instruction_pointer(regs),
--       };
--
--       force_sig_info(SIGTRAP, &info, current);
-        return 0;
- }
+>
+>         Arnd
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-pci" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
