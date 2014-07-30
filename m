@@ -1,66 +1,60 @@
-From: dinguyen@altera.com (Dinh Nguyen)
-Date: Wed, 30 Jul 2014 09:52:45 -0500
-Subject: [PATCH net v3 6/6] net: stmmac: squelch sparse warning with casts
-In-Reply-To: <1406671607-27368-7-git-send-email-vbridgers2013@gmail.com>
-References: <1406671607-27368-1-git-send-email-vbridgers2013@gmail.com>
- <1406671607-27368-7-git-send-email-vbridgers2013@gmail.com>
-Message-ID: <1406731965.23841.2.camel@linux-builds1>
+From: jungseoklee85@gmail.com (Jungseok Lee)
+Date: Wed, 30 Jul 2014 23:57:09 +0900
+Subject: [PATCH v7 07/11] arm64: mm: Implement 4 levels of translation
+ tables
+In-Reply-To: <53D7AD7A.8050706@amd.com>
+References: <CAGoO6fLT6B_vx+Wtm6bKHD6YkjQcM8f=deD7SDP3BR_uC+1c5w@mail.gmail.com>
+ <ACF42928-55EE-4466-B217-982839BB98C4@gmail.com> <53D7AD7A.8050706@amd.com>
+Message-ID: <9DF712F2-52EB-412B-9E6F-41FC8212AE1F@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Vince,
-
-On Tue, 2014-07-29 at 17:06 -0500, Vince Bridgers wrote:
-> Add casts to squelch the following sparse warnings so we can see
-> the ones that matter when they occur.
+On Jul 29, 2014, at 11:19 PM, Joel Schopp wrote:
 > 
-> stmmac_platform.c:260:20: warning: incorrect type in argument 1
-> 			  (different address spaces)
-> stmmac_platform.c:260:20:    expected void const *static extern
-> 			  [signed] [long] [typedef] [tls] inline [safe] ptr
-> stmmac_platform.c:260:20:    got void [noderef] <asn:2>*[assigned] addr
-> stmmac_platform.c:261:32: warning: incorrect type in argument 1
-> 			  (different address spaces)
-> stmmac_platform.c:261:32:    expected void const *static extern
-> 			  [signed] [long] [typedef] [tls] inline [safe] ptr
-> stmmac_platform.c:261:32:    got void [noderef] <asn:2>*[assigned] addr
+>>> Here's a good example of where we run into trouble equating page table
+>>> addressable bits with hardware addressable bits.  If VA_BITS is 48 due
+>>> to 4K 4 level page tables but is running on a 42 bit system this will
+>>> end up being out of range.
+>> Is your concern that CPU issues 48-bit address to MMU on 42-bit hardware?
+>> Have you tested this patch series on your hardware?
+>> 
+>> - Jungseok Lee
 > 
+> That is my concern.  I did test the patch on my hardware with the
+> following results:
+> 64k pages, 2 levels 42 bit VA - worked (no regression)
+> 64k pages, 3 levels 48 bit VA- didn't boot
+> 4k pages, 4 levels 42 bit VA - didn't boot
+> 4k pages, 4 levels 48 bit VA - didn't boot
 
 
-I think you should update your sparse. I have 0.5.0 and the only sparse
-warnings for stmmac are:
+Let me break the concern down into two small parts.
 
-drivers/net/ethernet/stmicro/stmmac/enh_desc.c:381:30: warning: symbol
-'enh_desc_ops' was not declared. Should it be static?
-drivers/net/ethernet/stmicro/stmmac/norm_desc.c:253:30: warning: symbol
-'ndesc_ops' was not declared. Should it be static?
-drivers/net/ethernet/stmicro/stmmac/dwmac-socfpga.c:128:29: warning:
-symbol 'socfpga_gmac_data' was not declared. Should it be static?
-drivers/net/ethernet/stmicro/stmmac/stmmac_hwtstamp.c:141:33: warning:
-symbol 'stmmac_ptp' was not declared. Should it be static?
+The first one is a relation between VA and PA. Let me visualize the above
+description in the following way. I assume that Cortex-A57 is used and
+connected to bus with 42-bit address line.
 
+SoC Boundary
+|---------------------------------------------
+| Cortex-A57 Boundary                        |
+| ---------------                            |
+| | CPU --> MMU | --> BUS --> Memory Controller --> RAM 
+| ------48------- 42      42                 |  42
+|---------------------------------------------
 
-Dinh
-> Signed-off-by: Vince Bridgers <vbridgers2013@gmail.com>
-> ---
-> V3: Add minor sparse warning correction as part of series
-> V2: Not present in prior submissions
-> ---
->  .../net/ethernet/stmicro/stmmac/stmmac_platform.c  |    4 ++--
->  1 file changed, 2 insertions(+), 2 deletions(-)
-> 
-> diff --git a/drivers/net/ethernet/stmicro/stmmac/stmmac_platform.c b/drivers/net/ethernet/stmicro/stmmac/stmmac_platform.c
-> index bb524a9..228003b 100644
-> --- a/drivers/net/ethernet/stmicro/stmmac/stmmac_platform.c
-> +++ b/drivers/net/ethernet/stmicro/stmmac/stmmac_platform.c
-> @@ -257,8 +257,8 @@ static int stmmac_pltfr_probe(struct platform_device *pdev)
->  
->  	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
->  	addr = devm_ioremap_resource(dev, res);
-> -	if (IS_ERR(addr))
-> -		return PTR_ERR(addr);
-> +	if (IS_ERR((void __force *)addr))
-> +		return PTR_ERR((void __force *)addr);
->  
->  	plat_dat = dev_get_platdata(&pdev->dev);
->  	if (pdev->dev.of_node) {
+In this configuration, there is no problem since 48-bit VA is handled in
+Cortex-A57 boundary. Cortex-A57 can support up to 48-bit VA and 44-bit PA. 
+
+The second part is the test result. It's bad actually. So, I've done booting
+test on for-next/core branch of arm64 linux git, [1], quickly using Model. All
+combinations, 4KB + 3Level (39-bit VA), 4KB + 4Level (48-bit VA), 64KB + 2Level
+(42-bit VA) and 64KB + 3Level(48bit VA), boot up successfully.
+
+I hesitate to say anything since I don't have any real hardware. I think people
+who have real platform, such as Juno, can help to figure it out.
+
+[1]: git://git.kernel.org/pub/scm/linux/kernel/git/arm64/linux.git
+
+I add Will in Cc since [1] looks updated by Will now. 
+
+- Jungseok Lee
