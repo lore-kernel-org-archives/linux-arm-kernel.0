@@ -1,141 +1,322 @@
-From: linux@roeck-us.net (Guenter Roeck)
-Date: Wed, 30 Jul 2014 07:10:50 -0700
-Subject: [PATCH v5 0/7] kernel: Add support for restart handler call chain
-In-Reply-To: <1705554.pBhZQ0Icu9@diego>
-References: <1405668856-13738-1-git-send-email-linux@roeck-us.net>
- <53D84F77.2050401@roeck-us.net> <1705554.pBhZQ0Icu9@diego>
-Message-ID: <53D8FCEA.9020506@roeck-us.net>
+From: edubezval@gmail.com (Eduardo Valentin)
+Date: Wed, 30 Jul 2014 10:16:39 -0400
+Subject: [PATCH 1/6] thermal: of: Add support for hardware-tracked trip
+ points
+In-Reply-To: <1403856699-2140-2-git-send-email-mperttunen@nvidia.com>
+References: <1403856699-2140-1-git-send-email-mperttunen@nvidia.com>
+ <1403856699-2140-2-git-send-email-mperttunen@nvidia.com>
+Message-ID: <20140730141639.GA3715@developer>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/30/2014 05:16 AM, Heiko St?bner wrote:
-> Hi Guenter,
->
-> Am Dienstag, 29. Juli 2014, 18:50:47 schrieb Guenter Roeck:
->> On 07/18/2014 12:34 AM, Guenter Roeck wrote:
->>> Various drivers implement architecture and/or device specific means
->>> to restart (reset) the system. Various mechanisms have been implemented
->>> to support those schemes. The best known mechanism is arm_pm_restart,
->>> which is a function pointer to be set either from platform specific code
->>> or from drivers. Another mechanism is to use hardware watchdogs to issue
->>> a reset; this mechanism is used if there is no other method available
->>> to reset a board or system. Two examples are alim7101_wdt, which currently
->>> uses the reboot notifier to trigger a reset, and moxart_wdt, which
->>> registers the arm_pm_restart function. Several other restart drivers for
->>> arm, all directly calling arm_pm_restart, are in the process of being
->>> integrated into the kernel. All those drivers would benefit from the new
->>> API.
->>>
->>> The existing mechanisms have a number of drawbacks. Typically only one
->>> scheme to restart the system is supported (at least if arm_pm_restart is
->>> used). At least in theory there can be multiple means to restart the
->>> system, some of which may be less desirable (for example one mechanism
->>> may only reset the CPU, while another may reset the entire system). Using
->>> arm_pm_restart can also be racy if the function pointer is set from a
->>> driver, as the driver may be in the process of being unloaded when
->>> arm_pm_restart is called.
->>> Using the reboot notifier is always racy, as it is unknown if and when
->>> other functions using the reboot notifier have completed execution
->>> by the time the watchdog fires.
->>>
->>> Introduce a system restart handler call chain to solve the described
->>> problems. This call chain is expected to be executed from the
->>> architecture specific machine_restart() function. Drivers providing
->>> system restart functionality (such as the watchdog drivers mentioned
->>> above) are expected to register with this call chain. By using the
->>> priority field in the notifier block, callers can control restart handler
->>> execution sequence and thus ensure that the restart handler with the
->>> optimal restart capabilities for a given system is called first.
->>>
->>> Since the first revision of this patchset, a number of separate patch
->>> submissions have been made which either depend on it or could make use of
->>> it.
->>>
->>> http://www.spinics.net/linux/lists/arm-kernel/msg344796.html
->>>
->>> 	registers three notifiers.
->>>
->>> https://lkml.org/lkml/2014/7/8/962
->>>
->>> 	would benefit from it.
->>>
->>> Patch 1 of this series implements the restart handler function. Patches 2
->>> and 3 implement calling the restart handler chain from arm and arm64
->>> restart code.
->>>
->>> Patch 4 modifies the restart-poweroff driver to no longer call
->>> arm_pm_restart directly but machine_restart. This is done to avoid
->>> calling arm_pm_restart from more than one place. The change makes the
->>> driver architecture independent, so it would be possible to drop the arm
->>> dependency from its Kconfig entry.
->>>
->>> Patch 5 and 6 convert existing restart handlers in the watchdog subsystem
->>> to use the restart handler. Patch 7 unexports arm_pm_restart to ensure
->>> that no one gets the idea to implement a restart handler as module.
->>>
->>> ---
->>> v5: Rebased series to v3.16-rc5
->>>
->>>       Function renames:
->>>       register_restart_notifier -> register_restart_handler
->>>       unregister_restart_notifier -> unregister_restart_handler
->>>       kernel_restart_notify -> do_kernel_restart
->>>
->>> v4: Document restart notifier priorities
->>>
->>>       Select 128 as default priority for newly introduced notifiers
->>>       Fix checkpatch warning (line too long) in moxart patch
->>>
->>> v3: Drop RFC.
->>>
->>>       Add kernel_restart_notify wrapper function to execute notifier
->>>       Improve documentation.
->>>       Move restart_notifier_list into kernel/reboot.c and make it static.
->>>
->>> v2: Add patch 4.
->>>
->>>       Only call blocking notifier call chain if arm_pm_restart was not set.
->>>
->>> --
->>
->> To get more test coverage, this series plus a few add-on patches which
->> depend on it are now available in the restart-staging branch of my
->> repository at kernel.org [1]. The branch is currently based on 3.16-rc7.
->> Extensive build test results are available at [2]; look for the column
->> marked 'restart-staging' on the far right of the tables.
->>
->> I would encourage everyone interested in this series to send me Reviewed-by:
->> or at least Acked-by: tags. Note that I removed all of the earlier tags
->> since I feel that the changes made subsequently warrant updated tags. An
->> Acked-by: from affected maintainers would also be very helpful.
->
-> Thanks for adapting my Samsung restart-patches to the API changes.
->
-> The one thing I found is, in
-> 	"clk: samsung: register restart handlers for s3c2412 and s3c2443"
-> you seem to have forgotten the priority in the clk-s3c2443.c part while in
-> clk-s3c2412.c it is present.
->
-Yes, you are correct. I fixed that after I got the message from Fengguang's
-robot. Which means that my auto-builder misses to build that file. Too bad
-that arm:allmodconfig fails with other errors and is unusable. Do you know
-if there is a defconfig which builds clk-s3c2443.c ?
+Terve Mikko,
 
-> And I'm not sure if there shouldn't be some sort of delay, to give the
-> watchdog some time to work, as Tomasz suggested in my initial submission?
->
-In your case the reset handler is in the clock code, itn's it ? Question
-would be if the write to SWRST results in an immediate reset or if it needs
-a delay. From the context, it looks to me as if reaction would be immediate,
-but obviously I don't have the specification so that is just a wild guess.
+On Fri, Jun 27, 2014 at 11:11:34AM +0300, Mikko Perttunen wrote:
+> This adds support for hardware-tracked trip points to the device tree
+> thermal sensor framework.
+> 
+> The framework supports an arbitrary number of trip points. Whenever
+> the current temperature is updated, the trip points immediately
+> below and above the current temperature are found. A sensor driver
 
->
-> I'll update the Rockchip specific restart-patches after the merge window, when
-> the core clock support has landed.
->
-> And I still like the whole concept very much, so
-> Acked-by: Heiko Stuebner <heiko@sntech.de>
+One thing I don't follow on your proposal is the groundings you need to
+'set_trips' whenever temperature changes. Given your intention is to add
+support to interrupt driven devices, shouldn't we 'set_trips' just when
+we cross the previously set trips range?
 
-Thanks!
+> callback `set_trips' is then called with the temperatures.
+> If there is no trip point above or below the current temperature,
+> the passed trip temperature will be LONG_MAX or LONG_MIN respectively.
+> In this callback, the driver should program the hardware such that
+> it is notified when either of these trip points are triggered.
+> When a trip point is triggered, the driver should call
+> `thermal_zone_device_update' for the respective thermal zone. This
+> will cause the trip points to be updated again.
+> 
+> If the `set_trips' callback is not implemented (is NULL), the framework
+> behaves as before.
 
-Guenter
+As already mentioned by swarren, the proposal must be wider. We shall
+keep the same support in case the device is used in a system without
+device tree. In other words, if you want to see extra functionality for
+interrupt driven devices, you shall update the core part too, and draft
+a common messaging path.
+
+In general, interrupt driven devices are not mapped in the current
+thermal framework. That is, the current code is timer interrupt driven.
+Other interrupt updates from devices are propagated to
+the framework using thermal_zone_device_update(). In other words, you would
+reprogram your hardware trips from your interrupt handler/workqueue then
+just let the framework know what is going on with temperature, via a simple
+thermal_zone_device_update().
+
+The way I see this going forward it would be a common interface to
+configure the thermal zones to be monitored:
+a. via polling only
+b. via interrupt only
+c. both a + b
+
+obviously, the above shall be informative only for userland.
+
+keep in mind also that changing interrupt configuration for high and low
+temperature thresholds can be racy. 
+
+This feature was kept in the TODO list of the of-thermal.c because the
+we lack a proper support from the thermal framework (never came out of
+the TODO list, I know, I apologize for this). And this missing feature
+was spotted by the hwmon folks also, as they do have such support. So,
+the major missing improvements on interrupt driven devices shall come in
+three steps: (i) thermal framework, (ii) of-thermal (iii) thermal
+framework and hwmon interface. 
+
+
+Cheers,
+
+
+> 
+> Signed-off-by: Mikko Perttunen <mperttunen@nvidia.com>
+> ---
+>  drivers/thermal/of-thermal.c | 97 ++++++++++++++++++++++++++++++++++++++++++--
+>  include/linux/thermal.h      |  3 +-
+>  2 files changed, 95 insertions(+), 5 deletions(-)
+> 
+> diff --git a/drivers/thermal/of-thermal.c b/drivers/thermal/of-thermal.c
+> index 04b1be7..bfccea5 100644
+> --- a/drivers/thermal/of-thermal.c
+> +++ b/drivers/thermal/of-thermal.c
+> @@ -89,6 +89,7 @@ struct __thermal_zone {
+>  	/* trip data */
+>  	int ntrips;
+>  	struct __thermal_trip *trips;
+> +	long prev_low_trip, prev_high_trip;
+>  
+>  	/* cooling binding data */
+>  	int num_tbps;
+> @@ -98,19 +99,66 @@ struct __thermal_zone {
+>  	void *sensor_data;
+>  	int (*get_temp)(void *, long *);
+>  	int (*get_trend)(void *, long *);
+> +	int (*set_trips)(void *, long, long);
+>  };
+>  
+> +/***   Automatic trip handling   ***/
+> +
+> +static int of_thermal_set_trips(struct thermal_zone_device *tz, long temp)
+> +{
+> +	struct __thermal_zone *data = tz->devdata;
+> +	long low = LONG_MIN, high = LONG_MAX;
+> +	int i;
+> +
+> +	/* Hardware trip points not supported */
+> +	if (!data->set_trips)
+> +		return 0;
+> +
+> +	/* No need to change trip points */
+> +	if (temp > data->prev_low_trip && temp < data->prev_high_trip)
+> +		return 0;
+> +
+> +	for (i = 0; i < data->ntrips; ++i) {
+> +		struct __thermal_trip *trip = data->trips + i;
+> +		long trip_low = trip->temperature - trip->hysteresis;
+> +
+> +		if (trip_low < temp && trip_low > low)
+> +			low = trip_low;
+> +
+> +		if (trip->temperature > temp && trip->temperature < high)
+> +			high = trip->temperature;
+> +	}
+> +
+> +	dev_dbg(&tz->device,
+> +		"temperature %ld, updating trip points to %ld, %ld\n",
+> +		temp, low, high);
+> +
+> +	data->prev_low_trip = low;
+> +	data->prev_high_trip = high;
+> +
+> +	return data->set_trips(data->sensor_data, low, high);
+> +}
+> +
+>  /***   DT thermal zone device callbacks   ***/
+>  
+>  static int of_thermal_get_temp(struct thermal_zone_device *tz,
+>  			       unsigned long *temp)
+>  {
+>  	struct __thermal_zone *data = tz->devdata;
+> +	int err;
+>  
+>  	if (!data->get_temp)
+>  		return -EINVAL;
+>  
+> -	return data->get_temp(data->sensor_data, temp);
+> +	err = data->get_temp(data->sensor_data, temp);
+> +	if (err)
+> +		return err;
+> +
+> +	err = of_thermal_set_trips(tz, *temp);
+
+Here, if you update trips whenever you get_temp, you are possibly
+reprogramming your trips on every poll. Remember, this function will be
+called on every poll, in the current implementation.
+
+> +	if (err)
+> +		return err;
+> +
+> +	return 0;
+>  }
+>  
+>  static int of_thermal_get_trend(struct thermal_zone_device *tz, int trip,
+> @@ -222,6 +270,22 @@ static int of_thermal_set_mode(struct thermal_zone_device *tz,
+>  	return 0;
+>  }
+>  
+> +static int of_thermal_update_trips(struct thermal_zone_device *tz)
+> +{
+> +	long temp;
+> +	int err;
+> +
+> +	err = of_thermal_get_temp(tz, &temp);
+> +	if (err)
+> +		return err;
+> +
+> +	err = of_thermal_set_trips(tz, temp);
+> +	if (err)
+> +		return err;
+> +
+> +	return 0;
+> +}
+> +
+>  static int of_thermal_get_trip_type(struct thermal_zone_device *tz, int trip,
+>  				    enum thermal_trip_type *type)
+>  {
+> @@ -252,6 +316,7 @@ static int of_thermal_set_trip_temp(struct thermal_zone_device *tz, int trip,
+>  				    unsigned long temp)
+>  {
+>  	struct __thermal_zone *data = tz->devdata;
+> +	int err;
+>  
+>  	if (trip >= data->ntrips || trip < 0)
+>  		return -EDOM;
+> @@ -259,6 +324,10 @@ static int of_thermal_set_trip_temp(struct thermal_zone_device *tz, int trip,
+>  	/* thermal framework should take care of data->mask & (1 << trip) */
+>  	data->trips[trip].temperature = temp;
+>  
+> +	err = of_thermal_update_trips(tz);
+> +	if (err)
+> +		return err;
+> +
+>  	return 0;
+>  }
+>  
+> @@ -279,6 +348,7 @@ static int of_thermal_set_trip_hyst(struct thermal_zone_device *tz, int trip,
+>  				    unsigned long hyst)
+>  {
+>  	struct __thermal_zone *data = tz->devdata;
+> +	int err;
+>  
+>  	if (trip >= data->ntrips || trip < 0)
+>  		return -EDOM;
+> @@ -286,6 +356,10 @@ static int of_thermal_set_trip_hyst(struct thermal_zone_device *tz, int trip,
+>  	/* thermal framework should take care of data->mask & (1 << trip) */
+>  	data->trips[trip].hysteresis = hyst;
+>  
+> +	err = of_thermal_update_trips(tz);
+> +	if (err)
+> +		return err;
+> +
+>  	return 0;
+>  }
+>  
+> @@ -325,10 +399,12 @@ static struct thermal_zone_device *
+>  thermal_zone_of_add_sensor(struct device_node *zone,
+>  			   struct device_node *sensor, void *data,
+>  			   int (*get_temp)(void *, long *),
+> -			   int (*get_trend)(void *, long *))
+> +			   int (*get_trend)(void *, long *),
+> +			   int (*set_trips)(void *, long, long))
+
+we need to clean the above arguments. they should become a .ops.
+
+>  {
+>  	struct thermal_zone_device *tzd;
+>  	struct __thermal_zone *tz;
+> +	int err;
+>  
+>  	tzd = thermal_zone_get_zone_by_name(zone->name);
+>  	if (IS_ERR(tzd))
+> @@ -339,8 +415,15 @@ thermal_zone_of_add_sensor(struct device_node *zone,
+>  	mutex_lock(&tzd->lock);
+>  	tz->get_temp = get_temp;
+>  	tz->get_trend = get_trend;
+> +	tz->set_trips = set_trips;
+>  	tz->sensor_data = data;
+>  
+> +	err = of_thermal_update_trips(tzd);
+> +	if (err) {
+> +		mutex_unlock(&tzd->lock);
+> +		return ERR_PTR(err);
+> +	}
+> +
+>  	tzd->ops->get_temp = of_thermal_get_temp;
+>  	tzd->ops->get_trend = of_thermal_get_trend;
+>  	mutex_unlock(&tzd->lock);
+> @@ -384,7 +467,8 @@ thermal_zone_of_add_sensor(struct device_node *zone,
+>  struct thermal_zone_device *
+>  thermal_zone_of_sensor_register(struct device *dev, int sensor_id,
+>  				void *data, int (*get_temp)(void *, long *),
+> -				int (*get_trend)(void *, long *))
+> +				int (*get_trend)(void *, long *),
+> +				int (*set_trips)(void *, long, long))
+
+ditto.
+
+>  {
+>  	struct device_node *np, *child, *sensor_np;
+>  
+> @@ -422,7 +506,8 @@ thermal_zone_of_sensor_register(struct device *dev, int sensor_id,
+>  			return thermal_zone_of_add_sensor(child, sensor_np,
+>  							  data,
+>  							  get_temp,
+> -							  get_trend);
+> +							  get_trend,
+> +							  set_trips);
+
+ditto.
+
+>  		}
+>  	}
+>  	of_node_put(np);
+> @@ -466,6 +551,7 @@ void thermal_zone_of_sensor_unregister(struct device *dev,
+>  
+>  	tz->get_temp = NULL;
+>  	tz->get_trend = NULL;
+> +	tz->set_trips = NULL;
+>  	tz->sensor_data = NULL;
+>  	mutex_unlock(&tzd->lock);
+>  }
+> @@ -671,6 +757,9 @@ thermal_of_build_thermal_zone(struct device_node *np)
+>  	/* trips */
+>  	child = of_get_child_by_name(np, "trips");
+>  
+> +	tz->prev_high_trip = LONG_MIN;
+> +	tz->prev_low_trip = LONG_MAX;
+> +
+>  	/* No trips provided */
+>  	if (!child)
+>  		goto finish;
+> diff --git a/include/linux/thermal.h b/include/linux/thermal.h
+> index f7e11c7..2f8951c 100644
+> --- a/include/linux/thermal.h
+> +++ b/include/linux/thermal.h
+> @@ -248,7 +248,8 @@ struct thermal_genl_event {
+>  struct thermal_zone_device *
+>  thermal_zone_of_sensor_register(struct device *dev, int id,
+>  				void *data, int (*get_temp)(void *, long *),
+> -				int (*get_trend)(void *, long *));
+> +				int (*get_trend)(void *, long *),
+> +				int (*set_trips)(void *, long, long));
+>  void thermal_zone_of_sensor_unregister(struct device *dev,
+>  				       struct thermal_zone_device *tz);
+>  #else
+> -- 
+> 1.8.1.5
+> 
