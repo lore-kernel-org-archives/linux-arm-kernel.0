@@ -1,250 +1,49 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Wed, 30 Jul 2014 16:26:47 +0100
-Subject: [PATCH v4] devicetree: Add generic IOMMU device tree bindings
-In-Reply-To: <1404487757-18829-1-git-send-email-thierry.reding@gmail.com>
-References: <1404487757-18829-1-git-send-email-thierry.reding@gmail.com>
-Message-ID: <20140730152646.GC20162@leverpostej>
+From: peter.griffin@linaro.org (Peter Griffin)
+Date: Wed, 30 Jul 2014 16:28:08 +0100
+Subject: [PATCH v4 0/3] Add ST dwc3 glue layer driver
+Message-ID: <1406734091-16202-1-git-send-email-peter.griffin@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Thierry,
+This series adds support for the ST glue logic which wraps the DWC3 controller
+on STiH407 SoC family chipsets.
 
-This looks sane to me.
+Changes since v3
+ - Various formating nits
 
-I just have a few questions below which are hopefully simple/stupid.
+Changes since v2
+ - Use dr_mode for host/device static configuration
+ - Manage shared reset signal to usbss to avoid hang if probing before usb3 phy
+ - Remove DT checks and make driver depend on OF
+ - Change some #define to use BIT macro
+ - Make some comments clearer
+ - Use kerneldoc for struct documentation
+ - Remove udelay
+ - Let DT create platform_devices, and remove legacy alloc
+ - Change some logging levels to dev_dbg
+ - Various whitespace and formatting cleanup
+ - Use SIMPLE_DEV_PM_OPS()
+ - Add const to of_device struct
+ - Reorder header files alphabetically
+ - Use devm_ioremap_resource instead of devm_request_and_ioremap
+ - Remove of_match_ptr()
 
-On Fri, Jul 04, 2014 at 04:29:17PM +0100, Thierry Reding wrote:
-> From: Thierry Reding <treding@nvidia.com>
-> 
-> This commit introduces a generic device tree binding for IOMMU devices.
-> Only a very minimal subset is described here, but it is enough to cover
-> the requirements of both the Exynos System MMU and Tegra SMMU as
-> discussed here:
-> 
->     https://lkml.org/lkml/2014/4/27/346
-> 
-> Signed-off-by: Thierry Reding <treding@nvidia.com>
-> ---
-> Changes in v4:
-> - clarify that disabling an IOMMU DT node may not disable translation
-> - be more explicit that examples are only examples
-> - add multi-ID master example
-> 
-> Changes in v3:
-> - use #iommu-cells instead of #address-cells/#size-cells
-> - drop optional iommu-names property
-> 
-> Changes in v2:
-> - add notes about "dma-ranges" property (drop note from commit message)
-> - document priorities of "iommus" property vs. "dma-ranges" property
-> - drop #iommu-cells in favour of #address-cells and #size-cells
-> - remove multiple-master device example
-> 
->  Documentation/devicetree/bindings/iommu/iommu.txt | 172 ++++++++++++++++++++++
->  1 file changed, 172 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/iommu/iommu.txt
-> 
-> diff --git a/Documentation/devicetree/bindings/iommu/iommu.txt b/Documentation/devicetree/bindings/iommu/iommu.txt
-> new file mode 100644
-> index 000000000000..464a81eaaf61
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/iommu/iommu.txt
-> @@ -0,0 +1,172 @@
-> +This document describes the generic device tree binding for IOMMUs and their
-> +master(s).
-> +
-> +
-> +IOMMU device node:
-> +==================
-> +
-> +An IOMMU can provide the following services:
-> +
-> +* Remap address space to allow devices to access physical memory ranges that
-> +  they otherwise wouldn't be capable of accessing.
-> +
-> +  Example: 32-bit DMA to 64-bit physical addresses
-> +
-> +* Implement scatter-gather at page level granularity so that the device does
-> +  not have to.
-> +
-> +* Provide system protection against "rogue" DMA by forcing all accesses to go
-> +  through the IOMMU and faulting when encountering accesses to unmapped
-> +  address regions.
-> +
-> +* Provide address space isolation between multiple contexts.
-> +
-> +  Example: Virtualization
-> +
-> +Device nodes compatible with this binding represent hardware with some of the
-> +above capabilities.
-> +
-> +IOMMUs can be single-master or multiple-master. Single-master IOMMU devices
-> +typically have a fixed association to the master device, whereas multiple-
-> +master IOMMU devices can translate accesses from more than one master.
-> +
-> +The device tree node of the IOMMU device's parent bus must contain a valid
-> +"dma-ranges" property that describes how the physical address space of the
-> +IOMMU maps to memory. An empty "dma-ranges" property means that there is a
-> +1:1 mapping from IOMMU to memory.
-> +
-> +Required properties:
-> +--------------------
-> +- #iommu-cells: The number of cells in an IOMMU specifier needed to encode an
-> +  address.
-> +
-> +The meaning of the IOMMU specifier is defined by the device tree binding of
-> +the specific IOMMU. Below are a few examples of typical use-cases:
-> +
-> +- #iommu-cells = <0>: Single master IOMMU devices are not configurable and
-> +  therefore no additional information needs to be encoded in the specifier.
-> +  This may also apply to multiple master IOMMU devices that do not allow the
-> +  association of masters to be configured. Note that an IOMMU can by design
-> +  be multi-master yet only expose a single master in a given configuration.
-> +  In such cases the number of cells will usually be 1 as in the next case.
-> +- #iommu-cells = <1>: Multiple master IOMMU devices may need to be configured
-> +  in order to enable translation for a given master. In such cases the single
-> +  address cell corresponds to the master device's ID. In some cases more than
-> +  one cell can be required to represent a single master ID.
-> +- #iommu-cells = <4>: Some IOMMU devices allow the DMA window for masters to
-> +  be configured. The first cell of the address in this may contain the master
-> +  device's ID for example, while the second cell could contain the start of
-> +  the DMA window for the given device. The length of the DMA window is given
-> +  by the third and fourth cells.
-> +
-> +Note that these are merely examples and real-world use-cases may use different
-> +definitions to represent their individual needs. Always refer to the specific
-> +IOMMU binding for the exact meaning of the cells that make up the specifier.
-> +
-> +
-> +IOMMU master node:
-> +==================
-> +
-> +Devices that access memory through an IOMMU are called masters. A device can
-> +have multiple master interfaces (to one or more IOMMU devices).
-> +
-> +Required properties:
-> +--------------------
-> +- iommus: A list of phandle and IOMMU specifier pairs that describe the IOMMU
-> +  master interfaces of the device. One entry in the list describes one master
-> +  interface of the device.
-> +
-> +When an "iommus" property is specified in a device tree node, the IOMMU will
-> +be used for address translation. If a "dma-ranges" property exists in the
-> +device's parent node it will be ignored. An exception to this rule is if the
-> +referenced IOMMU is disabled, in which case the "dma-ranges" property of the
-> +parent shall take effect. Note that merely disabling a device tree node does
-> +not guarantee that the IOMMU is really disabled since the hardware may not
-> +have a means to turn off translation.
-> +
-> +
-> +Notes:
-> +======
-> +
-> +One possible extension to the above is to use an "iommus" property along with
-> +a "dma-ranges" property in a bus device node (such as PCI host bridges). This
-> +can be useful to describe how children on the bus relate to the IOMMU if they
-> +are not explicitly listed in the device tree (e.g. PCI devices). However, the
-> +requirements of that use-case haven't been fully determined yet. Implementing
-> +this is therefore not recommended without further discussion and extension of
-> +this binding.
-> +
-> +
-> +Examples:
-> +=========
-> +
-> +Single-master IOMMU:
-> +--------------------
-> +
-> +	iommu {
-> +		#iommu-cells = <0>;
-> +	};
-> +
-> +	master {
-> +		iommus = <&/iommu>;
+Changes since v1
+ - Fix Kconfig mistake
 
-Nit: this should be iommus = <&{/iommu}>, or it's not valid dts syntax.
+Peter Griffin (3):
+  usb: dwc3: add ST dwc3 glue layer to manage dwc3 HC
+  usb: dwc3: dwc3-st: Add st-dwc3 devicetree bindings documentation
+  MAINTAINERS: Add dwc3-st.c file to ARCH/STI architecture
 
-> +	};
-> +
-> +Multiple-master IOMMU with fixed associations:
-> +----------------------------------------------
-> +
-> +	/* multiple-master IOMMU */
-> +	iommu {
-> +		/*
-> +		 * Masters are statically associated with this IOMMU and
-> +		 * address translation is always enabled.
-> +		 */
-> +		#iommu-cells = <0>;
+ Documentation/devicetree/bindings/usb/dwc3-st.txt |  69 +++++
+ MAINTAINERS                                       |   1 +
+ drivers/usb/dwc3/Kconfig                          |   9 +
+ drivers/usb/dwc3/Makefile                         |   1 +
+ drivers/usb/dwc3/dwc3-st.c                        | 336 ++++++++++++++++++++++
+ 5 files changed, 416 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/usb/dwc3-st.txt
+ create mode 100644 drivers/usb/dwc3/dwc3-st.c
 
-I don't follow why translation being always enabled is relevant to the
-example; that would seem to be independent from the binding.
-
-Surely the key point is that with no way to distinguish devices, they
-presumably share the same translations?
-
-> +	};
-> +
-> +	/* static association with IOMMU */
-> +	master at 1 {
-> +		reg = <1>;
-> +		iommus = <&/iommu>;
-> +	};
-> +
-> +	/* static association with IOMMU */
-> +	master at 2 {
-> +		reg = <2>;
-> +		iommus = <&/iommu>;
-> +	};
-> +
-> +Multiple-master IOMMU:
-> +----------------------
-> +
-> +	iommu {
-> +		/* the specifier represents the ID of the master */
-> +		#iommu-cells = <1>;
-> +	};
-> +
-> +	master at 1 {
-> +		/* device has master ID 42 in the IOMMU */
-> +		iommus = <&/iommu 42>;
-> +	};
-> +
-> +	master at 2 {
-> +		/* device has master IDs 23 and 24 in the IOMMU */
-> +		iommus = <&/iommu 23>, <&/iommu 24>;
-> +	};
-
-In future I suspect master will need to be able to identify which master
-IDs correspond to which of their master ports (where each port might
-have an arbitrary number of master IDs).
-
-While we don't need that for the first run, it would be nice to have
-that looked into so master bindings don't come up with arbitrarily
-different ways of doing that.
-
-> +
-> +Multiple-master IOMMU with configurable DMA window:
-> +---------------------------------------------------
-> +
-> +	/ {
-> +		#address-cells = <1>;
-> +		#size-cells = <1>;
-> +
-> +		iommu {
-> +			/* master ID, address and length of DMA window */
-> +			#iommu-cells = <4>;
-> +		};
-> +
-> +		master {
-> +			/* master ID 42, 4 GiB DMA window starting at 0 */
-> +			iommus = <&/iommu  42  0  0x1 0x0>;
-
-Is this that window is from the POV of the master, i.e. the master can
-address 0x0 to 0xffffffff when generating transactions, and these get
-translated somehow?
-
-Or is this the physical addresses to allocate to the master?
-
-Cheers,
-Mark.
+-- 
+1.9.1
