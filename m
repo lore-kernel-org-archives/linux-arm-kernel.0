@@ -1,47 +1,62 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Wed, 30 Jul 2014 21:17:02 +0200
-Subject: [PATCH v2 1/3] arm64: spin-table: handle unmapped
- cpu-release-addrs
-In-Reply-To: <20140730113013.GL12239@arm.com>
-References: <1406717944-24725-1-git-send-email-ard.biesheuvel@linaro.org>
- <1406717944-24725-2-git-send-email-ard.biesheuvel@linaro.org>
- <20140730113013.GL12239@arm.com>
-Message-ID: <CAKv+Gu8ne8k2NV12SyWye5aYJKHG0wHKAO+=V=1L89_hvyGopw@mail.gmail.com>
+From: broonie@kernel.org (Mark Brown)
+Date: Wed, 30 Jul 2014 20:23:14 +0100
+Subject: [PATCH] irq: gic-v3: Tag all low level accessors __maybey_unused
+Message-ID: <1406748194-21094-1-git-send-email-broonie@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-]On 30 July 2014 13:30, Will Deacon <will.deacon@arm.com> wrote:
-> On Wed, Jul 30, 2014 at 11:59:02AM +0100, Ard Biesheuvel wrote:
->> From: Mark Rutland <mark.rutland@arm.com>
->>
->> In certain cases the cpu-release-addr of a CPU may not fall in the
->> linear mapping (e.g. when the kernel is loaded above this address due to
->> the presence of other images in memory). This is problematic for the
->> spin-table code as it assumes that it can trivially convert a
->> cpu-release-addr to a valid VA in the linear map.
->>
->> This patch modifies the spin-table code to use a temporary cached
->> mapping to write to a given cpu-release-addr, enabling us to support
->> addresses regardless of whether they are covered by the linear mapping.
->>
->> Signed-off-by: Mark Rutland <mark.rutland@arm.com>
->> Tested-by: Mark Salter <msalter@redhat.com>
->> [ardb: added (__force void *) cast]
->> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
->> ---
->>  arch/arm64/kernel/smp_spin_table.c | 22 +++++++++++++++++-----
->>  1 file changed, 17 insertions(+), 5 deletions(-)
->
-> I'm nervous about this. What if the spin table sits in the same physical 64k
-> frame as a read-sensitive device and we're running with 64k pages?
->
+From: Mark Brown <broonie@linaro.org>
 
-Actually, booting.txt requires cpu-release-addr to point to a
-/memreserve/d part of memory, which implies DRAM (or you wouldn't have
-to memreserve it)
-That means it should always be covered by the linear mapping, unless
-it is located before Image in DRAM, which is the case addressed by
-this patch.
+This is only really needed for gic_write_sgi1r in the !SMP case since it
+is only referenced in the SMP initialisation code but it seems better to
+have these functions all next to each other and declared consistently.
 
+Signed-off-by: Mark Brown <broonie@linaro.org>
+---
+ drivers/irqchip/irq-gic-v3.c | 10 +++++-----
+ 1 file changed, 5 insertions(+), 5 deletions(-)
+
+diff --git a/drivers/irqchip/irq-gic-v3.c b/drivers/irqchip/irq-gic-v3.c
+index 41b98ba7ffd1..f1ba38f11f7a 100644
+--- a/drivers/irqchip/irq-gic-v3.c
++++ b/drivers/irqchip/irq-gic-v3.c
+@@ -104,7 +104,7 @@ static void gic_redist_wait_for_rwp(void)
+ }
+ 
+ /* Low level accessors */
+-static u64 gic_read_iar(void)
++static u64 __maybe_unused gic_read_iar(void)
+ {
+ 	u64 irqstat;
+ 
+@@ -112,24 +112,24 @@ static u64 gic_read_iar(void)
+ 	return irqstat;
+ }
+ 
+-static void gic_write_pmr(u64 val)
++static void __maybe_unused gic_write_pmr(u64 val)
+ {
+ 	asm volatile("msr_s " __stringify(ICC_PMR_EL1) ", %0" : : "r" (val));
+ }
+ 
+-static void gic_write_ctlr(u64 val)
++static void __maybe_unused gic_write_ctlr(u64 val)
+ {
+ 	asm volatile("msr_s " __stringify(ICC_CTLR_EL1) ", %0" : : "r" (val));
+ 	isb();
+ }
+ 
+-static void gic_write_grpen1(u64 val)
++static void __maybe_unused gic_write_grpen1(u64 val)
+ {
+ 	asm volatile("msr_s " __stringify(ICC_GRPEN1_EL1) ", %0" : : "r" (val));
+ 	isb();
+ }
+ 
+-static void gic_write_sgi1r(u64 val)
++static void __maybe_unused gic_write_sgi1r(u64 val)
+ {
+ 	asm volatile("msr_s " __stringify(ICC_SGI1R_EL1) ", %0" : : "r" (val));
+ }
 -- 
-Ard.
+2.0.1
