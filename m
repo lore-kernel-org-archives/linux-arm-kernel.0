@@ -1,58 +1,50 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Wed, 30 Jul 2014 12:00:49 +0100
-Subject: [PATCH] ARM64: KVM: Nuke EL2 mode tlbs before enabling MMU for EL2
-In-Reply-To: <1406713607-27150-1-git-send-email-pranavkumar@linaro.org>
- (Pranavkumar Sawargaonkar's message of "Wed, 30 Jul 2014 10:46:47
- +0100")
-References: <1406713607-27150-1-git-send-email-pranavkumar@linaro.org>
-Message-ID: <87k36vjela.fsf@approximate.cambridge.arm.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Wed, 30 Jul 2014 12:04:25 +0100
+Subject: [PATCH v4] devicetree: Add generic IOMMU device tree bindings
+In-Reply-To: <1404487757-18829-1-git-send-email-thierry.reding@gmail.com>
+References: <1404487757-18829-1-git-send-email-thierry.reding@gmail.com>
+Message-ID: <20140730110425.GI12239@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Pranav,
+Hi all,
 
-On Wed, Jul 30 2014 at 10:46:47 am BST, Pranavkumar Sawargaonkar <pranavkumar@linaro.org> wrote:
-> X-Gene u-boot runs in EL2 mode with MMU enabled hence we might
-> have stale EL2 tlb enteris when we enable EL2 MMU on each host CPU.
->
-> This can happen on any ARM64 board running bootloader in EL2
-> with MMU enabled.
->
-> This patch ensures that we flush all EL2 TLBs on each host CPU
-> before enabling EL2 MMU. This is very similar to what we do
-> for EL1 TLBs before enabling EL1 MMU.
-> (Refer __cpu_setup() of arch/arm64/mm/proc.S)
->
-> Signed-off-by: Pranavkumar Sawargaonkar <pranavkumar@linaro.org>
-> Signed-off-by: Anup Patel <anup.patel@linaro.org>
+On Fri, Jul 04, 2014 at 04:29:17PM +0100, Thierry Reding wrote:
+> From: Thierry Reding <treding@nvidia.com>
+> 
+> This commit introduces a generic device tree binding for IOMMU devices.
+> Only a very minimal subset is described here, but it is enough to cover
+> the requirements of both the Exynos System MMU and Tegra SMMU as
+> discussed here:
+> 
+>     https://lkml.org/lkml/2014/4/27/346
+> 
+> Signed-off-by: Thierry Reding <treding@nvidia.com>
 > ---
->  arch/arm64/kvm/hyp-init.S |    4 ++++
->  1 file changed, 4 insertions(+)
->
-> diff --git a/arch/arm64/kvm/hyp-init.S b/arch/arm64/kvm/hyp-init.S
-> index d968796..c319116 100644
-> --- a/arch/arm64/kvm/hyp-init.S
-> +++ b/arch/arm64/kvm/hyp-init.S
-> @@ -80,6 +80,10 @@ __do_hyp_init:
->  	msr	mair_el2, x4
->  	isb
->  
-> +	/* Invalidate the stale TLBs from Bootloader */
-> +	tlbi	alle2
-> +	dsb	sy
-> +
->  	mrs	x4, sctlr_el2
->  	and	x4, x4, #SCTLR_EL2_EE	// preserve endianness of EL2
->  	ldr	x5, =SCTLR_EL2_FLAGS
+> Changes in v4:
+> - clarify that disabling an IOMMU DT node may not disable translation
+> - be more explicit that examples are only examples
+> - add multi-ID master example
+> 
+> Changes in v3:
+> - use #iommu-cells instead of #address-cells/#size-cells
+> - drop optional iommu-names property
+> 
+> Changes in v2:
+> - add notes about "dma-ranges" property (drop note from commit message)
+> - document priorities of "iommus" property vs. "dma-ranges" property
+> - drop #iommu-cells in favour of #address-cells and #size-cells
+> - remove multiple-master device example
+> 
+>  Documentation/devicetree/bindings/iommu/iommu.txt | 172 ++++++++++++++++++++++
+>  1 file changed, 172 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/iommu/iommu.txt
 
-This looks like a valid fix. But I wonder if it wouldn't be better
-located in kernel/head.S::el2_setup?
+I'm concerned that this patch hasn't been picked up for 3.17 (I can't see it
+in -next). If we want to move the ARM SMMU driver over to this new binding,
+we can't keep dragging our feet for much longer as I *really* don't plan to
+support two bindings in parallel (one is complicated enough already).
 
-Also, the 32bit code seems to suffer from the same issue. Care to fix it
-as well?
+Any chance we can see this merged, please?
 
-Thanks,
-
-	M.
--- 
-Jazz is not dead. It just smells funny.
+Will
