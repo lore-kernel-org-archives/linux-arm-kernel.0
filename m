@@ -1,32 +1,93 @@
 From: christoffer.dall@linaro.org (Christoffer Dall)
-Date: Wed, 30 Jul 2014 14:55:40 +0200
-Subject: [GIT PULL] KVM/ARM Urgent fix for 3.16
-Message-ID: <1406724941-4283-1-git-send-email-christoffer.dall@linaro.org>
+Date: Wed, 30 Jul 2014 14:55:41 +0200
+Subject: [PATCH] kvm: arm64: vgic: fix hyp panic with 64k pages on juno
+ platform
+In-Reply-To: <1406724941-4283-1-git-send-email-christoffer.dall@linaro.org>
+References: <1406724941-4283-1-git-send-email-christoffer.dall@linaro.org>
+Message-ID: <1406724941-4283-2-git-send-email-christoffer.dall@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Paolo and Gleb,
+From: Will Deacon <will.deacon@arm.com>
 
-Is there any chance you can get this urgent fix (which allows KVM guest
-to bring down the entire system on some 64K enabled ARM64 hosts) merged
-for 3.16?
+If the physical address of GICV isn't page-aligned, then we end up
+creating a stage-2 mapping of the page containing it, which causes us to
+map neighbouring memory locations directly into the guest.
 
-The following changes since commit bb18b526a9d8d4a3fe56f234d5013b9f6036978d:
+As an example, consider a platform with GICV at physical 0x2c02f000
+running a 64k-page host kernel. If qemu maps this into the guest at
+0x80010000, then guest physical addresses 0x80010000 - 0x8001efff will
+map host physical region 0x2c020000 - 0x2c02efff. Accesses to these
+physical regions may cause UNPREDICTABLE behaviour, for example, on the
+Juno platform this will cause an SError exception to EL3, which brings
+down the entire physical CPU resulting in RCU stalls / HYP panics / host
+crashing / wasted weeks of debugging.
 
-  Merge tag 'signed-for-3.16' of git://github.com/agraf/linux-2.6 into kvm-master (2014-07-08 12:08:58 +0200)
+SBSA recommends that systems alias the 4k GICV across the bounding 64k
+region, in which case GICV physical could be described as 0x2c020000 in
+the above scenario.
 
-are available in the git repository at:
+This patch fixes the problem by failing the vgic probe if the physical
+base address or the size of GICV aren't page-aligned. Note that this
+generated a warning in dmesg about freeing enabled IRQs, so I had to
+move the IRQ enabling later in the probe.
 
-
-  git://git.kernel.org/pub/scm/linux/kernel/git/kvmarm/kvmarm.git tags/kvm-arm-for-3.16-rc7
-
-for you to fetch changes up to 63afbe7a0ac184ef8485dac4914e87b211b5bfaa:
-
-  kvm: arm64: vgic: fix hyp panic with 64k pages on juno platform (2014-07-30 14:35:42 +0200)
-
+Cc: Christoffer Dall <christoffer.dall@linaro.org>
+Cc: Marc Zyngier <marc.zyngier@arm.com>
+Cc: Gleb Natapov <gleb@kernel.org>
+Cc: Paolo Bonzini <pbonzini@redhat.com>
+Cc: Joel Schopp <joel.schopp@amd.com>
+Cc: Don Dutile <ddutile@redhat.com>
+Acked-by: Peter Maydell <peter.maydell@linaro.org>
+Acked-by: Joel Schopp <joel.schopp@amd.com>
+Acked-by: Marc Zyngier <marc.zyngier@arm.com>
+Signed-off-by: Will Deacon <will.deacon@arm.com>
+Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
 ---
-Will Deacon (1):
-  kvm: arm64: vgic: fix hyp panic with 64k pages on juno platform
-
  virt/kvm/arm/vgic.c | 24 ++++++++++++++++++++----
  1 file changed, 20 insertions(+), 4 deletions(-)
+
+diff --git a/virt/kvm/arm/vgic.c b/virt/kvm/arm/vgic.c
+index 56ff9be..476d3bf 100644
+--- a/virt/kvm/arm/vgic.c
++++ b/virt/kvm/arm/vgic.c
+@@ -1526,17 +1526,33 @@ int kvm_vgic_hyp_init(void)
+ 		goto out_unmap;
+ 	}
+ 
+-	kvm_info("%s@%llx IRQ%d\n", vgic_node->name,
+-		 vctrl_res.start, vgic_maint_irq);
+-	on_each_cpu(vgic_init_maintenance_interrupt, NULL, 1);
+-
+ 	if (of_address_to_resource(vgic_node, 3, &vcpu_res)) {
+ 		kvm_err("Cannot obtain VCPU resource\n");
+ 		ret = -ENXIO;
+ 		goto out_unmap;
+ 	}
++
++	if (!PAGE_ALIGNED(vcpu_res.start)) {
++		kvm_err("GICV physical address 0x%llx not page aligned\n",
++			(unsigned long long)vcpu_res.start);
++		ret = -ENXIO;
++		goto out_unmap;
++	}
++
++	if (!PAGE_ALIGNED(resource_size(&vcpu_res))) {
++		kvm_err("GICV size 0x%llx not a multiple of page size 0x%lx\n",
++			(unsigned long long)resource_size(&vcpu_res),
++			PAGE_SIZE);
++		ret = -ENXIO;
++		goto out_unmap;
++	}
++
+ 	vgic_vcpu_base = vcpu_res.start;
+ 
++	kvm_info("%s@%llx IRQ%d\n", vgic_node->name,
++		 vctrl_res.start, vgic_maint_irq);
++	on_each_cpu(vgic_init_maintenance_interrupt, NULL, 1);
++
+ 	goto out;
+ 
+ out_unmap:
+-- 
+2.0.0
