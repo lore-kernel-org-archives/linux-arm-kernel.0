@@ -1,53 +1,82 @@
-From: rric@kernel.org (Robert Richter)
-Date: Wed, 30 Jul 2014 17:06:32 +0200
-Subject: [PATCH 3/5] arm64,
- thunder: document devicetree bindings for Cavium Thunder SoC
-In-Reply-To: <1406732794-20920-1-git-send-email-rric@kernel.org>
-References: <1406732794-20920-1-git-send-email-rric@kernel.org>
-Message-ID: <1406732794-20920-4-git-send-email-rric@kernel.org>
+From: dianders@chromium.org (Doug Anderson)
+Date: Wed, 30 Jul 2014 08:13:52 -0700
+Subject: [PATCH 1/3] ARM: dts: Turn on USB host vbus on rk3288-evb
+In-Reply-To: <1836225.xQCoI7eRWl@diego>
+References: <1406676273-20701-1-git-send-email-dianders@chromium.org>
+ <1406676273-20701-2-git-send-email-dianders@chromium.org>
+ <1836225.xQCoI7eRWl@diego>
+Message-ID: <CAD=FV=Wm-cB3-xHQdOUAXyX2xeYrXxPN6wYZrAoC6WAQ9sQ_Bg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Radha Mohan Chintakuntla <rchintakuntla@cavium.com>
+Heiko,
 
-This patch adds documentation for the devicetree bindings used by the
-DT files of Cavium Thunder SoC platforms.
+On Wed, Jul 30, 2014 at 4:24 AM, Heiko St?bner <heiko@sntech.de> wrote:
+> Am Dienstag, 29. Juli 2014, 16:24:31 schrieb Doug Anderson:
+>> There is no phy driver that works on the Rockchip board for either USB
+>> host port yet.  For now just hardcode the vbus signal to be on all the
+>> time which makes both the dwc2 host and the EHCI port work.
+>>
+>> Signed-off-by: Doug Anderson <dianders@chromium.org>
+>> ---
+>>  arch/arm/boot/dts/rk3288-evb.dtsi | 18 ++++++++++++++++++
+>>  1 file changed, 18 insertions(+)
+>>
+>> diff --git a/arch/arm/boot/dts/rk3288-evb.dtsi
+>> b/arch/arm/boot/dts/rk3288-evb.dtsi index 749e20d..efd625e 100644
+>> --- a/arch/arm/boot/dts/rk3288-evb.dtsi
+>> +++ b/arch/arm/boot/dts/rk3288-evb.dtsi
+>> @@ -35,6 +35,18 @@
+>>                       debounce-interval = <100>;
+>>               };
+>>       };
+>> +
+>> +     /* This turns on vbus for both host0 (ehci) and host1 (dwc2) */
+>> +     usb_host_vbus_regulator: usb-host-vbus-regulator {
+>> +             compatible = "regulator-fixed";
+>> +             enable-active-high;
+>> +             gpio = <&gpio0 14 GPIO_ACTIVE_HIGH>;
+>> +             pinctrl-names = "default";
+>> +             pinctrl-0 = <&usb_host_vbus>;
+>> +             regulator-name = "usb-host-vbus";
+>> +             regulator-always-on;
+>> +             regulator-boot-on;
+>> +     };
+>>  };
+>
+> It seems I have a slightly outdated schematics pdf for the evb ... and only
+> see the OTG vbus pin, on <&gpio0 12>, but am missing the whole host vbus.
 
-Signed-off-by: Radha Mohan Chintakuntla <rchintakuntla@cavium.com>
-Signed-off-by: Robert Richter <rrichter@cavium.com>
----
- Documentation/devicetree/bindings/arm/cavium-thunder.txt | 10 ++++++++++
- Documentation/devicetree/bindings/arm/cpus.txt           |  1 +
- 2 files changed, 11 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/arm/cavium-thunder.txt
+I have schematics that claim to be from January 25, 2014 and claim to
+be rev 1.0.  On my schematics:
 
-diff --git a/Documentation/devicetree/bindings/arm/cavium-thunder.txt b/Documentation/devicetree/bindings/arm/cavium-thunder.txt
-new file mode 100644
-index 000000000000..6f63a5866902
---- /dev/null
-+++ b/Documentation/devicetree/bindings/arm/cavium-thunder.txt
-@@ -0,0 +1,10 @@
-+Cavium Thunder platform device tree bindings
-+--------------------------------------------
-+
-+Boards with Cavium's Thunder SoC shall have following properties.
-+
-+Root Node
-+---------
-+Required root node properties:
-+
-+  - compatible = "cavium,thunder-88xx";
-diff --git a/Documentation/devicetree/bindings/arm/cpus.txt b/Documentation/devicetree/bindings/arm/cpus.txt
-index 1fe72a0778cd..922e4970309d 100644
---- a/Documentation/devicetree/bindings/arm/cpus.txt
-+++ b/Documentation/devicetree/bindings/arm/cpus.txt
-@@ -163,6 +163,7 @@ nodes to be present and contain the properties described below.
- 			    "arm,cortex-r4"
- 			    "arm,cortex-r5"
- 			    "arm,cortex-r7"
-+			    "cavium,thunder"
- 			    "faraday,fa526"
- 			    "intel,sa110"
- 			    "intel,sa1100"
--- 
-2.0.1
+* GPIO0_B4 (12) = OTG_VBUS_DRV = pin 233 of the mainboard connector
+* GPIO0_B6 (14) = HOST_VBUS_DRV = pin 239 of the mainboard connector
+
+On the mainboard schematics I have the OTG signal (233) doesn't
+actually go to the OTG port.  It goes to a debug header and nowhere
+else.  The HOST VBUS controls VBUS on both of the two "host" ports.
+
+
+> Could you think about finding another name for the handle? For example, in my
+> incomplete evb-schematics the supply coming from the otg regulator is called
+> vcc50_usb and there should be something similar for the host supply, so I'd
+> like something like
+>
+>         vcc50_usbhost: usb-host-vbus-regulator { /* or whatever it gets called */
+>         ...
+>         };
+>
+> simply to keep with the supply names defined in the schematics - makes reading
+> easier.
+
+I did!  ;)  ...but I matched my schematics, not yours.  Can you
+provide the date / version number from your schematics and we can see
+which is newer?  Just for reference I was emailed schematics last week
+but that doesn't necessarily guarantee that they're the newest ones.
+
+
+Given the above, I'm not planning to spin this patch unless you
+confirm you want me to.  Thanks!  :)
+
+-Doug
