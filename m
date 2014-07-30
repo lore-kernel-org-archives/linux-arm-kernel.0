@@ -1,25 +1,23 @@
 From: olof@lixom.net (Olof Johansson)
-Date: Wed, 30 Jul 2014 12:49:11 -0700
-Subject: [PATCH 0/2] ARM: tegra: a couple of late DT patches
-In-Reply-To: <1406313603-11893-1-git-send-email-swarren@wwwdotorg.org>
-References: <1406313603-11893-1-git-send-email-swarren@wwwdotorg.org>
-Message-ID: <20140730194911.GE18384@quad.lixom.net>
+Date: Wed, 30 Jul 2014 12:52:42 -0700
+Subject: [PATCH] ARM: multi_v7_defconfig: Enable TI PIPE3 PHY driver
+In-Reply-To: <1406625328-26112-1-git-send-email-rogerq@ti.com>
+References: <1406540737-9493-1-git-send-email-rogerq@ti.com>
+ <1406625328-26112-1-git-send-email-rogerq@ti.com>
+Message-ID: <20140730195242.GF18384@quad.lixom.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jul 25, 2014 at 12:40:01PM -0600, Stephen Warren wrote:
-> From: Stephen Warren <swarren@nvidia.com>
+On Tue, Jul 29, 2014 at 12:15:28PM +0300, Roger Quadros wrote:
+> This driver is needed by SATA, PCIe and USB modules on TI SoCs.
 > 
-> Here are a couple of fixe/cleanup patches to Tegra DT files that came in
-> late. They're based on top of Tegra's for-3.17/dt branch/pull-request.
-> 
-> Marcel Ziswiler (1):
->   ARM: tegra: apalis t30: fix device tree compatible node
-> 
-> Thierry Reding (1):
->   ARM: tegra: paz00: Fix some indentation inconsistencies
+> Signed-off-by: Roger Quadros <rogerq@ti.com>
+> Acked-by: Tony Lindgren <tony@atomide.com>
 
-Both applied to next/dt. Thanks.
+What's this based on? It doesn't apply on top of next/defconfig. Please
+base it on there and resend. (or linux-next or our for-next branch, which
+should be all the same).
 
+Thanks,
 
 -Olof
