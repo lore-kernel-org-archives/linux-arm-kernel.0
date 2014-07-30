@@ -1,74 +1,47 @@
-From: Paul.Zimmerman@synopsys.com (Paul Zimmerman)
-Date: Wed, 30 Jul 2014 19:05:51 +0000
-Subject: [PATCH 4/4] usb: dwc2: add dr_mode support for dwc2
-In-Reply-To: <1406684129-18352-1-git-send-email-kever.yang@rock-chips.com>
-References: <1406683873-18194-1-git-send-email-kever.yang@rock-chips.com>
- <1406684129-18352-1-git-send-email-kever.yang@rock-chips.com>
-Message-ID: <A2CA0424C0A6F04399FB9E1CD98E0304844C2FA3@US01WEMBX2.internal.synopsys.com>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Wed, 30 Jul 2014 21:17:02 +0200
+Subject: [PATCH v2 1/3] arm64: spin-table: handle unmapped
+ cpu-release-addrs
+In-Reply-To: <20140730113013.GL12239@arm.com>
+References: <1406717944-24725-1-git-send-email-ard.biesheuvel@linaro.org>
+ <1406717944-24725-2-git-send-email-ard.biesheuvel@linaro.org>
+ <20140730113013.GL12239@arm.com>
+Message-ID: <CAKv+Gu8ne8k2NV12SyWye5aYJKHG0wHKAO+=V=1L89_hvyGopw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> From: Kever Yang [mailto:kever.yang at rock-chips.com]
-> Sent: Tuesday, July 29, 2014 6:35 PM
-> 
-> Some devices with A female host port and without use of usb_id pin
-> will need this for the otg controller works as device role
-> during firmware period and works as host role in rich os.
-> 
-> Signed-off-by: Kever Yang <kever.yang@rock-chips.com>
-> ---
->  drivers/usb/dwc2/core.c     |   13 +++++++++++++
->  drivers/usb/dwc2/core.h     |    2 ++
->  drivers/usb/dwc2/platform.c |    4 ++++
->  3 files changed, 19 insertions(+)
-> 
-> diff --git a/drivers/usb/dwc2/core.c b/drivers/usb/dwc2/core.c
-> index 27d2c9b..6688951 100644
-> --- a/drivers/usb/dwc2/core.c
-> +++ b/drivers/usb/dwc2/core.c
-> @@ -118,6 +118,7 @@ static int dwc2_core_reset(struct dwc2_hsotg *hsotg)
->  {
->  	u32 greset;
->  	int count = 0;
-> +	u32 gusbcfg;
-> 
->  	dev_vdbg(hsotg->dev, "%s()\n", __func__);
-> 
-> @@ -148,6 +149,18 @@ static int dwc2_core_reset(struct dwc2_hsotg *hsotg)
->  		}
->  	} while (greset & GRSTCTL_CSFTRST);
-> 
-> +	if (hsotg->dr_mode == USB_DR_MODE_HOST) {
-> +		gusbcfg = readl(hsotg->regs+GUSBCFG);
-> +		gusbcfg &= ~GUSBCFG_FORCEDEVMODE;
-> +		gusbcfg |= GUSBCFG_FORCEHOSTMODE;
-> +		writel(gusbcfg, hsotg->regs+GUSBCFG);
-> +	} else if (hsotg->dr_mode == USB_DR_MODE_PERIPHERAL) {
-> +		gusbcfg = readl(hsotg->regs+GUSBCFG);
-> +		gusbcfg &= ~GUSBCFG_FORCEHOSTMODE;
-> +		gusbcfg |= GUSBCFG_FORCEDEVMODE;
-> +		writel(gusbcfg, hsotg->regs+GUSBCFG);
-> +	}
+]On 30 July 2014 13:30, Will Deacon <will.deacon@arm.com> wrote:
+> On Wed, Jul 30, 2014 at 11:59:02AM +0100, Ard Biesheuvel wrote:
+>> From: Mark Rutland <mark.rutland@arm.com>
+>>
+>> In certain cases the cpu-release-addr of a CPU may not fall in the
+>> linear mapping (e.g. when the kernel is loaded above this address due to
+>> the presence of other images in memory). This is problematic for the
+>> spin-table code as it assumes that it can trivially convert a
+>> cpu-release-addr to a valid VA in the linear map.
+>>
+>> This patch modifies the spin-table code to use a temporary cached
+>> mapping to write to a given cpu-release-addr, enabling us to support
+>> addresses regardless of whether they are covered by the linear mapping.
+>>
+>> Signed-off-by: Mark Rutland <mark.rutland@arm.com>
+>> Tested-by: Mark Salter <msalter@redhat.com>
+>> [ardb: added (__force void *) cast]
+>> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+>> ---
+>>  arch/arm64/kernel/smp_spin_table.c | 22 +++++++++++++++++-----
+>>  1 file changed, 17 insertions(+), 5 deletions(-)
+>
+> I'm nervous about this. What if the spin table sits in the same physical 64k
+> frame as a read-sensitive device and we're running with 64k pages?
+>
 
-Please put spaces around the '+' operator. Did you run these patches
-through checkpatch?
-
-> +
->  	/*
->  	 * NOTE: This long sleep is _very_ important, otherwise the core will
->  	 * not stay in host mode after a connector ID change!
-> diff --git a/drivers/usb/dwc2/core.h b/drivers/usb/dwc2/core.h
-> index 1efd10c..9fe960b 100644
-> --- a/drivers/usb/dwc2/core.h
-> +++ b/drivers/usb/dwc2/core.h
-> @@ -501,6 +501,7 @@ struct dwc2_hw_params {
->   *                      a_peripheral and b_device=>b_host) this may not match
->   *                      the core, but allows the software to determine
->   *                      transitions
-> + * @dr_mode:            requested mode of operation
-
-Please expand this comment, e.g.
-"Requested mode of operation (host/peripheral/dual-role)"
+Actually, booting.txt requires cpu-release-addr to point to a
+/memreserve/d part of memory, which implies DRAM (or you wouldn't have
+to memreserve it)
+That means it should always be covered by the linear mapping, unless
+it is located before Image in DRAM, which is the case addressed by
+this patch.
 
 -- 
-Paul
+Ard.
