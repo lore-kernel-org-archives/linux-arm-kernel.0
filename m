@@ -1,66 +1,107 @@
-From: sassmann@kpanic.de (Stefan Assmann)
-Date: Thu, 31 Jul 2014 14:04:29 +0200
-Subject: [PATCH 2/2] clk: initial clock driver for TWL6030
-In-Reply-To: <20140731110531.GH17528@sirena.org.uk>
-References: <1406728949-7560-1-git-send-email-sassmann@kpanic.de>
- <1406728949-7560-3-git-send-email-sassmann@kpanic.de>
- <20140730175033.GA17528@sirena.org.uk> <53DA12BF.1060008@kpanic.de>
- <20140731110531.GH17528@sirena.org.uk>
-Message-ID: <53DA30CD.5020903@kpanic.de>
+From: vinod.koul@intel.com (Vinod Koul)
+Date: Thu, 31 Jul 2014 17:26:28 +0530
+Subject: [PATCH] Documentation: dmaengine: Add a documentation for the
+ dma controller API
+In-Reply-To: <20140731074440.GY3952@lukather>
+References: <1406736193-26685-1-git-send-email-maxime.ripard@free-electrons.com>
+ <20140730160607.GM8181@intel.com> <20140731074440.GY3952@lukather>
+Message-ID: <20140731115628.GQ8181@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 31.07.2014 13:05, Mark Brown wrote:
-> On Thu, Jul 31, 2014 at 11:56:15AM +0200, Stefan Assmann wrote:
->> On 30.07.2014 19:50, Mark Brown wrote:
->>> On Wed, Jul 30, 2014 at 04:02:29PM +0200, Stefan Assmann wrote:
+On Thu, Jul 31, 2014 at 09:44:40AM +0200, Maxime Ripard wrote:
+> Hi Vinod,
 > 
->>>> +static int twl6030_clk32kg_is_prepared(struct clk_hw *hw)
->>>> +{
->>>> +	struct twl6030_desc *desc = to_twl6030_desc(hw);
->>>> +
->>>> +	return desc->enabled;
->>>> +}
+> On Wed, Jul 30, 2014 at 09:36:07PM +0530, Vinod Koul wrote:
+> > On Wed, Jul 30, 2014 at 06:03:13PM +0200, Maxime Ripard wrote:
+> > > The dmaengine is neither trivial nor properly documented at the moment, which
+> > > means a lot of trial and error development, which is not that good for such a
+> > > central piece of the system.
+> > > 
+> > > Attempt at making such a documentation.
+> > 
+> > Did you miss Documentation/dmaengine.txt, lots of this is already covered
+> > there. But yes i would be really glad to know what isnt, so that we can fix
+> > that.
 > 
->>> Why not just check the register map - can't the register be cached?  If
->>> that's not possible a comment would be good.
+> I didn't miss it. But I feel like it describes quite nicely the slave
+> API, but doesn't help at all whenever you're writing a DMAengine driver.
 > 
->> I just took atl_clk_is_enabled() as template. If you say it's better
->> to read the value, that can be arranged.
+> The first lines of the existing document makes it quite clear too.
 > 
-> It might be worth doing this if you have to go to hardware to check the
-> status, if you can read a cache then just using the register is less
-> error prone.
+> There's still a bit of duplication, but I don't feel it's such a big
+> deal.
+And that made me think that you might have missed it.
 
-Ok.
+I am okay for idea to have this document but it needs to co-exist one. No
+point in duplicating as it can create ambiguity in future.
+> 
+> What I'd like to do with the documentation I just sent is basically
+> have a clear idea whenever you step into dmaengine what you can/cannot
+> do, and have a reference document explaining what's expected by the
+> framework, and hopefully have unified drivers that follow this
+> pattern.
+Sure, can you pls modify this to avoid duplication. I would be happy to
+apply that :)
 
 > 
->>>> +	else
->>>> +		clk_prepare(clk);
+> Because, for the moment, we're pretty much left in the dark with
+> different drivers doing the same thing in completetely different ways,
+> with basically no way to tell if it's either the framework that
+> requires such behaviour, or if the author was just feeling creative.
 > 
->>> Why is the clock driver defaulting to enabling the clock, and if it
->>> needs to shouldn't it be doing a prepere_enable() even if the enable
->>> happens not to do anything to the hardware?  Otherwise child clocks
->>> might get confused.
-> 
->> Mike advised me to convert the functions from enable/disable to
->> prepare/unprepare because i2c transactions may sleep. That's what I did.
->> The code no longer enables the clock and just prepares it. So IIUC the
->> call to clk_prepare() should be fine.
-> 
-> That's not going to help consumers of the clock, you do need to move the
-> operations to prepare() but users shouldn't need to know what happens in
-> prepare() and what happens in enable().
-> 
-> You've also not addressed the comment about defaulting to enabling the
-> clock in the first place.
+> There's numerous examples for this at the moment:
+>   - The GFP flags, with different drivers using either GFP_ATOMIC,
+>     GFP_NOWAIT or GFP_KERNEL in the same functions
+>   - Having to set device_slave_caps or not?
+>   - Some drivers use dma_run_depedencies, some other don't
+>   - That might just be my experience, but judging from previous
+>     commits, DMA_PRIVATE is completely obscure, and we just set it
+>     because it was making it work, without knowing what it was
+>     supposed to do.
+>   - etc.
 
-Maybe I misinterpreted your previous comment, sorry. So if I got it right
-this time you're saying that the prepare/enable, disable/unprepare should
-be seen as a single step. If that's the case then using prepare_enable()
-should be used indeed.
+Thanks for highlighting we should definitely add these in Documentation
 
-Tero suggested to look into making this a generic i2c clock driver. I'll
-look into that and report back.
+> 
+> And basically, we have no way to tell at the moment which one is
+> right and which one needs fixing.
+> 
+> The corollary being that it cripples the whole community ability to
+> maintain the framework and make it evolve.
+> 
+> > > +  * device_slave_caps
+> > > +    - Isn't that redundant with the cap_mask already?
+> > > +    - Only a few drivers seem to implement it
+> > For audio to know what your channel can do rather than hardcoding it
+> 
+> Ah, yes, I see it now. It's not related to the caps mask at all.
+> 
+> Just out of curiosity, wouldn't it be better to move this to the
+> framework, and have these informations provided through the struct
+> dma_device? Or would it have some non-trivial side-effects?
+Well the problem is ability to have this queried uniformly from all drivers
+across subsystems. If we can do this that would be nice.
+> 
+> > > +  * dma cookies?
+> > cookie is dma transaction representation which is monotonically incrementing
+> > number.
+> 
+> Ok, and it identifies a unique dma_async_tx_descriptor, right?
+Yup and this basically represents transactions you have submitted. Thats why
+cookie is allocated at tx_submit.
 
-  Stefan
+Thanks
+
+-- 
+~Vinod
+
+
+-- 
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140731/855590af/attachment.sig>
