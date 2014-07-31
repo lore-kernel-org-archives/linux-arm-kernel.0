@@ -1,85 +1,39 @@
 From: tomasz.figa@gmail.com (Tomasz Figa)
-Date: Thu, 31 Jul 2014 23:08:26 +0200
-Subject: [PATCHv2 4/5] clk: samsung: exynos5410: Add fixed rate clocks
-In-Reply-To: <CAEe5pB8wzECi=4Eoa_xZYuw7NRPuRmizBNm5mXYMjYY_hWBy9Q@mail.gmail.com>
-References: <1406805732-17372-1-git-send-email-hsnaves@gmail.com>
- <1406805732-17372-5-git-send-email-hsnaves@gmail.com>
- <53DA2C74.3010101@samsung.com>
- <CAEe5pB8wzECi=4Eoa_xZYuw7NRPuRmizBNm5mXYMjYY_hWBy9Q@mail.gmail.com>
-Message-ID: <53DAB04A.90005@gmail.com>
+Date: Thu, 31 Jul 2014 23:09:58 +0200
+Subject: [PATCH v4 4/4] ARM: dts: Add exynos5250-spring device tree
+In-Reply-To: <53DAA8E6.3010400@suse.de>
+References: <1406822910-6255-1-git-send-email-afaerber@suse.de>
+ <1406822910-6255-5-git-send-email-afaerber@suse.de>
+ <53DA936E.9060004@gmail.com> <53DAA8E6.3010400@suse.de>
+Message-ID: <53DAB0A6.9030700@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Humberto,
 
-On 31.07.2014 23:01, Humberto Naves wrote:
-> Hi,
-> 
-> On Thu, Jul 31, 2014 at 1:45 PM, Sylwester Nawrocki
-> <s.nawrocki@samsung.com> wrote:
->> Can you explain what is rationale behind this change ? Is it related to
->> suspend/resume ordering ?
-> 
-> I had forgotten, but now remember the reason why I did this. If you
-> see the current implementation of clk-exynos5410, you will notice it
-> heavily depends on the clock "fin_pll". On the other hand, this clock
-> exists because in the current dtb (exynos5410-smdk5410.dts), there is
-> a node fin_pll such as
-> 
->        fin_pll: xxti {
->                compatible = "fixed-clock";
->                clock-frequency = <24000000>;
->                clock-output-names = "fin_pll";
->                #clock-cells = <0>;
->        };
-> 
-> So far so good. But the real problem comes in when I check the rate of
-> fin_pll to determine if I should install the rate table or not (and I
-> really need this for my patch). More specifically
-> 
->        if (_get_rate("fin_pll") == 24 * MHZ) {
->                exynos5410_plls[apll].rate_table = apll_24mhz_tbl;
->                exynos5410_plls[cpll].rate_table = cpll_24mhz_tbl;
->                exynos5410_plls[kpll].rate_table = kpll_24mhz_tbl;
->                exynos5410_plls[dpll].rate_table = dpll_24mhz_tbl;
->                exynos5410_plls[epll].rate_table = epll_24mhz_tbl;
->                exynos5410_plls[ipll].rate_table = ipll_24mhz_tbl;
->        }
-> 
-> I *have* to determine if the rate of fin_pll is 24MHz, and this is
-> impossible to do if fin_pll is not available. Moreover, there is no
-> way I can ensure that the fixed clock provider for fin_pll was
-> initialized before mine, so there is chance that _get_rate won't work.
-> The only way I fix that is to set the dependency explicitly in the
-> dtb, by adding the fin_pll clock as required resource.
-> 
->               clock: clock-controller at 10010000 {
->                       compatible = "samsung,exynos5410-clock";
->                       reg = <0x10010000 0x30000>;
->                       #clock-cells = <1>;
->                       /* Add the parent clock */
->                       clocks = <&fin_pll>;
->                       clock-names = "fin_pll";
->               };
 
-This is the correct solution to your problem. The clocks and clock-names
-properties should have been there from the beginning but apparently this
-has been missed in review. Also see below.
-
+On 31.07.2014 22:36, Andreas F?rber wrote:
+> Am 31.07.2014 21:05, schrieb Tomasz Figa:
+>>> +	};
+>>> +
+>>> +	fixed-rate-clocks {
+>>> +		xxti {
+>>> +			compatible = "samsung,clock-xxti";
+>>> +			clock-frequency = <24000000>;
+>>> +		};
+>>> +	};
+>>
+>> This is also referencing a node from higher level, so it should be done
+>> using a reference.
 > 
-> But in any case, the bindings with the DTB must be changed one way or
-> another, because I *really* need to use fin_pll on my driver
-> registration.
+> Actually this one isn't! Neither fixed-rate-clocks nor xxti exists in
+> the .dtsi.
 
-This is a backwards compatible change. On DTBs without clocks and
-clock-names properties the PLL tables simply won't be registered which
-is exactly the same behavior we have now without any tables in the
-driver at all.
+You've got me here. :)
 
-> If you agree with this alternative solution I previously
-> described, I can change that in the next version of the patch series.
-
-Please update the dts instead, in the way you pointed above.
+In new dts I actually suggest to specify those on SoC level, since they
+are generic SoC inputs and just override their frequencies on board
+level, but apparently Exynos5250 doesn't follow this fashion. So this is
+fine as is, sorry for noise.
 
 Best regards,
 Tomasz
