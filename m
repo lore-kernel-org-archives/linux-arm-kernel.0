@@ -1,39 +1,33 @@
-From: tomasz.figa@gmail.com (Tomasz Figa)
-Date: Thu, 31 Jul 2014 16:15:15 +0200
-Subject: [PATCH v9 0/6] cpufreq: use generic cpufreq drivers for exynos
- platforms
-In-Reply-To: <1406707663-16656-1-git-send-email-thomas.ab@samsung.com>
-References: <1406707663-16656-1-git-send-email-thomas.ab@samsung.com>
-Message-ID: <53DA4F73.5040400@gmail.com>
+From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
+Date: Thu, 31 Jul 2014 16:15:29 +0200
+Subject: [PATCH] ARM: mvebu: Add RTC support for Armada 375
+In-Reply-To: <1406814276-11361-1-git-send-email-gregory.clement@free-electrons.com>
+References: <1406814276-11361-1-git-send-email-gregory.clement@free-electrons.com>
+Message-ID: <20140731161529.09c55afb@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Thomas,
+Dear Gregory CLEMENT,
 
-On 30.07.2014 10:07, Thomas Abraham wrote:
-> Changes since v8:
-> - Fixes suggested by Tomasz Figa.
-> 
-> This patch series removes the use of Exynos4210 and Exynos5250 specific cpufreq
-> drivers and enables the use of cpufreq-cpu0 driver for these platforms. This
-> series also enables cpufreq support for Exynos5420 using arm_big_little cpufreq
-> driver.
-> 
-> This patch series is dependent on two other patches
-> 1. ARM: dts: add CPU nodes for Exynos4 SoCs
->    - https://lkml.org/lkml/2014/7/21/315
-> 2. ARM: dts: smdk5250: Specify MAX77686 pmic interrupt
->    - http://www.spinics.net/lists/arm-kernel/msg351134.html
-> 3. clk: exynos4: remove duplicate div_core2 divider clock instantiation
->    - http://www.mail-archive.com/linux-samsung-soc at vger.kernel.org/msg34859.html
+On Thu, 31 Jul 2014 15:44:36 +0200, Gregory CLEMENT wrote:
 
-I think we are at final stage of works on this series. Thanks for your
-cooperation.
+> The Armada 375 XP Socs have the same controller that the one used in
+> the orion platforms. This patch updates the device tree for these
+> SoCs.
 
-After addressing remaining minor comments from this thread, feel free to
-add:
+Actually there's only one Armada 375 SoC, so singular would be good.
+And s/that/than/ as well. And "controller" is a bit vague. Proposal:
 
-Reviewed-by: Tomasz Figa <t.figa@samsung.com>
+"""
+The Armada 375 SoC has the same real time clock as the one used in
+other Marvell EBU platforms. This patch consequently updates the Device
+Tree of the Armada 375 SoC to describe the internal RTC.
+"""
 
-Best regards,
-Tomasz
+Thanks,
+
+Thomas
+-- 
+Thomas Petazzoni, CTO, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
