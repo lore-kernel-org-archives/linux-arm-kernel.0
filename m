@@ -1,46 +1,95 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Thu, 31 Jul 2014 06:11:08 -0700
-Subject: OMAP baseline test results for v3.16-rc4
-In-Reply-To: <alpine.DEB.2.02.1407300725290.4477@utopia.booyaka.com>
-References: <alpine.DEB.2.02.1407251857480.5875@utopia.booyaka.com>
- <20140729064243.GF29045@atomide.com>
- <alpine.DEB.2.02.1407290810160.22957@utopia.booyaka.com>
- <20140729084930.GH29045@atomide.com>
- <alpine.DEB.2.02.1407291225070.13035@utopia.booyaka.com>
- <alpine.DEB.2.02.1407291256270.13035@utopia.booyaka.com>
- <20140729145312.GT29045@atomide.com>
- <alpine.DEB.2.02.1407291922370.13035@utopia.booyaka.com>
- <20140730053940.GX29045@atomide.com>
- <alpine.DEB.2.02.1407300725290.4477@utopia.booyaka.com>
-Message-ID: <20140731131107.GB29045@atomide.com>
+From: hsnaves@gmail.com (Humberto Naves)
+Date: Thu, 31 Jul 2014 15:13:37 +0200
+Subject: [PATCHv2 1/5] clk: samsung: exynos5410: Add NULL pointer checks
+ in clock init
+In-Reply-To: <53DA37EA.7010306@gmail.com>
+References: <1406805732-17372-1-git-send-email-hsnaves@gmail.com>
+ <1406805732-17372-2-git-send-email-hsnaves@gmail.com>
+ <53DA37EA.7010306@gmail.com>
+Message-ID: <CAEe5pB-FnkY8E9qPjy+6R5ausEEx-pO2wupWYZO8Lscb2BAwiw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Paul Walmsley <paul@pwsan.com> [140730 00:55]:
-> On Tue, 29 Jul 2014, Tony Lindgren wrote:
-> 
-> > The following patch should fix the tests above for 3530es3beagle.
-> > Care to test and ack as I don't have one?
-> 
-> 3530es3beagle retention dynamic idle tests hang on next-20140729.  (Maybe 
-> other boards fail too - haven't tested any others).  
+Hi,
 
-I just checked that today's linux next works for off-idle and
-wake-up events for at least 37xx evm.
- 
-> http://www.pwsan.com/omap/testlogs/next_20140729/20140730010841/pm/3530es3beagle/3530es3beagle_log.txt
-> 
-> Adding the patch you sent doesn't change that, but now some extra warning 
-> messages appear ("PRM: I/O chain clock line assertion timed out"):
-> 
-> http://www.pwsan.com/omap/testlogs/next_20140729_beagle_pm/20140730004856/pm/3530es3beagle/3530es3beagle_log.txt
+I am bit confused by your response: first you mentioned that I should
+remove the NULL check for variable np, but later on you suggested that
+I should rearrange the conditional statement to avoid adding more
+indentation. My guess is that I should remove that if statement
+altogether?
 
-Weird it should just work. I don't know why the "PRM: I/O chain
-clock line assertion timed out" happens for you, I have not seen
-that. So far I've tested it on n900, beagle xm and 37xx-evm. None
-of those are 3530 though, but it should behave the same way as
-on n900.
+Regarding the ctx variable, should I still remove the NULL check? As
+you said, in the near future samsung_clk_init() won't panic anymore,
+and keeping the check in place won't hurt anybody.
 
-Regards,
+Best,
+Humberto
 
-Tony
+On Thu, Jul 31, 2014 at 2:34 PM, Tomasz Figa <tomasz.figa@gmail.com> wrote:
+> Hi Humberto,
+>
+> Please see my comments inline.
+>
+> On 31.07.2014 13:22, Humberto Silva Naves wrote:
+>> Added NULL pointer checks for device_node input parameter and
+>> for the samsung_clk_provider context returned by samsung_clk_init.
+>> Even though the *current* samsung_clk_init function never returns
+>> a NULL pointer, it is good to keep this check in place to avoid
+>> possible problems in the future due to changes in implementation.
+>> That way, we also improve the consistency of the code that performs
+>> clock initialization across the different SoCs.
+>>
+>> Signed-off-by: Humberto Silva Naves <hsnaves@gmail.com>
+>> ---
+>>  drivers/clk/samsung/clk-exynos5410.c |   12 +++++++++---
+>>  1 file changed, 9 insertions(+), 3 deletions(-)
+>>
+>> diff --git a/drivers/clk/samsung/clk-exynos5410.c b/drivers/clk/samsung/clk-exynos5410.c
+>> index 231475b..bf57c80 100644
+>> --- a/drivers/clk/samsung/clk-exynos5410.c
+>> +++ b/drivers/clk/samsung/clk-exynos5410.c
+>> @@ -188,11 +188,17 @@ static void __init exynos5410_clk_init(struct device_node *np)
+>>       struct samsung_clk_provider *ctx;
+>>       void __iomem *reg_base;
+>>
+>> -     reg_base = of_iomap(np, 0);
+>> -     if (!reg_base)
+>> -             panic("%s: failed to map registers\n", __func__);
+>> +     if (np) {
+>
+> Since all Exynos-based boards are always booted using DT, this function
+> will never be called if there is no node for the clock controller and so
+> there is no way this pointer can end up being NULL. I don't see a point
+> in complicating this code with useless checks.
+>
+>> +             reg_base = of_iomap(np, 0);
+>> +             if (!reg_base)
+>> +                     panic("%s: failed to map registers\n", __func__);
+>> +     } else {
+>> +             panic("%s: unable to determine soc\n", __func__);
+>> +     }
+>
+> As a side note, since panic() does not return, the code above could be
+> changed to follow rest of checks in this function:
+>
+>         if (!np)
+>                 panic("%s: unable to determine soc\n", __func__);
+>
+>         reg_base = of_iomap(np, 0);
+>         ...
+>
+> leading to more readable code with less indentation and less changes to
+> existing code.
+>
+>>
+>>       ctx = samsung_clk_init(np, reg_base, CLK_NR_CLKS);
+>> +     if (!ctx)
+>> +             panic("%s: unable to allocate context.\n", __func__);
+>
+> samsung_clk_init() already panics on any error, although now as I think
+> of it, it probably should be changed with a patch to just error out and
+> let the caller handle the error. However callers don't need to be
+> changed before this is done.
+>
+> Best regards,
+> Tomasz
