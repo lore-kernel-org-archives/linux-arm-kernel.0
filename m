@@ -1,92 +1,56 @@
-From: ta.omasab@gmail.com (Thomas Abraham)
-Date: Fri, 1 Aug 2014 00:19:36 +0530
-Subject: [PATCH v9 6/6] clk: samsung: remove unused clock aliases and
- update clock flags
-In-Reply-To: <53DA8F1B.3010907@gmail.com>
-References: <1406707663-16656-1-git-send-email-thomas.ab@samsung.com>
- <1406707663-16656-7-git-send-email-thomas.ab@samsung.com>
- <53DA4F1A.5040604@gmail.com>
- <CAJuA9ahCVnG8st0t_U+Nw9+eHV3fh57EjUeJw=LxCA0QzSm=AA@mail.gmail.com>
- <53DA8C70.2060009@gmail.com>
- <CAJuA9ah3PbGrMFqrahFUKCD+6ROnQ-7qyJN3cRawXAMHX7Jgrg@mail.gmail.com>
- <53DA8F1B.3010907@gmail.com>
-Message-ID: <CAJuA9aj9S_hSKHueBbr0kQk0fZLuAcoptmv1a-6tH1i5oFOJZA@mail.gmail.com>
+From: kgene.kim@samsung.com (Kukjin Kim)
+Date: Fri, 01 Aug 2014 04:00:31 +0900
+Subject: [GIT PULL] Samsung 2nd cleanup for v3.17
+Message-ID: <53DA924F.40201@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Aug 1, 2014 at 12:16 AM, Tomasz Figa <tomasz.figa@gmail.com> wrote:
-> On 31.07.2014 20:41, Thomas Abraham wrote:
->> On Fri, Aug 1, 2014 at 12:05 AM, Tomasz Figa <tomasz.figa@gmail.com> wrote:
->>> On 31.07.2014 20:24, Thomas Abraham wrote:
->>>> Hi Tomasz,
->>>>
->>>> On Thu, Jul 31, 2014 at 7:43 PM, Tomasz Figa <tomasz.figa@gmail.com> wrote:
->>>>> On 30.07.2014 10:07, Thomas Abraham wrote:
->>>>>> With some of the Exynos SoCs switched over to use the generic CPUfreq drivers,
->>>>>> the unused clock aliases can be removed. In addition to this, the individual
->>>>>> clock blocks which are now encapsulated with the consolidate CPU clock type
->>>>>> can now be marked with read-only flags.
->>>>>
->>>>> [snip]
->>>>>
->>>>>> @@ -1500,6 +1499,7 @@ static void __init exynos4_clk_init(struct device_node *np,
->>>>>>               exynos4_soc == EXYNOS4210 ? "Exynos4210" : "Exynos4x12",
->>>>>>               _get_rate("sclk_apll"), _get_rate("sclk_mpll"),
->>>>>>               _get_rate("sclk_epll"), _get_rate("sclk_vpll"),
->>>>>> +             exynos4_soc == EXYNOS4210 ? _get_rate("armclk") :
->>>>>>               _get_rate("div_core2"));
->>>>>
->>>>> I believe "div_core2" should work fine here for all SoCs without the
->>>>> need for this if.
->>>>
->>>> The following patch is a pre-requisite for this patch.
->>>> http://www.spinics.net/lists/arm-kernel/msg351540.html
->>>>
->>>> The rate can be obtained from div_core2 as well but with the cpu clock
->>>> now registered, the rate can be obtained from the cpu clock instance
->>>> instead of the div_core2 divider. And when Exynos4412 also add cpu
->>>> clock instance, the 'if' above will be removed.
->>>>
->>>>>
->>>>>>  }
->>>>>>
->>>>>> diff --git a/drivers/clk/samsung/clk-exynos5250.c b/drivers/clk/samsung/clk-exynos5250.c
->>>>>> index e19e365..1d958f1 100644
->>>>>> --- a/drivers/clk/samsung/clk-exynos5250.c
->>>>>> +++ b/drivers/clk/samsung/clk-exynos5250.c
->>>>>
->>>>> [snip]
->>>>>
->>>>>> @@ -848,6 +851,6 @@ static void __init exynos5250_clk_init(struct device_node *np)
->>>>>>       samsung_clk_of_add_provider(np, ctx);
->>>>>>
->>>>>>       pr_info("Exynos5250: clock setup completed, armclk=%ld\n",
->>>>>> -                     _get_rate("div_arm2"));
->>>>>> +                     _get_rate("armclk"));
->>>>>
->>>>> Similarly here, no need for this change.
->>>>
->>>> Same here. Instead of getting the rate from div_core2 divider block,
->>>> the cpu clock instance is used to find the rate. I would prefer to use
->>>> cpu clock here. Is there any reason to prefer div_core2 over the cpu
->>>> clock instance?
->>>
->>> Well, the reason is simple: if you don't need to change something (i.e.
->>> the change doesn't have any advantages), don't change it.
->>
->> The advantage with using cpu clock would be that get_rate can obtain
->> the cached rate whereas when reading div_core2 rate, the clock tree
->> will have to be traversed to determine the rate.
->>
->
-> This is just one time printk at initialization, so still no real
-> benefits. :)
->
-> Well anyway, if you really don't want to undo this change, then I guess
-> I can live with it.
+Hi Arnd, Olof
 
-Thanks Tomasz. Probably, I would just use cpu clock for now.
+One more pull-request. Sorry.
 
->
-> Best regards,
-> Tomasz
+Thanks,
+Kukjin
+
+The following changes since commit f1ff47454bb2fe0d5644f981679d1bea532816fd:
+
+   clk: samsung: s5pv210: Remove legacy board support (2014-07-19 
+04:32:19 +0900)
+
+are available in the git repository at:
+
+   git://git.kernel.org/pub/scm/linux/kernel/git/kgene/linux-samsung.git 
+tags/samsung-cleanup-2
+
+for you to fetch changes up to 3f47c65f86e7f85871432f7e2f6b3698f7c86021:
+
+   ARM: S5PV210: move <mach/regs-clock.h> into mach-s5pv210/ (2014-08-01 
+03:22:04 +0900)
+
+----------------------------------------------------------------
+Samsung 2nd cleanup for v3.17
+
+- since <mach/memory.h> in mach-exynos is not included
+   long time so can remove it
+
+- move <mach/regs-clock.h> into mach-s5pv210 and now
+   no more header files in mach-s5pv210/include/mach
+
+Note move <mach/regs-clock.h> in mach-s5pv210 depends on
+previous tags/s5pv210-dt which supports s5pv210 DT.
+
+----------------------------------------------------------------
+Kukjin Kim (1):
+       ARM: S5PV210: move <mach/regs-clock.h> into mach-s5pv210/
+
+Uwe Kleine-Koenig (1):
+       ARM: EXYNOS: remove unused <mach/memory.h>
+
+  arch/arm/mach-exynos/include/mach/memory.h         | 26 
+----------------------
+  arch/arm/mach-s5pv210/pm.c                         |  3 +--
+  .../mach-s5pv210/{include/mach => }/regs-clock.h   |  3 +--
+  arch/arm/mach-s5pv210/s5pv210.c                    |  2 +-
+  4 files changed, 3 insertions(+), 31 deletions(-)
+  delete mode 100644 arch/arm/mach-exynos/include/mach/memory.h
+  rename arch/arm/mach-s5pv210/{include/mach => }/regs-clock.h (99%)
