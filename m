@@ -1,63 +1,55 @@
-From: pranavkumar@linaro.org (Pranavkumar Sawargaonkar)
-Date: Thu, 31 Jul 2014 12:23:23 +0530
-Subject: [PATCH V2] ARM/ARM64: KVM: Nuke Hyp-mode tlbs before enabling MMU
-Message-ID: <1406789604-10533-1-git-send-email-pranavkumar@linaro.org>
+From: olof@lixom.net (Olof Johansson)
+Date: Wed, 30 Jul 2014 23:54:26 -0700
+Subject: [PATCH 10/19] ARM64 / ACPI: Get the enable method for SMP
+ initialization in ACPI way
+In-Reply-To: <1406206825-15590-11-git-send-email-hanjun.guo@linaro.org>
+References: <1406206825-15590-1-git-send-email-hanjun.guo@linaro.org>
+ <1406206825-15590-11-git-send-email-hanjun.guo@linaro.org>
+Message-ID: <20140731065426.GA876@quad.lixom.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-X-Gene u-boot runs in EL2 mode with MMU enabled hence we might
-have stale EL2 tlb enteris when we enable EL2 MMU on each host CPU.
+Hi,
 
-This can happen on any ARM/ARM64 board running bootloader in
-Hyp-mode (or EL2-mode) with MMU enabled.
+On Thu, Jul 24, 2014 at 09:00:16PM +0800, Hanjun Guo wrote:
+> +/*
+> + * In ACPI mode, the cpu possible map was enumerated before SMP
+> + * initialization when MADT table was parsed, so we can get the
+> + * possible map here to initialize CPUs.
+> + */
 
-This patch ensures that we flush all Hyp-mode (or EL2-mode) TLBs
-on each host CPU before enabling Hyp-mode (or EL2-mode) MMU.
+The DT smp init will warn if the kernel has been build with too low NR_CPUS.
+Does the ACPI core already warn, or did that go missing with this separate code
+path?
 
-Changelog:
+> +static void __init acpi_smp_init_cpus(void)
+> +{
+> +	int cpu;
+> +
+> +	for_each_possible_cpu(cpu) {
+> +		if (cpu_acpi_read_ops(cpu) != 0)
+> +			continue;
+> +
+> +		cpu_ops[cpu]->cpu_init(NULL, cpu);
+> +	}
+> +}
+> +
+> +void __init smp_init_cpus(void)
+> +{
+> +	if (acpi_disabled)
+> +		of_smp_init_cpus();
+> +	else
+> +		acpi_smp_init_cpus();
 
-V2:
- - Flush Hyp-mode TLBs for both KVM ARM32 and KVM ARM64 at boot time
+I'm liking these deeply split code paths less and less every time I see
+them. :(
 
-V1:
- - Initial patch with only arm64 change
+I would prefer to set up shared state in separate functions, but keep the
+control flow the same. Right now you're splitting it completely.
 
-Signed-off-by: Pranavkumar Sawargaonkar <pranavkumar@linaro.org>
-Signed-off-by: Anup Patel <anup.patel@linaro.org>
----
- arch/arm/kvm/init.S       |    4 ++++
- arch/arm64/kvm/hyp-init.S |    4 ++++
- 2 files changed, 8 insertions(+)
+I.e. split data setup between the two, but do the loop calling cpu_init()
+the same way. (Yes, that will require you to refactor the DT code path
+a bit too...)
 
-diff --git a/arch/arm/kvm/init.S b/arch/arm/kvm/init.S
-index 1b9844d..ee4f744 100644
---- a/arch/arm/kvm/init.S
-+++ b/arch/arm/kvm/init.S
-@@ -98,6 +98,10 @@ __do_hyp_init:
- 	mrc	p15, 0, r0, c10, c2, 1
- 	mcr	p15, 4, r0, c10, c2, 1
- 
-+	@ Invalidate the stale TLBs from Bootloader
-+	mcr	p15, 4, r0, c8, c7, 0	@ TLBIALLH
-+	dsb	ish
-+
- 	@ Set the HSCTLR to:
- 	@  - ARM/THUMB exceptions: Kernel config (Thumb-2 kernel)
- 	@  - Endianness: Kernel config
-diff --git a/arch/arm64/kvm/hyp-init.S b/arch/arm64/kvm/hyp-init.S
-index d968796..c319116 100644
---- a/arch/arm64/kvm/hyp-init.S
-+++ b/arch/arm64/kvm/hyp-init.S
-@@ -80,6 +80,10 @@ __do_hyp_init:
- 	msr	mair_el2, x4
- 	isb
- 
-+	/* Invalidate the stale TLBs from Bootloader */
-+	tlbi	alle2
-+	dsb	sy
-+
- 	mrs	x4, sctlr_el2
- 	and	x4, x4, #SCTLR_EL2_EE	// preserve endianness of EL2
- 	ldr	x5, =SCTLR_EL2_FLAGS
--- 
-1.7.9.5
+
+-Olof
