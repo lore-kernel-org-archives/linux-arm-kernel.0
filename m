@@ -1,28 +1,78 @@
-From: peter.maydell@linaro.org (Peter Maydell)
-Date: Thu, 31 Jul 2014 18:36:35 +0100
-Subject: [PATCH] arm64: KVM: export current vcpu->pause state via pseudo
- regs
-In-Reply-To: <53DA7B28.701@redhat.com>
-References: <1404914112-7298-1-git-send-email-alex.bennee@linaro.org>
- <53DA7583.2030504@redhat.com>
- <CAFEAcA9cT617t8JqOXtuO-wQ5xg5T3Sw_DUHB1fpPD6g3SSNaQ@mail.gmail.com>
- <53DA7B28.701@redhat.com>
-Message-ID: <CAFEAcA8RjmjoaEpjoDE5YJdKagtZYZe9TpCdsRPf86W=WCxCsA@mail.gmail.com>
+From: afaerber@suse.de (=?UTF-8?B?QW5kcmVhcyBGw6RyYmVy?=)
+Date: Thu, 31 Jul 2014 19:38:54 +0200
+Subject: [PATCH v4 4/4] ARM: dts: Add exynos5250-spring device tree
+In-Reply-To: <53DA7993.1000800@suse.de>
+References: <1406822910-6255-1-git-send-email-afaerber@suse.de>
+ <1406822910-6255-5-git-send-email-afaerber@suse.de>
+ <CAP_ceTz+KRJzF9XV=_aLE+6sV6d5GqCtQ_daKtpFJfCZQ1erpA@mail.gmail.com>
+ <53DA7993.1000800@suse.de>
+Message-ID: <53DA7F2E.2030109@suse.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 31 July 2014 18:21, Paolo Bonzini <pbonzini@redhat.com> wrote:
-> What does ARM do if you have a WFI while interrupts are disabled?  On
-> x86 after "cli;hlt" only an NMI will wake you up.  With spurious
-> wakeups, it's pretty much guaranteed that you will break such "cli;hlt"
-> sequences.
+Am 31.07.2014 19:14, schrieb Andreas F?rber:
+> Hi,
+> 
+> Am 31.07.2014 19:00, schrieb Vincent Palatin:
+>> Always a bit late to the game.
+>> One small comment inline.
+>>
+>> Reviewed-by: Vincent Palatin <vpalatin@chromium.org>
+> 
+> Thanks,
+> 
+>>
+>> On Thu, Jul 31, 2014 at 9:08 AM, Andreas F?rber <afaerber@suse.de> wrote:
+>>> +       usb3_vbus_reg: regulator-usb3 {
+>>> +               compatible = "regulator-fixed";
+>>> +               regulator-name = "P5.0V_USB3CON";
+>>> +               regulator-min-microvolt = <5000000>;
+>>> +               regulator-max-microvolt = <5000000>;
+>>> +               gpio = <&gpe1 0 GPIO_ACTIVE_LOW>;
+>>> +               enable-active-high;
+>>> +       };
+>>
+>> GPE1_0 GPIO is the HSIC hub (SMSC 3503) reset# line (already defined
+>> below afaik).
+> 
+> Yes, that was a suggestion you made on v1.
+> 
+>> On this design there is no external USB3 port, so no VBUS reg/load
+>> switch for USB3.
+> 
+> Could you be a little clearer? Are you suggesting to drop the gpio
+> property?
 
-The architecture mandates some things that *must* wake you from
-a WFI, but it also allows wakeups for other reasons not listed, or
-for no reason at all. It's perfectly valid to implement WFI as a NOP
-(though it would not be very good for power efficiency, obviously).
-Guests which don't surround WFI with a "check whether we should
-just go back to WFI" loop are buggy.
+Nah, doesn't work. Do we need a pinctrl on the usb-hub instead?
 
-thanks
--- PMM
+Andreas
+
+> I just re-tested that without the regulator node plus the
+> vbus-supply below I don't get any USB2 (so maybe rename the regulator?).
+> 
+> Regards,
+> Andreas
+> 
+>>> +
+>>> +       usb at 12110000 {
+>>> +               samsung,vbus-gpio = <&gpx1 1 GPIO_ACTIVE_HIGH>;
+>>> +       };
+>>> +
+>>> +       usb-hub {
+>>> +               compatible = "smsc,usb3503a";
+>>> +               reset-gpios = <&hsic_reset>;
+>>> +       };
+> [...]
+>>> +&usbdrd_phy {
+>>> +       vbus-supply = <&usb3_vbus_reg>;
+>>> +};
+>>> +
+>>> +#include "cros-ec-keyboard.dtsi"
+>>> --
+>>> 1.9.3
+> 
+
+
+-- 
+SUSE LINUX Products GmbH, Maxfeldstr. 5, 90409 N?rnberg, Germany
+GF: Jeff Hawn, Jennifer Guild, Felix Imend?rffer; HRB 16746 AG N?rnberg
