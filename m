@@ -1,254 +1,166 @@
-From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
-Date: Thu, 31 Jul 2014 20:09:42 +0200
-Subject: [PATCH v5] devicetree: Add generic IOMMU device tree bindings
-In-Reply-To: <1406803383-11601-1-git-send-email-thierry.reding@gmail.com>
-References: <1406803383-11601-1-git-send-email-thierry.reding@gmail.com>
-Message-ID: <5073694.BaMdO1z6rq@avalon>
+From: oleg@redhat.com (Oleg Nesterov)
+Date: Thu, 31 Jul 2014 20:12:30 +0200
+Subject: TIF_NOHZ can escape nonhz mask? (Was: [PATCH v3 6/8] x86:
+ Split syscall_trace_enter into two phases)
+In-Reply-To: <20140731171329.GD7842@localhost.localdomain>
+References: <3f649f5658a163645e3ce15156176c325283762e.1405992946.git.luto@amacapital.net>
+ <20140728173723.GA20993@redhat.com> <20140728185803.GA24663@redhat.com>
+ <20140728192209.GA26017@localhost.localdomain>
+ <20140729175414.GA3289@redhat.com>
+ <20140730163516.GC18158@localhost.localdomain>
+ <20140730174630.GA30862@redhat.com>
+ <20140731003034.GA32078@localhost.localdomain>
+ <20140731160353.GA14772@redhat.com>
+ <20140731171329.GD7842@localhost.localdomain>
+Message-ID: <20140731181230.GA18695@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Thierry,
+On 07/31, Frederic Weisbecker wrote:
+>
+> On Thu, Jul 31, 2014 at 06:03:53PM +0200, Oleg Nesterov wrote:
+> > On 07/31, Frederic Weisbecker wrote:
+> > >
+> > > I was convinced that the very first kernel init task is PID 0 then
+> > > it forks on rest_init() to launch the userspace init with PID 1. Then init/0 becomes the
+> > > idle task of the boot CPU.
+> >
+> > Yes sure. But context_tracking_cpu_set() is called by init task with PID 1, not
+> > by "swapper".
+>
+> Are you sure? It's called from start_kernel() which is init/0.
 
-On Thursday 31 July 2014 12:43:03 Thierry Reding wrote:
-> From: Thierry Reding <treding@nvidia.com>
-> 
-> This commit introduces a generic device tree binding for IOMMU devices.
-> Only a very minimal subset is described here, but it is enough to cover
-> the requirements of both the Exynos System MMU and Tegra SMMU as
-> discussed here:
-> 
->     https://lkml.org/lkml/2014/4/27/346
-> 
-> Acked-by: Will Deacon <will.deacon@arm.com>
-> Reviewed-by: Arnd Bergmann <arnd@arndb.de>
-> Acked-by: Rob Herring <robh@kernel.org>
-> Signed-off-by: Thierry Reding <treding@nvidia.com>
+But do_initcalls() is called by kernel_init(), this is the init process which is
+going to exec /sbin/init later.
 
-Thank you for the great work. This is nearly identical to my own IOMMU DT 
-bindings experiment developed with the Renesas IPMMU-VMSA driver, so I can't 
-disagree.
+But this doesn't really matter,
 
-Acked-by: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
+> Maybe we should just enable it everywhere.
 
-> ---
-> Changes in v5:
-> - clarify comment about dma-ranges vs. IOMMU regarding a device's
->   disabled state
-> - use proper DTS syntax reference absolute nodes for phandles
-> - clarify the meaning of the #iommu-cells = <0> example
-> - remove confusing (and unnecessary) #address-cells and #size-cells from
->   multi-master windowed IOMMU example and clarify the meaning of DMA
->   window
-> 
-> Changes in v4:
-> - clarify that disabling an IOMMU DT node may not disable translation
-> - be more explicit that examples are only examples
-> - add multi-ID master example
-> 
-> Changes in v3:
-> - use #iommu-cells instead of #address-cells/#size-cells
-> - drop optional iommu-names property
-> 
-> Changes in v2:
-> - add notes about "dma-ranges" property (drop note from commit message)
-> - document priorities of "iommus" property vs. "dma-ranges" property
-> - drop #iommu-cells in favour of #address-cells and #size-cells
-> - remove multiple-master device example
-> 
->  Documentation/devicetree/bindings/iommu/iommu.txt | 182
-> ++++++++++++++++++++++ 1 file changed, 182 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/iommu/iommu.txt
-> 
-> diff --git a/Documentation/devicetree/bindings/iommu/iommu.txt
-> b/Documentation/devicetree/bindings/iommu/iommu.txt new file mode 100644
-> index 000000000000..5a8b4624defc
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/iommu/iommu.txt
-> @@ -0,0 +1,182 @@
-> +This document describes the generic device tree binding for IOMMUs and
-> their +master(s).
-> +
-> +
-> +IOMMU device node:
-> +==================
-> +
-> +An IOMMU can provide the following services:
-> +
-> +* Remap address space to allow devices to access physical memory ranges
-> that +  they otherwise wouldn't be capable of accessing.
-> +
-> +  Example: 32-bit DMA to 64-bit physical addresses
-> +
-> +* Implement scatter-gather at page level granularity so that the device
-> does +  not have to.
-> +
-> +* Provide system protection against "rogue" DMA by forcing all accesses to
-> go +  through the IOMMU and faulting when encountering accesses to unmapped
-> +  address regions.
-> +
-> +* Provide address space isolation between multiple contexts.
-> +
-> +  Example: Virtualization
-> +
-> +Device nodes compatible with this binding represent hardware with some of
-> the +above capabilities.
-> +
-> +IOMMUs can be single-master or multiple-master. Single-master IOMMU devices
-> +typically have a fixed association to the master device, whereas multiple-
-> +master IOMMU devices can translate accesses from more than one master. +
-> +The device tree node of the IOMMU device's parent bus must contain a valid
-> +"dma-ranges" property that describes how the physical address space of the
-> +IOMMU maps to memory. An empty "dma-ranges" property means that there is a
-> +1:1 mapping from IOMMU to memory.
-> +
-> +Required properties:
-> +--------------------
-> +- #iommu-cells: The number of cells in an IOMMU specifier needed to encode
-> an +  address.
-> +
-> +The meaning of the IOMMU specifier is defined by the device tree binding of
-> +the specific IOMMU. Below are a few examples of typical use-cases: +
-> +- #iommu-cells = <0>: Single master IOMMU devices are not configurable and
-> +  therefore no additional information needs to be encoded in the specifier.
-> +  This may also apply to multiple master IOMMU devices that do not allow
-> the +  association of masters to be configured. Note that an IOMMU can by
-> design +  be multi-master yet only expose a single master in a given
-> configuration. +  In such cases the number of cells will usually be 1 as in
-> the next case. +- #iommu-cells = <1>: Multiple master IOMMU devices may
-> need to be configured +  in order to enable translation for a given master.
-> In such cases the single +  address cell corresponds to the master device's
-> ID. In some cases more than +  one cell can be required to represent a
-> single master ID.
-> +- #iommu-cells = <4>: Some IOMMU devices allow the DMA window for masters
-> to +  be configured. The first cell of the address in this may contain the
-> master +  device's ID for example, while the second cell could contain the
-> start of +  the DMA window for the given device. The length of the DMA
-> window is given +  by the third and fourth cells.
-> +
-> +Note that these are merely examples and real-world use-cases may use
-> different +definitions to represent their individual needs. Always refer to
-> the specific +IOMMU binding for the exact meaning of the cells that make up
-> the specifier. +
-> +
-> +IOMMU master node:
-> +==================
-> +
-> +Devices that access memory through an IOMMU are called masters. A device
-> can +have multiple master interfaces (to one or more IOMMU devices).
-> +
-> +Required properties:
-> +--------------------
-> +- iommus: A list of phandle and IOMMU specifier pairs that describe the
-> IOMMU +  master interfaces of the device. One entry in the list describes
-> one master +  interface of the device.
-> +
-> +When an "iommus" property is specified in a device tree node, the IOMMU
-> will +be used for address translation. If a "dma-ranges" property exists in
-> the +device's parent node it will be ignored. An exception to this rule is
-> if the +referenced IOMMU is disabled, in which case the "dma-ranges"
-> property of the +parent shall take effect. Note that merely disabling a
-> device tree node does +not guarantee that the IOMMU is really disabled
-> since the hardware may not +have a means to turn off translation. But it is
-> invalid in such cases to +disable the IOMMU's device tree node in the first
-> place because it would +prevent any driver from properly setting up the
-> translations.
-> +
-> +
-> +Notes:
-> +======
-> +
-> +One possible extension to the above is to use an "iommus" property along
-> with +a "dma-ranges" property in a bus device node (such as PCI host
-> bridges). This +can be useful to describe how children on the bus relate to
-> the IOMMU if they +are not explicitly listed in the device tree (e.g. PCI
-> devices). However, the +requirements of that use-case haven't been fully
-> determined yet. Implementing +this is therefore not recommended without
-> further discussion and extension of +this binding.
-> +
-> +
-> +Examples:
-> +=========
-> +
-> +Single-master IOMMU:
-> +--------------------
-> +
-> +	iommu {
-> +		#iommu-cells = <0>;
-> +	};
-> +
-> +	master {
-> +		iommus = <&{/iommu}>;
-> +	};
-> +
-> +Multiple-master IOMMU with fixed associations:
-> +----------------------------------------------
-> +
-> +	/* multiple-master IOMMU */
-> +	iommu {
-> +		/*
-> +		 * Masters are statically associated with this IOMMU and share
-> +		 * the same address translations because the IOMMU does not
-> +		 * have sufficient information to distinguish between masters.
-> +		 *
-> +		 * Consequently address translation is always on or off for
-> +		 * all masters at any given point in time.
-> +		 */
-> +		#iommu-cells = <0>;
-> +	};
-> +
-> +	/* static association with IOMMU */
-> +	master at 1 {
-> +		reg = <1>;
-> +		iommus = <&{/iommu}>;
-> +	};
-> +
-> +	/* static association with IOMMU */
-> +	master at 2 {
-> +		reg = <2>;
-> +		iommus = <&{/iommu}>;
-> +	};
-> +
-> +Multiple-master IOMMU:
-> +----------------------
-> +
-> +	iommu {
-> +		/* the specifier represents the ID of the master */
-> +		#iommu-cells = <1>;
-> +	};
-> +
-> +	master at 1 {
-> +		/* device has master ID 42 in the IOMMU */
-> +		iommus = <&{/iommu} 42>;
-> +	};
-> +
-> +	master at 2 {
-> +		/* device has master IDs 23 and 24 in the IOMMU */
-> +		iommus = <&{/iommu} 23>, <&{/iommu} 24>;
-> +	};
-> +
-> +Multiple-master IOMMU with configurable DMA window:
-> +---------------------------------------------------
-> +
-> +	/ {
-> +		iommu {
-> +			/*
-> +			 * One cell for the master ID and one cell for the
-> +			 * address of the DMA window. The length of the DMA
-> +			 * window is encoded in two cells.
-> +			 *
-> +			 * The DMA window is the range addressable by the
-> +			 * master (i.e. the I/O virtual address space).
-> +			 */
-> +			#iommu-cells = <4>;
-> +		};
-> +
-> +		master {
-> +			/* master ID 42, 4 GiB DMA window starting at 0 */
-> +			iommus = <&{/iommu}  42  0  0x1 0x0>;
-> +		};
-> +	};
+Yes, yes, this doesn't really matter. We can even add set(TIF_NOHZ) at the start
+of start_kernel(). The question is, I still can't understand why do we want to
+have the global TIF_NOHZ.
 
--- 
-Regards,
+> > OK. To simplify, lets discuss user_enter() only. So, it is actually a nop on
+> > CPU_0, and CPU_1 can miss it anyway.
+> >
+> > > But global TIF_NOHZ should enforce context tracking everywhere.
+> >
+> > And this is what I can't understand. Lets return to my initial question, why
+> > we can't change __context_tracking_task_switch()
+> >
+> > 	void __context_tracking_task_switch(struct task_struct *prev,
+> > 					    struct task_struct *next)
+> > 	{
+> > 		if (context_tracking_cpu_is_enabled())
+> > 			set_tsk_thread_flag(next, TIF_NOHZ);
+> > 		else
+> > 			clear_tsk_thread_flag(next, TIF_NOHZ);
+> > 	}
+> >
+> > ?
+>
+> Well we can change it to global TIF_NOHZ
+>
+> > How can the global TIF_NOHZ help?
+>
+> It avoids that flag swap on task_switch.
 
-Laurent Pinchart
+Ah, you probably meant that we can kill context_tracking_task_switch() as
+we discussed.
+
+But I meant another thing, TIF_NOHZ is already global because it is always
+set after context_tracking_cpu_set().
+
+Performance-wise, this set/clear code above can be better because it avoids
+the slow paths on the untracked CPU's. But let's ignore this, the question is
+why the change above is not correct? Or why it can make the things worse?
+
+
+> > OK, OK, a task can return to usermode on CPU_0, notice TIF_NOHZ, take the
+> > slow path, and do the "right" thing if it migrates to CPU_1 _before_ it
+> > comes to user_enter(). But this case is very unlikely, certainly this can't
+> > explain why do we penalize the untracked CPU's ?
+>
+> It's rather that CPU 0 calls user_enter() and then migrate to CPU 1 and resume
+> to userspace.
+
+And in this case a) user_enter() is pointless on CPU_0, and b) CPU_1 misses
+the necessary user_enter().
+
+> It's unlikely but possible. I actually observed that very easily on early testing.
+
+Sure. And this can happen anyway? Why the change in __context_tracking_task_switch()
+is wrong?
+
+> And it's a big problem because then the CPU runs in userspace, possibly for a long while
+> in HPC case, and context tracking thinks it is in kernelspace. As a result, RCU waits
+> for that CPU to complete grace periods and cputime is accounted to kernelspace instead of
+> userspace.
+>
+> It looks like a harmless race but it can have big consequences.
+
+I see. Again, does the global TIF_NOHZ really help?
+
+> > > And also it's
+> > > less context switch overhead.
+> >
+> > Why???
+>
+> Because calling context_switch_task_switch() on every context switch is costly.
+
+See above. This depends, but forcing the slow paths on all CPU's can be more
+costly.
+
+> > And of course I can't understand exception_enter/exit(). Not to mention that
+> > (afaics) "prev_ctx == IN_USER" in exception_exit() can be false positive even
+> > if we forget that the caller can migrate in between. Just because, once again,
+> > a tracked CPU can miss user_exit().
+>
+> You lost me on this. How can a tracked CPU miss user_exit()?
+
+I am lost too ;) Didn't we already discuss this? A task calls user_exit() on
+CPU_0 for no reason, migrates to the tracked CPU_1 and finally returns to user
+space leaving this cpu in IN_KERNEL state?
+
+> > So, why not
+> >
+> > 	static inline void exception_enter(void)
+> > 	{
+> > 		user_exit();
+> > 	}
+> >
+> > 	static inline void exception_exit(struct pt_regs *regs)
+> > 	{
+> > 		if (user_mode(regs))
+> > 			user_enter();
+> > 	}
+>
+> That's how I implemented it first. But then I changed it the way it is now:
+> 6c1e0256fad84a843d915414e4b5973b7443d48d
+> ("context_tracking: Restore correct previous context state on exception exit")
+>
+> This is again due to the shift between hard and soft userspace boundaries.
+> user_mode(regs) checks hard boundaries only.
+>
+> Lets get back to our beloved example:
+>
+>           CPU 0                                  CPU 1
+>           ---------------------------------------------
+>
+>           returning from syscall {
+>                user_enter();
+>                exception {
+>                     exception_enter()
+>                     PREEMPT!
+>                     ----------------------->
+>                                                  //resume exception
+>                                                    exception_exit();
+>                                                    return to userspace
+
+OK, thanks, so in this case we miss user_enter().
+
+But again, we can miss it anyway if preemptions comes before "exception" ?
+if CPU 1 was in IN_KERNEL state.
+
+Oleg.
