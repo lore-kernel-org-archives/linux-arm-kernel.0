@@ -1,75 +1,70 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Thu, 31 Jul 2014 11:04:39 +0100
-Subject: [PATCH v2 1/3] arm64: spin-table: handle unmapped
- cpu-release-addrs
-In-Reply-To: <20140731095854.GC21850@leverpostej>
-References: <1406717944-24725-1-git-send-email-ard.biesheuvel@linaro.org>
- <1406717944-24725-2-git-send-email-ard.biesheuvel@linaro.org>
- <20140730113013.GL12239@arm.com>
- <CAKv+Gu8ne8k2NV12SyWye5aYJKHG0wHKAO+=V=1L89_hvyGopw@mail.gmail.com>
- <20140731094515.GE26853@arm.com>
- <20140731095854.GC21850@leverpostej>
-Message-ID: <20140731100439.GI26853@arm.com>
+From: thierry.reding@gmail.com (Thierry Reding)
+Date: Thu, 31 Jul 2014 12:09:06 +0200
+Subject: [PATCH v4] devicetree: Add generic IOMMU device tree bindings
+In-Reply-To: <20140730181842.GG20162@leverpostej>
+References: <1404487757-18829-1-git-send-email-thierry.reding@gmail.com>
+ <20140730152646.GC20162@leverpostej>
+ <CAOesGMi3zM1-cqmeGddJ69RNXx0ktFm_zXO_yq7N0EeA3HNrUQ@mail.gmail.com>
+ <20140730181842.GG20162@leverpostej>
+Message-ID: <20140731100905.GA7458@ulmo>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jul 31, 2014 at 10:58:54AM +0100, Mark Rutland wrote:
-> On Thu, Jul 31, 2014 at 10:45:15AM +0100, Will Deacon wrote:
-> > On Wed, Jul 30, 2014 at 08:17:02PM +0100, Ard Biesheuvel wrote:
-> > > ]On 30 July 2014 13:30, Will Deacon <will.deacon@arm.com> wrote:
-> > > > On Wed, Jul 30, 2014 at 11:59:02AM +0100, Ard Biesheuvel wrote:
-> > > >> From: Mark Rutland <mark.rutland@arm.com>
-> > > >>
-> > > >> In certain cases the cpu-release-addr of a CPU may not fall in the
-> > > >> linear mapping (e.g. when the kernel is loaded above this address due to
-> > > >> the presence of other images in memory). This is problematic for the
-> > > >> spin-table code as it assumes that it can trivially convert a
-> > > >> cpu-release-addr to a valid VA in the linear map.
-> > > >>
-> > > >> This patch modifies the spin-table code to use a temporary cached
-> > > >> mapping to write to a given cpu-release-addr, enabling us to support
-> > > >> addresses regardless of whether they are covered by the linear mapping.
-> > > >>
-> > > >> Signed-off-by: Mark Rutland <mark.rutland@arm.com>
-> > > >> Tested-by: Mark Salter <msalter@redhat.com>
-> > > >> [ardb: added (__force void *) cast]
-> > > >> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
-> > > >> ---
-> > > >>  arch/arm64/kernel/smp_spin_table.c | 22 +++++++++++++++++-----
-> > > >>  1 file changed, 17 insertions(+), 5 deletions(-)
-> > > >
-> > > > I'm nervous about this. What if the spin table sits in the same physical 64k
-> > > > frame as a read-sensitive device and we're running with 64k pages?
-> > > >
-> > > 
-> > > Actually, booting.txt requires cpu-release-addr to point to a
-> > > /memreserve/d part of memory, which implies DRAM (or you wouldn't have
-> > > to memreserve it)
-> > > That means it should always be covered by the linear mapping, unless
-> > > it is located before Image in DRAM, which is the case addressed by
-> > > this patch.
+On Wed, Jul 30, 2014 at 07:18:42PM +0100, Mark Rutland wrote:
+[...]
+> > >> +
+> > >> +Multiple-master IOMMU with configurable DMA window:
+> > >> +---------------------------------------------------
+> > >> +
+> > >> +     / {
+> > >> +             #address-cells = <1>;
+> > >> +             #size-cells = <1>;
+> > >> +
+> > >> +             iommu {
+> > >> +                     /* master ID, address and length of DMA window */
+> > >> +                     #iommu-cells = <4>;
+> > >> +             };
+> > >> +
+> > >> +             master {
+> > >> +                     /* master ID 42, 4 GiB DMA window starting at 0 */
+> > >> +                     iommus = <&/iommu  42  0  0x1 0x0>;
+> > >
+> > > Is this that window is from the POV of the master, i.e. the master can
+> > > address 0x0 to 0xffffffff when generating transactions, and these get
+> > > translated somehow?
+> > >
+> > > Or is this the physical addresses to allocate to the master?
 > > 
-> > But if it's located before before the Image in DRAM and isn't covered by
-> > the linear mapping, then surely the /memreserve/ is pointless too? In which
-> > case, this looks like we're simply trying to cater for platforms that aren't
-> > following booting.txt (which may need updating if we need to handle this).
+> > It needs to be clarified in the documentation, but as far as I know it
+> > is the DMA address space that is used.
 > 
-> No. The DT is describing the memory which is present, and the subset
-> thereof which should not be used under normal circumstances. That's a
-> static property of the system.
-> 
-> Where the OS happens to get loaded and what it is able to address is a
-> dynamic property of the OS (and possibly the bootloader). The DT cannot
-> have knowledge of this.
-> 
-> It's always true that the OS should not blindly use memreserve'd memory.
-> The fact that it cannot address it in the linear mapping is orthogonal.
+> Ok. So that's pre-translation, from the POV of the master?
 
-In which case, I think asserting that /memreserve/ implies DRAM is pretty
-fragile and not actually enforced anywhere. Sure, we can say `don't do
-that', but I'd prefer to have the kernel detect this dynamically.
+Correct. It represents the window of the IOMMU's addressable I/O virtual
+address space that should be assigned to this particular master.
 
-Does dtc check that the /memreserve/ region is actually a subset of the
-memory node?
+> If we don't have that knowledge about the master already (e.g. based on
+> the compatible string), surely we always need that information in a
+> given iommu-specifier format? Otherwise certain iommus won't be able to
+> handle masters with limited addressing only due to limitations of their
+> binding.
 
-Will
+This is only used for what's often called a windowed IOMMU. Many IOMMUs
+(non-windowed) typically allow only a complete address space to be
+assigned to a master without additional control over subregions. So this
+is really a property/capability of the IOMMU rather than the masters
+themselves.
+
+There are already other means to respect the addressing limitations of
+masters. We typcially use a device's DMA mask for this, and it's natural
+to reuse that for I/O virtual addresses since they will in fact take the
+place of physical addresses for the master when translation is enabled.
+
+Thierry
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: not available
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140731/2e943799/attachment-0001.sig>
