@@ -1,85 +1,142 @@
-From: chander.kashyap@gmail.com (Chander M. Kashyap)
-Date: Thu, 31 Jul 2014 11:50:45 +0530
-Subject: [PATCH v9 0/6] cpufreq: use generic cpufreq drivers for exynos
- platforms
-In-Reply-To: <1406707663-16656-1-git-send-email-thomas.ab@samsung.com>
-References: <1406707663-16656-1-git-send-email-thomas.ab@samsung.com>
-Message-ID: <CADWw7OiwXNrbFyiVhpcJyBnAdsGsXcAMgMUOmY=JxHM7+7Z0eA@mail.gmail.com>
+From: xuwei5@hisilicon.com (xuwei)
+Date: Thu, 31 Jul 2014 14:19:22 +0800
+Subject: [GIT PULL v2][for 3.17] pull request for hisilicon terminal soc
+In-Reply-To: <CAOesGMgJjrQQFyszd-c_47d6REGXZKrXBuVU+KiJc8j9vY-B_Q@mail.gmail.com>
+References: <53D750CA.5090405@hisilicon.com>	<CAOesGMhEBsb_6vghQCHTm32FngZvURb2OozLpQu=UmJEY-MAKQ@mail.gmail.com>	<53D9DD53.4050909@hisilicon.com>
+ <CAOesGMgJjrQQFyszd-c_47d6REGXZKrXBuVU+KiJc8j9vY-B_Q@mail.gmail.com>
+Message-ID: <53D9DFEA.5020309@hisilicon.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jul 30, 2014 at 1:37 PM, Thomas Abraham <thomas.ab@samsung.com> wrote:
-> Changes since v8:
-> - Fixes suggested by Tomasz Figa.
->
-> This patch series removes the use of Exynos4210 and Exynos5250 specific cpufreq
-> drivers and enables the use of cpufreq-cpu0 driver for these platforms. This
-> series also enables cpufreq support for Exynos5420 using arm_big_little cpufreq
-> driver.
->
-> This patch series is dependent on two other patches
-> 1. ARM: dts: add CPU nodes for Exynos4 SoCs
->    - https://lkml.org/lkml/2014/7/21/315
-> 2. ARM: dts: smdk5250: Specify MAX77686 pmic interrupt
->    - http://www.spinics.net/lists/arm-kernel/msg351134.html
-> 3. clk: exynos4: remove duplicate div_core2 divider clock instantiation
->    - http://www.mail-archive.com/linux-samsung-soc at vger.kernel.org/msg34859.html
->
-> Thomas Abraham (6):
->   clk: samsung: add infrastructure to register cpu clocks
->   clk: samsung: add cpu clock configuration data and instantiate cpu clock
->   ARM: dts: Exynos: add CPU OPP and regulator supply property
->   ARM: Exynos: switch to using generic cpufreq driver for Exynos4210/5250/5420
->   cpufreq: exynos: remove exynos4210/5250 specific cpufreq driver support
->   clk: samsung: remove unused clock aliases and update clock flags
->
->  arch/arm/boot/dts/exynos4210-origen.dts         |    4 +
->  arch/arm/boot/dts/exynos4210-trats.dts          |    4 +
->  arch/arm/boot/dts/exynos4210-universal_c210.dts |    4 +
->  arch/arm/boot/dts/exynos4210.dtsi               |   14 +-
->  arch/arm/boot/dts/exynos5250-arndale.dts        |    4 +
->  arch/arm/boot/dts/exynos5250-smdk5250.dts       |    4 +
->  arch/arm/boot/dts/exynos5250-snow.dts           |    4 +
->  arch/arm/boot/dts/exynos5250.dtsi               |   25 +-
->  arch/arm/boot/dts/exynos5420.dtsi               |   38 +++
->  arch/arm/mach-exynos/exynos.c                   |   24 +-
->  drivers/clk/samsung/Makefile                    |    2 +-
->  drivers/clk/samsung/clk-cpu.c                   |  335 +++++++++++++++++++++++
->  drivers/clk/samsung/clk-cpu.h                   |   91 ++++++
->  drivers/clk/samsung/clk-exynos4.c               |   63 +++--
->  drivers/clk/samsung/clk-exynos5250.c            |   44 ++-
->  drivers/clk/samsung/clk-exynos5420.c            |   72 ++++-
->  drivers/cpufreq/Kconfig.arm                     |   22 --
->  drivers/cpufreq/Makefile                        |    2 -
->  drivers/cpufreq/exynos4210-cpufreq.c            |  184 -------------
->  drivers/cpufreq/exynos5250-cpufreq.c            |  210 --------------
->  include/dt-bindings/clock/exynos5250.h          |    1 +
->  include/dt-bindings/clock/exynos5420.h          |    2 +
->  22 files changed, 690 insertions(+), 463 deletions(-)
->  create mode 100644 drivers/clk/samsung/clk-cpu.c
->  create mode 100644 drivers/clk/samsung/clk-cpu.h
->  delete mode 100644 drivers/cpufreq/exynos4210-cpufreq.c
->  delete mode 100644 drivers/cpufreq/exynos5250-cpufreq.c
->
-> --
-> 1.7.9.5
-
-Working great.
-tested on smdk5420, and arndale-5250
-
->
->
->
->
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
 
 
+On 2014/7/31 14:14, Olof Johansson wrote:
+> On Wed, Jul 30, 2014 at 11:08 PM, xuwei <xuwei5@hisilicon.com> wrote:
+>>
+>>
+>> On 2014/7/31 13:32, Olof Johansson wrote:
+>>> Hi,
+>>>
+>>> There were a few things that still needed fixing here -- I took care
+>>> of most of them. See below.
+>>>
+>>>
+>>> On Tue, Jul 29, 2014 at 12:44 AM, xuwei <xuwei5@hisilicon.com> wrote:
+>>>> Hi Olof, Hi Kevin, Hi Arnd,
+>>>>
+>>>> Please help to merge pull request for hisilicon terminal soc.
+>>>>
+>>>> Best Regards,
+>>>> Wei
+>>>>
+>>>>
+>>>> The following changes since commit 7171511eaec5bf23fb06078f59784a3a0626b38f:
+>>>>
+>>>>   Linux 3.16-rc1 (2014-06-15 17:45:28 -1000)
+>>>>
+>>>> are available in the git repository at:
+>>>>
+>>>>   git://github.com/hisilicon/linux-hisi.git tags/hix5hd2-for-3.17-v2
+>>>>
+>>>> for you to fetch changes up to eeea1ab9b53f311f634e87d9208daa564a97dbba:
+>>>>
+>>>>   ARM: hisi: remove smp from machine descriptor (2014-07-29 14:54:11 +0800)
+>>>>
+>>>> ----------------------------------------------------------------
+>>>> ARM: mach-hisi: Hisilicon teminal soc udaptes for 3.17
+>>>>
+>>>> - Rename Hi3716 to HiX5HD2
+>>>> HiX5HD2 is a SoC with dual Cortex A9 cores for STB market.
+>>>> And original Hi3xxx SoC is for mobile market.
+>>>> To avoid confusing the two types of SoCs and also because of
+>>>> different implementation(SMP, IPs integarted and earlycon configure),
+>>>> rename Hi3716 to HIX5HD2 ann add ARCH_HIX5HD2.
+>>>>
+>>>> - Add HiX5HD2 STB SoC and development kit board support
+>>>> - Change to use power reset driver to reboot for HiX5HD2
+>>>> - Add ARCH_HISI for the common configure of hisilicon SoCs
+>>>> - Change to use CPU_METHOD_OF_DECLARE for SMP on HiX5HD2 and hi3xxx
+>>>> - Enable L2 aux value for Hi3620
+>>>>
+>>>> ----------------------------------------------------------------
+>>>> Haifeng Yan (3):
+>>>>       ARM: debug: Rename Hi3716 to HIX5HD2
+>>>>       ARM: hisi: enable hix5hd2 SoC
+>>>>       ARM: dts: Add hix5hd2-dkb dts file.
+>>
+>> Hi Olof,
+>>
+>>> It is confusing -- is the SoC named HIX5HD2 or Hisilicon X5HD2? Seems
+>>> like there are references to both.
+>>
+>> The full name is Hisilicon X5HD2.
+>> But we also call it HIX5HD2.
+> 
+> Ok. I think for consistency, it's better to call it X5HD2 everywhere
+> in the kernel where it's already prefixed by Hisilicon, such as
+> compatible strings and help texts on config options.
+> 
+>>> What I did was that I renamed the dts and dtsi to hisi-x5hd2  to have
+>>> the vendor/family as prefix. Given the few boards per SoC family you
+>>> have had so far, it makes more sense to prefix it with hisi.
+>>>
+>>
+>> It is OK for us.
+>> And we will follow the rule in the future.
+>>
+>>>> Haojian Zhuang (5):
+>>>>       ARM: hisi: add ARCH_HISI
+>>>>       power: reset: move hisilicon reboot code
+>>>>       ARM: config: enable ARCH_HIX5HD2
+>>>>       ARM: hisi: set l2 aux for pl310
+>>>
+>>> This patch makes no sense to still carry. If things still need to be
+>>> resolved, then it should just be dropped.
+>>>
+>>>>       ARM: hisi: remove smp from machine descriptor
+>>>
+>>>
+>>> Also, in general: Wei, you seem to have added your Acked-by instead of
+>>> Signed-off-by on the commits. When you apply them, you need to do so
+>>> with your sign off.
+>>
+>> Do you mean I need add both "Acked-by" and "Signed-off-by"?or just add "Signed-off-by"?
 
--- 
-thanks and regards,
-Chander M. Kashyap
-Contact Number: +918123738320
-------- TENSION LENE KA NAHI, DENE KE-----
+Hi Olof,
+
+> Just S-o-b. See Documentation/SubmittingPatches.txt for more
+> explanation on what the different tags mean.
+>
+
+OK.
+Thanks!
+
+Best Regards,
+Wei
+
+
+>>> What I have done is that I have applied most of the above patches
+>>> directly instead of merging the branch, and I have done the touchups
+>>> described above (dropped the L2 patch and renamed the dts/dtsi).
+>>>
+>>> If for some reason, the name really should be hisi-hix5hd2, then let
+>>> me know quickly so I can revisit before it goes in. But I don't thik
+>>> so -- I find more hits with "x5hd2" out there than with "hix5hd2". If
+>>> anything, the remaining traces of hix5hd2 should probably be renamed
+>>> too (machine descriptor, etc).
+>>
+>> It is OK with "x5hd2".
+>>
+>>> (I also fixed a few spelling errors in the patch descriptions here and
+>>> there, etc).
+>>
+>> Thanks!
+>>
+>> Best Regards,
+>> Wei
+> 
+> 
+> -Olof
+> 
+> .
+> 
