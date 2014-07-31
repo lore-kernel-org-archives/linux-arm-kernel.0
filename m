@@ -1,30 +1,28 @@
-From: cmetcalf@tilera.com (Chris Metcalf)
-Date: Thu, 31 Jul 2014 16:24:37 -0400
-Subject: [PATCH 2/5] char: tile-srom: Remove reference to platform_bus
-In-Reply-To: <1406298233-27876-2-git-send-email-pawel.moll@arm.com>
-References: <1406298233-27876-1-git-send-email-pawel.moll@arm.com>
- <1406298233-27876-2-git-send-email-pawel.moll@arm.com>
-Message-ID: <53DAA605.2030500@tilera.com>
+From: skannan@codeaurora.org (Saravana Kannan)
+Date: Thu, 31 Jul 2014 13:25:47 -0700
+Subject: [PATCH v4 0/5] Simplify hotplug/suspend handling
+In-Reply-To: <1667655.2j1xLy7HXa@vostro.rjw.lan>
+References: <1406250448-470-1-git-send-email-skannan@codeaurora.org>
+ <1667655.2j1xLy7HXa@vostro.rjw.lan>
+Message-ID: <53DAA64B.6040203@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 7/25/2014 10:23 AM, Pawel Moll wrote:
-> The code was creating "srom" class devices using
-> platform_bus as a parent. As they are not really
-> platform devices, make them virtual, using NULL instead.
+On 07/29/2014 05:29 PM, Rafael J. Wysocki wrote:
+> On Thursday, July 24, 2014 06:07:23 PM Saravana Kannan wrote:
+>> Series of patchs to simplify policy/sysfs/kobj/locking handling across
+>> suspend/resume
 >
-> Cc: Chris Metcalf<cmetcalf@tilera.com>
-> Signed-off-by: Pawel Moll<pawel.moll@arm.com>
-> ---
->   drivers/char/tile-srom.c | 2 +-
->   1 file changed, 1 insertion(+), 1 deletion(-)
+> I need someone to review this series for me.  Viresh or Srivatsa, preferably
+> both.
 
-Can you clarify the point of this change a bit?  The SROM devices
-in question are real devices (bits of silicon on the processor die), not
-some kind of virtual construct.  In addition, we also have user binaries
-in the wild that know to look for /sys/devices/platform/srom/ paths,
-so I'm pretty reluctant to change this path without good reason.
+Viresh/Srivatsa,
+
+Bump. Can you guys please review this?
+
+-Saravana
+
 
 -- 
-Chris Metcalf, Tilera Corp.
-http://www.tilera.com
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
+hosted by The Linux Foundation
