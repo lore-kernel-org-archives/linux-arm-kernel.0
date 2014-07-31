@@ -1,39 +1,27 @@
-From: tomasz.figa@gmail.com (Tomasz Figa)
-Date: Thu, 31 Jul 2014 23:09:58 +0200
-Subject: [PATCH v4 4/4] ARM: dts: Add exynos5250-spring device tree
-In-Reply-To: <53DAA8E6.3010400@suse.de>
-References: <1406822910-6255-1-git-send-email-afaerber@suse.de>
- <1406822910-6255-5-git-send-email-afaerber@suse.de>
- <53DA936E.9060004@gmail.com> <53DAA8E6.3010400@suse.de>
-Message-ID: <53DAB0A6.9030700@gmail.com>
+From: davem@davemloft.net (David Miller)
+Date: Thu, 31 Jul 2014 14:13:57 -0700 (PDT)
+Subject: [PATCH net v4 0/5] net: stmmac: Improve mcast/ucast filter for
+ snps
+In-Reply-To: <1406839757-10905-1-git-send-email-vbridgers2013@gmail.com>
+References: <1406839757-10905-1-git-send-email-vbridgers2013@gmail.com>
+Message-ID: <20140731.141357.559911187001982866.davem@davemloft.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+From: Vince Bridgers <vbridgers2013@gmail.com>
+Date: Thu, 31 Jul 2014 15:49:12 -0500
 
-
-On 31.07.2014 22:36, Andreas F?rber wrote:
-> Am 31.07.2014 21:05, schrieb Tomasz Figa:
->>> +	};
->>> +
->>> +	fixed-rate-clocks {
->>> +		xxti {
->>> +			compatible = "samsung,clock-xxti";
->>> +			clock-frequency = <24000000>;
->>> +		};
->>> +	};
->>
->> This is also referencing a node from higher level, so it should be done
->> using a reference.
+> This patch series adds Synopsys specific bindings for the Synopsys EMAC
+> filter characteristics since those are implementation dependent. The
+> multicast and unicast filtering code was improved to handle different
+> configuration variations based on device tree settings. 
 > 
-> Actually this one isn't! Neither fixed-rate-clocks nor xxti exists in
-> the .dtsi.
+> I verified the operation of the multicast and unicast filters through 
+> Synopsys support as requested during the V1 review, and tested the GMAC
+> configuration on an Altera Cyclone 5 SOC (which supports 256 multicast
+> bins and 128 Unicast addresses). The 10/100 variant of this driver
+> modification was not tested, although it was compile tested. I shared
+> the email thread results of the investigation through Synopsys with the
+> stmmac maintainer.
 
-You've got me here. :)
-
-In new dts I actually suggest to specify those on SoC level, since they
-are generic SoC inputs and just override their frequencies on board
-level, but apparently Exynos5250 doesn't follow this fashion. So this is
-fine as is, sorry for noise.
-
-Best regards,
-Tomasz
+Series applied to net-next, thanks Vince.
