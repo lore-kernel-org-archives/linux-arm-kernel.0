@@ -1,120 +1,55 @@
-From: tomasz.figa@gmail.com (Tomasz Figa)
-Date: Thu, 31 Jul 2014 15:20:24 +0200
-Subject: [PATCHv2 1/5] clk: samsung: exynos5410: Add NULL pointer checks
- in clock init
-In-Reply-To: <CAEe5pB-FnkY8E9qPjy+6R5ausEEx-pO2wupWYZO8Lscb2BAwiw@mail.gmail.com>
-References: <1406805732-17372-1-git-send-email-hsnaves@gmail.com>
- <1406805732-17372-2-git-send-email-hsnaves@gmail.com>
- <53DA37EA.7010306@gmail.com>
- <CAEe5pB-FnkY8E9qPjy+6R5ausEEx-pO2wupWYZO8Lscb2BAwiw@mail.gmail.com>
-Message-ID: <53DA4298.5090900@gmail.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Thu, 31 Jul 2014 14:22:50 +0100
+Subject: [PATCH v4] iommu/arm-smmu: avoid calling request_irq in atomic
+ context
+In-Reply-To: <1406743093-17227-1-git-send-email-mitchelh@codeaurora.org>
+References: <1406743093-17227-1-git-send-email-mitchelh@codeaurora.org>
+Message-ID: <20140731132250.GU26853@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 31.07.2014 15:13, Humberto Naves wrote:
-> Hi,
+On Wed, Jul 30, 2014 at 06:58:13PM +0100, Mitchel Humpherys wrote:
+> request_irq shouldn't be called from atomic context since it might
+> sleep, but we're calling it with a spinlock held, resulting in:
 > 
-> I am bit confused by your response: first you mentioned that I should
-> remove the NULL check for variable np, but later on you suggested that
-> I should rearrange the conditional statement to avoid adding more
-> indentation.
-
-That was just a side note.
-
-> My guess is that I should remove that if statement
-> altogether?
-
-Yes, that was my intention.
-
+>     [    9.172202] BUG: sleeping function called from invalid context at kernel/mm/slub.c:926
+>     [    9.182989] in_atomic(): 1, irqs_disabled(): 128, pid: 1, name: swapper/0
+>     [    9.189762] CPU: 1 PID: 1 Comm: swapper/0 Tainted: G        W    3.10.40-gbc1b510b-38437-g55831d3bd9-dirty #97
+>     [    9.199757] [<c020c448>] (unwind_backtrace+0x0/0x11c) from [<c02097d0>] (show_stack+0x10/0x14)
+>     [    9.208346] [<c02097d0>] (show_stack+0x10/0x14) from [<c0301d74>] (kmem_cache_alloc_trace+0x3c/0x210)
+>     [    9.217543] [<c0301d74>] (kmem_cache_alloc_trace+0x3c/0x210) from [<c0276a48>] (request_threaded_irq+0x88/0x11c)
+>     [    9.227702] [<c0276a48>] (request_threaded_irq+0x88/0x11c) from [<c0931ca4>] (arm_smmu_attach_dev+0x188/0x858)
+>     [    9.237686] [<c0931ca4>] (arm_smmu_attach_dev+0x188/0x858) from [<c0212cd8>] (arm_iommu_attach_device+0x18/0xd0)
+>     [    9.247837] [<c0212cd8>] (arm_iommu_attach_device+0x18/0xd0) from [<c093314c>] (arm_smmu_test_probe+0x68/0xd4)
+>     [    9.257823] [<c093314c>] (arm_smmu_test_probe+0x68/0xd4) from [<c05aadd0>] (driver_probe_device+0x12c/0x330)
+>     [    9.267629] [<c05aadd0>] (driver_probe_device+0x12c/0x330) from [<c05ab080>] (__driver_attach+0x68/0x8c)
+>     [    9.277090] [<c05ab080>] (__driver_attach+0x68/0x8c) from [<c05a92d4>] (bus_for_each_dev+0x70/0x84)
+>     [    9.286118] [<c05a92d4>] (bus_for_each_dev+0x70/0x84) from [<c05aa3b0>] (bus_add_driver+0x100/0x244)
+>     [    9.295233] [<c05aa3b0>] (bus_add_driver+0x100/0x244) from [<c05ab5d0>] (driver_register+0x9c/0x124)
+>     [    9.304347] [<c05ab5d0>] (driver_register+0x9c/0x124) from [<c0933088>] (arm_smmu_test_init+0x14/0x38)
+>     [    9.313635] [<c0933088>] (arm_smmu_test_init+0x14/0x38) from [<c0200618>] (do_one_initcall+0xb8/0x160)
+>     [    9.322926] [<c0200618>] (do_one_initcall+0xb8/0x160) from [<c1200b7c>] (kernel_init_freeable+0x108/0x1cc)
+>     [    9.332564] [<c1200b7c>] (kernel_init_freeable+0x108/0x1cc) from [<c0b924b0>] (kernel_init+0xc/0xe4)
+>     [    9.341675] [<c0b924b0>] (kernel_init+0xc/0xe4) from [<c0205e38>] (ret_from_fork+0x14/0x3c)
 > 
-> Regarding the ctx variable, should I still remove the NULL check? As
-> you said, in the near future samsung_clk_init() won't panic anymore,
-> and keeping the check in place won't hurt anybody.
-
-The rule of thumb for kernel patches is that we want a patch if we know
-that it is something we need. We don't know yet when and how (which
-error returning convention, NULL or ERR_PTR() or maybe something else?)
-samsung_clk_init() gets changed, so right now we shouldn't change its
-callers.
-
-Of course a patch changing samsung_clk_init() and all its callers in one
-go will be welcome.
-
-By the way, please avoid top posting. Here's a good read on Linux
-mailing lists netiquette: http://www.tux.org/lkml/#s3 .
-
-Best regards,
-Tomasz
-
+> Fix this by moving the request_irq out of the critical section. This
+> should be okay since smmu_domain->smmu is still being protected by the
+> critical section. Also, we still don't program the Stream Match Register
+> until after registering our interrupt handler so we shouldn't be missing
+> any interrupts.
 > 
-> Best,
-> Humberto
+> Signed-off-by: Mitchel Humpherys <mitchelh@codeaurora.org>
+> ---
+> Changelog:
 > 
-> On Thu, Jul 31, 2014 at 2:34 PM, Tomasz Figa <tomasz.figa@gmail.com> wrote:
->> Hi Humberto,
->>
->> Please see my comments inline.
->>
->> On 31.07.2014 13:22, Humberto Silva Naves wrote:
->>> Added NULL pointer checks for device_node input parameter and
->>> for the samsung_clk_provider context returned by samsung_clk_init.
->>> Even though the *current* samsung_clk_init function never returns
->>> a NULL pointer, it is good to keep this check in place to avoid
->>> possible problems in the future due to changes in implementation.
->>> That way, we also improve the consistency of the code that performs
->>> clock initialization across the different SoCs.
->>>
->>> Signed-off-by: Humberto Silva Naves <hsnaves@gmail.com>
->>> ---
->>>  drivers/clk/samsung/clk-exynos5410.c |   12 +++++++++---
->>>  1 file changed, 9 insertions(+), 3 deletions(-)
->>>
->>> diff --git a/drivers/clk/samsung/clk-exynos5410.c b/drivers/clk/samsung/clk-exynos5410.c
->>> index 231475b..bf57c80 100644
->>> --- a/drivers/clk/samsung/clk-exynos5410.c
->>> +++ b/drivers/clk/samsung/clk-exynos5410.c
->>> @@ -188,11 +188,17 @@ static void __init exynos5410_clk_init(struct device_node *np)
->>>       struct samsung_clk_provider *ctx;
->>>       void __iomem *reg_base;
->>>
->>> -     reg_base = of_iomap(np, 0);
->>> -     if (!reg_base)
->>> -             panic("%s: failed to map registers\n", __func__);
->>> +     if (np) {
->>
->> Since all Exynos-based boards are always booted using DT, this function
->> will never be called if there is no node for the clock controller and so
->> there is no way this pointer can end up being NULL. I don't see a point
->> in complicating this code with useless checks.
->>
->>> +             reg_base = of_iomap(np, 0);
->>> +             if (!reg_base)
->>> +                     panic("%s: failed to map registers\n", __func__);
->>> +     } else {
->>> +             panic("%s: unable to determine soc\n", __func__);
->>> +     }
->>
->> As a side note, since panic() does not return, the code above could be
->> changed to follow rest of checks in this function:
->>
->>         if (!np)
->>                 panic("%s: unable to determine soc\n", __func__);
->>
->>         reg_base = of_iomap(np, 0);
->>         ...
->>
->> leading to more readable code with less indentation and less changes to
->> existing code.
->>
->>>
->>>       ctx = samsung_clk_init(np, reg_base, CLK_NR_CLKS);
->>> +     if (!ctx)
->>> +             panic("%s: unable to allocate context.\n", __func__);
->>
->> samsung_clk_init() already panics on any error, although now as I think
->> of it, it probably should be changed with a patch to just error out and
->> let the caller handle the error. However callers don't need to be
->> changed before this is done.
->>
->> Best regards,
->> Tomasz
+>   - v4: some cleanup suggested by Will
+>   - v3: rework irq request code to avoid requesting the irq every
+>         time a master is added to the domain
+>   - v2: return error code from request_irq on failure
+> ---
+>  drivers/iommu/arm-smmu.c | 49 +++++++++++++++++++++++++-----------------------
+>  1 file changed, 26 insertions(+), 23 deletions(-)
+
+Great, thanks Mitch. I'll queue this for 3.18.
+
+Will
