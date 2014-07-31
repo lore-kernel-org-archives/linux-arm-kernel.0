@@ -1,68 +1,25 @@
-From: rric@kernel.org (Robert Richter)
-Date: Thu, 31 Jul 2014 18:35:24 +0200
-Subject: [PATCH 2/5] arm64, thunder: Add initial dts for Cavium Thunder SoC
-In-Reply-To: <CAL_JsqKgfjV4sEZOWuH4YcMjeOA_yNDvZLv_jTi_Sb=27cOD3g@mail.gmail.com>
-References: <1406732794-20920-1-git-send-email-rric@kernel.org>
- <1406732794-20920-3-git-send-email-rric@kernel.org>
- <20140730154626.GD20162@leverpostej>
- <CAL_JsqLJ_W34XTF2aMOW9z+Gq4oxbrX1RztyJN8Mi0OFPeNxfg@mail.gmail.com>
- <20140731123443.GS4703@rric.localhost>
- <CAL_JsqKgfjV4sEZOWuH4YcMjeOA_yNDvZLv_jTi_Sb=27cOD3g@mail.gmail.com>
-Message-ID: <20140731163524.GT4703@rric.localhost>
+From: joro@8bytes.org (Joerg Roedel)
+Date: Thu, 31 Jul 2014 18:36:11 +0200
+Subject: [PATCH v5] devicetree: Add generic IOMMU device tree bindings
+In-Reply-To: <CAOesGMiS_MJNnkfPOsqxV27=rXPgT9UNbp-+VhpMRNf9u0+-eA@mail.gmail.com>
+References: <1406803383-11601-1-git-send-email-thierry.reding@gmail.com>
+ <20140731120424.GK9809@8bytes.org>
+ <CAOesGMiS_MJNnkfPOsqxV27=rXPgT9UNbp-+VhpMRNf9u0+-eA@mail.gmail.com>
+Message-ID: <20140731163611.GM9809@8bytes.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 31.07.14 10:22:19, Rob Herring wrote:
-> On Thu, Jul 31, 2014 at 7:34 AM, Robert Richter <rric@kernel.org> wrote:
-> > On 30.07.14 11:37:38, Rob Herring wrote:
-> >> On Wed, Jul 30, 2014 at 10:46 AM, Mark Rutland <mark.rutland@arm.com> wrote:
-> >> > On Wed, Jul 30, 2014 at 04:06:31PM +0100, Robert Richter wrote:
-> >> >> From: Radha Mohan Chintakuntla <rchintakuntla@cavium.com>
+On Thu, Jul 31, 2014 at 08:38:47AM -0700, Olof Johansson wrote:
 > >
-> >> >> +/ {
-> >> >> +     model = "Cavium ThunderX CN88XX Family";
-> >> >> +     compatible = "cavium,thunder-88xx";
-> >> >
-> >> > Please don't use wildcards in compatible strings. Give this an absolute
-> >> > name, and override as necessary.
-> >
-> > The naming 88xx refers to the processor family and arn't actually
-> > wildcards. In the future we might need another dts file for 87xx, but
-> > so far all SoCs of 88xx family should use the same dts files. In this
-> > sense the naming is very specific.
+> > Applied, thanks everyone.
 > 
-> Yes, but each implementation can have its own errata. You might not
-> need to distinguish them now, but you could in the future.
+> Really?
 > 
-> However, if the family is really all the same die and different parts
-> are just marketing, then the name is fine. Or if you can easily probe
-> the exact part and revision it's probably fine.
+> Gee, thanks for giving people a chance to reply with acks. It's
+> considered polite to do so when there has been outstanding questions.
 
-Yes, this relates to the same soc.
+Its not pushed yet, I can still make changes. Do you have any objections
+or an Ack?
 
-> 
-> >
-> >
-> >> >> +     cpus {
-> >> >> +             #address-cells = <2>;
-> >> >> +             #size-cells = <0>;
-> >> >> +
-> >> >> +             cpu at 000 {
-> >> >> +                     device_type = "cpu";
-> >> >> +                     compatible = "cavium,thunder", "arm,armv8";
-> >> >> +                     reg = <0x0 0x000>;
-> >> >> +                     enable-method = "psci";
-> >> >> +             };
-> >> >
-> >> > Just to check: both the SoC and CPU are called thunder?
-> >
-> > The soc is called thunder-88xx, the cpu thunder. E.g. an 87xx soc will
-> > have the same core in which is thunder.
-> 
-> And the next version of the core would be called something else?
-> thunder-v2? lightning? As long as they are distinguishable they should
-> be fine.
 
-Same here, the name relates to the same core.
-
--Robert
+	Joerg
