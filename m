@@ -1,120 +1,91 @@
-From: mturquette@linaro.org (Mike Turquette)
-Date: Thu, 31 Jul 2014 15:45:23 -0700
-Subject: [PATCH 1/4] clk: rockchip: protect critical clocks from getting
- disabled
-In-Reply-To: <1406661128-7614-2-git-send-email-heiko@sntech.de>
-References: <1406661128-7614-1-git-send-email-heiko@sntech.de>
- <1406661128-7614-2-git-send-email-heiko@sntech.de>
-Message-ID: <20140731224523.4463.34464@quantum>
+From: dianders@chromium.org (Doug Anderson)
+Date: Thu, 31 Jul 2014 15:49:35 -0700
+Subject: [PATCH v4 4/5] ARM: dts: Fix the sort ordering of EHCI and HSIC in
+ rk3288.dtsi
+Message-ID: <1406846976-23127-4-git-send-email-dianders@chromium.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Quoting Heiko Stuebner (2014-07-29 12:12:05)
-> The clock-tree contains clocks that should never get disabled automatically.
-> One example are the base ACLKs, the base supplies for all peripherals.
-> 
-> Therefore add a structure similar to the sunxi clock-tree to protect these
-> special clocks from being disabled.
-> 
-> Signed-off-by: Heiko Stuebner <heiko@sntech.de>
-> ---
->  drivers/clk/rockchip/clk-rk3188.c |  7 +++++++
->  drivers/clk/rockchip/clk-rk3288.c |  7 +++++++
->  drivers/clk/rockchip/clk.c        | 13 +++++++++++++
->  drivers/clk/rockchip/clk.h        |  1 +
->  4 files changed, 28 insertions(+)
-> 
-> diff --git a/drivers/clk/rockchip/clk-rk3188.c b/drivers/clk/rockchip/clk-rk3188.c
-> index a83a6d8..5aef277 100644
-> --- a/drivers/clk/rockchip/clk-rk3188.c
-> +++ b/drivers/clk/rockchip/clk-rk3188.c
-> @@ -599,6 +599,11 @@ static struct rockchip_clk_branch rk3188_clk_branches[] __initdata = {
->         GATE(ACLK_GPS, "aclk_gps", "aclk_peri", 0, RK2928_CLKGATE_CON(8), 13, GFLAGS),
->  };
->  
-> +static const char *rk3188_critical_clocks[] __initconst = {
-> +       "aclk_cpu",
-> +       "aclk_peri",
+The EHCI and HSIC device tree nodes were added in the wrong place.
+Fix them.
 
-I'm not against the idea of critical clocks, but I want to verify that
-there is no other driver out there that is a better fit for claiming
-these clks via clk_get and enabling them the normal way via clk_enable?
+Signed-off-by: Doug Anderson <dianders@chromium.org>
+Signed-off-by: Kever Yang <kever.yang@rock-chips.com>
+---
+Changes in v4:
+- Based on the proper patch
 
-Regards,
-Mike
+Changes in v3:
+- EHCI and HSIC move new for version 3.
 
-> +};
-> +
->  static void __init rk3188_common_clk_init(struct device_node *np)
->  {
->         void __iomem *reg_base;
-> @@ -628,6 +633,8 @@ static void __init rk3188_common_clk_init(struct device_node *np)
->                                    RK3188_GRF_SOC_STATUS);
->         rockchip_clk_register_branches(common_clk_branches,
->                                   ARRAY_SIZE(common_clk_branches));
-> +       rockchip_clk_protect_critical(rk3188_critical_clocks,
-> +                                     ARRAY_SIZE(rk3188_critical_clocks));
->  
->         rockchip_register_softrst(np, 9, reg_base + RK2928_SOFTRST_CON(0),
->                                   ROCKCHIP_SOFTRST_HIWORD_MASK);
-> diff --git a/drivers/clk/rockchip/clk-rk3288.c b/drivers/clk/rockchip/clk-rk3288.c
-> index 0d8c6c5..6c6f954 100644
-> --- a/drivers/clk/rockchip/clk-rk3288.c
-> +++ b/drivers/clk/rockchip/clk-rk3288.c
-> @@ -680,6 +680,11 @@ static struct rockchip_clk_branch rk3288_clk_branches[] __initdata = {
->         GATE(0, "pclk_isp_in", "ext_isp", 0, RK3288_CLKGATE_CON(16), 3, GFLAGS),
->  };
->  
-> +static const char *rk3288_critical_clocks[] __initconst = {
-> +       "aclk_cpu",
-> +       "aclk_peri",
-> +};
-> +
->  static void __init rk3288_clk_init(struct device_node *np)
->  {
->         void __iomem *reg_base;
-> @@ -710,6 +715,8 @@ static void __init rk3288_clk_init(struct device_node *np)
->                                    RK3288_GRF_SOC_STATUS);
->         rockchip_clk_register_branches(rk3288_clk_branches,
->                                   ARRAY_SIZE(rk3288_clk_branches));
-> +       rockchip_clk_protect_critical(rk3288_critical_clocks,
-> +                                     ARRAY_SIZE(rk3288_critical_clocks));
->  
->         rockchip_register_softrst(np, 9, reg_base + RK3288_SOFTRST_CON(0),
->                                   ROCKCHIP_SOFTRST_HIWORD_MASK);
-> diff --git a/drivers/clk/rockchip/clk.c b/drivers/clk/rockchip/clk.c
-> index 278cf9d..9189f1b 100644
-> --- a/drivers/clk/rockchip/clk.c
-> +++ b/drivers/clk/rockchip/clk.c
-> @@ -242,3 +242,16 @@ void __init rockchip_clk_register_branches(
->                 rockchip_clk_add_lookup(clk, list->id);
->         }
->  }
-> +
-> +void __init rockchip_clk_protect_critical(const char *clocks[], int nclocks)
-> +{
-> +       int i;
-> +
-> +       /* Protect the clocks that needs to stay on */
-> +       for (i = 0; i < nclocks; i++) {
-> +               struct clk *clk = __clk_lookup(clocks[i]);
-> +
-> +               if (clk)
-> +                       clk_prepare_enable(clk);
-> +       }
-> +}
-> diff --git a/drivers/clk/rockchip/clk.h b/drivers/clk/rockchip/clk.h
-> index 887cbde..2b0bca1 100644
-> --- a/drivers/clk/rockchip/clk.h
-> +++ b/drivers/clk/rockchip/clk.h
-> @@ -329,6 +329,7 @@ void rockchip_clk_register_branches(struct rockchip_clk_branch *clk_list,
->                                     unsigned int nr_clk);
->  void rockchip_clk_register_plls(struct rockchip_pll_clock *pll_list,
->                                 unsigned int nr_pll, int grf_lock_offset);
-> +void rockchip_clk_protect_critical(const char *clocks[], int nclocks);
->  
->  #define ROCKCHIP_SOFTRST_HIWORD_MASK   BIT(0)
->  
-> -- 
-> 2.0.1
-> 
+ arch/arm/boot/dts/rk3288.dtsi | 41 ++++++++++++++++++++---------------------
+ 1 file changed, 20 insertions(+), 21 deletions(-)
+
+diff --git a/arch/arm/boot/dts/rk3288.dtsi b/arch/arm/boot/dts/rk3288.dtsi
+index 9713054..49c99f2 100644
+--- a/arch/arm/boot/dts/rk3288.dtsi
++++ b/arch/arm/boot/dts/rk3288.dtsi
+@@ -156,6 +156,17 @@
+ 		status = "disabled";
+ 	};
+ 
++	usb_host0_ehci: usb at ff500000 {
++		compatible = "generic-ehci";
++		reg = <0xff500000 0x100>;
++		interrupts = <GIC_SPI 24 IRQ_TYPE_LEVEL_HIGH>;
++		clocks = <&cru HCLK_USBHOST0>;
++		clock-names = "usbhost";
++		status = "disabled";
++	};
++
++	/* NOTE: ohci at ff520000 doesn't actually work on hardware */
++
+ 	usb_host1: usb at ff540000 {
+ 		compatible = "rockchip,rk3288-usb", "rockchip,rk3066-usb",
+ 				"snps,dwc2";
+@@ -176,6 +187,15 @@
+ 		status = "disabled";
+ 	};
+ 
++	usb_hsic: usb at ff5c0000 {
++		compatible = "generic-ehci";
++		reg = <0xff5c0000 0x100>;
++		interrupts = <GIC_SPI 26 IRQ_TYPE_LEVEL_HIGH>;
++		clocks = <&cru HCLK_HSIC>;
++		clock-names = "usbhost";
++		status = "disabled";
++	};
++
+ 	uart2: serial at ff690000 {
+ 		compatible = "rockchip,rk3288-uart", "snps,dw-apb-uart";
+ 		reg = <0xff690000 0x100>;
+@@ -270,27 +290,6 @@
+ 		interrupts = <GIC_SPI 111 IRQ_TYPE_LEVEL_HIGH>;
+ 		status = "disabled";
+ 	};
+-
+-	usb_host0_ehci: usb at ff500000 {
+-		compatible = "generic-ehci";
+-		reg = <0xff500000 0x100>;
+-		interrupts = <GIC_SPI 24 IRQ_TYPE_LEVEL_HIGH>;
+-		clocks = <&cru HCLK_USBHOST0>;
+-		clock-names = "usbhost";
+-		status = "disabled";
+-	};
+-
+-	/* NOTE: ohci at ff520000 doesn't actually work on hardware */
+-
+-	usb_hsic: usb at ff5c0000 {
+-		compatible = "generic-ehci";
+-		reg = <0xff5c0000 0x100>;
+-		interrupts = <GIC_SPI 26 IRQ_TYPE_LEVEL_HIGH>;
+-		clocks = <&cru HCLK_HSIC>;
+-		clock-names = "usbhost";
+-		status = "disabled";
+-	};
+-
+ 	gic: interrupt-controller at ffc01000 {
+ 		compatible = "arm,gic-400";
+ 		interrupt-controller;
+-- 
+2.0.0.526.g5318336
