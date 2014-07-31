@@ -1,56 +1,96 @@
-From: afaerber@suse.de (=?ISO-8859-1?Q?Andreas_F=E4rber?=)
-Date: Thu, 31 Jul 2014 07:31:30 +0200
-Subject: [PATCH 3/4] arm64: LLVMLinux: Calculate current_thread_info from
- current_stack_pointer
-In-Reply-To: <1406764649-20326-4-git-send-email-behanw@converseincode.com>
-References: <1406764649-20326-1-git-send-email-behanw@converseincode.com>
- <1406764649-20326-4-git-send-email-behanw@converseincode.com>
-Message-ID: <53D9D4B2.8070008@suse.de>
+From: olof@lixom.net (Olof Johansson)
+Date: Wed, 30 Jul 2014 22:32:47 -0700
+Subject: [GIT PULL v2][for 3.17] pull request for hisilicon terminal soc
+In-Reply-To: <53D750CA.5090405@hisilicon.com>
+References: <53D750CA.5090405@hisilicon.com>
+Message-ID: <CAOesGMhEBsb_6vghQCHTm32FngZvURb2OozLpQu=UmJEY-MAKQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Hi,
 
-Am 31.07.2014 01:57, schrieb behanw at converseincode.com:
-> From: Behan Webster <behanw@converseincode.com>
-> 
-> Use the global current_stack_pointer to get the value of the stack pointer.
-> This change supports being able to compile the kernel with both gcc and clang.
-> 
-> Signed-off-by: Behan Webster <behanw@converseincode.com>
-> Signed-off-by: Mark Charlebois <charlebm@gmail.com>
-> Reviewed-by: Jan-Simon M??ller <dl9pf@gmx.de>
+There were a few things that still needed fixing here -- I took care
+of most of them. See below.
 
-Something went wrong with ? encoding here and in 2/4.
 
-> ---
->  arch/arm64/include/asm/thread_info.h | 4 ++--
->  1 file changed, 2 insertions(+), 2 deletions(-)
-> 
-> diff --git a/arch/arm64/include/asm/thread_info.h b/arch/arm64/include/asm/thread_info.h
-> index e6b6094..c2432d2 100644
-> --- a/arch/arm64/include/asm/thread_info.h
-> +++ b/arch/arm64/include/asm/thread_info.h
-> @@ -80,8 +80,8 @@ static inline struct thread_info *current_thread_info(void) __attribute_const__;
->  
->  static inline struct thread_info *current_thread_info(void)
->  {
-> -	register unsigned long sp asm ("sp");
-> -	return (struct thread_info *)(sp & ~(THREAD_SIZE - 1));
-> +	return (struct thread_info *) \
+On Tue, Jul 29, 2014 at 12:44 AM, xuwei <xuwei5@hisilicon.com> wrote:
+> Hi Olof, Hi Kevin, Hi Arnd,
+>
+> Please help to merge pull request for hisilicon terminal soc.
+>
+> Best Regards,
+> Wei
+>
+>
+> The following changes since commit 7171511eaec5bf23fb06078f59784a3a0626b38f:
+>
+>   Linux 3.16-rc1 (2014-06-15 17:45:28 -1000)
+>
+> are available in the git repository at:
+>
+>   git://github.com/hisilicon/linux-hisi.git tags/hix5hd2-for-3.17-v2
+>
+> for you to fetch changes up to eeea1ab9b53f311f634e87d9208daa564a97dbba:
+>
+>   ARM: hisi: remove smp from machine descriptor (2014-07-29 14:54:11 +0800)
+>
+> ----------------------------------------------------------------
+> ARM: mach-hisi: Hisilicon teminal soc udaptes for 3.17
+>
+> - Rename Hi3716 to HiX5HD2
+> HiX5HD2 is a SoC with dual Cortex A9 cores for STB market.
+> And original Hi3xxx SoC is for mobile market.
+> To avoid confusing the two types of SoCs and also because of
+> different implementation(SMP, IPs integarted and earlycon configure),
+> rename Hi3716 to HIX5HD2 ann add ARCH_HIX5HD2.
+>
+> - Add HiX5HD2 STB SoC and development kit board support
+> - Change to use power reset driver to reboot for HiX5HD2
+> - Add ARCH_HISI for the common configure of hisilicon SoCs
+> - Change to use CPU_METHOD_OF_DECLARE for SMP on HiX5HD2 and hi3xxx
+> - Enable L2 aux value for Hi3620
+>
+> ----------------------------------------------------------------
+> Haifeng Yan (3):
+>       ARM: debug: Rename Hi3716 to HIX5HD2
+>       ARM: hisi: enable hix5hd2 SoC
+>       ARM: dts: Add hix5hd2-dkb dts file.
 
-This is not a macro, so \ seems superfluous.
+It is confusing -- is the SoC named HIX5HD2 or Hisilicon X5HD2? Seems
+like there are references to both.
 
-Looks okay otherwise.
+What I did was that I renamed the dts and dtsi to hisi-x5hd2  to have
+the vendor/family as prefix. Given the few boards per SoC family you
+have had so far, it makes more sense to prefix it with hisi.
 
-Regards,
-Andreas
+> Haojian Zhuang (5):
+>       ARM: hisi: add ARCH_HISI
+>       power: reset: move hisilicon reboot code
+>       ARM: config: enable ARCH_HIX5HD2
+>       ARM: hisi: set l2 aux for pl310
 
-> +		(current_stack_pointer & ~(THREAD_SIZE - 1));
->  }
->  
->  #define thread_saved_pc(tsk)	\
+This patch makes no sense to still carry. If things still need to be
+resolved, then it should just be dropped.
 
--- 
-SUSE LINUX Products GmbH, Maxfeldstr. 5, 90409 N?rnberg, Germany
-GF: Jeff Hawn, Jennifer Guild, Felix Imend?rffer; HRB 16746 AG N?rnberg
+>       ARM: hisi: remove smp from machine descriptor
+
+
+Also, in general: Wei, you seem to have added your Acked-by instead of
+Signed-off-by on the commits. When you apply them, you need to do so
+with your sign off.
+
+What I have done is that I have applied most of the above patches
+directly instead of merging the branch, and I have done the touchups
+described above (dropped the L2 patch and renamed the dts/dtsi).
+
+If for some reason, the name really should be hisi-hix5hd2, then let
+me know quickly so I can revisit before it goes in. But I don't thik
+so -- I find more hits with "x5hd2" out there than with "hix5hd2". If
+anything, the remaining traces of hix5hd2 should probably be renamed
+too (machine descriptor, etc).
+
+(I also fixed a few spelling errors in the patch descriptions here and
+there, etc).
+
+
+-Olof
