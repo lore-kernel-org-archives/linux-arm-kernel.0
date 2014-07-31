@@ -1,116 +1,55 @@
-From: thierry.reding@gmail.com (Thierry Reding)
-Date: Thu, 31 Jul 2014 13:42:50 +0200
-Subject: [RFC] pwm-backlight: Allow backlight to remain disabled on boot
-Message-ID: <1406806970-12561-1-git-send-email-thierry.reding@gmail.com>
+From: s.nawrocki@samsung.com (Sylwester Nawrocki)
+Date: Thu, 31 Jul 2014 13:45:56 +0200
+Subject: [PATCHv2 4/5] clk: samsung: exynos5410: Add fixed rate clocks
+In-Reply-To: <1406805732-17372-5-git-send-email-hsnaves@gmail.com>
+References: <1406805732-17372-1-git-send-email-hsnaves@gmail.com>
+ <1406805732-17372-5-git-send-email-hsnaves@gmail.com>
+Message-ID: <53DA2C74.3010101@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Thierry Reding <treding@nvidia.com>
+(dropping linux-doc ML and Randy from Cc)
 
-The default for backlight devices is to be enabled immediately when
-registering with the backlight core. This can be useful for setups that
-use a simple framebuffer device and where the backlight cannot otherwise
-be hooked up to the panel.
+On 31/07/14 13:22, Humberto Silva Naves wrote:
+> This implements the fixed rate clocks generated either inside or
+> outside the SoC. It also adds a dt-binding constant for the
+> sclk_hdmiphy clock, which shall be later used by other drivers,
+> such as the DRM.
+> 
+> Since the external fixed rate clock fin_pll is now registered by
+> the clk-exynos5410 file, the bindings with the device tree file have
+> changed. It is no longer needed to define fin_pll as a fixed clock,
+> such as in:
+> 
+> 	fin_pll: xxti {
+>   		compatible = "fixed-clock";
+> 	  	clock-frequency = <24000000>;
+> 	  	clock-output-names = "fin_pll";
+> 	  	#clock-cells = <0>;
+> 	};
+> 
+> The above lines should be replaced by the following lines:
+> 
+> 	fixed-rate-clocks {
+> 		oscclk {
+> 			compatible = "samsung,exynos5410-oscclk";
+> 			clock-frequency = <24000000>;
+> 		};
+> 	};
+> 
+> This new form of binding was properly documented in the relevant
+> documentation file.
 
-However, when dealing with more complex setups, such as those of recent
-ARM SoCs, this can be problematic. Since the backlight is usually setup
-separately from the display controller, the probe order is not usually
-deterministic. That can lead to situations where the backlight will be
-powered up and the panel will show an uninitialized framebuffer.
+Can you explain what is rationale behind this change ? Is it related to
+suspend/resume ordering ?
+Obviously it breaks the kernel/dtb compatibility. We should be moving
+in opposite direction, i.e. completely remove the custom samsung fixed
+rate clocks. I've tried to address this with patches [1], [2] but Tomasz
+wasn't happy with them IIRC and I postponed work on that.
 
-Furthermore, subsystems such as DRM have advanced functionality to set
-the power mode of a panel. In order to allow such setups to power up the
-panel at exactly the right moment, a way is needed to prevent the
-backlight core from powering the backlight up automatically when it is
-registered.
+[1] http://www.spinics.net/lists/arm-kernel/msg333211.html
+[2] http://lists.infradead.org/pipermail/linux-arm-kernel/2014-May/258490.html
 
-This commit introduces a new boot_off field in the platform data (and
-also implements getting the same information from device tree). When set
-the initial backlight power mode will be set to "off".
-
-Signed-off-by: Thierry Reding <treding@nvidia.com>
----
-I've been meaning to send this for a while but was always holding back
-because of the indoctrination that this type of configuration shouldn't
-be part of device tree. However this issue was recently raised again in
-the context of power up sequences for display panels. As described above
-the issue is that panel datasheets recommend that the backlight attached
-to a panel be turned on at the very last step to avoid visual glitches
-during the panel's power up sequence. With the current implementation it
-is typical for the backlight to be probed before the display panel. That
-has, in many cases, the side-effect of enabling the backlight, therefore
-making the screen content visible before it's actually initialized.
-
-Some panels come up with random garbage when uninitialized, others show
-all white. With some luck the panel will be all black and users won't
-really notice.
-
-This patch is an attempt to enable boards to override the default of
-turning on the backlight for the pwm-backlight driver. I'm not sure if
-there was a specific reason to turn on the backlight by default when
-this driver was initially written, but the fact is that since it has
-pretty much always been like this we can't really go and change the
-default, otherwise a lot of people may end up with no backlight and no
-clue as to how to enable it. So the only reasonable thing we can do is
-to keep the old behaviour and give new boards a way to override it if
-they know that some other part of the stack will enable it at the right
-moment.
-
- .../devicetree/bindings/video/backlight/pwm-backlight.txt         | 1 +
- drivers/video/backlight/pwm_bl.c                                  | 8 ++++++++
- include/linux/pwm_backlight.h                                     | 2 ++
- 3 files changed, 11 insertions(+)
-
-diff --git a/Documentation/devicetree/bindings/video/backlight/pwm-backlight.txt b/Documentation/devicetree/bindings/video/backlight/pwm-backlight.txt
-index 764db86d441a..65e001a1733d 100644
---- a/Documentation/devicetree/bindings/video/backlight/pwm-backlight.txt
-+++ b/Documentation/devicetree/bindings/video/backlight/pwm-backlight.txt
-@@ -17,6 +17,7 @@ Optional properties:
-                "pwms" property (see PWM binding[0])
-   - enable-gpios: contains a single GPIO specifier for the GPIO which enables
-                   and disables the backlight (see GPIO binding[1])
-+  - backlight-boot-off: keep the backlight disabled on boot
- 
- [0]: Documentation/devicetree/bindings/pwm/pwm.txt
- [1]: Documentation/devicetree/bindings/gpio/gpio.txt
-diff --git a/drivers/video/backlight/pwm_bl.c b/drivers/video/backlight/pwm_bl.c
-index d7a3d13e72ec..62adfc9d37a7 100644
---- a/drivers/video/backlight/pwm_bl.c
-+++ b/drivers/video/backlight/pwm_bl.c
-@@ -173,6 +173,8 @@ static int pwm_backlight_parse_dt(struct device *dev,
- 		data->max_brightness--;
- 	}
- 
-+	data->boot_off = of_property_read_bool(node, "backlight-boot-off");
-+
- 	return 0;
- }
- 
-@@ -317,6 +319,12 @@ static int pwm_backlight_probe(struct platform_device *pdev)
- 	}
- 
- 	bl->props.brightness = data->dft_brightness;
-+
-+	if (data->boot_off)
-+		bl->props.power = FB_BLANK_POWERDOWN;
-+	else
-+		bl->props.power = FB_BLANK_UNBLANK;
-+
- 	backlight_update_status(bl);
- 
- 	platform_set_drvdata(pdev, bl);
-diff --git a/include/linux/pwm_backlight.h b/include/linux/pwm_backlight.h
-index efdd9227a49c..1fc14989da4a 100644
---- a/include/linux/pwm_backlight.h
-+++ b/include/linux/pwm_backlight.h
-@@ -15,6 +15,8 @@ struct platform_pwm_backlight_data {
- 	unsigned int *levels;
- 	/* TODO remove once all users are switched to gpiod_* API */
- 	int enable_gpio;
-+	bool boot_off;
-+
- 	int (*init)(struct device *dev);
- 	int (*notify)(struct device *dev, int brightness);
- 	void (*notify_after)(struct device *dev, int brightness);
--- 
-2.0.3
+--
+Regards,
+Sylwester
