@@ -1,106 +1,239 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Thu, 31 Jul 2014 11:39:01 +0100
-Subject: [PATCH v2 1/3] arm64: spin-table: handle unmapped
- cpu-release-addrs
-In-Reply-To: <20140731100439.GI26853@arm.com>
-References: <1406717944-24725-1-git-send-email-ard.biesheuvel@linaro.org>
- <1406717944-24725-2-git-send-email-ard.biesheuvel@linaro.org>
- <20140730113013.GL12239@arm.com>
- <CAKv+Gu8ne8k2NV12SyWye5aYJKHG0wHKAO+=V=1L89_hvyGopw@mail.gmail.com>
- <20140731094515.GE26853@arm.com>
- <20140731095854.GC21850@leverpostej>
- <20140731100439.GI26853@arm.com>
-Message-ID: <20140731103900.GA22994@leverpostej>
+From: thierry.reding@gmail.com (Thierry Reding)
+Date: Thu, 31 Jul 2014 12:43:03 +0200
+Subject: [PATCH v5] devicetree: Add generic IOMMU device tree bindings
+Message-ID: <1406803383-11601-1-git-send-email-thierry.reding@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jul 31, 2014 at 11:04:39AM +0100, Will Deacon wrote:
-> On Thu, Jul 31, 2014 at 10:58:54AM +0100, Mark Rutland wrote:
-> > On Thu, Jul 31, 2014 at 10:45:15AM +0100, Will Deacon wrote:
-> > > On Wed, Jul 30, 2014 at 08:17:02PM +0100, Ard Biesheuvel wrote:
-> > > > ]On 30 July 2014 13:30, Will Deacon <will.deacon@arm.com> wrote:
-> > > > > On Wed, Jul 30, 2014 at 11:59:02AM +0100, Ard Biesheuvel wrote:
-> > > > >> From: Mark Rutland <mark.rutland@arm.com>
-> > > > >>
-> > > > >> In certain cases the cpu-release-addr of a CPU may not fall in the
-> > > > >> linear mapping (e.g. when the kernel is loaded above this address due to
-> > > > >> the presence of other images in memory). This is problematic for the
-> > > > >> spin-table code as it assumes that it can trivially convert a
-> > > > >> cpu-release-addr to a valid VA in the linear map.
-> > > > >>
-> > > > >> This patch modifies the spin-table code to use a temporary cached
-> > > > >> mapping to write to a given cpu-release-addr, enabling us to support
-> > > > >> addresses regardless of whether they are covered by the linear mapping.
-> > > > >>
-> > > > >> Signed-off-by: Mark Rutland <mark.rutland@arm.com>
-> > > > >> Tested-by: Mark Salter <msalter@redhat.com>
-> > > > >> [ardb: added (__force void *) cast]
-> > > > >> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
-> > > > >> ---
-> > > > >>  arch/arm64/kernel/smp_spin_table.c | 22 +++++++++++++++++-----
-> > > > >>  1 file changed, 17 insertions(+), 5 deletions(-)
-> > > > >
-> > > > > I'm nervous about this. What if the spin table sits in the same physical 64k
-> > > > > frame as a read-sensitive device and we're running with 64k pages?
-> > > > >
-> > > > 
-> > > > Actually, booting.txt requires cpu-release-addr to point to a
-> > > > /memreserve/d part of memory, which implies DRAM (or you wouldn't have
-> > > > to memreserve it)
-> > > > That means it should always be covered by the linear mapping, unless
-> > > > it is located before Image in DRAM, which is the case addressed by
-> > > > this patch.
-> > > 
-> > > But if it's located before before the Image in DRAM and isn't covered by
-> > > the linear mapping, then surely the /memreserve/ is pointless too? In which
-> > > case, this looks like we're simply trying to cater for platforms that aren't
-> > > following booting.txt (which may need updating if we need to handle this).
-> > 
-> > No. The DT is describing the memory which is present, and the subset
-> > thereof which should not be used under normal circumstances. That's a
-> > static property of the system.
-> > 
-> > Where the OS happens to get loaded and what it is able to address is a
-> > dynamic property of the OS (and possibly the bootloader). The DT cannot
-> > have knowledge of this.
-> > 
-> > It's always true that the OS should not blindly use memreserve'd memory.
-> > The fact that it cannot address it in the linear mapping is orthogonal.
-> 
-> In which case, I think asserting that /memreserve/ implies DRAM is pretty
-> fragile and not actually enforced anywhere. Sure, we can say `don't do
-> that', but I'd prefer to have the kernel detect this dynamically.
+From: Thierry Reding <treding@nvidia.com>
 
-I think the boot protocol needs an update to allow a cpu-release-addr
-not covered by linear mapping. There are reasons that the kernel might
-not be loaded at the start of RAM, and I think relying on the
-cpu-release-addr addresses lying in the linear mapping is a limitation
-we need to address. Given that I also think we should allow for
-cpu-release-addrs outside of the range desribed by memory nodes (and
-therefore not requiring any /mremreserve/).
+This commit introduces a generic device tree binding for IOMMU devices.
+Only a very minimal subset is described here, but it is enough to cover
+the requirements of both the Exynos System MMU and Tegra SMMU as
+discussed here:
 
-I do not think we should rely on being able to address the
-cpu-release-addr with a normal cacheable mapping. If the
-cpu-release-addr falls outside of the memory described by the memory
-node(s) then we have no idea where it lives. Currently this falls in
-normal memory, but mandating that feels odd.
+    https://lkml.org/lkml/2014/4/27/346
 
-The sole purpose of /memreserve/ is to describe areas in physical memory
-that memory should not be used for general allocation. I don't think it
-makes any sense to derive any information from /memreserve/ other than
-the fact said addresses shouldn't be poked arbitarily. If we allow
-cpu-release-addrs outside of memory, then we won't have a /memreserve/
-anyhow.
+Acked-by: Will Deacon <will.deacon@arm.com>
+Reviewed-by: Arnd Bergmann <arnd@arndb.de>
+Acked-by: Rob Herring <robh@kernel.org>
+Signed-off-by: Thierry Reding <treding@nvidia.com>
+---
+Changes in v5:
+- clarify comment about dma-ranges vs. IOMMU regarding a device's
+  disabled state
+- use proper DTS syntax reference absolute nodes for phandles
+- clarify the meaning of the #iommu-cells = <0> example
+- remove confusing (and unnecessary) #address-cells and #size-cells from
+  multi-master windowed IOMMU example and clarify the meaning of DMA
+  window
 
-So the question becomes can or can't we always detect when we already
-have a mapping that covers a cpu-release-addr?
+Changes in v4:
+- clarify that disabling an IOMMU DT node may not disable translation
+- be more explicit that examples are only examples
+- add multi-ID master example
 
-> Does dtc check that the /memreserve/ region is actually a subset of the
-> memory node?
+Changes in v3:
+- use #iommu-cells instead of #address-cells/#size-cells
+- drop optional iommu-names property
 
-I don't beleive it does. It's probably a sensible warning, but as far as
-I am aware the only time the memory reservation table will be read in
-any OS is to poke holes in its memory allocation pool(s).
+Changes in v2:
+- add notes about "dma-ranges" property (drop note from commit message)
+- document priorities of "iommus" property vs. "dma-ranges" property
+- drop #iommu-cells in favour of #address-cells and #size-cells
+- remove multiple-master device example
 
-Cheers,
-Mark.
+ Documentation/devicetree/bindings/iommu/iommu.txt | 182 ++++++++++++++++++++++
+ 1 file changed, 182 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/iommu/iommu.txt
+
+diff --git a/Documentation/devicetree/bindings/iommu/iommu.txt b/Documentation/devicetree/bindings/iommu/iommu.txt
+new file mode 100644
+index 000000000000..5a8b4624defc
+--- /dev/null
++++ b/Documentation/devicetree/bindings/iommu/iommu.txt
+@@ -0,0 +1,182 @@
++This document describes the generic device tree binding for IOMMUs and their
++master(s).
++
++
++IOMMU device node:
++==================
++
++An IOMMU can provide the following services:
++
++* Remap address space to allow devices to access physical memory ranges that
++  they otherwise wouldn't be capable of accessing.
++
++  Example: 32-bit DMA to 64-bit physical addresses
++
++* Implement scatter-gather at page level granularity so that the device does
++  not have to.
++
++* Provide system protection against "rogue" DMA by forcing all accesses to go
++  through the IOMMU and faulting when encountering accesses to unmapped
++  address regions.
++
++* Provide address space isolation between multiple contexts.
++
++  Example: Virtualization
++
++Device nodes compatible with this binding represent hardware with some of the
++above capabilities.
++
++IOMMUs can be single-master or multiple-master. Single-master IOMMU devices
++typically have a fixed association to the master device, whereas multiple-
++master IOMMU devices can translate accesses from more than one master.
++
++The device tree node of the IOMMU device's parent bus must contain a valid
++"dma-ranges" property that describes how the physical address space of the
++IOMMU maps to memory. An empty "dma-ranges" property means that there is a
++1:1 mapping from IOMMU to memory.
++
++Required properties:
++--------------------
++- #iommu-cells: The number of cells in an IOMMU specifier needed to encode an
++  address.
++
++The meaning of the IOMMU specifier is defined by the device tree binding of
++the specific IOMMU. Below are a few examples of typical use-cases:
++
++- #iommu-cells = <0>: Single master IOMMU devices are not configurable and
++  therefore no additional information needs to be encoded in the specifier.
++  This may also apply to multiple master IOMMU devices that do not allow the
++  association of masters to be configured. Note that an IOMMU can by design
++  be multi-master yet only expose a single master in a given configuration.
++  In such cases the number of cells will usually be 1 as in the next case.
++- #iommu-cells = <1>: Multiple master IOMMU devices may need to be configured
++  in order to enable translation for a given master. In such cases the single
++  address cell corresponds to the master device's ID. In some cases more than
++  one cell can be required to represent a single master ID.
++- #iommu-cells = <4>: Some IOMMU devices allow the DMA window for masters to
++  be configured. The first cell of the address in this may contain the master
++  device's ID for example, while the second cell could contain the start of
++  the DMA window for the given device. The length of the DMA window is given
++  by the third and fourth cells.
++
++Note that these are merely examples and real-world use-cases may use different
++definitions to represent their individual needs. Always refer to the specific
++IOMMU binding for the exact meaning of the cells that make up the specifier.
++
++
++IOMMU master node:
++==================
++
++Devices that access memory through an IOMMU are called masters. A device can
++have multiple master interfaces (to one or more IOMMU devices).
++
++Required properties:
++--------------------
++- iommus: A list of phandle and IOMMU specifier pairs that describe the IOMMU
++  master interfaces of the device. One entry in the list describes one master
++  interface of the device.
++
++When an "iommus" property is specified in a device tree node, the IOMMU will
++be used for address translation. If a "dma-ranges" property exists in the
++device's parent node it will be ignored. An exception to this rule is if the
++referenced IOMMU is disabled, in which case the "dma-ranges" property of the
++parent shall take effect. Note that merely disabling a device tree node does
++not guarantee that the IOMMU is really disabled since the hardware may not
++have a means to turn off translation. But it is invalid in such cases to
++disable the IOMMU's device tree node in the first place because it would
++prevent any driver from properly setting up the translations.
++
++
++Notes:
++======
++
++One possible extension to the above is to use an "iommus" property along with
++a "dma-ranges" property in a bus device node (such as PCI host bridges). This
++can be useful to describe how children on the bus relate to the IOMMU if they
++are not explicitly listed in the device tree (e.g. PCI devices). However, the
++requirements of that use-case haven't been fully determined yet. Implementing
++this is therefore not recommended without further discussion and extension of
++this binding.
++
++
++Examples:
++=========
++
++Single-master IOMMU:
++--------------------
++
++	iommu {
++		#iommu-cells = <0>;
++	};
++
++	master {
++		iommus = <&{/iommu}>;
++	};
++
++Multiple-master IOMMU with fixed associations:
++----------------------------------------------
++
++	/* multiple-master IOMMU */
++	iommu {
++		/*
++		 * Masters are statically associated with this IOMMU and share
++		 * the same address translations because the IOMMU does not
++		 * have sufficient information to distinguish between masters.
++		 *
++		 * Consequently address translation is always on or off for
++		 * all masters at any given point in time.
++		 */
++		#iommu-cells = <0>;
++	};
++
++	/* static association with IOMMU */
++	master at 1 {
++		reg = <1>;
++		iommus = <&{/iommu}>;
++	};
++
++	/* static association with IOMMU */
++	master at 2 {
++		reg = <2>;
++		iommus = <&{/iommu}>;
++	};
++
++Multiple-master IOMMU:
++----------------------
++
++	iommu {
++		/* the specifier represents the ID of the master */
++		#iommu-cells = <1>;
++	};
++
++	master at 1 {
++		/* device has master ID 42 in the IOMMU */
++		iommus = <&{/iommu} 42>;
++	};
++
++	master at 2 {
++		/* device has master IDs 23 and 24 in the IOMMU */
++		iommus = <&{/iommu} 23>, <&{/iommu} 24>;
++	};
++
++Multiple-master IOMMU with configurable DMA window:
++---------------------------------------------------
++
++	/ {
++		iommu {
++			/*
++			 * One cell for the master ID and one cell for the
++			 * address of the DMA window. The length of the DMA
++			 * window is encoded in two cells.
++			 *
++			 * The DMA window is the range addressable by the
++			 * master (i.e. the I/O virtual address space).
++			 */
++			#iommu-cells = <4>;
++		};
++
++		master {
++			/* master ID 42, 4 GiB DMA window starting at 0 */
++			iommus = <&{/iommu}  42  0  0x1 0x0>;
++		};
++	};
+-- 
+2.0.3
