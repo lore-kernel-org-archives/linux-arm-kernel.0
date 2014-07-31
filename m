@@ -1,49 +1,38 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Thu, 31 Jul 2014 09:33:02 +0900
-Subject: [GIT PULL] Fourth Round of Renesas ARM Based SoC Clock Updates for
- v3.17
-Message-ID: <cover.1406766463.git.horms+renesas@verge.net.au>
+Date: Thu, 31 Jul 2014 09:33:06 +0900
+Subject: [PATCH] ARM: shmobile: sh73a0: Remove spurious 0x from SCIFB clock
+ name
+In-Reply-To: <cover.1406766463.git.horms+renesas@verge.net.au>
+References: <cover.1406766463.git.horms+renesas@verge.net.au>
+Message-ID: <2c3758b01aa6f11382d2b018614b5d48ecf30350.1406766463.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Olof, Hi Kevin, Hi Arnd,
+A stray '0x' crept into a0f7e7496d56ac2d ("ARM: shmobile: sh73a0: add CMT1
+clock support for DT"). This  patch removes it.
 
-Please consider these fourth round of Renesas ARM based SoC clock
-updates for v3.17.
+This change should not have any run-time affect at this time as
+the clock in question is used by a SCIF device that is not enabled by
+default.
 
-I am sending this even though v3.16-rc6 has long since been released
-as this pull-request only includes a single one line fix for a problem
-introduced in patches you have already queued up for v3.16.
-
-At it turns out the problem should not manifest at run time
-as it is an error in an clock that is not used without DT modifications.
-As such I am happy for you to ask me to defer this to v3.18 if you like.
-
-This pull request is based on the previous round of
-such requests, tagged as renesas-clock3-for-v3.17,
-which you have already merged.
-
-
-The following changes since commit a0f7e7496d56ac2da7c684e2035815318c17973a:
-
-  ARM: shmobile: sh73a0: add CMT1 clock support for DT (2014-07-15 13:34:17 +0900)
-
-are available in the git repository at:
-
-  git://git.kernel.org/pub/scm/linux/kernel/git/horms/renesas.git tags/renesas-clock4-for-v3.17
-
-for you to fetch changes up to 2c3758b01aa6f11382d2b018614b5d48ecf30350:
-
-  ARM: shmobile: sh73a0: Remove spurious 0x from SCIFB clock name (2014-07-16 23:09:18 +0900)
-
-----------------------------------------------------------------
-Fourth Round of Renesas ARM Based SoC Clock Updates for v3.17
-
-* Remove spurious 0x from SCIFB clock name
-
-----------------------------------------------------------------
-Simon Horman (1):
-      ARM: shmobile: sh73a0: Remove spurious 0x from SCIFB clock name
-
+Reported-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
+Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
+---
  arch/arm/mach-shmobile/clock-sh73a0.c | 2 +-
  1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/arch/arm/mach-shmobile/clock-sh73a0.c b/arch/arm/mach-shmobile/clock-sh73a0.c
+index 0d77f65..b0993a5 100644
+--- a/arch/arm/mach-shmobile/clock-sh73a0.c
++++ b/arch/arm/mach-shmobile/clock-sh73a0.c
+@@ -644,7 +644,7 @@ static struct clk_lookup lookups[] = {
+ 	CLKDEV_DEV_ID("sh-sci.5", &mstp_clks[MSTP207]), /* SCIFA5 */
+ 	CLKDEV_DEV_ID("e6cb0000.serial", &mstp_clks[MSTP207]), /* SCIFA5 */
+ 	CLKDEV_DEV_ID("sh-sci.8", &mstp_clks[MSTP206]), /* SCIFB */
+-	CLKDEV_DEV_ID("0xe6c3000.serial", &mstp_clks[MSTP206]), /* SCIFB */
++	CLKDEV_DEV_ID("e6c3000.serial", &mstp_clks[MSTP206]), /* SCIFB */
+ 	CLKDEV_DEV_ID("sh-sci.0", &mstp_clks[MSTP204]), /* SCIFA0 */
+ 	CLKDEV_DEV_ID("e6c40000.serial", &mstp_clks[MSTP204]), /* SCIFA0 */
+ 	CLKDEV_DEV_ID("sh-sci.1", &mstp_clks[MSTP203]), /* SCIFA1 */
+-- 
+2.0.1
