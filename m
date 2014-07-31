@@ -1,181 +1,55 @@
-From: grygorii.strashko@ti.com (Grygorii Strashko)
-Date: Thu, 31 Jul 2014 20:33:15 +0300
-Subject: [PATCH 2/2] spi: davinci: add support to configure gpio cs through dt
-In-Reply-To: <1406827995-30913-1-git-send-email-grygorii.strashko@ti.com>
-References: <1406827995-30913-1-git-send-email-grygorii.strashko@ti.com>
-Message-ID: <1406827995-30913-3-git-send-email-grygorii.strashko@ti.com>
+From: fweisbec@gmail.com (Frederic Weisbecker)
+Date: Thu, 31 Jul 2014 18:49:20 +0200
+Subject: [PATCH v4 2/5] x86,entry: Only call user_exit if TIF_NOHZ
+In-Reply-To: <20140731164246.GA15974@redhat.com>
+References: <cover.1406604806.git.luto@amacapital.net>
+ <7123b2489cc5d1d5abb7bcf1364ca729cab3e6ca.1406604806.git.luto@amacapital.net>
+ <20140729193232.GA8153@redhat.com>
+ <20140730164344.GA27954@localhost.localdomain>
+ <CALCETrUVaz3JFiNbyU=r3M-E9muHa1ffn7RX+_-4V_0U-hVaPw@mail.gmail.com>
+ <20140731151630.GA7842@localhost.localdomain>
+ <20140731164246.GA15974@redhat.com>
+Message-ID: <20140731164918.GC7842@localhost.localdomain>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Murali Karicheri <m-karicheri2@ti.com>
+On Thu, Jul 31, 2014 at 06:42:46PM +0200, Oleg Nesterov wrote:
+> On 07/31, Frederic Weisbecker wrote:
+> >
+> > On Wed, Jul 30, 2014 at 10:23:34AM -0700, Andy Lutomirski wrote:
+> > >
+> > > At the end of the day, the syscall slowpath code calls a bunch of
+> > > functions depending on what TIF_XYZ flags are set.  As long as it's
+> > > structured like "if (TIF_A) do_a(); if (TIF_B) do_b();" or something
+> > > like that, it's comprehensible.  But once random functions with no
+> > > explicit flag checks or comments start showing up, it gets confusing.
+> >
+> > Yeah that's a point. I don't mind much the TIF_NOHZ test if you like.
+> 
+> And in my opinion
+> 
+> 	if (work & TIF_XYZ)
+> 		user_exit();
+> 
+> looks even more confusing. Because, once again, TIF_XYZ is not the
+> reason to call user_exit().
+> 
+> Not to mention this adds a minor performance penalty.
 
-Currently driver supports only configuration of GPIO CS through
-platform data. This patch enhances the driver to configure GPIO
-CS through DT. Also update the DT binding documentation to
-reflect the availability of cs-gpios.
+That's a point too! You guys both convinced me! ;-)
 
-Signed-off-by: Murali Karicheri <m-karicheri2@ti.com>
-Signed-off-by: Grygorii Strashko <grygorii.strashko@ti.com>
----
- .../devicetree/bindings/spi/spi-davinci.txt        |    9 ++-
- drivers/spi/spi-davinci.c                          |   59 +++++++++++++++++---
- 2 files changed, 59 insertions(+), 9 deletions(-)
+> 
+> > > If it's indeed all-or-nothing, I could remove the check and add a
+> > > comment.  But please keep in mind that, currently, the slow path is
+> > > *slow*, and my patches only improve the entry case.  So enabling
+> > > context tracking on every task will hurt.
+> >
+> > That's what we do anyway. I haven't found a safe way to enabled context tracking
+> > without tracking all CPUs.
+> 
+> And if we change this, then the code above becomes racy. The state of
+> TIF_XYZ can be changed right after the check. OK, it is racy anyway ;)
+> but still this adds more confusion.
 
-diff --git a/Documentation/devicetree/bindings/spi/spi-davinci.txt b/Documentation/devicetree/bindings/spi/spi-davinci.txt
-index 6d0ac8d..f80887b 100644
---- a/Documentation/devicetree/bindings/spi/spi-davinci.txt
-+++ b/Documentation/devicetree/bindings/spi/spi-davinci.txt
-@@ -8,7 +8,8 @@ Required properties:
- 	- "ti,dm6441-spi" for SPI used similar to that on DM644x SoC family
- 	- "ti,da830-spi" for SPI used similar to that on DA8xx SoC family
- - reg: Offset and length of SPI controller register space
--- num-cs: Number of chip selects
-+- num-cs: Number of chip selects. This includes internal as well as
-+	GPIO chip selects.
- - ti,davinci-spi-intr-line: interrupt line used to connect the SPI
- 	IP to the interrupt controller within the SoC. Possible values
- 	are 0 and 1. Manual says one of the two possible interrupt
-@@ -17,6 +18,12 @@ Required properties:
- - interrupts: interrupt number mapped to CPU.
- - clocks: spi clk phandle
- 
-+Optional:
-+- cs-gpios: gpio chip selects
-+	For example to have 3 internal CS and 2 GPIO CS, user could define
-+	cs-gpios = <0>, <0>, <0>, <&gpio1 30 0>, <&gpio1 31 0>;
-+	where first three are internal CS and last two are GPIO CS.
-+
- Example of a NOR flash slave device (n25q032) connected to DaVinci
- SPI controller device over the SPI bus.
- 
-diff --git a/drivers/spi/spi-davinci.c b/drivers/spi/spi-davinci.c
-index 2477af4..6aa04d1 100644
---- a/drivers/spi/spi-davinci.c
-+++ b/drivers/spi/spi-davinci.c
-@@ -30,6 +30,7 @@
- #include <linux/edma.h>
- #include <linux/of.h>
- #include <linux/of_device.h>
-+#include <linux/of_gpio.h>
- #include <linux/spi/spi.h>
- #include <linux/spi/spi_bitbang.h>
- #include <linux/slab.h>
-@@ -207,17 +208,28 @@ static inline void clear_io_bits(void __iomem *addr, u32 bits)
- static void davinci_spi_chipselect(struct spi_device *spi, int value)
- {
- 	struct davinci_spi *dspi;
-+	struct device_node *np = spi->dev.of_node;
- 	struct davinci_spi_platform_data *pdata;
-+	struct spi_master *master = spi->master;
- 	u8 chip_sel = spi->chip_select;
- 	u16 spidat1 = CS_DEFAULT;
- 	bool gpio_chipsel = false;
-+	int gpio;
- 
- 	dspi = spi_master_get_devdata(spi->master);
- 	pdata = &dspi->pdata;
- 
--	if (pdata->chip_sel && chip_sel < pdata->num_chipselect &&
--				pdata->chip_sel[chip_sel] != SPI_INTERN_CS)
-+	if (np && master->cs_gpios != NULL && spi->cs_gpio >= 0) {
-+		/* SPI core parse and update master->cs_gpio */
- 		gpio_chipsel = true;
-+		gpio = spi->cs_gpio;
-+	} else if (pdata->chip_sel &&
-+		   chip_sel < pdata->num_chipselect &&
-+		   pdata->chip_sel[chip_sel] != SPI_INTERN_CS) {
-+		/* platform data defines chip_sel */
-+		gpio_chipsel = true;
-+		gpio = pdata->chip_sel[chip_sel];
-+	}
- 
- 	/*
- 	 * Board specific chip select logic decides the polarity and cs
-@@ -225,9 +237,9 @@ static void davinci_spi_chipselect(struct spi_device *spi, int value)
- 	 */
- 	if (gpio_chipsel) {
- 		if (value == BITBANG_CS_ACTIVE)
--			gpio_set_value(pdata->chip_sel[chip_sel], 0);
-+			gpio_set_value(gpio, 0);
- 		else
--			gpio_set_value(pdata->chip_sel[chip_sel], 1);
-+			gpio_set_value(gpio, 1);
- 	} else {
- 		if (value == BITBANG_CS_ACTIVE) {
- 			spidat1 |= SPIDAT1_CSHOLD_MASK;
-@@ -390,17 +402,36 @@ static int davinci_spi_setup(struct spi_device *spi)
- 	int retval = 0;
- 	struct davinci_spi *dspi;
- 	struct davinci_spi_platform_data *pdata;
-+	struct spi_master *master = spi->master;
-+	struct device_node *np = spi->dev.of_node;
-+	bool internal_cs = true;
- 
- 	dspi = spi_master_get_devdata(spi->master);
- 	pdata = &dspi->pdata;
- 
- 	if (!(spi->mode & SPI_NO_CS)) {
--		if ((pdata->chip_sel == NULL) ||
--		    (pdata->chip_sel[spi->chip_select] == SPI_INTERN_CS))
--			set_io_bits(dspi->base + SPIPC0, 1 << spi->chip_select);
--
-+		if (np && (master->cs_gpios != NULL) && (spi->cs_gpio >= 0)) {
-+			retval =
-+				gpio_request(spi->cs_gpio, dev_name(&spi->dev));
-+			if (retval) {
-+				dev_err(&spi->dev,
-+					"GPIO %d request failed\n",
-+					spi->cs_gpio);
-+				return -ENODEV;
-+			}
-+			gpio_direction_output(spi->cs_gpio,
-+					      !(spi->mode & SPI_CS_HIGH));
-+			internal_cs = false;
-+		} else if (pdata->chip_sel &&
-+			   spi->chip_select < pdata->num_chipselect &&
-+			   pdata->chip_sel[spi->chip_select] != SPI_INTERN_CS) {
-+			internal_cs = false;
-+		}
- 	}
- 
-+	if (internal_cs)
-+		set_io_bits(dspi->base + SPIPC0, 1 << spi->chip_select);
-+
- 	if (spi->mode & SPI_READY)
- 		set_io_bits(dspi->base + SPIPC0, SPIPC0_SPIENA_MASK);
- 
-@@ -412,6 +443,15 @@ static int davinci_spi_setup(struct spi_device *spi)
- 	return retval;
- }
- 
-+static void davinci_spi_cleanup(struct spi_device *spi)
-+{
-+	struct spi_master *master = spi->master;
-+	struct device_node *np = spi->dev.of_node;
-+
-+	if (np && (master->cs_gpios != NULL) && (spi->cs_gpio >= 0))
-+		gpio_free(spi->cs_gpio);
-+}
-+
- static int davinci_spi_check_error(struct davinci_spi *dspi, int int_status)
- {
- 	struct device *sdev = dspi->bitbang.master->dev.parent;
-@@ -810,6 +850,8 @@ static int spi_davinci_get_pdata(struct platform_device *pdev,
- 
- 	/*
- 	 * default num_cs is 1 and all chipsel are internal to the chip
-+	 * indicated by chip_sel being NULL or cs_gpios being NULL or
-+	 * set to -ENOENT. num-cs includes internal as well as gpios.
- 	 * indicated by chip_sel being NULL. GPIO based CS is not
- 	 * supported yet in DT bindings.
- 	 */
-@@ -921,6 +963,7 @@ static int davinci_spi_probe(struct platform_device *pdev)
- 	master->num_chipselect = pdata->num_chipselect;
- 	master->bits_per_word_mask = SPI_BPW_RANGE_MASK(2, 16);
- 	master->setup = davinci_spi_setup;
-+	master->cleanup = davinci_spi_cleanup;
- 
- 	dspi->bitbang.chipselect = davinci_spi_chipselect;
- 	dspi->bitbang.setup_transfer = davinci_spi_setup_transfer;
--- 
-1.7.9.5
+No because all running tasks have this flag set when context tracking is
+enabled. And context tracking can't be disabled on runtime.
