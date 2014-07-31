@@ -1,10 +1,10 @@
 From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Fri, 01 Aug 2014 03:35:38 +0900
+Date: Fri, 01 Aug 2014 03:36:59 +0900
 Subject: [PATCHv9 1/5] mmc: dw_mmc: Slot quirk "disable-wp" is deprecated.
 In-Reply-To: <CAD=FV=VfXOqt1A=8-1kq5nhnMrk7PbpCWj-A-UWQN12_U8sW4g@mail.gmail.com>
 References: <1406784907-26349-1-git-send-email-jh80.chung@samsung.com>	<1406784907-26349-2-git-send-email-jh80.chung@samsung.com>
  <CAD=FV=VfXOqt1A=8-1kq5nhnMrk7PbpCWj-A-UWQN12_U8sW4g@mail.gmail.com>
-Message-ID: <53DA8C7A.60205@samsung.com>
+Message-ID: <53DA8CCB.3080900@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -32,7 +32,11 @@ On 08/01/14 01:02, Doug Anderson wrote:
 >
 Yes, right if we don't want to see useless merge conflicts...
 
+When I sent ack on exynos stuff, there was no conflict with my tree but 
+happens it now.
+
 - Kukjin
+
 
 > Reviewed-by: Doug Anderson<dianders@chromium.org>
 > Tested-by: Doug Anderson<dianders@chromium.org>
