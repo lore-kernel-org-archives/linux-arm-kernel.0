@@ -1,67 +1,56 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Thu, 31 Jul 2014 10:58:54 +0100
-Subject: [PATCH v2 1/3] arm64: spin-table: handle unmapped
- cpu-release-addrs
-In-Reply-To: <20140731094515.GE26853@arm.com>
-References: <1406717944-24725-1-git-send-email-ard.biesheuvel@linaro.org>
- <1406717944-24725-2-git-send-email-ard.biesheuvel@linaro.org>
- <20140730113013.GL12239@arm.com>
- <CAKv+Gu8ne8k2NV12SyWye5aYJKHG0wHKAO+=V=1L89_hvyGopw@mail.gmail.com>
- <20140731094515.GE26853@arm.com>
-Message-ID: <20140731095854.GC21850@leverpostej>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Thu, 31 Jul 2014 11:55:55 +0200
+Subject: [PATCH v5 0/6] ARM: sunxi: RTC support for A31/A23
+In-Reply-To: <1406724969-2482-1-git-send-email-wens@csie.org>
+References: <1406724969-2482-1-git-send-email-wens@csie.org>
+Message-ID: <20140731095555.GZ3952@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jul 31, 2014 at 10:45:15AM +0100, Will Deacon wrote:
-> On Wed, Jul 30, 2014 at 08:17:02PM +0100, Ard Biesheuvel wrote:
-> > ]On 30 July 2014 13:30, Will Deacon <will.deacon@arm.com> wrote:
-> > > On Wed, Jul 30, 2014 at 11:59:02AM +0100, Ard Biesheuvel wrote:
-> > >> From: Mark Rutland <mark.rutland@arm.com>
-> > >>
-> > >> In certain cases the cpu-release-addr of a CPU may not fall in the
-> > >> linear mapping (e.g. when the kernel is loaded above this address due to
-> > >> the presence of other images in memory). This is problematic for the
-> > >> spin-table code as it assumes that it can trivially convert a
-> > >> cpu-release-addr to a valid VA in the linear map.
-> > >>
-> > >> This patch modifies the spin-table code to use a temporary cached
-> > >> mapping to write to a given cpu-release-addr, enabling us to support
-> > >> addresses regardless of whether they are covered by the linear mapping.
-> > >>
-> > >> Signed-off-by: Mark Rutland <mark.rutland@arm.com>
-> > >> Tested-by: Mark Salter <msalter@redhat.com>
-> > >> [ardb: added (__force void *) cast]
-> > >> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
-> > >> ---
-> > >>  arch/arm64/kernel/smp_spin_table.c | 22 +++++++++++++++++-----
-> > >>  1 file changed, 17 insertions(+), 5 deletions(-)
-> > >
-> > > I'm nervous about this. What if the spin table sits in the same physical 64k
-> > > frame as a read-sensitive device and we're running with 64k pages?
-> > >
-> > 
-> > Actually, booting.txt requires cpu-release-addr to point to a
-> > /memreserve/d part of memory, which implies DRAM (or you wouldn't have
-> > to memreserve it)
-> > That means it should always be covered by the linear mapping, unless
-> > it is located before Image in DRAM, which is the case addressed by
-> > this patch.
+Hi,
+
+On Wed, Jul 30, 2014 at 08:56:03PM +0800, Chen-Yu Tsai wrote:
+> Hi everyone,
 > 
-> But if it's located before before the Image in DRAM and isn't covered by
-> the linear mapping, then surely the /memreserve/ is pointless too? In which
-> case, this looks like we're simply trying to cater for platforms that aren't
-> following booting.txt (which may need updating if we need to handle this).
+> This is v5 of the sun6i RTC series. This series adds support for
+> the RTC in A31 and A23 SoCs. The series applies to sunxi-next.
+> 
+> The A31 has a new RTC block that is separate from the timer block.
+> It has separate interrupts for each of the alarms, and a different
+> format for the counter alarm. The driver has been tested on the
+> A31 Hummingbird, and the A23 tablet I'm using to work on sun8i
+> support.
+> 
+> Patch 1 adds the driver for the RTC.
+> 
+> Patch 2 is a minor cleanup. This makes rtc-sunxi depend on sun4i or
+> sun7i, the 2 platforms the driver is actually used on.
+> 
+> Patch 3 adds the RTC device node to the sun6i DTSI.
+> 
+> Patch 4 adds the RTC device node to the sun8i DTSI.
+> 
+> Patch 5 adds enables rtc-sun6i in the sunxi defconfig.
+> 
+> Patch 6 adds enables rtc-sun6i in the multi_v7 defconfig.
+> This patch applies to arm-soc/next/defconfig (e9a86d96)
 
-No. The DT is describing the memory which is present, and the subset
-thereof which should not be used under normal circumstances. That's a
-static property of the system.
+I queued patches 3 to 6 for 3.18.
 
-Where the OS happens to get loaded and what it is able to address is a
-dynamic property of the OS (and possibly the bootloader). The DT cannot
-have knowledge of this.
+I'll rebase a publish the branches as soon as 3.17-rc1 is out, so
+don't worry if you don't see these patches appear right away.
 
-It's always true that the OS should not blindly use memreserve'd memory.
-The fact that it cannot address it in the linear mapping is orthogonal.
+Thanks,
+Maxime
 
-Cheers,
-Mark.
+-- 
+Maxime Ripard, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140731/929c1dbe/attachment-0001.sig>
