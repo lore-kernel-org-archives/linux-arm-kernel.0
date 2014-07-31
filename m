@@ -1,129 +1,126 @@
-From: javier.martinez@collabora.co.uk (Javier Martinez Canillas)
-Date: Thu, 31 Jul 2014 14:31:05 +0200
-Subject: [PATCH] regulator: tps65090: Set voltage for fixed regulators
-Message-ID: <1406809865-13115-1-git-send-email-javier.martinez@collabora.co.uk>
+From: rric@kernel.org (Robert Richter)
+Date: Thu, 31 Jul 2014 14:34:43 +0200
+Subject: [PATCH 2/5] arm64, thunder: Add initial dts for Cavium Thunder SoC
+In-Reply-To: <CAL_JsqLJ_W34XTF2aMOW9z+Gq4oxbrX1RztyJN8Mi0OFPeNxfg@mail.gmail.com>
+References: <1406732794-20920-1-git-send-email-rric@kernel.org>
+ <1406732794-20920-3-git-send-email-rric@kernel.org>
+ <20140730154626.GD20162@leverpostej>
+ <CAL_JsqLJ_W34XTF2aMOW9z+Gq4oxbrX1RztyJN8Mi0OFPeNxfg@mail.gmail.com>
+Message-ID: <20140731123443.GS4703@rric.localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-According to the tps65090 data manual [0], the DCDC1 and DCDC2
-step-down converters and the LDO's have a fixed output voltage.
+On 30.07.14 11:37:38, Rob Herring wrote:
+> On Wed, Jul 30, 2014 at 10:46 AM, Mark Rutland <mark.rutland@arm.com> wrote:
+> > On Wed, Jul 30, 2014 at 04:06:31PM +0100, Robert Richter wrote:
+> >> From: Radha Mohan Chintakuntla <rchintakuntla@cavium.com>
 
-Add this information to the driver since these fixed regulators
-can be used as parent input supply for switches that don't have
-an output voltage defined. So the regulator core needs to fetch
-the FET parent output voltage if the child voltage is queried.
+> >> +/ {
+> >> +     model = "Cavium ThunderX CN88XX Family";
+> >> +     compatible = "cavium,thunder-88xx";
+> >
+> > Please don't use wildcards in compatible strings. Give this an absolute
+> > name, and override as necessary.
 
-[0]: http://www.ti.com/lit/gpn/tps65090
+The naming 88xx refers to the processor family and arn't actually
+wildcards. In the future we might need another dts file for 87xx, but
+so far all SoCs of 88xx family should use the same dts files. In this
+sense the naming is very specific.
 
-Signed-off-by: Javier Martinez Canillas <javier.martinez@collabora.co.uk>
----
 
-Changes since RFC:
- - Use better names to describe the macro used to create the regulator desc.
-   Suggested by Mark Brown.
+> >> +     cpus {
+> >> +             #address-cells = <2>;
+> >> +             #size-cells = <0>;
+> >> +
+> >> +             cpu at 000 {
+> >> +                     device_type = "cpu";
+> >> +                     compatible = "cavium,thunder", "arm,armv8";
+> >> +                     reg = <0x0 0x000>;
+> >> +                     enable-method = "psci";
+> >> +             };
+> >
+> > Just to check: both the SoC and CPU are called thunder?
 
- drivers/regulator/tps65090-regulator.c | 76 +++++++++++++++++++---------------
- 1 file changed, 42 insertions(+), 34 deletions(-)
+The soc is called thunder-88xx, the cpu thunder. E.g. an 87xx soc will
+have the same core in which is thunder.
 
-diff --git a/drivers/regulator/tps65090-regulator.c b/drivers/regulator/tps65090-regulator.c
-index 2064b3f..d5df1e9 100644
---- a/drivers/regulator/tps65090-regulator.c
-+++ b/drivers/regulator/tps65090-regulator.c
-@@ -192,12 +192,14 @@ static struct regulator_ops tps65090_fet_control_ops = {
- static struct regulator_ops tps65090_ldo_ops = {
- };
- 
--#define tps65090_REG_DESC(_id, _sname, _en_reg, _en_bits, _ops)	\
-+#define tps65090_REG_DESC(_id, _sname, _en_reg, _en_bits, _nvolt, _volt, _ops) \
- {							\
- 	.name = "TPS65090_RAILS"#_id,			\
- 	.supply_name = _sname,				\
- 	.id = TPS65090_REGULATOR_##_id,			\
-+	.n_voltages = _nvolt,				\
- 	.ops = &_ops,					\
-+	.fixed_uV = _volt,				\
- 	.enable_reg = _en_reg,				\
- 	.enable_val = _en_bits,				\
- 	.enable_mask = _en_bits,			\
-@@ -205,40 +207,46 @@ static struct regulator_ops tps65090_ldo_ops = {
- 	.owner = THIS_MODULE,				\
- }
- 
-+#define tps65090_REG_FIXEDV(_id, _sname, en_reg, _en_bits, _volt, _ops) \
-+	tps65090_REG_DESC(_id, _sname, en_reg, _en_bits, 1, _volt, _ops)
-+
-+#define tps65090_REG_SWITCH(_id, _sname, en_reg, _en_bits, _ops) \
-+	tps65090_REG_DESC(_id, _sname, en_reg, _en_bits, 0, 0, _ops)
-+
- static struct regulator_desc tps65090_regulator_desc[] = {
--	tps65090_REG_DESC(DCDC1, "vsys1",   0x0C, BIT(CTRL_EN_BIT),
--			  tps65090_reg_control_ops),
--	tps65090_REG_DESC(DCDC2, "vsys2",   0x0D, BIT(CTRL_EN_BIT),
--			  tps65090_reg_control_ops),
--	tps65090_REG_DESC(DCDC3, "vsys3",   0x0E, BIT(CTRL_EN_BIT),
--			  tps65090_reg_control_ops),
--
--	tps65090_REG_DESC(FET1,  "infet1",  0x0F,
--			  BIT(CTRL_EN_BIT) | BIT(CTRL_PG_BIT),
--			  tps65090_fet_control_ops),
--	tps65090_REG_DESC(FET2,  "infet2",  0x10,
--			  BIT(CTRL_EN_BIT) | BIT(CTRL_PG_BIT),
--			  tps65090_fet_control_ops),
--	tps65090_REG_DESC(FET3,  "infet3",  0x11,
--			  BIT(CTRL_EN_BIT) | BIT(CTRL_PG_BIT),
--			  tps65090_fet_control_ops),
--	tps65090_REG_DESC(FET4,  "infet4",  0x12,
--			  BIT(CTRL_EN_BIT) | BIT(CTRL_PG_BIT),
--			  tps65090_fet_control_ops),
--	tps65090_REG_DESC(FET5,  "infet5",  0x13,
--			  BIT(CTRL_EN_BIT) | BIT(CTRL_PG_BIT),
--			  tps65090_fet_control_ops),
--	tps65090_REG_DESC(FET6,  "infet6",  0x14,
--			  BIT(CTRL_EN_BIT) | BIT(CTRL_PG_BIT),
--			  tps65090_fet_control_ops),
--	tps65090_REG_DESC(FET7,  "infet7",  0x15,
--			  BIT(CTRL_EN_BIT) | BIT(CTRL_PG_BIT),
--			  tps65090_fet_control_ops),
--
--	tps65090_REG_DESC(LDO1,  "vsys-l1", 0, 0,
--			  tps65090_ldo_ops),
--	tps65090_REG_DESC(LDO2,  "vsys-l2", 0, 0,
--			  tps65090_ldo_ops),
-+	tps65090_REG_FIXEDV(DCDC1, "vsys1",   0x0C, BIT(CTRL_EN_BIT), 5000000,
-+			    tps65090_reg_control_ops),
-+	tps65090_REG_FIXEDV(DCDC2, "vsys2",   0x0D, BIT(CTRL_EN_BIT), 3300000,
-+			    tps65090_reg_control_ops),
-+	tps65090_REG_SWITCH(DCDC3, "vsys3",   0x0E, BIT(CTRL_EN_BIT),
-+			    tps65090_reg_control_ops),
-+
-+	tps65090_REG_SWITCH(FET1,  "infet1",  0x0F,
-+			    BIT(CTRL_EN_BIT) | BIT(CTRL_PG_BIT),
-+			    tps65090_fet_control_ops),
-+	tps65090_REG_SWITCH(FET2,  "infet2",  0x10,
-+			    BIT(CTRL_EN_BIT) | BIT(CTRL_PG_BIT),
-+			    tps65090_fet_control_ops),
-+	tps65090_REG_SWITCH(FET3,  "infet3",  0x11,
-+			    BIT(CTRL_EN_BIT) | BIT(CTRL_PG_BIT),
-+			    tps65090_fet_control_ops),
-+	tps65090_REG_SWITCH(FET4,  "infet4",  0x12,
-+			    BIT(CTRL_EN_BIT) | BIT(CTRL_PG_BIT),
-+			    tps65090_fet_control_ops),
-+	tps65090_REG_SWITCH(FET5,  "infet5",  0x13,
-+			    BIT(CTRL_EN_BIT) | BIT(CTRL_PG_BIT),
-+			    tps65090_fet_control_ops),
-+	tps65090_REG_SWITCH(FET6,  "infet6",  0x14,
-+			    BIT(CTRL_EN_BIT) | BIT(CTRL_PG_BIT),
-+			    tps65090_fet_control_ops),
-+	tps65090_REG_SWITCH(FET7,  "infet7",  0x15,
-+			    BIT(CTRL_EN_BIT) | BIT(CTRL_PG_BIT),
-+			    tps65090_fet_control_ops),
-+
-+	tps65090_REG_FIXEDV(LDO1,  "vsys-l1", 0, 0, 5000000,
-+			    tps65090_ldo_ops),
-+	tps65090_REG_FIXEDV(LDO2,  "vsys-l2", 0, 0, 3300000,
-+			    tps65090_ldo_ops),
- };
- 
- static inline bool is_dcdc(int id)
--- 
-2.0.0.rc2
+
+> >> +     memory at 00000000 {
+> >> +             device_type = "memory";
+> >> +             reg = <0x0 0x00000000 0x0 0x80000000>;
+> >> +     };
+> >> +
+> >> +     gic0: interrupt-controller at 801000000000 {
+> >
+> > To make this easier to read, please place a comma between 32-bit
+> > portions of the unit address (e.g. here have 8010,00000000).
+
+Changed this.
+
+> 
+> Mark, perhaps a dtc or checkpatch.pl check for this?
+> 
+> This should also be under a bus node.
+
+Will do.
+
+> 
+> >> +             compatible = "arm,gic-v3";
+> >> +             #interrupt-cells = <3>;
+> >> +             #address-cells = <2>;
+> >> +             #size-cells = <2>;
+> >> +             ranges;
+> >
+> > This has no children, so why have ranges, #address-cells, and
+> > #size-cells?
+
+Right, this is a leftover from a change in a follow on patch that
+introduces a child for its. Will remove #address-cells, #size-cells
+and ranges in this patch and move the change to the later patch.
+
+> >
+> >> +             interrupt-controller;
+> >> +             reg = <0x8010 0x00000000 0x0 0x010000>, /* GICD */
+> >> +                   <0x8010 0x80000000 0x0 0x200000>; /* GICR */
+> >> +             interrupts = <1 9 0xf04>;
+> >> +     };
+
+> >> +             clocks {
+> >> +                     #address-cells = <2>;
+> >> +                     #size-cells = <2>;
+> >> +                     ranges;
+> >> +
+> >> +                     refclk50mhz: refclk50mhz {
+> >> +                             compatible = "fixed-clock";
+> >> +                             #clock-cells = <0>;
+> >> +                             clock-frequency = <50000000>;
+> >> +                             clock-output-names = "refclk50mhz";
+> >> +                     };
+> >> +             };
+> >
+> > Please get rid of the clocks node and just put the clocks here.
+
+Will do.
+
+> >
+> >> +
+> >> +             uaa0: serial at 87e024000000 {
+> >> +                     compatible = "arm,pl011", "arm,primecell";
+> >> +                     reg = <0x87e0 0x24000000 0x0 0x1000>;
+> >> +                     interrupts = <1 21 4>;
+> >> +                     clocks = <&refclk50mhz>;
+> >> +                     clock-names = "apb_pclk";
+> >
+> > Is this actually the apb_pclk, or is the the uartclk? I assume it's the
+> > latter.
+> 
+> Shouldn't new bindings have both clocks here? A single clock was a
+> mistake I think (mine in fact).
+
+Do you mean
+			clock-names = "uartclk", "apb_pclk";
+here?
+
+Thanks,
+
+-Robert
