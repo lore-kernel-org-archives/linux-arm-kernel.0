@@ -1,73 +1,61 @@
 From: jh80.chung@samsung.com (Jaehoon Chung)
-Date: Thu, 31 Jul 2014 14:35:03 +0900
-Subject: [PATCHv9 1/5] mmc: dw_mmc: Slot quirk "disable-wp" is deprecated.
+Date: Thu, 31 Jul 2014 14:35:07 +0900
+Subject: [PATCHv9 5/5] ARM: dts: rockchip: unuse the slot-node and deprecate
+ the supports-highspeed for dw-mmc
 In-Reply-To: <1406784907-26349-1-git-send-email-jh80.chung@samsung.com>
 References: <1406784907-26349-1-git-send-email-jh80.chung@samsung.com>
-Message-ID: <1406784907-26349-2-git-send-email-jh80.chung@samsung.com>
+Message-ID: <1406784907-26349-6-git-send-email-jh80.chung@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Slot quirks "disable-wp" is deprecated.
-Instead, use the host quirk "disable-wp".
-(Because the slot-node is removed in dt-file.)
+dw-mmc controller can support multiple slots.
+But, there are no use-cases anywhere. So we don't need to support the
+slot-node for dw-mmc controller.
+And "supports-highspeed" property in dw-mmc is deprecated.
+"supports-highspeed" property can be replaced with "cap-sd/mmc-highspeed".
 
 Signed-off-by: Jaehoon Chung <jh80.chung@samsung.com>
-Tested-by: Sachin Kamat <sachin.kamat@samsung.com>
+Reviewed-by: Tushar Behera <trblinux@gmail.com>
+Reviewed-by: Ulf Hansson <ulf.hansson@linaro.org>
+Reviewed-by: Heiko Stuebner <heiko@sntech.de>
 Acked-by: Seungwon Jeon <tgih.jun@samsung.com>
 ---
- drivers/mmc/host/dw_mmc.c  |   11 +++++++++--
- include/linux/mmc/dw_mmc.h |    2 ++
- 2 files changed, 11 insertions(+), 2 deletions(-)
+ arch/arm/boot/dts/rk3066a-bqcurie2.dts |   16 ++++------------
+ 1 file changed, 4 insertions(+), 12 deletions(-)
 
-diff --git a/drivers/mmc/host/dw_mmc.c b/drivers/mmc/host/dw_mmc.c
-index 1ac227c..47b52cc 100644
---- a/drivers/mmc/host/dw_mmc.c
-+++ b/drivers/mmc/host/dw_mmc.c
-@@ -997,7 +997,8 @@ static int dw_mci_get_ro(struct mmc_host *mmc)
- 	int gpio_ro = mmc_gpio_get_ro(mmc);
+diff --git a/arch/arm/boot/dts/rk3066a-bqcurie2.dts b/arch/arm/boot/dts/rk3066a-bqcurie2.dts
+index afb3273..ecea889 100644
+--- a/arch/arm/boot/dts/rk3066a-bqcurie2.dts
++++ b/arch/arm/boot/dts/rk3066a-bqcurie2.dts
+@@ -59,12 +59,8 @@
+ 			pinctrl-names = "default";
+ 			pinctrl-0 = <&sd0_clk &sd0_cmd &sd0_cd &sd0_bus4>;
+ 			vmmc-supply = <&vcc_sd0>;
+-
+-			slot at 0 {
+-				reg = <0>;
+-				bus-width = <4>;
+-				disable-wp;
+-			};
++			bus-width = <4>;
++			disable-wp;
+ 		};
  
- 	/* Use platform get_ro function, else try on board write protect */
--	if (slot->quirks & DW_MCI_SLOT_QUIRK_NO_WRITE_PROTECT)
-+	if ((slot->quirks & DW_MCI_SLOT_QUIRK_NO_WRITE_PROTECT) ||
-+			(slot->host->quirks & DW_MCI_QUIRK_NO_WRITE_PROTECT))
- 		read_only = 0;
- 	else if (!IS_ERR_VALUE(gpio_ro))
- 		read_only = gpio_ro;
-@@ -2021,8 +2022,11 @@ static int dw_mci_of_get_slot_quirks(struct device *dev, u8 slot)
+ 		dwmmc at 10218000 { /* wifi */
+@@ -74,12 +70,8 @@
  
- 	/* get quirks */
- 	for (idx = 0; idx < ARRAY_SIZE(of_slot_quirks); idx++)
--		if (of_get_property(np, of_slot_quirks[idx].quirk, NULL))
-+		if (of_get_property(np, of_slot_quirks[idx].quirk, NULL)) {
-+			dev_warn(dev, "Slot quirk %s is deprecated\n",
-+					of_slot_quirks[idx].quirk);
- 			quirks |= of_slot_quirks[idx].id;
-+		}
+ 			pinctrl-names = "default";
+ 			pinctrl-0 = <&sd1_clk &sd1_cmd &sd1_bus4>;
+-
+-			slot at 0 {
+-				reg = <0>;
+-				bus-width = <4>;
+-				disable-wp;
+-			};
++			bus-width = <4>;
++			disable-wp;
+ 		};
  
- 	return quirks;
- }
-@@ -2238,6 +2242,9 @@ static struct dw_mci_of_quirks {
- 	{
- 		.quirk	= "broken-cd",
- 		.id	= DW_MCI_QUIRK_BROKEN_CARD_DETECTION,
-+	}, {
-+		.quirk	= "disable-wp",
-+		.id	= DW_MCI_QUIRK_NO_WRITE_PROTECT,
- 	},
- };
- 
-diff --git a/include/linux/mmc/dw_mmc.h b/include/linux/mmc/dw_mmc.h
-index babaea9..29ce014 100644
---- a/include/linux/mmc/dw_mmc.h
-+++ b/include/linux/mmc/dw_mmc.h
-@@ -213,6 +213,8 @@ struct dw_mci_dma_ops {
- #define DW_MCI_QUIRK_HIGHSPEED			BIT(2)
- /* Unreliable card detection */
- #define DW_MCI_QUIRK_BROKEN_CARD_DETECTION	BIT(3)
-+/* No write protect */
-+#define DW_MCI_QUIRK_NO_WRITE_PROTECT		BIT(4)
- 
- /* Slot level quirks */
- /* This slot has no write protect */
+ 		gpio-keys {
 -- 
 1.7.9.5
