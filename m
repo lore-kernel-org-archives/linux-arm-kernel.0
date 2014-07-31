@@ -1,31 +1,42 @@
 From: peter.ujfalusi@ti.com (Peter Ujfalusi)
-Date: Thu, 31 Jul 2014 13:18:49 +0300
-Subject: [PATCH 1/6] ARM: davinci: da8xx-dt: add OF_DEV_AUXDATA entry for
- mcasp0
+Date: Thu, 31 Jul 2014 13:18:51 +0300
+Subject: [PATCH 3/6] ARM: DTS: da850: Add node for McASP
 In-Reply-To: <1406801934-23334-1-git-send-email-peter.ujfalusi@ti.com>
 References: <1406801934-23334-1-git-send-email-peter.ujfalusi@ti.com>
-Message-ID: <1406801934-23334-2-git-send-email-peter.ujfalusi@ti.com>
+Message-ID: <1406801934-23334-4-git-send-email-peter.ujfalusi@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add OF_DEV_AUXDATA for mcasp to be able to use clocks.
+Node for mcasp0
 
 Signed-off-by: Peter Ujfalusi <peter.ujfalusi@ti.com>
 ---
- arch/arm/mach-davinci/da8xx-dt.c | 1 +
- 1 file changed, 1 insertion(+)
+ arch/arm/boot/dts/da850.dtsi | 13 +++++++++++++
+ 1 file changed, 13 insertions(+)
 
-diff --git a/arch/arm/mach-davinci/da8xx-dt.c b/arch/arm/mach-davinci/da8xx-dt.c
-index ed1928740b5f..f703d82f08a8 100644
---- a/arch/arm/mach-davinci/da8xx-dt.c
-+++ b/arch/arm/mach-davinci/da8xx-dt.c
-@@ -46,6 +46,7 @@ static struct of_dev_auxdata da850_auxdata_lookup[] __initdata = {
- 	OF_DEV_AUXDATA("ti,davinci_mdio", 0x01e24000, "davinci_mdio.0", NULL),
- 	OF_DEV_AUXDATA("ti,davinci-dm6467-emac", 0x01e20000, "davinci_emac.1",
- 		       NULL),
-+	OF_DEV_AUXDATA("ti,da830-mcasp-audio", 0x01d00000, "davinci-mcasp.0", NULL),
- 	{}
- };
- 
+diff --git a/arch/arm/boot/dts/da850.dtsi b/arch/arm/boot/dts/da850.dtsi
+index 41ce4e8bf227..0bd98cd00816 100644
+--- a/arch/arm/boot/dts/da850.dtsi
++++ b/arch/arm/boot/dts/da850.dtsi
+@@ -276,6 +276,19 @@
+ 			ti,davinci-gpio-unbanked = <0>;
+ 			status = "disabled";
+ 		};
++
++		mcasp0: mcasp at 01d00000 {
++			compatible = "ti,da830-mcasp-audio";
++			reg = <0x100000 0x2000>,
++			      <0x102000 0x400000>;
++			reg-names = "mpu", "dat";
++			interrupts = <54>;
++			interrupt-names = "common";
++			status = "disabled";
++			dmas = <&edma0 1>,
++				<&edma0 0>;
++			dma-names = "tx", "rx";
++		};
+ 	};
+ 	nand_cs3 at 62000000 {
+ 		compatible = "ti,davinci-nand";
 -- 
 2.0.2
