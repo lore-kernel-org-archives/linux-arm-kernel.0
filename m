@@ -1,64 +1,47 @@
 From: matthias.bgg@gmail.com (Matthias Brugger)
-Date: Thu, 31 Jul 2014 18:42:22 +0200
-Subject: [PATCH 6/7] arm: mediatek: enable gpt6 on boot up to make arch timer
- working
+Date: Thu, 31 Jul 2014 18:42:23 +0200
+Subject: [PATCH 7/7] arm: dts: mt6589: Add arm arch timer node
 In-Reply-To: <1406824943-24052-1-git-send-email-matthias.bgg@gmail.com>
 References: <1406824943-24052-1-git-send-email-matthias.bgg@gmail.com>
-Message-ID: <1406824943-24052-7-git-send-email-matthias.bgg@gmail.com>
+Message-ID: <1406824943-24052-8-git-send-email-matthias.bgg@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-We enable GTP6 which ungates the arch timer clock. Apart we write the
-frequency with which the timer is running in the CNTFREQ register.
-In the future this should be done in the bootloader.
+This patch adds the device tree node for the arm architecture timer.
 
 Signed-off-by: Matthias Brugger <matthias.bgg@gmail.com>
 ---
- arch/arm/mach-mediatek/mediatek.c |   27 +++++++++++++++++++++++++++
- 1 file changed, 27 insertions(+)
+ arch/arm/boot/dts/mt6589.dtsi |   12 ++++++++++--
+ 1 file changed, 10 insertions(+), 2 deletions(-)
 
-diff --git a/arch/arm/mach-mediatek/mediatek.c b/arch/arm/mach-mediatek/mediatek.c
-index f2acf07..b7c5c60 100644
---- a/arch/arm/mach-mediatek/mediatek.c
-+++ b/arch/arm/mach-mediatek/mediatek.c
-@@ -16,6 +16,32 @@
-  */
- #include <linux/init.h>
- #include <asm/mach/arch.h>
-+#include <linux/of.h>
-+#include <linux/clk-provider.h>
-+#include <linux/clocksource.h>
-+
-+
-+#define GPT6_CON_MT65xx 0x10008060
-+
-+static void __init mediatek_timer_init(void)
-+{
-+	static void __iomem *gpt_base;
-+
-+	if (of_machine_is_compatible("mediatek,mt6589")) {
-+		/* set cntfreq register which is not done in bootloader */
-+		asm volatile("mcr p15, 0, %0, c14, c0, 0" : : "r" (13000000));
-+
-+		/* turn on GPT6 which ungates arch timer clocks */
-+		gpt_base = ioremap(GPT6_CON_MT65xx, 0x04);
-+	}
-+
-+	/* enabel clock and set to free-run */
-+	if (gpt_base)
-+		writel(0x31, gpt_base);
-+
-+	of_clk_init(NULL);
-+	clocksource_of_init();
-+};
+diff --git a/arch/arm/boot/dts/mt6589.dtsi b/arch/arm/boot/dts/mt6589.dtsi
+index 742c9bd..7bcf031 100644
+--- a/arch/arm/boot/dts/mt6589.dtsi
++++ b/arch/arm/boot/dts/mt6589.dtsi
+@@ -73,14 +73,22 @@
+ 		compatible = "simple-bus";
+ 		ranges;
  
- static const char * const mediatek_board_dt_compat[] = {
- 	"mediatek,mt6589",
-@@ -24,4 +50,5 @@ static const char * const mediatek_board_dt_compat[] = {
+-		timer: timer at 10008000 {
++		timer1: timer at 10008000 {
+ 			compatible = "mediatek,mt6577-timer";
+-			reg = <0x10008000 0x80>;
++			reg = <0x10008000 0x60>;
+ 			interrupts = <GIC_SPI 113 IRQ_TYPE_EDGE_RISING>;
+ 			clocks = <&system_clk>, <&rtc_clk>;
+ 			clock-names = "system-clk", "rtc-clk";
+ 		};
  
- DT_MACHINE_START(MEDIATEK_DT, "Mediatek Cortex-A7 (Device Tree)")
- 	.dt_compat	= mediatek_board_dt_compat,
-+	.init_time	= mediatek_timer_init,
- MACHINE_END
++		timer2: timer {
++			compatible = "arm,armv7-timer";
++			interrupts = <GIC_PPI 13 (GIC_CPU_MASK_SIMPLE(4) | IRQ_TYPE_LEVEL_LOW)>,
++				     <GIC_PPI 14 (GIC_CPU_MASK_SIMPLE(4) | IRQ_TYPE_LEVEL_LOW)>,
++				     <GIC_PPI 11 (GIC_CPU_MASK_SIMPLE(4) | IRQ_TYPE_LEVEL_LOW)>,
++				     <GIC_PPI 10 (GIC_CPU_MASK_SIMPLE(4) | IRQ_TYPE_LEVEL_LOW)>;
++		};
++
+ 		gic: interrupt-controller at 10211000 {
+ 			compatible = "arm,cortex-a15-gic";
+ 			interrupt-controller;
 -- 
 1.7.9.5
