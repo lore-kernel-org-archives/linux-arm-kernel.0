@@ -1,61 +1,89 @@
-From: jh80.chung@samsung.com (Jaehoon Chung)
-Date: Thu, 31 Jul 2014 14:35:07 +0900
-Subject: [PATCHv9 5/5] ARM: dts: rockchip: unuse the slot-node and deprecate
- the supports-highspeed for dw-mmc
-In-Reply-To: <1406784907-26349-1-git-send-email-jh80.chung@samsung.com>
-References: <1406784907-26349-1-git-send-email-jh80.chung@samsung.com>
-Message-ID: <1406784907-26349-6-git-send-email-jh80.chung@samsung.com>
+From: heiko@sntech.de (Heiko =?ISO-8859-1?Q?St=FCbner?=)
+Date: Thu, 31 Jul 2014 07:37:03 +0200
+Subject: [PATCH 2/2] ARM: dts: rockchip: add watchdog node
+In-Reply-To: <1507670.CGuyIht1az@diego>
+References: <1507670.CGuyIht1az@diego>
+Message-ID: <24685135.nT0fF4Dz3O@diego>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-dw-mmc controller can support multiple slots.
-But, there are no use-cases anywhere. So we don't need to support the
-slot-node for dw-mmc controller.
-And "supports-highspeed" property in dw-mmc is deprecated.
-"supports-highspeed" property can be replaced with "cap-sd/mmc-highspeed".
+This adds the Designware compatible watchdog found on RK3xxx Cortex-A9 SoCs.
 
-Signed-off-by: Jaehoon Chung <jh80.chung@samsung.com>
-Reviewed-by: Tushar Behera <trblinux@gmail.com>
-Reviewed-by: Ulf Hansson <ulf.hansson@linaro.org>
-Reviewed-by: Heiko Stuebner <heiko@sntech.de>
-Acked-by: Seungwon Jeon <tgih.jun@samsung.com>
+Signed-off-by: Heiko Stuebner <heiko@sntech.de>
 ---
- arch/arm/boot/dts/rk3066a-bqcurie2.dts |   16 ++++------------
- 1 file changed, 4 insertions(+), 12 deletions(-)
+ arch/arm/boot/dts/rk3066a-bqcurie2.dts | 4 ++++
+ arch/arm/boot/dts/rk3066a.dtsi         | 4 ++++
+ arch/arm/boot/dts/rk3188-radxarock.dts | 4 ++++
+ arch/arm/boot/dts/rk3188.dtsi          | 4 ++++
+ arch/arm/boot/dts/rk3xxx.dtsi          | 8 ++++++++
+ 5 files changed, 24 insertions(+)
 
 diff --git a/arch/arm/boot/dts/rk3066a-bqcurie2.dts b/arch/arm/boot/dts/rk3066a-bqcurie2.dts
-index afb3273..ecea889 100644
+index 8b479f7..042f821d 100644
 --- a/arch/arm/boot/dts/rk3066a-bqcurie2.dts
 +++ b/arch/arm/boot/dts/rk3066a-bqcurie2.dts
-@@ -59,12 +59,8 @@
- 			pinctrl-names = "default";
- 			pinctrl-0 = <&sd0_clk &sd0_cmd &sd0_cd &sd0_bus4>;
- 			vmmc-supply = <&vcc_sd0>;
--
--			slot at 0 {
--				reg = <0>;
--				bus-width = <4>;
--				disable-wp;
--			};
-+			bus-width = <4>;
-+			disable-wp;
- 		};
+@@ -188,3 +188,7 @@
+ &uart3 {
+ 	status = "okay";
+ };
++
++&wdt {
++	status = "okay";
++};
+diff --git a/arch/arm/boot/dts/rk3066a.dtsi b/arch/arm/boot/dts/rk3066a.dtsi
+index 9c34da4..879a818 100644
+--- a/arch/arm/boot/dts/rk3066a.dtsi
++++ b/arch/arm/boot/dts/rk3066a.dtsi
+@@ -425,3 +425,7 @@
+ 	pinctrl-names = "default";
+ 	pinctrl-0 = <&uart3_xfer>;
+ };
++
++&wdt {
++	compatible = "rockchip,rk3066-wdt", "snps,dw-wdt";
++};
+diff --git a/arch/arm/boot/dts/rk3188-radxarock.dts b/arch/arm/boot/dts/rk3188-radxarock.dts
+index 4195f5a..171b610 100644
+--- a/arch/arm/boot/dts/rk3188-radxarock.dts
++++ b/arch/arm/boot/dts/rk3188-radxarock.dts
+@@ -221,3 +221,7 @@
+ &uart3 {
+ 	status = "okay";
+ };
++
++&wdt {
++	status = "okay";
++};
+diff --git a/arch/arm/boot/dts/rk3188.dtsi b/arch/arm/boot/dts/rk3188.dtsi
+index 27215e0..ee801a9 100644
+--- a/arch/arm/boot/dts/rk3188.dtsi
++++ b/arch/arm/boot/dts/rk3188.dtsi
+@@ -400,3 +400,7 @@
+ 	pinctrl-names = "default";
+ 	pinctrl-0 = <&uart3_xfer>;
+ };
++
++&wdt {
++	compatible = "rockchip,rk3188-wdt", "snps,dw-wdt";
++};
+diff --git a/arch/arm/boot/dts/rk3xxx.dtsi b/arch/arm/boot/dts/rk3xxx.dtsi
+index c6f0561..8caf85d 100644
+--- a/arch/arm/boot/dts/rk3xxx.dtsi
++++ b/arch/arm/boot/dts/rk3xxx.dtsi
+@@ -174,6 +174,14 @@
+ 		status = "disabled";
+ 	};
  
- 		dwmmc at 10218000 { /* wifi */
-@@ -74,12 +70,8 @@
- 
- 			pinctrl-names = "default";
- 			pinctrl-0 = <&sd1_clk &sd1_cmd &sd1_bus4>;
--
--			slot at 0 {
--				reg = <0>;
--				bus-width = <4>;
--				disable-wp;
--			};
-+			bus-width = <4>;
-+			disable-wp;
- 		};
- 
- 		gpio-keys {
++	wdt: watchdog at 2004c000 {
++		compatible = "snps,dw-wdt";
++		reg = <0x2004c000 0x100>;
++		clocks = <&cru PCLK_WDT>;
++		interrupts = <GIC_SPI 51 IRQ_TYPE_LEVEL_HIGH>;
++		status = "disabled";
++	};
++
+ 	pwm2: pwm at 20050020 {
+ 		compatible = "rockchip,rk2928-pwm";
+ 		reg = <0x20050020 0x10>;
 -- 
-1.7.9.5
+2.0.1
