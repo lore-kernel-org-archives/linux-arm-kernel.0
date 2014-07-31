@@ -1,25 +1,143 @@
-From: joro@8bytes.org (Joerg Roedel)
-Date: Thu, 31 Jul 2014 18:36:11 +0200
-Subject: [PATCH v5] devicetree: Add generic IOMMU device tree bindings
-In-Reply-To: <CAOesGMiS_MJNnkfPOsqxV27=rXPgT9UNbp-+VhpMRNf9u0+-eA@mail.gmail.com>
-References: <1406803383-11601-1-git-send-email-thierry.reding@gmail.com>
- <20140731120424.GK9809@8bytes.org>
- <CAOesGMiS_MJNnkfPOsqxV27=rXPgT9UNbp-+VhpMRNf9u0+-eA@mail.gmail.com>
-Message-ID: <20140731163611.GM9809@8bytes.org>
+From: christoffer.dall@linaro.org (Christoffer Dall)
+Date: Thu, 31 Jul 2014 18:38:05 +0200
+Subject: [PATCH] arm64: KVM: export current vcpu->pause state via pseudo
+ regs
+In-Reply-To: <87mwbpimgz.fsf@linaro.org>
+References: <1404914112-7298-1-git-send-email-alex.bennee@linaro.org>
+ <20140731143538.GI11610@cbox> <87mwbpimgz.fsf@linaro.org>
+Message-ID: <20140731163805.GK11610@cbox>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jul 31, 2014 at 08:38:47AM -0700, Olof Johansson wrote:
+On Thu, Jul 31, 2014 at 04:14:51PM +0100, Alex Benn?e wrote:
+> 
+> Christoffer Dall writes:
+> 
+> > On Wed, Jul 09, 2014 at 02:55:12PM +0100, Alex Benn?e wrote:
+> >> To cleanly restore an SMP VM we need to ensure that the current pause
+> >> state of each vcpu is correctly recorded. Things could get confused if
+> >> the CPU starts running after migration restore completes when it was
+> >> paused before it state was captured.
+> >> 
+> <snip>
+> >> +/* Power state (PSCI), not real registers */
+> >> +#define KVM_REG_ARM_PSCI		(0x0014 << KVM_REG_ARM_COPROC_SHIFT)
+> >> +#define KVM_REG_ARM_PSCI_REG(n) \
+> >> +	(KVM_REG_ARM64 | KVM_REG_SIZE_U64 | KVM_REG_ARM_PSCI | \
+> >> +         (n & ~KVM_REG_ARM_COPROC_MASK))
 > >
-> > Applied, thanks everyone.
+> > I don't understand this mask, why isn't this
+> >             (n & 0xffff))
 > 
-> Really?
+> I was trying to use the existing masks, but of course if anyone changes
+> that it would be an ABI change so probably not worth it.
 > 
-> Gee, thanks for giving people a chance to reply with acks. It's
-> considered polite to do so when there has been outstanding questions.
 
-Its not pushed yet, I can still make changes. Do you have any objections
-or an Ack?
+the KVM_REG_ARM_COPROC_MASK is part of the uapi IIRC, so that's not the
+issue, but that mask doesn't cover all the upper bits, so it feels weird
+to use that to me.
+
+> >
+> >> +#define KVM_REG_ARM_PSCI_STATE          KVM_REG_ARM_PSCI_REG(0)
+> >> +#define NUM_KVM_PSCI_REGS               1
+> >> +
+> >
+> > you're missing updates to Documentation/virtual/kvm/api.txt here.
+> 
+> Will add.
+> 
+> >>  /* Device Control API: ARM VGIC */
+> >>  #define KVM_DEV_ARM_VGIC_GRP_ADDR	0
+> >>  #define KVM_DEV_ARM_VGIC_GRP_DIST_REGS	1
+> >> diff --git a/arch/arm64/kvm/guest.c b/arch/arm64/kvm/guest.c
+> >> index 205f0d8..31d6439 100644
+> >> --- a/arch/arm64/kvm/guest.c
+> >> +++ b/arch/arm64/kvm/guest.c
+> >> @@ -189,6 +189,54 @@ static int get_timer_reg(struct kvm_vcpu *vcpu, const struct kvm_one_reg *reg)
+> >>  }
+> >>  
+> >>  /**
+> >> + * PSCI State
+> >> + *
+> >> + * These are not real registers as they do not actually exist in the
+> >> + * hardware but represent the current power state of the vCPU
+> >
+> > full stop
+> >
+> >> + */
+> >> +
+> >> +static bool is_psci_reg(u64 index)
+> >> +{
+> >> +	switch (index) {
+> >> +	case KVM_REG_ARM_PSCI_STATE:
+> >> +		return true;
+> >> +	}
+> >> +	return false;
+> >> +}
+> >> +
+> >> +static int copy_psci_indices(struct kvm_vcpu *vcpu, u64 __user *uindices)
+> >> +{
+> >> +	if (put_user(KVM_REG_ARM_PSCI_STATE, uindices))
+> >> +		return -EFAULT;
+> >> +	return 0;
+> >> +}
+> >> +
+> >> +static int set_psci_reg(struct kvm_vcpu *vcpu, const struct kvm_one_reg *reg)
+> >> +{
+> >> +	void __user *uaddr = (void __user *)(long)reg->addr;
+> >> +	u64 val;
+> >> +	int ret;
+> >> +
+> >> +	ret = copy_from_user(&val, uaddr, KVM_REG_SIZE(reg->id));
+> >> +	if (ret != 0)
+> >> +		return ret;
+> >> +
+> >> +        vcpu->arch.pause = (val & 0x1) ? false : true;
+> >
+> > tabs
+> 
+> Hmmm, apparently the GNU Emacs "linux" style doesn't actually enforce
+> that. Who knew? I'll beat the editor into submission.
+> 
+> > I really need the documentation of the ABI, why is bit[0] == 1 not
+> > paused?
+> 
+> I figured 1 == running, but I can switch it round if you want to to map
+> directly to the .pause flag.
+> 
+
+don't care very deeply, just want something to describe it clearly.
+
+> > If we are not complaining when setting the pause value to false if it
+> > was true before, then we probably also need to wake up the thread in
+> > case this is called from another thread, right?
+> >
+> > or perhaps we should just return an error if you're trying to un-pause a
+> > CPU through this interface, hmmmm.
+> 
+> Wouldn't it be an error to mess with any register when the system is not
+> in a quiescent state? I was assuming that the wake state is dealt with
+> when the run loop finally restarts. 
+> 
+
+The ABI doesn't really define it as an error (the ABI doesn't enforce
+anything right now) so the question is, does it ever make sense to clear
+the pause flag through this ioctl?  If not, I think we should just err
+on the side of caution and specify in the docs that this is not
+supported and return an error.
 
 
-	Joerg
+> <snip>
+> >
+> > please check for use of tabs versus spaces, checkpatch.pl should
+> > complain.
+> >
+> > Can you add the 32-bit counterpart as part of this patch?
+> 
+> Same patch? Sure.
+
+really up to you if you want to split it up into two patches, but I
+think it's small enough that you can just create one patch.
+
+Thanks,
+-Christoffer
