@@ -1,42 +1,32 @@
-From: leif.lindholm@linaro.org (Leif Lindholm)
-Date: Thu, 31 Jul 2014 17:15:28 +0100
-Subject: [PATCH] arm64: dmi: Add SMBIOS/DMI support
-In-Reply-To: <20140731155338.GC26853@arm.com>
-References: <1406810830-6099-1-git-send-email-ard.biesheuvel@linaro.org>
- <CAKv+Gu9hwupNAxuOTNnsY8Spxkh3J6DwYF7Ym493PuZ-6phzXA@mail.gmail.com>
- <53DA509A.8070304@linaro.org>
- <CAKv+Gu8Nq7-mhFPRqRw6sxDxZAz5kyLvDBwC_0E3qZp9ZpxPig@mail.gmail.com>
- <53DA660D.3070504@linaro.org> <20140731155338.GC26853@arm.com>
-Message-ID: <20140731161528.GH4179@bivouac.eciton.net>
+From: afaerber@suse.de (=?UTF-8?B?QW5kcmVhcyBGw6RyYmVy?=)
+Date: Thu, 31 Jul 2014 18:21:51 +0200
+Subject: [PATCH v4 0/4] ARM: dts: exynos: Prepare Spring
+In-Reply-To: <1406822910-6255-1-git-send-email-afaerber@suse.de>
+References: <1406822910-6255-1-git-send-email-afaerber@suse.de>
+Message-ID: <53DA6D1F.3040102@suse.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jul 31, 2014 at 04:53:38PM +0100, Will Deacon wrote:
-> > >>      The patch works well on FVP model, and here are the boot log and
-> > >> dmidecode+lshw result:
-> > >>
-> > > Thanks Yi!
-> > >
-> > > Can we help Will out if he wants to test this himself?
-> >      @Will: which platform do you have on hand?  I am using FVP model 
-> > for testing.
-> >      First, you need to merge SMBIOS support into UEFI.
-> >      Then, compile and install the dmidecode(open source) on the linux 
-> > ,and run it.
+Am 31.07.2014 18:08, schrieb Andreas F?rber:
+> Hello,
 > 
-> I've got some stuff from Leif for testing this, but what I'm really after is
-> something that would have spotted this problem. Are there any compliance
-> tests, for example?
+> Based on the preinstalled 3.8 based ChromeOS kernel and previous 3.15 
+> based attempts by Stephan and me that broke for 3.16, I've prepared a 
+> device tree for the HP Chromebook 11 aka Google Spring.
+> 
+> v4 fixes a pinctrl bug.
 
-The patch as previously submitted (and accepted) was functional on all
-platforms it has been tested on. It is technically not compliant with
-the UEFI specification, but it works with the images we had.
-The worst-case failure would have been the lookup function returning
-NULL and the SMBIOS tables being unavailable even though they existed.
+Once again, resulting Snow vs. Spring diff attached for convenience.
 
-What you are asking for would be a test for UEFI, not for the kernel.
-(And this one might be useful to add to the fwts if it's not already
-part of it.)
+Andreas
 
-/
-    Leif
+-- 
+SUSE LINUX Products GmbH, Maxfeldstr. 5, 90409 N?rnberg, Germany
+GF: Jeff Hawn, Jennifer Guild, Felix Imend?rffer; HRB 16746 AG N?rnberg
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: spring-snow.v4.diff
+Type: text/x-patch
+Size: 17117 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140731/5522a095/attachment.bin>
