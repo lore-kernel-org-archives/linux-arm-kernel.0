@@ -1,57 +1,118 @@
-From: hsnaves@gmail.com (Humberto Silva Naves)
-Date: Thu, 31 Jul 2014 23:43:21 +0200
-Subject: [PATCH] clk: samsung: Changed return behavior of samsung_clk_init
-Message-ID: <1406843002-15652-1-git-send-email-hsnaves@gmail.com>
+From: jonsmirl@gmail.com (jonsmirl at gmail.com)
+Date: Thu, 31 Jul 2014 17:46:09 -0400
+Subject: [PATCH 7/9] ARM: sunxi: dt: Add PLL2 support
+In-Reply-To: <1406842092-25207-8-git-send-email-emilio@elopez.com.ar>
+References: <1406842092-25207-1-git-send-email-emilio@elopez.com.ar>
+ <1406842092-25207-8-git-send-email-emilio@elopez.com.ar>
+Message-ID: <CAKON4OycHvkAkndNvH3vkaE0d7P5d4ZsGrYw8eM_Py6HUo06sg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Instead of invoking panic, the samsung_clk_init returns a NULL
-pointer to indicate that an error has occurred. All the drivers
-using this function were changed appropriately (in this case
-just the clk-exynos5410).
+Would it be better to name this "allwinner,sun4i-a10-pll2-clk" instead
+of "allwinner,sun4i-a10-b-pll2-clk"? By encoding the b in it everyone
+is going to wonder what to do on the 'c' revision which is the most
+common revision.
 
-This patch was suggested by Tomasz Figa in
-http://www.mail-archive.com/linux-samsung-soc at vger.kernel.org/msg34982.html
+The revision based rename would then be from
+"allwinner,sun4i-a10-pll2-clk" to "allwinner,sun4i-a10-a-pll2-clk".
 
-Signed-off-by: Humberto Silva Naves <hsnaves@gmail.com>
----
- drivers/clk/samsung/clk-exynos5410.c |    2 ++
- drivers/clk/samsung/clk.c            |    8 +++++---
- 2 files changed, 7 insertions(+), 3 deletions(-)
+On Thu, Jul 31, 2014 at 5:28 PM, Emilio L?pez <emilio@elopez.com.ar> wrote:
+> This commit adds the PLL2 definition to the sun4i, sun5i and sun7i
+> device trees. PLL2 is used to clock audio devices.
+>
+> Signed-off-by: Emilio L?pez <emilio@elopez.com.ar>
+> ---
+>
+> Changes from RFC:
+>  * A10 rev A is now supported via the quirk code
+>
+>  arch/arm/boot/dts/sun4i-a10.dtsi  | 8 ++++++++
+>  arch/arm/boot/dts/sun5i-a10s.dtsi | 8 ++++++++
+>  arch/arm/boot/dts/sun5i-a13.dtsi  | 8 ++++++++
+>  arch/arm/boot/dts/sun7i-a20.dtsi  | 8 ++++++++
+>  4 files changed, 32 insertions(+)
+>
+> diff --git a/arch/arm/boot/dts/sun4i-a10.dtsi b/arch/arm/boot/dts/sun4i-a10.dtsi
+> index 459cb63..c4d4c73 100644
+> --- a/arch/arm/boot/dts/sun4i-a10.dtsi
+> +++ b/arch/arm/boot/dts/sun4i-a10.dtsi
+> @@ -81,6 +81,14 @@
+>                         clock-output-names = "pll1";
+>                 };
+>
+> +               pll2: clk at 01c20008 {
+> +                       #clock-cells = <1>;
+> +                       compatible = "allwinner,sun4i-a10-b-pll2-clk";
+> +                       reg = <0x01c20008 0x4>;
+> +                       clocks = <&osc24M>;
+> +                       clock-output-names = "pll2", "pll2x2", "pll2x4", "pll2x8";
+> +               };
+> +
+>                 pll4: clk at 01c20018 {
+>                         #clock-cells = <0>;
+>                         compatible = "allwinner,sun4i-a10-pll1-clk";
+> diff --git a/arch/arm/boot/dts/sun5i-a10s.dtsi b/arch/arm/boot/dts/sun5i-a10s.dtsi
+> index 24b0ad3..f35aa4d 100644
+> --- a/arch/arm/boot/dts/sun5i-a10s.dtsi
+> +++ b/arch/arm/boot/dts/sun5i-a10s.dtsi
+> @@ -74,6 +74,14 @@
+>                         clock-output-names = "pll1";
+>                 };
+>
+> +               pll2: clk at 01c20008 {
+> +                       #clock-cells = <1>;
+> +                       compatible = "allwinner,sun4i-a10-b-pll2-clk";
+> +                       reg = <0x01c20008 0x4>;
+> +                       clocks = <&osc24M>;
+> +                       clock-output-names = "pll2", "pll2x2", "pll2x4", "pll2x8";
+> +               };
+> +
+>                 pll4: clk at 01c20018 {
+>                         #clock-cells = <0>;
+>                         compatible = "allwinner,sun4i-a10-pll1-clk";
+> diff --git a/arch/arm/boot/dts/sun5i-a13.dtsi b/arch/arm/boot/dts/sun5i-a13.dtsi
+> index bf86e65..38b2d77 100644
+> --- a/arch/arm/boot/dts/sun5i-a13.dtsi
+> +++ b/arch/arm/boot/dts/sun5i-a13.dtsi
+> @@ -75,6 +75,14 @@
+>                         clock-output-names = "pll1";
+>                 };
+>
+> +               pll2: clk at 01c20008 {
+> +                       #clock-cells = <1>;
+> +                       compatible = "allwinner,sun4i-a10-b-pll2-clk";
+> +                       reg = <0x01c20008 0x4>;
+> +                       clocks = <&osc24M>;
+> +                       clock-output-names = "pll2", "pll2x2", "pll2x4", "pll2x8";
+> +               };
+> +
+>                 pll4: clk at 01c20018 {
+>                         #clock-cells = <0>;
+>                         compatible = "allwinner,sun4i-a10-pll1-clk";
+> diff --git a/arch/arm/boot/dts/sun7i-a20.dtsi b/arch/arm/boot/dts/sun7i-a20.dtsi
+> index 4011628..7a6a18c 100644
+> --- a/arch/arm/boot/dts/sun7i-a20.dtsi
+> +++ b/arch/arm/boot/dts/sun7i-a20.dtsi
+> @@ -91,6 +91,14 @@
+>                         clock-output-names = "pll1";
+>                 };
+>
+> +               pll2: clk at 01c20008 {
+> +                       #clock-cells = <1>;
+> +                       compatible = "allwinner,sun4i-a10-b-pll2-clk";
+> +                       reg = <0x01c20008 0x4>;
+> +                       clocks = <&osc24M>;
+> +                       clock-output-names = "pll2", "pll2x2", "pll2x4", "pll2x8";
+> +               };
+> +
+>                 pll4: clk at 01c20018 {
+>                         #clock-cells = <0>;
+>                         compatible = "allwinner,sun7i-a20-pll4-clk";
+> --
+> 2.0.3
 
-diff --git a/drivers/clk/samsung/clk-exynos5410.c b/drivers/clk/samsung/clk-exynos5410.c
-index 231475b..19657b4 100644
---- a/drivers/clk/samsung/clk-exynos5410.c
-+++ b/drivers/clk/samsung/clk-exynos5410.c
-@@ -193,6 +193,8 @@ static void __init exynos5410_clk_init(struct device_node *np)
- 		panic("%s: failed to map registers\n", __func__);
- 
- 	ctx = samsung_clk_init(np, reg_base, CLK_NR_CLKS);
-+	if (!ctx)
-+		panic("%s: unable to allocate context.\n", __func__);
- 
- 	samsung_clk_register_pll(ctx, exynos5410_plls,
- 			ARRAY_SIZE(exynos5410_plls), reg_base);
-diff --git a/drivers/clk/samsung/clk.c b/drivers/clk/samsung/clk.c
-index deab84d..0cf0ec6 100644
---- a/drivers/clk/samsung/clk.c
-+++ b/drivers/clk/samsung/clk.c
-@@ -57,11 +57,13 @@ struct samsung_clk_provider *__init samsung_clk_init(struct device_node *np,
- 
- 	ctx = kzalloc(sizeof(struct samsung_clk_provider), GFP_KERNEL);
- 	if (!ctx)
--		panic("could not allocate clock provider context.\n");
-+		return NULL;
- 
- 	clk_table = kcalloc(nr_clks, sizeof(struct clk *), GFP_KERNEL);
--	if (!clk_table)
--		panic("could not allocate clock lookup table\n");
-+	if (!clk_table) {
-+		kfree(ctx);
-+		return NULL;
-+	}
- 
- 	for (i = 0; i < nr_clks; ++i)
- 		clk_table[i] = ERR_PTR(-ENOENT);
+
+
 -- 
-1.7.10.4
+Jon Smirl
+jonsmirl at gmail.com
