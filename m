@@ -1,29 +1,34 @@
-From: grant.b.edwards@gmail.com (Grant Edwards)
-Date: Thu, 31 Jul 2014 13:59:36 +0000 (UTC)
-Subject: Building kernel for more than one SoC
-Message-ID: <lrdi48$ls1$1@ger.gmane.org>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Thu, 31 Jul 2014 15:00:44 +0100
+Subject: Bad Page dump (help)
+In-Reply-To: <53D9E10F.6040408@xenomai.org>
+References: <20140729190700.GN17808@saruman.home>
+ <53D9E10F.6040408@xenomai.org>
+Message-ID: <20140731140044.GL30282@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-I'm told that it should be possible to build a kernel that will run on
-two different SoC chips.  They're closely related (same ARM9 core,
-many identical internal peripherals -- AT91SAM9G20 and 'G25), and
-would likely have identical external hardware.
+On Thu, Jul 31, 2014 at 08:24:15AM +0200, Gilles Chanteperdrix wrote:
+> On 07/29/2014 09:07 PM, Felipe Balbi wrote:
+> > Hi Russell,
+> > 
+> > I'm bringing up a new board on today's linux-next but I'm having a bunch
+> > of bad_page() calls due to _mapcount not being zero (full logs
+> > attached). What could cause that ? Any hints on how to debug ? It's as
+> > if page_mapcount_reset() wasn't called for the pages which are causing
+> > issues.
+> 
+> FWIW, the same issue appeared on a Cogent CSB637 board (the last board 
+> I use not using DT) in between 3.13 and 3.14. I ran a bisect and found 
+> that reverting the following commit:
 
-In order to handle the internal periphals that differ, it was
-recommended that I use loadable modules to keep the kernel size small.
-However, my root filesystem is in RAM, so I don't see how loadable
-modules helps unless I remove all of the .ko files from the root
-filesystem after the kernel has booted.
+I don't seem to have a bug report from you for this.
 
-It seems it would be simpler to just link in all required drivers for
-both chips and discard the ones that aren't needed after kernel
-initialization. But, I'm not sure if there's a mechanism for doing
-that.  I know there's a way to declare a function or data that will be
-discarded after kernel init, but is ther a way to that conditionally
-depending on probed hardware or the device-tree used at boot-time?
+> Seemed to make the issue disappear. I later found out that changing the
+> kernel options also made the issue disappear.
+
+Which kernel options?
 
 -- 
-Grant Edwards               grant.b.edwards        Yow! Let me do my TRIBUTE
-                                  at               to FISHNET STOCKINGS ...
-                              gmail.com            
+FTTC broadband for 0.8mile line: currently at 9.5Mbps down 400kbps up
+according to speedtest.net.
