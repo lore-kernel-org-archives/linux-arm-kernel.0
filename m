@@ -1,59 +1,98 @@
-From: spk.linux@gmail.com (Sachin Kamat)
-Date: Thu, 31 Jul 2014 11:56:16 +0530
-Subject: [PATCH] ARM: multi_v7_defconfig: major refresh
-In-Reply-To: <CAC5m3BwDvHVMJEfXE4w5zQ2RYXYt9PRF8uP=3M03Rr3Ls=N4eQ@mail.gmail.com>
-References: <1406052070-6207-1-git-send-email-olof@lixom.net>
- <12165027.MHmNZOI7jc@wuerfel>
- <CAOesGMjo0AY=eGcfTh1sVxKkURK9bzK8SBAeEbvBFN4R0sF34A@mail.gmail.com>
- <CAC5m3BwDvHVMJEfXE4w5zQ2RYXYt9PRF8uP=3M03Rr3Ls=N4eQ@mail.gmail.com>
-Message-ID: <CAK5sBcEPQtMvT+mp4+jXQA06FcBRTdAVJLbTCtCu-kV07Wh5RQ@mail.gmail.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Wed, 30 Jul 2014 23:28:44 -0700
+Subject: [PATCH 29/35] arm: omap: intc: switch over to linear irq domain
+In-Reply-To: <20140730162038.GH7272@saruman.home>
+References: <1406582183-696-30-git-send-email-balbi@ti.com>
+ <20140729121425.GR29045@atomide.com>
+ <20140729141522.GB17808@saruman.home>
+ <20140729152052.GV29045@atomide.com>
+ <20140729154057.GE17808@saruman.home>
+ <20140729163345.GF17808@saruman.home>
+ <20140730060420.GY29045@atomide.com>
+ <20140730144059.GA7272@saruman.home>
+ <CAGo_u6ou+MoKOE_tTTmjxyFNW=jTaN9vnTsHrxR6sQHsieJyLA@mail.gmail.com>
+ <20140730162038.GH7272@saruman.home>
+Message-ID: <20140731062843.GA29045@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jul 31, 2014 at 11:37 AM, Tushar Behera <trblinux@gmail.com> wrote:
-> On Wed, Jul 23, 2014 at 1:58 AM, Olof Johansson <olof@lixom.net> wrote:
->> On Tue, Jul 22, 2014 at 11:36 AM, Arnd Bergmann <arnd@arndb.de> wrote:
->>> On Tuesday 22 July 2014 11:01:10 Olof Johansson wrote:
->>>> This is a major refresh of the multi_v7_defconfig:
->>>>
->>>> - Bring over a bunch of Samsung drivers to make ODROID-U3 and Chromebooks usable
->>>>  * Enable big.LITTLE
->>>>  * MCPM
->>>>  * CYAPA touchpad
->>>>  * Samsung-related MTD/regulator/clk/pinmux drivers
->>>>  * Add some of the CrOS EC drivers
->>>> - Turn on TPM, HW_RANDOM
->>>> - OMAP_USB3 -> TI_PIPE3 option rename
->>>> - Enable MCPM/b.L for VEXPRESS
->>>> - Add new CONFIG_MTD_SPI_NOR since it otherwise masks off SPI NOR drivers
->>>> - CONFIG_LOGO, because penguins.
->>>>
->>>> I took care to keep the new options that have been added for whose the
->>>> drivers are not yet in our for-next branch. This was pretty awkward so
->>>> we should sort out how to handle those better in the future.
->>>
->>> Since you've already done all those, how about enabling THUMB2_KERNEL?
->>> For the multi_v7_defconfig, it should actually give some benefits,
->>> since it's rather large, and it would be good to have some more testing
->>> with this option enabled.
->>>
->>> I guess the first step would be to enable it and just see if your
->>> boot farm survives the change.
->>
->> Good point, I'll definitely give that a go once the current issues are resolved.
->>
->> Which are: These changes make 5250-based machines (snow and arndale)
->> break. Lots of i2c timeouts on SATA and hdmi-phy. Looks like arndale
->> might be missing pinctrl setups for it?
+* Felipe Balbi <balbi@ti.com> [140730 09:23]:
+> Hi,
+> 
+> On Wed, Jul 30, 2014 at 10:45:41AM -0500, Nishanth Menon wrote:
+> > On Wed, Jul 30, 2014 at 9:40 AM, Felipe Balbi <balbi@ti.com> wrote:
+> > > HI,
+> > >
+> > > On Tue, Jul 29, 2014 at 11:04:21PM -0700, Tony Lindgren wrote:
+> > >> * Felipe Balbi <balbi@ti.com> [140729 09:36]:
+> > >> > Hi,
+> > >> >
+> > >> > On Tue, Jul 29, 2014 at 10:40:57AM -0500, Felipe Balbi wrote:
+> > >> > > On Tue, Jul 29, 2014 at 08:20:52AM -0700, Tony Lindgren wrote:
+> > >> > > > * Felipe Balbi <balbi@ti.com> [140729 07:18]:
+> > >> > > > > Hi,
+> > >> > > > >
+> > >> > > > > On Tue, Jul 29, 2014 at 05:14:25AM -0700, Tony Lindgren wrote:
+> > >> > > > > > * Felipe Balbi <balbi@ti.com> [140728 14:19]:
+> > >> > > > > > > now that we don't need to support legacy board-files,
+> > >> > > > > > > we can completely switch over to a linear irq domain
+> > >> > > > > > > and make use of irq_alloc_domain_generic_chips() to
+> > >> > > > > > > allocate all generic irq chips for us.
+> > >> > > > > >
+> > >> > > > > > This patch seems to somehow break off-idle for omap3
+> > >> > > > > > where it no longer wakes up.
+> > >> > > > >
+> > >> > > > > Sure your bisection is correct ? This patch just switches from legacy
+> > >> > > > > irq domain to linear irq domain.
+> > >> > > >
+> > >> > > > Yes, I tried it a few times. Just enabling
+> > >> > > > retention idle hangs too with this patch.
+> > >> > > >
+> > >> > > > Maybe it's omap3_prcm_irq_setup that relies on
+> > >> > > > 11 + OMAP_INTC_START? There may be other such issues
+> > >> > >
+> > >> > > lol.
+> > >> > >
+> > >> > > OMAP4 has the same nonsense.
+> > >> >
+> > >> > made me think why (if) OMAP4 works with that same setup. Does wake from
+> > >> > OFF work with OMAP4 ?
+> > >>
+> > >> Not without similar changes, omap4+ has the same issue.. There's a RFC
+> > >> series from Nishant to fix some of this, and Tero is moving the PRCM
+> > >> into a driver.
+> > >>
+> > >> > Anyway, here's a quick little hack to check if that's the reason for the
+> > >> > regression:
+> > >>
+> > >> OK yeah that's along the same lines with Nishant's RFC series in thread
+> > >> "[RFC PATCH 0/7] ARM: OMAP4+: PRM: minor cleanups and dt support of
+> > >> interrupts"
+> > >>
+> > >> FYI, it did not compile, needs to include linux/of_irq.h. But yes,
+> > >
+> > > I might have sent the wrong version as I had that same build error and
+> > > fixed it localy.
+> > >
+> > >> it fixes the regression for me, Also now the whole series works for
+> > >> me :)
+> > >
+> > > good to know.
+> > >
+> > > What do you want to do now ? Wait for PRCM to become a driver ? Wait for
+> > > Nishanth's series to get accepted ? I guess the same thing could be done
+> > > for OMAP3 and AM33, then we would have a chance of having working wake
+> > > from idle with the new irqchip.
+> > 
+> > I can repost the current series as it stands now once 17-rc1 comes out
+> > (without the build failure ofcourse).. if that helps to move it out of
+> > RFC status.
+> 
+> That'd be great. It would be ever greater if you could add support for
+> OMAP3 on that too.
 
-i2c timeout issue should have been fixed with the following patch:
-i2c: i2c-s3c2410: Drop class based scanning to improve bootup time
-(commit id: 6031d3dfc73b49bede540872e51a70ee0b6786d4) which is
-available on Wolfram's I2C tree (should be part of linux-next too). Also
-I do not see I2C_S3C2410 enabled in the config.
-I do not have access to h/w today. I can verify and check tomorrow or
-somebody could test it in the meantime with the above suggestions?
+Yeah sounds good to me. Tero, does that work OK for your PRCM changes?
 
--- 
 Regards,
-Sachin.
+
+Tony
