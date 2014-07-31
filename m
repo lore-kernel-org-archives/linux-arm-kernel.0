@@ -1,54 +1,33 @@
-From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
-Date: Thu, 31 Jul 2014 17:59:06 +0200
-Subject: [PATCH] ARM: at91: spi: request all csgpio in spi probe
-In-Reply-To: <20140729100017.31f0b1be@bbrezillon>
-References: <b033d16ec31d26a895726ee72ec89b43943dfbae.1406547656.git.jiri.prchal@aksignal.cz>
- <20140728122103.GR9532@piout.net> <53D64ADA.1000102@aksignal.cz>
- <20140728223859.GA3214@piout.net>
- <20140729100017.31f0b1be@bbrezillon>
-Message-ID: <20140731155906.GH3214@piout.net>
+From: dianders@google.com (Doug Anderson)
+Date: Thu, 31 Jul 2014 09:02:45 -0700
+Subject: [PATCHv9 1/5] mmc: dw_mmc: Slot quirk "disable-wp" is deprecated.
+In-Reply-To: <1406784907-26349-2-git-send-email-jh80.chung@samsung.com>
+References: <1406784907-26349-1-git-send-email-jh80.chung@samsung.com>
+ <1406784907-26349-2-git-send-email-jh80.chung@samsung.com>
+Message-ID: <CAD=FV=VfXOqt1A=8-1kq5nhnMrk7PbpCWj-A-UWQN12_U8sW4g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 29/07/2014 at 10:00:17 +0200, Boris Brezillon wrote :
-> Hi Alexandre,
-> 
-> > While this solves the particular issue Ji?? is seeing, this will not
-> > solve the case where PA14 (CS0) is not used by the spi driver at all. It
-> > will remained muxed as CS0 and toggle when the spi master needs to
-> > access CS0 until another driver muxes it to something else. I still
-> > believe we should explicitly ask pinctrl to mux them as gpios.
-> > 
-> 
-> Do we really care about this case ?
-> After all, if a given pin needs a specific muxing during kernel boot
-> (i.e. a pin connected to a gpio-led that needs to stay in its previous
-> state or a pin connected to the reset line of a device that needs to
-> stay up and running during kernel boot) the bootloader/bootstrap should
-> have muxed this pin appropriately before booting the kernel.
-> 
+Jaehoon
 
-Yeah, you are right.
+On Wed, Jul 30, 2014 at 10:35 PM, Jaehoon Chung <jh80.chung@samsung.com> wrote:
+> Slot quirks "disable-wp" is deprecated.
+> Instead, use the host quirk "disable-wp".
+> (Because the slot-node is removed in dt-file.)
+>
+> Signed-off-by: Jaehoon Chung <jh80.chung@samsung.com>
+> Tested-by: Sachin Kamat <sachin.kamat@samsung.com>
+> Acked-by: Seungwon Jeon <tgih.jun@samsung.com>
+> ---
+>  drivers/mmc/host/dw_mmc.c  |   11 +++++++++--
+>  include/linux/mmc/dw_mmc.h |    2 ++
+>  2 files changed, 11 insertions(+), 2 deletions(-)
 
+Thanks for taking my suggestion and making it backward compatible.
+This looks great to me.  It tested this in both the backward
+compatible way (with the warning) and the non-backward compatible way.
+I think we should land and patch #2 ASAP and then we can land the rest
+of the series as SoC maintainers see fit.
 
-> What do you mean by "we should explicitly ask pinctrl to mux them as
-> gpios" ?
-> Do you mean configuring all the pins as GPIOs when the pin controller is
-> probed, or just adding a new pinctrl state configuring the pin as an
-> output GPIO and reference it in the pinctrl-0 property of the spi
-> controller.
-> 
-> If the former, you'll break devices that needs their pins to stay in
-> the state they were during the bootloader/boostrap phase.
-> The latter won't work if the pin you request as GPIO is later requested
-> by another device (which, if I'm correct, is exactly the case you're
-> trying to solve).
-> 
-
-Again you are right, let's not care about that use case. I still feel
-that the pinctrl-0 property has to be filled correctly.
-
--- 
-Alexandre Belloni, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
+Reviewed-by: Doug Anderson <dianders@chromium.org>
+Tested-by: Doug Anderson <dianders@chromium.org>
