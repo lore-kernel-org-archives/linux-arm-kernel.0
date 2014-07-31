@@ -1,275 +1,91 @@
-From: thierry.reding@gmail.com (Thierry Reding)
-Date: Thu, 31 Jul 2014 11:51:06 +0200
-Subject: [PATCH v4] devicetree: Add generic IOMMU device tree bindings
-In-Reply-To: <CAOesGMi3zM1-cqmeGddJ69RNXx0ktFm_zXO_yq7N0EeA3HNrUQ@mail.gmail.com>
-References: <1404487757-18829-1-git-send-email-thierry.reding@gmail.com>
- <20140730152646.GC20162@leverpostej>
- <CAOesGMi3zM1-cqmeGddJ69RNXx0ktFm_zXO_yq7N0EeA3HNrUQ@mail.gmail.com>
-Message-ID: <20140731095103.GB31218@ulmo>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Thu, 31 Jul 2014 10:53:36 +0100
+Subject: [PATCH 2/5] arm64, thunder: Add initial dts for Cavium Thunder SoC
+In-Reply-To: <CAFpQJXWKybVUxpHg8MVrVMjLj3swuxLGo_9r1tL+gZ4hxUHTzQ@mail.gmail.com>
+References: <1406732794-20920-1-git-send-email-rric@kernel.org>
+ <1406732794-20920-3-git-send-email-rric@kernel.org>
+ <20140730154626.GD20162@leverpostej>
+ <CAFpQJXWKybVUxpHg8MVrVMjLj3swuxLGo_9r1tL+gZ4hxUHTzQ@mail.gmail.com>
+Message-ID: <20140731095336.GB21850@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jul 30, 2014 at 10:35:06AM -0700, Olof Johansson wrote:
-> Hi,
+On Thu, Jul 31, 2014 at 09:41:10AM +0100, Ganapatrao Kulkarni wrote:
+>    On Wed, Jul 30, 2014 at 9:16 PM, Mark Rutland <[1]mark.rutland@arm.com>
+>    wrote:
 > 
-> On Wed, Jul 30, 2014 at 8:26 AM, Mark Rutland <mark.rutland@arm.com> wrote:
-> > Hi Thierry,
-> >
-> > This looks sane to me.
-> >
-> > I just have a few questions below which are hopefully simple/stupid.
-> >
-> > On Fri, Jul 04, 2014 at 04:29:17PM +0100, Thierry Reding wrote:
-> >> From: Thierry Reding <treding@nvidia.com>
-> >>
-> >> This commit introduces a generic device tree binding for IOMMU devices.
-> >> Only a very minimal subset is described here, but it is enough to cover
-> >> the requirements of both the Exynos System MMU and Tegra SMMU as
-> >> discussed here:
-> >>
-> >>     https://lkml.org/lkml/2014/4/27/346
-> >>
-> >> Signed-off-by: Thierry Reding <treding@nvidia.com>
-> >> ---
-> >> Changes in v4:
-> >> - clarify that disabling an IOMMU DT node may not disable translation
-> >> - be more explicit that examples are only examples
-> >> - add multi-ID master example
-> >>
-> >> Changes in v3:
-> >> - use #iommu-cells instead of #address-cells/#size-cells
-> >> - drop optional iommu-names property
-> >>
-> >> Changes in v2:
-> >> - add notes about "dma-ranges" property (drop note from commit message)
-> >> - document priorities of "iommus" property vs. "dma-ranges" property
-> >> - drop #iommu-cells in favour of #address-cells and #size-cells
-> >> - remove multiple-master device example
-> >>
-> >>  Documentation/devicetree/bindings/iommu/iommu.txt | 172 ++++++++++++++++++++++
-> >>  1 file changed, 172 insertions(+)
-> >>  create mode 100644 Documentation/devicetree/bindings/iommu/iommu.txt
-> >>
-> >> diff --git a/Documentation/devicetree/bindings/iommu/iommu.txt b/Documentation/devicetree/bindings/iommu/iommu.txt
-> >> new file mode 100644
-> >> index 000000000000..464a81eaaf61
-> >> --- /dev/null
-> >> +++ b/Documentation/devicetree/bindings/iommu/iommu.txt
-> >> @@ -0,0 +1,172 @@
-> >> +This document describes the generic device tree binding for IOMMUs and their
-> >> +master(s).
-> >> +
-> >> +
-> >> +IOMMU device node:
-> >> +==================
-> >> +
-> >> +An IOMMU can provide the following services:
-> >> +
-> >> +* Remap address space to allow devices to access physical memory ranges that
-> >> +  they otherwise wouldn't be capable of accessing.
-> >> +
-> >> +  Example: 32-bit DMA to 64-bit physical addresses
-> >> +
-> >> +* Implement scatter-gather at page level granularity so that the device does
-> >> +  not have to.
-> >> +
-> >> +* Provide system protection against "rogue" DMA by forcing all accesses to go
-> >> +  through the IOMMU and faulting when encountering accesses to unmapped
-> >> +  address regions.
-> >> +
-> >> +* Provide address space isolation between multiple contexts.
-> >> +
-> >> +  Example: Virtualization
-> >> +
-> >> +Device nodes compatible with this binding represent hardware with some of the
-> >> +above capabilities.
-> >> +
-> >> +IOMMUs can be single-master or multiple-master. Single-master IOMMU devices
-> >> +typically have a fixed association to the master device, whereas multiple-
-> >> +master IOMMU devices can translate accesses from more than one master.
-> >> +
-> >> +The device tree node of the IOMMU device's parent bus must contain a valid
-> >> +"dma-ranges" property that describes how the physical address space of the
-> >> +IOMMU maps to memory. An empty "dma-ranges" property means that there is a
-> >> +1:1 mapping from IOMMU to memory.
-> >> +
-> >> +Required properties:
-> >> +--------------------
-> >> +- #iommu-cells: The number of cells in an IOMMU specifier needed to encode an
-> >> +  address.
-> >> +
-> >> +The meaning of the IOMMU specifier is defined by the device tree binding of
-> >> +the specific IOMMU. Below are a few examples of typical use-cases:
-> >> +
-> >> +- #iommu-cells = <0>: Single master IOMMU devices are not configurable and
-> >> +  therefore no additional information needs to be encoded in the specifier.
-> >> +  This may also apply to multiple master IOMMU devices that do not allow the
-> >> +  association of masters to be configured. Note that an IOMMU can by design
-> >> +  be multi-master yet only expose a single master in a given configuration.
-> >> +  In such cases the number of cells will usually be 1 as in the next case.
-> >> +- #iommu-cells = <1>: Multiple master IOMMU devices may need to be configured
-> >> +  in order to enable translation for a given master. In such cases the single
-> >> +  address cell corresponds to the master device's ID. In some cases more than
-> >> +  one cell can be required to represent a single master ID.
-> >> +- #iommu-cells = <4>: Some IOMMU devices allow the DMA window for masters to
-> >> +  be configured. The first cell of the address in this may contain the master
-> >> +  device's ID for example, while the second cell could contain the start of
-> >> +  the DMA window for the given device. The length of the DMA window is given
-> >> +  by the third and fourth cells.
-> >> +
-> >> +Note that these are merely examples and real-world use-cases may use different
-> >> +definitions to represent their individual needs. Always refer to the specific
-> >> +IOMMU binding for the exact meaning of the cells that make up the specifier.
-> >> +
-> >> +
-> >> +IOMMU master node:
-> >> +==================
-> >> +
-> >> +Devices that access memory through an IOMMU are called masters. A device can
-> >> +have multiple master interfaces (to one or more IOMMU devices).
-> >> +
-> >> +Required properties:
-> >> +--------------------
-> >> +- iommus: A list of phandle and IOMMU specifier pairs that describe the IOMMU
-> >> +  master interfaces of the device. One entry in the list describes one master
-> >> +  interface of the device.
-> >> +
-> >> +When an "iommus" property is specified in a device tree node, the IOMMU will
-> >> +be used for address translation. If a "dma-ranges" property exists in the
-> >> +device's parent node it will be ignored. An exception to this rule is if the
-> >> +referenced IOMMU is disabled, in which case the "dma-ranges" property of the
-> >> +parent shall take effect. Note that merely disabling a device tree node does
-> >> +not guarantee that the IOMMU is really disabled since the hardware may not
-> >> +have a means to turn off translation.
+>      Hi,
+>      On Wed, Jul 30, 2014 at 04:06:31PM +0100, Robert Richter wrote:
+>      > From: Radha Mohan Chintakuntla <[2]rchintakuntla@cavium.com>
+>      >
+>      > Add initial device tree nodes for Cavium Thunder SoCs with support of
+>      > 48 cores and gicv3. The dts file requires further changes, esp. for
+>      > pci, gicv3-its and smmu. This changes will be added later together
+>      > with the device drivers.
+>      >
+>      > Signed-off-by: Radha Mohan Chintakuntla <[3]rchintakuntla@cavium.com>
+>      > Signed-off-by: Robert Richter <[4]rrichter@cavium.com>
+>      > ---
+>      > ?arch/arm64/boot/dts/Makefile ? ? ? ? | ? 1 +
+>      > ?arch/arm64/boot/dts/thunder-88xx.dts | 387
+>      +++++++++++++++++++++++++++++++++++
+>      > ?2 files changed, 388 insertions(+)
+>      > ?create mode 100644 arch/arm64/boot/dts/thunder-88xx.dts
+>      >
+>      > diff --git a/arch/arm64/boot/dts/Makefile
+>      b/arch/arm64/boot/dts/Makefile
+>      > index c52bdb051f66..f8001a62029c 100644
+>      > --- a/arch/arm64/boot/dts/Makefile
+>      > +++ b/arch/arm64/boot/dts/Makefile
+>      > @@ -1,3 +1,4 @@
+>      > +dtb-$(CONFIG_ARCH_THUNDER) += thunder-88xx.dtb
+>      > ?dtb-$(CONFIG_ARCH_VEXPRESS) += rtsm_ve-aemv8a.dtb foundation-v8.dtb
+>      > ?dtb-$(CONFIG_ARCH_XGENE) += apm-mustang.dtb
+>      >
+>      > diff --git a/arch/arm64/boot/dts/thunder-88xx.dts
+>      b/arch/arm64/boot/dts/thunder-88xx.dts
+>      > new file mode 100644
+>      > index 000000000000..4cf20ac9138b
+>      > --- /dev/null
+>      > +++ b/arch/arm64/boot/dts/thunder-88xx.dts
+>      > @@ -0,0 +1,387 @@
+>      > +/*
+>      > + * Cavium Thunder DTS file
+>      > + *
+>      > + * Copyright (C) 2013, Cavium Inc.
+>      > + *
+>      > + * This program is free software; you can redistribute it and/or
+>      > + * modify it under the terms of the GNU General Public License as
+>      > + * published by the Free Software Foundation; either version 2 of
+>      > + * the License, or (at your option) any later version.
+>      > + */
+>      > +/dts-v1/;
+>      > +
+>      > +/* Reserving first 12MB of DDR for firmware */
+>      > +/memreserve/ 0x00000000 0x00c00000;
 > 
-> How do you know if the IOMMU is disabled then? Runtime by checking
-> status of the iommu?
+>      What exactly is this memreserve intended to protect at runtime?
+>      Yes, this 12 MB is reserved for ATF and UEFI boot and run-time services.
 
-I don't think you can really know that it is disabled. If it's disabled
-in device tree then you don't have a way of querying it either. This is
-probably an issue that needs to be resolved at integration time.
+If booted as an EFI application Linux will use the UEFI memory map.
+Anything UEFI needs to have kept around will be marked as such, so
+there's no need to memreserve that.
 
-Generally I'd think that if an IOMMU is capable of enable or disabling
-translation it will be disabled by default for all masters. Therefore if
-the device tree node is status = "disabled", then there's no driver that
-will set it up and enable translation, so the IOMMU can be considered to
-be disabled. If an IOMMU has translations always enabled with no means
-to disable them, then does it make sense to set the status = "disabled"
-on the IOMMU? I think not. No driver would be setting up the mappings
-within the IOMMU and translations would always fail. For IOMMUs that
-have no way to enable translations... well... they wouldn't be IOMMUs.
+I was under the impression that the ARM Trusted Firmware didn't need
+anything resident on the non-secure side, so I don't see why that needs
+a memreserve -- Linux should not be able to address anything it has
+resident.
 
-So I think we should either drop that last sentence or be more explicit
-in that disabling an IOMMU device (via device tree) that can't turn off
-address translation is invalid:
-
-	Note that merely disabling a device tree node does not guarantee
-	that the IOMMU is really disabled since the hardware may not
-	have a means to turn off translation. But it is invalid in such
-	cases to disable the IOMMU's device tree node in the first place
-	because doing so would prevent any driver from properly setting
-	up the translations.
-
-> >> +Multiple-master IOMMU:
-> >> +----------------------
-> >> +
-> >> +     iommu {
-> >> +             /* the specifier represents the ID of the master */
-> >> +             #iommu-cells = <1>;
-> >> +     };
-> >> +
-> >> +     master at 1 {
-> >> +             /* device has master ID 42 in the IOMMU */
-> >> +             iommus = <&/iommu 42>;
-> >> +     };
-> >> +
-> >> +     master at 2 {
-> >> +             /* device has master IDs 23 and 24 in the IOMMU */
-> >> +             iommus = <&/iommu 23>, <&/iommu 24>;
-> >> +     };
-> >
-> > In future I suspect master will need to be able to identify which master
-> > IDs correspond to which of their master ports (where each port might
-> > have an arbitrary number of master IDs).
-> >
-> > While we don't need that for the first run, it would be nice to have
-> > that looked into so master bindings don't come up with arbitrarily
-> > different ways of doing that.
+>      The only item of runtime firmware I see in use below is PSCI on the
+>      secure side.
 > 
-> iommu-names would be the logical extension to handle that, just like
-> we do with other resources, right?
-
-iommu-names used to be in the bindings as an optional property until v3
-where it was dropped upon request by Rob and Arnd on the grounds of
-being overengineered by modeling the binding after that of other
-subsystems.
-
-But I still think that if we ever want to support multiple-master IOMMUs
-then an iommu-names property will be required to tell them apart.
-
-Either that or bindings will have to specify a fixed ordering.
-
-> >> +Multiple-master IOMMU with configurable DMA window:
-> >> +---------------------------------------------------
-> >> +
-> >> +     / {
-> >> +             #address-cells = <1>;
-> >> +             #size-cells = <1>;
-> >> +
-> >> +             iommu {
-> >> +                     /* master ID, address and length of DMA window */
-> >> +                     #iommu-cells = <4>;
-> >> +             };
-> >> +
-> >> +             master {
-> >> +                     /* master ID 42, 4 GiB DMA window starting at 0 */
-> >> +                     iommus = <&/iommu  42  0  0x1 0x0>;
-> >
-> > Is this that window is from the POV of the master, i.e. the master can
-> > address 0x0 to 0xffffffff when generating transactions, and these get
-> > translated somehow?
-> >
-> > Or is this the physical addresses to allocate to the master?
+>      How is the kernel booted on this platform? UEFI?
 > 
-> It needs to be clarified in the documentation, but as far as I know it
-> is the DMA address space that is used.
-> 
-> It is somewhat confusing to have size-cells = 1 and then use 2 cells
-> for size in the iommu property. It's legal and expected, but having
-> size-cells in the example adds a little confusion.
+>    Boot sequence tried is ATF->UEFI->Linux? and ATF->UEFI->GRUB->Linux?
 
-I've changed the above to say:
+As I've just had it explained to me, in either of those cases we should
+enter Linux via the EFI stub. So we should be using the UEFI memory map
+regardless.
 
-	/ {
-		iommu {
-			/*
-			 * One cell for the master ID and one cell for the
-			 * address of the DMA window. The length of the DMA
-			 * window is encoded in two cells.
-			 *
-			 * The DMA window is the range addressable by the
-			 * master (i.e. the I/O virtual address space).
-			 */
-			#iommu-cells = <4>;
-		};
-
-		master {
-			/* master ID 42, 4 GiB DMA window starting at 0 */
-			iommus = <&{/iommu}  42  0  0x1 0x0>;
-		};
-	};
-
-The #size-cells = <1> was a remainder of an earlier example that didn't
-use #iommu-cells. #address-cells and #size-cells are irrelevant for the
-example, so removing them makes sense (and reduces confusion).
-
-Does that look better?
-
-Thierry
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: not available
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140731/553e36f6/attachment.sig>
+Thanks,
+Mark.
