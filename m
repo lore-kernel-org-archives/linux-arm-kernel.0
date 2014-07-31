@@ -1,38 +1,52 @@
 From: tomasz.figa@gmail.com (Tomasz Figa)
-Date: Thu, 31 Jul 2014 14:49:09 +0200
-Subject: [PATCHv2 2/5] clk: samsung: exynos5410: Organize register offset
- constants
-In-Reply-To: <1406805732-17372-3-git-send-email-hsnaves@gmail.com>
+Date: Thu, 31 Jul 2014 14:53:10 +0200
+Subject: [PATCHv2 4/5] clk: samsung: exynos5410: Add fixed rate clocks
+In-Reply-To: <1406805732-17372-5-git-send-email-hsnaves@gmail.com>
 References: <1406805732-17372-1-git-send-email-hsnaves@gmail.com>
- <1406805732-17372-3-git-send-email-hsnaves@gmail.com>
-Message-ID: <53DA3B45.4080501@gmail.com>
+ <1406805732-17372-5-git-send-email-hsnaves@gmail.com>
+Message-ID: <53DA3C36.1040206@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Hi Humberto,
 
-Please see my comments inline.
+You can find my comments inline.
 
 On 31.07.2014 13:22, Humberto Silva Naves wrote:
-> The different register groups (SRC, DIV, PLL, GATE, etc) are
-> now separated by a blank line, and within the same group, the
-> definitions are ordered by address. This is done to reduce the
-> chances of potential conflicts when adding new entries, and
-> to improve the readability of code. While at it, replaced some
-> spaces with tabs to keep consistency.
+> This implements the fixed rate clocks generated either inside or
+> outside the SoC. It also adds a dt-binding constant for the
+> sclk_hdmiphy clock, which shall be later used by other drivers,
+> such as the DRM.
+> 
+> Since the external fixed rate clock fin_pll is now registered by
+> the clk-exynos5410 file, the bindings with the device tree file have
+> changed. It is no longer needed to define fin_pll as a fixed clock,
+> such as in:
+> 
+> 	fin_pll: xxti {
+>   		compatible = "fixed-clock";
+> 	  	clock-frequency = <24000000>;
+> 	  	clock-output-names = "fin_pll";
+> 	  	#clock-cells = <0>;
+> 	};
+> 
+> The above lines should be replaced by the following lines:
+> 
+> 	fixed-rate-clocks {
+> 		oscclk {
+> 			compatible = "samsung,exynos5410-oscclk";
+> 			clock-frequency = <24000000>;
+> 		};
+> 	};
+> 
+> This new form of binding was properly documented in the relevant
+> documentation file.
 
-I'm not sure whether this change really improves anything.
-
-It might seem plausible to have the registers grouped by their purpose,
-however remaining drivers have them directly listed in order of their
-addresses to match the order they are mentioned in documentation. For
-consistency, I'd prefer only one convention to be used across all
-Samsung clock drivers, so they would have to be changed as well. But
-IMHO this is a material for a separate clean-up series, while this one
-should be limited to functional improvements.
-
-In fact, this driver is kind of exception as it has PLL register
-definitions separated, which I probably missed in review.
+In general this is backwards. This Exynos-specific clock binding was
+invented before generic fixed rate clock binding showed up and so few
+drivers still use it to maintain DT ABI compatibility. However new
+drivers are required to use the new generic binding and so does the one
+for Exynos5410.
 
 Best regards,
 Tomasz
