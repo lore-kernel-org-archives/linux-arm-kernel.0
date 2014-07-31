@@ -1,65 +1,67 @@
-From: peter.ujfalusi@ti.com (Peter Ujfalusi)
-Date: Thu, 31 Jul 2014 13:18:52 +0300
-Subject: [PATCH 4/6] ARM: DTS: da850-evm: Enable McASP via DT boot
-In-Reply-To: <1406801934-23334-1-git-send-email-peter.ujfalusi@ti.com>
-References: <1406801934-23334-1-git-send-email-peter.ujfalusi@ti.com>
-Message-ID: <1406801934-23334-5-git-send-email-peter.ujfalusi@ti.com>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Thu, 31 Jul 2014 12:19:01 +0200
+Subject: [RFC 8/8] ARM: sun7i: Add mod1 clock nodes
+In-Reply-To: <CAKON4OwRUg6aBHzuKemDExbuFpJT_h8Y=vaG_q3SBmEf-j55=Q@mail.gmail.com>
+References: <1406519386-4902-1-git-send-email-emilio@elopez.com.ar>
+ <1406519386-4902-9-git-send-email-emilio@elopez.com.ar>
+ <20140728132524.GM3952@lukather>
+ <CAKON4OwRUg6aBHzuKemDExbuFpJT_h8Y=vaG_q3SBmEf-j55=Q@mail.gmail.com>
+Message-ID: <20140731101901.GB3952@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add pinctrl nodes for the McASP0 pins and configure McASP to the desired
-mode for the board.
+On Mon, Jul 28, 2014 at 10:47:16AM -0400, jonsmirl at gmail.com wrote:
+> On Mon, Jul 28, 2014 at 9:25 AM, Maxime Ripard
+> <maxime.ripard@free-electrons.com> wrote:
+> > On Mon, Jul 28, 2014 at 12:49:46AM -0300, Emilio L?pez wrote:
+> >> This commit adds all the mod1 clocks available on A20 to its device
+> >> tree. This list was created by looking at the A20 user manual.
+> >>
+> >> Not-signed-off-by: Emilio L?pez <emilio@elopez.com.ar>
+> >> ---
+> >>
+> >> As mentioned on an earlier patch, note that this is untested, and I
+> >> only added them to sun7i. It'd be great if actual users of these clocks
+> >> could comment :)
+> >>
+> >>  arch/arm/boot/dts/sun7i-a20.dtsi | 39 +++++++++++++++++++++++++++++++++++++++
+> >>  1 file changed, 39 insertions(+)
+> >>
+> >> diff --git a/arch/arm/boot/dts/sun7i-a20.dtsi b/arch/arm/boot/dts/sun7i-a20.dtsi
+> >> index 5d0265a..c57f7ad 100644
+> >> --- a/arch/arm/boot/dts/sun7i-a20.dtsi
+> >> +++ b/arch/arm/boot/dts/sun7i-a20.dtsi
+> >> @@ -335,6 +335,29 @@
+> >>                       clock-output-names = "ir1";
+> >>               };
+> >>
+> >> +             iis0_clk: clk at 01c200b8 {
+> >> +                     #clock-cells = <0>;
+> >> +                     compatible = "allwinner,sun4i-a10-mod1-clk";
+> >> +                     reg = <0x01c200b8 0x4>;
+> >> +                     clocks = <&pll2 0>, <&pll2 1>, <&pll2 2>, <&pll2 3>;
+> >> +                     clock-output-names = "iis0";
+> >
+> > Usually, it's called i2s.
+> 
+> I'd preferred i2s, but Allwinner used iis everywhere in the manual. So
+> which wins in the device tree?
+> 
+> Same issue happens with twi vs i2c.
 
-Signed-off-by: Peter Ujfalusi <peter.ujfalusi@ti.com>
----
- arch/arm/boot/dts/da850-evm.dts | 31 +++++++++++++++++++++++++++++++
- 1 file changed, 31 insertions(+)
+I'd say whatever is the most common, this is why we ended up using i2c
+instead of allwinner's twi, pinctrl over port controller, etc.
 
-diff --git a/arch/arm/boot/dts/da850-evm.dts b/arch/arm/boot/dts/da850-evm.dts
-index 1e11e5a5f723..09118c72e83f 100644
---- a/arch/arm/boot/dts/da850-evm.dts
-+++ b/arch/arm/boot/dts/da850-evm.dts
-@@ -17,6 +17,18 @@
- 	soc {
- 		pmx_core: pinmux at 1c14120 {
- 			status = "okay";
-+
-+			mcasp0_pins: pinmux_mcasp0_pins {
-+				pinctrl-single,bits = <
-+					/*
-+					 * AHCLKX, ACLKX, AFSX, AHCLKR, ACLKR,
-+					 * AFSR, AMUTE
-+					 */
-+					0x00 0x11111111 0xffffffff
-+					/* AXR11, AXR12 */
-+					0x04 0x00011000 0x000ff000
-+				>;
-+			};
- 		};
- 		serial0: serial at 1c42000 {
- 			status = "okay";
-@@ -170,3 +182,22 @@
- 		};
- 	};
- };
-+
-+&mcasp0 {
-+	#sound-dai-cells = <0>;
-+	status = "okay";
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&mcasp0_pins>;
-+
-+	op-mode = <0>;          /* MCASP_IIS_MODE */
-+	tdm-slots = <2>;
-+	/* 4 serializer */
-+	serial-dir = <  /* 0: INACTIVE, 1: TX, 2: RX */
-+		0 0 0 0
-+		0 0 0 0
-+		0 0 0 1
-+		2 0 0 0
-+	>;
-+	tx-num-evt = <32>;
-+	rx-num-evt = <32>;
-+};
+Maxime
+
 -- 
-2.0.2
+Maxime Ripard, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140731/b9b3dd69/attachment.sig>
