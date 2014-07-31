@@ -1,61 +1,76 @@
-From: haojian.zhuang@linaro.org (Haojian Zhuang)
-Date: Thu, 31 Jul 2014 10:24:55 +0800
-Subject: [PATCH v15 08/12] ARM: config: append lpae configuration
-In-Reply-To: <CAOesGMge6U4B0Eedhi22t=r2gHucEcwcrcGBmkuZ6jAVR1ZoOA@mail.gmail.com>
-References: <1406555876-11989-1-git-send-email-haojian.zhuang@linaro.org>
- <1406555876-11989-9-git-send-email-haojian.zhuang@linaro.org>
- <20140729040531.GB8430@quad.lixom.net>
- <CAD6h2NQ-+t0=XvMWR54tzpvkMe+JT4FcLvQFPNJuUea32GDS8g@mail.gmail.com>
- <CAOesGMge6U4B0Eedhi22t=r2gHucEcwcrcGBmkuZ6jAVR1ZoOA@mail.gmail.com>
-Message-ID: <CAD6h2NTK=nARtyRwRPyprOmhLxEwkTFm84s4UqHZr1gEPFBaVw@mail.gmail.com>
+From: computersforpeace@gmail.com (Brian Norris)
+Date: Wed, 30 Jul 2014 19:36:35 -0700
+Subject: [PATCH v8 01/11] ARM: brcmstb: add infrastructure for ARM-based
+ Broadcom STB SoCs
+In-Reply-To: <20140730092635.GI30282@n2100.arm.linux.org.uk>
+References: <1405976886-27807-1-git-send-email-computersforpeace@gmail.com>
+ <1405976886-27807-2-git-send-email-computersforpeace@gmail.com>
+ <20140730092635.GI30282@n2100.arm.linux.org.uk>
+Message-ID: <20140731023635.GN3711@ld-irv-0074>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 31 July 2014 09:01, Olof Johansson <olof@lixom.net> wrote:
-> On Tue, Jul 29, 2014 at 3:43 AM, Haojian Zhuang
-> <haojian.zhuang@linaro.org> wrote:
->> On 29 July 2014 12:05, Olof Johansson <olof@lixom.net> wrote:
->>> On Mon, Jul 28, 2014 at 09:57:52PM +0800, Haojian Zhuang wrote:
->>>> Append multi_v7_lpae_config. In this default configuration,
->>>> CONFIG_ARCH_MULTI_V6 is disabled. CONFIG_ARM_LPAE is enabled.
->>>
->>> NACK. This is the nth time I have had to nack this patch.
->>>
->>> You are enabling platforms here that don't have LPAE. Don't do that.
->>>
->>> It's trivial to create a LPAE version of multi_v7 defconfig locally.
->>>
->>>
->>> -Olof
->>
->> I tried to remove those SoCs that can't support LPAE. But I don't know
->> every platform in details.
->>
->> How about that I only enable HIP04 in multi_v7_lpae_defconfig. If you
->> think any platform could be added, please help to list it. Then I
->> could append them into the multi_v7_lpae_defconfig.
->
-> I really don't like having to repeat this over and over: Just add LPAE
-> to a multi_v7_defconfig build when you need to turn it on.
->
-> The alternative is to do this right from the beginning, and move
-> multi_v7 over to be a v6_v7 defconfig, and also have an lpae+kvm
-> defconfig for A7/12/15/17 (and mvebu/krait) platforms. But there's
-> been no need for that yet since all platforms to date can boot without
-> LPAE just fine -- in fact most of them don't actually need it since
-> nearly all of them have less memory and for the few of them that do
-> you just turn on LPAE manually like I suggested.
->
->
-> -Olof
+Hi Russell,
 
-I can drop both hip04_defconfig & multi_v7_lpae_defconfig. But the
-problem is that 16GB memory is used in hip04 platform. 64bit memory
-address is also used in hip04 dts file. So I can't boot kernel without
-LPAE configuration.
+On Wed, Jul 30, 2014 at 10:26:35AM +0100, Russell King wrote:
+> On Mon, Jul 21, 2014 at 02:07:56PM -0700, Brian Norris wrote:
+> > +static DEFINE_SPINLOCK(boot_lock);
+> > +
+> > +static void brcmstb_secondary_init(unsigned int cpu)
+> > +{
+> > +	/*
+> > +	 * Synchronise with the boot thread.
+> > +	 */
+> > +	spin_lock(&boot_lock);
+> > +	spin_unlock(&boot_lock);
+> > +}
+> > +
+> > +static int brcmstb_boot_secondary(unsigned int cpu, struct task_struct *idle)
+> > +{
+> > +	/*
+> > +	 * set synchronisation state between this boot processor
+> > +	 * and the secondary one
+> > +	 */
+> > +	spin_lock(&boot_lock);
+> > +
+> > +	/* Bring up power to the core if necessary */
+> > +	if (brcmstb_cpu_get_power_state(cpu) == 0)
+> > +		brcmstb_cpu_power_on(cpu);
+> > +
+> > +	brcmstb_cpu_boot(cpu);
+> > +
+> > +	/*
+> > +	 * now the secondary core is starting up let it run its
+> > +	 * calibrations, then wait for it to finish
+> > +	 */
+> > +	spin_unlock(&boot_lock);
+> 
+> I've just read through this code (because it caused my allmodconfig to
+> break) and spotted this.
 
-If I integrate ARCH_HIP04 & LPAE into hi3xxx_defconfig, both
-ARCH_HI3XXX & ARCH_X5HD2 don't support LPAE.
+Sorry about the allmodconfig problems. I never compile-tested with ARMv6
+enabled. This look OK?
 
-Regards
-Haojian
+diff --git a/arch/arm/mach-bcm/Makefile b/arch/arm/mach-bcm/Makefile
+index f3665121729b..5ce82b4ba931 100644
+--- a/arch/arm/mach-bcm/Makefile
++++ b/arch/arm/mach-bcm/Makefile
+@@ -32,6 +32,7 @@ obj-$(CONFIG_ARCH_BCM2835)	+= board_bcm2835.o
+ obj-$(CONFIG_ARCH_BCM_5301X)	+= bcm_5301x.o
+ 
+ ifeq ($(CONFIG_ARCH_BRCMSTB),y)
++CFLAGS_platsmp-brcmstb.o	+= -march=armv7-a
+ obj-y				+= brcmstb.o
+ obj-$(CONFIG_SMP)		+= headsmp-brcmstb.o platsmp-brcmstb.o
+ endif
+
+> What function does boot_lock perform here?  Please, don't quote the
+> comments (I know where the comments came from) but what I want to hear
+> is your comments about why you decided to retain this.
+
+You might glean a little more from my response to Rob, but I'm not sure
+there was a good reason for retaining this. We do need to be sure the
+CPU is fully powered online before bringing it out of reset, but the
+spinlock seems overkill AFAICT.
+
+Brian
