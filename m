@@ -1,59 +1,32 @@
-From: collinsd@codeaurora.org (David Collins)
-Date: Thu, 31 Jul 2014 13:33:49 -0700
-Subject: [PATCH v3 1/4] mfd: pm8xxx-spmi: add support for Qualcomm SPMI
- PMICs
-In-Reply-To: <53DA02C0.2050606@mm-sol.com>
-References: <1406205921-7452-1-git-send-email-svarbanov@mm-sol.com>
- <1406205921-7452-2-git-send-email-svarbanov@mm-sol.com>
- <53D8182A.5050204@codeaurora.org> <53DA02C0.2050606@mm-sol.com>
-Message-ID: <53DAA82D.4020901@codeaurora.org>
+From: afaerber@suse.de (=?UTF-8?B?QW5kcmVhcyBGw6RyYmVy?=)
+Date: Thu, 31 Jul 2014 22:36:54 +0200
+Subject: [PATCH v4 4/4] ARM: dts: Add exynos5250-spring device tree
+In-Reply-To: <53DA936E.9060004@gmail.com>
+References: <1406822910-6255-1-git-send-email-afaerber@suse.de>
+ <1406822910-6255-5-git-send-email-afaerber@suse.de>
+ <53DA936E.9060004@gmail.com>
+Message-ID: <53DAA8E6.3010400@suse.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/31/2014 01:48 AM, Stanimir Varbanov wrote:
-> Hi David,
+Am 31.07.2014 21:05, schrieb Tomasz Figa:
+>> +	};
+>> +
+>> +	fixed-rate-clocks {
+>> +		xxti {
+>> +			compatible = "samsung,clock-xxti";
+>> +			clock-frequency = <24000000>;
+>> +		};
+>> +	};
 > 
-> Thanks for the comments!
-> 
-> On 07/30/2014 12:54 AM, David Collins wrote:
->> On 07/24/2014 05:45 AM, Stanimir Varbanov wrote:
->>> From: Josh Cartwright <joshc@codeaurora.org>
->>>
->>> The Qualcomm SPMI PMIC chips are components used with the
->>> Snapdragon 800 series SoC family.  This driver exists
->>> largely as a glue mfd component, it exists to be an owner
->>> of an SPMI regmap for children devices described in
->>> device tree.
+> This is also referencing a node from higher level, so it should be done
+> using a reference.
 
-(...)
->>> +static const struct regmap_config pm8xxx_regmap_config = {
->>> +	.reg_bits	= 16,
->>> +	.val_bits	= 8,
->>> +	.max_register	= 0xffff,
->>
->> Can you please add the following line here?
->>
->> 	.fast_io	= true;
->>
->> This will cause a spinlock to be held during SPMI transactions instead of
->> a mutex lock.  This is needed because several downstream peripheral
->> drivers need to make SPMI read and write calls from atomic context.  I
->> have commented on this point in a previous thread with specific examples [2].
-> 
-> OK, I understand the need of atomic context, but pmic_arb_read_cmd() and
-> pmic_arb_write_cmd() functions use raw_spin_lock_irqsave already. Isn't
-> those locks enough?
+Actually this one isn't! Neither fixed-rate-clocks nor xxti exists in
+the .dtsi.
 
-No, that isn't sufficient.  The problem is that the peripheral driver
-would already be in atomic context at the time that it needs to perform an
-SPMI read or write via regmap_read() or regmap_write() respectively.
-These regmap calls would take a mutex lock if fast_io == false.  This is
-not allowed since calling a sleepable function in atomic context can lead
-to deadlock.
-
-Take care,
-David
+Andreas
 
 -- 
-The Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-hosted by The Linux Foundation
+SUSE LINUX Products GmbH, Maxfeldstr. 5, 90409 N?rnberg, Germany
+GF: Jeff Hawn, Jennifer Guild, Felix Imend?rffer; HRB 16746 AG N?rnberg
