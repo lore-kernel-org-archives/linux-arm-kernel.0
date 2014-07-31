@@ -1,35 +1,46 @@
-From: jvial@adeneo-embedded.com (Jeremy Vial)
-Date: Thu, 31 Jul 2014 15:10:33 +0200
-Subject: [PATCH 1/2] ARM: OMAP3: Fix choice of omap3_restore_es function in
- OMAP34XX rev3.1.2 case.
-In-Reply-To: <1406812234-23163-1-git-send-email-jvial@adeneo-embedded.com>
-References: <1406812234-23163-1-git-send-email-jvial@adeneo-embedded.com>
-Message-ID: <1406812234-23163-2-git-send-email-jvial@adeneo-embedded.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Thu, 31 Jul 2014 06:11:08 -0700
+Subject: OMAP baseline test results for v3.16-rc4
+In-Reply-To: <alpine.DEB.2.02.1407300725290.4477@utopia.booyaka.com>
+References: <alpine.DEB.2.02.1407251857480.5875@utopia.booyaka.com>
+ <20140729064243.GF29045@atomide.com>
+ <alpine.DEB.2.02.1407290810160.22957@utopia.booyaka.com>
+ <20140729084930.GH29045@atomide.com>
+ <alpine.DEB.2.02.1407291225070.13035@utopia.booyaka.com>
+ <alpine.DEB.2.02.1407291256270.13035@utopia.booyaka.com>
+ <20140729145312.GT29045@atomide.com>
+ <alpine.DEB.2.02.1407291922370.13035@utopia.booyaka.com>
+ <20140730053940.GX29045@atomide.com>
+ <alpine.DEB.2.02.1407300725290.4477@utopia.booyaka.com>
+Message-ID: <20140731131107.GB29045@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-According to the comment ?restore_es3: applies to 34xx >= ES3.0" in
-"arch/arm/mach-omap2/sleep34xx.S?, omap3_restore_es3 should be used
-if the revision of an OMAP34xx is ES3.1.2.
+* Paul Walmsley <paul@pwsan.com> [140730 00:55]:
+> On Tue, 29 Jul 2014, Tony Lindgren wrote:
+> 
+> > The following patch should fix the tests above for 3530es3beagle.
+> > Care to test and ack as I don't have one?
+> 
+> 3530es3beagle retention dynamic idle tests hang on next-20140729.  (Maybe 
+> other boards fail too - haven't tested any others).  
 
-Signed-off-by: Jeremy Vial <jvial@adeneo-embedded.com>
----
- arch/arm/mach-omap2/control.c |    3 ++-
- 1 file changed, 2 insertions(+), 1 deletion(-)
+I just checked that today's linux next works for off-idle and
+wake-up events for at least 37xx evm.
+ 
+> http://www.pwsan.com/omap/testlogs/next_20140729/20140730010841/pm/3530es3beagle/3530es3beagle_log.txt
+> 
+> Adding the patch you sent doesn't change that, but now some extra warning 
+> messages appear ("PRM: I/O chain clock line assertion timed out"):
+> 
+> http://www.pwsan.com/omap/testlogs/next_20140729_beagle_pm/20140730004856/pm/3530es3beagle/3530es3beagle_log.txt
 
-diff --git a/arch/arm/mach-omap2/control.c b/arch/arm/mach-omap2/control.c
-index 751f354..acadac0 100644
---- a/arch/arm/mach-omap2/control.c
-+++ b/arch/arm/mach-omap2/control.c
-@@ -314,7 +314,8 @@ void omap3_save_scratchpad_contents(void)
- 		scratchpad_contents.public_restore_ptr =
- 			virt_to_phys(omap3_restore_3630);
- 	else if (omap_rev() != OMAP3430_REV_ES3_0 &&
--					omap_rev() != OMAP3430_REV_ES3_1)
-+					omap_rev() != OMAP3430_REV_ES3_1 &&
-+					omap_rev() != OMAP3430_REV_ES3_1_2)
- 		scratchpad_contents.public_restore_ptr =
- 			virt_to_phys(omap3_restore);
- 	else
--- 
-1.7.9.5
+Weird it should just work. I don't know why the "PRM: I/O chain
+clock line assertion timed out" happens for you, I have not seen
+that. So far I've tested it on n900, beagle xm and 37xx-evm. None
+of those are 3530 though, but it should behave the same way as
+on n900.
+
+Regards,
+
+Tony
