@@ -1,50 +1,45 @@
 From: dianders@chromium.org (Doug Anderson)
-Date: Thu, 31 Jul 2014 09:13:20 -0700
-Subject: [PATCH v2 4/4] ARM: dts: mmc slot node gone on rk3288 => no more
- address / size cells
-In-Reply-To: <1406823200-20911-1-git-send-email-dianders@chromium.org>
-References: <1406823200-20911-1-git-send-email-dianders@chromium.org>
-Message-ID: <1406823200-20911-5-git-send-email-dianders@chromium.org>
+Date: Thu, 31 Jul 2014 09:13:16 -0700
+Subject: [PATCH v2 0/4] Add eMMC and SD card support for rk3288-evb
+Message-ID: <1406823200-20911-1-git-send-email-dianders@chromium.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-We've removed the slot node from all rk3288 device trees, so we no
-longer need address-cells or size-cells.
+This series adds basic eMMC and SD card support for the rk3288-evb
+board based on Addy's posted dw_mmc patch from:
+  https://patchwork.kernel.org/patch/4653631/
 
-If Jaehoon's (mmc: dw_mmc: Slot quirk "disable-wp" is deprecated)
-patch lands before my (ARM: dts: Add emmc and sdmmc to the rk3288
-device tree) then this could be squashed into the later patch.
+The series is a little tricky because:
+* Jaehoon has some outstanding patches to remove the slot node.  Since
+  those haven't landed yet, I've posted my original patch with the
+  slot node and then some future patches that can land with Jaehoon's
+  patches.
 
-Signed-off-by: Doug Anderson <dianders@chromium.org>
-Acked-by: Arnd Bergmann <arnd@arndb.de>
----
+So just to be explicit:
+- Patch #1 and #2 can land after Addy's patch lands.
+- Patch #3 and #4 can land after Jaehoon's patch lands, though there's
+  no huge hurry since Jaehoon's patch supports the old mode (it just
+  prints a warning).
+
+Note that we don't have regulators specified yet (no regulator driver
+for rk808-based board).  We also don't yet support UHS modes (which
+require regulator support plus dw_mmc driver support for tuning).
+Those features can come later.
+
 Changes in v2:
+- New patchwork link for Addy's patch
+- Squashed in the DDR50 mode since Addy spun his patch.
 - Refer to the new title of Jaehoon's patch
 
- arch/arm/boot/dts/rk3288.dtsi | 4 ----
- 1 file changed, 4 deletions(-)
+Doug Anderson (4):
+  ARM: dts: Add emmc and sdmmc to the rk3288 device tree
+  ARM: dts: Enable emmc and sdmmc on the rk3288-evb boards
+  ARM: dts: Take the mmc slot node out of rk3288-evb
+  ARM: dts: mmc slot node gone on rk3288 => no more address / size cells
 
-diff --git a/arch/arm/boot/dts/rk3288.dtsi b/arch/arm/boot/dts/rk3288.dtsi
-index fd77a65..d2d0086 100644
---- a/arch/arm/boot/dts/rk3288.dtsi
-+++ b/arch/arm/boot/dts/rk3288.dtsi
-@@ -85,8 +85,6 @@
- 		fifo-depth = <0x100>;
- 		interrupts = <GIC_SPI 32 IRQ_TYPE_LEVEL_HIGH>;
- 		reg = <0xff0c0000 0x4000>;
--		#address-cells = <1>;
--		#size-cells = <0>;
- 	};
- 
- 	emmc: dwmmc at ff0f0000 {
-@@ -96,8 +94,6 @@
- 		fifo-depth = <0x100>;
- 		interrupts = <GIC_SPI 35 IRQ_TYPE_LEVEL_HIGH>;
- 		reg = <0xff0f0000 0x4000>;
--		#address-cells = <1>;
--		#size-cells = <0>;
- 	};
- 
- 	i2c1: i2c at ff140000 {
+ arch/arm/boot/dts/rk3288-evb.dtsi | 25 +++++++++++++++++++++++++
+ arch/arm/boot/dts/rk3288.dtsi     | 18 ++++++++++++++++++
+ 2 files changed, 43 insertions(+)
+
 -- 
 2.0.0.526.g5318336
