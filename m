@@ -1,238 +1,116 @@
-From: tomeu.vizoso@collabora.com (Tomeu Vizoso)
-Date: Thu, 31 Jul 2014 13:39:39 +0200
-Subject: [PATCH v4 RESEND 6/6] clk: Add floor and ceiling constraints to clock
- rates
-In-Reply-To: <1406806779-26939-1-git-send-email-tomeu.vizoso@collabora.com>
-References: <1406806779-26939-1-git-send-email-tomeu.vizoso@collabora.com>
-Message-ID: <1406806779-26939-6-git-send-email-tomeu.vizoso@collabora.com>
+From: thierry.reding@gmail.com (Thierry Reding)
+Date: Thu, 31 Jul 2014 13:42:50 +0200
+Subject: [RFC] pwm-backlight: Allow backlight to remain disabled on boot
+Message-ID: <1406806970-12561-1-git-send-email-thierry.reding@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Adds a way for clock consumers to set maximum and minimum rates. This can be
-used for thermal drivers to set ceiling rates, or by misc. drivers to set
-floor rates to assure a minimum performance level.
+From: Thierry Reding <treding@nvidia.com>
 
-Signed-off-by: Tomeu Vizoso <tomeu.vizoso@collabora.com>
+The default for backlight devices is to be enabled immediately when
+registering with the backlight core. This can be useful for setups that
+use a simple framebuffer device and where the backlight cannot otherwise
+be hooked up to the panel.
+
+However, when dealing with more complex setups, such as those of recent
+ARM SoCs, this can be problematic. Since the backlight is usually setup
+separately from the display controller, the probe order is not usually
+deterministic. That can lead to situations where the backlight will be
+powered up and the panel will show an uninitialized framebuffer.
+
+Furthermore, subsystems such as DRM have advanced functionality to set
+the power mode of a panel. In order to allow such setups to power up the
+panel at exactly the right moment, a way is needed to prevent the
+backlight core from powering the backlight up automatically when it is
+registered.
+
+This commit introduces a new boot_off field in the platform data (and
+also implements getting the same information from device tree). When set
+the initial backlight power mode will be set to "off".
+
+Signed-off-by: Thierry Reding <treding@nvidia.com>
 ---
- drivers/clk/clk.c           | 103 ++++++++++++++++++++++++++++++++++++++++++++
- drivers/clk/clk.h           |   1 +
- drivers/clk/clkdev.c        |   2 +-
- include/linux/clk-private.h |   1 +
- include/linux/clk.h         |  18 ++++++++
- 5 files changed, 124 insertions(+), 1 deletion(-)
+I've been meaning to send this for a while but was always holding back
+because of the indoctrination that this type of configuration shouldn't
+be part of device tree. However this issue was recently raised again in
+the context of power up sequences for display panels. As described above
+the issue is that panel datasheets recommend that the backlight attached
+to a panel be turned on at the very last step to avoid visual glitches
+during the panel's power up sequence. With the current implementation it
+is typical for the backlight to be probed before the display panel. That
+has, in many cases, the side-effect of enabling the backlight, therefore
+making the screen content visible before it's actually initialized.
 
-diff --git a/drivers/clk/clk.c b/drivers/clk/clk.c
-index f1cdc01..90db677 100644
---- a/drivers/clk/clk.c
-+++ b/drivers/clk/clk.c
-@@ -23,6 +23,19 @@
+Some panels come up with random garbage when uninitialized, others show
+all white. With some luck the panel will be all black and users won't
+really notice.
+
+This patch is an attempt to enable boards to override the default of
+turning on the backlight for the pwm-backlight driver. I'm not sure if
+there was a specific reason to turn on the backlight by default when
+this driver was initially written, but the fact is that since it has
+pretty much always been like this we can't really go and change the
+default, otherwise a lot of people may end up with no backlight and no
+clue as to how to enable it. So the only reasonable thing we can do is
+to keep the old behaviour and give new boards a way to override it if
+they know that some other part of the stack will enable it at the right
+moment.
+
+ .../devicetree/bindings/video/backlight/pwm-backlight.txt         | 1 +
+ drivers/video/backlight/pwm_bl.c                                  | 8 ++++++++
+ include/linux/pwm_backlight.h                                     | 2 ++
+ 3 files changed, 11 insertions(+)
+
+diff --git a/Documentation/devicetree/bindings/video/backlight/pwm-backlight.txt b/Documentation/devicetree/bindings/video/backlight/pwm-backlight.txt
+index 764db86d441a..65e001a1733d 100644
+--- a/Documentation/devicetree/bindings/video/backlight/pwm-backlight.txt
++++ b/Documentation/devicetree/bindings/video/backlight/pwm-backlight.txt
+@@ -17,6 +17,7 @@ Optional properties:
+                "pwms" property (see PWM binding[0])
+   - enable-gpios: contains a single GPIO specifier for the GPIO which enables
+                   and disables the backlight (see GPIO binding[1])
++  - backlight-boot-off: keep the backlight disabled on boot
  
- #include "clk.h"
+ [0]: Documentation/devicetree/bindings/pwm/pwm.txt
+ [1]: Documentation/devicetree/bindings/gpio/gpio.txt
+diff --git a/drivers/video/backlight/pwm_bl.c b/drivers/video/backlight/pwm_bl.c
+index d7a3d13e72ec..62adfc9d37a7 100644
+--- a/drivers/video/backlight/pwm_bl.c
++++ b/drivers/video/backlight/pwm_bl.c
+@@ -173,6 +173,8 @@ static int pwm_backlight_parse_dt(struct device *dev,
+ 		data->max_brightness--;
+ 	}
  
-+enum constraint_type {
-+	CONSTRAINT_FLOOR,
-+	CONSTRAINT_CEILING,
-+};
++	data->boot_off = of_property_read_bool(node, "backlight-boot-off");
 +
-+struct rate_constraint {
-+	struct hlist_node	node;
-+	const char		*dev_id;
-+	const char		*con_id;
-+	enum constraint_type	type;
-+	unsigned long		rate;
-+};
-+
- static DEFINE_SPINLOCK(enable_lock);
- static DEFINE_MUTEX(prepare_lock);
- 
-@@ -1653,6 +1666,7 @@ static void clk_change_rate(struct clk_core *clk)
- int clk_provider_set_rate(struct clk_core *clk, unsigned long rate)
- {
- 	struct clk_core *top, *fail_clk;
-+	struct rate_constraint *constraint;
- 	int ret = 0;
- 
- 	if (!clk)
-@@ -1661,6 +1675,17 @@ int clk_provider_set_rate(struct clk_core *clk, unsigned long rate)
- 	/* prevent racing with updates to the clock topology */
- 	clk_prepare_lock();
- 
-+	hlist_for_each_entry(constraint, &clk->rate_constraints, node) {
-+		switch (constraint->type) {
-+		case CONSTRAINT_FLOOR:
-+			rate = max(rate, constraint->rate);
-+			break;
-+		case CONSTRAINT_CEILING:
-+			rate = min(rate, constraint->rate);
-+			break;
-+		}
-+	}
-+
- 	/* bail early if nothing to do */
- 	if (rate == clk_provider_get_rate(clk))
- 		goto out;
-@@ -1727,6 +1752,65 @@ int clk_set_rate(struct clk *clk_user, unsigned long rate)
+ 	return 0;
  }
- EXPORT_SYMBOL_GPL(clk_set_rate);
  
-+static struct rate_constraint *__ensure_constraint(struct clk *clk_user,
-+						   enum constraint_type type)
-+{
-+	struct clk_core *clk = clk_to_clk_core(clk_user);
-+	struct rate_constraint *constraint = NULL;
-+	bool found = false;
-+
-+	hlist_for_each_entry(constraint, &clk->rate_constraints, node) {
-+		if (constraint->dev_id == clk_user->dev_id &&
-+		    constraint->con_id == clk_user->con_id &&
-+		    constraint->type == type)
-+			found = true;
-+	}
-+
-+	if (!found) {
-+		constraint = kzalloc(sizeof(*constraint), GFP_KERNEL);
-+		if (!constraint)
-+			return NULL;
-+		hlist_add_head(&constraint->node, &clk->rate_constraints);
-+	}
-+
-+	return constraint;
-+}
-+
-+static int __clk_set_constraint(struct clk *clk_user, unsigned long rate,
-+				enum constraint_type type)
-+{
-+	struct clk_core *clk = clk_to_clk_core(clk_user);
-+	struct rate_constraint *constraint;
-+	int ret;
-+
-+	clk_prepare_lock();
-+
-+	constraint = __ensure_constraint(clk_user, type);
-+	if (!constraint)
-+		return -ENOMEM;
-+
-+	constraint->rate = rate;
-+
-+	/* Update the rate so the new constraint is taken into account */
-+	ret = clk_provider_set_rate(clk, clk_provider_get_rate(clk));
-+
-+	clk_prepare_unlock();
-+
-+	return ret;
-+}
-+
-+int clk_set_floor_rate(struct clk *clk_user, unsigned long rate)
-+{
-+	return __clk_set_constraint(clk_user, rate, CONSTRAINT_FLOOR);
-+}
-+EXPORT_SYMBOL_GPL(clk_set_floor_rate);
-+
-+int clk_set_ceiling_rate(struct clk *clk_user, unsigned long rate)
-+{
-+	return __clk_set_constraint(clk_user, rate, CONSTRAINT_CEILING);
-+}
-+EXPORT_SYMBOL_GPL(clk_set_ceiling_rate);
-+
- struct clk_core *clk_provider_get_parent(struct clk_core *clk)
- {
- 	struct clk_core *parent;
-@@ -2072,6 +2156,8 @@ int __clk_init(struct device *dev, struct clk_core *clk)
- 			}
- 	 }
+@@ -317,6 +319,12 @@ static int pwm_backlight_probe(struct platform_device *pdev)
+ 	}
  
-+	INIT_HLIST_HEAD(&clk->rate_constraints);
+ 	bl->props.brightness = data->dft_brightness;
 +
- 	/*
- 	 * optional platform-specific magic
- 	 *
-@@ -2508,6 +2594,23 @@ int clk_notifier_unregister(struct clk *clk_user, struct notifier_block *nb)
- }
- EXPORT_SYMBOL_GPL(clk_notifier_unregister);
++	if (data->boot_off)
++		bl->props.power = FB_BLANK_POWERDOWN;
++	else
++		bl->props.power = FB_BLANK_UNBLANK;
++
+ 	backlight_update_status(bl);
  
-+void __clk_free_clk(struct clk *clk_user)
-+{
-+	struct clk_core *clk = clk_to_clk_core(clk_user);
-+	struct rate_constraint *constraint;
-+	struct hlist_node *tmp;
+ 	platform_set_drvdata(pdev, bl);
+diff --git a/include/linux/pwm_backlight.h b/include/linux/pwm_backlight.h
+index efdd9227a49c..1fc14989da4a 100644
+--- a/include/linux/pwm_backlight.h
++++ b/include/linux/pwm_backlight.h
+@@ -15,6 +15,8 @@ struct platform_pwm_backlight_data {
+ 	unsigned int *levels;
+ 	/* TODO remove once all users are switched to gpiod_* API */
+ 	int enable_gpio;
++	bool boot_off;
 +
-+	hlist_for_each_entry_safe(constraint, tmp, &clk->rate_constraints, node) {
-+		if (constraint->dev_id == clk_user->dev_id &&
-+		    constraint->con_id == clk_user->con_id) {
-+			hlist_del(&constraint->node);
-+			kfree(constraint);
-+		}
-+	}
-+
-+	kfree(clk_user);
-+}
-+
- #ifdef CONFIG_OF
- /**
-  * struct of_clk_provider - Clock provider registration structure
-diff --git a/drivers/clk/clk.h b/drivers/clk/clk.h
-index 49eff38..005deb3 100644
---- a/drivers/clk/clk.h
-+++ b/drivers/clk/clk.h
-@@ -21,4 +21,5 @@ void of_clk_unlock(void);
- #if defined(CONFIG_COMMON_CLK)
- struct clk *__clk_create_clk(struct clk_core *clk_core, const char *dev,
- 			     const char *con);
-+void __clk_free_clk(struct clk *clk_user);
- #endif
-diff --git a/drivers/clk/clkdev.c b/drivers/clk/clkdev.c
-index 517a25b..8a6a398 100644
---- a/drivers/clk/clkdev.c
-+++ b/drivers/clk/clkdev.c
-@@ -269,7 +269,7 @@ void clk_put(struct clk *clk)
- #if defined(CONFIG_COMMON_CLK)
- 	clk_core_t *core = clk_to_clk_core(clk);
- 
--	kfree(clk);
-+	__clk_free_clk(clk);
- 	__clk_put(core);
- #else
- 	__clk_put(clk);
-diff --git a/include/linux/clk-private.h b/include/linux/clk-private.h
-index 9657fc8..a8279e1 100644
---- a/include/linux/clk-private.h
-+++ b/include/linux/clk-private.h
-@@ -48,6 +48,7 @@ struct clk_core {
- 	unsigned long		accuracy;
- 	struct hlist_head	children;
- 	struct hlist_node	child_node;
-+	struct hlist_head	rate_constraints;
- 	unsigned int		notifier_count;
- #ifdef CONFIG_DEBUG_FS
- 	struct dentry		*dentry;
-diff --git a/include/linux/clk.h b/include/linux/clk.h
-index f46a2eb..066b100 100644
---- a/include/linux/clk.h
-+++ b/include/linux/clk.h
-@@ -275,6 +275,24 @@ long clk_round_rate(struct clk *clk, unsigned long rate);
- int clk_set_rate(struct clk *clk, unsigned long rate);
- 
- /**
-+ * clk_set_floor_rate - set a minimum clock rate for a clock source
-+ * @clk: clock source
-+ * @rate: desired minimum clock rate in Hz
-+ *
-+ * Returns success (0) or negative errno.
-+ */
-+int clk_set_floor_rate(struct clk *clk, unsigned long rate);
-+
-+/**
-+ * clk_set_ceiling_rate - set a maximum clock rate for a clock source
-+ * @clk: clock source
-+ * @rate: desired maximum clock rate in Hz
-+ *
-+ * Returns success (0) or negative errno.
-+ */
-+int clk_set_ceiling_rate(struct clk *clk, unsigned long rate);
-+
-+/**
-  * clk_set_parent - set the parent clock source for this clock
-  * @clk: clock source
-  * @parent: parent clock source
+ 	int (*init)(struct device *dev);
+ 	int (*notify)(struct device *dev, int brightness);
+ 	void (*notify_after)(struct device *dev, int brightness);
 -- 
-1.9.3
+2.0.3
