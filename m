@@ -1,39 +1,262 @@
-From: t-kristo@ti.com (Tero Kristo)
-Date: Thu, 31 Jul 2014 16:16:17 +0300
-Subject: [PATCH 2/2] clk: initial clock driver for TWL6030
-In-Reply-To: <53DA2F53.8010405@kpanic.de>
-References: <1406728949-7560-1-git-send-email-sassmann@kpanic.de>
- <1406728949-7560-3-git-send-email-sassmann@kpanic.de>
- <20140730175033.GA17528@sirena.org.uk> <53DA12BF.1060008@kpanic.de>
- <53DA284D.6030404@ti.com> <53DA2F53.8010405@kpanic.de>
-Message-ID: <53DA41A1.5010900@ti.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Thu, 31 Jul 2014 14:16:39 +0100
+Subject: [PATCH][next] arm64: KVM: GICv3: move system register access to
+ msr_s/mrs_s
+Message-ID: <1406812599-18631-1-git-send-email-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-<snip>
+Commit 72c583951526 (arm64: gicv3: Allow GICv3 compilation with
+older binutils) changed the way we express the GICv3 system registers,
+but couldn't change the occurences used by KVM as the code wasn't
+merged yet.
 
->>> +static int of_twl6030_clk32kg_probe(struct platform_device *pdev)
->>> +{
->>> +	struct device_node *node = pdev->dev.of_node;
->>> +	struct clk *clk;
->>> +
->>> +	if (!node)
->>> +		return -ENODEV;
->>> +
->>> +	clk = devm_clk_get(&pdev->dev, "clk32kg");
->>> +	if (IS_ERR(clk))
->>> +		return PTR_ERR(clk);
->>> +
->>> +	return clk_prepare(clk);
->>
->> This is plain wrong as pointed out earlier. The driver that uses the
->> clock must enable it.
->
-> Understood. I'll change it to clk_prepare_enable().
+Just fix the accessors.
 
-Nono, remove it completely from here. The clock driver should not enable 
-itself by default. The clock itself has some sort of customer somewhere 
-(like am33xx-wifi driver), which should request for the clock and enable 
-it only when needed.
+Cc: Will Deacon <will.deacon@arm.com>
+Cc: Catalin Marinas <catalin.marinas@arm.com>
+Cc: Christoffer Dall <christoffer.dall@linaro.org>
+Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+---
+-next is currently borked. I suggest we take this patch via the kvmarm tree,
+and only send our PR once the arm64 tree has hit Linus' tree. It contains
+the same dependency on the GIC tree anyway.
 
--Tero
+ arch/arm64/kvm/vgic-v3-switch.S | 130 ++++++++++++++++++++--------------------
+ 1 file changed, 65 insertions(+), 65 deletions(-)
+
+diff --git a/arch/arm64/kvm/vgic-v3-switch.S b/arch/arm64/kvm/vgic-v3-switch.S
+index 21e68f6..d160469 100644
+--- a/arch/arm64/kvm/vgic-v3-switch.S
++++ b/arch/arm64/kvm/vgic-v3-switch.S
+@@ -48,11 +48,11 @@
+ 	dsb	st
+ 
+ 	// Save all interesting registers
+-	mrs	x4, ICH_HCR_EL2
+-	mrs	x5, ICH_VMCR_EL2
+-	mrs	x6, ICH_MISR_EL2
+-	mrs	x7, ICH_EISR_EL2
+-	mrs	x8, ICH_ELSR_EL2
++	mrs_s	x4, ICH_HCR_EL2
++	mrs_s	x5, ICH_VMCR_EL2
++	mrs_s	x6, ICH_MISR_EL2
++	mrs_s	x7, ICH_EISR_EL2
++	mrs_s	x8, ICH_ELSR_EL2
+ 
+ 	str	w4, [x3, #VGIC_V3_CPU_HCR]
+ 	str	w5, [x3, #VGIC_V3_CPU_VMCR]
+@@ -60,9 +60,9 @@
+ 	str	w7, [x3, #VGIC_V3_CPU_EISR]
+ 	str	w8, [x3, #VGIC_V3_CPU_ELRSR]
+ 
+-	msr	ICH_HCR_EL2, xzr
++	msr_s	ICH_HCR_EL2, xzr
+ 
+-	mrs	x21, ICH_VTR_EL2
++	mrs_s	x21, ICH_VTR_EL2
+ 	mvn	w22, w21
+ 	ubfiz	w23, w22, 2, 4	// w23 = (15 - ListRegs) * 4
+ 
+@@ -71,22 +71,22 @@
+ 	br	x24
+ 
+ 1:
+-	mrs	x20, ICH_LR15_EL2
+-	mrs	x19, ICH_LR14_EL2
+-	mrs	x18, ICH_LR13_EL2
+-	mrs	x17, ICH_LR12_EL2
+-	mrs	x16, ICH_LR11_EL2
+-	mrs	x15, ICH_LR10_EL2
+-	mrs	x14, ICH_LR9_EL2
+-	mrs	x13, ICH_LR8_EL2
+-	mrs	x12, ICH_LR7_EL2
+-	mrs	x11, ICH_LR6_EL2
+-	mrs	x10, ICH_LR5_EL2
+-	mrs	x9, ICH_LR4_EL2
+-	mrs	x8, ICH_LR3_EL2
+-	mrs	x7, ICH_LR2_EL2
+-	mrs	x6, ICH_LR1_EL2
+-	mrs	x5, ICH_LR0_EL2
++	mrs_s	x20, ICH_LR15_EL2
++	mrs_s	x19, ICH_LR14_EL2
++	mrs_s	x18, ICH_LR13_EL2
++	mrs_s	x17, ICH_LR12_EL2
++	mrs_s	x16, ICH_LR11_EL2
++	mrs_s	x15, ICH_LR10_EL2
++	mrs_s	x14, ICH_LR9_EL2
++	mrs_s	x13, ICH_LR8_EL2
++	mrs_s	x12, ICH_LR7_EL2
++	mrs_s	x11, ICH_LR6_EL2
++	mrs_s	x10, ICH_LR5_EL2
++	mrs_s	x9, ICH_LR4_EL2
++	mrs_s	x8, ICH_LR3_EL2
++	mrs_s	x7, ICH_LR2_EL2
++	mrs_s	x6, ICH_LR1_EL2
++	mrs_s	x5, ICH_LR0_EL2
+ 
+ 	adr	x24, 1f
+ 	add	x24, x24, x23
+@@ -113,34 +113,34 @@
+ 	tbnz	w21, #29, 6f	// 6 bits
+ 	tbz	w21, #30, 5f	// 5 bits
+ 				// 7 bits
+-	mrs	x20, ICH_AP0R3_EL2
++	mrs_s	x20, ICH_AP0R3_EL2
+ 	str	w20, [x3, #(VGIC_V3_CPU_AP0R + 3*4)]
+-	mrs	x19, ICH_AP0R2_EL2
++	mrs_s	x19, ICH_AP0R2_EL2
+ 	str	w19, [x3, #(VGIC_V3_CPU_AP0R + 2*4)]
+-6:	mrs	x18, ICH_AP0R1_EL2
++6:	mrs_s	x18, ICH_AP0R1_EL2
+ 	str	w18, [x3, #(VGIC_V3_CPU_AP0R + 1*4)]
+-5:	mrs	x17, ICH_AP0R0_EL2
++5:	mrs_s	x17, ICH_AP0R0_EL2
+ 	str	w17, [x3, #VGIC_V3_CPU_AP0R]
+ 
+ 	tbnz	w21, #29, 6f	// 6 bits
+ 	tbz	w21, #30, 5f	// 5 bits
+ 				// 7 bits
+-	mrs	x20, ICH_AP1R3_EL2
++	mrs_s	x20, ICH_AP1R3_EL2
+ 	str	w20, [x3, #(VGIC_V3_CPU_AP1R + 3*4)]
+-	mrs	x19, ICH_AP1R2_EL2
++	mrs_s	x19, ICH_AP1R2_EL2
+ 	str	w19, [x3, #(VGIC_V3_CPU_AP1R + 2*4)]
+-6:	mrs	x18, ICH_AP1R1_EL2
++6:	mrs_s	x18, ICH_AP1R1_EL2
+ 	str	w18, [x3, #(VGIC_V3_CPU_AP1R + 1*4)]
+-5:	mrs	x17, ICH_AP1R0_EL2
++5:	mrs_s	x17, ICH_AP1R0_EL2
+ 	str	w17, [x3, #VGIC_V3_CPU_AP1R]
+ 
+ 	// Restore SRE_EL1 access and re-enable SRE at EL1.
+-	mrs	x5, ICC_SRE_EL2
++	mrs_s	x5, ICC_SRE_EL2
+ 	orr	x5, x5, #ICC_SRE_EL2_ENABLE
+-	msr	ICC_SRE_EL2, x5
++	msr_s	ICC_SRE_EL2, x5
+ 	isb
+ 	mov	x5, #1
+-	msr	ICC_SRE_EL1, x5
++	msr_s	ICC_SRE_EL1, x5
+ .endm
+ 
+ /*
+@@ -150,7 +150,7 @@
+ .macro	restore_vgic_v3_state
+ 	// Disable SRE_EL1 access. Necessary, otherwise
+ 	// ICH_VMCR_EL2.VFIQEn becomes one, and FIQ happens...
+-	msr	ICC_SRE_EL1, xzr
++	msr_s	ICC_SRE_EL1, xzr
+ 	isb
+ 
+ 	// Compute the address of struct vgic_cpu
+@@ -160,34 +160,34 @@
+ 	ldr	w4, [x3, #VGIC_V3_CPU_HCR]
+ 	ldr	w5, [x3, #VGIC_V3_CPU_VMCR]
+ 
+-	msr	ICH_HCR_EL2, x4
+-	msr	ICH_VMCR_EL2, x5
++	msr_s	ICH_HCR_EL2, x4
++	msr_s	ICH_VMCR_EL2, x5
+ 
+-	mrs	x21, ICH_VTR_EL2
++	mrs_s	x21, ICH_VTR_EL2
+ 
+ 	tbnz	w21, #29, 6f	// 6 bits
+ 	tbz	w21, #30, 5f	// 5 bits
+ 				// 7 bits
+ 	ldr	w20, [x3, #(VGIC_V3_CPU_AP1R + 3*4)]
+-	msr	ICH_AP1R3_EL2, x20
++	msr_s	ICH_AP1R3_EL2, x20
+ 	ldr	w19, [x3, #(VGIC_V3_CPU_AP1R + 2*4)]
+-	msr	ICH_AP1R2_EL2, x19
++	msr_s	ICH_AP1R2_EL2, x19
+ 6:	ldr	w18, [x3, #(VGIC_V3_CPU_AP1R + 1*4)]
+-	msr	ICH_AP1R1_EL2, x18
++	msr_s	ICH_AP1R1_EL2, x18
+ 5:	ldr	w17, [x3, #VGIC_V3_CPU_AP1R]
+-	msr	ICH_AP1R0_EL2, x17
++	msr_s	ICH_AP1R0_EL2, x17
+ 
+ 	tbnz	w21, #29, 6f	// 6 bits
+ 	tbz	w21, #30, 5f	// 5 bits
+ 				// 7 bits
+ 	ldr	w20, [x3, #(VGIC_V3_CPU_AP0R + 3*4)]
+-	msr	ICH_AP0R3_EL2, x20
++	msr_s	ICH_AP0R3_EL2, x20
+ 	ldr	w19, [x3, #(VGIC_V3_CPU_AP0R + 2*4)]
+-	msr	ICH_AP0R2_EL2, x19
++	msr_s	ICH_AP0R2_EL2, x19
+ 6:	ldr	w18, [x3, #(VGIC_V3_CPU_AP0R + 1*4)]
+-	msr	ICH_AP0R1_EL2, x18
++	msr_s	ICH_AP0R1_EL2, x18
+ 5:	ldr	w17, [x3, #VGIC_V3_CPU_AP0R]
+-	msr	ICH_AP0R0_EL2, x17
++	msr_s	ICH_AP0R0_EL2, x17
+ 
+ 	and	w22, w21, #0xf
+ 	mvn	w22, w21
+@@ -220,22 +220,22 @@
+ 	br	x24
+ 
+ 1:
+-	msr	ICH_LR15_EL2, x20
+-	msr	ICH_LR14_EL2, x19
+-	msr	ICH_LR13_EL2, x18
+-	msr	ICH_LR12_EL2, x17
+-	msr	ICH_LR11_EL2, x16
+-	msr	ICH_LR10_EL2, x15
+-	msr	ICH_LR9_EL2,  x14
+-	msr	ICH_LR8_EL2,  x13
+-	msr	ICH_LR7_EL2,  x12
+-	msr	ICH_LR6_EL2,  x11
+-	msr	ICH_LR5_EL2,  x10
+-	msr	ICH_LR4_EL2,   x9
+-	msr	ICH_LR3_EL2,   x8
+-	msr	ICH_LR2_EL2,   x7
+-	msr	ICH_LR1_EL2,   x6
+-	msr	ICH_LR0_EL2,   x5
++	msr_s	ICH_LR15_EL2, x20
++	msr_s	ICH_LR14_EL2, x19
++	msr_s	ICH_LR13_EL2, x18
++	msr_s	ICH_LR12_EL2, x17
++	msr_s	ICH_LR11_EL2, x16
++	msr_s	ICH_LR10_EL2, x15
++	msr_s	ICH_LR9_EL2,  x14
++	msr_s	ICH_LR8_EL2,  x13
++	msr_s	ICH_LR7_EL2,  x12
++	msr_s	ICH_LR6_EL2,  x11
++	msr_s	ICH_LR5_EL2,  x10
++	msr_s	ICH_LR4_EL2,   x9
++	msr_s	ICH_LR3_EL2,   x8
++	msr_s	ICH_LR2_EL2,   x7
++	msr_s	ICH_LR1_EL2,   x6
++	msr_s	ICH_LR0_EL2,   x5
+ 
+ 	// Ensure that the above will have reached the
+ 	// (re)distributors. This ensure the guest will read
+@@ -244,9 +244,9 @@
+ 	dsb	sy
+ 
+ 	// Prevent the guest from touching the GIC system registers
+-	mrs	x5, ICC_SRE_EL2
++	mrs_s	x5, ICC_SRE_EL2
+ 	and	x5, x5, #~ICC_SRE_EL2_ENABLE
+-	msr	ICC_SRE_EL2, x5
++	msr_s	ICC_SRE_EL2, x5
+ .endm
+ 
+ ENTRY(__save_vgic_v3_state)
+@@ -260,7 +260,7 @@ ENTRY(__restore_vgic_v3_state)
+ ENDPROC(__restore_vgic_v3_state)
+ 
+ ENTRY(__vgic_v3_get_ich_vtr_el2)
+-	mrs	x0, ICH_VTR_EL2
++	mrs_s	x0, ICH_VTR_EL2
+ 	ret
+ ENDPROC(__vgic_v3_get_ich_vtr_el2)
+ 
+-- 
+2.0.0
