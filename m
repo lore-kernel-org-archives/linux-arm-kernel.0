@@ -1,80 +1,39 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Thu, 31 Jul 2014 10:22:41 +0100
-Subject: [PATCH v4] devicetree: Add generic IOMMU device tree bindings
-In-Reply-To: <20140731083923.GA31218@ulmo>
-References: <1404487757-18829-1-git-send-email-thierry.reding@gmail.com>
- <20140730152646.GC20162@leverpostej> <20140731083923.GA31218@ulmo>
-Message-ID: <20140731092241.GA21850@leverpostej>
+From: afaerber@suse.de (=?UTF-8?B?QW5kcmVhcyBGw6RyYmVy?=)
+Date: Thu, 31 Jul 2014 11:26:02 +0200
+Subject: [PATCH v3 4/4] ARM: dts: Add exynos5250-spring device tree
+In-Reply-To: <1406728244-5105-5-git-send-email-afaerber@suse.de>
+References: <1406728244-5105-1-git-send-email-afaerber@suse.de>
+ <1406728244-5105-5-git-send-email-afaerber@suse.de>
+Message-ID: <53DA0BAA.8090000@suse.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Am 30.07.2014 15:50, schrieb Andreas F?rber:
+> diff --git a/arch/arm/boot/dts/exynos5250-spring.dts b/arch/arm/boot/dts/exynos5250-spring.dts
+> new file mode 100644
+> index 000000000000..bcca892bf2ff
+> --- /dev/null
+> +++ b/arch/arm/boot/dts/exynos5250-spring.dts
 [...]
+> +&pinctrl_0 {
+> +	dp_hpd_gpio: dp-hpd-gpio {
+> +		samsung,pins = "gpc3-0";
+> +		samsung,pin-function = <1>;
 
-> > > +Examples:
-> > > +=========
-> > > +
-> > > +Single-master IOMMU:
-> > > +--------------------
-> > > +
-> > > +	iommu {
-> > > +		#iommu-cells = <0>;
-> > > +	};
-> > > +
-> > > +	master {
-> > > +		iommus = <&/iommu>;
-> > 
-> > Nit: this should be iommus = <&{/iommu}>, or it's not valid dts syntax.
-> 
-> Done.
+Not sure where this 1 came from... Both Ajay and my 3.8 DT have 0.
 
-Cheers. I take it that was done for the other occurrences too?
+> +		samsung,pin-pud = <3>;
+> +		samsung,pin-drv = <0>;
+> +	};
 
-> 
-> > > +	};
-> > > +
-> > > +Multiple-master IOMMU with fixed associations:
-> > > +----------------------------------------------
-> > > +
-> > > +	/* multiple-master IOMMU */
-> > > +	iommu {
-> > > +		/*
-> > > +		 * Masters are statically associated with this IOMMU and
-> > > +		 * address translation is always enabled.
-> > > +		 */
-> > > +		#iommu-cells = <0>;
-> > 
-> > I don't follow why translation being always enabled is relevant to the
-> > example; that would seem to be independent from the binding.
-> > 
-> > Surely the key point is that with no way to distinguish devices, they
-> > presumably share the same translations?
-> 
-> Both aspects are important I think. For #iommu-cells = <0> there is no
-> way for the IOMMU driver to know how to enable translation for a given
-> device. So it must be either always on or always off.
+Seeing that Ajay called this node dp-hdp, it should probably be an override?
 
-Sure. But "always on or off" is not the same as "always enabled", which
-was what confused me.
+&dp_hpd {
+	...
+};
 
-> I guess one could say that this is implicit if all masters share the
-> same translations. And I guess translations don't always have to be on
-> or off technically. Let me try to rephrase this:
-> 
-> 		/*
-> 		 * Masters are statically associated with this IOMMU and share
-> 		 * the same address translations because the IOMMU does not
-> 		 * have sufficient information to distinguish between masters.
-> 		 *
-> 		 * Consequently address translation is always on or off for
-> 		 * all masters at any given point in time.
-> 		 */
-> 
-> Does that sound better?
+Andreas
 
-That addresses my concern, so yes.
-
-Given these are minor and everyone wants this in now, I'm happy for
-these to go through in a fixup patch later.
-
-Cheers,
-Mark.
+-- 
+SUSE LINUX Products GmbH, Maxfeldstr. 5, 90409 N?rnberg, Germany
+GF: Jeff Hawn, Jennifer Guild, Felix Imend?rffer; HRB 16746 AG N?rnberg
