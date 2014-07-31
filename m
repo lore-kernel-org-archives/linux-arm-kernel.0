@@ -1,38 +1,52 @@
-From: horms+renesas@verge.net.au (Simon Horman)
-Date: Thu, 31 Jul 2014 09:33:06 +0900
-Subject: [PATCH] ARM: shmobile: sh73a0: Remove spurious 0x from SCIFB clock
- name
-In-Reply-To: <cover.1406766463.git.horms+renesas@verge.net.au>
-References: <cover.1406766463.git.horms+renesas@verge.net.au>
-Message-ID: <2c3758b01aa6f11382d2b018614b5d48ecf30350.1406766463.git.horms+renesas@verge.net.au>
+From: olof@lixom.net (Olof Johansson)
+Date: Wed, 30 Jul 2014 17:33:59 -0700
+Subject: [PATCH 0/3] ARM: EXYNOS: Fix Exynos5410 boot
+In-Reply-To: <00c901cfa9fc$727b4e10$5771ea30$@samsung.com>
+References: <1406463725-4208-1-git-send-email-afaerber@suse.de>
+ <53D4EFBB.6000404@suse.de>
+ <00c901cfa9fc$727b4e10$5771ea30$@samsung.com>
+Message-ID: <CAOesGMjh=xMZ3vB45ofh=CLjTFDMQxSxus5q_P67XQSbwg6-+A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-A stray '0x' crept into a0f7e7496d56ac2d ("ARM: shmobile: sh73a0: add CMT1
-clock support for DT"). This  patch removes it.
+Hi,
 
-This change should not have any run-time affect at this time as
-the clock in question is used by a SCIF device that is not enabled by
-default.
+On Sun, Jul 27, 2014 at 5:39 PM, Kukjin Kim <kgene.kim@samsung.com> wrote:
+> Andreas F?rber wrote:
+>>
+>> Am 27.07.2014 14:22, schrieb Andreas F?rber:
+>> > Hello,
+>> >
+>> > This mini-series unbreaks booting on 5410 based ODROID-XU.
+>> >
+>> > Since I do not have access to a TRM, the address is a guess based on
+>> > 5250 and 5410. Such a node was not present in the 3.14 downstream tree.
+>>
+>> s/5410/5420/
+>>
+> OK.
+>
+>> >
+>> > Regards,
+>> > Andreas
+>> >
+>> > Andreas F?rber (3):
+>> >   Documentation: devicetree: Document exynos5410 PMU
+>> >   ARM: dts: exynos: Add PMU to Exynos5410
+>> >   ARM: EXYNOS: Add support for Exynos5410 PMU
+>> >
+>> >  Documentation/devicetree/bindings/arm/samsung/pmu.txt | 1 +
+>> >  arch/arm/boot/dts/exynos5410.dtsi                     | 5 +++++
+>> >  arch/arm/mach-exynos/exynos.c                         | 1 +
+>> >  3 files changed, 7 insertions(+)
+>>
+> Andreas, thanks.
+>
+> I'll apply this whole series.
 
-Reported-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
-Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
----
- arch/arm/mach-shmobile/clock-sh73a0.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+We're getting close to the merge window. I'd prefer not to have to
+start reverting samsung code to recover from these regressions, so
+please send this up very soon.
 
-diff --git a/arch/arm/mach-shmobile/clock-sh73a0.c b/arch/arm/mach-shmobile/clock-sh73a0.c
-index 0d77f65..b0993a5 100644
---- a/arch/arm/mach-shmobile/clock-sh73a0.c
-+++ b/arch/arm/mach-shmobile/clock-sh73a0.c
-@@ -644,7 +644,7 @@ static struct clk_lookup lookups[] = {
- 	CLKDEV_DEV_ID("sh-sci.5", &mstp_clks[MSTP207]), /* SCIFA5 */
- 	CLKDEV_DEV_ID("e6cb0000.serial", &mstp_clks[MSTP207]), /* SCIFA5 */
- 	CLKDEV_DEV_ID("sh-sci.8", &mstp_clks[MSTP206]), /* SCIFB */
--	CLKDEV_DEV_ID("0xe6c3000.serial", &mstp_clks[MSTP206]), /* SCIFB */
-+	CLKDEV_DEV_ID("e6c3000.serial", &mstp_clks[MSTP206]), /* SCIFB */
- 	CLKDEV_DEV_ID("sh-sci.0", &mstp_clks[MSTP204]), /* SCIFA0 */
- 	CLKDEV_DEV_ID("e6c40000.serial", &mstp_clks[MSTP204]), /* SCIFA0 */
- 	CLKDEV_DEV_ID("sh-sci.1", &mstp_clks[MSTP203]), /* SCIFA1 */
--- 
-2.0.1
+
+-Olof
