@@ -1,114 +1,79 @@
-From: chander.kashyap@gmail.com (Chander M. Kashyap)
-Date: Thu, 31 Jul 2014 17:54:50 +0530
-Subject: [PATCH v9 0/6] cpufreq: use generic cpufreq drivers for exynos
- platforms
-In-Reply-To: <CAJuA9aiwHUm1NrfLBR8pEzgTjpDd7xY9Lzpi3WmK0VeOgMGGFA@mail.gmail.com>
-References: <1406707663-16656-1-git-send-email-thomas.ab@samsung.com>
- <CADWw7OiwXNrbFyiVhpcJyBnAdsGsXcAMgMUOmY=JxHM7+7Z0eA@mail.gmail.com>
- <CAJuA9aiwHUm1NrfLBR8pEzgTjpDd7xY9Lzpi3WmK0VeOgMGGFA@mail.gmail.com>
-Message-ID: <CADWw7OhqAZ+zbZ=Q8SLMYL2rMxj3ajn+Y2OUtkZTCESzsjKYUQ@mail.gmail.com>
+From: vinod.koul@intel.com (Vinod Koul)
+Date: Thu, 31 Jul 2014 17:47:02 +0530
+Subject: [PATCH 1/7] dmaengine: edma: fix two faults which happen with
+ the 8250_dma user
+In-Reply-To: <1406660344-25307-2-git-send-email-bigeasy@linutronix.de>
+References: <1406660344-25307-1-git-send-email-bigeasy@linutronix.de>
+ <1406660344-25307-2-git-send-email-bigeasy@linutronix.de>
+Message-ID: <20140731121702.GU8181@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jul 31, 2014 at 4:29 PM, Thomas Abraham <ta.omasab@gmail.com> wrote:
-> On Thu, Jul 31, 2014 at 11:50 AM, Chander M. Kashyap
-> <chander.kashyap@gmail.com> wrote:
->> On Wed, Jul 30, 2014 at 1:37 PM, Thomas Abraham <thomas.ab@samsung.com> wrote:
->>> Changes since v8:
->>> - Fixes suggested by Tomasz Figa.
->>>
->>> This patch series removes the use of Exynos4210 and Exynos5250 specific cpufreq
->>> drivers and enables the use of cpufreq-cpu0 driver for these platforms. This
->>> series also enables cpufreq support for Exynos5420 using arm_big_little cpufreq
->>> driver.
->>>
->>> This patch series is dependent on two other patches
->>> 1. ARM: dts: add CPU nodes for Exynos4 SoCs
->>>    - https://lkml.org/lkml/2014/7/21/315
->>> 2. ARM: dts: smdk5250: Specify MAX77686 pmic interrupt
->>>    - http://www.spinics.net/lists/arm-kernel/msg351134.html
->>> 3. clk: exynos4: remove duplicate div_core2 divider clock instantiation
->>>    - http://www.mail-archive.com/linux-samsung-soc at vger.kernel.org/msg34859.html
->>>
->>> Thomas Abraham (6):
->>>   clk: samsung: add infrastructure to register cpu clocks
->>>   clk: samsung: add cpu clock configuration data and instantiate cpu clock
->>>   ARM: dts: Exynos: add CPU OPP and regulator supply property
->>>   ARM: Exynos: switch to using generic cpufreq driver for Exynos4210/5250/5420
->>>   cpufreq: exynos: remove exynos4210/5250 specific cpufreq driver support
->>>   clk: samsung: remove unused clock aliases and update clock flags
->>>
->>>  arch/arm/boot/dts/exynos4210-origen.dts         |    4 +
->>>  arch/arm/boot/dts/exynos4210-trats.dts          |    4 +
->>>  arch/arm/boot/dts/exynos4210-universal_c210.dts |    4 +
->>>  arch/arm/boot/dts/exynos4210.dtsi               |   14 +-
->>>  arch/arm/boot/dts/exynos5250-arndale.dts        |    4 +
->>>  arch/arm/boot/dts/exynos5250-smdk5250.dts       |    4 +
->>>  arch/arm/boot/dts/exynos5250-snow.dts           |    4 +
->>>  arch/arm/boot/dts/exynos5250.dtsi               |   25 +-
->>>  arch/arm/boot/dts/exynos5420.dtsi               |   38 +++
->>>  arch/arm/mach-exynos/exynos.c                   |   24 +-
->>>  drivers/clk/samsung/Makefile                    |    2 +-
->>>  drivers/clk/samsung/clk-cpu.c                   |  335 +++++++++++++++++++++++
->>>  drivers/clk/samsung/clk-cpu.h                   |   91 ++++++
->>>  drivers/clk/samsung/clk-exynos4.c               |   63 +++--
->>>  drivers/clk/samsung/clk-exynos5250.c            |   44 ++-
->>>  drivers/clk/samsung/clk-exynos5420.c            |   72 ++++-
->>>  drivers/cpufreq/Kconfig.arm                     |   22 --
->>>  drivers/cpufreq/Makefile                        |    2 -
->>>  drivers/cpufreq/exynos4210-cpufreq.c            |  184 -------------
->>>  drivers/cpufreq/exynos5250-cpufreq.c            |  210 --------------
->>>  include/dt-bindings/clock/exynos5250.h          |    1 +
->>>  include/dt-bindings/clock/exynos5420.h          |    2 +
->>>  22 files changed, 690 insertions(+), 463 deletions(-)
->>>  create mode 100644 drivers/clk/samsung/clk-cpu.c
->>>  create mode 100644 drivers/clk/samsung/clk-cpu.h
->>>  delete mode 100644 drivers/cpufreq/exynos4210-cpufreq.c
->>>  delete mode 100644 drivers/cpufreq/exynos5250-cpufreq.c
->>>
->>> --
->>> 1.7.9.5
->>
->> Working great.
->> tested on smdk5420, and arndale-5250
->
-> Hi Chander,
->
-> Thanks for testing this series. Can I add a "Tested-by" tag for this series?
+On Tue, Jul 29, 2014 at 08:58:58PM +0200, Sebastian Andrzej Siewior wrote:
+> The rx path of the 8250_dma user in the RX-timeout case:
+> - it starts the RX transfer
+> - if the rx-timeout interrupt occures, it dmaengine_pause() the transfer
+> - step two is dmaengine_terminate_all() on this channel.
+Okay after this whole channel needs to be reset, which means all the
+descriptors are discared.
+> - based on dmaengine_tx_status() it learns the number of transfered
+>   bytes.
+> - the rx interrupt occures,
+why, channel is terminated, so existing txn needs to be aborted too
 
-sure you can.
+>   it does not start the RX-transfer because
+>   according to dmaengine_tx_status() the status of the current transfer
+>   is still DMA_IN_PROGRESS because the earlier dmaengine_terminate_all()
+>   did not reset this.
+there is no current transfer anymore
 
->
-> Thanks,
-> Thomas.
->
->>
->>>
->>>
->>>
->>>
->>> _______________________________________________
->>> linux-arm-kernel mailing list
->>> linux-arm-kernel at lists.infradead.org
->>> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
->>
->>
->>
->> --
->> thanks and regards,
->> Chander M. Kashyap
->> Contact Number: +918123738320
->> ------- TENSION LENE KA NAHI, DENE KE-----
->>
->> _______________________________________________
->> linux-arm-kernel mailing list
->> linux-arm-kernel at lists.infradead.org
->> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+> - on rx-timeout it invokes dmaengine_pause() again. This time, it
+>   segfaults because the channel has no descriptor yet.
+> 
+> To make the upper case work better, this patch adds dma_cookie_complete()
+> to complete the cookie. Also it adds is an additional check for echan->edesc
+> in case the channel has no descriptor assigned.
+I think we are fixing the behvaiour rather than cause. terminate_all(()
+needs to do a proper cleanup of the channel
 
-
+And this looks a series, without cover letter sent to all. Which makes it a
+bit hard to see what is getting done
 
 -- 
-thanks and regards,
-Chander M. Kashyap
-Contact Number: +918123738320
-------- TENSION LENE KA NAHI, DENE KE-----
+~Vinod
+> 
+> Cc: Joel Fernandes <joelf@ti.com>
+> Cc: Vinod Koul <vinod.koul@intel.com>
+> Cc: Dan Williams <dan.j.williams@intel.com>
+> Cc: dmaengine at vger.kernel.org
+> Signed-off-by: Sebastian Andrzej Siewior <bigeasy@linutronix.de>
+> ---
+>  drivers/dma/edma.c | 3 ++-
+>  1 file changed, 2 insertions(+), 1 deletion(-)
+> 
+> diff --git a/drivers/dma/edma.c b/drivers/dma/edma.c
+> index d08c4de..ff05dd4 100644
+> --- a/drivers/dma/edma.c
+> +++ b/drivers/dma/edma.c
+> @@ -256,6 +256,7 @@ static int edma_terminate_all(struct edma_chan *echan)
+>  	 * echan->edesc is NULL and exit.)
+>  	 */
+>  	if (echan->edesc) {
+> +		dma_cookie_complete(&echan->edesc->vdesc.tx);
+>  		echan->edesc = NULL;
+>  		edma_stop(echan->ch_num);
+>  	}
+> @@ -282,7 +283,7 @@ static int edma_slave_config(struct edma_chan *echan,
+>  static int edma_dma_pause(struct edma_chan *echan)
+>  {
+>  	/* Pause/Resume only allowed with cyclic mode */
+> -	if (!echan->edesc->cyclic)
+> +	if (!echan->edesc || !echan->edesc->cyclic)
+>  		return -EINVAL;
+>  
+>  	edma_pause(echan->ch_num);
+> -- 
+> 2.0.1
+> 
+
+-- 
