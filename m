@@ -1,40 +1,21 @@
-From: peter.maydell@linaro.org (Peter Maydell)
-Date: Thu, 31 Jul 2014 17:45:28 +0100
-Subject: [PATCH] arm64: KVM: export current vcpu->pause state via pseudo
- regs
-In-Reply-To: <20140731163805.GK11610@cbox>
-References: <1404914112-7298-1-git-send-email-alex.bennee@linaro.org>
- <20140731143538.GI11610@cbox> <87mwbpimgz.fsf@linaro.org>
- <20140731163805.GK11610@cbox>
-Message-ID: <CAFEAcA91efUg3MVpLScNBkxZSEgDP0zNnmxxr055fAz5=vDCoA@mail.gmail.com>
+From: grygorii.strashko@ti.com (Grygorii Strashko)
+Date: Thu, 31 Jul 2014 20:33:13 +0300
+Subject: [PATCH 0/2] spi: davinci: add support for gpio cs through dt
+Message-ID: <1406827995-30913-1-git-send-email-grygorii.strashko@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 31 July 2014 17:38, Christoffer Dall <christoffer.dall@linaro.org> wrote:
->> > If we are not complaining when setting the pause value to false if it
->> > was true before, then we probably also need to wake up the thread in
->> > case this is called from another thread, right?
->> >
->> > or perhaps we should just return an error if you're trying to un-pause a
->> > CPU through this interface, hmmmm.
->>
->> Wouldn't it be an error to mess with any register when the system is not
->> in a quiescent state? I was assuming that the wake state is dealt with
->> when the run loop finally restarts.
->>
->
-> The ABI doesn't really define it as an error (the ABI doesn't enforce
-> anything right now) so the question is, does it ever make sense to clear
-> the pause flag through this ioctl?  If not, I think we should just err
-> on the side of caution and specify in the docs that this is not
-> supported and return an error.
+This small series enables GPIO chip select feature for Davinci SPI
+when DT-boot mode is used.
+This is actual for Keystone 2 which supports DT-boot mode only.
 
-Consider the case where the reset state of the system is
-"CPU 0 running, CPUs 1..N stopped", and we're doing an
-incoming migration to a state where all CPUs are running.
-In that case we'll be using this ioctl to clear the pause flag,
-right? (We'll also obviously need to set the PC and other
-register state correctly before resuming the guest.)
+Murali Karicheri (2):
+  spi: davinci: fix to support more than 2 chip selects
+  spi: davinci: add support to configure GPIO CS through DT
 
-thanks
--- PMM
+ .../devicetree/bindings/spi/spi-davinci.txt        |    9 ++-
+ drivers/spi/spi-davinci.c                          |   71 +++++++++++++++++---
+ 2 files changed, 68 insertions(+), 12 deletions(-)
+
+-- 
+1.7.9.5
