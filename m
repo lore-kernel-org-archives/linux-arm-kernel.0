@@ -1,38 +1,82 @@
-From: joel.schopp@amd.com (Joel Schopp)
-Date: Thu, 31 Jul 2014 14:43:56 -0500
-Subject: [PATCH] arm64: bump MAX_MASTER_STREAMIDS from 16 to 32
-Message-ID: <20140731194356.1871.76820.stgit@joelaarch64.amd.com>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Thu, 31 Jul 2014 13:53:54 -0600
+Subject: [PATCH 8/8] clk: tegra: Add EMC clock driver
+In-Reply-To: <20140731190659.4463.92139@quantum>
+References: <1405088313-20048-1-git-send-email-mperttunen@nvidia.com>
+ <1405088313-20048-9-git-send-email-mperttunen@nvidia.com>
+ <53CE97F2.80300@wwwdotorg.org> <53D75FA7.1030300@nvidia.com>
+ <20140729201939.4627.79710@quantum> <53D81CD4.5010307@wwwdotorg.org>
+ <20140730093456.GA29590@ulmo> <20140731190659.4463.92139@quantum>
+Message-ID: <53DA9ED2.5000003@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-I recently ran into a situation where I needed more than 16 stream ids
-for an smmu on an AMD SOC, but we are currently limited to 16 by:
+On 07/31/2014 01:06 PM, Mike Turquette wrote:
+> Quoting Thierry Reding (2014-07-30 02:34:57)
+>> On Tue, Jul 29, 2014 at 04:14:44PM -0600, Stephen Warren wrote:
+>>> On 07/29/2014 02:19 PM, Mike Turquette wrote:
+>>>> Quoting Mikko Perttunen (2014-07-29 01:47:35)
+>>>>> On 22/07/14 19:57, Stephen Warren wrote:
+>>>>>> On 07/11/2014 08:18 AM, Mikko Perttunen wrote:
+>>>>>>> +static int emc_debug_rate_set(void *data, u64 rate)
+>>>>>>> +{
+>>>>>>> +    struct tegra_emc *tegra = data;
+>>>>>>> +
+>>>>>>> +    return clk_set_rate(tegra->hw.clk, rate);
+>>>>>>> +}
+>>>>>>> +
+>>>>>>> +DEFINE_SIMPLE_ATTRIBUTE(emc_debug_rate_fops, emc_debug_rate_get,
+>>>>>>> +                    emc_debug_rate_set, "%lld\n");
+>>>>>>
+>>>>>> I think the rate can already be obtained through
+>>>>>> ...debug/clock/clock_summary. I'm not sure about changing the rate, but
+>>>>>> shouldn't that be a feature of the common clock core, not individual
+>>>>>> drivers?
+>>>>>
+>>>>> The core doesn't allow writing to the rate debugfs files, so this is the
+>>>>> only way to trigger an EMC clock change for now. I agree that the core
+>>>>> might be a better place. I don't know if there are any philosophical
+>>>>> objections to that. I'd like to keep this in until a possible core
+>>>>> feature addition. Mike, any comments?
+>>>>
+>>>> Yes, there is a philosophical rejection to exposing rate-change knobs to
+>>>> userspace through debugfs. These can and will ship in real products
+>>>> (typically Android) with lots of nasty userspace hacks, and also
+>>>> represent pretty dangerous things to expose to userspace. I have always
+>>>> maintained that such knobs should remain out of tree or, with the advent
+>>>> of the custom debugfs entries, should be burden of the clock drivers.
+>>>
+>>> That argument seems a bit inconsistent.
+>>>
+>>> I can see the argument to disallow code that lets user-space fiddle with
+>>> clocks. However, if that argument holds, then surely it must apply to either
+>>> the clock core *or* a clock driver; the end effect of allowing the code in
+>
+> Stephen,
+>
+> You meant to say, "it must apply to both the clock core and a clock
+> driver"? I agree.
 
-#define MAX_MASTER_STREAMIDS        MAX_PHANDLE_ARGS
-#define MAX_PHANDLE_ARGS 16
+Sure; s/either/both/ in what I said.
 
-I expect others will run into this in the future as more advanced SOCs
-start to come out. The resulting one line patch has been tested to fix
-the problem.
+>>> either place is that people will be able to implement the user-space hacks
+>>> you want to avoid. Yet, if we allow the code because it's a useful debug
+>>> tool, then surely it should be in the clock core so we don't implement it
+>>> redundantly in each clock driver.
+>
+> I don't want it anywhere to be honest. Read-only debugfs stuff is great
+> and I'm happy to merge it. I have repeatedly NAK'd any attempt to get
+> the userspace rate-change stuff merged into the core.
+>
+> Recently we have the ability to assign custom debugfs entries that are
+> specific to the clock driver. I'm trying to find the right balance
+> between giving the clock driver authors the right amount of autonomy to
+> implement what they need while trying to keep the crazy out of the
+> kernel. Maybe in this case I should stick to my guns and NAK this patch.
 
-Cc: Grant Likely <grant.likely@linaro.org>
-Cc: Rob Herring <robh+dt@kernel.org>
-Cc: Will Deacon <will.deacon@arm.com>
-Signed-off-by: Joel Schopp <joel.schopp@amd.com>
----
- include/linux/of.h |    2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
-
-diff --git a/include/linux/of.h b/include/linux/of.h
-index 196b34c..70ad4d9 100644
---- a/include/linux/of.h
-+++ b/include/linux/of.h
-@@ -67,7 +67,7 @@ struct device_node {
- #endif
- };
- 
--#define MAX_PHANDLE_ARGS 16
-+#define MAX_PHANDLE_ARGS 32
- struct of_phandle_args {
- 	struct device_node *np;
- 	int args_count;
+If someone implements the same thing in some downstream/product kernel, 
+and it can't be upstreamed, I'd argue they should still do that in the 
+clock core rather than individual clock drivers, since they'll probably 
+want the feature for multiple clocks. I don't think  the per-clock 
+debugfs hook is useful in this case, although I can certainly imagine 
+other read-only per-clock debug files could be useful.
