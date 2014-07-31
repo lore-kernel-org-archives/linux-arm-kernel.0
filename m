@@ -1,101 +1,58 @@
-From: ta.omasab@gmail.com (Thomas Abraham)
-Date: Thu, 31 Jul 2014 16:29:03 +0530
-Subject: [PATCH v9 0/6] cpufreq: use generic cpufreq drivers for exynos
- platforms
-In-Reply-To: <CADWw7OiwXNrbFyiVhpcJyBnAdsGsXcAMgMUOmY=JxHM7+7Z0eA@mail.gmail.com>
-References: <1406707663-16656-1-git-send-email-thomas.ab@samsung.com>
- <CADWw7OiwXNrbFyiVhpcJyBnAdsGsXcAMgMUOmY=JxHM7+7Z0eA@mail.gmail.com>
-Message-ID: <CAJuA9aiwHUm1NrfLBR8pEzgTjpDd7xY9Lzpi3WmK0VeOgMGGFA@mail.gmail.com>
+From: broonie@kernel.org (Mark Brown)
+Date: Thu, 31 Jul 2014 12:05:31 +0100
+Subject: [PATCH 2/2] clk: initial clock driver for TWL6030
+In-Reply-To: <53DA12BF.1060008@kpanic.de>
+References: <1406728949-7560-1-git-send-email-sassmann@kpanic.de>
+ <1406728949-7560-3-git-send-email-sassmann@kpanic.de>
+ <20140730175033.GA17528@sirena.org.uk> <53DA12BF.1060008@kpanic.de>
+Message-ID: <20140731110531.GH17528@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jul 31, 2014 at 11:50 AM, Chander M. Kashyap
-<chander.kashyap@gmail.com> wrote:
-> On Wed, Jul 30, 2014 at 1:37 PM, Thomas Abraham <thomas.ab@samsung.com> wrote:
->> Changes since v8:
->> - Fixes suggested by Tomasz Figa.
->>
->> This patch series removes the use of Exynos4210 and Exynos5250 specific cpufreq
->> drivers and enables the use of cpufreq-cpu0 driver for these platforms. This
->> series also enables cpufreq support for Exynos5420 using arm_big_little cpufreq
->> driver.
->>
->> This patch series is dependent on two other patches
->> 1. ARM: dts: add CPU nodes for Exynos4 SoCs
->>    - https://lkml.org/lkml/2014/7/21/315
->> 2. ARM: dts: smdk5250: Specify MAX77686 pmic interrupt
->>    - http://www.spinics.net/lists/arm-kernel/msg351134.html
->> 3. clk: exynos4: remove duplicate div_core2 divider clock instantiation
->>    - http://www.mail-archive.com/linux-samsung-soc at vger.kernel.org/msg34859.html
->>
->> Thomas Abraham (6):
->>   clk: samsung: add infrastructure to register cpu clocks
->>   clk: samsung: add cpu clock configuration data and instantiate cpu clock
->>   ARM: dts: Exynos: add CPU OPP and regulator supply property
->>   ARM: Exynos: switch to using generic cpufreq driver for Exynos4210/5250/5420
->>   cpufreq: exynos: remove exynos4210/5250 specific cpufreq driver support
->>   clk: samsung: remove unused clock aliases and update clock flags
->>
->>  arch/arm/boot/dts/exynos4210-origen.dts         |    4 +
->>  arch/arm/boot/dts/exynos4210-trats.dts          |    4 +
->>  arch/arm/boot/dts/exynos4210-universal_c210.dts |    4 +
->>  arch/arm/boot/dts/exynos4210.dtsi               |   14 +-
->>  arch/arm/boot/dts/exynos5250-arndale.dts        |    4 +
->>  arch/arm/boot/dts/exynos5250-smdk5250.dts       |    4 +
->>  arch/arm/boot/dts/exynos5250-snow.dts           |    4 +
->>  arch/arm/boot/dts/exynos5250.dtsi               |   25 +-
->>  arch/arm/boot/dts/exynos5420.dtsi               |   38 +++
->>  arch/arm/mach-exynos/exynos.c                   |   24 +-
->>  drivers/clk/samsung/Makefile                    |    2 +-
->>  drivers/clk/samsung/clk-cpu.c                   |  335 +++++++++++++++++++++++
->>  drivers/clk/samsung/clk-cpu.h                   |   91 ++++++
->>  drivers/clk/samsung/clk-exynos4.c               |   63 +++--
->>  drivers/clk/samsung/clk-exynos5250.c            |   44 ++-
->>  drivers/clk/samsung/clk-exynos5420.c            |   72 ++++-
->>  drivers/cpufreq/Kconfig.arm                     |   22 --
->>  drivers/cpufreq/Makefile                        |    2 -
->>  drivers/cpufreq/exynos4210-cpufreq.c            |  184 -------------
->>  drivers/cpufreq/exynos5250-cpufreq.c            |  210 --------------
->>  include/dt-bindings/clock/exynos5250.h          |    1 +
->>  include/dt-bindings/clock/exynos5420.h          |    2 +
->>  22 files changed, 690 insertions(+), 463 deletions(-)
->>  create mode 100644 drivers/clk/samsung/clk-cpu.c
->>  create mode 100644 drivers/clk/samsung/clk-cpu.h
->>  delete mode 100644 drivers/cpufreq/exynos4210-cpufreq.c
->>  delete mode 100644 drivers/cpufreq/exynos5250-cpufreq.c
->>
->> --
->> 1.7.9.5
->
-> Working great.
-> tested on smdk5420, and arndale-5250
+On Thu, Jul 31, 2014 at 11:56:15AM +0200, Stefan Assmann wrote:
+> On 30.07.2014 19:50, Mark Brown wrote:
+> > On Wed, Jul 30, 2014 at 04:02:29PM +0200, Stefan Assmann wrote:
 
-Hi Chander,
+> >> +static int twl6030_clk32kg_is_prepared(struct clk_hw *hw)
+> >> +{
+> >> +	struct twl6030_desc *desc = to_twl6030_desc(hw);
+> >> +
+> >> +	return desc->enabled;
+> >> +}
 
-Thanks for testing this series. Can I add a "Tested-by" tag for this series?
+> > Why not just check the register map - can't the register be cached?  If
+> > that's not possible a comment would be good.
 
-Thanks,
-Thomas.
+> I just took atl_clk_is_enabled() as template. If you say it's better
+> to read the value, that can be arranged.
 
->
->>
->>
->>
->>
->> _______________________________________________
->> linux-arm-kernel mailing list
->> linux-arm-kernel at lists.infradead.org
->> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
->
->
->
-> --
-> thanks and regards,
-> Chander M. Kashyap
-> Contact Number: +918123738320
-> ------- TENSION LENE KA NAHI, DENE KE-----
->
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+It might be worth doing this if you have to go to hardware to check the
+status, if you can read a cache then just using the register is less
+error prone.
+
+> >> +	else
+> >> +		clk_prepare(clk);
+
+> > Why is the clock driver defaulting to enabling the clock, and if it
+> > needs to shouldn't it be doing a prepere_enable() even if the enable
+> > happens not to do anything to the hardware?  Otherwise child clocks
+> > might get confused.
+
+> Mike advised me to convert the functions from enable/disable to
+> prepare/unprepare because i2c transactions may sleep. That's what I did.
+> The code no longer enables the clock and just prepares it. So IIUC the
+> call to clk_prepare() should be fine.
+
+That's not going to help consumers of the clock, you do need to move the
+operations to prepare() but users shouldn't need to know what happens in
+prepare() and what happens in enable().
+
+You've also not addressed the comment about defaulting to enabling the
+clock in the first place.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140731/d5677193/attachment-0001.sig>
