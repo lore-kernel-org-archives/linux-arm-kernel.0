@@ -1,47 +1,56 @@
-From: matthias.bgg@gmail.com (Matthias Brugger)
-Date: Thu, 31 Jul 2014 18:42:23 +0200
-Subject: [PATCH 7/7] arm: dts: mt6589: Add arm arch timer node
-In-Reply-To: <1406824943-24052-1-git-send-email-matthias.bgg@gmail.com>
-References: <1406824943-24052-1-git-send-email-matthias.bgg@gmail.com>
-Message-ID: <1406824943-24052-8-git-send-email-matthias.bgg@gmail.com>
+From: oleg@redhat.com (Oleg Nesterov)
+Date: Thu, 31 Jul 2014 18:42:46 +0200
+Subject: [PATCH v4 2/5] x86,entry: Only call user_exit if TIF_NOHZ
+In-Reply-To: <20140731151630.GA7842@localhost.localdomain>
+References: <cover.1406604806.git.luto@amacapital.net>
+ <7123b2489cc5d1d5abb7bcf1364ca729cab3e6ca.1406604806.git.luto@amacapital.net>
+ <20140729193232.GA8153@redhat.com>
+ <20140730164344.GA27954@localhost.localdomain>
+ <CALCETrUVaz3JFiNbyU=r3M-E9muHa1ffn7RX+_-4V_0U-hVaPw@mail.gmail.com>
+ <20140731151630.GA7842@localhost.localdomain>
+Message-ID: <20140731164246.GA15974@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds the device tree node for the arm architecture timer.
+On 07/31, Frederic Weisbecker wrote:
+>
+> On Wed, Jul 30, 2014 at 10:23:34AM -0700, Andy Lutomirski wrote:
+> >
+> > At the end of the day, the syscall slowpath code calls a bunch of
+> > functions depending on what TIF_XYZ flags are set.  As long as it's
+> > structured like "if (TIF_A) do_a(); if (TIF_B) do_b();" or something
+> > like that, it's comprehensible.  But once random functions with no
+> > explicit flag checks or comments start showing up, it gets confusing.
+>
+> Yeah that's a point. I don't mind much the TIF_NOHZ test if you like.
 
-Signed-off-by: Matthias Brugger <matthias.bgg@gmail.com>
----
- arch/arm/boot/dts/mt6589.dtsi |   12 ++++++++++--
- 1 file changed, 10 insertions(+), 2 deletions(-)
+And in my opinion
 
-diff --git a/arch/arm/boot/dts/mt6589.dtsi b/arch/arm/boot/dts/mt6589.dtsi
-index 742c9bd..7bcf031 100644
---- a/arch/arm/boot/dts/mt6589.dtsi
-+++ b/arch/arm/boot/dts/mt6589.dtsi
-@@ -73,14 +73,22 @@
- 		compatible = "simple-bus";
- 		ranges;
- 
--		timer: timer at 10008000 {
-+		timer1: timer at 10008000 {
- 			compatible = "mediatek,mt6577-timer";
--			reg = <0x10008000 0x80>;
-+			reg = <0x10008000 0x60>;
- 			interrupts = <GIC_SPI 113 IRQ_TYPE_EDGE_RISING>;
- 			clocks = <&system_clk>, <&rtc_clk>;
- 			clock-names = "system-clk", "rtc-clk";
- 		};
- 
-+		timer2: timer {
-+			compatible = "arm,armv7-timer";
-+			interrupts = <GIC_PPI 13 (GIC_CPU_MASK_SIMPLE(4) | IRQ_TYPE_LEVEL_LOW)>,
-+				     <GIC_PPI 14 (GIC_CPU_MASK_SIMPLE(4) | IRQ_TYPE_LEVEL_LOW)>,
-+				     <GIC_PPI 11 (GIC_CPU_MASK_SIMPLE(4) | IRQ_TYPE_LEVEL_LOW)>,
-+				     <GIC_PPI 10 (GIC_CPU_MASK_SIMPLE(4) | IRQ_TYPE_LEVEL_LOW)>;
-+		};
-+
- 		gic: interrupt-controller at 10211000 {
- 			compatible = "arm,cortex-a15-gic";
- 			interrupt-controller;
--- 
-1.7.9.5
+	if (work & TIF_XYZ)
+		user_exit();
+
+looks even more confusing. Because, once again, TIF_XYZ is not the
+reason to call user_exit().
+
+Not to mention this adds a minor performance penalty.
+
+> > If it's indeed all-or-nothing, I could remove the check and add a
+> > comment.  But please keep in mind that, currently, the slow path is
+> > *slow*, and my patches only improve the entry case.  So enabling
+> > context tracking on every task will hurt.
+>
+> That's what we do anyway. I haven't found a safe way to enabled context tracking
+> without tracking all CPUs.
+
+And if we change this, then the code above becomes racy. The state of
+TIF_XYZ can be changed right after the check. OK, it is racy anyway ;)
+but still this adds more confusion.
+
+I feel that TIF_XYZ must die. But yes, yes, I know that it is very simple
+to say this. And no, so far I do not know how we can improve this all.
+
+
+But again, again, I won't insist. Just another "can't resist" email,
+please ignore.
+
+Oleg.
