@@ -1,55 +1,27 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Wed, 30 Jul 2014 23:54:26 -0700
-Subject: [PATCH 10/19] ARM64 / ACPI: Get the enable method for SMP
- initialization in ACPI way
-In-Reply-To: <1406206825-15590-11-git-send-email-hanjun.guo@linaro.org>
-References: <1406206825-15590-1-git-send-email-hanjun.guo@linaro.org>
- <1406206825-15590-11-git-send-email-hanjun.guo@linaro.org>
-Message-ID: <20140731065426.GA876@quad.lixom.net>
+From: schwab@suse.de (Andreas Schwab)
+Date: Thu, 31 Jul 2014 09:18:04 +0200
+Subject: Missing module license in arm_big_little
+Message-ID: <mvmmwbqateb.fsf@hawking.suse.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+$ dmesg | grep arm_big_little
+[   22.596727] arm_big_little: module license 'unspecified' taints kernel.
+[   22.608717] arm_big_little: Unknown symbol cpufreq_register_driver (err 0)
+[   22.615565] arm_big_little: Unknown symbol dev_pm_opp_init_cpufreq_table (err 0)
+[   22.622927] arm_big_little: Unknown symbol cpufreq_unregister_driver (err 0)
+[   22.629935] arm_big_little: Unknown symbol clk_set_rate (err 0)
+[   22.648419] arm_big_little: Unknown symbol cpufreq_table_validate_and_show (err 0)
+[   22.655943] arm_big_little: Unknown symbol cpufreq_generic_attr (err 0)
+[   22.662551] arm_big_little: Unknown symbol dev_pm_opp_free_cpufreq_table (err 0)
+[   22.669886] arm_big_little: Unknown symbol clk_get_rate (err 0)
+[   22.675777] arm_big_little: Unknown symbol get_cpu_device (err 0)
+[   22.681840] arm_big_little: Unknown symbol cpu_topology (err 0)
+[   22.687722] arm_big_little: Unknown symbol cpufreq_generic_frequency_table_verify (err 0)
 
-On Thu, Jul 24, 2014 at 09:00:16PM +0800, Hanjun Guo wrote:
-> +/*
-> + * In ACPI mode, the cpu possible map was enumerated before SMP
-> + * initialization when MADT table was parsed, so we can get the
-> + * possible map here to initialize CPUs.
-> + */
+Andreas.
 
-The DT smp init will warn if the kernel has been build with too low NR_CPUS.
-Does the ACPI core already warn, or did that go missing with this separate code
-path?
-
-> +static void __init acpi_smp_init_cpus(void)
-> +{
-> +	int cpu;
-> +
-> +	for_each_possible_cpu(cpu) {
-> +		if (cpu_acpi_read_ops(cpu) != 0)
-> +			continue;
-> +
-> +		cpu_ops[cpu]->cpu_init(NULL, cpu);
-> +	}
-> +}
-> +
-> +void __init smp_init_cpus(void)
-> +{
-> +	if (acpi_disabled)
-> +		of_smp_init_cpus();
-> +	else
-> +		acpi_smp_init_cpus();
-
-I'm liking these deeply split code paths less and less every time I see
-them. :(
-
-I would prefer to set up shared state in separate functions, but keep the
-control flow the same. Right now you're splitting it completely.
-
-I.e. split data setup between the two, but do the loop calling cpu_init()
-the same way. (Yes, that will require you to refactor the DT code path
-a bit too...)
-
-
--Olof
+-- 
+Andreas Schwab, SUSE Labs, schwab at suse.de
+GPG Key fingerprint = 0196 BAD8 1CE9 1970 F4BE  1748 E4D4 88E3 0EEA B9D7
+"And now for something completely different."
