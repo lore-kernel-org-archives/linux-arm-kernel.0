@@ -1,332 +1,119 @@
-From: t-kristo@ti.com (Tero Kristo)
-Date: Thu, 31 Jul 2014 14:28:13 +0300
-Subject: [PATCH 2/2] clk: initial clock driver for TWL6030
-In-Reply-To: <53DA12BF.1060008@kpanic.de>
-References: <1406728949-7560-1-git-send-email-sassmann@kpanic.de>
- <1406728949-7560-3-git-send-email-sassmann@kpanic.de>
- <20140730175033.GA17528@sirena.org.uk> <53DA12BF.1060008@kpanic.de>
-Message-ID: <53DA284D.6030404@ti.com>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Thu, 31 Jul 2014 12:33:01 +0100
+Subject: [PATCH 2/5] arm64, thunder: Add initial dts for Cavium Thunder SoC
+In-Reply-To: <CAFpQJXUtP=v7FSLd3_OU7FG3w=pKYy2ihTQULA_DPEacsSu0Og@mail.gmail.com>
+References: <1406732794-20920-1-git-send-email-rric@kernel.org>
+ <1406732794-20920-3-git-send-email-rric@kernel.org>
+ <20140730154626.GD20162@leverpostej>
+ <CAFpQJXWKybVUxpHg8MVrVMjLj3swuxLGo_9r1tL+gZ4hxUHTzQ@mail.gmail.com>
+ <20140731095336.GB21850@leverpostej>
+ <CAFpQJXUtP=v7FSLd3_OU7FG3w=pKYy2ihTQULA_DPEacsSu0Og@mail.gmail.com>
+Message-ID: <20140731113301.GE22994@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/31/2014 12:56 PM, Stefan Assmann wrote:
-> On 30.07.2014 19:50, Mark Brown wrote:
->> On Wed, Jul 30, 2014 at 04:02:29PM +0200, Stefan Assmann wrote:
->>
->>> +static int twl6030_clk32kg_is_prepared(struct clk_hw *hw)
->>> +{
->>> +	struct twl6030_desc *desc = to_twl6030_desc(hw);
->>> +
->>> +	return desc->enabled;
->>> +}
->>
->> Why not just check the register map - can't the register be cached?  If
->> that's not possible a comment would be good.
->
-> I just took atl_clk_is_enabled() as template. If you say it's better
-> to read the value, that can be arranged.
->
->>
->>> +static int of_twl6030_clk32kg_probe(struct platform_device *pdev)
->>> +{
->>> +	struct device_node *node = pdev->dev.of_node;
->>> +	struct clk *clk;
->>> +	int ret = 0;
->>> +
->>> +	if (!node)
->>> +		return -ENODEV;
->>> +
->>> +	clk = clk_get(&pdev->dev, "clk32kg");
->>
->> devm_clk_get()?
->
-> Changed.
->
->>
->>> +	if (IS_ERR(clk))
->>> +		ret = -EPROBE_DEFER;
->>
->> Shouldn't the provided return code be being used?
->
-> Changed.
->
->>
->>> +	else
->>> +		clk_prepare(clk);
->>
->> Why is the clock driver defaulting to enabling the clock, and if it
->> needs to shouldn't it be doing a prepere_enable() even if the enable
->> happens not to do anything to the hardware?  Otherwise child clocks
->> might get confused.
->
-> Mike advised me to convert the functions from enable/disable to
-> prepare/unprepare because i2c transactions may sleep. That's what I did.
-> The code no longer enables the clock and just prepares it. So IIUC the
-> call to clk_prepare() should be fine.
->
->>
->> The return value is also not being checked.
->>
->
-> Changed.
->
-> Thanks for your comments Mark, here's a new version of the patch.
->
->    Stefan
->
->  From 2c52040f33af9dbb41e3e3f355ae154843b277c6 Mon Sep 17 00:00:00 2001
-> From: Stefan Assmann <sassmann@kpanic.de>
-> Date: Fri, 25 Jul 2014 09:42:27 +0200
-> Subject: [PATCH] clk: initial clock driver for TWL6030
->
-> Adding a clock driver for the TI TWL6030. The driver prepares the
-> CLK32KG clock, which is required for the wireless LAN.
->
-> v2:
-> - use MODULE_LICENSE("GPL v2")
-> - use devm_clk_get() instead of clk_get()
-> - propagate return value of clk_prepare()
-> - read prepared state instead of using enabled variable
->
-> Signed-off-by: Stefan Assmann <sassmann@kpanic.de>
-> ---
->   .../devicetree/bindings/clock/ti/twl6030.txt       |   4 +
->   drivers/clk/Kconfig                                |   7 ++
->   drivers/clk/ti/Makefile                            |   1 +
->   drivers/clk/ti/clk-6030.c                          | 133 +++++++++++++++++++++
->   drivers/mfd/twl-core.c                             |   3 +
->   5 files changed, 148 insertions(+)
->   create mode 100644 Documentation/devicetree/bindings/clock/ti/twl6030.txt
->   create mode 100644 drivers/clk/ti/clk-6030.c
->
-> diff --git a/Documentation/devicetree/bindings/clock/ti/twl6030.txt b/Documentation/devicetree/bindings/clock/ti/twl6030.txt
-> new file mode 100644
-> index 0000000..d290ad4
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/clock/ti/twl6030.txt
-> @@ -0,0 +1,4 @@
-> +Binding for TI TWL6030.
-> +
-> +Required properties:
-> +- compatible: "ti,twl6030-clk32kg"
-> diff --git a/drivers/clk/Kconfig b/drivers/clk/Kconfig
-> index 9f9c5ae..4e89e8b 100644
-> --- a/drivers/clk/Kconfig
-> +++ b/drivers/clk/Kconfig
-> @@ -65,6 +65,13 @@ config COMMON_CLK_S2MPS11
->   	  clock. These multi-function devices have two (S2MPS14) or three
->   	  (S2MPS11, S5M8767) fixed-rate oscillators, clocked at 32KHz each.
->
-> +config CLK_TWL6030
-> +	tristate "Clock driver for twl6030"
-> +	depends on TWL4030_CORE
-> +	---help---
-> +	  Enable the TWL6030 clock CLK32KG which is disabled by default.
-> +	  Needed on the Pandaboard for the wireless LAN.
-> +
->   config CLK_TWL6040
->   	tristate "External McPDM functional clock from twl6040"
->   	depends on TWL6040_CORE
-> diff --git a/drivers/clk/ti/Makefile b/drivers/clk/ti/Makefile
-> index ed4d0aa..04f25ea 100644
-> --- a/drivers/clk/ti/Makefile
-> +++ b/drivers/clk/ti/Makefile
-> @@ -10,4 +10,5 @@ obj-$(CONFIG_SOC_OMAP5)			+= $(clk-common) clk-54xx.o
->   obj-$(CONFIG_SOC_DRA7XX)		+= $(clk-common) clk-7xx.o \
->   					   clk-dra7-atl.o
->   obj-$(CONFIG_SOC_AM43XX)		+= $(clk-common) clk-43xx.o
-> +obj-$(CONFIG_CLK_TWL6030)		+= $(clk-common) clk-6030.o
->   endif
-> diff --git a/drivers/clk/ti/clk-6030.c b/drivers/clk/ti/clk-6030.c
-> new file mode 100644
-> index 0000000..61d1834
-> --- /dev/null
-> +++ b/drivers/clk/ti/clk-6030.c
+Please send plain text rather than HTML email; this is becoming painful
+to reply to.
 
-Please change the filename to something like clk-twl6030.c. clk-\d+ 
-filenames basically denote a SoC under TI clock driver structure.
+On Thu, Jul 31, 2014 at 12:12:33PM +0100, Ganapatrao Kulkarni wrote:
+>    On Thu, Jul 31, 2014 at 3:23 PM, Mark Rutland <[1]mark.rutland@arm.com>
+>    wrote:
+> 
+>      On Thu, Jul 31, 2014 at 09:41:10AM +0100, Ganapatrao Kulkarni wrote:
+>      > ? ?On Wed, Jul 30, 2014 at 9:16 PM, Mark Rutland
+>      <[1][2]mark.rutland@arm.com>
+>      > ? ?wrote:
+>      >
+>      > ? ? ?Hi,
+>      > ? ? ?On Wed, Jul 30, 2014 at 04:06:31PM +0100, Robert Richter wrote:
+>      > ? ? ?> From: Radha Mohan Chintakuntla <[2][3]rchintakuntla@cavium.com>
+>      > ? ? ?>
+>      > ? ? ?> Add initial device tree nodes for Cavium Thunder SoCs with
+>      support of
+>      > ? ? ?> 48 cores and gicv3. The dts file requires further changes, esp.
+>      for
+>      > ? ? ?> pci, gicv3-its and smmu. This changes will be added later
+>      together
+>      > ? ? ?> with the device drivers.
+>      > ? ? ?>
+>      > ? ? ?> Signed-off-by: Radha Mohan Chintakuntla
+>      <[3][4]rchintakuntla@cavium.com>
+>      > ? ? ?> Signed-off-by: Robert Richter <[4][5]rrichter@cavium.com>
+>      > ? ? ?> ---
+>      > ? ? ?> ?arch/arm64/boot/dts/Makefile ? ? ? ? | ? 1 +
+>      > ? ? ?> ?arch/arm64/boot/dts/thunder-88xx.dts | 387
+>      > ? ? ?+++++++++++++++++++++++++++++++++++
+>      > ? ? ?> ?2 files changed, 388 insertions(+)
+>      > ? ? ?> ?create mode 100644 arch/arm64/boot/dts/thunder-88xx.dts
+>      > ? ? ?>
+>      > ? ? ?> diff --git a/arch/arm64/boot/dts/Makefile
+>      > ? ? ?b/arch/arm64/boot/dts/Makefile
+>      > ? ? ?> index c52bdb051f66..f8001a62029c 100644
+>      > ? ? ?> --- a/arch/arm64/boot/dts/Makefile
+>      > ? ? ?> +++ b/arch/arm64/boot/dts/Makefile
+>      > ? ? ?> @@ -1,3 +1,4 @@
+>      > ? ? ?> +dtb-$(CONFIG_ARCH_THUNDER) += thunder-88xx.dtb
+>      > ? ? ?> ?dtb-$(CONFIG_ARCH_VEXPRESS) += rtsm_ve-aemv8a.dtb
+>      foundation-v8.dtb
+>      > ? ? ?> ?dtb-$(CONFIG_ARCH_XGENE) += apm-mustang.dtb
+>      > ? ? ?>
+>      > ? ? ?> diff --git a/arch/arm64/boot/dts/thunder-88xx.dts
+>      > ? ? ?b/arch/arm64/boot/dts/thunder-88xx.dts
+>      > ? ? ?> new file mode 100644
+>      > ? ? ?> index 000000000000..4cf20ac9138b
+>      > ? ? ?> --- /dev/null
+>      > ? ? ?> +++ b/arch/arm64/boot/dts/thunder-88xx.dts
+>      > ? ? ?> @@ -0,0 +1,387 @@
+>      > ? ? ?> +/*
+>      > ? ? ?> + * Cavium Thunder DTS file
+>      > ? ? ?> + *
+>      > ? ? ?> + * Copyright (C) 2013, Cavium Inc.
+>      > ? ? ?> + *
+>      > ? ? ?> + * This program is free software; you can redistribute it
+>      and/or
+>      > ? ? ?> + * modify it under the terms of the GNU General Public License
+>      as
+>      > ? ? ?> + * published by the Free Software Foundation; either version 2
+>      of
+>      > ? ? ?> + * the License, or (at your option) any later version.
+>      > ? ? ?> + */
+>      > ? ? ?> +/dts-v1/;
+>      > ? ? ?> +
+>      > ? ? ?> +/* Reserving first 12MB of DDR for firmware */
+>      > ? ? ?> +/memreserve/ 0x00000000 0x00c00000;
+>      >
+>      > ? ? ?What exactly is this memreserve intended to protect at runtime?
+>      > ? ? ?Yes, this 12 MB is reserved for ATF and UEFI boot and run-time
+>      services.
+> 
+>      If booted as an EFI application Linux will use the UEFI memory map.
+>      Anything UEFI needs to have kept around will be marked as such, so
+>      there's no need to memreserve that.
+> 
+>    We are loading ATF and UEFI from flash(which is not XIP) within 12MB of
+>    DDR.
+>    ?I dont see UEFI stub freeing RAM address where UEFI? image is loaded.
 
-> @@ -0,0 +1,133 @@
-> +/*
-> + * drivers/clk/ti/clk-6030.c
+Therefore we don't need the memreserve, then?
 
-Replace this with some sort of short description instead, see other 
-files under drivers/clk/ti. Having an absolute filename here doesn't 
-really provide anything.
+>      I was under the impression that the ARM Trusted Firmware didn't need
+>      anything resident on the non-secure side, so I don't see why that needs
+>      a memreserve -- Linux should not be able to address anything it has
+>      resident.
+> 
+>    We mark RAM used by ATF as secure-RAM, however we don't support
+>    secure/non-secure address aliasing.
+>    i.e, a DRAM address that can be referenced from both a secure PA and a
+>    non-secure PA is not allowed.
 
-> + *
-> + *  Copyright (C) 2014 Stefan Assmann <sassmann@kpanic.de>
-> + *
-> + * This program is free software; you can redistribute it and/or modify
-> + * it under the terms of the GNU General Public License version 2 as
-> + * published by the Free Software Foundation.
-> + *
-> + * Clock driver for TI twl6030.
-> + */
+What exactly do you mean by "not allowed"?
 
-A basic comment about this driver, how about trying to make it more 
-generic, as in making it an i2c-clock driver? I guess there are other 
-external chips/boards outside twl6030 family that would be interested in 
-using it.
+If Linux maps that memory, what happens?
 
-> +
-> +#include <linux/module.h>
-> +#include <linux/of.h>
-> +#include <linux/clkdev.h>
-> +#include <linux/clk-provider.h>
-> +#include <linux/i2c/twl.h>
-> +#include <linux/platform_device.h>
-> +
-> +struct twl6030_desc {
-> +	struct clk *clk;
-> +	struct clk_hw hw;
-> +};
-> +
-> +static int twl6030_clk32kg_prepare(struct clk_hw *hw)
-> +{
-> +	int ret;
-> +
-> +	ret = twl_i2c_write_u8(TWL_MODULE_PM_RECEIVER,
-> +			       TWL6030_GRP_CON << TWL6030_CFG_STATE_GRP_SHIFT |
-> +			       TWL6030_CFG_STATE_ON,
-> +			       TWL6030_PM_RECEIVER_CLK32KG_CFG_STATE);
-> +
-> +	return ret;
-> +}
-> +
-> +void twl6030_clk32kg_unprepare(struct clk_hw *hw)
-> +{
-> +	twl_i2c_write_u8(TWL_MODULE_PM_RECEIVER,
-> +			 TWL6030_GRP_CON << TWL6030_CFG_STATE_GRP_SHIFT |
-> +			 TWL6030_CFG_STATE_OFF,
-> +			 TWL6030_PM_RECEIVER_CLK32KG_CFG_STATE);
-> +}
-> +
-> +static int twl6030_clk32kg_is_prepared(struct clk_hw *hw)
-> +{
-> +	u8 is_prepared;
-> +
-> +	twl_i2c_read_u8(TWL_MODULE_PM_RECEIVER, &is_prepared,
-> +			TWL6030_PM_RECEIVER_CLK32KG_CFG_STATE);
-> +
-> +	return is_prepared & TWL6030_CFG_STATE_ON;
-> +}
-> +
-> +static const struct clk_ops twl6030_clk32kg_ops = {
-> +	.prepare	= twl6030_clk32kg_prepare,
-> +	.unprepare	= twl6030_clk32kg_unprepare,
-> +	.is_prepared	= twl6030_clk32kg_is_prepared,
-> +};
-> +
-> +static void __init of_ti_twl6030_clk32kg_setup(struct device_node *node)
-> +{
-> +	struct twl6030_desc *clk_hw = NULL;
-> +	struct clk_init_data init = { 0 };
-> +	struct clk_lookup *clookup;
-> +	struct clk *clk;
-> +
-> +	clookup = kzalloc(sizeof(*clookup), GFP_KERNEL);
-> +	if (!clookup) {
-> +		pr_err("%s: could not allocate clookup\n", __func__);
-> +		return;
-> +	}
-> +	clk_hw = kzalloc(sizeof(*clk_hw), GFP_KERNEL);
-> +	if (!clk_hw) {
-> +		pr_err("%s: could not allocate clk_hw\n", __func__);
-> +		goto err_clk_hw;
-> +	}
-> +
-> +	clk_hw->hw.init = &init;
-> +
-> +	init.name = node->name;
-> +	init.ops = &twl6030_clk32kg_ops;
-> +	init.flags = CLK_IS_ROOT;
-> +
-> +	clk = clk_register(NULL, &clk_hw->hw);
-> +	if (!IS_ERR(clk)) {
-> +		clookup->con_id = kstrdup("clk32kg", GFP_KERNEL);
-> +		clookup->clk = clk;
-> +		clkdev_add(clookup);
-> +
-> +		return;
-> +	}
-> +
-> +	kfree(clookup);
-> +err_clk_hw:
-> +	kfree(clk_hw);
-> +}
-> +CLK_OF_DECLARE(of_ti_twl6030_clk32kg, "ti,twl6030-clk32kg", of_ti_twl6030_clk32kg_setup);
-> +
-> +static int of_twl6030_clk32kg_probe(struct platform_device *pdev)
-> +{
-> +	struct device_node *node = pdev->dev.of_node;
-> +	struct clk *clk;
-> +
-> +	if (!node)
-> +		return -ENODEV;
-> +
-> +	clk = devm_clk_get(&pdev->dev, "clk32kg");
-> +	if (IS_ERR(clk))
-> +		return PTR_ERR(clk);
-> +
-> +	return clk_prepare(clk);
+What if Linux tried to read or write to it?
 
-This is plain wrong as pointed out earlier. The driver that uses the 
-clock must enable it.
+If Linux should not map that memory, it should not be described in the
+memory map to begin with.
 
-> +}
-> +
-> +static struct of_device_id of_twl6030_clk32kg_match_tbl[] = {
-> +	{ .compatible = "ti,twl6030-clk32kg", },
-> +	{},
-> +};
-> +MODULE_DEVICE_TABLE(of, of_twl6030_clk32kg_match_tbl);
-> +
-> +static struct platform_driver twl6030_clk_driver = {
-> +	.driver = {
-> +		.name = "twl6030-clk32kg",
-> +		.owner = THIS_MODULE,
-> +		.of_match_table = of_twl6030_clk32kg_match_tbl,
-> +	},
-> +	.probe = of_twl6030_clk32kg_probe,
-> +};
-> +module_platform_driver(twl6030_clk_driver);
-> +
-> +MODULE_AUTHOR("Stefan Assmann <sassmann@kpanic.de>");
-> +MODULE_DESCRIPTION("clock driver for TI SoC based boards with twl6030");
-> +MODULE_LICENSE("GPL v2");
-> diff --git a/drivers/mfd/twl-core.c b/drivers/mfd/twl-core.c
-> index db11b4f..440fe4e 100644
-> --- a/drivers/mfd/twl-core.c
-> +++ b/drivers/mfd/twl-core.c
-> @@ -34,6 +34,7 @@
->   #include <linux/platform_device.h>
->   #include <linux/regmap.h>
->   #include <linux/clk.h>
-> +#include <linux/clk-provider.h>
->   #include <linux/err.h>
->   #include <linux/device.h>
->   #include <linux/of.h>
-> @@ -1012,6 +1013,8 @@ static void clocks_init(struct device *dev,
->   	u32 rate;
->   	u8 ctrl = HFCLK_FREQ_26_MHZ;
->
-> +	of_clk_init(NULL);
-> +
-
-Don't do this please, this is horrible. of_clk_init or alternatives 
-should be called from board/SoC specific context, otherwise you end up 
-calling the init functions multiple times. If you are facing an issue 
-that TI boards do not initialize external clocks properly currently, 
-this is because TI clock driver does its init hierarchically and does 
-not parse the whole DT for clock nodes. I have an experimental patch 
-available I can post for you to try out which provides external clock 
-support on TI boards if you like.
-
--Tero
-
-
->   	osc = clk_get(dev, "fck");
->   	if (IS_ERR(osc)) {
->   		printk(KERN_WARNING "Skipping twl internal clock init and "
->
+Thanks,
+Mark.
