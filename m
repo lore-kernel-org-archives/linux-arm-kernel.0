@@ -1,323 +1,332 @@
-From: hsnaves@gmail.com (Humberto Silva Naves)
-Date: Thu, 31 Jul 2014 13:22:10 +0200
-Subject: [PATCHv2 3/5] clk: samsung: exynos5410: Add suspend/resume handling
-In-Reply-To: <1406805732-17372-1-git-send-email-hsnaves@gmail.com>
-References: <1406805732-17372-1-git-send-email-hsnaves@gmail.com>
-Message-ID: <1406805732-17372-4-git-send-email-hsnaves@gmail.com>
+From: t-kristo@ti.com (Tero Kristo)
+Date: Thu, 31 Jul 2014 14:28:13 +0300
+Subject: [PATCH 2/2] clk: initial clock driver for TWL6030
+In-Reply-To: <53DA12BF.1060008@kpanic.de>
+References: <1406728949-7560-1-git-send-email-sassmann@kpanic.de>
+ <1406728949-7560-3-git-send-email-sassmann@kpanic.de>
+ <20140730175033.GA17528@sirena.org.uk> <53DA12BF.1060008@kpanic.de>
+Message-ID: <53DA284D.6030404@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch implements all the necessary code that handles register
-saving and restoring during a suspend/resume cycle. To make this
-possible, the local variable reg_base from the function
-exynos5410_clk_init was changed to global. In addition, new
-clock register definitions were added for the majority of the relevant
-clocks inside the SoC.
+On 07/31/2014 12:56 PM, Stefan Assmann wrote:
+> On 30.07.2014 19:50, Mark Brown wrote:
+>> On Wed, Jul 30, 2014 at 04:02:29PM +0200, Stefan Assmann wrote:
+>>
+>>> +static int twl6030_clk32kg_is_prepared(struct clk_hw *hw)
+>>> +{
+>>> +	struct twl6030_desc *desc = to_twl6030_desc(hw);
+>>> +
+>>> +	return desc->enabled;
+>>> +}
+>>
+>> Why not just check the register map - can't the register be cached?  If
+>> that's not possible a comment would be good.
+>
+> I just took atl_clk_is_enabled() as template. If you say it's better
+> to read the value, that can be arranged.
+>
+>>
+>>> +static int of_twl6030_clk32kg_probe(struct platform_device *pdev)
+>>> +{
+>>> +	struct device_node *node = pdev->dev.of_node;
+>>> +	struct clk *clk;
+>>> +	int ret = 0;
+>>> +
+>>> +	if (!node)
+>>> +		return -ENODEV;
+>>> +
+>>> +	clk = clk_get(&pdev->dev, "clk32kg");
+>>
+>> devm_clk_get()?
+>
+> Changed.
+>
+>>
+>>> +	if (IS_ERR(clk))
+>>> +		ret = -EPROBE_DEFER;
+>>
+>> Shouldn't the provided return code be being used?
+>
+> Changed.
+>
+>>
+>>> +	else
+>>> +		clk_prepare(clk);
+>>
+>> Why is the clock driver defaulting to enabling the clock, and if it
+>> needs to shouldn't it be doing a prepere_enable() even if the enable
+>> happens not to do anything to the hardware?  Otherwise child clocks
+>> might get confused.
+>
+> Mike advised me to convert the functions from enable/disable to
+> prepare/unprepare because i2c transactions may sleep. That's what I did.
+> The code no longer enables the clock and just prepares it. So IIUC the
+> call to clk_prepare() should be fine.
+>
+>>
+>> The return value is also not being checked.
+>>
+>
+> Changed.
+>
+> Thanks for your comments Mark, here's a new version of the patch.
+>
+>    Stefan
+>
+>  From 2c52040f33af9dbb41e3e3f355ae154843b277c6 Mon Sep 17 00:00:00 2001
+> From: Stefan Assmann <sassmann@kpanic.de>
+> Date: Fri, 25 Jul 2014 09:42:27 +0200
+> Subject: [PATCH] clk: initial clock driver for TWL6030
+>
+> Adding a clock driver for the TI TWL6030. The driver prepares the
+> CLK32KG clock, which is required for the wireless LAN.
+>
+> v2:
+> - use MODULE_LICENSE("GPL v2")
+> - use devm_clk_get() instead of clk_get()
+> - propagate return value of clk_prepare()
+> - read prepared state instead of using enabled variable
+>
+> Signed-off-by: Stefan Assmann <sassmann@kpanic.de>
+> ---
+>   .../devicetree/bindings/clock/ti/twl6030.txt       |   4 +
+>   drivers/clk/Kconfig                                |   7 ++
+>   drivers/clk/ti/Makefile                            |   1 +
+>   drivers/clk/ti/clk-6030.c                          | 133 +++++++++++++++++++++
+>   drivers/mfd/twl-core.c                             |   3 +
+>   5 files changed, 148 insertions(+)
+>   create mode 100644 Documentation/devicetree/bindings/clock/ti/twl6030.txt
+>   create mode 100644 drivers/clk/ti/clk-6030.c
+>
+> diff --git a/Documentation/devicetree/bindings/clock/ti/twl6030.txt b/Documentation/devicetree/bindings/clock/ti/twl6030.txt
+> new file mode 100644
+> index 0000000..d290ad4
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/clock/ti/twl6030.txt
+> @@ -0,0 +1,4 @@
+> +Binding for TI TWL6030.
+> +
+> +Required properties:
+> +- compatible: "ti,twl6030-clk32kg"
+> diff --git a/drivers/clk/Kconfig b/drivers/clk/Kconfig
+> index 9f9c5ae..4e89e8b 100644
+> --- a/drivers/clk/Kconfig
+> +++ b/drivers/clk/Kconfig
+> @@ -65,6 +65,13 @@ config COMMON_CLK_S2MPS11
+>   	  clock. These multi-function devices have two (S2MPS14) or three
+>   	  (S2MPS11, S5M8767) fixed-rate oscillators, clocked at 32KHz each.
+>
+> +config CLK_TWL6030
+> +	tristate "Clock driver for twl6030"
+> +	depends on TWL4030_CORE
+> +	---help---
+> +	  Enable the TWL6030 clock CLK32KG which is disabled by default.
+> +	  Needed on the Pandaboard for the wireless LAN.
+> +
+>   config CLK_TWL6040
+>   	tristate "External McPDM functional clock from twl6040"
+>   	depends on TWL6040_CORE
+> diff --git a/drivers/clk/ti/Makefile b/drivers/clk/ti/Makefile
+> index ed4d0aa..04f25ea 100644
+> --- a/drivers/clk/ti/Makefile
+> +++ b/drivers/clk/ti/Makefile
+> @@ -10,4 +10,5 @@ obj-$(CONFIG_SOC_OMAP5)			+= $(clk-common) clk-54xx.o
+>   obj-$(CONFIG_SOC_DRA7XX)		+= $(clk-common) clk-7xx.o \
+>   					   clk-dra7-atl.o
+>   obj-$(CONFIG_SOC_AM43XX)		+= $(clk-common) clk-43xx.o
+> +obj-$(CONFIG_CLK_TWL6030)		+= $(clk-common) clk-6030.o
+>   endif
+> diff --git a/drivers/clk/ti/clk-6030.c b/drivers/clk/ti/clk-6030.c
+> new file mode 100644
+> index 0000000..61d1834
+> --- /dev/null
+> +++ b/drivers/clk/ti/clk-6030.c
 
-Signed-off-by: Humberto Silva Naves <hsnaves@gmail.com>
----
- drivers/clk/samsung/clk-exynos5410.c |  231 +++++++++++++++++++++++++++++++++-
- 1 file changed, 228 insertions(+), 3 deletions(-)
+Please change the filename to something like clk-twl6030.c. clk-\d+ 
+filenames basically denote a SoC under TI clock driver structure.
 
-diff --git a/drivers/clk/samsung/clk-exynos5410.c b/drivers/clk/samsung/clk-exynos5410.c
-index 92c56b7..a9c261c 100644
---- a/drivers/clk/samsung/clk-exynos5410.c
-+++ b/drivers/clk/samsung/clk-exynos5410.c
-@@ -16,6 +16,7 @@
- #include <linux/clk-provider.h>
- #include <linux/of.h>
- #include <linux/of_address.h>
-+#include <linux/syscore_ops.h>
- 
- #include "clk.h"
- 
-@@ -24,38 +25,134 @@
- #define MPLL_LOCK		0x4000
- #define MPLL_CON0		0x4100
- #define CPLL_LOCK		0x10020
-+#define DPLL_LOCK		0x10030
-+#define EPLL_LOCK		0x10040
-+#define VPLL_LOCK		0x10050
-+#define IPLL_LOCK		0x10060
- #define CPLL_CON0		0x10120
-+#define CPLL_CON1		0x10124
-+#define DPLL_CON0		0x10128
-+#define DPLL_CON1		0x1012C
-+#define EPLL_CON0		0x10130
-+#define EPLL_CON1		0x10134
-+#define EPLL_CON2		0x10138
-+#define VPLL_CON0		0x10140
-+#define VPLL_CON1		0x10144
-+#define VPLL_CON2		0x10148
-+#define IPLL_CON0		0x10150
-+#define IPLL_CON1		0x10154
- #define BPLL_LOCK		0x20010
- #define BPLL_CON0		0x20110
- #define KPLL_LOCK		0x28000
- #define KPLL_CON0		0x28100
- 
- #define SRC_CPU			0x200
-+#define SRC_CPERI0		0x4200
- #define SRC_CPERI1		0x4204
- #define SRC_TOP0		0x10210
- #define SRC_TOP1		0x10214
- #define SRC_TOP2		0x10218
-+#define SRC_TOP3		0x1021C
-+#define SRC_GSCL		0x10220
-+#define SRC_DISP0_0		0x10224
-+#define SRC_DISP0_1		0x10228
-+#define SRC_DISP1_0		0x1022C
-+#define SRC_DISP1_1		0x10230
-+#define SRC_MAU			0x10240
- #define SRC_FSYS		0x10244
- #define SRC_PERIC0		0x10250
-+#define SRC_PERIC1		0x10254
- #define SRC_CDREX		0x20200
- #define SRC_KFC			0x28200
- 
-+#define SRC_MASK_TOP		0x10310
-+#define SRC_MASK_GSCL		0x10320
-+#define SRC_MASK_DISP0_0	0x10324
-+#define SRC_MASK_DISP0_1	0x10328
-+#define SRC_MASK_DISP1_0	0x1032C
-+#define SRC_MASK_DISP1_1	0x10330
-+#define SRC_MASK_MAU		0x10334
- #define SRC_MASK_FSYS		0x10340
-+#define SRC_MASK_GEN		0x10344
- #define SRC_MASK_PERIC0		0x10350
-+#define SRC_MASK_PERIC1		0x10354
- 
- #define DIV_CPU0		0x500
-+#define DIV_CPU1		0x504
-+#define DIV_CPERI0		0x4500
-+#define DIV_CPERI1		0x4504
-+#define DIV_G2D			0x8500
-+#define DIV_ISP0		0xC300
-+#define DIV_ISP1		0xC304
-+#define DIV_ISP2		0xC308
- #define DIV_TOP0		0x10510
- #define DIV_TOP1		0x10514
--#define DIV_FSYS1		0x1054c
-+#define DIV_TOP2		0x10518
-+#define DIV_TOP3		0x1051C
-+#define DIV_GSCL		0x10520
-+#define DIV_DISP0_0		0x10524
-+#define DIV_DISP0_1		0x10528
-+#define DIV_DISP1_0		0x1052C
-+#define DIV_DISP1_1		0x10530
-+#define DIV_GEN			0x1053C
-+#define DIV_MAU			0x10544
-+#define DIV_FSYS0		0x10548
-+#define DIV_FSYS1		0x1054C
- #define DIV_FSYS2		0x10550
-+#define DIV_FSYS3		0x10554
- #define DIV_PERIC0		0x10558
-+#define DIV_PERIC1		0x1055C
-+#define DIV_PERIC2		0x10560
-+#define DIV_PERIC3		0x10564
-+#define DIV_PERIC4		0x10568
-+#define DIV_PERIC5		0x1056C
-+#define DIV2_RATIO0		0x10590
-+#define DIV2_RATIO1		0x10594
-+#define DIV_CDREX		0x20500
-+#define DIV_CDREX2		0x20504
- #define DIV_KFC0		0x28500
- 
-+#define GATE_BUS_CPU		0x700
-+#define GATE_BUS_GSCL0		0x10710
-+#define GATE_BUS_GSCL1		0x10720
-+#define GATE_BUS_DISP0		0x10724
-+#define GATE_BUS_DISP1		0x10728
-+#define GATE_BUS_MFC		0x10734
-+#define GATE_BUS_G3D		0x10738
-+#define GATE_BUS_GEN		0x1073C
- #define GATE_BUS_FSYS0		0x10740
--
-+#define GATE_BUS_FSYS1		0x10744
-+#define GATE_BUS_CDREX		0x20700
-+
-+#define GATE_IP_CORE		0x4900
-+#define GATE_IP_G2D		0x8800
-+#define GATE_IP_ISP0		0xC800
-+#define GATE_IP_ISP1		0xC804
-+#define GATE_IP_GSCL0		0x10910
-+#define GATE_IP_GSCL1		0x10920
-+#define GATE_IP_DISP0		0x10924
-+#define GATE_IP_DISP1		0x10928
-+#define GATE_IP_MFC		0x1092C
-+#define GATE_IP_G3D		0x10930
-+#define GATE_IP_GEN		0x10934
- #define GATE_IP_FSYS		0x10944
- #define GATE_IP_PERIC		0x10950
- #define GATE_IP_PERIS		0x10960
-+#define GATE_IP_CDREX		0x20900
-+
-+#define GATE_TOP_SCLK_GSCL	0x10820
-+#define GATE_TOP_SCLK_DISP0	0x10824
-+#define GATE_TOP_SCLK_DISP1	0x10828
-+#define GATE_TOP_SCLK_GEN	0x1082C
-+#define GATE_TOP_SCLK_MAU	0x1083C
-+#define GATE_TOP_SCLK_FSYS	0x10840
-+#define GATE_TOP_SCLK_PERIC	0x10850
-+
-+#define GATE_SCLK_CPU		0x800
-+#define SCLK_SRC_ISP		0x10270
-+#define SCLK_DIV_ISP		0x10580
-+#define SCLK_DIV_ISP1		0x10584
-+
- 
- /* list of PLLs */
- enum exynos5410_plls {
-@@ -64,6 +161,134 @@ enum exynos5410_plls {
- 	nr_plls                 /* number of PLLs */
- };
- 
-+static void __iomem *reg_base;
-+
-+#ifdef CONFIG_PM_SLEEP
-+static struct samsung_clk_reg_dump *exynos5410_save;
-+
-+/*
-+ * list of controller registers to be saved and restored during a
-+ * suspend/resume cycle.
-+ */
-+static unsigned long exynos5410_clk_regs[] __initdata = {
-+	SRC_CDREX,
-+	SRC_CPERI0,
-+	SRC_CPERI1,
-+	SRC_CPU,
-+	SRC_DISP0_0,
-+	SRC_DISP0_1,
-+	SRC_DISP1_0,
-+	SRC_DISP1_1,
-+	SRC_FSYS,
-+	SRC_GSCL,
-+	SRC_KFC,
-+	SRC_MAU,
-+	SRC_PERIC0,
-+	SRC_PERIC1,
-+	SRC_TOP0,
-+	SRC_TOP1,
-+	SRC_TOP2,
-+	SRC_TOP3,
-+
-+	DIV_CDREX,
-+	DIV_CDREX2,
-+	DIV_CPU0,
-+	DIV_CPERI1,
-+	DIV_DISP0_0,
-+	DIV_DISP0_1,
-+	DIV_DISP1_0,
-+	DIV_DISP1_1,
-+	DIV_FSYS0,
-+	DIV_FSYS1,
-+	DIV_FSYS2,
-+	DIV_GEN,
-+	DIV_GSCL,
-+	DIV_G2D,
-+	DIV_KFC0,
-+	DIV_MAU,
-+	DIV_PERIC0,
-+	DIV_PERIC1,
-+	DIV_PERIC2,
-+	DIV_PERIC3,
-+	DIV_PERIC4,
-+	DIV_PERIC5,
-+	DIV_TOP0,
-+	DIV_TOP1,
-+	DIV_TOP2,
-+	DIV_TOP3,
-+
-+	GATE_BUS_DISP1,
-+	GATE_BUS_FSYS0,
-+
-+	GATE_IP_CDREX,
-+	GATE_IP_CORE,
-+	GATE_IP_DISP0,
-+	GATE_IP_DISP1,
-+	GATE_IP_FSYS,
-+	GATE_IP_GEN,
-+	GATE_IP_GSCL0,
-+	GATE_IP_GSCL1,
-+	GATE_IP_G2D,
-+	GATE_IP_G3D,
-+	GATE_IP_MFC,
-+	GATE_IP_PERIC,
-+	GATE_IP_PERIS,
-+
-+	GATE_TOP_SCLK_DISP1,
-+	GATE_TOP_SCLK_FSYS,
-+	GATE_TOP_SCLK_GSCL,
-+	GATE_TOP_SCLK_MAU,
-+	GATE_TOP_SCLK_PERIC,
-+
-+	GATE_BUS_DISP1,
-+	GATE_BUS_FSYS0,
-+
-+	GATE_SCLK_CPU,
-+
-+	SRC_MASK_DISP0_0,
-+	SRC_MASK_DISP1_0,
-+	SRC_MASK_FSYS,
-+	SRC_MASK_MAU,
-+	SRC_MASK_PERIC0,
-+	SRC_MASK_PERIC1,
-+};
-+
-+static int exynos5410_clk_suspend(void)
-+{
-+	samsung_clk_save(reg_base, exynos5410_save,
-+				ARRAY_SIZE(exynos5410_clk_regs));
-+
-+	return 0;
-+}
-+
-+static void exynos5410_clk_resume(void)
-+{
-+	samsung_clk_restore(reg_base, exynos5410_save,
-+				ARRAY_SIZE(exynos5410_clk_regs));
-+}
-+
-+static struct syscore_ops exynos5410_clk_syscore_ops = {
-+	.suspend = exynos5410_clk_suspend,
-+	.resume = exynos5410_clk_resume,
-+};
-+
-+static void exynos5410_clk_sleep_init(void)
-+{
-+	exynos5410_save = samsung_clk_alloc_reg_dump(exynos5410_clk_regs,
-+					ARRAY_SIZE(exynos5410_clk_regs));
-+	if (!exynos5410_save) {
-+		pr_warn("%s: failed to allocate sleep save data, no sleep support!\n",
-+			__func__);
-+		return;
-+	}
-+
-+	register_syscore_ops(&exynos5410_clk_syscore_ops);
-+}
-+#else
-+static void exynos5410_clk_sleep_init(void) {}
-+#endif
-+
-+
- /* list of all parent clocks */
- PNAME(apll_p)		= { "fin_pll", "fout_apll", };
- PNAME(bpll_p)		= { "fin_pll", "fout_bpll", };
-@@ -190,7 +415,6 @@ static struct samsung_pll_clock exynos5410_plls[nr_plls] __initdata = {
- static void __init exynos5410_clk_init(struct device_node *np)
- {
- 	struct samsung_clk_provider *ctx;
--	void __iomem *reg_base;
- 
- 	if (np) {
- 		reg_base = of_iomap(np, 0);
-@@ -214,6 +438,7 @@ static void __init exynos5410_clk_init(struct device_node *np)
- 	samsung_clk_register_gate(ctx, exynos5410_gate_clks,
- 			ARRAY_SIZE(exynos5410_gate_clks));
- 
-+	exynos5410_clk_sleep_init();
- 	samsung_clk_of_add_provider(np, ctx);
- 
- 	pr_debug("Exynos5410: clock setup completed.\n");
--- 
-1.7.10.4
+> @@ -0,0 +1,133 @@
+> +/*
+> + * drivers/clk/ti/clk-6030.c
+
+Replace this with some sort of short description instead, see other 
+files under drivers/clk/ti. Having an absolute filename here doesn't 
+really provide anything.
+
+> + *
+> + *  Copyright (C) 2014 Stefan Assmann <sassmann@kpanic.de>
+> + *
+> + * This program is free software; you can redistribute it and/or modify
+> + * it under the terms of the GNU General Public License version 2 as
+> + * published by the Free Software Foundation.
+> + *
+> + * Clock driver for TI twl6030.
+> + */
+
+A basic comment about this driver, how about trying to make it more 
+generic, as in making it an i2c-clock driver? I guess there are other 
+external chips/boards outside twl6030 family that would be interested in 
+using it.
+
+> +
+> +#include <linux/module.h>
+> +#include <linux/of.h>
+> +#include <linux/clkdev.h>
+> +#include <linux/clk-provider.h>
+> +#include <linux/i2c/twl.h>
+> +#include <linux/platform_device.h>
+> +
+> +struct twl6030_desc {
+> +	struct clk *clk;
+> +	struct clk_hw hw;
+> +};
+> +
+> +static int twl6030_clk32kg_prepare(struct clk_hw *hw)
+> +{
+> +	int ret;
+> +
+> +	ret = twl_i2c_write_u8(TWL_MODULE_PM_RECEIVER,
+> +			       TWL6030_GRP_CON << TWL6030_CFG_STATE_GRP_SHIFT |
+> +			       TWL6030_CFG_STATE_ON,
+> +			       TWL6030_PM_RECEIVER_CLK32KG_CFG_STATE);
+> +
+> +	return ret;
+> +}
+> +
+> +void twl6030_clk32kg_unprepare(struct clk_hw *hw)
+> +{
+> +	twl_i2c_write_u8(TWL_MODULE_PM_RECEIVER,
+> +			 TWL6030_GRP_CON << TWL6030_CFG_STATE_GRP_SHIFT |
+> +			 TWL6030_CFG_STATE_OFF,
+> +			 TWL6030_PM_RECEIVER_CLK32KG_CFG_STATE);
+> +}
+> +
+> +static int twl6030_clk32kg_is_prepared(struct clk_hw *hw)
+> +{
+> +	u8 is_prepared;
+> +
+> +	twl_i2c_read_u8(TWL_MODULE_PM_RECEIVER, &is_prepared,
+> +			TWL6030_PM_RECEIVER_CLK32KG_CFG_STATE);
+> +
+> +	return is_prepared & TWL6030_CFG_STATE_ON;
+> +}
+> +
+> +static const struct clk_ops twl6030_clk32kg_ops = {
+> +	.prepare	= twl6030_clk32kg_prepare,
+> +	.unprepare	= twl6030_clk32kg_unprepare,
+> +	.is_prepared	= twl6030_clk32kg_is_prepared,
+> +};
+> +
+> +static void __init of_ti_twl6030_clk32kg_setup(struct device_node *node)
+> +{
+> +	struct twl6030_desc *clk_hw = NULL;
+> +	struct clk_init_data init = { 0 };
+> +	struct clk_lookup *clookup;
+> +	struct clk *clk;
+> +
+> +	clookup = kzalloc(sizeof(*clookup), GFP_KERNEL);
+> +	if (!clookup) {
+> +		pr_err("%s: could not allocate clookup\n", __func__);
+> +		return;
+> +	}
+> +	clk_hw = kzalloc(sizeof(*clk_hw), GFP_KERNEL);
+> +	if (!clk_hw) {
+> +		pr_err("%s: could not allocate clk_hw\n", __func__);
+> +		goto err_clk_hw;
+> +	}
+> +
+> +	clk_hw->hw.init = &init;
+> +
+> +	init.name = node->name;
+> +	init.ops = &twl6030_clk32kg_ops;
+> +	init.flags = CLK_IS_ROOT;
+> +
+> +	clk = clk_register(NULL, &clk_hw->hw);
+> +	if (!IS_ERR(clk)) {
+> +		clookup->con_id = kstrdup("clk32kg", GFP_KERNEL);
+> +		clookup->clk = clk;
+> +		clkdev_add(clookup);
+> +
+> +		return;
+> +	}
+> +
+> +	kfree(clookup);
+> +err_clk_hw:
+> +	kfree(clk_hw);
+> +}
+> +CLK_OF_DECLARE(of_ti_twl6030_clk32kg, "ti,twl6030-clk32kg", of_ti_twl6030_clk32kg_setup);
+> +
+> +static int of_twl6030_clk32kg_probe(struct platform_device *pdev)
+> +{
+> +	struct device_node *node = pdev->dev.of_node;
+> +	struct clk *clk;
+> +
+> +	if (!node)
+> +		return -ENODEV;
+> +
+> +	clk = devm_clk_get(&pdev->dev, "clk32kg");
+> +	if (IS_ERR(clk))
+> +		return PTR_ERR(clk);
+> +
+> +	return clk_prepare(clk);
+
+This is plain wrong as pointed out earlier. The driver that uses the 
+clock must enable it.
+
+> +}
+> +
+> +static struct of_device_id of_twl6030_clk32kg_match_tbl[] = {
+> +	{ .compatible = "ti,twl6030-clk32kg", },
+> +	{},
+> +};
+> +MODULE_DEVICE_TABLE(of, of_twl6030_clk32kg_match_tbl);
+> +
+> +static struct platform_driver twl6030_clk_driver = {
+> +	.driver = {
+> +		.name = "twl6030-clk32kg",
+> +		.owner = THIS_MODULE,
+> +		.of_match_table = of_twl6030_clk32kg_match_tbl,
+> +	},
+> +	.probe = of_twl6030_clk32kg_probe,
+> +};
+> +module_platform_driver(twl6030_clk_driver);
+> +
+> +MODULE_AUTHOR("Stefan Assmann <sassmann@kpanic.de>");
+> +MODULE_DESCRIPTION("clock driver for TI SoC based boards with twl6030");
+> +MODULE_LICENSE("GPL v2");
+> diff --git a/drivers/mfd/twl-core.c b/drivers/mfd/twl-core.c
+> index db11b4f..440fe4e 100644
+> --- a/drivers/mfd/twl-core.c
+> +++ b/drivers/mfd/twl-core.c
+> @@ -34,6 +34,7 @@
+>   #include <linux/platform_device.h>
+>   #include <linux/regmap.h>
+>   #include <linux/clk.h>
+> +#include <linux/clk-provider.h>
+>   #include <linux/err.h>
+>   #include <linux/device.h>
+>   #include <linux/of.h>
+> @@ -1012,6 +1013,8 @@ static void clocks_init(struct device *dev,
+>   	u32 rate;
+>   	u8 ctrl = HFCLK_FREQ_26_MHZ;
+>
+> +	of_clk_init(NULL);
+> +
+
+Don't do this please, this is horrible. of_clk_init or alternatives 
+should be called from board/SoC specific context, otherwise you end up 
+calling the init functions multiple times. If you are facing an issue 
+that TI boards do not initialize external clocks properly currently, 
+this is because TI clock driver does its init hierarchically and does 
+not parse the whole DT for clock nodes. I have an experimental patch 
+available I can post for you to try out which provides external clock 
+support on TI boards if you like.
+
+-Tero
+
+
+>   	osc = clk_get(dev, "fck");
+>   	if (IS_ERR(osc)) {
+>   		printk(KERN_WARNING "Skipping twl internal clock init and "
+>
