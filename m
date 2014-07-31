@@ -1,41 +1,51 @@
-From: tushar.b@samsung.com (Tushar Behera)
-Date: Thu, 31 Jul 2014 11:12:39 +0530
-Subject: [PATCH] ARM: exynos_defconfig: Enable PL330 DMA
-Message-ID: <1406785359-21669-1-git-send-email-tushar.b@samsung.com>
+From: olof@lixom.net (Olof Johansson)
+Date: Wed, 30 Jul 2014 23:00:24 -0700
+Subject: [PATCH] drivers: CCI: Correct use of ! and &
+In-Reply-To: <20140730195424.GG18384@quad.lixom.net>
+References: <1406716655-32494-1-git-send-email-punit.agrawal@arm.com>
+ <20140730195424.GG18384@quad.lixom.net>
+Message-ID: <CAOesGMgAY7-MDVG2CzesQurWtMLdODjsdBNV8jScFJtAB3NAJg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-We are getting a system hang on Arndale-Octa board if PL330_DMA is not
-enabled. The issue is related to [1].
+Hi,
 
-AUDSS block provides the clock for audio DMA controller. Any operation
-on this clock requires that the clock to AUDSS block be enabled. In
-current configuration, the clock is gated during late boot process when
-all unused clocks are disabled.
+On Wed, Jul 30, 2014 at 12:54 PM, Olof Johansson <olof@lixom.net> wrote:
+> On Wed, Jul 30, 2014 at 11:37:35AM +0100, Punit Agrawal wrote:
+>> From: Himangi Saraogi <himangi774@gmail.com>
+>>
+>> In commit ae91d60ba88ef0bdb1b5e9b2363bd52fc45d2af7, a bug was fixed that
+>> involved converting !x & y to !(x & y).  The code below shows the same
+>> pattern, and thus should perhaps be fixed in the same way.
+>>
+>> The Coccinelle semantic patch that makes this change is as follows:
+>>
+>> // <smpl>
+>> @@ expression E1,E2; @@
+>> (
+>>   !E1 & !E2
+>> |
+>> - !E1 & E2
+>> + !(E1 & E2)
+>> )
+>> // </smpl>
+>>
+>> Cc: stable at vger.kernel.org
+>> Signed-off-by: Himangi Saraogi <himangi774@gmail.com>
+>> Acked-by: Julia Lawall <julia.lawall@lip6.fr>
+>> Acked-by: Punit Agrawal <punit.agrawal@arm.com>
+>> ---
+>
+> Thanks, applied (adding a Fixes: tag, please use those in the future)
 
-When PL330_DMA is enabled, the 'apb_pclk' is enabled/disabled during
-amba_probe(). Otherwise, this clock is also disabled during late boot.
-If the AUDSS block clock is disabled by then, we get a system hang.
+On second look, I see that the code doesn't actually change behavior
+(since the mask is done with 0x1, it happens to have the same result).
+Pure luck before. :)
 
-[1] https://lkml.org/lkml/2014/6/11/32
+Because of this, I've moved this to our next/fixes-non-critical
+branch, which will be sent up during the 3.17 merge window, and I took
+off the stable cc. It's still a good fix, but since it doesn't
+actually fix broken behavior there's no need to rush it.
 
-Signed-off-by: Tushar Behera <tushar.b@samsung.com>
----
- arch/arm/configs/exynos_defconfig |    2 ++
- 1 file changed, 2 insertions(+)
 
-diff --git a/arch/arm/configs/exynos_defconfig b/arch/arm/configs/exynos_defconfig
-index e07a227..c5888e8 100644
---- a/arch/arm/configs/exynos_defconfig
-+++ b/arch/arm/configs/exynos_defconfig
-@@ -109,6 +109,8 @@ CONFIG_MMC_DW_IDMAC=y
- CONFIG_MMC_DW_EXYNOS=y
- CONFIG_RTC_CLASS=y
- CONFIG_RTC_DRV_S3C=y
-+CONFIG_DMADEVICES=y
-+CONFIG_PL330_DMA=y
- CONFIG_COMMON_CLK_MAX77686=y
- CONFIG_EXT2_FS=y
- CONFIG_EXT3_FS=y
--- 
-1.7.9.5
+-Olof
