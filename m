@@ -1,29 +1,33 @@
 From: will.deacon@arm.com (Will Deacon)
-Date: Thu, 31 Jul 2014 18:41:25 +0100
-Subject: arm64: More than 16 stream ids
-In-Reply-To: <53DA7E9E.7000501@amd.com>
-References: <53DA7E9E.7000501@amd.com>
-Message-ID: <20140731174125.GH26853@arm.com>
+Date: Thu, 31 Jul 2014 18:44:00 +0100
+Subject: [PATCH] arm64: KVM: export current vcpu->pause state via pseudo
+ regs
+In-Reply-To: <CAFEAcA8RjmjoaEpjoDE5YJdKagtZYZe9TpCdsRPf86W=WCxCsA@mail.gmail.com>
+References: <1404914112-7298-1-git-send-email-alex.bennee@linaro.org>
+ <53DA7583.2030504@redhat.com>
+ <CAFEAcA9cT617t8JqOXtuO-wQ5xg5T3Sw_DUHB1fpPD6g3SSNaQ@mail.gmail.com>
+ <53DA7B28.701@redhat.com>
+ <CAFEAcA8RjmjoaEpjoDE5YJdKagtZYZe9TpCdsRPf86W=WCxCsA@mail.gmail.com>
+Message-ID: <20140731174359.GI26853@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-[Adding the other Rob ;)]
-
-On Thu, Jul 31, 2014 at 06:36:30PM +0100, Joel Schopp wrote:
-> I recently ran into a situation where I needed more than 16 stream ids for
-> an smmu, but we are currently limited to 16 by:
+On Thu, Jul 31, 2014 at 06:36:35PM +0100, Peter Maydell wrote:
+> On 31 July 2014 18:21, Paolo Bonzini <pbonzini@redhat.com> wrote:
+> > What does ARM do if you have a WFI while interrupts are disabled?  On
+> > x86 after "cli;hlt" only an NMI will wake you up.  With spurious
+> > wakeups, it's pretty much guaranteed that you will break such "cli;hlt"
+> > sequences.
 > 
-> #define MAX_MASTER_STREAMIDS        MAX_PHANDLE_ARGS
-> #define MAX_PHANDLE_ARGS 16
-> 
-> I changed that 16 to 32 and everything worked for me.  I am wondering if
-> this is the preferred way to fix the limitation?  If so I'd be happy to
-> send out the 1 line patch.
+> The architecture mandates some things that *must* wake you from
+> a WFI, but it also allows wakeups for other reasons not listed, or
+> for no reason at all. It's perfectly valid to implement WFI as a NOP
+> (though it would not be very good for power efficiency, obviously).
+> Guests which don't surround WFI with a "check whether we should
+> just go back to WFI" loop are buggy.
 
-This seems fine to me. Last time it was brought up, the objection from RobH
-was that there wasn't any upstream activity for the AMD board, so this
-change could wait:
-
-  http://lists.linuxfoundation.org/pipermail/iommu/2014-January/007556.html
+(and in case that wasn't clear, local_irq_disable() doesn't prevent an
+interrupt from waking you up from wfi, otherwise our idle code would be
+broken).
 
 Will
