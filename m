@@ -1,86 +1,30 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Thu, 31 Jul 2014 09:43:15 +0100
-Subject: [PATCH v8 01/11] ARM: brcmstb: add infrastructure for
- ARM-based Broadcom STB SoCs
-In-Reply-To: <20140731022320.GM3711@ld-irv-0074>
-References: <1405976886-27807-1-git-send-email-computersforpeace@gmail.com>
- <1405976886-27807-2-git-send-email-computersforpeace@gmail.com>
- <CAL_Jsq+Nbk7m9KXhG+Chdpvurp75RrvhFR2oE_LGxV444GSe9Q@mail.gmail.com>
- <20140731022320.GM3711@ld-irv-0074>
-Message-ID: <20140731084315.GJ30282@n2100.arm.linux.org.uk>
+From: sassmann@kpanic.de (Stefan Assmann)
+Date: Thu, 31 Jul 2014 10:46:30 +0200
+Subject: [PATCH 1/2] mfd: twl-core: move TWL6030 defines to twl.h
+In-Reply-To: <20140731083611.GI9030@lee--X1>
+References: <1406728949-7560-1-git-send-email-sassmann@kpanic.de>
+ <1406728949-7560-2-git-send-email-sassmann@kpanic.de>
+ <20140731083611.GI9030@lee--X1>
+Message-ID: <53DA0266.6080807@kpanic.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jul 30, 2014 at 07:23:20PM -0700, Brian Norris wrote:
-> Hi Rob,
+On 31.07.2014 10:36, Lee Jones wrote:
+> On Wed, 30 Jul 2014, Stefan Assmann wrote:
 > 
-> I appreciate your comments, but where were many of these 5 months ago on
-> the first 7 revisions? :)
+>> These defines should be available to all drivers. Also added register
+>> offset for CLK32KG_CFG_STATE and GRP defines.
+>>
+>> Signed-off-by: Stefan Assmann <sassmann@kpanic.de>
+>> ---
+>>  drivers/regulator/twl-regulator.c | 11 -----------
+>>  include/linux/i2c/twl.h           | 20 ++++++++++++++++++++
+>>  2 files changed, 20 insertions(+), 11 deletions(-)
 > 
-> On a practical note: v9 is already queued for 3.17. Should I send
-> patches for the 3.17 cycle (or later) to fixup some of these issues? Or
-> would you recommend pulling the patches out of Matt Porter's tree now,
-> and reintroducing for 3.18? (I would be much happier with the first.)
+> This doesn't have anything to do with MFD?
 > 
-> I do note that we at least need to fix allmodconfig ASAP; I'll reply to
-> Russell on that one.
-> 
-> On Wed, Jul 30, 2014 at 12:09:48PM -0500, Rob Herring wrote:
-> > On Mon, Jul 21, 2014 at 4:07 PM, Brian Norris <computersforpeace@gmail.com> wrote:
-> > > +
-> > > +       per_cpu_sw_state_wr(cpu, 1);
-> > 
-> > The kernel already tracks the state.
-> 
-> Yes, but it doesn't synchronize cpu_die() and cpu_kill(). But I see you
-> objected below.
 
-Err.
+I added mfd because many other commits in include/linux/i2c/twl.h
+reference it. We can drop it if you like.
 
-static DECLARE_COMPLETION(cpu_died);
-
-/*
- * called on the thread which is asking for a CPU to be shutdown -
- * waits until shutdown has completed, or it is timed out.
- */
-void __cpu_die(unsigned int cpu)
-{
-        if (!wait_for_completion_timeout(&cpu_died, msecs_to_jiffies(5000))) {
-                pr_err("CPU%u: cpu didn't die\n", cpu);
-                return;
-        }
-        printk(KERN_NOTICE "CPU%u: shutdown\n", cpu);
-...
-        if (!platform_cpu_kill(cpu))
-                printk("CPU%u: unable to kill\n", cpu);
-}
-
-void __ref cpu_die(void)
-{
-...
-        /*
-         * Tell __cpu_die() that this CPU is now safe to dispose of.  Once
-         * this returns, power and/or clocks can be removed at any point
-         * from this CPU and its cache by platform_cpu_kill().
-         */
-        complete(&cpu_died);
-
-There _is_ synchronisation between these two.  Your cpu_kill() function
-will not be called until we have flushed all data from the dying CPU's
-cache.  That's the best we can do, because if we cause the dying CPU to
-exit the coherency domain, any kind of locking or completion will no
-longer work (neither will your state tracking solution because the L1
-caches will no longer snoop.)
-
-> Hmm, I'm pretty sure the synchronization is required for our B15 core.
-> If we yank the power before the core has properly quiesced, the whole
-> CPU complex will lock up. (Similar story for the power-up while loop you
-> complained about above.)
-
-If you need to ensure that the power isn't turned off too soon, how about
-using a delayed work queue to do the power-off of the CPU (remembering to
-cancel the delayed work queue when powering the CPU back up.)
-
--- 
-FTTC broadband for 0.8mile line: currently at 9.5Mbps down 400kbps up
-according to speedtest.net.
+  Stefan
