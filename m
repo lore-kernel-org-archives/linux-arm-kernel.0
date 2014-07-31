@@ -1,102 +1,126 @@
 From: emilio@elopez.com.ar (=?UTF-8?q?Emilio=20L=C3=B3pez?=)
-Date: Thu, 31 Jul 2014 18:28:10 -0300
-Subject: [PATCH 7/9] ARM: sunxi: dt: Add PLL2 support
+Date: Thu, 31 Jul 2014 18:28:09 -0300
+Subject: [PATCH 6/9] clk: sunxi: mod1 clock support
 In-Reply-To: <1406842092-25207-1-git-send-email-emilio@elopez.com.ar>
 References: <1406842092-25207-1-git-send-email-emilio@elopez.com.ar>
-Message-ID: <1406842092-25207-8-git-send-email-emilio@elopez.com.ar>
+Message-ID: <1406842092-25207-7-git-send-email-emilio@elopez.com.ar>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This commit adds the PLL2 definition to the sun4i, sun5i and sun7i
-device trees. PLL2 is used to clock audio devices.
+The module 1 type of clocks consist of a gate and a mux and are used on
+the audio blocks to mux and gate the PLL2 outputs for AC97, IIS or
+SPDIF. This commit adds support for them on the sunxi clock driver.
 
-Signed-off-by: Emilio L?pez <emilio@elopez.com.ar>
+Not-signed-off-by: Emilio L?pez <emilio@elopez.com.ar>
 ---
 
 Changes from RFC:
- * A10 rev A is now supported via the quirk code
+ * Document compatible used
 
- arch/arm/boot/dts/sun4i-a10.dtsi  | 8 ++++++++
- arch/arm/boot/dts/sun5i-a10s.dtsi | 8 ++++++++
- arch/arm/boot/dts/sun5i-a13.dtsi  | 8 ++++++++
- arch/arm/boot/dts/sun7i-a20.dtsi  | 8 ++++++++
- 4 files changed, 32 insertions(+)
+ Documentation/devicetree/bindings/clock/sunxi.txt |  1 +
+ drivers/clk/sunxi/Makefile                        |  1 +
+ drivers/clk/sunxi/clk-a10-mod1.c                  | 69 +++++++++++++++++++++++
+ 3 files changed, 71 insertions(+)
+ create mode 100644 drivers/clk/sunxi/clk-a10-mod1.c
 
-diff --git a/arch/arm/boot/dts/sun4i-a10.dtsi b/arch/arm/boot/dts/sun4i-a10.dtsi
-index 459cb63..c4d4c73 100644
---- a/arch/arm/boot/dts/sun4i-a10.dtsi
-+++ b/arch/arm/boot/dts/sun4i-a10.dtsi
-@@ -81,6 +81,14 @@
- 			clock-output-names = "pll1";
- 		};
+diff --git a/Documentation/devicetree/bindings/clock/sunxi.txt b/Documentation/devicetree/bindings/clock/sunxi.txt
+index d18b89b..b028ee2 100644
+--- a/Documentation/devicetree/bindings/clock/sunxi.txt
++++ b/Documentation/devicetree/bindings/clock/sunxi.txt
+@@ -50,6 +50,7 @@ Required properties:
+ 	"allwinner,sun8i-a23-apb2-gates-clk" - for the APB2 gates on A23
+ 	"allwinner,sun4i-a10-codec-clk" - for the codec clock on A10
+ 	"allwinner,sun4i-a10-mod0-clk" - for the module 0 family of clocks
++	"allwinner,sun4i-a10-mod1-clk" - for the module 1 family of clocks
+ 	"allwinner,sun7i-a20-out-clk" - for the external output clocks
+ 	"allwinner,sun7i-a20-gmac-clk" - for the GMAC clock module on A20/A31
+ 	"allwinner,sun4i-a10-usb-clk" - for usb gates + resets on A10 / A20
+diff --git a/drivers/clk/sunxi/Makefile b/drivers/clk/sunxi/Makefile
+index a7a96f8..75d113d 100644
+--- a/drivers/clk/sunxi/Makefile
++++ b/drivers/clk/sunxi/Makefile
+@@ -5,6 +5,7 @@
+ obj-y += clk-sunxi.o clk-factors.o
+ obj-y += clk-a10-codec.o
+ obj-y += clk-a10-hosc.o
++obj-y += clk-a10-mod1.o
+ obj-y += clk-a10-pll2.o
+ obj-y += clk-a20-gmac.o
  
-+		pll2: clk at 01c20008 {
-+			#clock-cells = <1>;
-+			compatible = "allwinner,sun4i-a10-b-pll2-clk";
-+			reg = <0x01c20008 0x4>;
-+			clocks = <&osc24M>;
-+			clock-output-names = "pll2", "pll2x2", "pll2x4", "pll2x8";
-+		};
+diff --git a/drivers/clk/sunxi/clk-a10-mod1.c b/drivers/clk/sunxi/clk-a10-mod1.c
+new file mode 100644
+index 0000000..09afd54
+--- /dev/null
++++ b/drivers/clk/sunxi/clk-a10-mod1.c
+@@ -0,0 +1,69 @@
++/*
++ * Copyright 2014 Emilio L?pez
++ *
++ * Emilio L?pez <emilio@elopez.com.ar>
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License as published by
++ * the Free Software Foundation; either version 2 of the License, or
++ * (at your option) any later version.
++ *
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
++ */
 +
- 		pll4: clk at 01c20018 {
- 			#clock-cells = <0>;
- 			compatible = "allwinner,sun4i-a10-pll1-clk";
-diff --git a/arch/arm/boot/dts/sun5i-a10s.dtsi b/arch/arm/boot/dts/sun5i-a10s.dtsi
-index 24b0ad3..f35aa4d 100644
---- a/arch/arm/boot/dts/sun5i-a10s.dtsi
-+++ b/arch/arm/boot/dts/sun5i-a10s.dtsi
-@@ -74,6 +74,14 @@
- 			clock-output-names = "pll1";
- 		};
- 
-+		pll2: clk at 01c20008 {
-+			#clock-cells = <1>;
-+			compatible = "allwinner,sun4i-a10-b-pll2-clk";
-+			reg = <0x01c20008 0x4>;
-+			clocks = <&osc24M>;
-+			clock-output-names = "pll2", "pll2x2", "pll2x4", "pll2x8";
-+		};
++#include <linux/clk-provider.h>
++#include <linux/clkdev.h>
++#include <linux/of.h>
++#include <linux/of_address.h>
 +
- 		pll4: clk at 01c20018 {
- 			#clock-cells = <0>;
- 			compatible = "allwinner,sun4i-a10-pll1-clk";
-diff --git a/arch/arm/boot/dts/sun5i-a13.dtsi b/arch/arm/boot/dts/sun5i-a13.dtsi
-index bf86e65..38b2d77 100644
---- a/arch/arm/boot/dts/sun5i-a13.dtsi
-+++ b/arch/arm/boot/dts/sun5i-a13.dtsi
-@@ -75,6 +75,14 @@
- 			clock-output-names = "pll1";
- 		};
- 
-+		pll2: clk at 01c20008 {
-+			#clock-cells = <1>;
-+			compatible = "allwinner,sun4i-a10-b-pll2-clk";
-+			reg = <0x01c20008 0x4>;
-+			clocks = <&osc24M>;
-+			clock-output-names = "pll2", "pll2x2", "pll2x4", "pll2x8";
-+		};
++static DEFINE_SPINLOCK(mod1_lock);
 +
- 		pll4: clk at 01c20018 {
- 			#clock-cells = <0>;
- 			compatible = "allwinner,sun4i-a10-pll1-clk";
-diff --git a/arch/arm/boot/dts/sun7i-a20.dtsi b/arch/arm/boot/dts/sun7i-a20.dtsi
-index 4011628..7a6a18c 100644
---- a/arch/arm/boot/dts/sun7i-a20.dtsi
-+++ b/arch/arm/boot/dts/sun7i-a20.dtsi
-@@ -91,6 +91,14 @@
- 			clock-output-names = "pll1";
- 		};
- 
-+		pll2: clk at 01c20008 {
-+			#clock-cells = <1>;
-+			compatible = "allwinner,sun4i-a10-b-pll2-clk";
-+			reg = <0x01c20008 0x4>;
-+			clocks = <&osc24M>;
-+			clock-output-names = "pll2", "pll2x2", "pll2x4", "pll2x8";
-+		};
++#define SUN4I_MOD1_ENABLE	31
++#define SUN4I_MOD1_MUX		16
++#define SUN4I_MOD1_MUX_WIDTH	2
++#define SUN4I_MOD1_MAX_PARENTS	4
 +
- 		pll4: clk at 01c20018 {
- 			#clock-cells = <0>;
- 			compatible = "allwinner,sun7i-a20-pll4-clk";
++static void __init sun4i_mod1_clk_setup(struct device_node *node)
++{
++	struct clk *clk;
++	struct clk_mux *mux;
++	struct clk_gate *gate;
++	const char *parents[4];
++	const char *clk_name = node->name;
++	void __iomem *reg;
++	int i = 0;
++
++	mux = kzalloc(sizeof(*mux), GFP_KERNEL);
++	gate = kzalloc(sizeof(*gate), GFP_KERNEL);
++	if (!mux || !gate) {
++		kfree(mux);
++		kfree(gate);
++		return;
++	}
++
++	of_property_read_string(node, "clock-output-names", &clk_name);
++	reg = of_iomap(node, 0);
++
++	while (i < SUN4I_MOD1_MAX_PARENTS &&
++	       (parents[i] = of_clk_get_parent_name(node, i)) != NULL)
++		i++;
++
++	gate->reg = reg;
++	gate->bit_idx = SUN4I_MOD1_ENABLE;
++	gate->lock = &mod1_lock;
++	mux->reg = reg;
++	mux->shift = SUN4I_MOD1_MUX;
++	mux->mask = BIT(SUN4I_MOD1_MUX_WIDTH) - 1;
++	mux->lock = &mod1_lock;
++
++	clk = clk_register_composite(NULL, clk_name, parents, i,
++				     &mux->hw, &clk_mux_ops,
++				     NULL, NULL,
++				     &gate->hw, &clk_gate_ops, 0);
++	if (!IS_ERR(clk))
++		of_clk_add_provider(node, of_clk_src_simple_get, clk);
++}
++CLK_OF_DECLARE(sun4i_mod1, "allwinner,sun4i-a10-mod1-clk", sun4i_mod1_clk_setup);
 -- 
 2.0.3
