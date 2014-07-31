@@ -1,95 +1,69 @@
-From: kever.yang@rock-chips.com (Kever Yang)
-Date: Thu, 31 Jul 2014 14:26:24 -0700
-Subject: [REPOST PATCH v3 4/5] ARM: dts: Fix the sort ordering of EHCI and
- HSIC in rk3288.dtsi
-In-Reply-To: <1406841985-15790-1-git-send-email-kever.yang@rock-chips.com>
-References: <1406841985-15790-1-git-send-email-kever.yang@rock-chips.com>
-Message-ID: <1406841985-15790-5-git-send-email-kever.yang@rock-chips.com>
+From: emilio@elopez.com.ar (=?UTF-8?q?Emilio=20L=C3=B3pez?=)
+Date: Thu, 31 Jul 2014 18:28:03 -0300
+Subject: [PATCH 0/9] Audio clocks for sun[457]i, SoC revision detection
+Message-ID: <1406842092-25207-1-git-send-email-emilio@elopez.com.ar>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Doug Anderson <dianders@chromium.org>
+Hi everyone,
 
-The EHCI and HSIC device tree nodes were added in the wrong place.
-Fix them.
+As part of my ongoing GSoC project effort, I did some work on the clock
+code we're going to need for the audio blocks. This series adds support for
+PLL2 on A10, A10S, A13 and A20. It also includes support for the codec
+clock as well as module 1 clocks, used in the audio blocks.
 
-Signed-off-by: Doug Anderson <dianders@chromium.org>
-Signed-off-by: Kever Yang <kever.yang@rock-chips.com>
----
+To achieve this, we also need to implement SoC revision detection,
+as the PLL2 clock is different on A10 revision A. As discussed on the
+RFC series, we achieve this by detecting the revision during runtime and
+adjusting the compatibles before the devices get probed. As a side effect,
+we can also add support for the SoC bus to expose these details to
+userspace.
 
-Changes in v3:
-- EHCI and HSIC move new for version 3.
+The first two patches introduce the SoC identification support and the
+quirk support. The third patch is a fix to a sparse warning that I hit
+while building the code. Patches four to six implement the support for PLL2,
+codec and module 1 clocks on our clock driver. The last three patches
+add the corresponding clock nodes to the device tree.
 
-Changes in v2: None
+As usual, all comments and reviews are welcome.
 
- arch/arm/boot/dts/rk3288.dtsi |   41 ++++++++++++++++++++---------------------
- 1 file changed, 20 insertions(+), 21 deletions(-)
+Thanks!
 
-diff --git a/arch/arm/boot/dts/rk3288.dtsi b/arch/arm/boot/dts/rk3288.dtsi
-index a5607a1..673dee3 100644
---- a/arch/arm/boot/dts/rk3288.dtsi
-+++ b/arch/arm/boot/dts/rk3288.dtsi
-@@ -205,6 +205,17 @@
- 		status = "disabled";
- 	};
- 
-+	usb_host0_ehci: ehci at ff500000 {
-+		compatible = "generic-ehci";
-+		reg = <0xff500000 0x100>;
-+		interrupts = <GIC_SPI 24 IRQ_TYPE_LEVEL_HIGH>;
-+		clocks = <&cru HCLK_USBHOST0>;
-+		clock-names = "usbhost";
-+		status = "disabled";
-+	};
-+
-+	/* NOTE: ohci at ff520000 doesn't actually work on hardware */
-+
- 	usb_host1: usb at ff540000 {
- 		compatible = "rockchip,rk3288-usb", "rockchip,rk3066-usb",
- 				"snps,dwc2";
-@@ -225,6 +236,15 @@
- 		status = "disabled";
- 	};
- 
-+	usb_hsic: ehci at ff5c0000 {
-+		compatible = "generic-ehci";
-+		reg = <0xff5c0000 0x100>;
-+		interrupts = <GIC_SPI 26 IRQ_TYPE_LEVEL_HIGH>;
-+		clocks = <&cru HCLK_HSIC>;
-+		clock-names = "usbhost";
-+		status = "disabled";
-+	};
-+
- 	uart2: serial at ff690000 {
- 		compatible = "rockchip,rk3288-uart", "snps,dw-apb-uart";
- 		reg = <0xff690000 0x100>;
-@@ -319,27 +339,6 @@
- 		interrupts = <GIC_SPI 111 IRQ_TYPE_LEVEL_HIGH>;
- 		status = "disabled";
- 	};
--
--	usb_host0_ehci: ehci at ff500000 {
--		compatible = "generic-ehci";
--		reg = <0xff500000 0x100>;
--		interrupts = <GIC_SPI 24 IRQ_TYPE_LEVEL_HIGH>;
--		clocks = <&cru HCLK_USBHOST0>;
--		clock-names = "usbhost";
--		status = "disabled";
--	};
--
--	/* NOTE: ohci at ff520000 doesn't actually work on hardware */
--
--	usb_hsic: ehci at ff5c0000 {
--		compatible = "generic-ehci";
--		reg = <0xff5c0000 0x100>;
--		interrupts = <GIC_SPI 26 IRQ_TYPE_LEVEL_HIGH>;
--		clocks = <&cru HCLK_HSIC>;
--		clock-names = "usbhost";
--		status = "disabled";
--	};
--
- 	gic: interrupt-controller at ffc01000 {
- 		compatible = "arm,gic-400";
- 		interrupt-controller;
+Emilio
+
+Emilio L?pez (9):
+  ARM: sunxi: introduce SoC identification support
+  ARM: sunxi: quirk support
+  ARM: sunxi: make sun6i SMP ops static
+  clk: sunxi: PLL2 support for sun4i, sun5i and sun7i
+  clk: sunxi: codec clock support
+  clk: sunxi: mod1 clock support
+  ARM: sunxi: dt: Add PLL2 support
+  ARM: sunxi: dt: Add codec clock support
+  ARM: sun7i: dt: Add mod1 clock nodes
+
+ Documentation/devicetree/bindings/clock/sunxi.txt |   4 +
+ arch/arm/boot/dts/sun4i-a10.dtsi                  |  16 ++
+ arch/arm/boot/dts/sun5i-a10s.dtsi                 |  16 ++
+ arch/arm/boot/dts/sun5i-a13.dtsi                  |  16 ++
+ arch/arm/boot/dts/sun7i-a20.dtsi                  |  56 +++++
+ arch/arm/mach-sunxi/Kconfig                       |   1 +
+ arch/arm/mach-sunxi/Makefile                      |   2 +-
+ arch/arm/mach-sunxi/platsmp.c                     |   2 +-
+ arch/arm/mach-sunxi/quirks.c                      |  82 ++++++++
+ arch/arm/mach-sunxi/sunxi-soc-id.c                | 226 ++++++++++++++++++++
+ arch/arm/mach-sunxi/sunxi-soc-id.h                |   6 +
+ drivers/clk/sunxi/Makefile                        |   3 +
+ drivers/clk/sunxi/clk-a10-codec.c                 |  41 ++++
+ drivers/clk/sunxi/clk-a10-mod1.c                  |  69 ++++++
+ drivers/clk/sunxi/clk-a10-pll2.c                  | 243 ++++++++++++++++++++++
+ 15 files changed, 781 insertions(+), 2 deletions(-)
+ create mode 100644 arch/arm/mach-sunxi/quirks.c
+ create mode 100644 arch/arm/mach-sunxi/sunxi-soc-id.c
+ create mode 100644 arch/arm/mach-sunxi/sunxi-soc-id.h
+ create mode 100644 drivers/clk/sunxi/clk-a10-codec.c
+ create mode 100644 drivers/clk/sunxi/clk-a10-mod1.c
+ create mode 100644 drivers/clk/sunxi/clk-a10-pll2.c
+
 -- 
-1.7.9.5
+2.0.3
