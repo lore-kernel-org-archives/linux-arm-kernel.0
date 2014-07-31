@@ -1,56 +1,62 @@
 From: emilio@elopez.com.ar (=?UTF-8?q?Emilio=20L=C3=B3pez?=)
-Date: Thu, 31 Jul 2014 18:28:04 -0300
-Subject: [PATCH 1/9] ARM: sunxi: introduce SoC identification support
+Date: Thu, 31 Jul 2014 18:28:07 -0300
+Subject: [PATCH 4/9] clk: sunxi: PLL2 support for sun4i, sun5i and sun7i
 In-Reply-To: <1406842092-25207-1-git-send-email-emilio@elopez.com.ar>
 References: <1406842092-25207-1-git-send-email-emilio@elopez.com.ar>
-Message-ID: <1406842092-25207-2-git-send-email-emilio@elopez.com.ar>
+Message-ID: <1406842092-25207-5-git-send-email-emilio@elopez.com.ar>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This commit adds SoC bus support on the sunxi platform, and exposes
-information such as the hardware revision to userspace and other kernel
-clients during init. A message with this information is also printed to
-the kernel log to ease future bug triaging.
+This patch adds support for PLL2 and derivates on sun4i, sun5i and
+sun7i SoCs. As this PLL is only used for audio and requires good
+accuracy, we only support two known good rates.
 
 Signed-off-by: Emilio L?pez <emilio@elopez.com.ar>
 ---
- arch/arm/mach-sunxi/Kconfig        |   1 +
- arch/arm/mach-sunxi/Makefile       |   2 +-
- arch/arm/mach-sunxi/sunxi-soc-id.c | 226 +++++++++++++++++++++++++++++++++++++
- arch/arm/mach-sunxi/sunxi-soc-id.h |   6 +
- 4 files changed, 234 insertions(+), 1 deletion(-)
- create mode 100644 arch/arm/mach-sunxi/sunxi-soc-id.c
- create mode 100644 arch/arm/mach-sunxi/sunxi-soc-id.h
 
-diff --git a/arch/arm/mach-sunxi/Kconfig b/arch/arm/mach-sunxi/Kconfig
-index 6434e3b..4a199df 100644
---- a/arch/arm/mach-sunxi/Kconfig
-+++ b/arch/arm/mach-sunxi/Kconfig
-@@ -5,6 +5,7 @@ menuconfig ARCH_SUNXI
- 	select GENERIC_IRQ_CHIP
- 	select PINCTRL
- 	select PINCTRL_SUNXI
-+	select SOC_BUS
- 	select SUN4I_TIMER
+Changes from RFC:
+ * Add support for A10 rev. A
+ * Document compatibles
+ * Use fixed factors
+
+ Documentation/devicetree/bindings/clock/sunxi.txt |   2 +
+ drivers/clk/sunxi/Makefile                        |   1 +
+ drivers/clk/sunxi/clk-a10-pll2.c                  | 243 ++++++++++++++++++++++
+ 3 files changed, 246 insertions(+)
+ create mode 100644 drivers/clk/sunxi/clk-a10-pll2.c
+
+diff --git a/Documentation/devicetree/bindings/clock/sunxi.txt b/Documentation/devicetree/bindings/clock/sunxi.txt
+index d3a5c3c..41ada31 100644
+--- a/Documentation/devicetree/bindings/clock/sunxi.txt
++++ b/Documentation/devicetree/bindings/clock/sunxi.txt
+@@ -10,6 +10,8 @@ Required properties:
+ 	"allwinner,sun4i-a10-pll1-clk" - for the main PLL clock and PLL4
+ 	"allwinner,sun6i-a31-pll1-clk" - for the main PLL clock on A31
+ 	"allwinner,sun8i-a23-pll1-clk" - for the main PLL clock on A23
++	"allwinner,sun4i-a10-a-pll2-clk" - for the PLL2 clock on A10 rev. A
++	"allwinner,sun4i-a10-b-pll2-clk" - for the PLL2 clock on A10 rev. B
+ 	"allwinner,sun4i-a10-pll5-clk" - for the PLL5 clock
+ 	"allwinner,sun4i-a10-pll6-clk" - for the PLL6 clock
+ 	"allwinner,sun6i-a31-pll6-clk" - for the PLL6 clock on A31
+diff --git a/drivers/clk/sunxi/Makefile b/drivers/clk/sunxi/Makefile
+index 6850cba..dcd5709 100644
+--- a/drivers/clk/sunxi/Makefile
++++ b/drivers/clk/sunxi/Makefile
+@@ -4,6 +4,7 @@
  
- if ARCH_SUNXI
-diff --git a/arch/arm/mach-sunxi/Makefile b/arch/arm/mach-sunxi/Makefile
-index 27b168f..589239b 100644
---- a/arch/arm/mach-sunxi/Makefile
-+++ b/arch/arm/mach-sunxi/Makefile
-@@ -1,2 +1,2 @@
--obj-$(CONFIG_ARCH_SUNXI) += sunxi.o
-+obj-$(CONFIG_ARCH_SUNXI) += sunxi.o sunxi-soc-id.o
- obj-$(CONFIG_SMP) += platsmp.o
-diff --git a/arch/arm/mach-sunxi/sunxi-soc-id.c b/arch/arm/mach-sunxi/sunxi-soc-id.c
+ obj-y += clk-sunxi.o clk-factors.o
+ obj-y += clk-a10-hosc.o
++obj-y += clk-a10-pll2.o
+ obj-y += clk-a20-gmac.o
+ 
+ obj-$(CONFIG_MFD_SUN6I_PRCM) += \
+diff --git a/drivers/clk/sunxi/clk-a10-pll2.c b/drivers/clk/sunxi/clk-a10-pll2.c
 new file mode 100644
-index 0000000..c7eff1c
+index 0000000..bcf7d0b
 --- /dev/null
-+++ b/arch/arm/mach-sunxi/sunxi-soc-id.c
-@@ -0,0 +1,226 @@
++++ b/drivers/clk/sunxi/clk-a10-pll2.c
+@@ -0,0 +1,243 @@
 +/*
-+ * SoC revision detection for sunxi SoCs
-+ *
 + * Copyright 2014 Emilio L?pez
 + *
 + * Emilio L?pez <emilio@elopez.com.ar>
@@ -66,225 +72,232 @@ index 0000000..c7eff1c
 + * GNU General Public License for more details.
 + */
 +
-+#include <linux/err.h>
-+#include <linux/io.h>
++#include <linux/clk-provider.h>
 +#include <linux/of.h>
 +#include <linux/of_address.h>
 +#include <linux/slab.h>
-+#include <linux/string.h>
-+#include <linux/sys_soc.h>
 +
-+#include "sunxi-soc-id.h"
++#define SUN4I_PLL2_ENABLE		31
++#define SUN4I_PLL2_A_VCOBIAS		0
++#define SUN4I_PLL2_A_VCOBIAS_MASK	0x1F
++#define SUN4I_PLL2_A_N			7
++#define SUN4I_PLL2_A_N_MASK		0x7F
++#define SUN4I_PLL2_B_POST_DIV		26
++#define SUN4I_PLL2_B_POST_DIV_MASK	0xF
++#define SUN4I_PLL2_B_N			8
++#define SUN4I_PLL2_B_N_MASK		0x7F
++#define SUN4I_PLL2_B_PRE_DIV		0
++#define SUN4I_PLL2_B_PRE_DIV_MASK	0x1F
 +
-+/*
-+ * On the A10 SoC, we can read the revision information from the timer
-+ * block. The detection logic is extracted from similar code on the
-+ * Allwinner vendor tree, as this is undocumented on the user manual
-+ */
++#define SUN4I_PLL2_OUTPUTS		4
 +
-+#define TIMER_SOC_REV_REG		0x13c
-+#define TIMER_SOC_REV_CLEAR(val)	((val) & ~(0x3 << 6))
-+#define TIMER_SOC_REV_GET(val)		(((val) >> 6) & 0x3)
-+
-+static const struct of_device_id sun4i_timer_compatible[] __initconst = {
-+	{ .compatible = "allwinner,sun4i-a10-timer", },
-+	{},
++struct sun4i_pll2_clk {
++	struct clk_hw hw;
++	void __iomem *reg;
 +};
 +
-+static int __init sun4i_get_soc_revision(void)
++static inline struct sun4i_pll2_clk *to_sun4i_pll2_clk(struct clk_hw *hw)
 +{
-+	struct device_node *np;
-+	void __iomem *base;
-+	u32 val;
-+	int ret;
-+
-+	/* Find the timer node */
-+	np = of_find_matching_node(NULL, sun4i_timer_compatible);
-+	if (!np)
-+		return -ENODEV;
-+
-+	/* Temporarily map it for reading */
-+	base = of_iomap(np, 0);
-+	if (!base) {
-+		of_node_put(np);
-+		return -ENOMEM;
-+	}
-+
-+	/* Clear the SoC revision bits and rewrite the register */
-+	val = readl(base + TIMER_SOC_REV_REG);
-+	val = TIMER_SOC_REV_CLEAR(val);
-+	writel(val, base + TIMER_SOC_REV_REG);
-+
-+	/* Now read it again and see what shows up */
-+	val = readl(base + TIMER_SOC_REV_REG);
-+	val = TIMER_SOC_REV_GET(val);
-+
-+	switch (val) {
-+	case 0:  /* revision A */
-+		ret = 'A';
-+	case 3:  /* revision B */
-+		ret = 'B';
-+	default: /* revision C */
-+		ret = 'C';
-+	}
-+
-+	iounmap(base);
-+	of_node_put(np);
-+
-+	return ret;
++	return container_of(hw, struct sun4i_pll2_clk, hw);
 +}
 +
-+/*
-+ * On the sun5i SoCs (A10S, A13), we can read the revision information
-+ * from the first bits in the Security ID. The detection logic is
-+ * extracted from similar code on the Allwinner vendor tree, as this
-+ * is undocumented on the user manual.
-+ */
++static unsigned long sun4i_pll2_recalc_rate_a(struct clk_hw *hw,
++					      unsigned long parent_rate)
++{
++	struct sun4i_pll2_clk *clk = to_sun4i_pll2_clk(hw);
++	int vcobias, n;
++	u32 val;
 +
-+static const struct of_device_id sun5i_sid_compatible[] __initconst = {
-+	{ .compatible = "allwinner,sun4i-a10-sid", },
-+	{},
++	val = readl(clk->reg);
++	vcobias = (val >> SUN4I_PLL2_A_VCOBIAS) & SUN4I_PLL2_A_VCOBIAS_MASK;
++	n = (val >> SUN4I_PLL2_A_N) & SUN4I_PLL2_A_N_MASK;
++
++	if (vcobias == 10 && n == 94)
++		return 22579200;
++	else if (vcobias == 9 && n == 83)
++		return 24576000;
++
++	/*
++	 * Unfortunately we don't really have much documentation on how
++	 * these factors relate mathematically
++	 */
++	return 0;
++}
++
++static unsigned long sun4i_pll2_recalc_rate_b(struct clk_hw *hw,
++					      unsigned long parent_rate)
++{
++	struct sun4i_pll2_clk *clk = to_sun4i_pll2_clk(hw);
++	int n, prediv, postdiv;
++	u32 val;
++
++	val = readl(clk->reg);
++	n = (val >> SUN4I_PLL2_B_N) & SUN4I_PLL2_B_N_MASK;
++	prediv = (val >> SUN4I_PLL2_B_PRE_DIV) & SUN4I_PLL2_B_PRE_DIV_MASK;
++	postdiv = (val >> SUN4I_PLL2_B_POST_DIV) & SUN4I_PLL2_B_POST_DIV_MASK;
++
++	/* 0 is a special case and means 1 */
++	if (n == 0)
++		n = 1;
++	if (prediv == 0)
++		prediv = 1;
++	if (postdiv == 0)
++		postdiv = 1;
++
++	return ((parent_rate * n) / prediv) / postdiv;
++}
++
++static long sun4i_pll2_round_rate(struct clk_hw *hw, unsigned long rate,
++				  unsigned long *parent_rate)
++{
++	/*
++	 * There is only two interesting rates for the audio PLL, the
++	 * rest isn't really usable due to accuracy concerns. Therefore,
++	 * we specifically round to those rates here
++	 */
++	if (rate < 22579200)
++		return -EINVAL;
++
++	if (rate >= 22579200 && rate < 24576000)
++		return 22579200;
++
++	return 24576000;
++}
++
++static int sun4i_pll2_set_rate_a(struct clk_hw *hw, unsigned long rate,
++				 unsigned long parent_rate)
++{
++	struct sun4i_pll2_clk *clk = to_sun4i_pll2_clk(hw);
++	u32 val = readl(clk->reg);
++
++	val &= ~(SUN4I_PLL2_A_VCOBIAS_MASK << SUN4I_PLL2_A_VCOBIAS);
++	val &= ~(SUN4I_PLL2_A_N_MASK << SUN4I_PLL2_A_N);
++
++	if (rate == 22579200)
++		val |= (10 << SUN4I_PLL2_A_VCOBIAS) | (94 << SUN4I_PLL2_A_N);
++	else if (rate == 24576000)
++		val |= (9 << SUN4I_PLL2_A_VCOBIAS) | (83 << SUN4I_PLL2_A_N);
++	else
++		return -EINVAL;
++
++	writel(val, clk->reg);
++
++	return 0;
++}
++
++static int sun4i_pll2_set_rate_b(struct clk_hw *hw, unsigned long rate,
++				 unsigned long parent_rate)
++{
++	struct sun4i_pll2_clk *clk = to_sun4i_pll2_clk(hw);
++	u32 val = readl(clk->reg);
++
++	val &= ~(SUN4I_PLL2_B_N_MASK << SUN4I_PLL2_B_N);
++	val &= ~(SUN4I_PLL2_B_PRE_DIV_MASK << SUN4I_PLL2_B_PRE_DIV);
++	val &= ~(SUN4I_PLL2_B_POST_DIV_MASK << SUN4I_PLL2_B_POST_DIV);
++
++	val |= (21 << SUN4I_PLL2_B_PRE_DIV) | (4 << SUN4I_PLL2_B_POST_DIV);
++
++	if (rate == 22579200)
++		val |= (79 << SUN4I_PLL2_B_N);
++	else if (rate == 24576000)
++		val |= (86 << SUN4I_PLL2_B_N);
++	else
++		return -EINVAL;
++
++	writel(val, clk->reg);
++
++	return 0;
++}
++
++static const struct clk_ops sun4i_pll2_ops_a = {
++	.recalc_rate = sun4i_pll2_recalc_rate_a,
++	.round_rate = sun4i_pll2_round_rate,
++	.set_rate = sun4i_pll2_set_rate_a,
 +};
 +
-+static int __init sun5i_get_soc_revision(void)
-+{
-+	struct device_node *np;
-+	void __iomem *sid;
-+	u32 val;
-+	int ret;
 +
-+	/* Find the SID node */
-+	np = of_find_matching_node(NULL, sun5i_sid_compatible);
-+	if (!np)
-+		return -ENODEV;
++static const struct clk_ops sun4i_pll2_ops_b = {
++	.recalc_rate = sun4i_pll2_recalc_rate_b,
++	.round_rate = sun4i_pll2_round_rate,
++	.set_rate = sun4i_pll2_set_rate_b,
++};
 +
-+	/* Temporarily map it for reading */
-+	sid = of_iomap(np, 0);
-+	if (!sid) {
-+		of_node_put(np);
-+		return -ENOMEM;
-+	}
-+
-+	/* Read and extract the chip revision from the SID */
-+	val = readl(sid);
-+	val = (val >> 8) & 0xffffff;
-+
-+	switch (val) {
-+	case 0:        /* A10S/A13 rev A */
-+	case 0x162541: /* A10S/A13 rev A */
-+	case 0x162565: /* A13 rev A */
-+		ret = 'A';
-+		break;
-+	case 0x162542: /* A10S/A13 rev B */
-+		ret = 'B';
-+		break;
-+	default:       /* Unknown chip revision */
-+		ret = -ENODATA;
-+	}
-+
-+	iounmap(sid);
-+	of_node_put(np);
-+
-+	return ret;
-+}
-+
-+int __init sunxi_soc_revision(void)
-+{
-+	static int revision = -ENODEV;
-+
-+	/* Try to query the hardware just once */
-+	if (!IS_ERR_VALUE(revision))
-+		return revision;
-+
-+	if (of_machine_is_compatible("allwinner,sun4i-a10")) {
-+		revision = sun4i_get_soc_revision();
-+	} else if (of_machine_is_compatible("allwinner,sun5i-a10s") ||
-+		   of_machine_is_compatible("allwinner,sun5i-a13")) {
-+		revision = sun5i_get_soc_revision();
-+	}
-+
-+	return revision;
-+}
-+
-+/* Matches for the sunxi SoCs we know of */
-+static const struct of_device_id soc_matches[] __initconst = {
-+	{ .compatible = "allwinner,sun4i-a10", .data = "A10 (sun4i)" },
-+	{ .compatible = "allwinner,sun5i-a13", .data = "A13 (sun5i)" },
-+	{ .compatible = "allwinner,sun5i-a10s", .data = "A10S (sun5i)" },
-+	{ .compatible = "allwinner,sun6i-a31", .data = "A31 (sun6i)" },
-+	{ .compatible = "allwinner,sun7i-a20", .data = "A20 (sun7i)" },
-+	{ .compatible = "allwinner,sun8i-a23", .data = "A23 (sun8i)" },
++static const struct of_device_id pll2_matches[] __initconst = {
++	{ .compatible = "allwinner,sun4i-a10-a-pll2-clk", .data = &sun4i_pll2_ops_a },
++	{ .compatible = "allwinner,sun4i-a10-b-pll2-clk", .data = &sun4i_pll2_ops_b },
 +	{ /* sentinel */ },
 +};
 +
-+static int __init sunxi_register_soc_device(void)
++static void __init sun4i_pll2_setup(struct device_node *np)
 +{
-+	struct soc_device_attribute *soc_dev_attr;
-+	struct soc_device *soc_dev;
++	const char *clk_name = np->name, *parent;
 +	const struct of_device_id *match;
-+	struct device_node *root;
-+	int revision;
++	struct clk_onecell_data *clk_data;
++	const struct clk_ops *pll2_ops;
++	struct sun4i_pll2_clk *pll2;
++	struct clk_gate *gate;
++	struct clk **clks;
++	void __iomem *reg;
 +
-+	/* Only run on sunxi SoCs that we know of */
-+	root = of_find_node_by_path("/");
-+	match = of_match_node(soc_matches, root);
-+	if (!match)
-+		goto exit;
++	/* Choose the correct ops for pll2 */
++	match = of_match_node(pll2_matches, np);
++	pll2_ops = match->data;
 +
-+	soc_dev_attr = kzalloc(sizeof(*soc_dev_attr), GFP_KERNEL);
-+	if (!soc_dev_attr)
-+		goto exit;
++	pll2 = kzalloc(sizeof(*pll2), GFP_KERNEL);
++	gate = kzalloc(sizeof(*gate), GFP_KERNEL);
++	clk_data = kzalloc(sizeof(*clk_data), GFP_KERNEL);
++	clks = kcalloc(SUN4I_PLL2_OUTPUTS, sizeof(*clks), GFP_KERNEL);
++	if (!pll2 || !gate || !clk_data || !clks)
++		goto free_mem;
 +
-+	/* Read the machine name if available */
-+	of_property_read_string(root, "model", &soc_dev_attr->machine);
++	reg = of_iomap(np, 0);
++	parent = of_clk_get_parent_name(np, 0);
++	of_property_read_string_index(np, "clock-output-names", 0, &clk_name);
 +
-+	soc_dev_attr->family = kstrdup("Allwinner A Series", GFP_KERNEL);
-+	soc_dev_attr->soc_id = kstrdup(match->data, GFP_KERNEL);
++	pll2->reg = reg;
++	gate->reg = reg;
++	gate->bit_idx = SUN4I_PLL2_ENABLE;
 +
-+	/* Revision may not always be available */
-+	revision = sunxi_soc_revision();
-+	if (IS_ERR_VALUE(revision))
-+		soc_dev_attr->revision = kstrdup("Unknown", GFP_KERNEL);
-+	else
-+		soc_dev_attr->revision = kasprintf(GFP_KERNEL, "%c", revision);
++	/* PLL2, also known as PLL2x1 */
++	of_property_read_string_index(np, "clock-output-names", 0, &clk_name);
++	clks[0] = clk_register_composite(NULL, clk_name, &parent, 1, NULL, NULL,
++					 &pll2->hw, pll2_ops,
++					 &gate->hw, &clk_gate_ops, 0);
++	WARN_ON(IS_ERR(clks[0]));
++	clk_set_rate(clks[0], 22579200);
++	parent = clk_name;
 +
-+	soc_dev = soc_device_register(soc_dev_attr);
-+	if (IS_ERR(soc_dev))
-+		goto free_struct;
++	/* PLL2x2, 1/4 the rate of PLL2x8 */
++	of_property_read_string_index(np, "clock-output-names", 1, &clk_name);
++	clks[1] = clk_register_fixed_factor(NULL, clk_name, parent,
++					    CLK_SET_RATE_PARENT, 2, 1);
++	WARN_ON(IS_ERR(clks[1]));
 +
-+	/*
-+	 * Print an informational line mentioning the hardware details.
-+	 * It may come in handy during bug reports, as some early SoC
-+	 * revisions have hardware quirks and do not get much testing.
-+	 */
-+	pr_info("SoC bus registered, running %s %s, revision %s\n",
-+		soc_dev_attr->family, soc_dev_attr->soc_id,
-+		soc_dev_attr->revision);
++	/* PLL2x4, 1/2 the rate of PLL2x8 */
++	of_property_read_string_index(np, "clock-output-names", 2, &clk_name);
++	clks[2] = clk_register_fixed_factor(NULL, clk_name, parent,
++					    CLK_SET_RATE_PARENT, 4, 1);
++	WARN_ON(IS_ERR(clks[2]));
 +
-+	return 0;
++	/* PLL2x8, double of PLL2 without the post divisor */
++	of_property_read_string_index(np, "clock-output-names", 3, &clk_name);
++	clks[3] = clk_register_fixed_factor(NULL, clk_name, parent,
++					    CLK_SET_RATE_PARENT, 2 * 4, 1);
++	WARN_ON(IS_ERR(clks[3]));
 +
-+free_struct:
-+	kfree(soc_dev_attr->family);
-+	kfree(soc_dev_attr->soc_id);
-+	kfree(soc_dev_attr->revision);
-+	kfree(soc_dev_attr);
-+exit:
-+	of_node_put(root);
++	clk_data->clks = clks;
++	clk_data->clk_num = SUN4I_PLL2_OUTPUTS;
++	of_clk_add_provider(np, of_clk_src_onecell_get, clk_data);
 +
-+	return 0;
++	return;
++
++free_mem:
++	kfree(pll2);
++	kfree(gate);
++	kfree(clk_data);
++	kfree(clks);
 +}
-+postcore_initcall(sunxi_register_soc_device)
-diff --git a/arch/arm/mach-sunxi/sunxi-soc-id.h b/arch/arm/mach-sunxi/sunxi-soc-id.h
-new file mode 100644
-index 0000000..d49c245
---- /dev/null
-+++ b/arch/arm/mach-sunxi/sunxi-soc-id.h
-@@ -0,0 +1,6 @@
-+#ifndef _SUNXI_SOC_ID_H
-+#define _SUNXI_SOC_ID_H
-+
-+int __init sunxi_soc_revision(void);
-+
-+#endif /* _SUNXI_SOC_ID_H */
++CLK_OF_DECLARE(sun4i_pll2_a, "allwinner,sun4i-a10-a-pll2-clk", sun4i_pll2_setup);
++CLK_OF_DECLARE(sun4i_pll2_b, "allwinner,sun4i-a10-b-pll2-clk", sun4i_pll2_setup);
 -- 
 2.0.3
