@@ -1,49 +1,85 @@
-From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Thu, 31 Jul 2014 23:07:37 +0200
-Subject: Building kernel for more than one SoC
-In-Reply-To: <lrdi48$ls1$1@ger.gmane.org>
-References: <lrdi48$ls1$1@ger.gmane.org>
-Message-ID: <20140731230737.66e94c3d@free-electrons.com>
+From: tomasz.figa@gmail.com (Tomasz Figa)
+Date: Thu, 31 Jul 2014 23:08:26 +0200
+Subject: [PATCHv2 4/5] clk: samsung: exynos5410: Add fixed rate clocks
+In-Reply-To: <CAEe5pB8wzECi=4Eoa_xZYuw7NRPuRmizBNm5mXYMjYY_hWBy9Q@mail.gmail.com>
+References: <1406805732-17372-1-git-send-email-hsnaves@gmail.com>
+ <1406805732-17372-5-git-send-email-hsnaves@gmail.com>
+ <53DA2C74.3010101@samsung.com>
+ <CAEe5pB8wzECi=4Eoa_xZYuw7NRPuRmizBNm5mXYMjYY_hWBy9Q@mail.gmail.com>
+Message-ID: <53DAB04A.90005@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear Grant Edwards,
+Humberto,
 
-(Adding Boris and Alexandre in Cc, since they do a lot of AT91 stuff
-these days.)
-
-On Thu, 31 Jul 2014 13:59:36 +0000 (UTC), Grant Edwards wrote:
-
-> I'm told that it should be possible to build a kernel that will run on
-> two different SoC chips.  They're closely related (same ARM9 core,
-> many identical internal peripherals -- AT91SAM9G20 and 'G25), and
-> would likely have identical external hardware.
+On 31.07.2014 23:01, Humberto Naves wrote:
+> Hi,
 > 
-> In order to handle the internal periphals that differ, it was
-> recommended that I use loadable modules to keep the kernel size small.
-> However, my root filesystem is in RAM, so I don't see how loadable
-> modules helps unless I remove all of the .ko files from the root
-> filesystem after the kernel has booted.
+> On Thu, Jul 31, 2014 at 1:45 PM, Sylwester Nawrocki
+> <s.nawrocki@samsung.com> wrote:
+>> Can you explain what is rationale behind this change ? Is it related to
+>> suspend/resume ordering ?
 > 
-> It seems it would be simpler to just link in all required drivers for
-> both chips and discard the ones that aren't needed after kernel
-> initialization. But, I'm not sure if there's a mechanism for doing
-> that.  I know there's a way to declare a function or data that will be
-> discarded after kernel init, but is ther a way to that conditionally
-> depending on probed hardware or the device-tree used at boot-time?
+> I had forgotten, but now remember the reason why I did this. If you
+> see the current implementation of clk-exynos5410, you will notice it
+> heavily depends on the clock "fin_pll". On the other hand, this clock
+> exists because in the current dtb (exynos5410-smdk5410.dts), there is
+> a node fin_pll such as
+> 
+>        fin_pll: xxti {
+>                compatible = "fixed-clock";
+>                clock-frequency = <24000000>;
+>                clock-output-names = "fin_pll";
+>                #clock-cells = <0>;
+>        };
+> 
+> So far so good. But the real problem comes in when I check the rate of
+> fin_pll to determine if I should install the rate table or not (and I
+> really need this for my patch). More specifically
+> 
+>        if (_get_rate("fin_pll") == 24 * MHZ) {
+>                exynos5410_plls[apll].rate_table = apll_24mhz_tbl;
+>                exynos5410_plls[cpll].rate_table = cpll_24mhz_tbl;
+>                exynos5410_plls[kpll].rate_table = kpll_24mhz_tbl;
+>                exynos5410_plls[dpll].rate_table = dpll_24mhz_tbl;
+>                exynos5410_plls[epll].rate_table = epll_24mhz_tbl;
+>                exynos5410_plls[ipll].rate_table = ipll_24mhz_tbl;
+>        }
+> 
+> I *have* to determine if the rate of fin_pll is 24MHz, and this is
+> impossible to do if fin_pll is not available. Moreover, there is no
+> way I can ensure that the fixed clock provider for fin_pll was
+> initialized before mine, so there is chance that _get_rate won't work.
+> The only way I fix that is to set the dependency explicitly in the
+> dtb, by adding the fin_pll clock as required resource.
+> 
+>               clock: clock-controller at 10010000 {
+>                       compatible = "samsung,exynos5410-clock";
+>                       reg = <0x10010000 0x30000>;
+>                       #clock-cells = <1>;
+>                       /* Add the parent clock */
+>                       clocks = <&fin_pll>;
+>                       clock-names = "fin_pll";
+>               };
 
-I don't think there's much point in worrying about this: the 9G20 and
-9G25 will use identical device drivers for the vast majority of the
-hardware blocks of the SoC, so the overhead of having the drivers for
-both SoCs inside the same kernel is going to be really low.
+This is the correct solution to your problem. The clocks and clock-names
+properties should have been there from the beginning but apparently this
+has been missed in review. Also see below.
 
-Make a test, a build a kernel only for 9G20, another only for 9G25, and
-another with both.
+> 
+> But in any case, the bindings with the DTB must be changed one way or
+> another, because I *really* need to use fin_pll on my driver
+> registration.
+
+This is a backwards compatible change. On DTBs without clocks and
+clock-names properties the PLL tables simply won't be registered which
+is exactly the same behavior we have now without any tables in the
+driver at all.
+
+> If you agree with this alternative solution I previously
+> described, I can change that in the next version of the patch series.
+
+Please update the dts instead, in the way you pointed above.
 
 Best regards,
-
-Thomas
--- 
-Thomas Petazzoni, CTO, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
+Tomasz
