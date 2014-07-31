@@ -1,25 +1,30 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Thu, 31 Jul 2014 21:22:31 +0100
-Subject: [PATCH] ASoC: sirf-audio-codec: Fix return value check in
- sirf_audio_codec_driver_probe()
-In-Reply-To: <1406678652-31950-1-git-send-email-weiyj_lk@163.com>
-References: <1406678652-31950-1-git-send-email-weiyj_lk@163.com>
-Message-ID: <20140731202231.GY17528@sirena.org.uk>
+From: cmetcalf@tilera.com (Chris Metcalf)
+Date: Thu, 31 Jul 2014 16:24:37 -0400
+Subject: [PATCH 2/5] char: tile-srom: Remove reference to platform_bus
+In-Reply-To: <1406298233-27876-2-git-send-email-pawel.moll@arm.com>
+References: <1406298233-27876-1-git-send-email-pawel.moll@arm.com>
+ <1406298233-27876-2-git-send-email-pawel.moll@arm.com>
+Message-ID: <53DAA605.2030500@tilera.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jul 30, 2014 at 08:04:12AM +0800, weiyj_lk at 163.com wrote:
-> From: Wei Yongjun <yongjun_wei@trendmicro.com.cn>
-> 
-> In case of error, the function devm_ioremap_resource() returns ERR_PTR()
-> and never returns NULL. The NULL test in the return value check should
-> be replaced with IS_ERR().
+On 7/25/2014 10:23 AM, Pawel Moll wrote:
+> The code was creating "srom" class devices using
+> platform_bus as a parent. As they are not really
+> platform devices, make them virtual, using NULL instead.
+>
+> Cc: Chris Metcalf<cmetcalf@tilera.com>
+> Signed-off-by: Pawel Moll<pawel.moll@arm.com>
+> ---
+>   drivers/char/tile-srom.c | 2 +-
+>   1 file changed, 1 insertion(+), 1 deletion(-)
 
-Applied, thanks.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140731/87729e18/attachment.sig>
+Can you clarify the point of this change a bit?  The SROM devices
+in question are real devices (bits of silicon on the processor die), not
+some kind of virtual construct.  In addition, we also have user binaries
+in the wild that know to look for /sys/devices/platform/srom/ paths,
+so I'm pretty reluctant to change this path without good reason.
+
+-- 
+Chris Metcalf, Tilera Corp.
+http://www.tilera.com
