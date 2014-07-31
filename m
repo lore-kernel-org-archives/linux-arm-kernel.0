@@ -1,53 +1,77 @@
-From: ajaynumb@gmail.com (Ajay kumar)
-Date: Thu, 31 Jul 2014 15:31:04 +0530
-Subject: [PATCH v3 4/4] ARM: dts: Add exynos5250-spring device tree
-In-Reply-To: <53DA1231.70309@suse.de>
-References: <1406728244-5105-1-git-send-email-afaerber@suse.de>
- <1406728244-5105-5-git-send-email-afaerber@suse.de>
- <53DA0BAA.8090000@suse.de>
- <CAEC9eQNuPN+WiKGOtCosCwcR48MNawQL7dU4S8=dbA4eFXB_-w@mail.gmail.com>
- <53DA1231.70309@suse.de>
-Message-ID: <CAEC9eQOfeW==+YhWbYT5zbCYtQ+poe5=NL2bcuL4GOjPrpQ5hg@mail.gmail.com>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Thu, 31 Jul 2014 12:01:01 +0200
+Subject: [PATCH v2 1/3] arm64: spin-table: handle unmapped
+ cpu-release-addrs
+In-Reply-To: <20140731094515.GE26853@arm.com>
+References: <1406717944-24725-1-git-send-email-ard.biesheuvel@linaro.org>
+ <1406717944-24725-2-git-send-email-ard.biesheuvel@linaro.org>
+ <20140730113013.GL12239@arm.com>
+ <CAKv+Gu8ne8k2NV12SyWye5aYJKHG0wHKAO+=V=1L89_hvyGopw@mail.gmail.com>
+ <20140731094515.GE26853@arm.com>
+Message-ID: <CAKv+Gu_xW3ci=hZ8vZZ=6Qxyer7d=WD25RPh_AKu-zH8qw1vrQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jul 31, 2014 at 3:23 PM, Andreas F?rber <afaerber@suse.de> wrote:
-> Hi,
->
-> Am 31.07.2014 11:49, schrieb Ajay kumar:
->> On Thu, Jul 31, 2014 at 2:56 PM, Andreas F?rber <afaerber@suse.de> wrote:
->>> Am 30.07.2014 15:50, schrieb Andreas F?rber:
->>>> diff --git a/arch/arm/boot/dts/exynos5250-spring.dts b/arch/arm/boot/dts/exynos5250-spring.dts
->>>> new file mode 100644
->>>> index 000000000000..bcca892bf2ff
->>>> --- /dev/null
->>>> +++ b/arch/arm/boot/dts/exynos5250-spring.dts
->>> [...]
->>>> +&pinctrl_0 {
->>>> +     dp_hpd_gpio: dp-hpd-gpio {
->>>> +             samsung,pins = "gpc3-0";
->>>> +             samsung,pin-function = <1>;
->>>
->>> Not sure where this 1 came from... Both Ajay and my 3.8 DT have 0.
->> Right, this should be 0.
+On 31 July 2014 11:45, Will Deacon <will.deacon@arm.com> wrote:
+> On Wed, Jul 30, 2014 at 08:17:02PM +0100, Ard Biesheuvel wrote:
+>> ]On 30 July 2014 13:30, Will Deacon <will.deacon@arm.com> wrote:
+>> > On Wed, Jul 30, 2014 at 11:59:02AM +0100, Ard Biesheuvel wrote:
+>> >> From: Mark Rutland <mark.rutland@arm.com>
+>> >>
+>> >> In certain cases the cpu-release-addr of a CPU may not fall in the
+>> >> linear mapping (e.g. when the kernel is loaded above this address due to
+>> >> the presence of other images in memory). This is problematic for the
+>> >> spin-table code as it assumes that it can trivially convert a
+>> >> cpu-release-addr to a valid VA in the linear map.
+>> >>
+>> >> This patch modifies the spin-table code to use a temporary cached
+>> >> mapping to write to a given cpu-release-addr, enabling us to support
+>> >> addresses regardless of whether they are covered by the linear mapping.
+>> >>
+>> >> Signed-off-by: Mark Rutland <mark.rutland@arm.com>
+>> >> Tested-by: Mark Salter <msalter@redhat.com>
+>> >> [ardb: added (__force void *) cast]
+>> >> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+>> >> ---
+>> >>  arch/arm64/kernel/smp_spin_table.c | 22 +++++++++++++++++-----
+>> >>  1 file changed, 17 insertions(+), 5 deletions(-)
+>> >
+>> > I'm nervous about this. What if the spin table sits in the same physical 64k
+>> > frame as a read-sensitive device and we're running with 64k pages?
+>> >
 >>
->>>> +             samsung,pin-pud = <3>;
->>>> +             samsung,pin-drv = <0>;
->>>> +     };
->>>
->>> Seeing that Ajay called this node dp-hdp, it should probably be an override?
->> dp_hpd should be enough. I will keep the same name for peach boards.
->> dp_hpd: dp-hpd {
->> .
->> .
->> .
->> };
+>> Actually, booting.txt requires cpu-release-addr to point to a
+>> /memreserve/d part of memory, which implies DRAM (or you wouldn't have
+>> to memreserve it)
+>> That means it should always be covered by the linear mapping, unless
+>> it is located before Image in DRAM, which is the case addressed by
+>> this patch.
 >
-> Apart from my own set of typos, I see that you proposed dp-hpd whereas
-> -pinctrl.dtsi has dp_hpd (dash vs. underscore). My question is, can we
-> override the pinctrl one instead of adding a new one, or do they need to
-> coexist?
-The one in exynos5250-pinctrl.dtsi will be used only for smdk5250/snow.
-For spring, you can override the same.
+> But if it's located before before the Image in DRAM and isn't covered by
+> the linear mapping, then surely the /memreserve/ is pointless too? In which
 
-Ajay
+No, it isn't. The existence of a linear mapping and where exactly it
+starts is an implementation detail of arm64 linux, whereas marking
+some regions of DRAM as containing firmware bits that should be left
+alone by the OS has a purpose in general. Also, with TEXT_OFFSET
+likely being changed in the future, the start of the linear mapping
+may change as well.
+
+> case, this looks like we're simply trying to cater for platforms that aren't
+> following booting.txt (which may need updating if we need to handle this).
+>
+
+booting.txt is not clear about the purpose of TEXT_OFFSET or whether
+the area below it should be kept vacant. So APM Mustang, for instance,
+keeps their holding pen there, which is entirely legal by the current
+wording of booting.txt. And it is memreserve'd, so the linear mapping
+will cover it but the memory will not be touched other than to bring
+up the secondaries.
+
+The point I was trying to make is that booting.txt seems to suggest
+(but it should be clarified) that cpu-release-addr must always reside
+on DRAM, in which case it is highly unlikely that some peripheral mem
+region with I/O semantics shares its 64k page frame.
+
+-- 
+Ard.
