@@ -1,59 +1,300 @@
 From: afaerber@suse.de (=?UTF-8?q?Andreas=20F=C3=A4rber?=)
-Date: Thu, 31 Jul 2014 18:08:25 +0200
-Subject: [PATCH v4 0/4] ARM: dts: exynos: Prepare Spring
-Message-ID: <1406822910-6255-1-git-send-email-afaerber@suse.de>
+Date: Thu, 31 Jul 2014 18:08:28 +0200
+Subject: [PATCH v4 3/4] ARM: dts: Clean up exynos5250-snow
+In-Reply-To: <1406822910-6255-1-git-send-email-afaerber@suse.de>
+References: <1406822910-6255-1-git-send-email-afaerber@suse.de>
+Message-ID: <1406822910-6255-4-git-send-email-afaerber@suse.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+Use the new style of referencing inherited nodes and use symbolic names.
 
-Based on the preinstalled 3.8 based ChromeOS kernel and previous 3.15 
-based attempts by Stephan and me that broke for 3.16, I've prepared a 
-device tree for the HP Chromebook 11 aka Google Spring.
+Suggested-by: Doug Anderson <dianders@chromium.org>
+Signed-off-by: Andreas F?rber <afaerber@suse.de>
+---
+ v3 -> v4: Unchanged
+ 
+ v3: New (Doug Anderson)
 
-v4 fixes a pinctrl bug.
+ arch/arm/boot/dts/exynos5250-snow.dts | 182 +++++++++++++++++-----------------
+ 1 file changed, 90 insertions(+), 92 deletions(-)
 
-Not yet enabled are trackpad, Wifi and sound.
-
-My rebasing branch for testing is here:
-https://github.com/afaerber/linux/commits/spring-next
-
-Regards,
-Andreas
-
-v1 -> v2:
-* Dropped 3 documentation patches from series:
-  2 picked up,
-  https://patchwork.kernel.org/patch/4397271/
-  https://patchwork.kernel.org/patch/4397291/
-  1 already sent separately as v2, pending.
-  https://patchwork.kernel.org/patch/4424881/
-* Minimized and beautified Spring device tree and to some degree Snow as well.
-  See individual patches.
-
-v2 -> v3:
-* Rebased: Two -cros-common cleanup patches were already applied
-* Lots of small cleanups for both Snow and Spring
-* Enabled I2S in Spring for symmetry
-* Added lid-switch and gpio-keys pinctrls to Spring
-
-v3 -> v4:
-* Fixed pin-function 1 -> 0 for dp-hpd pinctrl, style cleanup
-
-
-Andreas F?rber (4):
-  ARM: dts: Fix MMC pinctrl for exynos5250-snow
-  ARM: dts: Fold exynos5250-cros-common into exynos5250-snow
-  ARM: dts: Clean up exynos5250-snow
-  ARM: dts: Add exynos5250-spring device tree
-
- arch/arm/boot/dts/Makefile                    |   1 +
- arch/arm/boot/dts/exynos5250-cros-common.dtsi | 164 --------
- arch/arm/boot/dts/exynos5250-snow.dts         | 338 ++++++++++------
- arch/arm/boot/dts/exynos5250-spring.dts       | 539 ++++++++++++++++++++++++++
- 4 files changed, 770 insertions(+), 272 deletions(-)
- delete mode 100644 arch/arm/boot/dts/exynos5250-cros-common.dtsi
- create mode 100644 arch/arm/boot/dts/exynos5250-spring.dts
-
+diff --git a/arch/arm/boot/dts/exynos5250-snow.dts b/arch/arm/boot/dts/exynos5250-snow.dts
+index 1c36cd72905f..2ed6cb04a2db 100644
+--- a/arch/arm/boot/dts/exynos5250-snow.dts
++++ b/arch/arm/boot/dts/exynos5250-snow.dts
+@@ -9,6 +9,8 @@
+ */
+ 
+ /dts-v1/;
++#include <dt-bindings/gpio/gpio.h>
++#include <dt-bindings/input/input.h>
+ #include "exynos5250.dtsi"
+ 
+ / {
+@@ -30,85 +32,19 @@
+ 		status = "okay";
+ 	};
+ 
+-	pinctrl at 11400000 {
+-		ec_irq: ec-irq {
+-			samsung,pins = "gpx1-6";
+-			samsung,pin-function = <0>;
+-			samsung,pin-pud = <0>;
+-			samsung,pin-drv = <0>;
+-		};
+-
+-		sd3_clk: sd3-clk {
+-			samsung,pin-drv = <0>;
+-		};
+-
+-		sd3_cmd: sd3-cmd {
+-			samsung,pin-pud = <3>;
+-			samsung,pin-drv = <0>;
+-		};
+-
+-		sd3_bus4: sd3-bus-width4 {
+-			samsung,pin-drv = <0>;
+-		};
+-
+-		max98095_en: max98095-en {
+-			samsung,pins = "gpx1-7";
+-			samsung,pin-function = <0>;
+-			samsung,pin-pud = <3>;
+-			samsung,pin-drv = <0>;
+-		};
+-
+-		tps65090_irq: tps65090-irq {
+-			samsung,pins = "gpx2-6";
+-			samsung,pin-function = <0>;
+-			samsung,pin-pud = <0>;
+-			samsung,pin-drv = <0>;
+-		};
+-
+-		usb3_vbus_en: usb3-vbus-en {
+-			samsung,pins = "gpx2-7";
+-			samsung,pin-function = <1>;
+-			samsung,pin-pud = <0>;
+-			samsung,pin-drv = <0>;
+-		};
+-
+-		hdmi_hpd_irq: hdmi-hpd-irq {
+-			samsung,pins = "gpx3-7";
+-			samsung,pin-function = <0>;
+-			samsung,pin-pud = <1>;
+-			samsung,pin-drv = <0>;
+-		};
+-	};
+-
+-	pinctrl at 13400000 {
+-		arb_their_claim: arb-their-claim {
+-			samsung,pins = "gpe0-4";
+-			samsung,pin-function = <0>;
+-			samsung,pin-pud = <3>;
+-			samsung,pin-drv = <0>;
+-		};
+-
+-		arb_our_claim: arb-our-claim {
+-			samsung,pins = "gpf0-3";
+-			samsung,pin-function = <1>;
+-			samsung,pin-pud = <0>;
+-			samsung,pin-drv = <0>;
+-		};
+-	};
+-
+ 	gpio-keys {
+ 		compatible = "gpio-keys";
+ 
+ 		power {
+ 			label = "Power";
+-			gpios = <&gpx1 3 1>;
+-			linux,code = <116>; /* KEY_POWER */
++			gpios = <&gpx1 3 GPIO_ACTIVE_LOW>;
++			linux,code = <KEY_POWER>;
+ 			gpio-key,wakeup;
+ 		};
+ 
+ 		lid-switch {
+ 			label = "Lid";
+-			gpios = <&gpx3 5 1>;
++			gpios = <&gpx3 5 GPIO_ACTIVE_LOW>;
+ 			linux,input-type = <5>; /* EV_SW */
+ 			linux,code = <0>; /* SW_LID */
+ 			debounce-interval = <1>;
+@@ -129,8 +65,8 @@
+ 
+ 		i2c-parent = <&{/i2c@12CA0000}>;
+ 
+-		our-claim-gpio = <&gpf0 3 1>;
+-		their-claim-gpios = <&gpe0 4 1>;
++		our-claim-gpio = <&gpf0 3 GPIO_ACTIVE_LOW>;
++		their-claim-gpios = <&gpe0 4 GPIO_ACTIVE_LOW>;
+ 		slew-delay-us = <10>;
+ 		wait-retry-us = <3000>;
+ 		wait-free-us = <50000>;
+@@ -239,19 +175,6 @@
+ 		};
+ 	};
+ 
+-	i2c at 12CD0000 {
+-		max98095: codec at 11 {
+-			compatible = "maxim,max98095";
+-			reg = <0x11>;
+-			pinctrl-0 = <&max98095_en>;
+-			pinctrl-names = "default";
+-		};
+-	};
+-
+-	i2s0: i2s at 03830000 {
+-		status = "okay";
+-	};
+-
+ 	sound {
+ 		compatible = "google,snow-audio-max98095";
+ 
+@@ -265,18 +188,14 @@
+ 		regulator-name = "P5.0V_USB3CON";
+ 		regulator-min-microvolt = <5000000>;
+ 		regulator-max-microvolt = <5000000>;
+-		gpio = <&gpx2 7 0>;
++		gpio = <&gpx2 7 GPIO_ACTIVE_HIGH>;
+ 		pinctrl-names = "default";
+ 		pinctrl-0 = <&usb3_vbus_en>;
+ 		enable-active-high;
+ 	};
+ 
+-	phy at 12100000 {
+-		vbus-supply = <&usb3_vbus_reg>;
+-	};
+-
+ 	usb at 12110000 {
+-		samsung,vbus-gpio = <&gpx1 1 0>;
++		samsung,vbus-gpio = <&gpx1 1 GPIO_ACTIVE_HIGH>;
+ 	};
+ 
+ 	fixed-rate-clocks {
+@@ -287,7 +206,7 @@
+ 	};
+ 
+ 	hdmi {
+-		hpd-gpio = <&gpx3 7 0>;
++		hpd-gpio = <&gpx3 7 GPIO_ACTIVE_HIGH>;
+ 		pinctrl-names = "default";
+ 		pinctrl-0 = <&hdmi_hpd_irq>;
+ 		phy = <&hdmiphy>;
+@@ -322,7 +241,7 @@
+ 		samsung,color-depth = <1>;
+ 		samsung,link-rate = <0x0a>;
+ 		samsung,lane-count = <2>;
+-		samsung,hpd-gpio = <&gpx0 7 0>;
++		samsung,hpd-gpio = <&gpx0 7 GPIO_ACTIVE_HIGH>;
+ 
+ 		display-timings {
+ 			native-mode = <&timing1>;
+@@ -547,6 +466,13 @@
+ 	status = "okay";
+ 	samsung,i2c-sda-delay = <100>;
+ 	samsung,i2c-max-bus-freq = <66000>;
++
++	max98095: codec at 11 {
++		compatible = "maxim,max98095";
++		reg = <0x11>;
++		pinctrl-0 = <&max98095_en>;
++		pinctrl-names = "default";
++	};
+ };
+ 
+ &i2c_8 {
+@@ -560,6 +486,10 @@
+ 	};
+ };
+ 
++&i2s0 {
++	status = "okay";
++};
++
+ &mmc_0 {
+ 	status = "okay";
+ 	num-slots = <1>;
+@@ -625,6 +555,70 @@
+ 		samsung,pin-pud = <0>;
+ 		samsung,pin-drv = <0>;
+ 	};
++
++	ec_irq: ec-irq {
++		samsung,pins = "gpx1-6";
++		samsung,pin-function = <0>;
++		samsung,pin-pud = <0>;
++		samsung,pin-drv = <0>;
++	};
++
++	max98095_en: max98095-en {
++		samsung,pins = "gpx1-7";
++		samsung,pin-function = <0>;
++		samsung,pin-pud = <3>;
++		samsung,pin-drv = <0>;
++	};
++
++	tps65090_irq: tps65090-irq {
++		samsung,pins = "gpx2-6";
++		samsung,pin-function = <0>;
++		samsung,pin-pud = <0>;
++		samsung,pin-drv = <0>;
++	};
++
++	usb3_vbus_en: usb3-vbus-en {
++		samsung,pins = "gpx2-7";
++		samsung,pin-function = <1>;
++		samsung,pin-pud = <0>;
++		samsung,pin-drv = <0>;
++	};
++
++	hdmi_hpd_irq: hdmi-hpd-irq {
++		samsung,pins = "gpx3-7";
++		samsung,pin-function = <0>;
++		samsung,pin-pud = <1>;
++		samsung,pin-drv = <0>;
++	};
++};
++
++&pinctrl_1 {
++	arb_their_claim: arb-their-claim {
++		samsung,pins = "gpe0-4";
++		samsung,pin-function = <0>;
++		samsung,pin-pud = <3>;
++		samsung,pin-drv = <0>;
++	};
++
++	arb_our_claim: arb-our-claim {
++		samsung,pins = "gpf0-3";
++		samsung,pin-function = <1>;
++		samsung,pin-pud = <0>;
++		samsung,pin-drv = <0>;
++	};
++};
++
++&sd3_clk {
++	samsung,pin-drv = <0>;
++};
++
++&sd3_cmd {
++	samsung,pin-pud = <3>;
++	samsung,pin-drv = <0>;
++};
++
++&sd3_bus4 {
++	samsung,pin-drv = <0>;
+ };
+ 
+ &spi_1 {
+@@ -633,4 +627,8 @@
+ 	num-cs = <1>;
+ };
+ 
++&usbdrd_phy {
++	vbus-supply = <&usb3_vbus_reg>;
++};
++
+ #include "cros-ec-keyboard.dtsi"
 -- 
 1.9.3
