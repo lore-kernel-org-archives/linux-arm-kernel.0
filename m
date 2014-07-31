@@ -1,69 +1,101 @@
-From: hanjun.guo@linaro.org (Hanjun Guo)
-Date: Thu, 31 Jul 2014 18:57:20 +0800
-Subject: [PATCH 10/19] ARM64 / ACPI: Get the enable method for SMP
- initialization in ACPI way
-In-Reply-To: <20140731065426.GA876@quad.lixom.net>
-References: <1406206825-15590-1-git-send-email-hanjun.guo@linaro.org>
- <1406206825-15590-11-git-send-email-hanjun.guo@linaro.org>
- <20140731065426.GA876@quad.lixom.net>
-Message-ID: <53DA2110.8060000@linaro.org>
+From: ta.omasab@gmail.com (Thomas Abraham)
+Date: Thu, 31 Jul 2014 16:29:03 +0530
+Subject: [PATCH v9 0/6] cpufreq: use generic cpufreq drivers for exynos
+ platforms
+In-Reply-To: <CADWw7OiwXNrbFyiVhpcJyBnAdsGsXcAMgMUOmY=JxHM7+7Z0eA@mail.gmail.com>
+References: <1406707663-16656-1-git-send-email-thomas.ab@samsung.com>
+ <CADWw7OiwXNrbFyiVhpcJyBnAdsGsXcAMgMUOmY=JxHM7+7Z0eA@mail.gmail.com>
+Message-ID: <CAJuA9aiwHUm1NrfLBR8pEzgTjpDd7xY9Lzpi3WmK0VeOgMGGFA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2014-7-31 14:54, Olof Johansson wrote:
-> Hi,
-> 
-> On Thu, Jul 24, 2014 at 09:00:16PM +0800, Hanjun Guo wrote:
->> +/*
->> + * In ACPI mode, the cpu possible map was enumerated before SMP
->> + * initialization when MADT table was parsed, so we can get the
->> + * possible map here to initialize CPUs.
->> + */
-> 
-> The DT smp init will warn if the kernel has been build with too low NR_CPUS.
-> Does the ACPI core already warn, or did that go missing with this separate code
-> path?
+On Thu, Jul 31, 2014 at 11:50 AM, Chander M. Kashyap
+<chander.kashyap@gmail.com> wrote:
+> On Wed, Jul 30, 2014 at 1:37 PM, Thomas Abraham <thomas.ab@samsung.com> wrote:
+>> Changes since v8:
+>> - Fixes suggested by Tomasz Figa.
+>>
+>> This patch series removes the use of Exynos4210 and Exynos5250 specific cpufreq
+>> drivers and enables the use of cpufreq-cpu0 driver for these platforms. This
+>> series also enables cpufreq support for Exynos5420 using arm_big_little cpufreq
+>> driver.
+>>
+>> This patch series is dependent on two other patches
+>> 1. ARM: dts: add CPU nodes for Exynos4 SoCs
+>>    - https://lkml.org/lkml/2014/7/21/315
+>> 2. ARM: dts: smdk5250: Specify MAX77686 pmic interrupt
+>>    - http://www.spinics.net/lists/arm-kernel/msg351134.html
+>> 3. clk: exynos4: remove duplicate div_core2 divider clock instantiation
+>>    - http://www.mail-archive.com/linux-samsung-soc at vger.kernel.org/msg34859.html
+>>
+>> Thomas Abraham (6):
+>>   clk: samsung: add infrastructure to register cpu clocks
+>>   clk: samsung: add cpu clock configuration data and instantiate cpu clock
+>>   ARM: dts: Exynos: add CPU OPP and regulator supply property
+>>   ARM: Exynos: switch to using generic cpufreq driver for Exynos4210/5250/5420
+>>   cpufreq: exynos: remove exynos4210/5250 specific cpufreq driver support
+>>   clk: samsung: remove unused clock aliases and update clock flags
+>>
+>>  arch/arm/boot/dts/exynos4210-origen.dts         |    4 +
+>>  arch/arm/boot/dts/exynos4210-trats.dts          |    4 +
+>>  arch/arm/boot/dts/exynos4210-universal_c210.dts |    4 +
+>>  arch/arm/boot/dts/exynos4210.dtsi               |   14 +-
+>>  arch/arm/boot/dts/exynos5250-arndale.dts        |    4 +
+>>  arch/arm/boot/dts/exynos5250-smdk5250.dts       |    4 +
+>>  arch/arm/boot/dts/exynos5250-snow.dts           |    4 +
+>>  arch/arm/boot/dts/exynos5250.dtsi               |   25 +-
+>>  arch/arm/boot/dts/exynos5420.dtsi               |   38 +++
+>>  arch/arm/mach-exynos/exynos.c                   |   24 +-
+>>  drivers/clk/samsung/Makefile                    |    2 +-
+>>  drivers/clk/samsung/clk-cpu.c                   |  335 +++++++++++++++++++++++
+>>  drivers/clk/samsung/clk-cpu.h                   |   91 ++++++
+>>  drivers/clk/samsung/clk-exynos4.c               |   63 +++--
+>>  drivers/clk/samsung/clk-exynos5250.c            |   44 ++-
+>>  drivers/clk/samsung/clk-exynos5420.c            |   72 ++++-
+>>  drivers/cpufreq/Kconfig.arm                     |   22 --
+>>  drivers/cpufreq/Makefile                        |    2 -
+>>  drivers/cpufreq/exynos4210-cpufreq.c            |  184 -------------
+>>  drivers/cpufreq/exynos5250-cpufreq.c            |  210 --------------
+>>  include/dt-bindings/clock/exynos5250.h          |    1 +
+>>  include/dt-bindings/clock/exynos5420.h          |    2 +
+>>  22 files changed, 690 insertions(+), 463 deletions(-)
+>>  create mode 100644 drivers/clk/samsung/clk-cpu.c
+>>  create mode 100644 drivers/clk/samsung/clk-cpu.h
+>>  delete mode 100644 drivers/cpufreq/exynos4210-cpufreq.c
+>>  delete mode 100644 drivers/cpufreq/exynos5250-cpufreq.c
+>>
+>> --
+>> 1.7.9.5
+>
+> Working great.
+> tested on smdk5420, and arndale-5250
 
-ACPI code will warn, it is in PATCH 07/19,
+Hi Chander,
 
-+	if (enabled_cpus >=  NR_CPUS) {
-+		pr_warn("NR_CPUS limit of %d reached, Processor %d/0x%llx ignored.\n",
-+			NR_CPUS, total_cpus, mpidr);
-+		return -EINVAL;
-+	}
+Thanks for testing this series. Can I add a "Tested-by" tag for this series?
 
-> 
->> +static void __init acpi_smp_init_cpus(void)
->> +{
->> +	int cpu;
->> +
->> +	for_each_possible_cpu(cpu) {
->> +		if (cpu_acpi_read_ops(cpu) != 0)
->> +			continue;
->> +
->> +		cpu_ops[cpu]->cpu_init(NULL, cpu);
->> +	}
->> +}
->> +
->> +void __init smp_init_cpus(void)
->> +{
->> +	if (acpi_disabled)
->> +		of_smp_init_cpus();
->> +	else
->> +		acpi_smp_init_cpus();
-> 
-> I'm liking these deeply split code paths less and less every time I see
-> them. :(
-> 
-> I would prefer to set up shared state in separate functions, but keep the
-> control flow the same. Right now you're splitting it completely.
-> 
-> I.e. split data setup between the two, but do the loop calling cpu_init()
-> the same way. (Yes, that will require you to refactor the DT code path
-> a bit too...)
+Thanks,
+Thomas.
 
-OK, I will dive into the code and figure out if I can fix that as you
-suggested, thanks for your comments :)
-
-Best Regards
-Hanjun
+>
+>>
+>>
+>>
+>>
+>> _______________________________________________
+>> linux-arm-kernel mailing list
+>> linux-arm-kernel at lists.infradead.org
+>> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+>
+>
+>
+> --
+> thanks and regards,
+> Chander M. Kashyap
+> Contact Number: +918123738320
+> ------- TENSION LENE KA NAHI, DENE KE-----
+>
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
