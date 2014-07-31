@@ -1,32 +1,41 @@
-From: heiko@sntech.de (Heiko =?ISO-8859-1?Q?St=FCbner?=)
-Date: Thu, 31 Jul 2014 07:47:26 +0200
-Subject: [GIT PULL] two more dts changes for Rockchip Cortex-A9 SoCs
-In-Reply-To: <CAOesGMjqACtaBKP8Q0K_0HOku5zuKyWJU6NbsMDFrtYXmqWBAA@mail.gmail.com>
-References: <1507670.CGuyIht1az@diego>
- <CAOesGMjqACtaBKP8Q0K_0HOku5zuKyWJU6NbsMDFrtYXmqWBAA@mail.gmail.com>
-Message-ID: <5565113.AVeYUuFx2i@diego>
+From: tushar.b@samsung.com (Tushar Behera)
+Date: Thu, 31 Jul 2014 11:12:39 +0530
+Subject: [PATCH] ARM: exynos_defconfig: Enable PL330 DMA
+Message-ID: <1406785359-21669-1-git-send-email-tushar.b@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am Mittwoch, 30. Juli 2014, 22:42:03 schrieb Olof Johansson:
-> On Wed, Jul 30, 2014 at 10:24 PM, Heiko St?bner <heiko@sntech.de> wrote:
-> > Hi Arnd, Olof,
-> > 
-> > as it late in the cycle, this may not be appropriate anymore, but if it
-> > is still applicable, please pull
-> > 
-> > The following changes since commit 
-08567053f5cc4255ab53b75277b6102a3202bd75:
-> >   ARM: dts: rk3188-radxarock: add GPIO IR receiver node (2014-07-27
-> >   00:25:59 +0200)> 
-> > are available in the git repository at:
-> >   git://git.kernel.org/pub/scm/linux/kernel/git/mmind/linux-rockchip.git
-> >   tags/v3.17-rockchip-rk3xxx-dts-2
-> Grmbl, I set myself up for this one didn't I? :)
-> 
-> Merged. That's it though. I'm going to be a lot more picky from here
-> on, merge window is almost upon us.
+We are getting a system hang on Arndale-Octa board if PL330_DMA is not
+enabled. The issue is related to [1].
 
-don't worry, I haven't anything more at this point. As you know, everything 
-else would depend on driver changes that won't make it into 3.17 ... so you're 
-safe ;-) .
+AUDSS block provides the clock for audio DMA controller. Any operation
+on this clock requires that the clock to AUDSS block be enabled. In
+current configuration, the clock is gated during late boot process when
+all unused clocks are disabled.
+
+When PL330_DMA is enabled, the 'apb_pclk' is enabled/disabled during
+amba_probe(). Otherwise, this clock is also disabled during late boot.
+If the AUDSS block clock is disabled by then, we get a system hang.
+
+[1] https://lkml.org/lkml/2014/6/11/32
+
+Signed-off-by: Tushar Behera <tushar.b@samsung.com>
+---
+ arch/arm/configs/exynos_defconfig |    2 ++
+ 1 file changed, 2 insertions(+)
+
+diff --git a/arch/arm/configs/exynos_defconfig b/arch/arm/configs/exynos_defconfig
+index e07a227..c5888e8 100644
+--- a/arch/arm/configs/exynos_defconfig
++++ b/arch/arm/configs/exynos_defconfig
+@@ -109,6 +109,8 @@ CONFIG_MMC_DW_IDMAC=y
+ CONFIG_MMC_DW_EXYNOS=y
+ CONFIG_RTC_CLASS=y
+ CONFIG_RTC_DRV_S3C=y
++CONFIG_DMADEVICES=y
++CONFIG_PL330_DMA=y
+ CONFIG_COMMON_CLK_MAX77686=y
+ CONFIG_EXT2_FS=y
+ CONFIG_EXT3_FS=y
+-- 
+1.7.9.5
