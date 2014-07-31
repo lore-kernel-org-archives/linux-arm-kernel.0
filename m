@@ -1,126 +1,78 @@
-From: rric@kernel.org (Robert Richter)
-Date: Thu, 31 Jul 2014 14:34:43 +0200
-Subject: [PATCH 2/5] arm64, thunder: Add initial dts for Cavium Thunder SoC
-In-Reply-To: <CAL_JsqLJ_W34XTF2aMOW9z+Gq4oxbrX1RztyJN8Mi0OFPeNxfg@mail.gmail.com>
-References: <1406732794-20920-1-git-send-email-rric@kernel.org>
- <1406732794-20920-3-git-send-email-rric@kernel.org>
- <20140730154626.GD20162@leverpostej>
- <CAL_JsqLJ_W34XTF2aMOW9z+Gq4oxbrX1RztyJN8Mi0OFPeNxfg@mail.gmail.com>
-Message-ID: <20140731123443.GS4703@rric.localhost>
+From: tomasz.figa@gmail.com (Tomasz Figa)
+Date: Thu, 31 Jul 2014 14:34:50 +0200
+Subject: [PATCHv2 1/5] clk: samsung: exynos5410: Add NULL pointer checks
+ in clock init
+In-Reply-To: <1406805732-17372-2-git-send-email-hsnaves@gmail.com>
+References: <1406805732-17372-1-git-send-email-hsnaves@gmail.com>
+ <1406805732-17372-2-git-send-email-hsnaves@gmail.com>
+Message-ID: <53DA37EA.7010306@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 30.07.14 11:37:38, Rob Herring wrote:
-> On Wed, Jul 30, 2014 at 10:46 AM, Mark Rutland <mark.rutland@arm.com> wrote:
-> > On Wed, Jul 30, 2014 at 04:06:31PM +0100, Robert Richter wrote:
-> >> From: Radha Mohan Chintakuntla <rchintakuntla@cavium.com>
+Hi Humberto,
 
-> >> +/ {
-> >> +     model = "Cavium ThunderX CN88XX Family";
-> >> +     compatible = "cavium,thunder-88xx";
-> >
-> > Please don't use wildcards in compatible strings. Give this an absolute
-> > name, and override as necessary.
+Please see my comments inline.
 
-The naming 88xx refers to the processor family and arn't actually
-wildcards. In the future we might need another dts file for 87xx, but
-so far all SoCs of 88xx family should use the same dts files. In this
-sense the naming is very specific.
-
-
-> >> +     cpus {
-> >> +             #address-cells = <2>;
-> >> +             #size-cells = <0>;
-> >> +
-> >> +             cpu at 000 {
-> >> +                     device_type = "cpu";
-> >> +                     compatible = "cavium,thunder", "arm,armv8";
-> >> +                     reg = <0x0 0x000>;
-> >> +                     enable-method = "psci";
-> >> +             };
-> >
-> > Just to check: both the SoC and CPU are called thunder?
-
-The soc is called thunder-88xx, the cpu thunder. E.g. an 87xx soc will
-have the same core in which is thunder.
-
-
-> >> +     memory at 00000000 {
-> >> +             device_type = "memory";
-> >> +             reg = <0x0 0x00000000 0x0 0x80000000>;
-> >> +     };
-> >> +
-> >> +     gic0: interrupt-controller at 801000000000 {
-> >
-> > To make this easier to read, please place a comma between 32-bit
-> > portions of the unit address (e.g. here have 8010,00000000).
-
-Changed this.
-
+On 31.07.2014 13:22, Humberto Silva Naves wrote:
+> Added NULL pointer checks for device_node input parameter and
+> for the samsung_clk_provider context returned by samsung_clk_init.
+> Even though the *current* samsung_clk_init function never returns
+> a NULL pointer, it is good to keep this check in place to avoid
+> possible problems in the future due to changes in implementation.
+> That way, we also improve the consistency of the code that performs
+> clock initialization across the different SoCs.
 > 
-> Mark, perhaps a dtc or checkpatch.pl check for this?
+> Signed-off-by: Humberto Silva Naves <hsnaves@gmail.com>
+> ---
+>  drivers/clk/samsung/clk-exynos5410.c |   12 +++++++++---
+>  1 file changed, 9 insertions(+), 3 deletions(-)
 > 
-> This should also be under a bus node.
+> diff --git a/drivers/clk/samsung/clk-exynos5410.c b/drivers/clk/samsung/clk-exynos5410.c
+> index 231475b..bf57c80 100644
+> --- a/drivers/clk/samsung/clk-exynos5410.c
+> +++ b/drivers/clk/samsung/clk-exynos5410.c
+> @@ -188,11 +188,17 @@ static void __init exynos5410_clk_init(struct device_node *np)
+>  	struct samsung_clk_provider *ctx;
+>  	void __iomem *reg_base;
+>  
+> -	reg_base = of_iomap(np, 0);
+> -	if (!reg_base)
+> -		panic("%s: failed to map registers\n", __func__);
+> +	if (np) {
 
-Will do.
+Since all Exynos-based boards are always booted using DT, this function
+will never be called if there is no node for the clock controller and so
+there is no way this pointer can end up being NULL. I don't see a point
+in complicating this code with useless checks.
 
-> 
-> >> +             compatible = "arm,gic-v3";
-> >> +             #interrupt-cells = <3>;
-> >> +             #address-cells = <2>;
-> >> +             #size-cells = <2>;
-> >> +             ranges;
-> >
-> > This has no children, so why have ranges, #address-cells, and
-> > #size-cells?
+> +		reg_base = of_iomap(np, 0);
+> +		if (!reg_base)
+> +			panic("%s: failed to map registers\n", __func__);
+> +	} else {
+> +		panic("%s: unable to determine soc\n", __func__);
+> +	}
 
-Right, this is a leftover from a change in a follow on patch that
-introduces a child for its. Will remove #address-cells, #size-cells
-and ranges in this patch and move the change to the later patch.
+As a side note, since panic() does not return, the code above could be
+changed to follow rest of checks in this function:
 
-> >
-> >> +             interrupt-controller;
-> >> +             reg = <0x8010 0x00000000 0x0 0x010000>, /* GICD */
-> >> +                   <0x8010 0x80000000 0x0 0x200000>; /* GICR */
-> >> +             interrupts = <1 9 0xf04>;
-> >> +     };
+	if (!np)
+		panic("%s: unable to determine soc\n", __func__);
 
-> >> +             clocks {
-> >> +                     #address-cells = <2>;
-> >> +                     #size-cells = <2>;
-> >> +                     ranges;
-> >> +
-> >> +                     refclk50mhz: refclk50mhz {
-> >> +                             compatible = "fixed-clock";
-> >> +                             #clock-cells = <0>;
-> >> +                             clock-frequency = <50000000>;
-> >> +                             clock-output-names = "refclk50mhz";
-> >> +                     };
-> >> +             };
-> >
-> > Please get rid of the clocks node and just put the clocks here.
+	reg_base = of_iomap(np, 0);
+	...
 
-Will do.
+leading to more readable code with less indentation and less changes to
+existing code.
 
-> >
-> >> +
-> >> +             uaa0: serial at 87e024000000 {
-> >> +                     compatible = "arm,pl011", "arm,primecell";
-> >> +                     reg = <0x87e0 0x24000000 0x0 0x1000>;
-> >> +                     interrupts = <1 21 4>;
-> >> +                     clocks = <&refclk50mhz>;
-> >> +                     clock-names = "apb_pclk";
-> >
-> > Is this actually the apb_pclk, or is the the uartclk? I assume it's the
-> > latter.
-> 
-> Shouldn't new bindings have both clocks here? A single clock was a
-> mistake I think (mine in fact).
+>  
+>  	ctx = samsung_clk_init(np, reg_base, CLK_NR_CLKS);
+> +	if (!ctx)
+> +		panic("%s: unable to allocate context.\n", __func__);
 
-Do you mean
-			clock-names = "uartclk", "apb_pclk";
-here?
+samsung_clk_init() already panics on any error, although now as I think
+of it, it probably should be changed with a patch to just error out and
+let the caller handle the error. However callers don't need to be
+changed before this is done.
 
-Thanks,
-
--Robert
+Best regards,
+Tomasz
