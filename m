@@ -1,78 +1,29 @@
-From: afaerber@suse.de (=?UTF-8?B?QW5kcmVhcyBGw6RyYmVy?=)
-Date: Thu, 31 Jul 2014 19:38:54 +0200
-Subject: [PATCH v4 4/4] ARM: dts: Add exynos5250-spring device tree
-In-Reply-To: <53DA7993.1000800@suse.de>
-References: <1406822910-6255-1-git-send-email-afaerber@suse.de>
- <1406822910-6255-5-git-send-email-afaerber@suse.de>
- <CAP_ceTz+KRJzF9XV=_aLE+6sV6d5GqCtQ_daKtpFJfCZQ1erpA@mail.gmail.com>
- <53DA7993.1000800@suse.de>
-Message-ID: <53DA7F2E.2030109@suse.de>
+From: will.deacon@arm.com (Will Deacon)
+Date: Thu, 31 Jul 2014 18:41:25 +0100
+Subject: arm64: More than 16 stream ids
+In-Reply-To: <53DA7E9E.7000501@amd.com>
+References: <53DA7E9E.7000501@amd.com>
+Message-ID: <20140731174125.GH26853@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am 31.07.2014 19:14, schrieb Andreas F?rber:
-> Hi,
-> 
-> Am 31.07.2014 19:00, schrieb Vincent Palatin:
->> Always a bit late to the game.
->> One small comment inline.
->>
->> Reviewed-by: Vincent Palatin <vpalatin@chromium.org>
-> 
-> Thanks,
-> 
->>
->> On Thu, Jul 31, 2014 at 9:08 AM, Andreas F?rber <afaerber@suse.de> wrote:
->>> +       usb3_vbus_reg: regulator-usb3 {
->>> +               compatible = "regulator-fixed";
->>> +               regulator-name = "P5.0V_USB3CON";
->>> +               regulator-min-microvolt = <5000000>;
->>> +               regulator-max-microvolt = <5000000>;
->>> +               gpio = <&gpe1 0 GPIO_ACTIVE_LOW>;
->>> +               enable-active-high;
->>> +       };
->>
->> GPE1_0 GPIO is the HSIC hub (SMSC 3503) reset# line (already defined
->> below afaik).
-> 
-> Yes, that was a suggestion you made on v1.
-> 
->> On this design there is no external USB3 port, so no VBUS reg/load
->> switch for USB3.
-> 
-> Could you be a little clearer? Are you suggesting to drop the gpio
-> property?
+[Adding the other Rob ;)]
 
-Nah, doesn't work. Do we need a pinctrl on the usb-hub instead?
-
-Andreas
-
-> I just re-tested that without the regulator node plus the
-> vbus-supply below I don't get any USB2 (so maybe rename the regulator?).
+On Thu, Jul 31, 2014 at 06:36:30PM +0100, Joel Schopp wrote:
+> I recently ran into a situation where I needed more than 16 stream ids for
+> an smmu, but we are currently limited to 16 by:
 > 
-> Regards,
-> Andreas
+> #define MAX_MASTER_STREAMIDS        MAX_PHANDLE_ARGS
+> #define MAX_PHANDLE_ARGS 16
 > 
->>> +
->>> +       usb at 12110000 {
->>> +               samsung,vbus-gpio = <&gpx1 1 GPIO_ACTIVE_HIGH>;
->>> +       };
->>> +
->>> +       usb-hub {
->>> +               compatible = "smsc,usb3503a";
->>> +               reset-gpios = <&hsic_reset>;
->>> +       };
-> [...]
->>> +&usbdrd_phy {
->>> +       vbus-supply = <&usb3_vbus_reg>;
->>> +};
->>> +
->>> +#include "cros-ec-keyboard.dtsi"
->>> --
->>> 1.9.3
-> 
+> I changed that 16 to 32 and everything worked for me.  I am wondering if
+> this is the preferred way to fix the limitation?  If so I'd be happy to
+> send out the 1 line patch.
 
+This seems fine to me. Last time it was brought up, the objection from RobH
+was that there wasn't any upstream activity for the AMD board, so this
+change could wait:
 
--- 
-SUSE LINUX Products GmbH, Maxfeldstr. 5, 90409 N?rnberg, Germany
-GF: Jeff Hawn, Jennifer Guild, Felix Imend?rffer; HRB 16746 AG N?rnberg
+  http://lists.linuxfoundation.org/pipermail/iommu/2014-January/007556.html
+
+Will
