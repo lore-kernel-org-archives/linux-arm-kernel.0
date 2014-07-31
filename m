@@ -1,35 +1,33 @@
 From: peter.ujfalusi@ti.com (Peter Ujfalusi)
-Date: Thu, 31 Jul 2014 13:18:50 +0300
-Subject: [PATCH 2/6] ARM: DTS: da850: Add node for edma0
-In-Reply-To: <1406801934-23334-1-git-send-email-peter.ujfalusi@ti.com>
-References: <1406801934-23334-1-git-send-email-peter.ujfalusi@ti.com>
-Message-ID: <1406801934-23334-3-git-send-email-peter.ujfalusi@ti.com>
+Date: Thu, 31 Jul 2014 13:18:48 +0300
+Subject: [PATCH 0/6] ARM: DT/davinci: Audio for da850-evm in DT boot
+Message-ID: <1406801934-23334-1-git-send-email-peter.ujfalusi@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add DT node for edma0.
+Hi,
 
-Signed-off-by: Peter Ujfalusi <peter.ujfalusi@ti.com>
+The following series will enable audio via simple card on the board when booted
+with DT.
+
+For edma one patch is needed to have working dma:
+http://marc.info/?l=linux-omap&m=140680159327749&w=2
+
+Regards,
+Peter
 ---
- arch/arm/boot/dts/da850.dtsi | 6 ++++++
- 1 file changed, 6 insertions(+)
+Peter Ujfalusi (6):
+  ARM: davinci: da8xx-dt: add OF_DEV_AUXDATA entry for mcasp0
+  ARM: DTS: da850: Add node for edma0
+  ARM: DTS: da850: Add node for McASP
+  ARM: DTS: da850-evm: Enable McASP via DT boot
+  ARM: DTS: da850-evm: Add node for tlv320aic3106 codec
+  ARM: DTS: da850-evm: Enable audio via simple-card
 
-diff --git a/arch/arm/boot/dts/da850.dtsi b/arch/arm/boot/dts/da850.dtsi
-index b695548dbb4e..41ce4e8bf227 100644
---- a/arch/arm/boot/dts/da850.dtsi
-+++ b/arch/arm/boot/dts/da850.dtsi
-@@ -150,6 +150,12 @@
- 			};
- 
- 		};
-+		edma0: edma at 01c00000 {
-+			compatible = "ti,edma3";
-+			reg =	<0x0 0x10000>;
-+			interrupts = <11 13 12>;
-+			#dma-cells = <1>;
-+		};
- 		serial0: serial at 1c42000 {
- 			compatible = "ns16550a";
- 			reg = <0x42000 0x100>;
+ arch/arm/boot/dts/da850-evm.dts  | 72 ++++++++++++++++++++++++++++++++++++++++
+ arch/arm/boot/dts/da850.dtsi     | 19 +++++++++++
+ arch/arm/mach-davinci/da8xx-dt.c |  1 +
+ 3 files changed, 92 insertions(+)
+
 -- 
 2.0.2
