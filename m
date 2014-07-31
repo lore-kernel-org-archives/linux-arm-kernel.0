@@ -1,96 +1,68 @@
-From: christoffer.dall@linaro.org (Christoffer Dall)
-Date: Thu, 31 Jul 2014 18:30:38 +0200
-Subject: [PATCH][next] arm64: KVM: GICv3: move system register access to
- msr_s/mrs_s
-In-Reply-To: <20140731160558.GD26853@arm.com>
-References: <1406812599-18631-1-git-send-email-marc.zyngier@arm.com>
- <20140731131947.GT26853@arm.com> <20140731133227.GA589@cbox>
- <20140731160558.GD26853@arm.com>
-Message-ID: <20140731163038.GJ11610@cbox>
+From: rric@kernel.org (Robert Richter)
+Date: Thu, 31 Jul 2014 18:35:24 +0200
+Subject: [PATCH 2/5] arm64, thunder: Add initial dts for Cavium Thunder SoC
+In-Reply-To: <CAL_JsqKgfjV4sEZOWuH4YcMjeOA_yNDvZLv_jTi_Sb=27cOD3g@mail.gmail.com>
+References: <1406732794-20920-1-git-send-email-rric@kernel.org>
+ <1406732794-20920-3-git-send-email-rric@kernel.org>
+ <20140730154626.GD20162@leverpostej>
+ <CAL_JsqLJ_W34XTF2aMOW9z+Gq4oxbrX1RztyJN8Mi0OFPeNxfg@mail.gmail.com>
+ <20140731123443.GS4703@rric.localhost>
+ <CAL_JsqKgfjV4sEZOWuH4YcMjeOA_yNDvZLv_jTi_Sb=27cOD3g@mail.gmail.com>
+Message-ID: <20140731163524.GT4703@rric.localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jul 31, 2014 at 05:05:58PM +0100, Will Deacon wrote:
-> On Thu, Jul 31, 2014 at 02:32:27PM +0100, Christoffer Dall wrote:
-> > On Thu, Jul 31, 2014 at 02:19:47PM +0100, Will Deacon wrote:
-> > > On Thu, Jul 31, 2014 at 02:16:39PM +0100, Marc Zyngier wrote:
-> > > > Commit 72c583951526 (arm64: gicv3: Allow GICv3 compilation with
-> > > > older binutils) changed the way we express the GICv3 system registers,
-> > > > but couldn't change the occurences used by KVM as the code wasn't
-> > > > merged yet.
-> > > > 
-> > > > Just fix the accessors.
-> > > > 
-> > > > Cc: Will Deacon <will.deacon@arm.com>
-> > > > Cc: Catalin Marinas <catalin.marinas@arm.com>
-> > > > Cc: Christoffer Dall <christoffer.dall@linaro.org>
-> > > > Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
-> > > > ---
-> > > > -next is currently borked. I suggest we take this patch via the kvmarm tree,
-> > > > and only send our PR once the arm64 tree has hit Linus' tree. It contains
-> > > > the same dependency on the GIC tree anyway.
-> > > 
-> > > I'm fine with that as long as Paulo doesn't mind waiting for the arm64 stuff
-> > > to go in first (I have no reason to delay my pull request, so shouldn't be
-> > > an issue).
-> > > 
-> > > If it helps:
-> > > 
-> > >   Acked-by: Will Deacon <will.deacon@arm.com>
-> > > 
-> > > I can't help but point out that we wouldn't be in this mess if you'd got
-> > > your stuff into -next sooner ;)
-> > > 
-> > 
-> > Well yes, but it was hard to plan our holidays around the deadlines and
-> > unfortunately I couldn't find time to verify the kvmarm branch to make
-> > it ready for -next inclusion before I went on holiday this time.  In any
-> > case, this should be the exception rather than the rule, and I do try to
-> > get the next branch ready as soon as possible usually.
+On 31.07.14 10:22:19, Rob Herring wrote:
+> On Thu, Jul 31, 2014 at 7:34 AM, Robert Richter <rric@kernel.org> wrote:
+> > On 30.07.14 11:37:38, Rob Herring wrote:
+> >> On Wed, Jul 30, 2014 at 10:46 AM, Mark Rutland <mark.rutland@arm.com> wrote:
+> >> > On Wed, Jul 30, 2014 at 04:06:31PM +0100, Robert Richter wrote:
+> >> >> From: Radha Mohan Chintakuntla <rchintakuntla@cavium.com>
+> >
+> >> >> +/ {
+> >> >> +     model = "Cavium ThunderX CN88XX Family";
+> >> >> +     compatible = "cavium,thunder-88xx";
+> >> >
+> >> > Please don't use wildcards in compatible strings. Give this an absolute
+> >> > name, and override as necessary.
+> >
+> > The naming 88xx refers to the processor family and arn't actually
+> > wildcards. In the future we might need another dts file for 87xx, but
+> > so far all SoCs of 88xx family should use the same dts files. In this
+> > sense the naming is very specific.
 > 
-> Understood, but the communication could have been a lot better.
+> Yes, but each implementation can have its own errata. You might not
+> need to distinguish them now, but you could in the future.
 > 
-> Whilst you were away, -next broke due to the non-virt parts of the GICv3
-> driver (assumedly going via the irqchip tree?):
+> However, if the family is really all the same die and different parts
+> are just marketing, then the name is fine. Or if you can easily probe
+> the exact part and revision it's probably fine.
+
+Yes, this relates to the same soc.
+
 > 
->   http://lists.infradead.org/pipermail/linux-arm-kernel/2014-July/275410.html
+> >
+> >
+> >> >> +     cpus {
+> >> >> +             #address-cells = <2>;
+> >> >> +             #size-cells = <0>;
+> >> >> +
+> >> >> +             cpu at 000 {
+> >> >> +                     device_type = "cpu";
+> >> >> +                     compatible = "cavium,thunder", "arm,armv8";
+> >> >> +                     reg = <0x0 0x000>;
+> >> >> +                     enable-method = "psci";
+> >> >> +             };
+> >> >
+> >> > Just to check: both the SoC and CPU are called thunder?
+> >
+> > The soc is called thunder-88xx, the cpu thunder. E.g. an 87xx soc will
+> > have the same core in which is thunder.
 > 
-> Catalin fixed that up, and then Jason stated that the intention was for
-> GICv3 to go via the arm64 tree (see above link). Based on that, we pulled
-> his tag into our tree and applied our fix on top.
-> 
-> Now a bunch of stuff has cropped up out of nowhere causing conflicts and
-> breakages for everybody ~3 days before the merge window opens (the code
-> defaults to 'y'). We're not mind-readers, so all it would have taken is
-> a mail to the relevant maintainers before everybody disappeared on holiday
-> saying (a) what the merge plan is and (b) what to do if everything goes
-> wrong while you're away.
-> 
-> Bah, maybe I'm just being grumpy...
-> 
-Besides from postponing my vacation I'm not really sure what I could
-have done differently.  In this thread (on which you were cc'ed) I
-really tried to make people aware of what was coming:
+> And the next version of the core would be called something else?
+> thunder-v2? lightning? As long as they are distinguishable they should
+> be fine.
 
-https://lists.cs.columbia.edu/pipermail/kvmarm/2014-July/010482.html
+Same here, the name relates to the same core.
 
-nobody replied to my last mail about something potentially messing stuff
-up in the queue branch.
-
-Maybe my fault was my reluctance to put patches that hadn't been able to
-verify as working on a v8 platform into a branch that was pulled into
--next.  If I was being overly cautious in that sense, that's a fair
-point and I can adjust future behavior for that.
-
-Otherwise I think this was just an unfortunate series of events with a
-lot of new stuff coming in combined with finding some nasty bugs.  Hey,
-it happens.
-
-Also, it's not like anyone sent me an e-mail saying URGENT, fix your
-sh*t, in which case I would have dealt with it.
-
-Seriously, if I'm being stupid, please tell me which e-mail I should
-have sent to whom or what to have done differnently.
-
-Thanks,
--Christoffer
+-Robert
