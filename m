@@ -1,47 +1,101 @@
-From: dianders@chromium.org (Doug Anderson)
-Date: Thu, 31 Jul 2014 15:01:51 -0700
-Subject: [REPOST PATCH v3 4/5] ARM: dts: Fix the sort ordering of EHCI and
- HSIC in rk3288.dtsi
-In-Reply-To: <1406841985-15790-5-git-send-email-kever.yang@rock-chips.com>
-References: <1406841985-15790-1-git-send-email-kever.yang@rock-chips.com>
- <1406841985-15790-5-git-send-email-kever.yang@rock-chips.com>
-Message-ID: <CAD=FV=U-7D016n08My-SZRjqN68wTW9iuBEMDzkpy+LdTGRdtw@mail.gmail.com>
+From: computersforpeace@gmail.com (Brian Norris)
+Date: Thu, 31 Jul 2014 15:06:42 -0700
+Subject: [PATCH v8 01/11] ARM: brcmstb: add infrastructure for ARM-based
+ Broadcom STB SoCs
+In-Reply-To: <20140731084315.GJ30282@n2100.arm.linux.org.uk>
+References: <1405976886-27807-1-git-send-email-computersforpeace@gmail.com>
+ <1405976886-27807-2-git-send-email-computersforpeace@gmail.com>
+ <CAL_Jsq+Nbk7m9KXhG+Chdpvurp75RrvhFR2oE_LGxV444GSe9Q@mail.gmail.com>
+ <20140731022320.GM3711@ld-irv-0074>
+ <20140731084315.GJ30282@n2100.arm.linux.org.uk>
+Message-ID: <20140731220642.GQ3711@ld-irv-0074>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Kever,
+Hi Russell,
 
-On Thu, Jul 31, 2014 at 2:26 PM, Kever Yang <kever.yang@rock-chips.com> wrote:
-> From: Doug Anderson <dianders@chromium.org>
->
-> The EHCI and HSIC device tree nodes were added in the wrong place.
-> Fix them.
->
-> Signed-off-by: Doug Anderson <dianders@chromium.org>
-> Signed-off-by: Kever Yang <kever.yang@rock-chips.com>
-> ---
->
-> Changes in v3:
-> - EHCI and HSIC move new for version 3.
->
-> Changes in v2: None
->
->  arch/arm/boot/dts/rk3288.dtsi |   41 ++++++++++++++++++++---------------------
->  1 file changed, 20 insertions(+), 21 deletions(-)
->
-> diff --git a/arch/arm/boot/dts/rk3288.dtsi b/arch/arm/boot/dts/rk3288.dtsi
-> index a5607a1..673dee3 100644
-> --- a/arch/arm/boot/dts/rk3288.dtsi
-> +++ b/arch/arm/boot/dts/rk3288.dtsi
-> @@ -205,6 +205,17 @@
->                 status = "disabled";
->         };
->
-> +       usb_host0_ehci: ehci at ff500000 {
+On Thu, Jul 31, 2014 at 09:43:15AM +0100, Russell King wrote:
+> On Wed, Jul 30, 2014 at 07:23:20PM -0700, Brian Norris wrote:
+> > I appreciate your comments, but where were many of these 5 months ago on
+> > the first 7 revisions? :)
+> > 
+> > On a practical note: v9 is already queued for 3.17. Should I send
+> > patches for the 3.17 cycle (or later) to fixup some of these issues? Or
+> > would you recommend pulling the patches out of Matt Porter's tree now,
+> > and reintroducing for 3.18? (I would be much happier with the first.)
+> > 
+> > I do note that we at least need to fix allmodconfig ASAP; I'll reply to
+> > Russell on that one.
+> > 
+> > On Wed, Jul 30, 2014 at 12:09:48PM -0500, Rob Herring wrote:
+> > > On Mon, Jul 21, 2014 at 4:07 PM, Brian Norris <computersforpeace@gmail.com> wrote:
+> > > > +
+> > > > +       per_cpu_sw_state_wr(cpu, 1);
+> > > 
+> > > The kernel already tracks the state.
+> > 
+> > Yes, but it doesn't synchronize cpu_die() and cpu_kill(). But I see you
+> > objected below.
+> 
+> Err.
+> 
+> static DECLARE_COMPLETION(cpu_died);
 
-Argh.  When I was helping you I messed this up.  :(  I pointed you at
-an older version of the EHCI patch.
+Yes, I noticed this. What I meant is that smp_ops.cpu_die() and
+smp_ops.cpu_kill() are not synchronized.
 
-I'll post a fixup myself.  Sorry for the bother...
+> /*
+>  * called on the thread which is asking for a CPU to be shutdown -
+>  * waits until shutdown has completed, or it is timed out.
+>  */
+> void __cpu_die(unsigned int cpu)
+> {
+>         if (!wait_for_completion_timeout(&cpu_died, msecs_to_jiffies(5000))) {
+>                 pr_err("CPU%u: cpu didn't die\n", cpu);
+>                 return;
+>         }
+>         printk(KERN_NOTICE "CPU%u: shutdown\n", cpu);
+> ...
+>         if (!platform_cpu_kill(cpu))
+>                 printk("CPU%u: unable to kill\n", cpu);
+> }
+> 
+> void __ref cpu_die(void)
+> {
+> ...
+>         /*
+>          * Tell __cpu_die() that this CPU is now safe to dispose of.  Once
+>          * this returns, power and/or clocks can be removed at any point
+>          * from this CPU and its cache by platform_cpu_kill().
+>          */
+>         complete(&cpu_died);
+> 
+> There _is_ synchronisation between these two.  Your cpu_kill() function
+> will not be called until we have flushed all data from the dying CPU's
+> cache.  That's the best we can do, because if we cause the dying CPU to
+> exit the coherency domain, any kind of locking or completion will no
+> longer work (neither will your state tracking solution because the L1
+> caches will no longer snoop.)
 
--Doug
+We're not relying on the L1 cache, though. Don't sync_cache_{r,w}()
+ensure all reads/writes reach at least the L2?
+
+Besides, we modeled this after the MCPM code (e.g., __mcpm_cpu_down()).
+Are both implementations incorrect?
+
+> > Hmm, I'm pretty sure the synchronization is required for our B15 core.
+> > If we yank the power before the core has properly quiesced, the whole
+> > CPU complex will lock up. (Similar story for the power-up while loop you
+> > complained about above.)
+> 
+> If you need to ensure that the power isn't turned off too soon, how about
+> using a delayed work queue to do the power-off of the CPU (remembering to
+> cancel the delayed work queue when powering the CPU back up.)
+
+How does that ensure that the CPU is down by the time the work is
+scheduled? It seems like this would just defer the work long enough that
+it *most likely* has quiesced, but I don't see how this gives us a
+better guarantee. Or maybe I'm missing something. (If so, please do
+enlighten!)
+
+Brian
