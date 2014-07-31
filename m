@@ -1,68 +1,69 @@
-From: afaerber@suse.de (=?UTF-8?B?QW5kcmVhcyBGw6RyYmVy?=)
-Date: Thu, 31 Jul 2014 19:14:59 +0200
-Subject: [PATCH v4 4/4] ARM: dts: Add exynos5250-spring device tree
-In-Reply-To: <CAP_ceTz+KRJzF9XV=_aLE+6sV6d5GqCtQ_daKtpFJfCZQ1erpA@mail.gmail.com>
-References: <1406822910-6255-1-git-send-email-afaerber@suse.de>
- <1406822910-6255-5-git-send-email-afaerber@suse.de>
- <CAP_ceTz+KRJzF9XV=_aLE+6sV6d5GqCtQ_daKtpFJfCZQ1erpA@mail.gmail.com>
-Message-ID: <53DA7993.1000800@suse.de>
+From: fweisbec@gmail.com (Frederic Weisbecker)
+Date: Thu, 31 Jul 2014 19:17:14 +0200
+Subject: [PATCH v4 2/5] x86,entry: Only call user_exit if TIF_NOHZ
+In-Reply-To: <20140731165423.GA16800@redhat.com>
+References: <cover.1406604806.git.luto@amacapital.net>
+ <7123b2489cc5d1d5abb7bcf1364ca729cab3e6ca.1406604806.git.luto@amacapital.net>
+ <20140729193232.GA8153@redhat.com>
+ <20140730164344.GA27954@localhost.localdomain>
+ <CALCETrUVaz3JFiNbyU=r3M-E9muHa1ffn7RX+_-4V_0U-hVaPw@mail.gmail.com>
+ <20140731151630.GA7842@localhost.localdomain>
+ <20140731164246.GA15974@redhat.com>
+ <20140731164918.GC7842@localhost.localdomain>
+ <20140731165423.GA16800@redhat.com>
+Message-ID: <20140731171713.GE7842@localhost.localdomain>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-
-Am 31.07.2014 19:00, schrieb Vincent Palatin:
-> Always a bit late to the game.
-> One small comment inline.
+On Thu, Jul 31, 2014 at 06:54:23PM +0200, Oleg Nesterov wrote:
+> On 07/31, Frederic Weisbecker wrote:
+> >
+> > On Thu, Jul 31, 2014 at 06:42:46PM +0200, Oleg Nesterov wrote:
+> > > On 07/31, Frederic Weisbecker wrote:
+> > > >
+> > > > On Wed, Jul 30, 2014 at 10:23:34AM -0700, Andy Lutomirski wrote:
+> > > > >
+> > > > > At the end of the day, the syscall slowpath code calls a bunch of
+> > > > > functions depending on what TIF_XYZ flags are set.  As long as it's
+> > > > > structured like "if (TIF_A) do_a(); if (TIF_B) do_b();" or something
+> > > > > like that, it's comprehensible.  But once random functions with no
+> > > > > explicit flag checks or comments start showing up, it gets confusing.
+> > > >
+> > > > Yeah that's a point. I don't mind much the TIF_NOHZ test if you like.
+> > >
+> > > And in my opinion
+> > >
+> > > 	if (work & TIF_XYZ)
+> > > 		user_exit();
+> > >
+> > > looks even more confusing. Because, once again, TIF_XYZ is not the
+> > > reason to call user_exit().
+> > >
+> > > Not to mention this adds a minor performance penalty.
+> >
+> > That's a point too! You guys both convinced me! ;-)
 > 
-> Reviewed-by: Vincent Palatin <vpalatin@chromium.org>
+> Very nice, now I know that you can agree with 2 opposite opinions at
+> the same time ;)
 
-Thanks,
+That's what an Acked-by from Schroedinger would look like!
 
 > 
-> On Thu, Jul 31, 2014 at 9:08 AM, Andreas F?rber <afaerber@suse.de> wrote:
->> +       usb3_vbus_reg: regulator-usb3 {
->> +               compatible = "regulator-fixed";
->> +               regulator-name = "P5.0V_USB3CON";
->> +               regulator-min-microvolt = <5000000>;
->> +               regulator-max-microvolt = <5000000>;
->> +               gpio = <&gpe1 0 GPIO_ACTIVE_LOW>;
->> +               enable-active-high;
->> +       };
+> > > > > If it's indeed all-or-nothing, I could remove the check and add a
+> > > > > comment.  But please keep in mind that, currently, the slow path is
+> > > > > *slow*, and my patches only improve the entry case.  So enabling
+> > > > > context tracking on every task will hurt.
+> > > >
+> > > > That's what we do anyway. I haven't found a safe way to enabled context tracking
+> > > > without tracking all CPUs.
+> > >
+> > > And if we change this, then the code above becomes racy. The state of
+> > > TIF_XYZ can be changed right after the check. OK, it is racy anyway ;)
+> > > but still this adds more confusion.
+> >
+> > No because all running tasks have this flag set when context tracking is
+> > enabled. And context tracking can't be disabled on runtime.
 > 
-> GPE1_0 GPIO is the HSIC hub (SMSC 3503) reset# line (already defined
-> below afaik).
+> Yes, yes, please note that I said "if we change this".
 
-Yes, that was a suggestion you made on v1.
-
-> On this design there is no external USB3 port, so no VBUS reg/load
-> switch for USB3.
-
-Could you be a little clearer? Are you suggesting to drop the gpio
-property? I just re-tested that without the regulator node plus the
-vbus-supply below I don't get any USB2 (so maybe rename the regulator?).
-
-Regards,
-Andreas
-
->> +
->> +       usb at 12110000 {
->> +               samsung,vbus-gpio = <&gpx1 1 GPIO_ACTIVE_HIGH>;
->> +       };
->> +
->> +       usb-hub {
->> +               compatible = "smsc,usb3503a";
->> +               reset-gpios = <&hsic_reset>;
->> +       };
-[...]
->> +&usbdrd_phy {
->> +       vbus-supply = <&usb3_vbus_reg>;
->> +};
->> +
->> +#include "cros-ec-keyboard.dtsi"
->> --
->> 1.9.3
-
--- 
-SUSE LINUX Products GmbH, Maxfeldstr. 5, 90409 N?rnberg, Germany
-GF: Jeff Hawn, Jennifer Guild, Felix Imend?rffer; HRB 16746 AG N?rnberg
+Yeah but the NO_HZ test wouldn't change much the situation I think.
