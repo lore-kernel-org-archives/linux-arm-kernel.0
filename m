@@ -1,35 +1,62 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Thu, 31 Jul 2014 16:15:11 +0100
-Subject: [RFC] ARM: Enable dynamic clock gating?
-In-Reply-To: <81f4b45a-f8b3-4dec-9e94-9028ccd3e05f@BN1AFFO11FD009.protection.gbl>
-References: <81f4b45a-f8b3-4dec-9e94-9028ccd3e05f@BN1AFFO11FD009.protection.gbl>
-Message-ID: <20140731151510.GZ26853@arm.com>
+From: fweisbec@gmail.com (Frederic Weisbecker)
+Date: Thu, 31 Jul 2014 17:16:32 +0200
+Subject: [PATCH v4 2/5] x86,entry: Only call user_exit if TIF_NOHZ
+In-Reply-To: <CALCETrUVaz3JFiNbyU=r3M-E9muHa1ffn7RX+_-4V_0U-hVaPw@mail.gmail.com>
+References: <cover.1406604806.git.luto@amacapital.net>
+ <7123b2489cc5d1d5abb7bcf1364ca729cab3e6ca.1406604806.git.luto@amacapital.net>
+ <20140729193232.GA8153@redhat.com>
+ <20140730164344.GA27954@localhost.localdomain>
+ <CALCETrUVaz3JFiNbyU=r3M-E9muHa1ffn7RX+_-4V_0U-hVaPw@mail.gmail.com>
+Message-ID: <20140731151630.GA7842@localhost.localdomain>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jul 31, 2014 at 03:24:17PM +0100, S?ren Brinkmann wrote:
-> Hi all,
+On Wed, Jul 30, 2014 at 10:23:34AM -0700, Andy Lutomirski wrote:
+> On Wed, Jul 30, 2014 at 9:43 AM, Frederic Weisbecker <fweisbec@gmail.com> wrote:
+> > On Tue, Jul 29, 2014 at 09:32:32PM +0200, Oleg Nesterov wrote:
+> >> On 07/28, Andy Lutomirski wrote:
+> >> >
+> >> > @@ -1449,7 +1449,12 @@ long syscall_trace_enter(struct pt_regs *regs)
+> >> >  {
+> >> >     long ret = 0;
+> >> >
+> >> > -   user_exit();
+> >> > +   /*
+> >> > +    * If TIF_NOHZ is set, we are required to call user_exit() before
+> >> > +    * doing anything that could touch RCU.
+> >> > +    */
+> >> > +   if (test_thread_flag(TIF_NOHZ))
+> >> > +           user_exit();
+> >>
+> >> Personally I still think this change just adds more confusion, but I leave
+> >> this to you and Frederic.
+> >>
+> >> It is not that "If TIF_NOHZ is set, we are required to call user_exit()", we
+> >> need to call user_exit() just because we enter the kernel. TIF_NOHZ is just
+> >> the implementation detail which triggers this slow path.
+> >>
+> >> At least it should be correct, unless I am confused even more than I think.
+> >
+> > Agreed, Perhaps the confusion is on the syscall_trace_enter() name which suggests
+> > this is only about tracing? syscall_slowpath_enter() could be an alternative.
+> > But that's still tracing in a general sense so...
 > 
-> similar to the patch enabling the SCU standby mode
-> (https://lkml.org/lkml/2014/7/30/122), I have a patch to enable the A9's
-> 'dynamic clock gating'
-> (http://infocenter.arm.com/help/index.jsp?topic=/com.arm.doc.ddi0388f/CIHBGEHE.html)
-> in platform code. This might also be a candidate to enable in common
-> code.
-> Do you think that would make sense?
-> I tried to find the right place to add this and was looking at
-> mm/proc-v7.S. It probably works to put it there, but does not really
-> seem to be the right place.
+> At the end of the day, the syscall slowpath code calls a bunch of
+> functions depending on what TIF_XYZ flags are set.  As long as it's
+> structured like "if (TIF_A) do_a(); if (TIF_B) do_b();" or something
+> like that, it's comprehensible.  But once random functions with no
+> explicit flag checks or comments start showing up, it gets confusing.
+
+Yeah that's a point. I don't mind much the TIF_NOHZ test if you like.
+
 > 
-> As reference, this is what I currently have as part of platform code:
->   /* A9 clock gating */
->   asm volatile ("mrc  p15, 0, r12, c15, c0, 0\n"
->                 "orr  r12, r12, #1\n"
->                 "mcr  p15, 0, r12, c15, c0, 0\n"
->                 : /* no outputs */
->                 : /* no inputs */
->                 : "r12");
+> If it's indeed all-or-nothing, I could remove the check and add a
+> comment.  But please keep in mind that, currently, the slow path is
+> *slow*, and my patches only improve the entry case.  So enabling
+> context tracking on every task will hurt.
 
-This should *really* be done by firmware.
+That's what we do anyway. I haven't found a safe way to enabled context tracking
+without tracking all CPUs.
 
-Will
+> 
+> --Andy
