@@ -1,92 +1,97 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Thu, 31 Jul 2014 09:44:40 +0200
-Subject: [PATCH] Documentation: dmaengine: Add a documentation for the
- dma controller API
-In-Reply-To: <20140730160607.GM8181@intel.com>
-References: <1406736193-26685-1-git-send-email-maxime.ripard@free-electrons.com>
- <20140730160607.GM8181@intel.com>
-Message-ID: <20140731074440.GY3952@lukather>
+From: t-kristo@ti.com (Tero Kristo)
+Date: Thu, 31 Jul 2014 10:57:09 +0300
+Subject: [PATCH 29/35] arm: omap: intc: switch over to linear irq domain
+In-Reply-To: <20140731062843.GA29045@atomide.com>
+References: <1406582183-696-30-git-send-email-balbi@ti.com>
+ <20140729121425.GR29045@atomide.com> <20140729141522.GB17808@saruman.home>
+ <20140729152052.GV29045@atomide.com> <20140729154057.GE17808@saruman.home>
+ <20140729163345.GF17808@saruman.home> <20140730060420.GY29045@atomide.com>
+ <20140730144059.GA7272@saruman.home>
+ <CAGo_u6ou+MoKOE_tTTmjxyFNW=jTaN9vnTsHrxR6sQHsieJyLA@mail.gmail.com>
+ <20140730162038.GH7272@saruman.home> <20140731062843.GA29045@atomide.com>
+Message-ID: <53D9F6D5.1080307@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Vinod,
+On 07/31/2014 09:28 AM, Tony Lindgren wrote:
+> * Felipe Balbi <balbi@ti.com> [140730 09:23]:
+>> Hi,
+>>
+>> On Wed, Jul 30, 2014 at 10:45:41AM -0500, Nishanth Menon wrote:
+>>> On Wed, Jul 30, 2014 at 9:40 AM, Felipe Balbi <balbi@ti.com> wrote:
+>>>> HI,
+>>>>
+>>>> On Tue, Jul 29, 2014 at 11:04:21PM -0700, Tony Lindgren wrote:
+>>>>> * Felipe Balbi <balbi@ti.com> [140729 09:36]:
+>>>>>> Hi,
+>>>>>>
+>>>>>> On Tue, Jul 29, 2014 at 10:40:57AM -0500, Felipe Balbi wrote:
+>>>>>>> On Tue, Jul 29, 2014 at 08:20:52AM -0700, Tony Lindgren wrote:
+>>>>>>>> * Felipe Balbi <balbi@ti.com> [140729 07:18]:
+>>>>>>>>> Hi,
+>>>>>>>>>
+>>>>>>>>> On Tue, Jul 29, 2014 at 05:14:25AM -0700, Tony Lindgren wrote:
+>>>>>>>>>> * Felipe Balbi <balbi@ti.com> [140728 14:19]:
+>>>>>>>>>>> now that we don't need to support legacy board-files,
+>>>>>>>>>>> we can completely switch over to a linear irq domain
+>>>>>>>>>>> and make use of irq_alloc_domain_generic_chips() to
+>>>>>>>>>>> allocate all generic irq chips for us.
+>>>>>>>>>>
+>>>>>>>>>> This patch seems to somehow break off-idle for omap3
+>>>>>>>>>> where it no longer wakes up.
+>>>>>>>>>
+>>>>>>>>> Sure your bisection is correct ? This patch just switches from legacy
+>>>>>>>>> irq domain to linear irq domain.
+>>>>>>>>
+>>>>>>>> Yes, I tried it a few times. Just enabling
+>>>>>>>> retention idle hangs too with this patch.
+>>>>>>>>
+>>>>>>>> Maybe it's omap3_prcm_irq_setup that relies on
+>>>>>>>> 11 + OMAP_INTC_START? There may be other such issues
+>>>>>>>
+>>>>>>> lol.
+>>>>>>>
+>>>>>>> OMAP4 has the same nonsense.
+>>>>>>
+>>>>>> made me think why (if) OMAP4 works with that same setup. Does wake from
+>>>>>> OFF work with OMAP4 ?
+>>>>>
+>>>>> Not without similar changes, omap4+ has the same issue.. There's a RFC
+>>>>> series from Nishant to fix some of this, and Tero is moving the PRCM
+>>>>> into a driver.
+>>>>>
+>>>>>> Anyway, here's a quick little hack to check if that's the reason for the
+>>>>>> regression:
+>>>>>
+>>>>> OK yeah that's along the same lines with Nishant's RFC series in thread
+>>>>> "[RFC PATCH 0/7] ARM: OMAP4+: PRM: minor cleanups and dt support of
+>>>>> interrupts"
+>>>>>
+>>>>> FYI, it did not compile, needs to include linux/of_irq.h. But yes,
+>>>>
+>>>> I might have sent the wrong version as I had that same build error and
+>>>> fixed it localy.
+>>>>
+>>>>> it fixes the regression for me, Also now the whole series works for
+>>>>> me :)
+>>>>
+>>>> good to know.
+>>>>
+>>>> What do you want to do now ? Wait for PRCM to become a driver ? Wait for
+>>>> Nishanth's series to get accepted ? I guess the same thing could be done
+>>>> for OMAP3 and AM33, then we would have a chance of having working wake
+>>>> from idle with the new irqchip.
+>>>
+>>> I can repost the current series as it stands now once 17-rc1 comes out
+>>> (without the build failure ofcourse).. if that helps to move it out of
+>>> RFC status.
+>>
+>> That'd be great. It would be ever greater if you could add support for
+>> OMAP3 on that too.
+>
+> Yeah sounds good to me. Tero, does that work OK for your PRCM changes?
 
-On Wed, Jul 30, 2014 at 09:36:07PM +0530, Vinod Koul wrote:
-> On Wed, Jul 30, 2014 at 06:03:13PM +0200, Maxime Ripard wrote:
-> > The dmaengine is neither trivial nor properly documented at the moment, which
-> > means a lot of trial and error development, which is not that good for such a
-> > central piece of the system.
-> > 
-> > Attempt at making such a documentation.
-> 
-> Did you miss Documentation/dmaengine.txt, lots of this is already covered
-> there. But yes i would be really glad to know what isnt, so that we can fix
-> that.
+Well, this set seems to break PM. suspend-resume on omap3-beagle just 
+hangs after this set is applied. Works fine without it with 3.16-rc5 tag.
 
-I didn't miss it. But I feel like it describes quite nicely the slave
-API, but doesn't help at all whenever you're writing a DMAengine driver.
-
-The first lines of the existing document makes it quite clear too.
-
-There's still a bit of duplication, but I don't feel it's such a big
-deal.
-
-What I'd like to do with the documentation I just sent is basically
-have a clear idea whenever you step into dmaengine what you can/cannot
-do, and have a reference document explaining what's expected by the
-framework, and hopefully have unified drivers that follow this
-pattern.
-
-Because, for the moment, we're pretty much left in the dark with
-different drivers doing the same thing in completetely different ways,
-with basically no way to tell if it's either the framework that
-requires such behaviour, or if the author was just feeling creative.
-
-There's numerous examples for this at the moment:
-  - The GFP flags, with different drivers using either GFP_ATOMIC,
-    GFP_NOWAIT or GFP_KERNEL in the same functions
-  - Having to set device_slave_caps or not?
-  - Some drivers use dma_run_depedencies, some other don't
-  - That might just be my experience, but judging from previous
-    commits, DMA_PRIVATE is completely obscure, and we just set it
-    because it was making it work, without knowing what it was
-    supposed to do.
-  - etc.
-
-And basically, we have no way to tell at the moment which one is
-right and which one needs fixing.
-
-The corollary being that it cripples the whole community ability to
-maintain the framework and make it evolve.
-
-> > +  * device_slave_caps
-> > +    - Isn't that redundant with the cap_mask already?
-> > +    - Only a few drivers seem to implement it
-> For audio to know what your channel can do rather than hardcoding it
-
-Ah, yes, I see it now. It's not related to the caps mask at all.
-
-Just out of curiosity, wouldn't it be better to move this to the
-framework, and have these informations provided through the struct
-dma_device? Or would it have some non-trivial side-effects?
-
-> > +  * dma cookies?
-> cookie is dma transaction representation which is monotonically incrementing
-> number.
-
-Ok, and it identifies a unique dma_async_tx_descriptor, right?
-
-Thanks,
-Maxime
-
--- 
-Maxime Ripard, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140731/8ef53175/attachment.sig>
+-Tero
