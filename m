@@ -1,51 +1,60 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Wed, 30 Jul 2014 23:00:24 -0700
-Subject: [PATCH] drivers: CCI: Correct use of ! and &
-In-Reply-To: <20140730195424.GG18384@quad.lixom.net>
-References: <1406716655-32494-1-git-send-email-punit.agrawal@arm.com>
- <20140730195424.GG18384@quad.lixom.net>
-Message-ID: <CAOesGMgAY7-MDVG2CzesQurWtMLdODjsdBNV8jScFJtAB3NAJg@mail.gmail.com>
+From: trblinux@gmail.com (Tushar Behera)
+Date: Thu, 31 Jul 2014 11:37:11 +0530
+Subject: [PATCH] ARM: multi_v7_defconfig: major refresh
+In-Reply-To: <CAOesGMjo0AY=eGcfTh1sVxKkURK9bzK8SBAeEbvBFN4R0sF34A@mail.gmail.com>
+References: <1406052070-6207-1-git-send-email-olof@lixom.net>
+ <12165027.MHmNZOI7jc@wuerfel>
+ <CAOesGMjo0AY=eGcfTh1sVxKkURK9bzK8SBAeEbvBFN4R0sF34A@mail.gmail.com>
+Message-ID: <CAC5m3BwDvHVMJEfXE4w5zQ2RYXYt9PRF8uP=3M03Rr3Ls=N4eQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-
-On Wed, Jul 30, 2014 at 12:54 PM, Olof Johansson <olof@lixom.net> wrote:
-> On Wed, Jul 30, 2014 at 11:37:35AM +0100, Punit Agrawal wrote:
->> From: Himangi Saraogi <himangi774@gmail.com>
+On Wed, Jul 23, 2014 at 1:58 AM, Olof Johansson <olof@lixom.net> wrote:
+> On Tue, Jul 22, 2014 at 11:36 AM, Arnd Bergmann <arnd@arndb.de> wrote:
+>> On Tuesday 22 July 2014 11:01:10 Olof Johansson wrote:
+>>> This is a major refresh of the multi_v7_defconfig:
+>>>
+>>> - Bring over a bunch of Samsung drivers to make ODROID-U3 and Chromebooks usable
+>>>  * Enable big.LITTLE
+>>>  * MCPM
+>>>  * CYAPA touchpad
+>>>  * Samsung-related MTD/regulator/clk/pinmux drivers
+>>>  * Add some of the CrOS EC drivers
+>>> - Turn on TPM, HW_RANDOM
+>>> - OMAP_USB3 -> TI_PIPE3 option rename
+>>> - Enable MCPM/b.L for VEXPRESS
+>>> - Add new CONFIG_MTD_SPI_NOR since it otherwise masks off SPI NOR drivers
+>>> - CONFIG_LOGO, because penguins.
+>>>
+>>> I took care to keep the new options that have been added for whose the
+>>> drivers are not yet in our for-next branch. This was pretty awkward so
+>>> we should sort out how to handle those better in the future.
 >>
->> In commit ae91d60ba88ef0bdb1b5e9b2363bd52fc45d2af7, a bug was fixed that
->> involved converting !x & y to !(x & y).  The code below shows the same
->> pattern, and thus should perhaps be fixed in the same way.
+>> Since you've already done all those, how about enabling THUMB2_KERNEL?
+>> For the multi_v7_defconfig, it should actually give some benefits,
+>> since it's rather large, and it would be good to have some more testing
+>> with this option enabled.
 >>
->> The Coccinelle semantic patch that makes this change is as follows:
->>
->> // <smpl>
->> @@ expression E1,E2; @@
->> (
->>   !E1 & !E2
->> |
->> - !E1 & E2
->> + !(E1 & E2)
->> )
->> // </smpl>
->>
->> Cc: stable at vger.kernel.org
->> Signed-off-by: Himangi Saraogi <himangi774@gmail.com>
->> Acked-by: Julia Lawall <julia.lawall@lip6.fr>
->> Acked-by: Punit Agrawal <punit.agrawal@arm.com>
->> ---
+>> I guess the first step would be to enable it and just see if your
+>> boot farm survives the change.
 >
-> Thanks, applied (adding a Fixes: tag, please use those in the future)
+> Good point, I'll definitely give that a go once the current issues are resolved.
+>
+> Which are: These changes make 5250-based machines (snow and arndale)
+> break. Lots of i2c timeouts on SATA and hdmi-phy. Looks like arndale
+> might be missing pinctrl setups for it?
+>
+> Tushar, Kukjin, any chance you can investigate from your end? I'd like
+> to get this change in since it allows for better multiplatform
+> coverage, but the Exynos breakage must be fixed...
+>
+>
+> -Olof
 
-On second look, I see that the code doesn't actually change behavior
-(since the mask is done with 0x1, it happens to have the same result).
-Pure luck before. :)
++ Sachin (spk.linux at gmail.com)
 
-Because of this, I've moved this to our next/fixes-non-critical
-branch, which will be sent up during the 3.17 merge window, and I took
-off the stable cc. It's still a good fix, but since it doesn't
-actually fix broken behavior there's no need to rush it.
+We will have to cross-check with exynos_defconfig about the missing
+components, if any. We will update after checking.
 
-
--Olof
+-- 
+Tushar Behera
