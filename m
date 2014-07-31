@@ -1,36 +1,207 @@
-From: fkan@apm.com (Feng Kan)
-Date: Thu, 31 Jul 2014 12:03:27 -0700
-Subject: [PATCH V6 3/3] arm64:dts: Add APM X-Gene SoC GPIO controller DTS
- entries
-In-Reply-To: <1406833407-28316-1-git-send-email-fkan@apm.com>
-References: <1406833407-28316-1-git-send-email-fkan@apm.com>
-Message-ID: <1406833407-28316-4-git-send-email-fkan@apm.com>
+From: tomasz.figa@gmail.com (Tomasz Figa)
+Date: Thu, 31 Jul 2014 21:05:18 +0200
+Subject: [PATCH v4 4/4] ARM: dts: Add exynos5250-spring device tree
+In-Reply-To: <1406822910-6255-5-git-send-email-afaerber@suse.de>
+References: <1406822910-6255-1-git-send-email-afaerber@suse.de>
+ <1406822910-6255-5-git-send-email-afaerber@suse.de>
+Message-ID: <53DA936E.9060004@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add gpio dts node for APM X-Gene SoC platform.
+Hi Andreas,
 
-Signed-off-by: Feng Kan <fkan@apm.com>
----
- arch/arm64/boot/dts/apm-storm.dtsi | 7 +++++++
- 1 file changed, 7 insertions(+)
+Sorry for joining the party a bit late, but there were patches with less
+people involved so I preferred to review them first.
 
-diff --git a/arch/arm64/boot/dts/apm-storm.dtsi b/arch/arm64/boot/dts/apm-storm.dtsi
-index 40aa96c..cf38b6f 100644
---- a/arch/arm64/boot/dts/apm-storm.dtsi
-+++ b/arch/arm64/boot/dts/apm-storm.dtsi
-@@ -397,5 +397,12 @@
- 			#clock-cells = <1>;
- 			clocks = <&rtcclk 0>;
- 		};
-+
-+		gfcgpio: gpio0 at 1701c000 {
-+			compatible = "apm,xgene-gpio";
-+			reg = <0x0 0x1701c000 0x0 0x40>;
-+			gpio-controller;
-+			#gpio-cells = <2>;
-+		};
- 	};
- };
--- 
-1.9.1
+You can find my comments inline.
+
+On 31.07.2014 18:08, Andreas F?rber wrote:
+> Adds initial support for the HP Chromebook 11.
+
+[snip]
+
+> +	gpio-keys {
+> +		compatible = "gpio-keys";
+> +		pinctrl-names = "default";
+> +		pinctrl-0 = <&power_key_irq>, <&lid_irq>;
+> +
+> +		power {
+> +			label = "Power";
+> +			gpios = <&gpx1 3 GPIO_ACTIVE_LOW>;
+> +			linux,code = <KEY_POWER>;
+
+I assume the key is debounced in hardware, so there is no need for
+debounce-interval here. Is this correct?
+
+> +			gpio-key,wakeup;
+> +		};
+> +
+> +		lid-switch {
+> +			label = "Lid";
+> +			gpios = <&gpx3 5 GPIO_ACTIVE_LOW>;
+> +			linux,input-type = <5>; /* EV_SW */
+> +			linux,code = <0>; /* SW_LID */
+> +			debounce-interval = <1>;
+> +			gpio-key,wakeup;
+> +		};
+> +	};
+> +
+> +	usb3_vbus_reg: regulator-usb3 {
+> +		compatible = "regulator-fixed";
+> +		regulator-name = "P5.0V_USB3CON";
+> +		regulator-min-microvolt = <5000000>;
+> +		regulator-max-microvolt = <5000000>;
+> +		gpio = <&gpe1 0 GPIO_ACTIVE_LOW>;
+> +		enable-active-high;
+> +	};
+> +
+> +	usb at 12110000 {
+
+Since this is a brand new dts file, it should use the reference based
+syntax, which would be something like
+
+&usbhost {
+	...
+};
+
+below the / { ... }; block.
+
+> +		samsung,vbus-gpio = <&gpx1 1 GPIO_ACTIVE_HIGH>;
+> +	};
+> +
+> +	usb-hub {
+> +		compatible = "smsc,usb3503a";
+> +		reset-gpios = <&hsic_reset>;
+
+Hmm, why a -gpios property points to a pinctrl node? Shouldn't there be
+a phandle to GPIO bank + GPIO specifier instead?
+
+> +	};
+> +
+> +	fixed-rate-clocks {
+> +		xxti {
+> +			compatible = "samsung,clock-xxti";
+> +			clock-frequency = <24000000>;
+> +		};
+> +	};
+
+This is also referencing a node from higher level, so it should be done
+using a reference.
+
+> +
+> +	hdmi {
+> +		hpd-gpio = <&gpx3 7 GPIO_ACTIVE_HIGH>;
+> +		pinctrl-names = "default";
+> +		pinctrl-0 = <&hdmi_hpd_irq>;
+> +		phy = <&hdmiphy>;
+> +		ddc = <&i2c_2>;
+> +		hdmi-en-supply = <&s5m_ldo8_reg>;
+> +		vdd-supply = <&s5m_ldo8_reg>;
+> +		vdd_osc-supply = <&s5m_ldo10_reg>;
+> +		vdd_pll-supply = <&s5m_ldo8_reg>;
+> +	};
+
+Ditto.
+
+> +
+> +	fimd at 14400000 {
+> +		status = "okay";
+> +		samsung,invert-vclk;
+> +	};
+
+Ditto.
+
+> +
+> +	dp-controller at 145B0000 {
+> +		status = "okay";
+> +		pinctrl-names = "default";
+> +		pinctrl-0 = <&dp_hpd>;
+> +		samsung,color-space = <0>;
+> +		samsung,dynamic-range = <0>;
+> +		samsung,ycbcr-coeff = <0>;
+> +		samsung,color-depth = <1>;
+> +		samsung,link-rate = <0x0a>;
+> +		samsung,lane-count = <1>;
+> +		samsung,hpd-gpio = <&gpc3 0 GPIO_ACTIVE_HIGH>;
+> +	};
+
+Ditto.
+
+> +};
+> +
+> +&dp_hpd {
+> +	samsung,pins = "gpc3-0";
+> +	samsung,pin-function = <0>;
+> +	samsung,pin-pud = <3>;
+> +	samsung,pin-drv = <0>;
+> +};
+
+Hmm, what node is this referencing? I believe this should rather
+reference the pin controller and add a new board-specific pinconf/pinmux
+group instead....
+
+> +
+> +&i2c_0 {
+> +	status = "okay";
+> +	samsung,i2c-sda-delay = <100>;
+> +	samsung,i2c-max-bus-freq = <378000>;
+
+[snip]
+
+> +/*
+> + * Disabled pullups since external part has its own pullups and
+> + * double-pulling gets us out of spec in some cases.
+> + */
+> +&i2c2_bus {
+> +	samsung,pin-pud = <0>;
+> +};
+
+OK, here overriding a generic pinconf group is justified and nicely
+explained by a comment.
+
+> +
+> +&i2c_2 {
+> +	status = "okay";
+> +	samsung,i2c-sda-delay = <100>;
+> +	samsung,i2c-max-bus-freq = <66000>;
+> +
+> +	hdmiddc at 50 {
+> +		compatible = "samsung,exynos4210-hdmiddc";
+> +		reg = <0x50>;
+> +	};
+
+I don't think this matches current Exynos HDMI bindings, which I believe
+have been changed to just take a phandle to i2c bus instead.
+
+> +};
+> +
+> +&i2c_3 {
+> +	status = "okay";
+> +	samsung,i2c-sda-delay = <100>;
+> +	samsung,i2c-max-bus-freq = <66000>;
+> +};
+
+[snip]
+
+> +&sd1_clk {
+> +	samsung,pin-drv = <0>;
+> +};
+> +
+> +&sd1_cmd {
+> +	samsung,pin-pud = <3>;
+> +	samsung,pin-drv = <0>;
+> +};
+> +
+> +&sd1_cd {
+> +	samsung,pin-drv = <0>;
+> +};
+> +
+> +&sd1_bus4 {
+> +	samsung,pin-drv = <0>;
+> +};
+
+Here generic settings are being overridden, so it might be a good idea
+to explain why, like with i2c pull-up above.
+
+Best regards,
+Tomasz
