@@ -1,58 +1,67 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Thu, 31 Jul 2014 10:57:36 +0100
-Subject: [PATCH] arm64: defconfig: enable crypto drivers as modules
-In-Reply-To: <1406797002-21015-1-git-send-email-ard.biesheuvel@linaro.org>
-References: <1406797002-21015-1-git-send-email-ard.biesheuvel@linaro.org>
-Message-ID: <20140731095736.GH26853@arm.com>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Thu, 31 Jul 2014 10:58:54 +0100
+Subject: [PATCH v2 1/3] arm64: spin-table: handle unmapped
+ cpu-release-addrs
+In-Reply-To: <20140731094515.GE26853@arm.com>
+References: <1406717944-24725-1-git-send-email-ard.biesheuvel@linaro.org>
+ <1406717944-24725-2-git-send-email-ard.biesheuvel@linaro.org>
+ <20140730113013.GL12239@arm.com>
+ <CAKv+Gu8ne8k2NV12SyWye5aYJKHG0wHKAO+=V=1L89_hvyGopw@mail.gmail.com>
+ <20140731094515.GE26853@arm.com>
+Message-ID: <20140731095854.GC21850@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Ard,
-
-On Thu, Jul 31, 2014 at 09:56:42AM +0100, Ard Biesheuvel wrote:
-> This changes the arm64 defconfig to build the ARMv8 Crypto Extensions
-> and NEON based crypto drivers as modules rather than as built-ins. The
-> reason is that the ARMv8 Crypto Extensions based modules will be probed
-> for automatically through udev upon detecting the availability of the
-> respective crypto instructions (AES, PMULL, SHA1, SHA256), and similarly,
-> the NEON alternatives will be probed for upon request (i.e., at first use
-> of the algorithm) if no hardware acceleration is available.
+On Thu, Jul 31, 2014 at 10:45:15AM +0100, Will Deacon wrote:
+> On Wed, Jul 30, 2014 at 08:17:02PM +0100, Ard Biesheuvel wrote:
+> > ]On 30 July 2014 13:30, Will Deacon <will.deacon@arm.com> wrote:
+> > > On Wed, Jul 30, 2014 at 11:59:02AM +0100, Ard Biesheuvel wrote:
+> > >> From: Mark Rutland <mark.rutland@arm.com>
+> > >>
+> > >> In certain cases the cpu-release-addr of a CPU may not fall in the
+> > >> linear mapping (e.g. when the kernel is loaded above this address due to
+> > >> the presence of other images in memory). This is problematic for the
+> > >> spin-table code as it assumes that it can trivially convert a
+> > >> cpu-release-addr to a valid VA in the linear map.
+> > >>
+> > >> This patch modifies the spin-table code to use a temporary cached
+> > >> mapping to write to a given cpu-release-addr, enabling us to support
+> > >> addresses regardless of whether they are covered by the linear mapping.
+> > >>
+> > >> Signed-off-by: Mark Rutland <mark.rutland@arm.com>
+> > >> Tested-by: Mark Salter <msalter@redhat.com>
+> > >> [ardb: added (__force void *) cast]
+> > >> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+> > >> ---
+> > >>  arch/arm64/kernel/smp_spin_table.c | 22 +++++++++++++++++-----
+> > >>  1 file changed, 17 insertions(+), 5 deletions(-)
+> > >
+> > > I'm nervous about this. What if the spin table sits in the same physical 64k
+> > > frame as a read-sensitive device and we're running with 64k pages?
+> > >
+> > 
+> > Actually, booting.txt requires cpu-release-addr to point to a
+> > /memreserve/d part of memory, which implies DRAM (or you wouldn't have
+> > to memreserve it)
+> > That means it should always be covered by the linear mapping, unless
+> > it is located before Image in DRAM, which is the case addressed by
+> > this patch.
 > 
-> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
-> ---
->  arch/arm64/configs/defconfig | 14 +++++++-------
->  1 file changed, 7 insertions(+), 7 deletions(-)
-> 
-> diff --git a/arch/arm64/configs/defconfig b/arch/arm64/configs/defconfig
-> index c1071268c912..3310b4166dd0 100644
-> --- a/arch/arm64/configs/defconfig
-> +++ b/arch/arm64/configs/defconfig
-> @@ -127,10 +127,10 @@ CONFIG_LOCKUP_DETECTOR=y
->  CONFIG_SECURITY=y
->  CONFIG_CRYPTO_ANSI_CPRNG=y
->  CONFIG_ARM64_CRYPTO=y
-> -CONFIG_CRYPTO_SHA1_ARM64_CE=y
-> -CONFIG_CRYPTO_SHA2_ARM64_CE=y
-> -CONFIG_CRYPTO_GHASH_ARM64_CE=y
-> -CONFIG_CRYPTO_AES_ARM64_CE=y
-> -CONFIG_CRYPTO_AES_ARM64_CE_CCM=y
-> -CONFIG_CRYPTO_AES_ARM64_CE_BLK=y
-> -CONFIG_CRYPTO_AES_ARM64_NEON_BLK=y
-> +CONFIG_CRYPTO_SHA1_ARM64_CE=m
-> +CONFIG_CRYPTO_SHA2_ARM64_CE=m
-> +CONFIG_CRYPTO_GHASH_ARM64_CE=m
-> +CONFIG_CRYPTO_AES_ARM64_CE=m
-> +CONFIG_CRYPTO_AES_ARM64_CE_CCM=m
-> +CONFIG_CRYPTO_AES_ARM64_CE_BLK=m
-> +CONFIG_CRYPTO_AES_ARM64_NEON_BLK=m
+> But if it's located before before the Image in DRAM and isn't covered by
+> the linear mapping, then surely the /memreserve/ is pointless too? In which
+> case, this looks like we're simply trying to cater for platforms that aren't
+> following booting.txt (which may need updating if we need to handle this).
 
-Whilst I'm usually fairly open to defconfig updates if they make things more
-useful to people, I think building these as modules is going to be a pain
-for those not using udev (i.e. using busybox and/or simple filesystems for a
-VM). This seems more like something a distro might choose to do as opposed
-to something that is a good idea to have enabled by default.
+No. The DT is describing the memory which is present, and the subset
+thereof which should not be used under normal circumstances. That's a
+static property of the system.
 
-There could be an argument for a distroconfig, but I don't have high hopes
-that anybody would actually use it in practice.
+Where the OS happens to get loaded and what it is able to address is a
+dynamic property of the OS (and possibly the bootloader). The DT cannot
+have knowledge of this.
 
-Will
+It's always true that the OS should not blindly use memreserve'd memory.
+The fact that it cannot address it in the linear mapping is orthogonal.
+
+Cheers,
+Mark.
