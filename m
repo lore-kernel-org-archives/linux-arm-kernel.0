@@ -1,52 +1,35 @@
 From: olof@lixom.net (Olof Johansson)
-Date: Wed, 30 Jul 2014 17:33:59 -0700
-Subject: [PATCH 0/3] ARM: EXYNOS: Fix Exynos5410 boot
-In-Reply-To: <00c901cfa9fc$727b4e10$5771ea30$@samsung.com>
-References: <1406463725-4208-1-git-send-email-afaerber@suse.de>
- <53D4EFBB.6000404@suse.de>
- <00c901cfa9fc$727b4e10$5771ea30$@samsung.com>
-Message-ID: <CAOesGMjh=xMZ3vB45ofh=CLjTFDMQxSxus5q_P67XQSbwg6-+A@mail.gmail.com>
+Date: Wed, 30 Jul 2014 17:35:51 -0700
+Subject: [GIT PULL] Fourth Round of Renesas ARM Based SoC Clock Updates
+ for v3.17
+In-Reply-To: <cover.1406766463.git.horms+renesas@verge.net.au>
+References: <cover.1406766463.git.horms+renesas@verge.net.au>
+Message-ID: <CAOesGMi--0HO3Ae6mDfSrK=U+sFC201vb3UhfSPy_QisJN7FDg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-
-On Sun, Jul 27, 2014 at 5:39 PM, Kukjin Kim <kgene.kim@samsung.com> wrote:
-> Andreas F?rber wrote:
->>
->> Am 27.07.2014 14:22, schrieb Andreas F?rber:
->> > Hello,
->> >
->> > This mini-series unbreaks booting on 5410 based ODROID-XU.
->> >
->> > Since I do not have access to a TRM, the address is a guess based on
->> > 5250 and 5410. Such a node was not present in the 3.14 downstream tree.
->>
->> s/5410/5420/
->>
-> OK.
+On Wed, Jul 30, 2014 at 5:33 PM, Simon Horman
+<horms+renesas@verge.net.au> wrote:
+> Hi Olof, Hi Kevin, Hi Arnd,
 >
->> >
->> > Regards,
->> > Andreas
->> >
->> > Andreas F?rber (3):
->> >   Documentation: devicetree: Document exynos5410 PMU
->> >   ARM: dts: exynos: Add PMU to Exynos5410
->> >   ARM: EXYNOS: Add support for Exynos5410 PMU
->> >
->> >  Documentation/devicetree/bindings/arm/samsung/pmu.txt | 1 +
->> >  arch/arm/boot/dts/exynos5410.dtsi                     | 5 +++++
->> >  arch/arm/mach-exynos/exynos.c                         | 1 +
->> >  3 files changed, 7 insertions(+)
->>
-> Andreas, thanks.
+> Please consider these fourth round of Renesas ARM based SoC clock
+> updates for v3.17.
 >
-> I'll apply this whole series.
+> I am sending this even though v3.16-rc6 has long since been released
+> as this pull-request only includes a single one line fix for a problem
+> introduced in patches you have already queued up for v3.16.
+>
+> At it turns out the problem should not manifest at run time
+> as it is an error in an clock that is not used without DT modifications.
+> As such I am happy for you to ask me to defer this to v3.18 if you like.
+>
+> This pull request is based on the previous round of
+> such requests, tagged as renesas-clock3-for-v3.17,
+> which you have already merged.
 
-We're getting close to the merge window. I'd prefer not to have to
-start reverting samsung code to recover from these regressions, so
-please send this up very soon.
+It is less work to just apply a patch when there's a single one like
+this. Please just send it and ask us to apply it on top of the
+previous branch.
 
 
 -Olof
