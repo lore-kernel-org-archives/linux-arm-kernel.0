@@ -1,40 +1,50 @@
 From: hsnaves@gmail.com (Humberto Silva Naves)
-Date: Thu, 31 Jul 2014 13:22:07 +0200
-Subject: [PATCHv2 0/5] clk: samsung: exynos5410: Implementation of the PLL
- clocks
-Message-ID: <1406805732-17372-1-git-send-email-hsnaves@gmail.com>
+Date: Thu, 31 Jul 2014 13:22:08 +0200
+Subject: [PATCHv2 1/5] clk: samsung: exynos5410: Add NULL pointer checks in
+ clock init
+In-Reply-To: <1406805732-17372-1-git-send-email-hsnaves@gmail.com>
+References: <1406805732-17372-1-git-send-email-hsnaves@gmail.com>
+Message-ID: <1406805732-17372-2-git-send-email-hsnaves@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Added NULL pointer checks for device_node input parameter and
+for the samsung_clk_provider context returned by samsung_clk_init.
+Even though the *current* samsung_clk_init function never returns
+a NULL pointer, it is good to keep this check in place to avoid
+possible problems in the future due to changes in implementation.
+That way, we also improve the consistency of the code that performs
+clock initialization across the different SoCs.
 
-This patch series slightly improves the exynos5410 clock driver. Below is
-a list of changes introduced by the patch:
- - Basic validation in the clock initialization routine
- - Added resume/suspend handler
- - Implemented some fixed rate clocks and changed the way "fin_pll" is defined
- - Added the remaining PLL clocks
+Signed-off-by: Humberto Silva Naves <hsnaves@gmail.com>
+---
+ drivers/clk/samsung/clk-exynos5410.c |   12 +++++++++---
+ 1 file changed, 9 insertions(+), 3 deletions(-)
 
-Changelog since v1:
- * Split the reordering and addition of new constants  into two different
-commits, as suggested by Thomas Abraham. For details, see:
-http://www.mail-archive.com/linux-samsung-soc at vger.kernel.org/msg34950.html
- * The rate tables are only installed if the clock rate of the parent matches
-a specific frequency of 24MHz. For details, please refer to:
-http://www.mail-archive.com/linux-samsung-soc at vger.kernel.org/msg34953.html
- * Added some fixed rate clocks.
-
-Humberto Silva Naves (5):
-  clk: samsung: exynos5410: Add NULL pointer checks in clock init
-  clk: samsung: exynos5410: Organize register offset constants
-  clk: samsung: exynos5410: Add suspend/resume handling
-  clk: samsung: exynos5410: Add fixed rate clocks
-  clk: samsung: exynos5410: Added clocks DPLL, EPLL, IPLL, and VPLL
-
- .../devicetree/bindings/clock/exynos5410-clock.txt |   17 +-
- drivers/clk/samsung/clk-exynos5410.c               |  437 ++++++++++++++++++--
- include/dt-bindings/clock/exynos5410.h             |    5 +
- 3 files changed, 430 insertions(+), 29 deletions(-)
-
+diff --git a/drivers/clk/samsung/clk-exynos5410.c b/drivers/clk/samsung/clk-exynos5410.c
+index 231475b..bf57c80 100644
+--- a/drivers/clk/samsung/clk-exynos5410.c
++++ b/drivers/clk/samsung/clk-exynos5410.c
+@@ -188,11 +188,17 @@ static void __init exynos5410_clk_init(struct device_node *np)
+ 	struct samsung_clk_provider *ctx;
+ 	void __iomem *reg_base;
+ 
+-	reg_base = of_iomap(np, 0);
+-	if (!reg_base)
+-		panic("%s: failed to map registers\n", __func__);
++	if (np) {
++		reg_base = of_iomap(np, 0);
++		if (!reg_base)
++			panic("%s: failed to map registers\n", __func__);
++	} else {
++		panic("%s: unable to determine soc\n", __func__);
++	}
+ 
+ 	ctx = samsung_clk_init(np, reg_base, CLK_NR_CLKS);
++	if (!ctx)
++		panic("%s: unable to allocate context.\n", __func__);
+ 
+ 	samsung_clk_register_pll(ctx, exynos5410_plls,
+ 			ARRAY_SIZE(exynos5410_plls), reg_base);
 -- 
 1.7.10.4
