@@ -1,126 +1,144 @@
-From: alex.bennee@linaro.org (Alex =?utf-8?Q?Benn=C3=A9e?=)
-Date: Thu, 31 Jul 2014 16:14:51 +0100
-Subject: [PATCH] arm64: KVM: export current vcpu->pause state via pseudo
- regs
-In-Reply-To: <20140731143538.GI11610@cbox>
-References: <1404914112-7298-1-git-send-email-alex.bennee@linaro.org>
- <20140731143538.GI11610@cbox>
-Message-ID: <87mwbpimgz.fsf@linaro.org>
+From: robherring2@gmail.com (Rob Herring)
+Date: Thu, 31 Jul 2014 10:22:19 -0500
+Subject: [PATCH 2/5] arm64, thunder: Add initial dts for Cavium Thunder SoC
+In-Reply-To: <20140731123443.GS4703@rric.localhost>
+References: <1406732794-20920-1-git-send-email-rric@kernel.org>
+ <1406732794-20920-3-git-send-email-rric@kernel.org>
+ <20140730154626.GD20162@leverpostej>
+ <CAL_JsqLJ_W34XTF2aMOW9z+Gq4oxbrX1RztyJN8Mi0OFPeNxfg@mail.gmail.com>
+ <20140731123443.GS4703@rric.localhost>
+Message-ID: <CAL_JsqKgfjV4sEZOWuH4YcMjeOA_yNDvZLv_jTi_Sb=27cOD3g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-Christoffer Dall writes:
-
-> On Wed, Jul 09, 2014 at 02:55:12PM +0100, Alex Benn?e wrote:
->> To cleanly restore an SMP VM we need to ensure that the current pause
->> state of each vcpu is correctly recorded. Things could get confused if
->> the CPU starts running after migration restore completes when it was
->> paused before it state was captured.
->> 
-<snip>
->> +/* Power state (PSCI), not real registers */
->> +#define KVM_REG_ARM_PSCI		(0x0014 << KVM_REG_ARM_COPROC_SHIFT)
->> +#define KVM_REG_ARM_PSCI_REG(n) \
->> +	(KVM_REG_ARM64 | KVM_REG_SIZE_U64 | KVM_REG_ARM_PSCI | \
->> +         (n & ~KVM_REG_ARM_COPROC_MASK))
+On Thu, Jul 31, 2014 at 7:34 AM, Robert Richter <rric@kernel.org> wrote:
+> On 30.07.14 11:37:38, Rob Herring wrote:
+>> On Wed, Jul 30, 2014 at 10:46 AM, Mark Rutland <mark.rutland@arm.com> wrote:
+>> > On Wed, Jul 30, 2014 at 04:06:31PM +0100, Robert Richter wrote:
+>> >> From: Radha Mohan Chintakuntla <rchintakuntla@cavium.com>
 >
-> I don't understand this mask, why isn't this
->             (n & 0xffff))
+>> >> +/ {
+>> >> +     model = "Cavium ThunderX CN88XX Family";
+>> >> +     compatible = "cavium,thunder-88xx";
+>> >
+>> > Please don't use wildcards in compatible strings. Give this an absolute
+>> > name, and override as necessary.
+>
+> The naming 88xx refers to the processor family and arn't actually
+> wildcards. In the future we might need another dts file for 87xx, but
+> so far all SoCs of 88xx family should use the same dts files. In this
+> sense the naming is very specific.
 
-I was trying to use the existing masks, but of course if anyone changes
-that it would be an ABI change so probably not worth it.
+Yes, but each implementation can have its own errata. You might not
+need to distinguish them now, but you could in the future.
+
+However, if the family is really all the same die and different parts
+are just marketing, then the name is fine. Or if you can easily probe
+the exact part and revision it's probably fine.
 
 >
->> +#define KVM_REG_ARM_PSCI_STATE          KVM_REG_ARM_PSCI_REG(0)
->> +#define NUM_KVM_PSCI_REGS               1
->> +
 >
-> you're missing updates to Documentation/virtual/kvm/api.txt here.
-
-Will add.
-
->>  /* Device Control API: ARM VGIC */
->>  #define KVM_DEV_ARM_VGIC_GRP_ADDR	0
->>  #define KVM_DEV_ARM_VGIC_GRP_DIST_REGS	1
->> diff --git a/arch/arm64/kvm/guest.c b/arch/arm64/kvm/guest.c
->> index 205f0d8..31d6439 100644
->> --- a/arch/arm64/kvm/guest.c
->> +++ b/arch/arm64/kvm/guest.c
->> @@ -189,6 +189,54 @@ static int get_timer_reg(struct kvm_vcpu *vcpu, const struct kvm_one_reg *reg)
->>  }
->>  
->>  /**
->> + * PSCI State
->> + *
->> + * These are not real registers as they do not actually exist in the
->> + * hardware but represent the current power state of the vCPU
+>> >> +     cpus {
+>> >> +             #address-cells = <2>;
+>> >> +             #size-cells = <0>;
+>> >> +
+>> >> +             cpu at 000 {
+>> >> +                     device_type = "cpu";
+>> >> +                     compatible = "cavium,thunder", "arm,armv8";
+>> >> +                     reg = <0x0 0x000>;
+>> >> +                     enable-method = "psci";
+>> >> +             };
+>> >
+>> > Just to check: both the SoC and CPU are called thunder?
 >
-> full stop
+> The soc is called thunder-88xx, the cpu thunder. E.g. an 87xx soc will
+> have the same core in which is thunder.
+
+And the next version of the core would be called something else?
+thunder-v2? lightning? As long as they are distinguishable they should
+be fine.
+
+Rob
+
 >
->> + */
->> +
->> +static bool is_psci_reg(u64 index)
->> +{
->> +	switch (index) {
->> +	case KVM_REG_ARM_PSCI_STATE:
->> +		return true;
->> +	}
->> +	return false;
->> +}
->> +
->> +static int copy_psci_indices(struct kvm_vcpu *vcpu, u64 __user *uindices)
->> +{
->> +	if (put_user(KVM_REG_ARM_PSCI_STATE, uindices))
->> +		return -EFAULT;
->> +	return 0;
->> +}
->> +
->> +static int set_psci_reg(struct kvm_vcpu *vcpu, const struct kvm_one_reg *reg)
->> +{
->> +	void __user *uaddr = (void __user *)(long)reg->addr;
->> +	u64 val;
->> +	int ret;
->> +
->> +	ret = copy_from_user(&val, uaddr, KVM_REG_SIZE(reg->id));
->> +	if (ret != 0)
->> +		return ret;
->> +
->> +        vcpu->arch.pause = (val & 0x1) ? false : true;
 >
-> tabs
-
-Hmmm, apparently the GNU Emacs "linux" style doesn't actually enforce
-that. Who knew? I'll beat the editor into submission.
-
-> I really need the documentation of the ABI, why is bit[0] == 1 not
-> paused?
-
-I figured 1 == running, but I can switch it round if you want to to map
-directly to the .pause flag.
-
-> If we are not complaining when setting the pause value to false if it
-> was true before, then we probably also need to wake up the thread in
-> case this is called from another thread, right?
+>> >> +     memory at 00000000 {
+>> >> +             device_type = "memory";
+>> >> +             reg = <0x0 0x00000000 0x0 0x80000000>;
+>> >> +     };
+>> >> +
+>> >> +     gic0: interrupt-controller at 801000000000 {
+>> >
+>> > To make this easier to read, please place a comma between 32-bit
+>> > portions of the unit address (e.g. here have 8010,00000000).
 >
-> or perhaps we should just return an error if you're trying to un-pause a
-> CPU through this interface, hmmmm.
-
-Wouldn't it be an error to mess with any register when the system is not
-in a quiescent state? I was assuming that the wake state is dealt with
-when the run loop finally restarts. 
-
-<snip>
+> Changed this.
 >
-> please check for use of tabs versus spaces, checkpatch.pl should
-> complain.
+>>
+>> Mark, perhaps a dtc or checkpatch.pl check for this?
+>>
+>> This should also be under a bus node.
 >
-> Can you add the 32-bit counterpart as part of this patch?
-
-Same patch? Sure.
+> Will do.
 >
-> Thanks,
-> -Christoffer
+>>
+>> >> +             compatible = "arm,gic-v3";
+>> >> +             #interrupt-cells = <3>;
+>> >> +             #address-cells = <2>;
+>> >> +             #size-cells = <2>;
+>> >> +             ranges;
+>> >
+>> > This has no children, so why have ranges, #address-cells, and
+>> > #size-cells?
+>
+> Right, this is a leftover from a change in a follow on patch that
+> introduces a child for its. Will remove #address-cells, #size-cells
+> and ranges in this patch and move the change to the later patch.
+>
+>> >
+>> >> +             interrupt-controller;
+>> >> +             reg = <0x8010 0x00000000 0x0 0x010000>, /* GICD */
+>> >> +                   <0x8010 0x80000000 0x0 0x200000>; /* GICR */
+>> >> +             interrupts = <1 9 0xf04>;
+>> >> +     };
+>
+>> >> +             clocks {
+>> >> +                     #address-cells = <2>;
+>> >> +                     #size-cells = <2>;
+>> >> +                     ranges;
+>> >> +
+>> >> +                     refclk50mhz: refclk50mhz {
+>> >> +                             compatible = "fixed-clock";
+>> >> +                             #clock-cells = <0>;
+>> >> +                             clock-frequency = <50000000>;
+>> >> +                             clock-output-names = "refclk50mhz";
+>> >> +                     };
+>> >> +             };
+>> >
+>> > Please get rid of the clocks node and just put the clocks here.
+>
+> Will do.
+>
+>> >
+>> >> +
+>> >> +             uaa0: serial at 87e024000000 {
+>> >> +                     compatible = "arm,pl011", "arm,primecell";
+>> >> +                     reg = <0x87e0 0x24000000 0x0 0x1000>;
+>> >> +                     interrupts = <1 21 4>;
+>> >> +                     clocks = <&refclk50mhz>;
+>> >> +                     clock-names = "apb_pclk";
+>> >
+>> > Is this actually the apb_pclk, or is the the uartclk? I assume it's the
+>> > latter.
+>>
+>> Shouldn't new bindings have both clocks here? A single clock was a
+>> mistake I think (mine in fact).
+>
+> Do you mean
+>                         clock-names = "uartclk", "apb_pclk";
+> here?
 
--- 
-Alex Benn?e
+Yes, but Mark said this change never happened so maybe it is fine. In
+any case, follow the pl011 binding documentation.
+
+Rob
