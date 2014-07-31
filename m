@@ -1,64 +1,71 @@
-From: collinsd@codeaurora.org (David Collins)
-Date: Thu, 31 Jul 2014 13:53:59 -0700
-Subject: [PATCH v3 2/4] mfd: pm8xxx-spmi: document DT bindings for Qualcomm
- SPMI PMICs
-In-Reply-To: <53DA054D.2050508@mm-sol.com>
-References: <1406205921-7452-1-git-send-email-svarbanov@mm-sol.com>
- <1406205921-7452-3-git-send-email-svarbanov@mm-sol.com>
- <53D81EE1.7040309@codeaurora.org> <53DA054D.2050508@mm-sol.com>
-Message-ID: <53DAACE7.70500@codeaurora.org>
+From: hsnaves@gmail.com (Humberto Naves)
+Date: Thu, 31 Jul 2014 23:01:03 +0200
+Subject: [PATCHv2 4/5] clk: samsung: exynos5410: Add fixed rate clocks
+In-Reply-To: <53DA2C74.3010101@samsung.com>
+References: <1406805732-17372-1-git-send-email-hsnaves@gmail.com>
+ <1406805732-17372-5-git-send-email-hsnaves@gmail.com>
+ <53DA2C74.3010101@samsung.com>
+Message-ID: <CAEe5pB8wzECi=4Eoa_xZYuw7NRPuRmizBNm5mXYMjYY_hWBy9Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/31/2014 01:58 AM, Stanimir Varbanov wrote:
-> On 07/30/2014 01:23 AM, David Collins wrote:
->> On 07/24/2014 05:45 AM, Stanimir Varbanov wrote:
->>> Document DT bindings used to describe the Qualcomm SPMI PMICs.
->>> Currently the SPMI PMICs supported are pm8941, pm8841 and pma8084.
->>>
->>> Signed-off-by: Stanimir Varbanov <svarbanov@mm-sol.com>
->>
->> (...)
->>> +Required properties for peripheral child nodes:
->>> +- compatible:      Should contain "qcom,pm8xxx-xxx", where "xxx" is
->>> +                   peripheral name. The "pm8xxx" can be any of supported PMICs,
->>> +                   see example below.
->>
->> I don't think that this binding document should be imposing any formatting
->> restrictions on the compatible strings for QPNP peripheral drivers.  The
->> QPNP peripheral drivers in the downstream msm-3.10 tree [1] do not specify
->> per-PMIC compatible strings.  This is because ideally, a given QPNP
->> peripheral represents a hardware block that is identical in interface and
->> operation between PMICs.
->>
-> 
-> Isn't "hardware block that is identical in interface and operation
-> between PMICs" exactly the meaning of *compatible* property?
-> 
-> No *compatible* property, no platform device. We must have this property
-> for every peripheral driver.
+Hi,
 
-I am not suggesting that we remove the compatible property for peripheral
-device nodes.  I agree that these nodes need to have a compatible
-property.  My concern is that this binding document should not require the
-peripheral nodes to have compatible property values that are PMIC specific.
+On Thu, Jul 31, 2014 at 1:45 PM, Sylwester Nawrocki
+<s.nawrocki@samsung.com> wrote:
+> Can you explain what is rationale behind this change ? Is it related to
+> suspend/resume ordering ?
 
-For example, in the downstream msm-3.10 branch the power-on peripheral
-uses the same compatible string regardless of what PMIC the peripheral is
-found on: "qcom,qpnp-power-on" [1].  There is no reason for the driver to
-care about what PMIC the peripheral is found on.  Therefore, it does not
-make sense to force it to support compatible strings like
-"qcom,pm8941-power-on", "qcom,pm8841-power-on", "qcom,pma8084-power-on", etc.
+I had forgotten, but now remember the reason why I did this. If you
+see the current implementation of clk-exynos5410, you will notice it
+heavily depends on the clock "fin_pll". On the other hand, this clock
+exists because in the current dtb (exynos5410-smdk5410.dts), there is
+a node fin_pll such as
 
-Every QPNP PMIC peripheral has its own set of type and version registers
-that allow software to auto-detect its capabilities at runtime.
+       fin_pll: xxti {
+               compatible = "fixed-clock";
+               clock-frequency = <24000000>;
+               clock-output-names = "fin_pll";
+               #clock-cells = <0>;
+       };
 
-Take care,
-David
+So far so good. But the real problem comes in when I check the rate of
+fin_pll to determine if I should install the rate table or not (and I
+really need this for my patch). More specifically
 
-[1]:
-https://www.codeaurora.org/cgit/quic/la/kernel/msm-3.10/tree/Documentation/devicetree/bindings/platform/msm/qpnp-power-on.txt?h=msm-3.10
+       if (_get_rate("fin_pll") == 24 * MHZ) {
+               exynos5410_plls[apll].rate_table = apll_24mhz_tbl;
+               exynos5410_plls[cpll].rate_table = cpll_24mhz_tbl;
+               exynos5410_plls[kpll].rate_table = kpll_24mhz_tbl;
+               exynos5410_plls[dpll].rate_table = dpll_24mhz_tbl;
+               exynos5410_plls[epll].rate_table = epll_24mhz_tbl;
+               exynos5410_plls[ipll].rate_table = ipll_24mhz_tbl;
+       }
 
--- 
-The Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-hosted by The Linux Foundation
+I *have* to determine if the rate of fin_pll is 24MHz, and this is
+impossible to do if fin_pll is not available. Moreover, there is no
+way I can ensure that the fixed clock provider for fin_pll was
+initialized before mine, so there is chance that _get_rate won't work.
+The only way I fix that is to set the dependency explicitly in the
+dtb, by adding the fin_pll clock as required resource.
+
+              clock: clock-controller at 10010000 {
+                      compatible = "samsung,exynos5410-clock";
+                      reg = <0x10010000 0x30000>;
+                      #clock-cells = <1>;
+                      /* Add the parent clock */
+                      clocks = <&fin_pll>;
+                      clock-names = "fin_pll";
+              };
+
+But in any case, the bindings with the DTB must be changed one way or
+another, because I *really* need to use fin_pll on my driver
+registration. If you agree with this alternative solution I previously
+described, I can change that in the next version of the patch series.
+
+Best regards,
+Humberto
+
+> Obviously it breaks the kernel/dtb compatibility. We should be moving
+> in opposite direction, i.e. completely remove the custom samsung fixed
+> rate clocks.
