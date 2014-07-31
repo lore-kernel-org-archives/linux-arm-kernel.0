@@ -1,39 +1,64 @@
-From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
-Date: Thu, 31 Jul 2014 18:48:37 +0200
-Subject: [PATCH] ARM: at91: spi: request all csgpio in spi probe
-In-Reply-To: <C5B462AE-B1D2-4067-91EB-44FDF49D28FA@jcrosoft.com>
-References: <b033d16ec31d26a895726ee72ec89b43943dfbae.1406547656.git.jiri.prchal@aksignal.cz>
- <20140728122103.GR9532@piout.net> <53D64ADA.1000102@aksignal.cz>
- <20140728223859.GA3214@piout.net>
- <20140729100017.31f0b1be@bbrezillon>
- <20140731155906.GH3214@piout.net>
- <C5B462AE-B1D2-4067-91EB-44FDF49D28FA@jcrosoft.com>
-Message-ID: <20140731164836.GI3214@piout.net>
+From: oleg@redhat.com (Oleg Nesterov)
+Date: Thu, 31 Jul 2014 18:54:23 +0200
+Subject: [PATCH v4 2/5] x86,entry: Only call user_exit if TIF_NOHZ
+In-Reply-To: <20140731164918.GC7842@localhost.localdomain>
+References: <cover.1406604806.git.luto@amacapital.net>
+ <7123b2489cc5d1d5abb7bcf1364ca729cab3e6ca.1406604806.git.luto@amacapital.net>
+ <20140729193232.GA8153@redhat.com>
+ <20140730164344.GA27954@localhost.localdomain>
+ <CALCETrUVaz3JFiNbyU=r3M-E9muHa1ffn7RX+_-4V_0U-hVaPw@mail.gmail.com>
+ <20140731151630.GA7842@localhost.localdomain>
+ <20140731164246.GA15974@redhat.com>
+ <20140731164918.GC7842@localhost.localdomain>
+Message-ID: <20140731165423.GA16800@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/08/2014 at 00:10:05 +0800, Jean-Christophe PLAGNIOL-VILLARD wrote :
-> >>> While this solves the particular issue Ji?? is seeing, this will not
-> >>> solve the case where PA14 (CS0) is not used by the spi driver at all. It
-> >>> will remained muxed as CS0 and toggle when the spi master needs to
-> >>> access CS0 until another driver muxes it to something else. I still
-> >>> believe we should explicitly ask pinctrl to mux them as gpios.
-> 
-> This is not the job of the kernel but to the bootloader
-> no the pinctrl binding is not here and will never be here the configure a pin as a GPIO or
+On 07/31, Frederic Weisbecker wrote:
+>
+> On Thu, Jul 31, 2014 at 06:42:46PM +0200, Oleg Nesterov wrote:
+> > On 07/31, Frederic Weisbecker wrote:
+> > >
+> > > On Wed, Jul 30, 2014 at 10:23:34AM -0700, Andy Lutomirski wrote:
+> > > >
+> > > > At the end of the day, the syscall slowpath code calls a bunch of
+> > > > functions depending on what TIF_XYZ flags are set.  As long as it's
+> > > > structured like "if (TIF_A) do_a(); if (TIF_B) do_b();" or something
+> > > > like that, it's comprehensible.  But once random functions with no
+> > > > explicit flag checks or comments start showing up, it gets confusing.
+> > >
+> > > Yeah that's a point. I don't mind much the TIF_NOHZ test if you like.
+> >
+> > And in my opinion
+> >
+> > 	if (work & TIF_XYZ)
+> > 		user_exit();
+> >
+> > looks even more confusing. Because, once again, TIF_XYZ is not the
+> > reason to call user_exit().
+> >
+> > Not to mention this adds a minor performance penalty.
+>
+> That's a point too! You guys both convinced me! ;-)
 
-This is exactly what AT91_PERIPH_GPIO does though. Anyway, not request
-the pinmuxing in the driver is not a good idea, then nothing prevents
-another driver to request them to do something completely different.
+Very nice, now I know that you can agree with 2 opposite opinions at
+the same time ;)
 
-> to a specific state. This the job of the driver or the bootloader
-> 
+> > > > If it's indeed all-or-nothing, I could remove the check and add a
+> > > > comment.  But please keep in mind that, currently, the slow path is
+> > > > *slow*, and my patches only improve the entry case.  So enabling
+> > > > context tracking on every task will hurt.
+> > >
+> > > That's what we do anyway. I haven't found a safe way to enabled context tracking
+> > > without tracking all CPUs.
+> >
+> > And if we change this, then the code above becomes racy. The state of
+> > TIF_XYZ can be changed right after the check. OK, it is racy anyway ;)
+> > but still this adds more confusion.
+>
+> No because all running tasks have this flag set when context tracking is
+> enabled. And context tracking can't be disabled on runtime.
 
-I agree that it must not allow to set the state, we are talking about
-muxing.
+Yes, yes, please note that I said "if we change this".
 
-
--- 
-Alexandre Belloni, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
+Oleg.
