@@ -1,77 +1,41 @@
-From: punit.agrawal@arm.com (Punit Agrawal)
-Date: Thu, 31 Jul 2014 16:38:37 +0100
-Subject: [PATCH] drivers: CCI: Correct use of ! and &
-In-Reply-To: <CAOesGMgAY7-MDVG2CzesQurWtMLdODjsdBNV8jScFJtAB3NAJg@mail.gmail.com>
- (Olof Johansson's message of "Wed, 30 Jul 2014 23:00:24 -0700")
-References: <1406716655-32494-1-git-send-email-punit.agrawal@arm.com>
- <20140730195424.GG18384@quad.lixom.net>
- <CAOesGMgAY7-MDVG2CzesQurWtMLdODjsdBNV8jScFJtAB3NAJg@mail.gmail.com>
-Message-ID: <9hhoaw55yiq.fsf@arm.com>
+From: olof@lixom.net (Olof Johansson)
+Date: Thu, 31 Jul 2014 08:39:55 -0700
+Subject: [PATCH 0/4] LLVMLinux: Patches to enable the kernel to be
+ compiled with clang/LLVM
+In-Reply-To: <20140731103323.GL26853@arm.com>
+References: <1406764649-20326-1-git-send-email-behanw@converseincode.com>
+ <20140731103323.GL26853@arm.com>
+Message-ID: <CAOesGMiCiGwuGdOePPvE5WhZLRnG6qRvoJmBQHV4P9602Gy5DA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Olof,
-
-Olof Johansson <olof@lixom.net> writes:
-
-> Hi,
->
-> On Wed, Jul 30, 2014 at 12:54 PM, Olof Johansson <olof@lixom.net> wrote:
->> On Wed, Jul 30, 2014 at 11:37:35AM +0100, Punit Agrawal wrote:
->>> From: Himangi Saraogi <himangi774@gmail.com>
->>>
->>> In commit ae91d60ba88ef0bdb1b5e9b2363bd52fc45d2af7, a bug was fixed that
->>> involved converting !x & y to !(x & y).  The code below shows the same
->>> pattern, and thus should perhaps be fixed in the same way.
->>>
->>> The Coccinelle semantic patch that makes this change is as follows:
->>>
->>> // <smpl>
->>> @@ expression E1,E2; @@
->>> (
->>>   !E1 & !E2
->>> |
->>> - !E1 & E2
->>> + !(E1 & E2)
->>> )
->>> // </smpl>
->>>
->>> Cc: stable at vger.kernel.org
->>> Signed-off-by: Himangi Saraogi <himangi774@gmail.com>
->>> Acked-by: Julia Lawall <julia.lawall@lip6.fr>
->>> Acked-by: Punit Agrawal <punit.agrawal@arm.com>
->>> ---
+On Thu, Jul 31, 2014 at 3:33 AM, Will Deacon <will.deacon@arm.com> wrote:
+> On Thu, Jul 31, 2014 at 12:57:25AM +0100, behanw at converseincode.com wrote:
+>> From: Behan Webster <behanw@converseincode.com>
 >>
->> Thanks, applied (adding a Fixes: tag, please use those in the future)
-
-Will do.
-
+>> This patch set moves from using locally defined named registers to access the
+>> stack pointer to using a globally defined named register. This allows the code
+>> to work both with gcc and clang.
+>>
+>> The LLVMLinux project aims to fully build the Linux kernel using both gcc and
+>> clang (the C front end for the LLVM compiler infrastructure project).
+>>
+>> Behan Webster (4):
+>>   arm64: LLVMLinux: Add current_stack_pointer() for arm64
+>>   arm64: LLVMLinux: Use current_stack_pointer in save_stack_trace_tsk
+>>   arm64: LLVMLinux: Calculate current_thread_info from
+>>     current_stack_pointer
+>>   arm64: LLVMLinux: Use current_stack_pointer in kernel/traps.c
 >
-> On second look, I see that the code doesn't actually change behavior
-> (since the mask is done with 0x1, it happens to have the same result).
-> Pure luck before. :)
-
-Although I'd tested the original submission and had seen interrupts
-handled correctly, this fix made me question if I was mis-remembering
-(since this was about a year ago).
-
-I had convinced myself that the fix was required. Re-evaluating all the
-conditions after reading your response, I agree that it is not a change
-in behaviour but still a correct fix.
-
+> Once Andreas's comments have been addressed:
 >
-> Because of this, I've moved this to our next/fixes-non-critical
-> branch, which will be sent up during the 3.17 merge window, and I took
-> off the stable cc. It's still a good fix, but since it doesn't
-> actually fix broken behavior there's no need to rush it.
+>   Acked-by: Will Deacon <will.deacon@arm.com>
+>
+> Please can you send a new series after the merge window?
 
-Ack. Thanks a lot.
+Given that the ARM64 KVM guys are still actively breaking -next, and
+this is considerably smaller and lower risk than that, I think you can
+take it for 3.17?
 
->
->
-> -Olof
->
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+
+-Olof
