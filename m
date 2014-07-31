@@ -1,55 +1,50 @@
-From: fweisbec@gmail.com (Frederic Weisbecker)
-Date: Thu, 31 Jul 2014 18:49:20 +0200
-Subject: [PATCH v4 2/5] x86,entry: Only call user_exit if TIF_NOHZ
-In-Reply-To: <20140731164246.GA15974@redhat.com>
-References: <cover.1406604806.git.luto@amacapital.net>
- <7123b2489cc5d1d5abb7bcf1364ca729cab3e6ca.1406604806.git.luto@amacapital.net>
- <20140729193232.GA8153@redhat.com>
- <20140730164344.GA27954@localhost.localdomain>
- <CALCETrUVaz3JFiNbyU=r3M-E9muHa1ffn7RX+_-4V_0U-hVaPw@mail.gmail.com>
- <20140731151630.GA7842@localhost.localdomain>
- <20140731164246.GA15974@redhat.com>
-Message-ID: <20140731164918.GC7842@localhost.localdomain>
+From: christoffer.dall@linaro.org (Christoffer Dall)
+Date: Thu, 31 Jul 2014 18:50:06 +0200
+Subject: [PATCH] arm64: KVM: export current vcpu->pause state via pseudo
+ regs
+In-Reply-To: <CAFEAcA91efUg3MVpLScNBkxZSEgDP0zNnmxxr055fAz5=vDCoA@mail.gmail.com>
+References: <1404914112-7298-1-git-send-email-alex.bennee@linaro.org>
+ <20140731143538.GI11610@cbox> <87mwbpimgz.fsf@linaro.org>
+ <20140731163805.GK11610@cbox>
+ <CAFEAcA91efUg3MVpLScNBkxZSEgDP0zNnmxxr055fAz5=vDCoA@mail.gmail.com>
+Message-ID: <20140731165006.GL11610@cbox>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jul 31, 2014 at 06:42:46PM +0200, Oleg Nesterov wrote:
-> On 07/31, Frederic Weisbecker wrote:
+On Thu, Jul 31, 2014 at 05:45:28PM +0100, Peter Maydell wrote:
+> On 31 July 2014 17:38, Christoffer Dall <christoffer.dall@linaro.org> wrote:
+> >> > If we are not complaining when setting the pause value to false if it
+> >> > was true before, then we probably also need to wake up the thread in
+> >> > case this is called from another thread, right?
+> >> >
+> >> > or perhaps we should just return an error if you're trying to un-pause a
+> >> > CPU through this interface, hmmmm.
+> >>
+> >> Wouldn't it be an error to mess with any register when the system is not
+> >> in a quiescent state? I was assuming that the wake state is dealt with
+> >> when the run loop finally restarts.
+> >>
 > >
-> > On Wed, Jul 30, 2014 at 10:23:34AM -0700, Andy Lutomirski wrote:
-> > >
-> > > At the end of the day, the syscall slowpath code calls a bunch of
-> > > functions depending on what TIF_XYZ flags are set.  As long as it's
-> > > structured like "if (TIF_A) do_a(); if (TIF_B) do_b();" or something
-> > > like that, it's comprehensible.  But once random functions with no
-> > > explicit flag checks or comments start showing up, it gets confusing.
-> >
-> > Yeah that's a point. I don't mind much the TIF_NOHZ test if you like.
+> > The ABI doesn't really define it as an error (the ABI doesn't enforce
+> > anything right now) so the question is, does it ever make sense to clear
+> > the pause flag through this ioctl?  If not, I think we should just err
+> > on the side of caution and specify in the docs that this is not
+> > supported and return an error.
 > 
-> And in my opinion
+> Consider the case where the reset state of the system is
+> "CPU 0 running, CPUs 1..N stopped", and we're doing an
+> incoming migration to a state where all CPUs are running.
+> In that case we'll be using this ioctl to clear the pause flag,
+> right? (We'll also obviously need to set the PC and other
+> register state correctly before resuming the guest.)
 > 
-> 	if (work & TIF_XYZ)
-> 		user_exit();
-> 
-> looks even more confusing. Because, once again, TIF_XYZ is not the
-> reason to call user_exit().
-> 
-> Not to mention this adds a minor performance penalty.
+Doh, you're right, I somehow had it in my mind that when you send the
+thread a signal, the pause flag would be cleared, but that goes against
+the whole idea of a CPU being turned off for KVM.
 
-That's a point too! You guys both convinced me! ;-)
+But wouldn't we then have to also wake up the thread when clearing the
+pause flag?  It feels strange that the ioctl can clear the pause flag,
+but keep the thread on a wake-queue, and then userspace has to send the
+thread a signal of some sort to wake it up?
 
-> 
-> > > If it's indeed all-or-nothing, I could remove the check and add a
-> > > comment.  But please keep in mind that, currently, the slow path is
-> > > *slow*, and my patches only improve the entry case.  So enabling
-> > > context tracking on every task will hurt.
-> >
-> > That's what we do anyway. I haven't found a safe way to enabled context tracking
-> > without tracking all CPUs.
-> 
-> And if we change this, then the code above becomes racy. The state of
-> TIF_XYZ can be changed right after the check. OK, it is racy anyway ;)
-> but still this adds more confusion.
-
-No because all running tasks have this flag set when context tracking is
-enabled. And context tracking can't be disabled on runtime.
+-Christoffer
