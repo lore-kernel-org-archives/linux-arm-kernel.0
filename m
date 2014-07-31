@@ -1,93 +1,86 @@
-From: tomasz.figa@gmail.com (Tomasz Figa)
-Date: Thu, 31 Jul 2014 21:08:53 +0200
-Subject: [PATCH v3 0/7] Enable L2 cache support on Exynos4210/4x12 SoCs
-In-Reply-To: <1405615142-21426-1-git-send-email-t.figa@samsung.com>
-References: <1405615142-21426-1-git-send-email-t.figa@samsung.com>
-Message-ID: <53DA9445.1090201@gmail.com>
+From: mturquette@linaro.org (Mike Turquette)
+Date: Thu, 31 Jul 2014 12:14:05 -0700
+Subject: [PATCH 2/2] clk: initial clock driver for TWL6030
+In-Reply-To: <53DA30CD.5020903@kpanic.de>
+References: <1406728949-7560-1-git-send-email-sassmann@kpanic.de>
+ <1406728949-7560-3-git-send-email-sassmann@kpanic.de>
+ <20140730175033.GA17528@sirena.org.uk> <53DA12BF.1060008@kpanic.de>
+ <20140731110531.GH17528@sirena.org.uk> <53DA30CD.5020903@kpanic.de>
+Message-ID: <20140731191405.4463.88226@quantum>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 17.07.2014 18:38, Tomasz Figa wrote:
-> This series intends to add support for L2 cache on Exynos4 SoCs on boards
-> running under secure firmware, which requires certain initialization steps
-> to be done with help of firmware, as selected registers are writable only
-> from secure mode.
+Quoting Stefan Assmann (2014-07-31 05:04:29)
+> On 31.07.2014 13:05, Mark Brown wrote:
+> > On Thu, Jul 31, 2014 at 11:56:15AM +0200, Stefan Assmann wrote:
+> >> On 30.07.2014 19:50, Mark Brown wrote:
+> >>> On Wed, Jul 30, 2014 at 04:02:29PM +0200, Stefan Assmann wrote:
+> > 
+> >>>> +static int twl6030_clk32kg_is_prepared(struct clk_hw *hw)
+> >>>> +{
+> >>>> +  struct twl6030_desc *desc = to_twl6030_desc(hw);
+> >>>> +
+> >>>> +  return desc->enabled;
+> >>>> +}
+> > 
+> >>> Why not just check the register map - can't the register be cached?  If
+> >>> that's not possible a comment would be good.
+> > 
+> >> I just took atl_clk_is_enabled() as template. If you say it's better
+> >> to read the value, that can be arranged.
+> > 
+> > It might be worth doing this if you have to go to hardware to check the
+> > status, if you can read a cache then just using the register is less
+> > error prone.
 > 
-> First four patches extend existing support for secure write in L2C driver
-> to account for design of secure firmware running on Exynos. Namely:
->  1) direct read access to certain registers is needed on Exynos, because
->     secure firmware calls set several registers at once,
->  2) not all boards are running secure firmware, so .write_sec callback
->     needs to be installed in Exynos firmware ops initialization code,
->  3) write access to {DATA,TAG}_LATENCY_CTRL registers fron non-secure world
->     is not allowed and so must use l2c_write_sec as well,
->  4) on certain boards, default value of prefetch register is incorrect
->     and must be overridden at L2C initialization.
-> For boards running with firmware that provides access to individual
-> L2C registers this series should introduce no functional changes. However
-> since the driver is widely used on other platforms I'd like to kindly ask
-> any interested people for testing.
+> Ok.
 > 
-> Further two patches add impelmentation of .write_sec for Exynos secure
-> firmware and necessary DT nodes to enable L2 cache.
+> > 
+> >>>> +  else
+> >>>> +          clk_prepare(clk);
+> > 
+> >>> Why is the clock driver defaulting to enabling the clock, and if it
+> >>> needs to shouldn't it be doing a prepere_enable() even if the enable
+> >>> happens not to do anything to the hardware?  Otherwise child clocks
+> >>> might get confused.
+> > 
+> >> Mike advised me to convert the functions from enable/disable to
+> >> prepare/unprepare because i2c transactions may sleep. That's what I did.
+> >> The code no longer enables the clock and just prepares it. So IIUC the
+> >> call to clk_prepare() should be fine.
+> > 
+> > That's not going to help consumers of the clock, you do need to move the
+> > operations to prepare() but users shouldn't need to know what happens in
+> > prepare() and what happens in enable().
+> > 
+> > You've also not addressed the comment about defaulting to enabling the
+> > clock in the first place.
 > 
-> Tested on Exynos4210-based Universal C210 and Trats (both without secure
-> firmware) and Exynos4412-based TRATS2 and ODROID-U3 boards (both with secure
-> firmware).
-> 
-> Depends on:
->  - [PATCH] ARM: make it easier to check the CPU part number correctly
->    (http://thread.gmane.org/gmane.linux.ports.arm.kernel/335126
->     already in linux-next)
->  - [PATCH v2 0/2] Firmware-assisted suspend/resume of Exynos SoCs
->    (https://lkml.org/lkml/2014/7/17/431)
-> 
-> Changes since v2:
-> (https://lkml.org/lkml/2014/6/25/416)
->  - refactored L2C driver to use commit-like interface and make it no longer
->    depend on availability of writes to individual registers,
->  - moved L2C resume to assembly code, because doing it later makes some
->    systems unstable - this is also needed for deeper cpuidle modes,
->  - dropped unnecessary patch hacking around the .write_sec interface,
->  - dropped patch making the driver use l2c_write_sec() for LATENCY_CTRL
->    registers as Exynos is no longer affected and I'm not aware of any
->    reports that this is also needed on other platforms (can be applied
->    separately if it turns out to be so),
->  - rebased onto next-20140717 tag of linux-next tree.
-> 
-> Changes since v1:
-> (https://www.mail-archive.com/linux-omap at vger.kernel.org/msg106323.html)
->  - rebased onto for-next branch of linux-samsung tree,
->  - changed argument order of outer_cache.write_sec() callback to match
->    l2c_write_sec() function in cache-l2x0.c,
->  - added support of overriding of prefetch settings to work around incorrect
->    default settings on certain Exynos4x12-based boards,
->  - added call to firmware to invalidate whole L2 cache before setting enable
->    bit in L2C control register (required by Exynos secure firmware).
-> 
-> Tomasz Figa (7):
->   ARM: l2c: Refactor the driver to use commit-like interface
->   ARM: l2c: Add interface to ask hypervisor to configure L2C
->   ARM: l2c: Get outer cache .write_sec callback from mach_desc only if
->     not NULL
->   ARM: l2c: Add support for overriding prefetch settings
->   ARM: EXYNOS: Add .write_sec outer cache callback for L2C-310
->   ARM: EXYNOS: Add support for non-secure L2X0 resume
->   ARM: dts: exynos4: Add nodes for L2 cache controller
-> 
->  Documentation/devicetree/bindings/arm/l2cc.txt |  10 +
->  arch/arm/boot/dts/exynos4210.dtsi              |   9 +
->  arch/arm/boot/dts/exynos4x12.dtsi              |  14 ++
->  arch/arm/include/asm/outercache.h              |   3 +
->  arch/arm/kernel/irq.c                          |   3 +-
->  arch/arm/mach-exynos/common.h                  |   1 +
->  arch/arm/mach-exynos/firmware.c                |  40 ++++
->  arch/arm/mach-exynos/sleep.S                   |  41 +++++
->  arch/arm/mm/cache-l2x0.c                       | 245 ++++++++++++++++---------
->  9 files changed, 274 insertions(+), 92 deletions(-)
-> 
+> Maybe I misinterpreted your previous comment, sorry. So if I got it right
+> this time you're saying that the prepare/enable, disable/unprepare should
+> be seen as a single step. If that's the case then using prepare_enable()
+> should be used indeed.
 
-Any comments for this series?
+It's not so much that they are single step. The point is that the way we
+ungate a clock signal using the Linux clk.h api is by calling
+clk_enable().
 
-Best regards,
-Tomasz
+If you read the code for clk_enable you'll see that it depends on the
+clock already having been prepared via clk_prepare(). The fact that your
+particular implementation of this clock driver actually ungates the
+physical signal via clk_prepare is irrelevant from the api's
+perspective.  clk_enable is how we turn gateable clocks on, even if the
+hardware really gets affected by the prior call to clk_prepare.
+
+It would be a real mess if drivers knew the details of their underlying
+clock hardware and only called clk_prepare and never clk_enable to
+gate/ungate their clocks.
+
+Regards,
+Mike
+
+> 
+> Tero suggested to look into making this a generic i2c clock driver. I'll
+> look into that and report back.
+> 
+>   Stefan
