@@ -1,97 +1,282 @@
-From: t-kristo@ti.com (Tero Kristo)
-Date: Thu, 31 Jul 2014 10:57:09 +0300
-Subject: [PATCH 29/35] arm: omap: intc: switch over to linear irq domain
-In-Reply-To: <20140731062843.GA29045@atomide.com>
-References: <1406582183-696-30-git-send-email-balbi@ti.com>
- <20140729121425.GR29045@atomide.com> <20140729141522.GB17808@saruman.home>
- <20140729152052.GV29045@atomide.com> <20140729154057.GE17808@saruman.home>
- <20140729163345.GF17808@saruman.home> <20140730060420.GY29045@atomide.com>
- <20140730144059.GA7272@saruman.home>
- <CAGo_u6ou+MoKOE_tTTmjxyFNW=jTaN9vnTsHrxR6sQHsieJyLA@mail.gmail.com>
- <20140730162038.GH7272@saruman.home> <20140731062843.GA29045@atomide.com>
-Message-ID: <53D9F6D5.1080307@ti.com>
+From: hanjun.guo@linaro.org (Hanjun Guo)
+Date: Thu, 31 Jul 2014 16:14:10 +0800
+Subject: [PATCH 07/19] ARM64 / ACPI: Parse MADT to map logical cpu to
+ MPIDR and get cpu_possible/present_map
+In-Reply-To: <53D9376B.5080609@arm.com>
+References: <1406206825-15590-1-git-send-email-hanjun.guo@linaro.org>
+ <1406206825-15590-8-git-send-email-hanjun.guo@linaro.org>
+ <53D9376B.5080609@arm.com>
+Message-ID: <53D9FAD2.5030405@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/31/2014 09:28 AM, Tony Lindgren wrote:
-> * Felipe Balbi <balbi@ti.com> [140730 09:23]:
->> Hi,
+On 2014-7-31 2:20, Sudeep Holla wrote:
+> 
+> 
+> On 24/07/14 14:00, Hanjun Guo wrote:
+>> MADT contains the information for MPIDR which is essential for
+>> SMP initialization, parse the GIC cpu interface structures to
+>> get the MPIDR value and map it to cpu_logical_map(), and add
+>> enabled cpu with valid MPIDR into cpu_possible_map and
+>> cpu_present_map.
 >>
->> On Wed, Jul 30, 2014 at 10:45:41AM -0500, Nishanth Menon wrote:
->>> On Wed, Jul 30, 2014 at 9:40 AM, Felipe Balbi <balbi@ti.com> wrote:
->>>> HI,
->>>>
->>>> On Tue, Jul 29, 2014 at 11:04:21PM -0700, Tony Lindgren wrote:
->>>>> * Felipe Balbi <balbi@ti.com> [140729 09:36]:
->>>>>> Hi,
->>>>>>
->>>>>> On Tue, Jul 29, 2014 at 10:40:57AM -0500, Felipe Balbi wrote:
->>>>>>> On Tue, Jul 29, 2014 at 08:20:52AM -0700, Tony Lindgren wrote:
->>>>>>>> * Felipe Balbi <balbi@ti.com> [140729 07:18]:
->>>>>>>>> Hi,
->>>>>>>>>
->>>>>>>>> On Tue, Jul 29, 2014 at 05:14:25AM -0700, Tony Lindgren wrote:
->>>>>>>>>> * Felipe Balbi <balbi@ti.com> [140728 14:19]:
->>>>>>>>>>> now that we don't need to support legacy board-files,
->>>>>>>>>>> we can completely switch over to a linear irq domain
->>>>>>>>>>> and make use of irq_alloc_domain_generic_chips() to
->>>>>>>>>>> allocate all generic irq chips for us.
->>>>>>>>>>
->>>>>>>>>> This patch seems to somehow break off-idle for omap3
->>>>>>>>>> where it no longer wakes up.
->>>>>>>>>
->>>>>>>>> Sure your bisection is correct ? This patch just switches from legacy
->>>>>>>>> irq domain to linear irq domain.
->>>>>>>>
->>>>>>>> Yes, I tried it a few times. Just enabling
->>>>>>>> retention idle hangs too with this patch.
->>>>>>>>
->>>>>>>> Maybe it's omap3_prcm_irq_setup that relies on
->>>>>>>> 11 + OMAP_INTC_START? There may be other such issues
->>>>>>>
->>>>>>> lol.
->>>>>>>
->>>>>>> OMAP4 has the same nonsense.
->>>>>>
->>>>>> made me think why (if) OMAP4 works with that same setup. Does wake from
->>>>>> OFF work with OMAP4 ?
->>>>>
->>>>> Not without similar changes, omap4+ has the same issue.. There's a RFC
->>>>> series from Nishant to fix some of this, and Tero is moving the PRCM
->>>>> into a driver.
->>>>>
->>>>>> Anyway, here's a quick little hack to check if that's the reason for the
->>>>>> regression:
->>>>>
->>>>> OK yeah that's along the same lines with Nishant's RFC series in thread
->>>>> "[RFC PATCH 0/7] ARM: OMAP4+: PRM: minor cleanups and dt support of
->>>>> interrupts"
->>>>>
->>>>> FYI, it did not compile, needs to include linux/of_irq.h. But yes,
->>>>
->>>> I might have sent the wrong version as I had that same build error and
->>>> fixed it localy.
->>>>
->>>>> it fixes the regression for me, Also now the whole series works for
->>>>> me :)
->>>>
->>>> good to know.
->>>>
->>>> What do you want to do now ? Wait for PRCM to become a driver ? Wait for
->>>> Nishanth's series to get accepted ? I guess the same thing could be done
->>>> for OMAP3 and AM33, then we would have a chance of having working wake
->>>> from idle with the new irqchip.
->>>
->>> I can repost the current series as it stands now once 17-rc1 comes out
->>> (without the build failure ofcourse).. if that helps to move it out of
->>> RFC status.
+>> Signed-off-by: Hanjun Guo <hanjun.guo@linaro.org>
+>> Signed-off-by: Tomasz Nowicki <tomasz.nowicki@linaro.org>
+>> ---
+>>   arch/arm64/include/asm/acpi.h |    2 +
+>>   arch/arm64/kernel/acpi.c      |  127 +++++++++++++++++++++++++++++++++++++++++
+>>   arch/arm64/kernel/smp.c       |   10 +++-
+>>   3 files changed, 138 insertions(+), 1 deletion(-)
 >>
->> That'd be great. It would be ever greater if you could add support for
->> OMAP3 on that too.
->
-> Yeah sounds good to me. Tero, does that work OK for your PRCM changes?
+>> diff --git a/arch/arm64/include/asm/acpi.h b/arch/arm64/include/asm/acpi.h
+>> index 67dac90..5ce85f8 100644
+>> --- a/arch/arm64/include/asm/acpi.h
+>> +++ b/arch/arm64/include/asm/acpi.h
+>> @@ -50,6 +50,8 @@ static inline bool acpi_has_cpu_in_madt(void)
+>>   extern int (*acpi_suspend_lowlevel)(void);
+>>   #define acpi_wakeup_address 0
+>>
+>> +#define MAX_GIC_CPU_INTERFACE 65535
+>> +
+> 
+> Can this me made something like MAX_MADT_INTERRUPT_CONTROLLER_ENTRIES ?
 
-Well, this set seems to break PM. suspend-resume on omap3-beagle just 
-hangs after this set is applied. Works fine without it with 3.16-rc5 tag.
+It is GIC CPU interface structure, I think we can keep the name as it
+is or as ACPI_GIC_MAX_CPU_INTERFACE which modified in later patches.
 
--Tero
+> And assuming each entry to be at-least 4 or 8 bytes, it can be reduced.
+
+Sorry, I didn't catch up with you here, can you explain it?
+
+> 
+>>   #endif /* CONFIG_ACPI */
+>>
+>>   #endif /*_ASM_ACPI_H*/
+>> diff --git a/arch/arm64/kernel/acpi.c b/arch/arm64/kernel/acpi.c
+>> index 374926f..801e268 100644
+>> --- a/arch/arm64/kernel/acpi.c
+>> +++ b/arch/arm64/kernel/acpi.c
+>> @@ -22,6 +22,9 @@
+>>   #include <linux/bootmem.h>
+>>   #include <linux/smp.h>
+>>
+>> +#include <asm/smp_plat.h>
+>> +#include <asm/cputype.h>
+>> +
+>>   /*
+>>    * We never plan to use RSDT on arm/arm64 as its deprecated in spec but this
+>>    * variable is still required by the ACPI core
+>> @@ -42,6 +45,9 @@ int acpi_psci_present;
+>>   /* 1 to indicate HVC must be used instead of SMC as the PSCI conduit */
+>>   int acpi_psci_use_hvc;
+>>
+>> +/* Processors (GICC) with enabled flag in MADT */
+>> +static int enabled_cpus;
+>> +
+>>   /*
+>>    * __acpi_map_table() will be called before page_init(), so early_ioremap()
+>>    * or early_memremap() should be called here to for ACPI table mapping.
+>> @@ -62,6 +68,122 @@ void __init __acpi_unmap_table(char *map, unsigned long size)
+>>       early_iounmap(map, size);
+>>   }
+>>
+>> +/**
+>> + * acpi_register_gic_cpu_interface - register a gic cpu interface and
+>> + * generates a logic cpu number
+>> + * @mpidr: CPU's hardware id to register, MPIDR represented in MADT
+>> + * @enabled: this cpu is enabled or not
+>> + *
+>> + * Returns the logic cpu number which maps to the gic cpu interface
+>> + */
+>> +static int acpi_register_gic_cpu_interface(u64 mpidr, u8 enabled)
+> 
+> Honestly this function doesn't deal anything with GIC cpu interface.
+
+Yes, but every GIC cpu interface structure represents a CPU in the
+system, it is about the SMP init.
+
+> 
+>> +{
+>> +    int cpu;
+>> +
+>> +    if (mpidr == INVALID_HWID) {
+>> +        pr_info("Skip invalid cpu hardware ID\n");
+>> +        return -EINVAL;
+>> +    }
+>> +
+>> +    total_cpus++;
+>> +    if (!enabled)
+>> +        return -EINVAL;
+>> +
+>> +    if (enabled_cpus >=  NR_CPUS) {
+>> +        pr_warn("NR_CPUS limit of %d reached, Processor %d/0x%llx ignored.\n",
+>> +            NR_CPUS, total_cpus, mpidr);
+>> +        return -EINVAL;
+>> +    }
+>> +
+>> +    /* If it is the first CPU, no need to check duplicate MPIDRs */
+>> +    if (!enabled_cpus)
+>> +        goto skip_mpidr_check;
+>> +
+>> +    /*
+>> +     * Duplicate MPIDRs are a recipe for disaster. Scan
+>> +     * all initialized entries and check for
+>> +     * duplicates. If any is found just ignore the CPU.
+>> +     */
+>> +    for_each_present_cpu(cpu) {
+>> +        if (cpu_logical_map(cpu) == mpidr) {
+>> +            pr_err("Firmware bug, duplicate CPU MPIDR: 0x%llx in MADT\n",
+>> +                   mpidr);
+>> +            return -EINVAL;
+>> +        }
+>> +    }
+>> +
+>> +skip_mpidr_check:
+>> +    enabled_cpus++;
+>> +
+>> +    /* allocate a logic cpu id for the new comer */
+>> +    if (cpu_logical_map(0) == mpidr) {
+>> +        /*
+>> +         * boot_cpu_init() already hold bit 0 in cpu_present_mask
+>> +         * for BSP, no need to allocte again.
+>> +         */
+>> +        cpu = 0;
+>> +    } else {
+>> +        cpu = cpumask_next_zero(-1, cpu_present_mask);
+>> +    }
+>> +
+>> +    /* map the logic cpu id to cpu MPIDR */
+>> +    cpu_logical_map(cpu) = mpidr;
+>> +
+>> +    set_cpu_possible(cpu, true);
+>> +    set_cpu_present(cpu, true);
+>> +
+> 
+> I need to think more about this function and will comment later but I
+> think these cpumasks should be set only if SMP and probably belong to smp.c
+
+No, I don't think so, it is because of the CPU hot add.
+
+Considering a CPU will be added at run-time (you may fine out this function
+without __init), it will go through the ACPI routing and call this function
+to map its MPIDR to cpu logical num and then call cpu_up() to online it,
+so if you move these cpumasks to __init functions in smp.c, new CPUs added
+at run-time will never be set for there possible and present mask.
+
+> 
+>> +    return cpu;
+>> +}
+>> +
+>> +static int __init
+>> +acpi_parse_gic_cpu_interface(struct acpi_subtable_header *header,
+>> +                const unsigned long end)
+>> +{
+>> +    struct acpi_madt_generic_interrupt *processor;
+>> +
+>> +    processor = (struct acpi_madt_generic_interrupt *)header;
+>> +
+>> +    if (BAD_MADT_ENTRY(processor, end))
+>> +        return -EINVAL;
+>> +
+>> +    acpi_table_print_madt_entry(header);
+>> +
+>> +    acpi_register_gic_cpu_interface(processor->mpidr,
+>> +        processor->flags & ACPI_MADT_ENABLED);
+>> +
+>> +    return 0;
+>> +}
+>> +
+>> +/*
+>> + * Parse GIC cpu interface related entries in MADT
+>> + * returns 0 on success, < 0 on error
+>> + */
+>> +static int __init acpi_parse_madt_gic_cpu_interface_entries(void)
+>> +{
+>> +    int count;
+>> +
+>> +    /*
+>> +     * do a partial walk of MADT to determine how many CPUs
+>> +     * we have including disabled CPUs, and get information
+>> +     * we need for SMP init
+>> +     */
+>> +    count = acpi_table_parse_madt(ACPI_MADT_TYPE_GENERIC_INTERRUPT,
+>> +            acpi_parse_gic_cpu_interface, MAX_GIC_CPU_INTERFACE);
+>> +
+>> +    if (!count) {
+>> +        pr_err("No GIC CPU interface entries present\n");
+>> +        return -ENODEV;
+>> +    } else if (count < 0) {
+>> +        pr_err("Error parsing GIC CPU interface entry\n");
+>> +        return count;
+>> +    }
+>> +
+>> +    /* Make boot-up look pretty */
+>> +    pr_info("%d CPUs enabled, %d CPUs total\n", enabled_cpus, total_cpus);
+>> +
+>> +    return 0;
+>> +}
+>> +
+>>   static int __init acpi_parse_fadt(struct acpi_table_header *table)
+>>   {
+>>       struct acpi_table_fadt *fadt = (struct acpi_table_fadt *)table;
+>> @@ -122,6 +244,11 @@ int __init acpi_boot_init(void)
+>>       if (err)
+>>           pr_err("Can't find FADT\n");
+>>
+>> +    /* Get the boot CPU's MPIDR before MADT parsing */
+>> +    cpu_logical_map(0) = read_cpuid_mpidr() & MPIDR_HWID_BITMASK;
+>> +
+> 
+> As Mark suggested better to move this prior to ACPI changes.
+
+I will.
+
+> 
+>> +    err = acpi_parse_madt_gic_cpu_interface_entries();
+>> +
+> 
+> OK, so now you ignore if there was any FADT error if MADT is
+> successfully parsed ?
+
+My original intention is that we can continue the MADT table
+parsing even if we meet some error when parsing FADT, just
+as x86 did. But now ACPI is disabled when FADT version is not
+correct, so I think we need check here as you said.
+
+> 
+>>       return err;
+>>   }
+>>
+>> diff --git a/arch/arm64/kernel/smp.c b/arch/arm64/kernel/smp.c
+>> index 40f38f4..8f1d37c 100644
+>> --- a/arch/arm64/kernel/smp.c
+>> +++ b/arch/arm64/kernel/smp.c
+>> @@ -36,6 +36,7 @@
+>>   #include <linux/completion.h>
+>>   #include <linux/of.h>
+>>   #include <linux/irq_work.h>
+>> +#include <linux/acpi.h>
+>>
+>>   #include <asm/atomic.h>
+>>   #include <asm/cacheflush.h>
+>> @@ -458,7 +459,14 @@ void __init smp_prepare_cpus(unsigned int max_cpus)
+>>           if (err)
+>>               continue;
+>>
+>> -        set_cpu_present(cpu, true);
+>> +        /*
+>> +         * In ACPI mode, cpu_present_map was initialised when
+>> +         * MADT table was parsed which before this function
+>> +         * is called.
+>> +         */
+>> +        if (acpi_disabled)
+>> +            set_cpu_present(cpu, true);
+>> +
+> 
+> This is what I said above, it belongs here and we need to see how we do
+> that. I will give it a thought.
+
+Please refer to the comments above.
+
+Thanks
+Hanjun
