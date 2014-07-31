@@ -1,85 +1,68 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Wed, 30 Jul 2014 23:16:44 -0700
-Subject: [GIT PULL v2][for 3.17] pull request for hisilicon terminal soc
-In-Reply-To: <CAOesGMgJjrQQFyszd-c_47d6REGXZKrXBuVU+KiJc8j9vY-B_Q@mail.gmail.com>
-References: <53D750CA.5090405@hisilicon.com>
- <CAOesGMhEBsb_6vghQCHTm32FngZvURb2OozLpQu=UmJEY-MAKQ@mail.gmail.com>
- <53D9DD53.4050909@hisilicon.com>
- <CAOesGMgJjrQQFyszd-c_47d6REGXZKrXBuVU+KiJc8j9vY-B_Q@mail.gmail.com>
-Message-ID: <CAOesGMj-m+XgDSGPS329EXHW8kMV6FdgVaCmeDgVL=Xn5vfOkA@mail.gmail.com>
+From: yao.yuan@freescale.com (Yao Yuan)
+Date: Thu, 31 Jul 2014 06:16:55 +0000
+Subject: [PATCH v5 1/2] i2c: add DMA support for freescale i2c driver
+In-Reply-To: <201407231852.53893.marex@denx.de>
+References: <1406103883-3572-1-git-send-email-yao.yuan@freescale.com>
+ <53CF9933.8030908@gmail.com> <20140723141502.2d726afe@ipc1.ka-ro>
+ <201407231852.53893.marex@denx.de>
+Message-ID: <1a4d2e9ddc67421d8588305c927f3d3d@BL2PR03MB338.namprd03.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jul 30, 2014 at 11:14 PM, Olof Johansson <olof@lixom.net> wrote:
-> On Wed, Jul 30, 2014 at 11:08 PM, xuwei <xuwei5@hisilicon.com> wrote:
->>
->>
->> On 2014/7/31 13:32, Olof Johansson wrote:
->>> Hi,
->>>
->>> There were a few things that still needed fixing here -- I took care
->>> of most of them. See below.
->>>
->>>
->>> On Tue, Jul 29, 2014 at 12:44 AM, xuwei <xuwei5@hisilicon.com> wrote:
->>>> Hi Olof, Hi Kevin, Hi Arnd,
->>>>
->>>> Please help to merge pull request for hisilicon terminal soc.
->>>>
->>>> Best Regards,
->>>> Wei
->>>>
->>>>
->>>> The following changes since commit 7171511eaec5bf23fb06078f59784a3a0626b38f:
->>>>
->>>>   Linux 3.16-rc1 (2014-06-15 17:45:28 -1000)
->>>>
->>>> are available in the git repository at:
->>>>
->>>>   git://github.com/hisilicon/linux-hisi.git tags/hix5hd2-for-3.17-v2
->>>>
->>>> for you to fetch changes up to eeea1ab9b53f311f634e87d9208daa564a97dbba:
->>>>
->>>>   ARM: hisi: remove smp from machine descriptor (2014-07-29 14:54:11 +0800)
->>>>
->>>> ----------------------------------------------------------------
->>>> ARM: mach-hisi: Hisilicon teminal soc udaptes for 3.17
->>>>
->>>> - Rename Hi3716 to HiX5HD2
->>>> HiX5HD2 is a SoC with dual Cortex A9 cores for STB market.
->>>> And original Hi3xxx SoC is for mobile market.
->>>> To avoid confusing the two types of SoCs and also because of
->>>> different implementation(SMP, IPs integarted and earlycon configure),
->>>> rename Hi3716 to HIX5HD2 ann add ARCH_HIX5HD2.
->>>>
->>>> - Add HiX5HD2 STB SoC and development kit board support
->>>> - Change to use power reset driver to reboot for HiX5HD2
->>>> - Add ARCH_HISI for the common configure of hisilicon SoCs
->>>> - Change to use CPU_METHOD_OF_DECLARE for SMP on HiX5HD2 and hi3xxx
->>>> - Enable L2 aux value for Hi3620
->>>>
->>>> ----------------------------------------------------------------
->>>> Haifeng Yan (3):
->>>>       ARM: debug: Rename Hi3716 to HIX5HD2
->>>>       ARM: hisi: enable hix5hd2 SoC
->>>>       ARM: dts: Add hix5hd2-dkb dts file.
->>
->> Hi Olof,
->>
->>> It is confusing -- is the SoC named HIX5HD2 or Hisilicon X5HD2? Seems
->>> like there are references to both.
->>
->> The full name is Hisilicon X5HD2.
->> But we also call it HIX5HD2.
->
-> Ok. I think for consistency, it's better to call it X5HD2 everywhere
-> in the kernel where it's already prefixed by Hisilicon, such as
-> compatible strings and help texts on config options.
+Marek Vasut wrote:
+> On Wednesday, July 23, 2014 at 02:15:02 PM, Lothar Wa?mann wrote:
+> > Hi,
+> >
+> > Varka Bhadram wrote:
+> > > On 07/23/2014 04:41 PM, Yao Yuan wrote:
+> > > > Hi,
+> > > >
+> > > > Thanks for your review.
+> > > >
+> > > > Lothar Wa?mann wrote:
+> > > >> Yuan Yao wrote:
+> > > >>> Add dma support for i2c. This function depend on DMA driver.
+> > > >>> You can turn on it by write both the dmas and dma-name
+> > > >>> properties in dts node.
+> > > >>>
+> > > >>> Signed-off-by: Yuan Yao <yao.yuan@freescale.com>
+> > > >>> ---
+> > > >>>
+> > > >>>   drivers/i2c/busses/i2c-imx.c | 377
+> > > >
+> > > > [...]
+> > > >
+> > > >>> +
+> > > >>> +fail_rx:
+> > > >>> +	dma_release_channel(dma->chan_rx);
+> > > >>> +fail_tx:
+> > > >>> +	dma_release_channel(dma->chan_tx);
+> > > >>> +fail_al:
+> > > >>> +	devm_kfree(dev, dma);
+> > > >>
+> > > >> No need for this one (that's the whole point of using devm_kzalloc())!
+> > > >
+> > > > When DMA request failed, I2C will switch to PIO mode. So if the
+> > > > failed reason is just like DMA channel request failed. At this
+> > > > time the DMA should free by devm_kfree(). Is it?
+> > >
+> > > If probe failed the memory will be freed automatically because we
+> > > are using devm_kzalloc()...
+> > >
+> > > If we use devm_kzalloc() ,no need to free manually on fail...
+> >
+> > Yes, but as Yuan Yao stated, the driver will still work without DMA
+> > but carry around the unecessary allocated imx_i2c_dma struct.
+> > The devm_kfree() is not in the failure path of the driver's probe()
+> > function, but in the function that tries to initialize the optional
+> > DMA support.
+> 
+> If the DMA fails, I'd just make the entire probe fail. In case you cannot probe
+> DMA for your hardware, which is exected to be DMA capable, it means
+> something is wrong anyway.
 
-Hrm, I just noticed that the ethernet driver also uses
-hisilicon,hix5hd2. Based on that, it's probably easier to go back to
-hisi-hix5hd2 everywhere again. I'll rename the dts/dtsi to hisi-hi*
-again. Oh well.
+Yes, but if there is something wrong in dma, I think the i2c is innocent. So I think the error message is necessary but i2c can continue work.
 
 
--Olof
+Best regards,
+Yuan Yao
