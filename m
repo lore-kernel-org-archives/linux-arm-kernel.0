@@ -1,28 +1,53 @@
-From: davem@davemloft.net (David Miller)
-Date: Thu, 31 Jul 2014 11:59:11 -0700 (PDT)
-Subject: [PATCH net v3 0/6] net: stmmac: Improve mcast/ucast filter for
- snps
-In-Reply-To: <1406671607-27368-1-git-send-email-vbridgers2013@gmail.com>
-References: <1406671607-27368-1-git-send-email-vbridgers2013@gmail.com>
-Message-ID: <20140731.115911.404121838921688216.davem@davemloft.net>
+From: fkan@apm.com (Feng Kan)
+Date: Thu, 31 Jul 2014 12:03:24 -0700
+Subject: [PATCH V6 0/3] gpio: Add APM X-Gene SoC platform GPIO driver
+Message-ID: <1406833407-28316-1-git-send-email-fkan@apm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Vince Bridgers <vbridgers2013@gmail.com>
-Date: Tue, 29 Jul 2014 17:06:41 -0500
+This patch add the GPIO controller in the APM X-Gene platform. The GPIO
+controller pins are muxed with the generic flash controller pins on the 
+system.
 
-> This patch series adds Synopsys specific bindings for the Synopsys EMAC
-> filter characteristics since those are implementation dependent. The
-> multicast and unicast filtering code was improved to handle different
-> configuration variations based on device tree settings. 
-> 
-> I verified the operation of the multicast and unicast filters through 
-> Synopsys support as requested during the V1 review, and tested the GMAC
-> configuration on an Altera Cyclone 5 SOC (which supports 256 multicast
-> bins and 128 Unicast addresses). The 10/100 variant of this driver
-> modification was not tested, although it was compile tested. I shared
-> the email thread results of the investigation through Synopsys with the
-> stmmac maintainer.
+V6 Change:
+	1. change attribute description of second cell in gpio dts node
+	   under documentation.
 
-Please update this series taking into account the feedback you've
-received for patch #6, thanks.
+V5 Change:
+	1. Remove gpio->dev
+	2. Remove not needed headers. 
+	3. Change to use latest driver.h for gpio.
+	4. Set chip base to -1
+	5. Put back label as it is needed sys interface.
+
+V4 Change:
+	1. Add remove function for module
+	2. Add set function to dir out function.
+	3. remove sets to np and label in probe.
+
+V3 Change:
+	1. Change code to use single entry to describe gpio node, hardcode
+	   to use bank stride to target gpios.
+	2. Fix up dts and doc accordingly
+
+V2 Change:
+	1. Address concerns from maintainer, split to multiple device node
+	2. Add pm code to restore set register.
+	3. fix up dts and documentation accordingly.
+
+Feng Kan (3):
+  gpio: Add APM X-Gene SoC GPIO controller support
+  Documentation: gpio: Add APM X-Gene SoC GPIO controller DTS binding
+  arm64:dts: Add APM X-Gene SoC GPIO controller DTS entries
+
+ .../devicetree/bindings/gpio/gpio-xgene.txt        |  22 ++
+ arch/arm64/boot/dts/apm-storm.dtsi                 |   7 +
+ drivers/gpio/Kconfig                               |   9 +
+ drivers/gpio/Makefile                              |   1 +
+ drivers/gpio/gpio-xgene.c                          | 250 +++++++++++++++++++++
+ 5 files changed, 289 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/gpio/gpio-xgene.txt
+ create mode 100644 drivers/gpio/gpio-xgene.c
+
+-- 
+1.9.1
