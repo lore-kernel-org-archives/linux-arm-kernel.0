@@ -1,33 +1,52 @@
-From: dianders@google.com (Doug Anderson)
-Date: Thu, 31 Jul 2014 09:02:45 -0700
-Subject: [PATCHv9 1/5] mmc: dw_mmc: Slot quirk "disable-wp" is deprecated.
-In-Reply-To: <1406784907-26349-2-git-send-email-jh80.chung@samsung.com>
-References: <1406784907-26349-1-git-send-email-jh80.chung@samsung.com>
- <1406784907-26349-2-git-send-email-jh80.chung@samsung.com>
-Message-ID: <CAD=FV=VfXOqt1A=8-1kq5nhnMrk7PbpCWj-A-UWQN12_U8sW4g@mail.gmail.com>
+From: behanw@converseincode.com (Behan Webster)
+Date: Thu, 31 Jul 2014 09:04:25 -0700
+Subject: [PATCH 3/4] arm64: LLVMLinux: Calculate current_thread_info from
+ current_stack_pointer
+In-Reply-To: <53D9D4B2.8070008@suse.de>
+References: <1406764649-20326-1-git-send-email-behanw@converseincode.com>
+ <1406764649-20326-4-git-send-email-behanw@converseincode.com>
+ <53D9D4B2.8070008@suse.de>
+Message-ID: <53DA6909.1050007@converseincode.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Jaehoon
-
-On Wed, Jul 30, 2014 at 10:35 PM, Jaehoon Chung <jh80.chung@samsung.com> wrote:
-> Slot quirks "disable-wp" is deprecated.
-> Instead, use the host quirk "disable-wp".
-> (Because the slot-node is removed in dt-file.)
+On 07/30/14 22:31, Andreas F?rber wrote:
+> Hi,
 >
-> Signed-off-by: Jaehoon Chung <jh80.chung@samsung.com>
-> Tested-by: Sachin Kamat <sachin.kamat@samsung.com>
-> Acked-by: Seungwon Jeon <tgih.jun@samsung.com>
-> ---
->  drivers/mmc/host/dw_mmc.c  |   11 +++++++++--
->  include/linux/mmc/dw_mmc.h |    2 ++
->  2 files changed, 11 insertions(+), 2 deletions(-)
+> Am 31.07.2014 01:57, schrieb behanw at converseincode.com:
+>> From: Behan Webster <behanw@converseincode.com>
+>>
+>> Use the global current_stack_pointer to get the value of the stack pointer.
+>> This change supports being able to compile the kernel with both gcc and clang.
+>>
+>> Signed-off-by: Behan Webster <behanw@converseincode.com>
+>> Signed-off-by: Mark Charlebois <charlebm@gmail.com>
+>> Reviewed-by: Jan-Simon M??ller <dl9pf@gmx.de>
+> Something went wrong with ? encoding here and in 2/4.
+Yeah. That keeps happening. :(
 
-Thanks for taking my suggestion and making it backward compatible.
-This looks great to me.  It tested this in both the backward
-compatible way (with the warning) and the non-backward compatible way.
-I think we should land and patch #2 ASAP and then we can land the rest
-of the series as SoC maintainers see fit.
+Thanks.
 
-Reviewed-by: Doug Anderson <dianders@chromium.org>
-Tested-by: Doug Anderson <dianders@chromium.org>
+>> ---
+>>   arch/arm64/include/asm/thread_info.h | 4 ++--
+>>   1 file changed, 2 insertions(+), 2 deletions(-)
+>>
+>> diff --git a/arch/arm64/include/asm/thread_info.h b/arch/arm64/include/asm/thread_info.h
+>> index e6b6094..c2432d2 100644
+>> --- a/arch/arm64/include/asm/thread_info.h
+>> +++ b/arch/arm64/include/asm/thread_info.h
+>> @@ -80,8 +80,8 @@ static inline struct thread_info *current_thread_info(void) __attribute_const__;
+>>   
+>>   static inline struct thread_info *current_thread_info(void)
+>>   {
+>> -	register unsigned long sp asm ("sp");
+>> -	return (struct thread_info *)(sp & ~(THREAD_SIZE - 1));
+>> +	return (struct thread_info *) \
+> This is not a macro, so \ seems superfluous.
+Doh. Indeed. Will fix.
+
+Behan
+
+-- 
+Behan Webster
+behanw at converseincode.com
