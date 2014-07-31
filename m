@@ -1,118 +1,47 @@
-From: jonsmirl@gmail.com (jonsmirl at gmail.com)
-Date: Thu, 31 Jul 2014 17:46:09 -0400
-Subject: [PATCH 7/9] ARM: sunxi: dt: Add PLL2 support
-In-Reply-To: <1406842092-25207-8-git-send-email-emilio@elopez.com.ar>
-References: <1406842092-25207-1-git-send-email-emilio@elopez.com.ar>
- <1406842092-25207-8-git-send-email-emilio@elopez.com.ar>
-Message-ID: <CAKON4OycHvkAkndNvH3vkaE0d7P5d4ZsGrYw8eM_Py6HUo06sg@mail.gmail.com>
+From: dianders@chromium.org (Doug Anderson)
+Date: Thu, 31 Jul 2014 15:01:51 -0700
+Subject: [REPOST PATCH v3 4/5] ARM: dts: Fix the sort ordering of EHCI and
+ HSIC in rk3288.dtsi
+In-Reply-To: <1406841985-15790-5-git-send-email-kever.yang@rock-chips.com>
+References: <1406841985-15790-1-git-send-email-kever.yang@rock-chips.com>
+ <1406841985-15790-5-git-send-email-kever.yang@rock-chips.com>
+Message-ID: <CAD=FV=U-7D016n08My-SZRjqN68wTW9iuBEMDzkpy+LdTGRdtw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Would it be better to name this "allwinner,sun4i-a10-pll2-clk" instead
-of "allwinner,sun4i-a10-b-pll2-clk"? By encoding the b in it everyone
-is going to wonder what to do on the 'c' revision which is the most
-common revision.
+Kever,
 
-The revision based rename would then be from
-"allwinner,sun4i-a10-pll2-clk" to "allwinner,sun4i-a10-a-pll2-clk".
-
-On Thu, Jul 31, 2014 at 5:28 PM, Emilio L?pez <emilio@elopez.com.ar> wrote:
-> This commit adds the PLL2 definition to the sun4i, sun5i and sun7i
-> device trees. PLL2 is used to clock audio devices.
+On Thu, Jul 31, 2014 at 2:26 PM, Kever Yang <kever.yang@rock-chips.com> wrote:
+> From: Doug Anderson <dianders@chromium.org>
 >
-> Signed-off-by: Emilio L?pez <emilio@elopez.com.ar>
+> The EHCI and HSIC device tree nodes were added in the wrong place.
+> Fix them.
+>
+> Signed-off-by: Doug Anderson <dianders@chromium.org>
+> Signed-off-by: Kever Yang <kever.yang@rock-chips.com>
 > ---
 >
-> Changes from RFC:
->  * A10 rev A is now supported via the quirk code
+> Changes in v3:
+> - EHCI and HSIC move new for version 3.
 >
->  arch/arm/boot/dts/sun4i-a10.dtsi  | 8 ++++++++
->  arch/arm/boot/dts/sun5i-a10s.dtsi | 8 ++++++++
->  arch/arm/boot/dts/sun5i-a13.dtsi  | 8 ++++++++
->  arch/arm/boot/dts/sun7i-a20.dtsi  | 8 ++++++++
->  4 files changed, 32 insertions(+)
+> Changes in v2: None
 >
-> diff --git a/arch/arm/boot/dts/sun4i-a10.dtsi b/arch/arm/boot/dts/sun4i-a10.dtsi
-> index 459cb63..c4d4c73 100644
-> --- a/arch/arm/boot/dts/sun4i-a10.dtsi
-> +++ b/arch/arm/boot/dts/sun4i-a10.dtsi
-> @@ -81,6 +81,14 @@
->                         clock-output-names = "pll1";
->                 };
+>  arch/arm/boot/dts/rk3288.dtsi |   41 ++++++++++++++++++++---------------------
+>  1 file changed, 20 insertions(+), 21 deletions(-)
 >
-> +               pll2: clk at 01c20008 {
-> +                       #clock-cells = <1>;
-> +                       compatible = "allwinner,sun4i-a10-b-pll2-clk";
-> +                       reg = <0x01c20008 0x4>;
-> +                       clocks = <&osc24M>;
-> +                       clock-output-names = "pll2", "pll2x2", "pll2x4", "pll2x8";
-> +               };
-> +
->                 pll4: clk at 01c20018 {
->                         #clock-cells = <0>;
->                         compatible = "allwinner,sun4i-a10-pll1-clk";
-> diff --git a/arch/arm/boot/dts/sun5i-a10s.dtsi b/arch/arm/boot/dts/sun5i-a10s.dtsi
-> index 24b0ad3..f35aa4d 100644
-> --- a/arch/arm/boot/dts/sun5i-a10s.dtsi
-> +++ b/arch/arm/boot/dts/sun5i-a10s.dtsi
-> @@ -74,6 +74,14 @@
->                         clock-output-names = "pll1";
->                 };
+> diff --git a/arch/arm/boot/dts/rk3288.dtsi b/arch/arm/boot/dts/rk3288.dtsi
+> index a5607a1..673dee3 100644
+> --- a/arch/arm/boot/dts/rk3288.dtsi
+> +++ b/arch/arm/boot/dts/rk3288.dtsi
+> @@ -205,6 +205,17 @@
+>                 status = "disabled";
+>         };
 >
-> +               pll2: clk at 01c20008 {
-> +                       #clock-cells = <1>;
-> +                       compatible = "allwinner,sun4i-a10-b-pll2-clk";
-> +                       reg = <0x01c20008 0x4>;
-> +                       clocks = <&osc24M>;
-> +                       clock-output-names = "pll2", "pll2x2", "pll2x4", "pll2x8";
-> +               };
-> +
->                 pll4: clk at 01c20018 {
->                         #clock-cells = <0>;
->                         compatible = "allwinner,sun4i-a10-pll1-clk";
-> diff --git a/arch/arm/boot/dts/sun5i-a13.dtsi b/arch/arm/boot/dts/sun5i-a13.dtsi
-> index bf86e65..38b2d77 100644
-> --- a/arch/arm/boot/dts/sun5i-a13.dtsi
-> +++ b/arch/arm/boot/dts/sun5i-a13.dtsi
-> @@ -75,6 +75,14 @@
->                         clock-output-names = "pll1";
->                 };
->
-> +               pll2: clk at 01c20008 {
-> +                       #clock-cells = <1>;
-> +                       compatible = "allwinner,sun4i-a10-b-pll2-clk";
-> +                       reg = <0x01c20008 0x4>;
-> +                       clocks = <&osc24M>;
-> +                       clock-output-names = "pll2", "pll2x2", "pll2x4", "pll2x8";
-> +               };
-> +
->                 pll4: clk at 01c20018 {
->                         #clock-cells = <0>;
->                         compatible = "allwinner,sun4i-a10-pll1-clk";
-> diff --git a/arch/arm/boot/dts/sun7i-a20.dtsi b/arch/arm/boot/dts/sun7i-a20.dtsi
-> index 4011628..7a6a18c 100644
-> --- a/arch/arm/boot/dts/sun7i-a20.dtsi
-> +++ b/arch/arm/boot/dts/sun7i-a20.dtsi
-> @@ -91,6 +91,14 @@
->                         clock-output-names = "pll1";
->                 };
->
-> +               pll2: clk at 01c20008 {
-> +                       #clock-cells = <1>;
-> +                       compatible = "allwinner,sun4i-a10-b-pll2-clk";
-> +                       reg = <0x01c20008 0x4>;
-> +                       clocks = <&osc24M>;
-> +                       clock-output-names = "pll2", "pll2x2", "pll2x4", "pll2x8";
-> +               };
-> +
->                 pll4: clk at 01c20018 {
->                         #clock-cells = <0>;
->                         compatible = "allwinner,sun7i-a20-pll4-clk";
-> --
-> 2.0.3
+> +       usb_host0_ehci: ehci at ff500000 {
 
+Argh.  When I was helping you I messed this up.  :(  I pointed you at
+an older version of the EHCI patch.
 
+I'll post a fixup myself.  Sorry for the bother...
 
--- 
-Jon Smirl
-jonsmirl at gmail.com
+-Doug
