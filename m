@@ -1,40 +1,80 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 31 Jul 2014 16:41:02 +0200
-Subject: [PATCH v15 08/12] ARM: config: append lpae configuration
-In-Reply-To: <CAD6h2NT5BP4Rmz+vfTLSsw19xCNSfXE6wwAhr1Fcrd9VuyXOeg@mail.gmail.com>
-References: <1406555876-11989-1-git-send-email-haojian.zhuang@linaro.org>
- <CAOesGMhgWncQ9wafjjDiaZkT1ge-YPe5bjFs9Ebyj7Fg=3YhHQ@mail.gmail.com>
- <CAD6h2NT5BP4Rmz+vfTLSsw19xCNSfXE6wwAhr1Fcrd9VuyXOeg@mail.gmail.com>
-Message-ID: <201407311641.02462.arnd@arndb.de>
+From: msalter@redhat.com (Mark Salter)
+Date: Thu, 31 Jul 2014 10:41:53 -0400
+Subject: [PATCH v2 1/3] arm64: spin-table: handle unmapped
+ cpu-release-addrs
+In-Reply-To: <20140731100439.GI26853@arm.com>
+References: <1406717944-24725-1-git-send-email-ard.biesheuvel@linaro.org>
+ <1406717944-24725-2-git-send-email-ard.biesheuvel@linaro.org>
+ <20140730113013.GL12239@arm.com>
+ <CAKv+Gu8ne8k2NV12SyWye5aYJKHG0wHKAO+=V=1L89_hvyGopw@mail.gmail.com>
+ <20140731094515.GE26853@arm.com> <20140731095854.GC21850@leverpostej>
+ <20140731100439.GI26853@arm.com>
+Message-ID: <1406817713.3200.4.camel@deneb.redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday 31 July 2014, Haojian Zhuang wrote:
-> Maybe I didn't express this well. Let's check the memory layout in hip04.
+On Thu, 2014-07-31 at 11:04 +0100, Will Deacon wrote:
+> On Thu, Jul 31, 2014 at 10:58:54AM +0100, Mark Rutland wrote:
+> > On Thu, Jul 31, 2014 at 10:45:15AM +0100, Will Deacon wrote:
+> > > On Wed, Jul 30, 2014 at 08:17:02PM +0100, Ard Biesheuvel wrote:
+> > > > ]On 30 July 2014 13:30, Will Deacon <will.deacon@arm.com> wrote:
+> > > > > On Wed, Jul 30, 2014 at 11:59:02AM +0100, Ard Biesheuvel wrote:
+> > > > >> From: Mark Rutland <mark.rutland@arm.com>
+> > > > >>
+> > > > >> In certain cases the cpu-release-addr of a CPU may not fall in the
+> > > > >> linear mapping (e.g. when the kernel is loaded above this address due to
+> > > > >> the presence of other images in memory). This is problematic for the
+> > > > >> spin-table code as it assumes that it can trivially convert a
+> > > > >> cpu-release-addr to a valid VA in the linear map.
+> > > > >>
+> > > > >> This patch modifies the spin-table code to use a temporary cached
+> > > > >> mapping to write to a given cpu-release-addr, enabling us to support
+> > > > >> addresses regardless of whether they are covered by the linear mapping.
+> > > > >>
+> > > > >> Signed-off-by: Mark Rutland <mark.rutland@arm.com>
+> > > > >> Tested-by: Mark Salter <msalter@redhat.com>
+> > > > >> [ardb: added (__force void *) cast]
+> > > > >> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+> > > > >> ---
+> > > > >>  arch/arm64/kernel/smp_spin_table.c | 22 +++++++++++++++++-----
+> > > > >>  1 file changed, 17 insertions(+), 5 deletions(-)
+> > > > >
+> > > > > I'm nervous about this. What if the spin table sits in the same physical 64k
+> > > > > frame as a read-sensitive device and we're running with 64k pages?
+> > > > >
+> > > > 
+> > > > Actually, booting.txt requires cpu-release-addr to point to a
+> > > > /memreserve/d part of memory, which implies DRAM (or you wouldn't have
+> > > > to memreserve it)
+> > > > That means it should always be covered by the linear mapping, unless
+> > > > it is located before Image in DRAM, which is the case addressed by
+> > > > this patch.
+> > > 
+> > > But if it's located before before the Image in DRAM and isn't covered by
+> > > the linear mapping, then surely the /memreserve/ is pointless too? In which
+> > > case, this looks like we're simply trying to cater for platforms that aren't
+> > > following booting.txt (which may need updating if we need to handle this).
+> > 
+> > No. The DT is describing the memory which is present, and the subset
+> > thereof which should not be used under normal circumstances. That's a
+> > static property of the system.
+> > 
+> > Where the OS happens to get loaded and what it is able to address is a
+> > dynamic property of the OS (and possibly the bootloader). The DT cannot
+> > have knowledge of this.
+> > 
+> > It's always true that the OS should not blindly use memreserve'd memory.
+> > The fact that it cannot address it in the linear mapping is orthogonal.
 > 
-> <0x00000000-10000000, 0x00000000-c0000000> & <0x00000004-0xc0000000,
-> 0x00000003-40000000> are two memory regions.
+> In which case, I think asserting that /memreserve/ implies DRAM is pretty
+> fragile and not actually enforced anywhere. Sure, we can say `don't do
+> that', but I'd prefer to have the kernel detect this dynamically.
 > 
-> These memory address is 64-bit. When ARM_LPAE is disabled,
-> memblock_add() parses memory base address & size with 32-bit. Since
-> ARCH_PHYS_ADDR_T_64BIT is highly depend on ARM_LPAE.
-> 
-> Then these two memory regions become <0x10000000, 0xc0000000> &
-> <0xc0000000, 0xffffffff>. Lots of IO space are in <0xe0000000,
-> 0xefffffff>. So memory space conflicts when ARM_LPAE is disabled.
-> Kernel panic will come since it believes IO space is memory.
-> 
-> Only two solutions are available in below.
-> 1. Use hip04_defconfig to declare ARM_LPAE.
-> 2. Use hi3xxx_defconfig, and only declare 2.9GB memory in DTS file
-> without ARM_LPAE.
-> 
-> I think solution #1 is better. What's your opinion?
-> 
+> Does dtc check that the /memreserve/ region is actually a subset of the
+> memory node?
 
-I think it's a bug in the DT parsing code if incorrect memory
-regions get added. It's supposed to parse the memory nodes using
-"long enough" (u64 or arbitrary-length) data types and then
-skip every range that doesn't fit into phys_addr_t.
-
-	Arnd
+The handling of /memreserve/ in drivers/of/fdt.c uses the memblock API
+to reserve. And that means it is assumed that /memreserve/ is something
+which can be covered by the normal kernel RAM mapping. I suspect having
+/memreserve/ outside the kernel mapping would cause problems for the mm
+code.
