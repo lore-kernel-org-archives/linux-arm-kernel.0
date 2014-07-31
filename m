@@ -1,53 +1,60 @@
-From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Thu, 31 Jul 2014 16:21:40 +0200
-Subject: [PATCH] ARM: mvebu: Add RTC support for Armada 375
-In-Reply-To: <20140731161529.09c55afb@free-electrons.com>
-References: <1406814276-11361-1-git-send-email-gregory.clement@free-electrons.com>
- <20140731161529.09c55afb@free-electrons.com>
-Message-ID: <53DA50F4.3030204@free-electrons.com>
+From: balbi@ti.com (Felipe Balbi)
+Date: Thu, 31 Jul 2014 09:23:44 -0500
+Subject: Bad Page dump (help)
+In-Reply-To: <20140731134344.GA19512@saruman.home>
+References: <20140729190700.GN17808@saruman.home>
+ <53D9E10F.6040408@xenomai.org>
+ <20140731134344.GA19512@saruman.home>
+Message-ID: <20140731142344.GE19512@saruman.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Thomas,
-
-On 31/07/2014 16:15, Thomas Petazzoni wrote:
-> Dear Gregory CLEMENT,
+On Thu, Jul 31, 2014 at 08:43:44AM -0500, Felipe Balbi wrote:
+> Hi,
 > 
-> On Thu, 31 Jul 2014 15:44:36 +0200, Gregory CLEMENT wrote:
+> On Thu, Jul 31, 2014 at 08:24:15AM +0200, Gilles Chanteperdrix wrote:
+> > -----BEGIN PGP SIGNED MESSAGE-----
+> > Hash: SHA1
+> > 
+> > On 07/29/2014 09:07 PM, Felipe Balbi wrote:
+> > > Hi Russell,
+> > > 
+> > > I'm bringing up a new board on today's linux-next but I'm having a bunch
+> > > of bad_page() calls due to _mapcount not being zero (full logs
+> > > attached). What could cause that ? Any hints on how to debug ? It's as
+> > > if page_mapcount_reset() wasn't called for the pages which are causing
+> > > issues.
+> > 
+> > FWIW, the same issue appeared on a Cogent CSB637 board (the last board 
+> > I use not using DT) in between 3.13 and 3.14. I ran a bisect and found 
+> > that reverting the following commit:
+> > 
+> > commit 84f452b1e8fc73ac0e31254c66e3e2260ce5263d
+> > Author: Santosh Shilimkar <santosh.shilimkar@ti.com>
+> > Date:   Sun Jun 30 00:28:46 2013 -0400
+> > 
+> >     ARM: mm: Remove bootmem code and switch to NO_BOOTMEM
+> >     
+> >     Now with dma_mask series merged and max*pfn has consistent meaning on ARM
+> >     as rest of the arch's thanks to RMK's mega series, lets switch ARM code
+> >     to NO_BOOTMEM. With NO_BOOTMEM change, now we use memblock allocator to
+> >     reserve space for crash kernel to have one less dependency with nobootmem
+> >     allocator wrapper.
+> >     
+> >     Tested with both flat memory and sparse (faked) memory models with highmem
+> >     enabled.
 > 
->> The Armada 375 XP Socs have the same controller that the one used in
->> the orion platforms. This patch updates the device tree for these
->> SoCs.
-> 
-> Actually there's only one Armada 375 SoC, so singular would be good.
+> Thanks I'll give this a shot.
 
-On this point I was referring to the chips not to the family. But I agree
-that it can be understood in both way.
-
-> And s/that/than/ as well. And "controller" is a bit vague. Proposal:
-> 
-> """
-> The Armada 375 SoC has the same real time clock as the one used in
-> other Marvell EBU platforms. This patch consequently updates the Device
-> Tree of the Armada 375 SoC to describe the internal RTC.
-> """
-
-I agree with your proposal I will sent a new version soon.
-
-Thanks,
-
-Gregory
-
-
-> 
-> Thanks,
-> 
-> Thomas
-> 
-
+Reverting didn't help. It made things worse, now it doesn't even boot
+anymore :-)
 
 -- 
-Gregory Clement, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
+balbi
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140731/d31e7dba/attachment.sig>
