@@ -1,113 +1,76 @@
-From: balbi@ti.com (Felipe Balbi)
-Date: Thu, 31 Jul 2014 08:49:45 -0500
-Subject: [PATCH 29/35] arm: omap: intc: switch over to linear irq domain
-In-Reply-To: <53D9F6D5.1080307@ti.com>
-References: <20140729141522.GB17808@saruman.home>
- <20140729152052.GV29045@atomide.com>
- <20140729154057.GE17808@saruman.home>
- <20140729163345.GF17808@saruman.home>
- <20140730060420.GY29045@atomide.com>
- <20140730144059.GA7272@saruman.home>
- <CAGo_u6ou+MoKOE_tTTmjxyFNW=jTaN9vnTsHrxR6sQHsieJyLA@mail.gmail.com>
- <20140730162038.GH7272@saruman.home>
- <20140731062843.GA29045@atomide.com> <53D9F6D5.1080307@ti.com>
-Message-ID: <20140731134945.GB19512@saruman.home>
+From: bp@alien8.de (Borislav Petkov)
+Date: Thu, 31 Jul 2014 15:56:52 +0200
+Subject: [RFC PATCH v3] edac: synps: Added EDAC support for zynq ddr ecc
+ controller
+In-Reply-To: <a366b39c-b354-4d90-8b1e-71e74ab77cf3@BL2FFO11FD011.protection.gbl>
+References: <9dc2a947-d2ab-4f00-8ed3-d2499cb6fdfd@BN1BFFO11FD002.protection.gbl>
+ <20140731113324.GB4375@pd.tnic>
+ <808655a9-77eb-4e3a-9781-2b059ad9517b@BN1AFFO11FD020.protection.gbl>
+ <20140731131702.GC4375@pd.tnic>
+ <a366b39c-b354-4d90-8b1e-71e74ab77cf3@BL2FFO11FD011.protection.gbl>
+Message-ID: <20140731135652.GD4375@pd.tnic>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Thu, Jul 31, 2014 at 03:36:35PM +0200, Michal Simek wrote:
+> Mixing functions for two/more different controller seems to me
+> really messy.
 
-On Thu, Jul 31, 2014 at 10:57:09AM +0300, Tero Kristo wrote:
-> On 07/31/2014 09:28 AM, Tony Lindgren wrote:
-> >* Felipe Balbi <balbi@ti.com> [140730 09:23]:
-> >>Hi,
-> >>
-> >>On Wed, Jul 30, 2014 at 10:45:41AM -0500, Nishanth Menon wrote:
-> >>>On Wed, Jul 30, 2014 at 9:40 AM, Felipe Balbi <balbi@ti.com> wrote:
-> >>>>HI,
-> >>>>
-> >>>>On Tue, Jul 29, 2014 at 11:04:21PM -0700, Tony Lindgren wrote:
-> >>>>>* Felipe Balbi <balbi@ti.com> [140729 09:36]:
-> >>>>>>Hi,
-> >>>>>>
-> >>>>>>On Tue, Jul 29, 2014 at 10:40:57AM -0500, Felipe Balbi wrote:
-> >>>>>>>On Tue, Jul 29, 2014 at 08:20:52AM -0700, Tony Lindgren wrote:
-> >>>>>>>>* Felipe Balbi <balbi@ti.com> [140729 07:18]:
-> >>>>>>>>>Hi,
-> >>>>>>>>>
-> >>>>>>>>>On Tue, Jul 29, 2014 at 05:14:25AM -0700, Tony Lindgren wrote:
-> >>>>>>>>>>* Felipe Balbi <balbi@ti.com> [140728 14:19]:
-> >>>>>>>>>>>now that we don't need to support legacy board-files,
-> >>>>>>>>>>>we can completely switch over to a linear irq domain
-> >>>>>>>>>>>and make use of irq_alloc_domain_generic_chips() to
-> >>>>>>>>>>>allocate all generic irq chips for us.
-> >>>>>>>>>>
-> >>>>>>>>>>This patch seems to somehow break off-idle for omap3
-> >>>>>>>>>>where it no longer wakes up.
-> >>>>>>>>>
-> >>>>>>>>>Sure your bisection is correct ? This patch just switches from legacy
-> >>>>>>>>>irq domain to linear irq domain.
-> >>>>>>>>
-> >>>>>>>>Yes, I tried it a few times. Just enabling
-> >>>>>>>>retention idle hangs too with this patch.
-> >>>>>>>>
-> >>>>>>>>Maybe it's omap3_prcm_irq_setup that relies on
-> >>>>>>>>11 + OMAP_INTC_START? There may be other such issues
-> >>>>>>>
-> >>>>>>>lol.
-> >>>>>>>
-> >>>>>>>OMAP4 has the same nonsense.
-> >>>>>>
-> >>>>>>made me think why (if) OMAP4 works with that same setup. Does wake from
-> >>>>>>OFF work with OMAP4 ?
-> >>>>>
-> >>>>>Not without similar changes, omap4+ has the same issue.. There's a RFC
-> >>>>>series from Nishant to fix some of this, and Tero is moving the PRCM
-> >>>>>into a driver.
-> >>>>>
-> >>>>>>Anyway, here's a quick little hack to check if that's the reason for the
-> >>>>>>regression:
-> >>>>>
-> >>>>>OK yeah that's along the same lines with Nishant's RFC series in thread
-> >>>>>"[RFC PATCH 0/7] ARM: OMAP4+: PRM: minor cleanups and dt support of
-> >>>>>interrupts"
-> >>>>>
-> >>>>>FYI, it did not compile, needs to include linux/of_irq.h. But yes,
-> >>>>
-> >>>>I might have sent the wrong version as I had that same build error and
-> >>>>fixed it localy.
-> >>>>
-> >>>>>it fixes the regression for me, Also now the whole series works for
-> >>>>>me :)
-> >>>>
-> >>>>good to know.
-> >>>>
-> >>>>What do you want to do now ? Wait for PRCM to become a driver ? Wait for
-> >>>>Nishanth's series to get accepted ? I guess the same thing could be done
-> >>>>for OMAP3 and AM33, then we would have a chance of having working wake
-> >>>>from idle with the new irqchip.
-> >>>
-> >>>I can repost the current series as it stands now once 17-rc1 comes out
-> >>>(without the build failure ofcourse).. if that helps to move it out of
-> >>>RFC status.
-> >>
-> >>That'd be great. It would be ever greater if you could add support for
-> >>OMAP3 on that too.
-> >
-> >Yeah sounds good to me. Tero, does that work OK for your PRCM changes?
+Just stating that something is "really messy" without giving at least
+one technical reason for it is not going to get you any further. So let
+me give you mine:
+
+I think it is not messy because one file contains all the EDAC code for
+that system. Like every other system out there uses one EDAC driver.
+Everything is nicely contained in one place, any communication between
+the two memory controllers is done internally in that driver.
+
+Having two drivers would make that much more complicated. But hey, if
+you want to make your life more complicated because it is not enough
+complicated, feel free to do so. Just make sure you don't impose any
+restrictions on the rest of the subsystem.
+
+> > -ENOPARSE for this sentence.
 > 
-> Well, this set seems to break PM. suspend-resume on omap3-beagle just hangs
-> after this set is applied. Works fine without it with 3.16-rc5 tag.
+> I meant by this this scenario - please correct me if I am completely wrong
+> because I am not playing with this subsystem. My expectation is that
+> memory controller number should be same all the time.
+> 
+> two memory controllers with the same edac driver.
+> 
+> Normal calling sequence:
+> X probe - number 0
+> Y probe - number 1
+> 
+> Different order/name (I think order is taken at the first place)
+> in DTS should caused that X will have number 1 and Y number 0.
+> 
+> Another scenario:
+> two controllers and one with external gpio reset for example.
+> 
+> X probe is called but gpio controller is not ready and gpio driver returns
+> -EPROBE_DEFER then Y probe is called and get number 0. Then X probe is called
+> again and get number 1.
 
-did you apply the quick little hack to prm3xxx.c ? prcm IRQ is hardcoded
-to 11, once we switch to a linear irq domain, irq_base may change.
+Right, since you have a heterogeneous design, you'd need to account
+for all that in your driver and deal with probing order. Like having a
+way to ask a controller what kind of a controller it is and so on. I'm
+afraid I don't know anything about your design to be of more help there.
+
+However, doing this in one <name>_edac.c file is almost trivial than
+doing it with two separate drivers. Unless you don't need to do any
+meaningful communication between the PS and PL. Then it doesn't matter.
+
+If I were you, I'd spend a more time on a proper design now so that all
+my work later is easy. Adding two drivers just because it seems messy is
+not a very good idea. What I would do is analyze all my use cases and
+come up with a proper design then. But this is just me.
+
+HTH.
 
 -- 
-balbi
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140731/b1e3113a/attachment.sig>
+Regards/Gruss,
+    Boris.
+
+Sent from a fat crate under my desk. Formatting is fine.
+--
