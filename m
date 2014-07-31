@@ -1,42 +1,93 @@
-From: tomasz.figa@gmail.com (Tomasz Figa)
-Date: Fri, 01 Aug 2014 00:25:42 +0200
-Subject: [PATCH] clk: samsung: Changed return behavior of samsung_clk_init
-In-Reply-To: <1406843002-15652-1-git-send-email-hsnaves@gmail.com>
-References: <1406843002-15652-1-git-send-email-hsnaves@gmail.com>
-Message-ID: <53DAC266.4080102@gmail.com>
+From: afaerber@suse.de (=?UTF-8?B?QW5kcmVhcyBGw6RyYmVy?=)
+Date: Fri, 01 Aug 2014 01:17:07 +0200
+Subject: [PATCH v4 4/4] ARM: dts: Add exynos5250-spring device tree
+In-Reply-To: <53DA9BA9.60808@gmail.com>
+References: <1406822910-6255-1-git-send-email-afaerber@suse.de>
+ <1406822910-6255-5-git-send-email-afaerber@suse.de>
+ <53DA936E.9060004@gmail.com> <53DA9709.10602@suse.de>
+ <53DA9BA9.60808@gmail.com>
+Message-ID: <53DACE73.8080009@suse.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Humberto,
-
-On 31.07.2014 23:43, Humberto Silva Naves wrote:
-> Instead of invoking panic, the samsung_clk_init returns a NULL
-> pointer to indicate that an error has occurred. All the drivers
-> using this function were changed appropriately (in this case
-> just the clk-exynos5410).
+Am 31.07.2014 21:40, schrieb Tomasz Figa:
+> On 31.07.2014 21:20, Andreas F?rber wrote:
+>> Am 31.07.2014 21:05, schrieb Tomasz Figa:
+>>> On 31.07.2014 18:08, Andreas F?rber wrote:
+>>>> +	usb-hub {
+>>>> +		compatible = "smsc,usb3503a";
+>>>> +		reset-gpios = <&hsic_reset>;
+>>>
+>>> Hmm, why a -gpios property points to a pinctrl node? Shouldn't there be
+>>> a phandle to GPIO bank + GPIO specifier instead?
+>>
+>> Dunno, can change it. Can I just copy the gpio property from the
+>> regulator above?
 > 
-> This patch was suggested by Tomasz Figa in
-> http://www.mail-archive.com/linux-samsung-soc at vger.kernel.org/msg34982.html
+> Reading what Vincent posted earlier I would consider this as the right
+> thing to do and it might even let you remove the fake regulator node.
 
-There is a Suggested-by tag that can be added before your sign-off.
-Similarly there are few other useful tags which are good to know.
+Indeed it does, thanks for spotting this!
 
+[...]
+>>>> +&dp_hpd {
+>>>> +	samsung,pins = "gpc3-0";
+>>>> +	samsung,pin-function = <0>;
+>>>> +	samsung,pin-pud = <3>;
+>>>> +	samsung,pin-drv = <0>;
+>>>> +};
+>>>
+>>> Hmm, what node is this referencing? I believe this should rather
+>>> reference the pin controller and add a new board-specific pinconf/pinmux
+>>> group instead....
+>>
+>> It's a -pinctrl node. See v3->v4 change log and discussion on v3.
+>>
 > 
-> Signed-off-by: Humberto Silva Naves <hsnaves@gmail.com>
-> ---
->  drivers/clk/samsung/clk-exynos5410.c |    2 ++
->  drivers/clk/samsung/clk.c            |    8 +++++---
->  2 files changed, 7 insertions(+), 3 deletions(-)
+> Well, this is clearly a board specific node anyway, because it does not
+> refer to a special function, but simply an input/interrupt GPIO. If it
+> somehow has landed in generic pinctrl dtsi then it should be removed
+> from there and this patch should simply introduce its own instance of
+> dp_hpd node, so you did the right thing in v3.
+
+Well, my point was that the 3.8 tree contains only one dp-hpd node, not
+two as we would get by adding a new node here.
+
+Apart from Spring, it's used in Snow and SMDK5250, so moving it there
+seems feasible and the cleanest solution to me.
+
+>>> [snip]
+>>>
+>>>> +/*
+>>>> + * Disabled pullups since external part has its own pullups and
+>>>> + * double-pulling gets us out of spec in some cases.
+>>>> + */
+>>>> +&i2c2_bus {
+>>>> +	samsung,pin-pud = <0>;
+>>>> +};
+>>>
+>>> OK, here overriding a generic pinconf group is justified and nicely
+>>> explained by a comment.
+>>
+>> You seem to assume that I actually understand these things. ;)
+>> Just copied from -cros-common/-snow.
+>>
 > 
+> It is good if those things are being done with some level of
+> understanding. The DT mechanics are quite well documented in
+> Documentation/devicetree/bindings, while for HW-specific bits I believe
+> Chromium guys could give you a hand.
 
-In general the patch looks good, thanks for you work. Will wait some
-time to let people review it and then apply.
+I did read and even fix documentation for those bindings that I added
+myself in Spring, just not for those that were already in common code,
+like this one here.
 
-As a side note, it is always good to say why the patch is good in commit
-message, so that maintainers know that author knows what he does, they
-indeed want this patch and people that would stumble upon this patch in
-future could know the rationale behind this change. This patch is pretty
-trivial, though, so I'll let it go this time.
+A tps65090 patch has been ignored since being asked to extend the commit
+message, v3 was recently sent. Help getting that in appreciated.
 
-Best regards,
-Tomasz
+Cheers,
+Andreas
+
+-- 
+SUSE LINUX Products GmbH, Maxfeldstr. 5, 90409 N?rnberg, Germany
+GF: Jeff Hawn, Jennifer Guild, Felix Imend?rffer; HRB 16746 AG N?rnberg
