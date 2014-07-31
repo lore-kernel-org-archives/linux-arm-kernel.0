@@ -1,68 +1,101 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Wed, 30 Jul 2014 20:55:03 -0700
-Subject: [PATCH v15 08/12] ARM: config: append lpae configuration
-In-Reply-To: <CAD6h2NTK=nARtyRwRPyprOmhLxEwkTFm84s4UqHZr1gEPFBaVw@mail.gmail.com>
-References: <1406555876-11989-1-git-send-email-haojian.zhuang@linaro.org>
- <1406555876-11989-9-git-send-email-haojian.zhuang@linaro.org>
- <20140729040531.GB8430@quad.lixom.net>
- <CAD6h2NQ-+t0=XvMWR54tzpvkMe+JT4FcLvQFPNJuUea32GDS8g@mail.gmail.com>
- <CAOesGMge6U4B0Eedhi22t=r2gHucEcwcrcGBmkuZ6jAVR1ZoOA@mail.gmail.com>
- <CAD6h2NTK=nARtyRwRPyprOmhLxEwkTFm84s4UqHZr1gEPFBaVw@mail.gmail.com>
-Message-ID: <CAOesGMhgWncQ9wafjjDiaZkT1ge-YPe5bjFs9Ebyj7Fg=3YhHQ@mail.gmail.com>
+From: afaerber@suse.de (=?UTF-8?B?QW5kcmVhcyBGw6RyYmVy?=)
+Date: Thu, 31 Jul 2014 05:59:05 +0200
+Subject: [PATCH 0/3] ARM: EXYNOS: Fix Exynos5410 boot
+In-Reply-To: <03f501cfac5c$2c69be90$853d3bb0$@samsung.com>
+References: <1406463725-4208-1-git-send-email-afaerber@suse.de>
+ <53D4EFBB.6000404@suse.de> <00c901cfa9fc$727b4e10$5771ea30$@samsung.com>
+ <CAOesGMjh=xMZ3vB45ofh=CLjTFDMQxSxus5q_P67XQSbwg6-+A@mail.gmail.com>
+ <03f501cfac5c$2c69be90$853d3bb0$@samsung.com>
+Message-ID: <53D9BF09.7060002@suse.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jul 30, 2014 at 7:24 PM, Haojian Zhuang
-<haojian.zhuang@linaro.org> wrote:
-> On 31 July 2014 09:01, Olof Johansson <olof@lixom.net> wrote:
->> On Tue, Jul 29, 2014 at 3:43 AM, Haojian Zhuang
->> <haojian.zhuang@linaro.org> wrote:
->>> On 29 July 2014 12:05, Olof Johansson <olof@lixom.net> wrote:
->>>> On Mon, Jul 28, 2014 at 09:57:52PM +0800, Haojian Zhuang wrote:
->>>>> Append multi_v7_lpae_config. In this default configuration,
->>>>> CONFIG_ARCH_MULTI_V6 is disabled. CONFIG_ARM_LPAE is enabled.
+Hi Kukjin,
+
+Am 31.07.2014 03:10, schrieb Kukjin Kim:
+> Olof Johansson wrote:
+>>
+>> Hi,
+>>
+> Hi Olof,
+> 
+>> On Sun, Jul 27, 2014 at 5:39 PM, Kukjin Kim <kgene.kim@samsung.com> wrote:
+>>> Andreas F?rber wrote:
 >>>>
->>>> NACK. This is the nth time I have had to nack this patch.
+>>>> Am 27.07.2014 14:22, schrieb Andreas F?rber:
+>>>>> Hello,
+>>>>>
+>>>>> This mini-series unbreaks booting on 5410 based ODROID-XU.
+>>>>>
+>>>>> Since I do not have access to a TRM, the address is a guess based on
+>>>>> 5250 and 5410. Such a node was not present in the 3.14 downstream tree.
 >>>>
->>>> You are enabling platforms here that don't have LPAE. Don't do that.
+>>>> s/5410/5420/
 >>>>
->>>> It's trivial to create a LPAE version of multi_v7 defconfig locally.
->>>>
->>>>
->>>> -Olof
+>>> OK.
 >>>
->>> I tried to remove those SoCs that can't support LPAE. But I don't know
->>> every platform in details.
+>>>>>
+>>>>> Regards,
+>>>>> Andreas
+>>>>>
+>>>>> Andreas F?rber (3):
+>>>>>   Documentation: devicetree: Document exynos5410 PMU
+>>>>>   ARM: dts: exynos: Add PMU to Exynos5410
+>>>>>   ARM: EXYNOS: Add support for Exynos5410 PMU
+>>>>>
+>>>>>  Documentation/devicetree/bindings/arm/samsung/pmu.txt | 1 +
+>>>>>  arch/arm/boot/dts/exynos5410.dtsi                     | 5 +++++
+>>>>>  arch/arm/mach-exynos/exynos.c                         | 1 +
+>>>>>  3 files changed, 7 insertions(+)
+>>>>
+>>> Andreas, thanks.
 >>>
->>> How about that I only enable HIP04 in multi_v7_lpae_defconfig. If you
->>> think any platform could be added, please help to list it. Then I
->>> could append them into the multi_v7_lpae_defconfig.
+>>> I'll apply this whole series.
 >>
->> I really don't like having to repeat this over and over: Just add LPAE
->> to a multi_v7_defconfig build when you need to turn it on.
+>> We're getting close to the merge window. I'd prefer not to have to
+>> start reverting samsung code to recover from these regressions, so
+>> please send this up very soon.
 >>
->> The alternative is to do this right from the beginning, and move
->> multi_v7 over to be a v6_v7 defconfig, and also have an lpae+kvm
->> defconfig for A7/12/15/17 (and mvebu/krait) platforms. But there's
->> been no need for that yet since all platforms to date can boot without
->> LPAE just fine -- in fact most of them don't actually need it since
->> nearly all of them have less memory and for the few of them that do
->> you just turn on LPAE manually like I suggested.
->>
->>
->> -Olof
->
-> I can drop both hip04_defconfig & multi_v7_lpae_defconfig. But the
-> problem is that 16GB memory is used in hip04 platform. 64bit memory
-> address is also used in hip04 dts file. So I can't boot kernel without
-> LPAE configuration.
->
-> If I integrate ARCH_HIP04 & LPAE into hi3xxx_defconfig, both
-> ARCH_HI3XXX & ARCH_X5HD2 don't support LPAE.
+> Thanks for your gentle reminder.
+> 
+> BTW I'm waiting for exynos5250-spring support from Andreas and I'd like to get
+> confirmation about that from Doug. And I'm looking at s2r related patches now.
+> 
+> OK, I will send out current samsung tree tonight in my time anyway.
 
-There is memory at 0x10000000-0xd0000000 and all I/O is below 4GB. You
-should be able to boot just fine without LPAE, but you won't see all
-memory available.
+That would be kind.
 
+Patches 2-3 in spring v3 should be non-functional snow refactorings for
+you to consider, but untested by me; patch 1 you could skip if you
+modify patch 2, if necessary. As for patch 4, you can see from my
+spring-next branch [1] how I am successfully testing it with a TEST_ONLY
+patch: For simplefb usage I comment out the /dp-controller node to avoid
+drm/exynos detection (not enabling the driver in the user's .config
+would be an alternative); when I run into issues with the drm during
+testing, I can usually ssh in via USB ethernet/wifi.
 
--Olof
+In the dmesg for drm/exynos bridge series testing [2] (which I guess is
+not gonna hit 3.17 any more?) I noticed that the USB3503 /usb-hub node
+new in v3 is not working yet (complains about lack of #gpio-cells, I
+guess for my reset-gpios property), not sure how to fix, so we/you could
+probably just drop that node - preparing to test that now.
+
+As for the rest of patch 4, it's a new DT, so we could fix up any
+remaining bugs during 3.17 RC cycle, if it looks sane to you guys now. I
+had replied to two series - namely cpufreq [3] and dwmmc [4] - where
+merge conflicts might arise. Let me know if you need a respin for anything.
+
+Regards,
+Andreas
+
+[1] https://github.com/afaerber/linux/commits/spring-next
+[2]
+http://www.mail-archive.com/linux-samsung-soc at vger.kernel.org/msg34927.html
+[3]
+http://www.mail-archive.com/linux-samsung-soc at vger.kernel.org/msg34807.html
+[4]
+http://www.mail-archive.com/linux-samsung-soc at vger.kernel.org/msg34898.html
+
+-- 
+SUSE LINUX Products GmbH, Maxfeldstr. 5, 90409 N?rnberg, Germany
+GF: Jeff Hawn, Jennifer Guild, Felix Imend?rffer; HRB 16746 AG N?rnberg
