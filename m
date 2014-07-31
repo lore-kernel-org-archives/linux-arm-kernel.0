@@ -1,277 +1,327 @@
-From: ta.omasab@gmail.com (Thomas Abraham)
-Date: Thu, 31 Jul 2014 09:48:03 +0530
-Subject: [PATCH v9 3/6] ARM: dts: Exynos: add CPU OPP and regulator supply
- property
-In-Reply-To: <CAD=FV=WejyO1SqqYvh4wdKtRV58zc-rGCy=aq9Bf2GvpnbJGgg@mail.gmail.com>
-References: <1406707663-16656-1-git-send-email-thomas.ab@samsung.com>
- <1406707663-16656-4-git-send-email-thomas.ab@samsung.com>
- <CAD=FV=WNmREbRLmsusbJ6KKykVzwdBqOUfYkWWOhbc=HmxyTdA@mail.gmail.com>
- <CAJuA9aiBmM+HF0TJkvdjgOkGKYaL4SHU9JtvqfU2jiV7CP978A@mail.gmail.com>
- <CAD=FV=Vq7+ujjzwBCR4bvQ13-0qV4VVktVOWy8z51RF-9=LKXA@mail.gmail.com>
- <CAJuA9ahcg39YmSS43eTdLov-q=Eu0kaOQ_hFfiZeU2E_u6eCXQ@mail.gmail.com>
- <CAD=FV=WejyO1SqqYvh4wdKtRV58zc-rGCy=aq9Bf2GvpnbJGgg@mail.gmail.com>
-Message-ID: <CAJuA9ajJovdUsQMydmZPzK8eOOOeus9FqXaZ6hLP1z8Om3ReDw@mail.gmail.com>
+From: olof@lixom.net (Olof Johansson)
+Date: Wed, 30 Jul 2014 21:22:17 -0700
+Subject: [PATCH 06/19] ARM64 / ACPI: Parse FADT table to get PSCI flags
+ for PSCI init
+In-Reply-To: <1406206825-15590-7-git-send-email-hanjun.guo@linaro.org>
+References: <1406206825-15590-1-git-send-email-hanjun.guo@linaro.org>
+ <1406206825-15590-7-git-send-email-hanjun.guo@linaro.org>
+Message-ID: <CAOesGMjzFyd_=+ToFmjyn958F86KsDJDht+9ZmniAERz16K_VQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jul 31, 2014 at 9:38 AM, Doug Anderson <dianders@chromium.org> wrote:
-> Thomas,
->
-> On Wed, Jul 30, 2014 at 9:06 PM, Thomas Abraham <ta.omasab@gmail.com> wrote:
->> On Thu, Jul 31, 2014 at 9:23 AM, Doug Anderson <dianders@chromium.org> wrote:
->>> Thomas,
->>>
->>> On Wed, Jul 30, 2014 at 8:21 PM, Thomas Abraham <ta.omasab@gmail.com> wrote:
->>>> Hi Doug,
->>>>
->>>> On Thu, Jul 31, 2014 at 6:07 AM, Doug Anderson <dianders@chromium.org> wrote:
->>>>> Thomas,
->>>>>
->>>>> On Wed, Jul 30, 2014 at 1:07 AM, Thomas Abraham <thomas.ab@samsung.com> wrote:
->>>>>> diff --git a/arch/arm/boot/dts/exynos5250-arndale.dts b/arch/arm/boot/dts/exynos5250-arndale.dts
->>>>>> index d0de1f5..3b12a97 100644
->>>>>> --- a/arch/arm/boot/dts/exynos5250-arndale.dts
->>>>>> +++ b/arch/arm/boot/dts/exynos5250-arndale.dts
->>>>>> @@ -575,3 +575,7 @@
->>>>>>                 usb-phy = <&usb2_phy>;
->>>>>>         };
->>>>>>  };
->>>>>> +
->>>>>> +&cpu0 {
->>>>>> +       cpu0-supply = <&buck2_reg>;
->>>>>> +};
->>>>>> diff --git a/arch/arm/boot/dts/exynos5250-smdk5250.dts b/arch/arm/boot/dts/exynos5250-smdk5250.dts
->>>>>> index b4b35ad..f07e834 100644
->>>>>> --- a/arch/arm/boot/dts/exynos5250-smdk5250.dts
->>>>>> +++ b/arch/arm/boot/dts/exynos5250-smdk5250.dts
->>>>>> @@ -414,3 +414,7 @@
->>>>>>                 };
->>>>>>         };
->>>>>>  };
->>>>>> +
->>>>>> +&cpu0 {
->>>>>> +       cpu0-supply = <&buck2_reg>;
->>>>>> +};
->>>>>> diff --git a/arch/arm/boot/dts/exynos5250-snow.dts b/arch/arm/boot/dts/exynos5250-snow.dts
->>>>>> index f2b8c41..91acca7 100644
->>>>>> --- a/arch/arm/boot/dts/exynos5250-snow.dts
->>>>>> +++ b/arch/arm/boot/dts/exynos5250-snow.dts
->>>>>> @@ -509,4 +509,8 @@
->>>>>>         };
->>>>>>  };
->>>>>>
->>>>>> +&cpu0 {
->>>>>> +       cpu0-supply = <&buck2_reg>;
->>>>>> +};
->>>>>> +
->>>>>>  #include "cros-ec-keyboard.dtsi"
->>>>>> diff --git a/arch/arm/boot/dts/exynos5250.dtsi b/arch/arm/boot/dts/exynos5250.dtsi
->>>>>> index 492e1ef..97b282c 100644
->>>>>> --- a/arch/arm/boot/dts/exynos5250.dtsi
->>>>>> +++ b/arch/arm/boot/dts/exynos5250.dtsi
->>>>>> @@ -58,11 +58,34 @@
->>>>>>                 #address-cells = <1>;
->>>>>>                 #size-cells = <0>;
->>>>>>
->>>>>> -               cpu at 0 {
->>>>>> +               cpu0: cpu at 0 {
->>>>>>                         device_type = "cpu";
->>>>>>                         compatible = "arm,cortex-a15";
->>>>>>                         reg = <0>;
->>>>>>                         clock-frequency = <1700000000>;
->>>>>> +
->>>>>> +                       clocks = <&clock CLK_ARM_CLK>;
->>>>>> +                       clock-names = "cpu";
->>>>>> +                       clock-latency = <140000>;
->>>>>
->>>>> Where did the 140000 number come from?  My old calculations show that
->>>>> with lock time of 270 ad P up to 6 we were at 67.5us lock time.
->>>>
->>>> I measured the time taken by clk_set_rate call in the cpufreq driver
->>>> using do_gettimeofday(). The time taken to change the clock speed was
->>>> between 87us to 134us for Exynos5420. So I just took the worst case
->>>> time of 140us. Also, the time taken to change the CPU clock speed
->>>> includes the settling time for changes to dividers and mux clock
->>>> blocks.
->>>
->>> Interesting.  I wonder why the difference between my earlier
->>> calculations.  It seems just about double.  :-/
->>
->> In your calculation, only the PLL lock time is being considered. But
->> the 140us latency is for the whole clk_set_rate() call.
->>
->>>
->>>
->>>>>> +                       operating-points = <
->>>>>> +                               1700000 1300000
->>>>>> +                               1600000 1250000
->>>>>> +                               1500000 1225000
->>>>>> +                               1400000 1200000
->>>>>> +                               1300000 1150000
->>>>>> +                               1200000 1125000
->>>>>> +                               1100000 1100000
->>>>>> +                               1000000 1075000
->>>>>> +                                900000 1050000
->>>>>> +                                800000 1025000
->>>>>> +                                700000 1012500
->>>>>> +                                600000 1000000
->>>>>> +                                500000  975000
->>>>>> +                                400000  950000
->>>>>> +                                300000  937500
->>>>>> +                                200000  925000
->>>>>> +                       >;
->>>>>>                 };
->>>>>>                 cpu at 1 {
->>>>>>                         device_type = "cpu";
->>>>>> diff --git a/arch/arm/boot/dts/exynos5420.dtsi b/arch/arm/boot/dts/exynos5420.dtsi
->>>>>> index cb2b70e..3154b4c 100644
->>>>>> --- a/arch/arm/boot/dts/exynos5420.dtsi
->>>>>> +++ b/arch/arm/boot/dts/exynos5420.dtsi
->>>>>> @@ -59,8 +59,26 @@
->>>>>>                         device_type = "cpu";
->>>>>>                         compatible = "arm,cortex-a15";
->>>>>>                         reg = <0x0>;
->>>>>> +                       clocks = <&clock CLK_ARM_CLK>;
->>>>>> +                       clock-names = "cpu-cluster.0";
->>>>>>                         clock-frequency = <1800000000>;
->>>>>>                         cci-control-port = <&cci_control1>;
->>>>>> +                       clock-latency = <140000>;
->>>>>> +
->>>>>> +                       operating-points = <
->>>>>> +                               1800000 1250000
->>>>>> +                               1700000 1212500
->>>>>> +                               1600000 1175000
->>>>>> +                               1500000 1137500
->>>>>> +                               1400000 1112500
->>>>>> +                               1300000 1062500
->>>>>> +                               1200000 1037500
->>>>>> +                               1100000 1012500
->>>>>> +                               1000000 987500
->>>>>> +                                900000 962500
->>>>>> +                                800000 937500
->>>>>> +                                700000 912500
->>>>>> +                       >;
->>>>>>                 };
->>>>>>
->>>>>>                 cpu1: cpu at 1 {
->>>>>> @@ -69,6 +87,7 @@
->>>>>>                         reg = <0x1>;
->>>>>>                         clock-frequency = <1800000000>;
->>>>>>                         cci-control-port = <&cci_control1>;
->>>>>> +                       clock-latency = <140000>;
->>>>>>                 };
->>>>>>
->>>>>>                 cpu2: cpu at 2 {
->>>>>> @@ -77,6 +96,7 @@
->>>>>>                         reg = <0x2>;
->>>>>>                         clock-frequency = <1800000000>;
->>>>>>                         cci-control-port = <&cci_control1>;
->>>>>> +                       clock-latency = <140000>;
->>>>>>                 };
->>>>>>
->>>>>>                 cpu3: cpu at 3 {
->>>>>> @@ -85,14 +105,29 @@
->>>>>>                         reg = <0x3>;
->>>>>>                         clock-frequency = <1800000000>;
->>>>>>                         cci-control-port = <&cci_control1>;
->>>>>> +                       clock-latency = <140000>;
->>>>>>                 };
->>>>>>
->>>>>>                 cpu4: cpu at 100 {
->>>>>>                         device_type = "cpu";
->>>>>>                         compatible = "arm,cortex-a7";
->>>>>>                         reg = <0x100>;
->>>>>> +                       clocks = <&clock CLK_KFC_CLK>;
->>>>>> +                       clock-names = "cpu-cluster.1";
->>>>>>                         clock-frequency = <1000000000>;
->>>>>
->>>>> It does't start out at its maximum?
->>>>
->>>> The A7 CPU clock need not start with the maximum. On the SMDK5420
->>>> board, the firmware has set the A7 CPU clock to 1GHz. So I used the
->>>> same value here.
->>>
->>> Does it need to match the firmware?  On exynos5420-peach-pit and
->>> peach-pi I think the firmware starts the kernel at 1.7GHz.
->>
->> It need not strictly match with the firmware. 1.7GHz for A7 seems too
->> high since the max A7 speed was 1.3GHz. Probably peach-pit/pi had
->> 600MHz starting frequency for A7 CPU.
->
-> Sorry, the ARM was at 1.7, not the KFC.  ...but above the default for
-> ARM was listed as 1.8
+Hi,
 
-I think the listed frequency need not strictly match the initial
-firmware frequency. If it has to match, then this value can be
-overridden in the peach-pit/pi board dts files.
+On Thu, Jul 24, 2014 at 6:00 AM, Hanjun Guo <hanjun.guo@linaro.org> wrote:
+> There are two flags: PSCI_COMPLIANT and PSCI_USE_HVC. When set,
+> the former signals to the OS that the hardware is PSCI compliant.
+> The latter selects the appropriate conduit for PSCI calls by
+> toggling between Hypervisor Calls (HVC) and Secure Monitor Calls
+> (SMC).
+>
+> FADT table contains such information, parse FADT to get the flags
+> for PSCI init. Since ACPI 5.1 doesn't support self defined PSCI
+> function IDs, which means that only PSCI 0.2+ is supported in ACPI.
+>
+> At the same time, only ACPI 5.1 or higher verison supports PSCI,
+> and FADT Major.Minor version was introduced in ACPI 5.1, so we
+> will check the version and only parse FADT table with version >= 5.1.
+>
+> If firmware provides ACPI tables with ACPI version less than 5.1,
+> OS will be messed up with those information and have no way to
+> bring up secondery CPUs, so disable ACPI if we get an FADT table
+> with version less that 5.1.
+>
+> Signed-off-by: Hanjun Guo <hanjun.guo@linaro.org>
+> Signed-off-by: Graeme Gregory <graeme.gregory@linaro.org>
+> ---
+>  arch/arm64/include/asm/acpi.h |    2 +
+>  arch/arm64/kernel/acpi.c      |   50 ++++++++++++++++++++++
+>  arch/arm64/kernel/psci.c      |   95 +++++++++++++++++++++++++++++------------
+>  arch/arm64/kernel/setup.c     |    2 +
+>  4 files changed, 121 insertions(+), 28 deletions(-)
+>
+> diff --git a/arch/arm64/include/asm/acpi.h b/arch/arm64/include/asm/acpi.h
+> index 44b617f..67dac90 100644
+> --- a/arch/arm64/include/asm/acpi.h
+> +++ b/arch/arm64/include/asm/acpi.h
+> @@ -18,6 +18,8 @@ extern int acpi_disabled;
+>  extern int acpi_noirq;
+>  extern int acpi_pci_disabled;
+>  extern int acpi_strict;
+> +extern int acpi_psci_present;
+> +extern int acpi_psci_use_hvc;
+>
+>  static inline void disable_acpi(void)
+>  {
+> diff --git a/arch/arm64/kernel/acpi.c b/arch/arm64/kernel/acpi.c
+> index f5a10b5..374926f 100644
+> --- a/arch/arm64/kernel/acpi.c
+> +++ b/arch/arm64/kernel/acpi.c
+> @@ -11,6 +11,8 @@
+>   *  published by the Free Software Foundation.
+>   */
+>
+> +#define pr_fmt(fmt) "ACPI: " fmt
+> +
+>  #include <linux/init.h>
+>  #include <linux/acpi.h>
+>  #include <linux/cpumask.h>
+> @@ -34,6 +36,12 @@ EXPORT_SYMBOL(acpi_disabled);
+>  int acpi_pci_disabled;         /* skip ACPI PCI scan and IRQ initialization */
+>  EXPORT_SYMBOL(acpi_pci_disabled);
+>
+> +/* 1 to indicate PSCI is implemented */
+> +int acpi_psci_present;
+> +
+> +/* 1 to indicate HVC must be used instead of SMC as the PSCI conduit */
+> +int acpi_psci_use_hvc;
 
-Thanks,
-Thomas.
+Here's a prime example of where it would just make more sense to
+populate DT based on what's in the ACPI info.
+
+Have a acpi_parse_fadt() that, if needed, creates a /psci node in the
+system-wide DT and populates it with the few properties needed.
+
+That way, the rest of the code path in the kernel setup is identical,
+instead of dealing with separate functions for setup, two exported
+variables just to communicate the state, and so on. It's just extra
+complexity for no good reason. The ACPi side code isn't even adding
+significant complexity compared to this. We'll need to add an
+of_add_node() property though.
+
+>  /*
+>   * __acpi_map_table() will be called before page_init(), so early_ioremap()
+>   * or early_memremap() should be called here to for ACPI table mapping.
+> @@ -54,6 +62,33 @@ void __init __acpi_unmap_table(char *map, unsigned long size)
+>         early_iounmap(map, size);
+>  }
+>
+> +static int __init acpi_parse_fadt(struct acpi_table_header *table)
+> +{
+> +       struct acpi_table_fadt *fadt = (struct acpi_table_fadt *)table;
+> +
+> +       /*
+> +        * Revision in table header is the FADT Major version,
+> +        * and there is a minor version of FADT which was introduced
+> +        * by ACPI 5.1, we only deal with ACPI 5.1 or higher version
+> +        * to get arm boot flags, or we will disable ACPI.
+> +        */
+> +       if (table->revision < 5 || fadt->minor_version < 1) {
+> +               pr_info("FADT version is %d.%d, no PSCI support, should be 5.1 or higher\n",
+> +                       table->revision, fadt->minor_version);
+> +               acpi_psci_present = 0;
+> +               disable_acpi();
+
+This does more than just check for FADT/PSCI, it disables ACPI
+alltogether. That kind of side effect from parse_fadt() doesn't seem
+appropriate.
+
+> +               return -EINVAL;
+> +       }
+> +
+> +       if (acpi_gbl_FADT.arm_boot_flags & ACPI_FADT_PSCI_COMPLIANT)
+> +               acpi_psci_present = 1;
+> +
+> +       if (acpi_gbl_FADT.arm_boot_flags & ACPI_FADT_PSCI_USE_HVC)
+> +               acpi_psci_use_hvc = 1;
+> +
+> +       return 0;
+> +}
+> +
+>  /*
+>   * acpi_boot_table_init() called from setup_arch(), always.
+>   *     1. find RSDP and get its address, and then find XSDT
+> @@ -75,6 +110,21 @@ void __init acpi_boot_table_init(void)
+>         }
+>  }
+>
+> +int __init acpi_boot_init(void)
+> +{
+> +       int err = 0;
+> +
+> +       /* If acpi_disabled, bail out */
+> +       if (acpi_disabled)
+> +               return -ENODEV;
+> +
+> +       err = acpi_table_parse(ACPI_SIG_FADT, acpi_parse_fadt);
+> +       if (err)
+> +               pr_err("Can't find FADT\n");
+> +
+> +       return err;
+> +}
+> +
+>  static int __init parse_acpi(char *arg)
+>  {
+>         if (!arg)
+> diff --git a/arch/arm64/kernel/psci.c b/arch/arm64/kernel/psci.c
+> index 9e9798f..adb25f3 100644
+> --- a/arch/arm64/kernel/psci.c
+> +++ b/arch/arm64/kernel/psci.c
+> @@ -15,6 +15,7 @@
+>
+>  #define pr_fmt(fmt) "psci: " fmt
+>
+> +#include <linux/acpi.h>
+>  #include <linux/init.h>
+>  #include <linux/of.h>
+>  #include <linux/smp.h>
+> @@ -231,6 +232,33 @@ static void psci_sys_poweroff(void)
+>         invoke_psci_fn(PSCI_0_2_FN_SYSTEM_OFF, 0, 0, 0);
+>  }
+>
+> +static void psci_0_2_set_functions(void)
+> +{
+> +       pr_info("Using standard PSCI v0.2 function IDs\n");
+> +       psci_function_id[PSCI_FN_CPU_SUSPEND] = PSCI_0_2_FN64_CPU_SUSPEND;
+> +       psci_ops.cpu_suspend = psci_cpu_suspend;
+> +
+> +       psci_function_id[PSCI_FN_CPU_OFF] = PSCI_0_2_FN_CPU_OFF;
+> +       psci_ops.cpu_off = psci_cpu_off;
+> +
+> +       psci_function_id[PSCI_FN_CPU_ON] = PSCI_0_2_FN64_CPU_ON;
+> +       psci_ops.cpu_on = psci_cpu_on;
+> +
+> +       psci_function_id[PSCI_FN_MIGRATE] = PSCI_0_2_FN64_MIGRATE;
+> +       psci_ops.migrate = psci_migrate;
+> +
+> +       psci_function_id[PSCI_FN_AFFINITY_INFO] = PSCI_0_2_FN64_AFFINITY_INFO;
+> +       psci_ops.affinity_info = psci_affinity_info;
+> +
+> +       psci_function_id[PSCI_FN_MIGRATE_INFO_TYPE] =
+> +               PSCI_0_2_FN_MIGRATE_INFO_TYPE;
+> +       psci_ops.migrate_info_type = psci_migrate_info_type;
+> +
+> +       arm_pm_restart = psci_sys_reset;
+> +
+> +       pm_power_off = psci_sys_poweroff;
+> +}
+> +
+>  /*
+>   * PSCI Function IDs for v0.2+ are well defined so use
+>   * standard values.
+> @@ -264,29 +292,7 @@ static int psci_0_2_init(struct device_node *np)
+>                 }
+>         }
+>
+> -       pr_info("Using standard PSCI v0.2 function IDs\n");
+> -       psci_function_id[PSCI_FN_CPU_SUSPEND] = PSCI_0_2_FN64_CPU_SUSPEND;
+> -       psci_ops.cpu_suspend = psci_cpu_suspend;
+> -
+> -       psci_function_id[PSCI_FN_CPU_OFF] = PSCI_0_2_FN_CPU_OFF;
+> -       psci_ops.cpu_off = psci_cpu_off;
+> -
+> -       psci_function_id[PSCI_FN_CPU_ON] = PSCI_0_2_FN64_CPU_ON;
+> -       psci_ops.cpu_on = psci_cpu_on;
+> -
+> -       psci_function_id[PSCI_FN_MIGRATE] = PSCI_0_2_FN64_MIGRATE;
+> -       psci_ops.migrate = psci_migrate;
+> -
+> -       psci_function_id[PSCI_FN_AFFINITY_INFO] = PSCI_0_2_FN64_AFFINITY_INFO;
+> -       psci_ops.affinity_info = psci_affinity_info;
+> -
+> -       psci_function_id[PSCI_FN_MIGRATE_INFO_TYPE] =
+> -               PSCI_0_2_FN_MIGRATE_INFO_TYPE;
+> -       psci_ops.migrate_info_type = psci_migrate_info_type;
+> -
+> -       arm_pm_restart = psci_sys_reset;
+> -
+> -       pm_power_off = psci_sys_poweroff;
+> +       psci_0_2_set_functions();
+>
+>  out_put_node:
+>         of_node_put(np);
+> @@ -333,6 +339,33 @@ out_put_node:
+>         return err;
+>  }
+>
+> +#ifdef CONFIG_ACPI
+> +static int get_set_conduit_method_acpi(void)
+> +{
+> +       if (acpi_psci_use_hvc)
+> +               invoke_psci_fn = __invoke_psci_fn_hvc;
+> +       else
+> +               invoke_psci_fn = __invoke_psci_fn_smc;
+> +
+> +       return 0;
+> +}
+> +
+> +/* We use PSCI 0.2+ when ACPI is deployed */
+> +static int psci_0_2_init_acpi(void)
+> +{
+> +       get_set_conduit_method_acpi();
+> +
+> +       psci_0_2_set_functions();
+
+Here's a good example of the two code paths doing different things.
+The DT code paths does a test call into PSCI to make sure it's
+actually supported, while you blindly trust it. Keeping the code paths
+common has value w.r.t these kind of things.
+
+> +       return 0;
+> +}
+> +#else
+> +static inline int psci_0_2_init_acpi(void)
+> +{
+> +       return -ENODEV;
+> +}
+> +#endif
+> +
+>  static const struct of_device_id psci_of_match[] __initconst = {
+>         { .compatible = "arm,psci",     .data = psci_0_1_init},
+>         { .compatible = "arm,psci-0.2", .data = psci_0_2_init},
+> @@ -345,13 +378,19 @@ int __init psci_init(void)
+>         const struct of_device_id *matched_np;
+>         psci_initcall_t init_fn;
+>
+> -       np = of_find_matching_node_and_match(NULL, psci_of_match, &matched_np);
+> +       if (acpi_disabled) {
+> +               np = of_find_matching_node_and_match(NULL,
+> +                               psci_of_match, &matched_np);
+
+Ideally this code should go away by changing the rest of it, but for
+future cases: It'd be a lot cleaner to do this as:
+
+        if (!acpi_disabled)
+                return psci_0_2_init_acpi();
+
+... then fall through to the current implementation instead.
+
+But sharing the whole code path is even better, so let's do that.
 
 >
->>
->> Thanks,
->> Thomas.
->>
->>>
->>>
->>>>>>                         cci-control-port = <&cci_control0>;
->>>>>> +                       clock-latency = <140000>;
->>>>>> +
->>>>>> +                       operating-points = <
->>>>>> +                               1300000 1275000
->>>>>> +                               1200000 1212500
->>>>>> +                               1100000 1162500
->>>>>> +                               1000000 1112500
->>>>>> +                                900000 1062500
->>>>>> +                                800000 1025000
->>>>>> +                                700000 975000
->>>>>> +                                600000 937500
->>>>>> +                       >;
->>>>>>                 };
->>>>>>
->>>>>>                 cpu5: cpu at 101 {
->>>>>> @@ -101,6 +136,7 @@
->>>>>>                         reg = <0x101>;
->>>>>>                         clock-frequency = <1000000000>;
->>>>>>                         cci-control-port = <&cci_control0>;
->>>>>> +                       clock-latency = <140000>;
->>>>>>                 };
->>>>>>
->>>>>>                 cpu6: cpu at 102 {
->>>>>> @@ -109,6 +145,7 @@
->>>>>>                         reg = <0x102>;
->>>>>>                         clock-frequency = <1000000000>;
->>>>>>                         cci-control-port = <&cci_control0>;
->>>>>> +                       clock-latency = <140000>;
->>>>>>                 };
->>>>>>
->>>>>>                 cpu7: cpu at 103 {
->>>>>> @@ -117,6 +154,7 @@
->>>>>>                         reg = <0x103>;
->>>>>>                         clock-frequency = <1000000000>;
->>>>>>                         cci-control-port = <&cci_control0>;
->>>>>> +                       clock-latency = <140000>;
->>>>>>                 };
->>>>>>         };
->>>>>
->>>>> Don't you need to put a reference to the supply in the 5420 board
->>>>> files?  ...or is that not possible yet since the max77802 hasn't
->>>>> landed yet?
->>>>
->>>> The arm big.little cpufreq driver does not have voltage scaling
->>>> support yet. So the supply was not mentioned.
->>>>
->>>>>
->>>>> If that's not possible, is there any reason to post the 5420.dtsi
->>>>> patch now?  Also: what about 5800?  It's so similar to 5420 that it
->>>>> seems a shame not to do them at the same time.
->>>>
->>>> This patch series has support for Exynos5800 as well. But it is A15
->>>> clock is restricted to 1.8GHz for now since we do not have a way to
->>>> handle the vdd_arm and vdd_int voltage difference with 1.9GHz and
->>>> 2.0GHZ in upstream yet.
->>>
->>> Oh, right!  The 5800 includes the 5420 dtsi...
->>>
->>> -Doug
+> -       if (!np)
+> -               return -ENODEV;
+> +               if (!np)
+> +                       return -ENODEV;
+> +
+> +               init_fn = (psci_initcall_t)matched_np->data;
+> +
+> +               return init_fn(np);
+> +       }
+>
+> -       init_fn = (psci_initcall_t)matched_np->data;
+> -       return init_fn(np);
+> +       return psci_0_2_init_acpi();
+>  }
+>
+>  #ifdef CONFIG_SMP
+> diff --git a/arch/arm64/kernel/setup.c b/arch/arm64/kernel/setup.c
+> index 9dedb0b..e00d40c 100644
+> --- a/arch/arm64/kernel/setup.c
+> +++ b/arch/arm64/kernel/setup.c
+> @@ -394,6 +394,8 @@ void __init setup_arch(char **cmdline_p)
+>
+>         efi_idmap_init();
+>
+> +       acpi_boot_init();
+> +
+>         unflatten_device_tree();
+
+The above two will need to be swapped when you move over to populating
+the DT instead.
+
+>
+>         psci_init();
+
+
+-Olof
