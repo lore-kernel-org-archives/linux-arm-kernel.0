@@ -1,75 +1,80 @@
-From: svarbanov@mm-sol.com (Stanimir Varbanov)
-Date: Thu, 31 Jul 2014 11:58:53 +0300
-Subject: [PATCH v3 2/4] mfd: pm8xxx-spmi: document DT bindings for Qualcomm
- SPMI PMICs
-In-Reply-To: <53D81EE1.7040309@codeaurora.org>
-References: <1406205921-7452-1-git-send-email-svarbanov@mm-sol.com>
- <1406205921-7452-3-git-send-email-svarbanov@mm-sol.com>
- <53D81EE1.7040309@codeaurora.org>
-Message-ID: <53DA054D.2050508@mm-sol.com>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Thu, 31 Jul 2014 10:22:41 +0100
+Subject: [PATCH v4] devicetree: Add generic IOMMU device tree bindings
+In-Reply-To: <20140731083923.GA31218@ulmo>
+References: <1404487757-18829-1-git-send-email-thierry.reding@gmail.com>
+ <20140730152646.GC20162@leverpostej> <20140731083923.GA31218@ulmo>
+Message-ID: <20140731092241.GA21850@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/30/2014 01:23 AM, David Collins wrote:
-> On 07/24/2014 05:45 AM, Stanimir Varbanov wrote:
->> Document DT bindings used to describe the Qualcomm SPMI PMICs.
->> Currently the SPMI PMICs supported are pm8941, pm8841 and pma8084.
->>
->> Signed-off-by: Stanimir Varbanov <svarbanov@mm-sol.com>
+[...]
+
+> > > +Examples:
+> > > +=========
+> > > +
+> > > +Single-master IOMMU:
+> > > +--------------------
+> > > +
+> > > +	iommu {
+> > > +		#iommu-cells = <0>;
+> > > +	};
+> > > +
+> > > +	master {
+> > > +		iommus = <&/iommu>;
+> > 
+> > Nit: this should be iommus = <&{/iommu}>, or it's not valid dts syntax.
 > 
-> (...)
->> +Required properties for peripheral child nodes:
->> +- compatible:      Should contain "qcom,pm8xxx-xxx", where "xxx" is
->> +                   peripheral name. The "pm8xxx" can be any of supported PMICs,
->> +                   see example below.
+> Done.
+
+Cheers. I take it that was done for the other occurrences too?
+
 > 
-> I don't think that this binding document should be imposing any formatting
-> restrictions on the compatible strings for QPNP peripheral drivers.  The
-> QPNP peripheral drivers in the downstream msm-3.10 tree [1] do not specify
-> per-PMIC compatible strings.  This is because ideally, a given QPNP
-> peripheral represents a hardware block that is identical in interface and
-> operation between PMICs.
+> > > +	};
+> > > +
+> > > +Multiple-master IOMMU with fixed associations:
+> > > +----------------------------------------------
+> > > +
+> > > +	/* multiple-master IOMMU */
+> > > +	iommu {
+> > > +		/*
+> > > +		 * Masters are statically associated with this IOMMU and
+> > > +		 * address translation is always enabled.
+> > > +		 */
+> > > +		#iommu-cells = <0>;
+> > 
+> > I don't follow why translation being always enabled is relevant to the
+> > example; that would seem to be independent from the binding.
+> > 
+> > Surely the key point is that with no way to distinguish devices, they
+> > presumably share the same translations?
 > 
+> Both aspects are important I think. For #iommu-cells = <0> there is no
+> way for the IOMMU driver to know how to enable translation for a given
+> device. So it must be either always on or always off.
 
-Isn't "hardware block that is identical in interface and operation
-between PMICs" exactly the meaning of *compatible* property?
+Sure. But "always on or off" is not the same as "always enabled", which
+was what confused me.
 
-No *compatible* property, no platform device. We must have this property
-for every peripheral driver.
-
-> These peripheral drivers determine the base address for a given device
-> instance via device tree reg and reg-names properties.  In order for this
-> to continue to work with the pm8xxx-spmi driver, some mechanism will need
-> to be introduced which creates resource structs for the
-> non-memory-mappable SPMI base addresses.  One possible solution is
-> currently being discussed in another thread [2].  This document will need
-> to be updated to show the child node reg property scheme once a solution
-> is reached.
+> I guess one could say that this is implicit if all masters share the
+> same translations. And I guess translations don't always have to be on
+> or off technically. Let me try to rephrase this:
 > 
-
-That's correct. If we reach the "reg" solution this binding document
-must be changed.
-
-> (...)
->> +Example:
->> +
->> +	pm8941 at 0 {
->> +		compatible = "qcom,pm8941";
->> +		reg = <0x0 SPMI_USID>;
->> +
->> +		rtc {
->> +			compatible = "qcom,pm8941-rtc";
->> +			interrupts = <0x0 0x61 0x1 IRQ_TYPE_EDGE_RISING>;
->> +			interrupt-names = "alarm";
->> +		};
->> +	};
+> 		/*
+> 		 * Masters are statically associated with this IOMMU and share
+> 		 * the same address translations because the IOMMU does not
+> 		 * have sufficient information to distinguish between masters.
+> 		 *
+> 		 * Consequently address translation is always on or off for
+> 		 * all masters at any given point in time.
+> 		 */
 > 
-> Can you please expand your example to include the second SID for the
-> PM8941 chip?  That way, it will be clear that each PMIC needs two DT
-> nodes; one for each SID.
+> Does that sound better?
 
-Sure, will do.
+That addresses my concern, so yes.
 
--- 
-regards,
-Stan
+Given these are minor and everyone wants this in now, I'm happy for
+these to go through in a fixup patch later.
+
+Cheers,
+Mark.
