@@ -1,57 +1,38 @@
-From: dianders@chromium.org (Doug Anderson)
-Date: Thu, 31 Jul 2014 16:44:39 -0700
-Subject: [PATCH v2 2/4] ARM: dts: Enable emmc and sdmmc on the rk3288-evb
- boards
-In-Reply-To: <1406823200-20911-3-git-send-email-dianders@chromium.org>
-References: <1406823200-20911-1-git-send-email-dianders@chromium.org>
- <1406823200-20911-3-git-send-email-dianders@chromium.org>
-Message-ID: <CAD=FV=UcJD08wUB7kJH4DusJEZ+xdH=L-zig5DGZrUgu9HYbmA@mail.gmail.com>
+From: skannan@codeaurora.org (Saravana Kannan)
+Date: Thu, 31 Jul 2014 16:48:00 -0700
+Subject: [PATCH v4 3/5] cpufreq: Don't destroy/realloc policy/sysfs on
+ hotplug/suspend
+In-Reply-To: <3141717.0s1tLjazMZ@vostro.rjw.lan>
+References: <1406250448-470-1-git-send-email-skannan@codeaurora.org>
+ <1406250448-470-4-git-send-email-skannan@codeaurora.org>
+ <3141717.0s1tLjazMZ@vostro.rjw.lan>
+Message-ID: <53DAD5B0.3070500@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On 07/31/2014 02:56 PM, Rafael J. Wysocki wrote:
+> On Thursday, July 24, 2014 06:07:26 PM Saravana Kannan wrote:
+>> This patch simplifies a lot of the hotplug/suspend code by not
+>> adding/removing/moving the policy/sysfs/kobj during hotplug and just leaves
+>> the cpufreq directory and policy in place irrespective of whether the CPUs
+>> are ONLINE/OFFLINE.
+>
+> I'm still quite unsure how this is going to work with the real CPU hot-remove
+> that makes the entire sysfs cpu directories go away.  Can you please explain
+> that?
 
-On Thu, Jul 31, 2014 at 9:13 AM, Doug Anderson <dianders@chromium.org> wrote:
-> This adds support for the sdmmc and emmc ports on the rk3288 using the
-> currently posted driver from Addy at:
->   https://patchwork.kernel.org/patch/4653631/
->
-> This enables basic SD and eMMC support.  Things are not yet running at
-> the fastest speed and we don't have the regulators specified, but we
-> can at least use the eMMC and SD cards now.
->
-> A few notes:
-> * This is not baesd on Jaehoon's patch series removing the slot node,
->   but it does use new syntax like putting the bus width at the top
->   level and using the new cap-mmc-highspeed / cap-sd-highspeed.  A
->   future patch will modify this one to remove the slot node.
->
-> Signed-off-by: Doug Anderson <dianders@chromium.org>
-> Acked-by: Arnd Bergmann <arnd@arndb.de>
-> ---
-> Changes in v2:
-> - Squashed in the DDR50 mode since Addy spun his patch.
-> - New patchwork link for Addy's patch
->
->  arch/arm/boot/dts/rk3288-evb.dtsi | 33 +++++++++++++++++++++++++++++++++
->  1 file changed, 33 insertions(+)
->
-> diff --git a/arch/arm/boot/dts/rk3288-evb.dtsi b/arch/arm/boot/dts/rk3288-evb.dtsi
-> index 749e20d..ec580fa 100644
-> --- a/arch/arm/boot/dts/rk3288-evb.dtsi
-> +++ b/arch/arm/boot/dts/rk3288-evb.dtsi
-> @@ -37,6 +37,39 @@
->         };
->  };
->
-> +&emmc {
-> +       broken-cd;
-> +       bus-width = <8>;
-> +       cap-mmc-highspeed;
-> +       mmc-ddr-1_8v;
+Sure. Not a problem. I just wanted to make sure you had a chance to look 
+at the code first.
 
-Strangely DDR mode started failing all of a sudden for me.  Even going
-back to old git hashes made things fail.  ...I'd be curious to know if
-DDR mode is working for others.
+Physical hot-remove triggers a "remove" for all the  registered 
+subsys_interfaces for that CPU (after going through a couple of 
+functions). So, when that happens, the cpufreq subsys_interface remove 
+for that CPU gets called. At that point, I clean up that CPU's SW states 
+as if it was never plugged in from the start. If that CPU was the owner 
+of the sysfs directory, I move it over to a different CPU.
 
--Doug
+-Saravana
+
+-- 
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
+hosted by The Linux Foundation
