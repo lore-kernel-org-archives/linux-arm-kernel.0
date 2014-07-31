@@ -1,34 +1,32 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Thu, 31 Jul 2014 15:00:44 +0100
-Subject: Bad Page dump (help)
-In-Reply-To: <53D9E10F.6040408@xenomai.org>
-References: <20140729190700.GN17808@saruman.home>
- <53D9E10F.6040408@xenomai.org>
-Message-ID: <20140731140044.GL30282@n2100.arm.linux.org.uk>
+From: sassmann@kpanic.de (Stefan Assmann)
+Date: Thu, 31 Jul 2014 16:05:43 +0200
+Subject: [PATCH 2/2] clk: initial clock driver for TWL6030
+In-Reply-To: <53DA3D66.1030407@ti.com>
+References: <1406728949-7560-1-git-send-email-sassmann@kpanic.de>
+ <1406728949-7560-3-git-send-email-sassmann@kpanic.de>
+ <53DA3613.9010305@ti.com> <53DA3C68.3020406@kpanic.de>
+ <53DA3D66.1030407@ti.com>
+Message-ID: <53DA4D37.4030408@kpanic.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jul 31, 2014 at 08:24:15AM +0200, Gilles Chanteperdrix wrote:
-> On 07/29/2014 09:07 PM, Felipe Balbi wrote:
-> > Hi Russell,
-> > 
-> > I'm bringing up a new board on today's linux-next but I'm having a bunch
-> > of bad_page() calls due to _mapcount not being zero (full logs
-> > attached). What could cause that ? Any hints on how to debug ? It's as
-> > if page_mapcount_reset() wasn't called for the pages which are causing
-> > issues.
+On 31.07.2014 14:58, Peter Ujfalusi wrote:
+> On 07/31/2014 03:54 PM, Stefan Assmann wrote:
+>>> Why would you do this? The point of a clock provider is that you can
+>>> enable/disable the clock on demand. Here you enable the clock and leave it
+>>> enabled for the rest of the time...
+>>>
+>>> clk-dra7-atl deals with similar issue
+>>
+>> The idea is to enable the clock by default to get the wifi working.
+>> Sorry if I got it wrong.
 > 
-> FWIW, the same issue appeared on a Cogent CSB637 board (the last board 
-> I use not using DT) in between 3.13 and 3.14. I ran a bisect and found 
-> that reverting the following commit:
+> You should have a clock driver for the 32K clock. The wifi driver should
+> request and manage it's clocks via the clock API.
+> 
 
-I don't seem to have a bug report from you for this.
+If the clock does not get enabled the wifi driver wl12xx doesn't even
+get probed. Which is my initial problem. Maybe I need to figure that out
+first.
 
-> Seemed to make the issue disappear. I later found out that changing the
-> kernel options also made the issue disappear.
-
-Which kernel options?
-
--- 
-FTTC broadband for 0.8mile line: currently at 9.5Mbps down 400kbps up
-according to speedtest.net.
+  Stefan
