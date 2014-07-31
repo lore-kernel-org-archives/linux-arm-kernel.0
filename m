@@ -1,98 +1,60 @@
-From: tomasz.figa@gmail.com (Tomasz Figa)
-Date: Thu, 31 Jul 2014 15:37:39 +0200
-Subject: [PATCHv2 4/5] clk: samsung: exynos5410: Add fixed rate clocks
-In-Reply-To: <CAEe5pB_7e_5YkpcuRvsaUg6vKfdu6C+XhwRYyY1uUGptxM5zkg@mail.gmail.com>
-References: <1406805732-17372-1-git-send-email-hsnaves@gmail.com>
- <1406805732-17372-5-git-send-email-hsnaves@gmail.com>
- <53DA3C36.1040206@gmail.com>
- <CAEe5pB_7e_5YkpcuRvsaUg6vKfdu6C+XhwRYyY1uUGptxM5zkg@mail.gmail.com>
-Message-ID: <53DA46A3.9080808@gmail.com>
+From: balbi@ti.com (Felipe Balbi)
+Date: Thu, 31 Jul 2014 08:43:44 -0500
+Subject: Bad Page dump (help)
+In-Reply-To: <53D9E10F.6040408@xenomai.org>
+References: <20140729190700.GN17808@saruman.home>
+ <53D9E10F.6040408@xenomai.org>
+Message-ID: <20140731134344.GA19512@saruman.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 31.07.2014 15:23, Humberto Naves wrote:
-> Hi Tomasz,
+Hi,
+
+On Thu, Jul 31, 2014 at 08:24:15AM +0200, Gilles Chanteperdrix wrote:
+> -----BEGIN PGP SIGNED MESSAGE-----
+> Hash: SHA1
 > 
-> I perfectly see your point.
-> However my question was why you did you decide to postpone
-> Sylwester's? Was there any specific reason?
-> I suppose it would break all the dtb compatibility, but besides that,
-> was there any other reason?
-
-We discussed this in private (we work in the same office) and I pointed
-out certain issues with Sylwester's proposed implementation and we
-agreed that one more revision of the patch is needed, but as it happens,
-higher priority tasks showed up and this one got lost in action.
-
-The first version of the patch [1] changed the original behavior
-breaking DT ABI compatibility and relied on improper assumption that
-those clocks are always in "fixed-rate-clocks" node. The thing is that
-no code should rely on DT node naming.
-
-Second version [2] was much better in this aspect, but it had some minor
-implementation issues - custom clk_ops used instead of generic mux clock
-and chipid block being constantly mapped and unmapped in every call to
-__fin_pll_mux_get_parent().
-
-I should have reviewed them both on the mailing lists, but at that time
-there was no major activity related to Exynos4 outside of our office, so
-it was more convenient to just talk together directly.
-
-[1] http://www.spinics.net/lists/arm-kernel/msg333211.html
-[2]
-http://lists.infradead.org/pipermail/linux-arm-kernel/2014-May/258490.html
-
-Anyway, I don't think this is all relevant to Exynos5410, which just
-uses the generic fixed rate binding and has the thing done right from
-the start.
-
-Best regards,
-Tomasz
-
+> On 07/29/2014 09:07 PM, Felipe Balbi wrote:
+> > Hi Russell,
+> > 
+> > I'm bringing up a new board on today's linux-next but I'm having a bunch
+> > of bad_page() calls due to _mapcount not being zero (full logs
+> > attached). What could cause that ? Any hints on how to debug ? It's as
+> > if page_mapcount_reset() wasn't called for the pages which are causing
+> > issues.
 > 
-> Best,
-> Humberto
+> FWIW, the same issue appeared on a Cogent CSB637 board (the last board 
+> I use not using DT) in between 3.13 and 3.14. I ran a bisect and found 
+> that reverting the following commit:
 > 
-> On Thu, Jul 31, 2014 at 2:53 PM, Tomasz Figa <tomasz.figa@gmail.com> wrote:
->> Hi Humberto,
->>
->> You can find my comments inline.
->>
->> On 31.07.2014 13:22, Humberto Silva Naves wrote:
->>> This implements the fixed rate clocks generated either inside or
->>> outside the SoC. It also adds a dt-binding constant for the
->>> sclk_hdmiphy clock, which shall be later used by other drivers,
->>> such as the DRM.
->>>
->>> Since the external fixed rate clock fin_pll is now registered by
->>> the clk-exynos5410 file, the bindings with the device tree file have
->>> changed. It is no longer needed to define fin_pll as a fixed clock,
->>> such as in:
->>>
->>>       fin_pll: xxti {
->>>               compatible = "fixed-clock";
->>>               clock-frequency = <24000000>;
->>>               clock-output-names = "fin_pll";
->>>               #clock-cells = <0>;
->>>       };
->>>
->>> The above lines should be replaced by the following lines:
->>>
->>>       fixed-rate-clocks {
->>>               oscclk {
->>>                       compatible = "samsung,exynos5410-oscclk";
->>>                       clock-frequency = <24000000>;
->>>               };
->>>       };
->>>
->>> This new form of binding was properly documented in the relevant
->>> documentation file.
->>
->> In general this is backwards. This Exynos-specific clock binding was
->> invented before generic fixed rate clock binding showed up and so few
->> drivers still use it to maintain DT ABI compatibility. However new
->> drivers are required to use the new generic binding and so does the one
->> for Exynos5410.
->>
->> Best regards,
->> Tomasz
+> commit 84f452b1e8fc73ac0e31254c66e3e2260ce5263d
+> Author: Santosh Shilimkar <santosh.shilimkar@ti.com>
+> Date:   Sun Jun 30 00:28:46 2013 -0400
+> 
+>     ARM: mm: Remove bootmem code and switch to NO_BOOTMEM
+>     
+>     Now with dma_mask series merged and max*pfn has consistent meaning on ARM
+>     as rest of the arch's thanks to RMK's mega series, lets switch ARM code
+>     to NO_BOOTMEM. With NO_BOOTMEM change, now we use memblock allocator to
+>     reserve space for crash kernel to have one less dependency with nobootmem
+>     allocator wrapper.
+>     
+>     Tested with both flat memory and sparse (faked) memory models with highmem
+>     enabled.
+
+Thanks I'll give this a shot.
+
+> Seemed to make the issue disappear. I later found out that changing the
+> kernel options also made the issue disappear.
+
+which kernel options did you change ?
+
+-- 
+balbi
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140731/53edcf6c/attachment.sig>
