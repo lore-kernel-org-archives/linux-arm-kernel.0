@@ -1,34 +1,77 @@
 From: javier.martinez@collabora.co.uk (Javier Martinez Canillas)
-Date: Thu, 31 Jul 2014 13:55:09 +0200
-Subject: [PATCH 0/2] Better model Peach Pit and PI power scheme
-Message-ID: <1406807711-19955-1-git-send-email-javier.martinez@collabora.co.uk>
+Date: Thu, 31 Jul 2014 13:55:10 +0200
+Subject: [PATCH 1/2] ARM: dts: Improve Peach Pit and Pi power scheme
+In-Reply-To: <1406807711-19955-1-git-send-email-javier.martinez@collabora.co.uk>
+References: <1406807711-19955-1-git-send-email-javier.martinez@collabora.co.uk>
+Message-ID: <1406807711-19955-2-git-send-email-javier.martinez@collabora.co.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+The DeviceTree files for the Peach Pit and Pi machines have
+a simplistic model of the connections between the different
+regulators since not all the tps65090 regulators get their
+input supply voltage from the VDC. DCDC1-3, LD0-1 and fet7
+parent supply is indded VDC but the fet1-6 get their input
+supply from the DCDC1 and DCDC2 output voltage rails.
 
-This is a small series that improve the modeling of the power
-scheme on the Peach Pit and Pi boards. Besides making the DTS
-to better describe the hardware these changes allows the core
-regulator to know what's the real supply for a child to fetch
-the parent output voltage if the child voltage is requested,
-now that the regulator core allows to do that [0,1].
+Update the DeviceTree to better reflect the real connections
+between tps65090 regulators. Having this information in the
+DTS is useful since FETs are switches that don't provide an
+output voltage so the regulator core needs to fetch the FET
+parent output voltage if the child voltage is queried.
 
-Patch 1 modifies the regulators input supply to use the real
-parents instead of using a simplistic model and assume that
-VDC is supplying power to all regulators and patch 2 defines
-the maximum and minimum voltage constraints for the switches.
+Signed-off-by: Javier Martinez Canillas <javier.martinez@collabora.co.uk>
+Acked-by: Mark Brown <broonie@linaro.org>
+---
+ arch/arm/boot/dts/exynos5420-peach-pit.dts | 12 ++++++------
+ arch/arm/boot/dts/exynos5800-peach-pi.dts  | 12 ++++++------
+ 2 files changed, 12 insertions(+), 12 deletions(-)
 
-Javier Martinez Canillas (2):
-  ARM: dts: Improve Peach Pit and Pi power scheme model
-  ARM: dts: Add tps65090 FET constraints on Peach Pit and Pi
-
- arch/arm/boot/dts/exynos5420-peach-pit.dts | 26 ++++++++++++++++++++------
- arch/arm/boot/dts/exynos5800-peach-pi.dts  | 26 ++++++++++++++++++++------
- 2 files changed, 40 insertions(+), 12 deletions(-)
-
-Best regards,
-Javier
-
-[0]: https://patchwork.kernel.org/patch/4641331/
-[1]: https://patchwork.kernel.org/patch/4641311/
+diff --git a/arch/arm/boot/dts/exynos5420-peach-pit.dts b/arch/arm/boot/dts/exynos5420-peach-pit.dts
+index 228a6b1..d8710c1 100644
+--- a/arch/arm/boot/dts/exynos5420-peach-pit.dts
++++ b/arch/arm/boot/dts/exynos5420-peach-pit.dts
+@@ -365,12 +365,12 @@
+ 				vsys2-supply = <&vbat>;
+ 				vsys3-supply = <&vbat>;
+ 				infet1-supply = <&vbat>;
+-				infet2-supply = <&vbat>;
+-				infet3-supply = <&vbat>;
+-				infet4-supply = <&vbat>;
+-				infet5-supply = <&vbat>;
+-				infet6-supply = <&vbat>;
+-				infet7-supply = <&vbat>;
++				infet2-supply = <&tps65090_dcdc1>;
++				infet3-supply = <&tps65090_dcdc2>;
++				infet4-supply = <&tps65090_dcdc2>;
++				infet5-supply = <&tps65090_dcdc2>;
++				infet6-supply = <&tps65090_dcdc2>;
++				infet7-supply = <&tps65090_dcdc1>;
+ 				vsys-l1-supply = <&vbat>;
+ 				vsys-l2-supply = <&vbat>;
+ 
+diff --git a/arch/arm/boot/dts/exynos5800-peach-pi.dts b/arch/arm/boot/dts/exynos5800-peach-pi.dts
+index f3ee48b..07b29b7 100644
+--- a/arch/arm/boot/dts/exynos5800-peach-pi.dts
++++ b/arch/arm/boot/dts/exynos5800-peach-pi.dts
+@@ -363,12 +363,12 @@
+ 				vsys2-supply = <&vbat>;
+ 				vsys3-supply = <&vbat>;
+ 				infet1-supply = <&vbat>;
+-				infet2-supply = <&vbat>;
+-				infet3-supply = <&vbat>;
+-				infet4-supply = <&vbat>;
+-				infet5-supply = <&vbat>;
+-				infet6-supply = <&vbat>;
+-				infet7-supply = <&vbat>;
++				infet2-supply = <&tps65090_dcdc1>;
++				infet3-supply = <&tps65090_dcdc2>;
++				infet4-supply = <&tps65090_dcdc2>;
++				infet5-supply = <&tps65090_dcdc2>;
++				infet6-supply = <&tps65090_dcdc2>;
++				infet7-supply = <&tps65090_dcdc1>;
+ 				vsys-l1-supply = <&vbat>;
+ 				vsys-l2-supply = <&vbat>;
+ 
+-- 
+2.0.0.rc2
