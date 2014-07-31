@@ -1,43 +1,42 @@
 From: kever.yang@rock-chips.com (Kever Yang)
-Date: Thu, 31 Jul 2014 14:26:20 -0700
-Subject: [REPOST PATCH v3 0/5] Patches to add support for Rockchip dwc2
- controller
-Message-ID: <1406841985-15790-1-git-send-email-kever.yang@rock-chips.com>
+Date: Thu, 31 Jul 2014 14:26:25 -0700
+Subject: [REPOST PATCH v3 5/5] ARM: dts: Enable USB otg and host1(dwc) on
+ rk3288-evb
+In-Reply-To: <1406841985-15790-1-git-send-email-kever.yang@rock-chips.com>
+References: <1406841985-15790-1-git-send-email-kever.yang@rock-chips.com>
+Message-ID: <1406841985-15790-6-git-send-email-kever.yang@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-These patches to add support for dwc2 controller found in
-Rockchip processors rk3066, rk3188 and rk3288,
-and enable dts for rk3288 evb.
+USB otg port is the usb3.0 b-port on the board.
+USB host1 port is the host A port nearby the otg port.
 
-Reposting series with the proper email address.
+Signed-off-by: Kever Yang <kever.yang@rock-chips.com>
+
+---
 
 Changes in v3:
-- Moved out of pin control and sort by base address
-- EHCI and HSIC move new for version 3.
 - Rebase
 
 Changes in v2:
-- Split out dr_mode and rk3288 bindings.
-- add compatible "snps,dwc2" bingding info
-- set most parameters as driver auto-detect
-- change the node name from 'dwc2' to 'usb'
 - evb patch added in version 2
 
-Doug Anderson (1):
-  ARM: dts: Fix the sort ordering of EHCI and HSIC in rk3288.dtsi
+ arch/arm/boot/dts/rk3288-evb.dtsi |    6 ++++++
+ 1 file changed, 6 insertions(+)
 
-Kever Yang (4):
-  Documentation: dt-bindings: add dt binding info for Rockchip dwc2
-  usb: dwc2: add compatible data for rockchip soc
-  ARM: dts: add rk3288 dwc2 controller support
-  ARM: dts: Enable USB otg and host1(dwc) on rk3288-evb
-
- Documentation/devicetree/bindings/usb/dwc2.txt |    3 ++
- arch/arm/boot/dts/rk3288-evb.dtsi              |    6 +++
- arch/arm/boot/dts/rk3288.dtsi                  |   61 ++++++++++++++++--------
- drivers/usb/dwc2/platform.c                    |   29 +++++++++++
- 4 files changed, 78 insertions(+), 21 deletions(-)
-
+diff --git a/arch/arm/boot/dts/rk3288-evb.dtsi b/arch/arm/boot/dts/rk3288-evb.dtsi
+index 66f76a6..35a0837 100644
+--- a/arch/arm/boot/dts/rk3288-evb.dtsi
++++ b/arch/arm/boot/dts/rk3288-evb.dtsi
+@@ -127,3 +127,9 @@
+ &usb_host0_ehci {
+ 	status = "okay";
+ };
++&usb_host1 {
++	status = "okay";
++};
++&usb_otg {
++	status = "okay";
++};
 -- 
 1.7.9.5
