@@ -1,32 +1,91 @@
-From: shawn.guo@freescale.com (Shawn Guo)
-Date: Thu, 31 Jul 2014 09:10:11 +0800
-Subject: [PATCH v2 2/2] ARM: smp_scu: enable SCU standby support
-In-Reply-To: <20140729124410.GI24750@dragon>
-References: <1406275790-18617-1-git-send-email-shawn.guo@freescale.com>
- <1406275790-18617-3-git-send-email-shawn.guo@freescale.com>
- <20140729124410.GI24750@dragon>
-Message-ID: <20140731011010.GA2171@dragon>
+From: haojian.zhuang@linaro.org (Haojian Zhuang)
+Date: Thu, 31 Jul 2014 09:51:49 +0800
+Subject: [PATCH v5 0/8] enable Hisilicon HIX5HD2 SoC
+In-Reply-To: <CAOesGMj26SCnaOrRkvS=9t_CkOLK=pyJdqV0rxFXnfxt3E30kQ@mail.gmail.com>
+References: <1406551883-26154-1-git-send-email-haojian.zhuang@linaro.org>
+ <20140729064027.GE32359@quad.lixom.net>
+ <53D756B4.50907@hisilicon.com>
+ <CAOesGMj26SCnaOrRkvS=9t_CkOLK=pyJdqV0rxFXnfxt3E30kQ@mail.gmail.com>
+Message-ID: <CAD6h2NT=XdvWZ13EKo2JAFXb3Wgocddin2K-CfyM24W=77D8VQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jul 29, 2014 at 08:44:11PM +0800, Shawn Guo wrote:
-> On Fri, Jul 25, 2014 at 04:09:50PM +0800, Shawn Guo wrote:
-> > With SCU standby enabled, SCU CLK will be turned off when all processors
-> > are in WFI mode.  And the clock will be turned on when any processor
-> > leaves WFI mode.
-> > 
-> > This behavior should be preferable in terms of power efficiency of
-> > system idle.  So let's set the SCU standby bit to enable the support in
-> > function scu_enable().
-> > 
-> > Cortex-A9 earlier than r2p0 has no standby bit in SCU, so we need to
-> > skip setting the bit for those.
-> > 
-> > Signed-off-by: Shawn Guo <shawn.guo@freescale.com>
-> 
-> If there is no objection on the patch, I will put it into patch tracker
-> soon.
+On 31 July 2014 09:06, Olof Johansson <olof@lixom.net> wrote:
+> Hi,
+>
+> On Tue, Jul 29, 2014 at 1:09 AM, xuwei <xuwei5@hisilicon.com> wrote:
+>>
+>>
+>> On 2014/7/29 14:40, Olof Johansson wrote:
+>>> On Mon, Jul 28, 2014 at 08:51:15PM +0800, Haojian Zhuang wrote:
+>>>> Changelog:
+>>>> v5:
+>>>>   * Use CPU_OF_DECLARE_METHOD().
+>>>>   * State "hisilicon,cpuctrl" in documents.
+>>>>   * Set PL310 L2 aux value in machine descriptor.
+>>>>   * Use enable-method property for smp in dts file.
+>>>>   * Move reset code from machine platform driver into power reset driver.
+>>>>   * Move HIP04 debug uart into another patch series.
+>>>
+>>> Usually there's some more description in the cover letter than just the
+>>> changelog.
+>>
+>> Hi Olof,
+>>
+>>> Anyway, my question is this: what's the plan for upstreaming of this SoC? Is it
+>>> a mobile-only SoC, or has it been used (or will it be used) in other embedded
+>>> use cases, public development boards and the like?
+>>
+>> HiX5HD2 is for the STB market.
+>> Hisilicon has already made some public development boards for Linaro and hope
+>> it could be used in Linaro Home Group.
+>> And if you are interesting about it, we could send one to you.
+>>
+>> There are several phases for upstreaming of this SoC.
+>> At the first phase, it includes the basic SoC(earlycon, gic, timer, L2 cache,
+>> SMP and reboot), net, emc, USB and clock.
+>
+> I am mostly asking because I want to get a feel for whether you will
+> complete upstreaming, or just upstream the minimal set of platform
+> support that won't actually be useful for anyone (like with what's
+> already in the tree).
+>
+> For a STB chip, display is critical. Do you have a DRM driver planned?
+>
 
-Submitted these two patches as #8121 and #8122.
+Now Android is deployed on this platform. They're also investigating
+DRM driver. I think that Android on DRM driver should be resolved
+first. Maybe Linaro LHG is investigating it.
 
-Shawn
+>>> If it is a mobile-targeted product, what is the plan and rough timeline
+>>> for upstreaming things such as display/graphics and power management
+>>> components?
+>>
+>> About the display/graphics/video/audio, we are still discussing how to upstream.
+>> There are two limitations. One is the code we have now does not adapt with kernel.
+>> The other is the policy of company which part is allowed to upstream.
+>
+> This sounds odd. Are they shipping this chip in products today? If so,
+> they already have to publish GPL sources, so "allowed" to upstream is
+> a very odd limitation.
+>
+>> But anyway, we hope we could do upstreaming.
+>
+> Ok. I would very much like to see successful upstreaming of hisilicon
+> platforms to happen, but the track record so far hasn't been very
+> promising. If you think you'll get all the way and make the platform
+> useful, then that's a great sign. I am very concerned about lack of
+> graphics plans though.
+>
+>
+At first we want to upstream all the components. But we have to be step by step.
+
+https://github.com/hisilicon/linaro-kernel/commits/xjc/hix5hd2-lsk-3.10-msp
+
+Display, Irda, i2c, mmc, sata, and some other drivers are already
+contained in this public git repository. If HIX5HD2 SoC could be
+upstream, all these driver should also be upstream. Some drivers are
+not mature, we still need to modify them in the process of upstream.
+
+Best Regards
+Haojian
