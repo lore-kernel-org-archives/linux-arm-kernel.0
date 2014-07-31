@@ -1,80 +1,54 @@
-From: msalter@redhat.com (Mark Salter)
-Date: Thu, 31 Jul 2014 10:41:53 -0400
-Subject: [PATCH v2 1/3] arm64: spin-table: handle unmapped
- cpu-release-addrs
-In-Reply-To: <20140731100439.GI26853@arm.com>
-References: <1406717944-24725-1-git-send-email-ard.biesheuvel@linaro.org>
- <1406717944-24725-2-git-send-email-ard.biesheuvel@linaro.org>
- <20140730113013.GL12239@arm.com>
- <CAKv+Gu8ne8k2NV12SyWye5aYJKHG0wHKAO+=V=1L89_hvyGopw@mail.gmail.com>
- <20140731094515.GE26853@arm.com> <20140731095854.GC21850@leverpostej>
- <20140731100439.GI26853@arm.com>
-Message-ID: <1406817713.3200.4.camel@deneb.redhat.com>
+From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
+Date: Thu, 31 Jul 2014 18:24:26 +0400
+Subject: [PATCH 5/6] ARM: DTS: da850-evm: Add node for tlv320aic3106 codec
+In-Reply-To: <1406801934-23334-6-git-send-email-peter.ujfalusi@ti.com>
+References: <1406801934-23334-1-git-send-email-peter.ujfalusi@ti.com>
+ <1406801934-23334-6-git-send-email-peter.ujfalusi@ti.com>
+Message-ID: <53DA519A.4090905@cogentembedded.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 2014-07-31 at 11:04 +0100, Will Deacon wrote:
-> On Thu, Jul 31, 2014 at 10:58:54AM +0100, Mark Rutland wrote:
-> > On Thu, Jul 31, 2014 at 10:45:15AM +0100, Will Deacon wrote:
-> > > On Wed, Jul 30, 2014 at 08:17:02PM +0100, Ard Biesheuvel wrote:
-> > > > ]On 30 July 2014 13:30, Will Deacon <will.deacon@arm.com> wrote:
-> > > > > On Wed, Jul 30, 2014 at 11:59:02AM +0100, Ard Biesheuvel wrote:
-> > > > >> From: Mark Rutland <mark.rutland@arm.com>
-> > > > >>
-> > > > >> In certain cases the cpu-release-addr of a CPU may not fall in the
-> > > > >> linear mapping (e.g. when the kernel is loaded above this address due to
-> > > > >> the presence of other images in memory). This is problematic for the
-> > > > >> spin-table code as it assumes that it can trivially convert a
-> > > > >> cpu-release-addr to a valid VA in the linear map.
-> > > > >>
-> > > > >> This patch modifies the spin-table code to use a temporary cached
-> > > > >> mapping to write to a given cpu-release-addr, enabling us to support
-> > > > >> addresses regardless of whether they are covered by the linear mapping.
-> > > > >>
-> > > > >> Signed-off-by: Mark Rutland <mark.rutland@arm.com>
-> > > > >> Tested-by: Mark Salter <msalter@redhat.com>
-> > > > >> [ardb: added (__force void *) cast]
-> > > > >> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
-> > > > >> ---
-> > > > >>  arch/arm64/kernel/smp_spin_table.c | 22 +++++++++++++++++-----
-> > > > >>  1 file changed, 17 insertions(+), 5 deletions(-)
-> > > > >
-> > > > > I'm nervous about this. What if the spin table sits in the same physical 64k
-> > > > > frame as a read-sensitive device and we're running with 64k pages?
-> > > > >
-> > > > 
-> > > > Actually, booting.txt requires cpu-release-addr to point to a
-> > > > /memreserve/d part of memory, which implies DRAM (or you wouldn't have
-> > > > to memreserve it)
-> > > > That means it should always be covered by the linear mapping, unless
-> > > > it is located before Image in DRAM, which is the case addressed by
-> > > > this patch.
-> > > 
-> > > But if it's located before before the Image in DRAM and isn't covered by
-> > > the linear mapping, then surely the /memreserve/ is pointless too? In which
-> > > case, this looks like we're simply trying to cater for platforms that aren't
-> > > following booting.txt (which may need updating if we need to handle this).
-> > 
-> > No. The DT is describing the memory which is present, and the subset
-> > thereof which should not be used under normal circumstances. That's a
-> > static property of the system.
-> > 
-> > Where the OS happens to get loaded and what it is able to address is a
-> > dynamic property of the OS (and possibly the bootloader). The DT cannot
-> > have knowledge of this.
-> > 
-> > It's always true that the OS should not blindly use memreserve'd memory.
-> > The fact that it cannot address it in the linear mapping is orthogonal.
-> 
-> In which case, I think asserting that /memreserve/ implies DRAM is pretty
-> fragile and not actually enforced anywhere. Sure, we can say `don't do
-> that', but I'd prefer to have the kernel detect this dynamically.
-> 
-> Does dtc check that the /memreserve/ region is actually a subset of the
-> memory node?
+Hello.
 
-The handling of /memreserve/ in drivers/of/fdt.c uses the memblock API
-to reserve. And that means it is assumed that /memreserve/ is something
-which can be covered by the normal kernel RAM mapping. I suspect having
-/memreserve/ outside the kernel mapping would cause problems for the mm
-code.
+On 07/31/2014 02:18 PM, Peter Ujfalusi wrote:
+
+> The board uses aic3106 for audio.
+
+> Signed-off-by: Peter Ujfalusi <peter.ujfalusi@ti.com>
+> ---
+>   arch/arm/boot/dts/da850-evm.dts | 14 ++++++++++++++
+>   1 file changed, 14 insertions(+)
+
+> diff --git a/arch/arm/boot/dts/da850-evm.dts b/arch/arm/boot/dts/da850-evm.dts
+> index 09118c72e83f..b9ef2be0b145 100644
+> --- a/arch/arm/boot/dts/da850-evm.dts
+> +++ b/arch/arm/boot/dts/da850-evm.dts
+> @@ -51,6 +51,20 @@
+>   			tps: tps at 48 {
+>   				reg = <0x48>;
+>   			};
+> +			tlv320aic3106: tlv320aic3106 at 1b {
+
+    The "reg" property is <0x18>, why the unit-address part of a name is 
+different? Also, the ePAPR standard [1] says:
+
+The name of a node should be somewhat generic, reflecting the function of the 
+device and not its precise programming model.
+
+> +				#sound-dai-cells = <0>;
+> +				compatible = "ti,tlv320aic3106";
+> +				reg = <0x18>;
+> +				status = "okay";
+> +
+> +				/* Regulators */
+> +				IOVDD-supply = <&vdcdc2_reg>;
+> +				/* Derived from VBAT: Baseboard 3.3V / 1.8V */
+> +				AVDD-supply = <&vbat>;
+> +				DRVDD-supply = <&vbat>;
+> +				DVDD-supply = <&vbat>;
+> +			};
+> +
+
+[1] http://www.power.org/resources/downloads/Power_ePAPR_APPROVED_v1.0.pdf
+
+WBR, Sergei
