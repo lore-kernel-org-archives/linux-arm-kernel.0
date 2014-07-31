@@ -1,54 +1,92 @@
-From: u.kleine-koenig@pengutronix.de (=?UTF-8?q?Uwe=20Kleine-K=C3=B6nig?=)
-Date: Thu, 31 Jul 2014 09:36:56 +0200
-Subject: [PATCH] cpufreq: arm_big_little: fix module license spec
-In-Reply-To: <mvmmwbqateb.fsf@hawking.suse.de>
-References: <mvmmwbqateb.fsf@hawking.suse.de>
-Message-ID: <1406792216-827-1-git-send-email-u.kleine-koenig@pengutronix.de>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Thu, 31 Jul 2014 09:44:40 +0200
+Subject: [PATCH] Documentation: dmaengine: Add a documentation for the
+ dma controller API
+In-Reply-To: <20140730160607.GM8181@intel.com>
+References: <1406736193-26685-1-git-send-email-maxime.ripard@free-electrons.com>
+ <20140730160607.GM8181@intel.com>
+Message-ID: <20140731074440.GY3952@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Having no license specification in a module taints the kernel during load
-with:
+Hi Vinod,
 
-	arm_big_little: module license 'unspecified' taints kernel.
+On Wed, Jul 30, 2014 at 09:36:07PM +0530, Vinod Koul wrote:
+> On Wed, Jul 30, 2014 at 06:03:13PM +0200, Maxime Ripard wrote:
+> > The dmaengine is neither trivial nor properly documented at the moment, which
+> > means a lot of trial and error development, which is not that good for such a
+> > central piece of the system.
+> > 
+> > Attempt at making such a documentation.
+> 
+> Did you miss Documentation/dmaengine.txt, lots of this is already covered
+> there. But yes i would be really glad to know what isnt, so that we can fix
+> that.
 
-and also the linker doesn't allow it to make use of GPL-exported symbols
-which in this case also results in errors like:
+I didn't miss it. But I feel like it describes quite nicely the slave
+API, but doesn't help at all whenever you're writing a DMAengine driver.
 
-	arm_big_little: Unknown symbol cpufreq_register_driver (err 0)
+The first lines of the existing document makes it quite clear too.
 
-. The header of the driver specifies a GPL v2 license, so note that
-accordingly. While at it also add a description and an author and fix
-the license in a companion file to explicit v2.
+There's still a bit of duplication, but I don't feel it's such a big
+deal.
 
-Reported-by: Andreas Schwab <schwab@suse.de>
-Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
----
- drivers/cpufreq/arm_big_little.c    | 4 ++++
- drivers/cpufreq/arm_big_little_dt.c | 2 +-
- 2 files changed, 5 insertions(+), 1 deletion(-)
+What I'd like to do with the documentation I just sent is basically
+have a clear idea whenever you step into dmaengine what you can/cannot
+do, and have a reference document explaining what's expected by the
+framework, and hopefully have unified drivers that follow this
+pattern.
 
-diff --git a/drivers/cpufreq/arm_big_little.c b/drivers/cpufreq/arm_big_little.c
-index 1f4d4e315057..b600f3107bef 100644
---- a/drivers/cpufreq/arm_big_little.c
-+++ b/drivers/cpufreq/arm_big_little.c
-@@ -593,3 +593,7 @@ void bL_cpufreq_unregister(struct cpufreq_arm_bL_ops *ops)
- 	arm_bL_ops = NULL;
- }
- EXPORT_SYMBOL_GPL(bL_cpufreq_unregister);
-+
-+MODULE_AUTHOR("Viresh Kumar <viresh.kumar@linaro.org>");
-+MODULE_DESCRIPTION("Generic ARM big LITTLE cpufreq driver");
-+MODULE_LICENSE("GPL v2");
-diff --git a/drivers/cpufreq/arm_big_little_dt.c b/drivers/cpufreq/arm_big_little_dt.c
-index 8d9d59108906..4550f6976768 100644
---- a/drivers/cpufreq/arm_big_little_dt.c
-+++ b/drivers/cpufreq/arm_big_little_dt.c
-@@ -114,4 +114,4 @@ module_platform_driver(generic_bL_platdrv);
- 
- MODULE_AUTHOR("Viresh Kumar <viresh.kumar@linaro.org>");
- MODULE_DESCRIPTION("Generic ARM big LITTLE cpufreq driver via DT");
--MODULE_LICENSE("GPL");
-+MODULE_LICENSE("GPL v2");
+Because, for the moment, we're pretty much left in the dark with
+different drivers doing the same thing in completetely different ways,
+with basically no way to tell if it's either the framework that
+requires such behaviour, or if the author was just feeling creative.
+
+There's numerous examples for this at the moment:
+  - The GFP flags, with different drivers using either GFP_ATOMIC,
+    GFP_NOWAIT or GFP_KERNEL in the same functions
+  - Having to set device_slave_caps or not?
+  - Some drivers use dma_run_depedencies, some other don't
+  - That might just be my experience, but judging from previous
+    commits, DMA_PRIVATE is completely obscure, and we just set it
+    because it was making it work, without knowing what it was
+    supposed to do.
+  - etc.
+
+And basically, we have no way to tell at the moment which one is
+right and which one needs fixing.
+
+The corollary being that it cripples the whole community ability to
+maintain the framework and make it evolve.
+
+> > +  * device_slave_caps
+> > +    - Isn't that redundant with the cap_mask already?
+> > +    - Only a few drivers seem to implement it
+> For audio to know what your channel can do rather than hardcoding it
+
+Ah, yes, I see it now. It's not related to the caps mask at all.
+
+Just out of curiosity, wouldn't it be better to move this to the
+framework, and have these informations provided through the struct
+dma_device? Or would it have some non-trivial side-effects?
+
+> > +  * dma cookies?
+> cookie is dma transaction representation which is monotonically incrementing
+> number.
+
+Ok, and it identifies a unique dma_async_tx_descriptor, right?
+
+Thanks,
+Maxime
+
 -- 
-2.0.1
+Maxime Ripard, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140731/8ef53175/attachment.sig>
