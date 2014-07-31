@@ -1,42 +1,32 @@
 From: tomasz.figa@gmail.com (Tomasz Figa)
-Date: Thu, 31 Jul 2014 21:19:35 +0200
-Subject: [PATCH v4 3/4] ARM: dts: Clean up exynos5250-snow
-In-Reply-To: <1406822910-6255-4-git-send-email-afaerber@suse.de>
+Date: Thu, 31 Jul 2014 21:20:15 +0200
+Subject: [PATCH v4 1/4] ARM: dts: Fix MMC pinctrl for exynos5250-snow
+In-Reply-To: <1406822910-6255-2-git-send-email-afaerber@suse.de>
 References: <1406822910-6255-1-git-send-email-afaerber@suse.de>
- <1406822910-6255-4-git-send-email-afaerber@suse.de>
-Message-ID: <53DA96C7.30009@gmail.com>
+ <1406822910-6255-2-git-send-email-afaerber@suse.de>
+Message-ID: <53DA96EF.8050203@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Andreas,
-
-Please see my comments inline.
-
 On 31.07.2014 18:08, Andreas F?rber wrote:
-> Use the new style of referencing inherited nodes and use symbolic names.
+> The pinctrl properties should be on the device directly and not on the
+> slot sub-node.
 > 
-> Suggested-by: Doug Anderson <dianders@chromium.org>
+> Reported-by: Doug Anderson <dianders@chromium.org>
+> Cc: Jaehoon Chung <jh80.chung@samsung.com>
 > Signed-off-by: Andreas F?rber <afaerber@suse.de>
-
-[snip]
-
-> -
->  	usb at 12110000 {
-> -		samsung,vbus-gpio = <&gpx1 1 0>;
-> +		samsung,vbus-gpio = <&gpx1 1 GPIO_ACTIVE_HIGH>;
->  	};
-
-This is a higher level node being overridden, so it should be specified
-using references too.
-
+> ---
+>  v3 -> v4: Unchanged
 >  
->  	fixed-rate-clocks {
-> @@ -287,7 +206,7 @@
->  	};
->  
->  	hdmi {
+>  v3: New (Doug Anderson)
+>  Redundant with Jaehoon Chung's general slot at 0 deprecation,
+>  in case that hits the tree earlier.
+> 
+>  arch/arm/boot/dts/exynos5250-snow.dts | 6 ++----
+>  1 file changed, 2 insertions(+), 4 deletions(-)
+> 
 
-Ditto.
+Reviewed-by: Tomasz Figa <t.figa@samsung.com>
 
 Best regards,
 Tomasz
