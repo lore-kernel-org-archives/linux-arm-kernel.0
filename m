@@ -1,50 +1,83 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Thu, 31 Jul 2014 20:44:31 +0200
-Subject: [PATCH] arm64: dmi: Add SMBIOS/DMI support
-In-Reply-To: <20140731161528.GH4179@bivouac.eciton.net>
-References: <1406810830-6099-1-git-send-email-ard.biesheuvel@linaro.org>
- <CAKv+Gu9hwupNAxuOTNnsY8Spxkh3J6DwYF7Ym493PuZ-6phzXA@mail.gmail.com>
- <53DA509A.8070304@linaro.org>
- <CAKv+Gu8Nq7-mhFPRqRw6sxDxZAz5kyLvDBwC_0E3qZp9ZpxPig@mail.gmail.com>
- <53DA660D.3070504@linaro.org> <20140731155338.GC26853@arm.com>
- <20140731161528.GH4179@bivouac.eciton.net>
-Message-ID: <CAKv+Gu-WrvqyE-TF3ybG1VN1f=rAATAo6oBUeTmzX8KD1auA9w@mail.gmail.com>
+From: tomasz.figa@gmail.com (Tomasz Figa)
+Date: Thu, 31 Jul 2014 20:46:51 +0200
+Subject: [PATCH v9 6/6] clk: samsung: remove unused clock aliases and
+ update clock flags
+In-Reply-To: <CAJuA9ah3PbGrMFqrahFUKCD+6ROnQ-7qyJN3cRawXAMHX7Jgrg@mail.gmail.com>
+References: <1406707663-16656-1-git-send-email-thomas.ab@samsung.com>	<1406707663-16656-7-git-send-email-thomas.ab@samsung.com>	<53DA4F1A.5040604@gmail.com>	<CAJuA9ahCVnG8st0t_U+Nw9+eHV3fh57EjUeJw=LxCA0QzSm=AA@mail.gmail.com>	<53DA8C70.2060009@gmail.com>
+ <CAJuA9ah3PbGrMFqrahFUKCD+6ROnQ-7qyJN3cRawXAMHX7Jgrg@mail.gmail.com>
+Message-ID: <53DA8F1B.3010907@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 31 July 2014 18:15, Leif Lindholm <leif.lindholm@linaro.org> wrote:
-> On Thu, Jul 31, 2014 at 04:53:38PM +0100, Will Deacon wrote:
->> > >>      The patch works well on FVP model, and here are the boot log and
->> > >> dmidecode+lshw result:
->> > >>
->> > > Thanks Yi!
->> > >
->> > > Can we help Will out if he wants to test this himself?
->> >      @Will: which platform do you have on hand?  I am using FVP model
->> > for testing.
->> >      First, you need to merge SMBIOS support into UEFI.
->> >      Then, compile and install the dmidecode(open source) on the linux
->> > ,and run it.
+On 31.07.2014 20:41, Thomas Abraham wrote:
+> On Fri, Aug 1, 2014 at 12:05 AM, Tomasz Figa <tomasz.figa@gmail.com> wrote:
+>> On 31.07.2014 20:24, Thomas Abraham wrote:
+>>> Hi Tomasz,
+>>>
+>>> On Thu, Jul 31, 2014 at 7:43 PM, Tomasz Figa <tomasz.figa@gmail.com> wrote:
+>>>> On 30.07.2014 10:07, Thomas Abraham wrote:
+>>>>> With some of the Exynos SoCs switched over to use the generic CPUfreq drivers,
+>>>>> the unused clock aliases can be removed. In addition to this, the individual
+>>>>> clock blocks which are now encapsulated with the consolidate CPU clock type
+>>>>> can now be marked with read-only flags.
+>>>>
+>>>> [snip]
+>>>>
+>>>>> @@ -1500,6 +1499,7 @@ static void __init exynos4_clk_init(struct device_node *np,
+>>>>>               exynos4_soc == EXYNOS4210 ? "Exynos4210" : "Exynos4x12",
+>>>>>               _get_rate("sclk_apll"), _get_rate("sclk_mpll"),
+>>>>>               _get_rate("sclk_epll"), _get_rate("sclk_vpll"),
+>>>>> +             exynos4_soc == EXYNOS4210 ? _get_rate("armclk") :
+>>>>>               _get_rate("div_core2"));
+>>>>
+>>>> I believe "div_core2" should work fine here for all SoCs without the
+>>>> need for this if.
+>>>
+>>> The following patch is a pre-requisite for this patch.
+>>> http://www.spinics.net/lists/arm-kernel/msg351540.html
+>>>
+>>> The rate can be obtained from div_core2 as well but with the cpu clock
+>>> now registered, the rate can be obtained from the cpu clock instance
+>>> instead of the div_core2 divider. And when Exynos4412 also add cpu
+>>> clock instance, the 'if' above will be removed.
+>>>
+>>>>
+>>>>>  }
+>>>>>
+>>>>> diff --git a/drivers/clk/samsung/clk-exynos5250.c b/drivers/clk/samsung/clk-exynos5250.c
+>>>>> index e19e365..1d958f1 100644
+>>>>> --- a/drivers/clk/samsung/clk-exynos5250.c
+>>>>> +++ b/drivers/clk/samsung/clk-exynos5250.c
+>>>>
+>>>> [snip]
+>>>>
+>>>>> @@ -848,6 +851,6 @@ static void __init exynos5250_clk_init(struct device_node *np)
+>>>>>       samsung_clk_of_add_provider(np, ctx);
+>>>>>
+>>>>>       pr_info("Exynos5250: clock setup completed, armclk=%ld\n",
+>>>>> -                     _get_rate("div_arm2"));
+>>>>> +                     _get_rate("armclk"));
+>>>>
+>>>> Similarly here, no need for this change.
+>>>
+>>> Same here. Instead of getting the rate from div_core2 divider block,
+>>> the cpu clock instance is used to find the rate. I would prefer to use
+>>> cpu clock here. Is there any reason to prefer div_core2 over the cpu
+>>> clock instance?
 >>
->> I've got some stuff from Leif for testing this, but what I'm really after is
->> something that would have spotted this problem. Are there any compliance
->> tests, for example?
->
-> The patch as previously submitted (and accepted) was functional on all
-> platforms it has been tested on. It is technically not compliant with
-> the UEFI specification, but it works with the images we had.
-> The worst-case failure would have been the lookup function returning
-> NULL and the SMBIOS tables being unavailable even though they existed.
->
+>> Well, the reason is simple: if you don't need to change something (i.e.
+>> the change doesn't have any advantages), don't change it.
+> 
+> The advantage with using cpu clock would be that get_rate can obtain
+> the cached rate whereas when reading div_core2 rate, the clock tree
+> will have to be traversed to determine the rate.
+> 
 
-Indeed. It would be bad for us to rely on non-compliant but wide
-spread behavior, so I think it is a good thing to shake out these bugs
-now, even if they haven't caused any problems.
+This is just one time printk at initialization, so still no real
+benefits. :)
 
-> What you are asking for would be a test for UEFI, not for the kernel.
-> (And this one might be useful to add to the fwts if it's not already
-> part of it.)
->
+Well anyway, if you really don't want to undo this change, then I guess
+I can live with it.
 
-Yes, it would be good if we could test for patterns like this, (i.e.,
-config tables with EFI_MEMORY_RUNTIME set).
+Best regards,
+Tomasz
