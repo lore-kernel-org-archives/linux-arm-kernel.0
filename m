@@ -1,33 +1,46 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Thu, 31 Jul 2014 18:44:00 +0100
-Subject: [PATCH] arm64: KVM: export current vcpu->pause state via pseudo
- regs
-In-Reply-To: <CAFEAcA8RjmjoaEpjoDE5YJdKagtZYZe9TpCdsRPf86W=WCxCsA@mail.gmail.com>
-References: <1404914112-7298-1-git-send-email-alex.bennee@linaro.org>
- <53DA7583.2030504@redhat.com>
- <CAFEAcA9cT617t8JqOXtuO-wQ5xg5T3Sw_DUHB1fpPD6g3SSNaQ@mail.gmail.com>
- <53DA7B28.701@redhat.com>
- <CAFEAcA8RjmjoaEpjoDE5YJdKagtZYZe9TpCdsRPf86W=WCxCsA@mail.gmail.com>
-Message-ID: <20140731174359.GI26853@arm.com>
+From: gilles.chanteperdrix@xenomai.org (Gilles Chanteperdrix)
+Date: Thu, 31 Jul 2014 19:42:58 +0200
+Subject: Bad Page dump (help)
+In-Reply-To: <20140731140044.GL30282@n2100.arm.linux.org.uk>
+References: <20140729190700.GN17808@saruman.home>
+ <53D9E10F.6040408@xenomai.org>
+ <20140731140044.GL30282@n2100.arm.linux.org.uk>
+Message-ID: <53DA8022.9070708@xenomai.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jul 31, 2014 at 06:36:35PM +0100, Peter Maydell wrote:
-> On 31 July 2014 18:21, Paolo Bonzini <pbonzini@redhat.com> wrote:
-> > What does ARM do if you have a WFI while interrupts are disabled?  On
-> > x86 after "cli;hlt" only an NMI will wake you up.  With spurious
-> > wakeups, it's pretty much guaranteed that you will break such "cli;hlt"
-> > sequences.
+On 07/31/2014 04:00 PM, Russell King - ARM Linux wrote:
+> On Thu, Jul 31, 2014 at 08:24:15AM +0200, Gilles Chanteperdrix wrote:
+>> On 07/29/2014 09:07 PM, Felipe Balbi wrote:
+>>> Hi Russell,
+>>>
+>>> I'm bringing up a new board on today's linux-next but I'm having a bunch
+>>> of bad_page() calls due to _mapcount not being zero (full logs
+>>> attached). What could cause that ? Any hints on how to debug ? It's as
+>>> if page_mapcount_reset() wasn't called for the pages which are causing
+>>> issues.
+>>
+>> FWIW, the same issue appeared on a Cogent CSB637 board (the last board 
+>> I use not using DT) in between 3.13 and 3.14. I ran a bisect and found 
+>> that reverting the following commit:
 > 
-> The architecture mandates some things that *must* wake you from
-> a WFI, but it also allows wakeups for other reasons not listed, or
-> for no reason at all. It's perfectly valid to implement WFI as a NOP
-> (though it would not be very good for power efficiency, obviously).
-> Guests which don't surround WFI with a "check whether we should
-> just go back to WFI" loop are buggy.
+> I don't seem to have a bug report from you for this.
 
-(and in case that wasn't clear, local_irq_disable() doesn't prevent an
-interrupt from waking you up from wfi, otherwise our idle code would be
-broken).
+No, this is really low priority in my todo list, as this platform is
+based on at91rm9200, which is probably not that much used now. I did not
+really finished investigating, so was not ready for a report. Now that
+someone sees the same bug, I thought it might be useful to add my
+partial findings.
 
-Will
+> 
+>> Seemed to make the issue disappear. I later found out that changing the
+>> kernel options also made the issue disappear.
+> 
+> Which kernel options?
+
+Any option, adding ftrace for instance, or disabling CONFIG_PREEMPT, I
+could not identify a pattern.
+
+
+-- 
+                                                                Gilles.
