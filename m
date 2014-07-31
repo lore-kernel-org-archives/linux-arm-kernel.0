@@ -1,140 +1,55 @@
 From: ta.omasab@gmail.com (Thomas Abraham)
-Date: Thu, 31 Jul 2014 08:25:51 +0530
+Date: Thu, 31 Jul 2014 08:51:02 +0530
 Subject: [PATCH v9 3/6] ARM: dts: Exynos: add CPU OPP and regulator supply
  property
-In-Reply-To: <53D8D6EF.8010503@suse.de>
+In-Reply-To: <CAD=FV=WNmREbRLmsusbJ6KKykVzwdBqOUfYkWWOhbc=HmxyTdA@mail.gmail.com>
 References: <1406707663-16656-1-git-send-email-thomas.ab@samsung.com>
  <1406707663-16656-4-git-send-email-thomas.ab@samsung.com>
- <53D8D6EF.8010503@suse.de>
-Message-ID: <CAJuA9ahBF7wZN1FqFkLWYWxEa1x39VjEv5ck=qTAoE1F96TKDQ@mail.gmail.com>
+ <CAD=FV=WNmREbRLmsusbJ6KKykVzwdBqOUfYkWWOhbc=HmxyTdA@mail.gmail.com>
+Message-ID: <CAJuA9aiBmM+HF0TJkvdjgOkGKYaL4SHU9JtvqfU2jiV7CP978A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jul 30, 2014 at 4:58 PM, Andreas F?rber <afaerber@suse.de> wrote:
-> Am 30.07.2014 10:07, schrieb Thomas Abraham:
->> For Exynos 4210/5250/5420 based platforms, add CPU operating points and CPU
->> regulator supply properties for migrating from Exynos specific cpufreq driver
->> to using generic cpufreq drivers.
->>
->> Cc: Kukjin Kim <kgene.kim@samsung.com>
->> Cc: Doug Anderson <dianders@chromium.org>
->> Cc: Javier Martinez Canillas <javier.martinez@collabora.co.uk>
->> Cc: Andreas Faerber <afaerber@suse.de>
->> Cc: Sachin Kamat <sachin.kamat@linaro.org>
->> Signed-off-by: Thomas Abraham <thomas.ab@samsung.com>
->> ---
->>  arch/arm/boot/dts/exynos4210-origen.dts         |    4 +++
->>  arch/arm/boot/dts/exynos4210-trats.dts          |    4 +++
->>  arch/arm/boot/dts/exynos4210-universal_c210.dts |    4 +++
->>  arch/arm/boot/dts/exynos4210.dtsi               |   14 ++++++++-
->>  arch/arm/boot/dts/exynos5250-arndale.dts        |    4 +++
->>  arch/arm/boot/dts/exynos5250-smdk5250.dts       |    4 +++
->>  arch/arm/boot/dts/exynos5250-snow.dts           |    4 +++
->>  arch/arm/boot/dts/exynos5250.dtsi               |   25 ++++++++++++++-
->>  arch/arm/boot/dts/exynos5420.dtsi               |   38 +++++++++++++++++++++++
->>  9 files changed, 99 insertions(+), 2 deletions(-)
->>
->> diff --git a/arch/arm/boot/dts/exynos4210-origen.dts b/arch/arm/boot/dts/exynos4210-origen.dts
->> index f767c42..887dded 100644
->> --- a/arch/arm/boot/dts/exynos4210-origen.dts
->> +++ b/arch/arm/boot/dts/exynos4210-origen.dts
->> @@ -334,3 +334,7 @@
->>               };
->>       };
->>  };
->> +
->> +&cpu0 {
->> +     cpu0-supply = <&buck1_reg>;
->> +};
->> diff --git a/arch/arm/boot/dts/exynos4210-trats.dts b/arch/arm/boot/dts/exynos4210-trats.dts
->> index f516da9..66119dd 100644
->> --- a/arch/arm/boot/dts/exynos4210-trats.dts
->> +++ b/arch/arm/boot/dts/exynos4210-trats.dts
->> @@ -446,3 +446,7 @@
->>               };
->>       };
->>  };
->> +
->> +&cpu0 {
->> +     cpu0-supply = <&varm_breg>;
->> +};
->> diff --git a/arch/arm/boot/dts/exynos4210-universal_c210.dts b/arch/arm/boot/dts/exynos4210-universal_c210.dts
->> index d50eb3a..bf0a39c 100644
->> --- a/arch/arm/boot/dts/exynos4210-universal_c210.dts
->> +++ b/arch/arm/boot/dts/exynos4210-universal_c210.dts
->> @@ -492,3 +492,7 @@
->>  &mdma1 {
->>       reg = <0x12840000 0x1000>;
->>  };
->> +
->> +&cpu0 {
->> +     cpu0-supply = <&vdd_arm_reg>;
->> +};
->> diff --git a/arch/arm/boot/dts/exynos4210.dtsi b/arch/arm/boot/dts/exynos4210.dtsi
->> index bcc9e63..69bac07 100644
->> --- a/arch/arm/boot/dts/exynos4210.dtsi
->> +++ b/arch/arm/boot/dts/exynos4210.dtsi
->> @@ -35,10 +35,22 @@
->>               #address-cells = <1>;
->>               #size-cells = <0>;
->>
->> -             cpu at 900 {
->> +             cpu0: cpu at 900 {
->>                       device_type = "cpu";
->>                       compatible = "arm,cortex-a9";
->>                       reg = <0x900>;
->> +                     clocks = <&clock CLK_ARM_CLK>;
->> +                     clock-names = "cpu";
->> +                     clock-latency = <160000>;
->> +
->> +                     operating-points = <
->> +                             1200000 1250000
->> +                             1000000 1150000
->> +                             800000  1075000
->> +                             500000  975000
->> +                             400000  975000
->> +                             200000  950000
+Hi Doug,
+
+On Thu, Jul 31, 2014 at 6:07 AM, Doug Anderson <dianders@chromium.org> wrote:
+> Thomas,
 >
-> Nit: Here you left-align the columns ...
->
->> +                     >;
->>               };
->>
->>               cpu at 901 {
+> On Wed, Jul 30, 2014 at 1:07 AM, Thomas Abraham <thomas.ab@samsung.com> wrote:
 >> diff --git a/arch/arm/boot/dts/exynos5250-arndale.dts b/arch/arm/boot/dts/exynos5250-arndale.dts
 >> index d0de1f5..3b12a97 100644
 >> --- a/arch/arm/boot/dts/exynos5250-arndale.dts
 >> +++ b/arch/arm/boot/dts/exynos5250-arndale.dts
 >> @@ -575,3 +575,7 @@
->>               usb-phy = <&usb2_phy>;
->>       };
+>>                 usb-phy = <&usb2_phy>;
+>>         };
 >>  };
 >> +
 >> +&cpu0 {
->> +     cpu0-supply = <&buck2_reg>;
+>> +       cpu0-supply = <&buck2_reg>;
 >> +};
 >> diff --git a/arch/arm/boot/dts/exynos5250-smdk5250.dts b/arch/arm/boot/dts/exynos5250-smdk5250.dts
 >> index b4b35ad..f07e834 100644
 >> --- a/arch/arm/boot/dts/exynos5250-smdk5250.dts
 >> +++ b/arch/arm/boot/dts/exynos5250-smdk5250.dts
 >> @@ -414,3 +414,7 @@
->>               };
->>       };
+>>                 };
+>>         };
 >>  };
 >> +
 >> +&cpu0 {
->> +     cpu0-supply = <&buck2_reg>;
+>> +       cpu0-supply = <&buck2_reg>;
 >> +};
 >> diff --git a/arch/arm/boot/dts/exynos5250-snow.dts b/arch/arm/boot/dts/exynos5250-snow.dts
 >> index f2b8c41..91acca7 100644
 >> --- a/arch/arm/boot/dts/exynos5250-snow.dts
 >> +++ b/arch/arm/boot/dts/exynos5250-snow.dts
 >> @@ -509,4 +509,8 @@
->>       };
+>>         };
 >>  };
 >>
 >> +&cpu0 {
->> +     cpu0-supply = <&buck2_reg>;
+>> +       cpu0-supply = <&buck2_reg>;
 >> +};
 >> +
 >>  #include "cros-ec-keyboard.dtsi"
@@ -143,174 +58,188 @@ On Wed, Jul 30, 2014 at 4:58 PM, Andreas F?rber <afaerber@suse.de> wrote:
 >> --- a/arch/arm/boot/dts/exynos5250.dtsi
 >> +++ b/arch/arm/boot/dts/exynos5250.dtsi
 >> @@ -58,11 +58,34 @@
->>               #address-cells = <1>;
->>               #size-cells = <0>;
+>>                 #address-cells = <1>;
+>>                 #size-cells = <0>;
 >>
->> -             cpu at 0 {
->> +             cpu0: cpu at 0 {
->>                       device_type = "cpu";
->>                       compatible = "arm,cortex-a15";
->>                       reg = <0>;
->>                       clock-frequency = <1700000000>;
+>> -               cpu at 0 {
+>> +               cpu0: cpu at 0 {
+>>                         device_type = "cpu";
+>>                         compatible = "arm,cortex-a15";
+>>                         reg = <0>;
+>>                         clock-frequency = <1700000000>;
 >> +
->> +                     clocks = <&clock CLK_ARM_CLK>;
->> +                     clock-names = "cpu";
->> +                     clock-latency = <140000>;
->> +
->> +                     operating-points = <
->> +                             1700000 1300000
->> +                             1600000 1250000
->> +                             1500000 1225000
->> +                             1400000 1200000
->> +                             1300000 1150000
->> +                             1200000 1125000
->> +                             1100000 1100000
->> +                             1000000 1075000
->> +                              900000 1050000
->> +                              800000 1025000
->> +                              700000 1012500
->> +                              600000 1000000
->> +                              500000  975000
->> +                              400000  950000
->> +                              300000  937500
->> +                              200000  925000
+>> +                       clocks = <&clock CLK_ARM_CLK>;
+>> +                       clock-names = "cpu";
+>> +                       clock-latency = <140000>;
 >
-> ... here you right-align both ...
+> Where did the 140000 number come from?  My old calculations show that
+> with lock time of 270 ad P up to 6 we were at 67.5us lock time.
+
+I measured the time taken by clk_set_rate call in the cpufreq driver
+using do_gettimeofday(). The time taken to change the clock speed was
+between 87us to 134us for Exynos5420. So I just took the worst case
+time of 140us. Also, the time taken to change the CPU clock speed
+includes the settling time for changes to dividers and mux clock
+blocks.
+
 >
->> +                     >;
->>               };
->>               cpu at 1 {
->>                       device_type = "cpu";
+>
+>> +                       operating-points = <
+>> +                               1700000 1300000
+>> +                               1600000 1250000
+>> +                               1500000 1225000
+>> +                               1400000 1200000
+>> +                               1300000 1150000
+>> +                               1200000 1125000
+>> +                               1100000 1100000
+>> +                               1000000 1075000
+>> +                                900000 1050000
+>> +                                800000 1025000
+>> +                                700000 1012500
+>> +                                600000 1000000
+>> +                                500000  975000
+>> +                                400000  950000
+>> +                                300000  937500
+>> +                                200000  925000
+>> +                       >;
+>>                 };
+>>                 cpu at 1 {
+>>                         device_type = "cpu";
 >> diff --git a/arch/arm/boot/dts/exynos5420.dtsi b/arch/arm/boot/dts/exynos5420.dtsi
 >> index cb2b70e..3154b4c 100644
 >> --- a/arch/arm/boot/dts/exynos5420.dtsi
 >> +++ b/arch/arm/boot/dts/exynos5420.dtsi
 >> @@ -59,8 +59,26 @@
->>                       device_type = "cpu";
->>                       compatible = "arm,cortex-a15";
->>                       reg = <0x0>;
->> +                     clocks = <&clock CLK_ARM_CLK>;
->> +                     clock-names = "cpu-cluster.0";
->>                       clock-frequency = <1800000000>;
->>                       cci-control-port = <&cci_control1>;
->> +                     clock-latency = <140000>;
+>>                         device_type = "cpu";
+>>                         compatible = "arm,cortex-a15";
+>>                         reg = <0x0>;
+>> +                       clocks = <&clock CLK_ARM_CLK>;
+>> +                       clock-names = "cpu-cluster.0";
+>>                         clock-frequency = <1800000000>;
+>>                         cci-control-port = <&cci_control1>;
+>> +                       clock-latency = <140000>;
 >> +
->> +                     operating-points = <
->> +                             1800000 1250000
->> +                             1700000 1212500
->> +                             1600000 1175000
->> +                             1500000 1137500
->> +                             1400000 1112500
->> +                             1300000 1062500
->> +                             1200000 1037500
->> +                             1100000 1012500
->> +                             1000000 987500
->> +                              900000 962500
->> +                              800000 937500
->> +                              700000 912500
->
-> ... but here only the left column.
->
->> +                     >;
->>               };
+>> +                       operating-points = <
+>> +                               1800000 1250000
+>> +                               1700000 1212500
+>> +                               1600000 1175000
+>> +                               1500000 1137500
+>> +                               1400000 1112500
+>> +                               1300000 1062500
+>> +                               1200000 1037500
+>> +                               1100000 1012500
+>> +                               1000000 987500
+>> +                                900000 962500
+>> +                                800000 937500
+>> +                                700000 912500
+>> +                       >;
+>>                 };
 >>
->>               cpu1: cpu at 1 {
+>>                 cpu1: cpu at 1 {
 >> @@ -69,6 +87,7 @@
->>                       reg = <0x1>;
->>                       clock-frequency = <1800000000>;
->>                       cci-control-port = <&cci_control1>;
->> +                     clock-latency = <140000>;
->>               };
+>>                         reg = <0x1>;
+>>                         clock-frequency = <1800000000>;
+>>                         cci-control-port = <&cci_control1>;
+>> +                       clock-latency = <140000>;
+>>                 };
 >>
->>               cpu2: cpu at 2 {
+>>                 cpu2: cpu at 2 {
 >> @@ -77,6 +96,7 @@
->>                       reg = <0x2>;
->>                       clock-frequency = <1800000000>;
->>                       cci-control-port = <&cci_control1>;
->> +                     clock-latency = <140000>;
->>               };
+>>                         reg = <0x2>;
+>>                         clock-frequency = <1800000000>;
+>>                         cci-control-port = <&cci_control1>;
+>> +                       clock-latency = <140000>;
+>>                 };
 >>
->>               cpu3: cpu at 3 {
+>>                 cpu3: cpu at 3 {
 >> @@ -85,14 +105,29 @@
->>                       reg = <0x3>;
->>                       clock-frequency = <1800000000>;
->>                       cci-control-port = <&cci_control1>;
->> +                     clock-latency = <140000>;
->>               };
+>>                         reg = <0x3>;
+>>                         clock-frequency = <1800000000>;
+>>                         cci-control-port = <&cci_control1>;
+>> +                       clock-latency = <140000>;
+>>                 };
 >>
->>               cpu4: cpu at 100 {
->>                       device_type = "cpu";
->>                       compatible = "arm,cortex-a7";
->>                       reg = <0x100>;
->> +                     clocks = <&clock CLK_KFC_CLK>;
->> +                     clock-names = "cpu-cluster.1";
->>                       clock-frequency = <1000000000>;
->>                       cci-control-port = <&cci_control0>;
->> +                     clock-latency = <140000>;
+>>                 cpu4: cpu at 100 {
+>>                         device_type = "cpu";
+>>                         compatible = "arm,cortex-a7";
+>>                         reg = <0x100>;
+>> +                       clocks = <&clock CLK_KFC_CLK>;
+>> +                       clock-names = "cpu-cluster.1";
+>>                         clock-frequency = <1000000000>;
+>
+> It does't start out at its maximum?
+
+The A7 CPU clock need not start with the maximum. On the SMDK5420
+board, the firmware has set the A7 CPU clock to 1GHz. So I used the
+same value here.
+
+>
+>
+>>                         cci-control-port = <&cci_control0>;
+>> +                       clock-latency = <140000>;
 >> +
->> +                     operating-points = <
->> +                             1300000 1275000
->> +                             1200000 1212500
->> +                             1100000 1162500
->> +                             1000000 1112500
->> +                              900000 1062500
->> +                              800000 1025000
->> +                              700000 975000
->> +                              600000 937500
->
-> Dito.
->
->> +                     >;
->>               };
+>> +                       operating-points = <
+>> +                               1300000 1275000
+>> +                               1200000 1212500
+>> +                               1100000 1162500
+>> +                               1000000 1112500
+>> +                                900000 1062500
+>> +                                800000 1025000
+>> +                                700000 975000
+>> +                                600000 937500
+>> +                       >;
+>>                 };
 >>
->>               cpu5: cpu at 101 {
+>>                 cpu5: cpu at 101 {
 >> @@ -101,6 +136,7 @@
->>                       reg = <0x101>;
->>                       clock-frequency = <1000000000>;
->>                       cci-control-port = <&cci_control0>;
->> +                     clock-latency = <140000>;
->>               };
+>>                         reg = <0x101>;
+>>                         clock-frequency = <1000000000>;
+>>                         cci-control-port = <&cci_control0>;
+>> +                       clock-latency = <140000>;
+>>                 };
 >>
->>               cpu6: cpu at 102 {
+>>                 cpu6: cpu at 102 {
 >> @@ -109,6 +145,7 @@
->>                       reg = <0x102>;
->>                       clock-frequency = <1000000000>;
->>                       cci-control-port = <&cci_control0>;
->> +                     clock-latency = <140000>;
->>               };
+>>                         reg = <0x102>;
+>>                         clock-frequency = <1000000000>;
+>>                         cci-control-port = <&cci_control0>;
+>> +                       clock-latency = <140000>;
+>>                 };
 >>
->>               cpu7: cpu at 103 {
+>>                 cpu7: cpu at 103 {
 >> @@ -117,6 +154,7 @@
->>                       reg = <0x103>;
->>                       clock-frequency = <1000000000>;
->>                       cci-control-port = <&cci_control0>;
->> +                     clock-latency = <140000>;
->>               };
->>       };
->>
+>>                         reg = <0x103>;
+>>                         clock-frequency = <1000000000>;
+>>                         cci-control-port = <&cci_control0>;
+>> +                       clock-latency = <140000>;
+>>                 };
+>>         };
 >
-> Since I don't really care which template you choose and can't judge most
-> numbers, FWIW
->
-> Reviewed-by: Andreas F?rber <afaerber@suse.de>
->
-> Thanks for resolving the conflict,
->
-> Andreas
+> Don't you need to put a reference to the supply in the 5420 board
+> files?  ...or is that not possible yet since the max77802 hasn't
+> landed yet?
 
-Hi Andreas,
+The arm big.little cpufreq driver does not have voltage scaling
+support yet. So the supply was not mentioned.
 
-If I have to do one more revision of this series, I will fix the
-alignment. Thanks for finding this.
+>
+> If that's not possible, is there any reason to post the 5420.dtsi
+> patch now?  Also: what about 5800?  It's so similar to 5420 that it
+> seems a shame not to do them at the same time.
+
+This patch series has support for Exynos5800 as well. But it is A15
+clock is restricted to 1.8GHz for now since we do not have a way to
+handle the vdd_arm and vdd_int voltage difference with 1.9GHz and
+2.0GHZ in upstream yet.
 
 Thanks,
 Thomas.
 
 >
-> --
-> SUSE LINUX Products GmbH, Maxfeldstr. 5, 90409 N?rnberg, Germany
-> GF: Jeff Hawn, Jennifer Guild, Felix Imend?rffer; HRB 16746 AG N?rnberg
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-samsung-soc" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+>
+> -Doug
+>
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
