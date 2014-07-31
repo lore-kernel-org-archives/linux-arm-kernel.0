@@ -1,26 +1,43 @@
-From: dan.carpenter@oracle.com (Dan Carpenter)
-Date: Thu, 31 Jul 2014 15:57:51 +0300
-Subject: [patch] ASoC: pxa: pxa-ssp: small leak in probe()
-Message-ID: <20140731125751.GA31539@mwanda>
+From: will.deacon@arm.com (Will Deacon)
+Date: Thu, 31 Jul 2014 14:01:57 +0100
+Subject: [PATCH] arm64: dmi: Add SMBIOS/DMI support
+In-Reply-To: <CAKv+Gu9hwupNAxuOTNnsY8Spxkh3J6DwYF7Ym493PuZ-6phzXA@mail.gmail.com>
+References: <1406810830-6099-1-git-send-email-ard.biesheuvel@linaro.org>
+ <CAKv+Gu9hwupNAxuOTNnsY8Spxkh3J6DwYF7Ym493PuZ-6phzXA@mail.gmail.com>
+Message-ID: <20140731130157.GQ26853@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-There is a small memory leak if probe() fails.
+On Thu, Jul 31, 2014 at 01:48:36PM +0100, Ard Biesheuvel wrote:
+> On 31 July 2014 14:47, Ard Biesheuvel <ard.biesheuvel@linaro.org> wrote:
+> > From: Yi Li <yi.li@linaro.org>
+> >
+> > SMbios is important for server hardware vendors. It implements a spec for
+> > providing descriptive information about the platform. Things like serial
+> > numbers, physical layout of the ports, build configuration data, and the like.
+> >
+> > This has been tested by dmidecode and lshw tools.
+> >
+> > Signed-off-by: Yi Li <yi.li@linaro.org>
+> > Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+> > ---
+> >
+> > It turns out that efi_lookup_mapped_addr() is not appropriate after all for
+> > remapping the address of the SMBIOS tables. The reason is that the UEFI spec
+> > forbids virtual mappings being requested for configuration tables (which is not
+> > currently honored by Tianocore/EDK2)
+> >
+> 
+> @Yi: could you retest yet again, please?
+> 
+> @Will; this superseded the patch that is already queued up in
+> for-next/core, so perhaps you could drop that while we get this
+> tested?
 
-Fixes: 2023c90c3a2c ('ASoC: pxa: pxa-ssp: add DT bindings')
-Signed-off-by: Dan Carpenter <dan.carpenter@oracle.com>
+Reverted. I'd really appreciate help testing this stuff in future -- it was
+a pig getting it going on the foundation model and the whole setup felt
+rather contrived.
 
-diff --git a/sound/soc/pxa/pxa-ssp.c b/sound/soc/pxa/pxa-ssp.c
-index 199a8b3..0109f6c2 100644
---- a/sound/soc/pxa/pxa-ssp.c
-+++ b/sound/soc/pxa/pxa-ssp.c
-@@ -723,7 +723,8 @@ static int pxa_ssp_probe(struct snd_soc_dai *dai)
- 		ssp_handle = of_parse_phandle(dev->of_node, "port", 0);
- 		if (!ssp_handle) {
- 			dev_err(dev, "unable to get 'port' phandle\n");
--			return -ENODEV;
-+			ret = -ENODEV;
-+			goto err_priv;
- 		}
- 
- 		priv->ssp = pxa_ssp_request_of(ssp_handle, "SoC audio");
+Anyway, thanks for letting me know.
+
+Will
