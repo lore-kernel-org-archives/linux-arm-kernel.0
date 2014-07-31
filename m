@@ -1,115 +1,37 @@
-From: skannan@codeaurora.org (Saravana Kannan)
-Date: Thu, 31 Jul 2014 13:47:48 -0700
-Subject: [PATCH v4 1/5] cpufreq: Don't wait for CPU to going offline to
- restart governor
-In-Reply-To: <1406250448-470-2-git-send-email-skannan@codeaurora.org>
-References: <1406250448-470-1-git-send-email-skannan@codeaurora.org>
- <1406250448-470-2-git-send-email-skannan@codeaurora.org>
-Message-ID: <53DAAB74.7050003@codeaurora.org>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Thu, 31 Jul 2014 19:37:30 +0200
+Subject: [PATCH] Documentation: dmaengine: Add a documentation for the
+ dma controller API
+In-Reply-To: <53DA74B3.6060502@metafoo.de>
+References: <1406736193-26685-1-git-send-email-maxime.ripard@free-electrons.com>
+ <20140730160607.GM8181@intel.com> <20140731074440.GY3952@lukather>
+ <53DA3A48.8070900@metafoo.de> <20140731161331.GD3952@lukather>
+ <53DA74B3.6060502@metafoo.de>
+Message-ID: <20140731173730.GH3952@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/24/2014 06:07 PM, Saravana Kannan wrote:
-> There's no need to wait for the CPU going down to fully go offline to
-> restart the governor. We can stop the governor, change policy->cpus and
-> immediately restart the governor. This should reduce the time without any
-> CPUfreq monitoring and also help future patches with simplifying the code.
->
-> Signed-off-by: Saravana Kannan <skannan@codeaurora.org>
-> ---
->   drivers/cpufreq/cpufreq.c | 33 ++++++++++++++++++---------------
->   1 file changed, 18 insertions(+), 15 deletions(-)
->
-> diff --git a/drivers/cpufreq/cpufreq.c b/drivers/cpufreq/cpufreq.c
-> index 62259d2..ee0eb7b 100644
-> --- a/drivers/cpufreq/cpufreq.c
-> +++ b/drivers/cpufreq/cpufreq.c
-> @@ -1390,6 +1390,21 @@ static int __cpufreq_remove_dev_prepare(struct device *dev,
->   		cpufreq_driver->stop_cpu(policy);
->   	}
->
-> +	down_write(&policy->rwsem);
-> +	cpumask_clear_cpu(cpu, policy->cpus);
-> +	up_write(&policy->rwsem);
-> +
-> +	if (cpus > 1 && has_target()) {
-> +		ret = __cpufreq_governor(policy, CPUFREQ_GOV_START);
-> +		if (!ret)
-> +			ret = __cpufreq_governor(policy, CPUFREQ_GOV_LIMITS);
-> +
-> +		if (ret) {
-> +			pr_err("%s: Failed to start governor\n", __func__);
-> +			return ret;
-> +		}
-> +	}
-> +
->   	return 0;
->   }
->
-> @@ -1410,15 +1425,12 @@ static int __cpufreq_remove_dev_finish(struct device *dev,
->   		return -EINVAL;
->   	}
->
-> -	down_write(&policy->rwsem);
-> +	down_read(&policy->rwsem);
->   	cpus = cpumask_weight(policy->cpus);
-> -
-> -	if (cpus > 1)
-> -		cpumask_clear_cpu(cpu, policy->cpus);
-> -	up_write(&policy->rwsem);
-> +	up_read(&policy->rwsem);
->
->   	/* If cpu is last user of policy, free policy */
-> -	if (cpus == 1) {
-> +	if (cpus == 0) {
->   		if (has_target()) {
->   			ret = __cpufreq_governor(policy,
->   					CPUFREQ_GOV_POLICY_EXIT);
-> @@ -1447,15 +1459,6 @@ static int __cpufreq_remove_dev_finish(struct device *dev,
->
->   		if (!cpufreq_suspended)
->   			cpufreq_policy_free(policy);
-> -	} else if (has_target()) {
-> -		ret = __cpufreq_governor(policy, CPUFREQ_GOV_START);
-> -		if (!ret)
-> -			ret = __cpufreq_governor(policy, CPUFREQ_GOV_LIMITS);
-> -
-> -		if (ret) {
-> -			pr_err("%s: Failed to start governor\n", __func__);
-> -			return ret;
-> -		}
->   	}
->
->   	per_cpu(cpufreq_cpu_data, cpu) = NULL;
->
+On Thu, Jul 31, 2014 at 06:54:11PM +0200, Lars-Peter Clausen wrote:
+> On 07/31/2014 06:13 PM, Maxime Ripard wrote:
+> [...]
+> > From what you're saying, and judging from the drivers that already
+> >implement it, can't it be moved directly to the framework itself ?
+> >
+> 
+> What exactly do you mean by moving it directly to the framework? The
+> slave_caps API is part of the DMAengine framework.
 
-This patch should also fix another issue reported in-house recently. 
-cpufreq_update_policy() fails for an ONLINE CPU. This is the scenario 
-that triggers it:
-
-Thead A
-- Cluster with 4 CPUs
-- CPU3 is going down.
-- Governor is STOPed.
-- CPU3 is removed, but governor not STARTed yet.
-
-Thread B
-- get_online_cpus()
-- We cross this hotplug barrier since since POST_DEAD is sent AFTER 
-releasing the hotplug lock.
-- cpufreq_update_policy(CPU0) does a bunch of stuff
-- Then sends GOV_LIMITS to governor.
-- governor is currently STOPed, so it returns an error and 
-cpufreq_update_policy() fails.
-
-Thread A
-- In POST_DEAD notifier, STARTs the governor again.
-
-So, a perfectly valid call (doing get_online_cpus() and checking for 
-cpu_online() on a CPU before calling) fails.
-
--Saravana
+Not its implementation, which is defined by each and every driver,
+while the behaviour of device_slave_caps is rather generic.
 
 -- 
-The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
-hosted by The Linux Foundation
+Maxime Ripard, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140731/10d5f63e/attachment-0001.sig>
