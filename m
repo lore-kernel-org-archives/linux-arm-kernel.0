@@ -1,96 +1,81 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Wed, 30 Jul 2014 22:32:47 -0700
-Subject: [GIT PULL v2][for 3.17] pull request for hisilicon terminal soc
-In-Reply-To: <53D750CA.5090405@hisilicon.com>
-References: <53D750CA.5090405@hisilicon.com>
-Message-ID: <CAOesGMhEBsb_6vghQCHTm32FngZvURb2OozLpQu=UmJEY-MAKQ@mail.gmail.com>
+From: osandov@osandov.com (Omar Sandoval)
+Date: Wed, 30 Jul 2014 22:33:23 -0700
+Subject: [PATCH] ARM/ARM64: don't enter kgdb when userspace executes a
+ kgdb break instruction.
+In-Reply-To: <20140730112414.GJ12239@arm.com>
+References: <20140730071245.GA8954@mew.web-pass.com>
+ <20140730112414.GJ12239@arm.com>
+Message-ID: <20140731053323.GA15523@mew.web-pass.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Hi,
 
-There were a few things that still needed fixing here -- I took care
-of most of them. See below.
+On Wed, Jul 30, 2014 at 12:24:14PM +0100, Will Deacon wrote:
+> Whilst this sounds like a worrying problem, I've failed to reproduce it
+> on arm64.  Executing a brk instruction with either KGDB_DYN_DGB_BRK_IMM or
+> KDBG_COMPILED_DBG_BRK_IMM immediates from userspace results in a SIGTRAP being
+> delivered, assumedly because kgdb_handle_exception simply returns when kgdb
+> isn't active.
 
+>From what I can tell, the break hooks are registered so long as kgdb is enabled
+at all - i.e., the kernel was compiled with CONFIG_KGDB=y and, for example,
+CONFIG_KGDB_SERIAL_CONSOLE=y and kgdboc was passed on the kernel command line.
+kgdb_handle_exception doesn't seem to check whether the debugger is active.
 
-On Tue, Jul 29, 2014 at 12:44 AM, xuwei <xuwei5@hisilicon.com> wrote:
-> Hi Olof, Hi Kevin, Hi Arnd,
->
-> Please help to merge pull request for hisilicon terminal soc.
->
-> Best Regards,
-> Wei
->
->
-> The following changes since commit 7171511eaec5bf23fb06078f59784a3a0626b38f:
->
->   Linux 3.16-rc1 (2014-06-15 17:45:28 -1000)
->
-> are available in the git repository at:
->
->   git://github.com/hisilicon/linux-hisi.git tags/hix5hd2-for-3.17-v2
->
-> for you to fetch changes up to eeea1ab9b53f311f634e87d9208daa564a97dbba:
->
->   ARM: hisi: remove smp from machine descriptor (2014-07-29 14:54:11 +0800)
->
-> ----------------------------------------------------------------
-> ARM: mach-hisi: Hisilicon teminal soc udaptes for 3.17
->
-> - Rename Hi3716 to HiX5HD2
-> HiX5HD2 is a SoC with dual Cortex A9 cores for STB market.
-> And original Hi3xxx SoC is for mobile market.
-> To avoid confusing the two types of SoCs and also because of
-> different implementation(SMP, IPs integarted and earlycon configure),
-> rename Hi3716 to HIX5HD2 ann add ARCH_HIX5HD2.
->
-> - Add HiX5HD2 STB SoC and development kit board support
-> - Change to use power reset driver to reboot for HiX5HD2
-> - Add ARCH_HISI for the common configure of hisilicon SoCs
-> - Change to use CPU_METHOD_OF_DECLARE for SMP on HiX5HD2 and hi3xxx
-> - Enable L2 aux value for Hi3620
->
-> ----------------------------------------------------------------
-> Haifeng Yan (3):
->       ARM: debug: Rename Hi3716 to HIX5HD2
->       ARM: hisi: enable hix5hd2 SoC
->       ARM: dts: Add hix5hd2-dkb dts file.
+> The following (totally untested) diff is simpler for arm64, but again, I'm
+> not sure we even have a problem here.
 
-It is confusing -- is the SoC named HIX5HD2 or Hisilicon X5HD2? Seems
-like there are references to both.
+This diff also fixes the problem. I don't have a strong preference for either
+approach, so I can revise the patch with this approach instead if you'd prefer
+that.
 
-What I did was that I renamed the dts and dtsi to hisi-x5hd2  to have
-the vendor/family as prefix. Given the few boards per SoC family you
-have had so far, it makes more sense to prefix it with hisi.
+> On which systems have you managed to reproduce this and how?
 
-> Haojian Zhuang (5):
->       ARM: hisi: add ARCH_HISI
->       power: reset: move hisilicon reboot code
->       ARM: config: enable ARCH_HIX5HD2
->       ARM: hisi: set l2 aux for pl310
+I first reproduced this on a Raspberry Pi. The recommended distro, Raspbian,
+distributes a kernel compiled with CONFIG_KGDB=y, CONFIG_KGDB_KDB=y, and
+CONFIG_KDB_KEYBOARD=y, so it was sufficient to have a keyboard plugged in.
+However, I also reproduced it by booting with kgdboc on the command line, as
+CONFIG_KGDB_SERIAL_CONSOLE was also enabled. Additionally, I reproduced it and
+then verified that my patch fixed it on self-compiled kernels.
 
-This patch makes no sense to still carry. If things still need to be
-resolved, then it should just be dropped.
+I don't currenty have access to a physical ARM64 board, so I did all the
+testing for this with QEMU (loosely following the instructions here:
+http://www.bennee.com/~alex/blog/2014/05/09/running-linux-in-qemus-aarch64-system-emulation-mode/).
+Again, it was sufficient to build with CONFIG_KGDB=y and
+CONFIG_KGDB_SERIAL_CONSOLE=y and boot with kgdboc enabled, i.e., passing
+--append "console=ttyAMA0 kgdboc=ttyAMA0,115200" to QEMU. Here's a snippet from
+that session.
 
->       ARM: hisi: remove smp from machine descriptor
+# ./brk
 
+Entering kdb (current=0xffffffc07df60a80, pid 71) on processor 0 Oops: (null)
+due to oops @ 0x4000d8
 
-Also, in general: Wei, you seem to have added your Acked-by instead of
-Signed-off-by on the commits. When you apply them, you need to do so
-with your sign off.
+dCPU: 0 PID: 71 Comm: brk Not tainted 3.16.0-rc7ajb #2
+dtask: ffffffc07df60a80 ti: ffffffc07d0c0000 task.ti: ffffffc07d0c0000
+PC is at 0x4000d8
+LR is at 0x0
+pc : [<00000000004000d8>] lr : [<0000000000000000>] pstate: 00000000
+sp : 0000007fceefcdd0
+x29: 0000000000000000 x28: 0000000000000000 
+x27: 0000000000000000 x26: 0000000000000000 
+x25: 0000000000000000 x24: 0000000000000000 
+x23: 0000000000000000 x22: 0000000000000000 
+x21: 0000000000000000 x20: 0000000000000000 
+x19: 0000000000000000 x18: 0000000000000000 
+x17: 0000000000000000 x16: 0000000000000000 
+x15: 0000000000000000 x14: 0000000000000000 
+x13: 0000000000000000 x12: 0000000000000000 
+x11: 0000000000000000 x10: 0000000000000000 
+x9 : 0000000000000000 x8 : 0000000000000000 
+x7 : 0000000000000000 x6 : 0000000000000000 
+x5 : 0000000000000000 x4 : 0000000000000000 
+x3 : 0000000000000000 x2 : 0000000000000000 
+x1 : 0000000000000000 x0 : 0000000000000000 
 
-What I have done is that I have applied most of the above patches
-directly instead of merging the branch, and I have done the touchups
-described above (dropped the L2 patch and renamed the dts/dtsi).
+Let me know if you still have trouble reproducing this.
 
-If for some reason, the name really should be hisi-hix5hd2, then let
-me know quickly so I can revisit before it goes in. But I don't thik
-so -- I find more hits with "x5hd2" out there than with "hix5hd2". If
-anything, the remaining traces of hix5hd2 should probably be renamed
-too (machine descriptor, etc).
+Thanks again!
 
-(I also fixed a few spelling errors in the patch descriptions here and
-there, etc).
-
-
--Olof
+Omar
