@@ -1,33 +1,64 @@
 From: matthias.bgg@gmail.com (Matthias Brugger)
-Date: Thu, 31 Jul 2014 18:42:21 +0200
-Subject: [PATCH 5/7] arm: dts: mt6589-aquaris5: Add boot argument earlyprintk
+Date: Thu, 31 Jul 2014 18:42:22 +0200
+Subject: [PATCH 6/7] arm: mediatek: enable gpt6 on boot up to make arch timer
+ working
 In-Reply-To: <1406824943-24052-1-git-send-email-matthias.bgg@gmail.com>
 References: <1406824943-24052-1-git-send-email-matthias.bgg@gmail.com>
-Message-ID: <1406824943-24052-6-git-send-email-matthias.bgg@gmail.com>
+Message-ID: <1406824943-24052-7-git-send-email-matthias.bgg@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add boot argument for earlyprintk to the aquaris5 device tree file.
+We enable GTP6 which ungates the arch timer clock. Apart we write the
+frequency with which the timer is running in the CNTFREQ register.
+In the future this should be done in the bootloader.
 
 Signed-off-by: Matthias Brugger <matthias.bgg@gmail.com>
 ---
- arch/arm/boot/dts/mt6589-aquaris5.dts |    4 ++++
- 1 file changed, 4 insertions(+)
+ arch/arm/mach-mediatek/mediatek.c |   27 +++++++++++++++++++++++++++
+ 1 file changed, 27 insertions(+)
 
-diff --git a/arch/arm/boot/dts/mt6589-aquaris5.dts b/arch/arm/boot/dts/mt6589-aquaris5.dts
-index 443b446..74cb1ba 100644
---- a/arch/arm/boot/dts/mt6589-aquaris5.dts
-+++ b/arch/arm/boot/dts/mt6589-aquaris5.dts
-@@ -19,6 +19,10 @@
- / {
- 	model = "bq Aquaris5";
- 
-+	chosen {
-+		bootargs = "earlyprintk";
-+	};
+diff --git a/arch/arm/mach-mediatek/mediatek.c b/arch/arm/mach-mediatek/mediatek.c
+index f2acf07..b7c5c60 100644
+--- a/arch/arm/mach-mediatek/mediatek.c
++++ b/arch/arm/mach-mediatek/mediatek.c
+@@ -16,6 +16,32 @@
+  */
+ #include <linux/init.h>
+ #include <asm/mach/arch.h>
++#include <linux/of.h>
++#include <linux/clk-provider.h>
++#include <linux/clocksource.h>
 +
- 	memory {
- 		reg = <0x80000000 0x40000000>;
- 	};
++
++#define GPT6_CON_MT65xx 0x10008060
++
++static void __init mediatek_timer_init(void)
++{
++	static void __iomem *gpt_base;
++
++	if (of_machine_is_compatible("mediatek,mt6589")) {
++		/* set cntfreq register which is not done in bootloader */
++		asm volatile("mcr p15, 0, %0, c14, c0, 0" : : "r" (13000000));
++
++		/* turn on GPT6 which ungates arch timer clocks */
++		gpt_base = ioremap(GPT6_CON_MT65xx, 0x04);
++	}
++
++	/* enabel clock and set to free-run */
++	if (gpt_base)
++		writel(0x31, gpt_base);
++
++	of_clk_init(NULL);
++	clocksource_of_init();
++};
+ 
+ static const char * const mediatek_board_dt_compat[] = {
+ 	"mediatek,mt6589",
+@@ -24,4 +50,5 @@ static const char * const mediatek_board_dt_compat[] = {
+ 
+ DT_MACHINE_START(MEDIATEK_DT, "Mediatek Cortex-A7 (Device Tree)")
+ 	.dt_compat	= mediatek_board_dt_compat,
++	.init_time	= mediatek_timer_init,
+ MACHINE_END
 -- 
 1.7.9.5
