@@ -1,48 +1,24 @@
-From: t-kristo@ti.com (Tero Kristo)
-Date: Thu, 31 Jul 2014 16:12:03 +0300
-Subject: OMAP baseline test results for v3.16-rc4
-In-Reply-To: <20140730053940.GX29045@atomide.com>
-References: <alpine.DEB.2.02.1407062339420.15016@utopia.booyaka.com>
- <20140707080238.GF28884@atomide.com>
- <alpine.DEB.2.02.1407251857480.5875@utopia.booyaka.com>
- <20140729064243.GF29045@atomide.com>
- <alpine.DEB.2.02.1407290810160.22957@utopia.booyaka.com>
- <20140729084930.GH29045@atomide.com>
- <alpine.DEB.2.02.1407291225070.13035@utopia.booyaka.com>
- <alpine.DEB.2.02.1407291256270.13035@utopia.booyaka.com>
- <20140729145312.GT29045@atomide.com>
- <alpine.DEB.2.02.1407291922370.13035@utopia.booyaka.com>
- <20140730053940.GX29045@atomide.com>
-Message-ID: <53DA40A3.30102@ti.com>
+From: jvial@adeneo-embedded.com (Jeremy Vial)
+Date: Thu, 31 Jul 2014 15:10:32 +0200
+Subject: [PATCH 0/2] Manage OMAP34xx ES3.1.2 rev to resume from suspend
+Message-ID: <1406812234-23163-1-git-send-email-jvial@adeneo-embedded.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/30/2014 08:39 AM, Tony Lindgren wrote:
-> 8< -----------------------------------
-> From: Tony Lindgren<tony@atomide.com>
-> Date: Tue, 29 Jul 2014 22:36:59 -0700
-> Subject: [PATCH] ARM: dts: Enable UART wake-up events for beagleboard
->
-> For device tree based booting, we need to use wake-up
-> interrupts like we already do for some omaps. This fixes
-> a PM regression on beagleboard compared to legacy booting.
->
-> Signed-off-by: Tony Lindgren<tony@atomide.com>
->
-> --- a/arch/arm/boot/dts/omap3-beagle.dts
-> +++ b/arch/arm/boot/dts/omap3-beagle.dts
-> @@ -292,6 +292,7 @@
->   &uart3 {
->   	pinctrl-names = "default";
->   	pinctrl-0 = <&uart3_pins>;
-> +	interrupts-extended = <&intc 74 &omap3_pmx_core OMAP3_UART3_RX>;
->   };
->
->   &gpio1 {
-> --
+Hi,
 
-The above patch works for me with ret/off-idle on beagle rev C4 on top 
-of 3.16-rc5. Without it, the board just seems to hang with ret, and with 
-off, it just doesn't respond to anything on uart but seems alive otherwise.
+My kernel crashed when my OMAP34xx ES3.1.2 leave suspend mode. The first
+patch seems to solve the issue, and the second one corrects Linux kernel
+coding style problems.
 
-Tested-by: Tero Kristo <t-kristo@ti.com>
+Jeremy Vial (2):
+  ARM: OMAP3: Fix choice of omap3_restore_es function in OMAP34XX
+    rev3.1.2 case.
+  ARM: OMAP3: Fix coding style problems in
+    arch/arm/mach-omap2/control.c
+
+ arch/arm/mach-omap2/control.c |    6 +++---
+ 1 file changed, 3 insertions(+), 3 deletions(-)
+
+-- 
+1.7.9.5
