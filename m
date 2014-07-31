@@ -1,118 +1,114 @@
-From: michal.simek@xilinx.com (Michal Simek)
-Date: Thu, 31 Jul 2014 14:13:48 +0200
-Subject: [RFC PATCH v3] edac: synps: Added EDAC support for zynq ddr ecc
- controller
-In-Reply-To: <20140731113324.GB4375@pd.tnic>
-References: <9dc2a947-d2ab-4f00-8ed3-d2499cb6fdfd@BN1BFFO11FD002.protection.gbl>
- <20140731113324.GB4375@pd.tnic>
-Message-ID: <808655a9-77eb-4e3a-9781-2b059ad9517b@BN1AFFO11FD020.protection.gbl>
+From: chander.kashyap@gmail.com (Chander M. Kashyap)
+Date: Thu, 31 Jul 2014 17:54:50 +0530
+Subject: [PATCH v9 0/6] cpufreq: use generic cpufreq drivers for exynos
+ platforms
+In-Reply-To: <CAJuA9aiwHUm1NrfLBR8pEzgTjpDd7xY9Lzpi3WmK0VeOgMGGFA@mail.gmail.com>
+References: <1406707663-16656-1-git-send-email-thomas.ab@samsung.com>
+ <CADWw7OiwXNrbFyiVhpcJyBnAdsGsXcAMgMUOmY=JxHM7+7Z0eA@mail.gmail.com>
+ <CAJuA9aiwHUm1NrfLBR8pEzgTjpDd7xY9Lzpi3WmK0VeOgMGGFA@mail.gmail.com>
+Message-ID: <CADWw7OhqAZ+zbZ=Q8SLMYL2rMxj3ajn+Y2OUtkZTCESzsjKYUQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/31/2014 01:33 PM, Borislav Petkov wrote:
-> On Wed, Jul 30, 2014 at 03:41:47PM +0000, Punnaiah Choudary Kalluri wrote:
->>> So you're telling me that you want one edac driver for *two* memory
->>> controllers which can be present on a single system *at* *the* *same*
->>> *time*? Is that it?
->>
->> Yes.
-> 
-> Oh, this'll be fun. :-P
-
-just to give me one more possible and more crazy example.
-You can start system with one memory controller - then use partial
-reconfiguration and add others at run time till you have enough pins
-on your board. You can also remove it when you decide to do so.
-And every boot can be different on the same board.
-
-
+On Thu, Jul 31, 2014 at 4:29 PM, Thomas Abraham <ta.omasab@gmail.com> wrote:
+> On Thu, Jul 31, 2014 at 11:50 AM, Chander M. Kashyap
+> <chander.kashyap@gmail.com> wrote:
+>> On Wed, Jul 30, 2014 at 1:37 PM, Thomas Abraham <thomas.ab@samsung.com> wrote:
+>>> Changes since v8:
+>>> - Fixes suggested by Tomasz Figa.
 >>>
->>> How exactly is that topology supposed to look like, work, etc, etc? What
->>> kind of error reporting do you imagine you want to do with EDAC?
+>>> This patch series removes the use of Exynos4210 and Exynos5250 specific cpufreq
+>>> drivers and enables the use of cpufreq-cpu0 driver for these platforms. This
+>>> series also enables cpufreq support for Exynos5420 using arm_big_little cpufreq
+>>> driver.
+>>>
+>>> This patch series is dependent on two other patches
+>>> 1. ARM: dts: add CPU nodes for Exynos4 SoCs
+>>>    - https://lkml.org/lkml/2014/7/21/315
+>>> 2. ARM: dts: smdk5250: Specify MAX77686 pmic interrupt
+>>>    - http://www.spinics.net/lists/arm-kernel/msg351134.html
+>>> 3. clk: exynos4: remove duplicate div_core2 divider clock instantiation
+>>>    - http://www.mail-archive.com/linux-samsung-soc at vger.kernel.org/msg34859.html
+>>>
+>>> Thomas Abraham (6):
+>>>   clk: samsung: add infrastructure to register cpu clocks
+>>>   clk: samsung: add cpu clock configuration data and instantiate cpu clock
+>>>   ARM: dts: Exynos: add CPU OPP and regulator supply property
+>>>   ARM: Exynos: switch to using generic cpufreq driver for Exynos4210/5250/5420
+>>>   cpufreq: exynos: remove exynos4210/5250 specific cpufreq driver support
+>>>   clk: samsung: remove unused clock aliases and update clock flags
+>>>
+>>>  arch/arm/boot/dts/exynos4210-origen.dts         |    4 +
+>>>  arch/arm/boot/dts/exynos4210-trats.dts          |    4 +
+>>>  arch/arm/boot/dts/exynos4210-universal_c210.dts |    4 +
+>>>  arch/arm/boot/dts/exynos4210.dtsi               |   14 +-
+>>>  arch/arm/boot/dts/exynos5250-arndale.dts        |    4 +
+>>>  arch/arm/boot/dts/exynos5250-smdk5250.dts       |    4 +
+>>>  arch/arm/boot/dts/exynos5250-snow.dts           |    4 +
+>>>  arch/arm/boot/dts/exynos5250.dtsi               |   25 +-
+>>>  arch/arm/boot/dts/exynos5420.dtsi               |   38 +++
+>>>  arch/arm/mach-exynos/exynos.c                   |   24 +-
+>>>  drivers/clk/samsung/Makefile                    |    2 +-
+>>>  drivers/clk/samsung/clk-cpu.c                   |  335 +++++++++++++++++++++++
+>>>  drivers/clk/samsung/clk-cpu.h                   |   91 ++++++
+>>>  drivers/clk/samsung/clk-exynos4.c               |   63 +++--
+>>>  drivers/clk/samsung/clk-exynos5250.c            |   44 ++-
+>>>  drivers/clk/samsung/clk-exynos5420.c            |   72 ++++-
+>>>  drivers/cpufreq/Kconfig.arm                     |   22 --
+>>>  drivers/cpufreq/Makefile                        |    2 -
+>>>  drivers/cpufreq/exynos4210-cpufreq.c            |  184 -------------
+>>>  drivers/cpufreq/exynos5250-cpufreq.c            |  210 --------------
+>>>  include/dt-bindings/clock/exynos5250.h          |    1 +
+>>>  include/dt-bindings/clock/exynos5420.h          |    2 +
+>>>  22 files changed, 690 insertions(+), 463 deletions(-)
+>>>  create mode 100644 drivers/clk/samsung/clk-cpu.c
+>>>  create mode 100644 drivers/clk/samsung/clk-cpu.h
+>>>  delete mode 100644 drivers/cpufreq/exynos4210-cpufreq.c
+>>>  delete mode 100644 drivers/cpufreq/exynos5250-cpufreq.c
+>>>
+>>> --
+>>> 1.7.9.5
 >>
->> Zynq (All programmable SOC) contains a dual core ARM cortex A9 based processing
->> System(PS) and Xilinx programmable logic(PL) in a single device.
->>
->> Assume the application is a broadcast camera. The design for this system use PS as
->> Control plane and use PL as data plane for processing the video data. So, the design 
->> may have two different memory controllers one in PS and another one in PL.   
->> PS is running with Linux OS and PL doesn't have the OS and it is  controlled by the 
->> OS running on PS.
-> 
-> Ok.
-> 
->>  Now the requirement is to develop a monitoring system for all the
->> hardware failures Including ddr ecc errors. Since the broadcast camera
->> involves more data processing and DDR memory access, there is a high
->> probability of getting ddr ecc errors over the period.
-> 
-> So you're saying the camera has memory with ECC? People really pay
-> attention on getting error free video frames? :-)
-> 
-> Or this is just an example? You're saying the PL will need ECC for some
-> applications?
-
-I believe that this is real example.
-The another example can also be that Linux uses this PL memory with ECC
-and PS memory for application because of whatever reason - speed for example.
-
-But that configurations are real.
-
-> 
->> So, the user should be intimated with these errors when they occur and if the error rate
->>  is high, then the user can consider the preventive methods. Without this error reporting
->> mechanism it is difficult to debug the issues like memory corruption, kernel oops which
->>  may occur due to ddr ecc failures.
->>
->> Since, the memory controllers are different, it need two edac drivers for reporting the ecc 
->> errors and also maintaining the statistics of that particular memory controller. With the current
->> framework, there is a chance that both the drivers get mc_num as zero and malfunction. 
->> Assume the code for the two drivers looks like below
->>
->> Driver 1:
->> 	mci = edac_mc_alloc(0, ARRAY_SIZE(layers), layers,
->> 			    sizeof(struct  ctrl1_drvdata));
->>
->> Driver 2:
->> 	mci = edac_mc_alloc(0, ARRAY_SIZE(layers), layers,
->> 			    sizeof(struct ctrl2_drvdata));
->>
->> Issue:
->>   Since driver is providing the mc_num to framework, now there is chance that only one device active as
->>  both the drivers claiming the same number.
->>
->> Solution 1:
->>  Keep two drivers in single file and use static global variable for tracking the mc_num. This solution looks
->> good but the drivers may not be generic as these driver would be in a zynq_edac.c file. So others may not
->> reuse these drivers
-> 
-> Ok, I think I know what you mean. And this architecture works just fine.
-> On x86 we have one EDAC instance per memory controller so on a multinode
-> machine with multiple memory controllers, we do edac_mc_alloc() per
-> memory controller.
-> 
-> For examples, see amd64_edac::init_one_instance() and sb_edac should
-> have this too. So you basically have a local array of instances which
-> you allocate and setup.
-> 
-> If someone wants to reuse the driver, then we can talk about this later,
-> when the time comes.
+>> Working great.
+>> tested on smdk5420, and arndale-5250
 >
-> For now I think you should put both PS and PL stuff in one file,
-> zynq_edac or so.
-> 
-> Any issues with this design?
+> Hi Chander,
+>
+> Thanks for testing this series. Can I add a "Tested-by" tag for this series?
 
-Mixing two drivers in the one file is not a good idea because with more
-memory controllers it is just a mess and you are not able to cover all cases.
+sure you can.
 
-If this is just about providing uniq number we can easily extend binding
-and provide that uniq value.
-That's remind me solution with edac_mc_get_id() can caused that you won't have
-exact number all the time - depends on driver loading (deferred probing too).
+>
+> Thanks,
+> Thomas.
+>
+>>
+>>>
+>>>
+>>>
+>>>
+>>> _______________________________________________
+>>> linux-arm-kernel mailing list
+>>> linux-arm-kernel at lists.infradead.org
+>>> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+>>
+>>
+>>
+>> --
+>> thanks and regards,
+>> Chander M. Kashyap
+>> Contact Number: +918123738320
+>> ------- TENSION LENE KA NAHI, DENE KE-----
+>>
+>> _______________________________________________
+>> linux-arm-kernel mailing list
+>> linux-arm-kernel at lists.infradead.org
+>> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
 
-One option via DT can be via aliases where you can easily specify order.
-But all of these issues can be solved in follow-up patch.
 
-Thanks,
-Michal
+
+-- 
+thanks and regards,
+Chander M. Kashyap
+Contact Number: +918123738320
+------- TENSION LENE KA NAHI, DENE KE-----
