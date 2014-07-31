@@ -1,43 +1,81 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Thu, 31 Jul 2014 14:01:57 +0100
-Subject: [PATCH] arm64: dmi: Add SMBIOS/DMI support
-In-Reply-To: <CAKv+Gu9hwupNAxuOTNnsY8Spxkh3J6DwYF7Ym493PuZ-6phzXA@mail.gmail.com>
-References: <1406810830-6099-1-git-send-email-ard.biesheuvel@linaro.org>
- <CAKv+Gu9hwupNAxuOTNnsY8Spxkh3J6DwYF7Ym493PuZ-6phzXA@mail.gmail.com>
-Message-ID: <20140731130157.GQ26853@arm.com>
+From: bigeasy@linutronix.de (Sebastian Andrzej Siewior)
+Date: Thu, 31 Jul 2014 15:06:49 +0200
+Subject: [PATCH 1/7] dmaengine: edma: fix two faults which happen with
+ the 8250_dma user
+In-Reply-To: <20140731121702.GU8181@intel.com>
+References: <1406660344-25307-1-git-send-email-bigeasy@linutronix.de>
+ <1406660344-25307-2-git-send-email-bigeasy@linutronix.de>
+ <20140731121702.GU8181@intel.com>
+Message-ID: <53DA3F69.4000803@linutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jul 31, 2014 at 01:48:36PM +0100, Ard Biesheuvel wrote:
-> On 31 July 2014 14:47, Ard Biesheuvel <ard.biesheuvel@linaro.org> wrote:
-> > From: Yi Li <yi.li@linaro.org>
-> >
-> > SMbios is important for server hardware vendors. It implements a spec for
-> > providing descriptive information about the platform. Things like serial
-> > numbers, physical layout of the ports, build configuration data, and the like.
-> >
-> > This has been tested by dmidecode and lshw tools.
-> >
-> > Signed-off-by: Yi Li <yi.li@linaro.org>
-> > Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
-> > ---
-> >
-> > It turns out that efi_lookup_mapped_addr() is not appropriate after all for
-> > remapping the address of the SMBIOS tables. The reason is that the UEFI spec
-> > forbids virtual mappings being requested for configuration tables (which is not
-> > currently honored by Tianocore/EDK2)
-> >
-> 
-> @Yi: could you retest yet again, please?
-> 
-> @Will; this superseded the patch that is already queued up in
-> for-next/core, so perhaps you could drop that while we get this
-> tested?
+On 07/31/2014 02:17 PM, Vinod Koul wrote:
+> On Tue, Jul 29, 2014 at 08:58:58PM +0200, Sebastian Andrzej Siewior wrote:
+>> The rx path of the 8250_dma user in the RX-timeout case:
+>> - it starts the RX transfer
+>> - if the rx-timeout interrupt occures, it dmaengine_pause() the transfer
+>> - step two is dmaengine_terminate_all() on this channel.
+> Okay after this whole channel needs to be reset, which means all the
+> descriptors are discared.
+>> - based on dmaengine_tx_status() it learns the number of transfered
+>>   bytes.
+>> - the rx interrupt occures,
+> why, channel is terminated, so existing txn needs to be aborted too
 
-Reverted. I'd really appreciate help testing this stuff in future -- it was
-a pig getting it going on the foundation model and the whole setup felt
-rather contrived.
+serial8250_rx_dma() is invoked on 8250' RX interrupt to move all the
+data from the FIFO to memory. This is when the dma transfer is
+programmed (on all platforms but omap because we need to program it
+before the data is in the FIFO but this detail shouldn't matter).
 
-Anyway, thanks for letting me know.
+On Omap (atleast) it happens that if there are not enough characters in
+the FIFO over a given time the UART triggers a RX-timeout and no bytes
+are moved by the DMA engine. This is when UART_IIR_RX_TIMEOUT is hit.
+At that point it invokes the completion hanlder
+(__dma_rx_do_complete()) to learn how much bytes were transfered and to
+cancel the transfer (so the remaining bytes can be fetched via PIO).
 
-Will
+>>   it does not start the RX-transfer because
+>>   according to dmaengine_tx_status() the status of the current transfer
+>>   is still DMA_IN_PROGRESS because the earlier dmaengine_terminate_all()
+>>   did not reset this.
+> there is no current transfer anymore
+
+That is correct but since we never completed that cookie,
+dmaengine_tx_status() returns DMA_IN_PROGRESS and the 8250_dma does no
+book keeping of its own.
+
+>> - on rx-timeout it invokes dmaengine_pause() again. This time, it
+>>   segfaults because the channel has no descriptor yet.
+>>
+>> To make the upper case work better, this patch adds dma_cookie_complete()
+>> to complete the cookie. Also it adds is an additional check for echan->edesc
+>> in case the channel has no descriptor assigned.
+> I think we are fixing the behvaiour rather than cause. terminate_all(()
+> needs to do a proper cleanup of the channel
+
+The channel is clean an can be reused. Since the cookie has never been
+completed / incremented, serial8250_rx_dma() never enqueues another
+transfer.
+
+Are you suggesting that the 8250_dma driver should have its own book
+keeping whether it started a transfer or not?
+
+Either way, it looks wrong that dmaengine_tx_status() reports
+DMA_IN_PROGRESS even that the transfer got aborted and the channel is
+properly cleaned up.
+
+> And this looks a series, without cover letter sent to all. Which makes it a
+> bit hard to see what is getting done
+
+What is getting done, is getting 8250_dma used on omap after the 8250
+based driver is used for uart. The UART is mostly the same on am335x
+(where edma is used) as on DRA7 (where omap-dma is used) that is why I
+made the two patches for the two dma engines. The cover letter is at
+[1]. I tried to cover the problem and all informations in the patch
+description so you have all the required informations.
+
+[0] drivers/tty/serial/8250/8250_dma.c
+[1] https://lkml.org/lkml/2014/7/29/513
+
+Sebastian
