@@ -1,55 +1,52 @@
-From: s.nawrocki@samsung.com (Sylwester Nawrocki)
-Date: Thu, 31 Jul 2014 13:45:56 +0200
-Subject: [PATCHv2 4/5] clk: samsung: exynos5410: Add fixed rate clocks
-In-Reply-To: <1406805732-17372-5-git-send-email-hsnaves@gmail.com>
-References: <1406805732-17372-1-git-send-email-hsnaves@gmail.com>
- <1406805732-17372-5-git-send-email-hsnaves@gmail.com>
-Message-ID: <53DA2C74.3010101@samsung.com>
+From: thierry.reding@gmail.com (Thierry Reding)
+Date: Thu, 31 Jul 2014 13:54:31 +0200
+Subject: [RFC] pwm-backlight: Allow backlight to remain disabled on boot
+In-Reply-To: <1406806970-12561-1-git-send-email-thierry.reding@gmail.com>
+References: <1406806970-12561-1-git-send-email-thierry.reding@gmail.com>
+Message-ID: <20140731115429.GA12627@ulmo>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-(dropping linux-doc ML and Randy from Cc)
+On Thu, Jul 31, 2014 at 01:42:50PM +0200, Thierry Reding wrote:
+[...]
+> @@ -317,6 +319,12 @@ static int pwm_backlight_probe(struct platform_device *pdev)
+>  	}
+>  
+>  	bl->props.brightness = data->dft_brightness;
+> +
+> +	if (data->boot_off)
+> +		bl->props.power = FB_BLANK_POWERDOWN;
+> +	else
+> +		bl->props.power = FB_BLANK_UNBLANK;
+> +
+>  	backlight_update_status(bl);
 
-On 31/07/14 13:22, Humberto Silva Naves wrote:
-> This implements the fixed rate clocks generated either inside or
-> outside the SoC. It also adds a dt-binding constant for the
-> sclk_hdmiphy clock, which shall be later used by other drivers,
-> such as the DRM.
-> 
-> Since the external fixed rate clock fin_pll is now registered by
-> the clk-exynos5410 file, the bindings with the device tree file have
-> changed. It is no longer needed to define fin_pll as a fixed clock,
-> such as in:
-> 
-> 	fin_pll: xxti {
->   		compatible = "fixed-clock";
-> 	  	clock-frequency = <24000000>;
-> 	  	clock-output-names = "fin_pll";
-> 	  	#clock-cells = <0>;
-> 	};
-> 
-> The above lines should be replaced by the following lines:
-> 
-> 	fixed-rate-clocks {
-> 		oscclk {
-> 			compatible = "samsung,exynos5410-oscclk";
-> 			clock-frequency = <24000000>;
-> 		};
-> 	};
-> 
-> This new form of binding was properly documented in the relevant
-> documentation file.
+Looking at this again, perhaps a more sensible thing to do would be to
+not call backlight_update_status() in the first place. For example if
+the board defines that backlight should be kept off at boot, but the
+bootloader had already enabled it, then this would effectively turn off
+the backlight again.
 
-Can you explain what is rationale behind this change ? Is it related to
-suspend/resume ordering ?
-Obviously it breaks the kernel/dtb compatibility. We should be moving
-in opposite direction, i.e. completely remove the custom samsung fixed
-rate clocks. I've tried to address this with patches [1], [2] but Tomasz
-wasn't happy with them IIRC and I postponed work on that.
+I think it's safe to assume that if the bootloader sets up the backlight
+then it would also set up the display. Therefore not touching the
+backlight state at all at probe time seems like the safest default.
 
-[1] http://www.spinics.net/lists/arm-kernel/msg333211.html
-[2] http://lists.infradead.org/pipermail/linux-arm-kernel/2014-May/258490.html
+Of course that doesn't help people who use some dumb framebuffer driver
+and therefore nothing explicitly enables the backlight. So it would
+still be changing behaviour for people for whom the bootloader doesn't
+set up the backlight at all and who therefore rely on the kernel to turn
+it on.
 
---
-Regards,
-Sylwester
+We could perhaps alleviate that pain a little by making this dependent
+on whether or not the board is booted using DT on the assumption that
+anything that uses DT would be "modern" enough to provide a means to
+automatically enable the backlight at the right moment.
+
+Thierry
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: not available
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140731/6492d959/attachment-0001.sig>
