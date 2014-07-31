@@ -1,144 +1,244 @@
-From: robherring2@gmail.com (Rob Herring)
-Date: Thu, 31 Jul 2014 10:22:19 -0500
-Subject: [PATCH 2/5] arm64, thunder: Add initial dts for Cavium Thunder SoC
-In-Reply-To: <20140731123443.GS4703@rric.localhost>
-References: <1406732794-20920-1-git-send-email-rric@kernel.org>
- <1406732794-20920-3-git-send-email-rric@kernel.org>
- <20140730154626.GD20162@leverpostej>
- <CAL_JsqLJ_W34XTF2aMOW9z+Gq4oxbrX1RztyJN8Mi0OFPeNxfg@mail.gmail.com>
- <20140731123443.GS4703@rric.localhost>
-Message-ID: <CAL_JsqKgfjV4sEZOWuH4YcMjeOA_yNDvZLv_jTi_Sb=27cOD3g@mail.gmail.com>
+From: msalter@redhat.com (Mark Salter)
+Date: Thu, 31 Jul 2014 11:02:40 -0400
+Subject: [RFC PATCH] arm64/efi: use id mapping for Runtime Services
+In-Reply-To: <1406815909-26825-1-git-send-email-ard.biesheuvel@linaro.org>
+References: <1406815909-26825-1-git-send-email-ard.biesheuvel@linaro.org>
+Message-ID: <1406818960.3200.10.camel@deneb.redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jul 31, 2014 at 7:34 AM, Robert Richter <rric@kernel.org> wrote:
-> On 30.07.14 11:37:38, Rob Herring wrote:
->> On Wed, Jul 30, 2014 at 10:46 AM, Mark Rutland <mark.rutland@arm.com> wrote:
->> > On Wed, Jul 30, 2014 at 04:06:31PM +0100, Robert Richter wrote:
->> >> From: Radha Mohan Chintakuntla <rchintakuntla@cavium.com>
->
->> >> +/ {
->> >> +     model = "Cavium ThunderX CN88XX Family";
->> >> +     compatible = "cavium,thunder-88xx";
->> >
->> > Please don't use wildcards in compatible strings. Give this an absolute
->> > name, and override as necessary.
->
-> The naming 88xx refers to the processor family and arn't actually
-> wildcards. In the future we might need another dts file for 87xx, but
-> so far all SoCs of 88xx family should use the same dts files. In this
-> sense the naming is very specific.
+On Thu, 2014-07-31 at 16:11 +0200, Ard Biesheuvel wrote:
+> There are 2 interesting pieces of information in the UEFI spec section 2.3.6
+> regarding the mapping of runtime regions:
+> (a) the firmware should not request a virtual mapping for configuration tables,
+>     even though they are marked as EfiRuntimeServicesData;
+> (b) calling SetVirtualAddressMap() is optional, and it is equally appropriate to
+>     call Runtime Services using an identity mapping.
+> 
+> So we can eliminate some of the complexity around UEFI Runtime Services by not
+> using a virtual mapping at all, and calling the services at their physical
+> address. This is especially useful under kexec, as SetVirtualAddressMap() may
+> only be called once, and there is no guarantee that mappings are stable between
+> different kexec'd kernels.
+> 
+> The fallout for other in-kernel users of UEFI data structures should be
+> negligible, as they cannot legally access those data structures through
+> pre-existing virtual mappings anyway (point (a) above)
+> 
+> It should also be noted that, as the kernel side of the address space (TTBR1) is
+> retained, the stack and pointer function arguments remain accessible to the
+> runtime service while the id mapping is active.
+> 
+> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+> ---
+>  arch/arm64/include/asm/efi.h |  24 ++++++++--
+>  arch/arm64/kernel/efi.c      | 106 ++-----------------------------------------
+>  2 files changed, 23 insertions(+), 107 deletions(-)
+> 
+> diff --git a/arch/arm64/include/asm/efi.h b/arch/arm64/include/asm/efi.h
+> index a34fd3b12e2b..d42a21e79b39 100644
+> --- a/arch/arm64/include/asm/efi.h
+> +++ b/arch/arm64/include/asm/efi.h
+> @@ -1,8 +1,10 @@
+>  #ifndef _ASM_EFI_H
+>  #define _ASM_EFI_H
+>  
+> +#include <asm/cacheflush.h>
+>  #include <asm/io.h>
+>  #include <asm/neon.h>
+> +#include <asm/tlbflush.h>
+>  
+>  #ifdef CONFIG_EFI
+>  extern void efi_init(void);
+> @@ -12,23 +14,37 @@ extern void efi_idmap_init(void);
+>  #define efi_idmap_init()
+>  #endif
+>  
+> +static inline void switch_pgd(pgd_t *pgd, struct mm_struct *mm)
+> +{
+> +	cpu_switch_mm(pgd, mm);
+> +	flush_tlb_all();
+> +	if (icache_is_aivivt())
+> +		__flush_icache_all();
+> +}
+> +
+>  #define efi_call_virt(f, ...)						\
+>  ({									\
+> -	efi_##f##_t *__f = efi.systab->runtime->f;			\
+> +	efi_##f##_t *__f;						\
+>  	efi_status_t __s;						\
+>  									\
+> -	kernel_neon_begin();						\
+> +	kernel_neon_begin(); /* disables preemption */			\
+> +	switch_pgd(idmap_pg_dir, &init_mm);				\
+> +	__f =  efi.systab->runtime->f;					\
+>  	__s = __f(__VA_ARGS__);						\
+> +	switch_pgd(current->active_mm->pgd, current->active_mm);	\
+>  	kernel_neon_end();						\
+>  	__s;								\
+>  })
+>  
+>  #define __efi_call_virt(f, ...)						\
+>  ({									\
+> -	efi_##f##_t *__f = efi.systab->runtime->f;			\
+> +	efi_##f##_t *__f;						\
+>  									\
+> -	kernel_neon_begin();						\
+> +	kernel_neon_begin(); /* disables preemption */			\
+> +	switch_pgd(idmap_pg_dir, &init_mm);				\
+> +	__f =  efi.systab->runtime->f;					\
+>  	__f(__VA_ARGS__);						\
+> +	switch_pgd(current->active_mm->pgd, current->active_mm);	\
+>  	kernel_neon_end();						\
+>  })
 
-Yes, but each implementation can have its own errata. You might not
-need to distinguish them now, but you could in the future.
+If you replace the current user pgd with idmap pgd and there is
+an exception in the firmware which would lead to the user task
+being killed, what happens?
 
-However, if the family is really all the same die and different parts
-are just marketing, then the name is fine. Or if you can easily probe
-the exact part and revision it's probably fine.
-
->
->
->> >> +     cpus {
->> >> +             #address-cells = <2>;
->> >> +             #size-cells = <0>;
->> >> +
->> >> +             cpu at 000 {
->> >> +                     device_type = "cpu";
->> >> +                     compatible = "cavium,thunder", "arm,armv8";
->> >> +                     reg = <0x0 0x000>;
->> >> +                     enable-method = "psci";
->> >> +             };
->> >
->> > Just to check: both the SoC and CPU are called thunder?
->
-> The soc is called thunder-88xx, the cpu thunder. E.g. an 87xx soc will
-> have the same core in which is thunder.
-
-And the next version of the core would be called something else?
-thunder-v2? lightning? As long as they are distinguishable they should
-be fine.
-
-Rob
-
->
->
->> >> +     memory at 00000000 {
->> >> +             device_type = "memory";
->> >> +             reg = <0x0 0x00000000 0x0 0x80000000>;
->> >> +     };
->> >> +
->> >> +     gic0: interrupt-controller at 801000000000 {
->> >
->> > To make this easier to read, please place a comma between 32-bit
->> > portions of the unit address (e.g. here have 8010,00000000).
->
-> Changed this.
->
->>
->> Mark, perhaps a dtc or checkpatch.pl check for this?
->>
->> This should also be under a bus node.
->
-> Will do.
->
->>
->> >> +             compatible = "arm,gic-v3";
->> >> +             #interrupt-cells = <3>;
->> >> +             #address-cells = <2>;
->> >> +             #size-cells = <2>;
->> >> +             ranges;
->> >
->> > This has no children, so why have ranges, #address-cells, and
->> > #size-cells?
->
-> Right, this is a leftover from a change in a follow on patch that
-> introduces a child for its. Will remove #address-cells, #size-cells
-> and ranges in this patch and move the change to the later patch.
->
->> >
->> >> +             interrupt-controller;
->> >> +             reg = <0x8010 0x00000000 0x0 0x010000>, /* GICD */
->> >> +                   <0x8010 0x80000000 0x0 0x200000>; /* GICR */
->> >> +             interrupts = <1 9 0xf04>;
->> >> +     };
->
->> >> +             clocks {
->> >> +                     #address-cells = <2>;
->> >> +                     #size-cells = <2>;
->> >> +                     ranges;
->> >> +
->> >> +                     refclk50mhz: refclk50mhz {
->> >> +                             compatible = "fixed-clock";
->> >> +                             #clock-cells = <0>;
->> >> +                             clock-frequency = <50000000>;
->> >> +                             clock-output-names = "refclk50mhz";
->> >> +                     };
->> >> +             };
->> >
->> > Please get rid of the clocks node and just put the clocks here.
->
-> Will do.
->
->> >
->> >> +
->> >> +             uaa0: serial at 87e024000000 {
->> >> +                     compatible = "arm,pl011", "arm,primecell";
->> >> +                     reg = <0x87e0 0x24000000 0x0 0x1000>;
->> >> +                     interrupts = <1 21 4>;
->> >> +                     clocks = <&refclk50mhz>;
->> >> +                     clock-names = "apb_pclk";
->> >
->> > Is this actually the apb_pclk, or is the the uartclk? I assume it's the
->> > latter.
->>
->> Shouldn't new bindings have both clocks here? A single clock was a
->> mistake I think (mine in fact).
->
-> Do you mean
->                         clock-names = "uartclk", "apb_pclk";
-> here?
-
-Yes, but Mark said this change never happened so maybe it is fine. In
-any case, follow the pl011 binding documentation.
-
-Rob
+>  
+> diff --git a/arch/arm64/kernel/efi.c b/arch/arm64/kernel/efi.c
+> index e72f3100958f..d620a031e7bf 100644
+> --- a/arch/arm64/kernel/efi.c
+> +++ b/arch/arm64/kernel/efi.c
+> @@ -27,8 +27,6 @@
+>  
+>  struct efi_memory_map memmap;
+>  
+> -static efi_runtime_services_t *runtime;
+> -
+>  static u64 efi_system_table;
+>  
+>  static int uefi_debug __initdata;
+> @@ -340,51 +338,9 @@ void __init efi_idmap_init(void)
+>  	efi_setup_idmap();
+>  }
+>  
+> -static int __init remap_region(efi_memory_desc_t *md, void **new)
+> -{
+> -	u64 paddr, vaddr, npages, size;
+> -
+> -	paddr = md->phys_addr;
+> -	npages = md->num_pages;
+> -	memrange_efi_to_native(&paddr, &npages);
+> -	size = npages << PAGE_SHIFT;
+> -
+> -	if (is_normal_ram(md))
+> -		vaddr = (__force u64)ioremap_cache(paddr, size);
+> -	else
+> -		vaddr = (__force u64)ioremap(paddr, size);
+> -
+> -	if (!vaddr) {
+> -		pr_err("Unable to remap 0x%llx pages @ %p\n",
+> -		       npages, (void *)paddr);
+> -		return 0;
+> -	}
+> -
+> -	/* adjust for any rounding when EFI and system pagesize differs */
+> -	md->virt_addr = vaddr + (md->phys_addr - paddr);
+> -
+> -	if (uefi_debug)
+> -		pr_info("  EFI remap 0x%012llx => %p\n",
+> -			md->phys_addr, (void *)md->virt_addr);
+> -
+> -	memcpy(*new, md, memmap.desc_size);
+> -	*new += memmap.desc_size;
+> -
+> -	return 1;
+> -}
+> -
+> -/*
+> - * Switch UEFI from an identity map to a kernel virtual map
+> - */
+>  static int __init arm64_enter_virtual_mode(void)
+>  {
+> -	efi_memory_desc_t *md;
+> -	phys_addr_t virtmap_phys;
+> -	void *virtmap, *virt_md;
+> -	efi_status_t status;
+>  	u64 mapsize;
+> -	int count = 0;
+> -	unsigned long flags;
+>  
+>  	if (!efi_enabled(EFI_BOOT)) {
+>  		pr_info("EFI services will not be available.\n");
+> @@ -402,76 +358,20 @@ static int __init arm64_enter_virtual_mode(void)
+>  
+>  	efi.memmap = &memmap;
+>  
+> -	/* Map the runtime regions */
+> -	virtmap = kmalloc(mapsize, GFP_KERNEL);
+> -	if (!virtmap) {
+> -		pr_err("Failed to allocate EFI virtual memmap\n");
+> -		return -1;
+> -	}
+> -	virtmap_phys = virt_to_phys(virtmap);
+> -	virt_md = virtmap;
+> -
+> -	for_each_efi_memory_desc(&memmap, md) {
+> -		if (!(md->attribute & EFI_MEMORY_RUNTIME))
+> -			continue;
+> -		if (!remap_region(md, &virt_md))
+> -			goto err_unmap;
+> -		++count;
+> -	}
+> -
+> -	efi.systab = (__force void *)efi_lookup_mapped_addr(efi_system_table);
+> +	efi.systab = (__force void *)ioremap_cache(efi_system_table,
+> +						   sizeof(efi_system_table_t));
+>  	if (!efi.systab) {
+> -		/*
+> -		 * If we have no virtual mapping for the System Table at this
+> -		 * point, the memory map doesn't cover the physical offset where
+> -		 * it resides. This means the System Table will be inaccessible
+> -		 * to Runtime Services themselves once the virtual mapping is
+> -		 * installed.
+> -		 */
+>  		pr_err("Failed to remap EFI System Table -- buggy firmware?\n");
+> -		goto err_unmap;
+> +		return -1;
+>  	}
+>  	set_bit(EFI_SYSTEM_TABLES, &efi.flags);
+>  
+> -	local_irq_save(flags);
+> -	cpu_switch_mm(idmap_pg_dir, &init_mm);
+> -
+> -	/* Call SetVirtualAddressMap with the physical address of the map */
+> -	runtime = efi.systab->runtime;
+> -	efi.set_virtual_address_map = runtime->set_virtual_address_map;
+> -
+> -	status = efi.set_virtual_address_map(count * memmap.desc_size,
+> -					     memmap.desc_size,
+> -					     memmap.desc_version,
+> -					     (efi_memory_desc_t *)virtmap_phys);
+> -	cpu_set_reserved_ttbr0();
+> -	flush_tlb_all();
+> -	local_irq_restore(flags);
+> -
+> -	kfree(virtmap);
+> -
+>  	free_boot_services();
+>  
+> -	if (status != EFI_SUCCESS) {
+> -		pr_err("Failed to set EFI virtual address map! [%lx]\n",
+> -			status);
+> -		return -1;
+> -	}
+> -
+>  	/* Set up runtime services function pointers */
+> -	runtime = efi.systab->runtime;
+>  	efi_native_runtime_setup();
+>  	set_bit(EFI_RUNTIME_SERVICES, &efi.flags);
+>  
+>  	return 0;
+> -
+> -err_unmap:
+> -	/* unmap all mappings that succeeded: there are 'count' of those */
+> -	for (virt_md = virtmap; count--; virt_md += memmap.desc_size) {
+> -		md = virt_md;
+> -		iounmap((__force void __iomem *)md->virt_addr);
+> -	}
+> -	kfree(virtmap);
+> -	return -1;
+>  }
+>  early_initcall(arm64_enter_virtual_mode);
