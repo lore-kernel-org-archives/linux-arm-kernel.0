@@ -1,110 +1,80 @@
-From: mturquette@linaro.org (Mike Turquette)
-Date: Thu, 31 Jul 2014 11:33:06 -0700
-Subject: [GIT PULL] Samsung clock changes for v3.17
-In-Reply-To: <1406821055-7290-1-git-send-email-t.figa@samsung.com>
-References: <1406821055-7290-1-git-send-email-t.figa@samsung.com>
-Message-ID: <20140731183306.4463.28400@quantum>
+From: tomasz.figa@gmail.com (Tomasz Figa)
+Date: Thu, 31 Jul 2014 20:35:28 +0200
+Subject: [PATCH v9 6/6] clk: samsung: remove unused clock aliases and
+ update clock flags
+In-Reply-To: <CAJuA9ahCVnG8st0t_U+Nw9+eHV3fh57EjUeJw=LxCA0QzSm=AA@mail.gmail.com>
+References: <1406707663-16656-1-git-send-email-thomas.ab@samsung.com>	<1406707663-16656-7-git-send-email-thomas.ab@samsung.com>	<53DA4F1A.5040604@gmail.com>
+ <CAJuA9ahCVnG8st0t_U+Nw9+eHV3fh57EjUeJw=LxCA0QzSm=AA@mail.gmail.com>
+Message-ID: <53DA8C70.2060009@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Quoting Tomasz Figa (2014-07-31 08:37:35)
-> From: Tomasz Figa <tomasz.figa@gmail.com>
+On 31.07.2014 20:24, Thomas Abraham wrote:
+> Hi Tomasz,
 > 
-> Hi Mike,
+> On Thu, Jul 31, 2014 at 7:43 PM, Tomasz Figa <tomasz.figa@gmail.com> wrote:
+>> On 30.07.2014 10:07, Thomas Abraham wrote:
+>>> With some of the Exynos SoCs switched over to use the generic CPUfreq drivers,
+>>> the unused clock aliases can be removed. In addition to this, the individual
+>>> clock blocks which are now encapsulated with the consolidate CPU clock type
+>>> can now be marked with read-only flags.
+>>
+>> [snip]
+>>
+>>> @@ -1500,6 +1499,7 @@ static void __init exynos4_clk_init(struct device_node *np,
+>>>               exynos4_soc == EXYNOS4210 ? "Exynos4210" : "Exynos4x12",
+>>>               _get_rate("sclk_apll"), _get_rate("sclk_mpll"),
+>>>               _get_rate("sclk_epll"), _get_rate("sclk_vpll"),
+>>> +             exynos4_soc == EXYNOS4210 ? _get_rate("armclk") :
+>>>               _get_rate("div_core2"));
+>>
+>> I believe "div_core2" should work fine here for all SoCs without the
+>> need for this if.
 > 
-> The following changes since commit bdfcdf18c380a3c376b42709a89eb2cc52e95ae0:
+> The following patch is a pre-requisite for this patch.
+> http://www.spinics.net/lists/arm-kernel/msg351540.html
 > 
->   Merge branch 'v3.16-samsung-clk-fixes-1' into samsung-clk-next (2014-06-30 15:06:43 +0200)
+> The rate can be obtained from div_core2 as well but with the cpu clock
+> now registered, the rate can be obtained from the cpu clock instance
+> instead of the div_core2 divider. And when Exynos4412 also add cpu
+> clock instance, the 'if' above will be removed.
 > 
-> are available in the git repository at:
+>>
+>>>  }
+>>>
+>>> diff --git a/drivers/clk/samsung/clk-exynos5250.c b/drivers/clk/samsung/clk-exynos5250.c
+>>> index e19e365..1d958f1 100644
+>>> --- a/drivers/clk/samsung/clk-exynos5250.c
+>>> +++ b/drivers/clk/samsung/clk-exynos5250.c
+>>
+>> [snip]
+>>
+>>> @@ -848,6 +851,6 @@ static void __init exynos5250_clk_init(struct device_node *np)
+>>>       samsung_clk_of_add_provider(np, ctx);
+>>>
+>>>       pr_info("Exynos5250: clock setup completed, armclk=%ld\n",
+>>> -                     _get_rate("div_arm2"));
+>>> +                     _get_rate("armclk"));
+>>
+>> Similarly here, no need for this change.
 > 
->   git://git.kernel.org/pub/scm/linux/kernel/git/tfiga/samsung-clk.git tags/for_3.17/samsung-clk
-> 
-> for you to fetch changes up to f65d518942325d4bfa74b5c9d42ea5a89e4f6943:
-> 
->   clk: samsung: trivial: Correct typo in author's name (2014-07-26 02:57:20 +0200)
+> Same here. Instead of getting the rate from div_core2 divider block,
+> the cpu clock instance is used to find the rate. I would prefer to use
+> cpu clock here. Is there any reason to prefer div_core2 over the cpu
+> clock instance?
 
-Pulled.
+Well, the reason is simple: if you don't need to change something (i.e.
+the change doesn't have any advantages), don't change it.
 
-Regards,
-Mike
+There is no difference between obtaining the rate from div_{arm,core}2
+and armclk, so I don't see the point of changing this.
 
-> 
-> ----------------------------------------------------------------
-> Samsung clock patches for 3.17
-> 
-> 1) non-critical fixes (without need to push to stable):
-> 
-> d5e136a clk: samsung: Register clk provider only after registering its all clocks
-> 305cfab clk: samsung: Make of_device_id array const
-> e9d5295 clk: samsung: exynos5420: Setup clocks before system suspend
-> f65d518 clk: samsung: trivial: Correct typo in author's name
-> 
-> 2) Exynos CLKOUT driver:
-> 
-> 800c979 clk: samsung: exynos4: Add missing CPU/DMC clock hierarchy
-> 01f7ec2 clk: samsung: exynos4: Add CLKOUT clock hierarchy
-> 1e832e5 clk: samsung: Add driver to control CLKOUT line on Exynos SoCs
-> d19bb39 ARM: dts: exynos: Update PMU node with CLKOUT related data
-> 
-> 3) Clock hierarchy extensions:
-> 
-> 17d3f1d clk: exynos4: Add PPMU IP block source clocks.
-> ca5b402 clk: samsung: register exynos5420 apll/kpll configuration data
-> 
-> 4) ARM CLKDOWN functionality enablement for Exynos4 and 3250:
-> 
-> 42773b2 clk: samsung: exynos4: Enable ARMCLK down feature
-> 45c5b0a clk: samsung: exynos3250: Enable ARMCLK down feature
-> 
-> ----------------------------------------------------------------
-> Jonghwa Lee (1):
->       clk: exynos4: Add PPMU IP block source clocks.
-> 
-> Krzysztof Kozlowski (3):
->       clk: samsung: exynos4: Enable ARMCLK down feature
->       clk: samsung: exynos3250: Enable ARMCLK down feature
->       clk: samsung: Make of_device_id array const
-> 
-> Sylwester Nawrocki (1):
->       clk: samsung: Register clk provider only after registering its all clocks
-> 
-> Thomas Abraham (1):
->       clk: samsung: register exynos5420 apll/kpll configuration data
-> 
-> Tomasz Figa (5):
->       clk: samsung: exynos4: Add missing CPU/DMC clock hierarchy
->       clk: samsung: exynos4: Add CLKOUT clock hierarchy
->       clk: samsung: Add driver to control CLKOUT line on Exynos SoCs
->       ARM: dts: exynos: Update PMU node with CLKOUT related data
->       clk: samsung: trivial: Correct typo in author's name
-> 
-> Vikas Sajjan (1):
->       clk: samsung: exynos5420: Setup clocks before system suspend
-> 
->  .../devicetree/bindings/arm/samsung/pmu.txt        |  30 +++
->  arch/arm/boot/dts/exynos4210.dtsi                  |  10 +
->  arch/arm/boot/dts/exynos4x12.dtsi                  |   7 +
->  arch/arm/boot/dts/exynos5250.dtsi                  |   3 +
->  arch/arm/boot/dts/exynos5420.dtsi                  |   3 +
->  drivers/clk/samsung/Makefile                       |   1 +
->  drivers/clk/samsung/clk-exynos-clkout.c            | 153 ++++++++++++++
->  drivers/clk/samsung/clk-exynos3250.c               |  43 ++++
->  drivers/clk/samsung/clk-exynos4.c                  | 231 ++++++++++++++++++++-
->  drivers/clk/samsung/clk-exynos5250.c               |   4 +-
->  drivers/clk/samsung/clk-exynos5260.c               |   2 +
->  drivers/clk/samsung/clk-exynos5410.c               |   2 +
->  drivers/clk/samsung/clk-exynos5420.c               |  61 +++++-
->  drivers/clk/samsung/clk-exynos5440.c               |   4 +-
->  drivers/clk/samsung/clk-s3c2410.c                  |   2 +
->  drivers/clk/samsung/clk-s3c2412.c                  |   2 +
->  drivers/clk/samsung/clk-s3c2443.c                  |   2 +
->  drivers/clk/samsung/clk-s3c64xx.c                  |   2 +
->  drivers/clk/samsung/clk.c                          |  21 +-
->  drivers/clk/samsung/clk.h                          |   4 +-
->  include/dt-bindings/clock/exynos4.h                |  25 ++-
->  include/dt-bindings/clock/exynos5250.h             |   2 +-
->  include/dt-bindings/clock/exynos5420.h             |   2 +-
->  include/dt-bindings/clock/exynos5440.h             |   2 +-
->  24 files changed, 599 insertions(+), 19 deletions(-)
->  create mode 100644 drivers/clk/samsung/clk-exynos-clkout.c
+In fact now when thinking of it, this has revealed one hole that will be
+unhandled by your code - if cpufreq is disabled and the bootloader
+configures div_{arm,core}{,2} with non-zero values, armclk will return
+incorrect rate. However since I haven't observed such case on existing
+platforms, fixing this might be done on top of this series, in a
+separate patch.
+
+Best regards,
+Tomasz
