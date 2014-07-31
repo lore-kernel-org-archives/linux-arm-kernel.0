@@ -1,68 +1,85 @@
-From: yao.yuan@freescale.com (Yao Yuan)
-Date: Thu, 31 Jul 2014 06:16:55 +0000
-Subject: [PATCH v5 1/2] i2c: add DMA support for freescale i2c driver
-In-Reply-To: <201407231852.53893.marex@denx.de>
-References: <1406103883-3572-1-git-send-email-yao.yuan@freescale.com>
- <53CF9933.8030908@gmail.com> <20140723141502.2d726afe@ipc1.ka-ro>
- <201407231852.53893.marex@denx.de>
-Message-ID: <1a4d2e9ddc67421d8588305c927f3d3d@BL2PR03MB338.namprd03.prod.outlook.com>
+From: chander.kashyap@gmail.com (Chander M. Kashyap)
+Date: Thu, 31 Jul 2014 11:50:45 +0530
+Subject: [PATCH v9 0/6] cpufreq: use generic cpufreq drivers for exynos
+ platforms
+In-Reply-To: <1406707663-16656-1-git-send-email-thomas.ab@samsung.com>
+References: <1406707663-16656-1-git-send-email-thomas.ab@samsung.com>
+Message-ID: <CADWw7OiwXNrbFyiVhpcJyBnAdsGsXcAMgMUOmY=JxHM7+7Z0eA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Marek Vasut wrote:
-> On Wednesday, July 23, 2014 at 02:15:02 PM, Lothar Wa?mann wrote:
-> > Hi,
-> >
-> > Varka Bhadram wrote:
-> > > On 07/23/2014 04:41 PM, Yao Yuan wrote:
-> > > > Hi,
-> > > >
-> > > > Thanks for your review.
-> > > >
-> > > > Lothar Wa?mann wrote:
-> > > >> Yuan Yao wrote:
-> > > >>> Add dma support for i2c. This function depend on DMA driver.
-> > > >>> You can turn on it by write both the dmas and dma-name
-> > > >>> properties in dts node.
-> > > >>>
-> > > >>> Signed-off-by: Yuan Yao <yao.yuan@freescale.com>
-> > > >>> ---
-> > > >>>
-> > > >>>   drivers/i2c/busses/i2c-imx.c | 377
-> > > >
-> > > > [...]
-> > > >
-> > > >>> +
-> > > >>> +fail_rx:
-> > > >>> +	dma_release_channel(dma->chan_rx);
-> > > >>> +fail_tx:
-> > > >>> +	dma_release_channel(dma->chan_tx);
-> > > >>> +fail_al:
-> > > >>> +	devm_kfree(dev, dma);
-> > > >>
-> > > >> No need for this one (that's the whole point of using devm_kzalloc())!
-> > > >
-> > > > When DMA request failed, I2C will switch to PIO mode. So if the
-> > > > failed reason is just like DMA channel request failed. At this
-> > > > time the DMA should free by devm_kfree(). Is it?
-> > >
-> > > If probe failed the memory will be freed automatically because we
-> > > are using devm_kzalloc()...
-> > >
-> > > If we use devm_kzalloc() ,no need to free manually on fail...
-> >
-> > Yes, but as Yuan Yao stated, the driver will still work without DMA
-> > but carry around the unecessary allocated imx_i2c_dma struct.
-> > The devm_kfree() is not in the failure path of the driver's probe()
-> > function, but in the function that tries to initialize the optional
-> > DMA support.
-> 
-> If the DMA fails, I'd just make the entire probe fail. In case you cannot probe
-> DMA for your hardware, which is exected to be DMA capable, it means
-> something is wrong anyway.
+On Wed, Jul 30, 2014 at 1:37 PM, Thomas Abraham <thomas.ab@samsung.com> wrote:
+> Changes since v8:
+> - Fixes suggested by Tomasz Figa.
+>
+> This patch series removes the use of Exynos4210 and Exynos5250 specific cpufreq
+> drivers and enables the use of cpufreq-cpu0 driver for these platforms. This
+> series also enables cpufreq support for Exynos5420 using arm_big_little cpufreq
+> driver.
+>
+> This patch series is dependent on two other patches
+> 1. ARM: dts: add CPU nodes for Exynos4 SoCs
+>    - https://lkml.org/lkml/2014/7/21/315
+> 2. ARM: dts: smdk5250: Specify MAX77686 pmic interrupt
+>    - http://www.spinics.net/lists/arm-kernel/msg351134.html
+> 3. clk: exynos4: remove duplicate div_core2 divider clock instantiation
+>    - http://www.mail-archive.com/linux-samsung-soc at vger.kernel.org/msg34859.html
+>
+> Thomas Abraham (6):
+>   clk: samsung: add infrastructure to register cpu clocks
+>   clk: samsung: add cpu clock configuration data and instantiate cpu clock
+>   ARM: dts: Exynos: add CPU OPP and regulator supply property
+>   ARM: Exynos: switch to using generic cpufreq driver for Exynos4210/5250/5420
+>   cpufreq: exynos: remove exynos4210/5250 specific cpufreq driver support
+>   clk: samsung: remove unused clock aliases and update clock flags
+>
+>  arch/arm/boot/dts/exynos4210-origen.dts         |    4 +
+>  arch/arm/boot/dts/exynos4210-trats.dts          |    4 +
+>  arch/arm/boot/dts/exynos4210-universal_c210.dts |    4 +
+>  arch/arm/boot/dts/exynos4210.dtsi               |   14 +-
+>  arch/arm/boot/dts/exynos5250-arndale.dts        |    4 +
+>  arch/arm/boot/dts/exynos5250-smdk5250.dts       |    4 +
+>  arch/arm/boot/dts/exynos5250-snow.dts           |    4 +
+>  arch/arm/boot/dts/exynos5250.dtsi               |   25 +-
+>  arch/arm/boot/dts/exynos5420.dtsi               |   38 +++
+>  arch/arm/mach-exynos/exynos.c                   |   24 +-
+>  drivers/clk/samsung/Makefile                    |    2 +-
+>  drivers/clk/samsung/clk-cpu.c                   |  335 +++++++++++++++++++++++
+>  drivers/clk/samsung/clk-cpu.h                   |   91 ++++++
+>  drivers/clk/samsung/clk-exynos4.c               |   63 +++--
+>  drivers/clk/samsung/clk-exynos5250.c            |   44 ++-
+>  drivers/clk/samsung/clk-exynos5420.c            |   72 ++++-
+>  drivers/cpufreq/Kconfig.arm                     |   22 --
+>  drivers/cpufreq/Makefile                        |    2 -
+>  drivers/cpufreq/exynos4210-cpufreq.c            |  184 -------------
+>  drivers/cpufreq/exynos5250-cpufreq.c            |  210 --------------
+>  include/dt-bindings/clock/exynos5250.h          |    1 +
+>  include/dt-bindings/clock/exynos5420.h          |    2 +
+>  22 files changed, 690 insertions(+), 463 deletions(-)
+>  create mode 100644 drivers/clk/samsung/clk-cpu.c
+>  create mode 100644 drivers/clk/samsung/clk-cpu.h
+>  delete mode 100644 drivers/cpufreq/exynos4210-cpufreq.c
+>  delete mode 100644 drivers/cpufreq/exynos5250-cpufreq.c
+>
+> --
+> 1.7.9.5
 
-Yes, but if there is something wrong in dma, I think the i2c is innocent. So I think the error message is necessary but i2c can continue work.
+Working great.
+tested on smdk5420, and arndale-5250
+
+>
+>
+>
+>
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
 
 
-Best regards,
-Yuan Yao
+
+-- 
+thanks and regards,
+Chander M. Kashyap
+Contact Number: +918123738320
+------- TENSION LENE KA NAHI, DENE KE-----
