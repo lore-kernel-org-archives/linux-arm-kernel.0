@@ -1,107 +1,118 @@
-From: vinod.koul@intel.com (Vinod Koul)
-Date: Thu, 31 Jul 2014 17:26:28 +0530
-Subject: [PATCH] Documentation: dmaengine: Add a documentation for the
- dma controller API
-In-Reply-To: <20140731074440.GY3952@lukather>
-References: <1406736193-26685-1-git-send-email-maxime.ripard@free-electrons.com>
- <20140730160607.GM8181@intel.com> <20140731074440.GY3952@lukather>
-Message-ID: <20140731115628.GQ8181@intel.com>
+From: michal.simek@xilinx.com (Michal Simek)
+Date: Thu, 31 Jul 2014 14:13:48 +0200
+Subject: [RFC PATCH v3] edac: synps: Added EDAC support for zynq ddr ecc
+ controller
+In-Reply-To: <20140731113324.GB4375@pd.tnic>
+References: <9dc2a947-d2ab-4f00-8ed3-d2499cb6fdfd@BN1BFFO11FD002.protection.gbl>
+ <20140731113324.GB4375@pd.tnic>
+Message-ID: <808655a9-77eb-4e3a-9781-2b059ad9517b@BN1AFFO11FD020.protection.gbl>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jul 31, 2014 at 09:44:40AM +0200, Maxime Ripard wrote:
-> Hi Vinod,
+On 07/31/2014 01:33 PM, Borislav Petkov wrote:
+> On Wed, Jul 30, 2014 at 03:41:47PM +0000, Punnaiah Choudary Kalluri wrote:
+>>> So you're telling me that you want one edac driver for *two* memory
+>>> controllers which can be present on a single system *at* *the* *same*
+>>> *time*? Is that it?
+>>
+>> Yes.
 > 
-> On Wed, Jul 30, 2014 at 09:36:07PM +0530, Vinod Koul wrote:
-> > On Wed, Jul 30, 2014 at 06:03:13PM +0200, Maxime Ripard wrote:
-> > > The dmaengine is neither trivial nor properly documented at the moment, which
-> > > means a lot of trial and error development, which is not that good for such a
-> > > central piece of the system.
-> > > 
-> > > Attempt at making such a documentation.
-> > 
-> > Did you miss Documentation/dmaengine.txt, lots of this is already covered
-> > there. But yes i would be really glad to know what isnt, so that we can fix
-> > that.
-> 
-> I didn't miss it. But I feel like it describes quite nicely the slave
-> API, but doesn't help at all whenever you're writing a DMAengine driver.
-> 
-> The first lines of the existing document makes it quite clear too.
-> 
-> There's still a bit of duplication, but I don't feel it's such a big
-> deal.
-And that made me think that you might have missed it.
+> Oh, this'll be fun. :-P
 
-I am okay for idea to have this document but it needs to co-exist one. No
-point in duplicating as it can create ambiguity in future.
-> 
-> What I'd like to do with the documentation I just sent is basically
-> have a clear idea whenever you step into dmaengine what you can/cannot
-> do, and have a reference document explaining what's expected by the
-> framework, and hopefully have unified drivers that follow this
-> pattern.
-Sure, can you pls modify this to avoid duplication. I would be happy to
-apply that :)
-
-> 
-> Because, for the moment, we're pretty much left in the dark with
-> different drivers doing the same thing in completetely different ways,
-> with basically no way to tell if it's either the framework that
-> requires such behaviour, or if the author was just feeling creative.
-> 
-> There's numerous examples for this at the moment:
->   - The GFP flags, with different drivers using either GFP_ATOMIC,
->     GFP_NOWAIT or GFP_KERNEL in the same functions
->   - Having to set device_slave_caps or not?
->   - Some drivers use dma_run_depedencies, some other don't
->   - That might just be my experience, but judging from previous
->     commits, DMA_PRIVATE is completely obscure, and we just set it
->     because it was making it work, without knowing what it was
->     supposed to do.
->   - etc.
-
-Thanks for highlighting we should definitely add these in Documentation
-
-> 
-> And basically, we have no way to tell at the moment which one is
-> right and which one needs fixing.
-> 
-> The corollary being that it cripples the whole community ability to
-> maintain the framework and make it evolve.
-> 
-> > > +  * device_slave_caps
-> > > +    - Isn't that redundant with the cap_mask already?
-> > > +    - Only a few drivers seem to implement it
-> > For audio to know what your channel can do rather than hardcoding it
-> 
-> Ah, yes, I see it now. It's not related to the caps mask at all.
-> 
-> Just out of curiosity, wouldn't it be better to move this to the
-> framework, and have these informations provided through the struct
-> dma_device? Or would it have some non-trivial side-effects?
-Well the problem is ability to have this queried uniformly from all drivers
-across subsystems. If we can do this that would be nice.
-> 
-> > > +  * dma cookies?
-> > cookie is dma transaction representation which is monotonically incrementing
-> > number.
-> 
-> Ok, and it identifies a unique dma_async_tx_descriptor, right?
-Yup and this basically represents transactions you have submitted. Thats why
-cookie is allocated at tx_submit.
-
-Thanks
-
--- 
-~Vinod
+just to give me one more possible and more crazy example.
+You can start system with one memory controller - then use partial
+reconfiguration and add others at run time till you have enough pins
+on your board. You can also remove it when you decide to do so.
+And every boot can be different on the same board.
 
 
--- 
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140731/855590af/attachment.sig>
+>>>
+>>> How exactly is that topology supposed to look like, work, etc, etc? What
+>>> kind of error reporting do you imagine you want to do with EDAC?
+>>
+>> Zynq (All programmable SOC) contains a dual core ARM cortex A9 based processing
+>> System(PS) and Xilinx programmable logic(PL) in a single device.
+>>
+>> Assume the application is a broadcast camera. The design for this system use PS as
+>> Control plane and use PL as data plane for processing the video data. So, the design 
+>> may have two different memory controllers one in PS and another one in PL.   
+>> PS is running with Linux OS and PL doesn't have the OS and it is  controlled by the 
+>> OS running on PS.
+> 
+> Ok.
+> 
+>>  Now the requirement is to develop a monitoring system for all the
+>> hardware failures Including ddr ecc errors. Since the broadcast camera
+>> involves more data processing and DDR memory access, there is a high
+>> probability of getting ddr ecc errors over the period.
+> 
+> So you're saying the camera has memory with ECC? People really pay
+> attention on getting error free video frames? :-)
+> 
+> Or this is just an example? You're saying the PL will need ECC for some
+> applications?
+
+I believe that this is real example.
+The another example can also be that Linux uses this PL memory with ECC
+and PS memory for application because of whatever reason - speed for example.
+
+But that configurations are real.
+
+> 
+>> So, the user should be intimated with these errors when they occur and if the error rate
+>>  is high, then the user can consider the preventive methods. Without this error reporting
+>> mechanism it is difficult to debug the issues like memory corruption, kernel oops which
+>>  may occur due to ddr ecc failures.
+>>
+>> Since, the memory controllers are different, it need two edac drivers for reporting the ecc 
+>> errors and also maintaining the statistics of that particular memory controller. With the current
+>> framework, there is a chance that both the drivers get mc_num as zero and malfunction. 
+>> Assume the code for the two drivers looks like below
+>>
+>> Driver 1:
+>> 	mci = edac_mc_alloc(0, ARRAY_SIZE(layers), layers,
+>> 			    sizeof(struct  ctrl1_drvdata));
+>>
+>> Driver 2:
+>> 	mci = edac_mc_alloc(0, ARRAY_SIZE(layers), layers,
+>> 			    sizeof(struct ctrl2_drvdata));
+>>
+>> Issue:
+>>   Since driver is providing the mc_num to framework, now there is chance that only one device active as
+>>  both the drivers claiming the same number.
+>>
+>> Solution 1:
+>>  Keep two drivers in single file and use static global variable for tracking the mc_num. This solution looks
+>> good but the drivers may not be generic as these driver would be in a zynq_edac.c file. So others may not
+>> reuse these drivers
+> 
+> Ok, I think I know what you mean. And this architecture works just fine.
+> On x86 we have one EDAC instance per memory controller so on a multinode
+> machine with multiple memory controllers, we do edac_mc_alloc() per
+> memory controller.
+> 
+> For examples, see amd64_edac::init_one_instance() and sb_edac should
+> have this too. So you basically have a local array of instances which
+> you allocate and setup.
+> 
+> If someone wants to reuse the driver, then we can talk about this later,
+> when the time comes.
+>
+> For now I think you should put both PS and PL stuff in one file,
+> zynq_edac or so.
+> 
+> Any issues with this design?
+
+Mixing two drivers in the one file is not a good idea because with more
+memory controllers it is just a mess and you are not able to cover all cases.
+
+If this is just about providing uniq number we can easily extend binding
+and provide that uniq value.
+That's remind me solution with edac_mc_get_id() can caused that you won't have
+exact number all the time - depends on driver loading (deferred probing too).
+
+One option via DT can be via aliases where you can easily specify order.
+But all of these issues can be solved in follow-up patch.
+
+Thanks,
+Michal
