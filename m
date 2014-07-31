@@ -1,26 +1,26 @@
-From: peter.ujfalusi@ti.com (Peter Ujfalusi)
-Date: Thu, 31 Jul 2014 15:58:14 +0300
-Subject: [PATCH 2/2] clk: initial clock driver for TWL6030
-In-Reply-To: <53DA3C68.3020406@kpanic.de>
-References: <1406728949-7560-1-git-send-email-sassmann@kpanic.de>
- <1406728949-7560-3-git-send-email-sassmann@kpanic.de>
- <53DA3613.9010305@ti.com> <53DA3C68.3020406@kpanic.de>
-Message-ID: <53DA3D66.1030407@ti.com>
+From: dan.carpenter@oracle.com (Dan Carpenter)
+Date: Thu, 31 Jul 2014 15:57:51 +0300
+Subject: [patch] ASoC: pxa: pxa-ssp: small leak in probe()
+Message-ID: <20140731125751.GA31539@mwanda>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/31/2014 03:54 PM, Stefan Assmann wrote:
->> Why would you do this? The point of a clock provider is that you can
->> enable/disable the clock on demand. Here you enable the clock and leave it
->> enabled for the rest of the time...
->>
->> clk-dra7-atl deals with similar issue
-> 
-> The idea is to enable the clock by default to get the wifi working.
-> Sorry if I got it wrong.
+There is a small memory leak if probe() fails.
 
-You should have a clock driver for the 32K clock. The wifi driver should
-request and manage it's clocks via the clock API.
+Fixes: 2023c90c3a2c ('ASoC: pxa: pxa-ssp: add DT bindings')
+Signed-off-by: Dan Carpenter <dan.carpenter@oracle.com>
 
--- 
-P?ter
+diff --git a/sound/soc/pxa/pxa-ssp.c b/sound/soc/pxa/pxa-ssp.c
+index 199a8b3..0109f6c2 100644
+--- a/sound/soc/pxa/pxa-ssp.c
++++ b/sound/soc/pxa/pxa-ssp.c
+@@ -723,7 +723,8 @@ static int pxa_ssp_probe(struct snd_soc_dai *dai)
+ 		ssp_handle = of_parse_phandle(dev->of_node, "port", 0);
+ 		if (!ssp_handle) {
+ 			dev_err(dev, "unable to get 'port' phandle\n");
+-			return -ENODEV;
++			ret = -ENODEV;
++			goto err_priv;
+ 		}
+ 
+ 		priv->ssp = pxa_ssp_request_of(ssp_handle, "SoC audio");
