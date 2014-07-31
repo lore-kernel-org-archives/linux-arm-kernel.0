@@ -1,41 +1,56 @@
-From: soren.brinkmann@xilinx.com (=?utf-8?B?U8O2cmVu?= Brinkmann)
-Date: Thu, 31 Jul 2014 08:17:52 -0700
-Subject: [RFC] ARM: Enable dynamic clock gating?
-In-Reply-To: <20140731151510.GZ26853@arm.com>
-References: <81f4b45a-f8b3-4dec-9e94-9028ccd3e05f@BN1AFFO11FD009.protection.gbl>
- <20140731151510.GZ26853@arm.com>
-Message-ID: <f51a167f-959b-4687-9ec3-ee90e1951eca@BL2FFO11FD034.protection.gbl>
+From: tomasz.figa@gmail.com (Tomasz Figa)
+Date: Thu, 31 Jul 2014 17:19:26 +0200
+Subject: [PATCHv2 5/5] clk: samsung: exynos5410: Added clocks DPLL, EPLL,
+ IPLL, and VPLL
+In-Reply-To: <CAEe5pB9Rj9rdzk-fjyNcdWyhQCfLtwxt+nAZdb4xuKDO9OpzUA@mail.gmail.com>
+References: <1406805732-17372-1-git-send-email-hsnaves@gmail.com>
+ <1406805732-17372-6-git-send-email-hsnaves@gmail.com>
+ <53DA3F86.3020506@gmail.com>
+ <CAEe5pB9Rj9rdzk-fjyNcdWyhQCfLtwxt+nAZdb4xuKDO9OpzUA@mail.gmail.com>
+Message-ID: <53DA5E7E.9010607@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 2014-07-31 at 04:15PM +0100, Will Deacon wrote:
-> On Thu, Jul 31, 2014 at 03:24:17PM +0100, S?ren Brinkmann wrote:
-> > Hi all,
-> > 
-> > similar to the patch enabling the SCU standby mode
-> > (https://lkml.org/lkml/2014/7/30/122), I have a patch to enable the A9's
-> > 'dynamic clock gating'
-> > (http://infocenter.arm.com/help/index.jsp?topic=/com.arm.doc.ddi0388f/CIHBGEHE.html)
-> > in platform code. This might also be a candidate to enable in common
-> > code.
-> > Do you think that would make sense?
-> > I tried to find the right place to add this and was looking at
-> > mm/proc-v7.S. It probably works to put it there, but does not really
-> > seem to be the right place.
-> > 
-> > As reference, this is what I currently have as part of platform code:
-> >   /* A9 clock gating */
-> >   asm volatile ("mrc  p15, 0, r12, c15, c0, 0\n"
-> >                 "orr  r12, r12, #1\n"
-> >                 "mcr  p15, 0, r12, c15, c0, 0\n"
-> >                 : /* no outputs */
-> >                 : /* no inputs */
-> >                 : "r12");
+On 31.07.2014 15:37, Humberto Naves wrote:
+> Hi Tomasz,
 > 
-> This should *really* be done by firmware.
+> I remember checking these rates on my calculator. You might notice the
+> odd frequency of 45158401Hz (no pun intended) in the EPLL clock. This
+> particular clock frequency was giving me a big headache in a previous
+> project, since it was wrongly listed as 45158400. At first it seems
+> innocuous, but whenever I would ask for one of the child clocks to
+> change the rate, the driver would miscalculate the correct frequencies
+> and errors would propagate up and down the clock tree.
+> 
+> Anyway, I would double check these tables. And if you want, I can
+> write a separate patch for the rate table validation. I presume that
+> you would like to add a new field, such as default_base_freq, to the
+> structure samsung_pll_clock, and if that field is non-zero, you
+> perform the validation of the table in _samsung_clk_register_pll?
 
-Zynq doesn't have firmware, so we'd put it in platform code I guess.
-Is this so different compared to the SCU standby mode?
+I'm not sure I get the idea of the field you're suggesting. If I
+understand correctly, your intention would be to provide a default
+frequency if there is no table provided. I don't think there is a need
+for it, because current code can read back current settings from
+registers and calculate current rate.
 
-	Thanks,
-	S?ren
+As for the validation itself, one more thing that needs to be considered
+is that the rate table must be sorted.
+
+We once decided to rely on the fact that tables in SoC drivers have
+rates explicitly specified and are correctly sorted, but now I'm
+inclined to reconsider this, based on the fact that those rates often
+are already incorrectly calculated in vendor code or even datasheets,
+which are main information sources for patch authors.
+
+Before mainlining PLL drivers (which was quite some time ago), we had a
+bit different implementation in our internal tree, which did not use
+explicitly specified rates at all (they could have been considered just
+comments to improve table readability) and the _register_pll() function
+simply calculated rates for all entries creating new table for internal
+use of the PLL driver that was in addition explicitly sorted to make
+sure that the order is correct. This kind of implementation is what I
+would lean toward today.
+
+Best regards,
+Tomasz
