@@ -1,63 +1,41 @@
-From: pawel.moll@arm.com (Pawel Moll)
-Date: Thu, 31 Jul 2014 16:16:37 +0100
-Subject: [PATCH] bus: arm-ccn: Fix error handling at event allocation
-Message-ID: <1406819797-8372-1-git-send-email-pawel.moll@arm.com>
+From: soren.brinkmann@xilinx.com (=?utf-8?B?U8O2cmVu?= Brinkmann)
+Date: Thu, 31 Jul 2014 08:17:52 -0700
+Subject: [RFC] ARM: Enable dynamic clock gating?
+In-Reply-To: <20140731151510.GZ26853@arm.com>
+References: <81f4b45a-f8b3-4dec-9e94-9028ccd3e05f@BN1AFFO11FD009.protection.gbl>
+ <20140731151510.GZ26853@arm.com>
+Message-ID: <f51a167f-959b-4687-9ec3-ee90e1951eca@BL2FFO11FD034.protection.gbl>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The bitfield allocation function returns error condition
-as a negative value, but in two cases its result
-was assigned to an unsigned member of the hw_perf_event
-structure, thus the error would not be ever detected.
+On Thu, 2014-07-31 at 04:15PM +0100, Will Deacon wrote:
+> On Thu, Jul 31, 2014 at 03:24:17PM +0100, S?ren Brinkmann wrote:
+> > Hi all,
+> > 
+> > similar to the patch enabling the SCU standby mode
+> > (https://lkml.org/lkml/2014/7/30/122), I have a patch to enable the A9's
+> > 'dynamic clock gating'
+> > (http://infocenter.arm.com/help/index.jsp?topic=/com.arm.doc.ddi0388f/CIHBGEHE.html)
+> > in platform code. This might also be a candidate to enable in common
+> > code.
+> > Do you think that would make sense?
+> > I tried to find the right place to add this and was looking at
+> > mm/proc-v7.S. It probably works to put it there, but does not really
+> > seem to be the right place.
+> > 
+> > As reference, this is what I currently have as part of platform code:
+> >   /* A9 clock gating */
+> >   asm volatile ("mrc  p15, 0, r12, c15, c0, 0\n"
+> >                 "orr  r12, r12, #1\n"
+> >                 "mcr  p15, 0, r12, c15, c0, 0\n"
+> >                 : /* no outputs */
+> >                 : /* no inputs */
+> >                 : "r12");
+> 
+> This should *really* be done by firmware.
 
-Fixed by using an intermediate, signed variable.
+Zynq doesn't have firmware, so we'd put it in platform code I guess.
+Is this so different compared to the SCU standby mode?
 
-Reported-by: Dan Carpenter <dan.carpenter@oracle.com>
-Signed-off-by: Pawel Moll <pawel.moll@arm.com>
----
-
-Dan discovered the problem using his static checker. Thanks, Dan!
-
-Arnd, would you pick up the patch as it is or do you want me
-to send a pull request for a "ccn/fixes" branch?
-
- drivers/bus/arm-ccn.c | 9 +++++----
- 1 file changed, 5 insertions(+), 4 deletions(-)
-
-diff --git a/drivers/bus/arm-ccn.c b/drivers/bus/arm-ccn.c
-index 4f86bbb..3266f8f 100644
---- a/drivers/bus/arm-ccn.c
-+++ b/drivers/bus/arm-ccn.c
-@@ -591,7 +591,7 @@ static int arm_ccn_pmu_event_init(struct perf_event *event)
- 	struct arm_ccn *ccn;
- 	struct hw_perf_event *hw = &event->hw;
- 	u32 node_xp, type, event_id;
--	int valid;
-+	int valid, bit;
- 	struct arm_ccn_component *source;
- 	int i;
- 
-@@ -713,17 +713,18 @@ static int arm_ccn_pmu_event_init(struct perf_event *event)
- 
- 	/* Allocate an event source or a watchpoint */
- 	if (type == CCN_TYPE_XP && event_id == CCN_EVENT_WATCHPOINT)
--		hw->config_base = arm_ccn_pmu_alloc_bit(source->xp.dt_cmp_mask,
-+		bit = arm_ccn_pmu_alloc_bit(source->xp.dt_cmp_mask,
- 				CCN_NUM_XP_WATCHPOINTS);
- 	else
--		hw->config_base = arm_ccn_pmu_alloc_bit(source->pmu_events_mask,
-+		bit = arm_ccn_pmu_alloc_bit(source->pmu_events_mask,
- 				CCN_NUM_PMU_EVENTS);
--	if (hw->config_base < 0) {
-+	if (bit < 0) {
- 		dev_warn(ccn->dev, "No more event sources/watchpoints on node/XP %d!\n",
- 				node_xp);
- 		clear_bit(hw->idx, ccn->dt.pmu_counters_mask);
- 		return -EAGAIN;
- 	}
-+	hw->config_base = bit;
- 
- 	ccn->dt.pmu_counters[hw->idx].event = event;
- 
--- 
-1.9.1
+	Thanks,
+	S?ren
