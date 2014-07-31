@@ -1,52 +1,34 @@
-From: thierry.reding@gmail.com (Thierry Reding)
-Date: Thu, 31 Jul 2014 13:54:31 +0200
-Subject: [RFC] pwm-backlight: Allow backlight to remain disabled on boot
-In-Reply-To: <1406806970-12561-1-git-send-email-thierry.reding@gmail.com>
-References: <1406806970-12561-1-git-send-email-thierry.reding@gmail.com>
-Message-ID: <20140731115429.GA12627@ulmo>
+From: javier.martinez@collabora.co.uk (Javier Martinez Canillas)
+Date: Thu, 31 Jul 2014 13:55:09 +0200
+Subject: [PATCH 0/2] Better model Peach Pit and PI power scheme
+Message-ID: <1406807711-19955-1-git-send-email-javier.martinez@collabora.co.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jul 31, 2014 at 01:42:50PM +0200, Thierry Reding wrote:
-[...]
-> @@ -317,6 +319,12 @@ static int pwm_backlight_probe(struct platform_device *pdev)
->  	}
->  
->  	bl->props.brightness = data->dft_brightness;
-> +
-> +	if (data->boot_off)
-> +		bl->props.power = FB_BLANK_POWERDOWN;
-> +	else
-> +		bl->props.power = FB_BLANK_UNBLANK;
-> +
->  	backlight_update_status(bl);
+Hello,
 
-Looking at this again, perhaps a more sensible thing to do would be to
-not call backlight_update_status() in the first place. For example if
-the board defines that backlight should be kept off at boot, but the
-bootloader had already enabled it, then this would effectively turn off
-the backlight again.
+This is a small series that improve the modeling of the power
+scheme on the Peach Pit and Pi boards. Besides making the DTS
+to better describe the hardware these changes allows the core
+regulator to know what's the real supply for a child to fetch
+the parent output voltage if the child voltage is requested,
+now that the regulator core allows to do that [0,1].
 
-I think it's safe to assume that if the bootloader sets up the backlight
-then it would also set up the display. Therefore not touching the
-backlight state at all at probe time seems like the safest default.
+Patch 1 modifies the regulators input supply to use the real
+parents instead of using a simplistic model and assume that
+VDC is supplying power to all regulators and patch 2 defines
+the maximum and minimum voltage constraints for the switches.
 
-Of course that doesn't help people who use some dumb framebuffer driver
-and therefore nothing explicitly enables the backlight. So it would
-still be changing behaviour for people for whom the bootloader doesn't
-set up the backlight at all and who therefore rely on the kernel to turn
-it on.
+Javier Martinez Canillas (2):
+  ARM: dts: Improve Peach Pit and Pi power scheme model
+  ARM: dts: Add tps65090 FET constraints on Peach Pit and Pi
 
-We could perhaps alleviate that pain a little by making this dependent
-on whether or not the board is booted using DT on the assumption that
-anything that uses DT would be "modern" enough to provide a means to
-automatically enable the backlight at the right moment.
+ arch/arm/boot/dts/exynos5420-peach-pit.dts | 26 ++++++++++++++++++++------
+ arch/arm/boot/dts/exynos5800-peach-pi.dts  | 26 ++++++++++++++++++++------
+ 2 files changed, 40 insertions(+), 12 deletions(-)
 
-Thierry
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: not available
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140731/6492d959/attachment-0001.sig>
+Best regards,
+Javier
+
+[0]: https://patchwork.kernel.org/patch/4641331/
+[1]: https://patchwork.kernel.org/patch/4641311/
