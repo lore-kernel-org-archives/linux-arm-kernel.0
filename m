@@ -1,32 +1,101 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Thu, 31 Jul 2014 09:32:01 -0600
-Subject: [PATCH 5/8] of: Add Tegra124 EMC bindings
-In-Reply-To: <53DA230E.7060903@nvidia.com>
-References: <1405088313-20048-1-git-send-email-mperttunen@nvidia.com>	<1405088313-20048-6-git-send-email-mperttunen@nvidia.com>	<CAL1qeaGHfjQhLHvgzt85hmbuY4FOG5-k=f80=CNvzPDEgi9_6w@mail.gmail.com>	<53CD860B.7030800@wwwdotorg.org>	<CAL1qeaHtGQxCO3cGdeCRUYuk6mxei6z1B63-iZdBECEbFqGhHw@mail.gmail.com>	<53CE9514.1050903@wwwdotorg.org>
- <CAL1qeaEkL+mxb0S4JhQbXBjyNyKJndffTSjMaAFQD6ooDJPd+Q@mail.gmail.com>
- <53CEA093.6060106@wwwdotorg.org> <53D75B90.7050501@nvidia.com>
- <53D7C276.2080204@wwwdotorg.org> <53DA1EF0.7060207@nvidia.com>
- <53DA230E.7060903@nvidia.com>
-Message-ID: <53DA6171.30100@wwwdotorg.org>
+From: tomasz.figa@gmail.com (Tomasz Figa)
+Date: Thu, 31 Jul 2014 17:37:35 +0200
+Subject: [GIT PULL] Samsung clock changes for v3.17
+Message-ID: <1406821055-7290-1-git-send-email-t.figa@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/31/2014 05:05 AM, Mikko Perttunen wrote:
-> On 31/07/14 13:48, Mikko Perttunen wrote:
->>>
->>> I see that the TRM implies the whole 4-bit field is RAM code, rather
->>> than there being 2 separate 2-bit fields for RAM code and boot device
->>> code. Can you please file a bug against the TRM to document this
->>> correctly? (The details of which bits are which are visible on the
->>> Jetson TK1 schematics for example).
->>
->> Yes, I'll file a bug.
->
-> On a closer look, the downstream kernel has been recently updated to
-> consider the whole 4 bits the ram code. The relevant bug also has a
-> comment mentioning that starting from T124, the whole 4 bits is
-> considered the RAM code.
+From: Tomasz Figa <tomasz.figa@gmail.com>
 
-That's odd. Given the structure of the BCT hasn't change, I suspect 
-that's a documentation bug that's propagated elsewhere. Can you send me 
-the bug number internally, and I'll take a look? Thanks.
+Hi Mike,
+
+The following changes since commit bdfcdf18c380a3c376b42709a89eb2cc52e95ae0:
+
+  Merge branch 'v3.16-samsung-clk-fixes-1' into samsung-clk-next (2014-06-30 15:06:43 +0200)
+
+are available in the git repository at:
+
+  git://git.kernel.org/pub/scm/linux/kernel/git/tfiga/samsung-clk.git tags/for_3.17/samsung-clk
+
+for you to fetch changes up to f65d518942325d4bfa74b5c9d42ea5a89e4f6943:
+
+  clk: samsung: trivial: Correct typo in author's name (2014-07-26 02:57:20 +0200)
+
+----------------------------------------------------------------
+Samsung clock patches for 3.17
+
+1) non-critical fixes (without need to push to stable):
+
+d5e136a clk: samsung: Register clk provider only after registering its all clocks
+305cfab clk: samsung: Make of_device_id array const
+e9d5295 clk: samsung: exynos5420: Setup clocks before system suspend
+f65d518 clk: samsung: trivial: Correct typo in author's name
+
+2) Exynos CLKOUT driver:
+
+800c979 clk: samsung: exynos4: Add missing CPU/DMC clock hierarchy
+01f7ec2 clk: samsung: exynos4: Add CLKOUT clock hierarchy
+1e832e5 clk: samsung: Add driver to control CLKOUT line on Exynos SoCs
+d19bb39 ARM: dts: exynos: Update PMU node with CLKOUT related data
+
+3) Clock hierarchy extensions:
+
+17d3f1d clk: exynos4: Add PPMU IP block source clocks.
+ca5b402 clk: samsung: register exynos5420 apll/kpll configuration data
+
+4) ARM CLKDOWN functionality enablement for Exynos4 and 3250:
+
+42773b2 clk: samsung: exynos4: Enable ARMCLK down feature
+45c5b0a clk: samsung: exynos3250: Enable ARMCLK down feature
+
+----------------------------------------------------------------
+Jonghwa Lee (1):
+      clk: exynos4: Add PPMU IP block source clocks.
+
+Krzysztof Kozlowski (3):
+      clk: samsung: exynos4: Enable ARMCLK down feature
+      clk: samsung: exynos3250: Enable ARMCLK down feature
+      clk: samsung: Make of_device_id array const
+
+Sylwester Nawrocki (1):
+      clk: samsung: Register clk provider only after registering its all clocks
+
+Thomas Abraham (1):
+      clk: samsung: register exynos5420 apll/kpll configuration data
+
+Tomasz Figa (5):
+      clk: samsung: exynos4: Add missing CPU/DMC clock hierarchy
+      clk: samsung: exynos4: Add CLKOUT clock hierarchy
+      clk: samsung: Add driver to control CLKOUT line on Exynos SoCs
+      ARM: dts: exynos: Update PMU node with CLKOUT related data
+      clk: samsung: trivial: Correct typo in author's name
+
+Vikas Sajjan (1):
+      clk: samsung: exynos5420: Setup clocks before system suspend
+
+ .../devicetree/bindings/arm/samsung/pmu.txt        |  30 +++
+ arch/arm/boot/dts/exynos4210.dtsi                  |  10 +
+ arch/arm/boot/dts/exynos4x12.dtsi                  |   7 +
+ arch/arm/boot/dts/exynos5250.dtsi                  |   3 +
+ arch/arm/boot/dts/exynos5420.dtsi                  |   3 +
+ drivers/clk/samsung/Makefile                       |   1 +
+ drivers/clk/samsung/clk-exynos-clkout.c            | 153 ++++++++++++++
+ drivers/clk/samsung/clk-exynos3250.c               |  43 ++++
+ drivers/clk/samsung/clk-exynos4.c                  | 231 ++++++++++++++++++++-
+ drivers/clk/samsung/clk-exynos5250.c               |   4 +-
+ drivers/clk/samsung/clk-exynos5260.c               |   2 +
+ drivers/clk/samsung/clk-exynos5410.c               |   2 +
+ drivers/clk/samsung/clk-exynos5420.c               |  61 +++++-
+ drivers/clk/samsung/clk-exynos5440.c               |   4 +-
+ drivers/clk/samsung/clk-s3c2410.c                  |   2 +
+ drivers/clk/samsung/clk-s3c2412.c                  |   2 +
+ drivers/clk/samsung/clk-s3c2443.c                  |   2 +
+ drivers/clk/samsung/clk-s3c64xx.c                  |   2 +
+ drivers/clk/samsung/clk.c                          |  21 +-
+ drivers/clk/samsung/clk.h                          |   4 +-
+ include/dt-bindings/clock/exynos4.h                |  25 ++-
+ include/dt-bindings/clock/exynos5250.h             |   2 +-
+ include/dt-bindings/clock/exynos5420.h             |   2 +-
+ include/dt-bindings/clock/exynos5440.h             |   2 +-
+ 24 files changed, 599 insertions(+), 19 deletions(-)
+ create mode 100644 drivers/clk/samsung/clk-exynos-clkout.c
