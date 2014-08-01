@@ -1,37 +1,51 @@
-From: sudeep.holla@arm.com (Sudeep Holla)
-Date: Fri, 01 Aug 2014 11:21:12 +0100
-Subject: [Query] How to pass reboot arguments to secure firmware with
- PSCI spec
-In-Reply-To: <20140801180652.72e722be@xhacker>
-References: <20140801180652.72e722be@xhacker>
-Message-ID: <53DB6A18.5050904@arm.com>
+From: rric@kernel.org (Robert Richter)
+Date: Fri, 1 Aug 2014 12:25:35 +0200
+Subject: [PATCH 2/5] arm64, thunder: Add initial dts for Cavium Thunder SoC
+In-Reply-To: <20140730154626.GD20162@leverpostej>
+References: <1406732794-20920-1-git-send-email-rric@kernel.org>
+ <1406732794-20920-3-git-send-email-rric@kernel.org>
+ <20140730154626.GD20162@leverpostej>
+Message-ID: <20140801102535.GX4703@rric.localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Mark,
 
+On 30.07.14 16:46:26, Mark Rutland wrote:
 
-On 01/08/14 11:06, Jisheng Zhang wrote:
-> Hi Catalin and Will,
->
-> I noticed that the following commit implement reboot via. PSCI SYSTEM_RESET
-> function. So my question is how to handle the reboot arguments?
->
+> > diff --git a/arch/arm64/boot/dts/thunder-88xx.dts b/arch/arm64/boot/dts/thunder-88xx.dts
+> > new file mode 100644
+> > index 000000000000..4cf20ac9138b
+> > --- /dev/null
+> > +++ b/arch/arm64/boot/dts/thunder-88xx.dts
+> > @@ -0,0 +1,387 @@
+> > +/*
+> > + * Cavium Thunder DTS file
+> > + *
+> > + * Copyright (C) 2013, Cavium Inc.
+> > + *
+> > + * This program is free software; you can redistribute it and/or
+> > + * modify it under the terms of the GNU General Public License as
+> > + * published by the Free Software Foundation; either version 2 of
+> > + * the License, or (at your option) any later version.
+> > + */
+> > +/dts-v1/;
+> > +
+> > +/* Reserving first 12MB of DDR for firmware */
+> > +/memreserve/ 0x00000000 0x00c00000;
+> 
+> What exactly is this memreserve intended to protect at runtime?
+> 
+> The only item of runtime firmware I see in use below is PSCI on the
+> secure side.
+> 
+> How is the kernel booted on this platform? UEFI?
 
-What reboot arguments do you want to handle ?
+We checked this and it seems we don't need memreserve. Mem is either
+not visible to the kernel (ATF) or it is marked reserved by firmware
+(UEFI). At the moment we don't see any other use cases. We will remove
+this memreserve.
 
->
->> static void psci_sys_reset(enum reboot_mode reboot_mode, const char *cmd)
->> {
->>        invoke_psci_fn(PSCI_0_2_FN_SYSTEM_RESET, 0, 0, 0);
->
-> How to pass cmd to secure firmware?
->
+Thanks,
 
-What cmd do you want to pass ? The function id is already handled. What
-else do you want to pass ?
-
-If you see PSCI v0.2 spec, the SYSTEM_RESET and SYSTEM_SHUTDOWN takes no
-parameters.
-
-Regards,
-Sudeep
+-Robert
