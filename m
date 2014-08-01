@@ -1,51 +1,53 @@
-From: suravee.suthikulpanit@amd.com (Suravee Suthikulanit)
-Date: Fri, 1 Aug 2014 11:19:18 -0500
-Subject: [PATCH 4/4 V3] irqchip: gicv2m: Add support for multiple MSI
- for ARM64 GICv2m
-In-Reply-To: <53DBA986.90705@arm.com>
-References: <1404947104-21345-1-git-send-email-suravee.suthikulpanit@amd.com>
- <1404947104-21345-5-git-send-email-suravee.suthikulpanit@amd.com>
- <87vbqej2rj.fsf@approximate.cambridge.arm.com> <53DBA603.9030509@amd.com>
- <53DBA986.90705@arm.com>
-Message-ID: <53DBBE06.5040307@amd.com>
+From: robert.richter@caviumnetworks.com (Robert Richter)
+Date: Fri, 1 Aug 2014 18:18:39 +0200
+Subject: [PATCH 2/5] arm64, thunder: Add initial dts for Cavium Thunder SoC
+In-Reply-To: <CAOesGMh9KkdKB_ytJ7CCbkPW7dHTX91NdfDMsMNfbmOBVOJ8PQ@mail.gmail.com>
+References: <1406732794-20920-1-git-send-email-rric@kernel.org>
+ <1406732794-20920-3-git-send-email-rric@kernel.org>
+ <CAOesGMh9KkdKB_ytJ7CCbkPW7dHTX91NdfDMsMNfbmOBVOJ8PQ@mail.gmail.com>
+Message-ID: <20140801161839.GE4703@rric.localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 8/1/2014 9:51 AM, Marc Zyngier wrote:
-> Hi Suravee,
->
-> On 01/08/14 15:36, Suravee Suthikulanit wrote:
->> On 7/30/2014 10:16 AM, Marc Zyngier wrote:
->>> Why do we need this complexity at all? Is there any case where we'd want
->>> to limit ourselves to a single vector for MSI?
->>
->> I think the ARM64 GICv2m should not be the limitation for the devices
->> multiple MSI if there is no real hardware/design limitation.
->>
->>> arm64 is a new enough architecture so that we can expect all interrupt controllers to cope
->>> with that.
->>
->> I am not sure if I understand this comment.
->>
->> We are not forcing all interrupt controllers for ARM64 to handle
->> multi-MSI.  They have the option to support if multi-MSI if they want
->> to. I just think that we should not put the architectural limit here.
->
-> Let me be clearer: I think we should put the burden of *not* handling
-> multi-MSI on interrupt controllers. Here, you're making the
-> architectural default to be "I don't support multi-MSI", hence having to
-> override global vectors and such for well behaved MSI controllers like
-> GICv2m and GICv3 ITS.
->
-> Let's only support multi-MSI for the time being. If someone comes up
-> with a silly old MSI controller that can't deal with it, we'll address
-> the issue at that problem.
->
-> Thanks,
->
-> 	M.
->
+Olof,
 
-Ok, I'm fine with that. Thanks for clarification.
+On 30.07.14 11:14:23, Olof Johansson wrote:
+> On Wed, Jul 30, 2014 at 8:06 AM, Robert Richter <rric@kernel.org> wrote:
+> > From: Radha Mohan Chintakuntla <rchintakuntla@cavium.com>
+> >
+> > Add initial device tree nodes for Cavium Thunder SoCs with support of
+> > 48 cores and gicv3. The dts file requires further changes, esp. for
+> > pci, gicv3-its and smmu. This changes will be added later together
+> > with the device drivers.
+> >
+> > Signed-off-by: Radha Mohan Chintakuntla <rchintakuntla@cavium.com>
+> > Signed-off-by: Robert Richter <rrichter@cavium.com>
+> > ---
+> >  arch/arm64/boot/dts/Makefile         |   1 +
+> >  arch/arm64/boot/dts/thunder-88xx.dts | 387 +++++++++++++++++++++++++++++++++++
+> >  2 files changed, 388 insertions(+)
+> >  create mode 100644 arch/arm64/boot/dts/thunder-88xx.dts
+> >
+> > diff --git a/arch/arm64/boot/dts/Makefile b/arch/arm64/boot/dts/Makefile
+> > index c52bdb051f66..f8001a62029c 100644
+> > --- a/arch/arm64/boot/dts/Makefile
+> > +++ b/arch/arm64/boot/dts/Makefile
+> > @@ -1,3 +1,4 @@
+> > +dtb-$(CONFIG_ARCH_THUNDER) += thunder-88xx.dtb
+> >  dtb-$(CONFIG_ARCH_VEXPRESS) += rtsm_ve-aemv8a.dtb foundation-v8.dtb
+> >  dtb-$(CONFIG_ARCH_XGENE) += apm-mustang.dtb
+> 
+> Oh, and:
+> 
+> Let's fix the mistake we made on 32-bit here (that we can't undo
+> unless we move all dts files now, which is too much churn), and put
+> each SoC vendor in its own subdirectory.
+> 
+> So, please add a arch/arm64/boot/dts/cavium/ directory, add a Makefile
+> and the dts there.
+> 
+> We should move vexpress under arm/   and xgene under apm/ too.
 
-Suravee
+I well take a look at this.
+
+-Robert
