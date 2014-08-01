@@ -1,51 +1,35 @@
-From: grygorii.strashko@ti.com (Grygorii Strashko)
-Date: Fri, 01 Aug 2014 21:24:52 +0300
-Subject: [PATCH v2 1/2] spi: davinci: add support to configure gpio cs
- through dt
-In-Reply-To: <20140801173506.GB30458@sirena.org.uk>
-References: <1406911233-18999-1-git-send-email-grygorii.strashko@ti.com>
- <1406911233-18999-2-git-send-email-grygorii.strashko@ti.com>
- <20140801173506.GB30458@sirena.org.uk>
-Message-ID: <53DBDB74.3070205@ti.com>
+From: wsa@the-dreams.de (Wolfram Sang)
+Date: Fri, 1 Aug 2014 19:57:05 +0200
+Subject: [PATCH v2] i2c: pca954x: put the mux to disconnected state after
+ resume
+In-Reply-To: <1406289466-936-1-git-send-email-jszhang@marvell.com>
+References: <1406289466-936-1-git-send-email-jszhang@marvell.com>
+Message-ID: <20140801175705.GE3277@katana>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08/01/2014 08:35 PM, Mark Brown wrote:
-> On Fri, Aug 01, 2014 at 07:40:32PM +0300, Grygorii Strashko wrote:
->> From: Murali Karicheri <m-karicheri2@ti.com>
->>
->> Currently driver supports only configuration of GPIO CS through
->> platform data. This patch enhances the driver to configure GPIO
->> CS through DT. Also update the DT binding documentation to
->> reflect the availability of cs-gpios.
+On Fri, Jul 25, 2014 at 07:57:46PM +0800, Jisheng Zhang wrote:
+> pca954x may be power lost during suspend, so after resume we also suffer
+> the issue fixed by commit cd823db8b1161ef0d756514d280715a576d65cc3,
 > 
-> Ah, sorry - this is the unapplied patch from before.  It would have been
-> much better to submit this as the second patch after your rework patch
-> since this...
+>  "pca954x power-on default is channel 0 connected. If multiple pca954x
+>  muxes are connected to the same physical I2C bus, the parent bus will
+>  see channel 0 devices behind both muxes by default."
 > 
-
-I can do this, but It will wait for a week :(
-
->> -	if (pdata->chip_sel && chip_sel < pdata->num_chipselect &&
->> -				pdata->chip_sel[chip_sel] != SPI_INTERN_CS)
->> +	if (np && master->cs_gpios != NULL && spi->cs_gpio >= 0) {
->> +		/* SPI core parse and update master->cs_gpio */
->>   		gpio_chipsel = true;
->> +		gpio = spi->cs_gpio;
->> +	} else if (pdata->chip_sel &&
->> +		   chip_sel < pdata->num_chipselect &&
->> +		   pdata->chip_sel[chip_sel] != SPI_INTERN_CS) {
->> +		/* platform data defines chip_sel */
->> +		gpio_chipsel = true;
->> +		gpio = pdata->chip_sel[chip_sel];
->> +	}
+> What's more, when resume bootloader may also operate the mux, so the
+> the channel connected after that may not be the one driver thought.
 > 
-> ...still looks excessively confusing - it is way more logic than I'd
-> expect to see on every chip select.
+> We fix this problem by putting the mux to disconnected state and
+> clearing last_chan in the resume hook.
 > 
+> Signed-off-by: Jisheng Zhang <jszhang@marvell.com>
 
-Yep. Finally, patch "[PATCH v2 2/2] spi: davinci: use spi_device.cs_gpio to store gpio cs per spi device"
-simplifies logic above.
+Applied to for-next, thanks!
 
-Regards,
--grygorii
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140801/64d439fd/attachment-0001.sig>
