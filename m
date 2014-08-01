@@ -1,63 +1,43 @@
 From: dianders@chromium.org (Doug Anderson)
-Date: Fri, 1 Aug 2014 13:24:12 -0700
-Subject: [PATCH v5 03/10] ARM: dts: Clean up exynos5250-snow
-In-Reply-To: <1406868897-26874-4-git-send-email-afaerber@suse.de>
+Date: Fri, 1 Aug 2014 13:28:17 -0700
+Subject: [PATCH v5 04/10] ARM: dts: Fill in bootargs for exynos5250-snow
+In-Reply-To: <1406868897-26874-5-git-send-email-afaerber@suse.de>
 References: <1406868897-26874-1-git-send-email-afaerber@suse.de>
- <1406868897-26874-4-git-send-email-afaerber@suse.de>
-Message-ID: <CAD=FV=W2XJzv4NpB=27AFjX94VkH8dYXxAPBL58ntXL2WvRCoQ@mail.gmail.com>
+ <1406868897-26874-5-git-send-email-afaerber@suse.de>
+Message-ID: <CAD=FV=V4hQeGvE9+O2EY8KGvDj3SJKfOZGes4gKpHfg=xz1h4A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Andreas,
+Hi,
 
 On Thu, Jul 31, 2014 at 9:54 PM, Andreas F?rber <afaerber@suse.de> wrote:
-> Use the new style of referencing inherited nodes and use symbolic names.
-> Reorder one pinctrl node in GPIO order.
+> exynos5250-cros-common.dtsi had an empty /chosen node.
+> Fill in exemplary boot arguments.
 >
-> Goal is the alignment of all exynos5250 based device trees for comparison.
->
-> Suggested-by: Doug Anderson <dianders@chromium.org>
 > Signed-off-by: Andreas F?rber <afaerber@suse.de>
 > ---
->  v4 -> v5:
->  * Introduced labels to consistently use new referencing style (Tomasz)
->  * Use IRQ_TYPE_* constants
->  * Use some more GPIO_ACTIVE_*
+>  v5: New
+>  Cleanup for /chosen node moved into -snow.dts.
 >
->  v3 -> v4: Unchanged
+>  arch/arm/boot/dts/exynos5250-snow.dts | 1 +
+>  1 file changed, 1 insertion(+)
 >
->  v3: New (Doug Anderson)
+> diff --git a/arch/arm/boot/dts/exynos5250-snow.dts b/arch/arm/boot/dts/exynos5250-snow.dts
+> index 7680d5e03fb3..c4b0c73c736d 100644
+> --- a/arch/arm/boot/dts/exynos5250-snow.dts
+> +++ b/arch/arm/boot/dts/exynos5250-snow.dts
+> @@ -27,6 +27,7 @@
+>         };
 >
->  arch/arm/boot/dts/exynos5250-snow.dts | 291 +++++++++++++++++-----------------
->  arch/arm/boot/dts/exynos5250.dtsi     |  20 +--
+>         chosen {
+> +               bootargs = "console=tty1";
 
-As much as possible it's nice to touch the main exynos dtsi file and
-specific board files in different patches.  Among other things it
-makes backporting the patch and resolving merge conflicts easier (if
-someone doesn't care about snow they could just pick up the main dtsi,
-for instance).
+As mentioned earlier, I don't think this is a particularly useful
+change.  Just this boot argument is not enough to boot with anyway, so
+listing it doesn't really help anyone.  In theory you could make some
+assertion about what the "most popular" boot device and filesystem is,
+but it seems unlikely to cover the majority of the cases.
 
-I'm not a total stickler and I'd love to see this land quickly to
-avoid conflicts, though...
+I won't NAK this change myself, but I certainly won't push for it.
 
-
-> +&sd3_clk {
-> +       samsung,pin-drv = <0>;
-> +};
-> +
-> +&sd3_cmd {
-> +       samsung,pin-pud = <3>;
-> +       samsung,pin-drv = <0>;
-> +};
-> +
-> +&sd3_bus4 {
-
-Itty bitty bitty nit that "bus" sorts alphabetically above "clk".  ;)
-Maybe Kukjin would be willing to sort these when he applies?
-
-
-Thank you for all your hard work on this one.  Things look MUCH MUCH
-nicer!  I did a pretty thorough review of your changes and it all
-looks good.
-
-Reviewed-by: Doug Anderson <dianders@chromium.org>
+-Doug
