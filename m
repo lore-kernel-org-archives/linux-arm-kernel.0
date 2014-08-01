@@ -1,64 +1,66 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Fri, 1 Aug 2014 04:03:36 -0700
-Subject: [PATCH] ARM: multi_v7_defconfig: major refresh
-In-Reply-To: <1406890899.2794.40.camel@linaro1.home>
-References: <1406052070-6207-1-git-send-email-olof@lixom.net>
- <53DB6B4F.9080605@arm.com> <1406890899.2794.40.camel@linaro1.home>
-Message-ID: <CAOesGMi0RUbz4BSnmR92dEk3fWgN=hnENSdi55VeCXdcHLRLJQ@mail.gmail.com>
+From: jszhang@marvell.com (Jisheng Zhang)
+Date: Fri, 1 Aug 2014 19:02:27 +0800
+Subject: [Query] How to pass reboot arguments to secure firmware with
+ PSCI spec
+In-Reply-To: <53DB6A18.5050904@arm.com>
+References: <20140801180652.72e722be@xhacker>
+	<53DB6A18.5050904@arm.com>
+Message-ID: <20140801190227.116f4c39@xhacker>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Aug 1, 2014 at 4:01 AM, Jon Medhurst (Tixy) <tixy@linaro.org> wrote:
-> On Fri, 2014-08-01 at 11:26 +0100, Sudeep Holla wrote:
->>
->> On 22/07/14 19:01, Olof Johansson wrote:
->> > This is a major refresh of the multi_v7_defconfig:
->> >
->> > - Bring over a bunch of Samsung drivers to make ODROID-U3 and Chromebooks usable
->> >   * Enable big.LITTLE
->> >   * MCPM
->> [...]
->
->> > +CONFIG_BIG_LITTLE=y
->> > +CONFIG_BL_SWITCHER=y
->>
->> IIUC, this will enable switcher code by default. I am not sure if this
->> is intentional ? E.g.: After this I can have only 2 active cpus instead
->> of 5 on my Vexpress TC2 platform.
->>
->> IMO we can keep this enabled by default in the build, but disabled
->> by default on boot.
->
-> TC2 has a big.LITTLE processor and the switcher is the only mainlined
-> way of making any kind of proper use of big.LITTLE, so why not have it
-> enabled by default?
+Hi Sudeep,
 
-+1.
+On Fri, 1 Aug 2014 03:21:12 -0700
+Sudeep Holla <sudeep.holla@arm.com> wrote:
 
->
->>  One way to achieve this:
->> (There's sysfs to re-enable it runtime)
->
-> The opposite is also true, if you don't want the switcher enabled you
-> can disable it by the same method after boot ;-)
->
->> -->8
->> diff --git a/arch/arm/common/bL_switcher.c b/arch/arm/common/bL_switcher.c
->> index 490f3dced749..f4c36e70166a 100644
->> --- a/arch/arm/common/bL_switcher.c
->> +++ b/arch/arm/common/bL_switcher.c
->> @@ -794,7 +794,7 @@ static int bL_switcher_hotplug_callback(struct
->> notifier_block *nfb,
->>          return NOTIFY_DONE;
->>   }
->>
->> -static bool no_bL_switcher;
->> +static bool no_bL_switcher = true;
->
-> This changes the default for everyone, which I guess is fair enough if
-> there is a good reason, but I'm not sure there is.
+> 
+> 
+> On 01/08/14 11:06, Jisheng Zhang wrote:
+> > Hi Catalin and Will,
+> >
+> > I noticed that the following commit implement reboot via. PSCI
+> > SYSTEM_RESET function. So my question is how to handle the reboot
+> > arguments?
+> >
+> 
+> What reboot arguments do you want to handle ?
 
-No, I don't think there is.
+man 2 reboot
+
+...
+
+int reboot(int magic, int magic2, int cmd, void *arg);
+
+...
+
+I want to pass "void *arg" to secure firmware.
 
 
--Olof
+> 
+> >
+> >> static void psci_sys_reset(enum reboot_mode reboot_mode, const char *cmd)
+> >> {
+> >>        invoke_psci_fn(PSCI_0_2_FN_SYSTEM_RESET, 0, 0, 0);
+> >
+> > How to pass cmd to secure firmware?
+> >
+> 
+> What cmd do you want to pass ? The function id is already handled. What
+> else do you want to pass ?
+
+the "const char *cmd", usually this is the "abc" if user type "reboot abc"
+under shell.
+
+For example, android usually type "reboot recovery", the "recovery" will be
+passed to next boot kernel boot args.
+
+> 
+> If you see PSCI v0.2 spec, the SYSTEM_RESET and SYSTEM_SHUTDOWN takes no
+> parameters.
+
+Yes. I know it. That's why I need your help/suggestions about how to handle
+the situation above.
+
+Thanks for your input,
+Jisheng
