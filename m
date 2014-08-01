@@ -1,79 +1,140 @@
 From: svarbanov@mm-sol.com (Stanimir Varbanov)
-Date: Fri,  1 Aug 2014 17:30:47 +0300
-Subject: [PATCH v4 0/3] Support for Qualcomm QPNP PMIC's
-Message-ID: <1406903450-27283-1-git-send-email-svarbanov@mm-sol.com>
+Date: Fri,  1 Aug 2014 17:30:48 +0300
+Subject: [PATCH v4 1/3] mfd: add support for Qualcomm SPMI PMICs
+In-Reply-To: <1406903450-27283-1-git-send-email-svarbanov@mm-sol.com>
+References: <1406903450-27283-1-git-send-email-svarbanov@mm-sol.com>
+Message-ID: <1406903450-27283-2-git-send-email-svarbanov@mm-sol.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello all,
+From: Josh Cartwright <joshc@codeaurora.org>
 
-Changes since v3:
- - rename the driver to qcom-spmi-pmic - suggested by David Collins
- - spmi regmap config now initialize .fast_io to true
- - added generalized comptatible string in DT binding document and driver
- - I dropped the pm8921 rename patch for now, it will be subject of another
-   patchset later on.
+The Qualcomm SPMI PMIC chips are components used with the
+Snapdragon 800 series SoC family.  This driver exists
+largely as a glue mfd component, it exists to be an owner
+of an SPMI regmap for children devices described in
+device tree.
 
-regards,
-Stan
-
---------------------------------------------------------------------------------
-
-Changes since v2:
- - 1/4 - added new line, signed-off-by / acked-by and module_authors.
- - 3/4 - the subject has been changed.
-
-The previous v2 can be found at [1].
-
-I'm still waiting Acks for:
- - 4/4 from Qualcomm folks.
- - 2/4 and 3/4 from DT folks.
-
-The patchset is ready to merge version and also it can be treated as an
-intermediate step until we find a solution for non-translatable peripheral
-addresses.
-
-[1] https://lkml.org/lkml/2014/7/17/877
-
---------------------------------------------------------------------------------
-
-Hello everyone,
-
-Here is the continuation of patch sets sent recently about Qualcomm
-QPNP SPMI PMICs.
-
-The previous version of the patch set can be found at [1].
-
-Changes since v1:
- - removed completely custom *of* parser
- - renamed the mfd driver from qpnp-spmi to pm8xxx-spmi
- - now MFD_PM8XXX_SPMI Kconfig option depends on SPMI
-
-Removing of the custom *of* parser leads to that that the *reg* devicetree
-property cannot exist and therefore cannot be parsed to get PMIC peripheral
-resources. I took this step aside because no one from mfd drivers does this
-parsing. This will lead to inconvenience in the peripheral drivers to define
-internally the SPMI base addresses depending on the compatible property
-i.e. PMIC version. 
-
-Comments are welcome!
-
-[1] https://lkml.org/lkml/2014/7/8/428
-
---------------------------------------------------------------------------------
-
-Josh Cartwright (1):
-  mfd: add support for Qualcomm SPMI PMICs
-
-Stanimir Varbanov (2):
-  mfd: document DT bindings for Qualcomm SPMI PMICs
-  ARM: dts: qcom: add pm8941 and pm8841 PMICs device nodes
-
- .../devicetree/bindings/mfd/qcom,spmi-pmic.txt     |   64 +++++++++++++++++++
- arch/arm/boot/dts/qcom-msm8974.dtsi                |   37 +++++++++++
- drivers/mfd/Kconfig                                |   15 +++++
- drivers/mfd/Makefile                               |    1 +
- drivers/mfd/qcom-spmi-pmic.c                       |   67 ++++++++++++++++++++
- 5 files changed, 184 insertions(+), 0 deletions(-)
- create mode 100644 Documentation/devicetree/bindings/mfd/qcom,spmi-pmic.txt
+Signed-off-by: Josh Cartwright <joshc@codeaurora.org>
+Signed-off-by: Stanimir Varbanov <svarbanov@mm-sol.com>
+Acked-by: Lee Jones <lee.jones@linaro.org>
+---
+ drivers/mfd/Kconfig          |   15 +++++++++
+ drivers/mfd/Makefile         |    1 +
+ drivers/mfd/qcom-spmi-pmic.c |   67 ++++++++++++++++++++++++++++++++++++++++++
+ 3 files changed, 83 insertions(+), 0 deletions(-)
  create mode 100644 drivers/mfd/qcom-spmi-pmic.c
+
+diff --git a/drivers/mfd/Kconfig b/drivers/mfd/Kconfig
+index 6cc4b6a..abfe12a 100644
+--- a/drivers/mfd/Kconfig
++++ b/drivers/mfd/Kconfig
+@@ -524,6 +524,21 @@ config MFD_PM8921_CORE
+ 	  Say M here if you want to include support for PM8921 chip as a module.
+ 	  This will build a module called "pm8921-core".
+ 
++config MFD_SPMI_PMIC
++	tristate "Qualcomm SPMI PMICs"
++	depends on ARCH_QCOM || COMPILE_TEST
++	depends on OF
++	depends on SPMI
++	select REGMAP_SPMI
++	help
++	  This enables support for the Qualcomm SPMI PMICs.
++	  These PMICs are currently used with the Snapdragon 800 series of
++	  SoCs.  Note, that this will only be useful paired with descriptions
++	  of the independent functions as children nodes in the device tree.
++
++	  Say M here if you want to include support for the SPMI PMIC
++	  series as a module.  The module will be called "qcom-spmi-pmic".
++
+ config MFD_RDC321X
+ 	tristate "RDC R-321x southbridge"
+ 	select MFD_CORE
+diff --git a/drivers/mfd/Makefile b/drivers/mfd/Makefile
+index 8afedba..0e7f32e 100644
+--- a/drivers/mfd/Makefile
++++ b/drivers/mfd/Makefile
+@@ -153,6 +153,7 @@ obj-$(CONFIG_MFD_SI476X_CORE)	+= si476x-core.o
+ obj-$(CONFIG_MFD_CS5535)	+= cs5535-mfd.o
+ obj-$(CONFIG_MFD_OMAP_USB_HOST)	+= omap-usb-host.o omap-usb-tll.o
+ obj-$(CONFIG_MFD_PM8921_CORE) 	+= pm8921-core.o ssbi.o
++obj-$(CONFIG_MFD_SPMI_PMIC)	+= qcom-spmi-pmic.o
+ obj-$(CONFIG_TPS65911_COMPARATOR)	+= tps65911-comparator.o
+ obj-$(CONFIG_MFD_TPS65090)	+= tps65090.o
+ obj-$(CONFIG_MFD_AAT2870_CORE)	+= aat2870-core.o
+diff --git a/drivers/mfd/qcom-spmi-pmic.c b/drivers/mfd/qcom-spmi-pmic.c
+new file mode 100644
+index 0000000..4b8beb2
+--- /dev/null
++++ b/drivers/mfd/qcom-spmi-pmic.c
+@@ -0,0 +1,67 @@
++/*
++ * Copyright (c) 2014, The Linux Foundation. All rights reserved.
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 and
++ * only version 2 as published by the Free Software Foundation.
++ *
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
++ */
++
++#include <linux/kernel.h>
++#include <linux/module.h>
++#include <linux/spmi.h>
++#include <linux/regmap.h>
++#include <linux/of_platform.h>
++
++static const struct regmap_config spmi_regmap_config = {
++	.reg_bits	= 16,
++	.val_bits	= 8,
++	.max_register	= 0xffff,
++	.fast_io	= true,
++};
++
++static int pmic_spmi_probe(struct spmi_device *sdev)
++{
++	struct device_node *root = sdev->dev.of_node;
++	struct regmap *regmap;
++
++	regmap = devm_regmap_init_spmi_ext(sdev, &spmi_regmap_config);
++	if (IS_ERR(regmap))
++		return PTR_ERR(regmap);
++
++	return of_platform_populate(root, NULL, NULL, &sdev->dev);
++}
++
++static void pmic_spmi_remove(struct spmi_device *sdev)
++{
++	of_platform_depopulate(&sdev->dev);
++}
++
++static const struct of_device_id pmic_spmi_id_table[] = {
++	{ .compatible = "qcom,spmi-pmic" },
++	{ .compatible = "qcom,pm8941" },
++	{ .compatible = "qcom,pm8841" },
++	{ .compatible = "qcom,pma8084" },
++	{ }
++};
++MODULE_DEVICE_TABLE(of, pmic_spmi_id_table);
++
++static struct spmi_driver pmic_spmi_driver = {
++	.probe = pmic_spmi_probe,
++	.remove = pmic_spmi_remove,
++	.driver = {
++		.name = "pmic-spmi",
++		.of_match_table = pmic_spmi_id_table,
++	},
++};
++module_spmi_driver(pmic_spmi_driver);
++
++MODULE_DESCRIPTION("Qualcomm SPMI PMIC driver");
++MODULE_ALIAS("spmi:spmi-pmic");
++MODULE_LICENSE("GPL v2");
++MODULE_AUTHOR("Josh Cartwright <joshc@codeaurora.org>");
++MODULE_AUTHOR("Stanimir Varbanov <svarbanov@mm-sol.com>");
+-- 
+1.7.0.4
