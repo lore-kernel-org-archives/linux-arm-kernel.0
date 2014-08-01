@@ -1,50 +1,43 @@
-From: peter.ujfalusi@ti.com (Peter Ujfalusi)
-Date: Fri, 1 Aug 2014 08:09:31 +0300
-Subject: [PATCH 2/6] ARM: DTS: da850: Add node for edma0
-In-Reply-To: <53DA5230.1050200@cogentembedded.com>
-References: <1406801934-23334-1-git-send-email-peter.ujfalusi@ti.com>
- <1406801934-23334-3-git-send-email-peter.ujfalusi@ti.com>
- <53DA5230.1050200@cogentembedded.com>
-Message-ID: <53DB210B.5010204@ti.com>
+From: afaerber@suse.de (=?UTF-8?B?QW5kcmVhcyBGw6RyYmVy?=)
+Date: Fri, 01 Aug 2014 07:16:27 +0200
+Subject: [PATCH v5 00/10] ARM: dts: exynos: Prepare Spring
+In-Reply-To: <1406868897-26874-1-git-send-email-afaerber@suse.de>
+References: <1406868897-26874-1-git-send-email-afaerber@suse.de>
+Message-ID: <53DB22AB.6020007@suse.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/31/2014 05:26 PM, Sergei Shtylyov wrote:
-> On 07/31/2014 02:18 PM, Peter Ujfalusi wrote:
-> 
->> Add DT node for edma0.
-> 
->> Signed-off-by: Peter Ujfalusi <peter.ujfalusi@ti.com>
->> ---
->>   arch/arm/boot/dts/da850.dtsi | 6 ++++++
->>   1 file changed, 6 insertions(+)
-> 
->> diff --git a/arch/arm/boot/dts/da850.dtsi b/arch/arm/boot/dts/da850.dtsi
->> index b695548dbb4e..41ce4e8bf227 100644
->> --- a/arch/arm/boot/dts/da850.dtsi
->> +++ b/arch/arm/boot/dts/da850.dtsi
->> @@ -150,6 +150,12 @@
->>               };
->>
->>           };
->> +        edma0: edma at 01c00000 {
->> +            compatible = "ti,edma3";
->> +            reg =    <0x0 0x10000>;
-> 
->    Why the mismatch between the unit-address part of the node name and the
-> "reg" property?
+Am 01.08.2014 06:54, schrieb Andreas F?rber:
+> Andreas F?rber (10):
+>   ARM: dts: Fix MMC pinctrl for exynos5250-snow
+>   ARM: dts: Fold exynos5250-cros-common into exynos5250-snow
+>   ARM: dts: Clean up exynos5250-snow
+>   ARM: dts: Fill in bootargs for exynos5250-snow
+>   ARM: dts: Move dp_hpd from exynos5250 into smdk5250 and snow
+>   ARM: dts: Clean up exynos5250-smdk5250
+>   ARM: dts: Clean up exynos5250-arndale
 
-For some reason the whole da850 uses offset from 0x01c00000 for the SoC IPs.
-The nodes are under 'soc' and that has the ranges attribute.
-I do not really like this either.
+>   ARM: dts: Fix apparent GPIO typo in exynos5250-arndale
+>   ARM: dts: Simplify USB3503 on exynos5250-arndale
 
+Note that these two are again untested! They are entirely optional.
+
+Andreas
+
+>   ARM: dts: Add exynos5250-spring device tree
 > 
->> +            interrupts = <11 13 12>;
->> +            #dma-cells = <1>;
->> +        };
-> 
-> WBR, Sergei
-> 
+>  arch/arm/boot/dts/Makefile                    |   1 +
+>  arch/arm/boot/dts/exynos5250-arndale.dts      | 927 +++++++++++++-------------
+>  arch/arm/boot/dts/exynos5250-cros-common.dtsi | 164 -----
+>  arch/arm/boot/dts/exynos5250-pinctrl.dtsi     |   7 -
+>  arch/arm/boot/dts/exynos5250-smdk5250.dts     | 641 +++++++++---------
+>  arch/arm/boot/dts/exynos5250-snow.dts         | 441 +++++++-----
+>  arch/arm/boot/dts/exynos5250-spring.dts       | 536 +++++++++++++++
+>  arch/arm/boot/dts/exynos5250.dtsi             |  24 +-
+>  8 files changed, 1624 insertions(+), 1117 deletions(-)
+>  delete mode 100644 arch/arm/boot/dts/exynos5250-cros-common.dtsi
+>  create mode 100644 arch/arm/boot/dts/exynos5250-spring.dts
 
 -- 
-P?ter
+SUSE LINUX Products GmbH, Maxfeldstr. 5, 90409 N?rnberg, Germany
+GF: Jeff Hawn, Jennifer Guild, Felix Imend?rffer; HRB 16746 AG N?rnberg
