@@ -1,41 +1,44 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Thu, 31 Jul 2014 20:57:01 -0700
-Subject: [GIT PULL] ARM: Straggler SoC fix for 3.16
-Message-ID: <20140801035701.GA20901@quad.lixom.net>
+From: behanw@converseincode.com (Behan Webster)
+Date: Thu, 31 Jul 2014 21:11:59 -0700
+Subject: [PATCH 0/4] LLVMLinux: Patches to enable the kernel to be compiled
+ with clang/LLVM
+In-Reply-To: <20140731103323.GL26853@arm.com>
+References: <1406764649-20326-1-git-send-email-behanw@converseincode.com>
+ <20140731103323.GL26853@arm.com>
+Message-ID: <53DB138F.7070709@converseincode.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Linus,
+On 07/31/14 03:33, Will Deacon wrote:
+> On Thu, Jul 31, 2014 at 12:57:25AM +0100, behanw at converseincode.com wrote:
+>> From: Behan Webster <behanw@converseincode.com>
+>>
+>> This patch set moves from using locally defined named registers to access the
+>> stack pointer to using a globally defined named register. This allows the code
+>> to work both with gcc and clang.
+>>
+>> The LLVMLinux project aims to fully build the Linux kernel using both gcc and
+>> clang (the C front end for the LLVM compiler infrastructure project).
+>>
+>> Behan Webster (4):
+>>    arm64: LLVMLinux: Add current_stack_pointer() for arm64
+>>    arm64: LLVMLinux: Use current_stack_pointer in save_stack_trace_tsk
+>>    arm64: LLVMLinux: Calculate current_thread_info from
+>>      current_stack_pointer
+>>    arm64: LLVMLinux: Use current_stack_pointer in kernel/traps.c
+> Once Andreas's comments have been addressed:
+>
+>    Acked-by: Will Deacon <will.deacon@arm.com>
+>
+> Please can you send a new series after the merge window?
+Pity. I was hoping to get it in this merge window.
 
-The following changes since commit a1ae5b128365f36a3fa2143cfa9de14fc71c51d8:
+However, will resubmit for 3.18.
 
-  Merge tag 'omap-for-v3.16/n900-regression' of git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap into fixes (2014-07-29 13:04:27 +0200)
+Thanks,
 
-are available in the git repository at:
+Behan
 
-  git://git.kernel.org/pub/scm/linux/kernel/git/arm/arm-soc.git tags/fixes-for-linus
-
-for you to fetch changes up to b779b88df8370feafa6f49d08a2cc88db4834992:
-
-  MAINTAINERS: Update Tegra Git URL (2014-07-30 12:50:54 -0700)
-
-----------------------------------------------------------------
-ARM: Straggler SoC fix for 3.16
-
-A DT bugfix for Nomadik that had an ambigouos double-inversion of a gpio
-line, and one MAINTAINER URL update that might as well go in now.
-
-We could hold off until the merge window, but then we'll just have to mark
-the DT fix for stable and it just seems like in total causing more work.
-
-----------------------------------------------------------------
-Andreas F?rber (1):
-      MAINTAINERS: Update Tegra Git URL
-
-Linus Walleij (1):
-      ARM: nomadik: fix up double inversion in DT
-
- MAINTAINERS                                | 2 +-
- arch/arm/boot/dts/ste-nomadik-s8815.dts    | 2 +-
- arch/arm/boot/dts/ste-nomadik-stn8815.dtsi | 7 ++++---
- 3 files changed, 6 insertions(+), 5 deletions(-)
+-- 
+Behan Webster
+behanw at converseincode.com
