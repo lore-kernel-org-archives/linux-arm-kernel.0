@@ -1,87 +1,293 @@
-From: spk.linux@gmail.com (Sachin Kamat)
-Date: Fri, 1 Aug 2014 12:14:41 +0530
-Subject: [PATCH] ARM: multi_v7_defconfig: major refresh
-In-Reply-To: <CAK5sBcEPQtMvT+mp4+jXQA06FcBRTdAVJLbTCtCu-kV07Wh5RQ@mail.gmail.com>
-References: <1406052070-6207-1-git-send-email-olof@lixom.net>
- <12165027.MHmNZOI7jc@wuerfel>
- <CAOesGMjo0AY=eGcfTh1sVxKkURK9bzK8SBAeEbvBFN4R0sF34A@mail.gmail.com>
- <CAC5m3BwDvHVMJEfXE4w5zQ2RYXYt9PRF8uP=3M03Rr3Ls=N4eQ@mail.gmail.com>
- <CAK5sBcEPQtMvT+mp4+jXQA06FcBRTdAVJLbTCtCu-kV07Wh5RQ@mail.gmail.com>
-Message-ID: <CAK5sBcGrAKCRYvLxvgeDU=Bu-MoDTgwY+dmEBbiuCpn5ttRU3Q@mail.gmail.com>
+From: hanjun.guo@linaro.org (Hanjun Guo)
+Date: Fri, 01 Aug 2014 14:49:27 +0800
+Subject: [PATCH 10/19] ARM64 / ACPI: Get the enable method for SMP
+ initialization in ACPI way
+In-Reply-To: <1406832724.8971.29.camel@smoke>
+References: <1406206825-15590-1-git-send-email-hanjun.guo@linaro.org>	
+ <1406206825-15590-11-git-send-email-hanjun.guo@linaro.org>
+ <1406832724.8971.29.camel@smoke>
+Message-ID: <53DB3877.3010909@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jul 31, 2014 at 11:56 AM, Sachin Kamat <spk.linux@gmail.com> wrote:
-> On Thu, Jul 31, 2014 at 11:37 AM, Tushar Behera <trblinux@gmail.com> wrote:
->> On Wed, Jul 23, 2014 at 1:58 AM, Olof Johansson <olof@lixom.net> wrote:
->>> On Tue, Jul 22, 2014 at 11:36 AM, Arnd Bergmann <arnd@arndb.de> wrote:
->>>> On Tuesday 22 July 2014 11:01:10 Olof Johansson wrote:
->>>>> This is a major refresh of the multi_v7_defconfig:
->>>>>
->>>>> - Bring over a bunch of Samsung drivers to make ODROID-U3 and Chromebooks usable
->>>>>  * Enable big.LITTLE
->>>>>  * MCPM
->>>>>  * CYAPA touchpad
->>>>>  * Samsung-related MTD/regulator/clk/pinmux drivers
->>>>>  * Add some of the CrOS EC drivers
->>>>> - Turn on TPM, HW_RANDOM
->>>>> - OMAP_USB3 -> TI_PIPE3 option rename
->>>>> - Enable MCPM/b.L for VEXPRESS
->>>>> - Add new CONFIG_MTD_SPI_NOR since it otherwise masks off SPI NOR drivers
->>>>> - CONFIG_LOGO, because penguins.
->>>>>
->>>>> I took care to keep the new options that have been added for whose the
->>>>> drivers are not yet in our for-next branch. This was pretty awkward so
->>>>> we should sort out how to handle those better in the future.
->>>>
->>>> Since you've already done all those, how about enabling THUMB2_KERNEL?
->>>> For the multi_v7_defconfig, it should actually give some benefits,
->>>> since it's rather large, and it would be good to have some more testing
->>>> with this option enabled.
->>>>
->>>> I guess the first step would be to enable it and just see if your
->>>> boot farm survives the change.
->>>
->>> Good point, I'll definitely give that a go once the current issues are resolved.
->>>
->>> Which are: These changes make 5250-based machines (snow and arndale)
->>> break. Lots of i2c timeouts on SATA and hdmi-phy. Looks like arndale
->>> might be missing pinctrl setups for it?
->
-> i2c timeout issue should have been fixed with the following patch:
-> i2c: i2c-s3c2410: Drop class based scanning to improve bootup time
-> (commit id: 6031d3dfc73b49bede540872e51a70ee0b6786d4) which is
-> available on Wolfram's I2C tree (should be part of linux-next too). Also
-> I do not see I2C_S3C2410 enabled in the config.
-> I do not have access to h/w today. I can verify and check tomorrow or
-> somebody could test it in the meantime with the above suggestions?
+On 2014-8-1 2:52, Geoff Levand wrote:
+> Hi Hanjun,
 
-Olof,
-Tested your multi_v7_defconfig patch on top of latest linux-next (20140731).
-I did not see any aforementioned i2c issues on 5250 based Snow board. It
-booted fine. However on 5250 based Arndale board, the boot stops at
-the following:
+Hi Geoff,
 
-[    1.951863] ehci_hcd: USB 2.0 'Enhanced' Host Controller (EHCI) Driver
-[    1.956937] ehci-pci: EHCI PCI platform driver
-[    1.961392] ehci-exynos: EHCI EXYNOS driver
-[    1.965698] exynos-ehci 12110000.usb: EHCI Host Controller
-[    1.971007] exynos-ehci 12110000.usb: new USB bus registered,
-assigned bus number 1
-[    1.981593] exynos-ehci 12110000.usb: can't setup: -110
-[    1.985361] exynos-ehci 12110000.usb: USB bus 1 deregistered
-[    1.991001] exynos-ehci 12110000.usb: Failed to add USB HCD
-[    1.996569] exynos-ehci: probe of 12110000.usb failed with error -110
-[    2.003041] ohci_hcd: USB 1.1 'Open' Host Controller (OHCI) Driver
-[    2.009149] ohci-exynos: OHCI EXYNOS driver
-[    2.013457] exynos-ohci 12120000.usb: USB Host Controller
-[    2.018702] exynos-ohci 12120000.usb: new USB bus registered,
-assigned bus number 1
+> 
+> On Thu, 2014-07-24 at 21:00 +0800, Hanjun Guo wrote:
+>> ACPI 5.1 only has two explicit methods to boot up SMP,
+>> PSCI and Parking protocol, but the Parking protocol is
+>> only suitable for ARMv7 now, so make PSCI as the only way
+>> for the SMP boot protocol before some updates for the
+>> ACPI spec or the Parking protocol spec.
+>>
+>> Signed-off-by: Hanjun Guo <hanjun.guo@linaro.org>
+>> Signed-off-by: Tomasz Nowicki <tomasz.nowicki@linaro.org>
+>> ---
+>>  arch/arm64/include/asm/acpi.h    |   21 +++++++++++++++
+>>  arch/arm64/include/asm/cpu_ops.h |    9 ++++++-
+>>  arch/arm64/include/asm/smp.h     |    2 +-
+>>  arch/arm64/kernel/acpi.c         |    9 +++++++
+>>  arch/arm64/kernel/cpu_ops.c      |   52 ++++++++++++++++++++++++++++++++++----
+>>  arch/arm64/kernel/smp.c          |   29 +++++++++++++++++++--
+>>  6 files changed, 113 insertions(+), 9 deletions(-)
+>>
+>> diff --git a/arch/arm64/include/asm/acpi.h b/arch/arm64/include/asm/acpi.h
+>> index 5ce85f8..6240327 100644
+>> --- a/arch/arm64/include/asm/acpi.h
+>> +++ b/arch/arm64/include/asm/acpi.h
+>> @@ -14,6 +14,27 @@
+>>  
+>>  /* Basic configuration for ACPI */
+>>  #ifdef	CONFIG_ACPI
+> 
+> ^^ This seems to be a tab (\t) character here, which is a strange thing
+> for me to see...
 
-Boots well with exynos_defconfig though. Probably some conflict with
-other config options?
-I couldn't find out as I am busy with some other activity.
+Yes, seems to be a tab but actually not :)
 
--- 
-Regards,
-Sachin.
+> 
+>> +/*
+>> + * ACPI 5.1 only has two explicit methods to
+>> + * boot up SMP, PSCI and Parking protocol,
+>> + * but the Parking protocol is only defined
+>> + * for ARMv7 now, so make PSCI as the only
+>> + * way for the SMP boot protocol before some
+>> + * updates for the ACPI spec or the Parking
+>> + * protocol spec.
+>> + *
+>> + * This enum is intend to make the boot method
+>> + * scalable when above updates are happended,
+>> + * which NOT means to support all of them.
+>> + */
+> 
+> This comment will become out of date soon (I hope), and it is often the
+> case that these short term comments are not removed, so I think it
+> better to put this kind of note into the commit message, not the code.
+
+This will need some time, the spec is not ready and we still need more time
+for people to implement Parking protocol, I think we can keep this comments
+until Parking protocol driver is ready, and update them at that time.
+
+> 
+>> +enum acpi_smp_boot_protocol {
+>> +	ACPI_SMP_BOOT_PSCI,
+>> +	ACPI_SMP_BOOT_PARKING_PROTOCOL,
+>> +	ACPI_SMP_BOOT_PROTOCOL_MAX
+>> +};
+>> +
+>> +enum acpi_smp_boot_protocol smp_boot_protocol(void);
+>> +
+>>  extern int acpi_disabled;
+>>  extern int acpi_noirq;
+>>  extern int acpi_pci_disabled;
+>> diff --git a/arch/arm64/include/asm/cpu_ops.h b/arch/arm64/include/asm/cpu_ops.h
+>> index d7b4b38..2a7c6fd 100644
+>> --- a/arch/arm64/include/asm/cpu_ops.h
+>> +++ b/arch/arm64/include/asm/cpu_ops.h
+>> @@ -61,7 +61,14 @@ struct cpu_operations {
+>>  };
+>>  
+>>  extern const struct cpu_operations *cpu_ops[NR_CPUS];
+>> -extern int __init cpu_read_ops(struct device_node *dn, int cpu);
+>> +extern int __init cpu_of_read_ops(struct device_node *dn, int cpu);
+>> +
+>> +#ifdef CONFIG_ACPI
+>> +extern int __init cpu_acpi_read_ops(int cpu);
+>> +#else
+>> +static inline int __init cpu_acpi_read_ops(int cpu) { return -ENODEV; }
+>> +#endif
+> 
+> This looks messy and not scalable for new enable methods.  It
+> seems a better way is to retain cpu_read_ops() and its functionality,
+> which is to return the proper enable method for that cpu in a generic
+> way.
+> 
+> Is there some reason you can't integrate acpi into the existing
+> cpu_ops and need to make this completely parallel method?
+> 
+>>  extern void __init cpu_read_bootcpu_ops(void);
+>>  
+>>  #endif /* ifndef __ASM_CPU_OPS_H */
+>> diff --git a/arch/arm64/include/asm/smp.h b/arch/arm64/include/asm/smp.h
+>> index a498f2c..a5cea56 100644
+>> --- a/arch/arm64/include/asm/smp.h
+>> +++ b/arch/arm64/include/asm/smp.h
+>> @@ -39,7 +39,7 @@ extern void show_ipi_list(struct seq_file *p, int prec);
+>>  extern void handle_IPI(int ipinr, struct pt_regs *regs);
+>>  
+>>  /*
+>> - * Setup the set of possible CPUs (via set_cpu_possible)
+>> + * Platform specific SMP operations
+>>   */
+>>  extern void smp_init_cpus(void);
+>>  
+>> diff --git a/arch/arm64/kernel/acpi.c b/arch/arm64/kernel/acpi.c
+>> index ff0f6a0..2af6662 100644
+>> --- a/arch/arm64/kernel/acpi.c
+>> +++ b/arch/arm64/kernel/acpi.c
+>> @@ -184,6 +184,15 @@ static int __init acpi_parse_madt_gic_cpu_interface_entries(void)
+>>  	return 0;
+>>  }
+>>  
+>> +/* Protocol to bring up secondary CPUs */
+>> +enum acpi_smp_boot_protocol smp_boot_protocol(void)
+>> +{
+>> +	if (acpi_psci_present)
+>> +		return ACPI_SMP_BOOT_PSCI;
+>> +	else
+>> +		return ACPI_SMP_BOOT_PARKING_PROTOCOL;
+>> +}
+>> +
+>>  static int __init acpi_parse_fadt(struct acpi_table_header *table)
+>>  {
+>>  	struct acpi_table_fadt *fadt = (struct acpi_table_fadt *)table;
+>> diff --git a/arch/arm64/kernel/cpu_ops.c b/arch/arm64/kernel/cpu_ops.c
+>> index d62d12f..4d9b3cf 100644
+>> --- a/arch/arm64/kernel/cpu_ops.c
+>> +++ b/arch/arm64/kernel/cpu_ops.c
+>> @@ -16,11 +16,13 @@
+>>   * along with this program.  If not, see <http://www.gnu.org/licenses/>.
+>>   */
+>>  
+>> -#include <asm/cpu_ops.h>
+>> -#include <asm/smp_plat.h>
+>>  #include <linux/errno.h>
+>>  #include <linux/of.h>
+>>  #include <linux/string.h>
+>> +#include <linux/acpi.h>
+>> +
+>> +#include <asm/cpu_ops.h>
+>> +#include <asm/smp_plat.h>
+>>  
+>>  extern const struct cpu_operations smp_spin_table_ops;
+>>  extern const struct cpu_operations cpu_psci_ops;
+>> @@ -52,7 +54,7 @@ static const struct cpu_operations * __init cpu_get_ops(const char *name)
+>>  /*
+>>   * Read a cpu's enable method from the device tree and record it in cpu_ops.
+>>   */
+>> -int __init cpu_read_ops(struct device_node *dn, int cpu)
+>> +int __init cpu_of_read_ops(struct device_node *dn, int cpu)
+>>  {
+>>  	const char *enable_method = of_get_property(dn, "enable-method", NULL);
+>>  	if (!enable_method) {
+>> @@ -76,12 +78,52 @@ int __init cpu_read_ops(struct device_node *dn, int cpu)
+>>  	return 0;
+>>  }
+>>  
+>> +#ifdef CONFIG_ACPI
+>> +/*
+>> + * Read a cpu's enable method in the ACPI way and record it in cpu_ops.
+>> + */
+>> +int __init cpu_acpi_read_ops(int cpu)
+>> +{
+>> +	/*
+>> +	 * For ACPI 5.1, only two kind of methods are provided,
+>> +	 * Parking protocol and PSCI, but Parking protocol is
+>> +	 * used on ARMv7 only, so make PSCI as the only method
+>> +	 * for SMP initialization before the ACPI spec or Parking
+>> +	 * protocol spec is updated.
+>> +	 */
+> 
+> Again, this comment will get old fast (I hope).
+> 
+>> +	switch (smp_boot_protocol()) {
+>> +	case ACPI_SMP_BOOT_PSCI:
+>> +		cpu_ops[cpu] = cpu_get_ops("psci");
+>> +		break;
+>> +	case ACPI_SMP_BOOT_PARKING_PROTOCOL:
+>> +	default:
+>> +		cpu_ops[cpu] = NULL;
+>> +		break;
+>> +	}
+>> +
+>> +	if (!cpu_ops[cpu]) {
+>> +		pr_warn("CPU %d: unsupported enable-method, only PSCI is supported\n",
+>> +			cpu);
+>> +		return -EOPNOTSUPP;
+>> +	}
+>> +
+>> +	return 0;
+>> +}
+>> +#endif
+>> +
+>>  void __init cpu_read_bootcpu_ops(void)
+>>  {
+>> -	struct device_node *dn = of_get_cpu_node(0, NULL);
+>> +	struct device_node *dn;
+>> +
+>> +	if (!acpi_disabled) {
+>> +		cpu_acpi_read_ops(0);
+>> +		return;
+>> +	}
+>> +
+>> +	dn = of_get_cpu_node(0, NULL);
+>>  	if (!dn) {
+>>  		pr_err("Failed to find device node for boot cpu\n");
+>>  		return;
+>>  	}
+>> -	cpu_read_ops(dn, 0);
+>> +	cpu_of_read_ops(dn, 0);
+>>  }
+>> diff --git a/arch/arm64/kernel/smp.c b/arch/arm64/kernel/smp.c
+>> index 8f1d37c..cb71662 100644
+>> --- a/arch/arm64/kernel/smp.c
+>> +++ b/arch/arm64/kernel/smp.c
+>> @@ -315,7 +315,7 @@ static void (*smp_cross_call)(const struct cpumask *, unsigned int);
+>>   * cpu logical map array containing MPIDR values related to logical
+>>   * cpus. Assumes that cpu_logical_map(0) has already been initialized.
+>>   */
+>> -void __init smp_init_cpus(void)
+>> +static void __init of_smp_init_cpus(void)
+>>  {
+>>  	struct device_node *dn = NULL;
+>>  	unsigned int i, cpu = 1;
+>> @@ -387,7 +387,7 @@ void __init smp_init_cpus(void)
+>>  		if (cpu >= NR_CPUS)
+>>  			goto next;
+>>  
+>> -		if (cpu_read_ops(dn, cpu) != 0)
+>> +		if (cpu_of_read_ops(dn, cpu) != 0)
+>>  			goto next;
+>>  
+>>  		if (cpu_ops[cpu]->cpu_init(dn, cpu))
+>> @@ -418,6 +418,31 @@ next:
+>>  			set_cpu_possible(i, true);
+>>  }
+>>  
+>> +/*
+>> + * In ACPI mode, the cpu possible map was enumerated before SMP
+>> + * initialization when MADT table was parsed, so we can get the
+>> + * possible map here to initialize CPUs.
+>> + */
+>> +static void __init acpi_smp_init_cpus(void)
+>> +{
+>> +	int cpu;
+>> +
+>> +	for_each_possible_cpu(cpu) {
+>> +		if (cpu_acpi_read_ops(cpu) != 0)
+>> +			continue;
+>> +
+>> +		cpu_ops[cpu]->cpu_init(NULL, cpu);
+>> +	}
+>> +}
+>> +
+>> +void __init smp_init_cpus(void)
+>> +{
+>> +	if (acpi_disabled)
+>> +		of_smp_init_cpus();
+>> +	else
+>> +		acpi_smp_init_cpus();
+>> +}
+> 
+> This is the same as cpu_ops, is acpi so special we need a completely
+> parallel method of initializing secondary cpus?
+
+Good point, Olof suggested the same here, I'm working on it and try to
+implement the code as you suggested, if I can't I will comment on it for
+the reasons that why I can't make it.
+
+Thanks
+Hanjun
