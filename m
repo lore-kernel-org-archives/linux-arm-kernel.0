@@ -1,24 +1,46 @@
-From: vinod.koul@intel.com (Vinod Koul)
-Date: Fri, 1 Aug 2014 22:52:56 +0530
-Subject: [PATCH] Documentation: dmaengine: Add a documentation for the
- dma controller API
-In-Reply-To: <20140731132223.GK30282@n2100.arm.linux.org.uk>
-References: <1406736193-26685-1-git-send-email-maxime.ripard@free-electrons.com>
- <20140730160607.GM8181@intel.com> <20140731074440.GY3952@lukather>
- <20140731132223.GK30282@n2100.arm.linux.org.uk>
-Message-ID: <20140801172256.GH8181@intel.com>
+From: broonie@kernel.org (Mark Brown)
+Date: Fri, 1 Aug 2014 18:35:06 +0100
+Subject: [PATCH v2 1/2] spi: davinci: add support to configure gpio cs
+ through dt
+In-Reply-To: <1406911233-18999-2-git-send-email-grygorii.strashko@ti.com>
+References: <1406911233-18999-1-git-send-email-grygorii.strashko@ti.com>
+ <1406911233-18999-2-git-send-email-grygorii.strashko@ti.com>
+Message-ID: <20140801173506.GB30458@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jul 31, 2014 at 02:22:23PM +0100, Russell King - ARM Linux wrote:
-> DMA engine has lacked a lot of infrastructure for common patterns in
-> drivers; some of that is solved by my efforts with the virt_dma.c
-> support, and also various cleanups to existing drivers, but it's not
-> easy to fix this problem after drivers have been merged.
-I think list management is something that needs fix. I see lots of time and
-energy being spent by drivers in this.
-I will plan for this in near future to move descriptor and list management
-to the framework. That should help drivers get cleaned up a bit more
+On Fri, Aug 01, 2014 at 07:40:32PM +0300, Grygorii Strashko wrote:
+> From: Murali Karicheri <m-karicheri2@ti.com>
+> 
+> Currently driver supports only configuration of GPIO CS through
+> platform data. This patch enhances the driver to configure GPIO
+> CS through DT. Also update the DT binding documentation to
+> reflect the availability of cs-gpios.
 
--- 
-~Vinod
+Ah, sorry - this is the unapplied patch from before.  It would have been
+much better to submit this as the second patch after your rework patch
+since this...
+
+> -	if (pdata->chip_sel && chip_sel < pdata->num_chipselect &&
+> -				pdata->chip_sel[chip_sel] != SPI_INTERN_CS)
+> +	if (np && master->cs_gpios != NULL && spi->cs_gpio >= 0) {
+> +		/* SPI core parse and update master->cs_gpio */
+>  		gpio_chipsel = true;
+> +		gpio = spi->cs_gpio;
+> +	} else if (pdata->chip_sel &&
+> +		   chip_sel < pdata->num_chipselect &&
+> +		   pdata->chip_sel[chip_sel] != SPI_INTERN_CS) {
+> +		/* platform data defines chip_sel */
+> +		gpio_chipsel = true;
+> +		gpio = pdata->chip_sel[chip_sel];
+> +	}
+
+...still looks excessively confusing - it is way more logic than I'd
+expect to see on every chip select.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140801/813b5f28/attachment.sig>
