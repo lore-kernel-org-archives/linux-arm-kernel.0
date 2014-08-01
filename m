@@ -1,73 +1,47 @@
-From: peter.ujfalusi@ti.com (Peter Ujfalusi)
-Date: Fri, 1 Aug 2014 09:13:30 +0300
-Subject: [PATCH v2 6/6] ARM: DTS: da850-evm: Enable audio via simple-card
-In-Reply-To: <1406873610-5037-1-git-send-email-peter.ujfalusi@ti.com>
-References: <1406873610-5037-1-git-send-email-peter.ujfalusi@ti.com>
-Message-ID: <1406873610-5037-7-git-send-email-peter.ujfalusi@ti.com>
+From: nsekhar@ti.com (Sekhar Nori)
+Date: Fri, 1 Aug 2014 11:48:55 +0530
+Subject: [PATCH 2/6] ARM: DTS: da850: Add node for edma0
+In-Reply-To: <53DB210B.5010204@ti.com>
+References: <1406801934-23334-1-git-send-email-peter.ujfalusi@ti.com>
+ <1406801934-23334-3-git-send-email-peter.ujfalusi@ti.com>
+ <53DA5230.1050200@cogentembedded.com> <53DB210B.5010204@ti.com>
+Message-ID: <53DB314F.6060706@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The audio on the board is using McASP <-> tlv320aic3106 codec and we have
-LineIn and LineOut jacks.
+On Friday 01 August 2014 10:39 AM, Peter Ujfalusi wrote:
+> On 07/31/2014 05:26 PM, Sergei Shtylyov wrote:
+>> On 07/31/2014 02:18 PM, Peter Ujfalusi wrote:
+>>
+>>> Add DT node for edma0.
+>>
+>>> Signed-off-by: Peter Ujfalusi <peter.ujfalusi@ti.com>
+>>> ---
+>>>   arch/arm/boot/dts/da850.dtsi | 6 ++++++
+>>>   1 file changed, 6 insertions(+)
+>>
+>>> diff --git a/arch/arm/boot/dts/da850.dtsi b/arch/arm/boot/dts/da850.dtsi
+>>> index b695548dbb4e..41ce4e8bf227 100644
+>>> --- a/arch/arm/boot/dts/da850.dtsi
+>>> +++ b/arch/arm/boot/dts/da850.dtsi
+>>> @@ -150,6 +150,12 @@
+>>>               };
+>>>
+>>>           };
+>>> +        edma0: edma at 01c00000 {
+>>> +            compatible = "ti,edma3";
+>>> +            reg =    <0x0 0x10000>;
+>>
+>>    Why the mismatch between the unit-address part of the node name and the
+>> "reg" property?
+> 
+> For some reason the whole da850 uses offset from 0x01c00000 for the SoC IPs.
+> The nodes are under 'soc' and that has the ranges attribute.
+> I do not really like this either.
 
-Signed-off-by: Peter Ujfalusi <peter.ujfalusi@ti.com>
----
- arch/arm/boot/dts/da850-evm.dts | 29 +++++++++++++++++++++++++++++
- 1 file changed, 29 insertions(+)
+There is no reason I can remember for why we chose to go the offset +
+ranges way. Probably based it on an early OMAP example. Right now lets
+keep it that way unless there is a big disadvantage.
 
-diff --git a/arch/arm/boot/dts/da850-evm.dts b/arch/arm/boot/dts/da850-evm.dts
-index 41715b495861..4f935ad9f27b 100644
---- a/arch/arm/boot/dts/da850-evm.dts
-+++ b/arch/arm/boot/dts/da850-evm.dts
-@@ -52,6 +52,7 @@
- 				reg = <0x48>;
- 			};
- 			tlv320aic3106: tlv320aic3106 at 18 {
-+				#sound-dai-cells = <0>;
- 				compatible = "ti,tlv320aic3106";
- 				reg = <0x18>;
- 				status = "okay";
-@@ -142,6 +143,33 @@
- 		regulator-max-microvolt = <5000000>;
- 		regulator-boot-on;
- 	};
-+
-+	sound {
-+		compatible = "simple-audio-card";
-+		simple-audio-card,name = "DA850/OMAP-L138 EVM";
-+		simple-audio-card,widgets =
-+			"Line", "Line In",
-+			"Line", "Line Out";
-+		simple-audio-card,routing =
-+			"LINE1L", "Line In",
-+			"LINE1R", "Line In",
-+			"Line Out", "LLOUT",
-+			"Line Out", "RLOUT";
-+		simple-audio-card,format = "dsp_b";
-+		simple-audio-card,bitclock-master = <&link0_codec>;
-+		simple-audio-card,frame-master = <&link0_codec>;
-+		simple-audio-card,bitclock-inversion;
-+
-+		simple-audio-card,cpu {
-+			sound-dai = <&mcasp0>;
-+			system-clock-frequency = <24576000>;
-+		};
-+
-+		link0_codec: simple-audio-card,codec {
-+			sound-dai = <&tlv320aic3106>;
-+			system-clock-frequency = <24576000>;
-+		};
-+	};
- };
- 
- /include/ "tps6507x.dtsi"
-@@ -197,6 +225,7 @@
- };
- 
- &mcasp0 {
-+	#sound-dai-cells = <0>;
- 	status = "okay";
- 	pinctrl-names = "default";
- 	pinctrl-0 = <&mcasp0_pins>;
--- 
-2.0.2
+Thanks,
+Sekhar
