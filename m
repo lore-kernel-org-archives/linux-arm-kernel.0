@@ -1,54 +1,30 @@
-From: svarbanov@mm-sol.com (Stanimir Varbanov)
-Date: Fri, 01 Aug 2014 11:31:29 +0300
-Subject: [PATCH v3 1/4] mfd: pm8xxx-spmi: add support for Qualcomm SPMI
- PMICs
-In-Reply-To: <53DA02C0.2050606@mm-sol.com>
-References: <1406205921-7452-1-git-send-email-svarbanov@mm-sol.com>
- <1406205921-7452-2-git-send-email-svarbanov@mm-sol.com>
- <53D8182A.5050204@codeaurora.org> <53DA02C0.2050606@mm-sol.com>
-Message-ID: <53DB5061.8080403@mm-sol.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Fri, 1 Aug 2014 09:32:46 +0100
+Subject: [PATCH] arm64: optimize memcpy_{from,to}io() and memset_io()
+In-Reply-To: <20140801063009.GA24602@codeaurora.org>
+References: <1406701706-12808-1-git-send-email-joonwoop@codeaurora.org>
+ <20140801063009.GA24602@codeaurora.org>
+Message-ID: <20140801083245.GE15733@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/31/2014 11:48 AM, Stanimir Varbanov wrote:
-> Hi David,
+On Fri, Aug 01, 2014 at 07:30:09AM +0100, Joonwoo Park wrote:
+> + Catalin, Will
 > 
-> Thanks for the comments!
-> 
-> On 07/30/2014 12:54 AM, David Collins wrote:
->> On 07/24/2014 05:45 AM, Stanimir Varbanov wrote:
->>> From: Josh Cartwright <joshc@codeaurora.org>
->>>
->>> The Qualcomm SPMI PMIC chips are components used with the
->>> Snapdragon 800 series SoC family.  This driver exists
->>> largely as a glue mfd component, it exists to be an owner
->>> of an SPMI regmap for children devices described in
->>> device tree.
->>>
->>> Signed-off-by: Josh Cartwright <joshc@codeaurora.org>
->>> Signed-off-by: Stanimir Varbanov <svarbanov@mm-sol.com>
->>> Acked-by: Lee Jones <lee.jones@linaro.org>
->>> ---
->>>  drivers/mfd/Kconfig       |   16 +++++++++++
->>>  drivers/mfd/Makefile      |    1 +
->>>  drivers/mfd/pm8xxx-spmi.c |   65 +++++++++++++++++++++++++++++++++++++++++++++
->>
->> Would it be possible to rename this driver: qcom-spmi-pmic.c?  The driver
->> will be supporting several PMICs that do not fit the pm8xxx naming scheme.
->>  One of which is even specified in the compatible list of this driver
->> (pma8084).  There is presently downstream support for the following PMICs:
->> PM8019, PM8110, PM8226, PM8841, PM8916, PM8941, PM8994, PMA8084, PMD9635,
->> PMI8962, and PMI8994 [1].  Four of these do not fit the "PM8XXX" template.
-> 
-> I haven't strong opinion on the file names. The qcom prefix is the one
-> which annoying me. If you look at /drivers/mfd the company name prefixes
-> are very few.
-> 
-> The *compatible* strings are the important thing here. So If MFD
-> maintainer is fine with this name I'm fine too.
+> Thanks,
+> Joonwoo
+> On Tue, Jul 29, 2014 at 11:28:26PM -0700, Joonwoo Park wrote:
+> > Optimize memcpy_{from,to}io() and memset_io() by transferring in 64 bit
+> > as much as possible with minimized barrier usage.  This simplest optimization
+> > brings faster throughput compare to current byte-by-byte read and write with
+> > barrier in the loop.  Code's skeleton is taken from the powerpc.
 
-Lee, are you OK with suggested names qcom-spmi-pmic and qcom-ssbi-pmic?
+Hmm, I've never really understood the use-case for memcpy_{to,from}io on
+ARM, so getting to the bottom of that would help in reviewing this patch.
 
--- 
-regards,
-Stan
+Can you point me at the drivers which are using this for ARM please? Doing a
+blind byte-by-byte copy could easily cause problems with some peripherals,
+so there must be an underlying assumption somewhere about how this is
+supposed to work.
+
+Will
