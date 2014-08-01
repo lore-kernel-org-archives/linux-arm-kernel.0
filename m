@@ -1,25 +1,63 @@
-From: viresh.kumar@linaro.org (Viresh Kumar)
-Date: Fri, 1 Aug 2014 15:12:33 +0530
-Subject: [PATCH v9 0/6] cpufreq: use generic cpufreq drivers for exynos
- platforms
-In-Reply-To: <CAJuA9ajCP85aWL8ke_2sZ0bNXYxPHOLDHMfTVG1F7Z1aMCAyNA@mail.gmail.com>
-References: <1406707663-16656-1-git-send-email-thomas.ab@samsung.com>
- <53DA4F73.5040400@gmail.com>
- <CAJuA9ahoke1b+=TgJQ0tfb4dKh4QmT7w1PoLkB0pZueWr0Awkw@mail.gmail.com>
- <CAJuA9ajCP85aWL8ke_2sZ0bNXYxPHOLDHMfTVG1F7Z1aMCAyNA@mail.gmail.com>
-Message-ID: <CAKohpon2OqxtShjp8dE2qtukh6=2_v2B=neH+mvyFN9spq_56g@mail.gmail.com>
+From: alex.bennee@linaro.org (Alex =?utf-8?Q?Benn=C3=A9e?=)
+Date: Fri, 01 Aug 2014 10:48:36 +0100
+Subject: [PATCH] arm64: KVM: export current vcpu->pause state via pseudo
+ regs
+In-Reply-To: <20140731165006.GL11610@cbox>
+References: <1404914112-7298-1-git-send-email-alex.bennee@linaro.org>
+ <20140731143538.GI11610@cbox> <87mwbpimgz.fsf@linaro.org>
+ <20140731163805.GK11610@cbox>
+ <CAFEAcA91efUg3MVpLScNBkxZSEgDP0zNnmxxr055fAz5=vDCoA@mail.gmail.com>
+ <20140731165006.GL11610@cbox>
+Message-ID: <87egx0ilkg.fsf@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 1 August 2014 00:04, Thomas Abraham <ta.omasab@gmail.com> wrote:
-> You had acked the cpufreq related changes in  v7 of this series. But
-> there were some changes in v8 and so I have not included your Ack for
-> v8 and v9. Could you please have one more look at the patches 4/6 [1]
-> and 5/6 [2] of this v9 series and let me know if it looks okay.
+
+Christoffer Dall writes:
+
+> On Thu, Jul 31, 2014 at 05:45:28PM +0100, Peter Maydell wrote:
+>> On 31 July 2014 17:38, Christoffer Dall <christoffer.dall@linaro.org> wrote:
+>> >> > If we are not complaining when setting the pause value to false if it
+>> >> > was true before, then we probably also need to wake up the thread in
+>> >> > case this is called from another thread, right?
+>> >> >
+>> >> > or perhaps we should just return an error if you're trying to un-pause a
+>> >> > CPU through this interface, hmmmm.
+>> >>
+>> >> Wouldn't it be an error to mess with any register when the system is not
+>> >> in a quiescent state? I was assuming that the wake state is dealt with
+>> >> when the run loop finally restarts.
+>> >>
+>> >
+>> > The ABI doesn't really define it as an error (the ABI doesn't enforce
+>> > anything right now) so the question is, does it ever make sense to clear
+>> > the pause flag through this ioctl?  If not, I think we should just err
+>> > on the side of caution and specify in the docs that this is not
+>> > supported and return an error.
+>> 
+>> Consider the case where the reset state of the system is
+>> "CPU 0 running, CPUs 1..N stopped", and we're doing an
+>> incoming migration to a state where all CPUs are running.
+>> In that case we'll be using this ioctl to clear the pause flag,
+>> right? (We'll also obviously need to set the PC and other
+>> register state correctly before resuming the guest.)
+>> 
+> Doh, you're right, I somehow had it in my mind that when you send the
+> thread a signal, the pause flag would be cleared, but that goes against
+> the whole idea of a CPU being turned off for KVM.
 >
-> [1] http://www.mail-archive.com/linux-samsung-soc at vger.kernel.org/msg34865.html
-> [2] http://www.mail-archive.com/linux-samsung-soc at vger.kernel.org/msg34864.html
+> But wouldn't we then have to also wake up the thread when clearing the
+> pause flag?  It feels strange that the ioctl can clear the pause flag,
+> but keep the thread on a wake-queue, and then userspace has to send the
+> thread a signal of some sort to wake it up?
+<snip>
 
-Looks fine..
+Isn't the vCPU off the wait-queue by definition if the ioctl exits and
+you go through the KVM_SET_ONE_REG stuff?
 
-Acked-by: Viresh Kumar <viresh.kumar@linaro.org>
+Once you re-enter the KVM_RUN ioctl it sees the pause_flag as cleared
+and falls straight through into kvm_guest_enter() otherwise it will
+again wait on wait_event_interruptible(*wq, !vcpu->arch.pause).
+
+-- 
+Alex Benn?e
