@@ -1,36 +1,105 @@
-From: panpan1.liu@samsung.com (panpan liu)
-Date: Fri, 01 Aug 2014 17:15:14 +0800
-Subject: [PATCH] media: s5p_mfc_dec: delete the redundant code
-Message-ID: <1406884515-3250-1-git-send-email-panpan1.liu@samsung.com>
+From: heiko@sntech.de (Heiko =?ISO-8859-1?Q?St=FCbner?=)
+Date: Fri, 01 Aug 2014 11:17:27 +0200
+Subject: [PATCH v4 4/5] ARM: dts: Fix the sort ordering of EHCI and HSIC
+ in rk3288.dtsi
+In-Reply-To: <1406846976-23127-4-git-send-email-dianders@chromium.org>
+References: <1406846976-23127-4-git-send-email-dianders@chromium.org>
+Message-ID: <5965899.y405fxfhDg@diego>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Because the api s5p_mfc_queue_setup has already realized the same function
+Am Donnerstag, 31. Juli 2014, 15:49:35 schrieb Doug Anderson:
+> The EHCI and HSIC device tree nodes were added in the wrong place.
+> Fix them.
+> 
+> Signed-off-by: Doug Anderson <dianders@chromium.org>
+> Signed-off-by: Kever Yang <kever.yang@rock-chips.com>
 
-Signed-off-by: panpan liu <panpan1.liu@samsung.com>
----
- drivers/media/platform/s5p-mfc/s5p_mfc_dec.c |    9 +--------
- 1 file changed, 1 insertion(+), 8 deletions(-)
+hmm, not sure if this counts as fix ... aka material for 3.17-rc2 or should 
+wait for 3.18. Simply because it's more a cosmetic thing.
 
-diff --git a/drivers/media/platform/s5p-mfc/s5p_mfc_dec.c b/drivers/media/platform/s5p-mfc/s5p_mfc_dec.c
+If it is a fix, could base it on the appropriate dts revision, because here 
+it's in the middle of the dwc2 series, including the
+	usb_host1: usb at ff540000
+nodes.
 
---- a/drivers/media/platform/s5p-mfc/s5p_mfc_dec.c
-+++ b/drivers/media/platform/s5p-mfc/s5p_mfc_dec.c
-@@ -544,14 +544,7 @@ static int vidioc_reqbufs(struct file *file, void *priv,
- 			mfc_err("vb2_reqbufs on capture failed\n");
- 			return ret;
- 		}
--		if (reqbufs->count < ctx->pb_count) {
--			mfc_err("Not enough buffers allocated\n");
--			reqbufs->count = 0;
--			s5p_mfc_clock_on();
--			ret = vb2_reqbufs(&ctx->vq_dst, reqbufs);
--			s5p_mfc_clock_off();
--			return -ENOMEM;
--		}
-+
- 		ctx->total_dpb_count = reqbufs->count;
- 		ret = s5p_mfc_hw_call(dev->mfc_ops, alloc_codec_buffers, ctx);
- 		if (ret) {
---
-1.7.9.5
+
+Heiko
+
+> ---
+> Changes in v4:
+> - Based on the proper patch
+> 
+> Changes in v3:
+> - EHCI and HSIC move new for version 3.
+> 
+>  arch/arm/boot/dts/rk3288.dtsi | 41
+> ++++++++++++++++++++--------------------- 1 file changed, 20 insertions(+),
+> 21 deletions(-)
+> 
+> diff --git a/arch/arm/boot/dts/rk3288.dtsi b/arch/arm/boot/dts/rk3288.dtsi
+> index 9713054..49c99f2 100644
+> --- a/arch/arm/boot/dts/rk3288.dtsi
+> +++ b/arch/arm/boot/dts/rk3288.dtsi
+> @@ -156,6 +156,17 @@
+>  		status = "disabled";
+>  	};
+> 
+> +	usb_host0_ehci: usb at ff500000 {
+> +		compatible = "generic-ehci";
+> +		reg = <0xff500000 0x100>;
+> +		interrupts = <GIC_SPI 24 IRQ_TYPE_LEVEL_HIGH>;
+> +		clocks = <&cru HCLK_USBHOST0>;
+> +		clock-names = "usbhost";
+> +		status = "disabled";
+> +	};
+> +
+> +	/* NOTE: ohci at ff520000 doesn't actually work on hardware */
+> +
+>  	usb_host1: usb at ff540000 {
+>  		compatible = "rockchip,rk3288-usb", "rockchip,rk3066-usb",
+>  				"snps,dwc2";
+> @@ -176,6 +187,15 @@
+>  		status = "disabled";
+>  	};
+> 
+> +	usb_hsic: usb at ff5c0000 {
+> +		compatible = "generic-ehci";
+> +		reg = <0xff5c0000 0x100>;
+> +		interrupts = <GIC_SPI 26 IRQ_TYPE_LEVEL_HIGH>;
+> +		clocks = <&cru HCLK_HSIC>;
+> +		clock-names = "usbhost";
+> +		status = "disabled";
+> +	};
+> +
+>  	uart2: serial at ff690000 {
+>  		compatible = "rockchip,rk3288-uart", "snps,dw-apb-uart";
+>  		reg = <0xff690000 0x100>;
+> @@ -270,27 +290,6 @@
+>  		interrupts = <GIC_SPI 111 IRQ_TYPE_LEVEL_HIGH>;
+>  		status = "disabled";
+>  	};
+> -
+> -	usb_host0_ehci: usb at ff500000 {
+> -		compatible = "generic-ehci";
+> -		reg = <0xff500000 0x100>;
+> -		interrupts = <GIC_SPI 24 IRQ_TYPE_LEVEL_HIGH>;
+> -		clocks = <&cru HCLK_USBHOST0>;
+> -		clock-names = "usbhost";
+> -		status = "disabled";
+> -	};
+> -
+> -	/* NOTE: ohci at ff520000 doesn't actually work on hardware */
+> -
+> -	usb_hsic: usb at ff5c0000 {
+> -		compatible = "generic-ehci";
+> -		reg = <0xff5c0000 0x100>;
+> -		interrupts = <GIC_SPI 26 IRQ_TYPE_LEVEL_HIGH>;
+> -		clocks = <&cru HCLK_HSIC>;
+> -		clock-names = "usbhost";
+> -		status = "disabled";
+> -	};
+> -
+>  	gic: interrupt-controller at ffc01000 {
+>  		compatible = "arm,gic-400";
+>  		interrupt-controller;
