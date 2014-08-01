@@ -1,73 +1,59 @@
-From: sudeep.holla@arm.com (Sudeep Holla)
-Date: Fri, 01 Aug 2014 15:57:46 +0100
-Subject: [PATCH] ARM: multi_v7_defconfig: major refresh
-In-Reply-To: <1406892491.2794.58.camel@linaro1.home>
-References: <1406052070-6207-1-git-send-email-olof@lixom.net>		<53DB6B4F.9080605@arm.com>	<1406890899.2794.40.camel@linaro1.home>	
- <CAOesGMi0RUbz4BSnmR92dEk3fWgN=hnENSdi55VeCXdcHLRLJQ@mail.gmail.com>	
- <53DB763A.10306@arm.com> <1406892491.2794.58.camel@linaro1.home>
-Message-ID: <53DBAAEA.2010908@arm.com>
+From: stefano.stabellini@eu.citrix.com (Stefano Stabellini)
+Date: Fri, 1 Aug 2014 15:56:22 +0100
+Subject: [PATCH v3 1/3] xen/arm: introduce XENFEAT_grant_map_identity
+In-Reply-To: <alpine.DEB.2.02.1408011552460.2293@kaball.uk.xensource.com>
+References: <alpine.DEB.2.02.1408011552460.2293@kaball.uk.xensource.com>
+Message-ID: <1406904984-16068-1-git-send-email-stefano.stabellini@eu.citrix.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+The flag tells us that the hypervisor maps a grant page to guest
+physical address == machine address of the page in addition to the
+normal grant mapping address. It is needed to properly issue cache
+maintenance operation at the completion of a DMA operation involving a
+foreign grant.
 
+Signed-off-by: Stefano Stabellini <stefano.stabellini@eu.citrix.com>
+Tested-by: Denis Schneider <v1ne2go@gmail.com>
 
-On 01/08/14 12:28, Jon Medhurst (Tixy) wrote:
-> On Fri, 2014-08-01 at 12:12 +0100, Sudeep Holla wrote:
->>
->> On 01/08/14 12:03, Olof Johansson wrote:
->>> On Fri, Aug 1, 2014 at 4:01 AM, Jon Medhurst (Tixy) <tixy@linaro.org> wrote:
->>>> On Fri, 2014-08-01 at 11:26 +0100, Sudeep Holla wrote:
+---
+Changes in v3:
+- rename XENFEAT_grant_map_11 to XENFEAT_grant_map_identity.
+---
+ arch/arm/xen/enlighten.c         |    6 ++++++
+ include/xen/interface/features.h |    3 +++
+ 2 files changed, 9 insertions(+)
 
-[...]
-
->>>>
->>>>>    One way to achieve this:
->>>>> (There's sysfs to re-enable it runtime)
->>>>
->>>> The opposite is also true, if you don't want the switcher enabled you
->>>> can disable it by the same method after boot ;-)
->>>>
->>>>> -->8
->>>>> diff --git a/arch/arm/common/bL_switcher.c b/arch/arm/common/bL_switcher.c
->>>>> index 490f3dced749..f4c36e70166a 100644
->>>>> --- a/arch/arm/common/bL_switcher.c
->>>>> +++ b/arch/arm/common/bL_switcher.c
->>>>> @@ -794,7 +794,7 @@ static int bL_switcher_hotplug_callback(struct
->>>>> notifier_block *nfb,
->>>>>            return NOTIFY_DONE;
->>>>>     }
->>>>>
->>>>> -static bool no_bL_switcher;
->>>>> +static bool no_bL_switcher = true;
->>>>
->>>> This changes the default for everyone, which I guess is fair enough if
->>>> there is a good reason, but I'm not sure there is.
->>>
->>> No, I don't think there is.
->>>
->>
->> It's just that people using TC2 will suddenly see 3 of the 5 CPUs missing.
->
-> Yes, if they we're previously using multi_v7_defconfig (do people
-> working specifically with TC2's use that?)
->
-
-I don't, but assumed many might use it.
-
-> Conversely, with the change in default proposed above, anyone with their
-> own configs enabling the switcher will suddenly see the number of CPUs
-> go from 2 to 5. We also have the situation where we have a config
-> option, which when enabled, doesn't actually do anything unless the user
-> also changes boot arguments or takes measures to enable it after boot.
-> Which seems the wrong way for things to work to me.
->
-
-OK, makes sense. Just curious how many big.LITTLE platforms have CPUFreq
-support and integrated with bL switcher. Otherwise we end up switching
-clusters/cpus using dummy i/f anyways(and probably that's the reason why
-that config is enabled which I missed to understand initially as I was
-thinking it's more for development and testing only). If is that's
-acceptable for those platforms, then it should be fine I believe ?
-
-Regards,
-Sudeep
+diff --git a/arch/arm/xen/enlighten.c b/arch/arm/xen/enlighten.c
+index b96723e..eef324f 100644
+--- a/arch/arm/xen/enlighten.c
++++ b/arch/arm/xen/enlighten.c
+@@ -262,6 +262,12 @@ static int __init xen_guest_init(void)
+ 	xen_domain_type = XEN_HVM_DOMAIN;
+ 
+ 	xen_setup_features();
++
++	if (!xen_feature(XENFEAT_grant_map_identity)) {
++		pr_warn("Please upgrade your Xen.\n"
++				"If your platform has any non-coherent DMA devices, they won't work properly.\n");
++	}
++
+ 	if (xen_feature(XENFEAT_dom0))
+ 		xen_start_info->flags |= SIF_INITDOMAIN|SIF_PRIVILEGED;
+ 	else
+diff --git a/include/xen/interface/features.h b/include/xen/interface/features.h
+index 131a6cc..14334d0 100644
+--- a/include/xen/interface/features.h
++++ b/include/xen/interface/features.h
+@@ -53,6 +53,9 @@
+ /* operation as Dom0 is supported */
+ #define XENFEAT_dom0                      11
+ 
++/* Xen also maps grant references at pfn = mfn */
++#define XENFEAT_grant_map_identity        12
++
+ #define XENFEAT_NR_SUBMAPS 1
+ 
+ #endif /* __XEN_PUBLIC_FEATURES_H__ */
+-- 
+1.7.10.4
