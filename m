@@ -1,58 +1,111 @@
-From: viresh.kumar@linaro.org (Viresh Kumar)
-Date: Fri, 1 Aug 2014 14:52:49 +0530
-Subject: [PATCH] cpufreq: arm_big_little: fix module license spec
-In-Reply-To: <1406792216-827-1-git-send-email-u.kleine-koenig@pengutronix.de>
-References: <mvmmwbqateb.fsf@hawking.suse.de>
- <1406792216-827-1-git-send-email-u.kleine-koenig@pengutronix.de>
-Message-ID: <CAKohpokVOZhZ3j+mxkX0ogP_Dk=WtmfgJavzMV1EZ3WWgi-AiA@mail.gmail.com>
+From: heiko@sntech.de (Heiko =?ISO-8859-1?Q?St=FCbner?=)
+Date: Fri, 01 Aug 2014 11:24:56 +0200
+Subject: [PATCH v2] pinctrl: rockchip: fix rk3288 gpio0 configuration
+In-Reply-To: <1406872680-14641-1-git-send-email-sonnyrao@chromium.org>
+References: <1543632.JNPYWq24Lp@diego>
+ <1406872680-14641-1-git-send-email-sonnyrao@chromium.org>
+Message-ID: <1610557.3nVa59E5gW@diego>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 31 July 2014 13:06, Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de> wrote:
-> Having no license specification in a module taints the kernel during load
-> with:
->
->         arm_big_little: module license 'unspecified' taints kernel.
->
-> and also the linker doesn't allow it to make use of GPL-exported symbols
-> which in this case also results in errors like:
->
->         arm_big_little: Unknown symbol cpufreq_register_driver (err 0)
->
-> . The header of the driver specifies a GPL v2 license, so note that
-> accordingly. While at it also add a description and an author and fix
-> the license in a companion file to explicit v2.
->
-> Reported-by: Andreas Schwab <schwab@suse.de>
-> Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
+Am Donnerstag, 31. Juli 2014, 22:58:00 schrieb Sonny Rao:
+> On rk3288, for gpio bank 0, the registers which configure pull-up,
+> iomux, and drive strength don't implement the enable bits in the upper
+> half of the register, unlike the other gpio configuration registers,
+> and so the kernel must perform a read-modify-write of the register to
+> update a particular gpio in that bank.
+> 
+> The current code is actually clobbering the contents of the register,
+> so this fixes it by using regmap_update_bits and masking out only the
+> bits which require updating.  In the case of bank0 on rk3288 the upper
+> enable bits will just get ignored, and the other configurations won't
+> get clobbered.
+> 
+> Signed-off-by: Sonny Rao <sonnyrao@chromium.org>
+
+Reviewed-by: Heiko Stuebner <heiko@sntech.de>
+
+
+thanks for this fix
+Heiko
+
 > ---
->  drivers/cpufreq/arm_big_little.c    | 4 ++++
->  drivers/cpufreq/arm_big_little_dt.c | 2 +-
->  2 files changed, 5 insertions(+), 1 deletion(-)
->
-> diff --git a/drivers/cpufreq/arm_big_little.c b/drivers/cpufreq/arm_big_little.c
-> index 1f4d4e315057..b600f3107bef 100644
-> --- a/drivers/cpufreq/arm_big_little.c
-> +++ b/drivers/cpufreq/arm_big_little.c
-> @@ -593,3 +593,7 @@ void bL_cpufreq_unregister(struct cpufreq_arm_bL_ops *ops)
->         arm_bL_ops = NULL;
->  }
->  EXPORT_SYMBOL_GPL(bL_cpufreq_unregister);
-> +
-> +MODULE_AUTHOR("Viresh Kumar <viresh.kumar@linaro.org>");
-> +MODULE_DESCRIPTION("Generic ARM big LITTLE cpufreq driver");
-> +MODULE_LICENSE("GPL v2");
-> diff --git a/drivers/cpufreq/arm_big_little_dt.c b/drivers/cpufreq/arm_big_little_dt.c
-> index 8d9d59108906..4550f6976768 100644
-> --- a/drivers/cpufreq/arm_big_little_dt.c
-> +++ b/drivers/cpufreq/arm_big_little_dt.c
-> @@ -114,4 +114,4 @@ module_platform_driver(generic_bL_platdrv);
->
->  MODULE_AUTHOR("Viresh Kumar <viresh.kumar@linaro.org>");
->  MODULE_DESCRIPTION("Generic ARM big LITTLE cpufreq driver via DT");
-> -MODULE_LICENSE("GPL");
-> +MODULE_LICENSE("GPL v2");
-
-Thanks..
-
-Acked-by: Viresh Kumar <viresh.kumar@linaro.org>
+> v2: rebase onto latest pinctrl with drive strength and fix this bug on
+>   iomux and drive strength as well.
+> 
+>  drivers/pinctrl/pinctrl-rockchip.c | 15 +++++++++------
+>  1 file changed, 9 insertions(+), 6 deletions(-)
+> 
+> diff --git a/drivers/pinctrl/pinctrl-rockchip.c
+> b/drivers/pinctrl/pinctrl-rockchip.c index c15f7f9..4ff5dc3 100644
+> --- a/drivers/pinctrl/pinctrl-rockchip.c
+> +++ b/drivers/pinctrl/pinctrl-rockchip.c
+> @@ -438,7 +438,7 @@ static int rockchip_set_mux(struct rockchip_pin_bank
+> *bank, int pin, int mux) int reg, ret, mask;
+>  	unsigned long flags;
+>  	u8 bit;
+> -	u32 data;
+> +	u32 data, rmask;
+> 
+>  	if (iomux_num > 3)
+>  		return -EINVAL;
+> @@ -478,8 +478,9 @@ static int rockchip_set_mux(struct rockchip_pin_bank
+> *bank, int pin, int mux) spin_lock_irqsave(&bank->slock, flags);
+> 
+>  	data = (mask << (bit + 16));
+> +	rmask = data | (data >> 16);
+>  	data |= (mux & mask) << bit;
+> -	ret = regmap_write(regmap, reg, data);
+> +	ret = regmap_update_bits(regmap, reg, rmask, data);
+> 
+>  	spin_unlock_irqrestore(&bank->slock, flags);
+> 
+> @@ -634,7 +635,7 @@ static int rk3288_set_drive(struct rockchip_pin_bank
+> *bank, int pin_num, struct regmap *regmap;
+>  	unsigned long flags;
+>  	int reg, ret, i;
+> -	u32 data;
+> +	u32 data, rmask;
+>  	u8 bit;
+> 
+>  	rk3288_calc_drv_reg_and_bit(bank, pin_num, &regmap, &reg, &bit);
+> @@ -657,9 +658,10 @@ static int rk3288_set_drive(struct rockchip_pin_bank
+> *bank, int pin_num,
+> 
+>  	/* enable the write to the equivalent lower bits */
+>  	data = ((1 << RK3288_DRV_BITS_PER_PIN) - 1) << (bit + 16);
+> +	rmask = data | (data >> 16);
+>  	data |= (ret << bit);
+> 
+> -	ret = regmap_write(regmap, reg, data);
+> +	ret = regmap_update_bits(regmap, reg, rmask, data);
+>  	spin_unlock_irqrestore(&bank->slock, flags);
+> 
+>  	return ret;
+> @@ -722,7 +724,7 @@ static int rockchip_set_pull(struct rockchip_pin_bank
+> *bank, int reg, ret;
+>  	unsigned long flags;
+>  	u8 bit;
+> -	u32 data;
+> +	u32 data, rmask;
+> 
+>  	dev_dbg(info->dev, "setting pull of GPIO%d-%d to %d\n",
+>  		 bank->bank_num, pin_num, pull);
+> @@ -750,6 +752,7 @@ static int rockchip_set_pull(struct rockchip_pin_bank
+> *bank,
+> 
+>  		/* enable the write to the equivalent lower bits */
+>  		data = ((1 << RK3188_PULL_BITS_PER_PIN) - 1) << (bit + 16);
+> +		rmask = data | (data >> 16);
+> 
+>  		switch (pull) {
+>  		case PIN_CONFIG_BIAS_DISABLE:
+> @@ -770,7 +773,7 @@ static int rockchip_set_pull(struct rockchip_pin_bank
+> *bank, return -EINVAL;
+>  		}
+> 
+> -		ret = regmap_write(regmap, reg, data);
+> +		ret = regmap_update_bits(regmap, reg, rmask, data);
+> 
+>  		spin_unlock_irqrestore(&bank->slock, flags);
+>  		break;
