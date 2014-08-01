@@ -1,64 +1,42 @@
 From: peter.ujfalusi@ti.com (Peter Ujfalusi)
-Date: Fri, 1 Aug 2014 09:13:28 +0300
-Subject: [PATCH v2 4/6] ARM: DTS: da850-evm: Enable McASP via DT boot
+Date: Fri, 1 Aug 2014 09:13:29 +0300
+Subject: [PATCH v2 5/6] ARM: DTS: da850-evm: Add node for tlv320aic3106 codec
 In-Reply-To: <1406873610-5037-1-git-send-email-peter.ujfalusi@ti.com>
 References: <1406873610-5037-1-git-send-email-peter.ujfalusi@ti.com>
-Message-ID: <1406873610-5037-5-git-send-email-peter.ujfalusi@ti.com>
+Message-ID: <1406873610-5037-6-git-send-email-peter.ujfalusi@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add pinctrl nodes for the McASP0 pins and configure McASP to the desired
-mode for the board.
+The board uses aic3106 for audio.
 
 Signed-off-by: Peter Ujfalusi <peter.ujfalusi@ti.com>
 ---
- arch/arm/boot/dts/da850-evm.dts | 30 ++++++++++++++++++++++++++++++
- 1 file changed, 30 insertions(+)
+ arch/arm/boot/dts/da850-evm.dts | 13 +++++++++++++
+ 1 file changed, 13 insertions(+)
 
 diff --git a/arch/arm/boot/dts/da850-evm.dts b/arch/arm/boot/dts/da850-evm.dts
-index 1e11e5a5f723..1422c311af4c 100644
+index 1422c311af4c..41715b495861 100644
 --- a/arch/arm/boot/dts/da850-evm.dts
 +++ b/arch/arm/boot/dts/da850-evm.dts
-@@ -17,6 +17,18 @@
- 	soc {
- 		pmx_core: pinmux at 1c14120 {
- 			status = "okay";
+@@ -51,6 +51,19 @@
+ 			tps: tps at 48 {
+ 				reg = <0x48>;
+ 			};
++			tlv320aic3106: tlv320aic3106 at 18 {
++				compatible = "ti,tlv320aic3106";
++				reg = <0x18>;
++				status = "okay";
 +
-+			mcasp0_pins: pinmux_mcasp0_pins {
-+				pinctrl-single,bits = <
-+					/*
-+					 * AHCLKX, ACLKX, AFSX, AHCLKR, ACLKR,
-+					 * AFSR, AMUTE
-+					 */
-+					0x00 0x11111111 0xffffffff
-+					/* AXR11, AXR12 */
-+					0x04 0x00011000 0x000ff000
-+				>;
++				/* Regulators */
++				IOVDD-supply = <&vdcdc2_reg>;
++				/* Derived from VBAT: Baseboard 3.3V / 1.8V */
++				AVDD-supply = <&vbat>;
++				DRVDD-supply = <&vbat>;
++				DVDD-supply = <&vbat>;
 +			};
++
  		};
- 		serial0: serial at 1c42000 {
+ 		wdt: wdt at 1c21000 {
  			status = "okay";
-@@ -170,3 +182,21 @@
- 		};
- 	};
- };
-+
-+&mcasp0 {
-+	status = "okay";
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&mcasp0_pins>;
-+
-+	op-mode = <0>;          /* MCASP_IIS_MODE */
-+	tdm-slots = <2>;
-+	/* 4 serializer */
-+	serial-dir = <  /* 0: INACTIVE, 1: TX, 2: RX */
-+		0 0 0 0
-+		0 0 0 0
-+		0 0 0 1
-+		2 0 0 0
-+	>;
-+	tx-num-evt = <32>;
-+	rx-num-evt = <32>;
-+};
 -- 
 2.0.2
