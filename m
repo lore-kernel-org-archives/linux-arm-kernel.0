@@ -1,71 +1,49 @@
 From: fkan@apm.com (Feng Kan)
-Date: Thu, 31 Jul 2014 19:45:51 -0700
-Subject: [PATCH V9 0/6] Add X-Gene platform reboot mechanism
-Message-ID: <1406861157-29169-1-git-send-email-fkan@apm.com>
+Date: Thu, 31 Jul 2014 19:45:53 -0700
+Subject: [PATCH V9 2/6] Documentation: power: reset: Add documentation for
+ generic SYSCON reboot driver
+In-Reply-To: <1406861157-29169-1-git-send-email-fkan@apm.com>
+References: <1406861157-29169-1-git-send-email-fkan@apm.com>
+Message-ID: <1406861157-29169-3-git-send-email-fkan@apm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Enable reboot driver for the X-Gene platform. Add generic syscon reboot
-driver.
+Add documentation for generic SYSCON reboot driver.
 
-V9 Change:
-	- rebase on Guenter Roeck's V5 reset handler patch set. This 
-	  allows for a generic reset to be call rather than the arm
-	  specific reset handler.
-
-V8 Change:
-	- change Kconfig to depend on ARM || ARM64 || COMPILE_TEST
-
-V7 Change:
-	- Seem V3 on, the patches were not making in to the mailinglist.
-	- Fix build error produced by other ARCH while including this
-	  driver. Set to depend on arm64 ARCH for now.
-
-V6 Change:
-	- Add documentation for scu node.
-
-V5 Change:
-	- Documentation update, endian and access size.
-
-V4 Change:
-	- Remove old X-Gene reboot driver
-	- Add generic syscon reboot driver
-	- Add DTS and Kconfig for X-Gene reboot using syscon method
-
-V3 Change:
-	- Remove the reboot driver's use of acpi resource patch.
-	- Change the reboot driver to use syscon to parse out 
-	  system clock register. Remove the old method of getting
-	  register from the reboot driver directly.
-	- Remove documentation since its now simple.
-
-V2 Change:
-	- Add support for using ACPI resource.
-
-
-Feng Kan (6):
-  power: reset: Add generic SYSCON register mapped reset
-  Documentation: power: reset: Add documentation for generic SYSCON
-    reboot driver
-  Documentation: arm64: add SCU dts binding documentation to linux
-    kernel
-  arm64: dts: Add X-Gene reboot driver dts node
-  arm64: Select reboot driver for X-Gene platform
-  power: reset: Remove X-Gene reboot driver
-
- Documentation/devicetree/bindings/arm/apm/scu.txt  |  17 ++++
- .../bindings/power/reset/syscon-reboot.txt         |  23 +++++
- arch/arm64/Kconfig                                 |   2 +
- arch/arm64/boot/dts/apm-storm.dtsi                 |  12 +++
- drivers/power/reset/Kconfig                        |  12 +--
- drivers/power/reset/Makefile                       |   2 +-
- drivers/power/reset/syscon-reboot.c                |  98 ++++++++++++++++++++
- drivers/power/reset/xgene-reboot.c                 | 103 ---------------------
- 8 files changed, 158 insertions(+), 111 deletions(-)
- create mode 100644 Documentation/devicetree/bindings/arm/apm/scu.txt
+Signed-off-by: Feng Kan <fkan@apm.com>
+---
+ .../bindings/power/reset/syscon-reboot.txt         | 23 ++++++++++++++++++++++
+ 1 file changed, 23 insertions(+)
  create mode 100644 Documentation/devicetree/bindings/power/reset/syscon-reboot.txt
- create mode 100644 drivers/power/reset/syscon-reboot.c
- delete mode 100644 drivers/power/reset/xgene-reboot.c
 
+diff --git a/Documentation/devicetree/bindings/power/reset/syscon-reboot.txt b/Documentation/devicetree/bindings/power/reset/syscon-reboot.txt
+new file mode 100644
+index 0000000..1190631
+--- /dev/null
++++ b/Documentation/devicetree/bindings/power/reset/syscon-reboot.txt
+@@ -0,0 +1,23 @@
++Generic SYSCON mapped register reset driver
++
++This is a generic reset driver using syscon to map the reset register.
++The reset is generally performed with a write to the reset register
++defined by the register map pointed by syscon reference plus the offset
++with the mask defined in the reboot node.
++
++Required properties:
++- compatible: should contain "syscon-reboot"
++- regmap: this is phandle to the register map node
++- offset: offset in the register map for the reboot register (in bytes)
++- mask: the reset value written to the reboot register (32 bit access)
++
++Default will be little endian mode, 32 bit access only.
++
++Examples:
++
++	reboot {
++	   compatible = "syscon-reboot";
++	   regmap = <&regmapnode>;
++	   offset = <0x0>;
++	   mask = <0x1>;
++	};
 -- 
 1.9.1
