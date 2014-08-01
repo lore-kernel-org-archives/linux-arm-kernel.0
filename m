@@ -1,31 +1,46 @@
-From: lisovy@gmail.com (Rostislav Lisovy)
-Date: Fri,  1 Aug 2014 16:51:11 +0200
-Subject: [PATCH] ARM: PCI: Use PCI_CLASS_* defines for PCI class
-Message-ID: <1406904671-19197-1-git-send-email-lisovy@gmail.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Fri, 01 Aug 2014 15:51:50 +0100
+Subject: [PATCH 4/4 V3] irqchip: gicv2m: Add support for multiple MSI
+ for ARM64 GICv2m
+In-Reply-To: <53DBA603.9030509@amd.com>
+References: <1404947104-21345-1-git-send-email-suravee.suthikulpanit@amd.com>
+ <1404947104-21345-5-git-send-email-suravee.suthikulpanit@amd.com>
+ <87vbqej2rj.fsf@approximate.cambridge.arm.com> <53DBA603.9030509@amd.com>
+Message-ID: <53DBA986.90705@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Signed-off-by: Rostislav Lisovy <lisovy@gmail.com>
----
- arch/arm/kernel/bios32.c |    5 ++---
- 1 file changed, 2 insertions(+), 3 deletions(-)
+Hi Suravee,
 
-diff --git a/arch/arm/kernel/bios32.c b/arch/arm/kernel/bios32.c
-index 17a26c1..e511ad1 100644
---- a/arch/arm/kernel/bios32.c
-+++ b/arch/arm/kernel/bios32.c
-@@ -255,10 +255,9 @@ static void pci_fixup_it8152(struct pci_dev *dev)
- {
- 	int i;
- 	/* fixup for ITE 8152 devices */
--	/* FIXME: add defines for class 0x68000 and 0x80103 */
- 	if ((dev->class >> 8) == PCI_CLASS_BRIDGE_HOST ||
--	    dev->class == 0x68000 ||
--	    dev->class == 0x80103) {
-+	    dev->class == (PCI_CLASS_BRIDGE_OTHER << 8) ||
-+	    dev->class == ((PCI_CLASS_SYSTEM_DMA << 8) | 0x03)) {
- 		for (i = 0; i < PCI_NUM_RESOURCES; i++) {
- 			dev->resource[i].start = 0;
- 			dev->resource[i].end   = 0;
+On 01/08/14 15:36, Suravee Suthikulanit wrote:
+> On 7/30/2014 10:16 AM, Marc Zyngier wrote:
+>> Why do we need this complexity at all? Is there any case where we'd want
+>> to limit ourselves to a single vector for MSI?
+> 
+> I think the ARM64 GICv2m should not be the limitation for the devices 
+> multiple MSI if there is no real hardware/design limitation.
+> 
+>> arm64 is a new enough architecture so that we can expect all interrupt controllers to cope
+>> with that.
+> 
+> I am not sure if I understand this comment.
+> 
+> We are not forcing all interrupt controllers for ARM64 to handle 
+> multi-MSI.  They have the option to support if multi-MSI if they want 
+> to. I just think that we should not put the architectural limit here.
+
+Let me be clearer: I think we should put the burden of *not* handling
+multi-MSI on interrupt controllers. Here, you're making the
+architectural default to be "I don't support multi-MSI", hence having to
+override global vectors and such for well behaved MSI controllers like
+GICv2m and GICv3 ITS.
+
+Let's only support multi-MSI for the time being. If someone comes up
+with a silly old MSI controller that can't deal with it, we'll address
+the issue at that problem.
+
+Thanks,
+
+	M.
 -- 
-1.7.10.4
+Jazz is not dead. It just smells funny...
