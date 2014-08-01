@@ -1,41 +1,97 @@
-From: rric@kernel.org (Robert Richter)
-Date: Fri, 1 Aug 2014 19:04:11 +0200
-Subject: [PATCH 2/5] arm64, thunder: Add initial dts for Cavium Thunder SoC
-In-Reply-To: <20140731113301.GE22994@leverpostej>
-References: <1406732794-20920-1-git-send-email-rric@kernel.org>
- <1406732794-20920-3-git-send-email-rric@kernel.org>
- <20140730154626.GD20162@leverpostej>
- <CAFpQJXWKybVUxpHg8MVrVMjLj3swuxLGo_9r1tL+gZ4hxUHTzQ@mail.gmail.com>
- <20140731095336.GB21850@leverpostej>
- <CAFpQJXUtP=v7FSLd3_OU7FG3w=pKYy2ihTQULA_DPEacsSu0Og@mail.gmail.com>
- <20140731113301.GE22994@leverpostej>
-Message-ID: <20140801170411.GG4703@rric.localhost>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Fri, 01 Aug 2014 18:05:15 +0100
+Subject: [PATCH 3/4 V3] irqchip: gic: Add supports for ARM GICv2m MSI(-X)
+In-Reply-To: <53DBC074.3030309@amd.com> (Suravee Suthikulanit's message of
+ "Fri, 1 Aug 2014 17:29:40 +0100")
+References: <1404947104-21345-1-git-send-email-suravee.suthikulpanit@amd.com>
+ <1404947104-21345-4-git-send-email-suravee.suthikulpanit@amd.com>
+ <87zjfqj3mc.fsf@approximate.cambridge.arm.com>
+ <53DBB562.5020003@amd.com> <53DBC074.3030309@amd.com>
+Message-ID: <87oaw4gmyc.fsf@approximate.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Mark,
-
-On 31.07.14 12:33:01, Mark Rutland wrote:
-> On Thu, Jul 31, 2014 at 12:12:33PM +0100, Ganapatrao Kulkarni wrote:
-> >    We mark RAM used by ATF as secure-RAM, however we don't support
-> >    secure/non-secure address aliasing.
-> >    i.e, a DRAM address that can be referenced from both a secure PA and a
-> >    non-secure PA is not allowed.
+On Fri, Aug 01 2014 at  5:29:40 pm BST, Suravee Suthikulanit <suravee.suthikulpanit@amd.com> wrote:
+> On 8/1/2014 10:42 AM, Suravee Suthikulanit wrote:
+>>>> +#ifdef CONFIG_SMP
+>>>> +       .irq_set_affinity       = gic_set_affinity,
+>>>> +#endif
+>>>> +#ifdef CONFIG_PM
+>>>> +       .irq_set_wake           = gic_set_wake,
+>>>> +#endif
+>>>> +};
+>>>> +
+>>>> +#ifdef CONFIG_OF
+>>>> +static int __init
+>>>> +gicv2m_of_init(struct device_node *node, struct device_node *parent)
+>>>> +{
+>>>> +       struct gic_chip_data *gic;
+>>>> +       int ret;
+>>>> +
+>>>> +       ret = _gic_of_init(node, parent, &gicv2m_chip, &gic);
+>>>> +       if (ret) {
+>>>> +               pr_err("GICv2m: Failed to initialize GIC\n");
+>>>> +               return ret;
+>>>> +       }
+>>>> +
+>>>> +       gic->msi_chip.owner = THIS_MODULE;
+>>>> +       gic->msi_chip.of_node = node;
+>>>> +       gic->msi_chip.setup_irq = gicv2m_setup_msi_irq;
+>>>> +       gic->msi_chip.teardown_irq = gicv2m_teardown_msi_irq;
+>>>> +       ret = of_pci_msi_chip_add(&gic->msi_chip);
+>>>> +       if (ret) {
+>>>> +               /* MSI is optional and not supported here */
+>>>> +               pr_info("GICv2m: MSI is not supported.\n");
+>>>> +               return 0;
+>>>> +       }
+>>>> +
+>>>> +       ret = gicv2m_msi_init(node, &gic->v2m_data);
+>>>> +       if (ret)
+>>>> +               return ret;
+>>>> +       return ret;
+>>>> +}
+>>>> +
+>>>> +IRQCHIP_DECLARE(arm_gic_400_v2m, "arm,gic-400-v2m", gicv2m_of_init);
+>>>
+>>> So if you follow my advise of reversing your probing and call into the
+>>> v2m init from the main GIC driver, you could take a irq_chip as a
+>>> parameter, and use it to populate the v2m irq_chip, only overriding the
+>>> two methods that actually differ.
+>>>
+>>> This would have the net effect of completely dropping patch #2, which
+>>> becomes effectively useless.
+>>>
+>>
+>> [Suravee] Ok, lemme look into this.
 >
-> What exactly do you mean by "not allowed"?
+> So, in previous revision, you mentioned that we should have a separate 
+> irq_chip for gicv2m stuff, is that is still the case here?
 
-It actually means "not possible" since secure and non-secure memory is
-kept in separate address ranges.
+Yes. You would do something like this:
 
-> If Linux maps that memory, what happens?
->
-> What if Linux tried to read or write to it?
->
-> If Linux should not map that memory, it should not be described in the
-> memory map to begin with.
+- In the main GIC code:
+	if (v2m_present()) {
+        	v2m_init(&gic_chip);
+        }
 
-Linux never will see secure-RAM. Firmware must be sure to report the
-correct non-secure memory ranges to the OS (e.g. unsecure mem size =
-total size - secure mem size).
+- In the v2m code:
+	static struct irq_chip_v2m_chip;
+	void v2m_init(struct irq_chip *gic_chip)
+        {
+        	[...]
+        	v2m_chip = *gic_chip;
+                v2m_chip.mask = v2m_irq_mask;
+                v2m_chip.unmask = v2m_irq_unmask;
+                [...]
+        }
 
--Robert
+Basically, you inherit a number of default methods, only overloading the
+ones that are different. The rest of your driver is mostly unchanged.
+
+This preserves the current probing structure, and avoids exposing
+private methods outside of irq-gic.c (preventing people from doing silly
+things with an unsuspecting interrupt controller...).
+
+	M.
+-- 
+Jazz is not dead. It just smells funny.
