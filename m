@@ -1,42 +1,37 @@
 From: peter.ujfalusi@ti.com (Peter Ujfalusi)
-Date: Fri, 1 Aug 2014 09:13:27 +0300
-Subject: [PATCH v2 3/6] ARM: DTS: da850: Add node for McASP
-In-Reply-To: <1406873610-5037-1-git-send-email-peter.ujfalusi@ti.com>
-References: <1406873610-5037-1-git-send-email-peter.ujfalusi@ti.com>
-Message-ID: <1406873610-5037-4-git-send-email-peter.ujfalusi@ti.com>
+Date: Fri, 1 Aug 2014 09:13:24 +0300
+Subject: [PATCH v2 0/6] ARM: DT/davinci: Audio for da850-evm in DT boot
+Message-ID: <1406873610-5037-1-git-send-email-peter.ujfalusi@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Node for mcasp0
+Hi,
 
-Signed-off-by: Peter Ujfalusi <peter.ujfalusi@ti.com>
+Changes since v1:
+- fixed the address missmatch for tlv320aic3106 codec (@1b -> 18)
+- The edma patches has been taken by Vinod, they should be in linux-next soon.
+
+The following series will enable audio via simple card on the board when booted
+with DT.
+
+For edma one patch is needed to have working dma:
+http://marc.info/?l=linux-omap&m=140680159327749&w=2
+
+Regards,
+Peter
 ---
- arch/arm/boot/dts/da850.dtsi | 13 +++++++++++++
- 1 file changed, 13 insertions(+)
+Peter Ujfalusi (6):
+  ARM: davinci: da8xx-dt: add OF_DEV_AUXDATA entry for mcasp0
+  ARM: DTS: da850: Add node for edma0
+  ARM: DTS: da850: Add node for McASP
+  ARM: DTS: da850-evm: Enable McASP via DT boot
+  ARM: DTS: da850-evm: Add node for tlv320aic3106 codec
+  ARM: DTS: da850-evm: Enable audio via simple-card
 
-diff --git a/arch/arm/boot/dts/da850.dtsi b/arch/arm/boot/dts/da850.dtsi
-index 41ce4e8bf227..0bd98cd00816 100644
---- a/arch/arm/boot/dts/da850.dtsi
-+++ b/arch/arm/boot/dts/da850.dtsi
-@@ -276,6 +276,19 @@
- 			ti,davinci-gpio-unbanked = <0>;
- 			status = "disabled";
- 		};
-+
-+		mcasp0: mcasp at 01d00000 {
-+			compatible = "ti,da830-mcasp-audio";
-+			reg = <0x100000 0x2000>,
-+			      <0x102000 0x400000>;
-+			reg-names = "mpu", "dat";
-+			interrupts = <54>;
-+			interrupt-names = "common";
-+			status = "disabled";
-+			dmas = <&edma0 1>,
-+				<&edma0 0>;
-+			dma-names = "tx", "rx";
-+		};
- 	};
- 	nand_cs3 at 62000000 {
- 		compatible = "ti,davinci-nand";
+ arch/arm/boot/dts/da850-evm.dts  | 72 ++++++++++++++++++++++++++++++++++++++++
+ arch/arm/boot/dts/da850.dtsi     | 19 +++++++++++
+ arch/arm/mach-davinci/da8xx-dt.c |  1 +
+ 3 files changed, 92 insertions(+)
+
 -- 
 2.0.2
