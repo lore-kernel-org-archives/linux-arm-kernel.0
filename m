@@ -1,46 +1,27 @@
-From: lars@metafoo.de (Lars-Peter Clausen)
-Date: Fri, 01 Aug 2014 20:09:17 +0200
-Subject: [PATCH] Documentation: dmaengine: Add a documentation for the
- dma controller API
-In-Reply-To: <20140801171551.GG8181@intel.com>
-References: <1406736193-26685-1-git-send-email-maxime.ripard@free-electrons.com>
- <20140730160607.GM8181@intel.com> <20140731074440.GY3952@lukather>
- <53DA3A48.8070900@metafoo.de> <20140731161331.GD3952@lukather>
- <53DA74B3.6060502@metafoo.de> <20140731173730.GH3952@lukather>
- <53DB490A.5040709@metafoo.de> <20140801085707.GI3952@lukather>
- <20140801171551.GG8181@intel.com>
-Message-ID: <53DBD7CD.3030103@metafoo.de>
+From: broonie@kernel.org (Mark Brown)
+Date: Fri, 1 Aug 2014 19:21:10 +0100
+Subject: [PATCH v2 1/2] spi: davinci: add support to configure gpio cs
+ through dt
+In-Reply-To: <1406911233-18999-2-git-send-email-grygorii.strashko@ti.com>
+References: <1406911233-18999-1-git-send-email-grygorii.strashko@ti.com>
+ <1406911233-18999-2-git-send-email-grygorii.strashko@ti.com>
+Message-ID: <20140801182110.GI30458@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08/01/2014 07:15 PM, Vinod Koul wrote:
-> On Fri, Aug 01, 2014 at 10:57:07AM +0200, Maxime Ripard wrote:
->> On Fri, Aug 01, 2014 at 10:00:10AM +0200, Lars-Peter Clausen wrote:
->>> On 07/31/2014 07:37 PM, Maxime Ripard wrote:
->>>> On Thu, Jul 31, 2014 at 06:54:11PM +0200, Lars-Peter Clausen wrote:
->>>>> On 07/31/2014 06:13 PM, Maxime Ripard wrote:
->>>>> [...]
->>>>>>  From what you're saying, and judging from the drivers that already
->>>>>> implement it, can't it be moved directly to the framework itself ?
->>>>>>
->>>>>
->>>>> What exactly do you mean by moving it directly to the framework? The
->>>>> slave_caps API is part of the DMAengine framework.
->>>>
->>>> Not its implementation, which is defined by each and every driver,
->>>> while the behaviour of device_slave_caps is rather generic.
->>>>
->>>
->>> Do you mean something like adding a dma_slave_caps struct field to
->>> the DMA channel that gets initialized when the channel is created
->>> and then remove the callback? That makes some sense.
->>
->> I was rather thinking into something like:
->>    - Splitting device_control into independant functions
-> I like this part :)
+On Fri, Aug 01, 2014 at 07:40:32PM +0300, Grygorii Strashko wrote:
+> From: Murali Karicheri <m-karicheri2@ti.com>
+> 
+> Currently driver supports only configuration of GPIO CS through
+> platform data. This patch enhances the driver to configure GPIO
+> CS through DT. Also update the DT binding documentation to
+> reflect the availability of cs-gpios.
 
-I started working on this a while ago by splitting out the slave_config 
-functionality into its own callback. Haven't managed to finalize it since it 
-wasn't really top priority.
-
-- Lars
+Applied both, thanks.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140801/954f6c9a/attachment.sig>
