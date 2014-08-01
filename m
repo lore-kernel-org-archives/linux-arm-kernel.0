@@ -1,47 +1,40 @@
-From: haojian.zhuang@linaro.org (Haojian Zhuang)
-Date: Fri, 1 Aug 2014 20:02:16 +0800
-Subject: [PATCH v15 07/12] ARM: dts: append hip04 dts
-In-Reply-To: <CAOesGMg4qtuJoDzYHMEDesOSqySygM8pxgrxtm1Bz09SuKOiwQ@mail.gmail.com>
-References: <1406555876-11989-1-git-send-email-haojian.zhuang@linaro.org>
- <1406555876-11989-8-git-send-email-haojian.zhuang@linaro.org>
- <20140728180609.GE2576@leverpostej>
- <CAD6h2NQLgB1=8+WznE19rjsFwm3XWPUYEbDuPCbKbWjseRCBDg@mail.gmail.com>
- <20140729035321.GA8430@quad.lixom.net>
- <CAOesGMg4qtuJoDzYHMEDesOSqySygM8pxgrxtm1Bz09SuKOiwQ@mail.gmail.com>
-Message-ID: <CAD6h2NQ96kUNfD1-rw1cHL1FaFR-n4tuRZC8ASeBTuJTfnrwcw@mail.gmail.com>
+From: christoffer.dall@linaro.org (Christoffer Dall)
+Date: Fri, 1 Aug 2014 14:04:44 +0200
+Subject: [PATCH] arm64: KVM: fix 64bit CP15 VM access for 32bit guests
+In-Reply-To: <1406890836-7294-1-git-send-email-marc.zyngier@arm.com>
+References: <1406890836-7294-1-git-send-email-marc.zyngier@arm.com>
+Message-ID: <20140801120444.GM11610@cbox>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 29 July 2014 12:00, Olof Johansson <olof@lixom.net> wrote:
->>> >> +                       reg = <0x3e00000 0x00100000>;
->>> >> +                       relocation-entry = <0xe0000100>;
->>> >> +                       relocation-size = <0x1000>;
->>> >> +                       bootwrapper-phys = <0x10c00000>;
->>> >> +                       bootwrapper-size = <0x10000>;
->>> >> +                       bootwrapper-magic = <0xa5a5a5a5>;
->>> >
->>> > Are these absolute addresses, or translated per ranges above?
->>> >
->>> > Why are they related to the system controller?
->>> >
->>>
->>> I need these parameters. But I can't find a better place.
->>
->> Again, what is the boot wrapper in this case? And what do you need them for?
->
-> Ok, looking at patch 3/12, it seems that the "bootwrapper" base
-> address is used to specify where the CPU goes when released by the
-> system controller.
->
-> Isn't there an address that can be written in the system controller
-> that specifies this base address, such that you can just handle this
-> dynamically at runtime? It seems really, really odd that the platform
-> will expect this one page in the middle of ram to just be untouched
-> otherwise.
->
+On Fri, Aug 01, 2014 at 12:00:36PM +0100, Marc Zyngier wrote:
+> Commit f0a3eaff71b8 (ARM64: KVM: fix big endian issue in
+> access_vm_reg for 32bit guest) changed the way we handle CP15
+> VM accesses, so that all 64bit accesses are done via vcpu_sys_reg.
+> 
+> This looks like a good idea as it solves indianness issues in an
+> elegant way, except for one small detail: the register index is
+> doesn't refer to the same array! We end up corrupting some random
+> data structure instead.
 
-I'll move these parameters from DTS file to command line. Then I can
-reserve these memory when I parse the command line.
+Ouch!
 
-Regards
-Haojian
+> 
+> Fix this by reverting to the original code, except for the introduction
+> of a vcpu_cp15_64_high macro that deals with the endianness thing.
+> 
+> Tested on Juno with 32bit SMP guests.
+> 
+> Cc: Victor Kamensky <victor.kamensky@linaro.org>
+> Cc: Christoffer Dall <christoffer.dall@linaro.org>
+> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+> ---
+> Christoffer, can you please have a look at this one and and queue it if
+> you find it acceptable?
+> 
+
+Good catch, it looks good, I'll queue it on kvmarm/next right away.
+
+Reviewed-by: Christoffer Dall <christoffer.dall@linaro.org>
+
+-Christoffer
