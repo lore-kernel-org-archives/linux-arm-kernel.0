@@ -1,142 +1,63 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 1 Aug 2014 15:52:31 +0200
-Subject: [RFC PATCH 00/11] Refactor MSI to support Non-PCI device
-In-Reply-To: <53D85C2E.3060205@huawei.com>
-References: <1406344128-27055-1-git-send-email-wangyijing@huawei.com>
- <1748052.OMBQJiOLYT@wuerfel> <53D85C2E.3060205@huawei.com>
-Message-ID: <201408011552.32135.arnd@arndb.de>
+From: balbi@ti.com (Felipe Balbi)
+Date: Fri, 1 Aug 2014 08:54:07 -0500
+Subject: [PATCH 29/35] arm: omap: intc: switch over to linear irq domain
+In-Reply-To: <53DB877A.5000004@ti.com>
+References: <20140729154057.GE17808@saruman.home>
+ <20140729163345.GF17808@saruman.home>
+ <20140730060420.GY29045@atomide.com>
+ <20140730144059.GA7272@saruman.home>
+ <CAGo_u6ou+MoKOE_tTTmjxyFNW=jTaN9vnTsHrxR6sQHsieJyLA@mail.gmail.com>
+ <20140730162038.GH7272@saruman.home>
+ <20140731062843.GA29045@atomide.com> <53D9F6D5.1080307@ti.com>
+ <20140731134945.GB19512@saruman.home> <53DB877A.5000004@ti.com>
+Message-ID: <20140801135407.GB9216@saruman.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 30 July 2014, Yijing Wang wrote:
-> On 2014/7/29 22:08, Arnd Bergmann wrote:
-> > On Saturday 26 July 2014 11:08:37 Yijing Wang wrote:
+Hi,
+
+On Fri, Aug 01, 2014 at 03:26:34PM +0300, Tero Kristo wrote:
+> >>>>>>I might have sent the wrong version as I had that same build error and
+> >>>>>>fixed it localy.
+> >>>>>>
+> >>>>>>>it fixes the regression for me, Also now the whole series works for
+> >>>>>>>me :)
+> >>>>>>
+> >>>>>>good to know.
+> >>>>>>
+> >>>>>>What do you want to do now ? Wait for PRCM to become a driver ? Wait for
+> >>>>>>Nishanth's series to get accepted ? I guess the same thing could be done
+> >>>>>>for OMAP3 and AM33, then we would have a chance of having working wake
+> >>>>>>from idle with the new irqchip.
+> >>>>>
+> >>>>>I can repost the current series as it stands now once 17-rc1 comes out
+> >>>>>(without the build failure ofcourse).. if that helps to move it out of
+> >>>>>RFC status.
+> >>>>
+> >>>>That'd be great. It would be ever greater if you could add support for
+> >>>>OMAP3 on that too.
+> >>>
+> >>>Yeah sounds good to me. Tero, does that work OK for your PRCM changes?
 > >>
-> >> The new data struct for generic MSI driver.
-> >> struct msi_irqs {
-> >>         u8 msi_enabled:1; /* Enable flag */
-> >>         u8 msix_enabled:1;
-> >>         struct list_head msi_list; /* MSI desc list */
-> >>         void *data;     /* help to find the MSI device */
-> >>         struct msi_ops *ops; /* MSI device specific hook */
-> >> };
-> >> struct msi_irqs is used to manage MSI related informations. Every device supports
-> >> MSI should contain this data struct and allocate it.
-> > 
-> > I think you should have a stronger association with the 'struct
-> > device' here. Can you replace the 'void *data' with 'struct device *dev'?
+> >>Well, this set seems to break PM. suspend-resume on omap3-beagle just hangs
+> >>after this set is applied. Works fine without it with 3.16-rc5 tag.
+> >
+> >did you apply the quick little hack to prm3xxx.c ? prcm IRQ is hardcoded
+> >to 11, once we switch to a linear irq domain, irq_base may change.
 > 
-> Actually, I used the struct device *dev in my first draft, finally, I replaced
-> it with void *data, because some MSI devices don't have a struct device *dev,
-> like the existing hpet device, dmar msi device, and OF device, like the ARM consolidator.
-> 
-> Of course, we can make the MSI devices have their own struct device, and register to
-> device tree, eg, add a class device named MSI_DEV. But I'm not sure whether it is appropriate.
+> Yea, with that hack it works. However, you should make that into a proper
+> patch and add it to this series, otherwise you will be causing regressions.
 
-It doesn't have to be in the (OF) device tree, but I think it absolutely makes
-sense to use the 'struct device' infrastructure here, as almost everything uses
-a device, and the ones that don't do that today can be easily changed.
+can you please read the thread ? Nishanth has a proper series properly
+doing that for OMAP4, I asking him to add OMAP3 and respin his series
+without RFC.
 
-> > The other part I'm not completely sure about is how you want to
-> > have MSIs map into normal IRQ descriptors. At the moment, all
-> > MSI users are based on IRQ numbers, but this has known scalability problems.
-> 
-> Hmmm, I still use the IRQ number to map the MSIs to IRQ description.
-> I'm sorry, I don't understand you meaning.
-> What are the scalability problems you mentioned ?
-> For device drivers, they always process interrupt in two steps.
-> If irq is the legacy interrupt, drivers will first
-> use the irq_of_parse_and_map() or pci_enable_device() to parse and get the IRQ number.
-> Then drivers will call the request_irq() to register the interrupt handler.
-> If irq is MSIs, first call pci_enable_msi/x() to get the IRQ number and then call
-> request_irq() to register interrupt handler.
-
-The method you describe here makes sense for PCI devices that are required to support
-legacy interrupts and may or may not support MSI on a given system, but not so much
-for platform devices for which we know exactly whether we want to use MSI
-or legacy interrupts.
-
-In particular if you have a device that can only do MSI, the entire pci_enable_msi
-step is pointless: all we need to do is program the correct MSI target address/message
-pair into the device and register the handler.
-
-> > I wonder if we can do the interface in a way that
-> > hides the interrupt number from generic device drivers and just
-> > passes a 'struct irq_desc'. Note that there are long-term plans to
-> > get rid of IRQ numbers entirely, but those plans have existed for
-> > a long time already without anybody seriously addressing the device
-> > driver interfaces so far, so it might never really happen.
-> > 
-> 
-> Maybe this is a huge work, now hundreds drivers use the IRQ number, so maybe we can consider
-> this in a separate title.
-
-Sorry for being unclear here: I did suggest changing all drivers now. What I meant
-is that we use a different API for non-PCI devices that works without IRQ numbers.
-I don't think we should touch the PCI interfaces at this point.
-
-> > With the other operations, I think they should all take a 'struct device *'
-> > as the first argument for convenience and consistency. I don't think you actually
-> > need msi_read_message(), and we could avoid msi_write_message() by doing it
-> > the other way round.
-> > 
-> 
-> There only two functions use the read_msi_msg(), because every msi_desc has
-> a struct msi_msg, and it caches the msi address and data. I will consider to
-> retrieve the msg from cached msi_msg, then we can avoid the msi_read_message().
-> But msi_write_message() maybe necessary, some xxx_set_affinity() functions and
-> restore functions need the msi_write_message() to rewrite the address and data.
-
-Makes sense. I'd have to think about it more, but I think you are right
-about the affinity APIs needing this.
-
-> > What I'd envision as the API from the device driver perspective is something
-> > as simple like this:
-> > 
-> > struct msi_desc *msi_request(struct msi_chip *chip, irq_handler_t handler,
-> > 			unsigned long flags, const char *name, struct device *dev);
-> > 
-> > which would get an msi descriptor that is valid for this device (dev)
-> > connected to a particular msi_chip, and associate a handler function
-> > with it. The device driver can call that function and retrieve the
-> > address/message pair from the msi_desc in order to store it in its own
-> > device specific registers. The request_irq() can be handled internally
-> > to msi_request().
-> 
-> This is a huge change for device drivers, and some device drivers don't know which msi_chip
-> their MSI irq deliver to. I'm reworking the msi_chip, and try to use msi_chip to eliminate
-> all arch_msi_xxx() under every arch in kernel. And the important point is how to create the
-> binding for the MSI device to the target msi_chip.
-
-Which drivers are you thinking of? Again, I wouldn't expect to change any PCI drivers,
-but only platform drivers that do native MSI, so we only have to change drivers that
-do not support any MSI at all yet and that need to be changed anyway in order to add
-support.
-
-> For PCI device, some arm platform already bound the msi_chip to the pci hostbridge, then all
-> pci devices under the pci hostbridge deliver their MSI irqs to the target msi_chip.
-> And other platform create the binding in DTS file, then the MSI device can find their msi_chip
-> by device_node.
-> I don't know whether there are other situations, we should provide a generic interface that
-> every MSI device under every platform can use it to find its msi_chip exactly.
-
-We have introduced the "msi-parent" property to mirror the "interrupt-parent" property.
-For the PCI case, this property is only needed in the PCI host controller, and there
-can be a system-wide default, by putting the "msi-parent" property into the root device
-node or the node of a bus that is parent to all devices supporting MSI.
-
-For non-PCI devices, it should be possible to override the "msi-parent" property per
-device, but those can also use the global property.
-
-The main use case that I see are PCI host controllers that have their own MSI catcher
-included, so meaning that any PCI device can either send its MSIs there, or to a
-system-wide GICv3 instance, and we need a way to select which one.
-
-A degenerate case of this would be a system where a PCI device sends its MSI into
-the host controller, that generates a legacy interrupt and that in turn gets 
-sent to an irqchip which turns it back into an MSI for the GICv3. This would of
-course be very inefficient, but I think we should be able to express this with
-both the binding and the in-kernel framework just to be on the safe side.
-
-
-	Arnd
+-- 
+balbi
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140801/eee3ae0d/attachment.sig>
