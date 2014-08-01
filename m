@@ -1,37 +1,41 @@
 From: olof@lixom.net (Olof Johansson)
-Date: Thu, 31 Jul 2014 20:47:43 -0700
-Subject: [PATCH] bus: arm-ccn: Fix error handling at event allocation
-In-Reply-To: <1406819797-8372-1-git-send-email-pawel.moll@arm.com>
-References: <1406819797-8372-1-git-send-email-pawel.moll@arm.com>
-Message-ID: <20140801034743.GA18052@quad.lixom.net>
+Date: Thu, 31 Jul 2014 20:57:01 -0700
+Subject: [GIT PULL] ARM: Straggler SoC fix for 3.16
+Message-ID: <20140801035701.GA20901@quad.lixom.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jul 31, 2014 at 04:16:37PM +0100, Pawel Moll wrote:
-> The bitfield allocation function returns error condition
-> as a negative value, but in two cases its result
-> was assigned to an unsigned member of the hw_perf_event
-> structure, thus the error would not be ever detected.
-> 
-> Fixed by using an intermediate, signed variable.
-> 
-> Reported-by: Dan Carpenter <dan.carpenter@oracle.com>
-> Signed-off-by: Pawel Moll <pawel.moll@arm.com>
-> ---
-> 
-> Dan discovered the problem using his static checker. Thanks, Dan!
-> 
-> Arnd, would you pick up the patch as it is or do you want me
-> to send a pull request for a "ccn/fixes" branch?
+Hi Linus,
 
-I've started to prefer applying patches for cases like these, single-patch
-pull requests are actually more work than doing that.
+The following changes since commit a1ae5b128365f36a3fa2143cfa9de14fc71c51d8:
 
-So: applied on top of next/drivers, where the CCN driver was merged
-as well.
+  Merge tag 'omap-for-v3.16/n900-regression' of git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap into fixes (2014-07-29 13:04:27 +0200)
 
+are available in the git repository at:
 
-Thanks!
+  git://git.kernel.org/pub/scm/linux/kernel/git/arm/arm-soc.git tags/fixes-for-linus
 
+for you to fetch changes up to b779b88df8370feafa6f49d08a2cc88db4834992:
 
--Olof
+  MAINTAINERS: Update Tegra Git URL (2014-07-30 12:50:54 -0700)
+
+----------------------------------------------------------------
+ARM: Straggler SoC fix for 3.16
+
+A DT bugfix for Nomadik that had an ambigouos double-inversion of a gpio
+line, and one MAINTAINER URL update that might as well go in now.
+
+We could hold off until the merge window, but then we'll just have to mark
+the DT fix for stable and it just seems like in total causing more work.
+
+----------------------------------------------------------------
+Andreas F?rber (1):
+      MAINTAINERS: Update Tegra Git URL
+
+Linus Walleij (1):
+      ARM: nomadik: fix up double inversion in DT
+
+ MAINTAINERS                                | 2 +-
+ arch/arm/boot/dts/ste-nomadik-s8815.dts    | 2 +-
+ arch/arm/boot/dts/ste-nomadik-stn8815.dtsi | 7 ++++---
+ 3 files changed, 6 insertions(+), 5 deletions(-)
