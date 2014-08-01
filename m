@@ -1,78 +1,32 @@
-From: tixy@linaro.org (Jon Medhurst (Tixy))
-Date: Fri, 01 Aug 2014 16:53:19 +0100
-Subject: [PATCH] ARM: multi_v7_defconfig: major refresh
-In-Reply-To: <53DBAAEA.2010908@arm.com>
-References: <1406052070-6207-1-git-send-email-olof@lixom.net>
- <53DB6B4F.9080605@arm.com>	<1406890899.2794.40.camel@linaro1.home>
- <CAOesGMi0RUbz4BSnmR92dEk3fWgN=hnENSdi55VeCXdcHLRLJQ@mail.gmail.com>
- <53DB763A.10306@arm.com> <1406892491.2794.58.camel@linaro1.home>
- <53DBAAEA.2010908@arm.com>
-Message-ID: <1406908399.22757.12.camel@linaro1.home>
+From: grygorii.strashko@ti.com (Grygorii Strashko)
+Date: Fri, 1 Aug 2014 19:40:31 +0300
+Subject: [PATCH v2 0/2] spi: davinci: add support for gpio cs through dt
+Message-ID: <1406911233-18999-1-git-send-email-grygorii.strashko@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 2014-08-01 at 15:57 +0100, Sudeep Holla wrote:
-> 
-> On 01/08/14 12:28, Jon Medhurst (Tixy) wrote:
-> > On Fri, 2014-08-01 at 12:12 +0100, Sudeep Holla wrote:
-> >>
-> >> On 01/08/14 12:03, Olof Johansson wrote:
-> >>> On Fri, Aug 1, 2014 at 4:01 AM, Jon Medhurst (Tixy) <tixy@linaro.org> wrote:
-> >>>> On Fri, 2014-08-01 at 11:26 +0100, Sudeep Holla wrote:
-> 
-> [...]
-> 
-> >>>>
-> >>>>>    One way to achieve this:
-> >>>>> (There's sysfs to re-enable it runtime)
-> >>>>
-> >>>> The opposite is also true, if you don't want the switcher enabled you
-> >>>> can disable it by the same method after boot ;-)
-> >>>>
-> >>>>> -->8
-> >>>>> diff --git a/arch/arm/common/bL_switcher.c b/arch/arm/common/bL_switcher.c
-> >>>>> index 490f3dced749..f4c36e70166a 100644
-> >>>>> --- a/arch/arm/common/bL_switcher.c
-> >>>>> +++ b/arch/arm/common/bL_switcher.c
-> >>>>> @@ -794,7 +794,7 @@ static int bL_switcher_hotplug_callback(struct
-> >>>>> notifier_block *nfb,
-> >>>>>            return NOTIFY_DONE;
-> >>>>>     }
-> >>>>>
-> >>>>> -static bool no_bL_switcher;
-> >>>>> +static bool no_bL_switcher = true;
-> >>>>
-> >>>> This changes the default for everyone, which I guess is fair enough if
-> >>>> there is a good reason, but I'm not sure there is.
-> >>>
-> >>> No, I don't think there is.
-> >>>
-> >>
-> >> It's just that people using TC2 will suddenly see 3 of the 5 CPUs missing.
-> >
-> > Yes, if they we're previously using multi_v7_defconfig (do people
-> > working specifically with TC2's use that?)
-> >
-> 
-> I don't, but assumed many might use it.
-> 
-> > Conversely, with the change in default proposed above, anyone with their
-> > own configs enabling the switcher will suddenly see the number of CPUs
-> > go from 2 to 5. We also have the situation where we have a config
-> > option, which when enabled, doesn't actually do anything unless the user
-> > also changes boot arguments or takes measures to enable it after boot.
-> > Which seems the wrong way for things to work to me.
-> >
-> 
-> OK, makes sense. Just curious how many big.LITTLE platforms have CPUFreq
-> support and integrated with bL switcher. Otherwise we end up switching
-> clusters/cpus using dummy i/f anyways
+This small series enables GPIO chip select feature for Davinci SPI
+when DT-boot mode is used.
+This is actual for Keystone 2 which supports DT-boot mode only.
 
-Hmm, that is a point, there are 3 other big.LITTLE SoC's I can spot in
-mainline [1], and I wouldn't want to speculate how they would be
-affected by having the big.LITTLE switcher enabled.
+Changes in v2:
+- gpio_request_one() is used
+- as suggested by Mark Brown, new patch has been added which updates
+  Davinci SPI driver to use cs_gpio field
+  of SPI device structure (spi_device) for both DT and non-DT cases.
 
-[1] exynos5420, exynos5260, r8a7790
+v1:
+ http://www.spinics.net/lists/linux-spi/msg01446.html
+
+Grygorii Strashko (1):
+  spi: davinci: use spi_device.cs_gpio to store gpio cs per spi device
+
+Murali Karicheri (1):
+  spi: davinci: add support to configure gpio cs through dt
+
+ .../devicetree/bindings/spi/spi-davinci.txt        |    9 ++-
+ drivers/spi/spi-davinci.c                          |   60 ++++++++++++++------
+ 2 files changed, 52 insertions(+), 17 deletions(-)
 
 -- 
-Tixy
+1.7.9.5
