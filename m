@@ -1,38 +1,48 @@
-From: stefano.stabellini@eu.citrix.com (Stefano Stabellini)
-Date: Fri, 1 Aug 2014 17:27:14 +0100
-Subject: [PATCH v3 0/3] xen/arm: fix "xen_add_mach_to_phys_entry: cannot
- add" problem
-In-Reply-To: <53DBB231.5010900@citrix.com>
-References: <alpine.DEB.2.02.1408011552460.2293@kaball.uk.xensource.com>
- <53DBB231.5010900@citrix.com>
-Message-ID: <alpine.DEB.2.02.1408011726340.2293@kaball.uk.xensource.com>
+From: grygorii.strashko@ti.com (Grygorii Strashko)
+Date: Fri, 01 Aug 2014 20:29:04 +0300
+Subject: [PATCH 2/2] spi: davinci: add support to configure gpio cs through
+ dt
+In-Reply-To: <53DBB202.1040509@ti.com>
+References: <1406827995-30913-1-git-send-email-grygorii.strashko@ti.com>
+ <1406827995-30913-3-git-send-email-grygorii.strashko@ti.com>
+ <20140731193515.GO17528@sirena.org.uk> <53DBB202.1040509@ti.com>
+Message-ID: <53DBCE60.1010308@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 1 Aug 2014, David Vrabel wrote:
-> On 01/08/14 15:55, Stefano Stabellini wrote:
-> > Hi all,
-> > Xen support in Linux for ARM and ARM64 suffers from lack of support for
-> > multiple mfn to pfn mappings: whenever a frontend grants the same page
-> > multiple times to the backend, the mfn to pfn accounting in
-> > arch/arm/xen/p2m.c fails. The issue has become critical since v3.15,
-> > when xen-netfront/xen-netback switched from grant copies to grant
-> > mappings, therefore causing the issue to happen much more often.
-> > 
-> > Fixing the mfn to pfn accounting in p2m.c is difficult and expensive,
-> > therefore we are looking for alternative solutions. One idea is avoiding
-> > mfn to pfn conversions altogether. The only code path that needs them is
-> > swiotlb-xen:unmap_page (and single_for_cpu and single_for_device).
-> > 
-> > To avoid mfn to pfn conversions we rely on a second p2m mapping done by
-> > Xen (a separate patch series will be sent for Xen). In Linux we use it
-> > to perform the cache maintenance operations without mfns conversions.
-> > 
-> > 
-> > The Xen side patch series that introduces XENFEAT_grant_map_identity is:
-> > http://marc.info/?l=xen-devel&m=140690433923855
-> 
-> If the Xen side is in master, you can apply this series to
-> devel/for-linus-3.17
+Hi Mark,
 
-Thanks. The Xen series is not in yet, I'll do as soon as it is applied.
+On 08/01/2014 06:28 PM, Grygorii Strashko wrote:
+> Hi Mark,
+> On 07/31/2014 10:35 PM, Mark Brown wrote:
+>> On Thu, Jul 31, 2014 at 08:33:15PM +0300, Grygorii Strashko wrote:
+>>
+>>> +	if (np && master->cs_gpios != NULL && spi->cs_gpio >= 0) {
+>>> +		/* SPI core parse and update master->cs_gpio */
+>>>    		gpio_chipsel = true;
+>>> +		gpio = spi->cs_gpio;
+>>> +	} else if (pdata->chip_sel &&
+>>> +		   chip_sel < pdata->num_chipselect &&
+>>> +		   pdata->chip_sel[chip_sel] != SPI_INTERN_CS) {
+>>> +		/* platform data defines chip_sel */
+>>> +		gpio_chipsel = true;
+>>> +		gpio = pdata->chip_sel[chip_sel];
+>>> +	}
+>>
+>> This would all be a lot simpler and more direct if you were to arrange
+>> to use cs_gpio in the struct spi_device, and move you closer to
+>> converting to use more of the core functionality.
+> 
+> Unfortunately, I'm not sure this is good idea, because this part of
+> code is used by Davinci arch which is non-DT platform.
+> As result, this code was kept mostly unchanged.
+> 
+> I can try to rework it, but I'd like to do it as standalone patch.
+> Is it ok for you?
+
+I've just sent updated version with additional patch where
+I reworked driver for using cs_gpio for  both DT and non-DT cases.
+http://www.spinics.net/lists/arm-kernel/msg352382.html
+
+Regards,
+-grygorii
