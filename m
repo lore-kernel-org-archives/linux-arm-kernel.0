@@ -1,38 +1,68 @@
-From: skannan@codeaurora.org (Saravana Kannan)
-Date: Thu, 31 Jul 2014 16:48:00 -0700
-Subject: [PATCH v4 3/5] cpufreq: Don't destroy/realloc policy/sysfs on
- hotplug/suspend
-In-Reply-To: <3141717.0s1tLjazMZ@vostro.rjw.lan>
-References: <1406250448-470-1-git-send-email-skannan@codeaurora.org>
- <1406250448-470-4-git-send-email-skannan@codeaurora.org>
- <3141717.0s1tLjazMZ@vostro.rjw.lan>
-Message-ID: <53DAD5B0.3070500@codeaurora.org>
+From: mturquette@linaro.org (Mike Turquette)
+Date: Thu, 31 Jul 2014 17:30:25 -0700
+Subject: [PATCH 1/4] clk: rockchip: protect critical clocks from getting
+ disabled
+In-Reply-To: <4047366.k35vzjcKGH@diego>
+References: <1406661128-7614-1-git-send-email-heiko@sntech.de>
+ <1406661128-7614-2-git-send-email-heiko@sntech.de>
+ <20140731224523.4463.34464@quantum> <4047366.k35vzjcKGH@diego>
+Message-ID: <20140801003025.4463.76384@quantum>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/31/2014 02:56 PM, Rafael J. Wysocki wrote:
-> On Thursday, July 24, 2014 06:07:26 PM Saravana Kannan wrote:
->> This patch simplifies a lot of the hotplug/suspend code by not
->> adding/removing/moving the policy/sysfs/kobj during hotplug and just leaves
->> the cpufreq directory and policy in place irrespective of whether the CPUs
->> are ONLINE/OFFLINE.
->
-> I'm still quite unsure how this is going to work with the real CPU hot-remove
-> that makes the entire sysfs cpu directories go away.  Can you please explain
-> that?
+Quoting Heiko St?bner (2014-07-31 16:29:34)
+> Hi Mike,
+> 
+> Am Donnerstag, 31. Juli 2014, 15:45:23 schrieb Mike Turquette:
+> > Quoting Heiko Stuebner (2014-07-29 12:12:05)
+> > 
+> > > The clock-tree contains clocks that should never get disabled
+> > > automatically. One example are the base ACLKs, the base supplies for all
+> > > peripherals.
+> > > 
+> > > Therefore add a structure similar to the sunxi clock-tree to protect these
+> > > special clocks from being disabled.
+> > > 
+> > > Signed-off-by: Heiko Stuebner <heiko@sntech.de>
+> > > ---
+> > > 
+> > >  drivers/clk/rockchip/clk-rk3188.c |  7 +++++++
+> > >  drivers/clk/rockchip/clk-rk3288.c |  7 +++++++
+> > >  drivers/clk/rockchip/clk.c        | 13 +++++++++++++
+> > >  drivers/clk/rockchip/clk.h        |  1 +
+> > >  4 files changed, 28 insertions(+)
+> > > 
+> > > diff --git a/drivers/clk/rockchip/clk-rk3188.c
+> > > b/drivers/clk/rockchip/clk-rk3188.c index a83a6d8..5aef277 100644
+> > > --- a/drivers/clk/rockchip/clk-rk3188.c
+> > > +++ b/drivers/clk/rockchip/clk-rk3188.c
+> > > @@ -599,6 +599,11 @@ static struct rockchip_clk_branch
+> > > rk3188_clk_branches[] __initdata = {> 
+> > >         GATE(ACLK_GPS, "aclk_gps", "aclk_peri", 0, RK2928_CLKGATE_CON(8),
+> > >         13, GFLAGS),>  
+> > >  };
+> > > 
+> > > +static const char *rk3188_critical_clocks[] __initconst = {
+> > > +       "aclk_cpu",
+> > > +       "aclk_peri",
+> > 
+> > I'm not against the idea of critical clocks, but I want to verify that
+> > there is no other driver out there that is a better fit for claiming
+> > these clks via clk_get and enabling them the normal way via clk_enable?
+> 
+> In the clock hierarchy of Rockchip SoCs, both aclks listed here, are sources 
+> for pclk and hclk, as well as sourcing some other peripheral gates further 
+> below too. So from what I've seen from the clock diagrams, there is nothing 
+> that would claim these clocks directly, and it wouldn't also make any sense to 
+> let them get disabled as there will always be something using them (for 
+> example the dram-controller).
 
-Sure. Not a problem. I just wanted to make sure you had a chance to look 
-at the code first.
+Sounds good. Just out of curiosity, under what circumstances would you
+want to gate them? Is there a use case for it?
 
-Physical hot-remove triggers a "remove" for all the  registered 
-subsys_interfaces for that CPU (after going through a couple of 
-functions). So, when that happens, the cpufreq subsys_interface remove 
-for that CPU gets called. At that point, I clean up that CPU's SW states 
-as if it was never plugged in from the start. If that CPU was the owner 
-of the sysfs directory, I move it over to a different CPU.
+Regards,
+Mike
 
--Saravana
-
--- 
-The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
-hosted by The Linux Foundation
+> 
+> 
+> Heiko
