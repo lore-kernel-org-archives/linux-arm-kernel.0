@@ -1,88 +1,31 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Fri, 1 Aug 2014 09:22:28 +0100
-Subject: [PATCH v4 1/1] iommu-api: Add map_sg/unmap_sg functions
-In-Reply-To: <1406854484-3848-2-git-send-email-ohaugan@codeaurora.org>
-References: <1406854484-3848-1-git-send-email-ohaugan@codeaurora.org>
- <1406854484-3848-2-git-send-email-ohaugan@codeaurora.org>
-Message-ID: <20140801082228.GC15733@arm.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Fri, 1 Aug 2014 01:21:41 -0700
+Subject: [PATCH 0/2] Manage OMAP34xx ES3.1.2 rev to resume from suspend
+In-Reply-To: <1406812234-23163-1-git-send-email-jvial@adeneo-embedded.com>
+References: <1406812234-23163-1-git-send-email-jvial@adeneo-embedded.com>
+Message-ID: <20140801082140.GA26699@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Olav,
-
-On Fri, Aug 01, 2014 at 01:54:44AM +0100, Olav Haugan wrote:
-> Mapping and unmapping are more often than not in the critical path.
-> map_sg and unmap_sg allows IOMMU driver implementations to optimize
-> the process of mapping and unmapping buffers into the IOMMU page tables.
+* Jeremy Vial <jvial@adeneo-embedded.com> [140731 06:16]:
+> Hi,
 > 
-> Instead of mapping a buffer one page at a time and requiring potentially
-> expensive TLB operations for each page, this function allows the driver
-> to map all pages in one go and defer TLB maintenance until after all
-> pages have been mapped.
+> My kernel crashed when my OMAP34xx ES3.1.2 leave suspend mode. The first
+> patch seems to solve the issue, and the second one corrects Linux kernel
+> coding style problems.
 > 
-> Additionally, the mapping operation would be faster in general since
-> clients does not have to keep calling map API over and over again for
-> each physically contiguous chunk of memory that needs to be mapped to a
-> virtually contiguous region.
-
-Just a couple of minor comments, but I think this is almost there now.
-
-> Signed-off-by: Olav Haugan <ohaugan@codeaurora.org>
-> ---
->  drivers/iommu/iommu.c | 44 ++++++++++++++++++++++++++++++++++++++++++++
->  include/linux/iommu.h | 28 ++++++++++++++++++++++++++++
->  2 files changed, 72 insertions(+)
+> Jeremy Vial (2):
+>   ARM: OMAP3: Fix choice of omap3_restore_es function in OMAP34XX
+>     rev3.1.2 case.
+>   ARM: OMAP3: Fix coding style problems in
+>     arch/arm/mach-omap2/control.c
 > 
-> diff --git a/drivers/iommu/iommu.c b/drivers/iommu/iommu.c
-> index 1698360..1d5dc2e 100644
-> --- a/drivers/iommu/iommu.c
-> +++ b/drivers/iommu/iommu.c
-> @@ -1088,6 +1088,50 @@ size_t iommu_unmap(struct iommu_domain *domain, unsigned long iova, size_t size)
->  }
->  EXPORT_SYMBOL_GPL(iommu_unmap);
->  
-> +int iommu_map_sg(struct iommu_domain *domain, unsigned long iova,
-> +			struct scatterlist *sg, unsigned int nents,
-> +			int prot, unsigned long flags)
-> +{
+>  arch/arm/mach-omap2/control.c |    6 +++---
+>  1 file changed, 3 insertions(+), 3 deletions(-)
 
-What do you anticipate passing in the flags parameter? I assume it's
-something specific to the scatterlist, since we can't provide this to
-iommu_map as it stands?
+Thanks applying these fixes for the merge window. I've tagged
+the first patch also for stable.
 
-> +	int ret = 0;
-> +	unsigned long offset = 0;
-> +
-> +	if (unlikely(domain->ops->map_sg == NULL)) {
-> +		unsigned int i;
-> +		struct scatterlist *s;
-> +
-> +		for_each_sg(sg, s, nents, i) {
-> +			phys_addr_t phys = page_to_phys(sg_page(s));
-> +			size_t page_len = s->offset + s->length;
-> +
-> +			ret = iommu_map(domain, iova + offset, phys, page_len,
-> +					prot);
-> +			if (ret)
-> +				goto fail;
-> +
-> +			offset += page_len;
-> +		}
-> +	} else {
-> +		ret = domain->ops->map_sg(domain, iova, sg, nents, prot, flags);
-> +	}
-> +	goto out;
-> +
-> +fail:
-> +	/* undo mappings already done in case of error */
-> +	iommu_unmap(domain, iova, offset);
+Regards,
 
-I think this would be cleaner if you stuck it in the loop above and removed
-all these labels:
-
-  if (ret) {
-	iommu_unmap(...);
-	break;
-  }
-
-Will
+Tony
