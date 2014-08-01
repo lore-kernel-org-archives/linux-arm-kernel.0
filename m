@@ -1,37 +1,38 @@
-From: afaerber@suse.de (=?UTF-8?B?QW5kcmVhcyBGw6RyYmVy?=)
-Date: Fri, 01 Aug 2014 05:17:42 +0200
-Subject: [PATCH v4 4/4] ARM: dts: Add exynos5250-spring device tree
-In-Reply-To: <53DA936E.9060004@gmail.com>
-References: <1406822910-6255-1-git-send-email-afaerber@suse.de>
- <1406822910-6255-5-git-send-email-afaerber@suse.de>
- <53DA936E.9060004@gmail.com>
-Message-ID: <53DB06D6.9060604@suse.de>
+From: wangkefeng.wang@huawei.com (Kefeng Wang)
+Date: Fri, 1 Aug 2014 11:58:53 +0800
+Subject: [PATCH 0/3] move arm dual timer into drivers/clocksource
+Message-ID: <1406865536-23984-1-git-send-email-wangkefeng.wang@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am 31.07.2014 21:05, schrieb Tomasz Figa:
->> +
->> +&i2c_2 {
->> +	status = "okay";
->> +	samsung,i2c-sda-delay = <100>;
->> +	samsung,i2c-max-bus-freq = <66000>;
->> +
->> +	hdmiddc at 50 {
->> +		compatible = "samsung,exynos4210-hdmiddc";
->> +		reg = <0x50>;
->> +	};
-> 
-> I don't think this matches current Exynos HDMI bindings, which I believe
-> have been changed to just take a phandle to i2c bus instead.
+Kefeng Wang (3):
+  ARM: remove unnecessary include arm_timer.h and timer-sp.h
+  clocksource: move arm dual timer into drivers/clocksource
+  clocksouce: sp804: use pr_fmt for logging
 
-Looks correct to me:
-
-http://git.kernel.org/cgit/linux/kernel/git/kgene/linux-samsung.git/tree/Documentation/devicetree/bindings/video/exynos_hdmiddc.txt?h=for-next
-
-https://git.kernel.org/cgit/linux/kernel/git/next/linux-next.git/tree/Documentation/devicetree/bindings/video/exynos_hdmiddc.txt
-
-Andreas
+ arch/arm/Kconfig                          |   5 -
+ arch/arm/common/Makefile                  |   1 -
+ arch/arm/common/timer-sp.c                | 304 -----------------------------
+ arch/arm/include/asm/hardware/arm_timer.h |  35 ----
+ arch/arm/include/asm/hardware/timer-sp.h  |  23 ---
+ arch/arm/mach-integrator/integrator_ap.c  |   2 +-
+ arch/arm/mach-nspire/nspire.c             |   2 -
+ arch/arm/mach-realview/core.c             |   5 +-
+ arch/arm/mach-versatile/core.c            |   5 +-
+ arch/arm/mach-vexpress/ct-ca9x4.c         |   3 -
+ arch/arm/mach-vexpress/v2m.c              |   5 +-
+ drivers/clocksource/Kconfig               |   7 +
+ drivers/clocksource/Makefile              |   1 +
+ drivers/clocksource/timer-sp.c            | 307 ++++++++++++++++++++++++++++++
+ include/clocksource/arm_timer.h           |  35 ++++
+ include/clocksource/timer-sp.h            |  23 +++
+ 16 files changed, 383 insertions(+), 380 deletions(-)
+ delete mode 100644 arch/arm/common/timer-sp.c
+ delete mode 100644 arch/arm/include/asm/hardware/arm_timer.h
+ delete mode 100644 arch/arm/include/asm/hardware/timer-sp.h
+ create mode 100644 drivers/clocksource/timer-sp.c
+ create mode 100644 include/clocksource/arm_timer.h
+ create mode 100644 include/clocksource/timer-sp.h
 
 -- 
-SUSE LINUX Products GmbH, Maxfeldstr. 5, 90409 N?rnberg, Germany
-GF: Jeff Hawn, Jennifer Guild, Felix Imend?rffer; HRB 16746 AG N?rnberg
+1.7.12.4
