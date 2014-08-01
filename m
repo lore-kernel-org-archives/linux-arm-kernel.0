@@ -1,111 +1,126 @@
-From: heiko@sntech.de (Heiko =?ISO-8859-1?Q?St=FCbner?=)
-Date: Fri, 01 Aug 2014 11:24:56 +0200
-Subject: [PATCH v2] pinctrl: rockchip: fix rk3288 gpio0 configuration
-In-Reply-To: <1406872680-14641-1-git-send-email-sonnyrao@chromium.org>
-References: <1543632.JNPYWq24Lp@diego>
- <1406872680-14641-1-git-send-email-sonnyrao@chromium.org>
-Message-ID: <1610557.3nVa59E5gW@diego>
+From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
+Date: Fri, 01 Aug 2014 11:24:13 +0200
+Subject: DMA engine API issue (was: [PATCH/RFC 0/5] R-Car Gen2 DMAC
+ hardware descriptor list support)
+In-Reply-To: <20140724125120.GN21766@n2100.arm.linux.org.uk>
+References: <1406032431-3807-1-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
+ <28702317.aD0C1Ga3DS@avalon> <20140724125120.GN21766@n2100.arm.linux.org.uk>
+Message-ID: <5972281.SIICqHk85N@avalon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am Donnerstag, 31. Juli 2014, 22:58:00 schrieb Sonny Rao:
-> On rk3288, for gpio bank 0, the registers which configure pull-up,
-> iomux, and drive strength don't implement the enable bits in the upper
-> half of the register, unlike the other gpio configuration registers,
-> and so the kernel must perform a read-modify-write of the register to
-> update a particular gpio in that bank.
-> 
-> The current code is actually clobbering the contents of the register,
-> so this fixes it by using regmap_update_bits and masking out only the
-> bits which require updating.  In the case of bank0 on rk3288 the upper
-> enable bits will just get ignored, and the other configurations won't
-> get clobbered.
-> 
-> Signed-off-by: Sonny Rao <sonnyrao@chromium.org>
+Hi Russell,
 
-Reviewed-by: Heiko Stuebner <heiko@sntech.de>
+On Thursday 24 July 2014 13:51:21 Russell King - ARM Linux wrote:
+> On Wed, Jul 23, 2014 at 01:07:43PM +0200, Laurent Pinchart wrote:
+> > Now we have a core issue. On one side there's rsnd_soc_dai_trigger() being
+> > called in atomic context, and on the other side the function ends up
+> > calling dmaengine_prep_dma_cyclic() which needs to allocate memory. To
+> > make this more func the DMA engine API is undocumented and completely
+> > silent on whether the prep functions are allowed to sleep. The question
+> > is, who's wrong ?
+>
+> For slave DMA drivers, there is the expectation that the prepare functions
+> will be callable from tasklet context, without any locks held by the driver. 
+> So, it's expected that the prepare functions will work from tasklet context.
+> 
+> I don't think we've ever specified whether they should be callable from
+> interrupt context, but in practice, we have drivers which do exactly that,
+> so I think the decision has already been made - they will be callable from
+> IRQ context, and so GFP_ATOMIC is required in the driver.
 
+I agree with you, the decision has made itself to use allocation routines that 
+will not sleep. However,
 
-thanks for this fix
-Heiko
+$ grep -r GFP_NOWAIT drivers/dma | wc -l
+22
+$ grep -r GFP_ATOMIC drivers/dma | wc -l
+24
 
-> ---
-> v2: rebase onto latest pinctrl with drive strength and fix this bug on
->   iomux and drive strength as well.
+Looks like a draw to me :-) I'm pretty sure most of the decisions to use 
+GFP_NOWAIT or GFP_ATOMIC are cases of cargo-cult programming instead of 
+resulting from a thoughtful process. We should document this in Maxime's new 
+DMA engine internals documentation.
+
+This being said, I wonder whether allowing the prep functions to be called in 
+atomic context was a sane decision. We've pushed the whole DMA engine API to 
+atomic context, leading to such niceties as memory allocation pressure and the 
+impossibility to implement runtime PM support without resorting to a work 
+queue for the sole purpose of power management, in *every* DMA engine driver. 
+I can't help but thinking something is broken.
+
+I'd like your opinion on that. Whether fixing it would be worth the effort is 
+a different question, so we could certainly conclude that we'll have to live 
+with an imperfect design for the time being.
+
+> > The rcar-dmac DMA engine driver uses runtime PM. When not used, the device
+> > is suspended. The driver calls pm_runtime_get_sync() to resume the
+> > device, and needs to do so when a descriptor is submitted. This
+> > operation, currently performed in the tx_submit handler, could be moved
+> > to the prep_dma_cyclic or issue_pending handler, but the three operations
+> > are called in a row from rsnd_dma_start(), itself ultimately called from
+> > snd_pcm_lib_write1() with the spinlock held. This means I have no place
+> > in my DMA engine driver where I can resume the device.
 > 
->  drivers/pinctrl/pinctrl-rockchip.c | 15 +++++++++------
->  1 file changed, 9 insertions(+), 6 deletions(-)
+> Right, runtime PM with DMA engine drivers is hard. The best that can be done
+> right now is to pm_runtime_get() in the alloc_chan_resources() method and
+> put it in free_chan_resources() if you don't want to do the workqueue thing.
+
+That's an easy enough implementation, but given that channels are usually 
+requested at probe time and released at remove time, that would be roughly 
+equivalent to no PM at all.
+
+> There's a problem with the workqueue thing though - by doing so, you make it
+> asynchronous to the starting of the DMA. The DMA engine API allows for
+> delayed starting (it's actually the normal thing for DMA engine), but that
+> may not always be appropriate or desirable.
+
+If I'm not mistaken, the DMA engine API doesn't provide a way to synchronously 
+start DMA transfers. An implementation could do so, but no guarantee is 
+offered by the API to the caller. I agree, however, that it could be an issue.
+
+Doesn't this call for a new pair of open/close-like functions in the API ? 
+They would be called right before a client driver starts using a channel, and 
+right after it stops using it. Those functions would be allowed to sleep.
+
+Beside simplifying power management, those functions could also be used for 
+lazy hardware channel allocation. Renesas SoCs have DMA engines that include 
+general-purpose channels, usable by any slave. There are more slaves than 
+hardware channels, so not all slaves can be used at the same time. At the 
+moment the hardware channel is allocated when requesting the DMA engine 
+channel, at probe time for most slave drivers. This breaks when too many 
+slaves get registered, even if they're not all used at the same time. Some 
+kind of lazy/delayed allocation scheme would be useful.
+
+Another option would be to request the DMA engine channel later than probe 
+time, when the channel will actually be used. However, that would break 
+deferred probing, and would possibly degrade performances.
+
+> > One could argue that the rcar-dmac driver could use a work queue to
+> > handle power management. That's correct, but the additional complexity,
+> > which would be required in *all* DMA engine drivers, seem too high to
+> > me. If we need to go that way, this is really a task that the DMA
+> > engine core should handle.
 > 
-> diff --git a/drivers/pinctrl/pinctrl-rockchip.c
-> b/drivers/pinctrl/pinctrl-rockchip.c index c15f7f9..4ff5dc3 100644
-> --- a/drivers/pinctrl/pinctrl-rockchip.c
-> +++ b/drivers/pinctrl/pinctrl-rockchip.c
-> @@ -438,7 +438,7 @@ static int rockchip_set_mux(struct rockchip_pin_bank
-> *bank, int pin, int mux) int reg, ret, mask;
->  	unsigned long flags;
->  	u8 bit;
-> -	u32 data;
-> +	u32 data, rmask;
+> As I mention above, the problem with that is getting the workqueue to run
+> soon enough that it doesn't cause a performance degredation or other issues.
+
+That's why I liked the ability to sleep in the prep functions ;-)
+
+> There's also expectations from other code - OMAP for example explicitly
+> needs DMA to be started on the hardware before the audio block can be
+> enabled (from what I remember, it tickless an erratum if this is not done.)
+
+Nice. That pretty much bans the usage of a workqueue then, we need something 
+else.
+
+> > Let's start by answering the background question and updating the DMA
+> > engine API documentation once and for good : in which context are drivers
+> > allowed to call the prep, tx_submit and issue_pending functions ?
 > 
->  	if (iomux_num > 3)
->  		return -EINVAL;
-> @@ -478,8 +478,9 @@ static int rockchip_set_mux(struct rockchip_pin_bank
-> *bank, int pin, int mux) spin_lock_irqsave(&bank->slock, flags);
-> 
->  	data = (mask << (bit + 16));
-> +	rmask = data | (data >> 16);
->  	data |= (mux & mask) << bit;
-> -	ret = regmap_write(regmap, reg, data);
-> +	ret = regmap_update_bits(regmap, reg, rmask, data);
-> 
->  	spin_unlock_irqrestore(&bank->slock, flags);
-> 
-> @@ -634,7 +635,7 @@ static int rk3288_set_drive(struct rockchip_pin_bank
-> *bank, int pin_num, struct regmap *regmap;
->  	unsigned long flags;
->  	int reg, ret, i;
-> -	u32 data;
-> +	u32 data, rmask;
->  	u8 bit;
-> 
->  	rk3288_calc_drv_reg_and_bit(bank, pin_num, &regmap, &reg, &bit);
-> @@ -657,9 +658,10 @@ static int rk3288_set_drive(struct rockchip_pin_bank
-> *bank, int pin_num,
-> 
->  	/* enable the write to the equivalent lower bits */
->  	data = ((1 << RK3288_DRV_BITS_PER_PIN) - 1) << (bit + 16);
-> +	rmask = data | (data >> 16);
->  	data |= (ret << bit);
-> 
-> -	ret = regmap_write(regmap, reg, data);
-> +	ret = regmap_update_bits(regmap, reg, rmask, data);
->  	spin_unlock_irqrestore(&bank->slock, flags);
-> 
->  	return ret;
-> @@ -722,7 +724,7 @@ static int rockchip_set_pull(struct rockchip_pin_bank
-> *bank, int reg, ret;
->  	unsigned long flags;
->  	u8 bit;
-> -	u32 data;
-> +	u32 data, rmask;
-> 
->  	dev_dbg(info->dev, "setting pull of GPIO%d-%d to %d\n",
->  		 bank->bank_num, pin_num, pull);
-> @@ -750,6 +752,7 @@ static int rockchip_set_pull(struct rockchip_pin_bank
-> *bank,
-> 
->  		/* enable the write to the equivalent lower bits */
->  		data = ((1 << RK3188_PULL_BITS_PER_PIN) - 1) << (bit + 16);
-> +		rmask = data | (data >> 16);
-> 
->  		switch (pull) {
->  		case PIN_CONFIG_BIAS_DISABLE:
-> @@ -770,7 +773,7 @@ static int rockchip_set_pull(struct rockchip_pin_bank
-> *bank, return -EINVAL;
->  		}
-> 
-> -		ret = regmap_write(regmap, reg, data);
-> +		ret = regmap_update_bits(regmap, reg, rmask, data);
-> 
->  		spin_unlock_irqrestore(&bank->slock, flags);
->  		break;
+> IRQs-off contexts. :)
+
+-- 
+Regards,
+
+Laurent Pinchart
