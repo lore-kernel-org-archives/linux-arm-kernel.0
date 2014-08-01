@@ -1,44 +1,102 @@
-From: behanw@converseincode.com (Behan Webster)
-Date: Thu, 31 Jul 2014 21:11:59 -0700
-Subject: [PATCH 0/4] LLVMLinux: Patches to enable the kernel to be compiled
- with clang/LLVM
-In-Reply-To: <20140731103323.GL26853@arm.com>
-References: <1406764649-20326-1-git-send-email-behanw@converseincode.com>
- <20140731103323.GL26853@arm.com>
-Message-ID: <53DB138F.7070709@converseincode.com>
+From: sonnyrao@chromium.org (Sonny Rao)
+Date: Thu, 31 Jul 2014 22:58:00 -0700
+Subject: [PATCH v2] pinctrl: rockchip: fix rk3288 gpio0 configuration
+In-Reply-To: <1543632.JNPYWq24Lp@diego>
+References: <1543632.JNPYWq24Lp@diego>
+Message-ID: <1406872680-14641-1-git-send-email-sonnyrao@chromium.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/31/14 03:33, Will Deacon wrote:
-> On Thu, Jul 31, 2014 at 12:57:25AM +0100, behanw at converseincode.com wrote:
->> From: Behan Webster <behanw@converseincode.com>
->>
->> This patch set moves from using locally defined named registers to access the
->> stack pointer to using a globally defined named register. This allows the code
->> to work both with gcc and clang.
->>
->> The LLVMLinux project aims to fully build the Linux kernel using both gcc and
->> clang (the C front end for the LLVM compiler infrastructure project).
->>
->> Behan Webster (4):
->>    arm64: LLVMLinux: Add current_stack_pointer() for arm64
->>    arm64: LLVMLinux: Use current_stack_pointer in save_stack_trace_tsk
->>    arm64: LLVMLinux: Calculate current_thread_info from
->>      current_stack_pointer
->>    arm64: LLVMLinux: Use current_stack_pointer in kernel/traps.c
-> Once Andreas's comments have been addressed:
->
->    Acked-by: Will Deacon <will.deacon@arm.com>
->
-> Please can you send a new series after the merge window?
-Pity. I was hoping to get it in this merge window.
+On rk3288, for gpio bank 0, the registers which configure pull-up,
+iomux, and drive strength don't implement the enable bits in the upper
+half of the register, unlike the other gpio configuration registers,
+and so the kernel must perform a read-modify-write of the register to
+update a particular gpio in that bank.
 
-However, will resubmit for 3.18.
+The current code is actually clobbering the contents of the register,
+so this fixes it by using regmap_update_bits and masking out only the
+bits which require updating.  In the case of bank0 on rk3288 the upper
+enable bits will just get ignored, and the other configurations won't
+get clobbered.
 
-Thanks,
+Signed-off-by: Sonny Rao <sonnyrao@chromium.org>
+---
+v2: rebase onto latest pinctrl with drive strength and fix this bug on
+  iomux and drive strength as well.
+ 
+ drivers/pinctrl/pinctrl-rockchip.c | 15 +++++++++------
+ 1 file changed, 9 insertions(+), 6 deletions(-)
 
-Behan
-
+diff --git a/drivers/pinctrl/pinctrl-rockchip.c b/drivers/pinctrl/pinctrl-rockchip.c
+index c15f7f9..4ff5dc3 100644
+--- a/drivers/pinctrl/pinctrl-rockchip.c
++++ b/drivers/pinctrl/pinctrl-rockchip.c
+@@ -438,7 +438,7 @@ static int rockchip_set_mux(struct rockchip_pin_bank *bank, int pin, int mux)
+ 	int reg, ret, mask;
+ 	unsigned long flags;
+ 	u8 bit;
+-	u32 data;
++	u32 data, rmask;
+ 
+ 	if (iomux_num > 3)
+ 		return -EINVAL;
+@@ -478,8 +478,9 @@ static int rockchip_set_mux(struct rockchip_pin_bank *bank, int pin, int mux)
+ 	spin_lock_irqsave(&bank->slock, flags);
+ 
+ 	data = (mask << (bit + 16));
++	rmask = data | (data >> 16);
+ 	data |= (mux & mask) << bit;
+-	ret = regmap_write(regmap, reg, data);
++	ret = regmap_update_bits(regmap, reg, rmask, data);
+ 
+ 	spin_unlock_irqrestore(&bank->slock, flags);
+ 
+@@ -634,7 +635,7 @@ static int rk3288_set_drive(struct rockchip_pin_bank *bank, int pin_num,
+ 	struct regmap *regmap;
+ 	unsigned long flags;
+ 	int reg, ret, i;
+-	u32 data;
++	u32 data, rmask;
+ 	u8 bit;
+ 
+ 	rk3288_calc_drv_reg_and_bit(bank, pin_num, &regmap, &reg, &bit);
+@@ -657,9 +658,10 @@ static int rk3288_set_drive(struct rockchip_pin_bank *bank, int pin_num,
+ 
+ 	/* enable the write to the equivalent lower bits */
+ 	data = ((1 << RK3288_DRV_BITS_PER_PIN) - 1) << (bit + 16);
++	rmask = data | (data >> 16);
+ 	data |= (ret << bit);
+ 
+-	ret = regmap_write(regmap, reg, data);
++	ret = regmap_update_bits(regmap, reg, rmask, data);
+ 	spin_unlock_irqrestore(&bank->slock, flags);
+ 
+ 	return ret;
+@@ -722,7 +724,7 @@ static int rockchip_set_pull(struct rockchip_pin_bank *bank,
+ 	int reg, ret;
+ 	unsigned long flags;
+ 	u8 bit;
+-	u32 data;
++	u32 data, rmask;
+ 
+ 	dev_dbg(info->dev, "setting pull of GPIO%d-%d to %d\n",
+ 		 bank->bank_num, pin_num, pull);
+@@ -750,6 +752,7 @@ static int rockchip_set_pull(struct rockchip_pin_bank *bank,
+ 
+ 		/* enable the write to the equivalent lower bits */
+ 		data = ((1 << RK3188_PULL_BITS_PER_PIN) - 1) << (bit + 16);
++		rmask = data | (data >> 16);
+ 
+ 		switch (pull) {
+ 		case PIN_CONFIG_BIAS_DISABLE:
+@@ -770,7 +773,7 @@ static int rockchip_set_pull(struct rockchip_pin_bank *bank,
+ 			return -EINVAL;
+ 		}
+ 
+-		ret = regmap_write(regmap, reg, data);
++		ret = regmap_update_bits(regmap, reg, rmask, data);
+ 
+ 		spin_unlock_irqrestore(&bank->slock, flags);
+ 		break;
 -- 
-Behan Webster
-behanw at converseincode.com
+1.8.3.2
