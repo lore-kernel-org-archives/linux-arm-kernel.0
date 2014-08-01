@@ -1,46 +1,56 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Fri, 1 Aug 2014 01:02:46 -0700
-Subject: [PATCH 3/3] arm: dts: Add gta04a5 model
-In-Reply-To: <CABxcv=n7g8c2ePGKgu_0Y35iearcRoAj9ZH5jDWY9nE+1uUKnA@mail.gmail.com>
-References: <1406577213-9642-1-git-send-email-marek@goldelico.com>
- <1406577213-9642-4-git-send-email-marek@goldelico.com>
- <CAOf5uwk=ctww=pP4Ae+1C6i-oOtiYTv2NJbj1GpuPwVSKXB4Hw@mail.gmail.com>
- <CAAfyv35jvhzvjCKMwrpa=RQ1JkfcmthCsGDzwLW9Y6bq3Ww_fg@mail.gmail.com>
- <CAOf5uw=Fm9FXEH5ESqDC8pGjMbn5VQ1+MyPJVXSqGh_9+JRLHw@mail.gmail.com>
- <1FA8171E-1B7A-4684-887E-11593BB9C29E@goldelico.com>
- <20140729124120.GS29045@atomide.com>
- <589F7CA3-F245-4299-8E39-36A7FA9F3CBD@goldelico.com>
- <CABxcv=n7g8c2ePGKgu_0Y35iearcRoAj9ZH5jDWY9nE+1uUKnA@mail.gmail.com>
-Message-ID: <20140801080246.GG29045@atomide.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Fri, 1 Aug 2014 09:10:38 +0100
+Subject: [PATCH] ARM: don't enter kgdb when userspace executes a kgdb
+ break instruction.
+In-Reply-To: <20140801030520.GA27665@mew>
+References: <20140801030520.GA27665@mew>
+Message-ID: <20140801081038.GA15733@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Javier Martinez Canillas <javier@dowhile0.org> [140729 07:14]:
-> Hello,
+On Fri, Aug 01, 2014 at 04:05:20AM +0100, Omar Sandoval wrote:
+> The kgdb breakpoint hooks (kgdb_brk_fn and kgdb_compiled_brk_fn) should only be
+> entered when a kgdb break instruction is executed from the kernel. Otherwise,
+> if kgdb is enabled, a userspace program can cause the kernel to drop into the
+> debugger by executing either KGDB_BREAKINST or KGDB_COMPILED_BREAK.
 > 
-> On Tue, Jul 29, 2014 at 3:03 PM, Dr. H. Nikolaus Schaller
-> <hns@goldelico.com> wrote:
-> > Hi,
-> >> So what's the conclusion? Are changes needed to this patch
-> >> series or not?
-> >
-> > I advocate that no changes are needed.
-> >
+> Signed-off-by: Omar Sandoval <osandov@osandov.com>
+> ---
+> On a kernel running with kgdb enabled, this program reproduces the problem:
+> .globl _start
+> _start:
+> 	udf	#65006	@ KGDB_BREAKINST
 > 
-> I agree with Dr. H. Nikolaus on this regard. A DeviceTree should be a
-> description of the hardware and if two hardware platforms differs,
-> then we need two different DTS.
+> The same problem has been fixed in ARM64.
 > 
-> Lately I'm seeing some attempts to abuse u-boot's fdt command, u-boot
-> should only modify the strictly necessary like the /chosen branch.
-> Allowing u-boot to mangle the FDT before passing to the kernel just to
-> avoid some DT duplication doesn't sound like a good idea IMHO.
+>  arch/arm/kernel/kgdb.c | 4 ++++
+>  1 file changed, 4 insertions(+)
+> 
+> diff --git a/arch/arm/kernel/kgdb.c b/arch/arm/kernel/kgdb.c
+> index 778c2f7..a74b53c 100644
+> --- a/arch/arm/kernel/kgdb.c
+> +++ b/arch/arm/kernel/kgdb.c
+> @@ -160,12 +160,16 @@ static int kgdb_compiled_brk_fn(struct pt_regs *regs, unsigned int instr)
+>  static struct undef_hook kgdb_brkpt_hook = {
+>  	.instr_mask		= 0xffffffff,
+>  	.instr_val		= KGDB_BREAKINST,
+> +	.cpsr_mask		= MODE_MASK,
+> +	.cpsr_val		= SVC_MODE,
+>  	.fn			= kgdb_brk_fn
+>  };
+>  
+>  static struct undef_hook kgdb_compiled_brkpt_hook = {
+>  	.instr_mask		= 0xffffffff,
+>  	.instr_val		= KGDB_COMPILED_BREAK,
+> +	.cpsr_mask		= MODE_MASK,
+> +	.cpsr_val		= SVC_MODE,
+>  	.fn			= kgdb_compiled_brk_fn
+>  };
 
-OK no more comments, so applied all into omap-for-v3.17/dt.
-As there's a good chance the merge window will open on Monday,
-no guarantees the gta04 related changes will make it. But I'll
-send a pull request a bit later on today for them anyways.
+Acked-by: Will Deacon <will.deacon@arm.com>
 
-Regards,
+Please put this into rmk's patch system.
 
-Tony
+Cheers,
+
+Will
