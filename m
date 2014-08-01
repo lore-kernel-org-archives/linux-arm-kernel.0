@@ -1,80 +1,58 @@
-From: zhangfei.gao@linaro.org (Zhangfei Gao)
-Date: Fri,  1 Aug 2014 17:21:14 +0800
-Subject: [PATCH v3 5/5] clk: hix5hd2: add the I2C clocks
-In-Reply-To: <1406884874-30406-1-git-send-email-zhangfei.gao@linaro.org>
-References: <1406884874-30406-1-git-send-email-zhangfei.gao@linaro.org>
-Message-ID: <1406884874-30406-6-git-send-email-zhangfei.gao@linaro.org>
+From: viresh.kumar@linaro.org (Viresh Kumar)
+Date: Fri, 1 Aug 2014 14:52:49 +0530
+Subject: [PATCH] cpufreq: arm_big_little: fix module license spec
+In-Reply-To: <1406792216-827-1-git-send-email-u.kleine-koenig@pengutronix.de>
+References: <mvmmwbqateb.fsf@hawking.suse.de>
+ <1406792216-827-1-git-send-email-u.kleine-koenig@pengutronix.de>
+Message-ID: <CAKohpokVOZhZ3j+mxkX0ogP_Dk=WtmfgJavzMV1EZ3WWgi-AiA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Wei Yan <sledge.yanwei@huawei.com>
+On 31 July 2014 13:06, Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de> wrote:
+> Having no license specification in a module taints the kernel during load
+> with:
+>
+>         arm_big_little: module license 'unspecified' taints kernel.
+>
+> and also the linker doesn't allow it to make use of GPL-exported symbols
+> which in this case also results in errors like:
+>
+>         arm_big_little: Unknown symbol cpufreq_register_driver (err 0)
+>
+> . The header of the driver specifies a GPL v2 license, so note that
+> accordingly. While at it also add a description and an author and fix
+> the license in a companion file to explicit v2.
+>
+> Reported-by: Andreas Schwab <schwab@suse.de>
+> Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
+> ---
+>  drivers/cpufreq/arm_big_little.c    | 4 ++++
+>  drivers/cpufreq/arm_big_little_dt.c | 2 +-
+>  2 files changed, 5 insertions(+), 1 deletion(-)
+>
+> diff --git a/drivers/cpufreq/arm_big_little.c b/drivers/cpufreq/arm_big_little.c
+> index 1f4d4e315057..b600f3107bef 100644
+> --- a/drivers/cpufreq/arm_big_little.c
+> +++ b/drivers/cpufreq/arm_big_little.c
+> @@ -593,3 +593,7 @@ void bL_cpufreq_unregister(struct cpufreq_arm_bL_ops *ops)
+>         arm_bL_ops = NULL;
+>  }
+>  EXPORT_SYMBOL_GPL(bL_cpufreq_unregister);
+> +
+> +MODULE_AUTHOR("Viresh Kumar <viresh.kumar@linaro.org>");
+> +MODULE_DESCRIPTION("Generic ARM big LITTLE cpufreq driver");
+> +MODULE_LICENSE("GPL v2");
+> diff --git a/drivers/cpufreq/arm_big_little_dt.c b/drivers/cpufreq/arm_big_little_dt.c
+> index 8d9d59108906..4550f6976768 100644
+> --- a/drivers/cpufreq/arm_big_little_dt.c
+> +++ b/drivers/cpufreq/arm_big_little_dt.c
+> @@ -114,4 +114,4 @@ module_platform_driver(generic_bL_platdrv);
+>
+>  MODULE_AUTHOR("Viresh Kumar <viresh.kumar@linaro.org>");
+>  MODULE_DESCRIPTION("Generic ARM big LITTLE cpufreq driver via DT");
+> -MODULE_LICENSE("GPL");
+> +MODULE_LICENSE("GPL v2");
 
-hix5hd2 add the I2C clocks (I2C0~i2C5)
+Thanks..
 
-Signed-off-by: Wei Yan <sledge.yanwei@huawei.com>
----
- drivers/clk/hisilicon/clk-hix5hd2.c       |   25 +++++++++++++++++++++++++
- include/dt-bindings/clock/hix5hd2-clock.h |   12 ++++++++++++
- 2 files changed, 37 insertions(+)
-
-diff --git a/drivers/clk/hisilicon/clk-hix5hd2.c b/drivers/clk/hisilicon/clk-hix5hd2.c
-index 21f32d9..3a84ea5 100644
---- a/drivers/clk/hisilicon/clk-hix5hd2.c
-+++ b/drivers/clk/hisilicon/clk-hix5hd2.c
-@@ -105,6 +105,31 @@ static struct hisi_gate_clock hix5hd2_gate_clks[] __initdata = {
- 		CLK_SET_RATE_PARENT, 0x48, 4, 0, },
- 	{ HIX5HD2_IR_RST, "rst_ir", "clk_ir",
- 		CLK_SET_RATE_PARENT, 0x48, 5, CLK_GATE_SET_TO_DISABLE, },
-+	/* I2C */
-+	{HIX5HD2_I2C0_CLK, "clk_i2c0", "100m",
-+		 CLK_SET_RATE_PARENT, 0x06c, 4, 0, },
-+	{HIX5HD2_I2C0_RST, "rst_i2c0", "clk_i2c0",
-+		 CLK_SET_RATE_PARENT, 0x06c, 5, CLK_GATE_SET_TO_DISABLE, },
-+	{HIX5HD2_I2C1_CLK, "clk_i2c1", "100m",
-+		 CLK_SET_RATE_PARENT, 0x06c, 8, 0, },
-+	{HIX5HD2_I2C1_RST, "rst_i2c1", "clk_i2c1",
-+		 CLK_SET_RATE_PARENT, 0x06c, 9, CLK_GATE_SET_TO_DISABLE, },
-+	{HIX5HD2_I2C2_CLK, "clk_i2c2", "100m",
-+		 CLK_SET_RATE_PARENT, 0x06c, 12, 0, },
-+	{HIX5HD2_I2C2_RST, "rst_i2c2", "clk_i2c2",
-+		 CLK_SET_RATE_PARENT, 0x06c, 13, CLK_GATE_SET_TO_DISABLE, },
-+	{HIX5HD2_I2C3_CLK, "clk_i2c3", "100m",
-+		 CLK_SET_RATE_PARENT, 0x06c, 16, 0, },
-+	{HIX5HD2_I2C3_RST, "rst_i2c3", "clk_i2c3",
-+		 CLK_SET_RATE_PARENT, 0x06c, 17, CLK_GATE_SET_TO_DISABLE, },
-+	{HIX5HD2_I2C4_CLK, "clk_i2c4", "100m",
-+		 CLK_SET_RATE_PARENT, 0x06c, 20, 0, },
-+	{HIX5HD2_I2C4_RST, "rst_i2c4", "clk_i2c4",
-+		 CLK_SET_RATE_PARENT, 0x06c, 21, CLK_GATE_SET_TO_DISABLE, },
-+	{HIX5HD2_I2C5_CLK, "clk_i2c5", "100m",
-+		 CLK_SET_RATE_PARENT, 0x06c, 0, 0, },
-+	{HIX5HD2_I2C5_RST, "rst_i2c5", "clk_i2c5",
-+		 CLK_SET_RATE_PARENT, 0x06c, 1, CLK_GATE_SET_TO_DISABLE, },
- };
- 
- enum hix5hd2_clk_type {
-diff --git a/include/dt-bindings/clock/hix5hd2-clock.h b/include/dt-bindings/clock/hix5hd2-clock.h
-index 6aa4fec..025a8d9 100644
---- a/include/dt-bindings/clock/hix5hd2-clock.h
-+++ b/include/dt-bindings/clock/hix5hd2-clock.h
-@@ -64,6 +64,18 @@
- #define HIX5HD2_WDG0_RST		140
- #define HIX5HD2_IR_CLK			141
- #define HIX5HD2_IR_RST			142
-+#define HIX5HD2_I2C0_CLK		143
-+#define HIX5HD2_I2C0_RST		144
-+#define HIX5HD2_I2C1_CLK		145
-+#define HIX5HD2_I2C1_RST		146
-+#define HIX5HD2_I2C2_CLK		147
-+#define HIX5HD2_I2C2_RST		148
-+#define HIX5HD2_I2C3_CLK		149
-+#define HIX5HD2_I2C3_RST		150
-+#define HIX5HD2_I2C4_CLK		151
-+#define HIX5HD2_I2C4_RST		152
-+#define HIX5HD2_I2C5_CLK		153
-+#define HIX5HD2_I2C5_RST		154
- 
- /* complex */
- #define HIX5HD2_MAC0_CLK		192
--- 
-1.7.9.5
+Acked-by: Viresh Kumar <viresh.kumar@linaro.org>
