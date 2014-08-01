@@ -1,26 +1,77 @@
-From: dianders@chromium.org (Doug Anderson)
-Date: Fri, 1 Aug 2014 09:26:48 -0700
-Subject: [PATCH v5 01/10] ARM: dts: Fix MMC pinctrl for exynos5250-snow
-In-Reply-To: <1406868897-26874-2-git-send-email-afaerber@suse.de>
-References: <1406868897-26874-1-git-send-email-afaerber@suse.de>
- <1406868897-26874-2-git-send-email-afaerber@suse.de>
-Message-ID: <CAD=FV=VBa5rs_woj0mshFFbA69Nhyi3hXK_XX7-54T3vFyKYHA@mail.gmail.com>
+From: ajaykumar.rs@samsung.com (Ajay Kumar)
+Date: Fri, 01 Aug 2014 21:54:18 +0530
+Subject: [PATCH V2] ARM: dts: Add DT changes for display on peach_pi
+Message-ID: <1406910258-28036-1-git-send-email-ajaykumar.rs@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Add DT nodes for panel-simple "auo,b133htn01" panel.
+Add backlight enable pin and backlight power supply for pwm-backlight.
+Also add panel phandle needed by dp to enable display on peach_pi.
 
-On Thu, Jul 31, 2014 at 9:54 PM, Andreas F?rber <afaerber@suse.de> wrote:
-> The pinctrl properties should be on the device directly and not on the
-> slot sub-node.
->
-> Reported-by: Doug Anderson <dianders@chromium.org>
-> Cc: Jaehoon Chung <jh80.chung@samsung.com>
-> Reviewed-by: Tomasz Figa <t.figa@samsung.com>
-> Signed-off-by: Andreas F?rber <afaerber@suse.de>
+Signed-off-by: Ajay Kumar <ajaykumar.rs@samsung.com>
+---
+Changes since V1:
+Remove "simple-panel" compatible string and use only ""auo,b133htn01".
 
-Let's land this one before Jaehoon's, since it was a hidden
-functionality change in his patch.  It will be an easy conflict to
-resolve when his patch is applied.
+ arch/arm/boot/dts/exynos5800-peach-pi.dts |   27 ++++++++++-----------------
+ 1 file changed, 10 insertions(+), 17 deletions(-)
 
-Reviewed-by: Doug Anderson <dianders@chromium.org>
+diff --git a/arch/arm/boot/dts/exynos5800-peach-pi.dts b/arch/arm/boot/dts/exynos5800-peach-pi.dts
+index f3ee48b..f8c2e61 100644
+--- a/arch/arm/boot/dts/exynos5800-peach-pi.dts
++++ b/arch/arm/boot/dts/exynos5800-peach-pi.dts
+@@ -28,11 +28,13 @@
+ 		i2c20 = "/spi at 12d40000/cros-ec at 0/i2c-tunnel";
+ 	};
+ 
+-	backlight {
++	backlight: backlight {
+ 		compatible = "pwm-backlight";
+ 		pwms = <&pwm 0 1000000 0>;
+ 		brightness-levels = <0 100 500 1000 1500 2000 2500 2800>;
+ 		default-brightness-level = <7>;
++		enable-gpios = <&gpx2 2 0>;
++		power-supply = <&tps65090_fet1>;
+ 		pinctrl-0 = <&pwm0_out>;
+ 		pinctrl-names = "default";
+ 	};
+@@ -98,6 +100,12 @@
+ 		regulator-boot-on;
+ 		regulator-always-on;
+ 	};
++
++	panel: panel-simple {
++		compatible = "auo,b133htn01";
++		power-supply = <&tps65090_fet6>;
++		backlight = <&backlight>;
++	};
+ };
+ 
+ &dp {
+@@ -111,22 +119,7 @@
+ 	samsung,link-rate = <0x0a>;
+ 	samsung,lane-count = <2>;
+ 	samsung,hpd-gpio = <&gpx2 6 0>;
+-
+-	display-timings {
+-		native-mode = <&timing1>;
+-
+-		timing1: timing at 1 {
+-			clock-frequency = <150660000>;
+-			hactive = <1920>;
+-			vactive = <1080>;
+-			hfront-porch = <60>;
+-			hback-porch = <172>;
+-			hsync-len = <80>;
+-			vback-porch = <25>;
+-			vfront-porch = <10>;
+-			vsync-len = <10>;
+-		};
+-	};
++	panel = <&panel>;
+ };
+ 
+ &fimd {
+-- 
+1.7.9.5
