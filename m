@@ -1,86 +1,346 @@
-From: tixy@linaro.org (Jon Medhurst (Tixy))
-Date: Fri, 01 Aug 2014 12:28:11 +0100
-Subject: [PATCH] ARM: multi_v7_defconfig: major refresh
-In-Reply-To: <53DB763A.10306@arm.com>
-References: <1406052070-6207-1-git-send-email-olof@lixom.net>
- <53DB6B4F.9080605@arm.com>	<1406890899.2794.40.camel@linaro1.home>
- <CAOesGMi0RUbz4BSnmR92dEk3fWgN=hnENSdi55VeCXdcHLRLJQ@mail.gmail.com>
- <53DB763A.10306@arm.com>
-Message-ID: <1406892491.2794.58.camel@linaro1.home>
+From: mperttunen@nvidia.com (Mikko Perttunen)
+Date: Fri, 1 Aug 2014 14:42:05 +0300
+Subject: [PATCH 1/6] thermal: of: Add support for hardware-tracked trip
+ points
+In-Reply-To: <20140730141639.GA3715@developer>
+References: <1403856699-2140-1-git-send-email-mperttunen@nvidia.com>
+ <1403856699-2140-2-git-send-email-mperttunen@nvidia.com>
+ <20140730141639.GA3715@developer>
+Message-ID: <53DB7D0D.1070508@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 2014-08-01 at 12:12 +0100, Sudeep Holla wrote:
-> 
-> On 01/08/14 12:03, Olof Johansson wrote:
-> > On Fri, Aug 1, 2014 at 4:01 AM, Jon Medhurst (Tixy) <tixy@linaro.org> wrote:
-> >> On Fri, 2014-08-01 at 11:26 +0100, Sudeep Holla wrote:
-> >>>
-> >>> On 22/07/14 19:01, Olof Johansson wrote:
-> >>>> This is a major refresh of the multi_v7_defconfig:
-> >>>>
-> >>>> - Bring over a bunch of Samsung drivers to make ODROID-U3 and Chromebooks usable
-> >>>>    * Enable big.LITTLE
-> >>>>    * MCPM
-> >>> [...]
-> >>
-> >>>> +CONFIG_BIG_LITTLE=y
-> >>>> +CONFIG_BL_SWITCHER=y
-> >>>
-> >>> IIUC, this will enable switcher code by default. I am not sure if this
-> >>> is intentional ? E.g.: After this I can have only 2 active cpus instead
-> >>> of 5 on my Vexpress TC2 platform.
-> >>>
-> >>> IMO we can keep this enabled by default in the build, but disabled
-> >>> by default on boot.
-> >>
-> >> TC2 has a big.LITTLE processor and the switcher is the only mainlined
-> >> way of making any kind of proper use of big.LITTLE, so why not have it
-> >> enabled by default?
-> >
-> > +1.
-> >
-> >>
-> >>>   One way to achieve this:
-> >>> (There's sysfs to re-enable it runtime)
-> >>
-> >> The opposite is also true, if you don't want the switcher enabled you
-> >> can disable it by the same method after boot ;-)
-> >>
-> >>> -->8
-> >>> diff --git a/arch/arm/common/bL_switcher.c b/arch/arm/common/bL_switcher.c
-> >>> index 490f3dced749..f4c36e70166a 100644
-> >>> --- a/arch/arm/common/bL_switcher.c
-> >>> +++ b/arch/arm/common/bL_switcher.c
-> >>> @@ -794,7 +794,7 @@ static int bL_switcher_hotplug_callback(struct
-> >>> notifier_block *nfb,
-> >>>           return NOTIFY_DONE;
-> >>>    }
-> >>>
-> >>> -static bool no_bL_switcher;
-> >>> +static bool no_bL_switcher = true;
-> >>
-> >> This changes the default for everyone, which I guess is fair enough if
-> >> there is a good reason, but I'm not sure there is.
-> >
-> > No, I don't think there is.
-> >
-> 
-> It's just that people using TC2 will suddenly see 3 of the 5 CPUs missing.
+Moi Eduardo :)
 
-Yes, if they we're previously using multi_v7_defconfig (do people
-working specifically with TC2's use that?)
+On 30/07/14 17:16, Eduardo Valentin wrote:
+> Terve Mikko,
+>
+> On Fri, Jun 27, 2014 at 11:11:34AM +0300, Mikko Perttunen wrote:
+>> This adds support for hardware-tracked trip points to the device tree
+>> thermal sensor framework.
+>>
+>> The framework supports an arbitrary number of trip points. Whenever
+>> the current temperature is updated, the trip points immediately
+>> below and above the current temperature are found. A sensor driver
+>
+> One thing I don't follow on your proposal is the groundings you need to
+> 'set_trips' whenever temperature changes. Given your intention is to add
+> support to interrupt driven devices, shouldn't we 'set_trips' just when
+> we cross the previously set trips range?
 
-Conversely, with the change in default proposed above, anyone with their
-own configs enabling the switcher will suddenly see the number of CPUs
-go from 2 to 5. We also have the situation where we have a config
-option, which when enabled, doesn't actually do anything unless the user
-also changes boot arguments or takes measures to enable it after boot.
-Which seems the wrong way for things to work to me.
+I think the reasoning for this was that I didn't want to make changes to 
+thermal_core and thermal_zone_device_update only calls get_temp on the 
+zone, so I had to add this code to get_temp. set_trips would anyway only 
+be called if we had crossed a trip point.
 
-I believe that if we don't want the switcher enabled in kernels built
-with multi_v7_defconfig, then it should be done by not adding the config
-option to multi_v7_defconfig in the first place.
+>
+>> callback `set_trips' is then called with the temperatures.
+>> If there is no trip point above or below the current temperature,
+>> the passed trip temperature will be LONG_MAX or LONG_MIN respectively.
+>> In this callback, the driver should program the hardware such that
+>> it is notified when either of these trip points are triggered.
+>> When a trip point is triggered, the driver should call
+>> `thermal_zone_device_update' for the respective thermal zone. This
+>> will cause the trip points to be updated again.
+>>
+>> If the `set_trips' callback is not implemented (is NULL), the framework
+>> behaves as before.
+>
+> As already mentioned by swarren, the proposal must be wider. We shall
+> keep the same support in case the device is used in a system without
+> device tree. In other words, if you want to see extra functionality for
+> interrupt driven devices, you shall update the core part too, and draft
+> a common messaging path.
 
--- 
-Tixy
+Yeah, this is sensible. A simpler solution would be to just tell 
+of-thermal drivers about the trip points and let the driver do whatever 
+it wants. That would mirror the way normal thermal_core drivers are 
+done. What is your opinion on that?
+
+>
+> In general, interrupt driven devices are not mapped in the current
+> thermal framework. That is, the current code is timer interrupt driven.
+> Other interrupt updates from devices are propagated to
+> the framework using thermal_zone_device_update(). In other words, you would
+> reprogram your hardware trips from your interrupt handler/workqueue then
+> just let the framework know what is going on with temperature, via a simple
+> thermal_zone_device_update().
+>
+> The way I see this going forward it would be a common interface to
+> configure the thermal zones to be monitored:
+> a. via polling only
+> b. via interrupt only
+> c. both a + b
+>
+> obviously, the above shall be informative only for userland.
+>
+> keep in mind also that changing interrupt configuration for high and low
+> temperature thresholds can be racy.
+>
+> This feature was kept in the TODO list of the of-thermal.c because the
+> we lack a proper support from the thermal framework (never came out of
+> the TODO list, I know, I apologize for this). And this missing feature
+> was spotted by the hwmon folks also, as they do have such support. So,
+> the major missing improvements on interrupt driven devices shall come in
+> three steps: (i) thermal framework, (ii) of-thermal (iii) thermal
+> framework and hwmon interface.
+
+For now, I think I'll submit a driver with just polling support so that 
+we can get some support in.
+
+>
+>
+> Cheers,
+>
+>
+
+Thanks, Mikko
+
+>>
+>> Signed-off-by: Mikko Perttunen <mperttunen@nvidia.com>
+>> ---
+>>   drivers/thermal/of-thermal.c | 97 ++++++++++++++++++++++++++++++++++++++++++--
+>>   include/linux/thermal.h      |  3 +-
+>>   2 files changed, 95 insertions(+), 5 deletions(-)
+>>
+>> diff --git a/drivers/thermal/of-thermal.c b/drivers/thermal/of-thermal.c
+>> index 04b1be7..bfccea5 100644
+>> --- a/drivers/thermal/of-thermal.c
+>> +++ b/drivers/thermal/of-thermal.c
+>> @@ -89,6 +89,7 @@ struct __thermal_zone {
+>>        /* trip data */
+>>        int ntrips;
+>>        struct __thermal_trip *trips;
+>> +     long prev_low_trip, prev_high_trip;
+>>
+>>        /* cooling binding data */
+>>        int num_tbps;
+>> @@ -98,19 +99,66 @@ struct __thermal_zone {
+>>        void *sensor_data;
+>>        int (*get_temp)(void *, long *);
+>>        int (*get_trend)(void *, long *);
+>> +     int (*set_trips)(void *, long, long);
+>>   };
+>>
+>> +/***   Automatic trip handling   ***/
+>> +
+>> +static int of_thermal_set_trips(struct thermal_zone_device *tz, long temp)
+>> +{
+>> +     struct __thermal_zone *data = tz->devdata;
+>> +     long low = LONG_MIN, high = LONG_MAX;
+>> +     int i;
+>> +
+>> +     /* Hardware trip points not supported */
+>> +     if (!data->set_trips)
+>> +             return 0;
+>> +
+>> +     /* No need to change trip points */
+>> +     if (temp > data->prev_low_trip && temp < data->prev_high_trip)
+>> +             return 0;
+>> +
+>> +     for (i = 0; i < data->ntrips; ++i) {
+>> +             struct __thermal_trip *trip = data->trips + i;
+>> +             long trip_low = trip->temperature - trip->hysteresis;
+>> +
+>> +             if (trip_low < temp && trip_low > low)
+>> +                     low = trip_low;
+>> +
+>> +             if (trip->temperature > temp && trip->temperature < high)
+>> +                     high = trip->temperature;
+>> +     }
+>> +
+>> +     dev_dbg(&tz->device,
+>> +             "temperature %ld, updating trip points to %ld, %ld\n",
+>> +             temp, low, high);
+>> +
+>> +     data->prev_low_trip = low;
+>> +     data->prev_high_trip = high;
+>> +
+>> +     return data->set_trips(data->sensor_data, low, high);
+>> +}
+>> +
+>>   /***   DT thermal zone device callbacks   ***/
+>>
+>>   static int of_thermal_get_temp(struct thermal_zone_device *tz,
+>>                               unsigned long *temp)
+>>   {
+>>        struct __thermal_zone *data = tz->devdata;
+>> +     int err;
+>>
+>>        if (!data->get_temp)
+>>                return -EINVAL;
+>>
+>> -     return data->get_temp(data->sensor_data, temp);
+>> +     err = data->get_temp(data->sensor_data, temp);
+>> +     if (err)
+>> +             return err;
+>> +
+>> +     err = of_thermal_set_trips(tz, *temp);
+>
+> Here, if you update trips whenever you get_temp, you are possibly
+> reprogramming your trips on every poll. Remember, this function will be
+> called on every poll, in the current implementation.
+>
+>> +     if (err)
+>> +             return err;
+>> +
+>> +     return 0;
+>>   }
+>>
+>>   static int of_thermal_get_trend(struct thermal_zone_device *tz, int trip,
+>> @@ -222,6 +270,22 @@ static int of_thermal_set_mode(struct thermal_zone_device *tz,
+>>        return 0;
+>>   }
+>>
+>> +static int of_thermal_update_trips(struct thermal_zone_device *tz)
+>> +{
+>> +     long temp;
+>> +     int err;
+>> +
+>> +     err = of_thermal_get_temp(tz, &temp);
+>> +     if (err)
+>> +             return err;
+>> +
+>> +     err = of_thermal_set_trips(tz, temp);
+>> +     if (err)
+>> +             return err;
+>> +
+>> +     return 0;
+>> +}
+>> +
+>>   static int of_thermal_get_trip_type(struct thermal_zone_device *tz, int trip,
+>>                                    enum thermal_trip_type *type)
+>>   {
+>> @@ -252,6 +316,7 @@ static int of_thermal_set_trip_temp(struct thermal_zone_device *tz, int trip,
+>>                                    unsigned long temp)
+>>   {
+>>        struct __thermal_zone *data = tz->devdata;
+>> +     int err;
+>>
+>>        if (trip >= data->ntrips || trip < 0)
+>>                return -EDOM;
+>> @@ -259,6 +324,10 @@ static int of_thermal_set_trip_temp(struct thermal_zone_device *tz, int trip,
+>>        /* thermal framework should take care of data->mask & (1 << trip) */
+>>        data->trips[trip].temperature = temp;
+>>
+>> +     err = of_thermal_update_trips(tz);
+>> +     if (err)
+>> +             return err;
+>> +
+>>        return 0;
+>>   }
+>>
+>> @@ -279,6 +348,7 @@ static int of_thermal_set_trip_hyst(struct thermal_zone_device *tz, int trip,
+>>                                    unsigned long hyst)
+>>   {
+>>        struct __thermal_zone *data = tz->devdata;
+>> +     int err;
+>>
+>>        if (trip >= data->ntrips || trip < 0)
+>>                return -EDOM;
+>> @@ -286,6 +356,10 @@ static int of_thermal_set_trip_hyst(struct thermal_zone_device *tz, int trip,
+>>        /* thermal framework should take care of data->mask & (1 << trip) */
+>>        data->trips[trip].hysteresis = hyst;
+>>
+>> +     err = of_thermal_update_trips(tz);
+>> +     if (err)
+>> +             return err;
+>> +
+>>        return 0;
+>>   }
+>>
+>> @@ -325,10 +399,12 @@ static struct thermal_zone_device *
+>>   thermal_zone_of_add_sensor(struct device_node *zone,
+>>                           struct device_node *sensor, void *data,
+>>                           int (*get_temp)(void *, long *),
+>> -                        int (*get_trend)(void *, long *))
+>> +                        int (*get_trend)(void *, long *),
+>> +                        int (*set_trips)(void *, long, long))
+>
+> we need to clean the above arguments. they should become a .ops.
+>
+>>   {
+>>        struct thermal_zone_device *tzd;
+>>        struct __thermal_zone *tz;
+>> +     int err;
+>>
+>>        tzd = thermal_zone_get_zone_by_name(zone->name);
+>>        if (IS_ERR(tzd))
+>> @@ -339,8 +415,15 @@ thermal_zone_of_add_sensor(struct device_node *zone,
+>>        mutex_lock(&tzd->lock);
+>>        tz->get_temp = get_temp;
+>>        tz->get_trend = get_trend;
+>> +     tz->set_trips = set_trips;
+>>        tz->sensor_data = data;
+>>
+>> +     err = of_thermal_update_trips(tzd);
+>> +     if (err) {
+>> +             mutex_unlock(&tzd->lock);
+>> +             return ERR_PTR(err);
+>> +     }
+>> +
+>>        tzd->ops->get_temp = of_thermal_get_temp;
+>>        tzd->ops->get_trend = of_thermal_get_trend;
+>>        mutex_unlock(&tzd->lock);
+>> @@ -384,7 +467,8 @@ thermal_zone_of_add_sensor(struct device_node *zone,
+>>   struct thermal_zone_device *
+>>   thermal_zone_of_sensor_register(struct device *dev, int sensor_id,
+>>                                void *data, int (*get_temp)(void *, long *),
+>> -                             int (*get_trend)(void *, long *))
+>> +                             int (*get_trend)(void *, long *),
+>> +                             int (*set_trips)(void *, long, long))
+>
+> ditto.
+>
+>>   {
+>>        struct device_node *np, *child, *sensor_np;
+>>
+>> @@ -422,7 +506,8 @@ thermal_zone_of_sensor_register(struct device *dev, int sensor_id,
+>>                        return thermal_zone_of_add_sensor(child, sensor_np,
+>>                                                          data,
+>>                                                          get_temp,
+>> -                                                       get_trend);
+>> +                                                       get_trend,
+>> +                                                       set_trips);
+>
+> ditto.
+>
+>>                }
+>>        }
+>>        of_node_put(np);
+>> @@ -466,6 +551,7 @@ void thermal_zone_of_sensor_unregister(struct device *dev,
+>>
+>>        tz->get_temp = NULL;
+>>        tz->get_trend = NULL;
+>> +     tz->set_trips = NULL;
+>>        tz->sensor_data = NULL;
+>>        mutex_unlock(&tzd->lock);
+>>   }
+>> @@ -671,6 +757,9 @@ thermal_of_build_thermal_zone(struct device_node *np)
+>>        /* trips */
+>>        child = of_get_child_by_name(np, "trips");
+>>
+>> +     tz->prev_high_trip = LONG_MIN;
+>> +     tz->prev_low_trip = LONG_MAX;
+>> +
+>>        /* No trips provided */
+>>        if (!child)
+>>                goto finish;
+>> diff --git a/include/linux/thermal.h b/include/linux/thermal.h
+>> index f7e11c7..2f8951c 100644
+>> --- a/include/linux/thermal.h
+>> +++ b/include/linux/thermal.h
+>> @@ -248,7 +248,8 @@ struct thermal_genl_event {
+>>   struct thermal_zone_device *
+>>   thermal_zone_of_sensor_register(struct device *dev, int id,
+>>                                void *data, int (*get_temp)(void *, long *),
+>> -                             int (*get_trend)(void *, long *));
+>> +                             int (*get_trend)(void *, long *),
+>> +                             int (*set_trips)(void *, long, long));
+>>   void thermal_zone_of_sensor_unregister(struct device *dev,
+>>                                       struct thermal_zone_device *tz);
+>>   #else
+>> --
+>> 1.8.1.5
+>>
+>
