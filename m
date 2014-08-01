@@ -1,63 +1,79 @@
-From: balbi@ti.com (Felipe Balbi)
-Date: Fri, 1 Aug 2014 08:54:07 -0500
-Subject: [PATCH 29/35] arm: omap: intc: switch over to linear irq domain
-In-Reply-To: <53DB877A.5000004@ti.com>
-References: <20140729154057.GE17808@saruman.home>
- <20140729163345.GF17808@saruman.home>
- <20140730060420.GY29045@atomide.com>
- <20140730144059.GA7272@saruman.home>
- <CAGo_u6ou+MoKOE_tTTmjxyFNW=jTaN9vnTsHrxR6sQHsieJyLA@mail.gmail.com>
- <20140730162038.GH7272@saruman.home>
- <20140731062843.GA29045@atomide.com> <53D9F6D5.1080307@ti.com>
- <20140731134945.GB19512@saruman.home> <53DB877A.5000004@ti.com>
-Message-ID: <20140801135407.GB9216@saruman.home>
+From: sudeep.holla@arm.com (Sudeep Holla)
+Date: Fri, 01 Aug 2014 15:00:28 +0100
+Subject: [Query] How to pass reboot arguments to secure firmware with
+ PSCI spec
+In-Reply-To: <20140801190227.116f4c39@xhacker>
+References: <20140801180652.72e722be@xhacker>	<53DB6A18.5050904@arm.com>
+ <20140801190227.116f4c39@xhacker>
+Message-ID: <53DB9D7C.5000706@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
 
-On Fri, Aug 01, 2014 at 03:26:34PM +0300, Tero Kristo wrote:
-> >>>>>>I might have sent the wrong version as I had that same build error and
-> >>>>>>fixed it localy.
-> >>>>>>
-> >>>>>>>it fixes the regression for me, Also now the whole series works for
-> >>>>>>>me :)
-> >>>>>>
-> >>>>>>good to know.
-> >>>>>>
-> >>>>>>What do you want to do now ? Wait for PRCM to become a driver ? Wait for
-> >>>>>>Nishanth's series to get accepted ? I guess the same thing could be done
-> >>>>>>for OMAP3 and AM33, then we would have a chance of having working wake
-> >>>>>>from idle with the new irqchip.
-> >>>>>
-> >>>>>I can repost the current series as it stands now once 17-rc1 comes out
-> >>>>>(without the build failure ofcourse).. if that helps to move it out of
-> >>>>>RFC status.
-> >>>>
-> >>>>That'd be great. It would be ever greater if you could add support for
-> >>>>OMAP3 on that too.
-> >>>
-> >>>Yeah sounds good to me. Tero, does that work OK for your PRCM changes?
-> >>
-> >>Well, this set seems to break PM. suspend-resume on omap3-beagle just hangs
-> >>after this set is applied. Works fine without it with 3.16-rc5 tag.
-> >
-> >did you apply the quick little hack to prm3xxx.c ? prcm IRQ is hardcoded
-> >to 11, once we switch to a linear irq domain, irq_base may change.
-> 
-> Yea, with that hack it works. However, you should make that into a proper
-> patch and add it to this series, otherwise you will be causing regressions.
 
-can you please read the thread ? Nishanth has a proper series properly
-doing that for OMAP4, I asking him to add OMAP3 and respin his series
-without RFC.
+On 01/08/14 12:02, Jisheng Zhang wrote:
+> Hi Sudeep,
+>
+> On Fri, 1 Aug 2014 03:21:12 -0700
+> Sudeep Holla <sudeep.holla@arm.com> wrote:
+>
+>>
+>>
+>> On 01/08/14 11:06, Jisheng Zhang wrote:
+>>> Hi Catalin and Will,
+>>>
+>>> I noticed that the following commit implement reboot via. PSCI
+>>> SYSTEM_RESET function. So my question is how to handle the reboot
+>>> arguments?
+>>>
+>>
+>> What reboot arguments do you want to handle ?
+>
+> man 2 reboot
+>
+> ...
+>
+> int reboot(int magic, int magic2, int cmd, void *arg);
+>
+> ...
+>
+> I want to pass "void *arg" to secure firmware.
+>
+>
 
--- 
-balbi
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140801/eee3ae0d/attachment.sig>
+Why ? What will secure firmware do with that ? I can't think of any
+use of those arguments in the secure firmware esp. the example you have
+given below. Why should secure firmware know that you are booting in
+recovery mode.
+
+And you can't do that with PSCI, the specification has no provisions
+and if do that it's violation.
+
+>>
+>>>
+>>>> static void psci_sys_reset(enum reboot_mode reboot_mode, const char *cmd)
+>>>> {
+>>>>         invoke_psci_fn(PSCI_0_2_FN_SYSTEM_RESET, 0, 0, 0);
+>>>
+>>> How to pass cmd to secure firmware?
+>>>
+>>
+>> What cmd do you want to pass ? The function id is already handled. What
+>> else do you want to pass ?
+>
+> the "const char *cmd", usually this is the "abc" if user type "reboot abc"
+> under shell.
+>
+> For example, android usually type "reboot recovery", the "recovery" will be
+> passed to next boot kernel boot args.
+>
+
+How did you had manage to pass these information in absence of
+PSCI(i..e. other methods) ?
+
+IIUC it's typically write to non-volatile memory indicating the reboot
+reason(at-least in Android devices) through some reboot notifiers.
+
+You can still do that now even with PSCI right ?
+
+Yes
