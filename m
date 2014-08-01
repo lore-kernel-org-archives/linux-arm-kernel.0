@@ -1,61 +1,54 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Fri, 1 Aug 2014 10:23:20 +0200
-Subject: [PATCH] arm64: defconfig: enable crypto drivers as modules
-In-Reply-To: <20140731095736.GH26853@arm.com>
-References: <1406797002-21015-1-git-send-email-ard.biesheuvel@linaro.org>
- <20140731095736.GH26853@arm.com>
-Message-ID: <CAKv+Gu-c2MD30vNRGz7E8VWLOXqCVze3=_F876CQH0P_EYb9xA@mail.gmail.com>
+From: svarbanov@mm-sol.com (Stanimir Varbanov)
+Date: Fri, 01 Aug 2014 11:31:29 +0300
+Subject: [PATCH v3 1/4] mfd: pm8xxx-spmi: add support for Qualcomm SPMI
+ PMICs
+In-Reply-To: <53DA02C0.2050606@mm-sol.com>
+References: <1406205921-7452-1-git-send-email-svarbanov@mm-sol.com>
+ <1406205921-7452-2-git-send-email-svarbanov@mm-sol.com>
+ <53D8182A.5050204@codeaurora.org> <53DA02C0.2050606@mm-sol.com>
+Message-ID: <53DB5061.8080403@mm-sol.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 31 July 2014 11:57, Will Deacon <will.deacon@arm.com> wrote:
-> Hi Ard,
->
-> On Thu, Jul 31, 2014 at 09:56:42AM +0100, Ard Biesheuvel wrote:
->> This changes the arm64 defconfig to build the ARMv8 Crypto Extensions
->> and NEON based crypto drivers as modules rather than as built-ins. The
->> reason is that the ARMv8 Crypto Extensions based modules will be probed
->> for automatically through udev upon detecting the availability of the
->> respective crypto instructions (AES, PMULL, SHA1, SHA256), and similarly,
->> the NEON alternatives will be probed for upon request (i.e., at first use
->> of the algorithm) if no hardware acceleration is available.
+On 07/31/2014 11:48 AM, Stanimir Varbanov wrote:
+> Hi David,
+> 
+> Thanks for the comments!
+> 
+> On 07/30/2014 12:54 AM, David Collins wrote:
+>> On 07/24/2014 05:45 AM, Stanimir Varbanov wrote:
+>>> From: Josh Cartwright <joshc@codeaurora.org>
+>>>
+>>> The Qualcomm SPMI PMIC chips are components used with the
+>>> Snapdragon 800 series SoC family.  This driver exists
+>>> largely as a glue mfd component, it exists to be an owner
+>>> of an SPMI regmap for children devices described in
+>>> device tree.
+>>>
+>>> Signed-off-by: Josh Cartwright <joshc@codeaurora.org>
+>>> Signed-off-by: Stanimir Varbanov <svarbanov@mm-sol.com>
+>>> Acked-by: Lee Jones <lee.jones@linaro.org>
+>>> ---
+>>>  drivers/mfd/Kconfig       |   16 +++++++++++
+>>>  drivers/mfd/Makefile      |    1 +
+>>>  drivers/mfd/pm8xxx-spmi.c |   65 +++++++++++++++++++++++++++++++++++++++++++++
 >>
->> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
->> ---
->>  arch/arm64/configs/defconfig | 14 +++++++-------
->>  1 file changed, 7 insertions(+), 7 deletions(-)
->>
->> diff --git a/arch/arm64/configs/defconfig b/arch/arm64/configs/defconfig
->> index c1071268c912..3310b4166dd0 100644
->> --- a/arch/arm64/configs/defconfig
->> +++ b/arch/arm64/configs/defconfig
->> @@ -127,10 +127,10 @@ CONFIG_LOCKUP_DETECTOR=y
->>  CONFIG_SECURITY=y
->>  CONFIG_CRYPTO_ANSI_CPRNG=y
->>  CONFIG_ARM64_CRYPTO=y
->> -CONFIG_CRYPTO_SHA1_ARM64_CE=y
->> -CONFIG_CRYPTO_SHA2_ARM64_CE=y
->> -CONFIG_CRYPTO_GHASH_ARM64_CE=y
->> -CONFIG_CRYPTO_AES_ARM64_CE=y
->> -CONFIG_CRYPTO_AES_ARM64_CE_CCM=y
->> -CONFIG_CRYPTO_AES_ARM64_CE_BLK=y
->> -CONFIG_CRYPTO_AES_ARM64_NEON_BLK=y
->> +CONFIG_CRYPTO_SHA1_ARM64_CE=m
->> +CONFIG_CRYPTO_SHA2_ARM64_CE=m
->> +CONFIG_CRYPTO_GHASH_ARM64_CE=m
->> +CONFIG_CRYPTO_AES_ARM64_CE=m
->> +CONFIG_CRYPTO_AES_ARM64_CE_CCM=m
->> +CONFIG_CRYPTO_AES_ARM64_CE_BLK=m
->> +CONFIG_CRYPTO_AES_ARM64_NEON_BLK=m
->
-> Whilst I'm usually fairly open to defconfig updates if they make things more
-> useful to people, I think building these as modules is going to be a pain
-> for those not using udev (i.e. using busybox and/or simple filesystems for a
-> VM). This seems more like something a distro might choose to do as opposed
-> to something that is a good idea to have enabled by default.
->
-> There could be an argument for a distroconfig, but I don't have high hopes
-> that anybody would actually use it in practice.
->
+>> Would it be possible to rename this driver: qcom-spmi-pmic.c?  The driver
+>> will be supporting several PMICs that do not fit the pm8xxx naming scheme.
+>>  One of which is even specified in the compatible list of this driver
+>> (pma8084).  There is presently downstream support for the following PMICs:
+>> PM8019, PM8110, PM8226, PM8841, PM8916, PM8941, PM8994, PMA8084, PMD9635,
+>> PMI8962, and PMI8994 [1].  Four of these do not fit the "PM8XXX" template.
+> 
+> I haven't strong opinion on the file names. The qcom prefix is the one
+> which annoying me. If you look at /drivers/mfd the company name prefixes
+> are very few.
+> 
+> The *compatible* strings are the important thing here. So If MFD
+> maintainer is fine with this name I'm fine too.
 
-OK, fair enough
+Lee, are you OK with suggested names qcom-spmi-pmic and qcom-ssbi-pmic?
+
+-- 
+regards,
+Stan
