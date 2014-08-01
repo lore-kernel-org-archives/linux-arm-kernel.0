@@ -1,43 +1,48 @@
-From: dianders@chromium.org (Doug Anderson)
-Date: Fri, 1 Aug 2014 09:45:31 -0700
-Subject: [PATCH v5 02/10] ARM: dts: Fold exynos5250-cros-common into
- exynos5250-snow
-In-Reply-To: <1406868897-26874-3-git-send-email-afaerber@suse.de>
-References: <1406868897-26874-1-git-send-email-afaerber@suse.de>
- <1406868897-26874-3-git-send-email-afaerber@suse.de>
-Message-ID: <CAD=FV=USKuOxiFo=VgEB6aAQ=LdLv-7+jXQNh4VCMBQwasygxg@mail.gmail.com>
+From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
+Date: Fri,  1 Aug 2014 18:51:46 +0200
+Subject: [PATCHv2] dma: at_hdmac: fix invalid remaining bytes detection
+Message-ID: <1406911906-397-1-git-send-email-alexandre.belloni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Andreas,
+Found using smatch:
+drivers/dma/at_hdmac.c:299 atc_get_bytes_left() warn: unsigned
+'atchan->remain_desc' is never less than zero.
 
-On Thu, Jul 31, 2014 at 9:54 PM, Andreas F?rber <afaerber@suse.de> wrote:
-> exynos5250-cros-common.dtsi was meant for sharing common pieces across
-> ChromeOS devices. This turned out premature, as several devices ended up
-> in the common file that are not common after all. Since the remaining
-> common ChromeOS pieces are fairly minor,  exynos5250-cros-common.dtsi
-> was requested to be merged into the Snow device tree, sharing only the
-> keyboard controller for now. This may be re-evaluated as both mature.
->
-> Suggested-by: Doug Anderson <dianders@chromium.org>
-> Reviewed-by: Tomasz Figa <t.figa@samsung.com>
-> Signed-off-by: Andreas F?rber <afaerber@suse.de>
-> ---
->  v4 -> v5:
->  * Extended commit message (Tomasz Figa)
->
->  v3 -> v4: Unchanged
->
->  v2 -> v3:
->  * Renamed subject to match Kukjin's style
->  * Rebased onto MMC pinctrl bug fix (Doug Anderson)
->
->  v2: New (Doug Anderson)
->
->  arch/arm/boot/dts/exynos5250-cros-common.dtsi | 164 --------------------------
->  arch/arm/boot/dts/exynos5250-snow.dts         | 164 +++++++++++++++++++++++---
->  2 files changed, 145 insertions(+), 183 deletions(-)
+Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
+---
 
-Reviewed-by: Doug Anderson <dianders@chromium.org>
+Changes in v2:
+ - remove unnecessary parentheses
 
-I'd suggest that this land sooner rather than later to avoid future conflicts.
+ drivers/dma/at_hdmac.c | 12 +++++++-----
+ 1 file changed, 7 insertions(+), 5 deletions(-)
+
+diff --git a/drivers/dma/at_hdmac.c b/drivers/dma/at_hdmac.c
+index c13a3bb0f594..adb0fbc63f16 100644
+--- a/drivers/dma/at_hdmac.c
++++ b/drivers/dma/at_hdmac.c
+@@ -294,14 +294,16 @@ static int atc_get_bytes_left(struct dma_chan *chan)
+ 			ret = -EINVAL;
+ 			goto out;
+ 		}
+-		atchan->remain_desc -= (desc_cur->lli.ctrla & ATC_BTSIZE_MAX)
+-						<< (desc_first->tx_width);
+-		if (atchan->remain_desc < 0) {
++
++		count = (desc_cur->lli.ctrla & ATC_BTSIZE_MAX)
++			<< desc_first->tx_width;
++		if (atchan->remain_desc < count) {
+ 			ret = -EINVAL;
+ 			goto out;
+-		} else {
+-			ret = atchan->remain_desc;
+ 		}
++
++		atchan->remain_desc -= count;
++		ret = atchan->remain_desc;
+ 	} else {
+ 		/*
+ 		 * Get residual bytes when current
+-- 
+1.9.1
