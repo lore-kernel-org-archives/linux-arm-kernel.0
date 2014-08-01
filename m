@@ -1,133 +1,113 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Fri, 1 Aug 2014 13:35:57 +0200
-Subject: [PATCH v2 1/3] arm64: spin-table: handle unmapped
- cpu-release-addrs
-In-Reply-To: <20140731103900.GA22994@leverpostej>
-References: <1406717944-24725-1-git-send-email-ard.biesheuvel@linaro.org>
- <1406717944-24725-2-git-send-email-ard.biesheuvel@linaro.org>
- <20140730113013.GL12239@arm.com>
- <CAKv+Gu8ne8k2NV12SyWye5aYJKHG0wHKAO+=V=1L89_hvyGopw@mail.gmail.com>
- <20140731094515.GE26853@arm.com>
- <20140731095854.GC21850@leverpostej>
- <20140731100439.GI26853@arm.com>
- <20140731103900.GA22994@leverpostej>
-Message-ID: <CAKv+Gu_Ax++OGT1wBwUhKEndR97Q69zXeVZL8vkxAiY=VJuT4w@mail.gmail.com>
+From: yamada.m@jp.panasonic.com (Masahiro Yamada)
+Date: Fri, 01 Aug 2014 20:55:50 +0900
+Subject: [PATCH,RESEND] arm: Do not define "comma" twice
+In-Reply-To: <20140711205900.E6FA.AA925319@jp.panasonic.com>
+References: <1396228057-1488-1-git-send-email-yamada.m@jp.panasonic.com>
+ <20140711205900.E6FA.AA925319@jp.panasonic.com>
+Message-ID: <20140801205550.D532.AA925319@jp.panasonic.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 31 July 2014 12:39, Mark Rutland <mark.rutland@arm.com> wrote:
-> On Thu, Jul 31, 2014 at 11:04:39AM +0100, Will Deacon wrote:
->> On Thu, Jul 31, 2014 at 10:58:54AM +0100, Mark Rutland wrote:
->> > On Thu, Jul 31, 2014 at 10:45:15AM +0100, Will Deacon wrote:
->> > > On Wed, Jul 30, 2014 at 08:17:02PM +0100, Ard Biesheuvel wrote:
->> > > > ]On 30 July 2014 13:30, Will Deacon <will.deacon@arm.com> wrote:
->> > > > > On Wed, Jul 30, 2014 at 11:59:02AM +0100, Ard Biesheuvel wrote:
->> > > > >> From: Mark Rutland <mark.rutland@arm.com>
->> > > > >>
->> > > > >> In certain cases the cpu-release-addr of a CPU may not fall in the
->> > > > >> linear mapping (e.g. when the kernel is loaded above this address due to
->> > > > >> the presence of other images in memory). This is problematic for the
->> > > > >> spin-table code as it assumes that it can trivially convert a
->> > > > >> cpu-release-addr to a valid VA in the linear map.
->> > > > >>
->> > > > >> This patch modifies the spin-table code to use a temporary cached
->> > > > >> mapping to write to a given cpu-release-addr, enabling us to support
->> > > > >> addresses regardless of whether they are covered by the linear mapping.
->> > > > >>
->> > > > >> Signed-off-by: Mark Rutland <mark.rutland@arm.com>
->> > > > >> Tested-by: Mark Salter <msalter@redhat.com>
->> > > > >> [ardb: added (__force void *) cast]
->> > > > >> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
->> > > > >> ---
->> > > > >>  arch/arm64/kernel/smp_spin_table.c | 22 +++++++++++++++++-----
->> > > > >>  1 file changed, 17 insertions(+), 5 deletions(-)
->> > > > >
->> > > > > I'm nervous about this. What if the spin table sits in the same physical 64k
->> > > > > frame as a read-sensitive device and we're running with 64k pages?
->> > > > >
->> > > >
->> > > > Actually, booting.txt requires cpu-release-addr to point to a
->> > > > /memreserve/d part of memory, which implies DRAM (or you wouldn't have
->> > > > to memreserve it)
->> > > > That means it should always be covered by the linear mapping, unless
->> > > > it is located before Image in DRAM, which is the case addressed by
->> > > > this patch.
->> > >
->> > > But if it's located before before the Image in DRAM and isn't covered by
->> > > the linear mapping, then surely the /memreserve/ is pointless too? In which
->> > > case, this looks like we're simply trying to cater for platforms that aren't
->> > > following booting.txt (which may need updating if we need to handle this).
->> >
->> > No. The DT is describing the memory which is present, and the subset
->> > thereof which should not be used under normal circumstances. That's a
->> > static property of the system.
->> >
->> > Where the OS happens to get loaded and what it is able to address is a
->> > dynamic property of the OS (and possibly the bootloader). The DT cannot
->> > have knowledge of this.
->> >
->> > It's always true that the OS should not blindly use memreserve'd memory.
->> > The fact that it cannot address it in the linear mapping is orthogonal.
->>
->> In which case, I think asserting that /memreserve/ implies DRAM is pretty
->> fragile and not actually enforced anywhere. Sure, we can say `don't do
->> that', but I'd prefer to have the kernel detect this dynamically.
->
-> I think the boot protocol needs an update to allow a cpu-release-addr
-> not covered by linear mapping. There are reasons that the kernel might
-> not be loaded at the start of RAM, and I think relying on the
-> cpu-release-addr addresses lying in the linear mapping is a limitation
-> we need to address. Given that I also think we should allow for
-> cpu-release-addrs outside of the range desribed by memory nodes (and
-> therefore not requiring any /mremreserve/).
->
+Hello Russel King,
 
-While I agree that it would be a nice thing to get that requirement
-relaxed, do we necessarily need to address both issues at once?
 
-In a sense, this patch is a bug fix: even if a platform fully adheres
-to booting.txt, by putting the cpu-release-addr in a memreserved part
-of DRAM and loading Image at a 2 meg offset + TEXT_OFFSET, SMP will be
-broken in some cases, and that needs to be fixed. This issue is not
-imaginary, as TEXT_OFFSET fuzzing may well result in boot failures on
-APM Mustang, and the fix for /that/ (loading at the next 2 meg
-boundary (+ TEXT_OFFSET) up, a thing which booting.txt specifically
-allows) triggers the issue that this patch addresses.
+Could you apply this trivial patch for 3.17 merge window, please?
 
-> I do not think we should rely on being able to address the
-> cpu-release-addr with a normal cacheable mapping. If the
-> cpu-release-addr falls outside of the memory described by the memory
-> node(s) then we have no idea where it lives. Currently this falls in
-> normal memory, but mandating that feels odd.
->
+Thanks.
 
-We have the luxury that all existing working implementations have
-cpu-release-addr inside the linear mapping (or SMP would already be
-broken). Why makes our lives complicated by allowing things that
-nobody has asked for yet? Including dedicated SRAM patches makes
-sense, since anything that can tolerate being mapped MT_NORMAL using
-64k granule can be supported with your current code, but beyond that,
-what is the use case?
+Masahiro Yamada
 
-> The sole purpose of /memreserve/ is to describe areas in physical memory
-> that memory should not be used for general allocation. I don't think it
-> makes any sense to derive any information from /memreserve/ other than
-> the fact said addresses shouldn't be poked arbitarily. If we allow
-> cpu-release-addrs outside of memory, then we won't have a /memreserve/
-> anyhow.
->
-> So the question becomes can or can't we always detect when we already
-> have a mapping that covers a cpu-release-addr?
->
 
-Let's not get ourselves into this mess.
 
->> Does dtc check that the /memreserve/ region is actually a subset of the
->> memory node?
->
-> I don't beleive it does. It's probably a sensible warning, but as far as
-> I am aware the only time the memory reservation table will be read in
-> any OS is to poke holes in its memory allocation pool(s).
->
-> Cheers,
-> Mark.
+On Fri, 11 Jul 2014 20:59:00 +0900
+Masahiro Yamada <yamada.m@jp.panasonic.com> wrote:
+
+> Hi.
+> 
+> 
+> 
+> This is a ping.
+> 
+> It has been three months since I posted this trivial patch.
+> Any comments?
+> 
+> If this patch looks good, could you apply it
+> for Linux 3.17-rc1 ?
+> 
+> Thanks,
+> 
+> Masahiro Yamada
+> 
+> 
+> 
+> On Mon, 31 Mar 2014 10:07:37 +0900
+> Masahiro Yamada <yamada.m@jp.panasonic.com> wrote:
+> 
+> > We have the definition of "comma" in scripts/Kbuild.include.
+> > We should not double it.
+> > 
+> > Signed-off-by: Masahiro Yamada <yamada.m@jp.panasonic.com>
+> > ---
+> > 
+> > First I posted this patch to linux-kbuild ML.
+> > But, Michal Marek recommended me to send it to linux-arm-kernel ML.
+> > 
+> > So this is here now.
+> > 
+> > 
+> >  arch/arm/Makefile   | 2 --
+> >  arch/arm64/Makefile | 2 --
+> >  2 files changed, 4 deletions(-)
+> > 
+> > diff --git a/arch/arm/Makefile b/arch/arm/Makefile
+> > index 08a9ef5..72f7b8c 100644
+> > --- a/arch/arm/Makefile
+> > +++ b/arch/arm/Makefile
+> > @@ -50,8 +50,6 @@ AS		+= -EL
+> >  LD		+= -EL
+> >  endif
+> >  
+> > -comma = ,
+> > -
+> >  # This selects which instruction set is used.
+> >  # Note that GCC does not numerically define an architecture version
+> >  # macro, but instead defines a whole series of macros which makes
+> > diff --git a/arch/arm64/Makefile b/arch/arm64/Makefile
+> > index 2fceb71..473a050 100644
+> > --- a/arch/arm64/Makefile
+> > +++ b/arch/arm64/Makefile
+> > @@ -30,8 +30,6 @@ AS		+= -EL
+> >  LD		+= -EL
+> >  endif
+> >  
+> > -comma = ,
+> > -
+> >  CHECKFLAGS	+= -D__aarch64__
+> >  
+> >  # Default value
+> > -- 
+> > 1.8.3.2
+> > 
+> > 
+> > _______________________________________________
+> > linux-arm-kernel mailing list
+> > linux-arm-kernel at lists.infradead.org
+> > http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+> 
+> 
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+
+
+
+-- 
+????????? ????LSI????????
+??????????
+?????? ???????
+????? <yamada.m@jp.panasonic.com>
+?617-8520  ???????????1??
+?? : 050-3783-5420
+?? : 7-664-2813, ?????: 664-772
