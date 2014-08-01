@@ -1,248 +1,78 @@
-From: suravee.suthikulpanit@amd.com (Suravee Suthikulanit)
-Date: Fri, 1 Aug 2014 10:42:26 -0500
-Subject: [PATCH 3/4 V3] irqchip: gic: Add supports for ARM GICv2m MSI(-X)
-In-Reply-To: <87zjfqj3mc.fsf@approximate.cambridge.arm.com>
-References: <1404947104-21345-1-git-send-email-suravee.suthikulpanit@amd.com>
- <1404947104-21345-4-git-send-email-suravee.suthikulpanit@amd.com>
- <87zjfqj3mc.fsf@approximate.cambridge.arm.com>
-Message-ID: <53DBB562.5020003@amd.com>
+From: tixy@linaro.org (Jon Medhurst (Tixy))
+Date: Fri, 01 Aug 2014 16:53:19 +0100
+Subject: [PATCH] ARM: multi_v7_defconfig: major refresh
+In-Reply-To: <53DBAAEA.2010908@arm.com>
+References: <1406052070-6207-1-git-send-email-olof@lixom.net>
+ <53DB6B4F.9080605@arm.com>	<1406890899.2794.40.camel@linaro1.home>
+ <CAOesGMi0RUbz4BSnmR92dEk3fWgN=hnENSdi55VeCXdcHLRLJQ@mail.gmail.com>
+ <53DB763A.10306@arm.com> <1406892491.2794.58.camel@linaro1.home>
+ <53DBAAEA.2010908@arm.com>
+Message-ID: <1406908399.22757.12.camel@linaro1.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 7/30/2014 9:57 AM, Marc Zyngier wrote:
-> On Thu, Jul 10 2014 at 12:05:03 am BST, "suravee.suthikulpanit at amd.com" <suravee.suthikulpanit@amd.com> wrote:
->
-> Hi Suravee,
->
->> From: Suravee Suthikulpanit <Suravee.Suthikulpanit@amd.com>
->>
- >> ......
- >>
->> -  first region is the GIC distributor register base and size. The 2nd region is
->> -  the GIC cpu interface register base and size.
->> +- reg : Specifies base physical address(s) and size of the GIC register frames.
->> +
->> +  Region | Description
->> +  Index  |
->> +  -------------------------------------------------------------------
->> +     0   | GIC distributor register base and size
->> +     1   | GIC cpu interface register base and size
->> +     2   | VGIC interface control register base and size (Optional)
->> +     3   | VGIC CPU interface register base and size (Optional)
->> +     4   | GICv2m MSI interface register base and size (Optional)
->
-> Given that the v2m block is somehow bolted on the side of a standard
-> GICv2, I'd rather see it as a subnode of the main GIC.
->
-> Then you could directly call into the v2m layer to initialize it,
-> instead of the odd "reverse probing" you're using here...
+On Fri, 2014-08-01 at 15:57 +0100, Sudeep Holla wrote:
+> 
+> On 01/08/14 12:28, Jon Medhurst (Tixy) wrote:
+> > On Fri, 2014-08-01 at 12:12 +0100, Sudeep Holla wrote:
+> >>
+> >> On 01/08/14 12:03, Olof Johansson wrote:
+> >>> On Fri, Aug 1, 2014 at 4:01 AM, Jon Medhurst (Tixy) <tixy@linaro.org> wrote:
+> >>>> On Fri, 2014-08-01 at 11:26 +0100, Sudeep Holla wrote:
+> 
+> [...]
+> 
+> >>>>
+> >>>>>    One way to achieve this:
+> >>>>> (There's sysfs to re-enable it runtime)
+> >>>>
+> >>>> The opposite is also true, if you don't want the switcher enabled you
+> >>>> can disable it by the same method after boot ;-)
+> >>>>
+> >>>>> -->8
+> >>>>> diff --git a/arch/arm/common/bL_switcher.c b/arch/arm/common/bL_switcher.c
+> >>>>> index 490f3dced749..f4c36e70166a 100644
+> >>>>> --- a/arch/arm/common/bL_switcher.c
+> >>>>> +++ b/arch/arm/common/bL_switcher.c
+> >>>>> @@ -794,7 +794,7 @@ static int bL_switcher_hotplug_callback(struct
+> >>>>> notifier_block *nfb,
+> >>>>>            return NOTIFY_DONE;
+> >>>>>     }
+> >>>>>
+> >>>>> -static bool no_bL_switcher;
+> >>>>> +static bool no_bL_switcher = true;
+> >>>>
+> >>>> This changes the default for everyone, which I guess is fair enough if
+> >>>> there is a good reason, but I'm not sure there is.
+> >>>
+> >>> No, I don't think there is.
+> >>>
+> >>
+> >> It's just that people using TC2 will suddenly see 3 of the 5 CPUs missing.
+> >
+> > Yes, if they we're previously using multi_v7_defconfig (do people
+> > working specifically with TC2's use that?)
+> >
+> 
+> I don't, but assumed many might use it.
+> 
+> > Conversely, with the change in default proposed above, anyone with their
+> > own configs enabling the switcher will suddenly see the number of CPUs
+> > go from 2 to 5. We also have the situation where we have a config
+> > option, which when enabled, doesn't actually do anything unless the user
+> > also changes boot arguments or takes measures to enable it after boot.
+> > Which seems the wrong way for things to work to me.
+> >
+> 
+> OK, makes sense. Just curious how many big.LITTLE platforms have CPUFreq
+> support and integrated with bL switcher. Otherwise we end up switching
+> clusters/cpus using dummy i/f anyways
 
-[Suravee] IIUC, you don't think we should introduce the "gic-400-v2m" 
-compatible ID. Instead, you want to see something like:
+Hmm, that is a point, there are 3 other big.LITTLE SoC's I can spot in
+mainline [1], and I wouldn't want to speculate how they would be
+affected by having the big.LITTLE switcher enabled.
 
-     gic @ 0x00f00000 {
-         .....
-         v2m {
-             msi-controller;
-             reg = < .... >; /* v2m reg frame */
-         }
-     }
+[1] exynos5420, exynos5260, r8a7790
 
-If so, I can change this.
-
-
->> +
->> +static int __init
->> +gicv2m_msi_init(struct device_node *node, struct v2m_data *v2m)
->> +{
->> +       unsigned int val;
->> +
->> +       if (of_address_to_resource(node, GIC_OF_MSIV2M_RANGE_INDEX,
->> +                                  &v2m->res)) {
->> +               pr_err("GICv2m: Failed locate GICv2m MSI register frame\n");
->> +               return -EINVAL;
->> +       }
->> +
->> +       v2m->base = of_iomap(node, GIC_OF_MSIV2M_RANGE_INDEX);
->> +       if (!v2m->base) {
->> +               pr_err("GICv2m: Failed to map GIC MSI registers\n");
->> +               return -EINVAL;
->> +       }
->> +
->> +       val = readl_relaxed(v2m->base + V2M_MSI_TYPER);
->> +       if (!val) {
->> +               pr_warn("GICv2m: Failed to read V2M_MSI_TYPER register\n");
->> +               return -EINVAL;
->> +       }
->> +
->> +       v2m->spi_start = (val >> V2M_MSI_TYPER_BASE_SHIFT) &
->> +                               V2M_MSI_TYPER_BASE_MASK;
->> +       v2m->nr_spis = val & V2M_MSI_TYPER_NUM_MASK;
->> +       if ((v2m->spi_start < V2M_MIN_SPI) || (v2m->nr_spis >= V2M_MAX_SPI)) {
->> +                       pr_err("GICv2m: Invalid MSI_TYPER (%#x)\n", val);
->> +                       return -EINVAL;
->> +       }
->> +
->> +       v2m->bm = kzalloc(sizeof(long) * BITS_TO_LONGS(v2m->nr_spis),
->> +                         GFP_KERNEL);
->> +       if (!v2m->bm) {
->> +               pr_err("GICv2m: Failed to allocate MSI bitmap\n");
->> +               return -ENOMEM;
->> +       }
->> +
->> +       spin_lock_init(&v2m->msi_cnt_lock);
->> +
->> +       pr_info("GICv2m: SPI range [%d:%d]\n",
->> +               v2m->spi_start, (v2m->spi_start + v2m->nr_spis));
->> +
->> +       return 0;
->> +}
->
-> This function is assuming that you will only see one single MSI frame
-> here. Is there any chance that there would be more than one in a system?
->
-
-[Suravee] If I would imagine such SOC, where there are multiple MSI 
-frames (hence multiple msi-controllers), can we currently support this 
-with the current msichip interface?  Currently, each PCI RC connects to 
-an "interrupt-parrent", which is also an MSI controller. We would need 
-to have a way for PCI RC to specify which of the msichips within an 
-interrupt-controller it wants to use.
-
-Currently, I am not aware if there is a GIC w/ multiple MSI frames. 
-Could you check if there is such product for ARM GICs?
-
->> +
->> +static void gicv2m_mask_irq(struct irq_data *d)
->> +{
->> +       gic_mask_irq(d);
->> +       if (d->msi_desc)
->> +               mask_msi_irq(d);
->> +}
->> +
->> +static void gicv2m_unmask_irq(struct irq_data *d)
->> +{
->> +       gic_unmask_irq(d);
->> +       if (d->msi_desc)
->> +               unmask_msi_irq(d);
->> +}
->> +
->> +static struct irq_chip gicv2m_chip = {
->> +       .name                   = "GICv2m",
->> +       .irq_mask               = gicv2m_mask_irq,
->> +       .irq_unmask             = gicv2m_unmask_irq,
->> +       .irq_eoi                = gic_eoi_irq,
->> +       .irq_set_type           = gic_set_type,
->> +       .irq_retrigger          = gic_retrigger,
->
-> I think you can loose the retrigger here.
->
-OK.
-
->> +#ifdef CONFIG_SMP
->> +       .irq_set_affinity       = gic_set_affinity,
->> +#endif
->> +#ifdef CONFIG_PM
->> +       .irq_set_wake           = gic_set_wake,
->> +#endif
->> +};
->> +
->> +#ifdef CONFIG_OF
->> +static int __init
->> +gicv2m_of_init(struct device_node *node, struct device_node *parent)
->> +{
->> +       struct gic_chip_data *gic;
->> +       int ret;
->> +
->> +       ret = _gic_of_init(node, parent, &gicv2m_chip, &gic);
->> +       if (ret) {
->> +               pr_err("GICv2m: Failed to initialize GIC\n");
->> +               return ret;
->> +       }
->> +
->> +       gic->msi_chip.owner = THIS_MODULE;
->> +       gic->msi_chip.of_node = node;
->> +       gic->msi_chip.setup_irq = gicv2m_setup_msi_irq;
->> +       gic->msi_chip.teardown_irq = gicv2m_teardown_msi_irq;
->> +       ret = of_pci_msi_chip_add(&gic->msi_chip);
->> +       if (ret) {
->> +               /* MSI is optional and not supported here */
->> +               pr_info("GICv2m: MSI is not supported.\n");
->> +               return 0;
->> +       }
->> +
->> +       ret = gicv2m_msi_init(node, &gic->v2m_data);
->> +       if (ret)
->> +               return ret;
->> +       return ret;
->> +}
->> +
->> +IRQCHIP_DECLARE(arm_gic_400_v2m, "arm,gic-400-v2m", gicv2m_of_init);
->
-> So if you follow my advise of reversing your probing and call into the
-> v2m init from the main GIC driver, you could take a irq_chip as a
-> parameter, and use it to populate the v2m irq_chip, only overriding the
-> two methods that actually differ.
->
-> This would have the net effect of completely dropping patch #2, which
-> becomes effectively useless.
->
-
-[Suravee] Ok, lemme look into this.
-
->>   struct gic_chip_data {
->>          union gic_base dist_base;
->>          union gic_base cpu_base;
->> @@ -20,12 +31,23 @@ struct gic_chip_data {
->>   #endif
->>          struct irq_domain *domain;
->>          unsigned int gic_irqs;
->> -       struct irq_chip *irq_chip;
->>   #ifdef CONFIG_GIC_NON_BANKED
->>          void __iomem *(*get_base)(union gic_base *);
->>   #endif
->> +       struct irq_chip *irq_chip;
->> +       struct msi_chip msi_chip;
->> +#ifdef CONFIG_ARM_GIC_V2M
->> +       struct v2m_data v2m_data;
->> +#endif
->
-> Why isn't msi_chip directly part of v2m_data? I think that would make
-> some of the code slightly clearer, and avoid polluting unsuspecting
-> architectures...
->
-
-[Suravee] I can do that.
-
->>   };
->>
->> +#ifdef CONFIG_OF
->> +int _gic_of_init(struct device_node *node,
->> +                struct device_node *parent,
->> +                struct irq_chip *chip,
->> +                struct gic_chip_data **gic) __init;
->> +#endif
->> +
->>   void gic_mask_irq(struct irq_data *d);
->>   void gic_unmask_irq(struct irq_data *d);
->>   void gic_eoi_irq(struct irq_data *d);
->> @@ -42,11 +64,4 @@ int gic_set_affinity(struct irq_data *d,
->>   int gic_set_wake(struct irq_data *d, unsigned int on);
->>   #endif
->>
->> -#ifdef CONFIG_OF
->> -int _gic_of_init(struct device_node *node,
->> -                struct device_node *parent,
->> -                struct irq_chip *chip,
->> -                struct gic_chip_data **gic) __init;
->> -#endif
->> -
->>   #endif /* _IRQ_GIC_H_ */
->
-> What is the purpose of this move?
->
-[Suravee] No need. I might have accidentally moved it.
-
-Thanks,
-
-Suravee
+-- 
+Tixy
