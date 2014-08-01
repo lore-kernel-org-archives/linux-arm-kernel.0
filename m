@@ -1,68 +1,39 @@
-From: mturquette@linaro.org (Mike Turquette)
-Date: Thu, 31 Jul 2014 17:30:25 -0700
-Subject: [PATCH 1/4] clk: rockchip: protect critical clocks from getting
- disabled
-In-Reply-To: <4047366.k35vzjcKGH@diego>
-References: <1406661128-7614-1-git-send-email-heiko@sntech.de>
- <1406661128-7614-2-git-send-email-heiko@sntech.de>
- <20140731224523.4463.34464@quantum> <4047366.k35vzjcKGH@diego>
-Message-ID: <20140801003025.4463.76384@quantum>
+From: ohaugan@codeaurora.org (Olav Haugan)
+Date: Thu, 31 Jul 2014 17:54:43 -0700
+Subject: [PATCH v4 0/1] Add iommu map_sg/unmap_sg API
+Message-ID: <1406854484-3848-1-git-send-email-ohaugan@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Quoting Heiko St?bner (2014-07-31 16:29:34)
-> Hi Mike,
-> 
-> Am Donnerstag, 31. Juli 2014, 15:45:23 schrieb Mike Turquette:
-> > Quoting Heiko Stuebner (2014-07-29 12:12:05)
-> > 
-> > > The clock-tree contains clocks that should never get disabled
-> > > automatically. One example are the base ACLKs, the base supplies for all
-> > > peripherals.
-> > > 
-> > > Therefore add a structure similar to the sunxi clock-tree to protect these
-> > > special clocks from being disabled.
-> > > 
-> > > Signed-off-by: Heiko Stuebner <heiko@sntech.de>
-> > > ---
-> > > 
-> > >  drivers/clk/rockchip/clk-rk3188.c |  7 +++++++
-> > >  drivers/clk/rockchip/clk-rk3288.c |  7 +++++++
-> > >  drivers/clk/rockchip/clk.c        | 13 +++++++++++++
-> > >  drivers/clk/rockchip/clk.h        |  1 +
-> > >  4 files changed, 28 insertions(+)
-> > > 
-> > > diff --git a/drivers/clk/rockchip/clk-rk3188.c
-> > > b/drivers/clk/rockchip/clk-rk3188.c index a83a6d8..5aef277 100644
-> > > --- a/drivers/clk/rockchip/clk-rk3188.c
-> > > +++ b/drivers/clk/rockchip/clk-rk3188.c
-> > > @@ -599,6 +599,11 @@ static struct rockchip_clk_branch
-> > > rk3188_clk_branches[] __initdata = {> 
-> > >         GATE(ACLK_GPS, "aclk_gps", "aclk_peri", 0, RK2928_CLKGATE_CON(8),
-> > >         13, GFLAGS),>  
-> > >  };
-> > > 
-> > > +static const char *rk3188_critical_clocks[] __initconst = {
-> > > +       "aclk_cpu",
-> > > +       "aclk_peri",
-> > 
-> > I'm not against the idea of critical clocks, but I want to verify that
-> > there is no other driver out there that is a better fit for claiming
-> > these clks via clk_get and enabling them the normal way via clk_enable?
-> 
-> In the clock hierarchy of Rockchip SoCs, both aclks listed here, are sources 
-> for pclk and hclk, as well as sourcing some other peripheral gates further 
-> below too. So from what I've seen from the clock diagrams, there is nothing 
-> that would claim these clocks directly, and it wouldn't also make any sense to 
-> let them get disabled as there will always be something using them (for 
-> example the dram-controller).
+Patch for adding map_sg/unmap_sg to the generic IOMMU API.
 
-Sounds good. Just out of curiosity, under what circumstances would you
-want to gate them? Is there a use case for it?
+v3 -> v4:
+* Removed BUG_ON in both map_sg and unmap_sg
+* Removed PAGE_ALIGN of length of mapping
 
-Regards,
-Mike
+v2 -> v3:
+* Updated commit text
+* Simplifed fallback code and fixed variable types in map_sg function.
+* Renamed and changed arguments to map and unmap functions
 
-> 
-> 
-> Heiko
+v1 -> v2:
+* Added support for "option" argument to unmap call. This can be used by
+  IOMMU driver implentations to allow clients to signal to the driver not
+  to do TLB invalidate for example.
+* Added fallback in case iommu_{map,unmap}_range is called for an IOMMU driver
+  that does not have these implemented.
+* Rebased on top of Joerg's tree.
+* Split out patch from the rest of the patches.
+
+
+
+Olav Haugan (1):
+  iommu-api: Add map_sg/unmap_sg functions
+
+ drivers/iommu/iommu.c | 44 ++++++++++++++++++++++++++++++++++++++++++++
+ include/linux/iommu.h | 28 ++++++++++++++++++++++++++++
+ 2 files changed, 72 insertions(+)
+
+--
+The Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+hosted by The Linux Foundation
