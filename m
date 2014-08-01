@@ -1,46 +1,142 @@
-From: peter.ujfalusi@ti.com (Peter Ujfalusi)
-Date: Fri, 1 Aug 2014 16:34:09 +0300
-Subject: [PATCH 5/6] ARM: DTS: da850-evm: Add node for tlv320aic3106 codec
-In-Reply-To: <53DB9292.7080008@cogentembedded.com>
-References: <1406801934-23334-1-git-send-email-peter.ujfalusi@ti.com>
- <1406801934-23334-6-git-send-email-peter.ujfalusi@ti.com>
- <53DA519A.4090905@cogentembedded.com> <53DB240F.2030908@ti.com>
- <53DB8CEA.9010902@cogentembedded.com> <53DB8FE1.5010207@ti.com>
- <53DB9292.7080008@cogentembedded.com>
-Message-ID: <53DB9751.6030508@ti.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Fri, 1 Aug 2014 15:52:31 +0200
+Subject: [RFC PATCH 00/11] Refactor MSI to support Non-PCI device
+In-Reply-To: <53D85C2E.3060205@huawei.com>
+References: <1406344128-27055-1-git-send-email-wangyijing@huawei.com>
+ <1748052.OMBQJiOLYT@wuerfel> <53D85C2E.3060205@huawei.com>
+Message-ID: <201408011552.32135.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Wednesday 30 July 2014, Yijing Wang wrote:
+> On 2014/7/29 22:08, Arnd Bergmann wrote:
+> > On Saturday 26 July 2014 11:08:37 Yijing Wang wrote:
+> >>
+> >> The new data struct for generic MSI driver.
+> >> struct msi_irqs {
+> >>         u8 msi_enabled:1; /* Enable flag */
+> >>         u8 msix_enabled:1;
+> >>         struct list_head msi_list; /* MSI desc list */
+> >>         void *data;     /* help to find the MSI device */
+> >>         struct msi_ops *ops; /* MSI device specific hook */
+> >> };
+> >> struct msi_irqs is used to manage MSI related informations. Every device supports
+> >> MSI should contain this data struct and allocate it.
+> > 
+> > I think you should have a stronger association with the 'struct
+> > device' here. Can you replace the 'void *data' with 'struct device *dev'?
+> 
+> Actually, I used the struct device *dev in my first draft, finally, I replaced
+> it with void *data, because some MSI devices don't have a struct device *dev,
+> like the existing hpet device, dmar msi device, and OF device, like the ARM consolidator.
+> 
+> Of course, we can make the MSI devices have their own struct device, and register to
+> device tree, eg, add a class device named MSI_DEV. But I'm not sure whether it is appropriate.
 
-On 08/01/2014 04:13 PM, Sergei Shtylyov wrote:
-> Hello.
-> 
-> On 08/01/2014 05:02 PM, Peter Ujfalusi wrote:
-> 
->>>     I do. We should follow the standard consistently. Why not call the node
->>> "sound-codec"?
-> 
->> Well, there is _zero_ cases when the audio codec node is named as
->> "sound-codec" in linux-next but we have wmXXXX, tlvXXXX, twlXXXX, maxXXXX etc.
-> 
->    Which only means people don't read the standard (which is referred to on
-> http://www.devicetree.org/Device_Tree_Usage, that says the same).
-> 
->> Yeah, there are few DTS files which have codec as node name.
->> So, no, I'm not going to change the node name from tlv320aic3106.
-> 
->    So you prefer following the bad examples to following the standard?
+It doesn't have to be in the (OF) device tree, but I think it absolutely makes
+sense to use the 'struct device' infrastructure here, as almost everything uses
+a device, and the ones that don't do that today can be easily changed.
 
-those bad examples are in the tree and they did went through the review
-process (arch, DT and probably alsa). But it is interesting that we do not
-have a single correct node name for audio codecs (probably for other types also).
+> > The other part I'm not completely sure about is how you want to
+> > have MSIs map into normal IRQ descriptors. At the moment, all
+> > MSI users are based on IRQ numbers, but this has known scalability problems.
+> 
+> Hmmm, I still use the IRQ number to map the MSIs to IRQ description.
+> I'm sorry, I don't understand you meaning.
+> What are the scalability problems you mentioned ?
+> For device drivers, they always process interrupt in two steps.
+> If irq is the legacy interrupt, drivers will first
+> use the irq_of_parse_and_map() or pci_enable_device() to parse and get the IRQ number.
+> Then drivers will call the request_irq() to register the interrupt handler.
+> If irq is MSIs, first call pci_enable_msi/x() to get the IRQ number and then call
+> request_irq() to register interrupt handler.
 
-> Well, "the Moor has done his duty, the Moor can go"...
+The method you describe here makes sense for PCI devices that are required to support
+legacy interrupts and may or may not support MSI on a given system, but not so much
+for platform devices for which we know exactly whether we want to use MSI
+or legacy interrupts.
 
-Let's ask the DT maintainers what should be the correct approach and someone
-should go through all the existing DT files and clean them up? People usually
-start reading the code for examples before the standard...
+In particular if you have a device that can only do MSI, the entire pci_enable_msi
+step is pointless: all we need to do is program the correct MSI target address/message
+pair into the device and register the handler.
 
--- 
-P?ter
+> > I wonder if we can do the interface in a way that
+> > hides the interrupt number from generic device drivers and just
+> > passes a 'struct irq_desc'. Note that there are long-term plans to
+> > get rid of IRQ numbers entirely, but those plans have existed for
+> > a long time already without anybody seriously addressing the device
+> > driver interfaces so far, so it might never really happen.
+> > 
+> 
+> Maybe this is a huge work, now hundreds drivers use the IRQ number, so maybe we can consider
+> this in a separate title.
+
+Sorry for being unclear here: I did suggest changing all drivers now. What I meant
+is that we use a different API for non-PCI devices that works without IRQ numbers.
+I don't think we should touch the PCI interfaces at this point.
+
+> > With the other operations, I think they should all take a 'struct device *'
+> > as the first argument for convenience and consistency. I don't think you actually
+> > need msi_read_message(), and we could avoid msi_write_message() by doing it
+> > the other way round.
+> > 
+> 
+> There only two functions use the read_msi_msg(), because every msi_desc has
+> a struct msi_msg, and it caches the msi address and data. I will consider to
+> retrieve the msg from cached msi_msg, then we can avoid the msi_read_message().
+> But msi_write_message() maybe necessary, some xxx_set_affinity() functions and
+> restore functions need the msi_write_message() to rewrite the address and data.
+
+Makes sense. I'd have to think about it more, but I think you are right
+about the affinity APIs needing this.
+
+> > What I'd envision as the API from the device driver perspective is something
+> > as simple like this:
+> > 
+> > struct msi_desc *msi_request(struct msi_chip *chip, irq_handler_t handler,
+> > 			unsigned long flags, const char *name, struct device *dev);
+> > 
+> > which would get an msi descriptor that is valid for this device (dev)
+> > connected to a particular msi_chip, and associate a handler function
+> > with it. The device driver can call that function and retrieve the
+> > address/message pair from the msi_desc in order to store it in its own
+> > device specific registers. The request_irq() can be handled internally
+> > to msi_request().
+> 
+> This is a huge change for device drivers, and some device drivers don't know which msi_chip
+> their MSI irq deliver to. I'm reworking the msi_chip, and try to use msi_chip to eliminate
+> all arch_msi_xxx() under every arch in kernel. And the important point is how to create the
+> binding for the MSI device to the target msi_chip.
+
+Which drivers are you thinking of? Again, I wouldn't expect to change any PCI drivers,
+but only platform drivers that do native MSI, so we only have to change drivers that
+do not support any MSI at all yet and that need to be changed anyway in order to add
+support.
+
+> For PCI device, some arm platform already bound the msi_chip to the pci hostbridge, then all
+> pci devices under the pci hostbridge deliver their MSI irqs to the target msi_chip.
+> And other platform create the binding in DTS file, then the MSI device can find their msi_chip
+> by device_node.
+> I don't know whether there are other situations, we should provide a generic interface that
+> every MSI device under every platform can use it to find its msi_chip exactly.
+
+We have introduced the "msi-parent" property to mirror the "interrupt-parent" property.
+For the PCI case, this property is only needed in the PCI host controller, and there
+can be a system-wide default, by putting the "msi-parent" property into the root device
+node or the node of a bus that is parent to all devices supporting MSI.
+
+For non-PCI devices, it should be possible to override the "msi-parent" property per
+device, but those can also use the global property.
+
+The main use case that I see are PCI host controllers that have their own MSI catcher
+included, so meaning that any PCI device can either send its MSIs there, or to a
+system-wide GICv3 instance, and we need a way to select which one.
+
+A degenerate case of this would be a system where a PCI device sends its MSI into
+the host controller, that generates a legacy interrupt and that in turn gets 
+sent to an irqchip which turns it back into an MSI for the GICv3. This would of
+course be very inefficient, but I think we should be able to express this with
+both the binding and the in-kernel framework just to be on the safe side.
+
+
+	Arnd
