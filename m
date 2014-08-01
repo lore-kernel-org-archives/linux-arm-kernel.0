@@ -1,81 +1,39 @@
-From: sudeep.holla@arm.com (Sudeep Holla)
-Date: Fri, 01 Aug 2014 11:48:23 +0100
-Subject: [PATCH 04/19] ARM64 / ACPI: Introduce arch_fix_phys_package_id()
- for cpu topology
-In-Reply-To: <53DB352D.10507@linaro.org>
-References: <1406206825-15590-1-git-send-email-hanjun.guo@linaro.org>
- <1406206825-15590-5-git-send-email-hanjun.guo@linaro.org>
- <53D69BB3.8040106@arm.com> <53DB352D.10507@linaro.org>
-Message-ID: <53DB7077.7080804@arm.com>
+From: jy0922.shim@samsung.com (Joonyoung Shim)
+Date: Fri, 01 Aug 2014 19:57:06 +0900
+Subject: [PATCH] media: s5p_mfc_dec: delete the redundant code
+In-Reply-To: <1406884515-3250-1-git-send-email-panpan1.liu@samsung.com>
+References: <1406884515-3250-1-git-send-email-panpan1.liu@samsung.com>
+Message-ID: <53DB7282.4070806@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi,
 
+On 08/01/2014 06:15 PM, panpan liu wrote:
+> Because the api s5p_mfc_queue_setup has already realized the same function
+> 
+> Signed-off-by: panpan liu <panpan1.liu@samsung.com>
+> ---
+>  drivers/media/platform/s5p-mfc/s5p_mfc_dec.c |    9 +--------
+>  1 file changed, 1 insertion(+), 8 deletions(-)
+> 
+> diff --git a/drivers/media/platform/s5p-mfc/s5p_mfc_dec.c b/drivers/media/platform/s5p-mfc/s5p_mfc_dec.c
+> 
+> --- a/drivers/media/platform/s5p-mfc/s5p_mfc_dec.c
+> +++ b/drivers/media/platform/s5p-mfc/s5p_mfc_dec.c
+> @@ -544,14 +544,7 @@ static int vidioc_reqbufs(struct file *file, void *priv,
+>  			mfc_err("vb2_reqbufs on capture failed\n");
+>  			return ret;
+>  		}
+> -		if (reqbufs->count < ctx->pb_count) {
+> -			mfc_err("Not enough buffers allocated\n");
+> -			reqbufs->count = 0;
+> -			s5p_mfc_clock_on();
+> -			ret = vb2_reqbufs(&ctx->vq_dst, reqbufs);
+> -			s5p_mfc_clock_off();
+> -			return -ENOMEM;
+> -		}
+> +
 
-On 01/08/14 07:35, Hanjun Guo wrote:
-> On 2014-7-29 2:51, Sudeep Holla wrote:
->> On 24/07/14 14:00, Hanjun Guo wrote:
->>> arch_fix_phys_package_id() will be called in ACPI core to use
->>> the slot number provided by ACPI to update the physical package
->>> id, then we can get the right value in the "physical id" field
->>> of /proc/cpuinfo.
->>>
->>> Signed-off-by: Hanjun Guo <hanjun.guo@linaro.org>
->>> ---
->>>    arch/arm64/include/asm/topology.h |    2 ++
->>>    arch/arm64/kernel/topology.c      |   14 ++++++++++++++
->>>    2 files changed, 16 insertions(+)
->>>
->>> diff --git a/arch/arm64/include/asm/topology.h
->>> b/arch/arm64/include/asm/topology.h
->>> index 7ebcd31..2b216d4 100644
->>> --- a/arch/arm64/include/asm/topology.h
->>> +++ b/arch/arm64/include/asm/topology.h
->>> @@ -23,11 +23,13 @@ extern struct cpu_topology cpu_topology[NR_CPUS];
->>>    void init_cpu_topology(void);
->>>    void store_cpu_topology(unsigned int cpuid);
->>>    const struct cpumask *cpu_coregroup_mask(int cpu);
->>> +void arch_fix_phys_package_id(int num, u32 slot);
->>>
->>>    #else
->>>
->>>    static inline void init_cpu_topology(void) { }
->>>    static inline void store_cpu_topology(unsigned int cpuid) { }
->>> +static inline void arch_fix_phys_package_id(int num, u32 slot) { }
->>>
->>>    #endif
->>>
->>> diff --git a/arch/arm64/kernel/topology.c b/arch/arm64/kernel/topology.c
->>> index 43514f9..c547885 100644
->>> --- a/arch/arm64/kernel/topology.c
->>> +++ b/arch/arm64/kernel/topology.c
->>> @@ -281,3 +281,17 @@ void __init init_cpu_topology(void)
->>>        if (parse_dt_topology())
->>>            reset_cpu_topology();
->>>    }
->>> +
->>> +/*
->>> + * Use the CPU slot number provided by ACPI to update the physical
->>> + * package id when cpuid_topo->cluster_id is not available, then we
->>> + * can get the right value in the "physical id" field of /proc/cpuinfo.
->>> + */
->>
->> We don't have "physical id" field in /proc/cpuinfo on ARM64.
->
-> I'm just curious, if there are two or more CPU (SoC) chips and connected
-> into one system, how to tell one SoC from another?
->
-
-There was some discussion on ARM64 /proc/cpuinfo recently[1]. Even ARM
-doesn't have this. IMO we might want to present complete MPIDR in future
-if really needed.
-
-Not sure, why we need this "physical id" field as these cpuid topology
-is already visible via sysfs explicitly(we really don't need that again
-elsewhere ?)
-
-Regards,
-Sudeep
-
-[1] 
-http://lists.infradead.org/pipermail/linux-arm-kernel/2014-June/264390.html
+As Hans said, you should always check the latest upstream kernel. Why do
+you post patches based on old kernel at ML continuously?
