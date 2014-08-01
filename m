@@ -1,78 +1,79 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Fri, 1 Aug 2014 15:30:20 +0100
-Subject: DMA engine API issue (was: [PATCH/RFC 0/5] R-Car Gen2 DMAC
- hardware descriptor list support)
-In-Reply-To: <18522523.T2zy7HfoJ2@avalon>
-References: <1406032431-3807-1-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
- <28702317.aD0C1Ga3DS@avalon> <20140724045248.GB8181@intel.com>
- <18522523.T2zy7HfoJ2@avalon>
-Message-ID: <20140801143020.GQ30282@n2100.arm.linux.org.uk>
+From: svarbanov@mm-sol.com (Stanimir Varbanov)
+Date: Fri,  1 Aug 2014 17:30:47 +0300
+Subject: [PATCH v4 0/3] Support for Qualcomm QPNP PMIC's
+Message-ID: <1406903450-27283-1-git-send-email-svarbanov@mm-sol.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Aug 01, 2014 at 10:51:26AM +0200, Laurent Pinchart wrote:
-> I'll take this opportunity to question why we have a separation between 
-> tx_submit and issue_pending. What's the rationale for that, especially given 
-> that dma_issue_pending_all() might kick in at any point and issue pending 
-> transfers for all devices. A driver could thus see its submitted but not 
-> issued transactions being issued before it explicitly calls 
-> dma_async_issue_pending().
+Hello all,
 
-A prepared but not submitted transaction is not a pending transaction.
+Changes since v3:
+ - rename the driver to qcom-spmi-pmic - suggested by David Collins
+ - spmi regmap config now initialize .fast_io to true
+ - added generalized comptatible string in DT binding document and driver
+ - I dropped the pm8921 rename patch for now, it will be subject of another
+   patchset later on.
 
-The split is necessary so that a callback can be attached to the
-transaction.  This partially comes from the async-tx API, and also
-gets a lot of use with the slave API.
+regards,
+Stan
 
-The prepare function allocates the descriptor and does the initial
-setup, but does not mark the descriptor as a pending transaction.
-It returns the descriptor, and the caller is then free to add a
-callback function and data pointer to the descriptor before finally
-submitting it.  This sequence must occur in a timely manner as some
-DMA engine implementations hold a lock between the prepare and submit
-callbacks (Dan explicitly permits this as part of the API.)
+--------------------------------------------------------------------------------
 
-> The DMA_PRIVATE capability flag seems to play a role here, but it's far from 
-> being clear how that mechanism is supposed to work. This should be documented 
-> as well, and any light you could shed on this dark corner of the API would 
-> help.
+Changes since v2:
+ - 1/4 - added new line, signed-off-by / acked-by and module_authors.
+ - 3/4 - the subject has been changed.
 
-Why do you think that DMA_PRIVATE has a bearing in the callbacks?  It
-doesn't.  DMA_PRIVATE is all about channel allocation as I explained
-yesterday, and whether the channel is available for async_tx usage.
+The previous v2 can be found at [1].
 
-A channel marked DMA_PRIVATE is not available for async_tx usage at
-any moment.  A channel without DMA_PRIVATE is available for async_tx
-usage until it is allocated for the slave API - at which point the
-generic DMA engine code will mark the channel with DMA_PRIVATE,
-thereby taking it away from async_tx API usage.  When the slave API
-frees the channel, DMA_PRIVATE will be cleared, making the channel
-available for async_tx usage.
+I'm still waiting Acks for:
+ - 4/4 from Qualcomm folks.
+ - 2/4 and 3/4 from DT folks.
 
-So, basically, DMA_PRIVATE set -> async_tx usage not allowed.
-DMA_PRIVATE clear -> async_tx usage permitted.  It really is that
-simple.
+The patchset is ready to merge version and also it can be treated as an
+intermediate step until we find a solution for non-translatable peripheral
+addresses.
 
-> Similarly, the DMA engine API is split in functions with different
-> prefixes (mostly dmaengine_*, dma_async_*, dma_*, and various
-> unprefixed niceties such as async_tx_ack or txd_lock. If there's a
-> rationale for that (beyond just historical reasons) it should also
-> be documented, otherwise a cleanup would help all the confused DMA
-> engine users (myself included).
+[1] https://lkml.org/lkml/2014/7/17/877
 
-dmaengine_* are generally the interface functions to the DMA engine code,
-which have been recently introduced to avoid the multiple levels of
-pointer indirection having to be typed in every driver.
+--------------------------------------------------------------------------------
 
-dma_async_* are the DMA engine interface functions for the async_tx API.
+Hello everyone,
 
-dma_* predate the dmaengine_* naming, and are probably too generic, so
-should probably end up being renamed to dmaengine_*.
+Here is the continuation of patch sets sent recently about Qualcomm
+QPNP SPMI PMICs.
 
-txd_* are all about the DMA engine descriptors.
+The previous version of the patch set can be found at [1].
 
-async_tx_* are the higher level async_tx API functions.
+Changes since v1:
+ - removed completely custom *of* parser
+ - renamed the mfd driver from qpnp-spmi to pm8xxx-spmi
+ - now MFD_PM8XXX_SPMI Kconfig option depends on SPMI
 
--- 
-FTTC broadband for 0.8mile line: currently at 9.5Mbps down 400kbps up
-according to speedtest.net.
+Removing of the custom *of* parser leads to that that the *reg* devicetree
+property cannot exist and therefore cannot be parsed to get PMIC peripheral
+resources. I took this step aside because no one from mfd drivers does this
+parsing. This will lead to inconvenience in the peripheral drivers to define
+internally the SPMI base addresses depending on the compatible property
+i.e. PMIC version. 
+
+Comments are welcome!
+
+[1] https://lkml.org/lkml/2014/7/8/428
+
+--------------------------------------------------------------------------------
+
+Josh Cartwright (1):
+  mfd: add support for Qualcomm SPMI PMICs
+
+Stanimir Varbanov (2):
+  mfd: document DT bindings for Qualcomm SPMI PMICs
+  ARM: dts: qcom: add pm8941 and pm8841 PMICs device nodes
+
+ .../devicetree/bindings/mfd/qcom,spmi-pmic.txt     |   64 +++++++++++++++++++
+ arch/arm/boot/dts/qcom-msm8974.dtsi                |   37 +++++++++++
+ drivers/mfd/Kconfig                                |   15 +++++
+ drivers/mfd/Makefile                               |    1 +
+ drivers/mfd/qcom-spmi-pmic.c                       |   67 ++++++++++++++++++++
+ 5 files changed, 184 insertions(+), 0 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/mfd/qcom,spmi-pmic.txt
+ create mode 100644 drivers/mfd/qcom-spmi-pmic.c
