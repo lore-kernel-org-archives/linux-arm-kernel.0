@@ -1,77 +1,69 @@
-From: ajaykumar.rs@samsung.com (Ajay Kumar)
-Date: Fri, 01 Aug 2014 21:54:18 +0530
-Subject: [PATCH V2] ARM: dts: Add DT changes for display on peach_pi
-Message-ID: <1406910258-28036-1-git-send-email-ajaykumar.rs@samsung.com>
+From: suravee.suthikulpanit@amd.com (Suravee Suthikulanit)
+Date: Fri, 1 Aug 2014 11:29:40 -0500
+Subject: [PATCH 3/4 V3] irqchip: gic: Add supports for ARM GICv2m MSI(-X)
+In-Reply-To: <53DBB562.5020003@amd.com>
+References: <1404947104-21345-1-git-send-email-suravee.suthikulpanit@amd.com>
+ <1404947104-21345-4-git-send-email-suravee.suthikulpanit@amd.com>
+ <87zjfqj3mc.fsf@approximate.cambridge.arm.com> <53DBB562.5020003@amd.com>
+Message-ID: <53DBC074.3030309@amd.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add DT nodes for panel-simple "auo,b133htn01" panel.
-Add backlight enable pin and backlight power supply for pwm-backlight.
-Also add panel phandle needed by dp to enable display on peach_pi.
+On 8/1/2014 10:42 AM, Suravee Suthikulanit wrote:
+>>> +#ifdef CONFIG_SMP
+>>> +       .irq_set_affinity       = gic_set_affinity,
+>>> +#endif
+>>> +#ifdef CONFIG_PM
+>>> +       .irq_set_wake           = gic_set_wake,
+>>> +#endif
+>>> +};
+>>> +
+>>> +#ifdef CONFIG_OF
+>>> +static int __init
+>>> +gicv2m_of_init(struct device_node *node, struct device_node *parent)
+>>> +{
+>>> +       struct gic_chip_data *gic;
+>>> +       int ret;
+>>> +
+>>> +       ret = _gic_of_init(node, parent, &gicv2m_chip, &gic);
+>>> +       if (ret) {
+>>> +               pr_err("GICv2m: Failed to initialize GIC\n");
+>>> +               return ret;
+>>> +       }
+>>> +
+>>> +       gic->msi_chip.owner = THIS_MODULE;
+>>> +       gic->msi_chip.of_node = node;
+>>> +       gic->msi_chip.setup_irq = gicv2m_setup_msi_irq;
+>>> +       gic->msi_chip.teardown_irq = gicv2m_teardown_msi_irq;
+>>> +       ret = of_pci_msi_chip_add(&gic->msi_chip);
+>>> +       if (ret) {
+>>> +               /* MSI is optional and not supported here */
+>>> +               pr_info("GICv2m: MSI is not supported.\n");
+>>> +               return 0;
+>>> +       }
+>>> +
+>>> +       ret = gicv2m_msi_init(node, &gic->v2m_data);
+>>> +       if (ret)
+>>> +               return ret;
+>>> +       return ret;
+>>> +}
+>>> +
+>>> +IRQCHIP_DECLARE(arm_gic_400_v2m, "arm,gic-400-v2m", gicv2m_of_init);
+>>
+>> So if you follow my advise of reversing your probing and call into the
+>> v2m init from the main GIC driver, you could take a irq_chip as a
+>> parameter, and use it to populate the v2m irq_chip, only overriding the
+>> two methods that actually differ.
+>>
+>> This would have the net effect of completely dropping patch #2, which
+>> becomes effectively useless.
+>>
+>
+> [Suravee] Ok, lemme look into this.
 
-Signed-off-by: Ajay Kumar <ajaykumar.rs@samsung.com>
----
-Changes since V1:
-Remove "simple-panel" compatible string and use only ""auo,b133htn01".
+So, in previous revision, you mentioned that we should have a separate 
+irq_chip for gicv2m stuff, is that is still the case here?
 
- arch/arm/boot/dts/exynos5800-peach-pi.dts |   27 ++++++++++-----------------
- 1 file changed, 10 insertions(+), 17 deletions(-)
+Thanks,
 
-diff --git a/arch/arm/boot/dts/exynos5800-peach-pi.dts b/arch/arm/boot/dts/exynos5800-peach-pi.dts
-index f3ee48b..f8c2e61 100644
---- a/arch/arm/boot/dts/exynos5800-peach-pi.dts
-+++ b/arch/arm/boot/dts/exynos5800-peach-pi.dts
-@@ -28,11 +28,13 @@
- 		i2c20 = "/spi at 12d40000/cros-ec at 0/i2c-tunnel";
- 	};
- 
--	backlight {
-+	backlight: backlight {
- 		compatible = "pwm-backlight";
- 		pwms = <&pwm 0 1000000 0>;
- 		brightness-levels = <0 100 500 1000 1500 2000 2500 2800>;
- 		default-brightness-level = <7>;
-+		enable-gpios = <&gpx2 2 0>;
-+		power-supply = <&tps65090_fet1>;
- 		pinctrl-0 = <&pwm0_out>;
- 		pinctrl-names = "default";
- 	};
-@@ -98,6 +100,12 @@
- 		regulator-boot-on;
- 		regulator-always-on;
- 	};
-+
-+	panel: panel-simple {
-+		compatible = "auo,b133htn01";
-+		power-supply = <&tps65090_fet6>;
-+		backlight = <&backlight>;
-+	};
- };
- 
- &dp {
-@@ -111,22 +119,7 @@
- 	samsung,link-rate = <0x0a>;
- 	samsung,lane-count = <2>;
- 	samsung,hpd-gpio = <&gpx2 6 0>;
--
--	display-timings {
--		native-mode = <&timing1>;
--
--		timing1: timing at 1 {
--			clock-frequency = <150660000>;
--			hactive = <1920>;
--			vactive = <1080>;
--			hfront-porch = <60>;
--			hback-porch = <172>;
--			hsync-len = <80>;
--			vback-porch = <25>;
--			vfront-porch = <10>;
--			vsync-len = <10>;
--		};
--	};
-+	panel = <&panel>;
- };
- 
- &fimd {
--- 
-1.7.9.5
+Suravee
