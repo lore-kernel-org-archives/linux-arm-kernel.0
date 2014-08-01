@@ -1,139 +1,47 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Fri, 01 Aug 2014 17:05:14 +0100
-Subject: [PATCH 3/4 V3] irqchip: gic: Add supports for ARM GICv2m MSI(-X)
-In-Reply-To: <53DBB562.5020003@amd.com> (Suravee Suthikulanit's message of
- "Fri, 1 Aug 2014 16:42:26 +0100")
-References: <1404947104-21345-1-git-send-email-suravee.suthikulpanit@amd.com>
- <1404947104-21345-4-git-send-email-suravee.suthikulpanit@amd.com>
- <87zjfqj3mc.fsf@approximate.cambridge.arm.com>
- <53DBB562.5020003@amd.com>
-Message-ID: <87silggpqd.fsf@approximate.cambridge.arm.com>
+From: wsa@the-dreams.de (Wolfram Sang)
+Date: Fri, 1 Aug 2014 18:15:57 +0200
+Subject: [PATCH/RFC V8 1/1] clk: Support for clock parents and rates
+ assigned from device tree
+In-Reply-To: <20140725214231.5177.86866@quantum>
+References: <1403105372-30403-1-git-send-email-s.nawrocki@samsung.com>
+ <1403105372-30403-2-git-send-email-s.nawrocki@samsung.com>
+ <53B59221.5080100@samsung.com> <20140725214231.5177.86866@quantum>
+Message-ID: <20140801161557.GA3277@katana>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Aug 01 2014 at  4:42:26 pm BST, Suravee Suthikulanit <suravee.suthikulpanit@amd.com> wrote:
-> On 7/30/2014 9:57 AM, Marc Zyngier wrote:
->> On Thu, Jul 10 2014 at 12:05:03 am BST, "suravee.suthikulpanit at amd.com" <suravee.suthikulpanit@amd.com> wrote:
->>
->> Hi Suravee,
->>
->>> From: Suravee Suthikulpanit <Suravee.Suthikulpanit@amd.com>
->>>
->  >> ......
->  >>
->>> -  first region is the GIC distributor register base and size. The 2nd region is
->>> -  the GIC cpu interface register base and size.
->>> +- reg : Specifies base physical address(s) and size of the GIC register frames.
->>> +
->>> +  Region | Description
->>> +  Index  |
->>> +  -------------------------------------------------------------------
->>> +     0   | GIC distributor register base and size
->>> +     1   | GIC cpu interface register base and size
->>> +     2   | VGIC interface control register base and size (Optional)
->>> +     3   | VGIC CPU interface register base and size (Optional)
->>> +     4   | GICv2m MSI interface register base and size (Optional)
->>
->> Given that the v2m block is somehow bolted on the side of a standard
->> GICv2, I'd rather see it as a subnode of the main GIC.
->>
->> Then you could directly call into the v2m layer to initialize it,
->> instead of the odd "reverse probing" you're using here...
->
-> [Suravee] IIUC, you don't think we should introduce the "gic-400-v2m" 
-> compatible ID. Instead, you want to see something like:
->
->      gic @ 0x00f00000 {
->          .....
->          v2m {
->              msi-controller;
->              reg = < .... >; /* v2m reg frame */
->          }
->      }
->
-> If so, I can change this.
+On Fri, Jul 25, 2014 at 02:42:31PM -0700, Mike Turquette wrote:
+> Quoting Sylwester Nawrocki (2014-07-03 10:25:53)
+> > On 18/06/14 17:29, Sylwester Nawrocki wrote:
+> > > This patch adds helper functions to configure clock parents and rates
+> > > as specified through 'assigned-clock-parents', 'assigned-clock-rates'
+> > > DT properties for a clock provider or clock consumer device.
+> > > The helpers are now being called by the bus code for the platform, I2C
+> > > and SPI busses, before the driver probing and also in the clock core
+> > > after registration of a clock provider.
+> > > 
+> > > Signed-off-by: Sylwester Nawrocki <s.nawrocki@samsung.com>
+> > > Acked-by: Kyungmin Park <kyungmin.park@samsung.com>
+> > 
+> > Could someone please take a look and review that patch ?
+> > Any further suggestions, ACKs/NAKs ?
+> 
+> Patch looks good to me. I'm happy to take it.
+> 
+> > 
+> > I would appreciate a DT, SPI or the I2C maintainer opinions.
+> 
+> Yes, Acks from SPI and I2C maintainers would be good. I might need to
+> drop those parts of this patch if they don't come through :-(
 
-Yes, something like that indeed.
+For the I2C part:
 
->
->
->>> +
->>> +static int __init
->>> +gicv2m_msi_init(struct device_node *node, struct v2m_data *v2m)
->>> +{
->>> +       unsigned int val;
->>> +
->>> +       if (of_address_to_resource(node, GIC_OF_MSIV2M_RANGE_INDEX,
->>> +                                  &v2m->res)) {
->>> +               pr_err("GICv2m: Failed locate GICv2m MSI register frame\n");
->>> +               return -EINVAL;
->>> +       }
->>> +
->>> +       v2m->base = of_iomap(node, GIC_OF_MSIV2M_RANGE_INDEX);
->>> +       if (!v2m->base) {
->>> +               pr_err("GICv2m: Failed to map GIC MSI registers\n");
->>> +               return -EINVAL;
->>> +       }
->>> +
->>> +       val = readl_relaxed(v2m->base + V2M_MSI_TYPER);
->>> +       if (!val) {
->>> +               pr_warn("GICv2m: Failed to read V2M_MSI_TYPER register\n");
->>> +               return -EINVAL;
->>> +       }
->>> +
->>> +       v2m->spi_start = (val >> V2M_MSI_TYPER_BASE_SHIFT) &
->>> +                               V2M_MSI_TYPER_BASE_MASK;
->>> +       v2m->nr_spis = val & V2M_MSI_TYPER_NUM_MASK;
->>> +       if ((v2m->spi_start < V2M_MIN_SPI) || (v2m->nr_spis >= V2M_MAX_SPI)) {
->>> +                       pr_err("GICv2m: Invalid MSI_TYPER (%#x)\n", val);
->>> +                       return -EINVAL;
->>> +       }
->>> +
->>> +       v2m->bm = kzalloc(sizeof(long) * BITS_TO_LONGS(v2m->nr_spis),
->>> +                         GFP_KERNEL);
->>> +       if (!v2m->bm) {
->>> +               pr_err("GICv2m: Failed to allocate MSI bitmap\n");
->>> +               return -ENOMEM;
->>> +       }
->>> +
->>> +       spin_lock_init(&v2m->msi_cnt_lock);
->>> +
->>> +       pr_info("GICv2m: SPI range [%d:%d]\n",
->>> +               v2m->spi_start, (v2m->spi_start + v2m->nr_spis));
->>> +
->>> +       return 0;
->>> +}
->>
->> This function is assuming that you will only see one single MSI frame
->> here. Is there any chance that there would be more than one in a system?
->>
->
-> [Suravee] If I would imagine such SOC, where there are multiple MSI 
-> frames (hence multiple msi-controllers), can we currently support this 
-> with the current msichip interface?  Currently, each PCI RC connects to 
-> an "interrupt-parrent", which is also an MSI controller. We would need 
-> to have a way for PCI RC to specify which of the msichips within an 
-> interrupt-controller it wants to use.
+Acked-by: Wolfram Sang <wsa@the-dreams.de>
 
-Not necessarly multiple MSI controllers. As far as I can see, a v2m MSI
-frame describes a range of SPIs, and I can perfectly imagine a system
-where someone would have a number of these, each capable of generating a
-number of SPIs. It becomes interesting when you have non-contiguous SPI
-ranges... ;-)
-
-> Currently, I am not aware if there is a GIC w/ multiple MSI frames. 
-> Could you check if there is such product for ARM GICs?
-
-I can, but it is unlikely I'll be able to find about what people outside
-of ARM are doing. They usually only get in touch when they've screwed
-something up.. ;-)
-
-Anyway, maybe we just don't need to address this at this point in
-time. Adding a comment to that effect would probably be enough, and give
-a hint to anyone building such a configuration.
-
-Thanks,
-
-	M.
--- 
-Jazz is not dead. It just smells funny.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140801/12daccbb/attachment.sig>
