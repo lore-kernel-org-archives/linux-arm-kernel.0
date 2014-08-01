@@ -1,77 +1,28 @@
-From: pawel.moll@arm.com (Pawel Moll)
-Date: Fri, 01 Aug 2014 18:25:24 +0100
-Subject: [PATCH 4/5] [SCSI] Do not use platform_bus as a parent
-In-Reply-To: <20140727150720.GC1723@kroah.com>
-References: <1406298233-27876-1-git-send-email-pawel.moll@arm.com>
- <1406298233-27876-4-git-send-email-pawel.moll@arm.com>
- <1406299616.1789.13.camel@jarvis.lan> <20140726201150.GA21870@kroah.com>
- <1406433177.11069.3.camel@jarvis> <20140727150720.GC1723@kroah.com>
-Message-ID: <1406913924.22529.51.camel@hornet>
+From: broonie@kernel.org (Mark Brown)
+Date: Fri, 1 Aug 2014 18:26:20 +0100
+Subject: [PATCH v2 1/2] spi: davinci: add support to configure gpio cs
+ through dt
+In-Reply-To: <1406911233-18999-2-git-send-email-grygorii.strashko@ti.com>
+References: <1406911233-18999-1-git-send-email-grygorii.strashko@ti.com>
+ <1406911233-18999-2-git-send-email-grygorii.strashko@ti.com>
+Message-ID: <20140801172620.GA30458@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, 2014-07-27 at 16:07 +0100, Greg Kroah-Hartman wrote:
-> Ah, ok, it's a scsi core thing, not a driver core thing, that's less
-> confusing now.  For a "fallback" of a platform device, if you switch the
-> lines around you should be fine, something like this patch perhaps:
+On Fri, Aug 01, 2014 at 07:40:32PM +0300, Grygorii Strashko wrote:
+> From: Murali Karicheri <m-karicheri2@ti.com>
 > 
-> diff --git a/drivers/scsi/hosts.c b/drivers/scsi/hosts.c
-> index 3cbb57a8b846..d8d3b294f5bc 100644
-> --- a/drivers/scsi/hosts.c
-> +++ b/drivers/scsi/hosts.c
-> @@ -218,16 +218,16 @@ int scsi_add_host_with_dma(struct Scsi_Host *shost, struct device *dev,
->  		goto fail;
->  
->  	if (!shost->shost_gendev.parent)
-> -		shost->shost_gendev.parent = dev ? dev : &platform_bus;
-> -	if (!dma_dev)
-> -		dma_dev = shost->shost_gendev.parent;
-> -
-> -	shost->dma_dev = dma_dev;
-> +		shost->shost_gendev.parent = dev;
->  
->  	error = device_add(&shost->shost_gendev);
->  	if (error)
->  		goto out;
->  
-> +	if (!dma_dev)
-> +		dma_dev = shost->shost_gendev.parent;
-> +	shost->dma_dev = dma_dev;
-> +
->  	pm_runtime_set_active(&shost->shost_gendev);
->  	pm_runtime_enable(&shost->shost_gendev);
->  	device_enable_async_suspend(&shost->shost_gendev);
+> Currently driver supports only configuration of GPIO CS through
+> platform data. This patch enhances the driver to configure GPIO
+> CS through DT. Also update the DT binding documentation to
+> reflect the availability of cs-gpios.
 
-But this will still make shost->dma_dev == NULL in the cases James
-quoted:
-
-On Fri, 2014-07-25 at 15:46 +0100, James Bottomley wrote:
-> Yes, for DMA purposes, the parent cannot now be NULL; we'll get a panic
-> in the DMA transfers if it is.  A lot of the legacy ISA device on x86
-> and I thought some ARM SOC devices don't pass in the parent device, so
-> we hang them off a known parent.
-> 
-> You can grep for it; these are the devices that will begin to panic if
-> you apply this patch:
-> 
-> arch/ia64/hp/sim/simscsi.c:     error = scsi_add_host(host, NULL);
-> drivers/scsi/a2091.c:   error = scsi_add_host(instance, NULL);
-> drivers/scsi/a3000.c:   error = scsi_add_host(instance, NULL);
-> drivers/scsi/aha152x.c: if( scsi_add_host(shpnt, NULL) ) {
-> drivers/scsi/gdth.c:    error = scsi_add_host(shp, NULL);
-> drivers/scsi/gdth.c:    error = scsi_add_host(shp, NULL);
-> drivers/scsi/gvp11.c:   error = scsi_add_host(instance, NULL);
-> drivers/scsi/imm.c:     err = scsi_add_host(host, NULL);
-> drivers/scsi/pcmcia/fdomain_stub.c:    if (scsi_add_host(host, NULL))
-> drivers/scsi/pcmcia/nsp_cs.c:   ret = scsi_add_host (host, NULL);
-> drivers/scsi/pcmcia/qlogic_stub.c:      if (scsi_add_host(shost, NULL))
-> drivers/scsi/pcmcia/sym53c500_cs.c:     if (scsi_add_host(host, NULL))
-> drivers/scsi/ppa.c:     err = scsi_add_host(host, NULL);
-> drivers/scsi/qlogicfas.c:       if (scsi_add_host(hreg, NULL))
-> drivers/scsi/scsi_module.c:             error = scsi_add_host(shost, NULL);
-> drivers/scsi/sgiwd93.c: err = scsi_add_host(host, NULL);
-
-Maybe the DMA API should be coping with NULL device? It seems to handle
-it in a half of the methods and fails in the other half...
-
-Pawel
+Please submit an incremental patch with whatever the changes were from
+the version of this that I applied already.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140801/fd7572e8/attachment.sig>
