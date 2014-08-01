@@ -1,51 +1,104 @@
-From: rric@kernel.org (Robert Richter)
-Date: Fri, 1 Aug 2014 12:25:35 +0200
-Subject: [PATCH 2/5] arm64, thunder: Add initial dts for Cavium Thunder SoC
-In-Reply-To: <20140730154626.GD20162@leverpostej>
-References: <1406732794-20920-1-git-send-email-rric@kernel.org>
- <1406732794-20920-3-git-send-email-rric@kernel.org>
- <20140730154626.GD20162@leverpostej>
-Message-ID: <20140801102535.GX4703@rric.localhost>
+From: sudeep.holla@arm.com (Sudeep Holla)
+Date: Fri, 01 Aug 2014 11:26:23 +0100
+Subject: [PATCH] ARM: multi_v7_defconfig: major refresh
+In-Reply-To: <1406052070-6207-1-git-send-email-olof@lixom.net>
+References: <1406052070-6207-1-git-send-email-olof@lixom.net>
+Message-ID: <53DB6B4F.9080605@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Mark,
 
-On 30.07.14 16:46:26, Mark Rutland wrote:
 
-> > diff --git a/arch/arm64/boot/dts/thunder-88xx.dts b/arch/arm64/boot/dts/thunder-88xx.dts
-> > new file mode 100644
-> > index 000000000000..4cf20ac9138b
-> > --- /dev/null
-> > +++ b/arch/arm64/boot/dts/thunder-88xx.dts
-> > @@ -0,0 +1,387 @@
-> > +/*
-> > + * Cavium Thunder DTS file
-> > + *
-> > + * Copyright (C) 2013, Cavium Inc.
-> > + *
-> > + * This program is free software; you can redistribute it and/or
-> > + * modify it under the terms of the GNU General Public License as
-> > + * published by the Free Software Foundation; either version 2 of
-> > + * the License, or (at your option) any later version.
-> > + */
-> > +/dts-v1/;
-> > +
-> > +/* Reserving first 12MB of DDR for firmware */
-> > +/memreserve/ 0x00000000 0x00c00000;
-> 
-> What exactly is this memreserve intended to protect at runtime?
-> 
-> The only item of runtime firmware I see in use below is PSCI on the
-> secure side.
-> 
-> How is the kernel booted on this platform? UEFI?
+On 22/07/14 19:01, Olof Johansson wrote:
+> This is a major refresh of the multi_v7_defconfig:
+>
+> - Bring over a bunch of Samsung drivers to make ODROID-U3 and Chromebooks usable
+>   * Enable big.LITTLE
+>   * MCPM
+>   * CYAPA touchpad
+>   * Samsung-related MTD/regulator/clk/pinmux drivers
+>   * Add some of the CrOS EC drivers
+> - Turn on TPM, HW_RANDOM
+> - OMAP_USB3 -> TI_PIPE3 option rename
+> - Enable MCPM/b.L for VEXPRESS
+> - Add new CONFIG_MTD_SPI_NOR since it otherwise masks off SPI NOR drivers
+> - CONFIG_LOGO, because penguins.
+>
+> I took care to keep the new options that have been added for whose the
+> drivers are not yet in our for-next branch. This was pretty awkward so
+> we should sort out how to handle those better in the future.
+>
+> Signed-off-by: Olof Johansson <olof@lixom.net>
+> ---
+>   arch/arm/configs/multi_v7_defconfig |   74 +++++++++++++++++++++++++++--------
+>   1 file changed, 58 insertions(+), 16 deletions(-)
+>
+> diff --git a/arch/arm/configs/multi_v7_defconfig b/arch/arm/configs/multi_v7_defconfig
+> index 16518a7..c7654cf 100644
+> --- a/arch/arm/configs/multi_v7_defconfig
+> +++ b/arch/arm/configs/multi_v7_defconfig
+> @@ -50,6 +50,7 @@ CONFIG_MACH_SPEAR1310=y
+>   CONFIG_MACH_SPEAR1340=y
+>   CONFIG_ARCH_STI=y
+>   CONFIG_ARCH_EXYNOS=y
+> +CONFIG_EXYNOS5420_MCPM=y
+>   CONFIG_ARCH_SUNXI=y
+>   CONFIG_ARCH_SIRF=y
+>   CONFIG_ARCH_TEGRA=y
+> @@ -57,21 +58,23 @@ CONFIG_ARCH_TEGRA_2x_SOC=y
+>   CONFIG_ARCH_TEGRA_3x_SOC=y
+>   CONFIG_ARCH_TEGRA_114_SOC=y
+>   CONFIG_ARCH_TEGRA_124_SOC=y
+> -CONFIG_TEGRA_EMC_SCALING_ENABLE=y
+>   CONFIG_ARCH_U8500=y
+>   CONFIG_MACH_HREFV60=y
+>   CONFIG_MACH_SNOWBALL=y
+> -CONFIG_MACH_UX500_DT=y
+>   CONFIG_ARCH_VEXPRESS=y
+>   CONFIG_ARCH_VEXPRESS_CA9X4=y
+> +CONFIG_ARCH_VEXPRESS_DCSCB=y
+> +CONFIG_ARCH_VEXPRESS_TC2_PM=y
+>   CONFIG_ARCH_WM8850=y
+>   CONFIG_ARCH_ZYNQ=y
+> -CONFIG_TRUSTED_FOUNDATIONS=y
+>   CONFIG_PCI=y
+>   CONFIG_PCI_MSI=y
+>   CONFIG_PCI_MVEBU=y
+>   CONFIG_PCI_TEGRA=y
+>   CONFIG_SMP=y
+> +CONFIG_BIG_LITTLE=y
+> +CONFIG_BL_SWITCHER=y
 
-We checked this and it seems we don't need memreserve. Mem is either
-not visible to the kernel (ATF) or it is marked reserved by firmware
-(UEFI). At the moment we don't see any other use cases. We will remove
-this memreserve.
+IIUC, this will enable switcher code by default. I am not sure if this
+is intentional ? E.g.: After this I can have only 2 active cpus instead
+of 5 on my Vexpress TC2 platform.
 
-Thanks,
+IMO we can keep this enabled by default in the build, but disabled
+by default on boot. One way to achieve this:
+(There's sysfs to re-enable it runtime)
 
--Robert
+-->8
+diff --git a/arch/arm/common/bL_switcher.c b/arch/arm/common/bL_switcher.c
+index 490f3dced749..f4c36e70166a 100644
+--- a/arch/arm/common/bL_switcher.c
++++ b/arch/arm/common/bL_switcher.c
+@@ -794,7 +794,7 @@ static int bL_switcher_hotplug_callback(struct 
+notifier_block *nfb,
+         return NOTIFY_DONE;
+  }
+
+-static bool no_bL_switcher;
++static bool no_bL_switcher = true;
+  core_param(no_bL_switcher, no_bL_switcher, bool, 0644);
+
+  static int __init bL_switcher_init(void)
+
+---
+
+> +CONFIG_BL_SWITCHER_DUMMY_IF=y
+
+This was added only for debugging purposes, again not sure if you want
+this enabled by default. Ideally it should be triggered by CPUFreq.
+
+Regards,
+Sudeep
