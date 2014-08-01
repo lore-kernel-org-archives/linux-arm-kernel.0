@@ -1,34 +1,139 @@
-From: dianders@chromium.org (Doug Anderson)
-Date: Fri, 1 Aug 2014 08:55:48 -0700
-Subject: [PATCH v2] pinctrl: rockchip: fix rk3288 gpio0 configuration
-In-Reply-To: <1406872680-14641-1-git-send-email-sonnyrao@chromium.org>
-References: <1543632.JNPYWq24Lp@diego>
- <1406872680-14641-1-git-send-email-sonnyrao@chromium.org>
-Message-ID: <CAD=FV=WUHVGpULCN5WJGkC+Dqs7HX2w2-_PTG4tFwRpuHZF4PA@mail.gmail.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Fri, 01 Aug 2014 17:05:14 +0100
+Subject: [PATCH 3/4 V3] irqchip: gic: Add supports for ARM GICv2m MSI(-X)
+In-Reply-To: <53DBB562.5020003@amd.com> (Suravee Suthikulanit's message of
+ "Fri, 1 Aug 2014 16:42:26 +0100")
+References: <1404947104-21345-1-git-send-email-suravee.suthikulpanit@amd.com>
+ <1404947104-21345-4-git-send-email-suravee.suthikulpanit@amd.com>
+ <87zjfqj3mc.fsf@approximate.cambridge.arm.com>
+ <53DBB562.5020003@amd.com>
+Message-ID: <87silggpqd.fsf@approximate.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Sonny,
+On Fri, Aug 01 2014 at  4:42:26 pm BST, Suravee Suthikulanit <suravee.suthikulpanit@amd.com> wrote:
+> On 7/30/2014 9:57 AM, Marc Zyngier wrote:
+>> On Thu, Jul 10 2014 at 12:05:03 am BST, "suravee.suthikulpanit at amd.com" <suravee.suthikulpanit@amd.com> wrote:
+>>
+>> Hi Suravee,
+>>
+>>> From: Suravee Suthikulpanit <Suravee.Suthikulpanit@amd.com>
+>>>
+>  >> ......
+>  >>
+>>> -  first region is the GIC distributor register base and size. The 2nd region is
+>>> -  the GIC cpu interface register base and size.
+>>> +- reg : Specifies base physical address(s) and size of the GIC register frames.
+>>> +
+>>> +  Region | Description
+>>> +  Index  |
+>>> +  -------------------------------------------------------------------
+>>> +     0   | GIC distributor register base and size
+>>> +     1   | GIC cpu interface register base and size
+>>> +     2   | VGIC interface control register base and size (Optional)
+>>> +     3   | VGIC CPU interface register base and size (Optional)
+>>> +     4   | GICv2m MSI interface register base and size (Optional)
+>>
+>> Given that the v2m block is somehow bolted on the side of a standard
+>> GICv2, I'd rather see it as a subnode of the main GIC.
+>>
+>> Then you could directly call into the v2m layer to initialize it,
+>> instead of the odd "reverse probing" you're using here...
+>
+> [Suravee] IIUC, you don't think we should introduce the "gic-400-v2m" 
+> compatible ID. Instead, you want to see something like:
+>
+>      gic @ 0x00f00000 {
+>          .....
+>          v2m {
+>              msi-controller;
+>              reg = < .... >; /* v2m reg frame */
+>          }
+>      }
+>
+> If so, I can change this.
 
-On Thu, Jul 31, 2014 at 10:58 PM, Sonny Rao <sonnyrao@chromium.org> wrote:
-> On rk3288, for gpio bank 0, the registers which configure pull-up,
-> iomux, and drive strength don't implement the enable bits in the upper
-> half of the register, unlike the other gpio configuration registers,
-> and so the kernel must perform a read-modify-write of the register to
-> update a particular gpio in that bank.
->
-> The current code is actually clobbering the contents of the register,
-> so this fixes it by using regmap_update_bits and masking out only the
-> bits which require updating.  In the case of bank0 on rk3288 the upper
-> enable bits will just get ignored, and the other configurations won't
-> get clobbered.
->
-> Signed-off-by: Sonny Rao <sonnyrao@chromium.org>
-> ---
-> v2: rebase onto latest pinctrl with drive strength and fix this bug on
->   iomux and drive strength as well.
->
->  drivers/pinctrl/pinctrl-rockchip.c | 15 +++++++++------
->  1 file changed, 9 insertions(+), 6 deletions(-)
+Yes, something like that indeed.
 
-Reviewed-by: Doug Anderson <dianders@chromium.org>
+>
+>
+>>> +
+>>> +static int __init
+>>> +gicv2m_msi_init(struct device_node *node, struct v2m_data *v2m)
+>>> +{
+>>> +       unsigned int val;
+>>> +
+>>> +       if (of_address_to_resource(node, GIC_OF_MSIV2M_RANGE_INDEX,
+>>> +                                  &v2m->res)) {
+>>> +               pr_err("GICv2m: Failed locate GICv2m MSI register frame\n");
+>>> +               return -EINVAL;
+>>> +       }
+>>> +
+>>> +       v2m->base = of_iomap(node, GIC_OF_MSIV2M_RANGE_INDEX);
+>>> +       if (!v2m->base) {
+>>> +               pr_err("GICv2m: Failed to map GIC MSI registers\n");
+>>> +               return -EINVAL;
+>>> +       }
+>>> +
+>>> +       val = readl_relaxed(v2m->base + V2M_MSI_TYPER);
+>>> +       if (!val) {
+>>> +               pr_warn("GICv2m: Failed to read V2M_MSI_TYPER register\n");
+>>> +               return -EINVAL;
+>>> +       }
+>>> +
+>>> +       v2m->spi_start = (val >> V2M_MSI_TYPER_BASE_SHIFT) &
+>>> +                               V2M_MSI_TYPER_BASE_MASK;
+>>> +       v2m->nr_spis = val & V2M_MSI_TYPER_NUM_MASK;
+>>> +       if ((v2m->spi_start < V2M_MIN_SPI) || (v2m->nr_spis >= V2M_MAX_SPI)) {
+>>> +                       pr_err("GICv2m: Invalid MSI_TYPER (%#x)\n", val);
+>>> +                       return -EINVAL;
+>>> +       }
+>>> +
+>>> +       v2m->bm = kzalloc(sizeof(long) * BITS_TO_LONGS(v2m->nr_spis),
+>>> +                         GFP_KERNEL);
+>>> +       if (!v2m->bm) {
+>>> +               pr_err("GICv2m: Failed to allocate MSI bitmap\n");
+>>> +               return -ENOMEM;
+>>> +       }
+>>> +
+>>> +       spin_lock_init(&v2m->msi_cnt_lock);
+>>> +
+>>> +       pr_info("GICv2m: SPI range [%d:%d]\n",
+>>> +               v2m->spi_start, (v2m->spi_start + v2m->nr_spis));
+>>> +
+>>> +       return 0;
+>>> +}
+>>
+>> This function is assuming that you will only see one single MSI frame
+>> here. Is there any chance that there would be more than one in a system?
+>>
+>
+> [Suravee] If I would imagine such SOC, where there are multiple MSI 
+> frames (hence multiple msi-controllers), can we currently support this 
+> with the current msichip interface?  Currently, each PCI RC connects to 
+> an "interrupt-parrent", which is also an MSI controller. We would need 
+> to have a way for PCI RC to specify which of the msichips within an 
+> interrupt-controller it wants to use.
+
+Not necessarly multiple MSI controllers. As far as I can see, a v2m MSI
+frame describes a range of SPIs, and I can perfectly imagine a system
+where someone would have a number of these, each capable of generating a
+number of SPIs. It becomes interesting when you have non-contiguous SPI
+ranges... ;-)
+
+> Currently, I am not aware if there is a GIC w/ multiple MSI frames. 
+> Could you check if there is such product for ARM GICs?
+
+I can, but it is unlikely I'll be able to find about what people outside
+of ARM are doing. They usually only get in touch when they've screwed
+something up.. ;-)
+
+Anyway, maybe we just don't need to address this at this point in
+time. Adding a comment to that effect would probably be enough, and give
+a hint to anyone building such a configuration.
+
+Thanks,
+
+	M.
+-- 
+Jazz is not dead. It just smells funny.
