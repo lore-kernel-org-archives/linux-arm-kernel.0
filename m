@@ -1,47 +1,51 @@
-From: wsa@the-dreams.de (Wolfram Sang)
-Date: Fri, 1 Aug 2014 18:15:57 +0200
-Subject: [PATCH/RFC V8 1/1] clk: Support for clock parents and rates
- assigned from device tree
-In-Reply-To: <20140725214231.5177.86866@quantum>
-References: <1403105372-30403-1-git-send-email-s.nawrocki@samsung.com>
- <1403105372-30403-2-git-send-email-s.nawrocki@samsung.com>
- <53B59221.5080100@samsung.com> <20140725214231.5177.86866@quantum>
-Message-ID: <20140801161557.GA3277@katana>
+From: suravee.suthikulpanit@amd.com (Suravee Suthikulanit)
+Date: Fri, 1 Aug 2014 11:19:18 -0500
+Subject: [PATCH 4/4 V3] irqchip: gicv2m: Add support for multiple MSI
+ for ARM64 GICv2m
+In-Reply-To: <53DBA986.90705@arm.com>
+References: <1404947104-21345-1-git-send-email-suravee.suthikulpanit@amd.com>
+ <1404947104-21345-5-git-send-email-suravee.suthikulpanit@amd.com>
+ <87vbqej2rj.fsf@approximate.cambridge.arm.com> <53DBA603.9030509@amd.com>
+ <53DBA986.90705@arm.com>
+Message-ID: <53DBBE06.5040307@amd.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jul 25, 2014 at 02:42:31PM -0700, Mike Turquette wrote:
-> Quoting Sylwester Nawrocki (2014-07-03 10:25:53)
-> > On 18/06/14 17:29, Sylwester Nawrocki wrote:
-> > > This patch adds helper functions to configure clock parents and rates
-> > > as specified through 'assigned-clock-parents', 'assigned-clock-rates'
-> > > DT properties for a clock provider or clock consumer device.
-> > > The helpers are now being called by the bus code for the platform, I2C
-> > > and SPI busses, before the driver probing and also in the clock core
-> > > after registration of a clock provider.
-> > > 
-> > > Signed-off-by: Sylwester Nawrocki <s.nawrocki@samsung.com>
-> > > Acked-by: Kyungmin Park <kyungmin.park@samsung.com>
-> > 
-> > Could someone please take a look and review that patch ?
-> > Any further suggestions, ACKs/NAKs ?
-> 
-> Patch looks good to me. I'm happy to take it.
-> 
-> > 
-> > I would appreciate a DT, SPI or the I2C maintainer opinions.
-> 
-> Yes, Acks from SPI and I2C maintainers would be good. I might need to
-> drop those parts of this patch if they don't come through :-(
+On 8/1/2014 9:51 AM, Marc Zyngier wrote:
+> Hi Suravee,
+>
+> On 01/08/14 15:36, Suravee Suthikulanit wrote:
+>> On 7/30/2014 10:16 AM, Marc Zyngier wrote:
+>>> Why do we need this complexity at all? Is there any case where we'd want
+>>> to limit ourselves to a single vector for MSI?
+>>
+>> I think the ARM64 GICv2m should not be the limitation for the devices
+>> multiple MSI if there is no real hardware/design limitation.
+>>
+>>> arm64 is a new enough architecture so that we can expect all interrupt controllers to cope
+>>> with that.
+>>
+>> I am not sure if I understand this comment.
+>>
+>> We are not forcing all interrupt controllers for ARM64 to handle
+>> multi-MSI.  They have the option to support if multi-MSI if they want
+>> to. I just think that we should not put the architectural limit here.
+>
+> Let me be clearer: I think we should put the burden of *not* handling
+> multi-MSI on interrupt controllers. Here, you're making the
+> architectural default to be "I don't support multi-MSI", hence having to
+> override global vectors and such for well behaved MSI controllers like
+> GICv2m and GICv3 ITS.
+>
+> Let's only support multi-MSI for the time being. If someone comes up
+> with a silly old MSI controller that can't deal with it, we'll address
+> the issue at that problem.
+>
+> Thanks,
+>
+> 	M.
+>
 
-For the I2C part:
+Ok, I'm fine with that. Thanks for clarification.
 
-Acked-by: Wolfram Sang <wsa@the-dreams.de>
-
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140801/12daccbb/attachment.sig>
+Suravee
