@@ -1,104 +1,52 @@
-From: sudeep.holla@arm.com (Sudeep Holla)
-Date: Fri, 01 Aug 2014 11:26:23 +0100
-Subject: [PATCH] ARM: multi_v7_defconfig: major refresh
-In-Reply-To: <1406052070-6207-1-git-send-email-olof@lixom.net>
-References: <1406052070-6207-1-git-send-email-olof@lixom.net>
-Message-ID: <53DB6B4F.9080605@arm.com>
+From: arnab.basu@freescale.com (arnab.basu at freescale.com)
+Date: Fri, 1 Aug 2014 10:27:46 +0000
+Subject: [RFC PATCH 00/11] Refactor MSI to support Non-PCI device
+In-Reply-To: <1406344128-27055-1-git-send-email-wangyijing@huawei.com>
+References: <1406344128-27055-1-git-send-email-wangyijing@huawei.com>
+Message-ID: <c6d34fe1bbe9457ea8cff7dcd97902b8@DM2PR03MB317.namprd03.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi Yijing
 
+> -----Original Message-----
+> From: Yijing Wang [mailto:wangyijing at huawei.com]
+> Sent: Saturday, July 26, 2014 8:39 AM
+> To: linux-kernel at vger.kernel.org
+> Cc: Xinwei Hu; Wuyun; Bjorn Helgaas; linux-pci at vger.kernel.org;
+> Paul.Mundt at huawei.com; James E.J. Bottomley; Marc Zyngier; linux-arm-
+> kernel at lists.infradead.org; Russell King; linux-arch at vger.kernel.org;
+> Basu Arnab-B45036; virtualization at lists.linux-foundation.org; Hanjun Guo;
+> Yijing Wang
+> Subject: [RFC PATCH 00/11] Refactor MSI to support Non-PCI device
+> 
+> Hi all,
+> 	The series is a draft of generic MSI driver that supports PCI and
+> Non-PCI device which have MSI capability. If you're not interested it,
+> sorry for the noise.
+> 
 
-On 22/07/14 19:01, Olof Johansson wrote:
-> This is a major refresh of the multi_v7_defconfig:
->
-> - Bring over a bunch of Samsung drivers to make ODROID-U3 and Chromebooks usable
->   * Enable big.LITTLE
->   * MCPM
->   * CYAPA touchpad
->   * Samsung-related MTD/regulator/clk/pinmux drivers
->   * Add some of the CrOS EC drivers
-> - Turn on TPM, HW_RANDOM
-> - OMAP_USB3 -> TI_PIPE3 option rename
-> - Enable MCPM/b.L for VEXPRESS
-> - Add new CONFIG_MTD_SPI_NOR since it otherwise masks off SPI NOR drivers
-> - CONFIG_LOGO, because penguins.
->
-> I took care to keep the new options that have been added for whose the
-> drivers are not yet in our for-next branch. This was pretty awkward so
-> we should sort out how to handle those better in the future.
->
-> Signed-off-by: Olof Johansson <olof@lixom.net>
-> ---
->   arch/arm/configs/multi_v7_defconfig |   74 +++++++++++++++++++++++++++--------
->   1 file changed, 58 insertions(+), 16 deletions(-)
->
-> diff --git a/arch/arm/configs/multi_v7_defconfig b/arch/arm/configs/multi_v7_defconfig
-> index 16518a7..c7654cf 100644
-> --- a/arch/arm/configs/multi_v7_defconfig
-> +++ b/arch/arm/configs/multi_v7_defconfig
-> @@ -50,6 +50,7 @@ CONFIG_MACH_SPEAR1310=y
->   CONFIG_MACH_SPEAR1340=y
->   CONFIG_ARCH_STI=y
->   CONFIG_ARCH_EXYNOS=y
-> +CONFIG_EXYNOS5420_MCPM=y
->   CONFIG_ARCH_SUNXI=y
->   CONFIG_ARCH_SIRF=y
->   CONFIG_ARCH_TEGRA=y
-> @@ -57,21 +58,23 @@ CONFIG_ARCH_TEGRA_2x_SOC=y
->   CONFIG_ARCH_TEGRA_3x_SOC=y
->   CONFIG_ARCH_TEGRA_114_SOC=y
->   CONFIG_ARCH_TEGRA_124_SOC=y
-> -CONFIG_TEGRA_EMC_SCALING_ENABLE=y
->   CONFIG_ARCH_U8500=y
->   CONFIG_MACH_HREFV60=y
->   CONFIG_MACH_SNOWBALL=y
-> -CONFIG_MACH_UX500_DT=y
->   CONFIG_ARCH_VEXPRESS=y
->   CONFIG_ARCH_VEXPRESS_CA9X4=y
-> +CONFIG_ARCH_VEXPRESS_DCSCB=y
-> +CONFIG_ARCH_VEXPRESS_TC2_PM=y
->   CONFIG_ARCH_WM8850=y
->   CONFIG_ARCH_ZYNQ=y
-> -CONFIG_TRUSTED_FOUNDATIONS=y
->   CONFIG_PCI=y
->   CONFIG_PCI_MSI=y
->   CONFIG_PCI_MVEBU=y
->   CONFIG_PCI_TEGRA=y
->   CONFIG_SMP=y
-> +CONFIG_BIG_LITTLE=y
-> +CONFIG_BL_SWITCHER=y
+Thanks for sending out these patches, I have some (very basic) questions.
 
-IIUC, this will enable switcher code by default. I am not sure if this
-is intentional ? E.g.: After this I can have only 2 active cpus instead
-of 5 on my Vexpress TC2 platform.
+> The series is based on Linux-3.16-rc1.
+> 
+> MSI was introduced in PCI Spec 2.2. Currently, kernel MSI driver codes
+> are bonding with PCI device. Because MSI has a lot advantages in design.
+> More and more non-PCI devices want to use MSI as their default interrupt.
+> The existing MSI device include HPET. HPET driver provide its own MSI
+> code to initialize and process MSI interrupts. In the latest GIC v3 spec,
+> legacy device can deliver MSI by the help of a relay device named
+> consolidator.
+> Consolidator can translate the legacy interrupts connected to it to
+> MSI/MSI-X. And new non-PCI device will be designed to support MSI in
+> future. So make the MSI driver code be generic will help the non-PCI
+> device use MSI more simply.
 
-IMO we can keep this enabled by default in the build, but disabled
-by default on boot. One way to achieve this:
-(There's sysfs to re-enable it runtime)
+As per my understanding the GICv3 provides a service that will convert writes to a specified address to IRQs delivered to the core and as you mention above MSIs are part of the PCI spec. So I can see a strong case for non-PCI devices to want MSI like functionality without being fully compliant with the requirements of the MSI spec.
 
--->8
-diff --git a/arch/arm/common/bL_switcher.c b/arch/arm/common/bL_switcher.c
-index 490f3dced749..f4c36e70166a 100644
---- a/arch/arm/common/bL_switcher.c
-+++ b/arch/arm/common/bL_switcher.c
-@@ -794,7 +794,7 @@ static int bL_switcher_hotplug_callback(struct 
-notifier_block *nfb,
-         return NOTIFY_DONE;
-  }
+My question is do we necessarily want to rework so much of the PCI-MSI layer to support non PCI devices? Or will it be sufficient to create a framework to allow non PCI devices to hook up with a device that can convert their writes to an IRQ to the core.
 
--static bool no_bL_switcher;
-+static bool no_bL_switcher = true;
-  core_param(no_bL_switcher, no_bL_switcher, bool, 0644);
+As I understand it, the msi_chip is (almost) such a framework. The only problem being that it makes some PCI specific assumptions (such as PCI specific writes from within msi_chip functions). Won't it be sufficient to make the msi_chip framework generic enough to be used by non-PCI devices and let each bus/device manage any additional requirements (such as configuration flow, bit definitions etc) that it places on message based interrupts?
 
-  static int __init bL_switcher_init(void)
-
----
-
-> +CONFIG_BL_SWITCHER_DUMMY_IF=y
-
-This was added only for debugging purposes, again not sure if you want
-this enabled by default. Ideally it should be triggered by CPUFreq.
-
-Regards,
-Sudeep
+Thanks
+Arnab
