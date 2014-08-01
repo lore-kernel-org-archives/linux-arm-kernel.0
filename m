@@ -1,47 +1,31 @@
-From: nsekhar@ti.com (Sekhar Nori)
-Date: Fri, 1 Aug 2014 11:48:55 +0530
-Subject: [PATCH 2/6] ARM: DTS: da850: Add node for edma0
-In-Reply-To: <53DB210B.5010204@ti.com>
-References: <1406801934-23334-1-git-send-email-peter.ujfalusi@ti.com>
- <1406801934-23334-3-git-send-email-peter.ujfalusi@ti.com>
- <53DA5230.1050200@cogentembedded.com> <53DB210B.5010204@ti.com>
-Message-ID: <53DB314F.6060706@ti.com>
+From: mperttunen@nvidia.com (Mikko Perttunen)
+Date: Fri, 1 Aug 2014 09:31:04 +0300
+Subject: [PATCH 8/8] clk: tegra: Add EMC clock driver
+In-Reply-To: <20140731230804.4463.12253@quantum>
+References: <1405088313-20048-1-git-send-email-mperttunen@nvidia.com>
+ <1405088313-20048-9-git-send-email-mperttunen@nvidia.com>
+ <53CE97F2.80300@wwwdotorg.org> <53D75FA7.1030300@nvidia.com>
+ <20140729201939.4627.79710@quantum> <53D81CD4.5010307@wwwdotorg.org>
+ <20140730093456.GA29590@ulmo> <20140731190659.4463.92139@quantum>
+ <53DA9ED2.5000003@wwwdotorg.org> <20140731230804.4463.12253@quantum>
+Message-ID: <53DB3428.1060400@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday 01 August 2014 10:39 AM, Peter Ujfalusi wrote:
-> On 07/31/2014 05:26 PM, Sergei Shtylyov wrote:
->> On 07/31/2014 02:18 PM, Peter Ujfalusi wrote:
->>
->>> Add DT node for edma0.
->>
->>> Signed-off-by: Peter Ujfalusi <peter.ujfalusi@ti.com>
->>> ---
->>>   arch/arm/boot/dts/da850.dtsi | 6 ++++++
->>>   1 file changed, 6 insertions(+)
->>
->>> diff --git a/arch/arm/boot/dts/da850.dtsi b/arch/arm/boot/dts/da850.dtsi
->>> index b695548dbb4e..41ce4e8bf227 100644
->>> --- a/arch/arm/boot/dts/da850.dtsi
->>> +++ b/arch/arm/boot/dts/da850.dtsi
->>> @@ -150,6 +150,12 @@
->>>               };
->>>
->>>           };
->>> +        edma0: edma at 01c00000 {
->>> +            compatible = "ti,edma3";
->>> +            reg =    <0x0 0x10000>;
->>
->>    Why the mismatch between the unit-address part of the node name and the
->> "reg" property?
-> 
-> For some reason the whole da850 uses offset from 0x01c00000 for the SoC IPs.
-> The nodes are under 'soc' and that has the ranges attribute.
-> I do not really like this either.
+On 01/08/14 02:08, Mike Turquette wrote:
+> ...
+> That is sensible, and all the more reason that this patch shouldn't
+> implement the rate-change feature within the clock driver. So consider
+> it NAK'd.
+>
+> Also I agree that the per-clock debugfs entries are very useful for RO
+> operations, especially exposing how registers are programmed or other
+> relevant data.
+>
+> Regards,
+> Mike
+>
 
-There is no reason I can remember for why we chose to go the offset +
-ranges way. Probably based it on an early OMAP example. Right now lets
-keep it that way unless there is a big disadvantage.
+Sure, I'll remove the debugfs code from the next version.
 
-Thanks,
-Sekhar
+Thanks, Mikko
