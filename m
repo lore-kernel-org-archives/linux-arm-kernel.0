@@ -1,101 +1,171 @@
-From: trblinux@gmail.com (Tushar Behera)
-Date: Fri, 1 Aug 2014 07:54:35 +0530
-Subject: [PATCH] ARM: exynos_defconfig: Enable PL330 DMA
-In-Reply-To: <11826036.v8B4Gvn5AK@amdc1032>
-References: <1406785359-21669-1-git-send-email-tushar.b@samsung.com>
- <53D9DDAD.7040602@suse.de> <11826036.v8B4Gvn5AK@amdc1032>
-Message-ID: <CAC5m3BwDtu+=QZGDsvT2LHju5Qg6wi7xcmR+csF7-7sET8GynA@mail.gmail.com>
+From: wangkefeng.wang@huawei.com (Kefeng Wang)
+Date: Fri, 1 Aug 2014 10:42:00 +0800
+Subject: [PATCH] ARM: l2x0: fix build warning without CONFIG_OF
+Message-ID: <1406860920-23520-1-git-send-email-wangkefeng.wang@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jul 31, 2014 at 7:59 PM, Bartlomiej Zolnierkiewicz
-<b.zolnierkie@samsung.com> wrote:
->
-> Hi,
->
-> On Thursday, July 31, 2014 08:09:49 AM Andreas F?rber wrote:
->> Hi Tushar,
->>
->> Am 31.07.2014 07:42, schrieb Tushar Behera:
->> > We are getting a system hang on Arndale-Octa board if PL330_DMA is not
->> > enabled. The issue is related to [1].
->> >
->> > AUDSS block provides the clock for audio DMA controller. Any operation
->> > on this clock requires that the clock to AUDSS block be enabled. In
->> > current configuration, the clock is gated during late boot process when
->> > all unused clocks are disabled.
->> >
->> > When PL330_DMA is enabled, the 'apb_pclk' is enabled/disabled during
->> > amba_probe(). Otherwise, this clock is also disabled during late boot.
->> > If the AUDSS block clock is disabled by then, we get a system hang.
->
-> Could you please explain this more?
->
-> I don't get it how apb_pclk is related to AUDSS block clock and why
+Commit cf9ea8f13(ARM: l2c: remove obsolete l2x0 ops for non-OF init)
+remove some obsolete l2x0 ops, the rest of ops: l2x0_cache_sync,
+l2x0_cache_sync, l2x0_disable only use under OF enable, so move them
+into OF part, or "defined but not used" warning occurs.
 
-apb_pclk for ADMA is provided by AUDSS block on Exynos5420. Access to
-the control register for this clock cause the system hang when the
-clock to the AUDSS block is gated.
+Signed-off-by: Kefeng Wang <wangkefeng.wang@huawei.com>
+---
+ arch/arm/mm/cache-l2x0.c | 134 +++++++++++++++++++++++------------------------
+ 1 file changed, 67 insertions(+), 67 deletions(-)
 
-> enabling PL330_DMA fixes the issue (I suspect that enabling PL330_DMA
-> enables PL330 DMA AMBA device so the amba_probe() keeps apb_pclk clock
-> enabled but what is its relation to AUDSS block clock?).
->
->> > [1] https://lkml.org/lkml/2014/6/11/32
->> >
->> > Signed-off-by: Tushar Behera <tushar.b@samsung.com>
->> > ---
->> >  arch/arm/configs/exynos_defconfig |    2 ++
->> >  1 file changed, 2 insertions(+)
->> >
->> > diff --git a/arch/arm/configs/exynos_defconfig b/arch/arm/configs/exynos_defconfig
->> > index e07a227..c5888e8 100644
->> > --- a/arch/arm/configs/exynos_defconfig
->> > +++ b/arch/arm/configs/exynos_defconfig
->> > @@ -109,6 +109,8 @@ CONFIG_MMC_DW_IDMAC=y
->> >  CONFIG_MMC_DW_EXYNOS=y
->> >  CONFIG_RTC_CLASS=y
->> >  CONFIG_RTC_DRV_S3C=y
->> > +CONFIG_DMADEVICES=y
->> > +CONFIG_PL330_DMA=y
->> >  CONFIG_COMMON_CLK_MAX77686=y
->> >  CONFIG_EXT2_FS=y
->> >  CONFIG_EXT3_FS=y
->>
->> Reviewed-by: Andreas F?rber <afaerber@suse.de>
->>
->> Turns out I had those enabled in my local config when testing the memory
->> patches on Arndale Octa.
->>
->> multi_v7_defconfig has them already.
->
-> I observe more and more discrepancies between exynos_defconfig and
-> multi_v7_defconfig when it comes to Exynos specific options.  I wanted
-> to avoid this by proposing exynos_defconfig removal when multiplatform
-> support was added to Exynos.  Unfortunately there was no agreement on
-> this at that time.  It would really be great if all Exynos users run on
-> a common configuration so the testing is done more efficiently.
->
->> However, shouldn't Kconfig grow a dependency to enable those options
->> automatically for whatever driver or SoC needs them?
->
-> Yes, moreover it is not clear yet that enabling PL330 DMA to resolve
-> the hang issue is the right approach (to be honest it looks like
-> a workaround for the lack of proper clock dependencies in a code).
->
-
-This, for sure, is only a temporary fix. The real fix lies in patch
-[1] (mentioned in the original patch comment) which needs a bit of
-redesign. I am not able to work on that because of lack of time.
-
-> Best regards,
-> --
-> Bartlomiej Zolnierkiewicz
-> Samsung R&D Institute Poland
-> Samsung Electronics
->
-
-
-
+diff --git a/arch/arm/mm/cache-l2x0.c b/arch/arm/mm/cache-l2x0.c
+index 7c3fb41..77e57b0 100644
+--- a/arch/arm/mm/cache-l2x0.c
++++ b/arch/arm/mm/cache-l2x0.c
+@@ -135,73 +135,6 @@ static void l2c_disable(void)
+ 	dsb(st);
+ }
+ 
+-#ifdef CONFIG_CACHE_PL310
+-static inline void cache_wait(void __iomem *reg, unsigned long mask)
+-{
+-	/* cache operations by line are atomic on PL310 */
+-}
+-#else
+-#define cache_wait	l2c_wait_mask
+-#endif
+-
+-static inline void cache_sync(void)
+-{
+-	void __iomem *base = l2x0_base;
+-
+-	writel_relaxed(0, base + sync_reg_offset);
+-	cache_wait(base + L2X0_CACHE_SYNC, 1);
+-}
+-
+-#if defined(CONFIG_PL310_ERRATA_588369) || defined(CONFIG_PL310_ERRATA_727915)
+-static inline void debug_writel(unsigned long val)
+-{
+-	l2c_set_debug(l2x0_base, val);
+-}
+-#else
+-/* Optimised out for non-errata case */
+-static inline void debug_writel(unsigned long val)
+-{
+-}
+-#endif
+-
+-static void l2x0_cache_sync(void)
+-{
+-	unsigned long flags;
+-
+-	raw_spin_lock_irqsave(&l2x0_lock, flags);
+-	cache_sync();
+-	raw_spin_unlock_irqrestore(&l2x0_lock, flags);
+-}
+-
+-static void __l2x0_flush_all(void)
+-{
+-	debug_writel(0x03);
+-	__l2c_op_way(l2x0_base + L2X0_CLEAN_INV_WAY);
+-	cache_sync();
+-	debug_writel(0x00);
+-}
+-
+-static void l2x0_flush_all(void)
+-{
+-	unsigned long flags;
+-
+-	/* clean all ways */
+-	raw_spin_lock_irqsave(&l2x0_lock, flags);
+-	__l2x0_flush_all();
+-	raw_spin_unlock_irqrestore(&l2x0_lock, flags);
+-}
+-
+-static void l2x0_disable(void)
+-{
+-	unsigned long flags;
+-
+-	raw_spin_lock_irqsave(&l2x0_lock, flags);
+-	__l2x0_flush_all();
+-	l2c_write_sec(0, l2x0_base, L2X0_CTRL);
+-	dsb(st);
+-	raw_spin_unlock_irqrestore(&l2x0_lock, flags);
+-}
+-
+ static void l2c_save(void __iomem *base)
+ {
+ 	l2x0_saved_regs.aux_ctrl = readl_relaxed(l2x0_base + L2X0_AUX_CTRL);
+@@ -945,6 +878,73 @@ static int l2_wt_override;
+  * pass it though the device tree */
+ static u32 cache_id_part_number_from_dt;
+ 
++#ifdef CONFIG_CACHE_PL310
++static inline void cache_wait(void __iomem *reg, unsigned long mask)
++{
++	/* cache operations by line are atomic on PL310 */
++}
++#else
++#define cache_wait	l2c_wait_mask
++#endif
++
++static inline void cache_sync(void)
++{
++	void __iomem *base = l2x0_base;
++
++	writel_relaxed(0, base + sync_reg_offset);
++	cache_wait(base + L2X0_CACHE_SYNC, 1);
++}
++
++#if defined(CONFIG_PL310_ERRATA_588369) || defined(CONFIG_PL310_ERRATA_727915)
++static inline void debug_writel(unsigned long val)
++{
++	l2c_set_debug(l2x0_base, val);
++}
++#else
++/* Optimised out for non-errata case */
++static inline void debug_writel(unsigned long val)
++{
++}
++#endif
++
++static void l2x0_cache_sync(void)
++{
++	unsigned long flags;
++
++	raw_spin_lock_irqsave(&l2x0_lock, flags);
++	cache_sync();
++	raw_spin_unlock_irqrestore(&l2x0_lock, flags);
++}
++
++static void __l2x0_flush_all(void)
++{
++	debug_writel(0x03);
++	__l2c_op_way(l2x0_base + L2X0_CLEAN_INV_WAY);
++	cache_sync();
++	debug_writel(0x00);
++}
++
++static void l2x0_flush_all(void)
++{
++	unsigned long flags;
++
++	/* clean all ways */
++	raw_spin_lock_irqsave(&l2x0_lock, flags);
++	__l2x0_flush_all();
++	raw_spin_unlock_irqrestore(&l2x0_lock, flags);
++}
++
++static void l2x0_disable(void)
++{
++	unsigned long flags;
++
++	raw_spin_lock_irqsave(&l2x0_lock, flags);
++	__l2x0_flush_all();
++	l2c_write_sec(0, l2x0_base, L2X0_CTRL);
++	dsb(st);
++	raw_spin_unlock_irqrestore(&l2x0_lock, flags);
++}
++
+ static void __init l2x0_of_parse(const struct device_node *np,
+ 				 u32 *aux_val, u32 *aux_mask)
+ {
 -- 
-Tushar Behera
+1.7.12.4
