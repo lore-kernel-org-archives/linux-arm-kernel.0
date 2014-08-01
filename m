@@ -1,56 +1,79 @@
-From: pawel.moll@arm.com (Pawel Moll)
-Date: Fri, 01 Aug 2014 18:21:14 +0100
-Subject: [PATCH 5/5] platform: Make platform_bus device a platform device
-In-Reply-To: <20140726201240.GB21870@kroah.com>
-References: <1406298233-27876-1-git-send-email-pawel.moll@arm.com>
- <1406298233-27876-5-git-send-email-pawel.moll@arm.com>
- <20140726201240.GB21870@kroah.com>
-Message-ID: <1406913674.22529.45.camel@hornet>
+From: vinod.koul@intel.com (Vinod Koul)
+Date: Fri, 1 Aug 2014 22:43:06 +0530
+Subject: [PATCH] Documentation: dmaengine: Add a documentation for the
+ dma controller API
+In-Reply-To: <20140731162330.GE3952@lukather>
+References: <1406736193-26685-1-git-send-email-maxime.ripard@free-electrons.com>
+ <20140730160607.GM8181@intel.com> <20140731074440.GY3952@lukather>
+ <20140731115628.GQ8181@intel.com> <20140731162330.GE3952@lukather>
+Message-ID: <20140801171306.GF8181@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, 2014-07-26 at 21:12 +0100, Greg Kroah-Hartman wrote:
-> On Fri, Jul 25, 2014 at 03:23:53PM +0100, Pawel Moll wrote:
-> > ... describing the root of the device tree, so one can write
-> > a platform driver initializing the platform.
+On Thu, Jul 31, 2014 at 06:23:30PM +0200, Maxime Ripard wrote:
+> On Thu, Jul 31, 2014 at 05:26:28PM +0530, Vinod Koul wrote:
 > 
-> Wait, what do you mean by "one can write a platform driver initializing
-> the platform"?  I don't understand your end goal here...
+> Also, feel free to add anything that you feel like you keep saying
+> during the review. If mistakes keep coming, it's probably worth
+> documenting what you expect.
+I think the common issues seen would be:
+- prpeare calls in atomic context and usuage of GFP_NOWAIT for memory
+  allocations
+- residue callculation, though situation is much better now but still lots
+  of driver do it worng and folks do get it wrong
 
-Bad wording, sorry. The goal is to have a platform driver (as in
-platform bus) that will initialize my platform (as in: board, machine,
-hardware). My platform (as in: the board) will be represented by the
-root platform bus device (as in: the bus ;-) with compatible value
-matching the one passed in the device tree's root.
+> 
+> > > Because, for the moment, we're pretty much left in the dark with
+> > > different drivers doing the same thing in completetely different ways,
+> > > with basically no way to tell if it's either the framework that
+> > > requires such behaviour, or if the author was just feeling creative.
+> > > 
+> > > There's numerous examples for this at the moment:
+> > >   - The GFP flags, with different drivers using either GFP_ATOMIC,
+> > >     GFP_NOWAIT or GFP_KERNEL in the same functions
+> > >   - Having to set device_slave_caps or not?
+> > >   - Some drivers use dma_run_depedencies, some other don't
+> > >   - That might just be my experience, but judging from previous
+> > >     commits, DMA_PRIVATE is completely obscure, and we just set it
+> > >     because it was making it work, without knowing what it was
+> > >     supposed to do.
+> > >   - etc.
+> > 
+> > Thanks for highlighting we should definitely add these in Documentation
+> 
+> It's quite clear in the case of the GFP flags now, Lars-Peter and you
+> cleared up device_slave_caps, but I still could use some help with
+> DMA_PRIVATE.
+> 
+> > > And basically, we have no way to tell at the moment which one is
+> > > right and which one needs fixing.
+> > > 
+> > > The corollary being that it cripples the whole community ability to
+> > > maintain the framework and make it evolve.
+> > > 
+> > > > > +  * device_slave_caps
+> > > > > +    - Isn't that redundant with the cap_mask already?
+> > > > > +    - Only a few drivers seem to implement it
+> > > > For audio to know what your channel can do rather than hardcoding it
+> > > 
+> > > Ah, yes, I see it now. It's not related to the caps mask at all.
+> > > 
+> > > Just out of curiosity, wouldn't it be better to move this to the
+> > > framework, and have these informations provided through the struct
+> > > dma_device? Or would it have some non-trivial side-effects?
+> > Well the problem is ability to have this queried uniformly from all drivers
+> > across subsystems. If we can do this that would be nice.
+> 
+> I can work on some premelinary work to do just that, and see if it
+> works for you then.
+Sure sounds excellent to me
 
-The tree:
-
-8<----------------------------
-/ {
-	compatible = "my,board";
-}
-8<----------------------------
-
-The driver:
-
-8<----------------------------
-static struct of_device_id my_board_match[] = {
-        { .compatible = "my,board", },
-        {},
-};
-
-static struct platform_driver my_board_driver = {
-        .driver = {
-                .name = "my_board",
-                .owner = THIS_MODULE,
-                .of_match_table = of_match_ptr(my_board_match),
-        },
-        .probe = my_board_probe,
-        .remove = my_board_remove,
-};
-module_platform_driver(my_board_driver);
-8<----------------------------
-
-I'll work on better commit message for the next spin.
-
-Pawe?
+-- 
+~Vinod
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140801/5dd068cc/attachment.sig>
