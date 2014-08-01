@@ -1,115 +1,301 @@
-From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
-Date: Fri, 01 Aug 2014 10:51:26 +0200
-Subject: DMA engine API issue (was: [PATCH/RFC 0/5] R-Car Gen2 DMAC
- hardware descriptor list support)
-In-Reply-To: <20140724045248.GB8181@intel.com>
-References: <1406032431-3807-1-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
- <28702317.aD0C1Ga3DS@avalon> <20140724045248.GB8181@intel.com>
-Message-ID: <18522523.T2zy7HfoJ2@avalon>
+From: tomasz.figa@gmail.com (Tomasz Figa)
+Date: Fri,  1 Aug 2014 10:51:37 +0200
+Subject: [FIX][RESEND PATCH v3] ARM: EXYNOS: Fix suspend/resume sequences
+Message-ID: <1406883097-14157-1-git-send-email-tomasz.figa@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Vinod,
+From: Tomasz Figa <t.figa@samsung.com>
 
-On Thursday 24 July 2014 10:22:48 Vinod Koul wrote:
-> On Wed, Jul 23, 2014 at 01:07:43PM +0200, Laurent Pinchart wrote:
-> > > The rsnd_soc_dai_trigger() function takes a spinlock, making the context
-> > > atomic, which regmap doesn't like as it locks a mutex.
-> > > 
-> > > It might be possible to fix this by setting the fast_io field in both
-> > > the regmap_config and regmap_bus structures in sound/soc/sh/rcar/gen.c.
-> > > regmap will then use a spinlock instead of a mutex. However, even if I
-> > > believe that change makes sense and should be done, another atomic
-> > > context issue will come from the rcar-dmac driver which allocates memory
-> > > in the prep_dma_cyclic function, called by rsnd_dma_start() from
-> > > rsnd_soc_dai_trigger() with the spinlock help.
-> > > 
-> > > What context is the rsnd_soc_dai_trigger() function called in by the
-> > > alsa core ? If it's guaranteed to be a sleepable context, would it make
-> > > sense to replace the rsnd_priv spinlock with a mutex ?
-> > 
-> > Answering myself here, that's not an option, as the trigger function is
-> > called in atomic context (replacing the spinlock with a mutex produced a
-> > clear BUG) due to snd_pcm_lib_write1() taking a spinlock.
-> > 
-> > Now we have a core issue. On one side there's rsnd_soc_dai_trigger() being
-> > called in atomic context, and on the other side the function ends up
-> > calling dmaengine_prep_dma_cyclic() which needs to allocate memory. To
-> > make this more func the DMA engine API is undocumented and completely
-> > silent on whether the prep functions are allowed to sleep. The question
-> > is, who's wrong ?
-> > 
-> > Now, if you're tempted to say that I'm wrong by allocating memory with
-> > GFP_KERNEL in the DMA engine driver, please read on first :-) I've tried
-> > replacing GFP_KERNEL with GFP_ATOMIC allocations, and then ran into a
-> > problem more complex to solve.
-> > 
-> > The rcar-dmac DMA engine driver uses runtime PM. When not used, the device
-> > is suspended. The driver calls pm_runtime_get_sync() to resume the
-> > device, and needs to do so when a descriptor is submitted. This
-> > operation, currently performed in the tx_submit handler, could be moved
-> > to the prep_dma_cyclic or issue_pending handler, but the three operations
-> > are called in a row from rsnd_dma_start(), itself ultimately called from
-> > snd_pcm_lib_write1() with the spinlock held. This means I have no place
-> > in my DMA engine driver where I can resume the device.
-> > 
-> > One could argue that the rcar-dmac driver could use a work queue to handle
-> > power management. That's correct, but the additional complexity, which
-> > would be required in *all* DMA engine drivers, seem too high to me. If we
-> > need to go that way, this is really a task that the DMA engine core
-> > should handle.
-> > 
-> > Let's start by answering the background question and updating the DMA
-> > engine API documentation once and for good : in which context are drivers
-> > allowed to call the prep, tx_submit and issue_pending functions ?
-> 
-> I think this was bought up sometime back and we have cleared that all _prep
-> functions can be invoked in atomic context.
-> 
-> This is the reason why we have been pushing folks to use GFP_NOWAIT is
-> memory allocations during prepare.
+Due to recent consolidation of Exynos suspend and cpuidle code, some
+parts of suspend and resume sequences are executed two times, once from
+exynos_pm_syscore_ops and then from exynos_cpu_pm_notifier() and thus it
+breaks suspend, at least on Exynos4-based boards. In addition, simple
+core power down from a cpuidle driver could, in case of CPU 0 could
+result in calling functions that are specific to suspend and deeper idle
+states.
 
->From the replies I've received it's pretty clear that the prep functions need 
-to be callable from atomic context. I'll respond to this in more depth in a 
-reply to Russell's e-mail.
+This patch fixes the issue by moving those operations outside the CPU PM
+notifier into suspend and AFTR code paths. This leads to a bit of code
+duplication, but allows additional code simplification, so in the end
+more code is removed than added.
 
-> Thanks for pointing out documentation doesn't say so, will send a patch for
-> that.
+Fixes: 85f9f90808b4 ("ARM: EXYNOS: Use the cpu_pm notifier for pm")
+Cc: Kukjin Kim <kgene.kim@samsung.com>
+Cc: Arnd Bergmann <arnd@arndb.de>
+Cc: Olof Johansson <olof@lixom.net>
+Cc: arm at kernel.org
+Signed-off-by: Tomasz Figa <t.figa@samsung.com>
+---
+ arch/arm/mach-exynos/pm.c        | 164 ++++++++++++++++++---------------------
+ drivers/cpuidle/cpuidle-exynos.c |  25 +-----
+ 2 files changed, 80 insertions(+), 109 deletions(-)
 
-I wish that was all that is missing from the documentation ;-) Luckily Maxime 
-Ripard has sent a patch that documents DMA engine from a DMA engine driver's 
-point of view. While not perfect (I'm going to review it), it's a nice 
-starting point to (hopefully) get to a properly documented framework.
+This is resend of a regression fix sent more than two weeks ago (July, 15;
+[1]), without any response from respective maintainers. It fixes
+a significant regression breaking suspend/resume on Exynos4-based systems.
 
-> On issue_pending and tx_submit, yes these should be allowed to be called
-> from atomic context too.
+I know we already have -rc7, but this patch in its first iteration was
+sent more than a month ago (June, 24; [2]) and it changed only for
+convenience of authors of further patches, to either avoid conflicts ([3])
+or reduce the need of changes to support more functionality later (as
+discussed in [4]). However it should have had priority over clean-up or
+functional patches, which was apparently not the case.
 
-I'll take this opportunity to question why we have a separation between 
-tx_submit and issue_pending. What's the rationale for that, especially given 
-that dma_issue_pending_all() might kick in at any point and issue pending 
-transfers for all devices. A driver could thus see its submitted but not 
-issued transactions being issued before it explicitly calls 
-dma_async_issue_pending().
+[1] https://lkml.org/lkml/2014/7/15/319
+[2] https://lkml.org/lkml/2014/6/24/290
+[3] https://lkml.org/lkml/2014/6/24/351
+[4] http://thread.gmane.org/gmane.linux.kernel.samsung-soc/29085/focus=33975
 
-The DMA_PRIVATE capability flag seems to play a role here, but it's far from 
-being clear how that mechanism is supposed to work. This should be documented 
-as well, and any light you could shed on this dark corner of the API would 
-help.
-
-Similarly, the DMA engine API is split in functions with different prefixes 
-(mostly dmaengine_*, dma_async_*, dma_*, and various unprefixed niceties such 
-as async_tx_ack or txd_lock. If there's a rationale for that (beyond just 
-historical reasons) it should also be documented, otherwise a cleanup would 
-help all the confused DMA engine users (myself included). I might be able to 
-find a bit of time to work on that, but I'll first need to correctly 
-understand where we come from and where we are. Again, information would be 
-welcome and fully appreciated.
-
-> Lastly, just to clarify the callback invoked after descriptor is complete
-> can also be used to submit new descriptors, so folks are dropping locking
-> before invoking the callback
-
+diff --git a/arch/arm/mach-exynos/pm.c b/arch/arm/mach-exynos/pm.c
+index 202ca73e49c4..e3b04b45f39b 100644
+--- a/arch/arm/mach-exynos/pm.c
++++ b/arch/arm/mach-exynos/pm.c
+@@ -176,26 +176,6 @@ int exynos_cluster_power_state(int cluster)
+ #define S5P_CHECK_AFTR  0xFCBA0D10
+ #define S5P_CHECK_SLEEP 0x00000BAD
+ 
+-/* Ext-GIC nIRQ/nFIQ is the only wakeup source in AFTR */
+-static void exynos_set_wakeupmask(long mask)
+-{
+-	__raw_writel(mask, S5P_WAKEUP_MASK);
+-}
+-
+-static void exynos_cpu_set_boot_vector(long flags)
+-{
+-	__raw_writel(virt_to_phys(exynos_cpu_resume), EXYNOS_BOOT_VECTOR_ADDR);
+-	__raw_writel(flags, EXYNOS_BOOT_VECTOR_FLAG);
+-}
+-
+-void exynos_enter_aftr(void)
+-{
+-	exynos_set_wakeupmask(0x0000ff3e);
+-	exynos_cpu_set_boot_vector(S5P_CHECK_AFTR);
+-	/* Set value of power down register for aftr mode */
+-	exynos_sys_powerdown_conf(SYS_AFTR);
+-}
+-
+ /* For Cortex-A9 Diagnostic and Power control register */
+ static unsigned int save_arm_register[2];
+ 
+@@ -235,6 +215,82 @@ static void exynos_cpu_restore_register(void)
+ 		      : "cc");
+ }
+ 
++static void exynos_pm_central_suspend(void)
++{
++	unsigned long tmp;
++
++	/* Setting Central Sequence Register for power down mode */
++	tmp = __raw_readl(S5P_CENTRAL_SEQ_CONFIGURATION);
++	tmp &= ~S5P_CENTRAL_LOWPWR_CFG;
++	__raw_writel(tmp, S5P_CENTRAL_SEQ_CONFIGURATION);
++}
++
++static int exynos_pm_central_resume(void)
++{
++	unsigned long tmp;
++
++	/*
++	 * If PMU failed while entering sleep mode, WFI will be
++	 * ignored by PMU and then exiting cpu_do_idle().
++	 * S5P_CENTRAL_LOWPWR_CFG bit will not be set automatically
++	 * in this situation.
++	 */
++	tmp = __raw_readl(S5P_CENTRAL_SEQ_CONFIGURATION);
++	if (!(tmp & S5P_CENTRAL_LOWPWR_CFG)) {
++		tmp |= S5P_CENTRAL_LOWPWR_CFG;
++		__raw_writel(tmp, S5P_CENTRAL_SEQ_CONFIGURATION);
++		/* clear the wakeup state register */
++		__raw_writel(0x0, S5P_WAKEUP_STAT);
++		/* No need to perform below restore code */
++		return -1;
++	}
++
++	return 0;
++}
++
++/* Ext-GIC nIRQ/nFIQ is the only wakeup source in AFTR */
++static void exynos_set_wakeupmask(long mask)
++{
++	__raw_writel(mask, S5P_WAKEUP_MASK);
++}
++
++static void exynos_cpu_set_boot_vector(long flags)
++{
++	__raw_writel(virt_to_phys(exynos_cpu_resume), EXYNOS_BOOT_VECTOR_ADDR);
++	__raw_writel(flags, EXYNOS_BOOT_VECTOR_FLAG);
++}
++
++static int exynos_aftr_finisher(unsigned long flags)
++{
++	exynos_set_wakeupmask(0x0000ff3e);
++	exynos_cpu_set_boot_vector(S5P_CHECK_AFTR);
++	/* Set value of power down register for aftr mode */
++	exynos_sys_powerdown_conf(SYS_AFTR);
++	cpu_do_idle();
++
++	return 0;
++}
++
++void exynos_enter_aftr(void)
++{
++	cpu_pm_enter();
++
++	exynos_pm_central_suspend();
++	if (read_cpuid_part_number() == ARM_CPU_PART_CORTEX_A9)
++		exynos_cpu_save_register();
++
++	cpu_suspend(0, exynos_aftr_finisher);
++
++	if (read_cpuid_part_number() == ARM_CPU_PART_CORTEX_A9) {
++		scu_enable(S5P_VA_SCU);
++		exynos_cpu_restore_register();
++	}
++
++	exynos_pm_central_resume();
++
++	cpu_pm_exit();
++}
++
+ static int exynos_cpu_suspend(unsigned long arg)
+ {
+ #ifdef CONFIG_CACHE_L2X0
+@@ -279,16 +335,6 @@ static void exynos_pm_prepare(void)
+ 	__raw_writel(virt_to_phys(exynos_cpu_resume), S5P_INFORM0);
+ }
+ 
+-static void exynos_pm_central_suspend(void)
+-{
+-	unsigned long tmp;
+-
+-	/* Setting Central Sequence Register for power down mode */
+-	tmp = __raw_readl(S5P_CENTRAL_SEQ_CONFIGURATION);
+-	tmp &= ~S5P_CENTRAL_LOWPWR_CFG;
+-	__raw_writel(tmp, S5P_CENTRAL_SEQ_CONFIGURATION);
+-}
+-
+ static int exynos_pm_suspend(void)
+ {
+ 	unsigned long tmp;
+@@ -306,29 +352,6 @@ static int exynos_pm_suspend(void)
+ 	return 0;
+ }
+ 
+-static int exynos_pm_central_resume(void)
+-{
+-	unsigned long tmp;
+-
+-	/*
+-	 * If PMU failed while entering sleep mode, WFI will be
+-	 * ignored by PMU and then exiting cpu_do_idle().
+-	 * S5P_CENTRAL_LOWPWR_CFG bit will not be set automatically
+-	 * in this situation.
+-	 */
+-	tmp = __raw_readl(S5P_CENTRAL_SEQ_CONFIGURATION);
+-	if (!(tmp & S5P_CENTRAL_LOWPWR_CFG)) {
+-		tmp |= S5P_CENTRAL_LOWPWR_CFG;
+-		__raw_writel(tmp, S5P_CENTRAL_SEQ_CONFIGURATION);
+-		/* clear the wakeup state register */
+-		__raw_writel(0x0, S5P_WAKEUP_STAT);
+-		/* No need to perform below restore code */
+-		return -1;
+-	}
+-
+-	return 0;
+-}
+-
+ static void exynos_pm_resume(void)
+ {
+ 	if (exynos_pm_central_resume())
+@@ -431,45 +454,10 @@ static const struct platform_suspend_ops exynos_suspend_ops = {
+ 	.valid		= suspend_valid_only_mem,
+ };
+ 
+-static int exynos_cpu_pm_notifier(struct notifier_block *self,
+-				  unsigned long cmd, void *v)
+-{
+-	int cpu = smp_processor_id();
+-
+-	switch (cmd) {
+-	case CPU_PM_ENTER:
+-		if (cpu == 0) {
+-			exynos_pm_central_suspend();
+-			if (read_cpuid_part_number() == ARM_CPU_PART_CORTEX_A9)
+-				exynos_cpu_save_register();
+-		}
+-		break;
+-
+-	case CPU_PM_EXIT:
+-		if (cpu == 0) {
+-			if (read_cpuid_part_number() ==
+-					ARM_CPU_PART_CORTEX_A9) {
+-				scu_enable(S5P_VA_SCU);
+-				exynos_cpu_restore_register();
+-			}
+-			exynos_pm_central_resume();
+-		}
+-		break;
+-	}
+-
+-	return NOTIFY_OK;
+-}
+-
+-static struct notifier_block exynos_cpu_pm_notifier_block = {
+-	.notifier_call = exynos_cpu_pm_notifier,
+-};
+-
+ void __init exynos_pm_init(void)
+ {
+ 	u32 tmp;
+ 
+-	cpu_pm_register_notifier(&exynos_cpu_pm_notifier_block);
+-
+ 	/* Platform-specific GIC callback */
+ 	gic_arch_extn.irq_set_wake = exynos_irq_set_wake;
+ 
+diff --git a/drivers/cpuidle/cpuidle-exynos.c b/drivers/cpuidle/cpuidle-exynos.c
+index 7c0151263828..ba9b34b579f3 100644
+--- a/drivers/cpuidle/cpuidle-exynos.c
++++ b/drivers/cpuidle/cpuidle-exynos.c
+@@ -20,25 +20,6 @@
+ 
+ static void (*exynos_enter_aftr)(void);
+ 
+-static int idle_finisher(unsigned long flags)
+-{
+-	exynos_enter_aftr();
+-	cpu_do_idle();
+-
+-	return 1;
+-}
+-
+-static int exynos_enter_core0_aftr(struct cpuidle_device *dev,
+-				struct cpuidle_driver *drv,
+-				int index)
+-{
+-	cpu_pm_enter();
+-	cpu_suspend(0, idle_finisher);
+-	cpu_pm_exit();
+-
+-	return index;
+-}
+-
+ static int exynos_enter_lowpower(struct cpuidle_device *dev,
+ 				struct cpuidle_driver *drv,
+ 				int index)
+@@ -51,8 +32,10 @@ static int exynos_enter_lowpower(struct cpuidle_device *dev,
+ 
+ 	if (new_index == 0)
+ 		return arm_cpuidle_simple_enter(dev, drv, new_index);
+-	else
+-		return exynos_enter_core0_aftr(dev, drv, new_index);
++
++	exynos_enter_aftr();
++
++	return new_index;
+ }
+ 
+ static struct cpuidle_driver exynos_idle_driver = {
 -- 
-Regards,
-
-Laurent Pinchart
+2.0.2
