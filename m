@@ -1,70 +1,142 @@
-From: stefano.stabellini@eu.citrix.com (Stefano Stabellini)
-Date: Fri, 1 Aug 2014 18:09:15 +0100
-Subject: [Xen-devel] [PATCH v3 1/3] xen/arm: introduce
- XENFEAT_grant_map_identity
-In-Reply-To: <53DBC613.4070506@linaro.org>
-References: <alpine.DEB.2.02.1408011552460.2293@kaball.uk.xensource.com>
- <1406904984-16068-1-git-send-email-stefano.stabellini@eu.citrix.com>
- <53DBC613.4070506@linaro.org>
-Message-ID: <alpine.DEB.2.02.1408011802090.2293@kaball.uk.xensource.com>
+From: vinod.koul@intel.com (Vinod Koul)
+Date: Fri, 1 Aug 2014 22:37:44 +0530
+Subject: DMA engine API issue (was: [PATCH/RFC 0/5] R-Car Gen2 DMAC
+ hardware descriptor list support)
+In-Reply-To: <18522523.T2zy7HfoJ2@avalon>
+References: <1406032431-3807-1-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
+ <28702317.aD0C1Ga3DS@avalon> <20140724045248.GB8181@intel.com>
+ <18522523.T2zy7HfoJ2@avalon>
+Message-ID: <20140801170744.GD8181@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 1 Aug 2014, Julien Grall wrote:
-> Hi Stefano,
+On Fri, Aug 01, 2014 at 10:51:26AM +0200, Laurent Pinchart wrote:
+> Hi Vinod,
 > 
-> On 01/08/14 15:56, Stefano Stabellini wrote:
-> > The flag tells us that the hypervisor maps a grant page to guest
-> > physical address == machine address of the page in addition to the
-> > normal grant mapping address. It is needed to properly issue cache
-> > maintenance operation at the completion of a DMA operation involving a
-> > foreign grant.
+> On Thursday 24 July 2014 10:22:48 Vinod Koul wrote:
+> > On Wed, Jul 23, 2014 at 01:07:43PM +0200, Laurent Pinchart wrote:
+> > > > The rsnd_soc_dai_trigger() function takes a spinlock, making the context
+> > > > atomic, which regmap doesn't like as it locks a mutex.
+> > > > 
+> > > > It might be possible to fix this by setting the fast_io field in both
+> > > > the regmap_config and regmap_bus structures in sound/soc/sh/rcar/gen.c.
+> > > > regmap will then use a spinlock instead of a mutex. However, even if I
+> > > > believe that change makes sense and should be done, another atomic
+> > > > context issue will come from the rcar-dmac driver which allocates memory
+> > > > in the prep_dma_cyclic function, called by rsnd_dma_start() from
+> > > > rsnd_soc_dai_trigger() with the spinlock help.
+> > > > 
+> > > > What context is the rsnd_soc_dai_trigger() function called in by the
+> > > > alsa core ? If it's guaranteed to be a sleepable context, would it make
+> > > > sense to replace the rsnd_priv spinlock with a mutex ?
+> > > 
+> > > Answering myself here, that's not an option, as the trigger function is
+> > > called in atomic context (replacing the spinlock with a mutex produced a
+> > > clear BUG) due to snd_pcm_lib_write1() taking a spinlock.
+> > > 
+> > > Now we have a core issue. On one side there's rsnd_soc_dai_trigger() being
+> > > called in atomic context, and on the other side the function ends up
+> > > calling dmaengine_prep_dma_cyclic() which needs to allocate memory. To
+> > > make this more func the DMA engine API is undocumented and completely
+> > > silent on whether the prep functions are allowed to sleep. The question
+> > > is, who's wrong ?
+> > > 
+> > > Now, if you're tempted to say that I'm wrong by allocating memory with
+> > > GFP_KERNEL in the DMA engine driver, please read on first :-) I've tried
+> > > replacing GFP_KERNEL with GFP_ATOMIC allocations, and then ran into a
+> > > problem more complex to solve.
+> > > 
+> > > The rcar-dmac DMA engine driver uses runtime PM. When not used, the device
+> > > is suspended. The driver calls pm_runtime_get_sync() to resume the
+> > > device, and needs to do so when a descriptor is submitted. This
+> > > operation, currently performed in the tx_submit handler, could be moved
+> > > to the prep_dma_cyclic or issue_pending handler, but the three operations
+> > > are called in a row from rsnd_dma_start(), itself ultimately called from
+> > > snd_pcm_lib_write1() with the spinlock held. This means I have no place
+> > > in my DMA engine driver where I can resume the device.
+> > > 
+> > > One could argue that the rcar-dmac driver could use a work queue to handle
+> > > power management. That's correct, but the additional complexity, which
+> > > would be required in *all* DMA engine drivers, seem too high to me. If we
+> > > need to go that way, this is really a task that the DMA engine core
+> > > should handle.
+> > > 
+> > > Let's start by answering the background question and updating the DMA
+> > > engine API documentation once and for good : in which context are drivers
+> > > allowed to call the prep, tx_submit and issue_pending functions ?
 > > 
-> > Signed-off-by: Stefano Stabellini <stefano.stabellini@eu.citrix.com>
-> > Tested-by: Denis Schneider <v1ne2go@gmail.com>
+> > I think this was bought up sometime back and we have cleared that all _prep
+> > functions can be invoked in atomic context.
 > > 
-> > ---
-> > Changes in v3:
-> > - rename XENFEAT_grant_map_11 to XENFEAT_grant_map_identity.
-> > ---
-> >   arch/arm/xen/enlighten.c         |    6 ++++++
-> >   include/xen/interface/features.h |    3 +++
-> >   2 files changed, 9 insertions(+)
-> > 
-> > diff --git a/arch/arm/xen/enlighten.c b/arch/arm/xen/enlighten.c
-> > index b96723e..eef324f 100644
-> > --- a/arch/arm/xen/enlighten.c
-> > +++ b/arch/arm/xen/enlighten.c
-> > @@ -262,6 +262,12 @@ static int __init xen_guest_init(void)
-> >   	xen_domain_type = XEN_HVM_DOMAIN;
-> > 
-> >   	xen_setup_features();
-> > +
-> > +	if (!xen_feature(XENFEAT_grant_map_identity)) {
-> > +		pr_warn("Please upgrade your Xen.\n"
-> > +				"If your platform has any non-coherent DMA
-> > devices, they won't work properly.\n");
-> > +	}
+> > This is the reason why we have been pushing folks to use GFP_NOWAIT is
+> > memory allocations during prepare.
 > 
-> I know we talked about this on a previous thread but I can't find it in my
-> mail :/
+> From the replies I've received it's pretty clear that the prep functions need 
+> to be callable from atomic context. I'll respond to this in more depth in a 
+> reply to Russell's e-mail.
 > 
-> Does a Linux with this series will work on Xen 4.4? If not what's the plan?
- 
-I suggest we backport the changes to Xen 4.4.
+> > Thanks for pointing out documentation doesn't say so, will send a patch for
+> > that.
+> 
+> I wish that was all that is missing from the documentation ;-) Luckily Maxime 
+> Ripard has sent a patch that documents DMA engine from a DMA engine driver's 
+> point of view. While not perfect (I'm going to review it), it's a nice 
+> starting point to (hopefully) get to a properly documented framework.
+Sure, please do point out any other instance.
 
-"Still working" doesn't apply to a system without networking :-(
+Russell did improve it a lot. But then Documentation gets not so quick
+updates. Yes new users like you can list issues far more easily than others.
+
+Also now commit log provides a very valuable source of why a particular
+thing was done.
+
+> > from atomic context too.
+> 
+> I'll take this opportunity to question why we have a separation between 
+> tx_submit and issue_pending. What's the rationale for that, especially given 
+> that dma_issue_pending_all() might kick in at any point and issue pending 
+> transfers for all devices. A driver could thus see its submitted but not 
+> issued transactions being issued before it explicitly calls 
+> dma_async_issue_pending().
+The  API states that you need to get a channel, then prepare a descriptor
+and submit it back. Prepare can be in any order. The submit order is the one
+which is run on dmaengine. The submit marks the descriptor as pending.
+Typically you should have a pending_list which the descriptor should be
+pushed to.
+
+And lastly invoke dma_async_issue_pending() to start the pending ones.
+
+You have the flexibility to prepare descriptors and issue in the order you
+like. You can also attach the callback required for descriptors here.
 
 
-> I think we have to keep any OS working on top on Xen 4.4 as people may want to
-> retrieve the latest kernel for drivers bug fixes...
+> 
+> The DMA_PRIVATE capability flag seems to play a role here, but it's far from 
+> being clear how that mechanism is supposed to work. This should be documented 
+> as well, and any light you could shed on this dark corner of the API would 
+> help.
+Ah it is not so dark.
 
-Right, that's why we need to backport the fixes. Without the backport of
-the Xen patches, with or without this Linux series, networking won't
-work once the kernel is upgraded.
+if you look closely at dmaengine channel allocation it is only for marking
+if channel is privately to be used or for async_tx.
+Thus slave devices must set DMA_PRIVATE
 
+> 
+> Similarly, the DMA engine API is split in functions with different prefixes 
+> (mostly dmaengine_*, dma_async_*, dma_*, and various unprefixed niceties such 
+> as async_tx_ack or txd_lock. If there's a rationale for that (beyond just 
+> historical reasons) it should also be documented, otherwise a cleanup would 
+> help all the confused DMA engine users (myself included). I might be able to 
+> find a bit of time to work on that, but I'll first need to correctly 
+> understand where we come from and where we are. Again, information would be 
+> welcome and fully appreciated.
+History. DMA engine was developed for async_tx. (hence async_tx)
 
-> For running a previous kernel on Xen 4.5, then it will still be buggy. It
-> might be worse to backport thise series on LTS kernel (i.e at least 3.14).
+I think most of dmaengine APIs are dmaengine_. the async_ ones are
+specifically for async_tx usage.
+txd ones are descriptor related.
 
-The old thread is: http://marc.info/?l=xen-devel&m=140483414203686&w=2
+HTH
+
+-- 
+~Vinod
