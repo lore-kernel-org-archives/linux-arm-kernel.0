@@ -1,63 +1,31 @@
-From: grygorii.strashko@ti.com (Grygorii Strashko)
-Date: Fri, 01 Aug 2014 18:28:02 +0300
-Subject: [PATCH 2/2] spi: davinci: add support to configure gpio cs through
- dt
-In-Reply-To: <20140731193515.GO17528@sirena.org.uk>
-References: <1406827995-30913-1-git-send-email-grygorii.strashko@ti.com>
- <1406827995-30913-3-git-send-email-grygorii.strashko@ti.com>
- <20140731193515.GO17528@sirena.org.uk>
-Message-ID: <53DBB202.1040509@ti.com>
+From: lisovy@gmail.com (Rostislav Lisovy)
+Date: Fri,  1 Aug 2014 16:51:11 +0200
+Subject: [PATCH] ARM: PCI: Use PCI_CLASS_* defines for PCI class
+Message-ID: <1406904671-19197-1-git-send-email-lisovy@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Mark,
-On 07/31/2014 10:35 PM, Mark Brown wrote:
-> On Thu, Jul 31, 2014 at 08:33:15PM +0300, Grygorii Strashko wrote:
-> 
->> +	if (np && master->cs_gpios != NULL && spi->cs_gpio >= 0) {
->> +		/* SPI core parse and update master->cs_gpio */
->>   		gpio_chipsel = true;
->> +		gpio = spi->cs_gpio;
->> +	} else if (pdata->chip_sel &&
->> +		   chip_sel < pdata->num_chipselect &&
->> +		   pdata->chip_sel[chip_sel] != SPI_INTERN_CS) {
->> +		/* platform data defines chip_sel */
->> +		gpio_chipsel = true;
->> +		gpio = pdata->chip_sel[chip_sel];
->> +	}
-> 
-> This would all be a lot simpler and more direct if you were to arrange
-> to use cs_gpio in the struct spi_device, and move you closer to
-> converting to use more of the core functionality.
+Signed-off-by: Rostislav Lisovy <lisovy@gmail.com>
+---
+ arch/arm/kernel/bios32.c |    5 ++---
+ 1 file changed, 2 insertions(+), 3 deletions(-)
 
-Unfortunately, I'm not sure this is good idea, because this part of
-code is used by Davinci arch which is non-DT platform.
-As result, this code was kept mostly unchanged.
-
-I can try to rework it, but I'd like to do it as standalone patch.
-Is it ok for you?
-
-> 
->> +		if (np && (master->cs_gpios != NULL) && (spi->cs_gpio >= 0)) {
->> +			retval =
->> +				gpio_request(spi->cs_gpio, dev_name(&spi->dev));
->> +			if (retval) {
->> +				dev_err(&spi->dev,
->> +					"GPIO %d request failed\n",
->> +					spi->cs_gpio);
->> +				return -ENODEV;
->> +			}
->> +			gpio_direction_output(spi->cs_gpio,
->> +					      !(spi->mode & SPI_CS_HIGH));
->> +			internal_cs = false;
-> 
-> It's much better to use gpio_request_one() rather than using
-> gpio_request(), it's one function apart from anything else.  The above
-> is also discarding the return code of gpio_request() meaning it's broken
-> for deferred probe.  The error code should also appear in the error
-> message.
-> 
-Thanks, will update.
-
-Regards,
--grygorii
+diff --git a/arch/arm/kernel/bios32.c b/arch/arm/kernel/bios32.c
+index 17a26c1..e511ad1 100644
+--- a/arch/arm/kernel/bios32.c
++++ b/arch/arm/kernel/bios32.c
+@@ -255,10 +255,9 @@ static void pci_fixup_it8152(struct pci_dev *dev)
+ {
+ 	int i;
+ 	/* fixup for ITE 8152 devices */
+-	/* FIXME: add defines for class 0x68000 and 0x80103 */
+ 	if ((dev->class >> 8) == PCI_CLASS_BRIDGE_HOST ||
+-	    dev->class == 0x68000 ||
+-	    dev->class == 0x80103) {
++	    dev->class == (PCI_CLASS_BRIDGE_OTHER << 8) ||
++	    dev->class == ((PCI_CLASS_SYSTEM_DMA << 8) | 0x03)) {
+ 		for (i = 0; i < PCI_NUM_RESOURCES; i++) {
+ 			dev->resource[i].start = 0;
+ 			dev->resource[i].end   = 0;
+-- 
+1.7.10.4
