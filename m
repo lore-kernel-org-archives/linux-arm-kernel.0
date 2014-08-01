@@ -1,53 +1,26 @@
-From: robert.richter@caviumnetworks.com (Robert Richter)
-Date: Fri, 1 Aug 2014 18:18:39 +0200
-Subject: [PATCH 2/5] arm64, thunder: Add initial dts for Cavium Thunder SoC
-In-Reply-To: <CAOesGMh9KkdKB_ytJ7CCbkPW7dHTX91NdfDMsMNfbmOBVOJ8PQ@mail.gmail.com>
-References: <1406732794-20920-1-git-send-email-rric@kernel.org>
- <1406732794-20920-3-git-send-email-rric@kernel.org>
- <CAOesGMh9KkdKB_ytJ7CCbkPW7dHTX91NdfDMsMNfbmOBVOJ8PQ@mail.gmail.com>
-Message-ID: <20140801161839.GE4703@rric.localhost>
+From: dianders@chromium.org (Doug Anderson)
+Date: Fri, 1 Aug 2014 09:26:48 -0700
+Subject: [PATCH v5 01/10] ARM: dts: Fix MMC pinctrl for exynos5250-snow
+In-Reply-To: <1406868897-26874-2-git-send-email-afaerber@suse.de>
+References: <1406868897-26874-1-git-send-email-afaerber@suse.de>
+ <1406868897-26874-2-git-send-email-afaerber@suse.de>
+Message-ID: <CAD=FV=VBa5rs_woj0mshFFbA69Nhyi3hXK_XX7-54T3vFyKYHA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Olof,
+Hi,
 
-On 30.07.14 11:14:23, Olof Johansson wrote:
-> On Wed, Jul 30, 2014 at 8:06 AM, Robert Richter <rric@kernel.org> wrote:
-> > From: Radha Mohan Chintakuntla <rchintakuntla@cavium.com>
-> >
-> > Add initial device tree nodes for Cavium Thunder SoCs with support of
-> > 48 cores and gicv3. The dts file requires further changes, esp. for
-> > pci, gicv3-its and smmu. This changes will be added later together
-> > with the device drivers.
-> >
-> > Signed-off-by: Radha Mohan Chintakuntla <rchintakuntla@cavium.com>
-> > Signed-off-by: Robert Richter <rrichter@cavium.com>
-> > ---
-> >  arch/arm64/boot/dts/Makefile         |   1 +
-> >  arch/arm64/boot/dts/thunder-88xx.dts | 387 +++++++++++++++++++++++++++++++++++
-> >  2 files changed, 388 insertions(+)
-> >  create mode 100644 arch/arm64/boot/dts/thunder-88xx.dts
-> >
-> > diff --git a/arch/arm64/boot/dts/Makefile b/arch/arm64/boot/dts/Makefile
-> > index c52bdb051f66..f8001a62029c 100644
-> > --- a/arch/arm64/boot/dts/Makefile
-> > +++ b/arch/arm64/boot/dts/Makefile
-> > @@ -1,3 +1,4 @@
-> > +dtb-$(CONFIG_ARCH_THUNDER) += thunder-88xx.dtb
-> >  dtb-$(CONFIG_ARCH_VEXPRESS) += rtsm_ve-aemv8a.dtb foundation-v8.dtb
-> >  dtb-$(CONFIG_ARCH_XGENE) += apm-mustang.dtb
-> 
-> Oh, and:
-> 
-> Let's fix the mistake we made on 32-bit here (that we can't undo
-> unless we move all dts files now, which is too much churn), and put
-> each SoC vendor in its own subdirectory.
-> 
-> So, please add a arch/arm64/boot/dts/cavium/ directory, add a Makefile
-> and the dts there.
-> 
-> We should move vexpress under arm/   and xgene under apm/ too.
+On Thu, Jul 31, 2014 at 9:54 PM, Andreas F?rber <afaerber@suse.de> wrote:
+> The pinctrl properties should be on the device directly and not on the
+> slot sub-node.
+>
+> Reported-by: Doug Anderson <dianders@chromium.org>
+> Cc: Jaehoon Chung <jh80.chung@samsung.com>
+> Reviewed-by: Tomasz Figa <t.figa@samsung.com>
+> Signed-off-by: Andreas F?rber <afaerber@suse.de>
 
-I well take a look at this.
+Let's land this one before Jaehoon's, since it was a hidden
+functionality change in his patch.  It will be an easy conflict to
+resolve when his patch is applied.
 
--Robert
+Reviewed-by: Doug Anderson <dianders@chromium.org>
