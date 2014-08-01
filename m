@@ -1,109 +1,57 @@
-From: t-kristo@ti.com (Tero Kristo)
-Date: Fri, 1 Aug 2014 15:26:34 +0300
-Subject: [PATCH 29/35] arm: omap: intc: switch over to linear irq domain
-In-Reply-To: <20140731134945.GB19512@saruman.home>
-References: <20140729141522.GB17808@saruman.home>
- <20140729152052.GV29045@atomide.com> <20140729154057.GE17808@saruman.home>
- <20140729163345.GF17808@saruman.home> <20140730060420.GY29045@atomide.com>
- <20140730144059.GA7272@saruman.home>
- <CAGo_u6ou+MoKOE_tTTmjxyFNW=jTaN9vnTsHrxR6sQHsieJyLA@mail.gmail.com>
- <20140730162038.GH7272@saruman.home> <20140731062843.GA29045@atomide.com>
- <53D9F6D5.1080307@ti.com> <20140731134945.GB19512@saruman.home>
-Message-ID: <53DB877A.5000004@ti.com>
+From: yamada.m@jp.panasonic.com (Masahiro Yamada)
+Date: Fri, 01 Aug 2014 21:37:19 +0900
+Subject: [PATCH] ARM: mm: fix size rounding-down of arm_add_memory()
+In-Reply-To: <1402025567-18021-1-git-send-email-yamada.m@jp.panasonic.com>
+References: <1402025567-18021-1-git-send-email-yamada.m@jp.panasonic.com>
+Message-ID: <20140801213719.D537.AA925319@jp.panasonic.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/31/2014 04:49 PM, Felipe Balbi wrote:
-> Hi,
->
-> On Thu, Jul 31, 2014 at 10:57:09AM +0300, Tero Kristo wrote:
->> On 07/31/2014 09:28 AM, Tony Lindgren wrote:
->>> * Felipe Balbi <balbi@ti.com> [140730 09:23]:
->>>> Hi,
->>>>
->>>> On Wed, Jul 30, 2014 at 10:45:41AM -0500, Nishanth Menon wrote:
->>>>> On Wed, Jul 30, 2014 at 9:40 AM, Felipe Balbi <balbi@ti.com> wrote:
->>>>>> HI,
->>>>>>
->>>>>> On Tue, Jul 29, 2014 at 11:04:21PM -0700, Tony Lindgren wrote:
->>>>>>> * Felipe Balbi <balbi@ti.com> [140729 09:36]:
->>>>>>>> Hi,
->>>>>>>>
->>>>>>>> On Tue, Jul 29, 2014 at 10:40:57AM -0500, Felipe Balbi wrote:
->>>>>>>>> On Tue, Jul 29, 2014 at 08:20:52AM -0700, Tony Lindgren wrote:
->>>>>>>>>> * Felipe Balbi <balbi@ti.com> [140729 07:18]:
->>>>>>>>>>> Hi,
->>>>>>>>>>>
->>>>>>>>>>> On Tue, Jul 29, 2014 at 05:14:25AM -0700, Tony Lindgren wrote:
->>>>>>>>>>>> * Felipe Balbi <balbi@ti.com> [140728 14:19]:
->>>>>>>>>>>>> now that we don't need to support legacy board-files,
->>>>>>>>>>>>> we can completely switch over to a linear irq domain
->>>>>>>>>>>>> and make use of irq_alloc_domain_generic_chips() to
->>>>>>>>>>>>> allocate all generic irq chips for us.
->>>>>>>>>>>>
->>>>>>>>>>>> This patch seems to somehow break off-idle for omap3
->>>>>>>>>>>> where it no longer wakes up.
->>>>>>>>>>>
->>>>>>>>>>> Sure your bisection is correct ? This patch just switches from legacy
->>>>>>>>>>> irq domain to linear irq domain.
->>>>>>>>>>
->>>>>>>>>> Yes, I tried it a few times. Just enabling
->>>>>>>>>> retention idle hangs too with this patch.
->>>>>>>>>>
->>>>>>>>>> Maybe it's omap3_prcm_irq_setup that relies on
->>>>>>>>>> 11 + OMAP_INTC_START? There may be other such issues
->>>>>>>>>
->>>>>>>>> lol.
->>>>>>>>>
->>>>>>>>> OMAP4 has the same nonsense.
->>>>>>>>
->>>>>>>> made me think why (if) OMAP4 works with that same setup. Does wake from
->>>>>>>> OFF work with OMAP4 ?
->>>>>>>
->>>>>>> Not without similar changes, omap4+ has the same issue.. There's a RFC
->>>>>>> series from Nishant to fix some of this, and Tero is moving the PRCM
->>>>>>> into a driver.
->>>>>>>
->>>>>>>> Anyway, here's a quick little hack to check if that's the reason for the
->>>>>>>> regression:
->>>>>>>
->>>>>>> OK yeah that's along the same lines with Nishant's RFC series in thread
->>>>>>> "[RFC PATCH 0/7] ARM: OMAP4+: PRM: minor cleanups and dt support of
->>>>>>> interrupts"
->>>>>>>
->>>>>>> FYI, it did not compile, needs to include linux/of_irq.h. But yes,
->>>>>>
->>>>>> I might have sent the wrong version as I had that same build error and
->>>>>> fixed it localy.
->>>>>>
->>>>>>> it fixes the regression for me, Also now the whole series works for
->>>>>>> me :)
->>>>>>
->>>>>> good to know.
->>>>>>
->>>>>> What do you want to do now ? Wait for PRCM to become a driver ? Wait for
->>>>>> Nishanth's series to get accepted ? I guess the same thing could be done
->>>>>> for OMAP3 and AM33, then we would have a chance of having working wake
->>>>> >from idle with the new irqchip.
->>>>>
->>>>> I can repost the current series as it stands now once 17-rc1 comes out
->>>>> (without the build failure ofcourse).. if that helps to move it out of
->>>>> RFC status.
->>>>
->>>> That'd be great. It would be ever greater if you could add support for
->>>> OMAP3 on that too.
->>>
->>> Yeah sounds good to me. Tero, does that work OK for your PRCM changes?
->>
->> Well, this set seems to break PM. suspend-resume on omap3-beagle just hangs
->> after this set is applied. Works fine without it with 3.16-rc5 tag.
->
-> did you apply the quick little hack to prm3xxx.c ? prcm IRQ is hardcoded
-> to 11, once we switch to a linear irq domain, irq_base may change.
+Hi.
 
-Yea, with that hack it works. However, you should make that into a 
-proper patch and add it to this series, otherwise you will be causing 
-regressions. Just renaming that tmp into something meaningful for now 
-should be enough for me at least.
+Any comments for this patch?
 
--Tero
+
+Thanks
+
+Best Regards
+Masahiro Yamada
+
+
+
+On Fri,  6 Jun 2014 12:32:47 +0900
+Masahiro Yamada <yamada.m@jp.panasonic.com> wrote:
+
+> The current rounding of "size" is wrong.
+> 
+>     size -= start & ~PAGE_MASK;
+> 
+> should be
+> 
+>     size -= PAGE_SIZE - (start & ~PAGE_MASK);
+> 
+> Or more simply
+> 
+>     size -= aligned_start - start;
+> 
+> Signed-off-by: Masahiro Yamada <yamada.m@jp.panasonic.com>
+> ---
+>  arch/arm/kernel/setup.c | 2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
+> 
+> diff --git a/arch/arm/kernel/setup.c b/arch/arm/kernel/setup.c
+> index 50e198c..84508c0 100644
+> --- a/arch/arm/kernel/setup.c
+> +++ b/arch/arm/kernel/setup.c
+> @@ -641,8 +641,8 @@ int __init arm_add_memory(u64 start, u64 size)
+>  	 * Ensure that start/size are aligned to a page boundary.
+>  	 * Size is appropriately rounded down, start is rounded up.
+>  	 */
+> -	size -= start & ~PAGE_MASK;
+>  	aligned_start = PAGE_ALIGN(start);
+> +	size -= aligned_start - start;
+>  
+>  #ifndef CONFIG_ARCH_PHYS_ADDR_T_64BIT
+>  	if (aligned_start > ULONG_MAX) {
+> -- 
+> 1.9.1
