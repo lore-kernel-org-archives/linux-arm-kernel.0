@@ -1,63 +1,44 @@
-From: alex.bennee@linaro.org (Alex =?utf-8?Q?Benn=C3=A9e?=)
-Date: Fri, 01 Aug 2014 10:48:36 +0100
-Subject: [PATCH] arm64: KVM: export current vcpu->pause state via pseudo
- regs
-In-Reply-To: <20140731165006.GL11610@cbox>
-References: <1404914112-7298-1-git-send-email-alex.bennee@linaro.org>
- <20140731143538.GI11610@cbox> <87mwbpimgz.fsf@linaro.org>
- <20140731163805.GK11610@cbox>
- <CAFEAcA91efUg3MVpLScNBkxZSEgDP0zNnmxxr055fAz5=vDCoA@mail.gmail.com>
- <20140731165006.GL11610@cbox>
-Message-ID: <87egx0ilkg.fsf@linaro.org>
+From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
+Date: Fri,  1 Aug 2014 12:03:26 +0200
+Subject: [PATCH] dma: at_hdmac: fix invalid remaining bytes detection
+Message-ID: <1406887406-10567-1-git-send-email-alexandre.belloni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Found using smatch:
+drivers/dma/at_hdmac.c:299 atc_get_bytes_left() warn: unsigned
+'atchan->remain_desc' is never less than zero.
 
-Christoffer Dall writes:
+Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
+---
+ drivers/dma/at_hdmac.c | 12 +++++++-----
+ 1 file changed, 7 insertions(+), 5 deletions(-)
 
-> On Thu, Jul 31, 2014 at 05:45:28PM +0100, Peter Maydell wrote:
->> On 31 July 2014 17:38, Christoffer Dall <christoffer.dall@linaro.org> wrote:
->> >> > If we are not complaining when setting the pause value to false if it
->> >> > was true before, then we probably also need to wake up the thread in
->> >> > case this is called from another thread, right?
->> >> >
->> >> > or perhaps we should just return an error if you're trying to un-pause a
->> >> > CPU through this interface, hmmmm.
->> >>
->> >> Wouldn't it be an error to mess with any register when the system is not
->> >> in a quiescent state? I was assuming that the wake state is dealt with
->> >> when the run loop finally restarts.
->> >>
->> >
->> > The ABI doesn't really define it as an error (the ABI doesn't enforce
->> > anything right now) so the question is, does it ever make sense to clear
->> > the pause flag through this ioctl?  If not, I think we should just err
->> > on the side of caution and specify in the docs that this is not
->> > supported and return an error.
->> 
->> Consider the case where the reset state of the system is
->> "CPU 0 running, CPUs 1..N stopped", and we're doing an
->> incoming migration to a state where all CPUs are running.
->> In that case we'll be using this ioctl to clear the pause flag,
->> right? (We'll also obviously need to set the PC and other
->> register state correctly before resuming the guest.)
->> 
-> Doh, you're right, I somehow had it in my mind that when you send the
-> thread a signal, the pause flag would be cleared, but that goes against
-> the whole idea of a CPU being turned off for KVM.
->
-> But wouldn't we then have to also wake up the thread when clearing the
-> pause flag?  It feels strange that the ioctl can clear the pause flag,
-> but keep the thread on a wake-queue, and then userspace has to send the
-> thread a signal of some sort to wake it up?
-<snip>
-
-Isn't the vCPU off the wait-queue by definition if the ioctl exits and
-you go through the KVM_SET_ONE_REG stuff?
-
-Once you re-enter the KVM_RUN ioctl it sees the pause_flag as cleared
-and falls straight through into kvm_guest_enter() otherwise it will
-again wait on wait_event_interruptible(*wq, !vcpu->arch.pause).
-
+diff --git a/drivers/dma/at_hdmac.c b/drivers/dma/at_hdmac.c
+index c13a3bb0f594..9ec84ee2fa25 100644
+--- a/drivers/dma/at_hdmac.c
++++ b/drivers/dma/at_hdmac.c
+@@ -294,14 +294,16 @@ static int atc_get_bytes_left(struct dma_chan *chan)
+ 			ret = -EINVAL;
+ 			goto out;
+ 		}
+-		atchan->remain_desc -= (desc_cur->lli.ctrla & ATC_BTSIZE_MAX)
+-						<< (desc_first->tx_width);
+-		if (atchan->remain_desc < 0) {
++
++		count = (desc_cur->lli.ctrla & ATC_BTSIZE_MAX)
++			<< (desc_first->tx_width);
++		if (atchan->remain_desc < count) {
+ 			ret = -EINVAL;
+ 			goto out;
+-		} else {
+-			ret = atchan->remain_desc;
+ 		}
++
++		atchan->remain_desc -= count;
++		ret = atchan->remain_desc;
+ 	} else {
+ 		/*
+ 		 * Get residual bytes when current
 -- 
-Alex Benn?e
+1.9.1
