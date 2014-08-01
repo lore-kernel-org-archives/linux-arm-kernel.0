@@ -1,86 +1,87 @@
-From: hanjun.guo@linaro.org (Hanjun Guo)
-Date: Fri, 01 Aug 2014 14:35:25 +0800
-Subject: [PATCH 04/19] ARM64 / ACPI: Introduce arch_fix_phys_package_id()
- for cpu topology
-In-Reply-To: <53D69BB3.8040106@arm.com>
-References: <1406206825-15590-1-git-send-email-hanjun.guo@linaro.org>
- <1406206825-15590-5-git-send-email-hanjun.guo@linaro.org>
- <53D69BB3.8040106@arm.com>
-Message-ID: <53DB352D.10507@linaro.org>
+From: spk.linux@gmail.com (Sachin Kamat)
+Date: Fri, 1 Aug 2014 12:14:41 +0530
+Subject: [PATCH] ARM: multi_v7_defconfig: major refresh
+In-Reply-To: <CAK5sBcEPQtMvT+mp4+jXQA06FcBRTdAVJLbTCtCu-kV07Wh5RQ@mail.gmail.com>
+References: <1406052070-6207-1-git-send-email-olof@lixom.net>
+ <12165027.MHmNZOI7jc@wuerfel>
+ <CAOesGMjo0AY=eGcfTh1sVxKkURK9bzK8SBAeEbvBFN4R0sF34A@mail.gmail.com>
+ <CAC5m3BwDvHVMJEfXE4w5zQ2RYXYt9PRF8uP=3M03Rr3Ls=N4eQ@mail.gmail.com>
+ <CAK5sBcEPQtMvT+mp4+jXQA06FcBRTdAVJLbTCtCu-kV07Wh5RQ@mail.gmail.com>
+Message-ID: <CAK5sBcGrAKCRYvLxvgeDU=Bu-MoDTgwY+dmEBbiuCpn5ttRU3Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2014-7-29 2:51, Sudeep Holla wrote:
-> On 24/07/14 14:00, Hanjun Guo wrote:
->> arch_fix_phys_package_id() will be called in ACPI core to use
->> the slot number provided by ACPI to update the physical package
->> id, then we can get the right value in the "physical id" field
->> of /proc/cpuinfo.
->>
->> Signed-off-by: Hanjun Guo <hanjun.guo@linaro.org>
->> ---
->>   arch/arm64/include/asm/topology.h |    2 ++
->>   arch/arm64/kernel/topology.c      |   14 ++++++++++++++
->>   2 files changed, 16 insertions(+)
->>
->> diff --git a/arch/arm64/include/asm/topology.h
->> b/arch/arm64/include/asm/topology.h
->> index 7ebcd31..2b216d4 100644
->> --- a/arch/arm64/include/asm/topology.h
->> +++ b/arch/arm64/include/asm/topology.h
->> @@ -23,11 +23,13 @@ extern struct cpu_topology cpu_topology[NR_CPUS];
->>   void init_cpu_topology(void);
->>   void store_cpu_topology(unsigned int cpuid);
->>   const struct cpumask *cpu_coregroup_mask(int cpu);
->> +void arch_fix_phys_package_id(int num, u32 slot);
->>
->>   #else
->>
->>   static inline void init_cpu_topology(void) { }
->>   static inline void store_cpu_topology(unsigned int cpuid) { }
->> +static inline void arch_fix_phys_package_id(int num, u32 slot) { }
->>
->>   #endif
->>
->> diff --git a/arch/arm64/kernel/topology.c b/arch/arm64/kernel/topology.c
->> index 43514f9..c547885 100644
->> --- a/arch/arm64/kernel/topology.c
->> +++ b/arch/arm64/kernel/topology.c
->> @@ -281,3 +281,17 @@ void __init init_cpu_topology(void)
->>       if (parse_dt_topology())
->>           reset_cpu_topology();
->>   }
->> +
->> +/*
->> + * Use the CPU slot number provided by ACPI to update the physical
->> + * package id when cpuid_topo->cluster_id is not available, then we
->> + * can get the right value in the "physical id" field of /proc/cpuinfo.
->> + */
-> 
-> We don't have "physical id" field in /proc/cpuinfo on ARM64.
+On Thu, Jul 31, 2014 at 11:56 AM, Sachin Kamat <spk.linux@gmail.com> wrote:
+> On Thu, Jul 31, 2014 at 11:37 AM, Tushar Behera <trblinux@gmail.com> wrote:
+>> On Wed, Jul 23, 2014 at 1:58 AM, Olof Johansson <olof@lixom.net> wrote:
+>>> On Tue, Jul 22, 2014 at 11:36 AM, Arnd Bergmann <arnd@arndb.de> wrote:
+>>>> On Tuesday 22 July 2014 11:01:10 Olof Johansson wrote:
+>>>>> This is a major refresh of the multi_v7_defconfig:
+>>>>>
+>>>>> - Bring over a bunch of Samsung drivers to make ODROID-U3 and Chromebooks usable
+>>>>>  * Enable big.LITTLE
+>>>>>  * MCPM
+>>>>>  * CYAPA touchpad
+>>>>>  * Samsung-related MTD/regulator/clk/pinmux drivers
+>>>>>  * Add some of the CrOS EC drivers
+>>>>> - Turn on TPM, HW_RANDOM
+>>>>> - OMAP_USB3 -> TI_PIPE3 option rename
+>>>>> - Enable MCPM/b.L for VEXPRESS
+>>>>> - Add new CONFIG_MTD_SPI_NOR since it otherwise masks off SPI NOR drivers
+>>>>> - CONFIG_LOGO, because penguins.
+>>>>>
+>>>>> I took care to keep the new options that have been added for whose the
+>>>>> drivers are not yet in our for-next branch. This was pretty awkward so
+>>>>> we should sort out how to handle those better in the future.
+>>>>
+>>>> Since you've already done all those, how about enabling THUMB2_KERNEL?
+>>>> For the multi_v7_defconfig, it should actually give some benefits,
+>>>> since it's rather large, and it would be good to have some more testing
+>>>> with this option enabled.
+>>>>
+>>>> I guess the first step would be to enable it and just see if your
+>>>> boot farm survives the change.
+>>>
+>>> Good point, I'll definitely give that a go once the current issues are resolved.
+>>>
+>>> Which are: These changes make 5250-based machines (snow and arndale)
+>>> break. Lots of i2c timeouts on SATA and hdmi-phy. Looks like arndale
+>>> might be missing pinctrl setups for it?
+>
+> i2c timeout issue should have been fixed with the following patch:
+> i2c: i2c-s3c2410: Drop class based scanning to improve bootup time
+> (commit id: 6031d3dfc73b49bede540872e51a70ee0b6786d4) which is
+> available on Wolfram's I2C tree (should be part of linux-next too). Also
+> I do not see I2C_S3C2410 enabled in the config.
+> I do not have access to h/w today. I can verify and check tomorrow or
+> somebody could test it in the meantime with the above suggestions?
 
-I'm just curious, if there are two or more CPU (SoC) chips and connected
-into one system, how to tell one SoC from another?
+Olof,
+Tested your multi_v7_defconfig patch on top of latest linux-next (20140731).
+I did not see any aforementioned i2c issues on 5250 based Snow board. It
+booted fine. However on 5250 based Arndale board, the boot stops at
+the following:
 
-> 
->> +void arch_fix_phys_package_id(int num, u32 slot)
->> +{
->> +    struct cpu_topology *cpuid_topo = &cpu_topology[num];
->> +
->> +    if (cpuid_topo->cluster_id == -1)
->> +        cpuid_topo->cluster_id = slot;
->> +}
->> +EXPORT_SYMBOL_GPL(arch_fix_phys_package_id);
->>
-> 
-> The ACPI core uses this function to set the package id as read from
-> _SUN from the device. As per spec, _SUN is used by OSPM UI to identify
-> slots for the user. Do we know how will this be used on ARM64 ?
-> 
-> If not clear at this time, better to define it or keep it empty. I see
-> even x86 does nothing in that function.
+[    1.951863] ehci_hcd: USB 2.0 'Enhanced' Host Controller (EHCI) Driver
+[    1.956937] ehci-pci: EHCI PCI platform driver
+[    1.961392] ehci-exynos: EHCI EXYNOS driver
+[    1.965698] exynos-ehci 12110000.usb: EHCI Host Controller
+[    1.971007] exynos-ehci 12110000.usb: new USB bus registered,
+assigned bus number 1
+[    1.981593] exynos-ehci 12110000.usb: can't setup: -110
+[    1.985361] exynos-ehci 12110000.usb: USB bus 1 deregistered
+[    1.991001] exynos-ehci 12110000.usb: Failed to add USB HCD
+[    1.996569] exynos-ehci: probe of 12110000.usb failed with error -110
+[    2.003041] ohci_hcd: USB 1.1 'Open' Host Controller (OHCI) Driver
+[    2.009149] ohci-exynos: OHCI EXYNOS driver
+[    2.013457] exynos-ohci 12120000.usb: USB Host Controller
+[    2.018702] exynos-ohci 12120000.usb: new USB bus registered,
+assigned bus number 1
 
-I'm ok with it, will introduce a stub function for it and remove this patch.
+Boots well with exynos_defconfig though. Probably some conflict with
+other config options?
+I couldn't find out as I am busy with some other activity.
 
-Thanks
-Hanjun
+-- 
+Regards,
+Sachin.
