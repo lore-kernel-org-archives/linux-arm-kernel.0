@@ -1,106 +1,79 @@
-From: afaerber@suse.de (=?ISO-8859-15?Q?Andreas_F=E4rber?=)
-Date: Fri, 01 Aug 2014 18:54:25 +0200
-Subject: [PATCH V2] ARM: dts: Add DT changes for display on peach_pi
-In-Reply-To: <1406910258-28036-1-git-send-email-ajaykumar.rs@samsung.com>
-References: <1406910258-28036-1-git-send-email-ajaykumar.rs@samsung.com>
-Message-ID: <53DBC641.3090601@suse.de>
+From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
+Date: Fri, 01 Aug 2014 19:01:08 +0200
+Subject: [PATCH] dmaengine: Remove the context argument to the
+ prep_dma_cyclic operation
+In-Reply-To: <20140801164428.GB8181@intel.com>
+References: <1406888410-14504-1-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
+ <20140801164428.GB8181@intel.com>
+Message-ID: <20109653.z2OVfR07am@avalon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Hi Vinod,
 
-Am 01.08.2014 18:24, schrieb Ajay Kumar:
-> Add DT nodes for panel-simple "auo,b133htn01" panel.
-> Add backlight enable pin and backlight power supply for pwm-backlight.
-> Also add panel phandle needed by dp to enable display on peach_pi.
+On Friday 01 August 2014 22:14:28 Vinod Koul wrote:
+> On Fri, Aug 01, 2014 at 12:20:10PM +0200, Laurent Pinchart wrote:
+> > The argument is always set to NULL and never used. Remove it.
 > 
-> Signed-off-by: Ajay Kumar <ajaykumar.rs@samsung.com>
-> ---
-> Changes since V1:
-> Remove "simple-panel" compatible string and use only ""auo,b133htn01".
+> Thats not true.
 > 
->  arch/arm/boot/dts/exynos5800-peach-pi.dts |   27 ++++++++++-----------------
->  1 file changed, 10 insertions(+), 17 deletions(-)
+> It was introduced in commit:
+> commit 185ecb5f4fd43911c35956d4cc7d94a1da30417f
+> Author: Alexandre Bounine <alexandre.bounine@idt.com>
+> Date:   Thu Mar 8 15:35:13 2012 -0500
 > 
-> diff --git a/arch/arm/boot/dts/exynos5800-peach-pi.dts b/arch/arm/boot/dts/exynos5800-peach-pi.dts
-> index f3ee48b..f8c2e61 100644
-> --- a/arch/arm/boot/dts/exynos5800-peach-pi.dts
-> +++ b/arch/arm/boot/dts/exynos5800-peach-pi.dts
-> @@ -28,11 +28,13 @@
->  		i2c20 = "/spi at 12d40000/cros-ec at 0/i2c-tunnel";
->  	};
->  
-> -	backlight {
-> +	backlight: backlight {
->  		compatible = "pwm-backlight";
->  		pwms = <&pwm 0 1000000 0>;
->  		brightness-levels = <0 100 500 1000 1500 2000 2500 2800>;
->  		default-brightness-level = <7>;
-> +		enable-gpios = <&gpx2 2 0>;
+>     dmaengine: add context parameter to prep_slave_sg and prep_dma_cyclic
+> 
+>     Add context parameter to device_prep_slave_sg() and
+> device_prep_dma_cyclic() interfaces to allow passing client/target specific
+> information associated with the data transfer.
+>     Modify all affected DMA engine drivers.
+> 
+>     Signed-off-by: Alexandre Bounine <alexandre.bounine@idt.com>
+>     Acked-by: Linus Walleij <linus.walleij@linaro.org>
+>     Acked-by: Felipe Balbi <balbi@ti.com>
+>     Signed-off-by: Vinod Koul <vinod.koul@linux.intel.com>
+> 
+> This is still used by rapidio driver. This required some extra parameters
+> passed in struct rio_dma_ext.
 
-For Spring I was asked to use GPIO_ACTIVE_* - here that would mean
-s/0/GPIO_ACTIVE_HIGH/ IIUC and if necessary
-#include <dt-bindings/gpio/gpio.h> before the .dtsi #include.
+As far as I can see, rapidio uses the context argument for prep_slave_sg only, 
+not for prep_dma_cyclic. This patch addresses prep_dma_cyclic only.
 
-A modified version of your patch for Snow, rebased onto my cleanups, can
-be found on my spring-next branch.
+> I do agree this is not very elegant.
 
-> +		power-supply = <&tps65090_fet1>;
->  		pinctrl-0 = <&pwm0_out>;
->  		pinctrl-names = "default";
->  	};
-> @@ -98,6 +100,12 @@
->  		regulator-boot-on;
->  		regulator-always-on;
->  	};
-> +
-> +	panel: panel-simple {
+Indeed :-)
 
-Nit: panel-simple seems backwards in English language, and given that
-simple-panel would be referring to the implementation, I used just
-"panel" for Spring.
+What would you think about a prep_rio_slave_sg operation ?
 
-> +		compatible = "auo,b133htn01";
-
-FWIW this depends on auo,b133htn01 getting added to Documentation and
-panel-simple, which I think hasn't happened yet?
-
-https://patchwork.kernel.org/patch/4625321/
-
-> +		power-supply = <&tps65090_fet6>;
-> +		backlight = <&backlight>;
-> +	};
->  };
->  
->  &dp {
-> @@ -111,22 +119,7 @@
->  	samsung,link-rate = <0x0a>;
->  	samsung,lane-count = <2>;
->  	samsung,hpd-gpio = <&gpx2 6 0>;
-> -
-> -	display-timings {
-> -		native-mode = <&timing1>;
-> -
-> -		timing1: timing at 1 {
-> -			clock-frequency = <150660000>;
-> -			hactive = <1920>;
-> -			vactive = <1080>;
-> -			hfront-porch = <60>;
-> -			hback-porch = <172>;
-> -			hsync-len = <80>;
-> -			vback-porch = <25>;
-> -			vfront-porch = <10>;
-> -			vsync-len = <10>;
-> -		};
-> -	};
-> +	panel = <&panel>;
->  };
->  
->  &fimd {
-
-Regards,
-Andreas
+> > Signed-off-by: Laurent Pinchart
+> > <laurent.pinchart+renesas@ideasonboard.com>
+> > ---
+> > 
+> >  drivers/dma/amba-pl08x.c      | 2 +-
+> >  drivers/dma/at_hdmac.c        | 3 +--
+> >  drivers/dma/bcm2835-dma.c     | 2 +-
+> >  drivers/dma/dma-jz4740.c      | 2 +-
+> >  drivers/dma/edma.c            | 2 +-
+> >  drivers/dma/ep93xx_dma.c      | 4 +---
+> >  drivers/dma/fsl-edma.c        | 2 +-
+> >  drivers/dma/imx-dma.c         | 2 +-
+> >  drivers/dma/imx-sdma.c        | 2 +-
+> >  drivers/dma/mmp_pdma.c        | 2 +-
+> >  drivers/dma/mmp_tdma.c        | 2 +-
+> >  drivers/dma/mxs-dma.c         | 2 +-
+> >  drivers/dma/omap-dma.c        | 3 +--
+> >  drivers/dma/pl330.c           | 2 +-
+> >  drivers/dma/s3c24xx-dma.c     | 3 +--
+> >  drivers/dma/sa11x0-dma.c      | 2 +-
+> >  drivers/dma/sh/shdma-base.c   | 2 +-
+> >  drivers/dma/sirf-dma.c        | 2 +-
+> >  drivers/dma/ste_dma40.c       | 3 +--
+> >  drivers/dma/tegra20-apb-dma.c | 2 +-
+> >  include/linux/dmaengine.h     | 4 ++--
+> >  21 files changed, 22 insertions(+), 28 deletions(-)
 
 -- 
-SUSE LINUX Products GmbH, Maxfeldstr. 5, 90409 N?rnberg, Germany
-GF: Jeff Hawn, Jennifer Guild, Felix Imend?rffer; HRB 16746 AG N?rnberg
+Regards,
+
+Laurent Pinchart
