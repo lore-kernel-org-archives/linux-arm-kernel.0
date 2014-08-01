@@ -1,61 +1,106 @@
-From: julien.grall@linaro.org (Julien Grall)
-Date: Fri, 01 Aug 2014 17:53:39 +0100
-Subject: [Xen-devel] [PATCH v3 1/3] xen/arm: introduce
- XENFEAT_grant_map_identity
-In-Reply-To: <1406904984-16068-1-git-send-email-stefano.stabellini@eu.citrix.com>
-References: <alpine.DEB.2.02.1408011552460.2293@kaball.uk.xensource.com>
- <1406904984-16068-1-git-send-email-stefano.stabellini@eu.citrix.com>
-Message-ID: <53DBC613.4070506@linaro.org>
+From: afaerber@suse.de (=?ISO-8859-15?Q?Andreas_F=E4rber?=)
+Date: Fri, 01 Aug 2014 18:54:25 +0200
+Subject: [PATCH V2] ARM: dts: Add DT changes for display on peach_pi
+In-Reply-To: <1406910258-28036-1-git-send-email-ajaykumar.rs@samsung.com>
+References: <1406910258-28036-1-git-send-email-ajaykumar.rs@samsung.com>
+Message-ID: <53DBC641.3090601@suse.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Stefano,
+Hi,
 
-On 01/08/14 15:56, Stefano Stabellini wrote:
-> The flag tells us that the hypervisor maps a grant page to guest
-> physical address == machine address of the page in addition to the
-> normal grant mapping address. It is needed to properly issue cache
-> maintenance operation at the completion of a DMA operation involving a
-> foreign grant.
->
-> Signed-off-by: Stefano Stabellini <stefano.stabellini@eu.citrix.com>
-> Tested-by: Denis Schneider <v1ne2go@gmail.com>
->
+Am 01.08.2014 18:24, schrieb Ajay Kumar:
+> Add DT nodes for panel-simple "auo,b133htn01" panel.
+> Add backlight enable pin and backlight power supply for pwm-backlight.
+> Also add panel phandle needed by dp to enable display on peach_pi.
+> 
+> Signed-off-by: Ajay Kumar <ajaykumar.rs@samsung.com>
 > ---
-> Changes in v3:
-> - rename XENFEAT_grant_map_11 to XENFEAT_grant_map_identity.
-> ---
->   arch/arm/xen/enlighten.c         |    6 ++++++
->   include/xen/interface/features.h |    3 +++
->   2 files changed, 9 insertions(+)
->
-> diff --git a/arch/arm/xen/enlighten.c b/arch/arm/xen/enlighten.c
-> index b96723e..eef324f 100644
-> --- a/arch/arm/xen/enlighten.c
-> +++ b/arch/arm/xen/enlighten.c
-> @@ -262,6 +262,12 @@ static int __init xen_guest_init(void)
->   	xen_domain_type = XEN_HVM_DOMAIN;
->
->   	xen_setup_features();
+> Changes since V1:
+> Remove "simple-panel" compatible string and use only ""auo,b133htn01".
+> 
+>  arch/arm/boot/dts/exynos5800-peach-pi.dts |   27 ++++++++++-----------------
+>  1 file changed, 10 insertions(+), 17 deletions(-)
+> 
+> diff --git a/arch/arm/boot/dts/exynos5800-peach-pi.dts b/arch/arm/boot/dts/exynos5800-peach-pi.dts
+> index f3ee48b..f8c2e61 100644
+> --- a/arch/arm/boot/dts/exynos5800-peach-pi.dts
+> +++ b/arch/arm/boot/dts/exynos5800-peach-pi.dts
+> @@ -28,11 +28,13 @@
+>  		i2c20 = "/spi at 12d40000/cros-ec at 0/i2c-tunnel";
+>  	};
+>  
+> -	backlight {
+> +	backlight: backlight {
+>  		compatible = "pwm-backlight";
+>  		pwms = <&pwm 0 1000000 0>;
+>  		brightness-levels = <0 100 500 1000 1500 2000 2500 2800>;
+>  		default-brightness-level = <7>;
+> +		enable-gpios = <&gpx2 2 0>;
+
+For Spring I was asked to use GPIO_ACTIVE_* - here that would mean
+s/0/GPIO_ACTIVE_HIGH/ IIUC and if necessary
+#include <dt-bindings/gpio/gpio.h> before the .dtsi #include.
+
+A modified version of your patch for Snow, rebased onto my cleanups, can
+be found on my spring-next branch.
+
+> +		power-supply = <&tps65090_fet1>;
+>  		pinctrl-0 = <&pwm0_out>;
+>  		pinctrl-names = "default";
+>  	};
+> @@ -98,6 +100,12 @@
+>  		regulator-boot-on;
+>  		regulator-always-on;
+>  	};
 > +
-> +	if (!xen_feature(XENFEAT_grant_map_identity)) {
-> +		pr_warn("Please upgrade your Xen.\n"
-> +				"If your platform has any non-coherent DMA devices, they won't work properly.\n");
-> +	}
+> +	panel: panel-simple {
 
-I know we talked about this on a previous thread but I can't find it in 
-my mail :/
+Nit: panel-simple seems backwards in English language, and given that
+simple-panel would be referring to the implementation, I used just
+"panel" for Spring.
 
-Does a Linux with this series will work on Xen 4.4? If not what's the plan?
+> +		compatible = "auo,b133htn01";
 
-I think we have to keep any OS working on top on Xen 4.4 as people may 
-want to retrieve the latest kernel for drivers bug fixes...
+FWIW this depends on auo,b133htn01 getting added to Documentation and
+panel-simple, which I think hasn't happened yet?
 
-For running a previous kernel on Xen 4.5, then it will still be buggy. 
-It might be worse to backport thise series on LTS kernel (i.e at least 
-3.14).
+https://patchwork.kernel.org/patch/4625321/
+
+> +		power-supply = <&tps65090_fet6>;
+> +		backlight = <&backlight>;
+> +	};
+>  };
+>  
+>  &dp {
+> @@ -111,22 +119,7 @@
+>  	samsung,link-rate = <0x0a>;
+>  	samsung,lane-count = <2>;
+>  	samsung,hpd-gpio = <&gpx2 6 0>;
+> -
+> -	display-timings {
+> -		native-mode = <&timing1>;
+> -
+> -		timing1: timing at 1 {
+> -			clock-frequency = <150660000>;
+> -			hactive = <1920>;
+> -			vactive = <1080>;
+> -			hfront-porch = <60>;
+> -			hback-porch = <172>;
+> -			hsync-len = <80>;
+> -			vback-porch = <25>;
+> -			vfront-porch = <10>;
+> -			vsync-len = <10>;
+> -		};
+> -	};
+> +	panel = <&panel>;
+>  };
+>  
+>  &fimd {
 
 Regards,
+Andreas
 
 -- 
-Julien Grall
+SUSE LINUX Products GmbH, Maxfeldstr. 5, 90409 N?rnberg, Germany
+GF: Jeff Hawn, Jennifer Guild, Felix Imend?rffer; HRB 16746 AG N?rnberg
