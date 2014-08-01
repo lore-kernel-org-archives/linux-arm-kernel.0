@@ -1,53 +1,63 @@
-From: mporter@linaro.org (Matt Porter)
-Date: Fri, 1 Aug 2014 15:46:57 -0400
-Subject: [PATCH v8 01/11] ARM: brcmstb: add infrastructure for ARM-based
- Broadcom STB SoCs
-In-Reply-To: <CAGVrzcaEV81BW+a--QgQSHiLb6UQDFsP3cqQxGwV206MRx4gXw@mail.gmail.com>
-References: <1405976886-27807-1-git-send-email-computersforpeace@gmail.com>
- <1405976886-27807-2-git-send-email-computersforpeace@gmail.com>
- <CAL_Jsq+Nbk7m9KXhG+Chdpvurp75RrvhFR2oE_LGxV444GSe9Q@mail.gmail.com>
- <20140731022320.GM3711@ld-irv-0074>
- <CAL_Jsq+47YtqWwOkxYDzaEOG-+oouvpXvmGaX+Wh3wQ+BNAx_w@mail.gmail.com>
- <CAGVrzcaEV81BW+a--QgQSHiLb6UQDFsP3cqQxGwV206MRx4gXw@mail.gmail.com>
-Message-ID: <20140801194657.GJ2593@beef>
+From: dianders@chromium.org (Doug Anderson)
+Date: Fri, 1 Aug 2014 13:24:12 -0700
+Subject: [PATCH v5 03/10] ARM: dts: Clean up exynos5250-snow
+In-Reply-To: <1406868897-26874-4-git-send-email-afaerber@suse.de>
+References: <1406868897-26874-1-git-send-email-afaerber@suse.de>
+ <1406868897-26874-4-git-send-email-afaerber@suse.de>
+Message-ID: <CAD=FV=W2XJzv4NpB=27AFjX94VkH8dYXxAPBL58ntXL2WvRCoQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Aug 01, 2014 at 12:29:11PM -0700, Florian Fainelli wrote:
-> Hello,
-> 
-> 2014-08-01 7:33 GMT-07:00 Rob Herring <robherring2@gmail.com>:
-> > On Wed, Jul 30, 2014 at 9:23 PM, Brian Norris
-> > <computersforpeace@gmail.com> wrote:
-> >> Hi Rob,
-> >>
-> >> I appreciate your comments, but where were many of these 5 months ago on
-> >> the first 7 revisions? :)
-> >
-> > Sorry, but that is the nature of upstreaming. But given some of the
-> > issues, it is obvious the reviews were not sufficient.
-> >
-> >> On a practical note: v9 is already queued for 3.17. Should I send
-> >> patches for the 3.17 cycle (or later) to fixup some of these issues? Or
-> >> would you recommend pulling the patches out of Matt Porter's tree now,
-> >> and reintroducing for 3.18? (I would be much happier with the first.)
-> >
-> > Things can always be un-queued. I guess that's Matt's and arm-soc's decision.
-> 
-> Does that mean we should get all those patches un-queued, because that
-> specific patch adding SMP support that needs to be reworked, or does
-> that mean that if we drop this specific patch we are good with the
-> remainder of the patch series?
+Andreas,
 
-Well, keep in mind that there's no specific patch adding SMP support.
-The patch here contains *all* of the actual code that goes through
-mach-bcm. The rest will go through Russell.
+On Thu, Jul 31, 2014 at 9:54 PM, Andreas F?rber <afaerber@suse.de> wrote:
+> Use the new style of referencing inherited nodes and use symbolic names.
+> Reorder one pinctrl node in GPIO order.
+>
+> Goal is the alignment of all exynos5250 based device trees for comparison.
+>
+> Suggested-by: Doug Anderson <dianders@chromium.org>
+> Signed-off-by: Andreas F?rber <afaerber@suse.de>
+> ---
+>  v4 -> v5:
+>  * Introduced labels to consistently use new referencing style (Tomasz)
+>  * Use IRQ_TYPE_* constants
+>  * Use some more GPIO_ACTIVE_*
+>
+>  v3 -> v4: Unchanged
+>
+>  v3: New (Doug Anderson)
+>
+>  arch/arm/boot/dts/exynos5250-snow.dts | 291 +++++++++++++++++-----------------
+>  arch/arm/boot/dts/exynos5250.dtsi     |  20 +--
 
-Given what was missed, if we drop just this patch, we're left with just
-the DT, Kconfig, and MAINTAINERS changes. It doesn't seem like there's
-time to fix the problems now. It might be better to drop the whole
-series from arm-soc since it won't be functional in 3.17 if we drop
-just this patch. I'd like to see what Arnd and Olof think. I think
-there's value in leaving all the DT bits for 3.17.
+As much as possible it's nice to touch the main exynos dtsi file and
+specific board files in different patches.  Among other things it
+makes backporting the patch and resolving merge conflicts easier (if
+someone doesn't care about snow they could just pick up the main dtsi,
+for instance).
 
--Matt
+I'm not a total stickler and I'd love to see this land quickly to
+avoid conflicts, though...
+
+
+> +&sd3_clk {
+> +       samsung,pin-drv = <0>;
+> +};
+> +
+> +&sd3_cmd {
+> +       samsung,pin-pud = <3>;
+> +       samsung,pin-drv = <0>;
+> +};
+> +
+> +&sd3_bus4 {
+
+Itty bitty bitty nit that "bus" sorts alphabetically above "clk".  ;)
+Maybe Kukjin would be willing to sort these when he applies?
+
+
+Thank you for all your hard work on this one.  Things look MUCH MUCH
+nicer!  I did a pretty thorough review of your changes and it all
+looks good.
+
+Reviewed-by: Doug Anderson <dianders@chromium.org>
