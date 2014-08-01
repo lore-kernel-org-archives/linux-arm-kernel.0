@@ -1,171 +1,37 @@
-From: wangkefeng.wang@huawei.com (Kefeng Wang)
-Date: Fri, 1 Aug 2014 10:42:00 +0800
-Subject: [PATCH] ARM: l2x0: fix build warning without CONFIG_OF
-Message-ID: <1406860920-23520-1-git-send-email-wangkefeng.wang@huawei.com>
+From: afaerber@suse.de (=?UTF-8?B?QW5kcmVhcyBGw6RyYmVy?=)
+Date: Fri, 01 Aug 2014 05:17:42 +0200
+Subject: [PATCH v4 4/4] ARM: dts: Add exynos5250-spring device tree
+In-Reply-To: <53DA936E.9060004@gmail.com>
+References: <1406822910-6255-1-git-send-email-afaerber@suse.de>
+ <1406822910-6255-5-git-send-email-afaerber@suse.de>
+ <53DA936E.9060004@gmail.com>
+Message-ID: <53DB06D6.9060604@suse.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Commit cf9ea8f13(ARM: l2c: remove obsolete l2x0 ops for non-OF init)
-remove some obsolete l2x0 ops, the rest of ops: l2x0_cache_sync,
-l2x0_cache_sync, l2x0_disable only use under OF enable, so move them
-into OF part, or "defined but not used" warning occurs.
+Am 31.07.2014 21:05, schrieb Tomasz Figa:
+>> +
+>> +&i2c_2 {
+>> +	status = "okay";
+>> +	samsung,i2c-sda-delay = <100>;
+>> +	samsung,i2c-max-bus-freq = <66000>;
+>> +
+>> +	hdmiddc at 50 {
+>> +		compatible = "samsung,exynos4210-hdmiddc";
+>> +		reg = <0x50>;
+>> +	};
+> 
+> I don't think this matches current Exynos HDMI bindings, which I believe
+> have been changed to just take a phandle to i2c bus instead.
 
-Signed-off-by: Kefeng Wang <wangkefeng.wang@huawei.com>
----
- arch/arm/mm/cache-l2x0.c | 134 +++++++++++++++++++++++------------------------
- 1 file changed, 67 insertions(+), 67 deletions(-)
+Looks correct to me:
 
-diff --git a/arch/arm/mm/cache-l2x0.c b/arch/arm/mm/cache-l2x0.c
-index 7c3fb41..77e57b0 100644
---- a/arch/arm/mm/cache-l2x0.c
-+++ b/arch/arm/mm/cache-l2x0.c
-@@ -135,73 +135,6 @@ static void l2c_disable(void)
- 	dsb(st);
- }
- 
--#ifdef CONFIG_CACHE_PL310
--static inline void cache_wait(void __iomem *reg, unsigned long mask)
--{
--	/* cache operations by line are atomic on PL310 */
--}
--#else
--#define cache_wait	l2c_wait_mask
--#endif
--
--static inline void cache_sync(void)
--{
--	void __iomem *base = l2x0_base;
--
--	writel_relaxed(0, base + sync_reg_offset);
--	cache_wait(base + L2X0_CACHE_SYNC, 1);
--}
--
--#if defined(CONFIG_PL310_ERRATA_588369) || defined(CONFIG_PL310_ERRATA_727915)
--static inline void debug_writel(unsigned long val)
--{
--	l2c_set_debug(l2x0_base, val);
--}
--#else
--/* Optimised out for non-errata case */
--static inline void debug_writel(unsigned long val)
--{
--}
--#endif
--
--static void l2x0_cache_sync(void)
--{
--	unsigned long flags;
--
--	raw_spin_lock_irqsave(&l2x0_lock, flags);
--	cache_sync();
--	raw_spin_unlock_irqrestore(&l2x0_lock, flags);
--}
--
--static void __l2x0_flush_all(void)
--{
--	debug_writel(0x03);
--	__l2c_op_way(l2x0_base + L2X0_CLEAN_INV_WAY);
--	cache_sync();
--	debug_writel(0x00);
--}
--
--static void l2x0_flush_all(void)
--{
--	unsigned long flags;
--
--	/* clean all ways */
--	raw_spin_lock_irqsave(&l2x0_lock, flags);
--	__l2x0_flush_all();
--	raw_spin_unlock_irqrestore(&l2x0_lock, flags);
--}
--
--static void l2x0_disable(void)
--{
--	unsigned long flags;
--
--	raw_spin_lock_irqsave(&l2x0_lock, flags);
--	__l2x0_flush_all();
--	l2c_write_sec(0, l2x0_base, L2X0_CTRL);
--	dsb(st);
--	raw_spin_unlock_irqrestore(&l2x0_lock, flags);
--}
--
- static void l2c_save(void __iomem *base)
- {
- 	l2x0_saved_regs.aux_ctrl = readl_relaxed(l2x0_base + L2X0_AUX_CTRL);
-@@ -945,6 +878,73 @@ static int l2_wt_override;
-  * pass it though the device tree */
- static u32 cache_id_part_number_from_dt;
- 
-+#ifdef CONFIG_CACHE_PL310
-+static inline void cache_wait(void __iomem *reg, unsigned long mask)
-+{
-+	/* cache operations by line are atomic on PL310 */
-+}
-+#else
-+#define cache_wait	l2c_wait_mask
-+#endif
-+
-+static inline void cache_sync(void)
-+{
-+	void __iomem *base = l2x0_base;
-+
-+	writel_relaxed(0, base + sync_reg_offset);
-+	cache_wait(base + L2X0_CACHE_SYNC, 1);
-+}
-+
-+#if defined(CONFIG_PL310_ERRATA_588369) || defined(CONFIG_PL310_ERRATA_727915)
-+static inline void debug_writel(unsigned long val)
-+{
-+	l2c_set_debug(l2x0_base, val);
-+}
-+#else
-+/* Optimised out for non-errata case */
-+static inline void debug_writel(unsigned long val)
-+{
-+}
-+#endif
-+
-+static void l2x0_cache_sync(void)
-+{
-+	unsigned long flags;
-+
-+	raw_spin_lock_irqsave(&l2x0_lock, flags);
-+	cache_sync();
-+	raw_spin_unlock_irqrestore(&l2x0_lock, flags);
-+}
-+
-+static void __l2x0_flush_all(void)
-+{
-+	debug_writel(0x03);
-+	__l2c_op_way(l2x0_base + L2X0_CLEAN_INV_WAY);
-+	cache_sync();
-+	debug_writel(0x00);
-+}
-+
-+static void l2x0_flush_all(void)
-+{
-+	unsigned long flags;
-+
-+	/* clean all ways */
-+	raw_spin_lock_irqsave(&l2x0_lock, flags);
-+	__l2x0_flush_all();
-+	raw_spin_unlock_irqrestore(&l2x0_lock, flags);
-+}
-+
-+static void l2x0_disable(void)
-+{
-+	unsigned long flags;
-+
-+	raw_spin_lock_irqsave(&l2x0_lock, flags);
-+	__l2x0_flush_all();
-+	l2c_write_sec(0, l2x0_base, L2X0_CTRL);
-+	dsb(st);
-+	raw_spin_unlock_irqrestore(&l2x0_lock, flags);
-+}
-+
- static void __init l2x0_of_parse(const struct device_node *np,
- 				 u32 *aux_val, u32 *aux_mask)
- {
+http://git.kernel.org/cgit/linux/kernel/git/kgene/linux-samsung.git/tree/Documentation/devicetree/bindings/video/exynos_hdmiddc.txt?h=for-next
+
+https://git.kernel.org/cgit/linux/kernel/git/next/linux-next.git/tree/Documentation/devicetree/bindings/video/exynos_hdmiddc.txt
+
+Andreas
+
 -- 
-1.7.12.4
+SUSE LINUX Products GmbH, Maxfeldstr. 5, 90409 N?rnberg, Germany
+GF: Jeff Hawn, Jennifer Guild, Felix Imend?rffer; HRB 16746 AG N?rnberg
