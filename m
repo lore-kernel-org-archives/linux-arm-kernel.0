@@ -1,32 +1,23 @@
-From: osandov@osandov.com (Omar Sandoval)
-Date: Thu, 31 Jul 2014 20:07:46 -0700
-Subject: [PATCH] ARM/ARM64: don't enter kgdb when userspace executes a
- kgdb break instruction.
-In-Reply-To: <20140731104653.GM26853@arm.com>
-References: <20140730071245.GA8954@mew.web-pass.com>
- <20140730112414.GJ12239@arm.com>
- <20140731053323.GA15523@mew.web-pass.com>
- <20140731104653.GM26853@arm.com>
-Message-ID: <20140801030746.GA26941@mew>
+From: olof@lixom.net (Olof Johansson)
+Date: Thu, 31 Jul 2014 20:12:14 -0700
+Subject: [GIT PULL] Samsung 2nd cleanup for v3.17
+In-Reply-To: <53DA924F.40201@samsung.com>
+References: <53DA924F.40201@samsung.com>
+Message-ID: <CAOesGMizb9-mn7M1r2mLfKUjYVcV0TR_2+Z+1+wsc0n2Tb8xCg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi, Will,
+On Thu, Jul 31, 2014 at 12:00 PM, Kukjin Kim <kgene.kim@samsung.com> wrote:
+> Hi Arnd, Olof
+>
+> One more pull-request. Sorry.
 
-On Thu, Jul 31, 2014 at 11:46:53AM +0100, Will Deacon wrote:
-> I'll merge the arm64 diff I proposed. Could you repost the ARM part please?
-I've just reposted it, hopefully we can get that merged in soon as well.
+Hi Kukjin,
 
-> I think enabling and activating kgdb by default is a pretty crazy thing to
-> do, but I agree that we shouldn't allow userspace to trap into it either.
-Agreed, hopefully the actual footprint of this bug isn't too large, but it's
-worth fixing anyways.
+We're close enough to the merge window that this should be targeted to
+3.18 instead.
 
-> Once you repost the ARM patches, we can look at getting them merged via rmk.
-> 
-> Cheers,
-> 
-> Will
+Please send it as a cleanup once the merge window is over and we'll queue it up.
 
-Thanks again!
-Omar
+
+-Olof
