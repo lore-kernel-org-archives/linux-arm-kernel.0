@@ -1,301 +1,66 @@
-From: tomasz.figa@gmail.com (Tomasz Figa)
-Date: Fri,  1 Aug 2014 10:51:37 +0200
-Subject: [FIX][RESEND PATCH v3] ARM: EXYNOS: Fix suspend/resume sequences
-Message-ID: <1406883097-14157-1-git-send-email-tomasz.figa@gmail.com>
+From: heiko@sntech.de (Heiko =?ISO-8859-1?Q?St=FCbner?=)
+Date: Fri, 01 Aug 2014 10:58:50 +0200
+Subject: [PATCHv9 1/5] mmc: dw_mmc: Slot quirk "disable-wp" is deprecated.
+In-Reply-To: <53DB1703.4090002@samsung.com>
+References: <1406784907-26349-1-git-send-email-jh80.chung@samsung.com>
+ <53DA8CCB.3080900@samsung.com> <53DB1703.4090002@samsung.com>
+Message-ID: <1765329.zdt1X395r3@diego>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Tomasz Figa <t.figa@samsung.com>
+Am Freitag, 1. August 2014, 13:26:43 schrieb Jaehoon Chung:
+> Hi, All.
+> 
+> It seems too late that this patch-set is merged into linux-3.16.
+> Also there are some conflicts in device-tree. (I will remove the conflicts)
+> So if everybody is ok, I will rebase on linux-next after released
+> linux-3.16. At that time, i will send this patch-set to stable kernel, too.
+> how about?
 
-Due to recent consolidation of Exynos suspend and cpuidle code, some
-parts of suspend and resume sequences are executed two times, once from
-exynos_pm_syscore_ops and then from exynos_cpu_pm_notifier() and thus it
-breaks suspend, at least on Exynos4-based boards. In addition, simple
-core power down from a cpuidle driver could, in case of CPU 0 could
-result in calling functions that are specific to suspend and deeper idle
-states.
+> And I want to know who can apply this patch-set(#3~#5).
 
-This patch fixes the issue by moving those operations outside the CPU PM
-notifier into suspend and AFTR code paths. This leads to a bit of code
-duplication, but allows additional code simplification, so in the end
-more code is removed than added.
+I guess each SoC maintainer could take the changes to their work-area, once 
+the core changes have landed in the mmc tree. So I would take the Rockchip 
+patch, Kukjin the Exynos one and Dinh the socfpga patch.
 
-Fixes: 85f9f90808b4 ("ARM: EXYNOS: Use the cpu_pm notifier for pm")
-Cc: Kukjin Kim <kgene.kim@samsung.com>
-Cc: Arnd Bergmann <arnd@arndb.de>
-Cc: Olof Johansson <olof@lixom.net>
-Cc: arm at kernel.org
-Signed-off-by: Tomasz Figa <t.figa@samsung.com>
----
- arch/arm/mach-exynos/pm.c        | 164 ++++++++++++++++++---------------------
- drivers/cpuidle/cpuidle-exynos.c |  25 +-----
- 2 files changed, 80 insertions(+), 109 deletions(-)
 
-This is resend of a regression fix sent more than two weeks ago (July, 15;
-[1]), without any response from respective maintainers. It fixes
-a significant regression breaking suspend/resume on Exynos4-based systems.
+Heiko
 
-I know we already have -rc7, but this patch in its first iteration was
-sent more than a month ago (June, 24; [2]) and it changed only for
-convenience of authors of further patches, to either avoid conflicts ([3])
-or reduce the need of changes to support more functionality later (as
-discussed in [4]). However it should have had priority over clean-up or
-functional patches, which was apparently not the case.
-
-[1] https://lkml.org/lkml/2014/7/15/319
-[2] https://lkml.org/lkml/2014/6/24/290
-[3] https://lkml.org/lkml/2014/6/24/351
-[4] http://thread.gmane.org/gmane.linux.kernel.samsung-soc/29085/focus=33975
-
-diff --git a/arch/arm/mach-exynos/pm.c b/arch/arm/mach-exynos/pm.c
-index 202ca73e49c4..e3b04b45f39b 100644
---- a/arch/arm/mach-exynos/pm.c
-+++ b/arch/arm/mach-exynos/pm.c
-@@ -176,26 +176,6 @@ int exynos_cluster_power_state(int cluster)
- #define S5P_CHECK_AFTR  0xFCBA0D10
- #define S5P_CHECK_SLEEP 0x00000BAD
- 
--/* Ext-GIC nIRQ/nFIQ is the only wakeup source in AFTR */
--static void exynos_set_wakeupmask(long mask)
--{
--	__raw_writel(mask, S5P_WAKEUP_MASK);
--}
--
--static void exynos_cpu_set_boot_vector(long flags)
--{
--	__raw_writel(virt_to_phys(exynos_cpu_resume), EXYNOS_BOOT_VECTOR_ADDR);
--	__raw_writel(flags, EXYNOS_BOOT_VECTOR_FLAG);
--}
--
--void exynos_enter_aftr(void)
--{
--	exynos_set_wakeupmask(0x0000ff3e);
--	exynos_cpu_set_boot_vector(S5P_CHECK_AFTR);
--	/* Set value of power down register for aftr mode */
--	exynos_sys_powerdown_conf(SYS_AFTR);
--}
--
- /* For Cortex-A9 Diagnostic and Power control register */
- static unsigned int save_arm_register[2];
- 
-@@ -235,6 +215,82 @@ static void exynos_cpu_restore_register(void)
- 		      : "cc");
- }
- 
-+static void exynos_pm_central_suspend(void)
-+{
-+	unsigned long tmp;
-+
-+	/* Setting Central Sequence Register for power down mode */
-+	tmp = __raw_readl(S5P_CENTRAL_SEQ_CONFIGURATION);
-+	tmp &= ~S5P_CENTRAL_LOWPWR_CFG;
-+	__raw_writel(tmp, S5P_CENTRAL_SEQ_CONFIGURATION);
-+}
-+
-+static int exynos_pm_central_resume(void)
-+{
-+	unsigned long tmp;
-+
-+	/*
-+	 * If PMU failed while entering sleep mode, WFI will be
-+	 * ignored by PMU and then exiting cpu_do_idle().
-+	 * S5P_CENTRAL_LOWPWR_CFG bit will not be set automatically
-+	 * in this situation.
-+	 */
-+	tmp = __raw_readl(S5P_CENTRAL_SEQ_CONFIGURATION);
-+	if (!(tmp & S5P_CENTRAL_LOWPWR_CFG)) {
-+		tmp |= S5P_CENTRAL_LOWPWR_CFG;
-+		__raw_writel(tmp, S5P_CENTRAL_SEQ_CONFIGURATION);
-+		/* clear the wakeup state register */
-+		__raw_writel(0x0, S5P_WAKEUP_STAT);
-+		/* No need to perform below restore code */
-+		return -1;
-+	}
-+
-+	return 0;
-+}
-+
-+/* Ext-GIC nIRQ/nFIQ is the only wakeup source in AFTR */
-+static void exynos_set_wakeupmask(long mask)
-+{
-+	__raw_writel(mask, S5P_WAKEUP_MASK);
-+}
-+
-+static void exynos_cpu_set_boot_vector(long flags)
-+{
-+	__raw_writel(virt_to_phys(exynos_cpu_resume), EXYNOS_BOOT_VECTOR_ADDR);
-+	__raw_writel(flags, EXYNOS_BOOT_VECTOR_FLAG);
-+}
-+
-+static int exynos_aftr_finisher(unsigned long flags)
-+{
-+	exynos_set_wakeupmask(0x0000ff3e);
-+	exynos_cpu_set_boot_vector(S5P_CHECK_AFTR);
-+	/* Set value of power down register for aftr mode */
-+	exynos_sys_powerdown_conf(SYS_AFTR);
-+	cpu_do_idle();
-+
-+	return 0;
-+}
-+
-+void exynos_enter_aftr(void)
-+{
-+	cpu_pm_enter();
-+
-+	exynos_pm_central_suspend();
-+	if (read_cpuid_part_number() == ARM_CPU_PART_CORTEX_A9)
-+		exynos_cpu_save_register();
-+
-+	cpu_suspend(0, exynos_aftr_finisher);
-+
-+	if (read_cpuid_part_number() == ARM_CPU_PART_CORTEX_A9) {
-+		scu_enable(S5P_VA_SCU);
-+		exynos_cpu_restore_register();
-+	}
-+
-+	exynos_pm_central_resume();
-+
-+	cpu_pm_exit();
-+}
-+
- static int exynos_cpu_suspend(unsigned long arg)
- {
- #ifdef CONFIG_CACHE_L2X0
-@@ -279,16 +335,6 @@ static void exynos_pm_prepare(void)
- 	__raw_writel(virt_to_phys(exynos_cpu_resume), S5P_INFORM0);
- }
- 
--static void exynos_pm_central_suspend(void)
--{
--	unsigned long tmp;
--
--	/* Setting Central Sequence Register for power down mode */
--	tmp = __raw_readl(S5P_CENTRAL_SEQ_CONFIGURATION);
--	tmp &= ~S5P_CENTRAL_LOWPWR_CFG;
--	__raw_writel(tmp, S5P_CENTRAL_SEQ_CONFIGURATION);
--}
--
- static int exynos_pm_suspend(void)
- {
- 	unsigned long tmp;
-@@ -306,29 +352,6 @@ static int exynos_pm_suspend(void)
- 	return 0;
- }
- 
--static int exynos_pm_central_resume(void)
--{
--	unsigned long tmp;
--
--	/*
--	 * If PMU failed while entering sleep mode, WFI will be
--	 * ignored by PMU and then exiting cpu_do_idle().
--	 * S5P_CENTRAL_LOWPWR_CFG bit will not be set automatically
--	 * in this situation.
--	 */
--	tmp = __raw_readl(S5P_CENTRAL_SEQ_CONFIGURATION);
--	if (!(tmp & S5P_CENTRAL_LOWPWR_CFG)) {
--		tmp |= S5P_CENTRAL_LOWPWR_CFG;
--		__raw_writel(tmp, S5P_CENTRAL_SEQ_CONFIGURATION);
--		/* clear the wakeup state register */
--		__raw_writel(0x0, S5P_WAKEUP_STAT);
--		/* No need to perform below restore code */
--		return -1;
--	}
--
--	return 0;
--}
--
- static void exynos_pm_resume(void)
- {
- 	if (exynos_pm_central_resume())
-@@ -431,45 +454,10 @@ static const struct platform_suspend_ops exynos_suspend_ops = {
- 	.valid		= suspend_valid_only_mem,
- };
- 
--static int exynos_cpu_pm_notifier(struct notifier_block *self,
--				  unsigned long cmd, void *v)
--{
--	int cpu = smp_processor_id();
--
--	switch (cmd) {
--	case CPU_PM_ENTER:
--		if (cpu == 0) {
--			exynos_pm_central_suspend();
--			if (read_cpuid_part_number() == ARM_CPU_PART_CORTEX_A9)
--				exynos_cpu_save_register();
--		}
--		break;
--
--	case CPU_PM_EXIT:
--		if (cpu == 0) {
--			if (read_cpuid_part_number() ==
--					ARM_CPU_PART_CORTEX_A9) {
--				scu_enable(S5P_VA_SCU);
--				exynos_cpu_restore_register();
--			}
--			exynos_pm_central_resume();
--		}
--		break;
--	}
--
--	return NOTIFY_OK;
--}
--
--static struct notifier_block exynos_cpu_pm_notifier_block = {
--	.notifier_call = exynos_cpu_pm_notifier,
--};
--
- void __init exynos_pm_init(void)
- {
- 	u32 tmp;
- 
--	cpu_pm_register_notifier(&exynos_cpu_pm_notifier_block);
--
- 	/* Platform-specific GIC callback */
- 	gic_arch_extn.irq_set_wake = exynos_irq_set_wake;
- 
-diff --git a/drivers/cpuidle/cpuidle-exynos.c b/drivers/cpuidle/cpuidle-exynos.c
-index 7c0151263828..ba9b34b579f3 100644
---- a/drivers/cpuidle/cpuidle-exynos.c
-+++ b/drivers/cpuidle/cpuidle-exynos.c
-@@ -20,25 +20,6 @@
- 
- static void (*exynos_enter_aftr)(void);
- 
--static int idle_finisher(unsigned long flags)
--{
--	exynos_enter_aftr();
--	cpu_do_idle();
--
--	return 1;
--}
--
--static int exynos_enter_core0_aftr(struct cpuidle_device *dev,
--				struct cpuidle_driver *drv,
--				int index)
--{
--	cpu_pm_enter();
--	cpu_suspend(0, idle_finisher);
--	cpu_pm_exit();
--
--	return index;
--}
--
- static int exynos_enter_lowpower(struct cpuidle_device *dev,
- 				struct cpuidle_driver *drv,
- 				int index)
-@@ -51,8 +32,10 @@ static int exynos_enter_lowpower(struct cpuidle_device *dev,
- 
- 	if (new_index == 0)
- 		return arm_cpuidle_simple_enter(dev, drv, new_index);
--	else
--		return exynos_enter_core0_aftr(dev, drv, new_index);
-+
-+	exynos_enter_aftr();
-+
-+	return new_index;
- }
- 
- static struct cpuidle_driver exynos_idle_driver = {
--- 
-2.0.2
+> 
+> Best Regards,
+> Jaehoon Chung
+> 
+> On 08/01/2014 03:36 AM, Kukjin Kim wrote:
+> > On 08/01/14 01:02, Doug Anderson wrote:
+> >> Jaehoon
+> >> 
+> >> On Wed, Jul 30, 2014 at 10:35 PM, Jaehoon Chung<jh80.chung@samsung.com>  
+wrote:
+> >>> Slot quirks "disable-wp" is deprecated.
+> >>> Instead, use the host quirk "disable-wp".
+> >>> (Because the slot-node is removed in dt-file.)
+> >>> 
+> >>> Signed-off-by: Jaehoon Chung<jh80.chung@samsung.com>
+> >>> Tested-by: Sachin Kamat<sachin.kamat@samsung.com>
+> >>> Acked-by: Seungwon Jeon<tgih.jun@samsung.com>
+> >>> ---
+> >>> 
+> >>>   drivers/mmc/host/dw_mmc.c  |   11 +++++++++--
+> >>>   include/linux/mmc/dw_mmc.h |    2 ++
+> >>>   2 files changed, 11 insertions(+), 2 deletions(-)
+> >> 
+> >> Thanks for taking my suggestion and making it backward compatible.
+> >> This looks great to me.  It tested this in both the backward
+> >> compatible way (with the warning) and the non-backward compatible way.
+> >> I think we should land and patch #2 ASAP and then we can land the rest
+> >> of the series as SoC maintainers see fit.
+> > 
+> > Yes, right if we don't want to see useless merge conflicts...
+> > 
+> > When I sent ack on exynos stuff, there was no conflict with my tree but
+> > happens it now.
+> > 
+> > - Kukjin
+> > 
+> >> Reviewed-by: Doug Anderson<dianders@chromium.org>
+> >> Tested-by: Doug Anderson<dianders@chromium.org>
