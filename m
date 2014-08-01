@@ -1,36 +1,46 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 1 Aug 2014 15:16:26 +0200
-Subject: [RFC PATCH 00/11] Refactor MSI to support Non-PCI device
-In-Reply-To: <53D89CA1.7000501@huawei.com>
-References: <1406344128-27055-1-git-send-email-wangyijing@huawei.com>
- <53D89502.60506@linux.intel.com> <53D89CA1.7000501@huawei.com>
-Message-ID: <201408011516.26253.arnd@arndb.de>
+From: peter.ujfalusi@ti.com (Peter Ujfalusi)
+Date: Fri, 1 Aug 2014 16:34:09 +0300
+Subject: [PATCH 5/6] ARM: DTS: da850-evm: Add node for tlv320aic3106 codec
+In-Reply-To: <53DB9292.7080008@cogentembedded.com>
+References: <1406801934-23334-1-git-send-email-peter.ujfalusi@ti.com>
+ <1406801934-23334-6-git-send-email-peter.ujfalusi@ti.com>
+ <53DA519A.4090905@cogentembedded.com> <53DB240F.2030908@ti.com>
+ <53DB8CEA.9010902@cogentembedded.com> <53DB8FE1.5010207@ti.com>
+ <53DB9292.7080008@cogentembedded.com>
+Message-ID: <53DB9751.6030508@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 30 July 2014, Yijing Wang wrote:
-> >>>
-> >>> The other part I'm not completely sure about is how you want to
-> >>> have MSIs map into normal IRQ descriptors. At the moment, all
-> >>> MSI users are based on IRQ numbers, but this has known scalability problems.
-> >>
-> >> Hmmm, I still use the IRQ number to map the MSIs to IRQ description.
-> >> I'm sorry, I don't understand you meaning.
-> >> What are the scalability problems you mentioned ?
-> > We have soft limitation of nr_irqs or hard limitation NR_IRQS,
-> > we couldn't allocate as much irq number as we need in some cases,
-> > such as to support MSI-x.
+Hi,
+
+On 08/01/2014 04:13 PM, Sergei Shtylyov wrote:
+> Hello.
 > 
-> Oh, yes, this is a potential issue. Gerry, thanks for you explanation. :)
+> On 08/01/2014 05:02 PM, Peter Ujfalusi wrote:
+> 
+>>>     I do. We should follow the standard consistently. Why not call the node
+>>> "sound-codec"?
+> 
+>> Well, there is _zero_ cases when the audio codec node is named as
+>> "sound-codec" in linux-next but we have wmXXXX, tlvXXXX, twlXXXX, maxXXXX etc.
+> 
+>    Which only means people don't read the standard (which is referred to on
+> http://www.devicetree.org/Device_Tree_Usage, that says the same).
+> 
+>> Yeah, there are few DTS files which have codec as node name.
+>> So, no, I'm not going to change the node name from tlv320aic3106.
+> 
+>    So you prefer following the bad examples to following the standard?
 
-This should no longer be an issue, as arm64 uses CONFIG_SPARSE_IRQ
-and the number of interrupts is not limited in any form.
+those bad examples are in the tree and they did went through the review
+process (arch, DT and probably alsa). But it is interesting that we do not
+have a single correct node name for audio codecs (probably for other types also).
 
-My point was more that the device driver should not need to care about
-the interrupt number: it gets made up on the spot when the MSI is
-needed, and then it is only used to request the IRQ. This can be
-simplified into one interface at the device driver level, even though
-the internal still use numbers somewhere. If we ever remove IRQ numbers
-from the driver API, this part doesn't need to get touched again.
+> Well, "the Moor has done his duty, the Moor can go"...
 
-	Arnd
+Let's ask the DT maintainers what should be the correct approach and someone
+should go through all the existing DT files and clean them up? People usually
+start reading the code for examples before the standard...
+
+-- 
+P?ter
