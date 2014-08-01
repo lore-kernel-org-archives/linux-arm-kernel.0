@@ -1,42 +1,35 @@
 From: peter.ujfalusi@ti.com (Peter Ujfalusi)
-Date: Fri, 1 Aug 2014 09:13:29 +0300
-Subject: [PATCH v2 5/6] ARM: DTS: da850-evm: Add node for tlv320aic3106 codec
+Date: Fri, 1 Aug 2014 09:13:26 +0300
+Subject: [PATCH v2 2/6] ARM: DTS: da850: Add node for edma0
 In-Reply-To: <1406873610-5037-1-git-send-email-peter.ujfalusi@ti.com>
 References: <1406873610-5037-1-git-send-email-peter.ujfalusi@ti.com>
-Message-ID: <1406873610-5037-6-git-send-email-peter.ujfalusi@ti.com>
+Message-ID: <1406873610-5037-3-git-send-email-peter.ujfalusi@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The board uses aic3106 for audio.
+Add DT node for edma0.
 
 Signed-off-by: Peter Ujfalusi <peter.ujfalusi@ti.com>
 ---
- arch/arm/boot/dts/da850-evm.dts | 13 +++++++++++++
- 1 file changed, 13 insertions(+)
+ arch/arm/boot/dts/da850.dtsi | 6 ++++++
+ 1 file changed, 6 insertions(+)
 
-diff --git a/arch/arm/boot/dts/da850-evm.dts b/arch/arm/boot/dts/da850-evm.dts
-index 1422c311af4c..41715b495861 100644
---- a/arch/arm/boot/dts/da850-evm.dts
-+++ b/arch/arm/boot/dts/da850-evm.dts
-@@ -51,6 +51,19 @@
- 			tps: tps at 48 {
- 				reg = <0x48>;
+diff --git a/arch/arm/boot/dts/da850.dtsi b/arch/arm/boot/dts/da850.dtsi
+index b695548dbb4e..41ce4e8bf227 100644
+--- a/arch/arm/boot/dts/da850.dtsi
++++ b/arch/arm/boot/dts/da850.dtsi
+@@ -150,6 +150,12 @@
  			};
-+			tlv320aic3106: tlv320aic3106 at 18 {
-+				compatible = "ti,tlv320aic3106";
-+				reg = <0x18>;
-+				status = "okay";
-+
-+				/* Regulators */
-+				IOVDD-supply = <&vdcdc2_reg>;
-+				/* Derived from VBAT: Baseboard 3.3V / 1.8V */
-+				AVDD-supply = <&vbat>;
-+				DRVDD-supply = <&vbat>;
-+				DVDD-supply = <&vbat>;
-+			};
-+
+ 
  		};
- 		wdt: wdt at 1c21000 {
- 			status = "okay";
++		edma0: edma at 01c00000 {
++			compatible = "ti,edma3";
++			reg =	<0x0 0x10000>;
++			interrupts = <11 13 12>;
++			#dma-cells = <1>;
++		};
+ 		serial0: serial at 1c42000 {
+ 			compatible = "ns16550a";
+ 			reg = <0x42000 0x100>;
 -- 
 2.0.2
