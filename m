@@ -1,35 +1,60 @@
-From: wsa@the-dreams.de (Wolfram Sang)
-Date: Fri, 1 Aug 2014 19:57:05 +0200
-Subject: [PATCH v2] i2c: pca954x: put the mux to disconnected state after
- resume
-In-Reply-To: <1406289466-936-1-git-send-email-jszhang@marvell.com>
-References: <1406289466-936-1-git-send-email-jszhang@marvell.com>
-Message-ID: <20140801175705.GE3277@katana>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Fri, 1 Aug 2014 19:00:35 +0100
+Subject: [PATCH 2/5] arm64, thunder: Add initial dts for Cavium Thunder SoC
+In-Reply-To: <20140801170411.GG4703@rric.localhost>
+References: <1406732794-20920-1-git-send-email-rric@kernel.org>
+ <1406732794-20920-3-git-send-email-rric@kernel.org>
+ <20140730154626.GD20162@leverpostej>
+ <CAFpQJXWKybVUxpHg8MVrVMjLj3swuxLGo_9r1tL+gZ4hxUHTzQ@mail.gmail.com>
+ <20140731095336.GB21850@leverpostej>
+ <CAFpQJXUtP=v7FSLd3_OU7FG3w=pKYy2ihTQULA_DPEacsSu0Og@mail.gmail.com>
+ <20140731113301.GE22994@leverpostej>
+ <20140801170411.GG4703@rric.localhost>
+Message-ID: <20140801180035.GF3264@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jul 25, 2014 at 07:57:46PM +0800, Jisheng Zhang wrote:
-> pca954x may be power lost during suspend, so after resume we also suffer
-> the issue fixed by commit cd823db8b1161ef0d756514d280715a576d65cc3,
-> 
->  "pca954x power-on default is channel 0 connected. If multiple pca954x
->  muxes are connected to the same physical I2C bus, the parent bus will
->  see channel 0 devices behind both muxes by default."
-> 
-> What's more, when resume bootloader may also operate the mux, so the
-> the channel connected after that may not be the one driver thought.
-> 
-> We fix this problem by putting the mux to disconnected state and
-> clearing last_chan in the resume hook.
-> 
-> Signed-off-by: Jisheng Zhang <jszhang@marvell.com>
+On Fri, Aug 01, 2014 at 06:04:11PM +0100, Robert Richter wrote:
+> Mark,
 
-Applied to for-next, thanks!
+Hi Robert,
 
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140801/64d439fd/attachment-0001.sig>
+> On 31.07.14 12:33:01, Mark Rutland wrote:
+> > On Thu, Jul 31, 2014 at 12:12:33PM +0100, Ganapatrao Kulkarni wrote:
+> > >    We mark RAM used by ATF as secure-RAM, however we don't support
+> > >    secure/non-secure address aliasing.
+> > >    i.e, a DRAM address that can be referenced from both a secure PA and a
+> > >    non-secure PA is not allowed.
+> >
+> > What exactly do you mean by "not allowed"?
+> 
+> It actually means "not possible" since secure and non-secure memory is
+> kept in separate address ranges.
+
+I understand that the two are separate physical address spaces, but
+Ganapatrao's reply was somewhat ambiguous and it wasn't clear to me that
+the memory was actually marked as secure.
+
+> > If Linux maps that memory, what happens?
+> >
+> > What if Linux tried to read or write to it?
+> >
+> > If Linux should not map that memory, it should not be described in the
+> > memory map to begin with.
+> 
+> Linux never will see secure-RAM. Firmware must be sure to report the
+> correct non-secure memory ranges to the OS (e.g. unsecure mem size =
+> total size - secure mem size).
+
+Ok, that's what I had hoped for and that makes sense.
+
+The issue was that the memory node contained an address range that was
+supposedly secure-only (which Linux could attempt to map), which was
+'protected' with a /memreserve/ (which does not stop it from being
+mapped).
+
+Given they are unnecessary (unless you want to bypass EFI for some
+reason) they can be dropped.
+
+Thanks,
+Mark.
