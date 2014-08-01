@@ -1,120 +1,87 @@
 From: thierry.reding@gmail.com (Thierry Reding)
-Date: Fri, 1 Aug 2014 14:40:59 +0200
-Subject: [PATCH v2] dma-mapping: Provide write-combine allocations
-In-Reply-To: <1403863018-20033-1-git-send-email-thierry.reding@gmail.com>
-References: <1403863018-20033-1-git-send-email-thierry.reding@gmail.com>
-Message-ID: <20140801124057.GA19889@ulmo>
+Date: Fri,  1 Aug 2014 14:45:12 +0200
+Subject: [PATCH 1/2] iommu: Always define struct iommu_ops
+Message-ID: <1406897113-20099-1-git-send-email-thierry.reding@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jun 27, 2014 at 11:56:58AM +0200, Thierry Reding wrote:
-> From: Thierry Reding <treding@nvidia.com>
-> 
-> Provide an implementation for dma_{alloc,free,mmap}_writecombine() when
-> the architecture supports DMA attributes.
-> 
-> Signed-off-by: Thierry Reding <treding@nvidia.com>
-> ---
-> Changes in v2:
-> - Add a generic dma_mmap_writecombine() function
-> 
->  arch/arm/include/asm/dma-mapping.h       | 16 ----------------
->  include/asm-generic/dma-mapping-common.h |  8 --------
->  include/linux/dma-mapping.h              | 26 ++++++++++++++++++++++++++
->  3 files changed, 26 insertions(+), 24 deletions(-)
+From: Thierry Reding <treding@nvidia.com>
 
-Ping?
+With this structure always defined, drivers can be always compiled,
+irrespective of whether or not IOMMU_API is enabled. This helps to
+increase compile coverage without having to build with two separate
+configurations.
 
-> diff --git a/arch/arm/include/asm/dma-mapping.h b/arch/arm/include/asm/dma-mapping.h
-> index c45b61a4b4a5..85738b200023 100644
-> --- a/arch/arm/include/asm/dma-mapping.h
-> +++ b/arch/arm/include/asm/dma-mapping.h
-> @@ -265,22 +265,6 @@ extern int arm_dma_mmap(struct device *dev, struct vm_area_struct *vma,
->  			void *cpu_addr, dma_addr_t dma_addr, size_t size,
->  			struct dma_attrs *attrs);
->  
-> -static inline void *dma_alloc_writecombine(struct device *dev, size_t size,
-> -				       dma_addr_t *dma_handle, gfp_t flag)
-> -{
-> -	DEFINE_DMA_ATTRS(attrs);
-> -	dma_set_attr(DMA_ATTR_WRITE_COMBINE, &attrs);
-> -	return dma_alloc_attrs(dev, size, dma_handle, flag, &attrs);
-> -}
-> -
-> -static inline void dma_free_writecombine(struct device *dev, size_t size,
-> -				     void *cpu_addr, dma_addr_t dma_handle)
-> -{
-> -	DEFINE_DMA_ATTRS(attrs);
-> -	dma_set_attr(DMA_ATTR_WRITE_COMBINE, &attrs);
-> -	return dma_free_attrs(dev, size, cpu_addr, dma_handle, &attrs);
-> -}
-> -
->  /*
->   * This can be called during early boot to increase the size of the atomic
->   * coherent DMA pool above the default value of 256KiB. It must be called
-> diff --git a/include/asm-generic/dma-mapping-common.h b/include/asm-generic/dma-mapping-common.h
-> index de8bf89940f8..d137431bf26f 100644
-> --- a/include/asm-generic/dma-mapping-common.h
-> +++ b/include/asm-generic/dma-mapping-common.h
-> @@ -205,14 +205,6 @@ dma_mmap_attrs(struct device *dev, struct vm_area_struct *vma, void *cpu_addr,
->  
->  #define dma_mmap_coherent(d, v, c, h, s) dma_mmap_attrs(d, v, c, h, s, NULL)
->  
-> -static inline int dma_mmap_writecombine(struct device *dev, struct vm_area_struct *vma,
-> -		      void *cpu_addr, dma_addr_t dma_addr, size_t size)
-> -{
-> -	DEFINE_DMA_ATTRS(attrs);
-> -	dma_set_attr(DMA_ATTR_WRITE_COMBINE, &attrs);
-> -	return dma_mmap_attrs(dev, vma, cpu_addr, dma_addr, size, &attrs);
-> -}
-> -
->  int
->  dma_common_get_sgtable(struct device *dev, struct sg_table *sgt,
->  		       void *cpu_addr, dma_addr_t dma_addr, size_t size);
-> diff --git a/include/linux/dma-mapping.h b/include/linux/dma-mapping.h
-> index 931b70986272..d5d388160f42 100644
-> --- a/include/linux/dma-mapping.h
-> +++ b/include/linux/dma-mapping.h
-> @@ -263,6 +263,32 @@ struct dma_attrs;
->  #define dma_unmap_sg_attrs(dev, sgl, nents, dir, attrs) \
->  	dma_unmap_sg(dev, sgl, nents, dir)
->  
-> +#else
-> +static inline void *dma_alloc_writecombine(struct device *dev, size_t size,
-> +					   dma_addr_t *dma_addr, gfp_t gfp)
-> +{
-> +	DEFINE_DMA_ATTRS(attrs);
-> +	dma_set_attr(DMA_ATTR_WRITE_COMBINE, &attrs);
-> +	return dma_alloc_attrs(dev, size, dma_addr, gfp, &attrs);
-> +}
-> +
-> +static inline void dma_free_writecombine(struct device *dev, size_t size,
-> +					 void *cpu_addr, dma_addr_t dma_addr)
-> +{
-> +	DEFINE_DMA_ATTRS(attrs);
-> +	dma_set_attr(DMA_ATTR_WRITE_COMBINE, &attrs);
-> +	return dma_free_attrs(dev, size, cpu_addr, dma_addr, &attrs);
-> +}
-> +
-> +static inline int dma_mmap_writecombine(struct device *dev,
-> +					struct vm_area_struct *vma,
-> +					void *cpu_addr, dma_addr_t dma_addr,
-> +					size_t size)
-> +{
-> +	DEFINE_DMA_ATTRS(attrs);
-> +	dma_set_attr(DMA_ATTR_WRITE_COMBINE, &attrs);
-> +	return dma_mmap_attrs(dev, vma, cpu_addr, dma_addr, size, &attrs);
-> +}
->  #endif /* CONFIG_HAVE_DMA_ATTRS */
->  
->  #ifdef CONFIG_NEED_DMA_MAP_STATE
-> -- 
-> 2.0.0
-> 
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: not available
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140801/2b8ef231/attachment.sig>
+Unused code can still be discarded by the compiler if the IS_ENABLED()
+macro is properly used in an if condition, such as shown below:
+
+	static const struct iommu_ops iommu_ops = {
+		...
+	};
+
+	static int iommu_setup(...)
+	{
+		...
+
+		bus_set_iommu(..., &iommu_ops);
+
+		...
+	}
+
+	...
+
+	static int iommu_probe(...)
+	{
+		...
+
+		if (IS_ENABLED(CONFIG_IOMMU_API)) {
+			err = iommu_setup(...);
+			...
+		}
+
+		...
+	}
+
+That pattern will allow the compiler to notice that setup_iommu() is
+never called if IOMMU_API is not selected, which will allow it to
+discard its code and all data referenced from it.
+
+Signed-off-by: Thierry Reding <treding@nvidia.com>
+---
+ include/linux/iommu.h | 7 ++-----
+ 1 file changed, 2 insertions(+), 5 deletions(-)
+
+diff --git a/include/linux/iommu.h b/include/linux/iommu.h
+index 20f9a527922a..0b5222c7ff97 100644
+--- a/include/linux/iommu.h
++++ b/include/linux/iommu.h
+@@ -83,8 +83,6 @@ enum iommu_attr {
+ 	DOMAIN_ATTR_MAX,
+ };
+ 
+-#ifdef CONFIG_IOMMU_API
+-
+ /**
+  * struct iommu_ops - iommu ops and capabilities
+  * @domain_init: init iommu domain
+@@ -140,6 +138,8 @@ struct iommu_ops {
+ #define IOMMU_GROUP_NOTIFY_UNBIND_DRIVER	5 /* Pre Driver unbind */
+ #define IOMMU_GROUP_NOTIFY_UNBOUND_DRIVER	6 /* Post Driver unbind */
+ 
++#ifdef CONFIG_IOMMU_API
++
+ extern int bus_set_iommu(struct bus_type *bus, const struct iommu_ops *ops);
+ extern bool iommu_present(struct bus_type *bus);
+ extern struct iommu_domain *iommu_domain_alloc(struct bus_type *bus);
+@@ -242,9 +242,6 @@ static inline int report_iommu_fault(struct iommu_domain *domain,
+ 
+ #else /* CONFIG_IOMMU_API */
+ 
+-struct iommu_ops {};
+-struct iommu_group {};
+-
+ static inline bool iommu_present(struct bus_type *bus)
+ {
+ 	return false;
+-- 
+2.0.3
