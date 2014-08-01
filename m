@@ -1,50 +1,57 @@
-From: wangkefeng.wang@huawei.com (Kefeng Wang)
-Date: Fri, 1 Aug 2014 11:58:54 +0800
-Subject: [PATCH 1/3] ARM: remove unnecessary include arm_timer.h and timer-sp.h
-In-Reply-To: <1406865536-23984-1-git-send-email-wangkefeng.wang@huawei.com>
-References: <1406865536-23984-1-git-send-email-wangkefeng.wang@huawei.com>
-Message-ID: <1406865536-23984-2-git-send-email-wangkefeng.wang@huawei.com>
+From: jh80.chung@samsung.com (Jaehoon Chung)
+Date: Fri, 01 Aug 2014 13:26:43 +0900
+Subject: [PATCHv9 1/5] mmc: dw_mmc: Slot quirk "disable-wp" is deprecated.
+In-Reply-To: <53DA8CCB.3080900@samsung.com>
+References: <1406784907-26349-1-git-send-email-jh80.chung@samsung.com>
+ <1406784907-26349-2-git-send-email-jh80.chung@samsung.com>
+ <CAD=FV=VfXOqt1A=8-1kq5nhnMrk7PbpCWj-A-UWQN12_U8sW4g@mail.gmail.com>
+ <53DA8CCB.3080900@samsung.com>
+Message-ID: <53DB1703.4090002@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Signed-off-by: Kefeng Wang <wangkefeng.wang@huawei.com>
----
- arch/arm/mach-nspire/nspire.c     | 2 --
- arch/arm/mach-vexpress/ct-ca9x4.c | 3 ---
- 2 files changed, 5 deletions(-)
+Hi, All.
 
-diff --git a/arch/arm/mach-nspire/nspire.c b/arch/arm/mach-nspire/nspire.c
-index 3d24ebf..ba3607e 100644
---- a/arch/arm/mach-nspire/nspire.c
-+++ b/arch/arm/mach-nspire/nspire.c
-@@ -22,8 +22,6 @@
- #include <asm/mach-types.h>
- #include <asm/mach/map.h>
- 
--#include <asm/hardware/timer-sp.h>
--
- #include "mmio.h"
- #include "clcd.h"
- 
-diff --git a/arch/arm/mach-vexpress/ct-ca9x4.c b/arch/arm/mach-vexpress/ct-ca9x4.c
-index 86150d7..18a6907 100644
---- a/arch/arm/mach-vexpress/ct-ca9x4.c
-+++ b/arch/arm/mach-vexpress/ct-ca9x4.c
-@@ -12,15 +12,12 @@
- #include <linux/vexpress.h>
- #include <linux/irqchip/arm-gic.h>
- 
--#include <asm/hardware/arm_timer.h>
- #include <asm/hardware/cache-l2x0.h>
- #include <asm/smp_scu.h>
- #include <asm/smp_twd.h>
- 
- #include <mach/ct-ca9x4.h>
- 
--#include <asm/hardware/timer-sp.h>
--
- #include <asm/mach/map.h>
- #include <asm/mach/time.h>
- 
--- 
-1.7.12.4
+It seems too late that this patch-set is merged into linux-3.16.
+Also there are some conflicts in device-tree. (I will remove the conflicts)
+So if everybody is ok, I will rebase on linux-next after released linux-3.16.
+At that time, i will send this patch-set to stable kernel, too.
+how about?
+And I want to know who can apply this patch-set(#3~#5).
+
+Best Regards,
+Jaehoon Chung
+
+On 08/01/2014 03:36 AM, Kukjin Kim wrote:
+> On 08/01/14 01:02, Doug Anderson wrote:
+>> Jaehoon
+>>
+>> On Wed, Jul 30, 2014 at 10:35 PM, Jaehoon Chung<jh80.chung@samsung.com>  wrote:
+>>> Slot quirks "disable-wp" is deprecated.
+>>> Instead, use the host quirk "disable-wp".
+>>> (Because the slot-node is removed in dt-file.)
+>>>
+>>> Signed-off-by: Jaehoon Chung<jh80.chung@samsung.com>
+>>> Tested-by: Sachin Kamat<sachin.kamat@samsung.com>
+>>> Acked-by: Seungwon Jeon<tgih.jun@samsung.com>
+>>> ---
+>>>   drivers/mmc/host/dw_mmc.c  |   11 +++++++++--
+>>>   include/linux/mmc/dw_mmc.h |    2 ++
+>>>   2 files changed, 11 insertions(+), 2 deletions(-)
+>>
+>> Thanks for taking my suggestion and making it backward compatible.
+>> This looks great to me.  It tested this in both the backward
+>> compatible way (with the warning) and the non-backward compatible way.
+>> I think we should land and patch #2 ASAP and then we can land the rest
+>> of the series as SoC maintainers see fit.
+>>
+> Yes, right if we don't want to see useless merge conflicts...
+> 
+> When I sent ack on exynos stuff, there was no conflict with my tree but happens it now.
+> 
+> - Kukjin
+> 
+> 
+>> Reviewed-by: Doug Anderson<dianders@chromium.org>
+>> Tested-by: Doug Anderson<dianders@chromium.org>
+> 
