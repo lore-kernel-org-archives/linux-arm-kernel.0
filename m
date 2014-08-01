@@ -1,83 +1,38 @@
-From: ajaynumb@gmail.com (Ajay kumar)
-Date: Fri, 1 Aug 2014 22:00:25 +0530
-Subject: [PATCH V2] ARM: dts: Add DT changes for display on peach_pi
-In-Reply-To: <1406910258-28036-1-git-send-email-ajaykumar.rs@samsung.com>
-References: <1406910258-28036-1-git-send-email-ajaykumar.rs@samsung.com>
-Message-ID: <CAEC9eQNGGG1CH3UN2_1A0iW28gA9kVtJsK7-UNt-AOJKV=J-Gw@mail.gmail.com>
+From: stefano.stabellini@eu.citrix.com (Stefano Stabellini)
+Date: Fri, 1 Aug 2014 17:27:14 +0100
+Subject: [PATCH v3 0/3] xen/arm: fix "xen_add_mach_to_phys_entry: cannot
+ add" problem
+In-Reply-To: <53DBB231.5010900@citrix.com>
+References: <alpine.DEB.2.02.1408011552460.2293@kaball.uk.xensource.com>
+ <53DBB231.5010900@citrix.com>
+Message-ID: <alpine.DEB.2.02.1408011726340.2293@kaball.uk.xensource.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-+Kukjin
+On Fri, 1 Aug 2014, David Vrabel wrote:
+> On 01/08/14 15:55, Stefano Stabellini wrote:
+> > Hi all,
+> > Xen support in Linux for ARM and ARM64 suffers from lack of support for
+> > multiple mfn to pfn mappings: whenever a frontend grants the same page
+> > multiple times to the backend, the mfn to pfn accounting in
+> > arch/arm/xen/p2m.c fails. The issue has become critical since v3.15,
+> > when xen-netfront/xen-netback switched from grant copies to grant
+> > mappings, therefore causing the issue to happen much more often.
+> > 
+> > Fixing the mfn to pfn accounting in p2m.c is difficult and expensive,
+> > therefore we are looking for alternative solutions. One idea is avoiding
+> > mfn to pfn conversions altogether. The only code path that needs them is
+> > swiotlb-xen:unmap_page (and single_for_cpu and single_for_device).
+> > 
+> > To avoid mfn to pfn conversions we rely on a second p2m mapping done by
+> > Xen (a separate patch series will be sent for Xen). In Linux we use it
+> > to perform the cache maintenance operations without mfns conversions.
+> > 
+> > 
+> > The Xen side patch series that introduces XENFEAT_grant_map_identity is:
+> > http://marc.info/?l=xen-devel&m=140690433923855
+> 
+> If the Xen side is in master, you can apply this series to
+> devel/for-linus-3.17
 
-On Fri, Aug 1, 2014 at 9:54 PM, Ajay Kumar <ajaykumar.rs@samsung.com> wrote:
-> Add DT nodes for panel-simple "auo,b133htn01" panel.
-> Add backlight enable pin and backlight power supply for pwm-backlight.
-> Also add panel phandle needed by dp to enable display on peach_pi.
->
-> Signed-off-by: Ajay Kumar <ajaykumar.rs@samsung.com>
-> ---
-> Changes since V1:
-> Remove "simple-panel" compatible string and use only ""auo,b133htn01".
->
->  arch/arm/boot/dts/exynos5800-peach-pi.dts |   27 ++++++++++-----------------
->  1 file changed, 10 insertions(+), 17 deletions(-)
->
-> diff --git a/arch/arm/boot/dts/exynos5800-peach-pi.dts b/arch/arm/boot/dts/exynos5800-peach-pi.dts
-> index f3ee48b..f8c2e61 100644
-> --- a/arch/arm/boot/dts/exynos5800-peach-pi.dts
-> +++ b/arch/arm/boot/dts/exynos5800-peach-pi.dts
-> @@ -28,11 +28,13 @@
->                 i2c20 = "/spi at 12d40000/cros-ec at 0/i2c-tunnel";
->         };
->
-> -       backlight {
-> +       backlight: backlight {
->                 compatible = "pwm-backlight";
->                 pwms = <&pwm 0 1000000 0>;
->                 brightness-levels = <0 100 500 1000 1500 2000 2500 2800>;
->                 default-brightness-level = <7>;
-> +               enable-gpios = <&gpx2 2 0>;
-> +               power-supply = <&tps65090_fet1>;
->                 pinctrl-0 = <&pwm0_out>;
->                 pinctrl-names = "default";
->         };
-> @@ -98,6 +100,12 @@
->                 regulator-boot-on;
->                 regulator-always-on;
->         };
-> +
-> +       panel: panel-simple {
-> +               compatible = "auo,b133htn01";
-> +               power-supply = <&tps65090_fet6>;
-> +               backlight = <&backlight>;
-> +       };
->  };
->
->  &dp {
-> @@ -111,22 +119,7 @@
->         samsung,link-rate = <0x0a>;
->         samsung,lane-count = <2>;
->         samsung,hpd-gpio = <&gpx2 6 0>;
-> -
-> -       display-timings {
-> -               native-mode = <&timing1>;
-> -
-> -               timing1: timing at 1 {
-> -                       clock-frequency = <150660000>;
-> -                       hactive = <1920>;
-> -                       vactive = <1080>;
-> -                       hfront-porch = <60>;
-> -                       hback-porch = <172>;
-> -                       hsync-len = <80>;
-> -                       vback-porch = <25>;
-> -                       vfront-porch = <10>;
-> -                       vsync-len = <10>;
-> -               };
-> -       };
-> +       panel = <&panel>;
->  };
->
->  &fimd {
-> --
-> 1.7.9.5
->
+Thanks. The Xen series is not in yet, I'll do as soon as it is applied.
