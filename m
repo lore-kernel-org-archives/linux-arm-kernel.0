@@ -1,57 +1,74 @@
-From: jh80.chung@samsung.com (Jaehoon Chung)
-Date: Fri, 01 Aug 2014 13:26:43 +0900
-Subject: [PATCHv9 1/5] mmc: dw_mmc: Slot quirk "disable-wp" is deprecated.
-In-Reply-To: <53DA8CCB.3080900@samsung.com>
-References: <1406784907-26349-1-git-send-email-jh80.chung@samsung.com>
- <1406784907-26349-2-git-send-email-jh80.chung@samsung.com>
- <CAD=FV=VfXOqt1A=8-1kq5nhnMrk7PbpCWj-A-UWQN12_U8sW4g@mail.gmail.com>
- <53DA8CCB.3080900@samsung.com>
-Message-ID: <53DB1703.4090002@samsung.com>
+From: afaerber@suse.de (=?UTF-8?q?Andreas=20F=C3=A4rber?=)
+Date: Fri,  1 Aug 2014 06:54:47 +0200
+Subject: [PATCH v5 00/10] ARM: dts: exynos: Prepare Spring
+Message-ID: <1406868897-26874-1-git-send-email-afaerber@suse.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi, All.
+Hello,
 
-It seems too late that this patch-set is merged into linux-3.16.
-Also there are some conflicts in device-tree. (I will remove the conflicts)
-So if everybody is ok, I will rebase on linux-next after released linux-3.16.
-At that time, i will send this patch-set to stable kernel, too.
-how about?
-And I want to know who can apply this patch-set(#3~#5).
+Based on the preinstalled 3.8 based ChromeOS kernel and previous 3.15 
+based attempts by Stephan and me that broke for 3.16, I've prepared a 
+device tree for the HP Chromebook 11 aka Google Spring.
 
-Best Regards,
-Jaehoon Chung
+v5 cleans up a regulator and the USB3503 hub and touches more 
+exynos5250 files.
 
-On 08/01/2014 03:36 AM, Kukjin Kim wrote:
-> On 08/01/14 01:02, Doug Anderson wrote:
->> Jaehoon
->>
->> On Wed, Jul 30, 2014 at 10:35 PM, Jaehoon Chung<jh80.chung@samsung.com>  wrote:
->>> Slot quirks "disable-wp" is deprecated.
->>> Instead, use the host quirk "disable-wp".
->>> (Because the slot-node is removed in dt-file.)
->>>
->>> Signed-off-by: Jaehoon Chung<jh80.chung@samsung.com>
->>> Tested-by: Sachin Kamat<sachin.kamat@samsung.com>
->>> Acked-by: Seungwon Jeon<tgih.jun@samsung.com>
->>> ---
->>>   drivers/mmc/host/dw_mmc.c  |   11 +++++++++--
->>>   include/linux/mmc/dw_mmc.h |    2 ++
->>>   2 files changed, 11 insertions(+), 2 deletions(-)
->>
->> Thanks for taking my suggestion and making it backward compatible.
->> This looks great to me.  It tested this in both the backward
->> compatible way (with the warning) and the non-backward compatible way.
->> I think we should land and patch #2 ASAP and then we can land the rest
->> of the series as SoC maintainers see fit.
->>
-> Yes, right if we don't want to see useless merge conflicts...
-> 
-> When I sent ack on exynos stuff, there was no conflict with my tree but happens it now.
-> 
-> - Kukjin
-> 
-> 
->> Reviewed-by: Doug Anderson<dianders@chromium.org>
->> Tested-by: Doug Anderson<dianders@chromium.org>
-> 
+Not yet enabled are trackpad, Wifi and sound.
+
+My rebasing branch for testing is here:
+https://github.com/afaerber/linux/commits/spring-next
+
+Regards,
+Andreas
+
+v1 -> v2:
+* Dropped 3 documentation patches from series:
+  2 picked up,
+  https://patchwork.kernel.org/patch/4397271/
+  https://patchwork.kernel.org/patch/4397291/
+  1 already sent separately as v2, pending.
+  https://patchwork.kernel.org/patch/4424881/
+* Minimized and beautified Spring device tree and to some degree Snow as well.
+  See individual patches.
+
+v2 -> v3:
+* Rebased: Two -cros-common cleanup patches were already applied
+* Lots of small cleanups for both Snow and Spring
+* Enabled I2S in Spring for symmetry
+* Added lid-switch and gpio-keys pinctrls to Spring
+
+v3 -> v4:
+* Fixed pin-function 1 -> 0 for dp-hpd pinctrl, style cleanup
+
+v4 -> v5:
+* Dropped regulator and fixed USB3503 for Spring
+* More cleanups, including SMDK5250 and Arndale
+
+
+Andreas F?rber (10):
+  ARM: dts: Fix MMC pinctrl for exynos5250-snow
+  ARM: dts: Fold exynos5250-cros-common into exynos5250-snow
+  ARM: dts: Clean up exynos5250-snow
+  ARM: dts: Fill in bootargs for exynos5250-snow
+  ARM: dts: Move dp_hpd from exynos5250 into smdk5250 and snow
+  ARM: dts: Clean up exynos5250-smdk5250
+  ARM: dts: Clean up exynos5250-arndale
+  ARM: dts: Fix apparent GPIO typo in exynos5250-arndale
+  ARM: dts: Simplify USB3503 on exynos5250-arndale
+  ARM: dts: Add exynos5250-spring device tree
+
+ arch/arm/boot/dts/Makefile                    |   1 +
+ arch/arm/boot/dts/exynos5250-arndale.dts      | 927 +++++++++++++-------------
+ arch/arm/boot/dts/exynos5250-cros-common.dtsi | 164 -----
+ arch/arm/boot/dts/exynos5250-pinctrl.dtsi     |   7 -
+ arch/arm/boot/dts/exynos5250-smdk5250.dts     | 641 +++++++++---------
+ arch/arm/boot/dts/exynos5250-snow.dts         | 441 +++++++-----
+ arch/arm/boot/dts/exynos5250-spring.dts       | 536 +++++++++++++++
+ arch/arm/boot/dts/exynos5250.dtsi             |  24 +-
+ 8 files changed, 1624 insertions(+), 1117 deletions(-)
+ delete mode 100644 arch/arm/boot/dts/exynos5250-cros-common.dtsi
+ create mode 100644 arch/arm/boot/dts/exynos5250-spring.dts
+
+-- 
+1.9.3
