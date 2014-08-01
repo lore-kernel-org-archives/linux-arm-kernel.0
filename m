@@ -1,38 +1,47 @@
-From: thierry.reding@gmail.com (Thierry Reding)
-Date: Fri,  1 Aug 2014 14:45:13 +0200
-Subject: [PATCH 2/2] iommu: Implement a dummy bus_set_iommu()
-In-Reply-To: <1406897113-20099-1-git-send-email-thierry.reding@gmail.com>
-References: <1406897113-20099-1-git-send-email-thierry.reding@gmail.com>
-Message-ID: <1406897113-20099-2-git-send-email-thierry.reding@gmail.com>
+From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
+Date: Fri, 01 Aug 2014 16:49:46 +0400
+Subject: [PATCH 5/6] ARM: DTS: da850-evm: Add node for tlv320aic3106 codec
+In-Reply-To: <53DB240F.2030908@ti.com>
+References: <1406801934-23334-1-git-send-email-peter.ujfalusi@ti.com>
+ <1406801934-23334-6-git-send-email-peter.ujfalusi@ti.com>
+ <53DA519A.4090905@cogentembedded.com> <53DB240F.2030908@ti.com>
+Message-ID: <53DB8CEA.9010902@cogentembedded.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Thierry Reding <treding@nvidia.com>
+Hello.
 
-This allows IOMMU drivers to compile even if IOMMU_API is not selected
-and helps improve compile coverage.
+On 01-08-2014 9:22, Peter Ujfalusi wrote:
 
-Signed-off-by: Thierry Reding <treding@nvidia.com>
----
- include/linux/iommu.h | 6 ++++++
- 1 file changed, 6 insertions(+)
+>>> The board uses aic3106 for audio.
 
-diff --git a/include/linux/iommu.h b/include/linux/iommu.h
-index 0b5222c7ff97..415608ea2999 100644
---- a/include/linux/iommu.h
-+++ b/include/linux/iommu.h
-@@ -242,6 +242,12 @@ static inline int report_iommu_fault(struct iommu_domain *domain,
- 
- #else /* CONFIG_IOMMU_API */
- 
-+static inline int bus_set_iommu(struct bus_type *bus,
-+				const struct iommu_ops *ops)
-+{
-+	return -ENOSYS;
-+}
-+
- static inline bool iommu_present(struct bus_type *bus)
- {
- 	return false;
--- 
-2.0.3
+>>> Signed-off-by: Peter Ujfalusi <peter.ujfalusi@ti.com>
+>>> ---
+>>>    arch/arm/boot/dts/da850-evm.dts | 14 ++++++++++++++
+>>>    1 file changed, 14 insertions(+)
+
+>>> diff --git a/arch/arm/boot/dts/da850-evm.dts b/arch/arm/boot/dts/da850-evm.dts
+>>> index 09118c72e83f..b9ef2be0b145 100644
+>>> --- a/arch/arm/boot/dts/da850-evm.dts
+>>> +++ b/arch/arm/boot/dts/da850-evm.dts
+>>> @@ -51,6 +51,20 @@
+>>>                tps: tps at 48 {
+>>>                    reg = <0x48>;
+>>>                };
+>>> +            tlv320aic3106: tlv320aic3106 at 1b {
+
+[...]
+
+>> Also, the ePAPR standard [1] says:
+
+>> The name of a node should be somewhat generic, reflecting the function of the
+>> device and not its precise programming model.
+
+> True. This is why the node for the audio support is named as 'sound'. For the
+> components, like in this case I do not see issue to call the audio codec with
+> it's name.
+
+    I do. We should follow the standard consistently. Why not call the node 
+"sound-codec"?
+
+WBR, Sergei
