@@ -1,97 +1,46 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Fri, 01 Aug 2014 18:05:15 +0100
-Subject: [PATCH 3/4 V3] irqchip: gic: Add supports for ARM GICv2m MSI(-X)
-In-Reply-To: <53DBC074.3030309@amd.com> (Suravee Suthikulanit's message of
- "Fri, 1 Aug 2014 17:29:40 +0100")
-References: <1404947104-21345-1-git-send-email-suravee.suthikulpanit@amd.com>
- <1404947104-21345-4-git-send-email-suravee.suthikulpanit@amd.com>
- <87zjfqj3mc.fsf@approximate.cambridge.arm.com>
- <53DBB562.5020003@amd.com> <53DBC074.3030309@amd.com>
-Message-ID: <87oaw4gmyc.fsf@approximate.cambridge.arm.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Fri, 1 Aug 2014 18:06:33 +0100
+Subject: [PATCH] dmaengine: Remove the context argument to the
+ prep_dma_cyclic operation
+In-Reply-To: <20140801164428.GB8181@intel.com>
+References: <1406888410-14504-1-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
+ <20140801164428.GB8181@intel.com>
+Message-ID: <20140801170633.GT30282@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Aug 01 2014 at  5:29:40 pm BST, Suravee Suthikulanit <suravee.suthikulpanit@amd.com> wrote:
-> On 8/1/2014 10:42 AM, Suravee Suthikulanit wrote:
->>>> +#ifdef CONFIG_SMP
->>>> +       .irq_set_affinity       = gic_set_affinity,
->>>> +#endif
->>>> +#ifdef CONFIG_PM
->>>> +       .irq_set_wake           = gic_set_wake,
->>>> +#endif
->>>> +};
->>>> +
->>>> +#ifdef CONFIG_OF
->>>> +static int __init
->>>> +gicv2m_of_init(struct device_node *node, struct device_node *parent)
->>>> +{
->>>> +       struct gic_chip_data *gic;
->>>> +       int ret;
->>>> +
->>>> +       ret = _gic_of_init(node, parent, &gicv2m_chip, &gic);
->>>> +       if (ret) {
->>>> +               pr_err("GICv2m: Failed to initialize GIC\n");
->>>> +               return ret;
->>>> +       }
->>>> +
->>>> +       gic->msi_chip.owner = THIS_MODULE;
->>>> +       gic->msi_chip.of_node = node;
->>>> +       gic->msi_chip.setup_irq = gicv2m_setup_msi_irq;
->>>> +       gic->msi_chip.teardown_irq = gicv2m_teardown_msi_irq;
->>>> +       ret = of_pci_msi_chip_add(&gic->msi_chip);
->>>> +       if (ret) {
->>>> +               /* MSI is optional and not supported here */
->>>> +               pr_info("GICv2m: MSI is not supported.\n");
->>>> +               return 0;
->>>> +       }
->>>> +
->>>> +       ret = gicv2m_msi_init(node, &gic->v2m_data);
->>>> +       if (ret)
->>>> +               return ret;
->>>> +       return ret;
->>>> +}
->>>> +
->>>> +IRQCHIP_DECLARE(arm_gic_400_v2m, "arm,gic-400-v2m", gicv2m_of_init);
->>>
->>> So if you follow my advise of reversing your probing and call into the
->>> v2m init from the main GIC driver, you could take a irq_chip as a
->>> parameter, and use it to populate the v2m irq_chip, only overriding the
->>> two methods that actually differ.
->>>
->>> This would have the net effect of completely dropping patch #2, which
->>> becomes effectively useless.
->>>
->>
->> [Suravee] Ok, lemme look into this.
->
-> So, in previous revision, you mentioned that we should have a separate 
-> irq_chip for gicv2m stuff, is that is still the case here?
+On Fri, Aug 01, 2014 at 10:14:28PM +0530, Vinod Koul wrote:
+> On Fri, Aug 01, 2014 at 12:20:10PM +0200, Laurent Pinchart wrote:
+> > The argument is always set to NULL and never used. Remove it.
+> 
+> Thats not true.
+> 
+> It was introduced in commit:
+> commit 185ecb5f4fd43911c35956d4cc7d94a1da30417f
+> Author: Alexandre Bounine <alexandre.bounine@idt.com>
+> Date:   Thu Mar 8 15:35:13 2012 -0500
+> 
+>     dmaengine: add context parameter to prep_slave_sg and prep_dma_cyclic
+> 
+>     Add context parameter to device_prep_slave_sg() and device_prep_dma_cyclic()
+>     interfaces to allow passing client/target specific information associated
+>     with the data transfer.
+>     Modify all affected DMA engine drivers.
+> 
+>     Signed-off-by: Alexandre Bounine <alexandre.bounine@idt.com>
+>     Acked-by: Linus Walleij <linus.walleij@linaro.org>
+>     Acked-by: Felipe Balbi <balbi@ti.com>
+>     Signed-off-by: Vinod Koul <vinod.koul@linux.intel.com>
+> 
+> This is still used by rapidio driver. This required some extra parameters
+> passed in struct rio_dma_ext.
+> 
+> I do agree this is not very elegant.
 
-Yes. You would do something like this:
+Have the rapidio folk shown any sign of implementing the cyclic DMA API?
+>From what I can see from drivers/rapido/, it only uses the prep_slave_sg
+API.
 
-- In the main GIC code:
-	if (v2m_present()) {
-        	v2m_init(&gic_chip);
-        }
-
-- In the v2m code:
-	static struct irq_chip_v2m_chip;
-	void v2m_init(struct irq_chip *gic_chip)
-        {
-        	[...]
-        	v2m_chip = *gic_chip;
-                v2m_chip.mask = v2m_irq_mask;
-                v2m_chip.unmask = v2m_irq_unmask;
-                [...]
-        }
-
-Basically, you inherit a number of default methods, only overloading the
-ones that are different. The rest of your driver is mostly unchanged.
-
-This preserves the current probing structure, and avoids exposing
-private methods outside of irq-gic.c (preventing people from doing silly
-things with an unsuspecting interrupt controller...).
-
-	M.
 -- 
-Jazz is not dead. It just smells funny.
+FTTC broadband for 0.8mile line: currently at 9.5Mbps down 400kbps up
+according to speedtest.net.
