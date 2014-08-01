@@ -1,102 +1,142 @@
-From: sonnyrao@chromium.org (Sonny Rao)
-Date: Thu, 31 Jul 2014 22:58:00 -0700
-Subject: [PATCH v2] pinctrl: rockchip: fix rk3288 gpio0 configuration
-In-Reply-To: <1543632.JNPYWq24Lp@diego>
-References: <1543632.JNPYWq24Lp@diego>
-Message-ID: <1406872680-14641-1-git-send-email-sonnyrao@chromium.org>
+From: joonwoop@codeaurora.org (Joonwoo Park)
+Date: Thu, 31 Jul 2014 23:30:09 -0700
+Subject: [PATCH] arm64: optimize memcpy_{from,to}io() and memset_io()
+In-Reply-To: <1406701706-12808-1-git-send-email-joonwoop@codeaurora.org>
+References: <1406701706-12808-1-git-send-email-joonwoop@codeaurora.org>
+Message-ID: <20140801063009.GA24602@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On rk3288, for gpio bank 0, the registers which configure pull-up,
-iomux, and drive strength don't implement the enable bits in the upper
-half of the register, unlike the other gpio configuration registers,
-and so the kernel must perform a read-modify-write of the register to
-update a particular gpio in that bank.
++ Catalin, Will
 
-The current code is actually clobbering the contents of the register,
-so this fixes it by using regmap_update_bits and masking out only the
-bits which require updating.  In the case of bank0 on rk3288 the upper
-enable bits will just get ignored, and the other configurations won't
-get clobbered.
+Thanks,
+Joonwoo
+On Tue, Jul 29, 2014 at 11:28:26PM -0700, Joonwoo Park wrote:
+> Optimize memcpy_{from,to}io() and memset_io() by transferring in 64 bit
+> as much as possible with minimized barrier usage.  This simplest optimization
+> brings faster throughput compare to current byte-by-byte read and write with
+> barrier in the loop.  Code's skeleton is taken from the powerpc.
+> 
+> Signed-off-by: Joonwoo Park <joonwoop@codeaurora.org>
+> Acked-by: Trilok Soni <tsoni@codeaurora.org>
+> ---
+>  arch/arm64/kernel/io.c | 72 +++++++++++++++++++++++++++++++++++++++++++-------
+>  1 file changed, 62 insertions(+), 10 deletions(-)
+> 
+> diff --git a/arch/arm64/kernel/io.c b/arch/arm64/kernel/io.c
+> index 7d37ead..c0e3ab1 100644
+> --- a/arch/arm64/kernel/io.c
+> +++ b/arch/arm64/kernel/io.c
+> @@ -20,18 +20,34 @@
+>  #include <linux/types.h>
+>  #include <linux/io.h>
+>  
+> +#define IO_CHECK_ALIGN(v, a) ((((unsigned long)(v)) & ((a) - 1)) == 0)
+> +
+>  /*
+>   * Copy data from IO memory space to "real" memory space.
+>   */
+>  void __memcpy_fromio(void *to, const volatile void __iomem *from, size_t count)
+>  {
+> -	unsigned char *t = to;
+> -	while (count) {
+> +	while (count && (!IO_CHECK_ALIGN(from, 8) || !IO_CHECK_ALIGN(to, 8))) {
+> +		*(u8 *)to = readb_relaxed(from);
+> +		from++;
+> +		to++;
+>  		count--;
+> -		*t = readb(from);
+> -		t++;
+> +	}
+> +
+> +	while (count >= 8) {
+> +		*(u64 *)to = readq_relaxed(from);
+> +		from += 8;
+> +		to += 8;
+> +		count -= 8;
+> +	}
+> +
+> +	while (count) {
+> +		*(u8 *)to = readb_relaxed(from);
+>  		from++;
+> +		to++;
+> +		count--;
+>  	}
+> +	__iormb();
+>  }
+>  EXPORT_SYMBOL(__memcpy_fromio);
+>  
+> @@ -40,12 +56,28 @@ EXPORT_SYMBOL(__memcpy_fromio);
+>   */
+>  void __memcpy_toio(volatile void __iomem *to, const void *from, size_t count)
+>  {
+> -	const unsigned char *f = from;
+> +	void *p = (void __force *)from;
+> +
+> +	__iowmb();
+> +	while (count && (!IO_CHECK_ALIGN(p, 8) || !IO_CHECK_ALIGN(from, 8))) {
+> +		writeb_relaxed(*(volatile u8 *)from, p);
+> +		from++;
+> +		p++;
+> +		count--;
+> +	}
+> +
+> +	while (count >= 8) {
+> +		writeq_relaxed(*(volatile u64 *)from, p);
+> +		from += 8;
+> +		p += 8;
+> +		count -= 8;
+> +	}
+> +
+>  	while (count) {
+> +		writeb_relaxed(*(volatile u8 *)from, p);
+> +		from++;
+> +		p++;
+>  		count--;
+> -		writeb(*f, to);
+> -		f++;
+> -		to++;
+>  	}
+>  }
+>  EXPORT_SYMBOL(__memcpy_toio);
+> @@ -55,10 +87,30 @@ EXPORT_SYMBOL(__memcpy_toio);
+>   */
+>  void __memset_io(volatile void __iomem *dst, int c, size_t count)
+>  {
+> +	void *p = (void __force *)dst;
+> +	u64 qc = c;
+> +
+> +	qc |= qc << 8;
+> +	qc |= qc << 16;
+> +	qc |= qc << 32;
+> +
+> +	__iowmb();
+> +	while (count && !IO_CHECK_ALIGN(p, 8)) {
+> +		writeb_relaxed(c, p);
+> +		p++;
+> +		count--;
+> +	}
+> +
+> +	while (count >= 8) {
+> +		writeq_relaxed(c, p);
+> +		p += 8;
+> +		count -= 8;
+> +	}
+> +
+>  	while (count) {
+> +		writeb_relaxed(c, p);
+> +		p++;
+>  		count--;
+> -		writeb(c, dst);
+> -		dst++;
+>  	}
+>  }
+>  EXPORT_SYMBOL(__memset_io);
+> -- 
+> The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
+> hosted by The Linux Foundation
+> 
 
-Signed-off-by: Sonny Rao <sonnyrao@chromium.org>
----
-v2: rebase onto latest pinctrl with drive strength and fix this bug on
-  iomux and drive strength as well.
- 
- drivers/pinctrl/pinctrl-rockchip.c | 15 +++++++++------
- 1 file changed, 9 insertions(+), 6 deletions(-)
-
-diff --git a/drivers/pinctrl/pinctrl-rockchip.c b/drivers/pinctrl/pinctrl-rockchip.c
-index c15f7f9..4ff5dc3 100644
---- a/drivers/pinctrl/pinctrl-rockchip.c
-+++ b/drivers/pinctrl/pinctrl-rockchip.c
-@@ -438,7 +438,7 @@ static int rockchip_set_mux(struct rockchip_pin_bank *bank, int pin, int mux)
- 	int reg, ret, mask;
- 	unsigned long flags;
- 	u8 bit;
--	u32 data;
-+	u32 data, rmask;
- 
- 	if (iomux_num > 3)
- 		return -EINVAL;
-@@ -478,8 +478,9 @@ static int rockchip_set_mux(struct rockchip_pin_bank *bank, int pin, int mux)
- 	spin_lock_irqsave(&bank->slock, flags);
- 
- 	data = (mask << (bit + 16));
-+	rmask = data | (data >> 16);
- 	data |= (mux & mask) << bit;
--	ret = regmap_write(regmap, reg, data);
-+	ret = regmap_update_bits(regmap, reg, rmask, data);
- 
- 	spin_unlock_irqrestore(&bank->slock, flags);
- 
-@@ -634,7 +635,7 @@ static int rk3288_set_drive(struct rockchip_pin_bank *bank, int pin_num,
- 	struct regmap *regmap;
- 	unsigned long flags;
- 	int reg, ret, i;
--	u32 data;
-+	u32 data, rmask;
- 	u8 bit;
- 
- 	rk3288_calc_drv_reg_and_bit(bank, pin_num, &regmap, &reg, &bit);
-@@ -657,9 +658,10 @@ static int rk3288_set_drive(struct rockchip_pin_bank *bank, int pin_num,
- 
- 	/* enable the write to the equivalent lower bits */
- 	data = ((1 << RK3288_DRV_BITS_PER_PIN) - 1) << (bit + 16);
-+	rmask = data | (data >> 16);
- 	data |= (ret << bit);
- 
--	ret = regmap_write(regmap, reg, data);
-+	ret = regmap_update_bits(regmap, reg, rmask, data);
- 	spin_unlock_irqrestore(&bank->slock, flags);
- 
- 	return ret;
-@@ -722,7 +724,7 @@ static int rockchip_set_pull(struct rockchip_pin_bank *bank,
- 	int reg, ret;
- 	unsigned long flags;
- 	u8 bit;
--	u32 data;
-+	u32 data, rmask;
- 
- 	dev_dbg(info->dev, "setting pull of GPIO%d-%d to %d\n",
- 		 bank->bank_num, pin_num, pull);
-@@ -750,6 +752,7 @@ static int rockchip_set_pull(struct rockchip_pin_bank *bank,
- 
- 		/* enable the write to the equivalent lower bits */
- 		data = ((1 << RK3188_PULL_BITS_PER_PIN) - 1) << (bit + 16);
-+		rmask = data | (data >> 16);
- 
- 		switch (pull) {
- 		case PIN_CONFIG_BIAS_DISABLE:
-@@ -770,7 +773,7 @@ static int rockchip_set_pull(struct rockchip_pin_bank *bank,
- 			return -EINVAL;
- 		}
- 
--		ret = regmap_write(regmap, reg, data);
-+		ret = regmap_update_bits(regmap, reg, rmask, data);
- 
- 		spin_unlock_irqrestore(&bank->slock, flags);
- 		break;
 -- 
-1.8.3.2
+ Sent by an employee of the Qualcomm Innovation Center, Inc.
+ The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum.
