@@ -1,38 +1,46 @@
-From: lars@metafoo.de (Lars-Peter Clausen)
-Date: Fri, 01 Aug 2014 10:00:10 +0200
-Subject: [PATCH] Documentation: dmaengine: Add a documentation for the
- dma controller API
-In-Reply-To: <20140731173730.GH3952@lukather>
-References: <1406736193-26685-1-git-send-email-maxime.ripard@free-electrons.com>
- <20140730160607.GM8181@intel.com> <20140731074440.GY3952@lukather>
- <53DA3A48.8070900@metafoo.de> <20140731161331.GD3952@lukather>
- <53DA74B3.6060502@metafoo.de> <20140731173730.GH3952@lukather>
-Message-ID: <53DB490A.5040709@metafoo.de>
+From: tony@atomide.com (Tony Lindgren)
+Date: Fri, 1 Aug 2014 01:02:46 -0700
+Subject: [PATCH 3/3] arm: dts: Add gta04a5 model
+In-Reply-To: <CABxcv=n7g8c2ePGKgu_0Y35iearcRoAj9ZH5jDWY9nE+1uUKnA@mail.gmail.com>
+References: <1406577213-9642-1-git-send-email-marek@goldelico.com>
+ <1406577213-9642-4-git-send-email-marek@goldelico.com>
+ <CAOf5uwk=ctww=pP4Ae+1C6i-oOtiYTv2NJbj1GpuPwVSKXB4Hw@mail.gmail.com>
+ <CAAfyv35jvhzvjCKMwrpa=RQ1JkfcmthCsGDzwLW9Y6bq3Ww_fg@mail.gmail.com>
+ <CAOf5uw=Fm9FXEH5ESqDC8pGjMbn5VQ1+MyPJVXSqGh_9+JRLHw@mail.gmail.com>
+ <1FA8171E-1B7A-4684-887E-11593BB9C29E@goldelico.com>
+ <20140729124120.GS29045@atomide.com>
+ <589F7CA3-F245-4299-8E39-36A7FA9F3CBD@goldelico.com>
+ <CABxcv=n7g8c2ePGKgu_0Y35iearcRoAj9ZH5jDWY9nE+1uUKnA@mail.gmail.com>
+Message-ID: <20140801080246.GG29045@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/31/2014 07:37 PM, Maxime Ripard wrote:
-> On Thu, Jul 31, 2014 at 06:54:11PM +0200, Lars-Peter Clausen wrote:
->> On 07/31/2014 06:13 PM, Maxime Ripard wrote:
->> [...]
->>>  From what you're saying, and judging from the drivers that already
->>> implement it, can't it be moved directly to the framework itself ?
->>>
->>
->> What exactly do you mean by moving it directly to the framework? The
->> slave_caps API is part of the DMAengine framework.
->
-> Not its implementation, which is defined by each and every driver,
-> while the behaviour of device_slave_caps is rather generic.
->
+* Javier Martinez Canillas <javier@dowhile0.org> [140729 07:14]:
+> Hello,
+> 
+> On Tue, Jul 29, 2014 at 3:03 PM, Dr. H. Nikolaus Schaller
+> <hns@goldelico.com> wrote:
+> > Hi,
+> >> So what's the conclusion? Are changes needed to this patch
+> >> series or not?
+> >
+> > I advocate that no changes are needed.
+> >
+> 
+> I agree with Dr. H. Nikolaus on this regard. A DeviceTree should be a
+> description of the hardware and if two hardware platforms differs,
+> then we need two different DTS.
+> 
+> Lately I'm seeing some attempts to abuse u-boot's fdt command, u-boot
+> should only modify the strictly necessary like the /chosen branch.
+> Allowing u-boot to mangle the FDT before passing to the kernel just to
+> avoid some DT duplication doesn't sound like a good idea IMHO.
 
-Do you mean something like adding a dma_slave_caps struct field to the DMA 
-channel that gets initialized when the channel is created and then remove 
-the callback? That makes some sense.
+OK no more comments, so applied all into omap-for-v3.17/dt.
+As there's a good chance the merge window will open on Monday,
+no guarantees the gta04 related changes will make it. But I'll
+send a pull request a bit later on today for them anyways.
 
-I think the main reason why we use a callback right now is that in earlier 
-revisions of the API it was possible to pass a slave_config and the result 
-would be the capabilities of the DMA channel for this particular config. But 
-this was dropped before the final version was merged upstream.
+Regards,
 
-- Lars
+Tony
