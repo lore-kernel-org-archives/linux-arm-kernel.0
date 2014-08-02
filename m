@@ -1,34 +1,68 @@
-From: tomasz.figa@gmail.com (Tomasz Figa)
-Date: Sat, 02 Aug 2014 14:57:46 +0200
-Subject: [PATCH v6 06/10] ARM: dts: Clean up exynos5250-smdk5250
-In-Reply-To: <1406940750-15880-7-git-send-email-afaerber@suse.de>
+From: afaerber@suse.de (=?UTF-8?B?QW5kcmVhcyBGw6RyYmVy?=)
+Date: Sat, 02 Aug 2014 15:00:36 +0200
+Subject: [PATCH v6 03/10] ARM: dts: Prepare node labels for exynos5250
+In-Reply-To: <53DCD74B.8090400@gmail.com>
 References: <1406940750-15880-1-git-send-email-afaerber@suse.de>
- <1406940750-15880-7-git-send-email-afaerber@suse.de>
-Message-ID: <53DCE04A.1040803@gmail.com>
+ <1406940750-15880-4-git-send-email-afaerber@suse.de>
+ <53DCD74B.8090400@gmail.com>
+Message-ID: <53DCE0F4.4060101@suse.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 02.08.2014 02:52, Andreas F?rber wrote:
-> Use the new style for referencing inherited nodes and use symbolic names.
+Am 02.08.2014 14:19, schrieb Tomasz Figa:
+> Andreas,
 > 
-> Goal is the alignment of all exynos5250 based device trees for comparison.
+> Ehh, one more thing. It looks like my memory is playing tricks on me.
+> Please see inline.
 > 
-> Signed-off-by: Andreas F?rber <afaerber@suse.de>
-> ---
->  v5 -> v6:
->  * Renamed node label codec -> mfc for alignment with "add System MMU nodes"
->  * Rebased for leaving dp_hpd in .dtsi
->  
->  v5: New
->  Follow-up after adding dp_hpd pinctrl node new-style.
+> On 02.08.2014 02:52, Andreas F?rber wrote:
+>> Allows them to be extended by reference.
+>>
+>> Signed-off-by: Andreas F?rber <afaerber@suse.de>
+>> ---
+>>  v6: Split off from Snow/SMDK cleanups (Doug Anderson)
 > 
->  arch/arm/boot/dts/exynos5250-smdk5250.dts | 632 +++++++++++++++---------------
->  1 file changed, 318 insertions(+), 314 deletions(-)
+> [snip]
+> 
+>> -	serial at 12C00000 {
+>> +	uart0: serial at 12C00000 {
+>>  		clocks = <&clock CLK_UART0>, <&clock CLK_SCLK_UART0>;
+>>  		clock-names = "uart", "clk_uart_baud0";
+>>  	};
+>>  
+>> -	serial at 12C10000 {
+>> +	uart1: serial at 12C10000 {
+>>  		clocks = <&clock CLK_UART1>, <&clock CLK_SCLK_UART1>;
+>>  		clock-names = "uart", "clk_uart_baud0";
+>>  	};
+>>  
+>> -	serial at 12C20000 {
+>> +	uart2: serial at 12C20000 {
+>>  		clocks = <&clock CLK_UART2>, <&clock CLK_SCLK_UART2>;
+>>  		clock-names = "uart", "clk_uart_baud0";
+>>  	};
+>>  
+>> -	serial at 12C30000 {
+>> +	uart3: serial at 12C30000 {
+>>  		clocks = <&clock CLK_UART3>, <&clock CLK_SCLK_UART3>;
+>>  		clock-names = "uart", "clk_uart_baud0";
+>>  	};
+> 
+> I forgot about a series [1] that went through tty tree, which is going
+> to conflict with this patch. It already adds labels to uart nodes in
+> serial_X format. I don't really remember why I went with this format for
+> Exynos SoCs and with uartX for older ones...
+> 
+> [1]
+> https://git.kernel.org/cgit/linux/kernel/git/next/linux-next.git/commit/arch/arm/boot/dts?id=1e64f48ea7c59fb94acd7551dd9fa68b8a752efc
 
-This in fact ends up with empty diff after compiling and decompiling the
-dts, so obviously will not break anything. :)
+I doubt that I'll manage to resend another time today, so please just
+drop those hunks from my patch before applying - I ended up not using
+them here.
 
-Reviewed-by: Tomasz Figa <t.figa@samsung.com>
+Regards,
+Andreas
 
-Best regards,
-Tomasz
+-- 
+SUSE LINUX Products GmbH, Maxfeldstr. 5, 90409 N?rnberg, Germany
+GF: Jeff Hawn, Jennifer Guild, Felix Imend?rffer; HRB 16746 AG N?rnberg
