@@ -1,28 +1,118 @@
-From: libv@skynet.be (Luc Verhaegen)
-Date: Sat,  2 Aug 2014 15:06:30 +0200
-Subject: [PATCH] ARM: sunxi_defconfig: add NLS_CODEPAGE_437 and NLS_ISO8859_1
-Message-ID: <1406984790-16994-1-git-send-email-libv@skynet.be>
+From: afaerber@suse.de (=?UTF-8?B?QW5kcmVhcyBGw6RyYmVy?=)
+Date: Sat, 02 Aug 2014 15:08:10 +0200
+Subject: [PATCH v6 04/10] ARM: dts: Clean up exynos5250-snow
+In-Reply-To: <53DCDFF3.7030909@gmail.com>
+References: <1406940750-15880-1-git-send-email-afaerber@suse.de>
+ <1406940750-15880-5-git-send-email-afaerber@suse.de>
+ <53DCD7D7.2070208@gmail.com> <53DCDFF3.7030909@gmail.com>
+Message-ID: <53DCE2BA.7010803@suse.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Otherwise CONFIG_VFAT_FS is useless as mounting vfat fails.
+Am 02.08.2014 14:56, schrieb Tomasz Figa:
+> On 02.08.2014 14:21, Tomasz Figa wrote:
+>> On 02.08.2014 02:52, Andreas F?rber wrote:
+>>> Use the new style of referencing inherited nodes and use symbolic names.
+>>> Reorder one pinctrl node in GPIO order.
+>>>
+>>> Goal is the alignment of all exynos5250 based device trees for comparison.
+>>>
+>>> Suggested-by: Doug Anderson <dianders@chromium.org>
+>>> Reviewed-by: Doug Anderson <dianders@chromium.org>
+>>> Signed-off-by: Andreas F?rber <afaerber@suse.de>
+>>> ---
+>>>  v5 -> v6:
+>>>  * Split off label additions (Doug Anderson)
+>>>  * Fixed alphabetical order of sd3_* nodes (Doug Anderson)
+>>>  
+>>>  v4 -> v5:
+>>>  * Introduced labels to consistently use new referencing style (Tomasz Figa)
+>>>  * Use IRQ_TYPE_* constants
+>>>  * Use some more GPIO_ACTIVE_*
+>>>
+>>>  v3 -> v4: Unchanged
+>>>  
+>>>  v3: New (Doug Anderson)
+>>>
+>>>  arch/arm/boot/dts/exynos5250-snow.dts | 291 +++++++++++++++++-----------------
+>>>  1 file changed, 145 insertions(+), 146 deletions(-)
+>>
+>> Reviewed-by: Tomasz Figa <t.figa@samsung.com>
+> 
+> Just for convenience of other reviewers, here are actual changes done do
+> the device tree after compiling into dtb and then back into dts:
 
-Signed-off-by: Luc Verhaegen <libv@skynet.be>
----
- arch/arm/configs/sunxi_defconfig |    2 ++
- 1 files changed, 2 insertions(+), 0 deletions(-)
+Erm, to not confuse reviewers, this must be over the whole series:
 
-diff --git a/arch/arm/configs/sunxi_defconfig b/arch/arm/configs/sunxi_defconfig
-index 7209bfd..4532059 100644
---- a/arch/arm/configs/sunxi_defconfig
-+++ b/arch/arm/configs/sunxi_defconfig
-@@ -103,5 +103,7 @@ CONFIG_NFS_FS=y
- CONFIG_NFS_V3_ACL=y
- CONFIG_NFS_V4=y
- CONFIG_ROOT_NFS=y
-+CONFIG_NLS_CODEPAGE_437=y
-+CONFIG_NLS_ISO8859_1=y
- CONFIG_PRINTK_TIME=y
- CONFIG_DEBUG_FS=y
+>> --- exynos5250-snow.dtb.dts	2014-08-02 14:54:15.145905921 +0200
+>> +++ ../dtbs.post/exynos5250-snow.dtb.dts	2014-08-02 14:54:15.146905921 +0200
+>> @@ -8,6 +8,7 @@
+>>  	model = "Google Snow";
+>>  
+>>  	chosen {
+>> +		bootargs = "console=tty1";
+>>  	};
+>>  
+>>  	aliases {
+
+This is optional follow-on patch 05/10.
+
+>> @@ -829,15 +830,6 @@
+>>  			phandle = <0x44>;
+>>  		};
+>>  
+>> -		hdmi-hpd-irq {
+>> -			samsung,pins = "gpx3-7";
+>> -			samsung,pin-function = <0x0>;
+>> -			samsung,pin-pud = <0x1>;
+>> -			samsung,pin-drv = <0x0>;
+>> -			linux,phandle = <0x33>;
+>> -			phandle = <0x33>;
+>> -		};
+>> -
+>>  		max77686-irq {
+>>  			samsung,pins = "gpx3-2";
+>>  			samsung,pin-function = <0x0>;
+>> @@ -846,6 +838,15 @@
+>>  			linux,phandle = <0xe>;
+>>  			phandle = <0xe>;
+>>  		};
+>> +
+>> +		hdmi-hpd-irq {
+>> +			samsung,pins = "gpx3-7";
+>> +			samsung,pin-function = <0x0>;
+>> +			samsung,pin-pud = <0x1>;
+>> +			samsung,pin-drv = <0x0>;
+>> +			linux,phandle = <0x33>;
+>> +			phandle = <0x33>;
+>> +		};
+>>  	};
+>>  
+>>  	pinctrl at 13400000 {
+
+This is this patch 04/10. Just a movement.
+
+>> @@ -1703,12 +1704,12 @@
+>>  		samsung,dw-mshc-ciu-div = <0x3>;
+>>  		samsung,dw-mshc-sdr-timing = <0x2 0x3>;
+>>  		samsung,dw-mshc-ddr-timing = <0x1 0x2>;
+>> +		pinctrl-names = "default";
+>> +		pinctrl-0 = <0x27 0x28 0x29>;
+>>  
+>>  		slot at 0 {
+>>  			reg = <0x0>;
+>>  			bus-width = <0x4>;
+>> -			pinctrl-names = "default";
+>> -			pinctrl-0 = <0x27 0x28 0x29>;
+>>  		};
+>>  	};
+>>  
+
+This is preceding patch 01/10.
+
+Regards,
+Andreas
+
 -- 
-1.7.7
+SUSE LINUX Products GmbH, Maxfeldstr. 5, 90409 N?rnberg, Germany
+GF: Jeff Hawn, Jennifer Guild, Felix Imend?rffer; HRB 16746 AG N?rnberg
