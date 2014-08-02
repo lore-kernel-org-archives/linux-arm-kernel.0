@@ -1,58 +1,40 @@
 From: tomasz.figa@gmail.com (Tomasz Figa)
-Date: Sat, 02 Aug 2014 14:19:23 +0200
-Subject: [PATCH v6 03/10] ARM: dts: Prepare node labels for exynos5250
-In-Reply-To: <1406940750-15880-4-git-send-email-afaerber@suse.de>
+Date: Sat, 02 Aug 2014 14:21:43 +0200
+Subject: [PATCH v6 04/10] ARM: dts: Clean up exynos5250-snow
+In-Reply-To: <1406940750-15880-5-git-send-email-afaerber@suse.de>
 References: <1406940750-15880-1-git-send-email-afaerber@suse.de>
- <1406940750-15880-4-git-send-email-afaerber@suse.de>
-Message-ID: <53DCD74B.8090400@gmail.com>
+ <1406940750-15880-5-git-send-email-afaerber@suse.de>
+Message-ID: <53DCD7D7.2070208@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Andreas,
-
-Ehh, one more thing. It looks like my memory is playing tricks on me.
-Please see inline.
-
 On 02.08.2014 02:52, Andreas F?rber wrote:
-> Allows them to be extended by reference.
+> Use the new style of referencing inherited nodes and use symbolic names.
+> Reorder one pinctrl node in GPIO order.
 > 
+> Goal is the alignment of all exynos5250 based device trees for comparison.
+> 
+> Suggested-by: Doug Anderson <dianders@chromium.org>
+> Reviewed-by: Doug Anderson <dianders@chromium.org>
 > Signed-off-by: Andreas F?rber <afaerber@suse.de>
 > ---
->  v6: Split off from Snow/SMDK cleanups (Doug Anderson)
-
-[snip]
-
-> -	serial at 12C00000 {
-> +	uart0: serial at 12C00000 {
->  		clocks = <&clock CLK_UART0>, <&clock CLK_SCLK_UART0>;
->  		clock-names = "uart", "clk_uart_baud0";
->  	};
+>  v5 -> v6:
+>  * Split off label additions (Doug Anderson)
+>  * Fixed alphabetical order of sd3_* nodes (Doug Anderson)
 >  
-> -	serial at 12C10000 {
-> +	uart1: serial at 12C10000 {
->  		clocks = <&clock CLK_UART1>, <&clock CLK_SCLK_UART1>;
->  		clock-names = "uart", "clk_uart_baud0";
->  	};
+>  v4 -> v5:
+>  * Introduced labels to consistently use new referencing style (Tomasz Figa)
+>  * Use IRQ_TYPE_* constants
+>  * Use some more GPIO_ACTIVE_*
+> 
+>  v3 -> v4: Unchanged
 >  
-> -	serial at 12C20000 {
-> +	uart2: serial at 12C20000 {
->  		clocks = <&clock CLK_UART2>, <&clock CLK_SCLK_UART2>;
->  		clock-names = "uart", "clk_uart_baud0";
->  	};
->  
-> -	serial at 12C30000 {
-> +	uart3: serial at 12C30000 {
->  		clocks = <&clock CLK_UART3>, <&clock CLK_SCLK_UART3>;
->  		clock-names = "uart", "clk_uart_baud0";
->  	};
+>  v3: New (Doug Anderson)
+> 
+>  arch/arm/boot/dts/exynos5250-snow.dts | 291 +++++++++++++++++-----------------
+>  1 file changed, 145 insertions(+), 146 deletions(-)
 
-I forgot about a series [1] that went through tty tree, which is going
-to conflict with this patch. It already adds labels to uart nodes in
-serial_X format. I don't really remember why I went with this format for
-Exynos SoCs and with uartX for older ones...
-
-[1]
-https://git.kernel.org/cgit/linux/kernel/git/next/linux-next.git/commit/arch/arm/boot/dts?id=1e64f48ea7c59fb94acd7551dd9fa68b8a752efc
+Reviewed-by: Tomasz Figa <t.figa@samsung.com>
 
 Best regards,
 Tomasz
