@@ -1,38 +1,37 @@
 From: afaerber@suse.de (=?UTF-8?q?Andreas=20F=C3=A4rber?=)
-Date: Sat,  2 Aug 2014 02:52:28 +0200
-Subject: [PATCH v6 08/10] ARM: dts: Fix apparent GPIO typo in
- exynos5250-arndale
+Date: Sat,  2 Aug 2014 02:52:25 +0200
+Subject: [PATCH v6 05/10] ARM: dts: Fill in bootargs for exynos5250-snow
 In-Reply-To: <1406940750-15880-1-git-send-email-afaerber@suse.de>
 References: <1406940750-15880-1-git-send-email-afaerber@suse.de>
-Message-ID: <1406940750-15880-9-git-send-email-afaerber@suse.de>
+Message-ID: <1406940750-15880-6-git-send-email-afaerber@suse.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The GPIO flag 2 has no constant assigned, so this was probably active-low.
+exynos5250-cros-common.dtsi had an empty /chosen node.
+Fill in exemplary boot arguments.
 
 Reviewed-by: Tomasz Figa <t.figa@samsung.com>
 Signed-off-by: Andreas F?rber <afaerber@suse.de>
 ---
  v5 -> v6: Unchanged
- 
+
  v5: New
- Spotted during cleanup.
+ Cleanup for /chosen node moved into -snow.dts.
 
- arch/arm/boot/dts/exynos5250-arndale.dts | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+ arch/arm/boot/dts/exynos5250-snow.dts | 1 +
+ 1 file changed, 1 insertion(+)
 
-diff --git a/arch/arm/boot/dts/exynos5250-arndale.dts b/arch/arm/boot/dts/exynos5250-arndale.dts
-index aac41c394d43..cc8b9ffeecc1 100644
---- a/arch/arm/boot/dts/exynos5250-arndale.dts
-+++ b/arch/arm/boot/dts/exynos5250-arndale.dts
-@@ -159,7 +159,7 @@
- };
+diff --git a/arch/arm/boot/dts/exynos5250-snow.dts b/arch/arm/boot/dts/exynos5250-snow.dts
+index 40cad43f8a11..8d8e62de86c7 100644
+--- a/arch/arm/boot/dts/exynos5250-snow.dts
++++ b/arch/arm/boot/dts/exynos5250-snow.dts
+@@ -27,6 +27,7 @@
+ 	};
  
- &hdmi {
--	hpd-gpio = <&gpx3 7 2>;
-+	hpd-gpio = <&gpx3 7 GPIO_ACTIVE_LOW>;
- 	vdd_osc-supply = <&ldo10_reg>;
- 	vdd_pll-supply = <&ldo8_reg>;
- 	vdd-supply = <&ldo8_reg>;
+ 	chosen {
++		bootargs = "console=tty1";
+ 	};
+ 
+ 	gpio-keys {
 -- 
 1.9.3
