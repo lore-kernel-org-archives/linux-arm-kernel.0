@@ -1,60 +1,34 @@
-From: afaerber@suse.de (=?UTF-8?B?QW5kcmVhcyBGw6RyYmVy?=)
-Date: Sat, 02 Aug 2014 09:49:53 +0200
-Subject: [PATCH v4 4/4] ARM: dts: Add exynos5250-spring device tree
-In-Reply-To: <CAD=FV=XVM4FUMxjindZGXku5DZ1MkTWq=Smmt_Fs7=_i4MBFKw@mail.gmail.com>
-References: <1406822910-6255-1-git-send-email-afaerber@suse.de>	<1406822910-6255-5-git-send-email-afaerber@suse.de>	<53DA936E.9060004@gmail.com>	<53DA9709.10602@suse.de>	<53DA9BA9.60808@gmail.com>
- <CAD=FV=XVM4FUMxjindZGXku5DZ1MkTWq=Smmt_Fs7=_i4MBFKw@mail.gmail.com>
-Message-ID: <53DC9821.3010108@suse.de>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Sat, 2 Aug 2014 08:51:18 +0100
+Subject: [PATCH 02/15] ARM: pass IRQ domain to the core IRQ handler
+In-Reply-To: <1404825038-547-3-git-send-email-marc.zyngier@arm.com>
+References: <1404825038-547-1-git-send-email-marc.zyngier@arm.com>
+ <1404825038-547-3-git-send-email-marc.zyngier@arm.com>
+Message-ID: <20140802075118.GV30282@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am 02.08.2014 07:15, schrieb Doug Anderson:
-> On Thu, Jul 31, 2014 at 12:40 PM, Tomasz Figa <tomasz.figa@gmail.com> wrote:
->> On 31.07.2014 21:20, Andreas F?rber wrote:
->>> Am 31.07.2014 21:05, schrieb Tomasz Figa:
->>>> On 31.07.2014 18:08, Andreas F?rber wrote:
->>>>> +&sd1_clk {
->>>>> +   samsung,pin-drv = <0>;
->>>>> +};
->>>>> +
->>>>> +&sd1_cmd {
->>>>> +   samsung,pin-pud = <3>;
->>>>> +   samsung,pin-drv = <0>;
->>>>> +};
->>>>> +
->>>>> +&sd1_cd {
->>>>> +   samsung,pin-drv = <0>;
->>>>> +};
->>>>> +
->>>>> +&sd1_bus4 {
->>>>> +   samsung,pin-drv = <0>;
->>>>> +};
->>>>
->>>> Here generic settings are being overridden, so it might be a good idea
->>>> to explain why, like with i2c pull-up above.
->>>
->>> Snow does not have an explanation either, so please suggest what comment
->>> you'd like to see. Consider me just a user with no specs. :)
->>
->> Doug, Vincent, someone else?
+On Tue, Jul 08, 2014 at 02:10:25PM +0100, Marc Zyngier wrote:
+> Calling irq_find_mapping from outside a irq_{enter,exit} section is
+> unsafe and produces ugly messages if CONFIG_PROVE_RCU is enabled:
+> If coming from the idle state, the rcu_read_lock call in irq_find_mapping
+> will generate an an unpleasant warning.
 > 
-> The comment is just in a different place--it's in the dw_mmc node.
-> Probably belongs here, though:
+> A solution is to add a new handle_domain_irq entry point into
+> the arm code that the interrupt controller code can call.
+> This new function takes an irq_domain, and calls into irq_find_domain
+> inside the irq_{enter,exit} block.
 > 
->                 /*
->                  * Wifi is a SiP, so can keep drive strengths low
->                  * to reduce EMI.
->                  */
-> 
+> Interrupt controllers can then be updated to use the new mechanism.
 
-I did copy such a comment for the MMC node in v5, still present in v6.
+I merged this last night, and this says it all...
 
-Andreas
+Subject: rmk build: 244 warnings 49 failures (rmk/v3.16-rc3-70-gc1ed1df)
 
-> I guess the cmd line isn't documented.  There is no external pull on
-> the command line and on most boards there is one.  Our hardware guys
-> thought we didn't need it and apparently we don't...
+arch/arm/kernel/irq.c:81:3: error: implicit declaration of function 'irq_find_mapping' [-Werror=implicit-function-declaration]
+
+So I'm dropping it.
 
 -- 
-SUSE LINUX Products GmbH, Maxfeldstr. 5, 90409 N?rnberg, Germany
-GF: Jeff Hawn, Jennifer Guild, Felix Imend?rffer; HRB 16746 AG N?rnberg
+FTTC broadband for 0.8mile line: currently at 9.5Mbps down 400kbps up
+according to speedtest.net.
