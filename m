@@ -1,117 +1,106 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Sat, 2 Aug 2014 21:05:15 +0200
-Subject: [PATCH] Documentation: dmaengine: Add a documentation for the
- dma controller API
-In-Reply-To: <20140802152921.GC30282@n2100.arm.linux.org.uk>
-References: <1406736193-26685-1-git-send-email-maxime.ripard@free-electrons.com>
- <20140730160607.GM8181@intel.com> <20140731074440.GY3952@lukather>
- <20140731132223.GK30282@n2100.arm.linux.org.uk>
- <20140731164152.GF3952@lukather>
- <20140801145325.GR30282@n2100.arm.linux.org.uk>
- <20140802151144.GK3952@lukather>
- <20140802152921.GC30282@n2100.arm.linux.org.uk>
-Message-ID: <20140802190515.GN3952@lukather>
+From: heiko@sntech.de (Heiko =?ISO-8859-1?Q?St=FCbner?=)
+Date: Sat, 02 Aug 2014 21:51:42 +0200
+Subject: [PATCH v5.1 9/7] watchdog: s3c2410: add restart handler
+In-Reply-To: <53D9010B.7070700@roeck-us.net>
+References: <1405668856-13738-1-git-send-email-linux@roeck-us.net>
+ <53D8FCEA.9020506@roeck-us.net> <53D9010B.7070700@roeck-us.net>
+Message-ID: <1701800.eiHDUvPYI3@diego>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Aug 02, 2014 at 04:29:21PM +0100, Russell King - ARM Linux wrote:
-> On Sat, Aug 02, 2014 at 05:11:44PM +0200, Maxime Ripard wrote:
-> > On Fri, Aug 01, 2014 at 03:53:26PM +0100, Russell King - ARM Linux wrote:
-> > > > > >   - That might just be my experience, but judging from previous
-> > > > > >     commits, DMA_PRIVATE is completely obscure, and we just set it
-> > > > > >     because it was making it work, without knowing what it was
-> > > > > >     supposed to do.
-> > > > > 
-> > > > > DMA_PRIVATE means that the channel is unavailable for async-tx operations
-> > > > > - in other words, it's slave-only.  Setting it before registration results
-> > > > > in the private-use count being incremented, disabling the DMA_PRIVATE
-> > > > > manipulation in the channel request/release APIs (requested channels are
-> > > > > unavailable for async-tx operations, which is why that flag is also set
-> > > > > there.)
-> > > > > 
-> > > > > To put it another way, if a DMA engine driver only provides slave DMA
-> > > > > support, it must set DMA_PRIVATE to mark the channel unavailable for
-> > > > > async-tx operations.  If a DMA engine drivers channels can also be used
-> > > > > for async-tx operations, then it should leave the flag clear.
-> > > > 
-> > > > What about channels that can be both used for slave operations and
-> > > > async-tx (like memcpy) ?
-> > > 
-> > > Then you don't set DMA_PRIVATE when the DMA engine driver registers with
-> > > the core.  That then allows the DMA engine core to manage the flag,
-> > > setting it when the channel is allocated for slave usage.
-> > 
-> > Then I guess we currently have a bug related to this.
-> > 
-> > During the development of the A31 driver that recently got merged,
-> > during two subsequent channel allocation, the second would fail if
-> > DMA_PRIVATE wasn't set.
-> > 
-> > I think it was on in dmaengine_get, but I'll have to get back to you
-> > on that whenever I'm back from my holydays.
-> 
-> I think you mean dma_chan_get().  dmaengine_get() is used to obtain
-> references to the async_tx memcpy/crypto channels, and should not be used
-> by a driver making use of the slave capabilities.
+On a lot of Samsung systems the watchdog is responsible for restarting the
+system and until now this code was contained in plat-samsung/watchdog-reset.c .
 
-Like I said, I don't remember where the actual issue was lying, but
-ignoring DMA_PRIVATE prevented to allocate two channels at the same
-time in my case.
+With the introduction of the restart handlers, this code can now move into
+driver itself, removing the need for arch-specific code.
 
-When I'll have access again to my board, I'll try to dig more into it.
+Tested on a S3C2442 based GTA02
+Signed-off-by: Heiko Stuebner <heiko@sntech.de>
+[Guenter Roeck: Update to latest API; do not require static context variable]
+Signed-off-by: Guenter Roeck <linux@roeck-us.net>
+Acked-by: Heiko Stuebner <heiko@sntech.de>
+---
+changes since v5:
+- reintroduce the mdelay(500) from the platform code, to make sure the
+  watchdog has time to assert, as suggested by Tomasz Figa
 
-> There two systems are slightly competitive between each other.  Slave
-> stuff generally want to get hold of specific channels, whereas the
-> async_tx stuff can generally do with any channel which provides the
-> appropriate capabilities, and can switch between channels if it needs
-> to perform a series of operations only supported by separate channels.
-> 
-> > You can also add vchan scheduling or descriptor allocations. The atmel
-> > guys seem to have hit a performance issue with dma_pool_alloc, so they
-> > re-developped a descriptor allocation mechanism in their driver. I
-> > don't have much more details on this, but if that was to be true, that
-> > would definitely be something that should be in the framework.
-> 
-> It is entirely legal for a dmaengine driver to maintain its own list of
-> "free" transaction descriptors (that's actually what many async-tx
-> drivers do) and is partly why there's the alloc_chan_resources and
-> free_chan_resources callbacks.
-> 
-> However, they tend to be fairly large structures, and don't always
-> match what the hardware wants, so using them to describe the individual
-> scatterlist elements of a transaction is not always a good idea.
+ drivers/watchdog/s3c2410_wdt.c | 36 ++++++++++++++++++++++++++++++++++++
+ 1 file changed, 36 insertions(+)
 
-I was not really claiming it was illegal, but rather that it could be
-useful for other drivers too.
-
-> > vchan mapping to physical channels also seem to be quite common in the
-> > drivers. That would be a nice addition too.
-> 
-> It's intentionally not in the vchan interface because that mapping is
-> device specific.
-> 
-> For example, there are some DMA engine implementations where certain
-> physical DMA channels should not be used because they have slightly
-> different properties (for example, they can lock the CPU off the bus
-> if they're permanently transferring data, such as in a memcpy or
-> device-to-memory transfer where the device always has data available.)
-> 
-> In any case, I'm not interested in seeing vchan turning into another
-> "layer" - it must remain a library.  Layers are bad news. :)
-
-Yeah, I was assuming there would be such constraints. Still, handling
-the trivial case where you can map any vchan to any free physical
-channels is very painful, while at least a couple of drivers implement
-the same dumb logic.
-
+diff --git a/drivers/watchdog/s3c2410_wdt.c b/drivers/watchdog/s3c2410_wdt.c
+index 7c6ccd0..2955aef 100644
+--- a/drivers/watchdog/s3c2410_wdt.c
++++ b/drivers/watchdog/s3c2410_wdt.c
+@@ -41,6 +41,8 @@
+ #include <linux/of.h>
+ #include <linux/mfd/syscon.h>
+ #include <linux/regmap.h>
++#include <linux/reboot.h>
++#include <linux/delay.h>
+ 
+ #define S3C2410_WTCON		0x00
+ #define S3C2410_WTDAT		0x04
+@@ -128,6 +130,7 @@ struct s3c2410_wdt {
+ 	unsigned long		wtdat_save;
+ 	struct watchdog_device	wdt_device;
+ 	struct notifier_block	freq_transition;
++	struct notifier_block	restart_handler;
+ 	struct s3c2410_wdt_variant *drv_data;
+ 	struct regmap *pmureg;
+ };
+@@ -438,6 +441,31 @@ static inline void s3c2410wdt_cpufreq_deregister(struct s3c2410_wdt *wdt)
+ }
+ #endif
+ 
++static int s3c2410wdt_restart(struct notifier_block *this,
++			      unsigned long mode, void *cmd)
++{
++	struct s3c2410_wdt *wdt = container_of(this, struct s3c2410_wdt,
++					       restart_handler);
++	void __iomem *wdt_base = wdt->reg_base;
++
++	/* disable watchdog, to be safe  */
++	writel(0, wdt_base + S3C2410_WTCON);
++
++	/* put initial values into count and data */
++	writel(0x80, wdt_base + S3C2410_WTCNT);
++	writel(0x80, wdt_base + S3C2410_WTDAT);
++
++	/* set the watchdog to go and reset... */
++	writel(S3C2410_WTCON_ENABLE | S3C2410_WTCON_DIV16 |
++		S3C2410_WTCON_RSTEN | S3C2410_WTCON_PRESCALE(0x20),
++		wdt_base + S3C2410_WTCON);
++
++	/* wait for reset to assert... */
++	mdelay(500);
++
++	return NOTIFY_DONE;
++}
++
+ static inline unsigned int s3c2410wdt_get_bootstatus(struct s3c2410_wdt *wdt)
+ {
+ 	unsigned int rst_stat;
+@@ -592,6 +620,12 @@ static int s3c2410wdt_probe(struct platform_device *pdev)
+ 
+ 	platform_set_drvdata(pdev, wdt);
+ 
++	wdt->restart_handler.notifier_call = s3c2410wdt_restart;
++	wdt->restart_handler.priority = 128;
++	ret = register_restart_handler(&wdt->restart_handler);
++	if (ret)
++		pr_err("cannot register restart handler, %d\n", ret);
++
+ 	/* print out a statement of readiness */
+ 
+ 	wtcon = readl(wdt->reg_base + S3C2410_WTCON);
+@@ -621,6 +655,8 @@ static int s3c2410wdt_remove(struct platform_device *dev)
+ 	int ret;
+ 	struct s3c2410_wdt *wdt = platform_get_drvdata(dev);
+ 
++	unregister_restart_handler(&wdt->restart_handler);
++
+ 	ret = s3c2410wdt_mask_and_disable_reset(wdt, true);
+ 	if (ret < 0)
+ 		return ret;
 -- 
-Maxime Ripard, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140802/035803e7/attachment.sig>
+2.0.1
