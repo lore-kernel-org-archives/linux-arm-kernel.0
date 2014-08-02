@@ -1,79 +1,54 @@
-From: afaerber@suse.de (=?UTF-8?B?QW5kcmVhcyBGw6RyYmVy?=)
-Date: Sat, 02 Aug 2014 15:10:45 +0200
-Subject: [PATCH v6 07/10] ARM: dts: Clean up exynos5250-arndale
-In-Reply-To: <53DCE14A.3020108@gmail.com>
-References: <1406940750-15880-1-git-send-email-afaerber@suse.de>
- <1406940750-15880-8-git-send-email-afaerber@suse.de>
- <53DCE14A.3020108@gmail.com>
-Message-ID: <53DCE355.7010004@suse.de>
+From: tomasz.figa@gmail.com (Tomasz Figa)
+Date: Sat, 02 Aug 2014 15:13:51 +0200
+Subject: [PATCH v6 00/10] ARM: dts: exynos: Prepare Spring
+In-Reply-To: <53DCBC84.8080600@suse.de>
+References: <1406940750-15880-1-git-send-email-afaerber@suse.de>	<53DC4E41.4050200@collabora.co.uk>
+ <CAD=FV=V_vXZLMaTMFdgr62=zRXucZA6D3PvS0Mb40he0ShHTfA@mail.gmail.com>
+ <53DCBC84.8080600@suse.de>
+Message-ID: <53DCE40F.10809@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am 02.08.2014 15:02, schrieb Tomasz Figa:
-> On 02.08.2014 02:52, Andreas F?rber wrote:
->> Use the new style of referencing inherited nodes, use symbolic names,
->> tidy indentation and reorder includes.
->>
->> Goal is the alignment of all exynos5250 based device trees for comparison.
->>
->> Signed-off-by: Andreas F?rber <afaerber@suse.de>
->> ---
->>  v5 -> v6:
->>  * Updated for mfc node label
->>  
->>  v5: New
->>  Aligns with SMDK.
->>
->>  arch/arm/boot/dts/exynos5250-arndale.dts | 929 ++++++++++++++++---------------
->>  1 file changed, 466 insertions(+), 463 deletions(-)
->>
+On 02.08.2014 12:25, Andreas F?rber wrote:
+
+[snip]
+
+> One thing I've wondered is whether we should put status = "disabled" on
+> the dp node with some comment, since it's known not to work as is (but
+> better having the data here than leaving it out, I believe).
+
+Does the DP node itself need more data to work or just some external
+things are missing? If the former then probably status = "disabled"
+should be set, otherwise "okay" is fine if provided data are enough to
+probe the Exynos DP driver.
+
 > 
-> Diff in resulting dtb:
+> Of course if either of you has input on the discussions on the drm
+> bridge/panel series V6 [1] for how to enable non-simplefb display and
+> iommus, that would be valuable.
 
-Same here, appears to be over whole series:
+Support for Exynos IOMMU is being worked on right now and patches adding
+DT support from Marek Szyprowski should show up on the lists in very
+near future. However I think you don't strictly need IOMMU to get
+non-simplefb display, as CMA can be used to allocate contiguous memory.
 
->> --- exynos5250-arndale.dtb.dts	2014-08-02 14:54:15.102905920 +0200
->> +++ ../dtbs.post/exynos5250-arndale.dtb.dts	2014-08-02 14:54:15.104905920 +0200
->> @@ -1977,7 +1977,7 @@
->>  		clocks = <0x2 0x158 0x2 0x88 0x2 0x89 0x2 0x9f 0x2 0x400>;
->>  		clock-names = "hdmi", "sclk_hdmi", "sclk_pixel", "sclk_hdmiphy", "mout_hdmi";
->>  		samsung,syscon-phandle = <0x7>;
->> -		hpd-gpio = <0xc 0x7 0x2>;
->> +		hpd-gpio = <0xc 0x7 0x1>;
->>  		vdd_osc-supply = <0x31>;
->>  		vdd_pll-supply = <0x32>;
->>  		vdd-supply = <0x32>;
+> 
+> [1] http://www.spinics.net/lists/linux-samsung-soc/msg35274.html
+> 
 
-Optional follow-up patch 08/10.
+[snip]
 
->> @@ -2104,15 +2104,9 @@
->>  		};
->>  	};
->>  
->> -	usb_hub_bus {
->> -		compatible = "simple-bus";
->> -		#address-cells = <0x1>;
->> -		#size-cells = <0x0>;
->> -
->> -		usb_hub {
->> -			compatible = "smsc,usb3503a";
->> -			reset-gpios = <0xc 0x5 0x1>;
->> -			connect-gpios = <0x10 0x7 0x1>;
->> -		};
->> +	usb-hub {
->> +		compatible = "smsc,usb3503a";
->> +		reset-gpios = <0xc 0x5 0x1>;
->> +		connect-gpios = <0x10 0x7 0x1>;
->>  	};
->>  };
+> For the touchpad it seems DT support has landed in the input tree as
+> "atmel,maxtouch". Backporting just that patch does not make it work
+> though. (Tried the rejected pinctrl approach to be on the safe side.)
+> https://code.google.com/p/chromium/issues/detail?id=371114
+> https://patchwork.kernel.org/patch/3976801/
 
-Optional follow-up patch 09/10.
+Looking at what we already have in mainline and the discussion in
+Chromium issue tracker, current driver should be already in shape to
+handle the Chromebooks. Apparently it even supports recovery from
+bootloader mode without the need to parse bootloader address from DT (it
+somehow calculates possible addresses from main address).
 
-> Reviewed-by: Tomasz Figa <t.figa@samsung.com>
-
-Thanks,
-Andreas
-
--- 
-SUSE LINUX Products GmbH, Maxfeldstr. 5, 90409 N?rnberg, Germany
-GF: Jeff Hawn, Jennifer Guild, Felix Imend?rffer; HRB 16746 AG N?rnberg
+Best regards,
+Tomasz
