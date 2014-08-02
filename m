@@ -1,54 +1,38 @@
 From: afaerber@suse.de (=?UTF-8?q?Andreas=20F=C3=A4rber?=)
-Date: Sat,  2 Aug 2014 02:52:29 +0200
-Subject: [PATCH v6 09/10] ARM: dts: Simplify USB3503 on exynos5250-arndale
+Date: Sat,  2 Aug 2014 02:52:28 +0200
+Subject: [PATCH v6 08/10] ARM: dts: Fix apparent GPIO typo in
+ exynos5250-arndale
 In-Reply-To: <1406940750-15880-1-git-send-email-afaerber@suse.de>
 References: <1406940750-15880-1-git-send-email-afaerber@suse.de>
-Message-ID: <1406940750-15880-10-git-send-email-afaerber@suse.de>
+Message-ID: <1406940750-15880-9-git-send-email-afaerber@suse.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-There's no need for a simple-bus, place the smsc,usb3503a directly into
-the root node. That's what we're going to do on exynos5250-spring.
+The GPIO flag 2 has no constant assigned, so this was probably active-low.
 
-Reported-by: Tomasz Figa <t.figa@samsung.com>
 Reviewed-by: Tomasz Figa <t.figa@samsung.com>
 Signed-off-by: Andreas F?rber <afaerber@suse.de>
 ---
  v5 -> v6: Unchanged
  
  v5: New
- Aligns with Spring's new USB3503 node.
+ Spotted during cleanup.
 
- arch/arm/boot/dts/exynos5250-arndale.dts | 16 +++++-----------
- 1 file changed, 5 insertions(+), 11 deletions(-)
+ arch/arm/boot/dts/exynos5250-arndale.dts | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
 diff --git a/arch/arm/boot/dts/exynos5250-arndale.dts b/arch/arm/boot/dts/exynos5250-arndale.dts
-index cc8b9ffeecc1..b231bcff7403 100644
+index aac41c394d43..cc8b9ffeecc1 100644
 --- a/arch/arm/boot/dts/exynos5250-arndale.dts
 +++ b/arch/arm/boot/dts/exynos5250-arndale.dts
-@@ -108,18 +108,12 @@
- 		};
- 	};
- 
--	usb_hub_bus {
--		compatible = "simple-bus";
--		#address-cells = <1>;
--		#size-cells = <0>;
-+	// SMSC USB3503 connected in hardware only mode as a PHY
-+	usb_hub: usb-hub {
-+		compatible = "smsc,usb3503a";
- 
--		// SMSC USB3503 connected in hardware only mode as a PHY
--		usb_hub: usb_hub {
--			compatible = "smsc,usb3503a";
--
--			reset-gpios = <&gpx3 5 GPIO_ACTIVE_LOW>;
--			connect-gpios = <&gpd1 7 GPIO_ACTIVE_LOW>;
--		};
-+		reset-gpios = <&gpx3 5 GPIO_ACTIVE_LOW>;
-+		connect-gpios = <&gpd1 7 GPIO_ACTIVE_LOW>;
- 	};
+@@ -159,7 +159,7 @@
  };
  
+ &hdmi {
+-	hpd-gpio = <&gpx3 7 2>;
++	hpd-gpio = <&gpx3 7 GPIO_ACTIVE_LOW>;
+ 	vdd_osc-supply = <&ldo10_reg>;
+ 	vdd_pll-supply = <&ldo8_reg>;
+ 	vdd-supply = <&ldo8_reg>;
 -- 
 1.9.3
