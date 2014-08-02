@@ -1,68 +1,66 @@
-From: afaerber@suse.de (=?UTF-8?B?QW5kcmVhcyBGw6RyYmVy?=)
-Date: Sat, 02 Aug 2014 15:00:36 +0200
-Subject: [PATCH v6 03/10] ARM: dts: Prepare node labels for exynos5250
-In-Reply-To: <53DCD74B.8090400@gmail.com>
+From: tomasz.figa@gmail.com (Tomasz Figa)
+Date: Sat, 02 Aug 2014 15:02:02 +0200
+Subject: [PATCH v6 07/10] ARM: dts: Clean up exynos5250-arndale
+In-Reply-To: <1406940750-15880-8-git-send-email-afaerber@suse.de>
 References: <1406940750-15880-1-git-send-email-afaerber@suse.de>
- <1406940750-15880-4-git-send-email-afaerber@suse.de>
- <53DCD74B.8090400@gmail.com>
-Message-ID: <53DCE0F4.4060101@suse.de>
+ <1406940750-15880-8-git-send-email-afaerber@suse.de>
+Message-ID: <53DCE14A.3020108@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am 02.08.2014 14:19, schrieb Tomasz Figa:
-> Andreas,
+On 02.08.2014 02:52, Andreas F?rber wrote:
+> Use the new style of referencing inherited nodes, use symbolic names,
+> tidy indentation and reorder includes.
 > 
-> Ehh, one more thing. It looks like my memory is playing tricks on me.
-> Please see inline.
+> Goal is the alignment of all exynos5250 based device trees for comparison.
 > 
-> On 02.08.2014 02:52, Andreas F?rber wrote:
->> Allows them to be extended by reference.
->>
->> Signed-off-by: Andreas F?rber <afaerber@suse.de>
->> ---
->>  v6: Split off from Snow/SMDK cleanups (Doug Anderson)
+> Signed-off-by: Andreas F?rber <afaerber@suse.de>
+> ---
+>  v5 -> v6:
+>  * Updated for mfc node label
+>  
+>  v5: New
+>  Aligns with SMDK.
 > 
-> [snip]
+>  arch/arm/boot/dts/exynos5250-arndale.dts | 929 ++++++++++++++++---------------
+>  1 file changed, 466 insertions(+), 463 deletions(-)
 > 
->> -	serial at 12C00000 {
->> +	uart0: serial at 12C00000 {
->>  		clocks = <&clock CLK_UART0>, <&clock CLK_SCLK_UART0>;
->>  		clock-names = "uart", "clk_uart_baud0";
->>  	};
->>  
->> -	serial at 12C10000 {
->> +	uart1: serial at 12C10000 {
->>  		clocks = <&clock CLK_UART1>, <&clock CLK_SCLK_UART1>;
->>  		clock-names = "uart", "clk_uart_baud0";
->>  	};
->>  
->> -	serial at 12C20000 {
->> +	uart2: serial at 12C20000 {
->>  		clocks = <&clock CLK_UART2>, <&clock CLK_SCLK_UART2>;
->>  		clock-names = "uart", "clk_uart_baud0";
->>  	};
->>  
->> -	serial at 12C30000 {
->> +	uart3: serial at 12C30000 {
->>  		clocks = <&clock CLK_UART3>, <&clock CLK_SCLK_UART3>;
->>  		clock-names = "uart", "clk_uart_baud0";
->>  	};
-> 
-> I forgot about a series [1] that went through tty tree, which is going
-> to conflict with this patch. It already adds labels to uart nodes in
-> serial_X format. I don't really remember why I went with this format for
-> Exynos SoCs and with uartX for older ones...
-> 
-> [1]
-> https://git.kernel.org/cgit/linux/kernel/git/next/linux-next.git/commit/arch/arm/boot/dts?id=1e64f48ea7c59fb94acd7551dd9fa68b8a752efc
 
-I doubt that I'll manage to resend another time today, so please just
-drop those hunks from my patch before applying - I ended up not using
-them here.
+Diff in resulting dtb:
 
-Regards,
-Andreas
+> --- exynos5250-arndale.dtb.dts	2014-08-02 14:54:15.102905920 +0200
+> +++ ../dtbs.post/exynos5250-arndale.dtb.dts	2014-08-02 14:54:15.104905920 +0200
+> @@ -1977,7 +1977,7 @@
+>  		clocks = <0x2 0x158 0x2 0x88 0x2 0x89 0x2 0x9f 0x2 0x400>;
+>  		clock-names = "hdmi", "sclk_hdmi", "sclk_pixel", "sclk_hdmiphy", "mout_hdmi";
+>  		samsung,syscon-phandle = <0x7>;
+> -		hpd-gpio = <0xc 0x7 0x2>;
+> +		hpd-gpio = <0xc 0x7 0x1>;
+>  		vdd_osc-supply = <0x31>;
+>  		vdd_pll-supply = <0x32>;
+>  		vdd-supply = <0x32>;
+> @@ -2104,15 +2104,9 @@
+>  		};
+>  	};
+>  
+> -	usb_hub_bus {
+> -		compatible = "simple-bus";
+> -		#address-cells = <0x1>;
+> -		#size-cells = <0x0>;
+> -
+> -		usb_hub {
+> -			compatible = "smsc,usb3503a";
+> -			reset-gpios = <0xc 0x5 0x1>;
+> -			connect-gpios = <0x10 0x7 0x1>;
+> -		};
+> +	usb-hub {
+> +		compatible = "smsc,usb3503a";
+> +		reset-gpios = <0xc 0x5 0x1>;
+> +		connect-gpios = <0x10 0x7 0x1>;
+>  	};
+>  };
 
--- 
-SUSE LINUX Products GmbH, Maxfeldstr. 5, 90409 N?rnberg, Germany
-GF: Jeff Hawn, Jennifer Guild, Felix Imend?rffer; HRB 16746 AG N?rnberg
+Reviewed-by: Tomasz Figa <t.figa@samsung.com>
+
+Best regards,
+Tomasz
