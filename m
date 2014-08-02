@@ -1,50 +1,69 @@
 From: dianders@chromium.org (Doug Anderson)
-Date: Fri, 1 Aug 2014 21:57:42 -0700
-Subject: [PATCH v6 00/10] ARM: dts: exynos: Prepare Spring
-In-Reply-To: <53DC4E41.4050200@collabora.co.uk>
-References: <1406940750-15880-1-git-send-email-afaerber@suse.de>
- <53DC4E41.4050200@collabora.co.uk>
-Message-ID: <CAD=FV=V_vXZLMaTMFdgr62=zRXucZA6D3PvS0Mb40he0ShHTfA@mail.gmail.com>
+Date: Fri, 1 Aug 2014 22:01:44 -0700
+Subject: [PATCH v5 04/10] ARM: dts: Fill in bootargs for exynos5250-snow
+In-Reply-To: <53DC024A.3020106@suse.de>
+References: <1406868897-26874-1-git-send-email-afaerber@suse.de>
+ <1406868897-26874-5-git-send-email-afaerber@suse.de>
+ <CAD=FV=V4hQeGvE9+O2EY8KGvDj3SJKfOZGes4gKpHfg=xz1h4A@mail.gmail.com>
+ <53DC024A.3020106@suse.de>
+Message-ID: <CAD=FV=XyvVNJ8vLYUE+Tx8dYUzqLH_sXXYcA_ZEFDfH_Un2u4g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Andreas,
 
-On Fri, Aug 1, 2014 at 7:34 PM, Javier Martinez Canillas
-<javier.martinez@collabora.co.uk> wrote:
-> Hello Andreas
+On Fri, Aug 1, 2014 at 2:10 PM, Andreas F?rber <afaerber@suse.de> wrote:
+> Hi Doug,
 >
-> On 08/02/2014 02:52 AM, Andreas F?rber wrote:
+> Am 01.08.2014 22:28, schrieb Doug Anderson:
+>> On Thu, Jul 31, 2014 at 9:54 PM, Andreas F?rber <afaerber@suse.de> wrote:
+>>> exynos5250-cros-common.dtsi had an empty /chosen node.
+>>> Fill in exemplary boot arguments.
+>>>
+>>> Signed-off-by: Andreas F?rber <afaerber@suse.de>
+>>> ---
+>>>  v5: New
+>>>  Cleanup for /chosen node moved into -snow.dts.
+>>>
+>>>  arch/arm/boot/dts/exynos5250-snow.dts | 1 +
+>>>  1 file changed, 1 insertion(+)
+>>>
+>>> diff --git a/arch/arm/boot/dts/exynos5250-snow.dts b/arch/arm/boot/dts/exynos5250-snow.dts
+>>> index 7680d5e03fb3..c4b0c73c736d 100644
+>>> --- a/arch/arm/boot/dts/exynos5250-snow.dts
+>>> +++ b/arch/arm/boot/dts/exynos5250-snow.dts
+>>> @@ -27,6 +27,7 @@
+>>>         };
+>>>
+>>>         chosen {
+>>> +               bootargs = "console=tty1";
 >>
->> Based on the preinstalled 3.8 based ChromeOS kernel and previous 3.15
->> based attempts by Stephan and me that broke for 3.16, I've prepared a
->> device tree for the HP Chromebook 11 aka Google Spring.
+>> As mentioned earlier, I don't think this is a particularly useful
+>> change.  Just this boot argument is not enough to boot with anyway, so
+>> listing it doesn't really help anyone.  In theory you could make some
+>> assertion about what the "most popular" boot device and filesystem is,
+>> but it seems unlikely to cover the majority of the cases.
 >>
->> v6 renames a node and reverts dp_hpd.
->>
->> Not yet enabled are trackpad, Wifi and sound.
->>
->> My rebasing branch for testing is here:
->> https://github.com/afaerber/linux/commits/spring-next
->>
->> Regards,
->> Andreas
->>
+>> I won't NAK this change myself, but I certainly won't push for it.
 >
-> I made a comment on patch 05/10 but the rest of the series looks good to me. So
-> for the remaining patches:
+> This patch should be entirely optional.
 >
-> Reviewed-by: Javier Martinez Canillas <javier.martinez@collabora.co.uk>
->
-> NOTE: I thought that Tomasz Figa gave you his Reviewed-by on v5 for the whole
-> series as well but I didn't see his tag on the v6 patches.
+> I believe you said it wasn't necessary because the bootloader supplies
+> it. My point is that someone needs to know what to put into the bootargs
+> (setenv / boot.scr / uEnv.txt) - knowing whether it's ttySAC3 vs.
+> ttySAC2 vs. ttyS0 etc. has been pretty handy for me. In this case, Snow
+> and Spring use an identical console, so not sure if it might be tty2 or
+> something elsewhere?
 
-Yes, I thought that too.  I assume he's OK with the small changes you
-made between v5 and v6.  In the very least his Reviewed-by could be
-present on the patches that didn't change between the last two revs.
+...but in your case you're not including any of that info.  tty1 is a
+LCD console, isn't it?
 
-Given Javier's review and Tomasz's review and Vincent's comments, I'll
-probably skip all the work of reviewing the rest of the series unless
-someone really wants me to.  ;)
+
+> My question of what to use for linux,stdout-path (which was elsewhere
+> mentioned as successor to bootargs in that regard) remained unanswered.
+> Should it point to the dp-controller node or what?
+
+No idea since I've never heard of linux,stdout-path other than your
+emails.  Maybe someone else can chime in and I'll learn something.  ;)
 
 -Doug
