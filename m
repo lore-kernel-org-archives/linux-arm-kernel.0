@@ -1,42 +1,41 @@
-From: computersforpeace@gmail.com (Brian Norris)
-Date: Fri, 1 Aug 2014 19:06:17 -0700
-Subject: [PATCH v2 03/10] mtd: spi-nor: add DDR quad read support
-In-Reply-To: <20140730104607.GQ17528@sirena.org.uk>
-References: <1398657227-20721-1-git-send-email-b32955@freescale.com>
- <1398657227-20721-4-git-send-email-b32955@freescale.com>
- <20140730050843.GE11952@brian-ubuntu>
- <20140730064413.GA15547@shldeISGChi005.sh.intel.com>
- <20140730074500.GF11952@brian-ubuntu>
- <20140730104607.GQ17528@sirena.org.uk>
-Message-ID: <20140802020617.GS3711@ld-irv-0074>
+From: javier.martinez@collabora.co.uk (Javier Martinez Canillas)
+Date: Sat, 02 Aug 2014 04:17:51 +0200
+Subject: [PATCH v6 05/10] ARM: dts: Fill in bootargs for exynos5250-snow
+In-Reply-To: <1406940750-15880-6-git-send-email-afaerber@suse.de>
+References: <1406940750-15880-1-git-send-email-afaerber@suse.de>
+ <1406940750-15880-6-git-send-email-afaerber@suse.de>
+Message-ID: <53DC4A4F.8060009@collabora.co.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jul 30, 2014 at 11:46:07AM +0100, Mark Brown wrote:
-> On Wed, Jul 30, 2014 at 12:45:00AM -0700, Brian Norris wrote:
-> > On Wed, Jul 30, 2014 at 02:44:13PM +0800, Huang Shijie wrote:
-> > > IMHO, the DDR modes can _NOT_ be handled by the driver/spi/*.
-> 
-> > I agree to some extent, but I wanted to confirm with the SPI guys that
-> > DDR is truly unique to SPI NOR. (I know it doesn't currently support
-> > it.)
-> 
-> I don't know what DDR is in this context, sorry.
+Hello Andreas,
 
-I think it's just the ability to latch data on both the rising and
-falling edges of the SPI clock. For SPI flash, it seems to be used for
-the data portion of the opcode/address/data sequence.
+Sorry for missing your v5.
 
-> I'm guessing you're
-> right since it sounds like something to do with extra clocks and this is
-> probably not something used by generic SPI devices at present (if it
-> ends up being widely implemented by sufficiently generic controllers
-> that might change but the trend seems to be to flash specific
-> controllers).
+On 08/02/2014 02:52 AM, Andreas F?rber wrote:
+>  
+>  	chosen {
+> +		bootargs = "console=tty1";
+>  	};
 
-OK, thanks for chiming in.
+While I agree with you that having a chosen node with a default bootargs is
+better than having an empty one, I second Doug that this bootargs is not very
+useful.
 
-Yeah, I suppose it could be wedged in later if drivers/spi/ ever adopts
-a solution.
+If you want to add a bootargs in the DTS I think that it should be a complete
+kernel command line that allows to boot a system. I would at least add a root
+parameter and possibly another console for the serial port. So if
+CMDLINE_FROM_BOOTLOADER is not set then the DT can be used to specify the
+bootargs instead of using whatever was set in CONFIG_CMDLINE which probably
+won't be relevant for every system on a multi-platform kernel.
 
-Brian
+But I think that is safe to rely on the bootloader to set the bootargs and after
+all having a hardcoded bootargs in the DTS is not much better than having a
+hardcoded CONFIG_CMDLINE since as Doug said it is hard to make assumptions about
+what would be the most common options.
+
+Personally I would just drop this change and as I said before remove the empty
+chosen node on a follow up patch but I don't have a strong opinion either.
+
+Best regards,
+Javier
