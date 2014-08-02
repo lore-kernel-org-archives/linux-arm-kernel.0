@@ -1,441 +1,119 @@
 From: afaerber@suse.de (=?UTF-8?q?Andreas=20F=C3=A4rber?=)
-Date: Sat,  2 Aug 2014 02:52:22 +0200
-Subject: [PATCH v6 02/10] ARM: dts: Fold exynos5250-cros-common into
- exynos5250-snow
+Date: Sat,  2 Aug 2014 02:52:23 +0200
+Subject: [PATCH v6 03/10] ARM: dts: Prepare node labels for exynos5250
 In-Reply-To: <1406940750-15880-1-git-send-email-afaerber@suse.de>
 References: <1406940750-15880-1-git-send-email-afaerber@suse.de>
-Message-ID: <1406940750-15880-3-git-send-email-afaerber@suse.de>
+Message-ID: <1406940750-15880-4-git-send-email-afaerber@suse.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-exynos5250-cros-common.dtsi was meant for sharing common pieces across
-ChromeOS devices. This turned out premature, as several devices ended up
-in the common file that are not common after all. Since the remaining
-common ChromeOS pieces are fairly minor,  exynos5250-cros-common.dtsi
-was requested to be merged into the Snow device tree, sharing only the
-keyboard controller for now. This may be re-evaluated as both mature.
+Allows them to be extended by reference.
 
-Suggested-by: Doug Anderson <dianders@chromium.org>
-Reviewed-by: Tomasz Figa <t.figa@samsung.com>
-Reviewed-by: Doug Anderson <dianders@chromium.org>
 Signed-off-by: Andreas F?rber <afaerber@suse.de>
 ---
- v5 -> v6: Unchanged
+ v6: Split off from Snow/SMDK cleanups (Doug Anderson)
 
- v4 -> v5:
- * Extended commit message (Tomasz Figa)
+ arch/arm/boot/dts/exynos5250.dtsi | 24 ++++++++++++------------
+ 1 file changed, 12 insertions(+), 12 deletions(-)
 
- v3 -> v4: Unchanged
- 
- v2 -> v3:
- * Renamed subject to match Kukjin's style
- * Rebased onto MMC pinctrl bug fix (Doug Anderson)
- 
- v2: New (Doug Anderson)
-
- arch/arm/boot/dts/exynos5250-cros-common.dtsi | 164 --------------------------
- arch/arm/boot/dts/exynos5250-snow.dts         | 164 +++++++++++++++++++++++---
- 2 files changed, 145 insertions(+), 183 deletions(-)
- delete mode 100644 arch/arm/boot/dts/exynos5250-cros-common.dtsi
-
-diff --git a/arch/arm/boot/dts/exynos5250-cros-common.dtsi b/arch/arm/boot/dts/exynos5250-cros-common.dtsi
-deleted file mode 100644
-index e603e9c70142..000000000000
---- a/arch/arm/boot/dts/exynos5250-cros-common.dtsi
-+++ /dev/null
-@@ -1,164 +0,0 @@
--/*
-- * Common device tree include for all Exynos 5250 boards based off of Daisy.
-- *
-- * Copyright (c) 2012 Google, Inc
-- *
-- * This program is free software; you can redistribute it and/or modify
-- * it under the terms of the GNU General Public License version 2 as
-- * published by the Free Software Foundation.
--*/
--
--/ {
--	aliases {
--	};
--
--	memory {
--		reg = <0x40000000 0x80000000>;
--	};
--
--	chosen {
--	};
--
--	pinctrl at 11400000 {
--		/*
--		 * Disabled pullups since external part has its own pullups and
--		 * double-pulling gets us out of spec in some cases.
--		 */
--		i2c2_bus: i2c2-bus {
--			samsung,pin-pud = <0>;
--		};
--	};
--
--	i2c at 12C60000 {
--		status = "okay";
--		samsung,i2c-sda-delay = <100>;
--		samsung,i2c-max-bus-freq = <378000>;
--	};
--
--	i2c at 12C70000 {
--		status = "okay";
--		samsung,i2c-sda-delay = <100>;
--		samsung,i2c-max-bus-freq = <378000>;
--	};
--
--	i2c at 12C80000 {
--		status = "okay";
--		samsung,i2c-sda-delay = <100>;
--		samsung,i2c-max-bus-freq = <66000>;
--
--		hdmiddc at 50 {
--			compatible = "samsung,exynos4210-hdmiddc";
--			reg = <0x50>;
--		};
--	};
--
--	i2c at 12C90000 {
--		status = "okay";
--		samsung,i2c-sda-delay = <100>;
--		samsung,i2c-max-bus-freq = <66000>;
--	};
--
--	i2c at 12CA0000 {
--		status = "okay";
--		samsung,i2c-sda-delay = <100>;
--		samsung,i2c-max-bus-freq = <66000>;
--	};
--
--	i2c at 12CB0000 {
--		status = "okay";
--		samsung,i2c-sda-delay = <100>;
--		samsung,i2c-max-bus-freq = <66000>;
--	};
--
--	i2c at 12CD0000 {
--		status = "okay";
--		samsung,i2c-sda-delay = <100>;
--		samsung,i2c-max-bus-freq = <66000>;
--	};
--
--	i2c at 12CE0000 {
--		status = "okay";
--		samsung,i2c-sda-delay = <100>;
--		samsung,i2c-max-bus-freq = <378000>;
--
--		hdmiphy: hdmiphy at 38 {
--			compatible = "samsung,exynos4212-hdmiphy";
--			reg = <0x38>;
--		};
--	};
--
--	mmc at 12200000 {
--		num-slots = <1>;
--		supports-highspeed;
--		broken-cd;
--		card-detect-delay = <200>;
--		samsung,dw-mshc-ciu-div = <3>;
--		samsung,dw-mshc-sdr-timing = <2 3>;
--		samsung,dw-mshc-ddr-timing = <1 2>;
--		pinctrl-names = "default";
--		pinctrl-0 = <&sd0_clk &sd0_cmd &sd0_cd &sd0_bus4 &sd0_bus8>;
--
--		slot at 0 {
--			reg = <0>;
--			bus-width = <8>;
--		};
--	};
--
--	mmc at 12220000 {
--		num-slots = <1>;
--		supports-highspeed;
--		card-detect-delay = <200>;
--		samsung,dw-mshc-ciu-div = <3>;
--		samsung,dw-mshc-sdr-timing = <2 3>;
--		samsung,dw-mshc-ddr-timing = <1 2>;
--		pinctrl-names = "default";
--		pinctrl-0 = <&sd2_clk &sd2_cmd &sd2_cd &sd2_bus4>;
--
--		slot at 0 {
--			reg = <0>;
--			bus-width = <4>;
--			wp-gpios = <&gpc2 1 0>;
--		};
--	};
--
--	mmc at 12230000 {
--		num-slots = <1>;
--		supports-highspeed;
--		broken-cd;
--		card-detect-delay = <200>;
--		samsung,dw-mshc-ciu-div = <3>;
--		samsung,dw-mshc-sdr-timing = <2 3>;
--		samsung,dw-mshc-ddr-timing = <1 2>;
--		/* See board-specific dts files for pin setup */
--
--		slot at 0 {
--			reg = <0>;
--			bus-width = <4>;
--		};
--	};
--
--	spi_1: spi at 12d30000 {
--		status = "okay";
--		samsung,spi-src-clk = <0>;
--		num-cs = <1>;
--	};
--
--	hdmi {
--		hpd-gpio = <&gpx3 7 0>;
--		pinctrl-names = "default";
--		pinctrl-0 = <&hdmi_hpd_irq>;
--		phy = <&hdmiphy>;
--		ddc = <&i2c_2>;
--	};
--
--	gpio-keys {
--		compatible = "gpio-keys";
--
--		power {
--			label = "Power";
--			gpios = <&gpx1 3 1>;
--			linux,code = <116>; /* KEY_POWER */
--			gpio-key,wakeup;
--		};
--	};
--};
-diff --git a/arch/arm/boot/dts/exynos5250-snow.dts b/arch/arm/boot/dts/exynos5250-snow.dts
-index eb437f6afec1..1c36cd72905f 100644
---- a/arch/arm/boot/dts/exynos5250-snow.dts
-+++ b/arch/arm/boot/dts/exynos5250-snow.dts
-@@ -10,7 +10,6 @@
- 
- /dts-v1/;
- #include "exynos5250.dtsi"
--#include "exynos5250-cros-common.dtsi"
- 
- / {
- 	model = "Google Snow";
-@@ -20,6 +19,13 @@
- 		i2c104 = &i2c_104;
+diff --git a/arch/arm/boot/dts/exynos5250.dtsi b/arch/arm/boot/dts/exynos5250.dtsi
+index 834fb5a5306f..cf94aeaeaa84 100644
+--- a/arch/arm/boot/dts/exynos5250.dtsi
++++ b/arch/arm/boot/dts/exynos5250.dtsi
+@@ -215,7 +215,7 @@
+ 		clock-names = "fimg2d";
  	};
  
-+	memory {
-+		reg = <0x40000000 0x80000000>;
-+	};
-+
-+	chosen {
-+	};
-+
- 	rtc at 101E0000 {
- 		status = "okay";
+-	codec at 11000000 {
++	mfc: codec at 11000000 {
+ 		compatible = "samsung,mfc-v6";
+ 		reg = <0x11000000 0x10000>;
+ 		interrupts = <0 96 0>;
+@@ -224,7 +224,7 @@
+ 		clock-names = "mfc";
  	};
-@@ -93,6 +99,13 @@
- 	gpio-keys {
- 		compatible = "gpio-keys";
  
-+		power {
-+			label = "Power";
-+			gpios = <&gpx1 3 1>;
-+			linux,code = <116>; /* KEY_POWER */
-+			gpio-key,wakeup;
-+		};
-+
- 		lid-switch {
- 			label = "Lid";
- 			gpios = <&gpx3 5 1>;
-@@ -226,24 +239,6 @@
+-	rtc at 101E0000 {
++	rtc: rtc at 101E0000 {
+ 		clocks = <&clock CLK_RTC>;
+ 		clock-names = "rtc";
+ 		status = "disabled";
+@@ -238,27 +238,27 @@
+ 		clock-names = "tmu_apbif";
+ 	};
+ 
+-	serial at 12C00000 {
++	uart0: serial at 12C00000 {
+ 		clocks = <&clock CLK_UART0>, <&clock CLK_SCLK_UART0>;
+ 		clock-names = "uart", "clk_uart_baud0";
+ 	};
+ 
+-	serial at 12C10000 {
++	uart1: serial at 12C10000 {
+ 		clocks = <&clock CLK_UART1>, <&clock CLK_SCLK_UART1>;
+ 		clock-names = "uart", "clk_uart_baud0";
+ 	};
+ 
+-	serial at 12C20000 {
++	uart2: serial at 12C20000 {
+ 		clocks = <&clock CLK_UART2>, <&clock CLK_SCLK_UART2>;
+ 		clock-names = "uart", "clk_uart_baud0";
+ 	};
+ 
+-	serial at 12C30000 {
++	uart3: serial at 12C30000 {
+ 		clocks = <&clock CLK_UART3>, <&clock CLK_SCLK_UART3>;
+ 		clock-names = "uart", "clk_uart_baud0";
+ 	};
+ 
+-	sata at 122F0000 {
++	sata: sata at 122F0000 {
+ 		compatible = "snps,dwc-ahci";
+ 		samsung,sata-freq = <66>;
+ 		reg = <0x122F0000 0x1ff>;
+@@ -570,7 +570,7 @@
+ 		#phy-cells = <1>;
+ 	};
+ 
+-	usb at 12110000 {
++	ehci: usb at 12110000 {
+ 		compatible = "samsung,exynos4210-ehci";
+ 		reg = <0x12110000 0x100>;
+ 		interrupts = <0 71 0>;
+@@ -585,7 +585,7 @@
  		};
  	};
  
--	mmc at 12200000 {
--		status = "okay";
--	};
--
--	mmc at 12220000 {
--		status = "okay";
--	};
--
--	/*
--	 * On Snow we've got SIP WiFi and so can keep drive strengths low to
--	 * reduce EMI.
--	 */
--	mmc at 12230000 {
--		status = "okay";
--		pinctrl-names = "default";
--		pinctrl-0 = <&sd3_clk &sd3_cmd &sd3_bus4>;
--	};
--
- 	i2c at 12CD0000 {
- 		max98095: codec at 11 {
- 			compatible = "maxim,max98095";
-@@ -292,6 +287,11 @@
+-	usb at 12120000 {
++	ohci: usb at 12120000 {
+ 		compatible = "samsung,exynos4210-ohci";
+ 		reg = <0x12120000 0x100>;
+ 		interrupts = <0 71 0>;
+@@ -722,7 +722,7 @@
+ 		clock-names = "gscl";
  	};
  
- 	hdmi {
-+		hpd-gpio = <&gpx3 7 0>;
-+		pinctrl-names = "default";
-+		pinctrl-0 = <&hdmi_hpd_irq>;
-+		phy = <&hdmiphy>;
-+		ddc = <&i2c_2>;
- 		hdmi-en-supply = <&tps65090_fet7>;
- 		vdd-supply = <&ldo8_reg>;
- 		vdd_osc-supply = <&ldo10_reg>;
-@@ -343,6 +343,10 @@
- };
- 
- &i2c_0 {
-+	status = "okay";
-+	samsung,i2c-sda-delay = <100>;
-+	samsung,i2c-max-bus-freq = <378000>;
-+
- 	max77686 at 09 {
- 		compatible = "maxim,max77686";
- 		interrupt-parent = <&gpx3>;
-@@ -489,6 +493,10 @@
- };
- 
- &i2c_1 {
-+	status = "okay";
-+	samsung,i2c-sda-delay = <100>;
-+	samsung,i2c-max-bus-freq = <378000>;
-+
- 	trackpad {
- 		reg = <0x67>;
- 		compatible = "cypress,cyapa";
-@@ -498,6 +506,118 @@
+-	hdmi {
++	hdmi: hdmi {
+ 		compatible = "samsung,exynos4212-hdmi";
+ 		reg = <0x14530000 0x70000>;
+ 		interrupts = <0 95 0>;
+@@ -748,14 +748,14 @@
+ 		#phy-cells = <0>;
  	};
- };
  
-+/*
-+ * Disabled pullups since external part has its own pullups and
-+ * double-pulling gets us out of spec in some cases.
-+ */
-+&i2c2_bus {
-+	samsung,pin-pud = <0>;
-+};
-+
-+&i2c_2 {
-+	status = "okay";
-+	samsung,i2c-sda-delay = <100>;
-+	samsung,i2c-max-bus-freq = <66000>;
-+
-+	hdmiddc at 50 {
-+		compatible = "samsung,exynos4210-hdmiddc";
-+		reg = <0x50>;
-+	};
-+};
-+
-+&i2c_3 {
-+	status = "okay";
-+	samsung,i2c-sda-delay = <100>;
-+	samsung,i2c-max-bus-freq = <66000>;
-+};
-+
-+&i2c_4 {
-+	status = "okay";
-+	samsung,i2c-sda-delay = <100>;
-+	samsung,i2c-max-bus-freq = <66000>;
-+};
-+
-+&i2c_5 {
-+	status = "okay";
-+	samsung,i2c-sda-delay = <100>;
-+	samsung,i2c-max-bus-freq = <66000>;
-+};
-+
-+&i2c_7 {
-+	status = "okay";
-+	samsung,i2c-sda-delay = <100>;
-+	samsung,i2c-max-bus-freq = <66000>;
-+};
-+
-+&i2c_8 {
-+	status = "okay";
-+	samsung,i2c-sda-delay = <100>;
-+	samsung,i2c-max-bus-freq = <378000>;
-+
-+	hdmiphy: hdmiphy at 38 {
-+		compatible = "samsung,exynos4212-hdmiphy";
-+		reg = <0x38>;
-+	};
-+};
-+
-+&mmc_0 {
-+	status = "okay";
-+	num-slots = <1>;
-+	supports-highspeed;
-+	broken-cd;
-+	card-detect-delay = <200>;
-+	samsung,dw-mshc-ciu-div = <3>;
-+	samsung,dw-mshc-sdr-timing = <2 3>;
-+	samsung,dw-mshc-ddr-timing = <1 2>;
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&sd0_clk &sd0_cmd &sd0_cd &sd0_bus4 &sd0_bus8>;
-+
-+	slot at 0 {
-+		reg = <0>;
-+		bus-width = <8>;
-+	};
-+};
-+
-+&mmc_2 {
-+	status = "okay";
-+	num-slots = <1>;
-+	supports-highspeed;
-+	card-detect-delay = <200>;
-+	samsung,dw-mshc-ciu-div = <3>;
-+	samsung,dw-mshc-sdr-timing = <2 3>;
-+	samsung,dw-mshc-ddr-timing = <1 2>;
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&sd2_clk &sd2_cmd &sd2_cd &sd2_bus4>;
-+
-+	slot at 0 {
-+		reg = <0>;
-+		bus-width = <4>;
-+		wp-gpios = <&gpc2 1 0>;
-+	};
-+};
-+
-+/*
-+ * On Snow we've got SIP WiFi and so can keep drive strengths low to
-+ * reduce EMI.
-+ */
-+&mmc_3 {
-+	status = "okay";
-+	num-slots = <1>;
-+	supports-highspeed;
-+	broken-cd;
-+	card-detect-delay = <200>;
-+	samsung,dw-mshc-ciu-div = <3>;
-+	samsung,dw-mshc-sdr-timing = <2 3>;
-+	samsung,dw-mshc-ddr-timing = <1 2>;
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&sd3_clk &sd3_cmd &sd3_bus4>;
-+
-+	slot at 0 {
-+		reg = <0>;
-+		bus-width = <4>;
-+	};
-+};
-+
- &pinctrl_0 {
- 	max77686_irq: max77686-irq {
- 		samsung,pins = "gpx3-2";
-@@ -507,4 +627,10 @@
+-	dp-controller at 145B0000 {
++	dp: dp-controller at 145B0000 {
+ 		clocks = <&clock CLK_DP>;
+ 		clock-names = "dp";
+ 		phys = <&dp_phy>;
+ 		phy-names = "dp";
  	};
- };
  
-+&spi_1 {
-+	status = "okay";
-+	samsung,spi-src-clk = <0>;
-+	num-cs = <1>;
-+};
-+
- #include "cros-ec-keyboard.dtsi"
+-	fimd at 14400000 {
++	fimd: fimd at 14400000 {
+ 		clocks = <&clock CLK_SCLK_FIMD1>, <&clock CLK_FIMD1>;
+ 		clock-names = "sclk_fimd", "fimd";
+ 	};
 -- 
 1.9.3
