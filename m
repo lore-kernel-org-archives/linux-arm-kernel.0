@@ -1,76 +1,50 @@
-From: oleg@redhat.com (Oleg Nesterov)
-Date: Sat, 2 Aug 2014 19:30:24 +0200
-Subject: TIF_NOHZ can escape nonhz mask? (Was: [PATCH v3 6/8] x86:
- Split syscall_trace_enter into two phases)
-In-Reply-To: <20140731184729.GA12296@localhost.localdomain>
-References: <20140728185803.GA24663@redhat.com>
- <20140728192209.GA26017@localhost.localdomain>
- <20140729175414.GA3289@redhat.com>
- <20140730163516.GC18158@localhost.localdomain>
- <20140730174630.GA30862@redhat.com>
- <20140731003034.GA32078@localhost.localdomain>
- <20140731160353.GA14772@redhat.com>
- <20140731171329.GD7842@localhost.localdomain>
- <20140731181230.GA18695@redhat.com>
- <20140731184729.GA12296@localhost.localdomain>
-Message-ID: <20140802173024.GB22510@redhat.com>
+From: nathan_lynch@mentor.com (Nathan Lynch)
+Date: Sat, 2 Aug 2014 13:16:40 -0500
+Subject: [PATCH v8 03/10] clocksource: arm_arch_timer: change clocksource name
+ if CP15 unavailable
+In-Reply-To: <1407003407-31219-1-git-send-email-nathan_lynch@mentor.com>
+References: <1407003407-31219-1-git-send-email-nathan_lynch@mentor.com>
+Message-ID: <1407003407-31219-4-git-send-email-nathan_lynch@mentor.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/31, Frederic Weisbecker wrote:
->
-> On Thu, Jul 31, 2014 at 08:12:30PM +0200, Oleg Nesterov wrote:
-> > > >
-> > > > Yes sure. But context_tracking_cpu_set() is called by init task with PID 1, not
-> > > > by "swapper".
-> > >
-> > > Are you sure? It's called from start_kernel() which is init/0.
-> >
-> > But do_initcalls() is called by kernel_init(), this is the init process which is
-> > going to exec /sbin/init later.
-> >
-> > But this doesn't really matter,
->
-> Yeah but tick_nohz_init() is not an initcall, it's a function called from start_kernel(),
-> before initcalls.
+The arm and arm64 VDSOs need CP15 access to the architected counter.
+If this is unavailable (which is allowed by ARM v7), indicate this by
+changing the clocksource name to "arch_mem_counter" before registering
+the clocksource.
 
-Ah, indeed, and context_tracking_init() too. Even better, so we only need
+Suggested by Stephen Boyd.
 
-	--- x/kernel/context_tracking.c
-	+++ x/kernel/context_tracking.c
-	@@ -30,8 +30,10 @@ EXPORT_SYMBOL_GPL(context_tracking_enabl
-	 DEFINE_PER_CPU(struct context_tracking, context_tracking);
-	 EXPORT_SYMBOL_GPL(context_tracking);
-	 
-	-void context_tracking_cpu_set(int cpu)
-	+void __init context_tracking_cpu_set(int cpu)
-	 {
-	+	/* Called by "swapper" thread, all threads will inherit this flag */
-	+	set_thread_flag(TIF_NOHZ);
-		if (!per_cpu(context_tracking.active, cpu)) {
-			per_cpu(context_tracking.active, cpu) = true;
-			static_key_slow_inc(&context_tracking_enabled);
+Signed-off-by: Nathan Lynch <nathan_lynch@mentor.com>
+---
+ drivers/clocksource/arm_arch_timer.c | 12 ++++++++++--
+ 1 file changed, 10 insertions(+), 2 deletions(-)
 
-and now we can kill context_tracking_task_switch() ?
-
-> > Yes, yes, this doesn't really matter. We can even add set(TIF_NOHZ) at the start
-> > of start_kernel(). The question is, I still can't understand why do we want to
-> > have the global TIF_NOHZ.
->
-> Because then the flags is inherited in forks. It's better than inheriting it on
-> context switch due to context switch being called much more often than fork.
-
-This is clear, that is why I suggested this. Just we didn't understand each other,
-when I said "global TIF_NOHZ" I meant the current situtation when every (running)
-task has this bit set anyway. Sorry for confusion.
-
-> No, because preempt_schedule_irq() does the ctx_state save and restore with
-> exception_enter/exception_exit.
-
-Thanks again. Can't understand how I managed to miss that exception_enter/exit
-in preempt_schedule_*.
-
-Damn. And after I spent more time, I don't have any idea how to make this
-tracking cheaper.
-
-Oleg.
+diff --git a/drivers/clocksource/arm_arch_timer.c b/drivers/clocksource/arm_arch_timer.c
+index 5163ec13429d..c99afdf12e98 100644
+--- a/drivers/clocksource/arm_arch_timer.c
++++ b/drivers/clocksource/arm_arch_timer.c
+@@ -429,11 +429,19 @@ static void __init arch_counter_register(unsigned type)
+ 	u64 start_count;
+ 
+ 	/* Register the CP15 based counter if we have one */
+-	if (type & ARCH_CP15_TIMER)
++	if (type & ARCH_CP15_TIMER) {
+ 		arch_timer_read_counter = arch_counter_get_cntvct;
+-	else
++	} else {
+ 		arch_timer_read_counter = arch_counter_get_cntvct_mem;
+ 
++		/* If the clocksource name is "arch_sys_counter" the
++		 * VDSO will attempt to read the CP15-based counter.
++		 * Ensure this does not happen when CP15-based
++		 * counter is not available.
++		 */
++		clocksource_counter.name = "arch_mem_counter";
++	}
++
+ 	start_count = arch_timer_read_counter();
+ 	clocksource_register_hz(&clocksource_counter, arch_timer_rate);
+ 	cyclecounter.mult = clocksource_counter.mult;
+-- 
+1.9.3
