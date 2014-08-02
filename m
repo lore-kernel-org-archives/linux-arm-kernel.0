@@ -1,40 +1,73 @@
-From: tomasz.figa@gmail.com (Tomasz Figa)
-Date: Sat, 02 Aug 2014 14:21:43 +0200
-Subject: [PATCH v6 04/10] ARM: dts: Clean up exynos5250-snow
-In-Reply-To: <1406940750-15880-5-git-send-email-afaerber@suse.de>
-References: <1406940750-15880-1-git-send-email-afaerber@suse.de>
- <1406940750-15880-5-git-send-email-afaerber@suse.de>
-Message-ID: <53DCD7D7.2070208@gmail.com>
+From: haojian.zhuang@gmail.com (Haojian Zhuang)
+Date: Sat, 2 Aug 2014 20:27:21 +0800
+Subject: [PATCH v3 0/6] Migrate PXA27x platforms to clock framework
+In-Reply-To: <1406753464-15000-1-git-send-email-robert.jarzmik@free.fr>
+References: <1406753464-15000-1-git-send-email-robert.jarzmik@free.fr>
+Message-ID: <CAN1soZwDDwiLuVkT7kRJX-wy-UmyDj-2yiReGrpBrTOJkKpuSA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 02.08.2014 02:52, Andreas F?rber wrote:
-> Use the new style of referencing inherited nodes and use symbolic names.
-> Reorder one pinctrl node in GPIO order.
-> 
-> Goal is the alignment of all exynos5250 based device trees for comparison.
-> 
-> Suggested-by: Doug Anderson <dianders@chromium.org>
-> Reviewed-by: Doug Anderson <dianders@chromium.org>
-> Signed-off-by: Andreas F?rber <afaerber@suse.de>
-> ---
->  v5 -> v6:
->  * Split off label additions (Doug Anderson)
->  * Fixed alphabetical order of sd3_* nodes (Doug Anderson)
->  
->  v4 -> v5:
->  * Introduced labels to consistently use new referencing style (Tomasz Figa)
->  * Use IRQ_TYPE_* constants
->  * Use some more GPIO_ACTIVE_*
-> 
->  v3 -> v4: Unchanged
->  
->  v3: New (Doug Anderson)
-> 
->  arch/arm/boot/dts/exynos5250-snow.dts | 291 +++++++++++++++++-----------------
->  1 file changed, 145 insertions(+), 146 deletions(-)
+On Thu, Jul 31, 2014 at 4:50 AM, Robert Jarzmik <robert.jarzmik@free.fr> wrote:
+> This is the third opus of this serie.
+> From the previous one :
+>  - the boot ordering was fixed
+>    For DT, we rely on time_init() in arch/arm
+>    For non-DT, we keep the postcore_init() until all 3 PXA variants are
+>    converted, and meanwhile I'll discuss with Haojian where to call directly the
+>    clocks init function.
+>  - the section mismatches were fixed
+>    A split is done between CKEN clock descriptor and CKEN clock structure
+>
+> The result was tested with a Mitac MIO A701 :
+>  - with the upstream platform-data based machine code
+>  - with the device-tree version
+>
+> As for the patches, if they are carried fully by Mike, I think there will be a
+> minor conflict in arch/arm/mach-pxa/Makefile with the clocksource patches I
+> submitted earlier.
+>
+> As before, the goal remains the same :
+>  - keeping legacy platforms working (ie. without device-tree)
+>  - enable PXA27x to work with a device-tree kernel, and hence
+>    open the way to drivers conversion
+>  - be robust enough to support pxa25x and pxa3xx later inclusion
+>    with almost no change to clk-pxa-dt.c.
+>
+> Robert Jarzmik (6):
+>   clk: add pxa clocks infrastructure
+>   clk: dts: document pxa clock binding
+>   arm: pxa: add clock pll selection bits
+>   clk: add pxa27x clock drivers
+>   dts: add devicetree bindings for pxa27x clocks
+>   arm: pxa: Transition pxa27x to clk framework
+>
+>  .../devicetree/bindings/clock/pxa-clock.txt        |  16 +
+>  arch/arm/Kconfig                                   |   1 +
+>  arch/arm/boot/dts/pxa27x.dtsi                      |  20 +-
+>  arch/arm/mach-pxa/Makefile                         |   8 +-
+>  arch/arm/mach-pxa/include/mach/pxa2xx-regs.h       |  10 +
+>  arch/arm/mach-pxa/pxa27x.c                         | 186 +----------
+>  drivers/clk/Makefile                               |   1 +
+>  drivers/clk/pxa/Makefile                           |   2 +
+>  drivers/clk/pxa/clk-pxa.c                          |  97 ++++++
+>  drivers/clk/pxa/clk-pxa.h                          | 107 ++++++
+>  drivers/clk/pxa/clk-pxa27x.c                       | 370 +++++++++++++++++++++
+>  include/dt-bindings/clock/pxa-clock.h              |  77 +++++
+>  12 files changed, 716 insertions(+), 179 deletions(-)
+>  create mode 100644 Documentation/devicetree/bindings/clock/pxa-clock.txt
+>  create mode 100644 drivers/clk/pxa/Makefile
+>  create mode 100644 drivers/clk/pxa/clk-pxa.c
+>  create mode 100644 drivers/clk/pxa/clk-pxa.h
+>  create mode 100644 drivers/clk/pxa/clk-pxa27x.c
+>  create mode 100644 include/dt-bindings/clock/pxa-clock.h
+>
+> --
+> 2.0.0.rc2
+>
 
-Reviewed-by: Tomasz Figa <t.figa@samsung.com>
+Acked-by: Haojian Zhuang <haojian.zhuang@gmail.com>
 
-Best regards,
-Tomasz
+Only with a small comment.
+
+Regards
+Haojian
