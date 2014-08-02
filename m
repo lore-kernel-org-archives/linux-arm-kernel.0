@@ -1,79 +1,75 @@
-From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
-Date: Sat, 2 Aug 2014 04:05:54 +0400
-Subject: [PATCH v2 2/2] ARM: shmobile: henninger: add VIN0/ADV7180 DT support
-In-Reply-To: <201408020402.14560.sergei.shtylyov@cogentembedded.com>
-References: <201408020402.14560.sergei.shtylyov@cogentembedded.com>
-Message-ID: <201408020405.54978.sergei.shtylyov@cogentembedded.com>
+From: peter.chen@freescale.com (Peter Chen)
+Date: Sat, 2 Aug 2014 08:36:16 +0800
+Subject: [PATCH v2 3/7] usb: phy: mxs: Add VF610 USB PHY support
+In-Reply-To: <acb7c055ded38c74291d0f0d8d2fdca54a8b95f8.1406558450.git.stefan@agner.ch>
+References: <cover.1406558450.git.stefan@agner.ch>
+ <acb7c055ded38c74291d0f0d8d2fdca54a8b95f8.1406558450.git.stefan@agner.ch>
+Message-ID: <20140802003615.GA2833@peterchendt>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Define the Henninger board dependent part of the VIN0 device node. Add the
-device node for Analog Devices ADV7180 video decoder to I2C2  bus. Add the
-necessary subnodes to interconnect VIN0 and ADV7180 devices.
+On Mon, Jul 28, 2014 at 04:57:29PM +0200, Stefan Agner wrote:
+> This adds support for the USB PHY in Vybrid VF610. We assume that
+> the disconnection without VBUS is also needed for Vybrid.
+> 
+> Tests showed, without MXS_PHY_NEED_IP_FIX, enumeration of devices
+> behind a USB Hub fails with errors:
+> 
+> [  215.163507] usb usb1-port1: cannot reset (err = -32)
+> [  215.170498] usb usb1-port1: cannot reset (err = -32)
+> [  215.185120] usb usb1-port1: cannot reset (err = -32)
+> [  215.191345] usb usb1-port1: cannot reset (err = -32)
+> [  215.202487] usb usb1-port1: cannot reset (err = -32)
+> [  215.207718] usb usb1-port1: Cannot enable. Maybe the USB cable is bad?
+> [  215.219317] usb usb1-port1: unable to enumerate USB device
+> 
+> Hence we also enable the MXS_PHY_NEED_IP_FIX flag.
+> 
+> Signed-off-by: Stefan Agner <stefan@agner.ch>
+> ---
+>  Documentation/devicetree/bindings/usb/mxs-phy.txt | 1 +
+>  drivers/usb/phy/phy-mxs-usb.c                     | 6 ++++++
+>  2 files changed, 7 insertions(+)
+> 
+> diff --git a/Documentation/devicetree/bindings/usb/mxs-phy.txt b/Documentation/devicetree/bindings/usb/mxs-phy.txt
+> index cef181a..fe3eed8 100644
+> --- a/Documentation/devicetree/bindings/usb/mxs-phy.txt
+> +++ b/Documentation/devicetree/bindings/usb/mxs-phy.txt
+> @@ -5,6 +5,7 @@ Required properties:
+>  	* "fsl,imx23-usbphy" for imx23 and imx28
+>  	* "fsl,imx6q-usbphy" for imx6dq and imx6dl
+>  	* "fsl,imx6sl-usbphy" for imx6sl
+> +	* "fsl,vf610-usbphy" for Vybrid vf610
+>    "fsl,imx23-usbphy" is still a fallback for other strings
+>  - reg: Should contain registers location and length
+>  - interrupts: Should contain phy interrupt
+> diff --git a/drivers/usb/phy/phy-mxs-usb.c b/drivers/usb/phy/phy-mxs-usb.c
+> index c42bdf0..8c2f23b 100644
+> --- a/drivers/usb/phy/phy-mxs-usb.c
+> +++ b/drivers/usb/phy/phy-mxs-usb.c
+> @@ -125,10 +125,16 @@ static const struct mxs_phy_data imx6sl_phy_data = {
+>  		MXS_PHY_NEED_IP_FIX,
+>  };
+>  
+> +static const struct mxs_phy_data vf610_phy_data = {
+> +	.flags = MXS_PHY_DISCONNECT_LINE_WITHOUT_VBUS |
+> +		MXS_PHY_NEED_IP_FIX,
+> +};
+> +
+>  static const struct of_device_id mxs_phy_dt_ids[] = {
+>  	{ .compatible = "fsl,imx6sl-usbphy", .data = &imx6sl_phy_data, },
+>  	{ .compatible = "fsl,imx6q-usbphy", .data = &imx6q_phy_data, },
+>  	{ .compatible = "fsl,imx23-usbphy", .data = &imx23_phy_data, },
+> +	{ .compatible = "fsl,vf610-usbphy", .data = &vf610_phy_data, },
+>  	{ /* sentinel */ }
+>  };
+>  MODULE_DEVICE_TABLE(of, mxs_phy_dt_ids);
+> -- 
+> 2.0.2
+> 
 
-Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
+Acked-by: Peter Chen <peter.chen@freescale.com>
 
----
-Changes in version 2:
-- refreshed the patch.
-
- arch/arm/boot/dts/r8a7791-henninger.dts |   35 ++++++++++++++++++++++++++++++++
- 1 file changed, 35 insertions(+)
-
-Index: renesas/arch/arm/boot/dts/r8a7791-henninger.dts
-===================================================================
---- renesas.orig/arch/arm/boot/dts/r8a7791-henninger.dts
-+++ renesas/arch/arm/boot/dts/r8a7791-henninger.dts
-@@ -135,6 +135,11 @@
- 		renesas,groups = "usb1";
- 		renesas,function = "usb1";
- 	};
-+
-+	vin0_pins: vin0 {
-+		renesas,groups = "vin0_data8", "vin0_clk";
-+		renesas,function = "vin0";
-+	};
- };
- 
- &scif0 {
-@@ -191,6 +196,19 @@
- 
- 	status = "okay";
- 	clock-frequency = <400000>;
-+
-+	composite-in at 20 {
-+		compatible = "adi,adv7180";
-+		reg = <0x20>;
-+		remote = <&vin0>;
-+
-+		port {
-+			adv7180: endpoint {
-+				bus-width = <8>;
-+				remote-endpoint = <&vin0ep>;
-+			};
-+		};
-+	};
- };
- 
- &qspi {
-@@ -260,3 +278,20 @@
- &pciec {
- 	status = "okay";
- };
-+
-+/* composite video input */
-+&vin0 {
-+	status = "ok";
-+	pinctrl-0 = <&vin0_pins>;
-+	pinctrl-names = "default";
-+
-+	port {
-+		#address-cells = <1>;
-+		#size-cells = <0>;
-+
-+		vin0ep: endpoint {
-+			remote-endpoint = <&adv7180>;
-+			bus-width = <8>;
-+		};
-+	};
-+};
+-- 
+Best Regards,
+Peter Chen
