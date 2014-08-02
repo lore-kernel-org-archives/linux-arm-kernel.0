@@ -1,66 +1,36 @@
-From: afaerber@suse.de (=?UTF-8?B?QW5kcmVhcyBGw6RyYmVy?=)
-Date: Sat, 02 Aug 2014 18:05:15 +0200
-Subject: [PATCH v6 00/10] ARM: dts: exynos: Prepare Spring
-In-Reply-To: <53DCE40F.10809@gmail.com>
-References: <1406940750-15880-1-git-send-email-afaerber@suse.de>	<53DC4E41.4050200@collabora.co.uk>
- <CAD=FV=V_vXZLMaTMFdgr62=zRXucZA6D3PvS0Mb40he0ShHTfA@mail.gmail.com>
- <53DCBC84.8080600@suse.de> <53DCE40F.10809@gmail.com>
-Message-ID: <53DD0C3B.1000506@suse.de>
+From: robert.jarzmik@free.fr (Robert Jarzmik)
+Date: Sat, 02 Aug 2014 18:46:00 +0200
+Subject: [PATCH v3 1/6] clk: add pxa clocks infrastructure
+In-Reply-To: <CAN1soZyST84DNvK=zyj6EhOt0fswZ4SvOmMnWiCZsYmapxkhOg@mail.gmail.com>
+ (Haojian Zhuang's message of "Sat, 2 Aug 2014 20:00:43 +0800")
+References: <1406753464-15000-1-git-send-email-robert.jarzmik@free.fr>
+ <1406753464-15000-2-git-send-email-robert.jarzmik@free.fr>
+ <CAN1soZyST84DNvK=zyj6EhOt0fswZ4SvOmMnWiCZsYmapxkhOg@mail.gmail.com>
+Message-ID: <87tx5usuuv.fsf@free.fr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am 02.08.2014 15:13, schrieb Tomasz Figa:
-> On 02.08.2014 12:25, Andreas F?rber wrote:
->> One thing I've wondered is whether we should put status = "disabled" on
->> the dp node with some comment, since it's known not to work as is (but
->> better having the data here than leaving it out, I believe).
-> 
-> Does the DP node itself need more data to work or just some external
-> things are missing? If the former then probably status = "disabled"
-> should be set, otherwise "okay" is fine if provided data are enough to
-> probe the Exynos DP driver.
+Haojian Zhuang <haojian.zhuang@gmail.com> writes:
 
-Support for ps8622 eDP/LVDS bridge has not yet landed in the drm tree.
+> On Thu, Jul 31, 2014 at 4:50 AM, Robert Jarzmik <robert.jarzmik@free.fr> wrote:
+>> +void __init clkdev_pxa_register(int ckid, const char *con_id,
+>> +                               const char *dev_id, struct clk *clk)
+>> +{
+>> +       if (!IS_ERR(clk) && (ckid != CLK_NONE))
+>
+> Will you specify CLK_NONE in clock driver?
+I haven't found a use yet (ie. pxa27x has no use for it, while for pxa3xx and
+pxa25x I don't know yet).
+I had put that here for a "CKEN" type clock which would be declared, but hidden
+from device-tree. That's the meaning of "CLK_NONE", hidden from DT.
 
-The latest patch series V6 adds a "bridge" property to /dp-controller.
-It further requires a simple-panel node and a node for the ps8622:
+I can remove it if you think that there is no pxaXXX which needs this functionality.
 
-http://www.spinics.net/lists/linux-samsung-soc/msg35089.html
+> It seems that CLK_NONE isn't used in pxa27x clock driver. And pxa_clocks[0] is
+> not used. Is it redundant?
+Yes it is. pxa_clocks[0] is never filled by any clock.
 
->> Of course if either of you has input on the discussions on the drm
->> bridge/panel series V6 [1] for how to enable non-simplefb display and
->> iommus, that would be valuable.
-> 
-> Support for Exynos IOMMU is being worked on right now and patches adding
-> DT support from Marek Szyprowski should show up on the lists in very
-> near future.
+Cheers.
 
-Okay, good to hear.
-
-> However I think you don't strictly need IOMMU to get
-> non-simplefb display, as CMA can be used to allocate contiguous memory.
-
-I do have CMA enabled, but it wasn't working without iommu patches
-either. Machine booted, and display had backlight but stayed black.
-
-CONFIG_CMA=y
-# CONFIG_CMA_DEBUG is not set
-CONFIG_DMA_CMA=y
-CONFIG_CMA_SIZE_MBYTES=64
-CONFIG_CMA_SIZE_SEL_MBYTES=y
-# CONFIG_CMA_SIZE_SEL_PERCENTAGE is not set
-# CONFIG_CMA_SIZE_SEL_MIN is not set
-# CONFIG_CMA_SIZE_SEL_MAX is not set
-CONFIG_CMA_ALIGNMENT=8
-CONFIG_CMA_AREAS=7
-
-Ajay has reported the same patches working on his Skate.
-
-Regards,
-Andreas
-
->> [1] http://www.spinics.net/lists/linux-samsung-soc/msg35274.html
-
--- 
-SUSE LINUX Products GmbH, Maxfeldstr. 5, 90409 N?rnberg, Germany
-GF: Jeff Hawn, Jennifer Guild, Felix Imend?rffer; HRB 16746 AG N?rnberg
+--
+Robert
