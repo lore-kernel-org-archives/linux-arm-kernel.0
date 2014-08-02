@@ -1,41 +1,50 @@
 From: dianders@chromium.org (Doug Anderson)
-Date: Fri, 1 Aug 2014 21:54:46 -0700
-Subject: [PATCH v6 04/10] ARM: dts: Clean up exynos5250-snow
-In-Reply-To: <1406940750-15880-5-git-send-email-afaerber@suse.de>
+Date: Fri, 1 Aug 2014 21:57:42 -0700
+Subject: [PATCH v6 00/10] ARM: dts: exynos: Prepare Spring
+In-Reply-To: <53DC4E41.4050200@collabora.co.uk>
 References: <1406940750-15880-1-git-send-email-afaerber@suse.de>
- <1406940750-15880-5-git-send-email-afaerber@suse.de>
-Message-ID: <CAD=FV=WB_JP_jAp5bC-cBtJs8U0AmrxPGj_J2d6uJkn=LEjEPA@mail.gmail.com>
+ <53DC4E41.4050200@collabora.co.uk>
+Message-ID: <CAD=FV=V_vXZLMaTMFdgr62=zRXucZA6D3PvS0Mb40he0ShHTfA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Andreas,
+Hi,
 
-On Fri, Aug 1, 2014 at 5:52 PM, Andreas F?rber <afaerber@suse.de> wrote:
-> Use the new style of referencing inherited nodes and use symbolic names.
-> Reorder one pinctrl node in GPIO order.
+On Fri, Aug 1, 2014 at 7:34 PM, Javier Martinez Canillas
+<javier.martinez@collabora.co.uk> wrote:
+> Hello Andreas
 >
-> Goal is the alignment of all exynos5250 based device trees for comparison.
+> On 08/02/2014 02:52 AM, Andreas F?rber wrote:
+>>
+>> Based on the preinstalled 3.8 based ChromeOS kernel and previous 3.15
+>> based attempts by Stephan and me that broke for 3.16, I've prepared a
+>> device tree for the HP Chromebook 11 aka Google Spring.
+>>
+>> v6 renames a node and reverts dp_hpd.
+>>
+>> Not yet enabled are trackpad, Wifi and sound.
+>>
+>> My rebasing branch for testing is here:
+>> https://github.com/afaerber/linux/commits/spring-next
+>>
+>> Regards,
+>> Andreas
+>>
 >
-> Suggested-by: Doug Anderson <dianders@chromium.org>
-> Reviewed-by: Doug Anderson <dianders@chromium.org>
-> Signed-off-by: Andreas F?rber <afaerber@suse.de>
-> ---
->  v5 -> v6:
->  * Split off label additions (Doug Anderson)
->  * Fixed alphabetical order of sd3_* nodes (Doug Anderson)
+> I made a comment on patch 05/10 but the rest of the series looks good to me. So
+> for the remaining patches:
 >
->  v4 -> v5:
->  * Introduced labels to consistently use new referencing style (Tomasz Figa)
->  * Use IRQ_TYPE_* constants
->  * Use some more GPIO_ACTIVE_*
+> Reviewed-by: Javier Martinez Canillas <javier.martinez@collabora.co.uk>
 >
->  v3 -> v4: Unchanged
->
->  v3: New (Doug Anderson)
->
->  arch/arm/boot/dts/exynos5250-snow.dts | 291 +++++++++++++++++-----------------
->  1 file changed, 145 insertions(+), 146 deletions(-)
+> NOTE: I thought that Tomasz Figa gave you his Reviewed-by on v5 for the whole
+> series as well but I didn't see his tag on the v6 patches.
 
-I'm happy now.  :)  Thank you for putting up with me...
+Yes, I thought that too.  I assume he's OK with the small changes you
+made between v5 and v6.  In the very least his Reviewed-by could be
+present on the patches that didn't change between the last two revs.
 
-Reviewed-by: Doug Anderson <dianders@chromium.org>
+Given Javier's review and Tomasz's review and Vincent's comments, I'll
+probably skip all the work of reviewing the rest of the series unless
+someone really wants me to.  ;)
+
+-Doug
