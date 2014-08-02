@@ -1,62 +1,61 @@
-From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Sat, 2 Aug 2014 11:09:09 +0200
-Subject: [PATCH v2 03/10] mtd: spi-nor: add DDR quad read support
-In-Reply-To: <20140802020617.GS3711@ld-irv-0074>
-References: <1398657227-20721-1-git-send-email-b32955@freescale.com>
- <1398657227-20721-4-git-send-email-b32955@freescale.com>
- <20140730050843.GE11952@brian-ubuntu>
- <20140730064413.GA15547@shldeISGChi005.sh.intel.com>
- <20140730074500.GF11952@brian-ubuntu>
- <20140730104607.GQ17528@sirena.org.uk>
- <20140802020617.GS3711@ld-irv-0074>
-Message-ID: <CAMuHMdWxzKG1TTUVgYqfRP0Prp85HPwVxH7NQp7S-pNeLfFqjA@mail.gmail.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Sat, 2 Aug 2014 10:27:56 +0100
+Subject: [PATCH v8 01/11] ARM: brcmstb: add infrastructure for
+ ARM-based Broadcom STB SoCs
+In-Reply-To: <20140731220642.GQ3711@ld-irv-0074>
+References: <1405976886-27807-1-git-send-email-computersforpeace@gmail.com>
+ <1405976886-27807-2-git-send-email-computersforpeace@gmail.com>
+ <CAL_Jsq+Nbk7m9KXhG+Chdpvurp75RrvhFR2oE_LGxV444GSe9Q@mail.gmail.com>
+ <20140731022320.GM3711@ld-irv-0074>
+ <20140731084315.GJ30282@n2100.arm.linux.org.uk>
+ <20140731220642.GQ3711@ld-irv-0074>
+Message-ID: <20140802092756.GZ30282@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Aug 2, 2014 at 4:06 AM, Brian Norris
-<computersforpeace@gmail.com> wrote:
-> On Wed, Jul 30, 2014 at 11:46:07AM +0100, Mark Brown wrote:
->> On Wed, Jul 30, 2014 at 12:45:00AM -0700, Brian Norris wrote:
->> > On Wed, Jul 30, 2014 at 02:44:13PM +0800, Huang Shijie wrote:
->> > > IMHO, the DDR modes can _NOT_ be handled by the driver/spi/*.
->>
->> > I agree to some extent, but I wanted to confirm with the SPI guys that
->> > DDR is truly unique to SPI NOR. (I know it doesn't currently support
->> > it.)
->>
->> I don't know what DDR is in this context, sorry.
->
-> I think it's just the ability to latch data on both the rising and
-> falling edges of the SPI clock. For SPI flash, it seems to be used for
-> the data portion of the opcode/address/data sequence.
->
->> I'm guessing you're
->> right since it sounds like something to do with extra clocks and this is
->> probably not something used by generic SPI devices at present (if it
->> ends up being widely implemented by sufficiently generic controllers
->> that might change but the trend seems to be to flash specific
->> controllers).
->
-> OK, thanks for chiming in.
->
-> Yeah, I suppose it could be wedged in later if drivers/spi/ ever adopts
-> a solution.
+On Thu, Jul 31, 2014 at 03:06:42PM -0700, Brian Norris wrote:
+> Hi Russell,
+> 
+> Yes, I noticed this. What I meant is that smp_ops.cpu_die() and
+> smp_ops.cpu_kill() are not synchronized.
+...
+> We're not relying on the L1 cache, though. Don't sync_cache_{r,w}()
+> ensure all reads/writes reach at least the L2?
 
-I think this can just be another SPI_* spi_device.mode flag.
+What exactly are you trying to achieve here?
 
-Do we need bindings for this in
-Documentation/devicetree/bindings/spi/spi-bus.txt?
-Unlike Quad SPI transfer support, this doesn't need special wiring, so DDR
-capability is an intrinsic property of the SPI slave, and the mode bit can just
-be set in the SPI slave driver, without any DT magic?
+> How does that ensure that the CPU is down by the time the work is
+> scheduled? It seems like this would just defer the work long enough that
+> it *most likely* has quiesced, but I don't see how this gives us a
+> better guarantee. Or maybe I'm missing something. (If so, please do
+> enlighten!)
 
-Gr{oetje,eeting}s,
+Note that I said a delayed work queue.  The dying CPU runs a predictable
+sequence once cpu_die() has been entered - interrupts at the GIC have
+been programmed to be routed to other CPUs, interrupts at the CPU are
+masked, so the CPU isn't going to be doing anything else except executing
+that code path.  So, it's going to be a predictable number of CPU cycles.
 
-                        Geert
+That allows you to arrange a delayed workqueue (or a timer) to fire
+after a period of time that you can guarantee that the dying CPU has
+reached that wfi().
 
---
-Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+Another point which raises itself in your patch is this:
 
-In personal conversations with technical people, I call myself a hacker. But
-when I'm talking to journalists I just say "programmer" or something like that.
-                                -- Linus Torvalds
++       /* Settle-time from Broadcom-internal DVT reference code */
++       udelay(7);
+
+7us looks very precise, but udelay() may not be that precise.  What is
+the actual specification?  Does it say "you must wait at least 7us"?
+
+udelay() _may_ return early, especially if it is using the CPU delay
+loop to perform the delay - I've explained why this happens previously,
+and why it isn't a bug.
+
+If you're using a timer-based delay for udelay() (which you should be
+using if you support cpufreq) then the delay should be more accurate,
+but it's still good practise to give a little leeway on the figure.
+
+-- 
+FTTC broadband for 0.8mile line: currently at 9.5Mbps down 400kbps up
+according to speedtest.net.
