@@ -1,34 +1,299 @@
 From: wens@csie.org (Chen-Yu Tsai)
-Date: Sun, 3 Aug 2014 23:55:39 +0800
-Subject: [PATCH 7/9] ARM: sunxi: dt: Add PLL2 support
-In-Reply-To: <20140803125041.GX3952@lukather>
+Date: Sun, 3 Aug 2014 23:58:16 +0800
+Subject: [PATCH 4/9] clk: sunxi: PLL2 support for sun4i, sun5i and sun7i
+In-Reply-To: <20140803124458.GV3952@lukather>
 References: <1406842092-25207-1-git-send-email-emilio@elopez.com.ar>
- <1406842092-25207-8-git-send-email-emilio@elopez.com.ar>
- <CAKON4OycHvkAkndNvH3vkaE0d7P5d4ZsGrYw8eM_Py6HUo06sg@mail.gmail.com>
- <20140803125041.GX3952@lukather>
-Message-ID: <CAGb2v66PEQvv7DWR_uyLqMSdZu6NQpwexF-mo29BOVFVak+XVQ@mail.gmail.com>
+ <1406842092-25207-5-git-send-email-emilio@elopez.com.ar>
+ <20140803124458.GV3952@lukather>
+Message-ID: <CAGb2v67EBHL+A0N=3o8B+1z=oLya+vRjsrN2_SqWQrPcQsnbtA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Aug 3, 2014 at 8:50 PM, Maxime Ripard
+On Sun, Aug 3, 2014 at 8:44 PM, Maxime Ripard
 <maxime.ripard@free-electrons.com> wrote:
-> On Thu, Jul 31, 2014 at 05:46:09PM -0400, jonsmirl at gmail.com wrote:
->> Would it be better to name this "allwinner,sun4i-a10-pll2-clk" instead
->> of "allwinner,sun4i-a10-b-pll2-clk"? By encoding the b in it everyone
->> is going to wonder what to do on the 'c' revision which is the most
->> common revision.
->
-> Not really, the way we works usually is that the compatible is the one
-> from the first SoC that implemented that IP. If the rev C has the same
-> IP than rev B, then we're using the rev B compatible.
->
+> On Thu, Jul 31, 2014 at 06:28:07PM -0300, Emilio L?pez wrote:
+>> This patch adds support for PLL2 and derivates on sun4i, sun5i and
+>> sun7i SoCs. As this PLL is only used for audio and requires good
+>> accuracy, we only support two known good rates.
 >>
->> The revision based rename would then be from
->> "allwinner,sun4i-a10-pll2-clk" to "allwinner,sun4i-a10-a-pll2-clk".
+>> Signed-off-by: Emilio L?pez <emilio@elopez.com.ar>
+>> ---
+>>
+>> Changes from RFC:
+>>  * Add support for A10 rev. A
+>>  * Document compatibles
+>>  * Use fixed factors
+>>
+>>  Documentation/devicetree/bindings/clock/sunxi.txt |   2 +
+>>  drivers/clk/sunxi/Makefile                        |   1 +
+>>  drivers/clk/sunxi/clk-a10-pll2.c                  | 243 ++++++++++++++++++++++
+>>  3 files changed, 246 insertions(+)
+>>  create mode 100644 drivers/clk/sunxi/clk-a10-pll2.c
+>>
+>> diff --git a/Documentation/devicetree/bindings/clock/sunxi.txt b/Documentation/devicetree/bindings/clock/sunxi.txt
+>> index d3a5c3c..41ada31 100644
+>> --- a/Documentation/devicetree/bindings/clock/sunxi.txt
+>> +++ b/Documentation/devicetree/bindings/clock/sunxi.txt
+>> @@ -10,6 +10,8 @@ Required properties:
+>>       "allwinner,sun4i-a10-pll1-clk" - for the main PLL clock and PLL4
+>>       "allwinner,sun6i-a31-pll1-clk" - for the main PLL clock on A31
+>>       "allwinner,sun8i-a23-pll1-clk" - for the main PLL clock on A23
+>> +     "allwinner,sun4i-a10-a-pll2-clk" - for the PLL2 clock on A10 rev. A
+>> +     "allwinner,sun4i-a10-b-pll2-clk" - for the PLL2 clock on A10 rev. B
+>>       "allwinner,sun4i-a10-pll5-clk" - for the PLL5 clock
+>>       "allwinner,sun4i-a10-pll6-clk" - for the PLL6 clock
+>>       "allwinner,sun6i-a31-pll6-clk" - for the PLL6 clock on A31
+>> diff --git a/drivers/clk/sunxi/Makefile b/drivers/clk/sunxi/Makefile
+>> index 6850cba..dcd5709 100644
+>> --- a/drivers/clk/sunxi/Makefile
+>> +++ b/drivers/clk/sunxi/Makefile
+>> @@ -4,6 +4,7 @@
+>>
+>>  obj-y += clk-sunxi.o clk-factors.o
+>>  obj-y += clk-a10-hosc.o
+>> +obj-y += clk-a10-pll2.o
+>>  obj-y += clk-a20-gmac.o
+>>
+>>  obj-$(CONFIG_MFD_SUN6I_PRCM) += \
+>> diff --git a/drivers/clk/sunxi/clk-a10-pll2.c b/drivers/clk/sunxi/clk-a10-pll2.c
+>> new file mode 100644
+>> index 0000000..bcf7d0b
+>> --- /dev/null
+>> +++ b/drivers/clk/sunxi/clk-a10-pll2.c
+>> @@ -0,0 +1,243 @@
+>> +/*
+>> + * Copyright 2014 Emilio L?pez
+>> + *
+>> + * Emilio L?pez <emilio@elopez.com.ar>
+>> + *
+>> + * This program is free software; you can redistribute it and/or modify
+>> + * it under the terms of the GNU General Public License as published by
+>> + * the Free Software Foundation; either version 2 of the License, or
+>> + * (at your option) any later version.
+>> + *
+>> + * This program is distributed in the hope that it will be useful,
+>> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
+>> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+>> + * GNU General Public License for more details.
+>> + */
+>> +
+>> +#include <linux/clk-provider.h>
+>> +#include <linux/of.h>
+>> +#include <linux/of_address.h>
+>> +#include <linux/slab.h>
+>> +
+>> +#define SUN4I_PLL2_ENABLE            31
+>> +#define SUN4I_PLL2_A_VCOBIAS         0
+>> +#define SUN4I_PLL2_A_VCOBIAS_MASK    0x1F
+>> +#define SUN4I_PLL2_A_N                       7
+>> +#define SUN4I_PLL2_A_N_MASK          0x7F
+>> +#define SUN4I_PLL2_B_POST_DIV                26
+>> +#define SUN4I_PLL2_B_POST_DIV_MASK   0xF
+>> +#define SUN4I_PLL2_B_N                       8
+>> +#define SUN4I_PLL2_B_N_MASK          0x7F
+>> +#define SUN4I_PLL2_B_PRE_DIV         0
+>> +#define SUN4I_PLL2_B_PRE_DIV_MASK    0x1F
+>> +
+>> +#define SUN4I_PLL2_OUTPUTS           4
+>> +
+>> +struct sun4i_pll2_clk {
+>> +     struct clk_hw hw;
+>> +     void __iomem *reg;
+>> +};
+>> +
+>> +static inline struct sun4i_pll2_clk *to_sun4i_pll2_clk(struct clk_hw *hw)
+>> +{
+>> +     return container_of(hw, struct sun4i_pll2_clk, hw);
+>> +}
+>> +
+>> +static unsigned long sun4i_pll2_recalc_rate_a(struct clk_hw *hw,
+>> +                                           unsigned long parent_rate)
+>> +{
+>> +     struct sun4i_pll2_clk *clk = to_sun4i_pll2_clk(hw);
+>> +     int vcobias, n;
+>> +     u32 val;
+>> +
+>> +     val = readl(clk->reg);
+>> +     vcobias = (val >> SUN4I_PLL2_A_VCOBIAS) & SUN4I_PLL2_A_VCOBIAS_MASK;
+>> +     n = (val >> SUN4I_PLL2_A_N) & SUN4I_PLL2_A_N_MASK;
+>> +
+>> +     if (vcobias == 10 && n == 94)
+>> +             return 22579200;
+>> +     else if (vcobias == 9 && n == 83)
+>> +             return 24576000;
+>> +
+>> +     /*
+>> +      * Unfortunately we don't really have much documentation on how
+>> +      * these factors relate mathematically
+>> +      */
+>> +     return 0;
+>> +}
+>> +
+>> +static unsigned long sun4i_pll2_recalc_rate_b(struct clk_hw *hw,
+>> +                                           unsigned long parent_rate)
+>> +{
+>> +     struct sun4i_pll2_clk *clk = to_sun4i_pll2_clk(hw);
+>> +     int n, prediv, postdiv;
+>> +     u32 val;
+>> +
+>> +     val = readl(clk->reg);
+>> +     n = (val >> SUN4I_PLL2_B_N) & SUN4I_PLL2_B_N_MASK;
+>> +     prediv = (val >> SUN4I_PLL2_B_PRE_DIV) & SUN4I_PLL2_B_PRE_DIV_MASK;
+>> +     postdiv = (val >> SUN4I_PLL2_B_POST_DIV) & SUN4I_PLL2_B_POST_DIV_MASK;
+>> +
+>> +     /* 0 is a special case and means 1 */
+>> +     if (n == 0)
+>> +             n = 1;
+>> +     if (prediv == 0)
+>> +             prediv = 1;
+>> +     if (postdiv == 0)
+>> +             postdiv = 1;
+>> +
+>> +     return ((parent_rate * n) / prediv) / postdiv;
+>> +}
+>> +
+>> +static long sun4i_pll2_round_rate(struct clk_hw *hw, unsigned long rate,
+>> +                               unsigned long *parent_rate)
+>> +{
+>> +     /*
+>> +      * There is only two interesting rates for the audio PLL, the
+>> +      * rest isn't really usable due to accuracy concerns. Therefore,
+>> +      * we specifically round to those rates here
+>> +      */
+>> +     if (rate < 22579200)
+>> +             return -EINVAL;
+>> +
+>> +     if (rate >= 22579200 && rate < 24576000)
+>> +             return 22579200;
+>> +
+>> +     return 24576000;
+>> +}
+>> +
+>> +static int sun4i_pll2_set_rate_a(struct clk_hw *hw, unsigned long rate,
+>> +                              unsigned long parent_rate)
+>> +{
+>> +     struct sun4i_pll2_clk *clk = to_sun4i_pll2_clk(hw);
+>> +     u32 val = readl(clk->reg);
+>> +
+>> +     val &= ~(SUN4I_PLL2_A_VCOBIAS_MASK << SUN4I_PLL2_A_VCOBIAS);
+>> +     val &= ~(SUN4I_PLL2_A_N_MASK << SUN4I_PLL2_A_N);
+>> +
+>> +     if (rate == 22579200)
+>> +             val |= (10 << SUN4I_PLL2_A_VCOBIAS) | (94 << SUN4I_PLL2_A_N);
+>> +     else if (rate == 24576000)
+>> +             val |= (9 << SUN4I_PLL2_A_VCOBIAS) | (83 << SUN4I_PLL2_A_N);
+>> +     else
+>> +             return -EINVAL;
+>> +
+>> +     writel(val, clk->reg);
+>> +
+>> +     return 0;
+>> +}
+>> +
+>> +static int sun4i_pll2_set_rate_b(struct clk_hw *hw, unsigned long rate,
+>> +                              unsigned long parent_rate)
+>> +{
+>> +     struct sun4i_pll2_clk *clk = to_sun4i_pll2_clk(hw);
+>> +     u32 val = readl(clk->reg);
+>> +
+>> +     val &= ~(SUN4I_PLL2_B_N_MASK << SUN4I_PLL2_B_N);
+>> +     val &= ~(SUN4I_PLL2_B_PRE_DIV_MASK << SUN4I_PLL2_B_PRE_DIV);
+>> +     val &= ~(SUN4I_PLL2_B_POST_DIV_MASK << SUN4I_PLL2_B_POST_DIV);
+>> +
+>> +     val |= (21 << SUN4I_PLL2_B_PRE_DIV) | (4 << SUN4I_PLL2_B_POST_DIV);
+>> +
+>> +     if (rate == 22579200)
+>> +             val |= (79 << SUN4I_PLL2_B_N);
+>> +     else if (rate == 24576000)
+>> +             val |= (86 << SUN4I_PLL2_B_N);
+>> +     else
+>> +             return -EINVAL;
+>> +
+>> +     writel(val, clk->reg);
+>> +
+>> +     return 0;
+>> +}
+>> +
+>> +static const struct clk_ops sun4i_pll2_ops_a = {
+>> +     .recalc_rate = sun4i_pll2_recalc_rate_a,
+>> +     .round_rate = sun4i_pll2_round_rate,
+>> +     .set_rate = sun4i_pll2_set_rate_a,
+>> +};
+>> +
+>> +
+>> +static const struct clk_ops sun4i_pll2_ops_b = {
+>> +     .recalc_rate = sun4i_pll2_recalc_rate_b,
+>> +     .round_rate = sun4i_pll2_round_rate,
+>> +     .set_rate = sun4i_pll2_set_rate_b,
+>> +};
+>> +
+>> +static const struct of_device_id pll2_matches[] __initconst = {
+>> +     { .compatible = "allwinner,sun4i-a10-a-pll2-clk", .data = &sun4i_pll2_ops_a },
+>> +     { .compatible = "allwinner,sun4i-a10-b-pll2-clk", .data = &sun4i_pll2_ops_b },
+>> +     { /* sentinel */ },
+>> +};
+>> +
+>> +static void __init sun4i_pll2_setup(struct device_node *np)
+>> +{
+>> +     const char *clk_name = np->name, *parent;
+>> +     const struct of_device_id *match;
+>> +     struct clk_onecell_data *clk_data;
+>> +     const struct clk_ops *pll2_ops;
+>> +     struct sun4i_pll2_clk *pll2;
+>> +     struct clk_gate *gate;
+>> +     struct clk **clks;
+>> +     void __iomem *reg;
+>> +
+>> +     /* Choose the correct ops for pll2 */
+>> +     match = of_match_node(pll2_matches, np);
+>> +     pll2_ops = match->data;
+>> +
+>> +     pll2 = kzalloc(sizeof(*pll2), GFP_KERNEL);
+>> +     gate = kzalloc(sizeof(*gate), GFP_KERNEL);
+>> +     clk_data = kzalloc(sizeof(*clk_data), GFP_KERNEL);
+>> +     clks = kcalloc(SUN4I_PLL2_OUTPUTS, sizeof(*clks), GFP_KERNEL);
+>> +     if (!pll2 || !gate || !clk_data || !clks)
+>> +             goto free_mem;
+>> +
+>> +     reg = of_iomap(np, 0);
+>> +     parent = of_clk_get_parent_name(np, 0);
+>> +     of_property_read_string_index(np, "clock-output-names", 0, &clk_name);
+>> +
+>> +     pll2->reg = reg;
+>> +     gate->reg = reg;
+>> +     gate->bit_idx = SUN4I_PLL2_ENABLE;
+>> +
+>> +     /* PLL2, also known as PLL2x1 */
+>> +     of_property_read_string_index(np, "clock-output-names", 0, &clk_name);
+>> +     clks[0] = clk_register_composite(NULL, clk_name, &parent, 1, NULL, NULL,
+>> +                                      &pll2->hw, pll2_ops,
+>> +                                      &gate->hw, &clk_gate_ops, 0);
+>> +     WARN_ON(IS_ERR(clks[0]));
+>> +     clk_set_rate(clks[0], 22579200);
+>> +     parent = clk_name;
+>> +
+>> +     /* PLL2x2, 1/4 the rate of PLL2x8 */
+>> +     of_property_read_string_index(np, "clock-output-names", 1, &clk_name);
+>> +     clks[1] = clk_register_fixed_factor(NULL, clk_name, parent,
+>> +                                         CLK_SET_RATE_PARENT, 2, 1);
+>> +     WARN_ON(IS_ERR(clks[1]));
+>> +
+>> +     /* PLL2x4, 1/2 the rate of PLL2x8 */
+>> +     of_property_read_string_index(np, "clock-output-names", 2, &clk_name);
+>> +     clks[2] = clk_register_fixed_factor(NULL, clk_name, parent,
+>> +                                         CLK_SET_RATE_PARENT, 4, 1);
+>> +     WARN_ON(IS_ERR(clks[2]));
+>> +
+>> +     /* PLL2x8, double of PLL2 without the post divisor */
+>> +     of_property_read_string_index(np, "clock-output-names", 3, &clk_name);
+>> +     clks[3] = clk_register_fixed_factor(NULL, clk_name, parent,
+>> +                                         CLK_SET_RATE_PARENT, 2 * 4, 1);
 >
-> Though, I'd agree with you. We should have a single compatible in the
-> DT, a generic one, that would trigger the auto-detection, and might
-> change it to the rev A one, but the rev B doesn't make much sense.
+> Why have you declared them here, instead of using fixed factors in the
+> DT directly, like we have done in the past?
 
-I agree. The rev B would make people reading the DT wonder what happened
-to rev A.
+IIRC, We have not done so for the PLL clocks. This is how it was, though
+it was with the more complicated divs clocks.
+
+
+ChenYu
