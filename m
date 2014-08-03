@@ -1,189 +1,37 @@
-From: shc_work@mail.ru (Alexander Shiyan)
-Date: Sun,  3 Aug 2014 15:56:02 +0400
-Subject: [PATCH] ARM: i.MX: dts: Add support for the Motorola i.MX1 ADS board
-Message-ID: <1407066962-8343-1-git-send-email-shc_work@mail.ru>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Sun, 3 Aug 2014 13:56:30 +0200
+Subject: [PATCH] ARM: sunxi_defconfig: add NLS_CODEPAGE_437 and
+ NLS_ISO8859_1
+In-Reply-To: <1406984790-16994-1-git-send-email-libv@skynet.be>
+References: <1406984790-16994-1-git-send-email-libv@skynet.be>
+Message-ID: <20140803115630.GQ3952@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds support for the Motorola i.MX1 ADS board.
-This change is intended to further remove non-DT support for this board.
+Hi
 
-Signed-off-by: Alexander Shiyan <shc_work@mail.ru>
----
- arch/arm/boot/dts/Makefile              |   1 +
- arch/arm/boot/dts/imx1-motorola-ads.dts | 152 ++++++++++++++++++++++++++++++++
- 2 files changed, 153 insertions(+)
- create mode 100644 arch/arm/boot/dts/imx1-motorola-ads.dts
+On Sat, Aug 02, 2014 at 03:06:30PM +0200, Luc Verhaegen wrote:
+> Otherwise CONFIG_VFAT_FS is useless as mounting vfat fails.
+> 
+> Signed-off-by: Luc Verhaegen <libv@skynet.be>
 
-diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
-index acb6b42..8f32f00 100644
---- a/arch/arm/boot/dts/Makefile
-+++ b/arch/arm/boot/dts/Makefile
-@@ -161,6 +161,7 @@ dtb-$(CONFIG_ARCH_LPC32XX) += ea3250.dtb phy3250.dtb
- dtb-$(CONFIG_ARCH_MARCO) += marco-evb.dtb
- dtb-$(CONFIG_ARCH_MOXART) += moxart-uc7112lx.dtb
- dtb-$(CONFIG_ARCH_MXC) += \
-+	imx1-motorola-ads.dtb \
- 	imx25-eukrea-mbimxsd25-baseboard.dtb \
- 	imx25-eukrea-mbimxsd25-baseboard-cmo-qvga.dtb \
- 	imx25-eukrea-mbimxsd25-baseboard-dvi-svga.dtb \
-diff --git a/arch/arm/boot/dts/imx1-motorola-ads.dts b/arch/arm/boot/dts/imx1-motorola-ads.dts
-new file mode 100644
-index 0000000..29213b0a
---- /dev/null
-+++ b/arch/arm/boot/dts/imx1-motorola-ads.dts
-@@ -0,0 +1,152 @@
-+/*
-+ * Copyright (C) 2014 Alexander Shiyan <shc_work@mail.ru>
-+ *
-+ * The code contained herein is licensed under the GNU General Public
-+ * License. You may obtain a copy of the GNU General Public License
-+ * Version 2 or later at the following locations:
-+ *
-+ * http://www.opensource.org/licenses/gpl-license.html
-+ * http://www.gnu.org/copyleft/gpl.html
-+ */
-+
-+/dts-v1/;
-+#include "imx1.dtsi"
-+
-+/ {
-+	model = "Motorola MX1 ADS";
-+	compatible = "motorola,imx1ads", "fsl,imx1";
-+
-+	chosen {
-+		stdout-path = &uart1;
-+	};
-+
-+	memory {
-+		reg = <0x08000000 0x04000000>;
-+	};
-+
-+	clocks {
-+		#address-cells = <1>;
-+		#size-cells = <0>;
-+
-+		clk32 {
-+			compatible = "fsl,imx-clk32", "fixed-clock";
-+			#clock-cells = <0>;
-+			clock-frequency = <32000>;
-+		};
-+	};
-+};
-+
-+&cspi1 {
-+	pinctrl-0 = <&pinctrl_cspi1>;
-+	fsl,spi-num-chipselects = <1>;
-+	cs-gpios = <&gpio3 15 GPIO_ACTIVE_LOW>;
-+	status = "okay";
-+};
-+
-+&i2c {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&pinctrl_i2c>;
-+	status = "okay";
-+
-+	extgpio0: pcf8575 at 22 {
-+		compatible = "nxp,pcf8575";
-+		reg = <0x22>;
-+		gpio-controller;
-+		#gpio-cells = <2>;
-+	};
-+
-+	extgpio1: pcf8575 at 24 {
-+		compatible = "nxp,pcf8575";
-+		reg = <0x24>;
-+		gpio-controller;
-+		#gpio-cells = <2>;
-+	};
-+};
-+
-+&uart1 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&pinctrl_uart1>;
-+	fsl,uart-has-rtscts;
-+	status = "okay";
-+};
-+
-+&uart2 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&pinctrl_uart2>;
-+	fsl,uart-has-rtscts;
-+	status = "okay";
-+};
-+
-+&weim {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&pinctrl_weim>;
-+	status = "okay";
-+
-+	nor: nor at 0,0 {
-+		compatible = "cfi-flash";
-+		reg = <0 0x00000000 0x02000000>;
-+		bank-width = <4>;
-+		fsl,weim-cs-timing = <0x00003e00 0x00000801>;
-+		#address-cells = <1>;
-+		#size-cells = <1>;
-+	};
-+};
-+
-+&iomuxc {
-+	imx1-motorola-ads {
-+		pinctrl_cspi1: cspi1grp {
-+			fsl,pins = <
-+				MX1_PAD_SPI1_MISO__SPI1_MISO	0x0
-+				MX1_PAD_SPI1_MOSI__SPI1_MOSI	0x0
-+				MX1_PAD_SPI1_RDY__SPI1_RDY	0x0
-+				MX1_PAD_SPI1_SCLK__SPI1_SCLK	0x0
-+				MX1_PAD_SPI1_SS__GPIO3_15	0x0
-+			>;
-+		};
-+
-+		pinctrl_i2c: i2cgrp {
-+			fsl,pins = <
-+				MX1_PAD_I2C_SCL__I2C_SCL	0x0
-+				MX1_PAD_I2C_SDA__I2C_SDA	0x0
-+			>;
-+		};
-+
-+		pinctrl_uart1: uart1grp {
-+			fsl,pins = <
-+				MX1_PAD_UART1_TXD__UART1_TXD	0x0
-+				MX1_PAD_UART1_RXD__UART1_RXD	0x0
-+				MX1_PAD_UART1_CTS__UART1_CTS	0x0
-+				MX1_PAD_UART1_RTS__UART1_RTS	0x0
-+			>;
-+		};
-+
-+		pinctrl_uart2: uart2grp {
-+			fsl,pins = <
-+				MX1_PAD_UART2_TXD__UART2_TXD	0x0
-+				MX1_PAD_UART2_RXD__UART2_RXD	0x0
-+				MX1_PAD_UART2_CTS__UART2_CTS	0x0
-+				MX1_PAD_UART2_RTS__UART2_RTS	0x0
-+			>;
-+		};
-+
-+		pinctrl_weim: weimgrp {
-+			fsl,pins = <
-+				MX1_PAD_A0__A0			0x0
-+				MX1_PAD_A16__A16		0x0
-+				MX1_PAD_A17__A17		0x0
-+				MX1_PAD_A18__A18		0x0
-+				MX1_PAD_A19__A19		0x0
-+				MX1_PAD_A20__A20		0x0
-+				MX1_PAD_A21__A21		0x0
-+				MX1_PAD_A22__A22		0x0
-+				MX1_PAD_A23__A23		0x0
-+				MX1_PAD_A24__A24		0x0
-+				MX1_PAD_BCLK__BCLK		0x0
-+				MX1_PAD_CS4__CS4		0x0
-+				MX1_PAD_DTACK__DTACK		0x0
-+				MX1_PAD_ECB__ECB		0x0
-+				MX1_PAD_LBA__LBA		0x0
-+			>;
-+		};
-+	};
-+};
+Queued for 3.18.
+
+Since we're pretty much at the beginning of the merge window, I'll
+publish the branch whenever -rc1 will be out in order to avoid
+rebasing.
+
+Thanks!
+Maxime
+
 -- 
-1.8.5.5
+Maxime Ripard, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140803/cd3d51ef/attachment.sig>
