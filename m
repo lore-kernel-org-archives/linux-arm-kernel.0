@@ -1,57 +1,46 @@
-From: emilio@elopez.com.ar (=?windows-1252?Q?Emilio_L=F3pez?=)
-Date: Sun, 03 Aug 2014 18:37:31 -0300
-Subject: [PATCH 2/9] ARM: sunxi: quirk support
-In-Reply-To: <20140803124211.GU3952@lukather>
+From: emilio@elopez.com.ar (=?UTF-8?B?RW1pbGlvIEzDs3Bleg==?=)
+Date: Sun, 03 Aug 2014 19:15:00 -0300
+Subject: [PATCH 7/9] ARM: sunxi: dt: Add PLL2 support
+In-Reply-To: <CAGb2v66PEQvv7DWR_uyLqMSdZu6NQpwexF-mo29BOVFVak+XVQ@mail.gmail.com>
 References: <1406842092-25207-1-git-send-email-emilio@elopez.com.ar>
- <1406842092-25207-3-git-send-email-emilio@elopez.com.ar>
- <20140803124211.GU3952@lukather>
-Message-ID: <53DEAB9B.1090400@elopez.com.ar>
+ <1406842092-25207-8-git-send-email-emilio@elopez.com.ar>
+ <CAKON4OycHvkAkndNvH3vkaE0d7P5d4ZsGrYw8eM_Py6HUo06sg@mail.gmail.com>
+ <20140803125041.GX3952@lukather>
+ <CAGb2v66PEQvv7DWR_uyLqMSdZu6NQpwexF-mo29BOVFVak+XVQ@mail.gmail.com>
+Message-ID: <53DEB464.7050604@elopez.com.ar>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Maxime,
+Hi,
 
-El 03/08/14 a las 09:42, Maxime Ripard escibi?:
-> On Thu, Jul 31, 2014 at 06:28:05PM -0300, Emilio L?pez wrote:
->> Currently, some hardware revisions of sunxi SoCs need special care on
->> some blocks because of hardware differences and/or bugs. Unfortunately,
->> it is unfeasible to account for these issues directly when writing the
->> device tree, as SoC revision can vary between different units of the
->> same device. This commit introduces a place to adjust DT compatibles
->> as needed to work around said issues before devices are probed. To
->> demonstrate usage, two quirks are added for the PLL2 and audio codec
->> on sun4i.
+El 03/08/14 a las 12:55, Chen-Yu Tsai escibi?:
+> On Sun, Aug 3, 2014 at 8:50 PM, Maxime Ripard
+> <maxime.ripard@free-electrons.com> wrote:
+>> On Thu, Jul 31, 2014 at 05:46:09PM -0400, jonsmirl at gmail.com wrote:
+>>> Would it be better to name this "allwinner,sun4i-a10-pll2-clk" instead
+>>> of "allwinner,sun4i-a10-b-pll2-clk"? By encoding the b in it everyone
+>>> is going to wonder what to do on the 'c' revision which is the most
+>>> common revision.
 >>
->> Signed-off-by: Emilio L?pez <emilio@elopez.com.ar>
->> ---
-(...)
->> +static int __init sunxi_apply_quirks(void)
->> +{
->> +	if (of_machine_is_compatible("allwinner,sun4i-a10")) {
->> +		sun4i_pll2_quirk();
->> +		sun4i_codec_quirk();
->> +	}
->> +
->> +	return 0;
->> +}
->> +postcore_initcall(sunxi_apply_quirks)
+>> Not really, the way we works usually is that the compatible is the one
+>> from the first SoC that implemented that IP. If the rev C has the same
+>> IP than rev B, then we're using the rev B compatible.
+>>
+>>>
+>>> The revision based rename would then be from
+>>> "allwinner,sun4i-a10-pll2-clk" to "allwinner,sun4i-a10-a-pll2-clk".
+>>
+>> Though, I'd agree with you. We should have a single compatible in the
+>> DT, a generic one, that would trigger the auto-detection, and might
+>> change it to the rev A one, but the rev B doesn't make much sense.
 >
-> Have you tested it? My guess is that it wolud have to run *much*
-> sooner, before of_platform_populate to be effective.
+> I agree. The rev B would make people reading the DT wonder what happened
+> to rev A.
 
-I have, I was able to break my UART with it :)
+Would you like to see "allwinner,sun4i-a10-pll2-clk" on the DT then? 
+Should we document it as a magic property triggering an autodetect on 
+the clock binding document?
 
-of_platform_populate() is called from arch/arm/kernel/setup.c on 
-arch_initcall. From include/linux/init.h
-
-...
-#define postcore_initcall(fn)           __define_initcall(fn, 2)
-#define postcore_initcall_sync(fn)      __define_initcall(fn, 2s)
-#define arch_initcall(fn)               __define_initcall(fn, 3)
-...
-
-So it should be fine.
-
-Cheers,
+Cheers!
 
 Emilio
