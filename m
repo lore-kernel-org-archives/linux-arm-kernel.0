@@ -1,43 +1,31 @@
-From: shc_work@mail.ru (Alexander Shiyan)
-Date: Sun,  3 Aug 2014 16:10:30 +0400
-Subject: [PATCH] ARM: i.MX: Remove mxc_arch_reset_init_dt() call for i.MX1
-Message-ID: <1407067830-10985-1-git-send-email-shc_work@mail.ru>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Sun, 3 Aug 2014 14:41:08 +0200
+Subject: [PATCH 3/9] ARM: sunxi: make sun6i SMP ops static
+In-Reply-To: <1406842092-25207-4-git-send-email-emilio@elopez.com.ar>
+References: <1406842092-25207-1-git-send-email-emilio@elopez.com.ar>
+ <1406842092-25207-4-git-send-email-emilio@elopez.com.ar>
+Message-ID: <20140803124108.GT3952@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-i.MX1 watchdog is not compatible with other i.MX SOCs, so
-remove call of mxc_arch_reset_init_dt() for this CPU.
+On Thu, Jul 31, 2014 at 06:28:06PM -0300, Emilio L?pez wrote:
+> The sun6i SMP ops are currently not marked as static, as reported by
+> sparse. Let's mark it as such.
+> 
+> Signed-off-by: Emilio L?pez <emilio@elopez.com.ar>
 
-Signed-off-by: Alexander Shiyan <shc_work@mail.ru>
----
- arch/arm/mach-imx/imx1-dt.c | 8 --------
- 1 file changed, 8 deletions(-)
+That patch has nothing to do in this set. Please send it separately.
 
-diff --git a/arch/arm/mach-imx/imx1-dt.c b/arch/arm/mach-imx/imx1-dt.c
-index 05da661..6f915b0 100644
---- a/arch/arm/mach-imx/imx1-dt.c
-+++ b/arch/arm/mach-imx/imx1-dt.c
-@@ -12,13 +12,6 @@
- 
- #include "common.h"
- 
--static void __init imx1_dt_init(void)
--{
--	mxc_arch_reset_init_dt();
--
--	of_platform_populate(NULL, of_default_bus_match_table, NULL, NULL);
--}
--
- static const char * const imx1_dt_board_compat[] __initconst = {
- 	"fsl,imx1",
- 	NULL
-@@ -28,7 +21,6 @@ DT_MACHINE_START(IMX1_DT, "Freescale i.MX1 (Device Tree Support)")
- 	.map_io		= mx1_map_io,
- 	.init_early	= imx1_init_early,
- 	.init_irq	= mx1_init_irq,
--	.init_machine	= imx1_dt_init,
- 	.dt_compat	= imx1_dt_board_compat,
- 	.restart	= mxc_restart,
- MACHINE_END
+Maxime
+
 -- 
-1.8.5.5
+Maxime Ripard, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140803/9fd0e1c1/attachment.sig>
