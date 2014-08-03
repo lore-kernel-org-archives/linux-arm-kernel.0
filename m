@@ -1,111 +1,90 @@
 From: olof@lixom.net (Olof Johansson)
-Date: Sat, 2 Aug 2014 20:17:42 -0700
+Date: Sat, 2 Aug 2014 20:20:47 -0700
 Subject: [PATCH] ARM: multi_v7_defconfig: major refresh
-In-Reply-To: <2135708.OrJepJ40UM@amdc1032>
+In-Reply-To: <1406908399.22757.12.camel@linaro1.home>
 References: <1406052070-6207-1-git-send-email-olof@lixom.net>
- <CAK5sBcEPQtMvT+mp4+jXQA06FcBRTdAVJLbTCtCu-kV07Wh5RQ@mail.gmail.com>
- <CAK5sBcGrAKCRYvLxvgeDU=Bu-MoDTgwY+dmEBbiuCpn5ttRU3Q@mail.gmail.com>
- <2135708.OrJepJ40UM@amdc1032>
-Message-ID: <20140803031742.GA14214@quad.lixom.net>
+ <53DB6B4F.9080605@arm.com> <1406890899.2794.40.camel@linaro1.home>
+ <CAOesGMi0RUbz4BSnmR92dEk3fWgN=hnENSdi55VeCXdcHLRLJQ@mail.gmail.com>
+ <53DB763A.10306@arm.com> <1406892491.2794.58.camel@linaro1.home>
+ <53DBAAEA.2010908@arm.com> <1406908399.22757.12.camel@linaro1.home>
+Message-ID: <20140803032047.GB14214@quad.lixom.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Aug 01, 2014 at 02:53:40PM +0200, Bartlomiej Zolnierkiewicz wrote:
-> 
-> Hi,
-> 
-> On Friday, August 01, 2014 12:14:41 PM Sachin Kamat wrote:
-> > On Thu, Jul 31, 2014 at 11:56 AM, Sachin Kamat <spk.linux@gmail.com> wrote:
-> > > On Thu, Jul 31, 2014 at 11:37 AM, Tushar Behera <trblinux@gmail.com> wrote:
-> > >> On Wed, Jul 23, 2014 at 1:58 AM, Olof Johansson <olof@lixom.net> wrote:
-> > >>> On Tue, Jul 22, 2014 at 11:36 AM, Arnd Bergmann <arnd@arndb.de> wrote:
-> > >>>> On Tuesday 22 July 2014 11:01:10 Olof Johansson wrote:
-> > >>>>> This is a major refresh of the multi_v7_defconfig:
-> > >>>>>
-> > >>>>> - Bring over a bunch of Samsung drivers to make ODROID-U3 and Chromebooks usable
-> > >>>>>  * Enable big.LITTLE
-> > >>>>>  * MCPM
-> > >>>>>  * CYAPA touchpad
-> > >>>>>  * Samsung-related MTD/regulator/clk/pinmux drivers
-> > >>>>>  * Add some of the CrOS EC drivers
-> > >>>>> - Turn on TPM, HW_RANDOM
-> > >>>>> - OMAP_USB3 -> TI_PIPE3 option rename
-> > >>>>> - Enable MCPM/b.L for VEXPRESS
-> > >>>>> - Add new CONFIG_MTD_SPI_NOR since it otherwise masks off SPI NOR drivers
-> > >>>>> - CONFIG_LOGO, because penguins.
-> > >>>>>
-> > >>>>> I took care to keep the new options that have been added for whose the
-> > >>>>> drivers are not yet in our for-next branch. This was pretty awkward so
-> > >>>>> we should sort out how to handle those better in the future.
+On Fri, Aug 01, 2014 at 04:53:19PM +0100, Jon Medhurst (Tixy) wrote:
+> On Fri, 2014-08-01 at 15:57 +0100, Sudeep Holla wrote:
+> > 
+> > On 01/08/14 12:28, Jon Medhurst (Tixy) wrote:
+> > > On Fri, 2014-08-01 at 12:12 +0100, Sudeep Holla wrote:
+> > >>
+> > >> On 01/08/14 12:03, Olof Johansson wrote:
+> > >>> On Fri, Aug 1, 2014 at 4:01 AM, Jon Medhurst (Tixy) <tixy@linaro.org> wrote:
+> > >>>> On Fri, 2014-08-01 at 11:26 +0100, Sudeep Holla wrote:
+> > 
+> > [...]
+> > 
 > > >>>>
-> > >>>> Since you've already done all those, how about enabling THUMB2_KERNEL?
-> > >>>> For the multi_v7_defconfig, it should actually give some benefits,
-> > >>>> since it's rather large, and it would be good to have some more testing
-> > >>>> with this option enabled.
+> > >>>>>    One way to achieve this:
+> > >>>>> (There's sysfs to re-enable it runtime)
 > > >>>>
-> > >>>> I guess the first step would be to enable it and just see if your
-> > >>>> boot farm survives the change.
+> > >>>> The opposite is also true, if you don't want the switcher enabled you
+> > >>>> can disable it by the same method after boot ;-)
+> > >>>>
+> > >>>>> -->8
+> > >>>>> diff --git a/arch/arm/common/bL_switcher.c b/arch/arm/common/bL_switcher.c
+> > >>>>> index 490f3dced749..f4c36e70166a 100644
+> > >>>>> --- a/arch/arm/common/bL_switcher.c
+> > >>>>> +++ b/arch/arm/common/bL_switcher.c
+> > >>>>> @@ -794,7 +794,7 @@ static int bL_switcher_hotplug_callback(struct
+> > >>>>> notifier_block *nfb,
+> > >>>>>            return NOTIFY_DONE;
+> > >>>>>     }
+> > >>>>>
+> > >>>>> -static bool no_bL_switcher;
+> > >>>>> +static bool no_bL_switcher = true;
+> > >>>>
+> > >>>> This changes the default for everyone, which I guess is fair enough if
+> > >>>> there is a good reason, but I'm not sure there is.
 > > >>>
-> > >>> Good point, I'll definitely give that a go once the current issues are resolved.
+> > >>> No, I don't think there is.
 > > >>>
-> > >>> Which are: These changes make 5250-based machines (snow and arndale)
-> > >>> break. Lots of i2c timeouts on SATA and hdmi-phy. Looks like arndale
-> > >>> might be missing pinctrl setups for it?
+> > >>
+> > >> It's just that people using TC2 will suddenly see 3 of the 5 CPUs missing.
 > > >
-> > > i2c timeout issue should have been fixed with the following patch:
-> > > i2c: i2c-s3c2410: Drop class based scanning to improve bootup time
-> > > (commit id: 6031d3dfc73b49bede540872e51a70ee0b6786d4) which is
-> > > available on Wolfram's I2C tree (should be part of linux-next too). Also
-> > > I do not see I2C_S3C2410 enabled in the config.
-> > > I do not have access to h/w today. I can verify and check tomorrow or
-> > > somebody could test it in the meantime with the above suggestions?
+> > > Yes, if they we're previously using multi_v7_defconfig (do people
+> > > working specifically with TC2's use that?)
+> > >
 > > 
-> > Olof,
-> > Tested your multi_v7_defconfig patch on top of latest linux-next (20140731).
-> > I did not see any aforementioned i2c issues on 5250 based Snow board. It
-> > booted fine. However on 5250 based Arndale board, the boot stops at
-> > the following:
+> > I don't, but assumed many might use it.
 > > 
-> > [    1.951863] ehci_hcd: USB 2.0 'Enhanced' Host Controller (EHCI) Driver
-> > [    1.956937] ehci-pci: EHCI PCI platform driver
-> > [    1.961392] ehci-exynos: EHCI EXYNOS driver
-> > [    1.965698] exynos-ehci 12110000.usb: EHCI Host Controller
-> > [    1.971007] exynos-ehci 12110000.usb: new USB bus registered,
-> > assigned bus number 1
-> > [    1.981593] exynos-ehci 12110000.usb: can't setup: -110
-> > [    1.985361] exynos-ehci 12110000.usb: USB bus 1 deregistered
-> > [    1.991001] exynos-ehci 12110000.usb: Failed to add USB HCD
-> > [    1.996569] exynos-ehci: probe of 12110000.usb failed with error -110
-> > [    2.003041] ohci_hcd: USB 1.1 'Open' Host Controller (OHCI) Driver
-> > [    2.009149] ohci-exynos: OHCI EXYNOS driver
-> > [    2.013457] exynos-ohci 12120000.usb: USB Host Controller
-> > [    2.018702] exynos-ohci 12120000.usb: new USB bus registered,
-> > assigned bus number 1
+> > > Conversely, with the change in default proposed above, anyone with their
+> > > own configs enabling the switcher will suddenly see the number of CPUs
+> > > go from 2 to 5. We also have the situation where we have a config
+> > > option, which when enabled, doesn't actually do anything unless the user
+> > > also changes boot arguments or takes measures to enable it after boot.
+> > > Which seems the wrong way for things to work to me.
+> > >
 > > 
-> > Boots well with exynos_defconfig though. Probably some conflict with
-> > other config options?
-> > 
-> > I couldn't find out as I am busy with some other activity.
+> > OK, makes sense. Just curious how many big.LITTLE platforms have CPUFreq
+> > support and integrated with bL switcher. Otherwise we end up switching
+> > clusters/cpus using dummy i/f anyways
 > 
-> Olof, could you please remember to update exynos_defconfig when updating
-> multi_v7_defconfig with Exynos related changes?  These two configs have
-> been getting slightly out-of-sync since introduction of multiplatform
-> support for Exynos arch.  It causes waste of development/testing efforts.
+> Hmm, that is a point, there are 3 other big.LITTLE SoC's I can spot in
+> mainline [1], and I wouldn't want to speculate how they would be
+> affected by having the big.LITTLE switcher enabled.
+> 
+> [1] exynos5420, exynos5260, r8a7790
 
-I can try to, but in the end it's up to the platform maintainer, which is
-Kukjin.
+5422/5800 is a fourth SoC, but it's nearly identical to 5420 with a few
+bugfixes.
 
-> Kukjin, it would really be great if all Exynos users run on a common
-> configuration so the development/testing is done more efficiently.  Could
-> you please reconsider removal of exynos_defconfig?
+At the end of the day, b.L switcher has predictable user behavior, while
+running with assymetric SMP does not. Until the scheduler work has been done,
+it is significantly better to enable the switcher instead of SMP on these
+platforms.
 
-There's still some benefit to having per-SoC defconfigs, since it's a better
-starting point for someone looking to cut down a defconfig for use on their
-product/single-platform kernel.
-
-If anything, having slightly different defconfigs improves test coverage since
-fewer assumptions about everybody using exactly the same configs will get
-exposed.
+Once the scheduler work has come further, we can switch over. But not until
+then.
 
 
 -Olof
