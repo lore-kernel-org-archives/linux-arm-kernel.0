@@ -1,367 +1,299 @@
-From: hsnaves@gmail.com (Humberto Silva Naves)
-Date: Mon,  4 Aug 2014 16:02:48 +0200
-Subject: [PATCH 2/2] clk: samsung: Make pll initialization structures
- read-only.
-In-Reply-To: <1407160968-12108-1-git-send-email-hsnaves@gmail.com>
-References: <1407160968-12108-1-git-send-email-hsnaves@gmail.com>
-Message-ID: <1407160968-12108-3-git-send-email-hsnaves@gmail.com>
+From: b.zolnierkie@samsung.com (Bartlomiej Zolnierkiewicz)
+Date: Mon, 04 Aug 2014 16:09:51 +0200
+Subject: [PATCH v3][next-20140804] ARM: EXYNOS: Fix suspend/resume sequences
+Message-ID: <19823219.PknUbmjHjT@amdc1032>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-All the structures and tables related to the PLL clock
-initialization that were previously as __initdata are now marked
-as __initconst.
+From: Tomasz Figa <t.figa@samsung.com>
 
-Signed-off-by: Humberto Silva Naves <hsnaves@gmail.com>
+Due to recent consolidation of Exynos suspend and cpuidle code, some
+parts of suspend and resume sequences are executed two times, once from
+exynos_pm_syscore_ops and then from exynos_cpu_pm_notifier() and thus it
+breaks suspend, at least on Exynos4-based boards. In addition, simple
+core power down from a cpuidle driver could, in case of CPU 0 could
+result in calling functions that are specific to suspend and deeper idle
+states.
+
+This patch fixes the issue by moving those operations outside the CPU PM
+notifier into suspend and AFTR code paths. This leads to a bit of code
+duplication, but allows additional code simplification, so in the end
+more code is removed than added.
+
+Fixes: 85f9f90808b4 ("ARM: EXYNOS: Use the cpu_pm notifier for pm")
+Cc: Kukjin Kim <kgene.kim@samsung.com>
+Cc: Arnd Bergmann <arnd@arndb.de>
+Cc: Olof Johansson <olof@lixom.net>
+Cc: arm at kernel.org
+Signed-off-by: Tomasz Figa <t.figa@samsung.com>
+[b.zolnierkie: ported patch over current changes]
+Signed-off-by: Bartlomiej Zolnierkiewicz <b.zolnierkie@samsung.com>
 ---
- drivers/clk/samsung/clk-exynos3250.c |  6 +++---
- drivers/clk/samsung/clk-exynos4.c    | 16 ++++++++--------
- drivers/clk/samsung/clk-exynos5250.c |  8 ++++----
- drivers/clk/samsung/clk-exynos5260.c | 14 +++++++-------
- drivers/clk/samsung/clk-exynos5410.c |  2 +-
- drivers/clk/samsung/clk-exynos5420.c |  4 ++--
- drivers/clk/samsung/clk-s3c2410.c    |  8 ++++----
- drivers/clk/samsung/clk-s3c2412.c    |  2 +-
- drivers/clk/samsung/clk-s3c2443.c    |  4 ++--
- drivers/clk/samsung/clk-s3c64xx.c    |  2 +-
- 10 files changed, 33 insertions(+), 33 deletions(-)
+ arch/arm/mach-exynos/pm.c        | 163 ++++++++++++++++++---------------------
+ drivers/cpuidle/cpuidle-exynos.c |  25 +-----
+ 2 files changed, 80 insertions(+), 108 deletions(-)
 
-diff --git a/drivers/clk/samsung/clk-exynos3250.c b/drivers/clk/samsung/clk-exynos3250.c
-index ede6742..691b79b 100644
---- a/drivers/clk/samsung/clk-exynos3250.c
-+++ b/drivers/clk/samsung/clk-exynos3250.c
-@@ -703,7 +703,7 @@ static struct samsung_gate_clock gate_clks[] __initdata = {
+This is a Tomasz's patch ([1]) ported over current -next kernel.
+
+I'm sending this because Tomasz is on holiday currently and cannot
+test the patch (I tested it with Exynos4210 SoC based Origen board
+and Exynos4212 SoC based Trats2 target, BTW @Tomasz: on the former
+device S2R works even without this patch and on the latter one S2R
+doesn't work even with this patch applied).  I also need this patch
+as a prerequisite for my cpuidle AFTR changes.
+
+Kukjin, could you please apply it to your v3.17 tree?  Thanks!
+
+[1] http://www.mail-archive.com/linux-samsung-soc at vger.kernel.org/msg35094.html
+
+diff --git a/arch/arm/mach-exynos/pm.c b/arch/arm/mach-exynos/pm.c
+index 18646b7..e2c5c7b 100644
+--- a/arch/arm/mach-exynos/pm.c
++++ b/arch/arm/mach-exynos/pm.c
+@@ -114,26 +114,6 @@ static int exynos_irq_set_wake(struct irq_data *data, unsigned int state)
+ #define S5P_CHECK_AFTR  0xFCBA0D10
+ #define S5P_CHECK_SLEEP 0x00000BAD
+ 
+-/* Ext-GIC nIRQ/nFIQ is the only wakeup source in AFTR */
+-static void exynos_set_wakeupmask(long mask)
+-{
+-	pmu_raw_writel(mask, S5P_WAKEUP_MASK);
+-}
+-
+-static void exynos_cpu_set_boot_vector(long flags)
+-{
+-	__raw_writel(virt_to_phys(exynos_cpu_resume), EXYNOS_BOOT_VECTOR_ADDR);
+-	__raw_writel(flags, EXYNOS_BOOT_VECTOR_FLAG);
+-}
+-
+-void exynos_enter_aftr(void)
+-{
+-	exynos_set_wakeupmask(0x0000ff3e);
+-	exynos_cpu_set_boot_vector(S5P_CHECK_AFTR);
+-	/* Set value of power down register for aftr mode */
+-	exynos_sys_powerdown_conf(SYS_AFTR);
+-}
+-
+ /* For Cortex-A9 Diagnostic and Power control register */
+ static unsigned int save_arm_register[2];
+ 
+@@ -173,6 +153,82 @@ static void exynos_cpu_restore_register(void)
+ 		      : "cc");
+ }
+ 
++static void exynos_pm_central_suspend(void)
++{
++	unsigned long tmp;
++
++	/* Setting Central Sequence Register for power down mode */
++	tmp = pmu_raw_readl(S5P_CENTRAL_SEQ_CONFIGURATION);
++	tmp &= ~S5P_CENTRAL_LOWPWR_CFG;
++	pmu_raw_writel(tmp, S5P_CENTRAL_SEQ_CONFIGURATION);
++}
++
++static int exynos_pm_central_resume(void)
++{
++	unsigned long tmp;
++
++	/*
++	 * If PMU failed while entering sleep mode, WFI will be
++	 * ignored by PMU and then exiting cpu_do_idle().
++	 * S5P_CENTRAL_LOWPWR_CFG bit will not be set automatically
++	 * in this situation.
++	 */
++	tmp = pmu_raw_readl(S5P_CENTRAL_SEQ_CONFIGURATION);
++	if (!(tmp & S5P_CENTRAL_LOWPWR_CFG)) {
++		tmp |= S5P_CENTRAL_LOWPWR_CFG;
++		pmu_raw_writel(tmp, S5P_CENTRAL_SEQ_CONFIGURATION);
++		/* clear the wakeup state register */
++		pmu_raw_writel(0x0, S5P_WAKEUP_STAT);
++		/* No need to perform below restore code */
++		return -1;
++	}
++
++	return 0;
++}
++
++/* Ext-GIC nIRQ/nFIQ is the only wakeup source in AFTR */
++static void exynos_set_wakeupmask(long mask)
++{
++	pmu_raw_writel(mask, S5P_WAKEUP_MASK);
++}
++
++static void exynos_cpu_set_boot_vector(long flags)
++{
++	__raw_writel(virt_to_phys(exynos_cpu_resume), EXYNOS_BOOT_VECTOR_ADDR);
++	__raw_writel(flags, EXYNOS_BOOT_VECTOR_FLAG);
++}
++
++static int exynos_aftr_finisher(unsigned long flags)
++{
++	exynos_set_wakeupmask(0x0000ff3e);
++	exynos_cpu_set_boot_vector(S5P_CHECK_AFTR);
++	/* Set value of power down register for aftr mode */
++	exynos_sys_powerdown_conf(SYS_AFTR);
++	cpu_do_idle();
++
++	return 0;
++}
++
++void exynos_enter_aftr(void)
++{
++	cpu_pm_enter();
++
++	exynos_pm_central_suspend();
++	if (read_cpuid_part_number() == ARM_CPU_PART_CORTEX_A9)
++		exynos_cpu_save_register();
++
++	cpu_suspend(0, exynos_aftr_finisher);
++
++	if (read_cpuid_part_number() == ARM_CPU_PART_CORTEX_A9) {
++		scu_enable(S5P_VA_SCU);
++		exynos_cpu_restore_register();
++	}
++
++	exynos_pm_central_resume();
++
++	cpu_pm_exit();
++}
++
+ static int exynos_cpu_suspend(unsigned long arg)
+ {
+ #ifdef CONFIG_CACHE_L2X0
+@@ -217,16 +273,6 @@ static void exynos_pm_prepare(void)
+ 	pmu_raw_writel(virt_to_phys(exynos_cpu_resume), S5P_INFORM0);
+ }
+ 
+-static void exynos_pm_central_suspend(void)
+-{
+-	unsigned long tmp;
+-
+-	/* Setting Central Sequence Register for power down mode */
+-	tmp = pmu_raw_readl(S5P_CENTRAL_SEQ_CONFIGURATION);
+-	tmp &= ~S5P_CENTRAL_LOWPWR_CFG;
+-	pmu_raw_writel(tmp, S5P_CENTRAL_SEQ_CONFIGURATION);
+-}
+-
+ static int exynos_pm_suspend(void)
+ {
+ 	unsigned long tmp;
+@@ -244,29 +290,6 @@ static int exynos_pm_suspend(void)
+ 	return 0;
+ }
+ 
+-static int exynos_pm_central_resume(void)
+-{
+-	unsigned long tmp;
+-
+-	/*
+-	 * If PMU failed while entering sleep mode, WFI will be
+-	 * ignored by PMU and then exiting cpu_do_idle().
+-	 * S5P_CENTRAL_LOWPWR_CFG bit will not be set automatically
+-	 * in this situation.
+-	 */
+-	tmp = pmu_raw_readl(S5P_CENTRAL_SEQ_CONFIGURATION);
+-	if (!(tmp & S5P_CENTRAL_LOWPWR_CFG)) {
+-		tmp |= S5P_CENTRAL_LOWPWR_CFG;
+-		pmu_raw_writel(tmp, S5P_CENTRAL_SEQ_CONFIGURATION);
+-		/* clear the wakeup state register */
+-		pmu_raw_writel(0x0, S5P_WAKEUP_STAT);
+-		/* No need to perform below restore code */
+-		return -1;
+-	}
+-
+-	return 0;
+-}
+-
+ static void exynos_pm_resume(void)
+ {
+ 	if (exynos_pm_central_resume())
+@@ -369,44 +392,10 @@ static const struct platform_suspend_ops exynos_suspend_ops = {
+ 	.valid		= suspend_valid_only_mem,
  };
  
- /* APLL & MPLL & BPLL & UPLL */
--static struct samsung_pll_rate_table exynos3250_pll_rates[] = {
-+static const struct samsung_pll_rate_table exynos3250_pll_rates[] __initconst = {
- 	PLL_35XX_RATE(1200000000, 24000000, 400, 4, 1),
- 	PLL_35XX_RATE(1100000000, 24000000, 275, 3, 1),
- 	PLL_35XX_RATE(1066000000, 24000000, 533, 6, 1),
-@@ -725,7 +725,7 @@ static struct samsung_pll_rate_table exynos3250_pll_rates[] = {
- };
+-static int exynos_cpu_pm_notifier(struct notifier_block *self,
+-				  unsigned long cmd, void *v)
+-{
+-	int cpu = smp_processor_id();
+-
+-	switch (cmd) {
+-	case CPU_PM_ENTER:
+-		if (cpu == 0) {
+-			exynos_pm_central_suspend();
+-			if (read_cpuid_part() == ARM_CPU_PART_CORTEX_A9)
+-				exynos_cpu_save_register();
+-		}
+-		break;
+-
+-	case CPU_PM_EXIT:
+-		if (cpu == 0) {
+-			if (read_cpuid_part() == ARM_CPU_PART_CORTEX_A9) {
+-				scu_enable(S5P_VA_SCU);
+-				exynos_cpu_restore_register();
+-			}
+-			exynos_pm_central_resume();
+-		}
+-		break;
+-	}
+-
+-	return NOTIFY_OK;
+-}
+-
+-static struct notifier_block exynos_cpu_pm_notifier_block = {
+-	.notifier_call = exynos_cpu_pm_notifier,
+-};
+-
+ void __init exynos_pm_init(void)
+ {
+ 	u32 tmp;
  
- /* VPLL */
--static struct samsung_pll_rate_table exynos3250_vpll_rates[] = {
-+static const struct samsung_pll_rate_table exynos3250_vpll_rates[] __initconst = {
- 	PLL_36XX_RATE(600000000, 24000000, 100, 2, 1,     0),
- 	PLL_36XX_RATE(533000000, 24000000, 266, 3, 2, 32768),
- 	PLL_36XX_RATE(519230987, 24000000, 173, 2, 2,  5046),
-@@ -755,7 +755,7 @@ static struct samsung_pll_rate_table exynos3250_vpll_rates[] = {
- 	{ /* sentinel */ }
- };
+-	cpu_pm_register_notifier(&exynos_cpu_pm_notifier_block);
+-
+ 	/* Platform-specific GIC callback */
+ 	gic_arch_extn.irq_set_wake = exynos_irq_set_wake;
  
--static struct samsung_pll_clock exynos3250_plls[nr_plls] __initdata = {
-+static const struct samsung_pll_clock exynos3250_plls[nr_plls] __initconst = {
- 	[apll] = PLL(pll_35xx, CLK_FOUT_APLL, "fout_apll", "fin_pll",
- 			APLL_LOCK, APLL_CON0, exynos3250_pll_rates),
- 	[mpll] = PLL(pll_35xx, CLK_FOUT_MPLL, "fout_mpll", "fin_pll",
-diff --git a/drivers/clk/samsung/clk-exynos4.c b/drivers/clk/samsung/clk-exynos4.c
-index ab690c8..f214a35 100644
---- a/drivers/clk/samsung/clk-exynos4.c
-+++ b/drivers/clk/samsung/clk-exynos4.c
-@@ -1261,7 +1261,7 @@ static const struct of_device_id ext_clk_match[] __initconst = {
- };
+diff --git a/drivers/cpuidle/cpuidle-exynos.c b/drivers/cpuidle/cpuidle-exynos.c
+index 7c01512..ba9b34b 100644
+--- a/drivers/cpuidle/cpuidle-exynos.c
++++ b/drivers/cpuidle/cpuidle-exynos.c
+@@ -20,25 +20,6 @@
  
- /* PLLs PMS values */
--static struct samsung_pll_rate_table exynos4210_apll_rates[] __initdata = {
-+static const struct samsung_pll_rate_table exynos4210_apll_rates[] __initconst = {
- 	PLL_45XX_RATE(1200000000, 24000000, 150,  3, 1, 28),
- 	PLL_45XX_RATE(1000000000, 24000000, 250,  6, 1, 28),
- 	PLL_45XX_RATE( 800000000, 24000000, 200,  6, 1, 28),
-@@ -1274,7 +1274,7 @@ static struct samsung_pll_rate_table exynos4210_apll_rates[] __initdata = {
- 	{ /* sentinel */ }
- };
+ static void (*exynos_enter_aftr)(void);
  
--static struct samsung_pll_rate_table exynos4210_epll_rates[] __initdata = {
-+static const struct samsung_pll_rate_table exynos4210_epll_rates[] __initconst = {
- 	PLL_4600_RATE(192000000, 24000000, 48, 3, 1,     0, 0),
- 	PLL_4600_RATE(180633605, 24000000, 45, 3, 1, 10381, 0),
- 	PLL_4600_RATE(180000000, 24000000, 45, 3, 1,     0, 0),
-@@ -1285,7 +1285,7 @@ static struct samsung_pll_rate_table exynos4210_epll_rates[] __initdata = {
- 	{ /* sentinel */ }
- };
+-static int idle_finisher(unsigned long flags)
+-{
+-	exynos_enter_aftr();
+-	cpu_do_idle();
+-
+-	return 1;
+-}
+-
+-static int exynos_enter_core0_aftr(struct cpuidle_device *dev,
+-				struct cpuidle_driver *drv,
+-				int index)
+-{
+-	cpu_pm_enter();
+-	cpu_suspend(0, idle_finisher);
+-	cpu_pm_exit();
+-
+-	return index;
+-}
+-
+ static int exynos_enter_lowpower(struct cpuidle_device *dev,
+ 				struct cpuidle_driver *drv,
+ 				int index)
+@@ -51,8 +32,10 @@ static int exynos_enter_lowpower(struct cpuidle_device *dev,
  
--static struct samsung_pll_rate_table exynos4210_vpll_rates[] __initdata = {
-+static const struct samsung_pll_rate_table exynos4210_vpll_rates[] __initconst = {
- 	PLL_4650_RATE(360000000, 24000000, 44, 3, 0, 1024, 0, 14, 0),
- 	PLL_4650_RATE(324000000, 24000000, 53, 2, 1, 1024, 1,  1, 1),
- 	PLL_4650_RATE(259617187, 24000000, 63, 3, 1, 1950, 0, 20, 1),
-@@ -1294,7 +1294,7 @@ static struct samsung_pll_rate_table exynos4210_vpll_rates[] __initdata = {
- 	{ /* sentinel */ }
- };
+ 	if (new_index == 0)
+ 		return arm_cpuidle_simple_enter(dev, drv, new_index);
+-	else
+-		return exynos_enter_core0_aftr(dev, drv, new_index);
++
++	exynos_enter_aftr();
++
++	return new_index;
+ }
  
--static struct samsung_pll_rate_table exynos4x12_apll_rates[] __initdata = {
-+static const struct samsung_pll_rate_table exynos4x12_apll_rates[] __initconst = {
- 	PLL_35XX_RATE(1500000000, 24000000, 250, 4, 0),
- 	PLL_35XX_RATE(1400000000, 24000000, 175, 3, 0),
- 	PLL_35XX_RATE(1300000000, 24000000, 325, 6, 0),
-@@ -1312,7 +1312,7 @@ static struct samsung_pll_rate_table exynos4x12_apll_rates[] __initdata = {
- 	{ /* sentinel */ }
- };
- 
--static struct samsung_pll_rate_table exynos4x12_epll_rates[] __initdata = {
-+static const struct samsung_pll_rate_table exynos4x12_epll_rates[] __initconst = {
- 	PLL_36XX_RATE(192000000, 24000000, 48, 3, 1,     0),
- 	PLL_36XX_RATE(180633605, 24000000, 45, 3, 1, 10381),
- 	PLL_36XX_RATE(180000000, 24000000, 45, 3, 1,     0),
-@@ -1323,7 +1323,7 @@ static struct samsung_pll_rate_table exynos4x12_epll_rates[] __initdata = {
- 	{ /* sentinel */ }
- };
- 
--static struct samsung_pll_rate_table exynos4x12_vpll_rates[] __initdata = {
-+static const struct samsung_pll_rate_table exynos4x12_vpll_rates[] __initconst = {
- 	PLL_36XX_RATE(533000000, 24000000, 133, 3, 1, 16384),
- 	PLL_36XX_RATE(440000000, 24000000, 110, 3, 1,     0),
- 	PLL_36XX_RATE(350000000, 24000000, 175, 3, 2,     0),
-@@ -1334,7 +1334,7 @@ static struct samsung_pll_rate_table exynos4x12_vpll_rates[] __initdata = {
- 	{ /* sentinel */ }
- };
- 
--static struct samsung_pll_clock exynos4210_plls[nr_plls] __initdata = {
-+static const struct samsung_pll_clock exynos4210_plls[nr_plls] __initconst = {
- 	[apll] = PLL_A(pll_4508, CLK_FOUT_APLL, "fout_apll", "fin_pll",
- 		APLL_LOCK, APLL_CON0, "fout_apll", exynos4210_apll_rates),
- 	[mpll] = PLL_A(pll_4508, CLK_FOUT_MPLL, "fout_mpll", "fin_pll",
-@@ -1345,7 +1345,7 @@ static struct samsung_pll_clock exynos4210_plls[nr_plls] __initdata = {
- 		VPLL_LOCK, VPLL_CON0, "fout_vpll", exynos4210_vpll_rates),
- };
- 
--static struct samsung_pll_clock exynos4x12_plls[nr_plls] __initdata = {
-+static const struct samsung_pll_clock exynos4x12_plls[nr_plls] __initconst = {
- 	[apll] = PLL(pll_35xx, CLK_FOUT_APLL, "fout_apll", "fin_pll",
- 			APLL_LOCK, APLL_CON0, exynos4x12_apll_rates),
- 	[mpll] = PLL(pll_35xx, CLK_FOUT_MPLL, "fout_mpll", "fin_pll",
-diff --git a/drivers/clk/samsung/clk-exynos5250.c b/drivers/clk/samsung/clk-exynos5250.c
-index af3a660..d152fc9 100644
---- a/drivers/clk/samsung/clk-exynos5250.c
-+++ b/drivers/clk/samsung/clk-exynos5250.c
-@@ -687,7 +687,7 @@ static struct samsung_gate_clock exynos5250_gate_clks[] __initdata = {
- 			GATE_IP_ISP1, 7, 0, 0),
- };
- 
--static struct samsung_pll_rate_table vpll_24mhz_tbl[] __initdata = {
-+static const struct samsung_pll_rate_table vpll_24mhz_tbl[] __initconst = {
- 	/* PLL_36XX_RATE(rate, m, p, s, k) */
- 	PLL_36XX_RATE(266000000, 24000000, 266, 3, 3, 0),
- 	/* Not in UM, but need for eDP on snow */
-@@ -695,7 +695,7 @@ static struct samsung_pll_rate_table vpll_24mhz_tbl[] __initdata = {
- 	{ },
- };
- 
--static struct samsung_pll_rate_table epll_24mhz_tbl[] __initdata = {
-+static const struct samsung_pll_rate_table epll_24mhz_tbl[] __initconst = {
- 	/* PLL_36XX_RATE(rate, m, p, s, k) */
- 	PLL_36XX_RATE(192000000, 24000000,  64, 2, 2,     0),
- 	PLL_36XX_RATE(180633600, 24000000,  90, 3, 2, 20762),
-@@ -708,7 +708,7 @@ static struct samsung_pll_rate_table epll_24mhz_tbl[] __initdata = {
- 	{ },
- };
- 
--static struct samsung_pll_rate_table apll_24mhz_tbl[] __initdata = {
-+static const struct samsung_pll_rate_table apll_24mhz_tbl[] __initconst = {
- 	/* PLL_35XX_RATE(rate, m, p, s) */
- 	PLL_35XX_RATE(1700000000, 24000000, 425, 6, 0),
- 	PLL_35XX_RATE(1600000000, 24000000, 200, 3, 0),
-@@ -729,7 +729,7 @@ static struct samsung_pll_rate_table apll_24mhz_tbl[] __initdata = {
- 	{ },
- };
- 
--static struct samsung_pll_clock exynos5250_plls[nr_plls] __initdata = {
-+static const struct samsung_pll_clock exynos5250_plls[nr_plls] __initconst = {
- 	[apll] = PLL_A(pll_35xx, CLK_FOUT_APLL, "fout_apll", "fin_pll",
- 		APLL_LOCK, APLL_CON0, "fout_apll", apll_24mhz_tbl),
- 	[mpll] = PLL_A(pll_35xx, CLK_FOUT_MPLL, "fout_mpll", "fin_pll",
-diff --git a/drivers/clk/samsung/clk-exynos5260.c b/drivers/clk/samsung/clk-exynos5260.c
-index 0a9016a..624912a 100644
---- a/drivers/clk/samsung/clk-exynos5260.c
-+++ b/drivers/clk/samsung/clk-exynos5260.c
-@@ -59,7 +59,7 @@ struct exynos5260_cmu_info {
-  * Applicable for all 2550 Type PLLS for Exynos5260, listed below
-  * DISP_PLL, EGL_PLL, KFC_PLL, MEM_PLL, BUS_PLL, MEDIA_PLL, G3D_PLL.
-  */
--static struct samsung_pll_rate_table pll2550_24mhz_tbl[] __initdata = {
-+static const struct samsung_pll_rate_table pll2550_24mhz_tbl[] __initconst = {
- 	PLL_35XX_RATE(1700000000, 24000000, 425,  6, 0),
- 	PLL_35XX_RATE(1600000000, 24000000, 200,  3, 0),
- 	PLL_35XX_RATE(1500000000, 24000000, 250,  4, 0),
-@@ -92,7 +92,7 @@ static struct samsung_pll_rate_table pll2550_24mhz_tbl[] __initdata = {
- /*
-  * Applicable for 2650 Type PLL for AUD_PLL.
-  */
--static struct samsung_pll_rate_table pll2650_24mhz_tbl[] __initdata = {
-+static const struct samsung_pll_rate_table pll2650_24mhz_tbl[] __initconst = {
- 	PLL_36XX_RATE(1600000000, 24000000, 200, 3, 0, 0),
- 	PLL_36XX_RATE(1200000000, 24000000, 100, 2, 0, 0),
- 	PLL_36XX_RATE(1000000000, 24000000, 250, 3, 1, 0),
-@@ -514,7 +514,7 @@ struct samsung_div_clock egl_div_clks[] __initdata = {
- 	DIV(EGL_DOUT_EGL_PLL, "dout_egl_pll", "mout_egl_b", DIV_EGL, 24, 3),
- };
- 
--static struct samsung_pll_clock egl_pll_clks[] __initdata = {
-+static const struct samsung_pll_clock egl_pll_clks[] __initconst = {
- 	PLL(pll_2550xx, EGL_FOUT_EGL_PLL, "fout_egl_pll", "fin_pll",
- 		EGL_PLL_LOCK, EGL_PLL_CON0,
- 		pll2550_24mhz_tbl),
-@@ -766,7 +766,7 @@ struct samsung_gate_clock g3d_gate_clks[] __initdata = {
- 			EN_IP_G3D, 3, 0, 0),
- };
- 
--static struct samsung_pll_clock g3d_pll_clks[] __initdata = {
-+static const struct samsung_pll_clock g3d_pll_clks[] __initconst = {
- 	PLL(pll_2550, G3D_FOUT_G3D_PLL, "fout_g3d_pll", "fin_pll",
- 		G3D_PLL_LOCK, G3D_PLL_CON0,
- 		pll2550_24mhz_tbl),
-@@ -1084,7 +1084,7 @@ struct samsung_div_clock kfc_div_clks[] __initdata = {
- 	DIV(KFC_DOUT_KFC_PLL, "dout_kfc_pll", "mout_kfc", DIV_KFC, 24, 3),
- };
- 
--static struct samsung_pll_clock kfc_pll_clks[] __initdata = {
-+static const struct samsung_pll_clock kfc_pll_clks[] __initconst = {
- 	PLL(pll_2550xx, KFC_FOUT_KFC_PLL, "fout_kfc_pll", "fin_pll",
- 		KFC_PLL_LOCK, KFC_PLL_CON0,
- 		pll2550_24mhz_tbl),
-@@ -1281,7 +1281,7 @@ struct samsung_gate_clock mif_gate_clks[] __initdata = {
- 			CLK_IGNORE_UNUSED | CLK_SET_RATE_PARENT, 0),
- };
- 
--static struct samsung_pll_clock mif_pll_clks[] __initdata = {
-+static const struct samsung_pll_clock mif_pll_clks[] __initconst = {
- 	PLL(pll_2550xx, MIF_FOUT_MEM_PLL, "fout_mem_pll", "fin_pll",
- 		MEM_PLL_LOCK, MEM_PLL_CON0,
- 		pll2550_24mhz_tbl),
-@@ -1948,7 +1948,7 @@ struct samsung_gate_clock top_gate_clks[] __initdata = {
- 			CLK_SET_RATE_PARENT, 0),
- };
- 
--static struct samsung_pll_clock top_pll_clks[] __initdata = {
-+static const struct samsung_pll_clock top_pll_clks[] __initconst = {
- 	PLL(pll_2550xx, TOP_FOUT_DISP_PLL, "fout_disp_pll", "fin_pll",
- 		DISP_PLL_LOCK, DISP_PLL_CON0,
- 		pll2550_24mhz_tbl),
-diff --git a/drivers/clk/samsung/clk-exynos5410.c b/drivers/clk/samsung/clk-exynos5410.c
-index 231475b..bfa5434 100644
---- a/drivers/clk/samsung/clk-exynos5410.c
-+++ b/drivers/clk/samsung/clk-exynos5410.c
-@@ -169,7 +169,7 @@ static struct samsung_gate_clock exynos5410_gate_clks[] __initdata = {
- 			SRC_MASK_PERIC0, 8, CLK_SET_RATE_PARENT, 0),
- };
- 
--static struct samsung_pll_clock exynos5410_plls[nr_plls] __initdata = {
-+static const struct samsung_pll_clock exynos5410_plls[nr_plls] __initconst = {
- 	[apll] = PLL(pll_35xx, CLK_FOUT_APLL, "fout_apll", "fin_pll", APLL_LOCK,
- 		APLL_CON0, NULL),
- 	[cpll] = PLL(pll_35xx, CLK_FOUT_CPLL, "fout_cpll", "fin_pll", CPLL_LOCK,
-diff --git a/drivers/clk/samsung/clk-exynos5420.c b/drivers/clk/samsung/clk-exynos5420.c
-index 87e9c11..911c748 100644
---- a/drivers/clk/samsung/clk-exynos5420.c
-+++ b/drivers/clk/samsung/clk-exynos5420.c
-@@ -1196,7 +1196,7 @@ static struct samsung_gate_clock exynos5x_gate_clks[] __initdata = {
- 	GATE(CLK_G3D, "g3d", "mout_user_aclk_g3d", GATE_IP_G3D, 9, 0, 0),
- };
- 
--static const struct samsung_pll_rate_table exynos5420_pll2550x_24mhz_tbl[] = {
-+static const const struct samsung_pll_rate_table exynos5420_pll2550x_24mhz_tbl[] __initconst = {
- 	PLL_35XX_RATE(2000000000, 24000000, 250, 3, 0),
- 	PLL_35XX_RATE(1900000000, 24000000, 475, 6, 0),
- 	PLL_35XX_RATE(1800000000, 24000000, 225, 3, 0),
-@@ -1219,7 +1219,7 @@ static const struct samsung_pll_rate_table exynos5420_pll2550x_24mhz_tbl[] = {
- 	{ },
- };
- 
--static struct samsung_pll_clock exynos5x_plls[nr_plls] __initdata = {
-+static const struct samsung_pll_clock exynos5x_plls[nr_plls] __initconst = {
- 	[apll] = PLL(pll_2550, CLK_FOUT_APLL, "fout_apll", "fin_pll", APLL_LOCK,
- 		APLL_CON0, exynos5420_pll2550x_24mhz_tbl),
- 	[cpll] = PLL(pll_2550, CLK_FOUT_CPLL, "fout_cpll", "fin_pll", CPLL_LOCK,
-diff --git a/drivers/clk/samsung/clk-s3c2410.c b/drivers/clk/samsung/clk-s3c2410.c
-index 4cff9a1..1c31896 100644
---- a/drivers/clk/samsung/clk-s3c2410.c
-+++ b/drivers/clk/samsung/clk-s3c2410.c
-@@ -161,7 +161,7 @@ struct samsung_clock_alias s3c2410_common_aliases[] __initdata = {
- 
- /* S3C2410 specific clocks */
- 
--static struct samsung_pll_rate_table pll_s3c2410_12mhz_tbl[] __initdata = {
-+static const struct samsung_pll_rate_table pll_s3c2410_12mhz_tbl[] __initconst = {
- 	/* 2410A extras */
- 	PLL_35XX_RATE(270000000, 12000000, 127, 1, 1),
- 	PLL_35XX_RATE(268000000, 12000000, 126, 1, 1),
-@@ -194,7 +194,7 @@ static struct samsung_pll_rate_table pll_s3c2410_12mhz_tbl[] __initdata = {
- 	{ /* sentinel */ },
- };
- 
--static struct samsung_pll_clock s3c2410_plls[] __initdata = {
-+static const struct samsung_pll_clock s3c2410_plls[] __initconst = {
- 	[mpll] = PLL(pll_s3c2410_mpll, MPLL, "mpll", "xti",
- 			LOCKTIME, MPLLCON, pll_s3c2410_12mhz_tbl),
- 	[upll] = PLL(pll_s3c2410_upll, UPLL, "upll", "xti",
-@@ -228,7 +228,7 @@ struct samsung_clock_alias s3c2410_aliases[] __initdata = {
- 
- /* S3C244x specific clocks */
- 
--static struct samsung_pll_rate_table pll_s3c244x_12mhz_tbl[] __initdata = {
-+static const struct samsung_pll_rate_table pll_s3c244x_12mhz_tbl[] __initconst = {
- 	PLL_35XX_RATE(400000000, 12000000, 0x5c, 1, 1),
- 	PLL_35XX_RATE(390000000, 12000000, 0x7a, 2, 1),
- 	PLL_35XX_RATE(380000000, 12000000, 0x57, 1, 1),
-@@ -259,7 +259,7 @@ static struct samsung_pll_rate_table pll_s3c244x_12mhz_tbl[] __initdata = {
- 	{ /* sentinel */ },
- };
- 
--static struct samsung_pll_clock s3c244x_common_plls[] __initdata = {
-+static const struct samsung_pll_clock s3c244x_common_plls[] __initconst = {
- 	[mpll] = PLL(pll_s3c2440_mpll, MPLL, "mpll", "xti",
- 			LOCKTIME, MPLLCON, pll_s3c244x_12mhz_tbl),
- 	[upll] = PLL(pll_s3c2410_upll, UPLL, "upll", "xti",
-diff --git a/drivers/clk/samsung/clk-s3c2412.c b/drivers/clk/samsung/clk-s3c2412.c
-index 34af09f..5f3f782 100644
---- a/drivers/clk/samsung/clk-s3c2412.c
-+++ b/drivers/clk/samsung/clk-s3c2412.c
-@@ -143,7 +143,7 @@ struct samsung_mux_clock s3c2412_muxes[] __initdata = {
- 	MUX(ARMCLK, "armclk", armclk_p, CLKDIVN, 4, 1),
- };
- 
--static struct samsung_pll_clock s3c2412_plls[] __initdata = {
-+static const struct samsung_pll_clock s3c2412_plls[] __initconst = {
- 	[mpll] = PLL(pll_s3c2440_mpll, MPLL, "mpll", "xti",
- 						LOCKTIME, MPLLCON, NULL),
- 	[upll] = PLL(pll_s3c2410_upll, UPLL, "upll", "urefclk",
-diff --git a/drivers/clk/samsung/clk-s3c2443.c b/drivers/clk/samsung/clk-s3c2443.c
-index c92f853..513c757 100644
---- a/drivers/clk/samsung/clk-s3c2443.c
-+++ b/drivers/clk/samsung/clk-s3c2443.c
-@@ -220,7 +220,7 @@ struct samsung_clock_alias s3c2443_common_aliases[] __initdata = {
- 
- /* S3C2416 specific clocks */
- 
--static struct samsung_pll_clock s3c2416_pll_clks[] __initdata = {
-+static const struct samsung_pll_clock s3c2416_pll_clks[] __initconst = {
- 	[mpll] = PLL(pll_6552_s3c2416, 0, "mpll", "mpllref",
- 						LOCKCON0, MPLLCON, NULL),
- 	[epll] = PLL(pll_6553, 0, "epll", "epllref",
-@@ -274,7 +274,7 @@ struct samsung_clock_alias s3c2416_aliases[] __initdata = {
- 
- /* S3C2443 specific clocks */
- 
--static struct samsung_pll_clock s3c2443_pll_clks[] __initdata = {
-+static const struct samsung_pll_clock s3c2443_pll_clks[] __initconst = {
- 	[mpll] = PLL(pll_3000, 0, "mpll", "mpllref",
- 						LOCKCON0, MPLLCON, NULL),
- 	[epll] = PLL(pll_2126, 0, "epll", "epllref",
-diff --git a/drivers/clk/samsung/clk-s3c64xx.c b/drivers/clk/samsung/clk-s3c64xx.c
-index 0f590e5..f25fdfa 100644
---- a/drivers/clk/samsung/clk-s3c64xx.c
-+++ b/drivers/clk/samsung/clk-s3c64xx.c
-@@ -364,7 +364,7 @@ GATE_CLOCKS(s3c6410_gate_clks) __initdata = {
- };
- 
- /* List of PLL clocks. */
--static struct samsung_pll_clock s3c64xx_pll_clks[] __initdata = {
-+static const struct samsung_pll_clock s3c64xx_pll_clks[] __initconst = {
- 	[apll] = PLL(pll_6552, FOUT_APLL, "fout_apll", "fin_pll",
- 						APLL_LOCK, APLL_CON, NULL),
- 	[mpll] = PLL(pll_6552, FOUT_MPLL, "fout_mpll", "fin_pll",
+ static struct cpuidle_driver exynos_idle_driver = {
 -- 
-2.0.1
+1.8.2.3
