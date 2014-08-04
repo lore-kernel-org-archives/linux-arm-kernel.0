@@ -1,69 +1,22 @@
-From: wangyijing@huawei.com (Yijing Wang)
-Date: Mon, 4 Aug 2014 11:32:27 +0800
-Subject: [RFC PATCH 00/11] Refactor MSI to support Non-PCI device
-In-Reply-To: <201408011516.26253.arnd@arndb.de>
-References: <1406344128-27055-1-git-send-email-wangyijing@huawei.com>
- <53D89502.60506@linux.intel.com> <53D89CA1.7000501@huawei.com>
- <201408011516.26253.arnd@arndb.de>
-Message-ID: <53DEFECB.3030201@huawei.com>
+From: zhangfei.gao@linaro.org (Zhangfei Gao)
+Date: Mon,  4 Aug 2014 11:46:45 +0800
+Subject: [PATCH 0/2] i2c: hix5hd2: add i2c controller driver
+Message-ID: <1407124007-27631-1-git-send-email-zhangfei.gao@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2014/8/1 21:16, Arnd Bergmann wrote:
-> On Wednesday 30 July 2014, Yijing Wang wrote:
->>>>>
->>>>> The other part I'm not completely sure about is how you want to
->>>>> have MSIs map into normal IRQ descriptors. At the moment, all
->>>>> MSI users are based on IRQ numbers, but this has known scalability problems.
->>>>
->>>> Hmmm, I still use the IRQ number to map the MSIs to IRQ description.
->>>> I'm sorry, I don't understand you meaning.
->>>> What are the scalability problems you mentioned ?
->>> We have soft limitation of nr_irqs or hard limitation NR_IRQS,
->>> we couldn't allocate as much irq number as we need in some cases,
->>> such as to support MSI-x.
->>
->> Oh, yes, this is a potential issue. Gerry, thanks for you explanation. :)
-> 
-> This should no longer be an issue, as arm64 uses CONFIG_SPARSE_IRQ
-> and the number of interrupts is not limited in any form.
-> 
-> My point was more that the device driver should not need to care about
-> the interrupt number: it gets made up on the spot when the MSI is
-> needed, and then it is only used to request the IRQ. This can be
-> simplified into one interface at the device driver level, even though
-> the internal still use numbers somewhere. If we ever remove IRQ numbers
-> from the driver API, this part doesn't need to get touched again.
-> 
 
-Hi Arnd, I have another question is some drivers will request more than one
-MSI/MSI-X IRQ, and the driver will use them to process different things.
-Eg. network driver generally uses one of them to process trivial network thins,
-and others to transmit/receive data.
+Wei Yan (2):
+  i2c: hix5hd2: add devicetree documentation
+  i2c: hix5hd2: add i2c controller driver
 
-So, in this case, it seems to driver need to touch the IRQ numbers.
-
-wr-linux:~ # cat /proc/interrupts
-            CPU0       CPU1       CPU2     ....      CPU17      CPU18      CPU19      CPU20      CPU21      CPU22      CPU23
- ......
- 100:          0          0          0               0          0          0          0          0          0          0  IR-PCI-MSI-edge      eth0
- 101:          2          0          0               0          0          0  302830488          0          0          0  IR-PCI-MSI-edge      eth0-TxRx-0
- 102:        110          0          0               0          0  360675897          0          0          0          0  IR-PCI-MSI-edge      eth0-TxRx-1
- 103:        109          0          0               0          0          0          0          0          0          0  IR-PCI-MSI-edge      eth0-TxRx-2
- 104:        107          0          0         9678933          0          0          0          0          0          0  IR-PCI-MSI-edge      eth0-TxRx-3
- 105:        107          0          0               0  357838258          0          0          0          0          0  IR-PCI-MSI-edge      eth0-TxRx-4
- 106:        115          0          0               0          0          0          0          0          0          0  IR-PCI-MSI-edge      eth0-TxRx-5
- 107:        114          0          0               0          0          0          0  337866096          0          0  IR-PCI-MSI-edge      eth0-TxRx-6
- 108:  373801199          0          0               0          0          0          0          0          0          0  IR-PCI-MSI-edge      eth0-TxRx-7
-
-Thanks!
-Yijing.
-
-> 
-> .
-> 
-
+ .../devicetree/bindings/i2c/i2c-hix5hd2.txt        |   31 ++
+ drivers/i2c/busses/Kconfig                         |   16 +
+ drivers/i2c/busses/Makefile                        |    1 +
+ drivers/i2c/busses/i2c-hix5hd2.c                   |  577 ++++++++++++++++++++
+ 4 files changed, 625 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/i2c/i2c-hix5hd2.txt
+ create mode 100644 drivers/i2c/busses/i2c-hix5hd2.c
 
 -- 
-Thanks!
-Yijing
+1.7.9.5
