@@ -1,97 +1,61 @@
 From: christoffer.dall@linaro.org (Christoffer Dall)
-Date: Mon,  4 Aug 2014 10:46:34 +0200
-Subject: [GIT PULL 17/51] KVM: ARM: vgic: introduce vgic_enable
+Date: Mon,  4 Aug 2014 10:46:37 +0200
+Subject: [GIT PULL 20/51] KVM: ARM: vgic: revisit implementation of
+ irqchip_in_kernel
 In-Reply-To: <1407142028-31105-1-git-send-email-christoffer.dall@linaro.org>
 References: <1407142028-31105-1-git-send-email-christoffer.dall@linaro.org>
-Message-ID: <1407142028-31105-18-git-send-email-christoffer.dall@linaro.org>
+Message-ID: <1407142028-31105-21-git-send-email-christoffer.dall@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Marc Zyngier <marc.zyngier@arm.com>
 
-Move the code dealing with enabling the VGIC on to vgic_ops.
+So far, irqchip_in_kernel() was implemented by testing the value of
+vctrl_base, which worked fine with GICv2.
 
-Acked-by: Catalin Marinas <catalin.marinas@arm.com>
+With GICv3, this field is useless, as we're using system registers
+instead of a emmory mapped interface. To solve this, add a boolean
+flag indicating if the we're using a vgic or not.
+
 Reviewed-by: Christoffer Dall <christoffer.dall@linaro.org>
 Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 ---
- include/kvm/arm_vgic.h |  1 +
- virt/kvm/arm/vgic.c    | 29 +++++++++++++++++++++--------
- 2 files changed, 22 insertions(+), 8 deletions(-)
+ include/kvm/arm_vgic.h | 3 ++-
+ virt/kvm/arm/vgic.c    | 1 +
+ 2 files changed, 3 insertions(+), 1 deletion(-)
 
 diff --git a/include/kvm/arm_vgic.h b/include/kvm/arm_vgic.h
-index f515800..2228973 100644
+index d8d52a9..f6b9fec 100644
 --- a/include/kvm/arm_vgic.h
 +++ b/include/kvm/arm_vgic.h
-@@ -99,6 +99,7 @@ struct vgic_ops {
- 	void	(*disable_underflow)(struct kvm_vcpu *vcpu);
- 	void	(*get_vmcr)(struct kvm_vcpu *vcpu, struct vgic_vmcr *vmcr);
- 	void	(*set_vmcr)(struct kvm_vcpu *vcpu, struct vgic_vmcr *vmcr);
-+	void	(*enable)(struct kvm_vcpu *vcpu);
- };
- 
+@@ -117,6 +117,7 @@ struct vgic_params {
  struct vgic_dist {
+ #ifdef CONFIG_KVM_ARM_VGIC
+ 	spinlock_t		lock;
++	bool			in_kernel;
+ 	bool			ready;
+ 
+ 	/* Virtual control interface mapping */
+@@ -212,7 +213,7 @@ int kvm_vgic_vcpu_pending_irq(struct kvm_vcpu *vcpu);
+ bool vgic_handle_mmio(struct kvm_vcpu *vcpu, struct kvm_run *run,
+ 		      struct kvm_exit_mmio *mmio);
+ 
+-#define irqchip_in_kernel(k)	(!!((k)->arch.vgic.vctrl_base))
++#define irqchip_in_kernel(k)	(!!((k)->arch.vgic.in_kernel))
+ #define vgic_initialized(k)	((k)->arch.vgic.ready)
+ 
+ int vgic_v2_probe(struct device_node *vgic_node,
 diff --git a/virt/kvm/arm/vgic.c b/virt/kvm/arm/vgic.c
-index 5c70639..70f674b 100644
+index e4b9cbb..1348e74 100644
 --- a/virt/kvm/arm/vgic.c
 +++ b/virt/kvm/arm/vgic.c
-@@ -1097,6 +1097,19 @@ static void vgic_v2_set_vmcr(struct kvm_vcpu *vcpu, struct vgic_vmcr *vmcrp)
- 	vcpu->arch.vgic_cpu.vgic_v2.vgic_vmcr = vmcr;
- }
- 
-+static void vgic_v2_enable(struct kvm_vcpu *vcpu)
-+{
-+	/*
-+	 * By forcing VMCR to zero, the GIC will restore the binary
-+	 * points to their reset values. Anything else resets to zero
-+	 * anyway.
-+	 */
-+	vcpu->arch.vgic_cpu.vgic_v2.vgic_vmcr = 0;
-+
-+	/* Get the show on the road... */
-+	vcpu->arch.vgic_cpu.vgic_v2.vgic_hcr = GICH_HCR_EN;
-+}
-+
- static const struct vgic_ops vgic_ops = {
- 	.get_lr			= vgic_v2_get_lr,
- 	.set_lr			= vgic_v2_set_lr,
-@@ -1108,6 +1121,7 @@ static const struct vgic_ops vgic_ops = {
- 	.disable_underflow	= vgic_v2_disable_underflow,
- 	.get_vmcr		= vgic_v2_get_vmcr,
- 	.set_vmcr		= vgic_v2_set_vmcr,
-+	.enable			= vgic_v2_enable,
- };
- 
- static struct vgic_lr vgic_get_lr(const struct kvm_vcpu *vcpu, int lr)
-@@ -1162,6 +1176,11 @@ static void vgic_set_vmcr(struct kvm_vcpu *vcpu, struct vgic_vmcr *vmcr)
- 	vgic_ops.set_vmcr(vcpu, vmcr);
- }
- 
-+static inline void vgic_enable(struct kvm_vcpu *vcpu)
-+{
-+	vgic_ops.enable(vcpu);
-+}
-+
- static void vgic_retire_lr(int lr_nr, int irq, struct kvm_vcpu *vcpu)
- {
- 	struct vgic_cpu *vgic_cpu = &vcpu->arch.vgic_cpu;
-@@ -1624,15 +1643,9 @@ int kvm_vgic_vcpu_init(struct kvm_vcpu *vcpu)
- 		vgic_cpu->vgic_irq_lr_map[i] = LR_EMPTY;
+@@ -1650,6 +1650,7 @@ int kvm_vgic_create(struct kvm *kvm)
  	}
  
--	/*
--	 * By forcing VMCR to zero, the GIC will restore the binary
--	 * points to their reset values. Anything else resets to zero
--	 * anyway.
--	 */
--	vgic_cpu->vgic_v2.vgic_vmcr = 0;
--
- 	vgic_cpu->nr_lr = vgic_nr_lr;
--	vgic_cpu->vgic_v2.vgic_hcr = GICH_HCR_EN; /* Get the show on the road... */
-+
-+	vgic_enable(vcpu);
- 
- 	return 0;
- }
+ 	spin_lock_init(&kvm->arch.vgic.lock);
++	kvm->arch.vgic.in_kernel = true;
+ 	kvm->arch.vgic.vctrl_base = vgic->vctrl_base;
+ 	kvm->arch.vgic.vgic_dist_base = VGIC_ADDR_UNDEF;
+ 	kvm->arch.vgic.vgic_cpu_base = VGIC_ADDR_UNDEF;
 -- 
 2.0.0
