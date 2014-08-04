@@ -1,30 +1,48 @@
-From: wsa@the-dreams.de (Wolfram Sang)
-Date: Mon, 4 Aug 2014 13:21:05 +0200
-Subject: [PATCH] clk: Add missing of_clk_set_defaults export
-In-Reply-To: <1407149338-18401-1-git-send-email-s.nawrocki@samsung.com>
-References: <1407149338-18401-1-git-send-email-s.nawrocki@samsung.com>
-Message-ID: <20140804112105.GA4379@katana>
+From: geert@linux-m68k.org (Geert Uytterhoeven)
+Date: Mon, 4 Aug 2014 13:28:32 +0200
+Subject: [RFC PATCH 2/2] of/clk: use "clkops-clocks" to specify clocks
+ handled by clock_ops domain
+In-Reply-To: <2717555.fiA6A86F65@avalon>
+References: <1398334403-26181-1-git-send-email-geert+renesas@glider.be>
+ <53D68CC4.1010704@ti.com>
+ <CACxGe6uMke5vgzcNC9xUqjr2bHJ4QFHD6YjocSZWq8Ccx8Mm6A@mail.gmail.com>
+ <2717555.fiA6A86F65@avalon>
+Message-ID: <CAMuHMdVKDQz8q0b2UA7=1K8Qw4n3U0=M+mJyi5UQP7QZdC-JiQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Aug 04, 2014 at 12:48:58PM +0200, Sylwester Nawrocki wrote:
-> The of_clk_set_defaults() function is used in subsystems which can
-> be built as module. Add the missing symbol export entry so there
-> is no build errors like:
-> "ERROR: "of_clk_set_defaults" [drivers/i2c/i2c-core.ko] undefined!".
-> 
-> Fixes commit: 86be408bfbd846fab3c4ac21d6f9298bd2e4b790
-> "clk: Support for clock parents and rates assigned from device tree"
-> 
-> Reported-by: kbuild test robot <fengguang.wu@intel.com>
-> Signed-off-by: Sylwester Nawrocki <s.nawrocki@samsung.com>
+Hi Laurent,
 
-Acked-by: Wolfram Sang <wsa@the-dreams.de>
+On Wed, Jul 30, 2014 at 2:06 AM, Laurent Pinchart
+<laurent.pinchart@ideasonboard.com> wrote:
+> The third option would require storing the clocks lists in device drivers. I
+> believe this is our best option, as a trade-off between simplicity and
+> versatility. Drivers that use runtime PM already need to enable it explicitly
+> when probing devices. Passing a list of clock names to runtime PM at that
+> point wouldn't complicate drivers much. When the clocks list isn't SoC-
+> dependent it could be stored as static information. Otherwise it could be
+> derived from DT (or any other source of hardware description) using C code,
+> offering all the versatility we need.
+>
+> The only drawback of this solution I can think of right now is that the
+> runtime PM core couldn't manage device clocks before probing the device.
+> Specifically device clocks couldn't be managed if no driver is loaded for that
+> device. I somehow recall that someone raised this as being a problem, but I
+> can't remember why.
 
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140804/e2250867/attachment-0001.sig>
+Perhaps you're thinking of clocks that were enabled (by the boot loader or
+implicit reset state) before running Linux, and aren't disabled?
+
+That was fixed by commit bb178da701382a230e26d90cf94e8a24b280e0d9
+("clk: shmobile: mstp: Fix the is_enabled() operation").
+
+Gr{oetje,eeting}s,
+
+                        Geert
+
+--
+Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+
+In personal conversations with technical people, I call myself a hacker. But
+when I'm talking to journalists I just say "programmer" or something like that.
+                                -- Linus Torvalds
