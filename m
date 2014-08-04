@@ -1,74 +1,66 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Mon, 04 Aug 2014 14:26:36 +0100
-Subject: [PATCH V2] ARM/ARM64: KVM: Nuke Hyp-mode tlbs before enabling MMU
-In-Reply-To: <1406789604-10533-1-git-send-email-pranavkumar@linaro.org>
- (Pranavkumar Sawargaonkar's message of "Thu, 31 Jul 2014 07:53:23
- +0100")
-References: <1406789604-10533-1-git-send-email-pranavkumar@linaro.org>
-Message-ID: <877g2ogzcj.fsf@approximate.cambridge.arm.com>
+From: christoffer.dall@linaro.org (Christoffer Dall)
+Date: Mon, 4 Aug 2014 15:26:48 +0200
+Subject: [RFC] Saving/Restoring the internal state of an interrupt
+In-Reply-To: <87fvhch1x2.fsf@approximate.cambridge.arm.com>
+References: <539F3BDD.2090009@arm.com> <20140804115716.GA524@cbox>
+ <87fvhch1x2.fsf@approximate.cambridge.arm.com>
+Message-ID: <20140804132648.GA2471@cbox>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Pranav,
+On Mon, Aug 04, 2014 at 01:31:05PM +0100, Marc Zyngier wrote:
+> On Mon, Aug 04 2014 at 12:57:16 pm BST, Christoffer Dall <christoffer.dall@linaro.org> wrote:
+> > On Mon, Jun 16, 2014 at 07:47:57PM +0100, Marc Zyngier wrote:
+> >> Thomas, all,
+> >> 
+> >> Since ARM has grown some virtualization extensions, there is a
+> >> particular issue I've carefully avoided to address, and which is now
+> >> biting me exactly where you think it does.
+> >> 
+> >> Let's expose the problem:
+> >> - We have a per-CPU timer (the architected timer)
+> >> - This timer is shared across virtual machines
+> >> - We context-switch the state of the timer on entry/exit of the VM
+> >> 
+> >> The state of the timer itself is basically a control word and a
+> >> comparator value. Not much. Ah yes, one tiny detail: the state of the
+> >> interrupt controller (the GIC) is also part of the state.
+> >> 
+> >> This interrupt state is not the pending state, but the internal state
+> >> (called the "active" state), indicating if the interrupt is in
+> >> progress or not. If the interrupt is active (and configured as a level
+> >> interrupt), then the interrupt can't fire again until the guest EOIs
+> >> it (there is some special hardware dedicated to this).
+> >
+> > Can you clarify this part.  I was under the impression from reading the
+> > GICv2 specs at least that an active interrupt can become active and
+> > pending (and the pending part of that would cause the interrupt to fire
+> > again).  Specifically, I'm thinking about transition A2 in Figure 3-1 in
+> > the GICv2 spec (ARM IHI 0048B.b).  Am I reading this incorrectly or is
+> > there something special about the timer in this regard?
+> 
+> Nothing special about the timer. Just that the timer being a level
+> interrupt, the pending state is a direct consequence of the level being
+> high (as mentionned in the note at the bottom of 1.4.2).
+> 
+> You go from Pending to Active-and-Pending, and then to Active (when the
+> timer is reprogrammed/disabled, though you may go back to A&P if the timer
+> fires again immediately). Eventually, after the EOI, you go back to
+> Inactive.
+> 
+> Here, the only bit we really care about is the Active bit (Pending
+> changes anyway, as we save/restore the timer context).
+> 
+> Or is there something that I don't understand in your question?
+> 
 
-On Thu, Jul 31 2014 at  7:53:23 am BST, Pranavkumar Sawargaonkar <pranavkumar@linaro.org> wrote:
-> X-Gene u-boot runs in EL2 mode with MMU enabled hence we might
-> have stale EL2 tlb enteris when we enable EL2 MMU on each host CPU.
->
-> This can happen on any ARM/ARM64 board running bootloader in
-> Hyp-mode (or EL2-mode) with MMU enabled.
->
-> This patch ensures that we flush all Hyp-mode (or EL2-mode) TLBs
-> on each host CPU before enabling Hyp-mode (or EL2-mode) MMU.
->
-> Changelog:
->
-> V2:
->  - Flush Hyp-mode TLBs for both KVM ARM32 and KVM ARM64 at boot time
->
-> V1:
->  - Initial patch with only arm64 change
->
-> Signed-off-by: Pranavkumar Sawargaonkar <pranavkumar@linaro.org>
-> Signed-off-by: Anup Patel <anup.patel@linaro.org>
-> ---
->  arch/arm/kvm/init.S       |    4 ++++
->  arch/arm64/kvm/hyp-init.S |    4 ++++
->  2 files changed, 8 insertions(+)
->
-> diff --git a/arch/arm/kvm/init.S b/arch/arm/kvm/init.S
-> index 1b9844d..ee4f744 100644
-> --- a/arch/arm/kvm/init.S
-> +++ b/arch/arm/kvm/init.S
-> @@ -98,6 +98,10 @@ __do_hyp_init:
->  	mrc	p15, 0, r0, c10, c2, 1
->  	mcr	p15, 4, r0, c10, c2, 1
->  
-> +	@ Invalidate the stale TLBs from Bootloader
-> +	mcr	p15, 4, r0, c8, c7, 0	@ TLBIALLH
-> +	dsb	ish
-> +
->  	@ Set the HSCTLR to:
->  	@  - ARM/THUMB exceptions: Kernel config (Thumb-2 kernel)
->  	@  - Endianness: Kernel config
-> diff --git a/arch/arm64/kvm/hyp-init.S b/arch/arm64/kvm/hyp-init.S
-> index d968796..c319116 100644
-> --- a/arch/arm64/kvm/hyp-init.S
-> +++ b/arch/arm64/kvm/hyp-init.S
-> @@ -80,6 +80,10 @@ __do_hyp_init:
->  	msr	mair_el2, x4
->  	isb
->  
-> +	/* Invalidate the stale TLBs from Bootloader */
-> +	tlbi	alle2
-> +	dsb	sy
-> +
->  	mrs	x4, sctlr_el2
->  	and	x4, x4, #SCTLR_EL2_EE	// preserve endianness of EL2
->  	ldr	x5, =SCTLR_EL2_FLAGS
+If not using priorities, what difference does it make if we save/restore
+the active bit?  The whole point is that a timer that the guest hasn't
+reprogrammed/disabled should not raise a hardware interrupt, right?
 
-Reviewed-by: Marc Zyngier <marc.zyngier@arm.com>
+So what I inferred from your text is that we prevent that from happening
+by restoring the active bit.  But that will still cause the hardware to
+assert the signal (we will become A&P) and that would raise the
+interrupt on the hardware, we would trap again, and so on.  Or?
 
-	M.
--- 
-Jazz is not dead. It just smells funny.
+-Christoffer
