@@ -1,86 +1,51 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Mon, 04 Aug 2014 15:22:16 +0100
-Subject: [RFC] Saving/Restoring the internal state of an interrupt
-In-Reply-To: <20140804132648.GA2471@cbox> (Christoffer Dall's message of "Mon,
- 4 Aug 2014 14:26:48 +0100")
-References: <539F3BDD.2090009@arm.com> <20140804115716.GA524@cbox>
- <87fvhch1x2.fsf@approximate.cambridge.arm.com>
- <20140804132648.GA2471@cbox>
-Message-ID: <86r40w1giv.fsf@arm.com>
+From: broonie@kernel.org (Mark Brown)
+Date: Mon, 4 Aug 2014 15:25:07 +0100
+Subject: [PATCH v2 03/10] mtd: spi-nor: add DDR quad read support
+In-Reply-To: <CAMuHMdWxzKG1TTUVgYqfRP0Prp85HPwVxH7NQp7S-pNeLfFqjA@mail.gmail.com>
+References: <1398657227-20721-1-git-send-email-b32955@freescale.com>
+ <1398657227-20721-4-git-send-email-b32955@freescale.com>
+ <20140730050843.GE11952@brian-ubuntu>
+ <20140730064413.GA15547@shldeISGChi005.sh.intel.com>
+ <20140730074500.GF11952@brian-ubuntu>
+ <20140730104607.GQ17528@sirena.org.uk>
+ <20140802020617.GS3711@ld-irv-0074>
+ <CAMuHMdWxzKG1TTUVgYqfRP0Prp85HPwVxH7NQp7S-pNeLfFqjA@mail.gmail.com>
+Message-ID: <20140804142507.GP30458@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Aug 04 2014 at 02:26:48 PM, Christoffer Dall <christoffer.dall@linaro.org> wrote:
-> On Mon, Aug 04, 2014 at 01:31:05PM +0100, Marc Zyngier wrote:
->> On Mon, Aug 04 2014 at 12:57:16 pm BST, Christoffer Dall
->> <christoffer.dall@linaro.org> wrote:
->> > On Mon, Jun 16, 2014 at 07:47:57PM +0100, Marc Zyngier wrote:
->> >> Thomas, all,
->> >> 
->> >> Since ARM has grown some virtualization extensions, there is a
->> >> particular issue I've carefully avoided to address, and which is now
->> >> biting me exactly where you think it does.
->> >> 
->> >> Let's expose the problem:
->> >> - We have a per-CPU timer (the architected timer)
->> >> - This timer is shared across virtual machines
->> >> - We context-switch the state of the timer on entry/exit of the VM
->> >> 
->> >> The state of the timer itself is basically a control word and a
->> >> comparator value. Not much. Ah yes, one tiny detail: the state of the
->> >> interrupt controller (the GIC) is also part of the state.
->> >> 
->> >> This interrupt state is not the pending state, but the internal state
->> >> (called the "active" state), indicating if the interrupt is in
->> >> progress or not. If the interrupt is active (and configured as a level
->> >> interrupt), then the interrupt can't fire again until the guest EOIs
->> >> it (there is some special hardware dedicated to this).
->> >
->> > Can you clarify this part.  I was under the impression from reading the
->> > GICv2 specs at least that an active interrupt can become active and
->> > pending (and the pending part of that would cause the interrupt to fire
->> > again).  Specifically, I'm thinking about transition A2 in Figure 3-1 in
->> > the GICv2 spec (ARM IHI 0048B.b).  Am I reading this incorrectly or is
->> > there something special about the timer in this regard?
->> 
->> Nothing special about the timer. Just that the timer being a level
->> interrupt, the pending state is a direct consequence of the level being
->> high (as mentionned in the note at the bottom of 1.4.2).
->> 
->> You go from Pending to Active-and-Pending, and then to Active (when the
->> timer is reprogrammed/disabled, though you may go back to A&P if the timer
->> fires again immediately). Eventually, after the EOI, you go back to
->> Inactive.
->> 
->> Here, the only bit we really care about is the Active bit (Pending
->> changes anyway, as we save/restore the timer context).
->> 
->> Or is there something that I don't understand in your question?
->> 
->
-> If not using priorities, what difference does it make if we save/restore
-> the active bit?  The whole point is that a timer that the guest hasn't
-> reprogrammed/disabled should not raise a hardware interrupt, right?
+On Sat, Aug 02, 2014 at 11:09:09AM +0200, Geert Uytterhoeven wrote:
+> On Sat, Aug 2, 2014 at 4:06 AM, Brian Norris
+> > On Wed, Jul 30, 2014 at 11:46:07AM +0100, Mark Brown wrote:
 
-It makes a massive difference: the interrupt is active on the host, and
-it is what will prevent subsequent (and possibly spurious) timer
-interrupts from being taken.
+> >> I don't know what DDR is in this context, sorry.
 
-> So what I inferred from your text is that we prevent that from happening
-> by restoring the active bit.  But that will still cause the hardware to
-> assert the signal (we will become A&P) and that would raise the
-> interrupt on the hardware, we would trap again, and so on.  Or?
+> > I think it's just the ability to latch data on both the rising and
+> > falling edges of the SPI clock. For SPI flash, it seems to be used for
+> > the data portion of the opcode/address/data sequence.
 
-If the interrupt is already active when you restore the timer state, no
-other timer interrupt will be injected. That's the whole point of the
-active bit.
+> > Yeah, I suppose it could be wedged in later if drivers/spi/ ever adopts
+> > a solution.
 
-It feels like we're talking past each other, or that we're not exatly
-talking about the same thing. If that's of any help, can you have a look
-at the irq_forwarding patches I've posted a while ago?
+> I think this can just be another SPI_* spi_device.mode flag.
 
-Thanks,
+Sounds like it yes - I was wondering if this might be one of the modes
+with extra clock cycles that I've heard mentioned before which might be
+a little more fun.
 
-	M.
--- 
-Jazz is not dead. It just smells funny.
+> Do we need bindings for this in
+> Documentation/devicetree/bindings/spi/spi-bus.txt?
+> Unlike Quad SPI transfer support, this doesn't need special wiring, so DDR
+> capability is an intrinsic property of the SPI slave, and the mode bit can just
+> be set in the SPI slave driver, without any DT magic?
+
+Right, unless we run into things like board design issues causing
+constraints this is something that can be enabled by the two drivers
+without needing DT configuration.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140804/391bf0b7/attachment.sig>
