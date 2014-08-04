@@ -1,46 +1,121 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Mon, 4 Aug 2014 22:23:17 +0100
-Subject: Formal license ambiguity in arch/arm/boot/dts/sun?i-a*.dts
-In-Reply-To: <20140804192510.GF3952@lukather>
-References: <20140731192016.GA6869@excalibur.cnev.de>
- <20140803130430.GY3952@lukather> <201408031959.27607.arnd@arndb.de>
- <20140804192510.GF3952@lukather>
-Message-ID: <20140804212317.GL30282@n2100.arm.linux.org.uk>
+From: sboyd@codeaurora.org (Stephen Boyd)
+Date: Mon,  4 Aug 2014 15:33:36 -0700
+Subject: [PATCH] irqchip: gic: Allow gic_arch_extn hooks to call into scheduler
+Message-ID: <1407191616-31829-1-git-send-email-sboyd@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Aug 04, 2014 at 09:25:10PM +0200, Maxime Ripard wrote:
-> On Sun, Aug 03, 2014 at 07:59:27PM +0200, Arnd Bergmann wrote:
-> > I would actually prefer if we could migrate a lot of these files to BSD license,
-> > provided the original authors agree. We want the dtb blobs to be embeddable into
-> > boot loaders of any license.
-> 
-> Even though I'd be open to having my contributions to DTBs under the
-> BSD, is this really a thing?
-> 
-> I mean, for all I know, an OS/Bootloader would just parse a documented
-> binary file, and I don't see any derivative work there.
+Commit 1a6b69b6548c (ARM: gic: add CPU migration support,
+2012-04-12) introduced an acquisition of the irq_controller_lock
+in gic_raise_softirq() which can lead to a spinlock recursion if
+the gic_arch_extn hooks call into the scheduler (via complete()
+or wake_up(), etc.). This happens because gic_arch_extn hooks are
+normally called with the irq_controller_lock held and calling
+into the scheduler may cause us to call smp_send_reschedule()
+which will grab the irq_controller_lock again. Here's an example
+from a vendor kernel (note that the gic_arch_extn hook code here
+isn't actually in mainline):
 
-How does the OS/Bootloader end up with that binary file?
+BUG: spinlock recursion on CPU#0, swapper/0/1
+ lock: irq_controller_lock+0x0/0x18, .magic: dead4ead, .owner: sw
+er_cpu: 0
+CPU: 0 PID: 1 Comm: swapper/0 Not tainted 3.14.10-00430-g3d433c4e
 
-For the sake of argument, let's say that the BSDs want to move to DT on
-ARM.  Great, they convert over to parsing our DT blobs.
+Call trace:
+[<ffffffc000087e1c>] dump_backtrace+0x0/0x140
+[<ffffffc000087f6c>] show_stack+0x10/0x1c
+[<ffffffc00064732c>] dump_stack+0x74/0xc4
+[<ffffffc0006446c0>] spin_dump+0x78/0x88
+[<ffffffc0006446f4>] spin_bug+0x24/0x34
+[<ffffffc0000d47d0>] do_raw_spin_lock+0x58/0x148
+[<ffffffc00064d398>] _raw_spin_lock_irqsave+0x24/0x38
+[<ffffffc0002c9d7c>] gic_raise_softirq+0x2c/0xbc
+[<ffffffc00008daa4>] smp_send_reschedule+0x34/0x40
+[<ffffffc0000c1e94>] try_to_wake_up+0x224/0x288
+[<ffffffc0000c1f4c>] default_wake_function+0xc/0x18
+[<ffffffc0000ceef0>] __wake_up_common+0x50/0x8c
+[<ffffffc0000cef3c>] __wake_up_locked+0x10/0x1c
+[<ffffffc0000cf734>] complete+0x3c/0x5c
+[<ffffffc0002f0e78>] msm_mpm_enable_irq_exclusive+0x1b8/0x1c8
+[<ffffffc0002f0f58>] __msm_mpm_enable_irq+0x4c/0x7c
+[<ffffffc0002f0f94>] msm_mpm_enable_irq+0xc/0x18
+[<ffffffc0002c9bb0>] gic_unmask_irq+0x40/0x7c
+[<ffffffc0000de5f4>] irq_enable+0x2c/0x48
+[<ffffffc0000de65c>] irq_startup+0x4c/0x74
+[<ffffffc0000dd2fc>] __setup_irq+0x264/0x3f0
+[<ffffffc0000dd5e0>] request_threaded_irq+0xcc/0x11c
+[<ffffffc0000df254>] devm_request_threaded_irq+0x68/0xb4
+[<ffffffc000471520>] msm_iommu_ctx_probe+0x124/0x2d4
+[<ffffffc000337374>] platform_drv_probe+0x20/0x54
+[<ffffffc00033598c>] driver_probe_device+0x158/0x340
+[<ffffffc000335c20>] __driver_attach+0x60/0x90
+[<ffffffc000333c9c>] bus_for_each_dev+0x6c/0x8c
+[<ffffffc000335304>] driver_attach+0x1c/0x28
+[<ffffffc000334f14>] bus_add_driver+0x120/0x204
+[<ffffffc0003362e4>] driver_register+0xbc/0x10c
+[<ffffffc000337348>] __platform_driver_register+0x5c/0x68
+[<ffffffc00094c478>] msm_iommu_driver_init+0x54/0x7c
+[<ffffffc0000813ec>] do_one_initcall+0xa4/0x130
+[<ffffffc00091d928>] kernel_init_freeable+0x138/0x1dc
+[<ffffffc000642578>] kernel_init+0xc/0xd4
 
-However, they can't distribute the binary DT blobs to their users without
-coming up against the problems of the GPL wrt binary distribution.
+We really just want to synchronize the sending of an SGI with the
+update of the gic_cpu_map[], so introduce a new SGI lock that we
+can use to synchronize the two code paths.
 
-They could distribute the source files, but remember that many of those
-are currently GPL licensed, so they'd probably end up having to package
-them entirely separately, if they're willing to do that at all.
+Cc: Nicolas Pitre <nico@linaro.org>
+Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
+---
+ drivers/irqchip/irq-gic.c | 8 ++++++--
+ 1 file changed, 6 insertions(+), 2 deletions(-)
 
-Or they could decide to ignore us altogether, and do their own DT stuff,
-maybe partially implementing our properties, or maybe coming up with
-different and/or incompatible properties - which would be bad because
-we now end up with two ways to describe the same hardware in active use.
-
-I suspect the final option is the one they'd choose, and it's in our
-interest that _that_ doesn't happen.
-
+diff --git a/drivers/irqchip/irq-gic.c b/drivers/irqchip/irq-gic.c
+index 7c131cf7cc13..824c1e2ac403 100644
+--- a/drivers/irqchip/irq-gic.c
++++ b/drivers/irqchip/irq-gic.c
+@@ -72,6 +72,8 @@ struct gic_chip_data {
+ };
+ 
+ static DEFINE_RAW_SPINLOCK(irq_controller_lock);
++/* Synchronize switching CPU interface and sending SGIs */
++static DEFINE_RAW_SPINLOCK(gic_sgi_lock);
+ 
+ /*
+  * The GIC mapping of CPU interfaces does not necessarily match
+@@ -658,7 +660,7 @@ static void gic_raise_softirq(const struct cpumask *mask, unsigned int irq)
+ 	int cpu;
+ 	unsigned long flags, map = 0;
+ 
+-	raw_spin_lock_irqsave(&irq_controller_lock, flags);
++	raw_spin_lock_irqsave(&gic_sgi_lock, flags);
+ 
+ 	/* Convert our logical CPU mask into a physical one. */
+ 	for_each_cpu(cpu, mask)
+@@ -673,7 +675,7 @@ static void gic_raise_softirq(const struct cpumask *mask, unsigned int irq)
+ 	/* this always happens on GIC0 */
+ 	writel_relaxed(map << 16 | irq, gic_data_dist_base(&gic_data[0]) + GIC_DIST_SOFTINT);
+ 
+-	raw_spin_unlock_irqrestore(&irq_controller_lock, flags);
++	raw_spin_unlock_irqrestore(&gic_sgi_lock, flags);
+ }
+ #endif
+ 
+@@ -742,6 +744,7 @@ void gic_migrate_target(unsigned int new_cpu_id)
+ 	cur_target_mask = 0x01010101 << cur_cpu_id;
+ 	ror_val = (cur_cpu_id - new_cpu_id) & 31;
+ 
++	raw_spin_lock(&gic_sgi_lock);
+ 	raw_spin_lock(&irq_controller_lock);
+ 
+ 	/* Update the target interface for this logical CPU */
+@@ -763,6 +766,7 @@ void gic_migrate_target(unsigned int new_cpu_id)
+ 	}
+ 
+ 	raw_spin_unlock(&irq_controller_lock);
++	raw_spin_unlock(&gic_sgi_lock);
+ 
+ 	/*
+ 	 * Now let's migrate and clear any potential SGIs that might be
 -- 
-FTTC broadband for 0.8mile line: currently at 9.5Mbps down 400kbps up
-according to speedtest.net.
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
+hosted by The Linux Foundation
