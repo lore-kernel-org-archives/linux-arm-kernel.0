@@ -1,32 +1,19 @@
-From: s.nawrocki@samsung.com (Sylwester Nawrocki)
-Date: Mon, 04 Aug 2014 12:48:58 +0200
-Subject: [PATCH] clk: Add missing of_clk_set_defaults export
-Message-ID: <1407149338-18401-1-git-send-email-s.nawrocki@samsung.com>
+From: jsarha@ti.com (Jyri Sarha)
+Date: Mon, 4 Aug 2014 13:50:04 +0300
+Subject: [PATCH 1/1] clk: ti: add support for external clock provider
+In-Reply-To: <1406898948-26113-2-git-send-email-t-kristo@ti.com>
+References: <1406898948-26113-1-git-send-email-t-kristo@ti.com>
+ <1406898948-26113-2-git-send-email-t-kristo@ti.com>
+Message-ID: <53DF655C.9020409@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The of_clk_set_defaults() function is used in subsystems which can
-be built as module. Add the missing symbol export entry so there
-is no build errors like:
-"ERROR: "of_clk_set_defaults" [drivers/i2c/i2c-core.ko] undefined!".
+On 08/01/2014 04:15 PM, Tero Kristo wrote:
+> External clock provider can now be used to register external clocks under
+> it. This is needed as the TI clock driver only registers clocks
+> hierarchically under clock providers, and external clocks do not belong
+> under any of the current ones.
+>
+> Signed-off-by: Tero Kristo <t-kristo@ti.com>
 
-Fixes commit: 86be408bfbd846fab3c4ac21d6f9298bd2e4b790
-"clk: Support for clock parents and rates assigned from device tree"
-
-Reported-by: kbuild test robot <fengguang.wu@intel.com>
-Signed-off-by: Sylwester Nawrocki <s.nawrocki@samsung.com>
----
- drivers/clk/clk-conf.c |    1 +
- 1 file changed, 1 insertion(+)
-
-diff --git a/drivers/clk/clk-conf.c b/drivers/clk/clk-conf.c
-index 4e1bda7..aad4796 100644
---- a/drivers/clk/clk-conf.c
-+++ b/drivers/clk/clk-conf.c
-@@ -141,3 +141,4 @@ int of_clk_set_defaults(struct device_node *node, bool clk_supplier)
-
- 	return __set_clk_rates(node, clk_supplier);
- }
-+EXPORT_SYMBOL_GPL(of_clk_set_defaults);
---
-1.7.9.5
+Tested-by: Jyri Sarha <jsahra@ti.com>
