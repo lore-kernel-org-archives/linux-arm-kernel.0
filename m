@@ -1,23 +1,34 @@
-From: horms@verge.net.au (Simon Horman)
-Date: Mon, 4 Aug 2014 16:08:13 +0900
-Subject: [PATCH v2 0/2] Add VIN and ADV7180 device tree support for
- R8A7791/Henninger board
-In-Reply-To: <201408020402.14560.sergei.shtylyov@cogentembedded.com>
-References: <201408020402.14560.sergei.shtylyov@cogentembedded.com>
-Message-ID: <20140804070813.GB1889@verge.net.au>
+From: iamjoonsoo.kim@lge.com (Joonsoo Kim)
+Date: Mon, 4 Aug 2014 16:11:00 +0900
+Subject: [linux-3.10.17] Could not allocate memory from free CMA areas
+In-Reply-To: <54sabdnxop04vxd7ewndc0qf.1407077745645@email.android.com>
+References: <54sabdnxop04vxd7ewndc0qf.1407077745645@email.android.com>
+Message-ID: <003201cfafb3$3fe43180$bfac9480$@lge.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Aug 02, 2014 at 04:02:13AM +0400, Sergei Shtylyov wrote:
-> Hello.
+> Dear Joonsoo,
 > 
->    Here's the set of 2 patches against Simon Horman's 'renesas.git' repo,
-> 'renesas-devel-v3.16-rc7-20140731v2' tag. Here we add the VIN and ADV7180 video
-> decoder device tree support on the R8A7791/Henninger board. The patchset
-> requires Ben Dooks' 'rcar_vin' and 'soc_camera' DT support patches already
-> merged to the 'media_tree.git' in order to work.
-> 
-> [1/2] ARM: shmobile: r8a7791: add VIN DT support
-> [2/2] ARM: shmobile: henninger: add VIN0/ADV7180 DT support
+> I tried your changes which are present at the below link. 
+> https://github.com/JoonsooKim/linux/tree/cma-fix-up-v3.0-next-20140625
+> But unfortunately for me it did not help much. 
+> After running various apps that uses ION nonmovable memory, it fails to allocate memory after some time. When I see the pagetypeinfo shows lots of CMA pages available and non-movable were very less and thus nonmovable allocation were failing.
 
-Thanks, I have queued these up for v3.18.
+Okay. CMA pages cannot be used for nonmovable memory, so it can fail in above case.
+
+> However I noticed the failure was little delayed.
+
+It is good sign. I guess that there is movable/CMA ratio problem.
+My patchset uses free CMA pages in certain ratio to free movable page consumption.
+If your system doesn't use movable page sufficiently, free CMA pages cannot
+be used fully. Could you test with following workaround?
+
++       if (normal > cma) {
++               zone->max_try_normal = pageblock_nr_pages;
++               zone->max_try_cma = pageblock_nr_pages;
++       } else {
++               zone->max_try_normal = pageblock_nr_pages;
++               zone->max_try_cma = pageblock_nr_pages;
++       }
+
+Thanks.
