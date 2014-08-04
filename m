@@ -1,209 +1,111 @@
 From: christoffer.dall@linaro.org (Christoffer Dall)
-Date: Mon,  4 Aug 2014 10:46:24 +0200
-Subject: [GIT PULL 07/51] arm64: KVM: allow export and import of generic timer
- regs
+Date: Mon,  4 Aug 2014 10:46:25 +0200
+Subject: [GIT PULL 08/51] arm64: GICv3 device tree binding documentation
 In-Reply-To: <1407142028-31105-1-git-send-email-christoffer.dall@linaro.org>
 References: <1407142028-31105-1-git-send-email-christoffer.dall@linaro.org>
-Message-ID: <1407142028-31105-8-git-send-email-christoffer.dall@linaro.org>
+Message-ID: <1407142028-31105-9-git-send-email-christoffer.dall@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Alex Benn?e <alex.bennee@linaro.org>
+From: Marc Zyngier <marc.zyngier@arm.com>
 
-For correct guest suspend/resume behaviour we need to ensure we include
-the generic timer registers for 64 bit guests. As CONFIG_KVM_ARM_TIMER is
-always set for arm64 we don't need to worry about null implementations.
-However I have re-jigged the kvm_arm_timer_set/get_reg declarations to
-be in the common include/kvm/arm_arch_timer.h headers.
+Add the necessary documentation to support GICv3.
 
-Acked-by: Marc Zyngier <marc.zyngier@arm.com>
-Reviewed-by: Christoffer Dall <christoffer.dall@linaro.org>
-Signed-off-by: Alex Benn?e <alex.bennee@linaro.org>
-Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
+Cc: Thomas Gleixner <tglx@linutronix.de>
+Cc: Mark Rutland <mark.rutland@arm.com>
+Acked-by: Catalin Marinas <catalin.marinas@arm.com>
+Acked-by: Rob Herring <robh@kernel.org>
+Acked-by: Christoffer Dall <christoffer.dall@linaro.org>
+Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 ---
- arch/arm/include/asm/kvm_host.h |  3 --
- arch/arm/kvm/guest.c            | 10 ------
- arch/arm64/kvm/guest.c          | 68 ++++++++++++++++++++++++++++++++++++++++-
- include/kvm/arm_arch_timer.h    | 14 +++++++++
- 4 files changed, 81 insertions(+), 14 deletions(-)
+ Documentation/devicetree/bindings/arm/gic-v3.txt | 79 ++++++++++++++++++++++++
+ 1 file changed, 79 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/arm/gic-v3.txt
 
-diff --git a/arch/arm/include/asm/kvm_host.h b/arch/arm/include/asm/kvm_host.h
-index 193ceaf..dc4e3ed 100644
---- a/arch/arm/include/asm/kvm_host.h
-+++ b/arch/arm/include/asm/kvm_host.h
-@@ -228,7 +228,4 @@ static inline int kvm_arch_dev_ioctl_check_extension(long ext)
- int kvm_perf_init(void);
- int kvm_perf_teardown(void);
- 
--u64 kvm_arm_timer_get_reg(struct kvm_vcpu *, u64 regid);
--int kvm_arm_timer_set_reg(struct kvm_vcpu *, u64 regid, u64 value);
--
- #endif /* __ARM_KVM_HOST_H__ */
-diff --git a/arch/arm/kvm/guest.c b/arch/arm/kvm/guest.c
-index b23a59c..986e625 100644
---- a/arch/arm/kvm/guest.c
-+++ b/arch/arm/kvm/guest.c
-@@ -124,16 +124,6 @@ static bool is_timer_reg(u64 index)
- 	return false;
- }
- 
--int kvm_arm_timer_set_reg(struct kvm_vcpu *vcpu, u64 regid, u64 value)
--{
--	return 0;
--}
--
--u64 kvm_arm_timer_get_reg(struct kvm_vcpu *vcpu, u64 regid)
--{
--	return 0;
--}
--
- #else
- 
- #define NUM_TIMER_REGS 3
-diff --git a/arch/arm64/kvm/guest.c b/arch/arm64/kvm/guest.c
-index 60b5c31..8d1ec28 100644
---- a/arch/arm64/kvm/guest.c
-+++ b/arch/arm64/kvm/guest.c
-@@ -136,13 +136,67 @@ static unsigned long num_core_regs(void)
- }
- 
- /**
-+ * ARM64 versions of the TIMER registers, always available on arm64
-+ */
+diff --git a/Documentation/devicetree/bindings/arm/gic-v3.txt b/Documentation/devicetree/bindings/arm/gic-v3.txt
+new file mode 100644
+index 0000000..33cd05e
+--- /dev/null
++++ b/Documentation/devicetree/bindings/arm/gic-v3.txt
+@@ -0,0 +1,79 @@
++* ARM Generic Interrupt Controller, version 3
 +
-+#define NUM_TIMER_REGS 3
++AArch64 SMP cores are often associated with a GICv3, providing Private
++Peripheral Interrupts (PPI), Shared Peripheral Interrupts (SPI),
++Software Generated Interrupts (SGI), and Locality-specific Peripheral
++Interrupts (LPI).
 +
-+static bool is_timer_reg(u64 index)
-+{
-+	switch (index) {
-+	case KVM_REG_ARM_TIMER_CTL:
-+	case KVM_REG_ARM_TIMER_CNT:
-+	case KVM_REG_ARM_TIMER_CVAL:
-+		return true;
-+	}
-+	return false;
-+}
++Main node required properties:
 +
-+static int copy_timer_indices(struct kvm_vcpu *vcpu, u64 __user *uindices)
-+{
-+	if (put_user(KVM_REG_ARM_TIMER_CTL, uindices))
-+		return -EFAULT;
-+	uindices++;
-+	if (put_user(KVM_REG_ARM_TIMER_CNT, uindices))
-+		return -EFAULT;
-+	uindices++;
-+	if (put_user(KVM_REG_ARM_TIMER_CVAL, uindices))
-+		return -EFAULT;
++- compatible : should at least contain  "arm,gic-v3".
++- interrupt-controller : Identifies the node as an interrupt controller
++- #interrupt-cells : Specifies the number of cells needed to encode an
++  interrupt source. Must be a single cell with a value of at least 3.
 +
-+	return 0;
-+}
++  The 1st cell is the interrupt type; 0 for SPI interrupts, 1 for PPI
++  interrupts. Other values are reserved for future use.
 +
-+static int set_timer_reg(struct kvm_vcpu *vcpu, const struct kvm_one_reg *reg)
-+{
-+	void __user *uaddr = (void __user *)(long)reg->addr;
-+	u64 val;
-+	int ret;
++  The 2nd cell contains the interrupt number for the interrupt type.
++  SPI interrupts are in the range [0-987]. PPI interrupts are in the
++  range [0-15].
 +
-+	ret = copy_from_user(&val, uaddr, KVM_REG_SIZE(reg->id));
-+	if (ret != 0)
-+		return ret;
++  The 3rd cell is the flags, encoded as follows:
++	bits[3:0] trigger type and level flags.
++		1 = edge triggered
++		4 = level triggered
 +
-+	return kvm_arm_timer_set_reg(vcpu, reg->id, val);
-+}
++  Cells 4 and beyond are reserved for future use. When the 1st cell
++  has a value of 0 or 1, cells 4 and beyond act as padding, and may be
++  ignored. It is recommended that padding cells have a value of 0.
 +
-+static int get_timer_reg(struct kvm_vcpu *vcpu, const struct kvm_one_reg *reg)
-+{
-+	void __user *uaddr = (void __user *)(long)reg->addr;
-+	u64 val;
++- reg : Specifies base physical address(s) and size of the GIC
++  registers, in the following order:
++  - GIC Distributor interface (GICD)
++  - GIC Redistributors (GICR), one range per redistributor region
++  - GIC CPU interface (GICC)
++  - GIC Hypervisor interface (GICH)
++  - GIC Virtual CPU interface (GICV)
 +
-+	val = kvm_arm_timer_get_reg(vcpu, reg->id);
-+	return copy_to_user(uaddr, &val, KVM_REG_SIZE(reg->id));
-+}
++  GICC, GICH and GICV are optional.
 +
-+/**
-  * kvm_arm_num_regs - how many registers do we present via KVM_GET_ONE_REG
-  *
-  * This is for all registers.
-  */
- unsigned long kvm_arm_num_regs(struct kvm_vcpu *vcpu)
- {
--	return num_core_regs() + kvm_arm_num_sys_reg_descs(vcpu);
-+	return num_core_regs() + kvm_arm_num_sys_reg_descs(vcpu)
-+                + NUM_TIMER_REGS;
- }
- 
- /**
-@@ -154,6 +208,7 @@ int kvm_arm_copy_reg_indices(struct kvm_vcpu *vcpu, u64 __user *uindices)
- {
- 	unsigned int i;
- 	const u64 core_reg = KVM_REG_ARM64 | KVM_REG_SIZE_U64 | KVM_REG_ARM_CORE;
-+	int ret;
- 
- 	for (i = 0; i < sizeof(struct kvm_regs) / sizeof(__u32); i++) {
- 		if (put_user(core_reg | i, uindices))
-@@ -161,6 +216,11 @@ int kvm_arm_copy_reg_indices(struct kvm_vcpu *vcpu, u64 __user *uindices)
- 		uindices++;
- 	}
- 
-+	ret = copy_timer_indices(vcpu, uindices);
-+	if (ret)
-+		return ret;
-+	uindices += NUM_TIMER_REGS;
++- interrupts : Interrupt source of the VGIC maintenance interrupt.
 +
- 	return kvm_arm_copy_sys_reg_indices(vcpu, uindices);
- }
- 
-@@ -174,6 +234,9 @@ int kvm_arm_get_reg(struct kvm_vcpu *vcpu, const struct kvm_one_reg *reg)
- 	if ((reg->id & KVM_REG_ARM_COPROC_MASK) == KVM_REG_ARM_CORE)
- 		return get_core_reg(vcpu, reg);
- 
-+	if (is_timer_reg(reg->id))
-+		return get_timer_reg(vcpu, reg);
++Optional
 +
- 	return kvm_arm_sys_reg_get_reg(vcpu, reg);
- }
- 
-@@ -187,6 +250,9 @@ int kvm_arm_set_reg(struct kvm_vcpu *vcpu, const struct kvm_one_reg *reg)
- 	if ((reg->id & KVM_REG_ARM_COPROC_MASK) == KVM_REG_ARM_CORE)
- 		return set_core_reg(vcpu, reg);
- 
-+	if (is_timer_reg(reg->id))
-+		return set_timer_reg(vcpu, reg);
++- redistributor-stride : If using padding pages, specifies the stride
++  of consecutive redistributors. Must be a multiple of 64kB.
 +
- 	return kvm_arm_sys_reg_set_reg(vcpu, reg);
- }
- 
-diff --git a/include/kvm/arm_arch_timer.h b/include/kvm/arm_arch_timer.h
-index 6d9aedd..ad9db60 100644
---- a/include/kvm/arm_arch_timer.h
-+++ b/include/kvm/arm_arch_timer.h
-@@ -67,6 +67,10 @@ void kvm_timer_vcpu_init(struct kvm_vcpu *vcpu);
- void kvm_timer_flush_hwstate(struct kvm_vcpu *vcpu);
- void kvm_timer_sync_hwstate(struct kvm_vcpu *vcpu);
- void kvm_timer_vcpu_terminate(struct kvm_vcpu *vcpu);
++- #redistributor-regions: The number of independent contiguous regions
++  occupied by the redistributors. Required if more than one such
++  region is present.
 +
-+u64 kvm_arm_timer_get_reg(struct kvm_vcpu *, u64 regid);
-+int kvm_arm_timer_set_reg(struct kvm_vcpu *, u64 regid, u64 value);
++Examples:
 +
- #else
- static inline int kvm_timer_hyp_init(void)
- {
-@@ -84,6 +88,16 @@ static inline void kvm_timer_vcpu_init(struct kvm_vcpu *vcpu) {}
- static inline void kvm_timer_flush_hwstate(struct kvm_vcpu *vcpu) {}
- static inline void kvm_timer_sync_hwstate(struct kvm_vcpu *vcpu) {}
- static inline void kvm_timer_vcpu_terminate(struct kvm_vcpu *vcpu) {}
++	gic: interrupt-controller at 2cf00000 {
++		compatible = "arm,gic-v3";
++		#interrupt-cells = <3>;
++		interrupt-controller;
++		reg = <0x0 0x2f000000 0 0x10000>,	// GICD
++		      <0x0 0x2f100000 0 0x200000>,	// GICR
++		      <0x0 0x2c000000 0 0x2000>,	// GICC
++		      <0x0 0x2c010000 0 0x2000>,	// GICH
++		      <0x0 0x2c020000 0 0x2000>;	// GICV
++		interrupts = <1 9 4>;
++	};
 +
-+static inline int kvm_arm_timer_set_reg(struct kvm_vcpu *vcpu, u64 regid, u64 value)
-+{
-+	return 0;
-+}
-+
-+static inline u64 kvm_arm_timer_get_reg(struct kvm_vcpu *vcpu, u64 regid)
-+{
-+	return 0;
-+}
- #endif
- 
- #endif
++	gic: interrupt-controller at 2c010000 {
++		compatible = "arm,gic-v3";
++		#interrupt-cells = <3>;
++		interrupt-controller;
++		redistributor-stride = <0x0 0x40000>;	// 256kB stride
++		#redistributor-regions = <2>;
++		reg = <0x0 0x2c010000 0 0x10000>,	// GICD
++		      <0x0 0x2d000000 0 0x800000>,	// GICR 1: CPUs 0-31
++		      <0x0 0x2e000000 0 0x800000>;	// GICR 2: CPUs 32-63
++		      <0x0 0x2c040000 0 0x2000>,	// GICC
++		      <0x0 0x2c060000 0 0x2000>,	// GICH
++		      <0x0 0x2c080000 0 0x2000>;	// GICV
++		interrupts = <1 9 4>;
++	};
 -- 
 2.0.0
