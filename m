@@ -1,32 +1,32 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Mon,  4 Aug 2014 12:34:29 +0200
-Subject: [PATCH 2/2] ARM: crypto: enable NEON SHA-384/SHA-512 for big endian
-In-Reply-To: <1407148469-26190-1-git-send-email-ard.biesheuvel@linaro.org>
-References: <1407148469-26190-1-git-send-email-ard.biesheuvel@linaro.org>
-Message-ID: <1407148469-26190-2-git-send-email-ard.biesheuvel@linaro.org>
+From: christoffer.dall@linaro.org (Christoffer Dall)
+Date: Mon, 4 Aug 2014 12:36:24 +0200
+Subject: [PATCH] arm/arm64: KVM: Support KVM_CAP_READONLY_MEM
+In-Reply-To: <1405003351-12973-1-git-send-email-christoffer.dall@linaro.org>
+References: <1405003351-12973-1-git-send-email-christoffer.dall@linaro.org>
+Message-ID: <20140804103624.GA32684@cbox>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The SHA-512 NEON works just fine under big endian, so remove the Kconfig
-condition preventing it from being selected if CONFIG_CPU_BIG_ENDIAN is set.
+On Thu, Jul 10, 2014 at 07:42:31AM -0700, Christoffer Dall wrote:
+> When userspace loads code and data in a read-only memory regions, KVM
+> needs to be able to handle this on arm and arm64.  Specifically this is
+> used when running code directly from a read-only flash device; the
+> common scenario is a UEFI blob loaded with the -bios option in QEMU.
+> 
+> To avoid looking through the memslots twice and to reuse the hva error
+> checking of gfn_to_hva_prot(), add a new gfn_to_hva_memslot_prot()
+> function and refactor gfn_to_hva_prot() to use this function.
+> 
+> Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
+> ---
+> Note that if you want to test this with QEMU, you need to update the
+> uapi headers.  You can also grab the branch below from my qemu git tree
+> with the temporary update headers patch applied on top of Peter
+> Maydell's -bios in -M virt support patches:
+> 
+> git://git.linaro.org/people/christoffer.dall/qemu-arm.git virt-for-uefi
+> 
 
-Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
----
- crypto/Kconfig | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+Ping?
 
-diff --git a/crypto/Kconfig b/crypto/Kconfig
-index deef2a4b6559..d560c66125bd 100644
---- a/crypto/Kconfig
-+++ b/crypto/Kconfig
-@@ -602,7 +602,7 @@ config CRYPTO_SHA512_SPARC64
- 
- config CRYPTO_SHA512_ARM_NEON
- 	tristate "SHA384 and SHA512 digest algorithm (ARM NEON)"
--	depends on ARM && KERNEL_MODE_NEON && !CPU_BIG_ENDIAN
-+	depends on ARM && KERNEL_MODE_NEON
- 	select CRYPTO_SHA512
- 	select CRYPTO_HASH
- 	help
--- 
-1.8.3.2
+-Christoffer
