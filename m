@@ -1,28 +1,26 @@
-From: hans@hanshq.net (Hans Wennborg)
-Date: Sun,  3 Aug 2014 17:19:01 -0700
-Subject: [PATCH 05/19] media: s5p-mfs: fix %d confusingly prefixed with 0x in
- format string
-Message-ID: <1407111541-14662-1-git-send-email-hans@hanshq.net>
+From: ohaugan@codeaurora.org (Olav Haugan)
+Date: Sun,  3 Aug 2014 17:47:42 -0700
+Subject: [PATCH v1 0/2] arm-smmu fixes for CBn_TCR and S2CR/SMR programming
+Message-ID: <1407113264-23426-1-git-send-email-ohaugan@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Signed-off-by: Hans Wennborg <hans@hanshq.net>
----
- drivers/media/platform/s5p-mfc/s5p_mfc_opr_v6.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+Here are a couple fixes for the arm smmu driver. The first one deals with
+ensuring that we program CBn_TCR correctly when we are programming a stage-1
+context bank.
+The second patch ensures that the S2CR and SMR registers are programmed
+correctly for either stream id matching or stream id indexing. When stream
+id matching is not supported by the hardware the SMR registers does not
+exists. However, even if they are UNK/SBZP we prefer not to write to more
+registers than needed.
 
-diff --git a/drivers/media/platform/s5p-mfc/s5p_mfc_opr_v6.c b/drivers/media/platform/s5p-mfc/s5p_mfc_opr_v6.c
-index c1c12f8..e9175ab 100644
---- a/drivers/media/platform/s5p-mfc/s5p_mfc_opr_v6.c
-+++ b/drivers/media/platform/s5p-mfc/s5p_mfc_opr_v6.c
-@@ -525,7 +525,7 @@ static int s5p_mfc_set_enc_stream_buffer_v6(struct s5p_mfc_ctx *ctx,
- 	WRITEL(addr, mfc_regs->e_stream_buffer_addr); /* 16B align */
- 	WRITEL(size, mfc_regs->e_stream_buffer_size);
- 
--	mfc_debug(2, "stream buf addr: 0x%08lx, size: 0x%d\n",
-+	mfc_debug(2, "stream buf addr: 0x%08lx, size: 0x%x\n",
- 		  addr, size);
- 
- 	return 0;
--- 
-2.0.0.526.g5318336
+Olav Haugan (2):
+  iommu/arm-smmu: Fix programming of SMMU_CBn_TCR for stage 1
+  iommu/arm-smmu: Correctly program S2CR and SMR registers
+
+ drivers/iommu/arm-smmu.c | 19 +++++++++++++------
+ 1 file changed, 13 insertions(+), 6 deletions(-)
+
+--
+The Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+hosted by The Linux Foundation
