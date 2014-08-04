@@ -1,66 +1,202 @@
 From: christoffer.dall@linaro.org (Christoffer Dall)
-Date: Mon,  4 Aug 2014 10:46:49 +0200
-Subject: [GIT PULL 32/51] ARM: KVM: MMIO support BE host running LE code
+Date: Mon,  4 Aug 2014 10:46:50 +0200
+Subject: [GIT PULL 33/51] ARM: KVM: one_reg coproc set and get BE fixes
 In-Reply-To: <1407142028-31105-1-git-send-email-christoffer.dall@linaro.org>
 References: <1407142028-31105-1-git-send-email-christoffer.dall@linaro.org>
-Message-ID: <1407142028-31105-33-git-send-email-christoffer.dall@linaro.org>
+Message-ID: <1407142028-31105-34-git-send-email-christoffer.dall@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Victor Kamensky <victor.kamensky@linaro.org>
 
-In case of status register E bit is not set (LE mode) and host runs in
-BE mode we need byteswap data, so read/write is emulated correctly.
+Fix code that handles KVM_SET_ONE_REG, KVM_GET_ONE_REG ioctls to work in BE
+image. Before this fix get/set_one_reg functions worked correctly only in
+LE case - reg_from_user was taking 'void *' kernel address that actually could
+be target/source memory of either 4 bytes size or 8 bytes size, and code copied
+from/to user memory that could hold either 4 bytes register, 8 byte register
+or pair of 4 bytes registers.
+
+In order to work in endian agnostic way reg_from_user to reg_to_user functions
+should copy register value only to kernel variable with size that matches
+register size. In few place where size mismatch existed fix issue on macro
+caller side.
 
 Signed-off-by: Victor Kamensky <victor.kamensky@linaro.org>
 Reviewed-by: Christoffer Dall <christoffer.dall@linaro.org>
-Reviewed-by: Marc Zyngier <marc.zyngier@arm.com>
 Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 ---
- arch/arm/include/asm/kvm_emulate.h | 22 ++++++++++++++++++----
- 1 file changed, 18 insertions(+), 4 deletions(-)
+ arch/arm/kvm/coproc.c | 88 +++++++++++++++++++++++++++++++++++++++++++++------
+ 1 file changed, 79 insertions(+), 9 deletions(-)
 
-diff --git a/arch/arm/include/asm/kvm_emulate.h b/arch/arm/include/asm/kvm_emulate.h
-index 0fa90c9..69b7469 100644
---- a/arch/arm/include/asm/kvm_emulate.h
-+++ b/arch/arm/include/asm/kvm_emulate.h
-@@ -185,9 +185,16 @@ static inline unsigned long vcpu_data_guest_to_host(struct kvm_vcpu *vcpu,
- 		default:
- 			return be32_to_cpu(data);
- 		}
-+	} else {
-+		switch (len) {
-+		case 1:
-+			return data & 0xff;
-+		case 2:
-+			return le16_to_cpu(data & 0xffff);
-+		default:
-+			return le32_to_cpu(data);
-+		}
- 	}
--
--	return data;		/* Leave LE untouched */
+diff --git a/arch/arm/kvm/coproc.c b/arch/arm/kvm/coproc.c
+index c58a351..37a0fe1 100644
+--- a/arch/arm/kvm/coproc.c
++++ b/arch/arm/kvm/coproc.c
+@@ -44,6 +44,31 @@ static u32 cache_levels;
+ /* CSSELR values; used to index KVM_REG_ARM_DEMUX_ID_CCSIDR */
+ #define CSSELR_MAX 12
+ 
++/*
++ * kvm_vcpu_arch.cp15 holds cp15 registers as an array of u32, but some
++ * of cp15 registers can be viewed either as couple of two u32 registers
++ * or one u64 register. Current u64 register encoding is that least
++ * significant u32 word is followed by most significant u32 word.
++ */
++static inline void vcpu_cp15_reg64_set(struct kvm_vcpu *vcpu,
++				       const struct coproc_reg *r,
++				       u64 val)
++{
++	vcpu->arch.cp15[r->reg] = val & 0xffffffff;
++	vcpu->arch.cp15[r->reg + 1] = val >> 32;
++}
++
++static inline u64 vcpu_cp15_reg64_get(struct kvm_vcpu *vcpu,
++				      const struct coproc_reg *r)
++{
++	u64 val;
++
++	val = vcpu->arch.cp15[r->reg + 1];
++	val = val << 32;
++	val = val | vcpu->arch.cp15[r->reg];
++	return val;
++}
++
+ int kvm_handle_cp10_id(struct kvm_vcpu *vcpu, struct kvm_run *run)
+ {
+ 	kvm_inject_undefined(vcpu);
+@@ -682,17 +707,23 @@ static struct coproc_reg invariant_cp15[] = {
+ 	{ CRn( 0), CRm( 0), Op1( 1), Op2( 7), is32, NULL, get_AIDR },
+ };
+ 
++/*
++ * Reads a register value from a userspace address to a kernel
++ * variable. Make sure that register size matches sizeof(*__val).
++ */
+ static int reg_from_user(void *val, const void __user *uaddr, u64 id)
+ {
+-	/* This Just Works because we are little endian. */
+ 	if (copy_from_user(val, uaddr, KVM_REG_SIZE(id)) != 0)
+ 		return -EFAULT;
+ 	return 0;
  }
  
- static inline unsigned long vcpu_data_host_to_guest(struct kvm_vcpu *vcpu,
-@@ -203,9 +210,16 @@ static inline unsigned long vcpu_data_host_to_guest(struct kvm_vcpu *vcpu,
- 		default:
- 			return cpu_to_be32(data);
- 		}
-+	} else {
-+		switch (len) {
-+		case 1:
-+			return data & 0xff;
-+		case 2:
-+			return cpu_to_le16(data & 0xffff);
-+		default:
-+			return cpu_to_le32(data);
-+		}
- 	}
--
--	return data;		/* Leave LE untouched */
++/*
++ * Writes a register value to a userspace address from a kernel variable.
++ * Make sure that register size matches sizeof(*__val).
++ */
+ static int reg_to_user(void __user *uaddr, const void *val, u64 id)
+ {
+-	/* This Just Works because we are little endian. */
+ 	if (copy_to_user(uaddr, val, KVM_REG_SIZE(id)) != 0)
+ 		return -EFAULT;
+ 	return 0;
+@@ -702,6 +733,7 @@ static int get_invariant_cp15(u64 id, void __user *uaddr)
+ {
+ 	struct coproc_params params;
+ 	const struct coproc_reg *r;
++	int ret;
+ 
+ 	if (!index_to_params(id, &params))
+ 		return -ENOENT;
+@@ -710,7 +742,15 @@ static int get_invariant_cp15(u64 id, void __user *uaddr)
+ 	if (!r)
+ 		return -ENOENT;
+ 
+-	return reg_to_user(uaddr, &r->val, id);
++	ret = -ENOENT;
++	if (KVM_REG_SIZE(id) == 4) {
++		u32 val = r->val;
++
++		ret = reg_to_user(uaddr, &val, id);
++	} else if (KVM_REG_SIZE(id) == 8) {
++		ret = reg_to_user(uaddr, &r->val, id);
++	}
++	return ret;
  }
  
- #endif /* __ARM_KVM_EMULATE_H__ */
+ static int set_invariant_cp15(u64 id, void __user *uaddr)
+@@ -718,7 +758,7 @@ static int set_invariant_cp15(u64 id, void __user *uaddr)
+ 	struct coproc_params params;
+ 	const struct coproc_reg *r;
+ 	int err;
+-	u64 val = 0; /* Make sure high bits are 0 for 32-bit regs */
++	u64 val;
+ 
+ 	if (!index_to_params(id, &params))
+ 		return -ENOENT;
+@@ -726,7 +766,16 @@ static int set_invariant_cp15(u64 id, void __user *uaddr)
+ 	if (!r)
+ 		return -ENOENT;
+ 
+-	err = reg_from_user(&val, uaddr, id);
++	err = -ENOENT;
++	if (KVM_REG_SIZE(id) == 4) {
++		u32 val32;
++
++		err = reg_from_user(&val32, uaddr, id);
++		if (!err)
++			val = val32;
++	} else if (KVM_REG_SIZE(id) == 8) {
++		err = reg_from_user(&val, uaddr, id);
++	}
+ 	if (err)
+ 		return err;
+ 
+@@ -1004,6 +1053,7 @@ int kvm_arm_coproc_get_reg(struct kvm_vcpu *vcpu, const struct kvm_one_reg *reg)
+ {
+ 	const struct coproc_reg *r;
+ 	void __user *uaddr = (void __user *)(long)reg->addr;
++	int ret;
+ 
+ 	if ((reg->id & KVM_REG_ARM_COPROC_MASK) == KVM_REG_ARM_DEMUX)
+ 		return demux_c15_get(reg->id, uaddr);
+@@ -1015,14 +1065,24 @@ int kvm_arm_coproc_get_reg(struct kvm_vcpu *vcpu, const struct kvm_one_reg *reg)
+ 	if (!r)
+ 		return get_invariant_cp15(reg->id, uaddr);
+ 
+-	/* Note: copies two regs if size is 64 bit. */
+-	return reg_to_user(uaddr, &vcpu->arch.cp15[r->reg], reg->id);
++	ret = -ENOENT;
++	if (KVM_REG_SIZE(reg->id) == 8) {
++		u64 val;
++
++		val = vcpu_cp15_reg64_get(vcpu, r);
++		ret = reg_to_user(uaddr, &val, reg->id);
++	} else if (KVM_REG_SIZE(reg->id) == 4) {
++		ret = reg_to_user(uaddr, &vcpu->arch.cp15[r->reg], reg->id);
++	}
++
++	return ret;
+ }
+ 
+ int kvm_arm_coproc_set_reg(struct kvm_vcpu *vcpu, const struct kvm_one_reg *reg)
+ {
+ 	const struct coproc_reg *r;
+ 	void __user *uaddr = (void __user *)(long)reg->addr;
++	int ret;
+ 
+ 	if ((reg->id & KVM_REG_ARM_COPROC_MASK) == KVM_REG_ARM_DEMUX)
+ 		return demux_c15_set(reg->id, uaddr);
+@@ -1034,8 +1094,18 @@ int kvm_arm_coproc_set_reg(struct kvm_vcpu *vcpu, const struct kvm_one_reg *reg)
+ 	if (!r)
+ 		return set_invariant_cp15(reg->id, uaddr);
+ 
+-	/* Note: copies two regs if size is 64 bit */
+-	return reg_from_user(&vcpu->arch.cp15[r->reg], uaddr, reg->id);
++	ret = -ENOENT;
++	if (KVM_REG_SIZE(reg->id) == 8) {
++		u64 val;
++
++		ret = reg_from_user(&val, uaddr, reg->id);
++		if (!ret)
++			vcpu_cp15_reg64_set(vcpu, r, val);
++	} else if (KVM_REG_SIZE(reg->id) == 4) {
++		ret = reg_from_user(&vcpu->arch.cp15[r->reg], uaddr, reg->id);
++	}
++
++	return ret;
+ }
+ 
+ static unsigned int num_demux_regs(void)
 -- 
 2.0.0
