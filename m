@@ -1,34 +1,58 @@
 From: heiko@sntech.de (Heiko =?ISO-8859-1?Q?St=FCbner?=)
-Date: Mon, 04 Aug 2014 18:59:21 +0200
-Subject: [PATCH 1/2] ARM: multi_v7_defconfig: Enable
- ARM_ATAG_DTB_COMPAT_CMDLINE_EXTEND
-Message-ID: <5084600.YbBVvXy6Ug@diego>
+Date: Mon, 04 Aug 2014 19:00:07 +0200
+Subject: [PATCH 2/2] ARM: dts: rockchip: add bootargs setting the correct
+ serial console
+In-Reply-To: <5084600.YbBVvXy6Ug@diego>
+References: <5084600.YbBVvXy6Ug@diego>
+Message-ID: <1539097.4Cm43oOanj@diego>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-At present on atag based legacy bootloaders, the provided kernel commandline
-will be used unchanged, potentially using obscure parameters for outdated
-vendor-kernel drivers.
+Uart2 seems to be designated debug uart for all Rockchip platforms.
+On all rk30xx and rk31xx boards I've seen so far, this uart was used
+for the console and the rk3288 TRM even describes it as debug uart.
 
-Therefore allow them to be extended by known-good parameters from the
-bootargs property of the dtb.
+Thus add it to the core SoC dtsi files to not duplicate the same
+information on every board.
 
 Signed-off-by: Heiko Stuebner <heiko@sntech.de>
 ---
- arch/arm/configs/multi_v7_defconfig | 1 +
- 1 file changed, 1 insertion(+)
+This makes a multi_v7_defconfig-based kernel start sucessfully on my
+rk3188-radxarock and rk3288-evb
 
-diff --git a/arch/arm/configs/multi_v7_defconfig b/arch/arm/configs/multi_v7_defconfig
-index 1bf198b..16a42a5 100644
---- a/arch/arm/configs/multi_v7_defconfig
-+++ b/arch/arm/configs/multi_v7_defconfig
-@@ -80,6 +80,7 @@ CONFIG_HIGHPTE=y
- CONFIG_CMA=y
- CONFIG_ARM_APPENDED_DTB=y
- CONFIG_ARM_ATAG_DTB_COMPAT=y
-+CONFIG_ARM_ATAG_DTB_COMPAT_CMDLINE_EXTEND=y
- CONFIG_KEXEC=y
- CONFIG_CPU_FREQ=y
- CONFIG_CPU_FREQ_STAT_DETAILS=y
+ arch/arm/boot/dts/rk3288.dtsi | 4 ++++
+ arch/arm/boot/dts/rk3xxx.dtsi | 4 ++++
+ 2 files changed, 8 insertions(+)
+
+diff --git a/arch/arm/boot/dts/rk3288.dtsi b/arch/arm/boot/dts/rk3288.dtsi
+index e7cb008..3950bad 100644
+--- a/arch/arm/boot/dts/rk3288.dtsi
++++ b/arch/arm/boot/dts/rk3288.dtsi
+@@ -36,6 +36,10 @@
+ 		serial4 = &uart4;
+ 	};
+ 
++	chosen {
++		bootargs = "console=ttyS2,115200";
++	};
++
+ 	cpus {
+ 		#address-cells = <1>;
+ 		#size-cells = <0>;
+diff --git a/arch/arm/boot/dts/rk3xxx.dtsi b/arch/arm/boot/dts/rk3xxx.dtsi
+index 8caf85d..9eeb6cb 100644
+--- a/arch/arm/boot/dts/rk3xxx.dtsi
++++ b/arch/arm/boot/dts/rk3xxx.dtsi
+@@ -28,6 +28,10 @@
+ 		i2c4 = &i2c4;
+ 	};
+ 
++	chosen {
++		bootargs = "console=ttyS2,115200";
++	};
++
+ 	xin24m: oscillator {
+ 		compatible = "fixed-clock";
+ 		clock-frequency = <24000000>;
 -- 
 2.0.1
