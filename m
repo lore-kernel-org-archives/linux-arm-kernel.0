@@ -1,45 +1,64 @@
 From: emilio@elopez.com.ar (=?UTF-8?q?Emilio=20L=C3=B3pez?=)
-Date: Mon,  4 Aug 2014 17:09:59 -0300
-Subject: [PATCH v3 5/8] ARM: sun7i: dt: Add node to represent the DMA
- controller
+Date: Mon,  4 Aug 2014 17:10:00 -0300
+Subject: [PATCH v3 6/8] ARM: sun4i: dt: enable DMA on SPI
 In-Reply-To: <1407183002-29420-1-git-send-email-emilio@elopez.com.ar>
 References: <1407183002-29420-1-git-send-email-emilio@elopez.com.ar>
-Message-ID: <1407183002-29420-6-git-send-email-emilio@elopez.com.ar>
+Message-ID: <1407183002-29420-7-git-send-email-emilio@elopez.com.ar>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The A20 SoC has a sun4i-compatible DMA controller. Let's add a node to
-represent it on the device tree.
+All of our SPI controllers support DMA transfers, so let's add the
+properties here so they can be used when it's best to do so.
 
 Signed-off-by: Emilio L?pez <emilio@elopez.com.ar>
 Reviewed-by: Chen-Yu Tsai <wens@csie.org>
 ---
 
 Changes from v2:
- * Fix whitespace
  * Collect tag from Chen-Yu
 
- arch/arm/boot/dts/sun7i-a20.dtsi | 8 ++++++++
+ arch/arm/boot/dts/sun4i-a10.dtsi | 8 ++++++++
  1 file changed, 8 insertions(+)
 
-diff --git a/arch/arm/boot/dts/sun7i-a20.dtsi b/arch/arm/boot/dts/sun7i-a20.dtsi
-index 01e9466..510b5a8 100644
---- a/arch/arm/boot/dts/sun7i-a20.dtsi
-+++ b/arch/arm/boot/dts/sun7i-a20.dtsi
-@@ -423,6 +423,14 @@
- 			interrupts = <0 0 4>;
- 		};
- 
-+		dma: dma-controller at 01c02000 {
-+			compatible = "allwinner,sun4i-a10-dma";
-+			reg = <0x01c02000 0x1000>;
-+			interrupts = <0 27 4>;
-+			clocks = <&ahb_gates 6>;
-+			#dma-cells = <2>;
-+		};
-+
- 		spi0: spi at 01c05000 {
- 			compatible = "allwinner,sun4i-a10-spi";
- 			reg = <0x01c05000 0x1000>;
+diff --git a/arch/arm/boot/dts/sun4i-a10.dtsi b/arch/arm/boot/dts/sun4i-a10.dtsi
+index 5c6791a..b6a491b 100644
+--- a/arch/arm/boot/dts/sun4i-a10.dtsi
++++ b/arch/arm/boot/dts/sun4i-a10.dtsi
+@@ -353,6 +353,8 @@
+ 			interrupts = <10>;
+ 			clocks = <&ahb_gates 20>, <&spi0_clk>;
+ 			clock-names = "ahb", "mod";
++			dmas = <&dma 1 27>, <&dma 1 26>;
++			dma-names = "rx", "tx";
+ 			status = "disabled";
+ 			#address-cells = <1>;
+ 			#size-cells = <0>;
+@@ -364,6 +366,8 @@
+ 			interrupts = <11>;
+ 			clocks = <&ahb_gates 21>, <&spi1_clk>;
+ 			clock-names = "ahb", "mod";
++			dmas = <&dma 1 9>, <&dma 1 8>;
++			dma-names = "rx", "tx";
+ 			status = "disabled";
+ 			#address-cells = <1>;
+ 			#size-cells = <0>;
+@@ -459,6 +463,8 @@
+ 			interrupts = <12>;
+ 			clocks = <&ahb_gates 22>, <&spi2_clk>;
+ 			clock-names = "ahb", "mod";
++			dmas = <&dma 1 29>, <&dma 1 28>;
++			dma-names = "rx", "tx";
+ 			status = "disabled";
+ 			#address-cells = <1>;
+ 			#size-cells = <0>;
+@@ -498,6 +504,8 @@
+ 			interrupts = <50>;
+ 			clocks = <&ahb_gates 23>, <&spi3_clk>;
+ 			clock-names = "ahb", "mod";
++			dmas = <&dma 1 31>, <&dma 1 30>;
++			dma-names = "rx", "tx";
+ 			status = "disabled";
+ 			#address-cells = <1>;
+ 			#size-cells = <0>;
 -- 
 2.0.4
