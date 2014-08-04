@@ -1,113 +1,41 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Mon, 04 Aug 2014 13:31:05 +0100
-Subject: [RFC] Saving/Restoring the internal state of an interrupt
-In-Reply-To: <20140804115716.GA524@cbox> (Christoffer Dall's message of "Mon,
- 4 Aug 2014 12:57:16 +0100")
-References: <539F3BDD.2090009@arm.com> <20140804115716.GA524@cbox>
-Message-ID: <87fvhch1x2.fsf@approximate.cambridge.arm.com>
+From: t-kristo@ti.com (Tero Kristo)
+Date: Mon, 4 Aug 2014 15:36:19 +0300
+Subject: [PATCH 0/1] ARM: OMAP: add external clock provider support
+In-Reply-To: <53DF7094.7050601@ti.com>
+References: <1406898948-26113-1-git-send-email-t-kristo@ti.com>
+ <53DF7094.7050601@ti.com>
+Message-ID: <53DF7E43.2060907@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Aug 04 2014 at 12:57:16 pm BST, Christoffer Dall <christoffer.dall@linaro.org> wrote:
-> On Mon, Jun 16, 2014 at 07:47:57PM +0100, Marc Zyngier wrote:
->> Thomas, all,
->> 
->> Since ARM has grown some virtualization extensions, there is a
->> particular issue I've carefully avoided to address, and which is now
->> biting me exactly where you think it does.
->> 
->> Let's expose the problem:
->> - We have a per-CPU timer (the architected timer)
->> - This timer is shared across virtual machines
->> - We context-switch the state of the timer on entry/exit of the VM
->> 
->> The state of the timer itself is basically a control word and a
->> comparator value. Not much. Ah yes, one tiny detail: the state of the
->> interrupt controller (the GIC) is also part of the state.
->> 
->> This interrupt state is not the pending state, but the internal state
->> (called the "active" state), indicating if the interrupt is in
->> progress or not. If the interrupt is active (and configured as a level
->> interrupt), then the interrupt can't fire again until the guest EOIs
->> it (there is some special hardware dedicated to this).
+On 08/04/2014 02:37 PM, Peter Ujfalusi wrote:
+> On 08/01/2014 04:15 PM, Tero Kristo wrote:
+>> Hi,
+>>
+>> This patch adds possibility to register external clocks (outside the main
+>> SoC) on TI boards through device tree. Clock sources as such include for
+>> example twl-6030 / twl-6040 chips and variants which can be used to clock
+>> for example audio / WLAN chips.
 >
-> Can you clarify this part.  I was under the impression from reading the
-> GICv2 specs at least that an active interrupt can become active and
-> pending (and the pending part of that would cause the interrupt to fire
-> again).  Specifically, I'm thinking about transition A2 in Figure 3-1 in
-> the GICv2 spec (ARM IHI 0048B.b).  Am I reading this incorrectly or is
-> there something special about the timer in this regard?
+> Just one question to Mike and Tero:
+> would it be possible to have generic binding for such an external clocks?
+> We have the palmas clock driver already upstream which handles the 32K clocks
+> from the PMIC. Palmas class of PMICs can be used with TI/nVidia(/Intel?)
+> platforms. We use Palmas on omap5-uevm, DRA7-EVM also uses Palmas compatible
+> PMIC and some nVidia platform also uses this class of devices (and they all
+> need to have control over the 32K clock(s)).
 
-Nothing special about the timer. Just that the timer being a level
-interrupt, the pending state is a direct consequence of the level being
-high (as mentionned in the note at the bottom of 1.4.2).
+Other platforms initialize their clocks in different manner, they can 
+use generic of_clk_init I believe. If they can't use that for some 
+reason, then they need to implement something similar to this.
 
-You go from Pending to Active-and-Pending, and then to Active (when the
-timer is reprogrammed/disabled, though you may go back to A&P if the timer
-fires again immediately). Eventually, after the EOI, you go back to
-Inactive.
+-Tero
 
-Here, the only bit we really care about is the Active bit (Pending
-changes anyway, as we save/restore the timer context).
-
-Or is there something that I don't understand in your question?
-
->> 
->> So far, I got away with ignoring that state altogether by playing some
->> tricks in the timer control register (basically masking the interrupt
->> there). This worked fine until Ian found some interesting guest (QNX)
->> that falls over if someone masks the interrupt in the timer behind its
->> back. Fair enough.
->> 
->> So I'm back to square one and I have to context-switch that single
->> bit.
->> 
->> So far, I can see about three options:
->> 
->> - I can add a pair of exported functions:
->>   void gicv2_irq_set_active_state(struct irq_data *d, bool act)
->>   bool gicv2_irq_is_active(struct irq_data *d);
->> 
->>   that directly play with the state. Oh, and for GICv3 as well. And
->>   whatever comes after. It means that KVM has to know exactly the type
->>   of interrupt controller we're using (well, it already does), and call
->>   the right stuff.
->> 
->> - I can add similar function to struct irq_chip:
->>   void (*irq_set_state)(struct irq_data *d, void *data);
->>   void (*irq_get_state)(struct irq_data *d, void *data);
->> 
->>   and build a generic API on top of that. That's tempting, but I'm
->>   really not keen on the "void *data" crap, as it means KVM has to
->>   know the type of the opaque data anyway. Or we define what is the
->>   state of an interrupt, and I'm afraid there is as many definitions
->>   as there are interrupt controllers.
->> 
->> - The third possibility is that I go and duplicate parts of the two GIC
->>   drivers into KVM just to be able to save/restore these bits. Please
->>   pass the bucket around.
->> 
->> So far, I've prototyped the first option, but I'm seriously
->> questioning my own sanity. Any idea/opinion?
->> 
-> KVM and the GIC driver are tightly bound anyhow, so is there anything
-> particular horrible in the first approach?  (Besides the fact that we're
-> exposing random bits of information to the entire kernel not intended to
-> be used by anyone else than KVM for now).
 >
-> Second approach feels over-engineered to me, unless there are other
-> needs or real use cases in the near term.
-
-Well, I've decided on option 2 so far, as I feel we'd better have
-something that is more generic then just a bunch of driver-specific
-hacks. Other architectures may have similar requirements (we just
-haven't realized it yet).
-
-> The third option, just feels wrong, we'd have to do lookups in the DT
-> again to get the base address of the GICC etc. right?
-
-Yup. I don't even want to think about it. ;-)
-
-	M.
--- 
-Jazz is not dead. It just smells funny.
+>> This patch can be queued once someone has a use-case + patches that requires
+>> usage of such clocks.
+>>
+>> -Tero
+>>
+>
+>
