@@ -1,88 +1,83 @@
-From: christoffer.dall@linaro.org (Christoffer Dall)
-Date: Mon, 4 Aug 2014 13:57:16 +0200
-Subject: [RFC] Saving/Restoring the internal state of an interrupt
-In-Reply-To: <539F3BDD.2090009@arm.com>
-References: <539F3BDD.2090009@arm.com>
-Message-ID: <20140804115716.GA524@cbox>
+From: paulmck@linux.vnet.ibm.com (Paul E. McKenney)
+Date: Mon, 4 Aug 2014 05:02:25 -0700
+Subject: TIF_NOHZ can escape nonhz mask? (Was: [PATCH v3 6/8] x86:	Split
+ syscall_trace_enter into two phases)
+In-Reply-To: <20140802173024.GB22510@redhat.com>
+References: <20140728192209.GA26017@localhost.localdomain>
+ <20140729175414.GA3289@redhat.com>
+ <20140730163516.GC18158@localhost.localdomain>
+ <20140730174630.GA30862@redhat.com>
+ <20140731003034.GA32078@localhost.localdomain>
+ <20140731160353.GA14772@redhat.com>
+ <20140731171329.GD7842@localhost.localdomain>
+ <20140731181230.GA18695@redhat.com>
+ <20140731184729.GA12296@localhost.localdomain>
+ <20140802173024.GB22510@redhat.com>
+Message-ID: <20140804120225.GA32378@linux.vnet.ibm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jun 16, 2014 at 07:47:57PM +0100, Marc Zyngier wrote:
-> Thomas, all,
+On Sat, Aug 02, 2014 at 07:30:24PM +0200, Oleg Nesterov wrote:
+> On 07/31, Frederic Weisbecker wrote:
+> >
+> > On Thu, Jul 31, 2014 at 08:12:30PM +0200, Oleg Nesterov wrote:
+> > > > >
+> > > > > Yes sure. But context_tracking_cpu_set() is called by init task with PID 1, not
+> > > > > by "swapper".
+> > > >
+> > > > Are you sure? It's called from start_kernel() which is init/0.
+> > >
+> > > But do_initcalls() is called by kernel_init(), this is the init process which is
+> > > going to exec /sbin/init later.
+> > >
+> > > But this doesn't really matter,
+> >
+> > Yeah but tick_nohz_init() is not an initcall, it's a function called from start_kernel(),
+> > before initcalls.
 > 
-> Since ARM has grown some virtualization extensions, there is a
-> particular issue I've carefully avoided to address, and which is now
-> biting me exactly where you think it does.
+> Ah, indeed, and context_tracking_init() too. Even better, so we only need
 > 
-> Let's expose the problem:
-> - We have a per-CPU timer (the architected timer)
-> - This timer is shared across virtual machines
-> - We context-switch the state of the timer on entry/exit of the VM
+> 	--- x/kernel/context_tracking.c
+> 	+++ x/kernel/context_tracking.c
+> 	@@ -30,8 +30,10 @@ EXPORT_SYMBOL_GPL(context_tracking_enabl
+> 	 DEFINE_PER_CPU(struct context_tracking, context_tracking);
+> 	 EXPORT_SYMBOL_GPL(context_tracking);
+> 	 
+> 	-void context_tracking_cpu_set(int cpu)
+> 	+void __init context_tracking_cpu_set(int cpu)
+> 	 {
+> 	+	/* Called by "swapper" thread, all threads will inherit this flag */
+> 	+	set_thread_flag(TIF_NOHZ);
+> 		if (!per_cpu(context_tracking.active, cpu)) {
+> 			per_cpu(context_tracking.active, cpu) = true;
+> 			static_key_slow_inc(&context_tracking_enabled);
 > 
-> The state of the timer itself is basically a control word and a
-> comparator value. Not much. Ah yes, one tiny detail: the state of the
-> interrupt controller (the GIC) is also part of the state.
+> and now we can kill context_tracking_task_switch() ?
 > 
-> This interrupt state is not the pending state, but the internal state
-> (called the "active" state), indicating if the interrupt is in
-> progress or not. If the interrupt is active (and configured as a level
-> interrupt), then the interrupt can't fire again until the guest EOIs
-> it (there is some special hardware dedicated to this).
+> > > Yes, yes, this doesn't really matter. We can even add set(TIF_NOHZ) at the start
+> > > of start_kernel(). The question is, I still can't understand why do we want to
+> > > have the global TIF_NOHZ.
+> >
+> > Because then the flags is inherited in forks. It's better than inheriting it on
+> > context switch due to context switch being called much more often than fork.
+> 
+> This is clear, that is why I suggested this. Just we didn't understand each other,
+> when I said "global TIF_NOHZ" I meant the current situtation when every (running)
+> task has this bit set anyway. Sorry for confusion.
+> 
+> > No, because preempt_schedule_irq() does the ctx_state save and restore with
+> > exception_enter/exception_exit.
+> 
+> Thanks again. Can't understand how I managed to miss that exception_enter/exit
+> in preempt_schedule_*.
+> 
+> Damn. And after I spent more time, I don't have any idea how to make this
+> tracking cheaper.
 
-Can you clarify this part.  I was under the impression from reading the
-GICv2 specs at least that an active interrupt can become active and
-pending (and the pending part of that would cause the interrupt to fire
-again).  Specifically, I'm thinking about transition A2 in Figure 3-1 in
-the GICv2 spec (ARM IHI 0048B.b).  Am I reading this incorrectly or is
-there something special about the timer in this regard?
+Mike Galbraith's profiles showed that timekeeping was one of the most
+expensive operations.  Would it make sense to have the option of statistical
+jiffy-based accounting?  The idea would be to sample the jiffies counter
+at each context switch, and charge the time to whoever happens to be running
+when the jiffies counter increments.
 
-> 
-> So far, I got away with ignoring that state altogether by playing some
-> tricks in the timer control register (basically masking the interrupt
-> there). This worked fine until Ian found some interesting guest (QNX)
-> that falls over if someone masks the interrupt in the timer behind its
-> back. Fair enough.
-> 
-> So I'm back to square one and I have to context-switch that single
-> bit.
-> 
-> So far, I can see about three options:
-> 
-> - I can add a pair of exported functions:
->   void gicv2_irq_set_active_state(struct irq_data *d, bool act)
->   bool gicv2_irq_is_active(struct irq_data *d);
-> 
->   that directly play with the state. Oh, and for GICv3 as well. And
->   whatever comes after. It means that KVM has to know exactly the type
->   of interrupt controller we're using (well, it already does), and call
->   the right stuff.
-> 
-> - I can add similar function to struct irq_chip:
->   void (*irq_set_state)(struct irq_data *d, void *data);
->   void (*irq_get_state)(struct irq_data *d, void *data);
-> 
->   and build a generic API on top of that. That's tempting, but I'm
->   really not keen on the "void *data" crap, as it means KVM has to
->   know the type of the opaque data anyway. Or we define what is the
->   state of an interrupt, and I'm afraid there is as many definitions
->   as there are interrupt controllers.
-> 
-> - The third possibility is that I go and duplicate parts of the two GIC
->   drivers into KVM just to be able to save/restore these bits. Please
->   pass the bucket around.
-> 
-> So far, I've prototyped the first option, but I'm seriously
-> questioning my own sanity. Any idea/opinion?
-> 
-KVM and the GIC driver are tightly bound anyhow, so is there anything
-particular horrible in the first approach?  (Besides the fact that we're
-exposing random bits of information to the entire kernel not intended to
-be used by anyone else than KVM for now).
-
-Second approach feels over-engineered to me, unless there are other
-needs or real use cases in the near term.
-
-The third option, just feels wrong, we'd have to do lookups in the DT
-again to get the base address of the GICC etc. right?
-
--Christoffer
+							Thanx, Paul
