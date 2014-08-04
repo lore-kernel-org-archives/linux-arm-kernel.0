@@ -1,64 +1,56 @@
-From: emilio@elopez.com.ar (=?UTF-8?q?Emilio=20L=C3=B3pez?=)
-Date: Mon,  4 Aug 2014 17:10:02 -0300
-Subject: [PATCH v3 8/8] ARM: sun7i: dt: enable DMA on SPI
-In-Reply-To: <1407183002-29420-1-git-send-email-emilio@elopez.com.ar>
-References: <1407183002-29420-1-git-send-email-emilio@elopez.com.ar>
-Message-ID: <1407183002-29420-9-git-send-email-emilio@elopez.com.ar>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Mon, 4 Aug 2014 21:17:12 +0100
+Subject: Building kernel for more than one SoC
+In-Reply-To: <lrdi48$ls1$1@ger.gmane.org>
+References: <lrdi48$ls1$1@ger.gmane.org>
+Message-ID: <20140804201712.GK30282@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-All of our SPI controllers support DMA transfers, so let's add the
-properties here so they can be used when it's best to do so.
+On Thu, Jul 31, 2014 at 01:59:36PM +0000, Grant Edwards wrote:
+> I'm told that it should be possible to build a kernel that will run on
+> two different SoC chips.  They're closely related (same ARM9 core,
+> many identical internal peripherals -- AT91SAM9G20 and 'G25), and
+> would likely have identical external hardware.
+> 
+> In order to handle the internal periphals that differ, it was
+> recommended that I use loadable modules to keep the kernel size small.
+> However, my root filesystem is in RAM, so I don't see how loadable
+> modules helps unless I remove all of the .ko files from the root
+> filesystem after the kernel has booted.
 
-Signed-off-by: Emilio L?pez <emilio@elopez.com.ar>
-Reviewed-by: Chen-Yu Tsai <wens@csie.org>
----
+I think whoever made that recommendation probably isn't aware of the
+direction that mainline kernels are heading.
 
-Changes from v2:
- * Collect tag from Chen-Yu
+Where we're going with mainline kernels is to have a set of drivers
+which work irrespective of the hardware you have.
 
- arch/arm/boot/dts/sun7i-a20.dtsi | 8 ++++++++
- 1 file changed, 8 insertions(+)
+We've actually had this policy for about the last decade - we've
+supported building the same family of SoCs into one single kernel
+(identified by their mach-* directory) and expecting that their
+drivers will cope with the differences between the SoCs at runtime.
+(Note that the CPU itself has never really come into it; we've had
+good abstractions for the CPU support since the late 90's, with the
+exception of a borderline between the ARMv5 and ARMv6 architectures.)
 
-diff --git a/arch/arm/boot/dts/sun7i-a20.dtsi b/arch/arm/boot/dts/sun7i-a20.dtsi
-index 510b5a8..ecdc873 100644
---- a/arch/arm/boot/dts/sun7i-a20.dtsi
-+++ b/arch/arm/boot/dts/sun7i-a20.dtsi
-@@ -437,6 +437,8 @@
- 			interrupts = <0 10 4>;
- 			clocks = <&ahb_gates 20>, <&spi0_clk>;
- 			clock-names = "ahb", "mod";
-+			dmas = <&dma 1 27>, <&dma 1 26>;
-+			dma-names = "rx", "tx";
- 			status = "disabled";
- 			#address-cells = <1>;
- 			#size-cells = <0>;
-@@ -448,6 +450,8 @@
- 			interrupts = <0 11 4>;
- 			clocks = <&ahb_gates 21>, <&spi1_clk>;
- 			clock-names = "ahb", "mod";
-+			dmas = <&dma 1 9>, <&dma 1 8>;
-+			dma-names = "rx", "tx";
- 			status = "disabled";
- 			#address-cells = <1>;
- 			#size-cells = <0>;
-@@ -543,6 +547,8 @@
- 			interrupts = <0 12 4>;
- 			clocks = <&ahb_gates 22>, <&spi2_clk>;
- 			clock-names = "ahb", "mod";
-+			dmas = <&dma 1 29>, <&dma 1 28>;
-+			dma-names = "rx", "tx";
- 			status = "disabled";
- 			#address-cells = <1>;
- 			#size-cells = <0>;
-@@ -582,6 +588,8 @@
- 			interrupts = <0 50 4>;
- 			clocks = <&ahb_gates 23>, <&spi3_clk>;
- 			clock-names = "ahb", "mod";
-+			dmas = <&dma 1 31>, <&dma 1 30>;
-+			dma-names = "rx", "tx";
- 			status = "disabled";
- 			#address-cells = <1>;
- 			#size-cells = <0>;
+Whether the Atmel code does that or not, I don't know, but it _should_
+do it.
+
+Over the last few years, we've been moving mainline towards even
+tighter integration, where it's possible to build completely
+dissimilar SoCs together, so ultimately we end up with: legacy kernels,
+one multi-platform ARMv5 and earlier kernel, and one multi-platform
+ARMv6 and later kernel.
+
+> It seems it would be simpler to just link in all required drivers for
+> both chips and discard the ones that aren't needed after kernel
+> initialization.
+
+Even better is to abstract the differences and have the same driver
+code deal with the different variants internally - the selection of
+which variant being controlled via the device tree "compatible"
+property, or another appropriate method.
+
 -- 
-2.0.4
+FTTC broadband for 0.8mile line: currently at 9.5Mbps down 400kbps up
+according to speedtest.net.
