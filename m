@@ -1,157 +1,50 @@
 From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Mon, 4 Aug 2014 21:52:06 +0200
-Subject: [PATCH 6/9] clk: sunxi: mod1 clock support
-In-Reply-To: <53DEB398.8010109@elopez.com.ar>
+Date: Mon, 4 Aug 2014 21:53:44 +0200
+Subject: [PATCH 7/9] ARM: sunxi: dt: Add PLL2 support
+In-Reply-To: <53DEB464.7050604@elopez.com.ar>
 References: <1406842092-25207-1-git-send-email-emilio@elopez.com.ar>
- <1406842092-25207-7-git-send-email-emilio@elopez.com.ar>
- <20140803124733.GW3952@lukather> <53DEB398.8010109@elopez.com.ar>
-Message-ID: <20140804195206.GI3952@lukather>
+ <1406842092-25207-8-git-send-email-emilio@elopez.com.ar>
+ <CAKON4OycHvkAkndNvH3vkaE0d7P5d4ZsGrYw8eM_Py6HUo06sg@mail.gmail.com>
+ <20140803125041.GX3952@lukather>
+ <CAGb2v66PEQvv7DWR_uyLqMSdZu6NQpwexF-mo29BOVFVak+XVQ@mail.gmail.com>
+ <53DEB464.7050604@elopez.com.ar>
+Message-ID: <20140804195344.GJ3952@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Aug 03, 2014 at 07:11:36PM -0300, Emilio L?pez wrote:
+On Sun, Aug 03, 2014 at 07:15:00PM -0300, Emilio L?pez wrote:
 > Hi,
 > 
-> El 03/08/14 a las 09:47, Maxime Ripard escibi?:
-> >On Thu, Jul 31, 2014 at 06:28:09PM -0300, Emilio L?pez wrote:
-> >>The module 1 type of clocks consist of a gate and a mux and are used on
-> >>the audio blocks to mux and gate the PLL2 outputs for AC97, IIS or
-> >>SPDIF. This commit adds support for them on the sunxi clock driver.
+> El 03/08/14 a las 12:55, Chen-Yu Tsai escibi?:
+> >On Sun, Aug 3, 2014 at 8:50 PM, Maxime Ripard
+> ><maxime.ripard@free-electrons.com> wrote:
+> >>On Thu, Jul 31, 2014 at 05:46:09PM -0400, jonsmirl at gmail.com wrote:
+> >>>Would it be better to name this "allwinner,sun4i-a10-pll2-clk" instead
+> >>>of "allwinner,sun4i-a10-b-pll2-clk"? By encoding the b in it everyone
+> >>>is going to wonder what to do on the 'c' revision which is the most
+> >>>common revision.
 > >>
-> >>Not-signed-off-by: Emilio L?pez <emilio@elopez.com.ar>
+> >>Not really, the way we works usually is that the compatible is the one
+> >>from the first SoC that implemented that IP. If the rev C has the same
+> >>IP than rev B, then we're using the rev B compatible.
+> >>
+> >>>
+> >>>The revision based rename would then be from
+> >>>"allwinner,sun4i-a10-pll2-clk" to "allwinner,sun4i-a10-a-pll2-clk".
+> >>
+> >>Though, I'd agree with you. We should have a single compatible in the
+> >>DT, a generic one, that would trigger the auto-detection, and might
+> >>change it to the rev A one, but the rev B doesn't make much sense.
 > >
-> >Why so?
-> >
-> >It looks quite good.
+> >I agree. The rev B would make people reading the DT wonder what happened
+> >to rev A.
 > 
-> Because I have not tested this with any actual mod1 clients. Once
-> Jon or Marcus report it's ok I'll be happy to s/Not-s/S/; same with
-> the DT bindings.
+> Would you like to see "allwinner,sun4i-a10-pll2-clk" on the DT then?
+> Should we document it as a magic property triggering an autodetect
+> on the clock binding document?
 
-Ok.
-
-> 
-> >>---
-> >>
-> >>Changes from RFC:
-> >>  * Document compatible used
-> >>
-> >>  Documentation/devicetree/bindings/clock/sunxi.txt |  1 +
-> >>  drivers/clk/sunxi/Makefile                        |  1 +
-> >>  drivers/clk/sunxi/clk-a10-mod1.c                  | 69 +++++++++++++++++++++++
-> >>  3 files changed, 71 insertions(+)
-> >>  create mode 100644 drivers/clk/sunxi/clk-a10-mod1.c
-> >>
-> >>diff --git a/Documentation/devicetree/bindings/clock/sunxi.txt b/Documentation/devicetree/bindings/clock/sunxi.txt
-> >>index d18b89b..b028ee2 100644
-> >>--- a/Documentation/devicetree/bindings/clock/sunxi.txt
-> >>+++ b/Documentation/devicetree/bindings/clock/sunxi.txt
-> >>@@ -50,6 +50,7 @@ Required properties:
-> >>  	"allwinner,sun8i-a23-apb2-gates-clk" - for the APB2 gates on A23
-> >>  	"allwinner,sun4i-a10-codec-clk" - for the codec clock on A10
-> >>  	"allwinner,sun4i-a10-mod0-clk" - for the module 0 family of clocks
-> >>+	"allwinner,sun4i-a10-mod1-clk" - for the module 1 family of clocks
-> >>  	"allwinner,sun7i-a20-out-clk" - for the external output clocks
-> >>  	"allwinner,sun7i-a20-gmac-clk" - for the GMAC clock module on A20/A31
-> >>  	"allwinner,sun4i-a10-usb-clk" - for usb gates + resets on A10 / A20
-> >>diff --git a/drivers/clk/sunxi/Makefile b/drivers/clk/sunxi/Makefile
-> >>index a7a96f8..75d113d 100644
-> >>--- a/drivers/clk/sunxi/Makefile
-> >>+++ b/drivers/clk/sunxi/Makefile
-> >>@@ -5,6 +5,7 @@
-> >>  obj-y += clk-sunxi.o clk-factors.o
-> >>  obj-y += clk-a10-codec.o
-> >>  obj-y += clk-a10-hosc.o
-> >>+obj-y += clk-a10-mod1.o
-> >>  obj-y += clk-a10-pll2.o
-> >>  obj-y += clk-a20-gmac.o
-> >>
-> >>diff --git a/drivers/clk/sunxi/clk-a10-mod1.c b/drivers/clk/sunxi/clk-a10-mod1.c
-> >>new file mode 100644
-> >>index 0000000..09afd54
-> >>--- /dev/null
-> >>+++ b/drivers/clk/sunxi/clk-a10-mod1.c
-> >>@@ -0,0 +1,69 @@
-> >>+/*
-> >>+ * Copyright 2014 Emilio L?pez
-> >>+ *
-> >>+ * Emilio L?pez <emilio@elopez.com.ar>
-> >>+ *
-> >>+ * This program is free software; you can redistribute it and/or modify
-> >>+ * it under the terms of the GNU General Public License as published by
-> >>+ * the Free Software Foundation; either version 2 of the License, or
-> >>+ * (at your option) any later version.
-> >>+ *
-> >>+ * This program is distributed in the hope that it will be useful,
-> >>+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
-> >>+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-> >>+ * GNU General Public License for more details.
-> >>+ */
-> >>+
-> >>+#include <linux/clk-provider.h>
-> >>+#include <linux/clkdev.h>
-> >>+#include <linux/of.h>
-> >>+#include <linux/of_address.h>
-> >>+
-> >>+static DEFINE_SPINLOCK(mod1_lock);
-> >>+
-> >>+#define SUN4I_MOD1_ENABLE	31
-> >>+#define SUN4I_MOD1_MUX		16
-> >>+#define SUN4I_MOD1_MUX_WIDTH	2
-> >>+#define SUN4I_MOD1_MAX_PARENTS	4
-> >>+
-> >>+static void __init sun4i_mod1_clk_setup(struct device_node *node)
-> >>+{
-> >>+	struct clk *clk;
-> >>+	struct clk_mux *mux;
-> >>+	struct clk_gate *gate;
-> >>+	const char *parents[4];
-> >>+	const char *clk_name = node->name;
-> >>+	void __iomem *reg;
-> >>+	int i = 0;
-> >>+
-> >>+	mux = kzalloc(sizeof(*mux), GFP_KERNEL);
-> >>+	gate = kzalloc(sizeof(*gate), GFP_KERNEL);
-> >>+	if (!mux || !gate) {
-> >>+		kfree(mux);
-> >>+		kfree(gate);
-> >>+		return;
-> >>+	}
-> >>+
-> >>+	of_property_read_string(node, "clock-output-names", &clk_name);
-> >>+	reg = of_iomap(node, 0);
-> >>+
-> >>+	while (i < SUN4I_MOD1_MAX_PARENTS &&
-> >>+	       (parents[i] = of_clk_get_parent_name(node, i)) != NULL)
-> >>+		i++;
-> >>+
-> >>+	gate->reg = reg;
-> >>+	gate->bit_idx = SUN4I_MOD1_ENABLE;
-> >>+	gate->lock = &mod1_lock;
-> >>+	mux->reg = reg;
-> >>+	mux->shift = SUN4I_MOD1_MUX;
-> >>+	mux->mask = BIT(SUN4I_MOD1_MUX_WIDTH) - 1;
-> >>+	mux->lock = &mod1_lock;
-> >>+
-> >>+	clk = clk_register_composite(NULL, clk_name, parents, i,
-> >>+				     &mux->hw, &clk_mux_ops,
-> >>+				     NULL, NULL,
-> >>+				     &gate->hw, &clk_gate_ops, 0);
-> 
-> We'll probably need SET_RATE_PARENT here as well
-> 
-> >>+	if (!IS_ERR(clk))
-> >>+		of_clk_add_provider(node, of_clk_src_simple_get, clk);
-> >>+}
-> >>+CLK_OF_DECLARE(sun4i_mod1, "allwinner,sun4i-a10-mod1-clk", sun4i_mod1_clk_setup);
-> >
-> >Why are you not using clk-sunxi for this? It has pretty much
-> >everything in place to do so already.
-> 
-> If this were to have a rate component we could reuse the factors
-> infrastructure, but it doesn't, as it's just a gate and a mux.
-
-Ah, yes, we have nothing that combines mux and gate. My bad :)
+Yes, and the rev-a one as really only to be used with a rev A SoC,
+with a statement saying that we strongly discourage it, I guess.
 
 Maxime
 
@@ -165,4 +58,4 @@ Name: signature.asc
 Type: application/pgp-signature
 Size: 819 bytes
 Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140804/cf72b97f/attachment.sig>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140804/57c4e425/attachment.sig>
