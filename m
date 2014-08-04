@@ -1,85 +1,73 @@
-From: hanjun.guo@linaro.org (Hanjun Guo)
-Date: Mon, 04 Aug 2014 17:56:29 +0800
-Subject: [PATCH 10/19] ARM64 / ACPI: Get the enable method for SMP
- initialization in ACPI way
-In-Reply-To: <53DA2110.8060000@linaro.org>
-References: <1406206825-15590-1-git-send-email-hanjun.guo@linaro.org>
- <1406206825-15590-11-git-send-email-hanjun.guo@linaro.org>
- <20140731065426.GA876@quad.lixom.net> <53DA2110.8060000@linaro.org>
-Message-ID: <53DF58CD.9000704@linaro.org>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Mon, 4 Aug 2014 10:58:14 +0100
+Subject: [PATCH 2/3] arm64: add helper functions to read I-cache attributes
+In-Reply-To: <1407140216-22747-2-git-send-email-ard.biesheuvel@linaro.org>
+References: <1407140216-22747-1-git-send-email-ard.biesheuvel@linaro.org>
+ <1407140216-22747-2-git-send-email-ard.biesheuvel@linaro.org>
+Message-ID: <20140804095814.GA3197@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Olof,
-
-On 2014-7-31 18:57, Hanjun Guo wrote:
-> On 2014-7-31 14:54, Olof Johansson wrote:
-[...]
->>> +static void __init acpi_smp_init_cpus(void)
->>> +{
->>> +	int cpu;
->>> +
->>> +	for_each_possible_cpu(cpu) {
->>> +		if (cpu_acpi_read_ops(cpu) != 0)
->>> +			continue;
->>> +
->>> +		cpu_ops[cpu]->cpu_init(NULL, cpu);
->>> +	}
->>> +}
->>> +
->>> +void __init smp_init_cpus(void)
->>> +{
->>> +	if (acpi_disabled)
->>> +		of_smp_init_cpus();
->>> +	else
->>> +		acpi_smp_init_cpus();
->>
->> I'm liking these deeply split code paths less and less every time I see
->> them. :(
->>
->> I would prefer to set up shared state in separate functions, but keep the
->> control flow the same. Right now you're splitting it completely.
->>
->> I.e. split data setup between the two, but do the loop calling cpu_init()
->> the same way. (Yes, that will require you to refactor the DT code path
->> a bit too...)
+On Mon, Aug 04, 2014 at 09:16:55AM +0100, Ard Biesheuvel wrote:
+> This adds helper functions and #defines to <asm/cachetype.h> to read the
+> line size and the number of sets from the level 1 instruction cache.
 > 
-> OK, I will dive into the code and figure out if I can fix that as you
-> suggested, thanks for your comments :)
+> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+> ---
+>  arch/arm64/include/asm/cachetype.h | 28 ++++++++++++++++++++++++++++
+>  1 file changed, 28 insertions(+)
+> 
+> diff --git a/arch/arm64/include/asm/cachetype.h b/arch/arm64/include/asm/cachetype.h
+> index 7a2e0762cb40..c0bf1fc3d6a0 100644
+> --- a/arch/arm64/include/asm/cachetype.h
+> +++ b/arch/arm64/include/asm/cachetype.h
+> @@ -39,6 +39,34 @@
+>  
+>  extern unsigned long __icache_flags;
+>  
+> +#define CCSIDR_EL1_LINESIZE_MASK	0x7
+> +#define CCSIDR_EL1_LINESIZE(x)		(x & CCSIDR_EL1_LINESIZE_MASK)
 
-After some investigation of the code, it seems that it is pretty hard
-to do so, the major gap to do that is DT needs the device node of CPU
-to init CPUs, but ACPI just needs the logical CPU number. In DT mode,
-it needs to search the DT and get the CPU device node to get its enable
-method, but in ACPI mode, it is a flag to indicate the CPU enable (boot)
-method.
+It's probably worth bracketing x in case these get used elsewhere.
 
-the code can be modified as below, but the logic is the same:
+> +#define CCSIDR_EL1_NUMSETS_SHIFT	13
+> +#define CCSIDR_EL1_NUMSETS_MASK		(0x7fff << CCSIDR_EL1_NUMSETS_SHIFT)
+> +#define CCSIDR_EL1_NUMSETS(x) \
+> +	((x & CCSIDR_EL1_NUMSETS_MASK) >> CCSIDR_EL1_NUMSETS_SHIFT)
+> +
+> +static inline __attribute_const__ u32 icache_get_ccsidr(void)
+> +{
+> +	u32 ccsidr;
+> +
+> +	/* Select L1 I-cache and read its size ID register */
+> +	asm("msr csselr_el1, %x1; isb; mrs %x0, ccsidr_el1"
+> +	    : "=r"(ccsidr) : "r"(0x1));
 
-diff --git a/arch/arm64/kernel/smp.c b/arch/arm64/kernel/smp.c
-index 40f38f4..71a625b 100644
---- a/arch/arm64/kernel/smp.c
-+++ b/arch/arm64/kernel/smp.c
-@@ -320,6 +320,17 @@ void __init smp_init_cpus(void)
-        unsigned int i, cpu = 1;
-        bool bootcpu_valid = false;
+Does GCC provide any guarantee about the upper bits in this case?
 
-+       if (!acpi_disabled) {
-+               for_each_possible_cpu(cpu) {
-+                       if (cpu_read_ops(NULL, cpu) != 0)
-+                               continue;
-+
-+                       cpu_ops[cpu]->cpu_init(NULL, cpu);
-+               }
-+
-+               return;
-+       }
-+
-        while ((dn = of_find_node_by_type(dn, "cpu"))) {
-                const u32 *cell;
-                u64 hwid;
+Can we not make both values u64 rather than forcing the use of x
+registers within the asm template?
 
-Does it make sense to you?
+Thanks,
+Mark.
 
-Thanks
-Hanjun
+> +	return ccsidr;
+> +}
+> +
+> +static inline int icache_get_linesize(void)
+> +{
+> +	return 16 << CCSIDR_EL1_LINESIZE(icache_get_ccsidr());
+> +}
+> +
+> +static inline int icache_get_numsets(void)
+> +{
+> +	return 1 + CCSIDR_EL1_NUMSETS(icache_get_ccsidr());
+> +}
+> +
+>  /*
+>   * Whilst the D-side always behaves as PIPT on AArch64, aliasing is
+>   * permitted in the I-cache.
+> -- 
+> 1.8.3.2
+> 
+> 
