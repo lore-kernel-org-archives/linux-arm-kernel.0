@@ -1,75 +1,141 @@
-From: ta.omasab@gmail.com (Thomas Abraham)
-Date: Mon, 4 Aug 2014 08:30:00 +0530
-Subject: [PATCH v9 3/6] ARM: dts: Exynos: add CPU OPP and regulator supply
- property
-In-Reply-To: <53DC5FC1.7060700@collabora.co.uk>
-References: <1406707663-16656-1-git-send-email-thomas.ab@samsung.com>
- <1406707663-16656-4-git-send-email-thomas.ab@samsung.com>
- <53DC5FC1.7060700@collabora.co.uk>
-Message-ID: <CAJuA9ajwHbEGBxTBGgqJrFZMPS30UacTBEn0Bth23rKk-wXPzg@mail.gmail.com>
+From: haojian.zhuang@linaro.org (Haojian Zhuang)
+Date: Mon,  4 Aug 2014 10:57:59 +0800
+Subject: [PATCH v16 0/9] enable HiP04 SoC
+Message-ID: <1407121088-4151-1-git-send-email-haojian.zhuang@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Javier,
+Changelog:
+v16:
+  * Create new hip04 interrupt controller driver.
+  * Drop both hip04_defconfig & multi_v7_lpae_defconfig. Use hisi_defconfig
+    & multi_v7_defconfig instead.
+  * Rename hi3xxx_defconfig to hisi_defconfig. Since we need follow the rule of
+    each vendor only using one defconfig.
+  * Fix parsing memory issue in FDT when 64-bit address is enabled without
+    CONFIG_ARM_LPAE.
+  * Drop bootwrapper parameters from DTS file. Use command line instead.
+  * Declare clock node in DTS file since all these clocks are only fixed rate
+    clocks.
+  * Drop vgic patch.
 
-On Sat, Aug 2, 2014 at 9:19 AM, Javier Martinez Canillas
-<javier.martinez@collabora.co.uk> wrote:
-> Hello Thomas,
->
-> On 07/30/2014 10:07 AM, Thomas Abraham wrote:
->> For Exynos 4210/5250/5420 based platforms, add CPU operating points and CPU
->> regulator supply properties for migrating from Exynos specific cpufreq driver
->> to using generic cpufreq drivers.
->>
->> Cc: Kukjin Kim <kgene.kim@samsung.com>
->> Cc: Doug Anderson <dianders@chromium.org>
->> Cc: Javier Martinez Canillas <javier.martinez@collabora.co.uk>
->> Cc: Andreas Faerber <afaerber@suse.de>
->> Cc: Sachin Kamat <sachin.kamat@linaro.org>
->> Signed-off-by: Thomas Abraham <thomas.ab@samsung.com>
->> ---
->>  arch/arm/boot/dts/exynos4210-origen.dts         |    4 +++
->>  arch/arm/boot/dts/exynos4210-trats.dts          |    4 +++
->>  arch/arm/boot/dts/exynos4210-universal_c210.dts |    4 +++
->>  arch/arm/boot/dts/exynos4210.dtsi               |   14 ++++++++-
->>  arch/arm/boot/dts/exynos5250-arndale.dts        |    4 +++
->>  arch/arm/boot/dts/exynos5250-smdk5250.dts       |    4 +++
->>  arch/arm/boot/dts/exynos5250-snow.dts           |    4 +++
->>  arch/arm/boot/dts/exynos5250.dtsi               |   25 ++++++++++++++-
->>  arch/arm/boot/dts/exynos5420.dtsi               |   38 +++++++++++++++++++++++
->>  9 files changed, 99 insertions(+), 2 deletions(-)
->>
->
-> Tested the series on a Exynos5420 based Peach Pit Chromebook by doing the
-> following for CPU0-3:
->
-> 1) Verified that the big.LITTLE CPUFreq (arm-big-little) driver was reported as
-> used in /sys/devices/system/cpu/cpu*/cpufreq/scaling_driver.
->
-> 2) Set all available governors (conservative, ondemand, userspace, powersave and
-> performance).
->
-> 3) Confirmed that cpuinfo_cur_freq and scaling_cur_freq values were fixed or
-> changing according to the selected governor policy.
->
-> 4) Verified that the statistics in /sys/devices/system/cpu/cpu*/cpufreq/stats/*
-> were filled.
->
-> Everything is working correctly so please feel free to add for the whole series:
->
-> Tested-by: Javier Martinez Canillas <javier.martinez@collabora.co.uk>
+v15:
+  * Add p04 debug uart back.
+  * Refresh since hix5hd2 code updated.
 
-Thank you for using this series and the details of what has worked.
-This is very helpful.
+v14:
+  * Mount function pointers to different implementation on standard
+    GICv2 and Hisilicon HiP04 GIC.
 
-Regards,
-Thomas.
+v13:
+  * Restore power down operation in MCPM.
+  * Fix disabling snoop filter issue in MCPM.
 
->
-> Best regards,
-> Javier
->
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-samsung-soc" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+v12:
+  * Use wfi as power down state in MCPM.
+  * Remove wait_for_powerdown() in MCPM because wfi is used now.
+
+v11:
+  * Fix the protection issue on mcpm power down.
+  * Clean assembly code in mcpm power up.
+
+v10:
+  * Move snoop filter code to be executed on secondary cores. And change
+    it to assembly code since MMU isn't enabled at that time.
+  * Rebase irq gic patch on latest gic patch.
+  * Use global variable in irq gic patch.
+  * Use global variable in vgic patch.
+  * Drop debug uart patch since it's in another patch set.
+  * Remove some ARCHs from multi_v7_lpae_defconfig.
+
+v9:
+  * Remove delay workaround in mcpm implementation.
+  * Clean in gic.
+  * Rename vgic_cpu_nr_lr to vgic_cpu_hw_cfg in vgic driver.
+  * Always use high word of vgic_cpu_hw_cfg for GICH_APR offset. So the
+    implementation of arm64 is also updated.
+  * Drop "irq: gic: use mask field in GICC_IAR" patch since it's merged.
+
+v7:
+  * Remove hip04_smp_init_ops().
+  * Remove CONFIG_ARCH_HIP04 in hisilicn.c since hip04_smp_init_ops() is
+    removed.
+
+v6:
+  * Split HiP04 enabling patch into patches on document, mcpm & hiP04.
+  * Move reset operation in HiP04 MCPM implementation.
+  * Remove ARCH_MULTI_V7_NONLPAE & ARCH_MULTI_V7_LPAE according to olof's
+    comment.
+
+v5:
+  * Add ARCH_MULTI_V7_NONLPAE to avoid change too much things in Kconfig.
+  * Use memreserve in DTS.
+  * Remove L2 reset operation in mcpm implementation.
+  * Re-use nr_lr field to cover HIP04 GICH_APR implementation.
+  * Add more comments.
+
+v4:
+  * Add multi_v7_lpae_defconfig.
+  * Select CONFIG_ARCH_MULTI_V7_LPAE if CONFIG_ARCH_MULTI_V7 is selected.
+  * Only ARMADA_XP is ARCH_MULTI_V7_LPAE, other ARMADA chips are ARCH_MULTI_V7.
+  * Remove gich_lr0 variable since we can calculate offset of GICH_LR0 from
+    GICH_APR.
+  * Cleanup GIC driver to support HiP04 GIC.
+  * Cleanup HiP04 mcpm implementation.
+
+v3:
+  * Replace CONFIG_ARCH_MULTI_V7 by CONFIG_ARCH_MULTI_V7_LPAE in some SoC.
+  * Update MCPM code based on Dave's patch.
+  * Remove MCPM node in DTS file. Use sysctrl & fabric node instead.
+  * Move hardcoding on bootwrapper into DTS file.
+  * Append the CONFIG_MCPM_QUAD_CLUSTER for HiP04.
+  * Fix the return value from gic_get_cpumask() if it's used in standard gic.
+  * Add the vgic support on HiP04 GIC.
+  * Add virtualization support in HiP04 defconfig.
+
+v2:
+  * Append ARCH_MULTI_V7_LPAE configuration. Define ARCH_MULTI_V7 to only
+    support non-LPAE platform.
+  * Append document of DT supporting.
+  * Append ARCH_HISI in hi3xxx_defconfig.
+  * Enable errata 798181 for HiP04 SoC.
+  * Add PMU support.
+
+Haojian Zhuang (9):
+  ARM: mcpm: support 4 clusters
+  ARM: hisi: enable MCPM implementation
+  ARM: hisi: enable HiP04
+  document: dt: add the binding on HiP04
+  ARM: dts: add hip04 dts
+  ARM: config: enable hisilicon hip04
+  ARM: debug: add HiP04 debug uart
+  irq: enable hip04 irq chip
+  of: fdt: fix memory address be truncated
+
+ .../bindings/arm/hisilicon/hisilicon.txt           |  12 +
+ arch/arm/Kconfig                                   |   9 +
+ arch/arm/Kconfig.debug                             |  10 +
+ arch/arm/boot/dts/Makefile                         |   1 +
+ arch/arm/boot/dts/hip04-d01.dts                    |  32 ++
+ arch/arm/boot/dts/hip04.dtsi                       | 262 +++++++++++++
+ arch/arm/configs/hi3xxx_defconfig                  |  58 ---
+ arch/arm/configs/hisi_defconfig                    |  72 ++++
+ arch/arm/configs/multi_v7_defconfig                |   2 +
+ arch/arm/include/asm/mcpm.h                        |   5 +
+ arch/arm/mach-hisi/Kconfig                         |   9 +
+ arch/arm/mach-hisi/Makefile                        |   1 +
+ arch/arm/mach-hisi/hisilicon.c                     |   9 +
+ arch/arm/mach-hisi/platmcpm.c                      | 374 ++++++++++++++++++
+ drivers/irqchip/Makefile                           |   1 +
+ drivers/irqchip/irq-hip04.c                        | 429 +++++++++++++++++++++
+ drivers/of/fdt.c                                   |  10 +
+ 17 files changed, 1238 insertions(+), 58 deletions(-)
+ create mode 100644 arch/arm/boot/dts/hip04-d01.dts
+ create mode 100644 arch/arm/boot/dts/hip04.dtsi
+ delete mode 100644 arch/arm/configs/hi3xxx_defconfig
+ create mode 100644 arch/arm/configs/hisi_defconfig
+ create mode 100644 arch/arm/mach-hisi/platmcpm.c
+ create mode 100644 drivers/irqchip/irq-hip04.c
+
+-- 
+1.9.1
