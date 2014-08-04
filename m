@@ -1,77 +1,136 @@
 From: christoffer.dall@linaro.org (Christoffer Dall)
-Date: Mon,  4 Aug 2014 10:46:22 +0200
-Subject: [GIT PULL 05/51] ARM: KVM: user_mem_abort: support stage 2 MMIO page
- mapping
+Date: Mon,  4 Aug 2014 10:46:21 +0200
+Subject: [GIT PULL 04/51] ARM: KVM: Unmap IPA on memslot delete/move
 In-Reply-To: <1407142028-31105-1-git-send-email-christoffer.dall@linaro.org>
 References: <1407142028-31105-1-git-send-email-christoffer.dall@linaro.org>
-Message-ID: <1407142028-31105-6-git-send-email-christoffer.dall@linaro.org>
+Message-ID: <1407142028-31105-5-git-send-email-christoffer.dall@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Kim Phillips <kim.phillips@linaro.org>
+From: Eric Auger <eric.auger@linaro.org>
 
-A userspace process can map device MMIO memory via VFIO or /dev/mem,
-e.g., for platform device passthrough support in QEMU.
+Currently when a KVM region is deleted or moved after
+KVM_SET_USER_MEMORY_REGION ioctl, the corresponding
+intermediate physical memory is not unmapped.
 
-During early development, we found the PAGE_S2 memory type being used
-for MMIO mappings.  This patch corrects that by using the more strongly
-ordered memory type for device MMIO mappings: PAGE_S2_DEVICE.
+This patch corrects this and unmaps the region's IPA range
+in kvm_arch_commit_memory_region using unmap_stage2_range.
 
-Signed-off-by: Kim Phillips <kim.phillips@linaro.org>
-Acked-by: Christoffer Dall <christoffer.dall@linaro.org>
-Acked-by: Will Deacon <will.deacon@arm.com>
-Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+Signed-off-by: Eric Auger <eric.auger@linaro.org>
+Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
 ---
- arch/arm/kvm/mmu.c | 11 ++++++++---
- 1 file changed, 8 insertions(+), 3 deletions(-)
+ arch/arm/kvm/arm.c | 37 -------------------------------------
+ arch/arm/kvm/mmu.c | 46 ++++++++++++++++++++++++++++++++++++++++++++++
+ 2 files changed, 46 insertions(+), 37 deletions(-)
 
+diff --git a/arch/arm/kvm/arm.c b/arch/arm/kvm/arm.c
+index 3c82b37..d7424ef 100644
+--- a/arch/arm/kvm/arm.c
++++ b/arch/arm/kvm/arm.c
+@@ -155,16 +155,6 @@ int kvm_arch_vcpu_fault(struct kvm_vcpu *vcpu, struct vm_fault *vmf)
+ 	return VM_FAULT_SIGBUS;
+ }
+ 
+-void kvm_arch_free_memslot(struct kvm *kvm, struct kvm_memory_slot *free,
+-			   struct kvm_memory_slot *dont)
+-{
+-}
+-
+-int kvm_arch_create_memslot(struct kvm *kvm, struct kvm_memory_slot *slot,
+-			    unsigned long npages)
+-{
+-	return 0;
+-}
+ 
+ /**
+  * kvm_arch_destroy_vm - destroy the VM data structure
+@@ -225,33 +215,6 @@ long kvm_arch_dev_ioctl(struct file *filp,
+ 	return -EINVAL;
+ }
+ 
+-void kvm_arch_memslots_updated(struct kvm *kvm)
+-{
+-}
+-
+-int kvm_arch_prepare_memory_region(struct kvm *kvm,
+-				   struct kvm_memory_slot *memslot,
+-				   struct kvm_userspace_memory_region *mem,
+-				   enum kvm_mr_change change)
+-{
+-	return 0;
+-}
+-
+-void kvm_arch_commit_memory_region(struct kvm *kvm,
+-				   struct kvm_userspace_memory_region *mem,
+-				   const struct kvm_memory_slot *old,
+-				   enum kvm_mr_change change)
+-{
+-}
+-
+-void kvm_arch_flush_shadow_all(struct kvm *kvm)
+-{
+-}
+-
+-void kvm_arch_flush_shadow_memslot(struct kvm *kvm,
+-				   struct kvm_memory_slot *slot)
+-{
+-}
+ 
+ struct kvm_vcpu *kvm_arch_vcpu_create(struct kvm *kvm, unsigned int id)
+ {
 diff --git a/arch/arm/kvm/mmu.c b/arch/arm/kvm/mmu.c
-index b2a708b..16e7994 100644
+index 2336061..b2a708b 100644
 --- a/arch/arm/kvm/mmu.c
 +++ b/arch/arm/kvm/mmu.c
-@@ -759,6 +759,7 @@ static int user_mem_abort(struct kvm_vcpu *vcpu, phys_addr_t fault_ipa,
- 	struct kvm_mmu_memory_cache *memcache = &vcpu->arch.mmu_page_cache;
- 	struct vm_area_struct *vma;
- 	pfn_t pfn;
-+	pgprot_t mem_type = PAGE_S2;
- 
- 	write_fault = kvm_is_write_fault(kvm_vcpu_get_hsr(vcpu));
- 	if (fault_status == FSC_PERM && !write_fault) {
-@@ -809,6 +810,9 @@ static int user_mem_abort(struct kvm_vcpu *vcpu, phys_addr_t fault_ipa,
- 	if (is_error_pfn(pfn))
- 		return -EFAULT;
- 
-+	if (kvm_is_mmio_pfn(pfn))
-+		mem_type = PAGE_S2_DEVICE;
+@@ -1111,3 +1111,49 @@ out:
+ 	free_hyp_pgds();
+ 	return err;
+ }
 +
- 	spin_lock(&kvm->mmu_lock);
- 	if (mmu_notifier_retry(kvm, mmu_seq))
- 		goto out_unlock;
-@@ -816,7 +820,7 @@ static int user_mem_abort(struct kvm_vcpu *vcpu, phys_addr_t fault_ipa,
- 		hugetlb = transparent_hugepage_adjust(&pfn, &fault_ipa);
- 
- 	if (hugetlb) {
--		pmd_t new_pmd = pfn_pmd(pfn, PAGE_S2);
-+		pmd_t new_pmd = pfn_pmd(pfn, mem_type);
- 		new_pmd = pmd_mkhuge(new_pmd);
- 		if (writable) {
- 			kvm_set_s2pmd_writable(&new_pmd);
-@@ -825,13 +829,14 @@ static int user_mem_abort(struct kvm_vcpu *vcpu, phys_addr_t fault_ipa,
- 		coherent_cache_guest_page(vcpu, hva & PMD_MASK, PMD_SIZE);
- 		ret = stage2_set_pmd_huge(kvm, memcache, fault_ipa, &new_pmd);
- 	} else {
--		pte_t new_pte = pfn_pte(pfn, PAGE_S2);
-+		pte_t new_pte = pfn_pte(pfn, mem_type);
- 		if (writable) {
- 			kvm_set_s2pte_writable(&new_pte);
- 			kvm_set_pfn_dirty(pfn);
- 		}
- 		coherent_cache_guest_page(vcpu, hva, PAGE_SIZE);
--		ret = stage2_set_pte(kvm, memcache, fault_ipa, &new_pte, false);
-+		ret = stage2_set_pte(kvm, memcache, fault_ipa, &new_pte,
-+				     mem_type == PAGE_S2_DEVICE);
- 	}
- 
- 
++void kvm_arch_commit_memory_region(struct kvm *kvm,
++				   struct kvm_userspace_memory_region *mem,
++				   const struct kvm_memory_slot *old,
++				   enum kvm_mr_change change)
++{
++	gpa_t gpa = old->base_gfn << PAGE_SHIFT;
++	phys_addr_t size = old->npages << PAGE_SHIFT;
++	if (change == KVM_MR_DELETE || change == KVM_MR_MOVE) {
++		spin_lock(&kvm->mmu_lock);
++		unmap_stage2_range(kvm, gpa, size);
++		spin_unlock(&kvm->mmu_lock);
++	}
++}
++
++int kvm_arch_prepare_memory_region(struct kvm *kvm,
++				   struct kvm_memory_slot *memslot,
++				   struct kvm_userspace_memory_region *mem,
++				   enum kvm_mr_change change)
++{
++	return 0;
++}
++
++void kvm_arch_free_memslot(struct kvm *kvm, struct kvm_memory_slot *free,
++			   struct kvm_memory_slot *dont)
++{
++}
++
++int kvm_arch_create_memslot(struct kvm *kvm, struct kvm_memory_slot *slot,
++			    unsigned long npages)
++{
++	return 0;
++}
++
++void kvm_arch_memslots_updated(struct kvm *kvm)
++{
++}
++
++void kvm_arch_flush_shadow_all(struct kvm *kvm)
++{
++}
++
++void kvm_arch_flush_shadow_memslot(struct kvm *kvm,
++				   struct kvm_memory_slot *slot)
++{
++}
 -- 
 2.0.0
