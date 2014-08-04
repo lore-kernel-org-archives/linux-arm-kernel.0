@@ -1,150 +1,138 @@
-From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
-Date: Tue, 05 Aug 2014 01:12:18 +0200
-Subject: DMA engine API issue
-In-Reply-To: <20140804183225.GJ30282@n2100.arm.linux.org.uk>
-References: <1406032431-3807-1-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
- <53DFCB01.5050703@metafoo.de> <20140804183225.GJ30282@n2100.arm.linux.org.uk>
-Message-ID: <2551209.TdCRpqdDzh@avalon>
+From: nicolas.pitre@linaro.org (Nicolas Pitre)
+Date: Mon, 4 Aug 2014 19:20:25 -0400 (EDT)
+Subject: [PATCH] irqchip: gic: Allow gic_arch_extn hooks to call into
+ scheduler
+In-Reply-To: <1407191616-31829-1-git-send-email-sboyd@codeaurora.org>
+References: <1407191616-31829-1-git-send-email-sboyd@codeaurora.org>
+Message-ID: <alpine.LFD.2.11.1408041858570.6061@knanqh.ubzr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Russell,
+On Mon, 4 Aug 2014, Stephen Boyd wrote:
 
-On Monday 04 August 2014 19:32:25 Russell King - ARM Linux wrote:
-> On Mon, Aug 04, 2014 at 08:03:45PM +0200, Lars-Peter Clausen wrote:
-> > If the hardware has scatter gather support it allows the driver to chain
-> > the descriptors before submitting them, which reduces the latency between
-> > the transfers as well as the IO over overhead.
+> Commit 1a6b69b6548c (ARM: gic: add CPU migration support,
+> 2012-04-12) introduced an acquisition of the irq_controller_lock
+> in gic_raise_softirq() which can lead to a spinlock recursion if
+> the gic_arch_extn hooks call into the scheduler (via complete()
+> or wake_up(), etc.). This happens because gic_arch_extn hooks are
+> normally called with the irq_controller_lock held and calling
+> into the scheduler may cause us to call smp_send_reschedule()
+> which will grab the irq_controller_lock again. Here's an example
+> from a vendor kernel (note that the gic_arch_extn hook code here
+> isn't actually in mainline):
 > 
-> While partially true, that's not the full story...
+> BUG: spinlock recursion on CPU#0, swapper/0/1
+>  lock: irq_controller_lock+0x0/0x18, .magic: dead4ead, .owner: sw
+> er_cpu: 0
+> CPU: 0 PID: 1 Comm: swapper/0 Not tainted 3.14.10-00430-g3d433c4e
 > 
-> BTW, you're talking about stuff in DMA engine not being clear, but you're
-> using confusing terminology.  Descriptors vs transactions.  The prepare
-> functions return a transaction.  Descriptors are the hardware data
-> structures which describe the transaction.  I'll take what you're talking
-> about above as "chain the previous transaction descriptors to the next
-> transaction descriptors".
-
-Well, the prep_* functions return a struct dma_async_tx_descriptor, documented 
-as an "async transaction descriptor".
-
-There are several types of descriptors, transactions and transfers involved, 
-with different names depending on where you look at.
-
-- At the highest level, we have the DMA engine representation of a transaction 
-in the form of a struct dma_async_tx_descriptor (even this is slightly 
-misleading, as tx is a common abbreviation of transmit or transmission, but 
-not of transaction).
-
-- One level lower, when the high level transaction targets non contiguous 
-memory (from the device point of view) the transaction is split into 
-contiguous chunks. The device might be able to execute a list (or table, 
-depending of the implementation) of chunks on its own without requiring 
-software intervention. If it isn't the driver will need to submit the next 
-chunk in the completion interrupt of the previous chunk. Even when the device 
-supports executing multiple chunks on its own, it might be limited in the 
-number of chunks it can chain, requiring software intervention to handle one 
-transaction descriptor.
-
-- At the lowest level, the hardware will perform the transfer by repeating 
-transfer cycles, reading a data unit from the source and writing to the 
-destination. When the source or destination supports it, the read and/or write 
-operations can also be grouped in bursts.
-
-If we want to lower the confusion we should decide on names for those 
-different levels and stick to them.
-
-The highest level unit is called a transaction by (at least some parts of) the 
-API, the name sounds good enough to me. "Transaction" could thus refer to that 
-operation, and "transaction descriptor" to the struct dma_async_tx_descriptor 
-instance.
-
-We could then say that a transaction is split into transfers, each of them 
-targeting a contiguous piece of memory of both the source and the destination, 
-and that transfers are split into transfer cycles, each of them transferring 
-one data unit or element. I'm also open to other proposals (including using 
-the name "chunk" for one of the elements).
-
-> > The flaw with the current implementation is that there is only one global
-> > chain per channel instead of e.g. having the possibility to build up a
-> > chain in a driver and then submit and start the chain.
-
-Well, that's not completely true, the API supports scatterlists, so you could 
-create a single transaction descriptor that spans several unrelated transfers 
-(as long as they can use the same channel, for instance targeting the same 
-device for slave transactions).
-
-> > Some drivers have virtual channels where each channel basically acts as
-> > the chain and once issue pending is called it is the chain is mapped to a
-> > real channel which then executes it.
+> Call trace:
+> [<ffffffc000087e1c>] dump_backtrace+0x0/0x140
+> [<ffffffc000087f6c>] show_stack+0x10/0x1c
+> [<ffffffc00064732c>] dump_stack+0x74/0xc4
+> [<ffffffc0006446c0>] spin_dump+0x78/0x88
+> [<ffffffc0006446f4>] spin_bug+0x24/0x34
+> [<ffffffc0000d47d0>] do_raw_spin_lock+0x58/0x148
+> [<ffffffc00064d398>] _raw_spin_lock_irqsave+0x24/0x38
+> [<ffffffc0002c9d7c>] gic_raise_softirq+0x2c/0xbc
+> [<ffffffc00008daa4>] smp_send_reschedule+0x34/0x40
+> [<ffffffc0000c1e94>] try_to_wake_up+0x224/0x288
+> [<ffffffc0000c1f4c>] default_wake_function+0xc/0x18
+> [<ffffffc0000ceef0>] __wake_up_common+0x50/0x8c
+> [<ffffffc0000cef3c>] __wake_up_locked+0x10/0x1c
+> [<ffffffc0000cf734>] complete+0x3c/0x5c
+> [<ffffffc0002f0e78>] msm_mpm_enable_irq_exclusive+0x1b8/0x1c8
+> [<ffffffc0002f0f58>] __msm_mpm_enable_irq+0x4c/0x7c
+> [<ffffffc0002f0f94>] msm_mpm_enable_irq+0xc/0x18
+> [<ffffffc0002c9bb0>] gic_unmask_irq+0x40/0x7c
+> [<ffffffc0000de5f4>] irq_enable+0x2c/0x48
+> [<ffffffc0000de65c>] irq_startup+0x4c/0x74
+> [<ffffffc0000dd2fc>] __setup_irq+0x264/0x3f0
+> [<ffffffc0000dd5e0>] request_threaded_irq+0xcc/0x11c
+> [<ffffffc0000df254>] devm_request_threaded_irq+0x68/0xb4
+> [<ffffffc000471520>] msm_iommu_ctx_probe+0x124/0x2d4
+> [<ffffffc000337374>] platform_drv_probe+0x20/0x54
+> [<ffffffc00033598c>] driver_probe_device+0x158/0x340
+> [<ffffffc000335c20>] __driver_attach+0x60/0x90
+> [<ffffffc000333c9c>] bus_for_each_dev+0x6c/0x8c
+> [<ffffffc000335304>] driver_attach+0x1c/0x28
+> [<ffffffc000334f14>] bus_add_driver+0x120/0x204
+> [<ffffffc0003362e4>] driver_register+0xbc/0x10c
+> [<ffffffc000337348>] __platform_driver_register+0x5c/0x68
+> [<ffffffc00094c478>] msm_iommu_driver_init+0x54/0x7c
+> [<ffffffc0000813ec>] do_one_initcall+0xa4/0x130
+> [<ffffffc00091d928>] kernel_init_freeable+0x138/0x1dc
+> [<ffffffc000642578>] kernel_init+0xc/0xd4
 > 
-> Most DMA engines are unable to program anything except the parameters for
-> the next stage of the transfer.  In order to switch between "channels",
-> many DMA engine implementations need the help of the CPU to reprogram the
-> physical channel configuration.  Chaining two different channels which
-> may ultimately end up on the same physical channel would be a bug in that
-> case.
-
-I'm mostly familiar with DMA engines designed for slave transfers. The ones 
-I've seen have channels that are programmed and run independently, usually 
-with some logic to arbitrate bus access. When they support executing lists or 
-arrays of transfers the hardware transfer descriptors include the source and 
-destination addresses and the number of elements to be transfered. The 
-identifier of the slave device (basically the DMA request line to which the 
-slave is connected) is constant across all chained transfers.
-
-I'm not sure what you mean by "switching between channels". Could you please 
-explain that ?
-
-> Where the real flaw exists is the way that a lot of people write their
-> DMA engine drivers - in particular how they deal with the end of a
-> transfer.
+> We really just want to synchronize the sending of an SGI with the
+> update of the gic_cpu_map[], so introduce a new SGI lock that we
+> can use to synchronize the two code paths.
 > 
-> Many driver implementations receive an interrupt from the DMA controller,
-> and either queue a tasklet, or they check the existing transfer, mark it
-> as completed in some way, and queue a tasklet.
+> Cc: Nicolas Pitre <nico@linaro.org>
+> Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
+> ---
+>  drivers/irqchip/irq-gic.c | 8 ++++++--
+>  1 file changed, 6 insertions(+), 2 deletions(-)
 > 
-> When the tasklet runs, they then look to see if there's another transfer
-> which they can start, and they then start it.
+> diff --git a/drivers/irqchip/irq-gic.c b/drivers/irqchip/irq-gic.c
+> index 7c131cf7cc13..824c1e2ac403 100644
+> --- a/drivers/irqchip/irq-gic.c
+> +++ b/drivers/irqchip/irq-gic.c
+> @@ -72,6 +72,8 @@ struct gic_chip_data {
+>  };
+>  
+>  static DEFINE_RAW_SPINLOCK(irq_controller_lock);
+> +/* Synchronize switching CPU interface and sending SGIs */
+> +static DEFINE_RAW_SPINLOCK(gic_sgi_lock);
+
+I'd suggest moving this below gic_cpu_map[] definition for the comment 
+block right above it to also apply to this lock.
+
+>  
+>  /*
+>   * The GIC mapping of CPU interfaces does not necessarily match
+> @@ -658,7 +660,7 @@ static void gic_raise_softirq(const struct cpumask *mask, unsigned int irq)
+>  	int cpu;
+>  	unsigned long flags, map = 0;
+>  
+> -	raw_spin_lock_irqsave(&irq_controller_lock, flags);
+> +	raw_spin_lock_irqsave(&gic_sgi_lock, flags);
+>  
+>  	/* Convert our logical CPU mask into a physical one. */
+>  	for_each_cpu(cpu, mask)
+> @@ -673,7 +675,7 @@ static void gic_raise_softirq(const struct cpumask *mask, unsigned int irq)
+>  	/* this always happens on GIC0 */
+>  	writel_relaxed(map << 16 | irq, gic_data_dist_base(&gic_data[0]) + GIC_DIST_SOFTINT);
+>  
+> -	raw_spin_unlock_irqrestore(&irq_controller_lock, flags);
+> +	raw_spin_unlock_irqrestore(&gic_sgi_lock, flags);
+>  }
+>  #endif
+>  
+> @@ -742,6 +744,7 @@ void gic_migrate_target(unsigned int new_cpu_id)
+>  	cur_target_mask = 0x01010101 << cur_cpu_id;
+>  	ror_val = (cur_cpu_id - new_cpu_id) & 31;
+>  
+> +	raw_spin_lock(&gic_sgi_lock);
+>  	raw_spin_lock(&irq_controller_lock);
+
+According to your call trace, you would now take irq_controller_lock and 
+then gic_sgi_lock.  Here you're doing it in the opposite order with an 
+AB-BA deadlock potential.  I'd suggest reversing them here.
+
+
+>  
+>  	/* Update the target interface for this logical CPU */
+> @@ -763,6 +766,7 @@ void gic_migrate_target(unsigned int new_cpu_id)
+>  	}
+>  
+>  	raw_spin_unlock(&irq_controller_lock);
+> +	raw_spin_unlock(&gic_sgi_lock);
+>  
+>  	/*
+>  	 * Now let's migrate and clear any potential SGIs that might be
+> -- 
+> The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
+> hosted by The Linux Foundation
 > 
-> That is horribly inefficient - it is much better to do all the DMA
-> manipulation in IRQ context.  So, when the channel completes the
-> existing transfer, you move the transaction to the queue of completed
-> transfers and queue the tasklet, check whether there's a transaction for
-> the same channel pending, and if so, start it immediately.
 > 
-> This means that your inter-transfer gap is reduced down from the
-> interrupt latency plus tasklet latency, to just the interrupt latency.
-
-I totally agree. This should be documented to avoid this kind of mistake in 
-the future. Maxime, if you can find time for it, could you add this to the 
-next version of your documentation patch ?
-
-> Controllers such as OMAP (if their hardware scatter chains were used)
-> do have the ability to reprogram the entire channel configuration from
-> an appropriate transaction, and so /could/ start the next transfer
-> entirely automatically - but I never added support for the hardware
-> scatterlists as I have been told that TI measurements indicated that
-> it did not gain any performance to use them.  Had this been implemented,
-> it would mean that OMAP would only need to issue an interrupt to notify
-> completion of a transfer (so the driver would only have to work out
-> how many dma transactions had been completed.)
-> 
-> In this case, it is important that we do batch up the entries (since
-> an already in progress descriptor should not be modified), but I
-> suspect in the case of slave DMA, it is rarely the case that there
-> is more than one or two descriptors queued at any moment.
-
-I agree, in most cases there's only one or a few transaction descriptors 
-queued for slave DMA. There could then be a larger number of hardware transfer 
-descriptors to represent one transaction descriptor, but those would have been 
-created by the DMA engine driver from a single transaction descriptor, so 
-there would be no problem chaining the transfers.
-
-How about the memcpy (non-slave) DMA ? Do client drivers submit lots of small 
-DMA transactions that should be chained for optimal performances ?
-
--- 
-Regards,
-
-Laurent Pinchart
