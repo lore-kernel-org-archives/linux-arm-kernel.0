@@ -1,33 +1,28 @@
-From: heiko@sntech.de (Heiko =?ISO-8859-1?Q?St=FCbner?=)
-Date: Mon, 04 Aug 2014 00:18:40 +0200
-Subject: io-domain voltages as regulators?
-Message-ID: <3923586.SsVg941346@diego>
+From: hans@hanshq.net (Hans Wennborg)
+Date: Sun,  3 Aug 2014 17:19:01 -0700
+Subject: [PATCH 05/19] media: s5p-mfs: fix %d confusingly prefixed with 0x in
+ format string
+Message-ID: <1407111541-14662-1-git-send-email-hans@hanshq.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Mark, Linus,
+Signed-off-by: Hans Wennborg <hans@hanshq.net>
+---
+ drivers/media/platform/s5p-mfc/s5p_mfc_opr_v6.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-I'd like to clarify what the appropriate way to handle pin output voltages is. 
-On the Rockchip SoCs the voltage for some groups of pins can be set between 
-3.3V and 1.8V ... like the MMC/SD pins who need this to support UHS mode 
-cards.
-
-In [0] when talking about something different, Linus Walleij described a 
-similar case as
-
-"I think we need to have a discussion with Mark Brown on how to
-handle this.
-We have previously had the case of MMC/SD level-shifters, where
-a certain setting gives a certain level of signals out, and another setting
-gives another level. Like two discrete levels.
-So we modeled that as a regulator provider inside the pin control
-driver eventually, see sh-pfc/pfc-sh73a0.c"
-
-As this sound like exactly the thing I'm trying to solve, is handling this via 
-a regulator the correct general way?
-
-
-Thanks
-Heiko
-
-[0] https://lkml.org/lkml/2014/5/28/147
+diff --git a/drivers/media/platform/s5p-mfc/s5p_mfc_opr_v6.c b/drivers/media/platform/s5p-mfc/s5p_mfc_opr_v6.c
+index c1c12f8..e9175ab 100644
+--- a/drivers/media/platform/s5p-mfc/s5p_mfc_opr_v6.c
++++ b/drivers/media/platform/s5p-mfc/s5p_mfc_opr_v6.c
+@@ -525,7 +525,7 @@ static int s5p_mfc_set_enc_stream_buffer_v6(struct s5p_mfc_ctx *ctx,
+ 	WRITEL(addr, mfc_regs->e_stream_buffer_addr); /* 16B align */
+ 	WRITEL(size, mfc_regs->e_stream_buffer_size);
+ 
+-	mfc_debug(2, "stream buf addr: 0x%08lx, size: 0x%d\n",
++	mfc_debug(2, "stream buf addr: 0x%08lx, size: 0x%x\n",
+ 		  addr, size);
+ 
+ 	return 0;
+-- 
+2.0.0.526.g5318336
