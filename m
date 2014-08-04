@@ -1,37 +1,35 @@
-From: sfr@canb.auug.org.au (Stephen Rothwell)
-Date: Mon, 4 Aug 2014 14:28:47 +1000
-Subject: linux-next: build failure after merge of the gpio tree
-In-Reply-To: <CAAVeFuJmHX351WQpEo43sQUf+4BHk9QRJqZfJMsgWf8AXH=_8w@mail.gmail.com>
-References: <20140729183153.0e77a6f6@canb.auug.org.au>
- <20140729084237.GE31360@ulmo.nvidia.com>
- <CAAVeFuJmHX351WQpEo43sQUf+4BHk9QRJqZfJMsgWf8AXH=_8w@mail.gmail.com>
-Message-ID: <20140804142847.408921cf@canb.auug.org.au>
+From: sdu.liu@huawei.com (Liu Hua)
+Date: Mon, 4 Aug 2014 12:17:39 +0800
+Subject: [PATCH V2 0/1] irqchip: GIC: check and clear GIC interupt active state
+Message-ID: <1407125860-37718-1-git-send-email-sdu.liu@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Alexandre,
+For this version of GIC codes, kernel assumes that all the interrupt
+status of GIC is inactive. So the kernel does not check this when 
+booting.
 
-On Mon, 4 Aug 2014 13:10:14 +0900 Alexandre Courbot <gnurou@gmail.com> wrote:
->
-> I have sent a patch to fix this. In the meantime, if the merge
-> conflict of the GPIO tree on board-paz00.c is solved by taking the
-> GPIO version, there is no build error.
-> 
-> There are a few important patches pending in the GPIO tree that should
-> undergo testing - Stephen, do you think you could resolve the conflict
-> that way to enable the latest GPIO tree to be tested again?
+This is no problem on must sitations. But when kdump is deplayed.
+And a panic occurs when an interrupt is being handled (may be PPI 
+). We have no chance to write relative bit to GICC_EOIR. So this 
+interrupt remains active. And GIC will not deliver this type 
+interrupt to cpu interface. And the capture kernel may  fail to boot
+becase of lacking of certain interrupt (such as timer interupt).
 
-No, but I will apply that fix patch in my merge of the gpio tree - just
-make sure it is applied to the gpio tree before Linus (Torvalds) is
-asked to pull it.
+I have test this patch on arma9el(GIC v1), arma15el and arma15eb(GIC v2) 
+platforms. And the tests passed.
+
+changes from V1:
+
+  - used for_each_set_bit instead of find_next_bit
+  - removed the GIC version indentifying codes.
+  - used one way to inactive GIC interupt states for all GIC version
+
+Liu Hua (1):
+  GIC: introduce method to deactive interupts
+
+ drivers/irqchip/irq-gic.c | 26 ++++++++++++++++++++++++++
+ 1 file changed, 26 insertions(+)
 
 -- 
-Cheers,
-Stephen Rothwell                    sfr at canb.auug.org.au
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140804/edfa74e2/attachment.sig>
+1.9.0
