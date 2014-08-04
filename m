@@ -1,116 +1,308 @@
 From: christoffer.dall@linaro.org (Christoffer Dall)
-Date: Mon,  4 Aug 2014 10:46:17 +0200
-Subject: [GIT PULL 00/51] KVM/ARM updates for 3.17
-Message-ID: <1407142028-31105-1-git-send-email-christoffer.dall@linaro.org>
+Date: Mon,  4 Aug 2014 10:46:18 +0200
+Subject: [GIT PULL 01/51] irqchip: gic: Move some bits of GICv2 to a
+ library-type file
+In-Reply-To: <1407142028-31105-1-git-send-email-christoffer.dall@linaro.org>
+References: <1407142028-31105-1-git-send-email-christoffer.dall@linaro.org>
+Message-ID: <1407142028-31105-2-git-send-email-christoffer.dall@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Paolo and Gleb,
+From: Marc Zyngier <marc.zyngier@arm.com>
 
-The following changes since commit 9f6226a762c7ae02f6a23a3d4fc552dafa57ea23:
+A few GICv2 low-level function are actually very useful to GICv3,
+and it makes some sense to share them across the two drivers.
+They end-up in their own file, with an additional parameter used
+to ensure an optional synchronization (unused on GICv2).
 
-  arch: x86: kvm: x86.c: Cleaning up variable is set more than once (2014-06-30 16:52:04 +0200)
+Cc: Thomas Gleixner <tglx@linutronix.de>
+Cc: Jason Cooper <jason@lakedaemon.net>
+Acked-by: Christoffer Dall <christoffer.dall@linaro.org>
+Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+Link: https://lkml.kernel.org/r/1404140510-5382-2-git-send-email-marc.zyngier at arm.com
+Signed-off-by: Jason Cooper <jason@lakedaemon.net>
+---
+ drivers/irqchip/Makefile         |   2 +-
+ drivers/irqchip/irq-gic-common.c | 115 +++++++++++++++++++++++++++++++++++++++
+ drivers/irqchip/irq-gic-common.h |  29 ++++++++++
+ drivers/irqchip/irq-gic.c        |  59 ++------------------
+ 4 files changed, 149 insertions(+), 56 deletions(-)
+ create mode 100644 drivers/irqchip/irq-gic-common.c
+ create mode 100644 drivers/irqchip/irq-gic-common.h
 
-are available in the git repository at:
-
-  git://git.kernel.org/pub/scm/linux/kernel/git/kvmarm/kvmarm.git tags/kvm-arm-for-3.17
-
-for you to fetch changes up to dedf97e8ff2c7513b1370e36b56e08b6bd0f0290:
-
-  arm64: KVM: fix 64bit CP15 VM access for 32bit guests (2014-08-01 14:05:06 +0200)
-
-Please note that there are two dependencies for this series:
-  021f653 (deps-irqchip-gic-3.17) from Jason Cooper
-  72c5839 (Allow GICv3 compilation with older binutils) from Catalin
-
-These should both go in when the arm64 tree lands in Linus' tree.  We
-will let you know.
-
-Also note that merging these changes are likely to result in a somewhat
-non-trivial merge conflict.  We have provided a conflict resolution
-branch here with the correct merge result:
-  git://git.kernel.org/pub/scm/linux/kernel/git/kvmarm/kvmarm.git conflict-resolution-for-linus
-  commit: 19690a1119a0 (the top one)
-
-Can you pass this on to Linus?
-
-
-Thanks,
-Marc & Christoffer
-
-----------------------------------------------------------------
-KVM/ARM New features for 3.17 include:
- - Fixes and code refactoring for stage2 kvm MMU unmap_range
- - Support unmapping IPAs on deleting memslots for arm and arm64
- - Support MMIO mappings in stage2 faults
- - KVM VGIC v2 emulation on GICv3 hardware
- - Big-Endian support for arm/arm64 (guest and host)
- - Debug Architecture support for arm64 (arm32 is on Christoffer's todo list)
- - Detect non page-aligned GICV regions and bail out (plugs guest-can-crash host bug)
-
-Alex Benn?e (2):
-  arm64: KVM: export demux regids as KVM_REG_ARM64
-  arm64: KVM: allow export and import of generic timer regs
-
-Christoffer Dall (1):
-  arm/arm64: KVM: Fix and refactor unmap_range
-
-Eric Auger (1):
-  ARM: KVM: Unmap IPA on memslot delete/move
-
-Kim Phillips (1):
-  ARM: KVM: user_mem_abort: support stage 2 MMIO page mapping
-
-Li Liu (1):
-  ARM: virt: fix wrong HSCTLR.EE bit setting
-
-Marc Zyngier (33):
-  irqchip: gic: Move some bits of GICv2 to a library-type file
-  irqchip: gic-v3: Initial support for GICv3
-  arm64: GICv3 device tree binding documentation
-  arm64: boot protocol documentation update for GICv3
-  KVM: arm/arm64: vgic: move GICv2 registers to their own structure
-  KVM: ARM: vgic: introduce vgic_ops and LR manipulation primitives
-  KVM: ARM: vgic: abstract access to the ELRSR bitmap
-  KVM: ARM: vgic: abstract EISR bitmap access
-  KVM: ARM: vgic: abstract MISR decoding
-  KVM: ARM: vgic: move underflow handling to vgic_ops
-  KVM: ARM: vgic: abstract VMCR access
-  KVM: ARM: vgic: introduce vgic_enable
-  KVM: ARM: introduce vgic_params structure
-  KVM: ARM: vgic: split GICv2 backend from the main vgic code
-  KVM: ARM: vgic: revisit implementation of irqchip_in_kernel
-  arm64: KVM: remove __kvm_hyp_code_{start,end} from hyp.S
-  arm64: KVM: split GICv2 world switch from hyp code
-  arm64: KVM: move HCR_EL2.{IMO,FMO} manipulation into the vgic switch
-    code
-  KVM: ARM: vgic: add the GICv3 backend
-  arm64: KVM: vgic: add GICv3 world switch
-  arm64: KVM: vgic: enable GICv2 emulation on top on GICv3 hardware
-  arm64: KVM: rename pm_fake handler to trap_raz_wi
-  arm64: move DBG_MDSCR_* to asm/debug-monitors.h
-  arm64: KVM: add trap handlers for AArch64 debug registers
-  arm64: KVM: common infrastructure for handling AArch32 CP14/CP15
-  arm64: KVM: use separate tables for AArch32 32 and 64bit traps
-  arm64: KVM: check ordering of all system register tables
-  arm64: KVM: add trap handlers for AArch32 debug registers
-  arm64: KVM: implement lazy world switch for debug registers
-  arm64: KVM: enable trapping of all debug registers
-  arm64: KVM: GICv3: move system register access to msr_s/mrs_s
-  KVM: arm64: GICv3: mandate page-aligned GICV region
-  arm64: KVM: fix 64bit CP15 VM access for 32bit guests
-
-Victor Kamensky (12):
-  ARM: KVM: fix vgic V7 assembler code to work in BE image
-  ARM: KVM: handle 64bit values passed to mrcc or from mcrr instructions
-    in BE case
-  ARM: KVM: __kvm_vcpu_run function return result fix in BE case
-  ARM: KVM: vgic mmio should hold data as LE bytes array in BE case
-  ARM: KVM: MMIO support BE host running LE code
-  ARM: KVM: one_reg coproc set and get BE fixes
-  ARM: KVM: enable KVM in Kconfig on big-endian systems
-  ARM64: KVM: MMIO support BE host running LE code
-  ARM64: KVM: store kvm_vcpu_fault_info est_el2 as word
-  ARM64: KVM: fix vgic_bitmap_get_reg function for BE 64bit case
-  ARM64: KVM: set and get of sys registers in BE case
-  ARM64: KVM: fix big endian issue in access_vm_reg for 32bit guest
+diff --git a/drivers/irqchip/Makefile b/drivers/irqchip/Makefile
+index 62a13e5..9b9505c 100644
+--- a/drivers/irqchip/Makefile
++++ b/drivers/irqchip/Makefile
+@@ -15,7 +15,7 @@ obj-$(CONFIG_ORION_IRQCHIP)		+= irq-orion.o
+ obj-$(CONFIG_ARCH_SUNXI)		+= irq-sun4i.o
+ obj-$(CONFIG_ARCH_SUNXI)		+= irq-sunxi-nmi.o
+ obj-$(CONFIG_ARCH_SPEAR3XX)		+= spear-shirq.o
+-obj-$(CONFIG_ARM_GIC)			+= irq-gic.o
++obj-$(CONFIG_ARM_GIC)			+= irq-gic.o irq-gic-common.o
+ obj-$(CONFIG_ARM_NVIC)			+= irq-nvic.o
+ obj-$(CONFIG_ARM_VIC)			+= irq-vic.o
+ obj-$(CONFIG_IMGPDC_IRQ)		+= irq-imgpdc.o
+diff --git a/drivers/irqchip/irq-gic-common.c b/drivers/irqchip/irq-gic-common.c
+new file mode 100644
+index 0000000..60ac704
+--- /dev/null
++++ b/drivers/irqchip/irq-gic-common.c
+@@ -0,0 +1,115 @@
++/*
++ * Copyright (C) 2002 ARM Limited, All Rights Reserved.
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
++ *
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
++ *
++ * You should have received a copy of the GNU General Public License
++ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
++ */
++
++#include <linux/interrupt.h>
++#include <linux/io.h>
++#include <linux/irq.h>
++#include <linux/irqchip/arm-gic.h>
++
++#include "irq-gic-common.h"
++
++void gic_configure_irq(unsigned int irq, unsigned int type,
++		       void __iomem *base, void (*sync_access)(void))
++{
++	u32 enablemask = 1 << (irq % 32);
++	u32 enableoff = (irq / 32) * 4;
++	u32 confmask = 0x2 << ((irq % 16) * 2);
++	u32 confoff = (irq / 16) * 4;
++	bool enabled = false;
++	u32 val;
++
++	/*
++	 * Read current configuration register, and insert the config
++	 * for "irq", depending on "type".
++	 */
++	val = readl_relaxed(base + GIC_DIST_CONFIG + confoff);
++	if (type == IRQ_TYPE_LEVEL_HIGH)
++		val &= ~confmask;
++	else if (type == IRQ_TYPE_EDGE_RISING)
++		val |= confmask;
++
++	/*
++	 * As recommended by the spec, disable the interrupt before changing
++	 * the configuration
++	 */
++	if (readl_relaxed(base + GIC_DIST_ENABLE_SET + enableoff) & enablemask) {
++		writel_relaxed(enablemask, base + GIC_DIST_ENABLE_CLEAR + enableoff);
++		if (sync_access)
++			sync_access();
++		enabled = true;
++	}
++
++	/*
++	 * Write back the new configuration, and possibly re-enable
++	 * the interrupt.
++	 */
++	writel_relaxed(val, base + GIC_DIST_CONFIG + confoff);
++
++	if (enabled)
++		writel_relaxed(enablemask, base + GIC_DIST_ENABLE_SET + enableoff);
++
++	if (sync_access)
++		sync_access();
++}
++
++void __init gic_dist_config(void __iomem *base, int gic_irqs,
++			    void (*sync_access)(void))
++{
++	unsigned int i;
++
++	/*
++	 * Set all global interrupts to be level triggered, active low.
++	 */
++	for (i = 32; i < gic_irqs; i += 16)
++		writel_relaxed(0, base + GIC_DIST_CONFIG + i / 4);
++
++	/*
++	 * Set priority on all global interrupts.
++	 */
++	for (i = 32; i < gic_irqs; i += 4)
++		writel_relaxed(0xa0a0a0a0, base + GIC_DIST_PRI + i);
++
++	/*
++	 * Disable all interrupts.  Leave the PPI and SGIs alone
++	 * as they are enabled by redistributor registers.
++	 */
++	for (i = 32; i < gic_irqs; i += 32)
++		writel_relaxed(0xffffffff, base + GIC_DIST_ENABLE_CLEAR + i / 8);
++
++	if (sync_access)
++		sync_access();
++}
++
++void gic_cpu_config(void __iomem *base, void (*sync_access)(void))
++{
++	int i;
++
++	/*
++	 * Deal with the banked PPI and SGI interrupts - disable all
++	 * PPI interrupts, ensure all SGI interrupts are enabled.
++	 */
++	writel_relaxed(0xffff0000, base + GIC_DIST_ENABLE_CLEAR);
++	writel_relaxed(0x0000ffff, base + GIC_DIST_ENABLE_SET);
++
++	/*
++	 * Set priority on PPI and SGI interrupts
++	 */
++	for (i = 0; i < 32; i += 4)
++		writel_relaxed(0xa0a0a0a0, base + GIC_DIST_PRI + i * 4 / 4);
++
++	if (sync_access)
++		sync_access();
++}
+diff --git a/drivers/irqchip/irq-gic-common.h b/drivers/irqchip/irq-gic-common.h
+new file mode 100644
+index 0000000..b41f024
+--- /dev/null
++++ b/drivers/irqchip/irq-gic-common.h
+@@ -0,0 +1,29 @@
++/*
++ * Copyright (C) 2002 ARM Limited, All Rights Reserved.
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
++ *
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
++ *
++ * You should have received a copy of the GNU General Public License
++ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
++ */
++
++#ifndef _IRQ_GIC_COMMON_H
++#define _IRQ_GIC_COMMON_H
++
++#include <linux/of.h>
++#include <linux/irqdomain.h>
++
++void gic_configure_irq(unsigned int irq, unsigned int type,
++                       void __iomem *base, void (*sync_access)(void));
++void gic_dist_config(void __iomem *base, int gic_irqs,
++		     void (*sync_access)(void));
++void gic_cpu_config(void __iomem *base, void (*sync_access)(void));
++
++#endif /* _IRQ_GIC_COMMON_H */
+diff --git a/drivers/irqchip/irq-gic.c b/drivers/irqchip/irq-gic.c
+index 7e11c9d..508b815 100644
+--- a/drivers/irqchip/irq-gic.c
++++ b/drivers/irqchip/irq-gic.c
+@@ -46,6 +46,7 @@
+ #include <asm/exception.h>
+ #include <asm/smp_plat.h>
+ 
++#include "irq-gic-common.h"
+ #include "irqchip.h"
+ 
+ union gic_base {
+@@ -188,12 +189,6 @@ static int gic_set_type(struct irq_data *d, unsigned int type)
+ {
+ 	void __iomem *base = gic_dist_base(d);
+ 	unsigned int gicirq = gic_irq(d);
+-	u32 enablemask = 1 << (gicirq % 32);
+-	u32 enableoff = (gicirq / 32) * 4;
+-	u32 confmask = 0x2 << ((gicirq % 16) * 2);
+-	u32 confoff = (gicirq / 16) * 4;
+-	bool enabled = false;
+-	u32 val;
+ 
+ 	/* Interrupt configuration for SGIs can't be changed */
+ 	if (gicirq < 16)
+@@ -207,25 +202,7 @@ static int gic_set_type(struct irq_data *d, unsigned int type)
+ 	if (gic_arch_extn.irq_set_type)
+ 		gic_arch_extn.irq_set_type(d, type);
+ 
+-	val = readl_relaxed(base + GIC_DIST_CONFIG + confoff);
+-	if (type == IRQ_TYPE_LEVEL_HIGH)
+-		val &= ~confmask;
+-	else if (type == IRQ_TYPE_EDGE_RISING)
+-		val |= confmask;
+-
+-	/*
+-	 * As recommended by the spec, disable the interrupt before changing
+-	 * the configuration
+-	 */
+-	if (readl_relaxed(base + GIC_DIST_ENABLE_SET + enableoff) & enablemask) {
+-		writel_relaxed(enablemask, base + GIC_DIST_ENABLE_CLEAR + enableoff);
+-		enabled = true;
+-	}
+-
+-	writel_relaxed(val, base + GIC_DIST_CONFIG + confoff);
+-
+-	if (enabled)
+-		writel_relaxed(enablemask, base + GIC_DIST_ENABLE_SET + enableoff);
++	gic_configure_irq(gicirq, type, base, NULL);
+ 
+ 	raw_spin_unlock(&irq_controller_lock);
+ 
+@@ -387,12 +364,6 @@ static void __init gic_dist_init(struct gic_chip_data *gic)
+ 	writel_relaxed(0, base + GIC_DIST_CTRL);
+ 
+ 	/*
+-	 * Set all global interrupts to be level triggered, active low.
+-	 */
+-	for (i = 32; i < gic_irqs; i += 16)
+-		writel_relaxed(0, base + GIC_DIST_CONFIG + i * 4 / 16);
+-
+-	/*
+ 	 * Set all global interrupts to this CPU only.
+ 	 */
+ 	cpumask = gic_get_cpumask(gic);
+@@ -401,18 +372,7 @@ static void __init gic_dist_init(struct gic_chip_data *gic)
+ 	for (i = 32; i < gic_irqs; i += 4)
+ 		writel_relaxed(cpumask, base + GIC_DIST_TARGET + i * 4 / 4);
+ 
+-	/*
+-	 * Set priority on all global interrupts.
+-	 */
+-	for (i = 32; i < gic_irqs; i += 4)
+-		writel_relaxed(0xa0a0a0a0, base + GIC_DIST_PRI + i * 4 / 4);
+-
+-	/*
+-	 * Disable all interrupts.  Leave the PPI and SGIs alone
+-	 * as these enables are banked registers.
+-	 */
+-	for (i = 32; i < gic_irqs; i += 32)
+-		writel_relaxed(0xffffffff, base + GIC_DIST_ENABLE_CLEAR + i * 4 / 32);
++	gic_dist_config(base, gic_irqs, NULL);
+ 
+ 	writel_relaxed(1, base + GIC_DIST_CTRL);
+ }
+@@ -439,18 +399,7 @@ static void gic_cpu_init(struct gic_chip_data *gic)
+ 		if (i != cpu)
+ 			gic_cpu_map[i] &= ~cpu_mask;
+ 
+-	/*
+-	 * Deal with the banked PPI and SGI interrupts - disable all
+-	 * PPI interrupts, ensure all SGI interrupts are enabled.
+-	 */
+-	writel_relaxed(0xffff0000, dist_base + GIC_DIST_ENABLE_CLEAR);
+-	writel_relaxed(0x0000ffff, dist_base + GIC_DIST_ENABLE_SET);
+-
+-	/*
+-	 * Set priority on PPI and SGI interrupts
+-	 */
+-	for (i = 0; i < 32; i += 4)
+-		writel_relaxed(0xa0a0a0a0, dist_base + GIC_DIST_PRI + i * 4 / 4);
++	gic_cpu_config(dist_base, NULL);
+ 
+ 	writel_relaxed(0xf0, base + GIC_CPU_PRIMASK);
+ 	writel_relaxed(1, base + GIC_CPU_CTRL);
+-- 
+2.0.0
