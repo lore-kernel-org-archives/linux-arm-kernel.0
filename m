@@ -1,308 +1,271 @@
 From: christoffer.dall@linaro.org (Christoffer Dall)
-Date: Mon,  4 Aug 2014 10:46:18 +0200
-Subject: [GIT PULL 01/51] irqchip: gic: Move some bits of GICv2 to a
- library-type file
+Date: Mon,  4 Aug 2014 10:46:20 +0200
+Subject: [GIT PULL 03/51] arm/arm64: KVM: Fix and refactor unmap_range
 In-Reply-To: <1407142028-31105-1-git-send-email-christoffer.dall@linaro.org>
 References: <1407142028-31105-1-git-send-email-christoffer.dall@linaro.org>
-Message-ID: <1407142028-31105-2-git-send-email-christoffer.dall@linaro.org>
+Message-ID: <1407142028-31105-4-git-send-email-christoffer.dall@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Marc Zyngier <marc.zyngier@arm.com>
+unmap_range() was utterly broken, to quote Marc, and broke in all sorts
+of situations.  It was also quite complicated to follow and didn't
+follow the usual scheme of having a separate iterating function for each
+level of page tables.
 
-A few GICv2 low-level function are actually very useful to GICv3,
-and it makes some sense to share them across the two drivers.
-They end-up in their own file, with an additional parameter used
-to ensure an optional synchronization (unused on GICv2).
+Address this by refactoring the code and introduce a pgd_clear()
+function.
 
-Cc: Thomas Gleixner <tglx@linutronix.de>
-Cc: Jason Cooper <jason@lakedaemon.net>
-Acked-by: Christoffer Dall <christoffer.dall@linaro.org>
-Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
-Link: https://lkml.kernel.org/r/1404140510-5382-2-git-send-email-marc.zyngier at arm.com
-Signed-off-by: Jason Cooper <jason@lakedaemon.net>
+Reviewed-by: Jungseok Lee <jays.lee@samsung.com>
+Reviewed-by: Mario Smarduch <m.smarduch@samsung.com>
+Acked-by: Marc Zyngier <marc.zyngier@arm.com>
+Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
 ---
- drivers/irqchip/Makefile         |   2 +-
- drivers/irqchip/irq-gic-common.c | 115 +++++++++++++++++++++++++++++++++++++++
- drivers/irqchip/irq-gic-common.h |  29 ++++++++++
- drivers/irqchip/irq-gic.c        |  59 ++------------------
- 4 files changed, 149 insertions(+), 56 deletions(-)
- create mode 100644 drivers/irqchip/irq-gic-common.c
- create mode 100644 drivers/irqchip/irq-gic-common.h
+ arch/arm/include/asm/kvm_mmu.h   |  12 +++
+ arch/arm/kvm/mmu.c               | 157 +++++++++++++++++++++------------------
+ arch/arm64/include/asm/kvm_mmu.h |  15 ++++
+ 3 files changed, 111 insertions(+), 73 deletions(-)
 
-diff --git a/drivers/irqchip/Makefile b/drivers/irqchip/Makefile
-index 62a13e5..9b9505c 100644
---- a/drivers/irqchip/Makefile
-+++ b/drivers/irqchip/Makefile
-@@ -15,7 +15,7 @@ obj-$(CONFIG_ORION_IRQCHIP)		+= irq-orion.o
- obj-$(CONFIG_ARCH_SUNXI)		+= irq-sun4i.o
- obj-$(CONFIG_ARCH_SUNXI)		+= irq-sunxi-nmi.o
- obj-$(CONFIG_ARCH_SPEAR3XX)		+= spear-shirq.o
--obj-$(CONFIG_ARM_GIC)			+= irq-gic.o
-+obj-$(CONFIG_ARM_GIC)			+= irq-gic.o irq-gic-common.o
- obj-$(CONFIG_ARM_NVIC)			+= irq-nvic.o
- obj-$(CONFIG_ARM_VIC)			+= irq-vic.o
- obj-$(CONFIG_IMGPDC_IRQ)		+= irq-imgpdc.o
-diff --git a/drivers/irqchip/irq-gic-common.c b/drivers/irqchip/irq-gic-common.c
-new file mode 100644
-index 0000000..60ac704
---- /dev/null
-+++ b/drivers/irqchip/irq-gic-common.c
-@@ -0,0 +1,115 @@
-+/*
-+ * Copyright (C) 2002 ARM Limited, All Rights Reserved.
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+ *
-+ * This program is distributed in the hope that it will be useful,
-+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ * GNU General Public License for more details.
-+ *
-+ * You should have received a copy of the GNU General Public License
-+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
-+ */
-+
-+#include <linux/interrupt.h>
-+#include <linux/io.h>
-+#include <linux/irq.h>
-+#include <linux/irqchip/arm-gic.h>
-+
-+#include "irq-gic-common.h"
-+
-+void gic_configure_irq(unsigned int irq, unsigned int type,
-+		       void __iomem *base, void (*sync_access)(void))
+diff --git a/arch/arm/include/asm/kvm_mmu.h b/arch/arm/include/asm/kvm_mmu.h
+index 5c7aa3c..5cc0b0f 100644
+--- a/arch/arm/include/asm/kvm_mmu.h
++++ b/arch/arm/include/asm/kvm_mmu.h
+@@ -127,6 +127,18 @@ static inline void kvm_set_s2pmd_writable(pmd_t *pmd)
+ 	(__boundary - 1 < (end) - 1)? __boundary: (end);		\
+ })
+ 
++static inline bool kvm_page_empty(void *ptr)
 +{
-+	u32 enablemask = 1 << (irq % 32);
-+	u32 enableoff = (irq / 32) * 4;
-+	u32 confmask = 0x2 << ((irq % 16) * 2);
-+	u32 confoff = (irq / 16) * 4;
-+	bool enabled = false;
-+	u32 val;
-+
-+	/*
-+	 * Read current configuration register, and insert the config
-+	 * for "irq", depending on "type".
-+	 */
-+	val = readl_relaxed(base + GIC_DIST_CONFIG + confoff);
-+	if (type == IRQ_TYPE_LEVEL_HIGH)
-+		val &= ~confmask;
-+	else if (type == IRQ_TYPE_EDGE_RISING)
-+		val |= confmask;
-+
-+	/*
-+	 * As recommended by the spec, disable the interrupt before changing
-+	 * the configuration
-+	 */
-+	if (readl_relaxed(base + GIC_DIST_ENABLE_SET + enableoff) & enablemask) {
-+		writel_relaxed(enablemask, base + GIC_DIST_ENABLE_CLEAR + enableoff);
-+		if (sync_access)
-+			sync_access();
-+		enabled = true;
-+	}
-+
-+	/*
-+	 * Write back the new configuration, and possibly re-enable
-+	 * the interrupt.
-+	 */
-+	writel_relaxed(val, base + GIC_DIST_CONFIG + confoff);
-+
-+	if (enabled)
-+		writel_relaxed(enablemask, base + GIC_DIST_ENABLE_SET + enableoff);
-+
-+	if (sync_access)
-+		sync_access();
++	struct page *ptr_page = virt_to_page(ptr);
++	return page_count(ptr_page) == 1;
 +}
 +
-+void __init gic_dist_config(void __iomem *base, int gic_irqs,
-+			    void (*sync_access)(void))
-+{
-+	unsigned int i;
 +
-+	/*
-+	 * Set all global interrupts to be level triggered, active low.
-+	 */
-+	for (i = 32; i < gic_irqs; i += 16)
-+		writel_relaxed(0, base + GIC_DIST_CONFIG + i / 4);
++#define kvm_pte_table_empty(ptep) kvm_page_empty(ptep)
++#define kvm_pmd_table_empty(pmdp) kvm_page_empty(pmdp)
++#define kvm_pud_table_empty(pudp) (0)
 +
-+	/*
-+	 * Set priority on all global interrupts.
-+	 */
-+	for (i = 32; i < gic_irqs; i += 4)
-+		writel_relaxed(0xa0a0a0a0, base + GIC_DIST_PRI + i);
 +
-+	/*
-+	 * Disable all interrupts.  Leave the PPI and SGIs alone
-+	 * as they are enabled by redistributor registers.
-+	 */
-+	for (i = 32; i < gic_irqs; i += 32)
-+		writel_relaxed(0xffffffff, base + GIC_DIST_ENABLE_CLEAR + i / 8);
-+
-+	if (sync_access)
-+		sync_access();
-+}
-+
-+void gic_cpu_config(void __iomem *base, void (*sync_access)(void))
-+{
-+	int i;
-+
-+	/*
-+	 * Deal with the banked PPI and SGI interrupts - disable all
-+	 * PPI interrupts, ensure all SGI interrupts are enabled.
-+	 */
-+	writel_relaxed(0xffff0000, base + GIC_DIST_ENABLE_CLEAR);
-+	writel_relaxed(0x0000ffff, base + GIC_DIST_ENABLE_SET);
-+
-+	/*
-+	 * Set priority on PPI and SGI interrupts
-+	 */
-+	for (i = 0; i < 32; i += 4)
-+		writel_relaxed(0xa0a0a0a0, base + GIC_DIST_PRI + i * 4 / 4);
-+
-+	if (sync_access)
-+		sync_access();
-+}
-diff --git a/drivers/irqchip/irq-gic-common.h b/drivers/irqchip/irq-gic-common.h
-new file mode 100644
-index 0000000..b41f024
---- /dev/null
-+++ b/drivers/irqchip/irq-gic-common.h
-@@ -0,0 +1,29 @@
-+/*
-+ * Copyright (C) 2002 ARM Limited, All Rights Reserved.
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+ *
-+ * This program is distributed in the hope that it will be useful,
-+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ * GNU General Public License for more details.
-+ *
-+ * You should have received a copy of the GNU General Public License
-+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
-+ */
-+
-+#ifndef _IRQ_GIC_COMMON_H
-+#define _IRQ_GIC_COMMON_H
-+
-+#include <linux/of.h>
-+#include <linux/irqdomain.h>
-+
-+void gic_configure_irq(unsigned int irq, unsigned int type,
-+                       void __iomem *base, void (*sync_access)(void));
-+void gic_dist_config(void __iomem *base, int gic_irqs,
-+		     void (*sync_access)(void));
-+void gic_cpu_config(void __iomem *base, void (*sync_access)(void));
-+
-+#endif /* _IRQ_GIC_COMMON_H */
-diff --git a/drivers/irqchip/irq-gic.c b/drivers/irqchip/irq-gic.c
-index 7e11c9d..508b815 100644
---- a/drivers/irqchip/irq-gic.c
-+++ b/drivers/irqchip/irq-gic.c
-@@ -46,6 +46,7 @@
- #include <asm/exception.h>
- #include <asm/smp_plat.h>
+ struct kvm;
  
-+#include "irq-gic-common.h"
- #include "irqchip.h"
- 
- union gic_base {
-@@ -188,12 +189,6 @@ static int gic_set_type(struct irq_data *d, unsigned int type)
- {
- 	void __iomem *base = gic_dist_base(d);
- 	unsigned int gicirq = gic_irq(d);
--	u32 enablemask = 1 << (gicirq % 32);
--	u32 enableoff = (gicirq / 32) * 4;
--	u32 confmask = 0x2 << ((gicirq % 16) * 2);
--	u32 confoff = (gicirq / 16) * 4;
--	bool enabled = false;
--	u32 val;
- 
- 	/* Interrupt configuration for SGIs can't be changed */
- 	if (gicirq < 16)
-@@ -207,25 +202,7 @@ static int gic_set_type(struct irq_data *d, unsigned int type)
- 	if (gic_arch_extn.irq_set_type)
- 		gic_arch_extn.irq_set_type(d, type);
- 
--	val = readl_relaxed(base + GIC_DIST_CONFIG + confoff);
--	if (type == IRQ_TYPE_LEVEL_HIGH)
--		val &= ~confmask;
--	else if (type == IRQ_TYPE_EDGE_RISING)
--		val |= confmask;
--
--	/*
--	 * As recommended by the spec, disable the interrupt before changing
--	 * the configuration
--	 */
--	if (readl_relaxed(base + GIC_DIST_ENABLE_SET + enableoff) & enablemask) {
--		writel_relaxed(enablemask, base + GIC_DIST_ENABLE_CLEAR + enableoff);
--		enabled = true;
--	}
--
--	writel_relaxed(val, base + GIC_DIST_CONFIG + confoff);
--
--	if (enabled)
--		writel_relaxed(enablemask, base + GIC_DIST_ENABLE_SET + enableoff);
-+	gic_configure_irq(gicirq, type, base, NULL);
- 
- 	raw_spin_unlock(&irq_controller_lock);
- 
-@@ -387,12 +364,6 @@ static void __init gic_dist_init(struct gic_chip_data *gic)
- 	writel_relaxed(0, base + GIC_DIST_CTRL);
- 
- 	/*
--	 * Set all global interrupts to be level triggered, active low.
--	 */
--	for (i = 32; i < gic_irqs; i += 16)
--		writel_relaxed(0, base + GIC_DIST_CONFIG + i * 4 / 16);
--
--	/*
- 	 * Set all global interrupts to this CPU only.
- 	 */
- 	cpumask = gic_get_cpumask(gic);
-@@ -401,18 +372,7 @@ static void __init gic_dist_init(struct gic_chip_data *gic)
- 	for (i = 32; i < gic_irqs; i += 4)
- 		writel_relaxed(cpumask, base + GIC_DIST_TARGET + i * 4 / 4);
- 
--	/*
--	 * Set priority on all global interrupts.
--	 */
--	for (i = 32; i < gic_irqs; i += 4)
--		writel_relaxed(0xa0a0a0a0, base + GIC_DIST_PRI + i * 4 / 4);
--
--	/*
--	 * Disable all interrupts.  Leave the PPI and SGIs alone
--	 * as these enables are banked registers.
--	 */
--	for (i = 32; i < gic_irqs; i += 32)
--		writel_relaxed(0xffffffff, base + GIC_DIST_ENABLE_CLEAR + i * 4 / 32);
-+	gic_dist_config(base, gic_irqs, NULL);
- 
- 	writel_relaxed(1, base + GIC_DIST_CTRL);
+ #define kvm_flush_dcache_to_poc(a,l)	__cpuc_flush_dcache_area((a), (l))
+diff --git a/arch/arm/kvm/mmu.c b/arch/arm/kvm/mmu.c
+index 16f8049..2336061 100644
+--- a/arch/arm/kvm/mmu.c
++++ b/arch/arm/kvm/mmu.c
+@@ -90,104 +90,115 @@ static void *mmu_memory_cache_alloc(struct kvm_mmu_memory_cache *mc)
+ 	return p;
  }
-@@ -439,18 +399,7 @@ static void gic_cpu_init(struct gic_chip_data *gic)
- 		if (i != cpu)
- 			gic_cpu_map[i] &= ~cpu_mask;
  
--	/*
--	 * Deal with the banked PPI and SGI interrupts - disable all
--	 * PPI interrupts, ensure all SGI interrupts are enabled.
--	 */
--	writel_relaxed(0xffff0000, dist_base + GIC_DIST_ENABLE_CLEAR);
--	writel_relaxed(0x0000ffff, dist_base + GIC_DIST_ENABLE_SET);
+-static bool page_empty(void *ptr)
++static void clear_pgd_entry(struct kvm *kvm, pgd_t *pgd, phys_addr_t addr)
+ {
+-	struct page *ptr_page = virt_to_page(ptr);
+-	return page_count(ptr_page) == 1;
++	pud_t *pud_table __maybe_unused = pud_offset(pgd, 0);
++	pgd_clear(pgd);
++	kvm_tlb_flush_vmid_ipa(kvm, addr);
++	pud_free(NULL, pud_table);
++	put_page(virt_to_page(pgd));
+ }
+ 
+ static void clear_pud_entry(struct kvm *kvm, pud_t *pud, phys_addr_t addr)
+ {
+-	if (pud_huge(*pud)) {
+-		pud_clear(pud);
+-		kvm_tlb_flush_vmid_ipa(kvm, addr);
+-	} else {
+-		pmd_t *pmd_table = pmd_offset(pud, 0);
+-		pud_clear(pud);
+-		kvm_tlb_flush_vmid_ipa(kvm, addr);
+-		pmd_free(NULL, pmd_table);
+-	}
++	pmd_t *pmd_table = pmd_offset(pud, 0);
++	VM_BUG_ON(pud_huge(*pud));
++	pud_clear(pud);
++	kvm_tlb_flush_vmid_ipa(kvm, addr);
++	pmd_free(NULL, pmd_table);
+ 	put_page(virt_to_page(pud));
+ }
+ 
+ static void clear_pmd_entry(struct kvm *kvm, pmd_t *pmd, phys_addr_t addr)
+ {
+-	if (kvm_pmd_huge(*pmd)) {
+-		pmd_clear(pmd);
+-		kvm_tlb_flush_vmid_ipa(kvm, addr);
+-	} else {
+-		pte_t *pte_table = pte_offset_kernel(pmd, 0);
+-		pmd_clear(pmd);
+-		kvm_tlb_flush_vmid_ipa(kvm, addr);
+-		pte_free_kernel(NULL, pte_table);
+-	}
++	pte_t *pte_table = pte_offset_kernel(pmd, 0);
++	VM_BUG_ON(kvm_pmd_huge(*pmd));
++	pmd_clear(pmd);
++	kvm_tlb_flush_vmid_ipa(kvm, addr);
++	pte_free_kernel(NULL, pte_table);
+ 	put_page(virt_to_page(pmd));
+ }
+ 
+-static void clear_pte_entry(struct kvm *kvm, pte_t *pte, phys_addr_t addr)
++static void unmap_ptes(struct kvm *kvm, pmd_t *pmd,
++		       phys_addr_t addr, phys_addr_t end)
+ {
+-	if (pte_present(*pte)) {
+-		kvm_set_pte(pte, __pte(0));
+-		put_page(virt_to_page(pte));
+-		kvm_tlb_flush_vmid_ipa(kvm, addr);
+-	}
++	phys_addr_t start_addr = addr;
++	pte_t *pte, *start_pte;
++
++	start_pte = pte = pte_offset_kernel(pmd, addr);
++	do {
++		if (!pte_none(*pte)) {
++			kvm_set_pte(pte, __pte(0));
++			put_page(virt_to_page(pte));
++			kvm_tlb_flush_vmid_ipa(kvm, addr);
++		}
++	} while (pte++, addr += PAGE_SIZE, addr != end);
++
++	if (kvm_pte_table_empty(start_pte))
++		clear_pmd_entry(kvm, pmd, start_addr);
+ }
+ 
+-static void unmap_range(struct kvm *kvm, pgd_t *pgdp,
+-			unsigned long long start, u64 size)
++static void unmap_pmds(struct kvm *kvm, pud_t *pud,
++		       phys_addr_t addr, phys_addr_t end)
+ {
+-	pgd_t *pgd;
+-	pud_t *pud;
+-	pmd_t *pmd;
+-	pte_t *pte;
+-	unsigned long long addr = start, end = start + size;
+-	u64 next;
++	phys_addr_t next, start_addr = addr;
++	pmd_t *pmd, *start_pmd;
+ 
+-	while (addr < end) {
+-		pgd = pgdp + pgd_index(addr);
+-		pud = pud_offset(pgd, addr);
+-		pte = NULL;
+-		if (pud_none(*pud)) {
+-			addr = kvm_pud_addr_end(addr, end);
+-			continue;
+-		}
 -
--	/*
--	 * Set priority on PPI and SGI interrupts
--	 */
--	for (i = 0; i < 32; i += 4)
--		writel_relaxed(0xa0a0a0a0, dist_base + GIC_DIST_PRI + i * 4 / 4);
-+	gic_cpu_config(dist_base, NULL);
+-		if (pud_huge(*pud)) {
+-			/*
+-			 * If we are dealing with a huge pud, just clear it and
+-			 * move on.
+-			 */
+-			clear_pud_entry(kvm, pud, addr);
+-			addr = kvm_pud_addr_end(addr, end);
+-			continue;
++	start_pmd = pmd = pmd_offset(pud, addr);
++	do {
++		next = kvm_pmd_addr_end(addr, end);
++		if (!pmd_none(*pmd)) {
++			if (kvm_pmd_huge(*pmd)) {
++				pmd_clear(pmd);
++				kvm_tlb_flush_vmid_ipa(kvm, addr);
++				put_page(virt_to_page(pmd));
++			} else {
++				unmap_ptes(kvm, pmd, addr, next);
++			}
+ 		}
++	} while (pmd++, addr = next, addr != end);
  
- 	writel_relaxed(0xf0, base + GIC_CPU_PRIMASK);
- 	writel_relaxed(1, base + GIC_CPU_CTRL);
+-		pmd = pmd_offset(pud, addr);
+-		if (pmd_none(*pmd)) {
+-			addr = kvm_pmd_addr_end(addr, end);
+-			continue;
+-		}
++	if (kvm_pmd_table_empty(start_pmd))
++		clear_pud_entry(kvm, pud, start_addr);
++}
+ 
+-		if (!kvm_pmd_huge(*pmd)) {
+-			pte = pte_offset_kernel(pmd, addr);
+-			clear_pte_entry(kvm, pte, addr);
+-			next = addr + PAGE_SIZE;
+-		}
++static void unmap_puds(struct kvm *kvm, pgd_t *pgd,
++		       phys_addr_t addr, phys_addr_t end)
++{
++	phys_addr_t next, start_addr = addr;
++	pud_t *pud, *start_pud;
+ 
+-		/*
+-		 * If the pmd entry is to be cleared, walk back up the ladder
+-		 */
+-		if (kvm_pmd_huge(*pmd) || (pte && page_empty(pte))) {
+-			clear_pmd_entry(kvm, pmd, addr);
+-			next = kvm_pmd_addr_end(addr, end);
+-			if (page_empty(pmd) && !page_empty(pud)) {
+-				clear_pud_entry(kvm, pud, addr);
+-				next = kvm_pud_addr_end(addr, end);
++	start_pud = pud = pud_offset(pgd, addr);
++	do {
++		next = kvm_pud_addr_end(addr, end);
++		if (!pud_none(*pud)) {
++			if (pud_huge(*pud)) {
++				pud_clear(pud);
++				kvm_tlb_flush_vmid_ipa(kvm, addr);
++				put_page(virt_to_page(pud));
++			} else {
++				unmap_pmds(kvm, pud, addr, next);
+ 			}
+ 		}
++	} while (pud++, addr = next, addr != end);
+ 
+-		addr = next;
+-	}
++	if (kvm_pud_table_empty(start_pud))
++		clear_pgd_entry(kvm, pgd, start_addr);
++}
++
++
++static void unmap_range(struct kvm *kvm, pgd_t *pgdp,
++			phys_addr_t start, u64 size)
++{
++	pgd_t *pgd;
++	phys_addr_t addr = start, end = start + size;
++	phys_addr_t next;
++
++	pgd = pgdp + pgd_index(addr);
++	do {
++		next = kvm_pgd_addr_end(addr, end);
++		unmap_puds(kvm, pgd, addr, next);
++	} while (pgd++, addr = next, addr != end);
+ }
+ 
+ static void stage2_flush_ptes(struct kvm *kvm, pmd_t *pmd,
+diff --git a/arch/arm64/include/asm/kvm_mmu.h b/arch/arm64/include/asm/kvm_mmu.h
+index 7d29847..8e138c7 100644
+--- a/arch/arm64/include/asm/kvm_mmu.h
++++ b/arch/arm64/include/asm/kvm_mmu.h
+@@ -125,6 +125,21 @@ static inline void kvm_set_s2pmd_writable(pmd_t *pmd)
+ #define kvm_pud_addr_end(addr, end)	pud_addr_end(addr, end)
+ #define kvm_pmd_addr_end(addr, end)	pmd_addr_end(addr, end)
+ 
++static inline bool kvm_page_empty(void *ptr)
++{
++	struct page *ptr_page = virt_to_page(ptr);
++	return page_count(ptr_page) == 1;
++}
++
++#define kvm_pte_table_empty(ptep) kvm_page_empty(ptep)
++#ifndef CONFIG_ARM64_64K_PAGES
++#define kvm_pmd_table_empty(pmdp) kvm_page_empty(pmdp)
++#else
++#define kvm_pmd_table_empty(pmdp) (0)
++#endif
++#define kvm_pud_table_empty(pudp) (0)
++
++
+ struct kvm;
+ 
+ #define kvm_flush_dcache_to_poc(a,l)	__flush_dcache_area((a), (l))
 -- 
 2.0.0
