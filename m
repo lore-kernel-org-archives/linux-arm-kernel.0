@@ -1,45 +1,43 @@
-From: alex.bennee@linaro.org (Alex =?utf-8?Q?Benn=C3=A9e?=)
-Date: Mon, 04 Aug 2014 13:35:15 +0100
-Subject: [PATCH] arm64: KVM: export current vcpu->pause state via pseudo
- regs
-In-Reply-To: <20140804121655.GE524@cbox>
-References: <1404914112-7298-1-git-send-email-alex.bennee@linaro.org>
- <53DA7583.2030504@redhat.com>
- <CAFEAcA9cT617t8JqOXtuO-wQ5xg5T3Sw_DUHB1fpPD6g3SSNaQ@mail.gmail.com>
- <53DA7B28.701@redhat.com> <20140804121655.GE524@cbox>
-Message-ID: <877g2ol9dh.fsf@linaro.org>
+From: will.deacon@arm.com (Will Deacon)
+Date: Mon, 4 Aug 2014 13:46:30 +0100
+Subject: [PATCH v8 01/10] ARM: use _install_special_mapping for sigpage
+In-Reply-To: <1407003407-31219-2-git-send-email-nathan_lynch@mentor.com>
+References: <1407003407-31219-1-git-send-email-nathan_lynch@mentor.com>
+ <1407003407-31219-2-git-send-email-nathan_lynch@mentor.com>
+Message-ID: <20140804124630.GG15117@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Sat, Aug 02, 2014 at 07:16:38PM +0100, Nathan Lynch wrote:
+> _install_special_mapping allows the VMA to be identifed in
+> /proc/pid/maps without the use of arch_vma_name, providing a
+> slight net reduction in object size:
+> 
+>   text    data     bss     dec     hex filename
+>   2996      96     144    3236     ca4 arch/arm/kernel/process.o (before)
+>   2956     104     144    3204     c84 arch/arm/kernel/process.o (after)
+> 
+> Signed-off-by: Nathan Lynch <nathan_lynch@mentor.com>
+> Reviewed-by: Kees Cook <keescook@chromium.org>
+> ---
+>  arch/arm/kernel/process.c | 24 ++++++++++++++++--------
+>  1 file changed, 16 insertions(+), 8 deletions(-)
+> 
+> diff --git a/arch/arm/kernel/process.c b/arch/arm/kernel/process.c
+> index 81ef686a91ca..46fbbb3701a0 100644
+> --- a/arch/arm/kernel/process.c
+> +++ b/arch/arm/kernel/process.c
+> @@ -472,19 +472,23 @@ int in_gate_area_no_mm(unsigned long addr)
+>  
+>  const char *arch_vma_name(struct vm_area_struct *vma)
+>  {
+> -	return is_gate_vma(vma) ? "[vectors]" :
+> -		(vma->vm_mm && vma->vm_start == vma->vm_mm->context.sigpage) ?
+> -		 "[sigpage]" : NULL;
+> +	return is_gate_vma(vma) ? "[vectors]" : NULL;
+>  }
 
-Christoffer Dall writes:
+Why do you need this function? I just removed it for arm64 and I think x86
+has done the same.
 
-> On Thu, Jul 31, 2014 at 07:21:44PM +0200, Paolo Bonzini wrote:
->> Il 31/07/2014 19:04, Peter Maydell ha scritto:
->> > On 31 July 2014 17:57, Paolo Bonzini <pbonzini@redhat.com> wrote:
->> >> Il 09/07/2014 15:55, Alex Benn?e ha scritto:
-<snip>
->> 
->> No, it's not.  It's just the state of the CPU, s390 will be using it too.
->> 
->> On x86 the states are uninitialized (UNINITIALIZED), stopped
->> (INIT_RECEIVED), running (RUNNABLE), halted (HALTED).  CPU 0 starts in
->> RUNNABLE state, other CPUs start in UNINITIALIZED state.  There are
->> x86-specific cases (uninitialized) and x86-isms (the INIT_RECEIVED
->> name), but the idea is widely applicable.
->> 
-> Alex, I think it makes perfect sense to use GET/SET_MP_STATE, will you
-> revise the patch?
-
-I agree we should use the API that is explicitly for this so I'm looking
-at re-doing the patch now.
-
->
-> (Don't forget to update the documentation to reflect it is now supported
-> on ARM, and which states are used to represent what there.)
->
-> Thanks,
-> -Christoffer
-
--- 
-Alex Benn?e
+Will
