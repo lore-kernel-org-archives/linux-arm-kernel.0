@@ -1,68 +1,52 @@
 From: emilio@elopez.com.ar (=?UTF-8?q?Emilio=20L=C3=B3pez?=)
-Date: Mon,  4 Aug 2014 17:09:58 -0300
-Subject: [PATCH v3 4/8] ARM: sun5i: dt: Add nodes to represent the DMA
- controllers
-In-Reply-To: <1407183002-29420-1-git-send-email-emilio@elopez.com.ar>
-References: <1407183002-29420-1-git-send-email-emilio@elopez.com.ar>
-Message-ID: <1407183002-29420-5-git-send-email-emilio@elopez.com.ar>
+Date: Mon,  4 Aug 2014 17:09:54 -0300
+Subject: [PATCH v3 0/8] DMAEngine support for sun4i, sun5i & sun7i
+Message-ID: <1407183002-29420-1-git-send-email-emilio@elopez.com.ar>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The A10S and A13 SoCs have sun4i-compatible DMA controllers. Let's add
-the corresponding nodes to represent them on the device tree.
+Hi everyone,
 
-Signed-off-by: Emilio L?pez <emilio@elopez.com.ar>
-Reviewed-by: Chen-Yu Tsai <wens@csie.org>
----
+As part of Google Summer of Code, I've tasked myself with implementing
+DMA support for the earlier Allwinner platforms. This third round of
+patches is the result of said effort.
 
-Changes from v2:
- * Fix whitespace
- * Collect tag from Chen-Yu
+The first patch is the actual driver to support these platforms. Patches
+three, four and five add the corresponding DMA node to the sun4i, sun5i
+and sun7i device trees.
 
-Note that I have only tested on A10S, if anyone with an A13 device could
-test as well, that would be great! I don't expect any issues however.
+The second patch, involving the sunxi SPI driver, lets users do SPI
+transfers of >=64 bytes by using DMA. Patches six, seven and eight add
+the DMA properties to SPI so the first two patches can be used.
 
- arch/arm/boot/dts/sun5i-a10s.dtsi | 8 ++++++++
- arch/arm/boot/dts/sun5i-a13.dtsi  | 8 ++++++++
- 2 files changed, 16 insertions(+)
+All comments and reviews are welcome :)
 
-diff --git a/arch/arm/boot/dts/sun5i-a10s.dtsi b/arch/arm/boot/dts/sun5i-a10s.dtsi
-index b64f705..8b5a27c 100644
---- a/arch/arm/boot/dts/sun5i-a10s.dtsi
-+++ b/arch/arm/boot/dts/sun5i-a10s.dtsi
-@@ -300,6 +300,14 @@
- 		#size-cells = <1>;
- 		ranges;
- 
-+		dma: dma-controller at 01c02000 {
-+			compatible = "allwinner,sun4i-a10-dma";
-+			reg = <0x01c02000 0x1000>;
-+			interrupts = <27>;
-+			clocks = <&ahb_gates 6>;
-+			#dma-cells = <2>;
-+		};
-+
- 		spi0: spi at 01c05000 {
- 			compatible = "allwinner,sun4i-a10-spi";
- 			reg = <0x01c05000 0x1000>;
-diff --git a/arch/arm/boot/dts/sun5i-a13.dtsi b/arch/arm/boot/dts/sun5i-a13.dtsi
-index 3b2a94c..139f4ac 100644
---- a/arch/arm/boot/dts/sun5i-a13.dtsi
-+++ b/arch/arm/boot/dts/sun5i-a13.dtsi
-@@ -298,6 +298,14 @@
- 		#size-cells = <1>;
- 		ranges;
- 
-+		dma: dma-controller at 01c02000 {
-+			compatible = "allwinner,sun4i-a10-dma";
-+			reg = <0x01c02000 0x1000>;
-+			interrupts = <27>;
-+			clocks = <&ahb_gates 6>;
-+			#dma-cells = <2>;
-+		};
-+
- 		spi0: spi at 01c05000 {
- 			compatible = "allwinner,sun4i-a10-spi";
- 			reg = <0x01c05000 0x1000>;
+Thanks!
+
+Emilio
+
+Emilio L?pez (8):
+  dma: sun4i: Add support for the DMA engine on sun[457]i SoCs
+  spi: sun4i: add DMA support
+  ARM: sun4i: dt: Add node to represent the DMA controller
+  ARM: sun5i: dt: Add nodes to represent the DMA controllers
+  ARM: sun7i: dt: Add node to represent the DMA controller
+  ARM: sun4i: dt: enable DMA on SPI
+  ARM: sun5i: dt: enable DMA on SPI
+  ARM: sun7i: dt: enable DMA on SPI
+
+ .../devicetree/bindings/dma/sun4i-dma.txt          |   46 +
+ arch/arm/boot/dts/sun4i-a10.dtsi                   |   16 +
+ arch/arm/boot/dts/sun5i-a10s.dtsi                  |   14 +
+ arch/arm/boot/dts/sun5i-a13.dtsi                   |   14 +
+ arch/arm/boot/dts/sun7i-a20.dtsi                   |   16 +
+ drivers/dma/Kconfig                                |   11 +
+ drivers/dma/Makefile                               |    1 +
+ drivers/dma/sun4i-dma.c                            | 1238 ++++++++++++++++++++
+ drivers/spi/spi-sun4i.c                            |  155 ++-
+ 9 files changed, 1500 insertions(+), 11 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/dma/sun4i-dma.txt
+ create mode 100644 drivers/dma/sun4i-dma.c
+
 -- 
 2.0.4
