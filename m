@@ -1,50 +1,52 @@
-From: geoff@infradead.org (Geoff Levand)
-Date: Mon, 04 Aug 2014 10:21:09 -0700
-Subject: Kexec on arm64
-In-Reply-To: <CAFdej01ZHkTVZuN_0RrGbFmoG4_NTnwm6KDAPM_sf=zHBHSRwg@mail.gmail.com>
-References: <CAFdej00J2mJwcg2Cy6CHVuuQZ4uQ2zZg8oErGPi0uPejievB+Q@mail.gmail.com>
- <1406162287.4062.39.camel@smoke> <20140724093603.GC4079@leverpostej>
- <1406247468.4062.59.camel@smoke>
- <CAFdej01w_pE6vv+13cCCyfDs4Rbdkzx4CMUj9q97HBKV0B53ow@mail.gmail.com>
- <1406333901.4062.69.camel@smoke>
- <CAFdej014ohCFYvoUAXWiYGb4_4UmSY2G1MH-NEE_cF1cC-6Mow@mail.gmail.com>
- <20140728153812.GA2576@leverpostej> <1406592548.28348.49.camel@smoke>
- <CAFdej00is0kC-1q5uMNJL5APL1WezdNBg0jASgwYamsg5NO_Tg@mail.gmail.com>
- <20140729133557.GQ2576@leverpostej> <1406668741.28348.75.camel@smoke>
- <CAFdej02sTBsjHz+FCqjKkY9pF5sPF6n6QUtEadHi0hK3MxRxGA@mail.gmail.com>
- <CAFdej01ZHkTVZuN_0RrGbFmoG4_NTnwm6KDAPM_sf=zHBHSRwg@mail.gmail.com>
-Message-ID: <1407172869.8971.54.camel@smoke>
+From: javier.martinez@collabora.co.uk (Javier Martinez Canillas)
+Date: Mon, 04 Aug 2014 19:31:12 +0200
+Subject: [PATCH v6 10/10] ARM: dts: Add exynos5250-spring device tree
+In-Reply-To: <CAD=FV=WFP53bZAks7t9xybUxpna89Nz=KG+PQwAcxFEH0D+3mw@mail.gmail.com>
+References: <1406940750-15880-1-git-send-email-afaerber@suse.de>	<1406940750-15880-11-git-send-email-afaerber@suse.de>
+ <CAD=FV=WFP53bZAks7t9xybUxpna89Nz=KG+PQwAcxFEH0D+3mw@mail.gmail.com>
+Message-ID: <53DFC360.9080304@collabora.co.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Arun,
+Hello Doug,
 
-On Mon, 2014-08-04 at 15:46 +0530, Arun Chandran wrote:
-> The latest kexec code is working fine in LE/BE mode in UP configuration.
+On 08/04/2014 05:22 PM, Doug Anderson wrote:
+>> +
+>> +&pinctrl_0 {
+>> +       s5m8767_dvs: s5m8767-dvs {
+>> +               samsung,pins = "gpd1-0", "gpd1-1", "gpd1-2";
+>> +               samsung,pin-function = <0>;
+>> +               samsung,pin-pud = <1>;
+>> +               samsung,pin-drv = <0>;
+>> +       };
+>> +
+>> +       dp_hpd_gpio: dp-hpd-gpio {
+>> +               samsung,pins = "gpc3-0";
+>> +               samsung,pin-function = <0>;
+>> +               samsung,pin-pud = <3>;
+>> +               samsung,pin-drv = <0>;
+>> +       };
+>> +
+>> +       power_key_irq: power-key-irq {
+>> +               samsung,pins = "gpx1-3";
+>> +               samsung,pin-function = <0>;
+>> +               samsung,pin-pud = <0>;
+>> +               samsung,pin-drv = <0>;
+>> +       };
 > 
-> I had to change kexec-tools code a bit to make sure that "kexec -l"
-> is not putting dtb at an area where kernel is building its initial page
-> tables.
-
-OK, I'll add in code to handle this.
-
-> Now before trying SMP configuration I want to know whether the below "kexec -e"
-> scenarios are valid(required)?
+> The fact that snow is missing the pinctrl lines for power and lid is a
+> bug on snow.  Perhaps Javier would be interested in submitting a patch
+> to fix that?
 > 
-> 1st stage                                  |               2nd stage
-> ---------------------------------------------------------------------------------------------
-> LE UP                                      |               BE UP
-> LE UP                                      |               BE SMP
-> LE UP                                      |               LE SMP
-> LE SMP                                   |               LE UP
-> LE SMP                                   |               BE UP
-> LE SMP                                   |               BE SMP
+> 
 
-Kexec should work for all combinations of kernel options.  A
-bootloader (1st stage) may want to be UP, and custom crash
-dump kernels (2nd stage) are generally UP.  UP->UP may have
-limited use.  I think all these listed are important to test
-though, and going the other way also, so BE-SMP->LE-SMP for
-example.
+Sure, added on my TODO list to not only add these missing pin control lines for
+lid and power and reference them on gpio-keys but also to double check if there
+is anything else missing in the mainline Snow DTS that is on the downstream
+Chrome OS one.
 
--Geoff
+I'll wait for Andreas series to be picked by Kukjin before submit a patch though
+to avoid any unnecessary churn.
+
+Best regards,
+Javier
