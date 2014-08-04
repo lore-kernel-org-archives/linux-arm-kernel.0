@@ -1,26 +1,62 @@
-From: grant.b.edwards@gmail.com (Grant Edwards)
-Date: Mon, 4 Aug 2014 19:11:10 +0000 (UTC)
-Subject: Building kernel for more than one SoC
-References: <lrdi48$ls1$1@ger.gmane.org>
- <20140731230737.66e94c3d@free-electrons.com>
-Message-ID: <lrolse$35s$1@ger.gmane.org>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Mon, 4 Aug 2014 21:25:10 +0200
+Subject: Formal license ambiguity in arch/arm/boot/dts/sun?i-a*.dts
+In-Reply-To: <201408031959.27607.arnd@arndb.de>
+References: <20140731192016.GA6869@excalibur.cnev.de>
+ <20140803130430.GY3952@lukather> <201408031959.27607.arnd@arndb.de>
+Message-ID: <20140804192510.GF3952@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2014-07-31, Thomas Petazzoni <thomas.petazzoni@free-electrons.com> wrote:
+On Sun, Aug 03, 2014 at 07:59:27PM +0200, Arnd Bergmann wrote:
+> On Sunday 03 August 2014, Maxime Ripard wrote:
+> > Thanks for reporting this.
+> > 
+> > From a quick grep, the issue is actually broader than just
+> > Allwinner. At least the following platforms seem to do the same:
+> >   - mvebu
+> >   - axm5516
+> >   - bcm
+> >   - berlin
+> >   - ea3250
+> >   - ecx-2000
+> >   - highbank
+> >   - imx / mxs
+> >   - lpc32xx
+> >   - phy3250
+> >   - picoxcell
+> >   - shmobile
+> >   - rockchip
+> >   - socfpga
+> >   - spear
+> >   - ste
+> >   - zynq
+> > 
+> > Would you mind sending a patch to fix all these?
+> 
+> I would actually prefer if we could migrate a lot of these files to BSD license,
+> provided the original authors agree. We want the dtb blobs to be embeddable into
+> boot loaders of any license.
 
-> I don't think there's much point in worrying about this: the 9G20 and
-> 9G25 will use identical device drivers for the vast majority of the
-> hardware blocks of the SoC,
+Even though I'd be open to having my contributions to DTBs under the
+BSD, is this really a thing?
 
-Really identical drivers, or just compiled from the same source file?
-One thing I'm worried about is that they might share a driver that has
-code conditionally compiled one way for the G20 and the other for the
-G25.  I haven't _found_ any code like that yet, but it would be a pain
-to have to deal with something like that...
+I mean, for all I know, an OS/Bootloader would just parse a documented
+binary file, and I don't see any derivative work there.
+
+The same argument could be made for example for u-boot modifying a
+DTB I guess.
+
+Maxime
 
 -- 
-Grant Edwards               grant.b.edwards        Yow! I want to dress you
-                                  at               up as TALLULAH BANKHEAD and
-                              gmail.com            cover you with VASELINE and
-                                                   WHEAT THINS ...
+Maxime Ripard, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140804/139c804a/attachment.sig>
