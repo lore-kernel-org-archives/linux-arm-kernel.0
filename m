@@ -1,317 +1,275 @@
-From: b.zolnierkie@samsung.com (Bartlomiej Zolnierkiewicz)
-Date: Mon, 04 Aug 2014 16:36:09 +0200
-Subject: [PATCH v3][next-20140804] ARM: EXYNOS: Fix suspend/resume
- sequences
-In-Reply-To: <19823219.PknUbmjHjT@amdc1032>
-References: <19823219.PknUbmjHjT@amdc1032>
-Message-ID: <3315016.uq8MCuqyTs@amdc1032>
+From: joel.schopp@amd.com (Joel Schopp)
+Date: Mon, 4 Aug 2014 09:38:45 -0500
+Subject: [PATCH v3] arm64: fix VTTBR_BADDR_MASK
+Message-ID: <20140804143845.2851.85441.stgit@joelaarch64.amd.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+The current VTTBR_BADDR_MASK only masks 39 bits, which is broken on current
+systems.  Rather than just add a bit it seems like a good time to also set
+things at run-time instead of compile time to accomodate more hardware.
 
-Hi,
+This patch sets TCR_EL2.PS, VTCR_EL2.T0SZ and vttbr_baddr_mask in runtime,
+not compile time.
 
-On Monday, August 04, 2014 04:09:51 PM Bartlomiej Zolnierkiewicz wrote:
-> From: Tomasz Figa <t.figa@samsung.com>
-> 
-> Due to recent consolidation of Exynos suspend and cpuidle code, some
-> parts of suspend and resume sequences are executed two times, once from
-> exynos_pm_syscore_ops and then from exynos_cpu_pm_notifier() and thus it
-> breaks suspend, at least on Exynos4-based boards. In addition, simple
-> core power down from a cpuidle driver could, in case of CPU 0 could
-> result in calling functions that are specific to suspend and deeper idle
-> states.
-> 
-> This patch fixes the issue by moving those operations outside the CPU PM
-> notifier into suspend and AFTR code paths. This leads to a bit of code
-> duplication, but allows additional code simplification, so in the end
-> more code is removed than added.
-> 
-> Fixes: 85f9f90808b4 ("ARM: EXYNOS: Use the cpu_pm notifier for pm")
-> Cc: Kukjin Kim <kgene.kim@samsung.com>
-> Cc: Arnd Bergmann <arnd@arndb.de>
-> Cc: Olof Johansson <olof@lixom.net>
-> Cc: arm at kernel.org
-> Signed-off-by: Tomasz Figa <t.figa@samsung.com>
-> [b.zolnierkie: ported patch over current changes]
-> Signed-off-by: Bartlomiej Zolnierkiewicz <b.zolnierkie@samsung.com>
-> ---
->  arch/arm/mach-exynos/pm.c        | 163 ++++++++++++++++++---------------------
->  drivers/cpuidle/cpuidle-exynos.c |  25 +-----
->  2 files changed, 80 insertions(+), 108 deletions(-)
-> 
-> This is a Tomasz's patch ([1]) ported over current -next kernel.
-> 
-> I'm sending this because Tomasz is on holiday currently and cannot
-> test the patch (I tested it with Exynos4210 SoC based Origen board
-> and Exynos4212 SoC based Trats2 target, BTW @Tomasz: on the former
-> device S2R works even without this patch and on the latter one S2R
-> doesn't work even with this patch applied).  I also need this patch
-> as a prerequisite for my cpuidle AFTR changes.
-> 
-> Kukjin, could you please apply it to your v3.17 tree?  Thanks!
+In ARMv8, EL2 physical address size (TCR_EL2.PS) and stage2 input address
+size (VTCR_EL2.T0SZE) cannot be determined in compile time since they
+depends on hardware capability.
 
-I noticed one thing that is not correct (please see below),
-I will send updated patch shortly.
+According to Table D4-23 and Table D4-25 in ARM DDI 0487A.b document,
+vttbr_x is calculated using different hard-coded values with consideration
+of T0SZ, granule size and the level of translation tables. Therefore,
+vttbr_baddr_mask should be determined dynamically.
 
-> [1] http://www.mail-archive.com/linux-samsung-soc at vger.kernel.org/msg35094.html
-> 
-> diff --git a/arch/arm/mach-exynos/pm.c b/arch/arm/mach-exynos/pm.c
-> index 18646b7..e2c5c7b 100644
-> --- a/arch/arm/mach-exynos/pm.c
-> +++ b/arch/arm/mach-exynos/pm.c
-> @@ -114,26 +114,6 @@ static int exynos_irq_set_wake(struct irq_data *data, unsigned int state)
->  #define S5P_CHECK_AFTR  0xFCBA0D10
->  #define S5P_CHECK_SLEEP 0x00000BAD
->  
-> -/* Ext-GIC nIRQ/nFIQ is the only wakeup source in AFTR */
-> -static void exynos_set_wakeupmask(long mask)
-> -{
-> -	pmu_raw_writel(mask, S5P_WAKEUP_MASK);
-> -}
-> -
-> -static void exynos_cpu_set_boot_vector(long flags)
-> -{
-> -	__raw_writel(virt_to_phys(exynos_cpu_resume), EXYNOS_BOOT_VECTOR_ADDR);
-> -	__raw_writel(flags, EXYNOS_BOOT_VECTOR_FLAG);
-> -}
-> -
-> -void exynos_enter_aftr(void)
-> -{
-> -	exynos_set_wakeupmask(0x0000ff3e);
-> -	exynos_cpu_set_boot_vector(S5P_CHECK_AFTR);
-> -	/* Set value of power down register for aftr mode */
-> -	exynos_sys_powerdown_conf(SYS_AFTR);
-> -}
-> -
->  /* For Cortex-A9 Diagnostic and Power control register */
->  static unsigned int save_arm_register[2];
->  
-> @@ -173,6 +153,82 @@ static void exynos_cpu_restore_register(void)
->  		      : "cc");
->  }
->  
-> +static void exynos_pm_central_suspend(void)
-> +{
-> +	unsigned long tmp;
-> +
-> +	/* Setting Central Sequence Register for power down mode */
-> +	tmp = pmu_raw_readl(S5P_CENTRAL_SEQ_CONFIGURATION);
-> +	tmp &= ~S5P_CENTRAL_LOWPWR_CFG;
-> +	pmu_raw_writel(tmp, S5P_CENTRAL_SEQ_CONFIGURATION);
-> +}
-> +
-> +static int exynos_pm_central_resume(void)
-> +{
-> +	unsigned long tmp;
-> +
-> +	/*
-> +	 * If PMU failed while entering sleep mode, WFI will be
-> +	 * ignored by PMU and then exiting cpu_do_idle().
-> +	 * S5P_CENTRAL_LOWPWR_CFG bit will not be set automatically
-> +	 * in this situation.
-> +	 */
-> +	tmp = pmu_raw_readl(S5P_CENTRAL_SEQ_CONFIGURATION);
-> +	if (!(tmp & S5P_CENTRAL_LOWPWR_CFG)) {
-> +		tmp |= S5P_CENTRAL_LOWPWR_CFG;
-> +		pmu_raw_writel(tmp, S5P_CENTRAL_SEQ_CONFIGURATION);
-> +		/* clear the wakeup state register */
-> +		pmu_raw_writel(0x0, S5P_WAKEUP_STAT);
-> +		/* No need to perform below restore code */
-> +		return -1;
-> +	}
-> +
-> +	return 0;
-> +}
-> +
-> +/* Ext-GIC nIRQ/nFIQ is the only wakeup source in AFTR */
-> +static void exynos_set_wakeupmask(long mask)
-> +{
-> +	pmu_raw_writel(mask, S5P_WAKEUP_MASK);
-> +}
-> +
-> +static void exynos_cpu_set_boot_vector(long flags)
-> +{
-> +	__raw_writel(virt_to_phys(exynos_cpu_resume), EXYNOS_BOOT_VECTOR_ADDR);
-> +	__raw_writel(flags, EXYNOS_BOOT_VECTOR_FLAG);
-> +}
-> +
-> +static int exynos_aftr_finisher(unsigned long flags)
-> +{
-> +	exynos_set_wakeupmask(0x0000ff3e);
-> +	exynos_cpu_set_boot_vector(S5P_CHECK_AFTR);
-> +	/* Set value of power down register for aftr mode */
-> +	exynos_sys_powerdown_conf(SYS_AFTR);
-> +	cpu_do_idle();
-> +
-> +	return 0;
+Changes since v2:
+Rebased on https://git.kernel.org/pub/scm/linux/kernel/git/kvmarm/kvmarm.git next branch
 
-In the original code (before the patch) '1' not '0' was returned and
-I believe that the old code was correct.
+Changes since v1:
+Rebased fix on Jungseok Lee's patch https://lkml.org/lkml/2014/5/12/189 to
+provide better long term fix.  Updated that patch to log error instead of
+silently fail on unaligned vttbr.
 
-> +}
-> +
-> +void exynos_enter_aftr(void)
-> +{
-> +	cpu_pm_enter();
-> +
-> +	exynos_pm_central_suspend();
-> +	if (read_cpuid_part_number() == ARM_CPU_PART_CORTEX_A9)
-> +		exynos_cpu_save_register();
-> +
-> +	cpu_suspend(0, exynos_aftr_finisher);
-> +
-> +	if (read_cpuid_part_number() == ARM_CPU_PART_CORTEX_A9) {
-> +		scu_enable(S5P_VA_SCU);
-> +		exynos_cpu_restore_register();
-> +	}
-> +
-> +	exynos_pm_central_resume();
-> +
-> +	cpu_pm_exit();
-> +}
-> +
->  static int exynos_cpu_suspend(unsigned long arg)
->  {
->  #ifdef CONFIG_CACHE_L2X0
-> @@ -217,16 +273,6 @@ static void exynos_pm_prepare(void)
->  	pmu_raw_writel(virt_to_phys(exynos_cpu_resume), S5P_INFORM0);
->  }
->  
-> -static void exynos_pm_central_suspend(void)
-> -{
-> -	unsigned long tmp;
-> -
-> -	/* Setting Central Sequence Register for power down mode */
-> -	tmp = pmu_raw_readl(S5P_CENTRAL_SEQ_CONFIGURATION);
-> -	tmp &= ~S5P_CENTRAL_LOWPWR_CFG;
-> -	pmu_raw_writel(tmp, S5P_CENTRAL_SEQ_CONFIGURATION);
-> -}
-> -
->  static int exynos_pm_suspend(void)
->  {
->  	unsigned long tmp;
-> @@ -244,29 +290,6 @@ static int exynos_pm_suspend(void)
->  	return 0;
->  }
->  
-> -static int exynos_pm_central_resume(void)
-> -{
-> -	unsigned long tmp;
-> -
-> -	/*
-> -	 * If PMU failed while entering sleep mode, WFI will be
-> -	 * ignored by PMU and then exiting cpu_do_idle().
-> -	 * S5P_CENTRAL_LOWPWR_CFG bit will not be set automatically
-> -	 * in this situation.
-> -	 */
-> -	tmp = pmu_raw_readl(S5P_CENTRAL_SEQ_CONFIGURATION);
-> -	if (!(tmp & S5P_CENTRAL_LOWPWR_CFG)) {
-> -		tmp |= S5P_CENTRAL_LOWPWR_CFG;
-> -		pmu_raw_writel(tmp, S5P_CENTRAL_SEQ_CONFIGURATION);
-> -		/* clear the wakeup state register */
-> -		pmu_raw_writel(0x0, S5P_WAKEUP_STAT);
-> -		/* No need to perform below restore code */
-> -		return -1;
-> -	}
-> -
-> -	return 0;
-> -}
-> -
->  static void exynos_pm_resume(void)
->  {
->  	if (exynos_pm_central_resume())
-> @@ -369,44 +392,10 @@ static const struct platform_suspend_ops exynos_suspend_ops = {
->  	.valid		= suspend_valid_only_mem,
->  };
->  
-> -static int exynos_cpu_pm_notifier(struct notifier_block *self,
-> -				  unsigned long cmd, void *v)
-> -{
-> -	int cpu = smp_processor_id();
-> -
-> -	switch (cmd) {
-> -	case CPU_PM_ENTER:
-> -		if (cpu == 0) {
-> -			exynos_pm_central_suspend();
-> -			if (read_cpuid_part() == ARM_CPU_PART_CORTEX_A9)
-> -				exynos_cpu_save_register();
-> -		}
-> -		break;
-> -
-> -	case CPU_PM_EXIT:
-> -		if (cpu == 0) {
-> -			if (read_cpuid_part() == ARM_CPU_PART_CORTEX_A9) {
-> -				scu_enable(S5P_VA_SCU);
-> -				exynos_cpu_restore_register();
-> -			}
-> -			exynos_pm_central_resume();
-> -		}
-> -		break;
-> -	}
-> -
-> -	return NOTIFY_OK;
-> -}
-> -
-> -static struct notifier_block exynos_cpu_pm_notifier_block = {
-> -	.notifier_call = exynos_cpu_pm_notifier,
-> -};
-> -
->  void __init exynos_pm_init(void)
->  {
->  	u32 tmp;
->  
-> -	cpu_pm_register_notifier(&exynos_cpu_pm_notifier_block);
-> -
->  	/* Platform-specific GIC callback */
->  	gic_arch_extn.irq_set_wake = exynos_irq_set_wake;
->  
-> diff --git a/drivers/cpuidle/cpuidle-exynos.c b/drivers/cpuidle/cpuidle-exynos.c
-> index 7c01512..ba9b34b 100644
-> --- a/drivers/cpuidle/cpuidle-exynos.c
-> +++ b/drivers/cpuidle/cpuidle-exynos.c
-> @@ -20,25 +20,6 @@
->  
->  static void (*exynos_enter_aftr)(void);
->  
-> -static int idle_finisher(unsigned long flags)
-> -{
-> -	exynos_enter_aftr();
-> -	cpu_do_idle();
-> -
-> -	return 1;
-> -}
-> -
-> -static int exynos_enter_core0_aftr(struct cpuidle_device *dev,
-> -				struct cpuidle_driver *drv,
-> -				int index)
-> -{
-> -	cpu_pm_enter();
-> -	cpu_suspend(0, idle_finisher);
-> -	cpu_pm_exit();
-> -
-> -	return index;
-> -}
-> -
->  static int exynos_enter_lowpower(struct cpuidle_device *dev,
->  				struct cpuidle_driver *drv,
->  				int index)
-> @@ -51,8 +32,10 @@ static int exynos_enter_lowpower(struct cpuidle_device *dev,
->  
->  	if (new_index == 0)
->  		return arm_cpuidle_simple_enter(dev, drv, new_index);
-> -	else
-> -		return exynos_enter_core0_aftr(dev, drv, new_index);
-> +
-> +	exynos_enter_aftr();
-> +
-> +	return new_index;
->  }
->  
->  static struct cpuidle_driver exynos_idle_driver = {
+Cc: Christoffer Dall <christoffer.dall@linaro.org>
+Cc: Sungjinn Chung <sungjinn.chung@samsung.com>
+Signed-off-by: Jungseok Lee <jays.lee@samsung.com>
+Signed-off-by: Joel Schopp <joel.schopp@amd.com>
+---
+ arch/arm/kvm/arm.c               |   91 +++++++++++++++++++++++++++++++++++++-
+ arch/arm64/include/asm/kvm_arm.h |   17 +------
+ arch/arm64/kvm/hyp-init.S        |   20 ++++++--
+ 3 files changed, 106 insertions(+), 22 deletions(-)
 
-Best regards,
---
-Bartlomiej Zolnierkiewicz
-Samsung R&D Institute Poland
-Samsung Electronics
+diff --git a/arch/arm/kvm/arm.c b/arch/arm/kvm/arm.c
+index d7424ef..d7ca2f5 100644
+--- a/arch/arm/kvm/arm.c
++++ b/arch/arm/kvm/arm.c
+@@ -37,6 +37,7 @@
+ #include <asm/mman.h>
+ #include <asm/tlbflush.h>
+ #include <asm/cacheflush.h>
++#include <asm/cputype.h>
+ #include <asm/virt.h>
+ #include <asm/kvm_arm.h>
+ #include <asm/kvm_asm.h>
+@@ -61,6 +62,9 @@ static atomic64_t kvm_vmid_gen = ATOMIC64_INIT(1);
+ static u8 kvm_next_vmid;
+ static DEFINE_SPINLOCK(kvm_vmid_lock);
+ 
++/* VTTBR mask cannot be determined in complie time under ARMv8 */
++static u64 vttbr_baddr_mask;
++
+ static bool vgic_present;
+ 
+ static void kvm_arm_set_running_vcpu(struct kvm_vcpu *vcpu)
+@@ -376,6 +380,75 @@ static bool need_new_vmid_gen(struct kvm *kvm)
+ }
+ 
+ /**
++ * set_vttbr_baddr_mask - set mask value for vttbr base address
++ *
++ * In ARMv8, vttbr_baddr_mask cannot be determined in compile time since stage2
++ * input address size depends on hardware capability. Thus, it is needed to read
++ * ID_AA64MMFR0_EL1.PARange first and then set vttbr_baddr_mask with
++ * consideration of both granule size and the level of translation tables.
++ */
++static int set_vttbr_baddr_mask(void)
++{
++#ifndef CONFIG_ARM64
++	vttbr_baddr_mask = VTTBR_BADDR_MASK;
++#else
++	int pa_range, t0sz, vttbr_x;
++
++	pa_range = read_cpuid(ID_AA64MMFR0_EL1) & 0xf;
++
++	switch (pa_range) {
++	case 0:
++		t0sz = VTCR_EL2_T0SZ(32);
++		break;
++	case 1:
++		t0sz = VTCR_EL2_T0SZ(36);
++		break;
++	case 2:
++		t0sz = VTCR_EL2_T0SZ(40);
++		break;
++	case 3:
++		t0sz = VTCR_EL2_T0SZ(42);
++		break;
++	case 4:
++		t0sz = VTCR_EL2_T0SZ(44);
++		break;
++	default:
++		t0sz = VTCR_EL2_T0SZ(48);
++	}
++
++	/*
++	 * See Table D4-23 and Table D4-25 in ARM DDI 0487A.b to figure out
++	 * the origin of the hardcoded values, 38 and 37.
++	 */
++#ifdef CONFIG_ARM64_64K_PAGES
++	/*
++	 * 16 <= T0SZ <= 21 is valid under 3 level of translation tables
++	 * 18 <= T0SZ <= 34 is valid under 2 level of translation tables
++	 * 31 <= T0SZ <= 39 is valid under 1 level of transltaion tables
++	 */
++	if (t0sz <= 17) {
++		kvm_err("Cannot support %d-bit address space\n", 64 - t0sz);
++		return -EINVAL;
++	}
++	vttbr_x = 38 - t0sz;
++#else
++	/*
++	 * 16 <= T0SZ <= 24 is valid under 4 level of translation tables
++	 * 21 <= T0SZ <= 30 is valid under 3 level of translation tables
++	 * 30 <= T0SZ <= 39 is valid under 2 level of translation tables
++	 */
++	if (t0sz <= 20) {
++		kvm_err("Cannot support %d-bit address space\n", 64 - t0sz);
++		return -EINVAL;
++	}
++	vttbr_x = 37 - t0sz;
++#endif
++	vttbr_baddr_mask = (((1LLU << (48 - vttbr_x)) - 1) << (vttbr_x - 1));
++#endif
++	return 0;
++}
++
++/**
+  * update_vttbr - Update the VTTBR with a valid VMID before the guest runs
+  * @kvm	The guest that we are about to run
+  *
+@@ -429,8 +502,16 @@ static void update_vttbr(struct kvm *kvm)
+ 	/* update vttbr to be used with the new vmid */
+ 	pgd_phys = virt_to_phys(kvm->arch.pgd);
+ 	vmid = ((u64)(kvm->arch.vmid) << VTTBR_VMID_SHIFT) & VTTBR_VMID_MASK;
+-	kvm->arch.vttbr = pgd_phys & VTTBR_BADDR_MASK;
+-	kvm->arch.vttbr |= vmid;
++
++	/*
++	 * If the VTTBR isn't aligned there is something wrong with the system
++	 * or kernel.  It is better to just fail and not mask it. But no need
++	 * to panic the host kernel with a BUG_ON(), instead just log the error.
++	 */
++	if (pgd_phys & ~vttbr_baddr_mask)
++		kvm_err("VTTBR not aligned, expect guest to fail");
++
++	kvm->arch.vttbr = pgd_phys | vmid;
+ 
+ 	spin_unlock(&kvm_vmid_lock);
+ }
+@@ -1015,6 +1096,12 @@ int kvm_arch_init(void *opaque)
+ 		}
+ 	}
+ 
++	err = set_vttbr_baddr_mask();
++	if (err) {
++		kvm_err("Cannot set vttbr_baddr_mask\n");
++		return -EINVAL;
++	}
++
+ 	cpu_notifier_register_begin();
+ 
+ 	err = init_hyp_mode();
+diff --git a/arch/arm64/include/asm/kvm_arm.h b/arch/arm64/include/asm/kvm_arm.h
+index cc83520..ff4a4fa 100644
+--- a/arch/arm64/include/asm/kvm_arm.h
++++ b/arch/arm64/include/asm/kvm_arm.h
+@@ -95,7 +95,6 @@
+ /* TCR_EL2 Registers bits */
+ #define TCR_EL2_TBI	(1 << 20)
+ #define TCR_EL2_PS	(7 << 16)
+-#define TCR_EL2_PS_40B	(2 << 16)
+ #define TCR_EL2_TG0	(1 << 14)
+ #define TCR_EL2_SH0	(3 << 12)
+ #define TCR_EL2_ORGN0	(3 << 10)
+@@ -104,8 +103,6 @@
+ #define TCR_EL2_MASK	(TCR_EL2_TG0 | TCR_EL2_SH0 | \
+ 			 TCR_EL2_ORGN0 | TCR_EL2_IRGN0 | TCR_EL2_T0SZ)
+ 
+-#define TCR_EL2_FLAGS	(TCR_EL2_PS_40B)
+-
+ /* VTCR_EL2 Registers bits */
+ #define VTCR_EL2_PS_MASK	(7 << 16)
+ #define VTCR_EL2_TG0_MASK	(1 << 14)
+@@ -120,36 +117,28 @@
+ #define VTCR_EL2_SL0_MASK	(3 << 6)
+ #define VTCR_EL2_SL0_LVL1	(1 << 6)
+ #define VTCR_EL2_T0SZ_MASK	0x3f
+-#define VTCR_EL2_T0SZ_40B	24
++#define VTCR_EL2_T0SZ(bits)	(64 - (bits))
+ 
+ #ifdef CONFIG_ARM64_64K_PAGES
+ /*
+  * Stage2 translation configuration:
+- * 40bits output (PS = 2)
+- * 40bits input  (T0SZ = 24)
+  * 64kB pages (TG0 = 1)
+  * 2 level page tables (SL = 1)
+  */
+ #define VTCR_EL2_FLAGS		(VTCR_EL2_TG0_64K | VTCR_EL2_SH0_INNER | \
+ 				 VTCR_EL2_ORGN0_WBWA | VTCR_EL2_IRGN0_WBWA | \
+-				 VTCR_EL2_SL0_LVL1 | VTCR_EL2_T0SZ_40B)
+-#define VTTBR_X		(38 - VTCR_EL2_T0SZ_40B)
++				 VTCR_EL2_SL0_LVL1)
+ #else
+ /*
+  * Stage2 translation configuration:
+- * 40bits output (PS = 2)
+- * 40bits input  (T0SZ = 24)
+  * 4kB pages (TG0 = 0)
+  * 3 level page tables (SL = 1)
+  */
+ #define VTCR_EL2_FLAGS		(VTCR_EL2_TG0_4K | VTCR_EL2_SH0_INNER | \
+ 				 VTCR_EL2_ORGN0_WBWA | VTCR_EL2_IRGN0_WBWA | \
+-				 VTCR_EL2_SL0_LVL1 | VTCR_EL2_T0SZ_40B)
+-#define VTTBR_X		(37 - VTCR_EL2_T0SZ_40B)
++				 VTCR_EL2_SL0_LVL1)
+ #endif
+ 
+-#define VTTBR_BADDR_SHIFT (VTTBR_X - 1)
+-#define VTTBR_BADDR_MASK  (((1LLU << (40 - VTTBR_X)) - 1) << VTTBR_BADDR_SHIFT)
+ #define VTTBR_VMID_SHIFT  (48LLU)
+ #define VTTBR_VMID_MASK	  (0xffLLU << VTTBR_VMID_SHIFT)
+ 
+diff --git a/arch/arm64/kvm/hyp-init.S b/arch/arm64/kvm/hyp-init.S
+index d968796..c0f7634 100644
+--- a/arch/arm64/kvm/hyp-init.S
++++ b/arch/arm64/kvm/hyp-init.S
+@@ -63,17 +63,21 @@ __do_hyp_init:
+ 	mrs	x4, tcr_el1
+ 	ldr	x5, =TCR_EL2_MASK
+ 	and	x4, x4, x5
+-	ldr	x5, =TCR_EL2_FLAGS
+-	orr	x4, x4, x5
+-	msr	tcr_el2, x4
+-
+-	ldr	x4, =VTCR_EL2_FLAGS
+ 	/*
+ 	 * Read the PARange bits from ID_AA64MMFR0_EL1 and set the PS bits in
+-	 * VTCR_EL2.
++	 * TCR_EL2 and both PS bits and T0SZ bits in VTCR_EL2.
+ 	 */
+ 	mrs	x5, ID_AA64MMFR0_EL1
+ 	bfi	x4, x5, #16, #3
++	msr	tcr_el2, x4
++
++	ldr	x4, =VTCR_EL2_FLAGS
++	bfi	x4, x5, #16, #3
++	and	x5, x5, #0xf
++	adr	x6, t0sz
++	add	x6, x6, x5, lsl #2
++	ldr	w5, [x6]
++	orr	x4, x4, x5
+ 	msr	vtcr_el2, x4
+ 
+ 	mrs	x4, mair_el1
+@@ -109,6 +113,10 @@ target: /* We're now in the trampoline code, switch page tables */
+ 
+ 	/* Hello, World! */
+ 	eret
++
++t0sz:
++	.word	VTCR_EL2_T0SZ(32), VTCR_EL2_T0SZ(36), VTCR_EL2_T0SZ(40)
++	.word	VTCR_EL2_T0SZ(42), VTCR_EL2_T0SZ(44), VTCR_EL2_T0SZ(48)
+ ENDPROC(__kvm_hyp_init)
+ 
+ 	.ltorg
