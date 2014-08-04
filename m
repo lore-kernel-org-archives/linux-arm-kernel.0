@@ -1,186 +1,108 @@
-From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
-Date: Mon, 04 Aug 2014 18:50:17 +0200
-Subject: DMA engine API issue (was: [PATCH/RFC 0/5] R-Car Gen2 DMAC
- hardware descriptor list support)
-In-Reply-To: <20140801170744.GD8181@intel.com>
-References: <1406032431-3807-1-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
- <18522523.T2zy7HfoJ2@avalon> <20140801170744.GD8181@intel.com>
-Message-ID: <1621896.RqTTnmY7rK@avalon>
+From: ben@decadent.org.uk (Ben Hutchings)
+Date: Mon, 04 Aug 2014 17:48:32 +0100
+Subject: [PATCH 3.2 51/94] locking/mutex: Disable optimistic spinning on
+ some architectures
+In-Reply-To: <lsq.1407170911.107020799@decadent.org.uk>
+Message-ID: <lsq.1407170912.728427849@decadent.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Vinod,
+3.2.62-rc1 review patch.  If anyone has any objections, please let me know.
 
-On Friday 01 August 2014 22:37:44 Vinod Koul wrote:
-> On Fri, Aug 01, 2014 at 10:51:26AM +0200, Laurent Pinchart wrote:
-> > On Thursday 24 July 2014 10:22:48 Vinod Koul wrote:
-> >> On Wed, Jul 23, 2014 at 01:07:43PM +0200, Laurent Pinchart wrote:
-> >>>> The rsnd_soc_dai_trigger() function takes a spinlock, making the
-> >>>> context atomic, which regmap doesn't like as it locks a mutex.
-> >>>> 
-> >>>> It might be possible to fix this by setting the fast_io field in
-> >>>> both the regmap_config and regmap_bus structures in
-> >>>> sound/soc/sh/rcar/gen.c.
-> >>>> regmap will then use a spinlock instead of a mutex. However, even if
-> >>>> I believe that change makes sense and should be done, another atomic
-> >>>> context issue will come from the rcar-dmac driver which allocates
-> >>>> memory in the prep_dma_cyclic function, called by rsnd_dma_start()
-> >>>> from rsnd_soc_dai_trigger() with the spinlock help.
-> >>>> 
-> >>>> What context is the rsnd_soc_dai_trigger() function called in by the
-> >>>> alsa core ? If it's guaranteed to be a sleepable context, would it
-> >>>> make sense to replace the rsnd_priv spinlock with a mutex ?
-> >>> 
-> >>> Answering myself here, that's not an option, as the trigger function
-> >>> is called in atomic context (replacing the spinlock with a mutex
-> >>> produced a clear BUG) due to snd_pcm_lib_write1() taking a spinlock.
-> >>> 
-> >>> Now we have a core issue. On one side there's rsnd_soc_dai_trigger()
-> >>> being called in atomic context, and on the other side the function
-> >>> ends up calling dmaengine_prep_dma_cyclic() which needs to allocate
-> >>> memory. To make this more func the DMA engine API is undocumented and
-> >>> completely silent on whether the prep functions are allowed to sleep.
-> >>> The question is, who's wrong ?
-> >>> 
-> >>> Now, if you're tempted to say that I'm wrong by allocating memory with
-> >>> GFP_KERNEL in the DMA engine driver, please read on first :-) I've
-> >>> tried replacing GFP_KERNEL with GFP_ATOMIC allocations, and then ran
-> >>> into a problem more complex to solve.
-> >>> 
-> >>> The rcar-dmac DMA engine driver uses runtime PM. When not used, the
-> >>> device is suspended. The driver calls pm_runtime_get_sync() to resume
-> >>> the device, and needs to do so when a descriptor is submitted. This
-> >>> operation, currently performed in the tx_submit handler, could be
-> >>> moved to the prep_dma_cyclic or issue_pending handler, but the three
-> >>> operations are called in a row from rsnd_dma_start(), itself
-> >>> ultimately called from snd_pcm_lib_write1() with the spinlock held.
-> >>> This means I have no place in my DMA engine driver where I can resume
-> >>> the device.
-> >>> 
-> >>> One could argue that the rcar-dmac driver could use a work queue to
-> >>> handle power management. That's correct, but the additional
-> >>> complexity, which would be required in *all* DMA engine drivers, seem
-> >>> too high to me. If we need to go that way, this is really a task that
-> >>> the DMA engine core should handle.
-> >>> 
-> >>> Let's start by answering the background question and updating the DMA
-> >>> engine API documentation once and for good : in which context are
-> >>> drivers allowed to call the prep, tx_submit and issue_pending
-> >>> functions ?
-> >> 
-> >> I think this was bought up sometime back and we have cleared that all
-> >> _prep functions can be invoked in atomic context.
-> >> 
-> >> This is the reason why we have been pushing folks to use GFP_NOWAIT is
-> >> memory allocations during prepare.
-> > 
-> > From the replies I've received it's pretty clear that the prep functions
-> > need to be callable from atomic context. I'll respond to this in more
-> > depth in a reply to Russell's e-mail.
-> > 
-> > > Thanks for pointing out documentation doesn't say so, will send a patch
-> > > for that.
-> > 
-> > I wish that was all that is missing from the documentation ;-) Luckily
-> > Maxime Ripard has sent a patch that documents DMA engine from a DMA
-> > engine driver's point of view. While not perfect (I'm going to review
-> > it), it's a nice starting point to (hopefully) get to a properly
-> > documented framework.
->
-> Sure, please do point out any other instance.
+------------------
 
-Don't worry, I will :-)
+From: Peter Zijlstra <peterz@infradead.org>
 
-> Russell did improve it a lot. But then Documentation gets not so quick
-> updates. Yes new users like you can list issues far more easily than others.
-> 
-> Also now commit log provides a very valuable source of why a particular
-> thing was done.
+commit 4badad352a6bb202ec68afa7a574c0bb961e5ebc upstream.
 
-Come on. That's the theory (and we should of course aim for it). We all know 
-the difference between theory and practice : in theory they're the same.
+The optimistic spin code assumes regular stores and cmpxchg() play nice;
+this is found to not be true for at least: parisc, sparc32, tile32,
+metag-lock1, arc-!llsc and hexagon.
 
-More seriously speaking, I've dived into the git history more times than I 
-should have to retain some mental sanity, and it leaves way too many questions 
-unanswered.
+There is further wreckage, but this in particular seemed easy to
+trigger, so blacklist this.
 
-> > > from atomic context too.
-> > 
-> > I'll take this opportunity to question why we have a separation between
-> > tx_submit and issue_pending. What's the rationale for that, especially
-> > given that dma_issue_pending_all() might kick in at any point and issue
-> > pending transfers for all devices. A driver could thus see its submitted
-> > but not issued transactions being issued before it explicitly calls
-> > dma_async_issue_pending().
-> 
-> The  API states that you need to get a channel, then prepare a descriptor
-> and submit it back. Prepare can be in any order. The submit order is the one
-> which is run on dmaengine. The submit marks the descriptor as pending.
-> Typically you should have a pending_list which the descriptor should be
-> pushed to.
-> 
-> And lastly invoke dma_async_issue_pending() to start the pending ones.
-> 
-> You have the flexibility to prepare descriptors and issue in the order you
-> like. You can also attach the callback required for descriptors here.
+Opt in for known good archs.
 
-The question was why is there a dma_async_issue_pending() operation at all ? 
-Why can't dmaengine_submit() triggers the transfer start ? The only 
-explanation is a small comment in dmaengine.h that states
-
- * This allows drivers to push copies to HW in batches,
- * reducing MMIO writes where possible.
-
-I don't think that's applicable for DMA slave transfers. Is it still 
-applicable for anything else ?
-
-Quoting git log, the reason is
-
-commit c13c8260da3155f2cefb63b0d1b7dcdcb405c644
-Author: Chris Leech <christopher.leech@intel.com>
-Date:   Tue May 23 17:18:44 2006 -0700
-
-    [I/OAT]: DMA memcpy subsystem
-    
-    Provides an API for offloading memory copies to DMA devices
-    
-    Signed-off-by: Chris Leech <christopher.leech@intel.com>
-    Signed-off-by: David S. Miller <davem@davemloft.net>
-
-;-)
-
-> > The DMA_PRIVATE capability flag seems to play a role here, but it's far
-> > from being clear how that mechanism is supposed to work. This should be
-> > documented as well, and any light you could shed on this dark corner of
-> > the API would help.
-> 
-> Ah it is not so dark.
-> 
-> if you look closely at dmaengine channel allocation it is only for marking
-> if channel is privately to be used or for async_tx.
-> Thus slave devices must set DMA_PRIVATE
-
-In order to avoid scattering one topic across multiple mails, I'll pursue this 
-one in a reply to Russell.
-
-> > Similarly, the DMA engine API is split in functions with different
-> > prefixes (mostly dmaengine_*, dma_async_*, dma_*, and various unprefixed
-> > niceties such as async_tx_ack or txd_lock. If there's a rationale for that
-> > (beyond just historical reasons) it should also be documented, otherwise a
-> > cleanup would help all the confused DMA engine users (myself included). I
-> > might be able to find a bit of time to work on that, but I'll first need
-> > to correctly understand where we come from and where we are. Again,
-> > information would be welcome and fully appreciated.
-> 
-> History. DMA engine was developed for async_tx. (hence async_tx)
-> 
-> I think most of dmaengine APIs are dmaengine_. the async_ ones are
-> specifically for async_tx usage.
-> txd ones are descriptor related.
-
-Ditto here.
-
--- 
-Regards,
-
-Laurent Pinchart
+Signed-off-by: Peter Zijlstra <peterz@infradead.org>
+Reported-by: Mikulas Patocka <mpatocka@redhat.com>
+Cc: David Miller <davem@davemloft.net>
+Cc: Chris Metcalf <cmetcalf@tilera.com>
+Cc: James Bottomley <James.Bottomley@hansenpartnership.com>
+Cc: Vineet Gupta <vgupta@synopsys.com>
+Cc: Jason Low <jason.low2@hp.com>
+Cc: Waiman Long <waiman.long@hp.com>
+Cc: "James E.J. Bottomley" <jejb@parisc-linux.org>
+Cc: Paul McKenney <paulmck@linux.vnet.ibm.com>
+Cc: John David Anglin <dave.anglin@bell.net>
+Cc: James Hogan <james.hogan@imgtec.com>
+Cc: Linus Torvalds <torvalds@linux-foundation.org>
+Cc: Davidlohr Bueso <davidlohr@hp.com>
+Cc: Benjamin Herrenschmidt <benh@kernel.crashing.org>
+Cc: Catalin Marinas <catalin.marinas@arm.com>
+Cc: Russell King <linux@arm.linux.org.uk>
+Cc: Will Deacon <will.deacon@arm.com>
+Cc: linux-arm-kernel at lists.infradead.org
+Cc: linux-kernel at vger.kernel.org
+Cc: linuxppc-dev at lists.ozlabs.org
+Cc: sparclinux at vger.kernel.org
+Link: http://lkml.kernel.org/r/20140606175316.GV13930 at laptop.programming.kicks-ass.net
+Signed-off-by: Ingo Molnar <mingo@kernel.org>
+[bwh: Backported to 3.2:
+ - Adjust context
+ - Drop arm64 change]
+Signed-off-by: Ben Hutchings <ben@decadent.org.uk>
+---
+--- a/arch/arm/Kconfig
++++ b/arch/arm/Kconfig
+@@ -1,6 +1,7 @@
+ config ARM
+ 	bool
+ 	default y
++	select ARCH_SUPPORTS_ATOMIC_RMW
+ 	select HAVE_DMA_API_DEBUG
+ 	select HAVE_IDE if PCI || ISA || PCMCIA
+ 	select HAVE_MEMBLOCK
+--- a/arch/powerpc/Kconfig
++++ b/arch/powerpc/Kconfig
+@@ -137,6 +137,7 @@ config PPC
+ 	select HAVE_BPF_JIT if (PPC64 && NET)
+ 	select HAVE_ARCH_JUMP_LABEL
+ 	select ARCH_HAVE_NMI_SAFE_CMPXCHG
++	select ARCH_SUPPORTS_ATOMIC_RMW
+ 
+ config EARLY_PRINTK
+ 	bool
+--- a/arch/sparc/Kconfig
++++ b/arch/sparc/Kconfig
+@@ -57,6 +57,7 @@ config SPARC64
+ 	select IRQ_PREFLOW_FASTEOI
+ 	select ARCH_HAVE_NMI_SAFE_CMPXCHG
+ 	select HAVE_C_RECORDMCOUNT
++	select ARCH_SUPPORTS_ATOMIC_RMW
+ 
+ config ARCH_DEFCONFIG
+ 	string
+--- a/arch/x86/Kconfig
++++ b/arch/x86/Kconfig
+@@ -75,6 +75,7 @@ config X86
+ 	select HAVE_BPF_JIT if (X86_64 && NET)
+ 	select CLKEVT_I8253
+ 	select ARCH_HAVE_NMI_SAFE_CMPXCHG
++	select ARCH_SUPPORTS_ATOMIC_RMW
+ 
+ config INSTRUCTION_DECODER
+ 	def_bool (KPROBES || PERF_EVENTS)
+--- a/kernel/Kconfig.locks
++++ b/kernel/Kconfig.locks
+@@ -198,5 +198,9 @@ config INLINE_WRITE_UNLOCK_IRQ
+ config INLINE_WRITE_UNLOCK_IRQRESTORE
+ 	def_bool !DEBUG_SPINLOCK && ARCH_INLINE_WRITE_UNLOCK_IRQRESTORE
+ 
++config ARCH_SUPPORTS_ATOMIC_RMW
++	bool
++
+ config MUTEX_SPIN_ON_OWNER
+-	def_bool SMP && !DEBUG_MUTEXES
++	def_bool y
++	depends on SMP && !DEBUG_MUTEXES && ARCH_SUPPORTS_ATOMIC_RMW
