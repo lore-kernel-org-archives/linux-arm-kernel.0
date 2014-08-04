@@ -1,128 +1,116 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Mon, 4 Aug 2014 09:41:26 +0100
-Subject: [PATCHv9 1/3] mfd: altera: Add Altera SDRAM Controller
-In-Reply-To: <53DC146D.1070504@opensource.altera.com>
-References: <1406744573-609-1-git-send-email-tthayer@opensource.altera.com>
- <1406744573-609-2-git-send-email-tthayer@opensource.altera.com>
- <20140731082637.GH9030@lee--X1>
- <53DAA072.4010902@opensource.altera.com>
- <20140801081317.GL9030@lee--X1>
- <53DC146D.1070504@opensource.altera.com>
-Message-ID: <20140804084126.GD3935@lee--X1>
+From: christoffer.dall@linaro.org (Christoffer Dall)
+Date: Mon,  4 Aug 2014 10:46:17 +0200
+Subject: [GIT PULL 00/51] KVM/ARM updates for 3.17
+Message-ID: <1407142028-31105-1-git-send-email-christoffer.dall@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 01 Aug 2014, Thor Thayer wrote:
-> On 08/01/2014 03:13 AM, Lee Jones wrote:
-> >On Thu, 31 Jul 2014, Thor Thayer wrote:
-> >>On 07/31/2014 03:26 AM, Lee Jones wrote:
-> >>>On Wed, 30 Jul 2014, tthayer at opensource.altera.com wrote:
-> >>>
-> >>>>From: Thor Thayer <tthayer@opensource.altera.com>
-> >>>>
-> >>>>Add a simple MFD for the Altera SDRAM Controller.
-> >>>>
-> >>>>Signed-off-by: Alan Tull <atull@opensource.altera.com>
-> >>>>Signed-off-by: Thor Thayer <tthayer@opensource.altera.com>
-> >>>>---
-> >>>>v1-8: The MFD implementation was not included in the original series.
-> >>>>
-> >>>>v9: New MFD implementation.
-> >>>>---
-> >>>>  MAINTAINERS                    |    5 ++
-> >>>>  drivers/mfd/Kconfig            |    7 ++
-> >>>>  drivers/mfd/Makefile           |    1 +
-> >>>>  drivers/mfd/altera-sdr.c       |  162 ++++++++++++++++++++++++++++++++++++++++
-> >>>>  include/linux/mfd/altera-sdr.h |  102 +++++++++++++++++++++++++
-> >>>>  5 files changed, 277 insertions(+)
-> >>>>  create mode 100644 drivers/mfd/altera-sdr.c
-> >>>>  create mode 100644 include/linux/mfd/altera-sdr.h
+Hi Paolo and Gleb,
 
-[...]
+The following changes since commit 9f6226a762c7ae02f6a23a3d4fc552dafa57ea23:
 
-> >>>>+	return readl(sdr->reg_base + reg_offset);
-> >>>>+}
-> >>>>+EXPORT_SYMBOL_GPL(altera_sdr_readl);
-> >>>>+
-> >>>>+void altera_sdr_writel(struct altera_sdr *sdr, u32 reg_offset, u32 value)
-> >>>>+{
-> >>>>+	writel(value, sdr->reg_base + reg_offset);
-> >>>>+}
-> >>>>+EXPORT_SYMBOL_GPL(altera_sdr_writel);
-> >>>Why are you abstracting these?
+  arch: x86: kvm: x86.c: Cleaning up variable is set more than once (2014-06-30 16:52:04 +0200)
 
-You still didn't answer this?
+are available in the git repository at:
 
-> >>>Might be better to use Regmap even.
-> >>regmap seems unnecessarily complex for what we're doing which is why
-> >>this method was chosen.
-> >>
-> >>Future drivers will access different sets of registers in the
-> >>device. These drivers won't share bitfields in the same register so
-> >>the MFD seemed like the best solution. Originally we implemented
-> >>this using syscon but that seems to be frowned upon so we changed to
-> >>using a MFD.
-> >Why was the use of syscon frowned upon?  Can you link me to the
-> >thread?  Writing directly to the registers sounds to me a lot worse
-> >than using infrastructure which was designed for these kinds of
-> >accesses.
-> >
-> >If you do choose to fiddle with the registers in this manner, is there
-> >any reason why you're calling back into here, rather than using
-> >readl() and writel() directly?
-> >
-> We'd prefer to use syscon and that is what we started with. If you'd
-> like to be our advocate, I will return to that because it was pretty
-> clean. My primary concern is to get it upstreamed and if it is MFD
-> then I'll make the changes.
-> 
-> Here are the threads.
-> http://marc.info/?l=linux-kernel&m=140128791902800&w=2
-> and
-> http://article.gmane.org/gmane.linux.kernel/1679601
+  git://git.kernel.org/pub/scm/linux/kernel/git/kvmarm/kvmarm.git tags/kvm-arm-for-3.17
 
-Syscon looks the most appropriate to me.
+for you to fetch changes up to dedf97e8ff2c7513b1370e36b56e08b6bd0f0290:
 
-[...]
+  arm64: KVM: fix 64bit CP15 VM access for 32bit guests (2014-08-01 14:05:06 +0200)
 
-> >>>>+EXPORT_SYMBOL_GPL(altera_sdr_mem_size);
-> >>>Should this really be done in here?  Isn't this an SDRAM function?
-> >>>
-> >>This register is part of the SDRAM controller and size information
-> >>may be required by the other drivers that share this memory
-> >>area/need SDRAM information.
-> >Then export a function from the SDRAM driver, not from here.
-> We don't have an SDRAM driver.  Although I could put this in the
-> EDAC driver it would be lost to anyone else wanting this
-> functionality so this seemed to be the logical place.
+Please note that there are two dependencies for this series:
+  021f653 (deps-irqchip-gic-3.17) from Jason Cooper
+  72c5839 (Allow GICv3 compilation with older binutils) from Catalin
 
-Why can't you export it from the EDAC driver?
+These should both go in when the arm64 tree lands in Linus' tree.  We
+will let you know.
 
-[...]
+Also note that merging these changes are likely to result in a somewhat
+non-trivial merge conflict.  We have provided a conflict resolution
+branch here with the correct merge result:
+  git://git.kernel.org/pub/scm/linux/kernel/git/kvmarm/kvmarm.git conflict-resolution-for-linus
+  commit: 19690a1119a0 (the top one)
 
-> >>>>+static int __init altera_sdr_init(void)
-> >>>>+{
-> >>>>+	return platform_driver_register(&altera_sdr_driver);
-> >>>>+}
-> >>>>+postcore_initcall(altera_sdr_init);
-> >>>Why was this chosen?
-> >>We want this to happen pretty early.
-> >If you _need_ this is happen early, core_initcall() is more commonly
-> >used, but _why_ do you need it to happen this early?
-> The syscon driver used this designation. After talking with Alan,
-> this could be changed to a core_initcall(). However, it could also
-> be a subsys_initcall which seems to be more common in the MFD
-> drivers.
+Can you pass this on to Linus?
 
-That doesn't answer my question still. 
 
-What is the reason, requirement, need for this driver to be probed so
-early during the boot process?
+Thanks,
+Marc & Christoffer
 
-[...]
+----------------------------------------------------------------
+KVM/ARM New features for 3.17 include:
+ - Fixes and code refactoring for stage2 kvm MMU unmap_range
+ - Support unmapping IPAs on deleting memslots for arm and arm64
+ - Support MMIO mappings in stage2 faults
+ - KVM VGIC v2 emulation on GICv3 hardware
+ - Big-Endian support for arm/arm64 (guest and host)
+ - Debug Architecture support for arm64 (arm32 is on Christoffer's todo list)
+ - Detect non page-aligned GICV regions and bail out (plugs guest-can-crash host bug)
 
--- 
-Lee Jones
-Linaro STMicroelectronics Landing Team Lead
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+Alex Benn?e (2):
+  arm64: KVM: export demux regids as KVM_REG_ARM64
+  arm64: KVM: allow export and import of generic timer regs
+
+Christoffer Dall (1):
+  arm/arm64: KVM: Fix and refactor unmap_range
+
+Eric Auger (1):
+  ARM: KVM: Unmap IPA on memslot delete/move
+
+Kim Phillips (1):
+  ARM: KVM: user_mem_abort: support stage 2 MMIO page mapping
+
+Li Liu (1):
+  ARM: virt: fix wrong HSCTLR.EE bit setting
+
+Marc Zyngier (33):
+  irqchip: gic: Move some bits of GICv2 to a library-type file
+  irqchip: gic-v3: Initial support for GICv3
+  arm64: GICv3 device tree binding documentation
+  arm64: boot protocol documentation update for GICv3
+  KVM: arm/arm64: vgic: move GICv2 registers to their own structure
+  KVM: ARM: vgic: introduce vgic_ops and LR manipulation primitives
+  KVM: ARM: vgic: abstract access to the ELRSR bitmap
+  KVM: ARM: vgic: abstract EISR bitmap access
+  KVM: ARM: vgic: abstract MISR decoding
+  KVM: ARM: vgic: move underflow handling to vgic_ops
+  KVM: ARM: vgic: abstract VMCR access
+  KVM: ARM: vgic: introduce vgic_enable
+  KVM: ARM: introduce vgic_params structure
+  KVM: ARM: vgic: split GICv2 backend from the main vgic code
+  KVM: ARM: vgic: revisit implementation of irqchip_in_kernel
+  arm64: KVM: remove __kvm_hyp_code_{start,end} from hyp.S
+  arm64: KVM: split GICv2 world switch from hyp code
+  arm64: KVM: move HCR_EL2.{IMO,FMO} manipulation into the vgic switch
+    code
+  KVM: ARM: vgic: add the GICv3 backend
+  arm64: KVM: vgic: add GICv3 world switch
+  arm64: KVM: vgic: enable GICv2 emulation on top on GICv3 hardware
+  arm64: KVM: rename pm_fake handler to trap_raz_wi
+  arm64: move DBG_MDSCR_* to asm/debug-monitors.h
+  arm64: KVM: add trap handlers for AArch64 debug registers
+  arm64: KVM: common infrastructure for handling AArch32 CP14/CP15
+  arm64: KVM: use separate tables for AArch32 32 and 64bit traps
+  arm64: KVM: check ordering of all system register tables
+  arm64: KVM: add trap handlers for AArch32 debug registers
+  arm64: KVM: implement lazy world switch for debug registers
+  arm64: KVM: enable trapping of all debug registers
+  arm64: KVM: GICv3: move system register access to msr_s/mrs_s
+  KVM: arm64: GICv3: mandate page-aligned GICV region
+  arm64: KVM: fix 64bit CP15 VM access for 32bit guests
+
+Victor Kamensky (12):
+  ARM: KVM: fix vgic V7 assembler code to work in BE image
+  ARM: KVM: handle 64bit values passed to mrcc or from mcrr instructions
+    in BE case
+  ARM: KVM: __kvm_vcpu_run function return result fix in BE case
+  ARM: KVM: vgic mmio should hold data as LE bytes array in BE case
+  ARM: KVM: MMIO support BE host running LE code
+  ARM: KVM: one_reg coproc set and get BE fixes
+  ARM: KVM: enable KVM in Kconfig on big-endian systems
+  ARM64: KVM: MMIO support BE host running LE code
+  ARM64: KVM: store kvm_vcpu_fault_info est_el2 as word
+  ARM64: KVM: fix vgic_bitmap_get_reg function for BE 64bit case
+  ARM64: KVM: set and get of sys registers in BE case
+  ARM64: KVM: fix big endian issue in access_vm_reg for 32bit guest
