@@ -1,114 +1,54 @@
-From: ohaugan@codeaurora.org (Olav Haugan)
-Date: Mon, 04 Aug 2014 11:03:51 -0700
-Subject: [PATCH v4 1/1] iommu-api: Add map_sg/unmap_sg functions
-In-Reply-To: <53DBC3F1.40705@codeaurora.org>
-References: <1406854484-3848-1-git-send-email-ohaugan@codeaurora.org>
- <1406854484-3848-2-git-send-email-ohaugan@codeaurora.org>
- <20140801082228.GC15733@arm.com> <53DBC3F1.40705@codeaurora.org>
-Message-ID: <53DFCB07.5090209@codeaurora.org>
+From: lars@metafoo.de (Lars-Peter Clausen)
+Date: Mon, 04 Aug 2014 20:03:45 +0200
+Subject: DMA engine API issue
+In-Reply-To: <1621896.RqTTnmY7rK@avalon>
+References: <1406032431-3807-1-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
+ <18522523.T2zy7HfoJ2@avalon> <20140801170744.GD8181@intel.com>
+ <1621896.RqTTnmY7rK@avalon>
+Message-ID: <53DFCB01.5050703@metafoo.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Any more comments on this from anyone before I submit v5?
-
-On 8/1/2014 9:44 AM, Olav Haugan wrote:
-> Hi Will,
-> 
-> On 8/1/2014 1:22 AM, Will Deacon wrote:
->> Hi Olav,
->>
->> On Fri, Aug 01, 2014 at 01:54:44AM +0100, Olav Haugan wrote:
->>> Mapping and unmapping are more often than not in the critical path.
->>> map_sg and unmap_sg allows IOMMU driver implementations to optimize
->>> the process of mapping and unmapping buffers into the IOMMU page tables.
+On 08/04/2014 06:50 PM, Laurent Pinchart wrote:
+[...]
+>>>> from atomic context too.
 >>>
->>> Instead of mapping a buffer one page at a time and requiring potentially
->>> expensive TLB operations for each page, this function allows the driver
->>> to map all pages in one go and defer TLB maintenance until after all
->>> pages have been mapped.
->>>
->>> Additionally, the mapping operation would be faster in general since
->>> clients does not have to keep calling map API over and over again for
->>> each physically contiguous chunk of memory that needs to be mapped to a
->>> virtually contiguous region.
+>>> I'll take this opportunity to question why we have a separation between
+>>> tx_submit and issue_pending. What's the rationale for that, especially
+>>> given that dma_issue_pending_all() might kick in at any point and issue
+>>> pending transfers for all devices. A driver could thus see its submitted
+>>> but not issued transactions being issued before it explicitly calls
+>>> dma_async_issue_pending().
 >>
->> Just a couple of minor comments, but I think this is almost there now.
+>> The  API states that you need to get a channel, then prepare a descriptor
+>> and submit it back. Prepare can be in any order. The submit order is the one
+>> which is run on dmaengine. The submit marks the descriptor as pending.
+>> Typically you should have a pending_list which the descriptor should be
+>> pushed to.
 >>
->>> Signed-off-by: Olav Haugan <ohaugan@codeaurora.org>
->>> ---
->>>  drivers/iommu/iommu.c | 44 ++++++++++++++++++++++++++++++++++++++++++++
->>>  include/linux/iommu.h | 28 ++++++++++++++++++++++++++++
->>>  2 files changed, 72 insertions(+)
->>>
->>> diff --git a/drivers/iommu/iommu.c b/drivers/iommu/iommu.c
->>> index 1698360..1d5dc2e 100644
->>> --- a/drivers/iommu/iommu.c
->>> +++ b/drivers/iommu/iommu.c
->>> @@ -1088,6 +1088,50 @@ size_t iommu_unmap(struct iommu_domain *domain, unsigned long iova, size_t size)
->>>  }
->>>  EXPORT_SYMBOL_GPL(iommu_unmap);
->>>  
->>> +int iommu_map_sg(struct iommu_domain *domain, unsigned long iova,
->>> +			struct scatterlist *sg, unsigned int nents,
->>> +			int prot, unsigned long flags)
->>> +{
+>> And lastly invoke dma_async_issue_pending() to start the pending ones.
 >>
->> What do you anticipate passing in the flags parameter? I assume it's
->> something specific to the scatterlist, since we can't provide this to
->> iommu_map as it stands?
-> 
-> Initially the flags argument is planned to be used by clients to
-> indicate to the driver that no TLB operation is necessary. This allows
-> clients to for example map/unmap multiple scatter-gather lists without
-> doing expensive TLB invalidate operations for each call but just do this
-> at the last mapping/unmapping call instead. I believe Rob Clark was
-> looking for this feature and I can see the benefit for our use cases also.
-> 
->>> +	int ret = 0;
->>> +	unsigned long offset = 0;
->>> +
->>> +	if (unlikely(domain->ops->map_sg == NULL)) {
->>> +		unsigned int i;
->>> +		struct scatterlist *s;
->>> +
->>> +		for_each_sg(sg, s, nents, i) {
->>> +			phys_addr_t phys = page_to_phys(sg_page(s));
->>> +			size_t page_len = s->offset + s->length;
->>> +
->>> +			ret = iommu_map(domain, iova + offset, phys, page_len,
->>> +					prot);
->>> +			if (ret)
->>> +				goto fail;
->>> +
->>> +			offset += page_len;
->>> +		}
->>> +	} else {
->>> +		ret = domain->ops->map_sg(domain, iova, sg, nents, prot, flags);
->>> +	}
->>> +	goto out;
->>> +
->>> +fail:
->>> +	/* undo mappings already done in case of error */
->>> +	iommu_unmap(domain, iova, offset);
->>
->> I think this would be cleaner if you stuck it in the loop above and removed
->> all these labels:
->>
->>   if (ret) {
->> 	iommu_unmap(...);
->> 	break;
->>   }
-> 
-> Sure, I can do that.
-> 
-> Thanks,
-> 
-> Olav
-> 
+>> You have the flexibility to prepare descriptors and issue in the order you
+>> like. You can also attach the callback required for descriptors here.
+>
+> The question was why is there a dma_async_issue_pending() operation at all ?
+> Why can't dmaengine_submit() triggers the transfer start ? The only
+> explanation is a small comment in dmaengine.h that states
+>
+>   * This allows drivers to push copies to HW in batches,
+>   * reducing MMIO writes where possible.
+>
+> I don't think that's applicable for DMA slave transfers. Is it still
+> applicable for anything else ?
+[...]
 
+If the hardware has scatter gather support it allows the driver to chain the 
+descriptors before submitting them, which reduces the latency between the 
+transfers as well as the IO over overhead. The flaw with the current 
+implementation is that there is only one global chain per channel instead of 
+e.g. having the possibility to build up a chain in a driver and then submit and 
+start the chain. Some drivers have virtual channels where each channel 
+basically acts as the chain and once issue pending is called it is the chain is 
+mapped to a real channel which then executes it.
 
-Olav
-
--- 
-The Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-hosted by The Linux Foundation
+- Lars
