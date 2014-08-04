@@ -1,58 +1,295 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Mon, 4 Aug 2014 17:06:19 +0100
-Subject: [PATCH v8 01/10] ARM: use _install_special_mapping for sigpage
-In-Reply-To: <53DF9491.5040204@mentor.com>
-References: <1407003407-31219-1-git-send-email-nathan_lynch@mentor.com>
- <1407003407-31219-2-git-send-email-nathan_lynch@mentor.com>
- <20140804124630.GG15117@arm.com> <53DF86BA.2030207@mentor.com>
- <53DF9491.5040204@mentor.com>
-Message-ID: <20140804160619.GK15117@arm.com>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Mon,  4 Aug 2014 18:16:00 +0200
+Subject: [PATCH v4] efi: implement mandatory locking for UEFI Runtime Services
+Message-ID: <1407168960-30128-1-git-send-email-ard.biesheuvel@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Aug 04, 2014 at 03:11:29PM +0100, Nathan Lynch wrote:
-> On 08/04/2014 08:12 AM, Nathan Lynch wrote:
-> > On 08/04/2014 07:46 AM, Will Deacon wrote:
-> >> On Sat, Aug 02, 2014 at 07:16:38PM +0100, Nathan Lynch wrote:
-> >>> _install_special_mapping allows the VMA to be identifed in
-> >>> /proc/pid/maps without the use of arch_vma_name, providing a
-> >>> slight net reduction in object size:
-> >>>
-> >>>   text    data     bss     dec     hex filename
-> >>>   2996      96     144    3236     ca4 arch/arm/kernel/process.o (before)
-> >>>   2956     104     144    3204     c84 arch/arm/kernel/process.o (after)
-> >>>
-> >>> Signed-off-by: Nathan Lynch <nathan_lynch@mentor.com>
-> >>> Reviewed-by: Kees Cook <keescook@chromium.org>
-> >>> ---
-> >>>  arch/arm/kernel/process.c | 24 ++++++++++++++++--------
-> >>>  1 file changed, 16 insertions(+), 8 deletions(-)
-> >>>
-> >>> diff --git a/arch/arm/kernel/process.c b/arch/arm/kernel/process.c
-> >>> index 81ef686a91ca..46fbbb3701a0 100644
-> >>> --- a/arch/arm/kernel/process.c
-> >>> +++ b/arch/arm/kernel/process.c
-> >>> @@ -472,19 +472,23 @@ int in_gate_area_no_mm(unsigned long addr)
-> >>>  
-> >>>  const char *arch_vma_name(struct vm_area_struct *vma)
-> >>>  {
-> >>> -	return is_gate_vma(vma) ? "[vectors]" :
-> >>> -		(vma->vm_mm && vma->vm_start == vma->vm_mm->context.sigpage) ?
-> >>> -		 "[sigpage]" : NULL;
-> >>> +	return is_gate_vma(vma) ? "[vectors]" : NULL;
-> >>>  }
-> >>
-> >> Why do you need this function? I just removed it for arm64 and I think x86
-> >> has done the same.
-> > 
-> > I think arch_vma_name is still needed for arm as long as the vectors
-> > page is not installed using _install_special_mapping.
-> 
-> Actually... if we give arm's gate_vma a vm_ops with a ->name() routine
-> that returns "[vectors]" we could get rid of arch_vma_name, I think.
-> This seems to be what x86_64 does.
+According to section 7.1 of the UEFI spec, Runtime Services are not fully
+reentrant, and there are particular combinations of calls that need to be
+serialized. Use a spinlock to serialize all Runtime Services with respect
+to all others, even if this is more than strictly needed.
 
-To be honest, I forgot about the vectors page, but giving it a name sounds
-like a sensible idea.
+Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+---
+ arch/x86/include/asm/efi.h              |   2 +
+ drivers/firmware/efi/runtime-wrappers.c | 154 +++++++++++++++++++++++++++++---
+ 2 files changed, 146 insertions(+), 10 deletions(-)
 
-Will
+diff --git a/arch/x86/include/asm/efi.h b/arch/x86/include/asm/efi.h
+index 044a2fd3c5fe..b39ee5f2c02d 100644
+--- a/arch/x86/include/asm/efi.h
++++ b/arch/x86/include/asm/efi.h
+@@ -86,6 +86,8 @@ extern void __iomem *efi_ioremap(unsigned long addr, unsigned long size,
+ 
+ #endif /* CONFIG_X86_32 */
+ 
++#define efi_in_nmi()	in_nmi()
++
+ extern int add_efi_memmap;
+ extern struct efi_scratch efi_scratch;
+ extern void efi_set_executable(efi_memory_desc_t *md, bool executable);
+diff --git a/drivers/firmware/efi/runtime-wrappers.c b/drivers/firmware/efi/runtime-wrappers.c
+index 10daa4bbb258..9694cba665c4 100644
+--- a/drivers/firmware/efi/runtime-wrappers.c
++++ b/drivers/firmware/efi/runtime-wrappers.c
+@@ -14,11 +14,83 @@
+  * This file is released under the GPLv2.
+  */
+ 
++#include <linux/bug.h>
+ #include <linux/efi.h>
+-#include <linux/spinlock.h>             /* spinlock_t */
++#include <linux/mutex.h>
++#include <linux/spinlock.h>
+ #include <asm/efi.h>
+ 
+ /*
++ * According to section 7.1 of the UEFI spec, Runtime Services are not fully
++ * reentrant, and there are particular combinations of calls that need to be
++ * serialized. (source: UEFI Specification v2.4A)
++ *
++ * Table 31. Rules for Reentry Into Runtime Services
++ * +------------------------------------+-------------------------------+
++ * | If previous call is busy in	| Forbidden to call		|
++ * +------------------------------------+-------------------------------+
++ * | Any				| SetVirtualAddressMap()	|
++ * +------------------------------------+-------------------------------+
++ * | ConvertPointer()			| ConvertPointer()		|
++ * +------------------------------------+-------------------------------+
++ * | SetVariable()			| ResetSystem()			|
++ * | UpdateCapsule()			|				|
++ * | SetTime()				|				|
++ * | SetWakeupTime()			|				|
++ * | GetNextHighMonotonicCount()	|				|
++ * +------------------------------------+-------------------------------+
++ * | GetVariable()			| GetVariable()			|
++ * | GetNextVariableName()		| GetNextVariableName()		|
++ * | SetVariable()			| SetVariable()			|
++ * | QueryVariableInfo()		| QueryVariableInfo()		|
++ * | UpdateCapsule()			| UpdateCapsule()		|
++ * | QueryCapsuleCapabilities()		| QueryCapsuleCapabilities()	|
++ * | GetNextHighMonotonicCount()	| GetNextHighMonotonicCount()	|
++ * +------------------------------------+-------------------------------+
++ * | GetTime()				| GetTime()			|
++ * | SetTime()				| SetTime()			|
++ * | GetWakeupTime()			| GetWakeupTime()		|
++ * | SetWakeupTime()			| SetWakeupTime()		|
++ * +------------------------------------+-------------------------------+
++ *
++ * Due to the fact that the EFI pstore may write to the variable store in
++ * interrupt context, we need to use a spinlock for at least the groups that
++ * contain SetVariable() and QueryVariableInfo(). That leaves little else, as
++ * none of the remaining functions are actually ever called at runtime.
++ * So let's just use a single spinlock to serialize all Runtime Services calls.
++ */
++static DEFINE_SPINLOCK(efi_runtime_lock);
++
++/*
++ * Some runtime services calls can be reentrant under NMI, even if the table
++ * above says they are not. (source: UEFI Specification v2.4A)
++ *
++ * Table 32. Functions that may be called after Machine Check, INIT and NMI
++ * +----------------------------+------------------------------------------+
++ * | Function			| Called after Machine Check, INIT and NMI |
++ * +----------------------------+------------------------------------------+
++ * | GetTime()			| Yes, even if previously busy.		   |
++ * | GetVariable()		| Yes, even if previously busy		   |
++ * | GetNextVariableName()	| Yes, even if previously busy		   |
++ * | QueryVariableInfo()	| Yes, even if previously busy		   |
++ * | SetVariable()		| Yes, even if previously busy		   |
++ * | UpdateCapsule()		| Yes, even if previously busy		   |
++ * | QueryCapsuleCapabilities()	| Yes, even if previously busy		   |
++ * | ResetSystem()		| Yes, even if previously busy		   |
++ * +----------------------------+------------------------------------------+
++ *
++ * In order to prevent deadlocks under NMI, the wrappers for these functions
++ * may only grab the efi_runtime_lock or rtc_lock spinlocks if !efi_in_nmi().
++ * However, not all of the services listed are reachable through NMI code paths,
++ * so the the special handling as suggested by the UEFI spec is only implemented
++ * for QueryVariableInfo() and SetVariable(), as these can be reached in NMI
++ * context through efi_pstore_write().
++ */
++#ifndef efi_in_nmi
++#define efi_in_nmi()	(0)
++#endif
++
++/*
+  * As per commit ef68c8f87ed1 ("x86: Serialize EFI time accesses on rtc_lock"),
+  * the EFI specification requires that callers of the time related runtime
+  * functions serialize with other CMOS accesses in the kernel, as the EFI time
+@@ -32,7 +104,9 @@ static efi_status_t virt_efi_get_time(efi_time_t *tm, efi_time_cap_t *tc)
+ 	efi_status_t status;
+ 
+ 	spin_lock_irqsave(&rtc_lock, flags);
++	spin_lock(&efi_runtime_lock);
+ 	status = efi_call_virt(get_time, tm, tc);
++	spin_unlock(&efi_runtime_lock);
+ 	spin_unlock_irqrestore(&rtc_lock, flags);
+ 	return status;
+ }
+@@ -43,7 +117,9 @@ static efi_status_t virt_efi_set_time(efi_time_t *tm)
+ 	efi_status_t status;
+ 
+ 	spin_lock_irqsave(&rtc_lock, flags);
++	spin_lock(&efi_runtime_lock);
+ 	status = efi_call_virt(set_time, tm);
++	spin_unlock(&efi_runtime_lock);
+ 	spin_unlock_irqrestore(&rtc_lock, flags);
+ 	return status;
+ }
+@@ -56,7 +132,9 @@ static efi_status_t virt_efi_get_wakeup_time(efi_bool_t *enabled,
+ 	efi_status_t status;
+ 
+ 	spin_lock_irqsave(&rtc_lock, flags);
++	spin_lock(&efi_runtime_lock);
+ 	status = efi_call_virt(get_wakeup_time, enabled, pending, tm);
++	spin_unlock(&efi_runtime_lock);
+ 	spin_unlock_irqrestore(&rtc_lock, flags);
+ 	return status;
+ }
+@@ -67,7 +145,9 @@ static efi_status_t virt_efi_set_wakeup_time(efi_bool_t enabled, efi_time_t *tm)
+ 	efi_status_t status;
+ 
+ 	spin_lock_irqsave(&rtc_lock, flags);
++	spin_lock(&efi_runtime_lock);
+ 	status = efi_call_virt(set_wakeup_time, enabled, tm);
++	spin_unlock(&efi_runtime_lock);
+ 	spin_unlock_irqrestore(&rtc_lock, flags);
+ 	return status;
+ }
+@@ -78,14 +158,27 @@ static efi_status_t virt_efi_get_variable(efi_char16_t *name,
+ 					  unsigned long *data_size,
+ 					  void *data)
+ {
+-	return efi_call_virt(get_variable, name, vendor, attr, data_size, data);
++	unsigned long flags;
++	efi_status_t status;
++
++	spin_lock_irqsave(&efi_runtime_lock, flags);
++	status = efi_call_virt(get_variable, name, vendor, attr, data_size,
++			       data);
++	spin_unlock_irqrestore(&efi_runtime_lock, flags);
++	return status;
+ }
+ 
+ static efi_status_t virt_efi_get_next_variable(unsigned long *name_size,
+ 					       efi_char16_t *name,
+ 					       efi_guid_t *vendor)
+ {
+-	return efi_call_virt(get_next_variable, name_size, name, vendor);
++	unsigned long flags;
++	efi_status_t status;
++
++	spin_lock_irqsave(&efi_runtime_lock, flags);
++	status = efi_call_virt(get_next_variable, name_size, name, vendor);
++	spin_unlock_irqrestore(&efi_runtime_lock, flags);
++	return status;
+ }
+ 
+ static efi_status_t virt_efi_set_variable(efi_char16_t *name,
+@@ -94,7 +187,17 @@ static efi_status_t virt_efi_set_variable(efi_char16_t *name,
+ 					  unsigned long data_size,
+ 					  void *data)
+ {
+-	return efi_call_virt(set_variable, name, vendor, attr, data_size, data);
++	unsigned long flags;
++	efi_status_t status;
++	bool __in_nmi = efi_in_nmi();
++
++	if (!__in_nmi)
++		spin_lock_irqsave(&efi_runtime_lock, flags);
++	status = efi_call_virt(set_variable, name, vendor, attr, data_size,
++			       data);
++	if (!__in_nmi)
++		spin_unlock_irqrestore(&efi_runtime_lock, flags);
++	return status;
+ }
+ 
+ static efi_status_t virt_efi_query_variable_info(u32 attr,
+@@ -102,16 +205,31 @@ static efi_status_t virt_efi_query_variable_info(u32 attr,
+ 						 u64 *remaining_space,
+ 						 u64 *max_variable_size)
+ {
++	unsigned long flags;
++	efi_status_t status;
++	bool __in_nmi = efi_in_nmi();
++
+ 	if (efi.runtime_version < EFI_2_00_SYSTEM_TABLE_REVISION)
+ 		return EFI_UNSUPPORTED;
+ 
+-	return efi_call_virt(query_variable_info, attr, storage_space,
+-			     remaining_space, max_variable_size);
++	if (!__in_nmi)
++		spin_lock_irqsave(&efi_runtime_lock, flags);
++	status = efi_call_virt(query_variable_info, attr, storage_space,
++			       remaining_space, max_variable_size);
++	if (!__in_nmi)
++		spin_unlock_irqrestore(&efi_runtime_lock, flags);
++	return status;
+ }
+ 
+ static efi_status_t virt_efi_get_next_high_mono_count(u32 *count)
+ {
+-	return efi_call_virt(get_next_high_mono_count, count);
++	unsigned long flags;
++	efi_status_t status;
++
++	spin_lock_irqsave(&efi_runtime_lock, flags);
++	status = efi_call_virt(get_next_high_mono_count, count);
++	spin_unlock_irqrestore(&efi_runtime_lock, flags);
++	return status;
+ }
+ 
+ static void virt_efi_reset_system(int reset_type,
+@@ -119,17 +237,27 @@ static void virt_efi_reset_system(int reset_type,
+ 				  unsigned long data_size,
+ 				  efi_char16_t *data)
+ {
++	unsigned long flags;
++
++	spin_lock_irqsave(&efi_runtime_lock, flags);
+ 	__efi_call_virt(reset_system, reset_type, status, data_size, data);
++	spin_unlock_irqrestore(&efi_runtime_lock, flags);
+ }
+ 
+ static efi_status_t virt_efi_update_capsule(efi_capsule_header_t **capsules,
+ 					    unsigned long count,
+ 					    unsigned long sg_list)
+ {
++	unsigned long flags;
++	efi_status_t status;
++
+ 	if (efi.runtime_version < EFI_2_00_SYSTEM_TABLE_REVISION)
+ 		return EFI_UNSUPPORTED;
+ 
+-	return efi_call_virt(update_capsule, capsules, count, sg_list);
++	spin_lock_irqsave(&efi_runtime_lock, flags);
++	status = efi_call_virt(update_capsule, capsules, count, sg_list);
++	spin_unlock_irqrestore(&efi_runtime_lock, flags);
++	return status;
+ }
+ 
+ static efi_status_t virt_efi_query_capsule_caps(efi_capsule_header_t **capsules,
+@@ -137,11 +265,17 @@ static efi_status_t virt_efi_query_capsule_caps(efi_capsule_header_t **capsules,
+ 						u64 *max_size,
+ 						int *reset_type)
+ {
++	unsigned long flags;
++	efi_status_t status;
++
+ 	if (efi.runtime_version < EFI_2_00_SYSTEM_TABLE_REVISION)
+ 		return EFI_UNSUPPORTED;
+ 
+-	return efi_call_virt(query_capsule_caps, capsules, count, max_size,
+-			     reset_type);
++	spin_lock_irqsave(&efi_runtime_lock, flags);
++	status = efi_call_virt(query_capsule_caps, capsules, count, max_size,
++			       reset_type);
++	spin_unlock_irqrestore(&efi_runtime_lock, flags);
++	return status;
+ }
+ 
+ void efi_native_runtime_setup(void)
+-- 
+1.8.3.2
