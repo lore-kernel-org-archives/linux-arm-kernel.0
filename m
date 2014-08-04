@@ -1,65 +1,72 @@
 From: christoffer.dall@linaro.org (Christoffer Dall)
-Date: Mon, 4 Aug 2014 14:11:31 +0200
+Date: Mon, 4 Aug 2014 14:13:17 +0200
 Subject: [PATCH] arm64: KVM: export current vcpu->pause state via pseudo
  regs
-In-Reply-To: <87egx0ilkg.fsf@linaro.org>
+In-Reply-To: <87fvhgin6s.fsf@linaro.org>
 References: <1404914112-7298-1-git-send-email-alex.bennee@linaro.org>
  <20140731143538.GI11610@cbox> <87mwbpimgz.fsf@linaro.org>
- <20140731163805.GK11610@cbox>
- <CAFEAcA91efUg3MVpLScNBkxZSEgDP0zNnmxxr055fAz5=vDCoA@mail.gmail.com>
- <20140731165006.GL11610@cbox> <87egx0ilkg.fsf@linaro.org>
-Message-ID: <20140804121131.GC524@cbox>
+ <20140731163805.GK11610@cbox> <87fvhgin6s.fsf@linaro.org>
+Message-ID: <20140804121317.GD524@cbox>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Aug 01, 2014 at 10:48:36AM +0100, Alex Benn?e wrote:
+On Fri, Aug 01, 2014 at 10:11:52AM +0100, Alex Benn?e wrote:
 > 
 > Christoffer Dall writes:
 > 
-> > On Thu, Jul 31, 2014 at 05:45:28PM +0100, Peter Maydell wrote:
-> >> On 31 July 2014 17:38, Christoffer Dall <christoffer.dall@linaro.org> wrote:
-> >> >> > If we are not complaining when setting the pause value to false if it
-> >> >> > was true before, then we probably also need to wake up the thread in
-> >> >> > case this is called from another thread, right?
-> >> >> >
-> >> >> > or perhaps we should just return an error if you're trying to un-pause a
-> >> >> > CPU through this interface, hmmmm.
-> >> >>
-> >> >> Wouldn't it be an error to mess with any register when the system is not
-> >> >> in a quiescent state? I was assuming that the wake state is dealt with
-> >> >> when the run loop finally restarts.
-> >> >>
+> > On Thu, Jul 31, 2014 at 04:14:51PM +0100, Alex Benn?e wrote:
+> >> 
+> >> Christoffer Dall writes:
+> >> 
+> >> > On Wed, Jul 09, 2014 at 02:55:12PM +0100, Alex Benn?e wrote:
+> >> >> To cleanly restore an SMP VM we need to ensure that the current pause
+> >> >> state of each vcpu is correctly recorded. Things could get confused if
+> >> >> the CPU starts running after migration restore completes when it was
+> >> >> paused before it state was captured.
+> >> >> 
+> >> <snip>
+> >> >> +/* Power state (PSCI), not real registers */
+> >> >> +#define KVM_REG_ARM_PSCI		(0x0014 << KVM_REG_ARM_COPROC_SHIFT)
+> >> >> +#define KVM_REG_ARM_PSCI_REG(n) \
+> >> >> +	(KVM_REG_ARM64 | KVM_REG_SIZE_U64 | KVM_REG_ARM_PSCI | \
+> >> >> +         (n & ~KVM_REG_ARM_COPROC_MASK))
 > >> >
-> >> > The ABI doesn't really define it as an error (the ABI doesn't enforce
-> >> > anything right now) so the question is, does it ever make sense to clear
-> >> > the pause flag through this ioctl?  If not, I think we should just err
-> >> > on the side of caution and specify in the docs that this is not
-> >> > supported and return an error.
+> >> > I don't understand this mask, why isn't this
+> >> >             (n & 0xffff))
 > >> 
-> >> Consider the case where the reset state of the system is
-> >> "CPU 0 running, CPUs 1..N stopped", and we're doing an
-> >> incoming migration to a state where all CPUs are running.
-> >> In that case we'll be using this ioctl to clear the pause flag,
-> >> right? (We'll also obviously need to set the PC and other
-> >> register state correctly before resuming the guest.)
+> >> I was trying to use the existing masks, but of course if anyone changes
+> >> that it would be an ABI change so probably not worth it.
 > >> 
-> > Doh, you're right, I somehow had it in my mind that when you send the
-> > thread a signal, the pause flag would be cleared, but that goes against
-> > the whole idea of a CPU being turned off for KVM.
 > >
-> > But wouldn't we then have to also wake up the thread when clearing the
-> > pause flag?  It feels strange that the ioctl can clear the pause flag,
-> > but keep the thread on a wake-queue, and then userspace has to send the
-> > thread a signal of some sort to wake it up?
-> <snip>
+> > the KVM_REG_ARM_COPROC_MASK is part of the uapi IIRC, so that's not the
+> > issue, but that mask doesn't cover all the upper bits, so it feels weird
+> > to use that to me.
 > 
-> Isn't the vCPU off the wait-queue by definition if the ioctl exits and
-> you go through the KVM_SET_ONE_REG stuff?
+> Yeah I missed that. I could do a:
 > 
-> Once you re-enter the KVM_RUN ioctl it sees the pause_flag as cleared
-> and falls straight through into kvm_guest_enter() otherwise it will
-> again wait on wait_event_interruptible(*wq, !vcpu->arch.pause).
+> #define KVM_REG_ARM_COPROC_INDEX_MASK   ((1<<KVM_REG_ARM_COPROC_SHIFT)-1)
 > 
-Yeah, you're right, I forgot we grab the vcpu->mutex.
+> and use that. I'm generally try to avoid hardcoded numbers but I could
+> be being a little OCD here ;-)
+> 
+> >> > Can you add the 32-bit counterpart as part of this patch?
+> >> 
+> >> Same patch? Sure.
+> >
+> > really up to you if you want to split it up into two patches, but I
+> > think it's small enough that you can just create one patch.
+> 
+> Given the similarity of this code between arm and arm64 I'm wondering if
+> it's worth doing a arch/arm/kvm/guest_common.c or something to reduce
+> the amount of copy paste stuff?
+> 
+We've gotten by without it so far.  I fear we end up with a bunch of
+complications due to differences in sizeof(unsigned long) etc., but I
+may be wrong.
 
+The amount of code that is copied should be trivial boilerplate stuff,
+but if you think it's worth unifying, then I'd be happy to review the
+patch.
+
+Thanks,
 -Christoffer
