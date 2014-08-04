@@ -1,31 +1,23 @@
-From: horms+renesas@verge.net.au (Simon Horman)
-Date: Mon,  4 Aug 2014 15:51:48 +0900
-Subject: [PATCH] ARM: shmobile: Remove genmai_defconfig from MAINTAINERS
-Message-ID: <1407135108-3371-1-git-send-email-horms+renesas@verge.net.au>
+From: horms@verge.net.au (Simon Horman)
+Date: Mon, 4 Aug 2014 16:08:13 +0900
+Subject: [PATCH v2 0/2] Add VIN and ADV7180 device tree support for
+ R8A7791/Henninger board
+In-Reply-To: <201408020402.14560.sergei.shtylyov@cogentembedded.com>
+References: <201408020402.14560.sergei.shtylyov@cogentembedded.com>
+Message-ID: <20140804070813.GB1889@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The genmai defconfig file has been removed by
-3ed27bd90d6d0c8b ("ARM: shmobile: genmai: remove defconfig")
-so remove its entry in the MAINTAINERS accordingly.
+On Sat, Aug 02, 2014 at 04:02:13AM +0400, Sergei Shtylyov wrote:
+> Hello.
+> 
+>    Here's the set of 2 patches against Simon Horman's 'renesas.git' repo,
+> 'renesas-devel-v3.16-rc7-20140731v2' tag. Here we add the VIN and ADV7180 video
+> decoder device tree support on the R8A7791/Henninger board. The patchset
+> requires Ben Dooks' 'rcar_vin' and 'soc_camera' DT support patches already
+> merged to the 'media_tree.git' in order to work.
+> 
+> [1/2] ARM: shmobile: r8a7791: add VIN DT support
+> [2/2] ARM: shmobile: henninger: add VIN0/ADV7180 DT support
 
-Reported-by: Joe Perches <joe@perches.com>
-Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
----
- MAINTAINERS | 1 -
- 1 file changed, 1 deletion(-)
-
-diff --git a/MAINTAINERS b/MAINTAINERS
-index 86efa7e..6fb61a1 100644
---- a/MAINTAINERS
-+++ b/MAINTAINERS
-@@ -1320,7 +1320,6 @@ F:	arch/arm/boot/dts/sh*
- F:	arch/arm/configs/ape6evm_defconfig
- F:	arch/arm/configs/armadillo800eva_defconfig
- F:	arch/arm/configs/bockw_defconfig
--F:	arch/arm/configs/genmai_defconfig
- F:	arch/arm/configs/koelsch_defconfig
- F:	arch/arm/configs/kzm9g_defconfig
- F:	arch/arm/configs/lager_defconfig
--- 
-2.0.1
+Thanks, I have queued these up for v3.18.
