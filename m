@@ -1,50 +1,68 @@
 From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Mon, 4 Aug 2014 21:53:44 +0200
-Subject: [PATCH 7/9] ARM: sunxi: dt: Add PLL2 support
-In-Reply-To: <53DEB464.7050604@elopez.com.ar>
+Date: Mon, 4 Aug 2014 22:02:00 +0200
+Subject: [PATCH 4/9] clk: sunxi: PLL2 support for sun4i, sun5i and sun7i
+In-Reply-To: <53DEB181.1080902@elopez.com.ar>
 References: <1406842092-25207-1-git-send-email-emilio@elopez.com.ar>
- <1406842092-25207-8-git-send-email-emilio@elopez.com.ar>
- <CAKON4OycHvkAkndNvH3vkaE0d7P5d4ZsGrYw8eM_Py6HUo06sg@mail.gmail.com>
- <20140803125041.GX3952@lukather>
- <CAGb2v66PEQvv7DWR_uyLqMSdZu6NQpwexF-mo29BOVFVak+XVQ@mail.gmail.com>
- <53DEB464.7050604@elopez.com.ar>
-Message-ID: <20140804195344.GJ3952@lukather>
+ <1406842092-25207-5-git-send-email-emilio@elopez.com.ar>
+ <20140803124458.GV3952@lukather> <53DEB181.1080902@elopez.com.ar>
+Message-ID: <20140804200200.GK3952@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Aug 03, 2014 at 07:15:00PM -0300, Emilio L?pez wrote:
+On Sun, Aug 03, 2014 at 07:02:41PM -0300, Emilio L?pez wrote:
 > Hi,
 > 
-> El 03/08/14 a las 12:55, Chen-Yu Tsai escibi?:
-> >On Sun, Aug 3, 2014 at 8:50 PM, Maxime Ripard
-> ><maxime.ripard@free-electrons.com> wrote:
-> >>On Thu, Jul 31, 2014 at 05:46:09PM -0400, jonsmirl at gmail.com wrote:
-> >>>Would it be better to name this "allwinner,sun4i-a10-pll2-clk" instead
-> >>>of "allwinner,sun4i-a10-b-pll2-clk"? By encoding the b in it everyone
-> >>>is going to wonder what to do on the 'c' revision which is the most
-> >>>common revision.
+> El 03/08/14 a las 09:44, Maxime Ripard escibi?:
+> >On Thu, Jul 31, 2014 at 06:28:07PM -0300, Emilio L?pez wrote:
+> >>This patch adds support for PLL2 and derivates on sun4i, sun5i and
+> >>sun7i SoCs. As this PLL is only used for audio and requires good
+> >>accuracy, we only support two known good rates.
 > >>
-> >>Not really, the way we works usually is that the compatible is the one
-> >>from the first SoC that implemented that IP. If the rev C has the same
-> >>IP than rev B, then we're using the rev B compatible.
+> >>Signed-off-by: Emilio L?pez <emilio@elopez.com.ar>
+> >>---
 > >>
-> >>>
-> >>>The revision based rename would then be from
-> >>>"allwinner,sun4i-a10-pll2-clk" to "allwinner,sun4i-a10-a-pll2-clk".
-> >>
-> >>Though, I'd agree with you. We should have a single compatible in the
-> >>DT, a generic one, that would trigger the auto-detection, and might
-> >>change it to the rev A one, but the rev B doesn't make much sense.
+> (...)
+> >>+	/* PLL2x8, double of PLL2 without the post divisor */
+> >>+	of_property_read_string_index(np, "clock-output-names", 3, &clk_name);
+> >>+	clks[3] = clk_register_fixed_factor(NULL, clk_name, parent,
+> >>+					    CLK_SET_RATE_PARENT, 2 * 4, 1);
 > >
-> >I agree. The rev B would make people reading the DT wonder what happened
-> >to rev A.
+> >Why have you declared them here, instead of using fixed factors in the
+> >DT directly, like we have done in the past?
 > 
-> Would you like to see "allwinner,sun4i-a10-pll2-clk" on the DT then?
-> Should we document it as a magic property triggering an autodetect
-> on the clock binding document?
+> I'd prefer to see one clock with four outputs represented as one
+> clock with four outputs rather than one clock with one output and
+> other three weirdly named nodes floating around.
 
-Yes, and the rev-a one as really only to be used with a rev A SoC,
-with a statement saying that we strongly discourage it, I guess.
+Except that you have no control over these 3 other outputs, that
+directly derive from the only one you can control.
+
+Plus, their name wouldn't be weirded than the one you gave in
+clock-output-names ;)
+
+> I can only see four uses of fixed-factor-clock in our DTSI, three of
+> which are "pass through" clocks for ahb and ar100 on sun6/8i, and a
+> fourth one to implement the 32k that results from reducing the 24M
+> osc on sun7i.
+
+And PLLx2, PLL2x4, PLL2x8 are really just pass-through clocks
+too. Once PLL2 is controlled, those will just be enabled.
+
+> As a second reason, implementing it as fixed factors would be
+> slightly incorrect, as it's only "x8" when you use the limited set
+> of factors that Allwinner and us are using for audio.
+
+Hu? What do you mean by that?
+
+> If we were ever to support the full range of the PLL. the DT binding
+> would suddenly be off. By using a single binding, the meaning is
+> self-contained in the driver.
+> 
+> As a third reason, of_fixed_factor_clk_setup() does not set
+> CLK_SET_RATE_PARENT, which we'd need to propagate the rate change
+> upstream.
+
+That would be easy to fix.
 
 Maxime
 
@@ -58,4 +76,4 @@ Name: signature.asc
 Type: application/pgp-signature
 Size: 819 bytes
 Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140804/57c4e425/attachment.sig>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140804/8661cf34/attachment.sig>
