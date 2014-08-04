@@ -1,38 +1,28 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Mon, 4 Aug 2014 16:45:50 +0200
-Subject: [RFC PATCH 00/11] Refactor MSI to support Non-PCI device
-In-Reply-To: <53DEFECB.3030201@huawei.com>
-References: <1406344128-27055-1-git-send-email-wangyijing@huawei.com>
- <201408011516.26253.arnd@arndb.de> <53DEFECB.3030201@huawei.com>
-Message-ID: <201408041645.50566.arnd@arndb.de>
+From: broonie@kernel.org (Mark Brown)
+Date: Mon, 4 Aug 2014 15:46:46 +0100
+Subject: io-domain voltages as regulators?
+In-Reply-To: <3923586.SsVg941346@diego>
+References: <3923586.SsVg941346@diego>
+Message-ID: <20140804144646.GR30458@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday 04 August 2014, Yijing Wang wrote:
-> I have another question is some drivers will request more than one
-> MSI/MSI-X IRQ, and the driver will use them to process different things.
-> Eg. network driver generally uses one of them to process trivial network thins,
-> and others to transmit/receive data.
-> 
-> So, in this case, it seems to driver need to touch the IRQ numbers.
-> 
-> wr-linux:~ # cat /proc/interrupts
->             CPU0       CPU1       CPU2     ....      CPU17      CPU18      CPU19      CPU20      CPU21      CPU22      CPU23
->  ......
->  100:          0          0          0               0          0          0          0          0          0          0  IR-PCI-MSI-edge      eth0
->  101:          2          0          0               0          0          0  302830488          0          0          0  IR-PCI-MSI-edge      eth0-TxRx-0
->  102:        110          0          0               0          0  360675897          0          0          0          0  IR-PCI-MSI-edge      eth0-TxRx-1
->  103:        109          0          0               0          0          0          0          0          0          0  IR-PCI-MSI-edge      eth0-TxRx-2
->  104:        107          0          0         9678933          0          0          0          0          0          0  IR-PCI-MSI-edge      eth0-TxRx-3
->  105:        107          0          0               0  357838258          0          0          0          0          0  IR-PCI-MSI-edge      eth0-TxRx-4
->  106:        115          0          0               0          0          0          0          0          0          0  IR-PCI-MSI-edge      eth0-TxRx-5
->  107:        114          0          0               0          0          0          0  337866096          0          0  IR-PCI-MSI-edge      eth0-TxRx-6
->  108:  373801199          0          0               0          0          0          0          0          0          0  IR-PCI-MSI-edge      eth0-TxRx-7
-> 
+On Mon, Aug 04, 2014 at 12:18:40AM +0200, Heiko St?bner wrote:
 
-I think in this example, you just need to request eight interrupts, and pass a
-different data pointer each time, pointing to the napi_struct of each of the
-NIC queues. The driver has no need to deal with the IRQ number at all,
-and I would be surprised if it cared today.
+> As this sound like exactly the thing I'm trying to solve, is handling this via 
+> a regulator the correct general way?
 
-	Arnd
+My first thought is that it seems sensible if it's used as a regulated
+supply in a context where just a plain regulator might be used like
+MMC/SDIO type things.  If it's only setting logic levels for I/O pins
+but isn't something that's being dynamically managed or really visible
+to software (it's just a board design thing) then it might not be worth
+it but if it might be controlled by changing an external regulator then
+using the same API seems like it might be sensible.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140804/237364a3/attachment.sig>
