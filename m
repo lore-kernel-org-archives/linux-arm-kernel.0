@@ -1,73 +1,75 @@
 From: b.zolnierkie@samsung.com (Bartlomiej Zolnierkiewicz)
-Date: Mon, 04 Aug 2014 19:45:40 +0200
-Subject: [PATCH v4 0/5] ARM: EXYNOS: cpuidle: fix AFTR mode on boards with
- secure firmware enabled
-Message-ID: <1407174345-31213-1-git-send-email-b.zolnierkie@samsung.com>
+Date: Mon, 04 Aug 2014 19:45:41 +0200
+Subject: [PATCH v4 1/5] ARM: EXYNOS: PM: replace EXYNOS_BOOT_VECTOR_* macros by
+ static inlines
+In-Reply-To: <1407174345-31213-1-git-send-email-b.zolnierkie@samsung.com>
+References: <1407174345-31213-1-git-send-email-b.zolnierkie@samsung.com>
+Message-ID: <1407174345-31213-2-git-send-email-b.zolnierkie@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Replace EXYNOS_BOOT_VECTOR_ADDR and EXYNOS_BOOT_VECTOR_FLAG macros
+by exynos_boot_vector_addr() and exynos_boot_vector_flag() static
+inlines.
 
-This patch series adds support for AFTR idle mode on boards with
-secure firmware enabled and allows EXYNOS cpuidle driver usage on
-Exynos4x12 SoCs.
+This patch shouldn't cause any functionality changes.
 
-It has been tested on Trats2 board (using Exynos4412 SoC with secure
-firmware enabled) on which AFTR mode reduces power consumption by ~12%
-when EXYNOS cpuidle driver is enabled (in both cases the default
-exynos_defconfig config is used and CPU1-3 are offlined).
+Signed-off-by: Bartlomiej Zolnierkiewicz <b.zolnierkie@samsung.com>
+Acked-by: Kyungmin Park <kyungmin.park@samsung.com>
+Acked-by: Daniel Lezcano <daniel.lezcano@linaro.org>
+---
+ arch/arm/mach-exynos/pm.c | 32 ++++++++++++++++++++------------
+ 1 file changed, 20 insertions(+), 12 deletions(-)
 
-Depends on:
-- next-20140804 branch of linux-next kernel tree
-- [PATCH v4][next-20140804] ARM: EXYNOS: Fix suspend/resume sequences
-  (http://www.mail-archive.com/linux-samsung-soc at vger.kernel.org/msg35192.html)
-- [PATCH v2 0/2] Firmware-assisted suspend/resume of Exynos SoCs
-  (http://www.mail-archive.com/linux-samsung-soc at vger.kernel.org/msg34282.html)
-
-Changes since v3:
-- rebased on top of next-20140804 +
-  [PATCH v4][next-20140804] ARM: EXYNOS: Fix suspend/resume sequences
-  (http://www.mail-archive.com/linux-samsung-soc at vger.kernel.org/msg35192.html)
-  [PATCH v2 0/2] Firmware-assisted suspend/resume of Exynos SoCs
-  (http://www.mail-archive.com/linux-samsung-soc at vger.kernel.org/msg34282.html)
-- (re-)added patch fixing S5P_CENTRAL_SEQ_OPTION register setup
-
-Changes since v2:
-- rebased on top of next-20140708 +
-  [PATCH 5/6] ARM: EXYNOS: Fix suspend/resume sequencies
-  (http://www.mail-archive.com/linux-samsung-soc at vger.kernel.org/msg32809.html)
-  [with rejects fixed]
-  [PATCH 6/6] ARM: EXYNOS: Register cpuidle device only on Exynos4210 and 5250
-  (http://www.mail-archive.com/linux-samsung-soc at vger.kernel.org/msg32808.html)
-  [PATCH 0/2] Firmware-assisted suspend/resume of Exynos SoCs
-  (http://www.mail-archive.com/linux-samsung-soc at vger.kernel.org/msg32991.html)
-  [with rejects fixed in patch #2]
-- addressed review comments from Tomasz Figa and Daniel Lezcano
-
-Changes since v1:
-- synced against next-20140602
-- added missing Acked-by-s
-
-Best regards,
---
-Bartlomiej Zolnierkiewicz
-Samsung R&D Institute Poland
-Samsung Electronics
-
-
-Bartlomiej Zolnierkiewicz (5):
-  ARM: EXYNOS: PM: replace EXYNOS_BOOT_VECTOR_* macros by static inlines
-  ARM: EXYNOS: add AFTR mode support to firmware do_idle method
-  ARM: EXYNOS: cpuidle: add secure firmware support to AFTR mode code
-  ARM: EXYNOS: PM: fix register setup for AFTR mode code
-  ARM: EXYNOS: cpuidle: allow driver usage on Exynos4x12 SoCs
-
- arch/arm/include/asm/firmware.h |  2 +-
- arch/arm/mach-exynos/common.h   |  5 ++++
- arch/arm/mach-exynos/exynos.c   |  4 ++-
- arch/arm/mach-exynos/firmware.c | 33 ++++++++++++++++-------
- arch/arm/mach-exynos/pm.c       | 60 ++++++++++++++++++++++++-----------------
- 5 files changed, 69 insertions(+), 35 deletions(-)
-
+diff --git a/arch/arm/mach-exynos/pm.c b/arch/arm/mach-exynos/pm.c
+index 80a83b2..eeef8c4 100644
+--- a/arch/arm/mach-exynos/pm.c
++++ b/arch/arm/mach-exynos/pm.c
+@@ -101,16 +101,23 @@ static int exynos_irq_set_wake(struct irq_data *data, unsigned int state)
+ 	return -ENOENT;
+ }
+ 
+-#define EXYNOS_BOOT_VECTOR_ADDR	(samsung_rev() == EXYNOS4210_REV_1_1 ? \
+-			pmu_base_addr + S5P_INFORM7 : \
+-			(samsung_rev() == EXYNOS4210_REV_1_0 ? \
+-			(sysram_base_addr + 0x24) : \
+-			pmu_base_addr + S5P_INFORM0))
+-#define EXYNOS_BOOT_VECTOR_FLAG	(samsung_rev() == EXYNOS4210_REV_1_1 ? \
+-			pmu_base_addr + S5P_INFORM6 : \
+-			(samsung_rev() == EXYNOS4210_REV_1_0 ? \
+-			(sysram_base_addr + 0x20) : \
+-			pmu_base_addr + S5P_INFORM1))
++static inline void __iomem *exynos_boot_vector_addr(void)
++{
++	if (samsung_rev() == EXYNOS4210_REV_1_1)
++		return pmu_base_addr + S5P_INFORM7;
++	else if (samsung_rev() == EXYNOS4210_REV_1_0)
++		return sysram_base_addr + 0x24;
++	return pmu_base_addr + S5P_INFORM0;
++}
++
++static inline void __iomem *exynos_boot_vector_flag(void)
++{
++	if (samsung_rev() == EXYNOS4210_REV_1_1)
++		return pmu_base_addr + S5P_INFORM6;
++	else if (samsung_rev() == EXYNOS4210_REV_1_0)
++		return sysram_base_addr + 0x20;
++	return pmu_base_addr + S5P_INFORM1;
++}
+ 
+ #define S5P_CHECK_AFTR  0xFCBA0D10
+ #define S5P_CHECK_SLEEP 0x00000BAD
+@@ -195,8 +202,9 @@ static void exynos_set_wakeupmask(long mask)
+ 
+ static void exynos_cpu_set_boot_vector(long flags)
+ {
+-	__raw_writel(virt_to_phys(exynos_cpu_resume), EXYNOS_BOOT_VECTOR_ADDR);
+-	__raw_writel(flags, EXYNOS_BOOT_VECTOR_FLAG);
++	__raw_writel(virt_to_phys(exynos_cpu_resume),
++		     exynos_boot_vector_addr());
++	__raw_writel(flags, exynos_boot_vector_flag());
+ }
+ 
+ static int exynos_aftr_finisher(unsigned long flags)
 -- 
 1.8.2.3
