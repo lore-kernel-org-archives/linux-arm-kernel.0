@@ -1,136 +1,49 @@
-From: hanjun.guo@linaro.org (Hanjun Guo)
-Date: Mon,  4 Aug 2014 23:28:07 +0800
-Subject: [PATCH v2 00/18] Introduce ACPI for ARM64 based on ACPI 5.1
-Message-ID: <1407166105-17675-1-git-send-email-hanjun.guo@linaro.org>
+From: ohaugan@codeaurora.org (Olav Haugan)
+Date: Mon, 04 Aug 2014 08:39:15 -0700
+Subject: [PATCH v1 1/2] iommu/arm-smmu: Fix programming of SMMU_CBn_TCR
+ for stage 1
+In-Reply-To: <20140804094155.GC15117@arm.com>
+References: <1407113264-23426-1-git-send-email-ohaugan@codeaurora.org>
+ <1407113264-23426-2-git-send-email-ohaugan@codeaurora.org>
+ <20140804094155.GC15117@arm.com>
+Message-ID: <53DFA923.30708@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-ACPI 5.1 has been released and now be freely available for  
-download [1]. It fixed some major gaps to run ACPI on ARM,
-this patch just follow the ACPI 5.1 spec and prepare the
-code to run ACPI on ARM64.
+On 8/4/2014 2:41 AM, Will Deacon wrote:
+> Hi Olav,
+> 
+> On Mon, Aug 04, 2014 at 01:47:43AM +0100, Olav Haugan wrote:
+>> Stage-1 context bank does not have SMMU_CBn_TCR[SL0] field. SL0 field
+>> is only applicable to stage-2 context banks.
+> 
+> Ha, I actually noticed this last week but didn't get around to writing a
+> a fix. Thanks for taking a look!
+> 
+>> Signed-off-by: Olav Haugan <ohaugan@codeaurora.org>
+>> ---
+>>  drivers/iommu/arm-smmu.c | 5 +++--
+>>  1 file changed, 3 insertions(+), 2 deletions(-)
+>>
+>> diff --git a/drivers/iommu/arm-smmu.c b/drivers/iommu/arm-smmu.c
+>> index ff6633d..a83ca6a 100644
+>> --- a/drivers/iommu/arm-smmu.c
+>> +++ b/drivers/iommu/arm-smmu.c
+>> @@ -833,6 +833,8 @@ static void arm_smmu_init_context_bank(struct arm_smmu_domain *smmu_domain)
+>>  				reg |= (TTBCR2_ADDR_48 << TTBCR_PASIZE_SHIFT);
+>>  				break;
+>>  			}
+>> +			reg |= (TTBCR_SL0_LVL_1 << TTBCR_SL0_SHIFT);
+>> +
+> 
+> I think this block is all predicated on smmu->version > 1, so we need
+> something for stage2 CBs on SMMUv1 too.
 
-ACPI 5.1 has some major changes for the following tables and
-method which are essential for ARM platforms:
-
-1) MADT table updates.
-New fields were introduced to cover MPIDR and virtualization in
-GICC, and introduce GICR and GIC MSI frame structure to cover
-GICv3 and GICv2m (this patch set only cover GICv2).
-
-2) FADT updates for PSCI
-New fields were introduced to cover PSCI and ACPI can use psci
-to boot SMP and other PSCI related functions.
-
-3) GTDT
-GTDT was updated to support arch timer, memory-mapped tiemr,
-SBSA watchdog timer, in this patch, only arch timer tested on
-Juno board, so only arch timer init is available.
-
-4) _DSD
-_DSD (Device Specific Data) will provide some key values which
-presented by FDT before, it makes possible that some devices can
-be emumerated in ACPI way, please refer to the document provided
-in this patch set for detail.
-
-This patch set is the ARM64 ACPI core patches covered MADT, FADT
-and GTDT, _DSD is not covered in this patch set. We first introduce
-acpi.c and its related head file which are needed by ACPI core, and
-then get RSDP to extract all the ACPI boot-time tables.
-
-When all the boot-time tables (FADT, MADT, GTDT) are ready, then
-parse them to init the sytem when booted. Specifically, 
-a) we use FADT to init PSCI and use PSCI to boot SMP;
-b) Use MADT for GIC init and SMP init;
-c) GTDT for arch timer init.
-
-This patch set is based on Rafael's linux-pm tree/linux-next branch,
-and I already compiled it OK with:
-a) each patch applied on ARM64 with CONFIG_ACPI=y;
-b) CONFIG_ACPI=n on ARM64;
-c) CONFIG_ACPI=y on x86.
-
-Updates since v1:
-  - Set ACPI default off on ARM64 suggested by Olof;
-  - Rebase the patch set on top of linux-next branch/linux-pm tree which
-    includes the ACPICA for full ACPI 5.1 support.
-  - Update the document as suggested;
-  - Adress lots of comments from Mark, Sudeep, Randy, Naresh, Olof, Geoff
-    and more...
-
-[1]
-http://www.uefi.org/sites/default/files/resources/ACPI_5_1release.pdf
+Oh, I see. I will fix that.
 
 
-Al Stone (3):
-  ARM64 / ACPI: Get RSDP and ACPI boot-time tables
-  ARM64 / ACPI: Select ACPI_REDUCED_HARDWARE_ONLY if ACPI is enabled on
-    ARM64
-  ARM64 / ACPI: Introduce early_param for "acpi" and set ACPI default
-    off
-
-Ashwin Chaugule (1):
-  ACPI / table: Add new function to get table entries
-
-Graeme Gregory (4):
-  ARM64 / ACPI: Introduce lowlevel suspend function
-  ARM64 / ACPI: If we chose to boot from acpi then disable FDT
-  ARM64 / ACPI: Enable ARM64 in Kconfig
-  Documentation: ACPI for ARM64
-
-Hanjun Guo (9):
-  ARM64: Move the init of cpu_logical_map(0) before
-    unflatten_device_tree()
-  ARM64 / ACPI: Make PCI optional for ACPI on ARM64
-  ARM64 / ACPI: Parse FADT table to get PSCI flags for PSCI init
-  ARM64 / ACPI: Parse MADT to map logical cpu to MPIDR and get
-    cpu_possible/present_map
-  ACPI / table: Print GIC information when MADT is parsed
-  ARM64 / ACPI: Get the enable method for SMP initialization in ACPI
-    way
-  ACPI / processor: Make it possible to get CPU hardware ID via GICC
-  ARM64 / ACPI: Introduce ACPI_IRQ_MODEL_GIC and register device's gsi
-  ARM64 / ACPI: Parse GTDT to initialize arch timer
-
-Tomasz Nowicki (1):
-  ARM64 / ACPI: Add GICv2 specific ACPI boot support
-
- Documentation/arm64/arm-acpi.txt     |  215 +++++++++++++++++++
- Documentation/kernel-parameters.txt  |    5 +-
- arch/arm64/Kconfig                   |    3 +
- arch/arm64/include/asm/acenv.h       |   18 ++
- arch/arm64/include/asm/acpi.h        |  113 ++++++++++
- arch/arm64/include/asm/cpu.h         |   11 +
- arch/arm64/include/asm/pci.h         |   11 +
- arch/arm64/include/asm/smp.h         |    3 +-
- arch/arm64/kernel/Makefile           |    1 +
- arch/arm64/kernel/acpi.c             |  380 ++++++++++++++++++++++++++++++++++
- arch/arm64/kernel/cpu_ops.c          |   62 +++++-
- arch/arm64/kernel/irq.c              |    5 +
- arch/arm64/kernel/psci.c             |   89 ++++++--
- arch/arm64/kernel/setup.c            |   13 +-
- arch/arm64/kernel/smp.c              |   37 +++-
- arch/arm64/kernel/time.c             |    7 +
- drivers/acpi/Kconfig                 |    6 +-
- drivers/acpi/Makefile                |    2 +-
- drivers/acpi/bus.c                   |    3 +
- drivers/acpi/internal.h              |    5 +
- drivers/acpi/processor_core.c        |   37 ++++
- drivers/acpi/tables.c                |  109 ++++++++--
- drivers/clocksource/arm_arch_timer.c |  117 +++++++++--
- drivers/irqchip/irq-gic.c            |  114 ++++++++++
- include/linux/acpi.h                 |    5 +
- include/linux/clocksource.h          |    6 +
- include/linux/irqchip/arm-gic-acpi.h |   36 ++++
- include/linux/pci.h                  |   37 +++-
- 28 files changed, 1359 insertions(+), 91 deletions(-)
- create mode 100644 Documentation/arm64/arm-acpi.txt
- create mode 100644 arch/arm64/include/asm/acenv.h
- create mode 100644 arch/arm64/include/asm/acpi.h
- create mode 100644 arch/arm64/include/asm/cpu.h
- create mode 100644 arch/arm64/include/asm/pci.h
- create mode 100644 arch/arm64/kernel/acpi.c
- create mode 100644 include/linux/irqchip/arm-gic-acpi.h
+Olav
 
 -- 
-1.7.9.5
+The Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+hosted by The Linux Foundation
