@@ -1,181 +1,97 @@
 From: christoffer.dall@linaro.org (Christoffer Dall)
-Date: Mon,  4 Aug 2014 10:46:33 +0200
-Subject: [GIT PULL 16/51] KVM: ARM: vgic: abstract VMCR access
+Date: Mon,  4 Aug 2014 10:46:34 +0200
+Subject: [GIT PULL 17/51] KVM: ARM: vgic: introduce vgic_enable
 In-Reply-To: <1407142028-31105-1-git-send-email-christoffer.dall@linaro.org>
 References: <1407142028-31105-1-git-send-email-christoffer.dall@linaro.org>
-Message-ID: <1407142028-31105-17-git-send-email-christoffer.dall@linaro.org>
+Message-ID: <1407142028-31105-18-git-send-email-christoffer.dall@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Marc Zyngier <marc.zyngier@arm.com>
 
-Instead of directly messing with with the GICH_VMCR bits for the CPU
-interface save/restore code, add accessors that encode/decode the
-entire set of registers exposed by VMCR.
+Move the code dealing with enabling the VGIC on to vgic_ops.
 
-Not the most efficient thing, but given that this code is only used
-by the save/restore code, performance is far from being critical.
-
+Acked-by: Catalin Marinas <catalin.marinas@arm.com>
 Reviewed-by: Christoffer Dall <christoffer.dall@linaro.org>
 Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 ---
- include/kvm/arm_vgic.h |  9 +++++++
- virt/kvm/arm/vgic.c    | 69 ++++++++++++++++++++++++++++++++++++++------------
- 2 files changed, 62 insertions(+), 16 deletions(-)
+ include/kvm/arm_vgic.h |  1 +
+ virt/kvm/arm/vgic.c    | 29 +++++++++++++++++++++--------
+ 2 files changed, 22 insertions(+), 8 deletions(-)
 
 diff --git a/include/kvm/arm_vgic.h b/include/kvm/arm_vgic.h
-index cdfa5d9..f515800 100644
+index f515800..2228973 100644
 --- a/include/kvm/arm_vgic.h
 +++ b/include/kvm/arm_vgic.h
-@@ -81,6 +81,13 @@ struct vgic_lr {
- 	u8	state;
- };
- 
-+struct vgic_vmcr {
-+	u32	ctlr;
-+	u32	abpr;
-+	u32	bpr;
-+	u32	pmr;
-+};
-+
- struct vgic_ops {
- 	struct vgic_lr	(*get_lr)(const struct kvm_vcpu *, int);
- 	void	(*set_lr)(struct kvm_vcpu *, int, struct vgic_lr);
-@@ -90,6 +97,8 @@ struct vgic_ops {
- 	u32	(*get_interrupt_status)(const struct kvm_vcpu *vcpu);
- 	void	(*enable_underflow)(struct kvm_vcpu *vcpu);
+@@ -99,6 +99,7 @@ struct vgic_ops {
  	void	(*disable_underflow)(struct kvm_vcpu *vcpu);
-+	void	(*get_vmcr)(struct kvm_vcpu *vcpu, struct vgic_vmcr *vmcr);
-+	void	(*set_vmcr)(struct kvm_vcpu *vcpu, struct vgic_vmcr *vmcr);
+ 	void	(*get_vmcr)(struct kvm_vcpu *vcpu, struct vgic_vmcr *vmcr);
+ 	void	(*set_vmcr)(struct kvm_vcpu *vcpu, struct vgic_vmcr *vmcr);
++	void	(*enable)(struct kvm_vcpu *vcpu);
  };
  
  struct vgic_dist {
 diff --git a/virt/kvm/arm/vgic.c b/virt/kvm/arm/vgic.c
-index 6d618e0..5c70639 100644
+index 5c70639..70f674b 100644
 --- a/virt/kvm/arm/vgic.c
 +++ b/virt/kvm/arm/vgic.c
-@@ -100,8 +100,10 @@ static void vgic_kick_vcpus(struct kvm *kvm);
- static void vgic_dispatch_sgi(struct kvm_vcpu *vcpu, u32 reg);
- static struct vgic_lr vgic_get_lr(const struct kvm_vcpu *vcpu, int lr);
- static void vgic_set_lr(struct kvm_vcpu *vcpu, int lr, struct vgic_lr lr_desc);
--static u32 vgic_nr_lr;
-+static void vgic_get_vmcr(struct kvm_vcpu *vcpu, struct vgic_vmcr *vmcr);
-+static void vgic_set_vmcr(struct kvm_vcpu *vcpu, struct vgic_vmcr *vmcr);
- 
-+static u32 vgic_nr_lr;
- static unsigned int vgic_maint_irq;
- 
- static u32 *vgic_bitmap_get_reg(struct vgic_bitmap *x,
-@@ -1073,6 +1075,28 @@ static void vgic_v2_disable_underflow(struct kvm_vcpu *vcpu)
- 	vcpu->arch.vgic_cpu.vgic_v2.vgic_hcr &= ~GICH_HCR_UIE;
+@@ -1097,6 +1097,19 @@ static void vgic_v2_set_vmcr(struct kvm_vcpu *vcpu, struct vgic_vmcr *vmcrp)
+ 	vcpu->arch.vgic_cpu.vgic_v2.vgic_vmcr = vmcr;
  }
  
-+static void vgic_v2_get_vmcr(struct kvm_vcpu *vcpu, struct vgic_vmcr *vmcrp)
++static void vgic_v2_enable(struct kvm_vcpu *vcpu)
 +{
-+	u32 vmcr = vcpu->arch.vgic_cpu.vgic_v2.vgic_vmcr;
++	/*
++	 * By forcing VMCR to zero, the GIC will restore the binary
++	 * points to their reset values. Anything else resets to zero
++	 * anyway.
++	 */
++	vcpu->arch.vgic_cpu.vgic_v2.vgic_vmcr = 0;
 +
-+	vmcrp->ctlr = (vmcr & GICH_VMCR_CTRL_MASK) >> GICH_VMCR_CTRL_SHIFT;
-+	vmcrp->abpr = (vmcr & GICH_VMCR_ALIAS_BINPOINT_MASK) >> GICH_VMCR_ALIAS_BINPOINT_SHIFT;
-+	vmcrp->bpr  = (vmcr & GICH_VMCR_BINPOINT_MASK) >> GICH_VMCR_BINPOINT_SHIFT;
-+	vmcrp->pmr  = (vmcr & GICH_VMCR_PRIMASK_MASK) >> GICH_VMCR_PRIMASK_SHIFT;
-+}
-+
-+static void vgic_v2_set_vmcr(struct kvm_vcpu *vcpu, struct vgic_vmcr *vmcrp)
-+{
-+	u32 vmcr;
-+
-+	vmcr  = (vmcrp->ctlr << GICH_VMCR_CTRL_SHIFT) & GICH_VMCR_CTRL_MASK;
-+	vmcr |= (vmcrp->abpr << GICH_VMCR_ALIAS_BINPOINT_SHIFT) & GICH_VMCR_ALIAS_BINPOINT_MASK;
-+	vmcr |= (vmcrp->bpr << GICH_VMCR_BINPOINT_SHIFT) & GICH_VMCR_BINPOINT_MASK;
-+	vmcr |= (vmcrp->pmr << GICH_VMCR_PRIMASK_SHIFT) & GICH_VMCR_PRIMASK_MASK;
-+
-+	vcpu->arch.vgic_cpu.vgic_v2.vgic_vmcr = vmcr;
++	/* Get the show on the road... */
++	vcpu->arch.vgic_cpu.vgic_v2.vgic_hcr = GICH_HCR_EN;
 +}
 +
  static const struct vgic_ops vgic_ops = {
  	.get_lr			= vgic_v2_get_lr,
  	.set_lr			= vgic_v2_set_lr,
-@@ -1082,6 +1106,8 @@ static const struct vgic_ops vgic_ops = {
- 	.get_interrupt_status	= vgic_v2_get_interrupt_status,
- 	.enable_underflow	= vgic_v2_enable_underflow,
+@@ -1108,6 +1121,7 @@ static const struct vgic_ops vgic_ops = {
  	.disable_underflow	= vgic_v2_disable_underflow,
-+	.get_vmcr		= vgic_v2_get_vmcr,
-+	.set_vmcr		= vgic_v2_set_vmcr,
+ 	.get_vmcr		= vgic_v2_get_vmcr,
+ 	.set_vmcr		= vgic_v2_set_vmcr,
++	.enable			= vgic_v2_enable,
  };
  
  static struct vgic_lr vgic_get_lr(const struct kvm_vcpu *vcpu, int lr)
-@@ -1126,6 +1152,16 @@ static inline void vgic_disable_underflow(struct kvm_vcpu *vcpu)
- 	vgic_ops.disable_underflow(vcpu);
+@@ -1162,6 +1176,11 @@ static void vgic_set_vmcr(struct kvm_vcpu *vcpu, struct vgic_vmcr *vmcr)
+ 	vgic_ops.set_vmcr(vcpu, vmcr);
  }
  
-+static inline void vgic_get_vmcr(struct kvm_vcpu *vcpu, struct vgic_vmcr *vmcr)
++static inline void vgic_enable(struct kvm_vcpu *vcpu)
 +{
-+	vgic_ops.get_vmcr(vcpu, vmcr);
-+}
-+
-+static void vgic_set_vmcr(struct kvm_vcpu *vcpu, struct vgic_vmcr *vmcr)
-+{
-+	vgic_ops.set_vmcr(vcpu, vmcr);
++	vgic_ops.enable(vcpu);
 +}
 +
  static void vgic_retire_lr(int lr_nr, int irq, struct kvm_vcpu *vcpu)
  {
  	struct vgic_cpu *vgic_cpu = &vcpu->arch.vgic_cpu;
-@@ -1879,39 +1915,40 @@ int kvm_vgic_addr(struct kvm *kvm, unsigned long type, u64 *addr, bool write)
- static bool handle_cpu_mmio_misc(struct kvm_vcpu *vcpu,
- 				 struct kvm_exit_mmio *mmio, phys_addr_t offset)
- {
--	struct vgic_cpu *vgic_cpu = &vcpu->arch.vgic_cpu;
--	u32 reg, mask = 0, shift = 0;
- 	bool updated = false;
-+	struct vgic_vmcr vmcr;
-+	u32 *vmcr_field;
-+	u32 reg;
+@@ -1624,15 +1643,9 @@ int kvm_vgic_vcpu_init(struct kvm_vcpu *vcpu)
+ 		vgic_cpu->vgic_irq_lr_map[i] = LR_EMPTY;
+ 	}
+ 
+-	/*
+-	 * By forcing VMCR to zero, the GIC will restore the binary
+-	 * points to their reset values. Anything else resets to zero
+-	 * anyway.
+-	 */
+-	vgic_cpu->vgic_v2.vgic_vmcr = 0;
+-
+ 	vgic_cpu->nr_lr = vgic_nr_lr;
+-	vgic_cpu->vgic_v2.vgic_hcr = GICH_HCR_EN; /* Get the show on the road... */
 +
-+	vgic_get_vmcr(vcpu, &vmcr);
++	vgic_enable(vcpu);
  
- 	switch (offset & ~0x3) {
- 	case GIC_CPU_CTRL:
--		mask = GICH_VMCR_CTRL_MASK;
--		shift = GICH_VMCR_CTRL_SHIFT;
-+		vmcr_field = &vmcr.ctlr;
- 		break;
- 	case GIC_CPU_PRIMASK:
--		mask = GICH_VMCR_PRIMASK_MASK;
--		shift = GICH_VMCR_PRIMASK_SHIFT;
-+		vmcr_field = &vmcr.pmr;
- 		break;
- 	case GIC_CPU_BINPOINT:
--		mask = GICH_VMCR_BINPOINT_MASK;
--		shift = GICH_VMCR_BINPOINT_SHIFT;
-+		vmcr_field = &vmcr.bpr;
- 		break;
- 	case GIC_CPU_ALIAS_BINPOINT:
--		mask = GICH_VMCR_ALIAS_BINPOINT_MASK;
--		shift = GICH_VMCR_ALIAS_BINPOINT_SHIFT;
-+		vmcr_field = &vmcr.abpr;
- 		break;
-+	default:
-+		BUG();
- 	}
- 
- 	if (!mmio->is_write) {
--		reg = (vgic_cpu->vgic_v2.vgic_vmcr & mask) >> shift;
-+		reg = *vmcr_field;
- 		mmio_data_write(mmio, ~0, reg);
- 	} else {
- 		reg = mmio_data_read(mmio, ~0);
--		reg = (reg << shift) & mask;
--		if (reg != (vgic_cpu->vgic_v2.vgic_vmcr & mask))
-+		if (reg != *vmcr_field) {
-+			*vmcr_field = reg;
-+			vgic_set_vmcr(vcpu, &vmcr);
- 			updated = true;
--		vgic_cpu->vgic_v2.vgic_vmcr &= ~mask;
--		vgic_cpu->vgic_v2.vgic_vmcr |= reg;
-+		}
- 	}
- 	return updated;
+ 	return 0;
  }
 -- 
 2.0.0
