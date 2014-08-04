@@ -1,31 +1,39 @@
-From: s-anna@ti.com (Suman Anna)
-Date: Mon, 4 Aug 2014 10:48:56 -0500
-Subject: [PATCH 1/2] remoteproc: use a flag to detect the presence of IOMMU
-In-Reply-To: <CAK=Wgbbf5JNxzW16z=vXHi9D8Om1KnLEEr7hEw5T0oN7GuM=og@mail.gmail.com>
-References: <1404836521-59637-1-git-send-email-s-anna@ti.com>
- <1404836521-59637-2-git-send-email-s-anna@ti.com>
- <CAK=Wgbawdik3ZB0Zbeaa7eXd7M+9ev9u713GcfOc4Gy0+O80Dg@mail.gmail.com>
- <53D7C769.6080500@ti.com>
- <CAK=Wgbbf5JNxzW16z=vXHi9D8Om1KnLEEr7hEw5T0oN7GuM=og@mail.gmail.com>
-Message-ID: <53DFAB68.6020903@ti.com>
+From: dvhart@linux.intel.com (Darren Hart)
+Date: Mon, 04 Aug 2014 08:55:50 -0700
+Subject: [PATCH v2] spi/pxa2xx-pci: Add common clock framework support in
+ PCI glue layer
+In-Reply-To: <CAAQYJAtLVgqbs=n2gxyemDAoHhM=7PFJy9bqKUExTbC+1rSNMg@mail.gmail.com>
+References: <1406221854-12828-1-git-send-email-chiau.ee.chew@intel.com>
+ <20140725053230.GT1857@lahna.fi.intel.com>
+ <CAAQYJAtM79NJJtfNYda-yFk113nm-2D8gZE5x=gbnLt2_eUdzQ@mail.gmail.com>
+ <20140729185529.GG17528@sirena.org.uk>
+ <CAAQYJAtLVgqbs=n2gxyemDAoHhM=7PFJy9bqKUExTbC+1rSNMg@mail.gmail.com>
+Message-ID: <D004FADD.9F315%dvhart@linux.intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08/04/2014 06:50 AM, Ohad Ben-Cohen wrote:
-> On Tue, Jul 29, 2014 at 7:10 PM, Suman Anna <s-anna@ti.com> wrote:
->> We are trying to add a remoteproc driver for a small Cortex M3 called
->> the WkupM3 used for suspend/resume management on TI AM335/AM437x SoCs.
->> This processor does not have an MMU. Same is the case with another
->> processor subsystem PRU-ICSS on AM335/AM437x. All these are platform
->> devices, and the current iommu_present check will not scale for the same
->> kernel image to support OMAP4/OMAP5 and AM335/AM437x.
-> 
-> That's perfect, thanks. Can you please add this use case description
-> to the commit log?
+On 7/29/14, 15:06, "Andrea Adami" <andrea.adami@gmail.com> wrote:
 
-I kept the current description generic, but sure, I can add this
-specific usecase examples to the commit log. I will post the revised
-patches once rc1 is out.
+>On Tue, Jul 29, 2014 at 8:55 PM, Mark Brown <broonie@kernel.org> wrote:
+>> On Tue, Jul 29, 2014 at 06:13:06PM +0200, Andrea Adami wrote:
+>>
+>>> note that a previous version of the patch breaks spi on pxa machines:
+>>> tested on pxa250 poodle and pxa255 corgi.
+>>> The patch is included in linux-Yocto since 3.14.
+>>
+>> The interesting question is if this version works...
+>
+>Happy to report that I could finally test on poodle/pxa250 the current
+>v2 and the patch doesn't seem to disturb the probe.
+>Sorry for the noise.
+>
+>Andrea
+>
 
-regards
-Suman
+I tested this (v2) on the MinnowBoard-Max (Baytrail Atom E3825) in PCI
+mode and successfully attached an MCP32XX ADC and tested it's IIO
+interface.
+
+-- 
+Darren Hart					Open Source Technology Center
+darren.hart at intel.com				            Intel Corporation
