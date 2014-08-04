@@ -1,51 +1,86 @@
-From: Nathan_Lynch@mentor.com (Nathan Lynch)
-Date: Mon, 4 Aug 2014 09:11:29 -0500
-Subject: [PATCH v8 01/10] ARM: use _install_special_mapping for sigpage
-In-Reply-To: <53DF86BA.2030207@mentor.com>
-References: <1407003407-31219-1-git-send-email-nathan_lynch@mentor.com>
- <1407003407-31219-2-git-send-email-nathan_lynch@mentor.com>
- <20140804124630.GG15117@arm.com> <53DF86BA.2030207@mentor.com>
-Message-ID: <53DF9491.5040204@mentor.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Mon, 04 Aug 2014 15:22:16 +0100
+Subject: [RFC] Saving/Restoring the internal state of an interrupt
+In-Reply-To: <20140804132648.GA2471@cbox> (Christoffer Dall's message of "Mon,
+ 4 Aug 2014 14:26:48 +0100")
+References: <539F3BDD.2090009@arm.com> <20140804115716.GA524@cbox>
+ <87fvhch1x2.fsf@approximate.cambridge.arm.com>
+ <20140804132648.GA2471@cbox>
+Message-ID: <86r40w1giv.fsf@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08/04/2014 08:12 AM, Nathan Lynch wrote:
-> On 08/04/2014 07:46 AM, Will Deacon wrote:
->> On Sat, Aug 02, 2014 at 07:16:38PM +0100, Nathan Lynch wrote:
->>> _install_special_mapping allows the VMA to be identifed in
->>> /proc/pid/maps without the use of arch_vma_name, providing a
->>> slight net reduction in object size:
->>>
->>>   text    data     bss     dec     hex filename
->>>   2996      96     144    3236     ca4 arch/arm/kernel/process.o (before)
->>>   2956     104     144    3204     c84 arch/arm/kernel/process.o (after)
->>>
->>> Signed-off-by: Nathan Lynch <nathan_lynch@mentor.com>
->>> Reviewed-by: Kees Cook <keescook@chromium.org>
->>> ---
->>>  arch/arm/kernel/process.c | 24 ++++++++++++++++--------
->>>  1 file changed, 16 insertions(+), 8 deletions(-)
->>>
->>> diff --git a/arch/arm/kernel/process.c b/arch/arm/kernel/process.c
->>> index 81ef686a91ca..46fbbb3701a0 100644
->>> --- a/arch/arm/kernel/process.c
->>> +++ b/arch/arm/kernel/process.c
->>> @@ -472,19 +472,23 @@ int in_gate_area_no_mm(unsigned long addr)
->>>  
->>>  const char *arch_vma_name(struct vm_area_struct *vma)
->>>  {
->>> -	return is_gate_vma(vma) ? "[vectors]" :
->>> -		(vma->vm_mm && vma->vm_start == vma->vm_mm->context.sigpage) ?
->>> -		 "[sigpage]" : NULL;
->>> +	return is_gate_vma(vma) ? "[vectors]" : NULL;
->>>  }
->>
->> Why do you need this function? I just removed it for arm64 and I think x86
->> has done the same.
-> 
-> I think arch_vma_name is still needed for arm as long as the vectors
-> page is not installed using _install_special_mapping.
+On Mon, Aug 04 2014 at 02:26:48 PM, Christoffer Dall <christoffer.dall@linaro.org> wrote:
+> On Mon, Aug 04, 2014 at 01:31:05PM +0100, Marc Zyngier wrote:
+>> On Mon, Aug 04 2014 at 12:57:16 pm BST, Christoffer Dall
+>> <christoffer.dall@linaro.org> wrote:
+>> > On Mon, Jun 16, 2014 at 07:47:57PM +0100, Marc Zyngier wrote:
+>> >> Thomas, all,
+>> >> 
+>> >> Since ARM has grown some virtualization extensions, there is a
+>> >> particular issue I've carefully avoided to address, and which is now
+>> >> biting me exactly where you think it does.
+>> >> 
+>> >> Let's expose the problem:
+>> >> - We have a per-CPU timer (the architected timer)
+>> >> - This timer is shared across virtual machines
+>> >> - We context-switch the state of the timer on entry/exit of the VM
+>> >> 
+>> >> The state of the timer itself is basically a control word and a
+>> >> comparator value. Not much. Ah yes, one tiny detail: the state of the
+>> >> interrupt controller (the GIC) is also part of the state.
+>> >> 
+>> >> This interrupt state is not the pending state, but the internal state
+>> >> (called the "active" state), indicating if the interrupt is in
+>> >> progress or not. If the interrupt is active (and configured as a level
+>> >> interrupt), then the interrupt can't fire again until the guest EOIs
+>> >> it (there is some special hardware dedicated to this).
+>> >
+>> > Can you clarify this part.  I was under the impression from reading the
+>> > GICv2 specs at least that an active interrupt can become active and
+>> > pending (and the pending part of that would cause the interrupt to fire
+>> > again).  Specifically, I'm thinking about transition A2 in Figure 3-1 in
+>> > the GICv2 spec (ARM IHI 0048B.b).  Am I reading this incorrectly or is
+>> > there something special about the timer in this regard?
+>> 
+>> Nothing special about the timer. Just that the timer being a level
+>> interrupt, the pending state is a direct consequence of the level being
+>> high (as mentionned in the note at the bottom of 1.4.2).
+>> 
+>> You go from Pending to Active-and-Pending, and then to Active (when the
+>> timer is reprogrammed/disabled, though you may go back to A&P if the timer
+>> fires again immediately). Eventually, after the EOI, you go back to
+>> Inactive.
+>> 
+>> Here, the only bit we really care about is the Active bit (Pending
+>> changes anyway, as we save/restore the timer context).
+>> 
+>> Or is there something that I don't understand in your question?
+>> 
+>
+> If not using priorities, what difference does it make if we save/restore
+> the active bit?  The whole point is that a timer that the guest hasn't
+> reprogrammed/disabled should not raise a hardware interrupt, right?
 
-Actually... if we give arm's gate_vma a vm_ops with a ->name() routine
-that returns "[vectors]" we could get rid of arch_vma_name, I think.
-This seems to be what x86_64 does.
+It makes a massive difference: the interrupt is active on the host, and
+it is what will prevent subsequent (and possibly spurious) timer
+interrupts from being taken.
+
+> So what I inferred from your text is that we prevent that from happening
+> by restoring the active bit.  But that will still cause the hardware to
+> assert the signal (we will become A&P) and that would raise the
+> interrupt on the hardware, we would trap again, and so on.  Or?
+
+If the interrupt is already active when you restore the timer state, no
+other timer interrupt will be injected. That's the whole point of the
+active bit.
+
+It feels like we're talking past each other, or that we're not exatly
+talking about the same thing. If that's of any help, can you have a look
+at the irq_forwarding patches I've posted a while ago?
+
+Thanks,
+
+	M.
+-- 
+Jazz is not dead. It just smells funny.
