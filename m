@@ -1,99 +1,49 @@
 From: jingchang.lu@freescale.com (Jingchang Lu)
-Date: Mon, 4 Aug 2014 17:39:07 +0800
-Subject: [PATCHv2 5/6] ARM: imx: Add initial support for Freescale LS1021A
-In-Reply-To: <1407145148-29217-1-git-send-email-jingchang.lu@freescale.com>
-References: <1407145148-29217-1-git-send-email-jingchang.lu@freescale.com>
-Message-ID: <1407145148-29217-6-git-send-email-jingchang.lu@freescale.com>
+Date: Mon, 4 Aug 2014 17:45:37 +0800
+Subject: [PATCH] clk: ppc-corenet: Add Freescale ARM-based platforms
+ CLK_OF_DECLARE support
+Message-ID: <1407145537-15027-1-git-send-email-jingchang.lu@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Jingchang Lu <b35083@freescale.com>
-
-The LS1021A SoC is a dual-core Cortex-A7 based processor,
-this add the initial support for it.
-
-Signed-off-by: Jingchang Lu <b35083@freescale.com>
+Signed-off-by: Jingchang Lu <jingchang.lu@freescale.com>
 ---
- arch/arm/mach-imx/Kconfig        | 14 ++++++++++++++
- arch/arm/mach-imx/Makefile       |  2 ++
- arch/arm/mach-imx/mach-ls1021a.c | 33 +++++++++++++++++++++++++++++++++
- 3 files changed, 49 insertions(+)
- create mode 100644 arch/arm/mach-imx/mach-ls1021a.c
+ drivers/clk/Kconfig           | 7 ++++---
+ drivers/clk/clk-ppc-corenet.c | 5 +++++
+ 2 files changed, 9 insertions(+), 3 deletions(-)
 
-diff --git a/arch/arm/mach-imx/Kconfig b/arch/arm/mach-imx/Kconfig
-index 9de84a2..d9b9a2b 100644
---- a/arch/arm/mach-imx/Kconfig
-+++ b/arch/arm/mach-imx/Kconfig
-@@ -736,6 +736,20 @@ config SOC_VF610
- 	help
- 	  This enable support for Freescale Vybrid VF610 processor.
+diff --git a/drivers/clk/Kconfig b/drivers/clk/Kconfig
+index cfd3af7..8784704 100644
+--- a/drivers/clk/Kconfig
++++ b/drivers/clk/Kconfig
+@@ -82,11 +82,12 @@ config COMMON_CLK_AXI_CLKGEN
+ 	  FPGAs. It is commonly used in Analog Devices' reference designs.
  
-+config SOC_LS1021A
-+	bool "Freescale LS1021A support"
-+	select CPU_V7
-+	select ARM_GIC
-+	select CLKSRC_OF
-+	select HAVE_ARM_ARCH_TIMER
-+	select HAVE_SMP
-+	select MIGHT_HAVE_PCI
-+	select PCI_DOMAINS if PCI
-+	select ZONE_DMA if ARM_LPAE
-+
-+	help
-+	  This enable support for Freescale LS1021A processor.
-+
- endif
+ config CLK_PPC_CORENET
+-	bool "Clock driver for PowerPC corenet platforms"
+-	depends on PPC_E500MC && OF
++	bool "Clock driver for PowerPC corenet and compatible ARM-based platforms"
++	depends on (PPC_E500MC || ARM) && OF
+ 	---help---
+ 	  This adds the clock driver support for Freescale PowerPC corenet
+-	  platforms using common clock framework.
++	  platforms and compatible Freescale ARM based platforms using common
++	  clock framework.
  
- source "arch/arm/mach-imx/devices/Kconfig"
-diff --git a/arch/arm/mach-imx/Makefile b/arch/arm/mach-imx/Makefile
-index ac88599..2bc354c 100644
---- a/arch/arm/mach-imx/Makefile
-+++ b/arch/arm/mach-imx/Makefile
-@@ -112,4 +112,6 @@ obj-$(CONFIG_SOC_IMX53) += mach-imx53.o
- 
- obj-$(CONFIG_SOC_VF610) += clk-vf610.o mach-vf610.o
- 
-+obj-$(CONFIG_SOC_LS1021A) += mach-ls1021a.o
+ config COMMON_CLK_XGENE
+ 	bool "Clock driver for APM XGene SoC"
+diff --git a/drivers/clk/clk-ppc-corenet.c b/drivers/clk/clk-ppc-corenet.c
+index 8e58edf..7692cac 100644
+--- a/drivers/clk/clk-ppc-corenet.c
++++ b/drivers/clk/clk-ppc-corenet.c
+@@ -305,3 +305,8 @@ static int __init ppc_corenet_clk_init(void)
+ 	return platform_driver_register(&ppc_corenet_clk_driver);
+ }
+ subsys_initcall(ppc_corenet_clk_init);
 +
- obj-y += devices/
-diff --git a/arch/arm/mach-imx/mach-ls1021a.c b/arch/arm/mach-imx/mach-ls1021a.c
-new file mode 100644
-index 0000000..2ffc20f
---- /dev/null
-+++ b/arch/arm/mach-imx/mach-ls1021a.c
-@@ -0,0 +1,33 @@
-+/*
-+ * Copyright 2013-2014 Freescale Semiconductor, Inc.
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License as published by
-+ * the Free Software Foundation; either version 2 of the License, or
-+ * (at your option) any later version.
-+ */
-+
-+#include <linux/of_platform.h>
-+#include <asm/mach/arch.h>
-+
-+#include "common.h"
-+
-+static void __init ls1021a_init_machine(void)
-+{
-+	mxc_arch_reset_init_dt();
-+	of_platform_populate(NULL, of_default_bus_match_table, NULL, NULL);
-+}
-+
-+static const char *ls1021a_dt_compat[] __initdata = {
-+	"fsl,ls1021a",
-+	NULL,
-+};
-+
-+DT_MACHINE_START(LS1021A, "Freescale LS1021A")
-+#ifdef CONFIG_ZONE_DMA
-+	.dma_zone_size	= SZ_128M,
-+#endif
-+	.init_machine   = ls1021a_init_machine,
-+	.dt_compat	= ls1021a_dt_compat,
-+	.restart	= mxc_restart,
-+MACHINE_END
++CLK_OF_DECLARE(ppc_core_pll_v1, "fsl,qoriq-core-pll-1.0", core_pll_init);
++CLK_OF_DECLARE(ppc_core_pll_v2, "fsl,qoriq-core-pll-2.0", core_pll_init);
++CLK_OF_DECLARE(ppc_core_mux_v1, "fsl,qoriq-core-mux-1.0", core_mux_init);
++CLK_OF_DECLARE(ppc_core_mux_v2, "fsl,qoriq-core-mux-2.0", core_mux_init);
 -- 
 1.8.0
