@@ -1,309 +1,65 @@
 From: christoffer.dall@linaro.org (Christoffer Dall)
-Date: Mon,  4 Aug 2014 10:46:42 +0200
-Subject: [GIT PULL 25/51] arm64: KVM: vgic: add GICv3 world switch
+Date: Mon,  4 Aug 2014 10:46:43 +0200
+Subject: [GIT PULL 26/51] arm64: KVM: vgic: enable GICv2 emulation on top on
+ GICv3 hardware
 In-Reply-To: <1407142028-31105-1-git-send-email-christoffer.dall@linaro.org>
 References: <1407142028-31105-1-git-send-email-christoffer.dall@linaro.org>
-Message-ID: <1407142028-31105-26-git-send-email-christoffer.dall@linaro.org>
+Message-ID: <1407142028-31105-27-git-send-email-christoffer.dall@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Marc Zyngier <marc.zyngier@arm.com>
 
-Introduce the GICv3 world switch code used to save/restore the
-GICv3 context.
+Add the last missing bits that enable GICv2 emulation on top of
+GICv3 hardware.
 
-Acked-by: Catalin Marinas <catalin.marinas@arm.com>
-Reviewed-by: Christoffer Dall <christoffer.dall@linaro.org>
 Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 ---
- arch/arm64/include/asm/kvm_asm.h |   2 +
- arch/arm64/kernel/asm-offsets.c  |   8 ++
- arch/arm64/kvm/vgic-v3-switch.S  | 238 +++++++++++++++++++++++++++++++++++++++
- 3 files changed, 248 insertions(+)
+ arch/arm64/include/asm/kvm_host.h | 7 +++++++
+ arch/arm64/kvm/Makefile           | 2 ++
+ virt/kvm/arm/vgic.c               | 1 +
+ 3 files changed, 10 insertions(+)
 
-diff --git a/arch/arm64/include/asm/kvm_asm.h b/arch/arm64/include/asm/kvm_asm.h
-index ed4987b..a28c35b 100644
---- a/arch/arm64/include/asm/kvm_asm.h
-+++ b/arch/arm64/include/asm/kvm_asm.h
-@@ -110,6 +110,8 @@ extern u64 __vgic_v3_get_ich_vtr_el2(void);
+diff --git a/arch/arm64/include/asm/kvm_host.h b/arch/arm64/include/asm/kvm_host.h
+index 4c182d0..4ae9213 100644
+--- a/arch/arm64/include/asm/kvm_host.h
++++ b/arch/arm64/include/asm/kvm_host.h
+@@ -216,6 +216,13 @@ static inline void vgic_arch_setup(const struct vgic_params *vgic)
+ 		__vgic_sr_vectors.restore_vgic	= __restore_vgic_v2_state;
+ 		break;
  
- extern char __save_vgic_v2_state[];
- extern char __restore_vgic_v2_state[];
-+extern char __save_vgic_v3_state[];
-+extern char __restore_vgic_v3_state[];
++#ifdef CONFIG_ARM_GIC_V3
++	case VGIC_V3:
++		__vgic_sr_vectors.save_vgic	= __save_vgic_v3_state;
++		__vgic_sr_vectors.restore_vgic	= __restore_vgic_v3_state;
++		break;
++#endif
++
+ 	default:
+ 		BUG();
+ 	}
+diff --git a/arch/arm64/kvm/Makefile b/arch/arm64/kvm/Makefile
+index daf24dc..32a0961 100644
+--- a/arch/arm64/kvm/Makefile
++++ b/arch/arm64/kvm/Makefile
+@@ -22,4 +22,6 @@ kvm-$(CONFIG_KVM_ARM_HOST) += guest.o reset.o sys_regs.o sys_regs_generic_v8.o
+ kvm-$(CONFIG_KVM_ARM_VGIC) += $(KVM)/arm/vgic.o
+ kvm-$(CONFIG_KVM_ARM_VGIC) += $(KVM)/arm/vgic-v2.o
+ kvm-$(CONFIG_KVM_ARM_VGIC) += vgic-v2-switch.o
++kvm-$(CONFIG_KVM_ARM_VGIC) += $(KVM)/arm/vgic-v3.o
++kvm-$(CONFIG_KVM_ARM_VGIC) += vgic-v3-switch.o
+ kvm-$(CONFIG_KVM_ARM_TIMER) += $(KVM)/arm/arch_timer.o
+diff --git a/virt/kvm/arm/vgic.c b/virt/kvm/arm/vgic.c
+index 7867b9a..795ab48 100644
+--- a/virt/kvm/arm/vgic.c
++++ b/virt/kvm/arm/vgic.c
+@@ -1530,6 +1530,7 @@ static struct notifier_block vgic_cpu_nb = {
  
- #endif
+ static const struct of_device_id vgic_ids[] = {
+ 	{ .compatible = "arm,cortex-a15-gic", .data = vgic_v2_probe, },
++	{ .compatible = "arm,gic-v3", .data = vgic_v3_probe, },
+ 	{},
+ };
  
-diff --git a/arch/arm64/kernel/asm-offsets.c b/arch/arm64/kernel/asm-offsets.c
-index dafc415..e74654c 100644
---- a/arch/arm64/kernel/asm-offsets.c
-+++ b/arch/arm64/kernel/asm-offsets.c
-@@ -139,6 +139,14 @@ int main(void)
-   DEFINE(VGIC_V2_CPU_ELRSR,	offsetof(struct vgic_cpu, vgic_v2.vgic_elrsr));
-   DEFINE(VGIC_V2_CPU_APR,	offsetof(struct vgic_cpu, vgic_v2.vgic_apr));
-   DEFINE(VGIC_V2_CPU_LR,	offsetof(struct vgic_cpu, vgic_v2.vgic_lr));
-+  DEFINE(VGIC_V3_CPU_HCR,	offsetof(struct vgic_cpu, vgic_v3.vgic_hcr));
-+  DEFINE(VGIC_V3_CPU_VMCR,	offsetof(struct vgic_cpu, vgic_v3.vgic_vmcr));
-+  DEFINE(VGIC_V3_CPU_MISR,	offsetof(struct vgic_cpu, vgic_v3.vgic_misr));
-+  DEFINE(VGIC_V3_CPU_EISR,	offsetof(struct vgic_cpu, vgic_v3.vgic_eisr));
-+  DEFINE(VGIC_V3_CPU_ELRSR,	offsetof(struct vgic_cpu, vgic_v3.vgic_elrsr));
-+  DEFINE(VGIC_V3_CPU_AP0R,	offsetof(struct vgic_cpu, vgic_v3.vgic_ap0r));
-+  DEFINE(VGIC_V3_CPU_AP1R,	offsetof(struct vgic_cpu, vgic_v3.vgic_ap1r));
-+  DEFINE(VGIC_V3_CPU_LR,	offsetof(struct vgic_cpu, vgic_v3.vgic_lr));
-   DEFINE(VGIC_CPU_NR_LR,	offsetof(struct vgic_cpu, nr_lr));
-   DEFINE(KVM_VTTBR,		offsetof(struct kvm, arch.vttbr));
-   DEFINE(KVM_VGIC_VCTRL,	offsetof(struct kvm, arch.vgic.vctrl_base));
-diff --git a/arch/arm64/kvm/vgic-v3-switch.S b/arch/arm64/kvm/vgic-v3-switch.S
-index 9fbf273..21e68f6 100644
---- a/arch/arm64/kvm/vgic-v3-switch.S
-+++ b/arch/arm64/kvm/vgic-v3-switch.S
-@@ -18,9 +18,247 @@
- #include <linux/linkage.h>
- #include <linux/irqchip/arm-gic-v3.h>
- 
-+#include <asm/assembler.h>
-+#include <asm/memory.h>
-+#include <asm/asm-offsets.h>
-+#include <asm/kvm.h>
-+#include <asm/kvm_asm.h>
-+#include <asm/kvm_arm.h>
-+
- 	.text
- 	.pushsection	.hyp.text, "ax"
- 
-+/*
-+ * We store LRs in reverse order to let the CPU deal with streaming
-+ * access. Use this macro to make it look saner...
-+ */
-+#define LR_OFFSET(n)	(VGIC_V3_CPU_LR + (15 - n) * 8)
-+
-+/*
-+ * Save the VGIC CPU state into memory
-+ * x0: Register pointing to VCPU struct
-+ * Do not corrupt x1!!!
-+ */
-+.macro	save_vgic_v3_state
-+	// Compute the address of struct vgic_cpu
-+	add	x3, x0, #VCPU_VGIC_CPU
-+
-+	// Make sure stores to the GIC via the memory mapped interface
-+	// are now visible to the system register interface
-+	dsb	st
-+
-+	// Save all interesting registers
-+	mrs	x4, ICH_HCR_EL2
-+	mrs	x5, ICH_VMCR_EL2
-+	mrs	x6, ICH_MISR_EL2
-+	mrs	x7, ICH_EISR_EL2
-+	mrs	x8, ICH_ELSR_EL2
-+
-+	str	w4, [x3, #VGIC_V3_CPU_HCR]
-+	str	w5, [x3, #VGIC_V3_CPU_VMCR]
-+	str	w6, [x3, #VGIC_V3_CPU_MISR]
-+	str	w7, [x3, #VGIC_V3_CPU_EISR]
-+	str	w8, [x3, #VGIC_V3_CPU_ELRSR]
-+
-+	msr	ICH_HCR_EL2, xzr
-+
-+	mrs	x21, ICH_VTR_EL2
-+	mvn	w22, w21
-+	ubfiz	w23, w22, 2, 4	// w23 = (15 - ListRegs) * 4
-+
-+	adr	x24, 1f
-+	add	x24, x24, x23
-+	br	x24
-+
-+1:
-+	mrs	x20, ICH_LR15_EL2
-+	mrs	x19, ICH_LR14_EL2
-+	mrs	x18, ICH_LR13_EL2
-+	mrs	x17, ICH_LR12_EL2
-+	mrs	x16, ICH_LR11_EL2
-+	mrs	x15, ICH_LR10_EL2
-+	mrs	x14, ICH_LR9_EL2
-+	mrs	x13, ICH_LR8_EL2
-+	mrs	x12, ICH_LR7_EL2
-+	mrs	x11, ICH_LR6_EL2
-+	mrs	x10, ICH_LR5_EL2
-+	mrs	x9, ICH_LR4_EL2
-+	mrs	x8, ICH_LR3_EL2
-+	mrs	x7, ICH_LR2_EL2
-+	mrs	x6, ICH_LR1_EL2
-+	mrs	x5, ICH_LR0_EL2
-+
-+	adr	x24, 1f
-+	add	x24, x24, x23
-+	br	x24
-+
-+1:
-+	str	x20, [x3, #LR_OFFSET(15)]
-+	str	x19, [x3, #LR_OFFSET(14)]
-+	str	x18, [x3, #LR_OFFSET(13)]
-+	str	x17, [x3, #LR_OFFSET(12)]
-+	str	x16, [x3, #LR_OFFSET(11)]
-+	str	x15, [x3, #LR_OFFSET(10)]
-+	str	x14, [x3, #LR_OFFSET(9)]
-+	str	x13, [x3, #LR_OFFSET(8)]
-+	str	x12, [x3, #LR_OFFSET(7)]
-+	str	x11, [x3, #LR_OFFSET(6)]
-+	str	x10, [x3, #LR_OFFSET(5)]
-+	str	x9, [x3, #LR_OFFSET(4)]
-+	str	x8, [x3, #LR_OFFSET(3)]
-+	str	x7, [x3, #LR_OFFSET(2)]
-+	str	x6, [x3, #LR_OFFSET(1)]
-+	str	x5, [x3, #LR_OFFSET(0)]
-+
-+	tbnz	w21, #29, 6f	// 6 bits
-+	tbz	w21, #30, 5f	// 5 bits
-+				// 7 bits
-+	mrs	x20, ICH_AP0R3_EL2
-+	str	w20, [x3, #(VGIC_V3_CPU_AP0R + 3*4)]
-+	mrs	x19, ICH_AP0R2_EL2
-+	str	w19, [x3, #(VGIC_V3_CPU_AP0R + 2*4)]
-+6:	mrs	x18, ICH_AP0R1_EL2
-+	str	w18, [x3, #(VGIC_V3_CPU_AP0R + 1*4)]
-+5:	mrs	x17, ICH_AP0R0_EL2
-+	str	w17, [x3, #VGIC_V3_CPU_AP0R]
-+
-+	tbnz	w21, #29, 6f	// 6 bits
-+	tbz	w21, #30, 5f	// 5 bits
-+				// 7 bits
-+	mrs	x20, ICH_AP1R3_EL2
-+	str	w20, [x3, #(VGIC_V3_CPU_AP1R + 3*4)]
-+	mrs	x19, ICH_AP1R2_EL2
-+	str	w19, [x3, #(VGIC_V3_CPU_AP1R + 2*4)]
-+6:	mrs	x18, ICH_AP1R1_EL2
-+	str	w18, [x3, #(VGIC_V3_CPU_AP1R + 1*4)]
-+5:	mrs	x17, ICH_AP1R0_EL2
-+	str	w17, [x3, #VGIC_V3_CPU_AP1R]
-+
-+	// Restore SRE_EL1 access and re-enable SRE at EL1.
-+	mrs	x5, ICC_SRE_EL2
-+	orr	x5, x5, #ICC_SRE_EL2_ENABLE
-+	msr	ICC_SRE_EL2, x5
-+	isb
-+	mov	x5, #1
-+	msr	ICC_SRE_EL1, x5
-+.endm
-+
-+/*
-+ * Restore the VGIC CPU state from memory
-+ * x0: Register pointing to VCPU struct
-+ */
-+.macro	restore_vgic_v3_state
-+	// Disable SRE_EL1 access. Necessary, otherwise
-+	// ICH_VMCR_EL2.VFIQEn becomes one, and FIQ happens...
-+	msr	ICC_SRE_EL1, xzr
-+	isb
-+
-+	// Compute the address of struct vgic_cpu
-+	add	x3, x0, #VCPU_VGIC_CPU
-+
-+	// Restore all interesting registers
-+	ldr	w4, [x3, #VGIC_V3_CPU_HCR]
-+	ldr	w5, [x3, #VGIC_V3_CPU_VMCR]
-+
-+	msr	ICH_HCR_EL2, x4
-+	msr	ICH_VMCR_EL2, x5
-+
-+	mrs	x21, ICH_VTR_EL2
-+
-+	tbnz	w21, #29, 6f	// 6 bits
-+	tbz	w21, #30, 5f	// 5 bits
-+				// 7 bits
-+	ldr	w20, [x3, #(VGIC_V3_CPU_AP1R + 3*4)]
-+	msr	ICH_AP1R3_EL2, x20
-+	ldr	w19, [x3, #(VGIC_V3_CPU_AP1R + 2*4)]
-+	msr	ICH_AP1R2_EL2, x19
-+6:	ldr	w18, [x3, #(VGIC_V3_CPU_AP1R + 1*4)]
-+	msr	ICH_AP1R1_EL2, x18
-+5:	ldr	w17, [x3, #VGIC_V3_CPU_AP1R]
-+	msr	ICH_AP1R0_EL2, x17
-+
-+	tbnz	w21, #29, 6f	// 6 bits
-+	tbz	w21, #30, 5f	// 5 bits
-+				// 7 bits
-+	ldr	w20, [x3, #(VGIC_V3_CPU_AP0R + 3*4)]
-+	msr	ICH_AP0R3_EL2, x20
-+	ldr	w19, [x3, #(VGIC_V3_CPU_AP0R + 2*4)]
-+	msr	ICH_AP0R2_EL2, x19
-+6:	ldr	w18, [x3, #(VGIC_V3_CPU_AP0R + 1*4)]
-+	msr	ICH_AP0R1_EL2, x18
-+5:	ldr	w17, [x3, #VGIC_V3_CPU_AP0R]
-+	msr	ICH_AP0R0_EL2, x17
-+
-+	and	w22, w21, #0xf
-+	mvn	w22, w21
-+	ubfiz	w23, w22, 2, 4	// w23 = (15 - ListRegs) * 4
-+
-+	adr	x24, 1f
-+	add	x24, x24, x23
-+	br	x24
-+
-+1:
-+	ldr	x20, [x3, #LR_OFFSET(15)]
-+	ldr	x19, [x3, #LR_OFFSET(14)]
-+	ldr	x18, [x3, #LR_OFFSET(13)]
-+	ldr	x17, [x3, #LR_OFFSET(12)]
-+	ldr	x16, [x3, #LR_OFFSET(11)]
-+	ldr	x15, [x3, #LR_OFFSET(10)]
-+	ldr	x14, [x3, #LR_OFFSET(9)]
-+	ldr	x13, [x3, #LR_OFFSET(8)]
-+	ldr	x12, [x3, #LR_OFFSET(7)]
-+	ldr	x11, [x3, #LR_OFFSET(6)]
-+	ldr	x10, [x3, #LR_OFFSET(5)]
-+	ldr	x9, [x3, #LR_OFFSET(4)]
-+	ldr	x8, [x3, #LR_OFFSET(3)]
-+	ldr	x7, [x3, #LR_OFFSET(2)]
-+	ldr	x6, [x3, #LR_OFFSET(1)]
-+	ldr	x5, [x3, #LR_OFFSET(0)]
-+
-+	adr	x24, 1f
-+	add	x24, x24, x23
-+	br	x24
-+
-+1:
-+	msr	ICH_LR15_EL2, x20
-+	msr	ICH_LR14_EL2, x19
-+	msr	ICH_LR13_EL2, x18
-+	msr	ICH_LR12_EL2, x17
-+	msr	ICH_LR11_EL2, x16
-+	msr	ICH_LR10_EL2, x15
-+	msr	ICH_LR9_EL2,  x14
-+	msr	ICH_LR8_EL2,  x13
-+	msr	ICH_LR7_EL2,  x12
-+	msr	ICH_LR6_EL2,  x11
-+	msr	ICH_LR5_EL2,  x10
-+	msr	ICH_LR4_EL2,   x9
-+	msr	ICH_LR3_EL2,   x8
-+	msr	ICH_LR2_EL2,   x7
-+	msr	ICH_LR1_EL2,   x6
-+	msr	ICH_LR0_EL2,   x5
-+
-+	// Ensure that the above will have reached the
-+	// (re)distributors. This ensure the guest will read
-+	// the correct values from the memory-mapped interface.
-+	isb
-+	dsb	sy
-+
-+	// Prevent the guest from touching the GIC system registers
-+	mrs	x5, ICC_SRE_EL2
-+	and	x5, x5, #~ICC_SRE_EL2_ENABLE
-+	msr	ICC_SRE_EL2, x5
-+.endm
-+
-+ENTRY(__save_vgic_v3_state)
-+	save_vgic_v3_state
-+	ret
-+ENDPROC(__save_vgic_v3_state)
-+
-+ENTRY(__restore_vgic_v3_state)
-+	restore_vgic_v3_state
-+	ret
-+ENDPROC(__restore_vgic_v3_state)
-+
- ENTRY(__vgic_v3_get_ich_vtr_el2)
- 	mrs	x0, ICH_VTR_EL2
- 	ret
 -- 
 2.0.0
