@@ -1,54 +1,102 @@
-From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Mon, 4 Aug 2014 15:47:51 +0200
-Subject: DMA engine API issue (was: [PATCH/RFC 0/5] R-Car Gen2 DMAC
- hardware descriptor list support)
-In-Reply-To: <20140801143020.GQ30282@n2100.arm.linux.org.uk>
-References: <1406032431-3807-1-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
- <28702317.aD0C1Ga3DS@avalon> <20140724045248.GB8181@intel.com>
- <18522523.T2zy7HfoJ2@avalon>
- <20140801143020.GQ30282@n2100.arm.linux.org.uk>
-Message-ID: <CAMuHMdWSe8m2yRV5fhLfZ=gbGUev6ExD+0eQ_nKK84SRs1DEwQ@mail.gmail.com>
+From: svarbanov@mm-sol.com (Stanimir Varbanov)
+Date: Mon, 04 Aug 2014 16:51:54 +0300
+Subject: [PATCH v4 2/3] mfd: document DT bindings for Qualcomm SPMI PMICs
+In-Reply-To: <1406903450-27283-3-git-send-email-svarbanov@mm-sol.com>
+References: <1406903450-27283-1-git-send-email-svarbanov@mm-sol.com>
+ <1406903450-27283-3-git-send-email-svarbanov@mm-sol.com>
+Message-ID: <53DF8FFA.601@mm-sol.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Russell,
+Kumar, Stephen, David can I have your Acked/Reviewed-by tag for 2/3 and
+if possible for 3/3. The last patch can wait because currently we don't
+have child peripherals. Thanks.
 
-On Fri, Aug 1, 2014 at 4:30 PM, Russell King - ARM Linux
-<linux@arm.linux.org.uk> wrote:
-> On Fri, Aug 01, 2014 at 10:51:26AM +0200, Laurent Pinchart wrote:
->> I'll take this opportunity to question why we have a separation between
->> tx_submit and issue_pending. What's the rationale for that, especially given
->> that dma_issue_pending_all() might kick in at any point and issue pending
->> transfers for all devices. A driver could thus see its submitted but not
->> issued transactions being issued before it explicitly calls
->> dma_async_issue_pending().
->
-> A prepared but not submitted transaction is not a pending transaction.
->
-> The split is necessary so that a callback can be attached to the
-> transaction.  This partially comes from the async-tx API, and also
-> gets a lot of use with the slave API.
->
-> The prepare function allocates the descriptor and does the initial
-> setup, but does not mark the descriptor as a pending transaction.
-> It returns the descriptor, and the caller is then free to add a
-> callback function and data pointer to the descriptor before finally
-> submitting it.  This sequence must occur in a timely manner as some
-> DMA engine implementations hold a lock between the prepare and submit
-> callbacks (Dan explicitly permits this as part of the API.)
+regards,
+Stan
 
-I think you misunderstood the question: Laurent asked about
-dmaengine_submit() (step 2) and dma_async_issue_pending() (step 3),
-while your answer is about dmaengine_prep_slave_*() (step 1) and
-dmaengine_submit() (step 2).
+On 08/01/2014 05:30 PM, Stanimir Varbanov wrote:
+> Document DT bindings used to describe the Qualcomm SPMI PMICs.
+> 
+> Signed-off-by: Stanimir Varbanov <svarbanov@mm-sol.com>
+> ---
+>  .../devicetree/bindings/mfd/qcom,spmi-pmic.txt     |   64 ++++++++++++++++++++
+>  1 files changed, 64 insertions(+), 0 deletions(-)
+>  create mode 100644 Documentation/devicetree/bindings/mfd/qcom,spmi-pmic.txt
+> 
+> diff --git a/Documentation/devicetree/bindings/mfd/qcom,spmi-pmic.txt b/Documentation/devicetree/bindings/mfd/qcom,spmi-pmic.txt
+> new file mode 100644
+> index 0000000..7182b88
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/mfd/qcom,spmi-pmic.txt
+> @@ -0,0 +1,64 @@
+> +          Qualcomm SPMI PMICs multi-function device bindings
+> +
+> +The Qualcomm SPMI series presently includes PM8941, PM8841 and PMA8084
+> +PMICs.  These PMICs use a QPNP scheme through SPMI interface.
+> +QPNP is effectively a partitioning scheme for dividing the SPMI extended
+> +register space up into logical pieces, and set of fixed register
+> +locations/definitions within these regions, with some of these regions
+> +specifically used for interrupt handling.
+> +
+> +The QPNP PMICs are used with the Qualcomm Snapdragon series SoCs, and are
+> +interfaced to the chip via the SPMI (System Power Management Interface) bus.
+> +Support for multiple independent functions are implemented by splitting the
+> +16-bit SPMI slave address space into 256 smaller fixed-size regions, 256 bytes
+> +each. A function can consume one or more of these fixed-size register regions.
+> +
+> +Required properties:
+> +- compatible:      Should contain one of:
+> +                     "qcom,pm8941"
+> +                     "qcom,pm8841"
+> +                     "qcom,pma8084"
+> +                     or generalized "qcom,spmi-pmic".
+> +- reg:             Specifies the SPMI USID slave address for this device.
+> +                   For more information see:
+> +                   Documentation/devicetree/bindings/spmi/spmi.txt
+> +
+> +Required properties for peripheral child nodes:
+> +- compatible:      Should contain "qcom,xxx", where "xxx" is a peripheral name.
+> +
+> +Optional properties for peripheral child nodes:
+> +- interrupts:      Interrupts are specified as a 4-tuple. For more information
+> +                   see:
+> +                   Documentation/devicetree/bindings/spmi/qcom,spmi-pmic-arb.txt
+> +- interrupt-names: Corresponding interrupt name to the interrupts property
+> +
+> +Each child node of SPMI slave id represents a function of the PMIC. In the
+> +example below the rtc device node represents a peripheral of pm8941
+> +SID = 0. The regulator device node represents a peripheral of pm8941 SID = 1.
+> +
+> +Example:
+> +
+> +	spmi {
+> +		compatible = "qcom,spmi-pmic-arb";
+> +
+> +		pm8941 at 0 {
+> +			compatible = "qcom,pm8941", "qcom,spmi-pmic";
+> +			reg = <0x0 SPMI_USID>;
+> +
+> +			rtc {
+> +				compatible = "qcom,rtc";
+> +				interrupts = <0x0 0x61 0x1 IRQ_TYPE_EDGE_RISING>;
+> +				interrupt-names = "alarm";
+> +			};
+> +		};
+> +
+> +		pm8941 at 1 {
+> +			compatible = "qcom,pm8941", "qcom,spmi-pmic";
+> +			reg = <0x1 SPMI_USID>;
+> +
+> +			regulator {
+> +				compatible = "qcom,regulator";
+> +				regulator-name = "8941_boost";
+> +			};
+> +		};
+> +	};
+> 
 
-Gr{oetje,eeting}s,
 
-                        Geert
-
---
-Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
-
-In personal conversations with technical people, I call myself a hacker. But
-when I'm talking to journalists I just say "programmer" or something like that.
-                                -- Linus Torvalds
+-- 
+regards,
+Stan
