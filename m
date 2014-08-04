@@ -1,72 +1,31 @@
 From: christoffer.dall@linaro.org (Christoffer Dall)
-Date: Mon, 4 Aug 2014 14:13:17 +0200
-Subject: [PATCH] arm64: KVM: export current vcpu->pause state via pseudo
- regs
-In-Reply-To: <87fvhgin6s.fsf@linaro.org>
-References: <1404914112-7298-1-git-send-email-alex.bennee@linaro.org>
- <20140731143538.GI11610@cbox> <87mwbpimgz.fsf@linaro.org>
- <20140731163805.GK11610@cbox> <87fvhgin6s.fsf@linaro.org>
-Message-ID: <20140804121317.GD524@cbox>
+Date: Mon, 4 Aug 2014 14:06:48 +0200
+Subject: [PATCH V2] ARM/ARM64: KVM: Nuke Hyp-mode tlbs before enabling MMU
+In-Reply-To: <1406789604-10533-1-git-send-email-pranavkumar@linaro.org>
+References: <1406789604-10533-1-git-send-email-pranavkumar@linaro.org>
+Message-ID: <20140804120648.GB524@cbox>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Aug 01, 2014 at 10:11:52AM +0100, Alex Benn?e wrote:
+On Thu, Jul 31, 2014 at 12:23:23PM +0530, Pranavkumar Sawargaonkar wrote:
+> X-Gene u-boot runs in EL2 mode with MMU enabled hence we might
+> have stale EL2 tlb enteris when we enable EL2 MMU on each host CPU.
 > 
-> Christoffer Dall writes:
+> This can happen on any ARM/ARM64 board running bootloader in
+> Hyp-mode (or EL2-mode) with MMU enabled.
 > 
-> > On Thu, Jul 31, 2014 at 04:14:51PM +0100, Alex Benn?e wrote:
-> >> 
-> >> Christoffer Dall writes:
-> >> 
-> >> > On Wed, Jul 09, 2014 at 02:55:12PM +0100, Alex Benn?e wrote:
-> >> >> To cleanly restore an SMP VM we need to ensure that the current pause
-> >> >> state of each vcpu is correctly recorded. Things could get confused if
-> >> >> the CPU starts running after migration restore completes when it was
-> >> >> paused before it state was captured.
-> >> >> 
-> >> <snip>
-> >> >> +/* Power state (PSCI), not real registers */
-> >> >> +#define KVM_REG_ARM_PSCI		(0x0014 << KVM_REG_ARM_COPROC_SHIFT)
-> >> >> +#define KVM_REG_ARM_PSCI_REG(n) \
-> >> >> +	(KVM_REG_ARM64 | KVM_REG_SIZE_U64 | KVM_REG_ARM_PSCI | \
-> >> >> +         (n & ~KVM_REG_ARM_COPROC_MASK))
-> >> >
-> >> > I don't understand this mask, why isn't this
-> >> >             (n & 0xffff))
-> >> 
-> >> I was trying to use the existing masks, but of course if anyone changes
-> >> that it would be an ABI change so probably not worth it.
-> >> 
-> >
-> > the KVM_REG_ARM_COPROC_MASK is part of the uapi IIRC, so that's not the
-> > issue, but that mask doesn't cover all the upper bits, so it feels weird
-> > to use that to me.
+> This patch ensures that we flush all Hyp-mode (or EL2-mode) TLBs
+> on each host CPU before enabling Hyp-mode (or EL2-mode) MMU.
 > 
-> Yeah I missed that. I could do a:
+> Changelog:
 > 
-> #define KVM_REG_ARM_COPROC_INDEX_MASK   ((1<<KVM_REG_ARM_COPROC_SHIFT)-1)
+> V2:
+>  - Flush Hyp-mode TLBs for both KVM ARM32 and KVM ARM64 at boot time
 > 
-> and use that. I'm generally try to avoid hardcoded numbers but I could
-> be being a little OCD here ;-)
+> V1:
+>  - Initial patch with only arm64 change
 > 
-> >> > Can you add the 32-bit counterpart as part of this patch?
-> >> 
-> >> Same patch? Sure.
-> >
-> > really up to you if you want to split it up into two patches, but I
-> > think it's small enough that you can just create one patch.
-> 
-> Given the similarity of this code between arm and arm64 I'm wondering if
-> it's worth doing a arch/arm/kvm/guest_common.c or something to reduce
-> the amount of copy paste stuff?
-> 
-We've gotten by without it so far.  I fear we end up with a bunch of
-complications due to differences in sizeof(unsigned long) etc., but I
-may be wrong.
+> Signed-off-by: Pranavkumar Sawargaonkar <pranavkumar@linaro.org>
+> Signed-off-by: Anup Patel <anup.patel@linaro.org>
 
-The amount of code that is copied should be trivial boilerplate stuff,
-but if you think it's worth unifying, then I'd be happy to review the
-patch.
-
-Thanks,
--Christoffer
+Reviewed-by: Christoffer Dall <christoffer.dall@linaro.org>
