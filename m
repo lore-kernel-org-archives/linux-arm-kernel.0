@@ -1,58 +1,43 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Mon, 4 Aug 2014 13:49:25 +0100
-Subject: [PATCH v8 05/10] ARM: arch_timer: remove unused functions
-In-Reply-To: <1407003407-31219-6-git-send-email-nathan_lynch@mentor.com>
-References: <1407003407-31219-1-git-send-email-nathan_lynch@mentor.com>
- <1407003407-31219-6-git-send-email-nathan_lynch@mentor.com>
-Message-ID: <20140804124924.GH15117@arm.com>
+From: mpa@pengutronix.de (Markus Pargmann)
+Date: Mon,  4 Aug 2014 14:54:04 +0200
+Subject: [PATCH] ARM: OMAP2+: omap_device: remove warning that clk alias
+ already exists
+Message-ID: <1407156844-21548-1-git-send-email-mpa@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Aug 02, 2014 at 07:16:42PM +0100, Nathan Lynch wrote:
-> The counter access and evtstream configuration are now done in common
-> code, so remove the now-unused arch_counter_set_user_access and
-> arch_timer_evtstrm_enable.
-> 
-> Signed-off-by: Nathan Lynch <nathan_lynch@mentor.com>
-> ---
->  arch/arm/include/asm/arch_timer.h | 25 -------------------------
->  1 file changed, 25 deletions(-)
-> 
-> diff --git a/arch/arm/include/asm/arch_timer.h b/arch/arm/include/asm/arch_timer.h
-> index 0704e0cf5571..92793ba69c40 100644
-> --- a/arch/arm/include/asm/arch_timer.h
-> +++ b/arch/arm/include/asm/arch_timer.h
-> @@ -99,31 +99,6 @@ static inline void arch_timer_set_cntkctl(u32 cntkctl)
->  	asm volatile("mcr p15, 0, %0, c14, c1, 0" : : "r" (cntkctl));
->  }
->  
-> -static inline void arch_counter_set_user_access(void)
-> -{
-> -	u32 cntkctl = arch_timer_get_cntkctl();
-> -
-> -	/* Disable user access to both physical/virtual counters/timers */
-> -	/* Also disable virtual event stream */
-> -	cntkctl &= ~(ARCH_TIMER_USR_PT_ACCESS_EN
-> -			| ARCH_TIMER_USR_VT_ACCESS_EN
-> -			| ARCH_TIMER_VIRT_EVT_EN
-> -			| ARCH_TIMER_USR_VCT_ACCESS_EN
-> -			| ARCH_TIMER_USR_PCT_ACCESS_EN);
-> -	arch_timer_set_cntkctl(cntkctl);
-> -}
-> -
-> -static inline void arch_timer_evtstrm_enable(int divider)
-> -{
-> -	u32 cntkctl = arch_timer_get_cntkctl();
-> -	cntkctl &= ~ARCH_TIMER_EVT_TRIGGER_MASK;
-> -	/* Set the divider and enable virtual event stream */
-> -	cntkctl |= (divider << ARCH_TIMER_EVT_TRIGGER_SHIFT)
-> -			| ARCH_TIMER_VIRT_EVT_EN;
-> -	arch_timer_set_cntkctl(cntkctl);
-> -	elf_hwcap |= HWCAP_EVTSTRM;
-> -}
-> -
->  #endif
+When an alias for a clock already exists the warning is printed. For
+every module with a main_clk defined, a clk alias for fck is added.
+There are some components that have the same main_clk defined, so this
+is a really normal situation.
 
-Does these play nicely with the previous patch wrt bisection?
+For example the am33xx edma device has 4 components using the same main
+clock. So there are three warnings in the boot log for this already
+existing clock alias:
+	platform 49000000.edma: alias fck already exists
+	platform 49000000.edma: alias fck already exists
+	platform 49000000.edma: alias fck already exists
 
-Will
+As this is only interesting for developers, this patch changes the
+message to a debug message.
+
+Signed-off-by: Markus Pargmann <mpa@pengutronix.de>
+---
+ arch/arm/mach-omap2/omap_device.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/arch/arm/mach-omap2/omap_device.c b/arch/arm/mach-omap2/omap_device.c
+index 01ef59def44b..d22c30d3ccfa 100644
+--- a/arch/arm/mach-omap2/omap_device.c
++++ b/arch/arm/mach-omap2/omap_device.c
+@@ -56,7 +56,7 @@ static void _add_clkdev(struct omap_device *od, const char *clk_alias,
+ 
+ 	r = clk_get_sys(dev_name(&od->pdev->dev), clk_alias);
+ 	if (!IS_ERR(r)) {
+-		dev_warn(&od->pdev->dev,
++		dev_dbg(&od->pdev->dev,
+ 			 "alias %s already exists\n", clk_alias);
+ 		clk_put(r);
+ 		return;
+-- 
+2.0.1
