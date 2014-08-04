@@ -1,48 +1,189 @@
-From: Nathan_Lynch@mentor.com (Nathan Lynch)
-Date: Mon, 4 Aug 2014 08:12:26 -0500
-Subject: [PATCH v8 01/10] ARM: use _install_special_mapping for sigpage
-In-Reply-To: <20140804124630.GG15117@arm.com>
-References: <1407003407-31219-1-git-send-email-nathan_lynch@mentor.com>
- <1407003407-31219-2-git-send-email-nathan_lynch@mentor.com>
- <20140804124630.GG15117@arm.com>
-Message-ID: <53DF86BA.2030207@mentor.com>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Mon, 4 Aug 2014 15:13:28 +0200
+Subject: [PATCH v3] efi: implement mandatory locking for UEFI Runtime
+ Services
+In-Reply-To: <20140804130011.GI15082@console-pimps.org>
+References: <1405062556-14540-1-git-send-email-ard.biesheuvel@linaro.org>
+ <20140804130011.GI15082@console-pimps.org>
+Message-ID: <CAKv+Gu-LQ9ahV5js0V5XgyRwUkrc3BOT9YoZj=mvwCEMQVXfow@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08/04/2014 07:46 AM, Will Deacon wrote:
-> On Sat, Aug 02, 2014 at 07:16:38PM +0100, Nathan Lynch wrote:
->> _install_special_mapping allows the VMA to be identifed in
->> /proc/pid/maps without the use of arch_vma_name, providing a
->> slight net reduction in object size:
->>
->>   text    data     bss     dec     hex filename
->>   2996      96     144    3236     ca4 arch/arm/kernel/process.o (before)
->>   2956     104     144    3204     c84 arch/arm/kernel/process.o (after)
->>
->> Signed-off-by: Nathan Lynch <nathan_lynch@mentor.com>
->> Reviewed-by: Kees Cook <keescook@chromium.org>
->> ---
->>  arch/arm/kernel/process.c | 24 ++++++++++++++++--------
->>  1 file changed, 16 insertions(+), 8 deletions(-)
->>
->> diff --git a/arch/arm/kernel/process.c b/arch/arm/kernel/process.c
->> index 81ef686a91ca..46fbbb3701a0 100644
->> --- a/arch/arm/kernel/process.c
->> +++ b/arch/arm/kernel/process.c
->> @@ -472,19 +472,23 @@ int in_gate_area_no_mm(unsigned long addr)
->>  
->>  const char *arch_vma_name(struct vm_area_struct *vma)
->>  {
->> -	return is_gate_vma(vma) ? "[vectors]" :
->> -		(vma->vm_mm && vma->vm_start == vma->vm_mm->context.sigpage) ?
->> -		 "[sigpage]" : NULL;
->> +	return is_gate_vma(vma) ? "[vectors]" : NULL;
->>  }
-> 
-> Why do you need this function? I just removed it for arm64 and I think x86
-> has done the same.
+On 4 August 2014 15:00, Matt Fleming <matt@console-pimps.org> wrote:
+> On Fri, 11 Jul, at 09:09:16AM, Ard Biesheuvel wrote:
+>> According to section 7.1 of the UEFI spec, Runtime Services are not fully
+>> reentrant, and there are particular combinations of calls that need to be
+>> serialized. Use a spinlock to serialize all Runtime Services with respect
+>> to all others, even if this is more than strictly needed.
+>
+> It'd be good to include a point about why we're only using a spinlock,
+> namely that anything else introduces complication to code that is
+> unlikely to be performance critical.
+>
 
-I think arch_vma_name is still needed for arm as long as the vectors
-page is not installed using _install_special_mapping.  I'm honestly not
-sure whether moving the vectors page to that API would be appropriate,
-but it would be a larger undertaking.
+OK
+
+> [...]
+>
+>> + *
+>> + * In order to prevent deadlocks under NMI, the wrappers for these functions
+>> + * only grab the efi_runtime_lock or rtc_lock spinlocks if !efi_in_nmi().
+>> + */
+>> +#ifndef efi_in_nmi
+>> +#define efi_in_nmi() (0)
+>> +#endif
+>
+> It shouldn't be necessary to do the NMI checking for *all* runtime
+> services, unless you use, for instance, the timer functions on ARM64.
+>
+
+No, I only added the checks to functions that are listed in the UEFI
+spec as requiring the special treatment.
+Table 32 is copied right from the spec. (And if that is not obvious, I
+should definitely add a mention there)
+
+
+>> +/*
+>>   * As per commit ef68c8f87ed1 ("x86: Serialize EFI time accesses on rtc_lock"),
+>>   * the EFI specification requires that callers of the time related runtime
+>>   * functions serialize with other CMOS accesses in the kernel, as the EFI time
+>> @@ -30,10 +95,17 @@ static efi_status_t virt_efi_get_time(efi_time_t *tm, efi_time_cap_t *tc)
+>>  {
+>>       unsigned long flags;
+>>       efi_status_t status;
+>> +     bool __in_nmi = efi_in_nmi();
+>>
+>> -     spin_lock_irqsave(&rtc_lock, flags);
+>> +     if (!__in_nmi) {
+>> +             spin_lock_irqsave(&rtc_lock, flags);
+>> +             spin_lock(&efi_runtime_lock);
+>> +     }
+>>       status = efi_call_virt(get_time, tm, tc);
+>> -     spin_unlock_irqrestore(&rtc_lock, flags);
+>> +     if (!__in_nmi) {
+>> +             spin_unlock(&efi_runtime_lock);
+>> +             spin_unlock_irqrestore(&rtc_lock, flags);
+>> +     }
+>>       return status;
+>>  }
+>>
+>> @@ -42,8 +114,11 @@ static efi_status_t virt_efi_set_time(efi_time_t *tm)
+>>       unsigned long flags;
+>>       efi_status_t status;
+>>
+>> +     BUG_ON(efi_in_nmi());
+>
+> I think we can safely drop these BUG_ON()s. I would expect things to
+> explode pretty spectacularly anyway, even without them if we're in NMI
+> context. BUG_ON()s are usually reserved for "this is a fatal condition
+> and we cannot make any forward progress at all, so stop".
+>
+> But also see my earlier point about how most of these functions aren't
+> called from NMI context.
+>
+
+I added the BUG_ON() to functions not listed in the table, and added
+the treatment to functions that are listed in the table.
+Happy to drop the BUG_ON()'s, though.
+
+>>  static efi_status_t virt_efi_get_next_variable(unsigned long *name_size,
+>>                                              efi_char16_t *name,
+>>                                              efi_guid_t *vendor)
+>>  {
+>> -     return efi_call_virt(get_next_variable, name_size, name, vendor);
+>> +     unsigned long flags;
+>> +     efi_status_t status;
+>> +     bool __in_nmi = efi_in_nmi();
+>> +
+>> +     if (!__in_nmi)
+>> +             spin_lock_irqsave(&efi_runtime_lock, flags);
+>> +     status = efi_call_virt(get_next_variable, name_size, name, vendor);
+>> +     if (!__in_nmi)
+>> +             spin_unlock_irqrestore(&efi_runtime_lock, flags);
+>> +     return status;
+>
+> We shouldn't ever be in NMI context when calling get_next_variable(),
+> right?
+>
+
+Spec allows it ...
+
+>> @@ -119,17 +245,33 @@ static void virt_efi_reset_system(int reset_type,
+>>                                 unsigned long data_size,
+>>                                 efi_char16_t *data)
+>>  {
+>> +     unsigned long flags;
+>> +     bool __in_nmi = efi_in_nmi();
+>> +
+>> +     if (!__in_nmi)
+>> +             spin_lock_irqsave(&efi_runtime_lock, flags);
+>>       __efi_call_virt(reset_system, reset_type, status, data_size, data);
+>> +     if (!__in_nmi)
+>> +             spin_unlock_irqrestore(&efi_runtime_lock, flags);
+>>  }
+>
+> Is it even possible to perform a reset through the usual machinery in
+> NMI context? I don't think this is possible for x86. What about for
+> arm64?
+>
+
+We don't have NMI so all the in_nmi() macros evaluate to false anyway.
+
+>>  static efi_status_t virt_efi_update_capsule(efi_capsule_header_t **capsules,
+>>                                           unsigned long count,
+>>                                           unsigned long sg_list)
+>>  {
+>> +     unsigned long flags;
+>> +     efi_status_t status;
+>> +     bool __in_nmi = efi_in_nmi();
+>> +
+>>       if (efi.runtime_version < EFI_2_00_SYSTEM_TABLE_REVISION)
+>>               return EFI_UNSUPPORTED;
+>>
+>> -     return efi_call_virt(update_capsule, capsules, count, sg_list);
+>> +     if (!__in_nmi)
+>> +             spin_lock_irqsave(&efi_runtime_lock, flags);
+>> +     status = efi_call_virt(update_capsule, capsules, count, sg_list);
+>> +     if (!__in_nmi)
+>> +             spin_unlock_irqrestore(&efi_runtime_lock, flags);
+>> +     return status;
+>>  }
+>
+> I don't think we need to check for being in NMI context here.
+>
+
+Likewise, the spec says different ...
+
+>>  static efi_status_t virt_efi_query_capsule_caps(efi_capsule_header_t **capsules,
+>> @@ -137,11 +279,20 @@ static efi_status_t virt_efi_query_capsule_caps(efi_capsule_header_t **capsules,
+>>                                               u64 *max_size,
+>>                                               int *reset_type)
+>>  {
+>> +     unsigned long flags;
+>> +     efi_status_t status;
+>> +     bool __in_nmi = efi_in_nmi();
+>> +
+>>       if (efi.runtime_version < EFI_2_00_SYSTEM_TABLE_REVISION)
+>>               return EFI_UNSUPPORTED;
+>>
+>> -     return efi_call_virt(query_capsule_caps, capsules, count, max_size,
+>> -                          reset_type);
+>> +     if (!__in_nmi)
+>> +             spin_lock_irqsave(&efi_runtime_lock, flags);
+>> +     status = efi_call_virt(query_capsule_caps, capsules, count, max_size,
+>> +                            reset_type);
+>> +     if (!__in_nmi)
+>> +             spin_unlock_irqrestore(&efi_runtime_lock, flags);
+>> +     return status;
+>>  }
+>
+> Definitely should not be perfoming QueryCapsuleCapabilities() in NMI
+> context.
+>
+
+Well, again, the spec allows it. But I am happy to remove it as it
+does not affect ARM anyway
+
+
+Regards,
+Ard.
