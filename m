@@ -1,67 +1,144 @@
 From: hanjun.guo@linaro.org (Hanjun Guo)
-Date: Mon,  4 Aug 2014 23:28:10 +0800
-Subject: [PATCH v2 03/18] ARM64 / ACPI: Introduce lowlevel suspend function
+Date: Mon,  4 Aug 2014 23:28:11 +0800
+Subject: [PATCH v2 04/18] ARM64 / ACPI: Make PCI optional for ACPI on ARM64
 In-Reply-To: <1407166105-17675-1-git-send-email-hanjun.guo@linaro.org>
 References: <1407166105-17675-1-git-send-email-hanjun.guo@linaro.org>
-Message-ID: <1407166105-17675-4-git-send-email-hanjun.guo@linaro.org>
+Message-ID: <1407166105-17675-5-git-send-email-hanjun.guo@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Graeme Gregory <graeme.gregory@linaro.org>
+As PCI for ARM64 is not ready, so introduce some stub functions
+to make PCI optional for ACPI, and make ACPI core run without
+CONFIG_PCI on ARM64.
 
-acpi_wakeup_address is used on x86 as the address bios jumps into
-when machine wakes up from suspend. As arm64 does not have such a
-bios this mechanism will be provided by other means. But the define
-is still required inside the acpi core.
+Since ACPI on X86 and IA64 depends on PCI and this patch only makes
+PCI optional for ARM64, it will not break anything on X86 and IA64.
 
-Introduce a null stub for acpi_suspend_lowlevel as this is also
-required by core. This will be filled in when standards are
-defined for arm64 ACPI global power states.
-
-Signed-off-by: Graeme Gregory <graeme.gregory@linaro.org>
 Signed-off-by: Hanjun Guo <hanjun.guo@linaro.org>
 ---
- arch/arm64/include/asm/acpi.h |   12 ++++++++++++
- arch/arm64/kernel/acpi.c      |    7 +++++++
- 2 files changed, 19 insertions(+)
+ arch/arm64/include/asm/pci.h |   11 +++++++++++
+ drivers/acpi/Makefile        |    2 +-
+ drivers/acpi/internal.h      |    5 +++++
+ include/linux/pci.h          |   37 +++++++++++++++++++++++++++----------
+ 4 files changed, 44 insertions(+), 11 deletions(-)
+ create mode 100644 arch/arm64/include/asm/pci.h
 
-diff --git a/arch/arm64/include/asm/acpi.h b/arch/arm64/include/asm/acpi.h
-index e06da63..6400312 100644
---- a/arch/arm64/include/asm/acpi.h
-+++ b/arch/arm64/include/asm/acpi.h
-@@ -40,6 +40,18 @@ static inline bool acpi_has_cpu_in_madt(void)
- 
- static inline void arch_fix_phys_package_id(int num, u32 slot) { }
- 
-+/* Low-level suspend routine.
-+ *
-+ * ACPI S-states for ARM64 have to be defined
-+ * and approved before doing anything else, maybe
-+ * we need update the ACPI spec, here we
-+ * just introduce function and macro needed by
-+ * ACPI core as IA64 did, and revisit them when
-+ * the spec is ready.
-+ */
-+extern int (*acpi_suspend_lowlevel)(void);
-+#define acpi_wakeup_address 0
-+
- #endif /* CONFIG_ACPI */
- 
- #endif /*_ASM_ACPI_H*/
-diff --git a/arch/arm64/kernel/acpi.c b/arch/arm64/kernel/acpi.c
-index 395778c..9cf9127 100644
---- a/arch/arm64/kernel/acpi.c
-+++ b/arch/arm64/kernel/acpi.c
-@@ -67,3 +67,10 @@ void __init acpi_boot_table_init(void)
- 		return;
- 	}
- }
+diff --git a/arch/arm64/include/asm/pci.h b/arch/arm64/include/asm/pci.h
+new file mode 100644
+index 0000000..250cd24
+--- /dev/null
++++ b/arch/arm64/include/asm/pci.h
+@@ -0,0 +1,11 @@
++#ifndef __ASM_PCI_H
++#define __ASM_PCI_H
++#ifdef __KERNEL__
 +
 +/*
-+ * acpi_suspend_lowlevel() - save kernel state and suspend.
-+ *
-+ * TBD when ARM/ARM64 starts to support suspend...
++ * PCI address space differs from physical memory address space
 + */
-+int (*acpi_suspend_lowlevel)(void) = NULL;
++#define PCI_DMA_BUS_IS_PHYS	(0)
++
++#endif  /* __KERNEL__ */
++#endif  /* __ASM_PCI_H */
+diff --git a/drivers/acpi/Makefile b/drivers/acpi/Makefile
+index 505d4d7..8e9bbe6 100644
+--- a/drivers/acpi/Makefile
++++ b/drivers/acpi/Makefile
+@@ -39,7 +39,7 @@ acpi-y				+= processor_core.o
+ acpi-$(CONFIG_ARCH_MIGHT_HAVE_ACPI_PDC) += processor_pdc.o
+ acpi-y				+= ec.o
+ acpi-$(CONFIG_ACPI_DOCK)	+= dock.o
+-acpi-y				+= pci_root.o pci_link.o pci_irq.o
++acpi-$(CONFIG_PCI)		+= pci_root.o pci_link.o pci_irq.o
+ acpi-y				+= acpi_lpss.o
+ acpi-y				+= acpi_platform.o
+ acpi-y				+= acpi_pnp.o
+diff --git a/drivers/acpi/internal.h b/drivers/acpi/internal.h
+index 4c5cf77..e1e6487 100644
+--- a/drivers/acpi/internal.h
++++ b/drivers/acpi/internal.h
+@@ -26,8 +26,13 @@
+ acpi_status acpi_os_initialize1(void);
+ int init_acpi_device_notify(void);
+ int acpi_scan_init(void);
++#ifdef CONFIG_PCI
+ void acpi_pci_root_init(void);
+ void acpi_pci_link_init(void);
++#else
++static inline void acpi_pci_root_init(void) {}
++static inline void acpi_pci_link_init(void) {}
++#endif
+ void acpi_processor_init(void);
+ void acpi_platform_init(void);
+ void acpi_pnp_init(void);
+diff --git a/include/linux/pci.h b/include/linux/pci.h
+index 466bcd1..8e83281 100644
+--- a/include/linux/pci.h
++++ b/include/linux/pci.h
+@@ -558,15 +558,6 @@ struct pci_ops {
+ 	int (*write)(struct pci_bus *bus, unsigned int devfn, int where, int size, u32 val);
+ };
+ 
+-/*
+- * ACPI needs to be able to access PCI config space before we've done a
+- * PCI bus scan and created pci_bus structures.
+- */
+-int raw_pci_read(unsigned int domain, unsigned int bus, unsigned int devfn,
+-		 int reg, int len, u32 *val);
+-int raw_pci_write(unsigned int domain, unsigned int bus, unsigned int devfn,
+-		  int reg, int len, u32 val);
+-
+ struct pci_bus_region {
+ 	dma_addr_t start;
+ 	dma_addr_t end;
+@@ -1293,6 +1284,16 @@ typedef int (*arch_set_vga_state_t)(struct pci_dev *pdev, bool decode,
+ 		      unsigned int command_bits, u32 flags);
+ void pci_register_set_vga_state(arch_set_vga_state_t func);
+ 
++/*
++ * ACPI needs to be able to access PCI config space before we've done a
++ * PCI bus scan and created pci_bus structures.
++ */
++int raw_pci_read(unsigned int domain, unsigned int bus, unsigned int devfn,
++		 int reg, int len, u32 *val);
++int raw_pci_write(unsigned int domain, unsigned int bus, unsigned int devfn,
++		  int reg, int len, u32 val);
++void pcibios_penalize_isa_irq(int irq, int active);
++
+ #else /* CONFIG_PCI is not enabled */
+ 
+ /*
+@@ -1394,6 +1395,23 @@ static inline struct pci_dev *pci_get_bus_and_slot(unsigned int bus,
+ 						unsigned int devfn)
+ { return NULL; }
+ 
++static inline struct pci_bus *pci_find_bus(int domain, int busnr)
++{ return NULL; }
++
++static inline int pci_bus_write_config_byte(struct pci_bus *bus,
++				unsigned int devfn, int where, u8 val)
++{ return -ENOSYS; }
++
++static inline int raw_pci_read(unsigned int domain, unsigned int bus,
++			unsigned int devfn, int reg, int len, u32 *val)
++{ return -ENOSYS; }
++
++static inline int raw_pci_write(unsigned int domain, unsigned int bus,
++			unsigned int devfn, int reg, int len, u32 val)
++{ return -ENOSYS; }
++
++static inline void pcibios_penalize_isa_irq(int irq, int active) { }
++
+ static inline int pci_domain_nr(struct pci_bus *bus) { return 0; }
+ static inline struct pci_dev *pci_dev_get(struct pci_dev *dev) { return NULL; }
+ 
+@@ -1597,7 +1615,6 @@ int pcibios_set_pcie_reset_state(struct pci_dev *dev,
+ 				 enum pcie_reset_state state);
+ int pcibios_add_device(struct pci_dev *dev);
+ void pcibios_release_device(struct pci_dev *dev);
+-void pcibios_penalize_isa_irq(int irq, int active);
+ 
+ #ifdef CONFIG_HIBERNATE_CALLBACKS
+ extern struct dev_pm_ops pcibios_pm_ops;
 -- 
 1.7.9.5
