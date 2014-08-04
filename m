@@ -1,34 +1,27 @@
-From: peter.ujfalusi@ti.com (Peter Ujfalusi)
-Date: Mon, 4 Aug 2014 14:37:56 +0300
-Subject: [PATCH 0/1] ARM: OMAP: add external clock provider support
-In-Reply-To: <1406898948-26113-1-git-send-email-t-kristo@ti.com>
-References: <1406898948-26113-1-git-send-email-t-kristo@ti.com>
-Message-ID: <53DF7094.7050601@ti.com>
+From: ohad@wizery.com (Ohad Ben-Cohen)
+Date: Mon, 4 Aug 2014 14:50:47 +0300
+Subject: [PATCH 1/2] remoteproc: use a flag to detect the presence of IOMMU
+In-Reply-To: <53D7C769.6080500@ti.com>
+References: <1404836521-59637-1-git-send-email-s-anna@ti.com>
+ <1404836521-59637-2-git-send-email-s-anna@ti.com>
+ <CAK=Wgbawdik3ZB0Zbeaa7eXd7M+9ev9u713GcfOc4Gy0+O80Dg@mail.gmail.com>
+ <53D7C769.6080500@ti.com>
+Message-ID: <CAK=Wgbbf5JNxzW16z=vXHi9D8Om1KnLEEr7hEw5T0oN7GuM=og@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08/01/2014 04:15 PM, Tero Kristo wrote:
-> Hi,
-> 
-> This patch adds possibility to register external clocks (outside the main
-> SoC) on TI boards through device tree. Clock sources as such include for
-> example twl-6030 / twl-6040 chips and variants which can be used to clock
-> for example audio / WLAN chips.
+On Tue, Jul 29, 2014 at 7:10 PM, Suman Anna <s-anna@ti.com> wrote:
+> We are trying to add a remoteproc driver for a small Cortex M3 called
+> the WkupM3 used for suspend/resume management on TI AM335/AM437x SoCs.
+> This processor does not have an MMU. Same is the case with another
+> processor subsystem PRU-ICSS on AM335/AM437x. All these are platform
+> devices, and the current iommu_present check will not scale for the same
+> kernel image to support OMAP4/OMAP5 and AM335/AM437x.
 
-Just one question to Mike and Tero:
-would it be possible to have generic binding for such an external clocks?
-We have the palmas clock driver already upstream which handles the 32K clocks
-from the PMIC. Palmas class of PMICs can be used with TI/nVidia(/Intel?)
-platforms. We use Palmas on omap5-uevm, DRA7-EVM also uses Palmas compatible
-PMIC and some nVidia platform also uses this class of devices (and they all
-need to have control over the 32K clock(s)).
+That's perfect, thanks. Can you please add this use case description
+to the commit log?
 
-> This patch can be queued once someone has a use-case + patches that requires
-> usage of such clocks.
-> 
-> -Tero
-> 
+This way we'll be able to recover it easily one day if needed.
 
-
--- 
-P?ter
+Thanks,
+Ohad.
