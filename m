@@ -1,45 +1,34 @@
-From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
-Date: Mon, 04 Aug 2014 17:21:49 +0200
-Subject: [RFC PATCH 2/2] of/clk: use "clkops-clocks" to specify clocks
- handled by clock_ops domain
-In-Reply-To: <CAMuHMdVKDQz8q0b2UA7=1K8Qw4n3U0=M+mJyi5UQP7QZdC-JiQ@mail.gmail.com>
-References: <1398334403-26181-1-git-send-email-geert+renesas@glider.be>
- <2717555.fiA6A86F65@avalon>
- <CAMuHMdVKDQz8q0b2UA7=1K8Qw4n3U0=M+mJyi5UQP7QZdC-JiQ@mail.gmail.com>
-Message-ID: <1616494.8YxGyrZW3V@avalon>
+From: matt@console-pimps.org (Matt Fleming)
+Date: Mon, 4 Aug 2014 16:21:55 +0100
+Subject: [PATCH v3] efi: implement mandatory locking for UEFI Runtime
+ Services
+In-Reply-To: <CAKv+Gu_rcWtRtNPy5BHH7B4s0wDF3odN-=LD8YsnRCiDLGyFsA@mail.gmail.com>
+References: <1405062556-14540-1-git-send-email-ard.biesheuvel@linaro.org>
+ <20140804130011.GI15082@console-pimps.org>
+ <CAKv+Gu-LQ9ahV5js0V5XgyRwUkrc3BOT9YoZj=mvwCEMQVXfow@mail.gmail.com>
+ <20140804144957.GK15082@console-pimps.org>
+ <CAKv+Gu_rcWtRtNPy5BHH7B4s0wDF3odN-=LD8YsnRCiDLGyFsA@mail.gmail.com>
+Message-ID: <20140804152155.GL15082@console-pimps.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Geert,
-
-On Monday 04 August 2014 13:28:32 Geert Uytterhoeven wrote:
-> On Wed, Jul 30, 2014 at 2:06 AM, Laurent Pinchart wrote:
-> > The third option would require storing the clocks lists in device drivers.
-> > I believe this is our best option, as a trade-off between simplicity and
-> > versatility. Drivers that use runtime PM already need to enable it
-> > explicitly when probing devices. Passing a list of clock names to runtime
-> > PM at that point wouldn't complicate drivers much. When the clocks list
-> > isn't SoC- dependent it could be stored as static information. Otherwise
-> > it could be derived from DT (or any other source of hardware description)
-> > using C code, offering all the versatility we need.
-> > 
-> > The only drawback of this solution I can think of right now is that the
-> > runtime PM core couldn't manage device clocks before probing the device.
-> > Specifically device clocks couldn't be managed if no driver is loaded for
-> > that device. I somehow recall that someone raised this as being a
-> > problem, but I can't remember why.
+On Mon, 04 Aug, at 05:05:53PM, Ard Biesheuvel wrote:
 > 
-> Perhaps you're thinking of clocks that were enabled (by the boot loader or
-> implicit reset state) before running Linux, and aren't disabled?
+> I think that makes sense. As I said, I don't have a strong preference
+> either way regarding the NMI handling, as it does not affect the
+> systems I am primarily concerned with (and it sounds like a big hack
+> anyway). What I /am/ concerned with is not getting code into the
+> kernel that turns out to be non-compliant a couple of months down the
+> road and having to fix it urgently then.
 
-That wasn't the reason, I know that clk_disable_unused() takes care of that 
-problem (provided the clock drivers behave correctly, the commit you mention 
-below shows that's not always the case, but that's an unrelated issue).
+Right, that's a valid concern.
+ 
+> So other than GetVariable and SetVariable, or there any other services
+> that need the NMI treatment?
 
-> That was fixed by commit bb178da701382a230e26d90cf94e8a24b280e0d9
-> ("clk: shmobile: mstp: Fix the is_enabled() operation").
+The one and only (potential) NMI-context caller of EFI runtime services
+is efi_pstore_write(), which calls (as part of efivar_entry_set_safe())
+QueryVariableInfo() and SetVariable().
 
 -- 
-Regards,
-
-Laurent Pinchart
+Matt Fleming, Intel Open Source Technology Center
