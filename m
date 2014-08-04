@@ -1,69 +1,85 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Mon, 4 Aug 2014 10:57:19 +0100
-Subject: [PATCH] arm64: optimize memcpy_{from,to}io() and memset_io()
-In-Reply-To: <20140802013834.GA23206@codeaurora.org>
-References: <1406701706-12808-1-git-send-email-joonwoop@codeaurora.org>
- <20140801063009.GA24602@codeaurora.org>
- <20140801083245.GE15733@arm.com>
- <20140802013834.GA23206@codeaurora.org>
-Message-ID: <20140804095719.GE15117@arm.com>
+From: hanjun.guo@linaro.org (Hanjun Guo)
+Date: Mon, 04 Aug 2014 17:56:29 +0800
+Subject: [PATCH 10/19] ARM64 / ACPI: Get the enable method for SMP
+ initialization in ACPI way
+In-Reply-To: <53DA2110.8060000@linaro.org>
+References: <1406206825-15590-1-git-send-email-hanjun.guo@linaro.org>
+ <1406206825-15590-11-git-send-email-hanjun.guo@linaro.org>
+ <20140731065426.GA876@quad.lixom.net> <53DA2110.8060000@linaro.org>
+Message-ID: <53DF58CD.9000704@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Aug 02, 2014 at 02:38:34AM +0100, Joonwoo Park wrote:
-> On Fri, Aug 01, 2014 at 09:32:46AM +0100, Will Deacon wrote:
-> > On Fri, Aug 01, 2014 at 07:30:09AM +0100, Joonwoo Park wrote:
-> > > On Tue, Jul 29, 2014 at 11:28:26PM -0700, Joonwoo Park wrote:
-> > > > Optimize memcpy_{from,to}io() and memset_io() by transferring in 64 bit
-> > > > as much as possible with minimized barrier usage.  This simplest optimization
-> > > > brings faster throughput compare to current byte-by-byte read and write with
-> > > > barrier in the loop.  Code's skeleton is taken from the powerpc.
-> > 
-> > Hmm, I've never really understood the use-case for memcpy_{to,from}io on
-> > ARM, so getting to the bottom of that would help in reviewing this patch.
-> > 
-> > Can you point me at the drivers which are using this for ARM please? Doing a
-> Sure.  This peripheral-loader.c driver now moved under drivers/soc/ so it
-> can be used for ARM and ARM64.
-> https://android.googlesource.com/kernel/msm.git/+/db34f44bcba24345d26b8a4b8137cf94d70afa73/arch/arm/mach-msm/peripheral-loader.c
-> static int load_segment(const struct elf32_phdr *phdr, unsigned num, struct pil_device *pil)
-> {
-> <snip>
-> 	while (count > 0) {
-> 		int size;
-> 		u8 __iomem *buf;
-> 		size = min_t(size_t, IOMAP_SIZE, count);
-> 		buf = ioremap(paddr, size);
-> 	}
-> 	<snip>
-> 	memset(buf, 0, size);
-> <snip>
+Hi Olof,
 
-Right, but that code doesn't exist in mainline afaict.
-
-> As you can see the function load_segment() does ioremap() followed by
-> memset() and memcpy() which can cause unaligned multi-byte (maybe ARM64
-> traps 8byte unaligned access?) write to device memory.
-> Because of this I was fixing the driver to use memset_io() and memcpy_io()
-> but the existing implementations were too slow compare to the one I'm
-> proposing.
+On 2014-7-31 18:57, Hanjun Guo wrote:
+> On 2014-7-31 14:54, Olof Johansson wrote:
+[...]
+>>> +static void __init acpi_smp_init_cpus(void)
+>>> +{
+>>> +	int cpu;
+>>> +
+>>> +	for_each_possible_cpu(cpu) {
+>>> +		if (cpu_acpi_read_ops(cpu) != 0)
+>>> +			continue;
+>>> +
+>>> +		cpu_ops[cpu]->cpu_init(NULL, cpu);
+>>> +	}
+>>> +}
+>>> +
+>>> +void __init smp_init_cpus(void)
+>>> +{
+>>> +	if (acpi_disabled)
+>>> +		of_smp_init_cpus();
+>>> +	else
+>>> +		acpi_smp_init_cpus();
+>>
+>> I'm liking these deeply split code paths less and less every time I see
+>> them. :(
+>>
+>> I would prefer to set up shared state in separate functions, but keep the
+>> control flow the same. Right now you're splitting it completely.
+>>
+>> I.e. split data setup between the two, but do the loop calling cpu_init()
+>> the same way. (Yes, that will require you to refactor the DT code path
+>> a bit too...)
 > 
-> > blind byte-by-byte copy could easily cause problems with some peripherals,
-> > so there must be an underlying assumption somewhere about how this is
-> > supposed to work.
-> Would you mind to explain more about the problem with byte-by-byte copying
-> you're worried about?
-> I thought byte-by-byte copy always safe with regard to aligned access and
-> that's the reason existing implementation does byte-by-byte copy.
-> I can imagine there are some peripherals don't allow per-byte access.  But
-> if that is the case, should they not use memset_io() and
-> memcpy_{from,to}io() anyway?
+> OK, I will dive into the code and figure out if I can fix that as you
+> suggested, thanks for your comments :)
 
-Yes, if somebody tried to use memset_io to zero a bunch of control
-registers, for example, you'd likely get a bunch of aborts because the
-endpoint would give you a SLVERR for a byte-access to a word register.
+After some investigation of the code, it seems that it is pretty hard
+to do so, the major gap to do that is DT needs the device node of CPU
+to init CPUs, but ACPI just needs the logical CPU number. In DT mode,
+it needs to search the DT and get the CPU device node to get its enable
+method, but in ACPI mode, it is a flag to indicate the CPU enable (boot)
+method.
 
-It just seems like the expected usage of this function should be documented
-somewhere to avoid it becoming highly dependent on the architecture.
+the code can be modified as below, but the logic is the same:
 
-Will
+diff --git a/arch/arm64/kernel/smp.c b/arch/arm64/kernel/smp.c
+index 40f38f4..71a625b 100644
+--- a/arch/arm64/kernel/smp.c
++++ b/arch/arm64/kernel/smp.c
+@@ -320,6 +320,17 @@ void __init smp_init_cpus(void)
+        unsigned int i, cpu = 1;
+        bool bootcpu_valid = false;
+
++       if (!acpi_disabled) {
++               for_each_possible_cpu(cpu) {
++                       if (cpu_read_ops(NULL, cpu) != 0)
++                               continue;
++
++                       cpu_ops[cpu]->cpu_init(NULL, cpu);
++               }
++
++               return;
++       }
++
+        while ((dn = of_find_node_by_type(dn, "cpu"))) {
+                const u32 *cell;
+                u64 hwid;
+
+Does it make sense to you?
+
+Thanks
+Hanjun
