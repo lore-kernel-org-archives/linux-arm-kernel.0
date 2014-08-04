@@ -1,82 +1,69 @@
-From: ajaykumar.rs@samsung.com (Ajay Kumar)
-Date: Mon, 04 Aug 2014 15:17:18 +0530
-Subject: [PATCH V3] ARM: dts: Add DT changes for display on peach_pi
-Message-ID: <1407145638-3803-1-git-send-email-ajaykumar.rs@samsung.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Mon, 4 Aug 2014 10:57:19 +0100
+Subject: [PATCH] arm64: optimize memcpy_{from,to}io() and memset_io()
+In-Reply-To: <20140802013834.GA23206@codeaurora.org>
+References: <1406701706-12808-1-git-send-email-joonwoop@codeaurora.org>
+ <20140801063009.GA24602@codeaurora.org>
+ <20140801083245.GE15733@arm.com>
+ <20140802013834.GA23206@codeaurora.org>
+Message-ID: <20140804095719.GE15117@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add DT nodes for panel-simple "auo,b133htn01" panel.
-Add backlight enable pin and backlight power supply for pwm-backlight.
-Also, add panel phandle needed by dp to enable display on peach_pi.
+On Sat, Aug 02, 2014 at 02:38:34AM +0100, Joonwoo Park wrote:
+> On Fri, Aug 01, 2014 at 09:32:46AM +0100, Will Deacon wrote:
+> > On Fri, Aug 01, 2014 at 07:30:09AM +0100, Joonwoo Park wrote:
+> > > On Tue, Jul 29, 2014 at 11:28:26PM -0700, Joonwoo Park wrote:
+> > > > Optimize memcpy_{from,to}io() and memset_io() by transferring in 64 bit
+> > > > as much as possible with minimized barrier usage.  This simplest optimization
+> > > > brings faster throughput compare to current byte-by-byte read and write with
+> > > > barrier in the loop.  Code's skeleton is taken from the powerpc.
+> > 
+> > Hmm, I've never really understood the use-case for memcpy_{to,from}io on
+> > ARM, so getting to the bottom of that would help in reviewing this patch.
+> > 
+> > Can you point me at the drivers which are using this for ARM please? Doing a
+> Sure.  This peripheral-loader.c driver now moved under drivers/soc/ so it
+> can be used for ARM and ARM64.
+> https://android.googlesource.com/kernel/msm.git/+/db34f44bcba24345d26b8a4b8137cf94d70afa73/arch/arm/mach-msm/peripheral-loader.c
+> static int load_segment(const struct elf32_phdr *phdr, unsigned num, struct pil_device *pil)
+> {
+> <snip>
+> 	while (count > 0) {
+> 		int size;
+> 		u8 __iomem *buf;
+> 		size = min_t(size_t, IOMAP_SIZE, count);
+> 		buf = ioremap(paddr, size);
+> 	}
+> 	<snip>
+> 	memset(buf, 0, size);
+> <snip>
 
-Signed-off-by: Ajay Kumar <ajaykumar.rs@samsung.com>
----
-Changes since V1:
-Remove "simple-panel" compatible string and use only ""auo,b133htn01".
+Right, but that code doesn't exist in mainline afaict.
 
-Changes since V2:
-As suggested by Andreas,
-Use GPIO_ACTIVE_HIGH for backlight enable-gpios instead of using 0.
-Change panel node naming from "panel-simple" to "panel".
+> As you can see the function load_segment() does ioremap() followed by
+> memset() and memcpy() which can cause unaligned multi-byte (maybe ARM64
+> traps 8byte unaligned access?) write to device memory.
+> Because of this I was fixing the driver to use memset_io() and memcpy_io()
+> but the existing implementations were too slow compare to the one I'm
+> proposing.
+> 
+> > blind byte-by-byte copy could easily cause problems with some peripherals,
+> > so there must be an underlying assumption somewhere about how this is
+> > supposed to work.
+> Would you mind to explain more about the problem with byte-by-byte copying
+> you're worried about?
+> I thought byte-by-byte copy always safe with regard to aligned access and
+> that's the reason existing implementation does byte-by-byte copy.
+> I can imagine there are some peripherals don't allow per-byte access.  But
+> if that is the case, should they not use memset_io() and
+> memcpy_{from,to}io() anyway?
 
- arch/arm/boot/dts/exynos5800-peach-pi.dts |   27 ++++++++++-----------------
- 1 file changed, 10 insertions(+), 17 deletions(-)
+Yes, if somebody tried to use memset_io to zero a bunch of control
+registers, for example, you'd likely get a bunch of aborts because the
+endpoint would give you a SLVERR for a byte-access to a word register.
 
-diff --git a/arch/arm/boot/dts/exynos5800-peach-pi.dts b/arch/arm/boot/dts/exynos5800-peach-pi.dts
-index f3ee48b..f8c2e61 100644
---- a/arch/arm/boot/dts/exynos5800-peach-pi.dts
-+++ b/arch/arm/boot/dts/exynos5800-peach-pi.dts
-@@ -28,11 +28,13 @@
- 		i2c20 = "/spi at 12d40000/cros-ec at 0/i2c-tunnel";
- 	};
- 
--	backlight {
-+	backlight: backlight {
- 		compatible = "pwm-backlight";
- 		pwms = <&pwm 0 1000000 0>;
- 		brightness-levels = <0 100 500 1000 1500 2000 2500 2800>;
- 		default-brightness-level = <7>;
-+		enable-gpios = <&gpx2 2 GPIO_ACTIVE_HIGH>;
-+		power-supply = <&tps65090_fet1>;
- 		pinctrl-0 = <&pwm0_out>;
- 		pinctrl-names = "default";
- 	};
-@@ -98,6 +100,12 @@
- 		regulator-boot-on;
- 		regulator-always-on;
- 	};
-+
-+	panel: panel {
-+		compatible = "auo,b133htn01";
-+		power-supply = <&tps65090_fet6>;
-+		backlight = <&backlight>;
-+	};
- };
- 
- &dp {
-@@ -111,22 +119,7 @@
- 	samsung,link-rate = <0x0a>;
- 	samsung,lane-count = <2>;
- 	samsung,hpd-gpio = <&gpx2 6 0>;
--
--	display-timings {
--		native-mode = <&timing1>;
--
--		timing1: timing at 1 {
--			clock-frequency = <150660000>;
--			hactive = <1920>;
--			vactive = <1080>;
--			hfront-porch = <60>;
--			hback-porch = <172>;
--			hsync-len = <80>;
--			vback-porch = <25>;
--			vfront-porch = <10>;
--			vsync-len = <10>;
--		};
--	};
-+	panel = <&panel>;
- };
- 
- &fimd {
--- 
-1.7.9.5
+It just seems like the expected usage of this function should be documented
+somewhere to avoid it becoming highly dependent on the architecture.
+
+Will
