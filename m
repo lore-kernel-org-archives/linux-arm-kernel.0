@@ -1,77 +1,73 @@
 From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Mon, 04 Aug 2014 14:13:35 +0100
-Subject: [RFC PATCH 7/9] KVM: arm: vgic: allow dynamic mapping of
- physical/virtual interrupts
-In-Reply-To: <53DE0584.2040405@linaro.org> (Eric Auger's message of "Sun, 3
- Aug 2014 10:48:52 +0100")
-References: <1403688530-23273-1-git-send-email-marc.zyngier@arm.com>
- <1403688530-23273-8-git-send-email-marc.zyngier@arm.com>
- <53DE0584.2040405@linaro.org>
-Message-ID: <87bns0gzy8.fsf@approximate.cambridge.arm.com>
+Date: Mon, 04 Aug 2014 14:26:36 +0100
+Subject: [PATCH V2] ARM/ARM64: KVM: Nuke Hyp-mode tlbs before enabling MMU
+In-Reply-To: <1406789604-10533-1-git-send-email-pranavkumar@linaro.org>
+ (Pranavkumar Sawargaonkar's message of "Thu, 31 Jul 2014 07:53:23
+ +0100")
+References: <1406789604-10533-1-git-send-email-pranavkumar@linaro.org>
+Message-ID: <877g2ogzcj.fsf@approximate.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Aug 03 2014 at 10:48:52 am BST, Eric Auger <eric.auger@linaro.org> wrote:
-> On 06/25/2014 11:28 AM, Marc Zyngier wrote:
->> In order to be able to feed physical interrupts to a guest, we need
->> to be able to establish the virtual-physical mapping between the two
->> worlds.
->> 
->> As we try to keep the injection interface simple, find out what the
->> physical interrupt is (if any) when we actually build the LR.
->> 
->> The mapping is kept in a rbtree, indexed by virtual interrupts.
+Hi Pranav,
+
+On Thu, Jul 31 2014 at  7:53:23 am BST, Pranavkumar Sawargaonkar <pranavkumar@linaro.org> wrote:
+> X-Gene u-boot runs in EL2 mode with MMU enabled hence we might
+> have stale EL2 tlb enteris when we enable EL2 MMU on each host CPU.
 >
-> Hi Marc,
+> This can happen on any ARM/ARM64 board running bootloader in
+> Hyp-mode (or EL2-mode) with MMU enabled.
 >
-> I suspect there is a piece missing here related to bitmap state
-> management. When using maintenance IRQ, in process_maintenance we cleared
-> - dist->irq_pending (and new dist->irq_level)
-> - vcpu->irq_queued
+> This patch ensures that we flush all Hyp-mode (or EL2-mode) TLBs
+> on each host CPU before enabling Hyp-mode (or EL2-mode) MMU.
 >
-> Now this does not exist anymore for forwarded irqs, when a subsequent
-> IRQ will be injected, vgic_update_irq_pending will fail in injecting the
-> IRQ because the states are reflecting the IRQ is still in progress.
+> Changelog:
 >
-> Since I have a modified version of your code, using Christoffer patches
-> I may have missed some modifications you did but at least on my side I
-> was forced to add bitmap clearing.
+> V2:
+>  - Flush Hyp-mode TLBs for both KVM ARM32 and KVM ARM64 at boot time
 >
-> It is not clear to me where to put that code however. Since user-side
-> can inject an IRQ while the previous one is not completed at guest and
-> host level, it cannot be in update_irq_pending - or we shall prevent the
-> user from injecting fwd IRQs - .
+> V1:
+>  - Initial patch with only arm64 change
+>
+> Signed-off-by: Pranavkumar Sawargaonkar <pranavkumar@linaro.org>
+> Signed-off-by: Anup Patel <anup.patel@linaro.org>
+> ---
+>  arch/arm/kvm/init.S       |    4 ++++
+>  arch/arm64/kvm/hyp-init.S |    4 ++++
+>  2 files changed, 8 insertions(+)
+>
+> diff --git a/arch/arm/kvm/init.S b/arch/arm/kvm/init.S
+> index 1b9844d..ee4f744 100644
+> --- a/arch/arm/kvm/init.S
+> +++ b/arch/arm/kvm/init.S
+> @@ -98,6 +98,10 @@ __do_hyp_init:
+>  	mrc	p15, 0, r0, c10, c2, 1
+>  	mcr	p15, 4, r0, c10, c2, 1
+>  
+> +	@ Invalidate the stale TLBs from Bootloader
+> +	mcr	p15, 4, r0, c8, c7, 0	@ TLBIALLH
+> +	dsb	ish
+> +
+>  	@ Set the HSCTLR to:
+>  	@  - ARM/THUMB exceptions: Kernel config (Thumb-2 kernel)
+>  	@  - Endianness: Kernel config
+> diff --git a/arch/arm64/kvm/hyp-init.S b/arch/arm64/kvm/hyp-init.S
+> index d968796..c319116 100644
+> --- a/arch/arm64/kvm/hyp-init.S
+> +++ b/arch/arm64/kvm/hyp-init.S
+> @@ -80,6 +80,10 @@ __do_hyp_init:
+>  	msr	mair_el2, x4
+>  	isb
+>  
+> +	/* Invalidate the stale TLBs from Bootloader */
+> +	tlbi	alle2
+> +	dsb	sy
+> +
+>  	mrs	x4, sctlr_el2
+>  	and	x4, x4, #SCTLR_EL2_EE	// preserve endianness of EL2
+>  	ldr	x5, =SCTLR_EL2_FLAGS
 
-Interesting. Indeed, userspace shouldn't be allowed to inject a
-forwarded interrupt (or actually the virtual interrupt that matches the
-physical one). This interrupt is now under complete control of the
-kernel, and shouldn't triggered by userspace.
-
-Now, it is completely possible that we're missing something here (or
-actually doing too much).
-
-> In my case (VFIO/IRQFD), by construction I only inject a new forwarded
-> IRQ when the previous one was completed so I could put it in the irqfd
-> injection function. But even irqfd is injected through eventfd trigger.
-> We shall forbid the user-side to trigger that eventfd in place of the
-> VFIO driver. What do you think?
-
-Yup. userspace can't interfere with a forwarded interrupt, that's way
-too dangerous.
-
-> A question related to guest kill. Cannot it happen the guest sometimes
-> does not complete the vIRQ before exiting? Currently I observe cases
-> where when I launch qemu-system after a kill, forwarded irqs do not work
-> properly. I am not yet sure this is the cause of my problem but just in
-> case, can the host write into GICV_EOIR in place of guest?
-
-It is quite possible that the interrupt is left active when the guest is
-killed, which would tend to indicate that we need a way to cleanup
-behind us. It should be enough to clear the active bit, shouldn't it?
-
-> Besides those problems, the patch works in my test environment
-
-Thanks for testing!
+Reviewed-by: Marc Zyngier <marc.zyngier@arm.com>
 
 	M.
 -- 
