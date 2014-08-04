@@ -1,32 +1,34 @@
-From: computersforpeace@gmail.com (Brian Norris)
-Date: Mon, 4 Aug 2014 09:56:27 -0700
-Subject: [PATCH v8 03/11] ARM: brcmstb: add debug UART for earlyprintk
- support
-In-Reply-To: <20140802083040.GY30282@n2100.arm.linux.org.uk>
-References: <1405976886-27807-1-git-send-email-computersforpeace@gmail.com>
- <1405976886-27807-4-git-send-email-computersforpeace@gmail.com>
- <20140802083040.GY30282@n2100.arm.linux.org.uk>
-Message-ID: <20140804165627.GT3711@ld-irv-0074>
+From: heiko@sntech.de (Heiko =?ISO-8859-1?Q?St=FCbner?=)
+Date: Mon, 04 Aug 2014 18:59:21 +0200
+Subject: [PATCH 1/2] ARM: multi_v7_defconfig: Enable
+ ARM_ATAG_DTB_COMPAT_CMDLINE_EXTEND
+Message-ID: <5084600.YbBVvXy6Ug@diego>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Aug 02, 2014 at 09:30:40AM +0100, Russell King wrote:
-> On Mon, Jul 21, 2014 at 02:07:58PM -0700, Brian Norris wrote:
-> > From: Marc Carino <marc.ceeeee@gmail.com>
-> > 
-> > Add the UART definitions needed to support earlyprintk on brcmstb machines.
-> > 
-> > Signed-off-by: Marc Carino <marc.ceeeee@gmail.com>
-> > Acked-by: Florian Fainelli <f.fainelli@gmail.com>
-> > Signed-off-by: Brian Norris <computersforpeace@gmail.com>
-> 
-> I noticed that you sent this to the patch system.  I asked Olof last
-> night whether he had anything in arm-soc touching Kconfig.debug, and
-> he does (a number of other platforms have updated it.)  This means
-> that if I apply it to my tree, it may conflict, so I'm reluctant to
-> take it.
+At present on atag based legacy bootloaders, the provided kernel commandline
+will be used unchanged, potentially using obscure parameters for outdated
+vendor-kernel drivers.
 
-OK... Matt told me that such patches go through you. So which is it?
-Should all Kconfig.debug patches go through the arm-soc route?
+Therefore allow them to be extended by known-good parameters from the
+bootargs property of the dtb.
 
-Brian
+Signed-off-by: Heiko Stuebner <heiko@sntech.de>
+---
+ arch/arm/configs/multi_v7_defconfig | 1 +
+ 1 file changed, 1 insertion(+)
+
+diff --git a/arch/arm/configs/multi_v7_defconfig b/arch/arm/configs/multi_v7_defconfig
+index 1bf198b..16a42a5 100644
+--- a/arch/arm/configs/multi_v7_defconfig
++++ b/arch/arm/configs/multi_v7_defconfig
+@@ -80,6 +80,7 @@ CONFIG_HIGHPTE=y
+ CONFIG_CMA=y
+ CONFIG_ARM_APPENDED_DTB=y
+ CONFIG_ARM_ATAG_DTB_COMPAT=y
++CONFIG_ARM_ATAG_DTB_COMPAT_CMDLINE_EXTEND=y
+ CONFIG_KEXEC=y
+ CONFIG_CPU_FREQ=y
+ CONFIG_CPU_FREQ_STAT_DETAILS=y
+-- 
+2.0.1
