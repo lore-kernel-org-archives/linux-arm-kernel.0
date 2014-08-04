@@ -1,56 +1,46 @@
-From: rdunlap@infradead.org (Randy Dunlap)
-Date: Mon, 04 Aug 2014 13:48:11 -0700
-Subject: [PATCH v2 18/18] Documentation: ACPI for ARM64
-In-Reply-To: <1407166105-17675-19-git-send-email-hanjun.guo@linaro.org>
-References: <1407166105-17675-1-git-send-email-hanjun.guo@linaro.org>
- <1407166105-17675-19-git-send-email-hanjun.guo@linaro.org>
-Message-ID: <53DFF18B.5080509@infradead.org>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Mon, 4 Aug 2014 22:23:17 +0100
+Subject: Formal license ambiguity in arch/arm/boot/dts/sun?i-a*.dts
+In-Reply-To: <20140804192510.GF3952@lukather>
+References: <20140731192016.GA6869@excalibur.cnev.de>
+ <20140803130430.GY3952@lukather> <201408031959.27607.arnd@arndb.de>
+ <20140804192510.GF3952@lukather>
+Message-ID: <20140804212317.GL30282@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08/04/14 08:28, Hanjun Guo wrote:
-> From: Graeme Gregory <graeme.gregory@linaro.org>
+On Mon, Aug 04, 2014 at 09:25:10PM +0200, Maxime Ripard wrote:
+> On Sun, Aug 03, 2014 at 07:59:27PM +0200, Arnd Bergmann wrote:
+> > I would actually prefer if we could migrate a lot of these files to BSD license,
+> > provided the original authors agree. We want the dtb blobs to be embeddable into
+> > boot loaders of any license.
 > 
-> Add documentation for the guidelines of how to use ACPI
-> on ARM64.
+> Even though I'd be open to having my contributions to DTBs under the
+> BSD, is this really a thing?
 > 
-> Signed-off-by: Graeme Gregory <graeme.gregory@linaro.org>
-> Signed-off-by: Hanjun Guo <hanjun.guo@linaro.org>
-> ---
->  Documentation/arm64/arm-acpi.txt |  215 ++++++++++++++++++++++++++++++++++++++
->  1 file changed, 215 insertions(+)
->  create mode 100644 Documentation/arm64/arm-acpi.txt
-> 
-> diff --git a/Documentation/arm64/arm-acpi.txt b/Documentation/arm64/arm-acpi.txt
-> new file mode 100644
-> index 0000000..a6e14a2
-> --- /dev/null
-> +++ b/Documentation/arm64/arm-acpi.txt
-> @@ -0,0 +1,215 @@
-> +ACPI on ARMv8 Servers
-> +---------------------
-> +
+> I mean, for all I know, an OS/Bootloader would just parse a documented
+> binary file, and I don't see any derivative work there.
 
-...
+How does the OS/Bootloader end up with that binary file?
 
-> +
-> +ACPI Detection
-> +--------------
-> +
-> +Drivers should determine their probe() type by checking for ACPI_HANDLE,
-> +or .of_node, or other information in the device structure. This is
-> +detailed further in the "Driver Recommendations" section.
-> +
-> +In non-driver code If the presence of ACPI needs to be detected at runtime,
-> +then check the value of acpi_disabled. If CONFIG_ACPI not being set,
+For the sake of argument, let's say that the BSDs want to move to DT on
+ARM.  Great, they convert over to parsing our DT blobs.
 
-                                          If CONFIG_ACPI is not set,
+However, they can't distribute the binary DT blobs to their users without
+coming up against the problems of the GPL wrt binary distribution.
 
-> +acpi_disabled will always be 1.
-> +
-> +Device Enumeration
-> +------------------
+They could distribute the source files, but remember that many of those
+are currently GPL licensed, so they'd probably end up having to package
+them entirely separately, if they're willing to do that at all.
 
+Or they could decide to ignore us altogether, and do their own DT stuff,
+maybe partially implementing our properties, or maybe coming up with
+different and/or incompatible properties - which would be bad because
+we now end up with two ways to describe the same hardware in active use.
+
+I suspect the final option is the one they'd choose, and it's in our
+interest that _that_ doesn't happen.
 
 -- 
-~Randy
+FTTC broadband for 0.8mile line: currently at 9.5Mbps down 400kbps up
+according to speedtest.net.
