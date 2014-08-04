@@ -1,25 +1,45 @@
-From: christoffer.dall@linaro.org (Christoffer Dall)
-Date: Mon, 4 Aug 2014 17:18:21 +0200
-Subject: [PATCH v3] arm64: fix VTTBR_BADDR_MASK
-In-Reply-To: <53DF9BE6.2090701@amd.com>
-References: <20140804143845.2851.85441.stgit@joelaarch64.amd.com>
- <53DF9BE6.2090701@amd.com>
-Message-ID: <20140804151821.GB1774@cbox>
+From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
+Date: Mon, 04 Aug 2014 17:21:49 +0200
+Subject: [RFC PATCH 2/2] of/clk: use "clkops-clocks" to specify clocks
+ handled by clock_ops domain
+In-Reply-To: <CAMuHMdVKDQz8q0b2UA7=1K8Qw4n3U0=M+mJyi5UQP7QZdC-JiQ@mail.gmail.com>
+References: <1398334403-26181-1-git-send-email-geert+renesas@glider.be>
+ <2717555.fiA6A86F65@avalon>
+ <CAMuHMdVKDQz8q0b2UA7=1K8Qw4n3U0=M+mJyi5UQP7QZdC-JiQ@mail.gmail.com>
+Message-ID: <1616494.8YxGyrZW3V@avalon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Aug 04, 2014 at 09:42:46AM -0500, Joel Schopp wrote:
-> Since this fixes a real problem and didn't make it into 3.16 it would be
-> good if this made it into 3.17.
+Hi Geert,
+
+On Monday 04 August 2014 13:28:32 Geert Uytterhoeven wrote:
+> On Wed, Jul 30, 2014 at 2:06 AM, Laurent Pinchart wrote:
+> > The third option would require storing the clocks lists in device drivers.
+> > I believe this is our best option, as a trade-off between simplicity and
+> > versatility. Drivers that use runtime PM already need to enable it
+> > explicitly when probing devices. Passing a list of clock names to runtime
+> > PM at that point wouldn't complicate drivers much. When the clocks list
+> > isn't SoC- dependent it could be stored as static information. Otherwise
+> > it could be derived from DT (or any other source of hardware description)
+> > using C code, offering all the versatility we need.
+> > 
+> > The only drawback of this solution I can think of right now is that the
+> > runtime PM core couldn't manage device clocks before probing the device.
+> > Specifically device clocks couldn't be managed if no driver is loaded for
+> > that device. I somehow recall that someone raised this as being a
+> > problem, but I can't remember why.
 > 
-It's too late for the merge window, we have to review and test as I told
-you in a private e-mail.
+> Perhaps you're thinking of clocks that were enabled (by the boot loader or
+> implicit reset state) before running Linux, and aren't disabled?
 
-We will review this and test it, and if it makes sense merge as a fix
-for 3.17 before the release.
+That wasn't the reason, I know that clk_disable_unused() takes care of that 
+problem (provided the clock drivers behave correctly, the commit you mention 
+below shows that's not always the case, but that's an unrelated issue).
 
-Please be a little patient given the number of patches on the list
-currently.
+> That was fixed by commit bb178da701382a230e26d90cf94e8a24b280e0d9
+> ("clk: shmobile: mstp: Fix the is_enabled() operation").
 
-Thanks,
--Christoffer
+-- 
+Regards,
+
+Laurent Pinchart
