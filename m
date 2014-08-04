@@ -1,41 +1,209 @@
 From: christoffer.dall@linaro.org (Christoffer Dall)
-Date: Mon,  4 Aug 2014 10:46:23 +0200
-Subject: [GIT PULL 06/51] arm64: KVM: export demux regids as KVM_REG_ARM64
+Date: Mon,  4 Aug 2014 10:46:24 +0200
+Subject: [GIT PULL 07/51] arm64: KVM: allow export and import of generic timer
+ regs
 In-Reply-To: <1407142028-31105-1-git-send-email-christoffer.dall@linaro.org>
 References: <1407142028-31105-1-git-send-email-christoffer.dall@linaro.org>
-Message-ID: <1407142028-31105-7-git-send-email-christoffer.dall@linaro.org>
+Message-ID: <1407142028-31105-8-git-send-email-christoffer.dall@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Alex Benn?e <alex.bennee@linaro.org>
 
-I suspect this is a -ECUTPASTE fault from the initial implementation. If
-we don't declare the register ID to be KVM_REG_ARM64 the KVM_GET_ONE_REG
-implementation kvm_arm_get_reg() returns -EINVAL and hilarity ensues.
+For correct guest suspend/resume behaviour we need to ensure we include
+the generic timer registers for 64 bit guests. As CONFIG_KVM_ARM_TIMER is
+always set for arm64 we don't need to worry about null implementations.
+However I have re-jigged the kvm_arm_timer_set/get_reg declarations to
+be in the common include/kvm/arm_arch_timer.h headers.
 
-The kvm/api.txt document describes all arm64 registers as starting with
-0x60xx... (i.e KVM_REG_ARM64).
-
-Signed-off-by: Alex Benn?e <alex.bennee@linaro.org>
-Acked-by: Christoffer Dall <christoffer.dall@linaro.org>
 Acked-by: Marc Zyngier <marc.zyngier@arm.com>
-Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+Reviewed-by: Christoffer Dall <christoffer.dall@linaro.org>
+Signed-off-by: Alex Benn?e <alex.bennee@linaro.org>
+Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
 ---
- arch/arm64/kvm/sys_regs.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+ arch/arm/include/asm/kvm_host.h |  3 --
+ arch/arm/kvm/guest.c            | 10 ------
+ arch/arm64/kvm/guest.c          | 68 ++++++++++++++++++++++++++++++++++++++++-
+ include/kvm/arm_arch_timer.h    | 14 +++++++++
+ 4 files changed, 81 insertions(+), 14 deletions(-)
 
-diff --git a/arch/arm64/kvm/sys_regs.c b/arch/arm64/kvm/sys_regs.c
-index c59a1bd..34f25a5 100644
---- a/arch/arm64/kvm/sys_regs.c
-+++ b/arch/arm64/kvm/sys_regs.c
-@@ -962,7 +962,7 @@ static unsigned int num_demux_regs(void)
+diff --git a/arch/arm/include/asm/kvm_host.h b/arch/arm/include/asm/kvm_host.h
+index 193ceaf..dc4e3ed 100644
+--- a/arch/arm/include/asm/kvm_host.h
++++ b/arch/arm/include/asm/kvm_host.h
+@@ -228,7 +228,4 @@ static inline int kvm_arch_dev_ioctl_check_extension(long ext)
+ int kvm_perf_init(void);
+ int kvm_perf_teardown(void);
  
- static int write_demux_regids(u64 __user *uindices)
+-u64 kvm_arm_timer_get_reg(struct kvm_vcpu *, u64 regid);
+-int kvm_arm_timer_set_reg(struct kvm_vcpu *, u64 regid, u64 value);
+-
+ #endif /* __ARM_KVM_HOST_H__ */
+diff --git a/arch/arm/kvm/guest.c b/arch/arm/kvm/guest.c
+index b23a59c..986e625 100644
+--- a/arch/arm/kvm/guest.c
++++ b/arch/arm/kvm/guest.c
+@@ -124,16 +124,6 @@ static bool is_timer_reg(u64 index)
+ 	return false;
+ }
+ 
+-int kvm_arm_timer_set_reg(struct kvm_vcpu *vcpu, u64 regid, u64 value)
+-{
+-	return 0;
+-}
+-
+-u64 kvm_arm_timer_get_reg(struct kvm_vcpu *vcpu, u64 regid)
+-{
+-	return 0;
+-}
+-
+ #else
+ 
+ #define NUM_TIMER_REGS 3
+diff --git a/arch/arm64/kvm/guest.c b/arch/arm64/kvm/guest.c
+index 60b5c31..8d1ec28 100644
+--- a/arch/arm64/kvm/guest.c
++++ b/arch/arm64/kvm/guest.c
+@@ -136,13 +136,67 @@ static unsigned long num_core_regs(void)
+ }
+ 
+ /**
++ * ARM64 versions of the TIMER registers, always available on arm64
++ */
++
++#define NUM_TIMER_REGS 3
++
++static bool is_timer_reg(u64 index)
++{
++	switch (index) {
++	case KVM_REG_ARM_TIMER_CTL:
++	case KVM_REG_ARM_TIMER_CNT:
++	case KVM_REG_ARM_TIMER_CVAL:
++		return true;
++	}
++	return false;
++}
++
++static int copy_timer_indices(struct kvm_vcpu *vcpu, u64 __user *uindices)
++{
++	if (put_user(KVM_REG_ARM_TIMER_CTL, uindices))
++		return -EFAULT;
++	uindices++;
++	if (put_user(KVM_REG_ARM_TIMER_CNT, uindices))
++		return -EFAULT;
++	uindices++;
++	if (put_user(KVM_REG_ARM_TIMER_CVAL, uindices))
++		return -EFAULT;
++
++	return 0;
++}
++
++static int set_timer_reg(struct kvm_vcpu *vcpu, const struct kvm_one_reg *reg)
++{
++	void __user *uaddr = (void __user *)(long)reg->addr;
++	u64 val;
++	int ret;
++
++	ret = copy_from_user(&val, uaddr, KVM_REG_SIZE(reg->id));
++	if (ret != 0)
++		return ret;
++
++	return kvm_arm_timer_set_reg(vcpu, reg->id, val);
++}
++
++static int get_timer_reg(struct kvm_vcpu *vcpu, const struct kvm_one_reg *reg)
++{
++	void __user *uaddr = (void __user *)(long)reg->addr;
++	u64 val;
++
++	val = kvm_arm_timer_get_reg(vcpu, reg->id);
++	return copy_to_user(uaddr, &val, KVM_REG_SIZE(reg->id));
++}
++
++/**
+  * kvm_arm_num_regs - how many registers do we present via KVM_GET_ONE_REG
+  *
+  * This is for all registers.
+  */
+ unsigned long kvm_arm_num_regs(struct kvm_vcpu *vcpu)
  {
--	u64 val = KVM_REG_ARM | KVM_REG_SIZE_U32 | KVM_REG_ARM_DEMUX;
-+	u64 val = KVM_REG_ARM64 | KVM_REG_SIZE_U32 | KVM_REG_ARM_DEMUX;
- 	unsigned int i;
+-	return num_core_regs() + kvm_arm_num_sys_reg_descs(vcpu);
++	return num_core_regs() + kvm_arm_num_sys_reg_descs(vcpu)
++                + NUM_TIMER_REGS;
+ }
  
- 	val |= KVM_REG_ARM_DEMUX_ID_CCSIDR;
+ /**
+@@ -154,6 +208,7 @@ int kvm_arm_copy_reg_indices(struct kvm_vcpu *vcpu, u64 __user *uindices)
+ {
+ 	unsigned int i;
+ 	const u64 core_reg = KVM_REG_ARM64 | KVM_REG_SIZE_U64 | KVM_REG_ARM_CORE;
++	int ret;
+ 
+ 	for (i = 0; i < sizeof(struct kvm_regs) / sizeof(__u32); i++) {
+ 		if (put_user(core_reg | i, uindices))
+@@ -161,6 +216,11 @@ int kvm_arm_copy_reg_indices(struct kvm_vcpu *vcpu, u64 __user *uindices)
+ 		uindices++;
+ 	}
+ 
++	ret = copy_timer_indices(vcpu, uindices);
++	if (ret)
++		return ret;
++	uindices += NUM_TIMER_REGS;
++
+ 	return kvm_arm_copy_sys_reg_indices(vcpu, uindices);
+ }
+ 
+@@ -174,6 +234,9 @@ int kvm_arm_get_reg(struct kvm_vcpu *vcpu, const struct kvm_one_reg *reg)
+ 	if ((reg->id & KVM_REG_ARM_COPROC_MASK) == KVM_REG_ARM_CORE)
+ 		return get_core_reg(vcpu, reg);
+ 
++	if (is_timer_reg(reg->id))
++		return get_timer_reg(vcpu, reg);
++
+ 	return kvm_arm_sys_reg_get_reg(vcpu, reg);
+ }
+ 
+@@ -187,6 +250,9 @@ int kvm_arm_set_reg(struct kvm_vcpu *vcpu, const struct kvm_one_reg *reg)
+ 	if ((reg->id & KVM_REG_ARM_COPROC_MASK) == KVM_REG_ARM_CORE)
+ 		return set_core_reg(vcpu, reg);
+ 
++	if (is_timer_reg(reg->id))
++		return set_timer_reg(vcpu, reg);
++
+ 	return kvm_arm_sys_reg_set_reg(vcpu, reg);
+ }
+ 
+diff --git a/include/kvm/arm_arch_timer.h b/include/kvm/arm_arch_timer.h
+index 6d9aedd..ad9db60 100644
+--- a/include/kvm/arm_arch_timer.h
++++ b/include/kvm/arm_arch_timer.h
+@@ -67,6 +67,10 @@ void kvm_timer_vcpu_init(struct kvm_vcpu *vcpu);
+ void kvm_timer_flush_hwstate(struct kvm_vcpu *vcpu);
+ void kvm_timer_sync_hwstate(struct kvm_vcpu *vcpu);
+ void kvm_timer_vcpu_terminate(struct kvm_vcpu *vcpu);
++
++u64 kvm_arm_timer_get_reg(struct kvm_vcpu *, u64 regid);
++int kvm_arm_timer_set_reg(struct kvm_vcpu *, u64 regid, u64 value);
++
+ #else
+ static inline int kvm_timer_hyp_init(void)
+ {
+@@ -84,6 +88,16 @@ static inline void kvm_timer_vcpu_init(struct kvm_vcpu *vcpu) {}
+ static inline void kvm_timer_flush_hwstate(struct kvm_vcpu *vcpu) {}
+ static inline void kvm_timer_sync_hwstate(struct kvm_vcpu *vcpu) {}
+ static inline void kvm_timer_vcpu_terminate(struct kvm_vcpu *vcpu) {}
++
++static inline int kvm_arm_timer_set_reg(struct kvm_vcpu *vcpu, u64 regid, u64 value)
++{
++	return 0;
++}
++
++static inline u64 kvm_arm_timer_get_reg(struct kvm_vcpu *vcpu, u64 regid)
++{
++	return 0;
++}
+ #endif
+ 
+ #endif
 -- 
 2.0.0
