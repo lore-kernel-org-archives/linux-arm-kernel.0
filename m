@@ -1,102 +1,52 @@
-From: computersforpeace@gmail.com (Brian Norris)
-Date: Mon, 4 Aug 2014 10:39:07 -0700
-Subject: [PATCH v8 01/11] ARM: brcmstb: add infrastructure for ARM-based
- Broadcom STB SoCs
-In-Reply-To: <20140802081924.GW30282@n2100.arm.linux.org.uk>
-References: <1405976886-27807-1-git-send-email-computersforpeace@gmail.com>
- <1405976886-27807-2-git-send-email-computersforpeace@gmail.com>
- <20140802081924.GW30282@n2100.arm.linux.org.uk>
-Message-ID: <20140804173907.GU3711@ld-irv-0074>
+From: javier.martinez@collabora.co.uk (Javier Martinez Canillas)
+Date: Mon, 04 Aug 2014 19:43:22 +0200
+Subject: [PATCH v6 00/10] ARM: dts: exynos: Prepare Spring
+In-Reply-To: <CAD=FV=WFNW_5KZvLMk0kK1JQsdWLeo2kCjpQsFuxKNSnOKzfgw@mail.gmail.com>
+References: <1406940750-15880-1-git-send-email-afaerber@suse.de>	<53DC4E41.4050200@collabora.co.uk>	<CAD=FV=V_vXZLMaTMFdgr62=zRXucZA6D3PvS0Mb40he0ShHTfA@mail.gmail.com>	<53DCBC84.8080600@suse.de>
+ <CAD=FV=WFNW_5KZvLMk0kK1JQsdWLeo2kCjpQsFuxKNSnOKzfgw@mail.gmail.com>
+Message-ID: <53DFC63A.7010709@collabora.co.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Aug 02, 2014 at 09:19:24AM +0100, Russell King wrote:
-> Here's some more comments on this.
+Hello Doug,
+
+On 08/04/2014 05:42 PM, Doug Anderson wrote:
 > 
-> On Mon, Jul 21, 2014 at 02:07:56PM -0700, Brian Norris wrote:
-> > +static void brcmstb_cpu_die(u32 cpu)
-> > +{
-> > +	v7_exit_coherency_flush(all);
 > 
-> This is ultimately what causes my builds to break:
+>> Both of you mentioned limitations of cros_ec i2c passthrough leading to
+>> a forked tps65090 driver downstream - I don't think I can be of help
+>> there, as I guess simply copying a driver will not be an option. ;)
+>> https://code.google.com/p/chromium/issues/detail?id=391797
 > 
-> /tmp/ccSPowmq.s:171: Error: selected processor does not support ARM mode `isb '
-> /tmp/ccSPowmq.s:177: Error: selected processor does not support ARM mode `isb '
-> /tmp/ccSPowmq.s:178: Error: selected processor does not support ARM mode `dsb '
-> make[2]: *** [arch/arm/mach-bcm/platsmp-brcmstb.o] Error 1
+> Yup, I think this will be real work for someone.  I made a quick
+> attempt and failed at it and I haven't had time to work on it since
+> (and don't necessarily expect to have time in the near future)...  I
+> think it is possible for anyone versed in i2c to figure this out based
+> on what I already posted and what's in our local tree...
 > 
-> It seems that v7_exit_coherency_flush() can only be used with code which
-> is ARMv7 only.
 
-Yes, I noticed this already, and I proposed a solution:
+I posted a series [0] with the remaining cleanups/fixes for cros_ec that are on
+the downstream Chrome OS 3.8 kernel. Once these lands it will be easier to add
+the missing cros_ec functionality on top. I've these on my TODO list but I was
+going to give priority to the cros_ec user-space interface, LPC bus support and
+vboot context over the tps65090 Spring support since I don't have access to a
+Spring machine to test.
 
-  http://article.gmane.org/gmane.linux.drivers.devicetree/84517
-
-> > +	/* Prevent all interrupts from reaching this CPU. */
-> > +	arch_local_irq_disable();
 > 
-> Why do you think it is necessary to disable interrupts here?  Where
-> have they been re-enabled since this bit of generic code:
+>> For the touchpad it seems DT support has landed in the input tree as
+>> "atmel,maxtouch". Backporting just that patch does not make it work
+>> though. (Tried the rejected pinctrl approach to be on the safe side.)
+>> https://code.google.com/p/chromium/issues/detail?id=371114
+>> https://patchwork.kernel.org/patch/3976801/
 > 
-> void __ref cpu_die(void)
-> {
->         unsigned int cpu = smp_processor_id();
+> This is the same work as needed for pit and pi, I believe.  Perhaps
+> Javier or Dmitry has this on their todo list?
 > 
->         idle_task_exit();
 > 
->         local_irq_disable();
-> 
-> and why arch_local_irq_disable() at that?  Even if interrupts were
-> enabled prior to your call to arch_local_irq_disable(), what do you
-> think would be the effect of receiving an interrupt after you've
-> exited coherency?
 
-This mistake was already noted. No need for the extra IRQ disable.
+Yes, I've this on my TODO list as well.
 
-(http://article.gmane.org/gmane.linux.drivers.devicetree/84516)
+Best regards,
+Javier
 
-> > +
-> > +	/*
-> > +	 * Final full barrier to ensure everything before this instruction has
-> > +	 * quiesced.
-> > +	 */
-> > +	isb();
-> > +	dsb();
-> 
-> If the call to arch_local_irq_disable() is removed, and
-> v7_exit_coherency_flush() is fixed, then this is not required, because
-> v7_exit_coherency_flush() already does this at the very end.
-
-Right. Will drop.
-
-> > +
-> > +	per_cpu_sw_state_wr(cpu, 0);
-> > +
-> > +	/* Sit and wait to die */
-> > +	wfi();
-> > +
-> > +	/* We should never get here... */
-> > +	panic("Spurious interrupt on CPU %d received!\n", cpu);
-> 
-> You really should /not/ be calling panic here, because that uses data
-> shared with the CPUs which are still coherent.  This is akin to doing
-> DMA into bits of the kernel space without dealing with the cache
-> coherency issues.
-
-OK.
-
-> Moreover, if you read the comments on
-> v7_exit_coherency_flush() about ldrex/strex, which are two instructions
-> spinlocks use, you'll see that ldrex/strex must not be executed, which
-> means you can't call any function which uses spinlocks.  That rules
-> out printk() et.al.  printascii is fine, but that's only available when
-> the low level debug stuff is enabled.
-
-OK, so I'll drop the panic(). printascii doesn't look extremely useful,
-but I suppose we could use it for debugging. Seems like a while (1) loop
-might be a suitable replacement. If we get this far, we'll likely get
-locked up trying to power this CPU off anyway, so it'll be apparent that
-there was power-down failure.
-
-Thanks,
-Brian
+[0]: http://www.spinics.net/lists/linux-samsung-soc/msg34897.html
