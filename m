@@ -1,43 +1,54 @@
 From: christoffer.dall@linaro.org (Christoffer Dall)
-Date: Mon,  4 Aug 2014 10:47:05 +0200
-Subject: [GIT PULL 48/51] arm64: KVM: enable trapping of all debug registers
+Date: Mon,  4 Aug 2014 10:47:07 +0200
+Subject: [GIT PULL 50/51] KVM: arm64: GICv3: mandate page-aligned GICV region
 In-Reply-To: <1407142028-31105-1-git-send-email-christoffer.dall@linaro.org>
 References: <1407142028-31105-1-git-send-email-christoffer.dall@linaro.org>
-Message-ID: <1407142028-31105-49-git-send-email-christoffer.dall@linaro.org>
+Message-ID: <1407142028-31105-51-git-send-email-christoffer.dall@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Marc Zyngier <marc.zyngier@arm.com>
 
-Enable trapping of the debug registers, preventing the guests to
-mess with the host state (and allowing guests to use the debug
-infrastructure as well).
+Just like GICv2 was fixed in 63afbe7a0ac1
+(kvm: arm64: vgic: fix hyp panic with 64k pages on juno platform),
+mandate the GICV region to be both aligned on a page boundary and
+its size to be a multiple of page size.
 
-Reviewed-by: Anup Patel <anup.patel@linaro.org>
-Reviewed-by: Christoffer Dall <christoffer.dall@linaro.org>
+This prevents a guest from being able to poke at regions where we
+have no idea what is sitting there.
+
 Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
 ---
- arch/arm64/kvm/hyp.S | 8 ++++++++
- 1 file changed, 8 insertions(+)
+ virt/kvm/arm/vgic-v3.c | 16 ++++++++++++++++
+ 1 file changed, 16 insertions(+)
 
-diff --git a/arch/arm64/kvm/hyp.S b/arch/arm64/kvm/hyp.S
-index 100494b..b72aa9f 100644
---- a/arch/arm64/kvm/hyp.S
-+++ b/arch/arm64/kvm/hyp.S
-@@ -770,6 +770,14 @@
- 	mrs	x2, mdcr_el2
- 	and	x2, x2, #MDCR_EL2_HPMN_MASK
- 	orr	x2, x2, #(MDCR_EL2_TPM | MDCR_EL2_TPMCR)
-+	orr	x2, x2, #(MDCR_EL2_TDRA | MDCR_EL2_TDOSA)
+diff --git a/virt/kvm/arm/vgic-v3.c b/virt/kvm/arm/vgic-v3.c
+index f01d446..1c2c8ee 100644
+--- a/virt/kvm/arm/vgic-v3.c
++++ b/virt/kvm/arm/vgic-v3.c
+@@ -215,6 +215,22 @@ int vgic_v3_probe(struct device_node *vgic_node,
+ 		ret = -ENXIO;
+ 		goto out;
+ 	}
 +
-+	// Check for KVM_ARM64_DEBUG_DIRTY, and set debug to trap
-+	// if not dirty.
-+	ldr	x3, [x0, #VCPU_DEBUG_FLAGS]
-+	tbnz	x3, #KVM_ARM64_DEBUG_DIRTY_SHIFT, 1f
-+	orr	x2, x2,  #MDCR_EL2_TDA
-+1:
- 	msr	mdcr_el2, x2
- .endm
- 
++	if (!PAGE_ALIGNED(vcpu_res.start)) {
++		kvm_err("GICV physical address 0x%llx not page aligned\n",
++			(unsigned long long)vcpu_res.start);
++		ret = -ENXIO;
++		goto out;
++	}
++
++	if (!PAGE_ALIGNED(resource_size(&vcpu_res))) {
++		kvm_err("GICV size 0x%llx not a multiple of page size 0x%lx\n",
++			(unsigned long long)resource_size(&vcpu_res),
++			PAGE_SIZE);
++		ret = -ENXIO;
++		goto out;
++	}
++
+ 	vgic->vcpu_base = vcpu_res.start;
+ 	vgic->vctrl_base = NULL;
+ 	vgic->type = VGIC_V3;
 -- 
 2.0.0
