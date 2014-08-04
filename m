@@ -1,65 +1,78 @@
 From: christoffer.dall@linaro.org (Christoffer Dall)
-Date: Mon,  4 Aug 2014 10:46:43 +0200
-Subject: [GIT PULL 26/51] arm64: KVM: vgic: enable GICv2 emulation on top on
- GICv3 hardware
+Date: Mon,  4 Aug 2014 10:46:45 +0200
+Subject: [GIT PULL 28/51] ARM: KVM: fix vgic V7 assembler code to work in BE
+ image
 In-Reply-To: <1407142028-31105-1-git-send-email-christoffer.dall@linaro.org>
 References: <1407142028-31105-1-git-send-email-christoffer.dall@linaro.org>
-Message-ID: <1407142028-31105-27-git-send-email-christoffer.dall@linaro.org>
+Message-ID: <1407142028-31105-29-git-send-email-christoffer.dall@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Marc Zyngier <marc.zyngier@arm.com>
+From: Victor Kamensky <victor.kamensky@linaro.org>
 
-Add the last missing bits that enable GICv2 emulation on top of
-GICv3 hardware.
+The vgic h/w registers are little endian; when BE asm code
+reads/writes from/to them, it needs to do byteswap after/before.
+Byteswap code uses ARM_BE8 wrapper to add swap only if
+CONFIG_CPU_BIG_ENDIAN is configured.
 
+Signed-off-by: Victor Kamensky <victor.kamensky@linaro.org>
+Reviewed-by: Christoffer Dall <christoffer.dall@linaro.org>
+Acked-by: Marc Zyngier <marc.zyngier@arm.com>
 Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 ---
- arch/arm64/include/asm/kvm_host.h | 7 +++++++
- arch/arm64/kvm/Makefile           | 2 ++
- virt/kvm/arm/vgic.c               | 1 +
- 3 files changed, 10 insertions(+)
+ arch/arm/kvm/interrupts_head.S | 14 ++++++++++++++
+ 1 file changed, 14 insertions(+)
 
-diff --git a/arch/arm64/include/asm/kvm_host.h b/arch/arm64/include/asm/kvm_host.h
-index 4c182d0..4ae9213 100644
---- a/arch/arm64/include/asm/kvm_host.h
-+++ b/arch/arm64/include/asm/kvm_host.h
-@@ -216,6 +216,13 @@ static inline void vgic_arch_setup(const struct vgic_params *vgic)
- 		__vgic_sr_vectors.restore_vgic	= __restore_vgic_v2_state;
- 		break;
+diff --git a/arch/arm/kvm/interrupts_head.S b/arch/arm/kvm/interrupts_head.S
+index e4eaf30..68d99c6 100644
+--- a/arch/arm/kvm/interrupts_head.S
++++ b/arch/arm/kvm/interrupts_head.S
+@@ -1,4 +1,5 @@
+ #include <linux/irqchip/arm-gic.h>
++#include <asm/assembler.h>
  
-+#ifdef CONFIG_ARM_GIC_V3
-+	case VGIC_V3:
-+		__vgic_sr_vectors.save_vgic	= __save_vgic_v3_state;
-+		__vgic_sr_vectors.restore_vgic	= __restore_vgic_v3_state;
-+		break;
-+#endif
-+
- 	default:
- 		BUG();
- 	}
-diff --git a/arch/arm64/kvm/Makefile b/arch/arm64/kvm/Makefile
-index daf24dc..32a0961 100644
---- a/arch/arm64/kvm/Makefile
-+++ b/arch/arm64/kvm/Makefile
-@@ -22,4 +22,6 @@ kvm-$(CONFIG_KVM_ARM_HOST) += guest.o reset.o sys_regs.o sys_regs_generic_v8.o
- kvm-$(CONFIG_KVM_ARM_VGIC) += $(KVM)/arm/vgic.o
- kvm-$(CONFIG_KVM_ARM_VGIC) += $(KVM)/arm/vgic-v2.o
- kvm-$(CONFIG_KVM_ARM_VGIC) += vgic-v2-switch.o
-+kvm-$(CONFIG_KVM_ARM_VGIC) += $(KVM)/arm/vgic-v3.o
-+kvm-$(CONFIG_KVM_ARM_VGIC) += vgic-v3-switch.o
- kvm-$(CONFIG_KVM_ARM_TIMER) += $(KVM)/arm/arch_timer.o
-diff --git a/virt/kvm/arm/vgic.c b/virt/kvm/arm/vgic.c
-index 7867b9a..795ab48 100644
---- a/virt/kvm/arm/vgic.c
-+++ b/virt/kvm/arm/vgic.c
-@@ -1530,6 +1530,7 @@ static struct notifier_block vgic_cpu_nb = {
+ #define VCPU_USR_REG(_reg_nr)	(VCPU_USR_REGS + (_reg_nr * 4))
+ #define VCPU_USR_SP		(VCPU_USR_REG(13))
+@@ -420,6 +421,14 @@ vcpu	.req	r0		@ vcpu pointer always in r0
+ 	ldr	r8, [r2, #GICH_ELRSR0]
+ 	ldr	r9, [r2, #GICH_ELRSR1]
+ 	ldr	r10, [r2, #GICH_APR]
++ARM_BE8(rev	r3, r3	)
++ARM_BE8(rev	r4, r4	)
++ARM_BE8(rev	r5, r5	)
++ARM_BE8(rev	r6, r6	)
++ARM_BE8(rev	r7, r7	)
++ARM_BE8(rev	r8, r8	)
++ARM_BE8(rev	r9, r9	)
++ARM_BE8(rev	r10, r10	)
  
- static const struct of_device_id vgic_ids[] = {
- 	{ .compatible = "arm,cortex-a15-gic", .data = vgic_v2_probe, },
-+	{ .compatible = "arm,gic-v3", .data = vgic_v3_probe, },
- 	{},
- };
+ 	str	r3, [r11, #VGIC_V2_CPU_HCR]
+ 	str	r4, [r11, #VGIC_V2_CPU_VMCR]
+@@ -439,6 +448,7 @@ vcpu	.req	r0		@ vcpu pointer always in r0
+ 	add	r3, r11, #VGIC_V2_CPU_LR
+ 	ldr	r4, [r11, #VGIC_CPU_NR_LR]
+ 1:	ldr	r6, [r2], #4
++ARM_BE8(rev	r6, r6	)
+ 	str	r6, [r3], #4
+ 	subs	r4, r4, #1
+ 	bne	1b
+@@ -466,6 +476,9 @@ vcpu	.req	r0		@ vcpu pointer always in r0
+ 	ldr	r3, [r11, #VGIC_V2_CPU_HCR]
+ 	ldr	r4, [r11, #VGIC_V2_CPU_VMCR]
+ 	ldr	r8, [r11, #VGIC_V2_CPU_APR]
++ARM_BE8(rev	r3, r3	)
++ARM_BE8(rev	r4, r4	)
++ARM_BE8(rev	r8, r8	)
  
+ 	str	r3, [r2, #GICH_HCR]
+ 	str	r4, [r2, #GICH_VMCR]
+@@ -476,6 +489,7 @@ vcpu	.req	r0		@ vcpu pointer always in r0
+ 	add	r3, r11, #VGIC_V2_CPU_LR
+ 	ldr	r4, [r11, #VGIC_CPU_NR_LR]
+ 1:	ldr	r6, [r3], #4
++ARM_BE8(rev	r6, r6  )
+ 	str	r6, [r2], #4
+ 	subs	r4, r4, #1
+ 	bne	1b
 -- 
 2.0.0
