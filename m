@@ -1,27 +1,88 @@
-From: ohad@wizery.com (Ohad Ben-Cohen)
-Date: Mon, 4 Aug 2014 14:50:47 +0300
-Subject: [PATCH 1/2] remoteproc: use a flag to detect the presence of IOMMU
-In-Reply-To: <53D7C769.6080500@ti.com>
-References: <1404836521-59637-1-git-send-email-s-anna@ti.com>
- <1404836521-59637-2-git-send-email-s-anna@ti.com>
- <CAK=Wgbawdik3ZB0Zbeaa7eXd7M+9ev9u713GcfOc4Gy0+O80Dg@mail.gmail.com>
- <53D7C769.6080500@ti.com>
-Message-ID: <CAK=Wgbbf5JNxzW16z=vXHi9D8Om1KnLEEr7hEw5T0oN7GuM=og@mail.gmail.com>
+From: christoffer.dall@linaro.org (Christoffer Dall)
+Date: Mon, 4 Aug 2014 13:57:16 +0200
+Subject: [RFC] Saving/Restoring the internal state of an interrupt
+In-Reply-To: <539F3BDD.2090009@arm.com>
+References: <539F3BDD.2090009@arm.com>
+Message-ID: <20140804115716.GA524@cbox>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jul 29, 2014 at 7:10 PM, Suman Anna <s-anna@ti.com> wrote:
-> We are trying to add a remoteproc driver for a small Cortex M3 called
-> the WkupM3 used for suspend/resume management on TI AM335/AM437x SoCs.
-> This processor does not have an MMU. Same is the case with another
-> processor subsystem PRU-ICSS on AM335/AM437x. All these are platform
-> devices, and the current iommu_present check will not scale for the same
-> kernel image to support OMAP4/OMAP5 and AM335/AM437x.
+On Mon, Jun 16, 2014 at 07:47:57PM +0100, Marc Zyngier wrote:
+> Thomas, all,
+> 
+> Since ARM has grown some virtualization extensions, there is a
+> particular issue I've carefully avoided to address, and which is now
+> biting me exactly where you think it does.
+> 
+> Let's expose the problem:
+> - We have a per-CPU timer (the architected timer)
+> - This timer is shared across virtual machines
+> - We context-switch the state of the timer on entry/exit of the VM
+> 
+> The state of the timer itself is basically a control word and a
+> comparator value. Not much. Ah yes, one tiny detail: the state of the
+> interrupt controller (the GIC) is also part of the state.
+> 
+> This interrupt state is not the pending state, but the internal state
+> (called the "active" state), indicating if the interrupt is in
+> progress or not. If the interrupt is active (and configured as a level
+> interrupt), then the interrupt can't fire again until the guest EOIs
+> it (there is some special hardware dedicated to this).
 
-That's perfect, thanks. Can you please add this use case description
-to the commit log?
+Can you clarify this part.  I was under the impression from reading the
+GICv2 specs at least that an active interrupt can become active and
+pending (and the pending part of that would cause the interrupt to fire
+again).  Specifically, I'm thinking about transition A2 in Figure 3-1 in
+the GICv2 spec (ARM IHI 0048B.b).  Am I reading this incorrectly or is
+there something special about the timer in this regard?
 
-This way we'll be able to recover it easily one day if needed.
+> 
+> So far, I got away with ignoring that state altogether by playing some
+> tricks in the timer control register (basically masking the interrupt
+> there). This worked fine until Ian found some interesting guest (QNX)
+> that falls over if someone masks the interrupt in the timer behind its
+> back. Fair enough.
+> 
+> So I'm back to square one and I have to context-switch that single
+> bit.
+> 
+> So far, I can see about three options:
+> 
+> - I can add a pair of exported functions:
+>   void gicv2_irq_set_active_state(struct irq_data *d, bool act)
+>   bool gicv2_irq_is_active(struct irq_data *d);
+> 
+>   that directly play with the state. Oh, and for GICv3 as well. And
+>   whatever comes after. It means that KVM has to know exactly the type
+>   of interrupt controller we're using (well, it already does), and call
+>   the right stuff.
+> 
+> - I can add similar function to struct irq_chip:
+>   void (*irq_set_state)(struct irq_data *d, void *data);
+>   void (*irq_get_state)(struct irq_data *d, void *data);
+> 
+>   and build a generic API on top of that. That's tempting, but I'm
+>   really not keen on the "void *data" crap, as it means KVM has to
+>   know the type of the opaque data anyway. Or we define what is the
+>   state of an interrupt, and I'm afraid there is as many definitions
+>   as there are interrupt controllers.
+> 
+> - The third possibility is that I go and duplicate parts of the two GIC
+>   drivers into KVM just to be able to save/restore these bits. Please
+>   pass the bucket around.
+> 
+> So far, I've prototyped the first option, but I'm seriously
+> questioning my own sanity. Any idea/opinion?
+> 
+KVM and the GIC driver are tightly bound anyhow, so is there anything
+particular horrible in the first approach?  (Besides the fact that we're
+exposing random bits of information to the entire kernel not intended to
+be used by anyone else than KVM for now).
 
-Thanks,
-Ohad.
+Second approach feels over-engineered to me, unless there are other
+needs or real use cases in the near term.
+
+The third option, just feels wrong, we'd have to do lookups in the DT
+again to get the base address of the GICC etc. right?
+
+-Christoffer
