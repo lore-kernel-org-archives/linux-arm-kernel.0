@@ -1,174 +1,91 @@
 From: christoffer.dall@linaro.org (Christoffer Dall)
-Date: Mon,  4 Aug 2014 10:46:57 +0200
-Subject: [GIT PULL 40/51] arm64: KVM: rename pm_fake handler to trap_raz_wi
+Date: Mon,  4 Aug 2014 10:46:58 +0200
+Subject: [GIT PULL 41/51] arm64: move DBG_MDSCR_* to asm/debug-monitors.h
 In-Reply-To: <1407142028-31105-1-git-send-email-christoffer.dall@linaro.org>
 References: <1407142028-31105-1-git-send-email-christoffer.dall@linaro.org>
-Message-ID: <1407142028-31105-41-git-send-email-christoffer.dall@linaro.org>
+Message-ID: <1407142028-31105-42-git-send-email-christoffer.dall@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Marc Zyngier <marc.zyngier@arm.com>
 
-pm_fake doesn't quite describe what the handler does (ignoring writes
-and returning 0 for reads).
+In order to be able to use the DBG_MDSCR_* macros from the KVM code,
+move the relevant definitions to the obvious include file.
 
-As we're about to use it (a lot) in a different context, rename it
-with a (admitedly cryptic) name that make sense for all users.
+Also move the debug_el enum to a portion of the file that is guarded
+by #ifndef __ASSEMBLY__ in order to use that file from assembly code.
 
+Acked-by: Will Deacon <will.deacon@arm.com>
 Reviewed-by: Anup Patel <anup.patel@linaro.org>
-Reviewed-by: Christoffer Dall <christoffer.dall@linaro.org>
 Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 ---
- arch/arm64/kvm/sys_regs.c | 83 ++++++++++++++++++++++++-----------------------
- 1 file changed, 43 insertions(+), 40 deletions(-)
+ arch/arm64/include/asm/debug-monitors.h | 19 ++++++++++++++-----
+ arch/arm64/kernel/debug-monitors.c      |  9 ---------
+ 2 files changed, 14 insertions(+), 14 deletions(-)
 
-diff --git a/arch/arm64/kvm/sys_regs.c b/arch/arm64/kvm/sys_regs.c
-index 56288f3..492ba30 100644
---- a/arch/arm64/kvm/sys_regs.c
-+++ b/arch/arm64/kvm/sys_regs.c
-@@ -161,18 +161,9 @@ static bool access_sctlr(struct kvm_vcpu *vcpu,
- 	return true;
- }
+diff --git a/arch/arm64/include/asm/debug-monitors.h b/arch/arm64/include/asm/debug-monitors.h
+index 6e9b5b3..7fb3437 100644
+--- a/arch/arm64/include/asm/debug-monitors.h
++++ b/arch/arm64/include/asm/debug-monitors.h
+@@ -18,6 +18,15 @@
  
--/*
-- * We could trap ID_DFR0 and tell the guest we don't support performance
-- * monitoring.  Unfortunately the patch to make the kernel check ID_DFR0 was
-- * NAKed, so it will read the PMCR anyway.
-- *
-- * Therefore we tell the guest we have 0 counters.  Unfortunately, we
-- * must always support PMCCNTR (the cycle counter): we just RAZ/WI for
-- * all PM registers, which doesn't crash the guest kernel at least.
-- */
--static bool pm_fake(struct kvm_vcpu *vcpu,
--		    const struct sys_reg_params *p,
--		    const struct sys_reg_desc *r)
-+static bool trap_raz_wi(struct kvm_vcpu *vcpu,
-+			const struct sys_reg_params *p,
-+			const struct sys_reg_desc *r)
+ #ifdef __KERNEL__
+ 
++/* Low-level stepping controls. */
++#define DBG_MDSCR_SS		(1 << 0)
++#define DBG_SPSR_SS		(1 << 21)
++
++/* MDSCR_EL1 enabling bits */
++#define DBG_MDSCR_KDE		(1 << 13)
++#define DBG_MDSCR_MDE		(1 << 15)
++#define DBG_MDSCR_MASK		~(DBG_MDSCR_KDE | DBG_MDSCR_MDE)
++
+ #define	DBG_ESR_EVT(x)		(((x) >> 27) & 0x7)
+ 
+ /* AArch64 */
+@@ -73,11 +82,6 @@
+ 
+ #define CACHE_FLUSH_IS_SAFE		1
+ 
+-enum debug_el {
+-	DBG_ACTIVE_EL0 = 0,
+-	DBG_ACTIVE_EL1,
+-};
+-
+ /* AArch32 */
+ #define DBG_ESR_EVT_BKPT	0x4
+ #define DBG_ESR_EVT_VECC	0x5
+@@ -115,6 +119,11 @@ void unregister_break_hook(struct break_hook *hook);
+ 
+ u8 debug_monitors_arch(void);
+ 
++enum debug_el {
++	DBG_ACTIVE_EL0 = 0,
++	DBG_ACTIVE_EL1,
++};
++
+ void enable_debug_monitors(enum debug_el el);
+ void disable_debug_monitors(enum debug_el el);
+ 
+diff --git a/arch/arm64/kernel/debug-monitors.c b/arch/arm64/kernel/debug-monitors.c
+index a7fb874..e022f87 100644
+--- a/arch/arm64/kernel/debug-monitors.c
++++ b/arch/arm64/kernel/debug-monitors.c
+@@ -30,15 +30,6 @@
+ #include <asm/cputype.h>
+ #include <asm/system_misc.h>
+ 
+-/* Low-level stepping controls. */
+-#define DBG_MDSCR_SS		(1 << 0)
+-#define DBG_SPSR_SS		(1 << 21)
+-
+-/* MDSCR_EL1 enabling bits */
+-#define DBG_MDSCR_KDE		(1 << 13)
+-#define DBG_MDSCR_MDE		(1 << 15)
+-#define DBG_MDSCR_MASK		~(DBG_MDSCR_KDE | DBG_MDSCR_MDE)
+-
+ /* Determine debug architecture. */
+ u8 debug_monitors_arch(void)
  {
- 	if (p->is_write)
- 		return ignore_write(vcpu, p);
-@@ -199,6 +190,17 @@ static void reset_mpidr(struct kvm_vcpu *vcpu, const struct sys_reg_desc *r)
- /*
-  * Architected system registers.
-  * Important: Must be sorted ascending by Op0, Op1, CRn, CRm, Op2
-+ *
-+ * We could trap ID_DFR0 and tell the guest we don't support performance
-+ * monitoring.  Unfortunately the patch to make the kernel check ID_DFR0 was
-+ * NAKed, so it will read the PMCR anyway.
-+ *
-+ * Therefore we tell the guest we have 0 counters.  Unfortunately, we
-+ * must always support PMCCNTR (the cycle counter): we just RAZ/WI for
-+ * all PM registers, which doesn't crash the guest kernel at least.
-+ *
-+ * Same goes for the whole debug infrastructure, which probably breaks
-+ * some guest functionnality. This should be fixed.
-  */
- static const struct sys_reg_desc sys_reg_descs[] = {
- 	/* DC ISW */
-@@ -258,10 +260,10 @@ static const struct sys_reg_desc sys_reg_descs[] = {
- 
- 	/* PMINTENSET_EL1 */
- 	{ Op0(0b11), Op1(0b000), CRn(0b1001), CRm(0b1110), Op2(0b001),
--	  pm_fake },
-+	  trap_raz_wi },
- 	/* PMINTENCLR_EL1 */
- 	{ Op0(0b11), Op1(0b000), CRn(0b1001), CRm(0b1110), Op2(0b010),
--	  pm_fake },
-+	  trap_raz_wi },
- 
- 	/* MAIR_EL1 */
- 	{ Op0(0b11), Op1(0b000), CRn(0b1010), CRm(0b0010), Op2(0b000),
-@@ -290,43 +292,43 @@ static const struct sys_reg_desc sys_reg_descs[] = {
- 
- 	/* PMCR_EL0 */
- 	{ Op0(0b11), Op1(0b011), CRn(0b1001), CRm(0b1100), Op2(0b000),
--	  pm_fake },
-+	  trap_raz_wi },
- 	/* PMCNTENSET_EL0 */
- 	{ Op0(0b11), Op1(0b011), CRn(0b1001), CRm(0b1100), Op2(0b001),
--	  pm_fake },
-+	  trap_raz_wi },
- 	/* PMCNTENCLR_EL0 */
- 	{ Op0(0b11), Op1(0b011), CRn(0b1001), CRm(0b1100), Op2(0b010),
--	  pm_fake },
-+	  trap_raz_wi },
- 	/* PMOVSCLR_EL0 */
- 	{ Op0(0b11), Op1(0b011), CRn(0b1001), CRm(0b1100), Op2(0b011),
--	  pm_fake },
-+	  trap_raz_wi },
- 	/* PMSWINC_EL0 */
- 	{ Op0(0b11), Op1(0b011), CRn(0b1001), CRm(0b1100), Op2(0b100),
--	  pm_fake },
-+	  trap_raz_wi },
- 	/* PMSELR_EL0 */
- 	{ Op0(0b11), Op1(0b011), CRn(0b1001), CRm(0b1100), Op2(0b101),
--	  pm_fake },
-+	  trap_raz_wi },
- 	/* PMCEID0_EL0 */
- 	{ Op0(0b11), Op1(0b011), CRn(0b1001), CRm(0b1100), Op2(0b110),
--	  pm_fake },
-+	  trap_raz_wi },
- 	/* PMCEID1_EL0 */
- 	{ Op0(0b11), Op1(0b011), CRn(0b1001), CRm(0b1100), Op2(0b111),
--	  pm_fake },
-+	  trap_raz_wi },
- 	/* PMCCNTR_EL0 */
- 	{ Op0(0b11), Op1(0b011), CRn(0b1001), CRm(0b1101), Op2(0b000),
--	  pm_fake },
-+	  trap_raz_wi },
- 	/* PMXEVTYPER_EL0 */
- 	{ Op0(0b11), Op1(0b011), CRn(0b1001), CRm(0b1101), Op2(0b001),
--	  pm_fake },
-+	  trap_raz_wi },
- 	/* PMXEVCNTR_EL0 */
- 	{ Op0(0b11), Op1(0b011), CRn(0b1001), CRm(0b1101), Op2(0b010),
--	  pm_fake },
-+	  trap_raz_wi },
- 	/* PMUSERENR_EL0 */
- 	{ Op0(0b11), Op1(0b011), CRn(0b1001), CRm(0b1110), Op2(0b000),
--	  pm_fake },
-+	  trap_raz_wi },
- 	/* PMOVSSET_EL0 */
- 	{ Op0(0b11), Op1(0b011), CRn(0b1001), CRm(0b1110), Op2(0b011),
--	  pm_fake },
-+	  trap_raz_wi },
- 
- 	/* TPIDR_EL0 */
- 	{ Op0(0b11), Op1(0b011), CRn(0b1101), CRm(0b0000), Op2(0b010),
-@@ -372,19 +374,20 @@ static const struct sys_reg_desc cp15_regs[] = {
- 	{ Op1( 0), CRn( 7), CRm(10), Op2( 2), access_dcsw },
- 	{ Op1( 0), CRn( 7), CRm(14), Op2( 2), access_dcsw },
- 
--	{ Op1( 0), CRn( 9), CRm(12), Op2( 0), pm_fake },
--	{ Op1( 0), CRn( 9), CRm(12), Op2( 1), pm_fake },
--	{ Op1( 0), CRn( 9), CRm(12), Op2( 2), pm_fake },
--	{ Op1( 0), CRn( 9), CRm(12), Op2( 3), pm_fake },
--	{ Op1( 0), CRn( 9), CRm(12), Op2( 5), pm_fake },
--	{ Op1( 0), CRn( 9), CRm(12), Op2( 6), pm_fake },
--	{ Op1( 0), CRn( 9), CRm(12), Op2( 7), pm_fake },
--	{ Op1( 0), CRn( 9), CRm(13), Op2( 0), pm_fake },
--	{ Op1( 0), CRn( 9), CRm(13), Op2( 1), pm_fake },
--	{ Op1( 0), CRn( 9), CRm(13), Op2( 2), pm_fake },
--	{ Op1( 0), CRn( 9), CRm(14), Op2( 0), pm_fake },
--	{ Op1( 0), CRn( 9), CRm(14), Op2( 1), pm_fake },
--	{ Op1( 0), CRn( 9), CRm(14), Op2( 2), pm_fake },
-+	/* PMU */
-+	{ Op1( 0), CRn( 9), CRm(12), Op2( 0), trap_raz_wi },
-+	{ Op1( 0), CRn( 9), CRm(12), Op2( 1), trap_raz_wi },
-+	{ Op1( 0), CRn( 9), CRm(12), Op2( 2), trap_raz_wi },
-+	{ Op1( 0), CRn( 9), CRm(12), Op2( 3), trap_raz_wi },
-+	{ Op1( 0), CRn( 9), CRm(12), Op2( 5), trap_raz_wi },
-+	{ Op1( 0), CRn( 9), CRm(12), Op2( 6), trap_raz_wi },
-+	{ Op1( 0), CRn( 9), CRm(12), Op2( 7), trap_raz_wi },
-+	{ Op1( 0), CRn( 9), CRm(13), Op2( 0), trap_raz_wi },
-+	{ Op1( 0), CRn( 9), CRm(13), Op2( 1), trap_raz_wi },
-+	{ Op1( 0), CRn( 9), CRm(13), Op2( 2), trap_raz_wi },
-+	{ Op1( 0), CRn( 9), CRm(14), Op2( 0), trap_raz_wi },
-+	{ Op1( 0), CRn( 9), CRm(14), Op2( 1), trap_raz_wi },
-+	{ Op1( 0), CRn( 9), CRm(14), Op2( 2), trap_raz_wi },
- 
- 	{ Op1( 0), CRn(10), CRm( 2), Op2( 0), access_vm_reg, NULL, c10_PRRR },
- 	{ Op1( 0), CRn(10), CRm( 2), Op2( 1), access_vm_reg, NULL, c10_NMRR },
 -- 
 2.0.0
