@@ -1,73 +1,44 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Mon, 4 Aug 2014 10:58:14 +0100
-Subject: [PATCH 2/3] arm64: add helper functions to read I-cache attributes
-In-Reply-To: <1407140216-22747-2-git-send-email-ard.biesheuvel@linaro.org>
-References: <1407140216-22747-1-git-send-email-ard.biesheuvel@linaro.org>
- <1407140216-22747-2-git-send-email-ard.biesheuvel@linaro.org>
-Message-ID: <20140804095814.GA3197@leverpostej>
+From: pwalmsley@nvidia.com (Paul Walmsley)
+Date: Mon, 4 Aug 2014 03:00:29 -0700
+Subject: Tegra baseline test results for v3.16
+Message-ID: <53DF59BD.1000203@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Aug 04, 2014 at 09:16:55AM +0100, Ard Biesheuvel wrote:
-> This adds helper functions and #defines to <asm/cachetype.h> to read the
-> line size and the number of sets from the level 1 instruction cache.
-> 
-> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
-> ---
->  arch/arm64/include/asm/cachetype.h | 28 ++++++++++++++++++++++++++++
->  1 file changed, 28 insertions(+)
-> 
-> diff --git a/arch/arm64/include/asm/cachetype.h b/arch/arm64/include/asm/cachetype.h
-> index 7a2e0762cb40..c0bf1fc3d6a0 100644
-> --- a/arch/arm64/include/asm/cachetype.h
-> +++ b/arch/arm64/include/asm/cachetype.h
-> @@ -39,6 +39,34 @@
->  
->  extern unsigned long __icache_flags;
->  
-> +#define CCSIDR_EL1_LINESIZE_MASK	0x7
-> +#define CCSIDR_EL1_LINESIZE(x)		(x & CCSIDR_EL1_LINESIZE_MASK)
+Here are some basic Tegra test results for Linux v3.16.
+Logs and other details at:
 
-It's probably worth bracketing x in case these get used elsewhere.
+     http://nvt.pwsan.com/pub/linux/testlogs/test_v3.16/20140804004249/
 
-> +#define CCSIDR_EL1_NUMSETS_SHIFT	13
-> +#define CCSIDR_EL1_NUMSETS_MASK		(0x7fff << CCSIDR_EL1_NUMSETS_SHIFT)
-> +#define CCSIDR_EL1_NUMSETS(x) \
-> +	((x & CCSIDR_EL1_NUMSETS_MASK) >> CCSIDR_EL1_NUMSETS_SHIFT)
-> +
-> +static inline __attribute_const__ u32 icache_get_ccsidr(void)
-> +{
-> +	u32 ccsidr;
-> +
-> +	/* Select L1 I-cache and read its size ID register */
-> +	asm("msr csselr_el1, %x1; isb; mrs %x0, ccsidr_el1"
-> +	    : "=r"(ccsidr) : "r"(0x1));
 
-Does GCC provide any guarantee about the upper bits in this case?
+Test summary
+------------
 
-Can we not make both values u64 rather than forcing the use of x
-registers within the asm template?
+Build: zImage:
+     Pass: ( 2/ 2): multi_v7_defconfig, tegra_defconfig
 
-Thanks,
-Mark.
+Boot to userspace: multi_v7_defconfig:
+     Pass: ( 3/ 3): tegra114-dalmore-a04, tegra124-jetson-tk1,
+		   tegra30-beaver
 
-> +	return ccsidr;
-> +}
-> +
-> +static inline int icache_get_linesize(void)
-> +{
-> +	return 16 << CCSIDR_EL1_LINESIZE(icache_get_ccsidr());
-> +}
-> +
-> +static inline int icache_get_numsets(void)
-> +{
-> +	return 1 + CCSIDR_EL1_NUMSETS(icache_get_ccsidr());
-> +}
-> +
->  /*
->   * Whilst the D-side always behaves as PIPT on AArch64, aliasing is
->   * permitted in the I-cache.
-> -- 
-> 1.8.3.2
-> 
-> 
+Boot to userspace: tegra_defconfig:
+     Pass: ( 3/ 3): tegra114-dalmore-a04, tegra124-jetson-tk1,
+		   tegra30-beaver
+
+
+vmlinux object size
+(delta in bytes from test_v3.16-rc7 (64aa90f26c06e1cb2aacfb98a7d0eccfbd6c1a91)):
+    text     data      bss    total  kernel
+   +4636      +16        0    +4652  multi_v7_defconfig
+   +4280       +8        0    +4288  tegra_defconfig
+
+
+Boot-time memory difference
+(delta in bytes from test_v3.16-rc7 (64aa90f26c06e1cb2aacfb98a7d0eccfbd6c1a91))
+     avail    rsrvd     high    freed                board              kconfig                  dtb
+         .        .        .        . tegra114-dalmore-a04   multi_v7_defconfig     tegra114-dalmore
+         .        .        .        . tegra114-dalmore-a04      tegra_defconfig     tegra114-dalmore
+         .        .        .        .  tegra124-jetson-tk1   multi_v7_defconfig  tegra124-jetson-tk1
+         .        .        .        .  tegra124-jetson-tk1      tegra_defconfig  tegra124-jetson-tk1
+         .        .        .        .       tegra30-beaver   multi_v7_defconfig       tegra30-beaver
+         .        .        .        .       tegra30-beaver      tegra_defconfig       tegra30-beaver
