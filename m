@@ -1,52 +1,102 @@
-From: javier.martinez@collabora.co.uk (Javier Martinez Canillas)
-Date: Mon, 04 Aug 2014 19:31:12 +0200
-Subject: [PATCH v6 10/10] ARM: dts: Add exynos5250-spring device tree
-In-Reply-To: <CAD=FV=WFP53bZAks7t9xybUxpna89Nz=KG+PQwAcxFEH0D+3mw@mail.gmail.com>
-References: <1406940750-15880-1-git-send-email-afaerber@suse.de>	<1406940750-15880-11-git-send-email-afaerber@suse.de>
- <CAD=FV=WFP53bZAks7t9xybUxpna89Nz=KG+PQwAcxFEH0D+3mw@mail.gmail.com>
-Message-ID: <53DFC360.9080304@collabora.co.uk>
+From: computersforpeace@gmail.com (Brian Norris)
+Date: Mon, 4 Aug 2014 10:39:07 -0700
+Subject: [PATCH v8 01/11] ARM: brcmstb: add infrastructure for ARM-based
+ Broadcom STB SoCs
+In-Reply-To: <20140802081924.GW30282@n2100.arm.linux.org.uk>
+References: <1405976886-27807-1-git-send-email-computersforpeace@gmail.com>
+ <1405976886-27807-2-git-send-email-computersforpeace@gmail.com>
+ <20140802081924.GW30282@n2100.arm.linux.org.uk>
+Message-ID: <20140804173907.GU3711@ld-irv-0074>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Doug,
-
-On 08/04/2014 05:22 PM, Doug Anderson wrote:
->> +
->> +&pinctrl_0 {
->> +       s5m8767_dvs: s5m8767-dvs {
->> +               samsung,pins = "gpd1-0", "gpd1-1", "gpd1-2";
->> +               samsung,pin-function = <0>;
->> +               samsung,pin-pud = <1>;
->> +               samsung,pin-drv = <0>;
->> +       };
->> +
->> +       dp_hpd_gpio: dp-hpd-gpio {
->> +               samsung,pins = "gpc3-0";
->> +               samsung,pin-function = <0>;
->> +               samsung,pin-pud = <3>;
->> +               samsung,pin-drv = <0>;
->> +       };
->> +
->> +       power_key_irq: power-key-irq {
->> +               samsung,pins = "gpx1-3";
->> +               samsung,pin-function = <0>;
->> +               samsung,pin-pud = <0>;
->> +               samsung,pin-drv = <0>;
->> +       };
+On Sat, Aug 02, 2014 at 09:19:24AM +0100, Russell King wrote:
+> Here's some more comments on this.
 > 
-> The fact that snow is missing the pinctrl lines for power and lid is a
-> bug on snow.  Perhaps Javier would be interested in submitting a patch
-> to fix that?
+> On Mon, Jul 21, 2014 at 02:07:56PM -0700, Brian Norris wrote:
+> > +static void brcmstb_cpu_die(u32 cpu)
+> > +{
+> > +	v7_exit_coherency_flush(all);
 > 
+> This is ultimately what causes my builds to break:
 > 
+> /tmp/ccSPowmq.s:171: Error: selected processor does not support ARM mode `isb '
+> /tmp/ccSPowmq.s:177: Error: selected processor does not support ARM mode `isb '
+> /tmp/ccSPowmq.s:178: Error: selected processor does not support ARM mode `dsb '
+> make[2]: *** [arch/arm/mach-bcm/platsmp-brcmstb.o] Error 1
+> 
+> It seems that v7_exit_coherency_flush() can only be used with code which
+> is ARMv7 only.
 
-Sure, added on my TODO list to not only add these missing pin control lines for
-lid and power and reference them on gpio-keys but also to double check if there
-is anything else missing in the mainline Snow DTS that is on the downstream
-Chrome OS one.
+Yes, I noticed this already, and I proposed a solution:
 
-I'll wait for Andreas series to be picked by Kukjin before submit a patch though
-to avoid any unnecessary churn.
+  http://article.gmane.org/gmane.linux.drivers.devicetree/84517
 
-Best regards,
-Javier
+> > +	/* Prevent all interrupts from reaching this CPU. */
+> > +	arch_local_irq_disable();
+> 
+> Why do you think it is necessary to disable interrupts here?  Where
+> have they been re-enabled since this bit of generic code:
+> 
+> void __ref cpu_die(void)
+> {
+>         unsigned int cpu = smp_processor_id();
+> 
+>         idle_task_exit();
+> 
+>         local_irq_disable();
+> 
+> and why arch_local_irq_disable() at that?  Even if interrupts were
+> enabled prior to your call to arch_local_irq_disable(), what do you
+> think would be the effect of receiving an interrupt after you've
+> exited coherency?
+
+This mistake was already noted. No need for the extra IRQ disable.
+
+(http://article.gmane.org/gmane.linux.drivers.devicetree/84516)
+
+> > +
+> > +	/*
+> > +	 * Final full barrier to ensure everything before this instruction has
+> > +	 * quiesced.
+> > +	 */
+> > +	isb();
+> > +	dsb();
+> 
+> If the call to arch_local_irq_disable() is removed, and
+> v7_exit_coherency_flush() is fixed, then this is not required, because
+> v7_exit_coherency_flush() already does this at the very end.
+
+Right. Will drop.
+
+> > +
+> > +	per_cpu_sw_state_wr(cpu, 0);
+> > +
+> > +	/* Sit and wait to die */
+> > +	wfi();
+> > +
+> > +	/* We should never get here... */
+> > +	panic("Spurious interrupt on CPU %d received!\n", cpu);
+> 
+> You really should /not/ be calling panic here, because that uses data
+> shared with the CPUs which are still coherent.  This is akin to doing
+> DMA into bits of the kernel space without dealing with the cache
+> coherency issues.
+
+OK.
+
+> Moreover, if you read the comments on
+> v7_exit_coherency_flush() about ldrex/strex, which are two instructions
+> spinlocks use, you'll see that ldrex/strex must not be executed, which
+> means you can't call any function which uses spinlocks.  That rules
+> out printk() et.al.  printascii is fine, but that's only available when
+> the low level debug stuff is enabled.
+
+OK, so I'll drop the panic(). printascii doesn't look extremely useful,
+but I suppose we could use it for debugging. Seems like a while (1) loop
+might be a suitable replacement. If we get this far, we'll likely get
+locked up trying to power this CPU off anyway, so it'll be apparent that
+there was power-down failure.
+
+Thanks,
+Brian
