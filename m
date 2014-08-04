@@ -1,54 +1,61 @@
-From: christoffer.dall@linaro.org (Christoffer Dall)
-Date: Mon, 4 Aug 2014 14:16:55 +0200
-Subject: [PATCH] arm64: KVM: export current vcpu->pause state via pseudo
- regs
-In-Reply-To: <53DA7B28.701@redhat.com>
-References: <1404914112-7298-1-git-send-email-alex.bennee@linaro.org>
- <53DA7583.2030504@redhat.com>
- <CAFEAcA9cT617t8JqOXtuO-wQ5xg5T3Sw_DUHB1fpPD6g3SSNaQ@mail.gmail.com>
- <53DA7B28.701@redhat.com>
-Message-ID: <20140804121655.GE524@cbox>
+From: peter.ujfalusi@ti.com (Peter Ujfalusi)
+Date: Mon, 4 Aug 2014 15:26:56 +0300
+Subject: [PATCH] ARM: edma: Fix configuration parsing for SoCs with multiple
+ eDMA3 CC
+Message-ID: <1407155216-20267-1-git-send-email-peter.ujfalusi@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jul 31, 2014 at 07:21:44PM +0200, Paolo Bonzini wrote:
-> Il 31/07/2014 19:04, Peter Maydell ha scritto:
-> > On 31 July 2014 17:57, Paolo Bonzini <pbonzini@redhat.com> wrote:
-> >> Il 09/07/2014 15:55, Alex Benn?e ha scritto:
-> >>> To cleanly restore an SMP VM we need to ensure that the current pause
-> >>> state of each vcpu is correctly recorded. Things could get confused if
-> >>> the CPU starts running after migration restore completes when it was
-> >>> paused before it state was captured.
-> >>>
-> >>> I've done this by exposing a register (currently only 1 bit used) via
-> >>> the GET/SET_ONE_REG logic to pass the state between KVM and the VM
-> >>> controller (e.g. QEMU).
-> >>>
-> >>> Signed-off-by: Alex Benn?e <alex.bennee@linaro.org>
-> >>> ---
-> >>>  arch/arm64/include/uapi/asm/kvm.h |  8 +++++
-> >>>  arch/arm64/kvm/guest.c            | 61 ++++++++++++++++++++++++++++++++++++++-
-> >>>  2 files changed, 68 insertions(+), 1 deletion(-)
-> >>
-> >> Since it's a pseudo register anyway, would it make sense to use the
-> >> existing KVM_GET/SET_MP_STATE ioctl interface?
-> > 
-> > That appears to be an x86-specific thing relating to
-> > IRQ chips.
-> 
-> No, it's not.  It's just the state of the CPU, s390 will be using it too.
-> 
-> On x86 the states are uninitialized (UNINITIALIZED), stopped
-> (INIT_RECEIVED), running (RUNNABLE), halted (HALTED).  CPU 0 starts in
-> RUNNABLE state, other CPUs start in UNINITIALIZED state.  There are
-> x86-specific cases (uninitialized) and x86-isms (the INIT_RECEIVED
-> name), but the idea is widely applicable.
-> 
-Alex, I think it makes perfect sense to use GET/SET_MP_STATE, will you
-revise the patch?
+The edma_setup_from_hw() should know about the CC number when parsing the
+CCCFG register - when it reads the register to be precise. The base
+addresses for CCs stored in an array and we need to provide the correct id
+to edma_read() in order to read the correct register.
 
-(Don't forget to update the documentation to reflect it is now supported
-on ARM, and which states are used to represent what there.)
+Cc: <stable@vger.kernel.org> # 3.16
+Signed-off-by: Peter Ujfalusi <peter.ujfalusi@ti.com>
+---
+ arch/arm/common/edma.c | 9 +++++----
+ 1 file changed, 5 insertions(+), 4 deletions(-)
 
-Thanks,
--Christoffer
+diff --git a/arch/arm/common/edma.c b/arch/arm/common/edma.c
+index 88099175fc56..d86771abbf57 100644
+--- a/arch/arm/common/edma.c
++++ b/arch/arm/common/edma.c
+@@ -1443,14 +1443,14 @@ void edma_assign_channel_eventq(unsigned channel, enum dma_event_q eventq_no)
+ EXPORT_SYMBOL(edma_assign_channel_eventq);
+ 
+ static int edma_setup_from_hw(struct device *dev, struct edma_soc_info *pdata,
+-			      struct edma *edma_cc)
++			      struct edma *edma_cc, int cc_id)
+ {
+ 	int i;
+ 	u32 value, cccfg;
+ 	s8 (*queue_priority_map)[2];
+ 
+ 	/* Decode the eDMA3 configuration from CCCFG register */
+-	cccfg = edma_read(0, EDMA_CCCFG);
++	cccfg = edma_read(cc_id, EDMA_CCCFG);
+ 
+ 	value = GET_NUM_REGN(cccfg);
+ 	edma_cc->num_region = BIT(value);
+@@ -1464,7 +1464,8 @@ static int edma_setup_from_hw(struct device *dev, struct edma_soc_info *pdata,
+ 	value = GET_NUM_EVQUE(cccfg);
+ 	edma_cc->num_tc = value + 1;
+ 
+-	dev_dbg(dev, "eDMA3 HW configuration (cccfg: 0x%08x):\n", cccfg);
++	dev_dbg(dev, "eDMA3 CC%d HW configuration (cccfg: 0x%08x):\n", cc_id,
++		cccfg);
+ 	dev_dbg(dev, "num_region: %u\n", edma_cc->num_region);
+ 	dev_dbg(dev, "num_channel: %u\n", edma_cc->num_channels);
+ 	dev_dbg(dev, "num_slot: %u\n", edma_cc->num_slots);
+@@ -1684,7 +1685,7 @@ static int edma_probe(struct platform_device *pdev)
+ 			return -ENOMEM;
+ 
+ 		/* Get eDMA3 configuration from IP */
+-		ret = edma_setup_from_hw(dev, info[j], edma_cc[j]);
++		ret = edma_setup_from_hw(dev, info[j], edma_cc[j], j);
+ 		if (ret)
+ 			return ret;
+ 
+-- 
+2.0.2
