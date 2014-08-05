@@ -1,70 +1,295 @@
-From: pintu.k@outlook.com (Pintu Kumar)
-Date: Tue, 5 Aug 2014 20:24:50 +0530
-Subject: [linux-3.10.17] Could not allocate memory from free CMA areas
-In-Reply-To: <003201cfafb3$3fe43180$bfac9480$@lge.com>
-References: <54sabdnxop04vxd7ewndc0qf.1407077745645@email.android.com>,
- <003201cfafb3$3fe43180$bfac9480$@lge.com>
-Message-ID: <BAY169-W348ADD9113F32C2B459631EFE30@phx.gbl>
+From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
+Date: Tue, 05 Aug 2014 17:03:26 +0200
+Subject: [PATCH v5 1/3] ARM: EXYNOS: Move code from hotplug.c to platsmp.c
+In-Reply-To: <53E0EE32.7060500@linaro.org>
+References: <1407235425-13937-1-git-send-email-k.kozlowski@samsung.com>
+ <53E0EE32.7060500@linaro.org>
+Message-ID: <1407251006.9849.8.camel@AMDC1943>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
-
-> From: iamjoonsoo.kim at lge.com
-> To: pintu_agarwal at yahoo.com; linux-mm at kvack.org; linux-arm-kernel at lists.infradead.org; linaro-mm-sig at lists.linaro.org; ritesh.list at gmail.com
-> CC: pintu.k at outlook.com; pintu.k at samsung.com; vishu_1385 at yahoo.com; m.szyprowski at samsung.com; mina86 at mina86.com; ngupta at vflare.org; iqbalblr at gmail.com
-> Subject: RE: [linux-3.10.17] Could not allocate memory from free CMA areas
-> Date: Mon, 4 Aug 2014 16:11:00 +0900
+On wto, 2014-08-05 at 16:46 +0200, Daniel Lezcano wrote:
+> On 08/05/2014 12:43 PM, Krzysztof Kozlowski wrote:
+> > Cleanup a little the SMP/hotplug code for Exynos by:
+> > 1. Moving completely all functions from hotplug.c into the platsmp.c;
+> > 2. Deleting the hotplug.c file.
+> >
+> > After recent cleanups (e.g. 75ad2ab28f0f "ARM: EXYNOS: use
+> > v7_exit_coherency_flush macro for cache disabling") there was only CPU
+> > power down related code in hotplug.c file. Keeping this file does not
+> > give any benefits.
+> >
+> > The commit only moves code around with one additional observable change:
+> > the hotplug.c was compiled with custom CFLAGS (-march=armv7-a). These
+> > CFLAGS are not necessary any more.
 > 
->> Dear Joonsoo,
->> 
->> I tried your changes which are present at the below link. 
->> https://github.com/JoonsooKim/linux/tree/cma-fix-up-v3.0-next-20140625
->> But unfortunately for me it did not help much. 
->> After running various apps that uses ION nonmovable memory, it fails to allocate memory after some time. When I see the pagetypeinfo shows lots of CMA pages available and non-movable were very less and thus nonmovable allocation were failing.
+> What is the benefit of moving this code around ?
 > 
-> Okay. CMA pages cannot be used for nonmovable memory, so it can fail in above case.
-> 
->> However I noticed the failure was little delayed.
-> 
-> It is good sign. I guess that there is movable/CMA ratio problem.
-> My patchset uses free CMA pages in certain ratio to free movable page consumption.
-> If your system doesn't use movable page sufficiently, free CMA pages cannot
-> be used fully. Could you test with following workaround?
-> 
-> +       if (normal> cma) {
-> +               zone->max_try_normal = pageblock_nr_pages;
-> +               zone->max_try_cma = pageblock_nr_pages;
-> +       } else {
-> +               zone->max_try_normal = pageblock_nr_pages;
-> +               zone->max_try_cma = pageblock_nr_pages;
-> +       }
+> Usually the cpu hotplug code is located in hotplug.c for most of the 
+> platforms, so why moving pm code inside platsmp ?
 
-I applied these changes but still the allocations are failing because there are no non-movable memory left in the system.
-With the changes I noticed that nr_cma_free sometimes becomes almost zero.
-But in our case Display/Xorg needs to have atleast 8MB of CMA (contiguous) memory of order-8 and order-4 type.
-CMA:56MB is shared across display,camera,video etc.
+The benefits are:
 
-I think the previous changes are slightly better.
+1. Less dependencies, cleaner code because platsmp.c is the only user of
+code located in hotplug.c. So the exynos_cpu_die() had to be declared in
+common.h.
 
-My concern is that whether I am applying all you changes or missing some thing.
-I saw that your kernel version is based on next-20140625 but my kernel version is 3.10.17.
-And till now I applied only the below changes:
-https://github.com/JoonsooKim/linux/commit/33a0416b3ac1cd7c88e6b35ee61b4a81a7a14afc 
+2. Less dependencies between modules after adding patch 3/3 [1] which
+introduces exynos_set_delayed_reset_assertion() function. The
+exynos_set_delayed_reset_assertion() is called by:
+ - cpu_leave_power (hotplug.c)
+ - platform_do_lowpower (hotplug.c)
+ - exynos_boot_secondary (platsmp.c)
 
-But I haven't applied this:
-https://github.com/JoonsooKim/linux/commit/166b4186d101b190cf50195d841e2189f2743649
-(CMA: always treat free cma pages as non-free on watermark checking)
-These changes have other dependencies which is not present in my kernel version.
-Like inclusion of ALLOC_FAIR and area->nr_cma_free.
-Please let me know if these changes are also important for "aggressive alloc changes..."
+so merging everything into one file seemed simpler and cleaner.
 
-If possible please send me all the patches related to "aggressive cma.." so that I can conclude on my experiment.
+However I do not insist on such solution. I'm merely interested in
+getting the third patch into the kernel :) .
 
-Further I will share the experimental result from my side.
+[1] http://www.spinics.net/lists/arm-kernel/msg352890.html
 
+Best regards,
+Krzysztof
 
 > 
-> Thanks.
+> > Signed-off-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
+> > Reviewed-by: Tomasz Figa <t.figa@samsung.com>
+> >
+> > ---
+> > Changes since v4:
+> > 1. Rebase on linux-next-20140804.
+> > 2. Add Reviewed-by Tomasz Figa.
+> > ---
+> >   arch/arm/mach-exynos/Makefile  |  3 --
+> >   arch/arm/mach-exynos/common.h  |  2 -
+> >   arch/arm/mach-exynos/hotplug.c | 91 ------------------------------------------
+> >   arch/arm/mach-exynos/platsmp.c | 74 ++++++++++++++++++++++++++++++++++
+> >   4 files changed, 74 insertions(+), 96 deletions(-)
+> >   delete mode 100644 arch/arm/mach-exynos/hotplug.c
+> >
+> > diff --git a/arch/arm/mach-exynos/Makefile b/arch/arm/mach-exynos/Makefile
+> > index 788f26d21141..0095de99d703 100644
+> > --- a/arch/arm/mach-exynos/Makefile
+> > +++ b/arch/arm/mach-exynos/Makefile
+> > @@ -21,9 +21,6 @@ obj-$(CONFIG_PM_GENERIC_DOMAINS) += pm_domains.o
+> >
+> >   obj-$(CONFIG_SMP)		+= platsmp.o headsmp.o
+> >
+> > -obj-$(CONFIG_HOTPLUG_CPU)	+= hotplug.o
+> > -CFLAGS_hotplug.o		+= -march=armv7-a
+> > -
+> >   plus_sec := $(call as-instr,.arch_extension sec,+sec)
+> >   AFLAGS_exynos-smc.o		:=-Wa,-march=armv7-a$(plus_sec)
+> >
+> > diff --git a/arch/arm/mach-exynos/common.h b/arch/arm/mach-exynos/common.h
+> > index 47b904b3b973..3d3e6af9d015 100644
+> > --- a/arch/arm/mach-exynos/common.h
+> > +++ b/arch/arm/mach-exynos/common.h
+> > @@ -130,8 +130,6 @@ extern void exynos_cpu_resume(void);
+> >
+> >   extern struct smp_operations exynos_smp_ops;
+> >
+> > -extern void exynos_cpu_die(unsigned int cpu);
+> > -
+> >   /* PMU(Power Management Unit) support */
+> >
+> >   #define PMU_TABLE_END	(-1U)
+> > diff --git a/arch/arm/mach-exynos/hotplug.c b/arch/arm/mach-exynos/hotplug.c
+> > deleted file mode 100644
+> > index 4d86961a7957..000000000000
+> > --- a/arch/arm/mach-exynos/hotplug.c
+> > +++ /dev/null
+> > @@ -1,91 +0,0 @@
+> > -/*
+> > - *  Cloned from linux/arch/arm/mach-realview/hotplug.c
+> > - *
+> > - *  Copyright (C) 2002 ARM Ltd.
+> > - *  All Rights Reserved
+> > - *
+> > - * This program is free software; you can redistribute it and/or modify
+> > - * it under the terms of the GNU General Public License version 2 as
+> > - * published by the Free Software Foundation.
+> > -*/
+> > -
+> > -#include <linux/kernel.h>
+> > -#include <linux/errno.h>
+> > -#include <linux/smp.h>
+> > -#include <linux/io.h>
+> > -
+> > -#include <asm/cacheflush.h>
+> > -#include <asm/cp15.h>
+> > -#include <asm/smp_plat.h>
+> > -
+> > -#include "common.h"
+> > -#include "regs-pmu.h"
+> > -
+> > -static inline void cpu_leave_lowpower(void)
+> > -{
+> > -	unsigned int v;
+> > -
+> > -	asm volatile(
+> > -	"mrc	p15, 0, %0, c1, c0, 0\n"
+> > -	"	orr	%0, %0, %1\n"
+> > -	"	mcr	p15, 0, %0, c1, c0, 0\n"
+> > -	"	mrc	p15, 0, %0, c1, c0, 1\n"
+> > -	"	orr	%0, %0, %2\n"
+> > -	"	mcr	p15, 0, %0, c1, c0, 1\n"
+> > -	  : "=&r" (v)
+> > -	  : "Ir" (CR_C), "Ir" (0x40)
+> > -	  : "cc");
+> > -}
+> > -
+> > -static inline void platform_do_lowpower(unsigned int cpu, int *spurious)
+> > -{
+> > -	u32 mpidr = cpu_logical_map(cpu);
+> > -	u32 core_id = MPIDR_AFFINITY_LEVEL(mpidr, 0);
+> > -
+> > -	for (;;) {
+> > -
+> > -		/* Turn the CPU off on next WFI instruction. */
+> > -		exynos_cpu_power_down(core_id);
+> > -
+> > -		wfi();
+> > -
+> > -		if (pen_release == core_id) {
+> > -			/*
+> > -			 * OK, proper wakeup, we're done
+> > -			 */
+> > -			break;
+> > -		}
+> > -
+> > -		/*
+> > -		 * Getting here, means that we have come out of WFI without
+> > -		 * having been woken up - this shouldn't happen
+> > -		 *
+> > -		 * Just note it happening - when we're woken, we can report
+> > -		 * its occurrence.
+> > -		 */
+> > -		(*spurious)++;
+> > -	}
+> > -}
+> > -
+> > -/*
+> > - * platform-specific code to shutdown a CPU
+> > - *
+> > - * Called with IRQs disabled
+> > - */
+> > -void __ref exynos_cpu_die(unsigned int cpu)
+> > -{
+> > -	int spurious = 0;
+> > -
+> > -	v7_exit_coherency_flush(louis);
+> > -
+> > -	platform_do_lowpower(cpu, &spurious);
+> > -
+> > -	/*
+> > -	 * bring this CPU back into the world of cache
+> > -	 * coherency, and then restore interrupts
+> > -	 */
+> > -	cpu_leave_lowpower();
+> > -
+> > -	if (spurious)
+> > -		pr_warn("CPU%u: %u spurious wakeup calls\n", cpu, spurious);
+> > -}
+> > diff --git a/arch/arm/mach-exynos/platsmp.c b/arch/arm/mach-exynos/platsmp.c
+> > index a9f1cf759949..a809f76c8160 100644
+> > --- a/arch/arm/mach-exynos/platsmp.c
+> > +++ b/arch/arm/mach-exynos/platsmp.c
+> > @@ -22,6 +22,7 @@
+> >   #include <linux/of_address.h>
+> >
+> >   #include <asm/cacheflush.h>
+> > +#include <asm/cp15.h>
+> >   #include <asm/smp_plat.h>
+> >   #include <asm/smp_scu.h>
+> >   #include <asm/firmware.h>
+> > @@ -33,6 +34,54 @@
+> >
+> >   extern void exynos4_secondary_startup(void);
+> >
+> > +#ifdef CONFIG_HOTPLUG_CPU
+> > +static inline void cpu_leave_lowpower(void)
+> > +{
+> > +	unsigned int v;
+> > +
+> > +	asm volatile(
+> > +	"mrc	p15, 0, %0, c1, c0, 0\n"
+> > +	"	orr	%0, %0, %1\n"
+> > +	"	mcr	p15, 0, %0, c1, c0, 0\n"
+> > +	"	mrc	p15, 0, %0, c1, c0, 1\n"
+> > +	"	orr	%0, %0, %2\n"
+> > +	"	mcr	p15, 0, %0, c1, c0, 1\n"
+> > +	  : "=&r" (v)
+> > +	  : "Ir" (CR_C), "Ir" (0x40)
+> > +	  : "cc");
+> > +}
+> > +
+> > +static inline void platform_do_lowpower(unsigned int cpu, int *spurious)
+> > +{
+> > +	u32 mpidr = cpu_logical_map(cpu);
+> > +	u32 core_id = MPIDR_AFFINITY_LEVEL(mpidr, 0);
+> > +
+> > +	for (;;) {
+> > +
+> > +		/* Turn the CPU off on next WFI instruction. */
+> > +		exynos_cpu_power_down(core_id);
+> > +
+> > +		wfi();
+> > +
+> > +		if (pen_release == core_id) {
+> > +			/*
+> > +			 * OK, proper wakeup, we're done
+> > +			 */
+> > +			break;
+> > +		}
+> > +
+> > +		/*
+> > +		 * Getting here, means that we have come out of WFI without
+> > +		 * having been woken up - this shouldn't happen
+> > +		 *
+> > +		 * Just note it happening - when we're woken, we can report
+> > +		 * its occurrence.
+> > +		 */
+> > +		(*spurious)++;
+> > +	}
+> > +}
+> > +#endif /* CONFIG_HOTPLUG_CPU */
+> > +
+> >   /**
+> >    * exynos_core_power_down : power down the specified cpu
+> >    * @cpu : the cpu to power down
+> > @@ -318,6 +367,31 @@ static void __init exynos_smp_prepare_cpus(unsigned int max_cpus)
+> >   	}
+> >   }
+> >
+> > +#ifdef CONFIG_HOTPLUG_CPU
+> > +/*
+> > + * platform-specific code to shutdown a CPU
+> > + *
+> > + * Called with IRQs disabled
+> > + */
+> > +static void __ref exynos_cpu_die(unsigned int cpu)
+> > +{
+> > +	int spurious = 0;
+> > +
+> > +	v7_exit_coherency_flush(louis);
+> > +
+> > +	platform_do_lowpower(cpu, &spurious);
+> > +
+> > +	/*
+> > +	 * bring this CPU back into the world of cache
+> > +	 * coherency, and then restore interrupts
+> > +	 */
+> > +	cpu_leave_lowpower();
+> > +
+> > +	if (spurious)
+> > +		pr_warn("CPU%u: %u spurious wakeup calls\n", cpu, spurious);
+> > +}
+> > +#endif /* CONFIG_HOTPLUG_CPU */
+> > +
+> >   struct smp_operations exynos_smp_ops __initdata = {
+> >   	.smp_init_cpus		= exynos_smp_init_cpus,
+> >   	.smp_prepare_cpus	= exynos_smp_prepare_cpus,
+> >
 > 
- 		 	   		  
+> 
