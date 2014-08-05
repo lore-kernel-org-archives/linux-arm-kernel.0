@@ -1,41 +1,77 @@
 From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Mon,  4 Aug 2014 18:31:49 -0700
-Subject: [PATCH 7/8] msm: scm: Add logging of actual return code from scm call
+Date: Mon,  4 Aug 2014 18:31:47 -0700
+Subject: [PATCH 5/8] msm: scm: Add API to query for service/command
+ availability.
 In-Reply-To: <1407202310-3359-1-git-send-email-sboyd@codeaurora.org>
 References: <1407202310-3359-1-git-send-email-sboyd@codeaurora.org>
-Message-ID: <1407202310-3359-8-git-send-email-sboyd@codeaurora.org>
+Message-ID: <1407202310-3359-6-git-send-email-sboyd@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Olav Haugan <ohaugan@codeaurora.org>
+From: Saravana Kannan <skannan@codeaurora.org>
 
-When an error occurs during an scm call the error returned is
-remapped so we lose the original error code. This means that
-when an error occurs we have no idea what actually failed within
-the secure environment.
+Some drivers may need to query the secure environment about the
+availability of a particular service/command. Add support for
+this.
 
-Add a logging statement that will log the actual error code from
-scm call allowing us to easily determine what caused the error
-to occur.
+Signed-off-by: Saravana Kannan <skannan@codeaurora.org>
+[sboyd at codeaurora.org: Add some commit text]
 
-Signed-off-by: Olav Haugan <ohaugan@codeaurora.org>
 Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
 ---
- arch/arm/mach-qcom/scm.c | 1 +
- 1 file changed, 1 insertion(+)
+ arch/arm/mach-qcom/scm.c | 18 +++++++++++++++++-
+ arch/arm/mach-qcom/scm.h |  2 ++
+ 2 files changed, 19 insertions(+), 1 deletion(-)
 
 diff --git a/arch/arm/mach-qcom/scm.c b/arch/arm/mach-qcom/scm.c
-index 7c62c03324f4..cfd4717aec78 100644
+index a05cad3fa1c5..e80571f57ca4 100644
 --- a/arch/arm/mach-qcom/scm.c
 +++ b/arch/arm/mach-qcom/scm.c
-@@ -152,6 +152,7 @@ static inline void *scm_get_response_buffer(const struct scm_response *rsp)
+@@ -1,4 +1,4 @@
+-/* Copyright (c) 2010, Code Aurora Forum. All rights reserved.
++/* Copyright (c) 2010-2014, The Linux Foundation. All rights reserved.
+  *
+  * This program is free software; you can redistribute it and/or modify
+  * it under the terms of the GNU General Public License version 2 and
+@@ -394,3 +394,19 @@ u32 scm_get_version(void)
+ 	return version;
+ }
+ EXPORT_SYMBOL(scm_get_version);
++
++#define IS_CALL_AVAIL_CMD	1
++int scm_is_call_available(u32 svc_id, u32 cmd_id)
++{
++	int ret;
++	u32 svc_cmd = (svc_id << 10) | cmd_id;
++	u32 ret_val = 0;
++
++	ret = scm_call(SCM_SVC_INFO, IS_CALL_AVAIL_CMD, &svc_cmd,
++			sizeof(svc_cmd), &ret_val, sizeof(ret_val));
++	if (ret)
++		return ret;
++
++	return ret_val;
++}
++EXPORT_SYMBOL(scm_is_call_available);
+diff --git a/arch/arm/mach-qcom/scm.h b/arch/arm/mach-qcom/scm.h
+index 1f0f0180e767..f94c7279616a 100644
+--- a/arch/arm/mach-qcom/scm.h
++++ b/arch/arm/mach-qcom/scm.h
+@@ -14,6 +14,7 @@
  
- static int scm_remap_error(int err)
- {
-+	pr_err("scm_call failed with error code %d\n", err);
- 	switch (err) {
- 	case SCM_ERROR:
- 		return -EIO;
+ #define SCM_SVC_BOOT			0x1
+ #define SCM_SVC_PIL			0x2
++#define SCM_SVC_INFO			0x6
+ 
+ extern int scm_call(u32 svc_id, u32 cmd_id, const void *cmd_buf, size_t cmd_len,
+ 		void *resp_buf, size_t resp_len);
+@@ -24,5 +25,6 @@ extern s32 scm_call_atomic2(u32 svc, u32 cmd, u32 arg1, u32 arg2);
+ #define SCM_VERSION(major, minor) (((major) << 16) | ((minor) & 0xFF))
+ 
+ extern u32 scm_get_version(void);
++extern int scm_is_call_available(u32 svc_id, u32 cmd_id);
+ 
+ #endif
 -- 
 The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
 hosted by The Linux Foundation
