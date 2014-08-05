@@ -1,53 +1,51 @@
-From: varkabhadram@gmail.com (Varka Bhadram)
-Date: Tue, 05 Aug 2014 17:29:10 +0530
-Subject: [PATCH v2 1/2] dma: Add Xilinx Central DMA DT Binding
- Documentation
-In-Reply-To: <1407238791-3370-1-git-send-email-sthokal@xilinx.com>
-References: <1407238791-3370-1-git-send-email-sthokal@xilinx.com>
-Message-ID: <53E0C70E.2010603@gmail.com>
+From: matt@console-pimps.org (Matt Fleming)
+Date: Tue, 5 Aug 2014 13:03:32 +0100
+Subject: [PATCH v4] efi: implement mandatory locking for UEFI Runtime
+ Services
+In-Reply-To: <1407168960-30128-1-git-send-email-ard.biesheuvel@linaro.org>
+References: <1407168960-30128-1-git-send-email-ard.biesheuvel@linaro.org>
+Message-ID: <20140805120332.GO15082@console-pimps.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08/05/2014 05:09 PM, Srikanth Thokala wrote:
-> Device-tree binding documentation of Xilinx Central DMA Engine
->
-> Signed-off-by: Srikanth Thokala <sthokal@xilinx.com>
+On Mon, 04 Aug, at 06:16:00PM, Ard Biesheuvel wrote:
+> According to section 7.1 of the UEFI spec, Runtime Services are not fully
+> reentrant, and there are particular combinations of calls that need to be
+> serialized. Use a spinlock to serialize all Runtime Services with respect
+> to all others, even if this is more than strictly needed.
+
+I think we should include something that explains how we've managed to
+get away without an explicit runtime lock for so long,
+
+  We've managed to get away without requiring a runtime services lock
+  until now because most of the interactions with EFI involve EFI
+  variables, and those operations are already serialised with
+  __efivars->lock.
+
+and then a little bit of blurb about why that's no longer good enough.
+
+> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
 > ---
-> Changes in v2:
-> - Change property 'xlnx,data-width' to 'xlnx,datawidth' in the description
->    to match the implementation.
->
-> ---
->   .../devicetree/bindings/dma/xilinx/xilinx_cdma.txt |   54 ++++++++++++++++++++
->   1 file changed, 54 insertions(+)
->   create mode 100644 Documentation/devicetree/bindings/dma/xilinx/xilinx_cdma.txt
->
-> diff --git a/Documentation/devicetree/bindings/dma/xilinx/xilinx_cdma.txt b/Documentation/devicetree/bindings/dma/xilinx/xilinx_cdma.txt
-> new file mode 100644
-> index 0000000..b04f76b
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/dma/xilinx/xilinx_cdma.txt
-> @@ -0,0 +1,54 @@
-> +Xilinx AXI CDMA engine, it does transfers between memory-mapped source
-> +address and a memory-mapped destination address.
-> +
-> +Required properties:
-> +- compatible: Should be "xlnx,axi-cdma-1.00.a"
-> +- #dma-cells: Should be <1>, see "dmas" property below
-> +- reg: Should contain cdma registers location and length.
-> +- dma-channel child node: Should have only one channel
-> +
+>  arch/x86/include/asm/efi.h              |   2 +
+>  drivers/firmware/efi/runtime-wrappers.c | 154 +++++++++++++++++++++++++++++---
+>  2 files changed, 146 insertions(+), 10 deletions(-)
+> 
+> diff --git a/arch/x86/include/asm/efi.h b/arch/x86/include/asm/efi.h
+> index 044a2fd3c5fe..b39ee5f2c02d 100644
+> --- a/arch/x86/include/asm/efi.h
+> +++ b/arch/x86/include/asm/efi.h
+> @@ -86,6 +86,8 @@ extern void __iomem *efi_ioremap(unsigned long addr, unsigned long size,
+>  
+>  #endif /* CONFIG_X86_32 */
+>  
+> +#define efi_in_nmi()	in_nmi()
 > +
 
-proper alignment for all the properties...
-Required properties:
-- compatible	: Should be "xlnx,axi-cdma-1.00.a"
-- #dma-cells	: Should be <1>, see "dmas" property below
-- reg		: Should contain cdma registers location and length.
-.....
+Remind me why this is needed for x86 but not for arm again?
 
+The rest looks good. I'm just running it through some tests now.
 
+Thanks Ard.
 
 -- 
-Regards,
-Varka Bhadram.
+Matt Fleming, Intel Open Source Technology Center
