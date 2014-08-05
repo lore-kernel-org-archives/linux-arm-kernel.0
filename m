@@ -1,76 +1,99 @@
-From: christoffer.dall@linaro.org (Christoffer Dall)
-Date: Tue, 5 Aug 2014 15:49:09 +0200
-Subject: [PATCH v3 4/9] arm/arm64: KVM: vgic: kill VGIC_MAX_CPUS
-In-Reply-To: <1404817748-31302-5-git-send-email-marc.zyngier@arm.com>
-References: <1404817748-31302-1-git-send-email-marc.zyngier@arm.com>
- <1404817748-31302-5-git-send-email-marc.zyngier@arm.com>
-Message-ID: <20140805134909.GH524@cbox>
+From: daniel.lezcano@linaro.org (Daniel Lezcano)
+Date: Tue, 05 Aug 2014 15:50:54 +0200
+Subject: [PATCH v5 0/5] ARM: EXYNOS: cpuidle: fix AFTR mode on boards
+ with secure firmware enabled
+In-Reply-To: <1407245666-20016-1-git-send-email-b.zolnierkie@samsung.com>
+References: <1407245666-20016-1-git-send-email-b.zolnierkie@samsung.com>
+Message-ID: <53E0E13E.3@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jul 08, 2014 at 12:09:03PM +0100, Marc Zyngier wrote:
-> We now have the information about the number of CPU interfaces in
-> the distributor itself. Let's get rid of VGIC_MAX_CPUS, and just
-> rely on KVM_MAX_VCPUS where we don't have the choice. Yet.
-> 
-> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
-> ---
->  include/kvm/arm_vgic.h | 3 +--
->  virt/kvm/arm/vgic.c    | 6 +++---
->  2 files changed, 4 insertions(+), 5 deletions(-)
-> 
-> diff --git a/include/kvm/arm_vgic.h b/include/kvm/arm_vgic.h
-> index b8a6337..99ad8af 100644
-> --- a/include/kvm/arm_vgic.h
-> +++ b/include/kvm/arm_vgic.h
-> @@ -29,13 +29,12 @@
->  #define VGIC_NR_SGIS		16
->  #define VGIC_NR_PPIS		16
->  #define VGIC_NR_PRIVATE_IRQS	(VGIC_NR_SGIS + VGIC_NR_PPIS)
-> -#define VGIC_MAX_CPUS		KVM_MAX_VCPUS
->  
->  #define VGIC_V2_MAX_LRS		(1 << 6)
->  #define VGIC_V3_MAX_LRS		16
->  
->  /* Sanity checks... */
-> -#if (VGIC_MAX_CPUS > 8)
-> +#if (KVM_MAX_VCPUS > 8)
->  #error	Invalid number of CPU interfaces
->  #endif
->  
-> diff --git a/virt/kvm/arm/vgic.c b/virt/kvm/arm/vgic.c
-> index 6f7cf85..3cb667c 100644
-> --- a/virt/kvm/arm/vgic.c
-> +++ b/virt/kvm/arm/vgic.c
-> @@ -1206,7 +1206,7 @@ static bool vgic_queue_sgi(struct kvm_vcpu *vcpu, int irq)
->  
->  	sources = *vgic_get_sgi_sources(dist, vcpu_id, irq);
->  
-> -	for_each_set_bit(c, &sources, VGIC_MAX_CPUS) {
-> +	for_each_set_bit(c, &sources, dist->nr_cpus) {
->  		if (vgic_queue_irq(vcpu, c, irq))
->  			clear_bit(c, &sources);
->  	}
-> @@ -1583,7 +1583,7 @@ int kvm_vgic_vcpu_init(struct kvm_vcpu *vcpu)
->  	struct vgic_dist *dist = &vcpu->kvm->arch.vgic;
->  	int i;
->  
-> -	if (vcpu->vcpu_id >= VGIC_MAX_CPUS)
-> +	if (vcpu->vcpu_id >= dist->nr_cpus)
->  		return -EBUSY;
->  
->  	for (i = 0; i < VGIC_NR_IRQS; i++) {
-> @@ -1724,7 +1724,7 @@ static int vgic_init_maps(struct kvm *kvm)
->  	int nr_cpus, nr_irqs;
->  	int ret, i;
->  
-> -	nr_cpus = dist->nr_cpus = VGIC_MAX_CPUS;
-> +	nr_cpus = dist->nr_cpus = KVM_MAX_VCPUS;
->  	nr_irqs = dist->nr_irqs = VGIC_NR_IRQS;
->  
->  	ret  = vgic_init_bitmap(&dist->irq_enabled, nr_cpus, nr_irqs);
-> -- 
-> 2.0.0
-> 
+On 08/05/2014 03:34 PM, Bartlomiej Zolnierkiewicz wrote:
+> Hi,
+>
+> This patch series adds support for AFTR idle mode on boards with
+> secure firmware enabled and allows EXYNOS cpuidle driver usage on
+> Exynos4x12 SoCs.
+>
+> It has been tested on Trats2 board (using Exynos4412 SoC with secure
+> firmware enabled) on which AFTR mode reduces power consumption by ~12%
+> when EXYNOS cpuidle driver is enabled (in both cases the default
+> exynos_defconfig config is used and CPU1-3 are offlined).
 
-Reviewed-by: Christoffer Dall <christoffer.dall@linaro.org>
+Hi Bartlomiej,
+
+I tested your patchset on an odroid-u2. When the cpuidle driver is 
+enabled and the cpu1-3 are offlined, the kernel hangs.
+
+If I disable the AFTR state on cpuidle, and offline the 1-3, it works as 
+expected. So there is something wrong with the AFTR on the odroid board.
+
+> Depends on:
+> - next-20140804 branch of linux-next kernel tree
+> - [PATCH v5][next-20140804] ARM: EXYNOS: Fix suspend/resume sequences
+>    (http://www.mail-archive.com/linux-samsung-soc at vger.kernel.org/msg35262.html)
+> - [PATCH v2 0/2] Firmware-assisted suspend/resume of Exynos SoCs
+>    (http://www.mail-archive.com/linux-samsung-soc at vger.kernel.org/msg34282.html)
+>
+> Changes since v4:
+> - rebased on top of next-20140804 +
+>    [PATCH v5][next-20140804] ARM: EXYNOS: Fix suspend/resume sequences
+>    (http://www.mail-archive.com/linux-samsung-soc at vger.kernel.org/msg35262.html)
+>    [PATCH v2 0/2] Firmware-assisted suspend/resume of Exynos SoCs
+>    (http://www.mail-archive.com/linux-samsung-soc at vger.kernel.org/msg34282.html)
+> - call exynos_save_cp15() only on A9 type core (this is needed for the future
+>    Exynos3250 SoC support)
+>
+> Changes since v3:
+> - rebased on top of next-20140804 +
+>    [PATCH v4][next-20140804] ARM: EXYNOS: Fix suspend/resume sequences
+>    (http://www.mail-archive.com/linux-samsung-soc at vger.kernel.org/msg35192.html)
+>    [PATCH v2 0/2] Firmware-assisted suspend/resume of Exynos SoCs
+>    (http://www.mail-archive.com/linux-samsung-soc at vger.kernel.org/msg34282.html)
+> - (re-)added patch fixing S5P_CENTRAL_SEQ_OPTION register setup
+>
+> Changes since v2:
+> - rebased on top of next-20140708 +
+>    [PATCH 5/6] ARM: EXYNOS: Fix suspend/resume sequencies
+>    (http://www.mail-archive.com/linux-samsung-soc at vger.kernel.org/msg32809.html)
+>    [with rejects fixed]
+>    [PATCH 6/6] ARM: EXYNOS: Register cpuidle device only on Exynos4210 and 5250
+>    (http://www.mail-archive.com/linux-samsung-soc at vger.kernel.org/msg32808.html)
+>    [PATCH 0/2] Firmware-assisted suspend/resume of Exynos SoCs
+>    (http://www.mail-archive.com/linux-samsung-soc at vger.kernel.org/msg32991.html)
+>    [with rejects fixed in patch #2]
+> - addressed review comments from Tomasz Figa and Daniel Lezcano
+>
+> Changes since v1:
+> - synced against next-20140602
+> - added missing Acked-by-s
+>
+> Best regards,
+> --
+> Bartlomiej Zolnierkiewicz
+> Samsung R&D Institute Poland
+> Samsung Electronics
+>
+>
+> Bartlomiej Zolnierkiewicz (5):
+>    ARM: EXYNOS: PM: replace EXYNOS_BOOT_VECTOR_* macros by static inlines
+>    ARM: EXYNOS: add AFTR mode support to firmware do_idle method
+>    ARM: EXYNOS: cpuidle: add secure firmware support to AFTR mode code
+>    ARM: EXYNOS: PM: fix register setup for AFTR mode code
+>    ARM: EXYNOS: cpuidle: allow driver usage on Exynos4x12 SoCs
+>
+>   arch/arm/include/asm/firmware.h |  2 +-
+>   arch/arm/mach-exynos/common.h   |  5 ++++
+>   arch/arm/mach-exynos/exynos.c   |  4 ++-
+>   arch/arm/mach-exynos/firmware.c | 34 ++++++++++++++++-------
+>   arch/arm/mach-exynos/pm.c       | 60 ++++++++++++++++++++++++-----------------
+>   5 files changed, 70 insertions(+), 35 deletions(-)
+>
+
+
+-- 
+  <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
+
+Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
+<http://twitter.com/#!/linaroorg> Twitter |
+<http://www.linaro.org/linaro-blog/> Blog
