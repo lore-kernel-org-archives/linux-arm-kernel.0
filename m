@@ -1,75 +1,34 @@
 From: vinod.koul@intel.com (Vinod Koul)
-Date: Tue, 5 Aug 2014 22:02:30 +0530
-Subject: [PATCH] ARM: edma: Fix configuration parsing for SoCs with
- multiple eDMA3 CC
-In-Reply-To: <1407155216-20267-1-git-send-email-peter.ujfalusi@ti.com>
-References: <1407155216-20267-1-git-send-email-peter.ujfalusi@ti.com>
-Message-ID: <20140805163229.GZ8181@intel.com>
+Date: Tue, 5 Aug 2014 22:26:17 +0530
+Subject: DMA engine API issue (was: [PATCH/RFC 0/5] R-Car Gen2 DMAC
+ hardware descriptor list support)
+In-Reply-To: <1621896.RqTTnmY7rK@avalon>
+References: <1406032431-3807-1-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
+ <18522523.T2zy7HfoJ2@avalon> <20140801170744.GD8181@intel.com>
+ <1621896.RqTTnmY7rK@avalon>
+Message-ID: <20140805165617.GB8181@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Aug 04, 2014 at 03:26:56PM +0300, Peter Ujfalusi wrote:
-> The edma_setup_from_hw() should know about the CC number when parsing the
-> CCCFG register - when it reads the register to be precise. The base
-> addresses for CCs stored in an array and we need to provide the correct id
-> to edma_read() in order to read the correct register.
+On Mon, Aug 04, 2014 at 06:50:17PM +0200, Laurent Pinchart wrote:
+ 
+> The question was why is there a dma_async_issue_pending() operation at all ? 
+> Why can't dmaengine_submit() triggers the transfer start ? The only 
+> explanation is a small comment in dmaengine.h that states
+> 
+>  * This allows drivers to push copies to HW in batches,
+>  * reducing MMIO writes where possible.
+> 
+> I don't think that's applicable for DMA slave transfers. Is it still 
+> applicable for anything else ?
+why not?
 
-Just an othognal question:
+If your hw supports sg-lists and say length of 8 and you prepare two
+descriptors for lengths of 3 and 5. While in issue pending what prevents you
+from submiiting them in one shot to hardware while still getting interrupt.
 
-I still see lot of code for edma in arm/. What is the plan to re/move that
-to dma/
+I know designware and intel-dma do support that. It is different point that
+drivers don't
 
 -- 
 ~Vinod
-> 
-> Cc: <stable@vger.kernel.org> # 3.16
-> Signed-off-by: Peter Ujfalusi <peter.ujfalusi@ti.com>
-> ---
->  arch/arm/common/edma.c | 9 +++++----
->  1 file changed, 5 insertions(+), 4 deletions(-)
-> 
-> diff --git a/arch/arm/common/edma.c b/arch/arm/common/edma.c
-> index 88099175fc56..d86771abbf57 100644
-> --- a/arch/arm/common/edma.c
-> +++ b/arch/arm/common/edma.c
-> @@ -1443,14 +1443,14 @@ void edma_assign_channel_eventq(unsigned channel, enum dma_event_q eventq_no)
->  EXPORT_SYMBOL(edma_assign_channel_eventq);
->  
->  static int edma_setup_from_hw(struct device *dev, struct edma_soc_info *pdata,
-> -			      struct edma *edma_cc)
-> +			      struct edma *edma_cc, int cc_id)
->  {
->  	int i;
->  	u32 value, cccfg;
->  	s8 (*queue_priority_map)[2];
->  
->  	/* Decode the eDMA3 configuration from CCCFG register */
-> -	cccfg = edma_read(0, EDMA_CCCFG);
-> +	cccfg = edma_read(cc_id, EDMA_CCCFG);
->  
->  	value = GET_NUM_REGN(cccfg);
->  	edma_cc->num_region = BIT(value);
-> @@ -1464,7 +1464,8 @@ static int edma_setup_from_hw(struct device *dev, struct edma_soc_info *pdata,
->  	value = GET_NUM_EVQUE(cccfg);
->  	edma_cc->num_tc = value + 1;
->  
-> -	dev_dbg(dev, "eDMA3 HW configuration (cccfg: 0x%08x):\n", cccfg);
-> +	dev_dbg(dev, "eDMA3 CC%d HW configuration (cccfg: 0x%08x):\n", cc_id,
-> +		cccfg);
->  	dev_dbg(dev, "num_region: %u\n", edma_cc->num_region);
->  	dev_dbg(dev, "num_channel: %u\n", edma_cc->num_channels);
->  	dev_dbg(dev, "num_slot: %u\n", edma_cc->num_slots);
-> @@ -1684,7 +1685,7 @@ static int edma_probe(struct platform_device *pdev)
->  			return -ENOMEM;
->  
->  		/* Get eDMA3 configuration from IP */
-> -		ret = edma_setup_from_hw(dev, info[j], edma_cc[j]);
-> +		ret = edma_setup_from_hw(dev, info[j], edma_cc[j], j);
->  		if (ret)
->  			return ret;
->  
-> -- 
-> 2.0.2
-> 
-
--- 
