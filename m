@@ -1,48 +1,220 @@
 From: m.szyprowski@samsung.com (Marek Szyprowski)
-Date: Tue, 05 Aug 2014 12:47:35 +0200
-Subject: [PATCH 07/29] ARM: dma-mapping: arm_iommu_attach_device: automatically
- set max_seg_size
+Date: Tue, 05 Aug 2014 12:47:51 +0200
+Subject: [PATCH 23/29] iommu: exynos: init iommu controllers from device tree
 In-Reply-To: <1407235677-26324-1-git-send-email-m.szyprowski@samsung.com>
 References: <1407235677-26324-1-git-send-email-m.szyprowski@samsung.com>
-Message-ID: <1407235677-26324-8-git-send-email-m.szyprowski@samsung.com>
+Message-ID: <1407235677-26324-24-git-send-email-m.szyprowski@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-If device has no max_seg_size set, we assume that there is no limit and
-force it to DMA_BIT_MASK(32) to always use contiguous mappings in DMA
-address space.
+This patch adds code to initialize and assign SYSMMU controllers to
+their master devices defined in device tree.
 
 Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
 ---
- arch/arm/mm/dma-mapping.c | 16 ++++++++++++++++
- 1 file changed, 16 insertions(+)
+ drivers/iommu/exynos-iommu.c | 152 +++++++++++++++++++++++++++++++++++++++++--
+ 1 file changed, 145 insertions(+), 7 deletions(-)
 
-diff --git a/arch/arm/mm/dma-mapping.c b/arch/arm/mm/dma-mapping.c
-index 7a996aa..8161102 100644
---- a/arch/arm/mm/dma-mapping.c
-+++ b/arch/arm/mm/dma-mapping.c
-@@ -2051,6 +2051,22 @@ int arm_iommu_attach_device(struct device *dev,
- {
- 	int err;
+diff --git a/drivers/iommu/exynos-iommu.c b/drivers/iommu/exynos-iommu.c
+index 46e0edc..845f547 100644
+--- a/drivers/iommu/exynos-iommu.c
++++ b/drivers/iommu/exynos-iommu.c
+@@ -21,6 +21,7 @@
+ #include <linux/err.h>
+ #include <linux/mm.h>
+ #include <linux/of.h>
++#include <linux/of_platform.h>
+ #include <linux/iommu.h>
+ #include <linux/errno.h>
+ #include <linux/list.h>
+@@ -211,6 +212,9 @@ struct sysmmu_drvdata {
+ 	struct list_head owner_node;
+ 	phys_addr_t pgtable;
+ 	int version;
++	const char *name;
++	dma_addr_t base;
++	size_t size;
+ };
  
-+	/*
-+	 * if device has no max_seg_size set, we assume that there is no limit
-+	 * and force it to DMA_BIT_MASK(32) to always use contiguous mappings
-+	 * in DMA address space
-+	 */
-+	if (!dev->dma_parms) {
-+		dev->dma_parms = kzalloc(sizeof(*dev->dma_parms), GFP_KERNEL);
-+		if (!dev->dma_parms)
-+			return -ENOMEM;
-+	}
-+	if (!dev->dma_parms->max_segment_size) {
-+		err = dma_set_max_seg_size(dev, DMA_BIT_MASK(32));
-+		if (err)
-+			return err;
+ static bool set_sysmmu_active(struct sysmmu_drvdata *data)
+@@ -574,6 +578,11 @@ static int __init exynos_sysmmu_probe(struct platform_device *pdev)
+ 	}
+ 
+ 	data->sysmmu = dev;
++
++	/* default io address space parameters */
++	data->base = SZ_1G;
++	data->size = SZ_2G;
++
+ 	spin_lock_init(&data->lock);
+ 
+ 	platform_set_drvdata(pdev, data);
+@@ -1055,30 +1064,159 @@ static phys_addr_t exynos_iommu_iova_to_phys(struct iommu_domain *domain,
+ 	return phys;
+ }
+ 
++static void __free_owner_struct(struct exynos_iommu_owner *owner,
++				struct device *dev)
++{
++	while (!list_empty(&owner->clients))
++		list_del_init(owner->clients.next);
++
++	kfree(owner);
++	dev->archdata.iommu = NULL;
++}
++
++static int __init_master_sysmmu(struct device *dev)
++{
++	struct of_phandle_args sysmmu_spec;
++	struct exynos_iommu_owner *owner;
++	int i = 0;
++	int ret;
++
++	owner = kzalloc(sizeof(*owner), GFP_KERNEL);
++	if (!owner)
++		return -ENOMEM;
++	INIT_LIST_HEAD(&owner->clients);
++
++	while (!of_parse_phandle_with_args(dev->of_node, "iommus",
++					   "#iommu-cells", i,
++					   &sysmmu_spec)) {
++		struct platform_device *sysmmu;
++		struct sysmmu_drvdata *data;
++
++		sysmmu = of_find_device_by_node(sysmmu_spec.np);
++		if (!sysmmu) {
++			dev_err(dev, "sysmmu node not found\n");
++			ret = -ENODEV;
++			goto err;
++		}
++		data = platform_get_drvdata(sysmmu);
++		if (!data) {
++			ret = -ENODEV;
++			goto err;
++		}
++
++		of_property_read_string_index(dev->of_node, "iommu-names", i,
++					      &data->name);
++
++		if (sysmmu_spec.args_count == 2) {
++			data->base = sysmmu_spec.args[0];
++			data->size = sysmmu_spec.args[1];
++		} else if (sysmmu_spec.args_count != 0) {
++			dev_err(dev, "incorrect iommu property specified\n");
++			ret = -EINVAL;
++			goto err;
++		}
++
++		list_add_tail(&data->owner_node, &owner->clients);
++
++		i++;
 +	}
 +
- 	err = iommu_attach_device(mapping->domain, dev);
- 	if (err)
- 		return err;
++	if (i == 0) {
++		ret = -ENODEV;
++		goto err;
++	}
++
++	dev->archdata.iommu = owner;
++	dev_dbg(dev, "registered %d sysmmu controllers\n", i);
++
++	return 0;
++err:
++	__free_owner_struct(owner, dev);
++	return ret;
++}
++
++static int __init_subdevice_sysmmu(struct device *dev)
++{
++	struct device *parent = dev->parent;
++	struct exynos_iommu_owner *owner;
++	struct sysmmu_drvdata *data;
++	char *name;
++
++	name = strrchr(dev_name(dev), ':');
++	if (!name)
++		return -ENODEV;
++	name++;
++
++	owner = parent->archdata.iommu;
++	if (!owner)
++		return -ENODEV;
++
++	list_for_each_entry(data, &owner->clients, owner_node)
++		if (strcmp(name, data->name) == 0)
++			break;
++	if (!data)
++		return -ENODEV;
++
++	owner = kzalloc(sizeof(*owner), GFP_KERNEL);
++	if (!owner)
++		return -ENOMEM;
++	INIT_LIST_HEAD(&owner->clients);
++
++	/* move sysmmu from parent to child device */
++	list_del(&data->owner_node);
++	list_add_tail(&data->owner_node, &owner->clients);
++
++	dev->archdata.iommu = owner;
++	dev_dbg(dev->parent,
++		"registered sysmmu controller for %s subdevice\n", data->name);
++
++	return 0;
++}
++
+ static int exynos_iommu_add_device(struct device *dev)
+ {
+ 	struct iommu_group *group;
+ 	int ret;
+ 
+-	group = iommu_group_get(dev);
++	BUG_ON(dev->archdata.iommu != NULL);
+ 
+-	if (!group) {
+-		group = iommu_group_alloc();
+-		if (IS_ERR(group)) {
+-			dev_err(dev, "Failed to allocate IOMMU group\n");
+-			return PTR_ERR(group);
+-		}
++	if (of_get_property(dev->of_node, "iommus", NULL))
++		ret = __init_master_sysmmu(dev);
++	else if (dev->parent &&
++		 of_get_property(dev->parent->of_node, "iommus", NULL))
++		ret = __init_subdevice_sysmmu(dev);
++	else
++		return -ENODEV;
++
++	if (ret)
++		return ret;
++
++	group = iommu_group_alloc();
++	if (IS_ERR(group)) {
++		dev_err(dev, "Failed to allocate IOMMU group\n");
++		ret = PTR_ERR(group);
++		goto err;
+ 	}
+ 
+ 	ret = iommu_group_add_device(group, dev);
++	if (ret != 0)
++		goto err;
++
+ 	iommu_group_put(group);
+ 
++	return 0;
++err:
++	__free_owner_struct(dev->archdata.iommu, dev);
+ 	return ret;
+ }
+ 
+ static void exynos_iommu_remove_device(struct device *dev)
+ {
++	struct exynos_iommu_owner *owner = dev->archdata.iommu;
++
+ 	iommu_group_remove_device(dev);
++	if (owner)
++		__free_owner_struct(owner, dev);
+ }
+ 
+ static const struct iommu_ops exynos_iommu_ops = {
 -- 
 1.9.2
