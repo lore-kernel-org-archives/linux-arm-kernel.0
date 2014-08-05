@@ -1,59 +1,27 @@
-From: b.zolnierkie@samsung.com (Bartlomiej Zolnierkiewicz)
-Date: Tue, 05 Aug 2014 15:34:25 +0200
-Subject: [PATCH v5 4/5] ARM: EXYNOS: PM: fix register setup for AFTR mode code
-In-Reply-To: <1407245666-20016-1-git-send-email-b.zolnierkie@samsung.com>
-References: <1407245666-20016-1-git-send-email-b.zolnierkie@samsung.com>
-Message-ID: <1407245666-20016-5-git-send-email-b.zolnierkie@samsung.com>
+From: admar.schoonen@prodrive-technologies.com (Admar Schoonen)
+Date: Tue, 5 Aug 2014 13:36:44 +0000
+Subject: MMC + DMA too fast for CPU?
+Message-ID: <228FA701DC8C984DB8BA0243BEA01CAB015CC135@exc02.bk.prodrive.nl>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add S5P_CENTRAL_SEQ_OPTION register setup to cpuidle AFTR mode code
-by moving the relevant code from exynos_pm_suspend() (used only by
-suspend) to exynos_pm_central_suspend() (used by both suspend and
-AFTR).  Without this setup AFTR mode doesn't show any benefit over
-WFI one (at least on Exynos4412 SoC).  When this setup is applied
-AFTR mode reduces power consumption by ~12% (as measured on Trats2
-board).
+Hi all,
 
-This change is a preparation for adding secure firmware support to
-EXYNOS cpuidle driver.
+I have an LPC3250 (ARM926, ~ 200 MHz) with eMMC running Linux 3.12.20. By default, it runs the MMC (with MMCI driver) in PIO mode and I need to set the MMC clock very low ( ~ 400 kHz or lower) to get reliable operation. This gives me about 200 KB/s throughput.
 
-Signed-off-by: Bartlomiej Zolnierkiewicz <b.zolnierkie@samsung.com>
-Acked-by: Kyungmin Park <kyungmin.park@samsung.com>
----
- arch/arm/mach-exynos/pm.c | 11 ++++-------
- 1 file changed, 4 insertions(+), 7 deletions(-)
+I have enabled DMA with the patch from http://lists.infradead.org/pipermail/linux-arm-kernel/2013-January/143995.html and some small modifications here and there and MMC now seems to run fine at 1.5 MHz. This gives me a throughput of about 660 KB/s.
 
-diff --git a/arch/arm/mach-exynos/pm.c b/arch/arm/mach-exynos/pm.c
-index e0b6885..3cee123 100644
---- a/arch/arm/mach-exynos/pm.c
-+++ b/arch/arm/mach-exynos/pm.c
-@@ -169,6 +169,10 @@ static void exynos_pm_central_suspend(void)
- 	tmp = pmu_raw_readl(S5P_CENTRAL_SEQ_CONFIGURATION);
- 	tmp &= ~S5P_CENTRAL_LOWPWR_CFG;
- 	pmu_raw_writel(tmp, S5P_CENTRAL_SEQ_CONFIGURATION);
-+
-+	/* Setting SEQ_OPTION register */
-+	pmu_raw_writel(S5P_USE_STANDBY_WFI0 | S5P_USE_STANDBY_WFE0,
-+		       S5P_CENTRAL_SEQ_OPTION);
- }
- 
- static int exynos_pm_central_resume(void)
-@@ -291,15 +295,8 @@ static void exynos_pm_prepare(void)
- 
- static int exynos_pm_suspend(void)
- {
--	unsigned long tmp;
--
- 	exynos_pm_central_suspend();
- 
--	/* Setting SEQ_OPTION register */
--
--	tmp = (S5P_USE_STANDBY_WFI0 | S5P_USE_STANDBY_WFE0);
--	pmu_raw_writel(tmp, S5P_CENTRAL_SEQ_OPTION);
--
- 	if (read_cpuid_part() == ARM_CPU_PART_CORTEX_A9)
- 		exynos_cpu_save_register();
- 
--- 
-1.8.2.3
+If I clock the MMC higher than that, I get lots of errors (ETIMEDOUT, EIO etc) when executing the mmc_tests. Could that be caused by the CPU being too slow to handle the interrupts?
+
+And is this performance of 660 KB/s indeed what could be expected of such a CPU? Or must there be something else that is limiting the system?
+
+Thanks in advance and please keep me on CC as I am not subscribed to this list.
+
+Kind regards,
+
+Admar Schoonen 
+Engineer 
+
+www.prodrive-technologies.com 
+
+Disclaimer: The content of this e-mail is intended solely for the use of the Individual or entity to whom it is addressed. If you have received this communication in error, be aware that forwarding it, copying it, or in any way disclosing its content to any other person, is strictly prohibited. If you have received this communication in error, please notify the author by replying to this e-mail immediately.
