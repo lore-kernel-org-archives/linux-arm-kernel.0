@@ -1,49 +1,110 @@
 From: m.szyprowski@samsung.com (Marek Szyprowski)
-Date: Tue, 05 Aug 2014 12:47:34 +0200
-Subject: [PATCH 06/29] drivers: iommu: add notify about failed bind
+Date: Tue, 05 Aug 2014 12:47:52 +0200
+Subject: [PATCH 24/29] iommu: exynos: create default iommu-based dma-mapping
+ for master devices
 In-Reply-To: <1407235677-26324-1-git-send-email-m.szyprowski@samsung.com>
 References: <1407235677-26324-1-git-send-email-m.szyprowski@samsung.com>
-Message-ID: <1407235677-26324-7-git-send-email-m.szyprowski@samsung.com>
+Message-ID: <1407235677-26324-25-git-send-email-m.szyprowski@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds support for forwarding recently introduced
-BUS_NOTIFY_DRVBIND_FAILED event to iommu groups. This lets us getting a
-notify for failed device driver bind, so all the items done in
-IOMMU_GROUP_NOTIFY_BIND_DRIVER event can be cleaned if the driver fails
-to bind.
+This patch adds code to create default per-device iommu-based
+dma-mapping instance for all master devices, whose driver didn't set
+DRIVER_HAS_OWN_IOMMU_MANAGER flag.
 
 Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
 ---
- drivers/iommu/iommu.c | 3 +++
- include/linux/iommu.h | 1 +
- 2 files changed, 4 insertions(+)
+ drivers/iommu/exynos-iommu.c | 49 +++++++++++++++++++++++++++++++++++++++++++-
+ 1 file changed, 48 insertions(+), 1 deletion(-)
 
-diff --git a/drivers/iommu/iommu.c b/drivers/iommu/iommu.c
-index 1698360..516e93a 100644
---- a/drivers/iommu/iommu.c
-+++ b/drivers/iommu/iommu.c
-@@ -758,6 +758,9 @@ static int iommu_bus_notifier(struct notifier_block *nb,
- 	case BUS_NOTIFY_UNBOUND_DRIVER:
- 		group_action = IOMMU_GROUP_NOTIFY_UNBOUND_DRIVER;
- 		break;
-+	case BUS_NOTIFY_DRVBIND_FAILED:
-+		group_action = IOMMU_GROUP_NOTIFY_DRVBIND_FAILED;
+diff --git a/drivers/iommu/exynos-iommu.c b/drivers/iommu/exynos-iommu.c
+index 845f547..336b2f8 100644
+--- a/drivers/iommu/exynos-iommu.c
++++ b/drivers/iommu/exynos-iommu.c
+@@ -12,6 +12,7 @@
+ #define DEBUG
+ #endif
+ 
++#include <linux/dma-mapping.h>
+ #include <linux/io.h>
+ #include <linux/interrupt.h>
+ #include <linux/platform_device.h>
+@@ -29,6 +30,7 @@
+ #include <linux/export.h>
+ 
+ #include <asm/cacheflush.h>
++#include <asm/dma-iommu.h>
+ #include <asm/pgtable.h>
+ 
+ typedef u32 sysmmu_iova_t;
+@@ -1064,6 +1066,43 @@ static phys_addr_t exynos_iommu_iova_to_phys(struct iommu_domain *domain,
+ 	return phys;
+ }
+ 
++static int sysmmu_master_device_event(struct notifier_block *nb,
++				      unsigned long val, void *p)
++{
++	struct device *dev = p;
++	struct exynos_iommu_owner *owner = dev->archdata.iommu;
++	struct sysmmu_drvdata *data;
++
++	if (!owner)
++		return 0;
++
++	data = list_first_entry(&owner->clients, struct sysmmu_drvdata,
++				owner_node);
++	if (!data)
++		return 0;
++
++	switch (val) {
++
++	case IOMMU_GROUP_NOTIFY_BIND_DRIVER:
++		if (!(dev->driver->flags & DRIVER_HAS_OWN_IOMMU_MANAGER))
++			arm_iommu_create_default_mapping(dev, data->base,
++							 data->size);
 +		break;
- 	}
++
++	case IOMMU_GROUP_NOTIFY_UNBOUND_DRIVER:
++	case IOMMU_GROUP_NOTIFY_DRVBIND_FAILED:
++		if (!(dev->driver->flags & DRIVER_HAS_OWN_IOMMU_MANAGER))
++			arm_iommu_release_default_mapping(dev);
++		break;
++	}
++
++	return 0;
++}
++
++static struct notifier_block sysmmu_master_device_notifier = {
++	.notifier_call = sysmmu_master_device_event,
++};
++
+ static void __free_owner_struct(struct exynos_iommu_owner *owner,
+ 				struct device *dev)
+ {
+@@ -1202,6 +1241,7 @@ static int exynos_iommu_add_device(struct device *dev)
+ 	if (ret != 0)
+ 		goto err;
  
- 	if (group_action)
-diff --git a/include/linux/iommu.h b/include/linux/iommu.h
-index 20f9a52..f9fdae5 100644
---- a/include/linux/iommu.h
-+++ b/include/linux/iommu.h
-@@ -139,6 +139,7 @@ struct iommu_ops {
- #define IOMMU_GROUP_NOTIFY_BOUND_DRIVER		4 /* Post Driver bind */
- #define IOMMU_GROUP_NOTIFY_UNBIND_DRIVER	5 /* Pre Driver unbind */
- #define IOMMU_GROUP_NOTIFY_UNBOUND_DRIVER	6 /* Post Driver unbind */
-+#define IOMMU_GROUP_NOTIFY_DRVBIND_FAILED	7 /* Driver failed to bind */
++	iommu_group_register_notifier(group, &sysmmu_master_device_notifier);
+ 	iommu_group_put(group);
  
- extern int bus_set_iommu(struct bus_type *bus, const struct iommu_ops *ops);
- extern bool iommu_present(struct bus_type *bus);
+ 	return 0;
+@@ -1213,8 +1253,15 @@ err:
+ static void exynos_iommu_remove_device(struct device *dev)
+ {
+ 	struct exynos_iommu_owner *owner = dev->archdata.iommu;
++	struct iommu_group *group = iommu_group_get(dev);
++
++	if (group) {
++		iommu_group_unregister_notifier(group,
++						&sysmmu_master_device_notifier);
++		iommu_group_remove_device(dev);
++		iommu_group_put(group);
++	}
+ 
+-	iommu_group_remove_device(dev);
+ 	if (owner)
+ 		__free_owner_struct(owner, dev);
+ }
 -- 
 1.9.2
