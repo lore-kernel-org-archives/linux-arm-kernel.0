@@ -1,82 +1,127 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Tue, 5 Aug 2014 10:21:07 +0100
-Subject: Suspend/resume broken on mx5/mx6 running 4.16
-In-Reply-To: <20140805061658.GG2167@dragon>
-References: <CAOMZO5BN9H-4__2s9yyGiuOBsLO0gf9LOQ0_N1552P8LWJTxCg@mail.gmail.com>
- <9930f46074e04c90a58fa6b01e055ff2@BLUPR03MB373.namprd03.prod.outlook.com>
- <20140805061658.GG2167@dragon>
-Message-ID: <20140805092107.GM30282@n2100.arm.linux.org.uk>
+From: anup.patel@linaro.org (Anup Patel)
+Date: Tue,  5 Aug 2014 14:54:10 +0530
+Subject: [RFC PATCH 1/6] ARM64: Move PMU register related defines to asm/pmu.h
+In-Reply-To: <1407230655-28864-1-git-send-email-anup.patel@linaro.org>
+References: <1407230655-28864-1-git-send-email-anup.patel@linaro.org>
+Message-ID: <1407230655-28864-2-git-send-email-anup.patel@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Aug 05, 2014 at 02:16:59PM +0800, Shawn Guo wrote:
-> On Tue, Aug 05, 2014 at 02:06:18PM +0800, Duan Fugang-B38611 wrote:
-> > I use linux net tree cannot reproduce the issue like your log, but show another issue as below log:
-> > (imx6dl sabresd board, Nfs mount rootfs)
-> > 
-> > root at freescale ~$ uname -r
-> > 3.16.0-rc5-01146-gda388973d	
-> 
-> Fabio already bisect the issue down to commit a71e3c37960c (net: phy:
-> Set the driver when registering an MDIO bus device).  This commit
-> landed on mainline after v3.16-rc7, and that may be the reason you
-> do not see it on net tree (3.16.0-rc5-01146-gda388973d).
+To use the ARMv8 PMU related register defines from the KVM code,
+we move the relevant definitions to asm/pmu.h include file.
 
-Oh my... that commit looks totally bogus.
+We also add #ifndef __ASSEMBLY__ in order to use asm/pmu.h from
+assembly code.
 
-It has the effect (as can be seen from the oops) of attaching the MDIO bus
-device (itself is a bus-less device) to the platform driver, which means
-that if the platform driver supports power management, it will be called
-to power manage the MDIO bus device.
+Signed-off-by: Anup Patel <anup.patel@linaro.org>
+Signed-off-by: Pranavkumar Sawargaonkar <pranavkumar@linaro.org>
+---
+ arch/arm64/include/asm/pmu.h   |   44 ++++++++++++++++++++++++++++++++++++++++
+ arch/arm64/kernel/perf_event.c |   32 -----------------------------
+ 2 files changed, 44 insertions(+), 32 deletions(-)
 
-Moreover, drivers do not expect to be called for power management
-operations for devices which they haven't probed, and certainly not for
-devices which aren't part of the same bus that the driver is registered
-against.
-
-The commit text says:
-
-    net: phy: Set the driver when registering an MDIO bus device
-
-    mdiobus_register() registers a device which is already bound to a driver.
-    Hence, the driver pointer should be set properly in order to track down
-    the driver associated to the MDIO bus.
-
-    This will be used to allow ethernet driver to pin down a MDIO bus driver,
-    preventing it from being unloaded while the PHY device is running.
-
-which misses the implications of adding an unknown parent driver to that
-class device - and the argument that it's just to track down the parent
-driver is totally bogus.  That can already be done - it's the parent
-device's driver pointer.  Let's take the example of FEC.
-
-/sys/devices/soc0/soc/2100000.aips-bus/2188000.ethernet/mdio_bus/2188000.ethernet/
-
-lrwxrwxrwx 1 root root    0 Aug  5 10:07 device -> ../../../2188000.ethernet
-drwxr-xr-x 2 root root    0 Aug  5 10:07 power
-lrwxrwxrwx 1 root root    0 Aug  5 10:07 subsystem -> ../../../../../../../class/mdio_bus
--rw-r--r-- 1 root root 4096 Aug  5 10:07 uevent
-
-(note that the "%s-%x" format for this device in fec_main.c has been
-truncated - that's another bug!)
-
-Remembering that this is a class device, these devices have a "device"
-symlink which point at the parent device.  Normal devices which are bound
-to a driver have a "driver" symlink.
-
-So, the driver can be reached by following the "device" pointer, and then
-following the "driver" symlink:
-
-/sys/devices/soc0/soc/2100000.aips-bus/2188000.ethernet/mdio_bus/2188000.ethernet/device/
-...
-lrwxrwxrwx 1 root root    0 Aug  5 10:08 driver -> ../../../../../bus/platform/drivers/fec
-..
-
-So, given that there are already perfectly good ways to discover the
-information stated in the commit message, and that this commit causes
-regression, I think this commit should be reverted.  Greg, do you
-concur?
-
+diff --git a/arch/arm64/include/asm/pmu.h b/arch/arm64/include/asm/pmu.h
+index e6f0878..f49cc72 100644
+--- a/arch/arm64/include/asm/pmu.h
++++ b/arch/arm64/include/asm/pmu.h
+@@ -19,6 +19,49 @@
+ #ifndef __ASM_PMU_H
+ #define __ASM_PMU_H
+ 
++/*
++ * Per-CPU PMCR: config reg
++ */
++#define ARMV8_PMCR_E		(1 << 0) /* Enable all counters */
++#define ARMV8_PMCR_P		(1 << 1) /* Reset all counters */
++#define ARMV8_PMCR_C		(1 << 2) /* Cycle counter reset */
++#define ARMV8_PMCR_D		(1 << 3) /* CCNT counts every 64th cpu cycle */
++#define ARMV8_PMCR_X		(1 << 4) /* Export to ETM */
++#define ARMV8_PMCR_DP		(1 << 5) /* Disable CCNT if non-invasive debug*/
++#define	ARMV8_PMCR_N_SHIFT	11	 /* Number of counters supported */
++#define	ARMV8_PMCR_N_MASK	0x1f
++#define	ARMV8_PMCR_MASK		0x3f	 /* Mask for writable bits */
++
++/*
++ * PMCNTEN: counters enable reg
++ */
++#define	ARMV8_CNTEN_MASK	0xffffffff	/* Mask for writable bits */
++
++/*
++ * PMINTEN: counters interrupt enable reg
++ */
++#define	ARMV8_INTEN_MASK	0xffffffff	/* Mask for writable bits */
++
++/*
++ * PMOVSR: counters overflow flag status reg
++ */
++#define	ARMV8_OVSR_MASK		0xffffffff	/* Mask for writable bits */
++#define	ARMV8_OVERFLOWED_MASK	ARMV8_OVSR_MASK
++
++/*
++ * PMXEVTYPER: Event selection reg
++ */
++#define	ARMV8_EVTYPE_MASK	0xc80003ff	/* Mask for writable bits */
++#define	ARMV8_EVTYPE_EVENT	0x3ff		/* Mask for EVENT bits */
++
++/*
++ * Event filters for PMUv3
++ */
++#define	ARMV8_EXCLUDE_EL1	(1 << 31)
++#define	ARMV8_EXCLUDE_EL0	(1 << 30)
++#define	ARMV8_INCLUDE_EL2	(1 << 27)
++
++#ifndef __ASSEMBLY__
+ #ifdef CONFIG_HW_PERF_EVENTS
+ 
+ /* The events for a given PMU register set. */
+@@ -79,4 +122,5 @@ int armpmu_event_set_period(struct perf_event *event,
+ 			    int idx);
+ 
+ #endif /* CONFIG_HW_PERF_EVENTS */
++#endif /* __ASSEMBLY__ */
+ #endif /* __ASM_PMU_H */
+diff --git a/arch/arm64/kernel/perf_event.c b/arch/arm64/kernel/perf_event.c
+index baf5afb..47dfb8b 100644
+--- a/arch/arm64/kernel/perf_event.c
++++ b/arch/arm64/kernel/perf_event.c
+@@ -810,38 +810,6 @@ static const unsigned armv8_pmuv3_perf_cache_map[PERF_COUNT_HW_CACHE_MAX]
+ #define	ARMV8_IDX_TO_COUNTER(x)	\
+ 	(((x) - ARMV8_IDX_COUNTER0) & ARMV8_COUNTER_MASK)
+ 
+-/*
+- * Per-CPU PMCR: config reg
+- */
+-#define ARMV8_PMCR_E		(1 << 0) /* Enable all counters */
+-#define ARMV8_PMCR_P		(1 << 1) /* Reset all counters */
+-#define ARMV8_PMCR_C		(1 << 2) /* Cycle counter reset */
+-#define ARMV8_PMCR_D		(1 << 3) /* CCNT counts every 64th cpu cycle */
+-#define ARMV8_PMCR_X		(1 << 4) /* Export to ETM */
+-#define ARMV8_PMCR_DP		(1 << 5) /* Disable CCNT if non-invasive debug*/
+-#define	ARMV8_PMCR_N_SHIFT	11	 /* Number of counters supported */
+-#define	ARMV8_PMCR_N_MASK	0x1f
+-#define	ARMV8_PMCR_MASK		0x3f	 /* Mask for writable bits */
+-
+-/*
+- * PMOVSR: counters overflow flag status reg
+- */
+-#define	ARMV8_OVSR_MASK		0xffffffff	/* Mask for writable bits */
+-#define	ARMV8_OVERFLOWED_MASK	ARMV8_OVSR_MASK
+-
+-/*
+- * PMXEVTYPER: Event selection reg
+- */
+-#define	ARMV8_EVTYPE_MASK	0xc80003ff	/* Mask for writable bits */
+-#define	ARMV8_EVTYPE_EVENT	0x3ff		/* Mask for EVENT bits */
+-
+-/*
+- * Event filters for PMUv3
+- */
+-#define	ARMV8_EXCLUDE_EL1	(1 << 31)
+-#define	ARMV8_EXCLUDE_EL0	(1 << 30)
+-#define	ARMV8_INCLUDE_EL2	(1 << 27)
+-
+ static inline u32 armv8pmu_pmcr_read(void)
+ {
+ 	u32 val;
 -- 
-FTTC broadband for 0.8mile line: currently at 9.5Mbps down 400kbps up
-according to speedtest.net.
+1.7.9.5
