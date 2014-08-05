@@ -1,173 +1,185 @@
-From: konrad.wilk@oracle.com (Konrad Rzeszutek Wilk)
-Date: Tue, 5 Aug 2014 11:13:23 -0400
-Subject: [PATCH v4 1/1] iommu-api: Add map_sg/unmap_sg functions
-In-Reply-To: <1406854484-3848-2-git-send-email-ohaugan@codeaurora.org>
-References: <1406854484-3848-1-git-send-email-ohaugan@codeaurora.org>
- <1406854484-3848-2-git-send-email-ohaugan@codeaurora.org>
-Message-ID: <20140805151323.GB19709@laptop.dumpdata.com>
+From: christoffer.dall@linaro.org (Christoffer Dall)
+Date: Tue, 5 Aug 2014 17:34:35 +0200
+Subject: [PATCH v3 7/9] arm/arm64: KVM: vgic: delay vgic allocation until
+ init time
+In-Reply-To: <1404817748-31302-8-git-send-email-marc.zyngier@arm.com>
+References: <1404817748-31302-1-git-send-email-marc.zyngier@arm.com>
+ <1404817748-31302-8-git-send-email-marc.zyngier@arm.com>
+Message-ID: <20140805153435.GK524@cbox>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jul 31, 2014 at 05:54:44PM -0700, Olav Haugan wrote:
-> Mapping and unmapping are more often than not in the critical path.
-> map_sg and unmap_sg allows IOMMU driver implementations to optimize
-> the process of mapping and unmapping buffers into the IOMMU page tables.
-> 
-> Instead of mapping a buffer one page at a time and requiring potentially
-> expensive TLB operations for each page, this function allows the driver
-> to map all pages in one go and defer TLB maintenance until after all
-> pages have been mapped.
-> 
-> Additionally, the mapping operation would be faster in general since
-> clients does not have to keep calling map API over and over again for
-> each physically contiguous chunk of memory that needs to be mapped to a
-> virtually contiguous region.
+On Tue, Jul 08, 2014 at 12:09:06PM +0100, Marc Zyngier wrote:
+> It is now quite easy to delay the allocation of the vgic tables
+> until we actually require it to be up and running (when the first
 
-That is assuming that physical == bus topology.
+the first starting ?
 
+> starting to kick around).
 > 
-> Signed-off-by: Olav Haugan <ohaugan@codeaurora.org>
+> This allow us to allocate memory for the exact number of CPUs we
+> have. As nobody configures the number of interrupts just yet,
+> use a fallback to VGIC_NR_IRQS_LEGACY.
+> 
+> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 > ---
->  drivers/iommu/iommu.c | 44 ++++++++++++++++++++++++++++++++++++++++++++
->  include/linux/iommu.h | 28 ++++++++++++++++++++++++++++
->  2 files changed, 72 insertions(+)
+>  arch/arm/kvm/arm.c     |  7 -------
+>  include/kvm/arm_vgic.h |  1 -
+>  virt/kvm/arm/vgic.c    | 42 +++++++++++++++++++++++++++++-------------
+>  3 files changed, 29 insertions(+), 21 deletions(-)
 > 
-> diff --git a/drivers/iommu/iommu.c b/drivers/iommu/iommu.c
-> index 1698360..1d5dc2e 100644
-> --- a/drivers/iommu/iommu.c
-> +++ b/drivers/iommu/iommu.c
-> @@ -1088,6 +1088,50 @@ size_t iommu_unmap(struct iommu_domain *domain, unsigned long iova, size_t size)
->  }
->  EXPORT_SYMBOL_GPL(iommu_unmap);
+> diff --git a/arch/arm/kvm/arm.c b/arch/arm/kvm/arm.c
+> index 782632e..9b3957d 100644
+> --- a/arch/arm/kvm/arm.c
+> +++ b/arch/arm/kvm/arm.c
+> @@ -308,16 +308,9 @@ int kvm_cpu_has_pending_timer(struct kvm_vcpu *vcpu)
 >  
-> +int iommu_map_sg(struct iommu_domain *domain, unsigned long iova,
-> +			struct scatterlist *sg, unsigned int nents,
-> +			int prot, unsigned long flags)
-> +{
-> +	int ret = 0;
-> +	unsigned long offset = 0;
+>  int kvm_arch_vcpu_init(struct kvm_vcpu *vcpu)
+>  {
+> -	int ret;
+> -
+>  	/* Force users to call KVM_ARM_VCPU_INIT */
+>  	vcpu->arch.target = -1;
+>  
+> -	/* Set up VGIC */
+> -	ret = kvm_vgic_vcpu_init(vcpu);
+> -	if (ret)
+> -		return ret;
+> -
+>  	/* Set up the timer */
+>  	kvm_timer_vcpu_init(vcpu);
+>  
+> diff --git a/include/kvm/arm_vgic.h b/include/kvm/arm_vgic.h
+> index 9feb7fe..311a0f0 100644
+> --- a/include/kvm/arm_vgic.h
+> +++ b/include/kvm/arm_vgic.h
+> @@ -233,7 +233,6 @@ int kvm_vgic_hyp_init(void);
+>  int kvm_vgic_init(struct kvm *kvm);
+>  int kvm_vgic_create(struct kvm *kvm);
+>  void kvm_vgic_destroy(struct kvm *kvm);
+> -int kvm_vgic_vcpu_init(struct kvm_vcpu *vcpu);
+>  void kvm_vgic_vcpu_destroy(struct kvm_vcpu *vcpu);
+>  void kvm_vgic_flush_hwstate(struct kvm_vcpu *vcpu);
+>  void kvm_vgic_sync_hwstate(struct kvm_vcpu *vcpu);
+> diff --git a/virt/kvm/arm/vgic.c b/virt/kvm/arm/vgic.c
+> index 47a14a1..708aed9 100644
+> --- a/virt/kvm/arm/vgic.c
+> +++ b/virt/kvm/arm/vgic.c
+> @@ -1612,15 +1612,12 @@ static int vgic_vcpu_init_maps(struct kvm_vcpu *vcpu, int nr_irqs)
+>   * Initialize the vgic_cpu struct and vgic_dist struct fields pertaining to
+>   * this vcpu and enable the VGIC for this VCPU
+>   */
+> -int kvm_vgic_vcpu_init(struct kvm_vcpu *vcpu)
+> +static void kvm_vgic_vcpu_init(struct kvm_vcpu *vcpu)
+>  {
+>  	struct vgic_cpu *vgic_cpu = &vcpu->arch.vgic_cpu;
+>  	struct vgic_dist *dist = &vcpu->kvm->arch.vgic;
+>  	int i;
+>  
+> -	if (vcpu->vcpu_id >= dist->nr_cpus)
+> -		return -EBUSY;
+> -
+>  	for (i = 0; i < dist->nr_irqs; i++) {
+>  		if (i < VGIC_NR_PPIS)
+>  			vgic_bitmap_set_irq_val(&dist->irq_enabled,
+> @@ -1640,8 +1637,6 @@ int kvm_vgic_vcpu_init(struct kvm_vcpu *vcpu)
+>  	vgic_cpu->nr_lr = vgic->nr_lr;
+>  
+>  	vgic_enable(vcpu);
+> -
+> -	return 0;
+>  }
+>  
+>  static void vgic_init_maintenance_interrupt(void *info)
+> @@ -1759,8 +1754,17 @@ static int vgic_init_maps(struct kvm *kvm)
+>  	int nr_cpus, nr_irqs;
+>  	int ret, i;
+>  
+> -	nr_cpus = dist->nr_cpus = KVM_MAX_VCPUS;
+> +	if (dist->nr_cpus)	/* Already allocated */
+> +		return 0;
 > +
-> +	if (unlikely(domain->ops->map_sg == NULL)) {
-> +		unsigned int i;
-> +		struct scatterlist *s;
+> +	nr_cpus = dist->nr_cpus = atomic_read(&kvm->online_vcpus);
+> +	if (!nr_cpus)		/* No vcpus? Can't be good... */
+> +		return -EINVAL;
+>  
+> +	/*
+> +	 * If nobody configured the number of interrupts, use the
+> +	 * legacy one.
+> +	 */
+>  	if (!dist->nr_irqs)
+>  		dist->nr_irqs = VGIC_NR_IRQS_LEGACY;
+>  
+> @@ -1804,6 +1808,9 @@ static int vgic_init_maps(struct kvm *kvm)
+>  		}
+>  	}
+>  
+> +	for (i = VGIC_NR_PRIVATE_IRQS; i < dist->nr_irqs; i += 4)
+> +		vgic_set_target_reg(kvm, 0, i);
 > +
-> +		for_each_sg(sg, s, nents, i) {
-> +			phys_addr_t phys = page_to_phys(sg_page(s));
-> +			size_t page_len = s->offset + s->length;
-> +
-> +			ret = iommu_map(domain, iova + offset, phys, page_len,
-> +					prot);
-> +			if (ret)
-> +				goto fail;
-> +
-> +			offset += page_len;
-> +		}
-
-I think it would be better if you had an 'default_iommu_map_sg' with
-the implementation above. And then the default ops->map_sg would point to
-that and each IOMMU would over-write with its own version.
-
-That way you don't need any of this 'if' and can have the 'iommu_map_sg'
-be in the header file (either as static inline or an macro).
-
-
-> +	} else {
-> +		ret = domain->ops->map_sg(domain, iova, sg, nents, prot, flags);
+>  out:
+>  	if (ret)
+>  		kvm_vgic_destroy(kvm);
+> @@ -1822,6 +1829,7 @@ out:
+>   */
+>  int kvm_vgic_init(struct kvm *kvm)
+>  {
+> +	struct kvm_vcpu *vcpu;
+>  	int ret = 0, i;
+>  
+>  	if (!irqchip_in_kernel(kvm))
+> @@ -1839,6 +1847,12 @@ int kvm_vgic_init(struct kvm *kvm)
+>  		goto out;
+>  	}
+>  
+> +	ret = vgic_init_maps(kvm);
+> +	if (ret) {
+> +		kvm_err("Unable to allocate maps\n");
+> +		goto out;
 > +	}
-> +	goto out;
 > +
-> +fail:
-> +	/* undo mappings already done in case of error */
-> +	iommu_unmap(domain, iova, offset);
-> +out:
-> +	return ret;
-> +}
-> +EXPORT_SYMBOL_GPL(iommu_map_sg);
-> +
-> +int iommu_unmap_sg(struct iommu_domain *domain, unsigned long iova,
-> +			size_t size, unsigned long flags)
-> +{
-> +	if (unlikely(domain->ops->unmap_sg == NULL))
-> +		return iommu_unmap(domain, iova, size);
-> +	else
-> +		return domain->ops->unmap_sg(domain, iova, size, flags);
-> +}
-> +EXPORT_SYMBOL_GPL(iommu_unmap_sg);
+>  	ret = kvm_phys_addr_ioremap(kvm, kvm->arch.vgic.vgic_cpu_base,
+>  				    vgic->vcpu_base, KVM_VGIC_V2_CPU_SIZE);
+>  	if (ret) {
+> @@ -1846,11 +1860,13 @@ int kvm_vgic_init(struct kvm *kvm)
+>  		goto out;
+>  	}
 >  
->  int iommu_domain_window_enable(struct iommu_domain *domain, u32 wnd_nr,
->  			       phys_addr_t paddr, u64 size, int prot)
-> diff --git a/include/linux/iommu.h b/include/linux/iommu.h
-> index 20f9a52..66ad543 100644
-> --- a/include/linux/iommu.h
-> +++ b/include/linux/iommu.h
-> @@ -22,6 +22,7 @@
->  #include <linux/errno.h>
->  #include <linux/err.h>
->  #include <linux/types.h>
-> +#include <linux/scatterlist.h>
->  #include <trace/events/iommu.h>
+> -	for (i = VGIC_NR_PRIVATE_IRQS; i < kvm->arch.vgic.nr_irqs; i += 4)
+> -		vgic_set_target_reg(kvm, 0, i);
+> +	kvm_for_each_vcpu(i, vcpu, kvm)
+> +		kvm_vgic_vcpu_init(vcpu);
 >  
->  #define IOMMU_READ	(1 << 0)
-> @@ -93,6 +94,10 @@ enum iommu_attr {
->   * @detach_dev: detach device from an iommu domain
->   * @map: map a physically contiguous memory region to an iommu domain
->   * @unmap: unmap a physically contiguous memory region from an iommu domain
-> + * @map_sg: map a scatter-gather list of physically contiguous memory chunks
-> + * to an iommu domain
-> + * @unmap_sg: unmap a scatter-gather list of physically contiguous memory
-> + * chunks from an iommu domain
->   * @iova_to_phys: translate iova to physical address
->   * @domain_has_cap: domain capabilities query
->   * @add_device: add device to iommu grouping
-> @@ -110,6 +115,11 @@ struct iommu_ops {
->  		   phys_addr_t paddr, size_t size, int prot);
->  	size_t (*unmap)(struct iommu_domain *domain, unsigned long iova,
->  		     size_t size);
-> +	int (*map_sg)(struct iommu_domain *domain, unsigned long iova,
-> +			struct scatterlist *sg, unsigned int nents, int prot,
-> +			unsigned long flags);
-> +	int (*unmap_sg)(struct iommu_domain *domain, unsigned long iova,
-> +			size_t size, unsigned long flags);
->  	phys_addr_t (*iova_to_phys)(struct iommu_domain *domain, dma_addr_t iova);
->  	int (*domain_has_cap)(struct iommu_domain *domain,
->  			      unsigned long cap);
-> @@ -153,6 +163,11 @@ extern int iommu_map(struct iommu_domain *domain, unsigned long iova,
->  		     phys_addr_t paddr, size_t size, int prot);
->  extern size_t iommu_unmap(struct iommu_domain *domain, unsigned long iova,
->  		       size_t size);
-> +extern int iommu_map_sg(struct iommu_domain *domain, unsigned long iova,
-> +			struct scatterlist *sg, unsigned int nents, int prot,
-> +			unsigned long flags);
-> +extern int iommu_unmap_sg(struct iommu_domain *domain, unsigned long iova,
-> +				size_t size, unsigned long flags);
->  extern phys_addr_t iommu_iova_to_phys(struct iommu_domain *domain, dma_addr_t iova);
->  extern int iommu_domain_has_cap(struct iommu_domain *domain,
->  				unsigned long cap);
-> @@ -287,6 +302,19 @@ static inline int iommu_unmap(struct iommu_domain *domain, unsigned long iova,
->  	return -ENODEV;
+>  	kvm->arch.vgic.ready = true;
+>  out:
+> +	if (ret)
+> +		kvm_vgic_destroy(kvm);
+>  	mutex_unlock(&kvm->lock);
+>  	return ret;
 >  }
+> @@ -1891,10 +1907,6 @@ int kvm_vgic_create(struct kvm *kvm)
+>  	kvm->arch.vgic.vgic_dist_base = VGIC_ADDR_UNDEF;
+>  	kvm->arch.vgic.vgic_cpu_base = VGIC_ADDR_UNDEF;
 >  
-> +static inline int iommu_map_sg(struct iommu_domain *domain, unsigned long iova,
-> +			struct scatterlist *sg, unsigned int nents, int prot,
-> +			unsigned long flags)
-> +{
-> +	return -ENODEV;
-> +}
+> -	ret = vgic_init_maps(kvm);
+> -	if (ret)
+> -		kvm_err("Unable to allocate maps\n");
+> -
+>  out_unlock:
+>  	for (; vcpu_lock_idx >= 0; vcpu_lock_idx--) {
+>  		vcpu = kvm_get_vcpu(kvm, vcpu_lock_idx);
+> @@ -2095,6 +2107,10 @@ static int vgic_attr_regs_access(struct kvm_device *dev,
+>  
+>  	mutex_lock(&dev->kvm->lock);
+>  
+> +	ret = vgic_init_maps(dev->kvm);
+> +	if (ret)
+> +		goto out;
 > +
-> +static inline int iommu_unmap_sg(struct iommu_domain *domain,
-> +			unsigned long iova, size_t size, unsigned long flags)
-> +{
-> +	return -ENODEV;
-> +}
-> +
->  static inline int iommu_domain_window_enable(struct iommu_domain *domain,
->  					     u32 wnd_nr, phys_addr_t paddr,
->  					     u64 size, int prot)
+>  	if (cpuid >= atomic_read(&dev->kvm->online_vcpus)) {
+>  		ret = -EINVAL;
+>  		goto out;
 > -- 
-> The Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-> hosted by The Linux Foundation
+> 2.0.0
 > 
-> _______________________________________________
-> iommu mailing list
-> iommu at lists.linux-foundation.org
-> https://lists.linuxfoundation.org/mailman/listinfo/iommu
+Reviewed-by: Christoffer Dall <christoffer.dall@linaro.org>
