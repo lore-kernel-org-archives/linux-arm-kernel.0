@@ -1,56 +1,65 @@
 From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Mon,  4 Aug 2014 18:31:44 -0700
-Subject: [PATCH 2/8] msm: scm: Get cacheline size from CTR
+Date: Mon,  4 Aug 2014 18:31:45 -0700
+Subject: [PATCH 3/8] msm: scm: Flush the command buffer only instead of the
+ entire cache
 In-Reply-To: <1407202310-3359-1-git-send-email-sboyd@codeaurora.org>
 References: <1407202310-3359-1-git-send-email-sboyd@codeaurora.org>
-Message-ID: <1407202310-3359-3-git-send-email-sboyd@codeaurora.org>
+Message-ID: <1407202310-3359-4-git-send-email-sboyd@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Instead of hardcoding the cacheline size as 32, get the cacheline
-size from the CTR register.
+From: Vikram Mulukutla <markivx@codeaurora.org>
 
+scm_call flushes the entire cache before calling into the
+secure world. This is both a performance penalty as well
+as insufficient on SMP systems where the CPUs possess a
+write-back L1 cache. Flush only the command and response
+buffers instead, moving the responsibility of flushing any
+other cached buffer (being passed to the secure world) to
+callers.
+
+Signed-off-by: Vikram Mulukutla <markivx@codeaurora.org>
 Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
 ---
- arch/arm/mach-qcom/scm.c | 14 ++++++++------
- 1 file changed, 8 insertions(+), 6 deletions(-)
+ arch/arm/mach-qcom/scm.c | 17 ++++++++++++-----
+ 1 file changed, 12 insertions(+), 5 deletions(-)
 
 diff --git a/arch/arm/mach-qcom/scm.c b/arch/arm/mach-qcom/scm.c
-index 820c72165e19..c08786ebf116 100644
+index c08786ebf116..ec37b037e69c 100644
 --- a/arch/arm/mach-qcom/scm.c
 +++ b/arch/arm/mach-qcom/scm.c
-@@ -27,9 +27,6 @@
+@@ -196,12 +196,12 @@ static int __scm_call(const struct scm_command *cmd)
+ 	u32 cmd_addr = virt_to_phys(cmd);
  
- #include "scm.h"
- 
--/* Cache line size for msm8x60 */
--#define CACHELINESIZE 32
--
- #define SCM_ENOMEM		-5
- #define SCM_EOPNOTSUPP		-4
- #define SCM_EINVAL_ADDR		-3
-@@ -214,13 +211,18 @@ static int __scm_call(const struct scm_command *cmd)
- 
- static void scm_inv_range(unsigned long start, unsigned long end)
- {
--	start = round_down(start, CACHELINESIZE);
--	end = round_up(end, CACHELINESIZE);
-+	u32 cacheline_size, ctr;
+ 	/*
+-	 * Flush the entire cache here so callers don't have to remember
+-	 * to flush the cache when passing physical addresses to the secure
+-	 * side in the buffer.
++	 * Flush the command buffer so that the secure world sees
++	 * the correct data.
+ 	 */
+-	flush_cache_all();
+-	outer_flush_all();
++	__cpuc_flush_dcache_area((void *)cmd, cmd->len);
++	outer_flush_range(cmd_addr, cmd_addr + cmd->len);
 +
-+	asm volatile("mrc p15, 0, %0, c0, c0, 1" : "=r" (ctr));
-+	cacheline_size = 4 << ((ctr >> 16) & 0xf);
-+
-+	start = round_down(start, cacheline_size);
-+	end = round_up(end, cacheline_size);
- 	outer_inv_range(start, end);
- 	while (start < end) {
- 		asm ("mcr p15, 0, %0, c7, c6, 1" : : "r" (start)
- 		     : "memory");
--		start += CACHELINESIZE;
-+		start += cacheline_size;
- 	}
- 	dsb();
- 	isb();
+ 	ret = smc(cmd_addr);
+ 	if (ret < 0)
+ 		ret = scm_remap_error(ret);
+@@ -238,6 +238,13 @@ static void scm_inv_range(unsigned long start, unsigned long end)
+  * @resp_len: length of the response buffer
+  *
+  * Sends a command to the SCM and waits for the command to finish processing.
++ *
++ * A note on cache maintenance:
++ * Note that any buffers that are expected to be accessed by the secure world
++ * must be flushed before invoking scm_call and invalidated in the cache
++ * immediately after scm_call returns. Cache maintenance on the command and
++ * response buffers is taken care of by scm_call; however, callers are
++ * responsible for any other cached buffers passed over to the secure world.
+  */
+ int scm_call(u32 svc_id, u32 cmd_id, const void *cmd_buf, size_t cmd_len,
+ 		void *resp_buf, size_t resp_len)
 -- 
 The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
 hosted by The Linux Foundation
