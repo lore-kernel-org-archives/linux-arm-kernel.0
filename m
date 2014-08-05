@@ -1,86 +1,25 @@
 From: mperttunen@nvidia.com (Mikko Perttunen)
-Date: Tue, 5 Aug 2014 15:18:55 +0300
-Subject: [PATCH v2 2/4] ARM: tegra: Add soctherm and thermal zones to Tegra124
- device tree
-In-Reply-To: <1407241137-32232-1-git-send-email-mperttunen@nvidia.com>
+Date: Tue, 5 Aug 2014 15:24:02 +0300
+Subject: [PATCH v2 4/4] thermal: Add Tegra SOCTHERM thermal management
+ driver
+In-Reply-To: <1407241137-32232-5-git-send-email-mperttunen@nvidia.com>
 References: <1407241137-32232-1-git-send-email-mperttunen@nvidia.com>
-Message-ID: <1407241137-32232-3-git-send-email-mperttunen@nvidia.com>
+ <1407241137-32232-5-git-send-email-mperttunen@nvidia.com>
+Message-ID: <53E0CCE2.4050008@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This adds the soctherm thermal sensing and management unit to the
-Tegra124 device tree along with the four thermal zones corresponding
-to the four thermal sensors provided by soctherm.
+On 05/08/14 15:18, Mikko Perttunen wrote:
+> This adds support for the Tegra SOCTHERM thermal sensing and management
+> system found in the Tegra124 system-on-chip. This initial driver supports
+> the four thermal zones with hardware-tracked trip points.
 
-Signed-off-by: Mikko Perttunen <mperttunen@nvidia.com>
----
- arch/arm/boot/dts/tegra124.dtsi | 47 +++++++++++++++++++++++++++++++++++++++++
- 1 file changed, 47 insertions(+)
+.. does NOT support hardware-tracked trip points. I guess you always 
+have to have at least one little mistake there.
 
-diff --git a/arch/arm/boot/dts/tegra124.dtsi b/arch/arm/boot/dts/tegra124.dtsi
-index 03916ef..a579fab 100644
---- a/arch/arm/boot/dts/tegra124.dtsi
-+++ b/arch/arm/boot/dts/tegra124.dtsi
-@@ -3,6 +3,7 @@
- #include <dt-bindings/pinctrl/pinctrl-tegra.h>
- #include <dt-bindings/pinctrl/pinctrl-tegra-xusb.h>
- #include <dt-bindings/interrupt-controller/arm-gic.h>
-+#include <dt-bindings/thermal/tegra124-soctherm.h>
- 
- #include "skeleton.dtsi"
- 
-@@ -756,6 +757,52 @@
- 		status = "disabled";
- 	};
- 
-+	thermal-zones {
-+		cpu {
-+			polling-delay-passive = <1000>;
-+			polling-delay = <1000>;
-+
-+			thermal-sensors =
-+				<&soctherm TEGRA124_SOCTHERM_SENSOR_CPU>;
-+		};
-+
-+		mem {
-+			polling-delay-passive = <1000>;
-+			polling-delay = <1000>;
-+
-+			thermal-sensors =
-+				<&soctherm TEGRA124_SOCTHERM_SENSOR_MEM>;
-+		};
-+
-+		gpu {
-+			polling-delay-passive = <1000>;
-+			polling-delay = <1000>;
-+
-+			thermal-sensors =
-+				<&soctherm TEGRA124_SOCTHERM_SENSOR_GPU>;
-+		};
-+
-+		pllx {
-+			polling-delay-passive = <1000>;
-+			polling-delay = <1000>;
-+
-+			thermal-sensors =
-+				<&soctherm TEGRA124_SOCTHERM_SENSOR_PLLX>;
-+		};
-+	};
-+
-+	soctherm: soctherm at 0,700e2000 {
-+		compatible = "nvidia,tegra124-soctherm";
-+		reg = <0x0 0x700e2000 0x0 0x1000>;
-+		interrupts = <GIC_SPI 48 IRQ_TYPE_LEVEL_HIGH>;
-+		clocks = <&tegra_car TEGRA124_CLK_TSENSOR>,
-+			<&tegra_car TEGRA124_CLK_SOC_THERM>;
-+		clock-names = "tsensor", "soctherm";
-+		resets = <&tegra_car 78>;
-+		reset-names = "soctherm";
-+		#thermal-sensor-cells = <1>;
-+	};
-+
- 	cpus {
- 		#address-cells = <1>;
- 		#size-cells = <0>;
--- 
-1.8.1.5
+Mikko
+
+>
+> Signed-off-by: Mikko Perttunen <mperttunen@nvidia.com>
+> ---
+> ...
