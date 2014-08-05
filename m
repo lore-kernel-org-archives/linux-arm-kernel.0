@@ -1,32 +1,95 @@
-From: ohad@wizery.com (Ohad Ben-Cohen)
-Date: Tue, 5 Aug 2014 10:05:13 +0300
-Subject: [PATCH 1/2] remoteproc: use a flag to detect the presence of IOMMU
-In-Reply-To: <53DFAB68.6020903@ti.com>
-References: <1404836521-59637-1-git-send-email-s-anna@ti.com>
- <1404836521-59637-2-git-send-email-s-anna@ti.com>
- <CAK=Wgbawdik3ZB0Zbeaa7eXd7M+9ev9u713GcfOc4Gy0+O80Dg@mail.gmail.com>
- <53D7C769.6080500@ti.com>
- <CAK=Wgbbf5JNxzW16z=vXHi9D8Om1KnLEEr7hEw5T0oN7GuM=og@mail.gmail.com>
- <53DFAB68.6020903@ti.com>
-Message-ID: <CAK=WgbY5GGngd57=EBp+8_4djzMb5gZSOq0aQ9=vcpm-E9YQww@mail.gmail.com>
+From: pramod.gurav@smartplayin.com (Pramod Gurav)
+Date: Tue, 05 Aug 2014 12:50:41 +0530
+Subject: [PATCH v4 0/3] Support for Qualcomm QPNP PMIC's
+In-Reply-To: <1406903450-27283-1-git-send-email-svarbanov@mm-sol.com>
+References: <1406903450-27283-1-git-send-email-svarbanov@mm-sol.com>
+Message-ID: <53E085C9.4090302@smartplayin.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Aug 4, 2014 at 6:48 PM, Suman Anna <s-anna@ti.com> wrote:
-> On 08/04/2014 06:50 AM, Ohad Ben-Cohen wrote:
->> On Tue, Jul 29, 2014 at 7:10 PM, Suman Anna <s-anna@ti.com> wrote:
->>> We are trying to add a remoteproc driver for a small Cortex M3 called
->>> the WkupM3 used for suspend/resume management on TI AM335/AM437x SoCs.
->>> This processor does not have an MMU. Same is the case with another
->>> processor subsystem PRU-ICSS on AM335/AM437x. All these are platform
->>> devices, and the current iommu_present check will not scale for the same
->>> kernel image to support OMAP4/OMAP5 and AM335/AM437x.
->>
->> That's perfect, thanks. Can you please add this use case description
->> to the commit log?
->
-> I kept the current description generic, but sure, I can add this
-> specific usecase examples to the commit log. I will post the revised
-> patches once rc1 is out.
+Hi Stanimir.
+On Friday 01 August 2014 08:00 PM, Stanimir Varbanov wrote:
+> Hello all,
+> 
+> Changes since v3:
+>  - rename the driver to qcom-spmi-pmic - suggested by David Collins
+>  - spmi regmap config now initialize .fast_io to true
+>  - added generalized comptatible string in DT binding document and driver
+>  - I dropped the pm8921 rename patch for now, it will be subject of another
+>    patchset later on.
+> 
+> regards,
+> Stan
+> 
+> --------------------------------------------------------------------------------
+> 
+> Changes since v2:
+>  - 1/4 - added new line, signed-off-by / acked-by and module_authors.
+>  - 3/4 - the subject has been changed.
+> 
+> The previous v2 can be found at [1].
+> 
+> I'm still waiting Acks for:
+>  - 4/4 from Qualcomm folks.
 
-Thanks!
+If I am not missing something obvious, this patch needs to be resent as
+it does not apply on top of patches in this series. I tried applying and
+it fails in Kconfig.
+
+>  - 2/4 and 3/4 from DT folks.
+> 
+> The patchset is ready to merge version and also it can be treated as an
+> intermediate step until we find a solution for non-translatable peripheral
+> addresses.
+> 
+> [1] https://lkml.org/lkml/2014/7/17/877
+> 
+> --------------------------------------------------------------------------------
+> 
+> Hello everyone,
+> 
+> Here is the continuation of patch sets sent recently about Qualcomm
+> QPNP SPMI PMICs.
+> 
+> The previous version of the patch set can be found at [1].
+> 
+> Changes since v1:
+>  - removed completely custom *of* parser
+>  - renamed the mfd driver from qpnp-spmi to pm8xxx-spmi
+>  - now MFD_PM8XXX_SPMI Kconfig option depends on SPMI
+> 
+> Removing of the custom *of* parser leads to that that the *reg* devicetree
+> property cannot exist and therefore cannot be parsed to get PMIC peripheral
+> resources. I took this step aside because no one from mfd drivers does this
+> parsing. This will lead to inconvenience in the peripheral drivers to define
+> internally the SPMI base addresses depending on the compatible property
+> i.e. PMIC version. 
+> 
+> Comments are welcome!
+> 
+> [1] https://lkml.org/lkml/2014/7/8/428
+> 
+> --------------------------------------------------------------------------------
+> 
+> Josh Cartwright (1):
+>   mfd: add support for Qualcomm SPMI PMICs
+> 
+> Stanimir Varbanov (2):
+>   mfd: document DT bindings for Qualcomm SPMI PMICs
+>   ARM: dts: qcom: add pm8941 and pm8841 PMICs device nodes
+> 
+>  .../devicetree/bindings/mfd/qcom,spmi-pmic.txt     |   64 +++++++++++++++++++
+>  arch/arm/boot/dts/qcom-msm8974.dtsi                |   37 +++++++++++
+>  drivers/mfd/Kconfig                                |   15 +++++
+>  drivers/mfd/Makefile                               |    1 +
+>  drivers/mfd/qcom-spmi-pmic.c                       |   67 ++++++++++++++++++++
+>  5 files changed, 184 insertions(+), 0 deletions(-)
+>  create mode 100644 Documentation/devicetree/bindings/mfd/qcom,spmi-pmic.txt
+>  create mode 100644 drivers/mfd/qcom-spmi-pmic.c
+> 
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-kernel" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> Please read the FAQ at  http://www.tux.org/lkml/
+> 
