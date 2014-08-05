@@ -1,47 +1,53 @@
-From: svarbanov@mm-sol.com (Stanimir Varbanov)
-Date: Tue, 05 Aug 2014 15:00:10 +0300
-Subject: [PATCH v4 0/3] Support for Qualcomm QPNP PMIC's
-In-Reply-To: <53E085C9.4090302@smartplayin.com>
-References: <1406903450-27283-1-git-send-email-svarbanov@mm-sol.com>
- <53E085C9.4090302@smartplayin.com>
-Message-ID: <53E0C74A.2040108@mm-sol.com>
+From: varkabhadram@gmail.com (Varka Bhadram)
+Date: Tue, 05 Aug 2014 17:29:10 +0530
+Subject: [PATCH v2 1/2] dma: Add Xilinx Central DMA DT Binding
+ Documentation
+In-Reply-To: <1407238791-3370-1-git-send-email-sthokal@xilinx.com>
+References: <1407238791-3370-1-git-send-email-sthokal@xilinx.com>
+Message-ID: <53E0C70E.2010603@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Pramod,
+On 08/05/2014 05:09 PM, Srikanth Thokala wrote:
+> Device-tree binding documentation of Xilinx Central DMA Engine
+>
+> Signed-off-by: Srikanth Thokala <sthokal@xilinx.com>
+> ---
+> Changes in v2:
+> - Change property 'xlnx,data-width' to 'xlnx,datawidth' in the description
+>    to match the implementation.
+>
+> ---
+>   .../devicetree/bindings/dma/xilinx/xilinx_cdma.txt |   54 ++++++++++++++++++++
+>   1 file changed, 54 insertions(+)
+>   create mode 100644 Documentation/devicetree/bindings/dma/xilinx/xilinx_cdma.txt
+>
+> diff --git a/Documentation/devicetree/bindings/dma/xilinx/xilinx_cdma.txt b/Documentation/devicetree/bindings/dma/xilinx/xilinx_cdma.txt
+> new file mode 100644
+> index 0000000..b04f76b
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/dma/xilinx/xilinx_cdma.txt
+> @@ -0,0 +1,54 @@
+> +Xilinx AXI CDMA engine, it does transfers between memory-mapped source
+> +address and a memory-mapped destination address.
+> +
+> +Required properties:
+> +- compatible: Should be "xlnx,axi-cdma-1.00.a"
+> +- #dma-cells: Should be <1>, see "dmas" property below
+> +- reg: Should contain cdma registers location and length.
+> +- dma-channel child node: Should have only one channel
+> +
+> +
 
-On 08/05/2014 10:20 AM, Pramod Gurav wrote:
-> Hi Stanimir.
-> On Friday 01 August 2014 08:00 PM, Stanimir Varbanov wrote:
->> Hello all,
->>
->> Changes since v3:
->>  - rename the driver to qcom-spmi-pmic - suggested by David Collins
->>  - spmi regmap config now initialize .fast_io to true
->>  - added generalized comptatible string in DT binding document and driver
->>  - I dropped the pm8921 rename patch for now, it will be subject of another
->>    patchset later on.
->>
->> regards,
->> Stan
->>
->> --------------------------------------------------------------------------------
->>
->> Changes since v2:
->>  - 1/4 - added new line, signed-off-by / acked-by and module_authors.
->>  - 3/4 - the subject has been changed.
->>
->> The previous v2 can be found at [1].
->>
->> I'm still waiting Acks for:
->>  - 4/4 from Qualcomm folks.
-> 
-> If I am not missing something obvious, this patch needs to be resent as
-> it does not apply on top of patches in this series. I tried applying and
-> it fails in Kconfig.
+proper alignment for all the properties...
+Required properties:
+- compatible	: Should be "xlnx,axi-cdma-1.00.a"
+- #dma-cells	: Should be <1>, see "dmas" property below
+- reg		: Should contain cdma registers location and length.
+.....
 
-I dropped 4/4 from v4. See above what has been changed since v3.
+
 
 -- 
-regards,
-Stan
+Regards,
+Varka Bhadram.
