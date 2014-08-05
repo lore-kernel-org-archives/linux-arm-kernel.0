@@ -1,58 +1,38 @@
-From: luto@amacapital.net (Andy Lutomirski)
-Date: Tue, 5 Aug 2014 09:10:57 +0900
-Subject: [PATCH v8 03/10] clocksource: arm_arch_timer: change clocksource
- name if CP15 unavailable
-In-Reply-To: <1407003407-31219-4-git-send-email-nathan_lynch@mentor.com>
-References: <1407003407-31219-1-git-send-email-nathan_lynch@mentor.com>
- <1407003407-31219-4-git-send-email-nathan_lynch@mentor.com>
-Message-ID: <CALCETrWVgmMKJdBHg8oqd21_TNptqz8fTZ=4voOSNtF-Gw76cg@mail.gmail.com>
+From: nicolas.pitre@linaro.org (Nicolas Pitre)
+Date: Mon, 4 Aug 2014 21:02:57 -0400 (EDT)
+Subject: [PATCH v16 2/9] ARM: hisi: enable MCPM implementation
+In-Reply-To: <CAD6h2NTFJ0qBdymhQ1bEaKpCTQT13r2-F9HRDw9SdSS31Zer8w@mail.gmail.com>
+References: <1407121088-4151-1-git-send-email-haojian.zhuang@linaro.org>
+ <1407121088-4151-3-git-send-email-haojian.zhuang@linaro.org>
+ <alpine.LFD.2.11.1408041741460.6061@knanqh.ubzr>
+ <CAD6h2NTFJ0qBdymhQ1bEaKpCTQT13r2-F9HRDw9SdSS31Zer8w@mail.gmail.com>
+Message-ID: <alpine.LFD.2.11.1408042101360.6061@knanqh.ubzr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Aug 3, 2014 at 3:16 AM, Nathan Lynch <nathan_lynch@mentor.com> wrote:
-> The arm and arm64 VDSOs need CP15 access to the architected counter.
-> If this is unavailable (which is allowed by ARM v7), indicate this by
-> changing the clocksource name to "arch_mem_counter" before registering
-> the clocksource.
->
-> Suggested by Stephen Boyd.
->
-> Signed-off-by: Nathan Lynch <nathan_lynch@mentor.com>
-> ---
->  drivers/clocksource/arm_arch_timer.c | 12 ++++++++++--
->  1 file changed, 10 insertions(+), 2 deletions(-)
->
-> diff --git a/drivers/clocksource/arm_arch_timer.c b/drivers/clocksource/arm_arch_timer.c
-> index 5163ec13429d..c99afdf12e98 100644
-> --- a/drivers/clocksource/arm_arch_timer.c
-> +++ b/drivers/clocksource/arm_arch_timer.c
-> @@ -429,11 +429,19 @@ static void __init arch_counter_register(unsigned type)
->         u64 start_count;
->
->         /* Register the CP15 based counter if we have one */
-> -       if (type & ARCH_CP15_TIMER)
-> +       if (type & ARCH_CP15_TIMER) {
->                 arch_timer_read_counter = arch_counter_get_cntvct;
-> -       else
-> +       } else {
->                 arch_timer_read_counter = arch_counter_get_cntvct_mem;
->
-> +               /* If the clocksource name is "arch_sys_counter" the
-> +                * VDSO will attempt to read the CP15-based counter.
-> +                * Ensure this does not happen when CP15-based
-> +                * counter is not available.
-> +                */
-> +               clocksource_counter.name = "arch_mem_counter";
-> +       }
-> +
->         start_count = arch_timer_read_counter();
->         clocksource_register_hz(&clocksource_counter, arch_timer_rate);
->         cyclecounter.mult = clocksource_counter.mult;
-> --
-> 1.9.3
->
+On Tue, 5 Aug 2014, Haojian Zhuang wrote:
 
-FWIW, x86 does this using the archdata field in the clocksource, but I
-see nothing wrong with doing it this way instead.
+> On 5 August 2014 06:43, Nicolas Pitre <nicolas.pitre@linaro.org> wrote:
+> > Sorry for the delay -- I was on vacation.
+> >
+> > On Mon, 4 Aug 2014, Haojian Zhuang wrote:
+> >
+> >> Multiple CPU clusters are used in Hisilicon HiP04 SoC. Now use MCPM
+> >> framework to manage power on HiP04 SoC.
+> >>
+> >> Changelog:
+> >> v16:
+> >>   * Parse bootwrapper parameters in command line instead.
+> >
+> > What is that about?  I don't particularly like to see bootloader
+> > handshake details passed to the kernel via the kernel command line
+> > mechanism.  Given this looks like special memory regions, can't they be
+> > specified via the device tree instead?
+> >
+> 
+> Others don't agree put them into DTS file. So I move them into command line.
 
---Andy
+Could you give me a pointer to the discussion around that please?
+
+
+Nicolas
