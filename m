@@ -1,84 +1,35 @@
-From: daniel.lezcano@linaro.org (Daniel Lezcano)
-Date: Tue, 05 Aug 2014 17:07:36 +0200
-Subject: [PATCH v5 0/5] ARM: EXYNOS: cpuidle: fix AFTR mode on boards
- with secure firmware enabled
-In-Reply-To: <53E0E98F.5020706@samsung.com>
-References: <1407245666-20016-1-git-send-email-b.zolnierkie@samsung.com>
- <53E0E420.8060207@linaro.org> <53E0E98F.5020706@samsung.com>
-Message-ID: <53E0F338.8080006@linaro.org>
+From: keescook@chromium.org (Kees Cook)
+Date: Tue, 5 Aug 2014 08:08:47 -0700
+Subject: [PATCH v5 3/3] arm64: Add seccomp support
+In-Reply-To: <53D2255C.9050006@linaro.org>
+References: <1406020499-5537-1-git-send-email-takahiro.akashi@linaro.org>
+ <1406020499-5537-4-git-send-email-takahiro.akashi@linaro.org>
+ <53D082E9.8090303@amacapital.net> <53D09C4F.9010104@linaro.org>
+ <CALCETrWTDS7VSyuR5wgGxpu-_YMWVUVmv9ht6t1tCSX=GA46cQ@mail.gmail.com>
+ <53D2255C.9050006@linaro.org>
+Message-ID: <CAGXu5jJL=zXuSRNomGrB09kqpUhEpkuxDH18JN4NRbWocMw4xg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08/05/2014 04:26 PM, Krzysztof Kozlowski wrote:
-> On 05.08.2014 16:03, Daniel Lezcano wrote:
->> On 08/05/2014 03:34 PM, Bartlomiej Zolnierkiewicz wrote:
->>> Hi,
->>>
->>> This patch series adds support for AFTR idle mode on boards with
->>> secure firmware enabled and allows EXYNOS cpuidle driver usage on
->>> Exynos4x12 SoCs.
->>>
->>> It has been tested on Trats2 board (using Exynos4412 SoC with secure
->>> firmware enabled) on which AFTR mode reduces power consumption by ~12%
->>> when EXYNOS cpuidle driver is enabled (in both cases the default
->>> exynos_defconfig config is used and CPU1-3 are offlined).
->>
->> As a sidenote:
->>
->> On my odroid-U2:
->>   * 4 cpus online -> 130 mA
->>   * 3 cpus online -> 164 mA
->>   * 2 cpus online -> 160 mA
->>   * 1 cpu online  -> 157 mA
->>
->> So were are consuming more when there are unplugged cpu ... any ideas ?
->
-> On which tree are you testing? Current next has ARMCLK down feature
-> enabled. ARMCLK down may stop working after hotunplugging CPU:
-> http://www.spinics.net/lists/arm-kernel/msg352890.html
->
-> That was observed especially on Exynos4212 where ARMCLK down stops
-> working permanently. On Trats2 (Exynos4412) the clock down stopped only
-> a for short period after disabling CPU.
+On Fri, Jul 25, 2014 at 2:37 AM, AKASHI Takahiro
+<takahiro.akashi@linaro.org> wrote:
+> I found a bug in my current patch (v5). When 32-bit tracer skips a system call,
+> we should not update syscallno from x8 since syscallno is re-written directly
+> via ptrace(PTRACE_SET_SYSCALL).
 
-Hi Krzysztof,
+Ah, yes. Will aarch64 have a PTRACE_SET_SYSCALL option, or is this
+strictly a 32-bit vs 64-bit issue?
 
-I tested the patches you mentioned above on top of this patchset.
+> I'm sure that my next version should work with 32/64-bit tracers on 64-bit
+> kernel.
 
-You are right this is directly related to the ARMCLK but the behavior 
-may be not as you expect I think.
+Do you have a git tree uploaded anywhere? I'd love to follow this more
+closely. When do you expect a v6?
 
-When I boot:
+Thanks!
 
-4 cpus online => 131 mA
-
-Then I unplug one by one the cpus:
-
-3 cpus online => 127 mA
-2 cpus online => 123 mA
-1 cpu online  => 120 mA
-
-This is consistent.
-
-But now, I online the cpus:
-
-2 cpus online => 162 mA
-3 cpus online => 165 mA
-4 cpus online => 131 mA
-
-
--- side note --
-
-Please note, I did not disable the cpuidle neither the AFTR state and 
-the kernel did not hang but I don't see the noticeable power saving we 
-should be observing when there is one cpu remaining entering the AFTR 
-state (cpuidle stats show we enter AFTR). So there is definitively 
-something wrong with this state.
-
+-Kees
 
 -- 
-  <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
-
-Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
-<http://twitter.com/#!/linaroorg> Twitter |
-<http://www.linaro.org/linaro-blog/> Blog
+Kees Cook
+Chrome OS Security
