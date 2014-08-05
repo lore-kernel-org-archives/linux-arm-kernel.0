@@ -1,72 +1,63 @@
-From: rric@kernel.org (Robert Richter)
-Date: Tue, 5 Aug 2014 10:47:17 +0200
-Subject: [PATCH 2/5] arm64, thunder: Add initial dts for Cavium Thunder SoC
-In-Reply-To: <CAL_JsqKgfjV4sEZOWuH4YcMjeOA_yNDvZLv_jTi_Sb=27cOD3g@mail.gmail.com>
- <20140730174803.GF20162@leverpostej>
-Message-ID: <20140805084717.GH4703@rric.localhost>
+From: geert@linux-m68k.org (Geert Uytterhoeven)
+Date: Tue, 5 Aug 2014 11:07:55 +0200
+Subject: [PATCH v3 1/3] asm-generic/io.h: Implement generic {read,
+ write}s*()
+In-Reply-To: <20140719091156.GA31772@ravnborg.org>
+References: <1405508484-18303-1-git-send-email-thierry.reding@gmail.com>
+ <43703371.jktNRIezc3@wuerfel> <20140719084152.GA31564@ravnborg.org>
+ <4967546.K5Yf5hcJE1@wuerfel> <20140719091156.GA31772@ravnborg.org>
+Message-ID: <CAMuHMdUUSMGghDVDpdQygQCv0OWGP-Lwxzy004xRpR6BsZS81A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 30.07.14 18:48:03, Mark Rutland wrote:
-> > >> +             uaa0: serial at 87e024000000 {
-> > >> +                     compatible = "arm,pl011", "arm,primecell";
-> > >> +                     reg = <0x87e0 0x24000000 0x0 0x1000>;
-> > >> +                     interrupts = <1 21 4>;
-> > >> +                     clocks = <&refclk50mhz>;
-> > >> +                     clock-names = "apb_pclk";
-> > >
-> > > Is this actually the apb_pclk, or is the the uartclk? I assume it's the
-> > > latter.
-> > 
-> > Shouldn't new bindings have both clocks here? A single clock was a
-> > mistake I think (mine in fact).
-> 
-> I don't think we fixed it up in the end. It made drivers look a bit messy and
-> it dropped off my priority queue.
+On Sat, Jul 19, 2014 at 11:11 AM, Sam Ravnborg <sam@ravnborg.org> wrote:
+> On Sat, Jul 19, 2014 at 11:05:33AM +0200, Arnd Bergmann wrote:
+>> On Saturday 19 July 2014 10:41:52 Sam Ravnborg wrote:
+>> > > >
+>> > > > This set:
+>> > > > #define inb_p(addr)     inb(addr)
+>> > > > #define inw_p(addr)     inw(addr)
+>> > > > #define inl_p(addr)     inl(addr)
+>> > > > #define outb_p(x, addr) outb((x), (addr))
+>> > > > #define outw_p(x, addr) outw((x), (addr))
+>> > > > #define outl_p(x, addr) outl((x), (addr))
+>> > > >
+>> > > > Should have a comment that say they are deprecated.
+>> > > > Especially the "b" variants still have many users.
+>> > >
+>> > > Are they? I don't remember ever seeing a reason to deprecate
+>> > > them. We could perhaps enclose them in #ifdef CONFIG_ISA, but
+>> > > there may also be some drivers that use the same code for ISA
+>> > > and PCI, and it doesn't really hurt on PCI.
+>> >
+>> > It is my understanding that inl and inl_p are the same these days.
+>> > A quick grep indicate that only m68k define the
+>> > _p variant different from the other.
+>> > But I failed to find and description of the difference between the
+>> > two which is why I assumed they were identical and thus no need for both.
+>>
+>> I don't know why m68k needs it, it's really an x86-specific
+>> thing, see slow_down_io() in arch/x86/include/asm/io.h.
+>
+> I had missed the x86 versions when grepping.
+> Hmm, and with the macro tricks they play in asm/io.h this
+> file is not at all grep friendly.
+>
+> So xxx_p is for pause (or something like that).
+> This also matches that m68k do some tricks with delay() in the _p variants.
+> Thanks for the explanation.
 
-On 31.07.14 10:22:19, Rob Herring wrote:
-> On Thu, Jul 31, 2014 at 7:34 AM, Robert Richter <rric@kernel.org> wrote:
-> > On 30.07.14 11:37:38, Rob Herring wrote:
-> >> On Wed, Jul 30, 2014 at 10:46 AM, Mark Rutland <mark.rutland@arm.com> wrote:
-> >> > On Wed, Jul 30, 2014 at 04:06:31PM +0100, Robert Richter wrote:
-> >> >> From: Radha Mohan Chintakuntla <rchintakuntla@cavium.com>
-> >> >> +             uaa0: serial at 87e024000000 {
-> >> >> +                     compatible = "arm,pl011", "arm,primecell";
-> >> >> +                     reg = <0x87e0 0x24000000 0x0 0x1000>;
-> >> >> +                     interrupts = <1 21 4>;
-> >> >> +                     clocks = <&refclk50mhz>;
-> >> >> +                     clock-names = "apb_pclk";
-> >> >
-> >> > Is this actually the apb_pclk, or is the the uartclk? I assume it's the
-> >> > latter.
-> >>
-> >> Shouldn't new bindings have both clocks here? A single clock was a
-> >> mistake I think (mine in fact).
-> >
-> > Do you mean
-> >                         clock-names = "uartclk", "apb_pclk";
-> > here?
-> 
-> Yes, but Mark said this change never happened so maybe it is fine. In
-> any case, follow the pl011 binding documentation.
+m68k's isa_delay() uses the same approach as x86's slow_down_io(),
+but only for Q40/Q60, which has a "real" ISA bus that accepts legacy
+ISA expansion cards (http://www.q40.de/).
 
-Right:
+Gr{oetje,eeting}s,
 
-Documentation/devicetree/bindings/arm/primecell.txt:
-- clocks : From common clock binding. First clock is phandle to clock for apb
-        pclk. Additional clocks are optional and specific to those peripherals.
-- clock-names : From common clock binding. Shall be "apb_pclk" for first clock.
+                        Geert
 
-Documentation/devicetree/bindings/serial/pl011.txt
-- clocks:  When present, must refer to exactly one clock named
-           "apb_pclk"
+--
+Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
 
-There is no binding documentation at all for "uartclk".
-
-It seems we should should leave clock-names = "apb_pclk" as it is.
-
-Mark, Rob, would this be ok?
-
-Thanks,
-
--Robert
+In personal conversations with technical people, I call myself a hacker. But
+when I'm talking to journalists I just say "programmer" or something like that.
+                                -- Linus Torvalds
