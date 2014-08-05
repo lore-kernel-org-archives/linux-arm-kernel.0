@@ -1,198 +1,27 @@
-From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Tue, 05 Aug 2014 14:22:59 -0700
-Subject: [PATCH v2] irqchip: gic: Allow gic_arch_extn hooks to call into
- scheduler
-In-Reply-To: <alpine.LFD.2.11.1408051537250.6061@knanqh.ubzr>
-References: <alpine.LFD.2.11.1408041858570.6061@knanqh.ubzr>
- <1407194837-27190-1-git-send-email-sboyd@codeaurora.org>
- <53E118EE.5040205@codeaurora.org>
- <alpine.LFD.2.11.1408051537250.6061@knanqh.ubzr>
-Message-ID: <53E14B33.9080701@codeaurora.org>
+From: b08248@gmail.com (Stuart Yoder)
+Date: Tue, 5 Aug 2014 17:35:04 -0500
+Subject: [RFC PATCH 03/11] PCI/MSI: Refactor pci_dev_msi_enabled()
+In-Reply-To: <1406344128-27055-4-git-send-email-wangyijing@huawei.com>
+References: <1406344128-27055-1-git-send-email-wangyijing@huawei.com>
+ <1406344128-27055-4-git-send-email-wangyijing@huawei.com>
+Message-ID: <CALRxmdB0Ltt3_G=D4i7x47pHCtCKo8RHgn-hgN+u=px22dimOA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08/05/14 12:50, Nicolas Pitre wrote:
-> On Tue, 5 Aug 2014, Stephen Boyd wrote:
+On Fri, Jul 25, 2014 at 10:08 PM, Yijing Wang <wangyijing@huawei.com> wrote:
+> Pci_dev_msi_enabled() is used to check whether device
+> MSI/MSIX enabled. Refactor this function  to suuport
+> checking only device MSI or MSIX enabled.
 >
->> +nico (sorry dropped CC for v2)
->>
->> On 08/04/14 16:27, Stephen Boyd wrote:
->>> Commit 1a6b69b6548c (ARM: gic: add CPU migration support,
->>> 2012-04-12) introduced an acquisition of the irq_controller_lock
->>> in gic_raise_softirq() which can lead to a spinlock recursion if
->>> the gic_arch_extn hooks call into the scheduler (via complete()
->>> or wake_up(), etc.). This happens because gic_arch_extn hooks are
->>> normally called with the irq_controller_lock held and calling
->>> into the scheduler may cause us to call smp_send_reschedule()
->>> which will grab the irq_controller_lock again. Here's an example
->>> from a vendor kernel (note that the gic_arch_extn hook code here
->>> isn't actually in mainline):
->>>
->>> BUG: spinlock recursion on CPU#0, swapper/0/1
->>>  lock: irq_controller_lock+0x0/0x18, .magic: dead4ead, .owner: sw
->>> er_cpu: 0
->>> CPU: 0 PID: 1 Comm: swapper/0 Not tainted 3.14.10-00430-g3d433c4e
->>>
->>> Call trace:
->>> [<ffffffc000087e1c>] dump_backtrace+0x0/0x140
->>> [<ffffffc000087f6c>] show_stack+0x10/0x1c
->>> [<ffffffc00064732c>] dump_stack+0x74/0xc4
->>> [<ffffffc0006446c0>] spin_dump+0x78/0x88
->>> [<ffffffc0006446f4>] spin_bug+0x24/0x34
->>> [<ffffffc0000d47d0>] do_raw_spin_lock+0x58/0x148
->>> [<ffffffc00064d398>] _raw_spin_lock_irqsave+0x24/0x38
->>> [<ffffffc0002c9d7c>] gic_raise_softirq+0x2c/0xbc
->>> [<ffffffc00008daa4>] smp_send_reschedule+0x34/0x40
->>> [<ffffffc0000c1e94>] try_to_wake_up+0x224/0x288
->>> [<ffffffc0000c1f4c>] default_wake_function+0xc/0x18
->>> [<ffffffc0000ceef0>] __wake_up_common+0x50/0x8c
->>> [<ffffffc0000cef3c>] __wake_up_locked+0x10/0x1c
->>> [<ffffffc0000cf734>] complete+0x3c/0x5c
->>> [<ffffffc0002f0e78>] msm_mpm_enable_irq_exclusive+0x1b8/0x1c8
->>> [<ffffffc0002f0f58>] __msm_mpm_enable_irq+0x4c/0x7c
->>> [<ffffffc0002f0f94>] msm_mpm_enable_irq+0xc/0x18
->>> [<ffffffc0002c9bb0>] gic_unmask_irq+0x40/0x7c
->>> [<ffffffc0000de5f4>] irq_enable+0x2c/0x48
->>> [<ffffffc0000de65c>] irq_startup+0x4c/0x74
->>> [<ffffffc0000dd2fc>] __setup_irq+0x264/0x3f0
->>> [<ffffffc0000dd5e0>] request_threaded_irq+0xcc/0x11c
->>> [<ffffffc0000df254>] devm_request_threaded_irq+0x68/0xb4
->>> [<ffffffc000471520>] msm_iommu_ctx_probe+0x124/0x2d4
->>> [<ffffffc000337374>] platform_drv_probe+0x20/0x54
->>> [<ffffffc00033598c>] driver_probe_device+0x158/0x340
->>> [<ffffffc000335c20>] __driver_attach+0x60/0x90
->>> [<ffffffc000333c9c>] bus_for_each_dev+0x6c/0x8c
->>> [<ffffffc000335304>] driver_attach+0x1c/0x28
->>> [<ffffffc000334f14>] bus_add_driver+0x120/0x204
->>> [<ffffffc0003362e4>] driver_register+0xbc/0x10c
->>> [<ffffffc000337348>] __platform_driver_register+0x5c/0x68
->>> [<ffffffc00094c478>] msm_iommu_driver_init+0x54/0x7c
->>> [<ffffffc0000813ec>] do_one_initcall+0xa4/0x130
->>> [<ffffffc00091d928>] kernel_init_freeable+0x138/0x1dc
->>> [<ffffffc000642578>] kernel_init+0xc/0xd4
->>>
->>> We really just want to synchronize the sending of an SGI with the
->>> update of the gic_cpu_map[], so introduce a new SGI lock that we
->>> can use to synchronize the two code paths. Three main events are
->>> happening that we have to consider:
->>>
->>> 	1. We're updating the gic_cpu_mask to point to an
->>> 	incoming CPU
->>>
->>> 	2. We're (potentially) sending an SGI to the outgoing CPU
->>>
->>> 	3. We're redirecting any pending SGIs for the outgoing
->>> 	CPU to the incoming CPU.
->>>
->>> Events 1 and 3 are already ordered within the same CPU by means
->>> of program order and use of I/O accessors. Events 1 and 2 don't
->>> need to be ordered, but events 2 and 3 do because any SGIs for
->>> the outgoing CPU need to be pending before we can redirect them.
->>> Synchronize by acquiring a new lock around event 2 and before
->>> event 3. Use smp_mb__after_unlock_lock() before event 3 to ensure
->>> that event 1 is seen before event 3 on other CPUs that may be
->>> executing event 2.
->>>
->>> Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
->>> ---
->>>
->>> Changes since v1:
->>>  * Move gic_sgi_lock definition below gic_cpu_map[]
->>>  * Just use spinlock for synchronization instead of over the map update
->>>
->>>  drivers/irqchip/irq-gic.c | 16 ++++++++++++++--
->>>  1 file changed, 14 insertions(+), 2 deletions(-)
->>>
->>> diff --git a/drivers/irqchip/irq-gic.c b/drivers/irqchip/irq-gic.c
->>> index 7c131cf7cc13..00bac4627d2e 100644
->>> --- a/drivers/irqchip/irq-gic.c
->>> +++ b/drivers/irqchip/irq-gic.c
->>> @@ -81,6 +81,9 @@ static DEFINE_RAW_SPINLOCK(irq_controller_lock);
->>>  #define NR_GIC_CPU_IF 8
->>>  static u8 gic_cpu_map[NR_GIC_CPU_IF] __read_mostly;
->>>  
->>> +/* Synchronize switching CPU interface and sending SGIs */
->>> +static DEFINE_RAW_SPINLOCK(gic_sgi_lock);
->> This also needs an #ifdef CONFIG_SMP
->>
->>> +
->>>  /*
->>>   * Supported arch specific GIC irq extension.
->>>   * Default make them NULL.
->>> @@ -658,7 +661,7 @@ static void gic_raise_softirq(const struct cpumask *mask, unsigned int irq)
->>>  	int cpu;
->>>  	unsigned long flags, map = 0;
->>>  
->>> -	raw_spin_lock_irqsave(&irq_controller_lock, flags);
->>> +	raw_spin_lock_irqsave(&gic_sgi_lock, flags);
->>>  
->>>  	/* Convert our logical CPU mask into a physical one. */
->>>  	for_each_cpu(cpu, mask)
->>> @@ -673,7 +676,7 @@ static void gic_raise_softirq(const struct cpumask *mask, unsigned int irq)
->>>  	/* this always happens on GIC0 */
->>>  	writel_relaxed(map << 16 | irq, gic_data_dist_base(&gic_data[0]) + GIC_DIST_SOFTINT);
->>>  
->>> -	raw_spin_unlock_irqrestore(&irq_controller_lock, flags);
->>> +	raw_spin_unlock_irqrestore(&gic_sgi_lock, flags);
->>>  }
->>>  #endif
->>>  
->>> @@ -764,6 +767,15 @@ void gic_migrate_target(unsigned int new_cpu_id)
->>>  
->>>  	raw_spin_unlock(&irq_controller_lock);
->>>  
->>> +	raw_spin_lock(&gic_sgi_lock);
->>> +	/*
->>> +	 * Ensure that the gic_cpu_map update above is seen in
->>> +	 * gic_raise_softirq() before we redirect any pending SGIs that
->>> +	 * may have been raised for the outgoing CPU (cur_cpu_id)
->>> +	 */
->>> +	smp_mb__after_unlock_lock();
->>> +	raw_spin_unlock(&gic_sgi_lock);
-> I just can't see what protection the above hunk gives you.  I'd simply 
-> add the extra lock inside the irq_controller_lock area.
+> Signed-off-by: Yijing Wang <wangyijing@huawei.com>
 
-It allows us to synchronize with another CPU that may be inside
-gic_raise_softirq(). If the other CPU was in that function then this CPU
-would wait until it was done sending the IPI to continue along and
-reroute them. If the other CPU was just about to grab the sgi lock then
-we would guarantee that the CPU would see the new gic_cpu_map value and
-thus any redirection is not necessary. I hoped that the commit text
-explained this. Honestly it probably isn't a noticeable performance
-boost either way but I think this is the best we can do.
+So this patch refactors things so that checks like this:
+   > -       if (!dev->msi_enabled)
 
->
->>>  	/*
->>>  	 * Now let's migrate and clear any potential SGIs that might be
->>>  	 * pending for us (cur_cpu_id).  Since GIC_DIST_SGI_PENDING_SET
->> I also wonder if we should do something like this:
->>
->> diff --git a/drivers/irqchip/irq-gic.c b/drivers/irqchip/irq-gic.c
->> index ea3df28043f2..1655c9bcb633 100644
->> --- a/drivers/irqchip/irq-gic.c
->> +++ b/drivers/irqchip/irq-gic.c
->> @@ -663,7 +663,8 @@ static void gic_raise_softirq(const struct cpumask *mask, unsigned int irq)
->>         int cpu;
->>         unsigned long flags, map = 0;
->>
->> -       raw_spin_lock_irqsave(&gic_sgi_lock, flags);
->> +       if (IS_ENABLED(CONFIG_BL_SWITCHER))
->> +               raw_spin_lock_irqsave(&gic_sgi_lock, flags);
-> Absolutely.  That has been nagging me for a while but I never came 
-> around to make a patch.
->
-> If we were certain no b.L platform would ever need the arch hooks, that 
-> could even be all that is needed with the existing lock to fix your 
-> initial problem.  The switcher code is not meant to be widely used once 
-> the scheduler work is in place so I'd lean towards keeping things simple 
-> unless a more "complete" solution is actually needed, which in your case 
-> is not.
+are moved into a function:
+   > +       if (!pci_dev_msi_enabled(dev, MSI_TYPE))
 
-I'm fine with just throwing in the IS_ENABLED stuff and being done, but
-I was trying to make the proper fix in case someone else ran into this
-issue. Otherwise it's mostly a hack to avoid the scenario. We don't plan
-to use bL switcher code and this gic_arch_extn together as far as I know.
+Can you explain a bit more why this  needed.   Is it just cleanup?
 
--- 
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-hosted by The Linux Foundation
+Thanks,
+Stuart
