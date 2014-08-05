@@ -1,122 +1,148 @@
 From: m.szyprowski@samsung.com (Marek Szyprowski)
-Date: Tue, 05 Aug 2014 12:47:41 +0200
-Subject: [PATCH 13/29] temporary: media: s5p-mfc: remove DT hacks &
- initialization custom memory init code
+Date: Tue, 05 Aug 2014 12:47:42 +0200
+Subject: [PATCH 14/29] devicetree: Update Exynos SYSMMU device tree bindings
 In-Reply-To: <1407235677-26324-1-git-send-email-m.szyprowski@samsung.com>
 References: <1407235677-26324-1-git-send-email-m.szyprowski@samsung.com>
-Message-ID: <1407235677-26324-14-git-send-email-m.szyprowski@samsung.com>
+Message-ID: <1407235677-26324-15-git-send-email-m.szyprowski@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch removes custom initialization of reserved memory regions from
-s5p-mfc driver. Driver will use main device pointer for all memory allocations.
-
-This patch is temporary, do not merge it yet.
+This patch describes how generic iommu bindings are implemented by
+Exynos SYSMMU driver.
 
 Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
 ---
- drivers/media/platform/s5p-mfc/s5p_mfc.c | 73 +-------------------------------
- 1 file changed, 2 insertions(+), 71 deletions(-)
+ .../devicetree/bindings/iommu/samsung,sysmmu.txt   | 93 +++++++++++++++++++---
+ 1 file changed, 84 insertions(+), 9 deletions(-)
 
-diff --git a/drivers/media/platform/s5p-mfc/s5p_mfc.c b/drivers/media/platform/s5p-mfc/s5p_mfc.c
-index d35b041..77b99ae 100644
---- a/drivers/media/platform/s5p-mfc/s5p_mfc.c
-+++ b/drivers/media/platform/s5p-mfc/s5p_mfc.c
-@@ -996,55 +996,8 @@ static const struct v4l2_file_operations s5p_mfc_fops = {
- 	.mmap = s5p_mfc_mmap,
- };
+diff --git a/Documentation/devicetree/bindings/iommu/samsung,sysmmu.txt b/Documentation/devicetree/bindings/iommu/samsung,sysmmu.txt
+index 6fa4c73..999ba6d 100644
+--- a/Documentation/devicetree/bindings/iommu/samsung,sysmmu.txt
++++ b/Documentation/devicetree/bindings/iommu/samsung,sysmmu.txt
+@@ -23,16 +23,33 @@ MMUs.
+   for window 1, 2 and 3.
+ * M2M Scalers and G2D in Exynos5420 has one System MMU on the read channel and
+   the other System MMU on the write channel.
+-The drivers must consider how to handle those System MMUs. One of the idea is
+-to implement child devices or sub-devices which are the client devices of the
+-System MMU.
  
--static int match_child(struct device *dev, void *data)
--{
--	if (!dev_name(dev))
--		return 0;
--	return !strcmp(dev_name(dev), (char *)data);
--}
--
- static void *mfc_get_drv_data(struct platform_device *pdev);
+-Note:
+-The current DT binding for the Exynos System MMU is incomplete.
+-The following properties can be removed or changed, if found incompatible with
+-the "Generic IOMMU Binding" support for attaching devices to the IOMMU.
++The drivers must consider how to handle those System MMUs. When device
++have more than one SYSMMU controller it is neccessary to add
++"iommu-names" property, which specifies which SYSMMU controller operates
++on which bus or memory channel.
  
--static int s5p_mfc_alloc_memdevs(struct s5p_mfc_dev *dev)
--{
--	unsigned int mem_info[2] = { };
--
--	dev->mem_dev_l = devm_kzalloc(&dev->plat_dev->dev,
--			sizeof(struct device), GFP_KERNEL);
--	if (!dev->mem_dev_l) {
--		mfc_err("Not enough memory\n");
--		return -ENOMEM;
--	}
--	device_initialize(dev->mem_dev_l);
--	of_property_read_u32_array(dev->plat_dev->dev.of_node,
--			"samsung,mfc-l", mem_info, 2);
--	if (dma_declare_coherent_memory(dev->mem_dev_l, mem_info[0],
--				mem_info[0], mem_info[1],
--				DMA_MEMORY_MAP | DMA_MEMORY_EXCLUSIVE) == 0) {
--		mfc_err("Failed to declare coherent memory for\n"
--		"MFC device\n");
--		return -ENOMEM;
--	}
--
--	dev->mem_dev_r = devm_kzalloc(&dev->plat_dev->dev,
--			sizeof(struct device), GFP_KERNEL);
--	if (!dev->mem_dev_r) {
--		mfc_err("Not enough memory\n");
--		return -ENOMEM;
--	}
--	device_initialize(dev->mem_dev_r);
--	of_property_read_u32_array(dev->plat_dev->dev.of_node,
--			"samsung,mfc-r", mem_info, 2);
--	if (dma_declare_coherent_memory(dev->mem_dev_r, mem_info[0],
--				mem_info[0], mem_info[1],
--				DMA_MEMORY_MAP | DMA_MEMORY_EXCLUSIVE) == 0) {
--		pr_err("Failed to declare coherent memory for\n"
--		"MFC device\n");
--		return -ENOMEM;
--	}
--	return 0;
--}
--
- /* MFC probe function */
- static int s5p_mfc_probe(struct platform_device *pdev)
- {
-@@ -1096,26 +1049,8 @@ static int s5p_mfc_probe(struct platform_device *pdev)
- 		goto err_res;
- 	}
+-Required properties:
++It is up to the master device driver to decide how such case will be
++handled. It is possible to create separate IO address spaces for each
++SYSMMU or to bind them together to one common IO address space. It is
++also possible to bind more than one device to one IO address space. All
++this has to be handled by master device driver in its initialization
++procedure or flags and no changes to device tree nodes are needed.
++
++In Linux kernel, the general idea is that presence of the SYSMMU
++controllers is transparent to master drivers if they use standard DMA
++API. When driver wants to use IO separate address spaces for each bus or
++memory channel (each SYSMMU) or to bind more than one device to one IO
++address space, it has to specify this to SYSMMU driver by
++DRIVER_HAS_OWN_IOMMU_MANAGER flag. To get access to each SYSMMU bound to
++the given device, additional child devices with special names (matching
++"parent:bus" scheme) have to be registered. Once then, all standard
++IOMMU operations can be performed on such child devices, what will
++result in respective operations done on IO address space managed by
++SYSMMU of the given name. Other operating systems might implement those
++features differently.
++
++Required properties for SYSMMU controller node:
+ - compatible: Should be "samsung,exynos-sysmmu"
+ - reg: A tuple of base address and size of System MMU registers.
+ - interrupt-parent: The phandle of the interrupt controller of System MMU
+@@ -45,11 +62,27 @@ Required properties:
+ 	       Exynos4 SoCs, there needs no "master" clock.
+ 	       Exynos5 SoCs, some System MMUs must have "master" clocks.
+ - clocks: Required if the System MMU is needed to gate its clock.
++- #iommu-cells: Specify number of cells describing IO address space parameters,
++		can be: 0 (zero), meaning all 32bit address space is available,
++		or 2, if address space is limited, first cell then stores
++		base IO address, second cell contains IO window size in bytes.
+ - samsung,power-domain: Required if the System MMU is needed to gate its power.
+ 	  Please refer to the following document:
+ 	  Documentation/devicetree/bindings/arm/exynos/power_domain.txt
  
--	if (pdev->dev.of_node) {
--		ret = s5p_mfc_alloc_memdevs(dev);
--		if (ret < 0)
--			goto err_res;
--	} else {
--		dev->mem_dev_l = device_find_child(&dev->plat_dev->dev,
--				"s5p-mfc-l", match_child);
--		if (!dev->mem_dev_l) {
--			mfc_err("Mem child (L) device get failed\n");
--			ret = -ENODEV;
--			goto err_res;
--		}
--		dev->mem_dev_r = device_find_child(&dev->plat_dev->dev,
--				"s5p-mfc-r", match_child);
--		if (!dev->mem_dev_r) {
--			mfc_err("Mem child (R) device get failed\n");
--			ret = -ENODEV;
--			goto err_res;
--		}
--	}
-+	dev->mem_dev_l = &dev->plat_dev->dev;
-+	dev->mem_dev_r = &dev->plat_dev->dev;
+-Examples:
++Required properties for master device:
++- iommus: one or more phandles to the SYSMMU controller node, with optionally
++	  specified IO address space (see #iommu-cells property above)
++- iommu-names: if more than one SYSMMU controller is specified, this property
++	       must contain names for each of them. Those names are defined by
++	       the bindings for a particular master device.
++
++For more information, please refer to generic iommu bindings defined in
++iommu.txt file.
++
++Example 1:
++GScaller device with one SYSMMU controller
++
+ 	gsc_0: gsc at 13e00000 {
+ 		compatible = "samsung,exynos5-gsc";
+ 		reg = <0x13e00000 0x1000>;
+@@ -57,6 +90,7 @@ Examples:
+ 		samsung,power-domain = <&pd_gsc>;
+ 		clocks = <&clock CLK_GSCL0>;
+ 		clock-names = "gscl";
++		iommus = <&sysmmu_gsc0>;
+ 	};
  
- 	dev->alloc_ctx[0] = vb2_dma_contig_init_ctx(dev->mem_dev_l);
- 	if (IS_ERR(dev->alloc_ctx[0])) {
-@@ -1246,10 +1181,6 @@ static int s5p_mfc_remove(struct platform_device *pdev)
- 	s5p_mfc_release_firmware(dev);
- 	vb2_dma_contig_cleanup_ctx(dev->alloc_ctx[0]);
- 	vb2_dma_contig_cleanup_ctx(dev->alloc_ctx[1]);
--	if (pdev->dev.of_node) {
--		put_device(dev->mem_dev_l);
--		put_device(dev->mem_dev_r);
--	}
- 
- 	s5p_mfc_final_pm(dev);
- 	return 0;
+ 	sysmmu_gsc0: sysmmu at 13E80000 {
+@@ -67,4 +101,45 @@ Examples:
+ 		clock-names = "sysmmu", "master";
+ 		clocks = <&clock CLK_SMMU_GSCL0>, <&clock CLK_GSCL0>;
+ 		samsung,power-domain = <&pd_gsc>;
++		#iommu-cells = <0>;
++	};
++
++Example 2:
++MFC Codec with two SYSMMU controllers (on "left" and "right" bus), with address
++space limited to 256MiB each, left bus starts IO address space at 0x20000000,
++while right bus at 0x30000000
++
++	mfc: codec at 13400000 {
++		compatible = "samsung,mfc-v5";
++		reg = <0x13400000 0x10000>;
++		interrupts = <0 94 0>;
++		samsung,power-domain = <&pd_mfc>;
++		clocks = <&clock CLK_MFC>;
++		clock-names = "mfc";
++		status = "disabled";
++		iommus = <&sysmmu_mfc_l 0x20000000 0x10000000>,
++			 <&sysmmu_mfc_r 0x30000000 0x10000000>;
++		iommu-names = "left", "right";
++	};
++
++	sysmmu_mfc_l: sysmmu at 13620000 {
++		compatible = "samsung,exynos-sysmmu";
++		reg = <0x13620000 0x1000>;
++		interrupt-parent = <&combiner>;
++		interrupts = <5 5>;
++		clock-names = "sysmmu", "master";
++		clocks = <&clock CLK_SMMU_MFCL>, <&clock CLK_MFC>;
++		samsung,power-domain = <&pd_mfc>;
++		#iommu-cells = <2>;
++	};
++
++	sysmmu_mfc_r: sysmmu at 13630000 {
++		compatible = "samsung,exynos-sysmmu";
++		reg = <0x13630000 0x1000>;
++		interrupt-parent = <&combiner>;
++		interrupts = <5 6>;
++		clock-names = "sysmmu", "master";
++		clocks = <&clock CLK_SMMU_MFCR>, <&clock CLK_MFC>;
++		samsung,power-domain = <&pd_mfc>;
++		#iommu-cells = <2>;
+ 	};
 -- 
 1.9.2
