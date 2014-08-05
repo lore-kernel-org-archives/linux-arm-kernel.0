@@ -1,127 +1,64 @@
 From: anup.patel@linaro.org (Anup Patel)
-Date: Tue,  5 Aug 2014 14:54:10 +0530
-Subject: [RFC PATCH 1/6] ARM64: Move PMU register related defines to asm/pmu.h
-In-Reply-To: <1407230655-28864-1-git-send-email-anup.patel@linaro.org>
-References: <1407230655-28864-1-git-send-email-anup.patel@linaro.org>
-Message-ID: <1407230655-28864-2-git-send-email-anup.patel@linaro.org>
+Date: Tue,  5 Aug 2014 14:54:09 +0530
+Subject: [RFC PATCH 0/6] ARM64: KVM: PMU infrastructure support
+Message-ID: <1407230655-28864-1-git-send-email-anup.patel@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-To use the ARMv8 PMU related register defines from the KVM code,
-we move the relevant definitions to asm/pmu.h include file.
+This patchset enables PMU virtualization in KVM ARM64. The
+Guest can now directly use PMU available on the host HW.
 
-We also add #ifndef __ASSEMBLY__ in order to use asm/pmu.h from
-assembly code.
+The virtual PMU IRQ injection for Guest VCPUs is managed by
+small piece of code shared between KVM ARM and KVM ARM64. The
+virtual PMU IRQ number will be based on Guest machine model and
+user space will provide it using set device address vm ioctl.
 
-Signed-off-by: Anup Patel <anup.patel@linaro.org>
-Signed-off-by: Pranavkumar Sawargaonkar <pranavkumar@linaro.org>
----
- arch/arm64/include/asm/pmu.h   |   44 ++++++++++++++++++++++++++++++++++++++++
- arch/arm64/kernel/perf_event.c |   32 -----------------------------
- 2 files changed, 44 insertions(+), 32 deletions(-)
+The second last patch of this series implements full context
+switch of PMU registers which will context switch all PMU
+registers on every KVM world-switch.
 
-diff --git a/arch/arm64/include/asm/pmu.h b/arch/arm64/include/asm/pmu.h
-index e6f0878..f49cc72 100644
---- a/arch/arm64/include/asm/pmu.h
-+++ b/arch/arm64/include/asm/pmu.h
-@@ -19,6 +19,49 @@
- #ifndef __ASM_PMU_H
- #define __ASM_PMU_H
- 
-+/*
-+ * Per-CPU PMCR: config reg
-+ */
-+#define ARMV8_PMCR_E		(1 << 0) /* Enable all counters */
-+#define ARMV8_PMCR_P		(1 << 1) /* Reset all counters */
-+#define ARMV8_PMCR_C		(1 << 2) /* Cycle counter reset */
-+#define ARMV8_PMCR_D		(1 << 3) /* CCNT counts every 64th cpu cycle */
-+#define ARMV8_PMCR_X		(1 << 4) /* Export to ETM */
-+#define ARMV8_PMCR_DP		(1 << 5) /* Disable CCNT if non-invasive debug*/
-+#define	ARMV8_PMCR_N_SHIFT	11	 /* Number of counters supported */
-+#define	ARMV8_PMCR_N_MASK	0x1f
-+#define	ARMV8_PMCR_MASK		0x3f	 /* Mask for writable bits */
-+
-+/*
-+ * PMCNTEN: counters enable reg
-+ */
-+#define	ARMV8_CNTEN_MASK	0xffffffff	/* Mask for writable bits */
-+
-+/*
-+ * PMINTEN: counters interrupt enable reg
-+ */
-+#define	ARMV8_INTEN_MASK	0xffffffff	/* Mask for writable bits */
-+
-+/*
-+ * PMOVSR: counters overflow flag status reg
-+ */
-+#define	ARMV8_OVSR_MASK		0xffffffff	/* Mask for writable bits */
-+#define	ARMV8_OVERFLOWED_MASK	ARMV8_OVSR_MASK
-+
-+/*
-+ * PMXEVTYPER: Event selection reg
-+ */
-+#define	ARMV8_EVTYPE_MASK	0xc80003ff	/* Mask for writable bits */
-+#define	ARMV8_EVTYPE_EVENT	0x3ff		/* Mask for EVENT bits */
-+
-+/*
-+ * Event filters for PMUv3
-+ */
-+#define	ARMV8_EXCLUDE_EL1	(1 << 31)
-+#define	ARMV8_EXCLUDE_EL0	(1 << 30)
-+#define	ARMV8_INCLUDE_EL2	(1 << 27)
-+
-+#ifndef __ASSEMBLY__
- #ifdef CONFIG_HW_PERF_EVENTS
- 
- /* The events for a given PMU register set. */
-@@ -79,4 +122,5 @@ int armpmu_event_set_period(struct perf_event *event,
- 			    int idx);
- 
- #endif /* CONFIG_HW_PERF_EVENTS */
-+#endif /* __ASSEMBLY__ */
- #endif /* __ASM_PMU_H */
-diff --git a/arch/arm64/kernel/perf_event.c b/arch/arm64/kernel/perf_event.c
-index baf5afb..47dfb8b 100644
---- a/arch/arm64/kernel/perf_event.c
-+++ b/arch/arm64/kernel/perf_event.c
-@@ -810,38 +810,6 @@ static const unsigned armv8_pmuv3_perf_cache_map[PERF_COUNT_HW_CACHE_MAX]
- #define	ARMV8_IDX_TO_COUNTER(x)	\
- 	(((x) - ARMV8_IDX_COUNTER0) & ARMV8_COUNTER_MASK)
- 
--/*
-- * Per-CPU PMCR: config reg
-- */
--#define ARMV8_PMCR_E		(1 << 0) /* Enable all counters */
--#define ARMV8_PMCR_P		(1 << 1) /* Reset all counters */
--#define ARMV8_PMCR_C		(1 << 2) /* Cycle counter reset */
--#define ARMV8_PMCR_D		(1 << 3) /* CCNT counts every 64th cpu cycle */
--#define ARMV8_PMCR_X		(1 << 4) /* Export to ETM */
--#define ARMV8_PMCR_DP		(1 << 5) /* Disable CCNT if non-invasive debug*/
--#define	ARMV8_PMCR_N_SHIFT	11	 /* Number of counters supported */
--#define	ARMV8_PMCR_N_MASK	0x1f
--#define	ARMV8_PMCR_MASK		0x3f	 /* Mask for writable bits */
--
--/*
-- * PMOVSR: counters overflow flag status reg
-- */
--#define	ARMV8_OVSR_MASK		0xffffffff	/* Mask for writable bits */
--#define	ARMV8_OVERFLOWED_MASK	ARMV8_OVSR_MASK
--
--/*
-- * PMXEVTYPER: Event selection reg
-- */
--#define	ARMV8_EVTYPE_MASK	0xc80003ff	/* Mask for writable bits */
--#define	ARMV8_EVTYPE_EVENT	0x3ff		/* Mask for EVENT bits */
--
--/*
-- * Event filters for PMUv3
-- */
--#define	ARMV8_EXCLUDE_EL1	(1 << 31)
--#define	ARMV8_EXCLUDE_EL0	(1 << 30)
--#define	ARMV8_INCLUDE_EL2	(1 << 27)
--
- static inline u32 armv8pmu_pmcr_read(void)
- {
- 	u32 val;
+The last patch implements a lazy context switch of PMU registers
+which is very similar to lazy debug context switch.
+(Refer, http://lists.infradead.org/pipermail/linux-arm-kernel/2014-July/271040.html)
+
+Also, we reserve last PMU event counter for EL2 mode which
+will not be accessible from Host and Guest EL1 mode. This
+reserved EL2 mode PMU event counter can be used for profiling
+KVM world-switch and other EL2 mode functions.
+
+All testing have been done using KVMTOOL on X-Gene Mustang and
+Foundation v8 Model for both Aarch32 and Aarch64 guest.
+
+Anup Patel (6):
+  ARM64: Move PMU register related defines to asm/pmu.h
+  ARM64: perf: Re-enable overflow interrupt from interrupt handler
+  ARM: perf: Re-enable overflow interrupt from interrupt handler
+  ARM/ARM64: KVM: Add common code PMU IRQ routing
+  ARM64: KVM: Implement full context switch of PMU registers
+  ARM64: KVM: Upgrade to lazy context switch of PMU registers
+
+ arch/arm/include/asm/kvm_host.h   |    9 +
+ arch/arm/include/uapi/asm/kvm.h   |    1 +
+ arch/arm/kernel/perf_event_v7.c   |    8 +
+ arch/arm/kvm/arm.c                |    6 +
+ arch/arm/kvm/reset.c              |    4 +
+ arch/arm64/include/asm/kvm_asm.h  |   39 +++-
+ arch/arm64/include/asm/kvm_host.h |   12 ++
+ arch/arm64/include/asm/pmu.h      |   44 +++++
+ arch/arm64/include/uapi/asm/kvm.h |    1 +
+ arch/arm64/kernel/asm-offsets.c   |    2 +
+ arch/arm64/kernel/perf_event.c    |   40 +---
+ arch/arm64/kvm/Kconfig            |    7 +
+ arch/arm64/kvm/Makefile           |    1 +
+ arch/arm64/kvm/hyp-init.S         |   15 ++
+ arch/arm64/kvm/hyp.S              |  209 +++++++++++++++++++-
+ arch/arm64/kvm/reset.c            |    4 +
+ arch/arm64/kvm/sys_regs.c         |  385 +++++++++++++++++++++++++++++++++----
+ include/kvm/arm_pmu.h             |   52 +++++
+ virt/kvm/arm/pmu.c                |  105 ++++++++++
+ 19 files changed, 870 insertions(+), 74 deletions(-)
+ create mode 100644 include/kvm/arm_pmu.h
+ create mode 100644 virt/kvm/arm/pmu.c
+
 -- 
 1.7.9.5
