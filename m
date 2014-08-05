@@ -1,114 +1,55 @@
-From: christoffer.dall@linaro.org (Christoffer Dall)
-Date: Tue, 5 Aug 2014 17:39:52 +0200
-Subject: [PATCH v3 8/9] arm/arm64: KVM: vgic: make number of irqs a
- configurable attribute
-In-Reply-To: <1404817748-31302-9-git-send-email-marc.zyngier@arm.com>
-References: <1404817748-31302-1-git-send-email-marc.zyngier@arm.com>
- <1404817748-31302-9-git-send-email-marc.zyngier@arm.com>
-Message-ID: <20140805153952.GL524@cbox>
+From: koct9i@gmail.com (Konstantin Khlebnikov)
+Date: Tue, 5 Aug 2014 19:42:32 +0400
+Subject: [PATCH 1/2] ARM: LPAE: load upper bits of early TTBR0/TTBR1
+In-Reply-To: <20140722153623.25088.37742.stgit@buzz>
+References: <20140722153623.25088.37742.stgit@buzz>
+Message-ID: <CALYGNiPGoRskspqTc_u3VSbb+DPvM+jnvhjUuZFh8394bZuP5Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jul 08, 2014 at 12:09:07PM +0100, Marc Zyngier wrote:
-> In order to make the number of interrupt configurable, use the new
-                                 interrupts
-> fancy device management API to add KVM_DEV_ARM_VGIC_GRP_NR_IRQS as
-> a VGIC configurable attribute.
-> 
-> Userspace can now specify the exact size of the GIC (by increments
-> of 32 interrupts).
-> 
-> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+On Tue, Jul 22, 2014 at 7:36 PM, Konstantin Khlebnikov
+<k.khlebnikov@samsung.com> wrote:
+> This patch fixes booting when idmap pgd lays above 4gb. Commit
+> 4756dcbfd37 mostly had fixed this, but it'd failed to load upper bits.
+>
+> Also this fixes adding TTBR1_OFFSET to TTRR1: if lower part overflows
+> carry flag must be added to the upper part.
+>
+> Signed-off-by: Konstantin Khlebnikov <k.khlebnikov@samsung.com>
+> Cc: Cyril Chemparathy <cyril@ti.com>
+> Cc: Vitaly Andrianov <vitalya@ti.com>
 > ---
->  arch/arm/include/uapi/asm/kvm.h   |  1 +
->  arch/arm64/include/uapi/asm/kvm.h |  1 +
->  virt/kvm/arm/vgic.c               | 29 +++++++++++++++++++++++++++++
->  3 files changed, 31 insertions(+)
-> 
-> diff --git a/arch/arm/include/uapi/asm/kvm.h b/arch/arm/include/uapi/asm/kvm.h
-> index e6ebdd3..8b51c1a 100644
-> --- a/arch/arm/include/uapi/asm/kvm.h
-> +++ b/arch/arm/include/uapi/asm/kvm.h
-> @@ -173,6 +173,7 @@ struct kvm_arch_memory_slot {
->  #define   KVM_DEV_ARM_VGIC_CPUID_MASK	(0xffULL << KVM_DEV_ARM_VGIC_CPUID_SHIFT)
->  #define   KVM_DEV_ARM_VGIC_OFFSET_SHIFT	0
->  #define   KVM_DEV_ARM_VGIC_OFFSET_MASK	(0xffffffffULL << KVM_DEV_ARM_VGIC_OFFSET_SHIFT)
-> +#define KVM_DEV_ARM_VGIC_GRP_NR_IRQS	3
->  
->  /* KVM_IRQ_LINE irq field index values */
->  #define KVM_ARM_IRQ_TYPE_SHIFT		24
-> diff --git a/arch/arm64/include/uapi/asm/kvm.h b/arch/arm64/include/uapi/asm/kvm.h
-> index e633ff8..b5cd6ed 100644
-> --- a/arch/arm64/include/uapi/asm/kvm.h
-> +++ b/arch/arm64/include/uapi/asm/kvm.h
-> @@ -159,6 +159,7 @@ struct kvm_arch_memory_slot {
->  #define   KVM_DEV_ARM_VGIC_CPUID_MASK	(0xffULL << KVM_DEV_ARM_VGIC_CPUID_SHIFT)
->  #define   KVM_DEV_ARM_VGIC_OFFSET_SHIFT	0
->  #define   KVM_DEV_ARM_VGIC_OFFSET_MASK	(0xffffffffULL << KVM_DEV_ARM_VGIC_OFFSET_SHIFT)
-> +#define KVM_DEV_ARM_VGIC_GRP_NR_IRQS	3
->  
->  /* KVM_IRQ_LINE irq field index values */
->  #define KVM_ARM_IRQ_TYPE_SHIFT		24
-> diff --git a/virt/kvm/arm/vgic.c b/virt/kvm/arm/vgic.c
-> index 708aed9..aee10da 100644
-> --- a/virt/kvm/arm/vgic.c
-> +++ b/virt/kvm/arm/vgic.c
-> @@ -2208,6 +2208,28 @@ static int vgic_set_attr(struct kvm_device *dev, struct kvm_device_attr *attr)
->  
->  		return vgic_attr_regs_access(dev, attr, &reg, true);
->  	}
-> +	case KVM_DEV_ARM_VGIC_GRP_NR_IRQS: {
-> +		u32 __user *uaddr = (u32 __user *)(long)attr->addr;
-> +		u32 val;
-> +		int ret = 0;
-> +
-> +		if (get_user(val, uaddr))
-> +			return -EFAULT;
-> +
-> +		if (val > 1024 || (val & 31))
-> +			return -EINVAL;
+>  arch/arm/mm/proc-v7-3level.S |    7 +++----
+>  1 file changed, 3 insertions(+), 4 deletions(-)
+>
+> diff --git a/arch/arm/mm/proc-v7-3level.S b/arch/arm/mm/proc-v7-3level.S
+> index 22e3ad6..f0481dd 100644
+> --- a/arch/arm/mm/proc-v7-3level.S
+> +++ b/arch/arm/mm/proc-v7-3level.S
+> @@ -140,12 +140,11 @@ ENDPROC(cpu_v7_set_pte_ext)
+>         mov     \tmp, \ttbr1, lsr #(32 - ARCH_PGD_SHIFT)        @ upper bits
+>         mov     \ttbr1, \ttbr1, lsl #ARCH_PGD_SHIFT             @ lower bits
+>         addls   \ttbr1, \ttbr1, #TTBR1_OFFSET
+> -       mcrr    p15, 1, \ttbr1, \zero, c2                       @ load TTBR1
+> +       adcls   \tmp, \tmp, #0
 
-                        > VGIC_MAX_IRQS ?
 
-> +
-> +		mutex_lock(&dev->kvm->lock);
-> +
-> +		if (vgic_initialized(dev->kvm) || dev->kvm->arch.vgic.nr_irqs)
-> +			ret = -EBUSY;
-> +		else
-> +			dev->kvm->arch.vgic.nr_irqs = val;
-> +
-> +		mutex_unlock(&dev->kvm->lock);
-> +
-> +		return ret;
-> +	}
->  
->  	}
->  
-> @@ -2244,6 +2266,11 @@ static int vgic_get_attr(struct kvm_device *dev, struct kvm_device_attr *attr)
->  		r = put_user(reg, uaddr);
->  		break;
->  	}
-> +	case KVM_DEV_ARM_VGIC_GRP_NR_IRQS: {
-> +		u32 __user *uaddr = (u32 __user *)(long)attr->addr;
-> +		r = put_user(dev->kvm->arch.vgic.nr_irqs, uaddr);
-> +		break;
-> +	}
->  
->  	}
->  
-> @@ -2280,6 +2307,8 @@ static int vgic_has_attr(struct kvm_device *dev, struct kvm_device_attr *attr)
->  	case KVM_DEV_ARM_VGIC_GRP_CPU_REGS:
->  		offset = attr->attr & KVM_DEV_ARM_VGIC_OFFSET_MASK;
->  		return vgic_has_attr_regs(vgic_cpu_ranges, offset);
-> +	case KVM_DEV_ARM_VGIC_GRP_NR_IRQS:
-> +		return 0;
->  	}
->  	return -ENXIO;
->  }
-> -- 
-> 2.0.0
-> 
+Oops, this carry fixup is wrong. addls above doesn't set carry flag.
 
-Please add Documentation of this ABI extension to:
-Documentation/virtual/kvm/devices/arm-vgic.txt
+
+> +       mcrr    p15, 1, \ttbr1, \tmp, c2                        @ load TTBR1
+>         mov     \tmp, \ttbr0, lsr #(32 - ARCH_PGD_SHIFT)        @ upper bits
+>         mov     \ttbr0, \ttbr0, lsl #ARCH_PGD_SHIFT             @ lower bits
+> -       mcrr    p15, 0, \ttbr0, \zero, c2                       @ load TTBR0
+> -       mcrr    p15, 1, \ttbr1, \zero, c2                       @ load TTBR1
+> -       mcrr    p15, 0, \ttbr0, \zero, c2                       @ load TTBR0
+> +       mcrr    p15, 0, \ttbr0, \tmp, c2                        @ load TTBR0
+>         .endm
+>
+>         /*
+>
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-kernel" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> Please read the FAQ at  http://www.tux.org/lkml/
