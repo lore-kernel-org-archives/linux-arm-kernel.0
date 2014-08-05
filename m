@@ -1,76 +1,86 @@
-From: haojian.zhuang@linaro.org (Haojian Zhuang)
-Date: Tue, 5 Aug 2014 09:38:54 +0800
-Subject: [PATCH v16 2/9] ARM: hisi: enable MCPM implementation
-In-Reply-To: <alpine.LFD.2.11.1408042122480.6061@knanqh.ubzr>
-References: <1407121088-4151-1-git-send-email-haojian.zhuang@linaro.org>
- <1407121088-4151-3-git-send-email-haojian.zhuang@linaro.org>
- <alpine.LFD.2.11.1408041741460.6061@knanqh.ubzr>
- <CAD6h2NTFJ0qBdymhQ1bEaKpCTQT13r2-F9HRDw9SdSS31Zer8w@mail.gmail.com>
- <alpine.LFD.2.11.1408042101360.6061@knanqh.ubzr>
- <CAD6h2NSs7epwgtH29sjQ37nLZroLJK-+1aqY52JcUg8Y2fXcpw@mail.gmail.com>
- <alpine.LFD.2.11.1408042122480.6061@knanqh.ubzr>
-Message-ID: <CAD6h2NT_yYsDbCTYqgUEjJRcRQ9981Vx=T4yg4EW3ud=RMxPLA@mail.gmail.com>
+From: linux@roeck-us.net (Guenter Roeck)
+Date: Mon,  4 Aug 2014 18:48:51 -0700
+Subject: [PATCH v6 0/7] kernel: Add support for restart handler call chain
+Message-ID: <1407203338-12915-1-git-send-email-linux@roeck-us.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 5 August 2014 09:32, Nicolas Pitre <nicolas.pitre@linaro.org> wrote:
-> On Tue, 5 Aug 2014, Haojian Zhuang wrote:
->
->> On 5 August 2014 09:02, Nicolas Pitre <nicolas.pitre@linaro.org> wrote:
->> > On Tue, 5 Aug 2014, Haojian Zhuang wrote:
->> >
->> >> On 5 August 2014 06:43, Nicolas Pitre <nicolas.pitre@linaro.org> wrote:
->> >> > Sorry for the delay -- I was on vacation.
->> >> >
->> >> > On Mon, 4 Aug 2014, Haojian Zhuang wrote:
->> >> >
->> >> >> Multiple CPU clusters are used in Hisilicon HiP04 SoC. Now use MCPM
->> >> >> framework to manage power on HiP04 SoC.
->> >> >>
->> >> >> Changelog:
->> >> >> v16:
->> >> >>   * Parse bootwrapper parameters in command line instead.
->> >> >
->> >> > What is that about?  I don't particularly like to see bootloader
->> >> > handshake details passed to the kernel via the kernel command line
->> >> > mechanism.  Given this looks like special memory regions, can't they be
->> >> > specified via the device tree instead?
->> >> >
->> >>
->> >> Others don't agree put them into DTS file. So I move them into command line.
->> >
->> > Could you give me a pointer to the discussion around that please?
->> >
->> >
->> > Nicolas
->>
->> http://lists.infradead.org/pipermail/linux-arm-kernel/2014-July/275944.html
->>
->> Mark challenged what's relationship between bootwrapper address and
->> system controller.
->
-> There is no relation, obviously.  Hence this doesn't belong in the
-> system controller node.  That doesn't mean it should not be in DT at
-> all.
->
->> Actually code in bootwrapper is like trampoline. And it's a software
->> protocol, not hardware description. So I moved them into command line
->> instead.
->
-> There are many examples for software protocols being specified in DT
-> already.  The first that comes to my mind is the "boot method = spin
-> table" which has nothing to do with hardware.  PSCI bindings are about
-> another software-only thing.
->
->
-> Nicolas
+Various drivers implement architecture and/or device specific means
+to restart (reset) the system. Various mechanisms have been implemented
+to support those schemes. The best known mechanism is arm_pm_restart,
+which is a function pointer to be set either from platform specific code
+or from drivers. Another mechanism is to use hardware watchdogs to issue
+a reset; this mechanism is used if there is no other method available
+to reset a board or system. Two examples are alim7101_wdt, which currently
+uses the reboot notifier to trigger a reset, and moxart_wdt, which registers
+the arm_pm_restart function. Several other restart drivers for arm, all
+directly calling arm_pm_restart, are in the process of being integrated
+into the kernel. All those drivers would benefit from the new API.
 
-bootwrapper {
-        compatible = "hisilicon,hip04-bootwrapper";
-        boot-method = <0x10c00000, 0x10000, 0xa5a5a5a5, 0xe0000100, 0x1000>;
-};
+The existing mechanisms have a number of drawbacks. Typically only one scheme
+to restart the system is supported (at least if arm_pm_restart is used).
+At least in theory there can be multiple means to restart the system, some of
+which may be less desirable (for example one mechanism may only reset the CPU,
+while another may reset the entire system). Using arm_pm_restart can also be
+racy if the function pointer is set from a driver, as the driver may be in
+the process of being unloaded when arm_pm_restart is called.
+Using the reboot notifier is always racy, as it is unknown if and when
+other functions using the reboot notifier have completed execution
+by the time the watchdog fires.
 
-I changed them into this format. Could you help to review?
+Introduce a system restart handler call chain to solve the described problems.
+This call chain is expected to be executed from the architecture specific
+machine_restart() function. Drivers providing system restart functionality
+(such as the watchdog drivers mentioned above) are expected to register
+with this call chain. By using the priority field in the notifier block,
+callers can control restart handler execution sequence and thus ensure that
+the restart handler with the optimal restart capabilities for a given system
+is called first.
 
-Regards
-Haojian
+Since the first revision of this patchset, a number of separate patch
+submissions have been made which either depend on it or could make use of it.
+
+http://www.spinics.net/linux/lists/arm-kernel/msg344796.html
+	registers three notifiers.
+https://lkml.org/lkml/2014/7/8/962
+	would benefit from it.
+
+Patch 1 of this series implements the restart handler function. Patches 2 and 3
+implement calling the restart handler chain from arm and arm64 restart code.
+
+Patch 4 modifies the restart-poweroff driver to no longer call arm_pm_restart
+directly but machine_restart. This is done to avoid calling arm_pm_restart
+from more than one place. The change makes the driver architecture independent,
+so it would be possible to drop the arm dependency from its Kconfig entry.
+
+Patch 5 and 6 convert existing restart handlers in the watchdog subsystem
+to use the restart handler. Patch 7 unexports arm_pm_restart to ensure
+that no one gets the idea to implement a restart handler as module.
+
+The entire patch series, including additional patches depending on it,
+is available from
+https://git.kernel.org/cgit/linux/kernel/git/groeck/linux-staging.git/
+in branch 'restart-staging'.
+
+On a side note, I realize that the timing for sending this series is less
+than optimal, given that we have an open commit window. Letting it sit for
+two weeks collecting dust isn't optimal either, so I figure it may as well
+collect dust in public.
+
+---
+v6: Use atomic notifier call chain 
+    Rebased series to v3.16
+v5: Rebased series to v3.16-rc5
+    Function renames:
+    register_restart_notifier -> register_restart_handler
+    unregister_restart_notifier -> unregister_restart_handler
+    kernel_restart_notify -> do_kernel_restart
+v4: Document restart notifier priorities
+    Select 128 as default priority for newly introduced notifiers
+    Fix checkpatch warning (line too long) in moxart patch
+v3: Drop RFC.
+    Add kernel_restart_notify wrapper function to execute notifier
+    Improve documentation.
+    Move restart_notifier_list into kernel/reboot.c and make it static.
+v2: Add patch 4.
+    Only call blocking notifier call chain if arm_pm_restart was not set.
