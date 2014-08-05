@@ -1,75 +1,72 @@
-From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Tue, 5 Aug 2014 10:16:37 +0200
-Subject: [PATCH] Documentation: dmaengine: Add a documentation for the dma
- controller API
-In-Reply-To: <1406736193-26685-1-git-send-email-maxime.ripard@free-electrons.com>
-References: <1406736193-26685-1-git-send-email-maxime.ripard@free-electrons.com>
-Message-ID: <CAMuHMdXEH9koVnSS3EWjyUiiSOOOU3EdcT9JHAWNpfmVWQ2opQ@mail.gmail.com>
+From: rric@kernel.org (Robert Richter)
+Date: Tue, 5 Aug 2014 10:47:17 +0200
+Subject: [PATCH 2/5] arm64, thunder: Add initial dts for Cavium Thunder SoC
+In-Reply-To: <CAL_JsqKgfjV4sEZOWuH4YcMjeOA_yNDvZLv_jTi_Sb=27cOD3g@mail.gmail.com>
+ <20140730174803.GF20162@leverpostej>
+Message-ID: <20140805084717.GH4703@rric.localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Maxime,
+On 30.07.14 18:48:03, Mark Rutland wrote:
+> > >> +             uaa0: serial at 87e024000000 {
+> > >> +                     compatible = "arm,pl011", "arm,primecell";
+> > >> +                     reg = <0x87e0 0x24000000 0x0 0x1000>;
+> > >> +                     interrupts = <1 21 4>;
+> > >> +                     clocks = <&refclk50mhz>;
+> > >> +                     clock-names = "apb_pclk";
+> > >
+> > > Is this actually the apb_pclk, or is the the uartclk? I assume it's the
+> > > latter.
+> > 
+> > Shouldn't new bindings have both clocks here? A single clock was a
+> > mistake I think (mine in fact).
+> 
+> I don't think we fixed it up in the end. It made drivers look a bit messy and
+> it dropped off my priority queue.
 
-On Wed, Jul 30, 2014 at 6:03 PM, Maxime Ripard
-<maxime.ripard@free-electrons.com> wrote:
-> The dmaengine is neither trivial nor properly documented at the moment, which
-> means a lot of trial and error development, which is not that good for such a
-> central piece of the system.
->
-> Attempt at making such a documentation.
+On 31.07.14 10:22:19, Rob Herring wrote:
+> On Thu, Jul 31, 2014 at 7:34 AM, Robert Richter <rric@kernel.org> wrote:
+> > On 30.07.14 11:37:38, Rob Herring wrote:
+> >> On Wed, Jul 30, 2014 at 10:46 AM, Mark Rutland <mark.rutland@arm.com> wrote:
+> >> > On Wed, Jul 30, 2014 at 04:06:31PM +0100, Robert Richter wrote:
+> >> >> From: Radha Mohan Chintakuntla <rchintakuntla@cavium.com>
+> >> >> +             uaa0: serial at 87e024000000 {
+> >> >> +                     compatible = "arm,pl011", "arm,primecell";
+> >> >> +                     reg = <0x87e0 0x24000000 0x0 0x1000>;
+> >> >> +                     interrupts = <1 21 4>;
+> >> >> +                     clocks = <&refclk50mhz>;
+> >> >> +                     clock-names = "apb_pclk";
+> >> >
+> >> > Is this actually the apb_pclk, or is the the uartclk? I assume it's the
+> >> > latter.
+> >>
+> >> Shouldn't new bindings have both clocks here? A single clock was a
+> >> mistake I think (mine in fact).
+> >
+> > Do you mean
+> >                         clock-names = "uartclk", "apb_pclk";
+> > here?
+> 
+> Yes, but Mark said this change never happened so maybe it is fine. In
+> any case, follow the pl011 binding documentation.
 
-Great, thanks!
+Right:
 
-> +Our dma_device structure has a field called caps_mask that holds the
-> +various type of transaction supported, and you need to modify this
+Documentation/devicetree/bindings/arm/primecell.txt:
+- clocks : From common clock binding. First clock is phandle to clock for apb
+        pclk. Additional clocks are optional and specific to those peripherals.
+- clock-names : From common clock binding. Shall be "apb_pclk" for first clock.
 
-types of transactions
+Documentation/devicetree/bindings/serial/pl011.txt
+- clocks:  When present, must refer to exactly one clock named
+           "apb_pclk"
 
-> +mask using the dma_cap_set function, with various flags depending on
-> +transaction types you support as an argument.
+There is no binding documentation at all for "uartclk".
 
-> +  * DMA_SLAVE
-> +    - The device can handle device to memory transfers, including
-> +      scatter-gather transfers.
-> +    - While in the mem2mem case we were having two distinct type to
+It seems we should should leave clock-names = "apb_pclk" as it is.
 
-types
+Mark, Rob, would this be ok?
 
-> +      deal with a single chunk to copy or a collection of them, here,
-> +      we just have a single transaction type that is supposed to
-> +      handle both.
+Thanks,
 
-> +  * DMA_INTERLEAVE
-> +    - The device support interleaved transfer. Those transfers usually
-
-supports
-
-> +      involve an interleaved set of data, with chunks a few bytes
-> +      wide, where a scatter-gather transfer would be quite
-> +      inefficient.
-
-> +The functions that we have to fill in there, and hence have to
-> +implement, obviously depend on the transaction type you reported as
-
-types
-
-> +supported.
-
-> +   * device_issue_pending
-> +     - Takes the first descriptor in the pending queue, and start the
-
-starts
-
-> +       transfer. Whenever that transfer is done, it should move to the
-> +       next transaction in the list.
-
-Gr{oetje,eeting}s,
-
-                        Geert
-
---
-Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
-
-In personal conversations with technical people, I call myself a hacker. But
-when I'm talking to journalists I just say "programmer" or something like that.
-                                -- Linus Torvalds
+-Robert
