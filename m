@@ -1,27 +1,46 @@
-From: b08248@gmail.com (Stuart Yoder)
-Date: Tue, 5 Aug 2014 17:35:04 -0500
-Subject: [RFC PATCH 03/11] PCI/MSI: Refactor pci_dev_msi_enabled()
-In-Reply-To: <1406344128-27055-4-git-send-email-wangyijing@huawei.com>
-References: <1406344128-27055-1-git-send-email-wangyijing@huawei.com>
- <1406344128-27055-4-git-send-email-wangyijing@huawei.com>
-Message-ID: <CALRxmdB0Ltt3_G=D4i7x47pHCtCKo8RHgn-hgN+u=px22dimOA@mail.gmail.com>
+From: gregkh@linuxfoundation.org (Greg Kroah-Hartman)
+Date: Tue, 5 Aug 2014 16:06:54 -0700
+Subject: [PATCH 2/5] char: tile-srom: Remove reference to platform_bus
+In-Reply-To: <53E139C8.9000502@tilera.com>
+References: <1406298233-27876-1-git-send-email-pawel.moll@arm.com>
+ <1406298233-27876-2-git-send-email-pawel.moll@arm.com>
+ <53DAA605.2030500@tilera.com> <1406913678.22529.46.camel@hornet>
+ <53E139C8.9000502@tilera.com>
+Message-ID: <20140805230654.GA24614@kroah.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jul 25, 2014 at 10:08 PM, Yijing Wang <wangyijing@huawei.com> wrote:
-> Pci_dev_msi_enabled() is used to check whether device
-> MSI/MSIX enabled. Refactor this function  to suuport
-> checking only device MSI or MSIX enabled.
->
-> Signed-off-by: Yijing Wang <wangyijing@huawei.com>
+On Tue, Aug 05, 2014 at 04:08:40PM -0400, Chris Metcalf wrote:
+> On 8/1/2014 1:21 PM, Pawel Moll wrote:
+> >On Thu, 2014-07-31 at 21:24 +0100, Chris Metcalf wrote:
+> >>On 7/25/2014 10:23 AM, Pawel Moll wrote:
+> >>>The code was creating "srom" class devices using
+> >>>platform_bus as a parent. As they are not really
+> >>>platform devices, make them virtual, using NULL instead.
+> >>>
+> >>>Cc: Chris Metcalf<cmetcalf@tilera.com>
+> >>>Signed-off-by: Pawel Moll<pawel.moll@arm.com>
+> >>>---
+> >>>   drivers/char/tile-srom.c | 2 +-
+> >>>   1 file changed, 1 insertion(+), 1 deletion(-)
+> >>Can you clarify the point of this change a bit?
+> >Theoretically speaking there shouldn't be any need to export the
+> >platform bus root, as all devices should be registered via the platform
+> >API (platform_device_register & co.)
+> 
+> So, perhaps the right fix is to just use platform_device_register()
+> etc for this device, rather than making it virtual?
 
-So this patch refactors things so that checks like this:
-   > -       if (!dev->msi_enabled)
+Sure, that's fine with me if you want to make it a platform device, but
+note that a platform device doesn't have a minor associated with it, you
+will have to still have your existing srom_class and the rest.  Right
+now you aren't creating any real "devices" in the kernel, other than the
+one you use for your minor number, which is not a "real" device.
 
-are moved into a function:
-   > +       if (!pci_dev_msi_enabled(dev, MSI_TYPE))
+struct srom_dev should be a platform device and then this will get
+"easier" overall, sorry I missed that when the original code was
+submitted.
 
-Can you explain a bit more why this  needed.   Is it just cleanup?
+thanks,
 
-Thanks,
-Stuart
+greg k-h
