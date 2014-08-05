@@ -1,407 +1,185 @@
-From: tomasz.figa@gmail.com (Tomasz Figa)
-Date: Tue, 05 Aug 2014 21:50:07 +0200
-Subject: [PATCH v2] ARM: EXYNOS: Refactor the pm code to use DT based
- lookup
-In-Reply-To: <1406288941-20792-1-git-send-email-vikas.sajjan@samsung.com>
-References: <1406288941-20792-1-git-send-email-vikas.sajjan@samsung.com>
-Message-ID: <53E1356F.40400@gmail.com>
+From: nicolas.pitre@linaro.org (Nicolas Pitre)
+Date: Tue, 5 Aug 2014 15:50:12 -0400 (EDT)
+Subject: [PATCH v2] irqchip: gic: Allow gic_arch_extn hooks to call into
+ scheduler
+In-Reply-To: <53E118EE.5040205@codeaurora.org>
+References: <alpine.LFD.2.11.1408041858570.6061@knanqh.ubzr>
+ <1407194837-27190-1-git-send-email-sboyd@codeaurora.org>
+ <53E118EE.5040205@codeaurora.org>
+Message-ID: <alpine.LFD.2.11.1408051537250.6061@knanqh.ubzr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Vikas,
+On Tue, 5 Aug 2014, Stephen Boyd wrote:
 
-Please see my comments inline.
-
-On 25.07.2014 13:49, Vikas Sajjan wrote:
-> Refactoring the pm.c to avoid using "soc_is_exynos" checks,
-> instead use the DT based lookup.
+> +nico (sorry dropped CC for v2)
 > 
-> While at it, consolidate the common code across SoCs
-> and create a static helper functions.
+> On 08/04/14 16:27, Stephen Boyd wrote:
+> > Commit 1a6b69b6548c (ARM: gic: add CPU migration support,
+> > 2012-04-12) introduced an acquisition of the irq_controller_lock
+> > in gic_raise_softirq() which can lead to a spinlock recursion if
+> > the gic_arch_extn hooks call into the scheduler (via complete()
+> > or wake_up(), etc.). This happens because gic_arch_extn hooks are
+> > normally called with the irq_controller_lock held and calling
+> > into the scheduler may cause us to call smp_send_reschedule()
+> > which will grab the irq_controller_lock again. Here's an example
+> > from a vendor kernel (note that the gic_arch_extn hook code here
+> > isn't actually in mainline):
+> >
+> > BUG: spinlock recursion on CPU#0, swapper/0/1
+> >  lock: irq_controller_lock+0x0/0x18, .magic: dead4ead, .owner: sw
+> > er_cpu: 0
+> > CPU: 0 PID: 1 Comm: swapper/0 Not tainted 3.14.10-00430-g3d433c4e
+> >
+> > Call trace:
+> > [<ffffffc000087e1c>] dump_backtrace+0x0/0x140
+> > [<ffffffc000087f6c>] show_stack+0x10/0x1c
+> > [<ffffffc00064732c>] dump_stack+0x74/0xc4
+> > [<ffffffc0006446c0>] spin_dump+0x78/0x88
+> > [<ffffffc0006446f4>] spin_bug+0x24/0x34
+> > [<ffffffc0000d47d0>] do_raw_spin_lock+0x58/0x148
+> > [<ffffffc00064d398>] _raw_spin_lock_irqsave+0x24/0x38
+> > [<ffffffc0002c9d7c>] gic_raise_softirq+0x2c/0xbc
+> > [<ffffffc00008daa4>] smp_send_reschedule+0x34/0x40
+> > [<ffffffc0000c1e94>] try_to_wake_up+0x224/0x288
+> > [<ffffffc0000c1f4c>] default_wake_function+0xc/0x18
+> > [<ffffffc0000ceef0>] __wake_up_common+0x50/0x8c
+> > [<ffffffc0000cef3c>] __wake_up_locked+0x10/0x1c
+> > [<ffffffc0000cf734>] complete+0x3c/0x5c
+> > [<ffffffc0002f0e78>] msm_mpm_enable_irq_exclusive+0x1b8/0x1c8
+> > [<ffffffc0002f0f58>] __msm_mpm_enable_irq+0x4c/0x7c
+> > [<ffffffc0002f0f94>] msm_mpm_enable_irq+0xc/0x18
+> > [<ffffffc0002c9bb0>] gic_unmask_irq+0x40/0x7c
+> > [<ffffffc0000de5f4>] irq_enable+0x2c/0x48
+> > [<ffffffc0000de65c>] irq_startup+0x4c/0x74
+> > [<ffffffc0000dd2fc>] __setup_irq+0x264/0x3f0
+> > [<ffffffc0000dd5e0>] request_threaded_irq+0xcc/0x11c
+> > [<ffffffc0000df254>] devm_request_threaded_irq+0x68/0xb4
+> > [<ffffffc000471520>] msm_iommu_ctx_probe+0x124/0x2d4
+> > [<ffffffc000337374>] platform_drv_probe+0x20/0x54
+> > [<ffffffc00033598c>] driver_probe_device+0x158/0x340
+> > [<ffffffc000335c20>] __driver_attach+0x60/0x90
+> > [<ffffffc000333c9c>] bus_for_each_dev+0x6c/0x8c
+> > [<ffffffc000335304>] driver_attach+0x1c/0x28
+> > [<ffffffc000334f14>] bus_add_driver+0x120/0x204
+> > [<ffffffc0003362e4>] driver_register+0xbc/0x10c
+> > [<ffffffc000337348>] __platform_driver_register+0x5c/0x68
+> > [<ffffffc00094c478>] msm_iommu_driver_init+0x54/0x7c
+> > [<ffffffc0000813ec>] do_one_initcall+0xa4/0x130
+> > [<ffffffc00091d928>] kernel_init_freeable+0x138/0x1dc
+> > [<ffffffc000642578>] kernel_init+0xc/0xd4
+> >
+> > We really just want to synchronize the sending of an SGI with the
+> > update of the gic_cpu_map[], so introduce a new SGI lock that we
+> > can use to synchronize the two code paths. Three main events are
+> > happening that we have to consider:
+> >
+> > 	1. We're updating the gic_cpu_mask to point to an
+> > 	incoming CPU
+> >
+> > 	2. We're (potentially) sending an SGI to the outgoing CPU
+> >
+> > 	3. We're redirecting any pending SGIs for the outgoing
+> > 	CPU to the incoming CPU.
+> >
+> > Events 1 and 3 are already ordered within the same CPU by means
+> > of program order and use of I/O accessors. Events 1 and 2 don't
+> > need to be ordered, but events 2 and 3 do because any SGIs for
+> > the outgoing CPU need to be pending before we can redirect them.
+> > Synchronize by acquiring a new lock around event 2 and before
+> > event 3. Use smp_mb__after_unlock_lock() before event 3 to ensure
+> > that event 1 is seen before event 3 on other CPUs that may be
+> > executing event 2.
+> >
+> > Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
+> > ---
+> >
+> > Changes since v1:
+> >  * Move gic_sgi_lock definition below gic_cpu_map[]
+> >  * Just use spinlock for synchronization instead of over the map update
+> >
+> >  drivers/irqchip/irq-gic.c | 16 ++++++++++++++--
+> >  1 file changed, 14 insertions(+), 2 deletions(-)
+> >
+> > diff --git a/drivers/irqchip/irq-gic.c b/drivers/irqchip/irq-gic.c
+> > index 7c131cf7cc13..00bac4627d2e 100644
+> > --- a/drivers/irqchip/irq-gic.c
+> > +++ b/drivers/irqchip/irq-gic.c
+> > @@ -81,6 +81,9 @@ static DEFINE_RAW_SPINLOCK(irq_controller_lock);
+> >  #define NR_GIC_CPU_IF 8
+> >  static u8 gic_cpu_map[NR_GIC_CPU_IF] __read_mostly;
+> >  
+> > +/* Synchronize switching CPU interface and sending SGIs */
+> > +static DEFINE_RAW_SPINLOCK(gic_sgi_lock);
+> 
+> This also needs an #ifdef CONFIG_SMP
+> 
+> > +
+> >  /*
+> >   * Supported arch specific GIC irq extension.
+> >   * Default make them NULL.
+> > @@ -658,7 +661,7 @@ static void gic_raise_softirq(const struct cpumask *mask, unsigned int irq)
+> >  	int cpu;
+> >  	unsigned long flags, map = 0;
+> >  
+> > -	raw_spin_lock_irqsave(&irq_controller_lock, flags);
+> > +	raw_spin_lock_irqsave(&gic_sgi_lock, flags);
+> >  
+> >  	/* Convert our logical CPU mask into a physical one. */
+> >  	for_each_cpu(cpu, mask)
+> > @@ -673,7 +676,7 @@ static void gic_raise_softirq(const struct cpumask *mask, unsigned int irq)
+> >  	/* this always happens on GIC0 */
+> >  	writel_relaxed(map << 16 | irq, gic_data_dist_base(&gic_data[0]) + GIC_DIST_SOFTINT);
+> >  
+> > -	raw_spin_unlock_irqrestore(&irq_controller_lock, flags);
+> > +	raw_spin_unlock_irqrestore(&gic_sgi_lock, flags);
+> >  }
+> >  #endif
+> >  
+> > @@ -764,6 +767,15 @@ void gic_migrate_target(unsigned int new_cpu_id)
+> >  
+> >  	raw_spin_unlock(&irq_controller_lock);
+> >  
+> > +	raw_spin_lock(&gic_sgi_lock);
+> > +	/*
+> > +	 * Ensure that the gic_cpu_map update above is seen in
+> > +	 * gic_raise_softirq() before we redirect any pending SGIs that
+> > +	 * may have been raised for the outgoing CPU (cur_cpu_id)
+> > +	 */
+> > +	smp_mb__after_unlock_lock();
+> > +	raw_spin_unlock(&gic_sgi_lock);
 
-[snip]
+I just can't see what protection the above hunk gives you.  I'd simply 
+add the extra lock inside the irq_controller_lock area.
 
-> @@ -241,13 +266,13 @@ static void exynos_cpu_restore_register(void)
->  
->  static int exynos_cpu_suspend(unsigned long arg)
->  {
-> -#ifdef CONFIG_CACHE_L2X0
-> -	outer_flush_all();
-> -#endif
-> -
-> -	if (soc_is_exynos5250())
-> -		flush_cache_all();
-> +	if (pm_data->cpu_suspend)
-> +		return pm_data->cpu_suspend(arg);
-> +	return -1;
-> +}
+> >  	/*
+> >  	 * Now let's migrate and clear any potential SGIs that might be
+> >  	 * pending for us (cur_cpu_id).  Since GIC_DIST_SGI_PENDING_SET
+> 
+> I also wonder if we should do something like this:
+> 
+> diff --git a/drivers/irqchip/irq-gic.c b/drivers/irqchip/irq-gic.c
+> index ea3df28043f2..1655c9bcb633 100644
+> --- a/drivers/irqchip/irq-gic.c
+> +++ b/drivers/irqchip/irq-gic.c
+> @@ -663,7 +663,8 @@ static void gic_raise_softirq(const struct cpumask *mask, unsigned int irq)
+>         int cpu;
+>         unsigned long flags, map = 0;
+> 
+> -       raw_spin_lock_irqsave(&gic_sgi_lock, flags);
+> +       if (IS_ENABLED(CONFIG_BL_SWITCHER))
+> +               raw_spin_lock_irqsave(&gic_sgi_lock, flags);
 
-I believe you could just pass pm_data->cpu_suspend to cpu_suspend(),
-without this three-liner.
+Absolutely.  That has been nagging me for a while but I never came 
+around to make a patch.
 
->  
-> +static int exynos_cpu_do_idle(void)
-> +{
->  	/* issue the standby signal into the pm unit. */
->  	cpu_do_idle();
->  
-> @@ -257,32 +282,73 @@ static int exynos_cpu_suspend(unsigned long arg)
->  
->  static void exynos_pm_prepare(void)
->  {
-> -	unsigned int tmp;
-> +	if (pm_data->pm_prepare)
-> +		pm_data->pm_prepare();
+If we were certain no b.L platform would ever need the arch hooks, that 
+could even be all that is needed with the existing lock to fix your 
+initial problem.  The switcher code is not meant to be widely used once 
+the scheduler work is in place so I'd lean towards keeping things simple 
+unless a more "complete" solution is actually needed, which in your case 
+is not.
 
-You could just directly insert this code into exynos_suspend_enter()
-instead of adding this two-liner.
 
-> +}
->  
-> +static int exynos4_cpu_suspend(unsigned long arg)
-> +{
-> +#ifdef CONFIG_CACHE_L2X0
-> +	outer_flush_all();
-> +#endif
-> +	return exynos_cpu_do_idle();
-> +}
-> +
-> +static int exynos5250_cpu_suspend(unsigned long arg)
-> +{
-> +#ifdef CONFIG_CACHE_L2X0
-> +	outer_flush_all();
-> +#endif
-> +	flush_cache_all();
-> +	return exynos_cpu_do_idle();
-> +}
 
-I believe both can be merged safely into the same single function. A
-call to flush_cache_all() will not hurt on Exynos4, but it should be
-moved before outer_flush_all().
-
-Moreover, the #ifdef CONFIG_CACHE_L2X0 is superfluous, because the
-existence of outer_flush_all() symbol doesn't depend on this Kconfig
-symbol (it depends on CONFIG_OUTER_CACHE_SYNC, but a stub is provided if
-it is disabled).
-
-> +
-> +static void exynos_pm_set_wakeup_mask(void)
-> +{
->  	/* Set wake-up mask registers */
->  	pmu_raw_writel(exynos_get_eint_wake_mask(), S5P_EINT_WAKEUP_MASK);
->  	pmu_raw_writel(exynos_irqwake_intmask & ~(1 << 31), S5P_WAKEUP_MASK);
-> +}
->  
-> -	s3c_pm_do_save(exynos_core_save, ARRAY_SIZE(exynos_core_save));
-> -
-> -	if (soc_is_exynos5250()) {
-> -		s3c_pm_do_save(exynos5_sys_save, ARRAY_SIZE(exynos5_sys_save));
-> -		/* Disable USE_RETENTION of JPEG_MEM_OPTION */
-> -		tmp = pmu_raw_readl(EXYNOS5_JPEG_MEM_OPTION);
-> -		tmp &= ~EXYNOS5_OPTION_USE_RETENTION;
-> -		pmu_raw_writel(tmp, EXYNOS5_JPEG_MEM_OPTION);
-> -	}
-> -
-> +static void exynos_pm_enter_sleep_mode(void)
-> +{
->  	/* Set value of power down register for sleep mode */
-> -
->  	exynos_sys_powerdown_conf(SYS_SLEEP);
->  	pmu_raw_writel(S5P_CHECK_SLEEP, S5P_INFORM1);
->  
->  	/* ensure at least INFORM0 has the resume address */
-> -
->  	pmu_raw_writel(virt_to_phys(exynos_cpu_resume), S5P_INFORM0);
->  }
->  
-> +static void exynos5250_pm_prepare(void)
-> +{
-> +	unsigned int tmp;
-> +
-> +	/* Set wake-up mask registers */
-> +	exynos_pm_set_wakeup_mask();
-> +
-> +	s3c_pm_do_save(exynos_core_save, ARRAY_SIZE(exynos_core_save));
-> +
-> +	s3c_pm_do_save(exynos5_sys_save, ARRAY_SIZE(exynos5_sys_save));
-
-You could store a pointer to this array in new .extra_save field of the
-variant struct and handle this with generic code, like below:
-
-	if (pm_data->extra_save)
-		s3c_pm_do_save(pm_data->extra_save,
-				pm_data->num_extra_save);
-
-> +
-> +	/* Disable USE_RETENTION of JPEG_MEM_OPTION */
-> +	tmp = pmu_raw_readl(EXYNOS5_JPEG_MEM_OPTION);
-> +	tmp &= ~EXYNOS5_OPTION_USE_RETENTION;
-> +	pmu_raw_writel(tmp, EXYNOS5_JPEG_MEM_OPTION);
-
-This looks completely like a copy paste from a vendor tree needed to
-workaround some issues in early revisions of the SoC. Are you sure this
-is still needed in production versions of the silicon used on boards
-supported in mainline?
-
-Even if yes, Exynos4 handles such registers in PMU register array in
-pmu.c, so I wonder whether it shouldn't be moved there and allow
-handling of all Exynos SoCs uniformly in this file.
-
-> +
-> +	exynos_pm_enter_sleep_mode();
-> +}
-> +
-> +static void exynos4_pm_prepare(void)
-> +{
-> +	/* Set wake-up mask registers */
-> +	exynos_pm_set_wakeup_mask();
-> +
-> +	s3c_pm_do_save(exynos_core_save, ARRAY_SIZE(exynos_core_save));
-> +
-> +	exynos_pm_enter_sleep_mode();
-> +}
-
-In fact, exynos4_pm_prepare() is a direct subset of
-exynos5250_pm_prepare(). This just confirms that it might be a good idea
-to just merge both functions into a single generic one.
-
-> +
->  static void exynos_pm_central_suspend(void)
->  {
->  	unsigned long tmp;
-> @@ -295,6 +361,13 @@ static void exynos_pm_central_suspend(void)
->  
->  static int exynos_pm_suspend(void)
->  {
-> +	if (pm_data->pm_suspend)
-> +		return pm_data->pm_suspend();
-> +	return -1;
-> +}
-
-Do you need this three-liner? I believe you could just assign
-pm_data->pm_suspend directly to exynos_pm_syscore_ops.
-
-> +
-> +static int exynos4_pm_suspend(void)
-> +{
->  	unsigned long tmp;
->  
->  	exynos_pm_central_suspend();
-> @@ -304,9 +377,20 @@ static int exynos_pm_suspend(void)
->  	tmp = (S5P_USE_STANDBY_WFI0 | S5P_USE_STANDBY_WFE0);
->  	pmu_raw_writel(tmp, S5P_CENTRAL_SEQ_OPTION);
->  
-> -	if (read_cpuid_part_number() == ARM_CPU_PART_CORTEX_A9)
-> -		exynos_cpu_save_register();
-> +	exynos_cpu_save_register();
-> +	return 0;
-> +}
-> +
-> +static int exynos5250_pm_suspend(void)
-> +{
-> +	unsigned long tmp;
-> +
-> +	exynos_pm_central_suspend();
-> +
-> +	/* Setting SEQ_OPTION register */
->  
-> +	tmp = (S5P_USE_STANDBY_WFI0 | S5P_USE_STANDBY_WFE0);
-> +	pmu_raw_writel(tmp, S5P_CENTRAL_SEQ_OPTION);
->  	return 0;
->  }
-
-This function is exactly the same as exynos4_pm_suspend, but without the
-call to exynos_cpu_save_register(). Since originally this call was
-conditional, depending on CPU part number, is there any reason to split
-this function into SoC specific ones?
-
->  
-> @@ -333,39 +417,57 @@ static int exynos_pm_central_resume(void)
->  	return 0;
->  }
->  
-> +static void exynos_pm_set_release_retention(void)
-
-nit: exynos_pm_release_retention() would sound better.
-
-> +{
-> +	unsigned int i;
-> +
-> +	for (i = 0; (pm_data->release_ret_regs[i] != REG_TABLE_END); i++)
-> +		pmu_raw_writel(EXYNOS_WAKEUP_FROM_LOWPWR,
-> +				pm_data->release_ret_regs[i]);
-> +}
-> +
->  static void exynos_pm_resume(void)
->  {
-> +	if (pm_data->pm_resume)
-> +		pm_data->pm_resume();
-> +}
-
-Similarly as with exynos_pm_suspend().
-
-> +
-> +static void exynos4_pm_resume(void)
-> +{
->  	if (exynos_pm_central_resume())
->  		goto early_wakeup;
->  
-> -	if (read_cpuid_part_number() == ARM_CPU_PART_CORTEX_A9)
-> -		exynos_cpu_restore_register();
-> +	exynos_cpu_restore_register();
->  
->  	/* For release retention */
-> -
-> -	pmu_raw_writel((1 << 28), S5P_PAD_RET_MAUDIO_OPTION);
-> -	pmu_raw_writel((1 << 28), S5P_PAD_RET_GPIO_OPTION);
-> -	pmu_raw_writel((1 << 28), S5P_PAD_RET_UART_OPTION);
-> -	pmu_raw_writel((1 << 28), S5P_PAD_RET_MMCA_OPTION);
-> -	pmu_raw_writel((1 << 28), S5P_PAD_RET_MMCB_OPTION);
-> -	pmu_raw_writel((1 << 28), S5P_PAD_RET_EBIA_OPTION);
-> -	pmu_raw_writel((1 << 28), S5P_PAD_RET_EBIB_OPTION);
-> -
-> -	if (soc_is_exynos5250())
-> -		s3c_pm_do_restore(exynos5_sys_save,
-> -			ARRAY_SIZE(exynos5_sys_save));
-> +	exynos_pm_set_release_retention();
->  
->  	s3c_pm_do_restore_core(exynos_core_save, ARRAY_SIZE(exynos_core_save));
->  
-> -	if (read_cpuid_part_number() == ARM_CPU_PART_CORTEX_A9)
-> -		scu_enable(S5P_VA_SCU);
-> +	scu_enable(S5P_VA_SCU);
->  
->  early_wakeup:
->  
->  	/* Clear SLEEP mode set in INFORM1 */
->  	pmu_raw_writel(0x0, S5P_INFORM1);
-> +}
-> +
-> +static void exynos5250_pm_resume(void)
-> +{
-> +	if (exynos_pm_central_resume())
-> +		goto early_wakeup;
->  
-> -	return;
-> +	/* For release retention */
-> +	exynos_pm_set_release_retention();
-> +
-> +	s3c_pm_do_restore(exynos5_sys_save, ARRAY_SIZE(exynos5_sys_save));
-> +
-> +	s3c_pm_do_restore_core(exynos_core_save, ARRAY_SIZE(exynos_core_save));
-> +
-> +early_wakeup:
-> +
-> +	/* Clear SLEEP mode set in INFORM1 */
-> +	pmu_raw_writel(0x0, S5P_INFORM1);
->  }
-
-Similar to exynos{4,5250}_pm_suspend(), this could be kept as a single
-generic function. exynos5_sys_save would be handled by .extra_save field
-of the pm_data struct and scu_enable() and exynos_cpu_restore_register()
-was already handled in a generic way, based on ARM core type, not
-soc_is_*().
-
->  
->  static struct syscore_ops exynos_pm_syscore_ops = {
-> @@ -468,18 +570,64 @@ static struct notifier_block exynos_cpu_pm_notifier_block = {
->  	.notifier_call = exynos_cpu_pm_notifier,
->  };
->  
-> +static struct exynos_pm_data exynos4_pm_data = {
-
-static const
-
-> +	.wkup_irq	= exynos4_wkup_irq,
-> +	.wake_disable_mask = ((0xFF << 8) | (0x1F << 1)),
-> +	.release_ret_regs = exynos_release_ret_regs,
-> +	.pm_suspend	= exynos4_pm_suspend,
-> +	.pm_resume	= exynos4_pm_resume,
-> +	.pm_prepare	= exynos4_pm_prepare,
-> +	.cpu_suspend	= exynos4_cpu_suspend,
-> +};
-> +
-> +static struct exynos_pm_data exynos5250_pm_data = {
-
-static const
-
-> +	.wkup_irq	= exynos5250_wkup_irq,
-> +	.wake_disable_mask = ((0xFF << 8) | (0x1F << 1)),
-> +	.release_ret_regs = exynos_release_ret_regs,
-> +	.pm_suspend	= exynos5250_pm_suspend,
-> +	.pm_resume	= exynos5250_pm_resume,
-> +	.pm_prepare	= exynos5250_pm_prepare,
-> +	.cpu_suspend	= exynos5250_cpu_suspend,
-> +};
-> +
-> +static struct of_device_id exynos_pmu_of_device_ids[] = {
-> +	{
-> +		.compatible = "samsung,exynos4210-pmu",
-> +		.data = (void *)&exynos4_pm_data,
-
-No need to cast if const pointers are used. + 3 more below.
-
-> +	}, {
-> +		.compatible = "samsung,exynos4212-pmu",
-> +		.data = (void *)&exynos4_pm_data,
-> +	}, {
-> +		.compatible = "samsung,exynos4412-pmu",
-> +		.data = (void *)&exynos4_pm_data,
-> +	}, {
-> +		.compatible = "samsung,exynos5250-pmu",
-> +		.data = (void *)&exynos5250_pm_data,
-> +	},
-> +	{ /*sentinel*/ },
-> +};
-> +
->  void __init exynos_pm_init(void)
->  {
->  	u32 tmp;
-> +	const struct of_device_id *match;
-
-nit: it would look better if this variable was added above tmp.
-
->  
->  	cpu_pm_register_notifier(&exynos_cpu_pm_notifier_block);
->  
-> +	of_find_matching_node_and_match(NULL, exynos_pmu_of_device_ids, &match);
-> +
-
-nit: superfluous blank line
-
-> +	if (!match) {
-> +		pr_err("Failed to find PMU node\n");
-> +		return;
-> +	}
-> +	pm_data = (struct exynos_pm_data *) match->data;
-
-No need to cast if const pointers are used.
-
-> +
->  	/* Platform-specific GIC callback */
->  	gic_arch_extn.irq_set_wake = exynos_irq_set_wake;
->  
->  	/* All wakeup disable */
->  	tmp = pmu_raw_readl(S5P_WAKEUP_MASK);
-> -	tmp |= ((0xFF << 8) | (0x1F << 1));
-> +	tmp |= pm_data->wake_disable_mask;
-
-Does this vary between SoCs?
-
->  	pmu_raw_writel(tmp, S5P_WAKEUP_MASK);
->  
->  	register_syscore_ops(&exynos_pm_syscore_ops);
-> diff --git a/arch/arm/mach-exynos/regs-pmu.h b/arch/arm/mach-exynos/regs-pmu.h
-> index 96a1569..30c0301 100644
-> --- a/arch/arm/mach-exynos/regs-pmu.h
-> +++ b/arch/arm/mach-exynos/regs-pmu.h
-> @@ -21,6 +21,7 @@
->  #define S5P_USE_STANDBY_WFI0			(1 << 16)
->  #define S5P_USE_STANDBY_WFE0			(1 << 24)
->  
-> +#define EXYNOS_WAKEUP_FROM_LOWPWR		(1 << 28)
-
-Is this really the real name of this bit, as specified in the datasheet?
-
-Best regards,
-Tomasz
+Nicolas
