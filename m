@@ -1,92 +1,82 @@
-From: spk.linux@gmail.com (Sachin Kamat)
-Date: Tue, 5 Aug 2014 17:09:19 +0530
-Subject: [PATCH] ARM: multi_v7_defconfig: major refresh
-In-Reply-To: <CAK5sBcGrAKCRYvLxvgeDU=Bu-MoDTgwY+dmEBbiuCpn5ttRU3Q@mail.gmail.com>
-References: <1406052070-6207-1-git-send-email-olof@lixom.net>
- <12165027.MHmNZOI7jc@wuerfel>
- <CAOesGMjo0AY=eGcfTh1sVxKkURK9bzK8SBAeEbvBFN4R0sF34A@mail.gmail.com>
- <CAC5m3BwDvHVMJEfXE4w5zQ2RYXYt9PRF8uP=3M03Rr3Ls=N4eQ@mail.gmail.com>
- <CAK5sBcEPQtMvT+mp4+jXQA06FcBRTdAVJLbTCtCu-kV07Wh5RQ@mail.gmail.com>
- <CAK5sBcGrAKCRYvLxvgeDU=Bu-MoDTgwY+dmEBbiuCpn5ttRU3Q@mail.gmail.com>
-Message-ID: <CAK5sBcGDaAZ5Pfx0YNwFYyQw9h8bOFqWskXwT_98d6KwQbLaSA@mail.gmail.com>
+From: sthokal@xilinx.com (Srikanth Thokala)
+Date: Tue,  5 Aug 2014 17:09:50 +0530
+Subject: [PATCH v2 1/2] dma: Add Xilinx Central DMA DT Binding Documentation
+Message-ID: <1407238791-3370-1-git-send-email-sthokal@xilinx.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Aug 1, 2014 at 12:14 PM, Sachin Kamat <spk.linux@gmail.com> wrote:
-> On Thu, Jul 31, 2014 at 11:56 AM, Sachin Kamat <spk.linux@gmail.com> wrote:
->> On Thu, Jul 31, 2014 at 11:37 AM, Tushar Behera <trblinux@gmail.com> wrote:
->>> On Wed, Jul 23, 2014 at 1:58 AM, Olof Johansson <olof@lixom.net> wrote:
->>>> On Tue, Jul 22, 2014 at 11:36 AM, Arnd Bergmann <arnd@arndb.de> wrote:
->>>>> On Tuesday 22 July 2014 11:01:10 Olof Johansson wrote:
->>>>>> This is a major refresh of the multi_v7_defconfig:
->>>>>>
->>>>>> - Bring over a bunch of Samsung drivers to make ODROID-U3 and Chromebooks usable
->>>>>>  * Enable big.LITTLE
->>>>>>  * MCPM
->>>>>>  * CYAPA touchpad
->>>>>>  * Samsung-related MTD/regulator/clk/pinmux drivers
->>>>>>  * Add some of the CrOS EC drivers
->>>>>> - Turn on TPM, HW_RANDOM
->>>>>> - OMAP_USB3 -> TI_PIPE3 option rename
->>>>>> - Enable MCPM/b.L for VEXPRESS
->>>>>> - Add new CONFIG_MTD_SPI_NOR since it otherwise masks off SPI NOR drivers
->>>>>> - CONFIG_LOGO, because penguins.
->>>>>>
->>>>>> I took care to keep the new options that have been added for whose the
->>>>>> drivers are not yet in our for-next branch. This was pretty awkward so
->>>>>> we should sort out how to handle those better in the future.
->>>>>
->>>>> Since you've already done all those, how about enabling THUMB2_KERNEL?
->>>>> For the multi_v7_defconfig, it should actually give some benefits,
->>>>> since it's rather large, and it would be good to have some more testing
->>>>> with this option enabled.
->>>>>
->>>>> I guess the first step would be to enable it and just see if your
->>>>> boot farm survives the change.
->>>>
->>>> Good point, I'll definitely give that a go once the current issues are resolved.
->>>>
->>>> Which are: These changes make 5250-based machines (snow and arndale)
->>>> break. Lots of i2c timeouts on SATA and hdmi-phy. Looks like arndale
->>>> might be missing pinctrl setups for it?
->>
->> i2c timeout issue should have been fixed with the following patch:
->> i2c: i2c-s3c2410: Drop class based scanning to improve bootup time
->> (commit id: 6031d3dfc73b49bede540872e51a70ee0b6786d4) which is
->> available on Wolfram's I2C tree (should be part of linux-next too). Also
->> I do not see I2C_S3C2410 enabled in the config.
->> I do not have access to h/w today. I can verify and check tomorrow or
->> somebody could test it in the meantime with the above suggestions?
->
-> Olof,
-> Tested your multi_v7_defconfig patch on top of latest linux-next (20140731).
-> I did not see any aforementioned i2c issues on 5250 based Snow board. It
-> booted fine. However on 5250 based Arndale board, the boot stops at
-> the following:
->
-> [    1.951863] ehci_hcd: USB 2.0 'Enhanced' Host Controller (EHCI) Driver
-> [    1.956937] ehci-pci: EHCI PCI platform driver
-> [    1.961392] ehci-exynos: EHCI EXYNOS driver
-> [    1.965698] exynos-ehci 12110000.usb: EHCI Host Controller
-> [    1.971007] exynos-ehci 12110000.usb: new USB bus registered,
-> assigned bus number 1
-> [    1.981593] exynos-ehci 12110000.usb: can't setup: -110
-> [    1.985361] exynos-ehci 12110000.usb: USB bus 1 deregistered
-> [    1.991001] exynos-ehci 12110000.usb: Failed to add USB HCD
-> [    1.996569] exynos-ehci: probe of 12110000.usb failed with error -110
-> [    2.003041] ohci_hcd: USB 1.1 'Open' Host Controller (OHCI) Driver
-> [    2.009149] ohci-exynos: OHCI EXYNOS driver
-> [    2.013457] exynos-ohci 12120000.usb: USB Host Controller
-> [    2.018702] exynos-ohci 12120000.usb: new USB bus registered,
-> assigned bus number 1
->
-> Boots well with exynos_defconfig though. Probably some conflict with
-> other config options?
-> I couldn't find out as I am busy with some other activity.
+Device-tree binding documentation of Xilinx Central DMA Engine
 
-The following patch from Vivek fixes the above mentioned USB issue.
-https://lkml.org/lkml/2014/8/5/142
+Signed-off-by: Srikanth Thokala <sthokal@xilinx.com>
+---
+Changes in v2:
+- Change property 'xlnx,data-width' to 'xlnx,datawidth' in the description
+  to match the implementation.
 
+---
+ .../devicetree/bindings/dma/xilinx/xilinx_cdma.txt |   54 ++++++++++++++++++++
+ 1 file changed, 54 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/dma/xilinx/xilinx_cdma.txt
+
+diff --git a/Documentation/devicetree/bindings/dma/xilinx/xilinx_cdma.txt b/Documentation/devicetree/bindings/dma/xilinx/xilinx_cdma.txt
+new file mode 100644
+index 0000000..b04f76b
+--- /dev/null
++++ b/Documentation/devicetree/bindings/dma/xilinx/xilinx_cdma.txt
+@@ -0,0 +1,54 @@
++Xilinx AXI CDMA engine, it does transfers between memory-mapped source
++address and a memory-mapped destination address.
++
++Required properties:
++- compatible: Should be "xlnx,axi-cdma-1.00.a"
++- #dma-cells: Should be <1>, see "dmas" property below
++- reg: Should contain cdma registers location and length.
++- dma-channel child node: Should have only one channel
++
++Optional properties:
++- xlnx,include-sg: Tells whether configured for Scatter-mode in
++	the hardware.
++
++Required child node properties:
++- compatible: It should be "xlnx,axi-cdma-channel".
++- interrupts: Should contain per channel CDMA interrupts.
++- xlnx,datawidth: Should contain the stream data width, take values
++	{32,64...1024}.
++
++Option child node properties:
++- xlnx,include-dre: Tells whether hardware is configured for Data
++	Realignment Engine.
++
++Example:
++++++++++
++
++axi_cdma_0: axicdma at 7e200000 {
++	compatible = "xlnx,axi-cdma-1.00.a";
++	#dma_cells = <1>;
++	reg = < 0x7e200000 0x10000 >;
++	dma-channel at 7e200000 {
++		compatible = "xlnx,axi-cdma-channel";
++		interrupts = < 0 55 4 >;
++		xlnx,datawidth = <0x40>;
++	} ;
++} ;
++
++
++* DMA client
++
++Required properties:
++- dmas: a list of <[Central DMA device phandle] [Channel ID]> pairs,
++	where Channel ID is '0' for write/tx and '1' for read/rx
++	channel.
++- dma-names: a list of DMA channel names, one per "dmas" entry
++
++Example:
++++++++++
++
++cdmatest_0: cdmatest at 0 {
++	compatible ="xlnx,axi-cdma-test-1.00.a";
++	dmas = <&axi_cdma_0 0>;
++	dma-names = "cdma0";
++} ;
 -- 
-Regards,
-Sachin.
+1.7.9.5
