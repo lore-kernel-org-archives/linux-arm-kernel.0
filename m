@@ -1,54 +1,86 @@
-From: linux@roeck-us.net (Guenter Roeck)
-Date: Mon,  4 Aug 2014 18:48:58 -0700
-Subject: [PATCH v6 7/7] arm/arm64: Unexport restart handlers
-In-Reply-To: <1407203338-12915-1-git-send-email-linux@roeck-us.net>
-References: <1407203338-12915-1-git-send-email-linux@roeck-us.net>
-Message-ID: <1407203338-12915-8-git-send-email-linux@roeck-us.net>
+From: nicolas.pitre@linaro.org (Nicolas Pitre)
+Date: Mon, 4 Aug 2014 22:01:50 -0400 (EDT)
+Subject: [PATCH v16 2/9] ARM: hisi: enable MCPM implementation
+In-Reply-To: <CAD6h2NT_yYsDbCTYqgUEjJRcRQ9981Vx=T4yg4EW3ud=RMxPLA@mail.gmail.com>
+References: <1407121088-4151-1-git-send-email-haojian.zhuang@linaro.org>
+ <1407121088-4151-3-git-send-email-haojian.zhuang@linaro.org>
+ <alpine.LFD.2.11.1408041741460.6061@knanqh.ubzr>
+ <CAD6h2NTFJ0qBdymhQ1bEaKpCTQT13r2-F9HRDw9SdSS31Zer8w@mail.gmail.com>
+ <alpine.LFD.2.11.1408042101360.6061@knanqh.ubzr>
+ <CAD6h2NSs7epwgtH29sjQ37nLZroLJK-+1aqY52JcUg8Y2fXcpw@mail.gmail.com>
+ <alpine.LFD.2.11.1408042122480.6061@knanqh.ubzr>
+ <CAD6h2NT_yYsDbCTYqgUEjJRcRQ9981Vx=T4yg4EW3ud=RMxPLA@mail.gmail.com>
+Message-ID: <alpine.LFD.2.11.1408042153350.6061@knanqh.ubzr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Implementing a restart handler in a module don't make sense
-as there would be no guarantee that the module is loaded when
-a restart is needed. Unexport arm_pm_restart to ensure that
-no one gets the idea to do it anyway.
+On Tue, 5 Aug 2014, Haojian Zhuang wrote:
 
-Signed-off-by: Guenter Roeck <linux@roeck-us.net>
-Acked-by: Catalin Marinas <catalin.marinas@arm.com>
-Acked-by: Heiko Stuebner <heiko@sntech.de>
----
-v6: No change
-v5: No change
-v4: No change
-v3: No change
-v2: No change
+> On 5 August 2014 09:32, Nicolas Pitre <nicolas.pitre@linaro.org> wrote:
+> > On Tue, 5 Aug 2014, Haojian Zhuang wrote:
+> >
+> >> On 5 August 2014 09:02, Nicolas Pitre <nicolas.pitre@linaro.org> wrote:
+> >> > On Tue, 5 Aug 2014, Haojian Zhuang wrote:
+> >> >
+> >> >> On 5 August 2014 06:43, Nicolas Pitre <nicolas.pitre@linaro.org> wrote:
+> >> >> > Sorry for the delay -- I was on vacation.
+> >> >> >
+> >> >> > On Mon, 4 Aug 2014, Haojian Zhuang wrote:
+> >> >> >
+> >> >> >> Multiple CPU clusters are used in Hisilicon HiP04 SoC. Now use MCPM
+> >> >> >> framework to manage power on HiP04 SoC.
+> >> >> >>
+> >> >> >> Changelog:
+> >> >> >> v16:
+> >> >> >>   * Parse bootwrapper parameters in command line instead.
+> >> >> >
+> >> >> > What is that about?  I don't particularly like to see bootloader
+> >> >> > handshake details passed to the kernel via the kernel command line
+> >> >> > mechanism.  Given this looks like special memory regions, can't they be
+> >> >> > specified via the device tree instead?
+> >> >> >
+> >> >>
+> >> >> Others don't agree put them into DTS file. So I move them into command line.
+> >> >
+> >> > Could you give me a pointer to the discussion around that please?
+> >> >
+> >> >
+> >> > Nicolas
+> >>
+> >> http://lists.infradead.org/pipermail/linux-arm-kernel/2014-July/275944.html
+> >>
+> >> Mark challenged what's relationship between bootwrapper address and
+> >> system controller.
+> >
+> > There is no relation, obviously.  Hence this doesn't belong in the
+> > system controller node.  That doesn't mean it should not be in DT at
+> > all.
+> >
+> >> Actually code in bootwrapper is like trampoline. And it's a software
+> >> protocol, not hardware description. So I moved them into command line
+> >> instead.
+> >
+> > There are many examples for software protocols being specified in DT
+> > already.  The first that comes to my mind is the "boot method = spin
+> > table" which has nothing to do with hardware.  PSCI bindings are about
+> > another software-only thing.
+> >
+> >
+> > Nicolas
+> 
+> bootwrapper {
+>         compatible = "hisilicon,hip04-bootwrapper";
+>         boot-method = <0x10c00000, 0x10000, 0xa5a5a5a5, 0xe0000100, 0x1000>;
+> };
+> 
+> I changed them into this format. Could you help to review?
 
- arch/arm/kernel/process.c   | 1 -
- arch/arm64/kernel/process.c | 1 -
- 2 files changed, 2 deletions(-)
+Unfortunately I'm not really knowledgeable about best device tree syntax 
+and practices.  You'll have to nag someone else for reviewing this.
 
-diff --git a/arch/arm/kernel/process.c b/arch/arm/kernel/process.c
-index 84ca0d5..27bdf11 100644
---- a/arch/arm/kernel/process.c
-+++ b/arch/arm/kernel/process.c
-@@ -125,7 +125,6 @@ void (*pm_power_off)(void);
- EXPORT_SYMBOL(pm_power_off);
- 
- void (*arm_pm_restart)(enum reboot_mode reboot_mode, const char *cmd) = null_restart;
--EXPORT_SYMBOL_GPL(arm_pm_restart);
- 
- /*
-  * This is our default idle handler.
-diff --git a/arch/arm64/kernel/process.c b/arch/arm64/kernel/process.c
-index 9591e60..f5fddff 100644
---- a/arch/arm64/kernel/process.c
-+++ b/arch/arm64/kernel/process.c
-@@ -92,7 +92,6 @@ void (*pm_power_off)(void);
- EXPORT_SYMBOL_GPL(pm_power_off);
- 
- void (*arm_pm_restart)(enum reboot_mode reboot_mode, const char *cmd);
--EXPORT_SYMBOL_GPL(arm_pm_restart);
- 
- /*
-  * This is our default idle handler.
--- 
-1.9.1
+One thing though, do you really need to put some magic number there?  Is 
+it likely to change?  If not this could be hardcoded in the code and 
+only describe the special memory region in DT.
+
+
+Nicolas
