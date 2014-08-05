@@ -1,44 +1,46 @@
-From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
-Date: Tue, 05 Aug 2014 16:26:23 +0200
-Subject: [PATCH v5 0/5] ARM: EXYNOS: cpuidle: fix AFTR mode on boards with
- secure firmware enabled
-In-Reply-To: <53E0E420.8060207@linaro.org>
-References: <1407245666-20016-1-git-send-email-b.zolnierkie@samsung.com>
- <53E0E420.8060207@linaro.org>
-Message-ID: <53E0E98F.5020706@samsung.com>
+From: b.zolnierkie@samsung.com (Bartlomiej Zolnierkiewicz)
+Date: Tue, 05 Aug 2014 16:27:06 +0200
+Subject: [PATCH] ARM: remove unused/deprecated read_cpuid_part_number()
+Message-ID: <2694769.svrdKA2rqt@amdc1032>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05.08.2014 16:03, Daniel Lezcano wrote:
-> On 08/05/2014 03:34 PM, Bartlomiej Zolnierkiewicz wrote:
->> Hi,
->>
->> This patch series adds support for AFTR idle mode on boards with
->> secure firmware enabled and allows EXYNOS cpuidle driver usage on
->> Exynos4x12 SoCs.
->>
->> It has been tested on Trats2 board (using Exynos4412 SoC with secure
->> firmware enabled) on which AFTR mode reduces power consumption by ~12%
->> when EXYNOS cpuidle driver is enabled (in both cases the default
->> exynos_defconfig config is used and CPU1-3 are offlined).
->
-> As a sidenote:
->
-> On my odroid-U2:
->   * 4 cpus online -> 130 mA
->   * 3 cpus online -> 164 mA
->   * 2 cpus online -> 160 mA
->   * 1 cpu online  -> 157 mA
->
-> So were are consuming more when there are unplugged cpu ... any ideas ?
+Commit af040ffc9ba1 ("ARM: make it easier to check the CPU part
+number correctly") has left (now unused in the upstream tree and
+marked as deprecated) read_cpuid_part_number() while changing
+the way it works (using the old function with the definitions will
+now always evaluate as false).  This causes problems with porting
+older code to new kernels as the code compiles (with warnings but
+they are very easy to miss) but it can fail silently or work just
+fine depending on the used hardware.
 
-On which tree are you testing? Current next has ARMCLK down feature 
-enabled. ARMCLK down may stop working after hotunplugging CPU:
-http://www.spinics.net/lists/arm-kernel/msg352890.html
+Remove unused/deprecated read_cpuid_part_number() so developers
+have to update their code during build time instead of running into
+tricky runtime problems later.
 
-That was observed especially on Exynos4212 where ARMCLK down stops 
-working permanently. On Trats2 (Exynos4412) the clock down stopped only 
-a for short period after disabling CPU.
+Please see the commit af040ffc9ba1 for details on how to convert
+your old out-of-tree code to use read_cpuid_part() instead of
+read_cpuid_part_number().
 
-Best regards,
-Krzysztof
+Cc: Nicolas Pitre <nico@linaro.org>
+Signed-off-by: Bartlomiej Zolnierkiewicz <b.zolnierkie@samsung.com>
+---
+ arch/arm/include/asm/cputype.h |    5 -----
+ 1 file changed, 5 deletions(-)
+
+Index: b/arch/arm/include/asm/cputype.h
+===================================================================
+--- a/arch/arm/include/asm/cputype.h	2014-08-04 15:09:30.166988335 +0200
++++ b/arch/arm/include/asm/cputype.h	2014-08-05 15:40:03.793317783 +0200
+@@ -182,11 +182,6 @@ static inline unsigned int __attribute_c
+ 	return read_cpuid_id() & 0xff00fff0;
+ }
+ 
+-static inline unsigned int __attribute_const__ __deprecated read_cpuid_part_number(void)
+-{
+-	return read_cpuid_id() & 0xFFF0;
+-}
+-
+ static inline unsigned int __attribute_const__ xscale_cpu_arch_version(void)
+ {
+ 	return read_cpuid_id() & ARM_CPU_XSCALE_ARCH_MASK;
