@@ -1,53 +1,41 @@
 From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Mon,  4 Aug 2014 18:31:48 -0700
-Subject: [PATCH 6/8] msm: scm: Add a feat version query API
+Date: Mon,  4 Aug 2014 18:31:49 -0700
+Subject: [PATCH 7/8] msm: scm: Add logging of actual return code from scm call
 In-Reply-To: <1407202310-3359-1-git-send-email-sboyd@codeaurora.org>
 References: <1407202310-3359-1-git-send-email-sboyd@codeaurora.org>
-Message-ID: <1407202310-3359-7-git-send-email-sboyd@codeaurora.org>
+Message-ID: <1407202310-3359-8-git-send-email-sboyd@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Some users of SCM need to detect features and also detect if
-those features have certain versions available. Add this API.
+From: Olav Haugan <ohaugan@codeaurora.org>
 
+When an error occurs during an scm call the error returned is
+remapped so we lose the original error code. This means that
+when an error occurs we have no idea what actually failed within
+the secure environment.
+
+Add a logging statement that will log the actual error code from
+scm call allowing us to easily determine what caused the error
+to occur.
+
+Signed-off-by: Olav Haugan <ohaugan@codeaurora.org>
 Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
 ---
- arch/arm/mach-qcom/scm.c | 13 +++++++++++++
- arch/arm/mach-qcom/scm.h |  1 +
- 2 files changed, 14 insertions(+)
+ arch/arm/mach-qcom/scm.c | 1 +
+ 1 file changed, 1 insertion(+)
 
 diff --git a/arch/arm/mach-qcom/scm.c b/arch/arm/mach-qcom/scm.c
-index e80571f57ca4..7c62c03324f4 100644
+index 7c62c03324f4..cfd4717aec78 100644
 --- a/arch/arm/mach-qcom/scm.c
 +++ b/arch/arm/mach-qcom/scm.c
-@@ -410,3 +410,16 @@ int scm_is_call_available(u32 svc_id, u32 cmd_id)
- 	return ret_val;
- }
- EXPORT_SYMBOL(scm_is_call_available);
-+
-+#define GET_FEAT_VERSION_CMD	3
-+int scm_get_feat_version(u32 feat)
-+{
-+	if (scm_is_call_available(SCM_SVC_INFO, GET_FEAT_VERSION_CMD)) {
-+		u32 version;
-+		if (!scm_call(SCM_SVC_INFO, GET_FEAT_VERSION_CMD, &feat,
-+				sizeof(feat), &version, sizeof(version)))
-+			return version;
-+	}
-+	return 0;
-+}
-+EXPORT_SYMBOL(scm_get_feat_version);
-diff --git a/arch/arm/mach-qcom/scm.h b/arch/arm/mach-qcom/scm.h
-index f94c7279616a..6348b08524e7 100644
---- a/arch/arm/mach-qcom/scm.h
-+++ b/arch/arm/mach-qcom/scm.h
-@@ -26,5 +26,6 @@ extern s32 scm_call_atomic2(u32 svc, u32 cmd, u32 arg1, u32 arg2);
+@@ -152,6 +152,7 @@ static inline void *scm_get_response_buffer(const struct scm_response *rsp)
  
- extern u32 scm_get_version(void);
- extern int scm_is_call_available(u32 svc_id, u32 cmd_id);
-+extern int scm_get_feat_version(u32 feat);
- 
- #endif
+ static int scm_remap_error(int err)
+ {
++	pr_err("scm_call failed with error code %d\n", err);
+ 	switch (err) {
+ 	case SCM_ERROR:
+ 		return -EIO;
 -- 
 The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
 hosted by The Linux Foundation
