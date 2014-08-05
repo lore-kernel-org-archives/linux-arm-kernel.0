@@ -1,83 +1,41 @@
 From: b.zolnierkie@samsung.com (Bartlomiej Zolnierkiewicz)
-Date: Tue, 05 Aug 2014 15:34:23 +0200
-Subject: [PATCH v5 2/5] ARM: EXYNOS: add AFTR mode support to firmware do_idle
- method
+Date: Tue, 05 Aug 2014 15:34:26 +0200
+Subject: [PATCH v5 5/5] ARM: EXYNOS: cpuidle: allow driver usage on Exynos4x12
+ SoCs
 In-Reply-To: <1407245666-20016-1-git-send-email-b.zolnierkie@samsung.com>
 References: <1407245666-20016-1-git-send-email-b.zolnierkie@samsung.com>
-Message-ID: <1407245666-20016-3-git-send-email-b.zolnierkie@samsung.com>
+Message-ID: <1407245666-20016-6-git-send-email-b.zolnierkie@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On some platforms (i.e. EXYNOS ones) more than one idle mode is
-available and we need to distinguish them in firmware do_idle method.
+Register cpuidle platform device on Exynos4x12 SoCs allowing EXYNOS
+cpuidle driver usage on these SoCs.
 
-Add mode parameter to do_idle firmware method and AFTR mode support
-to EXYNOS do_idle implementation.
-
-This change is a preparation for adding secure firmware support to
-EXYNOS cpuidle driver.
-
-This patch shouldn't cause any functionality changes (please note
-that do_idle firmware method is unused currently).
+AFTR mode reduces power consumption on Trats2 board (Exynos4412 SoC
+with secure firmware enabled) by ~12% when EXYNOS cpuidle driver is
+enabled (in both cases the default exynos_defconfig config is used
+and CPU1-3 are offlined).
 
 Signed-off-by: Bartlomiej Zolnierkiewicz <b.zolnierkie@samsung.com>
 Acked-by: Kyungmin Park <kyungmin.park@samsung.com>
 ---
- arch/arm/include/asm/firmware.h |  2 +-
- arch/arm/mach-exynos/common.h   |  5 +++++
- arch/arm/mach-exynos/firmware.c | 10 ++++++++--
- 3 files changed, 14 insertions(+), 3 deletions(-)
+ arch/arm/mach-exynos/exynos.c | 4 +++-
+ 1 file changed, 3 insertions(+), 1 deletion(-)
 
-diff --git a/arch/arm/include/asm/firmware.h b/arch/arm/include/asm/firmware.h
-index 5904f59..89aefe1 100644
---- a/arch/arm/include/asm/firmware.h
-+++ b/arch/arm/include/asm/firmware.h
-@@ -28,7 +28,7 @@ struct firmware_ops {
- 	/*
- 	 * Enters CPU idle mode
- 	 */
--	int (*do_idle)(void);
-+	int (*do_idle)(unsigned long mode);
- 	/*
- 	 * Sets boot address of specified physical CPU
- 	 */
-diff --git a/arch/arm/mach-exynos/common.h b/arch/arm/mach-exynos/common.h
-index c218200..2d830df 100644
---- a/arch/arm/mach-exynos/common.h
-+++ b/arch/arm/mach-exynos/common.h
-@@ -119,6 +119,11 @@ extern void __iomem *sysram_base_addr;
- extern void __iomem *pmu_base_addr;
- void exynos_sysram_init(void);
+diff --git a/arch/arm/mach-exynos/exynos.c b/arch/arm/mach-exynos/exynos.c
+index 6a24e11..15cf86d 100644
+--- a/arch/arm/mach-exynos/exynos.c
++++ b/arch/arm/mach-exynos/exynos.c
+@@ -317,7 +317,9 @@ static void __init exynos_dt_machine_init(void)
+ 		exynos_sysram_init();
  
-+enum {
-+	FW_DO_IDLE_SLEEP,
-+	FW_DO_IDLE_AFTR,
-+};
-+
- void exynos_firmware_init(void);
+ 	if (of_machine_is_compatible("samsung,exynos4210") ||
+-			of_machine_is_compatible("samsung,exynos5250"))
++	    of_machine_is_compatible("samsung,exynos4212") ||
++	    of_machine_is_compatible("samsung,exynos4412") ||
++	    of_machine_is_compatible("samsung,exynos5250"))
+ 		platform_device_register(&exynos_cpuidle);
  
- extern u32 exynos_get_eint_wake_mask(void);
-diff --git a/arch/arm/mach-exynos/firmware.c b/arch/arm/mach-exynos/firmware.c
-index f5e626d..e57b7c3 100644
---- a/arch/arm/mach-exynos/firmware.c
-+++ b/arch/arm/mach-exynos/firmware.c
-@@ -28,9 +28,15 @@
- #define EXYNOS_BOOT_ADDR	0x8
- #define EXYNOS_BOOT_FLAG	0xc
- 
--static int exynos_do_idle(void)
-+static int exynos_do_idle(unsigned long mode)
- {
--	exynos_smc(SMC_CMD_SLEEP, 0, 0, 0);
-+	switch (mode) {
-+	case FW_DO_IDLE_AFTR:
-+		exynos_smc(SMC_CMD_CPU0AFTR, 0, 0, 0);
-+		break;
-+	case FW_DO_IDLE_SLEEP:
-+		exynos_smc(SMC_CMD_SLEEP, 0, 0, 0);
-+	}
- 	return 0;
- }
- 
+ 	platform_device_register_simple("exynos-cpufreq", -1, NULL, 0);
 -- 
 1.8.2.3
