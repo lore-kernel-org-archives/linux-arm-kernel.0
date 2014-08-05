@@ -1,220 +1,108 @@
 From: m.szyprowski@samsung.com (Marek Szyprowski)
-Date: Tue, 05 Aug 2014 12:47:51 +0200
-Subject: [PATCH 23/29] iommu: exynos: init iommu controllers from device tree
+Date: Tue, 05 Aug 2014 12:47:57 +0200
+Subject: [PATCH 29/29] temporary: media: s5p-mfc: add support for IOMMU
 In-Reply-To: <1407235677-26324-1-git-send-email-m.szyprowski@samsung.com>
 References: <1407235677-26324-1-git-send-email-m.szyprowski@samsung.com>
-Message-ID: <1407235677-26324-24-git-send-email-m.szyprowski@samsung.com>
+Message-ID: <1407235677-26324-30-git-send-email-m.szyprowski@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds code to initialize and assign SYSMMU controllers to
-their master devices defined in device tree.
+This patch is an example how to use more than one IOMMU controller in a
+device driver for hardware blocks, which have more then one dma master
+(memory interface with iommu controller).
+
+This patch is temporary, do not merge it yet.
 
 Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
 ---
- drivers/iommu/exynos-iommu.c | 152 +++++++++++++++++++++++++++++++++++++++++--
- 1 file changed, 145 insertions(+), 7 deletions(-)
+ drivers/media/platform/s5p-mfc/s5p_mfc.c | 46 ++++++++++++++++++++++++++++++--
+ 1 file changed, 44 insertions(+), 2 deletions(-)
 
-diff --git a/drivers/iommu/exynos-iommu.c b/drivers/iommu/exynos-iommu.c
-index 46e0edc..845f547 100644
---- a/drivers/iommu/exynos-iommu.c
-+++ b/drivers/iommu/exynos-iommu.c
-@@ -21,6 +21,7 @@
- #include <linux/err.h>
- #include <linux/mm.h>
+diff --git a/drivers/media/platform/s5p-mfc/s5p_mfc.c b/drivers/media/platform/s5p-mfc/s5p_mfc.c
+index 77b99ae..c2e95ab 100644
+--- a/drivers/media/platform/s5p-mfc/s5p_mfc.c
++++ b/drivers/media/platform/s5p-mfc/s5p_mfc.c
+@@ -22,7 +22,11 @@
+ #include <media/v4l2-event.h>
+ #include <linux/workqueue.h>
  #include <linux/of.h>
 +#include <linux/of_platform.h>
- #include <linux/iommu.h>
- #include <linux/errno.h>
- #include <linux/list.h>
-@@ -211,6 +212,9 @@ struct sysmmu_drvdata {
- 	struct list_head owner_node;
- 	phys_addr_t pgtable;
- 	int version;
-+	const char *name;
-+	dma_addr_t base;
-+	size_t size;
+ #include <media/videobuf2-core.h>
++
++#include <asm/dma-iommu.h>
++
+ #include "s5p_mfc_common.h"
+ #include "s5p_mfc_ctrl.h"
+ #include "s5p_mfc_debug.h"
+@@ -996,6 +1000,39 @@ static const struct v4l2_file_operations s5p_mfc_fops = {
+ 	.mmap = s5p_mfc_mmap,
  };
  
- static bool set_sysmmu_active(struct sysmmu_drvdata *data)
-@@ -574,6 +578,11 @@ static int __init exynos_sysmmu_probe(struct platform_device *pdev)
- 	}
- 
- 	data->sysmmu = dev;
-+
-+	/* default io address space parameters */
-+	data->base = SZ_1G;
-+	data->size = SZ_2G;
-+
- 	spin_lock_init(&data->lock);
- 
- 	platform_set_drvdata(pdev, data);
-@@ -1055,30 +1064,159 @@ static phys_addr_t exynos_iommu_iova_to_phys(struct iommu_domain *domain,
- 	return phys;
- }
- 
-+static void __free_owner_struct(struct exynos_iommu_owner *owner,
-+				struct device *dev)
++static struct device *s5p_mfc_alloc_memdev(struct device *dev, const char *name)
 +{
-+	while (!list_empty(&owner->clients))
-+		list_del_init(owner->clients.next);
-+
-+	kfree(owner);
-+	dev->archdata.iommu = NULL;
-+}
-+
-+static int __init_master_sysmmu(struct device *dev)
-+{
-+	struct of_phandle_args sysmmu_spec;
-+	struct exynos_iommu_owner *owner;
-+	int i = 0;
++	struct device *child;
 +	int ret;
 +
-+	owner = kzalloc(sizeof(*owner), GFP_KERNEL);
-+	if (!owner)
-+		return -ENOMEM;
-+	INIT_LIST_HEAD(&owner->clients);
++	child = devm_kzalloc(dev, sizeof(struct device), GFP_KERNEL);
++	if (!child)
++		return NULL;
 +
-+	while (!of_parse_phandle_with_args(dev->of_node, "iommus",
-+					   "#iommu-cells", i,
-+					   &sysmmu_spec)) {
-+		struct platform_device *sysmmu;
-+		struct sysmmu_drvdata *data;
++	device_initialize(child);
++	dev_set_name(child, "%s:%s", dev_name(dev), name);
++	child->parent = dev;
++	child->bus = dev->bus;
++	child->coherent_dma_mask = dev->coherent_dma_mask;
++	child->dma_mask = dev->dma_mask;
 +
-+		sysmmu = of_find_device_by_node(sysmmu_spec.np);
-+		if (!sysmmu) {
-+			dev_err(dev, "sysmmu node not found\n");
-+			ret = -ENODEV;
-+			goto err;
-+		}
-+		data = platform_get_drvdata(sysmmu);
-+		if (!data) {
-+			ret = -ENODEV;
-+			goto err;
-+		}
-+
-+		of_property_read_string_index(dev->of_node, "iommu-names", i,
-+					      &data->name);
-+
-+		if (sysmmu_spec.args_count == 2) {
-+			data->base = sysmmu_spec.args[0];
-+			data->size = sysmmu_spec.args[1];
-+		} else if (sysmmu_spec.args_count != 0) {
-+			dev_err(dev, "incorrect iommu property specified\n");
-+			ret = -EINVAL;
-+			goto err;
-+		}
-+
-+		list_add_tail(&data->owner_node, &owner->clients);
-+
-+		i++;
++	if (device_add(child) == 0) {
++		ret = arm_iommu_create_default_mapping(child, 0x20000000,
++						       SZ_256M);
++		if (ret == 0)
++			return child;
 +	}
 +
-+	if (i == 0) {
-+		ret = -ENODEV;
-+		goto err;
-+	}
-+
-+	dev->archdata.iommu = owner;
-+	dev_dbg(dev, "registered %d sysmmu controllers\n", i);
-+
-+	return 0;
-+err:
-+	__free_owner_struct(owner, dev);
-+	return ret;
++	put_device(child);
++	return NULL;
 +}
 +
-+static int __init_subdevice_sysmmu(struct device *dev)
++void s5p_mfc_free_memdev(struct device *dev)
 +{
-+	struct device *parent = dev->parent;
-+	struct exynos_iommu_owner *owner;
-+	struct sysmmu_drvdata *data;
-+	char *name;
-+
-+	name = strrchr(dev_name(dev), ':');
-+	if (!name)
-+		return -ENODEV;
-+	name++;
-+
-+	owner = parent->archdata.iommu;
-+	if (!owner)
-+		return -ENODEV;
-+
-+	list_for_each_entry(data, &owner->clients, owner_node)
-+		if (strcmp(name, data->name) == 0)
-+			break;
-+	if (!data)
-+		return -ENODEV;
-+
-+	owner = kzalloc(sizeof(*owner), GFP_KERNEL);
-+	if (!owner)
-+		return -ENOMEM;
-+	INIT_LIST_HEAD(&owner->clients);
-+
-+	/* move sysmmu from parent to child device */
-+	list_del(&data->owner_node);
-+	list_add_tail(&data->owner_node, &owner->clients);
-+
-+	dev->archdata.iommu = owner;
-+	dev_dbg(dev->parent,
-+		"registered sysmmu controller for %s subdevice\n", data->name);
-+
-+	return 0;
++	arm_iommu_release_default_mapping(dev);
++	put_device(dev);
 +}
 +
- static int exynos_iommu_add_device(struct device *dev)
- {
- 	struct iommu_group *group;
- 	int ret;
+ static void *mfc_get_drv_data(struct platform_device *pdev);
  
--	group = iommu_group_get(dev);
-+	BUG_ON(dev->archdata.iommu != NULL);
- 
--	if (!group) {
--		group = iommu_group_alloc();
--		if (IS_ERR(group)) {
--			dev_err(dev, "Failed to allocate IOMMU group\n");
--			return PTR_ERR(group);
--		}
-+	if (of_get_property(dev->of_node, "iommus", NULL))
-+		ret = __init_master_sysmmu(dev);
-+	else if (dev->parent &&
-+		 of_get_property(dev->parent->of_node, "iommus", NULL))
-+		ret = __init_subdevice_sysmmu(dev);
-+	else
-+		return -ENODEV;
-+
-+	if (ret)
-+		return ret;
-+
-+	group = iommu_group_alloc();
-+	if (IS_ERR(group)) {
-+		dev_err(dev, "Failed to allocate IOMMU group\n");
-+		ret = PTR_ERR(group);
-+		goto err;
+ /* MFC probe function */
+@@ -1049,8 +1086,8 @@ static int s5p_mfc_probe(struct platform_device *pdev)
+ 		goto err_res;
  	}
  
- 	ret = iommu_group_add_device(group, dev);
-+	if (ret != 0)
-+		goto err;
-+
- 	iommu_group_put(group);
+-	dev->mem_dev_l = &dev->plat_dev->dev;
+-	dev->mem_dev_r = &dev->plat_dev->dev;
++	dev->mem_dev_l = s5p_mfc_alloc_memdev(&dev->plat_dev->dev, "left");
++	dev->mem_dev_r = s5p_mfc_alloc_memdev(&dev->plat_dev->dev, "right");
  
-+	return 0;
-+err:
-+	__free_owner_struct(dev->archdata.iommu, dev);
- 	return ret;
- }
+ 	dev->alloc_ctx[0] = vb2_dma_contig_init_ctx(dev->mem_dev_l);
+ 	if (IS_ERR(dev->alloc_ctx[0])) {
+@@ -1181,6 +1218,10 @@ static int s5p_mfc_remove(struct platform_device *pdev)
+ 	s5p_mfc_release_firmware(dev);
+ 	vb2_dma_contig_cleanup_ctx(dev->alloc_ctx[0]);
+ 	vb2_dma_contig_cleanup_ctx(dev->alloc_ctx[1]);
++	if (dev->mem_dev_l)
++		s5p_mfc_free_memdev(dev->mem_dev_l);
++	if (dev->mem_dev_r)
++		s5p_mfc_free_memdev(dev->mem_dev_r);
  
- static void exynos_iommu_remove_device(struct device *dev)
- {
-+	struct exynos_iommu_owner *owner = dev->archdata.iommu;
-+
- 	iommu_group_remove_device(dev);
-+	if (owner)
-+		__free_owner_struct(owner, dev);
- }
+ 	s5p_mfc_final_pm(dev);
+ 	return 0;
+@@ -1436,6 +1477,7 @@ static struct platform_driver s5p_mfc_driver = {
+ 		.owner	= THIS_MODULE,
+ 		.pm	= &s5p_mfc_pm_ops,
+ 		.of_match_table = exynos_mfc_match,
++		.flags	= DRIVER_HAS_OWN_IOMMU_MANAGER,
+ 	},
+ };
  
- static const struct iommu_ops exynos_iommu_ops = {
 -- 
 1.9.2
