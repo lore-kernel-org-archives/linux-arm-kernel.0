@@ -1,29 +1,26 @@
-From: lina.iyer@linaro.org (Lina Iyer)
-Date: Mon, 4 Aug 2014 22:07:31 -0600 (MDT)
-Subject: [PATCH 8/8] msm: scm: Move the scm driver to drivers/soc/qcom
-In-Reply-To: <1407202310-3359-9-git-send-email-sboyd@codeaurora.org>
-References: <1407202310-3359-1-git-send-email-sboyd@codeaurora.org>
- <1407202310-3359-9-git-send-email-sboyd@codeaurora.org>
-Message-ID: <alpine.OSX.2.03.1408042203100.87047@linaro.org>
+From: airlied@linux.ie (Dave Airlie)
+Date: Tue, 5 Aug 2014 05:20:25 +0100 (IST)
+Subject: linux-next: build failures after merge of the drm tree
+In-Reply-To: <20140805130926.4e8c8fe5@canb.auug.org.au>
+References: <20140805130926.4e8c8fe5@canb.auug.org.au>
+Message-ID: <alpine.DEB.2.00.1408050519270.22643@skynet.skynet.ie>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 4 Aug 2014, Stephen Boyd wrote:
 
-> Architectural changes in the ARM Linux kernel tree mandate
-> the eventual removal of the mach-* directories. Move the
-> scm driver to drivers/soc/qcom and the scm header to
-> include/soc/qcom to support that removal.
+> Hi Dave,
 > 
-> Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
-> ---
->  arch/arm/mach-qcom/Kconfig                     | 3 ---
->  arch/arm/mach-qcom/Makefile                    | 4 +---
->  arch/arm/mach-qcom/scm-boot.c                  | 2 +-
+> After merging the drm tree, today's linux-next build (x86_64
+> allmodconfig) failed like this:
+> 
+> ERROR: "drm_sysfs_connector_remove" [drivers/gpu/drm/i2c/tda998x.ko] undefined!
+> ERROR: "drm_sysfs_connector_add" [drivers/gpu/drm/i2c/tda998x.ko] undefined!
+> 
 
- diff --git a/arch/arm/mach-qcom/scm.h b/include/soc/qcom/scm.h
-> similarity index 100%
-> rename from arch/arm/mach-qcom/scm.h
-> rename to include/soc/qcom/scm.h
+I've fixed this, caught it myself a few mins after push,
 
-Could we move scm-boot.c as well to drivers/soc/qcom and scm-boot.h to include/soc/qcom ?
+The other I'm not sure about, I'll hope the exynos guys know what is going 
+on.
+
+Thanks,
+Dave.
