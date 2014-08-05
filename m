@@ -1,99 +1,30 @@
-From: daniel.lezcano@linaro.org (Daniel Lezcano)
-Date: Tue, 05 Aug 2014 15:50:54 +0200
-Subject: [PATCH v5 0/5] ARM: EXYNOS: cpuidle: fix AFTR mode on boards
- with secure firmware enabled
-In-Reply-To: <1407245666-20016-1-git-send-email-b.zolnierkie@samsung.com>
-References: <1407245666-20016-1-git-send-email-b.zolnierkie@samsung.com>
-Message-ID: <53E0E13E.3@linaro.org>
+From: festevam@gmail.com (Fabio Estevam)
+Date: Tue, 5 Aug 2014 10:53:21 -0300
+Subject: Oops: 17 SMP ARM (v3.16-rc2)
+In-Reply-To: <C4A61A5CA4AD2246942F4BA6F20ACB8043575072@ALVA-EXMB04.alv.autoliv.int>
+References: <C4A61A5CA4AD2246942F4BA6F20ACB804356534D@ALVA-EXMB04.alv.autoliv.int>
+ <20140626140115.GQ32514@n2100.arm.linux.org.uk>
+ <C4A61A5CA4AD2246942F4BA6F20ACB80435655E9@ALVA-EXMB04.alv.autoliv.int>
+ <20140626151424.GT32514@n2100.arm.linux.org.uk>
+ <20140627112151.GF32514@n2100.arm.linux.org.uk>
+ <3FFB61A7A8473C49831AF20FA193534A43CADFA7@ALVA-EXMB01.alv.autoliv.int>
+ <20140627163108.GP32514@n2100.arm.linux.org.uk>
+ <C4A61A5CA4AD2246942F4BA6F20ACB8043575072@ALVA-EXMB04.alv.autoliv.int>
+Message-ID: <CAOMZO5BdPKZSV4mQMA+vCJFpZ2KV6fooLNH2TvfvvVto+Eb2JA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08/05/2014 03:34 PM, Bartlomiej Zolnierkiewicz wrote:
-> Hi,
->
-> This patch series adds support for AFTR idle mode on boards with
-> secure firmware enabled and allows EXYNOS cpuidle driver usage on
-> Exynos4x12 SoCs.
->
-> It has been tested on Trats2 board (using Exynos4412 SoC with secure
-> firmware enabled) on which AFTR mode reduces power consumption by ~12%
-> when EXYNOS cpuidle driver is enabled (in both cases the default
-> exynos_defconfig config is used and CPU1-3 are offlined).
+On Tue, Aug 5, 2014 at 10:31 AM, Mattis Lorentzon
+<Mattis.Lorentzon@autoliv.com> wrote:
 
-Hi Bartlomiej,
+> We have applied your V2 patch set of 30 patches on top of v3.16-rc2 and are
+> currently running some stability tests.
+>
+> During our first test round we triggered a timeout which caused the fec driver
+> to become unresponsive for several minutes. The attached backtrace was
+> shown when the hardware was rebooted.
 
-I tested your patchset on an odroid-u2. When the cpuidle driver is 
-enabled and the cpu1-3 are offlined, the kernel hangs.
+Could this problem be the same one as reported at:
+http://www.spinics.net/lists/arm-kernel/msg347914.html ?
 
-If I disable the AFTR state on cpuidle, and offline the 1-3, it works as 
-expected. So there is something wrong with the AFTR on the odroid board.
-
-> Depends on:
-> - next-20140804 branch of linux-next kernel tree
-> - [PATCH v5][next-20140804] ARM: EXYNOS: Fix suspend/resume sequences
->    (http://www.mail-archive.com/linux-samsung-soc at vger.kernel.org/msg35262.html)
-> - [PATCH v2 0/2] Firmware-assisted suspend/resume of Exynos SoCs
->    (http://www.mail-archive.com/linux-samsung-soc at vger.kernel.org/msg34282.html)
->
-> Changes since v4:
-> - rebased on top of next-20140804 +
->    [PATCH v5][next-20140804] ARM: EXYNOS: Fix suspend/resume sequences
->    (http://www.mail-archive.com/linux-samsung-soc at vger.kernel.org/msg35262.html)
->    [PATCH v2 0/2] Firmware-assisted suspend/resume of Exynos SoCs
->    (http://www.mail-archive.com/linux-samsung-soc at vger.kernel.org/msg34282.html)
-> - call exynos_save_cp15() only on A9 type core (this is needed for the future
->    Exynos3250 SoC support)
->
-> Changes since v3:
-> - rebased on top of next-20140804 +
->    [PATCH v4][next-20140804] ARM: EXYNOS: Fix suspend/resume sequences
->    (http://www.mail-archive.com/linux-samsung-soc at vger.kernel.org/msg35192.html)
->    [PATCH v2 0/2] Firmware-assisted suspend/resume of Exynos SoCs
->    (http://www.mail-archive.com/linux-samsung-soc at vger.kernel.org/msg34282.html)
-> - (re-)added patch fixing S5P_CENTRAL_SEQ_OPTION register setup
->
-> Changes since v2:
-> - rebased on top of next-20140708 +
->    [PATCH 5/6] ARM: EXYNOS: Fix suspend/resume sequencies
->    (http://www.mail-archive.com/linux-samsung-soc at vger.kernel.org/msg32809.html)
->    [with rejects fixed]
->    [PATCH 6/6] ARM: EXYNOS: Register cpuidle device only on Exynos4210 and 5250
->    (http://www.mail-archive.com/linux-samsung-soc at vger.kernel.org/msg32808.html)
->    [PATCH 0/2] Firmware-assisted suspend/resume of Exynos SoCs
->    (http://www.mail-archive.com/linux-samsung-soc at vger.kernel.org/msg32991.html)
->    [with rejects fixed in patch #2]
-> - addressed review comments from Tomasz Figa and Daniel Lezcano
->
-> Changes since v1:
-> - synced against next-20140602
-> - added missing Acked-by-s
->
-> Best regards,
-> --
-> Bartlomiej Zolnierkiewicz
-> Samsung R&D Institute Poland
-> Samsung Electronics
->
->
-> Bartlomiej Zolnierkiewicz (5):
->    ARM: EXYNOS: PM: replace EXYNOS_BOOT_VECTOR_* macros by static inlines
->    ARM: EXYNOS: add AFTR mode support to firmware do_idle method
->    ARM: EXYNOS: cpuidle: add secure firmware support to AFTR mode code
->    ARM: EXYNOS: PM: fix register setup for AFTR mode code
->    ARM: EXYNOS: cpuidle: allow driver usage on Exynos4x12 SoCs
->
->   arch/arm/include/asm/firmware.h |  2 +-
->   arch/arm/mach-exynos/common.h   |  5 ++++
->   arch/arm/mach-exynos/exynos.c   |  4 ++-
->   arch/arm/mach-exynos/firmware.c | 34 ++++++++++++++++-------
->   arch/arm/mach-exynos/pm.c       | 60 ++++++++++++++++++++++++-----------------
->   5 files changed, 70 insertions(+), 35 deletions(-)
->
-
-
--- 
-  <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
-
-Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
-<http://twitter.com/#!/linaroorg> Twitter |
-<http://www.linaro.org/linaro-blog/> Blog
+Which Ethernet PHY do you use? Do you have pull-up in the MDIO line?
