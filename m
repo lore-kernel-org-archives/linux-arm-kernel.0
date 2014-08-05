@@ -1,51 +1,41 @@
-From: wangyijing@huawei.com (Yijing Wang)
-Date: Tue, 5 Aug 2014 10:20:55 +0800
-Subject: [RFC PATCH 00/11] Refactor MSI to support Non-PCI device
-In-Reply-To: <201408041645.50566.arnd@arndb.de>
-References: <1406344128-27055-1-git-send-email-wangyijing@huawei.com>
- <201408011516.26253.arnd@arndb.de> <53DEFECB.3030201@huawei.com>
- <201408041645.50566.arnd@arndb.de>
-Message-ID: <53E03F87.8040702@huawei.com>
+From: festevam@gmail.com (Fabio Estevam)
+Date: Mon, 4 Aug 2014 23:33:17 -0300
+Subject: Suspend/resume broken on mx5/mx6 running 4.16
+In-Reply-To: <CAOMZO5D0a96m0NPibN5pHOMsu+muHygeb=oqPd=etG8WjgyAwQ@mail.gmail.com>
+References: <CAOMZO5BN9H-4__2s9yyGiuOBsLO0gf9LOQ0_N1552P8LWJTxCg@mail.gmail.com>
+ <20140804181106.GI30282@n2100.arm.linux.org.uk>
+ <CAOMZO5D0a96m0NPibN5pHOMsu+muHygeb=oqPd=etG8WjgyAwQ@mail.gmail.com>
+Message-ID: <CAOMZO5DhTk+Pd=77OB5nfQonjwHMdozi4C4bzfWLyYXz3_xHsQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2014/8/4 22:45, Arnd Bergmann wrote:
-> On Monday 04 August 2014, Yijing Wang wrote:
->> I have another question is some drivers will request more than one
->> MSI/MSI-X IRQ, and the driver will use them to process different things.
->> Eg. network driver generally uses one of them to process trivial network thins,
->> and others to transmit/receive data.
+On Mon, Aug 4, 2014 at 3:21 PM, Fabio Estevam <festevam@gmail.com> wrote:
+> Hi Russell,
+>
+> On Mon, Aug 4, 2014 at 3:11 PM, Russell King - ARM Linux
+> <linux@arm.linux.org.uk> wrote:
+>
+>> Right, so the code which oopsed was:
 >>
->> So, in this case, it seems to driver need to touch the IRQ numbers.
+>>    0:   e1a0c00d        mov     ip, sp
+>>    4:   e92dd818        push    {r3, r4, fp, ip, lr, pc}
+>>    8:   e24cb004        sub     fp, ip, #4
+>>    c:   e5904088        ldr     r4, [r0, #136]  ; 0x88
+>>   10:   e594302c        ldr     r3, [r4, #44]   ; 0x2c
 >>
->> wr-linux:~ # cat /proc/interrupts
->>             CPU0       CPU1       CPU2     ....      CPU17      CPU18      CPU19      CPU20      CPU21      CPU22      CPU23
->>  ......
->>  100:          0          0          0               0          0          0          0          0          0          0  IR-PCI-MSI-edge      eth0
->>  101:          2          0          0               0          0          0  302830488          0          0          0  IR-PCI-MSI-edge      eth0-TxRx-0
->>  102:        110          0          0               0          0  360675897          0          0          0          0  IR-PCI-MSI-edge      eth0-TxRx-1
->>  103:        109          0          0               0          0          0          0          0          0          0  IR-PCI-MSI-edge      eth0-TxRx-2
->>  104:        107          0          0         9678933          0          0          0          0          0          0  IR-PCI-MSI-edge      eth0-TxRx-3
->>  105:        107          0          0               0  357838258          0          0          0          0          0  IR-PCI-MSI-edge      eth0-TxRx-4
->>  106:        115          0          0               0          0          0          0          0          0          0  IR-PCI-MSI-edge      eth0-TxRx-5
->>  107:        114          0          0               0          0          0          0  337866096          0          0  IR-PCI-MSI-edge      eth0-TxRx-6
->>  108:  373801199          0          0               0          0          0          0          0          0          0  IR-PCI-MSI-edge      eth0-TxRx-7
+>> and from the above, we can see that r4 was NULL.
 >>
-> 
-> I think in this example, you just need to request eight interrupts, and pass a
-> different data pointer each time, pointing to the napi_struct of each of the
-> NIC queues. The driver has no need to deal with the IRQ number at all,
-> and I would be surprised if it cared today.
+>> fec_suspend(struct device *dev)
+>> {
+>>         struct net_device *ndev = dev_get_drvdata(dev);
+>>
+>> which would make ndev NULL.  I don't see how that could happen though,
+>> as we set the driver data in the probe function.  Any patches on top of
+>> 3.16?
+>
+> Yes, I still do not understand why we are getting this NULL pointer
+> inside fec_suspend().
+>
+> I am using the original 3.16 with no other patches on top.
 
-Yes, you are right, this is not a stumbling block. :)
-
-> 
-> 	Arnd
-> 
-> .
-> 
-
-
--- 
-Thanks!
-Yijing
+I managed to bisect it. Will start a thread at netdev about it.
