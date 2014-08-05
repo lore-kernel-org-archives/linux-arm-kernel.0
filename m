@@ -1,250 +1,173 @@
 From: m.szyprowski@samsung.com (Marek Szyprowski)
-Date: Tue, 05 Aug 2014 12:47:29 +0200
-Subject: [PATCH 01/29] pm: Add PM domain notifications
+Date: Tue, 05 Aug 2014 12:47:33 +0200
+Subject: [PATCH 05/29] drivers: convert suppress_bind_attrs parameter into
+ flags
 In-Reply-To: <1407235677-26324-1-git-send-email-m.szyprowski@samsung.com>
 References: <1407235677-26324-1-git-send-email-m.szyprowski@samsung.com>
-Message-ID: <1407235677-26324-2-git-send-email-m.szyprowski@samsung.com>
+Message-ID: <1407235677-26324-6-git-send-email-m.szyprowski@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Sylwester Nawrocki <s.nawrocki@samsung.com>
+This patch extends struct device_driver with a flags member and converts
+existing suppress_bind_attrs bool field to a flag. This way new flags
+can be easily added in the future without changing the structure itself.
 
-This patch adds notifiers to the runtime PM/genpd subsystem. It is now
-possible to register a notifier, which will be called before and after
-the generic power domain subsystem calls the power domain's power_on
-and power_off callbacks.
-
-Signed-off-by: Sylwester Nawrocki <s.nawrocki@samsung.com>
+Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
 ---
- Documentation/power/notifiers.txt | 14 ++++++++
- drivers/base/power/domain.c       | 70 ++++++++++++++++++++++++++++++++++++---
- include/linux/pm.h                |  2 ++
- include/linux/pm_domain.h         | 19 +++++++++++
- 4 files changed, 101 insertions(+), 4 deletions(-)
+ arch/arm/mach-integrator/impd1.c | 2 +-
+ drivers/base/bus.c               | 4 ++--
+ drivers/base/platform.c          | 2 +-
+ drivers/pci/host/pci-mvebu.c     | 2 +-
+ drivers/pci/host/pci-rcar-gen2.c | 2 +-
+ drivers/pci/host/pci-tegra.c     | 2 +-
+ drivers/pci/host/pcie-rcar.c     | 2 +-
+ drivers/soc/tegra/pmc.c          | 2 +-
+ include/linux/device.h           | 6 ++++--
+ 9 files changed, 13 insertions(+), 11 deletions(-)
 
-diff --git a/Documentation/power/notifiers.txt b/Documentation/power/notifiers.txt
-index a81fa25..62303f6 100644
---- a/Documentation/power/notifiers.txt
-+++ b/Documentation/power/notifiers.txt
-@@ -53,3 +53,17 @@ NULL).  To register and/or unregister a suspend notifier use the functions
- register_pm_notifier() and unregister_pm_notifier(), respectively, defined in
- include/linux/suspend.h .  If you don't need to unregister the notifier, you can
- also use the pm_notifier() macro defined in include/linux/suspend.h .
-+
-+Power Domain notifiers
-+----------------------
-+
-+The power domain notifiers allow subsystems or drivers to register for power
-+domain on/off notifications, should they need to perform any actions right
-+before or right after the power domain on/off.  The device must be already
-+added to a power domain before its subsystem or driver registers the notifier.
-+Following events are supported:
-+
-+PM_GENPD_POWER_ON_PREPARE	The power domain is about to turn on.
-+PM_GENPD_POST_POWER_ON		The power domain has just turned on.
-+PM_GENPD_POWER_OFF_PREPARE	The power domain is about to turn off.
-+PM_GENPD_POST_POWER_OFF		The power domain has just turned off.
-diff --git a/drivers/base/power/domain.c b/drivers/base/power/domain.c
-index eee55c1..5fe0966 100644
---- a/drivers/base/power/domain.c
-+++ b/drivers/base/power/domain.c
-@@ -70,6 +70,45 @@ static struct generic_pm_domain *pm_genpd_lookup_name(const char *domain_name)
- 	return genpd;
- }
- 
-+int pm_genpd_register_notifier(struct device *dev, struct notifier_block *nb)
-+{
-+	struct pm_domain_data *pdd;
-+	int ret = -EINVAL;
-+
-+	spin_lock_irq(&dev->power.lock);
-+	if (dev->power.subsys_data) {
-+		pdd = dev->power.subsys_data->domain_data;
-+		ret = blocking_notifier_chain_register(&pdd->notify_chain_head,
-+						       nb);
-+	}
-+	spin_unlock_irq(&dev->power.lock);
-+	return ret;
-+}
-+EXPORT_SYMBOL_GPL(pm_genpd_register_notifier);
-+
-+void pm_genpd_unregister_notifier(struct device *dev, struct notifier_block *nb)
-+{
-+	struct pm_domain_data *pdd;
-+
-+	spin_lock_irq(&dev->power.lock);
-+	if (dev->power.subsys_data) {
-+		pdd = dev->power.subsys_data->domain_data;
-+		blocking_notifier_chain_unregister(&pdd->notify_chain_head, nb);
-+	}
-+	spin_unlock_irq(&dev->power.lock);
-+}
-+EXPORT_SYMBOL_GPL(pm_genpd_unregister_notifier);
-+
-+static void pm_genpd_notifier_call(unsigned long event,
-+				   struct generic_pm_domain *genpd)
-+{
-+	struct pm_domain_data *pdd;
-+
-+	list_for_each_entry(pdd, &genpd->dev_list, list_node)
-+		blocking_notifier_call_chain(&pdd->notify_chain_head,
-+					     event, pdd->dev);
-+}
-+
- #ifdef CONFIG_PM
- 
- struct generic_pm_domain *dev_to_genpd(struct device *dev)
-@@ -231,10 +270,14 @@ static int __pm_genpd_poweron(struct generic_pm_domain *genpd)
- 		ktime_t time_start = ktime_get();
- 		s64 elapsed_ns;
- 
-+		pm_genpd_notifier_call(PM_GENPD_POWER_ON_PREPARE, genpd);
-+
- 		ret = genpd->power_on(genpd);
- 		if (ret)
- 			goto err;
- 
-+		pm_genpd_notifier_call(PM_GENPD_POST_POWER_ON, genpd);
-+
- 		elapsed_ns = ktime_to_ns(ktime_sub(ktime_get(), time_start));
- 		if (elapsed_ns > genpd->power_on_latency_ns) {
- 			genpd->power_on_latency_ns = elapsed_ns;
-@@ -554,13 +597,17 @@ static int pm_genpd_poweroff(struct generic_pm_domain *genpd)
- 		 * the pm_genpd_poweron() restore power for us (this shouldn't
- 		 * happen very often).
+diff --git a/arch/arm/mach-integrator/impd1.c b/arch/arm/mach-integrator/impd1.c
+index 3ce8807..a7e7330 100644
+--- a/arch/arm/mach-integrator/impd1.c
++++ b/arch/arm/mach-integrator/impd1.c
+@@ -406,7 +406,7 @@ static struct lm_driver impd1_driver = {
+ 		 * As we're dropping the probe() function, suppress driver
+ 		 * binding from sysfs.
  		 */
-+		pm_genpd_notifier_call(PM_GENPD_POWER_OFF_PREPARE, genpd);
-+
- 		ret = genpd->power_off(genpd);
- 		if (ret == -EBUSY) {
- 			genpd_set_active(genpd);
- 			goto out;
- 		}
--
- 		elapsed_ns = ktime_to_ns(ktime_sub(ktime_get(), time_start));
-+
-+		pm_genpd_notifier_call(PM_GENPD_POST_POWER_OFF, genpd);
-+
- 		if (elapsed_ns > genpd->power_off_latency_ns) {
- 			genpd->power_off_latency_ns = elapsed_ns;
- 			genpd->max_off_time_changed = true;
-@@ -837,9 +884,13 @@ static void pm_genpd_sync_poweroff(struct generic_pm_domain *genpd)
- 	    || atomic_read(&genpd->sd_count) > 0)
+-		.suppress_bind_attrs = true,
++		.flags = DRIVER_SUPPRESS_BIND_ATTRS,
+ 	},
+ 	.probe		= impd1_probe,
+ 	.remove		= impd1_remove,
+diff --git a/drivers/base/bus.c b/drivers/base/bus.c
+index 83e910a..f223f26 100644
+--- a/drivers/base/bus.c
++++ b/drivers/base/bus.c
+@@ -707,7 +707,7 @@ int bus_add_driver(struct device_driver *drv)
+ 			__func__, drv->name);
+ 	}
+ 
+-	if (!drv->suppress_bind_attrs) {
++	if (!(drv->flags & DRIVER_SUPPRESS_BIND_ATTRS)) {
+ 		error = add_bind_files(drv);
+ 		if (error) {
+ 			/* Ditto */
+@@ -740,7 +740,7 @@ void bus_remove_driver(struct device_driver *drv)
+ 	if (!drv->bus)
  		return;
  
--	if (genpd->power_off)
-+	if (genpd->power_off) {
-+		pm_genpd_notifier_call(PM_GENPD_POWER_OFF_PREPARE, genpd);
- 		genpd->power_off(genpd);
+-	if (!drv->suppress_bind_attrs)
++	if (!(drv->flags & DRIVER_SUPPRESS_BIND_ATTRS))
+ 		remove_bind_files(drv);
+ 	driver_remove_groups(drv, drv->bus->drv_groups);
+ 	driver_remove_file(drv, &driver_attr_uevent);
+diff --git a/drivers/base/platform.c b/drivers/base/platform.c
+index 68a8b77..c696058 100644
+--- a/drivers/base/platform.c
++++ b/drivers/base/platform.c
+@@ -608,7 +608,7 @@ int __init_or_module platform_driver_probe(struct platform_driver *drv,
+ 	drv->prevent_deferred_probe = true;
  
-+		pm_genpd_notifier_call(PM_GENPD_POST_POWER_OFF, genpd);
-+	}
-+
- 	genpd->status = GPD_STATE_POWER_OFF;
+ 	/* make sure driver won't have bind/unbind attributes */
+-	drv->driver.suppress_bind_attrs = true;
++	drv->driver.flags = DRIVER_SUPPRESS_BIND_ATTRS;
  
- 	list_for_each_entry(link, &genpd->slave_links, slave_node) {
-@@ -869,8 +920,11 @@ static void pm_genpd_sync_poweron(struct generic_pm_domain *genpd)
- 		genpd_sd_counter_inc(link->master);
- 	}
+ 	/* temporary section violation during probe() */
+ 	drv->probe = probe;
+diff --git a/drivers/pci/host/pci-mvebu.c b/drivers/pci/host/pci-mvebu.c
+index a8c6f1a..6815c50 100644
+--- a/drivers/pci/host/pci-mvebu.c
++++ b/drivers/pci/host/pci-mvebu.c
+@@ -1086,7 +1086,7 @@ static struct platform_driver mvebu_pcie_driver = {
+ 		.name = "mvebu-pcie",
+ 		.of_match_table = mvebu_pcie_of_match_table,
+ 		/* driver unloading/unbinding currently not supported */
+-		.suppress_bind_attrs = true,
++		.flags = DRIVER_SUPPRESS_BIND_ATTRS,
+ 	},
+ 	.probe = mvebu_pcie_probe,
+ };
+diff --git a/drivers/pci/host/pci-rcar-gen2.c b/drivers/pci/host/pci-rcar-gen2.c
+index 3ef854f..6f1b890 100644
+--- a/drivers/pci/host/pci-rcar-gen2.c
++++ b/drivers/pci/host/pci-rcar-gen2.c
+@@ -413,7 +413,7 @@ static struct platform_driver rcar_pci_driver = {
+ 	.driver = {
+ 		.name = "pci-rcar-gen2",
+ 		.owner = THIS_MODULE,
+-		.suppress_bind_attrs = true,
++		.flags = DRIVER_SUPPRESS_BIND_ATTRS,
+ 		.of_match_table = rcar_pci_of_match,
+ 	},
+ 	.probe = rcar_pci_probe,
+diff --git a/drivers/pci/host/pci-tegra.c b/drivers/pci/host/pci-tegra.c
+index 0fb0fdb..2e1698d 100644
+--- a/drivers/pci/host/pci-tegra.c
++++ b/drivers/pci/host/pci-tegra.c
+@@ -1927,7 +1927,7 @@ static struct platform_driver tegra_pcie_driver = {
+ 		.name = "tegra-pcie",
+ 		.owner = THIS_MODULE,
+ 		.of_match_table = tegra_pcie_of_match,
+-		.suppress_bind_attrs = true,
++		.flags = DRIVER_SUPPRESS_BIND_ATTRS,
+ 	},
+ 	.probe = tegra_pcie_probe,
+ };
+diff --git a/drivers/pci/host/pcie-rcar.c b/drivers/pci/host/pcie-rcar.c
+index 4884ee5..9a1936e 100644
+--- a/drivers/pci/host/pcie-rcar.c
++++ b/drivers/pci/host/pcie-rcar.c
+@@ -981,7 +981,7 @@ static struct platform_driver rcar_pcie_driver = {
+ 		.name = DRV_NAME,
+ 		.owner = THIS_MODULE,
+ 		.of_match_table = rcar_pcie_of_match,
+-		.suppress_bind_attrs = true,
++		.flags = DRIVER_SUPPRESS_BIND_ATTRS,
+ 	},
+ 	.probe = rcar_pcie_probe,
+ };
+diff --git a/drivers/soc/tegra/pmc.c b/drivers/soc/tegra/pmc.c
+index a2c0ceb..77c3eb3 100644
+--- a/drivers/soc/tegra/pmc.c
++++ b/drivers/soc/tegra/pmc.c
+@@ -892,7 +892,7 @@ static const struct of_device_id tegra_pmc_match[] = {
+ static struct platform_driver tegra_pmc_driver = {
+ 	.driver = {
+ 		.name = "tegra-pmc",
+-		.suppress_bind_attrs = true,
++		.flags = DRIVER_SUPPRESS_BIND_ATTRS,
+ 		.of_match_table = tegra_pmc_match,
+ 		.pm = &tegra_pmc_pm_ops,
+ 	},
+diff --git a/include/linux/device.h b/include/linux/device.h
+index 92daded..5f4ff02 100644
+--- a/include/linux/device.h
++++ b/include/linux/device.h
+@@ -201,7 +201,7 @@ extern struct klist *bus_get_device_klist(struct bus_type *bus);
+  * @bus:	The bus which the device of this driver belongs to.
+  * @owner:	The module owner.
+  * @mod_name:	Used for built-in modules.
+- * @suppress_bind_attrs: Disables bind/unbind via sysfs.
++ * @flags:	Flags defining driver behaviour, see below.
+  * @of_match_table: The open firmware table.
+  * @acpi_match_table: The ACPI match table.
+  * @probe:	Called to query the existence of a specific device,
+@@ -234,7 +234,7 @@ struct device_driver {
+ 	struct module		*owner;
+ 	const char		*mod_name;	/* used for built-in modules */
  
--	if (genpd->power_on)
-+	if (genpd->power_on) {
-+		pm_genpd_notifier_call(PM_GENPD_POWER_ON_PREPARE, genpd);
- 		genpd->power_on(genpd);
-+		pm_genpd_notifier_call(PM_GENPD_POST_POWER_ON, genpd);
-+	}
+-	bool suppress_bind_attrs;	/* disables bind/unbind via sysfs */
++	unsigned long		flags;
  
- 	genpd->status = GPD_STATE_ACTIVE;
- }
-@@ -1292,9 +1346,16 @@ static int pm_genpd_restore_noirq(struct device *dev)
- 			 * If the domain was off before the hibernation, make
- 			 * sure it will be off going forward.
- 			 */
--			if (genpd->power_off)
-+			if (genpd->power_off) {
-+				pm_genpd_notifier_call(PM_GENPD_POWER_OFF_PREPARE,
-+						       genpd);
-+
- 				genpd->power_off(genpd);
- 
-+				pm_genpd_notifier_call(PM_GENPD_POST_POWER_OFF,
-+						       genpd);
-+			}
-+
- 			return 0;
- 		}
- 	}
-@@ -1467,6 +1528,7 @@ int __pm_genpd_add_device(struct generic_pm_domain *genpd, struct device *dev,
- 	spin_unlock_irq(&dev->power.lock);
- 
- 	mutex_lock(&gpd_data->lock);
-+	BLOCKING_INIT_NOTIFIER_HEAD(&gpd_data->base.notify_chain_head);
- 	gpd_data->base.dev = dev;
- 	list_add_tail(&gpd_data->base.list_node, &genpd->dev_list);
- 	gpd_data->need_restore = genpd->status == GPD_STATE_POWER_OFF;
-diff --git a/include/linux/pm.h b/include/linux/pm.h
-index 72c0fe0..bfc55d4 100644
---- a/include/linux/pm.h
-+++ b/include/linux/pm.h
-@@ -22,6 +22,7 @@
- #define _LINUX_PM_H
- 
- #include <linux/list.h>
-+#include <linux/notifier.h>
- #include <linux/workqueue.h>
- #include <linux/spinlock.h>
- #include <linux/wait.h>
-@@ -542,6 +543,7 @@ struct wakeup_source;
- struct pm_domain_data {
- 	struct list_head list_node;
- 	struct device *dev;
-+	struct blocking_notifier_head notify_chain_head;
+ 	const struct of_device_id	*of_match_table;
+ 	const struct acpi_device_id	*acpi_match_table;
+@@ -251,6 +251,8 @@ struct device_driver {
+ 	struct driver_private *p;
  };
  
- struct pm_subsys_data {
-diff --git a/include/linux/pm_domain.h b/include/linux/pm_domain.h
-index 7c1d252..569ab16 100644
---- a/include/linux/pm_domain.h
-+++ b/include/linux/pm_domain.h
-@@ -17,6 +17,12 @@
- #include <linux/notifier.h>
- #include <linux/cpuidle.h>
++/* disables bind/unbind via sysfs */
++#define DRIVER_SUPPRESS_BIND_ATTRS	(1 << 0)
  
-+/* PM domain state transition notifications */
-+#define PM_GENPD_POWER_ON_PREPARE	0x01
-+#define PM_GENPD_POST_POWER_ON		0x02
-+#define PM_GENPD_POWER_OFF_PREPARE	0x03
-+#define PM_GENPD_POST_POWER_OFF		0x04
-+
- enum gpd_status {
- 	GPD_STATE_ACTIVE = 0,	/* PM domain is active */
- 	GPD_STATE_WAIT_MASTER,	/* PM domain's master is being waited for */
-@@ -167,6 +173,11 @@ extern int pm_genpd_name_poweron(const char *domain_name);
- 
- extern bool default_stop_ok(struct device *dev);
- 
-+extern int pm_genpd_register_notifier(struct device *dev,
-+				      struct notifier_block *nb);
-+extern void pm_genpd_unregister_notifier(struct device *dev,
-+					struct notifier_block *nb);
-+
- extern struct dev_power_governor pm_domain_always_on_gov;
- #else
- 
-@@ -259,6 +270,14 @@ static inline bool default_stop_ok(struct device *dev)
- {
- 	return false;
- }
-+static inline int pm_genpd_register_notifier(struct device *dev,
-+					struct notifier_block *nb)
-+{
-+	return -ENOSYS;
-+}
-+static inline void pm_genpd_unregister_notifier(struct device *dev,
-+					 struct notifier_block *nb) {}
-+
- #define simple_qos_governor NULL
- #define pm_domain_always_on_gov NULL
- #endif
+ extern int __must_check driver_register(struct device_driver *drv);
+ extern void driver_unregister(struct device_driver *drv);
 -- 
 1.9.2
