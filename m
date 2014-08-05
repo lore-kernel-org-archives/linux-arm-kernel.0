@@ -1,56 +1,250 @@
 From: m.szyprowski@samsung.com (Marek Szyprowski)
-Date: Tue, 05 Aug 2014 12:47:31 +0200
-Subject: [PATCH 03/29] clk: exynos: add missing smmu_g2d clock and update
- comments
+Date: Tue, 05 Aug 2014 12:47:29 +0200
+Subject: [PATCH 01/29] pm: Add PM domain notifications
 In-Reply-To: <1407235677-26324-1-git-send-email-m.szyprowski@samsung.com>
 References: <1407235677-26324-1-git-send-email-m.szyprowski@samsung.com>
-Message-ID: <1407235677-26324-4-git-send-email-m.szyprowski@samsung.com>
+Message-ID: <1407235677-26324-2-git-send-email-m.szyprowski@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds missing smmu_g2d clock implementation and updates
-comment about Exynos4 clocks from 278-282 range. Those clocks are
-available on all Exynos4 SoC series, so the misleading comment has been
-removed.
+From: Sylwester Nawrocki <s.nawrocki@samsung.com>
 
-Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
+This patch adds notifiers to the runtime PM/genpd subsystem. It is now
+possible to register a notifier, which will be called before and after
+the generic power domain subsystem calls the power domain's power_on
+and power_off callbacks.
+
+Signed-off-by: Sylwester Nawrocki <s.nawrocki@samsung.com>
 ---
- drivers/clk/samsung/clk-exynos4.c   |  1 +
- include/dt-bindings/clock/exynos4.h | 10 +++++-----
- 2 files changed, 6 insertions(+), 5 deletions(-)
+ Documentation/power/notifiers.txt | 14 ++++++++
+ drivers/base/power/domain.c       | 70 ++++++++++++++++++++++++++++++++++++---
+ include/linux/pm.h                |  2 ++
+ include/linux/pm_domain.h         | 19 +++++++++++
+ 4 files changed, 101 insertions(+), 4 deletions(-)
 
-diff --git a/drivers/clk/samsung/clk-exynos4.c b/drivers/clk/samsung/clk-exynos4.c
-index ac163d7..12a7cc3 100644
---- a/drivers/clk/samsung/clk-exynos4.c
-+++ b/drivers/clk/samsung/clk-exynos4.c
-@@ -1183,6 +1183,7 @@ static struct samsung_gate_clock exynos4x12_gate_clks[] __initdata = {
- 	GATE(CLK_SPI1_ISP, "spi1_isp", "aclk200", E4X12_GATE_ISP1, 13,
- 			CLK_IGNORE_UNUSED | CLK_GET_RATE_NOCACHE, 0),
- 	GATE(CLK_G2D, "g2d", "aclk200", GATE_IP_DMC, 23, 0, 0),
-+	GATE(CLK_SMMU_G2D, "smmu_g2d", "aclk200", GATE_IP_DMC, 24, 0, 0),
- 	GATE(CLK_TMU_APBIF, "tmu_apbif", "aclk100", E4X12_GATE_IP_PERIR, 17, 0,
- 		0),
+diff --git a/Documentation/power/notifiers.txt b/Documentation/power/notifiers.txt
+index a81fa25..62303f6 100644
+--- a/Documentation/power/notifiers.txt
++++ b/Documentation/power/notifiers.txt
+@@ -53,3 +53,17 @@ NULL).  To register and/or unregister a suspend notifier use the functions
+ register_pm_notifier() and unregister_pm_notifier(), respectively, defined in
+ include/linux/suspend.h .  If you don't need to unregister the notifier, you can
+ also use the pm_notifier() macro defined in include/linux/suspend.h .
++
++Power Domain notifiers
++----------------------
++
++The power domain notifiers allow subsystems or drivers to register for power
++domain on/off notifications, should they need to perform any actions right
++before or right after the power domain on/off.  The device must be already
++added to a power domain before its subsystem or driver registers the notifier.
++Following events are supported:
++
++PM_GENPD_POWER_ON_PREPARE	The power domain is about to turn on.
++PM_GENPD_POST_POWER_ON		The power domain has just turned on.
++PM_GENPD_POWER_OFF_PREPARE	The power domain is about to turn off.
++PM_GENPD_POST_POWER_OFF		The power domain has just turned off.
+diff --git a/drivers/base/power/domain.c b/drivers/base/power/domain.c
+index eee55c1..5fe0966 100644
+--- a/drivers/base/power/domain.c
++++ b/drivers/base/power/domain.c
+@@ -70,6 +70,45 @@ static struct generic_pm_domain *pm_genpd_lookup_name(const char *domain_name)
+ 	return genpd;
+ }
+ 
++int pm_genpd_register_notifier(struct device *dev, struct notifier_block *nb)
++{
++	struct pm_domain_data *pdd;
++	int ret = -EINVAL;
++
++	spin_lock_irq(&dev->power.lock);
++	if (dev->power.subsys_data) {
++		pdd = dev->power.subsys_data->domain_data;
++		ret = blocking_notifier_chain_register(&pdd->notify_chain_head,
++						       nb);
++	}
++	spin_unlock_irq(&dev->power.lock);
++	return ret;
++}
++EXPORT_SYMBOL_GPL(pm_genpd_register_notifier);
++
++void pm_genpd_unregister_notifier(struct device *dev, struct notifier_block *nb)
++{
++	struct pm_domain_data *pdd;
++
++	spin_lock_irq(&dev->power.lock);
++	if (dev->power.subsys_data) {
++		pdd = dev->power.subsys_data->domain_data;
++		blocking_notifier_chain_unregister(&pdd->notify_chain_head, nb);
++	}
++	spin_unlock_irq(&dev->power.lock);
++}
++EXPORT_SYMBOL_GPL(pm_genpd_unregister_notifier);
++
++static void pm_genpd_notifier_call(unsigned long event,
++				   struct generic_pm_domain *genpd)
++{
++	struct pm_domain_data *pdd;
++
++	list_for_each_entry(pdd, &genpd->dev_list, list_node)
++		blocking_notifier_call_chain(&pdd->notify_chain_head,
++					     event, pdd->dev);
++}
++
+ #ifdef CONFIG_PM
+ 
+ struct generic_pm_domain *dev_to_genpd(struct device *dev)
+@@ -231,10 +270,14 @@ static int __pm_genpd_poweron(struct generic_pm_domain *genpd)
+ 		ktime_t time_start = ktime_get();
+ 		s64 elapsed_ns;
+ 
++		pm_genpd_notifier_call(PM_GENPD_POWER_ON_PREPARE, genpd);
++
+ 		ret = genpd->power_on(genpd);
+ 		if (ret)
+ 			goto err;
+ 
++		pm_genpd_notifier_call(PM_GENPD_POST_POWER_ON, genpd);
++
+ 		elapsed_ns = ktime_to_ns(ktime_sub(ktime_get(), time_start));
+ 		if (elapsed_ns > genpd->power_on_latency_ns) {
+ 			genpd->power_on_latency_ns = elapsed_ns;
+@@ -554,13 +597,17 @@ static int pm_genpd_poweroff(struct generic_pm_domain *genpd)
+ 		 * the pm_genpd_poweron() restore power for us (this shouldn't
+ 		 * happen very often).
+ 		 */
++		pm_genpd_notifier_call(PM_GENPD_POWER_OFF_PREPARE, genpd);
++
+ 		ret = genpd->power_off(genpd);
+ 		if (ret == -EBUSY) {
+ 			genpd_set_active(genpd);
+ 			goto out;
+ 		}
+-
+ 		elapsed_ns = ktime_to_ns(ktime_sub(ktime_get(), time_start));
++
++		pm_genpd_notifier_call(PM_GENPD_POST_POWER_OFF, genpd);
++
+ 		if (elapsed_ns > genpd->power_off_latency_ns) {
+ 			genpd->power_off_latency_ns = elapsed_ns;
+ 			genpd->max_off_time_changed = true;
+@@ -837,9 +884,13 @@ static void pm_genpd_sync_poweroff(struct generic_pm_domain *genpd)
+ 	    || atomic_read(&genpd->sd_count) > 0)
+ 		return;
+ 
+-	if (genpd->power_off)
++	if (genpd->power_off) {
++		pm_genpd_notifier_call(PM_GENPD_POWER_OFF_PREPARE, genpd);
+ 		genpd->power_off(genpd);
+ 
++		pm_genpd_notifier_call(PM_GENPD_POST_POWER_OFF, genpd);
++	}
++
+ 	genpd->status = GPD_STATE_POWER_OFF;
+ 
+ 	list_for_each_entry(link, &genpd->slave_links, slave_node) {
+@@ -869,8 +920,11 @@ static void pm_genpd_sync_poweron(struct generic_pm_domain *genpd)
+ 		genpd_sd_counter_inc(link->master);
+ 	}
+ 
+-	if (genpd->power_on)
++	if (genpd->power_on) {
++		pm_genpd_notifier_call(PM_GENPD_POWER_ON_PREPARE, genpd);
+ 		genpd->power_on(genpd);
++		pm_genpd_notifier_call(PM_GENPD_POST_POWER_ON, genpd);
++	}
+ 
+ 	genpd->status = GPD_STATE_ACTIVE;
+ }
+@@ -1292,9 +1346,16 @@ static int pm_genpd_restore_noirq(struct device *dev)
+ 			 * If the domain was off before the hibernation, make
+ 			 * sure it will be off going forward.
+ 			 */
+-			if (genpd->power_off)
++			if (genpd->power_off) {
++				pm_genpd_notifier_call(PM_GENPD_POWER_OFF_PREPARE,
++						       genpd);
++
+ 				genpd->power_off(genpd);
+ 
++				pm_genpd_notifier_call(PM_GENPD_POST_POWER_OFF,
++						       genpd);
++			}
++
+ 			return 0;
+ 		}
+ 	}
+@@ -1467,6 +1528,7 @@ int __pm_genpd_add_device(struct generic_pm_domain *genpd, struct device *dev,
+ 	spin_unlock_irq(&dev->power.lock);
+ 
+ 	mutex_lock(&gpd_data->lock);
++	BLOCKING_INIT_NOTIFIER_HEAD(&gpd_data->base.notify_chain_head);
+ 	gpd_data->base.dev = dev;
+ 	list_add_tail(&gpd_data->base.list_node, &genpd->dev_list);
+ 	gpd_data->need_restore = genpd->status == GPD_STATE_POWER_OFF;
+diff --git a/include/linux/pm.h b/include/linux/pm.h
+index 72c0fe0..bfc55d4 100644
+--- a/include/linux/pm.h
++++ b/include/linux/pm.h
+@@ -22,6 +22,7 @@
+ #define _LINUX_PM_H
+ 
+ #include <linux/list.h>
++#include <linux/notifier.h>
+ #include <linux/workqueue.h>
+ #include <linux/spinlock.h>
+ #include <linux/wait.h>
+@@ -542,6 +543,7 @@ struct wakeup_source;
+ struct pm_domain_data {
+ 	struct list_head list_node;
+ 	struct device *dev;
++	struct blocking_notifier_head notify_chain_head;
  };
-diff --git a/include/dt-bindings/clock/exynos4.h b/include/dt-bindings/clock/exynos4.h
-index 459bd2b..fb981635 100644
---- a/include/dt-bindings/clock/exynos4.h
-+++ b/include/dt-bindings/clock/exynos4.h
-@@ -115,11 +115,11 @@
- #define CLK_SMMU_MFCR		275
- #define CLK_G3D			276
- #define CLK_G2D			277
--#define CLK_ROTATOR		278 /* Exynos4210 only */
--#define CLK_MDMA		279 /* Exynos4210 only */
--#define CLK_SMMU_G2D		280 /* Exynos4210 only */
--#define CLK_SMMU_ROTATOR	281 /* Exynos4210 only */
--#define CLK_SMMU_MDMA		282 /* Exynos4210 only */
-+#define CLK_ROTATOR		278
-+#define CLK_MDMA		279
-+#define CLK_SMMU_G2D		280
-+#define CLK_SMMU_ROTATOR	281
-+#define CLK_SMMU_MDMA		282
- #define CLK_FIMD0		283
- #define CLK_MIE0		284
- #define CLK_MDNIE0		285 /* Exynos4412 only */
+ 
+ struct pm_subsys_data {
+diff --git a/include/linux/pm_domain.h b/include/linux/pm_domain.h
+index 7c1d252..569ab16 100644
+--- a/include/linux/pm_domain.h
++++ b/include/linux/pm_domain.h
+@@ -17,6 +17,12 @@
+ #include <linux/notifier.h>
+ #include <linux/cpuidle.h>
+ 
++/* PM domain state transition notifications */
++#define PM_GENPD_POWER_ON_PREPARE	0x01
++#define PM_GENPD_POST_POWER_ON		0x02
++#define PM_GENPD_POWER_OFF_PREPARE	0x03
++#define PM_GENPD_POST_POWER_OFF		0x04
++
+ enum gpd_status {
+ 	GPD_STATE_ACTIVE = 0,	/* PM domain is active */
+ 	GPD_STATE_WAIT_MASTER,	/* PM domain's master is being waited for */
+@@ -167,6 +173,11 @@ extern int pm_genpd_name_poweron(const char *domain_name);
+ 
+ extern bool default_stop_ok(struct device *dev);
+ 
++extern int pm_genpd_register_notifier(struct device *dev,
++				      struct notifier_block *nb);
++extern void pm_genpd_unregister_notifier(struct device *dev,
++					struct notifier_block *nb);
++
+ extern struct dev_power_governor pm_domain_always_on_gov;
+ #else
+ 
+@@ -259,6 +270,14 @@ static inline bool default_stop_ok(struct device *dev)
+ {
+ 	return false;
+ }
++static inline int pm_genpd_register_notifier(struct device *dev,
++					struct notifier_block *nb)
++{
++	return -ENOSYS;
++}
++static inline void pm_genpd_unregister_notifier(struct device *dev,
++					 struct notifier_block *nb) {}
++
+ #define simple_qos_governor NULL
+ #define pm_domain_always_on_gov NULL
+ #endif
 -- 
 1.9.2
