@@ -1,110 +1,43 @@
 From: m.szyprowski@samsung.com (Marek Szyprowski)
-Date: Tue, 05 Aug 2014 12:47:52 +0200
-Subject: [PATCH 24/29] iommu: exynos: create default iommu-based dma-mapping
- for master devices
+Date: Tue, 05 Aug 2014 12:47:44 +0200
+Subject: [PATCH 16/29] iommu: exynos: make driver multiarch friendly
 In-Reply-To: <1407235677-26324-1-git-send-email-m.szyprowski@samsung.com>
 References: <1407235677-26324-1-git-send-email-m.szyprowski@samsung.com>
-Message-ID: <1407235677-26324-25-git-send-email-m.szyprowski@samsung.com>
+Message-ID: <1407235677-26324-17-git-send-email-m.szyprowski@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds code to create default per-device iommu-based
-dma-mapping instance for all master devices, whose driver didn't set
-DRIVER_HAS_OWN_IOMMU_MANAGER flag.
+Initialize all structures and register to iommu subsystem only on Exynos
+compatible platforms.
 
 Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
 ---
- drivers/iommu/exynos-iommu.c | 49 +++++++++++++++++++++++++++++++++++++++++++-
- 1 file changed, 48 insertions(+), 1 deletion(-)
+ drivers/iommu/exynos-iommu.c | 6 ++++++
+ 1 file changed, 6 insertions(+)
 
 diff --git a/drivers/iommu/exynos-iommu.c b/drivers/iommu/exynos-iommu.c
-index 845f547..336b2f8 100644
+index d037e87..64b3bc8 100644
 --- a/drivers/iommu/exynos-iommu.c
 +++ b/drivers/iommu/exynos-iommu.c
-@@ -12,6 +12,7 @@
- #define DEBUG
- #endif
- 
-+#include <linux/dma-mapping.h>
- #include <linux/io.h>
- #include <linux/interrupt.h>
- #include <linux/platform_device.h>
-@@ -29,6 +30,7 @@
- #include <linux/export.h>
- 
- #include <asm/cacheflush.h>
-+#include <asm/dma-iommu.h>
- #include <asm/pgtable.h>
- 
- typedef u32 sysmmu_iova_t;
-@@ -1064,6 +1066,43 @@ static phys_addr_t exynos_iommu_iova_to_phys(struct iommu_domain *domain,
- 	return phys;
- }
- 
-+static int sysmmu_master_device_event(struct notifier_block *nb,
-+				      unsigned long val, void *p)
-+{
-+	struct device *dev = p;
-+	struct exynos_iommu_owner *owner = dev->archdata.iommu;
-+	struct sysmmu_drvdata *data;
-+
-+	if (!owner)
-+		return 0;
-+
-+	data = list_first_entry(&owner->clients, struct sysmmu_drvdata,
-+				owner_node);
-+	if (!data)
-+		return 0;
-+
-+	switch (val) {
-+
-+	case IOMMU_GROUP_NOTIFY_BIND_DRIVER:
-+		if (!(dev->driver->flags & DRIVER_HAS_OWN_IOMMU_MANAGER))
-+			arm_iommu_create_default_mapping(dev, data->base,
-+							 data->size);
-+		break;
-+
-+	case IOMMU_GROUP_NOTIFY_UNBOUND_DRIVER:
-+	case IOMMU_GROUP_NOTIFY_DRVBIND_FAILED:
-+		if (!(dev->driver->flags & DRIVER_HAS_OWN_IOMMU_MANAGER))
-+			arm_iommu_release_default_mapping(dev);
-+		break;
-+	}
-+
-+	return 0;
-+}
-+
-+static struct notifier_block sysmmu_master_device_notifier = {
-+	.notifier_call = sysmmu_master_device_event,
-+};
-+
- static void __free_owner_struct(struct exynos_iommu_owner *owner,
- 				struct device *dev)
+@@ -20,6 +20,7 @@
+ #include <linux/clk.h>
+ #include <linux/err.h>
+ #include <linux/mm.h>
++#include <linux/of.h>
+ #include <linux/iommu.h>
+ #include <linux/errno.h>
+ #include <linux/list.h>
+@@ -1187,6 +1188,11 @@ static int __init exynos_iommu_init(void)
  {
-@@ -1202,6 +1241,7 @@ static int exynos_iommu_add_device(struct device *dev)
- 	if (ret != 0)
- 		goto err;
+ 	int ret;
  
-+	iommu_group_register_notifier(group, &sysmmu_master_device_notifier);
- 	iommu_group_put(group);
- 
- 	return 0;
-@@ -1213,8 +1253,15 @@ err:
- static void exynos_iommu_remove_device(struct device *dev)
- {
- 	struct exynos_iommu_owner *owner = dev->archdata.iommu;
-+	struct iommu_group *group = iommu_group_get(dev);
++	if (!of_machine_is_compatible("samsung,exynos3") &&
++	    !of_machine_is_compatible("samsung,exynos4") &&
++	    !of_machine_is_compatible("samsung,exynos5"))
++		return -ENODEV;
 +
-+	if (group) {
-+		iommu_group_unregister_notifier(group,
-+						&sysmmu_master_device_notifier);
-+		iommu_group_remove_device(dev);
-+		iommu_group_put(group);
-+	}
- 
--	iommu_group_remove_device(dev);
- 	if (owner)
- 		__free_owner_struct(owner, dev);
- }
+ 	lv2table_kmem_cache = kmem_cache_create("exynos-iommu-lv2table",
+ 				LV2TABLE_SIZE, LV2TABLE_SIZE, 0, NULL);
+ 	if (!lv2table_kmem_cache) {
 -- 
 1.9.2
