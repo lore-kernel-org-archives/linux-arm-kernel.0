@@ -1,97 +1,100 @@
-From: edubezval@gmail.com (Eduardo Valentin)
-Date: Tue, 5 Aug 2014 09:34:55 -0400
-Subject: [PATCH v2 1/4] of: Add bindings for nvidia,tegra124-soctherm
-In-Reply-To: <1407241137-32232-2-git-send-email-mperttunen@nvidia.com>
-References: <1407241137-32232-1-git-send-email-mperttunen@nvidia.com>
- <1407241137-32232-2-git-send-email-mperttunen@nvidia.com>
-Message-ID: <20140805133455.GA20354@developer>
+From: christoffer.dall@linaro.org (Christoffer Dall)
+Date: Tue, 5 Aug 2014 15:42:13 +0200
+Subject: [PATCH v3 3/9] arm/arm64: KVM: vgic: Parametrize
+ VGIC_NR_SHARED_IRQS
+In-Reply-To: <1404817748-31302-4-git-send-email-marc.zyngier@arm.com>
+References: <1404817748-31302-1-git-send-email-marc.zyngier@arm.com>
+ <1404817748-31302-4-git-send-email-marc.zyngier@arm.com>
+Message-ID: <20140805134213.GG524@cbox>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Mikko,
-
-On Tue, Aug 05, 2014 at 03:18:54PM +0300, Mikko Perttunen wrote:
-> This adds binding documentation and headers for the Tegra124
-> SOCTHERM device tree node.
+On Tue, Jul 08, 2014 at 12:09:02PM +0100, Marc Zyngier wrote:
+> Having a dynamic number of supported interrupts means that we
+> cannot relly on VGIC_NR_SHARED_IRQS being fixed anymore.
 > 
-> Signed-off-by: Mikko Perttunen <mperttunen@nvidia.com>
+> Instead, make it take the distributor structure as a parameter,
+> so it can return the right value.
+> 
+> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 > ---
->  .../devicetree/bindings/thermal/tegra-soctherm.txt | 35 ++++++++++++++++++++++
->  include/dt-bindings/thermal/tegra124-soctherm.h    | 13 ++++++++
->  2 files changed, 48 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/thermal/tegra-soctherm.txt
->  create mode 100644 include/dt-bindings/thermal/tegra124-soctherm.h
+>  include/kvm/arm_vgic.h |  1 -
+>  virt/kvm/arm/vgic.c    | 16 +++++++++++-----
+>  2 files changed, 11 insertions(+), 6 deletions(-)
 > 
-> diff --git a/Documentation/devicetree/bindings/thermal/tegra-soctherm.txt b/Documentation/devicetree/bindings/thermal/tegra-soctherm.txt
-> new file mode 100644
-> index 0000000..3505c8f
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/thermal/tegra-soctherm.txt
-> @@ -0,0 +1,35 @@
-> +Tegra124 SOCTHERM thermal management system
+> diff --git a/include/kvm/arm_vgic.h b/include/kvm/arm_vgic.h
+> index 2246f4c..b8a6337 100644
+> --- a/include/kvm/arm_vgic.h
+> +++ b/include/kvm/arm_vgic.h
+> @@ -29,7 +29,6 @@
+>  #define VGIC_NR_SGIS		16
+>  #define VGIC_NR_PPIS		16
+>  #define VGIC_NR_PRIVATE_IRQS	(VGIC_NR_SGIS + VGIC_NR_PPIS)
+> -#define VGIC_NR_SHARED_IRQS	(VGIC_NR_IRQS - VGIC_NR_PRIVATE_IRQS)
+>  #define VGIC_MAX_CPUS		KVM_MAX_VCPUS
+>  
+>  #define VGIC_V2_MAX_LRS		(1 << 6)
+> diff --git a/virt/kvm/arm/vgic.c b/virt/kvm/arm/vgic.c
+> index 754d1cd..6f7cf85 100644
+> --- a/virt/kvm/arm/vgic.c
+> +++ b/virt/kvm/arm/vgic.c
+> @@ -995,11 +995,17 @@ static void vgic_dispatch_sgi(struct kvm_vcpu *vcpu, u32 reg)
+>  	}
+>  }
+>  
+> +static int vgic_nr_shared_irqs(struct vgic_dist *dist)
+> +{
+> +	return dist->nr_irqs - VGIC_NR_PRIVATE_IRQS;
+> +}
 > +
+>  static int compute_pending_for_cpu(struct kvm_vcpu *vcpu)
+>  {
+>  	struct vgic_dist *dist = &vcpu->kvm->arch.vgic;
+>  	unsigned long *pending, *enabled, *pend_percpu, *pend_shared;
+>  	unsigned long pending_private, pending_shared;
+> +	int shared = vgic_nr_shared_irqs(dist);
 
-It would be kind of you to add a more descriptive information of this
-device here.
+nit: prefer nr_shared
 
-> +Required properties :
-> +- compatible : "nvidia,tegra124-soctherm".
-> +- reg : Should contain 1 entry:
-> +  - SOCTHERM register set
-> +- interrupts : Defines the interrupt used by SOCTHERM
-> +- clocks : Must contain an entry for each entry in clock-names.
-> +  See ../clocks/clock-bindings.txt for details.
-> +- clock-names : Must include the following entries:
-> +  - tsensor
-> +  - soctherm
-> +- resets : Must contain an entry for each entry in reset-names.
-> +  See ../reset/reset.txt for details.
-> +- reset-names : Must include the following entries:
-> +  - soctherm
-> +- #thermal-sensor-cells : Should be 1. See ./thermal.txt for a description
-> +    of this property. See <dt-bindings/thermal/tegra124-soctherm.h> for a
-> +    list of valid values.
-> +
-> +
-> +Example :
-> +
-> +	soctherm at 0,700e2000 {
-> +		compatible = "nvidia,tegra124-soctherm";
-> +		reg = <0x0 0x700e2000 0x0 0x1000>;
-> +		interrupts = <GIC_SPI 48 IRQ_TYPE_LEVEL_HIGH>;
-> +		clocks = <&tegra_car TEGRA124_CLK_TSENSOR>,
-> +			<&tegra_car TEGRA124_CLK_SOC_THERM>;
-> +		clock-names = "tsensor", "soctherm";
-> +		resets = <&tegra_car 78>;
-> +		reset-names = "soctherm";
-> +
-> +		#thermal-sensor-cells = <1>;
-> +	};
-> diff --git a/include/dt-bindings/thermal/tegra124-soctherm.h b/include/dt-bindings/thermal/tegra124-soctherm.h
-> new file mode 100644
-> index 0000000..85aaf66
-> --- /dev/null
-> +++ b/include/dt-bindings/thermal/tegra124-soctherm.h
-> @@ -0,0 +1,13 @@
-> +/*
-> + * This header provides constants for binding nvidia,tegra124-soctherm.
-> + */
-> +
-> +#ifndef _DT_BINDINGS_THERMAL_TEGRA124_SOCTHERM_H
-> +#define _DT_BINDINGS_THERMAL_TEGRA124_SOCTHERM_H
-> +
-> +#define TEGRA124_SOCTHERM_SENSOR_CPU 0
-> +#define TEGRA124_SOCTHERM_SENSOR_MEM 1
-> +#define TEGRA124_SOCTHERM_SENSOR_GPU 2
-> +#define TEGRA124_SOCTHERM_SENSOR_PLLX 3
-> +
-
-Having examples of usages of above defines improves the understanding of
-why we need them. Now, the way this patch is put, looks like they are
-optional (not even needed). For instance, you mention in the
-thermal-sensor-cells "Should be 1", so, why having extra defines? 
-
-> +#endif
+>  	int vcpu_id;
+>  
+>  	vcpu_id = vcpu->vcpu_id;
+> @@ -1012,15 +1018,15 @@ static int compute_pending_for_cpu(struct kvm_vcpu *vcpu)
+>  
+>  	pending = vgic_bitmap_get_shared_map(&dist->irq_state);
+>  	enabled = vgic_bitmap_get_shared_map(&dist->irq_enabled);
+> -	bitmap_and(pend_shared, pending, enabled, VGIC_NR_SHARED_IRQS);
+> +	bitmap_and(pend_shared, pending, enabled, shared);
+>  	bitmap_and(pend_shared, pend_shared,
+>  		   vgic_bitmap_get_shared_map(&dist->irq_spi_target[vcpu_id]),
+> -		   VGIC_NR_SHARED_IRQS);
+> +		   shared);
+>  
+>  	pending_private = find_first_bit(pend_percpu, VGIC_NR_PRIVATE_IRQS);
+> -	pending_shared = find_first_bit(pend_shared, VGIC_NR_SHARED_IRQS);
+> +	pending_shared = find_first_bit(pend_shared, shared);
+>  	return (pending_private < VGIC_NR_PRIVATE_IRQS ||
+> -		pending_shared < VGIC_NR_SHARED_IRQS);
+> +		pending_shared < vgic_nr_shared_irqs(dist));
+>  }
+>  
+>  /*
+> @@ -1277,7 +1283,7 @@ static void __kvm_vgic_flush_hwstate(struct kvm_vcpu *vcpu)
+>  	}
+>  
+>  	/* SPIs */
+> -	for_each_set_bit(i, vgic_cpu->pending_shared, VGIC_NR_SHARED_IRQS) {
+> +	for_each_set_bit(i, vgic_cpu->pending_shared, vgic_nr_shared_irqs(dist)) {
+>  		if (!vgic_queue_hwirq(vcpu, i + VGIC_NR_PRIVATE_IRQS))
+>  			overflow = 1;
+>  	}
 > -- 
-> 1.8.1.5
+> 2.0.0
 > 
+
+There are a number of places in patch 2 where you do "nr_irqs -
+VGIC_NR_PRIVATE_IRQS" which you could change to use this as well now.
+
+Otherwise:
+
+Reviewed-by: Christoffer Dall <christoffer.dall@linaro.org>
