@@ -1,73 +1,63 @@
 From: m.szyprowski@samsung.com (Marek Szyprowski)
-Date: Tue, 05 Aug 2014 12:47:40 +0200
-Subject: [PATCH 12/29] DRM: Exynos: fix window clear code
+Date: Tue, 05 Aug 2014 12:47:30 +0200
+Subject: [PATCH 02/29] ARM: Exynos: bind power domains earlier,
+ on device creation
 In-Reply-To: <1407235677-26324-1-git-send-email-m.szyprowski@samsung.com>
 References: <1407235677-26324-1-git-send-email-m.szyprowski@samsung.com>
-Message-ID: <1407235677-26324-13-git-send-email-m.szyprowski@samsung.com>
+Message-ID: <1407235677-26324-3-git-send-email-m.szyprowski@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-To correctly disable hardware window during driver init, both enable bits
-(WINCONx_ENWIN in WINCON and SHADOWCON_CHx_ENABLE in SHADOWCON) must be
-cleared, otherwise hardware fails to re-enable such window later.
-
-While touching this function, also temporarily disable ctx->suspended flag
-to let fimd_wait_for_vblank function really to do its job.
+This patches change initialization time of power domain driver from client
+device driver bind to device creation. This lets other core drivers to
+register power domain notifiers before client driver is bound.
 
 Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
 ---
- drivers/gpu/drm/exynos/exynos_drm_fimd.c | 25 ++++++++++++++++++-------
- 1 file changed, 18 insertions(+), 7 deletions(-)
+ arch/arm/mach-exynos/pm_domains.c | 12 ++++++++++--
+ 1 file changed, 10 insertions(+), 2 deletions(-)
 
-diff --git a/drivers/gpu/drm/exynos/exynos_drm_fimd.c b/drivers/gpu/drm/exynos/exynos_drm_fimd.c
-index 41904df..7a363d2 100644
---- a/drivers/gpu/drm/exynos/exynos_drm_fimd.c
-+++ b/drivers/gpu/drm/exynos/exynos_drm_fimd.c
-@@ -165,27 +165,38 @@ static void fimd_wait_for_vblank(struct exynos_drm_manager *mgr)
- 		DRM_DEBUG_KMS("vblank wait timed out.\n");
- }
+diff --git a/arch/arm/mach-exynos/pm_domains.c b/arch/arm/mach-exynos/pm_domains.c
+index fd76e1b..1d368a2 100644
+--- a/arch/arm/mach-exynos/pm_domains.c
++++ b/arch/arm/mach-exynos/pm_domains.c
+@@ -159,13 +159,13 @@ static int exynos_pm_notifier_call(struct notifier_block *nb,
+ 	struct device *dev = data;
  
--
- static void fimd_clear_channel(struct exynos_drm_manager *mgr)
- {
- 	struct fimd_context *ctx = mgr->ctx;
--	int win, ch_enabled = 0;
-+	int state, win, ch_enabled = 0;
+ 	switch (event) {
+-	case BUS_NOTIFY_BIND_DRIVER:
++	case BUS_NOTIFY_ADD_DEVICE:
+ 		if (dev->of_node)
+ 			exynos_read_domain_from_dt(dev);
  
- 	DRM_DEBUG_KMS("%s\n", __FILE__);
+ 		break;
  
- 	/* Check if any channel is enabled. */
- 	for (win = 0; win < WINDOWS_NR; win++) {
--		u32 val = readl(ctx->regs + SHADOWCON);
--		if (val & SHADOWCON_CHx_ENABLE(win)) {
--			val &= ~SHADOWCON_CHx_ENABLE(win);
--			writel(val, ctx->regs + SHADOWCON);
-+		u32 val = readl(ctx->regs + WINCON(win));
-+		if (val & WINCONx_ENWIN) {
-+			/* wincon */
-+			val &= ~WINCONx_ENWIN;
-+			writel(val, ctx->regs + WINCON(win));
+-	case BUS_NOTIFY_UNBOUND_DRIVER:
++	case BUS_NOTIFY_DEL_DEVICE:
+ 		exynos_remove_device_from_domain(dev);
+ 
+ 		break;
+@@ -177,6 +177,13 @@ static struct notifier_block platform_nb = {
+ 	.notifier_call = exynos_pm_notifier_call,
+ };
+ 
++static int exynos_pm_domain_add(struct device *dev, void *priv)
++{
++	if (dev->of_node)
++		exynos_read_domain_from_dt(dev);
++	return 0;
++}
 +
-+			/* unprotect windows */
-+			if (ctx->driver_data->has_shadowcon) {
-+				val = readl(ctx->regs + SHADOWCON);
-+				val &= ~SHADOWCON_CHx_ENABLE(win);
-+				writel(val, ctx->regs + SHADOWCON);
-+			}
- 			ch_enabled = 1;
- 		}
+ static __init int exynos4_pm_init_power_domain(void)
+ {
+ 	struct platform_device *pdev;
+@@ -236,6 +243,7 @@ no_clk:
  	}
  
- 	/* Wait for vsync, as disable channel takes effect at next vsync */
--	if (ch_enabled)
-+	if (ch_enabled) {
-+		state = ctx->suspended;
-+		ctx->suspended = 0;
- 		fimd_wait_for_vblank(mgr);
-+		ctx->suspended = state;
-+	}
- }
+ 	bus_register_notifier(&platform_bus_type, &platform_nb);
++	bus_for_each_dev(&platform_bus_type, NULL, NULL, exynos_pm_domain_add);
  
- static int fimd_mgr_initialize(struct exynos_drm_manager *mgr,
+ 	return 0;
+ }
 -- 
 1.9.2
