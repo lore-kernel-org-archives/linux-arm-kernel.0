@@ -1,43 +1,84 @@
-From: srv_yingjoe.chen@mediatek.com (Joe.C)
-Date: Tue, 5 Aug 2014 22:58:10 +0800
-Subject: [PATCH 3/3] dt-bindings: add bindings for mediatek intpol
-In-Reply-To: <1407250690-2858-1-git-send-email-srv_yingjoe.chen@mediatek.com>
-References: <1407250690-2858-1-git-send-email-srv_yingjoe.chen@mediatek.com>
-Message-ID: <1407250690-2858-4-git-send-email-srv_yingjoe.chen@mediatek.com>
+From: daniel.lezcano@linaro.org (Daniel Lezcano)
+Date: Tue, 05 Aug 2014 17:07:36 +0200
+Subject: [PATCH v5 0/5] ARM: EXYNOS: cpuidle: fix AFTR mode on boards
+ with secure firmware enabled
+In-Reply-To: <53E0E98F.5020706@samsung.com>
+References: <1407245666-20016-1-git-send-email-b.zolnierkie@samsung.com>
+ <53E0E420.8060207@linaro.org> <53E0E98F.5020706@samsung.com>
+Message-ID: <53E0F338.8080006@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: "Joe.C" <yingjoe.chen@mediatek.com>
+On 08/05/2014 04:26 PM, Krzysztof Kozlowski wrote:
+> On 05.08.2014 16:03, Daniel Lezcano wrote:
+>> On 08/05/2014 03:34 PM, Bartlomiej Zolnierkiewicz wrote:
+>>> Hi,
+>>>
+>>> This patch series adds support for AFTR idle mode on boards with
+>>> secure firmware enabled and allows EXYNOS cpuidle driver usage on
+>>> Exynos4x12 SoCs.
+>>>
+>>> It has been tested on Trats2 board (using Exynos4412 SoC with secure
+>>> firmware enabled) on which AFTR mode reduces power consumption by ~12%
+>>> when EXYNOS cpuidle driver is enabled (in both cases the default
+>>> exynos_defconfig config is used and CPU1-3 are offlined).
+>>
+>> As a sidenote:
+>>
+>> On my odroid-U2:
+>>   * 4 cpus online -> 130 mA
+>>   * 3 cpus online -> 164 mA
+>>   * 2 cpus online -> 160 mA
+>>   * 1 cpu online  -> 157 mA
+>>
+>> So were are consuming more when there are unplugged cpu ... any ideas ?
+>
+> On which tree are you testing? Current next has ARMCLK down feature
+> enabled. ARMCLK down may stop working after hotunplugging CPU:
+> http://www.spinics.net/lists/arm-kernel/msg352890.html
+>
+> That was observed especially on Exynos4212 where ARMCLK down stops
+> working permanently. On Trats2 (Exynos4412) the clock down stopped only
+> a for short period after disabling CPU.
 
-Add binding documentation for Mediatek SoC GIC interrupt polarity extension.
+Hi Krzysztof,
 
-Signed-off-by: Joe.C <yingjoe.chen@mediatek.com>
----
- .../bindings/interrupt-controller/mediatek,intpol.txt    | 16 ++++++++++++++++
- 1 file changed, 16 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/interrupt-controller/mediatek,intpol.txt
+I tested the patches you mentioned above on top of this patchset.
 
-diff --git a/Documentation/devicetree/bindings/interrupt-controller/mediatek,intpol.txt b/Documentation/devicetree/bindings/interrupt-controller/mediatek,intpol.txt
-new file mode 100644
-index 0000000..16ea372
---- /dev/null
-+++ b/Documentation/devicetree/bindings/interrupt-controller/mediatek,intpol.txt
-@@ -0,0 +1,16 @@
-+Mediatek 65xx/81xx GIC interrupt polarity extension
-+
-+Mediatek SOCs contain controllable inverter for each GIC SPI interrupt,
-+these can be used as GIC interrupt polarity extension.
-+
-+Required properties:
-+- compatible: Compatible property value should be "mediatek,mt6577-intpol"
-+
-+- reg: Physical base address of the int pol registers and length of memory
-+  mapped region.
-+
-+Example:
-+       intpol: intpol at 10200100 {
-+               compatible = "mediatek,mt6577-intpol";
-+               reg = <0x10200100 0x1c>;
-+       };
+You are right this is directly related to the ARMCLK but the behavior 
+may be not as you expect I think.
+
+When I boot:
+
+4 cpus online => 131 mA
+
+Then I unplug one by one the cpus:
+
+3 cpus online => 127 mA
+2 cpus online => 123 mA
+1 cpu online  => 120 mA
+
+This is consistent.
+
+But now, I online the cpus:
+
+2 cpus online => 162 mA
+3 cpus online => 165 mA
+4 cpus online => 131 mA
+
+
+-- side note --
+
+Please note, I did not disable the cpuidle neither the AFTR state and 
+the kernel did not hang but I don't see the noticeable power saving we 
+should be observing when there is one cpu remaining entering the AFTR 
+state (cpuidle stats show we enter AFTR). So there is definitively 
+something wrong with this state.
+
+
 -- 
-1.8.1.1.dirty
+  <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
+
+Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
+<http://twitter.com/#!/linaroorg> Twitter |
+<http://www.linaro.org/linaro-blog/> Blog
