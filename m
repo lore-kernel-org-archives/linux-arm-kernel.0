@@ -1,57 +1,53 @@
-From: nicolas.pitre@linaro.org (Nicolas Pitre)
-Date: Tue, 5 Aug 2014 12:29:56 -0400 (EDT)
-Subject: [PATCH] ARM: remove unused/deprecated read_cpuid_part_number()
-In-Reply-To: <2694769.svrdKA2rqt@amdc1032>
-References: <2694769.svrdKA2rqt@amdc1032>
-Message-ID: <alpine.LFD.2.11.1408051228480.6061@knanqh.ubzr>
+From: vinod.koul@intel.com (Vinod Koul)
+Date: Tue, 5 Aug 2014 21:55:45 +0530
+Subject: [PATCH] Documentation: dmaengine: Add a documentation for the
+ dma controller API
+In-Reply-To: <20140802144925.GJ3952@lukather>
+References: <1406736193-26685-1-git-send-email-maxime.ripard@free-electrons.com>
+ <20140730160607.GM8181@intel.com> <20140731074440.GY3952@lukather>
+ <20140731115628.GQ8181@intel.com> <20140731162330.GE3952@lukather>
+ <20140801171306.GF8181@intel.com> <20140802144925.GJ3952@lukather>
+Message-ID: <20140805162545.GX8181@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 5 Aug 2014, Bartlomiej Zolnierkiewicz wrote:
+On Sat, Aug 02, 2014 at 04:49:25PM +0200, Maxime Ripard wrote:
+> > - residue callculation, though situation is much better now but still lots
+> >   of driver do it worng and folks do get it wrong
+> 
+> What mistake in often made regarding the residue calculation?
+- residue is for the descriptor asked
+- not for the current active one
+- we can store the size locally and return that when not processing
+- arg txstate can be null
 
-> Commit af040ffc9ba1 ("ARM: make it easier to check the CPU part
-> number correctly") has left (now unused in the upstream tree and
-> marked as deprecated) read_cpuid_part_number() while changing
-> the way it works (using the old function with the definitions will
-> now always evaluate as false).  This causes problems with porting
-> older code to new kernels as the code compiles (with warnings but
-> they are very easy to miss) but it can fail silently or work just
-> fine depending on the used hardware.
+> Another extra questions arose during starting this.
 > 
-> Remove unused/deprecated read_cpuid_part_number() so developers
-> have to update their code during build time instead of running into
-> tricky runtime problems later.
+> In the case of the call to device_control, especially in the
+> DMA_SLAVE_CONFIG case, but that also applies to pause/resume, are the
+> changes supposed to be immediates or can they happen later?
 > 
-> Please see the commit af040ffc9ba1 for details on how to convert
-> your old out-of-tree code to use read_cpuid_part() instead of
-> read_cpuid_part_number().
-> 
-> Cc: Nicolas Pitre <nico@linaro.org>
-> Signed-off-by: Bartlomiej Zolnierkiewicz <b.zolnierkie@samsung.com>
+> I actually have in mind the case where we would use a vchan, that
+> might or might not be actually mapped to a physical channel at the
+> moment where the DMA_SLAVE_CONFIG call is made. In the case where it's
+> not mapped and not transfering anything, it's pretty trivial, to
+> handle, but in the case where it's actually mapped to a physical
+> channel, should we push the new configuration to the physical channel
+> right away, or can it wait until the transfer ends ?
+Ah no. The model doesn't assume the config will be written runtime. So the
+descriptor which are already prepared doesn't change with DMA_SLAVE_CONFIG
+call. Only new descriptors will take those values
 
-If there are no more in-tree users then it should go indeed.
+But yes the pause/resume would be syncronous
 
-Acked-by: Nicolas Pitre <nico@linaro.org>
+HTH
+-- 
+~Vinod
 
-> ---
->  arch/arm/include/asm/cputype.h |    5 -----
->  1 file changed, 5 deletions(-)
-> 
-> Index: b/arch/arm/include/asm/cputype.h
-> ===================================================================
-> --- a/arch/arm/include/asm/cputype.h	2014-08-04 15:09:30.166988335 +0200
-> +++ b/arch/arm/include/asm/cputype.h	2014-08-05 15:40:03.793317783 +0200
-> @@ -182,11 +182,6 @@ static inline unsigned int __attribute_c
->  	return read_cpuid_id() & 0xff00fff0;
->  }
->  
-> -static inline unsigned int __attribute_const__ __deprecated read_cpuid_part_number(void)
-> -{
-> -	return read_cpuid_id() & 0xFFF0;
-> -}
-> -
->  static inline unsigned int __attribute_const__ xscale_cpu_arch_version(void)
->  {
->  	return read_cpuid_id() & ARM_CPU_XSCALE_ARCH_MASK;
-> 
-> 
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140805/b070ba77/attachment.sig>
