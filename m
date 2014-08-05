@@ -1,129 +1,98 @@
 From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Mon,  4 Aug 2014 18:31:46 -0700
-Subject: [PATCH 4/8] msm: scm: Add atomic SCM APIs
+Date: Mon,  4 Aug 2014 18:31:43 -0700
+Subject: [PATCH 1/8] msm: scm: Fix incorrect cache invalidation
 In-Reply-To: <1407202310-3359-1-git-send-email-sboyd@codeaurora.org>
 References: <1407202310-3359-1-git-send-email-sboyd@codeaurora.org>
-Message-ID: <1407202310-3359-5-git-send-email-sboyd@codeaurora.org>
+Message-ID: <1407202310-3359-2-git-send-email-sboyd@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The atomic SCM APIs are useful for commands that are guaranteed
-by the secure side to be uninterruptable, atomic and SMP safe.
-The calling convention use registers for passing parameters and
-return values between the secure and non-secure side. Support
-this interface with  scm_call_atomic[1-2]() functions
-corresponding to the number of arguments passed.
+The cache invalidation in scm_call() correctly rounds down the
+start address to invalidate the beginning of the cacheline but
+doesn't properly round up the 'end' address to make it aligned.
+The last chunk of the buffer won't be invalidated when 'end' is
+not cacheline size aligned so make sure to invalidate the last
+few bytes in such situations. It also doesn't do anything about
+outer caches so make sure to invalidate and flush those as well.
 
 Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
 ---
- arch/arm/mach-qcom/scm.c | 73 ++++++++++++++++++++++++++++++++++++++++++++++++
- arch/arm/mach-qcom/scm.h |  5 +++-
- 2 files changed, 77 insertions(+), 1 deletion(-)
+ arch/arm/mach-qcom/scm.c | 31 +++++++++++++++++++++++--------
+ 1 file changed, 23 insertions(+), 8 deletions(-)
 
 diff --git a/arch/arm/mach-qcom/scm.c b/arch/arm/mach-qcom/scm.c
-index ec37b037e69c..a05cad3fa1c5 100644
+index c536fd6bf827..820c72165e19 100644
 --- a/arch/arm/mach-qcom/scm.c
 +++ b/arch/arm/mach-qcom/scm.c
-@@ -286,6 +286,79 @@ out:
+@@ -22,6 +22,7 @@
+ #include <linux/errno.h>
+ #include <linux/err.h>
+ 
++#include <asm/outercache.h>
+ #include <asm/cacheflush.h>
+ 
+ #include "scm.h"
+@@ -203,6 +204,7 @@ static int __scm_call(const struct scm_command *cmd)
+ 	 * side in the buffer.
+ 	 */
+ 	flush_cache_all();
++	outer_flush_all();
+ 	ret = smc(cmd_addr);
+ 	if (ret < 0)
+ 		ret = scm_remap_error(ret);
+@@ -210,6 +212,20 @@ static int __scm_call(const struct scm_command *cmd)
+ 	return ret;
  }
- EXPORT_SYMBOL(scm_call);
  
-+#define SCM_CLASS_REGISTER	(0x2 << 8)
-+#define SCM_MASK_IRQS		BIT(5)
-+#define SCM_ATOMIC(svc, cmd, n) (((((svc) << 10)|((cmd) & 0x3ff)) << 12) | \
-+				SCM_CLASS_REGISTER | \
-+				SCM_MASK_IRQS | \
-+				(n & 0xf))
-+
-+/**
-+ * scm_call_atomic1() - Send an atomic SCM command with one argument
-+ * @svc_id: service identifier
-+ * @cmd_id: command identifier
-+ * @arg1: first argument
-+ *
-+ * This shall only be used with commands that are guaranteed to be
-+ * uninterruptable, atomic and SMP safe.
-+ */
-+s32 scm_call_atomic1(u32 svc, u32 cmd, u32 arg1)
++static void scm_inv_range(unsigned long start, unsigned long end)
 +{
-+	int context_id;
-+	register u32 r0 asm("r0") = SCM_ATOMIC(svc, cmd, 1);
-+	register u32 r1 asm("r1") = (u32)&context_id;
-+	register u32 r2 asm("r2") = arg1;
-+
-+	asm volatile(
-+		__asmeq("%0", "r0")
-+		__asmeq("%1", "r0")
-+		__asmeq("%2", "r1")
-+		__asmeq("%3", "r2")
-+#ifdef REQUIRES_SEC
-+			".arch_extension sec\n"
-+#endif
-+		"smc	#0	@ switch to secure world\n"
-+		: "=r" (r0)
-+		: "r" (r0), "r" (r1), "r" (r2)
-+		: "r3");
-+	return r0;
++	start = round_down(start, CACHELINESIZE);
++	end = round_up(end, CACHELINESIZE);
++	outer_inv_range(start, end);
++	while (start < end) {
++		asm ("mcr p15, 0, %0, c7, c6, 1" : : "r" (start)
++		     : "memory");
++		start += CACHELINESIZE;
++	}
++	dsb();
++	isb();
 +}
-+EXPORT_SYMBOL(scm_call_atomic1);
 +
-+/**
-+ * scm_call_atomic2() - Send an atomic SCM command with two arguments
-+ * @svc_id: service identifier
-+ * @cmd_id: command identifier
-+ * @arg1: first argument
-+ * @arg2: second argument
-+ *
-+ * This shall only be used with commands that are guaranteed to be
-+ * uninterruptable, atomic and SMP safe.
-+ */
-+s32 scm_call_atomic2(u32 svc, u32 cmd, u32 arg1, u32 arg2)
-+{
-+	int context_id;
-+	register u32 r0 asm("r0") = SCM_ATOMIC(svc, cmd, 2);
-+	register u32 r1 asm("r1") = (u32)&context_id;
-+	register u32 r2 asm("r2") = arg1;
-+	register u32 r3 asm("r3") = arg2;
-+
-+	asm volatile(
-+		__asmeq("%0", "r0")
-+		__asmeq("%1", "r0")
-+		__asmeq("%2", "r1")
-+		__asmeq("%3", "r2")
-+		__asmeq("%4", "r3")
-+#ifdef REQUIRES_SEC
-+			".arch_extension sec\n"
-+#endif
-+		"smc	#0	@ switch to secure world\n"
-+		: "=r" (r0)
-+		: "r" (r0), "r" (r1), "r" (r2), "r" (r3));
-+	return r0;
-+}
-+EXPORT_SYMBOL(scm_call_atomic2);
-+
- u32 scm_get_version(void)
- {
- 	int context_id;
-diff --git a/arch/arm/mach-qcom/scm.h b/arch/arm/mach-qcom/scm.h
-index 00b31ea58f29..1f0f0180e767 100644
---- a/arch/arm/mach-qcom/scm.h
-+++ b/arch/arm/mach-qcom/scm.h
-@@ -1,4 +1,4 @@
--/* Copyright (c) 2010, Code Aurora Forum. All rights reserved.
-+/* Copyright (c) 2010-2014, The Linux Foundation. All rights reserved.
-  *
-  * This program is free software; you can redistribute it and/or modify
-  * it under the terms of the GNU General Public License version 2 and
-@@ -18,6 +18,9 @@
- extern int scm_call(u32 svc_id, u32 cmd_id, const void *cmd_buf, size_t cmd_len,
- 		void *resp_buf, size_t resp_len);
+ /**
+  * scm_call() - Send an SCM command
+  * @svc_id: service identifier
+@@ -227,6 +243,7 @@ int scm_call(u32 svc_id, u32 cmd_id, const void *cmd_buf, size_t cmd_len,
+ 	int ret;
+ 	struct scm_command *cmd;
+ 	struct scm_response *rsp;
++	unsigned long start, end;
  
-+extern s32 scm_call_atomic1(u32 svc, u32 cmd, u32 arg1);
-+extern s32 scm_call_atomic2(u32 svc, u32 cmd, u32 arg1, u32 arg2);
-+
- #define SCM_VERSION(major, minor) (((major) << 16) | ((minor) & 0xFF))
+ 	cmd = alloc_scm_command(cmd_len, resp_len);
+ 	if (!cmd)
+@@ -243,17 +260,15 @@ int scm_call(u32 svc_id, u32 cmd_id, const void *cmd_buf, size_t cmd_len,
+ 		goto out;
  
- extern u32 scm_get_version(void);
+ 	rsp = scm_command_to_response(cmd);
++	start = (unsigned long)rsp;
++
+ 	do {
+-		u32 start = (u32)rsp;
+-		u32 end = (u32)scm_get_response_buffer(rsp) + resp_len;
+-		start &= ~(CACHELINESIZE - 1);
+-		while (start < end) {
+-			asm ("mcr p15, 0, %0, c7, c6, 1" : : "r" (start)
+-			     : "memory");
+-			start += CACHELINESIZE;
+-		}
++		scm_inv_range(start, start + sizeof(*rsp));
+ 	} while (!rsp->is_complete);
+ 
++	end = (unsigned long)scm_get_response_buffer(rsp) + resp_len;
++	scm_inv_range(start, end);
++
+ 	if (resp_buf)
+ 		memcpy(resp_buf, scm_get_response_buffer(rsp), resp_len);
+ out:
 -- 
 The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
 hosted by The Linux Foundation
