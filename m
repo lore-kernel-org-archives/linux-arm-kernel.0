@@ -1,95 +1,98 @@
 From: m.szyprowski@samsung.com (Marek Szyprowski)
-Date: Tue, 05 Aug 2014 12:47:39 +0200
-Subject: [PATCH 11/29] DRM: exynos: add DRIVER_HAS_OWN_IOMMU_MANAGER flag to
- all sub-drivers
+Date: Tue, 05 Aug 2014 12:47:55 +0200
+Subject: [PATCH 27/29] iommu: exynos: document internal structures
 In-Reply-To: <1407235677-26324-1-git-send-email-m.szyprowski@samsung.com>
 References: <1407235677-26324-1-git-send-email-m.szyprowski@samsung.com>
-Message-ID: <1407235677-26324-12-git-send-email-m.szyprowski@samsung.com>
+Message-ID: <1407235677-26324-28-git-send-email-m.szyprowski@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Exynos DRM drivers do their own management of IO address space of all
-controlled devices, so set DRIVER_HAS_OWN_IOMMU_MANAGER flag to instruct
-IOMMU subsystem not to create any defaults for them.
+Add a few words of comment to all internal structures used by the driver.
 
 Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
 ---
- drivers/gpu/drm/exynos/exynos_drm_fimc.c    | 1 +
- drivers/gpu/drm/exynos/exynos_drm_fimd.c    | 1 +
- drivers/gpu/drm/exynos/exynos_drm_g2d.c     | 1 +
- drivers/gpu/drm/exynos/exynos_drm_gsc.c     | 1 +
- drivers/gpu/drm/exynos/exynos_drm_rotator.c | 1 +
- drivers/gpu/drm/exynos/exynos_mixer.c       | 1 +
- 6 files changed, 6 insertions(+)
+ drivers/iommu/exynos-iommu.c | 59 ++++++++++++++++++++++++++++----------------
+ 1 file changed, 38 insertions(+), 21 deletions(-)
 
-diff --git a/drivers/gpu/drm/exynos/exynos_drm_fimc.c b/drivers/gpu/drm/exynos/exynos_drm_fimc.c
-index 831dde9..fe84215 100644
---- a/drivers/gpu/drm/exynos/exynos_drm_fimc.c
-+++ b/drivers/gpu/drm/exynos/exynos_drm_fimc.c
-@@ -1896,6 +1896,7 @@ struct platform_driver fimc_driver = {
- 		.name	= "exynos-drm-fimc",
- 		.owner	= THIS_MODULE,
- 		.pm	= &fimc_pm_ops,
-+		.flags	= DRIVER_HAS_OWN_IOMMU_MANAGER,
- 	},
+diff --git a/drivers/iommu/exynos-iommu.c b/drivers/iommu/exynos-iommu.c
+index 7600861..78ce618 100644
+--- a/drivers/iommu/exynos-iommu.c
++++ b/drivers/iommu/exynos-iommu.c
+@@ -189,37 +189,54 @@ static char *sysmmu_fault_name[SYSMMU_FAULTS_NUM] = {
+ 	"UNKNOWN FAULT"
  };
  
-diff --git a/drivers/gpu/drm/exynos/exynos_drm_fimd.c b/drivers/gpu/drm/exynos/exynos_drm_fimd.c
-index 33161ad..41904df 100644
---- a/drivers/gpu/drm/exynos/exynos_drm_fimd.c
-+++ b/drivers/gpu/drm/exynos/exynos_drm_fimd.c
-@@ -1031,5 +1031,6 @@ struct platform_driver fimd_driver = {
- 		.name	= "exynos4-fb",
- 		.owner	= THIS_MODULE,
- 		.of_match_table = fimd_driver_dt_match,
-+		.flags	= DRIVER_HAS_OWN_IOMMU_MANAGER,
- 	},
- };
-diff --git a/drivers/gpu/drm/exynos/exynos_drm_g2d.c b/drivers/gpu/drm/exynos/exynos_drm_g2d.c
-index 8001587..dddeae3 100644
---- a/drivers/gpu/drm/exynos/exynos_drm_g2d.c
-+++ b/drivers/gpu/drm/exynos/exynos_drm_g2d.c
-@@ -1555,5 +1555,6 @@ struct platform_driver g2d_driver = {
- 		.owner	= THIS_MODULE,
- 		.pm	= &g2d_pm_ops,
- 		.of_match_table = exynos_g2d_match,
-+		.flags	= DRIVER_HAS_OWN_IOMMU_MANAGER,
- 	},
- };
-diff --git a/drivers/gpu/drm/exynos/exynos_drm_gsc.c b/drivers/gpu/drm/exynos/exynos_drm_gsc.c
-index 9e3ff16..76e8b1e 100644
---- a/drivers/gpu/drm/exynos/exynos_drm_gsc.c
-+++ b/drivers/gpu/drm/exynos/exynos_drm_gsc.c
-@@ -1797,6 +1797,7 @@ struct platform_driver gsc_driver = {
- 		.name	= "exynos-drm-gsc",
- 		.owner	= THIS_MODULE,
- 		.pm	= &gsc_pm_ops,
-+		.flags	= DRIVER_HAS_OWN_IOMMU_MANAGER,
- 	},
+-/* attached to dev.archdata.iommu of the master device */
++/*
++ * This structure is attached to dev.archdata.iommu of the master device
++ * on device add, contains a list of SYSMMU controllers defined by device tree,
++ * which are bound to given master device. It is usually referenced by 'owner'
++ * pointer.
++ */
+ struct exynos_iommu_owner {
+-	struct list_head clients;
++	struct list_head clients; /* list of sysmmu_drvdata.owner_node */
  };
  
-diff --git a/drivers/gpu/drm/exynos/exynos_drm_rotator.c b/drivers/gpu/drm/exynos/exynos_drm_rotator.c
-index f01fbb6..2da91c4 100644
---- a/drivers/gpu/drm/exynos/exynos_drm_rotator.c
-+++ b/drivers/gpu/drm/exynos/exynos_drm_rotator.c
-@@ -852,5 +852,6 @@ struct platform_driver rotator_driver = {
- 		.owner	= THIS_MODULE,
- 		.pm	= &rotator_pm_ops,
- 		.of_match_table = exynos_rotator_match,
-+		.flags	= DRIVER_HAS_OWN_IOMMU_MANAGER,
- 	},
++/*
++ * This structure is stored in ->priv field of generic struct iommu_domain,
++ * contains list of SYSMMU controllers from all master devices, which has been
++ * attached to this domain and page tables of IO address space defined by this
++ * domain. It is usually referenced by 'domain' pointer.
++ */
+ struct exynos_iommu_domain {
+-	struct list_head clients; /* list of sysmmu_drvdata.node */
++	struct list_head clients; /* list of sysmmu_drvdata.domain_node */
+ 	sysmmu_pte_t *pgtable; /* lv1 page table, 16KB */
+ 	short *lv2entcnt; /* free lv2 entry counter for each section */
+-	spinlock_t lock; /* lock for this structure */
++	spinlock_t lock; /* lock for modyfying list of clients */
+ 	spinlock_t pgtablelock; /* lock for modifying page table @ pgtable */
  };
-diff --git a/drivers/gpu/drm/exynos/exynos_mixer.c b/drivers/gpu/drm/exynos/exynos_mixer.c
-index 7529946..79b1309a 100644
---- a/drivers/gpu/drm/exynos/exynos_mixer.c
-+++ b/drivers/gpu/drm/exynos/exynos_mixer.c
-@@ -1320,6 +1320,7 @@ struct platform_driver mixer_driver = {
- 		.name = "exynos-mixer",
- 		.owner = THIS_MODULE,
- 		.of_match_table = mixer_match_types,
-+		.flags	= DRIVER_HAS_OWN_IOMMU_MANAGER,
- 	},
- 	.probe = mixer_probe,
- 	.remove = mixer_remove,
+ 
++/*
++ * This structure hold all data of a single SYSMMU controller, this includes
++ * hw resources like registers and clocks, pointers and list nodes to connect
++ * it to all other structures, internal state and parameters read from device
++ * tree. It is usually referenced by 'data' pointer.
++ */
+ struct sysmmu_drvdata {
+-	struct device *sysmmu;	/* System MMU's device descriptor */
+-	struct device *master;	/* Owner of system MMU */
+-	void __iomem *sfrbase;
+-	struct clk *clk;
+-	struct clk *clk_master;
+-	int activations;
+-	int suspended;
+-	spinlock_t lock;
+-	struct iommu_domain *domain;
+-	struct list_head domain_node;
+-	struct list_head owner_node;
+-	phys_addr_t pgtable;
+-	int version;
+-	const char *name;
+-	dma_addr_t base;
+-	size_t size;
+-	struct notifier_block pm_notifier;
++	struct device *sysmmu; /* SYSMMU controller device */
++	struct device *master; /* master device (owner of given SYSMMU) */
++	void __iomem *sfrbase; /* our registers */
++	struct clk *clk; /* SYSMMU's clock */
++	struct clk *clk_master; /* master's device clock */
++	int activations; /* number of calls to sysmmu_enable */
++	int suspended; /* status of the controller (managed by runtime pm) */
++	spinlock_t lock; /* lock for modyfying enable/disable state */
++	struct iommu_domain *domain; /* domain we belong to */
++	struct list_head domain_node; /* node for domain clients list */
++	struct list_head owner_node; /* node for owner clients list */
++	phys_addr_t pgtable; /* assigned page table structure */
++	int version; /* our version */
++	const char *name; /* our name from device tree */
++	dma_addr_t base; /* base addres of IO address space define in DT */
++	size_t size; /* size of IO address space define in DT */
++	struct notifier_block pm_notifier; /* notifier for pm domain on/off */
+ };
+ 
+ static bool set_sysmmu_active(struct sysmmu_drvdata *data)
 -- 
 1.9.2
