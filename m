@@ -1,74 +1,34 @@
 From: m.szyprowski@samsung.com (Marek Szyprowski)
-Date: Tue, 05 Aug 2014 12:47:49 +0200
-Subject: [PATCH 21/29] iommu: exynos: remove unused functions, part 2
+Date: Tue, 05 Aug 2014 12:47:38 +0200
+Subject: [PATCH 10/29] drivers: add DRIVER_HAS_OWN_IOMMU_MANAGER flag
 In-Reply-To: <1407235677-26324-1-git-send-email-m.szyprowski@samsung.com>
 References: <1407235677-26324-1-git-send-email-m.szyprowski@samsung.com>
-Message-ID: <1407235677-26324-22-git-send-email-m.szyprowski@samsung.com>
+Message-ID: <1407235677-26324-11-git-send-email-m.szyprowski@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-After refactoring functions to use pointer to struct sysmmu_drvdata
-directly, some functions became useless and thus never used, so remove
-them completely.
+This patch adds a new flags for device drivers. This flag instructs
+kernel that the device driver does it own management of IOMMU assisted
+IO address space translations, so no default dma-mapping structures
+should be initialized.
 
 Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
 ---
- drivers/iommu/exynos-iommu.c | 43 -------------------------------------------
- 1 file changed, 43 deletions(-)
+ include/linux/device.h | 2 ++
+ 1 file changed, 2 insertions(+)
 
-diff --git a/drivers/iommu/exynos-iommu.c b/drivers/iommu/exynos-iommu.c
-index 018a615..674d1fb 100644
---- a/drivers/iommu/exynos-iommu.c
-+++ b/drivers/iommu/exynos-iommu.c
-@@ -458,49 +458,6 @@ static int __sysmmu_enable(struct sysmmu_drvdata *data,
- 	return ret;
- }
+diff --git a/include/linux/device.h b/include/linux/device.h
+index 5f4ff02..2e62371 100644
+--- a/include/linux/device.h
++++ b/include/linux/device.h
+@@ -253,6 +253,8 @@ struct device_driver {
  
--/* __exynos_sysmmu_enable: Enables System MMU
-- *
-- * returns -error if an error occurred and System MMU is not enabled,
-- * 0 if the System MMU has been just enabled and 1 if System MMU was already
-- * enabled before.
-- */
--static int __exynos_sysmmu_enable(struct device *dev, phys_addr_t pgtable,
--				  struct iommu_domain *domain)
--{
--	int ret = 0;
--	unsigned long flags;
--	struct exynos_iommu_owner *owner = dev->archdata.iommu;
--	struct sysmmu_drvdata *data;
--
--	BUG_ON(!has_sysmmu(dev));
--
--	data = dev_get_drvdata(owner->sysmmu);
--
--	ret = __sysmmu_enable(data, pgtable, domain);
--	if (ret >= 0)
--		data->master = dev;
--
--	return ret;
--}
--
--static bool exynos_sysmmu_disable(struct device *dev)
--{
--	unsigned long flags;
--	bool disabled = true;
--	struct exynos_iommu_owner *owner = dev->archdata.iommu;
--	struct sysmmu_drvdata *data;
--
--	BUG_ON(!has_sysmmu(dev));
--
--	data = dev_get_drvdata(owner->sysmmu);
--
--	disabled = __sysmmu_disable(data);
--	if (disabled)
--		data->master = NULL;
--
--	return disabled;
--}
--
- static void __sysmmu_tlb_invalidate_flpdcache(struct sysmmu_drvdata *data,
- 					      sysmmu_iova_t iova)
- {
+ /* disables bind/unbind via sysfs */
+ #define DRIVER_SUPPRESS_BIND_ATTRS	(1 << 0)
++/* driver uses own methods to manage IO address space */
++#define DRIVER_HAS_OWN_IOMMU_MANAGER	(1 << 1)
+ 
+ extern int __must_check driver_register(struct device_driver *drv);
+ extern void driver_unregister(struct device_driver *drv);
 -- 
 1.9.2
