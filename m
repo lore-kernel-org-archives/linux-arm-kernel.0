@@ -1,173 +1,81 @@
 From: m.szyprowski@samsung.com (Marek Szyprowski)
-Date: Tue, 05 Aug 2014 12:47:33 +0200
-Subject: [PATCH 05/29] drivers: convert suppress_bind_attrs parameter into
- flags
+Date: Tue, 05 Aug 2014 12:47:32 +0200
+Subject: [PATCH 04/29] drivers: base: add notifier for failed driver bind
 In-Reply-To: <1407235677-26324-1-git-send-email-m.szyprowski@samsung.com>
 References: <1407235677-26324-1-git-send-email-m.szyprowski@samsung.com>
-Message-ID: <1407235677-26324-6-git-send-email-m.szyprowski@samsung.com>
+Message-ID: <1407235677-26324-5-git-send-email-m.szyprowski@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch extends struct device_driver with a flags member and converts
-existing suppress_bind_attrs bool field to a flag. This way new flags
-can be easily added in the future without changing the structure itself.
+This patch adds support for getting a notify for failed device driver
+bind, so all the items done in BUS_NOTIFY_BIND_DRIVER event can be
+cleaned if the driver fails to bind.
 
 Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
 ---
- arch/arm/mach-integrator/impd1.c | 2 +-
- drivers/base/bus.c               | 4 ++--
- drivers/base/platform.c          | 2 +-
- drivers/pci/host/pci-mvebu.c     | 2 +-
- drivers/pci/host/pci-rcar-gen2.c | 2 +-
- drivers/pci/host/pci-tegra.c     | 2 +-
- drivers/pci/host/pcie-rcar.c     | 2 +-
- drivers/soc/tegra/pmc.c          | 2 +-
- include/linux/device.h           | 6 ++++--
- 9 files changed, 13 insertions(+), 11 deletions(-)
+ drivers/base/dd.c      | 10 +++++++---
+ include/linux/device.h |  4 +++-
+ 2 files changed, 10 insertions(+), 4 deletions(-)
 
-diff --git a/arch/arm/mach-integrator/impd1.c b/arch/arm/mach-integrator/impd1.c
-index 3ce8807..a7e7330 100644
---- a/arch/arm/mach-integrator/impd1.c
-+++ b/arch/arm/mach-integrator/impd1.c
-@@ -406,7 +406,7 @@ static struct lm_driver impd1_driver = {
- 		 * As we're dropping the probe() function, suppress driver
- 		 * binding from sysfs.
- 		 */
--		.suppress_bind_attrs = true,
-+		.flags = DRIVER_SUPPRESS_BIND_ATTRS,
- 	},
- 	.probe		= impd1_probe,
- 	.remove		= impd1_remove,
-diff --git a/drivers/base/bus.c b/drivers/base/bus.c
-index 83e910a..f223f26 100644
---- a/drivers/base/bus.c
-+++ b/drivers/base/bus.c
-@@ -707,7 +707,7 @@ int bus_add_driver(struct device_driver *drv)
- 			__func__, drv->name);
- 	}
+diff --git a/drivers/base/dd.c b/drivers/base/dd.c
+index e4ffbcf..541a41f 100644
+--- a/drivers/base/dd.c
++++ b/drivers/base/dd.c
+@@ -237,10 +237,14 @@ static int driver_sysfs_add(struct device *dev)
+ 	return ret;
+ }
  
--	if (!drv->suppress_bind_attrs) {
-+	if (!(drv->flags & DRIVER_SUPPRESS_BIND_ATTRS)) {
- 		error = add_bind_files(drv);
- 		if (error) {
- 			/* Ditto */
-@@ -740,7 +740,7 @@ void bus_remove_driver(struct device_driver *drv)
- 	if (!drv->bus)
- 		return;
+-static void driver_sysfs_remove(struct device *dev)
++static void driver_sysfs_remove(struct device *dev, int failed)
+ {
+ 	struct device_driver *drv = dev->driver;
  
--	if (!drv->suppress_bind_attrs)
-+	if (!(drv->flags & DRIVER_SUPPRESS_BIND_ATTRS))
- 		remove_bind_files(drv);
- 	driver_remove_groups(drv, drv->bus->drv_groups);
- 	driver_remove_file(drv, &driver_attr_uevent);
-diff --git a/drivers/base/platform.c b/drivers/base/platform.c
-index 68a8b77..c696058 100644
---- a/drivers/base/platform.c
-+++ b/drivers/base/platform.c
-@@ -608,7 +608,7 @@ int __init_or_module platform_driver_probe(struct platform_driver *drv,
- 	drv->prevent_deferred_probe = true;
++	if (failed && dev->bus)
++		blocking_notifier_call_chain(&dev->bus->p->bus_notifier,
++					     BUS_NOTIFY_DRVBIND_FAILED, dev);
++
+ 	if (drv) {
+ 		sysfs_remove_link(&drv->p->kobj, kobject_name(&dev->kobj));
+ 		sysfs_remove_link(&dev->kobj, "driver");
+@@ -316,7 +320,7 @@ static int really_probe(struct device *dev, struct device_driver *drv)
  
- 	/* make sure driver won't have bind/unbind attributes */
--	drv->driver.suppress_bind_attrs = true;
-+	drv->driver.flags = DRIVER_SUPPRESS_BIND_ATTRS;
+ probe_failed:
+ 	devres_release_all(dev);
+-	driver_sysfs_remove(dev);
++	driver_sysfs_remove(dev, true);
+ 	dev->driver = NULL;
+ 	dev_set_drvdata(dev, NULL);
  
- 	/* temporary section violation during probe() */
- 	drv->probe = probe;
-diff --git a/drivers/pci/host/pci-mvebu.c b/drivers/pci/host/pci-mvebu.c
-index a8c6f1a..6815c50 100644
---- a/drivers/pci/host/pci-mvebu.c
-+++ b/drivers/pci/host/pci-mvebu.c
-@@ -1086,7 +1086,7 @@ static struct platform_driver mvebu_pcie_driver = {
- 		.name = "mvebu-pcie",
- 		.of_match_table = mvebu_pcie_of_match_table,
- 		/* driver unloading/unbinding currently not supported */
--		.suppress_bind_attrs = true,
-+		.flags = DRIVER_SUPPRESS_BIND_ATTRS,
- 	},
- 	.probe = mvebu_pcie_probe,
- };
-diff --git a/drivers/pci/host/pci-rcar-gen2.c b/drivers/pci/host/pci-rcar-gen2.c
-index 3ef854f..6f1b890 100644
---- a/drivers/pci/host/pci-rcar-gen2.c
-+++ b/drivers/pci/host/pci-rcar-gen2.c
-@@ -413,7 +413,7 @@ static struct platform_driver rcar_pci_driver = {
- 	.driver = {
- 		.name = "pci-rcar-gen2",
- 		.owner = THIS_MODULE,
--		.suppress_bind_attrs = true,
-+		.flags = DRIVER_SUPPRESS_BIND_ATTRS,
- 		.of_match_table = rcar_pci_of_match,
- 	},
- 	.probe = rcar_pci_probe,
-diff --git a/drivers/pci/host/pci-tegra.c b/drivers/pci/host/pci-tegra.c
-index 0fb0fdb..2e1698d 100644
---- a/drivers/pci/host/pci-tegra.c
-+++ b/drivers/pci/host/pci-tegra.c
-@@ -1927,7 +1927,7 @@ static struct platform_driver tegra_pcie_driver = {
- 		.name = "tegra-pcie",
- 		.owner = THIS_MODULE,
- 		.of_match_table = tegra_pcie_of_match,
--		.suppress_bind_attrs = true,
-+		.flags = DRIVER_SUPPRESS_BIND_ATTRS,
- 	},
- 	.probe = tegra_pcie_probe,
- };
-diff --git a/drivers/pci/host/pcie-rcar.c b/drivers/pci/host/pcie-rcar.c
-index 4884ee5..9a1936e 100644
---- a/drivers/pci/host/pcie-rcar.c
-+++ b/drivers/pci/host/pcie-rcar.c
-@@ -981,7 +981,7 @@ static struct platform_driver rcar_pcie_driver = {
- 		.name = DRV_NAME,
- 		.owner = THIS_MODULE,
- 		.of_match_table = rcar_pcie_of_match,
--		.suppress_bind_attrs = true,
-+		.flags = DRIVER_SUPPRESS_BIND_ATTRS,
- 	},
- 	.probe = rcar_pcie_probe,
- };
-diff --git a/drivers/soc/tegra/pmc.c b/drivers/soc/tegra/pmc.c
-index a2c0ceb..77c3eb3 100644
---- a/drivers/soc/tegra/pmc.c
-+++ b/drivers/soc/tegra/pmc.c
-@@ -892,7 +892,7 @@ static const struct of_device_id tegra_pmc_match[] = {
- static struct platform_driver tegra_pmc_driver = {
- 	.driver = {
- 		.name = "tegra-pmc",
--		.suppress_bind_attrs = true,
-+		.flags = DRIVER_SUPPRESS_BIND_ATTRS,
- 		.of_match_table = tegra_pmc_match,
- 		.pm = &tegra_pmc_pm_ops,
- 	},
+@@ -509,7 +513,7 @@ static void __device_release_driver(struct device *dev)
+ 	if (drv) {
+ 		pm_runtime_get_sync(dev);
+ 
+-		driver_sysfs_remove(dev);
++		driver_sysfs_remove(dev, false);
+ 
+ 		if (dev->bus)
+ 			blocking_notifier_call_chain(&dev->bus->p->bus_notifier,
 diff --git a/include/linux/device.h b/include/linux/device.h
-index 92daded..5f4ff02 100644
+index b387710..92daded 100644
 --- a/include/linux/device.h
 +++ b/include/linux/device.h
-@@ -201,7 +201,7 @@ extern struct klist *bus_get_device_klist(struct bus_type *bus);
-  * @bus:	The bus which the device of this driver belongs to.
-  * @owner:	The module owner.
-  * @mod_name:	Used for built-in modules.
-- * @suppress_bind_attrs: Disables bind/unbind via sysfs.
-+ * @flags:	Flags defining driver behaviour, see below.
-  * @of_match_table: The open firmware table.
-  * @acpi_match_table: The ACPI match table.
-  * @probe:	Called to query the existence of a specific device,
-@@ -234,7 +234,7 @@ struct device_driver {
- 	struct module		*owner;
- 	const char		*mod_name;	/* used for built-in modules */
+@@ -176,7 +176,7 @@ extern int bus_register_notifier(struct bus_type *bus,
+ extern int bus_unregister_notifier(struct bus_type *bus,
+ 				   struct notifier_block *nb);
  
--	bool suppress_bind_attrs;	/* disables bind/unbind via sysfs */
-+	unsigned long		flags;
+-/* All 4 notifers below get called with the target struct device *
++/* All 7 notifers below get called with the target struct device *
+  * as an argument. Note that those functions are likely to be called
+  * with the device lock held in the core, so be careful.
+  */
+@@ -189,6 +189,8 @@ extern int bus_unregister_notifier(struct bus_type *bus,
+ 						      unbound */
+ #define BUS_NOTIFY_UNBOUND_DRIVER	0x00000006 /* driver is unbound
+ 						      from the device */
++#define BUS_NOTIFY_DRVBIND_FAILED	0x00000007 /* driver failed to bind
++						      to device */
  
- 	const struct of_device_id	*of_match_table;
- 	const struct acpi_device_id	*acpi_match_table;
-@@ -251,6 +251,8 @@ struct device_driver {
- 	struct driver_private *p;
- };
- 
-+/* disables bind/unbind via sysfs */
-+#define DRIVER_SUPPRESS_BIND_ATTRS	(1 << 0)
- 
- extern int __must_check driver_register(struct device_driver *drv);
- extern void driver_unregister(struct device_driver *drv);
+ extern struct kset *bus_get_kset(struct bus_type *bus);
+ extern struct klist *bus_get_device_klist(struct bus_type *bus);
 -- 
 1.9.2
