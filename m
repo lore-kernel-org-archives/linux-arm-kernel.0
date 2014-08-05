@@ -1,26 +1,18 @@
-From: airlied@linux.ie (Dave Airlie)
-Date: Tue, 5 Aug 2014 05:20:25 +0100 (IST)
-Subject: linux-next: build failures after merge of the drm tree
-In-Reply-To: <20140805130926.4e8c8fe5@canb.auug.org.au>
-References: <20140805130926.4e8c8fe5@canb.auug.org.au>
-Message-ID: <alpine.DEB.2.00.1408050519270.22643@skynet.skynet.ie>
+From: shawn.guo@freescale.com (Shawn Guo)
+Date: Tue, 5 Aug 2014 13:42:48 +0800
+Subject: [PATCH] ARM: i.MX: Remove mxc_arch_reset_init_dt() call for i.MX1
+In-Reply-To: <1407067830-10985-1-git-send-email-shc_work@mail.ru>
+References: <1407067830-10985-1-git-send-email-shc_work@mail.ru>
+Message-ID: <20140805054246.GF2167@dragon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-> Hi Dave,
+On Sun, Aug 03, 2014 at 04:10:30PM +0400, Alexander Shiyan wrote:
+> i.MX1 watchdog is not compatible with other i.MX SOCs, so
+> remove call of mxc_arch_reset_init_dt() for this CPU.
 > 
-> After merging the drm tree, today's linux-next build (x86_64
-> allmodconfig) failed like this:
-> 
-> ERROR: "drm_sysfs_connector_remove" [drivers/gpu/drm/i2c/tda998x.ko] undefined!
-> ERROR: "drm_sysfs_connector_add" [drivers/gpu/drm/i2c/tda998x.ko] undefined!
-> 
+> Signed-off-by: Alexander Shiyan <shc_work@mail.ru>
 
-I've fixed this, caught it myself a few mins after push,
+Amend the change into 'ARM: i.MX1: Add devicetree support'.
 
-The other I'm not sure about, I'll hope the exynos guys know what is going 
-on.
-
-Thanks,
-Dave.
+Shawn
