@@ -1,87 +1,57 @@
-From: Fabio.Estevam@freescale.com (Fabio.Estevam at freescale.com)
-Date: Tue, 5 Aug 2014 16:09:01 +0000
-Subject: i.MX25 esdhc2 incomplete cmd0 transmission
-In-Reply-To: <20140729124808.GF13842@pengutronix.de>
-References: <20140728080633.GA13842@pengutronix.de>,
- <20140729124808.GF13842@pengutronix.de>
-Message-ID: <1407254932760.78584@freescale.com>
+From: nicolas.pitre@linaro.org (Nicolas Pitre)
+Date: Tue, 5 Aug 2014 12:29:56 -0400 (EDT)
+Subject: [PATCH] ARM: remove unused/deprecated read_cpuid_part_number()
+In-Reply-To: <2694769.svrdKA2rqt@amdc1032>
+References: <2694769.svrdKA2rqt@amdc1032>
+Message-ID: <alpine.LFD.2.11.1408051228480.6061@knanqh.ubzr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-[Sorry for top-posting here]
+On Tue, 5 Aug 2014, Bartlomiej Zolnierkiewicz wrote:
 
-Are you sure 0x00000000 are the correct values for the IOMUX?
+> Commit af040ffc9ba1 ("ARM: make it easier to check the CPU part
+> number correctly") has left (now unused in the upstream tree and
+> marked as deprecated) read_cpuid_part_number() while changing
+> the way it works (using the old function with the definitions will
+> now always evaluate as false).  This causes problems with porting
+> older code to new kernels as the code compiles (with warnings but
+> they are very easy to miss) but it can fail silently or work just
+> fine depending on the used hardware.
+> 
+> Remove unused/deprecated read_cpuid_part_number() so developers
+> have to update their code during build time instead of running into
+> tricky runtime problems later.
+> 
+> Please see the commit af040ffc9ba1 for details on how to convert
+> your old out-of-tree code to use read_cpuid_part() instead of
+> read_cpuid_part_number().
+> 
+> Cc: Nicolas Pitre <nico@linaro.org>
+> Signed-off-by: Bartlomiej Zolnierkiewicz <b.zolnierkie@samsung.com>
 
-Or do you mean 0x80000000, which would let the same IOMUX as configured by the bootloader?
+If there are no more in-tree users then it should go indeed.
 
-Are you able to correctly access port esdhc2 from the bootloader?
+Acked-by: Nicolas Pitre <nico@linaro.org>
 
-________________________________________
-From: Markus Pargmann <mpa@pengutronix.de>
-Sent: Tuesday, July 29, 2014 9:48 AM
-To: Guo Shawn-R65073
-Cc: Estevam Fabio-R49496; linux-arm-kernel at lists.infradead.org; kernel at pengutronix.de
-Subject: i.MX25 esdhc2 incomplete cmd0 transmission
-
-Hi,
-
-This mail did not reach the mailinglist, so here is the same mail
-without the images attached.
-
-On Mon, Jul 28, 2014 at 10:06:33AM +0200, Markus Pargmann wrote:
-> Hi,
->
-> I am currently having a Board with an i.MX25 which has an SD-Card slot
-> wired to the CSI pins (ESDHC2). I can see the correct clock and the beginning of
-> the cmd0 on the CMD wire (01 00000). But the arguments and CRC that
-> should follow the comand are missing. The card doesn't respond to this.
-> The same behavior is observable on the karo tx25 module with an
-> oscilloscope on ESDHC2.
->
-> The tx25 works correctly with the same software and the ESDHC1. I can
-> see the complete cmd0 command even without any SD card plugged in, as
-> expected. I attached some oscilloscope pictures of these two cases to
-> this mail.
->
-> This is the pincontrol setup I am using for esdhc2 on karo tx25:
->
-> #define MX25_PAD_CSI_HSYNC__SDHC2_DAT2                0x148 0x340 0x4ec 0x02 0x001
-> #define MX25_PAD_CSI_MCLK__SDHC2_DAT0         0x140 0x338 0x4e4 0x02 0x001
-> #define MX25_PAD_CSI_PIXCLK__SDHC2_DAT3               0x14c 0x344 0x4f0 0x02 0x001
-> #define MX25_PAD_CSI_VSYNC__SDHC2_DAT1                0x144 0x33c 0x4e8 0x02 0x001
-> #define MX25_PAD_CSI_D6__SDHC2_CMD            0x130 0x328 0x4e0 0x02 0x001
-> #define MX25_PAD_CSI_D7__SDHC2_DAT_CLK                0x134 0x32C 0x4dc 0x02 0x001
->       esdhc {
->               pinctrl_esdhc2: esdhc2 {
->                       fsl,pins = <
->                               MX25_PAD_CSI_HSYNC__SDHC2_DAT2          0x00000000
->                               MX25_PAD_CSI_MCLK__SDHC2_DAT0           0x00000000
->                               MX25_PAD_CSI_PIXCLK__SDHC2_DAT3         0x00000000
->                               MX25_PAD_CSI_VSYNC__SDHC2_DAT1          0x00000000
->                               MX25_PAD_CSI_D6__SDHC2_CMD              0x00000000
->                               MX25_PAD_CSI_D7__SDHC2_DAT_CLK          0x00000000
->                       >;
->               };
->       };
->
-> Any ideas what may be wrong/missing?
-
-Here are the images uploaded to a ftp server:
-
-karo tx25 esdhc1 initial communication without SD card inserted:
-ftp://ftp.pengutronix.de/pub/20140729_imx25-esdhc2-scope/karo_2.png
-ftp://ftp.pengutronix.de/pub/20140729_imx25-esdhc2-scope/karo.png
-
-and the same with karo tx25 esdhc2 and the above pincontrol setup:
-ftp://ftp.pengutronix.de/pub/20140729_imx25-esdhc2-scope/karo_esdhc2.png
-ftp://ftp.pengutronix.de/pub/20140729_imx25-esdhc2-scope/karo_esdhc2_2.png
-
-Thanks,
-
-Markus
-
---
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+> ---
+>  arch/arm/include/asm/cputype.h |    5 -----
+>  1 file changed, 5 deletions(-)
+> 
+> Index: b/arch/arm/include/asm/cputype.h
+> ===================================================================
+> --- a/arch/arm/include/asm/cputype.h	2014-08-04 15:09:30.166988335 +0200
+> +++ b/arch/arm/include/asm/cputype.h	2014-08-05 15:40:03.793317783 +0200
+> @@ -182,11 +182,6 @@ static inline unsigned int __attribute_c
+>  	return read_cpuid_id() & 0xff00fff0;
+>  }
+>  
+> -static inline unsigned int __attribute_const__ __deprecated read_cpuid_part_number(void)
+> -{
+> -	return read_cpuid_id() & 0xFFF0;
+> -}
+> -
+>  static inline unsigned int __attribute_const__ xscale_cpu_arch_version(void)
+>  {
+>  	return read_cpuid_id() & ARM_CPU_XSCALE_ARCH_MASK;
+> 
+> 
