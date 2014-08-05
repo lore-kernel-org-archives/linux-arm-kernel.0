@@ -1,53 +1,75 @@
 From: vinod.koul@intel.com (Vinod Koul)
-Date: Tue, 5 Aug 2014 21:55:45 +0530
-Subject: [PATCH] Documentation: dmaengine: Add a documentation for the
- dma controller API
-In-Reply-To: <20140802144925.GJ3952@lukather>
-References: <1406736193-26685-1-git-send-email-maxime.ripard@free-electrons.com>
- <20140730160607.GM8181@intel.com> <20140731074440.GY3952@lukather>
- <20140731115628.GQ8181@intel.com> <20140731162330.GE3952@lukather>
- <20140801171306.GF8181@intel.com> <20140802144925.GJ3952@lukather>
-Message-ID: <20140805162545.GX8181@intel.com>
+Date: Tue, 5 Aug 2014 22:02:30 +0530
+Subject: [PATCH] ARM: edma: Fix configuration parsing for SoCs with
+ multiple eDMA3 CC
+In-Reply-To: <1407155216-20267-1-git-send-email-peter.ujfalusi@ti.com>
+References: <1407155216-20267-1-git-send-email-peter.ujfalusi@ti.com>
+Message-ID: <20140805163229.GZ8181@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Aug 02, 2014 at 04:49:25PM +0200, Maxime Ripard wrote:
-> > - residue callculation, though situation is much better now but still lots
-> >   of driver do it worng and folks do get it wrong
-> 
-> What mistake in often made regarding the residue calculation?
-- residue is for the descriptor asked
-- not for the current active one
-- we can store the size locally and return that when not processing
-- arg txstate can be null
+On Mon, Aug 04, 2014 at 03:26:56PM +0300, Peter Ujfalusi wrote:
+> The edma_setup_from_hw() should know about the CC number when parsing the
+> CCCFG register - when it reads the register to be precise. The base
+> addresses for CCs stored in an array and we need to provide the correct id
+> to edma_read() in order to read the correct register.
 
-> Another extra questions arose during starting this.
-> 
-> In the case of the call to device_control, especially in the
-> DMA_SLAVE_CONFIG case, but that also applies to pause/resume, are the
-> changes supposed to be immediates or can they happen later?
-> 
-> I actually have in mind the case where we would use a vchan, that
-> might or might not be actually mapped to a physical channel at the
-> moment where the DMA_SLAVE_CONFIG call is made. In the case where it's
-> not mapped and not transfering anything, it's pretty trivial, to
-> handle, but in the case where it's actually mapped to a physical
-> channel, should we push the new configuration to the physical channel
-> right away, or can it wait until the transfer ends ?
-Ah no. The model doesn't assume the config will be written runtime. So the
-descriptor which are already prepared doesn't change with DMA_SLAVE_CONFIG
-call. Only new descriptors will take those values
+Just an othognal question:
 
-But yes the pause/resume would be syncronous
+I still see lot of code for edma in arm/. What is the plan to re/move that
+to dma/
 
-HTH
 -- 
 ~Vinod
+> 
+> Cc: <stable@vger.kernel.org> # 3.16
+> Signed-off-by: Peter Ujfalusi <peter.ujfalusi@ti.com>
+> ---
+>  arch/arm/common/edma.c | 9 +++++----
+>  1 file changed, 5 insertions(+), 4 deletions(-)
+> 
+> diff --git a/arch/arm/common/edma.c b/arch/arm/common/edma.c
+> index 88099175fc56..d86771abbf57 100644
+> --- a/arch/arm/common/edma.c
+> +++ b/arch/arm/common/edma.c
+> @@ -1443,14 +1443,14 @@ void edma_assign_channel_eventq(unsigned channel, enum dma_event_q eventq_no)
+>  EXPORT_SYMBOL(edma_assign_channel_eventq);
+>  
+>  static int edma_setup_from_hw(struct device *dev, struct edma_soc_info *pdata,
+> -			      struct edma *edma_cc)
+> +			      struct edma *edma_cc, int cc_id)
+>  {
+>  	int i;
+>  	u32 value, cccfg;
+>  	s8 (*queue_priority_map)[2];
+>  
+>  	/* Decode the eDMA3 configuration from CCCFG register */
+> -	cccfg = edma_read(0, EDMA_CCCFG);
+> +	cccfg = edma_read(cc_id, EDMA_CCCFG);
+>  
+>  	value = GET_NUM_REGN(cccfg);
+>  	edma_cc->num_region = BIT(value);
+> @@ -1464,7 +1464,8 @@ static int edma_setup_from_hw(struct device *dev, struct edma_soc_info *pdata,
+>  	value = GET_NUM_EVQUE(cccfg);
+>  	edma_cc->num_tc = value + 1;
+>  
+> -	dev_dbg(dev, "eDMA3 HW configuration (cccfg: 0x%08x):\n", cccfg);
+> +	dev_dbg(dev, "eDMA3 CC%d HW configuration (cccfg: 0x%08x):\n", cc_id,
+> +		cccfg);
+>  	dev_dbg(dev, "num_region: %u\n", edma_cc->num_region);
+>  	dev_dbg(dev, "num_channel: %u\n", edma_cc->num_channels);
+>  	dev_dbg(dev, "num_slot: %u\n", edma_cc->num_slots);
+> @@ -1684,7 +1685,7 @@ static int edma_probe(struct platform_device *pdev)
+>  			return -ENOMEM;
+>  
+>  		/* Get eDMA3 configuration from IP */
+> -		ret = edma_setup_from_hw(dev, info[j], edma_cc[j]);
+> +		ret = edma_setup_from_hw(dev, info[j], edma_cc[j], j);
+>  		if (ret)
+>  			return ret;
+>  
+> -- 
+> 2.0.2
+> 
 
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140805/b070ba77/attachment.sig>
+-- 
