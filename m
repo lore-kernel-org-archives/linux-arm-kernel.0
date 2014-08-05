@@ -1,150 +1,132 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Tue,  5 Aug 2014 22:34:52 +0200
-Subject: [PATCH v2] ARM: crypto: enable NEON SHA-1 for big endian
-Message-ID: <1407270892-20902-1-git-send-email-ard.biesheuvel@linaro.org>
+From: pekon@pek-sem.com (pekon at pek-sem.com)
+Date: Wed, 06 Aug 2014 02:32:18 +0530
+Subject: [PATCH] mtd: nand: =?UTF-8?Q?stm=5Fnand=5Fbch=3A=20add=20new?=
+ =?UTF-8?Q?=20driver?=
+In-Reply-To: <20140805142324.GA10136@lee--X1>
+References: <1401268805-26043-1-git-send-email-lee.jones@linaro.org>
+ <20140703002237.GM3599@ld-irv-0074>
+ <20980858CB6D3A4BAE95CA194937D5E73EAFAFF1@DBDE04.ent.ti.com>
+ <20140805142324.GA10136@lee--X1>
+Message-ID: <d4ba973a22bd71eaff94be1f479c5334@pek-sem.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This tweaks the SHA-1 NEON code slightly so it works correctly under big endian,
-and removes the Kconfig condition preventing it from being selected if
-CONFIG_CPU_BIG_ENDIAN is set.
+Hello,
 
-Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
----
+On Tuesday 05 August 2014 07:53 PM, Lee Jones wrote:
+> On Thu, 03 Jul 2014, Gupta, Pekon wrote:
+>>> From: Brian Norris [mailto:computersforpeace at gmail.com]
+>>> On Wed, May 28, 2014 at 10:20:05AM +0100, Lee Jones wrote:
+[...]
+>>>> +static void bch_wait_seq(struct nandi_controller *nandi)
+>>>> +{
+>>>> +	int ret;
+>>>> +
+>>>> +	ret = wait_for_completion_timeout(&nandi->seq_completed, HZ/2);
+>>
+>> Are you sure you want to use same timeout value for all operations
+>> like ERASE, READ, WRITE ? because
+>> (1) There is wide variance between:
+>> - BLOCK_ERASE:  max(tBER) = 10ms) for MT29F4G08 Micron NAND
+>> - PAGE_ERASE: max(tPROG) = 600usec for same Micron part.
+>>
+>> (2) The value of HZ varies across kernel versions and hardware 
+>> platforms.
+>>
+>> I suggest you pass the timeout value in call to bch_wait_seq().
+>> And this timeout value should be like 2x of typical value of which 
+>> you found
+>> during ONFI parsing, or from DT
+>
+> How do you obtain these timings?  I don't see tBER or tPROG being 
+> used
+> anywhere in MTD.
+>
 
-I accidentally submitted the version below to the patch system (#8125/1) rather
-than the version I had posted to LAKML for review.
+These are not from NAND framework, these are terms used in data-sheet.
+However, you can read all signal timing from ONFI page while probing.
+But, as Brian suggested that timeout is a erroneous and rare condition
+anyway, so these relaxed timeout values are acceptable. So you may
+ignore my previous comment.
 
-The difference between the two versions is that the first one just changed some
-vld1.32 calls into vld1.8 calls, resulting in the data being byte swapped twice
-after being read from memory: once by vld1.8 and once by the subsequent vrev32.8
-instruction.
 
-Instead, this version retains the vld1.32 calls and makes the vrev32.8 calls
-conditional on !CPU_BIG_ENDIAN. As the vrev32.8 instruction did an implicit move
-as well, some register names had to be reshuffled to avoid having to move values
-between registers instead.
+> [...]
+>
+>>>> +{
+>>>> +	uint8_t *b = data;
+>>>> +	int zeros = 0;
+>>>> +	int i;
+>>>> +
+>>>> +	for (i = 0; i < page_size; i++) {
+>>>> +		zeros += hweight8(~*b++);
+>> Are you sure you want to use hweight8 ?
+>> hweight32 or something should give better performance, plz check.
+>> because this piece of code (check_xx_bitflips) sometimes becomes
+>> bottle neck for READ path.
+>
+> I'm not sure, no.  If I change it, how will I know if it's still 
+> doing
+> the correct thing or otherwise?
+>
+hweight/hweight16/hweight32 are all macros of same family
+just operating on different data-widths, so you may continue
+for now. But once the driver is merged, you might like to
+re-analyze performance gain (especially on MLC NAND) when
+using hweight32() instead of hweight8().
 
-Both versions pass the tcrypt built-in test suite for SHA1, in both big-endian
-and little-endian modes.
 
- arch/arm/crypto/sha1-armv7-neon.S | 39 ++++++++++++++++++++++-----------------
- crypto/Kconfig                    |  2 +-
- 2 files changed, 23 insertions(+), 18 deletions(-)
+> [...]
+>
+>>>> +	/* Load last page of block */
+>>>> +	offs = (loff_t)block << chip->phys_erase_shift;
+>>>> +	offs += mtd->erasesize - mtd->writesize;
+>>>> +	if (bch_read_page(nandi, offs, buf) < 0) {
+>>
+>> *Important*: You shouldn't call internal functions directly here..
+>> Instead use chip->_read() OR mtd-read() that will:
+>> - keep this code independent of ECC modes added in your driver in 
+>> future.
+>> - implicitly handle updating mtd->ecc_stat (like ecc_failed, 
+>> bits_corrected).
+>> - implicitly take care of address alignments checks and offset 
+>> calculations.
+>>
+>> <Same applies to other places where you have directly used 
+>> bch_read_page())
+>
+> Yourself and Brian seem to disagree on this point.  Which is correct?
+>
+>>>> +	/* Is block already considered bad? (will also catch invalid 
+>>>> offsets) */
+>>>> +	ret = mtd_block_isbad(mtd, offs);
+>>>
+>>> You're violating some of the layering here; the low-level driver
+>>> probably shouldn't be calling the high-level mtd_*() APIs. On a 
+>>> similar
+>>> note, I'm not 100% confident that the nand_base/nand_bbt separation 
+>>> is
+>>> written cleanly enough for easy maintenance of your nand_base + ST 
+>>> BBT
+>>> code in parallel. I might need a second look at that, and I think
+>>> modularizing your BBT code to a separate file could help ease this 
+>>> a
+>>> little.
+>
+> ... here is the converse argument.
+>
+I think somewhere in earlier comments, Brian also supported
+to use high-level function like mtd_read(). Also, nand_bbt.c
+itself uses 'mtd_read(), mtd_read_oob() and mtd_write_oob()
+at many places. So I'll let Brain decide here.
+But having low-level function will add redundant code for
+re-checking and aligning the addresses boundaries to block
+and page/sector sizes.
 
-diff --git a/arch/arm/crypto/sha1-armv7-neon.S b/arch/arm/crypto/sha1-armv7-neon.S
-index 50013c0e2864..dcd01f3f0bb0 100644
---- a/arch/arm/crypto/sha1-armv7-neon.S
-+++ b/arch/arm/crypto/sha1-armv7-neon.S
-@@ -9,7 +9,7 @@
-  */
- 
- #include <linux/linkage.h>
--
-+#include <asm/assembler.h>
- 
- .syntax unified
- .code   32
-@@ -61,13 +61,13 @@
- #define RT3 r12
- 
- #define W0 q0
--#define W1 q1
-+#define W1 q7
- #define W2 q2
- #define W3 q3
- #define W4 q4
--#define W5 q5
--#define W6 q6
--#define W7 q7
-+#define W5 q6
-+#define W6 q5
-+#define W7 q1
- 
- #define tmp0 q8
- #define tmp1 q9
-@@ -79,6 +79,11 @@
- #define qK3 q14
- #define qK4 q15
- 
-+#ifdef CONFIG_CPU_BIG_ENDIAN
-+#define ARM_LE(code...)
-+#else
-+#define ARM_LE(code...)		code
-+#endif
- 
- /* Round function macros. */
- 
-@@ -150,45 +155,45 @@
- #define W_PRECALC_00_15() \
- 	add       RWK, sp, #(WK_offs(0));			\
- 	\
--	vld1.32   {tmp0, tmp1}, [RDATA]!;			\
--	vrev32.8  W0, tmp0;		/* big => little */	\
--	vld1.32   {tmp2, tmp3}, [RDATA]!;			\
-+	vld1.32   {W0, W7}, [RDATA]!;				\
-+ ARM_LE(vrev32.8  W0, W0;	)	/* big => little */	\
-+	vld1.32   {W6, W5}, [RDATA]!;				\
- 	vadd.u32  tmp0, W0, curK;				\
--	vrev32.8  W7, tmp1;		/* big => little */	\
--	vrev32.8  W6, tmp2;		/* big => little */	\
-+ ARM_LE(vrev32.8  W7, W7;	)	/* big => little */	\
-+ ARM_LE(vrev32.8  W6, W6;	)	/* big => little */	\
- 	vadd.u32  tmp1, W7, curK;				\
--	vrev32.8  W5, tmp3;		/* big => little */	\
-+ ARM_LE(vrev32.8  W5, W5;	)	/* big => little */	\
- 	vadd.u32  tmp2, W6, curK;				\
- 	vst1.32   {tmp0, tmp1}, [RWK]!;				\
- 	vadd.u32  tmp3, W5, curK;				\
- 	vst1.32   {tmp2, tmp3}, [RWK];				\
- 
- #define WPRECALC_00_15_0(i,W,W_m04,W_m08,W_m12,W_m16,W_m20,W_m24,W_m28) \
--	vld1.32   {tmp0, tmp1}, [RDATA]!;			\
-+	vld1.32   {W0, W7}, [RDATA]!;				\
- 
- #define WPRECALC_00_15_1(i,W,W_m04,W_m08,W_m12,W_m16,W_m20,W_m24,W_m28) \
- 	add       RWK, sp, #(WK_offs(0));			\
- 
- #define WPRECALC_00_15_2(i,W,W_m04,W_m08,W_m12,W_m16,W_m20,W_m24,W_m28) \
--	vrev32.8  W0, tmp0;		/* big => little */	\
-+ ARM_LE(vrev32.8  W0, W0;	)	/* big => little */	\
- 
- #define WPRECALC_00_15_3(i,W,W_m04,W_m08,W_m12,W_m16,W_m20,W_m24,W_m28) \
--	vld1.32   {tmp2, tmp3}, [RDATA]!;			\
-+	vld1.32   {W6, W5}, [RDATA]!;				\
- 
- #define WPRECALC_00_15_4(i,W,W_m04,W_m08,W_m12,W_m16,W_m20,W_m24,W_m28) \
- 	vadd.u32  tmp0, W0, curK;				\
- 
- #define WPRECALC_00_15_5(i,W,W_m04,W_m08,W_m12,W_m16,W_m20,W_m24,W_m28) \
--	vrev32.8  W7, tmp1;		/* big => little */	\
-+ ARM_LE(vrev32.8  W7, W7;	)	/* big => little */	\
- 
- #define WPRECALC_00_15_6(i,W,W_m04,W_m08,W_m12,W_m16,W_m20,W_m24,W_m28) \
--	vrev32.8  W6, tmp2;		/* big => little */	\
-+ ARM_LE(vrev32.8  W6, W6;	)	/* big => little */	\
- 
- #define WPRECALC_00_15_7(i,W,W_m04,W_m08,W_m12,W_m16,W_m20,W_m24,W_m28) \
- 	vadd.u32  tmp1, W7, curK;				\
- 
- #define WPRECALC_00_15_8(i,W,W_m04,W_m08,W_m12,W_m16,W_m20,W_m24,W_m28) \
--	vrev32.8  W5, tmp3;		/* big => little */	\
-+ ARM_LE(vrev32.8  W5, W5;	)	/* big => little */	\
- 
- #define WPRECALC_00_15_9(i,W,W_m04,W_m08,W_m12,W_m16,W_m20,W_m24,W_m28) \
- 	vadd.u32  tmp2, W6, curK;				\
-diff --git a/crypto/Kconfig b/crypto/Kconfig
-index 749b1e05c490..deef2a4b6559 100644
---- a/crypto/Kconfig
-+++ b/crypto/Kconfig
-@@ -542,7 +542,7 @@ config CRYPTO_SHA1_ARM
- 
- config CRYPTO_SHA1_ARM_NEON
- 	tristate "SHA1 digest algorithm (ARM NEON)"
--	depends on ARM && KERNEL_MODE_NEON && !CPU_BIG_ENDIAN
-+	depends on ARM && KERNEL_MODE_NEON
- 	select CRYPTO_SHA1_ARM
- 	select CRYPTO_SHA1
- 	select CRYPTO_HASH
--- 
-1.8.3.2
+Brian ??
+
+
+with regards, pekon
+
+
+------------------------
+Powered by BigRock.com
