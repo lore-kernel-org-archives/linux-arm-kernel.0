@@ -1,64 +1,42 @@
 From: anup.patel@linaro.org (Anup Patel)
-Date: Tue,  5 Aug 2014 14:54:09 +0530
-Subject: [RFC PATCH 0/6] ARM64: KVM: PMU infrastructure support
-Message-ID: <1407230655-28864-1-git-send-email-anup.patel@linaro.org>
+Date: Tue,  5 Aug 2014 14:54:11 +0530
+Subject: [RFC PATCH 2/6] ARM64: perf: Re-enable overflow interrupt from
+ interrupt handler
+In-Reply-To: <1407230655-28864-1-git-send-email-anup.patel@linaro.org>
+References: <1407230655-28864-1-git-send-email-anup.patel@linaro.org>
+Message-ID: <1407230655-28864-3-git-send-email-anup.patel@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patchset enables PMU virtualization in KVM ARM64. The
-Guest can now directly use PMU available on the host HW.
+A hypervisor will typically mask the overflow interrupt before
+forwarding it to Guest Linux hence we need to re-enable the overflow
+interrupt after clearing it in Guest Linux. Also, this re-enabling
+of overflow interrupt does not harm in non-virtualized scenarios.
 
-The virtual PMU IRQ injection for Guest VCPUs is managed by
-small piece of code shared between KVM ARM and KVM ARM64. The
-virtual PMU IRQ number will be based on Guest machine model and
-user space will provide it using set device address vm ioctl.
+Signed-off-by: Pranavkumar Sawargaonkar <pranavkumar@linaro.org>
+Signed-off-by: Anup Patel <anup.patel@linaro.org>
+---
+ arch/arm64/kernel/perf_event.c |    8 ++++++++
+ 1 file changed, 8 insertions(+)
 
-The second last patch of this series implements full context
-switch of PMU registers which will context switch all PMU
-registers on every KVM world-switch.
-
-The last patch implements a lazy context switch of PMU registers
-which is very similar to lazy debug context switch.
-(Refer, http://lists.infradead.org/pipermail/linux-arm-kernel/2014-July/271040.html)
-
-Also, we reserve last PMU event counter for EL2 mode which
-will not be accessible from Host and Guest EL1 mode. This
-reserved EL2 mode PMU event counter can be used for profiling
-KVM world-switch and other EL2 mode functions.
-
-All testing have been done using KVMTOOL on X-Gene Mustang and
-Foundation v8 Model for both Aarch32 and Aarch64 guest.
-
-Anup Patel (6):
-  ARM64: Move PMU register related defines to asm/pmu.h
-  ARM64: perf: Re-enable overflow interrupt from interrupt handler
-  ARM: perf: Re-enable overflow interrupt from interrupt handler
-  ARM/ARM64: KVM: Add common code PMU IRQ routing
-  ARM64: KVM: Implement full context switch of PMU registers
-  ARM64: KVM: Upgrade to lazy context switch of PMU registers
-
- arch/arm/include/asm/kvm_host.h   |    9 +
- arch/arm/include/uapi/asm/kvm.h   |    1 +
- arch/arm/kernel/perf_event_v7.c   |    8 +
- arch/arm/kvm/arm.c                |    6 +
- arch/arm/kvm/reset.c              |    4 +
- arch/arm64/include/asm/kvm_asm.h  |   39 +++-
- arch/arm64/include/asm/kvm_host.h |   12 ++
- arch/arm64/include/asm/pmu.h      |   44 +++++
- arch/arm64/include/uapi/asm/kvm.h |    1 +
- arch/arm64/kernel/asm-offsets.c   |    2 +
- arch/arm64/kernel/perf_event.c    |   40 +---
- arch/arm64/kvm/Kconfig            |    7 +
- arch/arm64/kvm/Makefile           |    1 +
- arch/arm64/kvm/hyp-init.S         |   15 ++
- arch/arm64/kvm/hyp.S              |  209 +++++++++++++++++++-
- arch/arm64/kvm/reset.c            |    4 +
- arch/arm64/kvm/sys_regs.c         |  385 +++++++++++++++++++++++++++++++++----
- include/kvm/arm_pmu.h             |   52 +++++
- virt/kvm/arm/pmu.c                |  105 ++++++++++
- 19 files changed, 870 insertions(+), 74 deletions(-)
- create mode 100644 include/kvm/arm_pmu.h
- create mode 100644 virt/kvm/arm/pmu.c
-
+diff --git a/arch/arm64/kernel/perf_event.c b/arch/arm64/kernel/perf_event.c
+index 47dfb8b..19fb140 100644
+--- a/arch/arm64/kernel/perf_event.c
++++ b/arch/arm64/kernel/perf_event.c
+@@ -1076,6 +1076,14 @@ static irqreturn_t armv8pmu_handle_irq(int irq_num, void *dev)
+ 		if (!armv8pmu_counter_has_overflowed(pmovsr, idx))
+ 			continue;
+ 
++		/*
++		 * If we are running under a hypervisor such as KVM then
++		 * hypervisor will mask the interrupt before forwarding
++		 * it to Guest Linux hence re-enable interrupt for the
++		 * overflowed counter.
++		 */
++		armv8pmu_enable_intens(idx);
++
+ 		hwc = &event->hw;
+ 		armpmu_event_update(event, hwc, idx);
+ 		perf_sample_data_init(&data, 0, hwc->last_period);
 -- 
 1.7.9.5
