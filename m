@@ -1,78 +1,173 @@
-From: m.szyprowski@samsung.com (Marek Szyprowski)
-Date: Tue, 05 Aug 2014 12:47:50 +0200
-Subject: [PATCH 22/29] iommu: exynos: add support for binding more than one
- sysmmu to master device
-In-Reply-To: <1407235677-26324-1-git-send-email-m.szyprowski@samsung.com>
-References: <1407235677-26324-1-git-send-email-m.szyprowski@samsung.com>
-Message-ID: <1407235677-26324-23-git-send-email-m.szyprowski@samsung.com>
+From: jg1.han@samsung.com (Jingoo Han)
+Date: Tue, 05 Aug 2014 19:58:07 +0900
+Subject: [PATCH RESEND] usb: ehci/ohci-exynos: Fix PHY getting sequence
+In-Reply-To: <1407235148-31790-1-git-send-email-gautam.vivek@samsung.com>
+References: <1407235148-31790-1-git-send-email-gautam.vivek@samsung.com>
+Message-ID: <000d01cfb09c$239a8670$6acf9350$%han@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds support for assigning more than one SYSMMU controller to
-the master device. This has been achieved simply by chaning the struct
-device pointer in struct exynos_iommu_owner into the list of struct
-sysmmu_drvdata of all controllers assigned to the given master device.
+On Tuesday, August 05, 2014 7:39 PM, Vivek Gautam wrote:
+> 
+> Since we want to keep support for both older usb-phys as well as the
+> newer generic phys, lets first get the generic PHYs and fallback to
+> older USB-PHYs only when we fail to get the former.
+> This should fix the issue with ehci-exynos and ohci-exynos, wherein
+> in the absence of SAMSUNG_USB2PHY config symbol, we end up getting
+> the NOP_USB_XCEIV phy when the same is enabled. And thus the PHYs
+> are not configured properly.
+> 
+> Reported-by: Sachin Kamat <sachin.kamat@samsung.com>
+> Signed-off-by: Vivek Gautam <gautam.vivek@samsung.com>
+> Cc: Alan Stern <stern@rowland.harvard.edu>
+> Cc: Jingoo Han <jg1.han@samsung.com>
 
-Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
----
- drivers/iommu/exynos-iommu.c | 11 +++++------
- 1 file changed, 5 insertions(+), 6 deletions(-)
+Acked-by: Jingoo Han <jg1.han@samsung.com>
 
-diff --git a/drivers/iommu/exynos-iommu.c b/drivers/iommu/exynos-iommu.c
-index 674d1fb..46e0edc 100644
---- a/drivers/iommu/exynos-iommu.c
-+++ b/drivers/iommu/exynos-iommu.c
-@@ -187,7 +187,7 @@ static char *sysmmu_fault_name[SYSMMU_FAULTS_NUM] = {
- 
- /* attached to dev.archdata.iommu of the master device */
- struct exynos_iommu_owner {
--	struct device *sysmmu;
-+	struct list_head clients;
- };
- 
- struct exynos_iommu_domain {
-@@ -208,6 +208,7 @@ struct sysmmu_drvdata {
- 	spinlock_t lock;
- 	struct iommu_domain *domain;
- 	struct list_head domain_node;
-+	struct list_head owner_node;
- 	phys_addr_t pgtable;
- 	int version;
- };
-@@ -695,8 +696,7 @@ static int exynos_iommu_attach_device(struct iommu_domain *domain,
- 	if (!has_sysmmu(dev))
- 		return -ENODEV;
- 
--	data = dev_get_drvdata(owner->sysmmu);
--	if (data) {
-+	list_for_each_entry(data, &owner->clients, owner_node) {
- 		ret = __sysmmu_enable(data, pagetable, domain);
- 		if (ret >= 0) {
- 			data->master = dev;
-@@ -724,7 +724,7 @@ static void exynos_iommu_detach_device(struct iommu_domain *domain,
- {
- 	struct exynos_iommu_domain *priv = domain->priv;
- 	phys_addr_t pagetable = virt_to_phys(priv->pgtable);
--	struct sysmmu_drvdata *data;
-+	struct sysmmu_drvdata *data, *next;
- 	unsigned long flags;
- 	int found = 0;
- 
-@@ -732,14 +732,13 @@ static void exynos_iommu_detach_device(struct iommu_domain *domain,
- 		return;
- 
- 	spin_lock_irqsave(&priv->lock, flags);
--	list_for_each_entry(data, &priv->clients, domain_node) {
-+	list_for_each_entry_safe(data, next, &priv->clients, domain_node) {
- 		if (data->master == dev) {
- 			if (__sysmmu_disable(data)) {
- 				data->master = NULL;
- 				list_del_init(&data->domain_node);
- 			}
- 			found = true;
--			break;
- 		}
- 	}
- 	spin_unlock_irqrestore(&priv->lock, flags);
--- 
-1.9.2
+Right, we would get the generic PHYs first, then get the older
+usb-phys. Then, the older one will be removed from the kernel.
+Thank you.
+
+Best regards,
+Jingoo Han
+
+> ---
+> 
+> Based on 'usb-next' branch.
+> Resending it after adding 'Reported-by' tag.
+> 
+>  drivers/usb/host/ehci-exynos.c |   40 +++++++++++++++++-----------------
+>  drivers/usb/host/ohci-exynos.c |   47 +++++++++++++++++++---------------------
+>  2 files changed, 42 insertions(+), 45 deletions(-)
+> 
+> diff --git a/drivers/usb/host/ehci-exynos.c b/drivers/usb/host/ehci-exynos.c
+> index cda0a2f..2eed9a4 100644
+> --- a/drivers/usb/host/ehci-exynos.c
+> +++ b/drivers/usb/host/ehci-exynos.c
+> @@ -62,18 +62,6 @@ static int exynos_ehci_get_phy(struct device *dev,
+>  	int phy_number;
+>  	int ret = 0;
+> 
+> -	exynos_ehci->phy = devm_usb_get_phy(dev, USB_PHY_TYPE_USB2);
+> -	if (IS_ERR(exynos_ehci->phy)) {
+> -		ret = PTR_ERR(exynos_ehci->phy);
+> -		if (ret != -ENXIO && ret != -ENODEV) {
+> -			dev_err(dev, "no usb2 phy configured\n");
+> -			return ret;
+> -		}
+> -		dev_dbg(dev, "Failed to get usb2 phy\n");
+> -	} else {
+> -		exynos_ehci->otg = exynos_ehci->phy->otg;
+> -	}
+> -
+>  	for_each_available_child_of_node(dev->of_node, child) {
+>  		ret = of_property_read_u32(child, "reg", &phy_number);
+>  		if (ret) {
+> @@ -90,15 +78,27 @@ static int exynos_ehci_get_phy(struct device *dev,
+> 
+>  		phy = devm_of_phy_get(dev, child, NULL);
+>  		of_node_put(child);
+> -		if (IS_ERR(phy)) {
+> -			ret = PTR_ERR(phy);
+> -			if (ret != -ENOSYS && ret != -ENODEV) {
+> -				dev_err(dev, "no usb2 phy configured\n");
+> -				return ret;
+> -			}
+> -			dev_dbg(dev, "Failed to get usb2 phy\n");
+> -		}
+> +		if (IS_ERR(phy))
+> +			/* Lets fallback to older USB-PHYs */
+> +			goto usb_phy_old;
+>  		exynos_ehci->phy_g[phy_number] = phy;
+> +		/* Make the older PHYs unavailable */
+> +		exynos_ehci->phy = ERR_PTR(-ENXIO);
+> +	}
+> +
+> +	return 0;
+> +
+> +usb_phy_old:
+> +	exynos_ehci->phy = devm_usb_get_phy(dev, USB_PHY_TYPE_USB2);
+> +	if (IS_ERR(exynos_ehci->phy)) {
+> +		ret = PTR_ERR(exynos_ehci->phy);
+> +		if (ret != -ENXIO && ret != -ENODEV) {
+> +			dev_err(dev, "no usb2 phy configured\n");
+> +			return ret;
+> +		}
+> +		dev_dbg(dev, "Failed to get usb2 phy\n");
+> +	} else {
+> +		exynos_ehci->otg = exynos_ehci->phy->otg;
+>  	}
+> 
+>  	return ret;
+> diff --git a/drivers/usb/host/ohci-exynos.c b/drivers/usb/host/ohci-exynos.c
+> index a72ab8f..7c48e3f 100644
+> --- a/drivers/usb/host/ohci-exynos.c
+> +++ b/drivers/usb/host/ohci-exynos.c
+> @@ -51,27 +51,12 @@ static int exynos_ohci_get_phy(struct device *dev,
+>  	int phy_number;
+>  	int ret = 0;
+> 
+> -	exynos_ohci->phy = devm_usb_get_phy(dev, USB_PHY_TYPE_USB2);
+> -	if (IS_ERR(exynos_ohci->phy)) {
+> -		ret = PTR_ERR(exynos_ohci->phy);
+> -		if (ret != -ENXIO && ret != -ENODEV) {
+> -			dev_err(dev, "no usb2 phy configured\n");
+> -			return ret;
+> -		}
+> -		dev_dbg(dev, "Failed to get usb2 phy\n");
+> -	} else {
+> -		exynos_ohci->otg = exynos_ohci->phy->otg;
+> -	}
+> -
+>  	/*
+>  	 * Getting generic phy:
+>  	 * We are keeping both types of phys as a part of transiting OHCI
+>  	 * to generic phy framework, so as to maintain backward compatibilty
+> -	 * with old DTB.
+> -	 * If there are existing devices using DTB files built from them,
+> -	 * to remove the support for old bindings in this driver,
+> -	 * we need to make sure that such devices have their DTBs
+> -	 * updated to ones built from new DTS.
+> +	 * with old DTB too.
+> +	 * We fallback to older USB-PHYs when we fail to get generic PHYs.
+>  	 */
+>  	for_each_available_child_of_node(dev->of_node, child) {
+>  		ret = of_property_read_u32(child, "reg", &phy_number);
+> @@ -89,15 +74,27 @@ static int exynos_ohci_get_phy(struct device *dev,
+> 
+>  		phy = devm_of_phy_get(dev, child, NULL);
+>  		of_node_put(child);
+> -		if (IS_ERR(phy)) {
+> -			ret = PTR_ERR(phy);
+> -			if (ret != -ENOSYS && ret != -ENODEV) {
+> -				dev_err(dev, "no usb2 phy configured\n");
+> -				return ret;
+> -			}
+> -			dev_dbg(dev, "Failed to get usb2 phy\n");
+> -		}
+> +		if (IS_ERR(phy))
+> +			/* Lets fallback to older USB-PHYs */
+> +			goto usb_phy_old;
+>  		exynos_ohci->phy_g[phy_number] = phy;
+> +		/* Make the older PHYs unavailable */
+> +		exynos_ohci->phy = ERR_PTR(-ENXIO);
+> +	}
+> +
+> +	return 0;
+> +
+> +usb_phy_old:
+> +	exynos_ohci->phy = devm_usb_get_phy(dev, USB_PHY_TYPE_USB2);
+> +	if (IS_ERR(exynos_ohci->phy)) {
+> +		ret = PTR_ERR(exynos_ohci->phy);
+> +		if (ret != -ENXIO && ret != -ENODEV) {
+> +			dev_err(dev, "no usb2 phy configured\n");
+> +			return ret;
+> +		}
+> +		dev_dbg(dev, "Failed to get usb2 phy\n");
+> +	} else {
+> +		exynos_ohci->otg = exynos_ohci->phy->otg;
+>  	}
+> 
+>  	return ret;
+> --
+> 1.7.10.4
