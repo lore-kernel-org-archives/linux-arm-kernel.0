@@ -1,98 +1,68 @@
 From: m.szyprowski@samsung.com (Marek Szyprowski)
-Date: Tue, 05 Aug 2014 12:47:55 +0200
-Subject: [PATCH 27/29] iommu: exynos: document internal structures
+Date: Tue, 05 Aug 2014 12:47:46 +0200
+Subject: [PATCH 18/29] iommu: exynos: remove unused functions
 In-Reply-To: <1407235677-26324-1-git-send-email-m.szyprowski@samsung.com>
 References: <1407235677-26324-1-git-send-email-m.szyprowski@samsung.com>
-Message-ID: <1407235677-26324-28-git-send-email-m.szyprowski@samsung.com>
+Message-ID: <1407235677-26324-19-git-send-email-m.szyprowski@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add a few words of comment to all internal structures used by the driver.
+This patch removes two unneeded functions, which are not a part of
+generic IOMMU API and were never used by any other driver.
 
 Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
 ---
- drivers/iommu/exynos-iommu.c | 59 ++++++++++++++++++++++++++++----------------
- 1 file changed, 38 insertions(+), 21 deletions(-)
+ drivers/iommu/exynos-iommu.c | 31 -------------------------------
+ 1 file changed, 31 deletions(-)
 
 diff --git a/drivers/iommu/exynos-iommu.c b/drivers/iommu/exynos-iommu.c
-index 7600861..78ce618 100644
+index 8927923..ec3c882 100644
 --- a/drivers/iommu/exynos-iommu.c
 +++ b/drivers/iommu/exynos-iommu.c
-@@ -189,37 +189,54 @@ static char *sysmmu_fault_name[SYSMMU_FAULTS_NUM] = {
- 	"UNKNOWN FAULT"
- };
+@@ -491,13 +491,6 @@ static int __exynos_sysmmu_enable(struct device *dev, phys_addr_t pgtable,
+ 	return ret;
+ }
  
--/* attached to dev.archdata.iommu of the master device */
-+/*
-+ * This structure is attached to dev.archdata.iommu of the master device
-+ * on device add, contains a list of SYSMMU controllers defined by device tree,
-+ * which are bound to given master device. It is usually referenced by 'owner'
-+ * pointer.
-+ */
- struct exynos_iommu_owner {
--	struct list_head clients;
-+	struct list_head clients; /* list of sysmmu_drvdata.owner_node */
- };
+-int exynos_sysmmu_enable(struct device *dev, phys_addr_t pgtable)
+-{
+-	BUG_ON(!memblock_is_memory(pgtable));
+-
+-	return __exynos_sysmmu_enable(dev, pgtable, NULL);
+-}
+-
+ static bool exynos_sysmmu_disable(struct device *dev)
+ {
+ 	unsigned long flags;
+@@ -589,30 +582,6 @@ static void sysmmu_tlb_invalidate_entry(struct device *dev, sysmmu_iova_t iova,
+ 	spin_unlock_irqrestore(&data->lock, flags);
+ }
  
-+/*
-+ * This structure is stored in ->priv field of generic struct iommu_domain,
-+ * contains list of SYSMMU controllers from all master devices, which has been
-+ * attached to this domain and page tables of IO address space defined by this
-+ * domain. It is usually referenced by 'domain' pointer.
-+ */
- struct exynos_iommu_domain {
--	struct list_head clients; /* list of sysmmu_drvdata.node */
-+	struct list_head clients; /* list of sysmmu_drvdata.domain_node */
- 	sysmmu_pte_t *pgtable; /* lv1 page table, 16KB */
- 	short *lv2entcnt; /* free lv2 entry counter for each section */
--	spinlock_t lock; /* lock for this structure */
-+	spinlock_t lock; /* lock for modyfying list of clients */
- 	spinlock_t pgtablelock; /* lock for modifying page table @ pgtable */
- };
- 
-+/*
-+ * This structure hold all data of a single SYSMMU controller, this includes
-+ * hw resources like registers and clocks, pointers and list nodes to connect
-+ * it to all other structures, internal state and parameters read from device
-+ * tree. It is usually referenced by 'data' pointer.
-+ */
- struct sysmmu_drvdata {
--	struct device *sysmmu;	/* System MMU's device descriptor */
--	struct device *master;	/* Owner of system MMU */
--	void __iomem *sfrbase;
--	struct clk *clk;
--	struct clk *clk_master;
--	int activations;
--	int suspended;
--	spinlock_t lock;
--	struct iommu_domain *domain;
--	struct list_head domain_node;
--	struct list_head owner_node;
--	phys_addr_t pgtable;
--	int version;
--	const char *name;
--	dma_addr_t base;
--	size_t size;
--	struct notifier_block pm_notifier;
-+	struct device *sysmmu; /* SYSMMU controller device */
-+	struct device *master; /* master device (owner of given SYSMMU) */
-+	void __iomem *sfrbase; /* our registers */
-+	struct clk *clk; /* SYSMMU's clock */
-+	struct clk *clk_master; /* master's device clock */
-+	int activations; /* number of calls to sysmmu_enable */
-+	int suspended; /* status of the controller (managed by runtime pm) */
-+	spinlock_t lock; /* lock for modyfying enable/disable state */
-+	struct iommu_domain *domain; /* domain we belong to */
-+	struct list_head domain_node; /* node for domain clients list */
-+	struct list_head owner_node; /* node for owner clients list */
-+	phys_addr_t pgtable; /* assigned page table structure */
-+	int version; /* our version */
-+	const char *name; /* our name from device tree */
-+	dma_addr_t base; /* base addres of IO address space define in DT */
-+	size_t size; /* size of IO address space define in DT */
-+	struct notifier_block pm_notifier; /* notifier for pm domain on/off */
- };
- 
- static bool set_sysmmu_active(struct sysmmu_drvdata *data)
+-void exynos_sysmmu_tlb_invalidate(struct device *dev)
+-{
+-	struct exynos_iommu_owner *owner = dev->archdata.iommu;
+-	unsigned long flags;
+-	struct sysmmu_drvdata *data;
+-
+-	data = dev_get_drvdata(owner->sysmmu);
+-
+-	spin_lock_irqsave(&data->lock, flags);
+-	if (is_sysmmu_active(data)) {
+-		if (!IS_ERR(data->clk_master))
+-			clk_enable(data->clk_master);
+-		if (sysmmu_block(data->sfrbase)) {
+-			__sysmmu_tlb_invalidate(data->sfrbase);
+-			sysmmu_unblock(data->sfrbase);
+-		}
+-		if (!IS_ERR(data->clk_master))
+-			clk_disable(data->clk_master);
+-	} else {
+-		dev_dbg(dev, "disabled. Skipping TLB invalidation\n");
+-	}
+-	spin_unlock_irqrestore(&data->lock, flags);
+-}
+-
+ static int __init exynos_sysmmu_probe(struct platform_device *pdev)
+ {
+ 	int irq, ret;
 -- 
 1.9.2
