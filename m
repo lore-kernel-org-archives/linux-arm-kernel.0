@@ -1,114 +1,54 @@
 From: linux@roeck-us.net (Guenter Roeck)
-Date: Mon,  4 Aug 2014 18:48:57 -0700
-Subject: [PATCH v6 6/7] watchdog: alim7101: Register restart handler with
- kernel restart handler
+Date: Mon,  4 Aug 2014 18:48:58 -0700
+Subject: [PATCH v6 7/7] arm/arm64: Unexport restart handlers
 In-Reply-To: <1407203338-12915-1-git-send-email-linux@roeck-us.net>
 References: <1407203338-12915-1-git-send-email-linux@roeck-us.net>
-Message-ID: <1407203338-12915-7-git-send-email-linux@roeck-us.net>
+Message-ID: <1407203338-12915-8-git-send-email-linux@roeck-us.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The kernel core now provides an API to trigger a system restart.
-Register with it to restart the system instead of misusing the
-reboot notifier.
+Implementing a restart handler in a module don't make sense
+as there would be no guarantee that the module is loaded when
+a restart is needed. Unexport arm_pm_restart to ensure that
+no one gets the idea to do it anyway.
 
 Signed-off-by: Guenter Roeck <linux@roeck-us.net>
 Acked-by: Catalin Marinas <catalin.marinas@arm.com>
 Acked-by: Heiko Stuebner <heiko@sntech.de>
 ---
-v6: No change.
-v5: Function and variable renames: *notifier -> *handler.
-v4: Set restart notifier priority to 128.
-v3: No change.
-v2: No change.
+v6: No change
+v5: No change
+v4: No change
+v3: No change
+v2: No change
 
- drivers/watchdog/alim7101_wdt.c | 42 +++++++++++++++++++++++++++++++----------
- 1 file changed, 32 insertions(+), 10 deletions(-)
+ arch/arm/kernel/process.c   | 1 -
+ arch/arm64/kernel/process.c | 1 -
+ 2 files changed, 2 deletions(-)
 
-diff --git a/drivers/watchdog/alim7101_wdt.c b/drivers/watchdog/alim7101_wdt.c
-index 996b2f7..665e0e7 100644
---- a/drivers/watchdog/alim7101_wdt.c
-+++ b/drivers/watchdog/alim7101_wdt.c
-@@ -301,6 +301,28 @@ static struct miscdevice wdt_miscdev = {
- 	.fops	=	&wdt_fops,
- };
+diff --git a/arch/arm/kernel/process.c b/arch/arm/kernel/process.c
+index 84ca0d5..27bdf11 100644
+--- a/arch/arm/kernel/process.c
++++ b/arch/arm/kernel/process.c
+@@ -125,7 +125,6 @@ void (*pm_power_off)(void);
+ EXPORT_SYMBOL(pm_power_off);
  
-+static int wdt_restart_handle(struct notifier_block *this, unsigned long mode,
-+			      void *cmd)
-+{
-+	/*
-+	 * Cobalt devices have no way of rebooting themselves other
-+	 * than getting the watchdog to pull reset, so we restart the
-+	 * watchdog on reboot with no heartbeat.
-+	 */
-+	wdt_change(WDT_ENABLE);
-+
-+	/* loop until the watchdog fires */
-+	while (true)
-+		;
-+
-+	return NOTIFY_DONE;
-+}
-+
-+static struct notifier_block wdt_restart_handler = {
-+	.notifier_call = wdt_restart_handle,
-+	.priority = 128,
-+};
-+
+ void (*arm_pm_restart)(enum reboot_mode reboot_mode, const char *cmd) = null_restart;
+-EXPORT_SYMBOL_GPL(arm_pm_restart);
+ 
  /*
-  *	Notifier for system down
-  */
-@@ -311,15 +333,6 @@ static int wdt_notify_sys(struct notifier_block *this,
- 	if (code == SYS_DOWN || code == SYS_HALT)
- 		wdt_turnoff();
+  * This is our default idle handler.
+diff --git a/arch/arm64/kernel/process.c b/arch/arm64/kernel/process.c
+index 9591e60..f5fddff 100644
+--- a/arch/arm64/kernel/process.c
++++ b/arch/arm64/kernel/process.c
+@@ -92,7 +92,6 @@ void (*pm_power_off)(void);
+ EXPORT_SYMBOL_GPL(pm_power_off);
  
--	if (code == SYS_RESTART) {
--		/*
--		 * Cobalt devices have no way of rebooting themselves other
--		 * than getting the watchdog to pull reset, so we restart the
--		 * watchdog on reboot with no heartbeat
--		 */
--		wdt_change(WDT_ENABLE);
--		pr_info("Watchdog timer is now enabled with no heartbeat - should reboot in ~1 second\n");
--	}
- 	return NOTIFY_DONE;
- }
+ void (*arm_pm_restart)(enum reboot_mode reboot_mode, const char *cmd);
+-EXPORT_SYMBOL_GPL(arm_pm_restart);
  
-@@ -338,6 +351,7 @@ static void __exit alim7101_wdt_unload(void)
- 	/* Deregister */
- 	misc_deregister(&wdt_miscdev);
- 	unregister_reboot_notifier(&wdt_notifier);
-+	unregister_restart_handler(&wdt_restart_handler);
- 	pci_dev_put(alim7101_pmu);
- }
- 
-@@ -390,11 +404,17 @@ static int __init alim7101_wdt_init(void)
- 		goto err_out;
- 	}
- 
-+	rc = register_restart_handler(&wdt_restart_handler);
-+	if (rc) {
-+		pr_err("cannot register restart handler (err=%d)\n", rc);
-+		goto err_out_reboot;
-+	}
-+
- 	rc = misc_register(&wdt_miscdev);
- 	if (rc) {
- 		pr_err("cannot register miscdev on minor=%d (err=%d)\n",
- 		       wdt_miscdev.minor, rc);
--		goto err_out_reboot;
-+		goto err_out_restart;
- 	}
- 
- 	if (nowayout)
-@@ -404,6 +424,8 @@ static int __init alim7101_wdt_init(void)
- 		timeout, nowayout);
- 	return 0;
- 
-+err_out_restart:
-+	unregister_restart_handler(&wdt_restart_handler);
- err_out_reboot:
- 	unregister_reboot_notifier(&wdt_notifier);
- err_out:
+ /*
+  * This is our default idle handler.
 -- 
 1.9.1
