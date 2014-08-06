@@ -1,156 +1,68 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Wed, 06 Aug 2014 10:46:20 +0100
-Subject: [PATCH V2 1/1] GIC: introduce method to deactive interupts
-In-Reply-To: <53E1EACA.6070502@huawei.com>
-References: <1407125860-37718-1-git-send-email-sdu.liu@huawei.com>
- <1407125860-37718-2-git-send-email-sdu.liu@huawei.com>
- <53DF55AC.5030705@arm.com> <53E1EACA.6070502@huawei.com>
-Message-ID: <53E1F96C.2030307@arm.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Wed, 6 Aug 2014 10:50:12 +0100
+Subject: Oops: 17 SMP ARM (v3.16-rc2)
+In-Reply-To: <C4A61A5CA4AD2246942F4BA6F20ACB8043575072@ALVA-EXMB04.alv.autoliv.int>
+References: <C4A61A5CA4AD2246942F4BA6F20ACB804356534D@ALVA-EXMB04.alv.autoliv.int>
+ <20140626140115.GQ32514@n2100.arm.linux.org.uk>
+ <C4A61A5CA4AD2246942F4BA6F20ACB80435655E9@ALVA-EXMB04.alv.autoliv.int>
+ <20140626151424.GT32514@n2100.arm.linux.org.uk>
+ <20140627112151.GF32514@n2100.arm.linux.org.uk>
+ <3FFB61A7A8473C49831AF20FA193534A43CADFA7@ALVA-EXMB01.alv.autoliv.int>
+ <20140627163108.GP32514@n2100.arm.linux.org.uk>
+ <C4A61A5CA4AD2246942F4BA6F20ACB8043575072@ALVA-EXMB04.alv.autoliv.int>
+Message-ID: <20140806095012.GN30282@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Liu,
+On Tue, Aug 05, 2014 at 01:31:29PM +0000, Mattis Lorentzon wrote:
+> We have applied your V2 patch set of 30 patches on top of v3.16-rc2 and are
+> currently running some stability tests.
+> 
+> During our first test round we triggered a timeout which caused the fec driver
+> to become unresponsive for several minutes. The attached backtrace was
+> shown when the hardware was rebooted.
 
-On 06/08/14 09:43, Liu hua wrote:
-> ? 2014/8/4 17:43, Marc Zyngier ??:
->> Hi Liu,
->>
->> On 04/08/14 05:17, Liu Hua wrote:
->>> When using kdump on ARM platform, if kernel panics in interrupt handler
->>> (maybe PPI), the capture kernel can not recive certain interrupt, and 
->>> fails to boot.
->>>
->>> On this situation, We have read register GICC_IAR. But we have no chance
->>> to write relative bit to register GICC_EOIR (kernel paniced before). So
->>> the state of this type interrupt remains active. And that makes gic not
->>> deliver this type interrupt to cpu interface.
->>>
->>> So we should not assume that all interrut states of GIC are inactive when
->>> kernel inittailize the GIC. This patch will identify these type interrupts
->>> and deactive them
->>>
->>> Signed-off-by: Liu Hua <sdu.liu@huawei.com>
->>> ---
->>>  drivers/irqchip/irq-gic.c | 26 ++++++++++++++++++++++++++
->>>  1 file changed, 26 insertions(+)
->>>
->>> diff --git a/drivers/irqchip/irq-gic.c b/drivers/irqchip/irq-gic.c
->>> index b2648fc..7708df1 100644
->>> --- a/drivers/irqchip/irq-gic.c
->>> +++ b/drivers/irqchip/irq-gic.c
->>> @@ -351,12 +351,37 @@ static u8 gic_get_cpumask(struct gic_chip_data *gic)
->>>  	return mask;
->>>  }
->>>  
->>> +void gic_eois(u32 active, int irq_off, void __iomem *cpu_base)
->>> +{
->>> +	int bit = -1;
->>> +
->>> +	for_each_set_bit(bit, (unsigned long *)&active, 32)
->>> +		writel_relaxed(bit + irq_off, cpu_base + GIC_CPU_EOI);
->>> +}
->>> +
->>> +void gic_dist_clear_active(void __iomem *dist_base,
->>> +			void __iomem *cpu_base, int gic_irqs)
->>> +{
->>> +	int irq, offset;
->>> +	u32 active;
->>> +
->>> +	for (irq = 0; irq < gic_irqs; irq += 32) {
->>> +		offset = GIC_DIST_ACTIVE_SET + irq * 4 / 32;
->>> +		active = readl_relaxed(dist_base + offset);
->>> +		if (!active)
->>> +			continue;
->>> +		gic_eois(active, irq, cpu_base);
->>> +	}
->>> +}
->>> +
->>> +
->>>  static void __init gic_dist_init(struct gic_chip_data *gic)
->>>  {
->>>  	unsigned int i;
->>>  	u32 cpumask;
->>>  	unsigned int gic_irqs = gic->gic_irqs;
->>>  	void __iomem *base = gic_data_dist_base(gic);
->>> +	void __iomem *cpu_base = gic_data_cpu_base(gic);
->>>  
->>>  	writel_relaxed(0, base + GIC_DIST_CTRL);
->>>  
->>> @@ -371,6 +396,7 @@ static void __init gic_dist_init(struct gic_chip_data *gic)
->>>  
->>>  	gic_dist_config(base, gic_irqs, NULL);
->>>  
->>> +	gic_dist_clear_active(base, cpu_base, gic_irqs);
->>>  	writel_relaxed(1, base + GIC_DIST_CTRL);
->>>  }
->>
->> So while this is solving a real issue, I don't think you can just fix it
->> for the UP case. You'll have to fix the same thing for secondary CPUs
->> (shouldn't be too hard to split things between local and global interrupts).
-> Hi Marc,
-> 
-> Thanks very much for you reply!
-> 
-> when I tried to implement your ideas. I found that: when kdump is deployed
-> and without my patch,
-> 
-> (1) panic in PPI, the capture kernel can not boot up.
-> (2) panic in SPI, the capture kernel boot up regularly.
-> 
-> I was confused and there may be something I did not catch. I glanced the kdump
-> code and found that function machine_kexec_mask_interrupts. It will clear the
-> GIC active state only if the IRQD_IRQ_INPROGRESS bit in d->state_use_accessors
-> is set.
-> 
-> And the PPI handler does not set this flag. So there are two ways to solve this
-> problem.
-> 
->  (1) consider this problem common, as you and I thought before. we should fix secondary CPUs issues;
-> 
-> 
->  (2)just set flag IRQD_IRQ_INPROGRESS in PPI. we need patch like this:
-> 
-> 	-------------(2) patch start-----------
-> 	diff --git a/kernel/irq/chip.c b/kernel/irq/chip.c
-> 	index a2b28a2..0a5dfe0 100644
-> 	--- a/kernel/irq/chip.c
-> 	+++ b/kernel/irq/chip.c
-> 	@@ -677,10 +677,18 @@ void handle_percpu_devid_irq(unsigned int irq, struct irq_desc *desc)
->         	if (chip->irq_ack)
->                 	chip->irq_ack(&desc->irq_data);
-> 
-> 	+ raw_spin_lock(&desc->lock);
-> 	+ irqd_set(&desc->irq_data, IRQD_IRQ_INPROGRESS);
-> 	+ raw_spin_unlock(&desc->lock);
-> 	+
->         trace_irq_handler_entry(irq, action);
->         res = action->handler(irq, dev_id);
->         trace_irq_handler_exit(irq, action, res);
-> 
-> 	+ raw_spin_lock(&desc->lock);
-> 	+ irqd_clear(&desc->irq_data, IRQD_IRQ_INPROGRESS);
-> 	+ raw_spin_unlock(&desc->lock);
-> 	+
->         if (chip->irq_eoi)
->                 chip->irq_eoi(&desc->irq_data);
-> 	 }
-> 	-------------(2) patch end-----------
-> 
-> Way 2 seems to be needed anyway.
-> For way 1, I do not find another situation that the gic interrupt states remains active when kernel booting.
-> And for kdump process, Way 2 is enough.
-> 
-> What do you think about them?
+What is on the other end of the link?
 
-Your second approach doesn't work, because you can have multiple CPUs
-handling the same PPI at the same time. Remember these are per-processor
-interrupts, despite having the same number. So you can't just have one
-bit, you'd need one bit per CPU (and that's not going to happen).
+> ------------[ cut here ]------------
+> WARNING: CPU: 0 PID: 0 at net/sched/sch_generic.c:264 dev_watchdog+0x270/0x27c()
+> NETDEV WATCHDOG: eth0 (fec): transmit queue 0 timed out
+...
+> fec 2188000.ethernet eth0: TX ring dump
+> Nr     SC     addr       len  SKB
+>   0    0x1c00 0x00000000   66   (null)
+...
+>  83    0x1c00 0x00000000   66   (null)
+>  84  H 0x1c00 0x00000000   66   (null)
+>  85    0x9c00 0x2e205000   66 9e384f00
+>  86    0x1c00 0x2e204800   66 9e384d80
+>  87    0x1c00 0x2e204000   66 9e384180
+...
+> 376    0x1c00 0x2e252800   66 81cf6180
+> 377    0x1c00 0x2e253000   66 81cf6240
+> 378 S  0x1c00 0x00000000   66   (null)
 
-I'm afraid that for PPIs, parsing the active bits is the only way.
+So, the software would insert the next packet into slot 378.  However,
+the slots from 85 to 377 have not been reaped, despite those in 86 to
+377 allegedly having been sent.  This is because the entry in slot 85
+shows that it has yet to be sent.
 
-Thanks,
+I've no idea what causes this; it looks like there's something screwed
+with the hardware which causes the transmitter to skip an entry in the
+ring under certain circumstances.  As I've never been able to reproduce
+it here, I've not been able to investigate it.
 
-	M.
+What I would like to do is to stamp each packet in some way with an
+identifier marking its ring position, and then monitor the network to
+find out whether the packet at slot 85 was actually transmitted - that's
+made slightly harder because packets may be dropped at the receiver
+when operating in promisc mode.  This would then allow us to work out
+some likely causes.
+
+Note that after the transmit watchdog, the interface should recover and
+start operating normally again - and that should not take "several
+minutes."
+
 -- 
-Jazz is not dead. It just smells funny...
+FTTC broadband for 0.8mile line: currently at 9.5Mbps down 400kbps up
+according to speedtest.net.
