@@ -1,67 +1,50 @@
-From: yao.yuan@freescale.com (Yao Yuan)
-Date: Wed, 6 Aug 2014 07:06:41 +0000
-Subject: [PATCH v6 1/2] i2c: imx: add DMA support for freescale i2c driver
-In-Reply-To: <41705e1e4c604240ba96333a03d5c544@BLUPR03MB373.namprd03.prod.outlook.com>
-References: <1407232563-10856-1-git-send-email-yao.yuan@freescale.com>
- <1407232563-10856-2-git-send-email-yao.yuan@freescale.com>
- <41705e1e4c604240ba96333a03d5c544@BLUPR03MB373.namprd03.prod.outlook.com>
-Message-ID: <14d042bbcfb04308bfb3a1db18e46bec@BL2PR03MB338.namprd03.prod.outlook.com>
+From: geert@linux-m68k.org (Geert Uytterhoeven)
+Date: Wed, 6 Aug 2014 09:17:57 +0200
+Subject: DMA engine API issue (was: [PATCH/RFC 0/5] R-Car Gen2 DMAC
+ hardware descriptor list support)
+In-Reply-To: <1877927.dGcJCfKbeH@avalon>
+References: <1406032431-3807-1-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
+ <2568292.I2Yo4lJlu6@avalon>
+ <20140804175458.GH30282@n2100.arm.linux.org.uk>
+ <1877927.dGcJCfKbeH@avalon>
+Message-ID: <CAMuHMdVz8hNus5x1hn0feqb1SYsUuhA4QHHfPGyebiKLZJwfEQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Fugang,
+Hi Laurent,
 
-Duan Fugang wrote:
-[...]
->+	dma_sconfig.dst_addr_width = DMA_SLAVE_BUSWIDTH_1_BYTE;
->+	dma_sconfig.dst_maxburst = 1;
-> The maxburst is 1 cause very slow efficiency for DMA copy, which system
-> performance even is slower Than cpu mode.
+On Wed, Aug 6, 2014 at 1:19 AM, Laurent Pinchart
+<laurent.pinchart@ideasonboard.com> wrote:
+> I actually have the opposite problem, in my case channels of physically
+> separate DMA engines can be used interchangeably to serve the system's slaves.
+> Using the DMA engine DT bindings, DT nodes of the slaves currently reference a
+> specific DMA engine, even if they can be served by both. This leads to limited
+> dynamic channel allocation capabilities (especially when taking into account
+> lazy channel allocation as mentioned in another mail in this thread).
 
-There is no FIFO for IMX i2c, so the maxburst shoud be 1 for hardware request.
+What about adding a property to the first one, referencing the second
+(or the other way around, don't know what's the easiest to implement)?
 
-[...]
+        dmac0: dma-controller at e6700000 {
+                ...
+                renesas,alternative = <&dmac1>;
+                ...
+        };
 
-> >+	/* Waiting for Transfer complete. */
-> >+	while (timeout--) {
-> >+		temp = imx_i2c_read_reg(i2c_imx, IMX_I2C_I2SR);
-> >+		if (temp & I2SR_ICF)
-> >+			break;
-> >+		udelay(10);
-> >+	}
-> Whether there have better method like interrupt to avoid dead wait here until
-> timeout ?
+        dmac1: dma-controller at e6720000 {
+                ...
+        };
 
-Can you give me more suggestion? We have discussed it with our team, It seems the short query wait is necessary.
+That would avoid having to bind a slave device explicitly to a single
+dmac, or having to bind all slave devices to all dmacs.
 
-> >+
-> >+	if (!timeout)
-> >+		return -ETIMEDOUT;
-> >+	temp = imx_i2c_read_reg(i2c_imx, IMX_I2C_I2CR);
-> >+	temp &= ~I2CR_DMAEN;
-> >+	imx_i2c_write_reg(temp, i2c_imx, IMX_I2C_I2CR);
-> >+
-> >+	/* The last data byte must be transferred by the CPU. */
-> >+	imx_i2c_write_reg(msgs->buf[msgs->len-1],
-> >+				i2c_imx, IMX_I2C_I2DR);
-> >+	result = i2c_imx_trx_complete(i2c_imx);
-> >+	if (result)
-> >+		return result;
-> I don't understand why the last data need to be transmited by cpu. I guess you
-> want to get IIF interrupt ?
+Gr{oetje,eeting}s,
 
-Yes, we need the interrupt to do some mop-up.
+                        Geert
 
-Also follow the hardware request as:
+--
+Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
 
-The following flow diagram details exactly the operation for using a DMA controller to
-transmit "n" data bytes to a slave. The first byte (the slave calling address) is always
-transmitted by the CPU. All subsequent data bytes (apart from the last data byte) can be
-transferred by the DMA controller. The last data byte must be transferred by the CPU.
-
-
-> >+
-> >+	result = i2c_imx_acked(i2c_imx);
-> >+	if (result)
-> >+		return result;
-> >+
+In personal conversations with technical people, I call myself a hacker. But
+when I'm talking to journalists I just say "programmer" or something like that.
+                                -- Linus Torvalds
