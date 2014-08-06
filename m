@@ -1,50 +1,28 @@
-From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Wed, 6 Aug 2014 09:17:57 +0200
-Subject: DMA engine API issue (was: [PATCH/RFC 0/5] R-Car Gen2 DMAC
- hardware descriptor list support)
-In-Reply-To: <1877927.dGcJCfKbeH@avalon>
-References: <1406032431-3807-1-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
- <2568292.I2Yo4lJlu6@avalon>
- <20140804175458.GH30282@n2100.arm.linux.org.uk>
- <1877927.dGcJCfKbeH@avalon>
-Message-ID: <CAMuHMdVz8hNus5x1hn0feqb1SYsUuhA4QHHfPGyebiKLZJwfEQ@mail.gmail.com>
+From: wsa@the-dreams.de (Wolfram Sang)
+Date: Wed, 6 Aug 2014 09:20:17 +0200
+Subject: [PATCH v6 1/2] i2c: imx: add DMA support for freescale i2c driver
+In-Reply-To: <30487e0abf4b4564af296d17f5cebf49@BL2PR03MB338.namprd03.prod.outlook.com>
+References: <1407232563-10856-1-git-send-email-yao.yuan@freescale.com>
+ <1407232563-10856-2-git-send-email-yao.yuan@freescale.com>
+ <53E0C498.6070608@gmail.com>
+ <30487e0abf4b4564af296d17f5cebf49@BL2PR03MB338.namprd03.prod.outlook.com>
+Message-ID: <20140806072017.GA2730@katana>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Laurent,
+> > static int i2c_imx_dma_write(struct imx_i2c_struct *i2c_imx,
+> > 			     struct i2c_msg *msgs)
+> > 
+> > run checkpatch.pl on this patch...
+> 
+> Sorry for my code style. I will match open parenthesis in this case.
 
-On Wed, Aug 6, 2014 at 1:19 AM, Laurent Pinchart
-<laurent.pinchart@ideasonboard.com> wrote:
-> I actually have the opposite problem, in my case channels of physically
-> separate DMA engines can be used interchangeably to serve the system's slaves.
-> Using the DMA engine DT bindings, DT nodes of the slaves currently reference a
-> specific DMA engine, even if they can be served by both. This leads to limited
-> dynamic channel allocation capabilities (especially when taking into account
-> lazy channel allocation as mentioned in another mail in this thread).
+FYI, I am not strict on the open parenthesis thingie.
 
-What about adding a property to the first one, referencing the second
-(or the other way around, don't know what's the easiest to implement)?
-
-        dmac0: dma-controller at e6700000 {
-                ...
-                renesas,alternative = <&dmac1>;
-                ...
-        };
-
-        dmac1: dma-controller at e6720000 {
-                ...
-        };
-
-That would avoid having to bind a slave device explicitly to a single
-dmac, or having to bind all slave devices to all dmacs.
-
-Gr{oetje,eeting}s,
-
-                        Geert
-
---
-Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
-
-In personal conversations with technical people, I call myself a hacker. But
-when I'm talking to journalists I just say "programmer" or something like that.
-                                -- Linus Torvalds
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140806/134fb5e3/attachment.sig>
