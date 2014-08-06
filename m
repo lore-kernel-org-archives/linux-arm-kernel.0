@@ -1,60 +1,28 @@
-From: m-karicheri2@ti.com (Murali Karicheri)
-Date: Wed, 6 Aug 2014 12:56:04 -0400
+From: jgunthorpe@obsidianresearch.com (Jason Gunthorpe)
+Date: Wed, 6 Aug 2014 10:58:37 -0600
 Subject: [PATCH] PCI: keystone: add a pci quirk to limit mrrs
-In-Reply-To: <20140806163021.GB19914@obsidianresearch.com>
+In-Reply-To: <53E25E24.8070506@ti.com>
 References: <1407338300-9146-1-git-send-email-m-karicheri2@ti.com>
  <20140806163021.GB19914@obsidianresearch.com>
-Message-ID: <53E25E24.8070506@ti.com>
+ <53E25E24.8070506@ti.com>
+Message-ID: <20140806165837.GC19914@obsidianresearch.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08/06/2014 12:30 PM, Jason Gunthorpe wrote:
-> On Wed, Aug 06, 2014 at 11:18:20AM -0400, Murali Karicheri wrote:
->> Keystone PCI controller has a limitation that memory read request
->> size must not exceed 256 bytes. This is a hardware limitation and
->> add a quirk to force this limit on all downstream devices by
->> updating mrrs.
->
-> Does this still work if the tuning is enabled, or does the tuning run
-> after this?
+On Wed, Aug 06, 2014 at 12:56:04PM -0400, Murali Karicheri wrote:
+> On 08/06/2014 12:30 PM, Jason Gunthorpe wrote:
+> >On Wed, Aug 06, 2014 at 11:18:20AM -0400, Murali Karicheri wrote:
+> >>Keystone PCI controller has a limitation that memory read request
+> >>size must not exceed 256 bytes. This is a hardware limitation and
+> >>add a quirk to force this limit on all downstream devices by
+> >>updating mrrs.
+> >
+> >Does this still work if the tuning is enabled, or does the tuning run
+> >after this?
+> 
+> Yes it works with tuning enabled. Tuning happens afterwards. The
+> 'limiting mrrs to 256' below is from my patch.
 
-Yes it works with tuning enabled. Tuning happens afterwards. The 
-'limiting mrrs to 256' below is from my patch.
+That seems backwards to me...
 
-
-[    2.267670] limiting mrrs to 256
-[    2.267698] limiting mrrs to 256
-[    2.267808] pcieport 0000:00:00.0: BAR 8: assigned [mem 
-0x50000000-0x500fffff]
-[    2.267818] pcieport 0000:00:00.0: BAR 9: assigned [mem 
-0x50100000-0x501fffff pref]
-[    2.267827] pcieport 0000:00:00.0: BAR 7: assigned [io  0x1000-0x1fff]
-[    2.267840] pci 0000:01:00.0: BAR 0: assigned [mem 0x50000000-0x5001ffff]
-[    2.267855] pci 0000:01:00.0: BAR 1: assigned [mem 0x50020000-0x5003ffff]
-[    2.267869] pci 0000:01:00.0: BAR 6: assigned [mem 
-0x50100000-0x5011ffff pref]
-[    2.267877] pci 0000:01:00.1: BAR 0: assigned [mem 0x50040000-0x5005ffff]
-[    2.267891] pci 0000:01:00.1: BAR 1: assigned [mem 0x50060000-0x5007ffff]
-[    2.267904] pci 0000:01:00.1: BAR 6: assigned [mem 
-0x50120000-0x5013ffff pref]
-[    2.267913] pci 0000:01:00.0: BAR 2: assigned [io  0x1000-0x101f]
-[    2.267926] pci 0000:01:00.1: BAR 2: assigned [io  0x1020-0x103f]
-[    2.267946] pcieport 0000:00:00.0: Max Payload Size set to  256/ 256 
-(was  128), Max Read Rq  256
-[    2.267980] pci 0000:01:00.0: Max Payload Size set to  256/ 256 (was 
-  128), Max Read Rq  256
-[    2.268013] pci 0000:01:00.1: Max Payload Size set to  256/ 256 (was 
-  128), Max Read Rq  256
-
-
->
->> +			if (pcie_get_readrq(dev)>  256) {
->> +				pr_info("limiting mrrs to 256\n");
->> +				pcie_set_readrq(dev, 256);
->
-> The pr_info should either go away, or at least print the PCI bdf..
-
-I will change this to a dev_info and print the PCI bdf as part of it.
-
->
-> Jason
+Jason
