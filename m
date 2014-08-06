@@ -1,32 +1,51 @@
 From: andrew@lunn.ch (Andrew Lunn)
-Date: Wed,  6 Aug 2014 03:18:27 +0200
-Subject: [RFC 3/8] ARM: Kirkwood: Update sound DT node to reflect DPCM support
-In-Reply-To: <1407287912-19447-1-git-send-email-andrew@lunn.ch>
-References: <1407287912-19447-1-git-send-email-andrew@lunn.ch>
-Message-ID: <1407287912-19447-4-git-send-email-andrew@lunn.ch>
+Date: Wed,  6 Aug 2014 03:18:24 +0200
+Subject: [RFC 0/8] DPCM with simple-card support for Kirkwood
+Message-ID: <1407287912-19447-1-git-send-email-andrew@lunn.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Now that kirkwood-i2s supports multiple DAIs, we need to specify which
-DAI is to be used in phandle. So increase the #sound-dai-cells to one.
+Hi Russell
 
-Signed-off-by: Andrew Lunn <andrew@lunn.ch>
----
- arch/arm/boot/dts/kirkwood.dtsi | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+30 June you posted your code to implement DPCM for kirkwood-i2s,
+making it possible to use both I2S and SPDIF at the same time.
 
-diff --git a/arch/arm/boot/dts/kirkwood.dtsi b/arch/arm/boot/dts/kirkwood.dtsi
-index afc640cd80c5..69b4cee1f4d3 100644
---- a/arch/arm/boot/dts/kirkwood.dtsi
-+++ b/arch/arm/boot/dts/kirkwood.dtsi
-@@ -372,7 +372,7 @@
- 
- 		audio0: audio-controller at a0000 {
- 			compatible = "marvell,kirkwood-audio";
--			#sound-dai-cells = <0>;
-+			#sound-dai-cells = <1>;
- 			reg = <0xa0000 0x2210>;
- 			interrupts = <24>;
- 			clocks = <&gate_clk 9>;
+It has taken me a while, but i now have this patch on 3.16-rc6, and
+i've extended simple-card to support DPCM. I've tested it on a
+kirkwood based HP T5325, which only makes use of the I2S backend.
+
+Please could you take a look and see if this helps to unblock getting
+your Cubox support into mainline.
+
+The code is also here
+
+https://github.com/lunn/linux.git v3.16-rc6-rmk-dpcm 
+
+Thanks
+	Andrew
+
+Andrew Lunn (7):
+  ASoC: simple-card: Make mclk setting a dai link property
+  ARM: Kirkwood: Update sound DT node to reflect DPCM support
+  ASoC: dt: Parse DPCM properties
+  ASoC: simple-card: Don't set DAI format for dynamic DAIs
+  ASoC: dt: Allow the platform name to be set for a DAI
+  ASoC: simple-card: Allow use of snd-soc-dummy as codec
+  ARM: Kirkwood: Describe DPCM audio support in DT
+
+Russell King (1):
+  ASoC: kirkwood: add DPCM support
+
+ .../devicetree/bindings/sound/simple-card.txt      |  11 +-
+ arch/arm/boot/dts/kirkwood-openrd-client.dts       |  39 +++-
+ arch/arm/boot/dts/kirkwood-t5325.dts               |  37 +++-
+ arch/arm/boot/dts/kirkwood.dtsi                    |   2 +-
+ include/sound/soc.h                                |   8 +
+ sound/soc/generic/simple-card.c                    | 140 +++++++-----
+ sound/soc/kirkwood/kirkwood-i2s.c                  | 244 ++++++++++++++-------
+ sound/soc/kirkwood/kirkwood.h                      |  20 ++
+ sound/soc/soc-core.c                               |  29 +++
+ 9 files changed, 380 insertions(+), 150 deletions(-)
+
 -- 
 2.0.1
