@@ -1,34 +1,34 @@
 From: will.deacon@arm.com (Will Deacon)
-Date: Wed, 6 Aug 2014 11:50:29 +0100
-Subject: [PATCH V2 2/4] ARM: perf: Associate PMU data with driver.
-In-Reply-To: <20140805144835.25462.71004.stgit@localhost>
+Date: Wed, 6 Aug 2014 11:50:48 +0100
+Subject: [PATCH V2 4/4] ARM: dts: i.MX53: Add PMU DT entry
+In-Reply-To: <20140805144840.25462.57101.stgit@localhost>
 References: <20140805144831.25462.18149.stgit@localhost>
- <20140805144835.25462.71004.stgit@localhost>
-Message-ID: <20140806105029.GE25953@arm.com>
+ <20140805144840.25462.57101.stgit@localhost>
+Message-ID: <20140806105048.GF25953@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Aug 05, 2014 at 03:48:35PM +0100, Martin Fuzzey wrote:
-> In order to use the PM hooks for platform specific control we sometimes
-> need access to the PMU driver data.
+On Tue, Aug 05, 2014 at 03:48:40PM +0100, Martin Fuzzey wrote:
+> Add device tree node for PMU on i.MX53
 > 
 > Signed-off-by: Martin Fuzzey <mfuzzey@parkeon.com>
 > ---
->  arch/arm/kernel/perf_event_cpu.c |    1 +
->  1 file changed, 1 insertion(+)
+>  arch/arm/boot/dts/imx53.dtsi |    5 +++++
+>  1 file changed, 5 insertions(+)
 > 
-> diff --git a/arch/arm/kernel/perf_event_cpu.c b/arch/arm/kernel/perf_event_cpu.c
-> index c09e18e..951a542 100644
-> --- a/arch/arm/kernel/perf_event_cpu.c
-> +++ b/arch/arm/kernel/perf_event_cpu.c
-> @@ -311,6 +311,7 @@ static int cpu_pmu_device_probe(struct platform_device *pdev)
+> diff --git a/arch/arm/boot/dts/imx53.dtsi b/arch/arm/boot/dts/imx53.dtsi
+> index 6456a00..ab3afe0 100644
+> --- a/arch/arm/boot/dts/imx53.dtsi
+> +++ b/arch/arm/boot/dts/imx53.dtsi
+> @@ -101,6 +101,11 @@
+>  		interrupt-parent = <&tzic>;
+>  		ranges;
 >  
->  	cpu_pmu = pmu;
->  	cpu_pmu->plat_device = pdev;
-> +	dev_set_drvdata(&pdev->dev, pmu);
+> +		pmu {
+> +			compatible = "arm,cortex-a8-pmu";
+> +			interrupts = <77>;
+> +		};
 
-I'd rather the platform-specific code used its own structures to keep track
-of what it's doing. Exposing the PMU like this is almost certainly going to
-cause us problems later on.
+You're missing the new property.
 
 Will
