@@ -1,41 +1,40 @@
-From: mpatocka@redhat.com (Mikulas Patocka)
-Date: Wed, 6 Aug 2014 17:33:24 -0400 (EDT)
-Subject: [3.13.y.z extended stable] Patch "locking/mutex: Disable
- optimistic
- spinning on some architectures" has been added to staging queue
-In-Reply-To: <CAJUuVQ5OpNye8HAEw6x=owBB32pq-aLF7_Gqo493jDDHDahhRA@mail.gmail.com>
-References: <1407358496-23094-1-git-send-email-kamal@canonical.com>
- <CAJUuVQ5OpNye8HAEw6x=owBB32pq-aLF7_Gqo493jDDHDahhRA@mail.gmail.com>
-Message-ID: <alpine.LRH.2.02.1408061730590.10016@file01.intranet.prod.int.rdu2.redhat.com>
+From: dinguyen@opensource.altera.com (dinguyen at opensource.altera.com)
+Date: Wed, 6 Aug 2014 16:38:52 -0500
+Subject: [PATCH] MAINTAINERS: update entries for ARM/SOCFPGA platform
+Message-ID: <1407361132-10773-1-git-send-email-dinguyen@opensource.altera.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+From: Dinh Nguyen <dinguyen@opensource.altera.com>
 
+Update email address, add W and T entries.
 
-On Wed, 6 Aug 2014, Andev wrote:
+Signed-off-by: Dinh Nguyen <dinguyen@opensource.altera.com>
+---
+ MAINTAINERS | 7 +++++--
+ 1 file changed, 5 insertions(+), 2 deletions(-)
 
-> On Wed, Aug 6, 2014 at 4:54 PM, Kamal Mostafa <kamal@canonical.com> wrote:
-> > This is a note to let you know that I have just added a patch titled
-> >
-> >     locking/mutex: Disable optimistic spinning on some architectures
-> >
-> > to the linux-3.13.y-queue branch of the 3.13.y.z extended stable tree
-> > which can be found at:
-> >
-> >  http://kernel.ubuntu.com/git?p=ubuntu/linux.git;a=shortlog;h=refs/heads/linux-3.13.y-queue
-> >
-> > This patch is scheduled to be released in version 3.13.11.6.
-> >
-> 
-> This patch is specifically for parisc, sparc32, tile32, metag-lock1,
-> arc-!llsc and hexagon none of which Ubuntu supports.
-> 
-> Why are you backporting this patch?
-> 
-> --
-> Andev
-
-I guess - it's less time consuming to backport all patches for stable than 
-to ponder on each patch if it applies to Ubuntu or not...
-
-Mikulas
+diff --git a/MAINTAINERS b/MAINTAINERS
+index f777763..4ea2f6b 100644
+--- a/MAINTAINERS
++++ b/MAINTAINERS
+@@ -1343,12 +1343,15 @@ F:	arch/arm/mach-shmobile/
+ F:	drivers/sh/
+ 
+ ARM/SOCFPGA ARCHITECTURE
+-M:	Dinh Nguyen <dinguyen@altera.com>
++M:	Dinh Nguyen <dinguyen@opensource.altera.com>
+ S:	Maintained
+ F:	arch/arm/mach-socfpga/
++W:	http://www.rocketboards.org
++T:	git://git.rocketboards.org/linux-socfpga.git
++T:	git://git.rocketboards.org/linux-socfpga-next.git
+ 
+ ARM/SOCFPGA CLOCK FRAMEWORK SUPPORT
+-M:	Dinh Nguyen <dinguyen@altera.com>
++M:	Dinh Nguyen <dinguyen@opensource.altera.com>
+ S:	Maintained
+ F:	drivers/clk/socfpga/
+ 
+-- 
+2.0.3
