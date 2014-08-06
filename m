@@ -1,129 +1,46 @@
-From: andrew@lunn.ch (Andrew Lunn)
-Date: Wed,  6 Aug 2014 03:18:32 +0200
-Subject: [RFC 8/8] ARM: Kirkwood: Describe DPCM audio support in DT
-In-Reply-To: <1407287912-19447-1-git-send-email-andrew@lunn.ch>
-References: <1407287912-19447-1-git-send-email-andrew@lunn.ch>
-Message-ID: <1407287912-19447-9-git-send-email-andrew@lunn.ch>
+From: wangyijing@huawei.com (Yijing Wang)
+Date: Wed, 6 Aug 2014 09:23:51 +0800
+Subject: [RFC PATCH 03/11] PCI/MSI: Refactor pci_dev_msi_enabled()
+In-Reply-To: <CALRxmdB0Ltt3_G=D4i7x47pHCtCKo8RHgn-hgN+u=px22dimOA@mail.gmail.com>
+References: <1406344128-27055-1-git-send-email-wangyijing@huawei.com>	<1406344128-27055-4-git-send-email-wangyijing@huawei.com>
+ <CALRxmdB0Ltt3_G=D4i7x47pHCtCKo8RHgn-hgN+u=px22dimOA@mail.gmail.com>
+Message-ID: <53E183A7.80905@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Describe the DAI backend and the I2S front end of the audio
-hardware for both HP T5325 and Marvell OpenRD Client.
+On 2014/8/6 6:35, Stuart Yoder wrote:
+> On Fri, Jul 25, 2014 at 10:08 PM, Yijing Wang <wangyijing@huawei.com> wrote:
+>> Pci_dev_msi_enabled() is used to check whether device
+>> MSI/MSIX enabled. Refactor this function  to suuport
+>> checking only device MSI or MSIX enabled.
+>>
+>> Signed-off-by: Yijing Wang <wangyijing@huawei.com>
+> 
+> So this patch refactors things so that checks like this:
+>    > -       if (!dev->msi_enabled)
+> 
+> are moved into a function:
+>    > +       if (!pci_dev_msi_enabled(dev, MSI_TYPE))
+> 
+> Can you explain a bit more why this  needed.   Is it just cleanup?
 
-Signed-off-by: Andrew Lunn <andrew@lunn.ch>
----
- arch/arm/boot/dts/kirkwood-openrd-client.dts | 39 +++++++++++++++++++++++-----
- arch/arm/boot/dts/kirkwood-t5325.dts         | 33 +++++++++++++++++------
- 2 files changed, 57 insertions(+), 15 deletions(-)
+Hi Stuart, it's not just cleanup, because "[RFC PATCH 08/11] PCI/MSI: Introduce new struct msi_irqs and struct msi_ops"
+introduced struct msi_irqs, so the code will change to
+if (!dev->msi_irqs->msi_enabled)
 
-diff --git a/arch/arm/boot/dts/kirkwood-openrd-client.dts b/arch/arm/boot/dts/kirkwood-openrd-client.dts
-index 887b9c1fee43..2cb216512ff2 100644
---- a/arch/arm/boot/dts/kirkwood-openrd-client.dts
-+++ b/arch/arm/boot/dts/kirkwood-openrd-client.dts
-@@ -29,19 +29,44 @@
- 				reg = <0x4a>;
- 			};
- 		};
-+
-+		audio: audio-controller at a0000 {
-+			status = "okay";
-+		};
-+
- 	};
- 
- 	sound {
- 		compatible = "simple-audio-card";
--		simple-audio-card,format = "i2s";
--		simple-audio-card,mclk-fs = <256>;
-+		simple-audio-card,name = "openrd-client-audio";
-+		simple-audio-card,routing =
-+			"i2s-tx", "dma-tx",
-+			"dma-rx", "i2s-rx";
- 
--		simple-audio-card,cpu {
--			sound-dai = <&audio0>;
-+		simple-audio-card,dai-link at 0 { /* Front end */
-+			dynamic;
-+			dpcm_playback;
-+			dpcm_capture;
-+			cpu {
-+				sound-dai = <&audio 0>;
-+			};
-+			codec {
-+				snd-soc-dummy;
-+			};
- 		};
--
--		simple-audio-card,codec {
--			sound-dai = <&cs42l51>;
-+		simple-audio-card,dia-link at 1 { /* I2S Backend */
-+			format = "i2s";
-+			dpcm_playback;
-+			dpcm_capture;
-+			no_pcm;
-+			mclk-fs = <256>;
-+			platform_name = "snd-soc-dummy";
-+			cpu {
-+				sound-dai = <&audio 1>;
-+			};
-+			codec {
-+				sound-dai = <&cs42l51>;
-+			};
- 		};
- 	};
- };
-diff --git a/arch/arm/boot/dts/kirkwood-t5325.dts b/arch/arm/boot/dts/kirkwood-t5325.dts
-index cc6cd0bdcfac..f9466a2858c9 100644
---- a/arch/arm/boot/dts/kirkwood-t5325.dts
-+++ b/arch/arm/boot/dts/kirkwood-t5325.dts
-@@ -189,7 +189,7 @@
- 
- 	sound {
- 		compatible = "simple-audio-card";
--		simple-audio-card,format = "i2s";
-+		simple-audio-card,name = "t5325";
- 		simple-audio-card,routing =
- 			"Headphone Jack", "HPL",
- 			"Headphone Jack", "HPR",
-@@ -204,15 +204,32 @@
- 			"Speaker", "Speaker",
- 			"Microphone", "Mic Jack";
- 
--		simple-audio-card,mclk-fs = <256>;
--
--		simple-audio-card,cpu {
--			sound-dai = <&audio>;
-+		simple-audio-card,dai-link at 0 { /* Front end */
-+			dynamic;
-+			dpcm_playback;
-+			dpcm_capture;
-+			cpu {
-+				sound-dai = <&audio 0>;
-+			};
-+			codec {
-+				snd-soc-dummy;
-+			};
- 		};
--
--		simple-audio-card,codec {
--			sound-dai = <&alc5621>;
-+		simple-audio-card,dia-link at 1 { /* I2S Backend */
-+			format = "i2s";
-+			dpcm_playback;
-+			dpcm_capture;
-+			no_pcm;
-+			mclk-fs = <256>;
-+			platform_name = "snd-soc-dummy";
-+			cpu {
-+				sound-dai = <&audio 1>;
-+			};
-+			codec {
-+				sound-dai = <&alc5621>;
-+			};
- 		};
-+
- 	};
- };
- 
+I think driver should not need to know the details of MSI members.
+So I try to rework the pci_dev_msi_enabled() to hide the detailed MSI info.
+
+
+Thanks!
+Yijing.
+
+
+> 
+> .
+> 
+
+
 -- 
-2.0.1
+Thanks!
+Yijing
