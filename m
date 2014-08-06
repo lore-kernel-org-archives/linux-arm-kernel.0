@@ -1,68 +1,43 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Wed, 6 Aug 2014 10:50:12 +0100
-Subject: Oops: 17 SMP ARM (v3.16-rc2)
-In-Reply-To: <C4A61A5CA4AD2246942F4BA6F20ACB8043575072@ALVA-EXMB04.alv.autoliv.int>
-References: <C4A61A5CA4AD2246942F4BA6F20ACB804356534D@ALVA-EXMB04.alv.autoliv.int>
- <20140626140115.GQ32514@n2100.arm.linux.org.uk>
- <C4A61A5CA4AD2246942F4BA6F20ACB80435655E9@ALVA-EXMB04.alv.autoliv.int>
- <20140626151424.GT32514@n2100.arm.linux.org.uk>
- <20140627112151.GF32514@n2100.arm.linux.org.uk>
- <3FFB61A7A8473C49831AF20FA193534A43CADFA7@ALVA-EXMB01.alv.autoliv.int>
- <20140627163108.GP32514@n2100.arm.linux.org.uk>
- <C4A61A5CA4AD2246942F4BA6F20ACB8043575072@ALVA-EXMB04.alv.autoliv.int>
-Message-ID: <20140806095012.GN30282@n2100.arm.linux.org.uk>
+From: will.deacon@arm.com (Will Deacon)
+Date: Wed, 6 Aug 2014 11:19:48 +0100
+Subject: [PATCH v2 2/2] iommu/arm-smmu: Do not access non-existing SMR
+ registers
+In-Reply-To: <1407175263-10699-3-git-send-email-ohaugan@codeaurora.org>
+References: <1407175263-10699-1-git-send-email-ohaugan@codeaurora.org>
+ <1407175263-10699-3-git-send-email-ohaugan@codeaurora.org>
+Message-ID: <20140806101948.GD23882@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Aug 05, 2014 at 01:31:29PM +0000, Mattis Lorentzon wrote:
-> We have applied your V2 patch set of 30 patches on top of v3.16-rc2 and are
-> currently running some stability tests.
+Hi Olav,
+
+On Mon, Aug 04, 2014 at 07:01:03PM +0100, Olav Haugan wrote:
+> The SMR registers do not exist when stream matching is not
+> supported by the hardware. Avoid writing to this register if not needed.
 > 
-> During our first test round we triggered a timeout which caused the fec driver
-> to become unresponsive for several minutes. The attached backtrace was
-> shown when the hardware was rebooted.
+> Signed-off-by: Olav Haugan <ohaugan@codeaurora.org>
+> ---
+>  drivers/iommu/arm-smmu.c | 5 ++++-
+>  1 file changed, 4 insertions(+), 1 deletion(-)
+> 
+> diff --git a/drivers/iommu/arm-smmu.c b/drivers/iommu/arm-smmu.c
+> index c16431f..1f3a5b3 100644
+> --- a/drivers/iommu/arm-smmu.c
+> +++ b/drivers/iommu/arm-smmu.c
+> @@ -1731,7 +1731,10 @@ static void arm_smmu_device_reset(struct arm_smmu_device *smmu)
+>  
+>  	/* Mark all SMRn as invalid and all S2CRn as bypass */
+>  	for (i = 0; i < smmu->num_mapping_groups; ++i) {
+> -		writel_relaxed(~SMR_VALID, gr0_base + ARM_SMMU_GR0_SMR(i));
+> +		if (smmu->features & ARM_SMMU_FEAT_STREAM_MATCH) {
+> +			writel_relaxed(~SMR_VALID,
+> +					gr0_base + ARM_SMMU_GR0_SMR(i));
+> +		}
+>  		writel_relaxed(S2CR_TYPE_BYPASS,
+>  			gr0_base + ARM_SMMU_GR0_S2CR(i));
 
-What is on the other end of the link?
+smmu->num_mapping_groups should be zero for an SMMU that doesn't include
+the SMR registers, so I don't think this change is needed. Are you seeing
+problems with real hardware?
 
-> ------------[ cut here ]------------
-> WARNING: CPU: 0 PID: 0 at net/sched/sch_generic.c:264 dev_watchdog+0x270/0x27c()
-> NETDEV WATCHDOG: eth0 (fec): transmit queue 0 timed out
-...
-> fec 2188000.ethernet eth0: TX ring dump
-> Nr     SC     addr       len  SKB
->   0    0x1c00 0x00000000   66   (null)
-...
->  83    0x1c00 0x00000000   66   (null)
->  84  H 0x1c00 0x00000000   66   (null)
->  85    0x9c00 0x2e205000   66 9e384f00
->  86    0x1c00 0x2e204800   66 9e384d80
->  87    0x1c00 0x2e204000   66 9e384180
-...
-> 376    0x1c00 0x2e252800   66 81cf6180
-> 377    0x1c00 0x2e253000   66 81cf6240
-> 378 S  0x1c00 0x00000000   66   (null)
-
-So, the software would insert the next packet into slot 378.  However,
-the slots from 85 to 377 have not been reaped, despite those in 86 to
-377 allegedly having been sent.  This is because the entry in slot 85
-shows that it has yet to be sent.
-
-I've no idea what causes this; it looks like there's something screwed
-with the hardware which causes the transmitter to skip an entry in the
-ring under certain circumstances.  As I've never been able to reproduce
-it here, I've not been able to investigate it.
-
-What I would like to do is to stamp each packet in some way with an
-identifier marking its ring position, and then monitor the network to
-find out whether the packet at slot 85 was actually transmitted - that's
-made slightly harder because packets may be dropped at the receiver
-when operating in promisc mode.  This would then allow us to work out
-some likely causes.
-
-Note that after the transmit watchdog, the interface should recover and
-start operating normally again - and that should not take "several
-minutes."
-
--- 
-FTTC broadband for 0.8mile line: currently at 9.5Mbps down 400kbps up
-according to speedtest.net.
+Will
