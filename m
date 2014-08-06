@@ -1,43 +1,41 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Wed, 6 Aug 2014 11:19:48 +0100
-Subject: [PATCH v2 2/2] iommu/arm-smmu: Do not access non-existing SMR
- registers
-In-Reply-To: <1407175263-10699-3-git-send-email-ohaugan@codeaurora.org>
-References: <1407175263-10699-1-git-send-email-ohaugan@codeaurora.org>
- <1407175263-10699-3-git-send-email-ohaugan@codeaurora.org>
-Message-ID: <20140806101948.GD23882@arm.com>
+From: mperttunen@nvidia.com (Mikko Perttunen)
+Date: Wed, 6 Aug 2014 13:25:02 +0300
+Subject: [PATCH v3 0/4] Tegra124 soctherm driver
+Message-ID: <1407320706-17440-1-git-send-email-mperttunen@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Olav,
+Hi,
 
-On Mon, Aug 04, 2014 at 07:01:03PM +0100, Olav Haugan wrote:
-> The SMR registers do not exist when stream matching is not
-> supported by the hardware. Avoid writing to this register if not needed.
-> 
-> Signed-off-by: Olav Haugan <ohaugan@codeaurora.org>
-> ---
->  drivers/iommu/arm-smmu.c | 5 ++++-
->  1 file changed, 4 insertions(+), 1 deletion(-)
-> 
-> diff --git a/drivers/iommu/arm-smmu.c b/drivers/iommu/arm-smmu.c
-> index c16431f..1f3a5b3 100644
-> --- a/drivers/iommu/arm-smmu.c
-> +++ b/drivers/iommu/arm-smmu.c
-> @@ -1731,7 +1731,10 @@ static void arm_smmu_device_reset(struct arm_smmu_device *smmu)
->  
->  	/* Mark all SMRn as invalid and all S2CRn as bypass */
->  	for (i = 0; i < smmu->num_mapping_groups; ++i) {
-> -		writel_relaxed(~SMR_VALID, gr0_base + ARM_SMMU_GR0_SMR(i));
-> +		if (smmu->features & ARM_SMMU_FEAT_STREAM_MATCH) {
-> +			writel_relaxed(~SMR_VALID,
-> +					gr0_base + ARM_SMMU_GR0_SMR(i));
-> +		}
->  		writel_relaxed(S2CR_TYPE_BYPASS,
->  			gr0_base + ARM_SMMU_GR0_S2CR(i));
+this series adds support for the thermal monitoring features of the
+soctherm unit on the Tegra124 SoC. v2 drops support for interrupt-
+based trip points. Thermtrip (emergency thermal shutdown) still
+works when this driver is loaded and the PMC thermal reset patch
+series is applied.
 
-smmu->num_mapping_groups should be zero for an SMMU that doesn't include
-the SMR registers, so I don't think this change is needed. Are you seeing
-problems with real hardware?
+The branch is also available in my github repo,
+  git://github.com/cyndis/linux.git soctherm-v3
 
-Will
+Thanks,
+Mikko
+
+Mikko Perttunen (4):
+  of: Add bindings for nvidia,tegra124-soctherm
+  ARM: tegra: Add soctherm and thermal zones to Tegra124 device tree
+  ARM: tegra: Add thermal trip points for Jetson TK1
+  thermal: Add Tegra SOCTHERM thermal management driver
+
+ .../devicetree/bindings/thermal/tegra-soctherm.txt |  53 +++
+ arch/arm/boot/dts/tegra124-jetson-tk1.dts          |  32 ++
+ arch/arm/boot/dts/tegra124.dtsi                    |  47 +++
+ drivers/thermal/Kconfig                            |  10 +
+ drivers/thermal/Makefile                           |   1 +
+ drivers/thermal/tegra_soctherm.c                   | 430 +++++++++++++++++++++
+ include/dt-bindings/thermal/tegra124-soctherm.h    |  13 +
+ 7 files changed, 586 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/thermal/tegra-soctherm.txt
+ create mode 100644 drivers/thermal/tegra_soctherm.c
+ create mode 100644 include/dt-bindings/thermal/tegra124-soctherm.h
+
+-- 
+1.8.1.5
