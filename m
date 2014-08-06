@@ -1,57 +1,24 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 6 Aug 2014 23:07:18 +0200
-Subject: [PATCH v3 2/6] usb: host: ehci-st: Add EHCI support for ST STB
- devices
-In-Reply-To: <1407344589-24863-3-git-send-email-peter.griffin@linaro.org>
-References: <1407344589-24863-1-git-send-email-peter.griffin@linaro.org>
- <1407344589-24863-3-git-send-email-peter.griffin@linaro.org>
-Message-ID: <201408062307.18851.arnd@arndb.de>
+From: broonie@kernel.org (Mark Brown)
+Date: Wed, 6 Aug 2014 22:10:51 +0100
+Subject: [PATCH v3] Documentation: devicetree: Fix tps65090 typos in
+ example
+In-Reply-To: <1406755767-5910-1-git-send-email-afaerber@suse.de>
+References: <1406755767-5910-1-git-send-email-afaerber@suse.de>
+Message-ID: <20140806211051.GA17528@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 06 August 2014, Peter Griffin wrote:
+On Wed, Jul 30, 2014 at 11:29:27PM +0200, Andreas F?rber wrote:
+> Specification and existing device trees use vsys-l{1,2}-supply,
+> not vsys_l{1,2}-supply. Fix the example to match the specification.
 
-> +static int st_ehci_platform_reset(struct usb_hcd *hcd)
-> +{
-> +	struct platform_device *pdev = to_platform_device(hcd->self.controller);
-> +	struct usb_ehci_pdata *pdata = dev_get_platdata(&pdev->dev);
-> +	struct ehci_hcd *ehci = hcd_to_ehci(hcd);
-> +	int retval;
-> +
-> +	if (pdata->pre_setup) {
-> +		retval = pdata->pre_setup(hcd);
-> +		if (retval < 0)
-> +			return retval;
-> +	}
-
-What is the point in going through a platform data function pointer here?
-Can't you just open-code st_ehci_configure_bus() here?
-
-> +static int st_ehci_platform_probe(struct platform_device *dev)
-> +{
-> +	struct usb_hcd *hcd;
-> +	struct resource *res_mem;
-> +	struct usb_ehci_pdata *pdata = dev_get_platdata(&dev->dev);
-> +	struct st_platform_priv *priv;
-> +	struct ehci_hcd *ehci;
-> +	int err, irq, clk = 0;
-> +
-> +	if (usb_disabled())
-> +		return -ENODEV;
-> +
-> +	/*
-> +	 * Use reasonable defaults so platforms don't have to provide these
-> +	 * with DT probing on ARM.
-> +	 */
-> +	if (!pdata)
-> +		pdata = &ehci_platform_defaults;
-
-How would you ever get here with pdata set?
-
-> +	err = dma_coerce_mask_and_coherent(&dev->dev, DMA_BIT_MASK(32));
-> +	if (err)
-> +		return err;
-
-Remove this here, and rely on the correct mask to be set from the DT scan.
-
-	Arnd
+Applied.  I've previously reminded you to use subject lines appropraite
+for the subsystem, please do so - this is important for telling people
+what the patch is for.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140806/f5490ac1/attachment.sig>
