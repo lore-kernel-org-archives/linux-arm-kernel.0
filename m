@@ -1,88 +1,39 @@
-From: dianders@chromium.org (Doug Anderson)
-Date: Wed,  6 Aug 2014 10:09:42 -0700
-Subject: [PATCH v3 2/4] ARM: dts: Enable emmc and sdmmc on the rk3288-evb
- boards
-In-Reply-To: <1407344984-14176-1-git-send-email-dianders@chromium.org>
-References: <1407344984-14176-1-git-send-email-dianders@chromium.org>
-Message-ID: <1407344984-14176-3-git-send-email-dianders@chromium.org>
+From: nicolas.pitre@linaro.org (Nicolas Pitre)
+Date: Wed, 6 Aug 2014 13:21:18 -0400 (EDT)
+Subject: [PATCH v3 2/2] ARM : change fixmap mapping region to support 32
+ CPUs
+In-Reply-To: <CAGXu5jKxtm0YAojOLhd_O9AFUAX+xHgEwwB0W_fpN7Xy8wHphQ@mail.gmail.com>
+References: <1397559967-26050-1-git-send-email-sdu.liu@huawei.com>
+ <1397559967-26050-3-git-send-email-sdu.liu@huawei.com>
+ <CAL_JsqKE-L2PN3mXHNdTPMEyTMR9ZtbgGB=O_V6nOXN0YC0a4A@mail.gmail.com>
+ <alpine.LFD.2.11.1405301441210.17310@knanqh.ubzr>
+ <CAGXu5j+ga5Enrsd8LuYarGh1Ozakmi3MNw+b9fZ7ubGUJFZY=w@mail.gmail.com>
+ <53E1A3A3.8080706@huawei.com>
+ <CAGXu5jKxtm0YAojOLhd_O9AFUAX+xHgEwwB0W_fpN7Xy8wHphQ@mail.gmail.com>
+Message-ID: <alpine.LFD.2.11.1408061317590.6061@knanqh.ubzr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This adds support for the sdmmc and emmc ports on the rk3288 using the
-currently posted driver from Addy at:
-  https://patchwork.kernel.org/patch/4653631/
+On Wed, 6 Aug 2014, Kees Cook wrote:
 
-This enables basic SD and eMMC support.  Things are not yet running at
-the fastest speed and we don't have the regulators specified, but we
-can at least use the eMMC and SD cards now.
+> With the original code, there is (I think) a page table entry for the
+> fixmap range. For the latter, there isn't. I see a NULL pgd entry
+> fault when trying to use it, and noticed that this only exists under
+> highmem:
+> 
+> static void __init kmap_init(void)
+> {
+> #ifdef CONFIG_HIGHMEM
+>         pkmap_page_table = early_pte_alloc(pmd_off_k(PKMAP_BASE),
+>                 PKMAP_BASE, _PAGE_KERNEL_TABLE);
+> 
+>         fixmap_page_table = early_pte_alloc(pmd_off_k(FIXADDR_START),
+>                 FIXADDR_START, _PAGE_KERNEL_TABLE);
+> #endif
+> }
 
-A few notes:
-* This is not baesd on Jaehoon's patch series removing the slot node,
-  but it does use new syntax like putting the bus width at the top
-  level and using the new cap-mmc-highspeed / cap-sd-highspeed.  A
-  future patch will modify this one to remove the slot node.
-* Though MMC DDR50 mode is partially supported in the dw_mmc
-  rk3288-specific code in Addy's patch, Addy's patch doesn't add
-  tuning support.  That means DDR50 mode is not reliable.  From the
-  3288 TRM: "Tuning is required for other speed modes-such as
-  DDR50-even though the output delay from the card is less than one
-  cycle."  Thus, we don't enable MMC DDR50 mode in this patch.
+The above is wrong.  The fixmap PTEs must be allocated unconditionally 
+irrespective of highmem.  So the #endif should be moved up by 3 lines.
 
-Signed-off-by: Doug Anderson <dianders@chromium.org>
-Acked-by: Arnd Bergmann <arnd@arndb.de>
----
-Changes in v3:
-- Removed DDR50 mode since it needs tuning, which isn't there yet.
 
-Changes in v2:
-- Squashed in the DDR50 mode since Addy spun his patch.
-- New patchwork link for Addy's patch
-
- arch/arm/boot/dts/rk3288-evb.dtsi | 32 ++++++++++++++++++++++++++++++++
- 1 file changed, 32 insertions(+)
-
-diff --git a/arch/arm/boot/dts/rk3288-evb.dtsi b/arch/arm/boot/dts/rk3288-evb.dtsi
-index 4f57209..c2cf72f 100644
---- a/arch/arm/boot/dts/rk3288-evb.dtsi
-+++ b/arch/arm/boot/dts/rk3288-evb.dtsi
-@@ -49,6 +49,38 @@
- 	};
- };
- 
-+&emmc {
-+	broken-cd;
-+	bus-width = <8>;
-+	cap-mmc-highspeed;
-+	non-removable;
-+	num-slots = <1>;
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&emmc_clk &emmc_cmd &emmc_pwr &emmc_bus8>;
-+	status = "okay";
-+
-+	slot at 0 {
-+		reg = <0>;
-+		disable-wp;
-+	};
-+};
-+
-+&sdmmc {
-+	bus-width = <4>;
-+	cap-mmc-highspeed;
-+	cap-sd-highspeed;
-+	card-detect-delay = <200>;
-+	num-slots = <1>;
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&sdmmc_clk &sdmmc_cmd &sdmmc_cd &sdmmc_bus4>;
-+	status = "okay";
-+
-+	slot at 0 {
-+		reg = <0>;
-+		disable-wp;		/* wp not hooked up */
-+	};
-+};
-+
- &i2c0 {
- 	status = "okay";
- };
--- 
-2.0.0.526.g5318336
+Nicolas
