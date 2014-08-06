@@ -1,50 +1,74 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Wed, 6 Aug 2014 14:00:26 +0100
-Subject: [PATCH v2 2/3] arm64: add helper functions to read I-cache
- attributes
-In-Reply-To: <1407230757-15305-2-git-send-email-ard.biesheuvel@linaro.org>
-References: <1407230757-15305-1-git-send-email-ard.biesheuvel@linaro.org>
- <1407230757-15305-2-git-send-email-ard.biesheuvel@linaro.org>
-Message-ID: <20140806130026.GR25953@arm.com>
+From: ronald.wahl@raritan.com (Ronald Wahl)
+Date: Wed,  6 Aug 2014 15:00:35 +0200
+Subject: [PATCH] spi: atmel: fix corruption caused by too early transfer
+ completion
+Message-ID: <1407330035-2212-1-git-send-email-ronald.wahl@raritan.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Aug 05, 2014 at 10:25:56AM +0100, Ard Biesheuvel wrote:
-> This adds helper functions and #defines to <asm/cachetype.h> to read the
-> line size and the number of sets from the level 1 instruction cache.
-> 
-> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
-> ---
-> v2: put () around macro args, use 64-bit types for asm() mrs/msr calls
-> 
->  arch/arm64/include/asm/cachetype.h | 28 ++++++++++++++++++++++++++++
->  1 file changed, 28 insertions(+)
-> 
-> diff --git a/arch/arm64/include/asm/cachetype.h b/arch/arm64/include/asm/cachetype.h
-> index 7a2e0762cb40..e59c0c25b307 100644
-> --- a/arch/arm64/include/asm/cachetype.h
-> +++ b/arch/arm64/include/asm/cachetype.h
-> @@ -39,6 +39,34 @@
->  
->  extern unsigned long __icache_flags;
->  
-> +#define CCSIDR_EL1_LINESIZE_MASK	0x7
-> +#define CCSIDR_EL1_LINESIZE(x)		((x) & CCSIDR_EL1_LINESIZE_MASK)
-> +
-> +#define CCSIDR_EL1_NUMSETS_SHIFT	13
-> +#define CCSIDR_EL1_NUMSETS_MASK		(0x7fff << CCSIDR_EL1_NUMSETS_SHIFT)
-> +#define CCSIDR_EL1_NUMSETS(x) \
-> +	(((x) & CCSIDR_EL1_NUMSETS_MASK) >> CCSIDR_EL1_NUMSETS_SHIFT)
-> +
-> +static inline __attribute_const__ u64 icache_get_ccsidr(void)
-> +{
-> +	u64 ccsidr;
-> +
-> +	/* Select L1 I-cache and read its size ID register */
-> +	asm("msr csselr_el1, %1; isb; mrs %0, ccsidr_el1"
-> +	    : "=r"(ccsidr) : "r"(1L));
-> +	return ccsidr;
+The PDC (peripheral DMA controller) on AT91 supports two transfer
+counters and associated registers - one for current and one for the
+next transfer. If the current transfer is done the next transfer is
+moved into the current transfer. Now there are two interrupts: one is
+raised whenever a single transfer is done (ENDRX) and the other one is
+raised when the current and the next transfer has finished (RXBUFF).
+The issue is that the driver only enables the ENDRX interrupt which may
+lead to queuing a new request while there is still a transfer running.
+This can lead to overruns and/or corruption. By using the RXBUFF
+interrupt only we queue new requests only when the hardware queue is
+empty avoiding this problem.
 
-Is it worth having a WARN_ON(preemptible()) here?
+Signed-off-by: Ronald Wahl <ronald.wahl@raritan.com>
+---
+ drivers/spi/spi-atmel.c | 17 ++++++++---------
+ 1 file changed, 8 insertions(+), 9 deletions(-)
 
-Will
+diff --git a/drivers/spi/spi-atmel.c b/drivers/spi/spi-atmel.c
+index 113c83f..3f7d138 100644
+--- a/drivers/spi/spi-atmel.c
++++ b/drivers/spi/spi-atmel.c
+@@ -775,17 +775,17 @@ static void atmel_spi_pdc_next_xfer(struct spi_master *master,
+ 			(unsigned long long)xfer->rx_dma);
+ 	}
+ 
+-	/* REVISIT: We're waiting for ENDRX before we start the next
++	/* REVISIT: We're waiting for RXBUFF before we start the next
+ 	 * transfer because we need to handle some difficult timing
+-	 * issues otherwise. If we wait for ENDTX in one transfer and
+-	 * then starts waiting for ENDRX in the next, it's difficult
+-	 * to tell the difference between the ENDRX interrupt we're
+-	 * actually waiting for and the ENDRX interrupt of the
++	 * issues otherwise. If we wait for TXBUFE in one transfer and
++	 * then starts waiting for RXBUFF in the next, it's difficult
++	 * to tell the difference between the RXBUFF interrupt we're
++	 * actually waiting for and the RXBUFF interrupt of the
+ 	 * previous transfer.
+ 	 *
+ 	 * It should be doable, though. Just not now...
+ 	 */
+-	spi_writel(as, IER, SPI_BIT(ENDRX) | SPI_BIT(OVRES));
++	spi_writel(as, IER, SPI_BIT(RXBUFF) | SPI_BIT(OVRES));
+ 	spi_writel(as, PTCR, SPI_BIT(TXTEN) | SPI_BIT(RXTEN));
+ }
+ 
+@@ -956,8 +956,7 @@ atmel_spi_pdc_interrupt(int irq, void *dev_id)
+ 
+ 		ret = IRQ_HANDLED;
+ 
+-		spi_writel(as, IDR, (SPI_BIT(RXBUFF) | SPI_BIT(ENDRX)
+-				     | SPI_BIT(OVRES)));
++		spi_writel(as, IDR, (SPI_BIT(RXBUFF) | SPI_BIT(OVRES)));
+ 
+ 		/* Clear any overrun happening while cleaning up */
+ 		spi_readl(as, SR);
+@@ -966,7 +965,7 @@ atmel_spi_pdc_interrupt(int irq, void *dev_id)
+ 
+ 		complete(&as->xfer_completion);
+ 
+-	} else if (pending & (SPI_BIT(RXBUFF) | SPI_BIT(ENDRX))) {
++	} else if (pending & (SPI_BIT(RXBUFF))) {
+ 		ret = IRQ_HANDLED;
+ 
+ 		spi_writel(as, IDR, pending);
+-- 
+1.9.3
