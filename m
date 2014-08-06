@@ -1,65 +1,60 @@
-From: ohaugan@codeaurora.org (Olav Haugan)
-Date: Wed, 06 Aug 2014 09:44:38 -0700
-Subject: [PATCH v2 2/2] iommu/arm-smmu: Do not access non-existing SMR
- registers
-In-Reply-To: <20140806101948.GD23882@arm.com>
-References: <1407175263-10699-1-git-send-email-ohaugan@codeaurora.org>
- <1407175263-10699-3-git-send-email-ohaugan@codeaurora.org>
- <20140806101948.GD23882@arm.com>
-Message-ID: <53E25B76.6090208@codeaurora.org>
+From: m-karicheri2@ti.com (Murali Karicheri)
+Date: Wed, 6 Aug 2014 12:56:04 -0400
+Subject: [PATCH] PCI: keystone: add a pci quirk to limit mrrs
+In-Reply-To: <20140806163021.GB19914@obsidianresearch.com>
+References: <1407338300-9146-1-git-send-email-m-karicheri2@ti.com>
+ <20140806163021.GB19914@obsidianresearch.com>
+Message-ID: <53E25E24.8070506@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 8/6/2014 3:19 AM, Will Deacon wrote:
-> Hi Olav,
-> 
-> On Mon, Aug 04, 2014 at 07:01:03PM +0100, Olav Haugan wrote:
->> The SMR registers do not exist when stream matching is not
->> supported by the hardware. Avoid writing to this register if not needed.
->>
->> Signed-off-by: Olav Haugan <ohaugan@codeaurora.org>
->> ---
->>  drivers/iommu/arm-smmu.c | 5 ++++-
->>  1 file changed, 4 insertions(+), 1 deletion(-)
->>
->> diff --git a/drivers/iommu/arm-smmu.c b/drivers/iommu/arm-smmu.c
->> index c16431f..1f3a5b3 100644
->> --- a/drivers/iommu/arm-smmu.c
->> +++ b/drivers/iommu/arm-smmu.c
->> @@ -1731,7 +1731,10 @@ static void arm_smmu_device_reset(struct arm_smmu_device *smmu)
->>  
->>  	/* Mark all SMRn as invalid and all S2CRn as bypass */
->>  	for (i = 0; i < smmu->num_mapping_groups; ++i) {
->> -		writel_relaxed(~SMR_VALID, gr0_base + ARM_SMMU_GR0_SMR(i));
->> +		if (smmu->features & ARM_SMMU_FEAT_STREAM_MATCH) {
->> +			writel_relaxed(~SMR_VALID,
->> +					gr0_base + ARM_SMMU_GR0_SMR(i));
->> +		}
->>  		writel_relaxed(S2CR_TYPE_BYPASS,
->>  			gr0_base + ARM_SMMU_GR0_S2CR(i));
-> 
-> smmu->num_mapping_groups should be zero for an SMMU that doesn't include
-> the SMR registers, so I don't think this change is needed. Are you seeing
-> problems with real hardware?
+On 08/06/2014 12:30 PM, Jason Gunthorpe wrote:
+> On Wed, Aug 06, 2014 at 11:18:20AM -0400, Murali Karicheri wrote:
+>> Keystone PCI controller has a limitation that memory read request
+>> size must not exceed 256 bytes. This is a hardware limitation and
+>> add a quirk to force this limit on all downstream devices by
+>> updating mrrs.
+>
+> Does this still work if the tuning is enabled, or does the tuning run
+> after this?
 
-Yes, you are correct. However, since that is the case we wouldn't be
-setting the S2CR registers to bypass then? Seems like
-num_mappings_groups should be initialized regardless whether stream
-matching or stream indexing is used. SMMU_IDR0.NUMSMRG specifies the
-number of stream mapping register groups (Section 2.5.2 of the ARM
-SMMUv1-v2 spec). So with stream indexing support this register should
-still tell us how many S2CR registers exist? As far as I can tell there
-are no other register telling us how many S2CR registers exist. That
-also brings up another point that there is no check in the code to
-ensure we are not trying to program more than the available S2CR
-registers when we use stream indexing.
+Yes it works with tuning enabled. Tuning happens afterwards. The 
+'limiting mrrs to 256' below is from my patch.
 
-No, I don't see any issue on real hardware.
 
-Thanks,
+[    2.267670] limiting mrrs to 256
+[    2.267698] limiting mrrs to 256
+[    2.267808] pcieport 0000:00:00.0: BAR 8: assigned [mem 
+0x50000000-0x500fffff]
+[    2.267818] pcieport 0000:00:00.0: BAR 9: assigned [mem 
+0x50100000-0x501fffff pref]
+[    2.267827] pcieport 0000:00:00.0: BAR 7: assigned [io  0x1000-0x1fff]
+[    2.267840] pci 0000:01:00.0: BAR 0: assigned [mem 0x50000000-0x5001ffff]
+[    2.267855] pci 0000:01:00.0: BAR 1: assigned [mem 0x50020000-0x5003ffff]
+[    2.267869] pci 0000:01:00.0: BAR 6: assigned [mem 
+0x50100000-0x5011ffff pref]
+[    2.267877] pci 0000:01:00.1: BAR 0: assigned [mem 0x50040000-0x5005ffff]
+[    2.267891] pci 0000:01:00.1: BAR 1: assigned [mem 0x50060000-0x5007ffff]
+[    2.267904] pci 0000:01:00.1: BAR 6: assigned [mem 
+0x50120000-0x5013ffff pref]
+[    2.267913] pci 0000:01:00.0: BAR 2: assigned [io  0x1000-0x101f]
+[    2.267926] pci 0000:01:00.1: BAR 2: assigned [io  0x1020-0x103f]
+[    2.267946] pcieport 0000:00:00.0: Max Payload Size set to  256/ 256 
+(was  128), Max Read Rq  256
+[    2.267980] pci 0000:01:00.0: Max Payload Size set to  256/ 256 (was 
+  128), Max Read Rq  256
+[    2.268013] pci 0000:01:00.1: Max Payload Size set to  256/ 256 (was 
+  128), Max Read Rq  256
 
-Olav
 
--- 
-The Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-hosted by The Linux Foundation
+>
+>> +			if (pcie_get_readrq(dev)>  256) {
+>> +				pr_info("limiting mrrs to 256\n");
+>> +				pcie_set_readrq(dev, 256);
+>
+> The pr_info should either go away, or at least print the PCI bdf..
+
+I will change this to a dev_info and print the PCI bdf as part of it.
+
+>
+> Jason
