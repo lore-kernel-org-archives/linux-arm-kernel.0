@@ -1,159 +1,336 @@
 From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Wed,  6 Aug 2014 11:15:10 -0700
-Subject: [PATCH 1/3] clk: qcom: Add support for setting rates on PLLs
+Date: Wed,  6 Aug 2014 11:15:11 -0700
+Subject: [PATCH 2/3] clk: qcom: Add support for banked MD RCGs
 In-Reply-To: <1407348912-9124-1-git-send-email-sboyd@codeaurora.org>
 References: <1407348912-9124-1-git-send-email-sboyd@codeaurora.org>
-Message-ID: <1407348912-9124-2-git-send-email-sboyd@codeaurora.org>
+Message-ID: <1407348912-9124-3-git-send-email-sboyd@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Some PLLs may require changing their rate at runtime. Add support
-for these PLLs.
+The banked MD RCGs in global clock control have a different
+register layout than the ones implemented in multimedia clock
+control. Add support for these types of clocks so we can change
+the rates of the UBI32 clocks.
 
 Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
 ---
- drivers/clk/qcom/clk-pll.c | 68 +++++++++++++++++++++++++++++++++++++++++++++-
- drivers/clk/qcom/clk-pll.h | 20 ++++++++++++++
- 2 files changed, 87 insertions(+), 1 deletion(-)
+ drivers/clk/qcom/clk-rcg.c      | 99 ++++++++++++++++++++++-------------------
+ drivers/clk/qcom/clk-rcg.h      |  6 ++-
+ drivers/clk/qcom/mmcc-msm8960.c | 28 +++++++++---
+ 3 files changed, 77 insertions(+), 56 deletions(-)
 
-diff --git a/drivers/clk/qcom/clk-pll.c b/drivers/clk/qcom/clk-pll.c
-index 9db03d3b1657..b823bc3b6250 100644
---- a/drivers/clk/qcom/clk-pll.c
-+++ b/drivers/clk/qcom/clk-pll.c
-@@ -97,7 +97,7 @@ static unsigned long
- clk_pll_recalc_rate(struct clk_hw *hw, unsigned long parent_rate)
+diff --git a/drivers/clk/qcom/clk-rcg.c b/drivers/clk/qcom/clk-rcg.c
+index b638c5846dbf..356e4de360d1 100644
+--- a/drivers/clk/qcom/clk-rcg.c
++++ b/drivers/clk/qcom/clk-rcg.c
+@@ -67,16 +67,16 @@ static u8 clk_dyn_rcg_get_parent(struct clk_hw *hw)
  {
- 	struct clk_pll *pll = to_clk_pll(hw);
--	u32 l, m, n;
-+	u32 l, m, n, config;
- 	unsigned long rate;
- 	u64 tmp;
+ 	struct clk_dyn_rcg *rcg = to_clk_dyn_rcg(hw);
+ 	int num_parents = __clk_get_num_parents(hw->clk);
+-	u32 ns, ctl;
++	u32 ns, reg;
+ 	int bank;
+ 	int i;
+ 	struct src_sel *s;
  
-@@ -116,13 +116,79 @@ clk_pll_recalc_rate(struct clk_hw *hw, unsigned long parent_rate)
- 		do_div(tmp, n);
- 		rate += tmp;
- 	}
-+	if (pll->post_div_width) {
-+		regmap_read(pll->clkr.regmap, pll->config_reg, &config);
-+		config >>= pll->post_div_shift;
-+		config &= BIT(pll->post_div_width) - 1;
-+		rate /= config + 1;
+-	regmap_read(rcg->clkr.regmap, rcg->clkr.enable_reg, &ctl);
+-	bank = reg_to_bank(rcg, ctl);
++	regmap_read(rcg->clkr.regmap, rcg->bank_reg, &reg);
++	bank = reg_to_bank(rcg, reg);
+ 	s = &rcg->s[bank];
+ 
+-	regmap_read(rcg->clkr.regmap, rcg->ns_reg, &ns);
++	regmap_read(rcg->clkr.regmap, rcg->ns_reg[bank], &ns);
+ 	ns = ns_to_src(s, ns);
+ 
+ 	for (i = 0; i < num_parents; i++)
+@@ -192,90 +192,93 @@ static u32 mn_to_reg(struct mn *mn, u32 m, u32 n, u32 val)
+ 
+ static void configure_bank(struct clk_dyn_rcg *rcg, const struct freq_tbl *f)
+ {
+-	u32 ns, md, ctl, *regp;
++	u32 ns, md, reg;
+ 	int bank, new_bank;
+ 	struct mn *mn;
+ 	struct pre_div *p;
+ 	struct src_sel *s;
+ 	bool enabled;
+-	u32 md_reg;
+-	u32 bank_reg;
++	u32 md_reg, ns_reg;
+ 	bool banked_mn = !!rcg->mn[1].width;
++	bool banked_p = !!rcg->p[1].pre_div_width;
+ 	struct clk_hw *hw = &rcg->clkr.hw;
+ 
+ 	enabled = __clk_is_enabled(hw->clk);
+ 
+-	regmap_read(rcg->clkr.regmap, rcg->ns_reg, &ns);
+-	regmap_read(rcg->clkr.regmap, rcg->clkr.enable_reg, &ctl);
+-
+-	if (banked_mn) {
+-		regp = &ctl;
+-		bank_reg = rcg->clkr.enable_reg;
+-	} else {
+-		regp = &ns;
+-		bank_reg = rcg->ns_reg;
+-	}
+-
+-	bank = reg_to_bank(rcg, *regp);
++	regmap_read(rcg->clkr.regmap, rcg->bank_reg, &reg);
++	bank = reg_to_bank(rcg, reg);
+ 	new_bank = enabled ? !bank : bank;
+ 
++	ns_reg = rcg->ns_reg[new_bank];
++	regmap_read(rcg->clkr.regmap, ns_reg, &ns);
++
+ 	if (banked_mn) {
+ 		mn = &rcg->mn[new_bank];
+ 		md_reg = rcg->md_reg[new_bank];
+ 
+ 		ns |= BIT(mn->mnctr_reset_bit);
+-		regmap_write(rcg->clkr.regmap, rcg->ns_reg, ns);
++		regmap_write(rcg->clkr.regmap, ns_reg, ns);
+ 
+ 		regmap_read(rcg->clkr.regmap, md_reg, &md);
+ 		md = mn_to_md(mn, f->m, f->n, md);
+ 		regmap_write(rcg->clkr.regmap, md_reg, md);
+ 
+ 		ns = mn_to_ns(mn, f->m, f->n, ns);
+-		regmap_write(rcg->clkr.regmap, rcg->ns_reg, ns);
++		regmap_write(rcg->clkr.regmap, ns_reg, ns);
+ 
+-		ctl = mn_to_reg(mn, f->m, f->n, ctl);
+-		regmap_write(rcg->clkr.regmap, rcg->clkr.enable_reg, ctl);
++		/* Two NS registers means mode control is in NS register */
++		if (rcg->ns_reg[0] != rcg->ns_reg[1]) {
++			ns = mn_to_reg(mn, f->m, f->n, ns);
++			regmap_write(rcg->clkr.regmap, ns_reg, ns);
++		} else {
++			reg = mn_to_reg(mn, f->m, f->n, reg);
++			regmap_write(rcg->clkr.regmap, rcg->bank_reg, reg);
++		}
+ 
+ 		ns &= ~BIT(mn->mnctr_reset_bit);
+-		regmap_write(rcg->clkr.regmap, rcg->ns_reg, ns);
+-	} else {
++		regmap_write(rcg->clkr.regmap, ns_reg, ns);
 +	}
 +
- 	return rate;
++	if (banked_p) {
+ 		p = &rcg->p[new_bank];
+ 		ns = pre_div_to_ns(p, f->pre_div - 1, ns);
+ 	}
+ 
+ 	s = &rcg->s[new_bank];
+ 	ns = src_to_ns(s, s->parent_map[f->src], ns);
+-	regmap_write(rcg->clkr.regmap, rcg->ns_reg, ns);
++	regmap_write(rcg->clkr.regmap, ns_reg, ns);
+ 
+ 	if (enabled) {
+-		*regp ^= BIT(rcg->mux_sel_bit);
+-		regmap_write(rcg->clkr.regmap, bank_reg, *regp);
++		regmap_read(rcg->clkr.regmap, rcg->bank_reg, &reg);
++		reg ^= BIT(rcg->mux_sel_bit);
++		regmap_write(rcg->clkr.regmap, rcg->bank_reg, reg);
+ 	}
  }
  
-+static const
-+struct pll_freq_tbl *find_freq(const struct pll_freq_tbl *f, unsigned long rate)
-+{
-+	if (!f)
-+		return NULL;
-+
-+	for (; f->freq; f++)
-+		if (rate <= f->freq)
-+			return f;
-+
-+	return NULL;
-+}
-+
-+static long
-+clk_pll_determine_rate(struct clk_hw *hw, unsigned long rate,
-+		       unsigned long *p_rate, struct clk **p)
-+{
-+	struct clk_pll *pll = to_clk_pll(hw);
-+	const struct pll_freq_tbl *f;
-+
-+	f = find_freq(pll->freq_tbl, rate);
-+	if (!f)
-+		return clk_pll_recalc_rate(hw, *p_rate);
-+
-+	return f->freq;
-+}
-+
-+static int
-+clk_pll_set_rate(struct clk_hw *hw, unsigned long rate, unsigned long p_rate)
-+{
-+	struct clk_pll *pll = to_clk_pll(hw);
-+	const struct pll_freq_tbl *f;
-+	bool enabled;
-+	u32 mode;
-+	u32 enable_mask = PLL_OUTCTRL | PLL_BYPASSNL | PLL_RESET_N;
-+
-+	f = find_freq(pll->freq_tbl, rate);
-+	if (!f)
-+		return -EINVAL;
-+
-+	regmap_read(pll->clkr.regmap, pll->mode_reg, &mode);
-+	enabled = (mode & enable_mask) == enable_mask;
-+
-+	if (enabled)
-+		clk_pll_disable(hw);
-+
-+	regmap_update_bits(pll->clkr.regmap, pll->l_reg, 0x3ff, f->l);
-+	regmap_update_bits(pll->clkr.regmap, pll->m_reg, 0x7ffff, f->m);
-+	regmap_update_bits(pll->clkr.regmap, pll->n_reg, 0x7ffff, f->n);
-+	regmap_write(pll->clkr.regmap, pll->config_reg, f->ibits);
-+
-+	if (enabled)
-+		clk_pll_enable(hw);
-+
-+	return 0;
-+}
-+
- const struct clk_ops clk_pll_ops = {
- 	.enable = clk_pll_enable,
- 	.disable = clk_pll_disable,
- 	.recalc_rate = clk_pll_recalc_rate,
-+	.determine_rate = clk_pll_determine_rate,
-+	.set_rate = clk_pll_set_rate,
- };
- EXPORT_SYMBOL_GPL(clk_pll_ops);
+ static int clk_dyn_rcg_set_parent(struct clk_hw *hw, u8 index)
+ {
+ 	struct clk_dyn_rcg *rcg = to_clk_dyn_rcg(hw);
+-	u32 ns, ctl, md, reg;
++	u32 ns, md, reg;
+ 	int bank;
+ 	struct freq_tbl f = { 0 };
+ 	bool banked_mn = !!rcg->mn[1].width;
++	bool banked_p = !!rcg->p[1].pre_div_width;
  
-diff --git a/drivers/clk/qcom/clk-pll.h b/drivers/clk/qcom/clk-pll.h
-index 3003e9962472..c9c0cda306d0 100644
---- a/drivers/clk/qcom/clk-pll.h
-+++ b/drivers/clk/qcom/clk-pll.h
-@@ -18,6 +18,21 @@
- #include "clk-regmap.h"
+-	regmap_read(rcg->clkr.regmap, rcg->ns_reg, &ns);
+-	regmap_read(rcg->clkr.regmap, rcg->clkr.enable_reg, &ctl);
+-	reg = banked_mn ? ctl : ns;
+-
++	regmap_read(rcg->clkr.regmap, rcg->bank_reg, &reg);
+ 	bank = reg_to_bank(rcg, reg);
  
- /**
-+ * struct pll_freq_tbl - PLL frequency table
-+ * @l: L value
-+ * @m: M value
-+ * @n: N value
-+ * @ibits: internal values
-+ */
-+struct pll_freq_tbl {
-+	unsigned long freq;
-+	u16 l;
-+	u16 m;
-+	u16 n;
-+	u32 ibits;
-+};
++	regmap_read(rcg->clkr.regmap, rcg->ns_reg[bank], &ns);
 +
-+/**
-  * struct clk_pll - phase locked loop (PLL)
-  * @l_reg: L register
-  * @m_reg: M register
-@@ -26,6 +41,7 @@
-  * @mode_reg: mode register
-  * @status_reg: status register
-  * @status_bit: ANDed with @status_reg to determine if PLL is enabled
-+ * @freq_tbl: PLL frequency table
-  * @hw: handle between common and hardware-specific interfaces
+ 	if (banked_mn) {
+ 		regmap_read(rcg->clkr.regmap, rcg->md_reg[bank], &md);
+ 		f.m = md_to_m(&rcg->mn[bank], md);
+ 		f.n = ns_m_to_n(&rcg->mn[bank], ns, f.m);
+-	} else {
+-		f.pre_div = ns_to_pre_div(&rcg->p[bank], ns) + 1;
+ 	}
+-	f.src = index;
+ 
++	if (banked_p)
++		f.pre_div = ns_to_pre_div(&rcg->p[bank], ns) + 1;
++
++	f.src = index;
+ 	configure_bank(rcg, &f);
+ 
+ 	return 0;
+@@ -336,28 +339,30 @@ clk_dyn_rcg_recalc_rate(struct clk_hw *hw, unsigned long parent_rate)
+ 	u32 m, n, pre_div, ns, md, mode, reg;
+ 	int bank;
+ 	struct mn *mn;
++	bool banked_p = !!rcg->p[1].pre_div_width;
+ 	bool banked_mn = !!rcg->mn[1].width;
+ 
+-	regmap_read(rcg->clkr.regmap, rcg->ns_reg, &ns);
+-
+-	if (banked_mn)
+-		regmap_read(rcg->clkr.regmap, rcg->clkr.enable_reg, &reg);
+-	else
+-		reg = ns;
+-
++	regmap_read(rcg->clkr.regmap, rcg->bank_reg, &reg);
+ 	bank = reg_to_bank(rcg, reg);
+ 
++	regmap_read(rcg->clkr.regmap, rcg->ns_reg[bank], &ns);
++	m = n = pre_div = mode = 0;
++
+ 	if (banked_mn) {
+ 		mn = &rcg->mn[bank];
+ 		regmap_read(rcg->clkr.regmap, rcg->md_reg[bank], &md);
+ 		m = md_to_m(mn, md);
+ 		n = ns_m_to_n(mn, ns, m);
++		/* Two NS registers means mode control is in NS register */
++		if (rcg->ns_reg[0] != rcg->ns_reg[1])
++			reg = ns;
+ 		mode = reg_to_mnctr_mode(mn, reg);
+-		return calc_rate(parent_rate, m, n, mode, 0);
+-	} else {
+-		pre_div = ns_to_pre_div(&rcg->p[bank], ns);
+-		return calc_rate(parent_rate, 0, 0, 0, pre_div);
+ 	}
++
++	if (banked_p)
++		pre_div = ns_to_pre_div(&rcg->p[bank], ns);
++
++	return calc_rate(parent_rate, m, n, mode, pre_div);
+ }
+ 
+ static const
+diff --git a/drivers/clk/qcom/clk-rcg.h b/drivers/clk/qcom/clk-rcg.h
+index ba0523cefd2e..687e41f91d7c 100644
+--- a/drivers/clk/qcom/clk-rcg.h
++++ b/drivers/clk/qcom/clk-rcg.h
+@@ -103,8 +103,9 @@ extern const struct clk_ops clk_rcg_bypass_ops;
+  * struct clk_dyn_rcg - root clock generator with glitch free mux
+  *
+  * @mux_sel_bit: bit to switch glitch free mux
+- * @ns_reg: NS register
++ * @ns_reg: NS0 and NS1 register
+  * @md_reg: MD0 and MD1 register
++ * @bank_reg: register to XOR @mux_sel_bit into to switch glitch free mux
+  * @mn: mn counter (banked)
+  * @s: source selector (banked)
+  * @freq_tbl: frequency table
+@@ -113,8 +114,9 @@ extern const struct clk_ops clk_rcg_bypass_ops;
+  *
   */
- struct clk_pll {
-@@ -36,6 +52,10 @@ struct clk_pll {
- 	u32	mode_reg;
- 	u32	status_reg;
- 	u8	status_bit;
-+	u8	post_div_width;
-+	u8	post_div_shift;
-+
-+	const struct pll_freq_tbl *freq_tbl;
+ struct clk_dyn_rcg {
+-	u32	ns_reg;
++	u32	ns_reg[2];
+ 	u32	md_reg[2];
++	u32	bank_reg;
  
- 	struct clk_regmap clkr;
+ 	u8	mux_sel_bit;
+ 
+diff --git a/drivers/clk/qcom/mmcc-msm8960.c b/drivers/clk/qcom/mmcc-msm8960.c
+index 2e80a219b8ea..775e00dbcbc8 100644
+--- a/drivers/clk/qcom/mmcc-msm8960.c
++++ b/drivers/clk/qcom/mmcc-msm8960.c
+@@ -773,9 +773,11 @@ static struct freq_tbl clk_tbl_gfx2d[] = {
  };
+ 
+ static struct clk_dyn_rcg gfx2d0_src = {
+-	.ns_reg = 0x0070,
++	.ns_reg[0] = 0x0070,
++	.ns_reg[1] = 0x0070,
+ 	.md_reg[0] = 0x0064,
+ 	.md_reg[1] = 0x0068,
++	.bank_reg = 0x0060,
+ 	.mn[0] = {
+ 		.mnctr_en_bit = 8,
+ 		.mnctr_reset_bit = 25,
+@@ -831,9 +833,11 @@ static struct clk_branch gfx2d0_clk = {
+ };
+ 
+ static struct clk_dyn_rcg gfx2d1_src = {
+-	.ns_reg = 0x007c,
++	.ns_reg[0] = 0x007c,
++	.ns_reg[1] = 0x007c,
+ 	.md_reg[0] = 0x0078,
+ 	.md_reg[1] = 0x006c,
++	.bank_reg = 0x0074,
+ 	.mn[0] = {
+ 		.mnctr_en_bit = 8,
+ 		.mnctr_reset_bit = 25,
+@@ -930,9 +934,11 @@ static struct freq_tbl clk_tbl_gfx3d_8064[] = {
+ };
+ 
+ static struct clk_dyn_rcg gfx3d_src = {
+-	.ns_reg = 0x008c,
++	.ns_reg[0] = 0x008c,
++	.ns_reg[1] = 0x008c,
+ 	.md_reg[0] = 0x0084,
+ 	.md_reg[1] = 0x0088,
++	.bank_reg = 0x0080,
+ 	.mn[0] = {
+ 		.mnctr_en_bit = 8,
+ 		.mnctr_reset_bit = 25,
+@@ -1006,9 +1012,11 @@ static struct freq_tbl clk_tbl_vcap[] = {
+ };
+ 
+ static struct clk_dyn_rcg vcap_src = {
+-	.ns_reg = 0x021c,
++	.ns_reg[0] = 0x021c,
++	.ns_reg[1] = 0x021c,
+ 	.md_reg[0] = 0x01ec,
+ 	.md_reg[1] = 0x0218,
++	.bank_reg = 0x0178,
+ 	.mn[0] = {
+ 		.mnctr_en_bit = 8,
+ 		.mnctr_reset_bit = 23,
+@@ -1211,9 +1219,11 @@ static struct freq_tbl clk_tbl_mdp[] = {
+ };
+ 
+ static struct clk_dyn_rcg mdp_src = {
+-	.ns_reg = 0x00d0,
++	.ns_reg[0] = 0x00d0,
++	.ns_reg[1] = 0x00d0,
+ 	.md_reg[0] = 0x00c4,
+ 	.md_reg[1] = 0x00c8,
++	.bank_reg = 0x00c0,
+ 	.mn[0] = {
+ 		.mnctr_en_bit = 8,
+ 		.mnctr_reset_bit = 31,
+@@ -1318,7 +1328,9 @@ static struct freq_tbl clk_tbl_rot[] = {
+ };
+ 
+ static struct clk_dyn_rcg rot_src = {
+-	.ns_reg = 0x00e8,
++	.ns_reg[0] = 0x00e8,
++	.ns_reg[1] = 0x00e8,
++	.bank_reg = 0x00e8,
+ 	.p[0] = {
+ 		.pre_div_shift = 22,
+ 		.pre_div_width = 4,
+@@ -1542,9 +1554,11 @@ static struct freq_tbl clk_tbl_vcodec[] = {
+ };
+ 
+ static struct clk_dyn_rcg vcodec_src = {
+-	.ns_reg = 0x0100,
++	.ns_reg[0] = 0x0100,
++	.ns_reg[1] = 0x0100,
+ 	.md_reg[0] = 0x00fc,
+ 	.md_reg[1] = 0x0128,
++	.bank_reg = 0x00f8,
+ 	.mn[0] = {
+ 		.mnctr_en_bit = 5,
+ 		.mnctr_reset_bit = 31,
 -- 
 The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
 hosted by The Linux Foundation
