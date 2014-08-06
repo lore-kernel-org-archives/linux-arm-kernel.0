@@ -1,40 +1,37 @@
-From: punit.agrawal@arm.com (Punit Agrawal)
-Date: Wed, 06 Aug 2014 14:41:26 +0100
-Subject: [PATCH 0/2] Convert exynos PPMU driver to be built as module
-In-Reply-To: <1405692594-19352-1-git-send-email-punit.agrawal@arm.com> (Punit
- Agrawal's message of "Fri, 18 Jul 2014 15:09:52 +0100")
-References: <1405692594-19352-1-git-send-email-punit.agrawal@arm.com>
-Message-ID: <9hhvbq54tx5.fsf@arm.com>
+From: jonsmirl@gmail.com (jonsmirl at gmail.com)
+Date: Wed, 6 Aug 2014 09:51:05 -0400
+Subject: [PATCH 4/9] clk: sunxi: PLL2 support for sun4i, sun5i and sun7i
+In-Reply-To: <1406842092-25207-5-git-send-email-emilio@elopez.com.ar>
+References: <1406842092-25207-1-git-send-email-emilio@elopez.com.ar>
+ <1406842092-25207-5-git-send-email-emilio@elopez.com.ar>
+Message-ID: <CAKON4OyBtzD=DhdO_fnCvgr=i+tJ63D9EbAGuCEP93T0UAPv_Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Punit Agrawal <punit.agrawal@arm.com> writes:
+On Thu, Jul 31, 2014 at 5:28 PM, Emilio L?pez <emilio@elopez.com.ar> wrote:
+> +CLK_OF_DECLARE(sun4i_pll2_a, "allwinner,sun4i-a10-a-pll2-clk", sun4i_pll2_setup);
+> +CLK_OF_DECLARE(sun4i_pll2_b, "allwinner,sun4i-a10-b-pll2-clk", sun4i_pll2_setup);
 
-> Hi,
->
-> There's no reason why the exynos PPMU can't be built as a module
-> except you need -
->
-> - The first patch exports the functions that are needed to build
-> devfreq drivers as modules.
->
-> - The second patch then converts the exynos PPMU devfreq driver to be
->   built as a module.
->
 
-Ping!
+This second one should not encode the 'b'.
+CLK_OF_DECLARE(sun4i_pll2_b, "allwinner,sun4i-a10-pll2-clk", sun4i_pll2_setup);
 
-> Compile tested only.
->
-> Thanks
->
-> Punit Agrawal (1):
->   PM / devfreq: exynos: Enable building exynos PPMU as module
->
-> ?rjan Eide (1):
->   PM / devfreq: Export helper functions for drivers
->
->  drivers/devfreq/Kconfig              |    2 +-
->  drivers/devfreq/devfreq.c            |    3 +++
->  drivers/devfreq/exynos/exynos_ppmu.c |    3 +++
->  3 files changed, 7 insertions(+), 1 deletion(-)
+The generic DTDs should only contain compatibles that don't have a
+chip revision in them.
+
+Then there are two choices:
+1) Identify your chip revision and load a DTD with the specific
+revisions in the compatible strings.
+2) Rely on the OS to identify the revision and modify the compatible at boot.
+
+The strings in the generic DTD should never contain a specific
+revision simply because it is unknown in a generic DTD.
+
+> --
+> 2.0.3
+
+
+
+-- 
+Jon Smirl
+jonsmirl at gmail.com
