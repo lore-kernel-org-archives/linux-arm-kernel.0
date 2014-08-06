@@ -1,84 +1,72 @@
 From: keescook@chromium.org (Kees Cook)
-Date: Wed,  6 Aug 2014 12:32:38 -0700
-Subject: [PATCH 1/7] arm: use generic fixmap.h
+Date: Wed,  6 Aug 2014 12:32:42 -0700
+Subject: [PATCH 5/7] ARM: kexec: Make .text R/W in machine_kexec
 In-Reply-To: <1407353564-21478-1-git-send-email-keescook@chromium.org>
 References: <1407353564-21478-1-git-send-email-keescook@chromium.org>
-Message-ID: <1407353564-21478-2-git-send-email-keescook@chromium.org>
+Message-ID: <1407353564-21478-6-git-send-email-keescook@chromium.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Mark Salter <msalter@redhat.com>
+From: Nikolay Borisov <Nikolay.Borisov@arm.com>
 
-ARM is different from other architectures in that fixmap pages are indexed
-with a positive offset from FIXADDR_START.  Other architectures index with
-a negative offset from FIXADDR_TOP.  In order to use the generic fixmap.h
-definitions, this patch redefines FIXADDR_TOP to be inclusive of the
-useable range.  That is, FIXADDR_TOP is the virtual address of the topmost
-fixed page.  The newly defined FIXADDR_END is the first virtual address
-past the fixed mappings.
+With the introduction of Kees Cook's patch to make the kernel .text
+read-only the existing method by which kexec works got broken since it
+directly pokes some values in the template code, which resides in the
+.text section.
 
-Signed-off-by: Mark Salter <msalter@redhat.com>
-Reviewed-by: Doug Anderson <dianders@chromium.org>
-[update for "ARM: 8031/2: change fixmap mapping region to support 32 CPUs"]
+The current patch changes the way those values are inserted so that poking
+.text section occurs only in machine_kexec (e.g when we are about to nuke
+the old kernel and are beyond the point of return). This allows to use
+set_kernel_text_rw() to directly patch the values in the .text section.
+
+I had already sent a patch which achieved this but it was significantly
+more complicated, so this is a cleaner/straight-forward approach.
+
+Signed-off-by: Nikolay Borisov <Nikolay.Borisov@arm.com>
+Acked-by: Will Deacon <will.deacon@arm.com>
+[collapsed kexec_boot_atags (will.daecon)]
 Signed-off-by: Kees Cook <keescook@chromium.org>
 ---
- arch/arm/include/asm/fixmap.h | 27 +++++++++------------------
- arch/arm/mm/init.c            |  2 +-
- 2 files changed, 10 insertions(+), 19 deletions(-)
+ arch/arm/kernel/machine_kexec.c | 10 ++++++----
+ 1 file changed, 6 insertions(+), 4 deletions(-)
 
-diff --git a/arch/arm/include/asm/fixmap.h b/arch/arm/include/asm/fixmap.h
-index 74124b0d0d79..190142d174ee 100644
---- a/arch/arm/include/asm/fixmap.h
-+++ b/arch/arm/include/asm/fixmap.h
-@@ -2,27 +2,18 @@
- #define _ASM_FIXMAP_H
+diff --git a/arch/arm/kernel/machine_kexec.c b/arch/arm/kernel/machine_kexec.c
+index 8cf0996aa1a8..fe6f3860ea57 100644
+--- a/arch/arm/kernel/machine_kexec.c
++++ b/arch/arm/kernel/machine_kexec.c
+@@ -29,6 +29,7 @@ extern unsigned long kexec_boot_atags;
  
- #define FIXADDR_START		0xffc00000UL
--#define FIXADDR_TOP		0xffe00000UL
--#define FIXADDR_SIZE		(FIXADDR_TOP - FIXADDR_START)
-+#define FIXADDR_END		0xffe00000UL
-+#define FIXADDR_TOP		(FIXADDR_END - PAGE_SIZE)
-+#define FIXADDR_SIZE		(FIXADDR_END - FIXADDR_START)
+ static atomic_t waiting_for_crash_ipi;
  
- #define FIX_KMAP_NR_PTES	(FIXADDR_SIZE >> PAGE_SHIFT)
++static unsigned long dt_mem;
+ /*
+  * Provide a dummy crash_notes definition while crash dump arrives to arm.
+  * This prevents breakage of crash_notes attribute in kernel/ksysfs.c.
+@@ -64,7 +65,7 @@ int machine_kexec_prepare(struct kimage *image)
+ 			return err;
  
--#define __fix_to_virt(x)	(FIXADDR_START + ((x) << PAGE_SHIFT))
--#define __virt_to_fix(x)	(((x) - FIXADDR_START) >> PAGE_SHIFT)
-+enum fixed_addresses {
-+	FIX_KMAP_BEGIN,
-+	FIX_KMAP_END = FIX_KMAP_NR_PTES - 1,
-+	__end_of_fixed_addresses
-+};
+ 		if (be32_to_cpu(header) == OF_DT_HEADER)
+-			kexec_boot_atags = current_segment->mem;
++			dt_mem = current_segment->mem;
+ 	}
+ 	return 0;
+ }
+@@ -163,12 +164,13 @@ void machine_kexec(struct kimage *image)
+ 	reboot_code_buffer = page_address(image->control_code_page);
  
--extern void __this_fixmap_does_not_exist(void);
+ 	/* Prepare parameters for reboot_code_buffer*/
++	set_kernel_text_rw();
+ 	kexec_start_address = image->start;
+ 	kexec_indirection_page = page_list;
+ 	kexec_mach_type = machine_arch_type;
+-	if (!kexec_boot_atags)
+-		kexec_boot_atags = image->start - KEXEC_ARM_ZIMAGE_OFFSET + KEXEC_ARM_ATAGS_OFFSET;
 -
--static inline unsigned long fix_to_virt(const unsigned int idx)
--{
--	if (idx >= FIX_KMAP_NR_PTES)
--		__this_fixmap_does_not_exist();
--	return __fix_to_virt(idx);
--}
--
--static inline unsigned int virt_to_fix(const unsigned long vaddr)
--{
--	BUG_ON(vaddr >= FIXADDR_TOP || vaddr < FIXADDR_START);
--	return __virt_to_fix(vaddr);
--}
-+#include <asm-generic/fixmap.h>
++	kexec_boot_atags = dt_mem ?: kexec_boot_atags = image->start
++				     - KEXEC_ARM_ZIMAGE_OFFSET
++				     + KEXEC_ARM_ATAGS_OFFSET;
  
- #endif
-diff --git a/arch/arm/mm/init.c b/arch/arm/mm/init.c
-index 659c75d808dc..ad82c05bfc3a 100644
---- a/arch/arm/mm/init.c
-+++ b/arch/arm/mm/init.c
-@@ -570,7 +570,7 @@ void __init mem_init(void)
- 			MLK(DTCM_OFFSET, (unsigned long) dtcm_end),
- 			MLK(ITCM_OFFSET, (unsigned long) itcm_end),
- #endif
--			MLK(FIXADDR_START, FIXADDR_TOP),
-+			MLK(FIXADDR_START, FIXADDR_END),
- 			MLM(VMALLOC_START, VMALLOC_END),
- 			MLM(PAGE_OFFSET, (unsigned long)high_memory),
- #ifdef CONFIG_HIGHMEM
+ 	/* copy our kernel relocation code to the control code page */
+ 	reboot_entry = fncpy(reboot_code_buffer,
 -- 
 1.9.1
