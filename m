@@ -1,101 +1,105 @@
 From: andrew@lunn.ch (Andrew Lunn)
-Date: Wed,  6 Aug 2014 03:18:26 +0200
-Subject: [RFC 2/8] ASoC: simple-card: Make mclk setting a dai link property
+Date: Wed,  6 Aug 2014 03:18:28 +0200
+Subject: [RFC 4/8] ASoC: dt: Parse DPCM properties
 In-Reply-To: <1407287912-19447-1-git-send-email-andrew@lunn.ch>
 References: <1407287912-19447-1-git-send-email-andrew@lunn.ch>
-Message-ID: <1407287912-19447-3-git-send-email-andrew@lunn.ch>
+Message-ID: <1407287912-19447-5-git-send-email-andrew@lunn.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The mclk factor between between stream rate and codec clk was wrongly
-made a property of the whole card, when in fact it is a property of a
-dai link. Correct this.
+In order to describe DPCM links in DT, we need some additional
+properties. Is the DAI dynamic, i.e. a front end? Should no PCM be
+created for the DAI?  Can it be used for DPCM playback and capture?
+Add parsing of these properties to the core and make use of them in
+simple card.
 
 Signed-off-by: Andrew Lunn <andrew@lunn.ch>
 ---
-
-The only users of this property are kirkwood devices, which are
-updated in a later patch. There is an ABI break anyway, in order to
-make use of DPCM, which is the right way to handle the kirkwood
-hardware, rather than what we currently have.
----
- Documentation/devicetree/bindings/sound/simple-card.txt |  4 ++--
- sound/soc/generic/simple-card.c                         | 16 +++++++++-------
- 2 files changed, 11 insertions(+), 9 deletions(-)
+ .../devicetree/bindings/sound/simple-card.txt      |  4 ++++
+ include/sound/soc.h                                |  6 ++++++
+ sound/soc/generic/simple-card.c                    |  4 ++++
+ sound/soc/soc-core.c                               | 22 ++++++++++++++++++++++
+ 4 files changed, 36 insertions(+)
 
 diff --git a/Documentation/devicetree/bindings/sound/simple-card.txt b/Documentation/devicetree/bindings/sound/simple-card.txt
-index c2e9841dfce4..8b9f902cdfc7 100644
+index 8b9f902cdfc7..cba8b8406bb0 100644
 --- a/Documentation/devicetree/bindings/sound/simple-card.txt
 +++ b/Documentation/devicetree/bindings/sound/simple-card.txt
-@@ -15,8 +15,6 @@ Optional properties:
- 					  Each entry is a pair of strings, the first being the
- 					  connection's sink, the second being the connection's
- 					  source.
--- simple-audio-card,mclk-fs             : Multiplication factor between stream rate and codec
--  					  mclk.
- 
- Optional subnodes:
- 
-@@ -51,6 +49,8 @@ Optional dai-link subnode properties:
- 					  dai-link uses bit clock inversion.
- - frame-inversion			: bool property. Add this if the
+@@ -51,6 +51,10 @@ Optional dai-link subnode properties:
  					  dai-link uses frame clock inversion.
-+- mclk-fs                               : Multiplication factor between stream
-+                                          rate and codec mclk.
+ - mclk-fs                               : Multiplication factor between stream
+                                           rate and codec mclk.
++- dynamic				: This DAI link can route to other DAI links at runtime
++- no_pcm				: Do not create a PCM for this DAI link
++- dpcm_capture				: DPCM capture supported for this DAI link
++- dpcm_playback				: DPCM playback supported for this DAI link
  
  For backward compatibility the frame-master and bitclock-master
  properties can be used as booleans in codec subnode to indicate if the
+diff --git a/include/sound/soc.h b/include/sound/soc.h
+index ed9e2d7e5fdc..060e2f955292 100644
+--- a/include/sound/soc.h
++++ b/include/sound/soc.h
+@@ -1374,6 +1374,12 @@ unsigned int snd_soc_of_parse_daifmt(struct device_node *np,
+ 				     const char *prefix,
+ 				     struct device_node **bitclkmaster,
+ 				     struct device_node **framemaster);
++void snd_soc_of_parse_dpcm(struct device_node *np,
++			   struct snd_soc_dai_link *dai_link);
++void snd_soc_of_parse_dynamic(struct device_node *np,
++			      struct snd_soc_dai_link *dai_link);
++void snd_soc_of_parse_no_pcm(struct device_node *np,
++			     struct snd_soc_dai_link *dai_link);
+ int snd_soc_of_get_dai_name(struct device_node *of_node,
+ 			    const char **dai_name);
+ 
 diff --git a/sound/soc/generic/simple-card.c b/sound/soc/generic/simple-card.c
-index 03a7fdcdf114..63f3d16d43ba 100644
+index 63f3d16d43ba..735a54099b8d 100644
 --- a/sound/soc/generic/simple-card.c
 +++ b/sound/soc/generic/simple-card.c
-@@ -23,8 +23,8 @@ struct simple_card_data {
- 	struct simple_dai_props {
- 		struct asoc_simple_dai cpu_dai;
- 		struct asoc_simple_dai codec_dai;
-+		unsigned int mclk_fs;
- 	} *dai_props;
--	unsigned int mclk_fs;
- 	struct snd_soc_dai_link dai_link[];	/* dynamically allocated */
- };
- 
-@@ -34,11 +34,13 @@ static int asoc_simple_card_hw_params(struct snd_pcm_substream *substream,
- 	struct snd_soc_pcm_runtime *rtd = substream->private_data;
- 	struct snd_soc_dai *codec_dai = rtd->codec_dai;
- 	struct simple_card_data *priv = snd_soc_card_get_drvdata(rtd->card);
-+	int num = rtd - rtd->card->rtd;
-+	struct simple_dai_props *dai_props = &priv->dai_props[num];
- 	unsigned int mclk;
- 	int ret = 0;
- 
--	if (priv->mclk_fs) {
--		mclk = params_rate(params) * priv->mclk_fs;
-+	if (dai_props->mclk_fs) {
-+		mclk = params_rate(params) * dai_props->mclk_fs;
- 		ret = snd_soc_dai_set_sysclk(codec_dai, 0, mclk,
- 					     SND_SOC_CLOCK_IN);
- 	}
-@@ -186,6 +188,10 @@ static int simple_card_dai_link_of(struct device_node *node,
+@@ -188,6 +188,10 @@ static int simple_card_dai_link_of(struct device_node *node,
  					 &bitclkmaster, &framemaster);
  	daifmt &= ~SND_SOC_DAIFMT_MASTER_MASK;
  
-+	/* Factor to mclk, used in hw_params() */
-+	of_property_read_u32(node, "mclk-fs",
-+			     &dai_props->mclk_fs);
++	snd_soc_of_parse_dpcm(node, dai_link);
++	snd_soc_of_parse_dynamic(node, dai_link);
++	snd_soc_of_parse_no_pcm(node, dai_link);
 +
- 	snprintf(prop, sizeof(prop), "%scpu", prefix);
- 	np = of_get_child_by_name(node, prop);
- 	if (!np) {
-@@ -324,10 +330,6 @@ static int asoc_simple_card_parse_of(struct device_node *node,
- 			return ret;
- 	}
+ 	/* Factor to mclk, used in hw_params() */
+ 	of_property_read_u32(node, "mclk-fs",
+ 			     &dai_props->mclk_fs);
+diff --git a/sound/soc/soc-core.c b/sound/soc/soc-core.c
+index 91120b8e283e..8aa3a21d37af 100644
+--- a/sound/soc/soc-core.c
++++ b/sound/soc/soc-core.c
+@@ -4745,6 +4745,28 @@ unsigned int snd_soc_of_parse_daifmt(struct device_node *np,
+ }
+ EXPORT_SYMBOL_GPL(snd_soc_of_parse_daifmt);
  
--	/* Factor to mclk, used in hw_params() */
--	of_property_read_u32(node, "simple-audio-card,mclk-fs",
--			     &priv->mclk_fs);
--
- 	dev_dbg(dev, "New simple-card: %s\n", priv->snd_card.name ?
- 		priv->snd_card.name : "");
- 
++void snd_soc_of_parse_dpcm(struct device_node *np,
++			   struct snd_soc_dai_link *dai_link)
++{
++	dai_link->dpcm_playback = of_property_read_bool(np, "dpcm_playback");
++	dai_link->dpcm_capture = of_property_read_bool(np, "dpcm_capture");
++}
++EXPORT_SYMBOL_GPL(snd_soc_of_parse_dpcm);
++
++void snd_soc_of_parse_dynamic(struct device_node *np,
++			      struct snd_soc_dai_link *dai_link)
++{
++	dai_link->dynamic = of_property_read_bool(np, "dynamic");
++}
++EXPORT_SYMBOL_GPL(snd_soc_of_parse_dynamic);
++
++void snd_soc_of_parse_no_pcm(struct device_node *np,
++			     struct snd_soc_dai_link *dai_link)
++{
++	dai_link->no_pcm = of_property_read_bool(np, "no_pcm");
++}
++EXPORT_SYMBOL_GPL(snd_soc_of_parse_no_pcm);
++
+ int snd_soc_of_get_dai_name(struct device_node *of_node,
+ 			    const char **dai_name)
+ {
 -- 
 2.0.1
