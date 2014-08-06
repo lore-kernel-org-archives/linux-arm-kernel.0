@@ -1,43 +1,57 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 6 Aug 2014 22:59:10 +0200
-Subject: [PATCH v3 1/6] usb: host: usb-st-common: Add common code required
- by ohci-st and ehci-st
-In-Reply-To: <1407344589-24863-2-git-send-email-peter.griffin@linaro.org>
+Date: Wed, 6 Aug 2014 23:07:18 +0200
+Subject: [PATCH v3 2/6] usb: host: ehci-st: Add EHCI support for ST STB
+ devices
+In-Reply-To: <1407344589-24863-3-git-send-email-peter.griffin@linaro.org>
 References: <1407344589-24863-1-git-send-email-peter.griffin@linaro.org>
- <1407344589-24863-2-git-send-email-peter.griffin@linaro.org>
-Message-ID: <201408062259.10697.arnd@arndb.de>
+ <1407344589-24863-3-git-send-email-peter.griffin@linaro.org>
+Message-ID: <201408062307.18851.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 On Wednesday 06 August 2014, Peter Griffin wrote:
-> +int st_usb_platform_power_on(struct st_platform_priv *priv)
+
+> +static int st_ehci_platform_reset(struct usb_hcd *hcd)
 > +{
-> +	int clk, ret;
+> +	struct platform_device *pdev = to_platform_device(hcd->self.controller);
+> +	struct usb_ehci_pdata *pdata = dev_get_platdata(&pdev->dev);
+> +	struct ehci_hcd *ehci = hcd_to_ehci(hcd);
+> +	int retval;
 > +
-> +	if (priv->pwr) {
-> +		ret = reset_control_deassert(priv->pwr);
-> +		if (ret)
-> +			return ret;
-> +	}
-> +
-> +	if (priv->rst) {
-> +		ret = 
-> (priv->rst);
-> +		if (ret)
-> +			goto err_assert_power;
+> +	if (pdata->pre_setup) {
+> +		retval = pdata->pre_setup(hcd);
+> +		if (retval < 0)
+> +			return retval;
 > +	}
 
-I wouldn't make these optional, just call the functions
-unconditionally and fail the probe function if they are
-not available.
+What is the point in going through a platform data function pointer here?
+Can't you just open-code st_ehci_configure_bus() here?
 
-I'm not sure if it's worth keeping these functions in a
-common file. You are adding complexity this way and I don't
-think you are even saving a significant number of code lines
-compared to just having two copies of them.
+> +static int st_ehci_platform_probe(struct platform_device *dev)
+> +{
+> +	struct usb_hcd *hcd;
+> +	struct resource *res_mem;
+> +	struct usb_ehci_pdata *pdata = dev_get_platdata(&dev->dev);
+> +	struct st_platform_priv *priv;
+> +	struct ehci_hcd *ehci;
+> +	int err, irq, clk = 0;
+> +
+> +	if (usb_disabled())
+> +		return -ENODEV;
+> +
+> +	/*
+> +	 * Use reasonable defaults so platforms don't have to provide these
+> +	 * with DT probing on ARM.
+> +	 */
+> +	if (!pdata)
+> +		pdata = &ehci_platform_defaults;
 
-> +EXPORT_SYMBOL(st_usb_platform_power_on);
+How would you ever get here with pdata set?
 
-If you want to keep them, it would be best to make
+> +	err = dma_coerce_mask_and_coherent(&dev->dev, DMA_BIT_MASK(32));
+> +	if (err)
+> +		return err;
+
+Remove this here, and rely on the correct mask to be set from the DT scan.
 
 	Arnd
