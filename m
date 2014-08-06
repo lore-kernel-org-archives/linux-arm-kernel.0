@@ -1,256 +1,107 @@
 From: keescook@chromium.org (Kees Cook)
-Date: Wed,  6 Aug 2014 12:32:43 -0700
-Subject: [PATCH 6/7] ARM: mm: allow non-text sections to be non-executable
+Date: Wed,  6 Aug 2014 12:32:40 -0700
+Subject: [PATCH 3/7] arm: mm: reduce fixmap kmap from 32 to 16 CPUS
 In-Reply-To: <1407353564-21478-1-git-send-email-keescook@chromium.org>
 References: <1407353564-21478-1-git-send-email-keescook@chromium.org>
-Message-ID: <1407353564-21478-7-git-send-email-keescook@chromium.org>
+Message-ID: <1407353564-21478-4-git-send-email-keescook@chromium.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Adds CONFIG_ARM_KERNMEM_PERMS to separate the kernel memory regions
-into section-sized areas that can have different permisions. Performs
-the NX permission changes during free_initmem, so that init memory can be
-reclaimed.
-
-This uses section size instead of PMD size to reduce memory lost to
-padding on non-LPAE systems.
-
-Based on work by Brad Spengler, Larry Bassel, and Laura Abbott.
+More room is needed in the fixmap range for non-kmap fixmap entries. This
+reduces the kmap range from 32 to 16 CPUs. Additionally, add PTE entry for
+fixmap regardless of CONFIG_HIGHMEM.
 
 Signed-off-by: Kees Cook <keescook@chromium.org>
 ---
- arch/arm/kernel/vmlinux.lds.S |  17 +++++++
- arch/arm/mm/Kconfig           |   9 ++++
- arch/arm/mm/init.c            | 106 ++++++++++++++++++++++++++++++++++++++++++
- arch/arm/mm/mmu.c             |  13 +++++-
- 4 files changed, 144 insertions(+), 1 deletion(-)
+ arch/arm/include/asm/fixmap.h | 12 ++++++++++--
+ arch/arm/mm/highmem.c         |  2 --
+ arch/arm/mm/mm.h              |  3 +++
+ arch/arm/mm/mmu.c             |  5 ++++-
+ 4 files changed, 17 insertions(+), 5 deletions(-)
 
-diff --git a/arch/arm/kernel/vmlinux.lds.S b/arch/arm/kernel/vmlinux.lds.S
-index 7bcee5c9b604..08fa667ef2f1 100644
---- a/arch/arm/kernel/vmlinux.lds.S
-+++ b/arch/arm/kernel/vmlinux.lds.S
-@@ -8,6 +8,9 @@
- #include <asm/thread_info.h>
- #include <asm/memory.h>
- #include <asm/page.h>
-+#ifdef CONFIG_ARM_KERNMEM_PERMS
-+#include <asm/pgtable.h>
-+#endif
- 	
- #define PROC_INFO							\
- 	. = ALIGN(4);							\
-@@ -90,6 +93,11 @@ SECTIONS
- 		_text = .;
- 		HEAD_TEXT
- 	}
-+
-+#ifdef CONFIG_ARM_KERNMEM_PERMS
-+	. = ALIGN(1<<SECTION_SHIFT);
-+#endif
-+
- 	.text : {			/* Real text segment		*/
- 		_stext = .;		/* Text and read-only data	*/
- 			__exception_text_start = .;
-@@ -145,7 +153,11 @@ SECTIONS
- 	_etext = .;			/* End of text and rodata section */
+diff --git a/arch/arm/include/asm/fixmap.h b/arch/arm/include/asm/fixmap.h
+index 8ee7cb4f62ca..3ed08232be55 100644
+--- a/arch/arm/include/asm/fixmap.h
++++ b/arch/arm/include/asm/fixmap.h
+@@ -1,16 +1,24 @@
+ #ifndef _ASM_FIXMAP_H
+ #define _ASM_FIXMAP_H
  
- #ifndef CONFIG_XIP_KERNEL
-+# ifdef CONFIG_ARM_KERNMEM_PERMS
-+	. = ALIGN(1<<SECTION_SHIFT);
-+# else
- 	. = ALIGN(PAGE_SIZE);
-+# endif
- 	__init_begin = .;
- #endif
- 	/*
-@@ -220,7 +232,12 @@ SECTIONS
- 	. = PAGE_OFFSET + TEXT_OFFSET;
- #else
- 	__init_end = .;
-+
-+#ifdef CONFIG_ARM_KERNMEM_PERMS
-+	. = ALIGN(1<<SECTION_SHIFT);
-+#else
- 	. = ALIGN(THREAD_SIZE);
-+#endif
- 	__data_loc = .;
- #endif
- 
-diff --git a/arch/arm/mm/Kconfig b/arch/arm/mm/Kconfig
-index c348eaee7ee2..0ea121dbf940 100644
---- a/arch/arm/mm/Kconfig
-+++ b/arch/arm/mm/Kconfig
-@@ -1007,3 +1007,12 @@ config ARCH_SUPPORTS_BIG_ENDIAN
- 	help
- 	  This option specifies the architecture can support big endian
- 	  operation.
-+
-+config ARM_KERNMEM_PERMS
-+	bool "Restrict kernel memory permissions"
-+	help
-+	  If this is set, kernel memory other than kernel text (and rodata)
-+	  will be made non-executable. The tradeoff is that each region is
-+	  padded to section-size (1MiB) boundaries (because their permissions
-+	  are different and splitting the 1M pages into 4K ones causes TLB
-+	  performance problems), wasting memory.
-diff --git a/arch/arm/mm/init.c b/arch/arm/mm/init.c
-index ad82c05bfc3a..ccf392ef40d4 100644
---- a/arch/arm/mm/init.c
-+++ b/arch/arm/mm/init.c
-@@ -32,6 +32,11 @@
- #include <asm/tlb.h>
- #include <asm/fixmap.h>
- 
-+#ifdef CONFIG_ARM_KERNMEM_PERMS
-+#include <asm/system_info.h>
-+#include <asm/cp15.h>
-+#endif
-+
- #include <asm/mach/arch.h>
- #include <asm/mach/map.h>
- 
-@@ -615,11 +620,112 @@ void __init mem_init(void)
- 	}
- }
- 
-+#ifdef CONFIG_ARM_KERNMEM_PERMS
-+struct section_perm {
-+	unsigned long start;
-+	unsigned long end;
-+	pmdval_t mask;
-+	pmdval_t prot;
-+};
-+
-+struct section_perm nx_perms[] = {
-+	/* Make pages tables, etc before _stext RW (set NX). */
-+	{
-+		.start	= PAGE_OFFSET,
-+		.end	= (unsigned long)_stext,
-+		.mask	= ~PMD_SECT_XN,
-+		.prot	= PMD_SECT_XN,
-+	},
-+	/* Make init RW (set NX). */
-+	{
-+		.start	= (unsigned long)__init_begin,
-+		.end	= (unsigned long)_sdata,
-+		.mask	= ~PMD_SECT_XN,
-+		.prot	= PMD_SECT_XN,
-+	},
-+};
-+
 +/*
-+ * Updates section permissions only for the current mm (sections are
-+ * copied into each mm). During startup, this is the init_mm.
++ * The fixmap uses 2MB. The KMAP fixmap needs 64k per CPU, so make room for
++ * 16 CPUs (taking 1MB) and leave the rest for additional fixmap areas.
 + */
-+static inline void section_update(unsigned long addr, pmdval_t mask,
-+				  pmdval_t prot)
-+{
-+	struct mm_struct *mm;
-+	pmd_t *pmd;
-+
-+	mm = current->active_mm;
-+	pmd = pmd_offset(pud_offset(pgd_offset(mm, addr), addr), addr);
-+
-+#ifdef CONFIG_ARM_LPAE
-+	pmd[0] = __pmd((pmd_val(pmd[0]) & mask) | prot);
-+#else
-+	if (addr & SECTION_SIZE)
-+		pmd[1] = __pmd((pmd_val(pmd[1]) & mask) | prot);
-+	else
-+		pmd[0] = __pmd((pmd_val(pmd[0]) & mask) | prot);
-+#endif
-+	flush_pmd_entry(pmd);
-+	local_flush_tlb_kernel_range(addr, addr + SECTION_SIZE);
-+}
-+
-+/* Make sure extended page tables are in use. */
-+static inline bool arch_has_strict_perms(void)
-+{
-+	unsigned int cr;
-+
-+	if (cpu_architecture() < CPU_ARCH_ARMv6)
-+		return false;
-+
-+	cr = get_cr();
-+	if (!(cr & CR_XP))
-+		return false;
-+
-+	return true;
-+}
-+
-+#define set_section_perms(perms, field)	{				\
-+	size_t i;							\
-+	unsigned long addr;						\
-+									\
-+	if (!arch_has_strict_perms())					\
-+		return;							\
-+									\
-+	for (i = 0; i < ARRAY_SIZE(perms); i++) {			\
-+		if (!IS_ALIGNED(perms[i].start, SECTION_SIZE) ||	\
-+		    !IS_ALIGNED(perms[i].end, SECTION_SIZE)) {		\
-+			pr_err("BUG: section %lx-%lx not aligned to %lx\n", \
-+				perms[i].start, perms[i].end,		\
-+				SECTION_SIZE);				\
-+			continue;					\
-+		}							\
-+									\
-+		for (addr = perms[i].start;				\
-+		     addr < perms[i].end;				\
-+		     addr += SECTION_SIZE)				\
-+			section_update(addr, perms[i].mask,		\
-+				       perms[i].field);			\
-+	}								\
-+}
-+
-+static inline void fix_kernmem_perms(void)
-+{
-+	set_section_perms(nx_perms, prot);
-+}
-+#else
-+static inline void fix_kernmem_perms(void) { }
-+#endif /* CONFIG_ARM_KERNMEM_PERMS */
-+
- void free_initmem(void)
- {
- #ifdef CONFIG_HAVE_TCM
- 	extern char __tcm_start, __tcm_end;
-+#endif
-+
-+	fix_kernmem_perms();
+ #define FIXADDR_START		0xffc00000UL
+ #define FIXADDR_END		0xffe00000UL
+ #define FIXADDR_TOP		(FIXADDR_END - PAGE_SIZE)
+ #define FIXADDR_SIZE		(FIXADDR_END - FIXADDR_START)
  
-+#ifdef CONFIG_HAVE_TCM
- 	poison_init_mem(&__tcm_start, &__tcm_end - &__tcm_start);
- 	free_reserved_area(&__tcm_start, &__tcm_end, -1, "TCM link");
- #endif
+-#define FIX_KMAP_NR_PTES	(FIXADDR_SIZE >> PAGE_SHIFT)
++/* 16 PTEs per CPU (64k of 4k pages). */
++#define FIX_KMAP_NR_PTES	16
++#define FIX_KMAP_NR_CPUS	16
+ 
+ enum fixed_addresses {
++	/* Support 16 CPUs for kmap as the first region of fixmap entries. */
+ 	FIX_KMAP_BEGIN,
+-	FIX_KMAP_END = FIX_KMAP_NR_PTES - 1,
++	FIX_KMAP_END = (FIX_KMAP_NR_PTES * FIX_KMAP_NR_CPUS) - 1,
++
+ 	__end_of_fixed_addresses
+ };
+ 
+diff --git a/arch/arm/mm/highmem.c b/arch/arm/mm/highmem.c
+index 45aeaaca9052..cbbef0b533d6 100644
+--- a/arch/arm/mm/highmem.c
++++ b/arch/arm/mm/highmem.c
+@@ -18,8 +18,6 @@
+ #include <asm/tlbflush.h>
+ #include "mm.h"
+ 
+-pte_t *fixmap_page_table;
+-
+ static inline void set_fixmap_pte(int idx, pte_t pte)
+ {
+ 	unsigned long vaddr = __fix_to_virt(idx);
+diff --git a/arch/arm/mm/mm.h b/arch/arm/mm/mm.h
+index ce727d47275c..c8b5b2d05b55 100644
+--- a/arch/arm/mm/mm.h
++++ b/arch/arm/mm/mm.h
+@@ -7,6 +7,9 @@
+ /* the upper-most page table pointer */
+ extern pmd_t *top_pmd;
+ 
++/* The fixmap PTE. */
++extern pte_t *fixmap_page_table;
++
+ /*
+  * 0xffff8000 to 0xffffffff is reserved for any ARM architecture
+  * specific hacks for copying pages efficiently, while 0xffff4000
 diff --git a/arch/arm/mm/mmu.c b/arch/arm/mm/mmu.c
-index 8dbdadc42d75..3b81f111ef27 100644
+index b005a3337bc1..8dbdadc42d75 100644
 --- a/arch/arm/mm/mmu.c
 +++ b/arch/arm/mm/mmu.c
-@@ -1368,13 +1368,24 @@ static void __init map_lowmem(void)
- 		if (start >= end)
- 			break;
+@@ -53,6 +53,9 @@ EXPORT_SYMBOL(empty_zero_page);
+  */
+ pmd_t *top_pmd;
  
--		if (end < kernel_x_start || start >= kernel_x_end) {
-+		if (end < kernel_x_start) {
- 			map.pfn = __phys_to_pfn(start);
- 			map.virtual = __phys_to_virt(start);
- 			map.length = end - start;
- 			map.type = MT_MEMORY_RWX;
- 
- 			create_mapping(&map);
-+		} else if (start >= kernel_x_end) {
-+			map.pfn = __phys_to_pfn(start);
-+			map.virtual = __phys_to_virt(start);
-+			map.length = end - start;
-+#ifdef CONFIG_ARM_KERNMEM_PERMS
-+			map.type = MT_MEMORY_RW;
-+#else
-+			map.type = MT_MEMORY_RWX;
-+#endif
++/* The fixmap PTE. */
++pte_t *fixmap_page_table;
 +
-+			create_mapping(&map);
- 		} else {
- 			/* This better cover the entire kernel */
- 			if (start < kernel_x_start) {
+ #define CPOLICY_UNCACHED	0
+ #define CPOLICY_BUFFERED	1
+ #define CPOLICY_WRITETHROUGH	2
+@@ -1342,10 +1345,10 @@ static void __init kmap_init(void)
+ #ifdef CONFIG_HIGHMEM
+ 	pkmap_page_table = early_pte_alloc(pmd_off_k(PKMAP_BASE),
+ 		PKMAP_BASE, _PAGE_KERNEL_TABLE);
++#endif
+ 
+ 	fixmap_page_table = early_pte_alloc(pmd_off_k(FIXADDR_START),
+ 		FIXADDR_START, _PAGE_KERNEL_TABLE);
+-#endif
+ }
+ 
+ static void __init map_lowmem(void)
 -- 
 1.9.1
