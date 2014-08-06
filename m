@@ -1,36 +1,30 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 6 Aug 2014 23:18:28 +0200
-Subject: [PATCH v3 0/6] Add EHCI and OHCI drivers for STi SoC's
-In-Reply-To: <1407344589-24863-1-git-send-email-peter.griffin@linaro.org>
-References: <1407344589-24863-1-git-send-email-peter.griffin@linaro.org>
-Message-ID: <201408062318.28958.arnd@arndb.de>
+From: debiandev@gmail.com (Andev)
+Date: Wed, 6 Aug 2014 17:25:02 -0400
+Subject: [3.13.y.z extended stable] Patch "locking/mutex: Disable
+ optimistic spinning on some architectures" has been added to staging queue
+In-Reply-To: <1407358496-23094-1-git-send-email-kamal@canonical.com>
+References: <1407358496-23094-1-git-send-email-kamal@canonical.com>
+Message-ID: <CAJUuVQ5OpNye8HAEw6x=owBB32pq-aLF7_Gqo493jDDHDahhRA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 06 August 2014, Peter Griffin wrote:
-> This series adds support for the OHCI and EHCI on-chip controllers
-> found in STi consumer electronics SoC's from STMicroelectronics.
-> 
-> The series has been re-worked from v2 to split out the ehci and ohci parts
-> into their own drivers / devices like most other ARM platforms based on
-> feedback from Arnd Bergmann (see here http://www.spinics.net/lists/linux-usb/msg111124.html. 
-> 
-> The ehci-platform & ohci-platform have been used as a basis for this in case we
-> wish to merge the drivers again in the future.
-> 
-> Changes since v2:
->  - Based on Arnd Berghman feedback, split out into 2 devices / drivers
->  - Base drivers oh ehci-platform.c & ohci-platform.c with required extensions
->    to allow possible re-merge in the furture.
+On Wed, Aug 6, 2014 at 4:54 PM, Kamal Mostafa <kamal@canonical.com> wrote:
+> This is a note to let you know that I have just added a patch titled
+>
+>     locking/mutex: Disable optimistic spinning on some architectures
+>
+> to the linux-3.13.y-queue branch of the 3.13.y.z extended stable tree
+> which can be found at:
+>
+>  http://kernel.ubuntu.com/git?p=ubuntu/linux.git;a=shortlog;h=refs/heads/linux-3.13.y-queue
+>
+> This patch is scheduled to be released in version 3.13.11.6.
+>
 
-Hi Peter,
+This patch is specifically for parisc, sparc32, tile32, metag-lock1,
+arc-!llsc and hexagon none of which Ubuntu supports.
 
-This looks much better than the first version. I have some remaining comments for
-how it could be simplified a bit more.
+Why are you backporting this patch?
 
-The way that you deal with the 48mhz clock seems like it should fit in well
-with the generic driver, just like all the rest (once the usb-st-common
-stuff is moved into the ohci/ehci drivers), so the alternative would be
-to make it all generic now.
-
-	Arnd
+--
+Andev
