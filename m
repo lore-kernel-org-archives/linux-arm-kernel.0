@@ -1,326 +1,273 @@
-From: jonsmirl@gmail.com (jonsmirl at gmail.com)
-Date: Wed, 6 Aug 2014 11:20:10 -0400
-Subject: [PATCH 4/9] clk: sunxi: PLL2 support for sun4i, sun5i and sun7i
-In-Reply-To: <1406842092-25207-5-git-send-email-emilio@elopez.com.ar>
-References: <1406842092-25207-1-git-send-email-emilio@elopez.com.ar>
- <1406842092-25207-5-git-send-email-emilio@elopez.com.ar>
-Message-ID: <CAKON4OyMOXjj_mdZvzo0Q_-MdNn076RTwKuBCVtMsRHhnyLoKw@mail.gmail.com>
+From: andre.przywara@arm.com (Andre Przywara)
+Date: Wed, 06 Aug 2014 16:26:50 +0100
+Subject: [PATCH v16 8/9] irq: enable hip04 irq chip
+In-Reply-To: <1407121088-4151-9-git-send-email-haojian.zhuang@linaro.org>
+References: <1407121088-4151-1-git-send-email-haojian.zhuang@linaro.org>
+ <1407121088-4151-9-git-send-email-haojian.zhuang@linaro.org>
+Message-ID: <53E2493A.1080202@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jul 31, 2014 at 5:28 PM, Emilio L?pez <emilio@elopez.com.ar> wrote:
-> This patch adds support for PLL2 and derivates on sun4i, sun5i and
-> sun7i SoCs. As this PLL is only used for audio and requires good
-> accuracy, we only support two known good rates.
->
-> Signed-off-by: Emilio L?pez <emilio@elopez.com.ar>
+Hi,
+
+to me this looks much better than the version integrated into irq-gic.c
+and is reasonably small and self-contained.
+
+See for comments below...
+
+On 04/08/14 03:58, Haojian Zhuang wrote:
+> HiP04 GIC is the variate of ARM GICv2.
+> 
+> ARM GICv2 supports 8 cores. HiP04 GIC extends to support 16 cores. It
+> results that bit fields in GIC_DIST_TARGET & GIC_DIST_SOFTINT are
+> different from ARM GICv2. And the maximium IRQ is downgrade from 1020 to 510.
+> 
+> Since different register offset & bitfields definitation breaks
+> compartible with ARM GICv2, create a new hip04 irq driver.
+> 
+> Signed-off-by: Haojian Zhuang <haojian.zhuang@linaro.org>
 > ---
->
-> Changes from RFC:
->  * Add support for A10 rev. A
->  * Document compatibles
->  * Use fixed factors
->
->  Documentation/devicetree/bindings/clock/sunxi.txt |   2 +
->  drivers/clk/sunxi/Makefile                        |   1 +
->  drivers/clk/sunxi/clk-a10-pll2.c                  | 243 ++++++++++++++++++++++
->  3 files changed, 246 insertions(+)
->  create mode 100644 drivers/clk/sunxi/clk-a10-pll2.c
->
-> diff --git a/Documentation/devicetree/bindings/clock/sunxi.txt b/Documentation/devicetree/bindings/clock/sunxi.txt
-> index d3a5c3c..41ada31 100644
-> --- a/Documentation/devicetree/bindings/clock/sunxi.txt
-> +++ b/Documentation/devicetree/bindings/clock/sunxi.txt
-> @@ -10,6 +10,8 @@ Required properties:
->         "allwinner,sun4i-a10-pll1-clk" - for the main PLL clock and PLL4
->         "allwinner,sun6i-a31-pll1-clk" - for the main PLL clock on A31
->         "allwinner,sun8i-a23-pll1-clk" - for the main PLL clock on A23
-> +       "allwinner,sun4i-a10-a-pll2-clk" - for the PLL2 clock on A10 rev. A
-> +       "allwinner,sun4i-a10-b-pll2-clk" - for the PLL2 clock on A10 rev. B
->         "allwinner,sun4i-a10-pll5-clk" - for the PLL5 clock
->         "allwinner,sun4i-a10-pll6-clk" - for the PLL6 clock
->         "allwinner,sun6i-a31-pll6-clk" - for the PLL6 clock on A31
-> diff --git a/drivers/clk/sunxi/Makefile b/drivers/clk/sunxi/Makefile
-> index 6850cba..dcd5709 100644
-> --- a/drivers/clk/sunxi/Makefile
-> +++ b/drivers/clk/sunxi/Makefile
-> @@ -4,6 +4,7 @@
->
->  obj-y += clk-sunxi.o clk-factors.o
->  obj-y += clk-a10-hosc.o
-> +obj-y += clk-a10-pll2.o
->  obj-y += clk-a20-gmac.o
->
->  obj-$(CONFIG_MFD_SUN6I_PRCM) += \
-> diff --git a/drivers/clk/sunxi/clk-a10-pll2.c b/drivers/clk/sunxi/clk-a10-pll2.c
+>  drivers/irqchip/Makefile    |   1 +
+>  drivers/irqchip/irq-hip04.c | 429 ++++++++++++++++++++++++++++++++++++++++++++
+>  2 files changed, 430 insertions(+)
+>  create mode 100644 drivers/irqchip/irq-hip04.c
+> 
+> diff --git a/drivers/irqchip/Makefile b/drivers/irqchip/Makefile
+> index c57e642..23dcf45 100644
+> --- a/drivers/irqchip/Makefile
+> +++ b/drivers/irqchip/Makefile
+> @@ -2,6 +2,7 @@ obj-$(CONFIG_IRQCHIP)			+= irqchip.o
+>  
+>  obj-$(CONFIG_ARCH_BCM2835)		+= irq-bcm2835.o
+>  obj-$(CONFIG_ARCH_EXYNOS)		+= exynos-combiner.o
+> +obj-$(CONFIG_ARCH_HIP04)		+= irq-hip04.o
+>  obj-$(CONFIG_ARCH_MMP)			+= irq-mmp.o
+>  obj-$(CONFIG_ARCH_MVEBU)		+= irq-armada-370-xp.o
+>  obj-$(CONFIG_ARCH_MXS)			+= irq-mxs.o
+> diff --git a/drivers/irqchip/irq-hip04.c b/drivers/irqchip/irq-hip04.c
 > new file mode 100644
-> index 0000000..bcf7d0b
+> index 0000000..751a7ee
 > --- /dev/null
-> +++ b/drivers/clk/sunxi/clk-a10-pll2.c
-> @@ -0,0 +1,243 @@
+> +++ b/drivers/irqchip/irq-hip04.c
+> @@ -0,0 +1,429 @@
 > +/*
-> + * Copyright 2014 Emilio L?pez
+> + * Hisilicon HiP04 INTC
 > + *
-> + * Emilio L?pez <emilio@elopez.com.ar>
+> + * Copyright (C) 2002-2014 ARM Limited.
+> + * Copyright (c) 2013-2014 Hisilicon Ltd.
+> + * Copyright (c) 2013-2014 Linaro Ltd.
 > + *
 > + * This program is free software; you can redistribute it and/or modify
-> + * it under the terms of the GNU General Public License as published by
-> + * the Free Software Foundation; either version 2 of the License, or
-> + * (at your option) any later version.
+> + * it under the terms of the GNU General Public License version 2 as
+> + * published by the Free Software Foundation.
 > + *
-> + * This program is distributed in the hope that it will be useful,
-> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
-> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-> + * GNU General Public License for more details.
+> + * Interrupt architecture for the HIP04 INTC:
+> + *
+> + * o There is one Interrupt Distributor, which receives interrupts
+> + *   from system devices and sends them to the Interrupt Controllers.
+> + *
+> + * o There is one CPU Interface per CPU, which sends interrupts sent
+> + *   by the Distributor, and interrupts generated locally, to the
+> + *   associated CPU. The base address of the CPU interface is usually
+> + *   aliased so that the same address points to different chips depending
+> + *   on the CPU it is accessed from.
+> + *
+> + * Note that IRQs 0-31 are special - they are local to each CPU.
+> + * As such, the enable set/clear, pending set/clear and active bit
+> + * registers are banked per-cpu for these sources.
 > + */
+
+I'd find it more useful to have a reference to the GIC code here and
+only list the delta of the two drivers.
+Since you removed (almost) any references to GIC, to an uninitiated
+reader it's not obvious that this is in fact a stripped and tweaked GIC.
+
+So you could copy some of the rationale from the commit message into
+here, something along the lines of:
+---------
+This is derived from irq-gic.c to support the HiSilicon HiP04 interrupt
+controller, which is similar to the GIC, but deviates at some points.
+Support for power management, non-banked registers, cascaded GICs (and
+multiple controllers in general) and bigLittle support has been removed
+from the GIC driver.
+Affinity related functions have been adjusted to match the HiSilicon
+hardware implementation.
+---------
+
+By the way, you removed CONFIG_CPU_PM support, is there any reason for
+that? I don't see an issue code-wise with keeping this in.
+
+[...]
+
 > +
-> +#include <linux/clk-provider.h>
-> +#include <linux/of.h>
-> +#include <linux/of_address.h>
-> +#include <linux/slab.h>
+> +void hip04_cpu_if_down(void)
+> +{
+> +	writel_relaxed(0, hip04_data.cpu_base + GIC_CPU_CTRL);
+> +}
+
+Where is this used? The GIC counterpart is only called by some VExpress
+code, does your platform need a similar call? Otherwise (and since you
+don't seem to provide a public prototype) this function can be removed.
+
+
 > +
-> +#define SUN4I_PLL2_ENABLE              31
-> +#define SUN4I_PLL2_A_VCOBIAS           0
-> +#define SUN4I_PLL2_A_VCOBIAS_MASK      0x1F
-> +#define SUN4I_PLL2_A_N                 7
-> +#define SUN4I_PLL2_A_N_MASK            0x7F
-> +#define SUN4I_PLL2_B_POST_DIV          26
-> +#define SUN4I_PLL2_B_POST_DIV_MASK     0xF
-> +#define SUN4I_PLL2_B_N                 8
-> +#define SUN4I_PLL2_B_N_MASK            0x7F
-> +#define SUN4I_PLL2_B_PRE_DIV           0
-> +#define SUN4I_PLL2_B_PRE_DIV_MASK      0x1F
+> +#ifdef CONFIG_SMP
+> +static void hip04_raise_softirq(const struct cpumask *mask, unsigned int irq)
+> +{
+> +	int cpu;
+> +	unsigned long flags, map = 0;
 > +
-> +#define SUN4I_PLL2_OUTPUTS             4
+> +	raw_spin_lock_irqsave(&irq_controller_lock, flags);
 > +
-> +struct sun4i_pll2_clk {
-> +       struct clk_hw hw;
-> +       void __iomem *reg;
+> +	/* Convert our logical CPU mask into a physical one. */
+> +	for_each_cpu(cpu, mask)
+> +		map |= hip04_cpu_map[cpu];
+
+Are we sure that mask does not contain any CPU number higher than
+NR_HIP04_CPU_IF?
+
+Regards,
+Andre.
+
+> +
+> +	/*
+> +	 * Ensure that stores to Normal memory are visible to the
+> +	 * other CPUs before they observe us issuing the IPI.
+> +	 */
+> +	dmb(ishst);
+> +
+> +	/* this always happens on GIC0 */
+> +	writel_relaxed(map << 8 | irq, hip04_data.dist_base + GIC_DIST_SOFTINT);
+> +
+> +	raw_spin_unlock_irqrestore(&irq_controller_lock, flags);
+> +}
+> +#endif
+> +
+> +static int hip04_irq_domain_map(struct irq_domain *d, unsigned int irq,
+> +				irq_hw_number_t hw)
+> +{
+> +	if (hw < 32) {
+> +		irq_set_percpu_devid(irq);
+> +		irq_set_chip_and_handler(irq, &hip04_irq_chip,
+> +					 handle_percpu_devid_irq);
+> +		set_irq_flags(irq, IRQF_VALID | IRQF_NOAUTOEN);
+> +	} else {
+> +		irq_set_chip_and_handler(irq, &hip04_irq_chip,
+> +					 handle_fasteoi_irq);
+> +		set_irq_flags(irq, IRQF_VALID | IRQF_PROBE);
+> +	}
+> +	irq_set_chip_data(irq, d->host_data);
+> +	return 0;
+> +}
+> +
+> +static int hip04_irq_domain_xlate(struct irq_domain *d,
+> +				  struct device_node *controller,
+> +				  const u32 *intspec, unsigned int intsize,
+> +				  unsigned long *out_hwirq,
+> +				  unsigned int *out_type)
+> +{
+> +	unsigned long ret = 0;
+> +
+> +	if (d->of_node != controller)
+> +		return -EINVAL;
+> +	if (intsize < 3)
+> +		return -EINVAL;
+> +
+> +	/* Get the interrupt number and add 16 to skip over SGIs */
+> +	*out_hwirq = intspec[1] + 16;
+> +
+> +	/* For SPIs, we need to add 16 more to get the irq ID number */
+> +	if (!intspec[0])
+> +		*out_hwirq += 16;
+> +
+> +	*out_type = intspec[2] & IRQ_TYPE_SENSE_MASK;
+> +
+> +	return ret;
+> +}
+> +
+> +#ifdef CONFIG_SMP
+> +static int hip04_irq_secondary_init(struct notifier_block *nfb,
+> +				    unsigned long action,
+> +				    void *hcpu)
+> +{
+> +	if (action == CPU_STARTING || action == CPU_STARTING_FROZEN)
+> +		hip04_irq_cpu_init(&hip04_data);
+> +	return NOTIFY_OK;
+> +}
+> +
+> +/*
+> + * Notifier for enabling the INTC CPU interface. Set an arbitrarily high
+> + * priority because the GIC needs to be up before the ARM generic timers.
+> + */
+> +static struct notifier_block hip04_irq_cpu_notifier = {
+> +	.notifier_call	= hip04_irq_secondary_init,
+> +	.priority	= 100,
+> +};
+> +#endif
+> +
+> +static const struct irq_domain_ops hip04_irq_domain_ops = {
+> +	.map	= hip04_irq_domain_map,
+> +	.xlate	= hip04_irq_domain_xlate,
 > +};
 > +
-> +static inline struct sun4i_pll2_clk *to_sun4i_pll2_clk(struct clk_hw *hw)
+> +static int __init
+> +hip04_of_init(struct device_node *node, struct device_node *parent)
 > +{
-> +       return container_of(hw, struct sun4i_pll2_clk, hw);
+> +	irq_hw_number_t hwirq_base = 16;
+> +	int nr_irqs, irq_base, i;
+> +
+> +	if (WARN_ON(!node))
+> +		return -ENODEV;
+> +
+> +	hip04_data.dist_base = of_iomap(node, 0);
+> +	WARN(!hip04_data.dist_base, "fail to map hip04 intc dist registers\n");
+> +
+> +	hip04_data.cpu_base = of_iomap(node, 1);
+> +	WARN(!hip04_data.cpu_base, "unable to map hip04 intc cpu registers\n");
+> +
+> +	/*
+> +	 * Initialize the CPU interface map to all CPUs.
+> +	 * It will be refined as each CPU probes its ID.
+> +	 */
+> +	for (i = 0; i < NR_HIP04_CPU_IF; i++)
+> +		hip04_cpu_map[i] = 0xff;
+> +
+> +	/*
+> +	 * Find out how many interrupts are supported.
+> +	 * The HIP04 INTC only supports up to 510 interrupt sources.
+> +	 */
+> +	nr_irqs = readl_relaxed(hip04_data.dist_base + GIC_DIST_CTR) & 0x1f;
+> +	nr_irqs = (nr_irqs + 1) * 32;
+> +	if (nr_irqs > HIP04_MAX_IRQS)
+> +		nr_irqs = HIP04_MAX_IRQS;
+> +	hip04_data.nr_irqs = nr_irqs;
+> +
+> +	nr_irqs -= hwirq_base; /* calculate # of irqs to allocate */
+> +
+> +	irq_base = irq_alloc_descs(-1, hwirq_base, nr_irqs, numa_node_id());
+> +	if (IS_ERR_VALUE(irq_base)) {
+> +		pr_err("failed to allocate IRQ numbers\n");
+> +		return -EINVAL;
+> +	}
+> +
+> +	hip04_data.domain = irq_domain_add_legacy(node, nr_irqs, irq_base,
+> +						  hwirq_base,
+> +						  &hip04_irq_domain_ops,
+> +						  &hip04_data);
+> +
+> +	if (WARN_ON(!hip04_data.domain))
+> +		return -EINVAL;
+> +
+> +#ifdef CONFIG_SMP
+> +	set_smp_cross_call(hip04_raise_softirq);
+> +	register_cpu_notifier(&hip04_irq_cpu_notifier);
+> +#endif
+> +	set_handle_irq(hip04_handle_irq);
+> +
+> +	hip04_irq_dist_init(&hip04_data);
+> +	hip04_irq_cpu_init(&hip04_data);
+> +
+> +	return 0;
 > +}
-> +
-> +static unsigned long sun4i_pll2_recalc_rate_a(struct clk_hw *hw,
-> +                                             unsigned long parent_rate)
-> +{
-> +       struct sun4i_pll2_clk *clk = to_sun4i_pll2_clk(hw);
-> +       int vcobias, n;
-> +       u32 val;
-> +
-> +       val = readl(clk->reg);
-> +       vcobias = (val >> SUN4I_PLL2_A_VCOBIAS) & SUN4I_PLL2_A_VCOBIAS_MASK;
-> +       n = (val >> SUN4I_PLL2_A_N) & SUN4I_PLL2_A_N_MASK;
-> +
-> +       if (vcobias == 10 && n == 94)
-> +               return 22579200;
-> +       else if (vcobias == 9 && n == 83)
-> +               return 24576000;
-> +
-> +       /*
-> +        * Unfortunately we don't really have much documentation on how
-> +        * these factors relate mathematically
-> +        */
-> +       return 0;
-> +}
-> +
-> +static unsigned long sun4i_pll2_recalc_rate_b(struct clk_hw *hw,
-> +                                             unsigned long parent_rate)
-> +{
-> +       struct sun4i_pll2_clk *clk = to_sun4i_pll2_clk(hw);
-> +       int n, prediv, postdiv;
-> +       u32 val;
-> +
-> +       val = readl(clk->reg);
-> +       n = (val >> SUN4I_PLL2_B_N) & SUN4I_PLL2_B_N_MASK;
-> +       prediv = (val >> SUN4I_PLL2_B_PRE_DIV) & SUN4I_PLL2_B_PRE_DIV_MASK;
-> +       postdiv = (val >> SUN4I_PLL2_B_POST_DIV) & SUN4I_PLL2_B_POST_DIV_MASK;
-> +
-> +       /* 0 is a special case and means 1 */
-> +       if (n == 0)
-> +               n = 1;
-> +       if (prediv == 0)
-> +               prediv = 1;
-> +       if (postdiv == 0)
-> +               postdiv = 1;
-> +
-> +       return ((parent_rate * n) / prediv) / postdiv;
-> +}
-> +
-> +static long sun4i_pll2_round_rate(struct clk_hw *hw, unsigned long rate,
-> +                                 unsigned long *parent_rate)
-> +{
-> +       /*
-> +        * There is only two interesting rates for the audio PLL, the
-> +        * rest isn't really usable due to accuracy concerns. Therefore,
-> +        * we specifically round to those rates here
-> +        */
-> +       if (rate < 22579200)
-> +               return -EINVAL;
-> +
-> +       if (rate >= 22579200 && rate < 24576000)
-> +               return 22579200;
-> +
-> +       return 24576000;
-> +}
-
-These should return the actual computed rate osc*n / (pre * post) so
-that the error column is displayed correctly.
-
-   pll2                                  1            1    22571428          0
-       i2s0                               1            1    22571428          0
-          mclk0                           0            0    22571428          0
-
-At 22.5 the error is 0.03%, 24.5 error is 0.01%.
-
-So when you ask for 24.576 it returns 24.571428 and 22.5792 returns 22.571428.
-
-
-
-
-> +
-> +static int sun4i_pll2_set_rate_a(struct clk_hw *hw, unsigned long rate,
-> +                                unsigned long parent_rate)
-> +{
-> +       struct sun4i_pll2_clk *clk = to_sun4i_pll2_clk(hw);
-> +       u32 val = readl(clk->reg);
-> +
-> +       val &= ~(SUN4I_PLL2_A_VCOBIAS_MASK << SUN4I_PLL2_A_VCOBIAS);
-> +       val &= ~(SUN4I_PLL2_A_N_MASK << SUN4I_PLL2_A_N);
-> +
-> +       if (rate == 22579200)
-> +               val |= (10 << SUN4I_PLL2_A_VCOBIAS) | (94 << SUN4I_PLL2_A_N);
-> +       else if (rate == 24576000)
-> +               val |= (9 << SUN4I_PLL2_A_VCOBIAS) | (83 << SUN4I_PLL2_A_N);
-> +       else
-> +               return -EINVAL;
-> +
-> +       writel(val, clk->reg);
-> +
-> +       return 0;
-> +}
-> +
-> +static int sun4i_pll2_set_rate_b(struct clk_hw *hw, unsigned long rate,
-> +                                unsigned long parent_rate)
-> +{
-> +       struct sun4i_pll2_clk *clk = to_sun4i_pll2_clk(hw);
-> +       u32 val = readl(clk->reg);
-> +
-> +       val &= ~(SUN4I_PLL2_B_N_MASK << SUN4I_PLL2_B_N);
-> +       val &= ~(SUN4I_PLL2_B_PRE_DIV_MASK << SUN4I_PLL2_B_PRE_DIV);
-> +       val &= ~(SUN4I_PLL2_B_POST_DIV_MASK << SUN4I_PLL2_B_POST_DIV);
-> +
-> +       val |= (21 << SUN4I_PLL2_B_PRE_DIV) | (4 << SUN4I_PLL2_B_POST_DIV);
-> +
-> +       if (rate == 22579200)
-> +               val |= (79 << SUN4I_PLL2_B_N);
-> +       else if (rate == 24576000)
-> +               val |= (86 << SUN4I_PLL2_B_N);
-> +       else
-> +               return -EINVAL;
-> +
-> +       writel(val, clk->reg);
-> +
-> +       return 0;
-> +}
-> +
-> +static const struct clk_ops sun4i_pll2_ops_a = {
-> +       .recalc_rate = sun4i_pll2_recalc_rate_a,
-> +       .round_rate = sun4i_pll2_round_rate,
-> +       .set_rate = sun4i_pll2_set_rate_a,
-> +};
-> +
-> +
-> +static const struct clk_ops sun4i_pll2_ops_b = {
-> +       .recalc_rate = sun4i_pll2_recalc_rate_b,
-> +       .round_rate = sun4i_pll2_round_rate,
-> +       .set_rate = sun4i_pll2_set_rate_b,
-> +};
-> +
-> +static const struct of_device_id pll2_matches[] __initconst = {
-> +       { .compatible = "allwinner,sun4i-a10-a-pll2-clk", .data = &sun4i_pll2_ops_a },
-> +       { .compatible = "allwinner,sun4i-a10-b-pll2-clk", .data = &sun4i_pll2_ops_b },
-> +       { /* sentinel */ },
-> +};
-> +
-> +static void __init sun4i_pll2_setup(struct device_node *np)
-> +{
-> +       const char *clk_name = np->name, *parent;
-> +       const struct of_device_id *match;
-> +       struct clk_onecell_data *clk_data;
-> +       const struct clk_ops *pll2_ops;
-> +       struct sun4i_pll2_clk *pll2;
-> +       struct clk_gate *gate;
-> +       struct clk **clks;
-> +       void __iomem *reg;
-> +
-> +       /* Choose the correct ops for pll2 */
-> +       match = of_match_node(pll2_matches, np);
-> +       pll2_ops = match->data;
-> +
-> +       pll2 = kzalloc(sizeof(*pll2), GFP_KERNEL);
-> +       gate = kzalloc(sizeof(*gate), GFP_KERNEL);
-> +       clk_data = kzalloc(sizeof(*clk_data), GFP_KERNEL);
-> +       clks = kcalloc(SUN4I_PLL2_OUTPUTS, sizeof(*clks), GFP_KERNEL);
-> +       if (!pll2 || !gate || !clk_data || !clks)
-> +               goto free_mem;
-> +
-> +       reg = of_iomap(np, 0);
-> +       parent = of_clk_get_parent_name(np, 0);
-> +       of_property_read_string_index(np, "clock-output-names", 0, &clk_name);
-> +
-> +       pll2->reg = reg;
-> +       gate->reg = reg;
-> +       gate->bit_idx = SUN4I_PLL2_ENABLE;
-> +
-> +       /* PLL2, also known as PLL2x1 */
-> +       of_property_read_string_index(np, "clock-output-names", 0, &clk_name);
-> +       clks[0] = clk_register_composite(NULL, clk_name, &parent, 1, NULL, NULL,
-> +                                        &pll2->hw, pll2_ops,
-> +                                        &gate->hw, &clk_gate_ops, 0);
-> +       WARN_ON(IS_ERR(clks[0]));
-> +       clk_set_rate(clks[0], 22579200);
-> +       parent = clk_name;
-> +
-> +       /* PLL2x2, 1/4 the rate of PLL2x8 */
-> +       of_property_read_string_index(np, "clock-output-names", 1, &clk_name);
-> +       clks[1] = clk_register_fixed_factor(NULL, clk_name, parent,
-> +                                           CLK_SET_RATE_PARENT, 2, 1);
-> +       WARN_ON(IS_ERR(clks[1]));
-> +
-> +       /* PLL2x4, 1/2 the rate of PLL2x8 */
-> +       of_property_read_string_index(np, "clock-output-names", 2, &clk_name);
-> +       clks[2] = clk_register_fixed_factor(NULL, clk_name, parent,
-> +                                           CLK_SET_RATE_PARENT, 4, 1);
-> +       WARN_ON(IS_ERR(clks[2]));
-> +
-> +       /* PLL2x8, double of PLL2 without the post divisor */
-> +       of_property_read_string_index(np, "clock-output-names", 3, &clk_name);
-> +       clks[3] = clk_register_fixed_factor(NULL, clk_name, parent,
-> +                                           CLK_SET_RATE_PARENT, 2 * 4, 1);
-> +       WARN_ON(IS_ERR(clks[3]));
-> +
-> +       clk_data->clks = clks;
-> +       clk_data->clk_num = SUN4I_PLL2_OUTPUTS;
-> +       of_clk_add_provider(np, of_clk_src_onecell_get, clk_data);
-> +
-> +       return;
-> +
-> +free_mem:
-> +       kfree(pll2);
-> +       kfree(gate);
-> +       kfree(clk_data);
-> +       kfree(clks);
-> +}
-> +CLK_OF_DECLARE(sun4i_pll2_a, "allwinner,sun4i-a10-a-pll2-clk", sun4i_pll2_setup);
-> +CLK_OF_DECLARE(sun4i_pll2_b, "allwinner,sun4i-a10-b-pll2-clk", sun4i_pll2_setup);
-> --
-> 2.0.3
-
-
-
--- 
-Jon Smirl
-jonsmirl at gmail.com
+> +IRQCHIP_DECLARE(hip04_intc, "hisilicon,hip04-intc", hip04_of_init);
+> 
