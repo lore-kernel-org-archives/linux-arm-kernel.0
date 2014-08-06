@@ -1,29 +1,33 @@
-From: andrew@lunn.ch (Andrew Lunn)
-Date: Wed, 6 Aug 2014 19:53:13 +0200
-Subject: [RFC 0/8] DPCM with simple-card support for Kirkwood
-In-Reply-To: <20140806194304.3a1867a8@armhf>
-References: <1407287912-19447-1-git-send-email-andrew@lunn.ch>
- <20140806103356.4e7c088a@armhf> <20140806143026.GA19574@lunn.ch>
- <20140806194304.3a1867a8@armhf>
-Message-ID: <20140806175313.GC19574@lunn.ch>
+From: sboyd@codeaurora.org (Stephen Boyd)
+Date: Wed,  6 Aug 2014 11:15:09 -0700
+Subject: [PATCH 0/3] IPQ NSS/GMAC clock support
+Message-ID: <1407348912-9124-1-git-send-email-sboyd@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Aug 06, 2014 at 07:43:04PM +0200, Jean-Francois Moine wrote:
-> On Wed, 6 Aug 2014 16:30:26 +0200
-> Andrew Lunn <andrew@lunn.ch> wrote:
-> 
-> > At the moment, i'm not so interested in details, but more about, is
-> > this the right direction to allow Russell to progress. Once i know
-> > that, we can work on details.
-> 
-> These are not details. Putting DPCM in the Cubox is easy (I may send
-> you my work which seems simpler), but there is no way to make it work
-> correctly, and that's why I forgot about it.
+The NSS and GMAC clocks were missing from the initial IPQ clock
+control driver. This patch series adds them by adding support for
+PLL rate switching, generalizing the dyn_rcg code a bit to deal
+with more exotic variants of the register layouts, and finally
+adding support for the clocks. Please note that the last patch
+depends on the safe switch hook that I've already sent out[1].
 
-Does it not work correctly because of a property of the hardware, or
-because of bugs in the DPCM implementation? From what you pointed out
-in the mailing lists, it seems like bugs.
+Stephen Boyd (3):
+  clk: qcom: Add support for setting rates on PLLs
+  clk: qcom: Add support for banked MD RCGs
+  clk: qcom: Add support for NSS/GMAC clocks and resets
 
-   Thanks
-	Andrew
+ drivers/clk/qcom/clk-pll.c                   |  68 ++-
+ drivers/clk/qcom/clk-pll.h                   |  20 +
+ drivers/clk/qcom/clk-rcg.c                   |  99 ++--
+ drivers/clk/qcom/clk-rcg.h                   |   6 +-
+ drivers/clk/qcom/gcc-ipq806x.c               | 710 ++++++++++++++++++++++++++-
+ drivers/clk/qcom/mmcc-msm8960.c              |  28 +-
+ include/dt-bindings/clock/qcom,gcc-ipq806x.h |   3 +
+ include/dt-bindings/reset/qcom,gcc-ipq806x.h |  43 ++
+ 8 files changed, 919 insertions(+), 58 deletions(-)
+
+[1] https://lkml.org/lkml/2014/6/24/921
+-- 
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
+hosted by The Linux Foundation
