@@ -1,110 +1,74 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Wed, 6 Aug 2014 17:15:23 +0200
-Subject: [RFC PATCH] arm64/efi: use id mapping for Runtime Services
-In-Reply-To: <20140806143632.GV25953@arm.com>
-References: <1406815909-26825-1-git-send-email-ard.biesheuvel@linaro.org>
- <20140806143632.GV25953@arm.com>
-Message-ID: <CAKv+Gu9xtGRTbhzzyCbGt7CEL=ORkpEnuipweedzDbBJZGGxuw@mail.gmail.com>
+From: m-karicheri2@ti.com (Murali Karicheri)
+Date: Wed, 6 Aug 2014 11:18:20 -0400
+Subject: [PATCH] PCI: keystone: add a pci quirk to limit mrrs
+Message-ID: <1407338300-9146-1-git-send-email-m-karicheri2@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 6 August 2014 16:36, Will Deacon <will.deacon@arm.com> wrote:
-> On Thu, Jul 31, 2014 at 03:11:49PM +0100, Ard Biesheuvel wrote:
->> There are 2 interesting pieces of information in the UEFI spec section 2.3.6
->> regarding the mapping of runtime regions:
->> (a) the firmware should not request a virtual mapping for configuration tables,
->>     even though they are marked as EfiRuntimeServicesData;
->> (b) calling SetVirtualAddressMap() is optional, and it is equally appropriate to
->>     call Runtime Services using an identity mapping.
->>
->> So we can eliminate some of the complexity around UEFI Runtime Services by not
->> using a virtual mapping at all, and calling the services at their physical
->> address. This is especially useful under kexec, as SetVirtualAddressMap() may
->> only be called once, and there is no guarantee that mappings are stable between
->> different kexec'd kernels.
->>
->> The fallout for other in-kernel users of UEFI data structures should be
->> negligible, as they cannot legally access those data structures through
->> pre-existing virtual mappings anyway (point (a) above)
->>
->> It should also be noted that, as the kernel side of the address space (TTBR1) is
->> retained, the stack and pointer function arguments remain accessible to the
->> runtime service while the id mapping is active.
->>
->> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
->> ---
->>  arch/arm64/include/asm/efi.h |  24 ++++++++--
->>  arch/arm64/kernel/efi.c      | 106 ++-----------------------------------------
->>  2 files changed, 23 insertions(+), 107 deletions(-)
->>
->> diff --git a/arch/arm64/include/asm/efi.h b/arch/arm64/include/asm/efi.h
->> index a34fd3b12e2b..d42a21e79b39 100644
->> --- a/arch/arm64/include/asm/efi.h
->> +++ b/arch/arm64/include/asm/efi.h
->> @@ -1,8 +1,10 @@
->>  #ifndef _ASM_EFI_H
->>  #define _ASM_EFI_H
->>
->> +#include <asm/cacheflush.h>
->>  #include <asm/io.h>
->>  #include <asm/neon.h>
->> +#include <asm/tlbflush.h>
->>
->>  #ifdef CONFIG_EFI
->>  extern void efi_init(void);
->> @@ -12,23 +14,37 @@ extern void efi_idmap_init(void);
->>  #define efi_idmap_init()
->>  #endif
->>
->> +static inline void switch_pgd(pgd_t *pgd, struct mm_struct *mm)
->> +{
->> +     cpu_switch_mm(pgd, mm);
->> +     flush_tlb_all();
->> +     if (icache_is_aivivt())
->> +             __flush_icache_all();
->> +}
->> +
->>  #define efi_call_virt(f, ...)                                                \
->>  ({                                                                   \
->> -     efi_##f##_t *__f = efi.systab->runtime->f;                      \
->> +     efi_##f##_t *__f;                                               \
->>       efi_status_t __s;                                               \
->>                                                                       \
->> -     kernel_neon_begin();                                            \
->> +     kernel_neon_begin(); /* disables preemption */                  \
->> +     switch_pgd(idmap_pg_dir, &init_mm);                             \
->> +     __f =  efi.systab->runtime->f;                                  \
->>       __s = __f(__VA_ARGS__);                                         \
->> +     switch_pgd(current->active_mm->pgd, current->active_mm);        \
->>       kernel_neon_end();                                              \
->>       __s;                                                            \
->>  })
->
-> This scares the bejesus out of me, but I can't put my finger on exactly why.
-> I think it does what you intend and I can't break it myself, so it would be
-> really good if the EFI folks could confirm that this looks good to them.
->
+Keystone PCI controller has a limitation that memory read request
+size must not exceed 256 bytes. This is a hardware limitation and
+add a quirk to force this limit on all downstream devices by
+updating mrrs.
 
-There is something similar in the x86 code (arch/x86/platform/efi/efi.c)
-"""
- * The new method does a pagetable switch in a preemption-safe manner
- * so that we're in a different address space when calling a runtime
- * function. For function arguments passing we do copy the PGDs of the
- * kernel page table into ->trampoline_pgd prior to each call.
-"""
+Signed-off-by: Murali Karicheri <m-karicheri2@ti.com>
+---
+ This applies on top of the Keystone PCI controller patch series
+ at http://thread.gmane.org/gmane.linux.kernel.pci/33523
+ drivers/pci/host/pci-keystone.c |   40 +++++++++++++++++++++++++++++++++++++++
+ 1 file changed, 40 insertions(+)
 
-How exactly this will turn out for arm64 (and ARM) is still under
-discussion, though. My position is that if you are going to switch
-pgd's anyway, why not just use the id mapping? And even if you feel it
-is mandatory to install a virtual address mapping into UEFI (which I
-think is /not/ the case), you could install an id mapping as well,
-which means all the related machinery still gets invoked.
-The alternative to using a TTBR0 mapping would be to reserve a slice
-of kernel virtual memory so that the Runtime Services are guaranteed
-to live at the same virtual address after a kexec, ideally the same
-region on 4k and 64k pages ...
-
-We are planning to discuss this further at Linaro Connect next month.
-
+diff --git a/drivers/pci/host/pci-keystone.c b/drivers/pci/host/pci-keystone.c
+index c1cfaef..541ab24 100644
+--- a/drivers/pci/host/pci-keystone.c
++++ b/drivers/pci/host/pci-keystone.c
+@@ -42,8 +42,48 @@
+ /* DEV_STAT_CTRL */
+ #define PCIE_CAP_BASE		0x70
+ 
++/* PCIE controller device IDs */
++#define PCIE_RC_K2HK		0xb008
++#define PCIE_RC_K2E		0xb009
++#define PCIE_RC_K2L		0xb00a
++
+ #define to_keystone_pcie(x)	container_of(x, struct keystone_pcie, pp)
+ 
++static void quirk_limit_mrrs(struct pci_dev *dev)
++{
++	struct pci_bus *bus = dev->bus;
++	struct pci_dev *bridge = bus->self;
++
++	if (pci_is_root_bus(bus))
++		return;
++
++	/* look for the host bridge */
++	while (!pci_is_root_bus(bus)) {
++		bridge = bus->self;
++		bus = bus->parent;
++	}
++
++	if (bridge) {
++		u16 id;
++
++		/*
++		 * Keystone PCI controller has a h/w limitation of
++		 * 256 bytes maximum read request size. It can't handle
++		 * anything higher than this. So force this limit on
++		 * all downstream devices
++		 */
++		pci_read_config_word(bridge, PCI_DEVICE_ID, &id);
++		if ((id == PCIE_RC_K2HK) || (id == PCIE_RC_K2E) ||
++		    (id == PCIE_RC_K2L)) {
++			if (pcie_get_readrq(dev) > 256) {
++				pr_info("limiting mrrs to 256\n");
++				pcie_set_readrq(dev, 256);
++			}
++		}
++	}
++}
++DECLARE_PCI_FIXUP_FINAL(PCI_ANY_ID, PCI_ANY_ID, quirk_limit_mrrs);
++
+ static int ks_pcie_establish_link(struct keystone_pcie *ks_pcie)
+ {
+ 	struct pcie_port *pp = &ks_pcie->pp;
 -- 
-Ard.
+1.7.9.5
