@@ -1,41 +1,25 @@
-From: rjw@rjwysocki.net (Rafael J. Wysocki)
-Date: Thu, 07 Aug 2014 00:50:23 +0200
-Subject: [PATCH v2] cpufreq: tests: Providing cpufreq regression test
-In-Reply-To: <20140724090402.1f981470@amdc2363>
-References: <1405678985-21677-1-git-send-email-l.majewski@samsung.com>
- <3777635.Nvoh2EpFlu@vostro.rjw.lan> <20140724090402.1f981470@amdc2363>
-Message-ID: <3078797.FIBUCqEiQa@vostro.rjw.lan>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Wed, 6 Aug 2014 23:34:41 +0100
+Subject: [BUG] nfs3_list_one_acl oops
+In-Reply-To: <CAHQdGtQhEQiuObg48JrNbK5L6=r0mxfSvErVC0JS4TqxxbJy_w@mail.gmail.com>
+References: <20140726162143.GB20396@n2100.arm.linux.org.uk>
+ <20140727131949.GB32153@infradead.org>
+ <CAHQdGtQhEQiuObg48JrNbK5L6=r0mxfSvErVC0JS4TqxxbJy_w@mail.gmail.com>
+Message-ID: <20140806223441.GU30282@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday, July 24, 2014 09:04:02 AM Lukasz Majewski wrote:
-> Hi Rafael,
+On Sun, Jul 27, 2014 at 11:15:40AM -0400, Trond Myklebust wrote:
+> On Sun, Jul 27, 2014 at 9:19 AM, Christoph Hellwig <hch@infradead.org> wrote:
+> > Thanks Russell, the patch looks good.
 > 
-> > On Monday, July 21, 2014 09:02:34 AM Lukasz Majewski wrote:
-> > > This commit adds first regression test "cpufreq_freq_test.sh" for
-> > > the cpufreq subsystem.
-> > 
-> > First of all, I'm not seeing any explanation why this script should be
-> > shipped with the kernel.
-> 
-> OK.
-> 
-> > 
-> > What regressions it tests against in particular and 
-> 
-> Do you require SHA's/commit messages of commits which were developed to
-> fix issues spotted with this test script?
+> No. It needs to use an IS_ERR_OR_NULL() test at least in order to work
+> correctly.
 
-No.  I want information about what kind of bugs can be catched with the
-help of this script.
+What's happening on this?  Did this get fixed for v3.16?
 
-> > how it does that.
-> 
-> Is this information required in the commit message or can it stay in
-> the README file created in the same commit?
-
-There should be *some* information in the changelog too.
+My patch still seems to apply to v3.16 so I guess NFS is broken there...
 
 -- 
-I speak only for myself.
-Rafael J. Wysocki, Intel Open Source Technology Center.
+FTTC broadband for 0.8mile line: currently at 9.5Mbps down 400kbps up
+according to speedtest.net.
