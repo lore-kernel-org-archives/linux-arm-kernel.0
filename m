@@ -1,51 +1,95 @@
-From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Wed, 06 Aug 2014 17:28:33 +0200
-Subject: CPUIdle Armada 370
-In-Reply-To: <53E24654.6020008@free-electrons.com>
-References: <1407333701627.99622@vitec.com>
- <53E24654.6020008@free-electrons.com>
-Message-ID: <53E249A1.900@free-electrons.com>
+From: sbabic@denx.de (Stefano Babic)
+Date: Wed, 06 Aug 2014 17:32:41 +0200
+Subject: [Regression] FEC: Panic on suspend in 3.16
+In-Reply-To: <53E24525.2020809@mentor.com>
+References: <53E24147.4050304@parkeon.com> <53E24525.2020809@mentor.com>
+Message-ID: <53E24A99.2020604@denx.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Nicolas,
+Hi Nathan, Martin,
 
-On 06/08/2014 17:14, Gregory CLEMENT wrote:
-> Hi Nicolas,
-> 
-> 
-> On 06/08/2014 16:01, Nicolas Derouineau wrote:
->> Hello,
->> I am currently trying to use the CPUIdle driver provided by linux-next (or by the patch here https://github.com/MISL-EBU-System-SW/mainline-public/commits/3.16/cpuidle-v3). 
-> 
-> I have just tested using next-20140806 and mvebu_v7_defconfig.
-> And it worked well on a mirabox using the Armada 370 SoC.
-> 
+On 06/08/2014 17:09, Nathan Lynch wrote:
+> On 08/06/2014 09:52 AM, Martin Fuzzey wrote:
+>> Hi all,
 >>
->> Everything runs fine as long as I don't select the CPU driver for the ARMADA Family. When I do, at boottime, the program is entering the __cpu_suspend save function and then get lost in it and that turns into a kernel panic. I have already made a post about this on the ARM Community Forum (http://community.arm.com/thread/6326).
+>> I am using the fec ethernet driver on a i.MX53 SoC.
 >>
->> The "faulty" configuration file is attached to this email.
+>> All was working fine on 3.13 but, after upgrading to 3.16 I now get a
+>> panic on suspend:
 > 
-> Now I will try with this configuration
+> Same issue reported here:
+> 
+> http://lists.infradead.org/pipermail/linux-arm-kernel/2014-August/277728.html
+> 
+> a71e3c37960c (net: phy: Set the driver when registering an MDIO bus
+> device) has been implicated; try reverting that.
+> 
 
-Using your configuration file I didn't reproduce your issue.
-And according to the stat given by linux the kernel spent a lot
-of time in idle:
+I confirm this issue (on a i.MX35). The ndev pointer is NULL in the
+suspend function. I added the check for the pointer:
 
-cat /sys/devices/system/cpu/cpu0/cpuidle/state1/time
-338822284
+>From 82af51e87b78000c0e038db6056c34f72a1f4045 Mon Sep 17 00:00:00 2001
+From: Stefano Babic <sbabic@denx.de>
+Date: Wed, 6 Aug 2014 16:37:58 +0200
+Subject: [PATCH] net: fec: check for pointer in suspend/resume
 
+Check to get a valid structure to driver data
+in suspend/resume functions before accessing.
 
-Could you try again with next-20140806?
+Signed-off-by: Stefano Babic <sbabic@denx.de>
+---
+ drivers/net/ethernet/freescale/fec_main.c | 13 +++++++++++--
+ 1 file changed, 11 insertions(+), 2 deletions(-)
 
+diff --git a/drivers/net/ethernet/freescale/fec_main.c
+b/drivers/net/ethernet/freescale/fec_main.c
+index 77037fd..0f5f52f 100644
+--- a/drivers/net/ethernet/freescale/fec_main.c
++++ b/drivers/net/ethernet/freescale/fec_main.c
+@@ -2659,7 +2659,12 @@ static int
+ fec_suspend(struct device *dev)
+ {
+ 	struct net_device *ndev = dev_get_drvdata(dev);
+-	struct fec_enet_private *fep = netdev_priv(ndev);
++	struct fec_enet_private *fep;
++
++	if (!ndev)
++		return 0;
++
++	fep = netdev_priv(ndev);
 
-Thanks,
+ 	if (netif_running(ndev)) {
+ 		fec_stop(ndev);
+@@ -2678,9 +2683,13 @@ static int
+ fec_resume(struct device *dev)
+ {
+ 	struct net_device *ndev = dev_get_drvdata(dev);
+-	struct fec_enet_private *fep = netdev_priv(ndev);
++	struct fec_enet_private *fep;
+ 	int ret;
 
-Gregory
++	if (!ndev)
++		return 0;
++
++	fep = netdev_priv(ndev);
+ 	if (fep->reg_phy) {
+ 		ret = regulator_enable(fep->reg_phy);
+ 		if (ret)
+-- 
+1.9.1
+
+Even if checking the pointer is correct (I can send a formal patch if
+there is an agreement), I do not understand why suspend is called twice:
+the first time with NULL pointer, the second time with the correct pointer.
+
+Best regards,
+Stefano Babic
 
 
 -- 
-Gregory Clement, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
+=====================================================================
+DENX Software Engineering GmbH,     MD: Wolfgang Denk & Detlev Zundel
+HRB 165235 Munich, Office: Kirchenstr.5, D-82194 Groebenzell, Germany
+Phone: +49-8142-66989-53 Fax: +49-8142-66989-80 Email: sbabic at denx.de
+=====================================================================
