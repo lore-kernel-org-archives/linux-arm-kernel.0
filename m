@@ -1,107 +1,84 @@
 From: keescook@chromium.org (Kees Cook)
-Date: Wed,  6 Aug 2014 12:32:40 -0700
-Subject: [PATCH 3/7] arm: mm: reduce fixmap kmap from 32 to 16 CPUS
+Date: Wed,  6 Aug 2014 12:32:38 -0700
+Subject: [PATCH 1/7] arm: use generic fixmap.h
 In-Reply-To: <1407353564-21478-1-git-send-email-keescook@chromium.org>
 References: <1407353564-21478-1-git-send-email-keescook@chromium.org>
-Message-ID: <1407353564-21478-4-git-send-email-keescook@chromium.org>
+Message-ID: <1407353564-21478-2-git-send-email-keescook@chromium.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-More room is needed in the fixmap range for non-kmap fixmap entries. This
-reduces the kmap range from 32 to 16 CPUs. Additionally, add PTE entry for
-fixmap regardless of CONFIG_HIGHMEM.
+From: Mark Salter <msalter@redhat.com>
 
+ARM is different from other architectures in that fixmap pages are indexed
+with a positive offset from FIXADDR_START.  Other architectures index with
+a negative offset from FIXADDR_TOP.  In order to use the generic fixmap.h
+definitions, this patch redefines FIXADDR_TOP to be inclusive of the
+useable range.  That is, FIXADDR_TOP is the virtual address of the topmost
+fixed page.  The newly defined FIXADDR_END is the first virtual address
+past the fixed mappings.
+
+Signed-off-by: Mark Salter <msalter@redhat.com>
+Reviewed-by: Doug Anderson <dianders@chromium.org>
+[update for "ARM: 8031/2: change fixmap mapping region to support 32 CPUs"]
 Signed-off-by: Kees Cook <keescook@chromium.org>
 ---
- arch/arm/include/asm/fixmap.h | 12 ++++++++++--
- arch/arm/mm/highmem.c         |  2 --
- arch/arm/mm/mm.h              |  3 +++
- arch/arm/mm/mmu.c             |  5 ++++-
- 4 files changed, 17 insertions(+), 5 deletions(-)
+ arch/arm/include/asm/fixmap.h | 27 +++++++++------------------
+ arch/arm/mm/init.c            |  2 +-
+ 2 files changed, 10 insertions(+), 19 deletions(-)
 
 diff --git a/arch/arm/include/asm/fixmap.h b/arch/arm/include/asm/fixmap.h
-index 8ee7cb4f62ca..3ed08232be55 100644
+index 74124b0d0d79..190142d174ee 100644
 --- a/arch/arm/include/asm/fixmap.h
 +++ b/arch/arm/include/asm/fixmap.h
-@@ -1,16 +1,24 @@
- #ifndef _ASM_FIXMAP_H
+@@ -2,27 +2,18 @@
  #define _ASM_FIXMAP_H
  
-+/*
-+ * The fixmap uses 2MB. The KMAP fixmap needs 64k per CPU, so make room for
-+ * 16 CPUs (taking 1MB) and leave the rest for additional fixmap areas.
-+ */
  #define FIXADDR_START		0xffc00000UL
- #define FIXADDR_END		0xffe00000UL
- #define FIXADDR_TOP		(FIXADDR_END - PAGE_SIZE)
- #define FIXADDR_SIZE		(FIXADDR_END - FIXADDR_START)
+-#define FIXADDR_TOP		0xffe00000UL
+-#define FIXADDR_SIZE		(FIXADDR_TOP - FIXADDR_START)
++#define FIXADDR_END		0xffe00000UL
++#define FIXADDR_TOP		(FIXADDR_END - PAGE_SIZE)
++#define FIXADDR_SIZE		(FIXADDR_END - FIXADDR_START)
  
--#define FIX_KMAP_NR_PTES	(FIXADDR_SIZE >> PAGE_SHIFT)
-+/* 16 PTEs per CPU (64k of 4k pages). */
-+#define FIX_KMAP_NR_PTES	16
-+#define FIX_KMAP_NR_CPUS	16
+ #define FIX_KMAP_NR_PTES	(FIXADDR_SIZE >> PAGE_SHIFT)
  
- enum fixed_addresses {
-+	/* Support 16 CPUs for kmap as the first region of fixmap entries. */
- 	FIX_KMAP_BEGIN,
--	FIX_KMAP_END = FIX_KMAP_NR_PTES - 1,
-+	FIX_KMAP_END = (FIX_KMAP_NR_PTES * FIX_KMAP_NR_CPUS) - 1,
-+
- 	__end_of_fixed_addresses
- };
+-#define __fix_to_virt(x)	(FIXADDR_START + ((x) << PAGE_SHIFT))
+-#define __virt_to_fix(x)	(((x) - FIXADDR_START) >> PAGE_SHIFT)
++enum fixed_addresses {
++	FIX_KMAP_BEGIN,
++	FIX_KMAP_END = FIX_KMAP_NR_PTES - 1,
++	__end_of_fixed_addresses
++};
  
-diff --git a/arch/arm/mm/highmem.c b/arch/arm/mm/highmem.c
-index 45aeaaca9052..cbbef0b533d6 100644
---- a/arch/arm/mm/highmem.c
-+++ b/arch/arm/mm/highmem.c
-@@ -18,8 +18,6 @@
- #include <asm/tlbflush.h>
- #include "mm.h"
- 
--pte_t *fixmap_page_table;
+-extern void __this_fixmap_does_not_exist(void);
 -
- static inline void set_fixmap_pte(int idx, pte_t pte)
- {
- 	unsigned long vaddr = __fix_to_virt(idx);
-diff --git a/arch/arm/mm/mm.h b/arch/arm/mm/mm.h
-index ce727d47275c..c8b5b2d05b55 100644
---- a/arch/arm/mm/mm.h
-+++ b/arch/arm/mm/mm.h
-@@ -7,6 +7,9 @@
- /* the upper-most page table pointer */
- extern pmd_t *top_pmd;
+-static inline unsigned long fix_to_virt(const unsigned int idx)
+-{
+-	if (idx >= FIX_KMAP_NR_PTES)
+-		__this_fixmap_does_not_exist();
+-	return __fix_to_virt(idx);
+-}
+-
+-static inline unsigned int virt_to_fix(const unsigned long vaddr)
+-{
+-	BUG_ON(vaddr >= FIXADDR_TOP || vaddr < FIXADDR_START);
+-	return __virt_to_fix(vaddr);
+-}
++#include <asm-generic/fixmap.h>
  
-+/* The fixmap PTE. */
-+extern pte_t *fixmap_page_table;
-+
- /*
-  * 0xffff8000 to 0xffffffff is reserved for any ARM architecture
-  * specific hacks for copying pages efficiently, while 0xffff4000
-diff --git a/arch/arm/mm/mmu.c b/arch/arm/mm/mmu.c
-index b005a3337bc1..8dbdadc42d75 100644
---- a/arch/arm/mm/mmu.c
-+++ b/arch/arm/mm/mmu.c
-@@ -53,6 +53,9 @@ EXPORT_SYMBOL(empty_zero_page);
-  */
- pmd_t *top_pmd;
- 
-+/* The fixmap PTE. */
-+pte_t *fixmap_page_table;
-+
- #define CPOLICY_UNCACHED	0
- #define CPOLICY_BUFFERED	1
- #define CPOLICY_WRITETHROUGH	2
-@@ -1342,10 +1345,10 @@ static void __init kmap_init(void)
+ #endif
+diff --git a/arch/arm/mm/init.c b/arch/arm/mm/init.c
+index 659c75d808dc..ad82c05bfc3a 100644
+--- a/arch/arm/mm/init.c
++++ b/arch/arm/mm/init.c
+@@ -570,7 +570,7 @@ void __init mem_init(void)
+ 			MLK(DTCM_OFFSET, (unsigned long) dtcm_end),
+ 			MLK(ITCM_OFFSET, (unsigned long) itcm_end),
+ #endif
+-			MLK(FIXADDR_START, FIXADDR_TOP),
++			MLK(FIXADDR_START, FIXADDR_END),
+ 			MLM(VMALLOC_START, VMALLOC_END),
+ 			MLM(PAGE_OFFSET, (unsigned long)high_memory),
  #ifdef CONFIG_HIGHMEM
- 	pkmap_page_table = early_pte_alloc(pmd_off_k(PKMAP_BASE),
- 		PKMAP_BASE, _PAGE_KERNEL_TABLE);
-+#endif
- 
- 	fixmap_page_table = early_pte_alloc(pmd_off_k(FIXADDR_START),
- 		FIXADDR_START, _PAGE_KERNEL_TABLE);
--#endif
- }
- 
- static void __init map_lowmem(void)
 -- 
 1.9.1
