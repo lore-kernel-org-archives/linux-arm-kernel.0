@@ -1,42 +1,42 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Wed,  6 Aug 2014 17:46:06 +0200
-Subject: [PATCH v3 2/2] arm64: don't flag non-aliasing VIPT I-caches as
- aliasing
-In-Reply-To: <1407339966-29351-1-git-send-email-ard.biesheuvel@linaro.org>
-References: <1407339966-29351-1-git-send-email-ard.biesheuvel@linaro.org>
-Message-ID: <1407339966-29351-2-git-send-email-ard.biesheuvel@linaro.org>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Wed, 6 Aug 2014 16:47:11 +0100
+Subject: [Regression] FEC: Panic on suspend in 3.16
+In-Reply-To: <53E24A99.2020604@denx.de>
+References: <53E24147.4050304@parkeon.com> <53E24525.2020809@mentor.com>
+ <53E24A99.2020604@denx.de>
+Message-ID: <20140806154711.GQ30282@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-VIPT caches are non-aliasing if the index is derived from address bits that
-are always equal between VA and PA. Classifying these as aliasing results in
-unnecessary flushing which may hurt performance.
+On Wed, Aug 06, 2014 at 05:32:41PM +0200, Stefano Babic wrote:
+> Hi Nathan, Martin,
+> 
+> On 06/08/2014 17:09, Nathan Lynch wrote:
+> > On 08/06/2014 09:52 AM, Martin Fuzzey wrote:
+> >> Hi all,
+> >>
+> >> I am using the fec ethernet driver on a i.MX53 SoC.
+> >>
+> >> All was working fine on 3.13 but, after upgrading to 3.16 I now get a
+> >> panic on suspend:
+> > 
+> > Same issue reported here:
+> > 
+> > http://lists.infradead.org/pipermail/linux-arm-kernel/2014-August/277728.html
+> > 
+> > a71e3c37960c (net: phy: Set the driver when registering an MDIO bus
+> > device) has been implicated; try reverting that.
+> > 
+> 
+> I confirm this issue (on a i.MX35). The ndev pointer is NULL in the
+> suspend function. I added the check for the pointer:
 
-Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
----
-v2, v3: no changes
+As Nathan says, the problem is caused by a71e3c37960c and the fix which
+will soon be merged into mainline and stable trees will be a revert of
+that commit.
 
- arch/arm64/kernel/cpuinfo.c | 8 +++++++-
- 1 file changed, 7 insertions(+), 1 deletion(-)
+Thanks.
 
-diff --git a/arch/arm64/kernel/cpuinfo.c b/arch/arm64/kernel/cpuinfo.c
-index 319255ff536d..a5b6dce48094 100644
---- a/arch/arm64/kernel/cpuinfo.c
-+++ b/arch/arm64/kernel/cpuinfo.c
-@@ -49,7 +49,13 @@ static void cpuinfo_detect_icache_policy(struct cpuinfo_arm64 *info)
- 	unsigned int cpu = smp_processor_id();
- 	u32 l1ip = CTR_L1IP(info->reg_ctr);
- 
--	if (l1ip != ICACHE_POLICY_PIPT)
-+	/*
-+	 * VIPT caches are non-aliasing if the VA always equals the PA in all
-+	 * bit positions that are covered by the index, i.e., if num_sets_shift
-+	 * is less than or equal to PAGE_SHIFT minus line_size_shift.
-+	 */
-+	if (l1ip != ICACHE_POLICY_PIPT && !(l1ip == ICACHE_POLICY_VIPT &&
-+	    icache_get_linesize() * icache_get_numsets() <= PAGE_SIZE))
- 		set_bit(ICACHEF_ALIASING, &__icache_flags);
- 	if (l1ip == ICACHE_POLICY_AIVIVT);
- 		set_bit(ICACHEF_AIVIVT, &__icache_flags);
 -- 
-1.8.3.2
+FTTC broadband for 0.8mile line: currently at 9.5Mbps down 400kbps up
+according to speedtest.net.
