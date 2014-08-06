@@ -1,76 +1,63 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Wed, 6 Aug 2014 14:40:25 +0200
-Subject: [PATCH 1/2] UEFI arm64: add noefi boot param
-In-Reply-To: <20140806083825.GA31711@dhcp-16-198.nay.redhat.com>
-References: <20140806083825.GA31711@dhcp-16-198.nay.redhat.com>
-Message-ID: <CAKv+Gu83+OtTkM+tEkB4AKpqHg2qGXtfAxC-pQq0u9ez+VjwaA@mail.gmail.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Wed, 6 Aug 2014 13:55:50 +0100
+Subject: Oops: 17 SMP ARM (v3.16-rc2)
+In-Reply-To: <C4A61A5CA4AD2246942F4BA6F20ACB8043575172@ALVA-EXMB04.alv.autoliv.int>
+References: <C4A61A5CA4AD2246942F4BA6F20ACB804356534D@ALVA-EXMB04.alv.autoliv.int>
+ <20140626140115.GQ32514@n2100.arm.linux.org.uk>
+ <C4A61A5CA4AD2246942F4BA6F20ACB80435655E9@ALVA-EXMB04.alv.autoliv.int>
+ <20140626151424.GT32514@n2100.arm.linux.org.uk>
+ <20140627112151.GF32514@n2100.arm.linux.org.uk>
+ <3FFB61A7A8473C49831AF20FA193534A43CADFA7@ALVA-EXMB01.alv.autoliv.int>
+ <20140627163108.GP32514@n2100.arm.linux.org.uk>
+ <C4A61A5CA4AD2246942F4BA6F20ACB8043575072@ALVA-EXMB04.alv.autoliv.int>
+ <20140806095012.GN30282@n2100.arm.linux.org.uk>
+ <C4A61A5CA4AD2246942F4BA6F20ACB8043575172@ALVA-EXMB04.alv.autoliv.int>
+Message-ID: <20140806125550.GO30282@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 6 August 2014 10:38, Dave Young <dyoung@redhat.com> wrote:
->
-> Adding a noefi boot param like in X86 to disable efi runtime services support.
->
-> This will be useful for debugging uefi problems. Also it will be useful
-> for later kexec/kdump work. Kexec on uefi support in X86 depends on a fixed vm
-> area specific for uefi runtime 1:1 mapping, kernel will switch to a different
-> page table for any uefi runtime callback in virtual mode. In arm64 similar
-> work probably is necessary. But kexec boot will just works with 'noefi' with
-> the limitaion of lacking runtime services. The runtime services is not critical
-> for kdump kernel for now. So as for kexec/kdump just leave the 1:1 mapping a
-> future work.
->
+On Wed, Aug 06, 2014 at 11:10:06AM +0000, Mattis Lorentzon wrote:
+> Russell,
+> 
+> > What is on the other end of the link?
+> 
+> 16 ARM cards connected to a 3Com Switch 4400 connected to a Linux FC 20
+> machine (Intel Corporation 82541PI Gigabit Ethernet Controller rev 05).
+> 
+> There may be multiple problems. The backtrace has only been seen a few
+> times, on two different cards. Most of the time, the network for a random
+> card just stalls without any visible backtrace or error messages. The other
+> cards seem to be unaffected when this happens.
 
-Can we find a better name? You will still be using the UEFI memory map
-rather than the DT memory nodes (which will have been deleted by the
-stub), and things like SMBIOS and ACPI that hinge off UEFI remain
-enabled as well.
+Can you ascertain whether these stalls are a result of some failure of the
+receive side or the transmit side - you should be able to tell that if you
+watch the packet counts via ifconfig on the stalled card.  Also, it would
+be useful to know whether the FEC interrupt was firing.
 
-Other than that, the patch looks fine to me
+I hope you have some kind of serial console on these cards?
 
-Regards,
-Ard.
+> > What I would like to do is to stamp each packet in some way with an
+> > identifier marking its ring position, and then monitor the network to find out
+> > whether the packet at slot 85 was actually transmitted - that's made slightly
+> > harder because packets may be dropped at the receiver when operating in
+> > promisc mode.  This would then allow us to work out some likely causes.
+> 
+> We would be glad to run this test on our setup, do you have more detailed
+> information on how to set it up?
 
+One of the problems is to find some way to stamp each packet with a 10-bit
+number without having any side effects.  I guess one possibility would be
+to overwrite the source MAC address on transmit, which hopefully should not
+cause any side effects.
 
-> Signed-off-by: Dave Young <dyoung@redhat.com>
-> ---
->  arch/arm64/kernel/efi.c |   17 ++++++++++++++---
->  1 file changed, 14 insertions(+), 3 deletions(-)
->
-> Index: linux-2.6/arch/arm64/kernel/efi.c
-> ===================================================================
-> --- linux-2.6.orig/arch/arm64/kernel/efi.c
-> +++ linux-2.6/arch/arm64/kernel/efi.c
-> @@ -31,6 +31,14 @@ static efi_runtime_services_t *runtime;
->
->  static u64 efi_system_table;
->
-> +static bool disable_runtime __initdata = false;
-> +static int __init setup_noefi(char *arg)
-> +{
-> +       disable_runtime = true;
-> +       return 0;
-> +}
-> +early_param("noefi", setup_noefi);
-> +
->  static int uefi_debug __initdata;
->  static int __init uefi_debug_setup(char *str)
->  {
-> @@ -391,11 +399,14 @@ static int __init arm64_enter_virtual_mo
->                 return -1;
->         }
->
-> -       pr_info("Remapping and enabling EFI services.\n");
-> -
-> -       /* replace early memmap mapping with permanent mapping */
->         mapsize = memmap.map_end - memmap.map;
->         early_memunmap(memmap.map, mapsize);
-> +
-> +       if (disable_runtime)
-> +               return -ENODEV;
-> +
-> +       pr_info("Remapping and enabling EFI services.\n");
-> +       /* replace early memmap mapping with permanent mapping */
->         memmap.map = (__force void *)ioremap_cache((phys_addr_t)memmap.phys_map,
->                                                    mapsize);
->         memmap.map_end = memmap.map + mapsize;
+> After a network stall, we usually have to powercycle the ARM hardware to
+> get it back to a usable state. These stalls last at least several minutes,
+> perhaps indefinitely. It does not seem to recover properly, and is no longer
+> reachable via the network.
+
+Hmm.  Okay, I think the first thing we need to do is to work out why
+the silent stalls are happening.
+
+-- 
+FTTC broadband for 0.8mile line: currently at 9.5Mbps down 400kbps up
+according to speedtest.net.
