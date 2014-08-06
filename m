@@ -1,110 +1,104 @@
-From: ronald.wahl@raritan.com (Ronald Wahl)
-Date: Wed,  6 Aug 2014 15:11:42 +0200
-Subject: [PATCH v2] usb: gadget: at91_udc: move prepare clk into process
- context
-Message-ID: <1407330702-2926-1-git-send-email-ronald.wahl@raritan.com>
+From: t.figa@samsung.com (Tomasz Figa)
+Date: Wed, 06 Aug 2014 15:12:09 +0200
+Subject: [PATCH v2] ARM: EXYNOS: Refactor the pm code to use DT based
+ lookup
+In-Reply-To: <CAGm_ybhFj12+tWEhBy=Z62HE6roWMDOXxyoaVsBC2KPMsrYq9A@mail.gmail.com>
+References: <1406288941-20792-1-git-send-email-vikas.sajjan@samsung.com>
+ <53E1356F.40400@gmail.com>
+ <CAGm_ybhFj12+tWEhBy=Z62HE6roWMDOXxyoaVsBC2KPMsrYq9A@mail.gmail.com>
+Message-ID: <53E229A9.4000302@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Commit 7628083227b6bc4a7e33d7c381d7a4e558424b6b added clock preparation in
-interrupt context. This is not allowed as it might sleep. Move clock
-preparation into process context (at91udc_probe).
----
- drivers/usb/gadget/udc/at91_udc.c | 39 ++++++++++++++++++++++++++++++---------
- 1 file changed, 30 insertions(+), 9 deletions(-)
+On 06.08.2014 14:58, Vikas Sajjan wrote:
+> On Wed, Aug 6, 2014 at 1:35 AM, Tomasz Figa <tomasz.figa@gmail.com> wrote:
+>> On 25.07.2014 13:49, Vikas Sajjan wrote:
 
-diff --git a/drivers/usb/gadget/udc/at91_udc.c b/drivers/usb/gadget/udc/at91_udc.c
-index cfd18bc..0b347a0 100644
---- a/drivers/usb/gadget/udc/at91_udc.c
-+++ b/drivers/usb/gadget/udc/at91_udc.c
-@@ -872,10 +872,10 @@ static void clk_on(struct at91_udc *udc)
- 
- 	if (IS_ENABLED(CONFIG_COMMON_CLK)) {
- 		clk_set_rate(udc->uclk, 48000000);
--		clk_prepare_enable(udc->uclk);
-+		clk_enable(udc->uclk);
- 	}
--	clk_prepare_enable(udc->iclk);
--	clk_prepare_enable(udc->fclk);
-+	clk_enable(udc->iclk);
-+	clk_enable(udc->fclk);
- }
- 
- static void clk_off(struct at91_udc *udc)
-@@ -884,10 +884,10 @@ static void clk_off(struct at91_udc *udc)
- 		return;
- 	udc->clocked = 0;
- 	udc->gadget.speed = USB_SPEED_UNKNOWN;
--	clk_disable_unprepare(udc->fclk);
--	clk_disable_unprepare(udc->iclk);
-+	clk_disable(udc->fclk);
-+	clk_disable(udc->iclk);
- 	if (IS_ENABLED(CONFIG_COMMON_CLK))
--		clk_disable_unprepare(udc->uclk);
-+		clk_disable(udc->uclk);
- }
- 
- /*
-@@ -1780,14 +1780,23 @@ static int at91udc_probe(struct platform_device *pdev)
- 	}
- 
- 	/* don't do anything until we have both gadget driver and VBUS */
-+	if (IS_ENABLED(CONFIG_COMMON_CLK)) {
-+		retval = clk_prepare(udc->uclk);
-+		if (retval)
-+			goto fail1;
-+	}
-+	retval = clk_prepare(udc->fclk);
-+	if (retval)
-+		goto fail1a;
-+
- 	retval = clk_prepare_enable(udc->iclk);
- 	if (retval)
--		goto fail1;
-+		goto fail1b;
- 	at91_udp_write(udc, AT91_UDP_TXVC, AT91_UDP_TXVC_TXVDIS);
- 	at91_udp_write(udc, AT91_UDP_IDR, 0xffffffff);
- 	/* Clear all pending interrupts - UDP may be used by bootloader. */
- 	at91_udp_write(udc, AT91_UDP_ICR, 0xffffffff);
--	clk_disable_unprepare(udc->iclk);
-+	clk_disable(udc->iclk);
- 
- 	/* request UDC and maybe VBUS irqs */
- 	udc->udp_irq = platform_get_irq(pdev, 0);
-@@ -1795,7 +1804,7 @@ static int at91udc_probe(struct platform_device *pdev)
- 			0, driver_name, udc);
- 	if (retval < 0) {
- 		DBG("request irq %d failed\n", udc->udp_irq);
--		goto fail1;
-+		goto fail1c;
- 	}
- 	if (gpio_is_valid(udc->board.vbus_pin)) {
- 		retval = gpio_request(udc->board.vbus_pin, "udc_vbus");
-@@ -1848,6 +1857,13 @@ fail3:
- 		gpio_free(udc->board.vbus_pin);
- fail2:
- 	free_irq(udc->udp_irq, udc);
-+fail1c:
-+	clk_unprepare(udc->iclk);
-+fail1b:
-+	clk_unprepare(udc->fclk);
-+fail1a:
-+	if (IS_ENABLED(CONFIG_COMMON_CLK))
-+		clk_unprepare(udc->uclk);
- fail1:
- 	if (IS_ENABLED(CONFIG_COMMON_CLK) && !IS_ERR(udc->uclk))
- 		clk_put(udc->uclk);
-@@ -1896,6 +1912,11 @@ static int __exit at91udc_remove(struct platform_device *pdev)
- 	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
- 	release_mem_region(res->start, resource_size(res));
- 
-+	if (IS_ENABLED(CONFIG_COMMON_CLK))
-+		clk_unprepare(udc->uclk);
-+	clk_unprepare(udc->fclk);
-+	clk_unprepare(udc->iclk);
-+
- 	clk_put(udc->iclk);
- 	clk_put(udc->fclk);
- 	if (IS_ENABLED(CONFIG_COMMON_CLK))
--- 
-1.9.3
+[snip]
+
+> 
+>>> +
+>>> +     /* Disable USE_RETENTION of JPEG_MEM_OPTION */
+>>> +     tmp = pmu_raw_readl(EXYNOS5_JPEG_MEM_OPTION);
+>>> +     tmp &= ~EXYNOS5_OPTION_USE_RETENTION;
+>>> +     pmu_raw_writel(tmp, EXYNOS5_JPEG_MEM_OPTION);
+>>
+>> This looks completely like a copy paste from a vendor tree needed to
+>> workaround some issues in early revisions of the SoC. Are you sure this
+>> is still needed in production versions of the silicon used on boards
+>> supported in mainline?
+> 
+> This piece of code is NOT copy paste from my side, it is an already
+> existing code. I just moved it into the function
+> exynos5250_pm_prepare().
+
+Sure, I'm aware of this. It might be good to know though if this is
+really necessary, as I don't think we want useless code.
+
+> However I removed this piece of code and
+> made a common function for exynos4 and exynos5250, S2R works on 5250
+> well even without this piece of code.
+
+Thanks for checking this. I wonder if we could get some clarification
+about this from hardware guys. Kukjin, Jingoo, any ideas or people that
+might know what this is about?
+
+For now, I believe it could be handled the same way as Exynos4, in PMU
+register array as I suggested in my previous reply (quoted below).
+
+> 
+>>
+>> Even if yes, Exynos4 handles such registers in PMU register array in
+>> pmu.c, so I wonder whether it shouldn't be moved there and allow
+>> handling of all Exynos SoCs uniformly in this file.
+>>
+>>> +
+>>> +     exynos_pm_enter_sleep_mode();
+>>> +}
+>>> +
+>>> +static void exynos4_pm_prepare(void)
+>>> +{
+>>> +     /* Set wake-up mask registers */
+>>> +     exynos_pm_set_wakeup_mask();
+>>> +
+>>> +     s3c_pm_do_save(exynos_core_save, ARRAY_SIZE(exynos_core_save));
+>>> +
+>>> +     exynos_pm_enter_sleep_mode();
+>>> +}
+>>
+>> In fact, exynos4_pm_prepare() is a direct subset of
+>> exynos5250_pm_prepare(). This just confirms that it might be a good idea
+>> to just merge both functions into a single generic one.
+> 
+> Right, can be merged into a common function which can be used for
+> exynos4 and exynos5250.
+> But I am afraid we still need specific functions in case of 5420.
+
+Could you provide some details about Exynos5420 specific things?
+
+> 
+>>
+>>> +
+>>>  static void exynos_pm_central_suspend(void)
+>>>  {
+>>>       unsigned long tmp;
+
+[snip]
+
+>>> +
+>>>       /* Platform-specific GIC callback */
+>>>       gic_arch_extn.irq_set_wake = exynos_irq_set_wake;
+>>>
+>>>       /* All wakeup disable */
+>>>       tmp = pmu_raw_readl(S5P_WAKEUP_MASK);
+>>> -     tmp |= ((0xFF << 8) | (0x1F << 1));
+>>> +     tmp |= pm_data->wake_disable_mask;
+>>
+>> Does this vary between SoCs?
+> 
+> Yes, It is different in case of 5420.
+
+Could you provide more information about the difference?
+
+Best regards,
+Tomasz
