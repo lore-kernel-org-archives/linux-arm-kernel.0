@@ -1,109 +1,55 @@
-From: sfr@canb.auug.org.au (Stephen Rothwell)
-Date: Wed, 6 Aug 2014 11:39:35 +1000
-Subject: linux-next: build failure after merge of the usb tree
-In-Reply-To: <20140724074452.GB11963@kroah.com>
-References: <20140724170755.035cea1c@canb.auug.org.au>
- <20140724074452.GB11963@kroah.com>
-Message-ID: <20140806113935.6728d15c@canb.auug.org.au>
+From: yao.yuan@freescale.com (Yao Yuan)
+Date: Wed, 6 Aug 2014 02:26:07 +0000
+Subject: [PATCH v6 1/2] i2c: imx: add DMA support for freescale i2c driver
+In-Reply-To: <53E0C498.6070608@gmail.com>
+References: <1407232563-10856-1-git-send-email-yao.yuan@freescale.com>
+ <1407232563-10856-2-git-send-email-yao.yuan@freescale.com>
+ <53E0C498.6070608@gmail.com>
+Message-ID: <30487e0abf4b4564af296d17f5cebf49@BL2PR03MB338.namprd03.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Thanks for your review.
 
-On Thu, 24 Jul 2014 00:44:52 -0700 Greg KH <greg@kroah.com> wrote:
->
-> On Thu, Jul 24, 2014 at 05:07:55PM +1000, Stephen Rothwell wrote:
-> > Hi Greg,
-> > 
-> > After merging the usb tree, today's linux-next build (x86_64 allmodconfig)
-> > failed like this:
-> > 
-> > drivers/phy/phy-spear1310-miphy.c: In function 'spear1310_miphy_probe':
-> > drivers/phy/phy-spear1310-miphy.c:232:14: warning: passing argument 2 of 'devm_phy_create' from incompatible pointer type
-> >   priv->phy = devm_phy_create(dev, &spear1310_miphy_ops, NULL);
-> >               ^
-> > In file included from drivers/phy/phy-spear1310-miphy.c:21:0:
-> > include/linux/phy/phy.h:164:13: note: expected 'struct device_node *' but argument is of type 'struct phy_ops *'
-> >  struct phy *devm_phy_create(struct device *dev, struct device_node *node,
-> >              ^
-> > drivers/phy/phy-spear1310-miphy.c:232:14: error: too few arguments to function 'devm_phy_create'
-> >   priv->phy = devm_phy_create(dev, &spear1310_miphy_ops, NULL);
-> >               ^
-> > In file included from drivers/phy/phy-spear1310-miphy.c:21:0:
-> > include/linux/phy/phy.h:164:13: note: declared here
-> >  struct phy *devm_phy_create(struct device *dev, struct device_node *node,
-> >              ^
-> > drivers/phy/phy-spear1340-miphy.c: In function 'spear1340_miphy_probe':
-> > drivers/phy/phy-spear1340-miphy.c:264:14: warning: passing argument 2 of 'devm_phy_create' from incompatible pointer type
-> >   priv->phy = devm_phy_create(dev, &spear1340_miphy_ops, NULL);
-> >               ^
-> > In file included from drivers/phy/phy-spear1340-miphy.c:21:0:
-> > include/linux/phy/phy.h:164:13: note: expected 'struct device_node *' but argument is of type 'struct phy_ops *'
-> >  struct phy *devm_phy_create(struct device *dev, struct device_node *node,
-> >              ^
-> > drivers/phy/phy-spear1340-miphy.c:264:14: error: too few arguments to function 'devm_phy_create'
-> >   priv->phy = devm_phy_create(dev, &spear1340_miphy_ops, NULL);
-> >               ^
-> > In file included from drivers/phy/phy-spear1340-miphy.c:21:0:
-> > include/linux/phy/phy.h:164:13: note: declared here
-> >  struct phy *devm_phy_create(struct device *dev, struct device_node *node,
-> >              ^
-> > 
-> > Caused by commit f0ed817638b5 ("phy: core: Let node ptr of PHY point to
-> > PHY and not of PHY provider") interacting with commit 64562e99477f
-> > ("phy: Add drivers for PCIe and SATA phy on SPEAr13xx") from the
-> > arm-soc tree.
-> > 
-> > I fixed that up and then got:
-> > 
-> > drivers/pinctrl/pinctrl-tegra-xusb.c: In function 'tegra_xusb_padctl_probe':
-> > drivers/pinctrl/pinctrl-tegra-xusb.c:913:8: warning: passing argument 2 of 'devm_phy_create' from incompatible pointer type
-> >   phy = devm_phy_create(&pdev->dev, &pcie_phy_ops, NULL);
-> >         ^
-> > In file included from drivers/pinctrl/pinctrl-tegra-xusb.c:18:0:
-> > include/linux/phy/phy.h:164:13: note: expected 'struct device_node *' but argument is of type 'const struct phy_ops *'
-> >  struct phy *devm_phy_create(struct device *dev, struct device_node *node,
-> >              ^
-> > drivers/pinctrl/pinctrl-tegra-xusb.c:913:8: error: too few arguments to function 'devm_phy_create'
-> >   phy = devm_phy_create(&pdev->dev, &pcie_phy_ops, NULL);
-> >         ^
-> > In file included from drivers/pinctrl/pinctrl-tegra-xusb.c:18:0:
-> > include/linux/phy/phy.h:164:13: note: declared here
-> >  struct phy *devm_phy_create(struct device *dev, struct device_node *node,
-> >              ^
-> > drivers/pinctrl/pinctrl-tegra-xusb.c:922:8: warning: passing argument 2 of 'devm_phy_create' from incompatible pointer type
-> >   phy = devm_phy_create(&pdev->dev, &sata_phy_ops, NULL);
-> >         ^
-> > In file included from drivers/pinctrl/pinctrl-tegra-xusb.c:18:0:
-> > include/linux/phy/phy.h:164:13: note: expected 'struct device_node *' but argument is of type 'const struct phy_ops *'
-> >  struct phy *devm_phy_create(struct device *dev, struct device_node *node,
-> >              ^
-> > drivers/pinctrl/pinctrl-tegra-xusb.c:922:8: error: too few arguments to function 'devm_phy_create'
-> >   phy = devm_phy_create(&pdev->dev, &sata_phy_ops, NULL);
-> >         ^
-> > In file included from drivers/pinctrl/pinctrl-tegra-xusb.c:18:0:
-> > include/linux/phy/phy.h:164:13: note: declared here
-> >  struct phy *devm_phy_create(struct device *dev, struct device_node *node,
-> >              ^
-> > 
-> > From an interaction with commit dc0a39386687 ("pinctrl: Add NVIDIA
-> > Tegra XUSB pad controller support") from the arm-soc tree.
-> > 
-> > Final merge fix patch:
+Varka Bhadram wrote:
+> On 08/05/2014 03:26 PM, Yuan Yao wrote:
 > 
-> Ugh, what a mess, sorry about that.  I'll keep this around for if I end
-> up merging with Linus after these other trees get merged.
+> (...)
+> > +fail_rx:
+> > +	dma_release_channel(dma->chan_rx);
+> > +fail_tx:
+> > +	dma_release_channel(dma->chan_tx);
+> > +fail_al:
+> > +	devm_kfree(dev, dma);
+> 
+> no need to use devm_kfree() if we use devm_kzalloc()...
+> 
+We have discussed it before.
+As Lothar Wa?mann said:
+"The devm_kfree() is not in the failure path of the driver's probe() function, but in the function that tries to initialize the optional DMA support."
+So It seems need to use devm_kfree().
+Do you have some other opinions?
 
-Since the usb tree has gone upstream, this merge fix patch is now
-needed when the arm-soc tree is merged.
+> > +	dev_info(dev, "can't use DMA\n");
+> > +
+> > +	return ret;
+> > +}
 
--- 
-Cheers,
-Stephen Rothwell                    sfr at canb.auug.org.au
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140806/79991819/attachment-0001.sig>
+(...)
+
+> > +static int i2c_imx_dma_write(struct imx_i2c_struct *i2c_imx,
+> > +					struct i2c_msg *msgs)
+> 
+> static int i2c_imx_dma_write(struct imx_i2c_struct *i2c_imx,
+> 			     struct i2c_msg *msgs)
+> 
+> run checkpatch.pl on this patch...
+
+Sorry for my code style. I will match open parenthesis in this case.
+
+I had run this script before, just one warning.
+
+
+> --
+> Regards,
+> Varka Bhadram.
