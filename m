@@ -1,24 +1,36 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Wed, 6 Aug 2014 22:10:51 +0100
-Subject: [PATCH v3] Documentation: devicetree: Fix tps65090 typos in
- example
-In-Reply-To: <1406755767-5910-1-git-send-email-afaerber@suse.de>
-References: <1406755767-5910-1-git-send-email-afaerber@suse.de>
-Message-ID: <20140806211051.GA17528@sirena.org.uk>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Wed, 6 Aug 2014 23:18:28 +0200
+Subject: [PATCH v3 0/6] Add EHCI and OHCI drivers for STi SoC's
+In-Reply-To: <1407344589-24863-1-git-send-email-peter.griffin@linaro.org>
+References: <1407344589-24863-1-git-send-email-peter.griffin@linaro.org>
+Message-ID: <201408062318.28958.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jul 30, 2014 at 11:29:27PM +0200, Andreas F?rber wrote:
-> Specification and existing device trees use vsys-l{1,2}-supply,
-> not vsys_l{1,2}-supply. Fix the example to match the specification.
+On Wednesday 06 August 2014, Peter Griffin wrote:
+> This series adds support for the OHCI and EHCI on-chip controllers
+> found in STi consumer electronics SoC's from STMicroelectronics.
+> 
+> The series has been re-worked from v2 to split out the ehci and ohci parts
+> into their own drivers / devices like most other ARM platforms based on
+> feedback from Arnd Bergmann (see here http://www.spinics.net/lists/linux-usb/msg111124.html. 
+> 
+> The ehci-platform & ohci-platform have been used as a basis for this in case we
+> wish to merge the drivers again in the future.
+> 
+> Changes since v2:
+>  - Based on Arnd Berghman feedback, split out into 2 devices / drivers
+>  - Base drivers oh ehci-platform.c & ohci-platform.c with required extensions
+>    to allow possible re-merge in the furture.
 
-Applied.  I've previously reminded you to use subject lines appropraite
-for the subsystem, please do so - this is important for telling people
-what the patch is for.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140806/f5490ac1/attachment.sig>
+Hi Peter,
+
+This looks much better than the first version. I have some remaining comments for
+how it could be simplified a bit more.
+
+The way that you deal with the 48mhz clock seems like it should fit in well
+with the generic driver, just like all the rest (once the usb-st-common
+stuff is moved into the ohci/ehci drivers), so the alternative would be
+to make it all generic now.
+
+	Arnd
