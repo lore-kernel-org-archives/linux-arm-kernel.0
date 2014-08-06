@@ -1,171 +1,101 @@
-From: sdu.liu@huawei.com (Liu hua)
-Date: Wed, 6 Aug 2014 20:18:15 +0800
-Subject: [PATCH V2 1/1] GIC: introduce method to deactive interupts
-In-Reply-To: <53E1F96C.2030307@arm.com>
-References: <1407125860-37718-1-git-send-email-sdu.liu@huawei.com>
- <1407125860-37718-2-git-send-email-sdu.liu@huawei.com>
- <53DF55AC.5030705@arm.com> <53E1EACA.6070502@huawei.com>
- <53E1F96C.2030307@arm.com>
-Message-ID: <53E21D07.7070407@huawei.com>
+From: ludovic.desroches@atmel.com (Ludovic Desroches)
+Date: Wed, 6 Aug 2014 14:23:48 +0200
+Subject: [PATCH v3 2/2] ARM: dts: at_xdmac: add bindings documentation
+In-Reply-To: <20140725072008.GI8181@intel.com>
+References: <1404825096-15724-1-git-send-email-ludovic.desroches@atmel.com>
+ <1404825096-15724-3-git-send-email-ludovic.desroches@atmel.com>
+ <20140725072008.GI8181@intel.com>
+Message-ID: <20140806122348.GD27338@ldesroches-Latitude-E6320>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2014/8/6 17:46, Marc Zyngier wrote:
-> Hi Liu,
+On Fri, Jul 25, 2014 at 12:50:08PM +0530, Vinod Koul wrote:
+> On Tue, Jul 08, 2014 at 03:11:36PM +0200, Ludovic Desroches wrote:
+> > Add bindings documentation for the new Atmel DMA controller (XDMAC)
+> > introduced with SAMA5D4.
+> > 
+> > Signed-off-by: Ludovic Desroches <ludovic.desroches@atmel.com>
+> > ---
+> >  .../devicetree/bindings/dma/atmel-xdma.txt         |   48 ++++++++++++++++++++
+> >  1 file changed, 48 insertions(+)
+> >  create mode 100644 Documentation/devicetree/bindings/dma/atmel-xdma.txt
 > 
-> On 06/08/14 09:43, Liu hua wrote:
->> ? 2014/8/4 17:43, Marc Zyngier ??:
->>> Hi Liu,
->>>
->>> On 04/08/14 05:17, Liu Hua wrote:
->>>> When using kdump on ARM platform, if kernel panics in interrupt handler
->>>> (maybe PPI), the capture kernel can not recive certain interrupt, and 
->>>> fails to boot.
->>>>
->>>> On this situation, We have read register GICC_IAR. But we have no chance
->>>> to write relative bit to register GICC_EOIR (kernel paniced before). So
->>>> the state of this type interrupt remains active. And that makes gic not
->>>> deliver this type interrupt to cpu interface.
->>>>
->>>> So we should not assume that all interrut states of GIC are inactive when
->>>> kernel inittailize the GIC. This patch will identify these type interrupts
->>>> and deactive them
->>>>
->>>> Signed-off-by: Liu Hua <sdu.liu@huawei.com>
->>>> ---
->>>>  drivers/irqchip/irq-gic.c | 26 ++++++++++++++++++++++++++
->>>>  1 file changed, 26 insertions(+)
->>>>
->>>> diff --git a/drivers/irqchip/irq-gic.c b/drivers/irqchip/irq-gic.c
->>>> index b2648fc..7708df1 100644
->>>> --- a/drivers/irqchip/irq-gic.c
->>>> +++ b/drivers/irqchip/irq-gic.c
->>>> @@ -351,12 +351,37 @@ static u8 gic_get_cpumask(struct gic_chip_data *gic)
->>>>  	return mask;
->>>>  }
->>>>  
->>>> +void gic_eois(u32 active, int irq_off, void __iomem *cpu_base)
->>>> +{
->>>> +	int bit = -1;
->>>> +
->>>> +	for_each_set_bit(bit, (unsigned long *)&active, 32)
->>>> +		writel_relaxed(bit + irq_off, cpu_base + GIC_CPU_EOI);
->>>> +}
->>>> +
->>>> +void gic_dist_clear_active(void __iomem *dist_base,
->>>> +			void __iomem *cpu_base, int gic_irqs)
->>>> +{
->>>> +	int irq, offset;
->>>> +	u32 active;
->>>> +
->>>> +	for (irq = 0; irq < gic_irqs; irq += 32) {
->>>> +		offset = GIC_DIST_ACTIVE_SET + irq * 4 / 32;
->>>> +		active = readl_relaxed(dist_base + offset);
->>>> +		if (!active)
->>>> +			continue;
->>>> +		gic_eois(active, irq, cpu_base);
->>>> +	}
->>>> +}
->>>> +
->>>> +
->>>>  static void __init gic_dist_init(struct gic_chip_data *gic)
->>>>  {
->>>>  	unsigned int i;
->>>>  	u32 cpumask;
->>>>  	unsigned int gic_irqs = gic->gic_irqs;
->>>>  	void __iomem *base = gic_data_dist_base(gic);
->>>> +	void __iomem *cpu_base = gic_data_cpu_base(gic);
->>>>  
->>>>  	writel_relaxed(0, base + GIC_DIST_CTRL);
->>>>  
->>>> @@ -371,6 +396,7 @@ static void __init gic_dist_init(struct gic_chip_data *gic)
->>>>  
->>>>  	gic_dist_config(base, gic_irqs, NULL);
->>>>  
->>>> +	gic_dist_clear_active(base, cpu_base, gic_irqs);
->>>>  	writel_relaxed(1, base + GIC_DIST_CTRL);
->>>>  }
->>>
->>> So while this is solving a real issue, I don't think you can just fix it
->>> for the UP case. You'll have to fix the same thing for secondary CPUs
->>> (shouldn't be too hard to split things between local and global interrupts).
->> Hi Marc,
->>
->> Thanks very much for you reply!
->>
->> when I tried to implement your ideas. I found that: when kdump is deployed
->> and without my patch,
->>
->> (1) panic in PPI, the capture kernel can not boot up.
->> (2) panic in SPI, the capture kernel boot up regularly.
->>
->> I was confused and there may be something I did not catch. I glanced the kdump
->> code and found that function machine_kexec_mask_interrupts. It will clear the
->> GIC active state only if the IRQD_IRQ_INPROGRESS bit in d->state_use_accessors
->> is set.
->>
->> And the PPI handler does not set this flag. So there are two ways to solve this
->> problem.
->>
->>  (1) consider this problem common, as you and I thought before. we should fix secondary CPUs issues;
->>
->>
->>  (2)just set flag IRQD_IRQ_INPROGRESS in PPI. we need patch like this:
->>
->> 	-------------(2) patch start-----------
->> 	diff --git a/kernel/irq/chip.c b/kernel/irq/chip.c
->> 	index a2b28a2..0a5dfe0 100644
->> 	--- a/kernel/irq/chip.c
->> 	+++ b/kernel/irq/chip.c
->> 	@@ -677,10 +677,18 @@ void handle_percpu_devid_irq(unsigned int irq, struct irq_desc *desc)
->>         	if (chip->irq_ack)
->>                 	chip->irq_ack(&desc->irq_data);
->>
->> 	+ raw_spin_lock(&desc->lock);
->> 	+ irqd_set(&desc->irq_data, IRQD_IRQ_INPROGRESS);
->> 	+ raw_spin_unlock(&desc->lock);
->> 	+
->>         trace_irq_handler_entry(irq, action);
->>         res = action->handler(irq, dev_id);
->>         trace_irq_handler_exit(irq, action, res);
->>
->> 	+ raw_spin_lock(&desc->lock);
->> 	+ irqd_clear(&desc->irq_data, IRQD_IRQ_INPROGRESS);
->> 	+ raw_spin_unlock(&desc->lock);
->> 	+
->>         if (chip->irq_eoi)
->>                 chip->irq_eoi(&desc->irq_data);
->> 	 }
->> 	-------------(2) patch end-----------
->>
->> Way 2 seems to be needed anyway.
->> For way 1, I do not find another situation that the gic interrupt states remains active when kernel booting.
->> And for kdump process, Way 2 is enough.
->>
->> What do you think about them?
-> 
-> Your second approach doesn't work, because you can have multiple CPUs
-> handling the same PPI at the same time. Remember these are per-processor
-> interrupts, despite having the same number. So you can't just have one
-> bit, you'd need one bit per CPU (and that's not going to happen).
+> I dont see delta with current atmel-dma bindings. Shouldn't we reuse that
+> here too?
 
-Yes, But during kdump process, the crash cpu will send IPIs to other CPUs
-and wait until other CPUs reply these IPIs. So at last only the crash CPU's
-active state of PPI should be cleared. My second approach seems enough for
-this situation.
+Bindings have change through the revision, I didn't notice they were so
+close to the hdmac bindings. The only difference is the content of the
+second cell.
 
-
-> I'm afraid that for PPIs, parsing the active bits is the only way.
-
-I think so, For other situation, the second approach is not enough. I should
-expend my first solution.
-
-BTW, if we have to "parsing the active bits" as you said, Is it necessary to
-change IRQD_IRQ_INPROGRESS flag in PPI as my second patch?
-
+I don't know if it's a sufficient reason to add a new binding.
 
 > 
-> Thanks,
+> Surely we dont want to add binding per contoller even if they are similar!
 > 
-> 	M.
+> -- 
+> ~Vinod
 > 
+> > 
+> > diff --git a/Documentation/devicetree/bindings/dma/atmel-xdma.txt b/Documentation/devicetree/bindings/dma/atmel-xdma.txt
+> > new file mode 100644
+> > index 0000000..647f099
+> > --- /dev/null
+> > +++ b/Documentation/devicetree/bindings/dma/atmel-xdma.txt
+> > @@ -0,0 +1,48 @@
+> > +* Atmel Extensible Direct Memory Access Controller (XDMAC)
+> > +
+> > +* XDMA Controller
+> > +Required properties:
+> > +- compatible: Should be "atmel,<chip>-dma".
+> > +- reg: Should contain DMA registers location and length.
+> > +- interrupts: Should contain DMA interrupt.
+> > +- #dma-cells: Must be <2>, used to represent the number of integer cells in
+> > +the dmas property of client devices.
+> > +  - The 1st cell specifies the memory interface (16 most significant bits) and
+> > +  the peripheral interface (16 less significant bits) to use.
+> > +  - The 2nd cell specifies the channel configuration register:
+> > +    - bit 30-24: PERID, peripheral identifier.
+> > +
+> > +Example:
+> > +
+> > +dma1: dma-controller at f0004000 {
+> > +	compatible = "atmel,sama5d4-dma";
+> > +	reg = <0xf0004000 0x200>;
+> > +	interrupts = <50 4 0>;
+> > +	#dma-cells = <2>;
+> > +};
+> > +
+> > +
+> > +* DMA clients
+> > +DMA clients connected to the Atmel XDMA controller must use the format
+> > +described in the dma.txt file, using a two-cell specifier for each channel.
+> > +The three cells in order are:
+> > +1. A phandle pointing to the DMA controller.
+> > +2. The memory interface (16 most significant bits), the peripheral interface
+> > +(16 less significant bits).
+> > +3. Channel configuration register. Configurable fields are:
+> > +  - bit 30-24: PERID, peripheral identifier.
+> > +
+> > +Example:
+> > +
+> > +i2c2: i2c at f8024000 {
+> > +	compatible = "atmel,at91sam9x5-i2c";
+> > +	reg = <0xf8024000 0x4000>;
+> > +	interrupts = <34 4 6>;
+> > +	dmas = <&dma1
+> > +		(AT91_XDMAC_DT_MEM_IF(0) | AT91_XDMAC_DT_PER_IF(1))
+> > +		AT91_XDMAC_DT_PERID(6)>,
+> > +	       <&dma1
+> > +		(AT91_XDMAC_DT_MEM_IF(0) | AT91_XDMAC_DT_PER_IF(1))
+> > +		AT91_XDMAC_DT_PERID(7)>;
+> > +	dma-names = "tx", "rx";
+> > +};
+> > -- 
+> > 1.7.9.5
+> > 
+> 
+> -- 
+> --
+> To unsubscribe from this list: send the line "unsubscribe dmaengine" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
