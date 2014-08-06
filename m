@@ -1,40 +1,26 @@
-From: moinejf@free.fr (Jean-Francois Moine)
-Date: Wed, 6 Aug 2014 10:33:56 +0200
-Subject: [RFC 0/8] DPCM with simple-card support for Kirkwood
-In-Reply-To: <1407287912-19447-1-git-send-email-andrew@lunn.ch>
-References: <1407287912-19447-1-git-send-email-andrew@lunn.ch>
-Message-ID: <20140806103356.4e7c088a@armhf>
+From: shengjiu.wang@freescale.com (Shengjiu Wang)
+Date: Wed, 6 Aug 2014 16:35:12 +0800
+Subject: [PATCH V2 0/3] refine clock tree for esai in imx6q
+Message-ID: <cover.1407313676.git.shengjiu.wang@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed,  6 Aug 2014 03:18:24 +0200
-Andrew Lunn <andrew@lunn.ch> wrote:
+refine clock tree for esai in imx6q
 
-> 30 June you posted your code to implement DPCM for kirkwood-i2s,
-> making it possible to use both I2S and SPDIF at the same time.
-> 
-> It has taken me a while, but i now have this patch on 3.16-rc6, and
-> i've extended simple-card to support DPCM. I've tested it on a
-> kirkwood based HP T5325, which only makes use of the I2S backend.
-> 
-> Please could you take a look and see if this helps to unblock getting
-> your Cubox support into mainline.
+Changes for V2
+- Add pll5_sel And update the comments for patch 2.
+- As the bypass mode is not supported in clk tree, so update the 
+- comments for patch 3.
 
-Andrew,
+Shengjiu Wang (3):
+  ARM: clk-imx6q: refine clock tree for ESAI
+  ARM: clk-imx6q: Add missing lvds and anaclk clock to the clock tree
+  ARM: imx6q: Add the clock route from external OSC to ESAI clock
 
-I had quite the same code as yours end 2013, and, if I did not miss
-something:
-
-- you cannot put Linux specific stuff in the DT:
-http://mailman.alsa-project.org/pipermail/alsa-devel/2013-December/070595.html
-http://mailman.alsa-project.org/pipermail/alsa-devel/2014-January/070622.html
-
-- the DPCM code does not handle the formats and rates of the back-ends:
-http://mailman.alsa-project.org/pipermail/alsa-devel/2013-December/070585.html
-
-Some more information may be found at:
-http://mailman.alsa-project.org/pipermail/alsa-devel/2014-January/070798.html
+ arch/arm/mach-imx/clk-imx6q.c             |   24 +++++++++++++++++++-----
+ arch/arm/mach-imx/mach-imx6q.c            |   28 ++++++++++++++++++++++++++++
+ include/dt-bindings/clock/imx6qdl-clock.h |   13 ++++++++++---
+ 3 files changed, 57 insertions(+), 8 deletions(-)
 
 -- 
-Ken ar c'henta?	|	      ** Breizh ha Linux atav! **
-Jef		|		http://moinejf.free.fr/
+1.7.9.5
