@@ -1,57 +1,54 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 6 Aug 2014 13:04:40 +0200
-Subject: DMA engine API issue (was: [PATCH/RFC 0/5] R-Car Gen2 DMAC
- hardware descriptor list support)
-In-Reply-To: <CAMuHMdVz8hNus5x1hn0feqb1SYsUuhA4QHHfPGyebiKLZJwfEQ@mail.gmail.com>
-References: <1406032431-3807-1-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
- <1877927.dGcJCfKbeH@avalon>
- <CAMuHMdVz8hNus5x1hn0feqb1SYsUuhA4QHHfPGyebiKLZJwfEQ@mail.gmail.com>
-Message-ID: <201408061304.41105.arnd@arndb.de>
+From: Mattis.Lorentzon@autoliv.com (Mattis Lorentzon)
+Date: Wed, 6 Aug 2014 11:10:06 +0000
+Subject: Oops: 17 SMP ARM (v3.16-rc2)
+In-Reply-To: <20140806095012.GN30282@n2100.arm.linux.org.uk>
+References: <C4A61A5CA4AD2246942F4BA6F20ACB804356534D@ALVA-EXMB04.alv.autoliv.int>
+ <20140626140115.GQ32514@n2100.arm.linux.org.uk>
+ <C4A61A5CA4AD2246942F4BA6F20ACB80435655E9@ALVA-EXMB04.alv.autoliv.int>
+ <20140626151424.GT32514@n2100.arm.linux.org.uk>
+ <20140627112151.GF32514@n2100.arm.linux.org.uk>
+ <3FFB61A7A8473C49831AF20FA193534A43CADFA7@ALVA-EXMB01.alv.autoliv.int>
+ <20140627163108.GP32514@n2100.arm.linux.org.uk>
+ <C4A61A5CA4AD2246942F4BA6F20ACB8043575072@ALVA-EXMB04.alv.autoliv.int>
+ <20140806095012.GN30282@n2100.arm.linux.org.uk>
+Message-ID: <C4A61A5CA4AD2246942F4BA6F20ACB8043575172@ALVA-EXMB04.alv.autoliv.int>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 06 August 2014, Geert Uytterhoeven wrote:
-> > I actually have the opposite problem, in my case channels of physically
-> > separate DMA engines can be used interchangeably to serve the system's slaves.
-> > Using the DMA engine DT bindings, DT nodes of the slaves currently reference a
-> > specific DMA engine, even if they can be served by both. This leads to limited
-> > dynamic channel allocation capabilities (especially when taking into account
-> > lazy channel allocation as mentioned in another mail in this thread).
-> 
-> What about adding a property to the first one, referencing the second
-> (or the other way around, don't know what's the easiest to implement)?
-> 
->         dmac0: dma-controller at e6700000 {
->                 ...
->                 renesas,alternative = <&dmac1>;
->                 ...
->         };
-> 
->         dmac1: dma-controller at e6720000 {
->                 ...
->         };
-> 
-> That would avoid having to bind a slave device explicitly to a single
-> dmac, or having to bind all slave devices to all dmacs.
+Russell,
 
-We have a perfectly fine way to express this with the existing binding
-already: you just list channels for both (or more) controllers for each
-slave, and let the dma subsystem pick one. This was a compromise we
-reached when we initially introduced the dma slave binding, the downside
-being that we have to name every reference from a slave to a controller,
-even though almost all of them are "rx", "tx" or "data".
+> What is on the other end of the link?
 
-I believe what happened though is that the initial implementation in the
-kernel was to just pick the first channel for a given name and try that
-but give up if it fails. This works for the majority of users and I had
-expected someone to implement a smarter strategy as needed.
+16 ARM cards connected to a 3Com Switch 4400 connected to a Linux FC 20
+machine (Intel Corporation 82541PI Gigabit Ethernet Controller rev 05).
 
-The easiest way would be to just randomize the order of the channels
-during lookup and then try them all, but there is a potential problem
-with this failing sometimes in nondeterministic ways.
-Another alternative would be for the dma controller to report back
-some form of "utilization" number to the dma subsystem and have the
-common code pick the least utilized engine that is connected to that
-slave.
+There may be multiple problems. The backtrace has only been seen a few
+times, on two different cards. Most of the time, the network for a random
+card just stalls without any visible backtrace or error messages. The other
+cards seem to be unaffected when this happens.
 
-	Arnd
+> What I would like to do is to stamp each packet in some way with an
+> identifier marking its ring position, and then monitor the network to find out
+> whether the packet at slot 85 was actually transmitted - that's made slightly
+> harder because packets may be dropped at the receiver when operating in
+> promisc mode.  This would then allow us to work out some likely causes.
+
+We would be glad to run this test on our setup, do you have more detailed
+information on how to set it up?
+
+> Note that after the transmit watchdog, the interface should recover and start
+> operating normally again - and that should not take "several minutes."
+
+After a network stall, we usually have to powercycle the ARM hardware to
+get it back to a usable state. These stalls last at least several minutes,
+perhaps indefinitely. It does not seem to recover properly, and is no longer
+reachable via the network.
+
+Best regards,
+Mattis Lorentzon
+***************************************************************
+Consider the environment before printing this message.
+
+To read Autoliv's Information and Confidentiality Notice, follow this link:
+http://www.autoliv.com/disclaimer.html
+***************************************************************
