@@ -1,169 +1,110 @@
-From: leif.lindholm@linaro.org (Leif Lindholm)
-Date: Wed, 6 Aug 2014 14:06:23 +0100
-Subject: [PATCH 1/2] UEFI arm64: add noefi boot param
-In-Reply-To: <20140806083825.GA31711@dhcp-16-198.nay.redhat.com>
-References: <20140806083825.GA31711@dhcp-16-198.nay.redhat.com>
-Message-ID: <20140806130623.GI4179@bivouac.eciton.net>
+From: ronald.wahl@raritan.com (Ronald Wahl)
+Date: Wed,  6 Aug 2014 15:11:42 +0200
+Subject: [PATCH v2] usb: gadget: at91_udc: move prepare clk into process
+ context
+Message-ID: <1407330702-2926-1-git-send-email-ronald.wahl@raritan.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Aug 06, 2014 at 04:38:25PM +0800, Dave Young wrote:
-> 
-> Adding a noefi boot param like in X86 to disable efi runtime services support.
-> 
-> This will be useful for debugging uefi problems. Also it will be useful
-> for later kexec/kdump work. Kexec on uefi support in X86 depends on a fixed vm
-> area specific for uefi runtime 1:1 mapping, kernel will switch to a different
-> page table for any uefi runtime callback in virtual mode. In arm64 similar
-> work probably is necessary. But kexec boot will just works with 'noefi' with
-> the limitaion of lacking runtime services. The runtime services is not critical
-> for kdump kernel for now. So as for kexec/kdump just leave the 1:1 mapping a
-> future work.
-
-Since this is really turning an x86-specific feature into a generic
-one, could it be moved to core code?
-Maybe an efi.mask, reusing the efi_enabled defines, with an
-efi_disabled macro?
-
-Also, since this patch (and its x86 predecessor) is not really
-"noefi", could this be integrated with the "efi=" patch
-(http://permalink.gmane.org/gmane.linux.kernel.efi/4405),
-as an efi=noruntime option?
-
-On x86, due to CSM, "noefi" was a useful fallback for completely
-broken (U)EFI implementations - but on an arm* UEFI system, there will
-be no fallback. Could it be wrapped in a kernel hacking config option?
-
-Partial code description, not even compile tested:
+Commit 7628083227b6bc4a7e33d7c381d7a4e558424b6b added clock preparation in
+interrupt context. This is not allowed as it might sleep. Move clock
+preparation into process context (at91udc_probe).
 ---
-diff --git a/arch/arm64/kernel/efi.c b/arch/arm64/kernel/efi.c
-index 14db1f6..a295a5c 100644
---- a/arch/arm64/kernel/efi.c
-+++ b/arch/arm64/kernel/efi.c
-@@ -386,7 +386,7 @@ static int __init arm64_enter_virtual_mode(void)
- 	int count = 0;
- 	unsigned long flags;
+ drivers/usb/gadget/udc/at91_udc.c | 39 ++++++++++++++++++++++++++++++---------
+ 1 file changed, 30 insertions(+), 9 deletions(-)
+
+diff --git a/drivers/usb/gadget/udc/at91_udc.c b/drivers/usb/gadget/udc/at91_udc.c
+index cfd18bc..0b347a0 100644
+--- a/drivers/usb/gadget/udc/at91_udc.c
++++ b/drivers/usb/gadget/udc/at91_udc.c
+@@ -872,10 +872,10 @@ static void clk_on(struct at91_udc *udc)
  
--	if (!efi_enabled(EFI_BOOT)) {
-+	if (!efi_enabled(EFI_BOOT) || efi_disabled(EFI_RUNTIME_SERVICES)) {
- 		pr_info("EFI services will not be available.\n");
- 		return -1;
+ 	if (IS_ENABLED(CONFIG_COMMON_CLK)) {
+ 		clk_set_rate(udc->uclk, 48000000);
+-		clk_prepare_enable(udc->uclk);
++		clk_enable(udc->uclk);
  	}
-diff --git a/arch/x86/platform/efi/efi.c b/arch/x86/platform/efi/efi.c
-index 87fc96b..b59a7c6 100644
---- a/arch/x86/platform/efi/efi.c
-+++ b/arch/x86/platform/efi/efi.c
-@@ -77,14 +77,6 @@ static efi_config_table_type_t arch_tables[] __initdata = {
- 
- u64 efi_setup;		/* efi setup_data physical address */
- 
--static bool disable_runtime __initdata = false;
--static int __init setup_noefi(char *arg)
--{
--	disable_runtime = true;
--	return 0;
--}
--early_param("noefi", setup_noefi);
--
- int add_efi_memmap;
- EXPORT_SYMBOL(add_efi_memmap);
- 
-@@ -764,7 +756,7 @@ void __init efi_init(void)
- 	if (!efi_runtime_supported())
- 		pr_info("No EFI runtime due to 32/64-bit mismatch with kernel\n");
- 	else {
--		if (disable_runtime || efi_runtime_init())
-+		if (efi_disabled(EFI_RUNTIME_SERVICES) || efi_runtime_init())
- 			return;
- 	}
- 	if (efi_memmap_init())
-diff --git a/drivers/firmware/efi/efi.c b/drivers/firmware/efi/efi.c
-index dc79346..ffc4a45 100644
---- a/drivers/firmware/efi/efi.c
-+++ b/drivers/firmware/efi/efi.c
-@@ -43,6 +43,15 @@ EXPORT_SYMBOL(efi);
- static struct kobject *efi_kobj;
- static struct kobject *efivars_kobj;
- 
-+static int __init setup_noefi(char *arg)
-+{
-+#if defined(CONFIG_X86) || defined(CONFIG_EFI_DEBUG)
-+	set_bit(EFI_RUNTIME_SERVICES, &efi.mask);
-+#endif
-+	return 0;
-+}
-+early_param("noefi", setup_noefi);
-+
- /*
-  * Let's not leave out systab information that snuck into
-  * the efivars driver
-diff --git a/include/linux/efi.h b/include/linux/efi.h
-index 41bbf8b..9533d0e 100644
---- a/include/linux/efi.h
-+++ b/include/linux/efi.h
-@@ -826,6 +826,7 @@ extern struct efi {
- 	efi_set_virtual_address_map_t *set_virtual_address_map;
- 	struct efi_memory_map *memmap;
- 	unsigned long flags;
-+	unsigned long mask;
- } efi;
- 
- static inline int
-@@ -926,6 +927,10 @@ static inline bool efi_enabled(int feature)
- {
- 	return test_bit(feature, &efi.flags) != 0;
+-	clk_prepare_enable(udc->iclk);
+-	clk_prepare_enable(udc->fclk);
++	clk_enable(udc->iclk);
++	clk_enable(udc->fclk);
  }
-+static inline bool efi_disabled(int feature)
-+{
-+	return test_bit(feature, &efi.mask) == 0;
-+}
- #else
- static inline bool efi_enabled(int feature)
- {
----
-
-/
-    Leif
-
-> Signed-off-by: Dave Young <dyoung@redhat.com>
-> ---
->  arch/arm64/kernel/efi.c |   17 ++++++++++++++---
->  1 file changed, 14 insertions(+), 3 deletions(-)
-> 
-> Index: linux-2.6/arch/arm64/kernel/efi.c
-> ===================================================================
-> --- linux-2.6.orig/arch/arm64/kernel/efi.c
-> +++ linux-2.6/arch/arm64/kernel/efi.c
-> @@ -31,6 +31,14 @@ static efi_runtime_services_t *runtime;
->  
->  static u64 efi_system_table;
->  
-> +static bool disable_runtime __initdata = false;
-> +static int __init setup_noefi(char *arg)
-> +{
-> +	disable_runtime = true;
-> +	return 0;
-> +}
-> +early_param("noefi", setup_noefi);
-> +
->  static int uefi_debug __initdata;
->  static int __init uefi_debug_setup(char *str)
->  {
-> @@ -391,11 +399,14 @@ static int __init arm64_enter_virtual_mo
->  		return -1;
->  	}
->  
-> -	pr_info("Remapping and enabling EFI services.\n");
-> -
-> -	/* replace early memmap mapping with permanent mapping */
->  	mapsize = memmap.map_end - memmap.map;
->  	early_memunmap(memmap.map, mapsize);
-> +
-> +	if (disable_runtime)
-> +		return -ENODEV;
-> +
-> +	pr_info("Remapping and enabling EFI services.\n");
-> +	/* replace early memmap mapping with permanent mapping */
->  	memmap.map = (__force void *)ioremap_cache((phys_addr_t)memmap.phys_map,
->  						   mapsize);
->  	memmap.map_end = memmap.map + mapsize;
+ 
+ static void clk_off(struct at91_udc *udc)
+@@ -884,10 +884,10 @@ static void clk_off(struct at91_udc *udc)
+ 		return;
+ 	udc->clocked = 0;
+ 	udc->gadget.speed = USB_SPEED_UNKNOWN;
+-	clk_disable_unprepare(udc->fclk);
+-	clk_disable_unprepare(udc->iclk);
++	clk_disable(udc->fclk);
++	clk_disable(udc->iclk);
+ 	if (IS_ENABLED(CONFIG_COMMON_CLK))
+-		clk_disable_unprepare(udc->uclk);
++		clk_disable(udc->uclk);
+ }
+ 
+ /*
+@@ -1780,14 +1780,23 @@ static int at91udc_probe(struct platform_device *pdev)
+ 	}
+ 
+ 	/* don't do anything until we have both gadget driver and VBUS */
++	if (IS_ENABLED(CONFIG_COMMON_CLK)) {
++		retval = clk_prepare(udc->uclk);
++		if (retval)
++			goto fail1;
++	}
++	retval = clk_prepare(udc->fclk);
++	if (retval)
++		goto fail1a;
++
+ 	retval = clk_prepare_enable(udc->iclk);
+ 	if (retval)
+-		goto fail1;
++		goto fail1b;
+ 	at91_udp_write(udc, AT91_UDP_TXVC, AT91_UDP_TXVC_TXVDIS);
+ 	at91_udp_write(udc, AT91_UDP_IDR, 0xffffffff);
+ 	/* Clear all pending interrupts - UDP may be used by bootloader. */
+ 	at91_udp_write(udc, AT91_UDP_ICR, 0xffffffff);
+-	clk_disable_unprepare(udc->iclk);
++	clk_disable(udc->iclk);
+ 
+ 	/* request UDC and maybe VBUS irqs */
+ 	udc->udp_irq = platform_get_irq(pdev, 0);
+@@ -1795,7 +1804,7 @@ static int at91udc_probe(struct platform_device *pdev)
+ 			0, driver_name, udc);
+ 	if (retval < 0) {
+ 		DBG("request irq %d failed\n", udc->udp_irq);
+-		goto fail1;
++		goto fail1c;
+ 	}
+ 	if (gpio_is_valid(udc->board.vbus_pin)) {
+ 		retval = gpio_request(udc->board.vbus_pin, "udc_vbus");
+@@ -1848,6 +1857,13 @@ fail3:
+ 		gpio_free(udc->board.vbus_pin);
+ fail2:
+ 	free_irq(udc->udp_irq, udc);
++fail1c:
++	clk_unprepare(udc->iclk);
++fail1b:
++	clk_unprepare(udc->fclk);
++fail1a:
++	if (IS_ENABLED(CONFIG_COMMON_CLK))
++		clk_unprepare(udc->uclk);
+ fail1:
+ 	if (IS_ENABLED(CONFIG_COMMON_CLK) && !IS_ERR(udc->uclk))
+ 		clk_put(udc->uclk);
+@@ -1896,6 +1912,11 @@ static int __exit at91udc_remove(struct platform_device *pdev)
+ 	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+ 	release_mem_region(res->start, resource_size(res));
+ 
++	if (IS_ENABLED(CONFIG_COMMON_CLK))
++		clk_unprepare(udc->uclk);
++	clk_unprepare(udc->fclk);
++	clk_unprepare(udc->iclk);
++
+ 	clk_put(udc->iclk);
+ 	clk_put(udc->fclk);
+ 	if (IS_ENABLED(CONFIG_COMMON_CLK))
+-- 
+1.9.3
