@@ -1,95 +1,106 @@
-From: sdu.liu@huawei.com (Liu hua)
-Date: Wed, 6 Aug 2014 11:40:19 +0800
-Subject: [PATCH v3 2/2] ARM : change fixmap mapping region to support
- 32 CPUs
-In-Reply-To: <CAGXu5j+ga5Enrsd8LuYarGh1Ozakmi3MNw+b9fZ7ubGUJFZY=w@mail.gmail.com>
-References: <1397559967-26050-1-git-send-email-sdu.liu@huawei.com>	<1397559967-26050-3-git-send-email-sdu.liu@huawei.com>	<CAL_JsqKE-L2PN3mXHNdTPMEyTMR9ZtbgGB=O_V6nOXN0YC0a4A@mail.gmail.com>	<alpine.LFD.2.11.1405301441210.17310@knanqh.ubzr>
- <CAGXu5j+ga5Enrsd8LuYarGh1Ozakmi3MNw+b9fZ7ubGUJFZY=w@mail.gmail.com>
-Message-ID: <53E1A3A3.8080706@huawei.com>
+From: greg@kroah.com (Greg KH)
+Date: Tue, 5 Aug 2014 21:04:50 -0700
+Subject: linux-next: build failure after merge of the usb tree
+In-Reply-To: <20140806113935.6728d15c@canb.auug.org.au>
+References: <20140724170755.035cea1c@canb.auug.org.au>
+ <20140724074452.GB11963@kroah.com>
+ <20140806113935.6728d15c@canb.auug.org.au>
+Message-ID: <20140806040450.GA7859@kroah.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-? 2014/8/6 10:51, Kees Cook ??:
-> On Fri, May 30, 2014 at 12:25 PM, Nicolas Pitre
-> <nicolas.pitre@linaro.org> wrote:
->> On Fri, 30 May 2014, Rob Herring wrote:
->>
->>> There's work in flight to support early_ioremap, early console, and RO
->>> text patching which all use the fixmap region.
->>>
->>> There's a couple of options to solve this:
->>>
->>> - Only support up to 16 cpus. It could be anywhere between 17-31, but
->>> that seems somewhat unlikely. Are we really ever going to see 32-bit
->>> 32 core systems?
->>
->> I wouldn't rule that out.  I've seen 16-core ARM chips in 2008 (although
->> they didn't go into production).  Silly limitations like that always
->> come back to bite you.  And we have better alternatives.
->>
->>> - Reduce KM_TYPE_NR from 16 to 15. Based on the comment for it, we
->>> probably don't want to do that. Is increasing it to the default of 20
->>> worthwhile? Some of the options here would allow doing that.
->>> - Add 0xffe00000-0xfff00000 to the fixmap region. This would make
->>> fixmap span 2 PMDs with the top PMD having a mixture of uses like we
->>> had before.
->>
->> That would be my preferred approach.  Note here it could be
->> 0xffe00000-0xfffe0000 to include the whole of the previous fixmap area
->> curently unused.
->>
->>> - push the PCI i/o space down to 0xfec00000 and make fixmap 4MB. This
->>> is a cleaner solution as the 2 PMDs are only used for fixmap. This may
->>> require some static mapping adjustments on some platforms.
->>
->> No need.  With the latest changes, the fixmap area is between 0xffc00000
->> and 0xffe00000 (there is apparently a mistake in
->> Documentation/arm/memory.txt).  So currently 0xff000000-0xffc00000 is
->> free, which makes the fixmap area far away from the PCI i/o area with
->> plenti of space in between.
+On Wed, Aug 06, 2014 at 11:39:35AM +1000, Stephen Rothwell wrote:
+> Hi,
 > 
-> So, it seems there is something wrong with this patch series. I had to
-> revert "ARM: 8031/2: change fixmap mapping region to support 32 CPUs"
-> to make other fixmap changes work correctly. I think this is due to
-> the non-highmem config case moving the fixmap to a location where
-> there is to page table entry...
-Hi Kees,
+> On Thu, 24 Jul 2014 00:44:52 -0700 Greg KH <greg@kroah.com> wrote:
+> >
+> > On Thu, Jul 24, 2014 at 05:07:55PM +1000, Stephen Rothwell wrote:
+> > > Hi Greg,
+> > > 
+> > > After merging the usb tree, today's linux-next build (x86_64 allmodconfig)
+> > > failed like this:
+> > > 
+> > > drivers/phy/phy-spear1310-miphy.c: In function 'spear1310_miphy_probe':
+> > > drivers/phy/phy-spear1310-miphy.c:232:14: warning: passing argument 2 of 'devm_phy_create' from incompatible pointer type
+> > >   priv->phy = devm_phy_create(dev, &spear1310_miphy_ops, NULL);
+> > >               ^
+> > > In file included from drivers/phy/phy-spear1310-miphy.c:21:0:
+> > > include/linux/phy/phy.h:164:13: note: expected 'struct device_node *' but argument is of type 'struct phy_ops *'
+> > >  struct phy *devm_phy_create(struct device *dev, struct device_node *node,
+> > >              ^
+> > > drivers/phy/phy-spear1310-miphy.c:232:14: error: too few arguments to function 'devm_phy_create'
+> > >   priv->phy = devm_phy_create(dev, &spear1310_miphy_ops, NULL);
+> > >               ^
+> > > In file included from drivers/phy/phy-spear1310-miphy.c:21:0:
+> > > include/linux/phy/phy.h:164:13: note: declared here
+> > >  struct phy *devm_phy_create(struct device *dev, struct device_node *node,
+> > >              ^
+> > > drivers/phy/phy-spear1340-miphy.c: In function 'spear1340_miphy_probe':
+> > > drivers/phy/phy-spear1340-miphy.c:264:14: warning: passing argument 2 of 'devm_phy_create' from incompatible pointer type
+> > >   priv->phy = devm_phy_create(dev, &spear1340_miphy_ops, NULL);
+> > >               ^
+> > > In file included from drivers/phy/phy-spear1340-miphy.c:21:0:
+> > > include/linux/phy/phy.h:164:13: note: expected 'struct device_node *' but argument is of type 'struct phy_ops *'
+> > >  struct phy *devm_phy_create(struct device *dev, struct device_node *node,
+> > >              ^
+> > > drivers/phy/phy-spear1340-miphy.c:264:14: error: too few arguments to function 'devm_phy_create'
+> > >   priv->phy = devm_phy_create(dev, &spear1340_miphy_ops, NULL);
+> > >               ^
+> > > In file included from drivers/phy/phy-spear1340-miphy.c:21:0:
+> > > include/linux/phy/phy.h:164:13: note: declared here
+> > >  struct phy *devm_phy_create(struct device *dev, struct device_node *node,
+> > >              ^
+> > > 
+> > > Caused by commit f0ed817638b5 ("phy: core: Let node ptr of PHY point to
+> > > PHY and not of PHY provider") interacting with commit 64562e99477f
+> > > ("phy: Add drivers for PCIe and SATA phy on SPEAr13xx") from the
+> > > arm-soc tree.
+> > > 
+> > > I fixed that up and then got:
+> > > 
+> > > drivers/pinctrl/pinctrl-tegra-xusb.c: In function 'tegra_xusb_padctl_probe':
+> > > drivers/pinctrl/pinctrl-tegra-xusb.c:913:8: warning: passing argument 2 of 'devm_phy_create' from incompatible pointer type
+> > >   phy = devm_phy_create(&pdev->dev, &pcie_phy_ops, NULL);
+> > >         ^
+> > > In file included from drivers/pinctrl/pinctrl-tegra-xusb.c:18:0:
+> > > include/linux/phy/phy.h:164:13: note: expected 'struct device_node *' but argument is of type 'const struct phy_ops *'
+> > >  struct phy *devm_phy_create(struct device *dev, struct device_node *node,
+> > >              ^
+> > > drivers/pinctrl/pinctrl-tegra-xusb.c:913:8: error: too few arguments to function 'devm_phy_create'
+> > >   phy = devm_phy_create(&pdev->dev, &pcie_phy_ops, NULL);
+> > >         ^
+> > > In file included from drivers/pinctrl/pinctrl-tegra-xusb.c:18:0:
+> > > include/linux/phy/phy.h:164:13: note: declared here
+> > >  struct phy *devm_phy_create(struct device *dev, struct device_node *node,
+> > >              ^
+> > > drivers/pinctrl/pinctrl-tegra-xusb.c:922:8: warning: passing argument 2 of 'devm_phy_create' from incompatible pointer type
+> > >   phy = devm_phy_create(&pdev->dev, &sata_phy_ops, NULL);
+> > >         ^
+> > > In file included from drivers/pinctrl/pinctrl-tegra-xusb.c:18:0:
+> > > include/linux/phy/phy.h:164:13: note: expected 'struct device_node *' but argument is of type 'const struct phy_ops *'
+> > >  struct phy *devm_phy_create(struct device *dev, struct device_node *node,
+> > >              ^
+> > > drivers/pinctrl/pinctrl-tegra-xusb.c:922:8: error: too few arguments to function 'devm_phy_create'
+> > >   phy = devm_phy_create(&pdev->dev, &sata_phy_ops, NULL);
+> > >         ^
+> > > In file included from drivers/pinctrl/pinctrl-tegra-xusb.c:18:0:
+> > > include/linux/phy/phy.h:164:13: note: declared here
+> > >  struct phy *devm_phy_create(struct device *dev, struct device_node *node,
+> > >              ^
+> > > 
+> > > From an interaction with commit dc0a39386687 ("pinctrl: Add NVIDIA
+> > > Tegra XUSB pad controller support") from the arm-soc tree.
+> > > 
+> > > Final merge fix patch:
+> > 
+> > Ugh, what a mess, sorry about that.  I'll keep this around for if I end
+> > up merging with Linus after these other trees get merged.
+> 
+> Since the usb tree has gone upstream, this merge fix patch is now
+> needed when the arm-soc tree is merged.
 
-Did this patch conflict with others, or it will at the future?
+I'll let the arm developers worry about this :)
 
-As Rob said "There's work in flight to support early_ioremap, early console, and RO
-text patching which all use the fixmap region."  So if this patch will block kernel's
-new feature, Should we makes new patch to changes it, not revert it. Because there are
-arm platforms with more than 14 CPUs.
+thanks,
 
-Thanks,
-Liu Hua
-> 
-> -Kees
-> 
->>
->>> - Same as previous option, but convert the PCI i/o space to fixmap
->>> entries. We don't really need all 2MB for PCI.
->>
->> See above.
->>
->>> Also, there is an error in the documentation below:
->>>
->>>>
->>>> Signed-off-by: Liu Hua <sdu.liu@huawei.com>
->>>> ---
->>>>  Documentation/arm/memory.txt   |  2 +-
->>
->> Yep, good that you spotted it as well.  I failed to catch it during my
->> review so I'll send a patch.
->>
->>
->> Nicolas
->>
->> _______________________________________________
->> linux-arm-kernel mailing list
->> linux-arm-kernel at lists.infradead.org
->> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
-> 
-> 
-> 
+greg k-h
