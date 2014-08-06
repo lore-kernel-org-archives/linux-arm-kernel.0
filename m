@@ -1,33 +1,23 @@
-From: matt@console-pimps.org (Matt Fleming)
-Date: Wed, 6 Aug 2014 15:55:03 +0100
-Subject: [PATCH 1/2] UEFI arm64: add noefi boot param
-In-Reply-To: <20140806144839.GK4179@bivouac.eciton.net>
-References: <20140806083825.GA31711@dhcp-16-198.nay.redhat.com>
- <20140806130623.GI4179@bivouac.eciton.net>
- <20140806132021.GB15082@console-pimps.org>
- <20140806132941.GJ4179@bivouac.eciton.net>
- <20140806140155.GC15082@console-pimps.org>
- <CAKv+Gu8ey1iKu-_wS6yYaEXQaQMDXa+PF5Kiw+edA9a_OE1EAw@mail.gmail.com>
- <20140806141814.GD15082@console-pimps.org>
- <20140806144839.GK4179@bivouac.eciton.net>
-Message-ID: <20140806145503.GF15082@console-pimps.org>
+From: Nathan_Lynch@mentor.com (Nathan Lynch)
+Date: Wed, 6 Aug 2014 10:09:25 -0500
+Subject: [Regression] FEC: Panic on suspend in 3.16
+In-Reply-To: <53E24147.4050304@parkeon.com>
+References: <53E24147.4050304@parkeon.com>
+Message-ID: <53E24525.2020809@mentor.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 06 Aug, at 03:48:39PM, Leif Lindholm wrote:
+On 08/06/2014 09:52 AM, Martin Fuzzey wrote:
+> Hi all,
 > 
-> Since we're now overlaying two different meanings onto the
-> EFI_RUNTIME_SERVICES bit, could we add comments at set/clear points to
-> explicitly state the intended action? I.e.:
+> I am using the fec ethernet driver on a i.MX53 SoC.
 > 
-> /* Set to attempt runtime services initialisation */
-> 
-> /* Clear to indicate runtime services will not be available */
+> All was working fine on 3.13 but, after upgrading to 3.16 I now get a
+> panic on suspend:
 
-Good idea.
+Same issue reported here:
 
-My patch was only a hack to show how it's possible to use efi_enabled().
-It may require some finessing ;-)
+http://lists.infradead.org/pipermail/linux-arm-kernel/2014-August/277728.html
 
--- 
-Matt Fleming, Intel Open Source Technology Center
+a71e3c37960c (net: phy: Set the driver when registering an MDIO bus
+device) has been implicated; try reverting that.
