@@ -1,415 +1,177 @@
-From: fugang.duan@freescale.com (fugang.duan at freescale.com)
-Date: Wed, 6 Aug 2014 02:33:17 +0000
-Subject: [PATCH v6 1/2] i2c: imx: add DMA support for freescale i2c driver
-In-Reply-To: <1407232563-10856-2-git-send-email-yao.yuan@freescale.com>
-References: <1407232563-10856-1-git-send-email-yao.yuan@freescale.com>
- <1407232563-10856-2-git-send-email-yao.yuan@freescale.com>
-Message-ID: <41705e1e4c604240ba96333a03d5c544@BLUPR03MB373.namprd03.prod.outlook.com>
+From: nicolas.pitre@linaro.org (Nicolas Pitre)
+Date: Tue, 5 Aug 2014 22:34:56 -0400 (EDT)
+Subject: [PATCH v2] irqchip: gic: Allow gic_arch_extn hooks to call into
+ scheduler
+In-Reply-To: <53E14B33.9080701@codeaurora.org>
+References: <alpine.LFD.2.11.1408041858570.6061@knanqh.ubzr>
+ <1407194837-27190-1-git-send-email-sboyd@codeaurora.org>
+ <53E118EE.5040205@codeaurora.org>
+ <alpine.LFD.2.11.1408051537250.6061@knanqh.ubzr>
+ <53E14B33.9080701@codeaurora.org>
+Message-ID: <alpine.LFD.2.11.1408052222350.6061@knanqh.ubzr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From:  Yuan Yao<yao.yuan@freescale.com> Data: Tuesday, August 05, 2014 5:56 PM
->To: wsa at the-dreams.de; marex at denx.de
->Cc: LW at KARO-electronics.de; mark.rutland at arm.com; shawn.guo at linaro.org;
->linux-kernel at vger.kernel.org; linux-arm-kernel at lists.infradead.org; linux-
->i2c at vger.kernel.org
->Subject: [PATCH v6 1/2] i2c: imx: add DMA support for freescale i2c driver
->
->Add dma support for i2c. This function depend on DMA driver.
->You can turn on it by write both the dmas and dma-name properties in dts
->node.
->DMA is optional, even DMA request unsuccessfully, i2c can also work well.
->
->Signed-off-by: Yuan Yao <yao.yuan@freescale.com>
->---
-> drivers/i2c/busses/i2c-imx.c | 341
->+++++++++++++++++++++++++++++++++++++++++--
-> 1 file changed, 331 insertions(+), 10 deletions(-)
->
->diff --git a/drivers/i2c/busses/i2c-imx.c b/drivers/i2c/busses/i2c-imx.c
->index aa8bc14..60ea946 100644
->--- a/drivers/i2c/busses/i2c-imx.c
->+++ b/drivers/i2c/busses/i2c-imx.c
->@@ -37,22 +37,27 @@
-> /** Includes
->*******************************************************************
->
->**************************************************************************
->*****/
-[...]
+On Tue, 5 Aug 2014, Stephen Boyd wrote:
 
->+/* Functions for DMA support */
->+static int i2c_imx_dma_request(struct imx_i2c_struct *i2c_imx,
->+						dma_addr_t phy_addr)
->+{
->+	struct imx_i2c_dma *dma;
->+	struct dma_slave_config dma_sconfig;
->+	struct device *dev = &i2c_imx->adapter.dev;
->+	int ret;
->+
->+	dma = devm_kzalloc(dev, sizeof(struct imx_i2c_dma), GFP_KERNEL);
->+	if (!dma)
->+		return -ENOMEM;
->+
->+	dma->chan_tx = dma_request_slave_channel(dev, "tx");
->+	if (!dma->chan_tx) {
->+		dev_dbg(dev, "can't request DMA tx channel\n");
->+		ret = -ENODEV;
->+		goto fail_al;
->+	}
->+
->+	dma_sconfig.dst_addr = phy_addr +
->+				(IMX_I2C_I2DR << i2c_imx->hwdata->regshift);
->+	dma_sconfig.dst_addr_width = DMA_SLAVE_BUSWIDTH_1_BYTE;
->+	dma_sconfig.dst_maxburst = 1;
-The maxburst is 1 cause very slow efficiency for DMA copy, which system performance even is slower
-Than cpu mode.
+> On 08/05/14 12:50, Nicolas Pitre wrote:
+> > On Tue, 5 Aug 2014, Stephen Boyd wrote:
+> >
+> >> +nico (sorry dropped CC for v2)
+> >>
+> >> On 08/04/14 16:27, Stephen Boyd wrote:
+> >>> Commit 1a6b69b6548c (ARM: gic: add CPU migration support,
+> >>> 2012-04-12) introduced an acquisition of the irq_controller_lock
+> >>> in gic_raise_softirq() which can lead to a spinlock recursion if
+> >>> the gic_arch_extn hooks call into the scheduler (via complete()
+> >>> or wake_up(), etc.). This happens because gic_arch_extn hooks are
+> >>> normally called with the irq_controller_lock held and calling
+> >>> into the scheduler may cause us to call smp_send_reschedule()
+> >>> which will grab the irq_controller_lock again. Here's an example
+> >>> from a vendor kernel (note that the gic_arch_extn hook code here
+> >>> isn't actually in mainline):
+> >>>
+> >>> BUG: spinlock recursion on CPU#0, swapper/0/1
+> >>>  lock: irq_controller_lock+0x0/0x18, .magic: dead4ead, .owner: sw
+> >>> er_cpu: 0
+> >>> CPU: 0 PID: 1 Comm: swapper/0 Not tainted 3.14.10-00430-g3d433c4e
+> >>>
+> >>> Call trace:
+> >>> [<ffffffc000087e1c>] dump_backtrace+0x0/0x140
+> >>> [<ffffffc000087f6c>] show_stack+0x10/0x1c
+> >>> [<ffffffc00064732c>] dump_stack+0x74/0xc4
+> >>> [<ffffffc0006446c0>] spin_dump+0x78/0x88
+> >>> [<ffffffc0006446f4>] spin_bug+0x24/0x34
+> >>> [<ffffffc0000d47d0>] do_raw_spin_lock+0x58/0x148
+> >>> [<ffffffc00064d398>] _raw_spin_lock_irqsave+0x24/0x38
+> >>> [<ffffffc0002c9d7c>] gic_raise_softirq+0x2c/0xbc
+> >>> [<ffffffc00008daa4>] smp_send_reschedule+0x34/0x40
+> >>> [<ffffffc0000c1e94>] try_to_wake_up+0x224/0x288
+> >>> [<ffffffc0000c1f4c>] default_wake_function+0xc/0x18
+> >>> [<ffffffc0000ceef0>] __wake_up_common+0x50/0x8c
+> >>> [<ffffffc0000cef3c>] __wake_up_locked+0x10/0x1c
+> >>> [<ffffffc0000cf734>] complete+0x3c/0x5c
+> >>> [<ffffffc0002f0e78>] msm_mpm_enable_irq_exclusive+0x1b8/0x1c8
+> >>> [<ffffffc0002f0f58>] __msm_mpm_enable_irq+0x4c/0x7c
+> >>> [<ffffffc0002f0f94>] msm_mpm_enable_irq+0xc/0x18
+> >>> [<ffffffc0002c9bb0>] gic_unmask_irq+0x40/0x7c
+> >>> [<ffffffc0000de5f4>] irq_enable+0x2c/0x48
+> >>> [<ffffffc0000de65c>] irq_startup+0x4c/0x74
+> >>> [<ffffffc0000dd2fc>] __setup_irq+0x264/0x3f0
+> >>> [<ffffffc0000dd5e0>] request_threaded_irq+0xcc/0x11c
+> >>> [<ffffffc0000df254>] devm_request_threaded_irq+0x68/0xb4
+> >>> [<ffffffc000471520>] msm_iommu_ctx_probe+0x124/0x2d4
+> >>> [<ffffffc000337374>] platform_drv_probe+0x20/0x54
+> >>> [<ffffffc00033598c>] driver_probe_device+0x158/0x340
+> >>> [<ffffffc000335c20>] __driver_attach+0x60/0x90
+> >>> [<ffffffc000333c9c>] bus_for_each_dev+0x6c/0x8c
+> >>> [<ffffffc000335304>] driver_attach+0x1c/0x28
+> >>> [<ffffffc000334f14>] bus_add_driver+0x120/0x204
+> >>> [<ffffffc0003362e4>] driver_register+0xbc/0x10c
+> >>> [<ffffffc000337348>] __platform_driver_register+0x5c/0x68
+> >>> [<ffffffc00094c478>] msm_iommu_driver_init+0x54/0x7c
+> >>> [<ffffffc0000813ec>] do_one_initcall+0xa4/0x130
+> >>> [<ffffffc00091d928>] kernel_init_freeable+0x138/0x1dc
+> >>> [<ffffffc000642578>] kernel_init+0xc/0xd4
+> >>>
+> >>> We really just want to synchronize the sending of an SGI with the
+> >>> update of the gic_cpu_map[], so introduce a new SGI lock that we
+> >>> can use to synchronize the two code paths. Three main events are
+> >>> happening that we have to consider:
+> >>>
+> >>> 	1. We're updating the gic_cpu_mask to point to an
+> >>> 	incoming CPU
+> >>>
+> >>> 	2. We're (potentially) sending an SGI to the outgoing CPU
+> >>>
+> >>> 	3. We're redirecting any pending SGIs for the outgoing
+> >>> 	CPU to the incoming CPU.
+> >>>
+> >>> Events 1 and 3 are already ordered within the same CPU by means
+> >>> of program order and use of I/O accessors. Events 1 and 2 don't
+> >>> need to be ordered, but events 2 and 3 do because any SGIs for
+> >>> the outgoing CPU need to be pending before we can redirect them.
+> >>> Synchronize by acquiring a new lock around event 2 and before
+> >>> event 3. Use smp_mb__after_unlock_lock() before event 3 to ensure
+> >>> that event 1 is seen before event 3 on other CPUs that may be
+> >>> executing event 2.
+> >>>
+> >>> Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
+> >>> ---
+> >>>
+> >>> Changes since v1:
+> >>>  * Move gic_sgi_lock definition below gic_cpu_map[]
+> >>>  * Just use spinlock for synchronization instead of over the map update
+> >>>
+> >>>  drivers/irqchip/irq-gic.c | 16 ++++++++++++++--
+> >>>  1 file changed, 14 insertions(+), 2 deletions(-)
+> >>>
+> >>> diff --git a/drivers/irqchip/irq-gic.c b/drivers/irqchip/irq-gic.c
+> >>> index 7c131cf7cc13..00bac4627d2e 100644
+> >>> --- a/drivers/irqchip/irq-gic.c
+> >>> +++ b/drivers/irqchip/irq-gic.c
+> >>> @@ -81,6 +81,9 @@ static DEFINE_RAW_SPINLOCK(irq_controller_lock);
+> >>>  #define NR_GIC_CPU_IF 8
+> >>>  static u8 gic_cpu_map[NR_GIC_CPU_IF] __read_mostly;
+> >>>  
+> >>> +/* Synchronize switching CPU interface and sending SGIs */
+> >>> +static DEFINE_RAW_SPINLOCK(gic_sgi_lock);
+> >> This also needs an #ifdef CONFIG_SMP
+> >>
+> >>> +
+> >>>  /*
+> >>>   * Supported arch specific GIC irq extension.
+> >>>   * Default make them NULL.
+> >>> @@ -658,7 +661,7 @@ static void gic_raise_softirq(const struct cpumask *mask, unsigned int irq)
+> >>>  	int cpu;
+> >>>  	unsigned long flags, map = 0;
+> >>>  
+> >>> -	raw_spin_lock_irqsave(&irq_controller_lock, flags);
+> >>> +	raw_spin_lock_irqsave(&gic_sgi_lock, flags);
+> >>>  
+> >>>  	/* Convert our logical CPU mask into a physical one. */
+> >>>  	for_each_cpu(cpu, mask)
+> >>> @@ -673,7 +676,7 @@ static void gic_raise_softirq(const struct cpumask *mask, unsigned int irq)
+> >>>  	/* this always happens on GIC0 */
+> >>>  	writel_relaxed(map << 16 | irq, gic_data_dist_base(&gic_data[0]) + GIC_DIST_SOFTINT);
+> >>>  
+> >>> -	raw_spin_unlock_irqrestore(&irq_controller_lock, flags);
+> >>> +	raw_spin_unlock_irqrestore(&gic_sgi_lock, flags);
+> >>>  }
+> >>>  #endif
+> >>>  
+> >>> @@ -764,6 +767,15 @@ void gic_migrate_target(unsigned int new_cpu_id)
+> >>>  
+> >>>  	raw_spin_unlock(&irq_controller_lock);
+> >>>  
+> >>> +	raw_spin_lock(&gic_sgi_lock);
+> >>> +	/*
+> >>> +	 * Ensure that the gic_cpu_map update above is seen in
+> >>> +	 * gic_raise_softirq() before we redirect any pending SGIs that
+> >>> +	 * may have been raised for the outgoing CPU (cur_cpu_id)
+> >>> +	 */
+> >>> +	smp_mb__after_unlock_lock();
+> >>> +	raw_spin_unlock(&gic_sgi_lock);
+> > I just can't see what protection the above hunk gives you.  I'd simply 
+> > add the extra lock inside the irq_controller_lock area.
+> 
+> It allows us to synchronize with another CPU that may be inside
+> gic_raise_softirq(). If the other CPU was in that function then this CPU
+> would wait until it was done sending the IPI to continue along and
+> reroute them. If the other CPU was just about to grab the sgi lock then
+> we would guarantee that the CPU would see the new gic_cpu_map value and
+> thus any redirection is not necessary.
 
->+	dma_sconfig.direction = DMA_MEM_TO_DEV;
->+	ret = dmaengine_slave_config(dma->chan_tx, &dma_sconfig);
->+	if (ret < 0) {
->+		dev_dbg(dev, "can't configure tx channel\n");
->+		goto fail_tx;
->+	}
->+
->+	dma->chan_rx = dma_request_slave_channel(dev, "rx");
->+	if (!dma->chan_rx) {
->+		dev_dbg(dev, "can't request DMA rx channel\n");
->+		ret = -ENODEV;
->+		goto fail_tx;
->+	}
->+
->+	dma_sconfig.src_addr = phy_addr +
->+				(IMX_I2C_I2DR << i2c_imx->hwdata->regshift);
->+	dma_sconfig.src_addr_width = DMA_SLAVE_BUSWIDTH_1_BYTE;
->+	dma_sconfig.src_maxburst = 1;
-As above.
+OK I get it now.
 
->+	dma_sconfig.direction = DMA_DEV_TO_MEM;
->+	ret = dmaengine_slave_config(dma->chan_rx, &dma_sconfig);
->+	if (ret < 0) {
->+		dev_dbg(dev, "can't configure rx channel\n");
->+		goto fail_rx;
->+	}
->+
->+	i2c_imx->dma = dma;
->+	init_completion(&dma->cmd_complete);
->+	dev_info(dev, "using %s (tx) and %s (rx) for DMA transfers\n",
->+		dma_chan_name(dma->chan_tx), dma_chan_name(dma->chan_rx));
->+
->+	return 0;
->+
->+fail_rx:
->+	dma_release_channel(dma->chan_rx);
->+fail_tx:
->+	dma_release_channel(dma->chan_tx);
->+fail_al:
->+	devm_kfree(dev, dma);
->+	dev_info(dev, "can't use DMA\n");
->+
->+	return ret;
->+}
->+
->+static void i2c_imx_dma_callback(void *arg) {
->+	struct imx_i2c_struct *i2c_imx = (struct imx_i2c_struct *)arg;
->+	struct imx_i2c_dma *dma = i2c_imx->dma;
->+
->+	dma_unmap_single(dma->chan_using->device->dev, dma->dma_buf,
->+			dma->dma_len, dma->dma_data_dir);
->+	complete(&dma->cmd_complete);
->+}
->+
->+static int i2c_imx_dma_xfer(struct imx_i2c_struct *i2c_imx,
->+					struct i2c_msg *msgs)
->+{
->+	struct imx_i2c_dma *dma = i2c_imx->dma;
->+	struct dma_async_tx_descriptor *txdesc;
->+	struct device *dev = &i2c_imx->adapter.dev;
->+	struct device *chan_dev = dma->chan_using->device->dev;
->+
->+	dma->dma_buf = dma_map_single(chan_dev, msgs->buf,
->+					dma->dma_len, dma->dma_data_dir);
->+	if (dma_mapping_error(chan_dev, dma->dma_buf)) {
->+		dev_err(dev, "DMA mapping failed\n");
->+		return -EINVAL;
->+	}
->+
->+	txdesc = dmaengine_prep_slave_single(dma->chan_using, dma->dma_buf,
->+					dma->dma_len, dma->dma_transfer_dir,
->+					DMA_PREP_INTERRUPT | DMA_CTRL_ACK);
->+	if (!txdesc) {
->+		dev_err(dev, "Not able to get desc for DMA xfer\n");
->+		dma_unmap_single(chan_dev, dma->dma_buf,
->+					dma->dma_len, dma->dma_data_dir);
->+		return -EINVAL;
->+	}
->+
->+	txdesc->callback = i2c_imx_dma_callback;
->+	txdesc->callback_param = i2c_imx;
->+	dmaengine_submit(txdesc);
->+	dma_async_issue_pending(dma->chan_using);
->+
->+	return 0;
->+}
->+
->+static void i2c_imx_dma_free(struct imx_i2c_struct *i2c_imx) {
->+	struct imx_i2c_dma *dma = i2c_imx->dma;
->+
->+	dma->dma_buf = 0;
->+	dma->dma_len = 0;
->+
->+	dma_release_channel(dma->chan_tx);
->+	dma->chan_tx = NULL;
->+
->+	dma_release_channel(dma->chan_rx);
->+	dma->chan_rx = NULL;
->+
->+	dma->chan_using = NULL;
->+}
->+
-> /** Functions for IMX I2C adapter driver
->***************************************
->
->**************************************************************************
->*****/
->
->@@ -379,6 +530,7 @@ static int i2c_imx_start(struct imx_i2c_struct
->*i2c_imx)
-> 	i2c_imx->stopped = 0;
->
-> 	temp |= I2CR_IIEN | I2CR_MTX | I2CR_TXAK;
->+	temp &= ~I2CR_DMAEN;
-> 	imx_i2c_write_reg(temp, i2c_imx, IMX_I2C_I2CR);
-> 	return result;
-> }
->@@ -432,6 +584,160 @@ static irqreturn_t i2c_imx_isr(int irq, void *dev_id)
-> 	return IRQ_NONE;
-> }
->
->+static int i2c_imx_dma_write(struct imx_i2c_struct *i2c_imx,
->+					struct i2c_msg *msgs)
->+{
->+	int result, timeout = IMX_I2C_DMA_TIMEOUT;
->+	unsigned int temp = 0;
->+	struct imx_i2c_dma *dma = i2c_imx->dma;
->+	struct device *dev = &i2c_imx->adapter.dev;
->+
->+	dev_dbg(dev, "<%s> write slave address: addr=0x%x\n",
->+		__func__, msgs->addr << 1);
->+
->+	reinit_completion(&i2c_imx->dma->cmd_complete);
->+	dma->chan_using = dma->chan_tx;
->+	dma->dma_transfer_dir = DMA_MEM_TO_DEV;
->+	dma->dma_data_dir = DMA_TO_DEVICE;
->+	dma->dma_len = msgs->len - 1;
->+	result = i2c_imx_dma_xfer(i2c_imx, msgs);
->+	if (result)
->+		return result;
->+
->+	temp = imx_i2c_read_reg(i2c_imx, IMX_I2C_I2CR);
->+	temp |= I2CR_DMAEN;
->+	imx_i2c_write_reg(temp, i2c_imx, IMX_I2C_I2CR);
->+
-First enable DMA, and then submit BD like as i2c read function operation.
+> I hoped that the commit text explained this.
 
->+	/*
->+	 * Write slave address.
->+	 * The first byte muse be transmitted by the CPU.
->+	 */
->+	imx_i2c_write_reg(msgs->addr << 1, i2c_imx, IMX_I2C_I2DR);
->+	result = wait_for_completion_interruptible_timeout(
->+				&i2c_imx->dma->cmd_complete,
->+				msecs_to_jiffies(IMX_I2C_DMA_TIMEOUT));
->+	if (result <= 0) {
->+		dmaengine_terminate_all(dma->chan_using);
->+		if (result)
->+			return result;
->+		else
->+			return -ETIMEDOUT;
->+	}
->+
->+	/* Waiting for Transfer complete. */
->+	while (timeout--) {
->+		temp = imx_i2c_read_reg(i2c_imx, IMX_I2C_I2SR);
->+		if (temp & I2SR_ICF)
->+			break;
->+		udelay(10);
->+	}
-Whether there have better method like interrupt to avoid dead wait here until timeout ?
+I'm possibly not bright enough to get it the first time.
 
->+
->+	if (!timeout)
->+		return -ETIMEDOUT;
->+	temp = imx_i2c_read_reg(i2c_imx, IMX_I2C_I2CR);
->+	temp &= ~I2CR_DMAEN;
->+	imx_i2c_write_reg(temp, i2c_imx, IMX_I2C_I2CR);
->+
->+	/* The last data byte must be transferred by the CPU. */
->+	imx_i2c_write_reg(msgs->buf[msgs->len-1],
->+				i2c_imx, IMX_I2C_I2DR);
->+	result = i2c_imx_trx_complete(i2c_imx);
->+	if (result)
->+		return result;
-I don't understand why the last data need to be transmited by cpu. I guess you want to get IIF interrupt ?	
+> Honestly it probably isn't a noticeable performance boost either way 
+> but I think this is the best we can do.
 
->+
->+	result = i2c_imx_acked(i2c_imx);
->+	if (result)
->+		return result;
->+
->+	return 0;
->+}
->+
->+static int i2c_imx_dma_read(struct imx_i2c_struct *i2c_imx,
->+			struct i2c_msg *msgs, bool is_lastmsg) {
->+	int result, timeout = IMX_I2C_DMA_TIMEOUT;
->+	unsigned int temp;
->+	struct imx_i2c_dma *dma = i2c_imx->dma;
->+	struct device *dev = &i2c_imx->adapter.dev;
->+
->+	temp = imx_i2c_read_reg(i2c_imx, IMX_I2C_I2CR);
->+	temp |= I2CR_DMAEN;
->+	imx_i2c_write_reg(temp, i2c_imx, IMX_I2C_I2CR);
->+
->+	reinit_completion(&i2c_imx->dma->cmd_complete);
->+	dma->chan_using = dma->chan_rx;
->+	dma->dma_transfer_dir = DMA_DEV_TO_MEM;
->+	dma->dma_data_dir = DMA_FROM_DEVICE;
->+	/* The last two data bytes must be transferred by the CPU. */
->+	dma->dma_len = msgs->len - 2;
->+	result = i2c_imx_dma_xfer(i2c_imx, msgs);
->+	if (result)
->+		return result;
->+
->+	result = wait_for_completion_interruptible_timeout(
->+				&i2c_imx->dma->cmd_complete,
->+				msecs_to_jiffies(IMX_I2C_DMA_TIMEOUT));
->+	if (result <= 0) {
->+		dmaengine_terminate_all(dma->chan_using);
->+		if (result)
->+			return result;
->+		else
->+			return -ETIMEDOUT;
->+	}
->+
->+	/* waiting for Transfer complete. */
->+	while (timeout--) {
->+		temp = imx_i2c_read_reg(i2c_imx, IMX_I2C_I2SR);
->+		if (temp & I2SR_ICF)
->+			break;
->+		udelay(10);	
->+	}
->+
->+	if (!timeout)
->+		return -ETIMEDOUT;
->+	temp = imx_i2c_read_reg(i2c_imx, IMX_I2C_I2CR);
->+	temp &= ~I2CR_DMAEN;
->+	imx_i2c_write_reg(temp, i2c_imx, IMX_I2C_I2CR);
->+
->+	/* read n-1 byte data */
->+	temp = imx_i2c_read_reg(i2c_imx, IMX_I2C_I2CR);
->+	temp |= I2CR_TXAK;
->+	imx_i2c_write_reg(temp, i2c_imx, IMX_I2C_I2CR);
->+
->+	msgs->buf[msgs->len-2] = imx_i2c_read_reg(i2c_imx, IMX_I2C_I2DR);
->+	/* read n byte data */
->+	result = i2c_imx_trx_complete(i2c_imx);
->+	if (result)
->+		return result;
->+
->+	if (is_lastmsg) {
->+		/*
->+		 * It must generate STOP before read I2DR to prevent
->+		 * controller from generating another clock cycle
->+		 */
->+		dev_dbg(dev, "<%s> clear MSTA\n", __func__);
->+		temp = imx_i2c_read_reg(i2c_imx, IMX_I2C_I2CR);
->+		temp &= ~(I2CR_MSTA | I2CR_MTX);
->+		imx_i2c_write_reg(temp, i2c_imx, IMX_I2C_I2CR);
->+		i2c_imx_bus_busy(i2c_imx, 0);
->+		i2c_imx->stopped = 1;
->+	} else {
->+		/*
->+		 * For i2c master receiver repeat restart operation like:
->+		 * read -> repeat MSTA -> read/write
->+		 * The controller must set MTX before read the last byte in
->+		 * the first read operation, otherwise the first read cost
->+		 * one extra clock cycle.
->+		 */
->+		temp = readb(i2c_imx->base + IMX_I2C_I2CR);
->+		temp |= I2CR_MTX;
->+		writeb(temp, i2c_imx->base + IMX_I2C_I2CR);
->+	}
->+	msgs->buf[msgs->len-1] = imx_i2c_read_reg(i2c_imx, IMX_I2C_I2DR);
->+
->+	return 0;
->+}
->+
-> static int i2c_imx_write(struct imx_i2c_struct *i2c_imx, struct i2c_msg
->*msgs)  {
-> 	int i, result;
->@@ -501,6 +807,9 @@ static int i2c_imx_read(struct imx_i2c_struct *i2c_imx,
->struct i2c_msg *msgs, bo
->
-> 	dev_dbg(&i2c_imx->adapter.dev, "<%s> read data\n", __func__);
->
->+	if (i2c_imx->dma && msgs->len >= IMX_I2C_DMA_THRESHOLD
->&& !block_data)
->+		return i2c_imx_dma_read(i2c_imx, msgs, is_lastmsg);
->+
-> 	/* read data */
-> 	for (i = 0; i < msgs->len; i++) {
-> 		u8 len = 0;
->@@ -615,8 +924,12 @@ static int i2c_imx_xfer(struct i2c_adapter *adapter,
->#endif
-> 		if (msgs[i].flags & I2C_M_RD)
-> 			result = i2c_imx_read(i2c_imx, &msgs[i], is_lastmsg);
->-		else
->-			result = i2c_imx_write(i2c_imx, &msgs[i]);
->+		else {
->+			if (i2c_imx->dma && msgs[i].len >= IMX_I2C_DMA_THRESHOLD)
->+				result = i2c_imx_dma_write(i2c_imx, &msgs[i]);
->+			else
->+				result = i2c_imx_write(i2c_imx, &msgs[i]);
->+		}
-> 		if (result)
-> 			goto fail0;
-> 	}
->@@ -651,6 +964,7 @@ static int i2c_imx_probe(struct platform_device *pdev)
-> 	struct imxi2c_platform_data *pdata = dev_get_platdata(&pdev->dev);
-> 	void __iomem *base;
-> 	int irq, ret;
->+	dma_addr_t phy_addr;
->
-> 	dev_dbg(&pdev->dev, "<%s>\n", __func__);
->
->@@ -661,6 +975,7 @@ static int i2c_imx_probe(struct platform_device *pdev)
-> 	}
->
-> 	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
->+	phy_addr = (dma_addr_t)res->start;
-> 	base = devm_ioremap_resource(&pdev->dev, res);
-> 	if (IS_ERR(base))
-> 		return PTR_ERR(base);
->@@ -743,6 +1058,9 @@ static int i2c_imx_probe(struct platform_device *pdev)
-> 		i2c_imx->adapter.name);
-> 	dev_info(&i2c_imx->adapter.dev, "IMX I2C adapter registered\n");
->
->+	/* Init DMA config if support*/
->+	i2c_imx_dma_request(i2c_imx, phy_addr);
->+
-> 	return 0;   /* Return OK */
-> }
->
->@@ -754,6 +1072,9 @@ static int i2c_imx_remove(struct platform_device
->*pdev)
-> 	dev_dbg(&i2c_imx->adapter.dev, "adapter removed\n");
-> 	i2c_del_adapter(&i2c_imx->adapter);
->
->+	if (i2c_imx->dma)
->+		i2c_imx_dma_free(i2c_imx);
->+
-> 	/* setup chip registers to defaults */
-> 	imx_i2c_write_reg(0, i2c_imx, IMX_I2C_IADR);
-> 	imx_i2c_write_reg(0, i2c_imx, IMX_I2C_IFDR);
->--
+Sure, agreed.
+
+
+Nicolas
