@@ -1,43 +1,48 @@
-From: mfuzzey@parkeon.com (Martin Fuzzey)
-Date: Wed, 06 Aug 2014 15:35:49 +0200
-Subject: [PATCH V2 4/4] ARM: dts: i.MX53: Add PMU DT entry
-In-Reply-To: <20140806105048.GF25953@arm.com>
-References: <20140805144831.25462.18149.stgit@localhost>
- <20140805144840.25462.57101.stgit@localhost> <20140806105048.GF25953@arm.com>
-Message-ID: <53E22F35.4060503@parkeon.com>
+From: tixy@linaro.org (Jon Medhurst (Tixy))
+Date: Wed, 06 Aug 2014 14:36:48 +0100
+Subject: [RFC PATCH] kprobes: arm: enable OPTPROBES for arm 32
+In-Reply-To: <53E1B2A0.1040807@hitachi.com>
+References: <1407223697-74911-1-git-send-email-wangnan0@huawei.com>
+ <53E1B2A0.1040807@hitachi.com>
+Message-ID: <1407332208.3006.13.camel@linaro1.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/08/14 12:50, Will Deacon wrote:
-> On Tue, Aug 05, 2014 at 03:48:40PM +0100, Martin Fuzzey wrote:
->> Add device tree node for PMU on i.MX53
->>
->> Signed-off-by: Martin Fuzzey <mfuzzey@parkeon.com>
->> ---
->>   arch/arm/boot/dts/imx53.dtsi |    5 +++++
->>   1 file changed, 5 insertions(+)
->>
->> diff --git a/arch/arm/boot/dts/imx53.dtsi b/arch/arm/boot/dts/imx53.dtsi
->> index 6456a00..ab3afe0 100644
->> --- a/arch/arm/boot/dts/imx53.dtsi
->> +++ b/arch/arm/boot/dts/imx53.dtsi
->> @@ -101,6 +101,11 @@
->>   		interrupt-parent = <&tzic>;
->>   		ranges;
->>   
->> +		pmu {
->> +			compatible = "arm,cortex-a8-pmu";
->> +			interrupts = <77>;
->> +		};
-> You're missing the new property.
+On Wed, 2014-08-06 at 13:44 +0900, Masami Hiramatsu wrote:
+> (2014/08/05 16:28), Wang Nan wrote
+[...]
+> > +asm (
+> > +			".global optprobe_template_entry\n"
+> > +			"optprobe_template_entry:\n"
+> > +#ifndef CONFIG_THUMB
+> > +			"	sub	sp, sp, #80\n"
+> > +			"	stmia	sp, {r0 - r14} \n"
+> > +			"	add	r3, sp, #80\n"
+> > +			"	str	r3, [sp, #52]\n"
+> > +			"	mrs	r4, cpsr\n"
+> > +			"	str	r4, [sp, #64]\n"
+> > +			"	mov	r1, sp\n"
+> > +			"	ldr	r0, 1f\n"
+> > +			"	ldr	r2, 2f\n"
+> > +			"	blx	r2\n"
+> > +			"	ldr	r1, [sp, #64]\n"
+> > +			"	msr	cpsr_fs, r1\n"
+> > +			"	ldmia	sp, {r0 - r15}\n"
+> > +			".global optprobe_template_val\n"
+> > +			"optprobe_template_val:\n"
+> > +			"1:	nop\n"
+> > +			".global optprobe_template_call\n"
+> > +			"optprobe_template_call:\n"
+> > +			"2:	nop\n"
+> > +#else /* CONFIG_THUMB */
+> > +# error optprobe for thumb is not supported.
+> 
+> Can we set CONFIG_THUMB=y without CONFIG_THUMB2_KERNEL ?
 
-Actually this was deliberate.
+Yes, CONFIG_THUMB is for supporting userside Thumb code,
+CONFIG_THUMB2_KERNEL is for building the kernel for Thumb and the
+options are orthogonal. So I don't think kprobes code should be testing
+CONFIG_THUMB as it doesn't deal with userside.
 
-Since the property should only be used if booting in secure mode this 
-generic dtsi file can't know if it is ok or not.
-I presume a (probably out of tree) board / application dts file will add 
-the property.
-
-Maybe I should put a comment here about that though?
-
-Martin
+-- 
+Tixy
