@@ -1,85 +1,37 @@
-From: l.stach@pengutronix.de (Lucas Stach)
-Date: Wed, 06 Aug 2014 16:42:27 +0200
-Subject: [PATCH V2 2/3] ARM: clk-imx6q: Add missing lvds and anaclk
- clock to the clock tree
-In-Reply-To: <f98c6ea35ef4fa382d8aaf4ff370530aeb5b107f.1407313676.git.shengjiu.wang@freescale.com>
-References: <cover.1407313676.git.shengjiu.wang@freescale.com>
- <f98c6ea35ef4fa382d8aaf4ff370530aeb5b107f.1407313676.git.shengjiu.wang@freescale.com>
-Message-ID: <1407336147.5208.11.camel@weser.hi.pengutronix.de>
+From: leif.lindholm@linaro.org (Leif Lindholm)
+Date: Wed, 6 Aug 2014 15:48:39 +0100
+Subject: [PATCH 1/2] UEFI arm64: add noefi boot param
+In-Reply-To: <20140806141814.GD15082@console-pimps.org>
+References: <20140806083825.GA31711@dhcp-16-198.nay.redhat.com>
+ <20140806130623.GI4179@bivouac.eciton.net>
+ <20140806132021.GB15082@console-pimps.org>
+ <20140806132941.GJ4179@bivouac.eciton.net>
+ <20140806140155.GC15082@console-pimps.org>
+ <CAKv+Gu8ey1iKu-_wS6yYaEXQaQMDXa+PF5Kiw+edA9a_OE1EAw@mail.gmail.com>
+ <20140806141814.GD15082@console-pimps.org>
+Message-ID: <20140806144839.GK4179@bivouac.eciton.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am Mittwoch, den 06.08.2014, 16:35 +0800 schrieb Shengjiu Wang:
-> anaclk1 and anaclk2 is the clock source for lvds1_in and lvds2_in. lvds1_in
-> and lvds2_in can be used to provide external clock source to the internal
-> pll, such as pll4_audio and pll5_video.
-> pll4_audio and pll5_video can have multiple source, not only "osc", so
-> add them.
+On Wed, Aug 06, 2014 at 03:18:14PM +0100, Matt Fleming wrote:
+> On Wed, 06 Aug, at 04:10:45PM, Ard Biesheuvel wrote:
+> > 
+> > Shouldn't we clear the bit here if we failed to enable runtime
+> > services for some reason? Other code may test the bit assuming that it
+> > signifies that runtime services have been enabled successfully, while
+> > this patch changes it to mean that we /intended/ to enable them, which
+> > is not quite the same thing.
 > 
-> Signed-off-by: Nicolin Chen <Guangyu.Chen@freescale.com>
-> Signed-off-by: Shengjiu Wang <shengjiu.wang@freescale.com>
-> ---
->  arch/arm/mach-imx/clk-imx6q.c             |   12 ++++++++++--
->  include/dt-bindings/clock/imx6qdl-clock.h |    8 +++++++-
->  2 files changed, 17 insertions(+), 3 deletions(-)
-> 
-> diff --git a/arch/arm/mach-imx/clk-imx6q.c b/arch/arm/mach-imx/clk-imx6q.c
-> index 1d6dd59..330aad3 100644
-> --- a/arch/arm/mach-imx/clk-imx6q.c
-> +++ b/arch/arm/mach-imx/clk-imx6q.c
-> @@ -73,6 +73,7 @@ static const char *lvds_sels[] = {
->  	"pll4_audio", "pll5_video", "pll8_mlb", "enet_ref",
->  	"pcie_ref_125m", "sata_ref_100m",
->  };
-> +static const char *pll_av_sels[] = { "osc", "lvds1_in", "lvds2_in", "dummy", };
->  
->  static struct clk *clk[IMX6QDL_CLK_END];
->  static struct clk_onecell_data clk_data;
-> @@ -119,6 +120,9 @@ static void __init imx6q_clocks_init(struct device_node *ccm_node)
->  	clk[IMX6QDL_CLK_CKIL] = imx_obtain_fixed_clock("ckil", 0);
->  	clk[IMX6QDL_CLK_CKIH] = imx_obtain_fixed_clock("ckih1", 0);
->  	clk[IMX6QDL_CLK_OSC] = imx_obtain_fixed_clock("osc", 0);
-> +	/* Clock source from external clock via ANACLK1/2 PADs */
-> +	clk[IMX6QDL_CLK_ANACLK1] = imx_obtain_fixed_clock("anaclk1", 0);
-> +	clk[IMX6QDL_CLK_ANACLK2] = imx_obtain_fixed_clock("anaclk2", 0);
->  
->  	np = of_find_compatible_node(NULL, NULL, "fsl,imx6q-anatop");
->  	base = of_iomap(np, 0);
-> @@ -136,8 +140,8 @@ static void __init imx6q_clocks_init(struct device_node *ccm_node)
->  	clk[IMX6QDL_CLK_PLL1_SYS]      = imx_clk_pllv3(IMX_PLLV3_SYS,	"pll1_sys",	"osc", base,        0x7f);
->  	clk[IMX6QDL_CLK_PLL2_BUS]      = imx_clk_pllv3(IMX_PLLV3_GENERIC,	"pll2_bus",	"osc", base + 0x30, 0x1);
->  	clk[IMX6QDL_CLK_PLL3_USB_OTG]  = imx_clk_pllv3(IMX_PLLV3_USB,	"pll3_usb_otg",	"osc", base + 0x10, 0x3);
-> -	clk[IMX6QDL_CLK_PLL4_AUDIO]    = imx_clk_pllv3(IMX_PLLV3_AV,	"pll4_audio",	"osc", base + 0x70, 0x7f);
-> -	clk[IMX6QDL_CLK_PLL5_VIDEO]    = imx_clk_pllv3(IMX_PLLV3_AV,	"pll5_video",	"osc", base + 0xa0, 0x7f);
-> +	clk[IMX6QDL_CLK_PLL4_AUDIO]    = imx_clk_pllv3(IMX_PLLV3_AV,	"pll4_audio",	"pll4_sel", base + 0x70, 0x7f);
-> +	clk[IMX6QDL_CLK_PLL5_VIDEO]    = imx_clk_pllv3(IMX_PLLV3_AV,	"pll5_video",	"pll5_sel", base + 0xa0, 0x7f);
->  	clk[IMX6QDL_CLK_PLL6_ENET]     = imx_clk_pllv3(IMX_PLLV3_ENET,	"pll6_enet",	"osc", base + 0xe0, 0x3);
->  	clk[IMX6QDL_CLK_PLL7_USB_HOST] = imx_clk_pllv3(IMX_PLLV3_USB,	"pll7_usb_host","osc", base + 0x20, 0x3);
->  
-> @@ -169,6 +173,8 @@ static void __init imx6q_clocks_init(struct device_node *ccm_node)
->  
->  	clk[IMX6QDL_CLK_LVDS1_SEL] = imx_clk_mux("lvds1_sel", base + 0x160, 0, 5, lvds_sels, ARRAY_SIZE(lvds_sels));
->  	clk[IMX6QDL_CLK_LVDS2_SEL] = imx_clk_mux("lvds2_sel", base + 0x160, 5, 5, lvds_sels, ARRAY_SIZE(lvds_sels));
-> +	clk[IMX6QDL_CLK_PLL4_SEL]  = imx_clk_mux("pll4_sel",  base + 0x70, 14, 2, pll_av_sels, ARRAY_SIZE(pll_av_sels));
-> +	clk[IMX6QDL_CLK_PLL5_SEL]  = imx_clk_mux("pll5_sel",  base + 0xa0, 14, 2, pll_av_sels, ARRAY_SIZE(pll_av_sels));
->  
->  	/*
->  	 * lvds1_gate and lvds2_gate are pseudo-gates.  Both can be
-> @@ -178,6 +184,8 @@ static void __init imx6q_clocks_init(struct device_node *ccm_node)
->  	 */
->  	clk[IMX6QDL_CLK_LVDS1_GATE] = imx_clk_gate("lvds1_gate", "lvds1_sel", base + 0x160, 10);
->  	clk[IMX6QDL_CLK_LVDS2_GATE] = imx_clk_gate("lvds2_gate", "lvds2_sel", base + 0x160, 11);
-> +	clk[IMX6QDL_CLK_LVDS1_IN] = imx_clk_gate("lvds1_in", "anaclk1", base + 0x160, 12);
-> +	clk[IMX6QDL_CLK_LVDS2_IN] = imx_clk_gate("lvds2_in", "anaclk2", base + 0x160, 13);
->  
-I think we need something more clever here. With both lvds in and out
-modeled as a clock gate it is possible for the user to enable both at
-the same time. The reference manual on the contrary states that both
-states are mutually exclusive: "Do not enable input and output buffers
-simultaneously".
+> Yep, good catch. We need to do something similar for efi_runtime_init()
+> on x86 too.
 
-Regards,
-Lucas
--- 
-Pengutronix e.K.             | Lucas Stach                 |
-Industrial Linux Solutions   | http://www.pengutronix.de/  |
+Since we're now overlaying two different meanings onto the
+EFI_RUNTIME_SERVICES bit, could we add comments at set/clear points to
+explicitly state the intended action? I.e.:
+
+/* Set to attempt runtime services initialisation */
+
+/* Clear to indicate runtime services will not be available */
+
+/
+    Leif
