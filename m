@@ -1,18 +1,29 @@
-From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Wed, 06 Aug 2014 18:10:17 +0200
+From: nicolas.derouineau@vitec.com (Nicolas Derouineau)
+Date: Wed, 6 Aug 2014 16:16:14 +0000
 Subject: CPUIdle Armada 370
-In-Reply-To: <1407340917231.68970@vitec.com>
+In-Reply-To: <53E25369.60809@free-electrons.com>
 References: <1407333701627.99622@vitec.com>
- <53E24654.6020008@free-electrons.com> <53E249A1.900@free-electrons.com>,
- <53E24D2A.50706@free-electrons.com> <1407340917231.68970@vitec.com>
-Message-ID: <53E25369.60809@free-electrons.com>
+ <53E24654.6020008@free-electrons.com>
+ <53E249A1.900@free-electrons.com>,<53E24D2A.50706@free-electrons.com>
+ <1407340917231.68970@vitec.com>,<53E25369.60809@free-electrons.com>
+Message-ID: <1407341774154.51157@vitec.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
+
+Here is our dts file.
+
+
+________________________________________
+De : Gregory CLEMENT <gregory.clement@free-electrons.com>
+Envoy? : mercredi 6 ao?t 2014 18:10
+? : Nicolas Derouineau; linux-arm-kernel at lists.infradead.org
+Cc : Thomas Petazzoni; Simon Boulay
+Objet : Re: CPUIdle Armada 370
 
 On 06/08/2014 18:01, Nicolas Derouineau wrote:
 > Ok,
 > So here is the log of the error(using the previous config file)>
-> 
+>
 > NAND read: device 0 offset 0x240000, size 0x600000
 >  6291456 bytes read: OK
 > ## Booting kernel from Legacy Image at 02000000 ...
@@ -28,9 +39,9 @@ On 06/08/2014 18:01, Nicolas Derouineau wrote:
 >    Loading Kernel Image ... OK
 > OK
 >    Loading Device Tree to 00ffa000, end 00fff8a6 ... OK
-> 
+>
 > Starting kernel ...
-> 
+>
 > [    0.000000] Booting Linux on physical CPU 0x0
 > [    0.000000] Linux version 3.16.0-next-20140805-dirty (nde at nde-OptiPlex-980) (gcc version 4.6.4 (Linaro GCC branch-4.6.4. Marvell GCC release 201308-2123.0cc69bb4 64K MAXPAGESIZE ALIGN) ) #13 Wed Aug 6 14
 > [    0.000000] CPU: ARMv7 Processor [561f5811] revision 1 (ARMv7), cr=10c5387d
@@ -57,11 +68,11 @@ Gregory
 > ? : Nicolas Derouineau; linux-arm-kernel at lists.infradead.org
 > Cc : Thomas Petazzoni; Simon Boulay
 > Objet : Re: CPUIdle Armada 370
-> 
+>
 > Hi Nicolas,
-> 
+>
 > [..]
-> 
+>
 >>> On 06/08/2014 16:01, Nicolas Derouineau wrote:
 >>>> Hello,
 >>>> I am currently trying to use the CPUIdle driver provided by linux-next (or by the patch here https://github.com/MISL-EBU-System-SW/mainline-public/commits/3.16/cpuidle-v3).
@@ -85,24 +96,31 @@ Gregory
 >>
 >>
 >> Could you try again with next-20140806?
-> 
+>
 > Also could you send your full boot log until the crash
 > it may help us.
-> 
+>
 > Thanks,
-> 
+>
 > Gregory
-> 
+>
 > --
 > Gregory Clement, Free Electrons
 > Kernel, drivers, real-time and embedded Linux
 > development, consulting, training and support.
 > http://free-electrons.com
-> 
+>
 
 
--- 
+--
 Gregory Clement, Free Electrons
 Kernel, drivers, real-time and embedded Linux
 development, consulting, training and support.
 http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: armada-370-vmr1404.dts
+Type: application/octet-stream
+Size: 2569 bytes
+Desc: armada-370-vmr1404.dts
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140806/8023abf4/attachment.obj>
