@@ -1,48 +1,38 @@
-From: khilman@linaro.org (Kevin Hilman)
-Date: Tue, 05 Aug 2014 17:28:40 -0700
-Subject: FOR KEVIN HILMAN: Fwd: Mail delivery failed: returning message to
- sender
-In-Reply-To: <20140626152138.GV32514@n2100.arm.linux.org.uk> (Russell King's
- message of "Thu, 26 Jun 2014 16:21:38 +0100")
-References: <20140626152138.GV32514@n2100.arm.linux.org.uk>
-Message-ID: <7h7g2mmpfr.fsf@paris.lan>
+From: horms@verge.net.au (Simon Horman)
+Date: Wed, 6 Aug 2014 09:54:59 +0900
+Subject: [PATCH] ARM: shmobile: Remove genmai_defconfig from MAINTAINERS
+In-Reply-To: <1407135108-3371-1-git-send-email-horms+renesas@verge.net.au>
+References: <1407135108-3371-1-git-send-email-horms+renesas@verge.net.au>
+Message-ID: <20140806005459.GB5611@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Russell,
+On Mon, Aug 04, 2014 at 03:51:48PM +0900, Simon Horman wrote:
+> The genmai defconfig file has been removed by
+> 3ed27bd90d6d0c8b ("ARM: shmobile: genmai: remove defconfig")
+> so remove its entry in the MAINTAINERS accordingly.
+> 
+> Reported-by: Joe Perches <joe@perches.com>
+> Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 
-Russell King - ARM Linux <linux@arm.linux.org.uk> writes:
+I have queued this up for v3.18.
 
-> can you please get a different email provider.  gmail is becoming
-> increasingly painful to send email to, and as gmail provides very
-> little help when this occurs, it's impossible to work around.
-
-Sorry for the major lag, just returning from vacation.
-
-Not sure why this is just for me as I'm pretty sure I'm not the only one
-using gmail as an email provider.  :)
-
-Kevin
-
-> ----- Forwarded message from Mail Delivery System <Mailer-Daemon@arm.linux.org.uk> -----
->
-> Date: Thu, 26 Jun 2014 16:19:07 +0100
-> From: Mail Delivery System <Mailer-Daemon@arm.linux.org.uk>
-> To: linux at arm.linux.org.uk
-> Subject: Mail delivery failed: returning message to sender
-> Delivery-date: Thu, 26 Jun 2014 16:19:11 +0100
->
-> This message was created automatically by mail delivery software.
->
-> A message that you sent could not be delivered to one or more of its
-> recipients. This is a permanent error. The following address(es) failed:
->
->   khilman at linaro.org
->     SMTP error from remote mail server after end of data:
->     host aspmx.l.google.com [2a00:1450:400c:c00::1a]:
->     550-5.7.1 [2001:4d48:ad52:3201:214:fdff:fe10:1be6      12] Our system has
->     550-5.7.1 detected that this message is likely unsolicited mail. To reduce the
->     550-5.7.1 amount of spam sent to Gmail, this message has been blocked. Please
->     550-5.7.1 visit
->     550-5.7.1 http://support.google.com/mail/bin/answer.py?hl=en&answer=188131 for
->     550 5.7.1 more information. r10si28737564wiz.104 - gsmtp
+> ---
+>  MAINTAINERS | 1 -
+>  1 file changed, 1 deletion(-)
+> 
+> diff --git a/MAINTAINERS b/MAINTAINERS
+> index 86efa7e..6fb61a1 100644
+> --- a/MAINTAINERS
+> +++ b/MAINTAINERS
+> @@ -1320,7 +1320,6 @@ F:	arch/arm/boot/dts/sh*
+>  F:	arch/arm/configs/ape6evm_defconfig
+>  F:	arch/arm/configs/armadillo800eva_defconfig
+>  F:	arch/arm/configs/bockw_defconfig
+> -F:	arch/arm/configs/genmai_defconfig
+>  F:	arch/arm/configs/koelsch_defconfig
+>  F:	arch/arm/configs/kzm9g_defconfig
+>  F:	arch/arm/configs/lager_defconfig
+> -- 
+> 2.0.1
+> 
