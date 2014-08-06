@@ -1,26 +1,56 @@
-From: moinejf@free.fr (Jean-Francois Moine)
-Date: Wed, 6 Aug 2014 20:29:04 +0200
-Subject: [RFC 0/8] DPCM with simple-card support for Kirkwood
-In-Reply-To: <20140806175313.GC19574@lunn.ch>
-References: <1407287912-19447-1-git-send-email-andrew@lunn.ch>
- <20140806103356.4e7c088a@armhf> <20140806143026.GA19574@lunn.ch>
- <20140806194304.3a1867a8@armhf> <20140806175313.GC19574@lunn.ch>
-Message-ID: <20140806202904.3016cb0b@armhf>
+From: galak@codeaurora.org (Kumar Gala)
+Date: Wed,  6 Aug 2014 13:37:11 -0500
+Subject: [PATCH] ARM: qcom: Update defconfig
+Message-ID: <1407350231-16902-1-git-send-email-galak@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 6 Aug 2014 19:53:13 +0200
-Andrew Lunn <andrew@lunn.ch> wrote:
+* Enable IPQ806x & APQ8084 clk support
+* Enable CPU_IDLE to get basic wfi support
+* Enable SPI NOR and MTD M25P80 support (used on AP148 board)
 
-> Does it not work correctly because of a property of the hardware, or
-> because of bugs in the DPCM implementation? From what you pointed out
-> in the mailing lists, it seems like bugs.
+Signed-off-by: Kumar Gala <galak@codeaurora.org>
+---
+ arch/arm/configs/qcom_defconfig | 5 ++++-
+ 1 file changed, 4 insertions(+), 1 deletion(-)
 
-As I explained, DPCM shunts the routing. The constraints are not
-handled, so, the formats and rates are always those of the front-end.
-And this is normal, because DPCM is done for devices with a firmware
-which adapts the back-ends to the chosen front-end format and rate.
-
+diff --git a/arch/arm/configs/qcom_defconfig b/arch/arm/configs/qcom_defconfig
+index 42ebd72..457f7f0 100644
+--- a/arch/arm/configs/qcom_defconfig
++++ b/arch/arm/configs/qcom_defconfig
+@@ -29,6 +29,7 @@ CONFIG_HIGHPTE=y
+ CONFIG_CLEANCACHE=y
+ CONFIG_ARM_APPENDED_DTB=y
+ CONFIG_ARM_ATAG_DTB_COMPAT=y
++CONFIG_CPU_IDLE=y
+ CONFIG_VFP=y
+ CONFIG_NEON=y
+ # CONFIG_CORE_DUMP_DEFAULT_ELF_HEADERS is not set
+@@ -53,6 +54,7 @@ CONFIG_DEVTMPFS_MOUNT=y
+ CONFIG_MTD=y
+ CONFIG_MTD_BLOCK=y
+ CONFIG_MTD_M25P80=y
++CONFIG_MTD_SPI_NOR=y
+ CONFIG_BLK_DEV_LOOP=y
+ CONFIG_BLK_DEV_RAM=y
+ CONFIG_SCSI=y
+@@ -86,7 +88,6 @@ CONFIG_SERIO_LIBPS2=y
+ CONFIG_SERIAL_MSM=y
+ CONFIG_SERIAL_MSM_CONSOLE=y
+ CONFIG_HW_RANDOM=y
+-CONFIG_HW_RANDOM_MSM=y
+ CONFIG_I2C=y
+ CONFIG_I2C_CHARDEV=y
+ CONFIG_I2C_QUP=y
+@@ -133,6 +134,8 @@ CONFIG_QCOM_BAM_DMA=y
+ CONFIG_STAGING=y
+ CONFIG_QCOM_GSBI=y
+ CONFIG_COMMON_CLK_QCOM=y
++CONFIG_APQ_MMCC_8084=y
++CONFIG_IPQ_GCC_806X=y
+ CONFIG_MSM_GCC_8660=y
+ CONFIG_MSM_MMCC_8960=y
+ CONFIG_MSM_MMCC_8974=y
 -- 
-Ken ar c'henta?	|	      ** Breizh ha Linux atav! **
-Jef		|		http://moinejf.free.fr/
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
+hosted by The Linux Foundation
