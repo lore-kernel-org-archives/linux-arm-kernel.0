@@ -1,53 +1,82 @@
-From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
-Date: Wed, 6 Aug 2014 09:40:29 +0200
-Subject: [PATCH 09/15] pinctrl: pinctrl-at91.c: fix decimal printf format
- specifiers prefixed with 0x
-In-Reply-To: <1407300196-32708-1-git-send-email-hans@hanshq.net>
-References: <1407300196-32708-1-git-send-email-hans@hanshq.net>
-Message-ID: <20140806074028.GZ3214@piout.net>
+From: iamjoonsoo.kim@lge.com (Joonsoo Kim)
+Date: Wed, 6 Aug 2014 16:59:45 +0900
+Subject: [linux-3.10.17] Could not allocate memory from free CMA areas
+In-Reply-To: <BAY169-W348ADD9113F32C2B459631EFE30@phx.gbl>
+References: <54sabdnxop04vxd7ewndc0qf.1407077745645@email.android.com>
+ <003201cfafb3$3fe43180$bfac9480$@lge.com>
+ <BAY169-W348ADD9113F32C2B459631EFE30@phx.gbl>
+Message-ID: <20140806075945.GA3661@js1304-P5Q-DELUXE>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05/08/2014 at 21:43:16 -0700, Hans Wennborg wrote :
-> The prefix suggests the number should be printed in hex, so use
-> the %x specifier to do that.
+On Tue, Aug 05, 2014 at 08:24:50PM +0530, Pintu Kumar wrote:
+> Hello,
 > 
-> Found by using regex suggested by Joe Perches.
+> > From: iamjoonsoo.kim at lge.com
+> > To: pintu_agarwal at yahoo.com; linux-mm at kvack.org; linux-arm-kernel at lists.infradead.org; linaro-mm-sig at lists.linaro.org; ritesh.list at gmail.com
+> > CC: pintu.k at outlook.com; pintu.k at samsung.com; vishu_1385 at yahoo.com; m.szyprowski at samsung.com; mina86 at mina86.com; ngupta at vflare.org; iqbalblr at gmail.com
+> > Subject: RE: [linux-3.10.17] Could not allocate memory from free CMA areas
+> > Date: Mon, 4 Aug 2014 16:11:00 +0900
+> > 
+> >> Dear Joonsoo,
+> >> 
+> >> I tried your changes which are present at the below link. 
+> >> https://github.com/JoonsooKim/linux/tree/cma-fix-up-v3.0-next-20140625
+> >> But unfortunately for me it did not help much. 
+> >> After running various apps that uses ION nonmovable memory, it fails to allocate memory after some time. When I see the pagetypeinfo shows lots of CMA pages available and non-movable were very less and thus nonmovable allocation were failing.
+> > 
+> > Okay. CMA pages cannot be used for nonmovable memory, so it can fail in above case.
+> > 
+> >> However I noticed the failure was little delayed.
+> > 
+> > It is good sign. I guess that there is movable/CMA ratio problem.
+> > My patchset uses free CMA pages in certain ratio to free movable page consumption.
+> > If your system doesn't use movable page sufficiently, free CMA pages cannot
+> > be used fully. Could you test with following workaround?
+> > 
+> > +       if (normal> cma) {
+> > +               zone->max_try_normal = pageblock_nr_pages;
+> > +               zone->max_try_cma = pageblock_nr_pages;
+> > +       } else {
+> > +               zone->max_try_normal = pageblock_nr_pages;
+> > +               zone->max_try_cma = pageblock_nr_pages;
+> > +       }
 > 
-> Signed-off-by: Hans Wennborg <hans@hanshq.net>
-Acked-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
+> I applied these changes but still the allocations are failing because there are no non-movable memory left in the system.
 
-> ---
->  drivers/pinctrl/pinctrl-at91.c | 4 ++--
->  1 file changed, 2 insertions(+), 2 deletions(-)
-> 
-> diff --git a/drivers/pinctrl/pinctrl-at91.c b/drivers/pinctrl/pinctrl-at91.c
-> index af1ba4f..60464a2 100644
-> --- a/drivers/pinctrl/pinctrl-at91.c
-> +++ b/drivers/pinctrl/pinctrl-at91.c
-> @@ -497,10 +497,10 @@ static struct at91_pinctrl_mux_ops at91sam9x5_ops = {
->  static void at91_pin_dbg(const struct device *dev, const struct at91_pmx_pin *pin)
->  {
->  	if (pin->mux) {
-> -		dev_dbg(dev, "pio%c%d configured as periph%c with conf = 0x%lu\n",
-> +		dev_dbg(dev, "pio%c%d configured as periph%c with conf = 0x%lx\n",
->  			pin->bank + 'A', pin->pin, pin->mux - 1 + 'A', pin->conf);
->  	} else {
-> -		dev_dbg(dev, "pio%c%d configured as gpio with conf = 0x%lu\n",
-> +		dev_dbg(dev, "pio%c%d configured as gpio with conf = 0x%lx\n",
->  			pin->bank + 'A', pin->pin, pin->conf);
->  	}
->  }
-> -- 
-> 2.0.0.526.g5318336
-> 
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+Hello,
 
--- 
-Alexandre Belloni, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
+kswapd doesn't work?
+Please let me know your problem in detail.
+
+> With the changes I noticed that nr_cma_free sometimes becomes almost zero.
+> But in our case Display/Xorg needs to have atleast 8MB of CMA (contiguous) memory of order-8 and order-4 type.
+> CMA:56MB is shared across display,camera,video etc.
+
+Used CMA pages will be released automatically when your Display/Xorg
+request them. So you don't need to worry about empty of free CMA pages.
+
+> 
+> I think the previous changes are slightly better.
+> 
+> My concern is that whether I am applying all you changes or missing some thing.
+> I saw that your kernel version is based on next-20140625 but my kernel version is 3.10.17.
+> And till now I applied only the below changes:
+> https://github.com/JoonsooKim/linux/commit/33a0416b3ac1cd7c88e6b35ee61b4a81a7a14afc 
+> 
+> But I haven't applied this:
+> https://github.com/JoonsooKim/linux/commit/166b4186d101b190cf50195d841e2189f2743649
+> (CMA: always treat free cma pages as non-free on watermark checking)
+
+This patch is somewhat related to your failure of non-movable memory
+allocation. It is simple so that you can easily backport.
+
+> These changes have other dependencies which is not present in my kernel version.
+> Like inclusion of ALLOC_FAIR and area->nr_cma_free.
+> Please let me know if these changes are also important for "aggressive alloc changes..."
+> 
+> If possible please send me all the patches related to "aggressive cma.." so that I can conclude on my experiment.
+
+Until now, that's all. :)
+
+Thanks.
