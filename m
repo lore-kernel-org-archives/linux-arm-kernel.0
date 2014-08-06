@@ -1,70 +1,115 @@
 From: shengjiu.wang@freescale.com (Shengjiu Wang)
-Date: Wed, 6 Aug 2014 16:35:13 +0800
-Subject: [PATCH V2 1/3] ARM: clk-imx6q: refine clock tree for ESAI
+Date: Wed, 6 Aug 2014 16:35:15 +0800
+Subject: [PATCH V2 3/3] ARM: imx6q: Add the clock route from external OSC to
+ ESAI clock
 In-Reply-To: <cover.1407313676.git.shengjiu.wang@freescale.com>
 References: <cover.1407313676.git.shengjiu.wang@freescale.com>
-Message-ID: <cdb30bb5d7f8a61c778ed53988976c4e79f56ace.1407313676.git.shengjiu.wang@freescale.com>
+Message-ID: <309d5e2cb941aba7d81e2d87a8237c4ef677e45c.1407313676.git.shengjiu.wang@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-There are three clock for ESAI, esai_extal, esai_ipg, esai_mem. Rename
-'esai' to 'esai_extal', 'esai_ahb' to 'esai_mem', and add 'esai_ipg'.
-Make the clock for ESAI more clear and align them with imx6sx.
+This patch mainly adds the clock route from external 24.576MHz OSC to internal
+ESAI clock via analog clock2 PADs on the SoC and pll4 so that ESAI can get an
+entirely synchronous clock source against CS42888.
 
+[ 1, We found if using pll4 to generate a 24.576MHz from inernal 24.0MHz OSC,
+  we would get noise during the audio playback via ESAI->CS42888 even though
+  this generated clock's rate is equal to the external one statistically. It
+  might be resulted from the tiny difference between two clock source, which
+  might be crucial to the sensitive CODEC we use -- CS42888.
+
+  2, Ideally, we should use bypass mode for pll4 since we only need to get
+  the raw rate (24.576MHz) while currently bypass mode in clk-pllv3.c isn't
+  supported. After bypass mode implement, then we can refine this patch.]
+
+  Expected result:
+
+  anaclk2                 0           1            24576000
+   lvds2_in               0           1            24576000
+    pll4_sel              0           1            24576000
+     pll4_audio           0           1            786432000
+      pll4_post_div       0           1            786432000
+       pll4_audio_div     0           1            786432000
+        esai_sel          0           1            786432000
+         esai_pred        0           1            98304000
+          esai_podf       0           1            24576000
+           esai_extal     0           1            24576000
+
+Signed-off-by: Nicolin Chen <Guangyu.Chen@freescale.com>
 Signed-off-by: Shengjiu Wang <shengjiu.wang@freescale.com>
 ---
- arch/arm/mach-imx/clk-imx6q.c             |    7 ++++---
- include/dt-bindings/clock/imx6qdl-clock.h |    7 ++++---
- 2 files changed, 8 insertions(+), 6 deletions(-)
+ arch/arm/mach-imx/clk-imx6q.c  |    5 +++++
+ arch/arm/mach-imx/mach-imx6q.c |   28 ++++++++++++++++++++++++++++
+ 2 files changed, 33 insertions(+)
 
 diff --git a/arch/arm/mach-imx/clk-imx6q.c b/arch/arm/mach-imx/clk-imx6q.c
-index 6cceb77..1d6dd59 100644
+index 330aad3..29151cb 100644
 --- a/arch/arm/mach-imx/clk-imx6q.c
 +++ b/arch/arm/mach-imx/clk-imx6q.c
-@@ -64,7 +64,7 @@ static const char *cko2_sels[] = {
- 	"ipu2", "vdo_axi", "osc", "gpu2d_core",
- 	"gpu3d_core", "usdhc2", "ssi1", "ssi2",
- 	"ssi3", "gpu3d_shader", "vpu_axi", "can_root",
--	"ldb_di0", "ldb_di1", "esai", "eim_slow",
-+	"ldb_di0", "ldb_di1", "esai_extal", "eim_slow",
- 	"uart_serial", "spdif", "asrc", "hsi_tx",
- };
- static const char *cko_sels[] = { "cko1", "cko2", };
-@@ -325,8 +325,9 @@ static void __init imx6q_clocks_init(struct device_node *ccm_node)
- 	else
- 		clk[IMX6Q_CLK_ECSPI5] = imx_clk_gate2("ecspi5",        "ecspi_root",        base + 0x6c, 8);
- 	clk[IMX6QDL_CLK_ENET]         = imx_clk_gate2("enet",          "ipg",               base + 0x6c, 10);
--	clk[IMX6QDL_CLK_ESAI]         = imx_clk_gate2_shared("esai",   "esai_podf",         base + 0x6c, 16, &share_count_esai);
--	clk[IMX6QDL_CLK_ESAI_AHB]     = imx_clk_gate2_shared("esai_ahb", "ahb",             base + 0x6c, 16, &share_count_esai);
-+	clk[IMX6QDL_CLK_ESAI_EXTAL]   = imx_clk_gate2_shared("esai_extal",   "esai_podf",   base + 0x6c, 16, &share_count_esai);
-+	clk[IMX6QDL_CLK_ESAI_IPG]     = imx_clk_gate2_shared("esai_ipg",   "ipg",           base + 0x6c, 16, &share_count_esai);
-+	clk[IMX6QDL_CLK_ESAI_MEM]     = imx_clk_gate2_shared("esai_mem", "ahb",             base + 0x6c, 16, &share_count_esai);
- 	clk[IMX6QDL_CLK_GPT_IPG]      = imx_clk_gate2("gpt_ipg",       "ipg",               base + 0x6c, 20);
- 	clk[IMX6QDL_CLK_GPT_IPG_PER]  = imx_clk_gate2("gpt_ipg_per",   "ipg_per",           base + 0x6c, 22);
- 	if (cpu_is_imx6dl())
-diff --git a/include/dt-bindings/clock/imx6qdl-clock.h b/include/dt-bindings/clock/imx6qdl-clock.h
-index 654151e..323e865 100644
---- a/include/dt-bindings/clock/imx6qdl-clock.h
-+++ b/include/dt-bindings/clock/imx6qdl-clock.h
-@@ -128,7 +128,7 @@
- #define IMX6Q_CLK_ECSPI5			116
- #define IMX6DL_CLK_I2C4				116
- #define IMX6QDL_CLK_ENET			117
--#define IMX6QDL_CLK_ESAI			118
-+#define IMX6QDL_CLK_ESAI_EXTAL			118
- #define IMX6QDL_CLK_GPT_IPG			119
- #define IMX6QDL_CLK_GPT_IPG_PER			120
- #define IMX6QDL_CLK_GPU2D_CORE			121
-@@ -218,7 +218,8 @@
- #define IMX6QDL_CLK_LVDS2_SEL			205
- #define IMX6QDL_CLK_LVDS1_GATE			206
- #define IMX6QDL_CLK_LVDS2_GATE			207
--#define IMX6QDL_CLK_ESAI_AHB			208
--#define IMX6QDL_CLK_END				209
-+#define IMX6QDL_CLK_ESAI_IPG			208
-+#define IMX6QDL_CLK_ESAI_MEM			209
-+#define IMX6QDL_CLK_END				210
+@@ -414,6 +414,10 @@ static void __init imx6q_clocks_init(struct device_node *ccm_node)
+ 	of_clk_add_provider(np, of_clk_src_onecell_get, &clk_data);
  
- #endif /* __DT_BINDINGS_CLOCK_IMX6QDL_H */
+ 	clk_register_clkdev(clk[IMX6QDL_CLK_ENET_REF], "enet_ref", NULL);
++	clk_register_clkdev(clk[IMX6QDL_CLK_PLL4_AUDIO_DIV], "pll4_audio_div", NULL);
++	clk_register_clkdev(clk[IMX6QDL_CLK_PLL4_SEL], "pll4_sel", NULL);
++	clk_register_clkdev(clk[IMX6QDL_CLK_LVDS2_IN], "lvds2_in", NULL);
++	clk_register_clkdev(clk[IMX6QDL_CLK_ESAI_EXTAL], "esai_extal", NULL);
+ 
+ 	if ((imx_get_soc_revision() != IMX_CHIP_REVISION_1_0) ||
+ 	    cpu_is_imx6dl()) {
+@@ -457,6 +461,7 @@ static void __init imx6q_clocks_init(struct device_node *ccm_node)
+ 
+ 	/* Audio-related clocks configuration */
+ 	clk_set_parent(clk[IMX6QDL_CLK_SPDIF_SEL], clk[IMX6QDL_CLK_PLL3_PFD3_454M]);
++	clk_set_parent(clk[IMX6QDL_CLK_ESAI_SEL], clk[IMX6QDL_CLK_PLL4_AUDIO_DIV]);
+ 
+ 	/* All existing boards with PCIe use LVDS1 */
+ 	if (IS_ENABLED(CONFIG_PCI_IMX6))
+diff --git a/arch/arm/mach-imx/mach-imx6q.c b/arch/arm/mach-imx/mach-imx6q.c
+index d51c6e9..ea24a96 100644
+--- a/arch/arm/mach-imx/mach-imx6q.c
++++ b/arch/arm/mach-imx/mach-imx6q.c
+@@ -362,6 +362,28 @@ put_node:
+ 	of_node_put(np);
+ }
+ 
++#define ESAI_AUDIO_MCLK 24576000
++
++static void __init imx6q_audio_lvds2_init(void)
++{
++        struct clk *pll4_sel, *lvds2_in, *pll4_audio_div, *esai_extal;
++
++        pll4_audio_div = clk_get_sys(NULL, "pll4_audio_div");
++        pll4_sel = clk_get_sys(NULL, "pll4_sel");
++        lvds2_in = clk_get_sys(NULL, "lvds2_in");
++        esai_extal = clk_get_sys(NULL, "esai_extal");
++        if (IS_ERR(pll4_audio_div) || IS_ERR(pll4_sel) ||
++            IS_ERR(lvds2_in) || IS_ERR(esai_extal))
++                return;
++
++        if (clk_get_rate(lvds2_in) != ESAI_AUDIO_MCLK)
++                return;
++
++        clk_set_parent(pll4_sel, lvds2_in);
++        clk_set_rate(pll4_audio_div, 786432000);
++        clk_set_rate(esai_extal, ESAI_AUDIO_MCLK);
++}
++
+ static struct platform_device imx6q_cpufreq_pdev = {
+ 	.name = "imx6q-cpufreq",
+ };
+@@ -379,6 +401,12 @@ static void __init imx6q_init_late(void)
+ 		imx6q_opp_init();
+ 		platform_device_register(&imx6q_cpufreq_pdev);
+ 	}
++
++	if (of_machine_is_compatible("fsl,imx6q-sabreauto")
++		|| of_machine_is_compatible("fsl,imx6dl-sabreauto")) {
++		imx6q_audio_lvds2_init();
++	}
++
+ }
+ 
+ static void __init imx6q_map_io(void)
 -- 
 1.7.9.5
