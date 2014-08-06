@@ -1,74 +1,35 @@
-From: keescook@chromium.org (Kees Cook)
-Date: Wed, 6 Aug 2014 16:22:12 -0700
-Subject: [PATCH v3 2/2] ARM : change fixmap mapping region to support 32
- CPUs
-In-Reply-To: <20140806221648.GT30282@n2100.arm.linux.org.uk>
-References: <1397559967-26050-1-git-send-email-sdu.liu@huawei.com>
- <1397559967-26050-3-git-send-email-sdu.liu@huawei.com>
- <CAL_JsqKE-L2PN3mXHNdTPMEyTMR9ZtbgGB=O_V6nOXN0YC0a4A@mail.gmail.com>
- <alpine.LFD.2.11.1405301441210.17310@knanqh.ubzr>
- <CAGXu5j+ga5Enrsd8LuYarGh1Ozakmi3MNw+b9fZ7ubGUJFZY=w@mail.gmail.com>
- <53E1A3A3.8080706@huawei.com>
- <CAGXu5jKxtm0YAojOLhd_O9AFUAX+xHgEwwB0W_fpN7Xy8wHphQ@mail.gmail.com>
- <alpine.LFD.2.11.1408061317590.6061@knanqh.ubzr>
- <CAGXu5jJN9w=Md3aMkYwFcBVanXfSGL1BdZGZ74ic945B_ocuqg@mail.gmail.com>
- <20140806221648.GT30282@n2100.arm.linux.org.uk>
-Message-ID: <CAGXu5jLuEFJsfDjVzz--ph9ZP_yy1v3u+JOwgNdc759eJs=SVg@mail.gmail.com>
+From: ohaugan@codeaurora.org (Olav Haugan)
+Date: Wed, 06 Aug 2014 16:28:45 -0700
+Subject: [PATCH v4 1/1] iommu-api: Add map_sg/unmap_sg functions
+In-Reply-To: <20140806201740.GW9809@8bytes.org>
+References: <1406854484-3848-1-git-send-email-ohaugan@codeaurora.org>
+ <1406854484-3848-2-git-send-email-ohaugan@codeaurora.org>
+ <20140805151323.GB19709@laptop.dumpdata.com>
+ <53E26127.1040805@codeaurora.org> <20140806201740.GW9809@8bytes.org>
+Message-ID: <53E2BA2D.1050007@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Aug 6, 2014 at 3:16 PM, Russell King - ARM Linux
-<linux@arm.linux.org.uk> wrote:
-> On Wed, Aug 06, 2014 at 10:28:37AM -0700, Kees Cook wrote:
->> That's what I was thinking. I tried this, and things are still weird,
->> though I think I'm narrowing it down. I made the early_pte_alloc
->> happen, but after boot it doesn't show up in
->> /sys/kernel/debug/kernel_page_tables. When I attempt a fixmap text
->> poke, I get this out of dmesg (lkdtm is reporting the address returned
->> from the patch mapping):
->>
->> lkdtm: 80421ac0 mapped RW via ffdefac0
->> Unable to handle kernel paging request at virtual address ffdefac0
->> pgd = 9e888000
->> [ffdefac0] *pgd=9fffc811, *pte=00000000, *ppte=00000000
->> Internal error: Oops: 807 [#1] SMP ARM
->>
->> The target address (0xffdefac0) is correct; it's in the range set aside:
->>
->> #define FIXADDR_START           0xffc00000UL
->> #define FIXADDR_END             0xffe00000UL
->> #define FIXADDR_TOP             (FIXADDR_END - PAGE_SIZE)
->>
->> enum fixed_addresses {
->>         /* Support 16 CPUs for kmap as the first region of fixmap entries. */
->>         FIX_KMAP_BEGIN,
->>         FIX_KMAP_END = 15,
->>
->>         /* Support writing RO kernel text via kprobes, jump labels, etc. */
->>         FIX_TEXT_POKE0,
->>         FIX_TEXT_POKE1,
->>
->>         __end_of_fixed_addresses
->> };
->>
->> But the resulting PTE is in totally the wrong location as reported by
->> /sys/kernel/debug/kernel_page_tables:
->>
->> ---[ Fixmap Area ]---
->> 0xfffef000-0xffff0000           4K     RW NX SHD MEM/CACHED/WBWA
->>
->> I continue to dig...
->
-> This sounds like you have an erroneous merge conflict resolution.  You
-> seem to be poking into TOP_PTE rather than fixmap_page_table.
+On 8/6/2014 1:17 PM, Joerg Roedel wrote:
+> On Wed, Aug 06, 2014 at 10:08:55AM -0700, Olav Haugan wrote:
+>> so you are suggesting that I check in "bus_set_iommu()" whether the
+>> driver has set the map_sg/unmap_sg function pointers or not and if not
+>> set it to the default? Is bus_set_iommu() the only way drivers can set
+>> up the callbacks?
+> 
+> This doesn't work as the iommu_ops are now const. You have to either
+> update the iommu drivers individually to point to the default function,
+> or you do the check in the API function itself and fall back to the
+> default it no call-back is provided.
+> 
 
-Yeah, agreed. This did turn out to be the issue, so I reworked the
-set_fixmap routine to aim at the correct pte. The result seems to
-work, so I after retesting everything, I sent the series out. So
-close! :)
+Ok, then I think it is better to just leave the fallback where it is now
+in the function itself.
 
--Kees
+Thanks,
+
+Olav
 
 -- 
-Kees Cook
-Chrome OS Security
+The Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+hosted by The Linux Foundation
