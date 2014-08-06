@@ -1,138 +1,129 @@
 From: andrew@lunn.ch (Andrew Lunn)
-Date: Wed,  6 Aug 2014 03:18:29 +0200
-Subject: [RFC 5/8] ASoC: simple-card: Don't set DAI format for dynamic DAIs
+Date: Wed,  6 Aug 2014 03:18:32 +0200
+Subject: [RFC 8/8] ARM: Kirkwood: Describe DPCM audio support in DT
 In-Reply-To: <1407287912-19447-1-git-send-email-andrew@lunn.ch>
 References: <1407287912-19447-1-git-send-email-andrew@lunn.ch>
-Message-ID: <1407287912-19447-6-git-send-email-andrew@lunn.ch>
+Message-ID: <1407287912-19447-9-git-send-email-andrew@lunn.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dynamic DAIs, i.e. frontend's should not have a fmt. Skip setting it
-when the dynamic property has been found in DT.
+Describe the DAI backend and the I2S front end of the audio
+hardware for both HP T5325 and Marvell OpenRD Client.
 
 Signed-off-by: Andrew Lunn <andrew@lunn.ch>
 ---
- sound/soc/generic/simple-card.c | 88 +++++++++++++++++++++++++----------------
- 1 file changed, 55 insertions(+), 33 deletions(-)
+ arch/arm/boot/dts/kirkwood-openrd-client.dts | 39 +++++++++++++++++++++++-----
+ arch/arm/boot/dts/kirkwood-t5325.dts         | 33 +++++++++++++++++------
+ 2 files changed, 57 insertions(+), 15 deletions(-)
 
-diff --git a/sound/soc/generic/simple-card.c b/sound/soc/generic/simple-card.c
-index 735a54099b8d..c3235923b12f 100644
---- a/sound/soc/generic/simple-card.c
-+++ b/sound/soc/generic/simple-card.c
-@@ -166,6 +166,52 @@ asoc_simple_card_sub_parse_of(struct device_node *np,
- 	return 0;
- }
- 
-+static void simple_card_cpu_dia_fmt(int daifmt,
-+				    struct simple_dai_props *dai_props,
-+				    struct device_node *np,
-+				    struct device_node *bitclkmaster,
-+				    struct device_node *framemaster)
-+{
-+	dai_props->cpu_dai.fmt = daifmt;
-+	switch (((np == bitclkmaster) << 4) | (np == framemaster)) {
-+	case 0x11:
-+		dai_props->cpu_dai.fmt |= SND_SOC_DAIFMT_CBS_CFS;
-+		break;
-+	case 0x10:
-+		dai_props->cpu_dai.fmt |= SND_SOC_DAIFMT_CBS_CFM;
-+		break;
-+	case 0x01:
-+		dai_props->cpu_dai.fmt |= SND_SOC_DAIFMT_CBM_CFS;
-+		break;
-+	default:
-+		dai_props->cpu_dai.fmt |= SND_SOC_DAIFMT_CBM_CFM;
-+		break;
-+	}
-+}
+diff --git a/arch/arm/boot/dts/kirkwood-openrd-client.dts b/arch/arm/boot/dts/kirkwood-openrd-client.dts
+index 887b9c1fee43..2cb216512ff2 100644
+--- a/arch/arm/boot/dts/kirkwood-openrd-client.dts
++++ b/arch/arm/boot/dts/kirkwood-openrd-client.dts
+@@ -29,19 +29,44 @@
+ 				reg = <0x4a>;
+ 			};
+ 		};
 +
-+static void simple_card_codec_dia_fmt(int daifmt,
-+				      struct simple_dai_props *dai_props,
-+				      struct device_node *np,
-+				      struct device_node *bitclkmaster,
-+				      struct device_node *framemaster)
-+{
-+	dai_props->codec_dai.fmt = daifmt;
-+	switch (((np == bitclkmaster) << 4) | (np == framemaster)) {
-+	case 0x11:
-+		dai_props->codec_dai.fmt |= SND_SOC_DAIFMT_CBM_CFM;
-+		break;
-+	case 0x10:
-+		dai_props->codec_dai.fmt |= SND_SOC_DAIFMT_CBM_CFS;
-+		break;
-+	case 0x01:
-+		dai_props->codec_dai.fmt |= SND_SOC_DAIFMT_CBS_CFM;
-+		break;
-+	default:
-+		dai_props->codec_dai.fmt |= SND_SOC_DAIFMT_CBS_CFS;
-+		break;
-+	}
-+}
++		audio: audio-controller at a0000 {
++			status = "okay";
++		};
 +
- static int simple_card_dai_link_of(struct device_node *node,
- 				   struct device *dev,
- 				   struct snd_soc_dai_link *dai_link,
-@@ -210,21 +256,9 @@ static int simple_card_dai_link_of(struct device_node *node,
- 	if (ret < 0)
- 		goto dai_link_of_err;
+ 	};
  
--	dai_props->cpu_dai.fmt = daifmt;
--	switch (((np == bitclkmaster) << 4) | (np == framemaster)) {
--	case 0x11:
--		dai_props->cpu_dai.fmt |= SND_SOC_DAIFMT_CBS_CFS;
--		break;
--	case 0x10:
--		dai_props->cpu_dai.fmt |= SND_SOC_DAIFMT_CBS_CFM;
--		break;
--	case 0x01:
--		dai_props->cpu_dai.fmt |= SND_SOC_DAIFMT_CBM_CFS;
--		break;
--	default:
--		dai_props->cpu_dai.fmt |= SND_SOC_DAIFMT_CBM_CFM;
--		break;
--	}
-+	if (!dai_link->dynamic)
-+		simple_card_cpu_dia_fmt(daifmt, dai_props, np,
-+					bitclkmaster, framemaster);
+ 	sound {
+ 		compatible = "simple-audio-card";
+-		simple-audio-card,format = "i2s";
+-		simple-audio-card,mclk-fs = <256>;
++		simple-audio-card,name = "openrd-client-audio";
++		simple-audio-card,routing =
++			"i2s-tx", "dma-tx",
++			"dma-rx", "i2s-rx";
  
- 	of_node_put(np);
- 	snprintf(prop, sizeof(prop), "%scodec", prefix);
-@@ -242,30 +276,18 @@ static int simple_card_dai_link_of(struct device_node *node,
- 		goto dai_link_of_err;
+-		simple-audio-card,cpu {
+-			sound-dai = <&audio0>;
++		simple-audio-card,dai-link at 0 { /* Front end */
++			dynamic;
++			dpcm_playback;
++			dpcm_capture;
++			cpu {
++				sound-dai = <&audio 0>;
++			};
++			codec {
++				snd-soc-dummy;
++			};
+ 		};
+-
+-		simple-audio-card,codec {
+-			sound-dai = <&cs42l51>;
++		simple-audio-card,dia-link at 1 { /* I2S Backend */
++			format = "i2s";
++			dpcm_playback;
++			dpcm_capture;
++			no_pcm;
++			mclk-fs = <256>;
++			platform_name = "snd-soc-dummy";
++			cpu {
++				sound-dai = <&audio 1>;
++			};
++			codec {
++				sound-dai = <&cs42l51>;
++			};
+ 		};
+ 	};
+ };
+diff --git a/arch/arm/boot/dts/kirkwood-t5325.dts b/arch/arm/boot/dts/kirkwood-t5325.dts
+index cc6cd0bdcfac..f9466a2858c9 100644
+--- a/arch/arm/boot/dts/kirkwood-t5325.dts
++++ b/arch/arm/boot/dts/kirkwood-t5325.dts
+@@ -189,7 +189,7 @@
  
- 	if (strlen(prefix) && !bitclkmaster && !framemaster) {
--		/* No dai-link level and master setting was not found from
--		   sound node level, revert back to legacy DT parsing and
--		   take the settings from codec node. */
-+		/* No dai-link level and master setting was not found
-+		   from sound node level, revert back to legacy DT
-+		   parsing and take the settings from codec node. */
- 		dev_dbg(dev, "%s: Revert to legacy daifmt parsing\n",
- 			__func__);
- 		dai_props->cpu_dai.fmt = dai_props->codec_dai.fmt =
- 			snd_soc_of_parse_daifmt(np, NULL, NULL, NULL) |
- 			(daifmt & ~SND_SOC_DAIFMT_CLOCK_MASK);
- 	} else {
--		dai_props->codec_dai.fmt = daifmt;
--		switch (((np == bitclkmaster) << 4) | (np == framemaster)) {
--		case 0x11:
--			dai_props->codec_dai.fmt |= SND_SOC_DAIFMT_CBM_CFM;
--			break;
--		case 0x10:
--			dai_props->codec_dai.fmt |= SND_SOC_DAIFMT_CBM_CFS;
--			break;
--		case 0x01:
--			dai_props->codec_dai.fmt |= SND_SOC_DAIFMT_CBS_CFM;
--			break;
--		default:
--			dai_props->codec_dai.fmt |= SND_SOC_DAIFMT_CBS_CFS;
--			break;
--		}
-+		if (!dai_link->dynamic)
-+			simple_card_codec_dia_fmt(daifmt, dai_props, np,
-+						bitclkmaster, framemaster);
- 	}
+ 	sound {
+ 		compatible = "simple-audio-card";
+-		simple-audio-card,format = "i2s";
++		simple-audio-card,name = "t5325";
+ 		simple-audio-card,routing =
+ 			"Headphone Jack", "HPL",
+ 			"Headphone Jack", "HPR",
+@@ -204,15 +204,32 @@
+ 			"Speaker", "Speaker",
+ 			"Microphone", "Mic Jack";
  
- 	if (!dai_link->cpu_dai_name || !dai_link->codec_dai_name) {
+-		simple-audio-card,mclk-fs = <256>;
+-
+-		simple-audio-card,cpu {
+-			sound-dai = <&audio>;
++		simple-audio-card,dai-link at 0 { /* Front end */
++			dynamic;
++			dpcm_playback;
++			dpcm_capture;
++			cpu {
++				sound-dai = <&audio 0>;
++			};
++			codec {
++				snd-soc-dummy;
++			};
+ 		};
+-
+-		simple-audio-card,codec {
+-			sound-dai = <&alc5621>;
++		simple-audio-card,dia-link at 1 { /* I2S Backend */
++			format = "i2s";
++			dpcm_playback;
++			dpcm_capture;
++			no_pcm;
++			mclk-fs = <256>;
++			platform_name = "snd-soc-dummy";
++			cpu {
++				sound-dai = <&audio 1>;
++			};
++			codec {
++				sound-dai = <&alc5621>;
++			};
+ 		};
++
+ 	};
+ };
+ 
 -- 
 2.0.1
