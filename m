@@ -1,121 +1,50 @@
-From: vikas.sajjan@samsung.com (Vikas Sajjan)
-Date: Wed, 6 Aug 2014 19:04:51 +0545
-Subject: [PATCH v2] ARM: EXYNOS: Refactor the pm code to use DT based
- lookup
-In-Reply-To: <53E229A9.4000302@samsung.com>
-References: <1406288941-20792-1-git-send-email-vikas.sajjan@samsung.com>
- <53E1356F.40400@gmail.com>
- <CAGm_ybhFj12+tWEhBy=Z62HE6roWMDOXxyoaVsBC2KPMsrYq9A@mail.gmail.com>
- <53E229A9.4000302@samsung.com>
-Message-ID: <CAGm_ybj=7uGJJv4yDJaM9bcpuA3ucH7Vtowbn9m-5C=-kOozNw@mail.gmail.com>
+From: matt@console-pimps.org (Matt Fleming)
+Date: Wed, 6 Aug 2014 14:20:21 +0100
+Subject: [PATCH 1/2] UEFI arm64: add noefi boot param
+In-Reply-To: <20140806130623.GI4179@bivouac.eciton.net>
+References: <20140806083825.GA31711@dhcp-16-198.nay.redhat.com>
+ <20140806130623.GI4179@bivouac.eciton.net>
+Message-ID: <20140806132021.GB15082@console-pimps.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Tomasz,
+On Wed, 06 Aug, at 02:06:23PM, Leif Lindholm wrote:
+> On Wed, Aug 06, 2014 at 04:38:25PM +0800, Dave Young wrote:
+> > 
+> > Adding a noefi boot param like in X86 to disable efi runtime services support.
+> > 
+> > This will be useful for debugging uefi problems. Also it will be useful
+> > for later kexec/kdump work. Kexec on uefi support in X86 depends on a fixed vm
+> > area specific for uefi runtime 1:1 mapping, kernel will switch to a different
+> > page table for any uefi runtime callback in virtual mode. In arm64 similar
+> > work probably is necessary. But kexec boot will just works with 'noefi' with
+> > the limitaion of lacking runtime services. The runtime services is not critical
+> > for kdump kernel for now. So as for kexec/kdump just leave the 1:1 mapping a
+> > future work.
+> 
+> Since this is really turning an x86-specific feature into a generic
+> one, could it be moved to core code?
+> Maybe an efi.mask, reusing the efi_enabled defines, with an
+> efi_disabled macro?
+ 
+Why the new efi_disabled() and efi.mask? This is all achievable with
+efi_enabled() and efi.flags, in fact, this kind of thing is exactly why
+they were invented.
 
-On Wed, Aug 6, 2014 at 6:57 PM, Tomasz Figa <t.figa@samsung.com> wrote:
-> On 06.08.2014 14:58, Vikas Sajjan wrote:
->> On Wed, Aug 6, 2014 at 1:35 AM, Tomasz Figa <tomasz.figa@gmail.com> wrote:
->>> On 25.07.2014 13:49, Vikas Sajjan wrote:
->
-> [snip]
->
->>
->>>> +
->>>> +     /* Disable USE_RETENTION of JPEG_MEM_OPTION */
->>>> +     tmp = pmu_raw_readl(EXYNOS5_JPEG_MEM_OPTION);
->>>> +     tmp &= ~EXYNOS5_OPTION_USE_RETENTION;
->>>> +     pmu_raw_writel(tmp, EXYNOS5_JPEG_MEM_OPTION);
->>>
->>> This looks completely like a copy paste from a vendor tree needed to
->>> workaround some issues in early revisions of the SoC. Are you sure this
->>> is still needed in production versions of the silicon used on boards
->>> supported in mainline?
->>
->> This piece of code is NOT copy paste from my side, it is an already
->> existing code. I just moved it into the function
->> exynos5250_pm_prepare().
->
-> Sure, I'm aware of this. It might be good to know though if this is
-> really necessary, as I don't think we want useless code.
->
->> However I removed this piece of code and
->> made a common function for exynos4 and exynos5250, S2R works on 5250
->> well even without this piece of code.
->
-> Thanks for checking this. I wonder if we could get some clarification
-> about this from hardware guys. Kukjin, Jingoo, any ideas or people that
-> might know what this is about?
->
-> For now, I believe it could be handled the same way as Exynos4, in PMU
-> register array as I suggested in my previous reply (quoted below).
->
->>
->>>
->>> Even if yes, Exynos4 handles such registers in PMU register array in
->>> pmu.c, so I wonder whether it shouldn't be moved there and allow
->>> handling of all Exynos SoCs uniformly in this file.
->>>
->>>> +
->>>> +     exynos_pm_enter_sleep_mode();
->>>> +}
->>>> +
->>>> +static void exynos4_pm_prepare(void)
->>>> +{
->>>> +     /* Set wake-up mask registers */
->>>> +     exynos_pm_set_wakeup_mask();
->>>> +
->>>> +     s3c_pm_do_save(exynos_core_save, ARRAY_SIZE(exynos_core_save));
->>>> +
->>>> +     exynos_pm_enter_sleep_mode();
->>>> +}
->>>
->>> In fact, exynos4_pm_prepare() is a direct subset of
->>> exynos5250_pm_prepare(). This just confirms that it might be a good idea
->>> to just merge both functions into a single generic one.
->>
->> Right, can be merged into a common function which can be used for
->> exynos4 and exynos5250.
->> But I am afraid we still need specific functions in case of 5420.
->
-> Could you provide some details about Exynos5420 specific things?
+> Also, since this patch (and its x86 predecessor) is not really
+> "noefi", could this be integrated with the "efi=" patch
+> (http://permalink.gmane.org/gmane.linux.kernel.efi/4405),
+> as an efi=noruntime option?
+> 
+> On x86, due to CSM, "noefi" was a useful fallback for completely
+> broken (U)EFI implementations - but on an arm* UEFI system, there will
+> be no fallback. Could it be wrapped in a kernel hacking config option?
+ 
+I don't mind making "noefi" a synonym for "efi=noruntime" on x86, as
+long as we keep "noefi" around with the same semantics it's always had.
 
-Please refer my post [1] for 5420 PMU and S2R Support
+And certainly if you're coming at this anew (like on arm(64)), I agree
+"efi=noruntime" just makes a ton more sense than "noefi".
 
-[1] http://lists.infradead.org/pipermail/linux-arm-kernel/2014-July/269956.html
-
->
->>
->>>
->>>> +
->>>>  static void exynos_pm_central_suspend(void)
->>>>  {
->>>>       unsigned long tmp;
->
-> [snip]
->
->>>> +
->>>>       /* Platform-specific GIC callback */
->>>>       gic_arch_extn.irq_set_wake = exynos_irq_set_wake;
->>>>
->>>>       /* All wakeup disable */
->>>>       tmp = pmu_raw_readl(S5P_WAKEUP_MASK);
->>>> -     tmp |= ((0xFF << 8) | (0x1F << 1));
->>>> +     tmp |= pm_data->wake_disable_mask;
->>>
->>> Does this vary between SoCs?
->>
->> Yes, It is different in case of 5420.
->
-> Could you provide more information about the difference?
-
-In case of 5420, it is wake_disable_mask = (0x7F << 7) | (0x1F << 1)
-
-
->
-> Best regards,
-> Tomasz
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-samsung-soc" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+-- 
+Matt Fleming, Intel Open Source Technology Center
