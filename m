@@ -1,63 +1,60 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Wed, 6 Aug 2014 15:34:30 +0100
-Subject: [PATCH v2 2/3] arm64: add helper functions to read I-cache
- attributes
-In-Reply-To: <CAKv+Gu-iGZMLgWHEPoc1w8HW3gUyuJXb6uerXg_kGQOhbqySSg@mail.gmail.com>
-References: <1407230757-15305-1-git-send-email-ard.biesheuvel@linaro.org>
- <1407230757-15305-2-git-send-email-ard.biesheuvel@linaro.org>
- <20140806130026.GR25953@arm.com>
- <CAKv+Gu_T+FuoS4jEyrG8b5WN8E9=N6nDUL7JC_=9VhaJV-2Pzg@mail.gmail.com>
- <CAKv+Gu-iGZMLgWHEPoc1w8HW3gUyuJXb6uerXg_kGQOhbqySSg@mail.gmail.com>
-Message-ID: <20140806143430.GU25953@arm.com>
+From: andrew@lunn.ch (Andrew Lunn)
+Date: Wed, 6 Aug 2014 16:30:26 +0200
+Subject: [RFC 0/8] DPCM with simple-card support for Kirkwood
+In-Reply-To: <20140806103356.4e7c088a@armhf>
+References: <1407287912-19447-1-git-send-email-andrew@lunn.ch>
+ <20140806103356.4e7c088a@armhf>
+Message-ID: <20140806143026.GA19574@lunn.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Aug 06, 2014 at 02:27:55PM +0100, Ard Biesheuvel wrote:
-> On 6 August 2014 15:17, Ard Biesheuvel <ard.biesheuvel@linaro.org> wrote:
-> > On 6 August 2014 15:00, Will Deacon <will.deacon@arm.com> wrote:
-> >> On Tue, Aug 05, 2014 at 10:25:56AM +0100, Ard Biesheuvel wrote:
-> >>> This adds helper functions and #defines to <asm/cachetype.h> to read the
-> >>> line size and the number of sets from the level 1 instruction cache.
-> >>>
-> >>> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
-> >>> ---
-
-[...]
-
-> >>> +static inline __attribute_const__ u64 icache_get_ccsidr(void)
-> >>> +{
-> >>> +     u64 ccsidr;
-> >>> +
-> >>> +     /* Select L1 I-cache and read its size ID register */
-> >>> +     asm("msr csselr_el1, %1; isb; mrs %0, ccsidr_el1"
-> >>> +         : "=r"(ccsidr) : "r"(1L));
-> >>> +     return ccsidr;
-> >>
-> >> Is it worth having a WARN_ON(preemptible()) here?
-> >>
-> >
-> > Sure, why not.
+On Wed, Aug 06, 2014 at 10:33:56AM +0200, Jean-Francois Moine wrote:
+> On Wed,  6 Aug 2014 03:18:24 +0200
+> Andrew Lunn <andrew@lunn.ch> wrote:
 > 
-> ... if it weren't for the fact that this triggers recursive header
-> inclusion hell
+> > 30 June you posted your code to implement DPCM for kirkwood-i2s,
+> > making it possible to use both I2S and SPDIF at the same time.
+> > 
+> > It has taken me a while, but i now have this patch on 3.16-rc6, and
+> > i've extended simple-card to support DPCM. I've tested it on a
+> > kirkwood based HP T5325, which only makes use of the I2S backend.
+> > 
+> > Please could you take a look and see if this helps to unblock getting
+> > your Cubox support into mainline.
 > 
->   CC      kernel/bounds.s
-> In file included from /home/ard/linux-2.6/include/asm-generic/preempt.h:4:0,
->                  from arch/arm64/include/generated/asm/preempt.h:1,
->                  from /home/ard/linux-2.6/include/linux/preempt.h:18,
->                  from /home/ard/linux-2.6/arch/arm64/include/asm/cachetype.h:21,
+> Andrew,
+> 
+> I had quite the same code as yours end 2013, and, if I did not miss
+> something:
 
-[...]
+Hi Jean
 
-> i.e., linux/bug,h and linux/preempt.h already implicitly #include
-> cachetype.h, so including the former from the latter to import the
-> declaration of WARN_ON() and/or preemptible respectively produces this
-> error.
+At the moment, i'm not so interested in details, but more about, is
+this the right direction to allow Russell to progress. Once i know
+that, we can work on details.
+ 
+> - you cannot put Linux specific stuff in the DT:
+> http://mailman.alsa-project.org/pipermail/alsa-devel/2013-December/070595.html
+> http://mailman.alsa-project.org/pipermail/alsa-devel/2014-January/070622.html
 
-Damn, that's a real shame. I'm always dubious about adding code like this
-which isn't obviously broken from preemptible context when you're just
-looking at the function name.
+The binding is not nice, and i know that. I want to simplify it. I
+need to look at other DPCM users and see what is possible. It might be
+i can just have two booleans: dpcm_frontend and dpcm_backend, and
+derive everything else from these. As of 3.16, there only appears to
+be one other dpcm user, intel haswell. There is a lot in common with
+kirkwood, needing to use the snd-soc-dummy, dummy platform, setting
+no_pcm, etc. So for simple-card, i can probably just assume these can
+be implied from flags like dpcm_frontend and dpcm_backend? It looks
+like you had the same idea at the end of 2013.
+ 
+> - the DPCM code does not handle the formats and rates of the back-ends:
+> http://mailman.alsa-project.org/pipermail/alsa-devel/2013-December/070585.html
+> 
+> Some more information may be found at:
+> http://mailman.alsa-project.org/pipermail/alsa-devel/2014-January/070798.html
 
-Ho-hum.
+I've not run into these problems, but i have not tested too much. Once
+we have the general direction decided, we should try to work on this
+together to fix it.
 
-Will
+	 Andrew
