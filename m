@@ -1,25 +1,173 @@
-From: joro@8bytes.org (Joerg Roedel)
-Date: Wed, 6 Aug 2014 22:17:40 +0200
-Subject: [PATCH v4 1/1] iommu-api: Add map_sg/unmap_sg functions
-In-Reply-To: <53E26127.1040805@codeaurora.org>
-References: <1406854484-3848-1-git-send-email-ohaugan@codeaurora.org>
- <1406854484-3848-2-git-send-email-ohaugan@codeaurora.org>
- <20140805151323.GB19709@laptop.dumpdata.com>
- <53E26127.1040805@codeaurora.org>
-Message-ID: <20140806201740.GW9809@8bytes.org>
+From: nicolas.pitre@linaro.org (Nicolas Pitre)
+Date: Wed, 6 Aug 2014 16:28:23 -0400 (EDT)
+Subject: [PATCH v2 4/5] ARM64: add IPI tracepoints
+In-Reply-To: <20140806155237.0a6d7d3c@gandalf.local.home>
+References: <1406318733-26754-1-git-send-email-nicolas.pitre@linaro.org>
+ <1406318733-26754-5-git-send-email-nicolas.pitre@linaro.org>
+ <20140806155237.0a6d7d3c@gandalf.local.home>
+Message-ID: <alpine.LFD.2.11.1408061627280.6061@knanqh.ubzr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Aug 06, 2014 at 10:08:55AM -0700, Olav Haugan wrote:
-> so you are suggesting that I check in "bus_set_iommu()" whether the
-> driver has set the map_sg/unmap_sg function pointers or not and if not
-> set it to the default? Is bus_set_iommu() the only way drivers can set
-> up the callbacks?
+On Wed, 6 Aug 2014, Steven Rostedt wrote:
 
-This doesn't work as the iommu_ops are now const. You have to either
-update the iommu drivers individually to point to the default function,
-or you do the check in the API function itself and fall back to the
-default it no call-back is provided.
+> Will and Russell,
+> 
+> Can you give me your Acked-by for this, and I can pull it through my
+> tree?
+
+Catalin (the ARM64 maintainer) already provided his.
 
 
-	Joerg
+> 
+> Thanks,
+> 
+> -- Steve
+> 
+> 
+> On Fri, 25 Jul 2014 16:05:32 -0400
+> Nicolas Pitre <nicolas.pitre@linaro.org> wrote:
+> 
+> > The strings used to list IPIs in /proc/interrupts are reused for tracing
+> > purposes.
+> > 
+> > While at it, the code is slightly cleaned up so the ipi_types array
+> > indices are no longer offset by IPI_RESCHEDULE whose value is 0 anyway.
+> > 
+> > Signed-off-by: Nicolas Pitre <nico@linaro.org>
+> > Acked-by: Steven Rostedt <rostedt@goodmis.org>
+> > Acked-by: Catalin Marinas <catalin.marinas@arm.com>
+> > ---
+> >  arch/arm64/kernel/smp.c | 65 +++++++++++++++++++++++++++++--------------------
+> >  1 file changed, 39 insertions(+), 26 deletions(-)
+> > 
+> > diff --git a/arch/arm64/kernel/smp.c b/arch/arm64/kernel/smp.c
+> > index 40f38f46c8..a89c66f3b4 100644
+> > --- a/arch/arm64/kernel/smp.c
+> > +++ b/arch/arm64/kernel/smp.c
+> > @@ -50,6 +50,9 @@
+> >  #include <asm/tlbflush.h>
+> >  #include <asm/ptrace.h>
+> >  
+> > +#define CREATE_TRACE_POINTS
+> > +#include <trace/events/ipi.h>
+> > +
+> >  /*
+> >   * as from 2.5, kernels no longer have an init_tasks structure
+> >   * so we need some other way of telling a new secondary core
+> > @@ -307,8 +310,6 @@ void __init smp_prepare_boot_cpu(void)
+> >  	set_my_cpu_offset(per_cpu_offset(smp_processor_id()));
+> >  }
+> >  
+> > -static void (*smp_cross_call)(const struct cpumask *, unsigned int);
+> > -
+> >  /*
+> >   * Enumerate the possible CPU set from the device tree and build the
+> >   * cpu logical map array containing MPIDR values related to logical
+> > @@ -463,32 +464,15 @@ void __init smp_prepare_cpus(unsigned int max_cpus)
+> >  	}
+> >  }
+> >  
+> > +static void (*__smp_cross_call)(const struct cpumask *, unsigned int);
+> >  
+> >  void __init set_smp_cross_call(void (*fn)(const struct cpumask *, unsigned int))
+> >  {
+> > -	smp_cross_call = fn;
+> > +	__smp_cross_call = fn;
+> >  }
+> >  
+> > -void arch_send_call_function_ipi_mask(const struct cpumask *mask)
+> > -{
+> > -	smp_cross_call(mask, IPI_CALL_FUNC);
+> > -}
+> > -
+> > -void arch_send_call_function_single_ipi(int cpu)
+> > -{
+> > -	smp_cross_call(cpumask_of(cpu), IPI_CALL_FUNC_SINGLE);
+> > -}
+> > -
+> > -#ifdef CONFIG_IRQ_WORK
+> > -void arch_irq_work_raise(void)
+> > -{
+> > -	if (smp_cross_call)
+> > -		smp_cross_call(cpumask_of(smp_processor_id()), IPI_IRQ_WORK);
+> > -}
+> > -#endif
+> > -
+> > -static const char *ipi_types[NR_IPI] = {
+> > -#define S(x,s)	[x - IPI_RESCHEDULE] = s
+> > +static const char *ipi_types[NR_IPI] __tracepoint_string = {
+> > +#define S(x,s)	[x] = s
+> >  	S(IPI_RESCHEDULE, "Rescheduling interrupts"),
+> >  	S(IPI_CALL_FUNC, "Function call interrupts"),
+> >  	S(IPI_CALL_FUNC_SINGLE, "Single function call interrupts"),
+> > @@ -497,12 +481,18 @@ static const char *ipi_types[NR_IPI] = {
+> >  	S(IPI_IRQ_WORK, "IRQ work interrupts"),
+> >  };
+> >  
+> > +static void smp_cross_call(const struct cpumask *target, unsigned int ipinr)
+> > +{
+> > +	trace_ipi_raise(target, ipi_types[ipinr]);
+> > +	__smp_cross_call(target, ipinr);
+> > +}
+> > +
+> >  void show_ipi_list(struct seq_file *p, int prec)
+> >  {
+> >  	unsigned int cpu, i;
+> >  
+> >  	for (i = 0; i < NR_IPI; i++) {
+> > -		seq_printf(p, "%*s%u:%s", prec - 1, "IPI", i + IPI_RESCHEDULE,
+> > +		seq_printf(p, "%*s%u:%s", prec - 1, "IPI", i,
+> >  			   prec >= 4 ? " " : "");
+> >  		for_each_online_cpu(cpu)
+> >  			seq_printf(p, "%10u ",
+> > @@ -522,6 +512,24 @@ u64 smp_irq_stat_cpu(unsigned int cpu)
+> >  	return sum;
+> >  }
+> >  
+> > +void arch_send_call_function_ipi_mask(const struct cpumask *mask)
+> > +{
+> > +	smp_cross_call(mask, IPI_CALL_FUNC);
+> > +}
+> > +
+> > +void arch_send_call_function_single_ipi(int cpu)
+> > +{
+> > +	smp_cross_call(cpumask_of(cpu), IPI_CALL_FUNC_SINGLE);
+> > +}
+> > +
+> > +#ifdef CONFIG_IRQ_WORK
+> > +void arch_irq_work_raise(void)
+> > +{
+> > +	if (__smp_cross_call)
+> > +		smp_cross_call(cpumask_of(smp_processor_id()), IPI_IRQ_WORK);
+> > +}
+> > +#endif
+> > +
+> >  static DEFINE_RAW_SPINLOCK(stop_lock);
+> >  
+> >  /*
+> > @@ -553,8 +561,10 @@ void handle_IPI(int ipinr, struct pt_regs *regs)
+> >  	unsigned int cpu = smp_processor_id();
+> >  	struct pt_regs *old_regs = set_irq_regs(regs);
+> >  
+> > -	if (ipinr >= IPI_RESCHEDULE && ipinr < IPI_RESCHEDULE + NR_IPI)
+> > -		__inc_irq_stat(cpu, ipi_irqs[ipinr - IPI_RESCHEDULE]);
+> > +	if ((unsigned)ipinr < NR_IPI) {
+> > +		trace_ipi_entry(ipi_types[ipinr]);
+> > +		__inc_irq_stat(cpu, ipi_irqs[ipinr]);
+> > +	}
+> >  
+> >  	switch (ipinr) {
+> >  	case IPI_RESCHEDULE:
+> > @@ -599,6 +609,9 @@ void handle_IPI(int ipinr, struct pt_regs *regs)
+> >  		pr_crit("CPU%u: Unknown IPI message 0x%x\n", cpu, ipinr);
+> >  		break;
+> >  	}
+> > +
+> > +	if ((unsigned)ipinr < NR_IPI)
+> > +		trace_ipi_exit(ipi_types[ipinr]);
+> >  	set_irq_regs(old_regs);
+> >  }
+> >  
+> 
+> 
