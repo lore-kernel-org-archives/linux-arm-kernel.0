@@ -1,54 +1,118 @@
-From: Mattis.Lorentzon@autoliv.com (Mattis Lorentzon)
-Date: Wed, 6 Aug 2014 11:10:06 +0000
-Subject: Oops: 17 SMP ARM (v3.16-rc2)
-In-Reply-To: <20140806095012.GN30282@n2100.arm.linux.org.uk>
-References: <C4A61A5CA4AD2246942F4BA6F20ACB804356534D@ALVA-EXMB04.alv.autoliv.int>
- <20140626140115.GQ32514@n2100.arm.linux.org.uk>
- <C4A61A5CA4AD2246942F4BA6F20ACB80435655E9@ALVA-EXMB04.alv.autoliv.int>
- <20140626151424.GT32514@n2100.arm.linux.org.uk>
- <20140627112151.GF32514@n2100.arm.linux.org.uk>
- <3FFB61A7A8473C49831AF20FA193534A43CADFA7@ALVA-EXMB01.alv.autoliv.int>
- <20140627163108.GP32514@n2100.arm.linux.org.uk>
- <C4A61A5CA4AD2246942F4BA6F20ACB8043575072@ALVA-EXMB04.alv.autoliv.int>
- <20140806095012.GN30282@n2100.arm.linux.org.uk>
-Message-ID: <C4A61A5CA4AD2246942F4BA6F20ACB8043575172@ALVA-EXMB04.alv.autoliv.int>
+From: christoffer.dall@linaro.org (Christoffer Dall)
+Date: Wed, 6 Aug 2014 13:30:17 +0200
+Subject: [RFC PATCH 4/9] irqchip: GIC: add support for forwarded interrupts
+In-Reply-To: <1403688530-23273-5-git-send-email-marc.zyngier@arm.com>
+References: <1403688530-23273-1-git-send-email-marc.zyngier@arm.com>
+ <1403688530-23273-5-git-send-email-marc.zyngier@arm.com>
+Message-ID: <20140806113017.GA14205@cbox>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Russell,
+On Wed, Jun 25, 2014 at 10:28:45AM +0100, Marc Zyngier wrote:
+> Now that we've switched to EOImode == 1, prevent a forwarded interrupt
+> from being deactivated after its priority has been dropped.
+> 
+> Also add support for the interrupt state to be saved/restored.
+> 
+> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+> ---
+>  drivers/irqchip/irq-gic.c | 48 +++++++++++++++++++++++++++++++++++++++++------
+>  1 file changed, 42 insertions(+), 6 deletions(-)
+> 
+> diff --git a/drivers/irqchip/irq-gic.c b/drivers/irqchip/irq-gic.c
+> index 9295bf2..bde1637 100644
+> --- a/drivers/irqchip/irq-gic.c
+> +++ b/drivers/irqchip/irq-gic.c
+> @@ -157,12 +157,22 @@ static inline unsigned int gic_irq(struct irq_data *d)
+>  /*
+>   * Routines to acknowledge, disable and enable interrupts
+>   */
+> -static void gic_mask_irq(struct irq_data *d)
+> +static void gic_poke_irq(struct irq_data *d, u32 offset)
+> +{
+> +	u32 mask = 1 << (gic_irq(d) % 32);
+> +	writel_relaxed(mask, gic_dist_base(d) + offset + (gic_irq(d) / 32) * 4);
+> +}
+> +
+> +static int gic_peek_irq(struct irq_data *d, u32 offset)
+>  {
+>  	u32 mask = 1 << (gic_irq(d) % 32);
+> +	return !!(readl_relaxed(gic_dist_base(d) + offset + (gic_irq(d) / 32) * 4) & mask);
+> +}
+>  
+> +static void gic_mask_irq(struct irq_data *d)
+> +{
+>  	raw_spin_lock(&irq_controller_lock);
+> -	writel_relaxed(mask, gic_dist_base(d) + GIC_DIST_ENABLE_CLEAR + (gic_irq(d) / 32) * 4);
+> +	gic_poke_irq(d, GIC_DIST_ENABLE_CLEAR);
+>  	if (gic_arch_extn.irq_mask)
+>  		gic_arch_extn.irq_mask(d);
+>  	raw_spin_unlock(&irq_controller_lock);
+> @@ -170,12 +180,10 @@ static void gic_mask_irq(struct irq_data *d)
+>  
+>  static void gic_unmask_irq(struct irq_data *d)
+>  {
+> -	u32 mask = 1 << (gic_irq(d) % 32);
+> -
+>  	raw_spin_lock(&irq_controller_lock);
+>  	if (gic_arch_extn.irq_unmask)
+>  		gic_arch_extn.irq_unmask(d);
+> -	writel_relaxed(mask, gic_dist_base(d) + GIC_DIST_ENABLE_SET + (gic_irq(d) / 32) * 4);
+> +	gic_poke_irq(d, GIC_DIST_ENABLE_SET);
+>  	raw_spin_unlock(&irq_controller_lock);
+>  }
+>  
+> @@ -193,7 +201,33 @@ static void gic_eoi_irq(struct irq_data *d)
+>  static void gic_eoi_dir_irq(struct irq_data *d)
+>  {
+>  	gic_eoi_irq(d);
+> -	writel_relaxed(gic_irq(d), gic_cpu_base(d) + GIC_CPU_DEACTIVATE);
+> +	if (!irqd_irq_forwarded(d))
+> +		writel_relaxed(gic_irq(d), gic_cpu_base(d) + GIC_CPU_DEACTIVATE);
+> +}
+> +
+> +static void gic_irq_set_fwd_state(struct irq_data *d, u32 val, u32 mask)
+> +{
+> +	if (mask & IRQ_FWD_STATE_PENDING)
+> +		gic_poke_irq(d, (val & IRQ_FWD_STATE_PENDING) ? GIC_DIST_ENABLE_SET : GIC_DIST_ENABLE_CLEAR);
 
-> What is on the other end of the link?
+Why are you masking/unmasking the interrupt on the pending bit?  Did you
+mean GIC_DIST_PENDING_{SET,CLEAR} ?
 
-16 ARM cards connected to a 3Com Switch 4400 connected to a Linux FC 20
-machine (Intel Corporation 82541PI Gigabit Ethernet Controller rev 05).
+> +	if (mask & IRQ_FWD_STATE_ACTIVE)
+> +		gic_poke_irq(d, (val & IRQ_FWD_STATE_ACTIVE) ? GIC_DIST_ACTIVE_SET : GIC_DIST_ACTIVE_CLEAR);
+> +	if (mask & IRQ_FWD_STATE_MASKED)
+> +		gic_poke_irq(d, (val & IRQ_FWD_STATE_MASKED) ? GIC_DIST_ENABLE_CLEAR : GIC_DIST_ENABLE_SET);
+> +
+> +}
+> +
+> +static u32 gic_irq_get_fwd_state(struct irq_data *d, u32 mask)
+> +{
+> +	u32 val = 0;
+> +
+> +	if (mask & IRQ_FWD_STATE_PENDING && gic_peek_irq(d, GIC_DIST_ENABLE_SET))
+> +		val |= IRQ_FWD_STATE_PENDING;
 
-There may be multiple problems. The backtrace has only been seen a few
-times, on two different cards. Most of the time, the network for a random
-card just stalls without any visible backtrace or error messages. The other
-cards seem to be unaffected when this happens.
+same
 
-> What I would like to do is to stamp each packet in some way with an
-> identifier marking its ring position, and then monitor the network to find out
-> whether the packet at slot 85 was actually transmitted - that's made slightly
-> harder because packets may be dropped at the receiver when operating in
-> promisc mode.  This would then allow us to work out some likely causes.
-
-We would be glad to run this test on our setup, do you have more detailed
-information on how to set it up?
-
-> Note that after the transmit watchdog, the interface should recover and start
-> operating normally again - and that should not take "several minutes."
-
-After a network stall, we usually have to powercycle the ARM hardware to
-get it back to a usable state. These stalls last at least several minutes,
-perhaps indefinitely. It does not seem to recover properly, and is no longer
-reachable via the network.
-
-Best regards,
-Mattis Lorentzon
-***************************************************************
-Consider the environment before printing this message.
-
-To read Autoliv's Information and Confidentiality Notice, follow this link:
-http://www.autoliv.com/disclaimer.html
-***************************************************************
+> +	if (mask & IRQ_FWD_STATE_ACTIVE && gic_peek_irq(d, GIC_DIST_ACTIVE_SET))
+> +		val |= IRQ_FWD_STATE_ACTIVE;
+> +	if (mask & IRQ_FWD_STATE_MASKED && !gic_peek_irq(d, GIC_DIST_ENABLE_SET))
+> +		val |= IRQ_FWD_STATE_MASKED;
+> +
+> +	return val;
+>  }
+>  
+>  static int gic_set_type(struct irq_data *d, unsigned int type)
+> @@ -349,6 +383,8 @@ static struct irq_chip gicv2_chip = {
+>  	.irq_set_affinity	= gic_set_affinity,
+>  #endif
+>  	.irq_set_wake		= gic_set_wake,
+> +	.irq_get_fwd_state	= gic_irq_get_fwd_state,
+> +	.irq_set_fwd_state	= gic_irq_set_fwd_state,
+>  };
+>  
+>  void __init gic_cascade_irq(unsigned int gic_nr, unsigned int irq)
+> -- 
+> 1.8.3.4
+> 
