@@ -1,187 +1,256 @@
 From: keescook@chromium.org (Kees Cook)
-Date: Thu,  7 Aug 2014 08:01:49 -0700
-Subject: [PATCH 4/8] arm: use fixmap for text patching when text is RO
+Date: Thu,  7 Aug 2014 08:01:52 -0700
+Subject: [PATCH 7/8] ARM: mm: allow non-text sections to be non-executable
 In-Reply-To: <1407423713-4160-1-git-send-email-keescook@chromium.org>
 References: <1407423713-4160-1-git-send-email-keescook@chromium.org>
-Message-ID: <1407423713-4160-5-git-send-email-keescook@chromium.org>
+Message-ID: <1407423713-4160-8-git-send-email-keescook@chromium.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Rabin Vincent <rabin@rab.in>
+Adds CONFIG_ARM_KERNMEM_PERMS to separate the kernel memory regions
+into section-sized areas that can have different permisions. Performs
+the NX permission changes during free_initmem, so that init memory can be
+reclaimed.
 
-Use fixmaps for text patching when the kernel text is read-only,
-inspired by x86.  This makes jump labels and kprobes work with the
-currently available CONFIG_DEBUG_SET_MODULE_RONX and the upcoming
-CONFIG_DEBUG_RODATA options.
+This uses section size instead of PMD size to reduce memory lost to
+padding on non-LPAE systems.
 
-Signed-off-by: Rabin Vincent <rabin@rab.in>
-[update for "ARM: 8031/2: change fixmap mapping region to support 32 CPUs"]
+Based on work by Brad Spengler, Larry Bassel, and Laura Abbott.
+
 Signed-off-by: Kees Cook <keescook@chromium.org>
 ---
- arch/arm/include/asm/fixmap.h |  4 +++
- arch/arm/kernel/jump_label.c  |  2 +-
- arch/arm/kernel/patch.c       | 70 ++++++++++++++++++++++++++++++++++++++-----
- arch/arm/kernel/patch.h       | 12 +++++++-
- 4 files changed, 79 insertions(+), 9 deletions(-)
+ arch/arm/kernel/vmlinux.lds.S |  17 +++++++
+ arch/arm/mm/Kconfig           |   9 ++++
+ arch/arm/mm/init.c            | 106 ++++++++++++++++++++++++++++++++++++++++++
+ arch/arm/mm/mmu.c             |  13 +++++-
+ 4 files changed, 144 insertions(+), 1 deletion(-)
 
-diff --git a/arch/arm/include/asm/fixmap.h b/arch/arm/include/asm/fixmap.h
-index 3ed08232be55..056f2be273a3 100644
---- a/arch/arm/include/asm/fixmap.h
-+++ b/arch/arm/include/asm/fixmap.h
-@@ -19,6 +19,10 @@ enum fixed_addresses {
- 	FIX_KMAP_BEGIN,
- 	FIX_KMAP_END = (FIX_KMAP_NR_PTES * FIX_KMAP_NR_CPUS) - 1,
- 
-+	/* Support writing RO kernel text via kprobes, jump labels, etc. */
-+	FIX_TEXT_POKE0,
-+	FIX_TEXT_POKE1,
-+
- 	__end_of_fixed_addresses
- };
- 
-diff --git a/arch/arm/kernel/jump_label.c b/arch/arm/kernel/jump_label.c
-index 4ce4f789446d..afeeb9ea6f43 100644
---- a/arch/arm/kernel/jump_label.c
-+++ b/arch/arm/kernel/jump_label.c
-@@ -19,7 +19,7 @@ static void __arch_jump_label_transform(struct jump_entry *entry,
- 		insn = arm_gen_nop();
- 
- 	if (is_static)
--		__patch_text(addr, insn);
-+		__patch_text_early(addr, insn);
- 	else
- 		patch_text(addr, insn);
- }
-diff --git a/arch/arm/kernel/patch.c b/arch/arm/kernel/patch.c
-index 07314af47733..03dd4e39c833 100644
---- a/arch/arm/kernel/patch.c
-+++ b/arch/arm/kernel/patch.c
-@@ -1,8 +1,11 @@
- #include <linux/kernel.h>
-+#include <linux/spinlock.h>
- #include <linux/kprobes.h>
-+#include <linux/mm.h>
- #include <linux/stop_machine.h>
- 
- #include <asm/cacheflush.h>
-+#include <asm/fixmap.h>
- #include <asm/smp_plat.h>
- #include <asm/opcodes.h>
- 
-@@ -13,21 +16,69 @@ struct patch {
- 	unsigned int insn;
- };
- 
--void __kprobes __patch_text(void *addr, unsigned int insn)
-+static DEFINE_SPINLOCK(patch_lock);
-+
-+static void __kprobes *patch_map(void *addr, int fixmap, unsigned long *flags)
-+{
-+	unsigned int uintaddr = (uintptr_t) addr;
-+	bool module = !core_kernel_text(uintaddr);
-+	struct page *page;
-+
-+	if (module && IS_ENABLED(CONFIG_DEBUG_SET_MODULE_RONX))
-+		page = vmalloc_to_page(addr);
-+	else if (!module && IS_ENABLED(CONFIG_DEBUG_RODATA))
-+		page = virt_to_page(addr);
-+	else
-+		return addr;
-+
-+	if (flags)
-+		spin_lock_irqsave(&patch_lock, *flags);
-+
-+	set_fixmap(fixmap, page_to_phys(page));
-+
-+	return (void *) (__fix_to_virt(fixmap) + (uintaddr & ~PAGE_MASK));
-+}
-+
-+static void __kprobes patch_unmap(int fixmap, unsigned long *flags)
-+{
-+	clear_fixmap(fixmap);
-+
-+	if (flags)
-+		spin_unlock_irqrestore(&patch_lock, *flags);
-+}
-+
-+void __kprobes __patch_text_real(void *addr, unsigned int insn, bool remap)
- {
- 	bool thumb2 = IS_ENABLED(CONFIG_THUMB2_KERNEL);
-+	unsigned int uintaddr = (uintptr_t) addr;
-+	bool twopage = false;
-+	unsigned long flags;
-+	void *waddr = addr;
- 	int size;
- 
-+	if (remap)
-+		waddr = patch_map(addr, FIX_TEXT_POKE0, &flags);
-+
- 	if (thumb2 && __opcode_is_thumb16(insn)) {
--		*(u16 *)addr = __opcode_to_mem_thumb16(insn);
-+		*(u16 *)waddr = __opcode_to_mem_thumb16(insn);
- 		size = sizeof(u16);
--	} else if (thumb2 && ((uintptr_t)addr & 2)) {
-+	} else if (thumb2 && (uintaddr & 2)) {
- 		u16 first = __opcode_thumb32_first(insn);
- 		u16 second = __opcode_thumb32_second(insn);
--		u16 *addrh = addr;
-+		u16 *addrh0 = waddr;
-+		u16 *addrh1 = waddr + 2;
- 
--		addrh[0] = __opcode_to_mem_thumb16(first);
--		addrh[1] = __opcode_to_mem_thumb16(second);
-+		twopage = (uintaddr & ~PAGE_MASK) == PAGE_SIZE - 2;
-+		if (twopage && remap)
-+			addrh1 = patch_map(addr + 2, FIX_TEXT_POKE1, NULL);
-+
-+		*addrh0 = __opcode_to_mem_thumb16(first);
-+		*addrh1 = __opcode_to_mem_thumb16(second);
-+
-+		if (twopage && addrh1 != addr + 2) {
-+			flush_kernel_vmap_range(addrh1, 2);
-+			patch_unmap(FIX_TEXT_POKE1, NULL);
-+		}
- 
- 		size = sizeof(u32);
- 	} else {
-@@ -36,10 +87,15 @@ void __kprobes __patch_text(void *addr, unsigned int insn)
- 		else
- 			insn = __opcode_to_mem_arm(insn);
- 
--		*(u32 *)addr = insn;
-+		*(u32 *)waddr = insn;
- 		size = sizeof(u32);
+diff --git a/arch/arm/kernel/vmlinux.lds.S b/arch/arm/kernel/vmlinux.lds.S
+index 6f57cb94367f..a3d07ca2bbb4 100644
+--- a/arch/arm/kernel/vmlinux.lds.S
++++ b/arch/arm/kernel/vmlinux.lds.S
+@@ -8,6 +8,9 @@
+ #include <asm/thread_info.h>
+ #include <asm/memory.h>
+ #include <asm/page.h>
++#ifdef CONFIG_ARM_KERNMEM_PERMS
++#include <asm/pgtable.h>
++#endif
+ 	
+ #define PROC_INFO							\
+ 	. = ALIGN(4);							\
+@@ -90,6 +93,11 @@ SECTIONS
+ 		_text = .;
+ 		HEAD_TEXT
  	}
- 
-+	if (waddr != addr) {
-+		flush_kernel_vmap_range(waddr, twopage ? size / 2 : size);
-+		patch_unmap(FIX_TEXT_POKE0, &flags);
-+	}
 +
- 	flush_icache_range((uintptr_t)(addr),
- 			   (uintptr_t)(addr) + size);
- }
-diff --git a/arch/arm/kernel/patch.h b/arch/arm/kernel/patch.h
-index b4731f2dac38..77e054c2f6cd 100644
---- a/arch/arm/kernel/patch.h
-+++ b/arch/arm/kernel/patch.h
-@@ -2,6 +2,16 @@
- #define _ARM_KERNEL_PATCH_H
- 
- void patch_text(void *addr, unsigned int insn);
--void __patch_text(void *addr, unsigned int insn);
-+void __patch_text_real(void *addr, unsigned int insn, bool remap);
++#ifdef CONFIG_ARM_KERNMEM_PERMS
++	. = ALIGN(1<<SECTION_SHIFT);
++#endif
 +
-+static inline void __patch_text(void *addr, unsigned int insn)
-+{
-+	__patch_text_real(addr, insn, true);
-+}
-+
-+static inline void __patch_text_early(void *addr, unsigned int insn)
-+{
-+	__patch_text_real(addr, insn, false);
-+}
+ 	.text : {			/* Real text segment		*/
+ 		_stext = .;		/* Text and read-only data	*/
+ 			__exception_text_start = .;
+@@ -145,7 +153,11 @@ SECTIONS
+ 	_etext = .;			/* End of text and rodata section */
  
+ #ifndef CONFIG_XIP_KERNEL
++# ifdef CONFIG_ARM_KERNMEM_PERMS
++	. = ALIGN(1<<SECTION_SHIFT);
++# else
+ 	. = ALIGN(PAGE_SIZE);
++# endif
+ 	__init_begin = .;
  #endif
+ 	/*
+@@ -220,7 +232,12 @@ SECTIONS
+ 	. = PAGE_OFFSET + TEXT_OFFSET;
+ #else
+ 	__init_end = .;
++
++#ifdef CONFIG_ARM_KERNMEM_PERMS
++	. = ALIGN(1<<SECTION_SHIFT);
++#else
+ 	. = ALIGN(THREAD_SIZE);
++#endif
+ 	__data_loc = .;
+ #endif
+ 
+diff --git a/arch/arm/mm/Kconfig b/arch/arm/mm/Kconfig
+index 577039a3f6e5..1fc1c30dfdc4 100644
+--- a/arch/arm/mm/Kconfig
++++ b/arch/arm/mm/Kconfig
+@@ -1008,3 +1008,12 @@ config ARCH_SUPPORTS_BIG_ENDIAN
+ 	help
+ 	  This option specifies the architecture can support big endian
+ 	  operation.
++
++config ARM_KERNMEM_PERMS
++	bool "Restrict kernel memory permissions"
++	help
++	  If this is set, kernel memory other than kernel text (and rodata)
++	  will be made non-executable. The tradeoff is that each region is
++	  padded to section-size (1MiB) boundaries (because their permissions
++	  are different and splitting the 1M pages into 4K ones causes TLB
++	  performance problems), wasting memory.
+diff --git a/arch/arm/mm/init.c b/arch/arm/mm/init.c
+index ad82c05bfc3a..ccf392ef40d4 100644
+--- a/arch/arm/mm/init.c
++++ b/arch/arm/mm/init.c
+@@ -32,6 +32,11 @@
+ #include <asm/tlb.h>
+ #include <asm/fixmap.h>
+ 
++#ifdef CONFIG_ARM_KERNMEM_PERMS
++#include <asm/system_info.h>
++#include <asm/cp15.h>
++#endif
++
+ #include <asm/mach/arch.h>
+ #include <asm/mach/map.h>
+ 
+@@ -615,11 +620,112 @@ void __init mem_init(void)
+ 	}
+ }
+ 
++#ifdef CONFIG_ARM_KERNMEM_PERMS
++struct section_perm {
++	unsigned long start;
++	unsigned long end;
++	pmdval_t mask;
++	pmdval_t prot;
++};
++
++struct section_perm nx_perms[] = {
++	/* Make pages tables, etc before _stext RW (set NX). */
++	{
++		.start	= PAGE_OFFSET,
++		.end	= (unsigned long)_stext,
++		.mask	= ~PMD_SECT_XN,
++		.prot	= PMD_SECT_XN,
++	},
++	/* Make init RW (set NX). */
++	{
++		.start	= (unsigned long)__init_begin,
++		.end	= (unsigned long)_sdata,
++		.mask	= ~PMD_SECT_XN,
++		.prot	= PMD_SECT_XN,
++	},
++};
++
++/*
++ * Updates section permissions only for the current mm (sections are
++ * copied into each mm). During startup, this is the init_mm.
++ */
++static inline void section_update(unsigned long addr, pmdval_t mask,
++				  pmdval_t prot)
++{
++	struct mm_struct *mm;
++	pmd_t *pmd;
++
++	mm = current->active_mm;
++	pmd = pmd_offset(pud_offset(pgd_offset(mm, addr), addr), addr);
++
++#ifdef CONFIG_ARM_LPAE
++	pmd[0] = __pmd((pmd_val(pmd[0]) & mask) | prot);
++#else
++	if (addr & SECTION_SIZE)
++		pmd[1] = __pmd((pmd_val(pmd[1]) & mask) | prot);
++	else
++		pmd[0] = __pmd((pmd_val(pmd[0]) & mask) | prot);
++#endif
++	flush_pmd_entry(pmd);
++	local_flush_tlb_kernel_range(addr, addr + SECTION_SIZE);
++}
++
++/* Make sure extended page tables are in use. */
++static inline bool arch_has_strict_perms(void)
++{
++	unsigned int cr;
++
++	if (cpu_architecture() < CPU_ARCH_ARMv6)
++		return false;
++
++	cr = get_cr();
++	if (!(cr & CR_XP))
++		return false;
++
++	return true;
++}
++
++#define set_section_perms(perms, field)	{				\
++	size_t i;							\
++	unsigned long addr;						\
++									\
++	if (!arch_has_strict_perms())					\
++		return;							\
++									\
++	for (i = 0; i < ARRAY_SIZE(perms); i++) {			\
++		if (!IS_ALIGNED(perms[i].start, SECTION_SIZE) ||	\
++		    !IS_ALIGNED(perms[i].end, SECTION_SIZE)) {		\
++			pr_err("BUG: section %lx-%lx not aligned to %lx\n", \
++				perms[i].start, perms[i].end,		\
++				SECTION_SIZE);				\
++			continue;					\
++		}							\
++									\
++		for (addr = perms[i].start;				\
++		     addr < perms[i].end;				\
++		     addr += SECTION_SIZE)				\
++			section_update(addr, perms[i].mask,		\
++				       perms[i].field);			\
++	}								\
++}
++
++static inline void fix_kernmem_perms(void)
++{
++	set_section_perms(nx_perms, prot);
++}
++#else
++static inline void fix_kernmem_perms(void) { }
++#endif /* CONFIG_ARM_KERNMEM_PERMS */
++
+ void free_initmem(void)
+ {
+ #ifdef CONFIG_HAVE_TCM
+ 	extern char __tcm_start, __tcm_end;
++#endif
++
++	fix_kernmem_perms();
+ 
++#ifdef CONFIG_HAVE_TCM
+ 	poison_init_mem(&__tcm_start, &__tcm_end - &__tcm_start);
+ 	free_reserved_area(&__tcm_start, &__tcm_end, -1, "TCM link");
+ #endif
+diff --git a/arch/arm/mm/mmu.c b/arch/arm/mm/mmu.c
+index a7a756603775..ae7cf9556f28 100644
+--- a/arch/arm/mm/mmu.c
++++ b/arch/arm/mm/mmu.c
+@@ -1368,13 +1368,24 @@ static void __init map_lowmem(void)
+ 		if (start >= end)
+ 			break;
+ 
+-		if (end < kernel_x_start || start >= kernel_x_end) {
++		if (end < kernel_x_start) {
+ 			map.pfn = __phys_to_pfn(start);
+ 			map.virtual = __phys_to_virt(start);
+ 			map.length = end - start;
+ 			map.type = MT_MEMORY_RWX;
+ 
+ 			create_mapping(&map);
++		} else if (start >= kernel_x_end) {
++			map.pfn = __phys_to_pfn(start);
++			map.virtual = __phys_to_virt(start);
++			map.length = end - start;
++#ifdef CONFIG_ARM_KERNMEM_PERMS
++			map.type = MT_MEMORY_RW;
++#else
++			map.type = MT_MEMORY_RWX;
++#endif
++
++			create_mapping(&map);
+ 		} else {
+ 			/* This better cover the entire kernel */
+ 			if (start < kernel_x_start) {
 -- 
 1.9.1
