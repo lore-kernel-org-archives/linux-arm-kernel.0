@@ -1,33 +1,65 @@
-From: thierry.reding@gmail.com (Thierry Reding)
-Date: Thu, 7 Aug 2014 15:20:52 +0200
-Subject: [PATCH v2 00/11] pwm: Introduce ST's PWM driver
-In-Reply-To: <20140721123950.GY30888@lee--X1>
-References: <1405348412-7352-1-git-send-email-lee.jones@linaro.org>
- <20140721123950.GY30888@lee--X1>
-Message-ID: <20140807132050.GC1540@ulmo.nvidia.com>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Thu, 7 Aug 2014 15:20:23 +0200
+Subject: Formal license ambiguity in arch/arm/boot/dts/sun?i-a*.dts
+In-Reply-To: <20140804212317.GL30282@n2100.arm.linux.org.uk>
+References: <20140731192016.GA6869@excalibur.cnev.de>
+ <20140803130430.GY3952@lukather> <201408031959.27607.arnd@arndb.de>
+ <20140804192510.GF3952@lukather>
+ <20140804212317.GL30282@n2100.arm.linux.org.uk>
+Message-ID: <20140807132023.GG15297@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jul 21, 2014 at 01:39:50PM +0100, Lee Jones wrote:
-> Hi Thierry,
+Hi Russell,
+
+On Mon, Aug 04, 2014 at 10:23:17PM +0100, Russell King - ARM Linux wrote:
+> On Mon, Aug 04, 2014 at 09:25:10PM +0200, Maxime Ripard wrote:
+> > On Sun, Aug 03, 2014 at 07:59:27PM +0200, Arnd Bergmann wrote:
+> > > I would actually prefer if we could migrate a lot of these files to BSD license,
+> > > provided the original authors agree. We want the dtb blobs to be embeddable into
+> > > boot loaders of any license.
+> > 
+> > Even though I'd be open to having my contributions to DTBs under the
+> > BSD, is this really a thing?
+> > 
+> > I mean, for all I know, an OS/Bootloader would just parse a documented
+> > binary file, and I don't see any derivative work there.
 > 
-> Did you find some time to look at this set?
+> How does the OS/Bootloader end up with that binary file?
+> 
+> For the sake of argument, let's say that the BSDs want to move to DT on
+> ARM.  Great, they convert over to parsing our DT blobs.
+> 
+> However, they can't distribute the binary DT blobs to their users without
+> coming up against the problems of the GPL wrt binary distribution.
+> 
+> They could distribute the source files, but remember that many of those
+> are currently GPL licensed, so they'd probably end up having to package
+> them entirely separately, if they're willing to do that at all.
+> 
+> Or they could decide to ignore us altogether, and do their own DT stuff,
+> maybe partially implementing our properties, or maybe coming up with
+> different and/or incompatible properties - which would be bad because
+> we now end up with two ways to describe the same hardware in active use.
+> 
+> I suspect the final option is the one they'd choose, and it's in our
+> interest that _that_ doesn't happen.
 
-Sorry for the long delay. I've applied patches 6-11 to the PWM tree,
-though I've modified patch 6 a little for consistency. The module is
-now named after the Kconfig option (pwm-sti rather than pwm-st). The
-dependencies also seem to be redundant (ARCH_STI already depends on
-OF), though I didn't change that just in case it's required for some
-other reason.
+Ah, yes, it's not really about a fear of a GPL-spread, but rather a
+concern about the source distribution. Makes sense.
 
-Anyway, scream if there's anything in the PWM for-next branch that
-needs to be fixed up.
+How should we deal with such relicensing?
 
-Thierry
+Maxime
+
+-- 
+Maxime Ripard, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
 -------------- next part --------------
 A non-text attachment was scrubbed...
-Name: not available
+Name: signature.asc
 Type: application/pgp-signature
 Size: 819 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140807/86e2c1f9/attachment.sig>
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140807/0b00c1f4/attachment.sig>
