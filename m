@@ -1,27 +1,18 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Thu, 7 Aug 2014 18:27:19 +0100
-Subject: [PATCH v3 1/2] arm64: add helper functions to read I-cache
- attributes
-In-Reply-To: <1407339966-29351-1-git-send-email-ard.biesheuvel@linaro.org>
-References: <1407339966-29351-1-git-send-email-ard.biesheuvel@linaro.org>
-Message-ID: <20140807172719.GE31101@arm.com>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Thu, 07 Aug 2014 11:27:28 -0600
+Subject: [PATCH v5 6/6] clk: Add floor and ceiling constraints to clock
+ rates
+In-Reply-To: <1407333368-31979-6-git-send-email-tomeu.vizoso@collabora.com>
+References: <1407333368-31979-1-git-send-email-tomeu.vizoso@collabora.com>
+ <1407333368-31979-6-git-send-email-tomeu.vizoso@collabora.com>
+Message-ID: <53E3B700.8080706@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Aug 06, 2014 at 04:46:05PM +0100, Ard Biesheuvel wrote:
-> This adds helper functions and #defines to <asm/cachetype.h> to read the
-> line size and the number of sets from the level 1 instruction cache.
-> 
-> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
-> ---
-> v3: add WARN_ON(preemptible()), move icache_get_ccsidr() to cpuinfo.c to
->     prevent #include header recursion hell
-> v2: put () around macro args, use 64-bit types for asm() mrs/msr calls
-> 
->  arch/arm64/include/asm/cachetype.h | 20 ++++++++++++++++++++
->  arch/arm64/kernel/cpuinfo.c        | 14 ++++++++++++++
->  2 files changed, 34 insertions(+)
+On 08/06/2014 07:56 AM, Tomeu Vizoso wrote:
+> Adds a way for clock consumers to set maximum and minimum rates. This can be
+> used for thermal drivers to set ceiling rates, or by misc. drivers to set
+> floor rates to assure a minimum performance level.
 
-  Acked-by: Will Deacon <will.deacon@arm.com>
-
-Will
+Patches 5, 6,
+Reviewed-by: Stephen Warren <swarren@nvidia.com>
