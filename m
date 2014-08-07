@@ -1,72 +1,89 @@
-From: Mattis.Lorentzon@autoliv.com (Mattis Lorentzon)
-Date: Thu, 7 Aug 2014 11:11:06 +0000
-Subject: Oops: 17 SMP ARM (v3.16-rc2)
-In-Reply-To: <20140806125550.GO30282@n2100.arm.linux.org.uk>
-References: <C4A61A5CA4AD2246942F4BA6F20ACB804356534D@ALVA-EXMB04.alv.autoliv.int>
- <20140626140115.GQ32514@n2100.arm.linux.org.uk>
- <C4A61A5CA4AD2246942F4BA6F20ACB80435655E9@ALVA-EXMB04.alv.autoliv.int>
- <20140626151424.GT32514@n2100.arm.linux.org.uk>
- <20140627112151.GF32514@n2100.arm.linux.org.uk>
- <3FFB61A7A8473C49831AF20FA193534A43CADFA7@ALVA-EXMB01.alv.autoliv.int>
- <20140627163108.GP32514@n2100.arm.linux.org.uk>
- <C4A61A5CA4AD2246942F4BA6F20ACB8043575072@ALVA-EXMB04.alv.autoliv.int>
- <20140806095012.GN30282@n2100.arm.linux.org.uk>
- <C4A61A5CA4AD2246942F4BA6F20ACB8043575172@ALVA-EXMB04.alv.autoliv.int>
- <20140806125550.GO30282@n2100.arm.linux.org.uk>
-Message-ID: <C4A61A5CA4AD2246942F4BA6F20ACB804357526C@ALVA-EXMB04.alv.autoliv.int>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Thu, 7 Aug 2014 13:23:37 +0200
+Subject: [PATCH 4/9] clk: sunxi: PLL2 support for sun4i, sun5i and sun7i
+In-Reply-To: <53DFEBD0.4050704@elopez.com.ar>
+References: <1406842092-25207-1-git-send-email-emilio@elopez.com.ar>
+ <1406842092-25207-5-git-send-email-emilio@elopez.com.ar>
+ <20140803124458.GV3952@lukather> <53DEB181.1080902@elopez.com.ar>
+ <20140804200200.GK3952@lukather> <53DFEBD0.4050704@elopez.com.ar>
+Message-ID: <20140807112337.GA15297@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Russell,
+On Mon, Aug 04, 2014 at 05:23:44PM -0300, Emilio L?pez wrote:
+> El 04/08/14 a las 17:02, Maxime Ripard escibi?:
+> >On Sun, Aug 03, 2014 at 07:02:41PM -0300, Emilio L?pez wrote:
+> >>Hi,
+> >>
+> >>El 03/08/14 a las 09:44, Maxime Ripard escibi?:
+> >>>On Thu, Jul 31, 2014 at 06:28:07PM -0300, Emilio L?pez wrote:
+> >>>>This patch adds support for PLL2 and derivates on sun4i, sun5i and
+> >>>>sun7i SoCs. As this PLL is only used for audio and requires good
+> >>>>accuracy, we only support two known good rates.
+> >>>>
+> >>>>Signed-off-by: Emilio L?pez <emilio@elopez.com.ar>
+> >>>>---
+> >>>>
+> >>(...)
+> >>>>+	/* PLL2x8, double of PLL2 without the post divisor */
+> >>>>+	of_property_read_string_index(np, "clock-output-names", 3, &clk_name);
+> >>>>+	clks[3] = clk_register_fixed_factor(NULL, clk_name, parent,
+> >>>>+					    CLK_SET_RATE_PARENT, 2 * 4, 1);
+> >>>
+> >>>Why have you declared them here, instead of using fixed factors in the
+> >>>DT directly, like we have done in the past?
+> >>
+> >>I'd prefer to see one clock with four outputs represented as one
+> >>clock with four outputs rather than one clock with one output and
+> >>other three weirdly named nodes floating around.
+> >
+> >Except that you have no control over these 3 other outputs, that
+> >directly derive from the only one you can control.
+> 
+> You do have one degree of control, see below.
+> 
+> >Plus, their name wouldn't be weirded than the one you gave in
+> >clock-output-names ;)
+> 
+> Allwinner chose those names on the user manual, not me :)
+> 
+> >>I can only see four uses of fixed-factor-clock in our DTSI, three of
+> >>which are "pass through" clocks for ahb and ar100 on sun6/8i, and a
+> >>fourth one to implement the 32k that results from reducing the 24M
+> >>osc on sun7i.
+> >
+> >And PLLx2, PLL2x4, PLL2x8 are really just pass-through clocks
+> >too. Once PLL2 is controlled, those will just be enabled.
+> 
+> Yes and no.
+> 
+> >>As a second reason, implementing it as fixed factors would be
+> >>slightly incorrect, as it's only "x8" when you use the limited set
+> >>of factors that Allwinner and us are using for audio.
+> >
+> >Hu? What do you mean by that?
+> 
+> PLL2 (aka PLL2x1) is 24 * N / pre / post
+> PLL2x8 is 24 * 2 * N / pre
+> 
+> So PLL2 * 8 == PLL2x8 only if post == 4, which holds true on our
+> software implementation as well as AW's, but may not always hold
+> true hardware wise.
 
-> Can you ascertain whether these stalls are a result of some failure of the
-> receive side or the transmit side - you should be able to tell that if you watch
-> the packet counts via ifconfig on the stalled card.  Also, it would be useful to
-> know whether the FEC interrupt was firing.
+Ah, right. I was looking at the wrong datasheet for this, my bad.
 
-grep eth /proc/interrupts
-151:          0          0          0          0       GIC 151  2188000.ethernet
-166:    1205661          0          0          0  gpio-mxc   6  2188000.ethernet
+Then, at least document the bindings properly :)
 
-The interrupt counter 166 increases regularly during the stalls.
-Ifconfig indicates that the RX and TX  counters do not increase.
+Maxime
 
-> I hope you have some kind of serial console on these cards?
-
-Yes, indeed. Local stimuli seems to be able to unstall the network in a
-somewhat random fashion. Running e.g. ifconfig or ping locally may
-immediately or after up to about half a minute make the network responsive.
-However, it usually degenerates again to a complete stall within seconds.
-Without local stimuli the network does not appear to recover at all. The card
-does not even respond to pings (again, most often without any apparent
-error messages).
-
-Running both of the following commands in parallel from the FC server seems
-to trigger the problem within minutes (please note that the arm card stops
-responding to both ping and ssh):
-
-# while :; do ssh arm-card echo Ok; done
-# ping arm-card
-
-We have noticed the same problem on both the i.MX6 and the Zynq cards
-(using KSZ9021 and Cadence GEM drivers). However, the number of
-iterations required to trigger the problem vary. Sometimes it might stall after
-less than 100, but in other cases the stalls begin after nearly 10000 iterations.
-Once stalled (and unstalled after stimuli), the network on that particular card
-degenerates a lot more often. Apart from the kernel, IP numbers and MAC
-addresses, the software configurations are identical between the Zynq and
-the i.MX6. Perhaps the fault is unrelated to the Freescale driver?
-
-> Hmm.  Okay, I think the first thing we need to do is to work out why the
-> silent stalls are happening.
-
-Would you have any ideas on what to check next?
-
-Best regards,
-Mattis Lorentzon
-***************************************************************
-Consider the environment before printing this message.
-
-To read Autoliv's Information and Confidentiality Notice, follow this link:
-http://www.autoliv.com/disclaimer.html
-***************************************************************
+-- 
+Maxime Ripard, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140807/f4332e60/attachment.sig>
