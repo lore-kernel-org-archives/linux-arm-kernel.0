@@ -1,84 +1,42 @@
-From: fabio.estevam@freescale.com (Fabio Estevam)
-Date: Thu, 7 Aug 2014 15:01:33 -0300
-Subject: [PATCH] ARM: dts: imx53-qsrb: Fix suspend/resume
-Message-ID: <1407434493-22152-1-git-send-email-fabio.estevam@freescale.com>
+From: festevam@gmail.com (Fabio Estevam)
+Date: Thu, 7 Aug 2014 15:12:24 -0300
+Subject: [PATCH v2] ARM: imx6: add pci config space as platform resource
+In-Reply-To: <1407433181-21960-1-git-send-email-l.stach@pengutronix.de>
+References: <1407433181-21960-1-git-send-email-l.stach@pengutronix.de>
+Message-ID: <CAOMZO5B1LWsBfDhsSn8PuxZb+Bdid-ce6ay_7G7SF75-vHpE5w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The following error is seen after a suspend/resume cycle on a mx53qsb with a
-MC34708 PMIC:
+On Thu, Aug 7, 2014 at 2:39 PM, Lucas Stach <l.stach@pengutronix.de> wrote:
+> Fixes "imx6q-pcie 1ffc000.pcie: missing *config* reg space"
+> error exposed by new versions of the designware pcie driver.
+>
+> Signed-off-by: Lucas Stach <l.stach@pengutronix.de>
+> ---
+> v2: also fix documentation example
+> ---
+>  Documentation/devicetree/bindings/pci/fsl,imx6q-pcie.txt | 4 +++-
+>  arch/arm/boot/dts/imx6qdl.dtsi                           | 4 +++-
+>  2 files changed, 6 insertions(+), 2 deletions(-)
+>
+> diff --git a/Documentation/devicetree/bindings/pci/fsl,imx6q-pcie.txt b/Documentation/devicetree/bindings/pci/fsl,imx6q-pcie.txt
+> index 9455fd0ec830..6fbba53a309b 100644
+> --- a/Documentation/devicetree/bindings/pci/fsl,imx6q-pcie.txt
+> +++ b/Documentation/devicetree/bindings/pci/fsl,imx6q-pcie.txt
+> @@ -17,7 +17,9 @@ Example:
+>
+>         pcie at 0x01000000 {
+>                 compatible = "fsl,imx6q-pcie", "snps,dw-pcie";
+> -               reg = <0x01ffc000 0x4000>;
+> +               reg = <0x01ffc000 0x04000>,
+> +                     <0x01f00000 0x80000>;
+> +               reg-names = "dbi", "config";
 
-root at freescale /$ echo mem > /sys/power/state 
-[   32.630592] PM: Syncing filesystems ... done.
-[   32.643924] Freezing user space processes ... (elapsed 0.001 seconds) done.
-[   32.652384] Freezing remaining freezable tasks ... (elapsed 0.001 seconds) done.
-[   32.679156] PM: suspend of devices complete after 13.113 msecs
-[   32.685128] PM: suspend devices took 0.030 seconds
-[   32.696109] PM: late suspend of devices complete after 6.133 msecs
-[   33.313032] mc13xxx 0-0008: Failed to read IRQ status: -110
-[   33.322009] PM: noirq suspend of devices complete after 619.667 msecs
-[   33.328544] Disabling non-boot CPUs ...
-[   33.335031] PM: noirq resume of devices complete after 2.352 msecs
-[   33.842940] mc13xxx 0-0008: Failed to read IRQ status: -110
-[   33.976095] [sched_delayed] sched: RT throttling activated
-[   33.984804] PM: early resume of devices complete after 642.642 msecs
-[   34.352954] mc13xxx 0-0008: Failed to read IRQ status: -110
-[   34.862910] mc13xxx 0-0008: Failed to read IRQ status: -110
-[   34.996595] PM: resume of devices complete after 1005.367 msecs
-[   35.372925] mc13xxx 0-0008: Failed to read IRQ status: -110
-[   35.882911] mc13xxx 0-0008: Failed to read IRQ status: -110
-[   35.955707] PM: resume devices took 1.970 seconds
-[   35.960445] Restarting tasks ... done.
-[   35.993386] fec 63fec000.ethernet eth0: Link is Down
-[   36.392980] mc13xxx 0-0008: Failed to read IRQ status: -110
-[   36.902908] mc13xxx 0-0008: Failed to read IRQ status: -110
-[   36.953036] ata1: SATA link down (SStatus 0 SControl 300)
-[   37.412922] mc13xxx 0-0008: Failed to read IRQ status: -110
-[   37.922906] mc13xxx 0-0008: Failed to read IRQ status: -110
-[   37.993379] fec 63fec000.ethernet eth0: Link is Up - 100Mbps/Full - flow control rx/tx
-[   38.432938] mc13xxx 0-0008: Failed to read IRQ status: -110
-[   38.942920] mc13xxx 0-0008: Failed to read IRQ status: -110
-[   39.452933] mc13xxx 0-0008: Failed to read IRQ status: -110
+It would be nice to update the 'reg' description and add the
+'reg-names' entry in the 'Required properties' section.
 
-(flood of this error message continues forever)
+Currently we have the following description:
 
-Commit 5169df8be0a432ee ("ARM: dts: i.MX53: add support for MCIMX53-START-R")
-missed to configure the IOMUX for the PMIC IRQ pin.
-
-Configure the PMIC IRQ pin so that the suspend/resume sequence behaves cleanly
-as expected.
-
-Cc: <stable@vger.kernel.org> # 3.16
-Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
----
- arch/arm/boot/dts/imx53-qsrb.dts | 8 ++++++++
- 1 file changed, 8 insertions(+)
-
-diff --git a/arch/arm/boot/dts/imx53-qsrb.dts b/arch/arm/boot/dts/imx53-qsrb.dts
-index f1bbf9a..82d623d 100644
---- a/arch/arm/boot/dts/imx53-qsrb.dts
-+++ b/arch/arm/boot/dts/imx53-qsrb.dts
-@@ -28,6 +28,12 @@
- 				MX53_PAD_CSI0_DAT9__I2C1_SCL      0x400001ec
- 			>;
- 		};
-+
-+		pinctrl_pmic: pmicgrp {
-+			fsl,pins = <
-+				MX53_PAD_CSI0_DAT5__GPIO5_23	0x1e4 /* IRQ */
-+			>;
-+		};
- 	};
- };
- 
-@@ -38,6 +44,8 @@
- 
- 	pmic: mc34708 at 8 {
- 		compatible = "fsl,mc34708";
-+		pinctrl-names = "default";
-+		pinctrl-0 = <&pinctrl_pmic>;
- 		reg = <0x08>;
- 		interrupt-parent = <&gpio5>;
- 		interrupts = <23 0x8>;
--- 
-1.9.1
+"reg: base addresse (---> typo here) and length of the pcie
+controller" ,which does not match the provided example after your
+patch.
