@@ -1,32 +1,59 @@
-From: rostedt@goodmis.org (Steven Rostedt)
-Date: Thu, 7 Aug 2014 11:18:28 -0400
-Subject: [PATCH v2 4/5] ARM64: add IPI tracepoints
-In-Reply-To: <20140807091817.GG13703@arm.com>
-References: <1406318733-26754-1-git-send-email-nicolas.pitre@linaro.org>
- <1406318733-26754-5-git-send-email-nicolas.pitre@linaro.org>
- <20140806155237.0a6d7d3c@gandalf.local.home>
- <20140807091817.GG13703@arm.com>
-Message-ID: <20140807111828.3c3d827a@gandalf.local.home>
+From: peter.griffin@linaro.org (Peter Griffin)
+Date: Thu,  7 Aug 2014 16:21:39 +0100
+Subject: [PATCH v4 0/5] Add EHCI and OHCI drivers for STi SoC's
+Message-ID: <1407424904-19251-1-git-send-email-peter.griffin@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 7 Aug 2014 10:18:17 +0100
-Will Deacon <will.deacon@arm.com> wrote:
+The series has been re-worked from v2 onwards to split out the ehci and ohci parts
+into their own drivers / devices like most other ARM platforms based on
+feedback from Arnd Bergmann (see here http://www.spinics.net/lists/linux-usb/msg111124.html. 
 
-> On Wed, Aug 06, 2014 at 08:52:37PM +0100, Steven Rostedt wrote:
-> > Will and Russell,
-> > 
-> > Can you give me your Acked-by for this, and I can pull it through my
-> > tree?
-> 
-> Looks fine to me:
-> 
->   Acked-by: Will Deacon <will.deacon@arm.com>
-> 
-> I'm assuming there's a dependency on other patches going via the tracing
-> tree, hence why you're taking this?
+The ehci-platform & ohci-platform have been used as a basis for this in case we
+wish to merge the drivers again in the future.
 
-Yeah, there's some generic updates to the trace facility for these
-tracepoints.
+Changes since v3:
+ - Make reset / power, clocks etc non optional dt options to simplify code
+ - Get rid of non DT boot code left over from *hci-platform drivers
+ - Remove DMA mask code
+ - Remove pre_setup func ptr and configure ahb2st bus convertor in ehci_platform_reset
+ - Unabstract and remove usb-st-common.c
+ - Have one kconfig which enables both ehci-st & ohci-st drivers
 
--- Steve
+Changes since v2:
+ - Based on Arnd Berghman feedback, split out into 2 devices / drivers
+ - Base drivers oh ehci-platform.c & ohci-platform.c with required extensions
+   to allow possible re-merge in the furture.
+
+Changes since v1:
+ - Correct s/OCHI/OHCI/ spelling
+ - Improve kconfig help message
+ - Various formating / spelling nits identified by Lee Jones
+ - Make driver depend on OF & remove node checks in code
+ - Use devm_ioremap_resource
+ - Remove unnecessary header files
+
+Peter Griffin (5):
+  usb: host: ehci-st: Add EHCI support for ST STB devices
+  usb: host: ohci-st: Add OHCI driver support for ST STB devices
+  usb: host: ehci-st: Add ehci-st devicetree bindings documentation
+  usb: host: ohci-st: Add ohci-st devicetree bindings documentation
+  MAINTAINERS: Add ehci-st.c and ohci-st.c to ARCH/STI architecture
+
+ Documentation/devicetree/bindings/usb/ehci-st.txt |  39 +++
+ Documentation/devicetree/bindings/usb/ohci-st.txt |  37 +++
+ MAINTAINERS                                       |   2 +
+ drivers/usb/host/Kconfig                          |   8 +
+ drivers/usb/host/Makefile                         |   1 +
+ drivers/usb/host/ehci-st.c                        | 363 ++++++++++++++++++++++
+ drivers/usb/host/ohci-st.c                        | 337 ++++++++++++++++++++
+ drivers/usb/host/usb-st-common.h                  |  31 ++
+ 8 files changed, 818 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/usb/ehci-st.txt
+ create mode 100644 Documentation/devicetree/bindings/usb/ohci-st.txt
+ create mode 100644 drivers/usb/host/ehci-st.c
+ create mode 100644 drivers/usb/host/ohci-st.c
+ create mode 100644 drivers/usb/host/usb-st-common.h
+
+-- 
+1.9.1
