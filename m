@@ -1,41 +1,94 @@
-From: debiandev@gmail.com (Andev)
-Date: Wed, 6 Aug 2014 22:00:39 -0400
-Subject: [3.13.y.z extended stable] Patch "locking/mutex: Disable
- optimistic spinning on some architectures" has been added to staging queue
-In-Reply-To: <1407376502.12474.64.camel@fourier>
-References: <1407358496-23094-1-git-send-email-kamal@canonical.com>
- <CAJUuVQ5OpNye8HAEw6x=owBB32pq-aLF7_Gqo493jDDHDahhRA@mail.gmail.com>
- <1407360614.3395.2.camel@buesod1.americas.hpqcorp.net>
- <1407376502.12474.64.camel@fourier>
-Message-ID: <CAJUuVQ4q8wN+iR84gkGgP-ax6pUY4oWFa83aH+LXwZFricgwXg@mail.gmail.com>
+From: dianders@chromium.org (Doug Anderson)
+Date: Wed, 6 Aug 2014 19:16:51 -0700
+Subject: [PATCH v4 2/2] pwm: rockchip: Added to support for RK3288 SoC
+In-Reply-To: <53E2D605.2000704@rock-chips.com>
+References: <1406197295-10604-1-git-send-email-caesar.wang@rock-chips.com>
+ <1406197295-10604-3-git-send-email-caesar.wang@rock-chips.com>
+ <CAD=FV=V4Kp-H3CcAKZPV1jBnYX+Ntwvxx6RB13TLxS5RRPHTWA@mail.gmail.com>
+ <53E2D605.2000704@rock-chips.com>
+Message-ID: <CAD=FV=Xw8tz2keCUtO+qYUmnuv=+DPGZjY9-j_2XmAcP3Luzjg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Aug 6, 2014 at 9:55 PM, Kamal Mostafa <kamal@canonical.com> wrote:
->
-> On Wed, 2014-08-06 at 14:30 -0700, Davidlohr Bueso wrote:
->> Well 3.13.y.z isn't an Ubuntu kernel, its upstream, and those archs
->> *are* supported.
->
-> Davidlohr's answer is correct: This is not an "Ubuntu kernel".
->
-> 3.13.y.z is an "extended stable" kernel which follows the same rules as
-> the kernel.org official stable kernels.  It contains no Ubuntu-specific
-> patches, and supports the same arch's as mainline.
->
-> More details about this and the other Canonical-funded-and-hosted
-> "extended stable" kernel versions is available here:
->
->> For more information about the 3.13.y.z tree, see
->> https://wiki.ubuntu.com/Kernel/Dev/ExtendedStable
+Caesar,
 
-OK, thank you for clarification. I was unsure as this is not hosted on
-kernel.org, I thought it was a Ubuntu specific kernel.
+On Wed, Aug 6, 2014 at 6:27 PM, caesar <caesar.wang@rock-chips.com> wrote:
+> Doug,
+>
+> ? 2014?08?07? 06:46, Doug Anderson ??:
+>
+>> Caesar,
+>>
+>> On Thu, Jul 24, 2014 at 3:21 AM, Caesar Wang <caesar.wang@rock-chips.com>
+>> wrote:
+>>>
+>>> +static const struct rockchip_pwm_data pwm_data_v1 = {
+>>> +       .regs.duty = PWM_HRC,
+>>> +       .regs.period = PWM_LRC,
+>>> +       .regs.cntr = PWM_CNTR,
+>>> +       .regs.ctrl = PWM_CTRL,
+>>> +       .prescaler = PRESCALER,
+>>> +       .set_enable = rockchip_pwm_set_enable_v1,
+>>> +};
+>>> +
+>>> +static const struct rockchip_pwm_data pwm_data_v2 = {
+>>> +       .regs.duty = PWM_LRC,
+>>> +       .regs.period = PWM_HRC,
+>>> +       .regs.cntr = PWM_CNTR,
+>>> +       .regs.ctrl = PWM_CTRL,
+>>> +       .prescaler = PRESCALER-1,
+>>> +       .set_enable = rockchip_pwm_set_enable_v2,
+>>> +};
+>>> +
+>>> +static const struct rockchip_pwm_data pwm_data_vop = {
+>>> +       .regs.duty = PWM_LRC,
+>>> +       .regs.period = PWM_HRC,
+>>> +       .regs.cntr = PWM_CTRL,
+>>> +       .regs.ctrl = PWM_CNTR,
+>>
+>> Did you really mean to flip CTRL and CNTR here?  If so, that's super
+>> confusing and deserves a comment.  AKA, I think the above should not
+>> be:
+>>
+>>   +       .regs.cntr = PWM_CTRL,
+>>   +       .regs.ctrl = PWM_CNTR,
+>>
+>> ...but should be
+>>
+>>   +       .regs.cntr = PWM_CNTR,
+>>   +       .regs.ctrl = PWM_CTRL,
+>>
+>> If you didn't mean to flip CTRL and CNTR here, then just get rid of
+>> pwm_data_vop and refer to pwm_data_v2.  In fact, I'd suggest that you
+>> totally remove the "rockchip,vop-pwm" since there's nothing different
+>> between "rockchip,rk3288-pwm" and "rockchip,vop-pwm".
+>
+>
+> Sorry,I think it's no problem. the  "rockchip,rk3288-pwm" and
+> "rockchip,vop-pwm" are seperate PWM controllers.
+> They are just different registers address between CNTR and CTRL .
 
-So we have the following stable kernels as of now:
+OK, I looked up in the TRM.  Right, the CNTR and CTRL are flipped on
+the vop.  So I think that the only change you need is to add:
 
-3.10, 3.12, 3.13, 3.14, 3.15(for a few days), 3.16!
+#define PWM_VOP_CTRL  0x00
+#define PWM_VOP_CNTR  0x0c
 
-Interesting.
--- 
-Andev
+...then use these new #defines for the vop structure.
+
+
+As you have the code written right now it's very confusing.  The new
+#defines will fix this.
+
+
+>> Have you validated Thierry's suggestion to allow you to access your
+>> memory range?
+>
+> Yes,we have solve it in lcdc driver.
+> The Mark Yao have the  submission in [0].
+>
+> [0]: https://lkml.org/lkml/2014/8/4/20
+
+Excellent!  Then we should be able to land after you fix the above.
+
+-Doug
