@@ -1,64 +1,85 @@
-From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
-Date: Thu, 07 Aug 2014 19:31:05 +0400
-Subject: [PATCH] ARM: shmobile: koelsch: add VIN1/ADV7180 DT support
-In-Reply-To: <CANqRtoQhr-7RjZTxdk_e--if7ruSPQzyoGOR7VEy2saih64duw@mail.gmail.com>
-References: <201408020402.14560.sergei.shtylyov@cogentembedded.com>	<2131152.vMTPsJUYLQ@wasted.cogentembedded.com>
- <CANqRtoQhr-7RjZTxdk_e--if7ruSPQzyoGOR7VEy2saih64duw@mail.gmail.com>
-Message-ID: <53E39BB9.7030809@cogentembedded.com>
+From: heiko@sntech.de (Heiko =?ISO-8859-1?Q?St=FCbner?=)
+Date: Thu, 07 Aug 2014 17:44:19 +0200
+Subject: [PATCH RESEND] ARM: dts: Fix the sort ordering of EHCI and HSIC in
+ rk3288.dtsi
+Message-ID: <14819563.gjVG8jMF0E@diego>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello.
+From: Doug Anderson <dianders@chromium.org>
 
-On 08/07/2014 08:01 AM, Magnus Damm wrote:
+The EHCI and HSIC device tree nodes were added in the wrong place.
+Fix them.
 
->> Define the Koelsch board dependent part of the VIN1 device node. Add the device
->> node for Analog  Devices ADV7180  video decoder to  I2C2 bus. Add the necessary
->> subnodes to interconnect VIN1 and ADV7180 devices.
+Signed-off-by: Doug Anderson <dianders@chromium.org>
+Signed-off-by: Kever Yang <kever.yang@rock-chips.com>
+Signed-off-by: Heiko Stuebner <heiko@sntech.de>
+---
+Sorry for the double-post. I messed something up when sending the original
+which made it look like it came from Doug instead of me.
 
->> Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
+Heiko
 
->> ---
->> This patch is against the 'renesas-devel-v3.16-20140804' tag of Simon Horman's
->> 'renesas.git' repo. It requires the 'soc_camera' and 'rcar_vin' device tree
->> support patches (already merged to the 'media_tree.git' repo) in order to work.
+ arch/arm/boot/dts/rk3288.dtsi | 40 ++++++++++++++++++++--------------------
+ 1 file changed, 20 insertions(+), 20 deletions(-)
 
->>   arch/arm/boot/dts/r8a7791-koelsch.dts |   35 ++++++++++++++++++++++++++++++++++
->>   1 file changed, 35 insertions(+)
-
->> Index: renesas/arch/arm/boot/dts/r8a7791-koelsch.dts
->> ===================================================================
->> --- renesas.orig/arch/arm/boot/dts/r8a7791-koelsch.dts
->> +++ renesas/arch/arm/boot/dts/r8a7791-koelsch.dts
->> @@ -289,6 +289,11 @@
->>                  renesas,groups = "usb1";
->>                  renesas,function = "usb1";
->>          };
->> +
->> +       vin1_pins: vin1 {
->> +               renesas,groups = "vin1_data8", "vin1_clk";
->> +               renesas,function = "vin1";
->> +       };
->>   };
-
-> Quick question: Does this pin description match to the board layout? I
-
-    Yes, it does.
-
-> suspect that clock and data by themselves are not enough.
-
-    They are enough as BT.656 interconnect is used between VIN1 and ADV7180.
-
-> I'm not sure about Koelsch, but  in case of older SoCs using the CEU
-> there were signals used like horizontal and vertical sync and
-> sometimes even something that was used to determine interlace.
-
-    The HS and VS/FIELD pins of ADV7180 are left unconnected.  There's also 
-ADV7612 connected to VIN0 on this board, there the HSYNC and VSYNC/FIELD pins 
-are connected; however, ADV7612 is not supported yet.
-
-> Thanks,
-
-> / magnus
-
-WBR, Sergei
+diff --git a/arch/arm/boot/dts/rk3288.dtsi b/arch/arm/boot/dts/rk3288.dtsi
+index e7cb008..5950b0a 100644
+--- a/arch/arm/boot/dts/rk3288.dtsi
++++ b/arch/arm/boot/dts/rk3288.dtsi
+@@ -195,6 +195,26 @@
+ 		status = "disabled";
+ 	};
+ 
++	usb_host0_ehci: usb at ff500000 {
++		compatible = "generic-ehci";
++		reg = <0xff500000 0x100>;
++		interrupts = <GIC_SPI 24 IRQ_TYPE_LEVEL_HIGH>;
++		clocks = <&cru HCLK_USBHOST0>;
++		clock-names = "usbhost";
++		status = "disabled";
++	};
++
++	/* NOTE: ohci at ff520000 doesn't actually work on hardware */
++
++	usb_hsic: usb at ff5c0000 {
++		compatible = "generic-ehci";
++		reg = <0xff5c0000 0x100>;
++		interrupts = <GIC_SPI 26 IRQ_TYPE_LEVEL_HIGH>;
++		clocks = <&cru HCLK_HSIC>;
++		clock-names = "usbhost";
++		status = "disabled";
++	};
++
+ 	i2c0: i2c at ff650000 {
+ 		compatible = "rockchip,rk3288-i2c";
+ 		reg = <0xff650000 0x1000>;
+@@ -251,26 +271,6 @@
+ 		status = "disabled";
+ 	};
+ 
+-	usb_host0_ehci: usb at ff500000 {
+-		compatible = "generic-ehci";
+-		reg = <0xff500000 0x100>;
+-		interrupts = <GIC_SPI 24 IRQ_TYPE_LEVEL_HIGH>;
+-		clocks = <&cru HCLK_USBHOST0>;
+-		clock-names = "usbhost";
+-		status = "disabled";
+-	};
+-
+-	/* NOTE: ohci at ff520000 doesn't actually work on hardware */
+-
+-	usb_hsic: usb at ff5c0000 {
+-		compatible = "generic-ehci";
+-		reg = <0xff5c0000 0x100>;
+-		interrupts = <GIC_SPI 26 IRQ_TYPE_LEVEL_HIGH>;
+-		clocks = <&cru HCLK_HSIC>;
+-		clock-names = "usbhost";
+-		status = "disabled";
+-	};
+-
+ 	gic: interrupt-controller at ffc01000 {
+ 		compatible = "arm,gic-400";
+ 		interrupt-controller;
+-- 
+2.0.0.526.g5318336
