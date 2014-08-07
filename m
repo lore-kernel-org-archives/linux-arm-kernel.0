@@ -1,45 +1,75 @@
-From: thierry.reding@gmail.com (Thierry Reding)
-Date: Thu, 7 Aug 2014 08:24:11 +0200
-Subject: [PATCH v4 1/1] iommu-api: Add map_sg/unmap_sg functions
-In-Reply-To: <53E2BA2D.1050007@codeaurora.org>
-References: <1406854484-3848-1-git-send-email-ohaugan@codeaurora.org>
- <1406854484-3848-2-git-send-email-ohaugan@codeaurora.org>
- <20140805151323.GB19709@laptop.dumpdata.com>
- <53E26127.1040805@codeaurora.org>
- <20140806201740.GW9809@8bytes.org>
- <53E2BA2D.1050007@codeaurora.org>
-Message-ID: <20140807062410.GC17340@ulmo>
+From: masami.hiramatsu.pt@hitachi.com (Masami Hiramatsu)
+Date: Thu, 07 Aug 2014 15:59:29 +0900
+Subject: [RFC PATCH] kprobes: arm: enable OPTPROBES for arm 32
+In-Reply-To: <53E1CA11.1030206@huawei.com>
+References: <1407223697-74911-1-git-send-email-wangnan0@huawei.com>
+ <53E1B2A0.1040807@hitachi.com> <53E1CA11.1030206@huawei.com>
+Message-ID: <53E323D1.8020209@hitachi.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Aug 06, 2014 at 04:28:45PM -0700, Olav Haugan wrote:
-> On 8/6/2014 1:17 PM, Joerg Roedel wrote:
-> > On Wed, Aug 06, 2014 at 10:08:55AM -0700, Olav Haugan wrote:
-> >> so you are suggesting that I check in "bus_set_iommu()" whether the
-> >> driver has set the map_sg/unmap_sg function pointers or not and if not
-> >> set it to the default? Is bus_set_iommu() the only way drivers can set
-> >> up the callbacks?
-> > 
-> > This doesn't work as the iommu_ops are now const. You have to either
-> > update the iommu drivers individually to point to the default function,
-> > or you do the check in the API function itself and fall back to the
-> > default it no call-back is provided.
-> > 
+(2014/08/06 15:24), Wang Nan wrote:
+>>> +
+>>> +static void
+>>> +optimized_callback(struct optimized_kprobe *op, struct pt_regs *regs)
+>>> +{
+>>> +	unsigned long flags;
+>>> +
+>>> +	regs->ARM_pc = (unsigned long)op->kp.addr;
+>>> +	regs->ARM_ORIG_r0 = ~0UL;
+>>> +
+>>> +
+>>> +	local_irq_save(flags);
+>>> +	/* 
+>>> +	 * This is possible if op is under delayed unoptimizing.
+>>> +	 * We need simulate the replaced instruction.
+>>> +	 */
+>>> +	if (kprobe_disabled(&op->kp)) {
+>>> +		struct kprobe *p = &op->kp;
+>>> +		op->kp.ainsn.insn_singlestep(p->opcode, &p->ainsn, regs);
+>>> +	} else {
+>>> +		kprobe_handler(regs);
+>>> +	}
+>>
+>> You don't need brace "{}" for one statement.
+>> By the way, why don't you call opt_pre_handler()?
+>>
 > 
-> Ok, then I think it is better to just leave the fallback where it is now
-> in the function itself.
+> I use kprobe_handler because it handles instruction emulation.
+> 
+> In addition, I'm not very sure whether skipping the complex checks
+> in kprobe_handler() is safe or not.
 
-What Konrad was suggesting is what I also proposed. The idea is to
-implement a fallback as standalone function, then make all drivers use
-that by default in the struct iommu_ops that they register. When drivers
-implement an optimized version they can simply replace the fallback
-implementation with their own.
+That seems to do same thing on x86. Then you should do something like
+the optimized_callback() on x86 as below.
 
-Thierry
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: not available
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140807/b1e51e16/attachment.sig>
+static void
+optimized_callback(struct optimized_kprobe *op, struct pt_regs *regs)
+{
+        struct kprobe_ctlblk *kcb = get_kprobe_ctlblk();
+        unsigned long flags;
+
+        local_irq_save(flags);
+        if (kprobe_running()) {
+                kprobes_inc_nmissed_count(&op->kp);
+        } else {
+                /* Save skipped registers */
+                regs->ARM_pc = (unsigned long)op->kp.addr;
+                regs->ARM_ORIG_r0 = ~0UL;
+
+                __this_cpu_write(current_kprobe, &op->kp);
+                kcb->kprobe_status = KPROBE_HIT_ACTIVE;
+                opt_pre_handler(&op->kp, regs);
+                __this_cpu_write(current_kprobe, NULL);
+		op->kp.ainsn.insn_singlestep(op->kp.opcode, &op->kp.ainsn, regs);
+        }
+        local_irq_restore(flags);
+}
+
+Thank you,
+
+-- 
+Masami HIRAMATSU
+Software Platform Research Dept. Linux Technology Research Center
+Hitachi, Ltd., Yokohama Research Laboratory
+E-mail: masami.hiramatsu.pt at hitachi.com
