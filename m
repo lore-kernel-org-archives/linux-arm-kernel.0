@@ -1,92 +1,74 @@
-From: jh80.chung@samsung.com (Jaehoon Chung)
-Date: Thu, 07 Aug 2014 16:38:01 +0900
-Subject: [PATCHv10 4/5] ARM: dts: socfpga: unuse the slot-node and deprecate
- the supports-highspeed for dw-mmc
-In-Reply-To: <1407397082-32495-1-git-send-email-jh80.chung@samsung.com>
-References: <1407397082-32495-1-git-send-email-jh80.chung@samsung.com>
-Message-ID: <1407397082-32495-5-git-send-email-jh80.chung@samsung.com>
+From: boris.brezillon@free-electrons.com (Boris BREZILLON)
+Date: Thu, 7 Aug 2014 09:52:31 +0200
+Subject: [PATCH v2] usb: gadget: at91_udc: move prepare clk into process
+ context
+In-Reply-To: <1407330702-2926-1-git-send-email-ronald.wahl@raritan.com>
+References: <1407330702-2926-1-git-send-email-ronald.wahl@raritan.com>
+Message-ID: <20140807095231.11bde829@bbrezillon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-dw-mmc controller can support multiple slots.
-But, there are no use-cases anywhere. So we don't need to support the
-slot-node for dw-mmc controller.
-And "supports-highspeed" property in dw-mmc is deprecated.
-"supports-highspeed" property can be replaced with "cap-sd/mmc-highspeed".
+Hi Ronald,
 
-Signed-off-by: Jaehoon Chung <jh80.chung@samsung.com>
-Reviewed-by: Tushar Behera <trblinux@gmail.com>
-Reviewed-by: Ulf Hansson <ulf.hansson@linaro.org>
-Acked-by: Seungwon Jeon <tgih.jun@samsung.com>
-Acked-by: Dinh Nguyen <dinguyen@altera.com>
----
- arch/arm/boot/dts/socfpga_arria5.dtsi   |    9 +++------
- arch/arm/boot/dts/socfpga_cyclone5.dtsi |    9 +++------
- arch/arm/boot/dts/socfpga_vt.dts        |    9 +++------
- 3 files changed, 9 insertions(+), 18 deletions(-)
+On Wed,  6 Aug 2014 15:11:42 +0200
+Ronald Wahl <ronald.wahl@raritan.com> wrote:
 
-diff --git a/arch/arm/boot/dts/socfpga_arria5.dtsi b/arch/arm/boot/dts/socfpga_arria5.dtsi
-index 12d1c2c..468fc4c 100644
---- a/arch/arm/boot/dts/socfpga_arria5.dtsi
-+++ b/arch/arm/boot/dts/socfpga_arria5.dtsi
-@@ -29,13 +29,10 @@
- 
- 		dwmmc0 at ff704000 {
- 			num-slots = <1>;
--			supports-highspeed;
- 			broken-cd;
--
--			slot at 0 {
--				reg = <0>;
--				bus-width = <4>;
--			};
-+			bus-width = <4>;
-+			cap-mmc-highspeed;
-+			cap-sd-highspeed;
- 		};
- 
- 		sysmgr at ffd08000 {
-diff --git a/arch/arm/boot/dts/socfpga_cyclone5.dtsi b/arch/arm/boot/dts/socfpga_cyclone5.dtsi
-index bf51182..1ee03c4 100644
---- a/arch/arm/boot/dts/socfpga_cyclone5.dtsi
-+++ b/arch/arm/boot/dts/socfpga_cyclone5.dtsi
-@@ -30,13 +30,10 @@
- 
- 		dwmmc0 at ff704000 {
- 			num-slots = <1>;
--			supports-highspeed;
- 			broken-cd;
--
--			slot at 0 {
--				reg = <0>;
--				bus-width = <4>;
--			};
-+			bus-width = <4>;
-+			cap-mmc-highspeed;
-+			cap-sd-highspeed;
- 		};
- 
- 		ethernet at ff702000 {
-diff --git a/arch/arm/boot/dts/socfpga_vt.dts b/arch/arm/boot/dts/socfpga_vt.dts
-index 09792b4..f9345e0 100644
---- a/arch/arm/boot/dts/socfpga_vt.dts
-+++ b/arch/arm/boot/dts/socfpga_vt.dts
-@@ -43,13 +43,10 @@
- 
- 		dwmmc0 at ff704000 {
- 			num-slots = <1>;
--			supports-highspeed;
- 			broken-cd;
--
--			slot at 0 {
--				reg = <0>;
--				bus-width = <4>;
--			};
-+			bus-width = <4>;
-+			cap-mmc-highspeed;
-+			cap-sd-highspeed;
- 		};
- 
- 		ethernet at ff700000 {
+> Commit 7628083227b6bc4a7e33d7c381d7a4e558424b6b added clock preparation in
+> interrupt context. This is not allowed as it might sleep. Move clock
+> preparation into process context (at91udc_probe).
+> ---
+>  drivers/usb/gadget/udc/at91_udc.c | 39 ++++++++++++++++++++++++++++++---------
+>  1 file changed, 30 insertions(+), 9 deletions(-)
+> 
+> diff --git a/drivers/usb/gadget/udc/at91_udc.c b/drivers/usb/gadget/udc/at91_udc.c
+> index cfd18bc..0b347a0 100644
+> --- a/drivers/usb/gadget/udc/at91_udc.c
+> +++ b/drivers/usb/gadget/udc/at91_udc.c
+> @@ -872,10 +872,10 @@ static void clk_on(struct at91_udc *udc)
+>  
+>  	if (IS_ENABLED(CONFIG_COMMON_CLK)) {
+>  		clk_set_rate(udc->uclk, 48000000);
+> -		clk_prepare_enable(udc->uclk);
+> +		clk_enable(udc->uclk);
+>  	}
+> -	clk_prepare_enable(udc->iclk);
+> -	clk_prepare_enable(udc->fclk);
+> +	clk_enable(udc->iclk);
+> +	clk_enable(udc->fclk);
+>  }
+>  
+>  static void clk_off(struct at91_udc *udc)
+> @@ -884,10 +884,10 @@ static void clk_off(struct at91_udc *udc)
+>  		return;
+>  	udc->clocked = 0;
+>  	udc->gadget.speed = USB_SPEED_UNKNOWN;
+> -	clk_disable_unprepare(udc->fclk);
+> -	clk_disable_unprepare(udc->iclk);
+> +	clk_disable(udc->fclk);
+> +	clk_disable(udc->iclk);
+>  	if (IS_ENABLED(CONFIG_COMMON_CLK))
+> -		clk_disable_unprepare(udc->uclk);
+> +		clk_disable(udc->uclk);
+>  }
+
+As you stated prepare and unprepare should never be called in interrupt
+context. 
+
+My concern here is that PLLB (which is often used as USB clock
+parent) will never be gated/disabled (because all this work is
+done in its unprepare method), and thus your power consumption will be
+higher (when entering suspend mode) than if you'd done a
+disable_unprepare call.
+
+How about leaving the clk_on/off unchanged and use a threaded irq
+instead of a normal irq ?
+
+
+Best Regards,
+
+Boris
+
 -- 
-1.7.9.5
+Boris Brezillon, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
