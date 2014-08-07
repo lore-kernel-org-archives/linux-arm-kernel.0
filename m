@@ -1,36 +1,40 @@
-From: mfuzzey@parkeon.com (Martin Fuzzey)
-Date: Thu, 07 Aug 2014 10:00:08 +0200
-Subject: [PATCH V2 4/4] ARM: dts: i.MX53: Add PMU DT entry
-In-Reply-To: <20140807055301.GD27051@dragon>
-References: <20140805144831.25462.18149.stgit@localhost>
- <20140805144840.25462.57101.stgit@localhost> <20140806105048.GF25953@arm.com>
- <53E22F35.4060503@parkeon.com> <20140807055301.GD27051@dragon>
-Message-ID: <53E33208.8020607@parkeon.com>
+From: yao.yuan@freescale.com (Yao Yuan)
+Date: Thu, 7 Aug 2014 08:04:58 +0000
+Subject: [PATCH v6 1/2] i2c: imx: add DMA support for freescale i2c driver
+In-Reply-To: <31f8f5504fc24d999f5af74338602bed@BLUPR03MB373.namprd03.prod.outlook.com>
+References: <1407232563-10856-1-git-send-email-yao.yuan@freescale.com>
+ <1407232563-10856-2-git-send-email-yao.yuan@freescale.com>
+ <41705e1e4c604240ba96333a03d5c544@BLUPR03MB373.namprd03.prod.outlook.com>
+ <14d042bbcfb04308bfb3a1db18e46bec@BL2PR03MB338.namprd03.prod.outlook.com>
+ <31f8f5504fc24d999f5af74338602bed@BLUPR03MB373.namprd03.prod.outlook.com>
+Message-ID: <c9727eaf22dc40f796793c6b127dfb9e@BL2PR03MB338.namprd03.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/08/14 07:53, Shawn Guo wrote:
-> On Wed, Aug 06, 2014 at 03:35:49PM +0200, Martin Fuzzey wrote:
->> On 06/08/14 12:50, Will Deacon wrote:
->>>
->>> You're missing the new property.
->> Actually this was deliberate.
->>
->> Since the property should only be used if booting in secure mode
->> this generic dtsi file can't know if it is ok or not.
-> As far as I know, most of the i.MX53 systems boot Linux kernel in secure
-> mode.  In that case, we should probably have the new property by
-> default?
+Hi Fugang,
 
-Is it possible to override a boolean property to remove it (set to 
-false) in a board specific dts?
+> >> >+	/* Waiting for Transfer complete. */
+> >> >+	while (timeout--) {
+> >> >+		temp = imx_i2c_read_reg(i2c_imx, IMX_I2C_I2SR);
+> >> >+		if (temp & I2SR_ICF)
+> >> >+			break;
+> >> >+		udelay(10);
+> >> >+	}
+> >> Whether there have better method like interrupt to avoid dead wait
+> >> here until timeout ?
+> >
+> >Can you give me more suggestion? We have discussed it with our team, It
+> >seems the short query wait is necessary.
+> >
+> At least, you can use schdule_timeout() instead of udelay() ?
 
-If it can be done then yes I agree it should be the default.
-
-However seeing as the dts syntax doesn't give a value for boolean 
-properties I don't see how.
-
-But I don't think people booting non secure should have to modify imx53.dtsi
+In fact, the waiting time normally is less than 10-50us, but the minimum time interval for schdule_timeout() is 1 jiffies.
+So maybe schdule_timeout() is not very necessary?
 
 
-Martin
+
+
+Thanks for your review.
+
+Best Regards,
+Yuan Yao
