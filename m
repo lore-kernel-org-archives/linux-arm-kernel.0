@@ -1,50 +1,147 @@
-From: ohaugan@codeaurora.org (Olav Haugan)
-Date: Thu, 07 Aug 2014 14:52:56 -0700
-Subject: [PATCH v4 1/1] iommu-api: Add map_sg/unmap_sg functions
-In-Reply-To: <20140807062410.GC17340@ulmo>
-References: <1406854484-3848-1-git-send-email-ohaugan@codeaurora.org>
- <1406854484-3848-2-git-send-email-ohaugan@codeaurora.org>
- <20140805151323.GB19709@laptop.dumpdata.com>
- <53E26127.1040805@codeaurora.org> <20140806201740.GW9809@8bytes.org>
- <53E2BA2D.1050007@codeaurora.org> <20140807062410.GC17340@ulmo>
-Message-ID: <53E3F538.8030000@codeaurora.org>
+From: isubramanian@apm.com (Iyappan Subramanian)
+Date: Thu, 7 Aug 2014 15:06:23 -0700
+Subject: [PATCH v9 2/4] Documentation: dts: Add bindings for APM X-Gene
+ SoC ethernet driver
+In-Reply-To: <53C4BFF2.5080103@gmail.com>
+References: <1405376285-23008-1-git-send-email-isubramanian@apm.com>
+ <1405376285-23008-3-git-send-email-isubramanian@apm.com>
+ <53C4BFF2.5080103@gmail.com>
+Message-ID: <CAKh23F=Weod3uo3n7afx=_aM0qmw40qwU54RnNXsNC=L8q9fGg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 8/6/2014 11:24 PM, Thierry Reding wrote:
-> On Wed, Aug 06, 2014 at 04:28:45PM -0700, Olav Haugan wrote:
->> On 8/6/2014 1:17 PM, Joerg Roedel wrote:
->>> On Wed, Aug 06, 2014 at 10:08:55AM -0700, Olav Haugan wrote:
->>>> so you are suggesting that I check in "bus_set_iommu()" whether the
->>>> driver has set the map_sg/unmap_sg function pointers or not and if not
->>>> set it to the default? Is bus_set_iommu() the only way drivers can set
->>>> up the callbacks?
->>>
->>> This doesn't work as the iommu_ops are now const. You have to either
->>> update the iommu drivers individually to point to the default function,
->>> or you do the check in the API function itself and fall back to the
->>> default it no call-back is provided.
->>>
+On Mon, Jul 14, 2014 at 10:45 PM, Varka Bhadram <varkabhadram@gmail.com> wrote:
+> On 07/15/2014 03:48 AM, Iyappan Subramanian wrote:
 >>
->> Ok, then I think it is better to just leave the fallback where it is now
->> in the function itself.
-> 
-> What Konrad was suggesting is what I also proposed. The idea is to
-> implement a fallback as standalone function, then make all drivers use
-> that by default in the struct iommu_ops that they register. When drivers
-> implement an optimized version they can simply replace the fallback
-> implementation with their own.
-> 
+>> This patch adds documentation for APM X-Gene SoC ethernet DTS binding.
+>>
+>> Signed-off-by: Iyappan Subramanian <isubramanian@apm.com>
+>> Signed-off-by: Ravi Patel <rapatel@apm.com>
+>> Signed-off-by: Keyur Chudgar <kchudgar@apm.com>
+>> ---
+>>   .../devicetree/bindings/net/apm-xgene-enet.txt     | 72
+>> ++++++++++++++++++++++
+>>   1 file changed, 72 insertions(+)
+>>   create mode 100644
+>> Documentation/devicetree/bindings/net/apm-xgene-enet.txt
+>>
+>> diff --git a/Documentation/devicetree/bindings/net/apm-xgene-enet.txt
+>> b/Documentation/devicetree/bindings/net/apm-xgene-enet.txt
+>> new file mode 100644
+>> index 0000000..3e2a295
+>> --- /dev/null
+>> +++ b/Documentation/devicetree/bindings/net/apm-xgene-enet.txt
+>> @@ -0,0 +1,72 @@
+>> +APM X-Gene SoC Ethernet nodes
+>> +
+>> +Ethernet nodes are defined to describe on-chip ethernet interfaces in
+>> +APM X-Gene SoC.
+>> +
+>> +Required properties:
+>> +- compatible:          Should be "apm,xgene-enet"
+>> +- reg: Address and length of the register set for the device. It contains
+>> the
+>> +       information of registers in the same order as described by
+>> reg-names
+>> +- reg-names: Should contain the register set names
+>
+>
+> These are not aligned properly...
 
-Ok, I can do that. I misunderstood the point of the fallback. I thought
-the point of the fallback was to catch drivers that forget/neglect to
-implement this callback. If that is not a concern I will update my patch
-to create a separate function that I will point all existing drivers to.
+I will fix these in the next patch.
 
-Thanks,
+>
+> Required properties:
+> - compatble             : Should be "apm,xgene-enet"
+>
+> - reg                   : Address and length of the register set for the
+> device.
+>                           It contains the information of registers in the
+> same order
+>                           as described by reg-names
+>
+> .....
+>
+>
+>> +  "enet_csr":          Ethernet control and status register address space
+>> +  "ring_csr":          Descriptor ring control and status register
+>> address space
+>> +  "ring_cmd":          Descriptor ring command register address space
+>> +- interrupts:          Ethernet main interrupt
+>> +- clocks:              Reference to the clock entry.
+>> +- local-mac-address:   MAC address assigned to this device
+>> +- phy-connection-type: Interface type between ethernet device and PHY
+>> device
+>> +- phy-handle:          Reference to a PHY node connected to this device
+>> +
+>> +- mdio:                Device tree subnode with the following required
+>> +                       properties:
+>> +
+>> +       - compatible: Must be "apm,xgene-mdio".
+>> +       - #address-cells: Must be <1>.
+>> +       - #size-cells: Must be <0>.
+>> +
+>> +       For the phy on the mdio bus, there must be a node with the
+>> following
+>> +       fields:
+>> +
+>> +       - compatible: PHY identifier.  Please refer ./phy.txt for the
+>> format.
+>> +       - reg: The ID number for the phy.
+>> +
+>
+>
+> alignment...  :-)
 
-Olav
+Thanks.  I will fix the alignments.
 
--- 
-The Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-hosted by The Linux Foundation
+>
+>
+>> +Optional properties:
+>> +- status               : Should be "ok" or "disabled" for
+>> enabled/disabled.
+>> +                         Default is "ok".
+>> +
+>> +
+>> +Example:
+>> +       menetclk: menetclk {
+>> +               compatible = "apm,xgene-device-clock";
+>> +               clock-output-names = "menetclk";
+>> +               status = "ok";
+>> +       };
+>> +
+>> +       menet: ethernet at 17020000 {
+>> +               compatible = "apm,xgene-enet";
+>> +               status = "disabled";
+>> +               reg = <0x0 0x17020000 0x0 0xd100>,
+>> +                     <0x0 0X17030000 0x0 0X400>,
+>> +                     <0x0 0X10000000 0x0 0X200>;
+>> +               reg-names = "enet_csr", "ring_csr", "ring_cmd";
+>> +               interrupts = <0x0 0x3c 0x4>;
+>> +               clocks = <&menetclk 0>;
+>> +               local-mac-address = [00 01 73 00 00 01];
+>> +               phy-connection-type = "rgmii";
+>> +               phy-handle = <&menetphy>;
+>> +               mdio {
+>> +                       compatible = "apm,xgene-mdio";
+>> +                       #address-cells = <1>;
+>> +                       #size-cells = <0>;
+>> +                       menetphy: menetphy at 3 {
+>> +                               compatible = "ethernet-phy-id001c.c915";
+>> +                               reg = <0x3>;
+>> +                       };
+>> +
+>> +               };
+>> +       };
+>> +
+>> +/* Board-specific peripheral configurations */
+>> +&menet {
+>> +        status = "ok";
+>> +};
+>
+>
+>
+> --
+> Regards,
+> Varka Bhadram.
+>
