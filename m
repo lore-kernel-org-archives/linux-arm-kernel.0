@@ -1,25 +1,32 @@
-From: jcmvbkbc@gmail.com (Max Filippov)
-Date: Thu, 7 Aug 2014 19:15:51 +0400
-Subject: [PATCH 1/7] arm: use generic fixmap.h
-In-Reply-To: <1407353564-21478-2-git-send-email-keescook@chromium.org>
-References: <1407353564-21478-1-git-send-email-keescook@chromium.org>
- <1407353564-21478-2-git-send-email-keescook@chromium.org>
-Message-ID: <CAMo8Bf+uq1vhqb7KxnNFHTZ53C1mtw_Do6dn09j7jjw_7MWF_Q@mail.gmail.com>
+From: rostedt@goodmis.org (Steven Rostedt)
+Date: Thu, 7 Aug 2014 11:18:28 -0400
+Subject: [PATCH v2 4/5] ARM64: add IPI tracepoints
+In-Reply-To: <20140807091817.GG13703@arm.com>
+References: <1406318733-26754-1-git-send-email-nicolas.pitre@linaro.org>
+ <1406318733-26754-5-git-send-email-nicolas.pitre@linaro.org>
+ <20140806155237.0a6d7d3c@gandalf.local.home>
+ <20140807091817.GG13703@arm.com>
+Message-ID: <20140807111828.3c3d827a@gandalf.local.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Thu, 7 Aug 2014 10:18:17 +0100
+Will Deacon <will.deacon@arm.com> wrote:
 
-On Wed, Aug 6, 2014 at 11:32 PM, Kees Cook <keescook@chromium.org> wrote:
-> ARM is different from other architectures in that fixmap pages are indexed
-> with a positive offset from FIXADDR_START.  Other architectures index with
-> a negative offset from FIXADDR_TOP.  In order to use the generic fixmap.h
+> On Wed, Aug 06, 2014 at 08:52:37PM +0100, Steven Rostedt wrote:
+> > Will and Russell,
+> > 
+> > Can you give me your Acked-by for this, and I can pull it through my
+> > tree?
+> 
+> Looks fine to me:
+> 
+>   Acked-by: Will Deacon <will.deacon@arm.com>
+> 
+> I'm assuming there's a dependency on other patches going via the tracing
+> tree, hence why you're taking this?
 
-Does anybody know if there's any reason why generic fixmap.h uses negative
-offsets? It complicates things with no obvious benefit if you e.g. try to align
-virtual address in the fixmap region with physical page color (that's why I've
-switched xtensa to positive fixmap addressing in v3.17).
+Yeah, there's some generic updates to the trace facility for these
+tracepoints.
 
--- 
-Thanks.
--- Max
+-- Steve
