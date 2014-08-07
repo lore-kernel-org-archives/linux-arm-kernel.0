@@ -1,81 +1,105 @@
-From: zhangfei.gao@linaro.org (Zhangfei Gao)
-Date: Thu,  7 Aug 2014 09:36:01 +0800
-Subject: [PATCH v4 4/4] clk: hix5hd2: add I2C clocks
-In-Reply-To: <1407375361-24958-1-git-send-email-zhangfei.gao@linaro.org>
-References: <1407375361-24958-1-git-send-email-zhangfei.gao@linaro.org>
-Message-ID: <1407375361-24958-5-git-send-email-zhangfei.gao@linaro.org>
+From: lv.zheng@intel.com (Zheng, Lv)
+Date: Thu, 7 Aug 2014 01:41:52 +0000
+Subject: [PATCH v2 07/18] ACPI / table: Print GIC information when MADT
+ is parsed
+In-Reply-To: <1407166105-17675-8-git-send-email-hanjun.guo@linaro.org>
+References: <1407166105-17675-1-git-send-email-hanjun.guo@linaro.org>
+ <1407166105-17675-8-git-send-email-hanjun.guo@linaro.org>
+Message-ID: <1AE640813FDE7649BE1B193DEA596E8802650766@SHSMSX101.ccr.corp.intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Wei Yan <sledge.yanwei@huawei.com>
+Hi,
 
-hix5hd2 add I2C clocks (I2C0~i2C5)
+> From: Hanjun Guo [mailto:hanjun.guo at linaro.org]
+> Sent: Monday, August 04, 2014 11:28 PM
+> To: Catalin Marinas; Rafael J. Wysocki; Mark Rutland
+> 
+> When MADT is parsed, print GIC information to make the boot
+> log look pretty.
+> 
+> Signed-off-by: Hanjun Guo <hanjun.guo@linaro.org>
+> Signed-off-by: Tomasz Nowicki <tomasz.nowicki@linaro.org>
+> ---
+>  drivers/acpi/tables.c |   39 ++++++++++++++++++++++++++++++++++++++-
+>  1 file changed, 38 insertions(+), 1 deletion(-)
+> 
+> diff --git a/drivers/acpi/tables.c b/drivers/acpi/tables.c
+> index 6d5a6cd..77f8bb1 100644
+> --- a/drivers/acpi/tables.c
+> +++ b/drivers/acpi/tables.c
+> @@ -183,6 +183,44 @@ void acpi_table_print_madt_entry(struct acpi_subtable_header *header)
+>  		}
+>  		break;
+> 
+> +	case ACPI_MADT_TYPE_GENERIC_INTERRUPT:
+> +		{
+> +			struct acpi_madt_generic_interrupt *p =
+> +				(struct acpi_madt_generic_interrupt *)header;
+> +			pr_info("GICC (acpi_id[0x%04x] address[0x%08llx] MPDIR[0x%llx] %s)\n",
+> +				p->uid, p->base_address, p->arm_mpidr,
 
-Signed-off-by: Wei Yan <sledge.yanwei@huawei.com>
-Signed-off-by: Zhangfei Gao <zhangfei.gao@linaro.org>
----
- drivers/clk/hisilicon/clk-hix5hd2.c       |   25 +++++++++++++++++++++++++
- include/dt-bindings/clock/hix5hd2-clock.h |   12 ++++++++++++
- 2 files changed, 37 insertions(+)
+Just reminders.
+The acpi_id looks vague, is it a UID for the processor?
+Should 0x%08llx for base_address be %p?
 
-diff --git a/drivers/clk/hisilicon/clk-hix5hd2.c b/drivers/clk/hisilicon/clk-hix5hd2.c
-index d6a2189..75efccb 100644
---- a/drivers/clk/hisilicon/clk-hix5hd2.c
-+++ b/drivers/clk/hisilicon/clk-hix5hd2.c
-@@ -100,6 +100,31 @@ static struct hisi_gate_clock hix5hd2_gate_clks[] __initdata = {
- 		CLK_SET_RATE_PARENT, 0x178, 0, 0, },
- 	{ HIX5HD2_WDG0_RST, "rst_wdg0", "clk_wdg0",
- 		CLK_SET_RATE_PARENT, 0x178, 4, CLK_GATE_SET_TO_DISABLE, },
-+	/* I2C */
-+	{HIX5HD2_I2C0_CLK, "clk_i2c0", "100m",
-+		 CLK_SET_RATE_PARENT, 0x06c, 4, 0, },
-+	{HIX5HD2_I2C0_RST, "rst_i2c0", "clk_i2c0",
-+		 CLK_SET_RATE_PARENT, 0x06c, 5, CLK_GATE_SET_TO_DISABLE, },
-+	{HIX5HD2_I2C1_CLK, "clk_i2c1", "100m",
-+		 CLK_SET_RATE_PARENT, 0x06c, 8, 0, },
-+	{HIX5HD2_I2C1_RST, "rst_i2c1", "clk_i2c1",
-+		 CLK_SET_RATE_PARENT, 0x06c, 9, CLK_GATE_SET_TO_DISABLE, },
-+	{HIX5HD2_I2C2_CLK, "clk_i2c2", "100m",
-+		 CLK_SET_RATE_PARENT, 0x06c, 12, 0, },
-+	{HIX5HD2_I2C2_RST, "rst_i2c2", "clk_i2c2",
-+		 CLK_SET_RATE_PARENT, 0x06c, 13, CLK_GATE_SET_TO_DISABLE, },
-+	{HIX5HD2_I2C3_CLK, "clk_i2c3", "100m",
-+		 CLK_SET_RATE_PARENT, 0x06c, 16, 0, },
-+	{HIX5HD2_I2C3_RST, "rst_i2c3", "clk_i2c3",
-+		 CLK_SET_RATE_PARENT, 0x06c, 17, CLK_GATE_SET_TO_DISABLE, },
-+	{HIX5HD2_I2C4_CLK, "clk_i2c4", "100m",
-+		 CLK_SET_RATE_PARENT, 0x06c, 20, 0, },
-+	{HIX5HD2_I2C4_RST, "rst_i2c4", "clk_i2c4",
-+		 CLK_SET_RATE_PARENT, 0x06c, 21, CLK_GATE_SET_TO_DISABLE, },
-+	{HIX5HD2_I2C5_CLK, "clk_i2c5", "100m",
-+		 CLK_SET_RATE_PARENT, 0x06c, 0, 0, },
-+	{HIX5HD2_I2C5_RST, "rst_i2c5", "clk_i2c5",
-+		 CLK_SET_RATE_PARENT, 0x06c, 1, CLK_GATE_SET_TO_DISABLE, },
- };
- 
- enum hix5hd2_clk_type {
-diff --git a/include/dt-bindings/clock/hix5hd2-clock.h b/include/dt-bindings/clock/hix5hd2-clock.h
-index b8e3c9d..fd29c17 100644
---- a/include/dt-bindings/clock/hix5hd2-clock.h
-+++ b/include/dt-bindings/clock/hix5hd2-clock.h
-@@ -62,6 +62,18 @@
- #define HIX5HD2_SD_CIU_RST		138
- #define HIX5HD2_WDG0_CLK		139
- #define HIX5HD2_WDG0_RST		140
-+#define HIX5HD2_I2C0_CLK		141
-+#define HIX5HD2_I2C0_RST		142
-+#define HIX5HD2_I2C1_CLK		143
-+#define HIX5HD2_I2C1_RST		144
-+#define HIX5HD2_I2C2_CLK		145
-+#define HIX5HD2_I2C2_RST		146
-+#define HIX5HD2_I2C3_CLK		147
-+#define HIX5HD2_I2C3_RST		148
-+#define HIX5HD2_I2C4_CLK		149
-+#define HIX5HD2_I2C4_RST		150
-+#define HIX5HD2_I2C5_CLK		151
-+#define HIX5HD2_I2C5_RST		152
- 
- /* complex */
- #define HIX5HD2_MAC0_CLK		192
--- 
-1.7.9.5
+> +				(p->flags & ACPI_MADT_ENABLED) ? "enabled" : "disabled");
+> +
+> +		}
+> +		break;
+> +
+> +	case ACPI_MADT_TYPE_GENERIC_DISTRIBUTOR:
+> +		{
+> +			struct acpi_madt_generic_distributor *p =
+> +				(struct acpi_madt_generic_distributor *)header;
+> +			pr_info("GIC Distributor (gic_id[0x%04x] address[0x%08llx] gsi_base[%d])\n",
+> +				p->gic_id, p->base_address, p->global_irq_base);
+> +		}
+> +		break;
+
+Same question for base_address.
+
+> +
+> +	case ACPI_MADT_TYPE_GENERIC_MSI_FRAME:
+> +		{
+> +			struct acpi_madt_generic_msi_frame *p =
+> +				(struct acpi_madt_generic_msi_frame *)header;
+> +			pr_info("GIC MSI Frame (msi_fame_id[%d] address[0x%08llx])\n",
+> +				p->msi_frame_id, p->base_address);
+
+Ditto.
+
+> +		}
+> +		break;
+> +
+> +	case ACPI_MADT_TYPE_GENERIC_REDISTRIBUTOR:
+> +		{
+> +			struct acpi_madt_generic_redistributor *p =
+> +				(struct acpi_madt_generic_redistributor *)header;
+> +			pr_info("GIC Redistributor (address[0x%08llx] region_size[0x%x])\n",
+> +				p->base_address, p->length);
+
+Ditto.
+
+> +		}
+> +		break;
+> +
+>  	default:
+>  		pr_warn("Found unsupported MADT entry (type = 0x%x)\n",
+>  			header->type);
+> @@ -190,7 +228,6 @@ void acpi_table_print_madt_entry(struct acpi_subtable_header *header)
+>  	}
+>  }
+> 
+> -
+>  int __init
+>  acpi_table_parse_entries(char *id,
+>  			     unsigned long table_size,
+
+This block shouldn't be a part of this patch.
+
+Thanks and best regards
+-Lv
+
+> --
+> 1.7.9.5
