@@ -1,49 +1,60 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Thu, 7 Aug 2014 10:22:54 +0100
-Subject: [PATCH v2 2/2] iommu/arm-smmu: Do not access non-existing SMR
- registers
-In-Reply-To: <53E2BB71.9000201@codeaurora.org>
-References: <1407175263-10699-1-git-send-email-ohaugan@codeaurora.org>
- <1407175263-10699-3-git-send-email-ohaugan@codeaurora.org>
- <20140806101948.GD23882@arm.com> <53E25B76.6090208@codeaurora.org>
- <20140806173518.GG25953@arm.com> <53E2BB71.9000201@codeaurora.org>
-Message-ID: <20140807092254.GH13703@arm.com>
+From: jg1.han@samsung.com (Jingoo Han)
+Date: Thu, 07 Aug 2014 18:30:47 +0900
+Subject: [RFC] pwm-backlight: Allow backlight to remain disabled on boot
+In-Reply-To: <20140731115429.GA12627@ulmo>
+References: <1406806970-12561-1-git-send-email-thierry.reding@gmail.com>
+ <20140731115429.GA12627@ulmo>
+Message-ID: <009e01cfb222$4555d940$d0018bc0$%han@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Aug 07, 2014 at 12:34:09AM +0100, Olav Haugan wrote:
-> On 8/6/2014 10:35 AM, Will Deacon wrote:
-> > Hmm, I'm checking this with the architects because the TRMs aren't exactly
-> > clear. The NUMSMRG works for stream-indexing (i.e. reports the number of
-> > S2CRs), then all we have to do is change the above ~SMR_VALID to 0x0, since
-> > those registers will be SBZP.
+On Thursday, July 31, 2014 8:55 PM, Thierry Reding wrote:
+> On Thu, Jul 31, 2014 at 01:42:50PM +0200, Thierry Reding wrote:
+> [...]
+> > @@ -317,6 +319,12 @@ static int pwm_backlight_probe(struct platform_device *pdev)
+> >  	}
+> >
+> >  	bl->props.brightness = data->dft_brightness;
+> > +
+> > +	if (data->boot_off)
+> > +		bl->props.power = FB_BLANK_POWERDOWN;
+> > +	else
+> > +		bl->props.power = FB_BLANK_UNBLANK;
+> > +
+> >  	backlight_update_status(bl);
 > 
-> You don't agree that we should avoid doing register writes if not
-> necessarily? In general I like to avoid trying to write registers that
-> is not needed so that we don't do more work than needed.
+> Looking at this again, perhaps a more sensible thing to do would be to
+> not call backlight_update_status() in the first place. For example if
+> the board defines that backlight should be kept off at boot, but the
+> bootloader had already enabled it, then this would effectively turn off
+> the backlight again.
 
-If this was a fast-path then I'd certainly agree. However, device reset is
-a pretty rare event and I'd be inclined to err on the side of code clarity
-in preference to performance.
+(+cc Ajay Kumar)
 
-Anyway, it turns out that we can't use NUMSMRG for this so all that's moot.
-We instead need to do 1 << SMMU_IDR0.NUMSIDB, which will give us the number
-of S2CRs.
+Personally, I prefer not to call backlight_update_status(), when the
+backlight was already turned on by bootloader. Also, it would be better
+for subsystems such as DRM to handle the power of panel.
 
-> >> As far as I can tell there are no other register telling us how many S2CR
-> >> registers exist. That also brings up another point that there is no check
-> >> in the code to ensure we are not trying to program more than the available
-> >> S2CR registers when we use stream indexing.
-> > 
-> > On an SMMU using stream-indexing, if the StreamID goes off the end of the
-> > S2CRs that's a fairly serious hardware configuration issue which I don't
-> > think Linux is in a position to handle. I agree that a warning wouldn't
-> > hurt on device add/attach though.
-> > 
 > 
-> Yes, I meant to protect against programming errors where someone
-> specified more Stream IDs than available S2CRs.
+> I think it's safe to assume that if the bootloader sets up the backlight
+> then it would also set up the display. Therefore not touching the
+> backlight state at all at probe time seems like the safest default.
+> 
+> Of course that doesn't help people who use some dumb framebuffer driver
+> and therefore nothing explicitly enables the backlight. So it would
+> still be changing behaviour for people for whom the bootloader doesn't
+> set up the backlight at all and who therefore rely on the kernel to turn
+> it on.
+> 
+> We could perhaps alleviate that pain a little by making this dependent
+> on whether or not the board is booted using DT on the assumption that
+> anything that uses DT would be "modern" enough to provide a means to
+> automatically enable the backlight at the right moment.
 
-Sure. Could you have a go at hacking this up, please?
+I also agree with the way to use DT.
 
-Will
+Best regards,
+Jingoo Han
+
+> 
+> Thierry
