@@ -1,90 +1,38 @@
-From: eric.auger@linaro.org (Eric Auger)
-Date: Thu, 07 Aug 2014 17:47:53 +0200
-Subject: [RFC PATCH 7/9] KVM: arm: vgic: allow dynamic mapping of
- physical/virtual interrupts
-In-Reply-To: <87bns0gzy8.fsf@approximate.cambridge.arm.com>
-References: <1403688530-23273-1-git-send-email-marc.zyngier@arm.com>	<1403688530-23273-8-git-send-email-marc.zyngier@arm.com>	<53DE0584.2040405@linaro.org>
- <87bns0gzy8.fsf@approximate.cambridge.arm.com>
-Message-ID: <53E39FA9.6040503@linaro.org>
+From: jcmvbkbc@gmail.com (Max Filippov)
+Date: Thu, 7 Aug 2014 19:42:59 +0400
+Subject: [PATCH 1/7] arm: use generic fixmap.h
+In-Reply-To: <alpine.LFD.2.11.1408071131170.6061@knanqh.ubzr>
+References: <1407353564-21478-1-git-send-email-keescook@chromium.org>
+ <1407353564-21478-2-git-send-email-keescook@chromium.org>
+ <CAMo8Bf+uq1vhqb7KxnNFHTZ53C1mtw_Do6dn09j7jjw_7MWF_Q@mail.gmail.com>
+ <CAL_JsqJgRFYTfdsY48C9QreBH=VcM3t-9AzFSV8oXLB5tVGjUw@mail.gmail.com>
+ <alpine.LFD.2.11.1408071131170.6061@knanqh.ubzr>
+Message-ID: <CAMo8Bf+DP-xZGnnFFvwc1XDEGUGkj1KkYQ_x+2i_hE0a9t7NKw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08/04/2014 03:13 PM, Marc Zyngier wrote:
-> On Sun, Aug 03 2014 at 10:48:52 am BST, Eric Auger <eric.auger@linaro.org> wrote:
->> On 06/25/2014 11:28 AM, Marc Zyngier wrote:
->>> In order to be able to feed physical interrupts to a guest, we need
->>> to be able to establish the virtual-physical mapping between the two
->>> worlds.
->>>
->>> As we try to keep the injection interface simple, find out what the
->>> physical interrupt is (if any) when we actually build the LR.
->>>
->>> The mapping is kept in a rbtree, indexed by virtual interrupts.
+On Thu, Aug 7, 2014 at 7:32 PM, Nicolas Pitre <nicolas.pitre@linaro.org> wrote:
+> On Thu, 7 Aug 2014, Rob Herring wrote:
+>
+>> On Thu, Aug 7, 2014 at 10:15 AM, Max Filippov <jcmvbkbc@gmail.com> wrote:
+>> > Hi,
+>> >
+>> > On Wed, Aug 6, 2014 at 11:32 PM, Kees Cook <keescook@chromium.org> wrote:
+>> >> ARM is different from other architectures in that fixmap pages are indexed
+>> >> with a positive offset from FIXADDR_START.  Other architectures index with
+>> >> a negative offset from FIXADDR_TOP.  In order to use the generic fixmap.h
+>> >
+>> > Does anybody know if there's any reason why generic fixmap.h uses negative
+>> > offsets? It complicates things with no obvious benefit if you e.g. try to align
+>> > virtual address in the fixmap region with physical page color (that's why I've
+>> > switched xtensa to positive fixmap addressing in v3.17).
 >>
->> Hi Marc,
->>
->> I suspect there is a piece missing here related to bitmap state
->> management. When using maintenance IRQ, in process_maintenance we cleared
->> - dist->irq_pending (and new dist->irq_level)
->> - vcpu->irq_queued
->>
->> Now this does not exist anymore for forwarded irqs, when a subsequent
->> IRQ will be injected, vgic_update_irq_pending will fail in injecting the
->> IRQ because the states are reflecting the IRQ is still in progress.
->>
->> Since I have a modified version of your code, using Christoffer patches
->> I may have missed some modifications you did but at least on my side I
->> was forced to add bitmap clearing.
->>
->> It is not clear to me where to put that code however. Since user-side
->> can inject an IRQ while the previous one is not completed at guest and
->> host level, it cannot be in update_irq_pending - or we shall prevent the
->> user from injecting fwd IRQs - .
-Hi Marc,
+>> No, but each arch doing it differently is even more annoying.
+>
+> Why not switching everybody to positive offsets then?
 
-Christoffer suggested me to put state bitmap reset in
-__kvm_vgic_sync_hwstate where we check whether the LR were consumed. It
-seems to work fine and we do no assumption about user action.
+I can cook a patch if people agree that that'd be good.
 
-> 
-> Interesting. Indeed, userspace shouldn't be allowed to inject a
-> forwarded interrupt (or actually the virtual interrupt that matches the
-> physical one). This interrupt is now under complete control of the
-> kernel, and shouldn't triggered by userspace.
-the user-side might only manipulate VFIO IRQ index (and not the hwirq).
-So we can make sure the physical IRQ belongs to a valid VFIO device.
-> 
-> Now, it is completely possible that we're missing something here (or
-> actually doing too much).
-> 
->> In my case (VFIO/IRQFD), by construction I only inject a new forwarded
->> IRQ when the previous one was completed so I could put it in the irqfd
->> injection function. But even irqfd is injected through eventfd trigger.
->> We shall forbid the user-side to trigger that eventfd in place of the
->> VFIO driver. What do you think?
-> 
-> Yup. userspace can't interfere with a forwarded interrupt, that's way
-> too dangerous.
-> 
->> A question related to guest kill. Cannot it happen the guest sometimes
->> does not complete the vIRQ before exiting? Currently I observe cases
->> where when I launch qemu-system after a kill, forwarded irqs do not work
->> properly. I am not yet sure this is the cause of my problem but just in
->> case, can the host write into GICV_EOIR in place of guest?
-> 
-> It is quite possible that the interrupt is left active when the guest is
-> killed, which would tend to indicate that we need a way to cleanup
-> behind us. It should be enough to clear the active bit, shouldn't it?
-So in practice this will directly write into the GICC_DIR right? I will
-try this.
-
-Best Regards
-
-Eric
-> 
->> Besides those problems, the patch works in my test environment
-> 
-> Thanks for testing!
-> 
-> 	M.
-> 
+-- 
+Thanks.
+-- Max
