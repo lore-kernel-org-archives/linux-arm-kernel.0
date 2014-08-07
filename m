@@ -1,139 +1,68 @@
-From: ajaynumb@gmail.com (Ajay kumar)
-Date: Thu, 7 Aug 2014 15:24:17 +0530
-Subject: [RFC] pwm-backlight: Allow backlight to remain disabled on boot
-In-Reply-To: <20140731115644.GB12627@ulmo>
-References: <1406806970-12561-1-git-send-email-thierry.reding@gmail.com>
- <20140731115644.GB12627@ulmo>
-Message-ID: <CAEC9eQNRCRBr7THFdu9=qtzcTn=oxVO8jRQWL3WCa8q70aagTQ@mail.gmail.com>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Thu, 7 Aug 2014 10:59:19 +0100
+Subject: Kexec on arm64
+In-Reply-To: <1407372003.8971.85.camel@smoke>
+References: <CAFdej014ohCFYvoUAXWiYGb4_4UmSY2G1MH-NEE_cF1cC-6Mow@mail.gmail.com>
+ <20140728153812.GA2576@leverpostej>
+ <1406592548.28348.49.camel@smoke>
+ <CAFdej00is0kC-1q5uMNJL5APL1WezdNBg0jASgwYamsg5NO_Tg@mail.gmail.com>
+ <20140729133557.GQ2576@leverpostej>
+ <1406668741.28348.75.camel@smoke>
+ <CAFdej02sTBsjHz+FCqjKkY9pF5sPF6n6QUtEadHi0hK3MxRxGA@mail.gmail.com>
+ <CAFdej01ZHkTVZuN_0RrGbFmoG4_NTnwm6KDAPM_sf=zHBHSRwg@mail.gmail.com>
+ <20140804113528.GC3197@leverpostej>
+ <1407372003.8971.85.camel@smoke>
+Message-ID: <20140807095919.GC9984@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Thierry,
+On Thu, Aug 07, 2014 at 01:40:03AM +0100, Geoff Levand wrote:
+> Hi,
 
-Thanks for adding me.
+Hi Geoff,
 
-On Thu, Jul 31, 2014 at 5:26 PM, Thierry Reding
-<thierry.reding@gmail.com> wrote:
-> Cc'ing Ajay (who raised this on a different thread recently), therefore
-> quoting all of the original email.
->
-> Thierry
->
-> On Thu, Jul 31, 2014 at 01:42:50PM +0200, Thierry Reding wrote:
->> From: Thierry Reding <treding@nvidia.com>
->>
->> The default for backlight devices is to be enabled immediately when
->> registering with the backlight core. This can be useful for setups that
->> use a simple framebuffer device and where the backlight cannot otherwise
->> be hooked up to the panel.
->>
->> However, when dealing with more complex setups, such as those of recent
->> ARM SoCs, this can be problematic. Since the backlight is usually setup
->> separately from the display controller, the probe order is not usually
->> deterministic. That can lead to situations where the backlight will be
->> powered up and the panel will show an uninitialized framebuffer.
->>
->> Furthermore, subsystems such as DRM have advanced functionality to set
->> the power mode of a panel. In order to allow such setups to power up the
->> panel at exactly the right moment, a way is needed to prevent the
->> backlight core from powering the backlight up automatically when it is
->> registered.
->>
->> This commit introduces a new boot_off field in the platform data (and
->> also implements getting the same information from device tree). When set
->> the initial backlight power mode will be set to "off".
->>
->> Signed-off-by: Thierry Reding <treding@nvidia.com>
->> ---
->> I've been meaning to send this for a while but was always holding back
->> because of the indoctrination that this type of configuration shouldn't
->> be part of device tree. However this issue was recently raised again in
->> the context of power up sequences for display panels. As described above
->> the issue is that panel datasheets recommend that the backlight attached
->> to a panel be turned on at the very last step to avoid visual glitches
->> during the panel's power up sequence. With the current implementation it
->> is typical for the backlight to be probed before the display panel. That
->> has, in many cases, the side-effect of enabling the backlight, therefore
->> making the screen content visible before it's actually initialized.
->>
->> Some panels come up with random garbage when uninitialized, others show
->> all white. With some luck the panel will be all black and users won't
->> really notice.
-Right, most of the DSI panels are lucky. But the case is not the same
-with few eDP/LVDS panels.
+> On Mon, 2014-08-04 at 12:35 +0100, Mark Rutland wrote:
+> > > +       /*
+> > > +        * arm64 kernel uses area above kernel image to build
+> > > +        * initial page tables. Max required size for this area is 384K. It
+> > > +        * happens when CONFIG_ARM64_PGTABLE_LEVELS is set.
+> > > +        * So place dtb 512k above kernel image area.
+> > > +        */
+> > 
+> > The area above the kernel Image holds the BSS too, and from some
+> > experiments I did a while back with an allyesconfig, it was possible to
+> > have many megabytes of BSS.
+> > 
+> > While 512k might be adequate for a defconfig today, it will become less
+> > so as time goes on.
+> > 
+> > For kernel Images post v3.17 you can and should read the Image header's
+> > image_size field to figure out how much memory is needed from _text to
+> > _end (i.e. all the memory the kernel will assume is available statically
+> > and will happily clobber). For kernel Images prior to v3.17 the best
+> > thing we can do is guess as you've done here, or place the DTB below the
+> > kernel and page tables in the TEXT_OFFSET area; neither option is
+> > particularly brilliant.
+> 
+> I haven't looked into it yet, but booting.txt says that the dtb must be
+> 'within the first 512 megabytes from the start of the kernel image'.  If
+> this restriction still holds we can't just put the dtb at
+> text_offset + image_size.
 
->> This patch is an attempt to enable boards to override the default of
->> turning on the backlight for the pwm-backlight driver. I'm not sure if
->> there was a specific reason to turn on the backlight by default when
->> this driver was initially written, but the fact is that since it has
->> pretty much always been like this we can't really go and change the
->> default, otherwise a lot of people may end up with no backlight and no
->> clue as to how to enable it. So the only reasonable thing we can do is
->> to keep the old behaviour and give new boards a way to override it if
->> they know that some other part of the stack will enable it at the right
->> moment.
-Agreed! And, I have tested this patch.
-This resolves the only remaining problem for display on peach_pi.
-I cannot see the boot time glitch anymore :)
+Isn't that only a problem if text_offset + image_size is huge (510MB+)?
 
-Ajay
+The wording in booting.txt doesn't sound quite right. As I understand
+it, the 512MB restriction is because of the way we map the dtb in the
+swapper page tables.
 
->>  .../devicetree/bindings/video/backlight/pwm-backlight.txt         | 1 +
->>  drivers/video/backlight/pwm_bl.c                                  | 8 ++++++++
->>  include/linux/pwm_backlight.h                                     | 2 ++
->>  3 files changed, 11 insertions(+)
->>
->> diff --git a/Documentation/devicetree/bindings/video/backlight/pwm-backlight.txt b/Documentation/devicetree/bindings/video/backlight/pwm-backlight.txt
->> index 764db86d441a..65e001a1733d 100644
->> --- a/Documentation/devicetree/bindings/video/backlight/pwm-backlight.txt
->> +++ b/Documentation/devicetree/bindings/video/backlight/pwm-backlight.txt
->> @@ -17,6 +17,7 @@ Optional properties:
->>                 "pwms" property (see PWM binding[0])
->>    - enable-gpios: contains a single GPIO specifier for the GPIO which enables
->>                    and disables the backlight (see GPIO binding[1])
->> +  - backlight-boot-off: keep the backlight disabled on boot
->>
->>  [0]: Documentation/devicetree/bindings/pwm/pwm.txt
->>  [1]: Documentation/devicetree/bindings/gpio/gpio.txt
->> diff --git a/drivers/video/backlight/pwm_bl.c b/drivers/video/backlight/pwm_bl.c
->> index d7a3d13e72ec..62adfc9d37a7 100644
->> --- a/drivers/video/backlight/pwm_bl.c
->> +++ b/drivers/video/backlight/pwm_bl.c
->> @@ -173,6 +173,8 @@ static int pwm_backlight_parse_dt(struct device *dev,
->>               data->max_brightness--;
->>       }
->>
->> +     data->boot_off = of_property_read_bool(node, "backlight-boot-off");
->> +
->>       return 0;
->>  }
->>
->> @@ -317,6 +319,12 @@ static int pwm_backlight_probe(struct platform_device *pdev)
->>       }
->>
->>       bl->props.brightness = data->dft_brightness;
->> +
->> +     if (data->boot_off)
->> +             bl->props.power = FB_BLANK_POWERDOWN;
->> +     else
->> +             bl->props.power = FB_BLANK_UNBLANK;
->> +
->>       backlight_update_status(bl);
->>
->>       platform_set_drvdata(pdev, bl);
->> diff --git a/include/linux/pwm_backlight.h b/include/linux/pwm_backlight.h
->> index efdd9227a49c..1fc14989da4a 100644
->> --- a/include/linux/pwm_backlight.h
->> +++ b/include/linux/pwm_backlight.h
->> @@ -15,6 +15,8 @@ struct platform_pwm_backlight_data {
->>       unsigned int *levels;
->>       /* TODO remove once all users are switched to gpiod_* API */
->>       int enable_gpio;
->> +     bool boot_off;
->> +
->>       int (*init)(struct device *dev);
->>       int (*notify)(struct device *dev, int brightness);
->>       void (*notify_after)(struct device *dev, int brightness);
->> --
->> 2.0.3
->>
+So a better wording would be "the kernel and DTB must be placed in the
+same naturally-aligned 512MB region of memory".
+
+It should be possible to get rid of the restrictions on the placement of
+the image and DTB, but this requires reworking the VA layout (using a
+kernel text mapping separate from the linear map as with x86_64, and
+similarly having a separate DTB mapping), and unfortunately I haven't
+had the time to do that.
+
+Thanks,
+Mark.
