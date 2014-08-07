@@ -1,62 +1,117 @@
-From: l.stach@pengutronix.de (Lucas Stach)
-Date: Thu, 07 Aug 2014 12:04:04 +0200
-Subject: [PATCH] ARM: mx6: Fix suspend/resume with PCI
-In-Reply-To: <1407371998-11437-1-git-send-email-festevam@gmail.com>
-References: <1407371998-11437-1-git-send-email-festevam@gmail.com>
-Message-ID: <1407405844.4675.9.camel@weser.hi.pengutronix.de>
+From: hanjun.guo@linaro.org (Hanjun Guo)
+Date: Thu, 07 Aug 2014 18:28:31 +0800
+Subject: [PATCH v2 07/18] ACPI / table: Print GIC information when MADT
+ is parsed
+In-Reply-To: <1AE640813FDE7649BE1B193DEA596E8802650766@SHSMSX101.ccr.corp.intel.com>
+References: <1407166105-17675-1-git-send-email-hanjun.guo@linaro.org>
+ <1407166105-17675-8-git-send-email-hanjun.guo@linaro.org>
+ <1AE640813FDE7649BE1B193DEA596E8802650766@SHSMSX101.ccr.corp.intel.com>
+Message-ID: <53E354CF.1070800@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am Mittwoch, den 06.08.2014, 21:39 -0300 schrieb Fabio Estevam:
-> From: Fabio Estevam <fabio.estevam@freescale.com>
-> 
-> When PCI is used and a suspend/resume sequence is done we see the following
-> kernel hang:
-> 
-> root at freescale /$ echo mem > /sys/power/state 
-> [   16.099018] PM: Syncing filesystems ... done.
-> [   16.141010] Freezing user space processes ... (elapsed 0.002 seconds) done.
-> [   16.150840] Freezing remaining freezable tasks ... (elapsed 0.003 seconds) done.
-> [   16.199438] random: nonblocking pool is initialized
-> [   16.229639] PM: suspend of devices complete after 64.793 msecs
-> [   16.235488] PM: suspend devices took 0.070 seconds
-> [   16.245301] PM: late suspend of devices complete after 4.968 msecs
-> [   16.257063] PM: noirq suspend of devices complete after 5.538 msecs
-> [   16.263425] Disabling non-boot CPUs ...
-> [   16.274666] CPU1: shutdown
-> [   16.286351] CPU2: shutdown
-> [   16.294169] CPU3: shutdown
-> [   16.299551] Enabling non-boot CPUs ...
-> [   16.304155] CPU1: Booted secondary processor
-> [   16.305717] CPU1 is up
-> [   16.313078] CPU2: Booted secondary processor
-> [   16.313456] CPU2 is up
-> [   16.320778] CPU3: Booted secondary processor
-> [   16.321174] CPU3 is up
-> 	(hangs here)
-> 
-> Implement a workaround for the erratum ERR005723: "PCIe does not support L2
-> Power Down", which consists in toggling bit 18 (TEST_POWERDOWN) of GPR1 register.
-> 
-> Tested on a mx6qsabresd TO1.2 revC2.
-> 
-> Reported-by: Shawn Guo <shawn.guo@freescale.com>
-> Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
+On 2014-8-7 9:41, Zheng, Lv wrote:
+> Hi,
 
-NACK
+Hi Lv,
 
-To my understanding the DW PCIe core needs a specific sequence to
-enter/exit L2 at suspend that we currently ignore. Contrary to the
-errata description I think it can be done without a dedicated core reset
-signal. Hitting the PHY PD is a sledgehammer without proper
-understanding of the problem.
+> 
+>> From: Hanjun Guo [mailto:hanjun.guo at linaro.org]
+>> Sent: Monday, August 04, 2014 11:28 PM
+>> To: Catalin Marinas; Rafael J. Wysocki; Mark Rutland
+>>
+>> When MADT is parsed, print GIC information to make the boot
+>> log look pretty.
+>>
+>> Signed-off-by: Hanjun Guo <hanjun.guo@linaro.org>
+>> Signed-off-by: Tomasz Nowicki <tomasz.nowicki@linaro.org>
+>> ---
+>>  drivers/acpi/tables.c |   39 ++++++++++++++++++++++++++++++++++++++-
+>>  1 file changed, 38 insertions(+), 1 deletion(-)
+>>
+>> diff --git a/drivers/acpi/tables.c b/drivers/acpi/tables.c
+>> index 6d5a6cd..77f8bb1 100644
+>> --- a/drivers/acpi/tables.c
+>> +++ b/drivers/acpi/tables.c
+>> @@ -183,6 +183,44 @@ void acpi_table_print_madt_entry(struct acpi_subtable_header *header)
+>>  		}
+>>  		break;
+>>
+>> +	case ACPI_MADT_TYPE_GENERIC_INTERRUPT:
+>> +		{
+>> +			struct acpi_madt_generic_interrupt *p =
+>> +				(struct acpi_madt_generic_interrupt *)header;
+>> +			pr_info("GICC (acpi_id[0x%04x] address[0x%08llx] MPDIR[0x%llx] %s)\n",
+>> +				p->uid, p->base_address, p->arm_mpidr,
+> 
+> Just reminders.
+> The acpi_id looks vague, is it a UID for the processor?
 
-Also hiding such things in the platform code seems really bad. Please
-keep in mind that this is the mainline kernel, not a vendor downstream
-tree where you are free to smash things all over the place.
+Yes, it is the UID of processor object in DSDT, How about use
+acpi_uid instead?
 
-Regards,
-Lucas
--- 
-Pengutronix e.K.             | Lucas Stach                 |
-Industrial Linux Solutions   | http://www.pengutronix.de/  |
+> Should 0x%08llx for base_address be %p?
+
+Yes, %p should be better, I will update the code and all the
+address field you pointed out below.
+
+> 
+>> +				(p->flags & ACPI_MADT_ENABLED) ? "enabled" : "disabled");
+>> +
+>> +		}
+>> +		break;
+>> +
+>> +	case ACPI_MADT_TYPE_GENERIC_DISTRIBUTOR:
+>> +		{
+>> +			struct acpi_madt_generic_distributor *p =
+>> +				(struct acpi_madt_generic_distributor *)header;
+>> +			pr_info("GIC Distributor (gic_id[0x%04x] address[0x%08llx] gsi_base[%d])\n",
+>> +				p->gic_id, p->base_address, p->global_irq_base);
+>> +		}
+>> +		break;
+> 
+> Same question for base_address.
+> 
+>> +
+>> +	case ACPI_MADT_TYPE_GENERIC_MSI_FRAME:
+>> +		{
+>> +			struct acpi_madt_generic_msi_frame *p =
+>> +				(struct acpi_madt_generic_msi_frame *)header;
+>> +			pr_info("GIC MSI Frame (msi_fame_id[%d] address[0x%08llx])\n",
+>> +				p->msi_frame_id, p->base_address);
+> 
+> Ditto.
+> 
+>> +		}
+>> +		break;
+>> +
+>> +	case ACPI_MADT_TYPE_GENERIC_REDISTRIBUTOR:
+>> +		{
+>> +			struct acpi_madt_generic_redistributor *p =
+>> +				(struct acpi_madt_generic_redistributor *)header;
+>> +			pr_info("GIC Redistributor (address[0x%08llx] region_size[0x%x])\n",
+>> +				p->base_address, p->length);
+> 
+> Ditto.
+> 
+>> +		}
+>> +		break;
+>> +
+>>  	default:
+>>  		pr_warn("Found unsupported MADT entry (type = 0x%x)\n",
+>>  			header->type);
+>> @@ -190,7 +228,6 @@ void acpi_table_print_madt_entry(struct acpi_subtable_header *header)
+>>  	}
+>>  }
+>>
+>> -
+>>  int __init
+>>  acpi_table_parse_entries(char *id,
+>>  			     unsigned long table_size,
+> 
+> This block shouldn't be a part of this patch.
+
+Ok, I will remove that from this patch.
+
+Thanks
+Hanjun
