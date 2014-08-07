@@ -1,59 +1,345 @@
 From: haojian.zhuang@linaro.org (Haojian Zhuang)
-Date: Thu,  7 Aug 2014 18:51:30 +0800
-Subject: [PATCH v17 4/9] document: dt: add the binding on HiP04
+Date: Thu,  7 Aug 2014 18:51:31 +0800
+Subject: [PATCH v17 5/9] ARM: dts: add hip04 dts
 In-Reply-To: <1407408695-19626-1-git-send-email-haojian.zhuang@linaro.org>
 References: <1407408695-19626-1-git-send-email-haojian.zhuang@linaro.org>
-Message-ID: <1407408695-19626-5-git-send-email-haojian.zhuang@linaro.org>
+Message-ID: <1407408695-19626-6-git-send-email-haojian.zhuang@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add Hisilicon HiP04 SoC platform & Fabric controller.
-
-Fabric controller could be used to configure snoop filter among multiple
-clusters.
+Add hip04-d01.dts & hip04.dtsi for hip04 SoC platform.
 
 Signed-off-by: Haojian Zhuang <haojian.zhuang@linaro.org>
 ---
- .../bindings/arm/hisilicon/hisilicon.txt           | 23 ++++++++++++++++++++++
- 1 file changed, 23 insertions(+)
+ arch/arm/boot/dts/Makefile      |   1 +
+ arch/arm/boot/dts/hip04-d01.dts |  32 +++++
+ arch/arm/boot/dts/hip04.dtsi    | 267 ++++++++++++++++++++++++++++++++++++++++
+ 3 files changed, 300 insertions(+)
+ create mode 100644 arch/arm/boot/dts/hip04-d01.dts
+ create mode 100644 arch/arm/boot/dts/hip04.dtsi
 
-diff --git a/Documentation/devicetree/bindings/arm/hisilicon/hisilicon.txt b/Documentation/devicetree/bindings/arm/hisilicon/hisilicon.txt
-index 934f000..f717c7b 100644
---- a/Documentation/devicetree/bindings/arm/hisilicon/hisilicon.txt
-+++ b/Documentation/devicetree/bindings/arm/hisilicon/hisilicon.txt
-@@ -5,6 +5,11 @@ Hi4511 Board
- Required root node properties:
- 	- compatible = "hisilicon,hi3620-hi4511";
- 
-+HiP04 D01 Board
-+Required root node properties:
-+	- compatible = "hisilicon,hip04-d01";
+diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
+index 721525e..6587bbf 100644
+--- a/arch/arm/boot/dts/Makefile
++++ b/arch/arm/boot/dts/Makefile
+@@ -86,6 +86,7 @@ dtb-$(CONFIG_ARCH_HI3xxx) += hi3620-hi4511.dtb
+ dtb-$(CONFIG_ARCH_HIX5HD2) += hix5hd2-dkb.dtb
+ dtb-$(CONFIG_ARCH_HIGHBANK) += highbank.dtb \
+ 	ecx-2000.dtb
++dtb-$(CONFIG_ARCH_HIP04) += hip04-d01.dtb
+ dtb-$(CONFIG_ARCH_INTEGRATOR) += integratorap.dtb \
+ 	integratorcp.dtb
+ dtb-$(CONFIG_ARCH_KEYSTONE) += k2hk-evm.dtb \
+diff --git a/arch/arm/boot/dts/hip04-d01.dts b/arch/arm/boot/dts/hip04-d01.dts
+new file mode 100644
+index 0000000..40a9e33
+--- /dev/null
++++ b/arch/arm/boot/dts/hip04-d01.dts
+@@ -0,0 +1,32 @@
++/*
++ *  Copyright (C) 2013-2014 Linaro Ltd.
++ *  Author: Haojian Zhuang <haojian.zhuang@linaro.org>
++ *
++ *  This program is free software; you can redistribute it and/or modify
++ *  it under the terms of the GNU General Public License version 2 as
++ *  publishhed by the Free Software Foundation.
++ */
 +
++/dts-v1/;
 +
- Hisilicon system controller
- 
- Required properties:
-@@ -55,3 +60,21 @@ Example:
- 		compatible = "hisilicon,pctrl";
- 		reg = <0xfca09000 0x1000>;
- 	};
++#include "hip04.dtsi"
 +
-+-----------------------------------------------------------------------
-+Fabric:
++/ {
++	/* memory bus is 64-bit */
++	#address-cells = <2>;
++	#size-cells = <2>;
++	model = "Hisilicon D01 Development Board";
++	compatible = "hisilicon,hip04-d01";
 +
-+Required Properties:
-+- compatible: "hisilicon,hip04-fabric";
-+- reg: Address and size of Fabric
++	memory at 00000000,10000000 {
++		device_type = "memory";
++		reg = <0x00000000 0x10000000 0x00000000 0xc0000000>,
++		      <0x00000004 0xc0000000 0x00000003 0x40000000>;
++	};
 +
-+-----------------------------------------------------------------------
-+Bootwrapper boot method (software protocol on SMP):
++	soc {
++		uart0: uart at 4007000 {
++			status = "ok";
++		};
++	};
++};
+diff --git a/arch/arm/boot/dts/hip04.dtsi b/arch/arm/boot/dts/hip04.dtsi
+new file mode 100644
+index 0000000..93b6c90
+--- /dev/null
++++ b/arch/arm/boot/dts/hip04.dtsi
+@@ -0,0 +1,267 @@
++/*
++ * Hisilicon Ltd. HiP04 SoC
++ *
++ * Copyright (C) 2013-2014 Hisilicon Ltd.
++ * Copyright (C) 2013-2014 Linaro Ltd.
++ *
++ * Author: Haojian Zhuang <haojian.zhuang@linaro.org>
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
++ */
 +
-+Required Properties:
-+- compatible: "hisilicon,hip04-bootwrapper";
-+- boot-method: Address and size of boot method.
-+  [0]: bootwrapper physical address
-+  [1]: bootwrapper size
-+  [2]: relocation physical address
-+  [3]: relocation size
++/ {
++	/* memory bus is 64-bit */
++	#address-cells = <2>;
++	#size-cells = <2>;
++
++	aliases {
++		serial0 = &uart0;
++	};
++
++	bootwrapper {
++		compatible = "hisilicon,hip04-bootwrapper";
++		boot-method = <0x10c00000 0x10000>, <0xe0000100 0x1000>;
++	};
++
++	cpus {
++		#address-cells = <1>;
++		#size-cells = <0>;
++
++		cpu-map {
++			cluster0 {
++				core0 {
++					cpu = <&CPU0>;
++				};
++				core1 {
++					cpu = <&CPU1>;
++				};
++				core2 {
++					cpu = <&CPU2>;
++				};
++				core3 {
++					cpu = <&CPU3>;
++				};
++			};
++			cluster1 {
++				core0 {
++					cpu = <&CPU4>;
++				};
++				core1 {
++					cpu = <&CPU5>;
++				};
++				core2 {
++					cpu = <&CPU6>;
++				};
++				core3 {
++					cpu = <&CPU7>;
++				};
++			};
++			cluster2 {
++				core0 {
++					cpu = <&CPU8>;
++				};
++				core1 {
++					cpu = <&CPU9>;
++				};
++				core2 {
++					cpu = <&CPU10>;
++				};
++				core3 {
++					cpu = <&CPU11>;
++				};
++			};
++			cluster3 {
++				core0 {
++					cpu = <&CPU12>;
++				};
++				core1 {
++					cpu = <&CPU13>;
++				};
++				core2 {
++					cpu = <&CPU14>;
++				};
++				core3 {
++					cpu = <&CPU15>;
++				};
++			};
++		};
++		CPU0: cpu at 0 {
++			device_type = "cpu";
++			compatible = "arm,cortex-a15";
++			reg = <0>;
++		};
++		CPU1: cpu at 1 {
++			device_type = "cpu";
++			compatible = "arm,cortex-a15";
++			reg = <1>;
++		};
++		CPU2: cpu at 2 {
++			device_type = "cpu";
++			compatible = "arm,cortex-a15";
++			reg = <2>;
++		};
++		CPU3: cpu at 3 {
++			device_type = "cpu";
++			compatible = "arm,cortex-a15";
++			reg = <3>;
++		};
++		CPU4: cpu at 100 {
++			device_type = "cpu";
++			compatible = "arm,cortex-a15";
++			reg = <0x100>;
++		};
++		CPU5: cpu at 101 {
++			device_type = "cpu";
++			compatible = "arm,cortex-a15";
++			reg = <0x101>;
++		};
++		CPU6: cpu at 102 {
++			device_type = "cpu";
++			compatible = "arm,cortex-a15";
++			reg = <0x102>;
++		};
++		CPU7: cpu at 103 {
++			device_type = "cpu";
++			compatible = "arm,cortex-a15";
++			reg = <0x103>;
++		};
++		CPU8: cpu at 200 {
++			device_type = "cpu";
++			compatible = "arm,cortex-a15";
++			reg = <0x200>;
++		};
++		CPU9: cpu at 201 {
++			device_type = "cpu";
++			compatible = "arm,cortex-a15";
++			reg = <0x201>;
++		};
++		CPU10: cpu at 202 {
++			device_type = "cpu";
++			compatible = "arm,cortex-a15";
++			reg = <0x202>;
++		};
++		CPU11: cpu at 203 {
++			device_type = "cpu";
++			compatible = "arm,cortex-a15";
++			reg = <0x203>;
++		};
++		CPU12: cpu at 300 {
++			device_type = "cpu";
++			compatible = "arm,cortex-a15";
++			reg = <0x300>;
++		};
++		CPU13: cpu at 301 {
++			device_type = "cpu";
++			compatible = "arm,cortex-a15";
++			reg = <0x301>;
++		};
++		CPU14: cpu at 302 {
++			device_type = "cpu";
++			compatible = "arm,cortex-a15";
++			reg = <0x302>;
++		};
++		CPU15: cpu at 303 {
++			device_type = "cpu";
++			compatible = "arm,cortex-a15";
++			reg = <0x303>;
++		};
++	};
++
++	timer {
++		compatible = "arm,armv7-timer";
++		interrupt-parent = <&gic>;
++		interrupts = <1 13 0xf08>,
++			     <1 14 0xf08>,
++			     <1 11 0xf08>,
++			     <1 10 0xf08>;
++	};
++
++	clk_50m: clk_50m {
++		#clock-cells = <0>;
++		compatible = "fixed-clock";
++		clock-frequency = <50000000>;
++	};
++
++	clk_168m: clk_168m {
++		#clock-cells = <0>;
++		compatible = "fixed-clock";
++		clock-frequency = <168000000>;
++	};
++
++	soc {
++		/* It's a 32-bit SoC. */
++		#address-cells = <1>;
++		#size-cells = <1>;
++		compatible = "simple-bus";
++		interrupt-parent = <&gic>;
++		ranges = <0 0 0xe0000000 0x10000000>;
++
++		gic: interrupt-controller at c01000 {
++			compatible = "hisilicon,hip04-intc";
++			#interrupt-cells = <3>;
++			#address-cells = <0>;
++			interrupt-controller;
++			interrupts = <1 9 0xf04>;
++
++			reg = <0xc01000 0x1000>, <0xc02000 0x1000>,
++			      <0xc04000 0x2000>, <0xc06000 0x2000>;
++		};
++
++		sysctrl: sysctrl {
++			compatible = "hisilicon,sysctrl";
++			reg = <0x3e00000 0x00100000>;
++		};
++
++		fabric: fabric {
++			compatible = "hisilicon,hip04-fabric";
++			reg = <0x302a000 0x1000>;
++		};
++
++		dual_timer0: dual_timer at 3000000 {
++			compatible = "arm,sp804", "arm,primecell";
++			reg = <0x3000000 0x1000>;
++			interrupts = <0 224 4>;
++			clocks = <&clk_50m>, <&clk_50m>;
++			clock-names = "apb_pclk";
++		};
++
++		arm-pmu {
++			compatible = "arm,cortex-a15-pmu";
++			interrupts = <0 64 4>,
++				     <0 65 4>,
++				     <0 66 4>,
++				     <0 67 4>,
++				     <0 68 4>,
++				     <0 69 4>,
++				     <0 70 4>,
++				     <0 71 4>,
++				     <0 72 4>,
++				     <0 73 4>,
++				     <0 74 4>,
++				     <0 75 4>,
++				     <0 76 4>,
++				     <0 77 4>,
++				     <0 78 4>,
++				     <0 79 4>;
++		};
++
++		uart0: uart at 4007000 {
++			compatible = "snps,dw-apb-uart";
++			reg = <0x4007000 0x1000>;
++			interrupts = <0 381 4>;
++			clocks = <&clk_168m>;
++			clock-names = "uartclk";
++			reg-shift = <2>;
++			status = "disabled";
++		};
++
++		sata0: sata at a000000 {
++			compatible = "hisilicon,hisi-ahci";
++			reg = <0xa000000 0x1000000>;
++			interrupts = <0 372 4>;
++		};
++
++	};
++};
 -- 
 1.9.1
