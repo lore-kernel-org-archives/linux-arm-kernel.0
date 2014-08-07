@@ -1,20 +1,19 @@
 From: dianders@chromium.org (Doug Anderson)
-Date: Thu, 7 Aug 2014 14:17:24 -0700
-Subject: [PATCH v4 3/4] ARM: dts: add rk3288 dwc2 controller support
-In-Reply-To: <1407404095-3265-4-git-send-email-kever.yang@rock-chips.com>
+Date: Thu, 7 Aug 2014 14:23:36 -0700
+Subject: [PATCH v4 4/4] ARM: dts: Enable USB otg and host1(dwc) on
+ rk3288-evb
+In-Reply-To: <1407404095-3265-5-git-send-email-kever.yang@rock-chips.com>
 References: <1407404095-3265-1-git-send-email-kever.yang@rock-chips.com>
- <1407404095-3265-4-git-send-email-kever.yang@rock-chips.com>
-Message-ID: <CAD=FV=WubCx0yn7FV_qpiW31hrOgaa4Qv0N7TdRyTtKshooYgA@mail.gmail.com>
+ <1407404095-3265-5-git-send-email-kever.yang@rock-chips.com>
+Message-ID: <CAD=FV=V-yb0JLJ24i5zsKzdZExJ5h8NGDD0QdG1740kc3yoEdQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Kever,
 
 On Thu, Aug 7, 2014 at 2:34 AM, Kever Yang <kever.yang@rock-chips.com> wrote:
-> rk3288 has two kind of usb controller, this add the dwc2 controller
-> for otg and host1.
->
-> Controller can works with usb PHY default setting and Vbus on.
+> USB otg port is the usb3.0 b-port on the board.
+> USB host1 port is the host A port nearby the otg port.
 >
 > Signed-off-by: Kever Yang <kever.yang@rock-chips.com>
 >
@@ -22,23 +21,45 @@ On Thu, Aug 7, 2014 at 2:34 AM, Kever Yang <kever.yang@rock-chips.com> wrote:
 >
 > Changes in v4: None
 > Changes in v3:
-> - EHCI and HSIC move new for version 3.
+> - Rebase
 >
-> Changes in v2: None
+> Changes in v2:
+> - evb patch added in version 2
 >
->  arch/arm/boot/dts/rk3288.dtsi | 20 ++++++++++++++++++++
->  1 file changed, 20 insertions(+)
+>  arch/arm/boot/dts/rk3288-evb.dtsi | 6 ++++++
+>  1 file changed, 6 insertions(+)
+>
+> diff --git a/arch/arm/boot/dts/rk3288-evb.dtsi b/arch/arm/boot/dts/rk3288-evb.dtsi
+> index 4f57209..a322100 100644
+> --- a/arch/arm/boot/dts/rk3288-evb.dtsi
+> +++ b/arch/arm/boot/dts/rk3288-evb.dtsi
+> @@ -94,3 +94,9 @@
+>  &usb_host0_ehci {
+>         status = "okay";
+>  };
+> +&usb_host1 {
+> +       status = "okay";
+> +};
+> +&usb_otg {
+> +       status = "okay";
+> +};
 
-This looks good to me.  I haven't been able to personally test the OTG
-port (since my board doesn't have vbus wired), but I've tested the
-Host port.
+Do you really want to enable "usb_otg" on EVB?  I think you have a
+rework on your board to enable vbus on this port, but I don't think
+it's applicable to anyone else, is it?
 
-I would request that you re-sort by base address (ignoring uart2,
-which apparently is in the wrong place).  Please make sure you base
-atop my patch that fixes the sort order of OHCI and EHCI.  I think
-that's supposed to land any day now.
+I'm told that on some boards you can turn on GPIO0_12 to get vbus, but
+I don't have a board like that so I can't really test.  Even so,
+before enabling the otg port we should probably put something in the
+dts file that would turn on that vbus...
 
-After changing the sort order:
+Unless you've somehow gotten gadget mode to work on the OTG port, my
+vote would be to leave it disabled for the EVB for now.
 
-Tested-by: Doug Anderson <dianders@chromium.org>
-Reviewed-by: Doug Anderson <dianders@chromium.org>
+
+NOTE: keeping the otg definition in the main "r3288.dtsi" (patch 3/4)
+still makes sense because other boards may have the OTG port hooked
+up.
+
+
+-Doug
