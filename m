@@ -1,105 +1,49 @@
-From: lv.zheng@intel.com (Zheng, Lv)
-Date: Thu, 7 Aug 2014 01:41:52 +0000
-Subject: [PATCH v2 07/18] ACPI / table: Print GIC information when MADT
- is parsed
-In-Reply-To: <1407166105-17675-8-git-send-email-hanjun.guo@linaro.org>
-References: <1407166105-17675-1-git-send-email-hanjun.guo@linaro.org>
- <1407166105-17675-8-git-send-email-hanjun.guo@linaro.org>
-Message-ID: <1AE640813FDE7649BE1B193DEA596E8802650766@SHSMSX101.ccr.corp.intel.com>
+From: kamal@canonical.com (Kamal Mostafa)
+Date: Wed, 06 Aug 2014 18:55:02 -0700
+Subject: [3.13.y.z extended stable] Patch "locking/mutex: Disable
+ optimistic spinning on some architectures" has been added to staging queue
+In-Reply-To: <1407360614.3395.2.camel@buesod1.americas.hpqcorp.net>
+References: <1407358496-23094-1-git-send-email-kamal@canonical.com>
+ <CAJUuVQ5OpNye8HAEw6x=owBB32pq-aLF7_Gqo493jDDHDahhRA@mail.gmail.com>
+ <1407360614.3395.2.camel@buesod1.americas.hpqcorp.net>
+Message-ID: <1407376502.12474.64.camel@fourier>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
 
-> From: Hanjun Guo [mailto:hanjun.guo at linaro.org]
-> Sent: Monday, August 04, 2014 11:28 PM
-> To: Catalin Marinas; Rafael J. Wysocki; Mark Rutland
-> 
-> When MADT is parsed, print GIC information to make the boot
-> log look pretty.
-> 
-> Signed-off-by: Hanjun Guo <hanjun.guo@linaro.org>
-> Signed-off-by: Tomasz Nowicki <tomasz.nowicki@linaro.org>
-> ---
->  drivers/acpi/tables.c |   39 ++++++++++++++++++++++++++++++++++++++-
->  1 file changed, 38 insertions(+), 1 deletion(-)
-> 
-> diff --git a/drivers/acpi/tables.c b/drivers/acpi/tables.c
-> index 6d5a6cd..77f8bb1 100644
-> --- a/drivers/acpi/tables.c
-> +++ b/drivers/acpi/tables.c
-> @@ -183,6 +183,44 @@ void acpi_table_print_madt_entry(struct acpi_subtable_header *header)
->  		}
->  		break;
-> 
-> +	case ACPI_MADT_TYPE_GENERIC_INTERRUPT:
-> +		{
-> +			struct acpi_madt_generic_interrupt *p =
-> +				(struct acpi_madt_generic_interrupt *)header;
-> +			pr_info("GICC (acpi_id[0x%04x] address[0x%08llx] MPDIR[0x%llx] %s)\n",
-> +				p->uid, p->base_address, p->arm_mpidr,
+> On Wed, 2014-08-06 at 17:25 -0400, Andev wrote:
+> > On Wed, Aug 6, 2014 at 4:54 PM, Kamal Mostafa <kamal@canonical.com> wrote:
+> > > This is a note to let you know that I have just added a patch titled
+> > >
+> > >     locking/mutex: Disable optimistic spinning on some architectures
+> > >
+> > > to the linux-3.13.y-queue branch of the 3.13.y.z extended stable tree
+> > > which can be found at:
+> > >
+> > >  http://kernel.ubuntu.com/git?p=ubuntu/linux.git;a=shortlog;h=refs/heads/linux-3.13.y-queue
+> > >
+> > > This patch is scheduled to be released in version 3.13.11.6.
+> > >
+> > 
+> > This patch is specifically for parisc, sparc32, tile32, metag-lock1,
+> > arc-!llsc and hexagon none of which Ubuntu supports.
+> > 
+> > Why are you backporting this patch?
 
-Just reminders.
-The acpi_id looks vague, is it a UID for the processor?
-Should 0x%08llx for base_address be %p?
+On Wed, 2014-08-06 at 14:30 -0700, Davidlohr Bueso wrote:
+> Well 3.13.y.z isn't an Ubuntu kernel, its upstream, and those archs
+> *are* supported.
 
-> +				(p->flags & ACPI_MADT_ENABLED) ? "enabled" : "disabled");
-> +
-> +		}
-> +		break;
-> +
-> +	case ACPI_MADT_TYPE_GENERIC_DISTRIBUTOR:
-> +		{
-> +			struct acpi_madt_generic_distributor *p =
-> +				(struct acpi_madt_generic_distributor *)header;
-> +			pr_info("GIC Distributor (gic_id[0x%04x] address[0x%08llx] gsi_base[%d])\n",
-> +				p->gic_id, p->base_address, p->global_irq_base);
-> +		}
-> +		break;
+Davidlohr's answer is correct: This is not an "Ubuntu kernel".
 
-Same question for base_address.
+3.13.y.z is an "extended stable" kernel which follows the same rules as
+the kernel.org official stable kernels.  It contains no Ubuntu-specific
+patches, and supports the same arch's as mainline.
 
-> +
-> +	case ACPI_MADT_TYPE_GENERIC_MSI_FRAME:
-> +		{
-> +			struct acpi_madt_generic_msi_frame *p =
-> +				(struct acpi_madt_generic_msi_frame *)header;
-> +			pr_info("GIC MSI Frame (msi_fame_id[%d] address[0x%08llx])\n",
-> +				p->msi_frame_id, p->base_address);
+More details about this and the other Canonical-funded-and-hosted
+"extended stable" kernel versions is available here:
 
-Ditto.
+> For more information about the 3.13.y.z tree, see
+> https://wiki.ubuntu.com/Kernel/Dev/ExtendedStable
 
-> +		}
-> +		break;
-> +
-> +	case ACPI_MADT_TYPE_GENERIC_REDISTRIBUTOR:
-> +		{
-> +			struct acpi_madt_generic_redistributor *p =
-> +				(struct acpi_madt_generic_redistributor *)header;
-> +			pr_info("GIC Redistributor (address[0x%08llx] region_size[0x%x])\n",
-> +				p->base_address, p->length);
-
-Ditto.
-
-> +		}
-> +		break;
-> +
->  	default:
->  		pr_warn("Found unsupported MADT entry (type = 0x%x)\n",
->  			header->type);
-> @@ -190,7 +228,6 @@ void acpi_table_print_madt_entry(struct acpi_subtable_header *header)
->  	}
->  }
-> 
-> -
->  int __init
->  acpi_table_parse_entries(char *id,
->  			     unsigned long table_size,
-
-This block shouldn't be a part of this patch.
-
-Thanks and best regards
--Lv
-
-> --
-> 1.7.9.5
+ -Kamal
