@@ -1,35 +1,45 @@
-From: simon.boulay@vitec.com (Simon Boulay)
-Date: Thu, 7 Aug 2014 16:44:35 +0200
-Subject: CPUIdle Armada 370
-In-Reply-To: <20140807132132.GD19574@lunn.ch>
-References: <1407333701627.99622@vitec.com>
- <53E24654.6020008@free-electrons.com> <53E249A1.900@free-electrons.com>
- <53E24D2A.50706@free-electrons.com> <1407340917231.68970@vitec.com>
- <53E25369.60809@free-electrons.com> <1407341774154.51157@vitec.com>
- <53E34744.6080300@free-electrons.com> <20140807132132.GD19574@lunn.ch>
-Message-ID: <53E390D3.7060805@vitec.com>
+From: peter.griffin@linaro.org (Peter Griffin)
+Date: Thu, 7 Aug 2014 15:47:10 +0100
+Subject: [PATCH v3 0/6] Add EHCI and OHCI drivers for STi SoC's
+In-Reply-To: <201408062318.28958.arnd@arndb.de>
+References: <1407344589-24863-1-git-send-email-peter.griffin@linaro.org>
+ <201408062318.28958.arnd@arndb.de>
+Message-ID: <20140807144710.GD12137@griffinp-ThinkPad-X1-Carbon-2nd>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Hi Arnd,
 
-On 08/07/2014 03:21 PM, Andrew Lunn wrote:
->> However I noticed that your base register is 0xf1000000 whereas until now we only
->> test on platform which have 0xd0000000. Even if the cpu ilde path should not have
->> any hardcoded value, it could be something to explore.
->
-> This would imply it is a different version of u-boot. Maybe that could
-> have something to do with it?
+Thanks for reviewing, see my comments below: -
 
-Our u-boot is based on Marvell's BSP 2014_T1.0. It seems that 0xf1000000 
-is the default, now.
-For the record we have designed two boards. One is based on the 88F6707 
-and the other is based on the 88F6W11 (which is detected as a 88F6710).
-We also have an Armada 370 RD board.
+> > Changes since v2:
+> >  - Based on Arnd Berghman feedback, split out into 2 devices / drivers
+> >  - Base drivers oh ehci-platform.c & ohci-platform.c with required extensions
+> >    to allow possible re-merge in the furture.
+> 
+> Hi Peter,
+> 
+> This looks much better than the first version. I have some remaining comments for
+> how it could be simplified a bit more.
 
-The plan is that Nicolas will make cpuidle support work on the Armada 
-370 RD first. Then we will try to make it work on our boards.
+Yes I think I've addressed these now in V4, which I will send in a moment.
 
-Thanks,
+> 
+> The way that you deal with the 48mhz clock seems like it should fit in well
+> with the generic driver, just like all the rest (once the usb-st-common
+> stuff is moved into the ohci/ehci drivers), so the alternative would be
+> to make it all generic now.
 
-Simon
+Yes I tried to do it in a way which would, however I would prefer not to merge into 
+the generic one for now because: -
+
+1) There are some other subtle changes versus the generic drivers. For example in power_on() and power_off()
+I put the IP into reset and power down, which isn't done in the generic driver. Also with this IP it needs 
+power signal asserted before reset, otherwise it can hang the chip.
+
+2) I don't have any of the other hardware which uses ehci-platform / ohci-platform to test 
+I haven't broken things.
+
+regards,
+
+Peter.
