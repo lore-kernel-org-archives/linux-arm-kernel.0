@@ -1,88 +1,35 @@
-From: boris.brezillon@free-electrons.com (Boris BREZILLON)
-Date: Thu, 7 Aug 2014 15:46:54 +0200
-Subject: [PATCH v2] usb: gadget: at91_udc: move prepare clk into process
- context
-In-Reply-To: <53E37474.6060501@raritan.com>
-References: <1407330702-2926-1-git-send-email-ronald.wahl@raritan.com>
- <20140807095231.11bde829@bbrezillon>
- <20140807095912.7648de46@bbrezillon> <53E37474.6060501@raritan.com>
-Message-ID: <20140807154654.3f23365a@bbrezillon>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Thu, 7 Aug 2014 14:54:32 +0100
+Subject: [PATCH v2 00/11] pwm: Introduce ST's PWM driver
+In-Reply-To: <20140807132050.GC1540@ulmo.nvidia.com>
+References: <1405348412-7352-1-git-send-email-lee.jones@linaro.org>
+ <20140721123950.GY30888@lee--X1>
+ <20140807132050.GC1540@ulmo.nvidia.com>
+Message-ID: <20140807135432.GB21618@lee--X1>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 07 Aug 2014 14:43:32 +0200
-Ronald Wahl <ronald.wahl@raritan.com> wrote:
+On Thu, 07 Aug 2014, Thierry Reding wrote:
 
-> On 07.08.2014 09:59, Boris BREZILLON wrote:
-> > On Thu, 7 Aug 2014 09:52:31 +0200
-> > Boris BREZILLON <boris.brezillon@free-electrons.com> wrote:
-> >> On Wed,  6 Aug 2014 15:11:42 +0200
-> >> Ronald Wahl <ronald.wahl@raritan.com> wrote:
-> >>
-> >>> Commit 7628083227b6bc4a7e33d7c381d7a4e558424b6b added clock preparation in
-> >>> interrupt context. This is not allowed as it might sleep. Move clock
-> >>> preparation into process context (at91udc_probe).
-> >>> ---
-> >>>   drivers/usb/gadget/udc/at91_udc.c | 39 ++++++++++++++++++++++++++++++---------
-> >>>   1 file changed, 30 insertions(+), 9 deletions(-)
-> >>>
-> >>> diff --git a/drivers/usb/gadget/udc/at91_udc.c b/drivers/usb/gadget/udc/at91_udc.c
-> >>> index cfd18bc..0b347a0 100644
-> >>> --- a/drivers/usb/gadget/udc/at91_udc.c
-> >>> +++ b/drivers/usb/gadget/udc/at91_udc.c
-> >>> @@ -872,10 +872,10 @@ static void clk_on(struct at91_udc *udc)
-> >>>
-> >>>   	if (IS_ENABLED(CONFIG_COMMON_CLK)) {
-> >>>   		clk_set_rate(udc->uclk, 48000000);
-> >>> -		clk_prepare_enable(udc->uclk);
-> >>> +		clk_enable(udc->uclk);
-> >>>   	}
-> >>> -	clk_prepare_enable(udc->iclk);
-> >>> -	clk_prepare_enable(udc->fclk);
-> >>> +	clk_enable(udc->iclk);
-> >>> +	clk_enable(udc->fclk);
-> >>>   }
-> >>>
-> >>>   static void clk_off(struct at91_udc *udc)
-> >>> @@ -884,10 +884,10 @@ static void clk_off(struct at91_udc *udc)
-> >>>   		return;
-> >>>   	udc->clocked = 0;
-> >>>   	udc->gadget.speed = USB_SPEED_UNKNOWN;
-> >>> -	clk_disable_unprepare(udc->fclk);
-> >>> -	clk_disable_unprepare(udc->iclk);
-> >>> +	clk_disable(udc->fclk);
-> >>> +	clk_disable(udc->iclk);
-> >>>   	if (IS_ENABLED(CONFIG_COMMON_CLK))
-> >>> -		clk_disable_unprepare(udc->uclk);
-> >>> +		clk_disable(udc->uclk);
-> >>>   }
-> >>
-> >> As you stated prepare and unprepare should never be called in interrupt
-> >> context.
-> >>
-> >> My concern here is that PLLB (which is often used as USB clock
-> >> parent) will never be gated/disabled (because all this work is
-> >> done in its unprepare method), and thus your power consumption will be
-> >> higher (when entering suspend mode) than if you'd done a
-> >> disable_unprepare call.
-> >>
-> >> How about leaving the clk_on/off unchanged and use a threaded irq
-> >> instead of a normal irq ?
+> On Mon, Jul 21, 2014 at 01:39:50PM +0100, Lee Jones wrote:
+> > Hi Thierry,
+> > 
+> > Did you find some time to look at this set?
 > 
-> Even with threaded interrupts things are still called while interrupts 
-> are disabled by one or more layers of spin_lock_irqsave. There are also 
-> different code paths from where clk_on() is called.
+> Sorry for the long delay. I've applied patches 6-11 to the PWM tree,
+> though I've modified patch 6 a little for consistency. The module is
+> now named after the Kconfig option (pwm-sti rather than pwm-st). The
+> dependencies also seem to be redundant (ARCH_STI already depends on
+> OF), though I didn't change that just in case it's required for some
+> other reason.
+> 
+> Anyway, scream if there's anything in the PWM for-next branch that
+> needs to be fixed up.
 
-You're right (I only had a quick look at it). Let's fix this as a first
-step and we'll figure out how to optimize power consumption later.
-BTW, clk_set_rate can sleep too (AFAIK clk_enable and clk_disable
-are the only one that can be called in atomic context).
-
-Best Regards,
-
-Boris
+And in time for v3.17.  Nice one, thanks Thierry.
 
 -- 
-Boris Brezillon, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
+Lee Jones
+Linaro STMicroelectronics Landing Team Lead
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
