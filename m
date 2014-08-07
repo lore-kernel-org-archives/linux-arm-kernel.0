@@ -1,102 +1,95 @@
-From: shengjiu.wang@freescale.com (shengjiu.wang at freescale.com)
-Date: Thu, 7 Aug 2014 03:19:28 +0000
-Subject: [PATCH V2 2/3] ARM: clk-imx6q: Add missing lvds and anaclk clock
- to the clock tree
-In-Reply-To: <1407336147.5208.11.camel@weser.hi.pengutronix.de>
-References: <cover.1407313676.git.shengjiu.wang@freescale.com>
- <f98c6ea35ef4fa382d8aaf4ff370530aeb5b107f.1407313676.git.shengjiu.wang@freescale.com>
- <1407336147.5208.11.camel@weser.hi.pengutronix.de>
-Message-ID: <577ff1cbd3e045179422336b49f8408a@BY2PR03MB332.namprd03.prod.outlook.com>
+From: caesar.wang@rock-chips.com (caesar)
+Date: Thu, 07 Aug 2014 11:23:06 +0800
+Subject: [PATCH v4 2/2] pwm: rockchip: Added to support for RK3288 SoC
+In-Reply-To: <CAD=FV=Xw8tz2keCUtO+qYUmnuv=+DPGZjY9-j_2XmAcP3Luzjg@mail.gmail.com>
+References: <1406197295-10604-1-git-send-email-caesar.wang@rock-chips.com>	<1406197295-10604-3-git-send-email-caesar.wang@rock-chips.com>	<CAD=FV=V4Kp-H3CcAKZPV1jBnYX+Ntwvxx6RB13TLxS5RRPHTWA@mail.gmail.com>	<53E2D605.2000704@rock-chips.com>
+ <CAD=FV=Xw8tz2keCUtO+qYUmnuv=+DPGZjY9-j_2XmAcP3Luzjg@mail.gmail.com>
+Message-ID: <53E2F11A.1040109@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Stash, Shawn
 
-  Do we have such API for exclusive clock? Or Do you have example for these exclusive clocks?
+? 2014?08?07? 10:16, Doug Anderson ??:
+> Caesar,
+>
+> On Wed, Aug 6, 2014 at 6:27 PM, caesar <caesar.wang@rock-chips.com> wrote:
+>> Doug,
+>>
+>> ? 2014?08?07? 06:46, Doug Anderson ??:
+>>
+>>> Caesar,
+>>>
+>>> On Thu, Jul 24, 2014 at 3:21 AM, Caesar Wang <caesar.wang@rock-chips.com>
+>>> wrote:
+>>>> +static const struct rockchip_pwm_data pwm_data_v1 = {
+>>>> +       .regs.duty = PWM_HRC,
+>>>> +       .regs.period = PWM_LRC,
+>>>> +       .regs.cntr = PWM_CNTR,
+>>>> +       .regs.ctrl = PWM_CTRL,
+>>>> +       .prescaler = PRESCALER,
+>>>> +       .set_enable = rockchip_pwm_set_enable_v1,
+>>>> +};
+>>>> +
+>>>> +static const struct rockchip_pwm_data pwm_data_v2 = {
+>>>> +       .regs.duty = PWM_LRC,
+>>>> +       .regs.period = PWM_HRC,
+>>>> +       .regs.cntr = PWM_CNTR,
+>>>> +       .regs.ctrl = PWM_CTRL,
+>>>> +       .prescaler = PRESCALER-1,
+>>>> +       .set_enable = rockchip_pwm_set_enable_v2,
+>>>> +};
+>>>> +
+>>>> +static const struct rockchip_pwm_data pwm_data_vop = {
+>>>> +       .regs.duty = PWM_LRC,
+>>>> +       .regs.period = PWM_HRC,
+>>>> +       .regs.cntr = PWM_CTRL,
+>>>> +       .regs.ctrl = PWM_CNTR,
+>>> Did you really mean to flip CTRL and CNTR here?  If so, that's super
+>>> confusing and deserves a comment.  AKA, I think the above should not
+>>> be:
+>>>
+>>>    +       .regs.cntr = PWM_CTRL,
+>>>    +       .regs.ctrl = PWM_CNTR,
+>>>
+>>> ...but should be
+>>>
+>>>    +       .regs.cntr = PWM_CNTR,
+>>>    +       .regs.ctrl = PWM_CTRL,
+>>>
+>>> If you didn't mean to flip CTRL and CNTR here, then just get rid of
+>>> pwm_data_vop and refer to pwm_data_v2.  In fact, I'd suggest that you
+>>> totally remove the "rockchip,vop-pwm" since there's nothing different
+>>> between "rockchip,rk3288-pwm" and "rockchip,vop-pwm".
+>>
+>> Sorry,I think it's no problem. the  "rockchip,rk3288-pwm" and
+>> "rockchip,vop-pwm" are seperate PWM controllers.
+>> They are just different registers address between CNTR and CTRL .
+> OK, I looked up in the TRM.  Right, the CNTR and CTRL are flipped on
+> the vop.  So I think that the only change you need is to add:
+>
+> #define PWM_VOP_CTRL  0x00
+> #define PWM_VOP_CNTR  0x0c
+>
+> ...then use these new #defines for the vop structure.
+>
+>
+> As you have the code written right now it's very confusing.  The new
+> #defines will fix this.
+>
+yeah, I think they can be used in the same context.
 
-Best regards
-Wang shengjiu
-
------Original Message-----
-From: Lucas Stach [mailto:l.stach at pengutronix.de] 
-Sent: Wednesday, August 06, 2014 10:42 PM
-To: Wang Shengjiu-B02247
-Cc: Guo Shawn-R65073; kernel at pengutronix.de; linux at arm.linux.org.uk; robh+dt at kernel.org; pawel.moll at arm.com; mark.rutland at arm.com; ijc+devicetree at hellion.org.uk; galak at codeaurora.org; Chen Guangyu-B42378; linux-arm-kernel at lists.infradead.org; linux-kernel at vger.kernel.org
-Subject: Re: [PATCH V2 2/3] ARM: clk-imx6q: Add missing lvds and anaclk clock to the clock tree
-
-Am Mittwoch, den 06.08.2014, 16:35 +0800 schrieb Shengjiu Wang:
-> anaclk1 and anaclk2 is the clock source for lvds1_in and lvds2_in. 
-> lvds1_in and lvds2_in can be used to provide external clock source to 
-> the internal pll, such as pll4_audio and pll5_video.
-> pll4_audio and pll5_video can have multiple source, not only "osc", so 
-> add them.
-> 
-> Signed-off-by: Nicolin Chen <Guangyu.Chen@freescale.com>
-> Signed-off-by: Shengjiu Wang <shengjiu.wang@freescale.com>
-> ---
->  arch/arm/mach-imx/clk-imx6q.c             |   12 ++++++++++--
->  include/dt-bindings/clock/imx6qdl-clock.h |    8 +++++++-
->  2 files changed, 17 insertions(+), 3 deletions(-)
-> 
-> diff --git a/arch/arm/mach-imx/clk-imx6q.c 
-> b/arch/arm/mach-imx/clk-imx6q.c index 1d6dd59..330aad3 100644
-> --- a/arch/arm/mach-imx/clk-imx6q.c
-> +++ b/arch/arm/mach-imx/clk-imx6q.c
-> @@ -73,6 +73,7 @@ static const char *lvds_sels[] = {
->  	"pll4_audio", "pll5_video", "pll8_mlb", "enet_ref",
->  	"pcie_ref_125m", "sata_ref_100m",
->  };
-> +static const char *pll_av_sels[] = { "osc", "lvds1_in", "lvds2_in", 
-> +"dummy", };
->  
->  static struct clk *clk[IMX6QDL_CLK_END];  static struct 
-> clk_onecell_data clk_data; @@ -119,6 +120,9 @@ static void __init 
-> imx6q_clocks_init(struct device_node *ccm_node)
->  	clk[IMX6QDL_CLK_CKIL] = imx_obtain_fixed_clock("ckil", 0);
->  	clk[IMX6QDL_CLK_CKIH] = imx_obtain_fixed_clock("ckih1", 0);
->  	clk[IMX6QDL_CLK_OSC] = imx_obtain_fixed_clock("osc", 0);
-> +	/* Clock source from external clock via ANACLK1/2 PADs */
-> +	clk[IMX6QDL_CLK_ANACLK1] = imx_obtain_fixed_clock("anaclk1", 0);
-> +	clk[IMX6QDL_CLK_ANACLK2] = imx_obtain_fixed_clock("anaclk2", 0);
->  
->  	np = of_find_compatible_node(NULL, NULL, "fsl,imx6q-anatop");
->  	base = of_iomap(np, 0);
-> @@ -136,8 +140,8 @@ static void __init imx6q_clocks_init(struct device_node *ccm_node)
->  	clk[IMX6QDL_CLK_PLL1_SYS]      = imx_clk_pllv3(IMX_PLLV3_SYS,	"pll1_sys",	"osc", base,        0x7f);
->  	clk[IMX6QDL_CLK_PLL2_BUS]      = imx_clk_pllv3(IMX_PLLV3_GENERIC,	"pll2_bus",	"osc", base + 0x30, 0x1);
->  	clk[IMX6QDL_CLK_PLL3_USB_OTG]  = imx_clk_pllv3(IMX_PLLV3_USB,	"pll3_usb_otg",	"osc", base + 0x10, 0x3);
-> -	clk[IMX6QDL_CLK_PLL4_AUDIO]    = imx_clk_pllv3(IMX_PLLV3_AV,	"pll4_audio",	"osc", base + 0x70, 0x7f);
-> -	clk[IMX6QDL_CLK_PLL5_VIDEO]    = imx_clk_pllv3(IMX_PLLV3_AV,	"pll5_video",	"osc", base + 0xa0, 0x7f);
-> +	clk[IMX6QDL_CLK_PLL4_AUDIO]    = imx_clk_pllv3(IMX_PLLV3_AV,	"pll4_audio",	"pll4_sel", base + 0x70, 0x7f);
-> +	clk[IMX6QDL_CLK_PLL5_VIDEO]    = imx_clk_pllv3(IMX_PLLV3_AV,	"pll5_video",	"pll5_sel", base + 0xa0, 0x7f);
->  	clk[IMX6QDL_CLK_PLL6_ENET]     = imx_clk_pllv3(IMX_PLLV3_ENET,	"pll6_enet",	"osc", base + 0xe0, 0x3);
->  	clk[IMX6QDL_CLK_PLL7_USB_HOST] = imx_clk_pllv3(IMX_PLLV3_USB,	"pll7_usb_host","osc", base + 0x20, 0x3);
->  
-> @@ -169,6 +173,8 @@ static void __init imx6q_clocks_init(struct 
-> device_node *ccm_node)
->  
->  	clk[IMX6QDL_CLK_LVDS1_SEL] = imx_clk_mux("lvds1_sel", base + 0x160, 0, 5, lvds_sels, ARRAY_SIZE(lvds_sels));
->  	clk[IMX6QDL_CLK_LVDS2_SEL] = imx_clk_mux("lvds2_sel", base + 0x160, 
-> 5, 5, lvds_sels, ARRAY_SIZE(lvds_sels));
-> +	clk[IMX6QDL_CLK_PLL4_SEL]  = imx_clk_mux("pll4_sel",  base + 0x70, 14, 2, pll_av_sels, ARRAY_SIZE(pll_av_sels));
-> +	clk[IMX6QDL_CLK_PLL5_SEL]  = imx_clk_mux("pll5_sel",  base + 0xa0, 
-> +14, 2, pll_av_sels, ARRAY_SIZE(pll_av_sels));
->  
->  	/*
->  	 * lvds1_gate and lvds2_gate are pseudo-gates.  Both can be @@ 
-> -178,6 +184,8 @@ static void __init imx6q_clocks_init(struct device_node *ccm_node)
->  	 */
->  	clk[IMX6QDL_CLK_LVDS1_GATE] = imx_clk_gate("lvds1_gate", "lvds1_sel", base + 0x160, 10);
->  	clk[IMX6QDL_CLK_LVDS2_GATE] = imx_clk_gate("lvds2_gate", 
-> "lvds2_sel", base + 0x160, 11);
-> +	clk[IMX6QDL_CLK_LVDS1_IN] = imx_clk_gate("lvds1_in", "anaclk1", base + 0x160, 12);
-> +	clk[IMX6QDL_CLK_LVDS2_IN] = imx_clk_gate("lvds2_in", "anaclk2", base 
-> ++ 0x160, 13);
->  
-I think we need something more clever here. With both lvds in and out modeled as a clock gate it is possible for the user to enable both at the same time. The reference manual on the contrary states that both states are mutually exclusive: "Do not enable input and output buffers simultaneously".
-
-Regards,
-Lucas
--- 
-Pengutronix e.K.             | Lucas Stach                 |
-Industrial Linux Solutions   | http://www.pengutronix.de/  |
+I will fix it in patch v5 if it is really need.
+>   
+>>> Have you validated Thierry's suggestion to allow you to access your
+>>> memory range?
+>> Yes,we have solve it in lcdc driver.
+>> The Mark Yao have the  submission in [0].
+>>
+>> [0]: https://lkml.org/lkml/2014/8/4/20
+> Excellent!  Then we should be able to land after you fix the above.
+>
+> -Doug
+>
+>
+>
+OK,Thanks!
