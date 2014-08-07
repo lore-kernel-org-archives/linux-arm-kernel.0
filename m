@@ -1,40 +1,69 @@
-From: matt@console-pimps.org (Matt Fleming)
-Date: Thu, 7 Aug 2014 21:26:20 +0100
-Subject: [PATCH 1/2] UEFI arm64: add noefi boot param
-In-Reply-To: <20140807061945.GE20295@darkstar.nay.redhat.com>
-References: <20140806083825.GA31711@dhcp-16-198.nay.redhat.com>
- <20140806130623.GI4179@bivouac.eciton.net>
- <20140806132021.GB15082@console-pimps.org>
- <20140806132941.GJ4179@bivouac.eciton.net>
- <20140806140155.GC15082@console-pimps.org>
- <CAKv+Gu8ey1iKu-_wS6yYaEXQaQMDXa+PF5Kiw+edA9a_OE1EAw@mail.gmail.com>
- <20140806141814.GD15082@console-pimps.org>
- <20140807061945.GE20295@darkstar.nay.redhat.com>
-Message-ID: <20140807202620.GI15082@console-pimps.org>
+From: lauraa@codeaurora.org (Laura Abbott)
+Date: Thu, 07 Aug 2014 13:43:55 -0700
+Subject: [PATCH v2 0/8] arm: support CONFIG_RODATA
+In-Reply-To: <1407423713-4160-1-git-send-email-keescook@chromium.org>
+References: <1407423713-4160-1-git-send-email-keescook@chromium.org>
+Message-ID: <53E3E50B.7050105@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 07 Aug, at 02:19:45PM, Dave Young wrote:
+On 8/7/2014 8:01 AM, Kees Cook wrote:
+> This is a series of patches to support CONFIG_RODATA on ARM, so that
+> the kernel text is RO, and non-text sections default to NX. To support
+> on-the-fly kernel text patching (via ftrace, kprobes, etc), fixmap
+> support has been finalized based on several versions of various patches
+> that are floating around on the mailing list. This series attempts to
+> include the least intrusive version, so that others can build on it for
+> future fixmap work.
 > 
-> The current efi_runtime_init() enables the bit after getting the efi
-> callback phyaddr of SetVirtualAddressMap.
+> The series has been heavily tested, and appears to be working correctly:
 > 
-> Thinking more about it, since SetVirtualAddressMap() could fail
-> somehow it seems better to set EFI_RUNTIME_SERIVCES bit only when
-> enter virtual mode return EFI_SUCCESS.
+> With CONFIG_ARM_PTDUMP, expected page table permissions are seen in
+> /sys/kernel/debug/kernel_page_tables.
 > 
-> Does it make sense to you, Matt?
+> Using CONFIG_LKDTM, the kernel now correctly detects bad accesses for
+> for the following lkdtm tests via /sys/kernel/debug/provoke-crash/DIRECT:
+>         EXEC_DATA
+>         WRITE_RO
+>         WRITE_KERN
+> 
+> ftrace works:
+>         CONFIG_FTRACE_STARTUP_TEST passes
+>         Enabling tracing works:
+>                 echo function > /sys/kernel/debug/tracing/current_tracer
+> 
+> kprobes works:
+>         CONFIG_ARM_KPROBES_TEST passes
+> 
+> kexec works:
+>         kexec will load and start a new kernel
+> 
+> Thanks to everyone who has been testing this series and working on its
+> various pieces!
+> 
+> -Kees
+> 
+> v2:
+> - fix typo in kexec merge (buildbot)
+> - flip index order for highmem pte access (lauraa)
+> - added kgdb updates (dianders)
+> 
 
-If you're going ahead with the scheme I proposed yesterday you'd
-actually want to *clear* the EFI_RUNTIME_SERVICES bit if
-SetVirtualAddressMap() fails, since we would have set it by default for
-EFI_BOOT.
+At least twice I managed to boot a build with CONFIG_DEBUG_RODATA where
+both  cat /sys/kernel/debug/kernel_page_table and JTAG were showing no
+sections marked as read only. I haven't been able to reproduce it though
+so I'm tempted to account for it as incorrect testing on my part. I'll
+play around with it some more but if you haven't heard anything more
+you can add
 
-However, I still think we want to panic() if SetVirtualAddressMap()
-fails because we really never expect that function to return an error
-under normal circumstances. Also, I'm not sure it's safe to make any
-assumptions about the state of the system if SetVirtualAddressMap()
-fails.
+Tested-by: Laura Abbott <lauraa@codeaurora.org>
+
+For boot up test, kernel_page_table/JTAG page table verification and
+simple kprobes test. 
+
+Thanks,
+Laura
 
 -- 
-Matt Fleming, Intel Open Source Technology Center
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+hosted by The Linux Foundation
