@@ -1,173 +1,86 @@
-From: mpa@pengutronix.de (Markus Pargmann)
-Date: Thu,  7 Aug 2014 21:52:40 +0200
-Subject: [PATCH 3/3] ARM: dts: imx25-pinfunc: Add several pin configurations
-In-Reply-To: <1407441160-2011-1-git-send-email-mpa@pengutronix.de>
-References: <1407441160-2011-1-git-send-email-mpa@pengutronix.de>
-Message-ID: <1407441160-2011-3-git-send-email-mpa@pengutronix.de>
+From: geoff@infradead.org (Geoff Levand)
+Date: Thu, 07 Aug 2014 13:07:38 -0700
+Subject: Kexec on arm64
+In-Reply-To: <CAFdej02ZsLuxd84fb-n9Q2yuhzqRba5cmx6G8pHk3QeqzpTLaQ@mail.gmail.com>
+References: <CAFdej00J2mJwcg2Cy6CHVuuQZ4uQ2zZg8oErGPi0uPejievB+Q@mail.gmail.com>
+ <1406162287.4062.39.camel@smoke> <20140724093603.GC4079@leverpostej>
+ <1406247468.4062.59.camel@smoke>
+ <CAFdej01w_pE6vv+13cCCyfDs4Rbdkzx4CMUj9q97HBKV0B53ow@mail.gmail.com>
+ <1406333901.4062.69.camel@smoke>
+ <CAFdej014ohCFYvoUAXWiYGb4_4UmSY2G1MH-NEE_cF1cC-6Mow@mail.gmail.com>
+ <20140728153812.GA2576@leverpostej> <1406592548.28348.49.camel@smoke>
+ <CAFdej00is0kC-1q5uMNJL5APL1WezdNBg0jASgwYamsg5NO_Tg@mail.gmail.com>
+ <20140729133557.GQ2576@leverpostej> <1406668741.28348.75.camel@smoke>
+ <CAFdej02sTBsjHz+FCqjKkY9pF5sPF6n6QUtEadHi0hK3MxRxGA@mail.gmail.com>
+ <CAFdej01ZHkTVZuN_0RrGbFmoG4_NTnwm6KDAPM_sf=zHBHSRwg@mail.gmail.com>
+ <1407172869.8971.54.camel@smoke>
+ <CAFdej02ZsLuxd84fb-n9Q2yuhzqRba5cmx6G8pHk3QeqzpTLaQ@mail.gmail.com>
+Message-ID: <1407442058.8971.106.camel@smoke>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Michael Grzeschik <m.grzeschik@pengutronix.de>
+Hi Arun,
 
-This patch adds pin configurations for:
- - csi aud6
- - cspi1 uart3
- - csi uart5
- - cc
- - csi sdhc2
- - csi cspi3
- - sd1 cspi2
- - cspi1 pwm
+On Wed, 2014-08-06 at 19:24 +0530, Arun Chandran wrote:
 
-Signed-off-by: Michael Grzeschik <m.grzeschik@pengutronix.de>
-Signed-off-by: Markus Pargmann <mpa@pengutronix.de>
----
- arch/arm/boot/dts/imx25-pinfunc.h | 33 +++++++++++++++++++++++++++++++--
- 1 file changed, 31 insertions(+), 2 deletions(-)
+> I have managed to run this test till 72 times with the
+> below changes.
+> 
+> ############################
+> diff --git a/arch/arm64/kernel/machine_kexec.c
+> b/arch/arm64/kernel/machine_kexec.c
+> index 363a246..7de11ee 100644
+> --- a/arch/arm64/kernel/machine_kexec.c
+> +++ b/arch/arm64/kernel/machine_kexec.c
+> @@ -623,7 +623,6 @@ static void kexec_list_flush_cb(void *ctx ,
+> unsigned int flag,
+>   break;
+>   case IND_SOURCE:
+>   __flush_dcache_area(addr, PAGE_SIZE);
+> - __flush_dcache_area(dest, PAGE_SIZE);
+>   break;
+>   default:
+>   break;
+> @@ -641,6 +640,8 @@ void machine_kexec(struct kimage *image)
+>   phys_addr_t reboot_code_buffer_phys;
+>   void *reboot_code_buffer;
+>   struct kexec_ctx *ctx = kexec_image_to_ctx(image);
+> + unsigned long start, end;
+> + int i;
+> 
+>   BUG_ON(relocate_new_kernel_size > KEXEC_CONTROL_PAGE_SIZE);
+>   BUG_ON(num_online_cpus() > 1);
+> @@ -698,6 +699,20 @@ void machine_kexec(struct kimage *image)
+> 
+>   kexec_list_walk(NULL, image->head, kexec_list_flush_cb);
+> 
+> + start = image->segment[0].mem;
+> + end = image->segment[0].mem + image->segment[0].memsz;
+> + for (i = 0; i < image->nr_segments; i++) {
+> + if (image->segment[i].mem > end)
+> + end = image->segment[i].mem + image->segment[i].memsz;
+> + }
+> +
+> + start = (unsigned long)phys_to_virt(start);
+> + end = (unsigned long)phys_to_virt(end);
+> + pr_info("flushing from %lx to %lx size = %lx\n", start, end, end - start);
+> + __flush_dcache_area((void *)start, end - start);
+> + //flush_icache_range(start, end);
+> + //mdelay(10);
+> +
+>   soft_restart(reboot_code_buffer_phys);
+>  }
 
-diff --git a/arch/arm/boot/dts/imx25-pinfunc.h b/arch/arm/boot/dts/imx25-pinfunc.h
-index 9238a95d8e62..88eebb15da6a 100644
---- a/arch/arm/boot/dts/imx25-pinfunc.h
-+++ b/arch/arm/boot/dts/imx25-pinfunc.h
-@@ -247,6 +247,7 @@
- #define MX25_PAD_OE_ACD__GPIO_1_25		0x114 0x30c 0x000 0x15 0x000
- 
- #define MX25_PAD_CONTRAST__CONTRAST		0x118 0x310 0x000 0x10 0x000
-+#define MX25_PAD_CONTRAST__CC4			0x118 0x310 0x000 0x11 0x000
- #define MX25_PAD_CONTRAST__PWM4_PWMO		0x118 0x310 0x000 0x14 0x000
- #define MX25_PAD_CONTRAST__FEC_CRS		0x118 0x310 0x508 0x15 0x001
- 
-@@ -260,6 +261,7 @@
- #define MX25_PAD_CSI_D2__CSPI3_MOSI		0x120 0x318 0x000 0x17 0x000
- 
- #define MX25_PAD_CSI_D3__CSI_D3			0x124 0x31c 0x000 0x10 0x000
-+#define MX25_PAD_CSI_D3__UART5_TXD_MUX		0x124 0x31c 0x000 0x11 0x000
- #define MX25_PAD_CSI_D3__GPIO_1_28		0x124 0x31c 0x000 0x15 0x000
- #define MX25_PAD_CSI_D3__CSPI3_MISO		0x124 0x31c 0x4b4 0x17 0x001
- 
-@@ -269,31 +271,46 @@
- #define MX25_PAD_CSI_D4__CSPI3_SCLK		0x128 0x320 0x000 0x17 0x000
- 
- #define MX25_PAD_CSI_D5__CSI_D5			0x12c 0x324 0x000 0x10 0x000
-+#define MX25_PAD_CSI_D5__UART5_CTS		0x12c 0x324 0x000 0x11 0x001
- #define MX25_PAD_CSI_D5__GPIO_1_30		0x12c 0x324 0x000 0x15 0x000
- #define MX25_PAD_CSI_D5__CSPI3_RDY		0x12c 0x324 0x000 0x17 0x000
- 
- #define MX25_PAD_CSI_D6__CSI_D6			0x130 0x328 0x000 0x10 0x000
-+#define MX25_PAD_CSI_D6__SDHC2_CMD		0x130 0x328 0x4e0 0x12 0x001
- #define MX25_PAD_CSI_D6__GPIO_1_31		0x130 0x328 0x000 0x15 0x000
- 
- #define MX25_PAD_CSI_D7__CSI_D7			0x134 0x32c 0x000 0x10 0x000
-+#define MX25_PAD_CSI_D7__SDHC2_DAT_CLK		0x134 0x32C 0x4dc 0x12 0x001
- #define MX25_PAD_CSI_D7__GPIO_1_6		0x134 0x32c 0x000 0x15 0x000
- 
- #define MX25_PAD_CSI_D8__CSI_D8			0x138 0x330 0x000 0x10 0x000
-+#define MX25_PAD_CSI_D8__AUD6_RXC		0x138 0x330 0x000 0x12 0x001
- #define MX25_PAD_CSI_D8__GPIO_1_7		0x138 0x330 0x000 0x15 0x000
-+#define MX25_PAD_CSI_D8__CSPI3_SS2		0x138 0x330 0x4c4 0x17 0x000
- 
- #define MX25_PAD_CSI_D9__CSI_D9			0x13c 0x334 0x000 0x10 0x000
-+#define MX25_PAD_CSI_D9__AUD6_RXFS		0x13c 0x334 0x000 0x12 0x001
- #define MX25_PAD_CSI_D9__GPIO_4_21		0x13c 0x334 0x000 0x15 0x000
-+#define MX25_PAD_CSI_D9__CSPI3_SS3		0x13c 0x334 0x4c8 0x17 0x000
- 
- #define MX25_PAD_CSI_MCLK__CSI_MCLK		0x140 0x338 0x000 0x10 0x000
-+#define MX25_PAD_CSI_MCLK__AUD6_TXD		0x140 0x338 0x000 0x11 0x001
-+#define MX25_PAD_CSI_MCLK__SDHC2_DAT0		0x140 0x338 0x4e4 0x12 0x001
- #define MX25_PAD_CSI_MCLK__GPIO_1_8		0x140 0x338 0x000 0x15 0x000
- 
- #define MX25_PAD_CSI_VSYNC__CSI_VSYNC		0x144 0x33c 0x000 0x10 0x000
-+#define MX25_PAD_CSI_VSYNC__AUD6_RXD		0x144 0x33c 0x000 0x11 0x001
-+#define MX25_PAD_CSI_VSYNC__SDHC2_DAT1		0x144 0x33c 0x4e8 0x12 0x001
- #define MX25_PAD_CSI_VSYNC__GPIO_1_9		0x144 0x33c 0x000 0x15 0x000
- 
- #define MX25_PAD_CSI_HSYNC__CSI_HSYNC		0x148 0x340 0x000 0x10 0x000
-+#define MX25_PAD_CSI_HSYNC__AUD6_TXC		0x148 0x340 0x000 0x11 0x001
-+#define MX25_PAD_CSI_HSYNC__SDHC2_DAT2		0x148 0x340 0x4ec 0x12 0x001
- #define MX25_PAD_CSI_HSYNC__GPIO_1_10		0x148 0x340 0x000 0x15 0x000
- 
- #define MX25_PAD_CSI_PIXCLK__CSI_PIXCLK		0x14c 0x344 0x000 0x10 0x000
-+#define MX25_PAD_CSI_PIXCLK__AUD6_TXFS		0x14c 0x344 0x000 0x11 0x001
-+#define MX25_PAD_CSI_PIXCLK__SDHC2_DAT3		0x14c 0x344 0x4f0 0x12 0x001
- #define MX25_PAD_CSI_PIXCLK__GPIO_1_11		0x14c 0x344 0x000 0x15 0x000
- 
- #define MX25_PAD_I2C1_CLK__I2C1_CLK		0x150 0x348 0x000 0x10 0x000
-@@ -303,18 +320,24 @@
- #define MX25_PAD_I2C1_DAT__GPIO_1_13		0x154 0x34c 0x000 0x15 0x000
- 
- #define MX25_PAD_CSPI1_MOSI__CSPI1_MOSI		0x158 0x350 0x000 0x10 0x000
-+#define MX25_PAD_CSPI1_MOSI__UART3_RXD		0x158 0x350 0x000 0x12 0x000
- #define MX25_PAD_CSPI1_MOSI__GPIO_1_14		0x158 0x350 0x000 0x15 0x000
- 
- #define MX25_PAD_CSPI1_MISO__CSPI1_MISO		0x15c 0x354 0x000 0x10 0x000
-+#define MX25_PAD_CSPI1_MISO__UART3_TXD		0x15c 0x354 0x000 0x12 0x000
- #define MX25_PAD_CSPI1_MISO__GPIO_1_15		0x15c 0x354 0x000 0x15 0x000
- 
- #define MX25_PAD_CSPI1_SS0__CSPI1_SS0		0x160 0x358 0x000 0x10 0x000
-+#define MX25_PAD_CSPI1_SS0__PWM2_PWMO		0x160 0x358 0x000 0x12 0x000
- #define MX25_PAD_CSPI1_SS0__GPIO_1_16		0x160 0x358 0x000 0x15 0x000
- 
- #define MX25_PAD_CSPI1_SS1__CSPI1_SS1		0x164 0x35c 0x000 0x10 0x000
-+#define MX25_PAD_CSPI1_SS1__I2C3_DAT		0x164 0x35C 0x528 0x11 0x001
-+#define MX25_PAD_CSPI1_SS1__UART3_RTS		0x164 0x35c 0x000 0x12 0x000
- #define MX25_PAD_CSPI1_SS1__GPIO_1_17		0x164 0x35c 0x000 0x15 0x000
- 
- #define MX25_PAD_CSPI1_SCLK__CSPI1_SCLK		0x168 0x360 0x000 0x10 0x000
-+#define MX25_PAD_CSPI1_SCLK__UART3_CTS		0x168 0x360 0x000 0x12 0x000
- #define MX25_PAD_CSPI1_SCLK__GPIO_1_18		0x168 0x360 0x000 0x15 0x000
- 
- #define MX25_PAD_CSPI1_RDY__CSPI1_RDY		0x16c 0x364 0x000 0x10 0x000
-@@ -328,6 +351,7 @@
- 
- #define MX25_PAD_UART1_RTS__UART1_RTS		0x178 0x370 0x000 0x10 0x000
- #define MX25_PAD_UART1_RTS__CSI_D0		0x178 0x370 0x488 0x11 0x001
-+#define MX25_PAD_UART1_RTS__CC3			0x178 0x370 0x000 0x12 0x000
- #define MX25_PAD_UART1_RTS__GPIO_4_24		0x178 0x370 0x000 0x15 0x000
- 
- #define MX25_PAD_UART1_CTS__UART1_CTS		0x17c 0x374 0x000 0x10 0x000
-@@ -342,6 +366,7 @@
- 
- #define MX25_PAD_UART2_RTS__UART2_RTS		0x188 0x380 0x000 0x10 0x000
- #define MX25_PAD_UART2_RTS__FEC_COL		0x188 0x380 0x504 0x12 0x002
-+#define MX25_PAD_UART2_RTS__CC1			0x188 0x380 0x000 0x13 0x000
- #define MX25_PAD_UART2_RTS__GPIO_4_28		0x188 0x380 0x000 0x15 0x000
- 
- #define MX25_PAD_UART2_CTS__FEC_RX_ER		0x18c 0x384 0x518 0x12 0x002
-@@ -349,14 +374,17 @@
- #define MX25_PAD_UART2_CTS__GPIO_4_29		0x18c 0x384 0x000 0x15 0x000
- 
- #define MX25_PAD_SD1_CMD__SD1_CMD		0x190 0x388 0x000 0x10 0x000
-+#define MX25_PAD_SD1_CMD__CSPI2_MOSI		0x190 0x388 0x4a0 0x11 0x001
- #define MX25_PAD_SD1_CMD__FEC_RDATA2		0x190 0x388 0x50c 0x12 0x002
- #define MX25_PAD_SD1_CMD__GPIO_2_23		0x190 0x388 0x000 0x15 0x000
- 
- #define MX25_PAD_SD1_CLK__SD1_CLK		0x194 0x38c 0x000 0x10 0x000
-+#define MX25_PAD_SD1_CLK__CSPI2_MISO		0x194 0x38c 0x49c 0x11 0x001
- #define MX25_PAD_SD1_CLK__FEC_RDATA3		0x194 0x38c 0x510 0x12 0x002
- #define MX25_PAD_SD1_CLK__GPIO_2_24		0x194 0x38c 0x000 0x15 0x000
- 
- #define MX25_PAD_SD1_DATA0__SD1_DATA0		0x198 0x390 0x000 0x10 0x000
-+#define MX25_PAD_SD1_DATA0__CSPI2_SCLK		0x198 0x390 0x494 0x11 0x001
- #define MX25_PAD_SD1_DATA0__GPIO_2_25		0x198 0x390 0x000 0x15 0x000
- 
- #define MX25_PAD_SD1_DATA1__SD1_DATA1		0x19c 0x394 0x000 0x10 0x000
-@@ -457,14 +485,15 @@
- #define MX25_PAD_GPIO_C__CAN2_TX		0x1fc 0x3f8 0x000 0x16 0x000
- 
- #define MX25_PAD_GPIO_D__GPIO_D			0x200 0x3fc 0x000 0x10 0x000
--#define MX25_PAD_GPIO_E__LD16			0x204 0x400 0x000 0x02 0x000
- #define MX25_PAD_GPIO_D__CAN2_RX		0x200 0x3fc 0x484 0x16 0x001
- 
- #define MX25_PAD_GPIO_E__GPIO_E			0x204 0x400 0x000 0x10 0x000
--#define MX25_PAD_GPIO_F__LD17			0x208 0x404 0x000 0x02 0x000
-+#define MX25_PAD_GPIO_E__I2C3_CLK		0x204 0x400 0x524 0x11 0x002
-+#define MX25_PAD_GPIO_E__LD16			0x204 0x400 0x000 0x12 0x000
- #define MX25_PAD_GPIO_E__AUD7_TXD		0x204 0x400 0x000 0x14 0x000
- 
- #define MX25_PAD_GPIO_F__GPIO_F			0x208 0x404 0x000 0x10 0x000
-+#define MX25_PAD_GPIO_F__LD17			0x208 0x404 0x000 0x12 0x000
- #define MX25_PAD_GPIO_F__AUD7_TXC		0x208 0x404 0x000 0x14 0x000
- 
- #define MX25_PAD_EXT_ARMCLK__EXT_ARMCLK		0x20c 0x000 0x000 0x10 0x000
--- 
-2.0.1
+Doing the flush in kexec_list_flush_cb() is almost the same
+as using the image->segment to flush.  Did you see a
+difference on your system?
+
+> diff --git a/arch/arm64/kernel/relocate_kernel.S
+> b/arch/arm64/kernel/relocate_kernel.S
+> index 4b077e1..a49549e 100644
+> --- a/arch/arm64/kernel/relocate_kernel.S
+> +++ b/arch/arm64/kernel/relocate_kernel.S
+
+I think these changes are good.  I'll add them in.
+
+-Geoff
