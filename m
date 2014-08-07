@@ -1,40 +1,53 @@
-From: yao.yuan@freescale.com (Yao Yuan)
-Date: Thu, 7 Aug 2014 08:04:58 +0000
-Subject: [PATCH v6 1/2] i2c: imx: add DMA support for freescale i2c driver
-In-Reply-To: <31f8f5504fc24d999f5af74338602bed@BLUPR03MB373.namprd03.prod.outlook.com>
-References: <1407232563-10856-1-git-send-email-yao.yuan@freescale.com>
- <1407232563-10856-2-git-send-email-yao.yuan@freescale.com>
- <41705e1e4c604240ba96333a03d5c544@BLUPR03MB373.namprd03.prod.outlook.com>
- <14d042bbcfb04308bfb3a1db18e46bec@BL2PR03MB338.namprd03.prod.outlook.com>
- <31f8f5504fc24d999f5af74338602bed@BLUPR03MB373.namprd03.prod.outlook.com>
-Message-ID: <c9727eaf22dc40f796793c6b127dfb9e@BL2PR03MB338.namprd03.prod.outlook.com>
+From: jh80.chung@samsung.com (Jaehoon Chung)
+Date: Thu, 07 Aug 2014 17:24:37 +0900
+Subject: [PATCH v3 0/4] Add eMMC and SD card support for rk3288-evb
+In-Reply-To: <1407344984-14176-1-git-send-email-dianders@chromium.org>
+References: <1407344984-14176-1-git-send-email-dianders@chromium.org>
+Message-ID: <53E337C5.3020802@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Fugang,
+Hi, Doug.
 
-> >> >+	/* Waiting for Transfer complete. */
-> >> >+	while (timeout--) {
-> >> >+		temp = imx_i2c_read_reg(i2c_imx, IMX_I2C_I2SR);
-> >> >+		if (temp & I2SR_ICF)
-> >> >+			break;
-> >> >+		udelay(10);
-> >> >+	}
-> >> Whether there have better method like interrupt to avoid dead wait
-> >> here until timeout ?
-> >
-> >Can you give me more suggestion? We have discussed it with our team, It
-> >seems the short query wait is necessary.
-> >
-> At least, you can use schdule_timeout() instead of udelay() ?
+Acked-by: Jaehoon Chung <jh80.chung@samsung.com>
 
-In fact, the waiting time normally is less than 10-50us, but the minimum time interval for schdule_timeout() is 1 jiffies.
-So maybe schdule_timeout() is not very necessary?
-
-
-
-
-Thanks for your review.
-
-Best Regards,
-Yuan Yao
+On 08/07/2014 02:09 AM, Doug Anderson wrote:
+> This series adds basic eMMC and SD card support for the rk3288-evb
+> board based on Addy's posted dw_mmc patch from:
+>   https://patchwork.kernel.org/patch/4653631/
+> 
+> The series is a little tricky because:
+> * Jaehoon has some outstanding patches to remove the slot node.  Since
+>   those haven't landed yet, I've posted my original patch with the
+>   slot node and then some future patches that can land with Jaehoon's
+>   patches.
+> 
+> So just to be explicit:
+> - Patch #1 and #2 can land after Addy's patch lands.
+> - Patch #3 and #4 can land after Jaehoon's patch lands, though there's
+>   no huge hurry since Jaehoon's patch supports the old mode (it just
+>   prints a warning).
+> 
+> Note that we don't have regulators specified yet (no regulator driver
+> for rk808-based board).  We also don't yet support UHS modes or MMC
+> DDR50 (which require regulator support plus dw_mmc driver support for
+> tuning).  Those features can come later.
+> 
+> Changes in v3:
+> - Removed DDR50 mode since it needs tuning, which isn't there yet.
+> 
+> Changes in v2:
+> - New patchwork link for Addy's patch
+> - Squashed in the DDR50 mode since Addy spun his patch.
+> - Refer to the new title of Jaehoon's patch
+> 
+> Doug Anderson (4):
+>   ARM: dts: Add emmc and sdmmc to the rk3288 device tree
+>   ARM: dts: Enable emmc and sdmmc on the rk3288-evb boards
+>   ARM: dts: Take the mmc slot node out of rk3288-evb
+>   ARM: dts: mmc slot node gone on rk3288 => no more address / size cells
+> 
+>  arch/arm/boot/dts/rk3288-evb.dtsi | 24 ++++++++++++++++++++++++
+>  arch/arm/boot/dts/rk3288.dtsi     | 18 ++++++++++++++++++
+>  2 files changed, 42 insertions(+)
+> 
