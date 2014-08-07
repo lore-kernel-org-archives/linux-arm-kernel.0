@@ -1,44 +1,62 @@
-From: fugang.duan@freescale.com (fugang.duan at freescale.com)
-Date: Thu, 7 Aug 2014 10:01:05 +0000
-Subject: [PATCH v6 1/2] i2c: imx: add DMA support for freescale i2c driver
-In-Reply-To: <c9727eaf22dc40f796793c6b127dfb9e@BL2PR03MB338.namprd03.prod.outlook.com>
-References: <1407232563-10856-1-git-send-email-yao.yuan@freescale.com>
- <1407232563-10856-2-git-send-email-yao.yuan@freescale.com>
- <41705e1e4c604240ba96333a03d5c544@BLUPR03MB373.namprd03.prod.outlook.com>
- <14d042bbcfb04308bfb3a1db18e46bec@BL2PR03MB338.namprd03.prod.outlook.com>
- <31f8f5504fc24d999f5af74338602bed@BLUPR03MB373.namprd03.prod.outlook.com>
- <c9727eaf22dc40f796793c6b127dfb9e@BL2PR03MB338.namprd03.prod.outlook.com>
-Message-ID: <6537011f698c4c7faaf5b66b870afbd2@BLUPR03MB373.namprd03.prod.outlook.com>
+From: l.stach@pengutronix.de (Lucas Stach)
+Date: Thu, 07 Aug 2014 12:04:04 +0200
+Subject: [PATCH] ARM: mx6: Fix suspend/resume with PCI
+In-Reply-To: <1407371998-11437-1-git-send-email-festevam@gmail.com>
+References: <1407371998-11437-1-git-send-email-festevam@gmail.com>
+Message-ID: <1407405844.4675.9.camel@weser.hi.pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Yuan Yao-B46683 Data: Thursday, August 07, 2014 4:05 PM
->To: Duan Fugang-B38611; wsa at the-dreams.de; marex at denx.de
->Cc: LW at KARO-electronics.de; mark.rutland at arm.com; shawn.guo at linaro.org;
->linux-kernel at vger.kernel.org; linux-arm-kernel at lists.infradead.org; linux-
->i2c at vger.kernel.org; Li Frank-B20596
->Subject: RE: [PATCH v6 1/2] i2c: imx: add DMA support for freescale i2c
->driver
->
->Hi Fugang,
->
->> >> >+	/* Waiting for Transfer complete. */
->> >> >+	while (timeout--) {
->> >> >+		temp = imx_i2c_read_reg(i2c_imx, IMX_I2C_I2SR);
->> >> >+		if (temp & I2SR_ICF)
->> >> >+			break;
->> >> >+		udelay(10);
->> >> >+	}
->> >> Whether there have better method like interrupt to avoid dead wait
->> >> here until timeout ?
->> >
->> >Can you give me more suggestion? We have discussed it with our team,
->> >It seems the short query wait is necessary.
->> >
->> At least, you can use schdule_timeout() instead of udelay() ?
->
->In fact, the waiting time normally is less than 10-50us, but the minimum
->time interval for schdule_timeout() is 1 jiffies.
->So maybe schdule_timeout() is not very necessary?
->
-Oh, if the waiting time is 10 ~ 50us, you can use usleep_range(10, 50).
+Am Mittwoch, den 06.08.2014, 21:39 -0300 schrieb Fabio Estevam:
+> From: Fabio Estevam <fabio.estevam@freescale.com>
+> 
+> When PCI is used and a suspend/resume sequence is done we see the following
+> kernel hang:
+> 
+> root at freescale /$ echo mem > /sys/power/state 
+> [   16.099018] PM: Syncing filesystems ... done.
+> [   16.141010] Freezing user space processes ... (elapsed 0.002 seconds) done.
+> [   16.150840] Freezing remaining freezable tasks ... (elapsed 0.003 seconds) done.
+> [   16.199438] random: nonblocking pool is initialized
+> [   16.229639] PM: suspend of devices complete after 64.793 msecs
+> [   16.235488] PM: suspend devices took 0.070 seconds
+> [   16.245301] PM: late suspend of devices complete after 4.968 msecs
+> [   16.257063] PM: noirq suspend of devices complete after 5.538 msecs
+> [   16.263425] Disabling non-boot CPUs ...
+> [   16.274666] CPU1: shutdown
+> [   16.286351] CPU2: shutdown
+> [   16.294169] CPU3: shutdown
+> [   16.299551] Enabling non-boot CPUs ...
+> [   16.304155] CPU1: Booted secondary processor
+> [   16.305717] CPU1 is up
+> [   16.313078] CPU2: Booted secondary processor
+> [   16.313456] CPU2 is up
+> [   16.320778] CPU3: Booted secondary processor
+> [   16.321174] CPU3 is up
+> 	(hangs here)
+> 
+> Implement a workaround for the erratum ERR005723: "PCIe does not support L2
+> Power Down", which consists in toggling bit 18 (TEST_POWERDOWN) of GPR1 register.
+> 
+> Tested on a mx6qsabresd TO1.2 revC2.
+> 
+> Reported-by: Shawn Guo <shawn.guo@freescale.com>
+> Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
+
+NACK
+
+To my understanding the DW PCIe core needs a specific sequence to
+enter/exit L2 at suspend that we currently ignore. Contrary to the
+errata description I think it can be done without a dedicated core reset
+signal. Hitting the PHY PD is a sledgehammer without proper
+understanding of the problem.
+
+Also hiding such things in the platform code seems really bad. Please
+keep in mind that this is the mainline kernel, not a vendor downstream
+tree where you are free to smash things all over the place.
+
+Regards,
+Lucas
+-- 
+Pengutronix e.K.             | Lucas Stach                 |
+Industrial Linux Solutions   | http://www.pengutronix.de/  |
