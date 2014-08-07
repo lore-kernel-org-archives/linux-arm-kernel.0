@@ -1,122 +1,79 @@
-From: robh@kernel.org (Rob Herring)
-Date: Thu, 7 Aug 2014 17:18:44 -0500
-Subject: [PATCH 3/8] arm: mm: reduce fixmap kmap from 32 to 16 CPUS
-In-Reply-To: <1407423713-4160-4-git-send-email-keescook@chromium.org>
-References: <1407423713-4160-1-git-send-email-keescook@chromium.org>
- <1407423713-4160-4-git-send-email-keescook@chromium.org>
-Message-ID: <CAL_JsqJZbbH=PwDzLKSwKiW1Y=N8MLgwEkp=xQaD_ST_uB-_Rw@mail.gmail.com>
+From: paul@pwsan.com (Paul Walmsley)
+Date: Thu, 7 Aug 2014 22:21:23 +0000 (UTC)
+Subject: OMAP baseline test results for v3.16-rc4
+In-Reply-To: <20140801071056.GD29045@atomide.com>
+References: <alpine.DEB.2.02.1407290810160.22957@utopia.booyaka.com>
+ <20140729084930.GH29045@atomide.com>
+ <alpine.DEB.2.02.1407291225070.13035@utopia.booyaka.com>
+ <alpine.DEB.2.02.1407291256270.13035@utopia.booyaka.com>
+ <20140729145312.GT29045@atomide.com>
+ <alpine.DEB.2.02.1407291922370.13035@utopia.booyaka.com>
+ <20140730053940.GX29045@atomide.com>
+ <alpine.DEB.2.02.1407300725290.4477@utopia.booyaka.com>
+ <20140731131107.GB29045@atomide.com>
+ <alpine.DEB.2.02.1407311922350.1845@utopia.booyaka.com>
+ <20140801071056.GD29045@atomide.com>
+Message-ID: <alpine.DEB.2.02.1408072210300.5770@utopia.booyaka.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Aug 7, 2014 at 10:01 AM, Kees Cook <keescook@chromium.org> wrote:
-> More room is needed in the fixmap range for non-kmap fixmap entries. This
-> reduces the kmap range from 32 to 16 CPUs.
+On Fri, 1 Aug 2014, Tony Lindgren wrote:
 
-Do you want this merged or just doing this to get the rest of your
-series working? I'll post my patch for making the fixmap region 3MB
-(it adds back the first 1MB of the top pmd).
+> * Paul Walmsley <paul@pwsan.com> [140731 12:29]:
+> > On Thu, 31 Jul 2014, Tony Lindgren wrote:
+> > 
+> > > * Paul Walmsley <paul@pwsan.com> [140730 00:55]:
+> > > > On Tue, 29 Jul 2014, Tony Lindgren wrote:
+> > > > 
+> > > > > The following patch should fix the tests above for 3530es3beagle.
+> > > > > Care to test and ack as I don't have one?
+> > > > 
+> > > > 3530es3beagle retention dynamic idle tests hang on next-20140729.  (Maybe 
+> > > > other boards fail too - haven't tested any others).  
+> > > 
+> > > I just checked that today's linux next works for off-idle and
+> > > wake-up events for at least 37xx evm.
+> > 
+> > I ran the full set of tests across all boards.  The only board that passed 
+> > the dynamic idle testing on next-20140729 was the 3730beaglexm.
+> > 
+> > http://www.pwsan.com/omap/testlogs/next_20140729/20140730124836/README.txt
+> > 
+> > 37xxevm hangs on the first suspend entry:
+> > 
+> > http://www.pwsan.com/omap/testlogs/next_20140729/20140730124836/pm/37xxevm/37xxevm_log.txt
+> > 
+> > If I find some extra time, I'll set up a bisection run.
+> 
+> OK that sounds like some driver suspend regression that needs
+> to be tracked down. I'm seeing it on my 37xx evm also with
+> linux next too.
 
-> Additionally, add PTE entry for
-> fixmap regardless of CONFIG_HIGHMEM.
+It's commit a71e3c37960ce5f9c6a519bc1215e3ba9fa83e75:
 
-"Additionally" is a good flag for this patch should be split-up. It
-seems like we would want to apply this part to stable.
+Author: Ezequiel Garcia <ezequiel.garcia@free-electrons.com>
+Date:   Wed Jul 23 16:47:31 2014 -0300
 
-Rob
+    net: phy: Set the driver when registering an MDIO bus device
+    
+    mdiobus_register() registers a device which is already bound to a driver.
+    Hence, the driver pointer should be set properly in order to track down
+    the driver associated to the MDIO bus.
+    
+    This will be used to allow ethernet driver to pin down a MDIO bus driver,
+    preventing it from being unloaded while the PHY device is running.
+    
+    Reviewed-by: Florian Fainelli <f.fainelli@gmail.com>
+    Tested-by: Florian Fainelli <f.fainelli@gmail.com>
+    Signed-off-by: Ezequiel Garcia <ezequiel.garcia@free-electrons.com>
+    Signed-off-by: David S. Miller <davem@davemloft.net>
 
->
-> Signed-off-by: Kees Cook <keescook@chromium.org>
-> ---
->  arch/arm/include/asm/fixmap.h | 12 ++++++++++--
->  arch/arm/mm/highmem.c         |  2 --
->  arch/arm/mm/mm.h              |  3 +++
->  arch/arm/mm/mmu.c             |  5 ++++-
->  4 files changed, 17 insertions(+), 5 deletions(-)
->
-> diff --git a/arch/arm/include/asm/fixmap.h b/arch/arm/include/asm/fixmap.h
-> index 8ee7cb4f62ca..3ed08232be55 100644
-> --- a/arch/arm/include/asm/fixmap.h
-> +++ b/arch/arm/include/asm/fixmap.h
-> @@ -1,16 +1,24 @@
->  #ifndef _ASM_FIXMAP_H
->  #define _ASM_FIXMAP_H
->
-> +/*
-> + * The fixmap uses 2MB. The KMAP fixmap needs 64k per CPU, so make room for
-> + * 16 CPUs (taking 1MB) and leave the rest for additional fixmap areas.
-> + */
->  #define FIXADDR_START          0xffc00000UL
->  #define FIXADDR_END            0xffe00000UL
->  #define FIXADDR_TOP            (FIXADDR_END - PAGE_SIZE)
->  #define FIXADDR_SIZE           (FIXADDR_END - FIXADDR_START)
->
-> -#define FIX_KMAP_NR_PTES       (FIXADDR_SIZE >> PAGE_SHIFT)
-> +/* 16 PTEs per CPU (64k of 4k pages). */
-> +#define FIX_KMAP_NR_PTES       16
-> +#define FIX_KMAP_NR_CPUS       16
->
->  enum fixed_addresses {
-> +       /* Support 16 CPUs for kmap as the first region of fixmap entries. */
->         FIX_KMAP_BEGIN,
-> -       FIX_KMAP_END = FIX_KMAP_NR_PTES - 1,
-> +       FIX_KMAP_END = (FIX_KMAP_NR_PTES * FIX_KMAP_NR_CPUS) - 1,
-> +
->         __end_of_fixed_addresses
->  };
->
-> diff --git a/arch/arm/mm/highmem.c b/arch/arm/mm/highmem.c
-> index a1241ee8425e..adf264fb700b 100644
-> --- a/arch/arm/mm/highmem.c
-> +++ b/arch/arm/mm/highmem.c
-> @@ -18,8 +18,6 @@
->  #include <asm/tlbflush.h>
->  #include "mm.h"
->
-> -pte_t *fixmap_page_table;
-> -
->  static inline void set_fixmap_pte(int idx, pte_t pte)
->  {
->         unsigned long vaddr = __fix_to_virt(idx);
-> diff --git a/arch/arm/mm/mm.h b/arch/arm/mm/mm.h
-> index ce727d47275c..c8b5b2d05b55 100644
-> --- a/arch/arm/mm/mm.h
-> +++ b/arch/arm/mm/mm.h
-> @@ -7,6 +7,9 @@
->  /* the upper-most page table pointer */
->  extern pmd_t *top_pmd;
->
-> +/* The fixmap PTE. */
-> +extern pte_t *fixmap_page_table;
-> +
->  /*
->   * 0xffff8000 to 0xffffffff is reserved for any ARM architecture
->   * specific hacks for copying pages efficiently, while 0xffff4000
-> diff --git a/arch/arm/mm/mmu.c b/arch/arm/mm/mmu.c
-> index e881ed817a8b..a7a756603775 100644
-> --- a/arch/arm/mm/mmu.c
-> +++ b/arch/arm/mm/mmu.c
-> @@ -53,6 +53,9 @@ EXPORT_SYMBOL(empty_zero_page);
->   */
->  pmd_t *top_pmd;
->
-> +/* The fixmap PTE. */
-> +pte_t *fixmap_page_table;
-> +
->  #define CPOLICY_UNCACHED       0
->  #define CPOLICY_BUFFERED       1
->  #define CPOLICY_WRITETHROUGH   2
-> @@ -1342,10 +1345,10 @@ static void __init kmap_init(void)
->  #ifdef CONFIG_HIGHMEM
->         pkmap_page_table = early_pte_alloc(pmd_off_k(PKMAP_BASE),
->                 PKMAP_BASE, _PAGE_KERNEL_TABLE);
-> +#endif
->
->         fixmap_page_table = early_pte_alloc(pmd_off_k(FIXADDR_START),
->                 FIXADDR_START, _PAGE_KERNEL_TABLE);
-> -#endif
->  }
->
->  static void __init map_lowmem(void)
-> --
-> 1.9.1
->
+
+What's bad is that this went in late during v3.16-rc fixes.  So now v3.16 
+itself is broken, and there's no way to fix it.
+
+As far as I can tell, this patch doesn't fix a regression.  So no way it 
+should have gone in during late -rc kernels.
+
+
+- Paul
