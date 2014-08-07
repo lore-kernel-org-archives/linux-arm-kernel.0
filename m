@@ -1,112 +1,30 @@
-From: rostedt@goodmis.org (Steven Rostedt)
-Date: Thu, 7 Aug 2014 11:33:02 -0400
-Subject: [PATCH v2 5/5] X86: add IPI tracepoints
-In-Reply-To: <1406318733-26754-6-git-send-email-nicolas.pitre@linaro.org>
-References: <1406318733-26754-1-git-send-email-nicolas.pitre@linaro.org>
- <1406318733-26754-6-git-send-email-nicolas.pitre@linaro.org>
-Message-ID: <20140807113302.55aee779@gandalf.local.home>
+From: schwab@suse.de (Andreas Schwab)
+Date: Thu, 07 Aug 2014 17:33:22 +0200
+Subject: [PATCH] cpufreq: arm_big_little: fix module license spec
+In-Reply-To: <20140807152934.GT1933@pengutronix.de> ("Uwe =?utf-8?Q?Kleine?=
+ =?utf-8?Q?-K=C3=B6nig=22's?=
+ message of "Thu, 7 Aug 2014 17:29:34 +0200")
+References: <mvmmwbqateb.fsf@hawking.suse.de>
+ <1406792216-827-1-git-send-email-u.kleine-koenig@pengutronix.de>
+ <mvmiom48knf.fsf@hawking.suse.de>
+ <20140807152934.GT1933@pengutronix.de>
+Message-ID: <mvmegws8gcd.fsf@hawking.suse.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Peter,
+Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de> writes:
 
-I'm pulling in Nicolas's changes to trace and the arm architectures. He
-has this x86 patch. Do you think this would be fine as well? Otherwise,
-I'll just add the arm patches, and push that for this merge window
-(these patches have been out on the mailing list for some time, with no
-changes).
+> Does adding
+>
+> 	#include <linux/module.h>
+>
+> in that file fix the problem?
 
--- Steve
+Yes, it does.
 
+Andreas.
 
-On Fri, 25 Jul 2014 16:05:33 -0400
-Nicolas Pitre <nicolas.pitre@linaro.org> wrote:
-
-> On X86 there are already tracepoints for IRQ vectors through which IPIs
-> are handled.  However this is highly X86 specific, and the IPI signaling
-> is not currently traced.
-> 
-> This is an attempt at adding generic IPI tracepoints to X86.
-> 
-> Signed-off-by: Nicolas Pitre <nico@linaro.org>
-> ---
->  arch/x86/kernel/smp.c | 20 ++++++++++++++++++++
->  1 file changed, 20 insertions(+)
-> 
-> diff --git a/arch/x86/kernel/smp.c b/arch/x86/kernel/smp.c
-> index be8e1bde07..d193609bea 100644
-> --- a/arch/x86/kernel/smp.c
-> +++ b/arch/x86/kernel/smp.c
-> @@ -31,6 +31,16 @@
->  #include <asm/apic.h>
->  #include <asm/nmi.h>
->  #include <asm/trace/irq_vectors.h>
-> +
-> +#define CREATE_TRACE_POINTS
-> +/*
-> + * Those were defined in <asm/trace/irq_vectors.h> and cause problems
-> + * when including <trace/events/ipi.h>.
-> + */
-> +#undef TRACE_INCLUDE_PATH
-> +#undef TRACE_INCLUDE_FILE
-> +#include <trace/events/ipi.h>
-> +
->  /*
->   *	Some notes on x86 processor bugs affecting SMP operation:
->   *
-> @@ -124,11 +134,13 @@ static void native_smp_send_reschedule(int cpu)
->  		WARN_ON(1);
->  		return;
->  	}
-> +	trace_ipi_raise(cpumask_of(cpu), tracepoint_string("RESCHEDULE"));
->  	apic->send_IPI_mask(cpumask_of(cpu), RESCHEDULE_VECTOR);
->  }
->  
->  void native_send_call_func_single_ipi(int cpu)
->  {
-> +	trace_ipi_raise(cpumask_of(cpu), tracepoint_string("CALL_FUNCTION_SINGLE"));
->  	apic->send_IPI_mask(cpumask_of(cpu), CALL_FUNCTION_SINGLE_VECTOR);
->  }
->  
-> @@ -136,6 +148,8 @@ void native_send_call_func_ipi(const struct cpumask *mask)
->  {
->  	cpumask_var_t allbutself;
->  
-> +	trace_ipi_raise(mask, tracepoint_string("CALL_FUNCTION"));
-> +
->  	if (!alloc_cpumask_var(&allbutself, GFP_ATOMIC)) {
->  		apic->send_IPI_mask(mask, CALL_FUNCTION_VECTOR);
->  		return;
-> @@ -252,8 +266,10 @@ finish:
->   */
->  static inline void __smp_reschedule_interrupt(void)
->  {
-> +	trace_ipi_entry(tracepoint_string("RESCHEDULE"));
->  	inc_irq_stat(irq_resched_count);
->  	scheduler_ipi();
-> +	trace_ipi_exit(tracepoint_string("RESCHEDULE"));
->  }
->  
->  __visible void smp_reschedule_interrupt(struct pt_regs *regs)
-> @@ -291,8 +307,10 @@ __visible void smp_trace_reschedule_interrupt(struct pt_regs *regs)
->  
->  static inline void __smp_call_function_interrupt(void)
->  {
-> +	trace_ipi_entry(tracepoint_string("CALL_FUNCTION"));
->  	generic_smp_call_function_interrupt();
->  	inc_irq_stat(irq_call_count);
-> +	trace_ipi_exit(tracepoint_string("CALL_FUNCTION"));
->  }
->  
->  __visible void smp_call_function_interrupt(struct pt_regs *regs)
-> @@ -313,8 +331,10 @@ __visible void smp_trace_call_function_interrupt(struct pt_regs *regs)
->  
->  static inline void __smp_call_function_single_interrupt(void)
->  {
-> +	trace_ipi_entry(tracepoint_string("CALL_FUNCTION_SINGLE"));
->  	generic_smp_call_function_single_interrupt();
->  	inc_irq_stat(irq_call_count);
-> +	trace_ipi_exit(tracepoint_string("CALL_FUNCTION_SINGLE"));
->  }
->  
->  __visible void smp_call_function_single_interrupt(struct pt_regs *regs)
+-- 
+Andreas Schwab, SUSE Labs, schwab at suse.de
+GPG Key fingerprint = 0196 BAD8 1CE9 1970 F4BE  1748 E4D4 88E3 0EEA B9D7
+"And now for something completely different."
