@@ -1,123 +1,50 @@
-From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Thu, 7 Aug 2014 23:36:10 +0200
-Subject: [PATCH v2 00/12] defconfigs: add MTD_SPI_NOR (new subsystem
- dependency for M25P80)
-In-Reply-To: <1398925607-7482-1-git-send-email-computersforpeace@gmail.com>
-References: <1398925607-7482-1-git-send-email-computersforpeace@gmail.com>
-Message-ID: <CAMuHMdVZmJR=Cu1Wvpyx+KqgdKRRtnAO94k4imXChUwfC_GPTw@mail.gmail.com>
+From: ohaugan@codeaurora.org (Olav Haugan)
+Date: Thu, 07 Aug 2014 14:52:56 -0700
+Subject: [PATCH v4 1/1] iommu-api: Add map_sg/unmap_sg functions
+In-Reply-To: <20140807062410.GC17340@ulmo>
+References: <1406854484-3848-1-git-send-email-ohaugan@codeaurora.org>
+ <1406854484-3848-2-git-send-email-ohaugan@codeaurora.org>
+ <20140805151323.GB19709@laptop.dumpdata.com>
+ <53E26127.1040805@codeaurora.org> <20140806201740.GW9809@8bytes.org>
+ <53E2BA2D.1050007@codeaurora.org> <20140807062410.GC17340@ulmo>
+Message-ID: <53E3F538.8030000@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Brian,
+On 8/6/2014 11:24 PM, Thierry Reding wrote:
+> On Wed, Aug 06, 2014 at 04:28:45PM -0700, Olav Haugan wrote:
+>> On 8/6/2014 1:17 PM, Joerg Roedel wrote:
+>>> On Wed, Aug 06, 2014 at 10:08:55AM -0700, Olav Haugan wrote:
+>>>> so you are suggesting that I check in "bus_set_iommu()" whether the
+>>>> driver has set the map_sg/unmap_sg function pointers or not and if not
+>>>> set it to the default? Is bus_set_iommu() the only way drivers can set
+>>>> up the callbacks?
+>>>
+>>> This doesn't work as the iommu_ops are now const. You have to either
+>>> update the iommu drivers individually to point to the default function,
+>>> or you do the check in the API function itself and fall back to the
+>>> default it no call-back is provided.
+>>>
+>>
+>> Ok, then I think it is better to just leave the fallback where it is now
+>> in the function itself.
+> 
+> What Konrad was suggesting is what I also proposed. The idea is to
+> implement a fallback as standalone function, then make all drivers use
+> that by default in the struct iommu_ops that they register. When drivers
+> implement an optimized version they can simply replace the fallback
+> implementation with their own.
+> 
 
-On Thu, May 1, 2014 at 8:26 AM, Brian Norris
-<computersforpeace@gmail.com> wrote:
-> v1 --> v2: split ARM defconfig changes into their sub-architectures. No change
->            in the overall diff.
->
-> Hi all,
->
-> We are introducing a new SPI-NOR subsystem/framework for MTD, to support
-> various types of SPI-NOR flash controllers which require (or benefit from)
-> intimate knowledge of the flash interface, rather than just the relatively dumb
-> SPI interface. This framework borrows much of the m25p80 driver for its
-> abstraction and moves this code into a spi-nor module.
->
-> This means CONFIG_M25P80 now has a dependency on CONFIG_MTD_SPI_NOR, which
-> should be added to the defconfigs. I expect that each (sub)architecture
-> maintainer can merge these patches to their own tree.
->
-> Note that without the new CONFIG_MTD_SPI_NOR symbol in your defconfig, Kconfig
-> will automatically drop M25P80 for you.
->
-> Please keep general comments to the cover letter, so all parties can see.
->
-> This series is based on 3.15-rc1.
->
-> The SPI-NOR development code (in -next, queued for 3.16) is here:
->
->   git://git.infradead.org/l2-mtd.git +spinor
->
-> This defconfig series is available in the same repo at:
->
->   git://git.infradead.org/l2-mtd.git +defconfigs
->
-> Thanks,
-> Brian
->
-> Brian Norris (12):
->   ARM: imx/mxs defconfigs: add MTD_SPI_NOR (new dependency for M25P80)
->   ARM: defconfigs: add MTD_SPI_NOR (new dependency for M25P80)
->   ARM: keystone: add MTD_SPI_NOR (new dependency for M25P80)
->   ARM: tegra: add MTD_SPI_NOR (new dependency for M25P80)
->   ARM: lpc32xx: add MTD_SPI_NOR (new dependency for M25P80)
->   ARM: at91: add MTD_SPI_NOR (new dependency for M25P80)
->   ARM: shmobile: add MTD_SPI_NOR (new dependency for M25P80)
->   ARM: marvell: add MTD_SPI_NOR (new dependency for M25P80)
->   blackfin: defconfigs: add MTD_SPI_NOR (new dependency for M25P80)
->   mips: defconfigs: add MTD_SPI_NOR (new dependency for M25P80)
->   powerpc: defconfigs: add MTD_SPI_NOR (new dependency for M25P80)
->   sh: defconfig: add MTD_SPI_NOR (new dependency for M25P80)
->
->  arch/arm/configs/bockw_defconfig               | 2 +-
->  arch/arm/configs/dove_defconfig                | 2 +-
->  arch/arm/configs/imx_v6_v7_defconfig           | 1 +
->  arch/arm/configs/keystone_defconfig            | 1 +
->  arch/arm/configs/kirkwood_defconfig            | 1 +
->  arch/arm/configs/koelsch_defconfig             | 1 +
->  arch/arm/configs/lager_defconfig               | 1 +
->  arch/arm/configs/lpc32xx_defconfig             | 2 +-
->  arch/arm/configs/multi_v5_defconfig            | 1 +
->  arch/arm/configs/multi_v7_defconfig            | 1 +
->  arch/arm/configs/mvebu_v5_defconfig            | 1 +
->  arch/arm/configs/mvebu_v7_defconfig            | 1 +
->  arch/arm/configs/mxs_defconfig                 | 1 +
->  arch/arm/configs/sama5_defconfig               | 2 +-
->  arch/arm/configs/shmobile_defconfig            | 1 +
->  arch/arm/configs/tegra_defconfig               | 1 +
->  arch/blackfin/configs/BF526-EZBRD_defconfig    | 2 +-
->  arch/blackfin/configs/BF527-EZKIT-V2_defconfig | 2 +-
->  arch/blackfin/configs/BF527-EZKIT_defconfig    | 2 +-
->  arch/blackfin/configs/BF548-EZKIT_defconfig    | 2 +-
->  arch/blackfin/configs/BF609-EZKIT_defconfig    | 2 +-
->  arch/blackfin/configs/BlackStamp_defconfig     | 3 +--
->  arch/blackfin/configs/H8606_defconfig          | 3 +--
->  arch/mips/configs/ath79_defconfig              | 3 +--
->  arch/mips/configs/db1xxx_defconfig             | 1 +
->  arch/mips/configs/rt305x_defconfig             | 2 +-
->  arch/powerpc/configs/corenet32_smp_defconfig   | 2 +-
->  arch/powerpc/configs/corenet64_smp_defconfig   | 2 +-
->  arch/powerpc/configs/mpc85xx_defconfig         | 2 +-
->  arch/powerpc/configs/mpc85xx_smp_defconfig     | 2 +-
->  arch/sh/configs/sh7757lcr_defconfig            | 2 +-
->  31 files changed, 31 insertions(+), 21 deletions(-)
+Ok, I can do that. I misunderstood the point of the fallback. I thought
+the point of the fallback was to catch drivers that forget/neglect to
+implement this callback. If that is not a concern I will update my patch
+to create a separate function that I will point all existing drivers to.
 
-FWIW, this change still hasn't propagated to the following defconfigs:
+Thanks,
 
-arch/arm/configs/axm55xx_defconfig
-arch/arm/configs/bockw_defconfig
-arch/arm/configs/koelsch_defconfig
-arch/arm/configs/lager_defconfig
-arch/arm/configs/lpc32xx_defconfig
-arch/arm/configs/multi_v5_defconfig
-arch/arm/configs/multi_v7_defconfig
-arch/arm/configs/qcom_defconfig
-arch/arm/configs/sama5_defconfig
-arch/arm/configs/shmobile_defconfig
-arch/powerpc/configs/85xx/kmp204x_defconfig
-arch/powerpc/configs/corenet32_smp_defconfig
-arch/powerpc/configs/corenet64_smp_defconfig
-arch/powerpc/configs/mpc85xx_defconfig
-arch/powerpc/configs/mpc85xx_smp_defconfig
-arch/sh/configs/sh7757lcr_defconfig
+Olav
 
-Gr{oetje,eeting}s,
-
-                        Geert
-
---
-Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
-
-In personal conversations with technical people, I call myself a hacker. But
-when I'm talking to journalists I just say "programmer" or something like that.
-                                -- Linus Torvalds
+-- 
+The Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+hosted by The Linux Foundation
