@@ -1,43 +1,39 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Thu, 7 Aug 2014 18:31:36 +0100
-Subject: [PATCH] ASoC: rt286: Add API to set supported jack type
-In-Reply-To: <ABFD875FF5FB574BA706497D987D48D7608E00@RTITMBSV03.realtek.com.tw>
-References: <1407217970-20126-1-git-send-email-bardliao@realtek.com>
- <20140806205421.GZ17528@sirena.org.uk>
- <ABFD875FF5FB574BA706497D987D48D7608E00@RTITMBSV03.realtek.com.tw>
-Message-ID: <20140807173136.GN17528@sirena.org.uk>
+From: will.deacon@arm.com (Will Deacon)
+Date: Thu, 7 Aug 2014 18:33:16 +0100
+Subject: [PATCH V2 1/4] ARM: perf: Set suniden bit.
+In-Reply-To: <53E22E0B.7080907@parkeon.com>
+References: <20140805144831.25462.18149.stgit@localhost>
+ <20140805144833.25462.46011.stgit@localhost>
+ <20140806104947.GD25953@arm.com> <53E22E0B.7080907@parkeon.com>
+Message-ID: <20140807173316.GH31101@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Aug 07, 2014 at 01:43:24AM +0000, Bard Liao wrote:
+On Wed, Aug 06, 2014 at 02:30:51PM +0100, Martin Fuzzey wrote:
+> On 06/08/14 12:49, Will Deacon wrote:
+> > +	/*
+> > +	 * Bits indicating any CPU or platform specific activations that have
+> > +	 * been done so we can undo them when stopping
+> > +	 */
+> > +	struct {
+> > +		unsigned int secure_regs_available : 1;
+> > +		unsigned int secure_debug_requested : 1;
+> > +		unsigned int platform_enabled : 1;
+> > +	} activated_flags;
+> > This should be a single bool secure_access; field.
+> 
+> The idea was to only actually modify the security settings while someone 
+> actually uses perf rather than just anytime the driver is loaded.
+> But I didn't want to disable the bit when exiting perf mode if it had 
+> already been enabled elsewhere (eg by the bootloader).
+> Hence the first two bits.
+> 
+> I'm not sure how important this really is but it seemed sensible and not 
+> too hard.
 
-> > If this is coming from the hardware design I'd expect this to be configured
-> > via platform data or firmware data rather than with an API.
-> > Why do it this way?
+I think it's unnecessary complication. We've booted secure, we're not
+spawning a non-secure OS and we're not doing any strange
+soft-virtualisation. This means that we own the PMU and can configure it
+once during probe.
 
-> Actually, this patch is for Intel platform which doesn't support platform data
-> yet. That's why we create an API so they can call the API in machine driver.
-
-So, this is something that the people wanting to use ACPI in platforms
-with devices like this are going to have to deal with - we need a way of
-getting configuration to devices.  Traditionally small tweaks have been
-done based on DMI information but that's not at all scalable.  I believe
-newer ACPI specs are trying to accomodate this due to the expanding
-range of systems supporting ACPI.  Punting to the machine driver just
-moves the problem around, it doesn't really address it.
-
-I've CCed in Graeme Gregory who's been writing some guidelines for this
-sort of thing in the context of ARMv8 serviers - the most recent patch
-is:
-
-   http://thread.gmane.org/gmane.linux.acpi.devel/69757
-
-The advice there looks good to me - see the "Device Enumeration"
-section.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140807/f6928c49/attachment.sig>
+Will
