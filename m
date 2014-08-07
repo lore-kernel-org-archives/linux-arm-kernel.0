@@ -1,98 +1,42 @@
-From: dianders@chromium.org (Doug Anderson)
-Date: Wed, 6 Aug 2014 20:26:51 -0700
-Subject: [PATCH v4 2/2] pwm: rockchip: Added to support for RK3288 SoC
-In-Reply-To: <53E2F11A.1040109@rock-chips.com>
-References: <1406197295-10604-1-git-send-email-caesar.wang@rock-chips.com>
- <1406197295-10604-3-git-send-email-caesar.wang@rock-chips.com>
- <CAD=FV=V4Kp-H3CcAKZPV1jBnYX+Ntwvxx6RB13TLxS5RRPHTWA@mail.gmail.com>
- <53E2D605.2000704@rock-chips.com>
- <CAD=FV=Xw8tz2keCUtO+qYUmnuv=+DPGZjY9-j_2XmAcP3Luzjg@mail.gmail.com>
- <53E2F11A.1040109@rock-chips.com>
-Message-ID: <CAD=FV=Wuj2_q+iW2EAj7w8TvgS=C2juSu+h_iG24NvPk4UqhKQ@mail.gmail.com>
+From: shawn.guo@freescale.com (Shawn Guo)
+Date: Thu, 7 Aug 2014 11:30:49 +0800
+Subject: [PATCH] ARM: mx6: Fix suspend/resume with PCI
+In-Reply-To: <CAOMZO5DZEvKLLjU_V645S=yGP7ePUFyyHzQPp56sUA-mDGkFzA@mail.gmail.com>
+References: <1407371998-11437-1-git-send-email-festevam@gmail.com>
+ <20140807021831.GM2167@dragon>
+ <CAOMZO5A0zwfr3+bo2RibMYF883aqx8LUb+8TN+uy79VtrwqVVA@mail.gmail.com>
+ <20140807030822.GN2167@dragon>
+ <CAOMZO5DZEvKLLjU_V645S=yGP7ePUFyyHzQPp56sUA-mDGkFzA@mail.gmail.com>
+Message-ID: <20140807033048.GP2167@dragon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-caesar,
+On Thu, Aug 07, 2014 at 12:24:37AM -0300, Fabio Estevam wrote:
+> On Thu, Aug 7, 2014 at 12:08 AM, Shawn Guo <shawn.guo@freescale.com> wrote:
+> > On Wed, Aug 06, 2014 at 11:52:29PM -0300, Fabio Estevam wrote:
+> >> On Wed, Aug 6, 2014 at 11:18 PM, Shawn Guo <shawn.guo@freescale.com> wrote:
+> >>
+> >> > I intend to agree with Lucas that we should align our testing and
+> >> > understanding on the issue before trying to fix it.
+> >> >
+> >> > Again, I do not see this issue on my TO1.2 chip, but only TO1.5,
+> >> > aka Rev 1.3, one.
+> >>
+> >> Which version is your sabresd with TO1.2? Mine is rev C2 and the
+> >> suspend/resume issue happens 100%.
+> >
+> > The label on the board says it's Rev B.
+> 
+> If I remember correctly you are testing suspend/resume with no PCI
+> card connected to the TO1.2 board, right?
 
-On Wed, Aug 6, 2014 at 8:23 PM, caesar <caesar.wang@rock-chips.com> wrote:
->
-> ? 2014?08?07? 10:16, Doug Anderson ??:
->
->> Caesar,
->>
->> On Wed, Aug 6, 2014 at 6:27 PM, caesar <caesar.wang@rock-chips.com> wrote:
->>>
->>> Doug,
->>>
->>> ? 2014?08?07? 06:46, Doug Anderson ??:
->>>
->>>> Caesar,
->>>>
->>>> On Thu, Jul 24, 2014 at 3:21 AM, Caesar Wang
->>>> <caesar.wang@rock-chips.com>
->>>> wrote:
->>>>>
->>>>> +static const struct rockchip_pwm_data pwm_data_v1 = {
->>>>> +       .regs.duty = PWM_HRC,
->>>>> +       .regs.period = PWM_LRC,
->>>>> +       .regs.cntr = PWM_CNTR,
->>>>> +       .regs.ctrl = PWM_CTRL,
->>>>> +       .prescaler = PRESCALER,
->>>>> +       .set_enable = rockchip_pwm_set_enable_v1,
->>>>> +};
->>>>> +
->>>>> +static const struct rockchip_pwm_data pwm_data_v2 = {
->>>>> +       .regs.duty = PWM_LRC,
->>>>> +       .regs.period = PWM_HRC,
->>>>> +       .regs.cntr = PWM_CNTR,
->>>>> +       .regs.ctrl = PWM_CTRL,
->>>>> +       .prescaler = PRESCALER-1,
->>>>> +       .set_enable = rockchip_pwm_set_enable_v2,
->>>>> +};
->>>>> +
->>>>> +static const struct rockchip_pwm_data pwm_data_vop = {
->>>>> +       .regs.duty = PWM_LRC,
->>>>> +       .regs.period = PWM_HRC,
->>>>> +       .regs.cntr = PWM_CTRL,
->>>>> +       .regs.ctrl = PWM_CNTR,
->>>>
->>>> Did you really mean to flip CTRL and CNTR here?  If so, that's super
->>>> confusing and deserves a comment.  AKA, I think the above should not
->>>> be:
->>>>
->>>>    +       .regs.cntr = PWM_CTRL,
->>>>    +       .regs.ctrl = PWM_CNTR,
->>>>
->>>> ...but should be
->>>>
->>>>    +       .regs.cntr = PWM_CNTR,
->>>>    +       .regs.ctrl = PWM_CTRL,
->>>>
->>>> If you didn't mean to flip CTRL and CNTR here, then just get rid of
->>>> pwm_data_vop and refer to pwm_data_v2.  In fact, I'd suggest that you
->>>> totally remove the "rockchip,vop-pwm" since there's nothing different
->>>> between "rockchip,rk3288-pwm" and "rockchip,vop-pwm".
->>>
->>>
->>> Sorry,I think it's no problem. the  "rockchip,rk3288-pwm" and
->>> "rockchip,vop-pwm" are seperate PWM controllers.
->>> They are just different registers address between CNTR and CTRL .
->>
->> OK, I looked up in the TRM.  Right, the CNTR and CTRL are flipped on
->> the vop.  So I think that the only change you need is to add:
->>
->> #define PWM_VOP_CTRL  0x00
->> #define PWM_VOP_CNTR  0x0c
->>
->> ...then use these new #defines for the vop structure.
->>
->>
->> As you have the code written right now it's very confusing.  The new
->> #defines will fix this.
->>
-> yeah, I think they can be used in the same context.
->
-> I will fix it in patch v5 if it is really need.
+Right.  I do not have any PCIe device on hands, so all my testing are
+without PCIe device connected, and TO1.2 works while TO1.5 doesn't.
 
-I think you should fix this, but if Thierry doesn't think so then it's
-really his decision.
+Shawn
+
+> 
+> I have just tried suspend/resume without any PCI card connect and it
+> does work fine.
+> 
+> Only when I have the PCI card connected I get the hang.
