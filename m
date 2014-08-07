@@ -1,48 +1,43 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Thu, 7 Aug 2014 18:28:07 +0100
-Subject: [PATCH v3 2/2] arm64: don't flag non-aliasing VIPT I-caches as
- aliasing
-In-Reply-To: <1407339966-29351-2-git-send-email-ard.biesheuvel@linaro.org>
-References: <1407339966-29351-1-git-send-email-ard.biesheuvel@linaro.org>
- <1407339966-29351-2-git-send-email-ard.biesheuvel@linaro.org>
-Message-ID: <20140807172807.GF31101@arm.com>
+From: broonie@kernel.org (Mark Brown)
+Date: Thu, 7 Aug 2014 18:31:36 +0100
+Subject: [PATCH] ASoC: rt286: Add API to set supported jack type
+In-Reply-To: <ABFD875FF5FB574BA706497D987D48D7608E00@RTITMBSV03.realtek.com.tw>
+References: <1407217970-20126-1-git-send-email-bardliao@realtek.com>
+ <20140806205421.GZ17528@sirena.org.uk>
+ <ABFD875FF5FB574BA706497D987D48D7608E00@RTITMBSV03.realtek.com.tw>
+Message-ID: <20140807173136.GN17528@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Aug 06, 2014 at 04:46:06PM +0100, Ard Biesheuvel wrote:
-> VIPT caches are non-aliasing if the index is derived from address bits that
-> are always equal between VA and PA. Classifying these as aliasing results in
-> unnecessary flushing which may hurt performance.
-> 
-> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
-> ---
-> v2, v3: no changes
-> 
->  arch/arm64/kernel/cpuinfo.c | 8 +++++++-
->  1 file changed, 7 insertions(+), 1 deletion(-)
-> 
-> diff --git a/arch/arm64/kernel/cpuinfo.c b/arch/arm64/kernel/cpuinfo.c
-> index 319255ff536d..a5b6dce48094 100644
-> --- a/arch/arm64/kernel/cpuinfo.c
-> +++ b/arch/arm64/kernel/cpuinfo.c
-> @@ -49,7 +49,13 @@ static void cpuinfo_detect_icache_policy(struct cpuinfo_arm64 *info)
->  	unsigned int cpu = smp_processor_id();
->  	u32 l1ip = CTR_L1IP(info->reg_ctr);
->  
-> -	if (l1ip != ICACHE_POLICY_PIPT)
-> +	/*
-> +	 * VIPT caches are non-aliasing if the VA always equals the PA in all
-> +	 * bit positions that are covered by the index, i.e., if num_sets_shift
-> +	 * is less than or equal to PAGE_SHIFT minus line_size_shift.
-> +	 */
-> +	if (l1ip != ICACHE_POLICY_PIPT && !(l1ip == ICACHE_POLICY_VIPT &&
-> +	    icache_get_linesize() * icache_get_numsets() <= PAGE_SIZE))
+On Thu, Aug 07, 2014 at 01:43:24AM +0000, Bard Liao wrote:
 
-Might just be me, but I'd find this a lot easier to understand if you had a
-local `way_size' variable and set it to linesize * num_sets.
+> > If this is coming from the hardware design I'd expect this to be configured
+> > via platform data or firmware data rather than with an API.
+> > Why do it this way?
 
-Either way:
+> Actually, this patch is for Intel platform which doesn't support platform data
+> yet. That's why we create an API so they can call the API in machine driver.
 
-  Acked-by: Will Deacon <will.deacon@arm.com>
+So, this is something that the people wanting to use ACPI in platforms
+with devices like this are going to have to deal with - we need a way of
+getting configuration to devices.  Traditionally small tweaks have been
+done based on DMI information but that's not at all scalable.  I believe
+newer ACPI specs are trying to accomodate this due to the expanding
+range of systems supporting ACPI.  Punting to the machine driver just
+moves the problem around, it doesn't really address it.
 
-Will
+I've CCed in Graeme Gregory who's been writing some guidelines for this
+sort of thing in the context of ARMv8 serviers - the most recent patch
+is:
+
+   http://thread.gmane.org/gmane.linux.acpi.devel/69757
+
+The advice there looks good to me - see the "Device Enumeration"
+section.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140807/f6928c49/attachment.sig>
