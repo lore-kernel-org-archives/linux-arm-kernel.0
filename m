@@ -1,26 +1,60 @@
-From: horms@verge.net.au (Simon Horman)
-Date: Thu, 7 Aug 2014 09:47:41 +0900
-Subject: [PATCH] ARM: shmobile: koelsch: add VIN1/ADV7180 DT support
-In-Reply-To: <2131152.vMTPsJUYLQ@wasted.cogentembedded.com>
-References: <201408020402.14560.sergei.shtylyov@cogentembedded.com>
- <2131152.vMTPsJUYLQ@wasted.cogentembedded.com>
-Message-ID: <20140807004741.GA32766@verge.net.au>
+From: dyoung@redhat.com (Dave Young)
+Date: Thu, 7 Aug 2014 09:27:09 +0800
+Subject: [PATCH 1/2] UEFI arm64: add noefi boot param
+In-Reply-To: <20140806140155.GC15082@console-pimps.org>
+References: <20140806083825.GA31711@dhcp-16-198.nay.redhat.com>
+ <20140806130623.GI4179@bivouac.eciton.net>
+ <20140806132021.GB15082@console-pimps.org>
+ <20140806132941.GJ4179@bivouac.eciton.net>
+ <20140806140155.GC15082@console-pimps.org>
+Message-ID: <20140807012708.GA20295@darkstar.nay.redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Aug 06, 2014 at 10:38:22PM +0400, sergei.shtylyov at cogentembedded.com wrote:
-> Define the Koelsch board dependent part of the VIN1 device node. Add the device
-> node for Analog  Devices ADV7180  video decoder to  I2C2 bus. Add the necessary
-> subnodes to interconnect VIN1 and ADV7180 devices.
+On 08/06/14 at 03:01pm, Matt Fleming wrote:
+> On Wed, 06 Aug, at 02:29:41PM, Leif Lindholm wrote:
+> > On Wed, Aug 06, 2014 at 02:20:21PM +0100, Matt Fleming wrote:
+> > > > Since this is really turning an x86-specific feature into a generic
+> > > > one, could it be moved to core code?
+> > > > Maybe an efi.mask, reusing the efi_enabled defines, with an
+> > > > efi_disabled macro?
+> > >  
+> > > Why the new efi_disabled() and efi.mask? This is all achievable with
+> > > efi_enabled() and efi.flags, in fact, this kind of thing is exactly why
+> > > they were invented.
+> > 
+> > Because this flag is indicating which facilities we should not try to
+> > enable, rather than which facilities we have enabled.
+> > 
+> > The EFI_RUNTIME_SERVICES flag is set after successful call to
+> > set_virtual_address_map. The apparent intent of "noefi" is to prevent
+> > that call from being made in the first place.
+> > 
+> > Anyway, it was just a suggestion - main point was it would make sense
+> > to share the code.
 > 
-> Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
+> Definitely.
 > 
-> ---
-> This patch is against the 'renesas-devel-v3.16-20140804' tag of Simon Horman's
-> 'renesas.git' repo. It requires the 'soc_camera' and 'rcar_vin' device tree
-> support patches (already merged to the 'media_tree.git' repo) in order to work.
+> Dave, below is the kind of thing that I had in mind. Please Cc the Xen
+> and SGI folks when you submit your next version because they're likely
+> to be hit the hardest by any changes to EFI_RUNTIME_SERVICES and
+> "noefi".
 > 
->  arch/arm/boot/dts/r8a7791-koelsch.dts |   35 ++++++++++++++++++++++++++++++++++
->  1 file changed, 35 insertions(+)
+> Obviously the addition of "efi=noruntime" is needed on top, but that's
+> about 6 lines of code.
 
-Thanks, I have queued this up for v3.18.
+[snip]
+
+Matt, will file a new version based on your code. I will also address the
+failure case in enter virtual mode.
+
+Currently in x86, there's cases such as efi_map_regions failure and efi call
+set_virtual_address_map, in case those failures it should be better to
+unset the EFI_RUNTIME_SERVICES in efi.flags instead of do noting or panic.
+
+As for Xen and SGI people? I have not been following all the efi threads
+so I'm not sure who exactly I should cc, could you tell me? 
+
+
+Thanks
+Dave
