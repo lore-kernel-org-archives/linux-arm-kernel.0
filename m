@@ -1,345 +1,186 @@
 From: haojian.zhuang@linaro.org (Haojian Zhuang)
-Date: Thu,  7 Aug 2014 18:51:31 +0800
-Subject: [PATCH v17 5/9] ARM: dts: add hip04 dts
+Date: Thu,  7 Aug 2014 18:51:32 +0800
+Subject: [PATCH v17 6/9] ARM: config: enable hisilicon hip04
 In-Reply-To: <1407408695-19626-1-git-send-email-haojian.zhuang@linaro.org>
 References: <1407408695-19626-1-git-send-email-haojian.zhuang@linaro.org>
-Message-ID: <1407408695-19626-6-git-send-email-haojian.zhuang@linaro.org>
+Message-ID: <1407408695-19626-7-git-send-email-haojian.zhuang@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add hip04-d01.dts & hip04.dtsi for hip04 SoC platform.
+Enable CONFIG_ARCH_HIP04 in both hi3xxx_defconfig & multi_v7_defconfig.
+
+Since CONFIG_ARM_LPAE is disabled by default, only 3GB memory could be
+support by this defconfig. User should enable CONFIG_ARM_LPAE locally to
+support 16GB memory on hip04 platform.
+
+Since hip04 doesn't belong to hi3xxx series, rename hi3xxx_defconfig to
+hisi_defconfig.
 
 Signed-off-by: Haojian Zhuang <haojian.zhuang@linaro.org>
 ---
- arch/arm/boot/dts/Makefile      |   1 +
- arch/arm/boot/dts/hip04-d01.dts |  32 +++++
- arch/arm/boot/dts/hip04.dtsi    | 267 ++++++++++++++++++++++++++++++++++++++++
- 3 files changed, 300 insertions(+)
- create mode 100644 arch/arm/boot/dts/hip04-d01.dts
- create mode 100644 arch/arm/boot/dts/hip04.dtsi
+ arch/arm/configs/hi3xxx_defconfig   | 58 ------------------------------
+ arch/arm/configs/hisi_defconfig     | 72 +++++++++++++++++++++++++++++++++++++
+ arch/arm/configs/multi_v7_defconfig |  2 ++
+ 3 files changed, 74 insertions(+), 58 deletions(-)
+ delete mode 100644 arch/arm/configs/hi3xxx_defconfig
+ create mode 100644 arch/arm/configs/hisi_defconfig
 
-diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
-index 721525e..6587bbf 100644
---- a/arch/arm/boot/dts/Makefile
-+++ b/arch/arm/boot/dts/Makefile
-@@ -86,6 +86,7 @@ dtb-$(CONFIG_ARCH_HI3xxx) += hi3620-hi4511.dtb
- dtb-$(CONFIG_ARCH_HIX5HD2) += hix5hd2-dkb.dtb
- dtb-$(CONFIG_ARCH_HIGHBANK) += highbank.dtb \
- 	ecx-2000.dtb
-+dtb-$(CONFIG_ARCH_HIP04) += hip04-d01.dtb
- dtb-$(CONFIG_ARCH_INTEGRATOR) += integratorap.dtb \
- 	integratorcp.dtb
- dtb-$(CONFIG_ARCH_KEYSTONE) += k2hk-evm.dtb \
-diff --git a/arch/arm/boot/dts/hip04-d01.dts b/arch/arm/boot/dts/hip04-d01.dts
+diff --git a/arch/arm/configs/hi3xxx_defconfig b/arch/arm/configs/hi3xxx_defconfig
+deleted file mode 100644
+index 9630687..0000000
+--- a/arch/arm/configs/hi3xxx_defconfig
++++ /dev/null
+@@ -1,58 +0,0 @@
+-CONFIG_IRQ_DOMAIN_DEBUG=y
+-CONFIG_NO_HZ=y
+-CONFIG_HIGH_RES_TIMERS=y
+-CONFIG_BLK_DEV_INITRD=y
+-CONFIG_RD_LZMA=y
+-CONFIG_ARCH_HISI=y
+-CONFIG_ARCH_HI3xxx=y
+-CONFIG_ARCH_HIX5HD2=y
+-CONFIG_SMP=y
+-CONFIG_PREEMPT=y
+-CONFIG_AEABI=y
+-CONFIG_ARM_APPENDED_DTB=y
+-CONFIG_NET=y
+-CONFIG_UNIX=y
+-CONFIG_INET=y
+-CONFIG_IP_PNP=y
+-CONFIG_IP_PNP_DHCP=y
+-CONFIG_DEVTMPFS=y
+-CONFIG_DEVTMPFS_MOUNT=y
+-CONFIG_BLK_DEV_SD=y
+-CONFIG_ATA=y
+-CONFIG_SATA_AHCI_PLATFORM=y
+-CONFIG_NETDEVICES=y
+-CONFIG_SERIAL_AMBA_PL011=y
+-CONFIG_SERIAL_AMBA_PL011_CONSOLE=y
+-CONFIG_SERIAL_OF_PLATFORM=y
+-CONFIG_I2C_DESIGNWARE_PLATFORM=y
+-CONFIG_SPI=y
+-CONFIG_SPI_PL022=y
+-CONFIG_PINCTRL_SINGLE=y
+-CONFIG_GPIO_GENERIC_PLATFORM=y
+-CONFIG_REGULATOR_GPIO=y
+-CONFIG_DRM=y
+-CONFIG_FB_SIMPLE=y
+-CONFIG_USB=y
+-CONFIG_USB_XHCI_HCD=y
+-CONFIG_USB_EHCI_HCD=y
+-CONFIG_USB_EHCI_MXC=y
+-CONFIG_USB_EHCI_HCD_PLATFORM=y
+-CONFIG_USB_STORAGE=y
+-CONFIG_NOP_USB_XCEIV=y
+-CONFIG_MMC=y
+-CONFIG_RTC_CLASS=y
+-CONFIG_RTC_DRV_PL031=y
+-CONFIG_DMADEVICES=y
+-CONFIG_DW_DMAC=y
+-CONFIG_PL330_DMA=y
+-CONFIG_PWM=y
+-CONFIG_EXT4_FS=y
+-CONFIG_TMPFS=y
+-CONFIG_NFS_FS=y
+-CONFIG_NFS_V3_ACL=y
+-CONFIG_NFS_V4=y
+-CONFIG_ROOT_NFS=y
+-CONFIG_PRINTK_TIME=y
+-CONFIG_DEBUG_FS=y
+-CONFIG_DEBUG_KERNEL=y
+-CONFIG_LOCKUP_DETECTOR=y
+diff --git a/arch/arm/configs/hisi_defconfig b/arch/arm/configs/hisi_defconfig
 new file mode 100644
-index 0000000..40a9e33
+index 0000000..a68ee94
 --- /dev/null
-+++ b/arch/arm/boot/dts/hip04-d01.dts
-@@ -0,0 +1,32 @@
-+/*
-+ *  Copyright (C) 2013-2014 Linaro Ltd.
-+ *  Author: Haojian Zhuang <haojian.zhuang@linaro.org>
-+ *
-+ *  This program is free software; you can redistribute it and/or modify
-+ *  it under the terms of the GNU General Public License version 2 as
-+ *  publishhed by the Free Software Foundation.
-+ */
-+
-+/dts-v1/;
-+
-+#include "hip04.dtsi"
-+
-+/ {
-+	/* memory bus is 64-bit */
-+	#address-cells = <2>;
-+	#size-cells = <2>;
-+	model = "Hisilicon D01 Development Board";
-+	compatible = "hisilicon,hip04-d01";
-+
-+	memory at 00000000,10000000 {
-+		device_type = "memory";
-+		reg = <0x00000000 0x10000000 0x00000000 0xc0000000>,
-+		      <0x00000004 0xc0000000 0x00000003 0x40000000>;
-+	};
-+
-+	soc {
-+		uart0: uart at 4007000 {
-+			status = "ok";
-+		};
-+	};
-+};
-diff --git a/arch/arm/boot/dts/hip04.dtsi b/arch/arm/boot/dts/hip04.dtsi
-new file mode 100644
-index 0000000..93b6c90
---- /dev/null
-+++ b/arch/arm/boot/dts/hip04.dtsi
-@@ -0,0 +1,267 @@
-+/*
-+ * Hisilicon Ltd. HiP04 SoC
-+ *
-+ * Copyright (C) 2013-2014 Hisilicon Ltd.
-+ * Copyright (C) 2013-2014 Linaro Ltd.
-+ *
-+ * Author: Haojian Zhuang <haojian.zhuang@linaro.org>
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+ */
-+
-+/ {
-+	/* memory bus is 64-bit */
-+	#address-cells = <2>;
-+	#size-cells = <2>;
-+
-+	aliases {
-+		serial0 = &uart0;
-+	};
-+
-+	bootwrapper {
-+		compatible = "hisilicon,hip04-bootwrapper";
-+		boot-method = <0x10c00000 0x10000>, <0xe0000100 0x1000>;
-+	};
-+
-+	cpus {
-+		#address-cells = <1>;
-+		#size-cells = <0>;
-+
-+		cpu-map {
-+			cluster0 {
-+				core0 {
-+					cpu = <&CPU0>;
-+				};
-+				core1 {
-+					cpu = <&CPU1>;
-+				};
-+				core2 {
-+					cpu = <&CPU2>;
-+				};
-+				core3 {
-+					cpu = <&CPU3>;
-+				};
-+			};
-+			cluster1 {
-+				core0 {
-+					cpu = <&CPU4>;
-+				};
-+				core1 {
-+					cpu = <&CPU5>;
-+				};
-+				core2 {
-+					cpu = <&CPU6>;
-+				};
-+				core3 {
-+					cpu = <&CPU7>;
-+				};
-+			};
-+			cluster2 {
-+				core0 {
-+					cpu = <&CPU8>;
-+				};
-+				core1 {
-+					cpu = <&CPU9>;
-+				};
-+				core2 {
-+					cpu = <&CPU10>;
-+				};
-+				core3 {
-+					cpu = <&CPU11>;
-+				};
-+			};
-+			cluster3 {
-+				core0 {
-+					cpu = <&CPU12>;
-+				};
-+				core1 {
-+					cpu = <&CPU13>;
-+				};
-+				core2 {
-+					cpu = <&CPU14>;
-+				};
-+				core3 {
-+					cpu = <&CPU15>;
-+				};
-+			};
-+		};
-+		CPU0: cpu at 0 {
-+			device_type = "cpu";
-+			compatible = "arm,cortex-a15";
-+			reg = <0>;
-+		};
-+		CPU1: cpu at 1 {
-+			device_type = "cpu";
-+			compatible = "arm,cortex-a15";
-+			reg = <1>;
-+		};
-+		CPU2: cpu at 2 {
-+			device_type = "cpu";
-+			compatible = "arm,cortex-a15";
-+			reg = <2>;
-+		};
-+		CPU3: cpu at 3 {
-+			device_type = "cpu";
-+			compatible = "arm,cortex-a15";
-+			reg = <3>;
-+		};
-+		CPU4: cpu at 100 {
-+			device_type = "cpu";
-+			compatible = "arm,cortex-a15";
-+			reg = <0x100>;
-+		};
-+		CPU5: cpu at 101 {
-+			device_type = "cpu";
-+			compatible = "arm,cortex-a15";
-+			reg = <0x101>;
-+		};
-+		CPU6: cpu at 102 {
-+			device_type = "cpu";
-+			compatible = "arm,cortex-a15";
-+			reg = <0x102>;
-+		};
-+		CPU7: cpu at 103 {
-+			device_type = "cpu";
-+			compatible = "arm,cortex-a15";
-+			reg = <0x103>;
-+		};
-+		CPU8: cpu at 200 {
-+			device_type = "cpu";
-+			compatible = "arm,cortex-a15";
-+			reg = <0x200>;
-+		};
-+		CPU9: cpu at 201 {
-+			device_type = "cpu";
-+			compatible = "arm,cortex-a15";
-+			reg = <0x201>;
-+		};
-+		CPU10: cpu at 202 {
-+			device_type = "cpu";
-+			compatible = "arm,cortex-a15";
-+			reg = <0x202>;
-+		};
-+		CPU11: cpu at 203 {
-+			device_type = "cpu";
-+			compatible = "arm,cortex-a15";
-+			reg = <0x203>;
-+		};
-+		CPU12: cpu at 300 {
-+			device_type = "cpu";
-+			compatible = "arm,cortex-a15";
-+			reg = <0x300>;
-+		};
-+		CPU13: cpu at 301 {
-+			device_type = "cpu";
-+			compatible = "arm,cortex-a15";
-+			reg = <0x301>;
-+		};
-+		CPU14: cpu at 302 {
-+			device_type = "cpu";
-+			compatible = "arm,cortex-a15";
-+			reg = <0x302>;
-+		};
-+		CPU15: cpu at 303 {
-+			device_type = "cpu";
-+			compatible = "arm,cortex-a15";
-+			reg = <0x303>;
-+		};
-+	};
-+
-+	timer {
-+		compatible = "arm,armv7-timer";
-+		interrupt-parent = <&gic>;
-+		interrupts = <1 13 0xf08>,
-+			     <1 14 0xf08>,
-+			     <1 11 0xf08>,
-+			     <1 10 0xf08>;
-+	};
-+
-+	clk_50m: clk_50m {
-+		#clock-cells = <0>;
-+		compatible = "fixed-clock";
-+		clock-frequency = <50000000>;
-+	};
-+
-+	clk_168m: clk_168m {
-+		#clock-cells = <0>;
-+		compatible = "fixed-clock";
-+		clock-frequency = <168000000>;
-+	};
-+
-+	soc {
-+		/* It's a 32-bit SoC. */
-+		#address-cells = <1>;
-+		#size-cells = <1>;
-+		compatible = "simple-bus";
-+		interrupt-parent = <&gic>;
-+		ranges = <0 0 0xe0000000 0x10000000>;
-+
-+		gic: interrupt-controller at c01000 {
-+			compatible = "hisilicon,hip04-intc";
-+			#interrupt-cells = <3>;
-+			#address-cells = <0>;
-+			interrupt-controller;
-+			interrupts = <1 9 0xf04>;
-+
-+			reg = <0xc01000 0x1000>, <0xc02000 0x1000>,
-+			      <0xc04000 0x2000>, <0xc06000 0x2000>;
-+		};
-+
-+		sysctrl: sysctrl {
-+			compatible = "hisilicon,sysctrl";
-+			reg = <0x3e00000 0x00100000>;
-+		};
-+
-+		fabric: fabric {
-+			compatible = "hisilicon,hip04-fabric";
-+			reg = <0x302a000 0x1000>;
-+		};
-+
-+		dual_timer0: dual_timer at 3000000 {
-+			compatible = "arm,sp804", "arm,primecell";
-+			reg = <0x3000000 0x1000>;
-+			interrupts = <0 224 4>;
-+			clocks = <&clk_50m>, <&clk_50m>;
-+			clock-names = "apb_pclk";
-+		};
-+
-+		arm-pmu {
-+			compatible = "arm,cortex-a15-pmu";
-+			interrupts = <0 64 4>,
-+				     <0 65 4>,
-+				     <0 66 4>,
-+				     <0 67 4>,
-+				     <0 68 4>,
-+				     <0 69 4>,
-+				     <0 70 4>,
-+				     <0 71 4>,
-+				     <0 72 4>,
-+				     <0 73 4>,
-+				     <0 74 4>,
-+				     <0 75 4>,
-+				     <0 76 4>,
-+				     <0 77 4>,
-+				     <0 78 4>,
-+				     <0 79 4>;
-+		};
-+
-+		uart0: uart at 4007000 {
-+			compatible = "snps,dw-apb-uart";
-+			reg = <0x4007000 0x1000>;
-+			interrupts = <0 381 4>;
-+			clocks = <&clk_168m>;
-+			clock-names = "uartclk";
-+			reg-shift = <2>;
-+			status = "disabled";
-+		};
-+
-+		sata0: sata at a000000 {
-+			compatible = "hisilicon,hisi-ahci";
-+			reg = <0xa000000 0x1000000>;
-+			interrupts = <0 372 4>;
-+		};
-+
-+	};
-+};
++++ b/arch/arm/configs/hisi_defconfig
+@@ -0,0 +1,72 @@
++CONFIG_IRQ_DOMAIN_DEBUG=y
++CONFIG_NO_HZ=y
++CONFIG_HIGH_RES_TIMERS=y
++CONFIG_BLK_DEV_INITRD=y
++CONFIG_RD_LZMA=y
++CONFIG_ARCH_HISI=y
++CONFIG_ARCH_HI3xxx=y
++CONFIG_ARCH_HIX5HD2=y
++CONFIG_ARCH_HIP04=y
++CONFIG_SMP=y
++CONFIG_NR_CPUS=16
++CONFIG_PREEMPT=y
++CONFIG_AEABI=y
++CONFIG_HIGHMEM=y
++CONFIG_ARM_APPENDED_DTB=y
++CONFIG_ARM_ATAG_DTB_COMPAT=y
++CONFIG_ARM_ATAG_DTB_COMPAT_CMDLINE_FROM_BOOTLOADER=y
++CONFIG_NET=y
++CONFIG_UNIX=y
++CONFIG_INET=y
++CONFIG_IP_PNP=y
++CONFIG_IP_PNP_DHCP=y
++CONFIG_DEVTMPFS=y
++CONFIG_DEVTMPFS_MOUNT=y
++CONFIG_BLK_DEV_SD=y
++CONFIG_ATA=y
++CONFIG_SATA_AHCI_PLATFORM=y
++CONFIG_NETDEVICES=y
++CONFIG_SERIAL_8250=y
++CONFIG_SERIAL_8250_DEPRECATED_OPTIONS=y
++CONFIG_SERIAL_8250_CONSOLE=y
++CONFIG_SERIAL_8250_NR_UARTS=2
++CONFIG_SERIAL_8250_RUNTIME_UARTS=2
++CONFIG_SERIAL_8250_DW=y
++CONFIG_SERIAL_AMBA_PL011=y
++CONFIG_SERIAL_AMBA_PL011_CONSOLE=y
++CONFIG_SERIAL_OF_PLATFORM=y
++CONFIG_I2C_DESIGNWARE_PLATFORM=y
++CONFIG_SPI=y
++CONFIG_SPI_PL022=y
++CONFIG_PINCTRL_SINGLE=y
++CONFIG_GPIO_GENERIC_PLATFORM=y
++CONFIG_REGULATOR_GPIO=y
++CONFIG_DRM=y
++CONFIG_FB_SIMPLE=y
++CONFIG_USB=y
++CONFIG_USB_XHCI_HCD=y
++CONFIG_USB_EHCI_HCD=y
++CONFIG_USB_EHCI_MXC=y
++CONFIG_USB_EHCI_HCD_PLATFORM=y
++CONFIG_USB_STORAGE=y
++CONFIG_NOP_USB_XCEIV=y
++CONFIG_MMC=y
++CONFIG_RTC_CLASS=y
++CONFIG_RTC_DRV_PL031=y
++CONFIG_DMADEVICES=y
++CONFIG_DW_DMAC=y
++CONFIG_PL330_DMA=y
++CONFIG_PWM=y
++CONFIG_EXT4_FS=y
++CONFIG_TMPFS=y
++CONFIG_NFS_FS=y
++CONFIG_NFS_V3_ACL=y
++CONFIG_NFS_V4=y
++CONFIG_ROOT_NFS=y
++CONFIG_PRINTK_TIME=y
++CONFIG_DEBUG_FS=y
++CONFIG_DEBUG_KERNEL=y
++CONFIG_LOCKUP_DETECTOR=y
++CONFIG_VFP=y
++CONFIG_VFPv3=y
++CONFIG_NEON=y
+diff --git a/arch/arm/configs/multi_v7_defconfig b/arch/arm/configs/multi_v7_defconfig
+index d34ab30..fd8694d 100644
+--- a/arch/arm/configs/multi_v7_defconfig
++++ b/arch/arm/configs/multi_v7_defconfig
+@@ -24,8 +24,10 @@ CONFIG_MACH_BERLIN_BG2=y
+ CONFIG_MACH_BERLIN_BG2CD=y
+ CONFIG_MACH_BERLIN_BG2Q=y
+ CONFIG_ARCH_HIGHBANK=y
++CONFIG_ARCH_HISI=y
+ CONFIG_ARCH_HI3xxx=y
+ CONFIG_ARCH_HIX5HD2=y
++CONFIG_ARCH_HIP04=y
+ CONFIG_ARCH_KEYSTONE=y
+ CONFIG_ARCH_MXC=y
+ CONFIG_MACH_IMX51_DT=y
 -- 
 1.9.1
