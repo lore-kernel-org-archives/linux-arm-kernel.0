@@ -1,71 +1,40 @@
-From: Paul.Zimmerman@synopsys.com (Paul Zimmerman)
-Date: Thu, 7 Aug 2014 20:18:53 +0000
-Subject: [PATCH] usb: dwc2: Read GNPTXFSIZ when in forced HOST mode.
-In-Reply-To: <1407440891-29295-1-git-send-email-dianders@chromium.org>
-References: <1407440891-29295-1-git-send-email-dianders@chromium.org>
-Message-ID: <A2CA0424C0A6F04399FB9E1CD98E0304844C4EA0@US01WEMBX2.internal.synopsys.com>
+From: matt@console-pimps.org (Matt Fleming)
+Date: Thu, 7 Aug 2014 21:26:20 +0100
+Subject: [PATCH 1/2] UEFI arm64: add noefi boot param
+In-Reply-To: <20140807061945.GE20295@darkstar.nay.redhat.com>
+References: <20140806083825.GA31711@dhcp-16-198.nay.redhat.com>
+ <20140806130623.GI4179@bivouac.eciton.net>
+ <20140806132021.GB15082@console-pimps.org>
+ <20140806132941.GJ4179@bivouac.eciton.net>
+ <20140806140155.GC15082@console-pimps.org>
+ <CAKv+Gu8ey1iKu-_wS6yYaEXQaQMDXa+PF5Kiw+edA9a_OE1EAw@mail.gmail.com>
+ <20140806141814.GD15082@console-pimps.org>
+ <20140807061945.GE20295@darkstar.nay.redhat.com>
+Message-ID: <20140807202620.GI15082@console-pimps.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> From: Doug Anderson [mailto:dianders at chromium.org]
-> Sent: Thursday, August 07, 2014 12:48 PM
+On Thu, 07 Aug, at 02:19:45PM, Dave Young wrote:
 > 
-> The documentation for GNPTXFSIZ says that "For host mode, this field
-> is always valid."  Since we're already switching to host mode for
-> HPTXFSIZ, let's also read GNPTXFSIZ in host mode.
+> The current efi_runtime_init() enables the bit after getting the efi
+> callback phyaddr of SetVirtualAddressMap.
 > 
-> On an rk3288 SoC, without this change we see this at bootup:
->   dwc2 ff580000.usb: gnptxfsiz=00100400
->   dwc2 ff580000.usb: 128 invalid for host_nperio_tx_fifo_size. Check HW configuration.
+> Thinking more about it, since SetVirtualAddressMap() could fail
+> somehow it seems better to set EFI_RUNTIME_SERIVCES bit only when
+> enter virtual mode return EFI_SUCCESS.
 > 
-> After this change we see:
->   dwc2 ff580000.usb: gnptxfsiz=04000400
-> 
-> Signed-off-by: Doug Anderson <dianders@chromium.org>
-> ---
->  drivers/usb/dwc2/core.c | 6 +++---
->  1 file changed, 3 insertions(+), 3 deletions(-)
-> 
-> diff --git a/drivers/usb/dwc2/core.c b/drivers/usb/dwc2/core.c
-> index 27d2c9b..c184ed43 100644
-> --- a/drivers/usb/dwc2/core.c
-> +++ b/drivers/usb/dwc2/core.c
-> @@ -2674,23 +2674,23 @@ int dwc2_get_hwparams(struct dwc2_hsotg *hsotg)
->  	hwcfg2 = readl(hsotg->regs + GHWCFG2);
->  	hwcfg3 = readl(hsotg->regs + GHWCFG3);
->  	hwcfg4 = readl(hsotg->regs + GHWCFG4);
-> -	gnptxfsiz = readl(hsotg->regs + GNPTXFSIZ);
->  	grxfsiz = readl(hsotg->regs + GRXFSIZ);
-> 
->  	dev_dbg(hsotg->dev, "hwcfg1=%08x\n", hwcfg1);
->  	dev_dbg(hsotg->dev, "hwcfg2=%08x\n", hwcfg2);
->  	dev_dbg(hsotg->dev, "hwcfg3=%08x\n", hwcfg3);
->  	dev_dbg(hsotg->dev, "hwcfg4=%08x\n", hwcfg4);
-> -	dev_dbg(hsotg->dev, "gnptxfsiz=%08x\n", gnptxfsiz);
->  	dev_dbg(hsotg->dev, "grxfsiz=%08x\n", grxfsiz);
-> 
-> -	/* Force host mode to get HPTXFSIZ exact power on value */
-> +	/* Force host mode to get HPTXFSIZ / GNPTXFSIZ exact power on value */
->  	gusbcfg = readl(hsotg->regs + GUSBCFG);
->  	gusbcfg |= GUSBCFG_FORCEHOSTMODE;
->  	writel(gusbcfg, hsotg->regs + GUSBCFG);
->  	usleep_range(100000, 150000);
-> 
-> +	gnptxfsiz = readl(hsotg->regs + GNPTXFSIZ);
->  	hptxfsiz = readl(hsotg->regs + HPTXFSIZ);
-> +	dev_dbg(hsotg->dev, "gnptxfsiz=%08x\n", gnptxfsiz);
->  	dev_dbg(hsotg->dev, "hptxfsiz=%08x\n", hptxfsiz);
->  	gusbcfg = readl(hsotg->regs + GUSBCFG);
->  	gusbcfg &= ~GUSBCFG_FORCEHOSTMODE;
+> Does it make sense to you, Matt?
 
-Nice! I wonder if this is a bug in the original driver, and they
-actually meant to read this register instead of HPTXFSIZ? Well, it
-doesn't really matter I guess.
+If you're going ahead with the scheme I proposed yesterday you'd
+actually want to *clear* the EFI_RUNTIME_SERVICES bit if
+SetVirtualAddressMap() fails, since we would have set it by default for
+EFI_BOOT.
 
-Acked-by: Paul Zimmerman <paulz@synopsys.com>
-
-You may want to resend this to Greg after -rc1 is out and he reopens
-his usb-next tree.
+However, I still think we want to panic() if SetVirtualAddressMap()
+fails because we really never expect that function to return an error
+under normal circumstances. Also, I'm not sure it's safe to make any
+assumptions about the state of the system if SetVirtualAddressMap()
+fails.
 
 -- 
-Paul
+Matt Fleming, Intel Open Source Technology Center
