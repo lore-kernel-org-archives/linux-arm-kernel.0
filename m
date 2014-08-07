@@ -1,46 +1,107 @@
 From: keescook@chromium.org (Kees Cook)
-Date: Thu,  7 Aug 2014 08:01:45 -0700
-Subject: [PATCH v2 0/8] arm: support CONFIG_RODATA
-Message-ID: <1407423713-4160-1-git-send-email-keescook@chromium.org>
+Date: Thu,  7 Aug 2014 08:01:48 -0700
+Subject: [PATCH 3/8] arm: mm: reduce fixmap kmap from 32 to 16 CPUS
+In-Reply-To: <1407423713-4160-1-git-send-email-keescook@chromium.org>
+References: <1407423713-4160-1-git-send-email-keescook@chromium.org>
+Message-ID: <1407423713-4160-4-git-send-email-keescook@chromium.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This is a series of patches to support CONFIG_RODATA on ARM, so that
-the kernel text is RO, and non-text sections default to NX. To support
-on-the-fly kernel text patching (via ftrace, kprobes, etc), fixmap
-support has been finalized based on several versions of various patches
-that are floating around on the mailing list. This series attempts to
-include the least intrusive version, so that others can build on it for
-future fixmap work.
+More room is needed in the fixmap range for non-kmap fixmap entries. This
+reduces the kmap range from 32 to 16 CPUs. Additionally, add PTE entry for
+fixmap regardless of CONFIG_HIGHMEM.
 
-The series has been heavily tested, and appears to be working correctly:
+Signed-off-by: Kees Cook <keescook@chromium.org>
+---
+ arch/arm/include/asm/fixmap.h | 12 ++++++++++--
+ arch/arm/mm/highmem.c         |  2 --
+ arch/arm/mm/mm.h              |  3 +++
+ arch/arm/mm/mmu.c             |  5 ++++-
+ 4 files changed, 17 insertions(+), 5 deletions(-)
 
-With CONFIG_ARM_PTDUMP, expected page table permissions are seen in
-/sys/kernel/debug/kernel_page_tables.
-
-Using CONFIG_LKDTM, the kernel now correctly detects bad accesses for
-for the following lkdtm tests via /sys/kernel/debug/provoke-crash/DIRECT:
-        EXEC_DATA
-        WRITE_RO
-        WRITE_KERN
-
-ftrace works:
-        CONFIG_FTRACE_STARTUP_TEST passes
-        Enabling tracing works:
-                echo function > /sys/kernel/debug/tracing/current_tracer
-
-kprobes works:
-        CONFIG_ARM_KPROBES_TEST passes
-
-kexec works:
-        kexec will load and start a new kernel
-
-Thanks to everyone who has been testing this series and working on its
-various pieces!
-
--Kees
-
-v2:
-- fix typo in kexec merge (buildbot)
-- flip index order for highmem pte access (lauraa)
-- added kgdb updates (dianders)
+diff --git a/arch/arm/include/asm/fixmap.h b/arch/arm/include/asm/fixmap.h
+index 8ee7cb4f62ca..3ed08232be55 100644
+--- a/arch/arm/include/asm/fixmap.h
++++ b/arch/arm/include/asm/fixmap.h
+@@ -1,16 +1,24 @@
+ #ifndef _ASM_FIXMAP_H
+ #define _ASM_FIXMAP_H
+ 
++/*
++ * The fixmap uses 2MB. The KMAP fixmap needs 64k per CPU, so make room for
++ * 16 CPUs (taking 1MB) and leave the rest for additional fixmap areas.
++ */
+ #define FIXADDR_START		0xffc00000UL
+ #define FIXADDR_END		0xffe00000UL
+ #define FIXADDR_TOP		(FIXADDR_END - PAGE_SIZE)
+ #define FIXADDR_SIZE		(FIXADDR_END - FIXADDR_START)
+ 
+-#define FIX_KMAP_NR_PTES	(FIXADDR_SIZE >> PAGE_SHIFT)
++/* 16 PTEs per CPU (64k of 4k pages). */
++#define FIX_KMAP_NR_PTES	16
++#define FIX_KMAP_NR_CPUS	16
+ 
+ enum fixed_addresses {
++	/* Support 16 CPUs for kmap as the first region of fixmap entries. */
+ 	FIX_KMAP_BEGIN,
+-	FIX_KMAP_END = FIX_KMAP_NR_PTES - 1,
++	FIX_KMAP_END = (FIX_KMAP_NR_PTES * FIX_KMAP_NR_CPUS) - 1,
++
+ 	__end_of_fixed_addresses
+ };
+ 
+diff --git a/arch/arm/mm/highmem.c b/arch/arm/mm/highmem.c
+index a1241ee8425e..adf264fb700b 100644
+--- a/arch/arm/mm/highmem.c
++++ b/arch/arm/mm/highmem.c
+@@ -18,8 +18,6 @@
+ #include <asm/tlbflush.h>
+ #include "mm.h"
+ 
+-pte_t *fixmap_page_table;
+-
+ static inline void set_fixmap_pte(int idx, pte_t pte)
+ {
+ 	unsigned long vaddr = __fix_to_virt(idx);
+diff --git a/arch/arm/mm/mm.h b/arch/arm/mm/mm.h
+index ce727d47275c..c8b5b2d05b55 100644
+--- a/arch/arm/mm/mm.h
++++ b/arch/arm/mm/mm.h
+@@ -7,6 +7,9 @@
+ /* the upper-most page table pointer */
+ extern pmd_t *top_pmd;
+ 
++/* The fixmap PTE. */
++extern pte_t *fixmap_page_table;
++
+ /*
+  * 0xffff8000 to 0xffffffff is reserved for any ARM architecture
+  * specific hacks for copying pages efficiently, while 0xffff4000
+diff --git a/arch/arm/mm/mmu.c b/arch/arm/mm/mmu.c
+index e881ed817a8b..a7a756603775 100644
+--- a/arch/arm/mm/mmu.c
++++ b/arch/arm/mm/mmu.c
+@@ -53,6 +53,9 @@ EXPORT_SYMBOL(empty_zero_page);
+  */
+ pmd_t *top_pmd;
+ 
++/* The fixmap PTE. */
++pte_t *fixmap_page_table;
++
+ #define CPOLICY_UNCACHED	0
+ #define CPOLICY_BUFFERED	1
+ #define CPOLICY_WRITETHROUGH	2
+@@ -1342,10 +1345,10 @@ static void __init kmap_init(void)
+ #ifdef CONFIG_HIGHMEM
+ 	pkmap_page_table = early_pte_alloc(pmd_off_k(PKMAP_BASE),
+ 		PKMAP_BASE, _PAGE_KERNEL_TABLE);
++#endif
+ 
+ 	fixmap_page_table = early_pte_alloc(pmd_off_k(FIXADDR_START),
+ 		FIXADDR_START, _PAGE_KERNEL_TABLE);
+-#endif
+ }
+ 
+ static void __init map_lowmem(void)
+-- 
+1.9.1
