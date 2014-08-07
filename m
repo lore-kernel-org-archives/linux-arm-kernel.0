@@ -1,186 +1,53 @@
 From: haojian.zhuang@linaro.org (Haojian Zhuang)
-Date: Thu,  7 Aug 2014 18:51:32 +0800
-Subject: [PATCH v17 6/9] ARM: config: enable hisilicon hip04
+Date: Thu,  7 Aug 2014 18:51:33 +0800
+Subject: [PATCH v17 7/9] ARM: debug: add HiP04 debug uart
 In-Reply-To: <1407408695-19626-1-git-send-email-haojian.zhuang@linaro.org>
 References: <1407408695-19626-1-git-send-email-haojian.zhuang@linaro.org>
-Message-ID: <1407408695-19626-7-git-send-email-haojian.zhuang@linaro.org>
+Message-ID: <1407408695-19626-8-git-send-email-haojian.zhuang@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Enable CONFIG_ARCH_HIP04 in both hi3xxx_defconfig & multi_v7_defconfig.
-
-Since CONFIG_ARM_LPAE is disabled by default, only 3GB memory could be
-support by this defconfig. User should enable CONFIG_ARM_LPAE locally to
-support 16GB memory on hip04 platform.
-
-Since hip04 doesn't belong to hi3xxx series, rename hi3xxx_defconfig to
-hisi_defconfig.
+Add the support of Hisilicon HiP04 debug uart.
 
 Signed-off-by: Haojian Zhuang <haojian.zhuang@linaro.org>
 ---
- arch/arm/configs/hi3xxx_defconfig   | 58 ------------------------------
- arch/arm/configs/hisi_defconfig     | 72 +++++++++++++++++++++++++++++++++++++
- arch/arm/configs/multi_v7_defconfig |  2 ++
- 3 files changed, 74 insertions(+), 58 deletions(-)
- delete mode 100644 arch/arm/configs/hi3xxx_defconfig
- create mode 100644 arch/arm/configs/hisi_defconfig
+ arch/arm/Kconfig.debug | 10 ++++++++++
+ 1 file changed, 10 insertions(+)
 
-diff --git a/arch/arm/configs/hi3xxx_defconfig b/arch/arm/configs/hi3xxx_defconfig
-deleted file mode 100644
-index 9630687..0000000
---- a/arch/arm/configs/hi3xxx_defconfig
-+++ /dev/null
-@@ -1,58 +0,0 @@
--CONFIG_IRQ_DOMAIN_DEBUG=y
--CONFIG_NO_HZ=y
--CONFIG_HIGH_RES_TIMERS=y
--CONFIG_BLK_DEV_INITRD=y
--CONFIG_RD_LZMA=y
--CONFIG_ARCH_HISI=y
--CONFIG_ARCH_HI3xxx=y
--CONFIG_ARCH_HIX5HD2=y
--CONFIG_SMP=y
--CONFIG_PREEMPT=y
--CONFIG_AEABI=y
--CONFIG_ARM_APPENDED_DTB=y
--CONFIG_NET=y
--CONFIG_UNIX=y
--CONFIG_INET=y
--CONFIG_IP_PNP=y
--CONFIG_IP_PNP_DHCP=y
--CONFIG_DEVTMPFS=y
--CONFIG_DEVTMPFS_MOUNT=y
--CONFIG_BLK_DEV_SD=y
--CONFIG_ATA=y
--CONFIG_SATA_AHCI_PLATFORM=y
--CONFIG_NETDEVICES=y
--CONFIG_SERIAL_AMBA_PL011=y
--CONFIG_SERIAL_AMBA_PL011_CONSOLE=y
--CONFIG_SERIAL_OF_PLATFORM=y
--CONFIG_I2C_DESIGNWARE_PLATFORM=y
--CONFIG_SPI=y
--CONFIG_SPI_PL022=y
--CONFIG_PINCTRL_SINGLE=y
--CONFIG_GPIO_GENERIC_PLATFORM=y
--CONFIG_REGULATOR_GPIO=y
--CONFIG_DRM=y
--CONFIG_FB_SIMPLE=y
--CONFIG_USB=y
--CONFIG_USB_XHCI_HCD=y
--CONFIG_USB_EHCI_HCD=y
--CONFIG_USB_EHCI_MXC=y
--CONFIG_USB_EHCI_HCD_PLATFORM=y
--CONFIG_USB_STORAGE=y
--CONFIG_NOP_USB_XCEIV=y
--CONFIG_MMC=y
--CONFIG_RTC_CLASS=y
--CONFIG_RTC_DRV_PL031=y
--CONFIG_DMADEVICES=y
--CONFIG_DW_DMAC=y
--CONFIG_PL330_DMA=y
--CONFIG_PWM=y
--CONFIG_EXT4_FS=y
--CONFIG_TMPFS=y
--CONFIG_NFS_FS=y
--CONFIG_NFS_V3_ACL=y
--CONFIG_NFS_V4=y
--CONFIG_ROOT_NFS=y
--CONFIG_PRINTK_TIME=y
--CONFIG_DEBUG_FS=y
--CONFIG_DEBUG_KERNEL=y
--CONFIG_LOCKUP_DETECTOR=y
-diff --git a/arch/arm/configs/hisi_defconfig b/arch/arm/configs/hisi_defconfig
-new file mode 100644
-index 0000000..a68ee94
---- /dev/null
-+++ b/arch/arm/configs/hisi_defconfig
-@@ -0,0 +1,72 @@
-+CONFIG_IRQ_DOMAIN_DEBUG=y
-+CONFIG_NO_HZ=y
-+CONFIG_HIGH_RES_TIMERS=y
-+CONFIG_BLK_DEV_INITRD=y
-+CONFIG_RD_LZMA=y
-+CONFIG_ARCH_HISI=y
-+CONFIG_ARCH_HI3xxx=y
-+CONFIG_ARCH_HIX5HD2=y
-+CONFIG_ARCH_HIP04=y
-+CONFIG_SMP=y
-+CONFIG_NR_CPUS=16
-+CONFIG_PREEMPT=y
-+CONFIG_AEABI=y
-+CONFIG_HIGHMEM=y
-+CONFIG_ARM_APPENDED_DTB=y
-+CONFIG_ARM_ATAG_DTB_COMPAT=y
-+CONFIG_ARM_ATAG_DTB_COMPAT_CMDLINE_FROM_BOOTLOADER=y
-+CONFIG_NET=y
-+CONFIG_UNIX=y
-+CONFIG_INET=y
-+CONFIG_IP_PNP=y
-+CONFIG_IP_PNP_DHCP=y
-+CONFIG_DEVTMPFS=y
-+CONFIG_DEVTMPFS_MOUNT=y
-+CONFIG_BLK_DEV_SD=y
-+CONFIG_ATA=y
-+CONFIG_SATA_AHCI_PLATFORM=y
-+CONFIG_NETDEVICES=y
-+CONFIG_SERIAL_8250=y
-+CONFIG_SERIAL_8250_DEPRECATED_OPTIONS=y
-+CONFIG_SERIAL_8250_CONSOLE=y
-+CONFIG_SERIAL_8250_NR_UARTS=2
-+CONFIG_SERIAL_8250_RUNTIME_UARTS=2
-+CONFIG_SERIAL_8250_DW=y
-+CONFIG_SERIAL_AMBA_PL011=y
-+CONFIG_SERIAL_AMBA_PL011_CONSOLE=y
-+CONFIG_SERIAL_OF_PLATFORM=y
-+CONFIG_I2C_DESIGNWARE_PLATFORM=y
-+CONFIG_SPI=y
-+CONFIG_SPI_PL022=y
-+CONFIG_PINCTRL_SINGLE=y
-+CONFIG_GPIO_GENERIC_PLATFORM=y
-+CONFIG_REGULATOR_GPIO=y
-+CONFIG_DRM=y
-+CONFIG_FB_SIMPLE=y
-+CONFIG_USB=y
-+CONFIG_USB_XHCI_HCD=y
-+CONFIG_USB_EHCI_HCD=y
-+CONFIG_USB_EHCI_MXC=y
-+CONFIG_USB_EHCI_HCD_PLATFORM=y
-+CONFIG_USB_STORAGE=y
-+CONFIG_NOP_USB_XCEIV=y
-+CONFIG_MMC=y
-+CONFIG_RTC_CLASS=y
-+CONFIG_RTC_DRV_PL031=y
-+CONFIG_DMADEVICES=y
-+CONFIG_DW_DMAC=y
-+CONFIG_PL330_DMA=y
-+CONFIG_PWM=y
-+CONFIG_EXT4_FS=y
-+CONFIG_TMPFS=y
-+CONFIG_NFS_FS=y
-+CONFIG_NFS_V3_ACL=y
-+CONFIG_NFS_V4=y
-+CONFIG_ROOT_NFS=y
-+CONFIG_PRINTK_TIME=y
-+CONFIG_DEBUG_FS=y
-+CONFIG_DEBUG_KERNEL=y
-+CONFIG_LOCKUP_DETECTOR=y
-+CONFIG_VFP=y
-+CONFIG_VFPv3=y
-+CONFIG_NEON=y
-diff --git a/arch/arm/configs/multi_v7_defconfig b/arch/arm/configs/multi_v7_defconfig
-index d34ab30..fd8694d 100644
---- a/arch/arm/configs/multi_v7_defconfig
-+++ b/arch/arm/configs/multi_v7_defconfig
-@@ -24,8 +24,10 @@ CONFIG_MACH_BERLIN_BG2=y
- CONFIG_MACH_BERLIN_BG2CD=y
- CONFIG_MACH_BERLIN_BG2Q=y
- CONFIG_ARCH_HIGHBANK=y
-+CONFIG_ARCH_HISI=y
- CONFIG_ARCH_HI3xxx=y
- CONFIG_ARCH_HIX5HD2=y
-+CONFIG_ARCH_HIP04=y
- CONFIG_ARCH_KEYSTONE=y
- CONFIG_ARCH_MXC=y
- CONFIG_MACH_IMX51_DT=y
+diff --git a/arch/arm/Kconfig.debug b/arch/arm/Kconfig.debug
+index d061de0..c6499cc 100644
+--- a/arch/arm/Kconfig.debug
++++ b/arch/arm/Kconfig.debug
+@@ -231,6 +231,14 @@ choice
+ 		  Say Y here if you want kernel low-level debugging support
+ 		  on Hix5hd2 UART.
+ 
++	config DEBUG_HIP04_UART
++		bool "Hisilicon HiP04 Debug UART"
++		depends on ARCH_HIP04
++		select DEBUG_UART_8250
++		help
++		  Say Y here if you want kernel low-level debugging support
++		  on HIP04 UART.
++
+ 	config DEBUG_HIGHBANK_UART
+ 		bool "Kernel low-level debugging messages via Highbank UART"
+ 		depends on ARCH_HIGHBANK
+@@ -1095,6 +1103,7 @@ config DEBUG_UART_PHYS
+ 	default 0xd4017000 if DEBUG_MMP_UART2
+ 	default 0xd4018000 if DEBUG_MMP_UART3
+ 	default 0xe0000000 if ARCH_SPEAR13XX
++	default 0xe4007000 if DEBUG_HIP04_UART
+ 	default 0xf0000be0 if ARCH_EBSA110
+ 	default 0xf1012000 if DEBUG_MVEBU_UART_ALTERNATE
+ 	default 0xf1012000 if ARCH_DOVE || ARCH_KIRKWOOD || ARCH_MV78XX0 || \
+@@ -1136,6 +1145,7 @@ config DEBUG_UART_VIRT
+ 	default 0xf7008000 if DEBUG_S3C24XX_UART && (DEBUG_S3C_UART2 || \
+ 				DEBUG_S3C2410_UART2)
+ 	default 0xf7fc9000 if DEBUG_BERLIN_UART
++	default 0xf8007000 if DEBUG_HIP04_UART
+ 	default 0xf8009000 if DEBUG_VEXPRESS_UART0_CA9
+ 	default 0xf8090000 if DEBUG_VEXPRESS_UART0_RS1
+ 	default 0xfa71e000 if DEBUG_QCOM_UARTDM
 -- 
 1.9.1
