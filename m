@@ -1,134 +1,84 @@
-From: keescook@chromium.org (Kees Cook)
-Date: Thu, 7 Aug 2014 10:47:30 -0700
-Subject: [PATCH 1/8] arm: use generic fixmap.h
-In-Reply-To: <20140807173832.GN4179@bivouac.eciton.net>
-References: <1407423713-4160-1-git-send-email-keescook@chromium.org>
- <1407423713-4160-2-git-send-email-keescook@chromium.org>
- <20140807173832.GN4179@bivouac.eciton.net>
-Message-ID: <CAGXu5jL8TzxcSf_o49sTtxoEEqLRqb-Nwm2utzsftPiqtJ6d1Q@mail.gmail.com>
+From: fabio.estevam@freescale.com (Fabio Estevam)
+Date: Thu, 7 Aug 2014 15:01:33 -0300
+Subject: [PATCH] ARM: dts: imx53-qsrb: Fix suspend/resume
+Message-ID: <1407434493-22152-1-git-send-email-fabio.estevam@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Aug 7, 2014 at 10:38 AM, Leif Lindholm <leif.lindholm@linaro.org> wrote:
-> On Thu, Aug 07, 2014 at 08:01:46AM -0700, Kees Cook wrote:
->> From: Mark Salter <msalter@redhat.com>
->>
->> ARM is different from other architectures in that fixmap pages are indexed
->> with a positive offset from FIXADDR_START.  Other architectures index with
->> a negative offset from FIXADDR_TOP.  In order to use the generic fixmap.h
->> definitions, this patch redefines FIXADDR_TOP to be inclusive of the
->> useable range.  That is, FIXADDR_TOP is the virtual address of the topmost
->> fixed page.  The newly defined FIXADDR_END is the first virtual address
->> past the fixed mappings.
->>
->> Signed-off-by: Mark Salter <msalter@redhat.com>
->> Reviewed-by: Doug Anderson <dianders@chromium.org>
->> [update for "ARM: 8031/2: change fixmap mapping region to support 32 CPUs"]
->> [flipped highmem order, thanks to Laura Abbott]
->> Signed-off-by: Kees Cook <keescook@chromium.org>
->> Cc: Laura Abbott <lauraa@codeaurora.org>
->> ---
->>  arch/arm/include/asm/fixmap.h | 27 +++++++++------------------
->>  arch/arm/mm/highmem.c         |  8 ++++++--
->>  arch/arm/mm/init.c            |  2 +-
->>  3 files changed, 16 insertions(+), 21 deletions(-)
->>
->> diff --git a/arch/arm/include/asm/fixmap.h b/arch/arm/include/asm/fixmap.h
->> index 74124b0d0d79..190142d174ee 100644
->> --- a/arch/arm/include/asm/fixmap.h
->> +++ b/arch/arm/include/asm/fixmap.h
->> @@ -2,27 +2,18 @@
->>  #define _ASM_FIXMAP_H
->>
->>  #define FIXADDR_START                0xffc00000UL
->> -#define FIXADDR_TOP          0xffe00000UL
->> -#define FIXADDR_SIZE         (FIXADDR_TOP - FIXADDR_START)
->> +#define FIXADDR_END          0xffe00000UL
->> +#define FIXADDR_TOP          (FIXADDR_END - PAGE_SIZE)
->> +#define FIXADDR_SIZE         (FIXADDR_END - FIXADDR_START)
->>
->>  #define FIX_KMAP_NR_PTES     (FIXADDR_SIZE >> PAGE_SHIFT)
->>
->> -#define __fix_to_virt(x)     (FIXADDR_START + ((x) << PAGE_SHIFT))
->> -#define __virt_to_fix(x)     (((x) - FIXADDR_START) >> PAGE_SHIFT)
->> +enum fixed_addresses {
->> +     FIX_KMAP_BEGIN,
->> +     FIX_KMAP_END = FIX_KMAP_NR_PTES - 1,
->> +     __end_of_fixed_addresses
->> +};
->>
->> -extern void __this_fixmap_does_not_exist(void);
->> -
->> -static inline unsigned long fix_to_virt(const unsigned int idx)
->> -{
->> -     if (idx >= FIX_KMAP_NR_PTES)
->> -             __this_fixmap_does_not_exist();
->> -     return __fix_to_virt(idx);
->> -}
->> -
->> -static inline unsigned int virt_to_fix(const unsigned long vaddr)
->> -{
->> -     BUG_ON(vaddr >= FIXADDR_TOP || vaddr < FIXADDR_START);
->> -     return __virt_to_fix(vaddr);
->> -}
->> +#include <asm-generic/fixmap.h>
->>
->>  #endif
->> diff --git a/arch/arm/mm/highmem.c b/arch/arm/mm/highmem.c
->> index 45aeaaca9052..a1241ee8425e 100644
->> --- a/arch/arm/mm/highmem.c
->> +++ b/arch/arm/mm/highmem.c
->> @@ -23,14 +23,18 @@ pte_t *fixmap_page_table;
->>  static inline void set_fixmap_pte(int idx, pte_t pte)
->>  {
->>       unsigned long vaddr = __fix_to_virt(idx);
->> -     set_pte_ext(fixmap_page_table + idx, pte, 0);
->> +     pte_t *ppte = pte_offset_kernel(pmd_off_k(FIXADDR_START), vaddr);
->> +
->> +     set_pte_ext(ppte, pte, 0);
->>       local_flush_tlb_kernel_page(vaddr);
->>  }
->>
->>  static inline pte_t get_fixmap_pte(unsigned long vaddr)
->>  {
->>       unsigned long idx = __virt_to_fix(vaddr);
->
-> idx is now "unused variable".
+The following error is seen after a suspend/resume cycle on a mx53qsb with a
+MC34708 PMIC:
 
-Ah! Yes, thanks. I'll add HIGHMEM to my build cycles.
+root at freescale /$ echo mem > /sys/power/state 
+[   32.630592] PM: Syncing filesystems ... done.
+[   32.643924] Freezing user space processes ... (elapsed 0.001 seconds) done.
+[   32.652384] Freezing remaining freezable tasks ... (elapsed 0.001 seconds) done.
+[   32.679156] PM: suspend of devices complete after 13.113 msecs
+[   32.685128] PM: suspend devices took 0.030 seconds
+[   32.696109] PM: late suspend of devices complete after 6.133 msecs
+[   33.313032] mc13xxx 0-0008: Failed to read IRQ status: -110
+[   33.322009] PM: noirq suspend of devices complete after 619.667 msecs
+[   33.328544] Disabling non-boot CPUs ...
+[   33.335031] PM: noirq resume of devices complete after 2.352 msecs
+[   33.842940] mc13xxx 0-0008: Failed to read IRQ status: -110
+[   33.976095] [sched_delayed] sched: RT throttling activated
+[   33.984804] PM: early resume of devices complete after 642.642 msecs
+[   34.352954] mc13xxx 0-0008: Failed to read IRQ status: -110
+[   34.862910] mc13xxx 0-0008: Failed to read IRQ status: -110
+[   34.996595] PM: resume of devices complete after 1005.367 msecs
+[   35.372925] mc13xxx 0-0008: Failed to read IRQ status: -110
+[   35.882911] mc13xxx 0-0008: Failed to read IRQ status: -110
+[   35.955707] PM: resume devices took 1.970 seconds
+[   35.960445] Restarting tasks ... done.
+[   35.993386] fec 63fec000.ethernet eth0: Link is Down
+[   36.392980] mc13xxx 0-0008: Failed to read IRQ status: -110
+[   36.902908] mc13xxx 0-0008: Failed to read IRQ status: -110
+[   36.953036] ata1: SATA link down (SStatus 0 SControl 300)
+[   37.412922] mc13xxx 0-0008: Failed to read IRQ status: -110
+[   37.922906] mc13xxx 0-0008: Failed to read IRQ status: -110
+[   37.993379] fec 63fec000.ethernet eth0: Link is Up - 100Mbps/Full - flow control rx/tx
+[   38.432938] mc13xxx 0-0008: Failed to read IRQ status: -110
+[   38.942920] mc13xxx 0-0008: Failed to read IRQ status: -110
+[   39.452933] mc13xxx 0-0008: Failed to read IRQ status: -110
 
->
->> -     return *(fixmap_page_table + idx);
->> +     pte_t *ppte = pte_offset_kernel(pmd_off_k(FIXADDR_START), vaddr);
->> +
->> +     return *ppte;
->>  }
->>
->>  void *kmap(struct page *page)
->> diff --git a/arch/arm/mm/init.c b/arch/arm/mm/init.c
->> index 659c75d808dc..ad82c05bfc3a 100644
->> --- a/arch/arm/mm/init.c
->> +++ b/arch/arm/mm/init.c
->> @@ -570,7 +570,7 @@ void __init mem_init(void)
->>                       MLK(DTCM_OFFSET, (unsigned long) dtcm_end),
->>                       MLK(ITCM_OFFSET, (unsigned long) itcm_end),
->>  #endif
->> -                     MLK(FIXADDR_START, FIXADDR_TOP),
->> +                     MLK(FIXADDR_START, FIXADDR_END),
->>                       MLM(VMALLOC_START, VMALLOC_END),
->>                       MLM(PAGE_OFFSET, (unsigned long)high_memory),
->>  #ifdef CONFIG_HIGHMEM
->> --
->> 1.9.1
->
-> Apart from that, verified with early_ioremap/UEFI patches on TC2.
->
-> Tested-by: Leif Lindholm <leif.lindholm@linaro.org>
+(flood of this error message continues forever)
 
-Thanks! I've added this and fixed idx above for the future v3 of this series.
+Commit 5169df8be0a432ee ("ARM: dts: i.MX53: add support for MCIMX53-START-R")
+missed to configure the IOMUX for the PMIC IRQ pin.
 
--Kees
+Configure the PMIC IRQ pin so that the suspend/resume sequence behaves cleanly
+as expected.
 
+Cc: <stable@vger.kernel.org> # 3.16
+Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
+---
+ arch/arm/boot/dts/imx53-qsrb.dts | 8 ++++++++
+ 1 file changed, 8 insertions(+)
+
+diff --git a/arch/arm/boot/dts/imx53-qsrb.dts b/arch/arm/boot/dts/imx53-qsrb.dts
+index f1bbf9a..82d623d 100644
+--- a/arch/arm/boot/dts/imx53-qsrb.dts
++++ b/arch/arm/boot/dts/imx53-qsrb.dts
+@@ -28,6 +28,12 @@
+ 				MX53_PAD_CSI0_DAT9__I2C1_SCL      0x400001ec
+ 			>;
+ 		};
++
++		pinctrl_pmic: pmicgrp {
++			fsl,pins = <
++				MX53_PAD_CSI0_DAT5__GPIO5_23	0x1e4 /* IRQ */
++			>;
++		};
+ 	};
+ };
+ 
+@@ -38,6 +44,8 @@
+ 
+ 	pmic: mc34708 at 8 {
+ 		compatible = "fsl,mc34708";
++		pinctrl-names = "default";
++		pinctrl-0 = <&pinctrl_pmic>;
+ 		reg = <0x08>;
+ 		interrupt-parent = <&gpio5>;
+ 		interrupts = <23 0x8>;
 -- 
-Kees Cook
-Chrome OS Security
+1.9.1
