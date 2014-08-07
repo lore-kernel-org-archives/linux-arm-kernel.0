@@ -1,33 +1,112 @@
-From: nicolas.pitre@linaro.org (Nicolas Pitre)
-Date: Thu, 7 Aug 2014 11:32:07 -0400 (EDT)
-Subject: [PATCH 1/7] arm: use generic fixmap.h
-In-Reply-To: <CAL_JsqJgRFYTfdsY48C9QreBH=VcM3t-9AzFSV8oXLB5tVGjUw@mail.gmail.com>
-References: <1407353564-21478-1-git-send-email-keescook@chromium.org>
- <1407353564-21478-2-git-send-email-keescook@chromium.org>
- <CAMo8Bf+uq1vhqb7KxnNFHTZ53C1mtw_Do6dn09j7jjw_7MWF_Q@mail.gmail.com>
- <CAL_JsqJgRFYTfdsY48C9QreBH=VcM3t-9AzFSV8oXLB5tVGjUw@mail.gmail.com>
-Message-ID: <alpine.LFD.2.11.1408071131170.6061@knanqh.ubzr>
+From: rostedt@goodmis.org (Steven Rostedt)
+Date: Thu, 7 Aug 2014 11:33:02 -0400
+Subject: [PATCH v2 5/5] X86: add IPI tracepoints
+In-Reply-To: <1406318733-26754-6-git-send-email-nicolas.pitre@linaro.org>
+References: <1406318733-26754-1-git-send-email-nicolas.pitre@linaro.org>
+ <1406318733-26754-6-git-send-email-nicolas.pitre@linaro.org>
+Message-ID: <20140807113302.55aee779@gandalf.local.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 7 Aug 2014, Rob Herring wrote:
+Peter,
 
-> On Thu, Aug 7, 2014 at 10:15 AM, Max Filippov <jcmvbkbc@gmail.com> wrote:
-> > Hi,
-> >
-> > On Wed, Aug 6, 2014 at 11:32 PM, Kees Cook <keescook@chromium.org> wrote:
-> >> ARM is different from other architectures in that fixmap pages are indexed
-> >> with a positive offset from FIXADDR_START.  Other architectures index with
-> >> a negative offset from FIXADDR_TOP.  In order to use the generic fixmap.h
-> >
-> > Does anybody know if there's any reason why generic fixmap.h uses negative
-> > offsets? It complicates things with no obvious benefit if you e.g. try to align
-> > virtual address in the fixmap region with physical page color (that's why I've
-> > switched xtensa to positive fixmap addressing in v3.17).
+I'm pulling in Nicolas's changes to trace and the arm architectures. He
+has this x86 patch. Do you think this would be fine as well? Otherwise,
+I'll just add the arm patches, and push that for this merge window
+(these patches have been out on the mailing list for some time, with no
+changes).
+
+-- Steve
+
+
+On Fri, 25 Jul 2014 16:05:33 -0400
+Nicolas Pitre <nicolas.pitre@linaro.org> wrote:
+
+> On X86 there are already tracepoints for IRQ vectors through which IPIs
+> are handled.  However this is highly X86 specific, and the IPI signaling
+> is not currently traced.
 > 
-> No, but each arch doing it differently is even more annoying.
-
-Why not switching everybody to positive offsets then?
-
-
-Nicolas
+> This is an attempt at adding generic IPI tracepoints to X86.
+> 
+> Signed-off-by: Nicolas Pitre <nico@linaro.org>
+> ---
+>  arch/x86/kernel/smp.c | 20 ++++++++++++++++++++
+>  1 file changed, 20 insertions(+)
+> 
+> diff --git a/arch/x86/kernel/smp.c b/arch/x86/kernel/smp.c
+> index be8e1bde07..d193609bea 100644
+> --- a/arch/x86/kernel/smp.c
+> +++ b/arch/x86/kernel/smp.c
+> @@ -31,6 +31,16 @@
+>  #include <asm/apic.h>
+>  #include <asm/nmi.h>
+>  #include <asm/trace/irq_vectors.h>
+> +
+> +#define CREATE_TRACE_POINTS
+> +/*
+> + * Those were defined in <asm/trace/irq_vectors.h> and cause problems
+> + * when including <trace/events/ipi.h>.
+> + */
+> +#undef TRACE_INCLUDE_PATH
+> +#undef TRACE_INCLUDE_FILE
+> +#include <trace/events/ipi.h>
+> +
+>  /*
+>   *	Some notes on x86 processor bugs affecting SMP operation:
+>   *
+> @@ -124,11 +134,13 @@ static void native_smp_send_reschedule(int cpu)
+>  		WARN_ON(1);
+>  		return;
+>  	}
+> +	trace_ipi_raise(cpumask_of(cpu), tracepoint_string("RESCHEDULE"));
+>  	apic->send_IPI_mask(cpumask_of(cpu), RESCHEDULE_VECTOR);
+>  }
+>  
+>  void native_send_call_func_single_ipi(int cpu)
+>  {
+> +	trace_ipi_raise(cpumask_of(cpu), tracepoint_string("CALL_FUNCTION_SINGLE"));
+>  	apic->send_IPI_mask(cpumask_of(cpu), CALL_FUNCTION_SINGLE_VECTOR);
+>  }
+>  
+> @@ -136,6 +148,8 @@ void native_send_call_func_ipi(const struct cpumask *mask)
+>  {
+>  	cpumask_var_t allbutself;
+>  
+> +	trace_ipi_raise(mask, tracepoint_string("CALL_FUNCTION"));
+> +
+>  	if (!alloc_cpumask_var(&allbutself, GFP_ATOMIC)) {
+>  		apic->send_IPI_mask(mask, CALL_FUNCTION_VECTOR);
+>  		return;
+> @@ -252,8 +266,10 @@ finish:
+>   */
+>  static inline void __smp_reschedule_interrupt(void)
+>  {
+> +	trace_ipi_entry(tracepoint_string("RESCHEDULE"));
+>  	inc_irq_stat(irq_resched_count);
+>  	scheduler_ipi();
+> +	trace_ipi_exit(tracepoint_string("RESCHEDULE"));
+>  }
+>  
+>  __visible void smp_reschedule_interrupt(struct pt_regs *regs)
+> @@ -291,8 +307,10 @@ __visible void smp_trace_reschedule_interrupt(struct pt_regs *regs)
+>  
+>  static inline void __smp_call_function_interrupt(void)
+>  {
+> +	trace_ipi_entry(tracepoint_string("CALL_FUNCTION"));
+>  	generic_smp_call_function_interrupt();
+>  	inc_irq_stat(irq_call_count);
+> +	trace_ipi_exit(tracepoint_string("CALL_FUNCTION"));
+>  }
+>  
+>  __visible void smp_call_function_interrupt(struct pt_regs *regs)
+> @@ -313,8 +331,10 @@ __visible void smp_trace_call_function_interrupt(struct pt_regs *regs)
+>  
+>  static inline void __smp_call_function_single_interrupt(void)
+>  {
+> +	trace_ipi_entry(tracepoint_string("CALL_FUNCTION_SINGLE"));
+>  	generic_smp_call_function_single_interrupt();
+>  	inc_irq_stat(irq_call_count);
+> +	trace_ipi_exit(tracepoint_string("CALL_FUNCTION_SINGLE"));
+>  }
+>  
+>  __visible void smp_call_function_single_interrupt(struct pt_regs *regs)
