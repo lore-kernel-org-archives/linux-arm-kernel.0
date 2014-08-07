@@ -1,50 +1,31 @@
-From: l.stach@pengutronix.de (Lucas Stach)
-Date: Thu,  7 Aug 2014 19:39:41 +0200
-Subject: [PATCH v2] ARM: imx6: add pci config space as platform resource
-Message-ID: <1407433181-21960-1-git-send-email-l.stach@pengutronix.de>
+From: broonie@kernel.org (Mark Brown)
+Date: Thu, 7 Aug 2014 18:44:42 +0100
+Subject: [PATCH v3 2/8] spi: sun4i: add DMA support
+In-Reply-To: <1407183002-29420-3-git-send-email-emilio@elopez.com.ar>
+References: <1407183002-29420-1-git-send-email-emilio@elopez.com.ar>
+ <1407183002-29420-3-git-send-email-emilio@elopez.com.ar>
+Message-ID: <20140807174442.GP17528@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Fixes "imx6q-pcie 1ffc000.pcie: missing *config* reg space"
-error exposed by new versions of the designware pcie driver.
+On Mon, Aug 04, 2014 at 05:09:56PM -0300, Emilio L?pez wrote:
 
-Signed-off-by: Lucas Stach <l.stach@pengutronix.de>
----
-v2: also fix documentation example
----
- Documentation/devicetree/bindings/pci/fsl,imx6q-pcie.txt | 4 +++-
- arch/arm/boot/dts/imx6qdl.dtsi                           | 4 +++-
- 2 files changed, 6 insertions(+), 2 deletions(-)
+> +static int sun4i_spi_prepare_message(struct spi_master *master,
+> +				     struct spi_message *msg)
+> +{
+> +	struct sun4i_spi *sspi = spi_master_get_devdata(master);
+> +
+> +	master->dma_rx = sspi->rx_dma_chan;
+> +	master->dma_tx = sspi->tx_dma_chan;
+> +
+> +	return 0;
+> +}
 
-diff --git a/Documentation/devicetree/bindings/pci/fsl,imx6q-pcie.txt b/Documentation/devicetree/bindings/pci/fsl,imx6q-pcie.txt
-index 9455fd0ec830..6fbba53a309b 100644
---- a/Documentation/devicetree/bindings/pci/fsl,imx6q-pcie.txt
-+++ b/Documentation/devicetree/bindings/pci/fsl,imx6q-pcie.txt
-@@ -17,7 +17,9 @@ Example:
- 
- 	pcie at 0x01000000 {
- 		compatible = "fsl,imx6q-pcie", "snps,dw-pcie";
--		reg = <0x01ffc000 0x4000>;
-+		reg = <0x01ffc000 0x04000>,
-+		      <0x01f00000 0x80000>;
-+		reg-names = "dbi", "config";
- 		#address-cells = <3>;
- 		#size-cells = <2>;
- 		device_type = "pci";
-diff --git a/arch/arm/boot/dts/imx6qdl.dtsi b/arch/arm/boot/dts/imx6qdl.dtsi
-index ce0599134a69..6b5da2a98aaf 100644
---- a/arch/arm/boot/dts/imx6qdl.dtsi
-+++ b/arch/arm/boot/dts/imx6qdl.dtsi
-@@ -133,7 +133,9 @@
- 
- 		pcie: pcie at 0x01000000 {
- 			compatible = "fsl,imx6q-pcie", "snps,dw-pcie";
--			reg = <0x01ffc000 0x4000>; /* DBI */
-+			reg = <0x01ffc000 0x04000>,
-+			      <0x01f00000 0x80000>;
-+			reg-names = "dbi", "config";
- 			#address-cells = <3>;
- 			#size-cells = <2>;
- 			device_type = "pci";
--- 
-2.0.1
+Why is this being done per transfer rather than at probe time?
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140807/930f5ba3/attachment.sig>
