@@ -1,79 +1,27 @@
-From: jic23@kernel.org (Jonathan Cameron)
-Date: Thu, 07 Aug 2014 10:15:19 +0100
-Subject: [PATCH 3/4] iio: fix error return code
-In-Reply-To: <1407355938-10932-3-git-send-email-Julia.Lawall@lip6.fr>
-References: <1407355938-10932-3-git-send-email-Julia.Lawall@lip6.fr>
-Message-ID: <53E343A7.9060700@kernel.org>
+From: will.deacon@arm.com (Will Deacon)
+Date: Thu, 7 Aug 2014 10:18:17 +0100
+Subject: [PATCH v2 4/5] ARM64: add IPI tracepoints
+In-Reply-To: <20140806155237.0a6d7d3c@gandalf.local.home>
+References: <1406318733-26754-1-git-send-email-nicolas.pitre@linaro.org>
+ <1406318733-26754-5-git-send-email-nicolas.pitre@linaro.org>
+ <20140806155237.0a6d7d3c@gandalf.local.home>
+Message-ID: <20140807091817.GG13703@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/08/14 21:12, Julia Lawall wrote:
-> From: Julia Lawall <Julia.Lawall@lip6.fr>
+On Wed, Aug 06, 2014 at 08:52:37PM +0100, Steven Rostedt wrote:
+> Will and Russell,
 > 
-> Convert a zero return value on error to a negative one, as returned
-> elsewhere in the function.
-> 
-> A simplified version of the semantic match that finds this problem is as
-> follows: (http://coccinelle.lip6.fr/)
-> 
-> // <smpl>
-> (
-> if at p1 (\(ret < 0\|ret != 0\))
->  { ... return ret; }
-> |
-> ret at p1 = 0
-> )
-> ... when != ret = e1
->     when != &ret
-> *if(...)
-> {
->   ... when != ret = e2
->       when forall
->  return ret;
-> }
-> 
-> // </smpl>
-> 
-> Signed-off-by: Julia Lawall <Julia.Lawall@lip6.fr>
-I'll take the view this one is 'obviously' right.  If it isn't
-then anyone feel free to shout!
+> Can you give me your Acked-by for this, and I can pull it through my
+> tree?
 
-Applied to the togreg branch of iio.git.
+Looks fine to me:
 
-Thanks,
+  Acked-by: Will Deacon <will.deacon@arm.com>
 
-Jonathan
-> 
-> ---
->  drivers/iio/adc/xilinx-xadc-core.c |    8 ++++++--
->  1 file changed, 6 insertions(+), 2 deletions(-)
-> 
-> diff --git a/drivers/iio/adc/xilinx-xadc-core.c b/drivers/iio/adc/xilinx-xadc-core.c
-> index fd2745c..196e269 100644
-> --- a/drivers/iio/adc/xilinx-xadc-core.c
-> +++ b/drivers/iio/adc/xilinx-xadc-core.c
-> @@ -1201,12 +1201,16 @@ static int xadc_probe(struct platform_device *pdev)
->  			goto err_device_free;
->  
->  		xadc->convst_trigger = xadc_alloc_trigger(indio_dev, "convst");
-> -		if (IS_ERR(xadc->convst_trigger))
-> +		if (IS_ERR(xadc->convst_trigger)) {
-> +			ret = PTR_ERR(xadc->convst_trigger);
->  			goto err_triggered_buffer_cleanup;
-> +		}
->  		xadc->samplerate_trigger = xadc_alloc_trigger(indio_dev,
->  			"samplerate");
-> -		if (IS_ERR(xadc->samplerate_trigger))
-> +		if (IS_ERR(xadc->samplerate_trigger)) {
-> +			ret = PTR_ERR(xadc->samplerate_trigger);
->  			goto err_free_convst_trigger;
-> +		}
->  	}
->  
->  	xadc->clk = devm_clk_get(&pdev->dev, NULL);
-> 
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-iio" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
-> 
+I'm assuming there's a dependency on other patches going via the tracing
+tree, hence why you're taking this?
+
+Cheers,
+
+Will
