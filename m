@@ -1,42 +1,27 @@
-From: msalter@redhat.com (Mark Salter)
-Date: Thu, 07 Aug 2014 13:23:14 -0400
-Subject: [PATCH 1/7] arm: use generic fixmap.h
-In-Reply-To: <CAMo8Bf+DP-xZGnnFFvwc1XDEGUGkj1KkYQ_x+2i_hE0a9t7NKw@mail.gmail.com>
-References: <1407353564-21478-1-git-send-email-keescook@chromium.org>
- <1407353564-21478-2-git-send-email-keescook@chromium.org>
- <CAMo8Bf+uq1vhqb7KxnNFHTZ53C1mtw_Do6dn09j7jjw_7MWF_Q@mail.gmail.com>
- <CAL_JsqJgRFYTfdsY48C9QreBH=VcM3t-9AzFSV8oXLB5tVGjUw@mail.gmail.com>
- <alpine.LFD.2.11.1408071131170.6061@knanqh.ubzr>
- <CAMo8Bf+DP-xZGnnFFvwc1XDEGUGkj1KkYQ_x+2i_hE0a9t7NKw@mail.gmail.com>
-Message-ID: <1407432194.599.13.camel@deneb.redhat.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Thu, 7 Aug 2014 18:27:19 +0100
+Subject: [PATCH v3 1/2] arm64: add helper functions to read I-cache
+ attributes
+In-Reply-To: <1407339966-29351-1-git-send-email-ard.biesheuvel@linaro.org>
+References: <1407339966-29351-1-git-send-email-ard.biesheuvel@linaro.org>
+Message-ID: <20140807172719.GE31101@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 2014-08-07 at 19:42 +0400, Max Filippov wrote:
-> On Thu, Aug 7, 2014 at 7:32 PM, Nicolas Pitre <nicolas.pitre@linaro.org> wrote:
-> > On Thu, 7 Aug 2014, Rob Herring wrote:
-> >
-> >> On Thu, Aug 7, 2014 at 10:15 AM, Max Filippov <jcmvbkbc@gmail.com> wrote:
-> >> > Hi,
-> >> >
-> >> > On Wed, Aug 6, 2014 at 11:32 PM, Kees Cook <keescook@chromium.org> wrote:
-> >> >> ARM is different from other architectures in that fixmap pages are indexed
-> >> >> with a positive offset from FIXADDR_START.  Other architectures index with
-> >> >> a negative offset from FIXADDR_TOP.  In order to use the generic fixmap.h
-> >> >
-> >> > Does anybody know if there's any reason why generic fixmap.h uses negative
-> >> > offsets? It complicates things with no obvious benefit if you e.g. try to align
-> >> > virtual address in the fixmap region with physical page color (that's why I've
-> >> > switched xtensa to positive fixmap addressing in v3.17).
-> >>
-> >> No, but each arch doing it differently is even more annoying.
-> >
-> > Why not switching everybody to positive offsets then?
+On Wed, Aug 06, 2014 at 04:46:05PM +0100, Ard Biesheuvel wrote:
+> This adds helper functions and #defines to <asm/cachetype.h> to read the
+> line size and the number of sets from the level 1 instruction cache.
 > 
-> I can cook a patch if people agree that that'd be good.
+> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+> ---
+> v3: add WARN_ON(preemptible()), move icache_get_ccsidr() to cpuinfo.c to
+>     prevent #include header recursion hell
+> v2: put () around macro args, use 64-bit types for asm() mrs/msr calls
 > 
+>  arch/arm64/include/asm/cachetype.h | 20 ++++++++++++++++++++
+>  arch/arm64/kernel/cpuinfo.c        | 14 ++++++++++++++
+>  2 files changed, 34 insertions(+)
 
-I think that would be fine. I think x86 was first and used a negative
-negative offset. Others that followed just copied that. When I did the
-generic fixmap patch, using a negative offset was the natural thing to
-do. Arm was only arch doing it differently.
+  Acked-by: Will Deacon <will.deacon@arm.com>
+
+Will
