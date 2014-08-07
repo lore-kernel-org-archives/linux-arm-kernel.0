@@ -1,65 +1,123 @@
-From: dianders@chromium.org (Doug Anderson)
-Date: Thu, 7 Aug 2014 14:23:36 -0700
-Subject: [PATCH v4 4/4] ARM: dts: Enable USB otg and host1(dwc) on
- rk3288-evb
-In-Reply-To: <1407404095-3265-5-git-send-email-kever.yang@rock-chips.com>
-References: <1407404095-3265-1-git-send-email-kever.yang@rock-chips.com>
- <1407404095-3265-5-git-send-email-kever.yang@rock-chips.com>
-Message-ID: <CAD=FV=V-yb0JLJ24i5zsKzdZExJ5h8NGDD0QdG1740kc3yoEdQ@mail.gmail.com>
+From: paul@pwsan.com (Paul Walmsley)
+Date: Thu, 7 Aug 2014 21:33:58 +0000 (UTC)
+Subject: OMAP baseline test results for v3.16
+Message-ID: <alpine.DEB.2.02.1408072131470.5770@utopia.booyaka.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Kever,
 
-On Thu, Aug 7, 2014 at 2:34 AM, Kever Yang <kever.yang@rock-chips.com> wrote:
-> USB otg port is the usb3.0 b-port on the board.
-> USB host1 port is the host A port nearby the otg port.
->
-> Signed-off-by: Kever Yang <kever.yang@rock-chips.com>
->
-> ---
->
-> Changes in v4: None
-> Changes in v3:
-> - Rebase
->
-> Changes in v2:
-> - evb patch added in version 2
->
->  arch/arm/boot/dts/rk3288-evb.dtsi | 6 ++++++
->  1 file changed, 6 insertions(+)
->
-> diff --git a/arch/arm/boot/dts/rk3288-evb.dtsi b/arch/arm/boot/dts/rk3288-evb.dtsi
-> index 4f57209..a322100 100644
-> --- a/arch/arm/boot/dts/rk3288-evb.dtsi
-> +++ b/arch/arm/boot/dts/rk3288-evb.dtsi
-> @@ -94,3 +94,9 @@
->  &usb_host0_ehci {
->         status = "okay";
->  };
-> +&usb_host1 {
-> +       status = "okay";
-> +};
-> +&usb_otg {
-> +       status = "okay";
-> +};
+Here are some basic OMAP test results for Linux v3.16.
+Logs and other details at:
 
-Do you really want to enable "usb_otg" on EVB?  I think you have a
-rework on your board to enable vbus on this port, but I don't think
-it's applicable to anyone else, is it?
-
-I'm told that on some boards you can turn on GPIO0_12 to get vbus, but
-I don't have a board like that so I can't really test.  Even so,
-before enabling the otg port we should probably put something in the
-dts file that would turn on that vbus...
-
-Unless you've somehow gotten gadget mode to work on the OTG port, my
-vote would be to leave it disabled for the EVB for now.
+    http://www.pwsan.com/omap/testlogs/test_v3.16/20140804182520/
 
 
-NOTE: keeping the otg definition in the main "r3288.dtsi" (patch 3/4)
-still makes sense because other boards may have the OTG port hooked
-up.
+Test summary
+------------
+
+Build: zImage:
+    Pass (16/16): multi_v7_defconfig, omap2plus_defconfig,
+		  omap2plus_defconfig_am33xx_only,
+		  omap2plus_defconfig_am43xx_only,
+		  omap2plus_defconfig_2430sdp_only,
+		  omap2plus_defconfig_cpupm, omap2plus_defconfig_no_pm,
+		  omap2plus_defconfig_n800_only_a,
+		  omap2plus_defconfig_n800_multi_omap2xxx,
+		  omap2plus_defconfig_omap2_4_only,
+		  omap2plus_defconfig_omap3_4_only,
+		  omap2plus_defconfig_dra7xx_only,
+		  rmk_omap3430_ldp_allnoconfig,
+		  rmk_omap3430_ldp_oldconfig,
+		  rmk_omap4430_sdp_allnoconfig,
+		  rmk_omap4430_sdp_oldconfig
+
+Build: uImage:
+    Pass ( 3/ 3): omap1_defconfig, omap1_defconfig_1510innovator_only,
+		  omap1_defconfig_5912osk_only
+
+Build: uImage+dtb:
+    Pass (10/10): omap2plus_defconfig_am33xx_only/am335x-bone,
+		  omap2plus_defconfig/omap4-panda,
+		  omap2plus_defconfig/omap4-panda-es,
+		  omap2plus_defconfig/am3517-evm,
+		  omap2plus_defconfig/omap2430-sdp,
+		  omap2plus_defconfig/omap3-beagle,
+		  omap2plus_defconfig/omap3-beagle-xm,
+		  omap2plus_defconfig/omap3-evm-37xx,
+		  omap2plus_defconfig/omap4-var-som,
+		  omap2plus_defconfig/omap5-uevm
+
+Boot to userspace:
+    FAIL ( 1/14): 2430sdp
+    skip ( 1/14): 5912osk
+    Pass (12/14): 2420n800, 3517evm, 3530es3beagle, 3730beaglexm,
+		  37xxevm, 4430es2panda, 4460pandaes, am335xbone,
+		  am335xbonelt, cmt3517, 4460varsomom, 5430es2uevm
+
+PM: chip retention via suspend:
+    FAIL ( 5/ 7): 2430sdp, 37xxevm, 4430es2panda, 4460pandaes,
+		  4460varsomom
+    Pass ( 2/ 7): 3530es3beagle, 3730beaglexm
+
+PM: chip retention via dynamic idle:
+    FAIL ( 6/ 7): 2430sdp, 3530es3beagle, 37xxevm, 4430es2panda,
+		  4460pandaes, 4460varsomom
+    Pass ( 1/ 7): 3730beaglexm
+
+PM: chip off except CORE via suspend:
+    Pass ( 1/ 1): 3730beaglexm
+
+PM: chip off except CORE via dynamic idle:
+    Pass ( 1/ 1): 3730beaglexm
+
+PM: chip off via suspend:
+    FAIL ( 5/ 5): 3530es3beagle, 37xxevm, 4430es2panda, 4460pandaes,
+		  4460varsomom
+
+PM: chip off via dynamic idle:
+    FAIL ( 5/ 5): 3530es3beagle, 37xxevm, 4430es2panda, 4460pandaes,
+		  4460varsomom
 
 
--Doug
+vmlinux object size
+(delta in bytes from test_v3.16-rc7 (64aa90f26c06e1cb2aacfb98a7d0eccfbd6c1a91)):
+   text     data      bss    total  kernel
+   +456        0        0     +456  omap1_defconfig
+   +400      -16        0     +384  omap1_defconfig_1510innovator_only
+   +400      +24        0     +424  omap1_defconfig_5912osk_only
+  +4720       -8        0    +4712  multi_v7_defconfig
+  +4600      +16        0    +4616  omap2plus_defconfig
+  +9228        0        0    +9228  omap2plus_defconfig_2430sdp_only
+  +4372       -8        0    +4364  omap2plus_defconfig_am33xx_only
+  +4436       -8        0    +4428  omap2plus_defconfig_am43xx_only
+  +8696      -16        0    +8680  omap2plus_defconfig_cpupm
+  +4492        0        0    +4492  omap2plus_defconfig_dra7xx_only
+  +3696      -16        0    +3680  omap2plus_defconfig_n800_multi_omap2xxx
+  +7788      -16        0    +7772  omap2plus_defconfig_n800_only_a
+  +4600      +16        0    +4616  omap2plus_defconfig_no_pm
+  +4380      -16        0    +4364  omap2plus_defconfig_omap2_4_only
+  +4448       +8        0    +4456  omap2plus_defconfig_omap3_4_only
+  +4372      +24        0    +4396  omap2plus_defconfig_omap5_only
+  +4100       +8    +3784    +7892  rmk_omap3430_ldp_allnoconfig
+  +4060        0        0    +4060  rmk_omap3430_ldp_oldconfig
+  +4228       -8     -456    +3764  rmk_omap4430_sdp_allnoconfig
+  +7996        0        0    +7996  rmk_omap4430_sdp_oldconfig
+
+Boot-time memory difference
+(delta in bytes from test_v3.16-rc7 (64aa90f26c06e1cb2aacfb98a7d0eccfbd6c1a91))
+  avail  rsrvd   high  freed  board          kconfig
+    -8k     8k      .      .  2420n800       omap2plus_defconfig_n800_only_a
+    -8k     8k      .      .  2430sdp        omap2plus_defconfig
+    -8k     8k      .      .  3517evm        omap2plus_defconfig
+    -8k     8k      .      .  3530es3beagle  omap2plus_defconfig
+    -8k     8k      .      .  3730beaglexm   omap2plus_defconfig
+    -8k     8k      .      .  37xxevm        omap2plus_defconfig
+    -8k     8k      .      .  4430es2panda   omap2plus_defconfig
+    -8k     8k      .      .  4460pandaes    omap2plus_defconfig
+    -8k     8k      .      .  4460varsomom   omap2plus_defconfig
+    -8k     8k      .      .  5430es2uevm    omap2plus_defconfig
+    -8k     8k      .      .  am335xbonelt   omap2plus_defconfig
+
+
+Someone snuck a patch in between v3.16-rc7 and v3.16 that breaks suspend 
+and resume on 37xxevm.
