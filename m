@@ -1,107 +1,86 @@
 From: keescook@chromium.org (Kees Cook)
-Date: Thu,  7 Aug 2014 08:01:48 -0700
-Subject: [PATCH 3/8] arm: mm: reduce fixmap kmap from 32 to 16 CPUS
+Date: Thu,  7 Aug 2014 08:01:51 -0700
+Subject: [PATCH 6/8] arm: kgdb: Handle read-only text / modules
 In-Reply-To: <1407423713-4160-1-git-send-email-keescook@chromium.org>
 References: <1407423713-4160-1-git-send-email-keescook@chromium.org>
-Message-ID: <1407423713-4160-4-git-send-email-keescook@chromium.org>
+Message-ID: <1407423713-4160-7-git-send-email-keescook@chromium.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-More room is needed in the fixmap range for non-kmap fixmap entries. This
-reduces the kmap range from 32 to 16 CPUs. Additionally, add PTE entry for
-fixmap regardless of CONFIG_HIGHMEM.
+From: Doug Anderson <dianders@chromium.org>
 
+Handle the case where someone has set the text segment of the kernel
+as read-only by using the newly introduced "patch" mechanism.
+
+Signed-off-by: Doug Anderson <dianders@chromium.org>
 Signed-off-by: Kees Cook <keescook@chromium.org>
 ---
- arch/arm/include/asm/fixmap.h | 12 ++++++++++--
- arch/arm/mm/highmem.c         |  2 --
- arch/arm/mm/mm.h              |  3 +++
- arch/arm/mm/mmu.c             |  5 ++++-
- 4 files changed, 17 insertions(+), 5 deletions(-)
+ arch/arm/kernel/Makefile |  2 +-
+ arch/arm/kernel/kgdb.c   | 30 ++++++++++++++++++++++++++++++
+ 2 files changed, 31 insertions(+), 1 deletion(-)
 
-diff --git a/arch/arm/include/asm/fixmap.h b/arch/arm/include/asm/fixmap.h
-index 8ee7cb4f62ca..3ed08232be55 100644
---- a/arch/arm/include/asm/fixmap.h
-+++ b/arch/arm/include/asm/fixmap.h
-@@ -1,16 +1,24 @@
- #ifndef _ASM_FIXMAP_H
- #define _ASM_FIXMAP_H
- 
-+/*
-+ * The fixmap uses 2MB. The KMAP fixmap needs 64k per CPU, so make room for
-+ * 16 CPUs (taking 1MB) and leave the rest for additional fixmap areas.
-+ */
- #define FIXADDR_START		0xffc00000UL
- #define FIXADDR_END		0xffe00000UL
- #define FIXADDR_TOP		(FIXADDR_END - PAGE_SIZE)
- #define FIXADDR_SIZE		(FIXADDR_END - FIXADDR_START)
- 
--#define FIX_KMAP_NR_PTES	(FIXADDR_SIZE >> PAGE_SHIFT)
-+/* 16 PTEs per CPU (64k of 4k pages). */
-+#define FIX_KMAP_NR_PTES	16
-+#define FIX_KMAP_NR_CPUS	16
- 
- enum fixed_addresses {
-+	/* Support 16 CPUs for kmap as the first region of fixmap entries. */
- 	FIX_KMAP_BEGIN,
--	FIX_KMAP_END = FIX_KMAP_NR_PTES - 1,
-+	FIX_KMAP_END = (FIX_KMAP_NR_PTES * FIX_KMAP_NR_CPUS) - 1,
+diff --git a/arch/arm/kernel/Makefile b/arch/arm/kernel/Makefile
+index 38ddd9f83d0e..70b730766330 100644
+--- a/arch/arm/kernel/Makefile
++++ b/arch/arm/kernel/Makefile
+@@ -67,7 +67,7 @@ test-kprobes-objs		+= kprobes-test-arm.o
+ endif
+ obj-$(CONFIG_OABI_COMPAT)	+= sys_oabi-compat.o
+ obj-$(CONFIG_ARM_THUMBEE)	+= thumbee.o
+-obj-$(CONFIG_KGDB)		+= kgdb.o
++obj-$(CONFIG_KGDB)		+= kgdb.o patch.o
+ obj-$(CONFIG_ARM_UNWIND)	+= unwind.o
+ obj-$(CONFIG_HAVE_TCM)		+= tcm.o
+ obj-$(CONFIG_OF)		+= devtree.o
+diff --git a/arch/arm/kernel/kgdb.c b/arch/arm/kernel/kgdb.c
+index a74b53c1b7df..b2b9ccb6be59 100644
+--- a/arch/arm/kernel/kgdb.c
++++ b/arch/arm/kernel/kgdb.c
+@@ -12,8 +12,12 @@
+ #include <linux/irq.h>
+ #include <linux/kdebug.h>
+ #include <linux/kgdb.h>
++#include <linux/uaccess.h>
 +
- 	__end_of_fixed_addresses
- };
+ #include <asm/traps.h>
  
-diff --git a/arch/arm/mm/highmem.c b/arch/arm/mm/highmem.c
-index a1241ee8425e..adf264fb700b 100644
---- a/arch/arm/mm/highmem.c
-+++ b/arch/arm/mm/highmem.c
-@@ -18,8 +18,6 @@
- #include <asm/tlbflush.h>
- #include "mm.h"
- 
--pte_t *fixmap_page_table;
--
- static inline void set_fixmap_pte(int idx, pte_t pte)
++#include "patch.h"
++
+ struct dbg_reg_def_t dbg_reg_def[DBG_MAX_REG_NUM] =
  {
- 	unsigned long vaddr = __fix_to_virt(idx);
-diff --git a/arch/arm/mm/mm.h b/arch/arm/mm/mm.h
-index ce727d47275c..c8b5b2d05b55 100644
---- a/arch/arm/mm/mm.h
-+++ b/arch/arm/mm/mm.h
-@@ -7,6 +7,9 @@
- /* the upper-most page table pointer */
- extern pmd_t *top_pmd;
- 
-+/* The fixmap PTE. */
-+extern pte_t *fixmap_page_table;
-+
- /*
-  * 0xffff8000 to 0xffffffff is reserved for any ARM architecture
-  * specific hacks for copying pages efficiently, while 0xffff4000
-diff --git a/arch/arm/mm/mmu.c b/arch/arm/mm/mmu.c
-index e881ed817a8b..a7a756603775 100644
---- a/arch/arm/mm/mmu.c
-+++ b/arch/arm/mm/mmu.c
-@@ -53,6 +53,9 @@ EXPORT_SYMBOL(empty_zero_page);
-  */
- pmd_t *top_pmd;
- 
-+/* The fixmap PTE. */
-+pte_t *fixmap_page_table;
-+
- #define CPOLICY_UNCACHED	0
- #define CPOLICY_BUFFERED	1
- #define CPOLICY_WRITETHROUGH	2
-@@ -1342,10 +1345,10 @@ static void __init kmap_init(void)
- #ifdef CONFIG_HIGHMEM
- 	pkmap_page_table = early_pte_alloc(pmd_off_k(PKMAP_BASE),
- 		PKMAP_BASE, _PAGE_KERNEL_TABLE);
-+#endif
- 
- 	fixmap_page_table = early_pte_alloc(pmd_off_k(FIXADDR_START),
- 		FIXADDR_START, _PAGE_KERNEL_TABLE);
--#endif
+ 	{ "r0", 4, offsetof(struct pt_regs, ARM_r0)},
+@@ -244,6 +248,32 @@ void kgdb_arch_exit(void)
+ 	unregister_die_notifier(&kgdb_notifier);
  }
  
- static void __init map_lowmem(void)
++int kgdb_arch_set_breakpoint(struct kgdb_bkpt *bpt)
++{
++	int err;
++
++	/* patch_text() only supports int-sized breakpoints */
++	if (sizeof(int) != BREAK_INSTR_SIZE)
++		return -EINVAL;
++
++	err = probe_kernel_read(bpt->saved_instr, (char *)bpt->bpt_addr,
++				BREAK_INSTR_SIZE);
++	if (err)
++		return err;
++
++	patch_text((void *)bpt->bpt_addr,
++		   *(unsigned int *)arch_kgdb_ops.gdb_bpt_instr);
++
++	return err;
++}
++
++int kgdb_arch_remove_breakpoint(struct kgdb_bkpt *bpt)
++{
++	patch_text((void *)bpt->bpt_addr, *(unsigned int *)bpt->saved_instr);
++
++	return 0;
++}
++
+ /*
+  * Register our undef instruction hooks with ARM undef core.
+  * We regsiter a hook specifically looking for the KGB break inst
 -- 
 1.9.1
