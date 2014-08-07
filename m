@@ -1,72 +1,32 @@
-From: caesar.wang@rock-chips.com (caesar)
-Date: Thu, 07 Aug 2014 09:27:33 +0800
-Subject: [PATCH v4 2/2] pwm: rockchip: Added to support for RK3288 SoC
-In-Reply-To: <CAD=FV=V4Kp-H3CcAKZPV1jBnYX+Ntwvxx6RB13TLxS5RRPHTWA@mail.gmail.com>
-References: <1406197295-10604-1-git-send-email-caesar.wang@rock-chips.com>	<1406197295-10604-3-git-send-email-caesar.wang@rock-chips.com>
- <CAD=FV=V4Kp-H3CcAKZPV1jBnYX+Ntwvxx6RB13TLxS5RRPHTWA@mail.gmail.com>
-Message-ID: <53E2D605.2000704@rock-chips.com>
+From: zhangfei.gao@linaro.org (Zhangfei Gao)
+Date: Thu,  7 Aug 2014 09:35:57 +0800
+Subject: [PATCH v4 0/4] clk: hix5hd2: clocks update
+Message-ID: <1407375361-24958-1-git-send-email-zhangfei.gao@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Doug,
+v4:
+Drop ir clock, whose register is not in the same region
 
-? 2014?08?07? 06:46, Doug Anderson ??:
-> Caesar,
->
-> On Thu, Jul 24, 2014 at 3:21 AM, Caesar Wang <caesar.wang@rock-chips.com> wrote:
->> +static const struct rockchip_pwm_data pwm_data_v1 = {
->> +       .regs.duty = PWM_HRC,
->> +       .regs.period = PWM_LRC,
->> +       .regs.cntr = PWM_CNTR,
->> +       .regs.ctrl = PWM_CTRL,
->> +       .prescaler = PRESCALER,
->> +       .set_enable = rockchip_pwm_set_enable_v1,
->> +};
->> +
->> +static const struct rockchip_pwm_data pwm_data_v2 = {
->> +       .regs.duty = PWM_LRC,
->> +       .regs.period = PWM_HRC,
->> +       .regs.cntr = PWM_CNTR,
->> +       .regs.ctrl = PWM_CTRL,
->> +       .prescaler = PRESCALER-1,
->> +       .set_enable = rockchip_pwm_set_enable_v2,
->> +};
->> +
->> +static const struct rockchip_pwm_data pwm_data_vop = {
->> +       .regs.duty = PWM_LRC,
->> +       .regs.period = PWM_HRC,
->> +       .regs.cntr = PWM_CTRL,
->> +       .regs.ctrl = PWM_CNTR,
-> Did you really mean to flip CTRL and CNTR here?  If so, that's super
-> confusing and deserves a comment.  AKA, I think the above should not
-> be:
->
->   +       .regs.cntr = PWM_CTRL,
->   +       .regs.ctrl = PWM_CNTR,
->
-> ...but should be
->
->   +       .regs.cntr = PWM_CNTR,
->   +       .regs.ctrl = PWM_CTRL,
->
-> If you didn't mean to flip CTRL and CNTR here, then just get rid of
-> pwm_data_vop and refer to pwm_data_v2.  In fact, I'd suggest that you
-> totally remove the "rockchip,vop-pwm" since there's nothing different
-> between "rockchip,rk3288-pwm" and "rockchip,vop-pwm".
+v3: 
+Add patches 3, 4, 5 for clocks of watchdog, ir, and i2c
+Patches 1, 2 are same as v2
 
-Sorry,I think it's no problem. the  "rockchip,rk3288-pwm" and 
-"rockchip,vop-pwm" are seperate PWM controllers.
-They are just different registers address between CNTR and CTRL .
+Guoxiong Yan (1):
+  clk: hix5hd2: add watchdog0 clocks
 
->
-> Have you validated Thierry's suggestion to allow you to access your
-> memory range?
-Yes,we have solve it in lcdc driver.
-The Mark Yao have the  submission in [0].
+Jiancheng Xue (1):
+  clk: hix5hd2: add sd clk
 
-[0]: https://lkml.org/lkml/2014/8/4/20
->
-> -Doug
->
->
->
+Wei Yan (1):
+  clk: hix5hd2: add the I2C clocks
+
+Zhangfei Gao (1):
+  clk: hix5hd2: add complex clk
+
+ drivers/clk/hisilicon/clk-hix5hd2.c       |  236 ++++++++++++++++++++++++++++-
+ include/dt-bindings/clock/hix5hd2-clock.h |   27 ++++
+ 2 files changed, 257 insertions(+), 6 deletions(-)
+
+-- 
+1.7.9.5
