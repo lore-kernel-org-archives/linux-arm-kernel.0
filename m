@@ -1,39 +1,73 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Thu, 7 Aug 2014 16:54:43 +0800
-Subject: [PATCH V2 4/4] ARM: dts: i.MX53: Add PMU DT entry
-In-Reply-To: <53E33208.8020607@parkeon.com>
-References: <20140805144831.25462.18149.stgit@localhost>
- <20140805144840.25462.57101.stgit@localhost> <20140806105048.GF25953@arm.com>
- <53E22F35.4060503@parkeon.com> <20140807055301.GD27051@dragon>
- <53E33208.8020607@parkeon.com>
-Message-ID: <20140807085442.GA26680@dragon>
+From: viresh.kumar@linaro.org (Viresh Kumar)
+Date: Thu, 7 Aug 2014 14:32:03 +0530
+Subject: [PATCH v4 2/5] cpufreq: Keep track of which CPU owns the
+ kobj/sysfs nodes separately
+In-Reply-To: <1406250448-470-3-git-send-email-skannan@codeaurora.org>
+References: <1406250448-470-1-git-send-email-skannan@codeaurora.org>
+ <1406250448-470-3-git-send-email-skannan@codeaurora.org>
+Message-ID: <CAKohpomN_shuNTAkHEs-1+rqjM21RRZmeg41PNWY3AnSQOEGzA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Aug 07, 2014 at 10:00:08AM +0200, Martin Fuzzey wrote:
-> On 07/08/14 07:53, Shawn Guo wrote:
-> >On Wed, Aug 06, 2014 at 03:35:49PM +0200, Martin Fuzzey wrote:
-> >>On 06/08/14 12:50, Will Deacon wrote:
-> >>>
-> >>>You're missing the new property.
-> >>Actually this was deliberate.
-> >>
-> >>Since the property should only be used if booting in secure mode
-> >>this generic dtsi file can't know if it is ok or not.
-> >As far as I know, most of the i.MX53 systems boot Linux kernel in secure
-> >mode.  In that case, we should probably have the new property by
-> >default?
-> 
-> Is it possible to override a boolean property to remove it (set to
-> false) in a board specific dts?
-> 
-> If it can be done then yes I agree it should be the default.
-> 
-> However seeing as the dts syntax doesn't give a value for boolean
-> properties I don't see how.
-> 
-> But I don't think people booting non secure should have to modify imx53.dtsi
+On 25 July 2014 06:37, Saravana Kannan <skannan@codeaurora.org> wrote:
+> The ownership of the kobj doesn't need to match policy->cpu or change as
+> frequently. So, keep track of it separately.
+>
+> Signed-off-by: Saravana Kannan <skannan@codeaurora.org>
+> ---
+>  drivers/cpufreq/cpufreq.c | 4 +++-
+>  include/linux/cpufreq.h   | 1 +
+>  2 files changed, 4 insertions(+), 1 deletion(-)
+>
+> diff --git a/drivers/cpufreq/cpufreq.c b/drivers/cpufreq/cpufreq.c
+> index ee0eb7b..af4f291 100644
+> --- a/drivers/cpufreq/cpufreq.c
+> +++ b/drivers/cpufreq/cpufreq.c
+> @@ -868,7 +868,7 @@ static int cpufreq_add_dev_symlink(struct cpufreq_policy *policy)
+>         for_each_cpu(j, policy->cpus) {
+>                 struct device *cpu_dev;
+>
+> -               if (j == policy->cpu)
+> +               if (j == policy->kobj_cpu)
+>                         continue;
+>
+>                 pr_debug("Adding link for CPU: %u\n", j);
+> @@ -917,6 +917,7 @@ static int cpufreq_add_dev_interface(struct cpufreq_policy *policy,
+>                         goto err_out_kobj_put;
+>         }
+>
+> +       policy->kobj_cpu = policy->cpu;
 
-Ah, yes.  I missed the fact that the property is a boolean.
+Not here but in __cpufreq_add_dev()..
 
-Shawn
+>         ret = cpufreq_add_dev_symlink(policy);
+>         if (ret)
+>                 goto err_out_kobj_put;
+> @@ -1330,6 +1331,7 @@ static int cpufreq_nominate_new_policy_cpu(struct cpufreq_policy *policy,
+
+This doesn't exist anymore.
+
+>
+>                 return -EINVAL;
+>         }
+> +       policy->kobj_cpu = cpu_dev->id;
+>
+>         return cpu_dev->id;
+>  }
+> diff --git a/include/linux/cpufreq.h b/include/linux/cpufreq.h
+> index ec4112d..91c2e38 100644
+> --- a/include/linux/cpufreq.h
+> +++ b/include/linux/cpufreq.h
+> @@ -68,6 +68,7 @@ struct cpufreq_policy {
+>         unsigned int            cpu;    /* cpu nr of CPU managing this policy */
+>         unsigned int            last_cpu; /* cpu nr of previous CPU that managed
+>                                            * this policy */
+> +       unsigned int            kobj_cpu; /* Tracks which CPU own the kobj */
+>         struct clk              *clk;
+>         struct cpufreq_cpuinfo  cpuinfo;/* see above */
+>
+> --
+> 1.8.2.1
+>
+> The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
+> hosted by The Linux Foundation
