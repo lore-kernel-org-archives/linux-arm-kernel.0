@@ -1,27 +1,116 @@
-From: robh@kernel.org (Rob Herring)
-Date: Thu, 7 Aug 2014 10:22:28 -0500
-Subject: [PATCH 1/7] arm: use generic fixmap.h
-In-Reply-To: <CAMo8Bf+uq1vhqb7KxnNFHTZ53C1mtw_Do6dn09j7jjw_7MWF_Q@mail.gmail.com>
-References: <1407353564-21478-1-git-send-email-keescook@chromium.org>
- <1407353564-21478-2-git-send-email-keescook@chromium.org>
- <CAMo8Bf+uq1vhqb7KxnNFHTZ53C1mtw_Do6dn09j7jjw_7MWF_Q@mail.gmail.com>
-Message-ID: <CAL_JsqJgRFYTfdsY48C9QreBH=VcM3t-9AzFSV8oXLB5tVGjUw@mail.gmail.com>
+From: ronald.wahl@raritan.com (Ronald Wahl)
+Date: Thu,  7 Aug 2014 17:11:36 +0200
+Subject: [PATCH v2] usb: gadget: at91_udc: move prepare clk into process
+ context
+Message-ID: <1407424296-12359-1-git-send-email-ronald.wahl@raritan.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Aug 7, 2014 at 10:15 AM, Max Filippov <jcmvbkbc@gmail.com> wrote:
-> Hi,
->
-> On Wed, Aug 6, 2014 at 11:32 PM, Kees Cook <keescook@chromium.org> wrote:
->> ARM is different from other architectures in that fixmap pages are indexed
->> with a positive offset from FIXADDR_START.  Other architectures index with
->> a negative offset from FIXADDR_TOP.  In order to use the generic fixmap.h
->
-> Does anybody know if there's any reason why generic fixmap.h uses negative
-> offsets? It complicates things with no obvious benefit if you e.g. try to align
-> virtual address in the fixmap region with physical page color (that's why I've
-> switched xtensa to positive fixmap addressing in v3.17).
+Commit 7628083227b6bc4a7e33d7c381d7a4e558424b6b added clock preparation in
+interrupt context. This is not allowed as it might sleep. Move clock
+preparation and setting clock rate into process context (at91udc_probe).
 
-No, but each arch doing it differently is even more annoying.
+Signed-off-by: Ronald Wahl <ronald.wahl@raritan.com>
+---
+ drivers/usb/gadget/udc/at91_udc.c | 44 ++++++++++++++++++++++++++++-----------
+ 1 file changed, 32 insertions(+), 12 deletions(-)
 
-Rob
+diff --git a/drivers/usb/gadget/udc/at91_udc.c b/drivers/usb/gadget/udc/at91_udc.c
+index cfd18bc..0d685d0 100644
+--- a/drivers/usb/gadget/udc/at91_udc.c
++++ b/drivers/usb/gadget/udc/at91_udc.c
+@@ -870,12 +870,10 @@ static void clk_on(struct at91_udc *udc)
+ 		return;
+ 	udc->clocked = 1;
+ 
+-	if (IS_ENABLED(CONFIG_COMMON_CLK)) {
+-		clk_set_rate(udc->uclk, 48000000);
+-		clk_prepare_enable(udc->uclk);
+-	}
+-	clk_prepare_enable(udc->iclk);
+-	clk_prepare_enable(udc->fclk);
++	if (IS_ENABLED(CONFIG_COMMON_CLK))
++		clk_enable(udc->uclk);
++	clk_enable(udc->iclk);
++	clk_enable(udc->fclk);
+ }
+ 
+ static void clk_off(struct at91_udc *udc)
+@@ -884,10 +882,10 @@ static void clk_off(struct at91_udc *udc)
+ 		return;
+ 	udc->clocked = 0;
+ 	udc->gadget.speed = USB_SPEED_UNKNOWN;
+-	clk_disable_unprepare(udc->fclk);
+-	clk_disable_unprepare(udc->iclk);
++	clk_disable(udc->fclk);
++	clk_disable(udc->iclk);
+ 	if (IS_ENABLED(CONFIG_COMMON_CLK))
+-		clk_disable_unprepare(udc->uclk);
++		clk_disable(udc->uclk);
+ }
+ 
+ /*
+@@ -1780,14 +1778,24 @@ static int at91udc_probe(struct platform_device *pdev)
+ 	}
+ 
+ 	/* don't do anything until we have both gadget driver and VBUS */
++	if (IS_ENABLED(CONFIG_COMMON_CLK)) {
++		clk_set_rate(udc->uclk, 48000000);
++		retval = clk_prepare(udc->uclk);
++		if (retval)
++			goto fail1;
++	}
++	retval = clk_prepare(udc->fclk);
++	if (retval)
++		goto fail1a;
++
+ 	retval = clk_prepare_enable(udc->iclk);
+ 	if (retval)
+-		goto fail1;
++		goto fail1b;
+ 	at91_udp_write(udc, AT91_UDP_TXVC, AT91_UDP_TXVC_TXVDIS);
+ 	at91_udp_write(udc, AT91_UDP_IDR, 0xffffffff);
+ 	/* Clear all pending interrupts - UDP may be used by bootloader. */
+ 	at91_udp_write(udc, AT91_UDP_ICR, 0xffffffff);
+-	clk_disable_unprepare(udc->iclk);
++	clk_disable(udc->iclk);
+ 
+ 	/* request UDC and maybe VBUS irqs */
+ 	udc->udp_irq = platform_get_irq(pdev, 0);
+@@ -1795,7 +1803,7 @@ static int at91udc_probe(struct platform_device *pdev)
+ 			0, driver_name, udc);
+ 	if (retval < 0) {
+ 		DBG("request irq %d failed\n", udc->udp_irq);
+-		goto fail1;
++		goto fail1c;
+ 	}
+ 	if (gpio_is_valid(udc->board.vbus_pin)) {
+ 		retval = gpio_request(udc->board.vbus_pin, "udc_vbus");
+@@ -1848,6 +1856,13 @@ fail3:
+ 		gpio_free(udc->board.vbus_pin);
+ fail2:
+ 	free_irq(udc->udp_irq, udc);
++fail1c:
++	clk_unprepare(udc->iclk);
++fail1b:
++	clk_unprepare(udc->fclk);
++fail1a:
++	if (IS_ENABLED(CONFIG_COMMON_CLK))
++		clk_unprepare(udc->uclk);
+ fail1:
+ 	if (IS_ENABLED(CONFIG_COMMON_CLK) && !IS_ERR(udc->uclk))
+ 		clk_put(udc->uclk);
+@@ -1896,6 +1911,11 @@ static int __exit at91udc_remove(struct platform_device *pdev)
+ 	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+ 	release_mem_region(res->start, resource_size(res));
+ 
++	if (IS_ENABLED(CONFIG_COMMON_CLK))
++		clk_unprepare(udc->uclk);
++	clk_unprepare(udc->fclk);
++	clk_unprepare(udc->iclk);
++
+ 	clk_put(udc->iclk);
+ 	clk_put(udc->fclk);
+ 	if (IS_ENABLED(CONFIG_COMMON_CLK))
+-- 
+1.9.3
