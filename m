@@ -1,78 +1,25 @@
-From: dianders@chromium.org (Doug Anderson)
-Date: Thu, 07 Aug 2014 17:15:03 +0200
-Subject: [PATCH] ARM: dts: Fix the sort ordering of EHCI and HSIC in
- rk3288.dtsi
-Message-ID: <3091007.XRV1H99NFV@diego>
+From: jcmvbkbc@gmail.com (Max Filippov)
+Date: Thu, 7 Aug 2014 19:15:51 +0400
+Subject: [PATCH 1/7] arm: use generic fixmap.h
+In-Reply-To: <1407353564-21478-2-git-send-email-keescook@chromium.org>
+References: <1407353564-21478-1-git-send-email-keescook@chromium.org>
+ <1407353564-21478-2-git-send-email-keescook@chromium.org>
+Message-ID: <CAMo8Bf+uq1vhqb7KxnNFHTZ53C1mtw_Do6dn09j7jjw_7MWF_Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The EHCI and HSIC device tree nodes were added in the wrong place.
-Fix them.
+Hi,
 
-Signed-off-by: Doug Anderson <dianders@chromium.org>
-Signed-off-by: Kever Yang <kever.yang@rock-chips.com>
-Signed-off-by: Heiko Stuebner <heiko@sntech.de>
----
- arch/arm/boot/dts/rk3288.dtsi | 40 ++++++++++++++++++++--------------------
- 1 file changed, 20 insertions(+), 20 deletions(-)
+On Wed, Aug 6, 2014 at 11:32 PM, Kees Cook <keescook@chromium.org> wrote:
+> ARM is different from other architectures in that fixmap pages are indexed
+> with a positive offset from FIXADDR_START.  Other architectures index with
+> a negative offset from FIXADDR_TOP.  In order to use the generic fixmap.h
 
-diff --git a/arch/arm/boot/dts/rk3288.dtsi b/arch/arm/boot/dts/rk3288.dtsi
-index e7cb008..5950b0a 100644
---- a/arch/arm/boot/dts/rk3288.dtsi
-+++ b/arch/arm/boot/dts/rk3288.dtsi
-@@ -195,6 +195,26 @@
- 		status = "disabled";
- 	};
- 
-+	usb_host0_ehci: usb at ff500000 {
-+		compatible = "generic-ehci";
-+		reg = <0xff500000 0x100>;
-+		interrupts = <GIC_SPI 24 IRQ_TYPE_LEVEL_HIGH>;
-+		clocks = <&cru HCLK_USBHOST0>;
-+		clock-names = "usbhost";
-+		status = "disabled";
-+	};
-+
-+	/* NOTE: ohci at ff520000 doesn't actually work on hardware */
-+
-+	usb_hsic: usb at ff5c0000 {
-+		compatible = "generic-ehci";
-+		reg = <0xff5c0000 0x100>;
-+		interrupts = <GIC_SPI 26 IRQ_TYPE_LEVEL_HIGH>;
-+		clocks = <&cru HCLK_HSIC>;
-+		clock-names = "usbhost";
-+		status = "disabled";
-+	};
-+
- 	i2c0: i2c at ff650000 {
- 		compatible = "rockchip,rk3288-i2c";
- 		reg = <0xff650000 0x1000>;
-@@ -251,26 +271,6 @@
- 		status = "disabled";
- 	};
- 
--	usb_host0_ehci: usb at ff500000 {
--		compatible = "generic-ehci";
--		reg = <0xff500000 0x100>;
--		interrupts = <GIC_SPI 24 IRQ_TYPE_LEVEL_HIGH>;
--		clocks = <&cru HCLK_USBHOST0>;
--		clock-names = "usbhost";
--		status = "disabled";
--	};
--
--	/* NOTE: ohci at ff520000 doesn't actually work on hardware */
--
--	usb_hsic: usb at ff5c0000 {
--		compatible = "generic-ehci";
--		reg = <0xff5c0000 0x100>;
--		interrupts = <GIC_SPI 26 IRQ_TYPE_LEVEL_HIGH>;
--		clocks = <&cru HCLK_HSIC>;
--		clock-names = "usbhost";
--		status = "disabled";
--	};
--
- 	gic: interrupt-controller at ffc01000 {
- 		compatible = "arm,gic-400";
- 		interrupt-controller;
+Does anybody know if there's any reason why generic fixmap.h uses negative
+offsets? It complicates things with no obvious benefit if you e.g. try to align
+virtual address in the fixmap region with physical page color (that's why I've
+switched xtensa to positive fixmap addressing in v3.17).
+
 -- 
-2.0.0.526.g5318336
+Thanks.
+-- Max
