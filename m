@@ -1,48 +1,88 @@
-From: robherring2@gmail.com (Rob Herring)
-Date: Thu, 7 Aug 2014 08:30:35 -0500
-Subject: [PATCH v17 9/9] of: fdt: fix memory address be truncated
-In-Reply-To: <1407408695-19626-10-git-send-email-haojian.zhuang@linaro.org>
-References: <1407408695-19626-1-git-send-email-haojian.zhuang@linaro.org>
- <1407408695-19626-10-git-send-email-haojian.zhuang@linaro.org>
-Message-ID: <CAL_Jsq+zDsRAwZxSkKfdkSkQqpmQOuxMHdyzRGzdhaUsTkpvkA@mail.gmail.com>
+From: boris.brezillon@free-electrons.com (Boris BREZILLON)
+Date: Thu, 7 Aug 2014 15:46:54 +0200
+Subject: [PATCH v2] usb: gadget: at91_udc: move prepare clk into process
+ context
+In-Reply-To: <53E37474.6060501@raritan.com>
+References: <1407330702-2926-1-git-send-email-ronald.wahl@raritan.com>
+ <20140807095231.11bde829@bbrezillon>
+ <20140807095912.7648de46@bbrezillon> <53E37474.6060501@raritan.com>
+Message-ID: <20140807154654.3f23365a@bbrezillon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Aug 7, 2014 at 5:51 AM, Haojian Zhuang
-<haojian.zhuang@linaro.org> wrote:
-> early_init_dt_add_memory_arch() accepts base & size parameters as u64
-> type. memblock_add() accepts base & size parameters as phys_addr_t type.
-> But phys_addr_t isn't equal to u64. In 32-bit system, phys_addr_t is
-> 32-bit long. If 64-bit memory address is specified in DTS file, it'll be
-> truncated into 32-bit address.
->
-> So create two values to store base & size first as phys_addr_t type.
-> Then compare them with u64 base & u64 size. If they don't match, discard
-> them.
+On Thu, 07 Aug 2014 14:43:32 +0200
+Ronald Wahl <ronald.wahl@raritan.com> wrote:
 
-This is fixed already in v3.16:
+> On 07.08.2014 09:59, Boris BREZILLON wrote:
+> > On Thu, 7 Aug 2014 09:52:31 +0200
+> > Boris BREZILLON <boris.brezillon@free-electrons.com> wrote:
+> >> On Wed,  6 Aug 2014 15:11:42 +0200
+> >> Ronald Wahl <ronald.wahl@raritan.com> wrote:
+> >>
+> >>> Commit 7628083227b6bc4a7e33d7c381d7a4e558424b6b added clock preparation in
+> >>> interrupt context. This is not allowed as it might sleep. Move clock
+> >>> preparation into process context (at91udc_probe).
+> >>> ---
+> >>>   drivers/usb/gadget/udc/at91_udc.c | 39 ++++++++++++++++++++++++++++++---------
+> >>>   1 file changed, 30 insertions(+), 9 deletions(-)
+> >>>
+> >>> diff --git a/drivers/usb/gadget/udc/at91_udc.c b/drivers/usb/gadget/udc/at91_udc.c
+> >>> index cfd18bc..0b347a0 100644
+> >>> --- a/drivers/usb/gadget/udc/at91_udc.c
+> >>> +++ b/drivers/usb/gadget/udc/at91_udc.c
+> >>> @@ -872,10 +872,10 @@ static void clk_on(struct at91_udc *udc)
+> >>>
+> >>>   	if (IS_ENABLED(CONFIG_COMMON_CLK)) {
+> >>>   		clk_set_rate(udc->uclk, 48000000);
+> >>> -		clk_prepare_enable(udc->uclk);
+> >>> +		clk_enable(udc->uclk);
+> >>>   	}
+> >>> -	clk_prepare_enable(udc->iclk);
+> >>> -	clk_prepare_enable(udc->fclk);
+> >>> +	clk_enable(udc->iclk);
+> >>> +	clk_enable(udc->fclk);
+> >>>   }
+> >>>
+> >>>   static void clk_off(struct at91_udc *udc)
+> >>> @@ -884,10 +884,10 @@ static void clk_off(struct at91_udc *udc)
+> >>>   		return;
+> >>>   	udc->clocked = 0;
+> >>>   	udc->gadget.speed = USB_SPEED_UNKNOWN;
+> >>> -	clk_disable_unprepare(udc->fclk);
+> >>> -	clk_disable_unprepare(udc->iclk);
+> >>> +	clk_disable(udc->fclk);
+> >>> +	clk_disable(udc->iclk);
+> >>>   	if (IS_ENABLED(CONFIG_COMMON_CLK))
+> >>> -		clk_disable_unprepare(udc->uclk);
+> >>> +		clk_disable(udc->uclk);
+> >>>   }
+> >>
+> >> As you stated prepare and unprepare should never be called in interrupt
+> >> context.
+> >>
+> >> My concern here is that PLLB (which is often used as USB clock
+> >> parent) will never be gated/disabled (because all this work is
+> >> done in its unprepare method), and thus your power consumption will be
+> >> higher (when entering suspend mode) than if you'd done a
+> >> disable_unprepare call.
+> >>
+> >> How about leaving the clk_on/off unchanged and use a threaded irq
+> >> instead of a normal irq ?
+> 
+> Even with threaded interrupts things are still called while interrupts 
+> are disabled by one or more layers of spin_lock_irqsave. There are also 
+> different code paths from where clk_on() is called.
 
-commit a67a6ed15513541579d38bcbd127e7be170710e5
-Author: Laura Abbott <lauraa@codeaurora.org>
-Date:   Thu Jun 19 20:13:38 2014 -0700
+You're right (I only had a quick look at it). Let's fix this as a first
+step and we'll figure out how to optimize power consumption later.
+BTW, clk_set_rate can sleep too (AFAIK clk_enable and clk_disable
+are the only one that can be called in atomic context).
 
-    of: Check for phys_addr_t overflows in early_init_dt_add_memory_arch
+Best Regards,
 
-    The common early_init_dt_add_memory_arch takes the base and size
-    of a memory region as u64 types. The function never checks if
-    the base and size can actually fit in a phys_addr_t which may
-    be smaller than 64-bits. This may result in incorrect memory
-    being passed to memblock_add if the memory falls outside the
-    range of phys_addr_t. Add range checks for the base and size if
-    phys_addr_t is smaller than u64.
+Boris
 
-    Reported-by: Geert Uytterhoeven <geert@linux-m68k.org>
-    Tested-by: Geert Uytterhoeven <geert@linux-m68k.org>
-    Signed-off-by: Laura Abbott <lauraa@codeaurora.org>
-    Acked-by: Nicolas Pitre <nico@linaro.org>
-    Signed-off-by: Grant Likely <grant.likely@linaro.org>
-
-
-In the future, please use get_maintainers.pl to cc the correct people.
-
-Rob
+-- 
+Boris Brezillon, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
