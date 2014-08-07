@@ -1,66 +1,44 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Thu, 7 Aug 2014 13:12:48 +0100
-Subject: Oops: 17 SMP ARM (v3.16-rc2)
-In-Reply-To: <C4A61A5CA4AD2246942F4BA6F20ACB804357526C@ALVA-EXMB04.alv.autoliv.int>
-References: <C4A61A5CA4AD2246942F4BA6F20ACB80435655E9@ALVA-EXMB04.alv.autoliv.int>
- <20140626151424.GT32514@n2100.arm.linux.org.uk>
- <20140627112151.GF32514@n2100.arm.linux.org.uk>
- <3FFB61A7A8473C49831AF20FA193534A43CADFA7@ALVA-EXMB01.alv.autoliv.int>
- <20140627163108.GP32514@n2100.arm.linux.org.uk>
- <C4A61A5CA4AD2246942F4BA6F20ACB8043575072@ALVA-EXMB04.alv.autoliv.int>
- <20140806095012.GN30282@n2100.arm.linux.org.uk>
- <C4A61A5CA4AD2246942F4BA6F20ACB8043575172@ALVA-EXMB04.alv.autoliv.int>
- <20140806125550.GO30282@n2100.arm.linux.org.uk>
- <C4A61A5CA4AD2246942F4BA6F20ACB804357526C@ALVA-EXMB04.alv.autoliv.int>
-Message-ID: <20140807121248.GY30282@n2100.arm.linux.org.uk>
+From: l.stach@pengutronix.de (Lucas Stach)
+Date: Thu, 07 Aug 2014 14:19:20 +0200
+Subject: [PATCH] ARM: imx6: add pci config space as platform resource
+In-Reply-To: <CAOMZO5Daf2+UcQKLkyiZeM7Zs9nd-ektO_f7n_3K-bw0GgPM8w@mail.gmail.com>
+References: <1407409120-23635-1-git-send-email-l.stach@pengutronix.de>
+ <CAOMZO5Daf2+UcQKLkyiZeM7Zs9nd-ektO_f7n_3K-bw0GgPM8w@mail.gmail.com>
+Message-ID: <1407413960.4675.10.camel@weser.hi.pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Aug 07, 2014 at 11:11:06AM +0000, Mattis Lorentzon wrote:
-> Russell,
+Am Donnerstag, den 07.08.2014, 08:53 -0300 schrieb Fabio Estevam:
+> On Thu, Aug 7, 2014 at 7:58 AM, Lucas Stach <l.stach@pengutronix.de> wrote:
+> > Fixes "imx6q-pcie 1ffc000.pcie: missing *config* reg space"
+> > error exposed by new versions of the designware pcie driver.
+> >
+> > Signed-off-by: Lucas Stach <l.stach@pengutronix.de>
+> > ---
+> >  arch/arm/boot/dts/imx6qdl.dtsi | 4 +++-
+> >  1 file changed, 3 insertions(+), 1 deletion(-)
+> >
+> > diff --git a/arch/arm/boot/dts/imx6qdl.dtsi b/arch/arm/boot/dts/imx6qdl.dtsi
+> > index ce0599134a69..6b5da2a98aaf 100644
+> > --- a/arch/arm/boot/dts/imx6qdl.dtsi
+> > +++ b/arch/arm/boot/dts/imx6qdl.dtsi
+> > @@ -133,7 +133,9 @@
+> >
+> >                 pcie: pcie at 0x01000000 {
+> >                         compatible = "fsl,imx6q-pcie", "snps,dw-pcie";
+> > -                       reg = <0x01ffc000 0x4000>; /* DBI */
+> > +                       reg = <0x01ffc000 0x04000>,
+> > +                             <0x01f00000 0x80000>;
+> > +                       reg-names = "dbi", "config";
 > 
-> > Can you ascertain whether these stalls are a result of some failure of the
-> > receive side or the transmit side - you should be able to tell that if you watch
-> > the packet counts via ifconfig on the stalled card.  Also, it would be useful to
-> > know whether the FEC interrupt was firing.
 > 
-> grep eth /proc/interrupts
-> 151:          0          0          0          0       GIC 151  2188000.ethernet
-> 166:    1205661          0          0          0  gpio-mxc   6  2188000.ethernet
-> 
-> The interrupt counter 166 increases regularly during the stalls.
-> Ifconfig indicates that the RX and TX  counters do not increase.
+> Please update Documentation/devicetree/bindings/pci/fsl,imx6q-pcie.txt as well.
 
-Hmm, I'm slightly confused.  On my iMX6Q, I have:
+The binding for this is part of the common designware binding. See
+Documentation/devicetree/bindings/pci/designware-pcie.txt
 
-150:     581754          0          0          0       GIC 150  2188000.ethernet
-151:          0          0          0          0       GIC 151  2188000.ethernet
-
-In the DT file, we have:
-
-                        fec: ethernet at 02188000 {
-                                compatible = "fsl,imx6q-fec";
-                                reg = <0x02188000 0x4000>;
-                                interrupts-extended =
-                                        <&intc 0 118 IRQ_TYPE_LEVEL_HIGH>,
-                                        <&intc 0 119 IRQ_TYPE_LEVEL_HIGH>;
-                                clocks = <&clks 117>, <&clks 117>, <&clks 190>;
-                                clock-names = "ipg", "ahb", "ptp";
-                                status = "disabled";
-                        };
-
-which, for the gic, would be 118 + 32 (first SPI) = 150, 119 + 32 = 151.
-Yet you seem to have nothing registered against GIC 150, instead having
-an interrupt against GPIO 6.
-
-This seems very odd, and as this is an on-SoC device, I don't see why
-you would want to bind the interrupts for the FEC device any differently
-to standard platforms.
-
-This could well be the cause of your stalls.
-
-What's GPIO 6 used for on your board?
-
+Regards,
+Lucas
 -- 
-FTTC broadband for 0.8mile line: currently at 9.5Mbps down 400kbps up
-according to speedtest.net.
+Pengutronix e.K.             | Lucas Stach                 |
+Industrial Linux Solutions   | http://www.pengutronix.de/  |
