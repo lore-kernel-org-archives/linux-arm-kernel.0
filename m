@@ -1,30 +1,27 @@
-From: peter.griffin@linaro.org (Peter Griffin)
-Date: Thu,  7 Aug 2014 16:21:44 +0100
-Subject: [PATCH v4 5/5] MAINTAINERS: Add ehci-st.c and ohci-st.c to ARCH/STI
- architecture
-In-Reply-To: <1407424904-19251-1-git-send-email-peter.griffin@linaro.org>
-References: <1407424904-19251-1-git-send-email-peter.griffin@linaro.org>
-Message-ID: <1407424904-19251-6-git-send-email-peter.griffin@linaro.org>
+From: robh@kernel.org (Rob Herring)
+Date: Thu, 7 Aug 2014 10:22:28 -0500
+Subject: [PATCH 1/7] arm: use generic fixmap.h
+In-Reply-To: <CAMo8Bf+uq1vhqb7KxnNFHTZ53C1mtw_Do6dn09j7jjw_7MWF_Q@mail.gmail.com>
+References: <1407353564-21478-1-git-send-email-keescook@chromium.org>
+ <1407353564-21478-2-git-send-email-keescook@chromium.org>
+ <CAMo8Bf+uq1vhqb7KxnNFHTZ53C1mtw_Do6dn09j7jjw_7MWF_Q@mail.gmail.com>
+Message-ID: <CAL_JsqJgRFYTfdsY48C9QreBH=VcM3t-9AzFSV8oXLB5tVGjUw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Signed-off-by: Peter Griffin <peter.griffin@linaro.org>
----
- MAINTAINERS | 2 ++
- 1 file changed, 2 insertions(+)
+On Thu, Aug 7, 2014 at 10:15 AM, Max Filippov <jcmvbkbc@gmail.com> wrote:
+> Hi,
+>
+> On Wed, Aug 6, 2014 at 11:32 PM, Kees Cook <keescook@chromium.org> wrote:
+>> ARM is different from other architectures in that fixmap pages are indexed
+>> with a positive offset from FIXADDR_START.  Other architectures index with
+>> a negative offset from FIXADDR_TOP.  In order to use the generic fixmap.h
+>
+> Does anybody know if there's any reason why generic fixmap.h uses negative
+> offsets? It complicates things with no obvious benefit if you e.g. try to align
+> virtual address in the fixmap region with physical page color (that's why I've
+> switched xtensa to positive fixmap addressing in v3.17).
 
-diff --git a/MAINTAINERS b/MAINTAINERS
-index c2066f4..89aef87 100644
---- a/MAINTAINERS
-+++ b/MAINTAINERS
-@@ -1356,6 +1356,8 @@ F:	drivers/pinctrl/pinctrl-st.c
- F:	drivers/media/rc/st_rc.c
- F:	drivers/i2c/busses/i2c-st.c
- F:	drivers/tty/serial/st-asc.c
-+F:	drivers/usb/host/ehci-st.c
-+F:	drivers/usb/host/ohci-st.c
- 
- ARM/TECHNOLOGIC SYSTEMS TS7250 MACHINE SUPPORT
- M:	Lennert Buytenhek <kernel@wantstofly.org>
--- 
-1.9.1
+No, but each arch doing it differently is even more annoying.
+
+Rob
