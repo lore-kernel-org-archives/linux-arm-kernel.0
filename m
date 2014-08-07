@@ -1,27 +1,49 @@
 From: will.deacon@arm.com (Will Deacon)
-Date: Thu, 7 Aug 2014 10:18:17 +0100
-Subject: [PATCH v2 4/5] ARM64: add IPI tracepoints
-In-Reply-To: <20140806155237.0a6d7d3c@gandalf.local.home>
-References: <1406318733-26754-1-git-send-email-nicolas.pitre@linaro.org>
- <1406318733-26754-5-git-send-email-nicolas.pitre@linaro.org>
- <20140806155237.0a6d7d3c@gandalf.local.home>
-Message-ID: <20140807091817.GG13703@arm.com>
+Date: Thu, 7 Aug 2014 10:22:54 +0100
+Subject: [PATCH v2 2/2] iommu/arm-smmu: Do not access non-existing SMR
+ registers
+In-Reply-To: <53E2BB71.9000201@codeaurora.org>
+References: <1407175263-10699-1-git-send-email-ohaugan@codeaurora.org>
+ <1407175263-10699-3-git-send-email-ohaugan@codeaurora.org>
+ <20140806101948.GD23882@arm.com> <53E25B76.6090208@codeaurora.org>
+ <20140806173518.GG25953@arm.com> <53E2BB71.9000201@codeaurora.org>
+Message-ID: <20140807092254.GH13703@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Aug 06, 2014 at 08:52:37PM +0100, Steven Rostedt wrote:
-> Will and Russell,
+On Thu, Aug 07, 2014 at 12:34:09AM +0100, Olav Haugan wrote:
+> On 8/6/2014 10:35 AM, Will Deacon wrote:
+> > Hmm, I'm checking this with the architects because the TRMs aren't exactly
+> > clear. The NUMSMRG works for stream-indexing (i.e. reports the number of
+> > S2CRs), then all we have to do is change the above ~SMR_VALID to 0x0, since
+> > those registers will be SBZP.
 > 
-> Can you give me your Acked-by for this, and I can pull it through my
-> tree?
+> You don't agree that we should avoid doing register writes if not
+> necessarily? In general I like to avoid trying to write registers that
+> is not needed so that we don't do more work than needed.
 
-Looks fine to me:
+If this was a fast-path then I'd certainly agree. However, device reset is
+a pretty rare event and I'd be inclined to err on the side of code clarity
+in preference to performance.
 
-  Acked-by: Will Deacon <will.deacon@arm.com>
+Anyway, it turns out that we can't use NUMSMRG for this so all that's moot.
+We instead need to do 1 << SMMU_IDR0.NUMSIDB, which will give us the number
+of S2CRs.
 
-I'm assuming there's a dependency on other patches going via the tracing
-tree, hence why you're taking this?
+> >> As far as I can tell there are no other register telling us how many S2CR
+> >> registers exist. That also brings up another point that there is no check
+> >> in the code to ensure we are not trying to program more than the available
+> >> S2CR registers when we use stream indexing.
+> > 
+> > On an SMMU using stream-indexing, if the StreamID goes off the end of the
+> > S2CRs that's a fairly serious hardware configuration issue which I don't
+> > think Linux is in a position to handle. I agree that a warning wouldn't
+> > hurt on device add/attach though.
+> > 
+> 
+> Yes, I meant to protect against programming errors where someone
+> specified more Stream IDs than available S2CRs.
 
-Cheers,
+Sure. Could you have a go at hacking this up, please?
 
 Will
