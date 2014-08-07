@@ -1,53 +1,136 @@
-From: shawn.guo@freescale.com (Shawn Guo)
-Date: Thu, 7 Aug 2014 10:18:32 +0800
-Subject: [PATCH] ARM: mx6: Fix suspend/resume with PCI
-In-Reply-To: <1407371998-11437-1-git-send-email-festevam@gmail.com>
-References: <1407371998-11437-1-git-send-email-festevam@gmail.com>
-Message-ID: <20140807021831.GM2167@dragon>
+From: lauraa@codeaurora.org (Laura Abbott)
+Date: Wed, 06 Aug 2014 19:24:20 -0700
+Subject: [PATCH 1/7] arm: use generic fixmap.h
+In-Reply-To: <1407353564-21478-2-git-send-email-keescook@chromium.org>
+References: <1407353564-21478-1-git-send-email-keescook@chromium.org>
+ <1407353564-21478-2-git-send-email-keescook@chromium.org>
+Message-ID: <53E2E354.6020902@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Aug 06, 2014 at 09:39:58PM -0300, Fabio Estevam wrote:
-> From: Fabio Estevam <fabio.estevam@freescale.com>
+On 8/6/2014 12:32 PM, Kees Cook wrote:
+> From: Mark Salter <msalter@redhat.com>
 > 
-> When PCI is used and a suspend/resume sequence is done we see the following
-> kernel hang:
+> ARM is different from other architectures in that fixmap pages are indexed
+> with a positive offset from FIXADDR_START.  Other architectures index with
+> a negative offset from FIXADDR_TOP.  In order to use the generic fixmap.h
+> definitions, this patch redefines FIXADDR_TOP to be inclusive of the
+> useable range.  That is, FIXADDR_TOP is the virtual address of the topmost
+> fixed page.  The newly defined FIXADDR_END is the first virtual address
+> past the fixed mappings.
 > 
-> root at freescale /$ echo mem > /sys/power/state 
-> [   16.099018] PM: Syncing filesystems ... done.
-> [   16.141010] Freezing user space processes ... (elapsed 0.002 seconds) done.
-> [   16.150840] Freezing remaining freezable tasks ... (elapsed 0.003 seconds) done.
-> [   16.199438] random: nonblocking pool is initialized
-> [   16.229639] PM: suspend of devices complete after 64.793 msecs
-> [   16.235488] PM: suspend devices took 0.070 seconds
-> [   16.245301] PM: late suspend of devices complete after 4.968 msecs
-> [   16.257063] PM: noirq suspend of devices complete after 5.538 msecs
-> [   16.263425] Disabling non-boot CPUs ...
-> [   16.274666] CPU1: shutdown
-> [   16.286351] CPU2: shutdown
-> [   16.294169] CPU3: shutdown
-> [   16.299551] Enabling non-boot CPUs ...
-> [   16.304155] CPU1: Booted secondary processor
-> [   16.305717] CPU1 is up
-> [   16.313078] CPU2: Booted secondary processor
-> [   16.313456] CPU2 is up
-> [   16.320778] CPU3: Booted secondary processor
-> [   16.321174] CPU3 is up
-> 	(hangs here)
+> Signed-off-by: Mark Salter <msalter@redhat.com>
+> Reviewed-by: Doug Anderson <dianders@chromium.org>
+> [update for "ARM: 8031/2: change fixmap mapping region to support 32 CPUs"]
+> Signed-off-by: Kees Cook <keescook@chromium.org>
+> ---
+>  arch/arm/include/asm/fixmap.h | 27 +++++++++------------------
+>  arch/arm/mm/init.c            |  2 +-
+>  2 files changed, 10 insertions(+), 19 deletions(-)
 > 
-> Implement a workaround for the erratum ERR005723: "PCIe does not support L2
-> Power Down", which consists in toggling bit 18 (TEST_POWERDOWN) of GPR1 register.
+> diff --git a/arch/arm/include/asm/fixmap.h b/arch/arm/include/asm/fixmap.h
+> index 74124b0d0d79..190142d174ee 100644
+> --- a/arch/arm/include/asm/fixmap.h
+> +++ b/arch/arm/include/asm/fixmap.h
+> @@ -2,27 +2,18 @@
+>  #define _ASM_FIXMAP_H
+>  
+>  #define FIXADDR_START		0xffc00000UL
+> -#define FIXADDR_TOP		0xffe00000UL
+> -#define FIXADDR_SIZE		(FIXADDR_TOP - FIXADDR_START)
+> +#define FIXADDR_END		0xffe00000UL
+> +#define FIXADDR_TOP		(FIXADDR_END - PAGE_SIZE)
+> +#define FIXADDR_SIZE		(FIXADDR_END - FIXADDR_START)
+>  
+>  #define FIX_KMAP_NR_PTES	(FIXADDR_SIZE >> PAGE_SHIFT)
+>  
+> -#define __fix_to_virt(x)	(FIXADDR_START + ((x) << PAGE_SHIFT))
+> -#define __virt_to_fix(x)	(((x) - FIXADDR_START) >> PAGE_SHIFT)
+> +enum fixed_addresses {
+> +	FIX_KMAP_BEGIN,
+> +	FIX_KMAP_END = FIX_KMAP_NR_PTES - 1,
+> +	__end_of_fixed_addresses
+> +};
+>  
+> -extern void __this_fixmap_does_not_exist(void);
+> -
+> -static inline unsigned long fix_to_virt(const unsigned int idx)
+> -{
+> -	if (idx >= FIX_KMAP_NR_PTES)
+> -		__this_fixmap_does_not_exist();
+> -	return __fix_to_virt(idx);
+> -}
+> -
+> -static inline unsigned int virt_to_fix(const unsigned long vaddr)
+> -{
+> -	BUG_ON(vaddr >= FIXADDR_TOP || vaddr < FIXADDR_START);
+> -	return __virt_to_fix(vaddr);
+> -}
+> +#include <asm-generic/fixmap.h>
+>  
+>  #endif
+> diff --git a/arch/arm/mm/init.c b/arch/arm/mm/init.c
+> index 659c75d808dc..ad82c05bfc3a 100644
+> --- a/arch/arm/mm/init.c
+> +++ b/arch/arm/mm/init.c
+> @@ -570,7 +570,7 @@ void __init mem_init(void)
+>  			MLK(DTCM_OFFSET, (unsigned long) dtcm_end),
+>  			MLK(ITCM_OFFSET, (unsigned long) itcm_end),
+>  #endif
+> -			MLK(FIXADDR_START, FIXADDR_TOP),
+> +			MLK(FIXADDR_START, FIXADDR_END),
+>  			MLM(VMALLOC_START, VMALLOC_END),
+>  			MLM(PAGE_OFFSET, (unsigned long)high_memory),
+>  #ifdef CONFIG_HIGHMEM
 > 
-> Tested on a mx6qsabresd TO1.2 revC2.
 
-I intend to agree with Lucas that we should align our testing and
-understanding on the issue before trying to fix it.
+I'm working off of a 3.14 kernel and with this backported 
+kmap_atomic does not actually map properly for me. This was
 
-Again, I do not see this issue on my TO1.2 chip, but only TO1.5,
-aka Rev 1.3, one.
+my quick fix (not sure if we should be using __set_fixmap?). Or did
+I fail at backportery?
 
-Shawn
+-----8<-----
+>From ea11b54704aa0a311ab3d05fd70072679bfe1a0b Mon Sep 17 00:00:00 2001
+From: Laura Abbott <lauraa@codeaurora.org>
+Date: Wed, 6 Aug 2014 19:20:46 -0700
+Subject: [PATCH] arm: Get proper pte for fixmaps
 
-> 
-> Reported-by: Shawn Guo <shawn.guo@freescale.com>
-> Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
+The generic fixmap.h gets indexes from high to low instead
+of low to high so the fixmap idx does not correspond to
+the array entry in fixmap_page_table. Get the proper pte
+to update.
+
+Signed-off-by: Laura Abbott <lauraa@codeaurora.org>
+---
+ arch/arm/mm/highmem.c | 8 ++++++--
+ 1 file changed, 6 insertions(+), 2 deletions(-)
+
+diff --git a/arch/arm/mm/highmem.c b/arch/arm/mm/highmem.c
+index bedca3a..7f08e64 100644
+--- a/arch/arm/mm/highmem.c
++++ b/arch/arm/mm/highmem.c
+@@ -22,14 +22,18 @@
+ static inline void set_fixmap_pte(int idx, pte_t pte)
+ {
+ 	unsigned long vaddr = __fix_to_virt(idx);
+-	set_pte_ext(fixmap_page_table + idx, pte, 0);
++	pte_t *ppte = pte_offset_kernel(pmd_off_k(FIXADDR_START), vaddr);
++
++	set_pte_ext(ppte, pte, 0);
+ 	local_flush_tlb_kernel_page(vaddr);
+ }
+ 
+ static inline pte_t get_fixmap_pte(unsigned long vaddr)
+ {
+ 	unsigned long idx = __virt_to_fix(vaddr);
+-	return *(fixmap_page_table + idx);
++	pte_t *ppte = pte_offset_kernel(pmd_off_k(FIXADDR_START), vaddr);
++
++	return *ppte;
+ }
+ 
+ void *kmap(struct page *page)
+-- 
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+hosted by The Linux Foundation
