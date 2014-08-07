@@ -1,25 +1,74 @@
 From: ttynkkynen@nvidia.com (Tuomas Tynkkynen)
-Date: Fri, 8 Aug 2014 02:01:52 +0300
-Subject: [PATCH 0/3] Introduce of_match_machine() helper
-Message-ID: <1407452515-2390-1-git-send-email-ttynkkynen@nvidia.com>
+Date: Fri, 8 Aug 2014 02:01:53 +0300
+Subject: [PATCH 1/3] of: Add of_match_machine helper
+In-Reply-To: <1407452515-2390-1-git-send-email-ttynkkynen@nvidia.com>
+References: <1407452515-2390-1-git-send-email-ttynkkynen@nvidia.com>
+Message-ID: <1407452515-2390-2-git-send-email-ttynkkynen@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Some mach-specific drivers that don't require their own node in the device tree
-(for example drivers/soc/*, cpufreq, cpuidle etc.) want to match on the device
-tree root compatible property instead. Instead of open-coding (and forgetting
-to call of_node_put on the root node) everywhere, add a helper to the OF core.
+Add of_match_machine function to test the device tree root for an
+of_match array. This can be useful when testing SoC versions at runtime,
+for example.
 
-Tuomas Tynkkynen (3):
-  of: Add of_match_machine helper
-  soc/tegra: Use of_match_machine in soc_is_tegra()
-  cpuidle: big.LITTLE: Use of_match_machine
+Signed-off-by: Tuomas Tynkkynen <ttynkkynen@nvidia.com>
+---
+ drivers/of/base.c  | 21 +++++++++++++++++++++
+ include/linux/of.h |  3 +++
+ 2 files changed, 24 insertions(+)
 
- drivers/cpuidle/cpuidle-big_little.c |  6 +-----
- drivers/of/base.c                    | 21 +++++++++++++++++++++
- drivers/soc/tegra/common.c           |  8 +-------
- include/linux/of.h                   |  3 +++
- 4 files changed, 26 insertions(+), 12 deletions(-)
-
+diff --git a/drivers/of/base.c b/drivers/of/base.c
+index d8574ad..37798ea 100644
+--- a/drivers/of/base.c
++++ b/drivers/of/base.c
+@@ -977,6 +977,27 @@ struct device_node *of_find_matching_node_and_match(struct device_node *from,
+ EXPORT_SYMBOL(of_find_matching_node_and_match);
+ 
+ /**
++ * of_match_machine - Tell if root of device tree has a matching of_match struct
++ *	@matches:	array of of device match structures to search in
++ *
++ *	Returns the result of of_match_node for the root node.
++ */
++const struct of_device_id *of_match_machine(const struct of_device_id *matches)
++{
++	const struct of_device_id *match;
++	struct device_node *root;
++
++	root = of_find_node_by_path("/");
++	if (!root)
++		return NULL;
++
++	match = of_match_node(matches, root);
++	of_node_put(root);
++	return match;
++}
++EXPORT_SYMBOL(of_match_machine);
++
++/**
+  * of_modalias_node - Lookup appropriate modalias for a device node
+  * @node:	pointer to a device tree node
+  * @modalias:	Pointer to buffer that modalias value will be copied into
+diff --git a/include/linux/of.h b/include/linux/of.h
+index 6c4363b..b7a8817 100644
+--- a/include/linux/of.h
++++ b/include/linux/of.h
+@@ -289,6 +289,8 @@ extern int of_n_addr_cells(struct device_node *np);
+ extern int of_n_size_cells(struct device_node *np);
+ extern const struct of_device_id *of_match_node(
+ 	const struct of_device_id *matches, const struct device_node *node);
++extern const struct of_device_id *of_match_machine(
++	const struct of_device_id *matches);
+ extern int of_modalias_node(struct device_node *node, char *modalias, int len);
+ extern void of_print_phandle_args(const char *msg, const struct of_phandle_args *args);
+ extern struct device_node *of_parse_phandle(const struct device_node *np,
+@@ -584,6 +586,7 @@ static inline const char *of_prop_next_string(struct property *prop,
+ 
+ #define of_match_ptr(_ptr)	NULL
+ #define of_match_node(_matches, _node)	NULL
++#define of_match_machine(_matches)	NULL
+ #endif /* CONFIG_OF */
+ 
+ #if defined(CONFIG_OF) && defined(CONFIG_NUMA)
 -- 
 1.8.1.5
