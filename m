@@ -1,48 +1,100 @@
-From: geoff@infradead.org (Geoff Levand)
-Date: Wed, 06 Aug 2014 17:40:03 -0700
-Subject: Kexec on arm64
-In-Reply-To: <20140804113528.GC3197@leverpostej>
-References: <CAFdej01w_pE6vv+13cCCyfDs4Rbdkzx4CMUj9q97HBKV0B53ow@mail.gmail.com>
- <1406333901.4062.69.camel@smoke>
- <CAFdej014ohCFYvoUAXWiYGb4_4UmSY2G1MH-NEE_cF1cC-6Mow@mail.gmail.com>
- <20140728153812.GA2576@leverpostej> <1406592548.28348.49.camel@smoke>
- <CAFdej00is0kC-1q5uMNJL5APL1WezdNBg0jASgwYamsg5NO_Tg@mail.gmail.com>
- <20140729133557.GQ2576@leverpostej> <1406668741.28348.75.camel@smoke>
- <CAFdej02sTBsjHz+FCqjKkY9pF5sPF6n6QUtEadHi0hK3MxRxGA@mail.gmail.com>
- <CAFdej01ZHkTVZuN_0RrGbFmoG4_NTnwm6KDAPM_sf=zHBHSRwg@mail.gmail.com>
- <20140804113528.GC3197@leverpostej>
-Message-ID: <1407372003.8971.85.camel@smoke>
+From: festevam@gmail.com (Fabio Estevam)
+Date: Wed,  6 Aug 2014 21:39:58 -0300
+Subject: [PATCH] ARM: mx6: Fix suspend/resume with PCI
+Message-ID: <1407371998-11437-1-git-send-email-festevam@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+From: Fabio Estevam <fabio.estevam@freescale.com>
 
-On Mon, 2014-08-04 at 12:35 +0100, Mark Rutland wrote:
-> > +       /*
-> > +        * arm64 kernel uses area above kernel image to build
-> > +        * initial page tables. Max required size for this area is 384K. It
-> > +        * happens when CONFIG_ARM64_PGTABLE_LEVELS is set.
-> > +        * So place dtb 512k above kernel image area.
-> > +        */
-> 
-> The area above the kernel Image holds the BSS too, and from some
-> experiments I did a while back with an allyesconfig, it was possible to
-> have many megabytes of BSS.
-> 
-> While 512k might be adequate for a defconfig today, it will become less
-> so as time goes on.
-> 
-> For kernel Images post v3.17 you can and should read the Image header's
-> image_size field to figure out how much memory is needed from _text to
-> _end (i.e. all the memory the kernel will assume is available statically
-> and will happily clobber). For kernel Images prior to v3.17 the best
-> thing we can do is guess as you've done here, or place the DTB below the
-> kernel and page tables in the TEXT_OFFSET area; neither option is
-> particularly brilliant.
+When PCI is used and a suspend/resume sequence is done we see the following
+kernel hang:
 
-I haven't looked into it yet, but booting.txt says that the dtb must be
-'within the first 512 megabytes from the start of the kernel image'.  If
-this restriction still holds we can't just put the dtb at
-text_offset + image_size.
+root at freescale /$ echo mem > /sys/power/state 
+[   16.099018] PM: Syncing filesystems ... done.
+[   16.141010] Freezing user space processes ... (elapsed 0.002 seconds) done.
+[   16.150840] Freezing remaining freezable tasks ... (elapsed 0.003 seconds) done.
+[   16.199438] random: nonblocking pool is initialized
+[   16.229639] PM: suspend of devices complete after 64.793 msecs
+[   16.235488] PM: suspend devices took 0.070 seconds
+[   16.245301] PM: late suspend of devices complete after 4.968 msecs
+[   16.257063] PM: noirq suspend of devices complete after 5.538 msecs
+[   16.263425] Disabling non-boot CPUs ...
+[   16.274666] CPU1: shutdown
+[   16.286351] CPU2: shutdown
+[   16.294169] CPU3: shutdown
+[   16.299551] Enabling non-boot CPUs ...
+[   16.304155] CPU1: Booted secondary processor
+[   16.305717] CPU1 is up
+[   16.313078] CPU2: Booted secondary processor
+[   16.313456] CPU2 is up
+[   16.320778] CPU3: Booted secondary processor
+[   16.321174] CPU3 is up
+	(hangs here)
 
--Geoff
+Implement a workaround for the erratum ERR005723: "PCIe does not support L2
+Power Down", which consists in toggling bit 18 (TEST_POWERDOWN) of GPR1 register.
+
+Tested on a mx6qsabresd TO1.2 revC2.
+
+Reported-by: Shawn Guo <shawn.guo@freescale.com>
+Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
+---
+Richard,
+
+Is there any better method to fix this issue? Or should we do the same
+as in the FSL kernel?
+
+I also tried to add pm ops into the imx6 pci driver and did the toggle there,
+but I still got the kernel hang.
+
+ arch/arm/mach-imx/pm-imx6.c | 27 +++++++++++++++++++++++++++
+ 1 file changed, 27 insertions(+)
+
+diff --git a/arch/arm/mach-imx/pm-imx6.c b/arch/arm/mach-imx/pm-imx6.c
+index 5c3af8f..92511cf 100644
+--- a/arch/arm/mach-imx/pm-imx6.c
++++ b/arch/arm/mach-imx/pm-imx6.c
+@@ -341,6 +341,23 @@ static int imx6q_suspend_finish(unsigned long val)
+ 
+ static int imx6q_pm_enter(suspend_state_t state)
+ {
++	struct regmap *gpr;
++	gpr = syscon_regmap_lookup_by_compatible("fsl,imx6q-iomuxc-gpr");
++	if (IS_ERR(gpr)) {
++		pr_err("failed to find fsl,imx6q-iomux-gpr regmap\n");
++		return PTR_ERR(gpr);
++	}
++
++	/*
++	 * L2 can exit by 'reset' or Inband beacon (from remote EP)
++	 * toggling phy_powerdown has same effect as 'inband beacon'
++	 * So, toggle bit18 of GPR1 as a workaround of erratum
++	 * ERR005723 - "PCIe does not support L2 Power Down"
++	 */
++	if (IS_ENABLED(CONFIG_PCI_IMX6) && !cpu_is_imx6sx())
++		regmap_update_bits(gpr, IOMUXC_GPR1, IMX6Q_GPR1_PCIE_TEST_PD,
++				   IMX6Q_GPR1_PCIE_TEST_PD);
++
+ 	switch (state) {
+ 	case PM_SUSPEND_STANDBY:
+ 		imx6q_set_lpm(STOP_POWER_ON);
+@@ -383,6 +400,16 @@ static int imx6q_pm_enter(suspend_state_t state)
+ 		return -EINVAL;
+ 	}
+ 
++	/*
++	 * L2 can exit by 'reset' or Inband beacon (from remote EP)
++	 * toggling phy_powerdown has same effect as 'inband beacon'
++	 * So, toggle bit18 of GPR1 as a workaround of erratum
++	 * ERR005723 - "PCIe does not support L2 Power Down"
++	 */
++	if (IS_ENABLED(CONFIG_PCI_IMX6) && !cpu_is_imx6sx())
++		regmap_update_bits(gpr, IOMUXC_GPR1, IMX6Q_GPR1_PCIE_TEST_PD,
++				   !IMX6Q_GPR1_PCIE_TEST_PD);
++
+ 	return 0;
+ }
+ 
+-- 
+1.9.1
