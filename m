@@ -1,139 +1,62 @@
-From: nicolas.derouineau@vitec.com (Nicolas Derouineau)
-Date: Thu, 7 Aug 2014 08:28:45 +0000
-Subject: CPUIdle Armada 370
-In-Reply-To: <1407341774154.51157@vitec.com>
-References: <1407333701627.99622@vitec.com>
- <53E24654.6020008@free-electrons.com>
- <53E249A1.900@free-electrons.com>,<53E24D2A.50706@free-electrons.com>
- <1407340917231.68970@vitec.com>, <53E25369.60809@free-electrons.com>,
- <1407341774154.51157@vitec.com>
-Message-ID: <1407400124543.92802@vitec.com>
+From: javier.martinez@collabora.co.uk (Javier Martinez Canillas)
+Date: Thu, 07 Aug 2014 10:40:36 +0200
+Subject: [PATCH v6 00/10] ARM: dts: exynos: Prepare Spring
+In-Reply-To: <CAD=FV=WFNW_5KZvLMk0kK1JQsdWLeo2kCjpQsFuxKNSnOKzfgw@mail.gmail.com>
+References: <1406940750-15880-1-git-send-email-afaerber@suse.de>	<53DC4E41.4050200@collabora.co.uk>	<CAD=FV=V_vXZLMaTMFdgr62=zRXucZA6D3PvS0Mb40he0ShHTfA@mail.gmail.com>	<53DCBC84.8080600@suse.de>
+ <CAD=FV=WFNW_5KZvLMk0kK1JQsdWLeo2kCjpQsFuxKNSnOKzfgw@mail.gmail.com>
+Message-ID: <53E33B84.2010108@collabora.co.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Gregory,
+Hello,
 
->Interesting you use a different variant the 88F6707 whereas we only test
->this driver on the 88F6710. Maybe there is something there.
+On 08/04/2014 05:42 PM, Doug Anderson wrote:
+> 
+> 
+>> For the touchpad it seems DT support has landed in the input tree as
+>> "atmel,maxtouch". Backporting just that patch does not make it work
+>> though. (Tried the rejected pinctrl approach to be on the safe side.)
+>> https://code.google.com/p/chromium/issues/detail?id=371114
+>> https://patchwork.kernel.org/patch/3976801/
+> 
+> This is the same work as needed for pit and pi, I believe.  Perhaps
+> Javier or Dmitry has this on their todo list?
+> 
+> 
 
-I guess this can be part of the problem. So I guess I'll have to compare in the BSP code if there is any differences between the two devices (so far, I can't see any). Maybe I should try to reach Marvell to have their opinion as well.
+I posted a couple of patches that allowed me to have the atmel touchpad working
+on Peach Pit. I found two issues while testing the driver:
 
-Regards,
+a) The device keycode event capabilities are hardcoded in the downstream Chrome
+OS driver while the mainline driver expect these to be defined in the DT. The
+property is called "linux,gpio-keymap" since it seems that the actual
+implementation is using a set of GPIOs. But this is handled by the firmware
+since the kernel just read a status register from the atmel T9 object.
 
-Nicolas
+I found the property confusing at first since it didn't have anything to do with
+Linux GPIO so posted a patch to add an example to the DT binding doc in order to
+make it easier to understand [0].
 
+b) The driver overwrites the edge/level flags parsed by OF core and expects that
+the IRQ type will be passed using platform data. The downstream Chrome OS driver
+defaults the type to IRQF_TRIGGER_FALLING if this is not provided while the
+mainline does not have a default so it's just 0 (IRQ_TYPE_NONE).
 
-________________________________________
-De : Nicolas Derouineau
-Envoy? : mercredi 6 ao?t 2014 18:16
-? : Gregory CLEMENT; linux-arm-kernel at lists.infradead.org
-Cc : Thomas Petazzoni; Simon Boulay
-Objet : RE: CPUIdle Armada 370
+This is fixed by reading back the IRQ type from the struct irq_data when parsing
+the DT data [1].
 
-Here is our dts file.
+The DTS changes to make the atmel touchpad work on Peach Pit were posted in [2].
+Changes for Pi were included as well since it should be the same but it was not
+tested since I don't have access to that machine, testing will be highly
+appreciated.
 
+> 
+> -Doug
+> 
 
-________________________________________
-De : Gregory CLEMENT <gregory.clement@free-electrons.com>
-Envoy? : mercredi 6 ao?t 2014 18:10
-? : Nicolas Derouineau; linux-arm-kernel at lists.infradead.org
-Cc : Thomas Petazzoni; Simon Boulay
-Objet : Re: CPUIdle Armada 370
+Thanks a lot and best regards,
+Javier
 
-On 06/08/2014 18:01, Nicolas Derouineau wrote:
-> Ok,
-> So here is the log of the error(using the previous config file)>
->
-> NAND read: device 0 offset 0x240000, size 0x600000
->  6291456 bytes read: OK
-> ## Booting kernel from Legacy Image at 02000000 ...
->    Image Name:   Linux-3.16.0-next-20140805-dirty
->    Created:      2014-08-06  15:56:06 UTC
->    Image Type:   ARM Linux Kernel Image (uncompressed)
->    Data Size:    2939920 Bytes = 2.8 MiB
->    Load Address: 00080000
->    Entry Point:  00080000
->    Verifying Checksum ... OK
-> ## Flattened Device Tree blob at 01000000
->    Booting using the fdt blob at 0x01000000
->    Loading Kernel Image ... OK
-> OK
->    Loading Device Tree to 00ffa000, end 00fff8a6 ... OK
->
-> Starting kernel ...
->
-> [    0.000000] Booting Linux on physical CPU 0x0
-> [    0.000000] Linux version 3.16.0-next-20140805-dirty (nde at nde-OptiPlex-980) (gcc version 4.6.4 (Linaro GCC branch-4.6.4. Marvell GCC release 201308-2123.0cc69bb4 64K MAXPAGESIZE ALIGN) ) #13 Wed Aug 6 14
-> [    0.000000] CPU: ARMv7 Processor [561f5811] revision 1 (ARMv7), cr=10c5387d
-> [    0.000000] CPU: PIPT / VIPT nonaliasing data cache, PIPT instruction cache
-> [    0.000000] Machine model: Vitec VMR-1404 (Marvell Armada 370 based)
-So this your own board with your own dts I guess. Would it possible to share it to see
-if a mistake could have slip there?
-
-[...]
-
-> [    0.073922] mvebu-soc-id: MVEBU SoC ID=0x6707, Rev=0x1
-
-Interesting you use a different variant the 88F6707 whereas we only test
-this driver on the 88F6710. Maybe there is something there.
-
-
-Thanks,
-
-Gregory
-
-> ________________________________________
-> De : Gregory CLEMENT <gregory.clement@free-electrons.com>
-> Envoy? : mercredi 6 ao?t 2014 17:43
-> ? : Nicolas Derouineau; linux-arm-kernel at lists.infradead.org
-> Cc : Thomas Petazzoni; Simon Boulay
-> Objet : Re: CPUIdle Armada 370
->
-> Hi Nicolas,
->
-> [..]
->
->>> On 06/08/2014 16:01, Nicolas Derouineau wrote:
->>>> Hello,
->>>> I am currently trying to use the CPUIdle driver provided by linux-next (or by the patch here https://github.com/MISL-EBU-System-SW/mainline-public/commits/3.16/cpuidle-v3).
->>>
->>> I have just tested using next-20140806 and mvebu_v7_defconfig.
->>> And it worked well on a mirabox using the Armada 370 SoC.
->>>
->>>>
->>>> Everything runs fine as long as I don't select the CPU driver for the ARMADA Family. When I do, at boottime, the program is entering the __cpu_suspend save function and then get lost in it and that turns into a kernel panic. I have already made a post about this on the ARM Community Forum (http://community.arm.com/thread/6326).
->>>>
->>>> The "faulty" configuration file is attached to this email.
->>>
->>> Now I will try with this configuration
->>
->> Using your configuration file I didn't reproduce your issue.
->> And according to the stat given by linux the kernel spent a lot
->> of time in idle:
->>
->> cat /sys/devices/system/cpu/cpu0/cpuidle/state1/time
->> 338822284
->>
->>
->> Could you try again with next-20140806?
->
-> Also could you send your full boot log until the crash
-> it may help us.
->
-> Thanks,
->
-> Gregory
->
-> --
-> Gregory Clement, Free Electrons
-> Kernel, drivers, real-time and embedded Linux
-> development, consulting, training and support.
-> http://free-electrons.com
->
-
-
---
-Gregory Clement, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
+[0]: https://lkml.org/lkml/2014/8/6/584
+[1]: https://lkml.org/lkml/2014/8/7/82
+[2]: https://lkml.org/lkml/2014/8/6/589
