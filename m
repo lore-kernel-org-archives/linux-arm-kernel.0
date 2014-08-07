@@ -1,30 +1,71 @@
-From: peter.griffin@linaro.org (Peter Griffin)
-Date: Thu, 7 Aug 2014 15:16:31 +0100
-Subject: [PATCH v3 1/6] usb: host: usb-st-common: Add common code
- required by ohci-st and ehci-st
-In-Reply-To: <20140807141457.GB12137@griffinp-ThinkPad-X1-Carbon-2nd>
-References: <1407344589-24863-1-git-send-email-peter.griffin@linaro.org>
- <1407344589-24863-2-git-send-email-peter.griffin@linaro.org>
- <201408062259.10697.arnd@arndb.de>
- <20140807141457.GB12137@griffinp-ThinkPad-X1-Carbon-2nd>
-Message-ID: <20140807141631.GC12137@griffinp-ThinkPad-X1-Carbon-2nd>
+From: festevam@gmail.com (Fabio Estevam)
+Date: Thu, 7 Aug 2014 11:20:38 -0300
+Subject: Oops: 17 SMP ARM (v3.16-rc2)
+In-Reply-To: <20140807121248.GY30282@n2100.arm.linux.org.uk>
+References: <C4A61A5CA4AD2246942F4BA6F20ACB80435655E9@ALVA-EXMB04.alv.autoliv.int>
+ <20140626151424.GT32514@n2100.arm.linux.org.uk>
+ <20140627112151.GF32514@n2100.arm.linux.org.uk>
+ <3FFB61A7A8473C49831AF20FA193534A43CADFA7@ALVA-EXMB01.alv.autoliv.int>
+ <20140627163108.GP32514@n2100.arm.linux.org.uk>
+ <C4A61A5CA4AD2246942F4BA6F20ACB8043575072@ALVA-EXMB04.alv.autoliv.int>
+ <20140806095012.GN30282@n2100.arm.linux.org.uk>
+ <C4A61A5CA4AD2246942F4BA6F20ACB8043575172@ALVA-EXMB04.alv.autoliv.int>
+ <20140806125550.GO30282@n2100.arm.linux.org.uk>
+ <C4A61A5CA4AD2246942F4BA6F20ACB804357526C@ALVA-EXMB04.alv.autoliv.int>
+ <20140807121248.GY30282@n2100.arm.linux.org.uk>
+Message-ID: <CAOMZO5ACj6ER3tUMS8XsnigT=-zs4TZFmobbtmTN-+LWJFLt4Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Arnd,
+On Thu, Aug 7, 2014 at 9:12 AM, Russell King - ARM Linux
+<linux@arm.linux.org.uk> wrote:
 
-> > > (priv->rst);
-> > > +		if (ret)
-> > > +			goto err_assert_power;
-> > > +	}
-> > 
-> > I wouldn't make these optional, just call the functions
-> > unconditionally and fail the probe function if they are
-> > not available.
+> Hmm, I'm slightly confused.  On my iMX6Q, I have:
+>
+> 150:     581754          0          0          0       GIC 150  2188000.ethernet
+> 151:          0          0          0          0       GIC 151  2188000.ethernet
 
-Also I've also done as you suggest and made
-these non optional in V4.
+Same here on a mx6qsabresd.
 
-regards,
+> In the DT file, we have:
+>
+>                         fec: ethernet at 02188000 {
+>                                 compatible = "fsl,imx6q-fec";
+>                                 reg = <0x02188000 0x4000>;
+>                                 interrupts-extended =
+>                                         <&intc 0 118 IRQ_TYPE_LEVEL_HIGH>,
+>                                         <&intc 0 119 IRQ_TYPE_LEVEL_HIGH>;
+>                                 clocks = <&clks 117>, <&clks 117>, <&clks 190>;
+>                                 clock-names = "ipg", "ahb", "ptp";
+>                                 status = "disabled";
+>                         };
+>
+> which, for the gic, would be 118 + 32 (first SPI) = 150, 119 + 32 = 151.
+> Yet you seem to have nothing registered against GIC 150, instead having
+> an interrupt against GPIO 6.
+>
+> This seems very odd, and as this is an on-SoC device, I don't see why
+> you would want to bind the interrupts for the FEC device any differently
+> to standard platforms.
+>
+> This could well be the cause of your stalls.
+>
+> What's GPIO 6 used for on your board?
 
-Peter.
+On a imx6q sabreauto I also get:
+
+151:          0          0          0          0       GIC 151  2188000.ethernet
+166:       4577          0          0          0  gpio-mxc   6  2188000.ethernet
+
+and the GPIO1_6 interrupt comes from this commit:
+
+commit bc20a5d6da718f9d60da0a78f70c653c1cd16af3
+Author: Troy Kisky <troy.kisky@boundarydevices.com>
+Date:   Fri Dec 20 11:47:12 2013 -0700
+
+    ARM: dts: imx6qdl-sabreauto: use GPIO_6 for FEC interrupt.
+
+    This works around a hardware bug.
+
+    Signed-off-by: Troy Kisky <troy.kisky@boundarydevices.com>
+    Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
