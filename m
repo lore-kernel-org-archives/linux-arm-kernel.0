@@ -1,83 +1,36 @@
-From: boris.brezillon@free-electrons.com (Boris BREZILLON)
-Date: Thu, 7 Aug 2014 09:59:12 +0200
-Subject: [PATCH v2] usb: gadget: at91_udc: move prepare clk into process
- context
-In-Reply-To: <20140807095231.11bde829@bbrezillon>
-References: <1407330702-2926-1-git-send-email-ronald.wahl@raritan.com>
- <20140807095231.11bde829@bbrezillon>
-Message-ID: <20140807095912.7648de46@bbrezillon>
+From: mfuzzey@parkeon.com (Martin Fuzzey)
+Date: Thu, 07 Aug 2014 10:00:08 +0200
+Subject: [PATCH V2 4/4] ARM: dts: i.MX53: Add PMU DT entry
+In-Reply-To: <20140807055301.GD27051@dragon>
+References: <20140805144831.25462.18149.stgit@localhost>
+ <20140805144840.25462.57101.stgit@localhost> <20140806105048.GF25953@arm.com>
+ <53E22F35.4060503@parkeon.com> <20140807055301.GD27051@dragon>
+Message-ID: <53E33208.8020607@parkeon.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Adding USB and Atmel Maintainers in Cc.
+On 07/08/14 07:53, Shawn Guo wrote:
+> On Wed, Aug 06, 2014 at 03:35:49PM +0200, Martin Fuzzey wrote:
+>> On 06/08/14 12:50, Will Deacon wrote:
+>>>
+>>> You're missing the new property.
+>> Actually this was deliberate.
+>>
+>> Since the property should only be used if booting in secure mode
+>> this generic dtsi file can't know if it is ok or not.
+> As far as I know, most of the i.MX53 systems boot Linux kernel in secure
+> mode.  In that case, we should probably have the new property by
+> default?
 
-On Thu, 7 Aug 2014 09:52:31 +0200
-Boris BREZILLON <boris.brezillon@free-electrons.com> wrote:
+Is it possible to override a boolean property to remove it (set to 
+false) in a board specific dts?
 
-> Hi Ronald,
-> 
-> On Wed,  6 Aug 2014 15:11:42 +0200
-> Ronald Wahl <ronald.wahl@raritan.com> wrote:
-> 
-> > Commit 7628083227b6bc4a7e33d7c381d7a4e558424b6b added clock preparation in
-> > interrupt context. This is not allowed as it might sleep. Move clock
-> > preparation into process context (at91udc_probe).
-> > ---
-> >  drivers/usb/gadget/udc/at91_udc.c | 39 ++++++++++++++++++++++++++++++---------
-> >  1 file changed, 30 insertions(+), 9 deletions(-)
-> > 
-> > diff --git a/drivers/usb/gadget/udc/at91_udc.c b/drivers/usb/gadget/udc/at91_udc.c
-> > index cfd18bc..0b347a0 100644
-> > --- a/drivers/usb/gadget/udc/at91_udc.c
-> > +++ b/drivers/usb/gadget/udc/at91_udc.c
-> > @@ -872,10 +872,10 @@ static void clk_on(struct at91_udc *udc)
-> >  
-> >  	if (IS_ENABLED(CONFIG_COMMON_CLK)) {
-> >  		clk_set_rate(udc->uclk, 48000000);
-> > -		clk_prepare_enable(udc->uclk);
-> > +		clk_enable(udc->uclk);
-> >  	}
-> > -	clk_prepare_enable(udc->iclk);
-> > -	clk_prepare_enable(udc->fclk);
-> > +	clk_enable(udc->iclk);
-> > +	clk_enable(udc->fclk);
-> >  }
-> >  
-> >  static void clk_off(struct at91_udc *udc)
-> > @@ -884,10 +884,10 @@ static void clk_off(struct at91_udc *udc)
-> >  		return;
-> >  	udc->clocked = 0;
-> >  	udc->gadget.speed = USB_SPEED_UNKNOWN;
-> > -	clk_disable_unprepare(udc->fclk);
-> > -	clk_disable_unprepare(udc->iclk);
-> > +	clk_disable(udc->fclk);
-> > +	clk_disable(udc->iclk);
-> >  	if (IS_ENABLED(CONFIG_COMMON_CLK))
-> > -		clk_disable_unprepare(udc->uclk);
-> > +		clk_disable(udc->uclk);
-> >  }
-> 
-> As you stated prepare and unprepare should never be called in interrupt
-> context. 
-> 
-> My concern here is that PLLB (which is often used as USB clock
-> parent) will never be gated/disabled (because all this work is
-> done in its unprepare method), and thus your power consumption will be
-> higher (when entering suspend mode) than if you'd done a
-> disable_unprepare call.
-> 
-> How about leaving the clk_on/off unchanged and use a threaded irq
-> instead of a normal irq ?
-> 
-> 
-> Best Regards,
-> 
-> Boris
-> 
+If it can be done then yes I agree it should be the default.
+
+However seeing as the dts syntax doesn't give a value for boolean 
+properties I don't see how.
+
+But I don't think people booting non secure should have to modify imx53.dtsi
 
 
-
--- 
-Boris Brezillon, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
+Martin
