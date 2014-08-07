@@ -1,123 +1,123 @@
-From: paul@pwsan.com (Paul Walmsley)
-Date: Thu, 7 Aug 2014 21:33:58 +0000 (UTC)
-Subject: OMAP baseline test results for v3.16
-Message-ID: <alpine.DEB.2.02.1408072131470.5770@utopia.booyaka.com>
+From: geert@linux-m68k.org (Geert Uytterhoeven)
+Date: Thu, 7 Aug 2014 23:36:10 +0200
+Subject: [PATCH v2 00/12] defconfigs: add MTD_SPI_NOR (new subsystem
+ dependency for M25P80)
+In-Reply-To: <1398925607-7482-1-git-send-email-computersforpeace@gmail.com>
+References: <1398925607-7482-1-git-send-email-computersforpeace@gmail.com>
+Message-ID: <CAMuHMdVZmJR=Cu1Wvpyx+KqgdKRRtnAO94k4imXChUwfC_GPTw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi Brian,
 
-Here are some basic OMAP test results for Linux v3.16.
-Logs and other details at:
+On Thu, May 1, 2014 at 8:26 AM, Brian Norris
+<computersforpeace@gmail.com> wrote:
+> v1 --> v2: split ARM defconfig changes into their sub-architectures. No change
+>            in the overall diff.
+>
+> Hi all,
+>
+> We are introducing a new SPI-NOR subsystem/framework for MTD, to support
+> various types of SPI-NOR flash controllers which require (or benefit from)
+> intimate knowledge of the flash interface, rather than just the relatively dumb
+> SPI interface. This framework borrows much of the m25p80 driver for its
+> abstraction and moves this code into a spi-nor module.
+>
+> This means CONFIG_M25P80 now has a dependency on CONFIG_MTD_SPI_NOR, which
+> should be added to the defconfigs. I expect that each (sub)architecture
+> maintainer can merge these patches to their own tree.
+>
+> Note that without the new CONFIG_MTD_SPI_NOR symbol in your defconfig, Kconfig
+> will automatically drop M25P80 for you.
+>
+> Please keep general comments to the cover letter, so all parties can see.
+>
+> This series is based on 3.15-rc1.
+>
+> The SPI-NOR development code (in -next, queued for 3.16) is here:
+>
+>   git://git.infradead.org/l2-mtd.git +spinor
+>
+> This defconfig series is available in the same repo at:
+>
+>   git://git.infradead.org/l2-mtd.git +defconfigs
+>
+> Thanks,
+> Brian
+>
+> Brian Norris (12):
+>   ARM: imx/mxs defconfigs: add MTD_SPI_NOR (new dependency for M25P80)
+>   ARM: defconfigs: add MTD_SPI_NOR (new dependency for M25P80)
+>   ARM: keystone: add MTD_SPI_NOR (new dependency for M25P80)
+>   ARM: tegra: add MTD_SPI_NOR (new dependency for M25P80)
+>   ARM: lpc32xx: add MTD_SPI_NOR (new dependency for M25P80)
+>   ARM: at91: add MTD_SPI_NOR (new dependency for M25P80)
+>   ARM: shmobile: add MTD_SPI_NOR (new dependency for M25P80)
+>   ARM: marvell: add MTD_SPI_NOR (new dependency for M25P80)
+>   blackfin: defconfigs: add MTD_SPI_NOR (new dependency for M25P80)
+>   mips: defconfigs: add MTD_SPI_NOR (new dependency for M25P80)
+>   powerpc: defconfigs: add MTD_SPI_NOR (new dependency for M25P80)
+>   sh: defconfig: add MTD_SPI_NOR (new dependency for M25P80)
+>
+>  arch/arm/configs/bockw_defconfig               | 2 +-
+>  arch/arm/configs/dove_defconfig                | 2 +-
+>  arch/arm/configs/imx_v6_v7_defconfig           | 1 +
+>  arch/arm/configs/keystone_defconfig            | 1 +
+>  arch/arm/configs/kirkwood_defconfig            | 1 +
+>  arch/arm/configs/koelsch_defconfig             | 1 +
+>  arch/arm/configs/lager_defconfig               | 1 +
+>  arch/arm/configs/lpc32xx_defconfig             | 2 +-
+>  arch/arm/configs/multi_v5_defconfig            | 1 +
+>  arch/arm/configs/multi_v7_defconfig            | 1 +
+>  arch/arm/configs/mvebu_v5_defconfig            | 1 +
+>  arch/arm/configs/mvebu_v7_defconfig            | 1 +
+>  arch/arm/configs/mxs_defconfig                 | 1 +
+>  arch/arm/configs/sama5_defconfig               | 2 +-
+>  arch/arm/configs/shmobile_defconfig            | 1 +
+>  arch/arm/configs/tegra_defconfig               | 1 +
+>  arch/blackfin/configs/BF526-EZBRD_defconfig    | 2 +-
+>  arch/blackfin/configs/BF527-EZKIT-V2_defconfig | 2 +-
+>  arch/blackfin/configs/BF527-EZKIT_defconfig    | 2 +-
+>  arch/blackfin/configs/BF548-EZKIT_defconfig    | 2 +-
+>  arch/blackfin/configs/BF609-EZKIT_defconfig    | 2 +-
+>  arch/blackfin/configs/BlackStamp_defconfig     | 3 +--
+>  arch/blackfin/configs/H8606_defconfig          | 3 +--
+>  arch/mips/configs/ath79_defconfig              | 3 +--
+>  arch/mips/configs/db1xxx_defconfig             | 1 +
+>  arch/mips/configs/rt305x_defconfig             | 2 +-
+>  arch/powerpc/configs/corenet32_smp_defconfig   | 2 +-
+>  arch/powerpc/configs/corenet64_smp_defconfig   | 2 +-
+>  arch/powerpc/configs/mpc85xx_defconfig         | 2 +-
+>  arch/powerpc/configs/mpc85xx_smp_defconfig     | 2 +-
+>  arch/sh/configs/sh7757lcr_defconfig            | 2 +-
+>  31 files changed, 31 insertions(+), 21 deletions(-)
 
-    http://www.pwsan.com/omap/testlogs/test_v3.16/20140804182520/
+FWIW, this change still hasn't propagated to the following defconfigs:
 
+arch/arm/configs/axm55xx_defconfig
+arch/arm/configs/bockw_defconfig
+arch/arm/configs/koelsch_defconfig
+arch/arm/configs/lager_defconfig
+arch/arm/configs/lpc32xx_defconfig
+arch/arm/configs/multi_v5_defconfig
+arch/arm/configs/multi_v7_defconfig
+arch/arm/configs/qcom_defconfig
+arch/arm/configs/sama5_defconfig
+arch/arm/configs/shmobile_defconfig
+arch/powerpc/configs/85xx/kmp204x_defconfig
+arch/powerpc/configs/corenet32_smp_defconfig
+arch/powerpc/configs/corenet64_smp_defconfig
+arch/powerpc/configs/mpc85xx_defconfig
+arch/powerpc/configs/mpc85xx_smp_defconfig
+arch/sh/configs/sh7757lcr_defconfig
 
-Test summary
-------------
+Gr{oetje,eeting}s,
 
-Build: zImage:
-    Pass (16/16): multi_v7_defconfig, omap2plus_defconfig,
-		  omap2plus_defconfig_am33xx_only,
-		  omap2plus_defconfig_am43xx_only,
-		  omap2plus_defconfig_2430sdp_only,
-		  omap2plus_defconfig_cpupm, omap2plus_defconfig_no_pm,
-		  omap2plus_defconfig_n800_only_a,
-		  omap2plus_defconfig_n800_multi_omap2xxx,
-		  omap2plus_defconfig_omap2_4_only,
-		  omap2plus_defconfig_omap3_4_only,
-		  omap2plus_defconfig_dra7xx_only,
-		  rmk_omap3430_ldp_allnoconfig,
-		  rmk_omap3430_ldp_oldconfig,
-		  rmk_omap4430_sdp_allnoconfig,
-		  rmk_omap4430_sdp_oldconfig
+                        Geert
 
-Build: uImage:
-    Pass ( 3/ 3): omap1_defconfig, omap1_defconfig_1510innovator_only,
-		  omap1_defconfig_5912osk_only
+--
+Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
 
-Build: uImage+dtb:
-    Pass (10/10): omap2plus_defconfig_am33xx_only/am335x-bone,
-		  omap2plus_defconfig/omap4-panda,
-		  omap2plus_defconfig/omap4-panda-es,
-		  omap2plus_defconfig/am3517-evm,
-		  omap2plus_defconfig/omap2430-sdp,
-		  omap2plus_defconfig/omap3-beagle,
-		  omap2plus_defconfig/omap3-beagle-xm,
-		  omap2plus_defconfig/omap3-evm-37xx,
-		  omap2plus_defconfig/omap4-var-som,
-		  omap2plus_defconfig/omap5-uevm
-
-Boot to userspace:
-    FAIL ( 1/14): 2430sdp
-    skip ( 1/14): 5912osk
-    Pass (12/14): 2420n800, 3517evm, 3530es3beagle, 3730beaglexm,
-		  37xxevm, 4430es2panda, 4460pandaes, am335xbone,
-		  am335xbonelt, cmt3517, 4460varsomom, 5430es2uevm
-
-PM: chip retention via suspend:
-    FAIL ( 5/ 7): 2430sdp, 37xxevm, 4430es2panda, 4460pandaes,
-		  4460varsomom
-    Pass ( 2/ 7): 3530es3beagle, 3730beaglexm
-
-PM: chip retention via dynamic idle:
-    FAIL ( 6/ 7): 2430sdp, 3530es3beagle, 37xxevm, 4430es2panda,
-		  4460pandaes, 4460varsomom
-    Pass ( 1/ 7): 3730beaglexm
-
-PM: chip off except CORE via suspend:
-    Pass ( 1/ 1): 3730beaglexm
-
-PM: chip off except CORE via dynamic idle:
-    Pass ( 1/ 1): 3730beaglexm
-
-PM: chip off via suspend:
-    FAIL ( 5/ 5): 3530es3beagle, 37xxevm, 4430es2panda, 4460pandaes,
-		  4460varsomom
-
-PM: chip off via dynamic idle:
-    FAIL ( 5/ 5): 3530es3beagle, 37xxevm, 4430es2panda, 4460pandaes,
-		  4460varsomom
-
-
-vmlinux object size
-(delta in bytes from test_v3.16-rc7 (64aa90f26c06e1cb2aacfb98a7d0eccfbd6c1a91)):
-   text     data      bss    total  kernel
-   +456        0        0     +456  omap1_defconfig
-   +400      -16        0     +384  omap1_defconfig_1510innovator_only
-   +400      +24        0     +424  omap1_defconfig_5912osk_only
-  +4720       -8        0    +4712  multi_v7_defconfig
-  +4600      +16        0    +4616  omap2plus_defconfig
-  +9228        0        0    +9228  omap2plus_defconfig_2430sdp_only
-  +4372       -8        0    +4364  omap2plus_defconfig_am33xx_only
-  +4436       -8        0    +4428  omap2plus_defconfig_am43xx_only
-  +8696      -16        0    +8680  omap2plus_defconfig_cpupm
-  +4492        0        0    +4492  omap2plus_defconfig_dra7xx_only
-  +3696      -16        0    +3680  omap2plus_defconfig_n800_multi_omap2xxx
-  +7788      -16        0    +7772  omap2plus_defconfig_n800_only_a
-  +4600      +16        0    +4616  omap2plus_defconfig_no_pm
-  +4380      -16        0    +4364  omap2plus_defconfig_omap2_4_only
-  +4448       +8        0    +4456  omap2plus_defconfig_omap3_4_only
-  +4372      +24        0    +4396  omap2plus_defconfig_omap5_only
-  +4100       +8    +3784    +7892  rmk_omap3430_ldp_allnoconfig
-  +4060        0        0    +4060  rmk_omap3430_ldp_oldconfig
-  +4228       -8     -456    +3764  rmk_omap4430_sdp_allnoconfig
-  +7996        0        0    +7996  rmk_omap4430_sdp_oldconfig
-
-Boot-time memory difference
-(delta in bytes from test_v3.16-rc7 (64aa90f26c06e1cb2aacfb98a7d0eccfbd6c1a91))
-  avail  rsrvd   high  freed  board          kconfig
-    -8k     8k      .      .  2420n800       omap2plus_defconfig_n800_only_a
-    -8k     8k      .      .  2430sdp        omap2plus_defconfig
-    -8k     8k      .      .  3517evm        omap2plus_defconfig
-    -8k     8k      .      .  3530es3beagle  omap2plus_defconfig
-    -8k     8k      .      .  3730beaglexm   omap2plus_defconfig
-    -8k     8k      .      .  37xxevm        omap2plus_defconfig
-    -8k     8k      .      .  4430es2panda   omap2plus_defconfig
-    -8k     8k      .      .  4460pandaes    omap2plus_defconfig
-    -8k     8k      .      .  4460varsomom   omap2plus_defconfig
-    -8k     8k      .      .  5430es2uevm    omap2plus_defconfig
-    -8k     8k      .      .  am335xbonelt   omap2plus_defconfig
-
-
-Someone snuck a patch in between v3.16-rc7 and v3.16 that breaks suspend 
-and resume on 37xxevm.
+In personal conversations with technical people, I call myself a hacker. But
+when I'm talking to journalists I just say "programmer" or something like that.
+                                -- Linus Torvalds
