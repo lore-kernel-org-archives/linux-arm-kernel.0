@@ -1,44 +1,124 @@
-From: geoff@infradead.org (Geoff Levand)
-Date: Thu, 07 Aug 2014 10:09:39 -0700
-Subject: Kexec on arm64
-In-Reply-To: <20140807095919.GC9984@leverpostej>
-References: <CAFdej014ohCFYvoUAXWiYGb4_4UmSY2G1MH-NEE_cF1cC-6Mow@mail.gmail.com>
- <20140728153812.GA2576@leverpostej> <1406592548.28348.49.camel@smoke>
- <CAFdej00is0kC-1q5uMNJL5APL1WezdNBg0jASgwYamsg5NO_Tg@mail.gmail.com>
- <20140729133557.GQ2576@leverpostej> <1406668741.28348.75.camel@smoke>
- <CAFdej02sTBsjHz+FCqjKkY9pF5sPF6n6QUtEadHi0hK3MxRxGA@mail.gmail.com>
- <CAFdej01ZHkTVZuN_0RrGbFmoG4_NTnwm6KDAPM_sf=zHBHSRwg@mail.gmail.com>
- <20140804113528.GC3197@leverpostej> <1407372003.8971.85.camel@smoke>
- <20140807095919.GC9984@leverpostej>
-Message-ID: <1407431379.8971.91.camel@smoke>
+From: b.zolnierkie@samsung.com (Bartlomiej Zolnierkiewicz)
+Date: Thu, 07 Aug 2014 19:18:43 +0200
+Subject: [PATCH v5 0/5] ARM: EXYNOS: cpuidle: fix AFTR mode on boards with
+ secure firmware enabled
+In-Reply-To: <53E0E13E.3@linaro.org>
+References: <1407245666-20016-1-git-send-email-b.zolnierkie@samsung.com>
+ <53E0E13E.3@linaro.org>
+Message-ID: <25593716.2VrAenu32Y@amdc1032>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 2014-08-07 at 10:59 +0100, Mark Rutland wrote:
-> On Thu, Aug 07, 2014 at 01:40:03AM +0100, Geoff Levand wrote:
-> > 
-> > I haven't looked into it yet, but booting.txt says that the dtb must be
-> > 'within the first 512 megabytes from the start of the kernel image'.  If
-> > this restriction still holds we can't just put the dtb at
-> > text_offset + image_size.
+
+On Tuesday, August 05, 2014 03:50:54 PM Daniel Lezcano wrote:
+> On 08/05/2014 03:34 PM, Bartlomiej Zolnierkiewicz wrote:
+> > Hi,
+> >
+> > This patch series adds support for AFTR idle mode on boards with
+> > secure firmware enabled and allows EXYNOS cpuidle driver usage on
+> > Exynos4x12 SoCs.
+> >
+> > It has been tested on Trats2 board (using Exynos4412 SoC with secure
+> > firmware enabled) on which AFTR mode reduces power consumption by ~12%
+> > when EXYNOS cpuidle driver is enabled (in both cases the default
+> > exynos_defconfig config is used and CPU1-3 are offlined).
 > 
-> Isn't that only a problem if text_offset + image_size is huge (510MB+)?
+> Hi Bartlomiej,
 
-Yes, a limit I don't think we need to be too concerned about at present.
+Hi Daniel,
 
-> The wording in booting.txt doesn't sound quite right. As I understand
-> it, the 512MB restriction is because of the way we map the dtb in the
-> swapper page tables.
+> I tested your patchset on an odroid-u2. When the cpuidle driver is 
+> enabled and the cpu1-3 are offlined, the kernel hangs.
 > 
-> So a better wording would be "the kernel and DTB must be placed in the
-> same naturally-aligned 512MB region of memory".
-> 
-> It should be possible to get rid of the restrictions on the placement of
-> the image and DTB, but this requires reworking the VA layout (using a
-> kernel text mapping separate from the linear map as with x86_64, and
-> similarly having a separate DTB mapping), and unfortunately I haven't
-> had the time to do that.
+> If I disable the AFTR state on cpuidle, and offline the 1-3, it works as 
+> expected. So there is something wrong with the AFTR on the odroid board.
 
-Or maybe just relocate the dtb at startup to within range.
+Thanks for testing.  I reproduced the problem on ODROID-U3 board.  I also
+tested Exynos4412 based Origen board and it also has problem with AFTR mode.
+We did some debugging but nothing specific has came up yet (we suspect that
+the issue may be caused by incompatibilities of bootloader firmware of
+ODROID-U2/U3 and Origen4412 boards).  We will keep investigating this but
+in the meantime I would like to have this patchset acked/merged if possible
+(with Exynos4412 support limited to Trats2 target currently [*]) as:
 
--Geoff
+- it contains mostly fundamental changes for all secure firmware enabled
+  boards (which would be needed also on ODROID/Origen4412 boards if we get
+  AFTR mode working on them)
+
+- it adds working AFTR mode support for Exynos4412 Trats2 target
+
+- it prepares support for Exynos4212 and Exynos3250 targets which are
+  working fine with AFTR mode in our internal kernels and which are not
+  yet upstreamed
+
+[*] In the future it should be possible to enable AFTR mode support per
+    board using DT (basing on patches from Lorenzo), for now it should be
+    fine to check for Trats2 target directly while registering cpuidle
+    platform device.  I will post v6 soon.
+
+Best regards,
+--
+Bartlomiej Zolnierkiewicz
+Samsung R&D Institute Poland
+Samsung Electronics
+
+> > Depends on:
+> > - next-20140804 branch of linux-next kernel tree
+> > - [PATCH v5][next-20140804] ARM: EXYNOS: Fix suspend/resume sequences
+> >    (http://www.mail-archive.com/linux-samsung-soc at vger.kernel.org/msg35262.html)
+> > - [PATCH v2 0/2] Firmware-assisted suspend/resume of Exynos SoCs
+> >    (http://www.mail-archive.com/linux-samsung-soc at vger.kernel.org/msg34282.html)
+> >
+> > Changes since v4:
+> > - rebased on top of next-20140804 +
+> >    [PATCH v5][next-20140804] ARM: EXYNOS: Fix suspend/resume sequences
+> >    (http://www.mail-archive.com/linux-samsung-soc at vger.kernel.org/msg35262.html)
+> >    [PATCH v2 0/2] Firmware-assisted suspend/resume of Exynos SoCs
+> >    (http://www.mail-archive.com/linux-samsung-soc at vger.kernel.org/msg34282.html)
+> > - call exynos_save_cp15() only on A9 type core (this is needed for the future
+> >    Exynos3250 SoC support)
+> >
+> > Changes since v3:
+> > - rebased on top of next-20140804 +
+> >    [PATCH v4][next-20140804] ARM: EXYNOS: Fix suspend/resume sequences
+> >    (http://www.mail-archive.com/linux-samsung-soc at vger.kernel.org/msg35192.html)
+> >    [PATCH v2 0/2] Firmware-assisted suspend/resume of Exynos SoCs
+> >    (http://www.mail-archive.com/linux-samsung-soc at vger.kernel.org/msg34282.html)
+> > - (re-)added patch fixing S5P_CENTRAL_SEQ_OPTION register setup
+> >
+> > Changes since v2:
+> > - rebased on top of next-20140708 +
+> >    [PATCH 5/6] ARM: EXYNOS: Fix suspend/resume sequencies
+> >    (http://www.mail-archive.com/linux-samsung-soc at vger.kernel.org/msg32809.html)
+> >    [with rejects fixed]
+> >    [PATCH 6/6] ARM: EXYNOS: Register cpuidle device only on Exynos4210 and 5250
+> >    (http://www.mail-archive.com/linux-samsung-soc at vger.kernel.org/msg32808.html)
+> >    [PATCH 0/2] Firmware-assisted suspend/resume of Exynos SoCs
+> >    (http://www.mail-archive.com/linux-samsung-soc at vger.kernel.org/msg32991.html)
+> >    [with rejects fixed in patch #2]
+> > - addressed review comments from Tomasz Figa and Daniel Lezcano
+> >
+> > Changes since v1:
+> > - synced against next-20140602
+> > - added missing Acked-by-s
+> >
+> > Best regards,
+> > --
+> > Bartlomiej Zolnierkiewicz
+> > Samsung R&D Institute Poland
+> > Samsung Electronics
+> >
+> >
+> > Bartlomiej Zolnierkiewicz (5):
+> >    ARM: EXYNOS: PM: replace EXYNOS_BOOT_VECTOR_* macros by static inlines
+> >    ARM: EXYNOS: add AFTR mode support to firmware do_idle method
+> >    ARM: EXYNOS: cpuidle: add secure firmware support to AFTR mode code
+> >    ARM: EXYNOS: PM: fix register setup for AFTR mode code
+> >    ARM: EXYNOS: cpuidle: allow driver usage on Exynos4x12 SoCs
+> >
+> >   arch/arm/include/asm/firmware.h |  2 +-
+> >   arch/arm/mach-exynos/common.h   |  5 ++++
+> >   arch/arm/mach-exynos/exynos.c   |  4 ++-
+> >   arch/arm/mach-exynos/firmware.c | 34 ++++++++++++++++-------
+> >   arch/arm/mach-exynos/pm.c       | 60 ++++++++++++++++++++++++-----------------
+> >   5 files changed, 70 insertions(+), 35 deletions(-)
