@@ -1,69 +1,44 @@
-From: lauraa@codeaurora.org (Laura Abbott)
-Date: Thu, 07 Aug 2014 13:43:55 -0700
-Subject: [PATCH v2 0/8] arm: support CONFIG_RODATA
-In-Reply-To: <1407423713-4160-1-git-send-email-keescook@chromium.org>
-References: <1407423713-4160-1-git-send-email-keescook@chromium.org>
-Message-ID: <53E3E50B.7050105@codeaurora.org>
+From: dianders@chromium.org (Doug Anderson)
+Date: Thu, 7 Aug 2014 14:17:24 -0700
+Subject: [PATCH v4 3/4] ARM: dts: add rk3288 dwc2 controller support
+In-Reply-To: <1407404095-3265-4-git-send-email-kever.yang@rock-chips.com>
+References: <1407404095-3265-1-git-send-email-kever.yang@rock-chips.com>
+ <1407404095-3265-4-git-send-email-kever.yang@rock-chips.com>
+Message-ID: <CAD=FV=WubCx0yn7FV_qpiW31hrOgaa4Qv0N7TdRyTtKshooYgA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 8/7/2014 8:01 AM, Kees Cook wrote:
-> This is a series of patches to support CONFIG_RODATA on ARM, so that
-> the kernel text is RO, and non-text sections default to NX. To support
-> on-the-fly kernel text patching (via ftrace, kprobes, etc), fixmap
-> support has been finalized based on several versions of various patches
-> that are floating around on the mailing list. This series attempts to
-> include the least intrusive version, so that others can build on it for
-> future fixmap work.
-> 
-> The series has been heavily tested, and appears to be working correctly:
-> 
-> With CONFIG_ARM_PTDUMP, expected page table permissions are seen in
-> /sys/kernel/debug/kernel_page_tables.
-> 
-> Using CONFIG_LKDTM, the kernel now correctly detects bad accesses for
-> for the following lkdtm tests via /sys/kernel/debug/provoke-crash/DIRECT:
->         EXEC_DATA
->         WRITE_RO
->         WRITE_KERN
-> 
-> ftrace works:
->         CONFIG_FTRACE_STARTUP_TEST passes
->         Enabling tracing works:
->                 echo function > /sys/kernel/debug/tracing/current_tracer
-> 
-> kprobes works:
->         CONFIG_ARM_KPROBES_TEST passes
-> 
-> kexec works:
->         kexec will load and start a new kernel
-> 
-> Thanks to everyone who has been testing this series and working on its
-> various pieces!
-> 
-> -Kees
-> 
-> v2:
-> - fix typo in kexec merge (buildbot)
-> - flip index order for highmem pte access (lauraa)
-> - added kgdb updates (dianders)
-> 
+Kever,
 
-At least twice I managed to boot a build with CONFIG_DEBUG_RODATA where
-both  cat /sys/kernel/debug/kernel_page_table and JTAG were showing no
-sections marked as read only. I haven't been able to reproduce it though
-so I'm tempted to account for it as incorrect testing on my part. I'll
-play around with it some more but if you haven't heard anything more
-you can add
+On Thu, Aug 7, 2014 at 2:34 AM, Kever Yang <kever.yang@rock-chips.com> wrote:
+> rk3288 has two kind of usb controller, this add the dwc2 controller
+> for otg and host1.
+>
+> Controller can works with usb PHY default setting and Vbus on.
+>
+> Signed-off-by: Kever Yang <kever.yang@rock-chips.com>
+>
+> ---
+>
+> Changes in v4: None
+> Changes in v3:
+> - EHCI and HSIC move new for version 3.
+>
+> Changes in v2: None
+>
+>  arch/arm/boot/dts/rk3288.dtsi | 20 ++++++++++++++++++++
+>  1 file changed, 20 insertions(+)
 
-Tested-by: Laura Abbott <lauraa@codeaurora.org>
+This looks good to me.  I haven't been able to personally test the OTG
+port (since my board doesn't have vbus wired), but I've tested the
+Host port.
 
-For boot up test, kernel_page_table/JTAG page table verification and
-simple kprobes test. 
+I would request that you re-sort by base address (ignoring uart2,
+which apparently is in the wrong place).  Please make sure you base
+atop my patch that fixes the sort order of OHCI and EHCI.  I think
+that's supposed to land any day now.
 
-Thanks,
-Laura
+After changing the sort order:
 
--- 
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-hosted by The Linux Foundation
+Tested-by: Doug Anderson <dianders@chromium.org>
+Reviewed-by: Doug Anderson <dianders@chromium.org>
