@@ -1,53 +1,139 @@
-From: jh80.chung@samsung.com (Jaehoon Chung)
-Date: Thu, 07 Aug 2014 17:24:37 +0900
-Subject: [PATCH v3 0/4] Add eMMC and SD card support for rk3288-evb
-In-Reply-To: <1407344984-14176-1-git-send-email-dianders@chromium.org>
-References: <1407344984-14176-1-git-send-email-dianders@chromium.org>
-Message-ID: <53E337C5.3020802@samsung.com>
+From: nicolas.derouineau@vitec.com (Nicolas Derouineau)
+Date: Thu, 7 Aug 2014 08:28:45 +0000
+Subject: CPUIdle Armada 370
+In-Reply-To: <1407341774154.51157@vitec.com>
+References: <1407333701627.99622@vitec.com>
+ <53E24654.6020008@free-electrons.com>
+ <53E249A1.900@free-electrons.com>,<53E24D2A.50706@free-electrons.com>
+ <1407340917231.68970@vitec.com>, <53E25369.60809@free-electrons.com>,
+ <1407341774154.51157@vitec.com>
+Message-ID: <1407400124543.92802@vitec.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi, Doug.
+Hi Gregory,
 
-Acked-by: Jaehoon Chung <jh80.chung@samsung.com>
+>Interesting you use a different variant the 88F6707 whereas we only test
+>this driver on the 88F6710. Maybe there is something there.
 
-On 08/07/2014 02:09 AM, Doug Anderson wrote:
-> This series adds basic eMMC and SD card support for the rk3288-evb
-> board based on Addy's posted dw_mmc patch from:
->   https://patchwork.kernel.org/patch/4653631/
-> 
-> The series is a little tricky because:
-> * Jaehoon has some outstanding patches to remove the slot node.  Since
->   those haven't landed yet, I've posted my original patch with the
->   slot node and then some future patches that can land with Jaehoon's
->   patches.
-> 
-> So just to be explicit:
-> - Patch #1 and #2 can land after Addy's patch lands.
-> - Patch #3 and #4 can land after Jaehoon's patch lands, though there's
->   no huge hurry since Jaehoon's patch supports the old mode (it just
->   prints a warning).
-> 
-> Note that we don't have regulators specified yet (no regulator driver
-> for rk808-based board).  We also don't yet support UHS modes or MMC
-> DDR50 (which require regulator support plus dw_mmc driver support for
-> tuning).  Those features can come later.
-> 
-> Changes in v3:
-> - Removed DDR50 mode since it needs tuning, which isn't there yet.
-> 
-> Changes in v2:
-> - New patchwork link for Addy's patch
-> - Squashed in the DDR50 mode since Addy spun his patch.
-> - Refer to the new title of Jaehoon's patch
-> 
-> Doug Anderson (4):
->   ARM: dts: Add emmc and sdmmc to the rk3288 device tree
->   ARM: dts: Enable emmc and sdmmc on the rk3288-evb boards
->   ARM: dts: Take the mmc slot node out of rk3288-evb
->   ARM: dts: mmc slot node gone on rk3288 => no more address / size cells
-> 
->  arch/arm/boot/dts/rk3288-evb.dtsi | 24 ++++++++++++++++++++++++
->  arch/arm/boot/dts/rk3288.dtsi     | 18 ++++++++++++++++++
->  2 files changed, 42 insertions(+)
-> 
+I guess this can be part of the problem. So I guess I'll have to compare in the BSP code if there is any differences between the two devices (so far, I can't see any). Maybe I should try to reach Marvell to have their opinion as well.
+
+Regards,
+
+Nicolas
+
+
+________________________________________
+De : Nicolas Derouineau
+Envoy? : mercredi 6 ao?t 2014 18:16
+? : Gregory CLEMENT; linux-arm-kernel at lists.infradead.org
+Cc : Thomas Petazzoni; Simon Boulay
+Objet : RE: CPUIdle Armada 370
+
+Here is our dts file.
+
+
+________________________________________
+De : Gregory CLEMENT <gregory.clement@free-electrons.com>
+Envoy? : mercredi 6 ao?t 2014 18:10
+? : Nicolas Derouineau; linux-arm-kernel at lists.infradead.org
+Cc : Thomas Petazzoni; Simon Boulay
+Objet : Re: CPUIdle Armada 370
+
+On 06/08/2014 18:01, Nicolas Derouineau wrote:
+> Ok,
+> So here is the log of the error(using the previous config file)>
+>
+> NAND read: device 0 offset 0x240000, size 0x600000
+>  6291456 bytes read: OK
+> ## Booting kernel from Legacy Image at 02000000 ...
+>    Image Name:   Linux-3.16.0-next-20140805-dirty
+>    Created:      2014-08-06  15:56:06 UTC
+>    Image Type:   ARM Linux Kernel Image (uncompressed)
+>    Data Size:    2939920 Bytes = 2.8 MiB
+>    Load Address: 00080000
+>    Entry Point:  00080000
+>    Verifying Checksum ... OK
+> ## Flattened Device Tree blob at 01000000
+>    Booting using the fdt blob at 0x01000000
+>    Loading Kernel Image ... OK
+> OK
+>    Loading Device Tree to 00ffa000, end 00fff8a6 ... OK
+>
+> Starting kernel ...
+>
+> [    0.000000] Booting Linux on physical CPU 0x0
+> [    0.000000] Linux version 3.16.0-next-20140805-dirty (nde at nde-OptiPlex-980) (gcc version 4.6.4 (Linaro GCC branch-4.6.4. Marvell GCC release 201308-2123.0cc69bb4 64K MAXPAGESIZE ALIGN) ) #13 Wed Aug 6 14
+> [    0.000000] CPU: ARMv7 Processor [561f5811] revision 1 (ARMv7), cr=10c5387d
+> [    0.000000] CPU: PIPT / VIPT nonaliasing data cache, PIPT instruction cache
+> [    0.000000] Machine model: Vitec VMR-1404 (Marvell Armada 370 based)
+So this your own board with your own dts I guess. Would it possible to share it to see
+if a mistake could have slip there?
+
+[...]
+
+> [    0.073922] mvebu-soc-id: MVEBU SoC ID=0x6707, Rev=0x1
+
+Interesting you use a different variant the 88F6707 whereas we only test
+this driver on the 88F6710. Maybe there is something there.
+
+
+Thanks,
+
+Gregory
+
+> ________________________________________
+> De : Gregory CLEMENT <gregory.clement@free-electrons.com>
+> Envoy? : mercredi 6 ao?t 2014 17:43
+> ? : Nicolas Derouineau; linux-arm-kernel at lists.infradead.org
+> Cc : Thomas Petazzoni; Simon Boulay
+> Objet : Re: CPUIdle Armada 370
+>
+> Hi Nicolas,
+>
+> [..]
+>
+>>> On 06/08/2014 16:01, Nicolas Derouineau wrote:
+>>>> Hello,
+>>>> I am currently trying to use the CPUIdle driver provided by linux-next (or by the patch here https://github.com/MISL-EBU-System-SW/mainline-public/commits/3.16/cpuidle-v3).
+>>>
+>>> I have just tested using next-20140806 and mvebu_v7_defconfig.
+>>> And it worked well on a mirabox using the Armada 370 SoC.
+>>>
+>>>>
+>>>> Everything runs fine as long as I don't select the CPU driver for the ARMADA Family. When I do, at boottime, the program is entering the __cpu_suspend save function and then get lost in it and that turns into a kernel panic. I have already made a post about this on the ARM Community Forum (http://community.arm.com/thread/6326).
+>>>>
+>>>> The "faulty" configuration file is attached to this email.
+>>>
+>>> Now I will try with this configuration
+>>
+>> Using your configuration file I didn't reproduce your issue.
+>> And according to the stat given by linux the kernel spent a lot
+>> of time in idle:
+>>
+>> cat /sys/devices/system/cpu/cpu0/cpuidle/state1/time
+>> 338822284
+>>
+>>
+>> Could you try again with next-20140806?
+>
+> Also could you send your full boot log until the crash
+> it may help us.
+>
+> Thanks,
+>
+> Gregory
+>
+> --
+> Gregory Clement, Free Electrons
+> Kernel, drivers, real-time and embedded Linux
+> development, consulting, training and support.
+> http://free-electrons.com
+>
+
+
+--
+Gregory Clement, Free Electrons
+Kernel, drivers, real-time and embedded Linux
+development, consulting, training and support.
+http://free-electrons.com
