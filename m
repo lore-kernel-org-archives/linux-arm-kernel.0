@@ -1,94 +1,53 @@
-From: dianders@chromium.org (Doug Anderson)
-Date: Wed, 6 Aug 2014 19:16:51 -0700
-Subject: [PATCH v4 2/2] pwm: rockchip: Added to support for RK3288 SoC
-In-Reply-To: <53E2D605.2000704@rock-chips.com>
-References: <1406197295-10604-1-git-send-email-caesar.wang@rock-chips.com>
- <1406197295-10604-3-git-send-email-caesar.wang@rock-chips.com>
- <CAD=FV=V4Kp-H3CcAKZPV1jBnYX+Ntwvxx6RB13TLxS5RRPHTWA@mail.gmail.com>
- <53E2D605.2000704@rock-chips.com>
-Message-ID: <CAD=FV=Xw8tz2keCUtO+qYUmnuv=+DPGZjY9-j_2XmAcP3Luzjg@mail.gmail.com>
+From: shawn.guo@freescale.com (Shawn Guo)
+Date: Thu, 7 Aug 2014 10:18:32 +0800
+Subject: [PATCH] ARM: mx6: Fix suspend/resume with PCI
+In-Reply-To: <1407371998-11437-1-git-send-email-festevam@gmail.com>
+References: <1407371998-11437-1-git-send-email-festevam@gmail.com>
+Message-ID: <20140807021831.GM2167@dragon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Caesar,
+On Wed, Aug 06, 2014 at 09:39:58PM -0300, Fabio Estevam wrote:
+> From: Fabio Estevam <fabio.estevam@freescale.com>
+> 
+> When PCI is used and a suspend/resume sequence is done we see the following
+> kernel hang:
+> 
+> root at freescale /$ echo mem > /sys/power/state 
+> [   16.099018] PM: Syncing filesystems ... done.
+> [   16.141010] Freezing user space processes ... (elapsed 0.002 seconds) done.
+> [   16.150840] Freezing remaining freezable tasks ... (elapsed 0.003 seconds) done.
+> [   16.199438] random: nonblocking pool is initialized
+> [   16.229639] PM: suspend of devices complete after 64.793 msecs
+> [   16.235488] PM: suspend devices took 0.070 seconds
+> [   16.245301] PM: late suspend of devices complete after 4.968 msecs
+> [   16.257063] PM: noirq suspend of devices complete after 5.538 msecs
+> [   16.263425] Disabling non-boot CPUs ...
+> [   16.274666] CPU1: shutdown
+> [   16.286351] CPU2: shutdown
+> [   16.294169] CPU3: shutdown
+> [   16.299551] Enabling non-boot CPUs ...
+> [   16.304155] CPU1: Booted secondary processor
+> [   16.305717] CPU1 is up
+> [   16.313078] CPU2: Booted secondary processor
+> [   16.313456] CPU2 is up
+> [   16.320778] CPU3: Booted secondary processor
+> [   16.321174] CPU3 is up
+> 	(hangs here)
+> 
+> Implement a workaround for the erratum ERR005723: "PCIe does not support L2
+> Power Down", which consists in toggling bit 18 (TEST_POWERDOWN) of GPR1 register.
+> 
+> Tested on a mx6qsabresd TO1.2 revC2.
 
-On Wed, Aug 6, 2014 at 6:27 PM, caesar <caesar.wang@rock-chips.com> wrote:
-> Doug,
->
-> ? 2014?08?07? 06:46, Doug Anderson ??:
->
->> Caesar,
->>
->> On Thu, Jul 24, 2014 at 3:21 AM, Caesar Wang <caesar.wang@rock-chips.com>
->> wrote:
->>>
->>> +static const struct rockchip_pwm_data pwm_data_v1 = {
->>> +       .regs.duty = PWM_HRC,
->>> +       .regs.period = PWM_LRC,
->>> +       .regs.cntr = PWM_CNTR,
->>> +       .regs.ctrl = PWM_CTRL,
->>> +       .prescaler = PRESCALER,
->>> +       .set_enable = rockchip_pwm_set_enable_v1,
->>> +};
->>> +
->>> +static const struct rockchip_pwm_data pwm_data_v2 = {
->>> +       .regs.duty = PWM_LRC,
->>> +       .regs.period = PWM_HRC,
->>> +       .regs.cntr = PWM_CNTR,
->>> +       .regs.ctrl = PWM_CTRL,
->>> +       .prescaler = PRESCALER-1,
->>> +       .set_enable = rockchip_pwm_set_enable_v2,
->>> +};
->>> +
->>> +static const struct rockchip_pwm_data pwm_data_vop = {
->>> +       .regs.duty = PWM_LRC,
->>> +       .regs.period = PWM_HRC,
->>> +       .regs.cntr = PWM_CTRL,
->>> +       .regs.ctrl = PWM_CNTR,
->>
->> Did you really mean to flip CTRL and CNTR here?  If so, that's super
->> confusing and deserves a comment.  AKA, I think the above should not
->> be:
->>
->>   +       .regs.cntr = PWM_CTRL,
->>   +       .regs.ctrl = PWM_CNTR,
->>
->> ...but should be
->>
->>   +       .regs.cntr = PWM_CNTR,
->>   +       .regs.ctrl = PWM_CTRL,
->>
->> If you didn't mean to flip CTRL and CNTR here, then just get rid of
->> pwm_data_vop and refer to pwm_data_v2.  In fact, I'd suggest that you
->> totally remove the "rockchip,vop-pwm" since there's nothing different
->> between "rockchip,rk3288-pwm" and "rockchip,vop-pwm".
->
->
-> Sorry,I think it's no problem. the  "rockchip,rk3288-pwm" and
-> "rockchip,vop-pwm" are seperate PWM controllers.
-> They are just different registers address between CNTR and CTRL .
+I intend to agree with Lucas that we should align our testing and
+understanding on the issue before trying to fix it.
 
-OK, I looked up in the TRM.  Right, the CNTR and CTRL are flipped on
-the vop.  So I think that the only change you need is to add:
+Again, I do not see this issue on my TO1.2 chip, but only TO1.5,
+aka Rev 1.3, one.
 
-#define PWM_VOP_CTRL  0x00
-#define PWM_VOP_CNTR  0x0c
+Shawn
 
-...then use these new #defines for the vop structure.
-
-
-As you have the code written right now it's very confusing.  The new
-#defines will fix this.
-
-
->> Have you validated Thierry's suggestion to allow you to access your
->> memory range?
->
-> Yes,we have solve it in lcdc driver.
-> The Mark Yao have the  submission in [0].
->
-> [0]: https://lkml.org/lkml/2014/8/4/20
-
-Excellent!  Then we should be able to land after you fix the above.
-
--Doug
+> 
+> Reported-by: Shawn Guo <shawn.guo@freescale.com>
+> Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
