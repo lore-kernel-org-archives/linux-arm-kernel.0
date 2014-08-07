@@ -1,56 +1,35 @@
-From: dianders@chromium.org (Doug Anderson)
-Date: Thu,  7 Aug 2014 12:48:11 -0700
-Subject: [PATCH] usb: dwc2: Read GNPTXFSIZ when in forced HOST mode.
-Message-ID: <1407440891-29295-1-git-send-email-dianders@chromium.org>
+From: mpa@pengutronix.de (Markus Pargmann)
+Date: Thu,  7 Aug 2014 21:52:39 +0200
+Subject: [PATCH 2/3] ARM: dts: imx25: fix ipg clk for cspi1
+In-Reply-To: <1407441160-2011-1-git-send-email-mpa@pengutronix.de>
+References: <1407441160-2011-1-git-send-email-mpa@pengutronix.de>
+Message-ID: <1407441160-2011-2-git-send-email-mpa@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The documentation for GNPTXFSIZ says that "For host mode, this field
-is always valid."  Since we're already switching to host mode for
-HPTXFSIZ, let's also read GNPTXFSIZ in host mode.
+From: Michael Grzeschik <m.grzeschik@pengutronix.de>
 
-On an rk3288 SoC, without this change we see this at bootup:
-  dwc2 ff580000.usb: gnptxfsiz=00100400
-  dwc2 ff580000.usb: 128 invalid for host_nperio_tx_fifo_size. Check HW configuration.
+This patch fixes the cspi1 clock. 62 is the 'esai_ahb' clock, clock 78
+is 'cspi1_ipg'.
 
-After this change we see:
-  dwc2 ff580000.usb: gnptxfsiz=04000400
-
-Signed-off-by: Doug Anderson <dianders@chromium.org>
+Signed-off-by: Michael Grzeschik <m.grzeschik@pengutronix.de>
+Signed-off-by: Markus Pargmann <mpa@pengutronix.de>
 ---
- drivers/usb/dwc2/core.c | 6 +++---
- 1 file changed, 3 insertions(+), 3 deletions(-)
+ arch/arm/boot/dts/imx25.dtsi | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/drivers/usb/dwc2/core.c b/drivers/usb/dwc2/core.c
-index 27d2c9b..c184ed43 100644
---- a/drivers/usb/dwc2/core.c
-+++ b/drivers/usb/dwc2/core.c
-@@ -2674,23 +2674,23 @@ int dwc2_get_hwparams(struct dwc2_hsotg *hsotg)
- 	hwcfg2 = readl(hsotg->regs + GHWCFG2);
- 	hwcfg3 = readl(hsotg->regs + GHWCFG3);
- 	hwcfg4 = readl(hsotg->regs + GHWCFG4);
--	gnptxfsiz = readl(hsotg->regs + GNPTXFSIZ);
- 	grxfsiz = readl(hsotg->regs + GRXFSIZ);
- 
- 	dev_dbg(hsotg->dev, "hwcfg1=%08x\n", hwcfg1);
- 	dev_dbg(hsotg->dev, "hwcfg2=%08x\n", hwcfg2);
- 	dev_dbg(hsotg->dev, "hwcfg3=%08x\n", hwcfg3);
- 	dev_dbg(hsotg->dev, "hwcfg4=%08x\n", hwcfg4);
--	dev_dbg(hsotg->dev, "gnptxfsiz=%08x\n", gnptxfsiz);
- 	dev_dbg(hsotg->dev, "grxfsiz=%08x\n", grxfsiz);
- 
--	/* Force host mode to get HPTXFSIZ exact power on value */
-+	/* Force host mode to get HPTXFSIZ / GNPTXFSIZ exact power on value */
- 	gusbcfg = readl(hsotg->regs + GUSBCFG);
- 	gusbcfg |= GUSBCFG_FORCEHOSTMODE;
- 	writel(gusbcfg, hsotg->regs + GUSBCFG);
- 	usleep_range(100000, 150000);
- 
-+	gnptxfsiz = readl(hsotg->regs + GNPTXFSIZ);
- 	hptxfsiz = readl(hsotg->regs + HPTXFSIZ);
-+	dev_dbg(hsotg->dev, "gnptxfsiz=%08x\n", gnptxfsiz);
- 	dev_dbg(hsotg->dev, "hptxfsiz=%08x\n", hptxfsiz);
- 	gusbcfg = readl(hsotg->regs + GUSBCFG);
- 	gusbcfg &= ~GUSBCFG_FORCEHOSTMODE;
+diff --git a/arch/arm/boot/dts/imx25.dtsi b/arch/arm/boot/dts/imx25.dtsi
+index 4d40e550d701..9c3830207339 100644
+--- a/arch/arm/boot/dts/imx25.dtsi
++++ b/arch/arm/boot/dts/imx25.dtsi
+@@ -162,7 +162,7 @@
+ 				#size-cells = <0>;
+ 				compatible = "fsl,imx25-cspi", "fsl,imx35-cspi";
+ 				reg = <0x43fa4000 0x4000>;
+-				clocks = <&clks 62>, <&clks 62>;
++				clocks = <&clks 78>, <&clks 78>;
+ 				clock-names = "ipg", "per";
+ 				interrupts = <14>;
+ 				status = "disabled";
 -- 
-2.0.0.526.g5318336
+2.0.1
