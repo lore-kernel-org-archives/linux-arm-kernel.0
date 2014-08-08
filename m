@@ -1,35 +1,348 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Fri, 8 Aug 2014 13:42:40 -0700
-Subject: [GIT PULL] omap gta04 dts changes for v3.17 merge window
-In-Reply-To: <20140801111628.GC26699@atomide.com>
-References: <20140801111628.GC26699@atomide.com>
-Message-ID: <20140808204240.GA19216@quad.lixom.net>
+From: christoffer.dall@linaro.org (Christoffer Dall)
+Date: Fri, 8 Aug 2014 22:46:12 +0200
+Subject: [PATCH v3] arm64: fix VTTBR_BADDR_MASK
+In-Reply-To: <20140804143845.2851.85441.stgit@joelaarch64.amd.com>
+References: <20140804143845.2851.85441.stgit@joelaarch64.amd.com>
+Message-ID: <20140808204612.GC14205@cbox>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Aug 01, 2014 at 04:16:29AM -0700, Tony Lindgren wrote:
-> The following changes since commit 3c9464ed75d6c15ee864da6d8f6a4cd3b0f2c934:
+On Mon, Aug 04, 2014 at 09:38:45AM -0500, Joel Schopp wrote:
+> The current VTTBR_BADDR_MASK only masks 39 bits, which is broken on current
+> systems.  Rather than just add a bit it seems like a good time to also set
+> things at run-time instead of compile time to accomodate more hardware.
 > 
->   ARM: DTS: omap5-uevm: Enable basic audio (McPDM <-> twl6040) (2014-07-15 00:21:25 -0700)
+> This patch sets TCR_EL2.PS, VTCR_EL2.T0SZ and vttbr_baddr_mask in runtime,
+> not compile time.
 > 
-> are available in the git repository at:
-> 
->   git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap tags/omap-for-v3.17/dt-gta04
-> 
-> for you to fetch changes up to c9940680b599300c3fb46e799986b736d394432d:
-> 
->   ARM: dts: Add gta04a5 model (2014-07-29 23:51:04 -0700)
-> 
-> ----------------------------------------------------------------
-> GTA04 related changes for v3.17 merge window. Except for the last
-> three patches they were ready to go earlier but I wanted to wait
-> for the discussion to to settle on the last three patches as these
-> are all related to GTA04.
-> 
-> If these are too late for v3.17 I can send the pull request again
-> for these after v3.17-rc1.
+> In ARMv8, EL2 physical address size (TCR_EL2.PS) and stage2 input address
+> size (VTCR_EL2.T0SZE) cannot be determined in compile time since they
+> depends on hardware capability.
 
-Yeah, let's hold off for the next cycle on these. Please resend after -rc1.
+  depend
 
+> 
+> According to Table D4-23 and Table D4-25 in ARM DDI 0487A.b document,
+> vttbr_x is calculated using different hard-coded values with consideration
 
--Olof
+                                        fixed values
+
+> of T0SZ, granule size and the level of translation tables. Therefore,
+> vttbr_baddr_mask should be determined dynamically.
+> 
+> Changes since v2:
+> Rebased on https://git.kernel.org/pub/scm/linux/kernel/git/kvmarm/kvmarm.git next branch
+> 
+> Changes since v1:
+> Rebased fix on Jungseok Lee's patch https://lkml.org/lkml/2014/5/12/189 to
+> provide better long term fix.  Updated that patch to log error instead of
+> silently fail on unaligned vttbr.
+> 
+> Cc: Christoffer Dall <christoffer.dall@linaro.org>
+> Cc: Sungjinn Chung <sungjinn.chung@samsung.com>
+> Signed-off-by: Jungseok Lee <jays.lee@samsung.com>
+> Signed-off-by: Joel Schopp <joel.schopp@amd.com>
+> ---
+>  arch/arm/kvm/arm.c               |   91 +++++++++++++++++++++++++++++++++++++-
+>  arch/arm64/include/asm/kvm_arm.h |   17 +------
+>  arch/arm64/kvm/hyp-init.S        |   20 ++++++--
+>  3 files changed, 106 insertions(+), 22 deletions(-)
+> 
+> diff --git a/arch/arm/kvm/arm.c b/arch/arm/kvm/arm.c
+> index d7424ef..d7ca2f5 100644
+> --- a/arch/arm/kvm/arm.c
+> +++ b/arch/arm/kvm/arm.c
+> @@ -37,6 +37,7 @@
+>  #include <asm/mman.h>
+>  #include <asm/tlbflush.h>
+>  #include <asm/cacheflush.h>
+> +#include <asm/cputype.h>
+>  #include <asm/virt.h>
+>  #include <asm/kvm_arm.h>
+>  #include <asm/kvm_asm.h>
+> @@ -61,6 +62,9 @@ static atomic64_t kvm_vmid_gen = ATOMIC64_INIT(1);
+>  static u8 kvm_next_vmid;
+>  static DEFINE_SPINLOCK(kvm_vmid_lock);
+>  
+> +/* VTTBR mask cannot be determined in complie time under ARMv8 */
+
+I don't think we need this comment.
+
+> +static u64 vttbr_baddr_mask;
+> +
+>  static bool vgic_present;
+>  
+>  static void kvm_arm_set_running_vcpu(struct kvm_vcpu *vcpu)
+> @@ -376,6 +380,75 @@ static bool need_new_vmid_gen(struct kvm *kvm)
+>  }
+>  
+>  /**
+> + * set_vttbr_baddr_mask - set mask value for vttbr base address
+> + *
+> + * In ARMv8, vttbr_baddr_mask cannot be determined in compile time since stage2
+
+the stage2 input address
+
+> + * input address size depends on hardware capability. Thus, it is needed to read
+
+Thus, we first need to read...
+
+> + * ID_AA64MMFR0_EL1.PARange first and then set vttbr_baddr_mask with
+> + * consideration of both granule size and the level of translation tables.
+
+                            the granule ...
+> + */
+> +static int set_vttbr_baddr_mask(void)
+> +{
+> +#ifndef CONFIG_ARM64
+> +	vttbr_baddr_mask = VTTBR_BADDR_MASK;
+> +#else
+> +	int pa_range, t0sz, vttbr_x;
+> +
+> +	pa_range = read_cpuid(ID_AA64MMFR0_EL1) & 0xf;
+> +
+> +	switch (pa_range) {
+> +	case 0:
+> +		t0sz = VTCR_EL2_T0SZ(32);
+> +		break;
+> +	case 1:
+> +		t0sz = VTCR_EL2_T0SZ(36);
+> +		break;
+> +	case 2:
+> +		t0sz = VTCR_EL2_T0SZ(40);
+> +		break;
+> +	case 3:
+> +		t0sz = VTCR_EL2_T0SZ(42);
+> +		break;
+> +	case 4:
+> +		t0sz = VTCR_EL2_T0SZ(44);
+> +		break;
+> +	default:
+> +		t0sz = VTCR_EL2_T0SZ(48);
+> +	}
+
+the last case would be case 5 and the default case would be a BUG().
+
+> +
+> +	/*
+> +	 * See Table D4-23 and Table D4-25 in ARM DDI 0487A.b to figure out
+> +	 * the origin of the hardcoded values, 38 and 37.
+> +	 */
+> +#ifdef CONFIG_ARM64_64K_PAGES
+> +	/*
+> +	 * 16 <= T0SZ <= 21 is valid under 3 level of translation tables
+> +	 * 18 <= T0SZ <= 34 is valid under 2 level of translation tables
+> +	 * 31 <= T0SZ <= 39 is valid under 1 level of transltaion tables
+> +	 */
+
+so this scheme is with concatenated initial level stage-2 page tables.
+
+But we only ever allocate the amount of pages for our pgd according to
+what the host has, so I think this allocation needs to be locked down
+more tight, because the host is always using the appropriate amount for
+39 bits virtual addresses.
+
+If you want to allow this full range, I think you need to change the
+allocation logic and go through arch/arm/kvm/mmu.c and look for all uses
+of pgd_offset() and friends and make sure we're doing the right thing.
+
+> +	if (t0sz <= 17) {
+
+I think this is more readable if you say (t0sz < 18) and don't you also
+need to check the upper bound?:
+
+(t0sz < 18 || t0sz > 34)
+
+> +		kvm_err("Cannot support %d-bit address space\n", 64 - t0sz);
+> +		return -EINVAL;
+> +	}
+> +	vttbr_x = 38 - t0sz;
+> +#else
+> +	/*
+> +	 * 16 <= T0SZ <= 24 is valid under 4 level of translation tables
+> +	 * 21 <= T0SZ <= 30 is valid under 3 level of translation tables
+
+under the current scheme, shouldn't this be:
+           21 <= T0SZ <= 33
+
+but same comment as above applies.
+
+> +	 * 30 <= T0SZ <= 39 is valid under 2 level of translation tables
+> +	 */
+> +	if (t0sz <= 20) {
+
+same as above
+
+> +		kvm_err("Cannot support %d-bit address space\n", 64 - t0sz);
+> +		return -EINVAL;
+> +	}
+> +	vttbr_x = 37 - t0sz;
+> +#endif
+> +	vttbr_baddr_mask = (((1LLU << (48 - vttbr_x)) - 1) << (vttbr_x - 1));
+> +#endif
+
+This nested ifdef is really quite horrible.  Can you either factor these
+out into some static inlines in arch/arm[64]/include/asm/kvm_mmu.h or
+provide a per-architecture implementation in a .c file?
+
+> +	return 0;
+> +}
+> +
+> +/**
+>   * update_vttbr - Update the VTTBR with a valid VMID before the guest runs
+>   * @kvm	The guest that we are about to run
+>   *
+> @@ -429,8 +502,16 @@ static void update_vttbr(struct kvm *kvm)
+>  	/* update vttbr to be used with the new vmid */
+>  	pgd_phys = virt_to_phys(kvm->arch.pgd);
+>  	vmid = ((u64)(kvm->arch.vmid) << VTTBR_VMID_SHIFT) & VTTBR_VMID_MASK;
+> -	kvm->arch.vttbr = pgd_phys & VTTBR_BADDR_MASK;
+> -	kvm->arch.vttbr |= vmid;
+> +
+> +	/*
+> +	 * If the VTTBR isn't aligned there is something wrong with the system
+> +	 * or kernel.  It is better to just fail and not mask it. But no need
+> +	 * to panic the host kernel with a BUG_ON(), instead just log the error.
+> +	 */
+
+These last two sentences are not very helpful, because they don't
+describe the rationale for what you're doing, only what you are (and are
+not) doing.
+
+That said, I don't think this is doing the right thing.  I think you
+want to refuse running the VM and avoid any stage-2 entried being
+created if this is not the case (actually, we may want to check this
+after set_vttbr_baddr_mask() or right aftert allocating the stage-2
+pgd), because otherwise I think we may be overwriting memory not
+belonging to us with concatenated page tables in a 42-bit 4KB system,
+for example.
+
+> +	if (pgd_phys & ~vttbr_baddr_mask)
+> +		kvm_err("VTTBR not aligned, expect guest to fail");
+> +
+> +	kvm->arch.vttbr = pgd_phys | vmid;
+>  
+>  	spin_unlock(&kvm_vmid_lock);
+>  }
+> @@ -1015,6 +1096,12 @@ int kvm_arch_init(void *opaque)
+>  		}
+>  	}
+>  
+> +	err = set_vttbr_baddr_mask();
+> +	if (err) {
+> +		kvm_err("Cannot set vttbr_baddr_mask\n");
+> +		return -EINVAL;
+> +	}
+> +
+>  	cpu_notifier_register_begin();
+>  
+>  	err = init_hyp_mode();
+> diff --git a/arch/arm64/include/asm/kvm_arm.h b/arch/arm64/include/asm/kvm_arm.h
+> index cc83520..ff4a4fa 100644
+> --- a/arch/arm64/include/asm/kvm_arm.h
+> +++ b/arch/arm64/include/asm/kvm_arm.h
+> @@ -95,7 +95,6 @@
+>  /* TCR_EL2 Registers bits */
+>  #define TCR_EL2_TBI	(1 << 20)
+>  #define TCR_EL2_PS	(7 << 16)
+> -#define TCR_EL2_PS_40B	(2 << 16)
+>  #define TCR_EL2_TG0	(1 << 14)
+>  #define TCR_EL2_SH0	(3 << 12)
+>  #define TCR_EL2_ORGN0	(3 << 10)
+> @@ -104,8 +103,6 @@
+>  #define TCR_EL2_MASK	(TCR_EL2_TG0 | TCR_EL2_SH0 | \
+>  			 TCR_EL2_ORGN0 | TCR_EL2_IRGN0 | TCR_EL2_T0SZ)
+>  
+> -#define TCR_EL2_FLAGS	(TCR_EL2_PS_40B)
+> -
+>  /* VTCR_EL2 Registers bits */
+>  #define VTCR_EL2_PS_MASK	(7 << 16)
+>  #define VTCR_EL2_TG0_MASK	(1 << 14)
+> @@ -120,36 +117,28 @@
+>  #define VTCR_EL2_SL0_MASK	(3 << 6)
+>  #define VTCR_EL2_SL0_LVL1	(1 << 6)
+>  #define VTCR_EL2_T0SZ_MASK	0x3f
+> -#define VTCR_EL2_T0SZ_40B	24
+> +#define VTCR_EL2_T0SZ(bits)	(64 - (bits))
+>  
+>  #ifdef CONFIG_ARM64_64K_PAGES
+>  /*
+>   * Stage2 translation configuration:
+> - * 40bits output (PS = 2)
+> - * 40bits input  (T0SZ = 24)
+>   * 64kB pages (TG0 = 1)
+>   * 2 level page tables (SL = 1)
+>   */
+>  #define VTCR_EL2_FLAGS		(VTCR_EL2_TG0_64K | VTCR_EL2_SH0_INNER | \
+>  				 VTCR_EL2_ORGN0_WBWA | VTCR_EL2_IRGN0_WBWA | \
+> -				 VTCR_EL2_SL0_LVL1 | VTCR_EL2_T0SZ_40B)
+> -#define VTTBR_X		(38 - VTCR_EL2_T0SZ_40B)
+> +				 VTCR_EL2_SL0_LVL1)
+>  #else
+>  /*
+>   * Stage2 translation configuration:
+> - * 40bits output (PS = 2)
+> - * 40bits input  (T0SZ = 24)
+>   * 4kB pages (TG0 = 0)
+>   * 3 level page tables (SL = 1)
+>   */
+>  #define VTCR_EL2_FLAGS		(VTCR_EL2_TG0_4K | VTCR_EL2_SH0_INNER | \
+>  				 VTCR_EL2_ORGN0_WBWA | VTCR_EL2_IRGN0_WBWA | \
+> -				 VTCR_EL2_SL0_LVL1 | VTCR_EL2_T0SZ_40B)
+> -#define VTTBR_X		(37 - VTCR_EL2_T0SZ_40B)
+> +				 VTCR_EL2_SL0_LVL1)
+>  #endif
+>  
+> -#define VTTBR_BADDR_SHIFT (VTTBR_X - 1)
+> -#define VTTBR_BADDR_MASK  (((1LLU << (40 - VTTBR_X)) - 1) << VTTBR_BADDR_SHIFT)
+>  #define VTTBR_VMID_SHIFT  (48LLU)
+>  #define VTTBR_VMID_MASK	  (0xffLLU << VTTBR_VMID_SHIFT)
+>  
+> diff --git a/arch/arm64/kvm/hyp-init.S b/arch/arm64/kvm/hyp-init.S
+> index d968796..c0f7634 100644
+> --- a/arch/arm64/kvm/hyp-init.S
+> +++ b/arch/arm64/kvm/hyp-init.S
+> @@ -63,17 +63,21 @@ __do_hyp_init:
+>  	mrs	x4, tcr_el1
+>  	ldr	x5, =TCR_EL2_MASK
+>  	and	x4, x4, x5
+> -	ldr	x5, =TCR_EL2_FLAGS
+> -	orr	x4, x4, x5
+> -	msr	tcr_el2, x4
+> -
+> -	ldr	x4, =VTCR_EL2_FLAGS
+>  	/*
+>  	 * Read the PARange bits from ID_AA64MMFR0_EL1 and set the PS bits in
+> -	 * VTCR_EL2.
+> +	 * TCR_EL2 and both PS bits and T0SZ bits in VTCR_EL2.
+>  	 */
+>  	mrs	x5, ID_AA64MMFR0_EL1
+>  	bfi	x4, x5, #16, #3
+> +	msr	tcr_el2, x4
+> +
+> +	ldr	x4, =VTCR_EL2_FLAGS
+> +	bfi	x4, x5, #16, #3
+> +	and	x5, x5, #0xf
+> +	adr	x6, t0sz
+> +	add	x6, x6, x5, lsl #2
+> +	ldr	w5, [x6]
+> +	orr	x4, x4, x5
+>  	msr	vtcr_el2, x4
+>  
+>  	mrs	x4, mair_el1
+> @@ -109,6 +113,10 @@ target: /* We're now in the trampoline code, switch page tables */
+>  
+>  	/* Hello, World! */
+>  	eret
+> +
+> +t0sz:
+> +	.word	VTCR_EL2_T0SZ(32), VTCR_EL2_T0SZ(36), VTCR_EL2_T0SZ(40)
+> +	.word	VTCR_EL2_T0SZ(42), VTCR_EL2_T0SZ(44), VTCR_EL2_T0SZ(48)
+>  ENDPROC(__kvm_hyp_init)
+>  
+>  	.ltorg
+> 
+
+Thanks for picking this up!
+
+-Christoffer
