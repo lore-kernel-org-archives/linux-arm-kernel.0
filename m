@@ -1,45 +1,37 @@
-From: geert+renesas@glider.be (Geert Uytterhoeven)
-Date: Fri,  8 Aug 2014 17:34:05 +0200
-Subject: [PATCH] PCI: mvebu: Fix uninitialized variable in mvebu_get_tgt_attr()
-Message-ID: <1407512045-26969-1-git-send-email-geert+renesas@glider.be>
+From: dianders@chromium.org (Doug Anderson)
+Date: Fri, 8 Aug 2014 08:45:16 -0700
+Subject: [PATCH v5 3/4] ARM: dts: add rk3288 dwc2 controller support
+In-Reply-To: <1407470159-14722-4-git-send-email-kever.yang@rock-chips.com>
+References: <1407470159-14722-1-git-send-email-kever.yang@rock-chips.com>
+ <1407470159-14722-4-git-send-email-kever.yang@rock-chips.com>
+Message-ID: <CAD=FV=XNSp85H2zVrLPdxDfhokEWFspvwUHjVMWRu8k_wFFm0Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-drivers/pci/host/pci-mvebu.c: In function 'mvebu_get_tgt_attr':
-drivers/pci/host/pci-mvebu.c:887:39: warning: 'rtype' may be used uninitialized in this function [-Wmaybe-uninitialized]
-   if (slot == PCI_SLOT(devfn) && type == rtype) {
-                                       ^
+Kever,
 
-If there's ever gonna be a configuration space or 64-bit memory space
-entry in DT, rtype will be uninitialized, and the wrong entry may be
-returned.
+On Thu, Aug 7, 2014 at 8:55 PM, Kever Yang <kever.yang@rock-chips.com> wrote:
+> rk3288 has two kind of usb controller, this add the dwc2 controller
+> for otg and host1.
+>
+> Controller can works with usb PHY default setting and Vbus on.
+>
+> Signed-off-by: Kever Yang <kever.yang@rock-chips.com>
+> Reviewed-by: Doug Anderson <dianders@chromium.org>
+> Tested-by: Doug Anderson <dianders@chromium.org>
+> ---
+>
+> Changes in v5:
+> - change the sort order of dwc2 in rk3288.dtsi
+>
+> Changes in v4: None
+> Changes in v3:
+> - EHCI and HSIC move new for version 3.
+>
+> Changes in v2: None
+>
+>  arch/arm/boot/dts/rk3288.dtsi | 20 ++++++++++++++++++++
+>  1 file changed, 20 insertions(+)
 
-Initialize rtype to 0 (which is an unused IORESOURCE_* type) to fix this.
-
-Introduced in commit 11be65472a427dcf7a11ab6e3e3628f1c6768b5b ("PCI:
-mvebu: Adapt to the new device tree layout").
-
-Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
----
-Alternatively, should the "else if (DT_FLAGS_TO_TYPE(flags) ==
-DT_TYPE_MEM32)" just be changed to "else", assuming there can never be
-other entries than for I/O or 32-bit memory space?
----
- drivers/pci/host/pci-mvebu.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
-
-diff --git a/drivers/pci/host/pci-mvebu.c b/drivers/pci/host/pci-mvebu.c
-index ce23e0f076b6..9515f0d13fd4 100644
---- a/drivers/pci/host/pci-mvebu.c
-+++ b/drivers/pci/host/pci-mvebu.c
-@@ -877,7 +877,7 @@ static int mvebu_get_tgt_attr(struct device_node *np, int devfn,
- 		u32 flags = of_read_number(range, 1);
- 		u32 slot = of_read_number(range + 1, 1);
- 		u64 cpuaddr = of_read_number(range + na, pna);
--		unsigned long rtype;
-+		unsigned long rtype = 0;
- 
- 		if (DT_FLAGS_TO_TYPE(flags) == DT_TYPE_IO)
- 			rtype = IORESOURCE_IO;
--- 
-1.9.1
+IMHO this series is ready to go in for 3.18.  I'm assuming Heiko will
+pick it up once the bindings have landed.  It already has my tags.  ;)
