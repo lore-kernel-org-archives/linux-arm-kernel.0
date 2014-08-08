@@ -1,64 +1,47 @@
-From: konrad.wilk@oracle.com (Konrad Rzeszutek Wilk)
-Date: Fri, 8 Aug 2014 13:14:02 -0400
-Subject: [PATCH v4 1/1] iommu-api: Add map_sg/unmap_sg functions
-In-Reply-To: <53E3F538.8030000@codeaurora.org>
-References: <1406854484-3848-1-git-send-email-ohaugan@codeaurora.org>
- <1406854484-3848-2-git-send-email-ohaugan@codeaurora.org>
- <20140805151323.GB19709@laptop.dumpdata.com>
- <53E26127.1040805@codeaurora.org>
- <20140806201740.GW9809@8bytes.org>
- <53E2BA2D.1050007@codeaurora.org> <20140807062410.GC17340@ulmo>
- <53E3F538.8030000@codeaurora.org>
-Message-ID: <20140808171402.GF13551@laptop.dumpdata.com>
+From: andrew@lunn.ch (Andrew Lunn)
+Date: Fri, 8 Aug 2014 19:12:08 +0200
+Subject: [PATCH 2/6] ARM: mvebu: Add proper pin muxing on Globalscale
+ Mirabox board
+In-Reply-To: <1407511136-26477-3-git-send-email-ezequiel.garcia@free-electrons.com>
+References: <1407511136-26477-1-git-send-email-ezequiel.garcia@free-electrons.com>
+ <1407511136-26477-3-git-send-email-ezequiel.garcia@free-electrons.com>
+Message-ID: <20140808171208.GC26751@lunn.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Aug 07, 2014 at 02:52:56PM -0700, Olav Haugan wrote:
-> On 8/6/2014 11:24 PM, Thierry Reding wrote:
-> > On Wed, Aug 06, 2014 at 04:28:45PM -0700, Olav Haugan wrote:
-> >> On 8/6/2014 1:17 PM, Joerg Roedel wrote:
-> >>> On Wed, Aug 06, 2014 at 10:08:55AM -0700, Olav Haugan wrote:
-> >>>> so you are suggesting that I check in "bus_set_iommu()" whether the
-> >>>> driver has set the map_sg/unmap_sg function pointers or not and if not
-> >>>> set it to the default? Is bus_set_iommu() the only way drivers can set
-> >>>> up the callbacks?
-> >>>
-> >>> This doesn't work as the iommu_ops are now const. You have to either
-> >>> update the iommu drivers individually to point to the default function,
-> >>> or you do the check in the API function itself and fall back to the
-> >>> default it no call-back is provided.
-> >>>
-> >>
-> >> Ok, then I think it is better to just leave the fallback where it is now
-> >> in the function itself.
-> > 
-> > What Konrad was suggesting is what I also proposed. The idea is to
-> > implement a fallback as standalone function, then make all drivers use
-> > that by default in the struct iommu_ops that they register. When drivers
-> > implement an optimized version they can simply replace the fallback
-> > implementation with their own.
-> > 
+On Fri, Aug 08, 2014 at 12:18:52PM -0300, Ezequiel Garcia wrote:
+> This commit adds the required pin muxing for the network interfaces and
+> the MDIO interface to be properly initialized. For instance, this makes
+> it possible for a bootloader to initialize and access the network interfaces.
 > 
-> Ok, I can do that. I misunderstood the point of the fallback. I thought
-> the point of the fallback was to catch drivers that forget/neglect to
-> implement this callback. If that is not a concern I will update my patch
-
-Nah. We want those drivers to crash and burn so we can see that and
-fix it. And by fix I meant it would just point do:
-
-	.map_sg = generic_map_sg,
-	.unmap_sg = generic_unmap_sg,
-
-In other words, none of the function ops will have an NULL functions.
-
-> to create a separate function that I will point all existing drivers to.
-
-Excellent!
+> Signed-off-by: Ezequiel Garcia <ezequiel.garcia@free-electrons.com>
+> ---
+>  arch/arm/boot/dts/armada-370-mirabox.dts | 6 ++++++
+>  1 file changed, 6 insertions(+)
 > 
-> Thanks,
-> 
-> Olav
-> 
-> -- 
-> The Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-> hosted by The Linux Foundation
+> diff --git a/arch/arm/boot/dts/armada-370-mirabox.dts b/arch/arm/boot/dts/armada-370-mirabox.dts
+> index 097df7d8..c745256 100644
+> --- a/arch/arm/boot/dts/armada-370-mirabox.dts
+> +++ b/arch/arm/boot/dts/armada-370-mirabox.dts
+> @@ -91,6 +91,8 @@
+>  			};
+>  
+>  			mdio {
+> +				pinctrl-0 = <&mdio_pins>;
+> +				pinctrl-names = "default";
+>  				phy0: ethernet-phy at 0 {
+>  					reg = <0>;
+>  				};
+> @@ -100,11 +102,15 @@
+>  				};
+>  			};
+>  			ethernet at 70000 {
+> +				pinctrl-0 = <&ge0_pins>;
+> +				pinctrl-names = "default";
+
+Hi Ezequiel
+
+Could you put these one level higher in the DT hierarchy? i.e. once in
+armada-370.dtsi and not in every board .dts file?
+
+	Andrew
