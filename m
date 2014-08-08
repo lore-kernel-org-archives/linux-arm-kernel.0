@@ -1,33 +1,15 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Fri, 8 Aug 2014 15:14:44 +0200
-Subject: [PATCH 4/4] gpio: pca953x: Add DT binding for reset gpio
-In-Reply-To: <1406618686-22385-5-git-send-email-mpa@pengutronix.de>
-References: <1406618686-22385-1-git-send-email-mpa@pengutronix.de>
- <1406618686-22385-5-git-send-email-mpa@pengutronix.de>
-Message-ID: <CACRpkdY0TqVH1tJR1H89S5hvdJUboQdVtNvZnL3NeWit4f+amw@mail.gmail.com>
+From: tom@sharkbay.at (Thomas Scheiblauer)
+Date: Fri, 08 Aug 2014 15:15:58 +0200
+Subject: [BUG]: imx6q (wandboard): Very unstable ethernet since kernel 3.16
+Message-ID: <1407503758.19455.1.camel@sharkbay.at>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jul 29, 2014 at 9:24 AM, Markus Pargmann <mpa@pengutronix.de> wrote:
+Since Kernel 3.16 (running on 3.16.0) the ethernet (fec) connection
+stops working after exchanging very little data. Sometimes it comes back
+again for some seconds and drops again. No clues in dmesg.
 
-> The pca953x has a negated reset input. This patch adds a DT binding for
-> the reset gpio and resets the chip when it is probed. This will reset
-> the device and leave the gpio in the correct state so reset is not
-> triggered.
->
-> Signed-off-by: Markus Pargmann <mpa@pengutronix.de>
-
-Why on earth should this be in the GPIO driver?
-
-The driver should be in drivers/reset/reset-gpio.c and you
-should provide a separate driver for it.
-
-As it happens, Houcheng Lin has already proposed such a
-driver:
-http://marc.info/?l=linux-kernel&m=140309916607115&w=2
-
-Please coordinate with Houcheng and use his driver for what
-you want to achieve.
-
-Yours,
-Linus Walleij
+After increasing TX_RING_SIZE in "drivers/net/ethernet/freescale/fec.h"
+from 512 to 1024 the connection seems to stay stable (judging after
+about half an hour of testing) but I really don't have experience with
+kernel driver hacking, so I'm not sure what I'm doing here.
