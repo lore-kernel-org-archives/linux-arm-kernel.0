@@ -1,348 +1,80 @@
-From: jonsmirl@gmail.com (jonsmirl at gmail.com)
-Date: Thu, 7 Aug 2014 20:03:47 -0400
-Subject: [PATCH 4/9] clk: sunxi: PLL2 support for sun4i, sun5i and sun7i
-In-Reply-To: <CAKON4OyMOXjj_mdZvzo0Q_-MdNn076RTwKuBCVtMsRHhnyLoKw@mail.gmail.com>
-References: <1406842092-25207-1-git-send-email-emilio@elopez.com.ar>
- <1406842092-25207-5-git-send-email-emilio@elopez.com.ar>
- <CAKON4OyMOXjj_mdZvzo0Q_-MdNn076RTwKuBCVtMsRHhnyLoKw@mail.gmail.com>
-Message-ID: <CAKON4OyNR1=7_N=YNiJ8RdDrPYgMVPt_-UF-Ndjqg+jWbHRMwQ@mail.gmail.com>
+From: dianders@chromium.org (Doug Anderson)
+Date: Thu, 7 Aug 2014 17:11:37 -0700
+Subject: [PATCH] usb: dwc2: Read GNPTXFSIZ when in forced HOST mode.
+In-Reply-To: <A2CA0424C0A6F04399FB9E1CD98E0304844C4EA0@US01WEMBX2.internal.synopsys.com>
+References: <1407440891-29295-1-git-send-email-dianders@chromium.org>
+ <A2CA0424C0A6F04399FB9E1CD98E0304844C4EA0@US01WEMBX2.internal.synopsys.com>
+Message-ID: <CAD=FV=XXP-0G=rxSkf-6=UznHj4ZqrLL3U+qQnNGdx_cLRGBPw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Aug 6, 2014 at 11:20 AM, jonsmirl at gmail.com <jonsmirl@gmail.com> wrote:
-> On Thu, Jul 31, 2014 at 5:28 PM, Emilio L?pez <emilio@elopez.com.ar> wrote:
->> This patch adds support for PLL2 and derivates on sun4i, sun5i and
->> sun7i SoCs. As this PLL is only used for audio and requires good
->> accuracy, we only support two known good rates.
+Paul,
+
+On Thu, Aug 7, 2014 at 1:18 PM, Paul Zimmerman
+<Paul.Zimmerman@synopsys.com> wrote:
+>> From: Doug Anderson [mailto:dianders at chromium.org]
+>> Sent: Thursday, August 07, 2014 12:48 PM
 >>
->> Signed-off-by: Emilio L?pez <emilio@elopez.com.ar>
+>> The documentation for GNPTXFSIZ says that "For host mode, this field
+>> is always valid."  Since we're already switching to host mode for
+>> HPTXFSIZ, let's also read GNPTXFSIZ in host mode.
+>>
+>> On an rk3288 SoC, without this change we see this at bootup:
+>>   dwc2 ff580000.usb: gnptxfsiz=00100400
+>>   dwc2 ff580000.usb: 128 invalid for host_nperio_tx_fifo_size. Check HW configuration.
+>>
+>> After this change we see:
+>>   dwc2 ff580000.usb: gnptxfsiz=04000400
+>>
+>> Signed-off-by: Doug Anderson <dianders@chromium.org>
 >> ---
+>>  drivers/usb/dwc2/core.c | 6 +++---
+>>  1 file changed, 3 insertions(+), 3 deletions(-)
 >>
->> Changes from RFC:
->>  * Add support for A10 rev. A
->>  * Document compatibles
->>  * Use fixed factors
+>> diff --git a/drivers/usb/dwc2/core.c b/drivers/usb/dwc2/core.c
+>> index 27d2c9b..c184ed43 100644
+>> --- a/drivers/usb/dwc2/core.c
+>> +++ b/drivers/usb/dwc2/core.c
+>> @@ -2674,23 +2674,23 @@ int dwc2_get_hwparams(struct dwc2_hsotg *hsotg)
+>>       hwcfg2 = readl(hsotg->regs + GHWCFG2);
+>>       hwcfg3 = readl(hsotg->regs + GHWCFG3);
+>>       hwcfg4 = readl(hsotg->regs + GHWCFG4);
+>> -     gnptxfsiz = readl(hsotg->regs + GNPTXFSIZ);
+>>       grxfsiz = readl(hsotg->regs + GRXFSIZ);
 >>
->>  Documentation/devicetree/bindings/clock/sunxi.txt |   2 +
->>  drivers/clk/sunxi/Makefile                        |   1 +
->>  drivers/clk/sunxi/clk-a10-pll2.c                  | 243 ++++++++++++++++++++++
->>  3 files changed, 246 insertions(+)
->>  create mode 100644 drivers/clk/sunxi/clk-a10-pll2.c
+>>       dev_dbg(hsotg->dev, "hwcfg1=%08x\n", hwcfg1);
+>>       dev_dbg(hsotg->dev, "hwcfg2=%08x\n", hwcfg2);
+>>       dev_dbg(hsotg->dev, "hwcfg3=%08x\n", hwcfg3);
+>>       dev_dbg(hsotg->dev, "hwcfg4=%08x\n", hwcfg4);
+>> -     dev_dbg(hsotg->dev, "gnptxfsiz=%08x\n", gnptxfsiz);
+>>       dev_dbg(hsotg->dev, "grxfsiz=%08x\n", grxfsiz);
 >>
->> diff --git a/Documentation/devicetree/bindings/clock/sunxi.txt b/Documentation/devicetree/bindings/clock/sunxi.txt
->> index d3a5c3c..41ada31 100644
->> --- a/Documentation/devicetree/bindings/clock/sunxi.txt
->> +++ b/Documentation/devicetree/bindings/clock/sunxi.txt
->> @@ -10,6 +10,8 @@ Required properties:
->>         "allwinner,sun4i-a10-pll1-clk" - for the main PLL clock and PLL4
->>         "allwinner,sun6i-a31-pll1-clk" - for the main PLL clock on A31
->>         "allwinner,sun8i-a23-pll1-clk" - for the main PLL clock on A23
->> +       "allwinner,sun4i-a10-a-pll2-clk" - for the PLL2 clock on A10 rev. A
->> +       "allwinner,sun4i-a10-b-pll2-clk" - for the PLL2 clock on A10 rev. B
->>         "allwinner,sun4i-a10-pll5-clk" - for the PLL5 clock
->>         "allwinner,sun4i-a10-pll6-clk" - for the PLL6 clock
->>         "allwinner,sun6i-a31-pll6-clk" - for the PLL6 clock on A31
->> diff --git a/drivers/clk/sunxi/Makefile b/drivers/clk/sunxi/Makefile
->> index 6850cba..dcd5709 100644
->> --- a/drivers/clk/sunxi/Makefile
->> +++ b/drivers/clk/sunxi/Makefile
->> @@ -4,6 +4,7 @@
+>> -     /* Force host mode to get HPTXFSIZ exact power on value */
+>> +     /* Force host mode to get HPTXFSIZ / GNPTXFSIZ exact power on value */
+>>       gusbcfg = readl(hsotg->regs + GUSBCFG);
+>>       gusbcfg |= GUSBCFG_FORCEHOSTMODE;
+>>       writel(gusbcfg, hsotg->regs + GUSBCFG);
+>>       usleep_range(100000, 150000);
 >>
->>  obj-y += clk-sunxi.o clk-factors.o
->>  obj-y += clk-a10-hosc.o
->> +obj-y += clk-a10-pll2.o
->>  obj-y += clk-a20-gmac.o
->>
->>  obj-$(CONFIG_MFD_SUN6I_PRCM) += \
->> diff --git a/drivers/clk/sunxi/clk-a10-pll2.c b/drivers/clk/sunxi/clk-a10-pll2.c
->> new file mode 100644
->> index 0000000..bcf7d0b
->> --- /dev/null
->> +++ b/drivers/clk/sunxi/clk-a10-pll2.c
->> @@ -0,0 +1,243 @@
->> +/*
->> + * Copyright 2014 Emilio L?pez
->> + *
->> + * Emilio L?pez <emilio@elopez.com.ar>
->> + *
->> + * This program is free software; you can redistribute it and/or modify
->> + * it under the terms of the GNU General Public License as published by
->> + * the Free Software Foundation; either version 2 of the License, or
->> + * (at your option) any later version.
->> + *
->> + * This program is distributed in the hope that it will be useful,
->> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
->> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
->> + * GNU General Public License for more details.
->> + */
->> +
->> +#include <linux/clk-provider.h>
->> +#include <linux/of.h>
->> +#include <linux/of_address.h>
->> +#include <linux/slab.h>
->> +
->> +#define SUN4I_PLL2_ENABLE              31
->> +#define SUN4I_PLL2_A_VCOBIAS           0
->> +#define SUN4I_PLL2_A_VCOBIAS_MASK      0x1F
->> +#define SUN4I_PLL2_A_N                 7
->> +#define SUN4I_PLL2_A_N_MASK            0x7F
->> +#define SUN4I_PLL2_B_POST_DIV          26
->> +#define SUN4I_PLL2_B_POST_DIV_MASK     0xF
->> +#define SUN4I_PLL2_B_N                 8
->> +#define SUN4I_PLL2_B_N_MASK            0x7F
->> +#define SUN4I_PLL2_B_PRE_DIV           0
->> +#define SUN4I_PLL2_B_PRE_DIV_MASK      0x1F
->> +
->> +#define SUN4I_PLL2_OUTPUTS             4
->> +
->> +struct sun4i_pll2_clk {
->> +       struct clk_hw hw;
->> +       void __iomem *reg;
->> +};
->> +
->> +static inline struct sun4i_pll2_clk *to_sun4i_pll2_clk(struct clk_hw *hw)
->> +{
->> +       return container_of(hw, struct sun4i_pll2_clk, hw);
->> +}
->> +
->> +static unsigned long sun4i_pll2_recalc_rate_a(struct clk_hw *hw,
->> +                                             unsigned long parent_rate)
->> +{
->> +       struct sun4i_pll2_clk *clk = to_sun4i_pll2_clk(hw);
->> +       int vcobias, n;
->> +       u32 val;
->> +
->> +       val = readl(clk->reg);
->> +       vcobias = (val >> SUN4I_PLL2_A_VCOBIAS) & SUN4I_PLL2_A_VCOBIAS_MASK;
->> +       n = (val >> SUN4I_PLL2_A_N) & SUN4I_PLL2_A_N_MASK;
->> +
->> +       if (vcobias == 10 && n == 94)
->> +               return 22579200;
->> +       else if (vcobias == 9 && n == 83)
->> +               return 24576000;
->> +
->> +       /*
->> +        * Unfortunately we don't really have much documentation on how
->> +        * these factors relate mathematically
->> +        */
->> +       return 0;
->> +}
->> +
->> +static unsigned long sun4i_pll2_recalc_rate_b(struct clk_hw *hw,
->> +                                             unsigned long parent_rate)
->> +{
->> +       struct sun4i_pll2_clk *clk = to_sun4i_pll2_clk(hw);
->> +       int n, prediv, postdiv;
->> +       u32 val;
->> +
->> +       val = readl(clk->reg);
->> +       n = (val >> SUN4I_PLL2_B_N) & SUN4I_PLL2_B_N_MASK;
->> +       prediv = (val >> SUN4I_PLL2_B_PRE_DIV) & SUN4I_PLL2_B_PRE_DIV_MASK;
->> +       postdiv = (val >> SUN4I_PLL2_B_POST_DIV) & SUN4I_PLL2_B_POST_DIV_MASK;
->> +
->> +       /* 0 is a special case and means 1 */
->> +       if (n == 0)
->> +               n = 1;
->> +       if (prediv == 0)
->> +               prediv = 1;
->> +       if (postdiv == 0)
->> +               postdiv = 1;
->> +
->> +       return ((parent_rate * n) / prediv) / postdiv;
->> +}
->> +
->> +static long sun4i_pll2_round_rate(struct clk_hw *hw, unsigned long rate,
->> +                                 unsigned long *parent_rate)
->> +{
->> +       /*
->> +        * There is only two interesting rates for the audio PLL, the
->> +        * rest isn't really usable due to accuracy concerns. Therefore,
->> +        * we specifically round to those rates here
->> +        */
->> +       if (rate < 22579200)
->> +               return -EINVAL;
->> +
->> +       if (rate >= 22579200 && rate < 24576000)
->> +               return 22579200;
->> +
->> +       return 24576000;
->> +}
+>> +     gnptxfsiz = readl(hsotg->regs + GNPTXFSIZ);
+>>       hptxfsiz = readl(hsotg->regs + HPTXFSIZ);
+>> +     dev_dbg(hsotg->dev, "gnptxfsiz=%08x\n", gnptxfsiz);
+>>       dev_dbg(hsotg->dev, "hptxfsiz=%08x\n", hptxfsiz);
+>>       gusbcfg = readl(hsotg->regs + GUSBCFG);
+>>       gusbcfg &= ~GUSBCFG_FORCEHOSTMODE;
 >
-> These should return the actual computed rate osc*n / (pre * post) so
-> that the error column is displayed correctly.
+> Nice! I wonder if this is a bug in the original driver, and they
+> actually meant to read this register instead of HPTXFSIZ? Well, it
+> doesn't really matter I guess.
 >
->    pll2                                  1            1    22571428          0
->        i2s0                               1            1    22571428          0
->           mclk0                           0            0    22571428          0
+> Acked-by: Paul Zimmerman <paulz@synopsys.com>
 >
-> At 22.5 the error is 0.03%, 24.5 error is 0.01%.
->
-> So when you ask for 24.576 it returns 24.571428 and 22.5792 returns 22.571428.
->
->
+> You may want to resend this to Greg after -rc1 is out and he reopens
+> his usb-next tree.
 
-This is more complicated that it looks. If you set 22.5792Mhz and the
-clock doesn't return  22.5792Mhz it throws off the math inside of
-ALSA. For example 22579200 / 44100 = 512fs. But if you use  22571428 /
-44100 = 511.8 = 511 because of truncation. Now the checks looking for
-512 don't trigger. I just hit this bug.
+Thanks!
 
-So I think the clock is doing the right thing when you set 22.5792Mhz
-and it returns the actual number 22.571428Mhz.
+...do you think this is a fix that needs to go in for 3.17?  Is it
+affecting anyone there?
 
-It's the ALSA code that needs to be more tolerant and use some round()
-functions to allow for a slight error in these frequencies.
-
-
->
->
->> +
->> +static int sun4i_pll2_set_rate_a(struct clk_hw *hw, unsigned long rate,
->> +                                unsigned long parent_rate)
->> +{
->> +       struct sun4i_pll2_clk *clk = to_sun4i_pll2_clk(hw);
->> +       u32 val = readl(clk->reg);
->> +
->> +       val &= ~(SUN4I_PLL2_A_VCOBIAS_MASK << SUN4I_PLL2_A_VCOBIAS);
->> +       val &= ~(SUN4I_PLL2_A_N_MASK << SUN4I_PLL2_A_N);
->> +
->> +       if (rate == 22579200)
->> +               val |= (10 << SUN4I_PLL2_A_VCOBIAS) | (94 << SUN4I_PLL2_A_N);
->> +       else if (rate == 24576000)
->> +               val |= (9 << SUN4I_PLL2_A_VCOBIAS) | (83 << SUN4I_PLL2_A_N);
->> +       else
->> +               return -EINVAL;
->> +
->> +       writel(val, clk->reg);
->> +
->> +       return 0;
->> +}
->> +
->> +static int sun4i_pll2_set_rate_b(struct clk_hw *hw, unsigned long rate,
->> +                                unsigned long parent_rate)
->> +{
->> +       struct sun4i_pll2_clk *clk = to_sun4i_pll2_clk(hw);
->> +       u32 val = readl(clk->reg);
->> +
->> +       val &= ~(SUN4I_PLL2_B_N_MASK << SUN4I_PLL2_B_N);
->> +       val &= ~(SUN4I_PLL2_B_PRE_DIV_MASK << SUN4I_PLL2_B_PRE_DIV);
->> +       val &= ~(SUN4I_PLL2_B_POST_DIV_MASK << SUN4I_PLL2_B_POST_DIV);
->> +
->> +       val |= (21 << SUN4I_PLL2_B_PRE_DIV) | (4 << SUN4I_PLL2_B_POST_DIV);
->> +
->> +       if (rate == 22579200)
->> +               val |= (79 << SUN4I_PLL2_B_N);
->> +       else if (rate == 24576000)
->> +               val |= (86 << SUN4I_PLL2_B_N);
->> +       else
->> +               return -EINVAL;
->> +
->> +       writel(val, clk->reg);
->> +
->> +       return 0;
->> +}
->> +
->> +static const struct clk_ops sun4i_pll2_ops_a = {
->> +       .recalc_rate = sun4i_pll2_recalc_rate_a,
->> +       .round_rate = sun4i_pll2_round_rate,
->> +       .set_rate = sun4i_pll2_set_rate_a,
->> +};
->> +
->> +
->> +static const struct clk_ops sun4i_pll2_ops_b = {
->> +       .recalc_rate = sun4i_pll2_recalc_rate_b,
->> +       .round_rate = sun4i_pll2_round_rate,
->> +       .set_rate = sun4i_pll2_set_rate_b,
->> +};
->> +
->> +static const struct of_device_id pll2_matches[] __initconst = {
->> +       { .compatible = "allwinner,sun4i-a10-a-pll2-clk", .data = &sun4i_pll2_ops_a },
->> +       { .compatible = "allwinner,sun4i-a10-b-pll2-clk", .data = &sun4i_pll2_ops_b },
->> +       { /* sentinel */ },
->> +};
->> +
->> +static void __init sun4i_pll2_setup(struct device_node *np)
->> +{
->> +       const char *clk_name = np->name, *parent;
->> +       const struct of_device_id *match;
->> +       struct clk_onecell_data *clk_data;
->> +       const struct clk_ops *pll2_ops;
->> +       struct sun4i_pll2_clk *pll2;
->> +       struct clk_gate *gate;
->> +       struct clk **clks;
->> +       void __iomem *reg;
->> +
->> +       /* Choose the correct ops for pll2 */
->> +       match = of_match_node(pll2_matches, np);
->> +       pll2_ops = match->data;
->> +
->> +       pll2 = kzalloc(sizeof(*pll2), GFP_KERNEL);
->> +       gate = kzalloc(sizeof(*gate), GFP_KERNEL);
->> +       clk_data = kzalloc(sizeof(*clk_data), GFP_KERNEL);
->> +       clks = kcalloc(SUN4I_PLL2_OUTPUTS, sizeof(*clks), GFP_KERNEL);
->> +       if (!pll2 || !gate || !clk_data || !clks)
->> +               goto free_mem;
->> +
->> +       reg = of_iomap(np, 0);
->> +       parent = of_clk_get_parent_name(np, 0);
->> +       of_property_read_string_index(np, "clock-output-names", 0, &clk_name);
->> +
->> +       pll2->reg = reg;
->> +       gate->reg = reg;
->> +       gate->bit_idx = SUN4I_PLL2_ENABLE;
->> +
->> +       /* PLL2, also known as PLL2x1 */
->> +       of_property_read_string_index(np, "clock-output-names", 0, &clk_name);
->> +       clks[0] = clk_register_composite(NULL, clk_name, &parent, 1, NULL, NULL,
->> +                                        &pll2->hw, pll2_ops,
->> +                                        &gate->hw, &clk_gate_ops, 0);
->> +       WARN_ON(IS_ERR(clks[0]));
->> +       clk_set_rate(clks[0], 22579200);
->> +       parent = clk_name;
->> +
->> +       /* PLL2x2, 1/4 the rate of PLL2x8 */
->> +       of_property_read_string_index(np, "clock-output-names", 1, &clk_name);
->> +       clks[1] = clk_register_fixed_factor(NULL, clk_name, parent,
->> +                                           CLK_SET_RATE_PARENT, 2, 1);
->> +       WARN_ON(IS_ERR(clks[1]));
->> +
->> +       /* PLL2x4, 1/2 the rate of PLL2x8 */
->> +       of_property_read_string_index(np, "clock-output-names", 2, &clk_name);
->> +       clks[2] = clk_register_fixed_factor(NULL, clk_name, parent,
->> +                                           CLK_SET_RATE_PARENT, 4, 1);
->> +       WARN_ON(IS_ERR(clks[2]));
->> +
->> +       /* PLL2x8, double of PLL2 without the post divisor */
->> +       of_property_read_string_index(np, "clock-output-names", 3, &clk_name);
->> +       clks[3] = clk_register_fixed_factor(NULL, clk_name, parent,
->> +                                           CLK_SET_RATE_PARENT, 2 * 4, 1);
->> +       WARN_ON(IS_ERR(clks[3]));
->> +
->> +       clk_data->clks = clks;
->> +       clk_data->clk_num = SUN4I_PLL2_OUTPUTS;
->> +       of_clk_add_provider(np, of_clk_src_onecell_get, clk_data);
->> +
->> +       return;
->> +
->> +free_mem:
->> +       kfree(pll2);
->> +       kfree(gate);
->> +       kfree(clk_data);
->> +       kfree(clks);
->> +}
->> +CLK_OF_DECLARE(sun4i_pll2_a, "allwinner,sun4i-a10-a-pll2-clk", sun4i_pll2_setup);
->> +CLK_OF_DECLARE(sun4i_pll2_b, "allwinner,sun4i-a10-b-pll2-clk", sun4i_pll2_setup);
->> --
->> 2.0.3
->
->
->
-> --
-> Jon Smirl
-> jonsmirl at gmail.com
-
-
-
--- 
-Jon Smirl
-jonsmirl at gmail.com
+-Doug
