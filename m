@@ -1,54 +1,53 @@
-From: dianders@chromium.org (Doug Anderson)
-Date: Fri,  8 Aug 2014 15:29:09 -0700
-Subject: [PATCH] pinctrl: Add mux options 3 and 4 for rockchip pinctrl
-Message-ID: <1407536949-31323-1-git-send-email-dianders@chromium.org>
+From: akpm@linux-foundation.org (Andrew Morton)
+Date: Fri, 8 Aug 2014 15:36:35 -0700
+Subject: [PATCHv6 1/5] lib/genalloc.c: Add power aligned algorithm
+In-Reply-To: <1407529397-6642-1-git-send-email-lauraa@codeaurora.org>
+References: <1407529397-6642-1-git-send-email-lauraa@codeaurora.org>
+Message-ID: <20140808153635.36f27a4fbfbd8f715e51d15e@linux-foundation.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Newer Rockchip SoCs have more muxing slots.  Add slots 3 and 4 since
-the rk3288 table goes all the way up to 4.
+On Fri,  8 Aug 2014 13:23:13 -0700 Laura Abbott <lauraa@codeaurora.org> wrote:
 
-Signed-off-by: Doug Anderson <dianders@chromium.org>
----
- Documentation/devicetree/bindings/pinctrl/rockchip,pinctrl.txt | 6 +++---
- include/dt-bindings/pinctrl/rockchip.h                         | 2 ++
- 2 files changed, 5 insertions(+), 3 deletions(-)
+> 
+> One of the more common algorithms used for allocation
+> is to align the start address of the allocation to
+> the order of size requested. Add this as an algorithm
+> option for genalloc.
+> 
+> --- a/lib/genalloc.c
+> +++ b/lib/genalloc.c
+> @@ -481,6 +481,27 @@ unsigned long gen_pool_first_fit(unsigned long *map, unsigned long size,
+>  EXPORT_SYMBOL(gen_pool_first_fit);
+>  
+>  /**
+> + * gen_pool_first_fit_order_align - find the first available region
+> + * of memory matching the size requirement. The region will be aligned
+> + * to the order of the size specified.
+> + * @map: The address to base the search on
+> + * @size: The bitmap size in bits
+> + * @start: The bitnumber to start searching at
+> + * @nr: The number of zeroed bits we're looking for
+> + * @data: additional data - unused
 
-diff --git a/Documentation/devicetree/bindings/pinctrl/rockchip,pinctrl.txt b/Documentation/devicetree/bindings/pinctrl/rockchip,pinctrl.txt
-index 4658b69..388b213 100644
---- a/Documentation/devicetree/bindings/pinctrl/rockchip,pinctrl.txt
-+++ b/Documentation/devicetree/bindings/pinctrl/rockchip,pinctrl.txt
-@@ -2,8 +2,8 @@
- 
- The Rockchip Pinmux Controller, enables the IC
- to share one PAD to several functional blocks. The sharing is done by
--multiplexing the PAD input/output signals. For each PAD there are up to
--4 muxing options with option 0 being the use as a GPIO.
-+multiplexing the PAD input/output signals. For each PAD there are several
-+muxing options with option 0 being the use as a GPIO.
- 
- Please refer to pinctrl-bindings.txt in this directory for details of the
- common pinctrl bindings used by client devices, including the meaning of the
-@@ -58,7 +58,7 @@ Deprecated properties for gpio sub nodes:
- Required properties for pin configuration node:
-   - rockchip,pins: 3 integers array, represents a group of pins mux and config
-     setting. The format is rockchip,pins = <PIN_BANK PIN_BANK_IDX MUX &phandle>.
--    The MUX 0 means gpio and MUX 1 to 3 mean the specific device function.
-+    The MUX 0 means gpio and MUX 1 to N mean the specific device function.
-     The phandle of a node containing the generic pinconfig options
-     to use, as described in pinctrl-bindings.txt in this directory.
- 
-diff --git a/include/dt-bindings/pinctrl/rockchip.h b/include/dt-bindings/pinctrl/rockchip.h
-index cd5788b..743e66a 100644
---- a/include/dt-bindings/pinctrl/rockchip.h
-+++ b/include/dt-bindings/pinctrl/rockchip.h
-@@ -28,5 +28,7 @@
- #define RK_FUNC_GPIO	0
- #define RK_FUNC_1	1
- #define RK_FUNC_2	2
-+#define RK_FUNC_3	3
-+#define RK_FUNC_4	4
- 
- #endif
--- 
-2.0.0.526.g5318336
+`data' is used.
+
+> + */
+> +unsigned long gen_pool_first_fit_order_align(unsigned long *map,
+> +		unsigned long size, unsigned long start,
+> +		unsigned int nr, void *data)
+> +{
+> +	unsigned long order = (unsigned long) data;
+
+Why pass a void*?  Why not pass "unsigned order;"?
+
+> +	unsigned long align_mask = (1 << get_order(nr << order)) - 1;
+> +
+> +	return bitmap_find_next_zero_area(map, size, start, nr, align_mask);
+> +}
+> +EXPORT_SYMBOL(gen_pool_first_fit_order_align);
+> +
+> +/**
+>   * gen_pool_best_fit - find the best fitting region of memory
+>   * macthing the size requirement (no alignment constraint)
+>   * @map: The address to base the search on
