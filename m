@@ -1,38 +1,25 @@
-From: kishon@ti.com (Kishon Vijay Abraham I)
-Date: Fri, 8 Aug 2014 16:45:35 +0530
-Subject: [PATCH 3/3] MAINTAINERS: Add phy-stih41x-usb.c to ARCH/STI
- architecture
-In-Reply-To: <1407493175-2611-4-git-send-email-peter.griffin@linaro.org>
-References: <1407493175-2611-1-git-send-email-peter.griffin@linaro.org>
- <1407493175-2611-4-git-send-email-peter.griffin@linaro.org>
-Message-ID: <53E4B157.6080405@ti.com>
+From: tklauser@distanz.ch (Tobias Klauser)
+Date: Fri, 8 Aug 2014 13:50:09 +0200
+Subject: [PATCH v10 4/4] drivers: net: Add APM X-Gene SoC ethernet driver
+ support.
+In-Reply-To: <1407449668-13520-5-git-send-email-isubramanian@apm.com>
+References: <1407449668-13520-1-git-send-email-isubramanian@apm.com>
+ <1407449668-13520-5-git-send-email-isubramanian@apm.com>
+Message-ID: <20140808115009.GE29832@distanz.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On 2014-08-08 at 00:14:28 +0200, Iyappan Subramanian <isubramanian@apm.com> wrote:
+> This patch adds network driver for APM X-Gene SoC ethernet.
+> 
+> Signed-off-by: Iyappan Subramanian <isubramanian@apm.com>
+> Signed-off-by: Ravi Patel <rapatel@apm.com>
+> Signed-off-by: Keyur Chudgar <kchudgar@apm.com>
+> Signed-off-by: Dean Nelson <dnelson@redhat.com>
 
-On Friday 08 August 2014 03:49 PM, Peter Griffin wrote:
-> Signed-off-by: Peter Griffin <peter.griffin@linaro.org>
+All my review comments for v9 of this series have been properly
+adressed.
 
-Empty commit message is not recommended even though the patch seems obvious.
+Reviewed-by: Tobias Klauser <tklauser@distanz.ch>
 
 Thanks
-Kishon
-
-> ---
->  MAINTAINERS | 1 +
->  1 file changed, 1 insertion(+)
-> 
-> diff --git a/MAINTAINERS b/MAINTAINERS
-> index c2066f4..6283d83 100644
-> --- a/MAINTAINERS
-> +++ b/MAINTAINERS
-> @@ -1356,6 +1356,7 @@ F:	drivers/pinctrl/pinctrl-st.c
->  F:	drivers/media/rc/st_rc.c
->  F:	drivers/i2c/busses/i2c-st.c
->  F:	drivers/tty/serial/st-asc.c
-> +F:	drivers/phy/phy-stih41x-usb.c
->  
->  ARM/TECHNOLOGIC SYSTEMS TS7250 MACHINE SUPPORT
->  M:	Lennert Buytenhek <kernel@wantstofly.org>
-> 
