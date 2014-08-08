@@ -1,47 +1,65 @@
-From: mathieu.poirier@linaro.org (Mathieu Poirier)
-Date: Fri, 8 Aug 2014 07:55:54 -0600
-Subject: [PATCH 07/10 v3] coresight-etm: add CoreSight ETM/PTM driver
-In-Reply-To: <53E4600C.4030505@de.bosch.com>
-References: <1407435706-19441-1-git-send-email-mathieu.poirier@linaro.org>
- <1407435706-19441-8-git-send-email-mathieu.poirier@linaro.org>
- <53E4600C.4030505@de.bosch.com>
-Message-ID: <CANLsYkzDbOyBbqMCp41nt6e84MSCJTWnRDZ0JBJ1jYgtL3ZPFA@mail.gmail.com>
+From: festevam@gmail.com (Fabio Estevam)
+Date: Fri, 8 Aug 2014 11:05:34 -0300
+Subject: Oops: 17 SMP ARM (v3.16-rc2)
+In-Reply-To: <CAOMZO5ACj6ER3tUMS8XsnigT=-zs4TZFmobbtmTN-+LWJFLt4Q@mail.gmail.com>
+References: <C4A61A5CA4AD2246942F4BA6F20ACB80435655E9@ALVA-EXMB04.alv.autoliv.int>
+ <20140626151424.GT32514@n2100.arm.linux.org.uk>
+ <20140627112151.GF32514@n2100.arm.linux.org.uk>
+ <3FFB61A7A8473C49831AF20FA193534A43CADFA7@ALVA-EXMB01.alv.autoliv.int>
+ <20140627163108.GP32514@n2100.arm.linux.org.uk>
+ <C4A61A5CA4AD2246942F4BA6F20ACB8043575072@ALVA-EXMB04.alv.autoliv.int>
+ <20140806095012.GN30282@n2100.arm.linux.org.uk>
+ <C4A61A5CA4AD2246942F4BA6F20ACB8043575172@ALVA-EXMB04.alv.autoliv.int>
+ <20140806125550.GO30282@n2100.arm.linux.org.uk>
+ <C4A61A5CA4AD2246942F4BA6F20ACB804357526C@ALVA-EXMB04.alv.autoliv.int>
+ <20140807121248.GY30282@n2100.arm.linux.org.uk>
+ <CAOMZO5ACj6ER3tUMS8XsnigT=-zs4TZFmobbtmTN-+LWJFLt4Q@mail.gmail.com>
+Message-ID: <CAOMZO5BXtXMXqdXjvZWy7E040wwxcxxnKDRMdFzsS12hdgr0ag@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 7 August 2014 23:28, Dirk Behme <dirk.behme@de.bosch.com> wrote:
-> On 07.08.2014 20:21, mathieu.poirier at linaro.org wrote:
->>
->> From: Pratik Patel <pratikp@codeaurora.org>
->>
->> This driver manages CoreSight ETM (Embedded Trace Macrocell) that
->> supports processor tracing. Currently supported version are ARM
->> ETMv3.x and PTM1.x.
->>
->> Signed-off-by: Pratik Patel <pratikp@codeaurora.org>
->> Signed-off-by: Panchaxari Prasannamurthy
->> <panchaxari.prasannamurthy@linaro.org>
->> Signed-off-by: Mathieu Poirier <mathieu.poirier@linaro.org>
->> ---
->
-> ...
->>
->> +static struct amba_id etm_ids[] = {
->> +       {       /* ETM 3.3 */
->> +               .id     = 0x0003b921,
->> +               .mask   = 0x0003ffff,
->> +       },
->> +       {       /* ETM 3.5 */
->> +               .id     = 0x0003b956,
->> +               .mask   = 0x0003ffff,
->> +       },
->> +       {       /* PTM */
->> +               .id     = 0x0003b95f,
->> +               .mask   = 0x0003ffff,
->> +       },
->> +       { 0, 0},
->
->
-> Maybe you like to add PTM 1.0 [1] here, too?
+Mattis,
 
-You got it.
+On Thu, Aug 7, 2014 at 11:20 AM, Fabio Estevam <festevam@gmail.com> wrote:
+> On Thu, Aug 7, 2014 at 9:12 AM, Russell King - ARM Linux
+> <linux@arm.linux.org.uk> wrote:
+>
+>> Hmm, I'm slightly confused.  On my iMX6Q, I have:
+>>
+>> 150:     581754          0          0          0       GIC 150  2188000.ethernet
+>> 151:          0          0          0          0       GIC 151  2188000.ethernet
+>
+> Same here on a mx6qsabresd.
+>
+>> In the DT file, we have:
+>>
+>>                         fec: ethernet at 02188000 {
+>>                                 compatible = "fsl,imx6q-fec";
+>>                                 reg = <0x02188000 0x4000>;
+>>                                 interrupts-extended =
+>>                                         <&intc 0 118 IRQ_TYPE_LEVEL_HIGH>,
+>>                                         <&intc 0 119 IRQ_TYPE_LEVEL_HIGH>;
+>>                                 clocks = <&clks 117>, <&clks 117>, <&clks 190>;
+>>                                 clock-names = "ipg", "ahb", "ptp";
+>>                                 status = "disabled";
+>>                         };
+>>
+>> which, for the gic, would be 118 + 32 (first SPI) = 150, 119 + 32 = 151.
+>> Yet you seem to have nothing registered against GIC 150, instead having
+>> an interrupt against GPIO 6.
+>>
+>> This seems very odd, and as this is an on-SoC device, I don't see why
+>> you would want to bind the interrupts for the FEC device any differently
+>> to standard platforms.
+>>
+>> This could well be the cause of your stalls.
+>>
+>> What's GPIO 6 used for on your board?
+>
+> On a imx6q sabreauto I also get:
+>
+> 151:          0          0          0          0       GIC 151  2188000.ethernet
+> 166:       4577          0          0          0  gpio-mxc   6  2188000.ethernet
+
+Could you remove 'interrupts-extended'  from the FEC node and also
+MX6QDL_PAD_GPIO_6__ENET_IRQ from the pinctrl node and test again?
