@@ -1,50 +1,40 @@
 From: ezequiel.garcia@free-electrons.com (Ezequiel Garcia)
-Date: Fri,  8 Aug 2014 12:18:51 -0300
-Subject: [PATCH 1/6] ARM: mvebu: Add required ethernet muxing for the Armada
- 370 SoC
-In-Reply-To: <1407511136-26477-1-git-send-email-ezequiel.garcia@free-electrons.com>
-References: <1407511136-26477-1-git-send-email-ezequiel.garcia@free-electrons.com>
-Message-ID: <1407511136-26477-2-git-send-email-ezequiel.garcia@free-electrons.com>
+Date: Fri,  8 Aug 2014 12:18:50 -0300
+Subject: [PATCH 0/6] mvebu: Network devicetree pin muxing
+Message-ID: <1407511136-26477-1-git-send-email-ezequiel.garcia@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This commit adds the required pin muxing for the two network interfaces
-and the MDIO interface, to the Armada 370 SoC.
+This series adds the proper devicetree pin muxing for the network interfaces
+on all Armada 370 boards.
 
-Signed-off-by: Ezequiel Garcia <ezequiel.garcia@free-electrons.com>
----
- arch/arm/boot/dts/armada-370.dtsi | 19 +++++++++++++++++++
- 1 file changed, 19 insertions(+)
+The MDIO interface uses pins MPP17 and MPP18, and so this is needed
+on all devices using MDIO.
 
-diff --git a/arch/arm/boot/dts/armada-370.dtsi b/arch/arm/boot/dts/armada-370.dtsi
-index 21b588b..b0700bf6 100644
---- a/arch/arm/boot/dts/armada-370.dtsi
-+++ b/arch/arm/boot/dts/armada-370.dtsi
-@@ -151,6 +151,25 @@
- 						       "mpp62", "mpp60", "mpp58";
- 					marvell,function = "audio";
- 				};
-+
-+				mdio_pins: mdio_pins {
-+					marvell,pins = "mpp17", "mpp18";
-+					marvell,function = "ge";
-+				};
-+
-+				ge0_pins: ge0_pins {
-+					marvell,pins = "mpp5", "mpp6", "mpp7", "mpp8",
-+						       "mpp9", "mpp10", "mpp11", "mpp12",
-+						       "mpp13", "mpp14", "mpp15", "mpp16";
-+					marvell,function = "ge0";
-+				};
-+
-+				ge1_pins: ge1_pins {
-+					marvell,pins = "mpp19", "mpp20", "mpp21", "mpp22",
-+						       "mpp23", "mpp24", "mpp25", "mpp26",
-+						       "mpp27", "mpp28", "mpp29", "mpp30";
-+					marvell,function = "ge1";
-+				};
- 			};
- 
- 			gpio0: gpio at 18100 {
+For the ethernet interfaces, only the boards connecting with RGMII
+need the mux. On this SoC, the SGMII is available on dedicated SerDes lanes,
+and so no MPP pin mux is required.
+
+The only board which uses SGMII is the Armada 370 Reference Design board.
+
+This has been tested on Armada 370 Mirabox only, using the recently submitted
+mvneta support for barebox. The series is based on v3.16.
+
+Ezequiel Garcia (6):
+  ARM: mvebu: Add required ethernet muxing for the Armada 370 SoC
+  ARM: mvebu: Add proper pin muxing on Globalscale Mirabox board
+  ARM: mvebu: Add proper pin muxing on the Armada 370 DB board
+  ARM: mvebu: Add proper pin muxing on Netgear ReadyNAS 102
+  ARM: mvebu: Add proper pin muxing on Netgear ReadyNAS 104
+  ARM: mvebu: Add proper pin muxing on Armada 370 RD board
+
+ arch/arm/boot/dts/armada-370-db.dts            |  6 ++++++
+ arch/arm/boot/dts/armada-370-mirabox.dts       |  6 ++++++
+ arch/arm/boot/dts/armada-370-netgear-rn102.dts |  4 ++++
+ arch/arm/boot/dts/armada-370-netgear-rn104.dts |  6 ++++++
+ arch/arm/boot/dts/armada-370-rd.dts            |  4 ++++
+ arch/arm/boot/dts/armada-370.dtsi              | 19 +++++++++++++++++++
+ 6 files changed, 45 insertions(+)
+
 -- 
 2.0.1
