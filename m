@@ -1,54 +1,66 @@
-From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Fri, 8 Aug 2014 16:39:05 +0200
-Subject: [PATCH 00/10 v3] Coresight framework and drivers
-In-Reply-To: <1407435706-19441-1-git-send-email-mathieu.poirier@linaro.org>
-References: <1407435706-19441-1-git-send-email-mathieu.poirier@linaro.org>
-Message-ID: <20140808163905.30f7cb12@free-electrons.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Fri, 8 Aug 2014 15:41:37 +0100
+Subject: Request to include Mailbox tree in linux-next
+In-Reply-To: <CAJe_ZhceR1j_b-_efJoq9Dv6X6C=UuMgyp8AofjcCvc+bQVkfw@mail.gmail.com>
+References: <CAJe_ZhdZTSs+Ns4u7bMXwbLHYTnE-5XEE8uev4zXbXrCP52bSg@mail.gmail.com>
+ <20140808142912.7bf68229@canb.auug.org.au>
+ <CAJe_ZhceR1j_b-_efJoq9Dv6X6C=UuMgyp8AofjcCvc+bQVkfw@mail.gmail.com>
+Message-ID: <20140808144137.GE30282@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Mathieu,
+On Fri, Aug 08, 2014 at 07:55:52PM +0530, Jassi Brar wrote:
+> On 8 August 2014 09:59, Stephen Rothwell <sfr@canb.auug.org.au> wrote:
+> > Hi Jassi,
+> >
+> > On Wed, 6 Aug 2014 12:25:49 +0530 Jassi Brar <jaswinder.singh@linaro.org> wrote:
+> >>
+> >>  The framework for Mailbox has undergone 10 revisions over the last
+> >> one year, which has garnered support in the form of 'Reviewed-by' and
+> >> 'looks good enough to be merged in this window' from people in the CC
+> >> list.
+> >>
+> >>   Could you please add it to linux-next?
+> >> Tree:       git://git.linaro.org/landing-teams/working/fujitsu/integration.git
+> >> Branch:   mailbox-for-3.17
+> >> Contact:  Jassi Brar <jaswinder.singh@linaro.org>
+> >
+> > This is really late for v3.17.  The purpose of linux-next is to
+> > discover interactions between trees before they are pulled into Linus'
+> > tree and to do some cross architecture build checking.  Adding a tree
+> > during the merge window is not very helpful to that.
+> >
+> > However if this is really going to be merged by Linus before v3.17-rc1,
+> > I will add it on Monday, OK?
+> >
+> The patchset was deemed ready enough for this merge window. However
+> some late nitpicks and bikeshedding discussions ate time and my
+> confidence to send a pull request to Linus.
 
-On Thu,  7 Aug 2014 12:21:36 -0600, mathieu.poirier at linaro.org wrote:
+If it wasn't in linux-next before the merge window, you shouldn't be
+thinking about sending it to Linus.  Your changes may cause conflicts
+with other trees, which would be unknown - and to push it in during
+a merge window without it having been visible to others is quite
+unacceptable.
 
->  arch/arm/Kconfig.debug                     |   36 +-
->  arch/arm/boot/dts/omap3-beagle-xm.dts      |   28 +
->  arch/arm/boot/dts/omap3-beagle.dts         |   28 +
->  arch/arm/boot/dts/vexpress-v2p-ca15_a7.dts |  199 ++++
->  arch/arm/include/asm/hardware/coresight.h  |  157 ---
->  arch/arm/include/asm/hardware/cp14.h       |  540 ++++++++++
->  arch/arm/kernel/Makefile                   |    1 -
->  arch/arm/kernel/etm.c                      |  654 ------------
->  arch/arm/kernel/hw_breakpoint.c            |    4 +-
->  arch/arm/mach-omap2/Kconfig                |    8 -
->  arch/arm/mach-omap2/Makefile               |    1 -
->  arch/arm/mach-omap2/emu.c                  |   50 -
->  drivers/Makefile                           |    1 +
->  drivers/amba/bus.c                         |    2 +-
->  drivers/coresight/Makefile                 |    9 +
->  drivers/coresight/coresight-etb10.c        |  529 ++++++++++
->  drivers/coresight/coresight-etm-cp14.c     |  506 ++++++++++
->  drivers/coresight/coresight-etm.h          |  192 ++++
->  drivers/coresight/coresight-etm3x.c        | 1516 ++++++++++++++++++++++++++++
->  drivers/coresight/coresight-funnel.c       |  251 +++++
->  drivers/coresight/coresight-priv.h         |   63 ++
->  drivers/coresight/coresight-replicator.c   |  153 +++
->  drivers/coresight/coresight-tmc.c          |  740 ++++++++++++++
->  drivers/coresight/coresight-tpiu.c         |  212 ++++
->  drivers/coresight/coresight.c              |  638 ++++++++++++
->  drivers/coresight/of_coresight.c           |  202 ++++
->  include/linux/amba/bus.h                   |    1 +
->  include/linux/coresight.h                  |  200 ++++
+As Stephen says, linux-next is there to find interactions between
+trees before the code hits during the merge window - so that people
+know what conflicts are likely, and what the resolutions to the
+conflicts should be.  If your tree is not part of linux-next, then
+it's an unknown as far as everyone else is concerned.
 
-So a brand new framework gets added, and there's nothing added in
-Documentation/ ? It'd be nice to have a short documentation that
-explains what the framework is defined for, how driver should be
-written for it, what is its kernel-space or user-space interface, etc.
+> Upon Mark's suggestion (and the right thing to do) I wanted the patchset
+> to live the cycle in linux-next.
 
-Thanks,
+Yes, that's the right thing to do, but you sent the request at an
+inappropriate time.  The correct time to send your request would be
+after 3.17-rc1 has been released, IOW after the current merge window
+is over.
 
-Thomas
+In general, kernel developers don't "remember" requests from one week
+to the next; instead, we much prefer people send their requests at the
+appropriate times in the development cycle.
+
 -- 
-Thomas Petazzoni, CTO, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
+FTTC broadband for 0.8mile line: currently at 9.5Mbps down 400kbps up
+according to speedtest.net.
