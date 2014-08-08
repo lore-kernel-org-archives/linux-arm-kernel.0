@@ -1,18 +1,15 @@
 From: Julia.Lawall@lip6.fr (Julia Lawall)
-Date: Fri,  8 Aug 2014 12:07:43 +0200
-Subject: =?UTF-8?q?=5BPATCH=202/14=5D=20net=3A=20axienet=3A=20delete=20unneeded=20test=20before=20of=5Fnode=5Fput?=
-Message-ID: <1407492475-26283-2-git-send-email-Julia.Lawall@lip6.fr>
+Date: Fri,  8 Aug 2014 12:07:52 +0200
+Subject: [PATCH 11/14] ARM: brcmstb: delete unneeded test before of_node_put
+Message-ID: <1407492475-26283-11-git-send-email-Julia.Lawall@lip6.fr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Julia Lawall <Julia.Lawall@lip6.fr>
 
-Of_node_put supports NULL as its argument, so the initial test is not
-necessary.
+Simplify the error path to avoid calling of_node_put when it is not needed.
 
-Suggested by Uwe Kleine-K?nig.
-
-The semantic patch that fixes this problem is as follows:
+The semantic patch that finds this problem is as follows:
 (http://coccinelle.lip6.fr/)
 
 // <smpl>
@@ -27,20 +24,52 @@ expression e;
 Signed-off-by: Julia Lawall <Julia.Lawall@lip6.fr>
 
 ---
- drivers/net/ethernet/xilinx/xilinx_axienet_main.c |    3 +--
- 1 file changed, 1 insertion(+), 2 deletions(-)
+ arch/arm/mach-bcm/platsmp-brcmstb.c |   14 ++++++--------
+ 1 file changed, 6 insertions(+), 8 deletions(-)
 
-diff --git a/drivers/net/ethernet/xilinx/xilinx_axienet_main.c b/drivers/net/ethernet/xilinx/xilinx_axienet_main.c
-index 7b0a735..30e8608 100644
---- a/drivers/net/ethernet/xilinx/xilinx_axienet_main.c
-+++ b/drivers/net/ethernet/xilinx/xilinx_axienet_main.c
-@@ -1630,8 +1630,7 @@ static int axienet_of_remove(struct platform_device *op)
- 	axienet_mdio_teardown(lp);
- 	unregister_netdev(ndev);
+diff --git a/arch/arm/mach-bcm/platsmp-brcmstb.c b/arch/arm/mach-bcm/platsmp-brcmstb.c
+index af780e9..c515ea1 100644
+--- a/arch/arm/mach-bcm/platsmp-brcmstb.c
++++ b/arch/arm/mach-bcm/platsmp-brcmstb.c
+@@ -227,7 +227,7 @@ static int __init setup_hifcpubiuctrl_regs(struct device_node *np)
+ 	if (!syscon_np) {
+ 		pr_err("can't find phandle %s\n", name);
+ 		rc = -EINVAL;
+-		goto cleanup;
++		goto out;
+ 	}
  
--	if (lp->phy_node)
--		of_node_put(lp->phy_node);
-+	of_node_put(lp->phy_node);
- 	lp->phy_node = NULL;
+ 	cpubiuctrl_block = of_iomap(syscon_np, 0);
+@@ -256,9 +256,8 @@ static int __init setup_hifcpubiuctrl_regs(struct device_node *np)
+ 	}
  
- 	iounmap(lp->regs);
+ cleanup:
+-	if (syscon_np)
+-		of_node_put(syscon_np);
+-
++	of_node_put(syscon_np);
++out:
+ 	return rc;
+ }
+ 
+@@ -274,7 +273,7 @@ static int __init setup_hifcont_regs(struct device_node *np)
+ 	if (!syscon_np) {
+ 		pr_err("can't find phandle %s\n", name);
+ 		rc = -EINVAL;
+-		goto cleanup;
++		goto out;
+ 	}
+ 
+ 	hif_cont_block = of_iomap(syscon_np, 0);
+@@ -288,9 +287,8 @@ static int __init setup_hifcont_regs(struct device_node *np)
+ 	hif_cont_reg = 0;
+ 
+ cleanup:
+-	if (syscon_np)
+-		of_node_put(syscon_np);
+-
++	of_node_put(syscon_np);
++out:
+ 	return rc;
+ }
+ 
