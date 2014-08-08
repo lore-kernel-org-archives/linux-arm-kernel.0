@@ -1,52 +1,54 @@
-From: khilman@linaro.org (Kevin Hilman)
-Date: Fri, 8 Aug 2014 15:19:12 -0700
-Subject: [GIT PULL 3/5] Samsung exynos cpuidle update for v3.17
-In-Reply-To: <53C9C159.4070305@samsung.com>
-References: <53C9C159.4070305@samsung.com>
-Message-ID: <CAGa+x86XpkxEhe2D9NfFvWhTre-mAPkcsyzObb8q=Xa=Yd2Xdw@mail.gmail.com>
+From: dianders@chromium.org (Doug Anderson)
+Date: Fri,  8 Aug 2014 15:29:09 -0700
+Subject: [PATCH] pinctrl: Add mux options 3 and 4 for rockchip pinctrl
+Message-ID: <1407536949-31323-1-git-send-email-dianders@chromium.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+Newer Rockchip SoCs have more muxing slots.  Add slots 3 and 4 since
+the rk3288 table goes all the way up to 4.
 
-On Fri, Jul 18, 2014 at 5:52 PM, Kukjin Kim <kgene.kim@samsung.com> wrote:
-> The following changes since commit 1795cd9b3a91d4b5473c97f491d63892442212ab:
->
->   Linux 3.16-rc5 (2014-07-13 14:04:33 -0700)
->
-> are available in the git repository at:
->
->   git://git.kernel.org/pub/scm/linux/kernel/git/kgene/linux-samsung.git
-> tags/exynos-cpuidle
->
-> for you to fetch changes up to fc2cac41ebbfb16da8b036cba6ec6714ab780a6d:
->
->   ARM: EXYNOS: populate suspend and powered_up callbacks for mcpm
-> (2014-07-19 03:36:00 +0900)
->
-> ----------------------------------------------------------------
-> exynos cpuidle update for v3.17
->
-> - add callbacks exynos_suspend() and exynos_powered_up()
->   for support cpuidle through mcpm
-> - skip exynos_cpuidle for exynos5420 because is uses
->   cpuidle-big-liggle generic cpuidle driver
-> - add generic functions to calculate cpu number is used
->   for pmu and this is required for exynos5420 multi-cluster
-> - add of_device_id structure for big.LITTLE cpuidle and
->   add "samsung,exynos5420" compatible string for exynos5420
+Signed-off-by: Doug Anderson <dianders@chromium.org>
+---
+ Documentation/devicetree/bindings/pinctrl/rockchip,pinctrl.txt | 6 +++---
+ include/dt-bindings/pinctrl/rockchip.h                         | 2 ++
+ 2 files changed, 5 insertions(+), 3 deletions(-)
 
-I'm curious what platforms this is expected to work on, and where it's
-been tested.
-
-I tried it on exynos5800-peach-pi (chromebook2) and it hangs up (no
-kernel messages) shortly after the driver loads, and never finishes to
-boot.
-
-I needed an extra compatible entry for the 5800 in the driver for the
-driver to load, which suggests it hasn't been tested on 5800, but at
-least in theory, this should be compatible with the 542x, right?
-
-For testing, I tried today's linux-next and arm-soc/for-next.
-
-Kevin
+diff --git a/Documentation/devicetree/bindings/pinctrl/rockchip,pinctrl.txt b/Documentation/devicetree/bindings/pinctrl/rockchip,pinctrl.txt
+index 4658b69..388b213 100644
+--- a/Documentation/devicetree/bindings/pinctrl/rockchip,pinctrl.txt
++++ b/Documentation/devicetree/bindings/pinctrl/rockchip,pinctrl.txt
+@@ -2,8 +2,8 @@
+ 
+ The Rockchip Pinmux Controller, enables the IC
+ to share one PAD to several functional blocks. The sharing is done by
+-multiplexing the PAD input/output signals. For each PAD there are up to
+-4 muxing options with option 0 being the use as a GPIO.
++multiplexing the PAD input/output signals. For each PAD there are several
++muxing options with option 0 being the use as a GPIO.
+ 
+ Please refer to pinctrl-bindings.txt in this directory for details of the
+ common pinctrl bindings used by client devices, including the meaning of the
+@@ -58,7 +58,7 @@ Deprecated properties for gpio sub nodes:
+ Required properties for pin configuration node:
+   - rockchip,pins: 3 integers array, represents a group of pins mux and config
+     setting. The format is rockchip,pins = <PIN_BANK PIN_BANK_IDX MUX &phandle>.
+-    The MUX 0 means gpio and MUX 1 to 3 mean the specific device function.
++    The MUX 0 means gpio and MUX 1 to N mean the specific device function.
+     The phandle of a node containing the generic pinconfig options
+     to use, as described in pinctrl-bindings.txt in this directory.
+ 
+diff --git a/include/dt-bindings/pinctrl/rockchip.h b/include/dt-bindings/pinctrl/rockchip.h
+index cd5788b..743e66a 100644
+--- a/include/dt-bindings/pinctrl/rockchip.h
++++ b/include/dt-bindings/pinctrl/rockchip.h
+@@ -28,5 +28,7 @@
+ #define RK_FUNC_GPIO	0
+ #define RK_FUNC_1	1
+ #define RK_FUNC_2	2
++#define RK_FUNC_3	3
++#define RK_FUNC_4	4
+ 
+ #endif
+-- 
+2.0.0.526.g5318336
