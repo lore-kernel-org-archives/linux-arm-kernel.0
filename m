@@ -1,35 +1,40 @@
-From: pawel.moll@arm.com (Pawel Moll)
-Date: Fri, 08 Aug 2014 17:39:00 +0100
-Subject: [PATCH 2/5] char: tile-srom: Remove reference to platform_bus
-In-Reply-To: <1407515691.31897.26.camel@hornet>
-References: <1406298233-27876-1-git-send-email-pawel.moll@arm.com>
- <1406298233-27876-2-git-send-email-pawel.moll@arm.com>
- <53DAA605.2030500@tilera.com> <1406913678.22529.46.camel@hornet>
- <53E139C8.9000502@tilera.com> <1407515691.31897.26.camel@hornet>
-Message-ID: <1407515940.31897.31.camel@hornet>
+From: olof@lixom.net (Olof Johansson)
+Date: Fri,  8 Aug 2014 09:47:52 -0700
+Subject: [GIT PULL 0/7] ARM: SoC changes for 3.17
+Message-ID: <1407516479-1251-1-git-send-email-olof@lixom.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 2014-08-08 at 17:34 +0100, Pawel Moll wrote:
-> On Tue, 2014-08-05 at 21:08 +0100, Chris Metcalf wrote:
-> > >> In addition, we also have user binaries
-> > >> in the wild that know to look for /sys/devices/platform/srom/ paths,
-> > >> so I'm pretty reluctant to change this path without good reason.
-> > > So what is the srom class for then if not for device discovery? And why
-> > > do they look for them in the first place? To get relevant character
-> > > device's data, if I understand it right?
-> > >
-> > > Maybe you could just register a simple "proper" platform device for all
-> > > the sroms and then hang the class devices from it? I can type some code
-> > > doing this if it sound reasonably?
-> > 
-> > I'm not sure exactly what you mean by device discovery here.  
+A moderately sized set of branches this merge window for us, about 750
+patches in total. There are several fairly large cleanups, and a net
+negative delta(!)
 
-(sorry, sent too early...)
+ 1014 files changed, 39452 insertions(+), 42425 deletions(-)
 
-By "device discovery" I meant the way you find the way in your devices
-in /sysfs. You seem to be traversing /sys/devices/... tree, while you've
-got almost direct access to them through /sys/class/srom and you can (I
-believe, correct me if I'm wrong, Greg) rely on this path being stable.
+Most of the removal comes from two Samsung platforms being taken out
+(together with a couple of legacy drivers used only by them), but there's
+other stuff too -- removal and diet of some OMAP drivers and header
+files, the final folding of Marvell Kirkwood into the mvebu platform,
+removal of the legacy atmel pwm driver and a few more things like that.
 
-Pawe?
+The format is nearly the same as always: I describe the conflicts in
+each email and I have pushed a 'resolved-3.17' branch if you want to
+compare. Most branches are free of conflicts, the main exception is the
+SoC branch and it's not horrible to deal with either.
+
+I did include one patch interspersed with the branches (6/7 is a patch),
+it's something Stephen was carrying locally and I think this is better to
+handle this way than for us to do a backmerge to handle it ourselves. I'll
+leave it up to you if you prefer to fold it into the 5/7 merge or apply
+it separately.
+
+More detailed descriptions in each pull request. I also anticipate having
+another short branch of misc small cleanups that we have held off applying
+for the second week of the merge window, but nothing major. This is by
+far the bulk of the contents.
+
+Please pull!
+
+Thanks,
+
+-Olof
