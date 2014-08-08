@@ -1,27 +1,26 @@
-From: leif.lindholm@linaro.org (Leif Lindholm)
-Date: Fri, 8 Aug 2014 11:16:41 +0100
-Subject: [PATCH 3/8] arm: mm: reduce fixmap kmap from 32 to 16 CPUS
-In-Reply-To: <CAL_JsqJZbbH=PwDzLKSwKiW1Y=N8MLgwEkp=xQaD_ST_uB-_Rw@mail.gmail.com>
-References: <1407423713-4160-1-git-send-email-keescook@chromium.org>
- <1407423713-4160-4-git-send-email-keescook@chromium.org>
- <CAL_JsqJZbbH=PwDzLKSwKiW1Y=N8MLgwEkp=xQaD_ST_uB-_Rw@mail.gmail.com>
-Message-ID: <20140808101640.GO4179@bivouac.eciton.net>
+From: peter.griffin@linaro.org (Peter Griffin)
+Date: Fri,  8 Aug 2014 11:19:32 +0100
+Subject: [PATCH 0/3] Add usb phy support for STiH41x SoCs.
+Message-ID: <1407493175-2611-1-git-send-email-peter.griffin@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Aug 07, 2014 at 05:18:44PM -0500, Rob Herring wrote:
-> On Thu, Aug 7, 2014 at 10:01 AM, Kees Cook <keescook@chromium.org> wrote:
-> > More room is needed in the fixmap range for non-kmap fixmap entries. This
-> > reduces the kmap range from 32 to 16 CPUs.
-> 
-> Do you want this merged or just doing this to get the rest of your
-> series working? I'll post my patch for making the fixmap region 3MB
-> (it adds back the first 1MB of the top pmd).
+This series adds support for the on-chip PHY used for USB 1.1 and 2.0 found
+on STiH415 and STiH416 consumer electronics SoC's from STMicroelectronics.
 
-Well, I would quite like the generic fixmap stuff merged as soon as
-possible, so that early_ioremap can go in. That way, the UEFI patches
-are unblocked, and we can start booting the D01 in a sane way rather
-than the broken-by-design built-in Linux loader.
- 
-/
-    Leif
+Peter Griffin (3):
+  phy: phy-stih41x-usb: Add usb phy support for STiH41x SoCs.
+  phy: phy-stih41x-usb: Add dt documentation for USB phy on STiH415/6
+  MAINTAINERS: Add phy-stih41x-usb.c to ARCH/STI architecture
+
+ .../devicetree/bindings/phy/phy-stih41x-usb.txt    |  24 +++
+ MAINTAINERS                                        |   1 +
+ drivers/phy/Kconfig                                |   8 +
+ drivers/phy/Makefile                               |   1 +
+ drivers/phy/phy-stih41x-usb.c                      | 187 +++++++++++++++++++++
+ 5 files changed, 221 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/phy/phy-stih41x-usb.txt
+ create mode 100644 drivers/phy/phy-stih41x-usb.c
+
+-- 
+1.9.1
