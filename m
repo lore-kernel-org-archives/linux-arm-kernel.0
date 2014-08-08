@@ -1,108 +1,90 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Fri, 8 Aug 2014 14:40:21 -0700
-Subject: linux-next: build failures after merge of the drm tree
-In-Reply-To: <53E0736E.7030901@samsung.com>
-References: <20140805130926.4e8c8fe5@canb.auug.org.au>
- <53E0736E.7030901@samsung.com>
-Message-ID: <CAOesGMjjLHOaBJZwFENaWW41KFsNZ3pUqiYk0jtet=8NFvce3g@mail.gmail.com>
+From: dianders@chromium.org (Doug Anderson)
+Date: Fri, 8 Aug 2014 14:58:11 -0700
+Subject: [PATCH 1/4] clk: rockchip: protect critical clocks from getting
+ disabled
+In-Reply-To: <2434370.xFIeZvuJnT@diego>
+References: <1406661128-7614-1-git-send-email-heiko@sntech.de>
+ <4047366.k35vzjcKGH@diego> <20140801003025.4463.76384@quantum>
+ <2434370.xFIeZvuJnT@diego>
+Message-ID: <CAD=FV=XA31T9i6nLaDhVS+BkJ=U-PiMye_ouC1QY8EMoKqMCiQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Aug 4, 2014 at 11:02 PM, YoungJun Cho <yj44.cho@samsung.com> wrote:
-> Hi Stephen and Dave,
->
->
-> On 08/05/2014 12:09 PM, Stephen Rothwell wrote:
->>
->> Hi Dave,
->>
->> After merging the drm tree, today's linux-next build (x86_64
->> allmodconfig) failed like this:
->>
->> ERROR: "drm_sysfs_connector_remove" [drivers/gpu/drm/i2c/tda998x.ko]
->> undefined!
->> ERROR: "drm_sysfs_connector_add" [drivers/gpu/drm/i2c/tda998x.ko]
->> undefined!
->>
->> Caused by commit c707c3619ca8 ("drm/i2c: tda998x: add component
->> support") interacting with commit 34ea3d386347 ("drm: add register and
->> unregister functions for connectors").  Maybe it should have been fixed
->> up in the merge commit 920f946428b7 ("Merge branch 'tda998x-devel' of
->> git://ftp.arm.linux.org.uk/~rmk/linux-cubox into drm-next")?
->>
->> I reverted commit c707c3619ca8 for today.
->>
->> But then the arm multi_v7_defconfig build produced these errors:
->>
->> ERROR (phandle_references): Reference to non-existent node or label
->> "disp_pd"
->>
->> ERROR: Input tree has errors, aborting (use -f to force output)
->> make[2]: *** [arch/arm/boot/dts/exynos5420-arndale-octa.dtb] Error 2
->> make[2]: *** Waiting for unfinished jobs....
->> ERROR (phandle_references): Reference to non-existent node or label
->> "disp_pd"
->>
->> ERROR: Input tree has errors, aborting (use -f to force output)
->> make[2]: *** [arch/arm/boot/dts/exynos5420-smdk5420.dtb] Error 2
->> ERROR (phandle_references): Reference to non-existent node or label
->> "disp_pd"
->>
->> ERROR: Input tree has errors, aborting (use -f to force output)
->> ERROR (phandle_references): Reference to non-existent node or label
->> "disp_pd"
->>
->> make[2]: *** [arch/arm/boot/dts/exynos5800-peach-pi.dtb] Error 2
->> ERROR: Input tree has errors, aborting (use -f to force output)
->>
->> Caused by commit 5a8da524049c ("ARM: dts: exynos5420: add dsi node")
->> interacting with commit d51cad7df871 ("ARM: dts: remove display power
->> domain for exynos5420") from the arm-soc tree.
->>
->
-> I missed the patch "ARM: dts: remove display power domain for exynos5420" in
-> linux-samsung-soc mail thread.
->
-> In my test without power domain property, the exynos5420 dsi master driver
-> works well.
->
->
->> I applied this merge fix patch:
->>
->> From: Stephen Rothwell <sfr@canb.auug.org.au>
->> Date: Tue, 5 Aug 2014 13:03:01 +1000
->> Subject: [PATCH] ARM: dts: exynos5420: remove disp_pd
->>
->> per comit d51cad7df871 ("ARM: dts: remove display power
->> domain for exynos5420").
->>
->> Signed-off-by: Stephen Rothwell <sfr@canb.auug.org.au>
->> ---
->>   arch/arm/boot/dts/exynos5420.dtsi | 1 -
->>   1 file changed, 1 deletion(-)
->>
->> diff --git a/arch/arm/boot/dts/exynos5420.dtsi
->> b/arch/arm/boot/dts/exynos5420.dtsi
->> index 95ec37dff3e8..bfe056d9148c 100644
->> --- a/arch/arm/boot/dts/exynos5420.dtsi
->> +++ b/arch/arm/boot/dts/exynos5420.dtsi
->> @@ -525,7 +525,6 @@
->>                 compatible = "samsung,exynos5410-mipi-dsi";
->>                 reg = <0x14500000 0x10000>;
->>                 interrupts = <0 82 0>;
->> -               samsung,power-domain = <&disp_pd>;
->>                 phys = <&mipi_phy 1>;
->>                 phy-names = "dsim";
->>                 clocks = <&clock CLK_DSIM1>, <&clock CLK_SCLK_MIPI1>;
->>
->
-> Tested-by: YoungJun Cho <yj44.cho@samsung.com>
+Heiko,
 
-Sigh, now Linus' tree is broken because of this because nobody picked it up.
+On Fri, Aug 1, 2014 at 1:15 AM, Heiko St?bner <heiko@sntech.de> wrote:
+> Am Donnerstag, 31. Juli 2014, 17:30:25 schrieb Mike Turquette:
+>> Quoting Heiko St?bner (2014-07-31 16:29:34)
+>>
+>> > Hi Mike,
+>> >
+>> > Am Donnerstag, 31. Juli 2014, 15:45:23 schrieb Mike Turquette:
+>> > > Quoting Heiko Stuebner (2014-07-29 12:12:05)
+>> > >
+>> > > > The clock-tree contains clocks that should never get disabled
+>> > > > automatically. One example are the base ACLKs, the base supplies for
+>> > > > all
+>> > > > peripherals.
+>> > > >
+>> > > > Therefore add a structure similar to the sunxi clock-tree to protect
+>> > > > these
+>> > > > special clocks from being disabled.
+>> > > >
+>> > > > Signed-off-by: Heiko Stuebner <heiko@sntech.de>
+>> > > > ---
+>> > > >
+>> > > >  drivers/clk/rockchip/clk-rk3188.c |  7 +++++++
+>> > > >  drivers/clk/rockchip/clk-rk3288.c |  7 +++++++
+>> > > >  drivers/clk/rockchip/clk.c        | 13 +++++++++++++
+>> > > >  drivers/clk/rockchip/clk.h        |  1 +
+>> > > >  4 files changed, 28 insertions(+)
+>> > > >
+>> > > > diff --git a/drivers/clk/rockchip/clk-rk3188.c
+>> > > > b/drivers/clk/rockchip/clk-rk3188.c index a83a6d8..5aef277 100644
+>> > > > --- a/drivers/clk/rockchip/clk-rk3188.c
+>> > > > +++ b/drivers/clk/rockchip/clk-rk3188.c
+>> > > > @@ -599,6 +599,11 @@ static struct rockchip_clk_branch
+>> > > > rk3188_clk_branches[] __initdata = {>
+>> > > >
+>> > > >         GATE(ACLK_GPS, "aclk_gps", "aclk_peri", 0,
+>> > > >         RK2928_CLKGATE_CON(8),
+>> > > >         13, GFLAGS),>
+>> > > >
+>> > > >  };
+>> > > >
+>> > > > +static const char *rk3188_critical_clocks[] __initconst = {
+>> > > > +       "aclk_cpu",
+>> > > > +       "aclk_peri",
+>> > >
+>> > > I'm not against the idea of critical clocks, but I want to verify that
+>> > > there is no other driver out there that is a better fit for claiming
+>> > > these clks via clk_get and enabling them the normal way via clk_enable?
+>> >
+>> > In the clock hierarchy of Rockchip SoCs, both aclks listed here, are
+>> > sources for pclk and hclk, as well as sourcing some other peripheral
+>> > gates further below too. So from what I've seen from the clock diagrams,
+>> > there is nothing that would claim these clocks directly, and it wouldn't
+>> > also make any sense to let them get disabled as there will always be
+>> > something using them (for example the dram-controller).
+>>
+>> Sounds good. Just out of curiosity, under what circumstances would you
+>> want to gate them? Is there a use case for it?
+>
+> hmm, I don't see a use-case for gating these at runtime right now, simply
+> because there should be a user for them all the time. (both aclks combined
+> have at least 68 consumers on the rk3288 and a similar number on the previous
+> socs)
+>
+> The only thing I could think of would be something suspend related - which we
+> don't have yet. But then this would probably happen in the clock controller
+> itself anyway in some late suspend-related action, so it could take into
+> account them being defined as critical clocks.
 
-Dave, can you revert the original change, please? (5a8da524049c).
+I know Rockchip has some funky stuff planned for memory scaling too.
+Perhaps Kever can comment whether these two clocks might need to be
+disabled in that case?
 
-DTS changes like these shouldn't go through driver trees in the first place. :(
+In any case, this patch fixes a hang at boot when using the PWM driver
+that just landed, so:
 
-
--Olof
+Tested-by: Doug Anderson <dianders@chromium.org>
