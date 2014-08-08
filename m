@@ -1,32 +1,29 @@
-From: tomasz.figa@gmail.com (Tomasz Figa)
-Date: Fri, 08 Aug 2014 15:29:30 +0200
-Subject: [RFC 4/5] ARM: dts: add pinctrl support to Exynos5410
-In-Reply-To: <1406549892-5558-5-git-send-email-afaerber@suse.de>
-References: <1406549892-5558-1-git-send-email-afaerber@suse.de>
- <1406549892-5558-5-git-send-email-afaerber@suse.de>
-Message-ID: <53E4D0BA.7050106@gmail.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Fri, 8 Aug 2014 15:37:46 +0200
+Subject: [PATCH] pinctrl: rockchip: fix rk3288 gpio0 pull up configuration
+In-Reply-To: <1406690465-11081-1-git-send-email-sonnyrao@chromium.org>
+References: <1406690465-11081-1-git-send-email-sonnyrao@chromium.org>
+Message-ID: <CACRpkdZUSziMwd+_uf7dQepQEyG1wQJnV9zkUML=NtLhft4NUQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Wed, Jul 30, 2014 at 5:21 AM, Sonny Rao <sonnyrao@chromium.org> wrote:
 
-Please see my comment inline.
+> On rk3288, for gpio bank 0, the registers which configure pull-ups
+> don't implement the enable bits in the upper half of the register,
+> unlike the other gpio configuration registers, and so the kernel
+> must perform a read-modify-write of the register to update a
+> particular gpio's pull up settings in that bank.
+>
+> The current code is actually clobbering the contents of the register,
+> so this fixes it by using regmap_update_bits and masking out only the
+> bits which require updating.  In the case of gpio0 on rk3288 the upper
+> enable bits will just get ignored, and the other configurations won't
+> get clobbered.
+>
+> Signed-off-by: Sonny Rao <sonnyrao@chromium.org>
 
-On 28.07.2014 14:18, Andreas F?rber wrote:
-> From: Hakjoo Kim <ruppi.kim@hardkernel.com>
-> 
-> Add the required pin configuration support to Exynos5410 using pinctrl
-> interface.
+Waiting for a v2 fixing the other issues pointed out by Heiko.
 
-[snip]
-
-> +	pinctrl_0: pinctrl at 13400000 {
-> +		compatible = "samsung,exynos5410-pinctrl";
-> +		reg = <0x13400000 0x1000>;
-> +		interrupts = <0 45 0>;
-
-I believe you are missing the wake-up IRQ controller node here, which is
-needed to handle the interrupts of EINTW (gpxN) banks.
-
-Best regards,
-Tomasz
+Yours,
+Linus Walleij
