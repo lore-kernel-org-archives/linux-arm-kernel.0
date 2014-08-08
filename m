@@ -1,142 +1,166 @@
-From: keescook@chromium.org (Kees Cook)
-Date: Fri, 8 Aug 2014 17:11:27 -0700
-Subject: [PATCH 3/8] arm: mm: reduce fixmap kmap from 32 to 16 CPUS
-In-Reply-To: <CAL_JsqJZbbH=PwDzLKSwKiW1Y=N8MLgwEkp=xQaD_ST_uB-_Rw@mail.gmail.com>
-References: <1407423713-4160-1-git-send-email-keescook@chromium.org>
- <1407423713-4160-4-git-send-email-keescook@chromium.org>
- <CAL_JsqJZbbH=PwDzLKSwKiW1Y=N8MLgwEkp=xQaD_ST_uB-_Rw@mail.gmail.com>
-Message-ID: <CAGXu5jLeN_HtDw5KsdXemfgDOszHCM0y7ZaKc167jkjMkNcTfw@mail.gmail.com>
+From: lauraa@codeaurora.org (Laura Abbott)
+Date: Fri, 08 Aug 2014 16:53:53 -0700
+Subject: [PATCH v2 4/4] drivers: dma-contiguous: add initialization from
+ device tree
+In-Reply-To: <1405321966-28184-5-git-send-email-m.szyprowski@samsung.com>
+References: <1405321966-28184-1-git-send-email-m.szyprowski@samsung.com>
+ <1405321966-28184-5-git-send-email-m.szyprowski@samsung.com>
+Message-ID: <53E56311.5010302@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Aug 7, 2014 at 3:18 PM, Rob Herring <robh@kernel.org> wrote:
-> On Thu, Aug 7, 2014 at 10:01 AM, Kees Cook <keescook@chromium.org> wrote:
->> More room is needed in the fixmap range for non-kmap fixmap entries. This
->> reduces the kmap range from 32 to 16 CPUs.
->
-> Do you want this merged or just doing this to get the rest of your
-> series working? I'll post my patch for making the fixmap region 3MB
-> (it adds back the first 1MB of the top pmd).
+On 7/14/2014 12:12 AM, Marek Szyprowski wrote:
+> Add a function to create CMA region from previously reserved memory
+> and add support for handling 'shared-dma-pool' reserved-memory device
+> tree nodes.
+> 
+> Based on previous code provided by Josh Cartwright <joshc@codeaurora.org>
+> 
+> Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
+> ---
+>  drivers/base/dma-contiguous.c | 60 +++++++++++++++++++++++++++++++++++++++++
+>  include/linux/cma.h           |  3 +++
+>  mm/cma.c                      | 62 +++++++++++++++++++++++++++++++++++--------
+>  3 files changed, 114 insertions(+), 11 deletions(-)
+> 
+> diff --git a/drivers/base/dma-contiguous.c b/drivers/base/dma-contiguous.c
+> index 6606abdf880c..0e480146fe05 100644
+> --- a/drivers/base/dma-contiguous.c
+> +++ b/drivers/base/dma-contiguous.c
+> @@ -211,3 +211,63 @@ bool dma_release_from_contiguous(struct device *dev, struct page *pages,
+>  {
+>  	return cma_release(dev_get_cma_area(dev), pages, count);
+>  }
+> +
+> +/*
+> + * Support for reserved memory regions defined in device tree
+> + */
+> +#ifdef CONFIG_OF_RESERVED_MEM
+> +#include <linux/of.h>
+> +#include <linux/of_fdt.h>
+> +#include <linux/of_reserved_mem.h>
+> +
+> +#undef pr_fmt
+> +#define pr_fmt(fmt) fmt
+> +
+> +static void rmem_cma_device_init(struct reserved_mem *rmem, struct device *dev)
+> +{
+> +	struct cma *cma = rmem->priv;
+> +	dev_set_cma_area(dev, cma);
+> +}
+> +
+> +static const struct reserved_mem_ops rmem_cma_ops = {
+> +	.device_init	= rmem_cma_device_init,
+> +};
+> +
+> +static int __init rmem_cma_setup(struct reserved_mem *rmem)
+> +{
+> +	phys_addr_t align = PAGE_SIZE << max(MAX_ORDER - 1, pageblock_order);
+> +	phys_addr_t mask = align - 1;
+> +	unsigned long node = rmem->fdt_node;
+> +	struct cma *cma;
+> +	int err;
+> +
+> +	if (!of_get_flat_dt_prop(node, "reusable", NULL) ||
+> +	    of_get_flat_dt_prop(node, "no-map", NULL))
+> +		return -EINVAL;
+> +
+> +	if ((rmem->base & mask) || (rmem->size & mask)) {
+> +		pr_err("Reserved memory: incorrect alignment of CMA region\n");
+> +		return -EINVAL;
+> +	}
+> +
+> +	err = cma_init_reserved_mem(rmem->base, rmem->size, 0, &cma);
+> +	if (err) {
+> +		pr_err("Reserved memory: unable to setup CMA region\n");
+> +		return err;
+> +	}
+> +	/* Architecture specific contiguous memory fixup. */
+> +	dma_contiguous_early_fixup(rmem->base, rmem->size);
+> +
+> +	if (of_get_flat_dt_prop(node, "linux,cma-default", NULL))
+> +		dma_contiguous_set_default(cma);
+> +
+> +	rmem->ops = &rmem_cma_ops;
+> +	rmem->priv = cma;
+> +
+> +	pr_info("Reserved memory: created CMA memory pool at %pa, size %ld MiB\n",
+> +		&rmem->base, (unsigned long)rmem->size / SZ_1M);
+> +
+> +	return 0;
+> +}
+> +RESERVEDMEM_OF_DECLARE(cma, "shared-dma-pool", rmem_cma_setup);
+> +#endif
+> diff --git a/include/linux/cma.h b/include/linux/cma.h
+> index 32cab7a425f9..9a18a2b1934c 100644
+> --- a/include/linux/cma.h
+> +++ b/include/linux/cma.h
+> @@ -16,6 +16,9 @@ extern int __init cma_declare_contiguous(phys_addr_t size,
+>  			phys_addr_t base, phys_addr_t limit,
+>  			phys_addr_t alignment, unsigned int order_per_bit,
+>  			bool fixed, struct cma **res_cma);
+> +extern int cma_init_reserved_mem(phys_addr_t size,
+> +					phys_addr_t base, int order_per_bit,
+> +					struct cma **res_cma);
+>  extern struct page *cma_alloc(struct cma *cma, int count, unsigned int align);
+>  extern bool cma_release(struct cma *cma, struct page *pages, int count);
+>  #endif
+> diff --git a/mm/cma.c b/mm/cma.c
+> index 4b251b037e1b..b3d8b925ad34 100644
+> --- a/mm/cma.c
+> +++ b/mm/cma.c
+> @@ -140,6 +140,54 @@ static int __init cma_init_reserved_areas(void)
+>  core_initcall(cma_init_reserved_areas);
+>  
+>  /**
+> + * cma_init_reserved_mem() - create custom contiguous area from reserved memory
+> + * @base: Base address of the reserved area
+> + * @size: Size of the reserved area (in bytes),
+> + * @order_per_bit: Order of pages represented by one bit on bitmap.
+> + * @res_cma: Pointer to store the created cma region.
+> + *
+> + * This function creates custom contiguous area from already reserved memory.
+> + */
+> +int __init cma_init_reserved_mem(phys_addr_t base, phys_addr_t size,
+> +				 int order_per_bit, struct cma **res_cma)
+> +{
+> +	struct cma *cma;
+> +	phys_addr_t alignment;
+> +
+> +	/* Sanity checks */
+> +	if (cma_area_count == ARRAY_SIZE(cma_areas)) {
+> +		pr_err("Not enough slots for CMA reserved regions!\n");
+> +		return -ENOSPC;
+> +	}
+> +
+> +	if (!size || !memblock_is_region_reserved(base, size))
+> +		return -EINVAL;
+> +
+> +	/* ensure minimal alignment requied by mm core */
+> +	alignment = PAGE_SIZE << max(MAX_ORDER - 1, pageblock_order);
+> +
+> +	/* alignment should be aligned with order_per_bit */
+> +	if (!IS_ALIGNED(alignment >> PAGE_SHIFT, 1 << order_per_bit))
+> +		return -EINVAL;
+> +
+> +	if (ALIGN(base, alignment) != base || ALIGN(size, alignment) != size)
+> +		return -EINVAL;
+> +
 
-Excellent, thanks for sending this, I'll get it tested as part of the series.
 
->> Additionally, add PTE entry for
->> fixmap regardless of CONFIG_HIGHMEM.
->
-> "Additionally" is a good flag for this patch should be split-up. It
-> seems like we would want to apply this part to stable.
+Rejecting the base/size right out if the alignment isn't correct is difficult
+to work with. There's no guarantee that a dynamically placed region will end
+up with the correct alignment or that the size was specified properly. This
+means the best option is manually rounding up the sizes and specifying the
+alignment in devicetree. But the alignment will also change if you boot
+with or without CONFIG_ARM64_64K_PAGES for example so there is no way to
+guarantee what is specified in devicetree will work. Perhaps this is a
+limitation of how the devicetree is setup but it seems like a big pain to get
+correct and prone to breakage if the kernel changes.
 
-Does anyone have use-cases that broke in 3.16 due to this bug? If so,
-it absolutely should be split out and CCed to -stable. I'll split it
-out regardless, and if someone can speak up with a broken situation,
-I'll add the CC.
-
-Thanks!
-
--Kees
-
->
-> Rob
->
->>
->> Signed-off-by: Kees Cook <keescook@chromium.org>
->> ---
->>  arch/arm/include/asm/fixmap.h | 12 ++++++++++--
->>  arch/arm/mm/highmem.c         |  2 --
->>  arch/arm/mm/mm.h              |  3 +++
->>  arch/arm/mm/mmu.c             |  5 ++++-
->>  4 files changed, 17 insertions(+), 5 deletions(-)
->>
->> diff --git a/arch/arm/include/asm/fixmap.h b/arch/arm/include/asm/fixmap.h
->> index 8ee7cb4f62ca..3ed08232be55 100644
->> --- a/arch/arm/include/asm/fixmap.h
->> +++ b/arch/arm/include/asm/fixmap.h
->> @@ -1,16 +1,24 @@
->>  #ifndef _ASM_FIXMAP_H
->>  #define _ASM_FIXMAP_H
->>
->> +/*
->> + * The fixmap uses 2MB. The KMAP fixmap needs 64k per CPU, so make room for
->> + * 16 CPUs (taking 1MB) and leave the rest for additional fixmap areas.
->> + */
->>  #define FIXADDR_START          0xffc00000UL
->>  #define FIXADDR_END            0xffe00000UL
->>  #define FIXADDR_TOP            (FIXADDR_END - PAGE_SIZE)
->>  #define FIXADDR_SIZE           (FIXADDR_END - FIXADDR_START)
->>
->> -#define FIX_KMAP_NR_PTES       (FIXADDR_SIZE >> PAGE_SHIFT)
->> +/* 16 PTEs per CPU (64k of 4k pages). */
->> +#define FIX_KMAP_NR_PTES       16
->> +#define FIX_KMAP_NR_CPUS       16
->>
->>  enum fixed_addresses {
->> +       /* Support 16 CPUs for kmap as the first region of fixmap entries. */
->>         FIX_KMAP_BEGIN,
->> -       FIX_KMAP_END = FIX_KMAP_NR_PTES - 1,
->> +       FIX_KMAP_END = (FIX_KMAP_NR_PTES * FIX_KMAP_NR_CPUS) - 1,
->> +
->>         __end_of_fixed_addresses
->>  };
->>
->> diff --git a/arch/arm/mm/highmem.c b/arch/arm/mm/highmem.c
->> index a1241ee8425e..adf264fb700b 100644
->> --- a/arch/arm/mm/highmem.c
->> +++ b/arch/arm/mm/highmem.c
->> @@ -18,8 +18,6 @@
->>  #include <asm/tlbflush.h>
->>  #include "mm.h"
->>
->> -pte_t *fixmap_page_table;
->> -
->>  static inline void set_fixmap_pte(int idx, pte_t pte)
->>  {
->>         unsigned long vaddr = __fix_to_virt(idx);
->> diff --git a/arch/arm/mm/mm.h b/arch/arm/mm/mm.h
->> index ce727d47275c..c8b5b2d05b55 100644
->> --- a/arch/arm/mm/mm.h
->> +++ b/arch/arm/mm/mm.h
->> @@ -7,6 +7,9 @@
->>  /* the upper-most page table pointer */
->>  extern pmd_t *top_pmd;
->>
->> +/* The fixmap PTE. */
->> +extern pte_t *fixmap_page_table;
->> +
->>  /*
->>   * 0xffff8000 to 0xffffffff is reserved for any ARM architecture
->>   * specific hacks for copying pages efficiently, while 0xffff4000
->> diff --git a/arch/arm/mm/mmu.c b/arch/arm/mm/mmu.c
->> index e881ed817a8b..a7a756603775 100644
->> --- a/arch/arm/mm/mmu.c
->> +++ b/arch/arm/mm/mmu.c
->> @@ -53,6 +53,9 @@ EXPORT_SYMBOL(empty_zero_page);
->>   */
->>  pmd_t *top_pmd;
->>
->> +/* The fixmap PTE. */
->> +pte_t *fixmap_page_table;
->> +
->>  #define CPOLICY_UNCACHED       0
->>  #define CPOLICY_BUFFERED       1
->>  #define CPOLICY_WRITETHROUGH   2
->> @@ -1342,10 +1345,10 @@ static void __init kmap_init(void)
->>  #ifdef CONFIG_HIGHMEM
->>         pkmap_page_table = early_pte_alloc(pmd_off_k(PKMAP_BASE),
->>                 PKMAP_BASE, _PAGE_KERNEL_TABLE);
->> +#endif
->>
->>         fixmap_page_table = early_pte_alloc(pmd_off_k(FIXADDR_START),
->>                 FIXADDR_START, _PAGE_KERNEL_TABLE);
->> -#endif
->>  }
->>
->>  static void __init map_lowmem(void)
->> --
->> 1.9.1
->>
-
-
+Thanks,
+Laura
 
 -- 
-Kees Cook
-Chrome OS Security
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+hosted by The Linux Foundation
