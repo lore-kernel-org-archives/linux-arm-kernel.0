@@ -1,60 +1,25 @@
-From: lauraa@codeaurora.org (Laura Abbott)
-Date: Fri,  8 Aug 2014 13:30:48 -0700
-Subject: [PATCHv6 0/5] DMA Atomic pool for arm64
-Message-ID: <1407529848-6806-1-git-send-email-lauraa@codeaurora.org>
+From: olof@lixom.net (Olof Johansson)
+Date: Fri, 8 Aug 2014 13:34:20 -0700
+Subject: [GIT PULL 5/7] .17 ARM: SoC driver changes for 3.17
+In-Reply-To: <CA+55aFydoHBfWZhNTtLR9894SZ_jb1230pmyMYXq6Vwfd02nkA@mail.gmail.com>
+References: <1407516479-1251-1-git-send-email-olof@lixom.net>
+ <1407516479-1251-6-git-send-email-olof@lixom.net>
+ <CA+55aFydoHBfWZhNTtLR9894SZ_jb1230pmyMYXq6Vwfd02nkA@mail.gmail.com>
+Message-ID: <CAOesGMj8_KSodHJjsZ7rdqvHzfaDO2adH1qPDDioKiAoBkYaag@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Fri, Aug 8, 2014 at 11:23 AM, Linus Torvalds
+<torvalds@linux-foundation.org> wrote:
+> On Fri, Aug 8, 2014 at 9:47 AM, Olof Johansson <olof@lixom.net> wrote:
+>>
+>> drivers/phy/Kconfig:
+>>         Add/add. Keep both sides, sort (ST -> QCOM -> XGENE)
+>
+> You may want to review your alphabet.
 
-This is v6 of the series to add an atomic pool for arm64 and refactor some of
-the arm dma_atomic code as well.
-
-Russell, assuming you have no issues I'd like to get your Acked-by before
-Catalin picks this up. As always, testing and reviews are appreiciated.
-
-Thanks,
-Laura
+D'oh, yes. Roll call held, all 29 showed up. Order was descrambled.
+All good now.
 
 
-v6: Tweaked the commit text to clarify that arm is moving from
-ioremap_page_range to map_vm_area and friends
-
-v5: v4: Addressed comments from Thierry and Catalin. Updated map_vm_area call in
-dma_common_pages_remap since the API changed.
-
-v4: Simplified the logic in gen_pool_first_fit_order_align which makes the
-data argument actually unused.
-
-v3: Now a patch series due to refactoring of arm code. arm and arm64 now both
-use genalloc for atomic pool management. genalloc extensions added.
-DMA remapping code factored out as well.
-
-v2: Various bug fixes pointed out by David and Ritesh (CMA dependency, swapping
-coherent, noncoherent). I'm still not sure how to address the devicetree
-suggestion by Will [1][2]. I added the devicetree mailing list this time around
-to get more input on this.
-
-[1] http://lists.infradead.org/pipermail/linux-arm-kernel/2014-April/249180.html
-[2] http://lists.infradead.org/pipermail/linux-arm-kernel/2014-April/249528.html
-
-Laura Abbott (5):
-  lib/genalloc.c: Add power aligned algorithm
-  lib/genalloc.c: Add genpool range check function
-  common: dma-mapping: Introduce common remapping functions
-  arm: use genalloc for the atomic pool
-  arm64: Add atomic pool for non-coherent and CMA allocations.
-
- arch/arm/Kconfig                         |   1 +
- arch/arm/mm/dma-mapping.c                | 210 +++++++++----------------------
- arch/arm64/Kconfig                       |   1 +
- arch/arm64/mm/dma-mapping.c              | 164 +++++++++++++++++++++---
- drivers/base/dma-mapping.c               |  67 ++++++++++
- include/asm-generic/dma-mapping-common.h |   9 ++
- include/linux/genalloc.h                 |   7 ++
- lib/genalloc.c                           |  50 ++++++++
- 8 files changed, 338 insertions(+), 171 deletions(-)
-
--- 
-The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
-hosted by The Linux Foundation
+-Olof
