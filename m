@@ -1,131 +1,45 @@
-From: robherring2@gmail.com (Rob Herring)
-Date: Fri,  8 Aug 2014 10:23:24 -0500
-Subject: [PATCH] ARM: expand fixmap region to 3MB
-Message-ID: <1407511404-11997-1-git-send-email-robherring2@gmail.com>
+From: geert+renesas@glider.be (Geert Uytterhoeven)
+Date: Fri,  8 Aug 2014 17:34:05 +0200
+Subject: [PATCH] PCI: mvebu: Fix uninitialized variable in mvebu_get_tgt_attr()
+Message-ID: <1407512045-26969-1-git-send-email-geert+renesas@glider.be>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Rob Herring <robh@kernel.org>
+drivers/pci/host/pci-mvebu.c: In function 'mvebu_get_tgt_attr':
+drivers/pci/host/pci-mvebu.c:887:39: warning: 'rtype' may be used uninitialized in this function [-Wmaybe-uninitialized]
+   if (slot == PCI_SLOT(devfn) && type == rtype) {
+                                       ^
 
-With commit a05e54c103b0b8 "ARM: 8031/2: change fixmap mapping region to
-support 32 CPUs", the fixmap region was expanded to 2MB, but it
-precluded any other uses of the fixmap region in order to support up to
-32 CPUs. In order to support other uses the fixmap region needs to be
-expanded beyond 2MB. Fortunately, the adjacent 1MB range
-0xffe00000-0xfff00000 is availabe to use.
+If there's ever gonna be a configuration space or 64-bit memory space
+entry in DT, rtype will be uninitialized, and the wrong entry may be
+returned.
 
-Remove fixmap_page_table ptr and lookup the page table via the virtual
-address so that the fixmap region can span more that one pmd. The 2nd
-pmd is already created since it is shared with the vector page.
+Initialize rtype to 0 (which is an unused IORESOURCE_* type) to fix this.
 
-Cc: Leif Lindholm <leif.lindholm@linaro.org>
-Cc: Kees Cook <keescook@chromium.org>
-Cc: Russell King <linux@arm.linux.org.uk>
-Signed-off-by: Rob Herring <robh@kernel.org>
+Introduced in commit 11be65472a427dcf7a11ab6e3e3628f1c6768b5b ("PCI:
+mvebu: Adapt to the new device tree layout").
+
+Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
 ---
+Alternatively, should the "else if (DT_FLAGS_TO_TYPE(flags) ==
+DT_TYPE_MEM32)" just be changed to "else", assuming there can never be
+other entries than for I/O or 32-bit memory space?
+---
+ drivers/pci/host/pci-mvebu.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-This patch can come before or after the generic fixmap.h. There's a 
-single line conflict with the ending address 
-
-This worked for earlycon, but I've not done any highmem specific 
-testing. My full series is available here:
-
-git://git.kernel.org/pub/scm/linux/kernel/git/robh/linux.git fixmap
-
-Rob
-
- Documentation/arm/memory.txt  |  2 +-
- arch/arm/include/asm/fixmap.h |  2 +-
- arch/arm/mm/highmem.c         | 15 ++++++++-------
- arch/arm/mm/mmu.c             |  2 +-
- 4 files changed, 11 insertions(+), 10 deletions(-)
-
-diff --git a/Documentation/arm/memory.txt b/Documentation/arm/memory.txt
-index 38dc06d..4178ebd 100644
---- a/Documentation/arm/memory.txt
-+++ b/Documentation/arm/memory.txt
-@@ -41,7 +41,7 @@ fffe8000	fffeffff	DTCM mapping area for platforms with
- fffe0000	fffe7fff	ITCM mapping area for platforms with
- 				ITCM mounted inside the CPU.
+diff --git a/drivers/pci/host/pci-mvebu.c b/drivers/pci/host/pci-mvebu.c
+index ce23e0f076b6..9515f0d13fd4 100644
+--- a/drivers/pci/host/pci-mvebu.c
++++ b/drivers/pci/host/pci-mvebu.c
+@@ -877,7 +877,7 @@ static int mvebu_get_tgt_attr(struct device_node *np, int devfn,
+ 		u32 flags = of_read_number(range, 1);
+ 		u32 slot = of_read_number(range + 1, 1);
+ 		u64 cpuaddr = of_read_number(range + na, pna);
+-		unsigned long rtype;
++		unsigned long rtype = 0;
  
--ffc00000	ffdfffff	Fixmap mapping region.  Addresses provided
-+ffc00000	ffefffff	Fixmap mapping region.  Addresses provided
- 				by fix_to_virt() will be located here.
- 
- fee00000	feffffff	Mapping of PCI I/O space. This is a static
-diff --git a/arch/arm/include/asm/fixmap.h b/arch/arm/include/asm/fixmap.h
-index 74124b0..cb50cee 100644
---- a/arch/arm/include/asm/fixmap.h
-+++ b/arch/arm/include/asm/fixmap.h
-@@ -2,7 +2,7 @@
- #define _ASM_FIXMAP_H
- 
- #define FIXADDR_START		0xffc00000UL
--#define FIXADDR_TOP		0xffe00000UL
-+#define FIXADDR_TOP		0xfff00000UL
- #define FIXADDR_SIZE		(FIXADDR_TOP - FIXADDR_START)
- 
- #define FIX_KMAP_NR_PTES	(FIXADDR_SIZE >> PAGE_SHIFT)
-diff --git a/arch/arm/mm/highmem.c b/arch/arm/mm/highmem.c
-index 45aeaac..ac2938f 100644
---- a/arch/arm/mm/highmem.c
-+++ b/arch/arm/mm/highmem.c
-@@ -18,19 +18,20 @@
- #include <asm/tlbflush.h>
- #include "mm.h"
- 
--pte_t *fixmap_page_table;
--
- static inline void set_fixmap_pte(int idx, pte_t pte)
- {
- 	unsigned long vaddr = __fix_to_virt(idx);
--	set_pte_ext(fixmap_page_table + idx, pte, 0);
-+	pte_t *ptep = pte_offset_kernel(pmd_off_k(vaddr), vaddr);
-+
-+	set_pte_ext(ptep, pte, 0);
- 	local_flush_tlb_kernel_page(vaddr);
- }
- 
- static inline pte_t get_fixmap_pte(unsigned long vaddr)
- {
--	unsigned long idx = __virt_to_fix(vaddr);
--	return *(fixmap_page_table + idx);
-+	pte_t *ptep = pte_offset_kernel(pmd_off_k(vaddr), vaddr);
-+
-+	return *ptep;
- }
- 
- void *kmap(struct page *page)
-@@ -84,7 +85,7 @@ void *kmap_atomic(struct page *page)
- 	 * With debugging enabled, kunmap_atomic forces that entry to 0.
- 	 * Make sure it was indeed properly unmapped.
- 	 */
--	BUG_ON(!pte_none(*(fixmap_page_table + idx)));
-+	BUG_ON(!pte_none(*get_fixmap_pte(vaddr)));
- #endif
- 	/*
- 	 * When debugging is off, kunmap_atomic leaves the previous mapping
-@@ -134,7 +135,7 @@ void *kmap_atomic_pfn(unsigned long pfn)
- 	idx = type + KM_TYPE_NR * smp_processor_id();
- 	vaddr = __fix_to_virt(idx);
- #ifdef CONFIG_DEBUG_HIGHMEM
--	BUG_ON(!pte_none(*(fixmap_page_table + idx)));
-+	BUG_ON(!pte_none(*get_fixmap_pte(vaddr)));
- #endif
- 	set_fixmap_pte(idx, pfn_pte(pfn, kmap_prot));
- 
-diff --git a/arch/arm/mm/mmu.c b/arch/arm/mm/mmu.c
-index 8348ed6..5e5d0ba 100644
---- a/arch/arm/mm/mmu.c
-+++ b/arch/arm/mm/mmu.c
-@@ -1327,7 +1327,7 @@ static void __init kmap_init(void)
- 	pkmap_page_table = early_pte_alloc(pmd_off_k(PKMAP_BASE),
- 		PKMAP_BASE, _PAGE_KERNEL_TABLE);
- 
--	fixmap_page_table = early_pte_alloc(pmd_off_k(FIXADDR_START),
-+	early_pte_alloc(pmd_off_k(FIXADDR_START),
- 		FIXADDR_START, _PAGE_KERNEL_TABLE);
- #endif
- }
+ 		if (DT_FLAGS_TO_TYPE(flags) == DT_TYPE_IO)
+ 			rtype = IORESOURCE_IO;
 -- 
 1.9.1
