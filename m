@@ -1,32 +1,51 @@
-From: shengjiu.wang@freescale.com (Shengjiu Wang)
-Date: Fri, 8 Aug 2014 15:02:46 +0800
-Subject: [PATCH V3 0/3] refine clock tree for esai in imx6q
-Message-ID: <cover.1407481023.git.shengjiu.wang@freescale.com>
+From: caesar.wang@rock-chips.com (Caesar Wang)
+Date: Fri,  8 Aug 2014 15:28:47 +0800
+Subject: [PATCH v5 0/2] This series adds support for RK3288 SoC integrated PWM
+Message-ID: <1407482929-13050-1-git-send-email-caesar.wang@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-refine clock tree for esai in imx6q
+This patch will make applying on the top of Beniamino's submission,
+the Beniamino's submission come from [1].
 
-Changes for V3
-- Drop patch3, for waiting bypass mode implementation.
-- As Lucas Stach suggestion, add new API for exclusive clock.
+[1]:
+    https://git.kernel.org/cgit/linux/kernel/git/thierry.reding/linux-pwm.git/log/?h=for-next
 
-Changes for V2
-- Add pll5_sel And update the comments for patch 2.
-- As the bypass mode is not supported in clk tree, so update the 
-- comments for patch 3.
+    Beniamino's submission won't be used from genenation Rockchip SoCs.
+    So I have to add the new pwm for next genenation Rockchip SoCs.
 
+    Tested on RK3288 SDK board.
 
-Shengjiu Wang (3):
-  ARM: clk-imx6q: refine clock tree for ESAI
-  ARM: clk-gate2: Add API imx_clk_gate2_exclusive for clk_gate2
-  ARM: clk-imx6q: Add missing lvds and anaclk clock to the clock tree
+Changes in v5:
+    * address comments from Thierry Reding and Doug Anderson:
+    - fix the symbolic names for registers. 
 
- arch/arm/mach-imx/clk-gate2.c             |   18 +++++++++++++++++-
- arch/arm/mach-imx/clk-imx6q.c             |   25 ++++++++++++++++++-------
- arch/arm/mach-imx/clk.h                   |    2 ++
- include/dt-bindings/clock/imx6qdl-clock.h |   13 ++++++++++---
- 4 files changed, 47 insertions(+), 11 deletions(-)
+Changes in v4:
+    * address comments from Heiko St?bner:
+    - fix the copyright for ROCKCHIP, Inc. 
+    - remove rockchip_pwm_set_enable_vop,then it instead of rockchip_pwm_set_enable_v2.
+
+Changes in v3:
+    * address comments from Thierry Reding:
+    - fix PWM document deccribes. 
+    - add a description for [PATCH v3 2/2].
+    - renamed the PWM registers
+    - Changed in rockchip_pwm_data struct
+    - remove the devm_ioremap(),fixed in lcdc driver.
+
+Changes in v2:
+    * address comments from Beniamino Galvani:
+    - remove #include <linux/of_address.h>. 
+    - of_iomap be removed,and devm_ioremap replace it.
+    - remove a line no be used.
+
+Caesar Wang (2):
+  pwm: rockchip: document RK3288 SoC compatible
+  pwm: rockchip: Added to support for RK3288 SoC
+
+ .../devicetree/bindings/pwm/pwm-rockchip.txt       |   5 +-
+ drivers/pwm/pwm-rockchip.c                         | 134 +++++++++++++++++----
+ 2 files changed, 114 insertions(+), 25 deletions(-)
 
 -- 
-1.7.9.5
+1.9.1
