@@ -1,42 +1,28 @@
-From: p.zabel@pengutronix.de (Philipp Zabel)
-Date: Fri, 08 Aug 2014 16:11:34 +0200
-Subject: [PATCH 4/4] gpio: pca953x: Add DT binding for reset gpio
-In-Reply-To: <CACRpkdY0TqVH1tJR1H89S5hvdJUboQdVtNvZnL3NeWit4f+amw@mail.gmail.com>
-References: <1406618686-22385-1-git-send-email-mpa@pengutronix.de>
- <1406618686-22385-5-git-send-email-mpa@pengutronix.de>
- <CACRpkdY0TqVH1tJR1H89S5hvdJUboQdVtNvZnL3NeWit4f+amw@mail.gmail.com>
-Message-ID: <1407507094.3354.11.camel@paszta.hi.pengutronix.de>
+From: festevam@gmail.com (Fabio Estevam)
+Date: Fri, 8 Aug 2014 11:17:56 -0300
+Subject: [BUG]: imx6q (wandboard): Very unstable ethernet since kernel 3.16
+In-Reply-To: <1407507023.19455.3.camel@sharkbay.at>
+References: <1407503758.19455.1.camel@sharkbay.at>
+ <20140808132754.GC30282@n2100.arm.linux.org.uk>
+ <1407507023.19455.3.camel@sharkbay.at>
+Message-ID: <CAOMZO5BVPfXCzihwPQZYrNOmuBEWALW5rQq=M2qVmCLjmFFZig@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am Freitag, den 08.08.2014, 15:14 +0200 schrieb Linus Walleij:
-> On Tue, Jul 29, 2014 at 9:24 AM, Markus Pargmann <mpa@pengutronix.de> wrote:
-> 
-> > The pca953x has a negated reset input. This patch adds a DT binding for
-> > the reset gpio and resets the chip when it is probed. This will reset
-> > the device and leave the gpio in the correct state so reset is not
-> > triggered.
-> >
-> > Signed-off-by: Markus Pargmann <mpa@pengutronix.de>
-> 
-> Why on earth should this be in the GPIO driver?
+Thomas,
+
+On Fri, Aug 8, 2014 at 11:10 AM, Thomas Scheiblauer <tom@sharkbay.at> wrote:
+
+> These lines in arch/arm/boot/dts/imx6qdl-wandboard.dtsi already seem to
+> be a workaround for some hardware errata:
+> ERR006687 ?ENET: Only the ENET wake-up interrupt request can wake the
+> system from Wait mode?
 >
-> The driver should be in drivers/reset/reset-gpio.c and you
-> should provide a separate driver for it.
+> See the original mail containing the patch:
+> http://lists.infradead.org/pipermail/linux-arm-kernel/2013-December/221204.html
 
-I still think we should keep using the reset-gpios binding for simple
-cases like this; I see no reason to add a separate device to the device
-tree for a single GPIO.
+This commit is also in 3.15 kernel. Do you have this instability issue in 3.15?
 
-> As it happens, Houcheng Lin has already proposed such a
-> driver:
-> http://marc.info/?l=linux-kernel&m=140309916607115&w=2
-
-That is a different issue, as there the device does not appear on the
-bus until the reset is released.
-
-Here the I2C device will be probed from the device tree, so the reset
-can be released or triggered from the probe function.
-
-regards
-Philipp
+It would be helpful if you could revert commit 9fc77821b17155c6e0 with
+3.16 and try again, just to make sure that the workaround is not
+introducing issues.
