@@ -1,39 +1,61 @@
-From: khilman@linaro.org (Kevin Hilman)
-Date: Fri, 8 Aug 2014 11:44:37 -0700
-Subject: [PATCH] ARM: multi_v7_defconfig: major refresh
-In-Reply-To: <alpine.LFD.2.11.1408081418390.6061@knanqh.ubzr>
-References: <1406052070-6207-1-git-send-email-olof@lixom.net>
- <53DB6B4F.9080605@arm.com> <1406890899.2794.40.camel@linaro1.home>
- <CAOesGMi0RUbz4BSnmR92dEk3fWgN=hnENSdi55VeCXdcHLRLJQ@mail.gmail.com>
- <53DB763A.10306@arm.com> <1406892491.2794.58.camel@linaro1.home>
- <53DBAAEA.2010908@arm.com> <1406908399.22757.12.camel@linaro1.home>
- <20140803032047.GB14214@quad.lixom.net> <7h4mxm3l5k.fsf@paris.lan>
- <alpine.LFD.2.11.1408081418390.6061@knanqh.ubzr>
-Message-ID: <CAGa+x84eqL5=+bamXWrxcATubAEpWsAKO9C7qZF6EY2KwW9vJg@mail.gmail.com>
+From: ohaugan@codeaurora.org (Olav Haugan)
+Date: Fri, 08 Aug 2014 11:51:54 -0700
+Subject: [PATCH v2 2/2] iommu/arm-smmu: Do not access non-existing SMR
+ registers
+In-Reply-To: <20140807092254.GH13703@arm.com>
+References: <1407175263-10699-1-git-send-email-ohaugan@codeaurora.org>
+ <1407175263-10699-3-git-send-email-ohaugan@codeaurora.org>
+ <20140806101948.GD23882@arm.com> <53E25B76.6090208@codeaurora.org>
+ <20140806173518.GG25953@arm.com> <53E2BB71.9000201@codeaurora.org>
+ <20140807092254.GH13703@arm.com>
+Message-ID: <53E51C4A.1060208@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Aug 8, 2014 at 11:26 AM, Nicolas Pitre <nicolas.pitre@linaro.org> wrote:
-> On Fri, 8 Aug 2014, Kevin Hilman wrote:
-
-[...]
-
->> I think the upstream defconfigs should facilitate the broader testing of
->> the scheduler work by having the swticher disabled.
+On 8/7/2014 2:22 AM, Will Deacon wrote:
+> On Thu, Aug 07, 2014 at 12:34:09AM +0100, Olav Haugan wrote:
+>> On 8/6/2014 10:35 AM, Will Deacon wrote:
+>>> Hmm, I'm checking this with the architects because the TRMs aren't exactly
+>>> clear. The NUMSMRG works for stream-indexing (i.e. reports the number of
+>>> S2CRs), then all we have to do is change the above ~SMR_VALID to 0x0, since
+>>> those registers will be SBZP.
 >>
->> By enabling the switcher (and the corresponding cpufreq switcher driver)
->> by default, we're now actually making one more obstacle for broader
->> testing of the generic scheduling on all cores.
->
-> The generic scheduler currently has nothing really worth testing by the
-> wider  audience.  Be assured that when it does then the switcher will
-> indeed default to off.
+>> You don't agree that we should avoid doing register writes if not
+>> necessarily? In general I like to avoid trying to write registers that
+>> is not needed so that we don't do more work than needed.
+> 
+> If this was a fast-path then I'd certainly agree. However, device reset is
+> a pretty rare event and I'd be inclined to err on the side of code clarity
+> in preference to performance.
+> 
+> Anyway, it turns out that we can't use NUMSMRG for this so all that's moot.
+> We instead need to do 1 << SMMU_IDR0.NUMSIDB, which will give us the number
+> of S2CRs.
+> 
+>>>> As far as I can tell there are no other register telling us how many S2CR
+>>>> registers exist. That also brings up another point that there is no check
+>>>> in the code to ensure we are not trying to program more than the available
+>>>> S2CR registers when we use stream indexing.
+>>>
+>>> On an SMMU using stream-indexing, if the StreamID goes off the end of the
+>>> S2CRs that's a fairly serious hardware configuration issue which I don't
+>>> think Linux is in a position to handle. I agree that a warning wouldn't
+>>> hurt on device add/attach though.
+>>>
+>>
+>> Yes, I meant to protect against programming errors where someone
+>> specified more Stream IDs than available S2CRs.
+> 
+> Sure. Could you have a go at hacking this up, please?
+> 
 
-I guess my vacation successfully purged my memory.  I was thinking the
-switcher was only a complie-time option, but just realized that it can
-be disabled at runtime (via /sys/kernel/bL_switcher/active.)
+Yes, I'll update the patches. Thanks for clarifying how to determine the
+# of S2CRs.
 
-With the runtime enable/disable feature of the switcher, I don't have
-any more (reasonable) objections to it being enabled by default.
+Thanks,
 
-Kevin
+Olav
+
+-- 
+The Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+hosted by The Linux Foundation
