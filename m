@@ -1,37 +1,33 @@
-From: dianders@chromium.org (Doug Anderson)
-Date: Fri, 8 Aug 2014 08:46:00 -0700
-Subject: [PATCH v5 4/4] ARM: dts: Enable USB host1(dwc) on rk3288-evb
-In-Reply-To: <1407470159-14722-5-git-send-email-kever.yang@rock-chips.com>
-References: <1407470159-14722-1-git-send-email-kever.yang@rock-chips.com>
- <1407470159-14722-5-git-send-email-kever.yang@rock-chips.com>
-Message-ID: <CAD=FV=Xwo6DLDapqpaVc3G+1Sx_rapwsw=w-to0JHy+E_U+-iw@mail.gmail.com>
+From: festevam@gmail.com (Fabio Estevam)
+Date: Fri, 8 Aug 2014 12:46:47 -0300
+Subject: [BUG]: imx6q (wandboard): Very unstable ethernet since kernel 3.16
+In-Reply-To: <1407509932.19455.7.camel@sharkbay.at>
+References: <1407503758.19455.1.camel@sharkbay.at>
+ <20140808132754.GC30282@n2100.arm.linux.org.uk>
+ <1407507023.19455.3.camel@sharkbay.at>
+ <20140808143008.GD30282@n2100.arm.linux.org.uk>
+ <1407509932.19455.7.camel@sharkbay.at>
+Message-ID: <CAOMZO5C=sTL-ksaHX9uL=zyGR0d5hR8Rd5JAiQMTrr_0wiNdxQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Kever,
+Hi Thomas,
 
-On Thu, Aug 7, 2014 at 8:55 PM, Kever Yang <kever.yang@rock-chips.com> wrote:
-> USB host1 port is the host A port nearby the otg port.
->
-> Signed-off-by: Kever Yang <kever.yang@rock-chips.com>
->
-> ---
->
-> Changes in v5:
-> - don't enable otg port for evb
->
-> Changes in v4: None
-> Changes in v3:
-> - Rebase
->
-> Changes in v2:
-> - evb patch added in version 2
->
->  arch/arm/boot/dts/rk3288-evb.dtsi | 4 ++++
->  1 file changed, 4 insertions(+)
+On Fri, Aug 8, 2014 at 11:58 AM, Thomas Scheiblauer <tom@sharkbay.at> wrote:
 
-IMHO this series is ready to go in for 3.18.  I'm assuming Heiko will
-pick it up once the bindings have landed.
+>> So, what I'm asking is to try without this workaround in case there is
+>> some interaction there, thus testing the same interrupt configuration
+>> that I've had here for the last 10 months without the kind of issues
+>> you're reporting.  Sometimes, workarounds for one problem end up causing
+>> other problem elsewhere.
+>>
+>
+> Indeed, commenting out these 2 lines in
+> arch/arm/boot/dts/imx6qdl-wandboard.dtsi fixes my problem without having
+> to increase TX_RING_SIZE.
+> Thank you very much!
 
-Reviewed-by: Doug Anderson <dianders@chromium.org>
-Tested-by: Doug Anderson <dianders@chromium.org>
+Could you please send a patch for imx6qdl-wandboard.dtsi? Please
+provide the details of the problem in the commit log.
+
+Thanks
