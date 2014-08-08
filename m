@@ -1,74 +1,61 @@
-From: festevam@gmail.com (Fabio Estevam)
-Date: Fri, 8 Aug 2014 14:01:26 -0300
-Subject: [PATCH 1/1] undo workaround for i.mx6 silicon errata ERR006687
- which resulted in an unstable ethernet connection (lost interrupts?)
-In-Reply-To: <1407515584.19455.9.camel@sharkbay.at>
-References: <1407503758.19455.1.camel@sharkbay.at>
- <20140808132754.GC30282@n2100.arm.linux.org.uk>
- <1407507023.19455.3.camel@sharkbay.at>
- <20140808143008.GD30282@n2100.arm.linux.org.uk>
- <1407509932.19455.7.camel@sharkbay.at>
- <CAOMZO5C=sTL-ksaHX9uL=zyGR0d5hR8Rd5JAiQMTrr_0wiNdxQ@mail.gmail.com>
- <1407515584.19455.9.camel@sharkbay.at>
-Message-ID: <CAOMZO5B-hkc1BJJBSaOuRXpkNa-kheskEWcTQv1pmhBa3n3WjQ@mail.gmail.com>
+From: stefano.stabellini@eu.citrix.com (Stefano Stabellini)
+Date: Fri, 8 Aug 2014 18:02:23 +0100
+Subject: [PATCH v4 0/3] xen/arm: fix "xen_add_mach_to_phys_entry: cannot add"
+ problem
+Message-ID: <alpine.DEB.2.02.1408081801020.2293@kaball.uk.xensource.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Thomas,
+Hi all,
+Xen support in Linux for ARM and ARM64 suffers from lack of support for
+multiple mfn to pfn mappings: whenever a frontend grants the same page
+multiple times to the backend, the mfn to pfn accounting in
+arch/arm/xen/p2m.c fails. The issue has become critical since v3.15,
+when xen-netfront/xen-netback switched from grant copies to grant
+mappings, therefore causing the issue to happen much more often.
 
-On Fri, Aug 8, 2014 at 1:33 PM, Thomas Scheiblauer <tom@sharkbay.at> wrote:
+Fixing the mfn to pfn accounting in p2m.c is difficult and expensive,
+therefore we are looking for alternative solutions. One idea is avoiding
+mfn to pfn conversions altogether. The only code path that needs them is
+swiotlb-xen:unmap_page (and single_for_cpu and single_for_device).
 
-> Ok, here is my attempt on the patch. I've also removed the respective lines from all the other imx6qdl-*.dtsi files.
+To avoid mfn to pfn conversions we rely on a second p2m mapping done by
+Xen (a separate patch series will be sent for Xen). In Linux we use it
+to perform the cache maintenance operations without mfns conversions.
 
-Please create a clean patch and submit it via git send-mail instead of
-sending it inside this thread.
 
-Also, please check the style of the Subject. It should be "ARM: dts:
-imx6qdl-wandboard: ....."
+The Xen side patch series that introduces XENFEAT_grant_map_identity is:
+http://marc.info/?l=xen-devel&m=140690433923855
 
-You need to copy the imx maintainer Shawn Guo and it would be nice to
-also copy commit Sascha Silbe, who introduced this patch for
-wandboard:
 
-9fc77821b17155c6e0ab50b1e1dd80c2b0e63e98
-Author: Sascha Silbe <x-linux@infra-silbe.de>
-Date:   Thu Feb 6 23:24:13 2014 +0100
 
-    ARM: dts: imx6qdl-wandboard: use GPIO_6 for FEC interrupt
+Changes in v4:
+- fix wrong DMA_TO_DEVICE check in __xen_dma_page_dev_to_cpu.
 
-, and also Troy Kisky to get their inputs.
+Changes in v3:
+- rename XENFEAT_grant_map_11 to XENFEAT_grant_map_identity.
 
->
-> Signed-off-by: Thomas Scheiblauer <tom@sharkbay.at>
-> ---
->  arch/arm/boot/dts/imx6qdl-nitrogen6x.dtsi | 2 --
->  arch/arm/boot/dts/imx6qdl-sabreauto.dtsi  | 2 --
->  arch/arm/boot/dts/imx6qdl-sabrelite.dtsi  | 2 --
->  arch/arm/boot/dts/imx6qdl-wandboard.dtsi  | 2 --
->  4 files changed, 8 deletions(-)
+Changes in v2:
+- introduce XENFEAT_grant_map_11;
+- remeber the ptep corresponding to scratch pages so that we don't need
+to calculate it again every time;
+- do not acutally unmap the page on xen_mm32_unmap;
+- properly account preempt_enable/disable;
+- do not check for mfn in xen_add_phys_to_mach_entry.
 
-I would suggest by starting only with
-arch/arm/boot/dts/imx6qdl-wandboard.dtsi as this is the one you have
-really tested.
 
-> diff --git a/arch/arm/boot/dts/imx6qdl-wandboard.dtsi
-> b/arch/arm/boot/dts/imx6qdl-wandboard.dtsi
-> index 6461f66..3b61c9a 100644
-> --- a/arch/arm/boot/dts/imx6qdl-wandboard.dtsi
-> +++ b/arch/arm/boot/dts/imx6qdl-wandboard.dtsi
-> @@ -257,8 +257,6 @@
->         pinctrl-0 = <&pinctrl_enet>;
->         phy-mode = "rgmii";
->         phy-reset-gpios = <&gpio3 29 0>;
-> -       interrupts-extended = <&gpio1 6 IRQ_TYPE_LEVEL_HIGH>,
-> -                             <&intc 0 119 IRQ_TYPE_LEVEL_HIGH>;
 
-You should also remove the MX6QDL_PAD_GPIO_6__ENET_IRQ.
+Stefano Stabellini (3):
+      xen/arm: introduce XENFEAT_grant_map_identity
+      xen/arm: reimplement xen_dma_unmap_page & friends
+      xen/arm: remove mach_to_phys rbtree
 
-Actually it would easier if you just send a patch reverting 9fc77821b17.
-
-You need to put a detailed commit log explaining what are the tests
-you are running that show an unstable ethernet connection, add the
-logs, command line tests, etc.
-
-Thanks
+ arch/arm/include/asm/xen/page-coherent.h |   25 ++--
+ arch/arm/include/asm/xen/page.h          |    9 --
+ arch/arm/xen/Makefile                    |    2 +-
+ arch/arm/xen/enlighten.c                 |    6 +
+ arch/arm/xen/mm32.c                      |  202 ++++++++++++++++++++++++++++++
+ arch/arm/xen/p2m.c                       |   66 +---------
+ include/xen/interface/features.h         |    3 +
+ 7 files changed, 220 insertions(+), 93 deletions(-)
+ create mode 100644 arch/arm/xen/mm32.c
