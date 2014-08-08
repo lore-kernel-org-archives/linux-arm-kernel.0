@@ -1,42 +1,54 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Fri, 8 Aug 2014 11:30:21 +0100
-Subject: Request to include Mailbox tree in linux-next
-In-Reply-To: <20140808142912.7bf68229@canb.auug.org.au>
-References: <CAJe_ZhdZTSs+Ns4u7bMXwbLHYTnE-5XEE8uev4zXbXrCP52bSg@mail.gmail.com>
- <20140808142912.7bf68229@canb.auug.org.au>
-Message-ID: <20140808103021.GA30282@n2100.arm.linux.org.uk>
+From: michal.simek@xilinx.com (Michal Simek)
+Date: Fri, 8 Aug 2014 12:45:11 +0200
+Subject: [PATCH 12/14] ll_temac: delete unneeded test before of_node_put
+In-Reply-To: <1407492475-26283-12-git-send-email-Julia.Lawall@lip6.fr>
+References: <1407492475-26283-12-git-send-email-Julia.Lawall@lip6.fr>
+Message-ID: <8c6f53e8-f0ae-4b5e-b852-50603bff0060@BN1BFFO11FD029.protection.gbl>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Aug 08, 2014 at 02:29:12PM +1000, Stephen Rothwell wrote:
-> Hi Jassi,
+On 08/08/2014 12:07 PM, Julia Lawall wrote:
+> From: Julia Lawall <Julia.Lawall@lip6.fr>
 > 
-> On Wed, 6 Aug 2014 12:25:49 +0530 Jassi Brar <jaswinder.singh@linaro.org> wrote:
-> >
-> >  The framework for Mailbox has undergone 10 revisions over the last
-> > one year, which has garnered support in the form of 'Reviewed-by' and
-> > 'looks good enough to be merged in this window' from people in the CC
-> > list.
-> > 
-> >   Could you please add it to linux-next?
-> > Tree:       git://git.linaro.org/landing-teams/working/fujitsu/integration.git
-> > Branch:   mailbox-for-3.17
-> > Contact:  Jassi Brar <jaswinder.singh@linaro.org>
+> Of_node_put supports NULL as its argument, so the initial test is not
+> necessary.
 > 
-> This is really late for v3.17.  The purpose of linux-next is to
-> discover interactions between trees before they are pulled into Linus'
-> tree and to do some cross architecture build checking.  Adding a tree
-> during the merge window is not very helpful to that.
+> Suggested by Uwe Kleine-K?nig.
+> 
+> The semantic patch that fixes this problem is as follows:
+> (http://coccinelle.lip6.fr/)
+> 
+> // <smpl>
+> @@
+> expression e;
+> @@
+> 
+> -if (e)
+>    of_node_put(e);
+> // </smpl>
+> 
+> Signed-off-by: Julia Lawall <Julia.Lawall@lip6.fr>
+> 
+> ---
+>  drivers/net/ethernet/xilinx/ll_temac_main.c |    3 +--
+>  1 file changed, 1 insertion(+), 2 deletions(-)
+> 
+> diff --git a/drivers/net/ethernet/xilinx/ll_temac_main.c b/drivers/net/ethernet/xilinx/ll_temac_main.c
+> index 8a6e5c2..36f4459 100644
+> --- a/drivers/net/ethernet/xilinx/ll_temac_main.c
+> +++ b/drivers/net/ethernet/xilinx/ll_temac_main.c
+> @@ -1148,8 +1148,7 @@ static int temac_of_remove(struct platform_device *op)
+>  	temac_mdio_teardown(lp);
+>  	unregister_netdev(ndev);
+>  	sysfs_remove_group(&lp->dev->kobj, &temac_attr_group);
+> -	if (lp->phy_node)
+> -		of_node_put(lp->phy_node);
+> +	of_node_put(lp->phy_node);
+>  	lp->phy_node = NULL;
+>  	iounmap(lp->regs);
+>  	if (lp->sdma_regs)
 
-+1.
+Reviewed-by: Michal Simek <michal.simek@xilinx.com>
 
-The same goes for any tree which is part of linux-next.
-
-Having a tree in linux-next carries with it the responsibility that the
-tree owner abides by the kernel development cycle, which includes
-respecting the moratorium on merging new development into branch(es)
-which are part of linux-next during an actively open merge window.
-
--- 
-FTTC broadband for 0.8mile line: currently at 9.5Mbps down 400kbps up
-according to speedtest.net.
+Thanks,
+Michal
