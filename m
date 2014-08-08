@@ -1,8 +1,10 @@
-From: balbi@ti.com (Felipe Balbi)
-Date: Thu, 7 Aug 2014 21:14:42 -0500
+From: festevam@gmail.com (Fabio Estevam)
+Date: Thu, 7 Aug 2014 23:29:20 -0300
 Subject: OMAP baseline test results for v3.16-rc4
 In-Reply-To: <alpine.DEB.2.02.1408072210300.5770@utopia.booyaka.com>
-References: <alpine.DEB.2.02.1407291225070.13035@utopia.booyaka.com>
+References: <alpine.DEB.2.02.1407290810160.22957@utopia.booyaka.com>
+ <20140729084930.GH29045@atomide.com>
+ <alpine.DEB.2.02.1407291225070.13035@utopia.booyaka.com>
  <alpine.DEB.2.02.1407291256270.13035@utopia.booyaka.com>
  <20140729145312.GT29045@atomide.com>
  <alpine.DEB.2.02.1407291922370.13035@utopia.booyaka.com>
@@ -12,76 +14,86 @@ References: <alpine.DEB.2.02.1407291225070.13035@utopia.booyaka.com>
  <alpine.DEB.2.02.1407311922350.1845@utopia.booyaka.com>
  <20140801071056.GD29045@atomide.com>
  <alpine.DEB.2.02.1408072210300.5770@utopia.booyaka.com>
-Message-ID: <20140808021442.GA22811@saruman.home>
+Message-ID: <CAOMZO5BmzaqVyHEJ0sqja8RgF2i_=FStSToJLwiX6NtTktNvCw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-
-On Thu, Aug 07, 2014 at 10:21:23PM +0000, Paul Walmsley wrote:
-> On Fri, 1 Aug 2014, Tony Lindgren wrote:
-> 
-> > * Paul Walmsley <paul@pwsan.com> [140731 12:29]:
-> > > On Thu, 31 Jul 2014, Tony Lindgren wrote:
-> > > 
-> > > > * Paul Walmsley <paul@pwsan.com> [140730 00:55]:
-> > > > > On Tue, 29 Jul 2014, Tony Lindgren wrote:
-> > > > > 
-> > > > > > The following patch should fix the tests above for 3530es3beagle.
-> > > > > > Care to test and ack as I don't have one?
-> > > > > 
-> > > > > 3530es3beagle retention dynamic idle tests hang on next-20140729.  (Maybe 
-> > > > > other boards fail too - haven't tested any others).  
-> > > > 
-> > > > I just checked that today's linux next works for off-idle and
-> > > > wake-up events for at least 37xx evm.
-> > > 
-> > > I ran the full set of tests across all boards.  The only board that passed 
-> > > the dynamic idle testing on next-20140729 was the 3730beaglexm.
-> > > 
-> > > http://www.pwsan.com/omap/testlogs/next_20140729/20140730124836/README.txt
-> > > 
-> > > 37xxevm hangs on the first suspend entry:
-> > > 
-> > > http://www.pwsan.com/omap/testlogs/next_20140729/20140730124836/pm/37xxevm/37xxevm_log.txt
-> > > 
-> > > If I find some extra time, I'll set up a bisection run.
-> > 
-> > OK that sounds like some driver suspend regression that needs
-> > to be tracked down. I'm seeing it on my 37xx evm also with
-> > linux next too.
-> 
+On Thu, Aug 7, 2014 at 7:21 PM, Paul Walmsley <paul@pwsan.com> wrote:
+>
 > It's commit a71e3c37960ce5f9c6a519bc1215e3ba9fa83e75:
-> 
+>
 > Author: Ezequiel Garcia <ezequiel.garcia@free-electrons.com>
 > Date:   Wed Jul 23 16:47:31 2014 -0300
-> 
+>
 >     net: phy: Set the driver when registering an MDIO bus device
->     
+>
 >     mdiobus_register() registers a device which is already bound to a driver.
 >     Hence, the driver pointer should be set properly in order to track down
 >     the driver associated to the MDIO bus.
->     
+>
 >     This will be used to allow ethernet driver to pin down a MDIO bus driver,
 >     preventing it from being unloaded while the PHY device is running.
->     
+>
 >     Reviewed-by: Florian Fainelli <f.fainelli@gmail.com>
 >     Tested-by: Florian Fainelli <f.fainelli@gmail.com>
 >     Signed-off-by: Ezequiel Garcia <ezequiel.garcia@free-electrons.com>
 >     Signed-off-by: David S. Miller <davem@davemloft.net>
-> 
-> 
-> What's bad is that this went in late during v3.16-rc fixes.  So now v3.16 
+>
+>
+> What's bad is that this went in late during v3.16-rc fixes.  So now v3.16
 > itself is broken, and there's no way to fix it.
 
-we have stable releases for that.
+I have sent a patch reverting this commit and it is in mainline now.
+It will reach 3.16.1:
 
--- 
-balbi
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140807/828d02d0/attachment.sig>
+commit ce7991e8198b80eb6b4441b6f6114bea4a665d66
+Author: Fabio Estevam <fabio.estevam@freescale.com>
+Date:   Tue Aug 5 08:13:42 2014 -0300
+
+    Revert "net: phy: Set the driver when registering an MDIO bus device"
+
+    Commit a71e3c37960ce5f9 ("net: phy: Set the driver when
+registering an MDIO bus
+    device") caused the following regression on the fec driver:
+
+    root at imx6qsabresd:~# echo mem > /sys/power/state
+    PM: Syncing filesystems ... done.
+    Freezing user space processes ... (elapsed 0.003 seconds) done.
+    Freezing remaining freezable tasks ... (elapsed 0.002 seconds) done.
+    Unable to handle kernel NULL pointer dereference at virtual address 0000002c
+    pgd = bcd14000
+    [0000002c] *pgd=4d9e0831, *pte=00000000, *ppte=00000000
+    Internal error: Oops: 17 [#1] SMP ARM
+    Modules linked in:
+    CPU: 0 PID: 617 Comm: sh Not tainted 3.16.0 #17
+    task: bc0c4e00 ti: bceb6000 task.ti: bceb6000
+    PC is at fec_suspend+0x10/0x70
+    LR is at dpm_run_callback.isra.7+0x34/0x6c
+    pc : [<803f8a98>]    lr : [<80361f44>]    psr: 600f0013
+    sp : bceb7d70  ip : bceb7d88  fp : bceb7d84
+    r10: 8091523c  r9 : 00000000  r8 : bd88f478
+    r7 : 803f8a88  r6 : 81165988  r5 : 00000000  r4 : 00000000
+    r3 : 00000000  r2 : 00000000  r1 : bd88f478  r0 : bd88f478
+    Flags: nZCv  IRQs on  FIQs on  Mode SVC_32  ISA ARM  Segment user
+    Control: 10c5387d  Table: 4cd1404a  DAC: 00000015
+    Process sh (pid: 617, stack limit = 0xbceb6240)
+    Stack: (0xbceb7d70 to 0xbceb8000)
+    ....
+
+    The problem with the original commit is explained by Russell King:
+
+    "It has the effect (as can be seen from the oops) of attaching the MDIO bus
+    device (itself is a bus-less device) to the platform driver, which means
+    that if the platform driver supports power management, it will be called
+    to power manage the MDIO bus device.
+
+    Moreover, drivers do not expect to be called for power management
+    operations for devices which they haven't probed, and certainly not for
+    devices which aren't part of the same bus that the driver is registered
+    against."
+
+    This reverts commit a71e3c37960ce5f9c6a519bc1215e3ba9fa83e75.
+
+    Cc: <stable@vger.kernel.org> #3.16
+    Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
+    Signed-off-by: David S. Miller <davem@davemloft.net>
