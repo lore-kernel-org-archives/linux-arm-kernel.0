@@ -1,56 +1,70 @@
-From: a.ryabinin@samsung.com (Andrey Ryabinin)
-Date: Fri, 08 Aug 2014 15:53:56 +0400
-Subject: [PATCH] arm: module: add support for R_ARM_TARGET1 relocations
-Message-ID: <1407498836-2797-1-git-send-email-a.ryabinin@samsung.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Fri, 8 Aug 2014 14:42:21 +0200
+Subject: [PATCH 5/8] pinctrl: add driver for MB86S7x
+In-Reply-To: <CAJe_Zhc2gz8DZjzo-4YAucAZ2P=UamZ2MtTP1fHmxC0vspZJDw@mail.gmail.com>
+References: <1405233067-4725-1-git-send-email-mollie.wu@linaro.org>
+ <CACRpkdb_NC7j=XkbMPv8YYLSeEd1AOpFqmD8x+ohC7ds3cPCfg@mail.gmail.com>
+ <CAJe_Zhc2gz8DZjzo-4YAucAZ2P=UamZ2MtTP1fHmxC0vspZJDw@mail.gmail.com>
+Message-ID: <CACRpkdb_8HBzLUKedZKwPxDZ8TQiNMs5QV_eFfkqD=-9TTK55w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Kernel module build with GCOV profiling fails to load with the
-following error:
+On Thu, Jul 24, 2014 at 8:04 PM, Jassi Brar <jaswinder.singh@linaro.org> wrote:
+> On 22 July 2014 21:41, Linus Walleij <linus.walleij@linaro.org> wrote:
+>> On Sun, Jul 13, 2014 at 8:31 AM, Mollie Wu <mollie.wu@linaro.org> wrote:
 
- $ insmod test_module.ko
-   test_module: unknown relocation: 38
-   insmod: can't insert 'test_module.ko': invalid module format
+>>> +               if (pchip->pin_busy[p + 3]) {
+>>> +                       pr_err("%s:%d:%d %d busy\n",
+>>> +                              __func__, __LINE__, pins[i], p+3);
+>>> +                       goto busy_exit;
+>>> +               }
+>>
+>> I don't understand this either.
+>>
+>> Why all this fuzz around the four pins from p ... p+3?
+>>
+> Pinctrl exposes each pin individually, but the controller clubs 4 pins
+> together to work in same mode... so we have to reject any attempt to
+> change mode of a pin if any other pin in the same group [p,.. p+3] is
+> already taken by some user and is in a different mode i.e, busy. And
+> no, we can't expose each group of 4 as a 'virtual' pin because some
+> groups serve to 2 different IPs.
 
-This happens because constructor pointers in the .init_array section
-have not supported R_ARM_TARGET1 relocation type.
+OK I get it now I think, seems valid.
 
-Documentation (ELF for the ARM Architecture) says:
-    "The relocation must be processed either in the same way as R_ARM_REL32 or
-     as R_ARM_ABS32: a virtual platform must specify which method is used."
+>>> +               pr_debug(" %d", p);
+>>> +               pchip->pin_busy[p] = true;
+>>
+>> So I'm questioning this....
+>>
+>>> +               if (p < PINS_VIRT) /* Not for virtual pins */
+>>
+>> We need an explanation somewhere about what "virtual pins"
+>> means in this driver, I have never seen that before.
+>>
+> Now, these are really 'virtual' :)
+> The registers for physically individual pins are uniformly spaced and
+> we can compact the offsets with simple math.
+> However for some peripherals like PCI, USB etc, the pins are all tied
+> together as one 'virtual' pin. To reuse the same math to calculate
+> offsets, we assign virtual numbers to these virtual pins, assuming
+> 'holes' wherever necessary.
 
-Since kernel expects to see absolute addresses in .init_array R_ARM_TARGET1
-relocation type should be treated the same way as R_ARM_ABS32.
+Aha. OK, well I guess readability is paramount, the scheme
+you come up with is likely to stick so make sure that whatever
+way it works is very clear and documented so others can follow
+the example later on.
 
-Signed-off-by: Andrey Ryabinin <a.ryabinin@samsung.com>
----
- arch/arm/include/asm/elf.h | 1 +
- arch/arm/kernel/module.c   | 1 +
- 2 files changed, 2 insertions(+)
+>>> +MODULE_DEVICE_TABLE(of, mb86s70_gpio_dt_ids);
+>>
+>> "fujitsu" does not seem to exist in
+>> Documentation/devicetree/bindings/vendor-prefixes.txt
+>> Do you want to add it?
+>>
+> Yup, in a later patch of this set :)
 
-diff --git a/arch/arm/include/asm/elf.h b/arch/arm/include/asm/elf.h
-index f4b46d3..afb9caf 100644
---- a/arch/arm/include/asm/elf.h
-+++ b/arch/arm/include/asm/elf.h
-@@ -50,6 +50,7 @@ typedef struct user_fp elf_fpregset_t;
- #define R_ARM_ABS32		2
- #define R_ARM_CALL		28
- #define R_ARM_JUMP24		29
-+#define R_ARM_TARGET1		38
- #define R_ARM_V4BX		40
- #define R_ARM_PREL31		42
- #define R_ARM_MOVW_ABS_NC	43
-diff --git a/arch/arm/kernel/module.c b/arch/arm/kernel/module.c
-index 45e4781..6a4dffe 100644
---- a/arch/arm/kernel/module.c
-+++ b/arch/arm/kernel/module.c
-@@ -91,6 +91,7 @@ apply_relocate(Elf32_Shdr *sechdrs, const char *strtab, unsigned int symindex,
- 			break;
- 
- 		case R_ARM_ABS32:
-+		case R_ARM_TARGET1:
- 			*(u32 *)loc += sym->st_value;
- 			break;
- 
--- 
-1.8.5.5
+OK thanks. Dunno if there is already some v2 in my inbox, I've
+got some stuff to process...
+
+Yours,
+Linus Walleij
