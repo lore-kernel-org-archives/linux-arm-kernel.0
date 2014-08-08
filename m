@@ -1,28 +1,170 @@
-From: festevam@gmail.com (Fabio Estevam)
-Date: Fri, 8 Aug 2014 11:17:56 -0300
-Subject: [BUG]: imx6q (wandboard): Very unstable ethernet since kernel 3.16
-In-Reply-To: <1407507023.19455.3.camel@sharkbay.at>
-References: <1407503758.19455.1.camel@sharkbay.at>
- <20140808132754.GC30282@n2100.arm.linux.org.uk>
- <1407507023.19455.3.camel@sharkbay.at>
-Message-ID: <CAOMZO5BVPfXCzihwPQZYrNOmuBEWALW5rQq=M2qVmCLjmFFZig@mail.gmail.com>
+From: matthias.bgg@gmail.com (Matthias Brugger)
+Date: Fri, 8 Aug 2014 16:19:01 +0200
+Subject: [PATCH v2 2/4] arm: mediatek: Add support for GIC interrupt
+ polarity extension.
+In-Reply-To: <1407505411-2207-3-git-send-email-srv_yingjoe.chen@mediatek.com>
+References: <1407505411-2207-1-git-send-email-srv_yingjoe.chen@mediatek.com>
+ <1407505411-2207-3-git-send-email-srv_yingjoe.chen@mediatek.com>
+Message-ID: <CABuKBeL-dcs+pDW3jUeRWNijyYwx4VUdUB=CjGXoGmQUCifQ5Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Thomas,
-
-On Fri, Aug 8, 2014 at 11:10 AM, Thomas Scheiblauer <tom@sharkbay.at> wrote:
-
-> These lines in arch/arm/boot/dts/imx6qdl-wandboard.dtsi already seem to
-> be a workaround for some hardware errata:
-> ERR006687 ?ENET: Only the ENET wake-up interrupt request can wake the
-> system from Wait mode?
+2014-08-08 15:43 GMT+02:00 Joe.C <srv_yingjoe.chen@mediatek.com>:
+> From: "Joe.C" <yingjoe.chen@mediatek.com>
 >
-> See the original mail containing the patch:
-> http://lists.infradead.org/pipermail/linux-arm-kernel/2013-December/221204.html
+> Mediatek SoCs have an interrupt polarity extension which allows
+> to swap the polarity for given interrupts.
 
-This commit is also in 3.15 kernel. Do you have this instability issue in 3.15?
+Please use ./script/checkpatch.pl, all 4 patches have errors.
+Apart please use the get_maintainer.pl on all patches of a set and
+send the whole set to all email addresses returned by the script.
+Otherwise it will be really difficult to understand the context of the
+patch set.
 
-It would be helpful if you could revert commit 9fc77821b17155c6e0 with
-3.16 and try again, just to make sure that the workaround is not
-introducing issues.
+Cheers,
+Matthias
+
+>
+> Signed-off-by: Joe.C <yingjoe.chen@mediatek.com>
+> ---
+>  arch/arm/mach-mediatek/Makefile   |  2 +-
+>  arch/arm/mach-mediatek/common.h   | 19 ++++++++++++
+>  arch/arm/mach-mediatek/intpol.c   | 61 +++++++++++++++++++++++++++++++++++++++
+>  arch/arm/mach-mediatek/mediatek.c | 10 +++++++
+>  4 files changed, 91 insertions(+), 1 deletion(-)
+>  create mode 100644 arch/arm/mach-mediatek/common.h
+>  create mode 100644 arch/arm/mach-mediatek/intpol.c
+>
+> diff --git a/arch/arm/mach-mediatek/Makefile b/arch/arm/mach-mediatek/Makefile
+> index 43e619f..82c39d8 100644
+> --- a/arch/arm/mach-mediatek/Makefile
+> +++ b/arch/arm/mach-mediatek/Makefile
+> @@ -1 +1 @@
+> -obj-$(CONFIG_ARCH_MEDIATEK) += mediatek.o
+> +obj-$(CONFIG_ARCH_MEDIATEK) += mediatek.o intpol.o
+> diff --git a/arch/arm/mach-mediatek/common.h b/arch/arm/mach-mediatek/common.h
+> new file mode 100644
+> index 0000000..8f2bbeb
+> --- /dev/null
+> +++ b/arch/arm/mach-mediatek/common.h
+> @@ -0,0 +1,19 @@
+> +/*
+> + * Copyright (c) 2014 Mediatek Inc.
+> + *
+> + * This program is free software; you can redistribute it and/or modify
+> + * it under the terms of the GNU General Public License as published by
+> + * the Free Software Foundation; either version 2 of the License, or
+> + * (at your option) any later version.
+> + *
+> + * This program is distributed in the hope that it will be useful,
+> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
+> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+> + * GNU General Public License for more details.
+> + */
+> +#ifndef __MEDIATEK_COMMON_H__
+> +#define __MEDIATEK_COMMON_H__
+> +
+> +extern char init_intpol(void);
+> +
+> +#endif /* __MEDIATEK_COMMON_H__ */
+> diff --git a/arch/arm/mach-mediatek/intpol.c b/arch/arm/mach-mediatek/intpol.c
+> new file mode 100644
+> index 0000000..65ccc7c
+> --- /dev/null
+> +++ b/arch/arm/mach-mediatek/intpol.c
+> @@ -0,0 +1,61 @@
+> +/*
+> + * This file contains common code that is intended to be used across
+> + * boards so that it's not replicated.
+> + *
+> + * Copyright (C) 2014 Mediatek Inc.
+> + *
+> + * This software is licensed under the terms of the GNU General Public
+> + * License version 2, as published by the Free Software Foundation, and
+> + * may be copied, distributed, and modified under those terms.
+> + *
+> + * This program is distributed in the hope that it will be useful,
+> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
+> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+> + * GNU General Public License for more details.
+> + */
+> +#include <linux/of_address.h>
+> +#include <linux/io.h>
+> +#include <linux/irq.h>
+> +#include <linux/irqchip/arm-gic.h>
+> +
+> +#define GIC_HW_IRQ_BASE  32
+> +#define INT_POL_INDEX(a)   ((a) - GIC_HW_IRQ_BASE)
+> +
+> +static void __iomem *int_pol_base;
+> +
+> +static int mtk_int_pol_set_type(struct irq_data *d, unsigned int type)
+> +{
+> +       unsigned int irq = d->hwirq;
+> +       u32 offset, reg_index, value;
+> +
+> +       offset = INT_POL_INDEX(irq) & 0x1F;
+> +       reg_index = INT_POL_INDEX(irq) >> 5;
+> +
+> +       /* This arch extension was called with irq_controller_lock held,
+> +          so the read-modify-write will be atomic */
+> +       value = readl(int_pol_base + reg_index * 4);
+> +       if (type == IRQ_TYPE_LEVEL_LOW || type == IRQ_TYPE_EDGE_FALLING)
+> +               value |= (1 << offset);
+> +       else
+> +               value &= ~(1 << offset);
+> +       writel(value, int_pol_base + reg_index * 4);
+> +
+> +       return 0;
+> +}
+> +
+> +void init_intpol(void)
+> +{
+> +       struct device_node *node;
+> +
+> +       node = of_find_compatible_node(NULL, NULL, "mediatek,mt6577-intpol");
+> +       if (!node)
+> +               return;
+> +
+> +       int_pol_base = of_io_request_and_map(node, 0, "intpol");
+> +       if (IS_ERR(int_pol_base)) {
+> +               pr_warn("Can't get resource\n");
+> +               return;
+> +       }
+> +
+> +       gic_arch_extn.irq_set_type = mtk_int_pol_set_type;
+> +}
+> diff --git a/arch/arm/mach-mediatek/mediatek.c b/arch/arm/mach-mediatek/mediatek.c
+> index 48051a2..aa10c70 100644
+> --- a/arch/arm/mach-mediatek/mediatek.c
+> +++ b/arch/arm/mach-mediatek/mediatek.c
+> @@ -16,6 +16,15 @@
+>   */
+>  #include <linux/init.h>
+>  #include <asm/mach/arch.h>
+> +#include <linux/irqchip.h>
+> +
+> +#include "common.h"
+> +
+> +static void __init mediatek_init_irq(void)
+> +{
+> +       init_intpol();
+> +       irqchip_init();
+> +}
+>
+>  static const char * const mediatek_board_dt_compat[] = {
+>         "mediatek,mt6589",
+> @@ -26,4 +35,5 @@ static const char * const mediatek_board_dt_compat[] = {
+>
+>  DT_MACHINE_START(MEDIATEK_DT, "Mediatek Cortex-A7 (Device Tree)")
+>         .dt_compat      = mediatek_board_dt_compat,
+> +       .init_irq       = mediatek_init_irq,
+>  MACHINE_END
+> --
+> 1.8.1.1.dirty
+>
+
+
+
+-- 
+motzblog.wordpress.com
