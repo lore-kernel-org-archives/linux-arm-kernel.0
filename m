@@ -1,99 +1,143 @@
-From: festevam@gmail.com (Fabio Estevam)
-Date: Thu, 7 Aug 2014 23:29:20 -0300
-Subject: OMAP baseline test results for v3.16-rc4
-In-Reply-To: <alpine.DEB.2.02.1408072210300.5770@utopia.booyaka.com>
-References: <alpine.DEB.2.02.1407290810160.22957@utopia.booyaka.com>
- <20140729084930.GH29045@atomide.com>
- <alpine.DEB.2.02.1407291225070.13035@utopia.booyaka.com>
- <alpine.DEB.2.02.1407291256270.13035@utopia.booyaka.com>
- <20140729145312.GT29045@atomide.com>
- <alpine.DEB.2.02.1407291922370.13035@utopia.booyaka.com>
- <20140730053940.GX29045@atomide.com>
- <alpine.DEB.2.02.1407300725290.4477@utopia.booyaka.com>
- <20140731131107.GB29045@atomide.com>
- <alpine.DEB.2.02.1407311922350.1845@utopia.booyaka.com>
- <20140801071056.GD29045@atomide.com>
- <alpine.DEB.2.02.1408072210300.5770@utopia.booyaka.com>
-Message-ID: <CAOMZO5BmzaqVyHEJ0sqja8RgF2i_=FStSToJLwiX6NtTktNvCw@mail.gmail.com>
+From: rostedt@goodmis.org (Steven Rostedt)
+Date: Thu, 7 Aug 2014 22:35:53 -0400
+Subject: [PATCH v2 1/5] tracing: Do not do anything special with
+ tracepoint_string when tracing is disabled
+In-Reply-To: <1406318733-26754-2-git-send-email-nicolas.pitre@linaro.org>
+References: <1406318733-26754-1-git-send-email-nicolas.pitre@linaro.org>
+ <1406318733-26754-2-git-send-email-nicolas.pitre@linaro.org>
+Message-ID: <20140807223553.541eada9@gandalf.local.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Aug 7, 2014 at 7:21 PM, Paul Walmsley <paul@pwsan.com> wrote:
->
-> It's commit a71e3c37960ce5f9c6a519bc1215e3ba9fa83e75:
->
-> Author: Ezequiel Garcia <ezequiel.garcia@free-electrons.com>
-> Date:   Wed Jul 23 16:47:31 2014 -0300
->
->     net: phy: Set the driver when registering an MDIO bus device
->
->     mdiobus_register() registers a device which is already bound to a driver.
->     Hence, the driver pointer should be set properly in order to track down
->     the driver associated to the MDIO bus.
->
->     This will be used to allow ethernet driver to pin down a MDIO bus driver,
->     preventing it from being unloaded while the PHY device is running.
->
->     Reviewed-by: Florian Fainelli <f.fainelli@gmail.com>
->     Tested-by: Florian Fainelli <f.fainelli@gmail.com>
->     Signed-off-by: Ezequiel Garcia <ezequiel.garcia@free-electrons.com>
->     Signed-off-by: David S. Miller <davem@davemloft.net>
->
->
-> What's bad is that this went in late during v3.16-rc fixes.  So now v3.16
-> itself is broken, and there's no way to fix it.
+Because ftrace_events.h is not included when config tracing is not
+enabled, I got error messages when compiling arm and arm64 without
+tracing enabled. This is the new patch I'm now testing that moves the
+tracepoint_string code to include/linux/tracepoint.h as well.
 
-I have sent a patch reverting this commit and it is in mainline now.
-It will reach 3.16.1:
+-- Steve
 
-commit ce7991e8198b80eb6b4441b6f6114bea4a665d66
-Author: Fabio Estevam <fabio.estevam@freescale.com>
-Date:   Tue Aug 5 08:13:42 2014 -0300
+>From 3c49b52b155d0f723792377e1a4480a0e7ca0ba2 Mon Sep 17 00:00:00 2001
+From: Steven Rostedt <rostedt@goodmis.org>
+Date: Fri, 25 Jul 2014 16:05:29 -0400
+Subject: [PATCH] tracing: Do not do anything special with tracepoint_string
+ when tracing is disabled
 
-    Revert "net: phy: Set the driver when registering an MDIO bus device"
+When CONFIG_TRACING is not enabled, there's no reason to save the trace
+strings either by the linker or as a static variable that can be
+referenced later. Simply pass back the string that is given to
+tracepoint_string().
 
-    Commit a71e3c37960ce5f9 ("net: phy: Set the driver when
-registering an MDIO bus
-    device") caused the following regression on the fec driver:
+Had to move the define to include/linux/tracepoint.h so that it is still
+visible when CONFIG_TRACING is not set.
 
-    root at imx6qsabresd:~# echo mem > /sys/power/state
-    PM: Syncing filesystems ... done.
-    Freezing user space processes ... (elapsed 0.003 seconds) done.
-    Freezing remaining freezable tasks ... (elapsed 0.002 seconds) done.
-    Unable to handle kernel NULL pointer dereference at virtual address 0000002c
-    pgd = bcd14000
-    [0000002c] *pgd=4d9e0831, *pte=00000000, *ppte=00000000
-    Internal error: Oops: 17 [#1] SMP ARM
-    Modules linked in:
-    CPU: 0 PID: 617 Comm: sh Not tainted 3.16.0 #17
-    task: bc0c4e00 ti: bceb6000 task.ti: bceb6000
-    PC is at fec_suspend+0x10/0x70
-    LR is at dpm_run_callback.isra.7+0x34/0x6c
-    pc : [<803f8a98>]    lr : [<80361f44>]    psr: 600f0013
-    sp : bceb7d70  ip : bceb7d88  fp : bceb7d84
-    r10: 8091523c  r9 : 00000000  r8 : bd88f478
-    r7 : 803f8a88  r6 : 81165988  r5 : 00000000  r4 : 00000000
-    r3 : 00000000  r2 : 00000000  r1 : bd88f478  r0 : bd88f478
-    Flags: nZCv  IRQs on  FIQs on  Mode SVC_32  ISA ARM  Segment user
-    Control: 10c5387d  Table: 4cd1404a  DAC: 00000015
-    Process sh (pid: 617, stack limit = 0xbceb6240)
-    Stack: (0xbceb7d70 to 0xbceb8000)
-    ....
+Link: http://lkml.kernel.org/p/1406318733-26754-2-git-send-email-nicolas.pitre at linaro.org
 
-    The problem with the original commit is explained by Russell King:
+Suggested-by: Nicolas Pitre <nico@linaro.org>
+Signed-off-by: Steven Rostedt <rostedt@goodmis.org>
+---
+ include/linux/ftrace_event.h | 34 ----------------------------------
+ include/linux/tracepoint.h   | 44 ++++++++++++++++++++++++++++++++++++++++++++
+ 2 files changed, 44 insertions(+), 34 deletions(-)
 
-    "It has the effect (as can be seen from the oops) of attaching the MDIO bus
-    device (itself is a bus-less device) to the platform driver, which means
-    that if the platform driver supports power management, it will be called
-    to power manage the MDIO bus device.
-
-    Moreover, drivers do not expect to be called for power management
-    operations for devices which they haven't probed, and certainly not for
-    devices which aren't part of the same bus that the driver is registered
-    against."
-
-    This reverts commit a71e3c37960ce5f9c6a519bc1215e3ba9fa83e75.
-
-    Cc: <stable@vger.kernel.org> #3.16
-    Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
-    Signed-off-by: David S. Miller <davem@davemloft.net>
+diff --git a/include/linux/ftrace_event.h b/include/linux/ftrace_event.h
+index cff3106ffe2c..c9f619a2070f 100644
+--- a/include/linux/ftrace_event.h
++++ b/include/linux/ftrace_event.h
+@@ -574,40 +574,6 @@ do {									\
+ 		__trace_printk(ip, fmt, ##args);			\
+ } while (0)
+ 
+-/**
+- * tracepoint_string - register constant persistent string to trace system
+- * @str - a constant persistent string that will be referenced in tracepoints
+- *
+- * If constant strings are being used in tracepoints, it is faster and
+- * more efficient to just save the pointer to the string and reference
+- * that with a printf "%s" instead of saving the string in the ring buffer
+- * and wasting space and time.
+- *
+- * The problem with the above approach is that userspace tools that read
+- * the binary output of the trace buffers do not have access to the string.
+- * Instead they just show the address of the string which is not very
+- * useful to users.
+- *
+- * With tracepoint_string(), the string will be registered to the tracing
+- * system and exported to userspace via the debugfs/tracing/printk_formats
+- * file that maps the string address to the string text. This way userspace
+- * tools that read the binary buffers have a way to map the pointers to
+- * the ASCII strings they represent.
+- *
+- * The @str used must be a constant string and persistent as it would not
+- * make sense to show a string that no longer exists. But it is still fine
+- * to be used with modules, because when modules are unloaded, if they
+- * had tracepoints, the ring buffers are cleared too. As long as the string
+- * does not change during the life of the module, it is fine to use
+- * tracepoint_string() within a module.
+- */
+-#define tracepoint_string(str)						\
+-	({								\
+-		static const char *___tp_str __tracepoint_string = str; \
+-		___tp_str;						\
+-	})
+-#define __tracepoint_string	__attribute__((section("__tracepoint_str")))
+-
+ #ifdef CONFIG_PERF_EVENTS
+ struct perf_event;
+ 
+diff --git a/include/linux/tracepoint.h b/include/linux/tracepoint.h
+index 2e2a5f7717e5..b1293f15f592 100644
+--- a/include/linux/tracepoint.h
++++ b/include/linux/tracepoint.h
+@@ -249,6 +249,50 @@ extern void syscall_unregfunc(void);
+ 
+ #endif /* CONFIG_TRACEPOINTS */
+ 
++#ifdef CONFIG_TRACING
++/**
++ * tracepoint_string - register constant persistent string to trace system
++ * @str - a constant persistent string that will be referenced in tracepoints
++ *
++ * If constant strings are being used in tracepoints, it is faster and
++ * more efficient to just save the pointer to the string and reference
++ * that with a printf "%s" instead of saving the string in the ring buffer
++ * and wasting space and time.
++ *
++ * The problem with the above approach is that userspace tools that read
++ * the binary output of the trace buffers do not have access to the string.
++ * Instead they just show the address of the string which is not very
++ * useful to users.
++ *
++ * With tracepoint_string(), the string will be registered to the tracing
++ * system and exported to userspace via the debugfs/tracing/printk_formats
++ * file that maps the string address to the string text. This way userspace
++ * tools that read the binary buffers have a way to map the pointers to
++ * the ASCII strings they represent.
++ *
++ * The @str used must be a constant string and persistent as it would not
++ * make sense to show a string that no longer exists. But it is still fine
++ * to be used with modules, because when modules are unloaded, if they
++ * had tracepoints, the ring buffers are cleared too. As long as the string
++ * does not change during the life of the module, it is fine to use
++ * tracepoint_string() within a module.
++ */
++#define tracepoint_string(str)						\
++	({								\
++		static const char *___tp_str __tracepoint_string = str; \
++		___tp_str;						\
++	})
++#define __tracepoint_string	__attribute__((section("__tracepoint_str")))
++#else
++/*
++ * tracepoint_string() is used to save the string address for userspace
++ * tracing tools. When tracing isn't configured, there's no need to save
++ * anything.
++ */
++# define tracepoint_string(str) str
++# define __tracepoint_string
++#endif
++
+ /*
+  * The need for the DECLARE_TRACE_NOARGS() is to handle the prototype
+  * (void). "void" is a special value in a function prototype and can
+-- 
+2.0.1
