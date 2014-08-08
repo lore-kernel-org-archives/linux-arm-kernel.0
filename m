@@ -1,81 +1,53 @@
 From: olof@lixom.net (Olof Johansson)
-Date: Fri,  8 Aug 2014 09:47:58 -0700
-Subject: [GIT PATCH 6/7] phy: fix up for devm_phy_create api change
+Date: Fri,  8 Aug 2014 09:47:55 -0700
+Subject: [GIT PULL 3/7] ARM: SoC board changes for 3.17
 In-Reply-To: <1407516479-1251-1-git-send-email-olof@lixom.net>
 References: <1407516479-1251-1-git-send-email-olof@lixom.net>
-Message-ID: <1407516479-1251-7-git-send-email-olof@lixom.net>
+Message-ID: <1407516479-1251-4-git-send-email-olof@lixom.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Stephen Rothwell <sfr@canb.auug.org.au>
-
-This is needed due to the devm changes going in through Greg's tree at
-the same time as a new driver was added through ours.
-
-Signed-off-by: Stephen Rothwell <sfr@canb.auug.org.au>
-[olof: Write patch description]
-Signed-off-by: Olof Johansson <olof@lixom.net>
----
-
-I'm sending this inline with the merge requests to keep things as
-bisectable as possible. This is a patch that Stephen was carrying for
-us in -next, you can also squash it into the merge commit if you prefer.
+This is the smallest board branch we have ever had. Most of this is a
+few cleanups for board code for Renesas shmobile, with a bit of legacy
+driver support added. This is strongly trending in the right direction now.
 
 
--Olof
 
- drivers/phy/phy-spear1310-miphy.c    | 2 +-
- drivers/phy/phy-spear1340-miphy.c    | 2 +-
- drivers/pinctrl/pinctrl-tegra-xusb.c | 4 ++--
- 3 files changed, 4 insertions(+), 4 deletions(-)
+Conflicts: None
 
-diff --git a/drivers/phy/phy-spear1310-miphy.c b/drivers/phy/phy-spear1310-miphy.c
-index c58c869d57e0..6dcbfcddb372 100644
---- a/drivers/phy/phy-spear1310-miphy.c
-+++ b/drivers/phy/phy-spear1310-miphy.c
-@@ -229,7 +229,7 @@ static int spear1310_miphy_probe(struct platform_device *pdev)
- 		return -EINVAL;
- 	}
- 
--	priv->phy = devm_phy_create(dev, &spear1310_miphy_ops, NULL);
-+	priv->phy = devm_phy_create(dev, NULL, &spear1310_miphy_ops, NULL);
- 	if (IS_ERR(priv->phy)) {
- 		dev_err(dev, "failed to create SATA PCIe PHY\n");
- 		return PTR_ERR(priv->phy);
-diff --git a/drivers/phy/phy-spear1340-miphy.c b/drivers/phy/phy-spear1340-miphy.c
-index 8de98adf21c3..7135ba2603b6 100644
---- a/drivers/phy/phy-spear1340-miphy.c
-+++ b/drivers/phy/phy-spear1340-miphy.c
-@@ -261,7 +261,7 @@ static int spear1340_miphy_probe(struct platform_device *pdev)
- 		return PTR_ERR(priv->misc);
- 	}
- 
--	priv->phy = devm_phy_create(dev, &spear1340_miphy_ops, NULL);
-+	priv->phy = devm_phy_create(dev, NULL, &spear1340_miphy_ops, NULL);
- 	if (IS_ERR(priv->phy)) {
- 		dev_err(dev, "failed to create SATA PCIe PHY\n");
- 		return PTR_ERR(priv->phy);
-diff --git a/drivers/pinctrl/pinctrl-tegra-xusb.c b/drivers/pinctrl/pinctrl-tegra-xusb.c
-index 4a7daf577b49..a06620474845 100644
---- a/drivers/pinctrl/pinctrl-tegra-xusb.c
-+++ b/drivers/pinctrl/pinctrl-tegra-xusb.c
-@@ -910,7 +910,7 @@ static int tegra_xusb_padctl_probe(struct platform_device *pdev)
- 		goto reset;
- 	}
- 
--	phy = devm_phy_create(&pdev->dev, &pcie_phy_ops, NULL);
-+	phy = devm_phy_create(&pdev->dev, NULL, &pcie_phy_ops, NULL);
- 	if (IS_ERR(phy)) {
- 		err = PTR_ERR(phy);
- 		goto unregister;
-@@ -919,7 +919,7 @@ static int tegra_xusb_padctl_probe(struct platform_device *pdev)
- 	padctl->phys[TEGRA_XUSB_PADCTL_PCIE] = phy;
- 	phy_set_drvdata(phy, padctl);
- 
--	phy = devm_phy_create(&pdev->dev, &sata_phy_ops, NULL);
-+	phy = devm_phy_create(&pdev->dev, NULL, &sata_phy_ops, NULL);
- 	if (IS_ERR(phy)) {
- 		err = PTR_ERR(phy);
- 		goto unregister;
--- 
-2.0.1.473.gc4d58ca
+----------------------------------------------------------------
+
+The following changes since commit af0de725999369f7b9a6d2a0b41c09178b4814d8:
+
+  Merge branch 'next/soc' into HEAD
+
+are available in the git repository at:
+
+  git://git.kernel.org/pub/scm/linux/kernel/git/arm/arm-soc.git tags/boards-for-3.17
+
+for you to fetch changes up to bdd18e8f76e33151a850906c8353222bd06a49e6:
+
+  Merge tag 'renesas-boards-for-v3.17' of git://git.kernel.org/pub/scm/linux/kernel/git/horms/renesas into next/boards
+
+----------------------------------------------------------------
+
+Geert Uytterhoeven (4):
+      ARM: shmobile: koelsch-reference: Remove workarounds for core clock issues
+      ARM: shmobile: lager-reference: Remove workarounds for core clock issues
+      ARM: shmobile: armadillo800eva legacy: Add LED support
+      ARM: shmobile: armadillo800eva reference: Spelling s/ED/LED/
+
+Magnus Damm (1):
+      ARM: shmobile: Enable R-Car Gen2 CMA code in board files
+
+Olof Johansson (1):
+      Merge tag 'renesas-boards-for-v3.17' of git://git.kernel.org/.../horms/renesas into next/boards
+
+
+ .../board-armadillo800eva-reference.c           |  8 ++---
+ arch/arm/mach-shmobile/board-armadillo800eva.c  | 35 ++++++++++++++++++++
+ .../arm/mach-shmobile/board-koelsch-reference.c | 16 +--------
+ arch/arm/mach-shmobile/board-koelsch.c          |  1 +
+ arch/arm/mach-shmobile/board-lager-reference.c  | 15 +--------
+ arch/arm/mach-shmobile/board-lager.c            |  1 +
+ 6 files changed, 43 insertions(+), 33 deletions(-)
