@@ -1,56 +1,67 @@
-From: stefano.stabellini@eu.citrix.com (Stefano Stabellini)
-Date: Fri, 8 Aug 2014 15:54:34 +0100
-Subject: [PATCH v3 2/3] xen/arm: reimplement xen_dma_unmap_page & friends
-In-Reply-To: <CAG4opy9ChMRYFkMz+RHqacGO3=d+mS=6ZS2qMALHpPUDzhSYsQ@mail.gmail.com>
-References: <alpine.DEB.2.02.1408011552460.2293@kaball.uk.xensource.com>
- <1406904984-16068-2-git-send-email-stefano.stabellini@eu.citrix.com>
- <alpine.DEB.2.02.1408081530580.2293@kaball.uk.xensource.com>
- <20140808143851.GF29341@zion.uk.xensource.com>
- <CAG4opy9ChMRYFkMz+RHqacGO3=d+mS=6ZS2qMALHpPUDzhSYsQ@mail.gmail.com>
-Message-ID: <alpine.DEB.2.02.1408081554110.2293@kaball.uk.xensource.com>
+From: tom@sharkbay.at (Thomas Scheiblauer)
+Date: Fri, 08 Aug 2014 16:58:52 +0200
+Subject: [BUG]: imx6q (wandboard): Very unstable ethernet since kernel 3.16
+In-Reply-To: <20140808143008.GD30282@n2100.arm.linux.org.uk>
+References: <1407503758.19455.1.camel@sharkbay.at>
+ <20140808132754.GC30282@n2100.arm.linux.org.uk>
+ <1407507023.19455.3.camel@sharkbay.at>
+ <20140808143008.GD30282@n2100.arm.linux.org.uk>
+Message-ID: <1407509932.19455.7.camel@sharkbay.at>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 8 Aug 2014, Thomas Leonard wrote:
-> On 8 August 2014 15:38, Wei Liu <wei.liu2@citrix.com> wrote:
-> > On Fri, Aug 08, 2014 at 03:32:41PM +0100, Stefano Stabellini wrote:
-> >> On Fri, 1 Aug 2014, Stefano Stabellini wrote:
-> >> > +static void __xen_dma_page_dev_to_cpu(struct device *hwdev, dma_addr_t handle,
-> >> > +           size_t size, enum dma_data_direction dir)
-> >> > +{
-> >> > +   /* Cannot use __dma_page_dev_to_cpu because we don't have a
-> >> > +    * struct page for handle */
-> >> > +
-> >> > +   if (dir == DMA_TO_DEVICE)
-> >>
-> >> This should be:
-> >>     if (dir != DMA_TO_DEVICE)
-> >>
-> >> Thomas, could you please confirm that with this small fix
-> >> http://pastebin.com/FPRf7pgL goes away?
-> >>
-> >
-> > Thomas, please try this fix with my ref-counting patch.
-> >
-> > The old "working" version might actually cover this latent bug due to
-> > it's long delay.
+
+
+
+On Fre, 2014-08-08 at 15:30 +0100, Russell King - ARM Linux wrote:
+> On Fri, Aug 08, 2014 at 04:10:23PM +0200, Thomas Scheiblauer wrote:
+> > On Fre, 2014-08-08 at 14:27 +0100, Russell King - ARM Linux wrote:
+> > > On Fri, Aug 08, 2014 at 03:15:58PM +0200, Thomas Scheiblauer wrote:
+> > > > Since Kernel 3.16 (running on 3.16.0) the ethernet (fec) connection
+> > > > stops working after exchanging very little data. Sometimes it comes back
+> > > > again for some seconds and drops again. No clues in dmesg.
+> > > > 
+> > > > After increasing TX_RING_SIZE in "drivers/net/ethernet/freescale/fec.h"
+> > > > from 512 to 1024 the connection seems to stay stable (judging after
+> > > > about half an hour of testing) but I really don't have experience with
+> > > > kernel driver hacking, so I'm not sure what I'm doing here.
+> > > 
+> > > Interesting.  There have been some other reports of instability in a
+> > > similar manner to that which you report, and, like the wanboard, they
+> > > too have this:
+> > > 
+> > >         interrupts-extended = <&gpio1 6 IRQ_TYPE_LEVEL_HIGH>,
+> > >                               <&intc 0 119 IRQ_TYPE_LEVEL_HIGH>;
+> > > 
+> > > Could it be that gpio1 6 doesn't actually work very well?  What happens
+> > > if you comment out the above property in
+> > > arch/arm/boot/dts/imx6qdl-wandboard.dtsi so you're using the standard
+> > > interrupt on GIC 150?
+> > > 
+> > 
+> > These lines in arch/arm/boot/dts/imx6qdl-wandboard.dtsi already seem to
+> > be a workaround for some hardware errata:
+> > ERR006687 ?ENET: Only the ENET wake-up interrupt request can wake the
+> > system from Wait mode?
 > 
-> I'm not sure how to apply this. The function
-> "__xen_dma_page_dev_to_cpu" doesn't appear in your "for-thomas"
-> branch. If you push the change to that branch I can test it.
+> Correct.  That's a workaround for wakeup.  That's not a workaround for
+> normal operation.
+> 
+> Two people (including yourself) have reported ethernet stability problems
+> with recent kernels.  Both reporters show that their platforms are using
+> GPIO1 6 being for the ethernet IRQ.
+> 
+> Meanwhile, I (and others) have the standard IRQ being used for it, and we
+> have yet to have any reports or see any instability resulting from that.
+> 
+> So, what I'm asking is to try without this workaround in case there is
+> some interaction there, thus testing the same interrupt configuration
+> that I've had here for the last 10 months without the kind of issues
+> you're reporting.  Sometimes, workarounds for one problem end up causing
+> other problem elsewhere.
+> 
 
-That's the patch for you:
-
-diff --git a/arch/arm/xen/mm32.c b/arch/arm/xen/mm32.c
-index 534f362..3b99860 100644
---- a/arch/arm/xen/mm32.c
-+++ b/arch/arm/xen/mm32.c
-@@ -131,7 +131,7 @@ static void __xen_dma_page_dev_to_cpu(struct device *hwdev, dma_addr_t handle,
- 	/* Cannot use __dma_page_dev_to_cpu because we don't have a
- 	 * struct page for handle */
- 
--	if (dir == DMA_TO_DEVICE)
-+	if (dir != DMA_TO_DEVICE)
- 		outer_inv_range(handle, handle + size);
- 
- 	dma_cache_maint(handle & PAGE_MASK, handle & ~PAGE_MASK, size, dir, dmac_unmap_area);
+Indeed, commenting out these 2 lines in
+arch/arm/boot/dts/imx6qdl-wandboard.dtsi fixes my problem without having
+to increase TX_RING_SIZE.
+Thank you very much!
