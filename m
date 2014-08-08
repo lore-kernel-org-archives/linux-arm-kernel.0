@@ -1,25 +1,31 @@
 From: olof@lixom.net (Olof Johansson)
-Date: Fri, 8 Aug 2014 13:34:20 -0700
-Subject: [GIT PULL 5/7] .17 ARM: SoC driver changes for 3.17
-In-Reply-To: <CA+55aFydoHBfWZhNTtLR9894SZ_jb1230pmyMYXq6Vwfd02nkA@mail.gmail.com>
+Date: Fri, 8 Aug 2014 13:37:16 -0700
+Subject: [GIT PULL 0/7] ARM: SoC changes for 3.17
+In-Reply-To: <CAL_JsqLgRM8_62mz3HCcsE6vw0gtB3pN0rg6SExnZvnOTRNu2g@mail.gmail.com>
 References: <1407516479-1251-1-git-send-email-olof@lixom.net>
- <1407516479-1251-6-git-send-email-olof@lixom.net>
- <CA+55aFydoHBfWZhNTtLR9894SZ_jb1230pmyMYXq6Vwfd02nkA@mail.gmail.com>
-Message-ID: <CAOesGMj8_KSodHJjsZ7rdqvHzfaDO2adH1qPDDioKiAoBkYaag@mail.gmail.com>
+ <CAL_JsqLgRM8_62mz3HCcsE6vw0gtB3pN0rg6SExnZvnOTRNu2g@mail.gmail.com>
+Message-ID: <CAOesGMgB7FpXzj1iFU2tFW9O7L=tiQwTUm-0gAuLAHw+=2zPXA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Aug 8, 2014 at 11:23 AM, Linus Torvalds
-<torvalds@linux-foundation.org> wrote:
-> On Fri, Aug 8, 2014 at 9:47 AM, Olof Johansson <olof@lixom.net> wrote:
+On Fri, Aug 8, 2014 at 1:03 PM, Rob Herring <robherring2@gmail.com> wrote:
+> On Fri, Aug 8, 2014 at 11:47 AM, Olof Johansson <olof@lixom.net> wrote:
+>> A moderately sized set of branches this merge window for us, about 750
+>> patches in total. There are several fairly large cleanups, and a net
+>> negative delta(!)
 >>
->> drivers/phy/Kconfig:
->>         Add/add. Keep both sides, sort (ST -> QCOM -> XGENE)
+>>  1014 files changed, 39452 insertions(+), 42425 deletions(-)
 >
-> You may want to review your alphabet.
+> If you look at mach-* and plat-* only, the overall delta has been
+> negative mostly since 3.0 which was when ARM DT support went in. The
+> overall size is trending down as well after growing by an order of
+> magnitude. You're going to be out of a job soon (or DTS maintainer).
+> ;)
 
-D'oh, yes. Roll call held, all 29 showed up. Order was descrambled.
-All good now.
+Yeah, mach/plat contents has gone down for quite a while, but we've
+been busy adding stuff like DTS contents and the like. I think might
+had a few net-negative-in-total merge windows in the past, but they
+haven't been all that common.
 
 
 -Olof
