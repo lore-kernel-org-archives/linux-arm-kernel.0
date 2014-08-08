@@ -1,69 +1,37 @@
-From: lauraa@codeaurora.org (Laura Abbott)
-Date: Fri, 08 Aug 2014 16:25:58 -0700
-Subject: [PATCHv6 3/5] common: dma-mapping: Introduce common remapping
- functions
-In-Reply-To: <20140808154556.11c7bf68d1bcf2714c148e3b@linux-foundation.org>
-References: <1407529397-6642-1-git-send-email-lauraa@codeaurora.org>
- <1407529397-6642-3-git-send-email-lauraa@codeaurora.org>
- <20140808154556.11c7bf68d1bcf2714c148e3b@linux-foundation.org>
-Message-ID: <53E55C86.3040705@codeaurora.org>
+From: paul@pwsan.com (Paul Walmsley)
+Date: Fri, 8 Aug 2014 23:39:08 +0000 (UTC)
+Subject: OMAP baseline test results for v3.16-rc4
+In-Reply-To: <20140808143411.GA2288@saruman.home>
+References: <20140729145312.GT29045@atomide.com>
+ <alpine.DEB.2.02.1407291922370.13035@utopia.booyaka.com>
+ <20140730053940.GX29045@atomide.com>
+ <alpine.DEB.2.02.1407300725290.4477@utopia.booyaka.com>
+ <20140731131107.GB29045@atomide.com>
+ <alpine.DEB.2.02.1407311922350.1845@utopia.booyaka.com>
+ <20140801071056.GD29045@atomide.com>
+ <alpine.DEB.2.02.1408072210300.5770@utopia.booyaka.com>
+ <20140808021442.GA22811@saruman.home>
+ <alpine.DEB.2.02.1408080610290.8332@utopia.booyaka.com>
+ <20140808143411.GA2288@saruman.home>
+Message-ID: <alpine.DEB.2.02.1408082338380.30868@utopia.booyaka.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 8/8/2014 3:45 PM, Andrew Morton wrote:
-> On Fri,  8 Aug 2014 13:23:15 -0700 Laura Abbott <lauraa@codeaurora.org> wrote:
-> 
->>
->> For architectures without coherent DMA, memory for DMA may
->> need to be remapped with coherent attributes. Factor out
->> the the remapping code from arm and put it in a
->> common location to reduce code duplication.
->>
->> As part of this, the arm APIs are now migrated away from
->> ioremap_page_range to the common APIs which use map_vm_area for remapping.
->> This should be an equivalent change and using map_vm_area is more
->> correct as ioremap_page_range is intended to bring in io addresses
->> into the cpu space and not regular kernel managed memory.
->>
->> ...
->>
->> @@ -267,3 +269,68 @@ int dma_common_mmap(struct device *dev, struct vm_area_struct *vma,
->>  	return ret;
->>  }
->>  EXPORT_SYMBOL(dma_common_mmap);
->> +
->> +/*
->> + * remaps an allocated contiguous region into another vm_area.
->> + * Cannot be used in non-sleeping contexts
->> + */
->> +
->> +void *dma_common_contiguous_remap(struct page *page, size_t size,
->> +			unsigned long vm_flags,
->> +			pgprot_t prot, const void *caller)
->> +{
->> +	int i;
->> +	struct page **pages;
->> +	void *ptr;
->> +
->> +	pages = kmalloc(sizeof(struct page *) << get_order(size), GFP_KERNEL);
->> +	if (!pages)
->> +		return NULL;
->> +
->> +	for (i = 0; i < (size >> PAGE_SHIFT); i++)
->> +		pages[i] = page + i;
-> 
-> Assumes a single mem_map[] array.  That's not the case for sparsemem
-> (at least).
-> 
-> 
+On Fri, 8 Aug 2014, Felipe Balbi wrote:
 
-Good point. I guess the best option is to increment via pfn and call
-pfn_to_page. Either that or go back to slightly abusing
-ioremap_page_range to remap normal memory.
+> On Fri, Aug 08, 2014 at 06:11:54AM +0000, Paul Walmsley wrote:
+> > On Thu, 7 Aug 2014, Felipe Balbi wrote:
+> > 
+> > > we have stable releases for that.
+> > 
+> > Stable releases aren't a fix for process failures.
+> 
+> of course not, but your claim that there's no way to fix v3.16 is
+> nonsense. And mistakes occur as well.
 
-Thanks,
-Laura
+There is no way to fix v3.16. 
 
--- 
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-hosted by The Linux Foundation
+The point of the -rc cycle is to stabilize the final, non-rc releases.
+
+
+- Paul
