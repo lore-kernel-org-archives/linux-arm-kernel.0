@@ -1,34 +1,38 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Fri, 8 Aug 2014 14:27:54 +0100
-Subject: [BUG]: imx6q (wandboard): Very unstable ethernet since kernel 3.16
-In-Reply-To: <1407503758.19455.1.camel@sharkbay.at>
-References: <1407503758.19455.1.camel@sharkbay.at>
-Message-ID: <20140808132754.GC30282@n2100.arm.linux.org.uk>
+From: tomasz.figa@gmail.com (Tomasz Figa)
+Date: Fri, 08 Aug 2014 15:20:19 +0200
+Subject: [RFC 3/5] pinctrl: exynos: add exynos5410 SoC specific data
+In-Reply-To: <CACRpkdazZTUS50_mrXd+sNVAdf2m7meT1_LX5r6BKg3U-tC3Kw@mail.gmail.com>
+References: <1406549892-5558-1-git-send-email-afaerber@suse.de>
+ <1406549892-5558-4-git-send-email-afaerber@suse.de>
+ <CACRpkdazZTUS50_mrXd+sNVAdf2m7meT1_LX5r6BKg3U-tC3Kw@mail.gmail.com>
+Message-ID: <53E4CE93.9000504@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Aug 08, 2014 at 03:15:58PM +0200, Thomas Scheiblauer wrote:
-> Since Kernel 3.16 (running on 3.16.0) the ethernet (fec) connection
-> stops working after exchanging very little data. Sometimes it comes back
-> again for some seconds and drops again. No clues in dmesg.
+Linus, Andreas,
+
+On 08.08.2014 14:55, Linus Walleij wrote:
+> On Mon, Jul 28, 2014 at 2:18 PM, Andreas F?rber <afaerber@suse.de> wrote:
 > 
-> After increasing TX_RING_SIZE in "drivers/net/ethernet/freescale/fec.h"
-> from 512 to 1024 the connection seems to stay stable (judging after
-> about half an hour of testing) but I really don't have experience with
-> kernel driver hacking, so I'm not sure what I'm doing here.
+>> From: Hakjoo Kim <ruppi.kim@hardkernel.com>
+>>
+>> Add Samsung EXYNOS5410 SoC specific data to enable pinctrl
+>> support for all platforms based on EXYNOS5410.
+>>
+>> Cc: Hakjoo Kim <ruppi.kim@hardkernel.com>
+>> [AF: Rebased onto Exynos5260]
+> 
+> I'm waiting for Tomasz to review this before applying.
 
-Interesting.  There have been some other reports of instability in a
-similar manner to that which you report, and, like the wanboard, they
-too have this:
+Thanks for the reminder. I'm currently on holidays and I'm not following
+the lists too closely, so sorry if I happen to miss some patches.
 
-        interrupts-extended = <&gpio1 6 IRQ_TYPE_LEVEL_HIGH>,
-                              <&intc 0 119 IRQ_TYPE_LEVEL_HIGH>;
+In general the changes look good, although I can't verify whether the
+data being added really match the hardware, as I don't have access to
+detailed information about Exynos5410. Also I believe this patch needs
+to be rebased onto current pinctrl tree as several (conflicting)
+improvements to the pinctrl-samsung driver hit it before this patch was
+posted.
 
-Could it be that gpio1 6 doesn't actually work very well?  What happens
-if you comment out the above property in
-arch/arm/boot/dts/imx6qdl-wandboard.dtsi so you're using the standard
-interrupt on GIC 150?
-
--- 
-FTTC broadband for 0.8mile line: currently at 9.5Mbps down 400kbps up
-according to speedtest.net.
+Best regards,
+Tomasz
