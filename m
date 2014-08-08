@@ -1,24 +1,28 @@
 From: linus.walleij@linaro.org (Linus Walleij)
-Date: Fri, 8 Aug 2014 14:55:39 +0200
-Subject: [RFC 3/5] pinctrl: exynos: add exynos5410 SoC specific data
-In-Reply-To: <1406549892-5558-4-git-send-email-afaerber@suse.de>
-References: <1406549892-5558-1-git-send-email-afaerber@suse.de>
- <1406549892-5558-4-git-send-email-afaerber@suse.de>
-Message-ID: <CACRpkdazZTUS50_mrXd+sNVAdf2m7meT1_LX5r6BKg3U-tC3Kw@mail.gmail.com>
+Date: Fri, 8 Aug 2014 15:07:21 +0200
+Subject: [PATCH 1/4] gpio: pca953x: Drop deprecated DT bindings
+In-Reply-To: <1406618686-22385-2-git-send-email-mpa@pengutronix.de>
+References: <1406618686-22385-1-git-send-email-mpa@pengutronix.de>
+ <1406618686-22385-2-git-send-email-mpa@pengutronix.de>
+Message-ID: <CACRpkdYOuUXv9U+sb_hQFNvVUm1G7W46sRv6n3nSPMwz7yLUiQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jul 28, 2014 at 2:18 PM, Andreas F?rber <afaerber@suse.de> wrote:
+On Tue, Jul 29, 2014 at 9:24 AM, Markus Pargmann <mpa@pengutronix.de> wrote:
 
-> From: Hakjoo Kim <ruppi.kim@hardkernel.com>
+> Drop deprecated DT bindings and use automaticly assigned gpio and irq
+> bases.
 >
-> Add Samsung EXYNOS5410 SoC specific data to enable pinctrl
-> support for all platforms based on EXYNOS5410.
->
-> Cc: Hakjoo Kim <ruppi.kim@hardkernel.com>
-> [AF: Rebased onto Exynos5260]
+> Signed-off-by: Markus Pargmann <mpa@pengutronix.de>
 
-I'm waiting for Tomasz to review this before applying.
+Patch applied.
+
+> -       val = of_get_property(node, "linux,gpio-base", &size);
+> -       WARN(val, "%s: device-tree property 'linux,gpio-base' is deprecated!", __func__);
+
+Gah! This should never have been merged.
+
+I even consider this patch a bug fix now.
 
 Yours,
 Linus Walleij
