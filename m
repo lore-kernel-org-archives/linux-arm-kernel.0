@@ -1,62 +1,74 @@
-From: stefano.stabellini@eu.citrix.com (Stefano Stabellini)
-Date: Fri, 8 Aug 2014 17:52:08 +0100
-Subject: [PATCH v3 2/3] xen/arm: reimplement xen_dma_unmap_page & friends
-In-Reply-To: <CAG4opy8T1kqfofbbNfAOmynAniwfpS+PktK1t3ZNMo17j4BZ5w@mail.gmail.com>
-References: <alpine.DEB.2.02.1408011552460.2293@kaball.uk.xensource.com>
- <1406904984-16068-2-git-send-email-stefano.stabellini@eu.citrix.com>
- <alpine.DEB.2.02.1408081530580.2293@kaball.uk.xensource.com>
- <20140808143851.GF29341@zion.uk.xensource.com>
- <CAG4opy9ChMRYFkMz+RHqacGO3=d+mS=6ZS2qMALHpPUDzhSYsQ@mail.gmail.com>
- <20140808150001.GG29341@zion.uk.xensource.com>
- <CAG4opy8T1kqfofbbNfAOmynAniwfpS+PktK1t3ZNMo17j4BZ5w@mail.gmail.com>
-Message-ID: <alpine.DEB.2.02.1408081751140.2293@kaball.uk.xensource.com>
+From: festevam@gmail.com (Fabio Estevam)
+Date: Fri, 8 Aug 2014 14:01:26 -0300
+Subject: [PATCH 1/1] undo workaround for i.mx6 silicon errata ERR006687
+ which resulted in an unstable ethernet connection (lost interrupts?)
+In-Reply-To: <1407515584.19455.9.camel@sharkbay.at>
+References: <1407503758.19455.1.camel@sharkbay.at>
+ <20140808132754.GC30282@n2100.arm.linux.org.uk>
+ <1407507023.19455.3.camel@sharkbay.at>
+ <20140808143008.GD30282@n2100.arm.linux.org.uk>
+ <1407509932.19455.7.camel@sharkbay.at>
+ <CAOMZO5C=sTL-ksaHX9uL=zyGR0d5hR8Rd5JAiQMTrr_0wiNdxQ@mail.gmail.com>
+ <1407515584.19455.9.camel@sharkbay.at>
+Message-ID: <CAOMZO5B-hkc1BJJBSaOuRXpkNa-kheskEWcTQv1pmhBa3n3WjQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 8 Aug 2014, Thomas Leonard wrote:
-> On 8 August 2014 16:00, Wei Liu <wei.liu2@citrix.com> wrote:
-> > On Fri, Aug 08, 2014 at 03:49:26PM +0100, Thomas Leonard wrote:
-> >> On 8 August 2014 15:38, Wei Liu <wei.liu2@citrix.com> wrote:
-> >> > On Fri, Aug 08, 2014 at 03:32:41PM +0100, Stefano Stabellini wrote:
-> >> >> On Fri, 1 Aug 2014, Stefano Stabellini wrote:
-> >> >> > +static void __xen_dma_page_dev_to_cpu(struct device *hwdev, dma_addr_t handle,
-> >> >> > +           size_t size, enum dma_data_direction dir)
-> >> >> > +{
-> >> >> > +   /* Cannot use __dma_page_dev_to_cpu because we don't have a
-> >> >> > +    * struct page for handle */
-> >> >> > +
-> >> >> > +   if (dir == DMA_TO_DEVICE)
-> >> >>
-> >> >> This should be:
-> >> >>     if (dir != DMA_TO_DEVICE)
-> >> >>
-> >> >> Thomas, could you please confirm that with this small fix
-> >> >> http://pastebin.com/FPRf7pgL goes away?
-> >> >>
-> >> >
-> >> > Thomas, please try this fix with my ref-counting patch.
-> >> >
-> >> > The old "working" version might actually cover this latent bug due to
-> >> > it's long delay.
-> >>
-> >> I'm not sure how to apply this. The function
-> >> "__xen_dma_page_dev_to_cpu" doesn't appear in your "for-thomas"
-> >> branch. If you push the change to that branch I can test it.
-> >>
-> >
-> > I think you can cherry-pick my three patches to your tree which contains
-> > Stefano's patches. It's probably easier because Stefano's patches are
-> > not yet in mainline while my patches should be able to apply to 3.16
-> > mainline kernel without much effort.
-> >
-> > I've rebased my patches on top of 3.16, in for-thomas2 branch.
-> 
-> OK, that works for me! I tried starting the quickly-exiting VM a few
-> times and it didn't break anything, and my queue service served up the
-> file too. Thanks!
-> 
-> (for reference, this is the exact commit I tested:
-> https://github.com/talex5/linux/commit/026c61c9649e0ef30546222a429a1b11ae7a7555)
-> 
+Hi Thomas,
 
-Thanks for testing! I'll update my patch series with the small fix.
+On Fri, Aug 8, 2014 at 1:33 PM, Thomas Scheiblauer <tom@sharkbay.at> wrote:
+
+> Ok, here is my attempt on the patch. I've also removed the respective lines from all the other imx6qdl-*.dtsi files.
+
+Please create a clean patch and submit it via git send-mail instead of
+sending it inside this thread.
+
+Also, please check the style of the Subject. It should be "ARM: dts:
+imx6qdl-wandboard: ....."
+
+You need to copy the imx maintainer Shawn Guo and it would be nice to
+also copy commit Sascha Silbe, who introduced this patch for
+wandboard:
+
+9fc77821b17155c6e0ab50b1e1dd80c2b0e63e98
+Author: Sascha Silbe <x-linux@infra-silbe.de>
+Date:   Thu Feb 6 23:24:13 2014 +0100
+
+    ARM: dts: imx6qdl-wandboard: use GPIO_6 for FEC interrupt
+
+, and also Troy Kisky to get their inputs.
+
+>
+> Signed-off-by: Thomas Scheiblauer <tom@sharkbay.at>
+> ---
+>  arch/arm/boot/dts/imx6qdl-nitrogen6x.dtsi | 2 --
+>  arch/arm/boot/dts/imx6qdl-sabreauto.dtsi  | 2 --
+>  arch/arm/boot/dts/imx6qdl-sabrelite.dtsi  | 2 --
+>  arch/arm/boot/dts/imx6qdl-wandboard.dtsi  | 2 --
+>  4 files changed, 8 deletions(-)
+
+I would suggest by starting only with
+arch/arm/boot/dts/imx6qdl-wandboard.dtsi as this is the one you have
+really tested.
+
+> diff --git a/arch/arm/boot/dts/imx6qdl-wandboard.dtsi
+> b/arch/arm/boot/dts/imx6qdl-wandboard.dtsi
+> index 6461f66..3b61c9a 100644
+> --- a/arch/arm/boot/dts/imx6qdl-wandboard.dtsi
+> +++ b/arch/arm/boot/dts/imx6qdl-wandboard.dtsi
+> @@ -257,8 +257,6 @@
+>         pinctrl-0 = <&pinctrl_enet>;
+>         phy-mode = "rgmii";
+>         phy-reset-gpios = <&gpio3 29 0>;
+> -       interrupts-extended = <&gpio1 6 IRQ_TYPE_LEVEL_HIGH>,
+> -                             <&intc 0 119 IRQ_TYPE_LEVEL_HIGH>;
+
+You should also remove the MX6QDL_PAD_GPIO_6__ENET_IRQ.
+
+Actually it would easier if you just send a patch reverting 9fc77821b17.
+
+You need to put a detailed commit log explaining what are the tests
+you are running that show an unstable ethernet connection, add the
+logs, command line tests, etc.
+
+Thanks
