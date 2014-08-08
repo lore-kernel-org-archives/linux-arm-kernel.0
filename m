@@ -1,46 +1,80 @@
-From: robherring2@gmail.com (Rob Herring)
-Date: Fri, 8 Aug 2014 14:01:57 -0500
-Subject: [PATCH 1/3] of: Add of_match_machine helper
-In-Reply-To: <53E4CF4E.6010500@nvidia.com>
-References: <1407452515-2390-1-git-send-email-ttynkkynen@nvidia.com>
- <1407452515-2390-2-git-send-email-ttynkkynen@nvidia.com>
- <20140808094123.GC5387@ulmo> <53E4CF4E.6010500@nvidia.com>
-Message-ID: <CAL_JsqLFkTGCn-n6+Z644-2iAZ=6PcFD6ox=63pR-eb1s6tNGw@mail.gmail.com>
+From: andrew@lunn.ch (Andrew Lunn)
+Date: Fri, 8 Aug 2014 21:21:06 +0200
+Subject: [PATCH 2/6] ARM: mvebu: Add proper pin muxing on Globalscale
+ Mirabox board
+In-Reply-To: <20140808182156.GA16889@arch.cereza>
+References: <1407511136-26477-1-git-send-email-ezequiel.garcia@free-electrons.com>
+ <1407511136-26477-3-git-send-email-ezequiel.garcia@free-electrons.com>
+ <20140808171208.GC26751@lunn.ch>
+ <20140808182156.GA16889@arch.cereza>
+Message-ID: <20140808192106.GD26751@lunn.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Aug 8, 2014 at 8:23 AM, Tuomas Tynkkynen <ttynkkynen@nvidia.com> wrote:
->
->
-> On 08/08/14 12:41, Thierry Reding wrote:
->>
->>> +const struct of_device_id *of_match_machine(const struct of_device_id *matches)
->>> +{
->>> +    const struct of_device_id *match;
->>> +    struct device_node *root;
->>> +
->>> +    root = of_find_node_by_path("/");
->>> +    if (!root)
->>> +            return NULL;
->>> +
->>> +    match = of_match_node(matches, root);
->>> +    of_node_put(root);
->>> +    return match;
->>> +}
->>> +EXPORT_SYMBOL(of_match_machine);
->>
->> I wonder if of_find_node_by_path("/") is somewhat overkill here. Perhaps
->> simply of_node_get(of_allnodes) would be more appropriate here since the
->> function is implemented in the core?
->
-> of_machine_is_compatible() uses of_find_node_by_path("/") as well, of_allnodes
-> seems to be only used when during iterating. So I'd prefer to have them
-> consistent.
+On Fri, Aug 08, 2014 at 03:21:56PM -0300, Ezequiel Garcia wrote:
+> On 08 Aug 07:12 PM, Andrew Lunn wrote:
+> > On Fri, Aug 08, 2014 at 12:18:52PM -0300, Ezequiel Garcia wrote:
+> > > This commit adds the required pin muxing for the network interfaces and
+> > > the MDIO interface to be properly initialized. For instance, this makes
+> > > it possible for a bootloader to initialize and access the network interfaces.
+> > > 
+> > > Signed-off-by: Ezequiel Garcia <ezequiel.garcia@free-electrons.com>
+> > > ---
+> > >  arch/arm/boot/dts/armada-370-mirabox.dts | 6 ++++++
+> > >  1 file changed, 6 insertions(+)
+> > > 
+> > > diff --git a/arch/arm/boot/dts/armada-370-mirabox.dts b/arch/arm/boot/dts/armada-370-mirabox.dts
+> > > index 097df7d8..c745256 100644
+> > > --- a/arch/arm/boot/dts/armada-370-mirabox.dts
+> > > +++ b/arch/arm/boot/dts/armada-370-mirabox.dts
+> > > @@ -91,6 +91,8 @@
+> > >  			};
+> > >  
+> > >  			mdio {
+> > > +				pinctrl-0 = <&mdio_pins>;
+> > > +				pinctrl-names = "default";
+> > >  				phy0: ethernet-phy at 0 {
+> > >  					reg = <0>;
+> > >  				};
+> > > @@ -100,11 +102,15 @@
+> > >  				};
+> > >  			};
+> > >  			ethernet at 70000 {
+> > > +				pinctrl-0 = <&ge0_pins>;
+> > > +				pinctrl-names = "default";
+> > 
+> > Hi Ezequiel
+> > 
+> > Could you put these one level higher in the DT hierarchy? i.e. once in
+> > armada-370.dtsi and not in every board .dts file?
+> > 
+> 
+> Are you sure that's the correct approach?
+> 
+> As explained on the cover letter, these MAC MPP mux are not required in the
+> SGMII case. Moreover, this is not the only way to wire the MAC0 and MAC1
+> controllers, so I even considered pushing down the pinmux to the dts files!
 
-Agreed.
+Hi Ezequiel
 
-For the series:
+At least at the moment, it seems like RGMII is the norm, and SGMII is
+the exception. So having the default as RGMII probably makes
+sense. Boards which don't require it can then override this in there
+.dts file. If we see this changes with time, we can swap it around.
 
-Acked-by: Rob Herring <robh@kernel.org>
+> The devicetree location of the pinmux is something that still confuses me,
+> so I'm more than open to directions here.
 
-Rob
+Patch #1 comment is not really correct. It defines a number of pin
+configuration nodes. These nodes can then be used via phandles.  What
+might help is naming these differently. Name them
+ge[01]_rgmii_pins. It is then clear when they should be used. You can
+also add ge[0]_sgmii_pins, which would be an empty set. You can then
+use ge[01]_rgmii_pins as the default in armada-370.dtsi and override
+them with ge[0]_sgmii_pins for the 370 RD.
+
+Experience from Kirkwood is that it also has multiple ways to wire up
+MAC0 and MAC1, but in practice, nobody ever does. And if they did, it
+can be overridden in the .dts file.
+
+    Andrew
