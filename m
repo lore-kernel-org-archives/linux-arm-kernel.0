@@ -1,86 +1,50 @@
 From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Fri,  8 Aug 2014 13:51:39 +0200
-Subject: [PATCH v4 1/2] arm64: add helper functions to read I-cache attributes
-Message-ID: <1407498700-10164-1-git-send-email-ard.biesheuvel@linaro.org>
+Date: Fri,  8 Aug 2014 13:51:40 +0200
+Subject: [PATCH v4 2/2] arm64: don't flag non-aliasing VIPT I-caches as
+ aliasing
+In-Reply-To: <1407498700-10164-1-git-send-email-ard.biesheuvel@linaro.org>
+References: <1407498700-10164-1-git-send-email-ard.biesheuvel@linaro.org>
+Message-ID: <1407498700-10164-2-git-send-email-ard.biesheuvel@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This adds helper functions and #defines to <asm/cachetype.h> to read the
-line size and the number of sets from the level 1 instruction cache.
+VIPT caches are non-aliasing if the index is derived from address bits that
+are always equal between VA and PA. Classifying these as aliasing results in
+unnecessary flushing which may hurt performance.
 
 Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
 Acked-by: Will Deacon <will.deacon@arm.com>
 ---
-v4: add Will's ack
-v3: add WARN_ON(preemptible()), move icache_get_ccsidr() to cpuinfo.c to
-    prevent #include header recursion hell
-v2: put () around macro args, use 64-bit types for asm() mrs/msr calls
+v4: de-obfuscate, add Will's ack
+v2, v3: no changes
 
- arch/arm64/include/asm/cachetype.h | 20 ++++++++++++++++++++
- arch/arm64/kernel/cpuinfo.c        | 14 ++++++++++++++
- 2 files changed, 34 insertions(+)
+ arch/arm64/kernel/cpuinfo.c | 14 ++++++++++++--
+ 1 file changed, 12 insertions(+), 2 deletions(-)
 
-diff --git a/arch/arm64/include/asm/cachetype.h b/arch/arm64/include/asm/cachetype.h
-index 7a2e0762cb40..4c631a0a3609 100644
---- a/arch/arm64/include/asm/cachetype.h
-+++ b/arch/arm64/include/asm/cachetype.h
-@@ -39,6 +39,26 @@
- 
- extern unsigned long __icache_flags;
- 
-+#define CCSIDR_EL1_LINESIZE_MASK	0x7
-+#define CCSIDR_EL1_LINESIZE(x)		((x) & CCSIDR_EL1_LINESIZE_MASK)
-+
-+#define CCSIDR_EL1_NUMSETS_SHIFT	13
-+#define CCSIDR_EL1_NUMSETS_MASK		(0x7fff << CCSIDR_EL1_NUMSETS_SHIFT)
-+#define CCSIDR_EL1_NUMSETS(x) \
-+	(((x) & CCSIDR_EL1_NUMSETS_MASK) >> CCSIDR_EL1_NUMSETS_SHIFT)
-+
-+extern u64 __attribute_const__ icache_get_ccsidr(void);
-+
-+static inline int icache_get_linesize(void)
-+{
-+	return 16 << CCSIDR_EL1_LINESIZE(icache_get_ccsidr());
-+}
-+
-+static inline int icache_get_numsets(void)
-+{
-+	return 1 + CCSIDR_EL1_NUMSETS(icache_get_ccsidr());
-+}
-+
- /*
-  * Whilst the D-side always behaves as PIPT on AArch64, aliasing is
-  * permitted in the I-cache.
 diff --git a/arch/arm64/kernel/cpuinfo.c b/arch/arm64/kernel/cpuinfo.c
-index 177169623026..d8c5a59a5687 100644
+index d8c5a59a5687..504fdaa8367e 100644
 --- a/arch/arm64/kernel/cpuinfo.c
 +++ b/arch/arm64/kernel/cpuinfo.c
-@@ -20,8 +20,10 @@
- #include <asm/cputype.h>
+@@ -49,8 +49,18 @@ static void cpuinfo_detect_icache_policy(struct cpuinfo_arm64 *info)
+ 	unsigned int cpu = smp_processor_id();
+ 	u32 l1ip = CTR_L1IP(info->reg_ctr);
  
- #include <linux/bitops.h>
-+#include <linux/bug.h>
- #include <linux/init.h>
- #include <linux/kernel.h>
-+#include <linux/preempt.h>
- #include <linux/printk.h>
- #include <linux/smp.h>
+-	if (l1ip != ICACHE_POLICY_PIPT)
+-		set_bit(ICACHEF_ALIASING, &__icache_flags);
++	if (l1ip != ICACHE_POLICY_PIPT) {
++		/*
++		 * VIPT caches are non-aliasing if the VA always equals the PA
++		 * in all bit positions that are covered by the index. This is
++		 * the case if the size of a way (# of sets * line size) does
++		 * not exceed PAGE_SIZE.
++		 */
++		u32 waysize = icache_get_numsets() * icache_get_linesize();
++
++		if (l1ip != ICACHE_POLICY_VIPT || waysize > PAGE_SIZE)
++			set_bit(ICACHEF_ALIASING, &__icache_flags);
++	}
+ 	if (l1ip == ICACHE_POLICY_AIVIVT)
+ 		set_bit(ICACHEF_AIVIVT, &__icache_flags);
  
-@@ -190,3 +192,15 @@ void __init cpuinfo_store_boot_cpu(void)
- 
- 	boot_cpu_data = *info;
- }
-+
-+u64 __attribute_const__ icache_get_ccsidr(void)
-+{
-+	u64 ccsidr;
-+
-+	WARN_ON(preemptible());
-+
-+	/* Select L1 I-cache and read its size ID register */
-+	asm("msr csselr_el1, %1; isb; mrs %0, ccsidr_el1"
-+	    : "=r"(ccsidr) : "r"(1L));
-+	return ccsidr;
-+}
 -- 
 1.8.3.2
