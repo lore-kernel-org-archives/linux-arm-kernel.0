@@ -1,76 +1,98 @@
-From: m-karicheri2@ti.com (Murali Karicheri)
-Date: Fri, 8 Aug 2014 15:45:32 -0400
-Subject: [PATCH v2] PCI: keystone: add a pci quirk to limit mrrs
-Message-ID: <1407527132-3294-1-git-send-email-m-karicheri2@ti.com>
+From: ezequiel.garcia@free-electrons.com (Ezequiel Garcia)
+Date: Fri, 8 Aug 2014 16:47:39 -0300
+Subject: [PATCH 2/6] ARM: mvebu: Add proper pin muxing on Globalscale
+ Mirabox board
+In-Reply-To: <20140808192106.GD26751@lunn.ch>
+References: <1407511136-26477-1-git-send-email-ezequiel.garcia@free-electrons.com>
+ <1407511136-26477-3-git-send-email-ezequiel.garcia@free-electrons.com>
+ <20140808171208.GC26751@lunn.ch>
+ <20140808182156.GA16889@arch.cereza>
+ <20140808192106.GD26751@lunn.ch>
+Message-ID: <20140808194739.GA17826@arch.cereza>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Keystone PCI controller has a limitation that memory read request
-size must not exceed 256 bytes. This is a hardware limitation and
-add a quirk to force this limit on all downstream devices by
-updating mrrs.
+On 08 Aug 09:21 PM, Andrew Lunn wrote:
+> On Fri, Aug 08, 2014 at 03:21:56PM -0300, Ezequiel Garcia wrote:
+> > On 08 Aug 07:12 PM, Andrew Lunn wrote:
+> > > On Fri, Aug 08, 2014 at 12:18:52PM -0300, Ezequiel Garcia wrote:
+> > > > This commit adds the required pin muxing for the network interfaces and
+> > > > the MDIO interface to be properly initialized. For instance, this makes
+> > > > it possible for a bootloader to initialize and access the network interfaces.
+> > > > 
+> > > > Signed-off-by: Ezequiel Garcia <ezequiel.garcia@free-electrons.com>
+> > > > ---
+> > > >  arch/arm/boot/dts/armada-370-mirabox.dts | 6 ++++++
+> > > >  1 file changed, 6 insertions(+)
+> > > > 
+> > > > diff --git a/arch/arm/boot/dts/armada-370-mirabox.dts b/arch/arm/boot/dts/armada-370-mirabox.dts
+> > > > index 097df7d8..c745256 100644
+> > > > --- a/arch/arm/boot/dts/armada-370-mirabox.dts
+> > > > +++ b/arch/arm/boot/dts/armada-370-mirabox.dts
+> > > > @@ -91,6 +91,8 @@
+> > > >  			};
+> > > >  
+> > > >  			mdio {
+> > > > +				pinctrl-0 = <&mdio_pins>;
+> > > > +				pinctrl-names = "default";
+> > > >  				phy0: ethernet-phy at 0 {
+> > > >  					reg = <0>;
+> > > >  				};
+> > > > @@ -100,11 +102,15 @@
+> > > >  				};
+> > > >  			};
+> > > >  			ethernet at 70000 {
+> > > > +				pinctrl-0 = <&ge0_pins>;
+> > > > +				pinctrl-names = "default";
+> > > 
+> > > Hi Ezequiel
+> > > 
+> > > Could you put these one level higher in the DT hierarchy? i.e. once in
+> > > armada-370.dtsi and not in every board .dts file?
+> > > 
+> > 
+> > Are you sure that's the correct approach?
+> > 
+> > As explained on the cover letter, these MAC MPP mux are not required in the
+> > SGMII case. Moreover, this is not the only way to wire the MAC0 and MAC1
+> > controllers, so I even considered pushing down the pinmux to the dts files!
+> 
+> Hi Ezequiel
+> 
+> At least at the moment, it seems like RGMII is the norm, and SGMII is
+> the exception. So having the default as RGMII probably makes
+> sense. Boards which don't require it can then override this in there
+> .dts file. If we see this changes with time, we can swap it around.
+> 
 
-Signed-off-by: Murali Karicheri <m-karicheri2@ti.com>
----
- -v2: made the quirk happens after tuning
- -v1: changed printk to indicate PCI bdf
- This applies on top of the Keystone PCI controller patch series
- at http://thread.gmane.org/gmane.linux.kernel.pci/33523
- drivers/pci/host/pci-keystone.c |   40 +++++++++++++++++++++++++++++++++++++++
- 1 file changed, 40 insertions(+)
+OK.
 
-diff --git a/drivers/pci/host/pci-keystone.c b/drivers/pci/host/pci-keystone.c
-index c1cfaef..a132622 100644
---- a/drivers/pci/host/pci-keystone.c
-+++ b/drivers/pci/host/pci-keystone.c
-@@ -42,8 +42,48 @@
- /* DEV_STAT_CTRL */
- #define PCIE_CAP_BASE		0x70
- 
-+/* PCIE controller device IDs */
-+#define PCIE_RC_K2HK		0xb008
-+#define PCIE_RC_K2E		0xb009
-+#define PCIE_RC_K2L		0xb00a
-+
- #define to_keystone_pcie(x)	container_of(x, struct keystone_pcie, pp)
- 
-+static void quirk_limit_mrrs(struct pci_dev *dev)
-+{
-+	struct pci_bus *bus = dev->bus;
-+	struct pci_dev *bridge = bus->self;
-+
-+	if (pci_is_root_bus(bus))
-+		return;
-+
-+	/* look for the host bridge */
-+	while (!pci_is_root_bus(bus)) {
-+		bridge = bus->self;
-+		bus = bus->parent;
-+	}
-+
-+	if (bridge) {
-+		u16 id;
-+
-+		/*
-+		 * Keystone PCI controller has a h/w limitation of
-+		 * 256 bytes maximum read request size. It can't handle
-+		 * anything higher than this. So force this limit on
-+		 * all downstream devices
-+		 */
-+		pci_read_config_word(bridge, PCI_DEVICE_ID, &id);
-+		if ((id == PCIE_RC_K2HK) || (id == PCIE_RC_K2E) ||
-+		    (id == PCIE_RC_K2L)) {
-+			if (pcie_get_readrq(dev) > 256) {
-+				dev_info(&dev->dev, "limiting mrrs to 256\n");
-+				pcie_set_readrq(dev, 256);
-+			}
-+		}
-+	}
-+}
-+DECLARE_PCI_FIXUP_ENABLE(PCI_ANY_ID, PCI_ANY_ID, quirk_limit_mrrs);
-+
- static int ks_pcie_establish_link(struct keystone_pcie *ks_pcie)
- {
- 	struct pcie_port *pp = &ks_pcie->pp;
+> > The devicetree location of the pinmux is something that still confuses me,
+> > so I'm more than open to directions here.
+> 
+> Patch #1 comment is not really correct. It defines a number of pin
+> configuration nodes. These nodes can then be used via phandles.  What
+> might help is naming these differently. Name them
+> ge[01]_rgmii_pins. It is then clear when they should be used. You can
+> also add ge[0]_sgmii_pins, which would be an empty set. You can then
+> use ge[01]_rgmii_pins as the default in armada-370.dtsi and override
+> them with ge[0]_sgmii_pins for the 370 RD.
+> 
+
+OK.
+
+> Experience from Kirkwood is that it also has multiple ways to wire up
+> MAC0 and MAC1, but in practice, nobody ever does. And if they did, it
+> can be overridden in the .dts file.
+> 
+
+The above sounds good, although I don't have a strong opinion.
+
+If everybody is happy with the approach, I'll prepare a v2 changing the .dtsi
+with RGMII as the default mux, and overriding it in the A370-RD dts.
+
+Jason, Thomas, Greg: Any objections?
 -- 
-1.7.9.5
+Ezequiel Garc?a, Free Electrons
+Embedded Linux, Kernel and Android Engineering
+http://free-electrons.com
