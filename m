@@ -1,33 +1,46 @@
-From: festevam@gmail.com (Fabio Estevam)
-Date: Fri, 8 Aug 2014 12:46:47 -0300
-Subject: [BUG]: imx6q (wandboard): Very unstable ethernet since kernel 3.16
-In-Reply-To: <1407509932.19455.7.camel@sharkbay.at>
-References: <1407503758.19455.1.camel@sharkbay.at>
- <20140808132754.GC30282@n2100.arm.linux.org.uk>
- <1407507023.19455.3.camel@sharkbay.at>
- <20140808143008.GD30282@n2100.arm.linux.org.uk>
- <1407509932.19455.7.camel@sharkbay.at>
-Message-ID: <CAOMZO5C=sTL-ksaHX9uL=zyGR0d5hR8Rd5JAiQMTrr_0wiNdxQ@mail.gmail.com>
+From: heiko@sntech.de (Heiko =?ISO-8859-1?Q?St=FCbner?=)
+Date: Fri, 08 Aug 2014 17:53:45 +0200
+Subject: [PATCH v5 3/4] ARM: dts: add rk3288 dwc2 controller support
+In-Reply-To: <CAD=FV=XNSp85H2zVrLPdxDfhokEWFspvwUHjVMWRu8k_wFFm0Q@mail.gmail.com>
+References: <1407470159-14722-1-git-send-email-kever.yang@rock-chips.com>
+ <1407470159-14722-4-git-send-email-kever.yang@rock-chips.com>
+ <CAD=FV=XNSp85H2zVrLPdxDfhokEWFspvwUHjVMWRu8k_wFFm0Q@mail.gmail.com>
+Message-ID: <1596739.u7ZntKLW7r@diego>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Thomas,
+Am Freitag, 8. August 2014, 08:45:16 schrieb Doug Anderson:
+> Kever,
+> 
+> On Thu, Aug 7, 2014 at 8:55 PM, Kever Yang <kever.yang@rock-chips.com> 
+wrote:
+> > rk3288 has two kind of usb controller, this add the dwc2 controller
+> > for otg and host1.
+> > 
+> > Controller can works with usb PHY default setting and Vbus on.
+> > 
+> > Signed-off-by: Kever Yang <kever.yang@rock-chips.com>
+> > Reviewed-by: Doug Anderson <dianders@chromium.org>
+> > Tested-by: Doug Anderson <dianders@chromium.org>
+> > ---
+> > 
+> > Changes in v5:
+> > - change the sort order of dwc2 in rk3288.dtsi
+> > 
+> > Changes in v4: None
+> > Changes in v3:
+> > - EHCI and HSIC move new for version 3.
+> > 
+> > Changes in v2: None
+> > 
+> >  arch/arm/boot/dts/rk3288.dtsi | 20 ++++++++++++++++++++
+> >  1 file changed, 20 insertions(+)
+> 
+> IMHO this series is ready to go in for 3.18.  I'm assuming Heiko will
+> pick it up once the bindings have landed.  It already has my tags.  ;)
 
-On Fri, Aug 8, 2014 at 11:58 AM, Thomas Scheiblauer <tom@sharkbay.at> wrote:
+correct ... the dts changes look ok, so I'll take patches 3 and 4 once patches 
+1 and 2 are included somewhere.
 
->> So, what I'm asking is to try without this workaround in case there is
->> some interaction there, thus testing the same interrupt configuration
->> that I've had here for the last 10 months without the kind of issues
->> you're reporting.  Sometimes, workarounds for one problem end up causing
->> other problem elsewhere.
->>
->
-> Indeed, commenting out these 2 lines in
-> arch/arm/boot/dts/imx6qdl-wandboard.dtsi fixes my problem without having
-> to increase TX_RING_SIZE.
-> Thank you very much!
 
-Could you please send a patch for imx6qdl-wandboard.dtsi? Please
-provide the details of the problem in the commit log.
-
-Thanks
+Heiko
