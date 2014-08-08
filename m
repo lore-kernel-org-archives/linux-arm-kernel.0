@@ -1,170 +1,55 @@
-From: matthias.bgg@gmail.com (Matthias Brugger)
-Date: Fri, 8 Aug 2014 16:19:01 +0200
-Subject: [PATCH v2 2/4] arm: mediatek: Add support for GIC interrupt
- polarity extension.
-In-Reply-To: <1407505411-2207-3-git-send-email-srv_yingjoe.chen@mediatek.com>
-References: <1407505411-2207-1-git-send-email-srv_yingjoe.chen@mediatek.com>
- <1407505411-2207-3-git-send-email-srv_yingjoe.chen@mediatek.com>
-Message-ID: <CABuKBeL-dcs+pDW3jUeRWNijyYwx4VUdUB=CjGXoGmQUCifQ5Q@mail.gmail.com>
+From: p.zabel@pengutronix.de (Philipp Zabel)
+Date: Fri, 08 Aug 2014 16:23:09 +0200
+Subject: [RFC PATCH v3] reset: Add a defer reset object to send board
+ specific reset
+In-Reply-To: <CACRpkdbFPAsu1gE-AVyD=-RxyE7mUJPSbFga7HLh0mxjE-mQuQ@mail.gmail.com>
+References: <1403098673-3058-1-git-send-email-houcheng@gmail.com>
+ <CACRpkdYfu8HmVCkn9JFh+YP5OPdr8o9nTfoCnkJ7SSpGoenQUg@mail.gmail.com>
+ <20140708080535.GJ13423@lukather>
+ <CACRpkdbFPAsu1gE-AVyD=-RxyE7mUJPSbFga7HLh0mxjE-mQuQ@mail.gmail.com>
+Message-ID: <1407507789.3354.20.camel@paszta.hi.pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2014-08-08 15:43 GMT+02:00 Joe.C <srv_yingjoe.chen@mediatek.com>:
-> From: "Joe.C" <yingjoe.chen@mediatek.com>
->
-> Mediatek SoCs have an interrupt polarity extension which allows
-> to swap the polarity for given interrupts.
+Am Dienstag, den 08.07.2014, 11:38 +0200 schrieb Linus Walleij:
+> On Tue, Jul 8, 2014 at 10:05 AM, Maxime Ripard
+> <maxime.ripard@free-electrons.com> wrote:
+> > On Tue, Jul 08, 2014 at 09:52:03AM +0200, Linus Walleij wrote:
+> >> On Wed, Jun 18, 2014 at 3:37 PM, Houcheng Lin <houcheng@gmail.com> wrote:
+> >>
+> >> > The Problem
+> >> > -----------
+> >> > The reset signal on a hardware board is send either:
+> >> >     - during machine initialization
+> >> >     - during bus master's initialization
+> >>
+> >> I just thought about this a bit, since there isn't already a generic GPIO
+> >> reset driver, just call this drivers/reset/reset-gpio.c and make the
+> >> ability to deferral just a configuration detail of the GPIO reset driver.
+> >
+> > Philipp has been working on one for quite some time. See
+> > http://www.spinics.net/lists/arm-kernel/msg321927.html
+> >
+> > However, it seems to progress slowly, and we don't seem to be able to
+> > reach a consensus here.
 
-Please use ./script/checkpatch.pl, all 4 patches have errors.
-Apart please use the get_maintainer.pl on all patches of a set and
-send the whole set to all email addresses returned by the script.
-Otherwise it will be really difficult to understand the context of the
-patch set.
+Mostly because Maxime and I seem to have a completely different opinion
+and nobody else argued one way or the other.
 
-Cheers,
-Matthias
+> > If you ask me, having to set a few extra properties like this just
+> > advocates for a regular reset driver and DT node for the reset GPIO,
+> > but I'm pretty sure Philipp will feel otherwise :)
+> 
+> Hm haha yeah let's fight it out :-)
+> 
+> This is not my subsystem so I'm getting some popcorn.
 
->
-> Signed-off-by: Joe.C <yingjoe.chen@mediatek.com>
-> ---
->  arch/arm/mach-mediatek/Makefile   |  2 +-
->  arch/arm/mach-mediatek/common.h   | 19 ++++++++++++
->  arch/arm/mach-mediatek/intpol.c   | 61 +++++++++++++++++++++++++++++++++++++++
->  arch/arm/mach-mediatek/mediatek.c | 10 +++++++
->  4 files changed, 91 insertions(+), 1 deletion(-)
->  create mode 100644 arch/arm/mach-mediatek/common.h
->  create mode 100644 arch/arm/mach-mediatek/intpol.c
->
-> diff --git a/arch/arm/mach-mediatek/Makefile b/arch/arm/mach-mediatek/Makefile
-> index 43e619f..82c39d8 100644
-> --- a/arch/arm/mach-mediatek/Makefile
-> +++ b/arch/arm/mach-mediatek/Makefile
-> @@ -1 +1 @@
-> -obj-$(CONFIG_ARCH_MEDIATEK) += mediatek.o
-> +obj-$(CONFIG_ARCH_MEDIATEK) += mediatek.o intpol.o
-> diff --git a/arch/arm/mach-mediatek/common.h b/arch/arm/mach-mediatek/common.h
-> new file mode 100644
-> index 0000000..8f2bbeb
-> --- /dev/null
-> +++ b/arch/arm/mach-mediatek/common.h
-> @@ -0,0 +1,19 @@
-> +/*
-> + * Copyright (c) 2014 Mediatek Inc.
-> + *
-> + * This program is free software; you can redistribute it and/or modify
-> + * it under the terms of the GNU General Public License as published by
-> + * the Free Software Foundation; either version 2 of the License, or
-> + * (at your option) any later version.
-> + *
-> + * This program is distributed in the hope that it will be useful,
-> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
-> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-> + * GNU General Public License for more details.
-> + */
-> +#ifndef __MEDIATEK_COMMON_H__
-> +#define __MEDIATEK_COMMON_H__
-> +
-> +extern char init_intpol(void);
-> +
-> +#endif /* __MEDIATEK_COMMON_H__ */
-> diff --git a/arch/arm/mach-mediatek/intpol.c b/arch/arm/mach-mediatek/intpol.c
-> new file mode 100644
-> index 0000000..65ccc7c
-> --- /dev/null
-> +++ b/arch/arm/mach-mediatek/intpol.c
-> @@ -0,0 +1,61 @@
-> +/*
-> + * This file contains common code that is intended to be used across
-> + * boards so that it's not replicated.
-> + *
-> + * Copyright (C) 2014 Mediatek Inc.
-> + *
-> + * This software is licensed under the terms of the GNU General Public
-> + * License version 2, as published by the Free Software Foundation, and
-> + * may be copied, distributed, and modified under those terms.
-> + *
-> + * This program is distributed in the hope that it will be useful,
-> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
-> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-> + * GNU General Public License for more details.
-> + */
-> +#include <linux/of_address.h>
-> +#include <linux/io.h>
-> +#include <linux/irq.h>
-> +#include <linux/irqchip/arm-gic.h>
-> +
-> +#define GIC_HW_IRQ_BASE  32
-> +#define INT_POL_INDEX(a)   ((a) - GIC_HW_IRQ_BASE)
-> +
-> +static void __iomem *int_pol_base;
-> +
-> +static int mtk_int_pol_set_type(struct irq_data *d, unsigned int type)
-> +{
-> +       unsigned int irq = d->hwirq;
-> +       u32 offset, reg_index, value;
-> +
-> +       offset = INT_POL_INDEX(irq) & 0x1F;
-> +       reg_index = INT_POL_INDEX(irq) >> 5;
-> +
-> +       /* This arch extension was called with irq_controller_lock held,
-> +          so the read-modify-write will be atomic */
-> +       value = readl(int_pol_base + reg_index * 4);
-> +       if (type == IRQ_TYPE_LEVEL_LOW || type == IRQ_TYPE_EDGE_FALLING)
-> +               value |= (1 << offset);
-> +       else
-> +               value &= ~(1 << offset);
-> +       writel(value, int_pol_base + reg_index * 4);
-> +
-> +       return 0;
-> +}
-> +
-> +void init_intpol(void)
-> +{
-> +       struct device_node *node;
-> +
-> +       node = of_find_compatible_node(NULL, NULL, "mediatek,mt6577-intpol");
-> +       if (!node)
-> +               return;
-> +
-> +       int_pol_base = of_io_request_and_map(node, 0, "intpol");
-> +       if (IS_ERR(int_pol_base)) {
-> +               pr_warn("Can't get resource\n");
-> +               return;
-> +       }
-> +
-> +       gic_arch_extn.irq_set_type = mtk_int_pol_set_type;
-> +}
-> diff --git a/arch/arm/mach-mediatek/mediatek.c b/arch/arm/mach-mediatek/mediatek.c
-> index 48051a2..aa10c70 100644
-> --- a/arch/arm/mach-mediatek/mediatek.c
-> +++ b/arch/arm/mach-mediatek/mediatek.c
-> @@ -16,6 +16,15 @@
->   */
->  #include <linux/init.h>
->  #include <asm/mach/arch.h>
-> +#include <linux/irqchip.h>
-> +
-> +#include "common.h"
-> +
-> +static void __init mediatek_init_irq(void)
-> +{
-> +       init_intpol();
-> +       irqchip_init();
-> +}
->
->  static const char * const mediatek_board_dt_compat[] = {
->         "mediatek,mt6589",
-> @@ -26,4 +35,5 @@ static const char * const mediatek_board_dt_compat[] = {
->
->  DT_MACHINE_START(MEDIATEK_DT, "Mediatek Cortex-A7 (Device Tree)")
->         .dt_compat      = mediatek_board_dt_compat,
-> +       .init_irq       = mediatek_init_irq,
->  MACHINE_END
-> --
-> 1.8.1.1.dirty
->
+Sorry about missing this earlier, I hope the popcorn is not stale.
 
+I think a reset that needs to be released before a fixed device appears
+on the bus, should be handled by the bus driver. The reset framework
+could be made to help with that, but I don't think a separate entity
+that scans the whole device tree itself is the right solution.
 
-
--- 
-motzblog.wordpress.com
+regards
+Philipp
