@@ -1,50 +1,56 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Fri,  8 Aug 2014 13:51:40 +0200
-Subject: [PATCH v4 2/2] arm64: don't flag non-aliasing VIPT I-caches as
- aliasing
-In-Reply-To: <1407498700-10164-1-git-send-email-ard.biesheuvel@linaro.org>
-References: <1407498700-10164-1-git-send-email-ard.biesheuvel@linaro.org>
-Message-ID: <1407498700-10164-2-git-send-email-ard.biesheuvel@linaro.org>
+From: a.ryabinin@samsung.com (Andrey Ryabinin)
+Date: Fri, 08 Aug 2014 15:53:56 +0400
+Subject: [PATCH] arm: module: add support for R_ARM_TARGET1 relocations
+Message-ID: <1407498836-2797-1-git-send-email-a.ryabinin@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-VIPT caches are non-aliasing if the index is derived from address bits that
-are always equal between VA and PA. Classifying these as aliasing results in
-unnecessary flushing which may hurt performance.
+Kernel module build with GCOV profiling fails to load with the
+following error:
 
-Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
-Acked-by: Will Deacon <will.deacon@arm.com>
+ $ insmod test_module.ko
+   test_module: unknown relocation: 38
+   insmod: can't insert 'test_module.ko': invalid module format
+
+This happens because constructor pointers in the .init_array section
+have not supported R_ARM_TARGET1 relocation type.
+
+Documentation (ELF for the ARM Architecture) says:
+    "The relocation must be processed either in the same way as R_ARM_REL32 or
+     as R_ARM_ABS32: a virtual platform must specify which method is used."
+
+Since kernel expects to see absolute addresses in .init_array R_ARM_TARGET1
+relocation type should be treated the same way as R_ARM_ABS32.
+
+Signed-off-by: Andrey Ryabinin <a.ryabinin@samsung.com>
 ---
-v4: de-obfuscate, add Will's ack
-v2, v3: no changes
+ arch/arm/include/asm/elf.h | 1 +
+ arch/arm/kernel/module.c   | 1 +
+ 2 files changed, 2 insertions(+)
 
- arch/arm64/kernel/cpuinfo.c | 14 ++++++++++++--
- 1 file changed, 12 insertions(+), 2 deletions(-)
-
-diff --git a/arch/arm64/kernel/cpuinfo.c b/arch/arm64/kernel/cpuinfo.c
-index d8c5a59a5687..504fdaa8367e 100644
---- a/arch/arm64/kernel/cpuinfo.c
-+++ b/arch/arm64/kernel/cpuinfo.c
-@@ -49,8 +49,18 @@ static void cpuinfo_detect_icache_policy(struct cpuinfo_arm64 *info)
- 	unsigned int cpu = smp_processor_id();
- 	u32 l1ip = CTR_L1IP(info->reg_ctr);
+diff --git a/arch/arm/include/asm/elf.h b/arch/arm/include/asm/elf.h
+index f4b46d3..afb9caf 100644
+--- a/arch/arm/include/asm/elf.h
++++ b/arch/arm/include/asm/elf.h
+@@ -50,6 +50,7 @@ typedef struct user_fp elf_fpregset_t;
+ #define R_ARM_ABS32		2
+ #define R_ARM_CALL		28
+ #define R_ARM_JUMP24		29
++#define R_ARM_TARGET1		38
+ #define R_ARM_V4BX		40
+ #define R_ARM_PREL31		42
+ #define R_ARM_MOVW_ABS_NC	43
+diff --git a/arch/arm/kernel/module.c b/arch/arm/kernel/module.c
+index 45e4781..6a4dffe 100644
+--- a/arch/arm/kernel/module.c
++++ b/arch/arm/kernel/module.c
+@@ -91,6 +91,7 @@ apply_relocate(Elf32_Shdr *sechdrs, const char *strtab, unsigned int symindex,
+ 			break;
  
--	if (l1ip != ICACHE_POLICY_PIPT)
--		set_bit(ICACHEF_ALIASING, &__icache_flags);
-+	if (l1ip != ICACHE_POLICY_PIPT) {
-+		/*
-+		 * VIPT caches are non-aliasing if the VA always equals the PA
-+		 * in all bit positions that are covered by the index. This is
-+		 * the case if the size of a way (# of sets * line size) does
-+		 * not exceed PAGE_SIZE.
-+		 */
-+		u32 waysize = icache_get_numsets() * icache_get_linesize();
-+
-+		if (l1ip != ICACHE_POLICY_VIPT || waysize > PAGE_SIZE)
-+			set_bit(ICACHEF_ALIASING, &__icache_flags);
-+	}
- 	if (l1ip == ICACHE_POLICY_AIVIVT)
- 		set_bit(ICACHEF_AIVIVT, &__icache_flags);
+ 		case R_ARM_ABS32:
++		case R_ARM_TARGET1:
+ 			*(u32 *)loc += sym->st_value;
+ 			break;
  
 -- 
-1.8.3.2
+1.8.5.5
