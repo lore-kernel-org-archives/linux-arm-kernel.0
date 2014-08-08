@@ -1,204 +1,129 @@
 From: olof@lixom.net (Olof Johansson)
-Date: Fri,  8 Aug 2014 09:47:57 -0700
-Subject: [GIT PULL 5/7] .17 ARM: SoC driver changes for 3.17
+Date: Fri,  8 Aug 2014 09:47:59 -0700
+Subject: [GIT PULL 7/7] ARM: SoC defconfig updates for 3.17
 In-Reply-To: <1407516479-1251-1-git-send-email-olof@lixom.net>
 References: <1407516479-1251-1-git-send-email-olof@lixom.net>
-Message-ID: <1407516479-1251-6-git-send-email-olof@lixom.net>
+Message-ID: <1407516479-1251-8-git-send-email-olof@lixom.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-A handful of driver-related changes. We've had a bunch of them going in through
-other branches as well, so it's only a part of what we really have this release.
+We broke this out in a separate branch since some defconfigs now are
+shared between maintainers, and having them merged in through separate
+topics (drivers/soc/etc) is a recipe for conflicts.
 
-Larger pieces are:
+Most of this is removal of two defconfigs:
 
-* Removal of a now unused PWM driver for atmel
-  - This includes AVR32 changes that have been appropriately acked.
-* Performance counter support for the arm CCN interconnect
-* OMAP mailbox driver cleanups and consolidation
-* PCI and SATA PHY drivers for SPEAr 13xx platforms
-* Redefinition (with backwards compatibility!) of PCI DT bindings for
-  Tegra to better model regulators/power.
+* Kirkwood, now folded into mvebu/multi_v5
+* Renesas genmai, removed platform
+* Major defconfig refresh for exynos
+* Various updates on the other multi-defconfigs and others (tegra,
+  socfpga, shmobile).
 
-Conflicts:
 
-arch/arm/mach-spear/spear1340.c:
-        Change/remove: (A fix staticized some of the removed 
-        functions). Remove the conflicting chunk, leaving just the
-        dt_init, compat table and machine descriptor.
-
-drivers/phy/Kconfig:
-        Add/add. Keep both sides, sort (ST -> QCOM -> XGENE)
-
-drivers/phy/Makefile:
-        Add/add. Keep both sides, sort.
+Conflicts: None
 
 ----------------------------------------------------------------
 
-The following changes since commit 02eb2d4ca08934f1fd4a2ebe9fbe5d6f2bc7e438:
+The following changes since commit 2696879b31fb6bbf9689996a7fe10f7a60b5ac54:
 
-  Merge branch 'next/dt' into HEAD
+  Merge branch 'next/drivers' into HEAD
 
 are available in the git repository at:
 
-  git://git.kernel.org/pub/scm/linux/kernel/git/arm/arm-soc.git tags/drivers-for-3.17
+  git://git.kernel.org/pub/scm/linux/kernel/git/arm/arm-soc.git tags/defconfig-for-3.17
 
-for you to fetch changes up to 3e528cb7bae00ba0d73def6645d0f2fa906ee3e8:
+for you to fetch changes up to dc1c5a84c7c97318f0f9cfb66198ef2f5db3dcb3:
 
-  bus: arm-ccn: Fix error handling at event allocation
+  ARM: multi_v7_defconfig: Enable TI PIPE3 PHY driver
 
 ----------------------------------------------------------------
 
-Alexandre Belloni (15):
-      ARM: at91: at91sam9g45: switch to generic PWM framework
-      ARM: at91: sam9m10g45ek: use generic leds_pwm driver
-      ARM: at91: at91sam9263: switch to generic PWM framework
-      ARM: at91: sam9263ek: use generic leds_pwm driver
-      ARM: at91: at91sam9rl: switch to generic PWM framework
-      ARM: at91: remove useless at91_pwm_leds()
-      PWM: atmel: allow building for AVR32
-      avr32/at32ap: switch to the generic PWM framework
-      avr32: MRMT: use generic leds_pwm driver
-      avr32: merisc: use generic leds_pwm driver
-      avr32: favr-32: use generic pwm_bl driver
-      avr32: update defconfig to use the generic PWM framework
-      backlight: atmel-pwm-bl: remove obsolete driver
-      leds: atmel-pwm: remove obsolete driver
-      misc: atmel_pwm: remove obsolete driver
+Andrew Lunn (3):
+      ARM: mvebu: Add LaCie 2Big and 5Big Network v2
+      ARM: multi_v5: Enable LaCie 2Big and 5Big Network v2
+      ARM: Kirkwood: Remove kirkwood_defconfig
 
-Arnd Bergmann (3):
-      bus: ARM CCN: add PERF_EVENTS dependency
-      Merge branch 'omap-for-v3.17/mailbox' into next/drivers
-      Merge tag 'omap-for-v3.17/mailbox-cleanup' of git://git.kernel.org/.../tmlind/linux-omap into next/drivers
+Gabriel FERNANDEZ (1):
+      ARM: multi_v7_defconfig: add ST Keyscan driver
 
-Mohit Kumar (1):
-      ARM: SPEAr13xx: Update defconfigs
+Gaku Inami (1):
+      ARM: shmobile: Enable CPUFREQ configuration
 
-Olof Johansson (3):
-      Merge tag 'at91-drivers' of git://github.com/at91linux/linux-at91 into next/drivers
-      Merge branch 'spear/pcie-support-v10' of git://git.kernel.org/.../vireshk/linux into next/drivers
-      Merge tag 'tegra-for-3.17-pcie-regulators' of git://git.kernel.org/.../tegra/linux into next/drivers
+Geert Uytterhoeven (1):
+      ARM: shmobile: armadillo800eva defconfig: Enable REGULATOR_GPIO and LEDS_GPIO
 
-Pawel Moll (2):
-      bus: ARM CCN PMU driver
-      bus: arm-ccn: Fix error handling at event allocation
+Gregory CLEMENT (1):
+      ARM: mvebu: defconfig: enable cpuidle support in mvebu_v7_defconfig
 
-Pratyush Anand (5):
-      PCI: spear: Add PCIe driver for ST Microelectronics SPEAr13xx
-      phy: Add drivers for PCIe and SATA phy on SPEAr13xx
-      ARM: SPEAr13xx: Fix static mapping table
-      ARM: SPEAr13xx: Add bindings and dt node for misc block
-      ARM: SPEAr13xx: Add pcie and miphy DT nodes
+Haojian Zhuang (1):
+      ARM: config: enable ARCH_HIX5HD2
 
-Suman Anna (7):
-      mailbox/omap: use devm_* interfaces
-      mailbox/omap: remove OMAP1 mailbox driver
-      mailbox/omap: remove omap_mbox_type_t from mailbox ops
-      mailbox/omap: simplify the fifo assignment by using macros
-      mailbox/omap: consolidate OMAP mailbox driver
-      mailbox/omap: remove the private mailbox structure
-      mailbox/omap: add a parent structure for every IP instance
+Laurent Pinchart (1):
+      ARM: shmobile: defconfig: Remove MACH_GENMAI
 
-Thierry Reding (5):
-      PCI: tegra: Overhaul regulator usage
-      ARM: tegra: Add new PCIe regulator properties
-      PCI: tegra: Implement accurate power supply scheme
-      PCI: tegra: Remove deprecated power supply properties
-      ARM: tegra: Remove legacy PCIe power supply properties
+Lee Jones (4):
+      ARM: multi_v7_defconfig: Enable ST's I2C driver
+      ARM: multi_v7_defconfig: Configure in ST's Thermal Controller
+      ARM: multi_v7_defconfig: Enable ST's (S)ATA driver
+      ARM: multi_v7_defconfig: Enable MiPHY365x - ST's Generic (SATA & PCIe) PHY
 
-Viresh Kumar (2):
-      PCI: spear: Fix Section mismatch compilation warning for probe()
-      PCI: spear: Remove spear13xx_pcie_remove()
+Marcel Ziswiler (2):
+      ARM: tegra: enable igb, stmpe, i2c chardev, lm95245, pwm leds
+      ARM: multi_v7: enable igb, stmpe, lm95245, pwm leds
+
+Marcin Wojtas (1):
+      ARM: mvebu: enable Armada 375 network driver in mvebu_v7_defconfig
+
+Olof Johansson (8):
+      Merge tag 'renesas-defconfig-for-v3.17' of git://git.kernel.org/.../horms/renesas into next/defconfig
+      Merge tag 'mvebu-defconfig-3.17' of git://git.infradead.org/linux-mvebu into next/defconfig
+      Merge tag 'renesas-defconfig2-for-v3.17' of git://git.kernel.org/.../horms/renesas into next/defconfig
+      Merge tag 'renesas-defconfig3-for-v3.17' of git://git.kernel.org/.../horms/renesas into next/defconfig
+      Merge tag 'renesas-defconfig4-for-v3.17' of git://git.kernel.org/.../horms/renesas into next/defconfig
+      Merge tag 'tegra-for-3.17-defconfig' of git://git.kernel.org/.../tegra/linux into next/defconfig
+      Merge tag 'mvebu-defconfig-3.17-2' of git://git.infradead.org/linux-mvebu into next/defconfig
+      Merge tag 'sti-defconfig-for-v3.17-1' of git://git.stlinux.com/devel/kernel/linux-sti into next/defconfig
+
+Peter Griffin (1):
+      ARM: update multi_v7_defconfig for STI
+
+Roger Quadros (1):
+      ARM: multi_v7_defconfig: Enable TI PIPE3 PHY driver
+
+Sachin Kamat (1):
+      ARM: exynos_defconfig: Update exynos_defconfig
+
+Simon Horman (5):
+      ARM: shmobile: marzen: Add to shmobile defconfig
+      ARM: shmobile: Enable PM_RUNTIME in defconfig
+      ARM: shmobile: Enable genmai board in multiplatform defconfig
+      ARM: shmobile: Enable R-Car Gen 2 PCIe in shmobile_defconfig
+      ARM: shmobile: genmai: remove defconfig
+
+Stephen Warren (1):
+      ARM: tegra: rebuild tegra_defconfig
+
+Thomas Petazzoni (3):
+      ARM: mvebu: add appended DTB support in mvebu_v5_defconfig
+      ARM: mvebu: add devtmpfs to mvebu_v5_defconfig
+      ARM: mvebu: update mvebu_v7_defconfig with cpufreq support
+
+Vince Bridgers (1):
+      ARM: socfpga: Update socfpga_defconfig
 
 
- Documentation/arm/CCN.txt                       |   52 +
- Documentation/devicetree/bindings/arm/ccn.txt   |   21 +
- .../devicetree/bindings/arm/spear-misc.txt      |    9 +
- .../bindings/pci/nvidia,tegra20-pcie.txt        |   30 +-
- .../devicetree/bindings/pci/spear13xx-pcie.txt  |   14 +
- .../devicetree/bindings/phy/st-spear-miphy.txt  |   15 +
- MAINTAINERS                                     |    6 +
- arch/arm/boot/dts/spear1310-evb.dts             |    4 +
- arch/arm/boot/dts/spear1310.dtsi                |   93 +-
- arch/arm/boot/dts/spear1340-evb.dts             |    4 +
- arch/arm/boot/dts/spear1340.dtsi                |   30 +-
- arch/arm/boot/dts/spear13xx.dtsi                |    9 +-
- arch/arm/boot/dts/tegra20-harmony.dts           |    8 +-
- arch/arm/boot/dts/tegra20-tamonten.dtsi         |    7 +-
- arch/arm/boot/dts/tegra20-trimslice.dts         |    8 +-
- arch/arm/boot/dts/tegra30-beaver.dts            |   12 +-
- arch/arm/boot/dts/tegra30-cardhu.dtsi           |   11 +-
- arch/arm/configs/omap1_defconfig                |    2 -
- arch/arm/configs/spear13xx_defconfig            |   16 +
- arch/arm/mach-at91/at91sam9263.c                |    1 +
- arch/arm/mach-at91/at91sam9263_devices.c        |   11 +-
- arch/arm/mach-at91/at91sam9g45.c                |    1 +
- arch/arm/mach-at91/at91sam9g45_devices.c        |   11 +-
- arch/arm/mach-at91/at91sam9rl.c                 |    1 +
- arch/arm/mach-at91/at91sam9rl_devices.c         |   11 +-
- arch/arm/mach-at91/board-sam9263ek.c            |   55 +-
- arch/arm/mach-at91/board-sam9m10g45ek.c         |   42 +-
- arch/arm/mach-at91/board.h                      |    1 -
- arch/arm/mach-at91/leds.c                       |   37 -
- arch/arm/mach-spear/Kconfig                     |    4 +
- arch/arm/mach-spear/include/mach/spear.h        |    4 +-
- arch/arm/mach-spear/spear1340.c                 |  125 +-
- arch/arm/mach-spear/spear13xx.c                 |    2 +-
- arch/avr32/boards/atngw100/mrmt.c               |   34 +-
- arch/avr32/boards/favr-32/setup.c               |   48 +-
- arch/avr32/boards/merisc/setup.c                |   34 +-
- arch/avr32/configs/atngw100_mrmt_defconfig      |    5 +-
- arch/avr32/configs/atstk1002_defconfig          |    5 +-
- arch/avr32/configs/atstk1003_defconfig          |    5 +-
- arch/avr32/configs/atstk1004_defconfig          |    5 +-
- arch/avr32/configs/atstk1006_defconfig          |    5 +-
- arch/avr32/configs/favr-32_defconfig            |    6 +-
- arch/avr32/configs/merisc_defconfig             |    5 +-
- arch/avr32/mach-at32ap/at32ap700x.c             |    7 +-
- drivers/bus/Kconfig                             |    8 +
- drivers/bus/Makefile                            |    4 +-
- drivers/bus/arm-ccn.c                           | 1391 ++++++++++++++++++
- drivers/leds/Kconfig                            |    8 -
- drivers/leds/Makefile                           |    1 -
- drivers/leds/leds-atmel-pwm.c                   |  149 --
- drivers/mailbox/Kconfig                         |   19 +-
- drivers/mailbox/Makefile                        |    6 +-
- drivers/mailbox/mailbox-omap1.c                 |  203 ---
- drivers/mailbox/mailbox-omap2.c                 |  357 -----
- drivers/mailbox/omap-mailbox.c                  |  444 ++++--
- drivers/mailbox/omap-mbox.h                     |   67 -
- drivers/misc/Kconfig                            |   10 -
- drivers/misc/Makefile                           |    1 -
- drivers/misc/atmel_pwm.c                        |  402 -----
- drivers/pci/host/Kconfig                        |    8 +
- drivers/pci/host/Makefile                       |    1 +
- drivers/pci/host/pci-tegra.c                    |  222 ++-
- drivers/pci/host/pcie-spear13xx.c               |  393 +++++
- drivers/phy/Kconfig                             |   20 +-
- drivers/phy/Makefile                            |    4 +-
- drivers/phy/phy-spear1310-miphy.c               |  274 ++++
- drivers/phy/phy-spear1340-miphy.c               |  307 ++++
- drivers/pwm/Kconfig                             |    2 +-
- drivers/video/backlight/Kconfig                 |   11 -
- drivers/video/backlight/Makefile                |    1 -
- drivers/video/backlight/atmel-pwm-bl.c          |  223 ---
- include/linux/atmel-pwm-bl.h                    |   43 -
- include/linux/atmel_pwm.h                       |   70 -
- 73 files changed, 3447 insertions(+), 2018 deletions(-)
- create mode 100644 Documentation/arm/CCN.txt
- create mode 100644 Documentation/devicetree/bindings/arm/ccn.txt
- create mode 100644 Documentation/devicetree/bindings/arm/spear-misc.txt
- create mode 100644 Documentation/devicetree/bindings/pci/spear13xx-pcie.txt
- create mode 100644 Documentation/devicetree/bindings/phy/st-spear-miphy.txt
- create mode 100644 drivers/bus/arm-ccn.c
- delete mode 100644 drivers/leds/leds-atmel-pwm.c
- delete mode 100644 drivers/mailbox/mailbox-omap1.c
- delete mode 100644 drivers/mailbox/mailbox-omap2.c
- delete mode 100644 drivers/mailbox/omap-mbox.h
- delete mode 100644 drivers/misc/atmel_pwm.c
- create mode 100644 drivers/pci/host/pcie-spear13xx.c
- create mode 100644 drivers/phy/phy-spear1310-miphy.c
- create mode 100644 drivers/phy/phy-spear1340-miphy.c
- delete mode 100644 drivers/video/backlight/atmel-pwm-bl.c
- delete mode 100644 include/linux/atmel-pwm-bl.h
- delete mode 100644 include/linux/atmel_pwm.h
+ arch/arm/configs/armadillo800eva_defconfig |   4 +
+ arch/arm/configs/exynos_defconfig          |  56 ++++++--
+ arch/arm/configs/genmai_defconfig          | 122 ----------------
+ arch/arm/configs/hi3xxx_defconfig          |   2 +
+ arch/arm/configs/kirkwood_defconfig        | 181 ------------------------
+ arch/arm/configs/multi_v5_defconfig        |   2 +
+ arch/arm/configs/multi_v7_defconfig        |  20 ++-
+ arch/arm/configs/mvebu_v5_defconfig        |   6 +
+ arch/arm/configs/mvebu_v7_defconfig        |   5 +
+ arch/arm/configs/shmobile_defconfig        |  23 ++-
+ arch/arm/configs/socfpga_defconfig         |  35 +++++
+ arch/arm/configs/tegra_defconfig           |  16 +--
+ 12 files changed, 151 insertions(+), 321 deletions(-)
+ delete mode 100644 arch/arm/configs/genmai_defconfig
+ delete mode 100644 arch/arm/configs/kirkwood_defconfig
