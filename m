@@ -1,61 +1,66 @@
-From: u.kleine-koenig@pengutronix.de (=?UTF-8?q?Uwe=20Kleine-K=C3=B6nig?=)
-Date: Fri,  8 Aug 2014 11:24:21 +0200
-Subject: [PATCH 1/2] ARM: dts: imx28: add pinmuxing for mmc1
-Message-ID: <1407489862-6358-1-git-send-email-u.kleine-koenig@pengutronix.de>
+From: thierry.reding@gmail.com (Thierry Reding)
+Date: Fri, 8 Aug 2014 11:41:25 +0200
+Subject: [PATCH 1/3] of: Add of_match_machine helper
+In-Reply-To: <1407452515-2390-2-git-send-email-ttynkkynen@nvidia.com>
+References: <1407452515-2390-1-git-send-email-ttynkkynen@nvidia.com>
+ <1407452515-2390-2-git-send-email-ttynkkynen@nvidia.com>
+Message-ID: <20140808094123.GC5387@ulmo>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Marc Kleine-Budde <mkl@pengutronix.de>
+On Fri, Aug 08, 2014 at 02:01:53AM +0300, Tuomas Tynkkynen wrote:
+> Add of_match_machine function to test the device tree root for an
+> of_match array. This can be useful when testing SoC versions at runtime,
+> for example.
+> 
+> Signed-off-by: Tuomas Tynkkynen <ttynkkynen@nvidia.com>
+> ---
+>  drivers/of/base.c  | 21 +++++++++++++++++++++
+>  include/linux/of.h |  3 +++
+>  2 files changed, 24 insertions(+)
+> 
+> diff --git a/drivers/of/base.c b/drivers/of/base.c
+> index d8574ad..37798ea 100644
+> --- a/drivers/of/base.c
+> +++ b/drivers/of/base.c
+> @@ -977,6 +977,27 @@ struct device_node *of_find_matching_node_and_match(struct device_node *from,
+>  EXPORT_SYMBOL(of_find_matching_node_and_match);
+>  
+>  /**
+> + * of_match_machine - Tell if root of device tree has a matching of_match struct
+> + *	@matches:	array of of device match structures to search in
+> + *
+> + *	Returns the result of of_match_node for the root node.
+> + */
 
-Signed-off-by: Marc Kleine-Budde <mkl@pengutronix.de>
-[ukl: rebase from ancient kernel version]
-Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
----
- arch/arm/boot/dts/imx28.dtsi | 32 ++++++++++++++++++++++++++++++++
- 1 file changed, 32 insertions(+)
+I was going to say that this kerneldoc is weirdly formatted, but when I
+looked at the other kerneldoc comments in this file it seems that they
+use similarly weird formatting...
 
-diff --git a/arch/arm/boot/dts/imx28.dtsi b/arch/arm/boot/dts/imx28.dtsi
-index a95cc5358ff4..defb98a5b045 100644
---- a/arch/arm/boot/dts/imx28.dtsi
-+++ b/arch/arm/boot/dts/imx28.dtsi
-@@ -489,6 +489,38 @@
- 					fsl,pull-up = <MXS_PULL_DISABLE>;
- 				};
- 
-+				mmc1_4bit_pins_a: mmc1-4bit at 0 {
-+					reg = <0>;
-+					fsl,pinmux-ids = <
-+						MX28_PAD_GPMI_D00__SSP1_D0
-+						MX28_PAD_GPMI_D01__SSP1_D1
-+						MX28_PAD_GPMI_D02__SSP1_D2
-+						MX28_PAD_GPMI_D03__SSP1_D3
-+						MX28_PAD_GPMI_RDY1__SSP1_CMD
-+						MX28_PAD_GPMI_RDY0__SSP1_CARD_DETECT
-+						MX28_PAD_GPMI_WRN__SSP1_SCK
-+					>;
-+					fsl,drive-strength = <MXS_DRIVE_8mA>;
-+					fsl,voltage = <MXS_VOLTAGE_HIGH>;
-+					fsl,pull-up = <MXS_PULL_ENABLE>;
-+				};
-+
-+				mmc1_cd_cfg: mmc1-cd-cfg {
-+					fsl,pinmux-ids = <
-+						MX28_PAD_GPMI_RDY0__SSP1_CARD_DETECT
-+					>;
-+					fsl,pull-up = <MXS_PULL_DISABLE>;
-+				};
-+
-+				mmc1_sck_cfg: mmc1-sck-cfg {
-+					fsl,pinmux-ids = <
-+						MX28_PAD_GPMI_WRN__SSP1_SCK
-+					>;
-+					fsl,drive-strength = <MXS_DRIVE_12mA>;
-+					fsl,pull-up = <MXS_PULL_DISABLE>;
-+				};
-+
-+
- 				mmc2_4bit_pins_a: mmc2-4bit at 0 {
- 					reg = <0>;
- 					fsl,pinmux-ids = <
--- 
-2.0.1
+> +const struct of_device_id *of_match_machine(const struct of_device_id *matches)
+> +{
+> +	const struct of_device_id *match;
+> +	struct device_node *root;
+> +
+> +	root = of_find_node_by_path("/");
+> +	if (!root)
+> +		return NULL;
+> +
+> +	match = of_match_node(matches, root);
+> +	of_node_put(root);
+> +	return match;
+> +}
+> +EXPORT_SYMBOL(of_match_machine);
+
+I wonder if of_find_node_by_path("/") is somewhat overkill here. Perhaps
+simply of_node_get(of_allnodes) would be more appropriate here since the
+function is implemented in the core?
+
+Thierry
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: not available
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140808/67e6af16/attachment.sig>
