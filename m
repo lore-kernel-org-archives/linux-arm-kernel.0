@@ -1,41 +1,42 @@
-From: tom@sharkbay.at (Thomas Scheiblauer)
-Date: Fri, 08 Aug 2014 16:10:23 +0200
-Subject: [BUG]: imx6q (wandboard): Very unstable ethernet since kernel 3.16
-In-Reply-To: <20140808132754.GC30282@n2100.arm.linux.org.uk>
-References: <1407503758.19455.1.camel@sharkbay.at>
- <20140808132754.GC30282@n2100.arm.linux.org.uk>
-Message-ID: <1407507023.19455.3.camel@sharkbay.at>
+From: p.zabel@pengutronix.de (Philipp Zabel)
+Date: Fri, 08 Aug 2014 16:11:34 +0200
+Subject: [PATCH 4/4] gpio: pca953x: Add DT binding for reset gpio
+In-Reply-To: <CACRpkdY0TqVH1tJR1H89S5hvdJUboQdVtNvZnL3NeWit4f+amw@mail.gmail.com>
+References: <1406618686-22385-1-git-send-email-mpa@pengutronix.de>
+ <1406618686-22385-5-git-send-email-mpa@pengutronix.de>
+ <CACRpkdY0TqVH1tJR1H89S5hvdJUboQdVtNvZnL3NeWit4f+amw@mail.gmail.com>
+Message-ID: <1407507094.3354.11.camel@paszta.hi.pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fre, 2014-08-08 at 14:27 +0100, Russell King - ARM Linux wrote:
-> On Fri, Aug 08, 2014 at 03:15:58PM +0200, Thomas Scheiblauer wrote:
-> > Since Kernel 3.16 (running on 3.16.0) the ethernet (fec) connection
-> > stops working after exchanging very little data. Sometimes it comes back
-> > again for some seconds and drops again. No clues in dmesg.
-> > 
-> > After increasing TX_RING_SIZE in "drivers/net/ethernet/freescale/fec.h"
-> > from 512 to 1024 the connection seems to stay stable (judging after
-> > about half an hour of testing) but I really don't have experience with
-> > kernel driver hacking, so I'm not sure what I'm doing here.
+Am Freitag, den 08.08.2014, 15:14 +0200 schrieb Linus Walleij:
+> On Tue, Jul 29, 2014 at 9:24 AM, Markus Pargmann <mpa@pengutronix.de> wrote:
 > 
-> Interesting.  There have been some other reports of instability in a
-> similar manner to that which you report, and, like the wanboard, they
-> too have this:
+> > The pca953x has a negated reset input. This patch adds a DT binding for
+> > the reset gpio and resets the chip when it is probed. This will reset
+> > the device and leave the gpio in the correct state so reset is not
+> > triggered.
+> >
+> > Signed-off-by: Markus Pargmann <mpa@pengutronix.de>
 > 
->         interrupts-extended = <&gpio1 6 IRQ_TYPE_LEVEL_HIGH>,
->                               <&intc 0 119 IRQ_TYPE_LEVEL_HIGH>;
-> 
-> Could it be that gpio1 6 doesn't actually work very well?  What happens
-> if you comment out the above property in
-> arch/arm/boot/dts/imx6qdl-wandboard.dtsi so you're using the standard
-> interrupt on GIC 150?
-> 
+> Why on earth should this be in the GPIO driver?
+>
+> The driver should be in drivers/reset/reset-gpio.c and you
+> should provide a separate driver for it.
 
-These lines in arch/arm/boot/dts/imx6qdl-wandboard.dtsi already seem to
-be a workaround for some hardware errata:
-ERR006687 ?ENET: Only the ENET wake-up interrupt request can wake the
-system from Wait mode?
+I still think we should keep using the reset-gpios binding for simple
+cases like this; I see no reason to add a separate device to the device
+tree for a single GPIO.
 
-See the original mail containing the patch:
-http://lists.infradead.org/pipermail/linux-arm-kernel/2013-December/221204.html
+> As it happens, Houcheng Lin has already proposed such a
+> driver:
+> http://marc.info/?l=linux-kernel&m=140309916607115&w=2
+
+That is a different issue, as there the device does not appear on the
+bus until the reset is released.
+
+Here the I2C device will be probed from the device tree, so the reset
+can be released or triggered from the probe function.
+
+regards
+Philipp
