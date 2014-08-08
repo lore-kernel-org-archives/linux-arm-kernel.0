@@ -1,44 +1,24 @@
-From: heikki.krogerus@linux.intel.com (Heikki Krogerus)
-Date: Fri, 8 Aug 2014 14:05:37 +0300
-Subject: [PATCH 6/6] tty: serial: Add 8250-core based omap driver
-In-Reply-To: <1404928177-26554-7-git-send-email-bigeasy@linutronix.de>
-References: <1404928177-26554-1-git-send-email-bigeasy@linutronix.de>
- <1404928177-26554-7-git-send-email-bigeasy@linutronix.de>
-Message-ID: <20140808110537.GA29184@xps8300>
+From: thierry.reding@gmail.com (Thierry Reding)
+Date: Fri, 8 Aug 2014 13:12:11 +0200
+Subject: [PATCH v5 0/2] This series adds support for RK3288 SoC
+ integrated PWM
+In-Reply-To: <1407482929-13050-1-git-send-email-caesar.wang@rock-chips.com>
+References: <1407482929-13050-1-git-send-email-caesar.wang@rock-chips.com>
+Message-ID: <20140808111209.GA20064@ulmo.nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jul 09, 2014 at 07:49:37PM +0200, Sebastian Andrzej Siewior wrote:
-> diff --git a/drivers/tty/serial/8250/8250_core.c b/drivers/tty/serial/8250/8250_core.c
-> index bf06a4c..1cbfc8c 100644
-> --- a/drivers/tty/serial/8250/8250_core.c
-> +++ b/drivers/tty/serial/8250/8250_core.c
-> @@ -263,6 +263,12 @@ static const struct serial8250_config uart_config[] = {
->  		.fcr		= UART_FCR_ENABLE_FIFO | UART_FCR_R_TRIG_10,
->  		.flags		= UART_CAP_FIFO | UART_CAP_AFE,
->  	},
-> +	[PORT_OMAP_16750] = {
-> +		.name		= "OMAP",
-> +		.fifo_size	= 64,
-> +		.tx_loadsz	= 64,
-> +		.flags		= UART_CAP_FIFO | UART_CAP_EFR | UART_CAP_SLEEP,
-> +	},
->  	[PORT_TEGRA] = {
->  		.name		= "Tegra",
->  		.fifo_size	= 32,
-> @@ -1340,6 +1346,8 @@ static void serial8250_stop_rx(struct uart_port *port)
->  	pm_runtime_get_sync(port->dev);
->  
->  	up->ier &= ~UART_IER_RLSI;
-> +	if (port->type == PORT_OMAP_16750)
-> +		up->ier &= ~UART_IER_RDI;
->  	up->port.read_status_mask &= ~UART_LSR_DR;
->  	serial_port_out(port, UART_IER, up->ier);
+On Fri, Aug 08, 2014 at 03:28:47PM +0800, Caesar Wang wrote:
+> This patch will make applying on the top of Beniamino's submission,
+> the Beniamino's submission come from [1].
 
-Alan couldn't UART_IER_RDI be always cleared here with all port types?
-Actually, shouldn't it be?
+Both patches applied (with last-minute minor stylistic fixups), thanks.
 
-Then the custom port type PORT_OMAP_16750 would not be needed.
-
--- 
-heikki
+Thierry
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: not available
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140808/96e6fc73/attachment.sig>
