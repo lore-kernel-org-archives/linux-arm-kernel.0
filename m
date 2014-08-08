@@ -1,81 +1,152 @@
 From: srv_yingjoe.chen@mediatek.com (Joe.C)
-Date: Fri, 8 Aug 2014 21:43:28 +0800
-Subject: [PATCH v2 1/4] irqchip: gic: Change irq type check when extension is
- present
+Date: Fri, 8 Aug 2014 21:43:29 +0800
+Subject: [PATCH v2 2/4] arm: mediatek: Add support for GIC interrupt polarity
+ extension.
 In-Reply-To: <1407505411-2207-1-git-send-email-srv_yingjoe.chen@mediatek.com>
 References: <1407505411-2207-1-git-send-email-srv_yingjoe.chen@mediatek.com>
-Message-ID: <1407505411-2207-2-git-send-email-srv_yingjoe.chen@mediatek.com>
+Message-ID: <1407505411-2207-3-git-send-email-srv_yingjoe.chen@mediatek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: "Joe.C" <yingjoe.chen@mediatek.com>
 
-GIC supports the combination with external extensions. But this
-is not reflected in the checks of the interrupt type flag.
-This patch allows interrupt types other than the one supported by GIC,
-if an architecture extension is present and supports them.
+Mediatek SoCs have an interrupt polarity extension which allows
+to swap the polarity for given interrupts.
 
 Signed-off-by: Joe.C <yingjoe.chen@mediatek.com>
 ---
- drivers/irqchip/irq-gic.c | 27 ++++++++++++++++++---------
- 1 file changed, 18 insertions(+), 9 deletions(-)
+ arch/arm/mach-mediatek/Makefile   |  2 +-
+ arch/arm/mach-mediatek/common.h   | 19 ++++++++++++
+ arch/arm/mach-mediatek/intpol.c   | 61 +++++++++++++++++++++++++++++++++++++++
+ arch/arm/mach-mediatek/mediatek.c | 10 +++++++
+ 4 files changed, 91 insertions(+), 1 deletion(-)
+ create mode 100644 arch/arm/mach-mediatek/common.h
+ create mode 100644 arch/arm/mach-mediatek/intpol.c
 
-diff --git a/drivers/irqchip/irq-gic.c b/drivers/irqchip/irq-gic.c
-index 57d165e..66485ab 100644
---- a/drivers/irqchip/irq-gic.c
-+++ b/drivers/irqchip/irq-gic.c
-@@ -194,23 +194,32 @@ static int gic_set_type(struct irq_data *d, unsigned int type)
- 	u32 confoff = (gicirq / 16) * 4;
- 	bool enabled = false;
- 	u32 val;
-+	int ret = 0;
- 
- 	/* Interrupt configuration for SGIs can't be changed */
- 	if (gicirq < 16)
- 		return -EINVAL;
- 
--	if (type != IRQ_TYPE_LEVEL_HIGH && type != IRQ_TYPE_EDGE_RISING)
--		return -EINVAL;
--
- 	raw_spin_lock(&irq_controller_lock);
- 
--	if (gic_arch_extn.irq_set_type)
--		gic_arch_extn.irq_set_type(d, type);
-+	if (gic_arch_extn.irq_set_type) {
-+		ret = gic_arch_extn.irq_set_type(d, type);
-+		if (ret)
-+			goto out;
-+	} else if (type != IRQ_TYPE_LEVEL_HIGH &&
-+		type != IRQ_TYPE_EDGE_RISING) {
-+			ret = -EINVAL;
-+			goto out;
+diff --git a/arch/arm/mach-mediatek/Makefile b/arch/arm/mach-mediatek/Makefile
+index 43e619f..82c39d8 100644
+--- a/arch/arm/mach-mediatek/Makefile
++++ b/arch/arm/mach-mediatek/Makefile
+@@ -1 +1 @@
+-obj-$(CONFIG_ARCH_MEDIATEK) += mediatek.o
++obj-$(CONFIG_ARCH_MEDIATEK) += mediatek.o intpol.o
+diff --git a/arch/arm/mach-mediatek/common.h b/arch/arm/mach-mediatek/common.h
+new file mode 100644
+index 0000000..8f2bbeb
+--- /dev/null
++++ b/arch/arm/mach-mediatek/common.h
+@@ -0,0 +1,19 @@
++/*
++ * Copyright (c) 2014 Mediatek Inc.
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License as published by
++ * the Free Software Foundation; either version 2 of the License, or
++ * (at your option) any later version.
++ *
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
++ */
++#ifndef __MEDIATEK_COMMON_H__
++#define __MEDIATEK_COMMON_H__
++
++extern char init_intpol(void);
++
++#endif /* __MEDIATEK_COMMON_H__ */
+diff --git a/arch/arm/mach-mediatek/intpol.c b/arch/arm/mach-mediatek/intpol.c
+new file mode 100644
+index 0000000..65ccc7c
+--- /dev/null
++++ b/arch/arm/mach-mediatek/intpol.c
+@@ -0,0 +1,61 @@
++/*
++ * This file contains common code that is intended to be used across
++ * boards so that it's not replicated.
++ *
++ * Copyright (C) 2014 Mediatek Inc.
++ *
++ * This software is licensed under the terms of the GNU General Public
++ * License version 2, as published by the Free Software Foundation, and
++ * may be copied, distributed, and modified under those terms.
++ *
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
++ */
++#include <linux/of_address.h>
++#include <linux/io.h>
++#include <linux/irq.h>
++#include <linux/irqchip/arm-gic.h>
++
++#define GIC_HW_IRQ_BASE  32
++#define INT_POL_INDEX(a)   ((a) - GIC_HW_IRQ_BASE)
++
++static void __iomem *int_pol_base;
++
++static int mtk_int_pol_set_type(struct irq_data *d, unsigned int type)
++{
++	unsigned int irq = d->hwirq;
++	u32 offset, reg_index, value;
++
++	offset = INT_POL_INDEX(irq) & 0x1F;
++	reg_index = INT_POL_INDEX(irq) >> 5;
++
++	/* This arch extension was called with irq_controller_lock held,
++	   so the read-modify-write will be atomic */
++	value = readl(int_pol_base + reg_index * 4);
++	if (type == IRQ_TYPE_LEVEL_LOW || type == IRQ_TYPE_EDGE_FALLING)
++		value |= (1 << offset);
++	else
++		value &= ~(1 << offset);
++	writel(value, int_pol_base + reg_index * 4);
++
++	return 0;
++}
++
++void init_intpol(void)
++{
++	struct device_node *node;
++
++	node = of_find_compatible_node(NULL, NULL, "mediatek,mt6577-intpol");
++	if (!node)
++		return;
++
++	int_pol_base = of_io_request_and_map(node, 0, "intpol");
++	if (IS_ERR(int_pol_base)) {
++		pr_warn("Can't get resource\n");
++		return;
 +	}
++
++	gic_arch_extn.irq_set_type = mtk_int_pol_set_type;
++}
+diff --git a/arch/arm/mach-mediatek/mediatek.c b/arch/arm/mach-mediatek/mediatek.c
+index 48051a2..aa10c70 100644
+--- a/arch/arm/mach-mediatek/mediatek.c
++++ b/arch/arm/mach-mediatek/mediatek.c
+@@ -16,6 +16,15 @@
+  */
+ #include <linux/init.h>
+ #include <asm/mach/arch.h>
++#include <linux/irqchip.h>
++
++#include "common.h"
++
++static void __init mediatek_init_irq(void)
++{
++	init_intpol();
++	irqchip_init();
++}
  
- 	val = readl_relaxed(base + GIC_DIST_CONFIG + confoff);
--	if (type == IRQ_TYPE_LEVEL_HIGH)
-+	/* Check for both edge and level here, so we can support GIC irq
-+	   polarity extension in gic_arch_extn.irq_set_type. If arch
-+	   doesn't support polarity extension, the check above will reject
-+	   improper type. */
-+	if (type & IRQ_TYPE_LEVEL_MASK)
- 		val &= ~confmask;
--	else if (type == IRQ_TYPE_EDGE_RISING)
-+	else if (type & IRQ_TYPE_EDGE_BOTH)
- 		val |= confmask;
+ static const char * const mediatek_board_dt_compat[] = {
+ 	"mediatek,mt6589",
+@@ -26,4 +35,5 @@ static const char * const mediatek_board_dt_compat[] = {
  
- 	/*
-@@ -226,10 +235,10 @@ static int gic_set_type(struct irq_data *d, unsigned int type)
- 
- 	if (enabled)
- 		writel_relaxed(enablemask, base + GIC_DIST_ENABLE_SET + enableoff);
--
-+out:
- 	raw_spin_unlock(&irq_controller_lock);
- 
--	return 0;
-+	return ret;
- }
- 
- static int gic_retrigger(struct irq_data *d)
+ DT_MACHINE_START(MEDIATEK_DT, "Mediatek Cortex-A7 (Device Tree)")
+ 	.dt_compat	= mediatek_board_dt_compat,
++	.init_irq       = mediatek_init_irq,
+ MACHINE_END
 -- 
 1.8.1.1.dirty
