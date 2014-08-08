@@ -1,78 +1,75 @@
-From: kever.yang@rock-chips.com (Kever Yang)
-Date: Fri, 08 Aug 2014 09:12:12 +0800
-Subject: [PATCH] usb: dwc2: Read GNPTXFSIZ when in forced HOST mode.
-In-Reply-To: <1407440891-29295-1-git-send-email-dianders@chromium.org>
-References: <1407440891-29295-1-git-send-email-dianders@chromium.org>
-Message-ID: <53E423EC.6090309@rock-chips.com>
+From: wangnan0@huawei.com (Wang Nan)
+Date: Fri, 8 Aug 2014 09:25:24 +0800
+Subject: [RFC PATCH] kprobes: arm: enable OPTPROBES for arm 32
+In-Reply-To: <53E323D1.8020209@hitachi.com>
+References: <1407223697-74911-1-git-send-email-wangnan0@huawei.com>
+ <53E1B2A0.1040807@hitachi.com> <53E1CA11.1030206@huawei.com>
+ <53E323D1.8020209@hitachi.com>
+Message-ID: <53E42704.3090909@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Doug:
+On 2014/8/7 14:59, Masami Hiramatsu wrote:
+> (2014/08/06 15:24), Wang Nan wrote:
+>>>> +
+>>>> +static void
+>>>> +optimized_callback(struct optimized_kprobe *op, struct pt_regs *regs)
+>>>> +{
+>>>> +	unsigned long flags;
+>>>> +
+>>>> +	regs->ARM_pc = (unsigned long)op->kp.addr;
+>>>> +	regs->ARM_ORIG_r0 = ~0UL;
+>>>> +
+>>>> +
+>>>> +	local_irq_save(flags);
+>>>> +	/* 
+>>>> +	 * This is possible if op is under delayed unoptimizing.
+>>>> +	 * We need simulate the replaced instruction.
+>>>> +	 */
+>>>> +	if (kprobe_disabled(&op->kp)) {
+>>>> +		struct kprobe *p = &op->kp;
+>>>> +		op->kp.ainsn.insn_singlestep(p->opcode, &p->ainsn, regs);
+>>>> +	} else {
+>>>> +		kprobe_handler(regs);
+>>>> +	}
+>>>
+>>> You don't need brace "{}" for one statement.
+>>> By the way, why don't you call opt_pre_handler()?
+>>>
+>>
+>> I use kprobe_handler because it handles instruction emulation.
+>>
+>> In addition, I'm not very sure whether skipping the complex checks
+>> in kprobe_handler() is safe or not.
+> 
+> That seems to do same thing on x86. Then you should do something like
+> the optimized_callback() on x86 as below.
+> 
+> static void
+> optimized_callback(struct optimized_kprobe *op, struct pt_regs *regs)
+> {
+>         struct kprobe_ctlblk *kcb = get_kprobe_ctlblk();
+>         unsigned long flags;
+> 
+>         local_irq_save(flags);
+>         if (kprobe_running()) {
+>                 kprobes_inc_nmissed_count(&op->kp);
 
-On 08/08/2014 03:48 AM, Doug Anderson wrote:
-> The documentation for GNPTXFSIZ says that "For host mode, this field
-> is always valid."  Since we're already switching to host mode for
-> HPTXFSIZ, let's also read GNPTXFSIZ in host mode.
->
-> On an rk3288 SoC, without this change we see this at bootup:
->    dwc2 ff580000.usb: gnptxfsiz=00100400
->    dwc2 ff580000.usb: 128 invalid for host_nperio_tx_fifo_size. Check HW configuration.
->
-> After this change we see:
->    dwc2 ff580000.usb: gnptxfsiz=04000400
-Yeap, that is the problem cause the log you shown in rk3288-evb and 
-further more
-cause fifo setting fail.
+In this case we still need a singlestep, right?
 
-I was plan to commit this patch just the same as you did.
-It's great that you also find out the problem and send this patch.
->
-> Signed-off-by: Doug Anderson <dianders@chromium.org>
-> ---
->   drivers/usb/dwc2/core.c | 6 +++---
->   1 file changed, 3 insertions(+), 3 deletions(-)
->
-> diff --git a/drivers/usb/dwc2/core.c b/drivers/usb/dwc2/core.c
-> index 27d2c9b..c184ed43 100644
-> --- a/drivers/usb/dwc2/core.c
-> +++ b/drivers/usb/dwc2/core.c
-> @@ -2674,23 +2674,23 @@ int dwc2_get_hwparams(struct dwc2_hsotg *hsotg)
->   	hwcfg2 = readl(hsotg->regs + GHWCFG2);
->   	hwcfg3 = readl(hsotg->regs + GHWCFG3);
->   	hwcfg4 = readl(hsotg->regs + GHWCFG4);
-> -	gnptxfsiz = readl(hsotg->regs + GNPTXFSIZ);
->   	grxfsiz = readl(hsotg->regs + GRXFSIZ);
->   
->   	dev_dbg(hsotg->dev, "hwcfg1=%08x\n", hwcfg1);
->   	dev_dbg(hsotg->dev, "hwcfg2=%08x\n", hwcfg2);
->   	dev_dbg(hsotg->dev, "hwcfg3=%08x\n", hwcfg3);
->   	dev_dbg(hsotg->dev, "hwcfg4=%08x\n", hwcfg4);
-> -	dev_dbg(hsotg->dev, "gnptxfsiz=%08x\n", gnptxfsiz);
->   	dev_dbg(hsotg->dev, "grxfsiz=%08x\n", grxfsiz);
->   
-> -	/* Force host mode to get HPTXFSIZ exact power on value */
-> +	/* Force host mode to get HPTXFSIZ / GNPTXFSIZ exact power on value */
->   	gusbcfg = readl(hsotg->regs + GUSBCFG);
->   	gusbcfg |= GUSBCFG_FORCEHOSTMODE;
->   	writel(gusbcfg, hsotg->regs + GUSBCFG);
->   	usleep_range(100000, 150000);
->   
-> +	gnptxfsiz = readl(hsotg->regs + GNPTXFSIZ);
->   	hptxfsiz = readl(hsotg->regs + HPTXFSIZ);
-> +	dev_dbg(hsotg->dev, "gnptxfsiz=%08x\n", gnptxfsiz);
->   	dev_dbg(hsotg->dev, "hptxfsiz=%08x\n", hptxfsiz);
->   	gusbcfg = readl(hsotg->regs + GUSBCFG);
->   	gusbcfg &= ~GUSBCFG_FORCEHOSTMODE;
-There may be a potential problem still need to fix, the grxfsiz may have 
-being changed,
-the bootrom and uboot will change this value if they use the dwc2 
-controller.
-The way we get the register value here can not make sure this is the 
-power-on
-value which we actually need.
-
-Let me do more test for that, and maybe we need another patch.
-
-Anyway, this patch works and reasonable.
-
-Reviewed-by: Kever Yang <kever.yang@rock-chips.com>
+>         } else {
+>                 /* Save skipped registers */
+>                 regs->ARM_pc = (unsigned long)op->kp.addr;
+>                 regs->ARM_ORIG_r0 = ~0UL;
+> 
+>                 __this_cpu_write(current_kprobe, &op->kp);
+>                 kcb->kprobe_status = KPROBE_HIT_ACTIVE;
+>                 opt_pre_handler(&op->kp, regs);
+>                 __this_cpu_write(current_kprobe, NULL);
+> 		op->kp.ainsn.insn_singlestep(op->kp.opcode, &op->kp.ainsn, regs);
+>         }
+>         local_irq_restore(flags);
+> }
+> 
+> Thank you,
+> 
