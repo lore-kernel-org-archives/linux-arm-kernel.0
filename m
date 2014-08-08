@@ -1,56 +1,83 @@
-From: khilman@linaro.org (Kevin Hilman)
-Date: Fri, 08 Aug 2014 11:04:02 -0700
-Subject: [PATCH] ARM: multi_v7_defconfig: major refresh
-In-Reply-To: <CAOesGMi0RUbz4BSnmR92dEk3fWgN=hnENSdi55VeCXdcHLRLJQ@mail.gmail.com>
- (Olof Johansson's message of "Fri, 1 Aug 2014 04:03:36 -0700")
-References: <1406052070-6207-1-git-send-email-olof@lixom.net>
- <53DB6B4F.9080605@arm.com> <1406890899.2794.40.camel@linaro1.home>
- <CAOesGMi0RUbz4BSnmR92dEk3fWgN=hnENSdi55VeCXdcHLRLJQ@mail.gmail.com>
-Message-ID: <7hlhqy3lkd.fsf@paris.lan>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Fri, 8 Aug 2014 19:09:00 +0100
+Subject: Oops: 17 SMP ARM (v3.16-rc2)
+In-Reply-To: <20140807121248.GY30282@n2100.arm.linux.org.uk>
+References: <20140626151424.GT32514@n2100.arm.linux.org.uk>
+ <20140627112151.GF32514@n2100.arm.linux.org.uk>
+ <3FFB61A7A8473C49831AF20FA193534A43CADFA7@ALVA-EXMB01.alv.autoliv.int>
+ <20140627163108.GP32514@n2100.arm.linux.org.uk>
+ <C4A61A5CA4AD2246942F4BA6F20ACB8043575072@ALVA-EXMB04.alv.autoliv.int>
+ <20140806095012.GN30282@n2100.arm.linux.org.uk>
+ <C4A61A5CA4AD2246942F4BA6F20ACB8043575172@ALVA-EXMB04.alv.autoliv.int>
+ <20140806125550.GO30282@n2100.arm.linux.org.uk>
+ <C4A61A5CA4AD2246942F4BA6F20ACB804357526C@ALVA-EXMB04.alv.autoliv.int>
+ <20140807121248.GY30282@n2100.arm.linux.org.uk>
+Message-ID: <20140808180900.GG30282@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Olof Johansson <olof@lixom.net> writes:
+On Thu, Aug 07, 2014 at 01:12:48PM +0100, Russell King - ARM Linux wrote:
+> On Thu, Aug 07, 2014 at 11:11:06AM +0000, Mattis Lorentzon wrote:
+> > Russell,
+> > 
+> > > Can you ascertain whether these stalls are a result of some failure of the
+> > > receive side or the transmit side - you should be able to tell that if you watch
+> > > the packet counts via ifconfig on the stalled card.  Also, it would be useful to
+> > > know whether the FEC interrupt was firing.
+> > 
+> > grep eth /proc/interrupts
+> > 151:          0          0          0          0       GIC 151  2188000.ethernet
+> > 166:    1205661          0          0          0  gpio-mxc   6  2188000.ethernet
+> > 
+> > The interrupt counter 166 increases regularly during the stalls.
+> > Ifconfig indicates that the RX and TX  counters do not increase.
+> 
+> Hmm, I'm slightly confused.  On my iMX6Q, I have:
+> 
+> 150:     581754          0          0          0       GIC 150  2188000.ethernet
+> 151:          0          0          0          0       GIC 151  2188000.ethernet
+> 
+> In the DT file, we have:
+> 
+>                         fec: ethernet at 02188000 {
+>                                 compatible = "fsl,imx6q-fec";
+>                                 reg = <0x02188000 0x4000>;
+>                                 interrupts-extended =
+>                                         <&intc 0 118 IRQ_TYPE_LEVEL_HIGH>,
+>                                         <&intc 0 119 IRQ_TYPE_LEVEL_HIGH>;
+>                                 clocks = <&clks 117>, <&clks 117>, <&clks 190>;
+>                                 clock-names = "ipg", "ahb", "ptp";
+>                                 status = "disabled";
+>                         };
+> 
+> which, for the gic, would be 118 + 32 (first SPI) = 150, 119 + 32 = 151.
+> Yet you seem to have nothing registered against GIC 150, instead having
+> an interrupt against GPIO 6.
+> 
+> This seems very odd, and as this is an on-SoC device, I don't see why
+> you would want to bind the interrupts for the FEC device any differently
+> to standard platforms.
+> 
+> This could well be the cause of your stalls.
+> 
+> What's GPIO 6 used for on your board?
 
-> On Fri, Aug 1, 2014 at 4:01 AM, Jon Medhurst (Tixy) <tixy@linaro.org> wrote:
->> On Fri, 2014-08-01 at 11:26 +0100, Sudeep Holla wrote:
->>>
->>> On 22/07/14 19:01, Olof Johansson wrote:
->>> > This is a major refresh of the multi_v7_defconfig:
->>> >
->>> > - Bring over a bunch of Samsung drivers to make ODROID-U3 and Chromebooks usable
->>> >   * Enable big.LITTLE
->>> >   * MCPM
->>> [...]
->>
->>> > +CONFIG_BIG_LITTLE=y
->>> > +CONFIG_BL_SWITCHER=y
->>>
->>> IIUC, this will enable switcher code by default. I am not sure if this
->>> is intentional ? E.g.: After this I can have only 2 active cpus instead
->>> of 5 on my Vexpress TC2 platform.
->>>
->>> IMO we can keep this enabled by default in the build, but disabled
->>> by default on boot.
->>
->> TC2 has a big.LITTLE processor and the switcher is the only mainlined
->> way of making any kind of proper use of big.LITTLE, so why not have it
->> enabled by default?
->
-> +1.
->
+We have a second report of instability with the FEC today, and the
+problem board (wanboard) is also using GPIO1 6 for the ethernet IRQ.
+We have confirmation from the reporter that reverting the change
+(thus making the FEC use the standard interrupt) fixes their problem.
 
-I disagree.
+Therefore, it seems that the workaround for ERR006687 is itself buggy.
 
-The bL switcher is a stopgap used on products (which have their own
-defconfigs anyways) but upstream development is focused on HMP (or
-whatever the current buzzword is for the kernel directly scheduling both
-big and little cores.)  
+I'd be interested to hear whether removing the 
 
-So IMO, for upstream coverage, we should *not* be enabling the switcher
-but should be letting the scheduler directly manage all CPUs.
+	interrupts-extended = ...
 
-At least on Exynos, with MCPM support merged, the kernel can boot up all
-the CPUs and directly manage them.
+property from your board's DT file, thereby causing you to revert back
+to the default I list above, also fixes the instability you are seeing.
 
-Kevin
+Thanks.
+
+-- 
+FTTC broadband for 0.8mile line: currently at 9.5Mbps down 400kbps up
+according to speedtest.net.
