@@ -1,25 +1,20 @@
-From: davem@davemloft.net (David Miller)
-Date: Fri, 08 Aug 2014 10:29:06 -0700 (PDT)
-Subject: [PATCH 2/14] net: axienet: delete unneeded test before of_node_put
-In-Reply-To: <1407492475-26283-2-git-send-email-Julia.Lawall@lip6.fr>
-References: <1407492475-26283-2-git-send-email-Julia.Lawall@lip6.fr>
-Message-ID: <20140808.102906.1434751133512128265.davem@davemloft.net>
+From: vinod.koul@intel.com (Vinod Koul)
+Date: Fri, 8 Aug 2014 22:43:28 +0530
+Subject: [PATCH] dmaengine: sun6i: depends on RESET_CONTROLLER
+In-Reply-To: <1407430844-30498-1-git-send-email-maxime.ripard@free-electrons.com>
+References: <1407430844-30498-1-git-send-email-maxime.ripard@free-electrons.com>
+Message-ID: <20140808171328.GA13288@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Julia Lawall <Julia.Lawall@lip6.fr>
-Date: Fri,  8 Aug 2014 12:07:43 +0200
+On Thu, Aug 07, 2014 at 07:00:44PM +0200, Maxime Ripard wrote:
+> Fixes a compilation error when RESET_CONTROLLER is not enabled in the
+> configuration.
+> 
+> drivers/dma/sun6i-dma.c: In function 'sun6i_dma_probe':
+> drivers/dma/sun6i-dma.c:911:2: error: implicit declaration of function 'devm_reset_control_get' [-Werror=implicit-function-declaration]
 
-> From: Julia Lawall <Julia.Lawall@lip6.fr>
-> 
-> Of_node_put supports NULL as its argument, so the initial test is not
-> necessary.
-> 
-> Suggested by Uwe Kleine-K?nig.
-> 
-> The semantic patch that fixes this problem is as follows:
-> (http://coccinelle.lip6.fr/)
- ...
-> Signed-off-by: Julia Lawall <Julia.Lawall@lip6.fr>
+Applied, thanks
 
-Applied.
+-- 
+~Vinod
