@@ -1,98 +1,69 @@
-From: ezequiel.garcia@free-electrons.com (Ezequiel Garcia)
-Date: Fri, 8 Aug 2014 16:47:39 -0300
-Subject: [PATCH 2/6] ARM: mvebu: Add proper pin muxing on Globalscale
- Mirabox board
-In-Reply-To: <20140808192106.GD26751@lunn.ch>
-References: <1407511136-26477-1-git-send-email-ezequiel.garcia@free-electrons.com>
- <1407511136-26477-3-git-send-email-ezequiel.garcia@free-electrons.com>
- <20140808171208.GC26751@lunn.ch>
- <20140808182156.GA16889@arch.cereza>
- <20140808192106.GD26751@lunn.ch>
-Message-ID: <20140808194739.GA17826@arch.cereza>
+From: robherring2@gmail.com (Rob Herring)
+Date: Fri, 8 Aug 2014 15:03:11 -0500
+Subject: [GIT PULL 0/7] ARM: SoC changes for 3.17
+In-Reply-To: <1407516479-1251-1-git-send-email-olof@lixom.net>
+References: <1407516479-1251-1-git-send-email-olof@lixom.net>
+Message-ID: <CAL_JsqLgRM8_62mz3HCcsE6vw0gtB3pN0rg6SExnZvnOTRNu2g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08 Aug 09:21 PM, Andrew Lunn wrote:
-> On Fri, Aug 08, 2014 at 03:21:56PM -0300, Ezequiel Garcia wrote:
-> > On 08 Aug 07:12 PM, Andrew Lunn wrote:
-> > > On Fri, Aug 08, 2014 at 12:18:52PM -0300, Ezequiel Garcia wrote:
-> > > > This commit adds the required pin muxing for the network interfaces and
-> > > > the MDIO interface to be properly initialized. For instance, this makes
-> > > > it possible for a bootloader to initialize and access the network interfaces.
-> > > > 
-> > > > Signed-off-by: Ezequiel Garcia <ezequiel.garcia@free-electrons.com>
-> > > > ---
-> > > >  arch/arm/boot/dts/armada-370-mirabox.dts | 6 ++++++
-> > > >  1 file changed, 6 insertions(+)
-> > > > 
-> > > > diff --git a/arch/arm/boot/dts/armada-370-mirabox.dts b/arch/arm/boot/dts/armada-370-mirabox.dts
-> > > > index 097df7d8..c745256 100644
-> > > > --- a/arch/arm/boot/dts/armada-370-mirabox.dts
-> > > > +++ b/arch/arm/boot/dts/armada-370-mirabox.dts
-> > > > @@ -91,6 +91,8 @@
-> > > >  			};
-> > > >  
-> > > >  			mdio {
-> > > > +				pinctrl-0 = <&mdio_pins>;
-> > > > +				pinctrl-names = "default";
-> > > >  				phy0: ethernet-phy at 0 {
-> > > >  					reg = <0>;
-> > > >  				};
-> > > > @@ -100,11 +102,15 @@
-> > > >  				};
-> > > >  			};
-> > > >  			ethernet at 70000 {
-> > > > +				pinctrl-0 = <&ge0_pins>;
-> > > > +				pinctrl-names = "default";
-> > > 
-> > > Hi Ezequiel
-> > > 
-> > > Could you put these one level higher in the DT hierarchy? i.e. once in
-> > > armada-370.dtsi and not in every board .dts file?
-> > > 
-> > 
-> > Are you sure that's the correct approach?
-> > 
-> > As explained on the cover letter, these MAC MPP mux are not required in the
-> > SGMII case. Moreover, this is not the only way to wire the MAC0 and MAC1
-> > controllers, so I even considered pushing down the pinmux to the dts files!
-> 
-> Hi Ezequiel
-> 
-> At least at the moment, it seems like RGMII is the norm, and SGMII is
-> the exception. So having the default as RGMII probably makes
-> sense. Boards which don't require it can then override this in there
-> .dts file. If we see this changes with time, we can swap it around.
-> 
+On Fri, Aug 8, 2014 at 11:47 AM, Olof Johansson <olof@lixom.net> wrote:
+> A moderately sized set of branches this merge window for us, about 750
+> patches in total. There are several fairly large cleanups, and a net
+> negative delta(!)
+>
+>  1014 files changed, 39452 insertions(+), 42425 deletions(-)
 
-OK.
+If you look at mach-* and plat-* only, the overall delta has been
+negative mostly since 3.0 which was when ARM DT support went in. The
+overall size is trending down as well after growing by an order of
+magnitude. You're going to be out of a job soon (or DTS maintainer).
+;)
 
-> > The devicetree location of the pinmux is something that still confuses me,
-> > so I'm more than open to directions here.
-> 
-> Patch #1 comment is not really correct. It defines a number of pin
-> configuration nodes. These nodes can then be used via phandles.  What
-> might help is naming these differently. Name them
-> ge[01]_rgmii_pins. It is then clear when they should be used. You can
-> also add ge[0]_sgmii_pins, which would be an empty set. You can then
-> use ge[01]_rgmii_pins as the default in armada-370.dtsi and override
-> them with ge[0]_sgmii_pins for the 370 RD.
-> 
+v2.6.12: 104 files changed, 3896 insertions(+), 1001 deletions(-)
+v2.6.13: 153 files changed, 4160 insertions(+), 2033 deletions(-)
+v2.6.14: 125 files changed, 4048 insertions(+), 924 deletions(-)
+v2.6.15: 178 files changed, 15850 insertions(+), 2666 deletions(-)
+v2.6.16: 179 files changed, 3741 insertions(+), 2338 deletions(-)
+v2.6.17: 151 files changed, 9469 insertions(+), 1646 deletions(-)
+v2.6.18: 293 files changed, 14782 insertions(+), 2056 deletions(-)
+v2.6.19: 228 files changed, 5906 insertions(+), 4286 deletions(-)
+v2.6.20: 159 files changed, 7002 insertions(+), 646 deletions(-)
+v2.6.21: 193 files changed, 17596 insertions(+), 5574 deletions(-)
+v2.6.22: 238 files changed, 8694 insertions(+), 1364 deletions(-)
+v2.6.23: 143 files changed, 4811 insertions(+), 849 deletions(-)
+v2.6.24: 139 files changed, 7448 insertions(+), 1038 deletions(-)
+v2.6.25: 238 files changed, 18425 insertions(+), 3397 deletions(-)
+v2.6.26: 225 files changed, 19606 insertions(+), 8390 deletions(-)
+v2.6.27: 1384 files changed, 90110 insertions(+), 5576 deletions(-)
+v2.6.28: 640 files changed, 21783 insertions(+), 5853 deletions(-)
+v2.6.29: 724 files changed, 24235 insertions(+), 8258 deletions(-)
+v2.6.30: 678 files changed, 31267 insertions(+), 12506 deletions(-)
+v2.6.31: 685 files changed, 49529 insertions(+), 10099 deletions(-)
+v2.6.32: 698 files changed, 59564 insertions(+), 5593 deletions(-)
+v2.6.33: 835 files changed, 50995 insertions(+), 16124 deletions(-)
+v2.6.34: 1059 files changed, 56064 insertions(+), 16620 deletions(-)
+v2.6.35: 797 files changed, 44051 insertions(+), 11856 deletions(-)
+v2.6.36: 871 files changed, 43841 insertions(+), 13222 deletions(-)
+v2.6.37: 1126 files changed, 48471 insertions(+), 12067 deletions(-)
+v2.6.38: 1055 files changed, 60061 insertions(+), 17964 deletions(-)
+v2.6.39: 1223 files changed, 52552 insertions(+), 23067 deletions(-)
+v3.0: 833 files changed, 10945 insertions(+), 37476 deletions(-)
+v3.1: 955 files changed, 17796 insertions(+), 20300 deletions(-)
+v3.2: 1507 files changed, 32960 insertions(+), 33392 deletions(-)
+v3.3: 1301 files changed, 27725 insertions(+), 18941 deletions(-)
+v3.4: 1324 files changed, 27079 insertions(+), 21500 deletions(-)
+v3.5: 975 files changed, 32340 insertions(+), 46663 deletions(-)
+v3.6: 648 files changed, 16121 insertions(+), 13161 deletions(-)
+v3.7: 1389 files changed, 23739 insertions(+), 61097 deletions(-)
+v3.8: 1066 files changed, 32812 insertions(+), 40821 deletions(-)
+v3.9: 1031 files changed, 10051 insertions(+), 33399 deletions(-)
+v3.10: 831 files changed, 15049 insertions(+), 27333 deletions(-)
+v3.11: 675 files changed, 18519 insertions(+), 30012 deletions(-)
+v3.12: 474 files changed, 12575 insertions(+), 25120 deletions(-)
+v3.13: 491 files changed, 11088 insertions(+), 13375 deletions(-)
+v3.14: 408 files changed, 5586 insertions(+), 12691 deletions(-)
+v3.15: 538 files changed, 7809 insertions(+), 9337 deletions(-)
+v3.16: 499 files changed, 6528 insertions(+), 10252 deletions(-)
 
-OK.
-
-> Experience from Kirkwood is that it also has multiple ways to wire up
-> MAC0 and MAC1, but in practice, nobody ever does. And if they did, it
-> can be overridden in the .dts file.
-> 
-
-The above sounds good, although I don't have a strong opinion.
-
-If everybody is happy with the approach, I'll prepare a v2 changing the .dtsi
-with RGMII as the default mux, and overriding it in the A370-RD dts.
-
-Jason, Thomas, Greg: Any objections?
--- 
-Ezequiel Garc?a, Free Electrons
-Embedded Linux, Kernel and Android Engineering
-http://free-electrons.com
+Rob
