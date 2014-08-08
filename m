@@ -1,42 +1,41 @@
-From: kever.yang@rock-chips.com (Kever Yang)
-Date: Fri,  8 Aug 2014 11:55:59 +0800
-Subject: [PATCH v5 4/4] ARM: dts: Enable USB host1(dwc) on rk3288-evb
-In-Reply-To: <1407470159-14722-1-git-send-email-kever.yang@rock-chips.com>
-References: <1407470159-14722-1-git-send-email-kever.yang@rock-chips.com>
-Message-ID: <1407470159-14722-5-git-send-email-kever.yang@rock-chips.com>
+From: sfr@canb.auug.org.au (Stephen Rothwell)
+Date: Fri, 8 Aug 2014 14:29:12 +1000
+Subject: Request to include Mailbox tree in linux-next
+In-Reply-To: <CAJe_ZhdZTSs+Ns4u7bMXwbLHYTnE-5XEE8uev4zXbXrCP52bSg@mail.gmail.com>
+References: <CAJe_ZhdZTSs+Ns4u7bMXwbLHYTnE-5XEE8uev4zXbXrCP52bSg@mail.gmail.com>
+Message-ID: <20140808142912.7bf68229@canb.auug.org.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-USB host1 port is the host A port nearby the otg port.
+Hi Jassi,
 
-Signed-off-by: Kever Yang <kever.yang@rock-chips.com>
+On Wed, 6 Aug 2014 12:25:49 +0530 Jassi Brar <jaswinder.singh@linaro.org> wrote:
+>
+>  The framework for Mailbox has undergone 10 revisions over the last
+> one year, which has garnered support in the form of 'Reviewed-by' and
+> 'looks good enough to be merged in this window' from people in the CC
+> list.
+> 
+>   Could you please add it to linux-next?
+> Tree:       git://git.linaro.org/landing-teams/working/fujitsu/integration.git
+> Branch:   mailbox-for-3.17
+> Contact:  Jassi Brar <jaswinder.singh@linaro.org>
 
----
+This is really late for v3.17.  The purpose of linux-next is to
+discover interactions between trees before they are pulled into Linus'
+tree and to do some cross architecture build checking.  Adding a tree
+during the merge window is not very helpful to that.
 
-Changes in v5:
-- don't enable otg port for evb
+However if this is really going to be merged by Linus before v3.17-rc1,
+I will add it on Monday, OK?
 
-Changes in v4: None
-Changes in v3:
-- Rebase
-
-Changes in v2:
-- evb patch added in version 2
-
- arch/arm/boot/dts/rk3288-evb.dtsi | 4 ++++
- 1 file changed, 4 insertions(+)
-
-diff --git a/arch/arm/boot/dts/rk3288-evb.dtsi b/arch/arm/boot/dts/rk3288-evb.dtsi
-index 4f57209..4b62df6 100644
---- a/arch/arm/boot/dts/rk3288-evb.dtsi
-+++ b/arch/arm/boot/dts/rk3288-evb.dtsi
-@@ -94,3 +94,7 @@
- &usb_host0_ehci {
- 	status = "okay";
- };
-+
-+&usb_host1 {
-+	status = "okay";
-+};
 -- 
-1.9.1
+Cheers,
+Stephen Rothwell                    sfr at canb.auug.org.au
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140808/d5e92858/attachment.sig>
