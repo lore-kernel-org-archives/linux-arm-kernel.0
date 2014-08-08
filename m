@@ -1,40 +1,34 @@
-From: ttynkkynen@nvidia.com (Tuomas Tynkkynen)
-Date: Fri, 8 Aug 2014 16:23:26 +0300
-Subject: [PATCH 1/3] of: Add of_match_machine helper
-In-Reply-To: <20140808094123.GC5387@ulmo>
-References: <1407452515-2390-1-git-send-email-ttynkkynen@nvidia.com>
- <1407452515-2390-2-git-send-email-ttynkkynen@nvidia.com>
- <20140808094123.GC5387@ulmo>
-Message-ID: <53E4CF4E.6010500@nvidia.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Fri, 8 Aug 2014 14:27:54 +0100
+Subject: [BUG]: imx6q (wandboard): Very unstable ethernet since kernel 3.16
+In-Reply-To: <1407503758.19455.1.camel@sharkbay.at>
+References: <1407503758.19455.1.camel@sharkbay.at>
+Message-ID: <20140808132754.GC30282@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-
-On 08/08/14 12:41, Thierry Reding wrote:
+On Fri, Aug 08, 2014 at 03:15:58PM +0200, Thomas Scheiblauer wrote:
+> Since Kernel 3.16 (running on 3.16.0) the ethernet (fec) connection
+> stops working after exchanging very little data. Sometimes it comes back
+> again for some seconds and drops again. No clues in dmesg.
 > 
->> +const struct of_device_id *of_match_machine(const struct of_device_id *matches)
->> +{
->> +	const struct of_device_id *match;
->> +	struct device_node *root;
->> +
->> +	root = of_find_node_by_path("/");
->> +	if (!root)
->> +		return NULL;
->> +
->> +	match = of_match_node(matches, root);
->> +	of_node_put(root);
->> +	return match;
->> +}
->> +EXPORT_SYMBOL(of_match_machine);
-> 
-> I wonder if of_find_node_by_path("/") is somewhat overkill here. Perhaps
-> simply of_node_get(of_allnodes) would be more appropriate here since the
-> function is implemented in the core?
+> After increasing TX_RING_SIZE in "drivers/net/ethernet/freescale/fec.h"
+> from 512 to 1024 the connection seems to stay stable (judging after
+> about half an hour of testing) but I really don't have experience with
+> kernel driver hacking, so I'm not sure what I'm doing here.
 
-of_machine_is_compatible() uses of_find_node_by_path("/") as well, of_allnodes
-seems to be only used when during iterating. So I'd prefer to have them
-consistent.
+Interesting.  There have been some other reports of instability in a
+similar manner to that which you report, and, like the wanboard, they
+too have this:
+
+        interrupts-extended = <&gpio1 6 IRQ_TYPE_LEVEL_HIGH>,
+                              <&intc 0 119 IRQ_TYPE_LEVEL_HIGH>;
+
+Could it be that gpio1 6 doesn't actually work very well?  What happens
+if you comment out the above property in
+arch/arm/boot/dts/imx6qdl-wandboard.dtsi so you're using the standard
+interrupt on GIC 150?
 
 -- 
-nvpublic
+FTTC broadband for 0.8mile line: currently at 9.5Mbps down 400kbps up
+according to speedtest.net.
