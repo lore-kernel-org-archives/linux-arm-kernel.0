@@ -1,40 +1,54 @@
-From: wei.liu2@citrix.com (Wei Liu)
-Date: Fri, 8 Aug 2014 15:38:51 +0100
-Subject: [PATCH v3 2/3] xen/arm: reimplement xen_dma_unmap_page & friends
-In-Reply-To: <alpine.DEB.2.02.1408081530580.2293@kaball.uk.xensource.com>
-References: <alpine.DEB.2.02.1408011552460.2293@kaball.uk.xensource.com>
- <1406904984-16068-2-git-send-email-stefano.stabellini@eu.citrix.com>
- <alpine.DEB.2.02.1408081530580.2293@kaball.uk.xensource.com>
-Message-ID: <20140808143851.GF29341@zion.uk.xensource.com>
+From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
+Date: Fri, 8 Aug 2014 16:39:05 +0200
+Subject: [PATCH 00/10 v3] Coresight framework and drivers
+In-Reply-To: <1407435706-19441-1-git-send-email-mathieu.poirier@linaro.org>
+References: <1407435706-19441-1-git-send-email-mathieu.poirier@linaro.org>
+Message-ID: <20140808163905.30f7cb12@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Aug 08, 2014 at 03:32:41PM +0100, Stefano Stabellini wrote:
-> On Fri, 1 Aug 2014, Stefano Stabellini wrote:
-> > +static void __xen_dma_page_dev_to_cpu(struct device *hwdev, dma_addr_t handle,
-> > +		size_t size, enum dma_data_direction dir)
-> > +{
-> > +	/* Cannot use __dma_page_dev_to_cpu because we don't have a
-> > +	 * struct page for handle */
-> > +
-> > +	if (dir == DMA_TO_DEVICE)
-> 
-> This should be:
->     if (dir != DMA_TO_DEVICE)
-> 
-> Thomas, could you please confirm that with this small fix
-> http://pastebin.com/FPRf7pgL goes away?
-> 
+Mathieu,
 
-Thomas, please try this fix with my ref-counting patch.
+On Thu,  7 Aug 2014 12:21:36 -0600, mathieu.poirier at linaro.org wrote:
 
-The old "working" version might actually cover this latent bug due to
-it's long delay.
+>  arch/arm/Kconfig.debug                     |   36 +-
+>  arch/arm/boot/dts/omap3-beagle-xm.dts      |   28 +
+>  arch/arm/boot/dts/omap3-beagle.dts         |   28 +
+>  arch/arm/boot/dts/vexpress-v2p-ca15_a7.dts |  199 ++++
+>  arch/arm/include/asm/hardware/coresight.h  |  157 ---
+>  arch/arm/include/asm/hardware/cp14.h       |  540 ++++++++++
+>  arch/arm/kernel/Makefile                   |    1 -
+>  arch/arm/kernel/etm.c                      |  654 ------------
+>  arch/arm/kernel/hw_breakpoint.c            |    4 +-
+>  arch/arm/mach-omap2/Kconfig                |    8 -
+>  arch/arm/mach-omap2/Makefile               |    1 -
+>  arch/arm/mach-omap2/emu.c                  |   50 -
+>  drivers/Makefile                           |    1 +
+>  drivers/amba/bus.c                         |    2 +-
+>  drivers/coresight/Makefile                 |    9 +
+>  drivers/coresight/coresight-etb10.c        |  529 ++++++++++
+>  drivers/coresight/coresight-etm-cp14.c     |  506 ++++++++++
+>  drivers/coresight/coresight-etm.h          |  192 ++++
+>  drivers/coresight/coresight-etm3x.c        | 1516 ++++++++++++++++++++++++++++
+>  drivers/coresight/coresight-funnel.c       |  251 +++++
+>  drivers/coresight/coresight-priv.h         |   63 ++
+>  drivers/coresight/coresight-replicator.c   |  153 +++
+>  drivers/coresight/coresight-tmc.c          |  740 ++++++++++++++
+>  drivers/coresight/coresight-tpiu.c         |  212 ++++
+>  drivers/coresight/coresight.c              |  638 ++++++++++++
+>  drivers/coresight/of_coresight.c           |  202 ++++
+>  include/linux/amba/bus.h                   |    1 +
+>  include/linux/coresight.h                  |  200 ++++
 
-Wei.
+So a brand new framework gets added, and there's nothing added in
+Documentation/ ? It'd be nice to have a short documentation that
+explains what the framework is defined for, how driver should be
+written for it, what is its kernel-space or user-space interface, etc.
 
-> 
-> > +		outer_inv_range(handle, handle + size);
-> > +
-> > +	dma_cache_maint(handle & PAGE_MASK, handle & ~PAGE_MASK, size, dir, dmac_unmap_area);
-> > +}
+Thanks,
+
+Thomas
+-- 
+Thomas Petazzoni, CTO, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
