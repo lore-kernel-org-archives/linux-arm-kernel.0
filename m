@@ -1,72 +1,37 @@
 From: santosh.shilimkar@ti.com (Santosh Shilimkar)
-Date: Fri, 8 Aug 2014 14:19:39 -0400
-Subject: [Patch v3 0/6] soc: ti: Keystone Navigator drivers
-Message-ID: <1407521985-22574-1-git-send-email-santosh.shilimkar@ti.com>
+Date: Fri, 8 Aug 2014 14:19:45 -0400
+Subject: [Patch v3 6/6] MAINTAINERS: Add Keystone Multicore Navigator drivers
+ entry
+In-Reply-To: <1407521985-22574-1-git-send-email-santosh.shilimkar@ti.com>
+References: <1407521985-22574-1-git-send-email-santosh.shilimkar@ti.com>
+Message-ID: <1407521985-22574-7-git-send-email-santosh.shilimkar@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Here is an updated version3 of the Keystone Navigator drivers after
-addressing Rob's device tree bindings comments from earlier version [1].
-I couldn't get the series ready just in time for v3.17 merge window
-but surely like to get it in v3.18 merge window. 
+Signed-off-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
+---
+ MAINTAINERS |    9 +++++++++
+ 1 file changed, 9 insertions(+)
 
-The QMSS found on Keystone SOCs is one of the main hardware sub
-system which forms the backbone of the Keystone Multi-core Navigator.
-QMSS consist of queue managers, packed-data structure processors(PDSP),
-linking RAM, descriptor pools and infrastructure DMA.
-
-After the discussion and alignment [2] on Navigator DMA, now we pair
-this driver along with QMSS. Initially this driver was proposed as DMA
-engine driver but since the hardware is not typical DMA engine and doesn't
-comply with typical DMA engine driver needs, that approach was naked.
-
-These two drivers works as infrastructure drivers for subsystems like
-Ethernet subsystem, SRIO subsystem, Crypto Engines etc on Keystone
-SOC families. Testing is done with NetCP(ethernet) subsystem drivers.
-
-Sandeep Nair (3):
-  firmware: add Keystone QMSS PDSP accumulator firmware blob
-  Documentation: dt: soc: add Keystone Navigator QMSS bindings
-  soc: ti: add Keystone Navigator QMSS driver
-
-Santosh Shilimkar (3):
-  Documentation: dt: soc: add Keystone Navigator DMA bindings
-  soc: ti: add Keystone Navigator DMA support
-  MAINTAINERS: Add Keystone Multicore Navigator drivers entry
-
- .../bindings/soc/ti/keystone-navigator-dma.txt     |  111 ++
- .../bindings/soc/ti/keystone-navigator-qmss.txt    |  232 +++
- MAINTAINERS                                        |    9 +
- drivers/Kconfig                                    |    2 +
- drivers/soc/Kconfig                                |    1 +
- drivers/soc/Makefile                               |    1 +
- drivers/soc/ti/Kconfig                             |   31 +
- drivers/soc/ti/Makefile                            |    5 +
- drivers/soc/ti/knav_dma.c                          |  813 +++++++++
- drivers/soc/ti/knav_qmss.h                         |  386 +++++
- drivers/soc/ti/knav_qmss_acc.c                     |  591 +++++++
- drivers/soc/ti/knav_qmss_queue.c                   | 1814 ++++++++++++++++++++
- firmware/Makefile                                  |    1 +
- .../keystone/qmss_pdsp_acc48_k2_le_1_0_0_8.fw.ihex |  110 ++
- include/linux/soc/ti/knav_dma.h                    |  175 ++
- include/linux/soc/ti/knav_qmss.h                   |   90 +
- 16 files changed, 4372 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/soc/ti/keystone-navigator-dma.txt
- create mode 100644 Documentation/devicetree/bindings/soc/ti/keystone-navigator-qmss.txt
- create mode 100644 drivers/soc/ti/Kconfig
- create mode 100644 drivers/soc/ti/Makefile
- create mode 100644 drivers/soc/ti/knav_dma.c
- create mode 100644 drivers/soc/ti/knav_qmss.h
- create mode 100644 drivers/soc/ti/knav_qmss_acc.c
- create mode 100644 drivers/soc/ti/knav_qmss_queue.c
- create mode 100644 firmware/keystone/qmss_pdsp_acc48_k2_le_1_0_0_8.fw.ihex
- create mode 100644 include/linux/soc/ti/knav_dma.h
- create mode 100644 include/linux/soc/ti/knav_qmss.h
-
-
-regards,
-Santosh
-[1] https://lkml.org/lkml/2014/4/23/730
-[2] https://lkml.org/lkml/2014/3/18/340
+diff --git a/MAINTAINERS b/MAINTAINERS
+index c2066f4..e5b1179 100644
+--- a/MAINTAINERS
++++ b/MAINTAINERS
+@@ -9051,6 +9051,15 @@ F:	drivers/misc/tifm*
+ F:	drivers/mmc/host/tifm_sd.c
+ F:	include/linux/tifm.h
+ 
++TI KEYSTONE MULTICORE NAVIGATOR DRIVERS
++M:	Santosh Shilimkar <santosh.shilimkar@ti.com>
++L:	linux-kernel at vger.kernel.org
++L:	linux-arm-kernel at lists.infradead.org (moderated for non-subscribers)
++S:	Maintained
++F:	drivers/soc/ti/*
++T:	git git://git.kernel.org/pub/scm/linux/kernel/git/ssantosh/linux-keystone.git
++
++
+ TI LM49xxx FAMILY ASoC CODEC DRIVERS
+ M:	M R Swami Reddy <mr.swami.reddy@ti.com>
+ M:	Vishwas A Deshpande <vishwas.a.deshpande@ti.com>
 -- 
 1.7.9.5
