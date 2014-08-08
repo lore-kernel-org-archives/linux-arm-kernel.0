@@ -1,56 +1,44 @@
-From: michal.simek@xilinx.com (Michal Simek)
-Date: Fri, 8 Aug 2014 12:44:59 +0200
-Subject: [PATCH 2/14] net: axienet: delete unneeded test before
- of_node_put
-In-Reply-To: <1407492475-26283-2-git-send-email-Julia.Lawall@lip6.fr>
-References: <1407492475-26283-2-git-send-email-Julia.Lawall@lip6.fr>
-Message-ID: <982aa979-17f6-4f7d-af29-084c2f263652@BY2FFO11FD060.protection.gbl>
+From: heikki.krogerus@linux.intel.com (Heikki Krogerus)
+Date: Fri, 8 Aug 2014 14:05:37 +0300
+Subject: [PATCH 6/6] tty: serial: Add 8250-core based omap driver
+In-Reply-To: <1404928177-26554-7-git-send-email-bigeasy@linutronix.de>
+References: <1404928177-26554-1-git-send-email-bigeasy@linutronix.de>
+ <1404928177-26554-7-git-send-email-bigeasy@linutronix.de>
+Message-ID: <20140808110537.GA29184@xps8300>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08/08/2014 12:07 PM, Julia Lawall wrote:
-> From: Julia Lawall <Julia.Lawall@lip6.fr>
-> 
-> Of_node_put supports NULL as its argument, so the initial test is not
-> necessary.
-> 
-> Suggested by Uwe Kleine-K?nig.
-> 
-> The semantic patch that fixes this problem is as follows:
-> (http://coccinelle.lip6.fr/)
-> 
-> // <smpl>
-> @@
-> expression e;
-> @@
-> 
-> -if (e)
->    of_node_put(e);
-> // </smpl>
-> 
-> Signed-off-by: Julia Lawall <Julia.Lawall@lip6.fr>
-> 
-> ---
->  drivers/net/ethernet/xilinx/xilinx_axienet_main.c |    3 +--
->  1 file changed, 1 insertion(+), 2 deletions(-)
-> 
-> diff --git a/drivers/net/ethernet/xilinx/xilinx_axienet_main.c b/drivers/net/ethernet/xilinx/xilinx_axienet_main.c
-> index 7b0a735..30e8608 100644
-> --- a/drivers/net/ethernet/xilinx/xilinx_axienet_main.c
-> +++ b/drivers/net/ethernet/xilinx/xilinx_axienet_main.c
-> @@ -1630,8 +1630,7 @@ static int axienet_of_remove(struct platform_device *op)
->  	axienet_mdio_teardown(lp);
->  	unregister_netdev(ndev);
+On Wed, Jul 09, 2014 at 07:49:37PM +0200, Sebastian Andrzej Siewior wrote:
+> diff --git a/drivers/tty/serial/8250/8250_core.c b/drivers/tty/serial/8250/8250_core.c
+> index bf06a4c..1cbfc8c 100644
+> --- a/drivers/tty/serial/8250/8250_core.c
+> +++ b/drivers/tty/serial/8250/8250_core.c
+> @@ -263,6 +263,12 @@ static const struct serial8250_config uart_config[] = {
+>  		.fcr		= UART_FCR_ENABLE_FIFO | UART_FCR_R_TRIG_10,
+>  		.flags		= UART_CAP_FIFO | UART_CAP_AFE,
+>  	},
+> +	[PORT_OMAP_16750] = {
+> +		.name		= "OMAP",
+> +		.fifo_size	= 64,
+> +		.tx_loadsz	= 64,
+> +		.flags		= UART_CAP_FIFO | UART_CAP_EFR | UART_CAP_SLEEP,
+> +	},
+>  	[PORT_TEGRA] = {
+>  		.name		= "Tegra",
+>  		.fifo_size	= 32,
+> @@ -1340,6 +1346,8 @@ static void serial8250_stop_rx(struct uart_port *port)
+>  	pm_runtime_get_sync(port->dev);
 >  
-> -	if (lp->phy_node)
-> -		of_node_put(lp->phy_node);
-> +	of_node_put(lp->phy_node);
->  	lp->phy_node = NULL;
->  
->  	iounmap(lp->regs);
-> 
+>  	up->ier &= ~UART_IER_RLSI;
+> +	if (port->type == PORT_OMAP_16750)
+> +		up->ier &= ~UART_IER_RDI;
+>  	up->port.read_status_mask &= ~UART_LSR_DR;
+>  	serial_port_out(port, UART_IER, up->ier);
 
-Reviewed-by: Michal Simek <michal.simek@xilinx.com>
+Alan couldn't UART_IER_RDI be always cleared here with all port types?
+Actually, shouldn't it be?
 
-Thanks,
-Michal
+Then the custom port type PORT_OMAP_16750 would not be needed.
+
+-- 
+heikki
