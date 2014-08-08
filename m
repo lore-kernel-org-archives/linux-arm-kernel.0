@@ -1,253 +1,52 @@
-From: caesar.wang@rock-chips.com (Caesar Wang)
-Date: Fri,  8 Aug 2014 15:28:49 +0800
-Subject: [PATCH v5 2/2] pwm: rockchip: Added to support for RK3288 SoC
-In-Reply-To: <1407482929-13050-1-git-send-email-caesar.wang@rock-chips.com>
-References: <1407482929-13050-1-git-send-email-caesar.wang@rock-chips.com>
-Message-ID: <1407482929-13050-3-git-send-email-caesar.wang@rock-chips.com>
+From: takahiro.akashi@linaro.org (AKASHI Takahiro)
+Date: Fri, 08 Aug 2014 16:35:42 +0900
+Subject: [PATCH v5 3/3] arm64: Add seccomp support
+In-Reply-To: <CAGXu5jJL=zXuSRNomGrB09kqpUhEpkuxDH18JN4NRbWocMw4xg@mail.gmail.com>
+References: <1406020499-5537-1-git-send-email-takahiro.akashi@linaro.org>	<1406020499-5537-4-git-send-email-takahiro.akashi@linaro.org>	<53D082E9.8090303@amacapital.net>	<53D09C4F.9010104@linaro.org>	<CALCETrWTDS7VSyuR5wgGxpu-_YMWVUVmv9ht6t1tCSX=GA46cQ@mail.gmail.com>	<53D2255C.9050006@linaro.org>
+ <CAGXu5jJL=zXuSRNomGrB09kqpUhEpkuxDH18JN4NRbWocMw4xg@mail.gmail.com>
+Message-ID: <53E47DCE.4080902@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch added to support the PWM controller found on
-RK3288 SoC.
+On 08/06/2014 12:08 AM, Kees Cook wrote:
+> On Fri, Jul 25, 2014 at 2:37 AM, AKASHI Takahiro
+> <takahiro.akashi@linaro.org> wrote:
+>> I found a bug in my current patch (v5). When 32-bit tracer skips a system call,
+>> we should not update syscallno from x8 since syscallno is re-written directly
+>> via ptrace(PTRACE_SET_SYSCALL).
+>
+> Ah, yes. Will aarch64 have a PTRACE_SET_SYSCALL option, or is this
+> strictly a 32-bit vs 64-bit issue?
 
-Signed-off-by: Caesar Wang <caesar.wang@rock-chips.com>
----
- drivers/pwm/pwm-rockchip.c | 134 +++++++++++++++++++++++++++++++++++++--------
- 1 file changed, 110 insertions(+), 24 deletions(-)
+As discussed in a few weeks ago, aarch64 won't support PTRACE_SET_SYSCALL.
 
-diff --git a/drivers/pwm/pwm-rockchip.c b/drivers/pwm/pwm-rockchip.c
-index eec2145..a40db15 100644
---- a/drivers/pwm/pwm-rockchip.c
-+++ b/drivers/pwm/pwm-rockchip.c
-@@ -2,6 +2,7 @@
-  * PWM driver for Rockchip SoCs
-  *
-  * Copyright (C) 2014 Beniamino Galvani <b.galvani@gmail.com>
-+ * Copyright (C) 2014 ROCKCHIP, Inc.
-  *
-  * This program is free software; you can redistribute it and/or
-  * modify it under the terms of the GNU General Public License
-@@ -12,30 +13,80 @@
- #include <linux/io.h>
- #include <linux/module.h>
- #include <linux/of.h>
-+#include <linux/of_device.h>
- #include <linux/platform_device.h>
- #include <linux/pwm.h>
- #include <linux/time.h>
- 
--#define PWM_CNTR		0x00		/* Counter register */
--#define PWM_HRC			0x04		/* High reference register */
--#define PWM_LRC			0x08		/* Low reference register */
--#define PWM_CTRL		0x0c		/* Control register */
- #define PWM_CTRL_TIMER_EN	(1 << 0)
- #define PWM_CTRL_OUTPUT_EN	(1 << 3)
- 
--#define PRESCALER		2
-+#define PWM_ENABLE		(1 << 0)
-+#define PWM_CONTINUOUS		(1 << 1)
-+#define PWM_DUTY_POSITIVE	(1 << 3)
-+#define PWM_INACTIVE_NEGATIVE	(0 << 4)
-+#define PWM_OUTPUT_LEFT		(0 << 5)
-+#define PWM_LP_DISABLE		(0 << 8)
- 
- struct rockchip_pwm_chip {
- 	struct pwm_chip chip;
- 	struct clk *clk;
-+	const struct rockchip_pwm_data *data;
- 	void __iomem *base;
- };
- 
-+struct rockchip_pwm_regs {
-+	unsigned long duty;
-+	unsigned long period;
-+	unsigned long cntr;
-+	unsigned long ctrl;
-+};
-+
-+struct rockchip_pwm_data {
-+	struct rockchip_pwm_regs regs;
-+	unsigned int prescaler;
-+
-+	void (*set_enable)(struct pwm_chip *chip, bool enable);
-+};
-+
- static inline struct rockchip_pwm_chip *to_rockchip_pwm_chip(struct pwm_chip *c)
- {
- 	return container_of(c, struct rockchip_pwm_chip, chip);
- }
- 
-+static void rockchip_pwm_set_enable_v1(struct pwm_chip *chip, bool enable)
-+{
-+	struct rockchip_pwm_chip *pc = to_rockchip_pwm_chip(chip);
-+	u32 val = 0;
-+	u32 enable_conf = PWM_CTRL_OUTPUT_EN | PWM_CTRL_TIMER_EN;
-+
-+	val = readl_relaxed(pc->base + pc->data->regs.ctrl);
-+
-+	if (enable)
-+		val |= enable_conf;
-+	else
-+		val &= ~enable_conf;
-+
-+	writel_relaxed(val, pc->base + pc->data->regs.ctrl);
-+}
-+
-+static void rockchip_pwm_set_enable_v2(struct pwm_chip *chip, bool enable)
-+{
-+	struct rockchip_pwm_chip *pc = to_rockchip_pwm_chip(chip);
-+	u32 val = 0;
-+	u32 enable_conf = PWM_OUTPUT_LEFT | PWM_LP_DISABLE | PWM_ENABLE |
-+		PWM_CONTINUOUS | PWM_DUTY_POSITIVE | PWM_INACTIVE_NEGATIVE;
-+
-+	val = readl_relaxed(pc->base + pc->data->regs.ctrl);
-+
-+	if (enable)
-+		val |= enable_conf;
-+	else
-+		val &= ~enable_conf;
-+
-+	writel_relaxed(val, pc->base + pc->data->regs.ctrl);
-+}
-+
- static int rockchip_pwm_config(struct pwm_chip *chip, struct pwm_device *pwm,
- 			       int duty_ns, int period_ns)
- {
-@@ -52,20 +103,20 @@ static int rockchip_pwm_config(struct pwm_chip *chip, struct pwm_device *pwm,
- 	 * default prescaler value for all practical clock rate values.
- 	 */
- 	div = clk_rate * period_ns;
--	do_div(div, PRESCALER * NSEC_PER_SEC);
-+	do_div(div, pc->data->prescaler * NSEC_PER_SEC);
- 	period = div;
- 
- 	div = clk_rate * duty_ns;
--	do_div(div, PRESCALER * NSEC_PER_SEC);
-+	do_div(div, pc->data->prescaler * NSEC_PER_SEC);
- 	duty = div;
- 
- 	ret = clk_enable(pc->clk);
- 	if (ret)
- 		return ret;
- 
--	writel(period, pc->base + PWM_LRC);
--	writel(duty, pc->base + PWM_HRC);
--	writel(0, pc->base + PWM_CNTR);
-+	writel(period, pc->base + pc->data->regs.period);
-+	writel(duty, pc->base + pc->data->regs.duty);
-+	writel(0, pc->base + pc->data->regs.cntr);
- 
- 	clk_disable(pc->clk);
- 
-@@ -76,15 +127,12 @@ static int rockchip_pwm_enable(struct pwm_chip *chip, struct pwm_device *pwm)
- {
- 	struct rockchip_pwm_chip *pc = to_rockchip_pwm_chip(chip);
- 	int ret;
--	u32 val;
- 
- 	ret = clk_enable(pc->clk);
- 	if (ret)
- 		return ret;
- 
--	val = readl_relaxed(pc->base + PWM_CTRL);
--	val |= PWM_CTRL_OUTPUT_EN | PWM_CTRL_TIMER_EN;
--	writel_relaxed(val, pc->base + PWM_CTRL);
-+	pc->data->set_enable(chip, true);
- 
- 	return 0;
- }
-@@ -92,11 +140,8 @@ static int rockchip_pwm_enable(struct pwm_chip *chip, struct pwm_device *pwm)
- static void rockchip_pwm_disable(struct pwm_chip *chip, struct pwm_device *pwm)
- {
- 	struct rockchip_pwm_chip *pc = to_rockchip_pwm_chip(chip);
--	u32 val;
- 
--	val = readl_relaxed(pc->base + PWM_CTRL);
--	val &= ~(PWM_CTRL_OUTPUT_EN | PWM_CTRL_TIMER_EN);
--	writel_relaxed(val, pc->base + PWM_CTRL);
-+	pc->data->set_enable(chip, false);
- 
- 	clk_disable(pc->clk);
- }
-@@ -108,12 +153,58 @@ static const struct pwm_ops rockchip_pwm_ops = {
- 	.owner = THIS_MODULE,
- };
- 
-+static const struct rockchip_pwm_data pwm_data_v1 = {
-+	.regs = {
-+		.duty = 0x04,
-+		.period = 0x08,
-+		.cntr = 0x00,
-+		.ctrl = 0x0c,
-+	},
-+	.prescaler = 2,
-+	.set_enable = rockchip_pwm_set_enable_v1,
-+};
-+
-+static const struct rockchip_pwm_data pwm_data_v2 = {
-+	.regs = {
-+		.duty = 0x08,
-+		.period = 0x04,
-+		.cntr = 0x00,
-+		.ctrl = 0x0c,
-+	},
-+	.prescaler = 1,
-+	.set_enable = rockchip_pwm_set_enable_v2,
-+};
-+
-+static const struct rockchip_pwm_data pwm_data_vop = {
-+	.regs = {
-+		.duty = 0x08,
-+		.period = 0x04,
-+		.cntr = 0x0c,
-+		.ctrl = 0x00,
-+	},
-+	.prescaler = 1,
-+	.set_enable = rockchip_pwm_set_enable_v2,
-+};
-+
-+static const struct of_device_id rockchip_pwm_dt_ids[] = {
-+	{ .compatible = "rockchip,rk2928-pwm", .data = &pwm_data_v1},
-+	{ .compatible = "rockchip,rk3288-pwm", .data = &pwm_data_v2},
-+	{ .compatible = "rockchip,vop-pwm", .data = &pwm_data_vop},
-+	{ /* sentinel */ }
-+};
-+MODULE_DEVICE_TABLE(of, rockchip_pwm_dt_ids);
-+
- static int rockchip_pwm_probe(struct platform_device *pdev)
- {
-+	const struct of_device_id *id;
- 	struct rockchip_pwm_chip *pc;
- 	struct resource *r;
- 	int ret;
- 
-+	id = of_match_device(rockchip_pwm_dt_ids, &pdev->dev);
-+	if (!id)
-+		return -EINVAL;
-+
- 	pc = devm_kzalloc(&pdev->dev, sizeof(*pc), GFP_KERNEL);
- 	if (!pc)
- 		return -ENOMEM;
-@@ -133,6 +224,7 @@ static int rockchip_pwm_probe(struct platform_device *pdev)
- 
- 	platform_set_drvdata(pdev, pc);
- 
-+	pc->data = id->data;
- 	pc->chip.dev = &pdev->dev;
- 	pc->chip.ops = &rockchip_pwm_ops;
- 	pc->chip.base = -1;
-@@ -156,12 +248,6 @@ static int rockchip_pwm_remove(struct platform_device *pdev)
- 	return pwmchip_remove(&pc->chip);
- }
- 
--static const struct of_device_id rockchip_pwm_dt_ids[] = {
--	{ .compatible = "rockchip,rk2928-pwm" },
--	{ /* sentinel */ }
--};
--MODULE_DEVICE_TABLE(of, rockchip_pwm_dt_ids);
--
- static struct platform_driver rockchip_pwm_driver = {
- 	.driver = {
- 		.name = "rockchip-pwm",
--- 
-1.9.1
+>> I'm sure that my next version should work with 32/64-bit tracers on 64-bit
+>> kernel.
+>
+> Do you have a git tree uploaded anywhere? I'd love to follow this more
+> closely. When do you expect a v6?
+
+I'd like to submit v6 as soon as possible, but
+(1) how we should handle syscall(-1) is annoying me.
+     Without ptracer, we will normally return -ENOSYS but, for example,
+     what if some seccomp filter is installed and it does allow (or doesn't
+     have any rule against) '-1' syscall? Since the kernel doesn't know tracer's
+     intention, we should just let syscall(-1) return a bogus value.
+     Thus we will see inconsistent results of syscall(-1).
+
+(2) I'm investigating some failures in Kees' test suite.
+   * 'TRACE.handler' case on compat task:
+     Now I found a bug in arm64's compat_siginfo_t and fixed it.
+   * 'TSYNC.two_siblings_*' cases on 32/64-bit task:
+     I rebased my patch on pre-v3.17-rc1, but those cases still fail.
+     I have no clues at this moment.
+
+So please be patient for a while.
+
+-Takahiro AKASHI
+
+
+> Thanks!
+>
+> -Kees
+>
