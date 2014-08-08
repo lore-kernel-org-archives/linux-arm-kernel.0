@@ -1,40 +1,81 @@
 From: olof@lixom.net (Olof Johansson)
-Date: Fri,  8 Aug 2014 09:47:52 -0700
-Subject: [GIT PULL 0/7] ARM: SoC changes for 3.17
-Message-ID: <1407516479-1251-1-git-send-email-olof@lixom.net>
+Date: Fri,  8 Aug 2014 09:47:58 -0700
+Subject: [GIT PATCH 6/7] phy: fix up for devm_phy_create api change
+In-Reply-To: <1407516479-1251-1-git-send-email-olof@lixom.net>
+References: <1407516479-1251-1-git-send-email-olof@lixom.net>
+Message-ID: <1407516479-1251-7-git-send-email-olof@lixom.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-A moderately sized set of branches this merge window for us, about 750
-patches in total. There are several fairly large cleanups, and a net
-negative delta(!)
+From: Stephen Rothwell <sfr@canb.auug.org.au>
 
- 1014 files changed, 39452 insertions(+), 42425 deletions(-)
+This is needed due to the devm changes going in through Greg's tree at
+the same time as a new driver was added through ours.
 
-Most of the removal comes from two Samsung platforms being taken out
-(together with a couple of legacy drivers used only by them), but there's
-other stuff too -- removal and diet of some OMAP drivers and header
-files, the final folding of Marvell Kirkwood into the mvebu platform,
-removal of the legacy atmel pwm driver and a few more things like that.
+Signed-off-by: Stephen Rothwell <sfr@canb.auug.org.au>
+[olof: Write patch description]
+Signed-off-by: Olof Johansson <olof@lixom.net>
+---
 
-The format is nearly the same as always: I describe the conflicts in
-each email and I have pushed a 'resolved-3.17' branch if you want to
-compare. Most branches are free of conflicts, the main exception is the
-SoC branch and it's not horrible to deal with either.
+I'm sending this inline with the merge requests to keep things as
+bisectable as possible. This is a patch that Stephen was carrying for
+us in -next, you can also squash it into the merge commit if you prefer.
 
-I did include one patch interspersed with the branches (6/7 is a patch),
-it's something Stephen was carrying locally and I think this is better to
-handle this way than for us to do a backmerge to handle it ourselves. I'll
-leave it up to you if you prefer to fold it into the 5/7 merge or apply
-it separately.
-
-More detailed descriptions in each pull request. I also anticipate having
-another short branch of misc small cleanups that we have held off applying
-for the second week of the merge window, but nothing major. This is by
-far the bulk of the contents.
-
-Please pull!
-
-Thanks,
 
 -Olof
+
+ drivers/phy/phy-spear1310-miphy.c    | 2 +-
+ drivers/phy/phy-spear1340-miphy.c    | 2 +-
+ drivers/pinctrl/pinctrl-tegra-xusb.c | 4 ++--
+ 3 files changed, 4 insertions(+), 4 deletions(-)
+
+diff --git a/drivers/phy/phy-spear1310-miphy.c b/drivers/phy/phy-spear1310-miphy.c
+index c58c869d57e0..6dcbfcddb372 100644
+--- a/drivers/phy/phy-spear1310-miphy.c
++++ b/drivers/phy/phy-spear1310-miphy.c
+@@ -229,7 +229,7 @@ static int spear1310_miphy_probe(struct platform_device *pdev)
+ 		return -EINVAL;
+ 	}
+ 
+-	priv->phy = devm_phy_create(dev, &spear1310_miphy_ops, NULL);
++	priv->phy = devm_phy_create(dev, NULL, &spear1310_miphy_ops, NULL);
+ 	if (IS_ERR(priv->phy)) {
+ 		dev_err(dev, "failed to create SATA PCIe PHY\n");
+ 		return PTR_ERR(priv->phy);
+diff --git a/drivers/phy/phy-spear1340-miphy.c b/drivers/phy/phy-spear1340-miphy.c
+index 8de98adf21c3..7135ba2603b6 100644
+--- a/drivers/phy/phy-spear1340-miphy.c
++++ b/drivers/phy/phy-spear1340-miphy.c
+@@ -261,7 +261,7 @@ static int spear1340_miphy_probe(struct platform_device *pdev)
+ 		return PTR_ERR(priv->misc);
+ 	}
+ 
+-	priv->phy = devm_phy_create(dev, &spear1340_miphy_ops, NULL);
++	priv->phy = devm_phy_create(dev, NULL, &spear1340_miphy_ops, NULL);
+ 	if (IS_ERR(priv->phy)) {
+ 		dev_err(dev, "failed to create SATA PCIe PHY\n");
+ 		return PTR_ERR(priv->phy);
+diff --git a/drivers/pinctrl/pinctrl-tegra-xusb.c b/drivers/pinctrl/pinctrl-tegra-xusb.c
+index 4a7daf577b49..a06620474845 100644
+--- a/drivers/pinctrl/pinctrl-tegra-xusb.c
++++ b/drivers/pinctrl/pinctrl-tegra-xusb.c
+@@ -910,7 +910,7 @@ static int tegra_xusb_padctl_probe(struct platform_device *pdev)
+ 		goto reset;
+ 	}
+ 
+-	phy = devm_phy_create(&pdev->dev, &pcie_phy_ops, NULL);
++	phy = devm_phy_create(&pdev->dev, NULL, &pcie_phy_ops, NULL);
+ 	if (IS_ERR(phy)) {
+ 		err = PTR_ERR(phy);
+ 		goto unregister;
+@@ -919,7 +919,7 @@ static int tegra_xusb_padctl_probe(struct platform_device *pdev)
+ 	padctl->phys[TEGRA_XUSB_PADCTL_PCIE] = phy;
+ 	phy_set_drvdata(phy, padctl);
+ 
+-	phy = devm_phy_create(&pdev->dev, &sata_phy_ops, NULL);
++	phy = devm_phy_create(&pdev->dev, NULL, &sata_phy_ops, NULL);
+ 	if (IS_ERR(phy)) {
+ 		err = PTR_ERR(phy);
+ 		goto unregister;
+-- 
+2.0.1.473.gc4d58ca
