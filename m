@@ -1,112 +1,52 @@
-From: heiko@sntech.de (Heiko =?ISO-8859-1?Q?St=FCbner?=)
-Date: Sat, 09 Aug 2014 00:20:46 +0200
-Subject: [PATCH 1/4] clk: rockchip: protect critical clocks from getting
- disabled
-In-Reply-To: <CAD=FV=XA31T9i6nLaDhVS+BkJ=U-PiMye_ouC1QY8EMoKqMCiQ@mail.gmail.com>
-References: <1406661128-7614-1-git-send-email-heiko@sntech.de>
- <2434370.xFIeZvuJnT@diego>
- <CAD=FV=XA31T9i6nLaDhVS+BkJ=U-PiMye_ouC1QY8EMoKqMCiQ@mail.gmail.com>
-Message-ID: <3332039.dxD4mlCSgf@diego>
+From: khilman@linaro.org (Kevin Hilman)
+Date: Fri, 8 Aug 2014 15:19:12 -0700
+Subject: [GIT PULL 3/5] Samsung exynos cpuidle update for v3.17
+In-Reply-To: <53C9C159.4070305@samsung.com>
+References: <53C9C159.4070305@samsung.com>
+Message-ID: <CAGa+x86XpkxEhe2D9NfFvWhTre-mAPkcsyzObb8q=Xa=Yd2Xdw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am Freitag, 8. August 2014, 14:58:11 schrieb Doug Anderson:
-> Heiko,
-> 
-> On Fri, Aug 1, 2014 at 1:15 AM, Heiko St?bner <heiko@sntech.de> wrote:
-> > Am Donnerstag, 31. Juli 2014, 17:30:25 schrieb Mike Turquette:
-> >> Quoting Heiko St?bner (2014-07-31 16:29:34)
-> >> 
-> >> > Hi Mike,
-> >> > 
-> >> > Am Donnerstag, 31. Juli 2014, 15:45:23 schrieb Mike Turquette:
-> >> > > Quoting Heiko Stuebner (2014-07-29 12:12:05)
-> >> > > 
-> >> > > > The clock-tree contains clocks that should never get disabled
-> >> > > > automatically. One example are the base ACLKs, the base supplies
-> >> > > > for
-> >> > > > all
-> >> > > > peripherals.
-> >> > > > 
-> >> > > > Therefore add a structure similar to the sunxi clock-tree to
-> >> > > > protect
-> >> > > > these
-> >> > > > special clocks from being disabled.
-> >> > > > 
-> >> > > > Signed-off-by: Heiko Stuebner <heiko@sntech.de>
-> >> > > > ---
-> >> > > > 
-> >> > > >  drivers/clk/rockchip/clk-rk3188.c |  7 +++++++
-> >> > > >  drivers/clk/rockchip/clk-rk3288.c |  7 +++++++
-> >> > > >  drivers/clk/rockchip/clk.c        | 13 +++++++++++++
-> >> > > >  drivers/clk/rockchip/clk.h        |  1 +
-> >> > > >  4 files changed, 28 insertions(+)
-> >> > > > 
-> >> > > > diff --git a/drivers/clk/rockchip/clk-rk3188.c
-> >> > > > b/drivers/clk/rockchip/clk-rk3188.c index a83a6d8..5aef277 100644
-> >> > > > --- a/drivers/clk/rockchip/clk-rk3188.c
-> >> > > > +++ b/drivers/clk/rockchip/clk-rk3188.c
-> >> > > > @@ -599,6 +599,11 @@ static struct rockchip_clk_branch
-> >> > > > rk3188_clk_branches[] __initdata = {>
-> >> > > > 
-> >> > > >         GATE(ACLK_GPS, "aclk_gps", "aclk_peri", 0,
-> >> > > >         RK2928_CLKGATE_CON(8),
-> >> > > >         13, GFLAGS),>
-> >> > > >  
-> >> > > >  };
-> >> > > > 
-> >> > > > +static const char *rk3188_critical_clocks[] __initconst = {
-> >> > > > +       "aclk_cpu",
-> >> > > > +       "aclk_peri",
-> >> > > 
-> >> > > I'm not against the idea of critical clocks, but I want to verify
-> >> > > that
-> >> > > there is no other driver out there that is a better fit for claiming
-> >> > > these clks via clk_get and enabling them the normal way via
-> >> > > clk_enable?
-> >> > 
-> >> > In the clock hierarchy of Rockchip SoCs, both aclks listed here, are
-> >> > sources for pclk and hclk, as well as sourcing some other peripheral
-> >> > gates further below too. So from what I've seen from the clock
-> >> > diagrams,
-> >> > there is nothing that would claim these clocks directly, and it
-> >> > wouldn't
-> >> > also make any sense to let them get disabled as there will always be
-> >> > something using them (for example the dram-controller).
-> >> 
-> >> Sounds good. Just out of curiosity, under what circumstances would you
-> >> want to gate them? Is there a use case for it?
-> > 
-> > hmm, I don't see a use-case for gating these at runtime right now, simply
-> > because there should be a user for them all the time. (both aclks combined
-> > have at least 68 consumers on the rk3288 and a similar number on the
-> > previous socs)
-> > 
-> > The only thing I could think of would be something suspend related - which
-> > we don't have yet. But then this would probably happen in the clock
-> > controller itself anyway in some late suspend-related action, so it could
-> > take into account them being defined as critical clocks.
-> 
-> I know Rockchip has some funky stuff planned for memory scaling too.
-> Perhaps Kever can comment whether these two clocks might need to be
-> disabled in that case?
+Hello,
 
-hmm looking at the core clock tree, I wouldn't think so.
+On Fri, Jul 18, 2014 at 5:52 PM, Kukjin Kim <kgene.kim@samsung.com> wrote:
+> The following changes since commit 1795cd9b3a91d4b5473c97f491d63892442212ab:
+>
+>   Linux 3.16-rc5 (2014-07-13 14:04:33 -0700)
+>
+> are available in the git repository at:
+>
+>   git://git.kernel.org/pub/scm/linux/kernel/git/kgene/linux-samsung.git
+> tags/exynos-cpuidle
+>
+> for you to fetch changes up to fc2cac41ebbfb16da8b036cba6ec6714ab780a6d:
+>
+>   ARM: EXYNOS: populate suspend and powered_up callbacks for mcpm
+> (2014-07-19 03:36:00 +0900)
+>
+> ----------------------------------------------------------------
+> exynos cpuidle update for v3.17
+>
+> - add callbacks exynos_suspend() and exynos_powered_up()
+>   for support cpuidle through mcpm
+> - skip exynos_cpuidle for exynos5420 because is uses
+>   cpuidle-big-liggle generic cpuidle driver
+> - add generic functions to calculate cpu number is used
+>   for pmu and this is required for exynos5420 multi-cluster
+> - add of_device_id structure for big.LITTLE cpuidle and
+>   add "samsung,exynos5420" compatible string for exynos5420
 
-The only intersection between the ddr-clk, aclk_cpu and aclk_peri is the gpll 
-which can be a source to both. But the ddr-clk is mainly sourced from the dpll 
-anyway.
+I'm curious what platforms this is expected to work on, and where it's
+been tested.
 
-In any case, turning off aclk_cpu/aclk_peri in this scenario wouldn't normally 
-be possible anyway, as most of the time some pclk_* would be active anyway.
+I tried it on exynos5800-peach-pi (chromebook2) and it hangs up (no
+kernel messages) shortly after the driver loads, and never finishes to
+boot.
 
+I needed an extra compatible entry for the 5800 in the driver for the
+driver to load, which suggests it hasn't been tested on 5800, but at
+least in theory, this should be compatible with the 542x, right?
 
-> In any case, this patch fixes a hang at boot when using the PWM driver
-> that just landed, so:
-> 
-> Tested-by: Doug Anderson <dianders@chromium.org>
+For testing, I tried today's linux-next and arm-soc/for-next.
 
-thanks
-
-
-Heiko
+Kevin
