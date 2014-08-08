@@ -1,46 +1,43 @@
 From: srv_yingjoe.chen@mediatek.com (Joe.C)
-Date: Fri, 8 Aug 2014 21:43:30 +0800
-Subject: [PATCH v2 3/4] arm: mediatek: Add intpol in mt6589.dtsi
+Date: Fri, 8 Aug 2014 21:43:31 +0800
+Subject: [PATCH v2 4/4] dt-bindings: add bindings for mediatek intpol
 In-Reply-To: <1407505411-2207-1-git-send-email-srv_yingjoe.chen@mediatek.com>
 References: <1407505411-2207-1-git-send-email-srv_yingjoe.chen@mediatek.com>
-Message-ID: <1407505411-2207-4-git-send-email-srv_yingjoe.chen@mediatek.com>
+Message-ID: <1407505411-2207-5-git-send-email-srv_yingjoe.chen@mediatek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: "Joe.C" <yingjoe.chen@mediatek.com>
 
-Add intpol settings for mt6589.
-This also correct timer interrupt flag setting. The old setting
-works because 6589 boot loader already set polarity for time
-interrupt. Without intpol support, the setting was not changed
-so gic can get the irq correctly.
+Add binding documentation for Mediatek SoC GIC interrupt polarity extension.
 
 Signed-off-by: Joe.C <yingjoe.chen@mediatek.com>
 ---
- arch/arm/boot/dts/mt6589.dtsi | 7 ++++++-
- 1 file changed, 6 insertions(+), 1 deletion(-)
+ .../bindings/interrupt-controller/mediatek,intpol.txt    | 16 ++++++++++++++++
+ 1 file changed, 16 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/interrupt-controller/mediatek,intpol.txt
 
-diff --git a/arch/arm/boot/dts/mt6589.dtsi b/arch/arm/boot/dts/mt6589.dtsi
-index d0297a0..18df47f 100644
---- a/arch/arm/boot/dts/mt6589.dtsi
-+++ b/arch/arm/boot/dts/mt6589.dtsi
-@@ -76,11 +76,16 @@
- 		timer: timer at 10008000 {
- 			compatible = "mediatek,mt6577-timer";
- 			reg = <0x10008000 0x80>;
--			interrupts = <GIC_SPI 113 IRQ_TYPE_EDGE_RISING>;
-+			interrupts = <GIC_SPI 113 IRQ_TYPE_LEVEL_LOW>;
- 			clocks = <&system_clk>, <&rtc_clk>;
- 			clock-names = "system-clk", "rtc-clk";
- 		};
- 
-+		intpol: intpol at 10200100 {
-+			compatible = "mediatek,mt6577-intpol";
-+			reg = <0x10200100 0x1c>;
-+		};
+diff --git a/Documentation/devicetree/bindings/interrupt-controller/mediatek,intpol.txt b/Documentation/devicetree/bindings/interrupt-controller/mediatek,intpol.txt
+new file mode 100644
+index 0000000..16ea372
+--- /dev/null
++++ b/Documentation/devicetree/bindings/interrupt-controller/mediatek,intpol.txt
+@@ -0,0 +1,16 @@
++Mediatek 65xx/81xx GIC interrupt polarity extension
 +
- 		gic: interrupt-controller at 10212000 {
- 			compatible = "arm,cortex-a15-gic";
- 			interrupt-controller;
++Mediatek SOCs contain controllable inverter for each GIC SPI interrupt,
++these can be used as GIC interrupt polarity extension.
++
++Required properties:
++- compatible: Compatible property value should be "mediatek,mt6577-intpol"
++
++- reg: Physical base address of the int pol registers and length of memory
++  mapped region.
++
++Example:
++       intpol: intpol at 10200100 {
++               compatible = "mediatek,mt6577-intpol";
++               reg = <0x10200100 0x1c>;
++       };
 -- 
 1.8.1.1.dirty
