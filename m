@@ -1,47 +1,30 @@
-From: jaswinder.singh@linaro.org (Jassi Brar)
-Date: Fri, 8 Aug 2014 20:03:01 +0530
-Subject: Request to include Mailbox tree in linux-next
-In-Reply-To: <20140808103021.GA30282@n2100.arm.linux.org.uk>
-References: <CAJe_ZhdZTSs+Ns4u7bMXwbLHYTnE-5XEE8uev4zXbXrCP52bSg@mail.gmail.com>
- <20140808142912.7bf68229@canb.auug.org.au>
- <20140808103021.GA30282@n2100.arm.linux.org.uk>
-Message-ID: <CAJe_Zhcy+CjXa218gWNFR=O1U7g3iXGQ8s+VwgoGKamk3ysoKw@mail.gmail.com>
+From: stefano.stabellini@eu.citrix.com (Stefano Stabellini)
+Date: Fri, 8 Aug 2014 15:32:41 +0100
+Subject: [PATCH v3 2/3] xen/arm: reimplement xen_dma_unmap_page & friends
+In-Reply-To: <1406904984-16068-2-git-send-email-stefano.stabellini@eu.citrix.com>
+References: <alpine.DEB.2.02.1408011552460.2293@kaball.uk.xensource.com>
+ <1406904984-16068-2-git-send-email-stefano.stabellini@eu.citrix.com>
+Message-ID: <alpine.DEB.2.02.1408081530580.2293@kaball.uk.xensource.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 8 August 2014 16:00, Russell King - ARM Linux <linux@arm.linux.org.uk> wrote:
-> On Fri, Aug 08, 2014 at 02:29:12PM +1000, Stephen Rothwell wrote:
->> Hi Jassi,
->>
->> On Wed, 6 Aug 2014 12:25:49 +0530 Jassi Brar <jaswinder.singh@linaro.org> wrote:
->> >
->> >  The framework for Mailbox has undergone 10 revisions over the last
->> > one year, which has garnered support in the form of 'Reviewed-by' and
->> > 'looks good enough to be merged in this window' from people in the CC
->> > list.
->> >
->> >   Could you please add it to linux-next?
->> > Tree:       git://git.linaro.org/landing-teams/working/fujitsu/integration.git
->> > Branch:   mailbox-for-3.17
->> > Contact:  Jassi Brar <jaswinder.singh@linaro.org>
->>
->> This is really late for v3.17.  The purpose of linux-next is to
->> discover interactions between trees before they are pulled into Linus'
->> tree and to do some cross architecture build checking.  Adding a tree
->> during the merge window is not very helpful to that.
->
-> +1.
->
-> The same goes for any tree which is part of linux-next.
->
-> Having a tree in linux-next carries with it the responsibility that the
-> tree owner abides by the kernel development cycle, which includes
-> respecting the moratorium on merging new development into branch(es)
-> which are part of linux-next during an actively open merge window.
->
-I wasn't aware that any new subsystem must live at least one cycle in
-linux-next, I submitted it for inclusion just because someone
-suggested that as the next best thing to merging this cycle.
+On Fri, 1 Aug 2014, Stefano Stabellini wrote:
+> +static void __xen_dma_page_dev_to_cpu(struct device *hwdev, dma_addr_t handle,
+> +		size_t size, enum dma_data_direction dir)
+> +{
+> +	/* Cannot use __dma_page_dev_to_cpu because we don't have a
+> +	 * struct page for handle */
+> +
+> +	if (dir == DMA_TO_DEVICE)
 
-Thanks
--Jassi
+This should be:
+    if (dir != DMA_TO_DEVICE)
+
+Thomas, could you please confirm that with this small fix
+http://pastebin.com/FPRf7pgL goes away?
+
+
+> +		outer_inv_range(handle, handle + size);
+> +
+> +	dma_cache_maint(handle & PAGE_MASK, handle & ~PAGE_MASK, size, dir, dmac_unmap_area);
+> +}
