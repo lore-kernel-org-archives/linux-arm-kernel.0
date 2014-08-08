@@ -1,106 +1,118 @@
-From: tom@sharkbay.at (Thomas Scheiblauer)
-Date: Fri, 08 Aug 2014 18:33:04 +0200
-Subject: [PATCH 1/1] undo workaround for i.mx6 silicon errata ERR006687
- which resulted in an unstable ethernet connection (lost interrupts?)
-In-Reply-To: <CAOMZO5C=sTL-ksaHX9uL=zyGR0d5hR8Rd5JAiQMTrr_0wiNdxQ@mail.gmail.com>
-References: <1407503758.19455.1.camel@sharkbay.at>
- <20140808132754.GC30282@n2100.arm.linux.org.uk>
- <1407507023.19455.3.camel@sharkbay.at>
- <20140808143008.GD30282@n2100.arm.linux.org.uk>
- <1407509932.19455.7.camel@sharkbay.at>
- <CAOMZO5C=sTL-ksaHX9uL=zyGR0d5hR8Rd5JAiQMTrr_0wiNdxQ@mail.gmail.com>
-Message-ID: <1407515584.19455.9.camel@sharkbay.at>
+From: pawel.moll@arm.com (Pawel Moll)
+Date: Fri, 08 Aug 2014 17:34:51 +0100
+Subject: [PATCH 2/5] char: tile-srom: Remove reference to platform_bus
+In-Reply-To: <53E139C8.9000502@tilera.com>
+References: <1406298233-27876-1-git-send-email-pawel.moll@arm.com>
+ <1406298233-27876-2-git-send-email-pawel.moll@arm.com>
+ <53DAA605.2030500@tilera.com> <1406913678.22529.46.camel@hornet>
+ <53E139C8.9000502@tilera.com>
+Message-ID: <1407515691.31897.26.camel@hornet>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> > 
-> > On Fre, 2014-08-08 at 12:46 -0300, Fabio Estevam wrote:
-> > Hi Thomas,
-> > 
-> > On Fri, Aug 8, 2014 at 11:58 AM, Thomas Scheiblauer <tom@sharkbay.at> wrote:
-> > 
-> > >> So, what I'm asking is to try without this workaround in case there is
-> > >> some interaction there, thus testing the same interrupt configuration
-> > >> that I've had here for the last 10 months without the kind of issues
-> > >> you're reporting.  Sometimes, workarounds for one problem end up causing
-> > >> other problem elsewhere.
-> > >>
-> > >
-> > > Indeed, commenting out these 2 lines in
-> > > arch/arm/boot/dts/imx6qdl-wandboard.dtsi fixes my problem without having
-> > > to increase TX_RING_SIZE.
-> > > Thank you very much!
-> > 
-> > Could you please send a patch for imx6qdl-wandboard.dtsi? Please
-> > provide the details of the problem in the commit log.
-> > 
-> > Thanks
+On Tue, 2014-08-05 at 21:08 +0100, Chris Metcalf wrote:
+> >> In addition, we also have user binaries
+> >> in the wild that know to look for /sys/devices/platform/srom/ paths,
+> >> so I'm pretty reluctant to change this path without good reason.
+> > So what is the srom class for then if not for device discovery? And why
+> > do they look for them in the first place? To get relevant character
+> > device's data, if I understand it right?
+> >
+> > Maybe you could just register a simple "proper" platform device for all
+> > the sroms and then hang the class devices from it? I can type some code
+> > doing this if it sound reasonably?
+> 
+> I'm not sure exactly what you mean by device discovery here.  
 
-Ok, here is my attempt on the patch. I've also removed the respective lines from all the other imx6qdl-*.dtsi files.
 
-Signed-off-by: Thomas Scheiblauer <tom@sharkbay.at>
+
+> The
+> subdirectories under /sys/devices/platform/srom/ correspond to partitions
+> in the SPI-ROM, which are software constructs created by the Tilera hypervisor.
+> By default we have three, where the first holds boot data that the chip
+> can use to boot out of hardware, and the other two are smaller partitions
+> for boot- and user-specific data.  We use the /sys files primarily to get the
+> page size and sector size for the sroms, and also export other interesting
+> information like the total size of the particular srom device.
+> 
+> Thank you for volunteering to write a bit of code; if that's the best
+> way to clarify this for us, fantastic, or else pointing us at existing
+> good practices or documentation would be great too.
+
+I was thinking about something like the following (warning, untested)
+
+8<-------------------------------------------
+>From c53f0a2492d6cd38d1f82d57916a6528b071e8a8 Mon Sep 17 00:00:00 2001
+From: Pawel Moll <pawel.moll@arm.com>
+Date: Fri, 8 Aug 2014 16:32:58 +0100
+Subject: [PATCH] char: tile-srom: Add real platform bus parent
+
+Add a real platform bus device as a parent for
+the srom class devices, to prevent non-platform
+devices hanging from the bus root.
+
+Signed-off-by: Pawel Moll <pawel.moll@arm.com>
 ---
- arch/arm/boot/dts/imx6qdl-nitrogen6x.dtsi | 2 --
- arch/arm/boot/dts/imx6qdl-sabreauto.dtsi  | 2 --
- arch/arm/boot/dts/imx6qdl-sabrelite.dtsi  | 2 --
- arch/arm/boot/dts/imx6qdl-wandboard.dtsi  | 2 --
- 4 files changed, 8 deletions(-)
+ drivers/char/tile-srom.c | 13 ++++++++++++-
+ 1 file changed, 12 insertions(+), 1 deletion(-)
 
-diff --git a/arch/arm/boot/dts/imx6qdl-nitrogen6x.dtsi
-b/arch/arm/boot/dts/imx6qdl-nitrogen6x.dtsi
-index 42ff525..cf4e6db 100644
---- a/arch/arm/boot/dts/imx6qdl-nitrogen6x.dtsi
-+++ b/arch/arm/boot/dts/imx6qdl-nitrogen6x.dtsi
-@@ -169,8 +169,6 @@
- 	txd1-skew-ps = <0>;
- 	txd2-skew-ps = <0>;
- 	txd3-skew-ps = <0>;
--	interrupts-extended = <&gpio1 6 IRQ_TYPE_LEVEL_HIGH>,
--			      <&intc 0 119 IRQ_TYPE_LEVEL_HIGH>;
- 	status = "okay";
- };
+diff --git a/drivers/char/tile-srom.c b/drivers/char/tile-srom.c
+index bd37747..7fb0fd5 100644
+--- a/drivers/char/tile-srom.c
++++ b/drivers/char/tile-srom.c
+@@ -76,6 +76,7 @@ MODULE_LICENSE("GPL");
  
-diff --git a/arch/arm/boot/dts/imx6qdl-sabreauto.dtsi
-b/arch/arm/boot/dts/imx6qdl-sabreauto.dtsi
-index 009abd6..f47e82f 100644
---- a/arch/arm/boot/dts/imx6qdl-sabreauto.dtsi
-+++ b/arch/arm/boot/dts/imx6qdl-sabreauto.dtsi
-@@ -65,8 +65,6 @@
- 	pinctrl-names = "default";
- 	pinctrl-0 = <&pinctrl_enet>;
- 	phy-mode = "rgmii";
--	interrupts-extended = <&gpio1 6 IRQ_TYPE_LEVEL_HIGH>,
--			      <&intc 0 119 IRQ_TYPE_LEVEL_HIGH>;
- 	status = "okay";
- };
+ static int srom_devs;			/* Number of SROM partitions */
+ static struct cdev srom_cdev;
++static struct platform_device *srom_parent;
+ static struct class *srom_class;
+ static struct srom_dev *srom_devices;
  
-diff --git a/arch/arm/boot/dts/imx6qdl-sabrelite.dtsi
-b/arch/arm/boot/dts/imx6qdl-sabrelite.dtsi
-index 0a36129..ebfcab4 100644
---- a/arch/arm/boot/dts/imx6qdl-sabrelite.dtsi
-+++ b/arch/arm/boot/dts/imx6qdl-sabrelite.dtsi
-@@ -168,8 +168,6 @@
- 	txd1-skew-ps = <0>;
- 	txd2-skew-ps = <0>;
- 	txd3-skew-ps = <0>;
--	interrupts-extended = <&gpio1 6 IRQ_TYPE_LEVEL_HIGH>,
--			      <&intc 0 119 IRQ_TYPE_LEVEL_HIGH>;
- 	status = "okay";
- };
+@@ -350,7 +351,7 @@ static int srom_setup_minor(struct srom_dev *srom, int index)
+ 		       SROM_PAGE_SIZE_OFF, sizeof(srom->page_size)) < 0)
+ 		return -EIO;
  
-diff --git a/arch/arm/boot/dts/imx6qdl-wandboard.dtsi
-b/arch/arm/boot/dts/imx6qdl-wandboard.dtsi
-index 6461f66..3b61c9a 100644
---- a/arch/arm/boot/dts/imx6qdl-wandboard.dtsi
-+++ b/arch/arm/boot/dts/imx6qdl-wandboard.dtsi
-@@ -257,8 +257,6 @@
- 	pinctrl-0 = <&pinctrl_enet>;
- 	phy-mode = "rgmii";
- 	phy-reset-gpios = <&gpio3 29 0>;
--	interrupts-extended = <&gpio1 6 IRQ_TYPE_LEVEL_HIGH>,
--			      <&intc 0 119 IRQ_TYPE_LEVEL_HIGH>;
- 	status = "okay";
- };
+-	dev = device_create(srom_class, &platform_bus,
++	dev = device_create(srom_class, srom_parent,
+ 			    MKDEV(srom_major, index), srom, "%d", index);
+ 	return PTR_ERR_OR_ZERO(dev);
+ }
+@@ -415,6 +416,13 @@ static int srom_init(void)
+ 	if (result < 0)
+ 		goto fail_chrdev;
  
++	/* Create a parent device */
++	srom_parent = platform_device_register_simple("srom", -1, NULL, 0);
++	if (IS_ERR(srom_parent)) {
++		result = PTR_ERR(srom_parent);
++		goto fail_pdev;
++	}
++
+ 	/* Create a sysfs class. */
+ 	srom_class = class_create(THIS_MODULE, "srom");
+ 	if (IS_ERR(srom_class)) {
+@@ -438,6 +446,8 @@ fail_class:
+ 		device_destroy(srom_class, MKDEV(srom_major, i));
+ 	class_destroy(srom_class);
+ fail_cdev:
++	platform_device_unregister(srom_parent);
++fail_pdev:
+ 	cdev_del(&srom_cdev);
+ fail_chrdev:
+ 	unregister_chrdev_region(dev, srom_devs);
+@@ -454,6 +464,7 @@ static void srom_cleanup(void)
+ 		device_destroy(srom_class, MKDEV(srom_major, i));
+ 	class_destroy(srom_class);
+ 	cdev_del(&srom_cdev);
++	platform_device_unregister(srom_parent);
+ 	unregister_chrdev_region(MKDEV(srom_major, 0), srom_devs);
+ 	kfree(srom_devices);
+ }
 -- 
-2.0.2
+1.9.1
+8<-------------------------------------------
+
+Would that work for you? Note that it will move the srom class devices
+one level deeper in /sys/devices/... hierarchy.
+
+Pawe?
