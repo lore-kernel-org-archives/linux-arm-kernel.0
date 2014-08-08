@@ -1,69 +1,82 @@
-From: robherring2@gmail.com (Rob Herring)
-Date: Fri, 8 Aug 2014 15:03:11 -0500
-Subject: [GIT PULL 0/7] ARM: SoC changes for 3.17
-In-Reply-To: <1407516479-1251-1-git-send-email-olof@lixom.net>
-References: <1407516479-1251-1-git-send-email-olof@lixom.net>
-Message-ID: <CAL_JsqLgRM8_62mz3HCcsE6vw0gtB3pN0rg6SExnZvnOTRNu2g@mail.gmail.com>
+From: lauraa@codeaurora.org (Laura Abbott)
+Date: Fri,  8 Aug 2014 13:23:14 -0700
+Subject: [PATCHv6 2/5] lib/genalloc.c: Add genpool range check function
+In-Reply-To: <1407529397-6642-1-git-send-email-lauraa@codeaurora.org>
+References: <1407529397-6642-1-git-send-email-lauraa@codeaurora.org>
+Message-ID: <1407529397-6642-2-git-send-email-lauraa@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Aug 8, 2014 at 11:47 AM, Olof Johansson <olof@lixom.net> wrote:
-> A moderately sized set of branches this merge window for us, about 750
-> patches in total. There are several fairly large cleanups, and a net
-> negative delta(!)
->
->  1014 files changed, 39452 insertions(+), 42425 deletions(-)
 
-If you look at mach-* and plat-* only, the overall delta has been
-negative mostly since 3.0 which was when ARM DT support went in. The
-overall size is trending down as well after growing by an order of
-magnitude. You're going to be out of a job soon (or DTS maintainer).
-;)
+After allocating an address from a particular genpool,
+there is no good way to verify if that address actually
+belongs to a genpool. Introduce addr_in_gen_pool which
+will return if an address plus size falls completely
+within the genpool range.
 
-v2.6.12: 104 files changed, 3896 insertions(+), 1001 deletions(-)
-v2.6.13: 153 files changed, 4160 insertions(+), 2033 deletions(-)
-v2.6.14: 125 files changed, 4048 insertions(+), 924 deletions(-)
-v2.6.15: 178 files changed, 15850 insertions(+), 2666 deletions(-)
-v2.6.16: 179 files changed, 3741 insertions(+), 2338 deletions(-)
-v2.6.17: 151 files changed, 9469 insertions(+), 1646 deletions(-)
-v2.6.18: 293 files changed, 14782 insertions(+), 2056 deletions(-)
-v2.6.19: 228 files changed, 5906 insertions(+), 4286 deletions(-)
-v2.6.20: 159 files changed, 7002 insertions(+), 646 deletions(-)
-v2.6.21: 193 files changed, 17596 insertions(+), 5574 deletions(-)
-v2.6.22: 238 files changed, 8694 insertions(+), 1364 deletions(-)
-v2.6.23: 143 files changed, 4811 insertions(+), 849 deletions(-)
-v2.6.24: 139 files changed, 7448 insertions(+), 1038 deletions(-)
-v2.6.25: 238 files changed, 18425 insertions(+), 3397 deletions(-)
-v2.6.26: 225 files changed, 19606 insertions(+), 8390 deletions(-)
-v2.6.27: 1384 files changed, 90110 insertions(+), 5576 deletions(-)
-v2.6.28: 640 files changed, 21783 insertions(+), 5853 deletions(-)
-v2.6.29: 724 files changed, 24235 insertions(+), 8258 deletions(-)
-v2.6.30: 678 files changed, 31267 insertions(+), 12506 deletions(-)
-v2.6.31: 685 files changed, 49529 insertions(+), 10099 deletions(-)
-v2.6.32: 698 files changed, 59564 insertions(+), 5593 deletions(-)
-v2.6.33: 835 files changed, 50995 insertions(+), 16124 deletions(-)
-v2.6.34: 1059 files changed, 56064 insertions(+), 16620 deletions(-)
-v2.6.35: 797 files changed, 44051 insertions(+), 11856 deletions(-)
-v2.6.36: 871 files changed, 43841 insertions(+), 13222 deletions(-)
-v2.6.37: 1126 files changed, 48471 insertions(+), 12067 deletions(-)
-v2.6.38: 1055 files changed, 60061 insertions(+), 17964 deletions(-)
-v2.6.39: 1223 files changed, 52552 insertions(+), 23067 deletions(-)
-v3.0: 833 files changed, 10945 insertions(+), 37476 deletions(-)
-v3.1: 955 files changed, 17796 insertions(+), 20300 deletions(-)
-v3.2: 1507 files changed, 32960 insertions(+), 33392 deletions(-)
-v3.3: 1301 files changed, 27725 insertions(+), 18941 deletions(-)
-v3.4: 1324 files changed, 27079 insertions(+), 21500 deletions(-)
-v3.5: 975 files changed, 32340 insertions(+), 46663 deletions(-)
-v3.6: 648 files changed, 16121 insertions(+), 13161 deletions(-)
-v3.7: 1389 files changed, 23739 insertions(+), 61097 deletions(-)
-v3.8: 1066 files changed, 32812 insertions(+), 40821 deletions(-)
-v3.9: 1031 files changed, 10051 insertions(+), 33399 deletions(-)
-v3.10: 831 files changed, 15049 insertions(+), 27333 deletions(-)
-v3.11: 675 files changed, 18519 insertions(+), 30012 deletions(-)
-v3.12: 474 files changed, 12575 insertions(+), 25120 deletions(-)
-v3.13: 491 files changed, 11088 insertions(+), 13375 deletions(-)
-v3.14: 408 files changed, 5586 insertions(+), 12691 deletions(-)
-v3.15: 538 files changed, 7809 insertions(+), 9337 deletions(-)
-v3.16: 499 files changed, 6528 insertions(+), 10252 deletions(-)
+Acked-by: Will Deacon <will.deacon@arm.com>
+Reviewed-by: Olof Johansson <olof@lixom.net>
+Reviewed-by: Catalin Marinas <catalin.marinas@arm.com>
+Signed-off-by: Laura Abbott <lauraa@codeaurora.org>
+---
+ include/linux/genalloc.h |  3 +++
+ lib/genalloc.c           | 29 +++++++++++++++++++++++++++++
+ 2 files changed, 32 insertions(+)
 
-Rob
+diff --git a/include/linux/genalloc.h b/include/linux/genalloc.h
+index 3cd0934..1ccaab4 100644
+--- a/include/linux/genalloc.h
++++ b/include/linux/genalloc.h
+@@ -121,6 +121,9 @@ extern struct gen_pool *devm_gen_pool_create(struct device *dev,
+ 		int min_alloc_order, int nid);
+ extern struct gen_pool *dev_get_gen_pool(struct device *dev);
+ 
++bool addr_in_gen_pool(struct gen_pool *pool, unsigned long start,
++			size_t size);
++
+ #ifdef CONFIG_OF
+ extern struct gen_pool *of_get_named_gen_pool(struct device_node *np,
+ 	const char *propname, int index);
+diff --git a/lib/genalloc.c b/lib/genalloc.c
+index 9758529..66edf93 100644
+--- a/lib/genalloc.c
++++ b/lib/genalloc.c
+@@ -403,6 +403,35 @@ void gen_pool_for_each_chunk(struct gen_pool *pool,
+ EXPORT_SYMBOL(gen_pool_for_each_chunk);
+ 
+ /**
++ * addr_in_gen_pool - checks if an address falls within the range of a pool
++ * @pool:	the generic memory pool
++ * @start:	start address
++ * @size:	size of the region
++ *
++ * Check if the range of addresses falls within the specified pool. Takes
++ * the rcu_read_lock for the duration of the check.
++ */
++bool addr_in_gen_pool(struct gen_pool *pool, unsigned long start,
++			size_t size)
++{
++	bool found = false;
++	unsigned long end = start + size;
++	struct gen_pool_chunk *chunk;
++
++	rcu_read_lock();
++	list_for_each_entry_rcu(chunk, &(pool)->chunks, next_chunk) {
++		if (start >= chunk->start_addr && start <= chunk->end_addr) {
++			if (end <= chunk->end_addr) {
++				found = true;
++				break;
++			}
++		}
++	}
++	rcu_read_unlock();
++	return found;
++}
++
++/**
+  * gen_pool_avail - get available free space of the pool
+  * @pool: pool to get available free space
+  *
+-- 
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
+hosted by The Linux Foundation
