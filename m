@@ -1,29 +1,42 @@
-From: peter.griffin@linaro.org (Peter Griffin)
-Date: Fri,  8 Aug 2014 11:19:35 +0100
-Subject: [PATCH 3/3] MAINTAINERS: Add phy-stih41x-usb.c to ARCH/STI
- architecture
-In-Reply-To: <1407493175-2611-1-git-send-email-peter.griffin@linaro.org>
-References: <1407493175-2611-1-git-send-email-peter.griffin@linaro.org>
-Message-ID: <1407493175-2611-4-git-send-email-peter.griffin@linaro.org>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Fri, 8 Aug 2014 11:30:21 +0100
+Subject: Request to include Mailbox tree in linux-next
+In-Reply-To: <20140808142912.7bf68229@canb.auug.org.au>
+References: <CAJe_ZhdZTSs+Ns4u7bMXwbLHYTnE-5XEE8uev4zXbXrCP52bSg@mail.gmail.com>
+ <20140808142912.7bf68229@canb.auug.org.au>
+Message-ID: <20140808103021.GA30282@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Signed-off-by: Peter Griffin <peter.griffin@linaro.org>
----
- MAINTAINERS | 1 +
- 1 file changed, 1 insertion(+)
+On Fri, Aug 08, 2014 at 02:29:12PM +1000, Stephen Rothwell wrote:
+> Hi Jassi,
+> 
+> On Wed, 6 Aug 2014 12:25:49 +0530 Jassi Brar <jaswinder.singh@linaro.org> wrote:
+> >
+> >  The framework for Mailbox has undergone 10 revisions over the last
+> > one year, which has garnered support in the form of 'Reviewed-by' and
+> > 'looks good enough to be merged in this window' from people in the CC
+> > list.
+> > 
+> >   Could you please add it to linux-next?
+> > Tree:       git://git.linaro.org/landing-teams/working/fujitsu/integration.git
+> > Branch:   mailbox-for-3.17
+> > Contact:  Jassi Brar <jaswinder.singh@linaro.org>
+> 
+> This is really late for v3.17.  The purpose of linux-next is to
+> discover interactions between trees before they are pulled into Linus'
+> tree and to do some cross architecture build checking.  Adding a tree
+> during the merge window is not very helpful to that.
 
-diff --git a/MAINTAINERS b/MAINTAINERS
-index c2066f4..6283d83 100644
---- a/MAINTAINERS
-+++ b/MAINTAINERS
-@@ -1356,6 +1356,7 @@ F:	drivers/pinctrl/pinctrl-st.c
- F:	drivers/media/rc/st_rc.c
- F:	drivers/i2c/busses/i2c-st.c
- F:	drivers/tty/serial/st-asc.c
-+F:	drivers/phy/phy-stih41x-usb.c
- 
- ARM/TECHNOLOGIC SYSTEMS TS7250 MACHINE SUPPORT
- M:	Lennert Buytenhek <kernel@wantstofly.org>
++1.
+
+The same goes for any tree which is part of linux-next.
+
+Having a tree in linux-next carries with it the responsibility that the
+tree owner abides by the kernel development cycle, which includes
+respecting the moratorium on merging new development into branch(es)
+which are part of linux-next during an actively open merge window.
+
 -- 
-1.9.1
+FTTC broadband for 0.8mile line: currently at 9.5Mbps down 400kbps up
+according to speedtest.net.
