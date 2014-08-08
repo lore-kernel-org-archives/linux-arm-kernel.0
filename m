@@ -1,55 +1,42 @@
-From: p.zabel@pengutronix.de (Philipp Zabel)
-Date: Fri, 08 Aug 2014 16:23:09 +0200
-Subject: [RFC PATCH v3] reset: Add a defer reset object to send board
- specific reset
-In-Reply-To: <CACRpkdbFPAsu1gE-AVyD=-RxyE7mUJPSbFga7HLh0mxjE-mQuQ@mail.gmail.com>
-References: <1403098673-3058-1-git-send-email-houcheng@gmail.com>
- <CACRpkdYfu8HmVCkn9JFh+YP5OPdr8o9nTfoCnkJ7SSpGoenQUg@mail.gmail.com>
- <20140708080535.GJ13423@lukather>
- <CACRpkdbFPAsu1gE-AVyD=-RxyE7mUJPSbFga7HLh0mxjE-mQuQ@mail.gmail.com>
-Message-ID: <1407507789.3354.20.camel@paszta.hi.pengutronix.de>
+From: jaswinder.singh@linaro.org (Jassi Brar)
+Date: Fri, 8 Aug 2014 19:55:52 +0530
+Subject: Request to include Mailbox tree in linux-next
+In-Reply-To: <20140808142912.7bf68229@canb.auug.org.au>
+References: <CAJe_ZhdZTSs+Ns4u7bMXwbLHYTnE-5XEE8uev4zXbXrCP52bSg@mail.gmail.com>
+ <20140808142912.7bf68229@canb.auug.org.au>
+Message-ID: <CAJe_ZhceR1j_b-_efJoq9Dv6X6C=UuMgyp8AofjcCvc+bQVkfw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am Dienstag, den 08.07.2014, 11:38 +0200 schrieb Linus Walleij:
-> On Tue, Jul 8, 2014 at 10:05 AM, Maxime Ripard
-> <maxime.ripard@free-electrons.com> wrote:
-> > On Tue, Jul 08, 2014 at 09:52:03AM +0200, Linus Walleij wrote:
-> >> On Wed, Jun 18, 2014 at 3:37 PM, Houcheng Lin <houcheng@gmail.com> wrote:
-> >>
-> >> > The Problem
-> >> > -----------
-> >> > The reset signal on a hardware board is send either:
-> >> >     - during machine initialization
-> >> >     - during bus master's initialization
-> >>
-> >> I just thought about this a bit, since there isn't already a generic GPIO
-> >> reset driver, just call this drivers/reset/reset-gpio.c and make the
-> >> ability to deferral just a configuration detail of the GPIO reset driver.
-> >
-> > Philipp has been working on one for quite some time. See
-> > http://www.spinics.net/lists/arm-kernel/msg321927.html
-> >
-> > However, it seems to progress slowly, and we don't seem to be able to
-> > reach a consensus here.
+On 8 August 2014 09:59, Stephen Rothwell <sfr@canb.auug.org.au> wrote:
+> Hi Jassi,
+>
+> On Wed, 6 Aug 2014 12:25:49 +0530 Jassi Brar <jaswinder.singh@linaro.org> wrote:
+>>
+>>  The framework for Mailbox has undergone 10 revisions over the last
+>> one year, which has garnered support in the form of 'Reviewed-by' and
+>> 'looks good enough to be merged in this window' from people in the CC
+>> list.
+>>
+>>   Could you please add it to linux-next?
+>> Tree:       git://git.linaro.org/landing-teams/working/fujitsu/integration.git
+>> Branch:   mailbox-for-3.17
+>> Contact:  Jassi Brar <jaswinder.singh@linaro.org>
+>
+> This is really late for v3.17.  The purpose of linux-next is to
+> discover interactions between trees before they are pulled into Linus'
+> tree and to do some cross architecture build checking.  Adding a tree
+> during the merge window is not very helpful to that.
+>
+> However if this is really going to be merged by Linus before v3.17-rc1,
+> I will add it on Monday, OK?
+>
+The patchset was deemed ready enough for this merge window. However
+some late nitpicks and bikeshedding discussions ate time and my
+confidence to send a pull request to Linus. Upon Mark's suggestion
+(and the right thing to do) I wanted the patchset to live the cycle in
+linux-next.
+ Sorry, I messed up by calling it for-3.17. It should have been for-3.18.
 
-Mostly because Maxime and I seem to have a completely different opinion
-and nobody else argued one way or the other.
-
-> > If you ask me, having to set a few extra properties like this just
-> > advocates for a regular reset driver and DT node for the reset GPIO,
-> > but I'm pretty sure Philipp will feel otherwise :)
-> 
-> Hm haha yeah let's fight it out :-)
-> 
-> This is not my subsystem so I'm getting some popcorn.
-
-Sorry about missing this earlier, I hope the popcorn is not stale.
-
-I think a reset that needs to be released before a fixed device appears
-on the bus, should be handled by the bus driver. The reset framework
-could be made to help with that, but I don't think a separate entity
-that scans the whole device tree itself is the right solution.
-
-regards
-Philipp
+Regards,
+-Jassi
