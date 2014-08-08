@@ -1,32 +1,47 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Fri, 8 Aug 2014 15:32:27 +0100
-Subject: master build: 1 failures 16 warnings (v3.16-8695-ga7d7a14)
-In-Reply-To: <E1XFj9r-0003ZJ-40@cassiel.sirena.org.uk>
-References: <E1XFj9r-0003ZJ-40@cassiel.sirena.org.uk>
-Message-ID: <20140808143227.GR17528@sirena.org.uk>
+From: jaswinder.singh@linaro.org (Jassi Brar)
+Date: Fri, 8 Aug 2014 20:03:01 +0530
+Subject: Request to include Mailbox tree in linux-next
+In-Reply-To: <20140808103021.GA30282@n2100.arm.linux.org.uk>
+References: <CAJe_ZhdZTSs+Ns4u7bMXwbLHYTnE-5XEE8uev4zXbXrCP52bSg@mail.gmail.com>
+ <20140808142912.7bf68229@canb.auug.org.au>
+ <20140808103021.GA30282@n2100.arm.linux.org.uk>
+Message-ID: <CAJe_Zhcy+CjXa218gWNFR=O1U7g3iXGQ8s+VwgoGKamk3ysoKw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Aug 08, 2014 at 01:20:31PM +0100, Build bot for Mark Brown wrote:
+On 8 August 2014 16:00, Russell King - ARM Linux <linux@arm.linux.org.uk> wrote:
+> On Fri, Aug 08, 2014 at 02:29:12PM +1000, Stephen Rothwell wrote:
+>> Hi Jassi,
+>>
+>> On Wed, 6 Aug 2014 12:25:49 +0530 Jassi Brar <jaswinder.singh@linaro.org> wrote:
+>> >
+>> >  The framework for Mailbox has undergone 10 revisions over the last
+>> > one year, which has garnered support in the form of 'Reviewed-by' and
+>> > 'looks good enough to be merged in this window' from people in the CC
+>> > list.
+>> >
+>> >   Could you please add it to linux-next?
+>> > Tree:       git://git.linaro.org/landing-teams/working/fujitsu/integration.git
+>> > Branch:   mailbox-for-3.17
+>> > Contact:  Jassi Brar <jaswinder.singh@linaro.org>
+>>
+>> This is really late for v3.17.  The purpose of linux-next is to
+>> discover interactions between trees before they are pulled into Linus'
+>> tree and to do some cross architecture build checking.  Adding a tree
+>> during the merge window is not very helpful to that.
+>
+> +1.
+>
+> The same goes for any tree which is part of linux-next.
+>
+> Having a tree in linux-next carries with it the responsibility that the
+> tree owner abides by the kernel development cycle, which includes
+> respecting the moratorium on merging new development into branch(es)
+> which are part of linux-next during an actively open merge window.
+>
+I wasn't aware that any new subsystem must live at least one cycle in
+linux-next, I submitted it for inclusion just because someone
+suggested that as the next best thing to merging this cycle.
 
-> Failed defconfigs:
-> 	arm64-allmodconfig
-#
-> Errors:
-
-> 	arm64-allmodconfig
-> ../arch/arm64/xen/../../arm/xen/grant-table.c:53:5: error: conflicting types for 'arch_gnttab_init'
-
-This build failure which was present in -next has now appeared in Linus'
-tree too.  It appears to be the result of a mismerge, we have two
-definitions of the function, one from b7dd0e350e0bd (x86/xen: safely map
-and unmap grant frames when in atomic context) with the old signature
-and one from 438b33c7145ca8a5131 (xen/grant-table: remove support for V2
-tables).
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140808/97b646b2/attachment.sig>
+Thanks
+-Jassi
