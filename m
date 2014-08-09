@@ -1,69 +1,72 @@
 From: lauraa@codeaurora.org (Laura Abbott)
-Date: Fri, 08 Aug 2014 17:25:11 -0700
-Subject: [PATCH v2 3/4] drivers: dma-coherent: add initialization from
- device tree
-In-Reply-To: <1405321966-28184-4-git-send-email-m.szyprowski@samsung.com>
+Date: Fri, 08 Aug 2014 17:28:06 -0700
+Subject: [PATCH v2 0/4] CMA & device tree, once again
+In-Reply-To: <1405321966-28184-1-git-send-email-m.szyprowski@samsung.com>
 References: <1405321966-28184-1-git-send-email-m.szyprowski@samsung.com>
- <1405321966-28184-4-git-send-email-m.szyprowski@samsung.com>
-Message-ID: <53E56A67.7040303@codeaurora.org>
+Message-ID: <53E56B16.5030402@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 On 7/14/2014 12:12 AM, Marek Szyprowski wrote:
-> Add support for handling 'shared-dma-pool' reserved-memory device tree
-> nodes.
+> Hello,
 > 
-> Based on previous code provided by Josh Cartwright <joshc@codeaurora.org>
+> This is one more respin of the patches which add support for creating
+> reserved memory regions defined in device tree. The last attempt
+> (http://lists.linaro.org/pipermail/linaro-mm-sig/2014-February/003738.html)
+> ended in merging only half of the code, so right now we have complete
+> documentation merged and only basic code, which implements a half of it
+> is written in the documentation. Although the merged patches allow to
+> reserve memory, there is no way of using it for devices and drivers.
 > 
-> Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
-> ---
->  drivers/base/dma-coherent.c | 40 ++++++++++++++++++++++++++++++++++++++++
->  1 file changed, 40 insertions(+)
+> This situation makes CMA rather useless, as the main architecture (ARM),
+> which used it, has been converted from board-file based system
+> initialization to device tree. Thus there is no place to use direct
+> calls to dma_declare_contiguous() and some new solution, which bases on
+> device tree, is urgently needed.
 > 
-> diff --git a/drivers/base/dma-coherent.c b/drivers/base/dma-coherent.c
-> index 7d6e84a51424..b20cbe095d86 100644
-> --- a/drivers/base/dma-coherent.c
-> +++ b/drivers/base/dma-coherent.c
-> @@ -218,3 +218,43 @@ int dma_mmap_from_coherent(struct device *dev, struct vm_area_struct *vma,
->  	return 0;
->  }
->  EXPORT_SYMBOL(dma_mmap_from_coherent);
-> +
-> +/*
-> + * Support for reserved memory regions defined in device tree
-> + */
-> +#ifdef CONFIG_OF_RESERVED_MEM
-> +#include <linux/of.h>
-> +#include <linux/of_fdt.h>
-> +#include <linux/of_reserved_mem.h>
-> +
-> +static void rmem_dma_device_init(struct reserved_mem *rmem, struct device *dev)
-> +{
-> +	dma_declare_coherent_memory(dev, rmem->base, rmem->base,
-> +		rmem->size, DMA_MEMORY_MAP | DMA_MEMORY_EXCLUSIVE);
-> +}
-> +
-> +static void rmem_dma_device_release(struct reserved_mem *rmem,
-> +				    struct device *dev)
-> +{
-> +	dma_release_declared_memory(dev);
-> +}
-> +
-> +static const struct reserved_mem_ops rmem_dma_ops = {
-> +	.device_init	= rmem_dma_device_init,
-> +	.device_release	= rmem_dma_device_release,
-> +};
-> +
-> +static int __init rmem_dma_setup(struct reserved_mem *rmem)
-> +{
-> +	unsigned long node = rmem->fdt_node;
-> +
-> +	if (of_get_flat_dt_prop(node, "reusable", NULL))
-> +		return -EINVAL;
-> +
+> This patch series fixes this issue. It provides two, already widely
+> discussed and already present in the kernel, drivers for reserved
+> memory: first based on DMA-coherent allocator, second using Contiguous
+> Memory Allocator. The first one nicely implements typical 'carved out'
+> reserved memory way of allocating contiguous buffers in a kernel-style
+> way. The memory is used exclusively by devices assigned to the given
+> memory region. The second one allows to reuse reserved memory for
+> movable kernel pages (like disk buffers, anonymous memory) and migrates
+> it out when device to allocates contiguous memory buffer. Both driver
+> provides memory buffers via standard dma-mapping API.
+> 
+> The patches have been rebased on top of latest CMA and mm changes merged
+> to akmp kernel tree.
+> 
+> To define a 64MiB CMA region following node is needed:
+> 
+> multimedia_reserved: multimedia_mem_region {
+> 	compatible = "shared-dma-pool";
+> 	reusable;
+> 	size = <0x4000000>;
+> 	alignment = <0x400000>;
+> };
+> 
+> Similarly, one can define 64MiB region with DMA coherent memory:
+> 
+> multimedia_reserved: multimedia_mem_region {
+> 	compatible = "shared-dma-pool";
+> 	no-map;
+> 	size = <0x4000000>;
+> 	alignment = <0x400000>;
+> };
+> 
 
-Can we add a check for 'no-map' property here? At least on ARM, the
-lack of the no-map property causes the ioremap to fail.
+Longer term, I think it would be good if we didn't have to use no-map with
+the coherent memory. With no-map and dma-coherent.c right now, not only
+do you lose out on the physical memory space, you also have to give up
+the same amount of vmalloc space for mapping. On arm32, if you have the default
+240MB vmalloc space, 64M is ~25% of the vmalloc space. At least on arm you can
+make this up by remapping the memory as coherent.
+
+I haven't seen this picked up anywhere yet so you are welcome to add
+
+Tested-by: Laura Abbott <lauraa@codeaurora.org>
 
 Thanks,
 Laura
