@@ -1,49 +1,71 @@
-From: troy.kisky@boundarydevices.com (Troy Kisky)
-Date: Fri, 08 Aug 2014 17:33:18 -0700
-Subject: [BUG]: imx6q (wandboard): Very unstable ethernet since kernel 3.16
-In-Reply-To: <CAHKv19Cky2+vEOirwwd8xhix_V0Vivn_6BbuYq+D_k0o8o4Gsg@mail.gmail.com>
-References: <1407503758.19455.1.camel@sharkbay.at>	<20140808132754.GC30282@n2100.arm.linux.org.uk>	<1407507023.19455.3.camel@sharkbay.at>	<20140808143008.GD30282@n2100.arm.linux.org.uk>	<1407509932.19455.7.camel@sharkbay.at>	<53E548DB.90905@boundarydevices.com>
- <CAHKv19Cky2+vEOirwwd8xhix_V0Vivn_6BbuYq+D_k0o8o4Gsg@mail.gmail.com>
-Message-ID: <53E56C4E.9090708@boundarydevices.com>
+From: kgene.kim@samsung.com (Kukjin Kim)
+Date: Sat, 09 Aug 2014 09:35:49 +0900
+Subject: [GIT PULL 3/5] Samsung exynos cpuidle update for v3.17
+In-Reply-To: <CAGa+x86XpkxEhe2D9NfFvWhTre-mAPkcsyzObb8q=Xa=Yd2Xdw@mail.gmail.com>
+References: <53C9C159.4070305@samsung.com>
+ <CAGa+x86XpkxEhe2D9NfFvWhTre-mAPkcsyzObb8q=Xa=Yd2Xdw@mail.gmail.com>
+Message-ID: <010101cfb369$dfe6da20$9fb48e60$@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 8/8/2014 3:51 PM, George Joseph wrote:
-> On Fri, Aug 8, 2014 at 4:02 PM, Troy Kisky <troy.kisky@boundarydevices.com
-> <mailto:troy.kisky@boundarydevices.com>> wrote:
+Kevin Hilman wrote:
 > 
->     On 8/8/2014 7:58 AM, Thomas Scheiblauer wrote:
->     >
->     >
->     > Indeed, commenting out these 2 lines in
->     > arch/arm/boot/dts/imx6qdl-wandboard.dtsi fixes my problem without having
->     > to increase TX_RING_SIZE.
->     > Thank you very much!
->     >
->     Could you also please checkout commit
+> Hello,
 > 
->     commit 9fc77821b17155c6e0ab50b1e1dd80c2b0e63e98
->     Author: Sascha Silbe <x-linux at infra-silbe.de <mailto:x-linux@infra-silbe.de>>
->     Date:   Thu Feb 6 23:24:13 2014 +0100
-> 
->         ARM: dts: imx6qdl-wandboard: use GPIO_6 for FEC interrupt
-> 
-> 
->     and see if it also shows ethernet instabilities?
-> 
-> 
-> I'm confused by the references to GPIO_6 and GPIO1_IO06 as it relates to the wandboard.   According
-> to the schematic for both the rev B1 and C1, the GPIO_6 PAD is physically connected to pin 30 on the
-> camera interface and according to the dtb tree, GPIO1_IO06 isn't mapped to any PAD.
-> 
-> This kinda fits with my own observation which is that Ethernet is working fine (40MB/s sustained)
-> regardless of whether fec is using "gpio1 6" and "intc 0 119" for extended interrupts or the default
-> "intc 0 118" and "intc 0 119".   Otherwise stock 3.16.0 on WB Quad C1.
-> 
-Are you using a wandboard also?   With or without camera plugged in?
+Hi,
 
+> On Fri, Jul 18, 2014 at 5:52 PM, Kukjin Kim <kgene.kim@samsung.com> wrote:
+> > The following changes since commit 1795cd9b3a91d4b5473c97f491d63892442212ab:
+> >
+> >   Linux 3.16-rc5 (2014-07-13 14:04:33 -0700)
+> >
+> > are available in the git repository at:
+> >
+> >   git://git.kernel.org/pub/scm/linux/kernel/git/kgene/linux-samsung.git
+> > tags/exynos-cpuidle
+> >
+> > for you to fetch changes up to fc2cac41ebbfb16da8b036cba6ec6714ab780a6d:
+> >
+> >   ARM: EXYNOS: populate suspend and powered_up callbacks for mcpm
+> > (2014-07-19 03:36:00 +0900)
+> >
+> > ----------------------------------------------------------------
+> > exynos cpuidle update for v3.17
+> >
+> > - add callbacks exynos_suspend() and exynos_powered_up()
+> >   for support cpuidle through mcpm
+> > - skip exynos_cpuidle for exynos5420 because is uses
+> >   cpuidle-big-liggle generic cpuidle driver
+> > - add generic functions to calculate cpu number is used
+> >   for pmu and this is required for exynos5420 multi-cluster
+> > - add of_device_id structure for big.LITTLE cpuidle and
+> >   add "samsung,exynos5420" compatible string for exynos5420
+> 
+> I'm curious what platforms this is expected to work on, and where it's
+> been tested.
+> 
+exynos5420 and its reference board, smdk5420.
 
-Same question for Thomas. Do you have a camera?
+> I tried it on exynos5800-peach-pi (chromebook2) and it hangs up (no
+> kernel messages) shortly after the driver loads, and never finishes to
+> boot.
+> 
+Oh, sorry about that, if so, it should be fixed before -rc1. Just note that I
+thought since exynos5800 is very similar with exynos5420 so I didn't ask
+Chander to test the series on exynos5800 based board...Just asked to test with
+Nico's mcpm series. BTW, unfortunately I have no exynos5800-peach-pi...
 
+> I needed an extra compatible entry for the 5800 in the driver for the
+> driver to load, which suggests it hasn't been tested on 5800, but at
+> least in theory, this should be compatible with the 542x, right?
+> 
+Yes I think so. As you can see in exynos5800.dtsi, it is including exynos5420.
 
-Troy
+> For testing, I tried today's linux-next and arm-soc/for-next.
+> 
+Hmm...why is the problem happened at last? Not at that time? :(
+
+I need to figure it out...
+
+Thanks,
+Kukjin
