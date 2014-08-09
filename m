@@ -1,85 +1,91 @@
-From: ezequiel.garcia@free-electrons.com (Ezequiel Garcia)
-Date: Sat, 9 Aug 2014 09:41:24 -0300
-Subject: OMAP baseline test results for v3.16-rc4
-In-Reply-To: <alpine.DEB.2.02.1408072210300.5770@utopia.booyaka.com>
-References: <alpine.DEB.2.02.1407291225070.13035@utopia.booyaka.com>
- <alpine.DEB.2.02.1407291256270.13035@utopia.booyaka.com>
- <20140729145312.GT29045@atomide.com>
- <alpine.DEB.2.02.1407291922370.13035@utopia.booyaka.com>
- <20140730053940.GX29045@atomide.com>
- <alpine.DEB.2.02.1407300725290.4477@utopia.booyaka.com>
- <20140731131107.GB29045@atomide.com>
- <alpine.DEB.2.02.1407311922350.1845@utopia.booyaka.com>
- <20140801071056.GD29045@atomide.com>
- <alpine.DEB.2.02.1408072210300.5770@utopia.booyaka.com>
-Message-ID: <20140809124124.GA1201@arch.cereza>
+From: shawn.guo@freescale.com (Shawn Guo)
+Date: Sat, 9 Aug 2014 21:33:17 +0800
+Subject: [PATCH V3 2/3] ARM: clk-gate2: Add API imx_clk_gate2_exclusive
+ for clk_gate2
+In-Reply-To: <e1a314548b2e00fccccb4ece8200da97cf89c6bb.1407481023.git.shengjiu.wang@freescale.com>
+References: <cover.1407481023.git.shengjiu.wang@freescale.com>
+ <e1a314548b2e00fccccb4ece8200da97cf89c6bb.1407481023.git.shengjiu.wang@freescale.com>
+Message-ID: <20140809133314.GA8849@dragon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07 Aug 10:21 PM, Paul Walmsley wrote:
-> On Fri, 1 Aug 2014, Tony Lindgren wrote:
+On Fri, Aug 08, 2014 at 03:02:48PM +0800, Shengjiu Wang wrote:
+> As some clocks are mutually exlcusive, they can't be enabled simultaneously,
+> So add this new API for registering exclusive clock, the enable function will
+> check if there is exclusive clock and it is not enabled, then this clock can
+> be enabled, otherwise, it will return error.
 > 
-> > * Paul Walmsley <paul@pwsan.com> [140731 12:29]:
-> > > On Thu, 31 Jul 2014, Tony Lindgren wrote:
-> > > 
-> > > > * Paul Walmsley <paul@pwsan.com> [140730 00:55]:
-> > > > > On Tue, 29 Jul 2014, Tony Lindgren wrote:
-> > > > > 
-> > > > > > The following patch should fix the tests above for 3530es3beagle.
-> > > > > > Care to test and ack as I don't have one?
-> > > > > 
-> > > > > 3530es3beagle retention dynamic idle tests hang on next-20140729.  (Maybe 
-> > > > > other boards fail too - haven't tested any others).  
-> > > > 
-> > > > I just checked that today's linux next works for off-idle and
-> > > > wake-up events for at least 37xx evm.
-> > > 
-> > > I ran the full set of tests across all boards.  The only board that passed 
-> > > the dynamic idle testing on next-20140729 was the 3730beaglexm.
-> > > 
-> > > http://www.pwsan.com/omap/testlogs/next_20140729/20140730124836/README.txt
-> > > 
-> > > 37xxevm hangs on the first suspend entry:
-> > > 
-> > > http://www.pwsan.com/omap/testlogs/next_20140729/20140730124836/pm/37xxevm/37xxevm_log.txt
-> > > 
-> > > If I find some extra time, I'll set up a bisection run.
-> > 
-> > OK that sounds like some driver suspend regression that needs
-> > to be tracked down. I'm seeing it on my 37xx evm also with
-> > linux next too.
+> Signed-off-by: Shengjiu Wang <shengjiu.wang@freescale.com>
+> ---
+>  arch/arm/mach-imx/clk-gate2.c |   18 +++++++++++++++++-
+>  arch/arm/mach-imx/clk.h       |    2 ++
+>  2 files changed, 19 insertions(+), 1 deletion(-)
 > 
-> It's commit a71e3c37960ce5f9c6a519bc1215e3ba9fa83e75:
-> 
-> Author: Ezequiel Garcia <ezequiel.garcia@free-electrons.com>
-> Date:   Wed Jul 23 16:47:31 2014 -0300
-> 
->     net: phy: Set the driver when registering an MDIO bus device
->     
->     mdiobus_register() registers a device which is already bound to a driver.
->     Hence, the driver pointer should be set properly in order to track down
->     the driver associated to the MDIO bus.
->     
->     This will be used to allow ethernet driver to pin down a MDIO bus driver,
->     preventing it from being unloaded while the PHY device is running.
->     
->     Reviewed-by: Florian Fainelli <f.fainelli@gmail.com>
->     Tested-by: Florian Fainelli <f.fainelli@gmail.com>
->     Signed-off-by: Ezequiel Garcia <ezequiel.garcia@free-electrons.com>
->     Signed-off-by: David S. Miller <davem@davemloft.net>
-> 
-> 
-> What's bad is that this went in late during v3.16-rc fixes.  So now v3.16 
-> itself is broken, and there's no way to fix it.
-> 
-> As far as I can tell, this patch doesn't fix a regression.  So no way it 
-> should have gone in during late -rc kernels.
-> 
+> diff --git a/arch/arm/mach-imx/clk-gate2.c b/arch/arm/mach-imx/clk-gate2.c
+> index 84acdfd..df64c4d 100644
+> --- a/arch/arm/mach-imx/clk-gate2.c
+> +++ b/arch/arm/mach-imx/clk-gate2.c
+> @@ -8,7 +8,7 @@
+>   *
+>   * Gated clock implementation
+>   */
+> -
+> +#include <linux/clk-private.h>
 
-Indeed, the commit shouldn't have landed as a v3.16-rc fix. FWIW, it was
-originally intended for v3.17, but I wasn't clear enough about this when it
-was submitted.
--- 
-Ezequiel Garc?a, Free Electrons
-Embedded Linux, Kernel and Android Engineering
-http://free-electrons.com
+I do not see why this header is needed.
+
+Shawn
+
+>  #include <linux/clk-provider.h>
+>  #include <linux/module.h>
+>  #include <linux/slab.h>
+> @@ -34,6 +34,7 @@ struct clk_gate2 {
+>  	u8		flags;
+>  	spinlock_t	*lock;
+>  	unsigned int	*share_count;
+> +	struct clk	*clk_exclusive;
+>  };
+>  
+>  #define to_clk_gate2(_hw) container_of(_hw, struct clk_gate2, hw)
+> @@ -46,6 +47,11 @@ static int clk_gate2_enable(struct clk_hw *hw)
+>  
+>  	spin_lock_irqsave(gate->lock, flags);
+>  
+> +	if (gate->clk_exclusive && __clk_is_enabled(gate->clk_exclusive)) {
+> +		spin_unlock_irqrestore(gate->lock, flags);
+> +		return -EBUSY;
+> +	}
+> +
+>  	if (gate->share_count && (*gate->share_count)++ > 0)
+>  		goto out;
+>  
+> @@ -147,3 +153,13 @@ struct clk *clk_register_gate2(struct device *dev, const char *name,
+>  
+>  	return clk;
+>  }
+> +
+> +int imx_clk_gate2_exclusive(struct clk *clk1, struct clk *clk2)
+> +{
+> +	struct clk_gate2 *gate1 = to_clk_gate2(clk1->hw);
+> +	struct clk_gate2 *gate2 = to_clk_gate2(clk2->hw);
+> +
+> +	gate1->clk_exclusive = clk2;
+> +	gate2->clk_exclusive = clk1;
+> +	return 0;
+> +}
+> diff --git a/arch/arm/mach-imx/clk.h b/arch/arm/mach-imx/clk.h
+> index d5ba76f..2b07376 100644
+> --- a/arch/arm/mach-imx/clk.h
+> +++ b/arch/arm/mach-imx/clk.h
+> @@ -36,6 +36,8 @@ struct clk *clk_register_gate2(struct device *dev, const char *name,
+>  struct clk * imx_obtain_fixed_clock(
+>  			const char *name, unsigned long rate);
+>  
+> +int imx_clk_gate2_exclusive(struct clk *clk1, struct clk *clk2);
+> +
+>  static inline struct clk *imx_clk_gate2(const char *name, const char *parent,
+>  		void __iomem *reg, u8 shift)
+>  {
+> -- 
+> 1.7.9.5
+> 
