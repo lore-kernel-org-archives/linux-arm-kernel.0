@@ -1,105 +1,88 @@
-From: heiko@sntech.de (Heiko =?ISO-8859-1?Q?St=FCbner?=)
-Date: Sat, 09 Aug 2014 22:25:12 +0200
-Subject: [PATCH v2] clk: rockchip: add restart handler
-In-Reply-To: <1407203338-12915-1-git-send-email-linux@roeck-us.net>
+From: linux@roeck-us.net (Guenter Roeck)
+Date: Sat, 09 Aug 2014 14:11:08 -0700
+Subject: [PATCH v6 3/7] arm: Support restart through restart handler call
+ chain
+In-Reply-To: <2985231.leR3BbmHFl@diego>
 References: <1407203338-12915-1-git-send-email-linux@roeck-us.net>
-Message-ID: <1812271.NdMZDbhgpa@diego>
+ <1407203338-12915-4-git-send-email-linux@roeck-us.net>
+ <2985231.leR3BbmHFl@diego>
+Message-ID: <53E68E6C.300@roeck-us.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add infrastructure to write the correct value to the restart register and
-register the restart notifier for both rk3188 (including rk3066) and rk3288.
+On 08/09/2014 01:01 PM, Heiko St?bner wrote:
+> Hi Guenter,
+>
+> Am Montag, 4. August 2014, 18:48:54 schrieb Guenter Roeck:
+>> The kernel core now supports a restart handler call chain for system
+>> restart functions.
+>>
+>> With this change, the arm_pm_restart callback is now optional, so check
+>> if it is set before calling it. Only call the kernel restart handler
+>> if arm_pm_restart is not set.
+>>
+>> Signed-off-by: Guenter Roeck <linux@roeck-us.net>
+>> Acked-by: Catalin Marinas <catalin.marinas@arm.com>
+>> Acked-by: Heiko Stuebner <heiko@sntech.de>
+>> ---
+>> v6: No change.
+>> v5: Renamed restart function to do_kernel_restart
+>> v4: No change.
+>> v3: Use wrapper function to execute notifier call chain.
+>> v2: Only call notifier call chain if arm_pm_restart is not set.
+>>      Do not include linux/watchdog.h.
+>>
+>>   arch/arm/kernel/process.c | 5 ++++-
+>>   1 file changed, 4 insertions(+), 1 deletion(-)
+>>
+>> diff --git a/arch/arm/kernel/process.c b/arch/arm/kernel/process.c
+>> index 81ef686..84ca0d5 100644
+>> --- a/arch/arm/kernel/process.c
+>> +++ b/arch/arm/kernel/process.c
+>> @@ -230,7 +230,10 @@ void machine_restart(char *cmd)
+>>   	local_irq_disable();
+>>   	smp_send_stop();
+>>
+>> -	arm_pm_restart(reboot_mode, cmd);
+>> +	if (arm_pm_restart)
+>> +		arm_pm_restart(reboot_mode, cmd);
+>> +	else
+>> +		do_kernel_restart(cmd);
+>>
+>>   	/* Give a grace period for failure to restart of 1s */
+>>   	mdelay(1000);
+>
+> shouldn't you also get rid of
+>
+> 	void (*arm_pm_restart)(enum reboot_mode reboot_mode, const char *cmd) = null_restart;
+>
+Yes. Looks like I'll need another revision.
 
-Signed-off-by: Heiko Stuebner <heiko@sntech.de>
----
-This of course needs the restart generalization from Guenter Roeck
-and would need to go with that series.
+Even worse, the current upstream code is somewhat broken and doesn't really
+like the following instructions.
+	drivers/watchdog/moxart_wdt.c:  arm_pm_restart = NULL;
+	drivers/watchdog/sunxi_wdt.c:   arm_pm_restart = NULL;
 
-changes since v1:
-- adapt to changed restart notifier handling
+Fortunately that code is only executed if those drivers are built as modules
+and unloaded.
 
- drivers/clk/rockchip/clk-rk3188.c |  2 ++
- drivers/clk/rockchip/clk-rk3288.c |  2 ++
- drivers/clk/rockchip/clk.c        | 25 +++++++++++++++++++++++++
- drivers/clk/rockchip/clk.h        |  1 +
- 4 files changed, 30 insertions(+)
+Guenter
 
-diff --git a/drivers/clk/rockchip/clk-rk3188.c b/drivers/clk/rockchip/clk-rk3188.c
-index a83a6d8..71b661a 100644
---- a/drivers/clk/rockchip/clk-rk3188.c
-+++ b/drivers/clk/rockchip/clk-rk3188.c
-@@ -631,6 +631,8 @@ static void __init rk3188_common_clk_init(struct device_node *np)
- 
- 	rockchip_register_softrst(np, 9, reg_base + RK2928_SOFTRST_CON(0),
- 				  ROCKCHIP_SOFTRST_HIWORD_MASK);
-+
-+	rockchip_register_restart_notifier(RK2928_GLB_SRST_FST);
- }
- 
- static void __init rk3066a_clk_init(struct device_node *np)
-diff --git a/drivers/clk/rockchip/clk-rk3288.c b/drivers/clk/rockchip/clk-rk3288.c
-index 0d8c6c5..b604217 100644
---- a/drivers/clk/rockchip/clk-rk3288.c
-+++ b/drivers/clk/rockchip/clk-rk3288.c
-@@ -713,5 +713,7 @@ static void __init rk3288_clk_init(struct device_node *np)
- 
- 	rockchip_register_softrst(np, 9, reg_base + RK3288_SOFTRST_CON(0),
- 				  ROCKCHIP_SOFTRST_HIWORD_MASK);
-+
-+	rockchip_register_restart_notifier(RK3288_GLB_SRST_FST);
- }
- CLK_OF_DECLARE(rk3288_cru, "rockchip,rk3288-cru", rk3288_clk_init);
-diff --git a/drivers/clk/rockchip/clk.c b/drivers/clk/rockchip/clk.c
-index 278cf9d..aa41433 100644
---- a/drivers/clk/rockchip/clk.c
-+++ b/drivers/clk/rockchip/clk.c
-@@ -25,6 +25,7 @@
- #include <linux/clk-provider.h>
- #include <linux/mfd/syscon.h>
- #include <linux/regmap.h>
-+#include <linux/reboot.h>
- #include "clk.h"
- 
- /**
-@@ -242,3 +243,27 @@ void __init rockchip_clk_register_branches(
- 		rockchip_clk_add_lookup(clk, list->id);
- 	}
- }
-+
-+static unsigned int reg_restart;
-+static int rockchip_restart_notify(struct notifier_block *this,
-+				   unsigned long mode, void *cmd)
-+{
-+	writel(0xfdb9, reg_base + reg_restart);
-+	return NOTIFY_DONE;
-+}
-+
-+static struct notifier_block rockchip_restart_handler = {
-+	.notifier_call = rockchip_restart_notify,
-+	.priority = 128,
-+};
-+
-+void __init rockchip_register_restart_notifier(unsigned int reg)
-+{
-+	int ret;
-+
-+	reg_restart = reg;
-+	ret = register_restart_handler(&rockchip_restart_handler);
-+	if (ret)
-+		pr_err("%s: cannot register restart handler, %d\n",
-+		       __func__, ret);
-+}
-diff --git a/drivers/clk/rockchip/clk.h b/drivers/clk/rockchip/clk.h
-index 887cbde..0b5eab5 100644
---- a/drivers/clk/rockchip/clk.h
-+++ b/drivers/clk/rockchip/clk.h
-@@ -329,6 +329,7 @@ void rockchip_clk_register_branches(struct rockchip_clk_branch *clk_list,
- 				    unsigned int nr_clk);
- void rockchip_clk_register_plls(struct rockchip_pll_clock *pll_list,
- 				unsigned int nr_pll, int grf_lock_offset);
-+void rockchip_register_restart_notifier(unsigned int reg);
- 
- #define ROCKCHIP_SOFTRST_HIWORD_MASK	BIT(0)
- 
--- 
-2.0.1
+> like a previous attempt at unifying the restart handling [0] did.
+>
+> Because when testing the current series on my Rockchip boards, there was
+> always an arm_pm_restart defined ... namely the null_restart mentioned above.
+> So do_kernel_restart is never reached until I disable the null_restart.
+>
+>
+> Heiko
+>
+>
+> [0] http://permalink.gmane.org/gmane.linux.ports.arm.kernel/277042
+>
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-watchdog" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+>
+>
