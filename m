@@ -1,31 +1,56 @@
-From: tharvey@gateworks.com (Tim Harvey)
-Date: Sun, 10 Aug 2014 01:15:09 -0700
-Subject: [PATCH] devicetree: bindings: Document Gateworks vendor prefix
-Message-ID: <1407658509-1773-1-git-send-email-tharvey@gateworks.com>
+From: kiran.padwal21@gmail.com (Kiran Padwal)
+Date: Sun, 10 Aug 2014 13:52:19 +0530
+Subject: [PATCH 1/3] clk: st: clkgen-mux: Make of_device_id array const
+Message-ID: <1407658939-1458-1-git-send-email-kiran.padwal21@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add Gateworks Corporation to the list of device tree vendor prefixes.
+Make of_device_id array const, because all OF functions handle it as const.
 
-Gateworks designs and manufactures single board computers designed for
-embedded wireless and wired network applications.
-
-Signed-off-by: Tim Harvey <tharvey@gateworks.com>
+Signed-off-by: Kiran Padwal <kiran.padwal21@gmail.com>
 ---
- Documentation/devicetree/bindings/vendor-prefixes.txt | 1 +
- 1 file changed, 1 insertion(+)
+ drivers/clk/st/clkgen-mux.c |    8 ++++----
+ 1 files changed, 4 insertions(+), 4 deletions(-)
 
-diff --git a/Documentation/devicetree/bindings/vendor-prefixes.txt b/Documentation/devicetree/bindings/vendor-prefixes.txt
-index 46a311e..803fa4f 100644
---- a/Documentation/devicetree/bindings/vendor-prefixes.txt
-+++ b/Documentation/devicetree/bindings/vendor-prefixes.txt
-@@ -54,6 +54,7 @@ globalscale	Globalscale Technologies, Inc.
- gmt	Global Mixed-mode Technology, Inc.
- google	Google, Inc.
- gumstix	Gumstix, Inc.
-+gw	Gateworks Corporation
- haoyu	Haoyu Microelectronic Co. Ltd.
- hisilicon	Hisilicon Limited.
- honeywell	Honeywell
+diff --git a/drivers/clk/st/clkgen-mux.c b/drivers/clk/st/clkgen-mux.c
+index 79dc40b..bed5ef8 100644
+--- a/drivers/clk/st/clkgen-mux.c
++++ b/drivers/clk/st/clkgen-mux.c
+@@ -341,7 +341,7 @@ static struct clkgena_divmux_data st_divmux_c32odf3 = {
+ 	.fb_start_bit_idx = 24,
+ };
+ 
+-static struct of_device_id clkgena_divmux_of_match[] = {
++static const struct of_device_id clkgena_divmux_of_match[] = {
+ 	{
+ 		.compatible = "st,clkgena-divmux-c65-hs",
+ 		.data = &st_divmux_c65hs,
+@@ -479,7 +479,7 @@ static struct clkgena_prediv_data prediv_c32_data = {
+ 	.table = prediv_table16,
+ };
+ 
+-static struct of_device_id clkgena_prediv_of_match[] = {
++static const struct of_device_id clkgena_prediv_of_match[] = {
+ 	{ .compatible = "st,clkgena-prediv-c65", .data = &prediv_c65_data },
+ 	{ .compatible = "st,clkgena-prediv-c32", .data = &prediv_c32_data },
+ 	{}
+@@ -586,7 +586,7 @@ static struct clkgen_mux_data stih407_a9_mux_data = {
+ 	.width = 2,
+ };
+ 
+-static struct of_device_id mux_of_match[] = {
++static const struct of_device_id mux_of_match[] = {
+ 	{
+ 		.compatible = "st,stih416-clkgenc-vcc-hd",
+ 		.data = &clkgen_mux_c_vcc_hd_416,
+@@ -693,7 +693,7 @@ static struct clkgen_vcc_data st_clkgenf_vcc_416 = {
+ 	.lock = &clkgenf_lock,
+ };
+ 
+-static struct of_device_id vcc_of_match[] = {
++static const struct of_device_id vcc_of_match[] = {
+ 	{ .compatible = "st,stih416-clkgenc", .data = &st_clkgenc_vcc_416 },
+ 	{ .compatible = "st,stih416-clkgenf", .data = &st_clkgenf_vcc_416 },
+ 	{}
 -- 
-1.8.3.2
+1.7.0.4
