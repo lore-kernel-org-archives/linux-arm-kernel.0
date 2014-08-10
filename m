@@ -1,56 +1,149 @@
-From: kiran.padwal21@gmail.com (Kiran Padwal)
-Date: Sun, 10 Aug 2014 13:52:19 +0530
-Subject: [PATCH 1/3] clk: st: clkgen-mux: Make of_device_id array const
-Message-ID: <1407658939-1458-1-git-send-email-kiran.padwal21@gmail.com>
+From: afaerber@suse.de (=?UTF-8?B?QW5kcmVhcyBGw6RyYmVy?=)
+Date: Sun, 10 Aug 2014 10:15:19 +0100
+Subject: [PATCH v5 05/10] ARM: dts: Move dp_hpd from exynos5250 into
+ smdk5250 and snow
+In-Reply-To: <000e01cfb0a7$25d0ed70$7172c850$%han@samsung.com>
+References: <1406868897-26874-1-git-send-email-afaerber@suse.de>
+ <1406868897-26874-6-git-send-email-afaerber@suse.de>
+ <CAD=FV=WhocoyQ=rU7dU1EPM-PAQq06gg9HhamSOm+BgMDeM8NA@mail.gmail.com>
+ <53DBFE8A.7020505@suse.de> <53DBFF22.3010905@gmail.com>
+ <000e01cfb0a7$25d0ed70$7172c850$%han@samsung.com>
+Message-ID: <53E73827.7000703@suse.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Make of_device_id array const, because all OF functions handle it as const.
+Hi Jingoo,
 
-Signed-off-by: Kiran Padwal <kiran.padwal21@gmail.com>
----
- drivers/clk/st/clkgen-mux.c |    8 ++++----
- 1 files changed, 4 insertions(+), 4 deletions(-)
+Am 05.08.2014 13:16, schrieb Jingoo Han:
+> On Saturday, August 02, 2014 5:57 AM, Tomasz Figa wrote:
+>> On 01.08.2014 22:54, Andreas F?rber wrote:
+>>> Am 01.08.2014 22:33, schrieb Doug Anderson:
+>>>> On Thu, Jul 31, 2014 at 9:54 PM, Andreas F?rber <afaerber@suse.de> wrote:
+>>>>> Spring uses a different GPIO, so this is not a generic SoC piece.
+>>>>>
+>>>>> Suggested-by: Tomasz Figa <t.figa@samsung.com>
+>>>>> Signed-off-by: Andreas F?rber <afaerber@suse.de>
+>>>>> ---
+>>>>>  v5: New (Tomasz Figa)
+>>>>>  Frees dp_hpd for Spring.
+>>>>>
+>>>>>  arch/arm/boot/dts/exynos5250-pinctrl.dtsi | 7 -------
+>>>>>  arch/arm/boot/dts/exynos5250-smdk5250.dts | 9 +++++++++
+>>>>>  arch/arm/boot/dts/exynos5250-snow.dts     | 7 +++++++
+>>>>>  3 files changed, 16 insertions(+), 7 deletions(-)
+>>>>>
+>>>>> diff --git a/arch/arm/boot/dts/exynos5250-pinctrl.dtsi b/arch/arm/boot/dts/exynos5250-pinctrl.dtsi
+>>>>> index 886cfca044ac..ed0e5230514b 100644
+>>>>> --- a/arch/arm/boot/dts/exynos5250-pinctrl.dtsi
+>>>>> +++ b/arch/arm/boot/dts/exynos5250-pinctrl.dtsi
+>>>>> @@ -581,13 +581,6 @@
+>>>>>                         samsung,pin-pud = <0>;
+>>>>>                         samsung,pin-drv = <0>;
+>>>>>                 };
+>>>>> -
+>>>>> -               dp_hpd: dp_hpd {
+>>>>> -                       samsung,pins = "gpx0-7";
+>>>>> -                       samsung,pin-function = <3>;
+>>>>> -                       samsung,pin-pud = <0>;
+>>>>> -                       samsung,pin-drv = <0>;
+>>>>> -               };
+>>>>>         };
+>>>>>
+>>>>>         pinctrl at 13400000 {
+>>>>> diff --git a/arch/arm/boot/dts/exynos5250-smdk5250.dts b/arch/arm/boot/dts/exynos5250-smdk5250.dts
+>>>>> index aaa055ac0fe3..5d30fe1dcda4 100644
+>>>>> --- a/arch/arm/boot/dts/exynos5250-smdk5250.dts
+>>>>> +++ b/arch/arm/boot/dts/exynos5250-smdk5250.dts
+>>>>> @@ -414,3 +414,12 @@
+>>>>>                 };
+>>>>>         };
+>>>>>  };
+>>>>> +
+>>>>> +&pinctrl_0 {
+>>>>> +       dp_hpd: dp_hpd {
+>>>>> +               samsung,pins = "gpx0-7";
+>>>>> +               samsung,pin-function = <3>;
+>>>>> +               samsung,pin-pud = <0>;
+>>>>> +               samsung,pin-drv = <0>;
+>>>>> +       };
+>>>>> +};
+>>>>> diff --git a/arch/arm/boot/dts/exynos5250-snow.dts b/arch/arm/boot/dts/exynos5250-snow.dts
+>>>>> index c4b0c73c736d..a9a2f2743794 100644
+>>>>> --- a/arch/arm/boot/dts/exynos5250-snow.dts
+>>>>> +++ b/arch/arm/boot/dts/exynos5250-snow.dts
+>>>>> @@ -547,6 +547,13 @@
+>>>>>  };
+>>>>>
+>>>>>  &pinctrl_0 {
+>>>>> +       dp_hpd: dp_hpd {
+>>>>> +               samsung,pins = "gpx0-7";
+>>>>> +               samsung,pin-function = <3>;
+>>>>> +               samsung,pin-pud = <0>;
+>>>>> +               samsung,pin-drv = <0>;
+>>>>> +       };
+>>>>> +
+>>>>
+>>>> NAK.  dp_hpd is a generic SoC piece.  Pin function 0 and 1 are GPIOs.
+>>>> Pin function 3 is special function.  This pin _is_ the hot plug detect
+>>>> pin for display port.  When it's set as special function 3 it goes
+>>>> straight into the hot plug logic of the display port controller.
+>>>>
+>>>> Spring may have had its reasons to detect hot plug events on a GPIO
+>>>> instead of using this pin, but that doesn't make this pin any less the
+>>>> "hot plug pin".
+>>>
+>>> Please advise how to handle it then: Should there be two different
+>>> pinctrl entries (if so, how should it be named?),
+>>
+>> IMHO this is the right way. Just name the GPIO variant dp_hpd_gpio.
+> 
+> Hi Andreas F?rber,
+> 
+> I agree with Tomasz Figa and Doug Anderson.
+> Please refer to the following.
+> 
+> 1. case: Standard HPD pin is used. (smdk5420)
+> arch/arm/boot/dts/exynos5420-pinctrl.dts
+> 	pinctrl at 13400000 {
+> 		dp_hpd: dp_hpd {
+> 			samsung,pins = "gpx0-7";
+> 			samsung,pin-function = <3>;
+> 			samsung,pin-pud = <0>;
+> 			samsung,pin-drv = <0>;
+> 		};
+> arch/arm/boot/dts/exynos5420-smdk5420.dts
+> 	dp-controller at 145B0000 {
+> 		pinctrl-names = "default";
+> 		pinctrl-0 = <&dp_hpd>;
+> 		...
+> 
+> 2. case: non-standard HPD pin such as GPIO is used. (peach pit)
+> arch/arm/boot/dts/exynos5420-peach-pit.dts
+> 	pinctrl at 13400000 {
+> 		dp_hpd_gpio: dp_hpd_gpio {
+> 			samsung,pins = "gpx2-6";
+> 			samsung,pin-function = <0>;
+> 			samsung,pin-pud = <3>;
+> 			samsung,pin-drv = <0>;
+> 		};
+> 	dp-controller at 145B0000 {
+> 		pinctrl-names = "default";
+> 		pinctrl-0 = <&dp_hpd_gpio>;
+> 		...
+> 		samsung,hpd-gpio = <&gpx2 6 0>;
+> 
+> So, you need to follow the second case.
+> "dp_hpd_gpio" can be used for Spring board.
 
-diff --git a/drivers/clk/st/clkgen-mux.c b/drivers/clk/st/clkgen-mux.c
-index 79dc40b..bed5ef8 100644
---- a/drivers/clk/st/clkgen-mux.c
-+++ b/drivers/clk/st/clkgen-mux.c
-@@ -341,7 +341,7 @@ static struct clkgena_divmux_data st_divmux_c32odf3 = {
- 	.fb_start_bit_idx = 24,
- };
- 
--static struct of_device_id clkgena_divmux_of_match[] = {
-+static const struct of_device_id clkgena_divmux_of_match[] = {
- 	{
- 		.compatible = "st,clkgena-divmux-c65-hs",
- 		.data = &st_divmux_c65hs,
-@@ -479,7 +479,7 @@ static struct clkgena_prediv_data prediv_c32_data = {
- 	.table = prediv_table16,
- };
- 
--static struct of_device_id clkgena_prediv_of_match[] = {
-+static const struct of_device_id clkgena_prediv_of_match[] = {
- 	{ .compatible = "st,clkgena-prediv-c65", .data = &prediv_c65_data },
- 	{ .compatible = "st,clkgena-prediv-c32", .data = &prediv_c32_data },
- 	{}
-@@ -586,7 +586,7 @@ static struct clkgen_mux_data stih407_a9_mux_data = {
- 	.width = 2,
- };
- 
--static struct of_device_id mux_of_match[] = {
-+static const struct of_device_id mux_of_match[] = {
- 	{
- 		.compatible = "st,stih416-clkgenc-vcc-hd",
- 		.data = &clkgen_mux_c_vcc_hd_416,
-@@ -693,7 +693,7 @@ static struct clkgen_vcc_data st_clkgenf_vcc_416 = {
- 	.lock = &clkgenf_lock,
- };
- 
--static struct of_device_id vcc_of_match[] = {
-+static const struct of_device_id vcc_of_match[] = {
- 	{ .compatible = "st,stih416-clkgenc", .data = &st_clkgenc_vcc_416 },
- 	{ .compatible = "st,stih416-clkgenf", .data = &st_clkgenf_vcc_416 },
- 	{}
+I believe I already did so in v6 [0]? Please take a look there and let
+me know if you still need anything changed. The label name seems
+identical, whereas for the node name I adopted the dashes convention.
+
+Thanks,
+Andreas
+
+[0] https://patchwork.kernel.org/patch/4664691/
+
 -- 
-1.7.0.4
+SUSE LINUX Products GmbH, Maxfeldstr. 5, 90409 N?rnberg, Germany
+GF: Jeff Hawn, Jennifer Guild, Felix Imend?rffer; HRB 16746 AG N?rnberg
