@@ -1,107 +1,31 @@
 From: tharvey@gateworks.com (Tim Harvey)
-Date: Sun, 10 Aug 2014 01:01:03 -0700
-Subject: [PATCH] ARM: dts: Gateworks GW5520 support (i.MX6)
-In-Reply-To: <CABxcv=kSfVoPgdDsodSPMSC7u_B6YiVuqHsh5T_Y4eucU6bQWw@mail.gmail.com>
-References: <1407572602-14017-1-git-send-email-tharvey@gateworks.com>
- <CABxcv=kSfVoPgdDsodSPMSC7u_B6YiVuqHsh5T_Y4eucU6bQWw@mail.gmail.com>
-Message-ID: <CAJ+vNU3dW_L-Oc_2_wof9pAogovaOpy3ymfm_RwNN3mMCCaZ8w@mail.gmail.com>
+Date: Sun, 10 Aug 2014 01:15:09 -0700
+Subject: [PATCH] devicetree: bindings: Document Gateworks vendor prefix
+Message-ID: <1407658509-1773-1-git-send-email-tharvey@gateworks.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Aug 9, 2014 at 4:44 AM, Javier Martinez Canillas
-<javier@dowhile0.org> wrote:
-> Hello Tim,
->
-> On Sat, Aug 9, 2014 at 10:23 AM, Tim Harvey <tharvey@gateworks.com> wrote:
->> +/*
->> + * Copyright 2014 Gateworks Corporation
->> + *
->> + * The code contained herein is licensed under the GNU General Public
->> + * License. You may obtain a copy of the GNU General Public License
->> + * Version 2 or later at the following locations:
->> + *
->> + * http://www.opensource.org/licenses/gpl-license.html
->> + * http://www.gnu.org/copyleft/gpl.html
->> + */
->
-> There was a discussion [0] recently about what license(s) should be
-> used for Device Tree source files. It seems that we have been using
-> GPLv2-only just because is the Linux kernel license but unlike other
-> source files, the DTS could be used verbatim in other operating
-> systems / bootloaders so we have to better think the implications of
-> the licensing.
->
-> Of course this shouldn't hold your patch, I'm just mentioning so you
-> can keep an eye in case an agreement is made while you are pushing
-> this.
+Add Gateworks Corporation to the list of device tree vendor prefixes.
 
-Javier,
+Gateworks designs and manufactures single board computers designed for
+embedded wireless and wired network applications.
 
-Thanks for pointing this out - The discussion makes sense. I'll try to
-keep an eye on it.
+Signed-off-by: Tim Harvey <tharvey@gateworks.com>
+---
+ Documentation/devicetree/bindings/vendor-prefixes.txt | 1 +
+ 1 file changed, 1 insertion(+)
 
->
->> +
->> +#include <dt-bindings/gpio/gpio.h>
->> +#include <dt-bindings/input/input.h>
->> +
->> +/ {
->> +       /* these are used by bootloader for disabling nodes */
->> +       aliases {
->> +               led0 = &led0;
->> +               led1 = &led1;
->> +               led2 = &led2;
->> +               nand = &gpmi;
->> +               usb0 = &usbh1;
->> +               usb1 = &usbotg;
->> +       };
->> +
->> +       chosen {
->> +               bootargs = "console=ttymxc1,115200";
->> +       };
->> +
->> +       leds {
->> +               compatible = "gpio-leds";
->> +               pinctrl-names = "default";
->> +               pinctrl-0 = <&pinctrl_gpio_leds>;
->> +
->> +               led0: user1 {
->> +                       label = "user1";
->> +                       gpios = <&gpio4 6 0>; /* MX6_PANLEDG */
->
-> You are already including <dt-bindings/gpio/gpio.h> so please use the
-> GPIO constants instead of magic numbers (e.g: GPIO_ACTIVE_HIGH in this
-> case). Same for others gpios properties.
-
-Agreed - I will change this for v2.
-
->
->> +                       default-state = "on";
->> +                       linux,default-trigger = "heartbeat";
->> +               };
->> +
->> +               led1: user2 {
->> +                       label = "user2";
->> +                       gpios = <&gpio4 7 0>; /* MX6_PANLEDR */
->> +                       default-state = "off";
->> +               };
->> +
->> +               led2: user3 {
->> +                       label = "user3";
->> +                       gpios = <&gpio4 15 1>; /* MX6_LOCLED# */
->> +                       default-state = "off";
->> +               };
->> +       };
->> +
->
-> Overall, looks good to me. After the changes mentioned above:
->
-> Reviewed-by: Javier Martinez Canillas <javier@dowhile0.org>
->
-> [0]: http://www.spinics.net/lists/devicetree/msg44439.html
-
-Thanks for the review.
-
-Regards,
-
-Tim
+diff --git a/Documentation/devicetree/bindings/vendor-prefixes.txt b/Documentation/devicetree/bindings/vendor-prefixes.txt
+index 46a311e..803fa4f 100644
+--- a/Documentation/devicetree/bindings/vendor-prefixes.txt
++++ b/Documentation/devicetree/bindings/vendor-prefixes.txt
+@@ -54,6 +54,7 @@ globalscale	Globalscale Technologies, Inc.
+ gmt	Global Mixed-mode Technology, Inc.
+ google	Google, Inc.
+ gumstix	Gumstix, Inc.
++gw	Gateworks Corporation
+ haoyu	Haoyu Microelectronic Co. Ltd.
+ hisilicon	Hisilicon Limited.
+ honeywell	Honeywell
+-- 
+1.8.3.2
