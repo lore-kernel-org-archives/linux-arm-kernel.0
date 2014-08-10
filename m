@@ -1,11 +1,11 @@
 From: sebastian.hesselbarth@gmail.com (Sebastian Hesselbarth)
-Date: Sun, 10 Aug 2014 14:16:32 +0200
+Date: Sun, 10 Aug 2014 14:21:49 +0200
 Subject: [PATCH 1/6] ARM: mvebu: Add required ethernet muxing for the
  Armada 370 SoC
 In-Reply-To: <1407511136-26477-2-git-send-email-ezequiel.garcia@free-electrons.com>
 References: <1407511136-26477-1-git-send-email-ezequiel.garcia@free-electrons.com>
  <1407511136-26477-2-git-send-email-ezequiel.garcia@free-electrons.com>
-Message-ID: <53E762A0.5070900@gmail.com>
+Message-ID: <53E763DD.4000305@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -28,27 +28,19 @@ On 08/08/2014 05:18 PM, Ezequiel Garcia wrote:
 >  				};
 > +
 > +				mdio_pins: mdio_pins {
-
-Ezequiel,
-
-please keep me posted next time ;)
-
-Above should be: mdio_pins: mdio-pins {
-same for the ones below.
-
 > +					marvell,pins = "mpp17", "mpp18";
 > +					marvell,function = "ge";
-
-As we haven't used it before, we could still rename "ge" function to
-more approprate "mdio"... but it is ok.
-
-Besides the comments,
-
-Acked-by: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
-
 > +				};
 > +
 > +				ge0_pins: ge0_pins {
+
+More nitpicking,
+
+as stated by others it should be "ge{0,1]_rgmii_pins" not only because
+it is rgmii, but because a370 also supports gmii for ge0.
+
+Sebastian
+
 > +					marvell,pins = "mpp5", "mpp6", "mpp7", "mpp8",
 > +						       "mpp9", "mpp10", "mpp11", "mpp12",
 > +						       "mpp13", "mpp14", "mpp15", "mpp16";
