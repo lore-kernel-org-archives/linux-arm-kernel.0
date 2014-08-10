@@ -1,75 +1,53 @@
 From: andrew@lunn.ch (Andrew Lunn)
-Date: Sun, 10 Aug 2014 16:54:49 +0200
-Subject: [PATCH 1/2] ARM: Kirkwood: add DT support for Seagate Goflex
+Date: Sun, 10 Aug 2014 18:17:20 +0200
+Subject: [PATCH 2/2] ARM: Kirkwood: add DT support for Seagate Goflex
  Home and CloudEngines Pogoplug E02
-In-Reply-To: <CAA8MNViqMpuV8K0X5f4WWsEihwtPVZaE8g6RRmDB=Te2Wuzojg@mail.gmail.com>
-References: <CAA8MNViqMpuV8K0X5f4WWsEihwtPVZaE8g6RRmDB=Te2Wuzojg@mail.gmail.com>
-Message-ID: <20140810145449.GE26751@lunn.ch>
+In-Reply-To: <CAA8MNVjieDJ-dv2NNWXK=+uqrPmvtk2EiBYJGJkMugEiN2TsAw@mail.gmail.com>
+References: <CAA8MNVjieDJ-dv2NNWXK=+uqrPmvtk2EiBYJGJkMugEiN2TsAw@mail.gmail.com>
+Message-ID: <20140810161720.GF26751@lunn.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Aug 10, 2014 at 04:37:35AM -0600, Oleg Rakhmanov wrote:
+On Sun, Aug 10, 2014 at 04:37:37AM -0600, Oleg Rakhmanov wrote:
+> This patch adds Pogoplug E02 support and to apply clean it depends on the
+> first patch in the series.
+
 Hi Oleg
 
-Thanks for the patches. Overall they look good. I just have a few
-minor comments.
+I don't see any dependencies between the two patches.  Even if there
+is, we treat a two patch series as one entity, and apply them together
+in order. So you can remove that part of the comment.
 
-> This patch adds support for Sevice Tree support for Seagate GoFlex Home. It
-
-Typo: Device not Sevice.
-
-> is very similar to GoFlex Net, but with only 1 sata available and different
-> leds. DTS is based on ArchLinux ARM boardfile for this devices. Kernel with
-> this patch is availabe in Arch ARM repos and is tested by myself and users
-> using the package.
 > 
-> The second patch in the series add Pogoplug E02 support. Again, it is
-> available in repositories and is tested by myself and users using the
-> package.
-
-The text you provide here ends up in the commit changelog, for this
-one commit. However, you are talking about both patches. So it would
-be better to have this text in the cover note. Then in each patch,
-just talk about that one patch.
-
-Also, the subject line should be specific to the patch. So the subject
-line for this patch should be just about Go Flex Home.
-
-You are missing a signed-of-by line. Take a look at section 12 of
-
-https://www.kernel.org/doc/Documentation/SubmittingPatches
-
-
-> diff -uprN a/arch/arm/boot/dts/kirkwood-goflexhome.dts
-> b/arch/arm/boot/dts/kirkwood-goflexhome.dts
-> --- a/arch/arm/boot/dts/kirkwood-goflexhome.dts 1969-12-31
+> diff -uprN a/arch/arm/boot/dts/kirkwood-pogo_e02.dts
+> b/arch/arm/boot/dts/kirkwood-pogo_e02.dts
+> --- a/arch/arm/boot/dts/kirkwood-pogo_e02.dts   1969-12-31
 > 17:00:00.000000000 -0700
-> +++ b/arch/arm/boot/dts/kirkwood-goflexhome.dts 2014-08-10
-> 02:34:52.310545726 -0600
-> @@ -0,0 +1,127 @@
+> +++ b/arch/arm/boot/dts/kirkwood-pogo_e02.dts   2014-08-10
+> 03:59:10.616338535 -0600
+> @@ -0,0 +1,117 @@
 > +/dts-v1/;
 > +
 > +#include "kirkwood.dtsi"
 > +#include "kirkwood-6281.dtsi"
 > +
 > +/ {
-> +       model = "Seagate GoFlex Home";
-> +       compatible = "seagate,goflexhome", "marvell,kirkwood-88f6281",
+> +       model = "CloudEngines Pogoplug E02";
+> +       compatible = "cloudengines,pogo_e02", "marvell,kirkwood-88f6281",
 > "marvell,kirkwood";
-> +
+
+All vendors should be listed in
+Documentation/devicetree/bindings/vendor-prefixes.txt.  Please could
+you make a separate patch in this series adding it.
+
 > +       memory {
 > +               device_type = "memory";
-> +               reg = <0x00000000 0x8000000>;
+> +               reg = <0x00000000 0x10000000>;
 > +       };
 > +
 > +       chosen {
 > +               bootargs = "console=ttyS0,115200n8 earlyprintk
 > root=/dev/sda1 rootdelay=10";
-
-Specifying the root device is pretty unusual. However i see that both
-Go Flex Net and Dockstar does this. No other devices have this. This
-needs some discussion.
-
 > +               stdout-path = &uart0;
 > +       };
 > +
@@ -79,22 +57,18 @@ needs some discussion.
 > +                               marvell,pins = "mpp29";
 > +                               marvell,function = "gpio";
 > +                       };
-> +                       pmx_led_white: pmx-led_white {
-
-pmx-led_white should be pmx-led-white
-
-> +                               marvell,pins = "mpp40";
-> +                               marvell,function = "gpio";
-> +                       };
 > +                       pmx_led_green: pmx-led_green {
-> +                               marvell,pins = "mpp46";
+
+Last _ should be -
+
+> +                               marvell,pins = "mpp48";
 > +                               marvell,function = "gpio";
 > +                       };
 > +                       pmx_led_orange: pmx-led_orange {
 
-Same again.
+Same here.
 
-> +                               marvell,pins = "mpp47";
+> +                               marvell,pins = "mpp49";
 > +                               marvell,function = "gpio";
 > +                       };
 > +               };
@@ -102,33 +76,22 @@ Same again.
 > +                       status = "ok";
 > +               };
 > +
-> +               sata at 80000 {
-> +                       status = "okay";
-> +                       nr-ports = <1>;
-> +               };
-> +
 > +       };
 > +       gpio-leds {
 > +               compatible = "gpio-leds";
 > +               pinctrl-0 = < &pmx_led_orange
 > +                             &pmx_led_green
-> +                             &pmx_led_white
 > +                           >;
 > +               pinctrl-names = "default";
 > +
 > +               health {
 > +                       label = "status:green:health";
-> +                       gpios = <&gpio1 14 GPIO_ACTIVE_LOW>;
+> +                       gpios = <&gpio1 16 GPIO_ACTIVE_LOW>;
 > +                       default-state = "keep";
 > +               };
 > +               fault {
 > +                       label = "status:orange:fault";
-> +                       gpios = <&gpio1 15 GPIO_ACTIVE_LOW>;
-> +               };
-> +               misc {
-> +                       label = "status:white:misc";
-> +                       gpios = <&gpio1 8 GPIO_ACTIVE_HIGH>;
-> +                       linux,default-trigger = "ide-disk";
+> +                       gpios = <&gpio1 17 GPIO_ACTIVE_LOW>;
 > +               };
 > +       };
 > +       regulators {
@@ -153,7 +116,7 @@ Same again.
 > +};
 > +
 > +&nand {
-> +       chip-delay = <40>;
+> +       chip-delay = <25>;
 > +       status = "okay";
 > +
 > +       partition at 0 {
@@ -164,12 +127,17 @@ Same again.
 > +
 > +       partition at 100000 {
 > +               label = "uImage";
-> +               reg = <0x0100000 0x0600000>;
+> +               reg = <0x0100000 0x0500000>;
 > +       };
 > +
-> +       partition at 0600000 {
+> +        partition at 0500000 {
+> +                label = "pogoplug";
+> +                reg = <0x0500000 0x2500000>;
+> +        };
+> +
+> +       partition at 2500000 {
 > +               label = "root";
-> +               reg = <0x0600000 0xd800000>;
+> +               reg = <0x2500000 0x6c00000>;
 > +       };
 > +};
 > +
@@ -188,19 +156,19 @@ Same again.
 > +       };
 > +};
 > diff -uprN a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
-> --- a/arch/arm/boot/dts/Makefile        2014-08-03 16:25:02.000000000 -0600
-> +++ b/arch/arm/boot/dts/Makefile        2014-08-10 03:14:10.157372577 -0600
-> @@ -111,6 +111,7 @@ kirkwood := \
->         kirkwood-ds411.dtb \
->         kirkwood-ds411j.dtb \
->         kirkwood-ds411slim.dtb \
-> +      kirkwood-goflexhome.dtb \
+> --- a/arch/arm/boot/dts/Makefile        2014-08-10 03:54:22.764885366 -0600
+> +++ b/arch/arm/boot/dts/Makefile        2014-08-10 04:00:43.570037020 -0600
+> @@ -137,6 +137,7 @@ kirkwood := \
+>         kirkwood-openrd-base.dtb \
+>         kirkwood-openrd-client.dtb \
+>         kirkwood-openrd-ultimate.dtb \
+> +      kirkwood-pogo_e02.dtb \
 
-Is there a space/tab mixup here? Indentation looks wrong?
+Again, there looks to be something odd here.
 
->         kirkwood-goflexnet.dtb \
->         kirkwood-guruplug-server-plus.dtb \
->         kirkwood-ib62x0.dtb \
+>         kirkwood-rd88f6192.dtb \
+>         kirkwood-rd88f6281-a0.dtb \
+>         kirkwood-rd88f6281-a1.dtb \
 
 Thanks
 	Andrew
