@@ -1,64 +1,152 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Mon, 11 Aug 2014 16:47:55 +0100
-Subject: [PATCH] arm64: audit: Fix build for audit changes
-In-Reply-To: <20140811151502.GS24268@arm.com>
-References: <1405596402-23844-1-git-send-email-broonie@kernel.org>
- <20140811090947.GC15344@arm.com>
- <1407763344.2423.0.camel@redhat.com>
- <20140811133338.GB15853@arm.com> <20140811151502.GS24268@arm.com>
-Message-ID: <20140811154755.GI15853@arm.com>
+From: dianders@chromium.org (Doug Anderson)
+Date: Mon, 11 Aug 2014 08:57:24 -0700
+Subject: [RESEND PATCH 2/2] ARM: dts: Add tps65090 FET constraints on
+ Peach Pit and Pi
+In-Reply-To: <1407757091-18730-2-git-send-email-javier.martinez@collabora.co.uk>
+References: <1407757091-18730-1-git-send-email-javier.martinez@collabora.co.uk>
+ <1407757091-18730-2-git-send-email-javier.martinez@collabora.co.uk>
+Message-ID: <CAD=FV=XRmNkxXoxWaEfxFADrTgBrOPVX746woxiZoKck1ajwgA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Aug 11, 2014 at 04:15:02PM +0100, Catalin Marinas wrote:
-> On Mon, Aug 11, 2014 at 02:33:38PM +0100, Will Deacon wrote:
-> > On Mon, Aug 11, 2014 at 02:22:24PM +0100, Eric Paris wrote:
-> > > On Mon, 2014-08-11 at 10:09 +0100, Will Deacon wrote:
-> > > > On Thu, Jul 17, 2014 at 12:26:42PM +0100, Mark Brown wrote:
-> > > > > From: Mark Brown <broonie@linaro.org>
-> > > > > 
-> > > > > Commit 3efe33f5d2 (audit: x86: drop arch from __audit_syscall_entry()
-> > > > > interface) removed the arch parameter from __audit_syscall_entry() and
-> > > > > updated the only current user in mainline but this breaks the ARMv8 audit
-> > > > > code that has been added in -next. Fix this by making the equivalent
-> > > > > update to ARMv8.
-> > > > > 
-> > > > > Signed-off-by: Mark Brown <broonie@linaro.org>
-> > > > > ---
-> > > > >  arch/arm64/kernel/ptrace.c | 4 ++--
-> > > > >  1 file changed, 2 insertions(+), 2 deletions(-)
-> > > > > 
-> > > > > diff --git a/arch/arm64/kernel/ptrace.c b/arch/arm64/kernel/ptrace.c
-> > > > > index 70526cfda056..310842e3d477 100644
-> > > > > --- a/arch/arm64/kernel/ptrace.c
-> > > > > +++ b/arch/arm64/kernel/ptrace.c
-> > > > > @@ -1115,8 +1115,8 @@ asmlinkage int syscall_trace_enter(struct pt_regs *regs)
-> > > > >  	if (test_thread_flag(TIF_SYSCALL_TRACEPOINT))
-> > > > >  		trace_sys_enter(regs, regs->syscallno);
-> > > > >  
-> > > > > -	audit_syscall_entry(syscall_get_arch(), regs->syscallno,
-> > > > > -		regs->orig_x0, regs->regs[1], regs->regs[2], regs->regs[3]);
-> > > > > +	audit_syscall_entry(regs->syscallno, regs->orig_x0, regs->regs[1],
-> > > > > +			    regs->regs[2], regs->regs[3]);
-> > > > 
-> > > > Eric, Richard: when is 3efe33f5d2 ("audit: x86: drop arch from
-> > > > __audit_syscall_entry() interface") going to hit mainline? I've been holding
-> > > > off this fix until the offending commit is merged, but if that's not going
-> > > > to happen for 3.17, then we probably need to do something else to fix -next.
-> > > 
-> > > I think I'm being lazy this window and not oging to send a pull.  So
-> > > I'll pick up this fix as soon as rc1 cuts in my tree.
-> > 
-> > Oh, alright then. If you're not going to send the code for mainline, you
-> > could also just drop it from -next ;)
-> > 
-> > Anyway, if you do fix it, please let me know so that I can remove our #ifdef
-> > CONFIG_AUDITSYSCALL guards (which only exist to stop build breakage in -next
-> > with defconfig).
-> 
-> Actually, Eric could carry the arm64 change from Mark into -next as well
-> and we can drop the arm64 #ifdef before the API change hits mainline.
+Javier,
 
-Indeed -- I think that's what we'd agreed, right?
+On Mon, Aug 11, 2014 at 4:38 AM, Javier Martinez Canillas
+<javier.martinez@collabora.co.uk> wrote:
+> Both Exynos5420 Peach Pit and Exynos5800 Peach Pi boards
+> have a tps65090 PMU that has a number of switches (FETs)
+> that are just on/off devices but they do have a current
+> limit and the output voltage of the switch is ramped up
+> within a controlled slope.
+>
+> After the switch is turned on, a safety timer is started
+> and before this timer times out the output voltage must
+> have reached the input voltage. Otherwise the switch is
+> turned off expecting an overload condition.
+>
+> So using the maximum output voltage slew rate and the timer
+> minimum and maximum timeouts, a voltage constraints can be
+> expressed as bounded limits for the timeout. That is what
+> is used in the board schematics and should be in the DT too.
 
-Will
+I don't understand this, but if you and Mark are happy with it...
+
+...I'm also not 100% certain what the above description has to do with
+this change, but I'll admit to having only skimmed some of the earlier
+conversations.
+
+
+> Signed-off-by: Javier Martinez Canillas <javier.martinez@collabora.co.uk>
+> ---
+>  arch/arm/boot/dts/exynos5420-peach-pit.dts | 14 ++++++++++++++
+>  arch/arm/boot/dts/exynos5800-peach-pi.dts  | 14 ++++++++++++++
+>  2 files changed, 28 insertions(+)
+>
+> diff --git a/arch/arm/boot/dts/exynos5420-peach-pit.dts b/arch/arm/boot/dts/exynos5420-peach-pit.dts
+> index d8710c1..eefafe6 100644
+> --- a/arch/arm/boot/dts/exynos5420-peach-pit.dts
+> +++ b/arch/arm/boot/dts/exynos5420-peach-pit.dts
+> @@ -386,27 +386,41 @@
+>                                         };
+>                                         tps65090_fet1: fet1 {
+>                                                 regulator-name = "vcd_led";
+> +                                               regulator-min-microvolt = <5000000>;
+> +                                               regulator-max-microvolt = <1700000>;
+
+This is almost certainly wrong.  Your max is smaller than your min.
+Perhaps you want an extra 0.
+
+>                                         };
+>                                         tps65090_fet2: fet2 {
+>                                                 regulator-name = "video_mid";
+> +                                               regulator-min-microvolt = <4500000>;
+> +                                               regulator-max-microvolt = <5500000>;
+>                                                 regulator-always-on;
+>                                         };
+>                                         tps65090_fet3: fet3 {
+>                                                 regulator-name = "wwan_r";
+> +                                               regulator-min-microvolt = <3000000>;
+> +                                               regulator-max-microvolt = <5500000>;
+>                                                 regulator-always-on;
+>                                         };
+>                                         tps65090_fet4: fet4 {
+>                                                 regulator-name = "sdcard";
+> +                                               regulator-min-microvolt = <3000000>;
+> +                                               regulator-max-microvolt = <5500000>;
+>                                                 regulator-always-on;
+>                                         };
+>                                         tps65090_fet5: fet5 {
+>                                                 regulator-name = "camout";
+> +                                               regulator-min-microvolt = <3000000>;
+> +                                               regulator-max-microvolt = <5500000>;
+>                                         };
+>                                         tps65090_fet6: fet6 {
+>                                                 regulator-name = "lcd_vdd";
+> +                                               regulator-min-microvolt = <3000000>;
+> +                                               regulator-max-microvolt = <5500000>;
+>                                         };
+>                                         tps65090_fet7: fet7 {
+>                                                 regulator-name = "video_mid_1a";
+> +                                               regulator-min-microvolt = <3000000>;
+> +                                               regulator-max-microvolt = <5500000>;
+>                                                 regulator-always-on;
+>                                         };
+>                                         tps65090_ldo1: ldo1 {
+> diff --git a/arch/arm/boot/dts/exynos5800-peach-pi.dts b/arch/arm/boot/dts/exynos5800-peach-pi.dts
+> index 07b29b7..5c38bc0 100644
+> --- a/arch/arm/boot/dts/exynos5800-peach-pi.dts
+> +++ b/arch/arm/boot/dts/exynos5800-peach-pi.dts
+> @@ -384,27 +384,41 @@
+>                                         };
+>                                         tps65090_fet1: fet1 {
+>                                                 regulator-name = "vcd_led";
+> +                                               regulator-min-microvolt = <5000000>;
+> +                                               regulator-max-microvolt = <1700000>;
+
+Here, too.
+
+>                                         };
+>                                         tps65090_fet2: fet2 {
+>                                                 regulator-name = "video_mid";
+> +                                               regulator-min-microvolt = <4500000>;
+> +                                               regulator-max-microvolt = <5500000>;
+>                                                 regulator-always-on;
+>                                         };
+>                                         tps65090_fet3: fet3 {
+>                                                 regulator-name = "wwan_r";
+> +                                               regulator-min-microvolt = <3000000>;
+> +                                               regulator-max-microvolt = <5500000>;
+>                                                 regulator-always-on;
+>                                         };
+>                                         tps65090_fet4: fet4 {
+>                                                 regulator-name = "sdcard";
+> +                                               regulator-min-microvolt = <3000000>;
+> +                                               regulator-max-microvolt = <5500000>;
+>                                                 regulator-always-on;
+>                                         };
+>                                         tps65090_fet5: fet5 {
+>                                                 regulator-name = "camout";
+> +                                               regulator-min-microvolt = <3000000>;
+> +                                               regulator-max-microvolt = <5500000>;
+>                                         };
+>                                         tps65090_fet6: fet6 {
+>                                                 regulator-name = "lcd_vdd";
+> +                                               regulator-min-microvolt = <3000000>;
+> +                                               regulator-max-microvolt = <5500000>;
+>                                         };
+>                                         tps65090_fet7: fet7 {
+>                                                 regulator-name = "video_mid_1a";
+> +                                               regulator-min-microvolt = <3000000>;
+> +                                               regulator-max-microvolt = <5500000>;
+>                                                 regulator-always-on;
+>                                         };
+>                                         tps65090_ldo1: ldo1 {
+
+Other than 1.7V vs. 17V, this matches what I see in the tps65090
+specifications.  Technically I think that this should also be applied
+to other tps65090 users in mainline since it's a property shared among
+every user of tps65090.  That means exynos5250-snow and
+tegra114-dalmore.  I'd be tempted to say that it belongs in source
+code or in a dts fragment as well.
+
+-Doug
