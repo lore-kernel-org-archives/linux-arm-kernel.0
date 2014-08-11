@@ -1,47 +1,21 @@
-From: leif.lindholm@linaro.org (Leif Lindholm)
-Date: Mon, 11 Aug 2014 17:14:48 +0100
-Subject: [PATCH] ARM: expand fixmap region to 3MB
-In-Reply-To: <1407511404-11997-1-git-send-email-robherring2@gmail.com>
-References: <1407511404-11997-1-git-send-email-robherring2@gmail.com>
-Message-ID: <20140811161448.GA4002@bivouac.eciton.net>
+From: dianders@chromium.org (Doug Anderson)
+Date: Mon, 11 Aug 2014 09:19:18 -0700
+Subject: [PATCH 2/4] ARM: rockchip: enable the AMBA bus
+In-Reply-To: <1406661128-7614-3-git-send-email-heiko@sntech.de>
+References: <1406661128-7614-1-git-send-email-heiko@sntech.de>
+ <1406661128-7614-3-git-send-email-heiko@sntech.de>
+Message-ID: <CAD=FV=V2qAd0MAAZubr-rUgA+DDLk-G0RLOvvME2=ym4vO-2-Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Aug 08, 2014 at 10:23:24AM -0500, Rob Herring wrote:
-> From: Rob Herring <robh@kernel.org>
-> 
-> With commit a05e54c103b0b8 "ARM: 8031/2: change fixmap mapping region to
-> support 32 CPUs", the fixmap region was expanded to 2MB, but it
-> precluded any other uses of the fixmap region in order to support up to
-> 32 CPUs. In order to support other uses the fixmap region needs to be
-> expanded beyond 2MB. Fortunately, the adjacent 1MB range
-> 0xffe00000-0xfff00000 is availabe to use.
-> 
-> Remove fixmap_page_table ptr and lookup the page table via the virtual
-> address so that the fixmap region can span more that one pmd. The 2nd
-> pmd is already created since it is shared with the vector page.
-> 
-> Cc: Leif Lindholm <leif.lindholm@linaro.org>
-> Cc: Kees Cook <keescook@chromium.org>
-> Cc: Russell King <linux@arm.linux.org.uk>
-> Signed-off-by: Rob Herring <robh@kernel.org>
+Heiko,
+
+On Tue, Jul 29, 2014 at 12:12 PM, Heiko Stuebner <heiko@sntech.de> wrote:
+> This is needed to access the pl330 dma controllers on Rockchip SoCs.
+>
+> Signed-off-by: Heiko Stuebner <heiko@sntech.de>
 > ---
-> 
-> This patch can come before or after the generic fixmap.h. There's a 
-> single line conflict with the ending address 
+>  arch/arm/mach-rockchip/Kconfig | 1 +
+>  1 file changed, 1 insertion(+)
 
-Tested-by: Leif Lindholm <leif.lindholm@linaro.org>
-For Kees' set with this addition + generic fixmap + early_ioremap +
-UEFI.
- 
-> This worked for earlycon, but I've not done any highmem specific 
-> testing. My full series is available here:
-> 
-> git://git.kernel.org/pub/scm/linux/kernel/git/robh/linux.git fixmap
-
-I was hoping to be able to give you a tested-by for that series on
-next-20140811 with the UEFI patches, but that setup fails to boot
-right now. Looking into why.
-
-/
-    Leif
+Reviewed-by: Doug Anderson <dianders@chromium.org>
