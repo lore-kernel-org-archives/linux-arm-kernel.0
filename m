@@ -1,30 +1,52 @@
-From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Mon, 11 Aug 2014 09:11:22 +0200
-Subject: [PATCH 1/5] ARM: shmobile: r8a7740: Add CMT1 device to DT
-In-Reply-To: <1407725139-16156-2-git-send-email-horms+renesas@verge.net.au>
-References: <1407725139-16156-1-git-send-email-horms+renesas@verge.net.au>
- <1407725139-16156-2-git-send-email-horms+renesas@verge.net.au>
-Message-ID: <CAMuHMdWBdbeTAG9eB_kg63i=4jYKLK7_1iD_POVOLnDkVHCUDQ@mail.gmail.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Mon, 11 Aug 2014 09:15:39 +0200
+Subject: [PATCH 6/7] arm: mediatek: enable gpt6 on boot up to make arch
+ timer working
+In-Reply-To: <1406824943-24052-7-git-send-email-matthias.bgg@gmail.com>
+References: <1406824943-24052-1-git-send-email-matthias.bgg@gmail.com>
+ <1406824943-24052-7-git-send-email-matthias.bgg@gmail.com>
+Message-ID: <CACRpkdbRhGE8tcKj+W_4F9-xmcm-fxcYuCmLOqX-ESC+3PAmyA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Aug 11, 2014 at 4:45 AM, Simon Horman
-<horms+renesas@verge.net.au> wrote:
-> Add the CMT0 counters to the r8a7740 device tree and make it
+On Thu, Jul 31, 2014 at 6:42 PM, Matthias Brugger
+<matthias.bgg@gmail.com> wrote:
 
-CMT1?
+> We enable GTP6 which ungates the arch timer clock. Apart we write the
+> frequency with which the timer is running in the CNTFREQ register.
+> In the future this should be done in the bootloader.
+>
+> Signed-off-by: Matthias Brugger <matthias.bgg@gmail.com>
+(...)
 
-> disabled by default.
+> +       if (of_machine_is_compatible("mediatek,mt6589")) {
+> +               /* set cntfreq register which is not done in bootloader */
+> +               asm volatile("mcr p15, 0, %0, c14, c0, 0" : : "r" (13000000));
 
-> +       cmt1: timer at e6138000 {
+I guess this is for something like the ARM arch timer in
+drivers/clocksource/arm_arch_timer.c
 
-Gr{oetje,eeting}s,
+Instead of doing this, use the DT property "clock-frequency" on
+the ARM arch timer node, as that overrides the CP15 setting.
 
-                        Geert
+> +
+> +               /* turn on GPT6 which ungates arch timer clocks */
+> +               gpt_base = ioremap(GPT6_CON_MT65xx, 0x04);
+> +       }
+> +
+> +       /* enabel clock and set to free-run */
+> +       if (gpt_base)
+> +               writel(0x31, gpt_base);
 
---
-Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+Why is this not done properly in the GPT driver (I guess
+in drivers/clocksource/mtk_timer.c) instead of remapping
+it and fiddling around in the machine?
 
-In personal conversations with technical people, I call myself a hacker. But
-when I'm talking to journalists I just say "programmer" or something like that.
-                                -- Linus Torvalds
+If it only affects the mt6589 just add another compatible string
+to that driver like "mediatek,mt6589-timer" as it properly reflects the
+fact that this timer is slightly different on the 6589.
+
+Also use a #define for the magic constant 0x31.
+
+Yours,
+Linus Walleij
