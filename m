@@ -1,37 +1,71 @@
-From: silvio.fricke@gmail.com (Silvio Fricke)
-Date: Mon, 11 Aug 2014 15:53:11 +0200
-Subject: [PATCH] ARM: dts: imx6: edmqmx6: change enet reset pin
-In-Reply-To: <cover.1407765032.git.silvio.fricke@gmail.com>
-References: <cover.1407765032.git.silvio.fricke@gmail.com>
-Message-ID: <76f23118ec2c07696aefd4fd88133f42837d45a5.1407765032.git.silvio.fricke@gmail.com>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Mon, 11 Aug 2014 14:56:45 +0100
+Subject: [RESEND PATCH 0/6] thermal: sti: Add new Thermal driver
+In-Reply-To: <20140721101306.GW30888@lee--X1>
+References: <20140624092309.GD13803@lee--X1> <20140709120823.GA32573@lee--X1>
+ <1404911964.28592.4.camel@rzhang1-toshiba>
+ <20140709134646.GB479@lee--X1> <20140714130824.GA3993@lee--X1>
+ <1405347277.28592.25.camel@rzhang1-toshiba>
+ <20140714142703.GC3993@lee--X1> <20140721091753.GV30888@lee--X1>
+ <1405935299.2455.3.camel@rzhang1-toshiba>
+ <20140721101306.GW30888@lee--X1>
+Message-ID: <20140811135645.GD31769@lee--X1>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Signed-off-by: Silvio Fricke <silvio.fricke@gmail.com>
----
- arch/arm/boot/dts/imx6q-dmo-edmqmx6.dts | 3 ++-
- 1 file changed, 2 insertions(+), 1 deletion(-)
+On Mon, 21 Jul 2014, Lee Jones wrote:
+> On Mon, 21 Jul 2014, Zhang Rui wrote:
+> > On Mon, 2014-07-21 at 10:17 +0100, Lee Jones wrote:
+> > > On Mon, 14 Jul 2014, Lee Jones wrote:
+> > > > On Mon, 14 Jul 2014, Zhang Rui wrote:
+> > > > > On Mon, 2014-07-14 at 14:08 +0100, Lee Jones wrote:
+> > > > > > On Wed, 09 Jul 2014, Lee Jones wrote:
+> > > > > > > On Wed, 09 Jul 2014, Zhang Rui wrote:
+> > > > > > > > On Wed, 2014-07-09 at 13:08 +0100, Lee Jones wrote:
+> > > > > > > > > On Tue, 24 Jun 2014, Lee Jones wrote:
+> > > > > > > > > 
+> > > > > > > > > > > I'm re-sending this set, as one of the maintainers' email addresses
+> > > > > > > > > > > is incorrect in the MAINTAINERS file.
+> > > > > > > > > > > 
+> > > > > > > > > > > This patchset adds full support for 2 types of Thermal Controllers
+> > > > > > > > > > > produced by STMicroelectronics.  One is a more traditional memory
+> > > > > > > > > > > mapped variant, the other is controlled solely by system configuration
+> > > > > > > > > > > registers.
+> > > > > > > > > > 
+> > > > > > > > > > Any thing from the Thermal guys? Has this set fallen through the gaps?
+> > > > > > > > > 
+> > > > > > > > > Anything at all?  It's been well over a month now.
+> > > > > > > > > 
+> > > > > > > > Well, for the soc thermal drivers, I'd prefer to take them via Eduardo,
+> > > > > > > > but as we didn't get any feedback from Eduardo, I will take them.
+> > > > > > > 
+> > > > > > > Thanks Rui.
+> > > > > > > 
+> > > > > > > So have you taken all 4 "thermal: sti: *" patches?
+> > > > > > 
+> > > > > > Have you taken these yet?
+> > > > > 
+> > > > > Not yet. will do tomorrow.
+> > > 
+> > > I waited 7 days and still don't see them?
+> > > 
+> > Done, they're in my local tree and I forgot to push them.
+> > thanks for the reminder.
+> 
+> Thanks dude.
 
-diff --git a/arch/arm/boot/dts/imx6q-dmo-edmqmx6.dts b/arch/arm/boot/dts/imx6q-dmo-edmqmx6.dts
-index 8c1cb53..4fa2543 100644
---- a/arch/arm/boot/dts/imx6q-dmo-edmqmx6.dts
-+++ b/arch/arm/boot/dts/imx6q-dmo-edmqmx6.dts
-@@ -119,7 +119,7 @@
- 	pinctrl-names = "default";
- 	pinctrl-0 = <&pinctrl_enet>;
- 	phy-mode = "rgmii";
--	phy-reset-gpios = <&gpio3 23 0>;
-+	phy-reset-gpios = <&gpio1 25 0>;
- 	phy-supply = <&vgen2_1v2_eth>;
- 	status = "okay";
- };
-@@ -339,6 +339,7 @@
- 				MX6QDL_PAD_ENET_REF_CLK__ENET_TX_CLK	0x1b0b0
- 				MX6QDL_PAD_ENET_MDIO__ENET_MDIO		0x1b0b0
- 				MX6QDL_PAD_ENET_MDC__ENET_MDC		0x1b0b0
-+				MX6QDL_PAD_ENET_CRS_DV__GPIO1_IO25	0x1b0b0
- 				MX6QDL_PAD_GPIO_16__ENET_REF_CLK	0x4001b0a8
- 			>;
- 		};
+Hi Rui,
+
+Do you know when you will send your pull-request?
+
+We are half way through the merge window and I don't see any new
+Thermal patches?
+
+Kind regards,
+Lee
+
 -- 
-2.0.3
+Lee Jones
+Linaro STMicroelectronics Landing Team Lead
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
