@@ -1,77 +1,133 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Mon, 11 Aug 2014 19:33:56 +0200
-Subject: [RFC PATCH v3] reset: Add a defer reset object to send board
- specific reset
-In-Reply-To: <1407507789.3354.20.camel@paszta.hi.pengutronix.de>
-References: <1403098673-3058-1-git-send-email-houcheng@gmail.com>
- <CACRpkdYfu8HmVCkn9JFh+YP5OPdr8o9nTfoCnkJ7SSpGoenQUg@mail.gmail.com>
- <20140708080535.GJ13423@lukather>
- <CACRpkdbFPAsu1gE-AVyD=-RxyE7mUJPSbFga7HLh0mxjE-mQuQ@mail.gmail.com>
- <1407507789.3354.20.camel@paszta.hi.pengutronix.de>
-Message-ID: <20140811173356.GN15297@lukather>
+From: dianders@chromium.org (Doug Anderson)
+Date: Mon, 11 Aug 2014 10:36:50 -0700
+Subject: [RESEND PATCH 1/1] ARM: exynos_defconfig: Enable SBS battery
+ support
+In-Reply-To: <87990175.pWuoYNXuLf@amdc1032>
+References: <1407755198-17568-1-git-send-email-javier.martinez@collabora.co.uk>
+ <CAD=FV=XfvzKJO-enwH95hi_mGT6AhXq-R9WHjvhRrDdNtdmazA@mail.gmail.com>
+ <53E8EDE5.4000807@collabora.co.uk> <87990175.pWuoYNXuLf@amdc1032>
+Message-ID: <CAD=FV=WB9SVMf2r1zE9JjLW0yLt=jPXkW_OyvNzhtjoiUzB5Lg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Aug 08, 2014 at 04:23:09PM +0200, Philipp Zabel wrote:
-> Am Dienstag, den 08.07.2014, 11:38 +0200 schrieb Linus Walleij:
-> > On Tue, Jul 8, 2014 at 10:05 AM, Maxime Ripard
-> > <maxime.ripard@free-electrons.com> wrote:
-> > > On Tue, Jul 08, 2014 at 09:52:03AM +0200, Linus Walleij wrote:
-> > >> On Wed, Jun 18, 2014 at 3:37 PM, Houcheng Lin <houcheng@gmail.com> wrote:
-> > >>
-> > >> > The Problem
-> > >> > -----------
-> > >> > The reset signal on a hardware board is send either:
-> > >> >     - during machine initialization
-> > >> >     - during bus master's initialization
-> > >>
-> > >> I just thought about this a bit, since there isn't already a generic GPIO
-> > >> reset driver, just call this drivers/reset/reset-gpio.c and make the
-> > >> ability to deferral just a configuration detail of the GPIO reset driver.
-> > >
-> > > Philipp has been working on one for quite some time. See
-> > > http://www.spinics.net/lists/arm-kernel/msg321927.html
-> > >
-> > > However, it seems to progress slowly, and we don't seem to be able to
-> > > reach a consensus here.
-> 
-> Mostly because Maxime and I seem to have a completely different opinion
-> and nobody else argued one way or the other.
+Hi,
 
-Yep, mostly because I don't see how a generic approach can work.
+On Mon, Aug 11, 2014 at 10:28 AM, Bartlomiej Zolnierkiewicz
+<b.zolnierkie@samsung.com> wrote:
+>
+> Hi,
+>
+> On Monday, August 11, 2014 06:23:01 PM Javier Martinez Canillas wrote:
+>> Hello,
+>>
+>> On 08/11/2014 05:59 PM, Doug Anderson wrote:
+>> > Bartlomiej,
+>> >
+>> > On Mon, Aug 11, 2014 at 8:42 AM, Bartlomiej Zolnierkiewicz
+>> > <b.zolnierkie@samsung.com> wrote:
+>> >>
+>> >> Hi,
+>> >>
+>> >> On Monday, August 11, 2014 02:52:27 PM Javier Martinez Canillas wrote:
+>> >>> Hello Bartlomiej,
+>> >>>
+>> >>> On 08/11/2014 02:40 PM, Bartlomiej Zolnierkiewicz wrote:
+>> >>> >> index fc7d168..c390bb9 100644
+>> >>> >> --- a/arch/arm/configs/exynos_defconfig
+>> >>> >> +++ b/arch/arm/configs/exynos_defconfig
+>> >>> >> @@ -77,6 +77,7 @@ CONFIG_SPI_S3C64XX=y
+>> >>> >>  CONFIG_I2C_S3C2410=y
+>> >>> >>  CONFIG_DEBUG_GPIO=y
+>> >>> >>  CONFIG_POWER_SUPPLY=y
+>> >>> >> +CONFIG_BATTERY_SBS=m
+>> >>> >
+>> >>> > Why not make it "=y"?
+>> >>> >
+>> >>> > Rationale:
+>> >>> > - currently no hardware related option uses "=m" in exynos_defconfig
+>> >>> > - it would match the SBS option usage in multi_v7_defconfig
+>> >>> >
+>> >>> >>  CONFIG_CHARGER_TPS65090=y
+>> >>> >>  # CONFIG_HWMON is not set
+>> >>> >>  CONFIG_THERMAL=y
+>> >>> >
+>> >>>
+>> >>> I know but personally I think this should be changed. The idea of having a multi
+>> >>> platform kernel is to build a single kernel image that can be used to boot
+>> >>> different platforms. Not all platforms have a SBS-compliant battery so this
+>> >>> support shouldn't be built in the kernel image IMHO.
+>> >>>
+>> >>> This also matches to what real users will do since distributions most likely
+>> >>> will have a minimal kernel and every possible hardware support will be enabled
+>> >>> as a loadable kernel module. This is what distros do for other platforms too.
+>> >>>
+>> >>> If someone has a different use case and wants a kernel image that is optimized
+>> >>> for a particular platform then she has to create its own defconfig anyways.
+>> >>
+>> >> Distributions usually use their own configs anyway and the current most
+>> >> popular use case for exynos_defconfig (not multi_v7_defconfig) seems to
+>> >> be to build kernel image alone and use it without any modules:
+>> >>
+>> >> $ grep "=m" arch/arm/configs/exynos_defconfig
+>> >> CONFIG_DM_CRYPT=m
+>> >>
+>> >> $ grep "=m" .config
+>> >> CONFIG_NET_IP_TUNNEL=m
+>> >> CONFIG_INET_TUNNEL=m
+>> >> CONFIG_IPV6=m
+>> >> CONFIG_INET6_XFRM_MODE_TRANSPORT=m
+>> >> CONFIG_INET6_XFRM_MODE_TUNNEL=m
+>> >> CONFIG_INET6_XFRM_MODE_BEET=m
+>> >> CONFIG_IPV6_SIT=m
+>> >> CONFIG_DM_CRYPT=m
+>> >> CONFIG_CRYPTO_RNG=m
+>> >> CONFIG_CRYPTO_ANSI_CPRNG=m
+>> >>
+>> >> What I'm trying to say is that there is a high probability that people
+>> >> will continue to use just the kernel image for exynos_defconfig and
+>> >> will therefore miss SBS battery support altogether (which is only 3.6
+>> >> kB of code more in the kernel image so there is no much gain in making
+>> >> it modular currently).
+>> >
+>> > I'm not against making it =y for exynos_defconfig.  I do pretty
+>> > strongly agree that the multi_v7 version should be =m eventually,
+>> > though.  We'd need to do everything we can to make that kernel
+>> > smaller.
+>> >
+>>
+>> Same for me. I don't have such a strong opinion about this so if you think that
+>> I should re-spin to change to =m, I will.
+>>
+>> I do think that we should try to keep the delta between exynos_defconfig and
+>> multi_v7_defconfig as small as possible and eventually even get rid of
+>> exynos_defconfig. Since building everything as built-in and having a config
+>
+> I completely agree.  I proposed exynos_defconfig removal as soon as
+> Exynos gained multiplatform support (and before exynos_defconfig
+> started getting out-of-sync with multi_v7_defconfig).  There were
+> arguments that it is still useful in some cases.  I think that if
+> it would be possible to go from a modular multi_v7_defconfig to
+> a modular/built-in single platform config (using a script?) all
+> such use cases will be covered.
 
-The existing reset-gpios property only provide the gpio to use, but
-some informations are encoded in the driver, such as the reset
-duration, or a reset sequence if any.
+There's one really nice thing about having an "exynos_defconfig".  It
+makes it a little easier to tease apart what's actually needed if you
+just want to build a product kernel that support exynos.
 
-How do you plan on giving that information to your generic driver?
+Most product kernels shipping in embedded devices only support one or
+maybe a small number of SoCs.  If you need to try to figure out what
+parts of the "multi_v7" config is relevant then it's very hard.
 
-The only solution I can think of would be to add an extra property
-that your code would parse. But then, you break the existing DT
-bindings.
+It's also nice to help measure multiplatform code bloat.  You can keep
+measuring the output kernel size of the exynos kernel to see how much
+bloat all of the mutliplatform stuff has added.
 
-And if we're going to break those bindings, at least do it in a way
-consistent with reset bindings.
 
-Plus, your approach doesn't cover the weird corner cases such as:
-  - reset-gpio
-  - wlf,reset-gpios
-  - phy-reset-gpios
-  - snps,reset-gpio
-  - the drivers that need several gpio and expect the reset one as a
-    positional argument.
-  - etc.
+> so I would vote for CONFIG_BATTERY_SBS=y for both configs.  Especially
+> since it results in only 3.6 kB bigger kernel image (0.05% kernel size
+> increase for kernel image built with exynos_defconfig, probably a lot
+> less for multi_v7_defconfig one).
 
-Maxime
+Death by 1000 cuts is a very painful death indeed, even if each cut is small.
 
--- 
-Maxime Ripard, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140811/8b38b659/attachment.sig>
+-Doug
