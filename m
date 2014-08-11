@@ -1,38 +1,106 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Mon, 11 Aug 2014 21:59:09 +0100
-Subject: Building kernel for more than one SoC
-In-Reply-To: <lsb9tn$nnv$1@ger.gmane.org>
-References: <lrdi48$ls1$1@ger.gmane.org>
- <20140804201712.GK30282@n2100.arm.linux.org.uk> <53E8E469.9050807@atmel.com>
- <lsaoih$e9$1@ger.gmane.org>
- <CAOCHtYgPoxveSjYpWWo8W+_0WwQdaCBga0piazg_Oq6aeZ=w-g@mail.gmail.com>
- <lsb9tn$nnv$1@ger.gmane.org>
-Message-ID: <20140811205909.GC30401@n2100.arm.linux.org.uk>
+From: dinh.linux@gmail.com (Dinh Nguyen)
+Date: Mon, 11 Aug 2014 16:03:52 -0500
+Subject: [PATCHv10 4/5] ARM: dts: socfpga: unuse the slot-node and
+ deprecate the supports-highspeed for dw-mmc
+In-Reply-To: <1407397082-32495-5-git-send-email-jh80.chung@samsung.com>
+References: <1407397082-32495-1-git-send-email-jh80.chung@samsung.com>
+ <1407397082-32495-5-git-send-email-jh80.chung@samsung.com>
+Message-ID: <CADhT+wcKrL8f-OyLnKKzsBgyU3PSYFLfsZgvCcdAgVV5BAT76Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Aug 11, 2014 at 08:43:35PM +0000, Grant Edwards wrote:
-> On 2014-08-11, Robert Nelson <robertcnelson@gmail.com> wrote:
-> >> Now it's up to somebody else to decide if the price difference between
-> >> a G20 and G25 is worth the engineering time to upgrade U-Boot and
-> >> Linux kernel to versions that know about device trees...
-> >
-> > http://cateee.net/lkddb/web-lkddb/ARM_APPENDED_DTB.html
-> 
-> Interesting.  That would still require modifying U-Boot so that at
-> run-time it detects the SoC type and appends the proper DTB to the
-> kernel image, but it that may be less work than "real" DTB support in
-> U-Boot.
+On Thu, Aug 7, 2014 at 2:38 AM, Jaehoon Chung <jh80.chung@samsung.com> wrote:
+> dw-mmc controller can support multiple slots.
+> But, there are no use-cases anywhere. So we don't need to support the
+> slot-node for dw-mmc controller.
+> And "supports-highspeed" property in dw-mmc is deprecated.
+> "supports-highspeed" property can be replaced with "cap-sd/mmc-highspeed".
+>
+> Signed-off-by: Jaehoon Chung <jh80.chung@samsung.com>
+> Reviewed-by: Tushar Behera <trblinux@gmail.com>
+> Reviewed-by: Ulf Hansson <ulf.hansson@linaro.org>
+> Acked-by: Seungwon Jeon <tgih.jun@samsung.com>
+> Acked-by: Dinh Nguyen <dinguyen@altera.com>
+> ---
 
-The idea of that feature is:
+I've queued this patch in my tree for v3.18.
 
-- You take the kernel zImage
-- You take the appropriate dtb file
-- You concatenate the dtb file into the zImage
-- You run mkimage on the resulting combined image to create the special
-  uboot format file for uboot to load
-- You use it with uboot as you have done in the past with non-DT kernels.
+Thanks,
+Dinh
 
--- 
-FTTC broadband for 0.8mile line: currently at 9.5Mbps down 400kbps up
-according to speedtest.net.
+>  arch/arm/boot/dts/socfpga_arria5.dtsi   |    9 +++------
+>  arch/arm/boot/dts/socfpga_cyclone5.dtsi |    9 +++------
+>  arch/arm/boot/dts/socfpga_vt.dts        |    9 +++------
+>  3 files changed, 9 insertions(+), 18 deletions(-)
+>
+> diff --git a/arch/arm/boot/dts/socfpga_arria5.dtsi b/arch/arm/boot/dts/socfpga_arria5.dtsi
+> index 12d1c2c..468fc4c 100644
+> --- a/arch/arm/boot/dts/socfpga_arria5.dtsi
+> +++ b/arch/arm/boot/dts/socfpga_arria5.dtsi
+> @@ -29,13 +29,10 @@
+>
+>                 dwmmc0 at ff704000 {
+>                         num-slots = <1>;
+> -                       supports-highspeed;
+>                         broken-cd;
+> -
+> -                       slot at 0 {
+> -                               reg = <0>;
+> -                               bus-width = <4>;
+> -                       };
+> +                       bus-width = <4>;
+> +                       cap-mmc-highspeed;
+> +                       cap-sd-highspeed;
+>                 };
+>
+>                 sysmgr at ffd08000 {
+> diff --git a/arch/arm/boot/dts/socfpga_cyclone5.dtsi b/arch/arm/boot/dts/socfpga_cyclone5.dtsi
+> index bf51182..1ee03c4 100644
+> --- a/arch/arm/boot/dts/socfpga_cyclone5.dtsi
+> +++ b/arch/arm/boot/dts/socfpga_cyclone5.dtsi
+> @@ -30,13 +30,10 @@
+>
+>                 dwmmc0 at ff704000 {
+>                         num-slots = <1>;
+> -                       supports-highspeed;
+>                         broken-cd;
+> -
+> -                       slot at 0 {
+> -                               reg = <0>;
+> -                               bus-width = <4>;
+> -                       };
+> +                       bus-width = <4>;
+> +                       cap-mmc-highspeed;
+> +                       cap-sd-highspeed;
+>                 };
+>
+>                 ethernet at ff702000 {
+> diff --git a/arch/arm/boot/dts/socfpga_vt.dts b/arch/arm/boot/dts/socfpga_vt.dts
+> index 09792b4..f9345e0 100644
+> --- a/arch/arm/boot/dts/socfpga_vt.dts
+> +++ b/arch/arm/boot/dts/socfpga_vt.dts
+> @@ -43,13 +43,10 @@
+>
+>                 dwmmc0 at ff704000 {
+>                         num-slots = <1>;
+> -                       supports-highspeed;
+>                         broken-cd;
+> -
+> -                       slot at 0 {
+> -                               reg = <0>;
+> -                               bus-width = <4>;
+> -                       };
+> +                       bus-width = <4>;
+> +                       cap-mmc-highspeed;
+> +                       cap-sd-highspeed;
+>                 };
+>
+>                 ethernet at ff700000 {
+> --
+> 1.7.9.5
+>
+>
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
