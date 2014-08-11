@@ -1,81 +1,58 @@
-From: dianders@chromium.org (Doug Anderson)
-Date: Mon, 11 Aug 2014 10:01:08 -0700
-Subject: [PATCH 3/4] ARM: dts: rockchip: add rk3288 dma controllers
-In-Reply-To: <1406661128-7614-4-git-send-email-heiko@sntech.de>
-References: <1406661128-7614-1-git-send-email-heiko@sntech.de>
- <1406661128-7614-4-git-send-email-heiko@sntech.de>
-Message-ID: <CAD=FV=VWBh3STfZWLDuYerS9wiceQL=UEJyjqp0-GLh0=-hTdw@mail.gmail.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Mon, 11 Aug 2014 18:15:11 +0100
+Subject: [PATCH 2/2] asm-generic: add memfd_create system call to unistd.h
+In-Reply-To: <CANq1E4Q0gDaJ5XGnkoCQsG8xLh1Q-EBErtEVPpeeZgGj+Nr8dQ@mail.gmail.com>
+References: <1407764228-7904-1-git-send-email-will.deacon@arm.com>
+ <1407764228-7904-2-git-send-email-will.deacon@arm.com>
+ <CANq1E4Q0gDaJ5XGnkoCQsG8xLh1Q-EBErtEVPpeeZgGj+Nr8dQ@mail.gmail.com>
+Message-ID: <20140811171511.GF8828@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Heiko,
+On Mon, Aug 11, 2014 at 05:54:08PM +0100, David Herrmann wrote:
+> On Mon, Aug 11, 2014 at 3:37 PM, Will Deacon <will.deacon@arm.com> wrote:
+> > Commit 9183df25fe7b ("shm: add memfd_create() syscall") added a new
+> > system call (memfd_create) but didn't update the asm-generic unistd
+> > header.
+> >
+> > This patch adds the new system call to the asm-generic version of
+> > unistd.h so that it can be used by architectures such as arm64.
+> >
+> > Cc: Arnd Bergmann <arnd@arndb.de>
+> > Cc: David Herrmann <dh.herrmann@gmail.com>
+> > Signed-off-by: Will Deacon <will.deacon@arm.com>
+> 
+> Reviewed-by: David Herrmann <dh.herrmann@gmail.com>
 
-On Tue, Jul 29, 2014 at 12:12 PM, Heiko Stuebner <heiko@sntech.de> wrote:
-> Add both the bus and peripheral pl330 dma controllers present in rk3288 socs.
-> The first dma controller can change between secure and non-secure mode and is
-> left by the bootloader in secure mode, which gets added here.
->
-> Signed-off-by: Heiko Stuebner <heiko@sntech.de>
-> ---
->  arch/arm/boot/dts/rk3288.dtsi | 27 +++++++++++++++++++++++++++
->  1 file changed, 27 insertions(+)
+Thanks, David.
 
-This is outside of my area of expertise, but comparing this to
-bindings, TRM, and other platforms it looks reasonable to me.
+Arnd: shall I take this via the arm64 tree, or do you already have some
+asm-generic patches queued?
 
+Will
 
-> diff --git a/arch/arm/boot/dts/rk3288.dtsi b/arch/arm/boot/dts/rk3288.dtsi
-> index 3ef8951..3f39d26 100644
-> --- a/arch/arm/boot/dts/rk3288.dtsi
-> +++ b/arch/arm/boot/dts/rk3288.dtsi
-> @@ -62,6 +62,33 @@
->                 };
->         };
->
-> +       amba {
-> +               compatible = "arm,amba-bus";
-> +               #address-cells = <1>;
-> +               #size-cells = <1>;
-> +               ranges;
-> +
-> +               dmac1: dma at ffb20000 {
-
-I'm curious: why did you choose "dmac1" for the alias here?  I would
-have called it "dmac_peri", "pdma", or something similar as per the
-address map in the TRM.  I found a single reference in the TRM to
-"dmac2" but it wasn't immediately clear to me which DMA that was
-referring to.  In a commit in a temporary tree I see that someone at
-Rockchip called the DMA at ff250000 "pdma1".
-
-
-> +                       compatible = "arm,pl330", "arm,primecell";
-> +                       reg = <0xffb20000 0x4000>;
-> +                       interrupts = <GIC_SPI 0 IRQ_TYPE_LEVEL_HIGH>,
-> +                                    <GIC_SPI 1 IRQ_TYPE_LEVEL_HIGH>;
-> +                       #dma-cells = <1>;
-> +                       clocks = <&cru ACLK_DMAC1>;
-> +                       clock-names = "apb_pclk";
-> +               };
-> +
-> +               dmac2: dma at ff250000 {
-
-nit: when we have easy addresses to compare to, we should probably
-sort by address?
-
-
-> +                       compatible = "arm,pl330", "arm,primecell";
-> +                       reg = <0xff250000 0x4000>;
-> +                       interrupts = <GIC_SPI 2 IRQ_TYPE_LEVEL_HIGH>,
-> +                                    <GIC_SPI 3 IRQ_TYPE_LEVEL_HIGH>;
-> +                       #dma-cells = <1>;
-> +                       clocks = <&cru ACLK_DMAC2>;
-> +                       clock-names = "apb_pclk";
-> +               };
-> +       };
-> +
->         xin24m: oscillator {
->                 compatible = "fixed-clock";
->                 clock-frequency = <24000000>;
-> --
-> 2.0.1
->
+> > ---
+> >  include/uapi/asm-generic/unistd.h | 4 +++-
+> >  1 file changed, 3 insertions(+), 1 deletion(-)
+> >
+> > diff --git a/include/uapi/asm-generic/unistd.h b/include/uapi/asm-generic/unistd.h
+> > index f1afd607f043..11d11bc5c78f 100644
+> > --- a/include/uapi/asm-generic/unistd.h
+> > +++ b/include/uapi/asm-generic/unistd.h
+> > @@ -703,9 +703,11 @@ __SYSCALL(__NR_renameat2, sys_renameat2)
+> >  __SYSCALL(__NR_seccomp, sys_seccomp)
+> >  #define __NR_getrandom 278
+> >  __SYSCALL(__NR_getrandom, sys_getrandom)
+> > +#define __NR_memfd_create 279
+> > +__SYSCALL(__NR_memfd_create, sys_memfd_create)
+> >
+> >  #undef __NR_syscalls
+> > -#define __NR_syscalls 279
+> > +#define __NR_syscalls 280
+> >
+> >  /*
+> >   * All syscalls below here should go away really,
+> > --
+> > 2.0.1
+> >
+> 
