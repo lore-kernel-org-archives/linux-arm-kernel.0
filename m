@@ -1,55 +1,62 @@
-From: dyoung@redhat.com (Dave Young)
-Date: Mon, 11 Aug 2014 17:00:14 +0800
-Subject: [PATCH 1/2] UEFI arm64: add noefi boot param
-In-Reply-To: <20140807202620.GI15082@console-pimps.org>
-References: <20140806083825.GA31711@dhcp-16-198.nay.redhat.com>
- <20140806130623.GI4179@bivouac.eciton.net>
- <20140806132021.GB15082@console-pimps.org>
- <20140806132941.GJ4179@bivouac.eciton.net>
- <20140806140155.GC15082@console-pimps.org>
- <CAKv+Gu8ey1iKu-_wS6yYaEXQaQMDXa+PF5Kiw+edA9a_OE1EAw@mail.gmail.com>
- <20140806141814.GD15082@console-pimps.org>
- <20140807061945.GE20295@darkstar.nay.redhat.com>
- <20140807202620.GI15082@console-pimps.org>
-Message-ID: <20140811090013.GD1834@darkstar.nay.redhat.com>
+From: ulf.hansson@linaro.org (Ulf Hansson)
+Date: Mon, 11 Aug 2014 11:07:57 +0200
+Subject: [PATCH 3/5] mmc: sdhci-pltfm: Do not use parent as the host's
+ device
+In-Reply-To: <1407515785.31897.28.camel@hornet>
+References: <1406298233-27876-1-git-send-email-pawel.moll@arm.com>
+ <1406298233-27876-3-git-send-email-pawel.moll@arm.com>
+ <1407515785.31897.28.camel@hornet>
+Message-ID: <CAPDyKFoLU6pnJFmKe7CB0q-hKfwv4uCPSr0cE4aoYMvfhjMteQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08/07/14 at 09:26pm, Matt Fleming wrote:
-> On Thu, 07 Aug, at 02:19:45PM, Dave Young wrote:
-> > 
-> > The current efi_runtime_init() enables the bit after getting the efi
-> > callback phyaddr of SetVirtualAddressMap.
-> > 
-> > Thinking more about it, since SetVirtualAddressMap() could fail
-> > somehow it seems better to set EFI_RUNTIME_SERIVCES bit only when
-> > enter virtual mode return EFI_SUCCESS.
-> > 
-> > Does it make sense to you, Matt?
-> 
-> If you're going ahead with the scheme I proposed yesterday you'd
-> actually want to *clear* the EFI_RUNTIME_SERVICES bit if
-> SetVirtualAddressMap() fails, since we would have set it by default for
-> EFI_BOOT.
+On 8 August 2014 18:36, Pawel Moll <pawel.moll@arm.com> wrote:
+> On Fri, 2014-07-25 at 15:23 +0100, Pawel Moll wrote:
+>> The code selecting a device for the sdhci host has been
+>> continuously tweaked (4b711cb13843f5082e82970dd1e8031383134a65
+>> "mmc: sdhci-pltfm: Add structure for host-specific data" and
+>> a4d2177f00a5252d825236c5124bc1e9918bdb41 "mmc: sdhci-pltfm: dt
+>> device does not pass parent to sdhci_alloc_host") while there
+>> does not seem to be any reason to use platform device's parent
+>> in the first place.
+>>
+>> The comment saying "Some PCI-based MFD need the parent here"
+>> seem to refer to Timberdale FPGA driver (the only MFD driver
+>> registering SDHCI cell, drivers/mfd/timberdale.c) but again,
+>> the only situation when parent device matter is runtime PM,
+>> which is not implemented for Timberdale.
+>>
+>> Cc: Chris Ball <chris@printf.net>
+>> Cc: Anton Vorontsov <anton@enomsg.org>
+>> Cc: Ulf Hansson <ulf.hansson@linaro.org>
+>> Cc: linux-mmc at vger.kernel.org
+>> Cc: linuxppc-dev at lists.ozlabs.org
+>> Signed-off-by: Pawel Moll <pawel.moll@arm.com>
+>> ---
+>>
+>> This patch is a part of effort to remove references to platform_bus
+>> and make it static.
+>>
+>> Chris, Anton, Ulf - could you please advise if the assumptions
+>> above are correct or if I'm completely wrong? Do you know what
+>> where the real reasons to use parent originally? The PCI comment
+>> seems like a red herring to me...
+>
+> Can I take the silence as a suggestion that the change looks ok-ish for
+> you?
 
-There's one concern about the noefi early param handling in your proposal.
-Your patch depends on the parse_early_param() being called after setting
-EFI_RUNTIME_SERVICES bit. It's true in X86 setup.c, but it's not in arm64
-setup.c so I'm afraid there's other piece of code need early params and it
-will not work.
+Sorry for the delay. I suppose this make sense, but I really don't
+know for sure.
 
-How about using a variable like runtime_disabled, then add a global function
-efi_runtime_disabled() to get the status. 
+I guess we need some testing in linux-next, to get some confidence.
 
+Kind regards
+Uffe
 
-> 
-> However, I still think we want to panic() if SetVirtualAddressMap()
-> fails because we really never expect that function to return an error
-> under normal circumstances. Also, I'm not sure it's safe to make any
-> assumptions about the state of the system if SetVirtualAddressMap()
-> fails.
-
-Ok, so the panic is reasonable to me as well.
-
-Thanks
-Dave
+>
+> Pawe?
+>
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-mmc" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
