@@ -1,171 +1,46 @@
-From: javier.martinez@collabora.co.uk (Javier Martinez Canillas)
-Date: Mon, 11 Aug 2014 19:47:18 +0200
-Subject: [RESEND PATCH 2/2] ARM: dts: Add tps65090 FET constraints on
- Peach Pit and Pi
-In-Reply-To: <CAD=FV=XRmNkxXoxWaEfxFADrTgBrOPVX746woxiZoKck1ajwgA@mail.gmail.com>
-References: <1407757091-18730-1-git-send-email-javier.martinez@collabora.co.uk>	<1407757091-18730-2-git-send-email-javier.martinez@collabora.co.uk>
- <CAD=FV=XRmNkxXoxWaEfxFADrTgBrOPVX746woxiZoKck1ajwgA@mail.gmail.com>
-Message-ID: <53E901A6.2020902@collabora.co.uk>
+From: festevam@gmail.com (Fabio Estevam)
+Date: Mon, 11 Aug 2014 14:41:25 -0300
+Subject: Oops: 17 SMP ARM (v3.16-rc2)
+In-Reply-To: <C4A61A5CA4AD2246942F4BA6F20ACB8043576356@ALVA-EXMB04.alv.autoliv.int>
+References: <20140626151424.GT32514@n2100.arm.linux.org.uk>
+ <20140627112151.GF32514@n2100.arm.linux.org.uk>
+ <3FFB61A7A8473C49831AF20FA193534A43CADFA7@ALVA-EXMB01.alv.autoliv.int>
+ <20140627163108.GP32514@n2100.arm.linux.org.uk>
+ <C4A61A5CA4AD2246942F4BA6F20ACB8043575072@ALVA-EXMB04.alv.autoliv.int>
+ <20140806095012.GN30282@n2100.arm.linux.org.uk>
+ <C4A61A5CA4AD2246942F4BA6F20ACB8043575172@ALVA-EXMB04.alv.autoliv.int>
+ <20140806125550.GO30282@n2100.arm.linux.org.uk>
+ <C4A61A5CA4AD2246942F4BA6F20ACB804357526C@ALVA-EXMB04.alv.autoliv.int>
+ <20140807121248.GY30282@n2100.arm.linux.org.uk>
+ <20140808180900.GG30282@n2100.arm.linux.org.uk>
+ <C4A61A5CA4AD2246942F4BA6F20ACB8043576356@ALVA-EXMB04.alv.autoliv.int>
+Message-ID: <CAOMZO5B8GR+ABBoJ=dJcFqw3Wagfaip7HM+C1FTz+aE4CmqiPw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Doug,
-
-On 08/11/2014 05:57 PM, Doug Anderson wrote:
-> Javier,
-> 
-> On Mon, Aug 11, 2014 at 4:38 AM, Javier Martinez Canillas
-> <javier.martinez@collabora.co.uk> wrote:
->> Both Exynos5420 Peach Pit and Exynos5800 Peach Pi boards
->> have a tps65090 PMU that has a number of switches (FETs)
->> that are just on/off devices but they do have a current
->> limit and the output voltage of the switch is ramped up
->> within a controlled slope.
->>
->> After the switch is turned on, a safety timer is started
->> and before this timer times out the output voltage must
->> have reached the input voltage. Otherwise the switch is
->> turned off expecting an overload condition.
->>
->> So using the maximum output voltage slew rate and the timer
->> minimum and maximum timeouts, a voltage constraints can be
->> expressed as bounded limits for the timeout. That is what
->> is used in the board schematics and should be in the DT too.
-> 
-> I don't understand this, but if you and Mark are happy with it...
-> 
-> ...I'm also not 100% certain what the above description has to do with
-> this change, but I'll admit to having only skimmed some of the earlier
-> conversations.
+On Mon, Aug 11, 2014 at 10:32 AM, Mattis Lorentzon
+<Mattis.Lorentzon@autoliv.com> wrote:
+> Russell and Fabio,
 >
-
-As I stated before, I wrongly assumed from where the constraints in the
-schematics came from. From the latest doc I now know that there is a
-"recommended operating conditions table". I'll fix it in v2, sorry for the
-confusion...
-
-> 
->> Signed-off-by: Javier Martinez Canillas <javier.martinez@collabora.co.uk>
->> ---
->>  arch/arm/boot/dts/exynos5420-peach-pit.dts | 14 ++++++++++++++
->>  arch/arm/boot/dts/exynos5800-peach-pi.dts  | 14 ++++++++++++++
->>  2 files changed, 28 insertions(+)
+>> I'd be interested to hear whether removing the
 >>
->> diff --git a/arch/arm/boot/dts/exynos5420-peach-pit.dts b/arch/arm/boot/dts/exynos5420-peach-pit.dts
->> index d8710c1..eefafe6 100644
->> --- a/arch/arm/boot/dts/exynos5420-peach-pit.dts
->> +++ b/arch/arm/boot/dts/exynos5420-peach-pit.dts
->> @@ -386,27 +386,41 @@
->>                                         };
->>                                         tps65090_fet1: fet1 {
->>                                                 regulator-name = "vcd_led";
->> +                                               regulator-min-microvolt = <5000000>;
->> +                                               regulator-max-microvolt = <1700000>;
-> 
-> This is almost certainly wrong.  Your max is smaller than your min.
-> Perhaps you want an extra 0.
-> 
->>                                         };
->>                                         tps65090_fet2: fet2 {
->>                                                 regulator-name = "video_mid";
->> +                                               regulator-min-microvolt = <4500000>;
->> +                                               regulator-max-microvolt = <5500000>;
->>                                                 regulator-always-on;
->>                                         };
->>                                         tps65090_fet3: fet3 {
->>                                                 regulator-name = "wwan_r";
->> +                                               regulator-min-microvolt = <3000000>;
->> +                                               regulator-max-microvolt = <5500000>;
->>                                                 regulator-always-on;
->>                                         };
->>                                         tps65090_fet4: fet4 {
->>                                                 regulator-name = "sdcard";
->> +                                               regulator-min-microvolt = <3000000>;
->> +                                               regulator-max-microvolt = <5500000>;
->>                                                 regulator-always-on;
->>                                         };
->>                                         tps65090_fet5: fet5 {
->>                                                 regulator-name = "camout";
->> +                                               regulator-min-microvolt = <3000000>;
->> +                                               regulator-max-microvolt = <5500000>;
->>                                         };
->>                                         tps65090_fet6: fet6 {
->>                                                 regulator-name = "lcd_vdd";
->> +                                               regulator-min-microvolt = <3000000>;
->> +                                               regulator-max-microvolt = <5500000>;
->>                                         };
->>                                         tps65090_fet7: fet7 {
->>                                                 regulator-name = "video_mid_1a";
->> +                                               regulator-min-microvolt = <3000000>;
->> +                                               regulator-max-microvolt = <5500000>;
->>                                                 regulator-always-on;
->>                                         };
->>                                         tps65090_ldo1: ldo1 {
->> diff --git a/arch/arm/boot/dts/exynos5800-peach-pi.dts b/arch/arm/boot/dts/exynos5800-peach-pi.dts
->> index 07b29b7..5c38bc0 100644
->> --- a/arch/arm/boot/dts/exynos5800-peach-pi.dts
->> +++ b/arch/arm/boot/dts/exynos5800-peach-pi.dts
->> @@ -384,27 +384,41 @@
->>                                         };
->>                                         tps65090_fet1: fet1 {
->>                                                 regulator-name = "vcd_led";
->> +                                               regulator-min-microvolt = <5000000>;
->> +                                               regulator-max-microvolt = <1700000>;
-> 
-> Here, too.
-> 
->>                                         };
->>                                         tps65090_fet2: fet2 {
->>                                                 regulator-name = "video_mid";
->> +                                               regulator-min-microvolt = <4500000>;
->> +                                               regulator-max-microvolt = <5500000>;
->>                                                 regulator-always-on;
->>                                         };
->>                                         tps65090_fet3: fet3 {
->>                                                 regulator-name = "wwan_r";
->> +                                               regulator-min-microvolt = <3000000>;
->> +                                               regulator-max-microvolt = <5500000>;
->>                                                 regulator-always-on;
->>                                         };
->>                                         tps65090_fet4: fet4 {
->>                                                 regulator-name = "sdcard";
->> +                                               regulator-min-microvolt = <3000000>;
->> +                                               regulator-max-microvolt = <5500000>;
->>                                                 regulator-always-on;
->>                                         };
->>                                         tps65090_fet5: fet5 {
->>                                                 regulator-name = "camout";
->> +                                               regulator-min-microvolt = <3000000>;
->> +                                               regulator-max-microvolt = <5500000>;
->>                                         };
->>                                         tps65090_fet6: fet6 {
->>                                                 regulator-name = "lcd_vdd";
->> +                                               regulator-min-microvolt = <3000000>;
->> +                                               regulator-max-microvolt = <5500000>;
->>                                         };
->>                                         tps65090_fet7: fet7 {
->>                                                 regulator-name = "video_mid_1a";
->> +                                               regulator-min-microvolt = <3000000>;
->> +                                               regulator-max-microvolt = <5500000>;
->>                                                 regulator-always-on;
->>                                         };
->>                                         tps65090_ldo1: ldo1 {
-> 
-> Other than 1.7V vs. 17V, this matches what I see in the tps65090
-> specifications.  Technically I think that this should also be applied
-> to other tps65090 users in mainline since it's a property shared among
-> every user of tps65090.  That means exynos5250-snow and
-> tegra114-dalmore.  I'd be tempted to say that it belongs in source
-> code or in a dts fragment as well.
-> 
+>>       interrupts-extended = ...
+>>
+>> property from your board's DT file, thereby causing you to revert back to the
+>> default I list above, also fixes the instability you are seeing.
+>
+> We have tried to remove the board specific interrupts-extended field and the
+> MX6QDL_PAD_GPIO_6__ENET_IRQ entry. Sadly this did not seem to improve
+> the stalls. Our interrupts look like this now:
+>
+> 150:      15519          0          0          0       GIC 150  2188000.ethernet
+> 151:          0          0          0          0       GIC 151  2188000.ethernet
+>
+> Our device tree might still be slightly incorrect. We have noticed that our
+> RGMII_INT is connected to GPIO 19 (P5) which might be nonstandard (we are
+> a bit surprised that this works at all). We are not quite sure how to configure
+> this properly.
 
-Agreed, now is clear from the table that these are operating conditions related
-to the PMIC and is not a per board value. So since these are constants, they
-should be added to the driver source code and not in the DTS. I'll do this in v2
-as well.
-
-> -Doug
-> 
-
-Best regards,
-Javier
+In order to try to narrow down whether this is a board issue, could
+you try to run the same kernel on a mx6q development board, such as
+mx6qsabresd, cubox-i, wandboard, etc?
