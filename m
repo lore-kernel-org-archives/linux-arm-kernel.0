@@ -1,53 +1,41 @@
-From: Suravee.Suthikulpanit@amd.com (Suthikulpanit, Suravee)
-Date: Mon, 11 Aug 2014 13:30:50 +0000
-Subject: [PATCH 0/4] irqchip: gic-v2m: Rework GICv2m Initialization
-In-Reply-To: <53E87ADA.6040204@arm.com>
-References: <1407539836-9768-1-git-send-email-suravee.suthikulpanit@amd.com>
- <53E87ADA.6040204@arm.com>
-Message-ID: <02D2024799561B48A732D1A51CB969E836F74ABC@satlexdag05.amd.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Mon, 11 Aug 2014 14:30:55 +0100
+Subject: [PATCH 8/8] ARM: mm: allow text and rodata sections to be
+ read-only
+In-Reply-To: <1407423713-4160-9-git-send-email-keescook@chromium.org>
+References: <1407423713-4160-1-git-send-email-keescook@chromium.org>
+ <1407423713-4160-9-git-send-email-keescook@chromium.org>
+Message-ID: <20140811133055.GA15853@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Marc,
+On Thu, Aug 07, 2014 at 04:01:53PM +0100, Kees Cook wrote:
+> This introduces CONFIG_DEBUG_RODATA, making kernel text and rodata
+> read-only. Additionally, this splits rodata from text so that rodata can
+> also be NX, which may lead to wasted memory when aligning to SECTION_SIZE.
+> The read-only areas are made writable during ftrace updates and kexec.
 
-Jason already created a branch irqchip/gic-v2m, which I have created my patch against.  So, what branch do you want me to re-create a patch against for you to review?
+[...]
 
-Suravee
+> diff --git a/arch/arm/kernel/machine_kexec.c b/arch/arm/kernel/machine_kexec.c
+> index 1ac184f2bdd8..4423a565ef6f 100644
+> --- a/arch/arm/kernel/machine_kexec.c
+> +++ b/arch/arm/kernel/machine_kexec.c
+> @@ -164,11 +164,11 @@ void machine_kexec(struct kimage *image)
+>  	reboot_code_buffer = page_address(image->control_code_page);
+>  
+>  	/* Prepare parameters for reboot_code_buffer*/
+> +	set_kernel_text_rw();
+>  	kexec_start_address = image->start;
+>  	kexec_indirection_page = page_list;
+>  	kexec_mach_type = machine_arch_type;
+> -	kexec_boot_atags = dt_mem ?: image->start
+> -				     - KEXEC_ARM_ZIMAGE_OFFSET
+> +	kexec_boot_atags = dt_mem ?: image->start - KEXEC_ARM_ZIMAGE_OFFSET
+>  				     + KEXEC_ARM_ATAGS_OFFSET;
 
------Original Message-----
-From: Marc Zyngier [mailto:marc.zyngier at arm.com] 
-Sent: Monday, August 11, 2014 3:12 AM
-To: Suthikulpanit, Suravee
-Cc: Mark Rutland; jason at lakedaemon.net; Pawel Moll; Catalin Marinas; Will Deacon; tglx at linutronix.de; Kasiviswanathan, Harish; linux-arm-kernel at lists.infradead.org; linux-pci at vger.kernel.org; linux-kernel at vger.kernel.org; linux-doc at vger.kernel.org; devicetree at vger.kernel.org
-Subject: Re: [PATCH 0/4] irqchip: gic-v2m: Rework GICv2m Initialization
+Minor nit: but this patch and the kexec patch earlier in the series seem to
+move this line around in different ways without actually changing the code.
+I guess you just got a screwy rebase?
 
-Hi Suravee,
-
-On 09/08/14 00:17, suravee.suthikulpanit at amd.com wrote:
-> From: Suravee Suthikulpanit <Suravee.Suthikulpanit@amd.com>
-> 
-> This patch set reworks the GICv2m initialization based on Marc Zyngier 
-> review comments.
-> 
-> * Rebase to git://git.infradead.org/users/jcooper/linux.git 
-> irqchip/gic-v2m
-> 
-> Suravee Suthikulpanit (1):
->   irqchip/gic-v2m: Restructure the initalization code for v2m
-> 
->  Documentation/devicetree/bindings/arm/gic.txt |  37 +++++++--
->  drivers/irqchip/irq-gic-v2m.c                 | 115 +++++++++-----------------
->  drivers/irqchip/irq-gic.c                     |  30 +++----
->  drivers/irqchip/irq-gic.h                     |  10 +--
->  4 files changed, 91 insertions(+), 101 deletions(-)
-> 
-
-While I appreciate that you're trying to reduce the amount of stuff we review, it is actually much easier to look at the patch series as a whole, rather then as a diff against the previous version.
-
-Please squash this into your original series and repost it with a log of what has changed in the cover letter.
-
-Thanks,
-
-	M.
---
-Jazz is not dead. It just smells funny...
+Will
