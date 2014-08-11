@@ -1,58 +1,62 @@
-From: dianders@chromium.org (Doug Anderson)
-Date: Mon, 11 Aug 2014 08:13:45 -0700
-Subject: [RESEND PATCH 1/1] ARM: exynos_defconfig: Enable SBS battery
- support
-In-Reply-To: <1407755198-17568-1-git-send-email-javier.martinez@collabora.co.uk>
-References: <1407755198-17568-1-git-send-email-javier.martinez@collabora.co.uk>
-Message-ID: <CAD=FV=WD_-_SkixY0pZ7Auoe-kV3EkK6ksDnbe0ApT8-hfnHNw@mail.gmail.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Mon, 11 Aug 2014 16:15:02 +0100
+Subject: [PATCH] arm64: audit: Fix build for audit changes
+In-Reply-To: <20140811133338.GB15853@arm.com>
+References: <1405596402-23844-1-git-send-email-broonie@kernel.org>
+ <20140811090947.GC15344@arm.com>
+ <1407763344.2423.0.camel@redhat.com>
+ <20140811133338.GB15853@arm.com>
+Message-ID: <20140811151502.GS24268@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Javier,
+On Mon, Aug 11, 2014 at 02:33:38PM +0100, Will Deacon wrote:
+> On Mon, Aug 11, 2014 at 02:22:24PM +0100, Eric Paris wrote:
+> > On Mon, 2014-08-11 at 10:09 +0100, Will Deacon wrote:
+> > > On Thu, Jul 17, 2014 at 12:26:42PM +0100, Mark Brown wrote:
+> > > > From: Mark Brown <broonie@linaro.org>
+> > > > 
+> > > > Commit 3efe33f5d2 (audit: x86: drop arch from __audit_syscall_entry()
+> > > > interface) removed the arch parameter from __audit_syscall_entry() and
+> > > > updated the only current user in mainline but this breaks the ARMv8 audit
+> > > > code that has been added in -next. Fix this by making the equivalent
+> > > > update to ARMv8.
+> > > > 
+> > > > Signed-off-by: Mark Brown <broonie@linaro.org>
+> > > > ---
+> > > >  arch/arm64/kernel/ptrace.c | 4 ++--
+> > > >  1 file changed, 2 insertions(+), 2 deletions(-)
+> > > > 
+> > > > diff --git a/arch/arm64/kernel/ptrace.c b/arch/arm64/kernel/ptrace.c
+> > > > index 70526cfda056..310842e3d477 100644
+> > > > --- a/arch/arm64/kernel/ptrace.c
+> > > > +++ b/arch/arm64/kernel/ptrace.c
+> > > > @@ -1115,8 +1115,8 @@ asmlinkage int syscall_trace_enter(struct pt_regs *regs)
+> > > >  	if (test_thread_flag(TIF_SYSCALL_TRACEPOINT))
+> > > >  		trace_sys_enter(regs, regs->syscallno);
+> > > >  
+> > > > -	audit_syscall_entry(syscall_get_arch(), regs->syscallno,
+> > > > -		regs->orig_x0, regs->regs[1], regs->regs[2], regs->regs[3]);
+> > > > +	audit_syscall_entry(regs->syscallno, regs->orig_x0, regs->regs[1],
+> > > > +			    regs->regs[2], regs->regs[3]);
+> > > 
+> > > Eric, Richard: when is 3efe33f5d2 ("audit: x86: drop arch from
+> > > __audit_syscall_entry() interface") going to hit mainline? I've been holding
+> > > off this fix until the offending commit is merged, but if that's not going
+> > > to happen for 3.17, then we probably need to do something else to fix -next.
+> > 
+> > I think I'm being lazy this window and not oging to send a pull.  So
+> > I'll pick up this fix as soon as rc1 cuts in my tree.
+> 
+> Oh, alright then. If you're not going to send the code for mainline, you
+> could also just drop it from -next ;)
+> 
+> Anyway, if you do fix it, please let me know so that I can remove our #ifdef
+> CONFIG_AUDITSYSCALL guards (which only exist to stop build breakage in -next
+> with defconfig).
 
-On Mon, Aug 11, 2014 at 4:06 AM, Javier Martinez Canillas
-<javier.martinez@collabora.co.uk> wrote:
-> Many Exynos5 boards (e.g: Snow, Peach Pit and Pi) have
-> a SBS-compliant gas gauge battery. Enable it as module
-> so the needed support is available for these boards.
->
-> Suggested-by: Doug Anderson <dianders@chromium.org>
-> Signed-off-by: Javier Martinez Canillas <javier.martinez@collabora.co.uk>
-> Acked-by: Kukjin Kim <kgene.kim@samsung.com>
-> ---
->  arch/arm/configs/exynos_defconfig | 1 +
->  1 file changed, 1 insertion(+)
->
-> diff --git a/arch/arm/configs/exynos_defconfig b/arch/arm/configs/exynos_defconfig
-> index fc7d168..c390bb9 100644
-> --- a/arch/arm/configs/exynos_defconfig
-> +++ b/arch/arm/configs/exynos_defconfig
-> @@ -77,6 +77,7 @@ CONFIG_SPI_S3C64XX=y
->  CONFIG_I2C_S3C2410=y
->  CONFIG_DEBUG_GPIO=y
->  CONFIG_POWER_SUPPLY=y
-> +CONFIG_BATTERY_SBS=m
->  CONFIG_CHARGER_TPS65090=y
->  # CONFIG_HWMON is not set
->  CONFIG_THERMAL=y
+Actually, Eric could carry the arm64 change from Mark into -next as well
+and we can drop the arm64 #ifdef before the API change hits mainline.
 
-I'm good with this, so:
-
-Reviewed-by: Doug Anderson <dianders@chromium.org>
-
-To address Bartlomiej: =m is what's in ChromeOS for exynos, though I
-notice that other platforms in the ChromeOS tree have =y.  I'm not
-sure why there is a difference, but it's probably just carelessness.
-
-Normally in ChromeOS we use "=m" for drivers that can afford to wait
-until after the UI is up and running.  That helps improve boot time
-since the user can use the device sooner (and it's OK if the battery
-driver takes a few extra seconds to load).  The only things that
-really should be "=y" are drivers that are critical to load early or
-that are needed for the user to interact with the system.  In this
-case you could argue that loading sbs earlier means that if the system
-is low on battery it will get back to "shutdown" sooner.  I'm not sure
-getting the shutdown a few seconds earlier is really critical,
-though...
-
--Doug
+-- 
+Catalin
