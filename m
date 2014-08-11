@@ -1,75 +1,126 @@
 From: javier.martinez@collabora.co.uk (Javier Martinez Canillas)
-Date: Mon, 11 Aug 2014 13:38:10 +0200
-Subject: [RESEND PATCH 1/2] ARM: dts: Improve Peach Pit and Pi power scheme
-Message-ID: <1407757091-18730-1-git-send-email-javier.martinez@collabora.co.uk>
+Date: Mon, 11 Aug 2014 13:38:11 +0200
+Subject: [RESEND PATCH 2/2] ARM: dts: Add tps65090 FET constraints on Peach
+ Pit and Pi
+In-Reply-To: <1407757091-18730-1-git-send-email-javier.martinez@collabora.co.uk>
+References: <1407757091-18730-1-git-send-email-javier.martinez@collabora.co.uk>
+Message-ID: <1407757091-18730-2-git-send-email-javier.martinez@collabora.co.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The DeviceTree files for the Peach Pit and Pi machines have
-a simplistic model of the connections between the different
-regulators since not all the tps65090 regulators get their
-input supply voltage from the VDC. DCDC1-3, LD0-1 and fet7
-parent supply is indded VDC but the fet1-6 get their input
-supply from the DCDC1 and DCDC2 output voltage rails.
+Both Exynos5420 Peach Pit and Exynos5800 Peach Pi boards
+have a tps65090 PMU that has a number of switches (FETs)
+that are just on/off devices but they do have a current
+limit and the output voltage of the switch is ramped up
+within a controlled slope.
 
-Update the DeviceTree to better reflect the real connections
-between tps65090 regulators. Having this information in the
-DTS is useful since FETs are switches that don't provide an
-output voltage so the regulator core needs to fetch the FET
-parent output voltage if the child voltage is queried.
+After the switch is turned on, a safety timer is started
+and before this timer times out the output voltage must
+have reached the input voltage. Otherwise the switch is
+turned off expecting an overload condition.
+
+So using the maximum output voltage slew rate and the timer
+minimum and maximum timeouts, a voltage constraints can be
+expressed as bounded limits for the timeout. That is what
+is used in the board schematics and should be in the DT too.
 
 Signed-off-by: Javier Martinez Canillas <javier.martinez@collabora.co.uk>
-Acked-by: Mark Brown <broonie@linaro.org>
 ---
- arch/arm/boot/dts/exynos5420-peach-pit.dts | 12 ++++++------
- arch/arm/boot/dts/exynos5800-peach-pi.dts  | 12 ++++++------
- 2 files changed, 12 insertions(+), 12 deletions(-)
+ arch/arm/boot/dts/exynos5420-peach-pit.dts | 14 ++++++++++++++
+ arch/arm/boot/dts/exynos5800-peach-pi.dts  | 14 ++++++++++++++
+ 2 files changed, 28 insertions(+)
 
 diff --git a/arch/arm/boot/dts/exynos5420-peach-pit.dts b/arch/arm/boot/dts/exynos5420-peach-pit.dts
-index 228a6b1..d8710c1 100644
+index d8710c1..eefafe6 100644
 --- a/arch/arm/boot/dts/exynos5420-peach-pit.dts
 +++ b/arch/arm/boot/dts/exynos5420-peach-pit.dts
-@@ -365,12 +365,12 @@
- 				vsys2-supply = <&vbat>;
- 				vsys3-supply = <&vbat>;
- 				infet1-supply = <&vbat>;
--				infet2-supply = <&vbat>;
--				infet3-supply = <&vbat>;
--				infet4-supply = <&vbat>;
--				infet5-supply = <&vbat>;
--				infet6-supply = <&vbat>;
--				infet7-supply = <&vbat>;
-+				infet2-supply = <&tps65090_dcdc1>;
-+				infet3-supply = <&tps65090_dcdc2>;
-+				infet4-supply = <&tps65090_dcdc2>;
-+				infet5-supply = <&tps65090_dcdc2>;
-+				infet6-supply = <&tps65090_dcdc2>;
-+				infet7-supply = <&tps65090_dcdc1>;
- 				vsys-l1-supply = <&vbat>;
- 				vsys-l2-supply = <&vbat>;
- 
+@@ -386,27 +386,41 @@
+ 					};
+ 					tps65090_fet1: fet1 {
+ 						regulator-name = "vcd_led";
++						regulator-min-microvolt = <5000000>;
++						regulator-max-microvolt = <1700000>;
+ 					};
+ 					tps65090_fet2: fet2 {
+ 						regulator-name = "video_mid";
++						regulator-min-microvolt = <4500000>;
++						regulator-max-microvolt = <5500000>;
+ 						regulator-always-on;
+ 					};
+ 					tps65090_fet3: fet3 {
+ 						regulator-name = "wwan_r";
++						regulator-min-microvolt = <3000000>;
++						regulator-max-microvolt = <5500000>;
+ 						regulator-always-on;
+ 					};
+ 					tps65090_fet4: fet4 {
+ 						regulator-name = "sdcard";
++						regulator-min-microvolt = <3000000>;
++						regulator-max-microvolt = <5500000>;
+ 						regulator-always-on;
+ 					};
+ 					tps65090_fet5: fet5 {
+ 						regulator-name = "camout";
++						regulator-min-microvolt = <3000000>;
++						regulator-max-microvolt = <5500000>;
+ 					};
+ 					tps65090_fet6: fet6 {
+ 						regulator-name = "lcd_vdd";
++						regulator-min-microvolt = <3000000>;
++						regulator-max-microvolt = <5500000>;
+ 					};
+ 					tps65090_fet7: fet7 {
+ 						regulator-name = "video_mid_1a";
++						regulator-min-microvolt = <3000000>;
++						regulator-max-microvolt = <5500000>;
+ 						regulator-always-on;
+ 					};
+ 					tps65090_ldo1: ldo1 {
 diff --git a/arch/arm/boot/dts/exynos5800-peach-pi.dts b/arch/arm/boot/dts/exynos5800-peach-pi.dts
-index f3ee48b..07b29b7 100644
+index 07b29b7..5c38bc0 100644
 --- a/arch/arm/boot/dts/exynos5800-peach-pi.dts
 +++ b/arch/arm/boot/dts/exynos5800-peach-pi.dts
-@@ -363,12 +363,12 @@
- 				vsys2-supply = <&vbat>;
- 				vsys3-supply = <&vbat>;
- 				infet1-supply = <&vbat>;
--				infet2-supply = <&vbat>;
--				infet3-supply = <&vbat>;
--				infet4-supply = <&vbat>;
--				infet5-supply = <&vbat>;
--				infet6-supply = <&vbat>;
--				infet7-supply = <&vbat>;
-+				infet2-supply = <&tps65090_dcdc1>;
-+				infet3-supply = <&tps65090_dcdc2>;
-+				infet4-supply = <&tps65090_dcdc2>;
-+				infet5-supply = <&tps65090_dcdc2>;
-+				infet6-supply = <&tps65090_dcdc2>;
-+				infet7-supply = <&tps65090_dcdc1>;
- 				vsys-l1-supply = <&vbat>;
- 				vsys-l2-supply = <&vbat>;
- 
+@@ -384,27 +384,41 @@
+ 					};
+ 					tps65090_fet1: fet1 {
+ 						regulator-name = "vcd_led";
++						regulator-min-microvolt = <5000000>;
++						regulator-max-microvolt = <1700000>;
+ 					};
+ 					tps65090_fet2: fet2 {
+ 						regulator-name = "video_mid";
++						regulator-min-microvolt = <4500000>;
++						regulator-max-microvolt = <5500000>;
+ 						regulator-always-on;
+ 					};
+ 					tps65090_fet3: fet3 {
+ 						regulator-name = "wwan_r";
++						regulator-min-microvolt = <3000000>;
++						regulator-max-microvolt = <5500000>;
+ 						regulator-always-on;
+ 					};
+ 					tps65090_fet4: fet4 {
+ 						regulator-name = "sdcard";
++						regulator-min-microvolt = <3000000>;
++						regulator-max-microvolt = <5500000>;
+ 						regulator-always-on;
+ 					};
+ 					tps65090_fet5: fet5 {
+ 						regulator-name = "camout";
++						regulator-min-microvolt = <3000000>;
++						regulator-max-microvolt = <5500000>;
+ 					};
+ 					tps65090_fet6: fet6 {
+ 						regulator-name = "lcd_vdd";
++						regulator-min-microvolt = <3000000>;
++						regulator-max-microvolt = <5500000>;
+ 					};
+ 					tps65090_fet7: fet7 {
+ 						regulator-name = "video_mid_1a";
++						regulator-min-microvolt = <3000000>;
++						regulator-max-microvolt = <5500000>;
+ 						regulator-always-on;
+ 					};
+ 					tps65090_ldo1: ldo1 {
 -- 
 2.0.0.rc2
