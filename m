@@ -1,37 +1,32 @@
-From: dianders@chromium.org (Doug Anderson)
-Date: Mon, 11 Aug 2014 08:46:42 -0700
-Subject: [RESEND PATCH 1/2] ARM: dts: Improve Peach Pit and Pi power scheme
-In-Reply-To: <1407757091-18730-1-git-send-email-javier.martinez@collabora.co.uk>
-References: <1407757091-18730-1-git-send-email-javier.martinez@collabora.co.uk>
-Message-ID: <CAD=FV=UbckfwGucuPjEtHixVgF5K2fD5N3EPS2BH96DRDACuqw@mail.gmail.com>
+From: grant.b.edwards@gmail.com (Grant Edwards)
+Date: Mon, 11 Aug 2014 15:47:29 +0000 (UTC)
+Subject: Building kernel for more than one SoC
+References: <lrdi48$ls1$1@ger.gmane.org>
+ <20140804201712.GK30282@n2100.arm.linux.org.uk>
+ <53E8E469.9050807@atmel.com>
+Message-ID: <lsaoih$e9$1@ger.gmane.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Javier,
+On 2014-08-11, Nicolas Ferre <nicolas.ferre@atmel.com> wrote:
+> On 04/08/2014 22:17, Russell King - ARM Linux :
 
-On Mon, Aug 11, 2014 at 4:38 AM, Javier Martinez Canillas
-<javier.martinez@collabora.co.uk> wrote:
-> The DeviceTree files for the Peach Pit and Pi machines have
-> a simplistic model of the connections between the different
-> regulators since not all the tps65090 regulators get their
-> input supply voltage from the VDC. DCDC1-3, LD0-1 and fet7
-> parent supply is indded VDC but the fet1-6 get their input
-> supply from the DCDC1 and DCDC2 output voltage rails.
+[...]
+
+>> Even better is to abstract the differences and have the same driver
+>> code deal with the different variants internally - the selection of
+>> which variant being controlled via the device tree "compatible"
+>> property, or another appropriate method.
 >
-> Update the DeviceTree to better reflect the real connections
-> between tps65090 regulators. Having this information in the
-> DTS is useful since FETs are switches that don't provide an
-> output voltage so the regulator core needs to fetch the FET
-> parent output voltage if the child voltage is queried.
->
-> Signed-off-by: Javier Martinez Canillas <javier.martinez@collabora.co.uk>
-> Acked-by: Mark Brown <broonie@linaro.org>
-> ---
->  arch/arm/boot/dts/exynos5420-peach-pit.dts | 12 ++++++------
->  arch/arm/boot/dts/exynos5800-peach-pi.dts  | 12 ++++++------
->  2 files changed, 12 insertions(+), 12 deletions(-)
+> Sure. Everything in at91 is converted to device tree those days.
 
-Matches my schematics.  Kukjin: I think this could be applied to
-for-next whenever it's convenient.
+That's good to hear, thanks.
 
-Acked-by: Doug Anderson <dianders@chromium.org>
+Now it's up to somebody else to decide if the price difference between
+a G20 and G25 is worth the engineering time to upgrade U-Boot and
+Linux kernel to versions that know about device trees...
+
+-- 
+Grant Edwards               grant.b.edwards        Yow! I smell a RANCID
+                                  at               CORN DOG!
+                              gmail.com            
