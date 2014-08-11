@@ -1,42 +1,60 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Mon, 11 Aug 2014 10:09:47 +0100
-Subject: [PATCH] arm64: audit: Fix build for audit changes
-In-Reply-To: <1405596402-23844-1-git-send-email-broonie@kernel.org>
-References: <1405596402-23844-1-git-send-email-broonie@kernel.org>
-Message-ID: <20140811090947.GC15344@arm.com>
+From: pawel.moll@arm.com (Pawel Moll)
+Date: Mon, 11 Aug 2014 10:15:50 +0100
+Subject: [PATCH 3/5] mmc: sdhci-pltfm: Do not use parent as the host's
+ device
+In-Reply-To: <CAPDyKFoLU6pnJFmKe7CB0q-hKfwv4uCPSr0cE4aoYMvfhjMteQ@mail.gmail.com>
+References: <1406298233-27876-1-git-send-email-pawel.moll@arm.com>
+ <1406298233-27876-3-git-send-email-pawel.moll@arm.com>
+ <1407515785.31897.28.camel@hornet>
+ <CAPDyKFoLU6pnJFmKe7CB0q-hKfwv4uCPSr0cE4aoYMvfhjMteQ@mail.gmail.com>
+Message-ID: <1407748550.3680.10.camel@hornet>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jul 17, 2014 at 12:26:42PM +0100, Mark Brown wrote:
-> From: Mark Brown <broonie@linaro.org>
+On Mon, 2014-08-11 at 10:07 +0100, Ulf Hansson wrote:
+> On 8 August 2014 18:36, Pawel Moll <pawel.moll@arm.com> wrote:
+> > On Fri, 2014-07-25 at 15:23 +0100, Pawel Moll wrote:
+> >> The code selecting a device for the sdhci host has been
+> >> continuously tweaked (4b711cb13843f5082e82970dd1e8031383134a65
+> >> "mmc: sdhci-pltfm: Add structure for host-specific data" and
+> >> a4d2177f00a5252d825236c5124bc1e9918bdb41 "mmc: sdhci-pltfm: dt
+> >> device does not pass parent to sdhci_alloc_host") while there
+> >> does not seem to be any reason to use platform device's parent
+> >> in the first place.
+> >>
+> >> The comment saying "Some PCI-based MFD need the parent here"
+> >> seem to refer to Timberdale FPGA driver (the only MFD driver
+> >> registering SDHCI cell, drivers/mfd/timberdale.c) but again,
+> >> the only situation when parent device matter is runtime PM,
+> >> which is not implemented for Timberdale.
+> >>
+> >> Cc: Chris Ball <chris@printf.net>
+> >> Cc: Anton Vorontsov <anton@enomsg.org>
+> >> Cc: Ulf Hansson <ulf.hansson@linaro.org>
+> >> Cc: linux-mmc at vger.kernel.org
+> >> Cc: linuxppc-dev at lists.ozlabs.org
+> >> Signed-off-by: Pawel Moll <pawel.moll@arm.com>
+> >> ---
+> >>
+> >> This patch is a part of effort to remove references to platform_bus
+> >> and make it static.
+> >>
+> >> Chris, Anton, Ulf - could you please advise if the assumptions
+> >> above are correct or if I'm completely wrong? Do you know what
+> >> where the real reasons to use parent originally? The PCI comment
+> >> seems like a red herring to me...
+> >
+> > Can I take the silence as a suggestion that the change looks ok-ish for
+> > you?
 > 
-> Commit 3efe33f5d2 (audit: x86: drop arch from __audit_syscall_entry()
-> interface) removed the arch parameter from __audit_syscall_entry() and
-> updated the only current user in mainline but this breaks the ARMv8 audit
-> code that has been added in -next. Fix this by making the equivalent
-> update to ARMv8.
+> Sorry for the delay. I suppose this make sense, but I really don't
+> know for sure.
 > 
-> Signed-off-by: Mark Brown <broonie@linaro.org>
-> ---
->  arch/arm64/kernel/ptrace.c | 4 ++--
->  1 file changed, 2 insertions(+), 2 deletions(-)
-> 
-> diff --git a/arch/arm64/kernel/ptrace.c b/arch/arm64/kernel/ptrace.c
-> index 70526cfda056..310842e3d477 100644
-> --- a/arch/arm64/kernel/ptrace.c
-> +++ b/arch/arm64/kernel/ptrace.c
-> @@ -1115,8 +1115,8 @@ asmlinkage int syscall_trace_enter(struct pt_regs *regs)
->  	if (test_thread_flag(TIF_SYSCALL_TRACEPOINT))
->  		trace_sys_enter(regs, regs->syscallno);
->  
-> -	audit_syscall_entry(syscall_get_arch(), regs->syscallno,
-> -		regs->orig_x0, regs->regs[1], regs->regs[2], regs->regs[3]);
-> +	audit_syscall_entry(regs->syscallno, regs->orig_x0, regs->regs[1],
-> +			    regs->regs[2], regs->regs[3]);
+> I guess we need some testing in linux-next, to get some confidence.
 
-Eric, Richard: when is 3efe33f5d2 ("audit: x86: drop arch from
-__audit_syscall_entry() interface") going to hit mainline? I've been holding
-off this fix until the offending commit is merged, but if that's not going
-to happen for 3.17, then we probably need to do something else to fix -next.
+Would you take it into -next then? Unless I'm completely wrong there
+should be no impact on any in-tree driver...
 
-Will
+Cheers!
+
+Pawel
