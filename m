@@ -1,126 +1,66 @@
-From: javier.martinez@collabora.co.uk (Javier Martinez Canillas)
-Date: Mon, 11 Aug 2014 13:38:11 +0200
-Subject: [RESEND PATCH 2/2] ARM: dts: Add tps65090 FET constraints on Peach
- Pit and Pi
-In-Reply-To: <1407757091-18730-1-git-send-email-javier.martinez@collabora.co.uk>
-References: <1407757091-18730-1-git-send-email-javier.martinez@collabora.co.uk>
-Message-ID: <1407757091-18730-2-git-send-email-javier.martinez@collabora.co.uk>
+From: ezequiel.garcia@free-electrons.com (Ezequiel Garcia)
+Date: Mon, 11 Aug 2014 08:38:56 -0300
+Subject: [PATCH 1/6] ARM: mvebu: Add required ethernet muxing for the
+ Armada 370 SoC
+In-Reply-To: <53E762A0.5070900@gmail.com>
+References: <1407511136-26477-1-git-send-email-ezequiel.garcia@free-electrons.com>
+ <1407511136-26477-2-git-send-email-ezequiel.garcia@free-electrons.com>
+ <53E762A0.5070900@gmail.com>
+Message-ID: <20140811113856.GA1665@arch.cereza>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Both Exynos5420 Peach Pit and Exynos5800 Peach Pi boards
-have a tps65090 PMU that has a number of switches (FETs)
-that are just on/off devices but they do have a current
-limit and the output voltage of the switch is ramped up
-within a controlled slope.
+On 10 Aug 02:16 PM, Sebastian Hesselbarth wrote:
+> On 08/08/2014 05:18 PM, Ezequiel Garcia wrote:
+> > This commit adds the required pin muxing for the two network interfaces
+> > and the MDIO interface, to the Armada 370 SoC.
+> > 
+> > Signed-off-by: Ezequiel Garcia <ezequiel.garcia@free-electrons.com>
+> > ---
+> >  arch/arm/boot/dts/armada-370.dtsi | 19 +++++++++++++++++++
+> >  1 file changed, 19 insertions(+)
+> > 
+> > diff --git a/arch/arm/boot/dts/armada-370.dtsi b/arch/arm/boot/dts/armada-370.dtsi
+> > index 21b588b..b0700bf6 100644
+> > --- a/arch/arm/boot/dts/armada-370.dtsi
+> > +++ b/arch/arm/boot/dts/armada-370.dtsi
+> > @@ -151,6 +151,25 @@
+> >  						       "mpp62", "mpp60", "mpp58";
+> >  					marvell,function = "audio";
+> >  				};
+> > +
+> > +				mdio_pins: mdio_pins {
+> 
+> Ezequiel,
+> 
+> please keep me posted next time ;)
+> 
 
-After the switch is turned on, a safety timer is started
-and before this timer times out the output voltage must
-have reached the input voltage. Otherwise the switch is
-turned off expecting an overload condition.
+Ouch...
 
-So using the maximum output voltage slew rate and the timer
-minimum and maximum timeouts, a voltage constraints can be
-expressed as bounded limits for the timeout. That is what
-is used in the board schematics and should be in the DT too.
+> Above should be: mdio_pins: mdio-pins {
+> same for the ones below.
+> 
 
-Signed-off-by: Javier Martinez Canillas <javier.martinez@collabora.co.uk>
----
- arch/arm/boot/dts/exynos5420-peach-pit.dts | 14 ++++++++++++++
- arch/arm/boot/dts/exynos5800-peach-pi.dts  | 14 ++++++++++++++
- 2 files changed, 28 insertions(+)
+OK.
 
-diff --git a/arch/arm/boot/dts/exynos5420-peach-pit.dts b/arch/arm/boot/dts/exynos5420-peach-pit.dts
-index d8710c1..eefafe6 100644
---- a/arch/arm/boot/dts/exynos5420-peach-pit.dts
-+++ b/arch/arm/boot/dts/exynos5420-peach-pit.dts
-@@ -386,27 +386,41 @@
- 					};
- 					tps65090_fet1: fet1 {
- 						regulator-name = "vcd_led";
-+						regulator-min-microvolt = <5000000>;
-+						regulator-max-microvolt = <1700000>;
- 					};
- 					tps65090_fet2: fet2 {
- 						regulator-name = "video_mid";
-+						regulator-min-microvolt = <4500000>;
-+						regulator-max-microvolt = <5500000>;
- 						regulator-always-on;
- 					};
- 					tps65090_fet3: fet3 {
- 						regulator-name = "wwan_r";
-+						regulator-min-microvolt = <3000000>;
-+						regulator-max-microvolt = <5500000>;
- 						regulator-always-on;
- 					};
- 					tps65090_fet4: fet4 {
- 						regulator-name = "sdcard";
-+						regulator-min-microvolt = <3000000>;
-+						regulator-max-microvolt = <5500000>;
- 						regulator-always-on;
- 					};
- 					tps65090_fet5: fet5 {
- 						regulator-name = "camout";
-+						regulator-min-microvolt = <3000000>;
-+						regulator-max-microvolt = <5500000>;
- 					};
- 					tps65090_fet6: fet6 {
- 						regulator-name = "lcd_vdd";
-+						regulator-min-microvolt = <3000000>;
-+						regulator-max-microvolt = <5500000>;
- 					};
- 					tps65090_fet7: fet7 {
- 						regulator-name = "video_mid_1a";
-+						regulator-min-microvolt = <3000000>;
-+						regulator-max-microvolt = <5500000>;
- 						regulator-always-on;
- 					};
- 					tps65090_ldo1: ldo1 {
-diff --git a/arch/arm/boot/dts/exynos5800-peach-pi.dts b/arch/arm/boot/dts/exynos5800-peach-pi.dts
-index 07b29b7..5c38bc0 100644
---- a/arch/arm/boot/dts/exynos5800-peach-pi.dts
-+++ b/arch/arm/boot/dts/exynos5800-peach-pi.dts
-@@ -384,27 +384,41 @@
- 					};
- 					tps65090_fet1: fet1 {
- 						regulator-name = "vcd_led";
-+						regulator-min-microvolt = <5000000>;
-+						regulator-max-microvolt = <1700000>;
- 					};
- 					tps65090_fet2: fet2 {
- 						regulator-name = "video_mid";
-+						regulator-min-microvolt = <4500000>;
-+						regulator-max-microvolt = <5500000>;
- 						regulator-always-on;
- 					};
- 					tps65090_fet3: fet3 {
- 						regulator-name = "wwan_r";
-+						regulator-min-microvolt = <3000000>;
-+						regulator-max-microvolt = <5500000>;
- 						regulator-always-on;
- 					};
- 					tps65090_fet4: fet4 {
- 						regulator-name = "sdcard";
-+						regulator-min-microvolt = <3000000>;
-+						regulator-max-microvolt = <5500000>;
- 						regulator-always-on;
- 					};
- 					tps65090_fet5: fet5 {
- 						regulator-name = "camout";
-+						regulator-min-microvolt = <3000000>;
-+						regulator-max-microvolt = <5500000>;
- 					};
- 					tps65090_fet6: fet6 {
- 						regulator-name = "lcd_vdd";
-+						regulator-min-microvolt = <3000000>;
-+						regulator-max-microvolt = <5500000>;
- 					};
- 					tps65090_fet7: fet7 {
- 						regulator-name = "video_mid_1a";
-+						regulator-min-microvolt = <3000000>;
-+						regulator-max-microvolt = <5500000>;
- 						regulator-always-on;
- 					};
- 					tps65090_ldo1: ldo1 {
+> > +					marvell,pins = "mpp17", "mpp18";
+> > +					marvell,function = "ge";
+> 
+> As we haven't used it before, we could still rename "ge" function to
+> more approprate "mdio"... but it is ok.
+>
+
+FWIW, I'd rather leave it as it is. If we change the function name, we would
+make backporting a PITA, just because of a nitpick.
+ 
+> Besides the comments,
+> 
+> Acked-by: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
+>
+
+Thanks,
 -- 
-2.0.0.rc2
+Ezequiel Garc?a, Free Electrons
+Embedded Linux, Kernel and Android Engineering
+http://free-electrons.com
