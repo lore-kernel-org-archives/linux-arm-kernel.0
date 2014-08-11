@@ -1,21 +1,102 @@
-From: dianders@chromium.org (Doug Anderson)
-Date: Mon, 11 Aug 2014 09:19:18 -0700
-Subject: [PATCH 2/4] ARM: rockchip: enable the AMBA bus
-In-Reply-To: <1406661128-7614-3-git-send-email-heiko@sntech.de>
-References: <1406661128-7614-1-git-send-email-heiko@sntech.de>
- <1406661128-7614-3-git-send-email-heiko@sntech.de>
-Message-ID: <CAD=FV=V2qAd0MAAZubr-rUgA+DDLk-G0RLOvvME2=ym4vO-2-Q@mail.gmail.com>
+From: javier.martinez@collabora.co.uk (Javier Martinez Canillas)
+Date: Mon, 11 Aug 2014 18:23:01 +0200
+Subject: [RESEND PATCH 1/1] ARM: exynos_defconfig: Enable SBS battery
+ support
+In-Reply-To: <CAD=FV=XfvzKJO-enwH95hi_mGT6AhXq-R9WHjvhRrDdNtdmazA@mail.gmail.com>
+References: <1407755198-17568-1-git-send-email-javier.martinez@collabora.co.uk>	<1761549.yKSqfXafKr@amdc1032>	<53E8BC8B.70709@collabora.co.uk>	<35198339.PY7xVRQz0X@amdc1032>
+ <CAD=FV=XfvzKJO-enwH95hi_mGT6AhXq-R9WHjvhRrDdNtdmazA@mail.gmail.com>
+Message-ID: <53E8EDE5.4000807@collabora.co.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Heiko,
+Hello,
 
-On Tue, Jul 29, 2014 at 12:12 PM, Heiko Stuebner <heiko@sntech.de> wrote:
-> This is needed to access the pl330 dma controllers on Rockchip SoCs.
+On 08/11/2014 05:59 PM, Doug Anderson wrote:
+> Bartlomiej,
+> 
+> On Mon, Aug 11, 2014 at 8:42 AM, Bartlomiej Zolnierkiewicz
+> <b.zolnierkie@samsung.com> wrote:
+>>
+>> Hi,
+>>
+>> On Monday, August 11, 2014 02:52:27 PM Javier Martinez Canillas wrote:
+>>> Hello Bartlomiej,
+>>>
+>>> On 08/11/2014 02:40 PM, Bartlomiej Zolnierkiewicz wrote:
+>>> >> index fc7d168..c390bb9 100644
+>>> >> --- a/arch/arm/configs/exynos_defconfig
+>>> >> +++ b/arch/arm/configs/exynos_defconfig
+>>> >> @@ -77,6 +77,7 @@ CONFIG_SPI_S3C64XX=y
+>>> >>  CONFIG_I2C_S3C2410=y
+>>> >>  CONFIG_DEBUG_GPIO=y
+>>> >>  CONFIG_POWER_SUPPLY=y
+>>> >> +CONFIG_BATTERY_SBS=m
+>>> >
+>>> > Why not make it "=y"?
+>>> >
+>>> > Rationale:
+>>> > - currently no hardware related option uses "=m" in exynos_defconfig
+>>> > - it would match the SBS option usage in multi_v7_defconfig
+>>> >
+>>> >>  CONFIG_CHARGER_TPS65090=y
+>>> >>  # CONFIG_HWMON is not set
+>>> >>  CONFIG_THERMAL=y
+>>> >
+>>>
+>>> I know but personally I think this should be changed. The idea of having a multi
+>>> platform kernel is to build a single kernel image that can be used to boot
+>>> different platforms. Not all platforms have a SBS-compliant battery so this
+>>> support shouldn't be built in the kernel image IMHO.
+>>>
+>>> This also matches to what real users will do since distributions most likely
+>>> will have a minimal kernel and every possible hardware support will be enabled
+>>> as a loadable kernel module. This is what distros do for other platforms too.
+>>>
+>>> If someone has a different use case and wants a kernel image that is optimized
+>>> for a particular platform then she has to create its own defconfig anyways.
+>>
+>> Distributions usually use their own configs anyway and the current most
+>> popular use case for exynos_defconfig (not multi_v7_defconfig) seems to
+>> be to build kernel image alone and use it without any modules:
+>>
+>> $ grep "=m" arch/arm/configs/exynos_defconfig
+>> CONFIG_DM_CRYPT=m
+>>
+>> $ grep "=m" .config
+>> CONFIG_NET_IP_TUNNEL=m
+>> CONFIG_INET_TUNNEL=m
+>> CONFIG_IPV6=m
+>> CONFIG_INET6_XFRM_MODE_TRANSPORT=m
+>> CONFIG_INET6_XFRM_MODE_TUNNEL=m
+>> CONFIG_INET6_XFRM_MODE_BEET=m
+>> CONFIG_IPV6_SIT=m
+>> CONFIG_DM_CRYPT=m
+>> CONFIG_CRYPTO_RNG=m
+>> CONFIG_CRYPTO_ANSI_CPRNG=m
+>>
+>> What I'm trying to say is that there is a high probability that people
+>> will continue to use just the kernel image for exynos_defconfig and
+>> will therefore miss SBS battery support altogether (which is only 3.6
+>> kB of code more in the kernel image so there is no much gain in making
+>> it modular currently).
+> 
+> I'm not against making it =y for exynos_defconfig.  I do pretty
+> strongly agree that the multi_v7 version should be =m eventually,
+> though.  We'd need to do everything we can to make that kernel
+> smaller.
 >
-> Signed-off-by: Heiko Stuebner <heiko@sntech.de>
-> ---
->  arch/arm/mach-rockchip/Kconfig | 1 +
->  1 file changed, 1 insertion(+)
 
-Reviewed-by: Doug Anderson <dianders@chromium.org>
+Same for me. I don't have such a strong opinion about this so if you think that
+I should re-spin to change to =m, I will.
+
+I do think that we should try to keep the delta between exynos_defconfig and
+multi_v7_defconfig as small as possible and eventually even get rid of
+exynos_defconfig. Since building everything as built-in and having a config
+targeted to a single platform is not aligned with the effort to have support for
+multi platforms kernels.
+
+> -Doug
+> 
+
+Best regards,
+Javier
