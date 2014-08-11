@@ -1,86 +1,41 @@
-From: dianders@chromium.org (Doug Anderson)
-Date: Mon, 11 Aug 2014 08:59:24 -0700
-Subject: [RESEND PATCH 1/1] ARM: exynos_defconfig: Enable SBS battery
- support
-In-Reply-To: <35198339.PY7xVRQz0X@amdc1032>
-References: <1407755198-17568-1-git-send-email-javier.martinez@collabora.co.uk>
- <1761549.yKSqfXafKr@amdc1032> <53E8BC8B.70709@collabora.co.uk>
- <35198339.PY7xVRQz0X@amdc1032>
-Message-ID: <CAD=FV=XfvzKJO-enwH95hi_mGT6AhXq-R9WHjvhRrDdNtdmazA@mail.gmail.com>
+From: broonie@kernel.org (Mark Brown)
+Date: Mon, 11 Aug 2014 17:02:22 +0100
+Subject: [RESEND PATCH 2/2] ARM: dts: Add tps65090 FET constraints on
+ Peach Pit and Pi
+In-Reply-To: <CAD=FV=XRmNkxXoxWaEfxFADrTgBrOPVX746woxiZoKck1ajwgA@mail.gmail.com>
+References: <1407757091-18730-1-git-send-email-javier.martinez@collabora.co.uk>
+ <1407757091-18730-2-git-send-email-javier.martinez@collabora.co.uk>
+ <CAD=FV=XRmNkxXoxWaEfxFADrTgBrOPVX746woxiZoKck1ajwgA@mail.gmail.com>
+Message-ID: <20140811160222.GF17528@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Bartlomiej,
+On Mon, Aug 11, 2014 at 08:57:24AM -0700, Doug Anderson wrote:
+> On Mon, Aug 11, 2014 at 4:38 AM, Javier Martinez Canillas
 
-On Mon, Aug 11, 2014 at 8:42 AM, Bartlomiej Zolnierkiewicz
-<b.zolnierkie@samsung.com> wrote:
->
-> Hi,
->
-> On Monday, August 11, 2014 02:52:27 PM Javier Martinez Canillas wrote:
->> Hello Bartlomiej,
->>
->> On 08/11/2014 02:40 PM, Bartlomiej Zolnierkiewicz wrote:
->> >> index fc7d168..c390bb9 100644
->> >> --- a/arch/arm/configs/exynos_defconfig
->> >> +++ b/arch/arm/configs/exynos_defconfig
->> >> @@ -77,6 +77,7 @@ CONFIG_SPI_S3C64XX=y
->> >>  CONFIG_I2C_S3C2410=y
->> >>  CONFIG_DEBUG_GPIO=y
->> >>  CONFIG_POWER_SUPPLY=y
->> >> +CONFIG_BATTERY_SBS=m
->> >
->> > Why not make it "=y"?
->> >
->> > Rationale:
->> > - currently no hardware related option uses "=m" in exynos_defconfig
->> > - it would match the SBS option usage in multi_v7_defconfig
->> >
->> >>  CONFIG_CHARGER_TPS65090=y
->> >>  # CONFIG_HWMON is not set
->> >>  CONFIG_THERMAL=y
->> >
->>
->> I know but personally I think this should be changed. The idea of having a multi
->> platform kernel is to build a single kernel image that can be used to boot
->> different platforms. Not all platforms have a SBS-compliant battery so this
->> support shouldn't be built in the kernel image IMHO.
->>
->> This also matches to what real users will do since distributions most likely
->> will have a minimal kernel and every possible hardware support will be enabled
->> as a loadable kernel module. This is what distros do for other platforms too.
->>
->> If someone has a different use case and wants a kernel image that is optimized
->> for a particular platform then she has to create its own defconfig anyways.
->
-> Distributions usually use their own configs anyway and the current most
-> popular use case for exynos_defconfig (not multi_v7_defconfig) seems to
-> be to build kernel image alone and use it without any modules:
->
-> $ grep "=m" arch/arm/configs/exynos_defconfig
-> CONFIG_DM_CRYPT=m
->
-> $ grep "=m" .config
-> CONFIG_NET_IP_TUNNEL=m
-> CONFIG_INET_TUNNEL=m
-> CONFIG_IPV6=m
-> CONFIG_INET6_XFRM_MODE_TRANSPORT=m
-> CONFIG_INET6_XFRM_MODE_TUNNEL=m
-> CONFIG_INET6_XFRM_MODE_BEET=m
-> CONFIG_IPV6_SIT=m
-> CONFIG_DM_CRYPT=m
-> CONFIG_CRYPTO_RNG=m
-> CONFIG_CRYPTO_ANSI_CPRNG=m
->
-> What I'm trying to say is that there is a high probability that people
-> will continue to use just the kernel image for exynos_defconfig and
-> will therefore miss SBS battery support altogether (which is only 3.6
-> kB of code more in the kernel image so there is no much gain in making
-> it modular currently).
+> > After the switch is turned on, a safety timer is started
+> > and before this timer times out the output voltage must
+> > have reached the input voltage. Otherwise the switch is
+> > turned off expecting an overload condition.
 
-I'm not against making it =y for exynos_defconfig.  I do pretty
-strongly agree that the multi_v7 version should be =m eventually,
-though.  We'd need to do everything we can to make that kernel
-smaller.
+> > So using the maximum output voltage slew rate and the timer
+> > minimum and maximum timeouts, a voltage constraints can be
+> > expressed as bounded limits for the timeout. That is what
+> > is used in the board schematics and should be in the DT too.
 
--Doug
+> I don't understand this, but if you and Mark are happy with it...
+
+I have not looked at this change to my knowledge.
+
+> ...I'm also not 100% certain what the above description has to do with
+> this change, but I'll admit to having only skimmed some of the earlier
+> conversations.
+
+It's not at all clear to me either looking at the quoted section.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140811/a491d7bd/attachment.sig>
