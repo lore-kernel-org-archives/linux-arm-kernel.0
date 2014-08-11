@@ -1,58 +1,55 @@
-From: ulf.hansson@linaro.org (Ulf Hansson)
-Date: Mon, 11 Aug 2014 14:46:54 +0200
-Subject: io-domain voltages as regulators?
-In-Reply-To: <CACRpkdaJS0PUDLaCnrhtiuXPf4ccx51uNTqYWVWm47mhOhGEbA@mail.gmail.com>
-References: <3923586.SsVg941346@diego>
- <CACRpkdaJS0PUDLaCnrhtiuXPf4ccx51uNTqYWVWm47mhOhGEbA@mail.gmail.com>
-Message-ID: <CAPDyKFpiHf+urR85iJPqAXxREO+yPrDMcXM4K+BJqq=ur3DZtA@mail.gmail.com>
+From: javier.martinez@collabora.co.uk (Javier Martinez Canillas)
+Date: Mon, 11 Aug 2014 14:52:27 +0200
+Subject: [RESEND PATCH 1/1] ARM: exynos_defconfig: Enable SBS battery
+ support
+In-Reply-To: <1761549.yKSqfXafKr@amdc1032>
+References: <1407755198-17568-1-git-send-email-javier.martinez@collabora.co.uk>
+ <1761549.yKSqfXafKr@amdc1032>
+Message-ID: <53E8BC8B.70709@collabora.co.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11 August 2014 09:44, Linus Walleij <linus.walleij@linaro.org> wrote:
-> On Mon, Aug 4, 2014 at 12:18 AM, Heiko St?bner <heiko@sntech.de> wrote:
->
-> [Adding Ulf Hansson to this discussion...]
->
->> Hi Mark, Linus,
->>
->> I'd like to clarify what the appropriate way to handle pin output voltages is.
->> On the Rockchip SoCs the voltage for some groups of pins can be set between
->> 3.3V and 1.8V ... like the MMC/SD pins who need this to support UHS mode
->> cards.
->
-> This is called "vqmmc" in the mmc/sd subsystem.
->
-> grep for mmc_set_signal_voltage() in drivers/mmc/core/*
->
-> In drivers/mmc/core/core.c, you find:
->
->  mmc->supply.vqmmc = devm_regulator_get_optional(dev, "vqmmc");
->
-> Which gets the regulator to set the signal voltage, if such
-> a regulator is specified for the host.
->
-> Very simple and straight-forward, and handled by the MMC core.
->
->> In [0] when talking about something different, Linus Walleij described a
->> similar case as
->>
->> "I think we need to have a discussion with Mark Brown on how to
->> handle this.
->> We have previously had the case of MMC/SD level-shifters, where
->> a certain setting gives a certain level of signals out, and another setting
->> gives another level. Like two discrete levels.
->> So we modeled that as a regulator provider inside the pin control
->> driver eventually, see sh-pfc/pfc-sh73a0.c"
->>
->> As this sound like exactly the thing I'm trying to solve, is handling this via
->> a regulator the correct general way?
->
-> Ithinkso.
+Hello Bartlomiej,
 
-Just to confirm, I fully agree with the above said.
+On 08/11/2014 02:40 PM, Bartlomiej Zolnierkiewicz wrote:
+>> index fc7d168..c390bb9 100644
+>> --- a/arch/arm/configs/exynos_defconfig
+>> +++ b/arch/arm/configs/exynos_defconfig
+>> @@ -77,6 +77,7 @@ CONFIG_SPI_S3C64XX=y
+>>  CONFIG_I2C_S3C2410=y
+>>  CONFIG_DEBUG_GPIO=y
+>>  CONFIG_POWER_SUPPLY=y
+>> +CONFIG_BATTERY_SBS=m
+> 
+> Why not make it "=y"?
+> 
+> Rationale:
+> - currently no hardware related option uses "=m" in exynos_defconfig
+> - it would match the SBS option usage in multi_v7_defconfig
+>
+>>  CONFIG_CHARGER_TPS65090=y
+>>  # CONFIG_HWMON is not set
+>>  CONFIG_THERMAL=y
+> 
 
-You may also find a good example in the mmci host driver for how to
-make use of the vqmmc regulator.
+I know but personally I think this should be changed. The idea of having a multi
+platform kernel is to build a single kernel image that can be used to boot
+different platforms. Not all platforms have a SBS-compliant battery so this
+support shouldn't be built in the kernel image IMHO.
 
-Kind regards
-Uffe
+This also matches to what real users will do since distributions most likely
+will have a minimal kernel and every possible hardware support will be enabled
+as a loadable kernel module. This is what distros do for other platforms too.
+
+If someone has a different use case and wants a kernel image that is optimized
+for a particular platform then she has to create its own defconfig anyways.
+
+> Best regards,
+> --
+> Bartlomiej Zolnierkiewicz
+> Samsung R&D Institute Poland
+> Samsung Electronics
+> 
+
+Best regards,
+Javier
