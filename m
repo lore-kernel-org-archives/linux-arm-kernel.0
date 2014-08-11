@@ -1,54 +1,39 @@
-From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Mon, 11 Aug 2014 21:37:41 +0200
-Subject: [PATCH 2/2] asm-generic: add memfd_create system call to unistd.h
-In-Reply-To: <201408112057.01177.arnd@arndb.de>
-References: <1407764228-7904-1-git-send-email-will.deacon@arm.com>
- <CANq1E4Q0gDaJ5XGnkoCQsG8xLh1Q-EBErtEVPpeeZgGj+Nr8dQ@mail.gmail.com>
- <20140811171511.GF8828@arm.com> <201408112057.01177.arnd@arndb.de>
-Message-ID: <CAMuHMdWZ30ZKO2ddh8whmw5ThrKZC0wsU+rhgoc8fRZni0Zduw@mail.gmail.com>
+From: computersforpeace@gmail.com (Brian Norris)
+Date: Mon, 11 Aug 2014 12:51:37 -0700
+Subject: [GIT PULL 2/7] ARM: SoC platform changes for 3.17
+In-Reply-To: <1407516479-1251-3-git-send-email-olof@lixom.net>
+References: <1407516479-1251-1-git-send-email-olof@lixom.net>
+ <1407516479-1251-3-git-send-email-olof@lixom.net>
+Message-ID: <20140811195137.GB3711@ld-irv-0074>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Aug 11, 2014 at 8:57 PM, Arnd Bergmann <arnd@arndb.de> wrote:
-> On Monday 11 August 2014, Will Deacon wrote:
->> On Mon, Aug 11, 2014 at 05:54:08PM +0100, David Herrmann wrote:
->> > On Mon, Aug 11, 2014 at 3:37 PM, Will Deacon <will.deacon@arm.com> wrote:
->> > > Commit 9183df25fe7b ("shm: add memfd_create() syscall") added a new
->> > > system call (memfd_create) but didn't update the asm-generic unistd
->> > > header.
->> > >
->> > > This patch adds the new system call to the asm-generic version of
->> > > unistd.h so that it can be used by architectures such as arm64.
->> > >
->> > > Cc: Arnd Bergmann <arnd@arndb.de>
->> > > Cc: David Herrmann <dh.herrmann@gmail.com>
->> > > Signed-off-by: Will Deacon <will.deacon@arm.com>
->> >
->> > Reviewed-by: David Herrmann <dh.herrmann@gmail.com>
->>
->> Thanks, David.
->>
->> Arnd: shall I take this via the arm64 tree, or do you already have some
->> asm-generic patches queued?
->
-> Please take it for arm64, I don't have any other patches queued at the moment
-> and am currently on vacation.
++ other involved parties
 
-Thanks, I was just going to look into adding it...
+On Fri, Aug 08, 2014 at 09:47:54AM -0700, Olof Johansson wrote:
+> This is the bulk of new SoC enablement and other platform changes for 3.17:
+[...]
+> * Broadcom BCM7xxx settop box chipset is introduced
+[...]
+> Marc Carino (1):
+>       ARM: brcmstb: add infrastructure for ARM-based Broadcom STB SoCs
 
-BTW, another one sneaked in: kexec_file_load. I say "sneaked", as
-scripts/checksyscalls.sh doesn't catch it, due to it being wired up on
-amd64 only.
+I realize this is a bit late (the pull request is already merged), but
+I'd like to be up-front about this: there were some (late) oustanding
+review comments made on this patch [1]. I have a few patches queued
+locally for addressing many of them, but not all of the issues are
+completely resolved.
 
-Will, you can please add that one, too, while you're at it?
+Shall I simply send a revert patch for the
+arch/arm/mach-bcm/platsmp-brcmstb.c stuff, and get it in through the
+bcm -> arm-soc -> Linus merge path in 3.17-rcX? Or should I take the
+incremental improvement approach, as we have functioning code with no
+clear alternative proposal yet?
 
-Gr{oetje,eeting}s,
+Again, sorry for the late noise.
 
-                        Geert
+Brian
 
---
-Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+[1] version 8 patch:
 
-In personal conversations with technical people, I call myself a hacker. But
-when I'm talking to journalists I just say "programmer" or something like that.
-                                -- Linus Torvalds
+      http://article.gmane.org/gmane.linux.ports.arm.kernel/343391
