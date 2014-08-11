@@ -1,48 +1,56 @@
-From: Mattis.Lorentzon@autoliv.com (Mattis Lorentzon)
-Date: Mon, 11 Aug 2014 13:32:57 +0000
-Subject: Oops: 17 SMP ARM (v3.16-rc2)
-In-Reply-To: <20140808180900.GG30282@n2100.arm.linux.org.uk>
-References: <20140626151424.GT32514@n2100.arm.linux.org.uk>
- <20140627112151.GF32514@n2100.arm.linux.org.uk>
- <3FFB61A7A8473C49831AF20FA193534A43CADFA7@ALVA-EXMB01.alv.autoliv.int>
- <20140627163108.GP32514@n2100.arm.linux.org.uk>
- <C4A61A5CA4AD2246942F4BA6F20ACB8043575072@ALVA-EXMB04.alv.autoliv.int>
- <20140806095012.GN30282@n2100.arm.linux.org.uk>
- <C4A61A5CA4AD2246942F4BA6F20ACB8043575172@ALVA-EXMB04.alv.autoliv.int>
- <20140806125550.GO30282@n2100.arm.linux.org.uk>
- <C4A61A5CA4AD2246942F4BA6F20ACB804357526C@ALVA-EXMB04.alv.autoliv.int>
- <20140807121248.GY30282@n2100.arm.linux.org.uk>
- <20140808180900.GG30282@n2100.arm.linux.org.uk>
-Message-ID: <C4A61A5CA4AD2246942F4BA6F20ACB8043576356@ALVA-EXMB04.alv.autoliv.int>
+From: will.deacon@arm.com (Will Deacon)
+Date: Mon, 11 Aug 2014 14:33:38 +0100
+Subject: [PATCH] arm64: audit: Fix build for audit changes
+In-Reply-To: <1407763344.2423.0.camel@redhat.com>
+References: <1405596402-23844-1-git-send-email-broonie@kernel.org>
+ <20140811090947.GC15344@arm.com>
+ <1407763344.2423.0.camel@redhat.com>
+Message-ID: <20140811133338.GB15853@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Russell and Fabio,
-
-> I'd be interested to hear whether removing the
+On Mon, Aug 11, 2014 at 02:22:24PM +0100, Eric Paris wrote:
+> On Mon, 2014-08-11 at 10:09 +0100, Will Deacon wrote:
+> > On Thu, Jul 17, 2014 at 12:26:42PM +0100, Mark Brown wrote:
+> > > From: Mark Brown <broonie@linaro.org>
+> > > 
+> > > Commit 3efe33f5d2 (audit: x86: drop arch from __audit_syscall_entry()
+> > > interface) removed the arch parameter from __audit_syscall_entry() and
+> > > updated the only current user in mainline but this breaks the ARMv8 audit
+> > > code that has been added in -next. Fix this by making the equivalent
+> > > update to ARMv8.
+> > > 
+> > > Signed-off-by: Mark Brown <broonie@linaro.org>
+> > > ---
+> > >  arch/arm64/kernel/ptrace.c | 4 ++--
+> > >  1 file changed, 2 insertions(+), 2 deletions(-)
+> > > 
+> > > diff --git a/arch/arm64/kernel/ptrace.c b/arch/arm64/kernel/ptrace.c
+> > > index 70526cfda056..310842e3d477 100644
+> > > --- a/arch/arm64/kernel/ptrace.c
+> > > +++ b/arch/arm64/kernel/ptrace.c
+> > > @@ -1115,8 +1115,8 @@ asmlinkage int syscall_trace_enter(struct pt_regs *regs)
+> > >  	if (test_thread_flag(TIF_SYSCALL_TRACEPOINT))
+> > >  		trace_sys_enter(regs, regs->syscallno);
+> > >  
+> > > -	audit_syscall_entry(syscall_get_arch(), regs->syscallno,
+> > > -		regs->orig_x0, regs->regs[1], regs->regs[2], regs->regs[3]);
+> > > +	audit_syscall_entry(regs->syscallno, regs->orig_x0, regs->regs[1],
+> > > +			    regs->regs[2], regs->regs[3]);
+> > 
+> > Eric, Richard: when is 3efe33f5d2 ("audit: x86: drop arch from
+> > __audit_syscall_entry() interface") going to hit mainline? I've been holding
+> > off this fix until the offending commit is merged, but if that's not going
+> > to happen for 3.17, then we probably need to do something else to fix -next.
 > 
-> 	interrupts-extended = ...
-> 
-> property from your board's DT file, thereby causing you to revert back to the
-> default I list above, also fixes the instability you are seeing.
+> I think I'm being lazy this window and not oging to send a pull.  So
+> I'll pick up this fix as soon as rc1 cuts in my tree.
 
-We have tried to remove the board specific interrupts-extended field and the
-MX6QDL_PAD_GPIO_6__ENET_IRQ entry. Sadly this did not seem to improve
-the stalls. Our interrupts look like this now:
+Oh, alright then. If you're not going to send the code for mainline, you
+could also just drop it from -next ;)
 
-150:      15519          0          0          0       GIC 150  2188000.ethernet
-151:          0          0          0          0       GIC 151  2188000.ethernet
+Anyway, if you do fix it, please let me know so that I can remove our #ifdef
+CONFIG_AUDITSYSCALL guards (which only exist to stop build breakage in -next
+with defconfig).
 
-Our device tree might still be slightly incorrect. We have noticed that our
-RGMII_INT is connected to GPIO 19 (P5) which might be nonstandard (we are
-a bit surprised that this works at all). We are not quite sure how to configure
-this properly.
-
-Best regards,
-Mattis Lorentzon
-***************************************************************
-Consider the environment before printing this message.
-
-To read Autoliv's Information and Confidentiality Notice, follow this link:
-http://www.autoliv.com/disclaimer.html
-***************************************************************
+Will
