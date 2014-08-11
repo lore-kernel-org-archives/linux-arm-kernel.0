@@ -1,52 +1,51 @@
 From: linus.walleij@linaro.org (Linus Walleij)
-Date: Mon, 11 Aug 2014 09:15:39 +0200
-Subject: [PATCH 6/7] arm: mediatek: enable gpt6 on boot up to make arch
- timer working
-In-Reply-To: <1406824943-24052-7-git-send-email-matthias.bgg@gmail.com>
-References: <1406824943-24052-1-git-send-email-matthias.bgg@gmail.com>
- <1406824943-24052-7-git-send-email-matthias.bgg@gmail.com>
-Message-ID: <CACRpkdbRhGE8tcKj+W_4F9-xmcm-fxcYuCmLOqX-ESC+3PAmyA@mail.gmail.com>
+Date: Mon, 11 Aug 2014 09:44:22 +0200
+Subject: io-domain voltages as regulators?
+In-Reply-To: <3923586.SsVg941346@diego>
+References: <3923586.SsVg941346@diego>
+Message-ID: <CACRpkdaJS0PUDLaCnrhtiuXPf4ccx51uNTqYWVWm47mhOhGEbA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jul 31, 2014 at 6:42 PM, Matthias Brugger
-<matthias.bgg@gmail.com> wrote:
+On Mon, Aug 4, 2014 at 12:18 AM, Heiko St?bner <heiko@sntech.de> wrote:
 
-> We enable GTP6 which ungates the arch timer clock. Apart we write the
-> frequency with which the timer is running in the CNTFREQ register.
-> In the future this should be done in the bootloader.
+[Adding Ulf Hansson to this discussion...]
+
+> Hi Mark, Linus,
 >
-> Signed-off-by: Matthias Brugger <matthias.bgg@gmail.com>
-(...)
+> I'd like to clarify what the appropriate way to handle pin output voltages is.
+> On the Rockchip SoCs the voltage for some groups of pins can be set between
+> 3.3V and 1.8V ... like the MMC/SD pins who need this to support UHS mode
+> cards.
 
-> +       if (of_machine_is_compatible("mediatek,mt6589")) {
-> +               /* set cntfreq register which is not done in bootloader */
-> +               asm volatile("mcr p15, 0, %0, c14, c0, 0" : : "r" (13000000));
+This is called "vqmmc" in the mmc/sd subsystem.
 
-I guess this is for something like the ARM arch timer in
-drivers/clocksource/arm_arch_timer.c
+grep for mmc_set_signal_voltage() in drivers/mmc/core/*
 
-Instead of doing this, use the DT property "clock-frequency" on
-the ARM arch timer node, as that overrides the CP15 setting.
+In drivers/mmc/core/core.c, you find:
 
-> +
-> +               /* turn on GPT6 which ungates arch timer clocks */
-> +               gpt_base = ioremap(GPT6_CON_MT65xx, 0x04);
-> +       }
-> +
-> +       /* enabel clock and set to free-run */
-> +       if (gpt_base)
-> +               writel(0x31, gpt_base);
+ mmc->supply.vqmmc = devm_regulator_get_optional(dev, "vqmmc");
 
-Why is this not done properly in the GPT driver (I guess
-in drivers/clocksource/mtk_timer.c) instead of remapping
-it and fiddling around in the machine?
+Which gets the regulator to set the signal voltage, if such
+a regulator is specified for the host.
 
-If it only affects the mt6589 just add another compatible string
-to that driver like "mediatek,mt6589-timer" as it properly reflects the
-fact that this timer is slightly different on the 6589.
+Very simple and straight-forward, and handled by the MMC core.
 
-Also use a #define for the magic constant 0x31.
+> In [0] when talking about something different, Linus Walleij described a
+> similar case as
+>
+> "I think we need to have a discussion with Mark Brown on how to
+> handle this.
+> We have previously had the case of MMC/SD level-shifters, where
+> a certain setting gives a certain level of signals out, and another setting
+> gives another level. Like two discrete levels.
+> So we modeled that as a regulator provider inside the pin control
+> driver eventually, see sh-pfc/pfc-sh73a0.c"
+>
+> As this sound like exactly the thing I'm trying to solve, is handling this via
+> a regulator the correct general way?
+
+Ithinkso.
 
 Yours,
 Linus Walleij
