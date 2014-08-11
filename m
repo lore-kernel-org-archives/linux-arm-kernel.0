@@ -1,66 +1,139 @@
-From: ezequiel.garcia@free-electrons.com (Ezequiel Garcia)
-Date: Mon, 11 Aug 2014 08:38:56 -0300
-Subject: [PATCH 1/6] ARM: mvebu: Add required ethernet muxing for the
- Armada 370 SoC
-In-Reply-To: <53E762A0.5070900@gmail.com>
-References: <1407511136-26477-1-git-send-email-ezequiel.garcia@free-electrons.com>
- <1407511136-26477-2-git-send-email-ezequiel.garcia@free-electrons.com>
- <53E762A0.5070900@gmail.com>
-Message-ID: <20140811113856.GA1665@arch.cereza>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Mon, 11 Aug 2014 13:40:14 +0200
+Subject: [PATCH v3 1/8] dma: sun4i: Add support for the DMA engine on
+ sun[457]i SoCs
+In-Reply-To: <53E3D56C.5030204@elopez.com.ar>
+References: <1407183002-29420-1-git-send-email-emilio@elopez.com.ar>
+ <1407183002-29420-2-git-send-email-emilio@elopez.com.ar>
+ <20140805200042.GO3952@lukather> <53E3D56C.5030204@elopez.com.ar>
+Message-ID: <20140811114014.GH15297@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10 Aug 02:16 PM, Sebastian Hesselbarth wrote:
-> On 08/08/2014 05:18 PM, Ezequiel Garcia wrote:
-> > This commit adds the required pin muxing for the two network interfaces
-> > and the MDIO interface, to the Armada 370 SoC.
-> > 
-> > Signed-off-by: Ezequiel Garcia <ezequiel.garcia@free-electrons.com>
-> > ---
-> >  arch/arm/boot/dts/armada-370.dtsi | 19 +++++++++++++++++++
-> >  1 file changed, 19 insertions(+)
-> > 
-> > diff --git a/arch/arm/boot/dts/armada-370.dtsi b/arch/arm/boot/dts/armada-370.dtsi
-> > index 21b588b..b0700bf6 100644
-> > --- a/arch/arm/boot/dts/armada-370.dtsi
-> > +++ b/arch/arm/boot/dts/armada-370.dtsi
-> > @@ -151,6 +151,25 @@
-> >  						       "mpp62", "mpp60", "mpp58";
-> >  					marvell,function = "audio";
-> >  				};
-> > +
-> > +				mdio_pins: mdio_pins {
+On Thu, Aug 07, 2014 at 04:37:16PM -0300, Emilio L?pez wrote:
+> Hi,
 > 
-> Ezequiel,
+> El 05/08/14 a las 17:00, Maxime Ripard escibi?:
+> >Hi,
+> >
+> >Overall it looks very nice, thanks.
+> >
+> >On Mon, Aug 04, 2014 at 05:09:55PM -0300, Emilio L?pez wrote:
+> >>+static struct sun4i_dma_pchan *find_and_use_pchan(struct sun4i_dma_dev *priv,
+> >>+                                                 struct sun4i_dma_vchan *vchan)
+> >>+{
+> >>+       struct sun4i_dma_pchan *pchan = NULL, *pchans = priv->pchans;
+> >>+       unsigned long flags;
+> >>+       int i, max;
+> >>+
+> >>+       /*
+> >>+        * pchans 0-NDMA_NR_MAX_CHANNELS are normal, and
+> >>+        * NDMA_NR_MAX_CHANNELS+ are dedicated ones
+> >>+        */
+> >>+       if (vchan->is_dedicated) {
+> >>+               i = NDMA_NR_MAX_CHANNELS;
+> >>+               max = DMA_NR_MAX_CHANNELS;
+> >>+       } else {
+> >>+               i = 0;
+> >>+               max = NDMA_NR_MAX_CHANNELS;
+> >>+       }
+> >>+
+> >>+       spin_lock_irqsave(&priv->lock, flags);
+> >>+       for_each_clear_bit_from(i, &priv->pchans_used, max) {
+> >>+               pchan = &pchans[i];
+> >>+               pchan->vchan = vchan;
+> >>+               set_bit(i, priv->pchans_used);
+> >>+               break;
+> >
+> >ffz instead?
 > 
-> please keep me posted next time ;)
+> I think it'd look way more messy with ffz, as it only works on
+> unsigned longs and it's undefined on the all-1s case.
 > 
-
-Ouch...
-
-> Above should be: mdio_pins: mdio-pins {
-> same for the ones below.
+> We could have something like this, but I don't see much point in
+> what's basically expanding the macro
 > 
+> 	spin_lock_irqsave(&priv->lock, flags);
+> 	i = find_next_zero_bit(&priv->pchans_used, max, i);
+> 	if (i < max) {
+> 		pchan = &pchans[i];
+> 		pchan->vchan = vchan;
+> 		set_bit(i, priv->pchans_used);
+> 	}
+> 	spin_unlock_irqrestore(&priv->lock, flags);
 
-OK.
+What about 
 
-> > +					marvell,pins = "mpp17", "mpp18";
-> > +					marvell,function = "ge";
+spin_lock_irqsave(&priv->lock, flags);
+i = ffz(&priv->pchans_used);
+if (!i)
+   return NULL;
+
+pchan = &pchans[i];
+pchan->vchan = vchan;
+set_bit(i, priv->pchans_used);
+
+spin_unlock_irqrestore(&priv->lock, flags);
+
+It looks quite clean to me.
+
+> >>+static irqreturn_t sun4i_dma_submit_work(int irq, void *dev_id)
+> >>+{
+> >>+	struct sun4i_dma_dev *priv = dev_id;
+> >>+	struct sun4i_dma_vchan *vchan;
+> >>+	unsigned long flags;
+> >>+	int i;
+> >>+
+> >>+	for (i = 0; i < DMA_NR_MAX_VCHANS; i++) {
+> >>+		vchan = &priv->vchans[i];
+> >>+		spin_lock_irqsave(&vchan->vc.lock, flags);
+> >>+		execute_vchan_pending(priv, vchan);
+> >>+		spin_unlock_irqrestore(&vchan->vc.lock, flags);
+> >>+	}
+> >>+
+> >>+	return IRQ_HANDLED;
+> >>+}
+> >
+> >Judging from Russell's comment here, that should be in the interrupt
+> >handler
+> >
+> >http://lists.infradead.org/pipermail/linux-arm-kernel/2014-August/277737.html
 > 
-> As we haven't used it before, we could still rename "ge" function to
-> more approprate "mdio"... but it is ok.
->
+> Wouldn't that make the interrupt handler quite big time wise? I was
+> under the impression they should remain as short as possible. LDD3
+> says "The programmer should be careful to write a routine that
+> executes in a minimum amount of time (...)" on chapter 10
 
-FWIW, I'd rather leave it as it is. If we change the function name, we would
-make backporting a PITA, just because of a nitpick.
- 
-> Besides the comments,
+Yeah, but if that involves delaying a lot a task that should have been
+performed asap, it would make sense.
+
+Plus, besides the loop in the contract's demands,
+execute_vchan_pending is actually rather small. Did you timed it to
+have such concerns?
+
+> I did try something mid-way a bit ago; I added code to see if we
+> could issue the next DMA operation from the current set, but it was
+> just extra complexity for a noop in performance, as they're sets of
+> one on all cases I tried.
 > 
-> Acked-by: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
->
+> It's worth noting that the very latency sensitive DMA users we will
+> have (ie, audio) are already completely managed in the IRQ handler
+> thanks to the less flexible concept of cyclic transfers.
 
-Thanks,
+It's not just a matter of latency, but also of throughput. If you wait
+for the tasklet softirq to be executed to schedule a new vchan, you
+aren't going to do anything during that time, while you could have.
+
+Maxime
+
 -- 
-Ezequiel Garc?a, Free Electrons
-Embedded Linux, Kernel and Android Engineering
+Maxime Ripard, Free Electrons
+Embedded Linux, Kernel and Android engineering
 http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140811/4803c8aa/attachment-0001.sig>
