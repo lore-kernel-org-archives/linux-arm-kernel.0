@@ -1,77 +1,54 @@
-From: tomeu@tomeuvizoso.net (Tomeu Vizoso)
-Date: Mon, 11 Aug 2014 14:07:30 +0200
-Subject: [PATCH v2 0/2] Firmware-assisted suspend/resume of Exynos SoCs
-In-Reply-To: <1405612571-32598-1-git-send-email-t.figa@samsung.com>
-References: <1405612571-32598-1-git-send-email-t.figa@samsung.com>
-Message-ID: <CAAObsKB3vO1KtgSvDY-+1WA4qDFVS_A6cXZM=vr9U1gVM=v=5g@mail.gmail.com>
+From: ezequiel.garcia@free-electrons.com (Ezequiel Garcia)
+Date: Mon, 11 Aug 2014 09:14:35 -0300
+Subject: [PATCH v2 0/6] mvebu: Network devicetree pin muxing
+Message-ID: <1407759281-11513-1-git-send-email-ezequiel.garcia@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-For both patches, on the Odroid U2:
+This series adds the proper devicetree pin muxing for the network interfaces
+on all Armada 370 boards.
 
-Tested-by: Tomeu Vizoso <tomeu.vizoso@collabora.com>
+The MDIO interface uses pins MPP17 and MPP18, and so this is needed
+on all devices using MDIO.
 
-Thanks,
+For the ethernet interfaces, only the boards connecting with RGMII/GMII/MII
+need the mux. On this SoC, the SGMII is available on dedicated SerDes lanes,
+and so no MPP pin mux is required.
 
-Tomeu
+Given all the supported board use either RGMII or SGMII, we only add RGMII mux
+configuration. The only board which uses SGMII is the Armada 370 Reference
+Design board.
 
-On 17 July 2014 17:56, Tomasz Figa <t.figa@samsung.com> wrote:
-> On Exynos-based boards running secure firmware the sequence of low level
-> operations to enter and leave system-wide sleep mode is different than
-> on those without the firmware. Namely:
->  - CP15 power control and diagnostic registers cannot be written directly,
->  - the way of setting boot address and boot flag is different,
->  - different resume handler needs to be used,
->  - dedicated SMC call needs to be performed instead of letting the CPU enter
->    WFI.
->
-> This series introduces .suspend() and .resume() firmware operations to
-> perform low level firmware-specific suspend and resume and then leverages
-> them to provide suspend-resume path meeting the above requirements.
->
-> The series is based on Kgene's for-next branch and tested on:
->  - Exynos4412-based Trats2 board running in non-secure mode (under secure
->    firmware) with few board-specific fixes that will be sent separately soon,
->  - Exynos4210-based Trats board running in secure mode,
->  - Exynos4412-based ODROID-U3 board running in non-secure mode with one minor
->    board-specific fix which will be send shortly.
->
-> Depends on:
->  - [PATCH v3] ARM: save/restore Cortex-A9 CP15 registers on suspend/resume
->    (http://www.spinics.net/lists/arm-kernel/msg346212.html)
->  - [PATCH v3] ARM: EXYNOS: Fix suspend/resume sequences
->    (https://lkml.org/lkml/2014/7/15/319)
->  - [PATCH] ARM: make it easier to check the CPU part number correctly
->    (http://thread.gmane.org/gmane.linux.ports.arm.kernel/335126
->     already in linux-next)
->
-> Changes since v1:
->  - dropped outer_resume() - will be handled in assembly in further patches,
->    as support for L2C in non-secure mode gets added,
->  - moved CP15 resume to assembly as it needs to be done before MMU is enabled,
->  - surrounded CP15 save with a check for cpuid part, because it is valid only
->    on Cortex A9,
->  - rebased on next-20140717 tag of linux-next tree.
->
-> Tomasz Figa (2):
->   ARM: firmware: Introduce suspend and resume operations
->   ARM: EXYNOS: Add support for firmware-assisted suspend/resume
->
->  Documentation/arm/firmware.txt  | 28 +++++--------------------
->  arch/arm/include/asm/firmware.h |  8 ++++++++
->  arch/arm/mach-exynos/Makefile   |  1 +
->  arch/arm/mach-exynos/common.h   |  4 ++++
->  arch/arm/mach-exynos/firmware.c | 45 +++++++++++++++++++++++++++++++++++++++++
->  arch/arm/mach-exynos/pm.c       | 16 ++++++++++-----
->  arch/arm/mach-exynos/sleep.S    | 28 +++++++++++++++++++++++++
->  arch/arm/mach-exynos/smc.h      |  4 ++++
->  8 files changed, 106 insertions(+), 28 deletions(-)
->
-> --
-> 1.9.3
->
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-kernel" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
-> Please read the FAQ at  http://www.tux.org/lkml/
+Patches have been tested on Armada 370 Mirabox only, using the recently submitted
+mvneta support for barebox. The series is based on v3.16.
+
+It would be great if someone else can test on the other boards, to make sure
+no regressions are introduced.
+
+Changes from v1:
+
+  * Replaced mux node name: ge{0,1}_pins -> ge{0,1}_rgmii_pins to be clear
+    about the MII.
+
+  * Replaced {}_pins -> {}-pins, to be consistent.
+
+  * Massaged the commit logs a bit.
+
+Ezequiel Garcia (6):
+  ARM: mvebu: Add network pin mux configuration for the Armada 370 SoC
+  ARM: mvebu: Add proper pin muxing on Globalscale Mirabox board
+  ARM: mvebu: Add proper pin muxing on the Armada 370 DB board
+  ARM: mvebu: Add proper pin muxing on Netgear ReadyNAS 102
+  ARM: mvebu: Add proper pin muxing on Netgear ReadyNAS 104
+  ARM: mvebu: Add proper pin muxing on Armada 370 RD board
+
+ arch/arm/boot/dts/armada-370-db.dts            |  6 ++++++
+ arch/arm/boot/dts/armada-370-mirabox.dts       |  6 ++++++
+ arch/arm/boot/dts/armada-370-netgear-rn102.dts |  4 ++++
+ arch/arm/boot/dts/armada-370-netgear-rn104.dts |  6 ++++++
+ arch/arm/boot/dts/armada-370-rd.dts            |  4 ++++
+ arch/arm/boot/dts/armada-370.dtsi              | 19 +++++++++++++++++++
+ 6 files changed, 45 insertions(+)
+
+-- 
+2.0.1
