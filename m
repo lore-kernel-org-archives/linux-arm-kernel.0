@@ -1,124 +1,84 @@
-From: cmetcalf@tilera.com (Chris Metcalf)
-Date: Mon, 11 Aug 2014 02:38:43 +0000
-Subject: [PATCH 2/5] char: tile-srom: Remove reference to platform_bus
-In-Reply-To: <1407515691.31897.26.camel@hornet>
-References: <1406298233-27876-1-git-send-email-pawel.moll@arm.com>
- <1406298233-27876-2-git-send-email-pawel.moll@arm.com>
- <53DAA605.2030500@tilera.com> <1406913678.22529.46.camel@hornet>
- <53E139C8.9000502@tilera.com>,<1407515691.31897.26.camel@hornet>
-Message-ID: <16873F3E-2114-41B6-A2F1-EF87D4DA01D2@tilera.com>
+From: horms+renesas@verge.net.au (Simon Horman)
+Date: Mon, 11 Aug 2014 11:38:59 +0900
+Subject: [PATCH] ARM: shmobile: armadillo800eva: Sort includes
+Message-ID: <1407724739-14100-1-git-send-email-horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Thanks for the code and comments. I'm out on vacation till mid next week but I'll look at this when I get back.
-Chris
+Sorted includes seems to be the done thing these days.
 
-> On Aug 8, 2014, at 12:35 PM, "Pawel Moll" <pawel.moll@arm.com> wrote:
-> 
-> On Tue, 2014-08-05 at 21:08 +0100, Chris Metcalf wrote:
->>>> In addition, we also have user binaries
->>>> in the wild that know to look for /sys/devices/platform/srom/ paths,
->>>> so I'm pretty reluctant to change this path without good reason.
->>> So what is the srom class for then if not for device discovery? And why
->>> do they look for them in the first place? To get relevant character
->>> device's data, if I understand it right?
->>> 
->>> Maybe you could just register a simple "proper" platform device for all
->>> the sroms and then hang the class devices from it? I can type some code
->>> doing this if it sound reasonably?
->> 
->> I'm not sure exactly what you mean by device discovery here.  
-> 
-> 
-> 
->> The
->> subdirectories under /sys/devices/platform/srom/ correspond to partitions
->> in the SPI-ROM, which are software constructs created by the Tilera hypervisor.
->> By default we have three, where the first holds boot data that the chip
->> can use to boot out of hardware, and the other two are smaller partitions
->> for boot- and user-specific data.  We use the /sys files primarily to get the
->> page size and sector size for the sroms, and also export other interesting
->> information like the total size of the particular srom device.
->> 
->> Thank you for volunteering to write a bit of code; if that's the best
->> way to clarify this for us, fantastic, or else pointing us at existing
->> good practices or documentation would be great too.
-> 
-> I was thinking about something like the following (warning, untested)
-> 
-> 8<-------------------------------------------
-> From c53f0a2492d6cd38d1f82d57916a6528b071e8a8 Mon Sep 17 00:00:00 2001
-> From: Pawel Moll <pawel.moll@arm.com>
-> Date: Fri, 8 Aug 2014 16:32:58 +0100
-> Subject: [PATCH] char: tile-srom: Add real platform bus parent
-> 
-> Add a real platform bus device as a parent for
-> the srom class devices, to prevent non-platform
-> devices hanging from the bus root.
-> 
-> Signed-off-by: Pawel Moll <pawel.moll@arm.com>
-> ---
-> drivers/char/tile-srom.c | 13 ++++++++++++-
-> 1 file changed, 12 insertions(+), 1 deletion(-)
-> 
-> diff --git a/drivers/char/tile-srom.c b/drivers/char/tile-srom.c
-> index bd37747..7fb0fd5 100644
-> --- a/drivers/char/tile-srom.c
-> +++ b/drivers/char/tile-srom.c
-> @@ -76,6 +76,7 @@ MODULE_LICENSE("GPL");
-> 
-> static int srom_devs;            /* Number of SROM partitions */
-> static struct cdev srom_cdev;
-> +static struct platform_device *srom_parent;
-> static struct class *srom_class;
-> static struct srom_dev *srom_devices;
-> 
-> @@ -350,7 +351,7 @@ static int srom_setup_minor(struct srom_dev *srom, int index)
->               SROM_PAGE_SIZE_OFF, sizeof(srom->page_size)) < 0)
->        return -EIO;
-> 
-> -    dev = device_create(srom_class, &platform_bus,
-> +    dev = device_create(srom_class, srom_parent,
->                MKDEV(srom_major, index), srom, "%d", index);
->    return PTR_ERR_OR_ZERO(dev);
-> }
-> @@ -415,6 +416,13 @@ static int srom_init(void)
->    if (result < 0)
->        goto fail_chrdev;
-> 
-> +    /* Create a parent device */
-> +    srom_parent = platform_device_register_simple("srom", -1, NULL, 0);
-> +    if (IS_ERR(srom_parent)) {
-> +        result = PTR_ERR(srom_parent);
-> +        goto fail_pdev;
-> +    }
-> +
->    /* Create a sysfs class. */
->    srom_class = class_create(THIS_MODULE, "srom");
->    if (IS_ERR(srom_class)) {
-> @@ -438,6 +446,8 @@ fail_class:
->        device_destroy(srom_class, MKDEV(srom_major, i));
->    class_destroy(srom_class);
-> fail_cdev:
-> +    platform_device_unregister(srom_parent);
-> +fail_pdev:
->    cdev_del(&srom_cdev);
-> fail_chrdev:
->    unregister_chrdev_region(dev, srom_devs);
-> @@ -454,6 +464,7 @@ static void srom_cleanup(void)
->        device_destroy(srom_class, MKDEV(srom_major, i));
->    class_destroy(srom_class);
->    cdev_del(&srom_cdev);
-> +    platform_device_unregister(srom_parent);
->    unregister_chrdev_region(MKDEV(srom_major, 0), srom_devs);
->    kfree(srom_devices);
-> }
-> -- 
-> 1.9.1
-> 8<-------------------------------------------
-> 
-> Would that work for you? Note that it will move the srom class devices
-> one level deeper in /sys/devices/... hierarchy.
-> 
-> Pawe?
-> 
+Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
+---
+ arch/arm/mach-shmobile/board-armadillo800eva.c | 40 +++++++++++++-------------
+ 1 file changed, 20 insertions(+), 20 deletions(-)
+
+diff --git a/arch/arm/mach-shmobile/board-armadillo800eva.c b/arch/arm/mach-shmobile/board-armadillo800eva.c
+index fc73246..ad27665 100644
+--- a/arch/arm/mach-shmobile/board-armadillo800eva.c
++++ b/arch/arm/mach-shmobile/board-armadillo800eva.c
+@@ -22,43 +22,43 @@
+ #include <linux/clk.h>
+ #include <linux/delay.h>
+ #include <linux/err.h>
+-#include <linux/kernel.h>
+-#include <linux/input.h>
+-#include <linux/platform_data/st1232_pdata.h>
+-#include <linux/irq.h>
+-#include <linux/platform_device.h>
+ #include <linux/gpio.h>
+ #include <linux/gpio_keys.h>
+-#include <linux/regulator/driver.h>
++#include <linux/i2c-gpio.h>
++#include <linux/input.h>
++#include <linux/irq.h>
++#include <linux/kernel.h>
++#include <linux/mfd/tmio.h>
++#include <linux/mmc/host.h>
++#include <linux/mmc/sh_mmcif.h>
++#include <linux/mmc/sh_mobile_sdhi.h>
+ #include <linux/pinctrl/machine.h>
++#include <linux/platform_data/st1232_pdata.h>
++#include <linux/platform_device.h>
+ #include <linux/pwm.h>
+ #include <linux/pwm_backlight.h>
++#include <linux/reboot.h>
++#include <linux/regulator/driver.h>
+ #include <linux/regulator/fixed.h>
+ #include <linux/regulator/gpio-regulator.h>
+ #include <linux/regulator/machine.h>
+ #include <linux/sh_eth.h>
+-#include <linux/videodev2.h>
+ #include <linux/usb/renesas_usbhs.h>
+-#include <linux/mfd/tmio.h>
+-#include <linux/mmc/host.h>
+-#include <linux/mmc/sh_mmcif.h>
+-#include <linux/mmc/sh_mobile_sdhi.h>
+-#include <linux/i2c-gpio.h>
+-#include <linux/reboot.h>
++#include <linux/videodev2.h>
+ 
+-#include <media/mt9t112.h>
+-#include <media/sh_mobile_ceu.h>
+-#include <media/soc_camera.h>
+-#include <asm/page.h>
++#include <asm/hardware/cache-l2x0.h>
+ #include <asm/mach-types.h>
+ #include <asm/mach/arch.h>
+ #include <asm/mach/map.h>
+ #include <asm/mach/time.h>
+-#include <asm/hardware/cache-l2x0.h>
+-#include <video/sh_mobile_lcdc.h>
+-#include <video/sh_mobile_hdmi.h>
++#include <asm/page.h>
++#include <media/mt9t112.h>
++#include <media/sh_mobile_ceu.h>
++#include <media/soc_camera.h>
+ #include <sound/sh_fsi.h>
+ #include <sound/simple_card.h>
++#include <video/sh_mobile_hdmi.h>
++#include <video/sh_mobile_lcdc.h>
+ 
+ #include "common.h"
+ #include "irqs.h"
+-- 
+2.0.1
