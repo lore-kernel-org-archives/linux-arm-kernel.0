@@ -1,37 +1,84 @@
 From: tthayer@opensource.altera.com (tthayer at opensource.altera.com)
-Date: Mon, 11 Aug 2014 10:18:11 -0500
-Subject: [PATCHv10 0/2] Addition of Altera EDAC support
-Message-ID: <1407770293-27190-1-git-send-email-tthayer@opensource.altera.com>
+Date: Mon, 11 Aug 2014 10:18:13 -0500
+Subject: [PATCHv10 2/2] arm: dts: Add Altera SDRAM EDAC bindings & devicetree
+ entries.
+In-Reply-To: <1407770293-27190-1-git-send-email-tthayer@opensource.altera.com>
+References: <1407770293-27190-1-git-send-email-tthayer@opensource.altera.com>
+Message-ID: <1407770293-27190-3-git-send-email-tthayer@opensource.altera.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Thor Thayer <tthayer@opensource.altera.com>
 
-The Altera SDRAM controller EDAC support is added in this
-patch series. The SDRAM controller shares its registers with
-the EDAC, and 2 upcoming drivers (fpga bridge and power control).
-This series of patches started using the syscon driver to share
-the SDRAM controller registers but met with resistance. 
+Add the Altera SDRAM EDAC bindings and device tree changes to the Altera SoC project.
 
-In the last series of patches, this was changed to using an
-MFD for the SDRAM but the suggested changes began to look more 
-like the syscon interface. As a result, I'm resubmitting this
-with syscon and addressing some of the objections to the use
-of syscon. 
+Signed-off-by: Thor Thayer <tthayer@opensource.altera.com>
+---
+v2: Changes to SoC SDRAM EDAC code.
 
-Thor Thayer (2):
-  edac: altera: Add Altera SDRAM EDAC support.
-  arm: dts: Add Altera SDRAM EDAC bindings & devicetree entries.
+v3: Implement code suggestions for SDRAM EDAC code.
 
- .../bindings/arm/altera/socfpga-sdram-edac.txt     |   15 +
- MAINTAINERS                                        |    5 +
- arch/arm/boot/dts/socfpga.dtsi                     |   11 +
- drivers/edac/Kconfig                               |    9 +
- drivers/edac/Makefile                              |    2 +
- drivers/edac/altera_edac.c                         |  410 ++++++++++++++++++++
- 6 files changed, 452 insertions(+)
+v4: Remove syscon from SDRAM controller bindings.
+
+v5: No Change, bump version for consistency.
+
+v6: Only map the ctrlcfg register as syscon.
+
+v7: No change. Bump for consistency.
+
+v8: No change. Bump for consistency.
+
+v9: Changes to support a MFD SDRAM controller with nested EDAC.
+
+v10: Revert to using syscon based on feedback.
+---
+ .../bindings/arm/altera/socfpga-sdram-edac.txt     |   15 +++++++++++++++
+ arch/arm/boot/dts/socfpga.dtsi                     |   11 +++++++++++
+ 2 files changed, 26 insertions(+)
  create mode 100644 Documentation/devicetree/bindings/arm/altera/socfpga-sdram-edac.txt
- create mode 100644 drivers/edac/altera_edac.c
 
+diff --git a/Documentation/devicetree/bindings/arm/altera/socfpga-sdram-edac.txt b/Documentation/devicetree/bindings/arm/altera/socfpga-sdram-edac.txt
+new file mode 100644
+index 0000000..d0ce01d
+--- /dev/null
++++ b/Documentation/devicetree/bindings/arm/altera/socfpga-sdram-edac.txt
+@@ -0,0 +1,15 @@
++Altera SOCFPGA SDRAM Error Detection & Correction [EDAC]
++The EDAC accesses a range of registers in the SDRAM controller.
++
++Required properties:
++- compatible : should contain "altr,sdram-edac";
++- altr,sdr-syscon : phandle of the sdr module
++- interrupts : Should contain the SDRAM ECC IRQ in the
++	appropriate format for the IRQ controller.
++
++Example:
++	sdramedac {
++		compatible = "altr,sdram-edac";
++		altr,sdr-syscon = <&sdr>;
++		interrupts = <0 39 4>;
++	};
+diff --git a/arch/arm/boot/dts/socfpga.dtsi b/arch/arm/boot/dts/socfpga.dtsi
+index 4676f25..45b361e 100644
+--- a/arch/arm/boot/dts/socfpga.dtsi
++++ b/arch/arm/boot/dts/socfpga.dtsi
+@@ -603,6 +603,17 @@
+ 			};
+ 		};
+ 
++		sdr: sdr at ffc25000 {
++			compatible = "syscon";
++			reg = <0xffc25000 0x1000>;
++		};
++
++		sdramedac {
++			compatible = "altr,sdram-edac";
++			altr,sdr-syscon = <&sdr>;
++			interrupts = <0 39 4>;
++		};
++
+ 		L2: l2-cache at fffef000 {
+ 			compatible = "arm,pl310-cache";
+ 			reg = <0xfffef000 0x1000>;
 -- 
 1.7.9.5
