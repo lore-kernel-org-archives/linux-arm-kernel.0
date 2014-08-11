@@ -1,45 +1,68 @@
-From: eparis@redhat.com (Eric Paris)
-Date: Mon, 11 Aug 2014 09:22:24 -0400
-Subject: [PATCH] arm64: audit: Fix build for audit changes
-In-Reply-To: <20140811090947.GC15344@arm.com>
-References: <1405596402-23844-1-git-send-email-broonie@kernel.org>
- <20140811090947.GC15344@arm.com>
-Message-ID: <1407763344.2423.0.camel@redhat.com>
+From: andrew@lunn.ch (Andrew Lunn)
+Date: Mon, 11 Aug 2014 15:21:34 +0200
+Subject: [PATCH v2 0/6] mvebu: Network devicetree pin muxing
+In-Reply-To: <1407759281-11513-1-git-send-email-ezequiel.garcia@free-electrons.com>
+References: <1407759281-11513-1-git-send-email-ezequiel.garcia@free-electrons.com>
+Message-ID: <20140811132134.GI26751@lunn.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 2014-08-11 at 10:09 +0100, Will Deacon wrote:
-> On Thu, Jul 17, 2014 at 12:26:42PM +0100, Mark Brown wrote:
-> > From: Mark Brown <broonie@linaro.org>
-> > 
-> > Commit 3efe33f5d2 (audit: x86: drop arch from __audit_syscall_entry()
-> > interface) removed the arch parameter from __audit_syscall_entry() and
-> > updated the only current user in mainline but this breaks the ARMv8 audit
-> > code that has been added in -next. Fix this by making the equivalent
-> > update to ARMv8.
-> > 
-> > Signed-off-by: Mark Brown <broonie@linaro.org>
-> > ---
-> >  arch/arm64/kernel/ptrace.c | 4 ++--
-> >  1 file changed, 2 insertions(+), 2 deletions(-)
-> > 
-> > diff --git a/arch/arm64/kernel/ptrace.c b/arch/arm64/kernel/ptrace.c
-> > index 70526cfda056..310842e3d477 100644
-> > --- a/arch/arm64/kernel/ptrace.c
-> > +++ b/arch/arm64/kernel/ptrace.c
-> > @@ -1115,8 +1115,8 @@ asmlinkage int syscall_trace_enter(struct pt_regs *regs)
-> >  	if (test_thread_flag(TIF_SYSCALL_TRACEPOINT))
-> >  		trace_sys_enter(regs, regs->syscallno);
-> >  
-> > -	audit_syscall_entry(syscall_get_arch(), regs->syscallno,
-> > -		regs->orig_x0, regs->regs[1], regs->regs[2], regs->regs[3]);
-> > +	audit_syscall_entry(regs->syscallno, regs->orig_x0, regs->regs[1],
-> > +			    regs->regs[2], regs->regs[3]);
+On Mon, Aug 11, 2014 at 09:14:35AM -0300, Ezequiel Garcia wrote:
+> This series adds the proper devicetree pin muxing for the network interfaces
+> on all Armada 370 boards.
 > 
-> Eric, Richard: when is 3efe33f5d2 ("audit: x86: drop arch from
-> __audit_syscall_entry() interface") going to hit mainline? I've been holding
-> off this fix until the offending commit is merged, but if that's not going
-> to happen for 3.17, then we probably need to do something else to fix -next.
+> The MDIO interface uses pins MPP17 and MPP18, and so this is needed
+> on all devices using MDIO.
+> 
+> For the ethernet interfaces, only the boards connecting with RGMII/GMII/MII
+> need the mux. On this SoC, the SGMII is available on dedicated SerDes lanes,
+> and so no MPP pin mux is required.
+> 
+> Given all the supported board use either RGMII or SGMII, we only add RGMII mux
+> configuration. The only board which uses SGMII is the Armada 370 Reference
+> Design board.
 
-I think I'm being lazy this window and not oging to send a pull.  So
-I'll pick up this fix as soon as rc1 cuts in my tree.
+Acked-by: Andrew Lunn <andrew@lunn.ch>
+
+	  Andrew
+
+> 
+> Patches have been tested on Armada 370 Mirabox only, using the recently submitted
+> mvneta support for barebox. The series is based on v3.16.
+> 
+> It would be great if someone else can test on the other boards, to make sure
+> no regressions are introduced.
+> 
+> Changes from v1:
+> 
+>   * Replaced mux node name: ge{0,1}_pins -> ge{0,1}_rgmii_pins to be clear
+>     about the MII.
+> 
+>   * Replaced {}_pins -> {}-pins, to be consistent.
+> 
+>   * Massaged the commit logs a bit.
+> 
+> Ezequiel Garcia (6):
+>   ARM: mvebu: Add network pin mux configuration for the Armada 370 SoC
+>   ARM: mvebu: Add proper pin muxing on Globalscale Mirabox board
+>   ARM: mvebu: Add proper pin muxing on the Armada 370 DB board
+>   ARM: mvebu: Add proper pin muxing on Netgear ReadyNAS 102
+>   ARM: mvebu: Add proper pin muxing on Netgear ReadyNAS 104
+>   ARM: mvebu: Add proper pin muxing on Armada 370 RD board
+> 
+>  arch/arm/boot/dts/armada-370-db.dts            |  6 ++++++
+>  arch/arm/boot/dts/armada-370-mirabox.dts       |  6 ++++++
+>  arch/arm/boot/dts/armada-370-netgear-rn102.dts |  4 ++++
+>  arch/arm/boot/dts/armada-370-netgear-rn104.dts |  6 ++++++
+>  arch/arm/boot/dts/armada-370-rd.dts            |  4 ++++
+>  arch/arm/boot/dts/armada-370.dtsi              | 19 +++++++++++++++++++
+>  6 files changed, 45 insertions(+)
+> 
+> -- 
+> 2.0.1
+> 
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
