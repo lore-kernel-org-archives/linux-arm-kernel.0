@@ -1,66 +1,80 @@
-From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Mon, 11 Aug 2014 17:42:33 +0200
-Subject: Building kernel for more than one SoC
-In-Reply-To: <20140804201712.GK30282@n2100.arm.linux.org.uk>
-References: <lrdi48$ls1$1@ger.gmane.org>
- <20140804201712.GK30282@n2100.arm.linux.org.uk>
-Message-ID: <53E8E469.9050807@atmel.com>
+From: b.zolnierkie@samsung.com (Bartlomiej Zolnierkiewicz)
+Date: Mon, 11 Aug 2014 17:42:49 +0200
+Subject: [RESEND PATCH 1/1] ARM: exynos_defconfig: Enable SBS battery
+ support
+In-Reply-To: <53E8BC8B.70709@collabora.co.uk>
+References: <1407755198-17568-1-git-send-email-javier.martinez@collabora.co.uk>
+ <1761549.yKSqfXafKr@amdc1032> <53E8BC8B.70709@collabora.co.uk>
+Message-ID: <35198339.PY7xVRQz0X@amdc1032>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 04/08/2014 22:17, Russell King - ARM Linux :
-> On Thu, Jul 31, 2014 at 01:59:36PM +0000, Grant Edwards wrote:
->> I'm told that it should be possible to build a kernel that will run on
->> two different SoC chips.  They're closely related (same ARM9 core,
->> many identical internal peripherals -- AT91SAM9G20 and 'G25), and
->> would likely have identical external hardware.
->>
->> In order to handle the internal periphals that differ, it was
->> recommended that I use loadable modules to keep the kernel size small.
->> However, my root filesystem is in RAM, so I don't see how loadable
->> modules helps unless I remove all of the .ko files from the root
->> filesystem after the kernel has booted.
-> 
-> I think whoever made that recommendation probably isn't aware of the
-> direction that mainline kernels are heading.
-> 
-> Where we're going with mainline kernels is to have a set of drivers
-> which work irrespective of the hardware you have.
-> 
-> We've actually had this policy for about the last decade - we've
-> supported building the same family of SoCs into one single kernel
-> (identified by their mach-* directory) and expecting that their
-> drivers will cope with the differences between the SoCs at runtime.
-> (Note that the CPU itself has never really come into it; we've had
-> good abstractions for the CPU support since the late 90's, with the
-> exception of a borderline between the ARMv5 and ARMv6 architectures.)
-> 
-> Whether the Atmel code does that or not, I don't know, but it _should_
-> do it.
 
-Absolutely, we do follow this policy for quite some time. So anything
-that prevents what Russell describes above should be considered as a bug ;-)
+Hi,
 
-> Over the last few years, we've been moving mainline towards even
-> tighter integration, where it's possible to build completely
-> dissimilar SoCs together, so ultimately we end up with: legacy kernels,
-> one multi-platform ARMv5 and earlier kernel, and one multi-platform
-> ARMv6 and later kernel.
-
-We are almost at the point where we can have a multi-platform ARMv6/7
-for sama5 SoCs and ARMv5 for our ARM9s.
-
->> It seems it would be simpler to just link in all required drivers for
->> both chips and discard the ones that aren't needed after kernel
->> initialization.
+On Monday, August 11, 2014 02:52:27 PM Javier Martinez Canillas wrote:
+> Hello Bartlomiej,
 > 
-> Even better is to abstract the differences and have the same driver
-> code deal with the different variants internally - the selection of
-> which variant being controlled via the device tree "compatible"
-> property, or another appropriate method.
+> On 08/11/2014 02:40 PM, Bartlomiej Zolnierkiewicz wrote:
+> >> index fc7d168..c390bb9 100644
+> >> --- a/arch/arm/configs/exynos_defconfig
+> >> +++ b/arch/arm/configs/exynos_defconfig
+> >> @@ -77,6 +77,7 @@ CONFIG_SPI_S3C64XX=y
+> >>  CONFIG_I2C_S3C2410=y
+> >>  CONFIG_DEBUG_GPIO=y
+> >>  CONFIG_POWER_SUPPLY=y
+> >> +CONFIG_BATTERY_SBS=m
+> > 
+> > Why not make it "=y"?
+> > 
+> > Rationale:
+> > - currently no hardware related option uses "=m" in exynos_defconfig
+> > - it would match the SBS option usage in multi_v7_defconfig
+> >
+> >>  CONFIG_CHARGER_TPS65090=y
+> >>  # CONFIG_HWMON is not set
+> >>  CONFIG_THERMAL=y
+> > 
+> 
+> I know but personally I think this should be changed. The idea of having a multi
+> platform kernel is to build a single kernel image that can be used to boot
+> different platforms. Not all platforms have a SBS-compliant battery so this
+> support shouldn't be built in the kernel image IMHO.
+> 
+> This also matches to what real users will do since distributions most likely
+> will have a minimal kernel and every possible hardware support will be enabled
+> as a loadable kernel module. This is what distros do for other platforms too.
+> 
+> If someone has a different use case and wants a kernel image that is optimized
+> for a particular platform then she has to create its own defconfig anyways.
 
-Sure. Everything in at91 is converted to device tree those days.
+Distributions usually use their own configs anyway and the current most
+popular use case for exynos_defconfig (not multi_v7_defconfig) seems to
+be to build kernel image alone and use it without any modules:
+
+$ grep "=m" arch/arm/configs/exynos_defconfig
+CONFIG_DM_CRYPT=m
+
+$ grep "=m" .config
+CONFIG_NET_IP_TUNNEL=m
+CONFIG_INET_TUNNEL=m
+CONFIG_IPV6=m
+CONFIG_INET6_XFRM_MODE_TRANSPORT=m
+CONFIG_INET6_XFRM_MODE_TUNNEL=m
+CONFIG_INET6_XFRM_MODE_BEET=m
+CONFIG_IPV6_SIT=m
+CONFIG_DM_CRYPT=m
+CONFIG_CRYPTO_RNG=m
+CONFIG_CRYPTO_ANSI_CPRNG=m
+
+What I'm trying to say is that there is a high probability that people
+will continue to use just the kernel image for exynos_defconfig and
+will therefore miss SBS battery support altogether (which is only 3.6
+kB of code more in the kernel image so there is no much gain in making
+it modular currently).
 
 Best regards,
--- 
-Nicolas Ferre
+--
+Bartlomiej Zolnierkiewicz
+Samsung R&D Institute Poland
+Samsung Electronics
