@@ -1,68 +1,53 @@
-From: andrew@lunn.ch (Andrew Lunn)
-Date: Mon, 11 Aug 2014 15:21:34 +0200
-Subject: [PATCH v2 0/6] mvebu: Network devicetree pin muxing
-In-Reply-To: <1407759281-11513-1-git-send-email-ezequiel.garcia@free-electrons.com>
-References: <1407759281-11513-1-git-send-email-ezequiel.garcia@free-electrons.com>
-Message-ID: <20140811132134.GI26751@lunn.ch>
+From: Suravee.Suthikulpanit@amd.com (Suthikulpanit, Suravee)
+Date: Mon, 11 Aug 2014 13:30:50 +0000
+Subject: [PATCH 0/4] irqchip: gic-v2m: Rework GICv2m Initialization
+In-Reply-To: <53E87ADA.6040204@arm.com>
+References: <1407539836-9768-1-git-send-email-suravee.suthikulpanit@amd.com>
+ <53E87ADA.6040204@arm.com>
+Message-ID: <02D2024799561B48A732D1A51CB969E836F74ABC@satlexdag05.amd.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Aug 11, 2014 at 09:14:35AM -0300, Ezequiel Garcia wrote:
-> This series adds the proper devicetree pin muxing for the network interfaces
-> on all Armada 370 boards.
-> 
-> The MDIO interface uses pins MPP17 and MPP18, and so this is needed
-> on all devices using MDIO.
-> 
-> For the ethernet interfaces, only the boards connecting with RGMII/GMII/MII
-> need the mux. On this SoC, the SGMII is available on dedicated SerDes lanes,
-> and so no MPP pin mux is required.
-> 
-> Given all the supported board use either RGMII or SGMII, we only add RGMII mux
-> configuration. The only board which uses SGMII is the Armada 370 Reference
-> Design board.
+Marc,
 
-Acked-by: Andrew Lunn <andrew@lunn.ch>
+Jason already created a branch irqchip/gic-v2m, which I have created my patch against.  So, what branch do you want me to re-create a patch against for you to review?
 
-	  Andrew
+Suravee
 
+-----Original Message-----
+From: Marc Zyngier [mailto:marc.zyngier at arm.com] 
+Sent: Monday, August 11, 2014 3:12 AM
+To: Suthikulpanit, Suravee
+Cc: Mark Rutland; jason at lakedaemon.net; Pawel Moll; Catalin Marinas; Will Deacon; tglx at linutronix.de; Kasiviswanathan, Harish; linux-arm-kernel at lists.infradead.org; linux-pci at vger.kernel.org; linux-kernel at vger.kernel.org; linux-doc at vger.kernel.org; devicetree at vger.kernel.org
+Subject: Re: [PATCH 0/4] irqchip: gic-v2m: Rework GICv2m Initialization
+
+Hi Suravee,
+
+On 09/08/14 00:17, suravee.suthikulpanit at amd.com wrote:
+> From: Suravee Suthikulpanit <Suravee.Suthikulpanit@amd.com>
 > 
-> Patches have been tested on Armada 370 Mirabox only, using the recently submitted
-> mvneta support for barebox. The series is based on v3.16.
+> This patch set reworks the GICv2m initialization based on Marc Zyngier 
+> review comments.
 > 
-> It would be great if someone else can test on the other boards, to make sure
-> no regressions are introduced.
+> * Rebase to git://git.infradead.org/users/jcooper/linux.git 
+> irqchip/gic-v2m
 > 
-> Changes from v1:
+> Suravee Suthikulpanit (1):
+>   irqchip/gic-v2m: Restructure the initalization code for v2m
 > 
->   * Replaced mux node name: ge{0,1}_pins -> ge{0,1}_rgmii_pins to be clear
->     about the MII.
+>  Documentation/devicetree/bindings/arm/gic.txt |  37 +++++++--
+>  drivers/irqchip/irq-gic-v2m.c                 | 115 +++++++++-----------------
+>  drivers/irqchip/irq-gic.c                     |  30 +++----
+>  drivers/irqchip/irq-gic.h                     |  10 +--
+>  4 files changed, 91 insertions(+), 101 deletions(-)
 > 
->   * Replaced {}_pins -> {}-pins, to be consistent.
-> 
->   * Massaged the commit logs a bit.
-> 
-> Ezequiel Garcia (6):
->   ARM: mvebu: Add network pin mux configuration for the Armada 370 SoC
->   ARM: mvebu: Add proper pin muxing on Globalscale Mirabox board
->   ARM: mvebu: Add proper pin muxing on the Armada 370 DB board
->   ARM: mvebu: Add proper pin muxing on Netgear ReadyNAS 102
->   ARM: mvebu: Add proper pin muxing on Netgear ReadyNAS 104
->   ARM: mvebu: Add proper pin muxing on Armada 370 RD board
-> 
->  arch/arm/boot/dts/armada-370-db.dts            |  6 ++++++
->  arch/arm/boot/dts/armada-370-mirabox.dts       |  6 ++++++
->  arch/arm/boot/dts/armada-370-netgear-rn102.dts |  4 ++++
->  arch/arm/boot/dts/armada-370-netgear-rn104.dts |  6 ++++++
->  arch/arm/boot/dts/armada-370-rd.dts            |  4 ++++
->  arch/arm/boot/dts/armada-370.dtsi              | 19 +++++++++++++++++++
->  6 files changed, 45 insertions(+)
-> 
-> -- 
-> 2.0.1
-> 
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+
+While I appreciate that you're trying to reduce the amount of stuff we review, it is actually much easier to look at the patch series as a whole, rather then as a diff against the previous version.
+
+Please squash this into your original series and repost it with a log of what has changed in the cover letter.
+
+Thanks,
+
+	M.
+--
+Jazz is not dead. It just smells funny...
