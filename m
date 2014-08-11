@@ -1,43 +1,66 @@
-From: fkan@apm.com (Feng Kan)
-Date: Mon, 11 Aug 2014 11:05:23 -0700
-Subject: [PATCH V2] arm64: optimized copy_to_user and copy_from_user
- assembly code
-In-Reply-To: <CAC8NTUXb1JmHwMLjmJtEKXjb+xYtuO4qKnSqMRWwACs35P8_HA@mail.gmail.com>
-References: <1407538940-9167-1-git-send-email-fkan@apm.com>
- <CAC8NTUXb1JmHwMLjmJtEKXjb+xYtuO4qKnSqMRWwACs35P8_HA@mail.gmail.com>
-Message-ID: <CAL85gmChQCM3iw-xqy-bkGRWH0jDvGf7v-GnxynS4HoOkL-cwQ@mail.gmail.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Mon, 11 Aug 2014 19:05:42 +0100
+Subject: [PATCHv6 3/5] common: dma-mapping: Introduce common remapping
+ functions
+In-Reply-To: <53E55C86.3040705@codeaurora.org>
+References: <1407529397-6642-1-git-send-email-lauraa@codeaurora.org>
+ <1407529397-6642-3-git-send-email-lauraa@codeaurora.org>
+ <20140808154556.11c7bf68d1bcf2714c148e3b@linux-foundation.org>
+ <53E55C86.3040705@codeaurora.org>
+Message-ID: <20140811180542.GI13871@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Aug 10, 2014 at 8:01 PM, Radha Mohan <mohun106@gmail.com> wrote:
-> Hi Feng,
->
->
->> +
->> +.Lcpy_not_short:
->> +       /*
->> +        * We don't much care about the alignment of DST, but we want SRC
->> +        * to be 128-bit (16 byte) aligned so that we don't cross cache line
->> +        * boundaries on both loads and stores.
->> +        */
->
-> Could you please tell why is destination alignment not an issue? Is
-> this a generic implementation that you are referring to or specific to
-> your platform?
-This is per Linaro Cortext String optimization routines.
+On Sat, Aug 09, 2014 at 12:25:58AM +0100, Laura Abbott wrote:
+> On 8/8/2014 3:45 PM, Andrew Morton wrote:
+> > On Fri,  8 Aug 2014 13:23:15 -0700 Laura Abbott <lauraa@codeaurora.org> wrote:
+> >> For architectures without coherent DMA, memory for DMA may
+> >> need to be remapped with coherent attributes. Factor out
+> >> the the remapping code from arm and put it in a
+> >> common location to reduce code duplication.
+> >>
+> >> As part of this, the arm APIs are now migrated away from
+> >> ioremap_page_range to the common APIs which use map_vm_area for remapping.
+> >> This should be an equivalent change and using map_vm_area is more
+> >> correct as ioremap_page_range is intended to bring in io addresses
+> >> into the cpu space and not regular kernel managed memory.
+> >>
+> >> ...
+> >>
+> >> @@ -267,3 +269,68 @@ int dma_common_mmap(struct device *dev, struct vm_area_struct *vma,
+> >>  	return ret;
+> >>  }
+> >>  EXPORT_SYMBOL(dma_common_mmap);
+> >> +
+> >> +/*
+> >> + * remaps an allocated contiguous region into another vm_area.
+> >> + * Cannot be used in non-sleeping contexts
+> >> + */
+> >> +
+> >> +void *dma_common_contiguous_remap(struct page *page, size_t size,
+> >> +			unsigned long vm_flags,
+> >> +			pgprot_t prot, const void *caller)
+> >> +{
+> >> +	int i;
+> >> +	struct page **pages;
+> >> +	void *ptr;
+> >> +
+> >> +	pages = kmalloc(sizeof(struct page *) << get_order(size), GFP_KERNEL);
+> >> +	if (!pages)
+> >> +		return NULL;
+> >> +
+> >> +	for (i = 0; i < (size >> PAGE_SHIFT); i++)
+> >> +		pages[i] = page + i;
+> > 
+> > Assumes a single mem_map[] array.  That's not the case for sparsemem
+> > (at least).
+> 
+> Good point. I guess the best option is to increment via pfn and call
+> pfn_to_page. Either that or go back to slightly abusing
+> ioremap_page_range to remap normal memory.
 
-https://launchpad.net/cortex-strings
+I now noticed you suggested the pfn_to_page(). I think this should work
+and it's better than ioremap_page_range().
 
-Zhichang submitted something similar for the memcpy from the
-same optimization.
-
-Sorry resend in text mode.
->
->> --
->> 1.9.1
->>
->>
->> _______________________________________________
->> linux-arm-kernel mailing list
->> linux-arm-kernel at lists.infradead.org
->> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+-- 
+Catalin
