@@ -1,72 +1,124 @@
-From: ipaton0@gmail.com (Iain Paton)
-Date: Sun, 10 Aug 2014 23:36:45 +0100
-Subject: [BUG]: imx6q (wandboard): Very unstable ethernet since kernel 3.16
-In-Reply-To: <53E56C4E.9090708@boundarydevices.com>
-References: <1407503758.19455.1.camel@sharkbay.at>	<20140808132754.GC30282@n2100.arm.linux.org.uk>	<1407507023.19455.3.camel@sharkbay.at>	<20140808143008.GD30282@n2100.arm.linux.org.uk>	<1407509932.19455.7.camel@sharkbay.at>	<53E548DB.90905@boundarydevices.com>
- <CAHKv19Cky2+vEOirwwd8xhix_V0Vivn_6BbuYq+D_k0o8o4Gsg@mail.gmail.com>
- <53E56C4E.9090708@boundarydevices.com>
-Message-ID: <53E7F3FD.9030009@gmail.com>
+From: cmetcalf@tilera.com (Chris Metcalf)
+Date: Mon, 11 Aug 2014 02:38:43 +0000
+Subject: [PATCH 2/5] char: tile-srom: Remove reference to platform_bus
+In-Reply-To: <1407515691.31897.26.camel@hornet>
+References: <1406298233-27876-1-git-send-email-pawel.moll@arm.com>
+ <1406298233-27876-2-git-send-email-pawel.moll@arm.com>
+ <53DAA605.2030500@tilera.com> <1406913678.22529.46.camel@hornet>
+ <53E139C8.9000502@tilera.com>,<1407515691.31897.26.camel@hornet>
+Message-ID: <16873F3E-2114-41B6-A2F1-EF87D4DA01D2@tilera.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09/08/14 01:33, Troy Kisky wrote:
-> On 8/8/2014 3:51 PM, George Joseph wrote:
->> On Fri, Aug 8, 2014 at 4:02 PM, Troy Kisky <troy.kisky@boundarydevices.com
->> <mailto:troy.kisky@boundarydevices.com>> wrote:
->>
->>     On 8/8/2014 7:58 AM, Thomas Scheiblauer wrote:
->>     >
->>     >
->>     > Indeed, commenting out these 2 lines in
->>     > arch/arm/boot/dts/imx6qdl-wandboard.dtsi fixes my problem without having
->>     > to increase TX_RING_SIZE.
->>     > Thank you very much!
->>     >
->>     Could you also please checkout commit
->>
->>     commit 9fc77821b17155c6e0ab50b1e1dd80c2b0e63e98
->>     Author: Sascha Silbe <x-linux at infra-silbe.de <mailto:x-linux@infra-silbe.de>>
->>     Date:   Thu Feb 6 23:24:13 2014 +0100
->>
->>         ARM: dts: imx6qdl-wandboard: use GPIO_6 for FEC interrupt
->>
->>
->>     and see if it also shows ethernet instabilities?
->>
->>
->> I'm confused by the references to GPIO_6 and GPIO1_IO06 as it relates to the wandboard.   According
->> to the schematic for both the rev B1 and C1, the GPIO_6 PAD is physically connected to pin 30 on the
->> camera interface and according to the dtb tree, GPIO1_IO06 isn't mapped to any PAD.
->>
->> This kinda fits with my own observation which is that Ethernet is working fine (40MB/s sustained)
->> regardless of whether fec is using "gpio1 6" and "intc 0 119" for extended interrupts or the default
->> "intc 0 118" and "intc 0 119".   Otherwise stock 3.16.0 on WB Quad C1.
->>
-> Are you using a wandboard also?   With or without camera plugged in?
+Thanks for the code and comments. I'm out on vacation till mid next week but I'll look at this when I get back.
+Chris
 
-I have:
-
-2x WBQUAD (B1)  i.MX6Q, silicon rev 1.2
-1x Sabre-Lite   i.MX6Q, silicon rev 1.0
-2x Sabre-Lite   i.MX6Q, silicon rev 1.2
-2x RIoTboard i.MX6Solo, silicon rev 1.1
-1x MarSBoard i.MX6Dual, silicon rev 1.2 (I haven't posted the dts for this yet)
-
-all with the GPIO_6 interrupt patch in place, no cameras or anything else 
-connected to that pad, no issues seen on 3.15 or 3.16 
-
-I had seen problems on earlier kernels, before the GPIO_6 workaround was 
-implemented, where one of my Sabre-Lite boards (only one, and always the 
-same one) would vanish off the network for a few minutes. I'd even had it 
-happen while in the middle of typing something over an ssh connection.
-Connectivity usually seemed to recover on it's own eventually, or I 
-could log in over a serial connection and ping something else on the 
-network which would restore the connection immediately.
-After the GPIO_6 workaround was implemented I've never had the problem 
-re-occur.
-
-I use the two wandboards and the three sabre-lites as builders with 
-distcc and nfs in the mix, so network issues usually show up fairly 
-quickly.
-
-Iain
+> On Aug 8, 2014, at 12:35 PM, "Pawel Moll" <pawel.moll@arm.com> wrote:
+> 
+> On Tue, 2014-08-05 at 21:08 +0100, Chris Metcalf wrote:
+>>>> In addition, we also have user binaries
+>>>> in the wild that know to look for /sys/devices/platform/srom/ paths,
+>>>> so I'm pretty reluctant to change this path without good reason.
+>>> So what is the srom class for then if not for device discovery? And why
+>>> do they look for them in the first place? To get relevant character
+>>> device's data, if I understand it right?
+>>> 
+>>> Maybe you could just register a simple "proper" platform device for all
+>>> the sroms and then hang the class devices from it? I can type some code
+>>> doing this if it sound reasonably?
+>> 
+>> I'm not sure exactly what you mean by device discovery here.  
+> 
+> 
+> 
+>> The
+>> subdirectories under /sys/devices/platform/srom/ correspond to partitions
+>> in the SPI-ROM, which are software constructs created by the Tilera hypervisor.
+>> By default we have three, where the first holds boot data that the chip
+>> can use to boot out of hardware, and the other two are smaller partitions
+>> for boot- and user-specific data.  We use the /sys files primarily to get the
+>> page size and sector size for the sroms, and also export other interesting
+>> information like the total size of the particular srom device.
+>> 
+>> Thank you for volunteering to write a bit of code; if that's the best
+>> way to clarify this for us, fantastic, or else pointing us at existing
+>> good practices or documentation would be great too.
+> 
+> I was thinking about something like the following (warning, untested)
+> 
+> 8<-------------------------------------------
+> From c53f0a2492d6cd38d1f82d57916a6528b071e8a8 Mon Sep 17 00:00:00 2001
+> From: Pawel Moll <pawel.moll@arm.com>
+> Date: Fri, 8 Aug 2014 16:32:58 +0100
+> Subject: [PATCH] char: tile-srom: Add real platform bus parent
+> 
+> Add a real platform bus device as a parent for
+> the srom class devices, to prevent non-platform
+> devices hanging from the bus root.
+> 
+> Signed-off-by: Pawel Moll <pawel.moll@arm.com>
+> ---
+> drivers/char/tile-srom.c | 13 ++++++++++++-
+> 1 file changed, 12 insertions(+), 1 deletion(-)
+> 
+> diff --git a/drivers/char/tile-srom.c b/drivers/char/tile-srom.c
+> index bd37747..7fb0fd5 100644
+> --- a/drivers/char/tile-srom.c
+> +++ b/drivers/char/tile-srom.c
+> @@ -76,6 +76,7 @@ MODULE_LICENSE("GPL");
+> 
+> static int srom_devs;            /* Number of SROM partitions */
+> static struct cdev srom_cdev;
+> +static struct platform_device *srom_parent;
+> static struct class *srom_class;
+> static struct srom_dev *srom_devices;
+> 
+> @@ -350,7 +351,7 @@ static int srom_setup_minor(struct srom_dev *srom, int index)
+>               SROM_PAGE_SIZE_OFF, sizeof(srom->page_size)) < 0)
+>        return -EIO;
+> 
+> -    dev = device_create(srom_class, &platform_bus,
+> +    dev = device_create(srom_class, srom_parent,
+>                MKDEV(srom_major, index), srom, "%d", index);
+>    return PTR_ERR_OR_ZERO(dev);
+> }
+> @@ -415,6 +416,13 @@ static int srom_init(void)
+>    if (result < 0)
+>        goto fail_chrdev;
+> 
+> +    /* Create a parent device */
+> +    srom_parent = platform_device_register_simple("srom", -1, NULL, 0);
+> +    if (IS_ERR(srom_parent)) {
+> +        result = PTR_ERR(srom_parent);
+> +        goto fail_pdev;
+> +    }
+> +
+>    /* Create a sysfs class. */
+>    srom_class = class_create(THIS_MODULE, "srom");
+>    if (IS_ERR(srom_class)) {
+> @@ -438,6 +446,8 @@ fail_class:
+>        device_destroy(srom_class, MKDEV(srom_major, i));
+>    class_destroy(srom_class);
+> fail_cdev:
+> +    platform_device_unregister(srom_parent);
+> +fail_pdev:
+>    cdev_del(&srom_cdev);
+> fail_chrdev:
+>    unregister_chrdev_region(dev, srom_devs);
+> @@ -454,6 +464,7 @@ static void srom_cleanup(void)
+>        device_destroy(srom_class, MKDEV(srom_major, i));
+>    class_destroy(srom_class);
+>    cdev_del(&srom_cdev);
+> +    platform_device_unregister(srom_parent);
+>    unregister_chrdev_region(MKDEV(srom_major, 0), srom_devs);
+>    kfree(srom_devices);
+> }
+> -- 
+> 1.9.1
+> 8<-------------------------------------------
+> 
+> Would that work for you? Note that it will move the srom class devices
+> one level deeper in /sys/devices/... hierarchy.
+> 
+> Pawe?
+> 
