@@ -1,110 +1,102 @@
-From: k.chander@samsung.com (Chander Kashyap)
-Date: Mon, 11 Aug 2014 11:52:44 +0530
-Subject: [PATCH] ARM: Exynos: remove arm diagnostic and power register
- save/restore code
-Message-ID: <1407738165-10139-1-git-send-email-k.chander@samsung.com>
+From: chander.kashyap@gmail.com (Chander M. Kashyap)
+Date: Mon, 11 Aug 2014 12:06:10 +0530
+Subject: [GIT PULL 3/5] Samsung exynos cpuidle update for v3.17
+In-Reply-To: <010101cfb369$dfe6da20$9fb48e60$@samsung.com>
+References: <53C9C159.4070305@samsung.com>
+ <CAGa+x86XpkxEhe2D9NfFvWhTre-mAPkcsyzObb8q=Xa=Yd2Xdw@mail.gmail.com>
+ <010101cfb369$dfe6da20$9fb48e60$@samsung.com>
+Message-ID: <CADWw7OjrK6cb1zZ3Ud_W89K5hn9nxuvLwCV5DqHa4TEiGw+T5w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-As save/restore of arm "diagnostic" and "power" registers is handled by
-generic code, so remove the same.
+Hi Kukjin,
 
-Signed-off-by: Chander Kashyap <k.chander@samsung.com>
----
- arch/arm/mach-exynos/pm.c |   54 ++-------------------------------------------
- 1 file changed, 2 insertions(+), 52 deletions(-)
+On Sat, Aug 9, 2014 at 6:05 AM, Kukjin Kim <kgene.kim@samsung.com> wrote:
+> Kevin Hilman wrote:
+>>
+>> Hello,
+>>
+> Hi,
+>
+>> On Fri, Jul 18, 2014 at 5:52 PM, Kukjin Kim <kgene.kim@samsung.com> wrote:
+>> > The following changes since commit 1795cd9b3a91d4b5473c97f491d63892442212ab:
+>> >
+>> >   Linux 3.16-rc5 (2014-07-13 14:04:33 -0700)
+>> >
+>> > are available in the git repository at:
+>> >
+>> >   git://git.kernel.org/pub/scm/linux/kernel/git/kgene/linux-samsung.git
+>> > tags/exynos-cpuidle
+>> >
+>> > for you to fetch changes up to fc2cac41ebbfb16da8b036cba6ec6714ab780a6d:
+>> >
+>> >   ARM: EXYNOS: populate suspend and powered_up callbacks for mcpm
+>> > (2014-07-19 03:36:00 +0900)
+>> >
+>> > ----------------------------------------------------------------
+>> > exynos cpuidle update for v3.17
+>> >
+>> > - add callbacks exynos_suspend() and exynos_powered_up()
+>> >   for support cpuidle through mcpm
+>> > - skip exynos_cpuidle for exynos5420 because is uses
+>> >   cpuidle-big-liggle generic cpuidle driver
+>> > - add generic functions to calculate cpu number is used
+>> >   for pmu and this is required for exynos5420 multi-cluster
+>> > - add of_device_id structure for big.LITTLE cpuidle and
+>> >   add "samsung,exynos5420" compatible string for exynos5420
+>>
+>> I'm curious what platforms this is expected to work on, and where it's
+>> been tested.
+>>
+> exynos5420 and its reference board, smdk5420.
+>
+>> I tried it on exynos5800-peach-pi (chromebook2) and it hangs up (no
+>> kernel messages) shortly after the driver loads, and never finishes to
+>> boot.
+>>
+> Oh, sorry about that, if so, it should be fixed before -rc1. Just note that I
+> thought since exynos5800 is very similar with exynos5420 so I didn't ask
+> Chander to test the series on exynos5800 based board...Just asked to test with
+> Nico's mcpm series. BTW, unfortunately I have no exynos5800-peach-pi...
+>
+>> I needed an extra compatible entry for the 5800 in the driver for the
+>> driver to load, which suggests it hasn't been tested on 5800, but at
+>> least in theory, this should be compatible with the 542x, right?
+>>
+> Yes I think so. As you can see in exynos5800.dtsi, it is including exynos5420.
+>
+>> For testing, I tried today's linux-next and arm-soc/for-next.
+>>
+> Hmm...why is the problem happened at last? Not at that time? :(
 
-diff --git a/arch/arm/mach-exynos/pm.c b/arch/arm/mach-exynos/pm.c
-index 18646b7..af99c55 100644
---- a/arch/arm/mach-exynos/pm.c
-+++ b/arch/arm/mach-exynos/pm.c
-@@ -134,45 +134,6 @@ void exynos_enter_aftr(void)
- 	exynos_sys_powerdown_conf(SYS_AFTR);
- }
- 
--/* For Cortex-A9 Diagnostic and Power control register */
--static unsigned int save_arm_register[2];
--
--static void exynos_cpu_save_register(void)
--{
--	unsigned long tmp;
--
--	/* Save Power control register */
--	asm ("mrc p15, 0, %0, c15, c0, 0"
--	     : "=r" (tmp) : : "cc");
--
--	save_arm_register[0] = tmp;
--
--	/* Save Diagnostic register */
--	asm ("mrc p15, 0, %0, c15, c0, 1"
--	     : "=r" (tmp) : : "cc");
--
--	save_arm_register[1] = tmp;
--}
--
--static void exynos_cpu_restore_register(void)
--{
--	unsigned long tmp;
--
--	/* Restore Power control register */
--	tmp = save_arm_register[0];
--
--	asm volatile ("mcr p15, 0, %0, c15, c0, 0"
--		      : : "r" (tmp)
--		      : "cc");
--
--	/* Restore Diagnostic register */
--	tmp = save_arm_register[1];
--
--	asm volatile ("mcr p15, 0, %0, c15, c0, 1"
--		      : : "r" (tmp)
--		      : "cc");
--}
--
- static int exynos_cpu_suspend(unsigned long arg)
- {
- #ifdef CONFIG_CACHE_L2X0
-@@ -238,9 +199,6 @@ static int exynos_pm_suspend(void)
- 	tmp = (S5P_USE_STANDBY_WFI0 | S5P_USE_STANDBY_WFE0);
- 	pmu_raw_writel(tmp, S5P_CENTRAL_SEQ_OPTION);
- 
--	if (read_cpuid_part() == ARM_CPU_PART_CORTEX_A9)
--		exynos_cpu_save_register();
--
- 	return 0;
- }
- 
-@@ -272,9 +230,6 @@ static void exynos_pm_resume(void)
- 	if (exynos_pm_central_resume())
- 		goto early_wakeup;
- 
--	if (read_cpuid_part() == ARM_CPU_PART_CORTEX_A9)
--		exynos_cpu_restore_register();
--
- 	/* For release retention */
- 
- 	pmu_raw_writel((1 << 28), S5P_PAD_RET_MAUDIO_OPTION);
-@@ -376,19 +331,14 @@ static int exynos_cpu_pm_notifier(struct notifier_block *self,
- 
- 	switch (cmd) {
- 	case CPU_PM_ENTER:
--		if (cpu == 0) {
-+		if (cpu == 0)
- 			exynos_pm_central_suspend();
--			if (read_cpuid_part() == ARM_CPU_PART_CORTEX_A9)
--				exynos_cpu_save_register();
--		}
- 		break;
- 
- 	case CPU_PM_EXIT:
- 		if (cpu == 0) {
--			if (read_cpuid_part() == ARM_CPU_PART_CORTEX_A9) {
-+			if (read_cpuid_part() == ARM_CPU_PART_CORTEX_A9)
- 				scu_enable(S5P_VA_SCU);
--				exynos_cpu_restore_register();
--			}
- 			exynos_pm_central_resume();
- 		}
- 		break;
+Patch has been sent for the same:
+http://lists.infradead.org/pipermail/linux-arm-kernel/2014-July/270472.html
+
+This patch has been dropped as Tomasz has sent the fix in his patch.
+
+Below is the link for the patch:
+
+https://lkml.org/lkml/2014/8/1/103
+
+which is yet to be merged.
+
+
+>
+> I need to figure it out...
+>
+> Thanks,
+> Kukjin
+>
+>
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+
+
+
 -- 
-1.7.9.5
+thanks and regards,
+Chander M. Kashyap
+Contact Number: +918123738320
+------- TENSION LENE KA NAHI, DENE KE-----
