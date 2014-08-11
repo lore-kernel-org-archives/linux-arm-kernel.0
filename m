@@ -1,47 +1,70 @@
-From: heiko@sntech.de (Heiko =?ISO-8859-1?Q?St=FCbner?=)
-Date: Mon, 11 Aug 2014 20:41:59 +0200
-Subject: [PATCH] ARM: dts: rockchip: readd missing mmc0 pinctrl settings
-Message-ID: <1626837.6qR3aISu0X@diego>
+From: dianders@chromium.org (Doug Anderson)
+Date: Mon, 11 Aug 2014 11:47:29 -0700
+Subject: [PATCH] ARM: dts: Move the PMIC interrupt pinctrl line to rk3288-evb
+ common
+Message-ID: <1407782849-11056-1-git-send-email-dianders@chromium.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-During the restructuring of the Rockchip Cortex-A9 dtsi files it seems
-like the pinctrl settings vanished at some point from the mmc0 support.
+The PMIC interrupt pinctrl line was added to the rk3288-evb-act8846,
+but it's the same line on both the ACT8846 version and the RK808
+version.  This makes a lot of sense since they share the same SoC
+daugherboard.  Move the pinctrl definition to the common file so we
+can use it for the RK808 version.
 
-This of course renders them unusable, so readd the necessary pinctrl
-properties.
+NOTE: The PMIC interrupt doesn't _actually_ go to the PMIC on the
+ACT8846 version of the board (it does on the RK808), but our
+convention is to label things as they're labelled on the schematics.
+In the very least you can argue that this is the interrupt from the
+PMIC daughtercard even if it doesn't actually go to the PMIC chip.
 
-Signed-off-by: Heiko Stuebner <heiko@sntech.de>
+Signed-off-by: Doug Anderson <dianders@chromium.org>
 ---
- arch/arm/boot/dts/rk3066a-bqcurie2.dts | 2 ++
- arch/arm/boot/dts/rk3188-radxarock.dts | 2 ++
- 2 files changed, 4 insertions(+)
+ arch/arm/boot/dts/rk3288-evb-act8846.dts | 10 +---------
+ arch/arm/boot/dts/rk3288-evb.dtsi        |  6 ++++++
+ 2 files changed, 7 insertions(+), 9 deletions(-)
 
-diff --git a/arch/arm/boot/dts/rk3066a-bqcurie2.dts b/arch/arm/boot/dts/rk3066a-bqcurie2.dts
-index 042f821d..c9d912d 100644
---- a/arch/arm/boot/dts/rk3066a-bqcurie2.dts
-+++ b/arch/arm/boot/dts/rk3066a-bqcurie2.dts
-@@ -149,6 +149,8 @@
- &mmc0 { /* sdmmc */
- 	num-slots = <1>;
- 	status = "okay";
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&sd0_clk>, <&sd0_cmd>, <&sd0_cd>, <&sd0_bus4>;
- 	vmmc-supply = <&vcc_sd0>;
+diff --git a/arch/arm/boot/dts/rk3288-evb-act8846.dts b/arch/arm/boot/dts/rk3288-evb-act8846.dts
+index 7d59ff4..a76dd44 100644
+--- a/arch/arm/boot/dts/rk3288-evb-act8846.dts
++++ b/arch/arm/boot/dts/rk3288-evb-act8846.dts
+@@ -26,7 +26,7 @@
+ 		interrupts = <4 IRQ_TYPE_EDGE_FALLING>;
  
- 	slot at 0 {
-diff --git a/arch/arm/boot/dts/rk3188-radxarock.dts b/arch/arm/boot/dts/rk3188-radxarock.dts
-index 171b610..5e4e3c23 100644
---- a/arch/arm/boot/dts/rk3188-radxarock.dts
-+++ b/arch/arm/boot/dts/rk3188-radxarock.dts
-@@ -179,6 +179,8 @@
- &mmc0 {
- 	num-slots = <1>;
- 	status = "okay";
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&sd0_clk>, <&sd0_cmd>, <&sd0_cd>, <&sd0_bus4>;
- 	vmmc-supply = <&vcc_sd0>;
+ 		pinctrl-names = "default";
+-		pinctrl-0 = <&hym8563_int>;
++		pinctrl-0 = <&pmic_int>;
  
- 	slot at 0 {
+ 		#clock-cells = <0>;
+ 		clock-output-names = "xin32k";
+@@ -124,11 +124,3 @@
+ 		};
+ 	};
+ };
+-
+-&pinctrl {
+-	hym8563 {
+-		hym8563_int: hym8563-int {
+-			rockchip,pins = <RK_GPIO0 4 RK_FUNC_GPIO &pcfg_pull_up>;
+-		};
+-	};
+-};
+diff --git a/arch/arm/boot/dts/rk3288-evb.dtsi b/arch/arm/boot/dts/rk3288-evb.dtsi
+index 4f57209..ae3e10b 100644
+--- a/arch/arm/boot/dts/rk3288-evb.dtsi
++++ b/arch/arm/boot/dts/rk3288-evb.dtsi
+@@ -84,6 +84,12 @@
+ 		};
+ 	};
+ 
++	pmic {
++		pmic_int: pmic-int {
++			rockchip,pins = <RK_GPIO0 4 RK_FUNC_GPIO &pcfg_pull_up>;
++		};
++	};
++
+ 	usb {
+ 		host_vbus_drv: host-vbus-drv {
+ 			rockchip,pins = <0 14 RK_FUNC_GPIO &pcfg_pull_none>;
 -- 
-2.0.1
+2.0.0.526.g5318336
