@@ -1,50 +1,32 @@
-From: liam.r.girdwood@linux.intel.com (Liam Girdwood)
-Date: Mon, 11 Aug 2014 10:59:45 +0100
-Subject: [alsa-devel] [PATCH] ASoC: rt286: Add API to set supported jack
- type
-In-Reply-To: <20140807173136.GN17528@sirena.org.uk>
-References: <1407217970-20126-1-git-send-email-bardliao@realtek.com>
- <20140806205421.GZ17528@sirena.org.uk>
- <ABFD875FF5FB574BA706497D987D48D7608E00@RTITMBSV03.realtek.com.tw>
- <20140807173136.GN17528@sirena.org.uk>
-Message-ID: <1407751185.2487.150.camel@loki>
+From: will.deacon@arm.com (Will Deacon)
+Date: Mon, 11 Aug 2014 11:00:42 +0100
+Subject: master build: 1 failures 16 warnings (v3.16-8695-ga7d7a14)
+In-Reply-To: <20140808143227.GR17528@sirena.org.uk>
+References: <E1XFj9r-0003ZJ-40@cassiel.sirena.org.uk>
+ <20140808143227.GR17528@sirena.org.uk>
+Message-ID: <20140811100041.GM15344@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 2014-08-07 at 18:31 +0100, Mark Brown wrote:
-> On Thu, Aug 07, 2014 at 01:43:24AM +0000, Bard Liao wrote:
+On Fri, Aug 08, 2014 at 03:32:27PM +0100, Mark Brown wrote:
+> On Fri, Aug 08, 2014 at 01:20:31PM +0100, Build bot for Mark Brown wrote:
 > 
-> > > If this is coming from the hardware design I'd expect this to be configured
-> > > via platform data or firmware data rather than with an API.
-> > > Why do it this way?
+> > Failed defconfigs:
+> > 	arm64-allmodconfig
+> #
+> > Errors:
 > 
-> > Actually, this patch is for Intel platform which doesn't support platform data
-> > yet. That's why we create an API so they can call the API in machine driver.
+> > 	arm64-allmodconfig
+> > ../arch/arm64/xen/../../arm/xen/grant-table.c:53:5: error: conflicting types for 'arch_gnttab_init'
 > 
-> So, this is something that the people wanting to use ACPI in platforms
-> with devices like this are going to have to deal with - we need a way of
-> getting configuration to devices.  Traditionally small tweaks have been
-> done based on DMI information but that's not at all scalable.  I believe
-> newer ACPI specs are trying to accomodate this due to the expanding
-> range of systems supporting ACPI.  Punting to the machine driver just
-> moves the problem around, it doesn't really address it.
-> 
+> This build failure which was present in -next has now appeared in Linus'
+> tree too.  It appears to be the result of a mismerge, we have two
+> definitions of the function, one from b7dd0e350e0bd (x86/xen: safely map
+> and unmap grant frames when in atomic context) with the old signature
+> and one from 438b33c7145ca8a5131 (xen/grant-table: remove support for V2
+> tables).
 
-Unfortunately this will be needed for some Broadwell based BIOSes since
-the timing of the ACPI spec/implementation has meant that some Broadwell
-BIOSes will contain the data whilst most others wont atm :( 
+Stefano, Konrad: do you have a fix queued for this? I don't think there's a
+lot I can do from the arm64 side.
 
-> I've CCed in Graeme Gregory who's been writing some guidelines for this
-> sort of thing in the context of ARMv8 serviers - the most recent patch
-> is:
-> 
->    http://thread.gmane.org/gmane.linux.acpi.devel/69757
-> 
-> The advice there looks good to me - see the "Device Enumeration"
-> section.
-
-This is indeed good, just too late for the initial Broadwell BIOSes that
-wont have this _DSD field for the codec (it will be hard coded for
-Windows anyway).
-
-Liam
+Will
