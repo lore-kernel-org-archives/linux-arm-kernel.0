@@ -1,139 +1,77 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Mon, 11 Aug 2014 13:40:14 +0200
-Subject: [PATCH v3 1/8] dma: sun4i: Add support for the DMA engine on
- sun[457]i SoCs
-In-Reply-To: <53E3D56C.5030204@elopez.com.ar>
-References: <1407183002-29420-1-git-send-email-emilio@elopez.com.ar>
- <1407183002-29420-2-git-send-email-emilio@elopez.com.ar>
- <20140805200042.GO3952@lukather> <53E3D56C.5030204@elopez.com.ar>
-Message-ID: <20140811114014.GH15297@lukather>
+From: tomeu@tomeuvizoso.net (Tomeu Vizoso)
+Date: Mon, 11 Aug 2014 14:07:30 +0200
+Subject: [PATCH v2 0/2] Firmware-assisted suspend/resume of Exynos SoCs
+In-Reply-To: <1405612571-32598-1-git-send-email-t.figa@samsung.com>
+References: <1405612571-32598-1-git-send-email-t.figa@samsung.com>
+Message-ID: <CAAObsKB3vO1KtgSvDY-+1WA4qDFVS_A6cXZM=vr9U1gVM=v=5g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Aug 07, 2014 at 04:37:16PM -0300, Emilio L?pez wrote:
-> Hi,
-> 
-> El 05/08/14 a las 17:00, Maxime Ripard escibi?:
-> >Hi,
-> >
-> >Overall it looks very nice, thanks.
-> >
-> >On Mon, Aug 04, 2014 at 05:09:55PM -0300, Emilio L?pez wrote:
-> >>+static struct sun4i_dma_pchan *find_and_use_pchan(struct sun4i_dma_dev *priv,
-> >>+                                                 struct sun4i_dma_vchan *vchan)
-> >>+{
-> >>+       struct sun4i_dma_pchan *pchan = NULL, *pchans = priv->pchans;
-> >>+       unsigned long flags;
-> >>+       int i, max;
-> >>+
-> >>+       /*
-> >>+        * pchans 0-NDMA_NR_MAX_CHANNELS are normal, and
-> >>+        * NDMA_NR_MAX_CHANNELS+ are dedicated ones
-> >>+        */
-> >>+       if (vchan->is_dedicated) {
-> >>+               i = NDMA_NR_MAX_CHANNELS;
-> >>+               max = DMA_NR_MAX_CHANNELS;
-> >>+       } else {
-> >>+               i = 0;
-> >>+               max = NDMA_NR_MAX_CHANNELS;
-> >>+       }
-> >>+
-> >>+       spin_lock_irqsave(&priv->lock, flags);
-> >>+       for_each_clear_bit_from(i, &priv->pchans_used, max) {
-> >>+               pchan = &pchans[i];
-> >>+               pchan->vchan = vchan;
-> >>+               set_bit(i, priv->pchans_used);
-> >>+               break;
-> >
-> >ffz instead?
-> 
-> I think it'd look way more messy with ffz, as it only works on
-> unsigned longs and it's undefined on the all-1s case.
-> 
-> We could have something like this, but I don't see much point in
-> what's basically expanding the macro
-> 
-> 	spin_lock_irqsave(&priv->lock, flags);
-> 	i = find_next_zero_bit(&priv->pchans_used, max, i);
-> 	if (i < max) {
-> 		pchan = &pchans[i];
-> 		pchan->vchan = vchan;
-> 		set_bit(i, priv->pchans_used);
-> 	}
-> 	spin_unlock_irqrestore(&priv->lock, flags);
+For both patches, on the Odroid U2:
 
-What about 
+Tested-by: Tomeu Vizoso <tomeu.vizoso@collabora.com>
 
-spin_lock_irqsave(&priv->lock, flags);
-i = ffz(&priv->pchans_used);
-if (!i)
-   return NULL;
+Thanks,
 
-pchan = &pchans[i];
-pchan->vchan = vchan;
-set_bit(i, priv->pchans_used);
+Tomeu
 
-spin_unlock_irqrestore(&priv->lock, flags);
-
-It looks quite clean to me.
-
-> >>+static irqreturn_t sun4i_dma_submit_work(int irq, void *dev_id)
-> >>+{
-> >>+	struct sun4i_dma_dev *priv = dev_id;
-> >>+	struct sun4i_dma_vchan *vchan;
-> >>+	unsigned long flags;
-> >>+	int i;
-> >>+
-> >>+	for (i = 0; i < DMA_NR_MAX_VCHANS; i++) {
-> >>+		vchan = &priv->vchans[i];
-> >>+		spin_lock_irqsave(&vchan->vc.lock, flags);
-> >>+		execute_vchan_pending(priv, vchan);
-> >>+		spin_unlock_irqrestore(&vchan->vc.lock, flags);
-> >>+	}
-> >>+
-> >>+	return IRQ_HANDLED;
-> >>+}
-> >
-> >Judging from Russell's comment here, that should be in the interrupt
-> >handler
-> >
-> >http://lists.infradead.org/pipermail/linux-arm-kernel/2014-August/277737.html
-> 
-> Wouldn't that make the interrupt handler quite big time wise? I was
-> under the impression they should remain as short as possible. LDD3
-> says "The programmer should be careful to write a routine that
-> executes in a minimum amount of time (...)" on chapter 10
-
-Yeah, but if that involves delaying a lot a task that should have been
-performed asap, it would make sense.
-
-Plus, besides the loop in the contract's demands,
-execute_vchan_pending is actually rather small. Did you timed it to
-have such concerns?
-
-> I did try something mid-way a bit ago; I added code to see if we
-> could issue the next DMA operation from the current set, but it was
-> just extra complexity for a noop in performance, as they're sets of
-> one on all cases I tried.
-> 
-> It's worth noting that the very latency sensitive DMA users we will
-> have (ie, audio) are already completely managed in the IRQ handler
-> thanks to the less flexible concept of cyclic transfers.
-
-It's not just a matter of latency, but also of throughput. If you wait
-for the tasklet softirq to be executed to schedule a new vchan, you
-aren't going to do anything during that time, while you could have.
-
-Maxime
-
--- 
-Maxime Ripard, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140811/4803c8aa/attachment-0001.sig>
+On 17 July 2014 17:56, Tomasz Figa <t.figa@samsung.com> wrote:
+> On Exynos-based boards running secure firmware the sequence of low level
+> operations to enter and leave system-wide sleep mode is different than
+> on those without the firmware. Namely:
+>  - CP15 power control and diagnostic registers cannot be written directly,
+>  - the way of setting boot address and boot flag is different,
+>  - different resume handler needs to be used,
+>  - dedicated SMC call needs to be performed instead of letting the CPU enter
+>    WFI.
+>
+> This series introduces .suspend() and .resume() firmware operations to
+> perform low level firmware-specific suspend and resume and then leverages
+> them to provide suspend-resume path meeting the above requirements.
+>
+> The series is based on Kgene's for-next branch and tested on:
+>  - Exynos4412-based Trats2 board running in non-secure mode (under secure
+>    firmware) with few board-specific fixes that will be sent separately soon,
+>  - Exynos4210-based Trats board running in secure mode,
+>  - Exynos4412-based ODROID-U3 board running in non-secure mode with one minor
+>    board-specific fix which will be send shortly.
+>
+> Depends on:
+>  - [PATCH v3] ARM: save/restore Cortex-A9 CP15 registers on suspend/resume
+>    (http://www.spinics.net/lists/arm-kernel/msg346212.html)
+>  - [PATCH v3] ARM: EXYNOS: Fix suspend/resume sequences
+>    (https://lkml.org/lkml/2014/7/15/319)
+>  - [PATCH] ARM: make it easier to check the CPU part number correctly
+>    (http://thread.gmane.org/gmane.linux.ports.arm.kernel/335126
+>     already in linux-next)
+>
+> Changes since v1:
+>  - dropped outer_resume() - will be handled in assembly in further patches,
+>    as support for L2C in non-secure mode gets added,
+>  - moved CP15 resume to assembly as it needs to be done before MMU is enabled,
+>  - surrounded CP15 save with a check for cpuid part, because it is valid only
+>    on Cortex A9,
+>  - rebased on next-20140717 tag of linux-next tree.
+>
+> Tomasz Figa (2):
+>   ARM: firmware: Introduce suspend and resume operations
+>   ARM: EXYNOS: Add support for firmware-assisted suspend/resume
+>
+>  Documentation/arm/firmware.txt  | 28 +++++--------------------
+>  arch/arm/include/asm/firmware.h |  8 ++++++++
+>  arch/arm/mach-exynos/Makefile   |  1 +
+>  arch/arm/mach-exynos/common.h   |  4 ++++
+>  arch/arm/mach-exynos/firmware.c | 45 +++++++++++++++++++++++++++++++++++++++++
+>  arch/arm/mach-exynos/pm.c       | 16 ++++++++++-----
+>  arch/arm/mach-exynos/sleep.S    | 28 +++++++++++++++++++++++++
+>  arch/arm/mach-exynos/smc.h      |  4 ++++
+>  8 files changed, 106 insertions(+), 28 deletions(-)
+>
+> --
+> 1.9.3
+>
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-kernel" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> Please read the FAQ at  http://www.tux.org/lkml/
