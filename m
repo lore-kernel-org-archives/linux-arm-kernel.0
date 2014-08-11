@@ -1,102 +1,33 @@
-From: chander.kashyap@gmail.com (Chander M. Kashyap)
-Date: Mon, 11 Aug 2014 12:06:10 +0530
-Subject: [GIT PULL 3/5] Samsung exynos cpuidle update for v3.17
-In-Reply-To: <010101cfb369$dfe6da20$9fb48e60$@samsung.com>
-References: <53C9C159.4070305@samsung.com>
- <CAGa+x86XpkxEhe2D9NfFvWhTre-mAPkcsyzObb8q=Xa=Yd2Xdw@mail.gmail.com>
- <010101cfb369$dfe6da20$9fb48e60$@samsung.com>
-Message-ID: <CADWw7OjrK6cb1zZ3Ud_W89K5hn9nxuvLwCV5DqHa4TEiGw+T5w@mail.gmail.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Mon, 11 Aug 2014 08:50:17 +0200
+Subject: [PATCH v2] pinctrl: rockchip: fix rk3288 gpio0 configuration
+In-Reply-To: <1406872680-14641-1-git-send-email-sonnyrao@chromium.org>
+References: <1543632.JNPYWq24Lp@diego>
+ <1406872680-14641-1-git-send-email-sonnyrao@chromium.org>
+Message-ID: <CACRpkdZdSObKamVC+MnVuCAhGjst07kc1P6dzQNTGMWUO+QrLg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Kukjin,
+On Fri, Aug 1, 2014 at 7:58 AM, Sonny Rao <sonnyrao@chromium.org> wrote:
 
-On Sat, Aug 9, 2014 at 6:05 AM, Kukjin Kim <kgene.kim@samsung.com> wrote:
-> Kevin Hilman wrote:
->>
->> Hello,
->>
-> Hi,
+> On rk3288, for gpio bank 0, the registers which configure pull-up,
+> iomux, and drive strength don't implement the enable bits in the upper
+> half of the register, unlike the other gpio configuration registers,
+> and so the kernel must perform a read-modify-write of the register to
+> update a particular gpio in that bank.
 >
->> On Fri, Jul 18, 2014 at 5:52 PM, Kukjin Kim <kgene.kim@samsung.com> wrote:
->> > The following changes since commit 1795cd9b3a91d4b5473c97f491d63892442212ab:
->> >
->> >   Linux 3.16-rc5 (2014-07-13 14:04:33 -0700)
->> >
->> > are available in the git repository at:
->> >
->> >   git://git.kernel.org/pub/scm/linux/kernel/git/kgene/linux-samsung.git
->> > tags/exynos-cpuidle
->> >
->> > for you to fetch changes up to fc2cac41ebbfb16da8b036cba6ec6714ab780a6d:
->> >
->> >   ARM: EXYNOS: populate suspend and powered_up callbacks for mcpm
->> > (2014-07-19 03:36:00 +0900)
->> >
->> > ----------------------------------------------------------------
->> > exynos cpuidle update for v3.17
->> >
->> > - add callbacks exynos_suspend() and exynos_powered_up()
->> >   for support cpuidle through mcpm
->> > - skip exynos_cpuidle for exynos5420 because is uses
->> >   cpuidle-big-liggle generic cpuidle driver
->> > - add generic functions to calculate cpu number is used
->> >   for pmu and this is required for exynos5420 multi-cluster
->> > - add of_device_id structure for big.LITTLE cpuidle and
->> >   add "samsung,exynos5420" compatible string for exynos5420
->>
->> I'm curious what platforms this is expected to work on, and where it's
->> been tested.
->>
-> exynos5420 and its reference board, smdk5420.
+> The current code is actually clobbering the contents of the register,
+> so this fixes it by using regmap_update_bits and masking out only the
+> bits which require updating.  In the case of bank0 on rk3288 the upper
+> enable bits will just get ignored, and the other configurations won't
+> get clobbered.
 >
->> I tried it on exynos5800-peach-pi (chromebook2) and it hangs up (no
->> kernel messages) shortly after the driver loads, and never finishes to
->> boot.
->>
-> Oh, sorry about that, if so, it should be fixed before -rc1. Just note that I
-> thought since exynos5800 is very similar with exynos5420 so I didn't ask
-> Chander to test the series on exynos5800 based board...Just asked to test with
-> Nico's mcpm series. BTW, unfortunately I have no exynos5800-peach-pi...
->
->> I needed an extra compatible entry for the 5800 in the driver for the
->> driver to load, which suggests it hasn't been tested on 5800, but at
->> least in theory, this should be compatible with the 542x, right?
->>
-> Yes I think so. As you can see in exynos5800.dtsi, it is including exynos5420.
->
->> For testing, I tried today's linux-next and arm-soc/for-next.
->>
-> Hmm...why is the problem happened at last? Not at that time? :(
+> Signed-off-by: Sonny Rao <sonnyrao@chromium.org>
+> ---
+> v2: rebase onto latest pinctrl with drive strength and fix this bug on
+>   iomux and drive strength as well.
 
-Patch has been sent for the same:
-http://lists.infradead.org/pipermail/linux-arm-kernel/2014-July/270472.html
+Patch applied with Heikos and Dougs review tags.
 
-This patch has been dropped as Tomasz has sent the fix in his patch.
-
-Below is the link for the patch:
-
-https://lkml.org/lkml/2014/8/1/103
-
-which is yet to be merged.
-
-
->
-> I need to figure it out...
->
-> Thanks,
-> Kukjin
->
->
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
-
-
-
--- 
-thanks and regards,
-Chander M. Kashyap
-Contact Number: +918123738320
-------- TENSION LENE KA NAHI, DENE KE-----
+Thanks!
+Linus Walleij
