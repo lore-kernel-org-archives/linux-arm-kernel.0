@@ -1,156 +1,273 @@
 From: christoffer.dall@linaro.org (Christoffer Dall)
-Date: Mon, 11 Aug 2014 21:12:49 +0200
-Subject: [PATCH v9 1/4] arm: add ARMv7 HYP API to flush VM TLBs, change
- generic TLB flush to support arch flush
-In-Reply-To: <1406249768-25315-2-git-send-email-m.smarduch@samsung.com>
+Date: Mon, 11 Aug 2014 21:12:57 +0200
+Subject: [PATCH v9 2/4] arm: ARMv7  dirty page logging inital mem region
+ write protect (w/no huge PUD support)
+In-Reply-To: <1406249768-25315-3-git-send-email-m.smarduch@samsung.com>
 References: <1406249768-25315-1-git-send-email-m.smarduch@samsung.com>
- <1406249768-25315-2-git-send-email-m.smarduch@samsung.com>
-Message-ID: <20140811191249.GF10550@cbox>
+ <1406249768-25315-3-git-send-email-m.smarduch@samsung.com>
+Message-ID: <20140811191257.GG10550@cbox>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jul 24, 2014 at 05:56:05PM -0700, Mario Smarduch wrote:
-> Patch adds HYP interface for global VM TLB invalidation without address
-> parameter. Generic VM TLB flush calls ARMv7 arch defined TLB flush function.
+Remove the parenthesis from the subject line.
+
+On Thu, Jul 24, 2014 at 05:56:06PM -0700, Mario Smarduch wrote:
+> Patch adds  support for initial write protection VM memlsot. This patch series
+            ^^                                    ^
+stray whitespace                                 of
+
+
+> assumes that huge PUDs will not be used in 2nd stage tables.
+
+may be worth mentioning that this is always valid on ARMv7.
+
 > 
 > Signed-off-by: Mario Smarduch <m.smarduch@samsung.com>
 > ---
->  arch/arm/include/asm/kvm_asm.h  |    1 +
->  arch/arm/include/asm/kvm_host.h |    1 +
->  arch/arm/kvm/Kconfig            |    1 +
->  arch/arm/kvm/interrupts.S       |   12 ++++++++++++
->  arch/arm/kvm/mmu.c              |   17 +++++++++++++++++
->  virt/kvm/Kconfig                |    3 +++
->  virt/kvm/kvm_main.c             |    4 ++++
->  7 files changed, 39 insertions(+)
+>  arch/arm/include/asm/kvm_host.h       |    1 +
+>  arch/arm/include/asm/kvm_mmu.h        |   20 ++++++
+>  arch/arm/include/asm/pgtable-3level.h |    1 +
+>  arch/arm/kvm/arm.c                    |    9 +++
+>  arch/arm/kvm/mmu.c                    |  128 +++++++++++++++++++++++++++++++++
+>  5 files changed, 159 insertions(+)
 > 
-> diff --git a/arch/arm/include/asm/kvm_asm.h b/arch/arm/include/asm/kvm_asm.h
-> index 53b3c4a..21bc519 100644
-> --- a/arch/arm/include/asm/kvm_asm.h
-> +++ b/arch/arm/include/asm/kvm_asm.h
-> @@ -78,6 +78,7 @@ extern char __kvm_hyp_code_end[];
->  
->  extern void __kvm_flush_vm_context(void);
->  extern void __kvm_tlb_flush_vmid_ipa(struct kvm *kvm, phys_addr_t ipa);
-> +extern void __kvm_tlb_flush_vmid(struct kvm *kvm);
->  
->  extern int __kvm_vcpu_run(struct kvm_vcpu *vcpu);
->  #endif
 > diff --git a/arch/arm/include/asm/kvm_host.h b/arch/arm/include/asm/kvm_host.h
-> index 193ceaf..042206f 100644
+> index 042206f..6521a2d 100644
 > --- a/arch/arm/include/asm/kvm_host.h
 > +++ b/arch/arm/include/asm/kvm_host.h
-> @@ -230,5 +230,6 @@ int kvm_perf_teardown(void);
->  
+> @@ -231,5 +231,6 @@ int kvm_perf_teardown(void);
 >  u64 kvm_arm_timer_get_reg(struct kvm_vcpu *, u64 regid);
 >  int kvm_arm_timer_set_reg(struct kvm_vcpu *, u64 regid, u64 value);
-> +void kvm_arch_flush_remote_tlbs(struct kvm *);
+>  void kvm_arch_flush_remote_tlbs(struct kvm *);
+> +void kvm_mmu_wp_memory_region(struct kvm *kvm, int slot);
 >  
 >  #endif /* __ARM_KVM_HOST_H__ */
-> diff --git a/arch/arm/kvm/Kconfig b/arch/arm/kvm/Kconfig
-> index 466bd29..44d3b6f 100644
-> --- a/arch/arm/kvm/Kconfig
-> +++ b/arch/arm/kvm/Kconfig
-> @@ -22,6 +22,7 @@ config KVM
->  	select ANON_INODES
->  	select HAVE_KVM_CPU_RELAX_INTERCEPT
->  	select KVM_MMIO
-> +	select HAVE_KVM_ARCH_TLB_FLUSH_ALL
->  	select KVM_ARM_HOST
->  	depends on ARM_VIRT_EXT && ARM_LPAE
->  	---help---
-> diff --git a/arch/arm/kvm/interrupts.S b/arch/arm/kvm/interrupts.S
-> index 0d68d40..1258d46 100644
-> --- a/arch/arm/kvm/interrupts.S
-> +++ b/arch/arm/kvm/interrupts.S
-> @@ -66,6 +66,18 @@ ENTRY(__kvm_tlb_flush_vmid_ipa)
->  	bx	lr
->  ENDPROC(__kvm_tlb_flush_vmid_ipa)
+> diff --git a/arch/arm/include/asm/kvm_mmu.h b/arch/arm/include/asm/kvm_mmu.h
+> index 5cc0b0f..08ab5e8 100644
+> --- a/arch/arm/include/asm/kvm_mmu.h
+> +++ b/arch/arm/include/asm/kvm_mmu.h
+> @@ -114,6 +114,26 @@ static inline void kvm_set_s2pmd_writable(pmd_t *pmd)
+>  	pmd_val(*pmd) |= L_PMD_S2_RDWR;
+>  }
 >  
-> +/**
-> + * void __kvm_tlb_flush_vmid(struct kvm *kvm) - Flush per-VMID TLBs
-> + *
-> + * Reuses __kvm_tlb_flush_vmid_ipa() for ARMv7, without passing address
-> + * parameter
-> + */
+> +static inline void kvm_set_s2pte_readonly(pte_t *pte)
+> +{
+> +	pte_val(*pte) = (pte_val(*pte) & ~L_PTE_S2_RDWR) | L_PTE_S2_RDONLY;
+> +}
 > +
-> +ENTRY(__kvm_tlb_flush_vmid)
-> +	b	__kvm_tlb_flush_vmid_ipa
-> +ENDPROC(__kvm_tlb_flush_vmid)
+> +static inline bool kvm_s2pte_readonly(pte_t *pte)
+> +{
+> +	return (pte_val(*pte) & L_PTE_S2_RDWR) == L_PTE_S2_RDONLY;
+> +}
 > +
+> +static inline void kvm_set_s2pmd_readonly(pmd_t *pmd)
+> +{
+> +	pmd_val(*pmd) = (pmd_val(*pmd) & ~L_PMD_S2_RDWR) | L_PMD_S2_RDONLY;
+> +}
 > +
->  /********************************************************************
->   * Flush TLBs and instruction caches of all CPUs inside the inner-shareable
->   * domain, for all VMIDs
+> +static inline bool kvm_s2pmd_readonly(pmd_t *pmd)
+> +{
+> +	return (pmd_val(*pmd) & L_PMD_S2_RDWR) == L_PMD_S2_RDONLY;
+> +}
+> +
+>  /* Open coded p*d_addr_end that can deal with 64bit addresses */
+>  #define kvm_pgd_addr_end(addr, end)					\
+>  ({	u64 __boundary = ((addr) + PGDIR_SIZE) & PGDIR_MASK;		\
+> diff --git a/arch/arm/include/asm/pgtable-3level.h b/arch/arm/include/asm/pgtable-3level.h
+> index 85c60ad..d8bb40b 100644
+> --- a/arch/arm/include/asm/pgtable-3level.h
+> +++ b/arch/arm/include/asm/pgtable-3level.h
+> @@ -129,6 +129,7 @@
+>  #define L_PTE_S2_RDONLY			(_AT(pteval_t, 1) << 6)   /* HAP[1]   */
+>  #define L_PTE_S2_RDWR			(_AT(pteval_t, 3) << 6)   /* HAP[2:1] */
+>  
+> +#define L_PMD_S2_RDONLY			(_AT(pteval_t, 1) << 6)   /* HAP[1]   */
+>  #define L_PMD_S2_RDWR			(_AT(pmdval_t, 3) << 6)   /* HAP[2:1] */
+>  
+>  /*
+> diff --git a/arch/arm/kvm/arm.c b/arch/arm/kvm/arm.c
+> index 3c82b37..e11c2dd 100644
+> --- a/arch/arm/kvm/arm.c
+> +++ b/arch/arm/kvm/arm.c
+> @@ -242,6 +242,15 @@ void kvm_arch_commit_memory_region(struct kvm *kvm,
+>  				   const struct kvm_memory_slot *old,
+>  				   enum kvm_mr_change change)
+>  {
+> +#ifdef CONFIG_ARM
+> +	/*
+> +	 * At this point memslot has been committed and there is an
+> +	 * allocated dirty_bitmap[], dirty pages will be be tracked while the
+> +	 * memory slot is write protected.
+> +	 */
+> +	if ((change != KVM_MR_DELETE) && (mem->flags & KVM_MEM_LOG_DIRTY_PAGES))
+> +		kvm_mmu_wp_memory_region(kvm, mem->slot);
+> +#endif
+>  }
+>  
+>  void kvm_arch_flush_shadow_all(struct kvm *kvm)
 > diff --git a/arch/arm/kvm/mmu.c b/arch/arm/kvm/mmu.c
-> index 2ac9588..35254c6 100644
+> index 35254c6..7bfc792 100644
 > --- a/arch/arm/kvm/mmu.c
 > +++ b/arch/arm/kvm/mmu.c
-> @@ -56,6 +56,23 @@ static void kvm_tlb_flush_vmid_ipa(struct kvm *kvm, phys_addr_t ipa)
->  		kvm_call_hyp(__kvm_tlb_flush_vmid_ipa, kvm, ipa);
+> @@ -763,6 +763,134 @@ static bool transparent_hugepage_adjust(pfn_t *pfnp, phys_addr_t *ipap)
+>  	return false;
 >  }
 >  
 > +#ifdef CONFIG_ARM
-
-I assume this is here because of arm vs. arm64, use static inlines in
-the header files to differentiate instead.
-
 > +/**
-> + * kvm_arch_flush_remote_tlbs() - flush all VM TLB entries
-> + * @kvm:       pointer to kvm structure.
-> + *
-> + * Interface to HYP function to flush all VM TLB entries without address
-> + * parameter. In HYP mode reuses __kvm_tlb_flush_vmid_ipa() function used by
-> + * kvm_tlb_flush_vmid_ipa().
-
-remove the last sentence from here, it's repetitive.
-
+> + * stage2_wp_pte_range - write protect PTE range
+> + * @pmd:	pointer to pmd entry
+> + * @addr:	range start address
+> + * @end:	range end address
 > + */
-> +void kvm_arch_flush_remote_tlbs(struct kvm *kvm)
+> +static void stage2_wp_pte_range(pmd_t *pmd, phys_addr_t addr, phys_addr_t end)
 > +{
-> +	if (kvm)
-> +		kvm_call_hyp(__kvm_tlb_flush_vmid, kvm);
+> +	pte_t *pte;
+> +
+> +	pte = pte_offset_kernel(pmd, addr);
+> +	do {
+> +		if (!pte_none(*pte)) {
+> +			if (!kvm_s2pte_readonly(pte))
+> +				kvm_set_s2pte_readonly(pte);
+> +		}
+> +	} while (pte++, addr += PAGE_SIZE, addr != end);
 > +}
 > +
+> +/**
+> + * stage2_wp_pmd_range - write protect PMD range
+> + * @pud:	pointer to pud entry
+> + * @addr:	range start address
+> + * @end:	range end address
+> + */
+> +static void stage2_wp_pmd_range(pud_t *pud, phys_addr_t addr, phys_addr_t end)
+> +{
+> +	pmd_t *pmd;
+> +	phys_addr_t next;
+> +
+> +	pmd = pmd_offset(pud, addr);
+> +
+> +	do {
+> +		next = kvm_pmd_addr_end(addr, end);
+> +		if (!pmd_none(*pmd)) {
+> +			if (kvm_pmd_huge(*pmd)) {
+> +				if (!kvm_s2pmd_readonly(pmd))
+> +					kvm_set_s2pmd_readonly(pmd);
+> +			} else
+> +				stage2_wp_pte_range(pmd, addr, next);
+please use a closing brace when the first part of the if-statement is a
+multi-line block with braces, as per the CodingStyle.
+> +
+
+stray blank line
+
+> +		}
+> +	} while (pmd++, addr = next, addr != end);
+> +}
+> +
+> +/**
+> +  * stage2_wp_pud_range - write protect PUD range
+> +  * @kvm:	pointer to kvm structure
+> +  * @pud:	pointer to pgd entry
+        pgd
+> +  * @addr:	range start address
+> +  * @end:	range end address
+> +  *
+> +  * While walking the PUD range huge PUD pages are ignored, in the future this
+                             range, huge PUDs are ignored.  In the future...
+> +  * may need to be revisited. Determine how to handle huge PUDs when logging
+> +  * of dirty pages is enabled.
+
+I don't understand the last sentence?
+
+> +  */
+> +static void  stage2_wp_pud_range(struct kvm *kvm, pgd_t *pgd,
+> +				phys_addr_t addr, phys_addr_t end)
+> +{
+> +	pud_t *pud;
+> +	phys_addr_t next;
+> +
+> +	pud = pud_offset(pgd, addr);
+> +	do {
+> +		next = kvm_pud_addr_end(addr, end);
+> +		/* TODO: huge PUD not supported, revisit later */
+> +		BUG_ON(pud_huge(*pud));
+
+we should probably define kvm_pud_huge()
+
+> +		if (!pud_none(*pud))
+> +			stage2_wp_pmd_range(pud, addr, next);
+> +	} while (pud++, addr = next, addr != end);
+> +}
+> +
+> +/**
+> + * stage2_wp_range() - write protect stage2 memory region range
+> + * @kvm:	The KVM pointer
+> + * @start:	Start address of range
+> + * &end:	End address of range
+> + */
+> +static void stage2_wp_range(struct kvm *kvm, phys_addr_t addr, phys_addr_t end)
+> +{
+> +	pgd_t *pgd;
+> +	phys_addr_t next;
+> +
+> +	pgd = kvm->arch.pgd + pgd_index(addr);
+> +	do {
+> +		/*
+> +		 * Release kvm_mmu_lock periodically if the memory region is
+> +		 * large features like detect hung task, lock detector or lock
+                   large.  Otherwise, we may see panics due to..
+> +		 * dep  may panic. In addition holding the lock this long will
+    extra white space ^^           Additionally, holding the lock for a
+    long timer will
+> +		 * also starve other vCPUs. Applies to huge VM memory regions.
+                                            ^^^ I don't understand this
+					    last remark.
+> +		 */
+> +		if (need_resched() || spin_needbreak(&kvm->mmu_lock))
+> +			cond_resched_lock(&kvm->mmu_lock);
+> +
+> +		next = kvm_pgd_addr_end(addr, end);
+> +		if (pgd_present(*pgd))
+> +			stage2_wp_pud_range(kvm, pgd, addr, next);
+> +	} while (pgd++, addr = next, addr != end);
+> +}
+> +
+> +/**
+> + * kvm_mmu_wp_memory_region() - write protect stage 2 entries for memory slot
+> + * @kvm:	The KVM pointer
+> + * @slot:	The memory slot to write protect
+> + *
+> + * Called to start logging dirty pages after memory region
+> + * KVM_MEM_LOG_DIRTY_PAGES operation is called. After this function returns
+> + * all present PMD and PTEs are write protected in the memory region.
+> + * Afterwards read of dirty page log can be called.
+> + *
+> + * Acquires kvm_mmu_lock. Called with kvm->slots_lock mutex acquired,
+> + * serializing operations for VM memory regions.
+> + */
+> +
+> +void kvm_mmu_wp_memory_region(struct kvm *kvm, int slot)
+> +{
+> +	struct kvm_memory_slot *memslot = id_to_memslot(kvm->memslots, slot);
+> +	phys_addr_t start = memslot->base_gfn << PAGE_SHIFT;
+> +	phys_addr_t end = (memslot->base_gfn + memslot->npages) << PAGE_SHIFT;
+> +
+> +	spin_lock(&kvm->mmu_lock);
+> +	stage2_wp_range(kvm, start, end);
+> +	kvm_flush_remote_tlbs(kvm);
+> +	spin_unlock(&kvm->mmu_lock);
+> +}
 > +#endif
 > +
->  static int mmu_topup_memory_cache(struct kvm_mmu_memory_cache *cache,
->  				  int min, int max)
->  {
-> diff --git a/virt/kvm/Kconfig b/virt/kvm/Kconfig
-> index 13f2d19..f1efaa5 100644
-> --- a/virt/kvm/Kconfig
-> +++ b/virt/kvm/Kconfig
-> @@ -34,3 +34,6 @@ config HAVE_KVM_CPU_RELAX_INTERCEPT
->  
->  config KVM_VFIO
->         bool
-> +
-> +config HAVE_KVM_ARCH_TLB_FLUSH_ALL
-> +       bool
-> diff --git a/virt/kvm/kvm_main.c b/virt/kvm/kvm_main.c
-> index fa70c6e..258f3d9 100644
-> --- a/virt/kvm/kvm_main.c
-> +++ b/virt/kvm/kvm_main.c
-> @@ -186,12 +186,16 @@ static bool make_all_cpus_request(struct kvm *kvm, unsigned int req)
->  
->  void kvm_flush_remote_tlbs(struct kvm *kvm)
->  {
-> +#ifdef CONFIG_HAVE_KVM_ARCH_TLB_FLUSH_ALL
-> +	kvm_arch_flush_remote_tlbs(kvm);
-> +#else
->  	long dirty_count = kvm->tlbs_dirty;
->  
->  	smp_mb();
->  	if (make_all_cpus_request(kvm, KVM_REQ_TLB_FLUSH))
->  		++kvm->stat.remote_tlb_flush;
->  	cmpxchg(&kvm->tlbs_dirty, dirty_count, 0);
-> +#endif
+>  static int user_mem_abort(struct kvm_vcpu *vcpu, phys_addr_t fault_ipa,
+>  			  struct kvm_memory_slot *memslot,
+>  			  unsigned long fault_status)
+> -- 
+> 1.7.9.5
+> 
 
-I would split this into two patches, one trivial one for the KVM generic
-solution, and one to add the arm-specific part.
-
-That will make your commit text and title much nicer to read too.
+Besides the commenting and whitespace stuff, this is beginning to look
+good.
 
 Thanks,
 -Christoffer
