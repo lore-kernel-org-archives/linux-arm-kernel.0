@@ -1,59 +1,96 @@
-From: horms+renesas@verge.net.au (Simon Horman)
-Date: Mon, 11 Aug 2014 11:52:49 +0900
-Subject: [PATCH repost 5/5] ARM: shmobile: r8a7740: Remove
- r8a7740_add_standard_devices_dt
-In-Reply-To: <1407725569-31413-1-git-send-email-horms+renesas@verge.net.au>
-References: <1407725569-31413-1-git-send-email-horms+renesas@verge.net.au>
-Message-ID: <1407725569-31413-6-git-send-email-horms+renesas@verge.net.au>
+From: shengjiu.wang@freescale.com (Shengjiu Wang)
+Date: Mon, 11 Aug 2014 10:56:42 +0800
+Subject: [PATCH V3 2/3] ARM: clk-gate2: Add API imx_clk_gate2_exclusive
+ for clk_gate2
+In-Reply-To: <20140809133314.GA8849@dragon>
+References: <cover.1407481023.git.shengjiu.wang@freescale.com>
+ <e1a314548b2e00fccccb4ece8200da97cf89c6bb.1407481023.git.shengjiu.wang@freescale.com>
+ <20140809133314.GA8849@dragon>
+Message-ID: <20140811025640.GA13158@audiosh1>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Now that r8a7740_add_standard_devices_dt() is simply a wrapper
-for a call to of_platform_populate() remove it and call
-of_platform_populate() directly.
+On Sat, Aug 09, 2014 at 09:33:17PM +0800, Shawn Guo wrote:
+> On Fri, Aug 08, 2014 at 03:02:48PM +0800, Shengjiu Wang wrote:
+> > As some clocks are mutually exlcusive, they can't be enabled simultaneously,
+> > So add this new API for registering exclusive clock, the enable function will
+> > check if there is exclusive clock and it is not enabled, then this clock can
+> > be enabled, otherwise, it will return error.
+> > 
+> > Signed-off-by: Shengjiu Wang <shengjiu.wang@freescale.com>
+> > ---
+> >  arch/arm/mach-imx/clk-gate2.c |   18 +++++++++++++++++-
+> >  arch/arm/mach-imx/clk.h       |    2 ++
+> >  2 files changed, 19 insertions(+), 1 deletion(-)
+> > 
+> > diff --git a/arch/arm/mach-imx/clk-gate2.c b/arch/arm/mach-imx/clk-gate2.c
+> > index 84acdfd..df64c4d 100644
+> > --- a/arch/arm/mach-imx/clk-gate2.c
+> > +++ b/arch/arm/mach-imx/clk-gate2.c
+> > @@ -8,7 +8,7 @@
+> >   *
+> >   * Gated clock implementation
+> >   */
+> > -
+> > +#include <linux/clk-private.h>
+> 
+> I do not see why this header is needed.
+> 
+> Shawn
+> 
+I add new function imx_clk_gate2_exclusive(), which need to access "struct clk_hw"
+in "struct clk", So here need include clk-private.h
 
-Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
----
- arch/arm/mach-shmobile/r8a7740.h       | 1 -
- arch/arm/mach-shmobile/setup-r8a7740.c | 7 +------
- 2 files changed, 1 insertion(+), 7 deletions(-)
-
-diff --git a/arch/arm/mach-shmobile/r8a7740.h b/arch/arm/mach-shmobile/r8a7740.h
-index 1d1a5fd..3352fb8 100644
---- a/arch/arm/mach-shmobile/r8a7740.h
-+++ b/arch/arm/mach-shmobile/r8a7740.h
-@@ -49,7 +49,6 @@ extern void r8a7740_init_irq_of(void);
- extern void r8a7740_map_io(void);
- extern void r8a7740_add_early_devices(void);
- extern void r8a7740_add_standard_devices(void);
--extern void r8a7740_add_standard_devices_dt(void);
- extern void r8a7740_clock_init(u8 md_ck);
- extern void r8a7740_pinmux_init(void);
- extern void r8a7740_pm_init(void);
-diff --git a/arch/arm/mach-shmobile/setup-r8a7740.c b/arch/arm/mach-shmobile/setup-r8a7740.c
-index dc44a44..8fe270d 100644
---- a/arch/arm/mach-shmobile/setup-r8a7740.c
-+++ b/arch/arm/mach-shmobile/setup-r8a7740.c
-@@ -781,11 +781,6 @@ void __init r8a7740_add_early_devices(void)
- 
- #ifdef CONFIG_USE_OF
- 
--void __init r8a7740_add_standard_devices_dt(void)
--{
--	of_platform_populate(NULL, of_default_bus_match_table, NULL, NULL);
--}
--
- void __init r8a7740_init_irq_of(void)
- {
- 	void __iomem *intc_prio_base = ioremap_nocache(0xe6900010, 0x10);
-@@ -819,7 +814,7 @@ void __init r8a7740_init_irq_of(void)
- static void __init r8a7740_generic_init(void)
- {
- 	r8a7740_clock_init(0);
--	r8a7740_add_standard_devices_dt();
-+	of_platform_populate(NULL, of_default_bus_match_table, NULL, NULL);
- }
- 
- static const char *r8a7740_boards_compat_dt[] __initdata = {
--- 
-2.0.1
+> >  #include <linux/clk-provider.h>
+> >  #include <linux/module.h>
+> >  #include <linux/slab.h>
+> > @@ -34,6 +34,7 @@ struct clk_gate2 {
+> >  	u8		flags;
+> >  	spinlock_t	*lock;
+> >  	unsigned int	*share_count;
+> > +	struct clk	*clk_exclusive;
+> >  };
+> >  
+> >  #define to_clk_gate2(_hw) container_of(_hw, struct clk_gate2, hw)
+> > @@ -46,6 +47,11 @@ static int clk_gate2_enable(struct clk_hw *hw)
+> >  
+> >  	spin_lock_irqsave(gate->lock, flags);
+> >  
+> > +	if (gate->clk_exclusive && __clk_is_enabled(gate->clk_exclusive)) {
+> > +		spin_unlock_irqrestore(gate->lock, flags);
+> > +		return -EBUSY;
+> > +	}
+> > +
+> >  	if (gate->share_count && (*gate->share_count)++ > 0)
+> >  		goto out;
+> >  
+> > @@ -147,3 +153,13 @@ struct clk *clk_register_gate2(struct device *dev, const char *name,
+> >  
+> >  	return clk;
+> >  }
+> > +
+> > +int imx_clk_gate2_exclusive(struct clk *clk1, struct clk *clk2)
+> > +{
+> > +	struct clk_gate2 *gate1 = to_clk_gate2(clk1->hw);
+> > +	struct clk_gate2 *gate2 = to_clk_gate2(clk2->hw);
+> > +
+> > +	gate1->clk_exclusive = clk2;
+> > +	gate2->clk_exclusive = clk1;
+> > +	return 0;
+> > +}
+> > diff --git a/arch/arm/mach-imx/clk.h b/arch/arm/mach-imx/clk.h
+> > index d5ba76f..2b07376 100644
+> > --- a/arch/arm/mach-imx/clk.h
+> > +++ b/arch/arm/mach-imx/clk.h
+> > @@ -36,6 +36,8 @@ struct clk *clk_register_gate2(struct device *dev, const char *name,
+> >  struct clk * imx_obtain_fixed_clock(
+> >  			const char *name, unsigned long rate);
+> >  
+> > +int imx_clk_gate2_exclusive(struct clk *clk1, struct clk *clk2);
+> > +
+> >  static inline struct clk *imx_clk_gate2(const char *name, const char *parent,
+> >  		void __iomem *reg, u8 shift)
+> >  {
+> > -- 
+> > 1.7.9.5
+> > 
