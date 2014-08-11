@@ -1,32 +1,97 @@
-From: spk.linux@gmail.com (Sachin Kamat)
-Date: Mon, 11 Aug 2014 09:26:00 +0530
-Subject: linux-next: build failures after merge of the drm tree
-In-Reply-To: <alpine.DEB.2.00.1408100856270.32072@skynet.skynet.ie>
-References: <20140805130926.4e8c8fe5@canb.auug.org.au>
- <53E0736E.7030901@samsung.com>
- <CAOesGMjjLHOaBJZwFENaWW41KFsNZ3pUqiYk0jtet=8NFvce3g@mail.gmail.com>
- <CAOesGMg=kFM_9ksgoOXgqLFjzoE38tCuPy7pxbG5F_j5KovkVA@mail.gmail.com>
- <alpine.DEB.2.00.1408100856270.32072@skynet.skynet.ie>
-Message-ID: <CAK5sBcHceBqYQOQrWw9D0CviVpnXOdAtfgh7pFkT=L53Gfbe6g@mail.gmail.com>
+From: tom@sharkbay.at (Thomas Scheiblauer)
+Date: Mon, 11 Aug 2014 07:24:52 +0200
+Subject: [BUG]: imx6q (wandboard): Very unstable ethernet since kernel 3.16
+In-Reply-To: <53E7F3FD.9030009@gmail.com>
+References: <1407503758.19455.1.camel@sharkbay.at>
+ <20140808132754.GC30282@n2100.arm.linux.org.uk>
+ <1407507023.19455.3.camel@sharkbay.at>
+ <20140808143008.GD30282@n2100.arm.linux.org.uk>
+ <1407509932.19455.7.camel@sharkbay.at> <53E548DB.90905@boundarydevices.com>
+ <CAHKv19Cky2+vEOirwwd8xhix_V0Vivn_6BbuYq+D_k0o8o4Gsg@mail.gmail.com>
+ <53E56C4E.9090708@boundarydevices.com> <53E7F3FD.9030009@gmail.com>
+Message-ID: <e5e80736-6acc-4106-acfd-a14cbd0fd751@email.android.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Aug 10, 2014 at 1:28 PM, Dave Airlie <airlied@linux.ie> wrote:
->>
+On 11. August 2014 00:36:45 MESZ, Iain Paton <ipaton0@gmail.com> wrote:
+>On 09/08/14 01:33, Troy Kisky wrote:
+>> On 8/8/2014 3:51 PM, George Joseph wrote:
+>>> On Fri, Aug 8, 2014 at 4:02 PM, Troy Kisky
+><troy.kisky@boundarydevices.com
+>>> <mailto:troy.kisky@boundarydevices.com>> wrote:
+>>>
+>>>     On 8/8/2014 7:58 AM, Thomas Scheiblauer wrote:
+>>>     >
+>>>     >
+>>>     > Indeed, commenting out these 2 lines in
+>>>     > arch/arm/boot/dts/imx6qdl-wandboard.dtsi fixes my problem
+>without having
+>>>     > to increase TX_RING_SIZE.
+>>>     > Thank you very much!
+>>>     >
+>>>     Could you also please checkout commit
+>>>
+>>>     commit 9fc77821b17155c6e0ab50b1e1dd80c2b0e63e98
+>>>     Author: Sascha Silbe <x-linux@infra-silbe.de
+><mailto:x-linux@infra-silbe.de>>
+>>>     Date:   Thu Feb 6 23:24:13 2014 +0100
+>>>
+>>>         ARM: dts: imx6qdl-wandboard: use GPIO_6 for FEC interrupt
+>>>
+>>>
+>>>     and see if it also shows ethernet instabilities?
+>>>
+>>>
+>>> I'm confused by the references to GPIO_6 and GPIO1_IO06 as it
+>relates to the wandboard.   According
+>>> to the schematic for both the rev B1 and C1, the GPIO_6 PAD is
+>physically connected to pin 30 on the
+>>> camera interface and according to the dtb tree, GPIO1_IO06 isn't
+>mapped to any PAD.
+>>>
+>>> This kinda fits with my own observation which is that Ethernet is
+>working fine (40MB/s sustained)
+>>> regardless of whether fec is using "gpio1 6" and "intc 0 119" for
+>extended interrupts or the default
+>>> "intc 0 118" and "intc 0 119".   Otherwise stock 3.16.0 on WB Quad
+>C1.
+>>>
+>> Are you using a wandboard also?   With or without camera plugged in?
 >
-> Been on holidays, but ack for anything DT related,
+>I have:
 >
-> Look I wishI knew how DT worked, and what tree is canonical for changes to
-> it, I'm not sure its well defined enough or sub maintaniers know enough,
-> so I do just trust the exynos guys with this.
+>2x WBQUAD (B1)  i.MX6Q, silicon rev 1.2
+>1x Sabre-Lite   i.MX6Q, silicon rev 1.0
+>2x Sabre-Lite   i.MX6Q, silicon rev 1.2
+>2x RIoTboard i.MX6Solo, silicon rev 1.1
+>1x MarSBoard i.MX6Dual, silicon rev 1.2 (I haven't posted the dts for
+>this yet)
 >
+>all with the GPIO_6 interrupt patch in place, no cameras or anything
+>else 
+>connected to that pad, no issues seen on 3.15 or 3.16 
+>
+>I had seen problems on earlier kernels, before the GPIO_6 workaround
+>was 
+>implemented, where one of my Sabre-Lite boards (only one, and always
+>the 
+>same one) would vanish off the network for a few minutes. I'd even had
+>it 
+>happen while in the middle of typing something over an ssh connection.
+>Connectivity usually seemed to recover on it's own eventually, or I 
+>could log in over a serial connection and ping something else on the 
+>network which would restore the connection immediately.
+>After the GPIO_6 workaround was implemented I've never had the problem 
+>re-occur.
+>
+>I use the two wandboards and the three sabre-lites as builders with 
+>distcc and nfs in the mix, so network issues usually show up fairly 
+>quickly.
+>
+>Iain
 
-Inki,
+I've always had ethernet problems with my Wandboards. Especially when I hadn't increased the TX_RING_SIZE in the fec driver. I'm pretty sure I've been using the GPIO_6 patch for a long time since I always patch my kernels with Robert C. Nelson's ARM patch collection. Now that I've removed the patch (on Kernel 3.16.0) the problems seem to have an end.
 
-Can you please get your tree included in linux-next so that these kind of issues
-could be detected much earlier (even before they hit Dave's tree)?
+I've also experienced your special case with one of my Wandboard quads where it would loose the connection every minute or so but would restore it when sending some data by itself, e.g. a ping. I worked around this by installing a systemd timer which did exactly that.
 
-
--- 
-Regards,
-Sachin.
+Tom
