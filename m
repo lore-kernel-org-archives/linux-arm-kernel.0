@@ -1,65 +1,81 @@
-From: dh.herrmann@gmail.com (David Herrmann)
-Date: Mon, 11 Aug 2014 18:55:50 +0200
-Subject: [PATCH 1/2] arm64: compat: wire up memfd_create and getrandom
- syscalls for aarch32
-In-Reply-To: <1407764228-7904-1-git-send-email-will.deacon@arm.com>
-References: <1407764228-7904-1-git-send-email-will.deacon@arm.com>
-Message-ID: <CANq1E4SyoMEXa7dX8PdYUckBJzL3V+FzZSoKUKqsgGnzPAVbFg@mail.gmail.com>
+From: dianders@chromium.org (Doug Anderson)
+Date: Mon, 11 Aug 2014 10:01:08 -0700
+Subject: [PATCH 3/4] ARM: dts: rockchip: add rk3288 dma controllers
+In-Reply-To: <1406661128-7614-4-git-send-email-heiko@sntech.de>
+References: <1406661128-7614-1-git-send-email-heiko@sntech.de>
+ <1406661128-7614-4-git-send-email-heiko@sntech.de>
+Message-ID: <CAD=FV=VWBh3STfZWLDuYerS9wiceQL=UEJyjqp0-GLh0=-hTdw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi
+Heiko,
 
-On Mon, Aug 11, 2014 at 3:37 PM, Will Deacon <will.deacon@arm.com> wrote:
-> arch/arm/ just grew support for the new memfd_create and getrandom
-> syscalls, so add them to our compat layer too.
+On Tue, Jul 29, 2014 at 12:12 PM, Heiko Stuebner <heiko@sntech.de> wrote:
+> Add both the bus and peripheral pl330 dma controllers present in rk3288 socs.
+> The first dma controller can change between secure and non-secure mode and is
+> left by the bootloader in secure mode, which gets added here.
 >
-> Signed-off-by: Will Deacon <will.deacon@arm.com>
+> Signed-off-by: Heiko Stuebner <heiko@sntech.de>
 > ---
->  arch/arm64/include/asm/unistd.h   | 2 +-
->  arch/arm64/include/asm/unistd32.h | 5 +++++
->  2 files changed, 6 insertions(+), 1 deletion(-)
->
-> diff --git a/arch/arm64/include/asm/unistd.h b/arch/arm64/include/asm/unistd.h
-> index 4bc95d27e063..6d2bf419431d 100644
-> --- a/arch/arm64/include/asm/unistd.h
-> +++ b/arch/arm64/include/asm/unistd.h
-> @@ -41,7 +41,7 @@
->  #define __ARM_NR_compat_cacheflush     (__ARM_NR_COMPAT_BASE+2)
->  #define __ARM_NR_compat_set_tls                (__ARM_NR_COMPAT_BASE+5)
->
-> -#define __NR_compat_syscalls           383
-> +#define __NR_compat_syscalls           386
->  #endif
->
->  #define __ARCH_WANT_SYS_CLONE
-> diff --git a/arch/arm64/include/asm/unistd32.h b/arch/arm64/include/asm/unistd32.h
-> index e242600c4046..da1f06b535e3 100644
-> --- a/arch/arm64/include/asm/unistd32.h
-> +++ b/arch/arm64/include/asm/unistd32.h
-> @@ -787,3 +787,8 @@ __SYSCALL(__NR_sched_setattr, sys_sched_setattr)
->  __SYSCALL(__NR_sched_getattr, sys_sched_getattr)
->  #define __NR_renameat2 382
->  __SYSCALL(__NR_renameat2, sys_renameat2)
-> +                       /* 383 for seccomp */
+>  arch/arm/boot/dts/rk3288.dtsi | 27 +++++++++++++++++++++++++++
+>  1 file changed, 27 insertions(+)
 
-No idea what happens if you increase __NR_compat_syscalls without
-adding __SYSCALL(). Apart from that, it's the same I have in my
-private memfd-branch, so fine with me (I will then drop my
-arm64-compat patch for memfd).
+This is outside of my area of expertise, but comparing this to
+bindings, TRM, and other platforms it looks reasonable to me.
 
-Thanks
-David
 
-> +#define __NR_getrandom 384
-> +__SYSCALL(__NR_getrandom, sys_getrandom)
-> +#define __NR_memfd_create 385
-> +__SYSCALL(__NR_memfd_create, sys_memfd_create)
+> diff --git a/arch/arm/boot/dts/rk3288.dtsi b/arch/arm/boot/dts/rk3288.dtsi
+> index 3ef8951..3f39d26 100644
+> --- a/arch/arm/boot/dts/rk3288.dtsi
+> +++ b/arch/arm/boot/dts/rk3288.dtsi
+> @@ -62,6 +62,33 @@
+>                 };
+>         };
+>
+> +       amba {
+> +               compatible = "arm,amba-bus";
+> +               #address-cells = <1>;
+> +               #size-cells = <1>;
+> +               ranges;
+> +
+> +               dmac1: dma at ffb20000 {
+
+I'm curious: why did you choose "dmac1" for the alias here?  I would
+have called it "dmac_peri", "pdma", or something similar as per the
+address map in the TRM.  I found a single reference in the TRM to
+"dmac2" but it wasn't immediately clear to me which DMA that was
+referring to.  In a commit in a temporary tree I see that someone at
+Rockchip called the DMA at ff250000 "pdma1".
+
+
+> +                       compatible = "arm,pl330", "arm,primecell";
+> +                       reg = <0xffb20000 0x4000>;
+> +                       interrupts = <GIC_SPI 0 IRQ_TYPE_LEVEL_HIGH>,
+> +                                    <GIC_SPI 1 IRQ_TYPE_LEVEL_HIGH>;
+> +                       #dma-cells = <1>;
+> +                       clocks = <&cru ACLK_DMAC1>;
+> +                       clock-names = "apb_pclk";
+> +               };
+> +
+> +               dmac2: dma at ff250000 {
+
+nit: when we have easy addresses to compare to, we should probably
+sort by address?
+
+
+> +                       compatible = "arm,pl330", "arm,primecell";
+> +                       reg = <0xff250000 0x4000>;
+> +                       interrupts = <GIC_SPI 2 IRQ_TYPE_LEVEL_HIGH>,
+> +                                    <GIC_SPI 3 IRQ_TYPE_LEVEL_HIGH>;
+> +                       #dma-cells = <1>;
+> +                       clocks = <&cru ACLK_DMAC2>;
+> +                       clock-names = "apb_pclk";
+> +               };
+> +       };
+> +
+>         xin24m: oscillator {
+>                 compatible = "fixed-clock";
+>                 clock-frequency = <24000000>;
 > --
 > 2.0.1
 >
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-kernel" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
-> Please read the FAQ at  http://www.tux.org/lkml/
