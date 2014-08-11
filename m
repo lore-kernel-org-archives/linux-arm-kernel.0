@@ -1,56 +1,42 @@
 From: will.deacon@arm.com (Will Deacon)
-Date: Mon, 11 Aug 2014 14:33:38 +0100
-Subject: [PATCH] arm64: audit: Fix build for audit changes
-In-Reply-To: <1407763344.2423.0.camel@redhat.com>
-References: <1405596402-23844-1-git-send-email-broonie@kernel.org>
- <20140811090947.GC15344@arm.com>
- <1407763344.2423.0.camel@redhat.com>
-Message-ID: <20140811133338.GB15853@arm.com>
+Date: Mon, 11 Aug 2014 14:37:08 +0100
+Subject: [PATCH 2/2] asm-generic: add memfd_create system call to unistd.h
+In-Reply-To: <1407764228-7904-1-git-send-email-will.deacon@arm.com>
+References: <1407764228-7904-1-git-send-email-will.deacon@arm.com>
+Message-ID: <1407764228-7904-2-git-send-email-will.deacon@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Aug 11, 2014 at 02:22:24PM +0100, Eric Paris wrote:
-> On Mon, 2014-08-11 at 10:09 +0100, Will Deacon wrote:
-> > On Thu, Jul 17, 2014 at 12:26:42PM +0100, Mark Brown wrote:
-> > > From: Mark Brown <broonie@linaro.org>
-> > > 
-> > > Commit 3efe33f5d2 (audit: x86: drop arch from __audit_syscall_entry()
-> > > interface) removed the arch parameter from __audit_syscall_entry() and
-> > > updated the only current user in mainline but this breaks the ARMv8 audit
-> > > code that has been added in -next. Fix this by making the equivalent
-> > > update to ARMv8.
-> > > 
-> > > Signed-off-by: Mark Brown <broonie@linaro.org>
-> > > ---
-> > >  arch/arm64/kernel/ptrace.c | 4 ++--
-> > >  1 file changed, 2 insertions(+), 2 deletions(-)
-> > > 
-> > > diff --git a/arch/arm64/kernel/ptrace.c b/arch/arm64/kernel/ptrace.c
-> > > index 70526cfda056..310842e3d477 100644
-> > > --- a/arch/arm64/kernel/ptrace.c
-> > > +++ b/arch/arm64/kernel/ptrace.c
-> > > @@ -1115,8 +1115,8 @@ asmlinkage int syscall_trace_enter(struct pt_regs *regs)
-> > >  	if (test_thread_flag(TIF_SYSCALL_TRACEPOINT))
-> > >  		trace_sys_enter(regs, regs->syscallno);
-> > >  
-> > > -	audit_syscall_entry(syscall_get_arch(), regs->syscallno,
-> > > -		regs->orig_x0, regs->regs[1], regs->regs[2], regs->regs[3]);
-> > > +	audit_syscall_entry(regs->syscallno, regs->orig_x0, regs->regs[1],
-> > > +			    regs->regs[2], regs->regs[3]);
-> > 
-> > Eric, Richard: when is 3efe33f5d2 ("audit: x86: drop arch from
-> > __audit_syscall_entry() interface") going to hit mainline? I've been holding
-> > off this fix until the offending commit is merged, but if that's not going
-> > to happen for 3.17, then we probably need to do something else to fix -next.
-> 
-> I think I'm being lazy this window and not oging to send a pull.  So
-> I'll pick up this fix as soon as rc1 cuts in my tree.
+Commit 9183df25fe7b ("shm: add memfd_create() syscall") added a new
+system call (memfd_create) but didn't update the asm-generic unistd
+header.
 
-Oh, alright then. If you're not going to send the code for mainline, you
-could also just drop it from -next ;)
+This patch adds the new system call to the asm-generic version of
+unistd.h so that it can be used by architectures such as arm64.
 
-Anyway, if you do fix it, please let me know so that I can remove our #ifdef
-CONFIG_AUDITSYSCALL guards (which only exist to stop build breakage in -next
-with defconfig).
+Cc: Arnd Bergmann <arnd@arndb.de>
+Cc: David Herrmann <dh.herrmann@gmail.com>
+Signed-off-by: Will Deacon <will.deacon@arm.com>
+---
+ include/uapi/asm-generic/unistd.h | 4 +++-
+ 1 file changed, 3 insertions(+), 1 deletion(-)
 
-Will
+diff --git a/include/uapi/asm-generic/unistd.h b/include/uapi/asm-generic/unistd.h
+index f1afd607f043..11d11bc5c78f 100644
+--- a/include/uapi/asm-generic/unistd.h
++++ b/include/uapi/asm-generic/unistd.h
+@@ -703,9 +703,11 @@ __SYSCALL(__NR_renameat2, sys_renameat2)
+ __SYSCALL(__NR_seccomp, sys_seccomp)
+ #define __NR_getrandom 278
+ __SYSCALL(__NR_getrandom, sys_getrandom)
++#define __NR_memfd_create 279
++__SYSCALL(__NR_memfd_create, sys_memfd_create)
+ 
+ #undef __NR_syscalls
+-#define __NR_syscalls 279
++#define __NR_syscalls 280
+ 
+ /*
+  * All syscalls below here should go away really,
+-- 
+2.0.1
