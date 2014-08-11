@@ -1,47 +1,64 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Mon, 11 Aug 2014 10:30:24 +0100
-Subject: [PATCHv6 0/5] DMA Atomic pool for arm64
-In-Reply-To: <1407529848-6806-1-git-send-email-lauraa@codeaurora.org>
-References: <1407529848-6806-1-git-send-email-lauraa@codeaurora.org>
-Message-ID: <20140811093024.GF15344@arm.com>
+From: ulf.hansson@linaro.org (Ulf Hansson)
+Date: Mon, 11 Aug 2014 11:32:40 +0200
+Subject: [PATCH 3/5] mmc: sdhci-pltfm: Do not use parent as the host's
+ device
+In-Reply-To: <1407748550.3680.10.camel@hornet>
+References: <1406298233-27876-1-git-send-email-pawel.moll@arm.com>
+ <1406298233-27876-3-git-send-email-pawel.moll@arm.com>
+ <1407515785.31897.28.camel@hornet>
+ <CAPDyKFoLU6pnJFmKe7CB0q-hKfwv4uCPSr0cE4aoYMvfhjMteQ@mail.gmail.com>
+ <1407748550.3680.10.camel@hornet>
+Message-ID: <CAPDyKFruZxUtzUKM+PvsK-_qqcE4OcCaKSkRJ2_01y7TuQMGkA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Aug 08, 2014 at 09:30:48PM +0100, Laura Abbott wrote:
-> Hi,
-> 
-> This is v6 of the series to add an atomic pool for arm64 and refactor some of
-> the arm dma_atomic code as well.
-> 
-> Russell, assuming you have no issues I'd like to get your Acked-by before
-> Catalin picks this up. As always, testing and reviews are appreiciated.
-> 
-> Thanks,
-> Laura
-> 
-> 
-> v6: Tweaked the commit text to clarify that arm is moving from
-> ioremap_page_range to map_vm_area and friends
-> 
-> v5: v4: Addressed comments from Thierry and Catalin. Updated map_vm_area call in
-> dma_common_pages_remap since the API changed.
-> 
-> v4: Simplified the logic in gen_pool_first_fit_order_align which makes the
-> data argument actually unused.
-> 
-> v3: Now a patch series due to refactoring of arm code. arm and arm64 now both
-> use genalloc for atomic pool management. genalloc extensions added.
-> DMA remapping code factored out as well.
-> 
-> v2: Various bug fixes pointed out by David and Ritesh (CMA dependency, swapping
-> coherent, noncoherent). I'm still not sure how to address the devicetree
-> suggestion by Will [1][2]. I added the devicetree mailing list this time around
-> to get more input on this.
-> 
-> [1] http://lists.infradead.org/pipermail/linux-arm-kernel/2014-April/249180.html
-> [2] http://lists.infradead.org/pipermail/linux-arm-kernel/2014-April/249528.html
+On 11 August 2014 11:15, Pawel Moll <pawel.moll@arm.com> wrote:
+> On Mon, 2014-08-11 at 10:07 +0100, Ulf Hansson wrote:
+>> On 8 August 2014 18:36, Pawel Moll <pawel.moll@arm.com> wrote:
+>> > On Fri, 2014-07-25 at 15:23 +0100, Pawel Moll wrote:
+>> >> The code selecting a device for the sdhci host has been
+>> >> continuously tweaked (4b711cb13843f5082e82970dd1e8031383134a65
+>> >> "mmc: sdhci-pltfm: Add structure for host-specific data" and
+>> >> a4d2177f00a5252d825236c5124bc1e9918bdb41 "mmc: sdhci-pltfm: dt
+>> >> device does not pass parent to sdhci_alloc_host") while there
+>> >> does not seem to be any reason to use platform device's parent
+>> >> in the first place.
+>> >>
+>> >> The comment saying "Some PCI-based MFD need the parent here"
+>> >> seem to refer to Timberdale FPGA driver (the only MFD driver
+>> >> registering SDHCI cell, drivers/mfd/timberdale.c) but again,
+>> >> the only situation when parent device matter is runtime PM,
+>> >> which is not implemented for Timberdale.
+>> >>
+>> >> Cc: Chris Ball <chris@printf.net>
+>> >> Cc: Anton Vorontsov <anton@enomsg.org>
+>> >> Cc: Ulf Hansson <ulf.hansson@linaro.org>
+>> >> Cc: linux-mmc at vger.kernel.org
+>> >> Cc: linuxppc-dev at lists.ozlabs.org
+>> >> Signed-off-by: Pawel Moll <pawel.moll@arm.com>
+>> >> ---
+>> >>
+>> >> This patch is a part of effort to remove references to platform_bus
+>> >> and make it static.
+>> >>
+>> >> Chris, Anton, Ulf - could you please advise if the assumptions
+>> >> above are correct or if I'm completely wrong? Do you know what
+>> >> where the real reasons to use parent originally? The PCI comment
+>> >> seems like a red herring to me...
+>> >
+>> > Can I take the silence as a suggestion that the change looks ok-ish for
+>> > you?
+>>
+>> Sorry for the delay. I suppose this make sense, but I really don't
+>> know for sure.
+>>
+>> I guess we need some testing in linux-next, to get some confidence.
+>
+> Would you take it into -next then? Unless I'm completely wrong there
+> should be no impact on any in-tree driver...
 
-FWIW: I don't think the device-tree comments need to block this series. I
-was just curious as to why they weren't being used.
+I will take it; though I think it's best to queue it for 3.18 to get
+some more testing.
 
-Will
+Kind regards
+Uffe
