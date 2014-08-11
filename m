@@ -1,71 +1,85 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Mon, 11 Aug 2014 14:56:45 +0100
-Subject: [RESEND PATCH 0/6] thermal: sti: Add new Thermal driver
-In-Reply-To: <20140721101306.GW30888@lee--X1>
-References: <20140624092309.GD13803@lee--X1> <20140709120823.GA32573@lee--X1>
- <1404911964.28592.4.camel@rzhang1-toshiba>
- <20140709134646.GB479@lee--X1> <20140714130824.GA3993@lee--X1>
- <1405347277.28592.25.camel@rzhang1-toshiba>
- <20140714142703.GC3993@lee--X1> <20140721091753.GV30888@lee--X1>
- <1405935299.2455.3.camel@rzhang1-toshiba>
- <20140721101306.GW30888@lee--X1>
-Message-ID: <20140811135645.GD31769@lee--X1>
+From: heiko@sntech.de (Heiko =?ISO-8859-1?Q?St=FCbner?=)
+Date: Mon, 11 Aug 2014 16:38:31 +0200
+Subject: [PATCHv10 5/5] ARM: dts: rockchip: unuse the slot-node and
+ deprecate the supports-highspeed for dw-mmc
+In-Reply-To: <1407397082-32495-6-git-send-email-jh80.chung@samsung.com>
+References: <1407397082-32495-1-git-send-email-jh80.chung@samsung.com>
+ <1407397082-32495-6-git-send-email-jh80.chung@samsung.com>
+Message-ID: <2216569.yZfKCR5Kzu@diego>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 21 Jul 2014, Lee Jones wrote:
-> On Mon, 21 Jul 2014, Zhang Rui wrote:
-> > On Mon, 2014-07-21 at 10:17 +0100, Lee Jones wrote:
-> > > On Mon, 14 Jul 2014, Lee Jones wrote:
-> > > > On Mon, 14 Jul 2014, Zhang Rui wrote:
-> > > > > On Mon, 2014-07-14 at 14:08 +0100, Lee Jones wrote:
-> > > > > > On Wed, 09 Jul 2014, Lee Jones wrote:
-> > > > > > > On Wed, 09 Jul 2014, Zhang Rui wrote:
-> > > > > > > > On Wed, 2014-07-09 at 13:08 +0100, Lee Jones wrote:
-> > > > > > > > > On Tue, 24 Jun 2014, Lee Jones wrote:
-> > > > > > > > > 
-> > > > > > > > > > > I'm re-sending this set, as one of the maintainers' email addresses
-> > > > > > > > > > > is incorrect in the MAINTAINERS file.
-> > > > > > > > > > > 
-> > > > > > > > > > > This patchset adds full support for 2 types of Thermal Controllers
-> > > > > > > > > > > produced by STMicroelectronics.  One is a more traditional memory
-> > > > > > > > > > > mapped variant, the other is controlled solely by system configuration
-> > > > > > > > > > > registers.
-> > > > > > > > > > 
-> > > > > > > > > > Any thing from the Thermal guys? Has this set fallen through the gaps?
-> > > > > > > > > 
-> > > > > > > > > Anything at all?  It's been well over a month now.
-> > > > > > > > > 
-> > > > > > > > Well, for the soc thermal drivers, I'd prefer to take them via Eduardo,
-> > > > > > > > but as we didn't get any feedback from Eduardo, I will take them.
-> > > > > > > 
-> > > > > > > Thanks Rui.
-> > > > > > > 
-> > > > > > > So have you taken all 4 "thermal: sti: *" patches?
-> > > > > > 
-> > > > > > Have you taken these yet?
-> > > > > 
-> > > > > Not yet. will do tomorrow.
-> > > 
-> > > I waited 7 days and still don't see them?
-> > > 
-> > Done, they're in my local tree and I forgot to push them.
-> > thanks for the reminder.
+Am Donnerstag, 7. August 2014, 16:38:02 schrieb Jaehoon Chung:
+> dw-mmc controller can support multiple slots.
+> But, there are no use-cases anywhere. So we don't need to support the
+> slot-node for dw-mmc controller.
+> And "supports-highspeed" property in dw-mmc is deprecated.
+> "supports-highspeed" property can be replaced with "cap-sd/mmc-highspeed".
 > 
-> Thanks dude.
+> Signed-off-by: Jaehoon Chung <jh80.chung@samsung.com>
+> Reviewed-by: Tushar Behera <trblinux@gmail.com>
+> Reviewed-by: Ulf Hansson <ulf.hansson@linaro.org>
+> Reviewed-by: Heiko Stuebner <heiko@sntech.de>
+> Acked-by: Seungwon Jeon <tgih.jun@samsung.com>
 
-Hi Rui,
+I've added this one to my queue for 3.18
 
-Do you know when you will send your pull-request?
 
-We are half way through the merge window and I don't see any new
-Thermal patches?
+Heiko
 
-Kind regards,
-Lee
-
--- 
-Lee Jones
-Linaro STMicroelectronics Landing Team Lead
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+> ---
+>  arch/arm/boot/dts/rk3066a-bqcurie2.dts |   15 ++++-----------
+>  arch/arm/boot/dts/rk3188-radxarock.dts |    7 ++-----
+>  2 files changed, 6 insertions(+), 16 deletions(-)
+> 
+> diff --git a/arch/arm/boot/dts/rk3066a-bqcurie2.dts
+> b/arch/arm/boot/dts/rk3066a-bqcurie2.dts index 042f821d..665dd56 100644
+> --- a/arch/arm/boot/dts/rk3066a-bqcurie2.dts
+> +++ b/arch/arm/boot/dts/rk3066a-bqcurie2.dts
+> @@ -150,12 +150,8 @@
+>  	num-slots = <1>;
+>  	status = "okay";
+>  	vmmc-supply = <&vcc_sd0>;
+> -
+> -	slot at 0 {
+> -		reg = <0>;
+> -		bus-width = <4>;
+> -		disable-wp;
+> -	};
+> +	bus-width = <4>;
+> +	disable-wp;
+>  };
+> 
+>  &mmc1 { /* wifi */
+> @@ -166,11 +162,8 @@
+>  	pinctrl-names = "default";
+>  	pinctrl-0 = <&sd1_clk &sd1_cmd &sd1_bus4>;
+> 
+> -	slot at 0 {
+> -		reg = <0>;
+> -		bus-width = <4>;
+> -		disable-wp;
+> -	};
+> +	bus-width = <4>;
+> +	disable-wp;
+>  };
+> 
+>  &uart0 {
+> diff --git a/arch/arm/boot/dts/rk3188-radxarock.dts
+> b/arch/arm/boot/dts/rk3188-radxarock.dts index 171b610..ef72faf 100644
+> --- a/arch/arm/boot/dts/rk3188-radxarock.dts
+> +++ b/arch/arm/boot/dts/rk3188-radxarock.dts
+> @@ -181,11 +181,8 @@
+>  	status = "okay";
+>  	vmmc-supply = <&vcc_sd0>;
+> 
+> -	slot at 0 {
+> -		reg = <0>;
+> -		bus-width = <4>;
+> -		disable-wp;
+> -	};
+> +	bus-width = <4>;
+> +	disable-wp;
+>  };
+> 
+>  &pinctrl {
