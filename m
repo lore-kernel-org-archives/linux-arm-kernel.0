@@ -1,55 +1,129 @@
-From: grant.b.edwards@gmail.com (Grant Edwards)
-Date: Mon, 11 Aug 2014 21:57:54 +0000 (UTC)
-Subject: Building kernel for more than one SoC
-References: <lrdi48$ls1$1@ger.gmane.org>
- <20140804201712.GK30282@n2100.arm.linux.org.uk>
- <53E8E469.9050807@atmel.com> <lsaoih$e9$1@ger.gmane.org>
- <CAOCHtYgPoxveSjYpWWo8W+_0WwQdaCBga0piazg_Oq6aeZ=w-g@mail.gmail.com>
- <lsb9tn$nnv$1@ger.gmane.org>
- <20140811205909.GC30401@n2100.arm.linux.org.uk>
- <lsbbp9$j4n$1@ger.gmane.org>
- <CAOCHtYj+DRa-U6vZTgRr9MyKTStqhE5iThhA785FWSOt8GS6DA@mail.gmail.com>
-Message-ID: <lsbe92$guu$2@ger.gmane.org>
+From: skannan@codeaurora.org (Saravana Kannan)
+Date: Mon, 11 Aug 2014 15:11:18 -0700
+Subject: [PATCH v4 1/5] cpufreq: Don't wait for CPU to going offline to
+ restart governor
+In-Reply-To: <CAKohpon=xWZJzfN0PceVntumAUFfCsbG1ibUwSxewB7bE=U7bQ@mail.gmail.com>
+References: <CAKohpon=xWZJzfN0PceVntumAUFfCsbG1ibUwSxewB7bE=U7bQ@mail.gmail.com>
+Message-ID: <53E93F86.5030304@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2014-08-11, Robert Nelson <robertcnelson@gmail.com> wrote:
-> On Mon, Aug 11, 2014 at 4:15 PM, Grant Edwards
-><grant.b.edwards@gmail.com> wrote:
->> On 2014-08-11, Russell King - ARM Linux <linux@arm.linux.org.uk> wrote:
->>> On Mon, Aug 11, 2014 at 08:43:35PM +0000, Grant Edwards wrote:
->>>> On 2014-08-11, Robert Nelson <robertcnelson@gmail.com> wrote:
->>>> >> Now it's up to somebody else to decide if the price difference between
->>>> >> a G20 and G25 is worth the engineering time to upgrade U-Boot and
->>>> >> Linux kernel to versions that know about device trees...
->>>> >
->>>> > http://cateee.net/lkddb/web-lkddb/ARM_APPENDED_DTB.html
->>>>
->>>> Interesting.  That would still require modifying U-Boot so that at
->>>> run-time it detects the SoC type and appends the proper DTB to the
->>>> kernel image, but it that may be less work than "real" DTB support in
->>>> U-Boot.
->>>
->>> The idea of that feature is:
->>>
->>> - You take the kernel zImage
->>> - You take the appropriate dtb file
->>> - You concatenate the dtb file into the zImage
->>> - You run mkimage on the resulting combined image to create the special
->>>   uboot format file for uboot to load
->>
->> The problem is now you've got a kernel image that won't run on both
->> the '9g20 and the '9g25.  The requirement is to have a kernel image
->> that will run on either.
+On 08/07/2014 01:54 AM, Viresh Kumar wrote:
+> Sorry for the really long delay this time around. I am used to replying within a
+> day normally, and this time it just took so much time.
 >
-> Then, upgrade your u-boot to mainline, use the dtb, etc.  You have a
-> lot of excuses. ;)
+> For next time please rebase on latest updates in pm/linux-next as there are
+> few updates there.
 
-Yep. Unfortunately, excuses aren't the problem.  Cost (mostly
-opportunity cost) is the problem...
+Will do.
+
+>
+> On 25 July 2014 06:37, Saravana Kannan <skannan@codeaurora.org> wrote:
+>> There's no need to wait for the CPU going down to fully go offline to
+>> restart the governor. We can stop the governor, change policy->cpus and
+>> immediately restart the governor. This should reduce the time without any
+>> CPUfreq monitoring and also help future patches with simplifying the code.
+>
+> I agree with the idea here, though the $subject can be improved a bit
+> here..
+
+Suggestions welcome. I think the current one explains the main point of 
+this change.
+
+>> Signed-off-by: Saravana Kannan <skannan@codeaurora.org>
+>> ---
+>>   drivers/cpufreq/cpufreq.c | 33 ++++++++++++++++++---------------
+>>   1 file changed, 18 insertions(+), 15 deletions(-)
+>>
+>> diff --git a/drivers/cpufreq/cpufreq.c b/drivers/cpufreq/cpufreq.c
+>> index 62259d2..ee0eb7b 100644
+>> --- a/drivers/cpufreq/cpufreq.c
+>> +++ b/drivers/cpufreq/cpufreq.c
+>> @@ -1390,6 +1390,21 @@ static int __cpufreq_remove_dev_prepare(struct device *dev,
+>>                  cpufreq_driver->stop_cpu(policy);
+>>          }
+>>
+>> +       down_write(&policy->rwsem);
+>> +       cpumask_clear_cpu(cpu, policy->cpus);
+>> +       up_write(&policy->rwsem);
+>
+> There is a down_read() present early in this routine and we better update this
+> at that place only.
+
+I would rather not. My v1 patch series was super refactored to allow a 
+lot of reuse, etc. But you guys complained about the diffs being 
+confusing (which was a valid point).
+
+Also, if we are talking about refactoring this, there's room for much 
+better refactor at the end of the series. I will add a patch to the 
+series to do the refactoring.
+
+>
+>> +       if (cpus > 1 && has_target()) {
+>
+> We already have a if (cpus > 1) block, move this there.
+
+That only runs if cpu != policy->cpu. This needs to run irrespective of 
+that.
+
+>
+>> +               ret = __cpufreq_governor(policy, CPUFREQ_GOV_START);
+>> +               if (!ret)
+>> +                       ret = __cpufreq_governor(policy, CPUFREQ_GOV_LIMITS);
+>> +
+>> +               if (ret) {
+>> +                       pr_err("%s: Failed to start governor\n", __func__);
+>> +                       return ret;
+>> +               }
+>> +       }
+>> +
+>>          return 0;
+>>   }
+>>
+>> @@ -1410,15 +1425,12 @@ static int __cpufreq_remove_dev_finish(struct device *dev,
+>>                  return -EINVAL;
+>>          }
+>>
+>> -       down_write(&policy->rwsem);
+>> +       down_read(&policy->rwsem);
+>>          cpus = cpumask_weight(policy->cpus);
+>> -
+>> -       if (cpus > 1)
+>> -               cpumask_clear_cpu(cpu, policy->cpus);
+>> -       up_write(&policy->rwsem);
+>> +       up_read(&policy->rwsem);
+>>
+>>          /* If cpu is last user of policy, free policy */
+>> -       if (cpus == 1) {
+>> +       if (cpus == 0) {
+>>                  if (has_target()) {
+>>                          ret = __cpufreq_governor(policy,
+>>                                          CPUFREQ_GOV_POLICY_EXIT);
+>> @@ -1447,15 +1459,6 @@ static int __cpufreq_remove_dev_finish(struct device *dev,
+>>
+>>                  if (!cpufreq_suspended)
+>>                          cpufreq_policy_free(policy);
+>> -       } else if (has_target()) {
+>> -               ret = __cpufreq_governor(policy, CPUFREQ_GOV_START);
+>> -               if (!ret)
+>> -                       ret = __cpufreq_governor(policy, CPUFREQ_GOV_LIMITS);
+>> -
+>> -               if (ret) {
+>> -                       pr_err("%s: Failed to start governor\n", __func__);
+>> -                       return ret;
+>> -               }
+>>          }
+>
+> Also, you must mention in the log about an important change you are making.
+> Don't know if there are any side effects...
+>
+> You are emptying policy->cpus on removal of last CPU of a policy, which wasn't
+> the case earlier.
+
+You mean the log in the cover letter? Will do.
+
+-Saravana
 
 -- 
-Grant Edwards               grant.b.edwards        Yow! Is it NOUVELLE
-                                  at               CUISINE when 3 olives are
-                              gmail.com            struggling with a scallop
-                                                   in a plate of SAUCE MORNAY?
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
+hosted by The Linux Foundation
