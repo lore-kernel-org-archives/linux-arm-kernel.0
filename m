@@ -1,36 +1,107 @@
-From: peter.ujfalusi@ti.com (Peter Ujfalusi)
-Date: Mon, 11 Aug 2014 10:58:50 +0300
-Subject: [PATCH] ARM: edma: Fix configuration parsing for SoCs with
- multiple eDMA3 CC
-In-Reply-To: <20140805163229.GZ8181@intel.com>
-References: <1407155216-20267-1-git-send-email-peter.ujfalusi@ti.com>
- <20140805163229.GZ8181@intel.com>
-Message-ID: <53E877BA.6040705@ti.com>
+From: christoffer.dall@linaro.org (Christoffer Dall)
+Date: Mon, 11 Aug 2014 10:01:25 +0200
+Subject: [RFC PATCH 7/9] KVM: arm: vgic: allow dynamic mapping of
+ physical/virtual interrupts
+In-Reply-To: <53E39FA9.6040503@linaro.org>
+References: <1403688530-23273-1-git-send-email-marc.zyngier@arm.com>
+ <1403688530-23273-8-git-send-email-marc.zyngier@arm.com>
+ <53DE0584.2040405@linaro.org>
+ <87bns0gzy8.fsf@approximate.cambridge.arm.com>
+ <53E39FA9.6040503@linaro.org>
+Message-ID: <20140811080125.GA10550@cbox>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08/05/2014 07:32 PM, Vinod Koul wrote:
-> On Mon, Aug 04, 2014 at 03:26:56PM +0300, Peter Ujfalusi wrote:
->> The edma_setup_from_hw() should know about the CC number when parsing the
->> CCCFG register - when it reads the register to be precise. The base
->> addresses for CCs stored in an array and we need to provide the correct id
->> to edma_read() in order to read the correct register.
+On Thu, Aug 07, 2014 at 05:47:53PM +0200, Eric Auger wrote:
+> On 08/04/2014 03:13 PM, Marc Zyngier wrote:
+> > On Sun, Aug 03 2014 at 10:48:52 am BST, Eric Auger <eric.auger@linaro.org> wrote:
+> >> On 06/25/2014 11:28 AM, Marc Zyngier wrote:
+> >>> In order to be able to feed physical interrupts to a guest, we need
+> >>> to be able to establish the virtual-physical mapping between the two
+> >>> worlds.
+> >>>
+> >>> As we try to keep the injection interface simple, find out what the
+> >>> physical interrupt is (if any) when we actually build the LR.
+> >>>
+> >>> The mapping is kept in a rbtree, indexed by virtual interrupts.
+> >>
+> >> Hi Marc,
+> >>
+> >> I suspect there is a piece missing here related to bitmap state
+> >> management. When using maintenance IRQ, in process_maintenance we cleared
+> >> - dist->irq_pending (and new dist->irq_level)
+> >> - vcpu->irq_queued
+> >>
+> >> Now this does not exist anymore for forwarded irqs, when a subsequent
+> >> IRQ will be injected, vgic_update_irq_pending will fail in injecting the
+> >> IRQ because the states are reflecting the IRQ is still in progress.
+> >>
+> >> Since I have a modified version of your code, using Christoffer patches
+> >> I may have missed some modifications you did but at least on my side I
+> >> was forced to add bitmap clearing.
+> >>
+> >> It is not clear to me where to put that code however. Since user-side
+> >> can inject an IRQ while the previous one is not completed at guest and
+> >> host level, it cannot be in update_irq_pending - or we shall prevent the
+> >> user from injecting fwd IRQs - .
+> Hi Marc,
 > 
-> Just an othognal question:
+> Christoffer suggested me to put state bitmap reset in
+> __kvm_vgic_sync_hwstate where we check whether the LR were consumed. It
+> seems to work fine and we do no assumption about user action.
 > 
-> I still see lot of code for edma in arm/. What is the plan to re/move that
-> to dma/
 
-Yes, there's still a big split. The code under arch/arm/common/ provides still
-the 'legacy' edma API. This is still used by audio
-sound/soc/davinci/davinci-pcm for older daVinci devices (AM335x. AM43xx uses
-the edma-pcm).
+What I said specifically was that we currently don't have to worry about
+clearing the active bit or resample the level when we look through the
+ELRSR bitmap, because level-triggered interrupts that have been
+processed currently always raise a maintenance interrupt.
 
-And it is not that simple to deprecate davinci-pcm: it can use so called
-ping-pong mode for audio data transfer. This mode is not possible via
-dmaengine AFAIK.
-I'm going to check if edma-pcm would work fine instead of the ping-pong mode.
-If it does I can remove davinci-pcm and we can start cleaning up the edma code.
+So my suggestion would be to factor out the "this is some common
+housekeeping we have to do for all level-triggered interrupts which have
+not been completed on a VCPU interface" from vgic_process_maintenance()
+and call this functionality from both vgic_process_maintenance() and
+from __kvm_vgic_sync_hwstate().
 
--- 
-P?ter
+[...]
+
+> > 
+> > Now, it is completely possible that we're missing something here (or
+> > actually doing too much).
+> > 
+> >> In my case (VFIO/IRQFD), by construction I only inject a new forwarded
+> >> IRQ when the previous one was completed so I could put it in the irqfd
+> >> injection function. But even irqfd is injected through eventfd trigger.
+> >> We shall forbid the user-side to trigger that eventfd in place of the
+> >> VFIO driver. What do you think?
+
+I'm afraid I'm not quite sure what you mean here?
+
+> > 
+> > Yup. userspace can't interfere with a forwarded interrupt, that's way
+> > too dangerous.
+> > 
+> >> A question related to guest kill. Cannot it happen the guest sometimes
+> >> does not complete the vIRQ before exiting? Currently I observe cases
+> >> where when I launch qemu-system after a kill, forwarded irqs do not work
+> >> properly. I am not yet sure this is the cause of my problem but just in
+> >> case, can the host write into GICV_EOIR in place of guest?
+> > 
+> > It is quite possible that the interrupt is left active when the guest is
+> > killed, which would tend to indicate that we need a way to cleanup
+> > behind us. It should be enough to clear the active bit, shouldn't it?
+> So in practice this will directly write into the GICC_DIR right? I will
+> try this.
+> 
+Not sure what you mean with "this will directly write into the
+GICC_DIR"?  What is 'this' ?
+
+I haven't experimented a lot with this, but I think you need to catch
+all forwarded IRQs that may have been in flight when the VM was killed
+and use the API to the irqchip to tell it that it's no longer forwarded
+and either the cleanup then sits within the specific irqchip logic or
+you do some more manual cleanup inside KVM.  I would lean towards the
+first option (because the irqchip would always be in charge of
+guaranteeting some queiesced state), but we should look at the specific
+details of what needs to be done.
+
+-Christoffer
