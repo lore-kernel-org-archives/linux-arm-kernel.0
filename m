@@ -1,40 +1,36 @@
-From: horms@verge.net.au (Simon Horman)
-Date: Mon, 11 Aug 2014 16:57:57 +0900
-Subject: [PATCH 1/5] ARM: shmobile: r8a7740: Add CMT1 device to DT
-In-Reply-To: <CAMuHMdWBdbeTAG9eB_kg63i=4jYKLK7_1iD_POVOLnDkVHCUDQ@mail.gmail.com>
-References: <1407725139-16156-1-git-send-email-horms+renesas@verge.net.au>
- <1407725139-16156-2-git-send-email-horms+renesas@verge.net.au>
- <CAMuHMdWBdbeTAG9eB_kg63i=4jYKLK7_1iD_POVOLnDkVHCUDQ@mail.gmail.com>
-Message-ID: <20140811075752.GA21071@verge.net.au>
+From: peter.ujfalusi@ti.com (Peter Ujfalusi)
+Date: Mon, 11 Aug 2014 10:58:50 +0300
+Subject: [PATCH] ARM: edma: Fix configuration parsing for SoCs with
+ multiple eDMA3 CC
+In-Reply-To: <20140805163229.GZ8181@intel.com>
+References: <1407155216-20267-1-git-send-email-peter.ujfalusi@ti.com>
+ <20140805163229.GZ8181@intel.com>
+Message-ID: <53E877BA.6040705@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Aug 11, 2014 at 09:11:22AM +0200, Geert Uytterhoeven wrote:
-> On Mon, Aug 11, 2014 at 4:45 AM, Simon Horman
-> <horms+renesas@verge.net.au> wrote:
-> > Add the CMT0 counters to the r8a7740 device tree and make it
+On 08/05/2014 07:32 PM, Vinod Koul wrote:
+> On Mon, Aug 04, 2014 at 03:26:56PM +0300, Peter Ujfalusi wrote:
+>> The edma_setup_from_hw() should know about the CC number when parsing the
+>> CCCFG register - when it reads the register to be precise. The base
+>> addresses for CCs stored in an array and we need to provide the correct id
+>> to edma_read() in order to read the correct register.
 > 
-> CMT1?
+> Just an othognal question:
+> 
+> I still see lot of code for edma in arm/. What is the plan to re/move that
+> to dma/
 
-Thanks, I was sure I had fixed that... obviously not.
+Yes, there's still a big split. The code under arch/arm/common/ provides still
+the 'legacy' edma API. This is still used by audio
+sound/soc/davinci/davinci-pcm for older daVinci devices (AM335x. AM43xx uses
+the edma-pcm).
 
-> 
-> > disabled by default.
-> 
-> > +       cmt1: timer at e6138000 {
-> 
-> Gr{oetje,eeting}s,
-> 
->                         Geert
-> 
-> --
-> Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
-> 
-> In personal conversations with technical people, I call myself a hacker. But
-> when I'm talking to journalists I just say "programmer" or something like that.
->                                 -- Linus Torvalds
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-sh" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
-> 
+And it is not that simple to deprecate davinci-pcm: it can use so called
+ping-pong mode for audio data transfer. This mode is not possible via
+dmaengine AFAIK.
+I'm going to check if edma-pcm would work fine instead of the ping-pong mode.
+If it does I can remove davinci-pcm and we can start cleaning up the edma code.
+
+-- 
+P?ter
