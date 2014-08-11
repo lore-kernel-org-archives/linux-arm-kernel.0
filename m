@@ -1,33 +1,74 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Mon, 11 Aug 2014 10:24:09 +0100
-Subject: [PATCH v5 3/3] arm64: Add seccomp support
-In-Reply-To: <53E47DCE.4080902@linaro.org>
-References: <1406020499-5537-1-git-send-email-takahiro.akashi@linaro.org>
- <1406020499-5537-4-git-send-email-takahiro.akashi@linaro.org>
- <53D082E9.8090303@amacapital.net> <53D09C4F.9010104@linaro.org>
- <CALCETrWTDS7VSyuR5wgGxpu-_YMWVUVmv9ht6t1tCSX=GA46cQ@mail.gmail.com>
- <53D2255C.9050006@linaro.org>
- <CAGXu5jJL=zXuSRNomGrB09kqpUhEpkuxDH18JN4NRbWocMw4xg@mail.gmail.com>
- <53E47DCE.4080902@linaro.org>
-Message-ID: <20140811092409.GE15344@arm.com>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Mon, 11 Aug 2014 10:24:07 +0100
+Subject: [PATCH 1/2] ARM: abort: don't clear the exclusive monitors
+Message-ID: <1407749048-18909-1-git-send-email-mark.rutland@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Aug 08, 2014 at 08:35:42AM +0100, AKASHI Takahiro wrote:
-> On 08/06/2014 12:08 AM, Kees Cook wrote:
-> > On Fri, Jul 25, 2014 at 2:37 AM, AKASHI Takahiro
-> > <takahiro.akashi@linaro.org> wrote:
-> >> I found a bug in my current patch (v5). When 32-bit tracer skips a system call,
-> >> we should not update syscallno from x8 since syscallno is re-written directly
-> >> via ptrace(PTRACE_SET_SYSCALL).
-> >
-> > Ah, yes. Will aarch64 have a PTRACE_SET_SYSCALL option, or is this
-> > strictly a 32-bit vs 64-bit issue?
-> 
-> As discussed in a few weeks ago, aarch64 won't support PTRACE_SET_SYSCALL.
+The ARMv6 and ARMv7 early abort handlers clear the exclusive monitors
+upon entry to the kernel, but this is redundant:
 
-Well, I don't think anything was set in stone. If you have a compelling
-reason why adding the new request gives you something over setting w8
-directly, then we can extend ptrace.
+  - We clear the monitors on every exception return since commit
+    200b812d0084 ("Clear the exclusive monitor when returning from an
+    exception"), so this is not necessary to ensure the monitors are
+    cleared before returning from a fault handler.
 
-Will
+  - Any dummy STREX will target a temporary scratch area in memory, and
+    may succeed or fail without corrupting useful data. Its status value
+    will not be used.
+
+  - Any other STREX in the kernel must be preceded by an LDREX, which
+    will initialise the monitors consistently and will not depend on the
+    earlier state of the monitors.
+
+Therefore we have no reason to care about the initial state of the
+exclusive monitors when a data abort is taken, and clearing the monitors
+prior to exception return (as we already do) is sufficient.
+
+This patch removes the redundant clearing of the exclusive monitors from
+the early abort handlers.
+
+Signed-off-by: Mark Rutland <mark.rutland@arm.com>
+Acked-by: Will Deacon <will.deacon@arm.com>
+Cc: stable at vger.kernel.org
+---
+ arch/arm/mm/abort-ev6.S | 6 ------
+ arch/arm/mm/abort-ev7.S | 6 ------
+ 2 files changed, 12 deletions(-)
+
+diff --git a/arch/arm/mm/abort-ev6.S b/arch/arm/mm/abort-ev6.S
+index 3815a82..8c48c5c 100644
+--- a/arch/arm/mm/abort-ev6.S
++++ b/arch/arm/mm/abort-ev6.S
+@@ -17,12 +17,6 @@
+  */
+ 	.align	5
+ ENTRY(v6_early_abort)
+-#ifdef CONFIG_CPU_V6
+-	sub	r1, sp, #4			@ Get unused stack location
+-	strex	r0, r1, [r1]			@ Clear the exclusive monitor
+-#elif defined(CONFIG_CPU_32v6K)
+-	clrex
+-#endif
+ 	mrc	p15, 0, r1, c5, c0, 0		@ get FSR
+ 	mrc	p15, 0, r0, c6, c0, 0		@ get FAR
+ /*
+diff --git a/arch/arm/mm/abort-ev7.S b/arch/arm/mm/abort-ev7.S
+index 7033752..4812ad0 100644
+--- a/arch/arm/mm/abort-ev7.S
++++ b/arch/arm/mm/abort-ev7.S
+@@ -13,12 +13,6 @@
+  */
+ 	.align	5
+ ENTRY(v7_early_abort)
+-	/*
+-	 * The effect of data aborts on on the exclusive access monitor are
+-	 * UNPREDICTABLE. Do a CLREX to clear the state
+-	 */
+-	clrex
+-
+ 	mrc	p15, 0, r1, c5, c0, 0		@ get FSR
+ 	mrc	p15, 0, r0, c6, c0, 0		@ get FAR
+ 
+-- 
+1.9.1
