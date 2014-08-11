@@ -1,292 +1,105 @@
-From: ohaugan@codeaurora.org (Olav Haugan)
-Date: Mon, 11 Aug 2014 15:45:50 -0700
-Subject: [PATCH v5 1/1] iommu-api: Add map_sg/unmap_sg functions
-In-Reply-To: <1407797150-515-1-git-send-email-ohaugan@codeaurora.org>
-References: <1407797150-515-1-git-send-email-ohaugan@codeaurora.org>
-Message-ID: <1407797150-515-2-git-send-email-ohaugan@codeaurora.org>
+From: joel.schopp@amd.com (Joel Schopp)
+Date: Mon, 11 Aug 2014 17:48:34 -0500
+Subject: [RFC PATCH] arm64: KVM: add irqfd support
+Message-ID: <20140811224834.21813.82517.stgit@joelaarch64.amd.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Mapping and unmapping are more often than not in the critical path.
-map_sg and unmap_sg allows IOMMU driver implementations to optimize
-the process of mapping and unmapping buffers into the IOMMU page tables.
+Depends on Eric Auger's "ARM: KVM: add irqfd support" patch.
 
-Instead of mapping a buffer one page at a time and requiring potentially
-expensive TLB operations for each page, this function allows the driver
-to map all pages in one go and defer TLB maintenance until after all
-pages have been mapped.
+Enable vfio of platform devices for ARM64.  This patch fixes the ARM64 compile.
+However this patch has only been compile tested.  It seemed worth sharing as it
+will allow us to carry both the ARM and ARM64 patches together as we do more
+testing.
 
-Additionally, the mapping operation would be faster in general since
-clients does not have to keep calling map API over and over again for
-each physically contiguous chunk of memory that needs to be mapped to a
-virtually contiguous region.
-
-Signed-off-by: Olav Haugan <ohaugan@codeaurora.org>
+Cc: Eirc Auger <eric.auger@linaro.org>
+Signed-off-by: Joel Schopp <joel.schopp@amd.com>
 ---
- drivers/iommu/amd_iommu.c      |  2 ++
- drivers/iommu/arm-smmu.c       |  2 ++
- drivers/iommu/exynos-iommu.c   |  2 ++
- drivers/iommu/intel-iommu.c    |  2 ++
- drivers/iommu/iommu.c          | 33 +++++++++++++++++++++++++++++++
- drivers/iommu/ipmmu-vmsa.c     |  2 ++
- drivers/iommu/msm_iommu.c      |  2 ++
- drivers/iommu/omap-iommu.c     |  2 ++
- drivers/iommu/shmobile-iommu.c |  2 ++
- drivers/iommu/tegra-smmu.c     |  2 ++
- include/linux/iommu.h          | 44 ++++++++++++++++++++++++++++++++++++++++++
- 11 files changed, 95 insertions(+)
+ Documentation/virtual/kvm/api.txt |    2 +-
+ arch/arm64/include/uapi/asm/kvm.h |    4 ++++
+ arch/arm64/kvm/Kconfig            |    4 +++-
+ arch/arm64/kvm/Makefile           |    2 +-
+ drivers/vfio/platform/Kconfig     |    2 +-
+ 5 files changed, 10 insertions(+), 4 deletions(-)
 
-diff --git a/drivers/iommu/amd_iommu.c b/drivers/iommu/amd_iommu.c
-index 1840531..3604f3c 100644
---- a/drivers/iommu/amd_iommu.c
-+++ b/drivers/iommu/amd_iommu.c
-@@ -3402,6 +3402,8 @@ static const struct iommu_ops amd_iommu_ops = {
- 	.detach_dev = amd_iommu_detach_device,
- 	.map = amd_iommu_map,
- 	.unmap = amd_iommu_unmap,
-+	.map_sg = default_iommu_map_sg,
-+	.unmap_sg = default_iommu_unmap_sg,
- 	.iova_to_phys = amd_iommu_iova_to_phys,
- 	.domain_has_cap = amd_iommu_domain_has_cap,
- 	.pgsize_bitmap	= AMD_IOMMU_PGSIZES,
-diff --git a/drivers/iommu/arm-smmu.c b/drivers/iommu/arm-smmu.c
-index ca18d6d..231e006 100644
---- a/drivers/iommu/arm-smmu.c
-+++ b/drivers/iommu/arm-smmu.c
-@@ -1604,6 +1604,8 @@ static const struct iommu_ops arm_smmu_ops = {
- 	.detach_dev	= arm_smmu_detach_dev,
- 	.map		= arm_smmu_map,
- 	.unmap		= arm_smmu_unmap,
-+	.map_sg		= default_iommu_map_sg,
-+	.unmap_sg	= default_iommu_unmap_sg,
- 	.iova_to_phys	= arm_smmu_iova_to_phys,
- 	.domain_has_cap	= arm_smmu_domain_has_cap,
- 	.add_device	= arm_smmu_add_device,
-diff --git a/drivers/iommu/exynos-iommu.c b/drivers/iommu/exynos-iommu.c
-index d037e87..8876508 100644
---- a/drivers/iommu/exynos-iommu.c
-+++ b/drivers/iommu/exynos-iommu.c
-@@ -1177,6 +1177,8 @@ static const struct iommu_ops exynos_iommu_ops = {
- 	.detach_dev = exynos_iommu_detach_device,
- 	.map = exynos_iommu_map,
- 	.unmap = exynos_iommu_unmap,
-+	.map_sg = default_iommu_map_sg,
-+	.unmap_sg = default_iommu_unmap_sg,
- 	.iova_to_phys = exynos_iommu_iova_to_phys,
- 	.add_device = exynos_iommu_add_device,
- 	.remove_device = exynos_iommu_remove_device,
-diff --git a/drivers/iommu/intel-iommu.c b/drivers/iommu/intel-iommu.c
-index d1f5caa..4fc61ff 100644
---- a/drivers/iommu/intel-iommu.c
-+++ b/drivers/iommu/intel-iommu.c
-@@ -4462,6 +4462,8 @@ static const struct iommu_ops intel_iommu_ops = {
- 	.detach_dev	= intel_iommu_detach_device,
- 	.map		= intel_iommu_map,
- 	.unmap		= intel_iommu_unmap,
-+	.map_sg		= default_iommu_map_sg,
-+	.unmap_sg	= default_iommu_unmap_sg,
- 	.iova_to_phys	= intel_iommu_iova_to_phys,
- 	.domain_has_cap = intel_iommu_domain_has_cap,
- 	.add_device	= intel_iommu_add_device,
-diff --git a/drivers/iommu/iommu.c b/drivers/iommu/iommu.c
-index 1698360..24cf727 100644
---- a/drivers/iommu/iommu.c
-+++ b/drivers/iommu/iommu.c
-@@ -1088,6 +1088,39 @@ size_t iommu_unmap(struct iommu_domain *domain, unsigned long iova, size_t size)
- }
- EXPORT_SYMBOL_GPL(iommu_unmap);
+diff --git a/Documentation/virtual/kvm/api.txt b/Documentation/virtual/kvm/api.txt
+index 04310d9..bc64ce9 100644
+--- a/Documentation/virtual/kvm/api.txt
++++ b/Documentation/virtual/kvm/api.txt
+@@ -2132,7 +2132,7 @@ into the hash PTE second double word).
+ 4.75 KVM_IRQFD
  
-+int default_iommu_map_sg(struct iommu_domain *domain, unsigned long iova,
-+			 struct scatterlist *sg, unsigned int nents,
-+			 int prot, unsigned long flags)
-+{
-+	int ret = 0;
-+	unsigned long offset = 0;
-+	unsigned int i;
-+	struct scatterlist *s;
-+
-+	for_each_sg(sg, s, nents, i) {
-+		phys_addr_t phys = page_to_phys(sg_page(s));
-+		size_t page_len = s->offset + s->length;
-+
-+		ret = iommu_map(domain, iova + offset, phys, page_len,
-+				prot);
-+		if (ret) {
-+			/* undo mappings already done */
-+			iommu_unmap(domain, iova, offset);
-+			break;
-+		}
-+		offset += page_len;
-+	}
-+
-+	return ret;
-+}
-+EXPORT_SYMBOL_GPL(default_iommu_map_sg);
-+
-+int default_iommu_unmap_sg(struct iommu_domain *domain, unsigned long iova,
-+			       size_t size, unsigned long flags)
-+{
-+	return iommu_unmap(domain, iova, size);
-+}
-+EXPORT_SYMBOL_GPL(default_iommu_unmap_sg);
+ Capability: KVM_CAP_IRQFD
+-Architectures: x86 s390 arm
++Architectures: x86 s390 arm arm64
+ Type: vm ioctl
+ Parameters: struct kvm_irqfd (in)
+ Returns: 0 on success, -1 on error
+diff --git a/arch/arm64/include/uapi/asm/kvm.h b/arch/arm64/include/uapi/asm/kvm.h
+index e633ff8..3df8baa 100644
+--- a/arch/arm64/include/uapi/asm/kvm.h
++++ b/arch/arm64/include/uapi/asm/kvm.h
+@@ -180,6 +180,10 @@ struct kvm_arch_memory_slot {
+ /* Highest supported SPI, from VGIC_NR_IRQS */
+ #define KVM_ARM_IRQ_GIC_MAX		127
  
- int iommu_domain_window_enable(struct iommu_domain *domain, u32 wnd_nr,
- 			       phys_addr_t paddr, u64 size, int prot)
-diff --git a/drivers/iommu/ipmmu-vmsa.c b/drivers/iommu/ipmmu-vmsa.c
-index 7dab5cb..1dc6f94 100644
---- a/drivers/iommu/ipmmu-vmsa.c
-+++ b/drivers/iommu/ipmmu-vmsa.c
-@@ -1127,6 +1127,8 @@ static const struct iommu_ops ipmmu_ops = {
- 	.detach_dev = ipmmu_detach_device,
- 	.map = ipmmu_map,
- 	.unmap = ipmmu_unmap,
-+	.map_sg = default_iommu_map_sg,
-+	.unmap_sg = default_iommu_unmap_sg,
- 	.iova_to_phys = ipmmu_iova_to_phys,
- 	.add_device = ipmmu_add_device,
- 	.remove_device = ipmmu_remove_device,
-diff --git a/drivers/iommu/msm_iommu.c b/drivers/iommu/msm_iommu.c
-index 49f41d6..2b3c8d3 100644
---- a/drivers/iommu/msm_iommu.c
-+++ b/drivers/iommu/msm_iommu.c
-@@ -681,6 +681,8 @@ static const struct iommu_ops msm_iommu_ops = {
- 	.detach_dev = msm_iommu_detach_dev,
- 	.map = msm_iommu_map,
- 	.unmap = msm_iommu_unmap,
-+	.map_sg = default_iommu_map_sg,
-+	.unmap_sg = default_iommu_unmap_sg,
- 	.iova_to_phys = msm_iommu_iova_to_phys,
- 	.domain_has_cap = msm_iommu_domain_has_cap,
- 	.pgsize_bitmap = MSM_IOMMU_PGSIZES,
-diff --git a/drivers/iommu/omap-iommu.c b/drivers/iommu/omap-iommu.c
-index e202b0c..7d4c920 100644
---- a/drivers/iommu/omap-iommu.c
-+++ b/drivers/iommu/omap-iommu.c
-@@ -1285,6 +1285,8 @@ static const struct iommu_ops omap_iommu_ops = {
- 	.detach_dev	= omap_iommu_detach_dev,
- 	.map		= omap_iommu_map,
- 	.unmap		= omap_iommu_unmap,
-+	.map_sg		= default_iommu_map_sg,
-+	.unmap_sg	= default_iommu_unmap_sg,
- 	.iova_to_phys	= omap_iommu_iova_to_phys,
- 	.add_device	= omap_iommu_add_device,
- 	.remove_device	= omap_iommu_remove_device,
-diff --git a/drivers/iommu/shmobile-iommu.c b/drivers/iommu/shmobile-iommu.c
-index 1333e6fb..3510f70 100644
---- a/drivers/iommu/shmobile-iommu.c
-+++ b/drivers/iommu/shmobile-iommu.c
-@@ -361,6 +361,8 @@ static const struct iommu_ops shmobile_iommu_ops = {
- 	.detach_dev = shmobile_iommu_detach_device,
- 	.map = shmobile_iommu_map,
- 	.unmap = shmobile_iommu_unmap,
-+	.map_sg = default_iommu_map_sg,
-+	.unmap_sg = default_iommu_unmap_sg,
- 	.iova_to_phys = shmobile_iommu_iova_to_phys,
- 	.add_device = shmobile_iommu_add_device,
- 	.pgsize_bitmap = SZ_1M | SZ_64K | SZ_4K,
-diff --git a/drivers/iommu/tegra-smmu.c b/drivers/iommu/tegra-smmu.c
-index 792da5e..ebd847b 100644
---- a/drivers/iommu/tegra-smmu.c
-+++ b/drivers/iommu/tegra-smmu.c
-@@ -954,6 +954,8 @@ static const struct iommu_ops smmu_iommu_ops = {
- 	.detach_dev	= smmu_iommu_detach_dev,
- 	.map		= smmu_iommu_map,
- 	.unmap		= smmu_iommu_unmap,
-+	.map_sg		= default_iommu_map_sg,
-+	.unmap_sg	= default_iommu_unmap_sg,
- 	.iova_to_phys	= smmu_iommu_iova_to_phys,
- 	.domain_has_cap	= smmu_iommu_domain_has_cap,
- 	.pgsize_bitmap	= SMMU_IOMMU_PGSIZES,
-diff --git a/include/linux/iommu.h b/include/linux/iommu.h
-index 20f9a52..ee106ce 100644
---- a/include/linux/iommu.h
-+++ b/include/linux/iommu.h
-@@ -22,6 +22,7 @@
- #include <linux/errno.h>
- #include <linux/err.h>
- #include <linux/types.h>
-+#include <linux/scatterlist.h>
- #include <trace/events/iommu.h>
- 
- #define IOMMU_READ	(1 << 0)
-@@ -93,6 +94,10 @@ enum iommu_attr {
-  * @detach_dev: detach device from an iommu domain
-  * @map: map a physically contiguous memory region to an iommu domain
-  * @unmap: unmap a physically contiguous memory region from an iommu domain
-+ * @map_sg: map a scatter-gather list of physically contiguous memory chunks
-+ * to an iommu domain
-+ * @unmap_sg: unmap a scatter-gather list of physically contiguous memory
-+ * chunks from an iommu domain
-  * @iova_to_phys: translate iova to physical address
-  * @domain_has_cap: domain capabilities query
-  * @add_device: add device to iommu grouping
-@@ -110,6 +115,11 @@ struct iommu_ops {
- 		   phys_addr_t paddr, size_t size, int prot);
- 	size_t (*unmap)(struct iommu_domain *domain, unsigned long iova,
- 		     size_t size);
-+	int (*map_sg)(struct iommu_domain *domain, unsigned long iova,
-+			struct scatterlist *sg, unsigned int nents, int prot,
-+			unsigned long flags);
-+	int (*unmap_sg)(struct iommu_domain *domain, unsigned long iova,
-+			size_t size, unsigned long flags);
- 	phys_addr_t (*iova_to_phys)(struct iommu_domain *domain, dma_addr_t iova);
- 	int (*domain_has_cap)(struct iommu_domain *domain,
- 			      unsigned long cap);
-@@ -153,6 +163,12 @@ extern int iommu_map(struct iommu_domain *domain, unsigned long iova,
- 		     phys_addr_t paddr, size_t size, int prot);
- extern size_t iommu_unmap(struct iommu_domain *domain, unsigned long iova,
- 		       size_t size);
-+extern int default_iommu_map_sg(struct iommu_domain *domain, unsigned long iova,
-+				struct scatterlist *sg,unsigned int nents,
-+				int prot, unsigned long flags);
-+extern int default_iommu_unmap_sg(struct iommu_domain *domain,
-+				  unsigned long iova, size_t size,
-+				  unsigned long flags);
- extern phys_addr_t iommu_iova_to_phys(struct iommu_domain *domain, dma_addr_t iova);
- extern int iommu_domain_has_cap(struct iommu_domain *domain,
- 				unsigned long cap);
-@@ -240,6 +256,20 @@ static inline int report_iommu_fault(struct iommu_domain *domain,
- 	return ret;
- }
- 
-+static inline int iommu_map_sg(struct iommu_domain *domain, unsigned long iova,
-+			       struct scatterlist *sg, unsigned int nents,
-+			       int prot, unsigned long flags)
-+{
-+	return domain->ops->map_sg(domain, iova, sg, nents, prot, flags);
-+}
++/* One single KVM irqchip, ie. the VGIC */
++#define KVM_NR_IRQCHIPS          1
 +
-+static inline int iommu_unmap_sg(struct iommu_domain *domain,
-+				 unsigned long iova, size_t size,
-+				 unsigned long flags)
-+{
-+	return domain->ops->unmap_sg(domain, iova, size, flags);
-+}
 +
- #else /* CONFIG_IOMMU_API */
+ /* PSCI interface */
+ #define KVM_PSCI_FN_BASE		0x95c1ba5e
+ #define KVM_PSCI_FN(n)			(KVM_PSCI_FN_BASE + (n))
+diff --git a/arch/arm64/kvm/Kconfig b/arch/arm64/kvm/Kconfig
+index 8ba85e9..cbd3525 100644
+--- a/arch/arm64/kvm/Kconfig
++++ b/arch/arm64/kvm/Kconfig
+@@ -26,6 +26,7 @@ config KVM
+ 	select KVM_ARM_HOST
+ 	select KVM_ARM_VGIC
+ 	select KVM_ARM_TIMER
++	select HAVE_KVM_EVENTFD
+ 	---help---
+ 	  Support hosting virtualized guest machines.
  
- struct iommu_ops {};
-@@ -287,6 +317,20 @@ static inline int iommu_unmap(struct iommu_domain *domain, unsigned long iova,
- 	return -ENODEV;
- }
+@@ -50,13 +51,14 @@ config KVM_ARM_MAX_VCPUS
+ config KVM_ARM_VGIC
+ 	bool
+ 	depends on KVM_ARM_HOST && OF
+-	select HAVE_KVM_IRQCHIP
++	select HAVE_KVM_IRQFD
+ 	---help---
+ 	  Adds support for a hardware assisted, in-kernel GIC emulation.
  
-+static inline int iommu_map_sg(struct iommu_domain *domain, unsigned long iova,
-+			       struct scatterlist *sg, unsigned int nents,
-+			       int prot, unsigned long flags)
-+{
-+	return -ENODEV;
-+}
-+
-+static inline int iommu_unmap_sg(struct iommu_domain *domain,
-+				 unsigned long iova, size_t size,
-+				 unsigned long flags)
-+{
-+	return -ENODEV;
-+}
-+
- static inline int iommu_domain_window_enable(struct iommu_domain *domain,
- 					     u32 wnd_nr, phys_addr_t paddr,
- 					     u64 size, int prot)
--- 
-The Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-hosted by The Linux Foundation
+ config KVM_ARM_TIMER
+ 	bool
+ 	depends on KVM_ARM_VGIC
++	select HAVE_KVM_IRQCHIP
+ 	---help---
+ 	  Adds support for the Architected Timers in virtual machines.
+ 
+diff --git a/arch/arm64/kvm/Makefile b/arch/arm64/kvm/Makefile
+index 72a9fd5..40b9970 100644
+--- a/arch/arm64/kvm/Makefile
++++ b/arch/arm64/kvm/Makefile
+@@ -11,7 +11,7 @@ ARM=../../../arch/arm/kvm
+ 
+ obj-$(CONFIG_KVM_ARM_HOST) += kvm.o
+ 
+-kvm-$(CONFIG_KVM_ARM_HOST) += $(KVM)/kvm_main.o $(KVM)/coalesced_mmio.o
++kvm-$(CONFIG_KVM_ARM_HOST) += $(KVM)/kvm_main.o $(KVM)/coalesced_mmio.o $(KVM)/eventfd.o
+ kvm-$(CONFIG_KVM_ARM_HOST) += $(ARM)/arm.o $(ARM)/mmu.o $(ARM)/mmio.o
+ kvm-$(CONFIG_KVM_ARM_HOST) += $(ARM)/psci.o $(ARM)/perf.o
+ 
+diff --git a/drivers/vfio/platform/Kconfig b/drivers/vfio/platform/Kconfig
+index c51af17..43ee890 100644
+--- a/drivers/vfio/platform/Kconfig
++++ b/drivers/vfio/platform/Kconfig
+@@ -1,6 +1,6 @@
+ config VFIO_PLATFORM
+ 	tristate "VFIO support for platform devices"
+-	depends on VFIO && EVENTFD && ARM
++	depends on VFIO && EVENTFD && (ARM || ARM64)
+ 	help
+ 	  Support for platform devices with VFIO. This is required to make
+ 	  use of platform devices present on the system using the VFIO
