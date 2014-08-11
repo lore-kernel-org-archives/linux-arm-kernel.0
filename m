@@ -1,84 +1,34 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Mon, 11 Aug 2014 11:38:59 +0900
-Subject: [PATCH] ARM: shmobile: armadillo800eva: Sort includes
-Message-ID: <1407724739-14100-1-git-send-email-horms+renesas@verge.net.au>
+Date: Mon, 11 Aug 2014 11:45:34 +0900
+Subject: [PATCH 0/5] ARM: shmobile: armadillo800eva-reference: Enable CMT1 in
+ device tree
+Message-ID: <1407725139-16156-1-git-send-email-horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Sorted includes seems to be the done thing these days.
+This short series enables the CMT1 timer using DT on
+armadillo800eva-reference.
 
-Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
----
- arch/arm/mach-shmobile/board-armadillo800eva.c | 40 +++++++++++++-------------
- 1 file changed, 20 insertions(+), 20 deletions(-)
+It is based on "ARM: shmobile: r8a7740: add clocks to DT" applied
+on top of renesas-devel-v3.16-20140808.
 
-diff --git a/arch/arm/mach-shmobile/board-armadillo800eva.c b/arch/arm/mach-shmobile/board-armadillo800eva.c
-index fc73246..ad27665 100644
---- a/arch/arm/mach-shmobile/board-armadillo800eva.c
-+++ b/arch/arm/mach-shmobile/board-armadillo800eva.c
-@@ -22,43 +22,43 @@
- #include <linux/clk.h>
- #include <linux/delay.h>
- #include <linux/err.h>
--#include <linux/kernel.h>
--#include <linux/input.h>
--#include <linux/platform_data/st1232_pdata.h>
--#include <linux/irq.h>
--#include <linux/platform_device.h>
- #include <linux/gpio.h>
- #include <linux/gpio_keys.h>
--#include <linux/regulator/driver.h>
-+#include <linux/i2c-gpio.h>
-+#include <linux/input.h>
-+#include <linux/irq.h>
-+#include <linux/kernel.h>
-+#include <linux/mfd/tmio.h>
-+#include <linux/mmc/host.h>
-+#include <linux/mmc/sh_mmcif.h>
-+#include <linux/mmc/sh_mobile_sdhi.h>
- #include <linux/pinctrl/machine.h>
-+#include <linux/platform_data/st1232_pdata.h>
-+#include <linux/platform_device.h>
- #include <linux/pwm.h>
- #include <linux/pwm_backlight.h>
-+#include <linux/reboot.h>
-+#include <linux/regulator/driver.h>
- #include <linux/regulator/fixed.h>
- #include <linux/regulator/gpio-regulator.h>
- #include <linux/regulator/machine.h>
- #include <linux/sh_eth.h>
--#include <linux/videodev2.h>
- #include <linux/usb/renesas_usbhs.h>
--#include <linux/mfd/tmio.h>
--#include <linux/mmc/host.h>
--#include <linux/mmc/sh_mmcif.h>
--#include <linux/mmc/sh_mobile_sdhi.h>
--#include <linux/i2c-gpio.h>
--#include <linux/reboot.h>
-+#include <linux/videodev2.h>
- 
--#include <media/mt9t112.h>
--#include <media/sh_mobile_ceu.h>
--#include <media/soc_camera.h>
--#include <asm/page.h>
-+#include <asm/hardware/cache-l2x0.h>
- #include <asm/mach-types.h>
- #include <asm/mach/arch.h>
- #include <asm/mach/map.h>
- #include <asm/mach/time.h>
--#include <asm/hardware/cache-l2x0.h>
--#include <video/sh_mobile_lcdc.h>
--#include <video/sh_mobile_hdmi.h>
-+#include <asm/page.h>
-+#include <media/mt9t112.h>
-+#include <media/sh_mobile_ceu.h>
-+#include <media/soc_camera.h>
- #include <sound/sh_fsi.h>
- #include <sound/simple_card.h>
-+#include <video/sh_mobile_hdmi.h>
-+#include <video/sh_mobile_lcdc.h>
- 
- #include "common.h"
- #include "irqs.h"
+Ulrich, if you end up reposting "ARM: shmobile: r8a7740: add clocks to DT"
+please consider appending this series to it.
+
+Simon Horman (5):
+  ARM: shmobile: r8a7740: Add CMT1 device to DT
+  ARM: shmobile: armadillo800eva-reference: Enable CMT1 in device tree
+  ARM: shmobile: armadillo800eva-reference: Sort includes
+  ARM: shmobile: armadillo800eva-reference: Do not use
+    r8a7740_add_standard_devices_dt()
+  ARM: shmobile: r8a7740: Remove r8a7740_add_standard_devices_dt
+
+ .../arm/boot/dts/r8a7740-armadillo800eva-reference.dts |  4 ++++
+ arch/arm/boot/dts/r8a7740.dtsi                         | 12 ++++++++++++
+ .../mach-shmobile/board-armadillo800eva-reference.c    |  5 +++--
+ arch/arm/mach-shmobile/r8a7740.h                       |  1 -
+ arch/arm/mach-shmobile/setup-r8a7740.c                 | 18 ++----------------
+ 5 files changed, 21 insertions(+), 19 deletions(-)
+
 -- 
 2.0.1
