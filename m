@@ -1,54 +1,50 @@
 From: ezequiel.garcia@free-electrons.com (Ezequiel Garcia)
-Date: Mon, 11 Aug 2014 09:14:35 -0300
-Subject: [PATCH v2 0/6] mvebu: Network devicetree pin muxing
-Message-ID: <1407759281-11513-1-git-send-email-ezequiel.garcia@free-electrons.com>
+Date: Mon, 11 Aug 2014 09:14:37 -0300
+Subject: [PATCH v2 2/6] ARM: mvebu: Add proper pin muxing on Globalscale
+ Mirabox board
+In-Reply-To: <1407759281-11513-1-git-send-email-ezequiel.garcia@free-electrons.com>
+References: <1407759281-11513-1-git-send-email-ezequiel.garcia@free-electrons.com>
+Message-ID: <1407759281-11513-3-git-send-email-ezequiel.garcia@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This series adds the proper devicetree pin muxing for the network interfaces
-on all Armada 370 boards.
+This commit adds the required pin muxing for the network interfaces and
+the MDIO interface to be properly initialized. For instance, this makes
+it possible for a bootloader to initialize and access the network interfaces.
 
-The MDIO interface uses pins MPP17 and MPP18, and so this is needed
-on all devices using MDIO.
+Signed-off-by: Ezequiel Garcia <ezequiel.garcia@free-electrons.com>
+---
+ arch/arm/boot/dts/armada-370-mirabox.dts | 6 ++++++
+ 1 file changed, 6 insertions(+)
 
-For the ethernet interfaces, only the boards connecting with RGMII/GMII/MII
-need the mux. On this SoC, the SGMII is available on dedicated SerDes lanes,
-and so no MPP pin mux is required.
-
-Given all the supported board use either RGMII or SGMII, we only add RGMII mux
-configuration. The only board which uses SGMII is the Armada 370 Reference
-Design board.
-
-Patches have been tested on Armada 370 Mirabox only, using the recently submitted
-mvneta support for barebox. The series is based on v3.16.
-
-It would be great if someone else can test on the other boards, to make sure
-no regressions are introduced.
-
-Changes from v1:
-
-  * Replaced mux node name: ge{0,1}_pins -> ge{0,1}_rgmii_pins to be clear
-    about the MII.
-
-  * Replaced {}_pins -> {}-pins, to be consistent.
-
-  * Massaged the commit logs a bit.
-
-Ezequiel Garcia (6):
-  ARM: mvebu: Add network pin mux configuration for the Armada 370 SoC
-  ARM: mvebu: Add proper pin muxing on Globalscale Mirabox board
-  ARM: mvebu: Add proper pin muxing on the Armada 370 DB board
-  ARM: mvebu: Add proper pin muxing on Netgear ReadyNAS 102
-  ARM: mvebu: Add proper pin muxing on Netgear ReadyNAS 104
-  ARM: mvebu: Add proper pin muxing on Armada 370 RD board
-
- arch/arm/boot/dts/armada-370-db.dts            |  6 ++++++
- arch/arm/boot/dts/armada-370-mirabox.dts       |  6 ++++++
- arch/arm/boot/dts/armada-370-netgear-rn102.dts |  4 ++++
- arch/arm/boot/dts/armada-370-netgear-rn104.dts |  6 ++++++
- arch/arm/boot/dts/armada-370-rd.dts            |  4 ++++
- arch/arm/boot/dts/armada-370.dtsi              | 19 +++++++++++++++++++
- 6 files changed, 45 insertions(+)
-
+diff --git a/arch/arm/boot/dts/armada-370-mirabox.dts b/arch/arm/boot/dts/armada-370-mirabox.dts
+index 097df7d8..2b6d24e 100644
+--- a/arch/arm/boot/dts/armada-370-mirabox.dts
++++ b/arch/arm/boot/dts/armada-370-mirabox.dts
+@@ -91,6 +91,8 @@
+ 			};
+ 
+ 			mdio {
++				pinctrl-0 = <&mdio_pins>;
++				pinctrl-names = "default";
+ 				phy0: ethernet-phy at 0 {
+ 					reg = <0>;
+ 				};
+@@ -100,11 +102,15 @@
+ 				};
+ 			};
+ 			ethernet at 70000 {
++				pinctrl-0 = <&ge0_rgmii_pins>;
++				pinctrl-names = "default";
+ 				status = "okay";
+ 				phy = <&phy0>;
+ 				phy-mode = "rgmii-id";
+ 			};
+ 			ethernet at 74000 {
++				pinctrl-0 = <&ge1_rgmii_pins>;
++				pinctrl-names = "default";
+ 				status = "okay";
+ 				phy = <&phy1>;
+ 				phy-mode = "rgmii-id";
 -- 
 2.0.1
