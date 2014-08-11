@@ -1,45 +1,86 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Mon, 11 Aug 2014 11:52:45 +0900
-Subject: [PATCH repost 1/5] ARM: shmobile: r8a7740: Add CMT1 device to DT
+Date: Mon, 11 Aug 2014 11:52:46 +0900
+Subject: [PATCH repost 2/5] ARM: shmobile: armadillo800eva-reference: Enable
+ CMT1 in device tree
 In-Reply-To: <1407725569-31413-1-git-send-email-horms+renesas@verge.net.au>
 References: <1407725569-31413-1-git-send-email-horms+renesas@verge.net.au>
-Message-ID: <1407725569-31413-2-git-send-email-horms+renesas@verge.net.au>
+Message-ID: <1407725569-31413-3-git-send-email-horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add the CMT0 counters to the r8a7740 device tree and make it
-disabled by default.
-
-Based on work by Magnus Damm.
+Based on work by Magnus Damm
 
 Cc: Magnus Damm <magnus.damm@gmail.com>
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
- arch/arm/boot/dts/r8a7740.dtsi | 12 ++++++++++++
- 1 file changed, 12 insertions(+)
+ arch/arm/boot/dts/r8a7740-armadillo800eva-reference.dts |  4 ++++
+ arch/arm/mach-shmobile/setup-r8a7740.c                  | 11 +----------
+ 2 files changed, 5 insertions(+), 10 deletions(-)
 
-diff --git a/arch/arm/boot/dts/r8a7740.dtsi b/arch/arm/boot/dts/r8a7740.dtsi
-index 6cd6a46..1067a96 100644
---- a/arch/arm/boot/dts/r8a7740.dtsi
-+++ b/arch/arm/boot/dts/r8a7740.dtsi
-@@ -41,6 +41,18 @@
- 		interrupts = <0 83 IRQ_TYPE_LEVEL_HIGH>;
- 	};
+diff --git a/arch/arm/boot/dts/r8a7740-armadillo800eva-reference.dts b/arch/arm/boot/dts/r8a7740-armadillo800eva-reference.dts
+index 266c439..5e646e6 100644
+--- a/arch/arm/boot/dts/r8a7740-armadillo800eva-reference.dts
++++ b/arch/arm/boot/dts/r8a7740-armadillo800eva-reference.dts
+@@ -191,6 +191,10 @@
+ 	renesas,mode = <0x05>; /* MD_CK0 | MD_CK2 */
+ };
  
-+	cmt1: timer at e6138000 {
-+		compatible = "renesas,cmt-48";
-+		reg = <0xe6138000 0x170>;
-+		interrupts = <0 58 IRQ_TYPE_LEVEL_HIGH>;
-+		clocks = <&mstp3_clks R8A7740_CLK_CMT1>;
-+		clock-names = "fck";
++&cmt1 {
++	status = "ok";
++};
 +
-+		renesas,channels-mask = <0x3f>;
-+
-+		status = "disabled";
-+	};
-+
- 	/* irqpin0: IRQ0 - IRQ7 */
- 	irqpin0: irqpin at e6900000 {
- 		compatible = "renesas,intc-irqpin-r8a7740", "renesas,intc-irqpin";
+ &i2c0 {
+ 	status = "okay";
+ 	touchscreen at 55 {
+diff --git a/arch/arm/mach-shmobile/setup-r8a7740.c b/arch/arm/mach-shmobile/setup-r8a7740.c
+index 3d5eaca..dc44a44 100644
+--- a/arch/arm/mach-shmobile/setup-r8a7740.c
++++ b/arch/arm/mach-shmobile/setup-r8a7740.c
+@@ -311,10 +311,6 @@ static struct platform_device ipmmu_device = {
+ 	.num_resources  = ARRAY_SIZE(ipmmu_resources),
+ };
+ 
+-static struct platform_device *r8a7740_devices_dt[] __initdata = {
+-	&cmt1_device,
+-};
+-
+ static struct platform_device *r8a7740_early_devices[] __initdata = {
+ 	&scif0_device,
+ 	&scif1_device,
+@@ -331,6 +327,7 @@ static struct platform_device *r8a7740_early_devices[] __initdata = {
+ 	&irqpin3_device,
+ 	&tmu0_device,
+ 	&ipmmu_device,
++	&cmt1_device,
+ };
+ 
+ /* DMA */
+@@ -756,8 +753,6 @@ void __init r8a7740_add_standard_devices(void)
+ 	/* add devices */
+ 	platform_add_devices(r8a7740_early_devices,
+ 			    ARRAY_SIZE(r8a7740_early_devices));
+-	platform_add_devices(r8a7740_devices_dt,
+-			    ARRAY_SIZE(r8a7740_devices_dt));
+ 	platform_add_devices(r8a7740_late_devices,
+ 			     ARRAY_SIZE(r8a7740_late_devices));
+ 
+@@ -779,8 +774,6 @@ void __init r8a7740_add_early_devices(void)
+ {
+ 	early_platform_add_devices(r8a7740_early_devices,
+ 				   ARRAY_SIZE(r8a7740_early_devices));
+-	early_platform_add_devices(r8a7740_devices_dt,
+-				   ARRAY_SIZE(r8a7740_devices_dt));
+ 
+ 	/* setup early console here as well */
+ 	shmobile_setup_console();
+@@ -790,8 +783,6 @@ void __init r8a7740_add_early_devices(void)
+ 
+ void __init r8a7740_add_standard_devices_dt(void)
+ {
+-	platform_add_devices(r8a7740_devices_dt,
+-			    ARRAY_SIZE(r8a7740_devices_dt));
+ 	of_platform_populate(NULL, of_default_bus_match_table, NULL, NULL);
+ }
+ 
 -- 
 2.0.1
