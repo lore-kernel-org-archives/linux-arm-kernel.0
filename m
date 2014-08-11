@@ -1,35 +1,32 @@
-From: kever.yang@rock-chips.com (Kever Yang)
-Date: Mon, 11 Aug 2014 11:35:15 +0800
-Subject: [PATCH 2/4] ARM: rockchip: enable the AMBA bus
-In-Reply-To: <1406661128-7614-3-git-send-email-heiko@sntech.de>
-References: <1406661128-7614-1-git-send-email-heiko@sntech.de>
- <1406661128-7614-3-git-send-email-heiko@sntech.de>
-Message-ID: <53E839F3.7040208@rock-chips.com>
+From: spk.linux@gmail.com (Sachin Kamat)
+Date: Mon, 11 Aug 2014 09:26:00 +0530
+Subject: linux-next: build failures after merge of the drm tree
+In-Reply-To: <alpine.DEB.2.00.1408100856270.32072@skynet.skynet.ie>
+References: <20140805130926.4e8c8fe5@canb.auug.org.au>
+ <53E0736E.7030901@samsung.com>
+ <CAOesGMjjLHOaBJZwFENaWW41KFsNZ3pUqiYk0jtet=8NFvce3g@mail.gmail.com>
+ <CAOesGMg=kFM_9ksgoOXgqLFjzoE38tCuPy7pxbG5F_j5KovkVA@mail.gmail.com>
+ <alpine.DEB.2.00.1408100856270.32072@skynet.skynet.ie>
+Message-ID: <CAK5sBcHceBqYQOQrWw9D0CviVpnXOdAtfgh7pFkT=L53Gfbe6g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Heiko:
+On Sun, Aug 10, 2014 at 1:28 PM, Dave Airlie <airlied@linux.ie> wrote:
+>>
+>
+> Been on holidays, but ack for anything DT related,
+>
+> Look I wishI knew how DT worked, and what tree is canonical for changes to
+> it, I'm not sure its well defined enough or sub maintaniers know enough,
+> so I do just trust the exynos guys with this.
+>
 
-On 07/30/2014 03:12 AM, Heiko Stuebner wrote:
-> This is needed to access the pl330 dma controllers on Rockchip SoCs.
->
-> Signed-off-by: Heiko Stuebner <heiko@sntech.de>
-> ---
->   arch/arm/mach-rockchip/Kconfig | 1 +
->   1 file changed, 1 insertion(+)
->
-> diff --git a/arch/arm/mach-rockchip/Kconfig b/arch/arm/mach-rockchip/Kconfig
-> index d168669..ac5803c 100644
-> --- a/arch/arm/mach-rockchip/Kconfig
-> +++ b/arch/arm/mach-rockchip/Kconfig
-> @@ -4,6 +4,7 @@ config ARCH_ROCKCHIP
->   	select PINCTRL_ROCKCHIP
->   	select ARCH_HAS_RESET_CONTROLLER
->   	select ARCH_REQUIRE_GPIOLIB
-> +	select ARM_AMBA
-These two config is also needed by pl330 dma driver. Can we add it here?
-     DMADEVICES
-     PL330_DMA
->   	select ARM_GIC
->   	select CACHE_L2X0
->   	select HAVE_ARM_ARCH_TIMER
+Inki,
+
+Can you please get your tree included in linux-next so that these kind of issues
+could be detected much earlier (even before they hit Dave's tree)?
+
+
+-- 
+Regards,
+Sachin.
