@@ -1,69 +1,165 @@
-From: dianders@chromium.org (Doug Anderson)
-Date: Tue, 12 Aug 2014 08:13:41 -0700
-Subject: io-domain voltages as regulators?
-In-Reply-To: <CAPDyKFpiHf+urR85iJPqAXxREO+yPrDMcXM4K+BJqq=ur3DZtA@mail.gmail.com>
-References: <3923586.SsVg941346@diego>
- <CACRpkdaJS0PUDLaCnrhtiuXPf4ccx51uNTqYWVWm47mhOhGEbA@mail.gmail.com>
- <CAPDyKFpiHf+urR85iJPqAXxREO+yPrDMcXM4K+BJqq=ur3DZtA@mail.gmail.com>
-Message-ID: <CAD=FV=Vewr5QkNEiBEOXA=FdKHKzg0ag5+Cf4KXuXWjcshSq_g@mail.gmail.com>
+From: nicolas.pitre@linaro.org (Nicolas Pitre)
+Date: Tue, 12 Aug 2014 11:52:49 -0400 (EDT)
+Subject: [PATCH v18 2/8] ARM: hisi: enable MCPM implementation
+In-Reply-To: <1407828408-21431-1-git-send-email-haojian.zhuang@linaro.org>
+References: <1407828408-21431-1-git-send-email-haojian.zhuang@linaro.org>
+Message-ID: <alpine.LFD.2.11.1408121129440.6061@knanqh.ubzr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Tue, 12 Aug 2014, Haojian Zhuang wrote:
 
-On Mon, Aug 11, 2014 at 5:46 AM, Ulf Hansson <ulf.hansson@linaro.org> wrote:
-> On 11 August 2014 09:44, Linus Walleij <linus.walleij@linaro.org> wrote:
->> On Mon, Aug 4, 2014 at 12:18 AM, Heiko St?bner <heiko@sntech.de> wrote:
->>
->> [Adding Ulf Hansson to this discussion...]
->>
->>> Hi Mark, Linus,
->>>
->>> I'd like to clarify what the appropriate way to handle pin output voltages is.
->>> On the Rockchip SoCs the voltage for some groups of pins can be set between
->>> 3.3V and 1.8V ... like the MMC/SD pins who need this to support UHS mode
->>> cards.
->>
->> This is called "vqmmc" in the mmc/sd subsystem.
->>
->> grep for mmc_set_signal_voltage() in drivers/mmc/core/*
->>
->> In drivers/mmc/core/core.c, you find:
->>
->>  mmc->supply.vqmmc = devm_regulator_get_optional(dev, "vqmmc");
->>
->> Which gets the regulator to set the signal voltage, if such
->> a regulator is specified for the host.
->>
->> Very simple and straight-forward, and handled by the MMC core.
->>
->>> In [0] when talking about something different, Linus Walleij described a
->>> similar case as
->>>
->>> "I think we need to have a discussion with Mark Brown on how to
->>> handle this.
->>> We have previously had the case of MMC/SD level-shifters, where
->>> a certain setting gives a certain level of signals out, and another setting
->>> gives another level. Like two discrete levels.
->>> So we modeled that as a regulator provider inside the pin control
->>> driver eventually, see sh-pfc/pfc-sh73a0.c"
->>>
->>> As this sound like exactly the thing I'm trying to solve, is handling this via
->>> a regulator the correct general way?
->>
->> Ithinkso.
->
-> Just to confirm, I fully agree with the above said.
->
-> You may also find a good example in the mmci host driver for how to
-> make use of the vqmmc regulator.
+> +static int hip04_mcpm_power_up(unsigned int cpu, unsigned int cluster)
+> +{
+> +	unsigned long data, mask;
+> +	void __iomem *sys_dreq, *sys_status;
+> +
+> +	if (!sysctrl)
+> +		return -ENODEV;
+> +	if (cluster >= HIP04_MAX_CLUSTERS || cpu >= HIP04_MAX_CPUS_PER_CLUSTER)
+> +		return -EINVAL;
+> +
+> +	spin_lock_irq(&boot_lock);
+> +
+> +	if (hip04_cpu_table[cluster][cpu])
+> +		goto out;
+> +
+> +	sys_dreq = sysctrl + SC_CPU_RESET_DREQ(cluster);
+> +	sys_status = sysctrl + SC_CPU_RESET_STATUS(cluster);
+> +	if (hip04_cluster_is_down(cluster)) {
+> +		data = CLUSTER_DEBUG_RESET_BIT;
+> +		writel_relaxed(data, sys_dreq);
+> +		do {
+> +			cpu_relax();
+> +			mask = CLUSTER_DEBUG_RESET_STATUS;
+> +			data = readl_relaxed(sys_status);
+> +		} while (data & mask);
+> +	}
+> +
+> +	data = CORE_RESET_BIT(cpu) | NEON_RESET_BIT(cpu) | \
+> +	       CORE_DEBUG_RESET_BIT(cpu);
+> +	writel_relaxed(data, sys_dreq);
+> +	do {
+> +		cpu_relax();
+> +	} while (data == readl_relaxed(sys_status));
+> +	udelay(20);
 
-Yuvaraj also submitted patches for dw_mmc:
+You really need this even if the snoops aren't disabled in 
+hip04_mcpm_power_down() ?
 
-4401241 New          [1/3] mmc: dw_mmc: use mmc_regulator_get_supply
-to handle regulators
-4401261 New          [2/3] mmc: dw_mmc: Dont cut off vqmmc and vmmc
-4401281 New          [3/3] mmc: dw_mmc: Support voltage changes
+> +out:
+> +	hip04_cpu_table[cluster][cpu]++;
+> +	spin_unlock_irq(&boot_lock);
+> +
+> +	return 0;
+> +}
+> +
+> +static void hip04_mcpm_power_down(void)
+> +{
+> +	unsigned int mpidr, cpu, cluster;
+> +	bool skip_wfi = false, last_man = false;
+> +
+> +	mpidr = read_cpuid_mpidr();
+> +	cpu = MPIDR_AFFINITY_LEVEL(mpidr, 0);
+> +	cluster = MPIDR_AFFINITY_LEVEL(mpidr, 1);
+> +
+> +	__mcpm_cpu_going_down(cpu, cluster);
+> +
+> +	spin_lock_irq(&boot_lock);
+> +	BUG_ON(__mcpm_cluster_state(cluster) != CLUSTER_UP);
+> +	hip04_cpu_table[cluster][cpu]--;
+> +	if (hip04_cpu_table[cluster][cpu] == 1) {
+> +		/* A power_up request went ahead of us. */
+> +		skip_wfi = true;
+> +	} else if (hip04_cpu_table[cluster][cpu] > 1) {
+> +		pr_err("Cluster %d CPU%d boots multiple times\n", cluster, cpu);
+> +		BUG();
+> +	}
+> +
+> +	last_man = hip04_cluster_is_down(cluster);
+> +	if (last_man && __mcpm_outbound_enter_critical(cpu, cluster)) {
+> +		spin_unlock(&boot_lock);
+> +		v7_exit_coherency_flush(all);
+> +		__mcpm_outbound_leave_critical(cluster, CLUSTER_DOWN);
+> +	} else {
+> +		spin_unlock(&boot_lock);
+> +		v7_exit_coherency_flush(louis);
+> +	}
+> +
+> +	__mcpm_cpu_down(cpu, cluster);
+> +
+> +	if (!skip_wfi)
+> +		wfi();
+> +}
+> +
+> +static int hip04_mcpm_wait_for_powerdown(unsigned int cpu, unsigned int cluster)
+> +{
+> +	unsigned int data, tries, count;
+> +
+> +	BUG_ON(cluster >= HIP04_MAX_CLUSTERS ||
+> +	       cpu >= HIP04_MAX_CPUS_PER_CLUSTER);
+> +
+> +	count = TIMEOUT_MSEC / POLL_MSEC;
 
-He seems to have dropped these patches on the floor and I had review
-feedback on them, but I think they're in the right direction.
+This count value doesn't make much sense anymore, does it?  Nothing 
+relates to POLL_MSEC afterwards.
+
+> +	spin_lock_irq(&boot_lock);
+> +	/*
+> +	 * Target core should enter WFI first.
+> +	 * Then cluster could be disabled in snoop filter.
+> +	 * At last, target core could be reset.
+> +	 */
+
+You should verify that the CPU usage count is still 0 here as I 
+suggested.
+
+> +	for (tries = 0; tries < count; tries++) {
+> +		cpu_relax();
+
+There is probably no point calling cpu_relax() if it is followed by 
+udelay().
+
+> +		udelay(50);
+> +		data = readl_relaxed(sysctrl + SC_CPU_RESET_STATUS(cluster));
+> +		if (!hip04_cpu_table[cluster][cpu] || \
+> +		    (data & CORE_WFI_STATUS(cpu))) {
+> +			break;
+> +		}
+> +	}
+> +	if (tries >= count)
+> +		goto err;
+> +	if (hip04_cluster_is_down(cluster))
+> +		hip04_set_snoop_filter(cluster, 0);
+> +	data = CORE_RESET_BIT(cpu) | NEON_RESET_BIT(cpu) | \
+> +	       CORE_DEBUG_RESET_BIT(cpu);
+> +	writel_relaxed(data, sysctrl + SC_CPU_RESET_REQ(cluster));
+> +	for (tries = 0; tries < count; tries++) {
+> +		cpu_relax();
+> +		udelay(50);
+> +		data = readl_relaxed(sysctrl + SC_CPU_RESET_STATUS(cluster));
+> +		if (!hip04_cpu_table[cluster][cpu] || \
+> +		    (data & CORE_RESET_STATUS(cpu))) {
+> +			break;
+> +		}
+> +	}
+> +	if (tries >= count)
+> +		goto err;
+> +	spin_unlock_irq(&boot_lock);
+> +	return 0;
+> +err:
+> +	spin_unlock_irq(&boot_lock);
+> +	return -EBUSY;
+> +}
+
+I don't really like the way things are done in general.  And we're 
+apparently going in circle over this. This is almost like if MCPM was of 
+no benefit to you given all the things which look "wrong".  But given 
+that no usable documentation is available, preventing me and others from 
+suggesting better ways, then this platform is going to be limited to 
+suboptimal CPU hotplug support.  So if you fix the minor issues I've 
+noted above then I'll provide my reluctant ACK for this patch if nothing 
+else can be helped.
+
+
+Nicolas
