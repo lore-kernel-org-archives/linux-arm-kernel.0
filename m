@@ -1,58 +1,37 @@
-From: fkan@apm.com (Feng Kan)
-Date: Tue, 12 Aug 2014 09:20:50 -0700
-Subject: [PATCH Resend 0/2] arm64: Add PMU node for APM X-Gene Storm SoC
-In-Reply-To: <CALrVBkumLjUZMsfWTn3e_5U=jDFerx0LLzESiuNPZrnBVVfgQg@mail.gmail.com>
-References: <1407800853-3149-1-git-send-email-fkan@apm.com>
- <CALrVBkumLjUZMsfWTn3e_5U=jDFerx0LLzESiuNPZrnBVVfgQg@mail.gmail.com>
-Message-ID: <CAL85gmDw3-yacob+t+DcBU2qNhTUSj=cTBkv7kNc9ocTb+=FCA@mail.gmail.com>
+From: Liviu.Dudau@arm.com (Liviu Dudau)
+Date: Tue, 12 Aug 2014 17:25:18 +0100
+Subject: [PATCH v9 05/12] ARM: Define PCI_IOBASE as the base of virtual PCI IO
+ space.
+In-Reply-To: <1407860725-25202-1-git-send-email-Liviu.Dudau@arm.com>
+References: <1407860725-25202-1-git-send-email-Liviu.Dudau@arm.com>
+Message-ID: <1407860725-25202-6-git-send-email-Liviu.Dudau@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Aug 11, 2014 at 8:47 PM, Anup Patel <anup.patel@linaro.org> wrote:
-> On 12 August 2014 05:17, Feng Kan <fkan@apm.com> wrote:
->> This patch series adds PMU node for APM X-Gene's Potenza CPU.
->> Potenza CPU PMU is compatible with ARMv8-PMUv3.
->>
->> I have remove the previous notice regarding the dependancy on the GIC driver
->> from the commit message.
->>
->> Feng Kan (1):
->>   dt-bindings: Add Potenza PMU binding
->>
->> Vinayak Kale (1):
->>   arm64: dts: Add PMU node for APM X-Gene Storm SOC
->>
->>  Documentation/devicetree/bindings/arm/pmu.txt | 1 +
->>  arch/arm64/boot/dts/apm-storm.dtsi            | 5 +++++
->>  2 files changed, 6 insertions(+)
->>
->> --
->> 1.9.1
->>
->>
->> _______________________________________________
->> linux-arm-kernel mailing list
->> linux-arm-kernel at lists.infradead.org
->> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
->
-> Hi Feng,
->
-> Please follow proper protocol when resending patchset originally
-> authored by someone else.
-> (http://comments.gmane.org/gmane.linux.ports.arm.kernel/310795)
-I will retract this patch and reauthor it. The person originally started the
-patch has left the company. I will take over to resubmit it.
+This is needed for calls into OF code that parses PCI ranges.
+It signals support for memory mapped PCI I/O accesses that
+are described be device trees.
 
+Cc: Russell King <linux@arm.linux.org.uk>
+Cc: Catalin Marinas <catalin.marinas@arm.com>
+Cc: Arnd Bergmann <arnd@arndb.de>
+Cc: Rob Herring <robh+dt@kernel.org>
+Signed-off-by: Liviu Dudau <Liviu.Dudau@arm.com>
+---
+ arch/arm/include/asm/io.h | 1 +
+ 1 file changed, 1 insertion(+)
 
->
-> Also, I see that original patchset clearly states that second patch
-> depends on a GIC patch [1] authored by you:
->
-> [1]- https://lkml.org/lkml/2014/2/27/605
-> (irqchip:gic: change access of gicc_ctrl register to read modify write)
->
-> I have recently posted RFC patch for PMU support in KVM ARM64
-> which also requires your GIC patch for APM X-Gene.
->
-> Regards,
-> Anup
+diff --git a/arch/arm/include/asm/io.h b/arch/arm/include/asm/io.h
+index 3d23418..22b7529 100644
+--- a/arch/arm/include/asm/io.h
++++ b/arch/arm/include/asm/io.h
+@@ -178,6 +178,7 @@ static inline void __iomem *__typesafe_io(unsigned long addr)
+ 
+ /* PCI fixed i/o mapping */
+ #define PCI_IO_VIRT_BASE	0xfee00000
++#define PCI_IOBASE		PCI_IO_VIRT_BASE
+ 
+ #if defined(CONFIG_PCI)
+ void pci_ioremap_set_mem_type(int mem_type);
+-- 
+2.0.4
