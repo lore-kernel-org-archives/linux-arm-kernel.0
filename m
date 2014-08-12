@@ -1,68 +1,60 @@
-From: thierry.reding@gmail.com (Thierry Reding)
-Date: Tue, 12 Aug 2014 16:40:41 +0200
-Subject: [PATCH] ARM: dts: Only build dtb if associated Arch and/or SoC
- is enabled
-In-Reply-To: <CALeDE9MMJBbs87oVsHV39tez6Eafg745GSWng-9QdnKV1FKJqQ@mail.gmail.com>
-References: <1407852078-31309-1-git-send-email-pbrobinson@gmail.com>
- <1407853179.4724.4.camel@weser.hi.pengutronix.de>
- <CALeDE9MMJBbs87oVsHV39tez6Eafg745GSWng-9QdnKV1FKJqQ@mail.gmail.com>
-Message-ID: <20140812144040.GB9868@ulmo.nvidia.com>
+From: robherring2@gmail.com (Rob Herring)
+Date: Tue, 12 Aug 2014 10:03:48 -0500
+Subject: [PATCH 6/7] arm: mediatek: enable gpt6 on boot up to make arch
+ timer working
+In-Reply-To: <CABuKBe+Q3tnN0s22EMY-dK_6FeN_xN9SmrsW3dPONR6QDJ+V_w@mail.gmail.com>
+References: <1406824943-24052-1-git-send-email-matthias.bgg@gmail.com>
+ <1406824943-24052-7-git-send-email-matthias.bgg@gmail.com>
+ <CACRpkdbRhGE8tcKj+W_4F9-xmcm-fxcYuCmLOqX-ESC+3PAmyA@mail.gmail.com>
+ <CABuKBe+Q3tnN0s22EMY-dK_6FeN_xN9SmrsW3dPONR6QDJ+V_w@mail.gmail.com>
+Message-ID: <CAL_JsqJLn=dKKEgWFtvg_PnLFa5PEKM1J-M+fVbdirBWD2ii2A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Aug 12, 2014 at 03:25:31PM +0100, Peter Robinson wrote:
-> On Tue, Aug 12, 2014 at 3:19 PM, Lucas Stach <l.stach@pengutronix.de> wrote:
-> > Am Dienstag, den 12.08.2014, 15:01 +0100 schrieb Peter Robinson:
-> >> A number of arches (EXYNOS/IMX/TEGRA) are separated out into finer
-> >> grained definitions whether it be sub ARCH or SOC definitions. The
-> >> device tree blobs should only be built if the specific option is
-> >> enabled that supports that device or it might be that there's an
-> >> expectation that the device is supported when in actual fact it's
-> >> not. This ensures only the relevant bits are built.
-> >>
-> >> This also helps to avoid trivial merge conflicts when adding support
-> >> for new boards.
-> >>
-> >> Signed-off-by: Peter Robinson <pbrobinson@gmail.com>
-> >
-> > a small nitpick below, otherwise:
-> > Reviewed-by: Lucas Stach <l.stach@pengutronix.de>
-> >
-> >> ---
-> >>  arch/arm/boot/dts/Makefile | 50 +++++++++++++++++++++++++++-------------------
-> >>  1 file changed, 30 insertions(+), 20 deletions(-)
-> >>
-> >> diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
-> >> index b8c5cd3..e95808e 100644
-> >> --- a/arch/arm/boot/dts/Makefile
-> >> +++ b/arch/arm/boot/dts/Makefile
-> >> @@ -64,7 +64,7 @@ dtb-$(CONFIG_ARCH_BRCMSTB) += \
-> >>  dtb-$(CONFIG_ARCH_DAVINCI) += da850-enbw-cmc.dtb \
-> >>       da850-evm.dtb
-> >>  dtb-$(CONFIG_ARCH_EFM32) += efm32gg-dk3750.dtb
-> >> -dtb-$(CONFIG_ARCH_EXYNOS) += exynos4210-origen.dtb \
-> >> +dtb-$(CONFIG_ARCH_EXYNOS4) += exynos4210-origen.dtb \
-> >>       exynos4210-smdkv310.dtb \
-> >>       exynos4210-trats.dtb \
-> >>       exynos4210-universal_c210.dtb \
-> >> @@ -74,8 +74,8 @@ dtb-$(CONFIG_ARCH_EXYNOS) += exynos4210-origen.dtb \
-> >
-> > I would argue that things look a little more consistent with the
-> > linebreak directly behind the "+=", as with the IMX entries. Maybe if
-> > other platform maintainers agree we could change this while touching
-> > things anyway. But this is only a small nitpick, so feel free to ignore.
-> 
-> I agree but I left it as each platform had it to save extra churn as I
-> wasn't sure what the exact convention was.
+On Tue, Aug 12, 2014 at 4:02 AM, Matthias Brugger
+<matthias.bgg@gmail.com> wrote:
+> 2014-08-11 9:15 GMT+02:00 Linus Walleij <linus.walleij@linaro.org>:
+>> On Thu, Jul 31, 2014 at 6:42 PM, Matthias Brugger
+>> <matthias.bgg@gmail.com> wrote:
+>>
+>>> We enable GTP6 which ungates the arch timer clock. Apart we write the
+>>> frequency with which the timer is running in the CNTFREQ register.
+>>> In the future this should be done in the bootloader.
+>>>
+>>> Signed-off-by: Matthias Brugger <matthias.bgg@gmail.com>
+>> (...)
+>>
+>>> +       if (of_machine_is_compatible("mediatek,mt6589")) {
+>>> +               /* set cntfreq register which is not done in bootloader */
+>>> +               asm volatile("mcr p15, 0, %0, c14, c0, 0" : : "r" (13000000));
+>>
+>> I guess this is for something like the ARM arch timer in
+>> drivers/clocksource/arm_arch_timer.c
+>>
+>> Instead of doing this, use the DT property "clock-frequency" on
+>> the ARM arch timer node, as that overrides the CP15 setting.
+>>
+>>> +
+>>> +               /* turn on GPT6 which ungates arch timer clocks */
+>>> +               gpt_base = ioremap(GPT6_CON_MT65xx, 0x04);
+>>> +       }
+>>> +
+>>> +       /* enabel clock and set to free-run */
+>>> +       if (gpt_base)
+>>> +               writel(0x31, gpt_base);
+>>
+>> Why is this not done properly in the GPT driver (I guess
+>> in drivers/clocksource/mtk_timer.c) instead of remapping
+>> it and fiddling around in the machine?
+>
+> I didn't put it in the GPT driver, because that would mean, that you
+> need to have the mtk_timer to be able to use the ARM arch timer.
+> From my understanding this are two independent blocks in the SoC.
+> Apart from that, as stated in the commit message, this patch is a
+> workaround until we have a bootloader which does this for us.
+> Therefore I thought the init_time function would be the better place to do this.
 
-It seems like there isn't one convention. But consistency is always
-good, so I second Lucas' proposal.
+I agree that the bootloader is the right place, and the fixup in the
+machine code until that is in place is the right place for the fixup.
 
-Thierry
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: not available
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140812/007cfa84/attachment-0001.sig>
+Rob
