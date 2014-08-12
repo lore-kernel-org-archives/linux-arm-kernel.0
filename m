@@ -1,85 +1,35 @@
 From: wangyijing@huawei.com (Yijing Wang)
-Date: Tue, 12 Aug 2014 15:26:00 +0800
-Subject: [RFC PATCH 07/20] x86/MSI: Use msi_chip instead of arch func to
- configure MSI/MSI-X
+Date: Tue, 12 Aug 2014 15:25:56 +0800
+Subject: [RFC PATCH 03/20] PCI/MSI: Remove useless bus->msi assignment
 In-Reply-To: <1407828373-24322-1-git-send-email-wangyijing@huawei.com>
 References: <1407828373-24322-1-git-send-email-wangyijing@huawei.com>
-Message-ID: <1407828373-24322-8-git-send-email-wangyijing@huawei.com>
+Message-ID: <1407828373-24322-4-git-send-email-wangyijing@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Introduce a new struct msi_chip apic_msi_chip instead of weak arch
-functions to configure MSI/MSI-X in x86.
+Currently, PCI drivers will initialize bus->msi in
+pcibios_add_bus(). pcibios_add_bus() will be called
+in every pci bus initialization. So the bus->msi
+assignment in pci_alloc_child_bus() is useless.
 
 Signed-off-by: Yijing Wang <wangyijing@huawei.com>
+CC: Thierry Reding <thierry.reding@avionic-design.de>
+CC: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
 ---
- arch/x86/include/asm/pci.h     |    1 +
- arch/x86/kernel/apic/io_apic.c |   20 ++++++++++++++++----
- 2 files changed, 17 insertions(+), 4 deletions(-)
+ drivers/pci/probe.c |    1 -
+ 1 files changed, 0 insertions(+), 1 deletions(-)
 
-diff --git a/arch/x86/include/asm/pci.h b/arch/x86/include/asm/pci.h
-index 0892ea0..878a06d 100644
---- a/arch/x86/include/asm/pci.h
-+++ b/arch/x86/include/asm/pci.h
-@@ -101,6 +101,7 @@ void native_teardown_msi_irq(unsigned int irq);
- void native_restore_msi_irqs(struct pci_dev *dev);
- int setup_msi_irq(struct pci_dev *dev, struct msi_desc *msidesc,
- 		  unsigned int irq_base, unsigned int irq_offset);
-+extern struct msi_chip *x86_msi_chip;
- #else
- #define native_setup_msi_irqs		NULL
- #define native_teardown_msi_irq		NULL
-diff --git a/arch/x86/kernel/apic/io_apic.c b/arch/x86/kernel/apic/io_apic.c
-index 2609dcd..eb8ab7c 100644
---- a/arch/x86/kernel/apic/io_apic.c
-+++ b/arch/x86/kernel/apic/io_apic.c
-@@ -3077,24 +3077,25 @@ int setup_msi_irq(struct pci_dev *dev, struct msi_desc *msidesc,
- 	return 0;
- }
+diff --git a/drivers/pci/probe.c b/drivers/pci/probe.c
+index e3cf8a2..8296576 100644
+--- a/drivers/pci/probe.c
++++ b/drivers/pci/probe.c
+@@ -677,7 +677,6 @@ static struct pci_bus *pci_alloc_child_bus(struct pci_bus *parent,
  
--int native_setup_msi_irqs(struct pci_dev *dev, int nvec, int type)
-+int native_setup_msi_irqs(struct device *dev, int nvec, int type)
- {
- 	struct msi_desc *msidesc;
- 	unsigned int irq;
- 	int node, ret;
-+	struct pci_dev *pdev = to_pci_dev(dev);
+ 	child->parent = parent;
+ 	child->ops = parent->ops;
+-	child->msi = parent->msi;
+ 	child->sysdata = parent->sysdata;
+ 	child->bus_flags = parent->bus_flags;
  
- 	/* Multiple MSI vectors only supported with interrupt remapping */
- 	if (type == PCI_CAP_ID_MSI && nvec > 1)
- 		return 1;
- 
--	node = dev_to_node(&dev->dev);
-+	node = dev_to_node(dev);
- 
--	list_for_each_entry(msidesc, &dev->msi_list, list) {
-+	list_for_each_entry(msidesc, &pdev->msi_list, list) {
- 		irq = irq_alloc_hwirq(node);
- 		if (!irq)
- 			return -ENOSPC;
- 
--		ret = setup_msi_irq(dev, msidesc, irq, 0);
-+		ret = setup_msi_irq(pdev, msidesc, irq, 0);
- 		if (ret < 0) {
- 			irq_free_hwirq(irq);
- 			return ret;
-@@ -3214,6 +3215,17 @@ int default_setup_hpet_msi(unsigned int irq, unsigned int id)
- }
- #endif
- 
-+struct msi_chip apic_msi_chip = {
-+	.setup_irqs = native_setup_msi_irqs,
-+	.teardown_irq = native_teardown_msi_irq,
-+};
-+
-+struct msi_chip *arch_get_match_msi_chip(struct device *dev)
-+{
-+	return x86_msi_chip;
-+}
-+
-+struct msi_chip *x86_msi_chip = &apic_msi_chip;
- #endif /* CONFIG_PCI_MSI */
- /*
-  * Hypertransport interrupt support
 -- 
 1.7.1
