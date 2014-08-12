@@ -1,61 +1,74 @@
 From: wangyijing@huawei.com (Yijing Wang)
-Date: Tue, 12 Aug 2014 15:26:10 +0800
-Subject: [RFC PATCH 17/20] IA64/MSI: Use msi_chip instead of arch func to
+Date: Tue, 12 Aug 2014 15:26:06 +0800
+Subject: [RFC PATCH 13/20] MIPS/xlr/MSI: Use msi_chip instead of arch func to
  configure MSI/MSI-X
 In-Reply-To: <1407828373-24322-1-git-send-email-wangyijing@huawei.com>
 References: <1407828373-24322-1-git-send-email-wangyijing@huawei.com>
-Message-ID: <1407828373-24322-18-git-send-email-wangyijing@huawei.com>
+Message-ID: <1407828373-24322-14-git-send-email-wangyijing@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Introduce a new struct msi_chip ia64_msi_chip instead of weak arch
+Introduce a new struct msi_chip xlr_msi_chip instead of weak arch
 functions to configure MSI/MSI-X.
 
 Signed-off-by: Yijing Wang <wangyijing@huawei.com>
 ---
- arch/ia64/kernel/msi_ia64.c |   18 ++++++++++++++----
- 1 files changed, 14 insertions(+), 4 deletions(-)
+ arch/mips/pci/pci-xlr.c |   19 +++++++++++++++----
+ 1 files changed, 15 insertions(+), 4 deletions(-)
 
-diff --git a/arch/ia64/kernel/msi_ia64.c b/arch/ia64/kernel/msi_ia64.c
-index c430f91..6e527c4 100644
---- a/arch/ia64/kernel/msi_ia64.c
-+++ b/arch/ia64/kernel/msi_ia64.c
-@@ -112,15 +112,15 @@ static struct irq_chip ia64_msi_chip = {
- };
- 
- 
--int arch_setup_msi_irq(struct pci_dev *pdev, struct msi_desc *desc)
-+static int arch_ia64_setup_msi_irq(struct device *dev, struct msi_desc *desc)
- {
- 	if (platform_setup_msi_irq)
--		return platform_setup_msi_irq(pdev, desc);
-+		return platform_setup_msi_irq(to_pci_dev(dev), desc);
- 
--	return ia64_setup_msi_irq(pdev, desc);
-+	return ia64_setup_msi_irq(to_pci_dev(dev), desc);
+diff --git a/arch/mips/pci/pci-xlr.c b/arch/mips/pci/pci-xlr.c
+index 0dde803..6eef164 100644
+--- a/arch/mips/pci/pci-xlr.c
++++ b/arch/mips/pci/pci-xlr.c
+@@ -214,11 +214,11 @@ static int get_irq_vector(const struct pci_dev *dev)
  }
  
+ #ifdef CONFIG_PCI_MSI
 -void arch_teardown_msi_irq(unsigned int irq)
-+static void arch_ia64_teardown_msi_irq(unsigned int irq)
++void xlr_teardown_msi_irq(unsigned int irq)
  {
- 	if (platform_teardown_msi_irq)
- 		return platform_teardown_msi_irq(irq);
-@@ -128,6 +128,16 @@ void arch_teardown_msi_irq(unsigned int irq)
- 	return ia64_teardown_msi_irq(irq);
  }
  
-+static struct msi_chip chip = {
-+	.setup_irq = arch_ia64_setup_msi_irq,
-+	.teardown_irq = arch_ia64_teardown_msi_irq,
+-int arch_setup_msi_irq(struct pci_dev *dev, struct msi_desc *desc)
++int xlr_setup_msi_irq(struct device *dev, struct msi_desc *desc)
+ {
+ 	struct msi_msg msg;
+ 	struct pci_dev *lnk;
+@@ -233,7 +233,7 @@ int arch_setup_msi_irq(struct pci_dev *dev, struct msi_desc *desc)
+ 	 * Enable MSI on the XLS PCIe controller bridge which was disabled
+ 	 * at enumeration, the bridge MSI capability is at 0x50
+ 	 */
+-	lnk = xls_get_pcie_link(dev);
++	lnk = xls_get_pcie_link(to_pci_dev(dev));
+ 	if (lnk == NULL)
+ 		return 1;
+ 
+@@ -243,7 +243,7 @@ int arch_setup_msi_irq(struct pci_dev *dev, struct msi_desc *desc)
+ 		pci_write_config_word(lnk, 0x50 + PCI_MSI_FLAGS, val);
+ 	}
+ 
+-	irq = get_irq_vector(dev);
++	irq = get_irq_vector(to_pci_dev(dev));
+ 	if (irq <= 0)
+ 		return 1;
+ 
+@@ -263,6 +263,17 @@ int arch_setup_msi_irq(struct pci_dev *dev, struct msi_desc *desc)
+ 	write_msi_msg(irq, &msg);
+ 	return 0;
+ }
++
++struct msi_chip xlr_msi_chip = {
++	.setup_irq = xlr_setup_msi_irq,
++	.teardown_irq = xlr_teardown_msi_irq,
 +};
 +
 +struct msi_chip *arch_get_match_msi_chip(struct device *dev)
 +{
-+	return &chip;
++	return &xlr_msi_chip;
 +}
 +
- #ifdef CONFIG_INTEL_IOMMU
- #ifdef CONFIG_SMP
- static int dmar_msi_set_affinity(struct irq_data *data,
+ #endif
+ 
+ /* Extra ACK needed for XLR on chip PCI controller */
 -- 
 1.7.1
