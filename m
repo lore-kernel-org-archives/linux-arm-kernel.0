@@ -1,155 +1,285 @@
 From: m.smarduch@samsung.com (Mario Smarduch)
-Date: Mon, 11 Aug 2014 18:25:05 -0700
-Subject: [PATCH v9 4/4] arm: ARMv7 dirty page logging 2nd stage page fault
- handling support
-In-Reply-To: <20140811191315.GI10550@cbox>
+Date: Mon, 11 Aug 2014 18:36:14 -0700
+Subject: [PATCH v9 2/4] arm: ARMv7  dirty page logging inital mem region
+ write protect (w/no huge PUD support)
+In-Reply-To: <20140811191257.GG10550@cbox>
 References: <1406249768-25315-1-git-send-email-m.smarduch@samsung.com>
- <1406249768-25315-5-git-send-email-m.smarduch@samsung.com>
- <20140811191315.GI10550@cbox>
-Message-ID: <53E96CF1.6040806@samsung.com>
+ <1406249768-25315-3-git-send-email-m.smarduch@samsung.com>
+ <20140811191257.GG10550@cbox>
+Message-ID: <53E96F8E.3070905@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08/11/2014 12:13 PM, Christoffer Dall wrote:
-> On Thu, Jul 24, 2014 at 05:56:08PM -0700, Mario Smarduch wrote:
->> This patch adds support for handling 2nd stage page faults during migration,
->> it disables faulting in huge pages, and dissolves huge pages to page tables.
->> In case migration is canceled huge pages will be used again.
+On 08/11/2014 12:12 PM, Christoffer Dall wrote:
+> Remove the parenthesis from the subject line.
+> 
+> On Thu, Jul 24, 2014 at 05:56:06PM -0700, Mario Smarduch wrote:
+>> Patch adds  support for initial write protection VM memlsot. This patch series
+>             ^^                                    ^
+> stray whitespace                                 of
+> 
+> 
+>> assumes that huge PUDs will not be used in 2nd stage tables.
+> 
+> may be worth mentioning that this is always valid on ARMv7.
+> 
 >>
 >> Signed-off-by: Mario Smarduch <m.smarduch@samsung.com>
 >> ---
->>  arch/arm/kvm/mmu.c |   31 +++++++++++++++++++++++++------
->>  1 file changed, 25 insertions(+), 6 deletions(-)
+>>  arch/arm/include/asm/kvm_host.h       |    1 +
+>>  arch/arm/include/asm/kvm_mmu.h        |   20 ++++++
+>>  arch/arm/include/asm/pgtable-3level.h |    1 +
+>>  arch/arm/kvm/arm.c                    |    9 +++
+>>  arch/arm/kvm/mmu.c                    |  128 +++++++++++++++++++++++++++++++++
+>>  5 files changed, 159 insertions(+)
 >>
+>> diff --git a/arch/arm/include/asm/kvm_host.h b/arch/arm/include/asm/kvm_host.h
+>> index 042206f..6521a2d 100644
+>> --- a/arch/arm/include/asm/kvm_host.h
+>> +++ b/arch/arm/include/asm/kvm_host.h
+>> @@ -231,5 +231,6 @@ int kvm_perf_teardown(void);
+>>  u64 kvm_arm_timer_get_reg(struct kvm_vcpu *, u64 regid);
+>>  int kvm_arm_timer_set_reg(struct kvm_vcpu *, u64 regid, u64 value);
+>>  void kvm_arch_flush_remote_tlbs(struct kvm *);
+>> +void kvm_mmu_wp_memory_region(struct kvm *kvm, int slot);
+>>  
+>>  #endif /* __ARM_KVM_HOST_H__ */
+>> diff --git a/arch/arm/include/asm/kvm_mmu.h b/arch/arm/include/asm/kvm_mmu.h
+>> index 5cc0b0f..08ab5e8 100644
+>> --- a/arch/arm/include/asm/kvm_mmu.h
+>> +++ b/arch/arm/include/asm/kvm_mmu.h
+>> @@ -114,6 +114,26 @@ static inline void kvm_set_s2pmd_writable(pmd_t *pmd)
+>>  	pmd_val(*pmd) |= L_PMD_S2_RDWR;
+>>  }
+>>  
+>> +static inline void kvm_set_s2pte_readonly(pte_t *pte)
+>> +{
+>> +	pte_val(*pte) = (pte_val(*pte) & ~L_PTE_S2_RDWR) | L_PTE_S2_RDONLY;
+>> +}
+>> +
+>> +static inline bool kvm_s2pte_readonly(pte_t *pte)
+>> +{
+>> +	return (pte_val(*pte) & L_PTE_S2_RDWR) == L_PTE_S2_RDONLY;
+>> +}
+>> +
+>> +static inline void kvm_set_s2pmd_readonly(pmd_t *pmd)
+>> +{
+>> +	pmd_val(*pmd) = (pmd_val(*pmd) & ~L_PMD_S2_RDWR) | L_PMD_S2_RDONLY;
+>> +}
+>> +
+>> +static inline bool kvm_s2pmd_readonly(pmd_t *pmd)
+>> +{
+>> +	return (pmd_val(*pmd) & L_PMD_S2_RDWR) == L_PMD_S2_RDONLY;
+>> +}
+>> +
+>>  /* Open coded p*d_addr_end that can deal with 64bit addresses */
+>>  #define kvm_pgd_addr_end(addr, end)					\
+>>  ({	u64 __boundary = ((addr) + PGDIR_SIZE) & PGDIR_MASK;		\
+>> diff --git a/arch/arm/include/asm/pgtable-3level.h b/arch/arm/include/asm/pgtable-3level.h
+>> index 85c60ad..d8bb40b 100644
+>> --- a/arch/arm/include/asm/pgtable-3level.h
+>> +++ b/arch/arm/include/asm/pgtable-3level.h
+>> @@ -129,6 +129,7 @@
+>>  #define L_PTE_S2_RDONLY			(_AT(pteval_t, 1) << 6)   /* HAP[1]   */
+>>  #define L_PTE_S2_RDWR			(_AT(pteval_t, 3) << 6)   /* HAP[2:1] */
+>>  
+>> +#define L_PMD_S2_RDONLY			(_AT(pteval_t, 1) << 6)   /* HAP[1]   */
+>>  #define L_PMD_S2_RDWR			(_AT(pmdval_t, 3) << 6)   /* HAP[2:1] */
+>>  
+>>  /*
+>> diff --git a/arch/arm/kvm/arm.c b/arch/arm/kvm/arm.c
+>> index 3c82b37..e11c2dd 100644
+>> --- a/arch/arm/kvm/arm.c
+>> +++ b/arch/arm/kvm/arm.c
+>> @@ -242,6 +242,15 @@ void kvm_arch_commit_memory_region(struct kvm *kvm,
+>>  				   const struct kvm_memory_slot *old,
+>>  				   enum kvm_mr_change change)
+>>  {
+>> +#ifdef CONFIG_ARM
+>> +	/*
+>> +	 * At this point memslot has been committed and there is an
+>> +	 * allocated dirty_bitmap[], dirty pages will be be tracked while the
+>> +	 * memory slot is write protected.
+>> +	 */
+>> +	if ((change != KVM_MR_DELETE) && (mem->flags & KVM_MEM_LOG_DIRTY_PAGES))
+>> +		kvm_mmu_wp_memory_region(kvm, mem->slot);
+>> +#endif
+>>  }
+>>  
+>>  void kvm_arch_flush_shadow_all(struct kvm *kvm)
 >> diff --git a/arch/arm/kvm/mmu.c b/arch/arm/kvm/mmu.c
->> index ca84331..a17812a 100644
+>> index 35254c6..7bfc792 100644
 >> --- a/arch/arm/kvm/mmu.c
 >> +++ b/arch/arm/kvm/mmu.c
->> @@ -642,7 +642,8 @@ static int stage2_set_pmd_huge(struct kvm *kvm, struct kvm_mmu_memory_cache
+>> @@ -763,6 +763,134 @@ static bool transparent_hugepage_adjust(pfn_t *pfnp, phys_addr_t *ipap)
+>>  	return false;
 >>  }
 >>  
->>  static int stage2_set_pte(struct kvm *kvm, struct kvm_mmu_memory_cache *cache,
->> -			  phys_addr_t addr, const pte_t *new_pte, bool iomap)
->> +			  phys_addr_t addr, const pte_t *new_pte, bool iomap,
->> +			  bool logging_active)
->>  {
->>  	pmd_t *pmd;
->>  	pte_t *pte, old_pte;
->> @@ -657,6 +658,15 @@ static int stage2_set_pte(struct kvm *kvm, struct kvm_mmu_memory_cache *cache,
->>  		return 0;
->>  	}
->>  
->> +	/*
->> +	 * While dirty memory logging, clear PMD entry for huge page and split
->> +	 * into smaller pages, to track dirty memory at page granularity.
->> +	 */
->> +	if (logging_active && kvm_pmd_huge(*pmd)) {
->> +		phys_addr_t ipa = pmd_pfn(*pmd) << PAGE_SHIFT;
->> +		clear_pmd_entry(kvm, pmd, ipa);
-> 
-> clear_pmd_entry has a VM_BUG_ON(kvm_pmd_huge(*pmd)) so that is
-> definitely not the right thing to call.
-
-I don't see that in 3.15rc1/rc4 -
-
-static void clear_pmd_entry(struct kvm *kvm, pmd_t *pmd, phys_addr_t addr)
-{
-        if (kvm_pmd_huge(*pmd)) {
-                pmd_clear(pmd);
-                kvm_tlb_flush_vmid_ipa(kvm, addr);
-        } else {
-                  [....]
-}
-
-I thought the purpose of this function was to clear PMD entry. Also
-ran hundreds of tests no problems. Hmmm confused.
-
-> 
->> +	}
+>> +#ifdef CONFIG_ARM
+>> +/**
+>> + * stage2_wp_pte_range - write protect PTE range
+>> + * @pmd:	pointer to pmd entry
+>> + * @addr:	range start address
+>> + * @end:	range end address
+>> + */
+>> +static void stage2_wp_pte_range(pmd_t *pmd, phys_addr_t addr, phys_addr_t end)
+>> +{
+>> +	pte_t *pte;
 >> +
->>  	/* Create stage-2 page mappings - Level 2 */
->>  	if (pmd_none(*pmd)) {
->>  		if (!cache)
->> @@ -709,7 +719,7 @@ int kvm_phys_addr_ioremap(struct kvm *kvm, phys_addr_t guest_ipa,
->>  		if (ret)
->>  			goto out;
->>  		spin_lock(&kvm->mmu_lock);
->> -		ret = stage2_set_pte(kvm, &cache, addr, &pte, true);
->> +		ret = stage2_set_pte(kvm, &cache, addr, &pte, true, false);
->>  		spin_unlock(&kvm->mmu_lock);
->>  		if (ret)
->>  			goto out;
->> @@ -926,6 +936,12 @@ static int user_mem_abort(struct kvm_vcpu *vcpu, phys_addr_t fault_ipa,
->>  	struct kvm_mmu_memory_cache *memcache = &vcpu->arch.mmu_page_cache;
->>  	struct vm_area_struct *vma;
->>  	pfn_t pfn;
->> +	/* Get logging status, if dirty_bitmap is not NULL then logging is on */
->> +	#ifdef CONFIG_ARM
->> +		bool logging_active = !!memslot->dirty_bitmap;
->> +	#else
->> +		bool logging_active = false;
->> +	#endif
+>> +	pte = pte_offset_kernel(pmd, addr);
+>> +	do {
+>> +		if (!pte_none(*pte)) {
+>> +			if (!kvm_s2pte_readonly(pte))
+>> +				kvm_set_s2pte_readonly(pte);
+>> +		}
+>> +	} while (pte++, addr += PAGE_SIZE, addr != end);
+>> +}
+>> +
+>> +/**
+>> + * stage2_wp_pmd_range - write protect PMD range
+>> + * @pud:	pointer to pud entry
+>> + * @addr:	range start address
+>> + * @end:	range end address
+>> + */
+>> +static void stage2_wp_pmd_range(pud_t *pud, phys_addr_t addr, phys_addr_t end)
+>> +{
+>> +	pmd_t *pmd;
+>> +	phys_addr_t next;
+>> +
+>> +	pmd = pmd_offset(pud, addr);
+>> +
+>> +	do {
+>> +		next = kvm_pmd_addr_end(addr, end);
+>> +		if (!pmd_none(*pmd)) {
+>> +			if (kvm_pmd_huge(*pmd)) {
+>> +				if (!kvm_s2pmd_readonly(pmd))
+>> +					kvm_set_s2pmd_readonly(pmd);
+>> +			} else
+>> +				stage2_wp_pte_range(pmd, addr, next);
+> please use a closing brace when the first part of the if-statement is a
+> multi-line block with braces, as per the CodingStyle.
+>> +
 > 
-> can you make this an inline in the header files for now please?
-
-Yes definitely.
-
+> stray blank line
 > 
->>  
->>  	write_fault = kvm_is_write_fault(kvm_vcpu_get_hsr(vcpu));
->>  	if (fault_status == FSC_PERM && !write_fault) {
->> @@ -936,7 +952,7 @@ static int user_mem_abort(struct kvm_vcpu *vcpu, phys_addr_t fault_ipa,
->>  	/* Let's check if we will get back a huge page backed by hugetlbfs */
->>  	down_read(&current->mm->mmap_sem);
->>  	vma = find_vma_intersection(current->mm, hva, hva + 1);
->> -	if (is_vm_hugetlb_page(vma)) {
->> +	if (is_vm_hugetlb_page(vma) && !logging_active) {
->>  		hugetlb = true;
->>  		gfn = (fault_ipa & PMD_MASK) >> PAGE_SHIFT;
->>  	} else {
->> @@ -979,7 +995,7 @@ static int user_mem_abort(struct kvm_vcpu *vcpu, phys_addr_t fault_ipa,
->>  	spin_lock(&kvm->mmu_lock);
->>  	if (mmu_notifier_retry(kvm, mmu_seq))
->>  		goto out_unlock;
->> -	if (!hugetlb && !force_pte)
->> +	if (!hugetlb && !force_pte && !logging_active)
->>  		hugetlb = transparent_hugepage_adjust(&pfn, &fault_ipa);
->>  
->>  	if (hugetlb) {
->> @@ -998,9 +1014,12 @@ static int user_mem_abort(struct kvm_vcpu *vcpu, phys_addr_t fault_ipa,
->>  			kvm_set_pfn_dirty(pfn);
->>  		}
->>  		coherent_cache_guest_page(vcpu, hva, PAGE_SIZE);
->> -		ret = stage2_set_pte(kvm, memcache, fault_ipa, &new_pte, false);
->> +		ret = stage2_set_pte(kvm, memcache, fault_ipa, &new_pte, false,
->> +					logging_active);
->>  	}
->>  
->> +	if (write_fault)
->> +		mark_page_dirty(kvm, gfn);
->>  
->>  out_unlock:
->>  	spin_unlock(&kvm->mmu_lock);
->> @@ -1151,7 +1170,7 @@ static void kvm_set_spte_handler(struct kvm *kvm, gpa_t gpa, void *data)
->>  {
->>  	pte_t *pte = (pte_t *)data;
->>  
->> -	stage2_set_pte(kvm, NULL, gpa, pte, false);
->> +	stage2_set_pte(kvm, NULL, gpa, pte, false, false);
+>> +		}
+>> +	} while (pmd++, addr = next, addr != end);
+>> +}
+>> +
+>> +/**
+>> +  * stage2_wp_pud_range - write protect PUD range
+>> +  * @kvm:	pointer to kvm structure
+>> +  * @pud:	pointer to pgd entry
+>         pgd
+>> +  * @addr:	range start address
+>> +  * @end:	range end address
+>> +  *
+>> +  * While walking the PUD range huge PUD pages are ignored, in the future this
+>                              range, huge PUDs are ignored.  In the future...
+>> +  * may need to be revisited. Determine how to handle huge PUDs when logging
+>> +  * of dirty pages is enabled.
 > 
-> why is logging never active if we are called from MMU notifiers?
-
-mmu notifiers update sptes, but I don't see how these updates
-can result in guest dirty pages. Also guest pages are marked dirty
-from 2nd stage page fault handlers (searching through the code).
-
+> I don't understand the last sentence?
 > 
->>  }
->>  
->>  
+>> +  */
+>> +static void  stage2_wp_pud_range(struct kvm *kvm, pgd_t *pgd,
+>> +				phys_addr_t addr, phys_addr_t end)
+>> +{
+>> +	pud_t *pud;
+>> +	phys_addr_t next;
+>> +
+>> +	pud = pud_offset(pgd, addr);
+>> +	do {
+>> +		next = kvm_pud_addr_end(addr, end);
+>> +		/* TODO: huge PUD not supported, revisit later */
+>> +		BUG_ON(pud_huge(*pud));
+> 
+> we should probably define kvm_pud_huge()
+> 
+>> +		if (!pud_none(*pud))
+>> +			stage2_wp_pmd_range(pud, addr, next);
+>> +	} while (pud++, addr = next, addr != end);
+>> +}
+>> +
+>> +/**
+>> + * stage2_wp_range() - write protect stage2 memory region range
+>> + * @kvm:	The KVM pointer
+>> + * @start:	Start address of range
+>> + * &end:	End address of range
+>> + */
+>> +static void stage2_wp_range(struct kvm *kvm, phys_addr_t addr, phys_addr_t end)
+>> +{
+>> +	pgd_t *pgd;
+>> +	phys_addr_t next;
+>> +
+>> +	pgd = kvm->arch.pgd + pgd_index(addr);
+>> +	do {
+>> +		/*
+>> +		 * Release kvm_mmu_lock periodically if the memory region is
+>> +		 * large features like detect hung task, lock detector or lock
+>                    large.  Otherwise, we may see panics due to..
+>> +		 * dep  may panic. In addition holding the lock this long will
+>     extra white space ^^           Additionally, holding the lock for a
+>     long timer will
+>> +		 * also starve other vCPUs. Applies to huge VM memory regions.
+>                                             ^^^ I don't understand this
+> 					    last remark.
+Sorry overlooked this.
+
+While testing - VM regions that were small (~1GB) holding the mmu_lock
+caused not problems, but when I was running memory regions around 2GB large
+some kernel lockup detection/lock contention options (some selected by default) 
+caused deadlock warnings/panics in host kernel.
+
+This was in one my previous review comments sometime ago, I can go back
+and find the options.
+
+>> +		 */
+>> +		if (need_resched() || spin_needbreak(&kvm->mmu_lock))
+>> +			cond_resched_lock(&kvm->mmu_lock);
+>> +
+>> +		next = kvm_pgd_addr_end(addr, end);
+>> +		if (pgd_present(*pgd))
+>> +			stage2_wp_pud_range(kvm, pgd, addr, next);
+>> +	} while (pgd++, addr = next, addr != end);
+>> +}
+>> +
+>> +/**
+>> + * kvm_mmu_wp_memory_region() - write protect stage 2 entries for memory slot
+>> + * @kvm:	The KVM pointer
+>> + * @slot:	The memory slot to write protect
+>> + *
+>> + * Called to start logging dirty pages after memory region
+>> + * KVM_MEM_LOG_DIRTY_PAGES operation is called. After this function returns
+>> + * all present PMD and PTEs are write protected in the memory region.
+>> + * Afterwards read of dirty page log can be called.
+>> + *
+>> + * Acquires kvm_mmu_lock. Called with kvm->slots_lock mutex acquired,
+>> + * serializing operations for VM memory regions.
+>> + */
+>> +
+>> +void kvm_mmu_wp_memory_region(struct kvm *kvm, int slot)
+>> +{
+>> +	struct kvm_memory_slot *memslot = id_to_memslot(kvm->memslots, slot);
+>> +	phys_addr_t start = memslot->base_gfn << PAGE_SHIFT;
+>> +	phys_addr_t end = (memslot->base_gfn + memslot->npages) << PAGE_SHIFT;
+>> +
+>> +	spin_lock(&kvm->mmu_lock);
+>> +	stage2_wp_range(kvm, start, end);
+>> +	kvm_flush_remote_tlbs(kvm);
+>> +	spin_unlock(&kvm->mmu_lock);
+>> +}
+>> +#endif
+>> +
+>>  static int user_mem_abort(struct kvm_vcpu *vcpu, phys_addr_t fault_ipa,
+>>  			  struct kvm_memory_slot *memslot,
+>>  			  unsigned long fault_status)
 >> -- 
 >> 1.7.9.5
 >>
+> 
+> Besides the commenting and whitespace stuff, this is beginning to look
+> good.
 > 
 > Thanks,
 > -Christoffer
