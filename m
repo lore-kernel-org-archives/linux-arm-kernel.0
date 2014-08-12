@@ -1,41 +1,47 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Tue, 12 Aug 2014 11:28:07 +0100
-Subject: [PATCH 2/2] asm-generic: add memfd_create system call to unistd.h
-In-Reply-To: <201408112057.01177.arnd@arndb.de>
-References: <1407764228-7904-1-git-send-email-will.deacon@arm.com>
- <CANq1E4Q0gDaJ5XGnkoCQsG8xLh1Q-EBErtEVPpeeZgGj+Nr8dQ@mail.gmail.com>
- <20140811171511.GF8828@arm.com> <201408112057.01177.arnd@arndb.de>
-Message-ID: <20140812102807.GH29013@arm.com>
+From: vinceh@nvidia.com (Vince Hsu)
+Date: Tue, 12 Aug 2014 18:37:12 +0800
+Subject: [PATCH v2 08/16] clk: tegra: Add Tegra124 DFLL clocksource
+ platform driver
+In-Reply-To: <1405957142-19416-9-git-send-email-ttynkkynen@nvidia.com>
+References: <1405957142-19416-1-git-send-email-ttynkkynen@nvidia.com>
+ <1405957142-19416-9-git-send-email-ttynkkynen@nvidia.com>
+Message-ID: <53E9EE58.3060408@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Aug 11, 2014 at 07:57:00PM +0100, Arnd Bergmann wrote:
-> On Monday 11 August 2014, Will Deacon wrote:
-> > On Mon, Aug 11, 2014 at 05:54:08PM +0100, David Herrmann wrote:
-> > > On Mon, Aug 11, 2014 at 3:37 PM, Will Deacon <will.deacon@arm.com> wrote:
-> > > > Commit 9183df25fe7b ("shm: add memfd_create() syscall") added a new
-> > > > system call (memfd_create) but didn't update the asm-generic unistd
-> > > > header.
-> > > >
-> > > > This patch adds the new system call to the asm-generic version of
-> > > > unistd.h so that it can be used by architectures such as arm64.
-> > > >
-> > > > Cc: Arnd Bergmann <arnd@arndb.de>
-> > > > Cc: David Herrmann <dh.herrmann@gmail.com>
-> > > > Signed-off-by: Will Deacon <will.deacon@arm.com>
-> > > 
-> > > Reviewed-by: David Herrmann <dh.herrmann@gmail.com>
-> > 
-> > Thanks, David.
-> > 
-> > Arnd: shall I take this via the arm64 tree, or do you already have some
-> > asm-generic patches queued?
-> 
-> Please take it for arm64, I don't have any other patches queued at the moment
-> and am currently on vacation.
+Hi,
 
-Thanks, Arnd. I'll include it with the arm64 pull req at -rc1.
+On 07/21/2014 11:38 PM, Tuomas Tynkkynen wrote:
+> Add basic platform driver support for the fast CPU cluster DFLL
+> clocksource found on Tegra124 SoCs. This small driver selects the
+> appropriate Tegra124-specific characterization data and integration
+> code. It relies on the DFLL common code to do most of the work.
+>
+> diff --git a/drivers/clk/tegra/Makefile b/drivers/clk/tegra/Makefile
+> index 47320ca..2f87188 100644
+> --- a/drivers/clk/tegra/Makefile
+> +++ b/drivers/clk/tegra/Makefile
+> @@ -16,3 +16,5 @@ obj-$(CONFIG_ARCH_TEGRA_2x_SOC)         += clk-tegra20.o
+>   obj-$(CONFIG_ARCH_TEGRA_3x_SOC)         += clk-tegra30.o
+>   obj-$(CONFIG_ARCH_TEGRA_114_SOC)	+= clk-tegra114.o
+>   obj-$(CONFIG_ARCH_TEGRA_124_SOC)	+= clk-tegra124.o
+> +obj-$(CONFIG_ARCH_TEGRA_124_SOC)	+= clk-tegra124-dfll-fcpu.o
+> +obj-y					+= cvb.o
+> diff --git a/drivers/clk/tegra/clk-tegra124-dfll-fcpu.c b/drivers/clk/tegra/clk-tegra124-dfll-fcpu.c
+> new file mode 100644
+> index 0000000..f068360
+> --- /dev/null
+> +++ b/drivers/clk/tegra/clk-tegra124-dfll-fcpu.c
+...
+> +	if (IS_ERR(cvb)) {
+> +		pr_err("couldn't build OPP table: %ld\n", PTR_ERR(cvb));
+> +		return PTR_ERR(cvb);
+> +	}
+> +
+> +	soc.assert_dvco_reset = tegra124_clock_assert_dfll_dvco_reset,
+> +	soc.deassert_dvco_reset = tegra124_clock_deassert_dfll_dvco_reset,
+nit: Use semicolon instead at the end of the two lines above.
 
-Have a good holiday,
 
-Will
+Thanks,
+Vince
