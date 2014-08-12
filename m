@@ -1,138 +1,33 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Tue, 12 Aug 2014 10:04:23 +0100
-Subject: [PATCH v3] kprobes: arm: enable OPTPROBES for ARM 32
-In-Reply-To: <53E96FFF.8030101@hitachi.com>
-References: <1407550339-34805-1-git-send-email-wangnan0@huawei.com>
- <20140811134832.GD15853@arm.com> <53E96FFF.8030101@hitachi.com>
-Message-ID: <20140812090423.GC29013@arm.com>
+From: david.vrabel@citrix.com (David Vrabel)
+Date: Tue, 12 Aug 2014 10:09:49 +0100
+Subject: [Xen-devel] [RFC PATCH 01/20] x86/xen/MSI: Eliminate
+ arch_msix_mask_irq() and arch_msi_mask_irq()
+In-Reply-To: <1407828373-24322-2-git-send-email-wangyijing@huawei.com>
+References: <1407828373-24322-1-git-send-email-wangyijing@huawei.com>
+ <1407828373-24322-2-git-send-email-wangyijing@huawei.com>
+Message-ID: <53E9D9DD.3060901@citrix.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Aug 12, 2014 at 02:38:07AM +0100, Masami Hiramatsu wrote:
-> (2014/08/11 22:48), Will Deacon wrote:
-> > On Sat, Aug 09, 2014 at 03:12:19AM +0100, Wang Nan wrote:
-> >> This patch introduce kprobeopt for ARM 32.
-> >>
-> >> Limitations:
-> >>  - Currently only kernel compiled with ARM ISA is supported.
-> >>
-> >>  - Offset between probe point and optinsn slot must not larger than
-> >>    32MiB. Masami Hiramatsu suggests replacing 2 words, it will make
-> >>    things complex. Futher patch can make such optimization.
-> >>
-> >> Kprobe opt on ARM is relatively simpler than kprobe opt on x86 because
-> >> ARM instruction is always 4 bytes aligned and 4 bytes long. This patch
-> >> replace probed instruction by a 'b', branch to trampoline code and then
-> >> calls optimized_callback(). optimized_callback() calls opt_pre_handler()
-> >> to execute kprobe handler. It also emulate/simulate replaced instruction.
-> > 
-> > Could you briefly describe the optimisation please?
-> 
-> On arm32, optimization means "replacing a breakpoint with a branch".
+On 12/08/14 08:25, Yijing Wang wrote:
+> Commit 0e4ccb150 added two __weak arch functions arch_msix_mask_irq()
+> and arch_msi_mask_irq() to fix a bug found when running xen in x86.
+> Introduced these two funcntions make MSI code complex. This patch
+> reverted commit 0e4ccb150 and add #ifdef for x86 msi_chip to fix this
+> bug for simplicity. Also this is preparation for using struct
+> msi_chip instead of weak arch MSI functions in all platforms.
+[...]
+>  static struct irq_chip msi_chip = {
+>  	.name			= "PCI-MSI",
+> +#ifdef CONFIG_XEN
+> +	.irq_unmask		= nop_unmask_msi_irq,
+> +	.irq_mask		= nop_mask_msi_irq,
+> +#else
+>  	.irq_unmask		= unmask_msi_irq,
+>  	.irq_mask		= mask_msi_irq,
+> +#endif
 
-What do you mean by breakpoint in this case?
-KPROBE_ARM_BREAKPOINT_INSTRUCTION an friends are actually undefined
-instructions, and the architecture doesn't provide atomicity guarantees
-when overwriting those in a live instruction stream.
+No.  CONFIG_XEN kernels can run on Xen and bare metal so this must be a
+runtime option.
 
-That means that if you overwrite one of these `breakpoint' instructions with
-a branch, you can't guarantee that another core will see either the
-breakpoint of the branch -- it could see a combination of both.
-
-> Of course simple branch instruction doesn't memorize the source(probe)
-> address, optprobe makes a trampoline code for each probe point and
-> each trampoline stores "struct kprobe" of that probe point.
-> 
-> At first, the kprobe puts a breakpoint into the probe site, and builds
-> a trampoline. After a while, it starts optimizing the probe site by
-> replacing the breakpoint with a branch.
-> 
-> > I'm not familiar with
-> > kprobes internals, but if you're trying to patch an arbitrary instruction
-> > with a branch then that's not guaranteed to be atomic by the ARM
-> > architecture.
-> 
-> Hmm, I'm not sure about arm32 too. Would you mean patch_text() can't
-> replace an instruction atomically? Or only the breakpoint is special?
-> (for cache?)
-> optprobe always swaps branch and breakpoint, isn't that safe?
-
-No, it's not safe. The ARM ARM is pretty clear about this (see section
-3.5.4. "Concurrent modification and execution of instructions"). Note that
-there is a special-purpose BKPT instruction designed for this case, but I
-think this tends to get used by hardware debuggers and having the
-instruction in the kernel can hamper debugging efforts.
-
-> > We can, however, patch branches with other branches.
-> > 
-> > Anyway, minor comments in-line:
-> > 
-> >> +/* Caller must ensure addr & 3 == 0 */
-> >> +static int can_optimize(unsigned long paddr)
-> >> +{
-> >> +	return 1;
-> >> +}
-> > 
-> > Why not check the paddr alignment here, rather than have a comment?
-> 
-> Actually, we don't need to care about that. The alignment is already
-> checked before calling this function (at arch_prepare_kprobe() in
-> arch/arm/kernel/kprobes.c).
-> 
-> > 
-> >> +/* Free optimized instruction slot */
-> >> +static void
-> >> +__arch_remove_optimized_kprobe(struct optimized_kprobe *op, int dirty)
-> >> +{
-> >> +	if (op->optinsn.insn) {
-> >> +		free_optinsn_slot(op->optinsn.insn, dirty);
-> >> +		op->optinsn.insn = NULL;
-> >> +	}
-> >> +}
-> >> +
-> >> +extern void kprobe_handler(struct pt_regs *regs);
-> >> +
-> >> +static void
-> >> +optimized_callback(struct optimized_kprobe *op, struct pt_regs *regs)
-> >> +{
-> >> +	unsigned long flags;
-> >> +	struct kprobe *p = &op->kp;
-> >> +	struct kprobe_ctlblk *kcb = get_kprobe_ctlblk();
-> >> +
-> >> +	/* Save skipped registers */
-> >> +	regs->ARM_pc = (unsigned long)op->kp.addr;
-> >> +	regs->ARM_ORIG_r0 = ~0UL;
-> > 
-> > Why are you writing ORIG_r0?
-> 
-> In x86, optimization(breakpoint to jump) is transparently done, thus
-> we have to mimic all registers as the breakpoint exception. And in x86
-> int3(which is the breakpoint) exception sets -1 to orig_ax.
-
-Ok, we do the same thing on ARM when we take an exception.
-
-> >> +	/* Copy arch-dep-instance from template */
-> >> +	memcpy(buf, &optprobe_template_entry, TMPL_END_IDX);
-> >> +
-> >> +	/* Set probe information */
-> >> +	val = (unsigned long)op;
-> >> +	memcpy(buf + TMPL_VAL_IDX, &val, sizeof(val));
-> >> +
-> >> +	/* Set probe function call */
-> >> +	val = (unsigned long)optimized_callback;
-> >> +	memcpy(buf + TMPL_CALL_IDX, &val, sizeof(val));
-> > 
-> > Ok, so this is updating the `offset' portion of a b instruction, right? What
-> > if memcpy does that byte-by-byte?
-> 
-> No, as you can see a indirect call "blx r2" in optprobe_template_entry(
-> inline asm), this sets .data bytes at optprobe_template_call which is loaded
-> to r2 register. :-)
-> So all the 4bytes are used for storing the address.
-
-Ah, ok, that makes sense. So we copy the offset into the .data word,
-synchronise the caches and only then run the new code. I was wondering
-about concurrent execution by another core, but it doesn't look like that
-can happen.
-
-Will
+David
