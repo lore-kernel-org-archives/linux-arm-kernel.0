@@ -1,68 +1,70 @@
-From: ulf.hansson@linaro.org (Ulf Hansson)
-Date: Tue, 12 Aug 2014 10:58:02 +0200
-Subject: [PATCH 3/5] mmc: sdhci-pltfm: Do not use parent as the host's
- device
-In-Reply-To: <CAPDyKFruZxUtzUKM+PvsK-_qqcE4OcCaKSkRJ2_01y7TuQMGkA@mail.gmail.com>
-References: <1406298233-27876-1-git-send-email-pawel.moll@arm.com>
- <1406298233-27876-3-git-send-email-pawel.moll@arm.com>
- <1407515785.31897.28.camel@hornet>
- <CAPDyKFoLU6pnJFmKe7CB0q-hKfwv4uCPSr0cE4aoYMvfhjMteQ@mail.gmail.com>
- <1407748550.3680.10.camel@hornet>
- <CAPDyKFruZxUtzUKM+PvsK-_qqcE4OcCaKSkRJ2_01y7TuQMGkA@mail.gmail.com>
-Message-ID: <CAPDyKFrb9OSbhHtn=wgbs9Yky1t453rdNBJVgGA62vER-65dYw@mail.gmail.com>
+From: matthias.bgg@gmail.com (Matthias Brugger)
+Date: Tue, 12 Aug 2014 11:02:15 +0200
+Subject: [PATCH 6/7] arm: mediatek: enable gpt6 on boot up to make arch
+ timer working
+In-Reply-To: <CACRpkdbRhGE8tcKj+W_4F9-xmcm-fxcYuCmLOqX-ESC+3PAmyA@mail.gmail.com>
+References: <1406824943-24052-1-git-send-email-matthias.bgg@gmail.com>
+ <1406824943-24052-7-git-send-email-matthias.bgg@gmail.com>
+ <CACRpkdbRhGE8tcKj+W_4F9-xmcm-fxcYuCmLOqX-ESC+3PAmyA@mail.gmail.com>
+Message-ID: <CABuKBe+Q3tnN0s22EMY-dK_6FeN_xN9SmrsW3dPONR6QDJ+V_w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11 August 2014 11:32, Ulf Hansson <ulf.hansson@linaro.org> wrote:
-> On 11 August 2014 11:15, Pawel Moll <pawel.moll@arm.com> wrote:
->> On Mon, 2014-08-11 at 10:07 +0100, Ulf Hansson wrote:
->>> On 8 August 2014 18:36, Pawel Moll <pawel.moll@arm.com> wrote:
->>> > On Fri, 2014-07-25 at 15:23 +0100, Pawel Moll wrote:
->>> >> The code selecting a device for the sdhci host has been
->>> >> continuously tweaked (4b711cb13843f5082e82970dd1e8031383134a65
->>> >> "mmc: sdhci-pltfm: Add structure for host-specific data" and
->>> >> a4d2177f00a5252d825236c5124bc1e9918bdb41 "mmc: sdhci-pltfm: dt
->>> >> device does not pass parent to sdhci_alloc_host") while there
->>> >> does not seem to be any reason to use platform device's parent
->>> >> in the first place.
->>> >>
->>> >> The comment saying "Some PCI-based MFD need the parent here"
->>> >> seem to refer to Timberdale FPGA driver (the only MFD driver
->>> >> registering SDHCI cell, drivers/mfd/timberdale.c) but again,
->>> >> the only situation when parent device matter is runtime PM,
->>> >> which is not implemented for Timberdale.
->>> >>
->>> >> Cc: Chris Ball <chris@printf.net>
->>> >> Cc: Anton Vorontsov <anton@enomsg.org>
->>> >> Cc: Ulf Hansson <ulf.hansson@linaro.org>
->>> >> Cc: linux-mmc at vger.kernel.org
->>> >> Cc: linuxppc-dev at lists.ozlabs.org
->>> >> Signed-off-by: Pawel Moll <pawel.moll@arm.com>
->>> >> ---
->>> >>
->>> >> This patch is a part of effort to remove references to platform_bus
->>> >> and make it static.
->>> >>
->>> >> Chris, Anton, Ulf - could you please advise if the assumptions
->>> >> above are correct or if I'm completely wrong? Do you know what
->>> >> where the real reasons to use parent originally? The PCI comment
->>> >> seems like a red herring to me...
->>> >
->>> > Can I take the silence as a suggestion that the change looks ok-ish for
->>> > you?
->>>
->>> Sorry for the delay. I suppose this make sense, but I really don't
->>> know for sure.
->>>
->>> I guess we need some testing in linux-next, to get some confidence.
->>
->> Would you take it into -next then? Unless I'm completely wrong there
->> should be no impact on any in-tree driver...
+2014-08-11 9:15 GMT+02:00 Linus Walleij <linus.walleij@linaro.org>:
+> On Thu, Jul 31, 2014 at 6:42 PM, Matthias Brugger
+> <matthias.bgg@gmail.com> wrote:
 >
-> I will take it; though I think it's best to queue it for 3.18 to get
-> some more testing.
+>> We enable GTP6 which ungates the arch timer clock. Apart we write the
+>> frequency with which the timer is running in the CNTFREQ register.
+>> In the future this should be done in the bootloader.
+>>
+>> Signed-off-by: Matthias Brugger <matthias.bgg@gmail.com>
+> (...)
+>
+>> +       if (of_machine_is_compatible("mediatek,mt6589")) {
+>> +               /* set cntfreq register which is not done in bootloader */
+>> +               asm volatile("mcr p15, 0, %0, c14, c0, 0" : : "r" (13000000));
+>
+> I guess this is for something like the ARM arch timer in
+> drivers/clocksource/arm_arch_timer.c
+>
+> Instead of doing this, use the DT property "clock-frequency" on
+> the ARM arch timer node, as that overrides the CP15 setting.
+>
+>> +
+>> +               /* turn on GPT6 which ungates arch timer clocks */
+>> +               gpt_base = ioremap(GPT6_CON_MT65xx, 0x04);
+>> +       }
+>> +
+>> +       /* enabel clock and set to free-run */
+>> +       if (gpt_base)
+>> +               writel(0x31, gpt_base);
+>
+> Why is this not done properly in the GPT driver (I guess
+> in drivers/clocksource/mtk_timer.c) instead of remapping
+> it and fiddling around in the machine?
 
-This patch causes a compiler warning, could you please fix it.
+I didn't put it in the GPT driver, because that would mean, that you
+need to have the mtk_timer to be able to use the ARM arch timer.
+>From my understanding this are two independent blocks in the SoC.
+Apart from that, as stated in the commit message, this patch is a
+workaround until we have a bootloader which does this for us.
+Therefore I thought the init_time function would be the better place to do this.
 
-Kind regards
-Uffe
+Thanks,
+Matthias
+
+>
+> If it only affects the mt6589 just add another compatible string
+> to that driver like "mediatek,mt6589-timer" as it properly reflects the
+> fact that this timer is slightly different on the 6589.
+>
+> Also use a #define for the magic constant 0x31.
+>
+> Yours,
+> Linus Walleij
+
+
+
+-- 
+motzblog.wordpress.com
