@@ -1,92 +1,62 @@
-From: rdunlap@infradead.org (Randy Dunlap)
-Date: Mon, 11 Aug 2014 23:52:35 -0700
-Subject: [PATCH 1/5] efi: move noefi early param code out of x86 arch code
-In-Reply-To: <1407823822-23829-1-git-send-email-dyoung@redhat.com>
-References: <1407823822-23829-1-git-send-email-dyoung@redhat.com>
-Message-ID: <53E9B9B3.1050504@infradead.org>
+From: takahiro.akashi@linaro.org (AKASHI Takahiro)
+Date: Tue, 12 Aug 2014 15:57:25 +0900
+Subject: [PATCH v5 3/3] arm64: Add seccomp support
+In-Reply-To: <20140811092409.GE15344@arm.com>
+References: <1406020499-5537-1-git-send-email-takahiro.akashi@linaro.org>
+ <1406020499-5537-4-git-send-email-takahiro.akashi@linaro.org>
+ <53D082E9.8090303@amacapital.net> <53D09C4F.9010104@linaro.org>
+ <CALCETrWTDS7VSyuR5wgGxpu-_YMWVUVmv9ht6t1tCSX=GA46cQ@mail.gmail.com>
+ <53D2255C.9050006@linaro.org>
+ <CAGXu5jJL=zXuSRNomGrB09kqpUhEpkuxDH18JN4NRbWocMw4xg@mail.gmail.com>
+ <53E47DCE.4080902@linaro.org> <20140811092409.GE15344@arm.com>
+Message-ID: <53E9BAD5.3080201@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08/11/14 23:10, Dave Young wrote:
-> noefi param can be used for arches other than X86 later, thus move it out of
-> x86 platform code.
-> 
-> Signed-off-by: Dave Young <dyoung@redhat.com>
-> ---
->  arch/x86/platform/efi/efi.c | 10 +---------
->  drivers/firmware/efi/efi.c  | 13 +++++++++++++
->  include/linux/efi.h         |  1 +
->  3 files changed, 15 insertions(+), 9 deletions(-)
+Will,
 
-This line in Documentation/kernel-parameters.txt needs to be updated:
+On 08/11/2014 06:24 PM, Will Deacon wrote:
+> On Fri, Aug 08, 2014 at 08:35:42AM +0100, AKASHI Takahiro wrote:
+>> On 08/06/2014 12:08 AM, Kees Cook wrote:
+>>> On Fri, Jul 25, 2014 at 2:37 AM, AKASHI Takahiro
+>>> <takahiro.akashi@linaro.org> wrote:
+>>>> I found a bug in my current patch (v5). When 32-bit tracer skips a system call,
+>>>> we should not update syscallno from x8 since syscallno is re-written directly
+>>>> via ptrace(PTRACE_SET_SYSCALL).
+>>>
+>>> Ah, yes. Will aarch64 have a PTRACE_SET_SYSCALL option, or is this
+>>> strictly a 32-bit vs 64-bit issue?
+>>
+>> As discussed in a few weeks ago, aarch64 won't support PTRACE_SET_SYSCALL.
+>
+> Well, I don't think anything was set in stone. If you have a compelling
+> reason why adding the new request gives you something over setting w8
+> directly, then we can extend ptrace.
 
-	noefi		[X86] Disable EFI runtime services support.
+Yeah, I think I may have to change my mind. Looking into __secure_computing(),
+I found the code below:
 
+ >     case SECCOMP_MODE_FILTER:
+ >         case SECCOMP_RET_TRACE:
+ >             ...
+ >             if (syscall_get_nr(current, regs) < 0)
+ >                 goto skip;
 
-> diff --git a/arch/x86/platform/efi/efi.c b/arch/x86/platform/efi/efi.c
-> index 850da94..dd7aaa1 100644
-> --- a/arch/x86/platform/efi/efi.c
-> +++ b/arch/x86/platform/efi/efi.c
-> @@ -70,14 +70,6 @@ static efi_config_table_type_t arch_tables[] __initdata = {
->  
->  u64 efi_setup;		/* efi setup_data physical address */
->  
-> -static bool disable_runtime __initdata = false;
-> -static int __init setup_noefi(char *arg)
-> -{
-> -	disable_runtime = true;
-> -	return 0;
-> -}
-> -early_param("noefi", setup_noefi);
-> -
->  int add_efi_memmap;
->  EXPORT_SYMBOL(add_efi_memmap);
->  
-> @@ -492,7 +484,7 @@ void __init efi_init(void)
->  	if (!efi_runtime_supported())
->  		pr_info("No EFI runtime due to 32/64-bit mismatch with kernel\n");
->  	else {
-> -		if (disable_runtime || efi_runtime_init())
-> +		if (efi_runtime_disabled() || efi_runtime_init())
->  			return;
->  	}
->  	if (efi_memmap_init())
-> diff --git a/drivers/firmware/efi/efi.c b/drivers/firmware/efi/efi.c
-> index 64ecbb5..c8f01a7 100644
-> --- a/drivers/firmware/efi/efi.c
-> +++ b/drivers/firmware/efi/efi.c
-> @@ -41,6 +41,19 @@ struct efi __read_mostly efi = {
->  };
->  EXPORT_SYMBOL(efi);
->  
-> +static bool disable_runtime;
-> +static int __init setup_noefi(char *arg)
-> +{
-> +	disable_runtime = true;
-> +	return 0;
-> +}
-> +early_param("noefi", setup_noefi);
-> +
-> +bool efi_runtime_disabled(void)
-> +{
-> +	return disable_runtime;
-> +}
-> +
->  static struct kobject *efi_kobj;
->  static struct kobject *efivars_kobj;
->  
-> diff --git a/include/linux/efi.h b/include/linux/efi.h
-> index 45cb4ff..06d7c03 100644
-> --- a/include/linux/efi.h
-> +++ b/include/linux/efi.h
-> @@ -1227,4 +1227,5 @@ efi_status_t handle_cmdline_files(efi_system_table_t *sys_table_arg,
->  				  unsigned long *load_addr,
->  				  unsigned long *load_size);
->  
-> +bool efi_runtime_disabled(void);
->  #endif /* _LINUX_EFI_H */
-> 
+This implies that we should modify syscallno *before* __secure_computing() returns.
+
+I assumed, in my next version, we could skip a system call by overwriting syscallno
+with x8 in syscall_trace_enter() after __secure_computing() returns 0, and it actually
+works.
+But we'd better implement PTRACE_SET_SYSCALL to comply with what __secure_computing()
+expects.
+
+-Takahiro AKASHI
 
 
--- 
-~Randy
+> Will
+>
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+>
