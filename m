@@ -1,49 +1,80 @@
-From: stefano.stabellini@eu.citrix.com (Stefano Stabellini)
-Date: Tue, 12 Aug 2014 18:48:34 +0100
-Subject: [PATCH] arm/xen: fix wrong conflict resolution of xen merge
-In-Reply-To: <87fvh1vd49.fsf@igel.home>
-References: <87fvh1vd49.fsf@igel.home>
-Message-ID: <alpine.DEB.2.02.1408121846310.2293@kaball.uk.xensource.com>
+From: keescook@chromium.org (Kees Cook)
+Date: Tue, 12 Aug 2014 10:55:13 -0700
+Subject: [PATCH] ARM: expand fixmap region to 3MB
+In-Reply-To: <20140811161448.GA4002@bivouac.eciton.net>
+References: <1407511404-11997-1-git-send-email-robherring2@gmail.com>
+ <20140811161448.GA4002@bivouac.eciton.net>
+Message-ID: <CAGXu5j+Wm7LzdTZWsjLpisBqgcKxx-_t=O_LWsn8hP+_KiBxEw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 12 Aug 2014, Andreas Schwab wrote:
-> Remove duplicate definition of arch_gnttab_init.
-> 
-> Signed-off-by: Andreas Schwab <schwab@linux-m68k.org>
+On Mon, Aug 11, 2014 at 9:14 AM, Leif Lindholm <leif.lindholm@linaro.org> wrote:
+> On Fri, Aug 08, 2014 at 10:23:24AM -0500, Rob Herring wrote:
+>> From: Rob Herring <robh@kernel.org>
+>>
+>> With commit a05e54c103b0b8 "ARM: 8031/2: change fixmap mapping region to
+>> support 32 CPUs", the fixmap region was expanded to 2MB, but it
+>> precluded any other uses of the fixmap region in order to support up to
+>> 32 CPUs. In order to support other uses the fixmap region needs to be
+>> expanded beyond 2MB. Fortunately, the adjacent 1MB range
+>> 0xffe00000-0xfff00000 is availabe to use.
+>>
+>> Remove fixmap_page_table ptr and lookup the page table via the virtual
+>> address so that the fixmap region can span more that one pmd. The 2nd
+>> pmd is already created since it is shared with the vector page.
+>>
+>> Cc: Leif Lindholm <leif.lindholm@linaro.org>
+>> Cc: Kees Cook <keescook@chromium.org>
+>> Cc: Russell King <linux@arm.linux.org.uk>
+>> Signed-off-by: Rob Herring <robh@kernel.org>
+>> ---
+>>
+>> This patch can come before or after the generic fixmap.h. There's a
+>> single line conflict with the ending address
+>
+> Tested-by: Leif Lindholm <leif.lindholm@linaro.org>
+> For Kees' set with this addition + generic fixmap + early_ioremap +
+> UEFI.
+>
+>> This worked for earlycon, but I've not done any highmem specific
+>> testing. My full series is available here:
+>>
+>> git://git.kernel.org/pub/scm/linux/kernel/git/robh/linux.git fixmap
+>
+> I was hoping to be able to give you a tested-by for that series on
+> next-20140811 with the UEFI patches, but that setup fails to boot
+> right now. Looking into why.
 
-Thanks for the patch, however David Vrabel already committed a fix for
-this.
+For me, the 3MB change doesn't work. It acts like the PTE isn't there:
 
+lkdtm: Performing direct entry WRITE_KERN
+lkdtm: attempting 52 byte write at 804331cc
+lkdtm: 804331cc mapped RW via ffe7f1cc
+Unable to handle kernel paging request at virtual address ffe7f1cc
+pgd = 9ea40000
+[ffe7f1cc] *pgd=9fffd821, *pte=00000000, *ppte=00000000
 
+And it weirdly leaves this hanging around in
+/sys/kernel/debug/kernel_page_tables:
 
->  arch/arm/xen/grant-table.c | 5 -----
->  1 file changed, 5 deletions(-)
-> 
-> diff --git a/arch/arm/xen/grant-table.c b/arch/arm/xen/grant-table.c
-> index 2c4041c..e437918 100644
-> --- a/arch/arm/xen/grant-table.c
-> +++ b/arch/arm/xen/grant-table.c
-> @@ -49,8 +49,3 @@ int arch_gnttab_init(unsigned long nr_shared)
->  {
->  	return 0;
->  }
-> -
-> -int arch_gnttab_init(unsigned long nr_shared, unsigned long nr_status)
-> -{
-> -	return 0;
-> -}
-> -- 
-> 2.0.4
-> 
-> 
-> -- 
-> Andreas Schwab, schwab at linux-m68k.org
-> GPG Key fingerprint = 58CA 54C7 6D53 942B 1756  01D3 44D5 214B 8276 4ED5
-> "And now for something completely different."
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-kernel" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
-> Please read the FAQ at  http://www.tux.org/lkml/
-> 
+0xffc7f000-0xffc80000           4K     RW NX SHD MEM/CACHED/WBWA
+
+If I use all the other changes to clean up the code, everything is
+fine. The only change I have been the trees now is just this:
+
+-#define FIXADDR_END            0xffe00000UL
++#define FIXADDR_END            0xfff00000UL
+
+I think my build isn't catching this extra area via the vector table pmd.
+
+So, instead of continuing to beat my head against this, I've changed
+my series around to use NR_CPUS as Rob was doing, and added
+BUILD_BUG_ON to check the fixmap size. The result is that there will
+be a build-time limit on the number of CPUs, rather than surprising
+run-time problems.
+
+I will repost the series in a moment.
+
+-- 
+Kees Cook
+Chrome OS Security
