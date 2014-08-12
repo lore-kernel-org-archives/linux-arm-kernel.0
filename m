@@ -1,47 +1,46 @@
-From: vinceh@nvidia.com (Vince Hsu)
-Date: Tue, 12 Aug 2014 18:37:12 +0800
-Subject: [PATCH v2 08/16] clk: tegra: Add Tegra124 DFLL clocksource
- platform driver
-In-Reply-To: <1405957142-19416-9-git-send-email-ttynkkynen@nvidia.com>
-References: <1405957142-19416-1-git-send-email-ttynkkynen@nvidia.com>
- <1405957142-19416-9-git-send-email-ttynkkynen@nvidia.com>
-Message-ID: <53E9EE58.3060408@nvidia.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Tue, 12 Aug 2014 11:46:27 +0100
+Subject: [PATCH 3/5] efi arm64: do not enter virtual mode in case booting
+ with efi=noruntime or noefi
+In-Reply-To: <1407823822-23829-3-git-send-email-dyoung@redhat.com>
+References: <1407823822-23829-1-git-send-email-dyoung@redhat.com>
+ <1407823822-23829-3-git-send-email-dyoung@redhat.com>
+Message-ID: <20140812104627.GI29013@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-
-On 07/21/2014 11:38 PM, Tuomas Tynkkynen wrote:
-> Add basic platform driver support for the fast CPU cluster DFLL
-> clocksource found on Tegra124 SoCs. This small driver selects the
-> appropriate Tegra124-specific characterization data and integration
-> code. It relies on the DFLL common code to do most of the work.
->
-> diff --git a/drivers/clk/tegra/Makefile b/drivers/clk/tegra/Makefile
-> index 47320ca..2f87188 100644
-> --- a/drivers/clk/tegra/Makefile
-> +++ b/drivers/clk/tegra/Makefile
-> @@ -16,3 +16,5 @@ obj-$(CONFIG_ARCH_TEGRA_2x_SOC)         += clk-tegra20.o
->   obj-$(CONFIG_ARCH_TEGRA_3x_SOC)         += clk-tegra30.o
->   obj-$(CONFIG_ARCH_TEGRA_114_SOC)	+= clk-tegra114.o
->   obj-$(CONFIG_ARCH_TEGRA_124_SOC)	+= clk-tegra124.o
-> +obj-$(CONFIG_ARCH_TEGRA_124_SOC)	+= clk-tegra124-dfll-fcpu.o
-> +obj-y					+= cvb.o
-> diff --git a/drivers/clk/tegra/clk-tegra124-dfll-fcpu.c b/drivers/clk/tegra/clk-tegra124-dfll-fcpu.c
-> new file mode 100644
-> index 0000000..f068360
-> --- /dev/null
-> +++ b/drivers/clk/tegra/clk-tegra124-dfll-fcpu.c
-...
-> +	if (IS_ERR(cvb)) {
-> +		pr_err("couldn't build OPP table: %ld\n", PTR_ERR(cvb));
-> +		return PTR_ERR(cvb);
-> +	}
+On Tue, Aug 12, 2014 at 07:10:20AM +0100, Dave Young wrote:
+> In case efi runtime disabled via noefi kernel cmdline arm64_enter_virtual_mode
+> should error out.
+> 
+> At the same time move early_memunmap(memmap.map, mapsize) to the beginning of
+> the function or it will leak early mem.
+> 
+> Signed-off-by: Dave Young <dyoung@redhat.com>
+> ---
+>  arch/arm64/kernel/efi.c | 7 ++++---
+>  1 file changed, 4 insertions(+), 3 deletions(-)
+> 
+> diff --git a/arch/arm64/kernel/efi.c b/arch/arm64/kernel/efi.c
+> index e72f310..324cdd1 100644
+> --- a/arch/arm64/kernel/efi.c
+> +++ b/arch/arm64/kernel/efi.c
+> @@ -386,7 +386,10 @@ static int __init arm64_enter_virtual_mode(void)
+>  	int count = 0;
+>  	unsigned long flags;
+>  
+> -	if (!efi_enabled(EFI_BOOT)) {
+> +	mapsize = memmap.map_end - memmap.map;
+> +	early_memunmap(memmap.map, mapsize);
 > +
-> +	soc.assert_dvco_reset = tegra124_clock_assert_dfll_dvco_reset,
-> +	soc.deassert_dvco_reset = tegra124_clock_deassert_dfll_dvco_reset,
-nit: Use semicolon instead at the end of the two lines above.
+> +	if (!efi_enabled(EFI_BOOT) || efi_runtime_disabled()) {
 
+Hmm, is this right? We only set EFI_BOOT if we find EFI parameters in the
+DT (see efi_init -> uefi_init), so you run the risk of unmapping something
+we never mapped here.
 
-Thanks,
-Vince
+Furthermore, there seems to be a leak in uefi_init anyway, as we return
+-EINVAL if the signature of the EFI table doesn't match without unmapping it
+first.
+
+Will
