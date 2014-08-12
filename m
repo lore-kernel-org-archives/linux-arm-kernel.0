@@ -1,192 +1,39 @@
-From: masami.hiramatsu.pt@hitachi.com (Masami Hiramatsu)
-Date: Tue, 12 Aug 2014 10:38:07 +0900
-Subject: [PATCH v3] kprobes: arm: enable OPTPROBES for ARM 32
-In-Reply-To: <20140811134832.GD15853@arm.com>
-References: <1407550339-34805-1-git-send-email-wangnan0@huawei.com>
- <20140811134832.GD15853@arm.com>
-Message-ID: <53E96FFF.8030101@hitachi.com>
+From: hdoyu@nvidia.com (Hiroshi Doyu)
+Date: Tue, 12 Aug 2014 04:51:04 +0300
+Subject: [PATCH v5 1/1] iommu-api: Add map_sg/unmap_sg functions
+In-Reply-To: <1407797150-515-2-git-send-email-ohaugan@codeaurora.org>
+References: <1407797150-515-1-git-send-email-ohaugan@codeaurora.org>
+ <1407797150-515-2-git-send-email-ohaugan@codeaurora.org>
+Message-ID: <871tsm5vcn.fsf@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-(2014/08/11 22:48), Will Deacon wrote:
-> Hello,
-> 
-> On Sat, Aug 09, 2014 at 03:12:19AM +0100, Wang Nan wrote:
->> This patch introduce kprobeopt for ARM 32.
->>
->> Limitations:
->>  - Currently only kernel compiled with ARM ISA is supported.
->>
->>  - Offset between probe point and optinsn slot must not larger than
->>    32MiB. Masami Hiramatsu suggests replacing 2 words, it will make
->>    things complex. Futher patch can make such optimization.
->>
->> Kprobe opt on ARM is relatively simpler than kprobe opt on x86 because
->> ARM instruction is always 4 bytes aligned and 4 bytes long. This patch
->> replace probed instruction by a 'b', branch to trampoline code and then
->> calls optimized_callback(). optimized_callback() calls opt_pre_handler()
->> to execute kprobe handler. It also emulate/simulate replaced instruction.
-> 
-> Could you briefly describe the optimisation please?
+Hi Olav,
 
-On arm32, optimization means "replacing a breakpoint with a branch".
-Of course simple branch instruction doesn't memorize the source(probe)
-address, optprobe makes a trampoline code for each probe point and
-each trampoline stores "struct kprobe" of that probe point.
+Olav Haugan <ohaugan@codeaurora.org> writes:
 
-At first, the kprobe puts a breakpoint into the probe site, and builds
-a trampoline. After a while, it starts optimizing the probe site by
-replacing the breakpoint with a branch.
+> @@ -93,6 +94,10 @@ enum iommu_attr {
+>   * @detach_dev: detach device from an iommu domain
+>   * @map: map a physically contiguous memory region to an iommu domain
+>   * @unmap: unmap a physically contiguous memory region from an iommu domain
+> + * @map_sg: map a scatter-gather list of physically contiguous memory chunks
+> + * to an iommu domain
+> + * @unmap_sg: unmap a scatter-gather list of physically contiguous memory
+> + * chunks from an iommu domain
+>   * @iova_to_phys: translate iova to physical address
+>   * @domain_has_cap: domain capabilities query
+>   * @add_device: add device to iommu grouping
+> @@ -110,6 +115,11 @@ struct iommu_ops {
+>                    phys_addr_t paddr, size_t size, int prot);
+>         size_t (*unmap)(struct iommu_domain *domain, unsigned long iova,
+>                      size_t size);
+> +       int (*map_sg)(struct iommu_domain *domain, unsigned long iova,
+> +                       struct scatterlist *sg, unsigned int nents, int prot,
+> +                       unsigned long flags);
+> +       int (*unmap_sg)(struct iommu_domain *domain, unsigned long iova,
+> +                       size_t size, unsigned long flags);
 
-> I'm not familiar with
-> kprobes internals, but if you're trying to patch an arbitrary instruction
-> with a branch then that's not guaranteed to be atomic by the ARM
-> architecture.
+Do you have any exmaple/explanation for the above "flags"?
 
-Hmm, I'm not sure about arm32 too. Would you mean patch_text() can't
-replace an instruction atomically? Or only the breakpoint is special?
-(for cache?)
-optprobe always swaps branch and breakpoint, isn't that safe?
-
-> 
-> We can, however, patch branches with other branches.
-> 
-> Anyway, minor comments in-line:
-> 
->> +/* Caller must ensure addr & 3 == 0 */
->> +static int can_optimize(unsigned long paddr)
->> +{
->> +	return 1;
->> +}
-> 
-> Why not check the paddr alignment here, rather than have a comment?
-
-Actually, we don't need to care about that. The alignment is already
-checked before calling this function (at arch_prepare_kprobe() in
-arch/arm/kernel/kprobes.c).
-
-> 
->> +/* Free optimized instruction slot */
->> +static void
->> +__arch_remove_optimized_kprobe(struct optimized_kprobe *op, int dirty)
->> +{
->> +	if (op->optinsn.insn) {
->> +		free_optinsn_slot(op->optinsn.insn, dirty);
->> +		op->optinsn.insn = NULL;
->> +	}
->> +}
->> +
->> +extern void kprobe_handler(struct pt_regs *regs);
->> +
->> +static void
->> +optimized_callback(struct optimized_kprobe *op, struct pt_regs *regs)
->> +{
->> +	unsigned long flags;
->> +	struct kprobe *p = &op->kp;
->> +	struct kprobe_ctlblk *kcb = get_kprobe_ctlblk();
->> +
->> +	/* Save skipped registers */
->> +	regs->ARM_pc = (unsigned long)op->kp.addr;
->> +	regs->ARM_ORIG_r0 = ~0UL;
-> 
-> Why are you writing ORIG_r0?
-
-In x86, optimization(breakpoint to jump) is transparently done, thus
-we have to mimic all registers as the breakpoint exception. And in x86
-int3(which is the breakpoint) exception sets -1 to orig_ax.
-So, if arm32's breakpoint doesn't attach the ARM_ORIG_r0, you don't
-need to touch it. We just consider the pt_regs looks same as that
-at the breakpoint handler.
-
-> 
->> +	local_irq_save(flags);
->> +
->> +	if (kprobe_running()) {
->> +		kprobes_inc_nmissed_count(&op->kp);
->> +	} else {
->> +		__this_cpu_write(current_kprobe, &op->kp);
->> +		kcb->kprobe_status = KPROBE_HIT_ACTIVE;
->> +		opt_pre_handler(&op->kp, regs);
->> +		__this_cpu_write(current_kprobe, NULL);
->> +	}
->> +
->> +	/* In each case, we must singlestep the replaced instruction. */
->> +	op->kp.ainsn.insn_singlestep(p->opcode, &p->ainsn, regs);
->> +
->> +	local_irq_restore(flags);
->> +}
->> +
->> +int arch_prepare_optimized_kprobe(struct optimized_kprobe *op)
->> +{
->> +	u8 *buf;
->> +	unsigned long rel_chk;
->> +	unsigned long val;
->> +
->> +	if (!can_optimize((unsigned long)op->kp.addr))
->> +		return -EILSEQ;
->> +
->> +	op->optinsn.insn = get_optinsn_slot();
->> +	if (!op->optinsn.insn)
->> +		return -ENOMEM;
->> +
->> +	/*
->> +	 * Verify if the address gap is in 32MiB range, because this uses
->> +	 * a relative jump.
->> +	 *
->> +	 * kprobe opt use a 'b' instruction to branch to optinsn.insn.
->> +	 * According to ARM manual, branch instruction is:
->> +	 *
->> +	 *   31  28 27           24 23             0
->> +	 *  +------+---+---+---+---+----------------+
->> +	 *  | cond | 1 | 0 | 1 | 0 |      imm24     |
->> +	 *  +------+---+---+---+---+----------------+
->> +	 *
->> +	 * imm24 is a signed 24 bits integer. The real branch offset is computed
->> +	 * by: imm32 = SignExtend(imm24:'00', 32);
->> +	 *
->> +	 * So the maximum forward branch should be:
->> +	 *   (0x007fffff << 2) = 0x01fffffc =  0x1fffffc
->> +	 * The maximum backword branch should be:
->> +	 *   (0xff800000 << 2) = 0xfe000000 = -0x2000000
->> +	 *
->> +	 * We can simply check (rel & 0xfe000003):
->> +	 *  if rel is positive, (rel & 0xfe000000) shoule be 0
->> +	 *  if rel is negitive, (rel & 0xfe000000) should be 0xfe000000
->> +	 *  the last '3' is used for alignment checking.
->> +	 */
->> +	rel_chk = (unsigned long)((long)op->optinsn.insn -
->> +			(long)op->kp.addr + 8) & 0xfe000003;
->> +
->> +	if ((rel_chk != 0) && (rel_chk != 0xfe000000)) {
->> +		__arch_remove_optimized_kprobe(op, 0);
->> +		return -ERANGE;
->> +	}
->> +
->> +	buf = (u8 *)op->optinsn.insn;
->> +
->> +	/* Copy arch-dep-instance from template */
->> +	memcpy(buf, &optprobe_template_entry, TMPL_END_IDX);
->> +
->> +	/* Set probe information */
->> +	val = (unsigned long)op;
->> +	memcpy(buf + TMPL_VAL_IDX, &val, sizeof(val));
->> +
->> +	/* Set probe function call */
->> +	val = (unsigned long)optimized_callback;
->> +	memcpy(buf + TMPL_CALL_IDX, &val, sizeof(val));
-> 
-> Ok, so this is updating the `offset' portion of a b instruction, right? What
-> if memcpy does that byte-by-byte?
-
-No, as you can see a indirect call "blx r2" in optprobe_template_entry(
-inline asm), this sets .data bytes at optprobe_template_call which is loaded
-to r2 register. :-)
-So all the 4bytes are used for storing the address.
-
-Thank you,
-
--- 
-Masami HIRAMATSU
-Software Platform Research Dept. Linux Technology Research Center
-Hitachi, Ltd., Yokohama Research Laboratory
-E-mail: masami.hiramatsu.pt at hitachi.com
+Is this going to be used for iommu global/standard attribute or SoC
+spcific one?
