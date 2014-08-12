@@ -1,38 +1,43 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Tue, 12 Aug 2014 09:04:37 +0900
-Subject: [PATCH v2 0/5] ARM: shmobile: armadillo800eva-reference: Enable CMT1
- in device tree
-Message-ID: <1407801882-2561-1-git-send-email-horms+renesas@verge.net.au>
+Date: Tue, 12 Aug 2014 09:04:41 +0900
+Subject: [PATCH v2 4/5] ARM: shmobile: armadillo800eva-reference: Do not use
+ r8a7740_add_standard_devices_dt()
+In-Reply-To: <1407801882-2561-1-git-send-email-horms+renesas@verge.net.au>
+References: <1407801882-2561-1-git-send-email-horms+renesas@verge.net.au>
+Message-ID: <1407801882-2561-5-git-send-email-horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This short series enables the CMT1 timer using DT on
-armadillo800eva-reference.
+Now that r8a7740_add_standard_devices_dt() is just a wrapper for
+of_platform_populate() call the latter directly.
 
-It is based on "ARM: shmobile: r8a7740: add clocks to DT" applied
-on top of renesas-devel-v3.16-20140808.
+This is in preparation for removing r8a7740_add_standard_devices_dt().
 
-Ulrich, if you end up reposting "ARM: shmobile: r8a7740: add clocks to DT"
-please consider appending this series to it.
+Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
+---
+ arch/arm/mach-shmobile/board-armadillo800eva-reference.c | 3 ++-
+ 1 file changed, 2 insertions(+), 1 deletion(-)
 
-Changes since v1
-* Correct typo in change log of
-  "ARM: shmobile: r8a7740: Add CMT1 device to DT"
-
-Simon Horman (5):
-  ARM: shmobile: r8a7740: Add CMT1 device to DT
-  ARM: shmobile: armadillo800eva-reference: Enable CMT1 in device tree
-  ARM: shmobile: armadillo800eva-reference: Sort includes
-  ARM: shmobile: armadillo800eva-reference: Do not use
-    r8a7740_add_standard_devices_dt()
-  ARM: shmobile: r8a7740: Remove r8a7740_add_standard_devices_dt
-
- .../arm/boot/dts/r8a7740-armadillo800eva-reference.dts |  4 ++++
- arch/arm/boot/dts/r8a7740.dtsi                         | 12 ++++++++++++
- .../mach-shmobile/board-armadillo800eva-reference.c    |  5 +++--
- arch/arm/mach-shmobile/r8a7740.h                       |  1 -
- arch/arm/mach-shmobile/setup-r8a7740.c                 | 18 ++----------------
- 5 files changed, 21 insertions(+), 19 deletions(-)
-
+diff --git a/arch/arm/mach-shmobile/board-armadillo800eva-reference.c b/arch/arm/mach-shmobile/board-armadillo800eva-reference.c
+index c392632..ea8a781 100644
+--- a/arch/arm/mach-shmobile/board-armadillo800eva-reference.c
++++ b/arch/arm/mach-shmobile/board-armadillo800eva-reference.c
+@@ -24,6 +24,7 @@
+ #include <linux/gpio.h>
+ #include <linux/io.h>
+ #include <linux/kernel.h>
++#include <linux/of_platform.h>
+ 
+ #include <asm/mach/arch.h>
+ #include <asm/hardware/cache-l2x0.h>
+@@ -170,7 +171,7 @@ static void __init eva_init(void)
+ 	l2x0_init(IOMEM(0xf0002000), 0x00400000, 0xc20f0fff);
+ #endif
+ 
+-	r8a7740_add_standard_devices_dt();
++	of_platform_populate(NULL, of_default_bus_match_table, NULL, NULL);
+ 
+ 	r8a7740_pm_init();
+ }
 -- 
 2.0.0.rc2
