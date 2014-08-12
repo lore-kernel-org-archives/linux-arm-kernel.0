@@ -1,79 +1,68 @@
 From: wangyijing@huawei.com (Yijing Wang)
-Date: Tue, 12 Aug 2014 15:26:12 +0800
-Subject: [RFC PATCH 19/20] tile/MSI: Use msi_chip instead of arch func to
+Date: Tue, 12 Aug 2014 15:26:07 +0800
+Subject: [RFC PATCH 14/20] Powerpc/MSI: Use msi_chip instead of arch func to
  configure MSI/MSI-X
 In-Reply-To: <1407828373-24322-1-git-send-email-wangyijing@huawei.com>
 References: <1407828373-24322-1-git-send-email-wangyijing@huawei.com>
-Message-ID: <1407828373-24322-20-git-send-email-wangyijing@huawei.com>
+Message-ID: <1407828373-24322-15-git-send-email-wangyijing@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Introduce a new struct msi_chip tile_msi_chip instead of weak arch
+Introduce a new struct msi_chip ppc_msi_chip instead of weak arch
 functions to configure MSI/MSI-X.
 
 Signed-off-by: Yijing Wang <wangyijing@huawei.com>
 ---
- arch/tile/kernel/pci_gx.c |   20 +++++++++++++++-----
- 1 files changed, 15 insertions(+), 5 deletions(-)
+ arch/powerpc/kernel/msi.c |   23 +++++++++++++++++------
+ 1 files changed, 17 insertions(+), 6 deletions(-)
 
-diff --git a/arch/tile/kernel/pci_gx.c b/arch/tile/kernel/pci_gx.c
-index e39f9c5..d1f308c 100644
---- a/arch/tile/kernel/pci_gx.c
-+++ b/arch/tile/kernel/pci_gx.c
-@@ -1485,7 +1485,7 @@ static struct irq_chip tilegx_msi_chip = {
- 	/* TBD: support set_affinity. */
- };
+diff --git a/arch/powerpc/kernel/msi.c b/arch/powerpc/kernel/msi.c
+index 8bbc12d..170b02c 100644
+--- a/arch/powerpc/kernel/msi.c
++++ b/arch/powerpc/kernel/msi.c
+@@ -13,7 +13,7 @@
  
--int arch_setup_msi_irq(struct pci_dev *pdev, struct msi_desc *desc)
-+int tile_setup_msi_irq(struct device *dev, struct msi_desc *desc)
+ #include <asm/machdep.h>
+ 
+-int arch_msi_check_device(struct pci_dev* dev, int nvec, int type)
++int ppc_msi_check_device(struct device *dev, int nvec, int type)
  {
- 	struct pci_controller *controller;
- 	gxio_trio_context_t *trio_context;
-@@ -1510,7 +1510,7 @@ int arch_setup_msi_irq(struct pci_dev *pdev, struct msi_desc *desc)
- 	 * Most PCIe endpoint devices do support 64-bit message addressing.
- 	 */
- 	if (desc->msi_attrib.is_64 == 0) {
--		dev_printk(KERN_INFO, &pdev->dev,
-+		dev_printk(KERN_INFO, dev,
- 			"64-bit MSI message address not supported, "
- 			"falling back to legacy interrupts.\n");
+ 	if (!ppc_md.setup_msi_irqs || !ppc_md.teardown_msi_irqs) {
+ 		pr_debug("msi: Platform doesn't provide MSI callbacks.\n");
+@@ -26,18 +26,29 @@ int arch_msi_check_device(struct pci_dev* dev, int nvec, int type)
  
-@@ -1549,7 +1549,7 @@ int arch_setup_msi_irq(struct pci_dev *pdev, struct msi_desc *desc)
- 		/* SQ regions are out, allocate from map mem regions. */
- 		mem_map = gxio_trio_alloc_memory_maps(trio_context, 1, 0, 0);
- 		if (mem_map < 0) {
--			dev_printk(KERN_INFO, &pdev->dev,
-+			dev_printk(KERN_INFO, dev,
- 				"%s Mem-Map alloc failure. "
- 				"Failed to initialize MSI interrupts. "
- 				"Falling back to legacy interrupts.\n",
-@@ -1580,7 +1580,7 @@ int arch_setup_msi_irq(struct pci_dev *pdev, struct msi_desc *desc)
- 					mem_map, mem_map_base, mem_map_limit,
- 					trio_context->asid);
- 	if (ret < 0) {
--		dev_printk(KERN_INFO, &pdev->dev, "HV MSI config failed.\n");
-+		dev_printk(KERN_INFO, dev, "HV MSI config failed.\n");
- 
- 		goto hv_msi_config_failure;
+ 	if (ppc_md.msi_check_device) {
+ 		pr_debug("msi: Using platform check routine.\n");
+-		return ppc_md.msi_check_device(dev, nvec, type);
++		return ppc_md.msi_check_device(to_pci_dev(dev), nvec, type);
  	}
-@@ -1604,7 +1604,17 @@ is_64_failure:
- 	return ret;
+ 
+         return 0;
  }
  
--void arch_teardown_msi_irq(unsigned int irq)
-+void tile_teardown_msi_irq(unsigned int irq)
+-int arch_setup_msi_irqs(struct pci_dev *dev, int nvec, int type)
++int ppc_setup_msi_irqs(struct device *dev, int nvec, int type)
  {
- 	irq_free_hwirq(irq);
+-	return ppc_md.setup_msi_irqs(dev, nvec, type);
++	return ppc_md.setup_msi_irqs(to_pci_dev(dev), nvec, type);
  }
+ 
+-void arch_teardown_msi_irqs(struct pci_dev *dev)
++void ppc_teardown_msi_irqs(struct device *dev)
+ {
+-	ppc_md.teardown_msi_irqs(dev);
++	ppc_md.teardown_msi_irqs(to_pci_dev(dev));
++}
 +
-+struct msi_chip tile_msi_chip = {
-+	.setup_irq = tile_setup_msi_irq,
-+	.teardown_irq = tile_teardown_msi_irq,
++struct msi_chip ppc_msi_chip = {
++	.setup_irqs = ppc_setup_msi_irqs,
++	.teardown_irqs = ppc_teardown_msi_irqs,
++	.check_device = ppc_msi_check_device,
 +};
 +
 +struct msi_chip *arch_get_match_msi_chip(struct device *dev)
 +{
-+	return &tile_msi_chip;
-+}
++	return &ppc_msi_chip;
+ }
 -- 
 1.7.1
