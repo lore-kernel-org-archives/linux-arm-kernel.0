@@ -1,104 +1,81 @@
-From: takahiro.akashi@linaro.org (AKASHI Takahiro)
-Date: Tue, 12 Aug 2014 20:17:53 +0900
-Subject: [PATCH v5 3/3] arm64: Add seccomp support
-In-Reply-To: <20140812094058.GD29013@arm.com>
-References: <1406020499-5537-1-git-send-email-takahiro.akashi@linaro.org>
- <1406020499-5537-4-git-send-email-takahiro.akashi@linaro.org>
- <53D082E9.8090303@amacapital.net> <53D09C4F.9010104@linaro.org>
- <CALCETrWTDS7VSyuR5wgGxpu-_YMWVUVmv9ht6t1tCSX=GA46cQ@mail.gmail.com>
- <53D2255C.9050006@linaro.org>
- <CAGXu5jJL=zXuSRNomGrB09kqpUhEpkuxDH18JN4NRbWocMw4xg@mail.gmail.com>
- <53E47DCE.4080902@linaro.org> <20140811092409.GE15344@arm.com>
- <53E9BAD5.3080201@linaro.org> <20140812094058.GD29013@arm.com>
-Message-ID: <53E9F7E1.9090405@linaro.org>
+From: vgoyal@redhat.com (Vivek Goyal)
+Date: Tue, 12 Aug 2014 08:37:36 -0400
+Subject: [PATCH 2/2] asm-generic: add memfd_create system call to unistd.h
+In-Reply-To: <20140812111030.GK29013@arm.com>
+References: <1407764228-7904-1-git-send-email-will.deacon@arm.com>
+ <CANq1E4Q0gDaJ5XGnkoCQsG8xLh1Q-EBErtEVPpeeZgGj+Nr8dQ@mail.gmail.com>
+ <20140811171511.GF8828@arm.com> <201408112057.01177.arnd@arndb.de>
+ <CAMuHMdWZ30ZKO2ddh8whmw5ThrKZC0wsU+rhgoc8fRZni0Zduw@mail.gmail.com>
+ <20140812102734.GG29013@arm.com> <20140812111030.GK29013@arm.com>
+Message-ID: <20140812123736.GA16961@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08/12/2014 06:40 PM, Will Deacon wrote:
-> Hi Akashi,
->
-> On Tue, Aug 12, 2014 at 07:57:25AM +0100, AKASHI Takahiro wrote:
->> On 08/11/2014 06:24 PM, Will Deacon wrote:
->>> On Fri, Aug 08, 2014 at 08:35:42AM +0100, AKASHI Takahiro wrote:
->>>> As discussed in a few weeks ago, aarch64 won't support PTRACE_SET_SYSCALL.
->>>
->>> Well, I don't think anything was set in stone. If you have a compelling
->>> reason why adding the new request gives you something over setting w8
->>> directly, then we can extend ptrace.
->>
->> Yeah, I think I may have to change my mind. Looking into __secure_computing(),
->> I found the code below:
->>
->>   >     case SECCOMP_MODE_FILTER:
->>   >         case SECCOMP_RET_TRACE:
->>   >             ...
->>   >             if (syscall_get_nr(current, regs) < 0)
->>   >                 goto skip;
->>
->> This implies that we should modify syscallno *before* __secure_computing()
->> returns.
->
-> Why does it imply that? There are four competing entities here:
->
->   - seccomp
->   - tracehook
->   - ftrace (trace_sys_*)
->   - audit
->
-> With the exception of ftrace, they can all potentially rewrite the pt_regs
-> (the code you cite above is just below a ptrace_event call), so we have
-> to choose some order in which to call them.
+On Tue, Aug 12, 2014 at 12:10:30PM +0100, Will Deacon wrote:
+> On Tue, Aug 12, 2014 at 11:27:34AM +0100, Will Deacon wrote:
+> > On Mon, Aug 11, 2014 at 08:37:41PM +0100, Geert Uytterhoeven wrote:
+> > > On Mon, Aug 11, 2014 at 8:57 PM, Arnd Bergmann <arnd@arndb.de> wrote:
+> > > > On Monday 11 August 2014, Will Deacon wrote:
+> > > >> On Mon, Aug 11, 2014 at 05:54:08PM +0100, David Herrmann wrote:
+> > > >> > On Mon, Aug 11, 2014 at 3:37 PM, Will Deacon <will.deacon@arm.com> wrote:
+> > > >> > > Commit 9183df25fe7b ("shm: add memfd_create() syscall") added a new
+> > > >> > > system call (memfd_create) but didn't update the asm-generic unistd
+> > > >> > > header.
+> > > >> > >
+> > > >> > > This patch adds the new system call to the asm-generic version of
+> > > >> > > unistd.h so that it can be used by architectures such as arm64.
+> > > >> > >
+> > > >> > > Cc: Arnd Bergmann <arnd@arndb.de>
+> > > >> > > Cc: David Herrmann <dh.herrmann@gmail.com>
+> > > >> > > Signed-off-by: Will Deacon <will.deacon@arm.com>
+> > > >> >
+> > > >> > Reviewed-by: David Herrmann <dh.herrmann@gmail.com>
+> > > >>
+> > > >> Thanks, David.
+> > > >>
+> > > >> Arnd: shall I take this via the arm64 tree, or do you already have some
+> > > >> asm-generic patches queued?
+> > > >
+> > > > Please take it for arm64, I don't have any other patches queued at the moment
+> > > > and am currently on vacation.
+> > > 
+> > > Thanks, I was just going to look into adding it...
+> > > 
+> > > BTW, another one sneaked in: kexec_file_load. I say "sneaked", as
+> > > scripts/checksyscalls.sh doesn't catch it, due to it being wired up on
+> > > amd64 only.
+> > 
+> > Oh, well spotted!
+> > 
+> > > Will, you can please add that one, too, while you're at it?
+> > 
+> > Sure, I'll add an extra patch and repost.
+> 
+> Hmm, so whilst I can easily wire-up the new syscall, it's pretty useless for
+> anybody other than x86 at the moment. There are a bunch of arch helpers:
+> 
+>  arch_kexec_kernel_image_probe
+>  arch_kexec_kernel_verify_sig
+>  arch_kexec_kernel_image_load
+>  arch_kimage_file_post_load_cleanup
+> 
+> which are only implemented for x86 (arch/x86/kernel/machine_kexec_64.c),
+> even though I don't really see what makes them arch-specific as opposed to
+> file format specific.
 
-(audit won't change registers.)
+Yes, at this point of time, this system call will work only on x86. Agreed
+that primarily it is file format details which are primarily in arch
+specific section.
 
-> On entry, x86 and arm call them in the order I listed above, so it seems
-> sensible to follow that.
+I think that some of the code will become arch independent as other
+arches start implementing this syscall. 
 
-Right, but as far as I understand, ptrace_event() in __secure_computing()
-calls ptrace_notify(), and eventually executes ptrace_stop(), which can
-be stopped while tracer runs (until ptrace(PTRACE_CONT)?).
-So syscall_get_nr() is expected to return -1 if trace changes a syscall number to -1
-(as far as sycall_get_nr() refers to syscallno in pt_regs).
+> 
+> So this syscall will always fail with -ENOEXEC at the moment. Is it still
+> worth wiring it up?
 
-That is why I think we should have PTRACE_SET_SYSCALL.
+I thought that for other arches I have not even defined the syscall. So
+it probably will fail with -ENOSYS.
 
->> I assumed, in my next version, we could skip a system call by overwriting
->> syscallno with x8 in syscall_trace_enter() after __secure_computing()
->> returns 0, and it actually works.
->
-> Why does overwriting the syscallno with x8 skip the syscall?
->
-> I thought the idea was that we would save w8 prior to each call that could
-> change the pt_regs, then if it was changed to -1 we would replace it with
-> the saved value and return -1?
-
-I think its the right way to do.
-But x86 rewrites orig_ax and arm rewrites syscallno directly, and
-refer to these values as "syscall numbers" later on, for example,
-see the arguments to audit_syscall_entry().
-So if we don't update syscallno, we may see different behaviors from x86 or arm?
-
-> The only confusion I have is whether we
-> should call the exit hooks after skipping a syscall. I *think* x86 does
-> call them, but ARM doesn't. Andy says this can trigger an OOPs:
-
-Again, right. we should definitely avoid OOPs.
-But we may be able to avoid OOPs by not calling entry hooks for skipped system
-calls, instead of calling exit hooks, if we rewrite syscallno as mentioned above.
-(Please note, as I mentioned, audit_syscall_xx() ignores any request for logging
-invalid system calls.)
-
-Thanks,
--Takahiro AKASHI
-
->    http://lists.infradead.org/pipermail/linux-arm-kernel/2014-July/274988.html
->
-> so we should fix that for ARM while we're here.
->
-> Will
->
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
->
+Thanks
+Vivek
