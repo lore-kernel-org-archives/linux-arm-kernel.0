@@ -1,47 +1,82 @@
 From: b.zolnierkie@samsung.com (Bartlomiej Zolnierkiewicz)
-Date: Tue, 12 Aug 2014 17:11:54 +0200
-Subject: [PATCH v2 0/3] ARM: EXYNOS: Fix builds with PM_SLEEP=n
-Message-ID: <1407856317-2457-1-git-send-email-b.zolnierkie@samsung.com>
+Date: Tue, 12 Aug 2014 17:11:56 +0200
+Subject: [PATCH v2 2/3] ARM: mm: Fix ifdef around cpu_*_do_[suspend,
+ resume] ops
+In-Reply-To: <1407856317-2457-1-git-send-email-b.zolnierkie@samsung.com>
+References: <1407856317-2457-1-git-send-email-b.zolnierkie@samsung.com>
+Message-ID: <1407856317-2457-3-git-send-email-b.zolnierkie@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Ifdef around cpu_\name\()_do_suspend and cpu_\name\()_do_resume
+ops in proc-macros.S should check for CONFIG_ARM_CPU_SUSPEND and
+not CONFIG_PM_SLEEP.  Fix it.
 
-This patch series fixes builds with CONFIG_PM_SLEEP config option
-disabled.  It has been runtime tested on Exynos4210 based Origen
-board.
+[ Please note that cpu_v7_do_[suspend,resume] code in proc-v7.S
+  already correctly checks for CONFIG_ARM_CPU_SUSPEND, same is
+  true for functions for other architectures. ]
 
-Depends on:
-- next-20140811 branch of linux-next kernel
+This fix is needed for decoupling suspend/resume and advanced
+cpuidle support on Exynos platform (next patch fixes build for
+config with CONFIG_PM_SLEEP=n and CONFIG_ARM_EXYNOS_CPUIDLE=y).
 
-Changes since v1:
-(http://www.mail-archive.com/linux-samsung-soc at vger.kernel.org/msg34079.html)
-- rebased on top of next-20140811
-- fixed OOPS on the first try to enter cpuidle AFTR mode
-  (config with CONFIG_PM_SLEEP=n and CONFIG_ARM_EXYNOS_CPUIDLE=y)
+If this fix is not present then the following OOPS happens on
+the first attempt to go into advanced cpuidle mode (AFTR):
 
-Best regards,
---
-Bartlomiej Zolnierkiewicz
-Samsung R&D Institute Poland
-Samsung Electronics
+[   22.244143] Unable to handle kernel NULL pointer dereference at virtual address 00000000
+[   22.250759] pgd = c0004000
+[   22.253445] [00000000] *pgd=00000000
+[   22.257012] Internal error: Oops: 80000007 [#1] PREEMPT SMP ARM
+[   22.262906] Modules linked in:
+[   22.265949] CPU: 0 PID: 0 Comm: swapper/0 Not tainted 3.16.0-next-20140811-dirty #730
+[   22.273757] task: c05dce68 ti: c05d2000 task.ti: c05d2000
+[   22.279139] PC is at 0x0
+[   22.281661] LR is at __cpu_suspend_save+0x4c/0xa8
+[   22.286344] pc : [<00000000>]    lr : [<c00125e0>]    psr: a0000093
+[   22.286344] sp : c05d3ef4  ip : c05da414  fp : 00000001
+[   22.297799] r10: c05da414  r9 : c0609cb0  r8 : 0000000f
+[   22.303008] r7 : c05da444  r6 : 00000038  r5 : ea802c00  r4 : c05d3f14
+[   22.309517] r3 : 00000000  r2 : c05d3f4c  r1 : 00000038  r0 : c05d3f20
+[   22.316029] Flags: NzCv  IRQs off  FIQs on  Mode SVC_32  ISA ARM  Segment kernel
+[   22.323406] Control: 10c5387d  Table: 69d5404a  DAC: 00000015
+[   22.329135] Process swapper/0 (pid: 0, stack limit = 0xc05d2240)
+[   22.335124] Stack: (0xc05d3ef4 to 0xc05d4000)
+[   22.339466] 3ee0:                                              ea802c00 00000038 c05d3f4c
+[   22.347626] 3f00: 00000000 00000007 c00123bc 00000000 c001d468 6a888000 c05d3f4c 80000000
+[   22.355785] 3f20: 00000007 c003d3a0 0000193d eaf9dde4 eaf9dde4 c02ef0c8 c000969c fffffffe
+[   22.363944] 3f40: 00000000 c0037b54 eaf9dbb8 e9d1a380 00000000 c001d468 c0609cb0 00000000
+[   22.372103] 3f60: c0609cb0 c061649e 00000001 c001250c eaf9dbb8 00000001 c0609cb0 c001d618
+[   22.380262] 3f80: c001d5d0 c02ef56c 2d9d2e1e 00000005 eaf9dbb8 c02edcc4 2d9d2e1e 00000005
+[   22.388421] 3fa0: c040446c c05da4ec c040446c eaf9dbb8 c05cfbb0 c004c580 c05dce68 c05b3ae8
+[   22.396580] 3fc0: 00000000 c058bb24 ffffffff ffffffff c058b5e4 00000000 00000000 c05b3ae8
+[   22.404740] 3fe0: c0616994 c05da47c c05b3ae4 c05ddeec 4000406a 40008074 00000000 00000000
+[   22.412909] [<c00125e0>] (__cpu_suspend_save) from [<c00123bc>] (__cpu_suspend+0x5c/0x70)
+[   22.421074] [<c00123bc>] (__cpu_suspend) from [<c05d3f4c>] (init_thread_union+0x1f4c/0x2000)
+[   22.429479] Code: bad PC value
+[   22.432518] ---[ end trace fb90ebf4217d0ad9 ]---
+[   22.437116] Kernel panic - not syncing: Attempted to kill the idle task!
+[   22.443800] Rebooting in 5 seconds..
 
+This patch has been tested on Exynos4210 based Origen board.
 
-Bartlomiej Zolnierkiewicz (3):
-  ARM: EXYNOS: Fix build with PM_SLEEP=n and ARM_EXYNOS_CPUIDLE=n
-  ARM: mm: Fix ifdef around cpu_*_do_[suspend,resume] ops
-  ARM: EXYNOS: Fix build with PM_SLEEP=n and ARM_EXYNOS_CPUIDLE=y
+Signed-off-by: Bartlomiej Zolnierkiewicz <b.zolnierkie@samsung.com>
+Acked-by: Kyungmin Park <kyungmin.park@samsung.com>
+---
+ arch/arm/mm/proc-macros.S | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
- arch/arm/mach-exynos/Kconfig   |   5 +
- arch/arm/mach-exynos/Makefile  |   3 +-
- arch/arm/mach-exynos/common.h  |   4 +
- arch/arm/mach-exynos/exynos.c  |   2 +
- arch/arm/mach-exynos/pm.c      | 262 +-------------------------------------
- arch/arm/mach-exynos/suspend.c | 279 +++++++++++++++++++++++++++++++++++++++++
- arch/arm/mm/proc-macros.S      |   2 +-
- arch/arm/plat-samsung/Makefile |   1 +
- 8 files changed, 299 insertions(+), 259 deletions(-)
- create mode 100644 arch/arm/mach-exynos/suspend.c
-
+diff --git a/arch/arm/mm/proc-macros.S b/arch/arm/mm/proc-macros.S
+index ee1d805..ba1196c 100644
+--- a/arch/arm/mm/proc-macros.S
++++ b/arch/arm/mm/proc-macros.S
+@@ -279,7 +279,7 @@ ENTRY(\name\()_processor_functions)
+ 
+ 	.if \suspend
+ 	.word	cpu_\name\()_suspend_size
+-#ifdef CONFIG_PM_SLEEP
++#ifdef CONFIG_ARM_CPU_SUSPEND
+ 	.word	cpu_\name\()_do_suspend
+ 	.word	cpu_\name\()_do_resume
+ #else
 -- 
 1.8.2.3
