@@ -1,40 +1,106 @@
-From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Tue, 12 Aug 2014 15:37:00 -0700
-Subject: [PATCH v2] irqchip: gic: Allow gic_arch_extn hooks to call into
- scheduler
-In-Reply-To: <alpine.LFD.2.11.1408052222350.6061@knanqh.ubzr>
-References: <alpine.LFD.2.11.1408041858570.6061@knanqh.ubzr>
- <1407194837-27190-1-git-send-email-sboyd@codeaurora.org>
- <53E118EE.5040205@codeaurora.org>
- <alpine.LFD.2.11.1408051537250.6061@knanqh.ubzr>
- <53E14B33.9080701@codeaurora.org>
- <alpine.LFD.2.11.1408052222350.6061@knanqh.ubzr>
-Message-ID: <53EA970C.9070003@codeaurora.org>
+From: gang.chen.5i5j@gmail.com (Chen Gang)
+Date: Wed, 13 Aug 2014 06:48:35 +0800
+Subject: [PATCH v2] arch: Kconfig: Let all little endian architectures define
+ CPU_LITTLE_ENDIAN explicitly
+Message-ID: <53EA99C3.90203@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08/05/14 19:34, Nicolas Pitre wrote:
->
->> It allows us to synchronize with another CPU that may be inside
->> gic_raise_softirq(). If the other CPU was in that function then this CPU
->> would wait until it was done sending the IPI to continue along and
->> reroute them. If the other CPU was just about to grab the sgi lock then
->> we would guarantee that the CPU would see the new gic_cpu_map value and
->> thus any redirection is not necessary.
-> OK I get it now.
->
->> I hoped that the commit text explained this.
-> I'm possibly not bright enough to get it the first time.
->
->> Honestly it probably isn't a noticeable performance boost either way 
->> but I think this is the best we can do.
-> Sure, agreed.
->
->
->
+x86 and ia64 are always little endian. And another architectures may be
+little endian: mips, sh, powerpc, and m32r (may mark CPU_LITTLE_ENDIAN
+explicitly); also arm(64) and c6x (which may be !CPU_BIG_ENDIAN).
 
-Ok, so which patch is preferred?
+Some drivers (e.g. some of "drivers/isdn/hisax") may only support little
+endian (CPU_LITTLE_ENDIAN), and some drivers may only support big endian
+(!CPU_LITTLE_ENDIAN).
 
+So export all little endian architectures within kernel wide, so can let
+Kconfig easier for the modules which only support little endian or only
+for big endian (assume !CPU_LITTLE_ENDIAN is same as CPU_BIG_ENDIAN).
+
+
+Signed-off-by: Chen Gang <gang.chen.5i5j@gmail.com>
+---
+ arch/arm/Kconfig   | 5 +++++
+ arch/arm64/Kconfig | 4 ++++
+ arch/c6x/Kconfig   | 4 ++++
+ arch/ia64/Kconfig  | 3 +++
+ arch/x86/Kconfig   | 3 +++
+ 5 files changed, 19 insertions(+)
+
+diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+index c49a775..0510a5d 100644
+--- a/arch/arm/Kconfig
++++ b/arch/arm/Kconfig
+@@ -199,6 +199,11 @@ config NEED_DMA_MAP_STATE
+ config ARCH_SUPPORTS_UPROBES
+ 	def_bool y
+ 
++config CPU_LITTLE_ENDIAN
++	depends on !CPU_BIG_ENDIAN
++	def_bool y
++
++
+ config ARCH_HAS_DMA_SET_COHERENT_MASK
+ 	bool
+ 
+diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
+index 62b4ae1..290a253 100644
+--- a/arch/arm64/Kconfig
++++ b/arch/arm64/Kconfig
+@@ -129,6 +129,10 @@ config KERNEL_MODE_NEON
+ config FIX_EARLYCON_MEM
+ 	def_bool y
+ 
++config CPU_LITTLE_ENDIAN
++	depends on !CPU_BIG_ENDIAN
++	def_bool y
++
+ source "init/Kconfig"
+ 
+ source "kernel/Kconfig.freezer"
+diff --git a/arch/c6x/Kconfig b/arch/c6x/Kconfig
+index 77ea09b..56a8f53 100644
+--- a/arch/c6x/Kconfig
++++ b/arch/c6x/Kconfig
+@@ -48,6 +48,10 @@ config C6X_BIG_KERNEL
+ 
+ 	  If unsure, say N.
+ 
++config CPU_LITTLE_ENDIAN
++	depends on !CPU_BIG_ENDIAN
++	def_bool y
++
+ source "init/Kconfig"
+ 
+ # Use the generic interrupt handling code in kernel/irq/
+diff --git a/arch/ia64/Kconfig b/arch/ia64/Kconfig
+index 64aefb7..fa12d34 100644
+--- a/arch/ia64/Kconfig
++++ b/arch/ia64/Kconfig
+@@ -133,6 +133,9 @@ config AUDIT_ARCH
+ 	bool
+ 	default y
+ 
++config CPU_LITTLE_ENDIAN
++	def_bool y
++
+ menuconfig PARAVIRT_GUEST
+ 	bool "Paravirtualized guest support"
+ 	depends on BROKEN
+diff --git a/arch/x86/Kconfig b/arch/x86/Kconfig
+index 541e7cc..a1b3568 100644
+--- a/arch/x86/Kconfig
++++ b/arch/x86/Kconfig
+@@ -270,6 +270,9 @@ config ARCH_SUPPORTS_UPROBES
+ config FIX_EARLYCON_MEM
+ 	def_bool y
+ 
++config CPU_LITTLE_ENDIAN
++	def_bool y
++
+ source "init/Kconfig"
+ source "kernel/Kconfig.freezer"
+ 
 -- 
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-hosted by The Linux Foundation
+1.7.11.7
