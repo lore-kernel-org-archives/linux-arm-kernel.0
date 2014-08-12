@@ -1,80 +1,45 @@
-From: keescook@chromium.org (Kees Cook)
-Date: Tue, 12 Aug 2014 10:55:13 -0700
-Subject: [PATCH] ARM: expand fixmap region to 3MB
-In-Reply-To: <20140811161448.GA4002@bivouac.eciton.net>
-References: <1407511404-11997-1-git-send-email-robherring2@gmail.com>
- <20140811161448.GA4002@bivouac.eciton.net>
-Message-ID: <CAGXu5j+Wm7LzdTZWsjLpisBqgcKxx-_t=O_LWsn8hP+_KiBxEw@mail.gmail.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Tue, 12 Aug 2014 20:02:02 +0200
+Subject: [RESEND: PATCH 1/2] mfd: tc3589x: Add device tree bindings
+In-Reply-To: <20140617202340.GW29841@lee--X1>
+References: <1397028480-15413-1-git-send-email-linus.walleij@linaro.org>
+ <20140617202340.GW29841@lee--X1>
+Message-ID: <CACRpkdY2xjp9=muE5WFoN3smzgC+cqR0ijgD306nXi7owEGyyw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Aug 11, 2014 at 9:14 AM, Leif Lindholm <leif.lindholm@linaro.org> wrote:
-> On Fri, Aug 08, 2014 at 10:23:24AM -0500, Rob Herring wrote:
->> From: Rob Herring <robh@kernel.org>
+On Tue, Jun 17, 2014 at 10:23 PM, Lee Jones <lee.jones@linaro.org> wrote:
+> On Wed, 09 Apr 2014, Linus Walleij wrote:
+>
+>> This defines the device tree bindings for the Toshiba TC3589x
+>> series of multi-purpose expanders. Only the stuff I can test
+>> is defined: GPIO and keypad. Others may implement more
+>> subdevices further down the road.
 >>
->> With commit a05e54c103b0b8 "ARM: 8031/2: change fixmap mapping region to
->> support 32 CPUs", the fixmap region was expanded to 2MB, but it
->> precluded any other uses of the fixmap region in order to support up to
->> 32 CPUs. In order to support other uses the fixmap region needs to be
->> expanded beyond 2MB. Fortunately, the adjacent 1MB range
->> 0xffe00000-0xfff00000 is availabe to use.
+>> This is to complement
+>> commit a435ae1d51e2f18414f2a87219fdbe068231e692
+>> "mfd: Enable the tc3589x for Device Tree" which left off
+>> the definition of the device tree bindings.
 >>
->> Remove fixmap_page_table ptr and lookup the page table via the virtual
->> address so that the fixmap region can span more that one pmd. The 2nd
->> pmd is already created since it is shared with the vector page.
->>
->> Cc: Leif Lindholm <leif.lindholm@linaro.org>
->> Cc: Kees Cook <keescook@chromium.org>
->> Cc: Russell King <linux@arm.linux.org.uk>
->> Signed-off-by: Rob Herring <robh@kernel.org>
+>> Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
 >> ---
->>
->> This patch can come before or after the generic fixmap.h. There's a
->> single line conflict with the ending address
+>> ChangeLog v2->v3:
+>> - Fix the keys/rows bindings to be u32 rather than
+>>   /bits/ 8, inconsistency noted by Mark Rutland.
+>> ChangeLog v1->v2:
+>> - Include a verbose example in the DT bindings.
+>> - Explain why this is a stand-alone bindings patch.
+>> ---
+>>  Documentation/devicetree/bindings/mfd/tc3589x.txt | 107 ++++++++++++++++++++++
+>>  1 file changed, 107 insertions(+)
+>>  create mode 100644 Documentation/devicetree/bindings/mfd/tc3589x.txt
 >
-> Tested-by: Leif Lindholm <leif.lindholm@linaro.org>
-> For Kees' set with this addition + generic fixmap + early_ioremap +
-> UEFI.
->
->> This worked for earlycon, but I've not done any highmem specific
->> testing. My full series is available here:
->>
->> git://git.kernel.org/pub/scm/linux/kernel/git/robh/linux.git fixmap
->
-> I was hoping to be able to give you a tested-by for that series on
-> next-20140811 with the UEFI patches, but that setup fails to boot
-> right now. Looking into why.
+> Looks about right, been on the list for ages and doesn't add any new
+> properties.  Applied, thanks.
 
-For me, the 3MB change doesn't work. It acts like the PTE isn't there:
+This wasn't in the v3.17 pull request AFAICT :-(
 
-lkdtm: Performing direct entry WRITE_KERN
-lkdtm: attempting 52 byte write at 804331cc
-lkdtm: 804331cc mapped RW via ffe7f1cc
-Unable to handle kernel paging request at virtual address ffe7f1cc
-pgd = 9ea40000
-[ffe7f1cc] *pgd=9fffd821, *pte=00000000, *ppte=00000000
+Did it get dropped to the floor accidentally?
 
-And it weirdly leaves this hanging around in
-/sys/kernel/debug/kernel_page_tables:
-
-0xffc7f000-0xffc80000           4K     RW NX SHD MEM/CACHED/WBWA
-
-If I use all the other changes to clean up the code, everything is
-fine. The only change I have been the trees now is just this:
-
--#define FIXADDR_END            0xffe00000UL
-+#define FIXADDR_END            0xfff00000UL
-
-I think my build isn't catching this extra area via the vector table pmd.
-
-So, instead of continuing to beat my head against this, I've changed
-my series around to use NR_CPUS as Rob was doing, and added
-BUILD_BUG_ON to check the fixmap size. The result is that there will
-be a build-time limit on the number of CPUs, rather than surprising
-run-time problems.
-
-I will repost the series in a moment.
-
--- 
-Kees Cook
-Chrome OS Security
+Yours,
+Linus Walleij
