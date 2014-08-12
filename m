@@ -1,34 +1,71 @@
-From: thierry.reding@gmail.com (Thierry Reding)
-Date: Tue, 12 Aug 2014 16:37:25 +0200
-Subject: [PATCH] ARM: dts: Only build dtb if associated Arch and/or SoC
- is enabled
-In-Reply-To: <1407852078-31309-1-git-send-email-pbrobinson@gmail.com>
-References: <1407852078-31309-1-git-send-email-pbrobinson@gmail.com>
-Message-ID: <20140812143723.GA9868@ulmo.nvidia.com>
+From: ludovic.desroches@atmel.com (Ludovic Desroches)
+Date: Tue, 12 Aug 2014 16:37:57 +0200
+Subject: [PATCH] ARM: at91: sama5d3: add usart dma configurations
+Message-ID: <1407854277-328-1-git-send-email-ludovic.desroches@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Aug 12, 2014 at 03:01:18PM +0100, Peter Robinson wrote:
-> A number of arches (EXYNOS/IMX/TEGRA) are separated out into finer
-> grained definitions whether it be sub ARCH or SOC definitions. The
-> device tree blobs should only be built if the specific option is
-> enabled that supports that device or it might be that there's an
-> expectation that the device is supported when in actual fact it's
-> not. This ensures only the relevant bits are built.
-> 
-> This also helps to avoid trivial merge conflicts when adding support
-> for new boards.
-> 
-> Signed-off-by: Peter Robinson <pbrobinson@gmail.com>
-> ---
->  arch/arm/boot/dts/Makefile | 50 +++++++++++++++++++++++++++-------------------
->  1 file changed, 30 insertions(+), 20 deletions(-)
+Add the DMA configuration for USARTs mainly because it is not obvious to
+add the FIFO flag which is needed for rx.
 
-Acked-by: Thierry Reding <treding@nvidia.com>
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: not available
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140812/146a1d63/attachment.sig>
+Signed-off-by: Ludovic Desroches <ludovic.desroches@atmel.com>
+---
+ arch/arm/boot/dts/sama5d3.dtsi |   15 +++++++++++++++
+ 1 file changed, 15 insertions(+)
+
+diff --git a/arch/arm/boot/dts/sama5d3.dtsi b/arch/arm/boot/dts/sama5d3.dtsi
+index e0b15a6..829c162 100644
+--- a/arch/arm/boot/dts/sama5d3.dtsi
++++ b/arch/arm/boot/dts/sama5d3.dtsi
+@@ -177,6 +177,9 @@
+ 				compatible = "atmel,at91sam9260-usart";
+ 				reg = <0xf001c000 0x100>;
+ 				interrupts = <12 IRQ_TYPE_LEVEL_HIGH 5>;
++				dmas = <&dma0 2 AT91_DMA_CFG_PER_ID(3)>,
++				       <&dma0 2 (AT91_DMA_CFG_PER_ID(4) | AT91_DMA_CFG_FIFOCFG_ASAP)>;
++				dma-names = "tx", "rx";
+ 				pinctrl-names = "default";
+ 				pinctrl-0 = <&pinctrl_usart0>;
+ 				clocks = <&usart0_clk>;
+@@ -188,6 +191,9 @@
+ 				compatible = "atmel,at91sam9260-usart";
+ 				reg = <0xf0020000 0x100>;
+ 				interrupts = <13 IRQ_TYPE_LEVEL_HIGH 5>;
++				dmas = <&dma0 2 AT91_DMA_CFG_PER_ID(5)>,
++				       <&dma0 2 (AT91_DMA_CFG_PER_ID(6) | AT91_DMA_CFG_FIFOCFG_ASAP)>;
++				dma-names = "tx", "rx";
+ 				pinctrl-names = "default";
+ 				pinctrl-0 = <&pinctrl_usart1>;
+ 				clocks = <&usart1_clk>;
+@@ -333,6 +339,9 @@
+ 				compatible = "atmel,at91sam9260-usart";
+ 				reg = <0xf8020000 0x100>;
+ 				interrupts = <14 IRQ_TYPE_LEVEL_HIGH 5>;
++				dmas = <&dma1 2 AT91_DMA_CFG_PER_ID(7)>,
++				       <&dma1 2 (AT91_DMA_CFG_PER_ID(8) | AT91_DMA_CFG_FIFOCFG_ASAP)>;
++				dma-names = "tx", "rx";
+ 				pinctrl-names = "default";
+ 				pinctrl-0 = <&pinctrl_usart2>;
+ 				clocks = <&usart2_clk>;
+@@ -344,6 +353,9 @@
+ 				compatible = "atmel,at91sam9260-usart";
+ 				reg = <0xf8024000 0x100>;
+ 				interrupts = <15 IRQ_TYPE_LEVEL_HIGH 5>;
++				dmas = <&dma1 2 AT91_DMA_CFG_PER_ID(9)>,
++				       <&dma1 2 (AT91_DMA_CFG_PER_ID(10) | AT91_DMA_CFG_FIFOCFG_ASAP)>;
++				dma-names = "tx", "rx";
+ 				pinctrl-names = "default";
+ 				pinctrl-0 = <&pinctrl_usart3>;
+ 				clocks = <&usart3_clk>;
+@@ -410,6 +422,9 @@
+ 				compatible = "atmel,at91sam9260-usart";
+ 				reg = <0xffffee00 0x200>;
+ 				interrupts = <2 IRQ_TYPE_LEVEL_HIGH 7>;
++				dmas = <&dma1 2 AT91_DMA_CFG_PER_ID(13)>,
++				       <&dma1 2 (AT91_DMA_CFG_PER_ID(14) | AT91_DMA_CFG_FIFOCFG_ASAP)>;
++				dma-names = "tx", "rx";
+ 				pinctrl-names = "default";
+ 				pinctrl-0 = <&pinctrl_dbgu>;
+ 				clocks = <&dbgu_clk>;
+-- 
+1.7.9.5
