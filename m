@@ -1,71 +1,68 @@
-From: ludovic.desroches@atmel.com (Ludovic Desroches)
-Date: Tue, 12 Aug 2014 16:37:57 +0200
-Subject: [PATCH] ARM: at91: sama5d3: add usart dma configurations
-Message-ID: <1407854277-328-1-git-send-email-ludovic.desroches@atmel.com>
+From: thierry.reding@gmail.com (Thierry Reding)
+Date: Tue, 12 Aug 2014 16:40:41 +0200
+Subject: [PATCH] ARM: dts: Only build dtb if associated Arch and/or SoC
+ is enabled
+In-Reply-To: <CALeDE9MMJBbs87oVsHV39tez6Eafg745GSWng-9QdnKV1FKJqQ@mail.gmail.com>
+References: <1407852078-31309-1-git-send-email-pbrobinson@gmail.com>
+ <1407853179.4724.4.camel@weser.hi.pengutronix.de>
+ <CALeDE9MMJBbs87oVsHV39tez6Eafg745GSWng-9QdnKV1FKJqQ@mail.gmail.com>
+Message-ID: <20140812144040.GB9868@ulmo.nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add the DMA configuration for USARTs mainly because it is not obvious to
-add the FIFO flag which is needed for rx.
+On Tue, Aug 12, 2014 at 03:25:31PM +0100, Peter Robinson wrote:
+> On Tue, Aug 12, 2014 at 3:19 PM, Lucas Stach <l.stach@pengutronix.de> wrote:
+> > Am Dienstag, den 12.08.2014, 15:01 +0100 schrieb Peter Robinson:
+> >> A number of arches (EXYNOS/IMX/TEGRA) are separated out into finer
+> >> grained definitions whether it be sub ARCH or SOC definitions. The
+> >> device tree blobs should only be built if the specific option is
+> >> enabled that supports that device or it might be that there's an
+> >> expectation that the device is supported when in actual fact it's
+> >> not. This ensures only the relevant bits are built.
+> >>
+> >> This also helps to avoid trivial merge conflicts when adding support
+> >> for new boards.
+> >>
+> >> Signed-off-by: Peter Robinson <pbrobinson@gmail.com>
+> >
+> > a small nitpick below, otherwise:
+> > Reviewed-by: Lucas Stach <l.stach@pengutronix.de>
+> >
+> >> ---
+> >>  arch/arm/boot/dts/Makefile | 50 +++++++++++++++++++++++++++-------------------
+> >>  1 file changed, 30 insertions(+), 20 deletions(-)
+> >>
+> >> diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
+> >> index b8c5cd3..e95808e 100644
+> >> --- a/arch/arm/boot/dts/Makefile
+> >> +++ b/arch/arm/boot/dts/Makefile
+> >> @@ -64,7 +64,7 @@ dtb-$(CONFIG_ARCH_BRCMSTB) += \
+> >>  dtb-$(CONFIG_ARCH_DAVINCI) += da850-enbw-cmc.dtb \
+> >>       da850-evm.dtb
+> >>  dtb-$(CONFIG_ARCH_EFM32) += efm32gg-dk3750.dtb
+> >> -dtb-$(CONFIG_ARCH_EXYNOS) += exynos4210-origen.dtb \
+> >> +dtb-$(CONFIG_ARCH_EXYNOS4) += exynos4210-origen.dtb \
+> >>       exynos4210-smdkv310.dtb \
+> >>       exynos4210-trats.dtb \
+> >>       exynos4210-universal_c210.dtb \
+> >> @@ -74,8 +74,8 @@ dtb-$(CONFIG_ARCH_EXYNOS) += exynos4210-origen.dtb \
+> >
+> > I would argue that things look a little more consistent with the
+> > linebreak directly behind the "+=", as with the IMX entries. Maybe if
+> > other platform maintainers agree we could change this while touching
+> > things anyway. But this is only a small nitpick, so feel free to ignore.
+> 
+> I agree but I left it as each platform had it to save extra churn as I
+> wasn't sure what the exact convention was.
 
-Signed-off-by: Ludovic Desroches <ludovic.desroches@atmel.com>
----
- arch/arm/boot/dts/sama5d3.dtsi |   15 +++++++++++++++
- 1 file changed, 15 insertions(+)
+It seems like there isn't one convention. But consistency is always
+good, so I second Lucas' proposal.
 
-diff --git a/arch/arm/boot/dts/sama5d3.dtsi b/arch/arm/boot/dts/sama5d3.dtsi
-index e0b15a6..829c162 100644
---- a/arch/arm/boot/dts/sama5d3.dtsi
-+++ b/arch/arm/boot/dts/sama5d3.dtsi
-@@ -177,6 +177,9 @@
- 				compatible = "atmel,at91sam9260-usart";
- 				reg = <0xf001c000 0x100>;
- 				interrupts = <12 IRQ_TYPE_LEVEL_HIGH 5>;
-+				dmas = <&dma0 2 AT91_DMA_CFG_PER_ID(3)>,
-+				       <&dma0 2 (AT91_DMA_CFG_PER_ID(4) | AT91_DMA_CFG_FIFOCFG_ASAP)>;
-+				dma-names = "tx", "rx";
- 				pinctrl-names = "default";
- 				pinctrl-0 = <&pinctrl_usart0>;
- 				clocks = <&usart0_clk>;
-@@ -188,6 +191,9 @@
- 				compatible = "atmel,at91sam9260-usart";
- 				reg = <0xf0020000 0x100>;
- 				interrupts = <13 IRQ_TYPE_LEVEL_HIGH 5>;
-+				dmas = <&dma0 2 AT91_DMA_CFG_PER_ID(5)>,
-+				       <&dma0 2 (AT91_DMA_CFG_PER_ID(6) | AT91_DMA_CFG_FIFOCFG_ASAP)>;
-+				dma-names = "tx", "rx";
- 				pinctrl-names = "default";
- 				pinctrl-0 = <&pinctrl_usart1>;
- 				clocks = <&usart1_clk>;
-@@ -333,6 +339,9 @@
- 				compatible = "atmel,at91sam9260-usart";
- 				reg = <0xf8020000 0x100>;
- 				interrupts = <14 IRQ_TYPE_LEVEL_HIGH 5>;
-+				dmas = <&dma1 2 AT91_DMA_CFG_PER_ID(7)>,
-+				       <&dma1 2 (AT91_DMA_CFG_PER_ID(8) | AT91_DMA_CFG_FIFOCFG_ASAP)>;
-+				dma-names = "tx", "rx";
- 				pinctrl-names = "default";
- 				pinctrl-0 = <&pinctrl_usart2>;
- 				clocks = <&usart2_clk>;
-@@ -344,6 +353,9 @@
- 				compatible = "atmel,at91sam9260-usart";
- 				reg = <0xf8024000 0x100>;
- 				interrupts = <15 IRQ_TYPE_LEVEL_HIGH 5>;
-+				dmas = <&dma1 2 AT91_DMA_CFG_PER_ID(9)>,
-+				       <&dma1 2 (AT91_DMA_CFG_PER_ID(10) | AT91_DMA_CFG_FIFOCFG_ASAP)>;
-+				dma-names = "tx", "rx";
- 				pinctrl-names = "default";
- 				pinctrl-0 = <&pinctrl_usart3>;
- 				clocks = <&usart3_clk>;
-@@ -410,6 +422,9 @@
- 				compatible = "atmel,at91sam9260-usart";
- 				reg = <0xffffee00 0x200>;
- 				interrupts = <2 IRQ_TYPE_LEVEL_HIGH 7>;
-+				dmas = <&dma1 2 AT91_DMA_CFG_PER_ID(13)>,
-+				       <&dma1 2 (AT91_DMA_CFG_PER_ID(14) | AT91_DMA_CFG_FIFOCFG_ASAP)>;
-+				dma-names = "tx", "rx";
- 				pinctrl-names = "default";
- 				pinctrl-0 = <&pinctrl_dbgu>;
- 				clocks = <&dbgu_clk>;
--- 
-1.7.9.5
+Thierry
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: not available
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140812/007cfa84/attachment-0001.sig>
