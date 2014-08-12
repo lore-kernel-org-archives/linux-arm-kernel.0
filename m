@@ -1,81 +1,159 @@
-From: vgoyal@redhat.com (Vivek Goyal)
-Date: Tue, 12 Aug 2014 08:37:36 -0400
-Subject: [PATCH 2/2] asm-generic: add memfd_create system call to unistd.h
-In-Reply-To: <20140812111030.GK29013@arm.com>
-References: <1407764228-7904-1-git-send-email-will.deacon@arm.com>
- <CANq1E4Q0gDaJ5XGnkoCQsG8xLh1Q-EBErtEVPpeeZgGj+Nr8dQ@mail.gmail.com>
- <20140811171511.GF8828@arm.com> <201408112057.01177.arnd@arndb.de>
- <CAMuHMdWZ30ZKO2ddh8whmw5ThrKZC0wsU+rhgoc8fRZni0Zduw@mail.gmail.com>
- <20140812102734.GG29013@arm.com> <20140812111030.GK29013@arm.com>
-Message-ID: <20140812123736.GA16961@redhat.com>
+From: achandran@mvista.com (Arun Chandran)
+Date: Tue, 12 Aug 2014 18:12:45 +0530
+Subject: [PATCH] Arm64: convert soft_restart() to assembly code
+Message-ID: <1407847365-10873-1-git-send-email-achandran@mvista.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Aug 12, 2014 at 12:10:30PM +0100, Will Deacon wrote:
-> On Tue, Aug 12, 2014 at 11:27:34AM +0100, Will Deacon wrote:
-> > On Mon, Aug 11, 2014 at 08:37:41PM +0100, Geert Uytterhoeven wrote:
-> > > On Mon, Aug 11, 2014 at 8:57 PM, Arnd Bergmann <arnd@arndb.de> wrote:
-> > > > On Monday 11 August 2014, Will Deacon wrote:
-> > > >> On Mon, Aug 11, 2014 at 05:54:08PM +0100, David Herrmann wrote:
-> > > >> > On Mon, Aug 11, 2014 at 3:37 PM, Will Deacon <will.deacon@arm.com> wrote:
-> > > >> > > Commit 9183df25fe7b ("shm: add memfd_create() syscall") added a new
-> > > >> > > system call (memfd_create) but didn't update the asm-generic unistd
-> > > >> > > header.
-> > > >> > >
-> > > >> > > This patch adds the new system call to the asm-generic version of
-> > > >> > > unistd.h so that it can be used by architectures such as arm64.
-> > > >> > >
-> > > >> > > Cc: Arnd Bergmann <arnd@arndb.de>
-> > > >> > > Cc: David Herrmann <dh.herrmann@gmail.com>
-> > > >> > > Signed-off-by: Will Deacon <will.deacon@arm.com>
-> > > >> >
-> > > >> > Reviewed-by: David Herrmann <dh.herrmann@gmail.com>
-> > > >>
-> > > >> Thanks, David.
-> > > >>
-> > > >> Arnd: shall I take this via the arm64 tree, or do you already have some
-> > > >> asm-generic patches queued?
-> > > >
-> > > > Please take it for arm64, I don't have any other patches queued at the moment
-> > > > and am currently on vacation.
-> > > 
-> > > Thanks, I was just going to look into adding it...
-> > > 
-> > > BTW, another one sneaked in: kexec_file_load. I say "sneaked", as
-> > > scripts/checksyscalls.sh doesn't catch it, due to it being wired up on
-> > > amd64 only.
-> > 
-> > Oh, well spotted!
-> > 
-> > > Will, you can please add that one, too, while you're at it?
-> > 
-> > Sure, I'll add an extra patch and repost.
-> 
-> Hmm, so whilst I can easily wire-up the new syscall, it's pretty useless for
-> anybody other than x86 at the moment. There are a bunch of arch helpers:
-> 
->  arch_kexec_kernel_image_probe
->  arch_kexec_kernel_verify_sig
->  arch_kexec_kernel_image_load
->  arch_kimage_file_post_load_cleanup
-> 
-> which are only implemented for x86 (arch/x86/kernel/machine_kexec_64.c),
-> even though I don't really see what makes them arch-specific as opposed to
-> file format specific.
+soft_restart() will fail on arm64 systems that does not
+quarantee the flushing of cache to PoC with flush_cache_all().
 
-Yes, at this point of time, this system call will work only on x86. Agreed
-that primarily it is file format details which are primarily in arch
-specific section.
+soft_restart(addr)
+{
+	push_to_stack(addr);
 
-I think that some of the code will become arch independent as other
-arches start implementing this syscall. 
+	Do mm setup for restart;
+	Flush&turnoff D-cache;
 
-> 
-> So this syscall will always fail with -ENOEXEC at the moment. Is it still
-> worth wiring it up?
+	pop_from_stack(addr); --> fails here as addr is not at PoC
+	cpu_reset(addr) --> Jumps to invalid address
+}
 
-I thought that for other arches I have not even defined the syscall. So
-it probably will fail with -ENOSYS.
+So convert the whole code to assembly to make sure that addr
+is not pushed to stack.
 
-Thanks
-Vivek
+Signed-off-by: Arun Chandran <achandran@mvista.com>
+---
+ arch/arm64/include/asm/proc-fns.h    |    1 +
+ arch/arm64/include/asm/system_misc.h |    1 -
+ arch/arm64/kernel/process.c          |   38 ++--------------------------------
+ arch/arm64/mm/proc.S                 |   34 ++++++++++++++++++++++++++++++
+ 4 files changed, 37 insertions(+), 37 deletions(-)
+
+diff --git a/arch/arm64/include/asm/proc-fns.h b/arch/arm64/include/asm/proc-fns.h
+index 0c657bb..e18d5d0 100644
+--- a/arch/arm64/include/asm/proc-fns.h
++++ b/arch/arm64/include/asm/proc-fns.h
+@@ -32,6 +32,7 @@ extern void cpu_cache_off(void);
+ extern void cpu_do_idle(void);
+ extern void cpu_do_switch_mm(unsigned long pgd_phys, struct mm_struct *mm);
+ extern void cpu_reset(unsigned long addr) __attribute__((noreturn));
++extern void cpu_soft_restart(unsigned long addr) __attribute__((noreturn));
+ extern void cpu_do_suspend(struct cpu_suspend_ctx *ptr);
+ extern u64 cpu_do_resume(phys_addr_t ptr, u64 idmap_ttbr);
+ 
+diff --git a/arch/arm64/include/asm/system_misc.h b/arch/arm64/include/asm/system_misc.h
+index 7a18fab..659fbf5 100644
+--- a/arch/arm64/include/asm/system_misc.h
++++ b/arch/arm64/include/asm/system_misc.h
+@@ -41,7 +41,6 @@ struct mm_struct;
+ extern void show_pte(struct mm_struct *mm, unsigned long addr);
+ extern void __show_regs(struct pt_regs *);
+ 
+-void soft_restart(unsigned long);
+ extern void (*arm_pm_restart)(enum reboot_mode reboot_mode, const char *cmd);
+ 
+ #define UDBG_UNDEFINED	(1 << 0)
+diff --git a/arch/arm64/kernel/process.c b/arch/arm64/kernel/process.c
+index 1309d64..3ca1ade 100644
+--- a/arch/arm64/kernel/process.c
++++ b/arch/arm64/kernel/process.c
+@@ -57,40 +57,6 @@ unsigned long __stack_chk_guard __read_mostly;
+ EXPORT_SYMBOL(__stack_chk_guard);
+ #endif
+ 
+-static void setup_restart(void)
+-{
+-	/*
+-	 * Tell the mm system that we are going to reboot -
+-	 * we may need it to insert some 1:1 mappings so that
+-	 * soft boot works.
+-	 */
+-	setup_mm_for_reboot();
+-
+-	/* Clean and invalidate caches */
+-	flush_cache_all();
+-
+-	/* Turn D-cache off */
+-	cpu_cache_off();
+-
+-	/* Push out any further dirty data, and ensure cache is empty */
+-	flush_cache_all();
+-}
+-
+-void soft_restart(unsigned long addr)
+-{
+-	typedef void (*phys_reset_t)(unsigned long);
+-	phys_reset_t phys_reset;
+-
+-	setup_restart();
+-
+-	/* Switch to the identity mapping */
+-	phys_reset = (phys_reset_t)virt_to_phys(cpu_reset);
+-	phys_reset(addr);
+-
+-	/* Should never get here */
+-	BUG();
+-}
+-
+ /*
+  * Function pointers to optional machine specific functions
+  */
+@@ -162,8 +128,8 @@ void machine_power_off(void)
+ 
+ /*
+  * Restart requires that the secondary CPUs stop performing any activity
+- * while the primary CPU resets the system. Systems with a single CPU can
+- * use soft_restart() as their machine descriptor's .restart hook, since that
++ * while the primary CPU resets the system. Systems with a single CPU can use
++ * cpu_soft_restart() as their machine descriptor's .restart hook, since that
+  * will cause the only available CPU to reset. Systems with multiple CPUs must
+  * provide a HW restart implementation, to ensure that all CPUs reset@once.
+  * This is required so that any code running after reset on the primary CPU
+diff --git a/arch/arm64/mm/proc.S b/arch/arm64/mm/proc.S
+index 7736779..a7c3fce 100644
+--- a/arch/arm64/mm/proc.S
++++ b/arch/arm64/mm/proc.S
+@@ -76,6 +76,40 @@ ENTRY(cpu_reset)
+ 	ret	x0
+ ENDPROC(cpu_reset)
+ 
++	.align 3
++1:	.quad	memstart_addr
++
++ENTRY(cpu_soft_restart)
++	adr	x1, cpu_reset
++	adr	x2, 1b
++
++	/* virt_to_phys(cpu_reset) */
++	ldr	x3, [x2]
++	ldr	x3, [x3]
++	mov	x4, #1
++	lsl	x4, x4, #(VA_BITS - 1)
++	add	x1, x1, x4
++	add	x1, x1, x3
++
++	/* Save it; We can't use stack as it is going to run with caches OFF */
++	mov	x19, x0
++	mov	x20, x1
++
++	bl	setup_mm_for_reboot
++
++	bl	flush_cache_all
++	/* Turn D-cache off */
++	bl	cpu_cache_off
++	/* Push out any further dirty data, and ensure cache is empty */
++	bl	flush_cache_all
++
++	mov	x0, x19
++
++	br	x20
++	/* It should never come back */
++	bl	panic
++ENDPROC(cpu_soft_restart)
++
+ /*
+  *	cpu_do_idle()
+  *
+-- 
+1.7.9.5
