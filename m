@@ -1,41 +1,47 @@
 From: javier.martinez@collabora.co.uk (Javier Martinez Canillas)
-Date: Tue, 12 Aug 2014 20:49:29 +0200
-Subject: [PATCH 6/6] ARM: dts: Add tps65090 FETs constraints
-In-Reply-To: <20140812172552.GU17528@sirena.org.uk>
-References: <1407861868-20097-1-git-send-email-javier.martinez@collabora.co.uk>
- <1407861868-20097-7-git-send-email-javier.martinez@collabora.co.uk>
- <20140812172552.GU17528@sirena.org.uk>
-Message-ID: <53EA61B9.2070805@collabora.co.uk>
+Date: Tue, 12 Aug 2014 20:58:09 +0200
+Subject: [PATCH 3/6] ARM: dts: Create cros-tps65090 fragment
+In-Reply-To: <CAD=FV=XNsQ_8h-d8epU_gzWRH=A49a8iuirWCUe4TO6VGCvDSw@mail.gmail.com>
+References: <1407861868-20097-1-git-send-email-javier.martinez@collabora.co.uk>	<1407861868-20097-4-git-send-email-javier.martinez@collabora.co.uk>
+ <CAD=FV=XNsQ_8h-d8epU_gzWRH=A49a8iuirWCUe4TO6VGCvDSw@mail.gmail.com>
+Message-ID: <53EA63C1.2040302@collabora.co.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08/12/2014 07:25 PM, Mark Brown wrote:
-> 
->>  		tps65090_fet1: fet1 {
->> +			regulator-min-microvolt = <5000000>;
->> +			regulator-max-microvolt = <17000000>;
->>  		};
-> 
-> No, this is completely broken and exactly the sort of thing that makes
-> doing generic device .dtsi a bad idea.  We have absolutely no idea if
-> these voltage ranges are suitable for use on a given board using the
-> device, these are the design limits for the device but tell us nothing
-> about the system they are deployed in.
-> 
+Hello Doug,
 
-Thanks for the explanation. I did the refactoring because I saw that there are
-.dtsi files for other PMICs already (twl4030, twl6030, tps65*) but now you also
-explained that those are broken as well.
+Thanks for your feedback.
 
-So, is adding these voltages ranges (the design limits) in the Peach Pit DTS
-file directly an acceptable solution? Basically what my previous patch [0] did.
+On 08/12/2014 07:26 PM, Doug Anderson wrote:
+> Javier,
+> 
+> On Tue, Aug 12, 2014 at 9:44 AM, Javier Martinez Canillas
+> <javier.martinez@collabora.co.uk> wrote:
+>> The tps65090 PMU is a component used in many ChromeOS devices
+>> so instead of having the same device tree definitions in many
+>> files, create a .dtsi fragment that can be included in DTS.
+>>
+>> This fragment is based on the DT definitions for Peach boards.
+>>
+>> Signed-off-by: Javier Martinez Canillas <javier.martinez@collabora.co.uk>
+>> ---
+>>  arch/arm/boot/dts/cros-tps65090.dtsi | 81 ++++++++++++++++++++++++++++++++++++
+>>  1 file changed, 81 insertions(+)
+>>  create mode 100644 arch/arm/boot/dts/cros-tps65090.dtsi
+> 
+> I'd probably skip this patch (just have duplication in pit vs. pi), or
+> make it "peach" specific (like exynos-peach-tps65090.dtsi?).  This is
+> really board-specific info and trying to guess what the various FETs
+> are going to be for for all peach variants doesn't seem great.
+>
 
-That matches what is in the board schematic so I assume that it's safe to use
-these voltage ranges for that machine. If so I'll drop this series and repost
-that patch fixing the typo error and commit message pointed by Doug that were
-already addressed in $subject.
+Yes, I guess I went to far on the refactoring with this patch. Most likely I'll
+drop the whole series anyway and just add the voltage constraints and parent
+supplies to the board DTS, now that Mark explained to me that this refactoring
+is actually doing more harm than good.
+
+> -Doug
+> 
 
 Best regards,
 Javier
-
-[0]: https://lkml.org/lkml/2014/8/11/204
