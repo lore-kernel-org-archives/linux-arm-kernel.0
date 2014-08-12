@@ -1,59 +1,31 @@
-From: ohaugan@codeaurora.org (Olav Haugan)
-Date: Tue, 12 Aug 2014 09:56:11 -0700
-Subject: [PATCH v5 1/1] iommu-api: Add map_sg/unmap_sg functions
-In-Reply-To: <CAF6AEGvZUanVtPxAt76+AAdOaNwyMJ3cmcJ1srsEYBeG7ELkBQ@mail.gmail.com>
-References: <1407797150-515-1-git-send-email-ohaugan@codeaurora.org>
- <1407797150-515-2-git-send-email-ohaugan@codeaurora.org>
- <871tsm5vcn.fsf@nvidia.com>
- <CAF6AEGvZUanVtPxAt76+AAdOaNwyMJ3cmcJ1srsEYBeG7ELkBQ@mail.gmail.com>
-Message-ID: <53EA472B.3020900@codeaurora.org>
+From: broonie@kernel.org (Mark Brown)
+Date: Tue, 12 Aug 2014 17:58:52 +0100
+Subject: [PATCH 1/6] ARM: dts: Create fragment for tps65090 PMU
+In-Reply-To: <1407861868-20097-2-git-send-email-javier.martinez@collabora.co.uk>
+References: <1407861868-20097-1-git-send-email-javier.martinez@collabora.co.uk>
+ <1407861868-20097-2-git-send-email-javier.martinez@collabora.co.uk>
+Message-ID: <20140812165852.GT17528@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 8/12/2014 3:48 AM, Rob Clark wrote:
-> On Mon, Aug 11, 2014 at 9:51 PM, Hiroshi Doyu <hdoyu@nvidia.com> wrote:
->> Hi Olav,
->>
->> Olav Haugan <ohaugan@codeaurora.org> writes:
->>
->>> @@ -93,6 +94,10 @@ enum iommu_attr {
->>>   * @detach_dev: detach device from an iommu domain
->>>   * @map: map a physically contiguous memory region to an iommu domain
->>>   * @unmap: unmap a physically contiguous memory region from an iommu domain
->>> + * @map_sg: map a scatter-gather list of physically contiguous memory chunks
->>> + * to an iommu domain
->>> + * @unmap_sg: unmap a scatter-gather list of physically contiguous memory
->>> + * chunks from an iommu domain
->>>   * @iova_to_phys: translate iova to physical address
->>>   * @domain_has_cap: domain capabilities query
->>>   * @add_device: add device to iommu grouping
->>> @@ -110,6 +115,11 @@ struct iommu_ops {
->>>                    phys_addr_t paddr, size_t size, int prot);
->>>         size_t (*unmap)(struct iommu_domain *domain, unsigned long iova,
->>>                      size_t size);
->>> +       int (*map_sg)(struct iommu_domain *domain, unsigned long iova,
->>> +                       struct scatterlist *sg, unsigned int nents, int prot,
->>> +                       unsigned long flags);
->>> +       int (*unmap_sg)(struct iommu_domain *domain, unsigned long iova,
->>> +                       size_t size, unsigned long flags);
->>
->> Do you have any exmaple/explanation for the above "flags"?
->>
->> Is this going to be used for iommu global/standard attribute or SoC
->> spcific one?
-> 
-> iirc, one plan for 'flags' was some sort of DONT_FLUSH_TLB flag for
-> drivers which wanted to map/unmap N buffers with a single flush at the
-> end.  There might have been some other usages envisioned.
-> 
+On Tue, Aug 12, 2014 at 06:44:23PM +0200, Javier Martinez Canillas wrote:
+> The tps65090 is a Power Management Unit (PMU) used in several
+> boards so the same information is described on different DTS.
+> It is better to create a .dtsi fragment that can be included.
 
-Yes, that was the original intent of the flags for now. I am sure we can
-find other uses for this in the future.
+Why is it better to do this?
 
-Thanks,
+> +	regulators {
+> +		tps65090_dcdc1: dcdc1 {
+> +		};
+> +
 
-Olav
-
--- 
-The Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-hosted by The Linux Foundation
+It appears to be largely content free, exactly the same effect should be
+achieved by removing the entire regulators node.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140812/c473d347/attachment.sig>
