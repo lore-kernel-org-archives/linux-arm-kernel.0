@@ -1,54 +1,80 @@
-From: daniel.lezcano@linaro.org (Daniel Lezcano)
-Date: Tue, 12 Aug 2014 22:49:12 +0200
-Subject: [PATCH v2 1/3] ARM: EXYNOS: Fix build with PM_SLEEP=n and
- ARM_EXYNOS_CPUIDLE=n
-In-Reply-To: <1407856317-2457-2-git-send-email-b.zolnierkie@samsung.com>
-References: <1407856317-2457-1-git-send-email-b.zolnierkie@samsung.com>
- <1407856317-2457-2-git-send-email-b.zolnierkie@samsung.com>
-Message-ID: <53EA7DC8.6040801@linaro.org>
+From: dianders@chromium.org (Doug Anderson)
+Date: Tue, 12 Aug 2014 14:06:11 -0700
+Subject: [PATCH v3 1/4] ARM: dts: Add emmc and sdmmc to the rk3288 device
+ tree
+In-Reply-To: <1407344984-14176-2-git-send-email-dianders@chromium.org>
+References: <1407344984-14176-1-git-send-email-dianders@chromium.org>
+ <1407344984-14176-2-git-send-email-dianders@chromium.org>
+Message-ID: <CAD=FV=Wsc-Pkvg9jumdg9i1oO+T1=jtZTfbc+qE5RDrCXaaezA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08/12/2014 05:11 PM, Bartlomiej Zolnierkiewicz wrote:
-> Fix building of exynos_defconfig with disabled CONFIG_PM_SLEEP by
-> adding checking whether Exynos cpuidle support is enabled before
-> accessing exynos_enter_aftr.
+Heiko,
+
+On Wed, Aug 6, 2014 at 10:09 AM, Doug Anderson <dianders@chromium.org> wrote:
+> This adds support for the sdmmc and emmc ports on the rk3288 using the
+> currently posted driver from Addy at:
+>   https://patchwork.kernel.org/patch/4653631/
 >
-> The build error message:
-> arch/arm/mach-exynos/built-in.o:(.data+0x74): undefined reference to `exynos_enter_aftr'
-> make: *** [vmlinux] Error 1
- >
-> This patch has been tested on Exynos4210 based Origen board.
+> Note:
+> * This is not baesd on Jaehoon's patch series removing the slot node,
+>   but it does use new syntax like putting the bus width at the top
+>   level and using the new cap-mmc-highspeed / cap-sd-highspeed.  A
+>   future patch will modify this one to remove the slot node.
 >
-> Signed-off-by: Bartlomiej Zolnierkiewicz <b.zolnierkie@samsung.com>
-> Acked-by: Kyungmin Park <kyungmin.park@samsung.com>
+> Signed-off-by: Doug Anderson <dianders@chromium.org>
+> Acked-by: Arnd Bergmann <arnd@arndb.de>
 > ---
->   arch/arm/mach-exynos/exynos.c | 2 ++
->   1 file changed, 2 insertions(+)
+> Changes in v3: None
+> Changes in v2:
+> - New patchwork link for Addy's patch
 >
-> diff --git a/arch/arm/mach-exynos/exynos.c b/arch/arm/mach-exynos/exynos.c
-> index 6a24e11..d57f136 100644
-> --- a/arch/arm/mach-exynos/exynos.c
-> +++ b/arch/arm/mach-exynos/exynos.c
-> @@ -161,7 +161,9 @@ static void exynos_restart(enum reboot_mode mode, const char *cmd)
+>  arch/arm/boot/dts/rk3288.dtsi | 22 ++++++++++++++++++++++
+>  1 file changed, 22 insertions(+)
 >
->   static struct platform_device exynos_cpuidle = {
->   	.name              = "exynos_cpuidle",
-> +#ifdef CONFIG_ARM_EXYNOS_CPUIDLE
->   	.dev.platform_data = exynos_enter_aftr,
-> +#endif
->   	.id                = -1,
->   };
+> diff --git a/arch/arm/boot/dts/rk3288.dtsi b/arch/arm/boot/dts/rk3288.dtsi
+> index e7cb008..dc98a5b 100644
+> --- a/arch/arm/boot/dts/rk3288.dtsi
+> +++ b/arch/arm/boot/dts/rk3288.dtsi
+> @@ -78,6 +78,28 @@
+>                 clock-frequency = <24000000>;
+>         };
+>
+> +       sdmmc: dwmmc at ff0c0000 {
+> +               compatible = "rockchip,rk3288-dw-mshc";
+> +               clocks = <&cru HCLK_SDMMC>, <&cru SCLK_SDMMC>;
+> +               clock-names = "biu", "ciu";
+> +               fifo-depth = <0x100>;
+> +               interrupts = <GIC_SPI 32 IRQ_TYPE_LEVEL_HIGH>;
+> +               reg = <0xff0c0000 0x4000>;
+> +               #address-cells = <1>;
+> +               #size-cells = <0>;
 
-This patch does not address the real issue of the compilation error. The 
-cpuidle driver needs the exynos_enter_aftr function in order to work 
-correctly. Hence the Makefile should be fixed in order to compile pm.o 
-if cpuidle or pm_sleep are set.
+When doing other testing I realized that I missed a:
+  status = "disabled";
+
+...from both of these two nodes.  I'm happy to repost with this fix or
+I'm happy if you want to add to the patch when applying.
+
+Let me know.  Thanks!
 
 
--- 
-  <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
-
-Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
-<http://twitter.com/#!/linaroorg> Twitter |
-<http://www.linaro.org/linaro-blog/> Blog
+> +       };
+> +
+> +       emmc: dwmmc at ff0f0000 {
+> +               compatible = "rockchip,rk3288-dw-mshc";
+> +               clocks = <&cru HCLK_EMMC>, <&cru SCLK_EMMC>;
+> +               clock-names = "biu", "ciu";
+> +               fifo-depth = <0x100>;
+> +               interrupts = <GIC_SPI 35 IRQ_TYPE_LEVEL_HIGH>;
+> +               reg = <0xff0f0000 0x4000>;
+> +               #address-cells = <1>;
+> +               #size-cells = <0>;
+> +       };
+> +
+>         i2c1: i2c at ff140000 {
+>                 compatible = "rockchip,rk3288-i2c";
+>                 reg = <0xff140000 0x1000>;
+> --
+> 2.0.0.526.g5318336
+>
