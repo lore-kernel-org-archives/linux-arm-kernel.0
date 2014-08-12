@@ -1,39 +1,53 @@
-From: hdoyu@nvidia.com (Hiroshi Doyu)
-Date: Tue, 12 Aug 2014 04:51:04 +0300
-Subject: [PATCH v5 1/1] iommu-api: Add map_sg/unmap_sg functions
-In-Reply-To: <1407797150-515-2-git-send-email-ohaugan@codeaurora.org>
-References: <1407797150-515-1-git-send-email-ohaugan@codeaurora.org>
- <1407797150-515-2-git-send-email-ohaugan@codeaurora.org>
-Message-ID: <871tsm5vcn.fsf@nvidia.com>
+From: robherring2@gmail.com (Rob Herring)
+Date: Mon, 11 Aug 2014 21:25:45 -0500
+Subject: [PATCH] ARM: expand fixmap region to 3MB
+In-Reply-To: <20140811161448.GA4002@bivouac.eciton.net>
+References: <1407511404-11997-1-git-send-email-robherring2@gmail.com>
+ <20140811161448.GA4002@bivouac.eciton.net>
+Message-ID: <CAL_JsqLSZis=G-TzDcoPwUkv_=vyzNpGRc9oGOg_SJ_9gPjAtA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Olav,
+On Mon, Aug 11, 2014 at 11:14 AM, Leif Lindholm
+<leif.lindholm@linaro.org> wrote:
+> On Fri, Aug 08, 2014 at 10:23:24AM -0500, Rob Herring wrote:
+>> From: Rob Herring <robh@kernel.org>
+>>
+>> With commit a05e54c103b0b8 "ARM: 8031/2: change fixmap mapping region to
+>> support 32 CPUs", the fixmap region was expanded to 2MB, but it
+>> precluded any other uses of the fixmap region in order to support up to
+>> 32 CPUs. In order to support other uses the fixmap region needs to be
+>> expanded beyond 2MB. Fortunately, the adjacent 1MB range
+>> 0xffe00000-0xfff00000 is availabe to use.
+>>
+>> Remove fixmap_page_table ptr and lookup the page table via the virtual
+>> address so that the fixmap region can span more that one pmd. The 2nd
+>> pmd is already created since it is shared with the vector page.
+>>
+>> Cc: Leif Lindholm <leif.lindholm@linaro.org>
+>> Cc: Kees Cook <keescook@chromium.org>
+>> Cc: Russell King <linux@arm.linux.org.uk>
+>> Signed-off-by: Rob Herring <robh@kernel.org>
+>> ---
+>>
+>> This patch can come before or after the generic fixmap.h. There's a
+>> single line conflict with the ending address
+>
+> Tested-by: Leif Lindholm <leif.lindholm@linaro.org>
+> For Kees' set with this addition + generic fixmap + early_ioremap +
+> UEFI.
+>
+>> This worked for earlycon, but I've not done any highmem specific
+>> testing. My full series is available here:
+>>
+>> git://git.kernel.org/pub/scm/linux/kernel/git/robh/linux.git fixmap
+>
+> I was hoping to be able to give you a tested-by for that series on
+> next-20140811 with the UEFI patches, but that setup fails to boot
+> right now. Looking into why.
 
-Olav Haugan <ohaugan@codeaurora.org> writes:
+Doing early ioremap as well I guess? It may be that 2 page tables are
+not getting setup early as earlycon would use one end of the region
+and early_ioremap uses the other end.
 
-> @@ -93,6 +94,10 @@ enum iommu_attr {
->   * @detach_dev: detach device from an iommu domain
->   * @map: map a physically contiguous memory region to an iommu domain
->   * @unmap: unmap a physically contiguous memory region from an iommu domain
-> + * @map_sg: map a scatter-gather list of physically contiguous memory chunks
-> + * to an iommu domain
-> + * @unmap_sg: unmap a scatter-gather list of physically contiguous memory
-> + * chunks from an iommu domain
->   * @iova_to_phys: translate iova to physical address
->   * @domain_has_cap: domain capabilities query
->   * @add_device: add device to iommu grouping
-> @@ -110,6 +115,11 @@ struct iommu_ops {
->                    phys_addr_t paddr, size_t size, int prot);
->         size_t (*unmap)(struct iommu_domain *domain, unsigned long iova,
->                      size_t size);
-> +       int (*map_sg)(struct iommu_domain *domain, unsigned long iova,
-> +                       struct scatterlist *sg, unsigned int nents, int prot,
-> +                       unsigned long flags);
-> +       int (*unmap_sg)(struct iommu_domain *domain, unsigned long iova,
-> +                       size_t size, unsigned long flags);
-
-Do you have any exmaple/explanation for the above "flags"?
-
-Is this going to be used for iommu global/standard attribute or SoC
-spcific one?
+Rob
