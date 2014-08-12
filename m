@@ -1,106 +1,100 @@
-From: gang.chen.5i5j@gmail.com (Chen Gang)
-Date: Wed, 13 Aug 2014 06:48:35 +0800
-Subject: [PATCH v2] arch: Kconfig: Let all little endian architectures define
- CPU_LITTLE_ENDIAN explicitly
-Message-ID: <53EA99C3.90203@gmail.com>
+From: m.smarduch@samsung.com (Mario Smarduch)
+Date: Tue, 12 Aug 2014 16:17:10 -0700
+Subject: [PATCH v9 2/4] arm: ARMv7  dirty page logging inital mem region
+ write protect (w/no huge PUD support)
+In-Reply-To: <20140812093222.GL10550@cbox>
+References: <1406249768-25315-1-git-send-email-m.smarduch@samsung.com>
+ <1406249768-25315-3-git-send-email-m.smarduch@samsung.com>
+ <20140811191257.GG10550@cbox> <53E95CD5.9070809@samsung.com>
+ <20140812093222.GL10550@cbox>
+Message-ID: <53EAA076.8060802@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-x86 and ia64 are always little endian. And another architectures may be
-little endian: mips, sh, powerpc, and m32r (may mark CPU_LITTLE_ENDIAN
-explicitly); also arm(64) and c6x (which may be !CPU_BIG_ENDIAN).
+On 08/12/2014 02:32 AM, Christoffer Dall wrote:
+> On Mon, Aug 11, 2014 at 05:16:21PM -0700, Mario Smarduch wrote:
+>> On 08/11/2014 12:12 PM, Christoffer Dall wrote:
+>>> Remove the parenthesis from the subject line.
+>>
+> 
+> I just prefer not having the "(w/no huge PUD support)" part in the patch
+> title.
 
-Some drivers (e.g. some of "drivers/isdn/hisax") may only support little
-endian (CPU_LITTLE_ENDIAN), and some drivers may only support big endian
-(!CPU_LITTLE_ENDIAN).
+Ah ok.
 
-So export all little endian architectures within kernel wide, so can let
-Kconfig easier for the modules which only support little endian or only
-for big endian (assume !CPU_LITTLE_ENDIAN is same as CPU_BIG_ENDIAN).
+> 
+>> Hmmm have to check this don't see it my patch file.
+>>>
+>>> On Thu, Jul 24, 2014 at 05:56:06PM -0700, Mario Smarduch wrote:
+>>>> Patch adds  support for initial write protection VM memlsot. This patch series
+>>>             ^^                                    ^
+>>> stray whitespace                                 of
+>>>
+>> Need to watch out for these adds delays to review cycle.
+> 
+> yes, I care quite a lot about proper English, syntax, grammar and
+> spelling.  Reading critically through your own patch files before
+> mailing them out is a good exercise.  You can even consider putting them
+> through a spell-checker and/or configure your editor to mark double
+> white space, trailing white space etc.
+> 
+> [...]
+> 
+>>>> +	do {
+>>>> +		next = kvm_pmd_addr_end(addr, end);
+>>>> +		if (!pmd_none(*pmd)) {
+>>>> +			if (kvm_pmd_huge(*pmd)) {
+>>>> +				if (!kvm_s2pmd_readonly(pmd))
+>>>> +					kvm_set_s2pmd_readonly(pmd);
+>>>> +			} else
+>>>> +				stage2_wp_pte_range(pmd, addr, next);
+>>> please use a closing brace when the first part of the if-statement is a
+>>> multi-line block with braces, as per the CodingStyle.
+>> Will fix.
+>>>> +
+>>>
+>>> stray blank line
+>>
+>> Not sure how it got by checkpatch, will fix.
+> 
+> Not sure checkpatch will complain, but I do ;)  No big deal anyway.
+> 
+>>>
+>>>> +		}
+>>>> +	} while (pmd++, addr = next, addr != end);
+>>>> +}
+>>>> +
+>>>> +/**
+>>>> +  * stage2_wp_pud_range - write protect PUD range
+>>>> +  * @kvm:	pointer to kvm structure
+>>>> +  * @pud:	pointer to pgd entry
+>>>         pgd
+>>>> +  * @addr:	range start address
+>>>> +  * @end:	range end address
+>>>> +  *
+>>>> +  * While walking the PUD range huge PUD pages are ignored, in the future this
+>>>                              range, huge PUDs are ignored.  In the future...
+>>>> +  * may need to be revisited. Determine how to handle huge PUDs when logging
+>>>> +  * of dirty pages is enabled.
+>>>
+>>> I don't understand the last sentence?
+>>
+>> Probably last two sentences should be combined.
+>> ".... to determine how to handle huge PUT...". Would that be
+>> clear enough?
+>>
+>> The overall theme is what to do about PUDs - mark all pages dirty
+>> in the region, attempt to breakup such huge regions?
+>>
+> 
+> I think you should just state that this is not supported and worry
+> about how to deal with it when it's properly supported.  The TODO below
+> is sufficient, so just drop all mentionings about the future in the
+> function description above - it's likely to be forgotten when PUDs are
+> in fact support anyhow.
 
-
-Signed-off-by: Chen Gang <gang.chen.5i5j@gmail.com>
----
- arch/arm/Kconfig   | 5 +++++
- arch/arm64/Kconfig | 4 ++++
- arch/c6x/Kconfig   | 4 ++++
- arch/ia64/Kconfig  | 3 +++
- arch/x86/Kconfig   | 3 +++
- 5 files changed, 19 insertions(+)
-
-diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-index c49a775..0510a5d 100644
---- a/arch/arm/Kconfig
-+++ b/arch/arm/Kconfig
-@@ -199,6 +199,11 @@ config NEED_DMA_MAP_STATE
- config ARCH_SUPPORTS_UPROBES
- 	def_bool y
- 
-+config CPU_LITTLE_ENDIAN
-+	depends on !CPU_BIG_ENDIAN
-+	def_bool y
-+
-+
- config ARCH_HAS_DMA_SET_COHERENT_MASK
- 	bool
- 
-diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
-index 62b4ae1..290a253 100644
---- a/arch/arm64/Kconfig
-+++ b/arch/arm64/Kconfig
-@@ -129,6 +129,10 @@ config KERNEL_MODE_NEON
- config FIX_EARLYCON_MEM
- 	def_bool y
- 
-+config CPU_LITTLE_ENDIAN
-+	depends on !CPU_BIG_ENDIAN
-+	def_bool y
-+
- source "init/Kconfig"
- 
- source "kernel/Kconfig.freezer"
-diff --git a/arch/c6x/Kconfig b/arch/c6x/Kconfig
-index 77ea09b..56a8f53 100644
---- a/arch/c6x/Kconfig
-+++ b/arch/c6x/Kconfig
-@@ -48,6 +48,10 @@ config C6X_BIG_KERNEL
- 
- 	  If unsure, say N.
- 
-+config CPU_LITTLE_ENDIAN
-+	depends on !CPU_BIG_ENDIAN
-+	def_bool y
-+
- source "init/Kconfig"
- 
- # Use the generic interrupt handling code in kernel/irq/
-diff --git a/arch/ia64/Kconfig b/arch/ia64/Kconfig
-index 64aefb7..fa12d34 100644
---- a/arch/ia64/Kconfig
-+++ b/arch/ia64/Kconfig
-@@ -133,6 +133,9 @@ config AUDIT_ARCH
- 	bool
- 	default y
- 
-+config CPU_LITTLE_ENDIAN
-+	def_bool y
-+
- menuconfig PARAVIRT_GUEST
- 	bool "Paravirtualized guest support"
- 	depends on BROKEN
-diff --git a/arch/x86/Kconfig b/arch/x86/Kconfig
-index 541e7cc..a1b3568 100644
---- a/arch/x86/Kconfig
-+++ b/arch/x86/Kconfig
-@@ -270,6 +270,9 @@ config ARCH_SUPPORTS_UPROBES
- config FIX_EARLYCON_MEM
- 	def_bool y
- 
-+config CPU_LITTLE_ENDIAN
-+	def_bool y
-+
- source "init/Kconfig"
- source "kernel/Kconfig.freezer"
- 
--- 
-1.7.11.7
+Ok the simpler the better.
+> 
+> Thanks,
+> -Christoffer
+> 
