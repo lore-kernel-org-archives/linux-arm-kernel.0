@@ -1,49 +1,92 @@
-From: b20788@freescale.com (Anson Huang)
-Date: Tue, 12 Aug 2014 17:26:03 +0800
-Subject: [PATCH] ARM: imx: correct gpu2d_axi and gpu3d_axi clock setting
-Message-ID: <1407835563-28220-1-git-send-email-b20788@freescale.com>
+From: christoffer.dall@linaro.org (Christoffer Dall)
+Date: Tue, 12 Aug 2014 11:32:22 +0200
+Subject: [PATCH v9 2/4] arm: ARMv7  dirty page logging inital mem region
+ write protect (w/no huge PUD support)
+In-Reply-To: <53E95CD5.9070809@samsung.com>
+References: <1406249768-25315-1-git-send-email-m.smarduch@samsung.com>
+ <1406249768-25315-3-git-send-email-m.smarduch@samsung.com>
+ <20140811191257.GG10550@cbox> <53E95CD5.9070809@samsung.com>
+Message-ID: <20140812093222.GL10550@cbox>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On i.MX6Q, gpu2d_axi and gpu3d_axi are either from AXI or
-AHB clock, but on i.MX6DL, gpu2d_axi and gpu3d_axi are
-from mmdc_ch0_axi_podf, and they can NOT be gated by mmdc_ch0_axi
-'s clock gate, the mux option register field(CCM_CBCMR)
-is marked as "Reserved" now on i.MX6DL RM, so correct these
-two clks setting.
+On Mon, Aug 11, 2014 at 05:16:21PM -0700, Mario Smarduch wrote:
+> On 08/11/2014 12:12 PM, Christoffer Dall wrote:
+> > Remove the parenthesis from the subject line.
+> 
 
-Signed-off-by: Anson Huang <b20788@freescale.com>
----
- arch/arm/mach-imx/clk-imx6q.c |   10 ++++++++--
- 1 file changed, 8 insertions(+), 2 deletions(-)
+I just prefer not having the "(w/no huge PUD support)" part in the patch
+title.
 
-diff --git a/arch/arm/mach-imx/clk-imx6q.c b/arch/arm/mach-imx/clk-imx6q.c
-index 6cceb77..29d4129 100644
---- a/arch/arm/mach-imx/clk-imx6q.c
-+++ b/arch/arm/mach-imx/clk-imx6q.c
-@@ -194,6 +194,10 @@ static void __init imx6q_clocks_init(struct device_node *ccm_node)
- 	clk[IMX6QDL_CLK_PLL3_80M]  = imx_clk_fixed_factor("pll3_80m",  "pll3_usb_otg",   1, 6);
- 	clk[IMX6QDL_CLK_PLL3_60M]  = imx_clk_fixed_factor("pll3_60m",  "pll3_usb_otg",   1, 8);
- 	clk[IMX6QDL_CLK_TWD]       = imx_clk_fixed_factor("twd",       "arm",            1, 2);
-+	if (cpu_is_imx6dl()) {
-+		clk[IMX6QDL_CLK_GPU2D_AXI] = imx_clk_fixed_factor("gpu2d_axi", "mmdc_ch0_axi_podf", 1, 1);
-+		clk[IMX6QDL_CLK_GPU3D_AXI] = imx_clk_fixed_factor("gpu3d_axi", "mmdc_ch0_axi_podf", 1, 1);
-+	}
- 
- 	clk[IMX6QDL_CLK_PLL4_POST_DIV] = clk_register_divider_table(NULL, "pll4_post_div", "pll4_audio", CLK_SET_RATE_PARENT, base + 0x70, 19, 2, 0, post_div_table, &imx_ccm_lock);
- 	clk[IMX6QDL_CLK_PLL4_AUDIO_DIV] = clk_register_divider(NULL, "pll4_audio_div", "pll4_post_div", CLK_SET_RATE_PARENT, base + 0x170, 15, 1, 0, &imx_ccm_lock);
-@@ -217,8 +221,10 @@ static void __init imx6q_clocks_init(struct device_node *ccm_node)
- 	clk[IMX6QDL_CLK_ESAI_SEL]         = imx_clk_mux("esai_sel",         base + 0x20, 19, 2, audio_sels,        ARRAY_SIZE(audio_sels));
- 	clk[IMX6QDL_CLK_ASRC_SEL]         = imx_clk_mux("asrc_sel",         base + 0x30, 7,  2, audio_sels,        ARRAY_SIZE(audio_sels));
- 	clk[IMX6QDL_CLK_SPDIF_SEL]        = imx_clk_mux("spdif_sel",        base + 0x30, 20, 2, audio_sels,        ARRAY_SIZE(audio_sels));
--	clk[IMX6QDL_CLK_GPU2D_AXI]        = imx_clk_mux("gpu2d_axi",        base + 0x18, 0,  1, gpu_axi_sels,      ARRAY_SIZE(gpu_axi_sels));
--	clk[IMX6QDL_CLK_GPU3D_AXI]        = imx_clk_mux("gpu3d_axi",        base + 0x18, 1,  1, gpu_axi_sels,      ARRAY_SIZE(gpu_axi_sels));
-+	if (cpu_is_imx6q()) {
-+		clk[IMX6QDL_CLK_GPU2D_AXI]        = imx_clk_mux("gpu2d_axi",        base + 0x18, 0,  1, gpu_axi_sels,      ARRAY_SIZE(gpu_axi_sels));
-+		clk[IMX6QDL_CLK_GPU3D_AXI]        = imx_clk_mux("gpu3d_axi",        base + 0x18, 1,  1, gpu_axi_sels,      ARRAY_SIZE(gpu_axi_sels));
-+	}
- 	clk[IMX6QDL_CLK_GPU2D_CORE_SEL]   = imx_clk_mux("gpu2d_core_sel",   base + 0x18, 16, 2, gpu2d_core_sels,   ARRAY_SIZE(gpu2d_core_sels));
- 	clk[IMX6QDL_CLK_GPU3D_CORE_SEL]   = imx_clk_mux("gpu3d_core_sel",   base + 0x18, 4,  2, gpu3d_core_sels,   ARRAY_SIZE(gpu3d_core_sels));
- 	clk[IMX6QDL_CLK_GPU3D_SHADER_SEL] = imx_clk_mux("gpu3d_shader_sel", base + 0x18, 8,  2, gpu3d_shader_sels, ARRAY_SIZE(gpu3d_shader_sels));
--- 
-1.7.9.5
+> Hmmm have to check this don't see it my patch file.
+> > 
+> > On Thu, Jul 24, 2014 at 05:56:06PM -0700, Mario Smarduch wrote:
+> >> Patch adds  support for initial write protection VM memlsot. This patch series
+> >             ^^                                    ^
+> > stray whitespace                                 of
+> > 
+> Need to watch out for these adds delays to review cycle.
+
+yes, I care quite a lot about proper English, syntax, grammar and
+spelling.  Reading critically through your own patch files before
+mailing them out is a good exercise.  You can even consider putting them
+through a spell-checker and/or configure your editor to mark double
+white space, trailing white space etc.
+
+[...]
+
+> >> +	do {
+> >> +		next = kvm_pmd_addr_end(addr, end);
+> >> +		if (!pmd_none(*pmd)) {
+> >> +			if (kvm_pmd_huge(*pmd)) {
+> >> +				if (!kvm_s2pmd_readonly(pmd))
+> >> +					kvm_set_s2pmd_readonly(pmd);
+> >> +			} else
+> >> +				stage2_wp_pte_range(pmd, addr, next);
+> > please use a closing brace when the first part of the if-statement is a
+> > multi-line block with braces, as per the CodingStyle.
+> Will fix.
+> >> +
+> > 
+> > stray blank line
+> 
+> Not sure how it got by checkpatch, will fix.
+
+Not sure checkpatch will complain, but I do ;)  No big deal anyway.
+
+> > 
+> >> +		}
+> >> +	} while (pmd++, addr = next, addr != end);
+> >> +}
+> >> +
+> >> +/**
+> >> +  * stage2_wp_pud_range - write protect PUD range
+> >> +  * @kvm:	pointer to kvm structure
+> >> +  * @pud:	pointer to pgd entry
+> >         pgd
+> >> +  * @addr:	range start address
+> >> +  * @end:	range end address
+> >> +  *
+> >> +  * While walking the PUD range huge PUD pages are ignored, in the future this
+> >                              range, huge PUDs are ignored.  In the future...
+> >> +  * may need to be revisited. Determine how to handle huge PUDs when logging
+> >> +  * of dirty pages is enabled.
+> > 
+> > I don't understand the last sentence?
+> 
+> Probably last two sentences should be combined.
+> ".... to determine how to handle huge PUT...". Would that be
+> clear enough?
+> 
+> The overall theme is what to do about PUDs - mark all pages dirty
+> in the region, attempt to breakup such huge regions?
+> 
+
+I think you should just state that this is not supported and worry
+about how to deal with it when it's properly supported.  The TODO below
+is sufficient, so just drop all mentionings about the future in the
+function description above - it's likely to be forgotten when PUDs are
+in fact support anyhow.
+
+Thanks,
+-Christoffer
