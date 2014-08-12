@@ -1,35 +1,60 @@
-From: festevam@gmail.com (Fabio Estevam)
-Date: Tue, 12 Aug 2014 10:42:07 -0300
-Subject: Freescale: iMX6Q Sabre SD
-In-Reply-To: <CAOMZO5BJ6WS-OynZWJLE42pZbrvJ_nMM3qyndYVNsDYbBFWMmg@mail.gmail.com>
-References: <CACUGKYM=jPGL+GB1=n9-UQPaphPv4ONQz3Fb5k9-5CA=Zx=1xw@mail.gmail.com>
- <CAOMZO5BJ6WS-OynZWJLE42pZbrvJ_nMM3qyndYVNsDYbBFWMmg@mail.gmail.com>
-Message-ID: <CAOMZO5BD5EE6ZpVCz0ST3j=hoXf4rk7PXOC3ZpWAHn_2nN8t7g@mail.gmail.com>
+From: ceh@ti.com (Hernandez, Carlos)
+Date: Tue, 12 Aug 2014 13:49:16 +0000
+Subject: [PATCH 1/2] PM / devfreq: Export helper functions for drivers
+In-Reply-To: <1405692594-19352-2-git-send-email-punit.agrawal@arm.com>
+References: <1405692594-19352-1-git-send-email-punit.agrawal@arm.com>
+ <1405692594-19352-2-git-send-email-punit.agrawal@arm.com>
+Message-ID: <32B5D12402BE454796026F6AC58AA86E32F2EFD6@DLEE08.ent.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-John,
+Acked-By: Carlos Hernandez <ceh@ti.com>
 
-On Mon, Aug 11, 2014 at 10:31 AM, Fabio Estevam <festevam@gmail.com> wrote:
+-----Original Message-----
+From: linux-kernel-owner@vger.kernel.org [mailto:linux-kernel-owner at vger.kernel.org] On Behalf Of Punit Agrawal
+Sent: Friday, July 18, 2014 10:10 AM
+To: linux-pm at vger.kernel.org; linux-samsung-soc at vger.kernel.org
+Cc: orjan.eide at arm.com; linux-kernel at vger.kernel.org; linux-arm-kernel at lists.infradead.org; MyungJoo Ham; Kyungmin Park
+Subject: [PATCH 1/2] PM / devfreq: Export helper functions for drivers
 
-> I tested on my mx6qsabresd revC4 / rev C and the PCI link is not
-> detected just like you described.
+From: ?rjan Eide <orjan.eide@arm.com>
 
-Tested again today and my rev C4 detects the PCI card in U-boot and in
-the kernel.
+These functions are indended for use by drivers and should be available also when the driver is built as a module.
 
-For U-boot I use top of tree u-boot-imx.
+Cc: MyungJoo Ham <myungjoo.ham@samsung.com>
+Cc: Kyungmin Park <kyungmin.park@samsung.com>
+Signed-off-by: ?rjan Eide <orjan.eide@arm.com>
+---
+ drivers/devfreq/devfreq.c |    3 +++
+ 1 file changed, 3 insertions(+)
 
-For kernel I am using linux-next 20140811 plus two patches:
+diff --git a/drivers/devfreq/devfreq.c b/drivers/devfreq/devfreq.c index 9f90369..30b538d8 100644
+--- a/drivers/devfreq/devfreq.c
++++ b/drivers/devfreq/devfreq.c
+@@ -1119,6 +1119,7 @@ struct dev_pm_opp *devfreq_recommended_opp(struct device *dev,
+ 
+ 	return opp;
+ }
++EXPORT_SYMBOL(devfreq_recommended_opp);
+ 
+ /**
+  * devfreq_register_opp_notifier() - Helper function to get devfreq notified @@ -1142,6 +1143,7 @@ int devfreq_register_opp_notifier(struct device *dev, struct devfreq *devfreq)
+ 
+ 	return ret;
+ }
++EXPORT_SYMBOL(devfreq_register_opp_notifier);
+ 
+ /**
+  * devfreq_unregister_opp_notifier() - Helper function to stop getting devfreq @@ -1168,6 +1170,7 @@ int devfreq_unregister_opp_notifier(struct device *dev, struct devfreq *devfreq)
+ 
+ 	return ret;
+ }
++EXPORT_SYMBOL(devfreq_unregister_opp_notifier);
+ 
+ static void devm_devfreq_opp_release(struct device *dev, void *res)  {
+--
+1.7.10.4
 
-1. One patch from Lucas that allows the kernel to boot when the
-bootloader has already configured PCI:
-
-http://thread.gmane.org/gmane.linux.kernel.pci/33712/focus=33711
-
-2. A patch from Tim that fix occasional PCI linkup failures:
-
-http://www.spinics.net/lists/linux-pci/msg33520.html
-
-Let me know if using this kernel version allows your PCI card to be
-detected on revC4 mx6qsabresd board.
+--
+To unsubscribe from this list: send the line "unsubscribe linux-kernel" in the body of a message to majordomo at vger.kernel.org More majordomo info at  http://vger.kernel.org/majordomo-info.html
+Please read the FAQ at  http://www.tux.org/lkml/
