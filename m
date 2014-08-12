@@ -1,87 +1,34 @@
-From: dianders@chromium.org (Doug Anderson)
-Date: Tue, 12 Aug 2014 16:24:30 -0700
-Subject: [PATCH v3 1/4] ARM: dts: Add emmc and sdmmc to the rk3288 device
- tree
-In-Reply-To: <CAPz6YkX2ht62Swzepd=g6bBy6w2+SJ2C2M4xvBmWbtAjRHEocg@mail.gmail.com>
-References: <1407344984-14176-1-git-send-email-dianders@chromium.org>
- <1407344984-14176-2-git-send-email-dianders@chromium.org>
- <CAD=FV=Wsc-Pkvg9jumdg9i1oO+T1=jtZTfbc+qE5RDrCXaaezA@mail.gmail.com>
- <1445128.HbmmWnRJOL@phil>
- <CAPz6YkX2ht62Swzepd=g6bBy6w2+SJ2C2M4xvBmWbtAjRHEocg@mail.gmail.com>
-Message-ID: <CAD=FV=XCNRTrzScXKskLT-KRFvYODVA-+ODx3T4jZjZapCdO-Q@mail.gmail.com>
+From: lauraa@codeaurora.org (Laura Abbott)
+Date: Tue, 12 Aug 2014 16:37:45 -0700
+Subject: [PATCHv3 0/2] arm64 CONFIG_DEBUG_SET_MODULE_RONX support
+Message-ID: <1407886667-16919-1-git-send-email-lauraa@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Sonny and Heiko,
+Hi,
 
-On Tue, Aug 12, 2014 at 3:11 PM, Sonny Rao <sonnyrao@chromium.org> wrote:
-> On Tue, Aug 12, 2014 at 3:07 PM, Heiko St?bner <heiko@sntech.de> wrote:
->> Am Dienstag, 12. August 2014, 14:06:11 schrieb Doug Anderson:
->>> Heiko,
->>>
->>> On Wed, Aug 6, 2014 at 10:09 AM, Doug Anderson <dianders@chromium.org>
->> wrote:
->>> > This adds support for the sdmmc and emmc ports on the rk3288 using the
->>> >
->>> > currently posted driver from Addy at:
->>> >   https://patchwork.kernel.org/patch/4653631/
->>> >
->>> > Note:
->>> > * This is not baesd on Jaehoon's patch series removing the slot node,
->>> >
->>> >   but it does use new syntax like putting the bus width at the top
->>> >   level and using the new cap-mmc-highspeed / cap-sd-highspeed.  A
->>> >   future patch will modify this one to remove the slot node.
->>> >
->>> > Signed-off-by: Doug Anderson <dianders@chromium.org>
->>> > Acked-by: Arnd Bergmann <arnd@arndb.de>
->>> > ---
->>> > Changes in v3: None
->>> > Changes in v2:
->>> > - New patchwork link for Addy's patch
->>> >
->>> >  arch/arm/boot/dts/rk3288.dtsi | 22 ++++++++++++++++++++++
->>> >  1 file changed, 22 insertions(+)
->>> >
->>> > diff --git a/arch/arm/boot/dts/rk3288.dtsi b/arch/arm/boot/dts/rk3288.dtsi
->>> > index e7cb008..dc98a5b 100644
->>> > --- a/arch/arm/boot/dts/rk3288.dtsi
->>> > +++ b/arch/arm/boot/dts/rk3288.dtsi
->>> > @@ -78,6 +78,28 @@
->>> >
->>> >                 clock-frequency = <24000000>;
->>> >
->>> >         };
->>> >
->>> > +       sdmmc: dwmmc at ff0c0000 {
->>> > +               compatible = "rockchip,rk3288-dw-mshc";
->>> > +               clocks = <&cru HCLK_SDMMC>, <&cru SCLK_SDMMC>;
->>> > +               clock-names = "biu", "ciu";
->>> > +               fifo-depth = <0x100>;
->>> > +               interrupts = <GIC_SPI 32 IRQ_TYPE_LEVEL_HIGH>;
->>> > +               reg = <0xff0c0000 0x4000>;
->>> > +               #address-cells = <1>;
->>> > +               #size-cells = <0>;
->>>
->>> When doing other testing I realized that I missed a:
->>>   status = "disabled";
->>>
->>> ...from both of these two nodes.  I'm happy to repost with this fix or
->>> I'm happy if you want to add to the patch when applying.
->>>
->>> Let me know.  Thanks!
->>
->> I don't really have a preference :-) . Btw. I also did plan on merging patches
->> 1 +4 and 2+3 now that the slot-removal series has landed.
->> Would this be ok with you?
->>
->> So if you want to repost, you could do this as two patches already :-).
->
-> Please repost with the status = "disabled"; the fact that they were
-> enabled by the dtsi was confusing to some of us at least once already
-> :-)
+This adds support for CONFIG_DEBUG_SET_MODULE_RONX for arm64. The last version
+was added as part of a series to add RWX permissions for the rest of memory[1].
+That series still needs quite a bit of work though so I'm submitting this
+separately.
 
-Done.  Please let me know if it looks OK or if there are any other
-spins needed.  ;)
+Thanks,
+Laura
 
--Doug
+v3: Addressed comments by Will/Steve
+
+Laura Abbott (2):
+  arm64: Introduce {set,clear}_pte_bit
+  arm64: Add CONFIG_DEBUG_SET_MODULE_RONX support
+
+ arch/arm64/Kconfig.debug            |  11 ++++
+ arch/arm64/include/asm/cacheflush.h |   4 ++
+ arch/arm64/include/asm/pgtable.h    |  33 +++++-----
+ arch/arm64/mm/Makefile              |   2 +-
+ arch/arm64/mm/pageattr.c            | 118 ++++++++++++++++++++++++++++++++++++
+ 5 files changed, 153 insertions(+), 15 deletions(-)
+ create mode 100644 arch/arm64/mm/pageattr.c
+
+-- 
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
+hosted by The Linux Foundation
