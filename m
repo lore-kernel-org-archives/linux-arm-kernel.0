@@ -1,415 +1,377 @@
-From: wangnan0@huawei.com (Wang Nan)
-Date: Tue, 12 Aug 2014 12:56:28 +0800
-Subject: [PATCH v4] kprobes: arm: enable OPTPROBES for ARM 32
-Message-ID: <1407819388-52145-1-git-send-email-wangnan0@huawei.com>
+From: achandran@mvista.com (Arun Chandran)
+Date: Tue, 12 Aug 2014 11:12:55 +0530
+Subject: Kexec on arm64
+In-Reply-To: <CAFdej02gA7mpkdarjZ+66C252K+grhCa4uXm8PTV4ioKXZKqjQ@mail.gmail.com>
+References: <CAFdej00J2mJwcg2Cy6CHVuuQZ4uQ2zZg8oErGPi0uPejievB+Q@mail.gmail.com>
+ <1406162287.4062.39.camel@smoke>
+ <20140724093603.GC4079@leverpostej>
+ <1406247468.4062.59.camel@smoke>
+ <CAFdej01w_pE6vv+13cCCyfDs4Rbdkzx4CMUj9q97HBKV0B53ow@mail.gmail.com>
+ <1406333901.4062.69.camel@smoke>
+ <CAFdej014ohCFYvoUAXWiYGb4_4UmSY2G1MH-NEE_cF1cC-6Mow@mail.gmail.com>
+ <20140728153812.GA2576@leverpostej>
+ <1406592548.28348.49.camel@smoke>
+ <CAFdej00is0kC-1q5uMNJL5APL1WezdNBg0jASgwYamsg5NO_Tg@mail.gmail.com>
+ <20140729133557.GQ2576@leverpostej>
+ <1406668741.28348.75.camel@smoke>
+ <CAFdej02sTBsjHz+FCqjKkY9pF5sPF6n6QUtEadHi0hK3MxRxGA@mail.gmail.com>
+ <CAFdej01ZHkTVZuN_0RrGbFmoG4_NTnwm6KDAPM_sf=zHBHSRwg@mail.gmail.com>
+ <1407172869.8971.54.camel@smoke>
+ <CAFdej02ZsLuxd84fb-n9Q2yuhzqRba5cmx6G8pHk3QeqzpTLaQ@mail.gmail.com>
+ <1407442058.8971.106.camel@smoke>
+ <CAFdej03udSLMEneKM4YGiNe-HTQwZrGQ5J6DfB6qaq8X8A27CQ@mail.gmail.com>
+ <CAFdej02gA7mpkdarjZ+66C252K+grhCa4uXm8PTV4ioKXZKqjQ@mail.gmail.com>
+Message-ID: <CAFdej01msBA8Ry=Ek3NpYPUBgvw_4G6w+68oRvGC6_AVRvudjQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch introduce kprobeopt for ARM 32.
+Hi Geoff, Mark,
 
-Limitations:
- - Currently only kernel compiled with ARM ISA is supported.
 
- - Offset between probe point and optinsn slot must not larger than
-   32MiB. Masami Hiramatsu suggests replacing 2 words, it will make
-   things complex. Futher patch can make such optimization.
+Sorry for top posting. I hope we have solved almost all the problems
+with kexec in uni-processor scenario except converting soft_restart()
+to assembly (I will give try to do this).
 
-Kprobe opt on ARM is relatively simpler than kprobe opt on x86 because
-ARM instruction is always 4 bytes aligned and 4 bytes long. This patch
-replace probed instruction by a 'b', branch to trampoline code and then
-calls optimized_callback(). optimized_callback() calls opt_pre_handler()
-to execute kprobe handler. It also emulate/simulate replaced instruction.
+kexec is stress tested with L3 cache on with the below changes.
+It ran for 17 hours and rebooted totally 8226 times without any problem.
 
-When unregistering kprobe, the deferred manner of unoptimizer may leave
-branch instruction before optimizer is called. Different from x86_64,
-which only copy the probed insn after optprobe_template_end and
-reexecute them, this patch call singlestep to emulate/simulate the insn
-directly. Futher patch can optimize this behavior.
+Total LE boots - 4122
+Total BE boots - 4104
 
-v1 -> v2:
+Total LE to BE or BE to LE switching - 4112
 
- - Improvement: if replaced instruction is conditional, generate a
-   conditional branch instruction for it;
+##########################
+diff --git a/arch/arm64/kernel/machine_kexec.c
+b/arch/arm64/kernel/machine_kexec.c
+index 363a246..5b15a00 100644
+--- a/arch/arm64/kernel/machine_kexec.c
++++ b/arch/arm64/kernel/machine_kexec.c
+@@ -623,7 +623,6 @@ static void kexec_list_flush_cb(void *ctx ,
+unsigned int flag,
+                break;
+        case IND_SOURCE:
+                __flush_dcache_area(addr, PAGE_SIZE);
+-               __flush_dcache_area(dest, PAGE_SIZE);
+                break;
+        default:
+                break;
+diff --git a/arch/arm64/kernel/relocate_kernel.S
+b/arch/arm64/kernel/relocate_kernel.S
+index 4b077e1..e890516 100644
+--- a/arch/arm64/kernel/relocate_kernel.S
++++ b/arch/arm64/kernel/relocate_kernel.S
+@@ -31,6 +31,13 @@
 
- - Introduces RELATIVEJUMP_OPCODES due to ARM kprobe_opcode_t is 4
-   bytes;
+ .align 3
 
- - Removes size field in struct arch_optimized_insn;
++.macro dcache_line_size, reg, tmp
++mrs    \tmp, ctr_el0                   // read CTR
++ubfm   \tmp, \tmp, #16, #19            // cache line size encoding
++mov    \reg, #4                        // bytes per word
++lsl    \reg, \reg, \tmp                // actual cache line size
++.endm
++
+ .globl relocate_new_kernel
+ relocate_new_kernel:
 
- - Use arm_gen_branch() to generate branch instruction;
+@@ -56,25 +63,51 @@ relocate_new_kernel:
+ .Ltest_source:
+        tbz     x10, IND_SOURCE_BIT, .Ltest_indirection
 
- - Remove all recover logic: ARM doesn't use tail buffer, no need
-   recover replaced instructions like x86;
+-       /* source: copy_page(x20 = dest, x21 = addr) */
++       mov     x0, x13
++       add     x1, x13, #PAGE_SIZE
++
++       /* Invalidate the destination cache area to make sure that
++        * all the data required for the second stage kernel is
++        * intact at PoC. This is the safest place to do this activity
++        * as we are running with MMU and D-cache off.
++        */
++__inval_cache_range:
++       dcache_line_size x2, x3
++       sub     x3, x2, #1
++       tst     x1, x3                          // end cache line aligned?
++       bic     x1, x1, x3
++       b.eq    1f
++       dc      ivac, x1                        // invalidate D / U line
++1:     tst     x0, x3                          // start cache line aligned?
++       bic     x0, x0, x3
++       b.eq    2f
++       dc      ivac, x0                        // invalidate D / U line
++       b       3f
++2:     dc      ivac, x0                        // invalidate D / U line
++3:     add     x0, x0, x2
++       cmp     x0, x1
++       b.lo    2b
++       dsb     sy
 
- - Remove incorrect CONFIG_THUMB checking;
++       /* source: copy_page(x20 = dest, x21 = addr) */
+        mov x20, x13
+        mov x21, x14
 
- - can_optimize() always returns true if address is well aligned;
+-       prfm    pldl1strm, [x21, #64]
+-1:     ldp     x22, x23, [x21]
++       /*prfm  pldl1strm, [x21, #64] */
++.Lcopy_data:
++       ldp     x22, x23, [x21]
+        ldp     x24, x25, [x21, #16]
+        ldp     x26, x27, [x21, #32]
+        ldp     x28, x29, [x21, #48]
+        add     x21, x21, #64
+-       prfm    pldl1strm, [x21, #64]
++       /*prfm  pldl1strm, [x21, #64]*/
+        stnp    x22, x23, [x20]
+        stnp    x24, x25, [x20, #16]
+        stnp    x26, x27, [x20, #32]
+        stnp    x28, x29, [x20, #48]
+        add     x20, x20, #64
+        tst     x21, #(PAGE_SIZE - 1)
+-       b.ne    1b
++       b.ne    .Lcopy_data
 
- - Improve optimized_callback: using opt_pre_handler();
+        /* dest += PAGE_SIZE */
 
- - Bugfix: correct range checking code and improve comments;
+@@ -115,6 +148,11 @@ relocate_new_kernel:
+        mov     x3, xzr
 
- - Fix commit message.
+        ldr     x4, kexec_kimage_start
++
++       /* Clean entire I-cache */
++       ic      ialluis
++       isb
++       dsb     sy
+        br      x4
 
-v2 -> v3:
+ .align 3
+################################
 
- - Rename RELATIVEJUMP_OPCODES to MAX_COPIED_INSNS;
+I have attached the patch for this.
+Now I will try kexec in SMP configuration.
 
- - Remove unneeded checking:
-      arch_check_optimized_kprobe(), can_optimize();
+--Arun
 
- - Add missing flush_icache_range() in arch_prepare_optimized_kprobe();
-
- - Remove unneeded 'return;'.
-
-v3 -> v4:
-
- - Use __mem_to_opcode_arm() to translate copied_insn to ensure it
-   works in big endian kernel;
-
- - Replace 'nop' placeholder in trampoline code template with
-   '.long 0' to avoid confusion: reader may regard 'nop' as an
-   instruction, but it is value in fact.
-
-Signed-off-by: Wang Nan <wangnan0@huawei.com>
-Cc: Masami Hiramatsu <masami.hiramatsu.pt@hitachi.com>
-Cc: Jon Medhurst (Tixy) <tixy@linaro.org>
-Cc: Russell King - ARM Linux <linux@arm.linux.org.uk>
-Cc: Will Deacon <will.deacon@arm.com>
----
- arch/arm/Kconfig               |   1 +
- arch/arm/include/asm/kprobes.h |  26 +++++
- arch/arm/kernel/Makefile       |   3 +-
- arch/arm/kernel/kprobes-opt.c  | 255 +++++++++++++++++++++++++++++++++++++++++
- 4 files changed, 284 insertions(+), 1 deletion(-)
- create mode 100644 arch/arm/kernel/kprobes-opt.c
-
-diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-index 290f02ee..2106918 100644
---- a/arch/arm/Kconfig
-+++ b/arch/arm/Kconfig
-@@ -57,6 +57,7 @@ config ARM
- 	select HAVE_MEMBLOCK
- 	select HAVE_MOD_ARCH_SPECIFIC if ARM_UNWIND
- 	select HAVE_OPROFILE if (HAVE_PERF_EVENTS)
-+	select HAVE_OPTPROBES if (!THUMB2_KERNEL)
- 	select HAVE_PERF_EVENTS
- 	select HAVE_PERF_REGS
- 	select HAVE_PERF_USER_STACK_DUMP
-diff --git a/arch/arm/include/asm/kprobes.h b/arch/arm/include/asm/kprobes.h
-index 49fa0df..a05297f 100644
---- a/arch/arm/include/asm/kprobes.h
-+++ b/arch/arm/include/asm/kprobes.h
-@@ -51,5 +51,31 @@ int kprobe_fault_handler(struct pt_regs *regs, unsigned int fsr);
- int kprobe_exceptions_notify(struct notifier_block *self,
- 			     unsigned long val, void *data);
- 
-+/* optinsn template addresses */
-+extern __visible kprobe_opcode_t optprobe_template_entry;
-+extern __visible kprobe_opcode_t optprobe_template_val;
-+extern __visible kprobe_opcode_t optprobe_template_call;
-+extern __visible kprobe_opcode_t optprobe_template_end;
-+
-+#define MAX_OPTIMIZED_LENGTH	(4)
-+#define MAX_OPTINSN_SIZE				\
-+	(((unsigned long)&optprobe_template_end -	\
-+	  (unsigned long)&optprobe_template_entry))
-+#define RELATIVEJUMP_SIZE	(4)
-+
-+struct arch_optimized_insn {
-+	/*
-+	 * copy of the original instructions.
-+	 * Different from x86, ARM kprobe_opcode_t is u32.
-+	 */
-+#define MAX_COPIED_INSN	((RELATIVEJUMP_SIZE) / sizeof(kprobe_opcode_t))
-+	kprobe_opcode_t copied_insn[MAX_COPIED_INSN];
-+	/* detour code buffer */
-+	kprobe_opcode_t *insn;
-+	/*
-+	 *  we always copies one instruction on arm32,
-+	 *  size always be 4, so no size field.
-+	 */
-+};
- 
- #endif /* _ARM_KPROBES_H */
-diff --git a/arch/arm/kernel/Makefile b/arch/arm/kernel/Makefile
-index 38ddd9f..6a38ec1 100644
---- a/arch/arm/kernel/Makefile
-+++ b/arch/arm/kernel/Makefile
-@@ -52,11 +52,12 @@ obj-$(CONFIG_FUNCTION_GRAPH_TRACER)	+= ftrace.o insn.o
- obj-$(CONFIG_JUMP_LABEL)	+= jump_label.o insn.o patch.o
- obj-$(CONFIG_KEXEC)		+= machine_kexec.o relocate_kernel.o
- obj-$(CONFIG_UPROBES)		+= probes.o probes-arm.o uprobes.o uprobes-arm.o
--obj-$(CONFIG_KPROBES)		+= probes.o kprobes.o kprobes-common.o patch.o
-+obj-$(CONFIG_KPROBES)		+= probes.o kprobes.o kprobes-common.o patch.o insn.o
- ifdef CONFIG_THUMB2_KERNEL
- obj-$(CONFIG_KPROBES)		+= kprobes-thumb.o probes-thumb.o
- else
- obj-$(CONFIG_KPROBES)		+= kprobes-arm.o probes-arm.o
-+obj-$(CONFIG_OPTPROBES)		+= kprobes-opt.o
- endif
- obj-$(CONFIG_ARM_KPROBES_TEST)	+= test-kprobes.o
- test-kprobes-objs		:= kprobes-test.o
-diff --git a/arch/arm/kernel/kprobes-opt.c b/arch/arm/kernel/kprobes-opt.c
-new file mode 100644
-index 0000000..52330fb
---- /dev/null
-+++ b/arch/arm/kernel/kprobes-opt.c
-@@ -0,0 +1,255 @@
-+/*
-+ *  Kernel Probes Jump Optimization (Optprobes)
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License as published by
-+ * the Free Software Foundation; either version 2 of the License, or
-+ * (at your option) any later version.
-+ *
-+ * This program is distributed in the hope that it will be useful,
-+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ * GNU General Public License for more details.
-+ *
-+ * You should have received a copy of the GNU General Public License
-+ * along with this program; if not, write to the Free Software
-+ * Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA 02111-1307, USA.
-+ *
-+ * Copyright (C) IBM Corporation, 2002, 2004
-+ * Copyright (C) Hitachi Ltd., 2012
-+ * Copyright (C) Huawei Inc., 2014
-+ */
-+
-+#include <linux/kprobes.h>
-+#include <linux/jump_label.h>
-+#include <asm/kprobes.h>
-+#include <asm/cacheflush.h>
-+/* for arm_gen_branch */
-+#include "insn.h"
-+/* for patch_text */
-+#include "patch.h"
-+
-+asm (
-+			".global optprobe_template_entry\n"
-+			"optprobe_template_entry:\n"
-+			"	sub	sp, sp, #80\n"
-+			"	stmia	sp, {r0 - r14} \n"
-+			"	add	r3, sp, #80\n"
-+			"	str	r3, [sp, #52]\n"
-+			"	mrs	r4, cpsr\n"
-+			"	str	r4, [sp, #64]\n"
-+			"	mov	r1, sp\n"
-+			"	ldr	r0, 1f\n"
-+			"	ldr	r2, 2f\n"
-+			"	blx	r2\n"
-+			"	ldr	r1, [sp, #64]\n"
-+			"	msr	cpsr_fs, r1\n"
-+			"	ldmia	sp, {r0 - r15}\n"
-+			".global optprobe_template_val\n"
-+			"optprobe_template_val:\n"
-+			"1:	.long 0\n"
-+			".global optprobe_template_call\n"
-+			"optprobe_template_call:\n"
-+			"2:	.long 0\n"
-+			".global optprobe_template_end\n"
-+			"optprobe_template_end:\n");
-+
-+#define TMPL_VAL_IDX \
-+	((long)&optprobe_template_val - (long)&optprobe_template_entry)
-+#define TMPL_CALL_IDX \
-+	((long)&optprobe_template_call - (long)&optprobe_template_entry)
-+#define TMPL_END_IDX \
-+	((long)&optprobe_template_end - (long)&optprobe_template_entry)
-+
-+/*
-+ * ARM can always optimize an instruction when using ARM ISA.
-+ */
-+int arch_prepared_optinsn(struct arch_optimized_insn *optinsn)
-+{
-+	return 1;
-+}
-+
-+/*
-+ * In ARM ISA, kprobe opt always replace one instruction (4 bytes
-+ * aligned and 4 bytes long). It is impossiable to encounter another
-+ * kprobe in the address range. So always return 0.
-+ */
-+int arch_check_optimized_kprobe(struct optimized_kprobe *op)
-+{
-+	return 0;
-+}
-+
-+/* Caller must ensure addr & 3 == 0 */
-+static int can_optimize(unsigned long paddr)
-+{
-+	return 1;
-+}
-+
-+/* Free optimized instruction slot */
-+static void
-+__arch_remove_optimized_kprobe(struct optimized_kprobe *op, int dirty)
-+{
-+	if (op->optinsn.insn) {
-+		free_optinsn_slot(op->optinsn.insn, dirty);
-+		op->optinsn.insn = NULL;
-+	}
-+}
-+
-+extern void kprobe_handler(struct pt_regs *regs);
-+
-+static void
-+optimized_callback(struct optimized_kprobe *op, struct pt_regs *regs)
-+{
-+	unsigned long flags;
-+	struct kprobe *p = &op->kp;
-+	struct kprobe_ctlblk *kcb = get_kprobe_ctlblk();
-+
-+	/* Save skipped registers */
-+	regs->ARM_pc = (unsigned long)op->kp.addr;
-+	regs->ARM_ORIG_r0 = ~0UL;
-+
-+	local_irq_save(flags);
-+
-+	if (kprobe_running()) {
-+		kprobes_inc_nmissed_count(&op->kp);
-+	} else {
-+		__this_cpu_write(current_kprobe, &op->kp);
-+		kcb->kprobe_status = KPROBE_HIT_ACTIVE;
-+		opt_pre_handler(&op->kp, regs);
-+		__this_cpu_write(current_kprobe, NULL);
-+	}
-+
-+	/* In each case, we must singlestep the replaced instruction. */
-+	op->kp.ainsn.insn_singlestep(p->opcode, &p->ainsn, regs);
-+
-+	local_irq_restore(flags);
-+}
-+
-+int arch_prepare_optimized_kprobe(struct optimized_kprobe *op)
-+{
-+	u8 *buf;
-+	unsigned long rel_chk;
-+	unsigned long val;
-+
-+	if (!can_optimize((unsigned long)op->kp.addr))
-+		return -EILSEQ;
-+
-+	op->optinsn.insn = get_optinsn_slot();
-+	if (!op->optinsn.insn)
-+		return -ENOMEM;
-+
-+	/*
-+	 * Verify if the address gap is in 32MiB range, because this uses
-+	 * a relative jump.
-+	 *
-+	 * kprobe opt use a 'b' instruction to branch to optinsn.insn.
-+	 * According to ARM manual, branch instruction is:
-+	 *
-+	 *   31  28 27           24 23             0
-+	 *  +------+---+---+---+---+----------------+
-+	 *  | cond | 1 | 0 | 1 | 0 |      imm24     |
-+	 *  +------+---+---+---+---+----------------+
-+	 *
-+	 * imm24 is a signed 24 bits integer. The real branch offset is computed
-+	 * by: imm32 = SignExtend(imm24:'00', 32);
-+	 *
-+	 * So the maximum forward branch should be:
-+	 *   (0x007fffff << 2) = 0x01fffffc =  0x1fffffc
-+	 * The maximum backword branch should be:
-+	 *   (0xff800000 << 2) = 0xfe000000 = -0x2000000
-+	 *
-+	 * We can simply check (rel & 0xfe000003):
-+	 *  if rel is positive, (rel & 0xfe000000) shoule be 0
-+	 *  if rel is negitive, (rel & 0xfe000000) should be 0xfe000000
-+	 *  the last '3' is used for alignment checking.
-+	 */
-+	rel_chk = (unsigned long)((long)op->optinsn.insn -
-+			(long)op->kp.addr + 8) & 0xfe000003;
-+
-+	if ((rel_chk != 0) && (rel_chk != 0xfe000000)) {
-+		__arch_remove_optimized_kprobe(op, 0);
-+		return -ERANGE;
-+	}
-+
-+	buf = (u8 *)op->optinsn.insn;
-+
-+	/* Copy arch-dep-instance from template */
-+	memcpy(buf, &optprobe_template_entry, TMPL_END_IDX);
-+
-+	/* Set probe information */
-+	val = (unsigned long)op;
-+	memcpy(buf + TMPL_VAL_IDX, &val, sizeof(val));
-+
-+	/* Set probe function call */
-+	val = (unsigned long)optimized_callback;
-+	memcpy(buf + TMPL_CALL_IDX, &val, sizeof(val));
-+
-+	flush_icache_range((unsigned long)buf,
-+			   (unsigned long)buf + TMPL_END_IDX);
-+	return 0;
-+}
-+
-+void arch_optimize_kprobes(struct list_head *oplist)
-+{
-+	struct optimized_kprobe *op, *tmp;
-+
-+	list_for_each_entry_safe(op, tmp, oplist, list) {
-+		unsigned long insn;
-+		WARN_ON(kprobe_disabled(&op->kp));
-+
-+		/*
-+		 * Backup instructions which will be replaced
-+		 * by jump address
-+		 */
-+		memcpy(op->optinsn.copied_insn, op->kp.addr,
-+				RELATIVEJUMP_SIZE);
-+
-+		insn = arm_gen_branch((unsigned long)op->kp.addr,
-+				(unsigned long)op->optinsn.insn);
-+		BUG_ON(insn == 0);
-+
-+		/*
-+		 * Make it a conditional branch if replaced insn
-+		 * is consitional
-+		 */
-+		insn = (__mem_to_opcode_arm(
-+			  op->optinsn.copied_insn[0]) & 0xf0000000) |
-+			(insn & 0x0fffffff);
-+
-+		patch_text(op->kp.addr, insn);
-+
-+		list_del_init(&op->list);
-+	}
-+}
-+
-+void arch_unoptimize_kprobe(struct optimized_kprobe *op)
-+{
-+	arch_arm_kprobe(&op->kp);
-+}
-+
-+/*
-+ * Recover original instructions and breakpoints from relative jumps.
-+ * Caller must call with locking kprobe_mutex.
-+ */
-+void arch_unoptimize_kprobes(struct list_head *oplist,
-+ 			    struct list_head *done_list)
-+{
-+	struct optimized_kprobe *op, *tmp;
-+
-+	list_for_each_entry_safe(op, tmp, oplist, list) {
-+		arch_unoptimize_kprobe(op);
-+		list_move(&op->list, done_list);
-+	}
-+}
-+
-+int arch_within_optimized_kprobe(struct optimized_kprobe *op,
-+ 				unsigned long addr)
-+{
-+	return ((unsigned long)op->kp.addr <= addr &&
-+		(unsigned long)op->kp.addr + RELATIVEJUMP_SIZE > addr);
-+}
-+
-+void arch_remove_optimized_kprobe(struct optimized_kprobe *op)
-+{
-+	__arch_remove_optimized_kprobe(op, 1);
-+}
--- 
-1.8.4
+On Fri, Aug 8, 2014 at 3:33 PM, Arun Chandran <achandran@mvista.com> wrote:
+> On Fri, Aug 8, 2014 at 11:16 AM, Arun Chandran <achandran@mvista.com> wrote:
+>> Hi,
+>>
+>> On Fri, Aug 8, 2014 at 1:37 AM, Geoff Levand <geoff@infradead.org> wrote:
+>>> Hi Arun,
+>>>
+>>> On Wed, 2014-08-06 at 19:24 +0530, Arun Chandran wrote:
+>>>
+>>>> I have managed to run this test till 72 times with the
+>>>> below changes.
+>>>>
+>>>> ############################
+>>>> diff --git a/arch/arm64/kernel/machine_kexec.c
+>>>> b/arch/arm64/kernel/machine_kexec.c
+>>>> index 363a246..7de11ee 100644
+>>>> --- a/arch/arm64/kernel/machine_kexec.c
+>>>> +++ b/arch/arm64/kernel/machine_kexec.c
+>>>> @@ -623,7 +623,6 @@ static void kexec_list_flush_cb(void *ctx ,
+>>>> unsigned int flag,
+>>>>   break;
+>>>>   case IND_SOURCE:
+>>>>   __flush_dcache_area(addr, PAGE_SIZE);
+>>>> - __flush_dcache_area(dest, PAGE_SIZE);
+>>>>   break;
+>>>>   default:
+>>>>   break;
+>>>> @@ -641,6 +640,8 @@ void machine_kexec(struct kimage *image)
+>>>>   phys_addr_t reboot_code_buffer_phys;
+>>>>   void *reboot_code_buffer;
+>>>>   struct kexec_ctx *ctx = kexec_image_to_ctx(image);
+>>>> + unsigned long start, end;
+>>>> + int i;
+>>>>
+>>>>   BUG_ON(relocate_new_kernel_size > KEXEC_CONTROL_PAGE_SIZE);
+>>>>   BUG_ON(num_online_cpus() > 1);
+>>>> @@ -698,6 +699,20 @@ void machine_kexec(struct kimage *image)
+>>>>
+>>>>   kexec_list_walk(NULL, image->head, kexec_list_flush_cb);
+>>>>
+>>>> + start = image->segment[0].mem;
+>>>> + end = image->segment[0].mem + image->segment[0].memsz;
+>>>> + for (i = 0; i < image->nr_segments; i++) {
+>>>> + if (image->segment[i].mem > end)
+>>>> + end = image->segment[i].mem + image->segment[i].memsz;
+>>>> + }
+>>>> +
+>>>> + start = (unsigned long)phys_to_virt(start);
+>>>> + end = (unsigned long)phys_to_virt(end);
+>>>> + pr_info("flushing from %lx to %lx size = %lx\n", start, end, end - start);
+>>>> + __flush_dcache_area((void *)start, end - start);
+>>>> + //flush_icache_range(start, end);
+>>>> + //mdelay(10);
+>>>> +
+>>>>   soft_restart(reboot_code_buffer_phys);
+>>>>  }
+>>>
+>>> Doing the flush in kexec_list_flush_cb() is almost the same
+>>> as using the image->segment to flush.  Did you see a
+>>> difference on your system?
+>>>
+>>
+>> Yes I can see the difference. Let me explain it in detail.
+>>
+>> I am doing a stress test of "kexec -e" with the below reboot
+>> script.
+>>
+>> ################################
+>> #!/bin/sh
+>>
+>> sleep 5
+>> i=$RANDOM
+>> j=$(( $i % 2))
+>>
+>> mount /dev/mmcblk0p1 /mnt
+>> count=`cat /mnt/cnt`
+>>
+>> if [ $j -eq 0 ] ; then
+>>     echo "KEXEC rebootng to BE count = $count"
+>>     echo $RANDOM > /mnt/"$count""_BE"
+>>     kexec -l /mnt/vmlinux_BE.strip
+>> --command-line="console=ttyS0,115200 earlyprintk=uart8
+>> 250-32bit,0x1c020000 debug swiotlb=65536 log_buf_len=4M"
+>> else
+>>    echo "KEXEC rebooting to LE count = $count"
+>>    echo $RANDOM > /mnt/"$count""_LE"
+>>     kexec -l /mnt/vmlinux_LE.strip
+>> --command-line="console=ttyS0,115200 earlyprintk=uart8
+>> 250-32bit,0x1c020000 debug swiotlb=65536 log_buf_len=4M"
+>> fi
+>>
+>> count=$(( $count + 1 ))
+>> echo "$count">/mnt/cnt
+>> umount /mnt
+>> kexec -e
+>> exit $?
+>> ###############################
+>>
+>> Observations with the default code
+>> @https://git.linaro.org/people/geoff.levand/linux-kexec.git
+>> Changed last on "Mon, 4 Aug 2014 23:24:10 +0000 (16:24 -0700)"
+>>
+>> a) LE to LE worked without L3 cache on
+>> b) BE to BE worked without L3 cache on
+>> c) Random endian switching does not work in any case (with L3, No L3)
+>>     It breaks very early and unstable.
+>>
+>> Now with the below modifications
+>>
+>
+> I think the more cleaner approach is to invalidate
+> the cache lines from arch/arm64/kernel/relocate_kernel.S
+> As this code is already aware of the destination it has
+> to copy the 2nd stage kernel.
+>
+>
+> ########################
+> diff --git a/arch/arm64/kernel/relocate_kernel.S
+> b/arch/arm64/kernel/relocate_kernel.S
+> index 4b077e1..6880c1a 100644
+> --- a/arch/arm64/kernel/relocate_kernel.S
+> +++ b/arch/arm64/kernel/relocate_kernel.S
+> @@ -31,6 +31,13 @@
+>
+>  .align 3
+>
+> +.macro dcache_line_size, reg, tmp
+> +mrs    \tmp, ctr_el0                   // read CTR
+> +ubfm   \tmp, \tmp, #16, #19            // cache line size encoding
+> +mov    \reg, #4                        // bytes per word
+> +lsl    \reg, \reg, \tmp                // actual cache line size
+> +.endm
+> +
+>  .globl relocate_new_kernel
+>  relocate_new_kernel:
+>
+> @@ -58,23 +65,46 @@ relocate_new_kernel:
+>
+>         /* source: copy_page(x20 = dest, x21 = addr) */
+>
+> +       mov     x0, x13
+> +       add     x1, x13, #PAGE_SIZE
+> +
+> +       /* Invalidate the destination cache area */
+> +__inval_cache_range:
+> +       dcache_line_size x2, x3
+> +       sub     x3, x2, #1
+> +       tst     x1, x3                          // end cache line aligned?
+> +       bic     x1, x1, x3
+> +       b.eq    1f
+> +       dc      civac, x1                       // clean & invalidate D / U line
+> +1:     tst     x0, x3                          // start cache line aligned?
+> +       bic     x0, x0, x3
+> +       b.eq    2f
+> +       dc      civac, x0                       // clean & invalidate D / U line
+> +       b       3f
+> +2:     dc      ivac, x0                        // invalidate D / U line
+> +3:     add     x0, x0, x2
+> +       cmp     x0, x1
+> +       b.lo    2b
+> +       dsb     sy
+> +
+>         mov x20, x13
+>         mov x21, x14
+>
+> -       prfm    pldl1strm, [x21, #64]
+> -1:     ldp     x22, x23, [x21]
+> +       /*prfm  pldl1strm, [x21, #64] */
+> +.Lcopy_data:
+> +       ldp     x22, x23, [x21]
+>         ldp     x24, x25, [x21, #16]
+>         ldp     x26, x27, [x21, #32]
+>         ldp     x28, x29, [x21, #48]
+>         add     x21, x21, #64
+> -       prfm    pldl1strm, [x21, #64]
+> +       /*prfm  pldl1strm, [x21, #64]*/
+>         stnp    x22, x23, [x20]
+>         stnp    x24, x25, [x20, #16]
+>         stnp    x26, x27, [x20, #32]
+>         stnp    x28, x29, [x20, #48]
+>         add     x20, x20, #64
+>         tst     x21, #(PAGE_SIZE - 1)
+> -       b.ne    1b
+> +       b.ne    .Lcopy_data
+>
+>         /* dest += PAGE_SIZE */
+>
+> @@ -115,6 +145,8 @@ relocate_new_kernel:
+>         mov     x3, xzr
+>
+>         ldr     x4, kexec_kimage_start
+> +       dsb     sy
+> +       isb
+>         br      x4
+>
+>  .align 3
+> diff --git a/arch/arm64/mm/proc.S b/arch/arm64/mm/proc.S
+> index f1619c0..c62cba7 100644
+> --- a/arch/arm64/mm/proc.S
+> +++ b/arch/arm64/mm/proc.S
+> @@ -52,6 +52,13 @@
+>   */
+>  ENTRY(cpu_cache_off)
+>         mrs     x0, sctlr_el1
+> +       /* Turn off I-Cache */
+> +       bic     x0, x0, #1 << 12                // clear SCTLR.C
+> +       msr     sctlr_el1, x0
+> +       isb
+> +       dsb     sy
+> +
+> +       mrs     x0, sctlr_el1
+>         bic     x0, x0, #1 << 2                 // clear SCTLR.C
+>         msr     sctlr_el1, x0
+>         isb
+>
+> #############################
+>
+> --Arun
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: 0001-LE-BE-switching-worked-with-L3.patch
+Type: text/x-patch
+Size: 2946 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140812/1d732f96/attachment.bin>
