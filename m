@@ -1,46 +1,48 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Tue, 12 Aug 2014 11:46:27 +0100
-Subject: [PATCH 3/5] efi arm64: do not enter virtual mode in case booting
- with efi=noruntime or noefi
-In-Reply-To: <1407823822-23829-3-git-send-email-dyoung@redhat.com>
-References: <1407823822-23829-1-git-send-email-dyoung@redhat.com>
- <1407823822-23829-3-git-send-email-dyoung@redhat.com>
-Message-ID: <20140812104627.GI29013@arm.com>
+From: robdclark@gmail.com (Rob Clark)
+Date: Tue, 12 Aug 2014 06:48:54 -0400
+Subject: [PATCH v5 1/1] iommu-api: Add map_sg/unmap_sg functions
+In-Reply-To: <871tsm5vcn.fsf@nvidia.com>
+References: <1407797150-515-1-git-send-email-ohaugan@codeaurora.org>
+ <1407797150-515-2-git-send-email-ohaugan@codeaurora.org>
+ <871tsm5vcn.fsf@nvidia.com>
+Message-ID: <CAF6AEGvZUanVtPxAt76+AAdOaNwyMJ3cmcJ1srsEYBeG7ELkBQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Aug 12, 2014 at 07:10:20AM +0100, Dave Young wrote:
-> In case efi runtime disabled via noefi kernel cmdline arm64_enter_virtual_mode
-> should error out.
-> 
-> At the same time move early_memunmap(memmap.map, mapsize) to the beginning of
-> the function or it will leak early mem.
-> 
-> Signed-off-by: Dave Young <dyoung@redhat.com>
-> ---
->  arch/arm64/kernel/efi.c | 7 ++++---
->  1 file changed, 4 insertions(+), 3 deletions(-)
-> 
-> diff --git a/arch/arm64/kernel/efi.c b/arch/arm64/kernel/efi.c
-> index e72f310..324cdd1 100644
-> --- a/arch/arm64/kernel/efi.c
-> +++ b/arch/arm64/kernel/efi.c
-> @@ -386,7 +386,10 @@ static int __init arm64_enter_virtual_mode(void)
->  	int count = 0;
->  	unsigned long flags;
->  
-> -	if (!efi_enabled(EFI_BOOT)) {
-> +	mapsize = memmap.map_end - memmap.map;
-> +	early_memunmap(memmap.map, mapsize);
-> +
-> +	if (!efi_enabled(EFI_BOOT) || efi_runtime_disabled()) {
+On Mon, Aug 11, 2014 at 9:51 PM, Hiroshi Doyu <hdoyu@nvidia.com> wrote:
+> Hi Olav,
+>
+> Olav Haugan <ohaugan@codeaurora.org> writes:
+>
+>> @@ -93,6 +94,10 @@ enum iommu_attr {
+>>   * @detach_dev: detach device from an iommu domain
+>>   * @map: map a physically contiguous memory region to an iommu domain
+>>   * @unmap: unmap a physically contiguous memory region from an iommu domain
+>> + * @map_sg: map a scatter-gather list of physically contiguous memory chunks
+>> + * to an iommu domain
+>> + * @unmap_sg: unmap a scatter-gather list of physically contiguous memory
+>> + * chunks from an iommu domain
+>>   * @iova_to_phys: translate iova to physical address
+>>   * @domain_has_cap: domain capabilities query
+>>   * @add_device: add device to iommu grouping
+>> @@ -110,6 +115,11 @@ struct iommu_ops {
+>>                    phys_addr_t paddr, size_t size, int prot);
+>>         size_t (*unmap)(struct iommu_domain *domain, unsigned long iova,
+>>                      size_t size);
+>> +       int (*map_sg)(struct iommu_domain *domain, unsigned long iova,
+>> +                       struct scatterlist *sg, unsigned int nents, int prot,
+>> +                       unsigned long flags);
+>> +       int (*unmap_sg)(struct iommu_domain *domain, unsigned long iova,
+>> +                       size_t size, unsigned long flags);
+>
+> Do you have any exmaple/explanation for the above "flags"?
+>
+> Is this going to be used for iommu global/standard attribute or SoC
+> spcific one?
 
-Hmm, is this right? We only set EFI_BOOT if we find EFI parameters in the
-DT (see efi_init -> uefi_init), so you run the risk of unmapping something
-we never mapped here.
+iirc, one plan for 'flags' was some sort of DONT_FLUSH_TLB flag for
+drivers which wanted to map/unmap N buffers with a single flush at the
+end.  There might have been some other usages envisioned.
 
-Furthermore, there seems to be a leak in uefi_init anyway, as we return
--EINVAL if the signature of the EFI table doesn't match without unmapping it
-first.
-
-Will
+BR,
+-R
