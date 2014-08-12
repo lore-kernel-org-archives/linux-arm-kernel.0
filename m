@@ -1,60 +1,45 @@
-From: robherring2@gmail.com (Rob Herring)
-Date: Tue, 12 Aug 2014 10:03:48 -0500
-Subject: [PATCH 6/7] arm: mediatek: enable gpt6 on boot up to make arch
- timer working
-In-Reply-To: <CABuKBe+Q3tnN0s22EMY-dK_6FeN_xN9SmrsW3dPONR6QDJ+V_w@mail.gmail.com>
-References: <1406824943-24052-1-git-send-email-matthias.bgg@gmail.com>
- <1406824943-24052-7-git-send-email-matthias.bgg@gmail.com>
- <CACRpkdbRhGE8tcKj+W_4F9-xmcm-fxcYuCmLOqX-ESC+3PAmyA@mail.gmail.com>
- <CABuKBe+Q3tnN0s22EMY-dK_6FeN_xN9SmrsW3dPONR6QDJ+V_w@mail.gmail.com>
-Message-ID: <CAL_JsqJLn=dKKEgWFtvg_PnLFa5PEKM1J-M+fVbdirBWD2ii2A@mail.gmail.com>
+From: john.tobias.ph@gmail.com (John Tobias)
+Date: Tue, 12 Aug 2014 08:10:24 -0700
+Subject: Freescale: iMX6Q Sabre SD
+In-Reply-To: <CAOMZO5BD5EE6ZpVCz0ST3j=hoXf4rk7PXOC3ZpWAHn_2nN8t7g@mail.gmail.com>
+References: <CACUGKYM=jPGL+GB1=n9-UQPaphPv4ONQz3Fb5k9-5CA=Zx=1xw@mail.gmail.com>
+ <CAOMZO5BJ6WS-OynZWJLE42pZbrvJ_nMM3qyndYVNsDYbBFWMmg@mail.gmail.com>
+ <CAOMZO5BD5EE6ZpVCz0ST3j=hoXf4rk7PXOC3ZpWAHn_2nN8t7g@mail.gmail.com>
+Message-ID: <CACUGKYM-B18YKtbc1BE1=RvUwRTypt9iSwYgOmfXF7w2Yq_sBA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Aug 12, 2014 at 4:02 AM, Matthias Brugger
-<matthias.bgg@gmail.com> wrote:
-> 2014-08-11 9:15 GMT+02:00 Linus Walleij <linus.walleij@linaro.org>:
->> On Thu, Jul 31, 2014 at 6:42 PM, Matthias Brugger
->> <matthias.bgg@gmail.com> wrote:
->>
->>> We enable GTP6 which ungates the arch timer clock. Apart we write the
->>> frequency with which the timer is running in the CNTFREQ register.
->>> In the future this should be done in the bootloader.
->>>
->>> Signed-off-by: Matthias Brugger <matthias.bgg@gmail.com>
->> (...)
->>
->>> +       if (of_machine_is_compatible("mediatek,mt6589")) {
->>> +               /* set cntfreq register which is not done in bootloader */
->>> +               asm volatile("mcr p15, 0, %0, c14, c0, 0" : : "r" (13000000));
->>
->> I guess this is for something like the ARM arch timer in
->> drivers/clocksource/arm_arch_timer.c
->>
->> Instead of doing this, use the DT property "clock-frequency" on
->> the ARM arch timer node, as that overrides the CP15 setting.
->>
->>> +
->>> +               /* turn on GPT6 which ungates arch timer clocks */
->>> +               gpt_base = ioremap(GPT6_CON_MT65xx, 0x04);
->>> +       }
->>> +
->>> +       /* enabel clock and set to free-run */
->>> +       if (gpt_base)
->>> +               writel(0x31, gpt_base);
->>
->> Why is this not done properly in the GPT driver (I guess
->> in drivers/clocksource/mtk_timer.c) instead of remapping
->> it and fiddling around in the machine?
+Hi Fabio,
+
+Thanks for the info. I will check it.
+
+Regards,
+
+john
+
+On Tue, Aug 12, 2014 at 6:42 AM, Fabio Estevam <festevam@gmail.com> wrote:
+> John,
 >
-> I didn't put it in the GPT driver, because that would mean, that you
-> need to have the mtk_timer to be able to use the ARM arch timer.
-> From my understanding this are two independent blocks in the SoC.
-> Apart from that, as stated in the commit message, this patch is a
-> workaround until we have a bootloader which does this for us.
-> Therefore I thought the init_time function would be the better place to do this.
-
-I agree that the bootloader is the right place, and the fixup in the
-machine code until that is in place is the right place for the fixup.
-
-Rob
+> On Mon, Aug 11, 2014 at 10:31 AM, Fabio Estevam <festevam@gmail.com> wrote:
+>
+>> I tested on my mx6qsabresd revC4 / rev C and the PCI link is not
+>> detected just like you described.
+>
+> Tested again today and my rev C4 detects the PCI card in U-boot and in
+> the kernel.
+>
+> For U-boot I use top of tree u-boot-imx.
+>
+> For kernel I am using linux-next 20140811 plus two patches:
+>
+> 1. One patch from Lucas that allows the kernel to boot when the
+> bootloader has already configured PCI:
+>
+> http://thread.gmane.org/gmane.linux.kernel.pci/33712/focus=33711
+>
+> 2. A patch from Tim that fix occasional PCI linkup failures:
+>
+> http://www.spinics.net/lists/linux-pci/msg33520.html
+>
+> Let me know if using this kernel version allows your PCI card to be
+> detected on revC4 mx6qsabresd board.
