@@ -1,434 +1,301 @@
-From: haojian.zhuang@linaro.org (Haojian Zhuang)
-Date: Tue, 12 Aug 2014 15:26:48 +0800
-Subject: [PATCH v18 2/8] ARM: hisi: enable MCPM implementation
-Message-ID: <1407828408-21431-1-git-send-email-haojian.zhuang@linaro.org>
+From: mpa@pengutronix.de (Markus Pargmann)
+Date: Tue, 12 Aug 2014 10:31:23 +0200
+Subject: [PATCH] watchdog: Add DA906x PMIC watchdog driver.
+Message-ID: <1407832283-26444-1-git-send-email-mpa@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Multiple CPU clusters are used in Hisilicon HiP04 SoC. Now use MCPM
-framework to manage power on HiP04 SoC.
+From: Krystian Garbaciak <krystian.garbaciak@diasemi.com>
 
-Changelog:
-v18:
-  * Fix to release resource in probe().
-  * Check whether cpu is already up in the process of making cpu down.
-  * Add udelay in power up/down sequence.
-  * Optimize on setting relocation entry.
-  * Optimize on polling status in wait_for_power_down().
-  * Add mcpm critical operations.
-v17:
-  * Parse bootwrapper parameters in DTS file.
-  * Fix to use msleep() in spinlock region.
-v16:
-  * Parse bootwrapper parameters in command line instead.
-v13:
-  * Restore power down operation in MCPM.
-  * Fix disabling snoop filter issue in MCPM.
-v12:
-  * Use wfi as power down state in MCPM.
-  * Remove wait_for_powerdown() in MCPM because wfi is used now.
+This driver supports watchdog device inside DA906x PMIC.
 
-Signed-off-by: Haojian Zhuang <haojian.zhuang@linaro.org>
+Signed-off-by: Krystian Garbaciak <krystian.garbaciak@diasemi.com>
+Signed-off-by: Philipp Zabel <p.zabel@pengutronix.de>
+Signed-off-by: Markus Pargmann <mpa@pengutronix.de>
 ---
- arch/arm/mach-hisi/Makefile   |   1 +
- arch/arm/mach-hisi/platmcpm.c | 379 ++++++++++++++++++++++++++++++++++++++++++
- 2 files changed, 380 insertions(+)
- create mode 100644 arch/arm/mach-hisi/platmcpm.c
+ drivers/watchdog/Kconfig             |   7 ++
+ drivers/watchdog/Makefile            |   1 +
+ drivers/watchdog/da9063_wdt.c        | 229 +++++++++++++++++++++++++++++++++++
+ include/linux/mfd/da9063/registers.h |   1 +
+ 4 files changed, 238 insertions(+)
+ create mode 100644 drivers/watchdog/da9063_wdt.c
 
-diff --git a/arch/arm/mach-hisi/Makefile b/arch/arm/mach-hisi/Makefile
-index ee2506b..d64831e 100644
---- a/arch/arm/mach-hisi/Makefile
-+++ b/arch/arm/mach-hisi/Makefile
-@@ -3,4 +3,5 @@
- #
+diff --git a/drivers/watchdog/Kconfig b/drivers/watchdog/Kconfig
+index c845527b503a..8d5c9b33552a 100644
+--- a/drivers/watchdog/Kconfig
++++ b/drivers/watchdog/Kconfig
+@@ -87,6 +87,13 @@ config DA9055_WATCHDOG
+ 	  This driver can also be built as a module.  If so, the module
+ 	  will be called da9055_wdt.
  
- obj-y	+= hisilicon.o
-+obj-$(CONFIG_MCPM)		+= platmcpm.o
- obj-$(CONFIG_SMP)		+= platsmp.o hotplug.o headsmp.o
-diff --git a/arch/arm/mach-hisi/platmcpm.c b/arch/arm/mach-hisi/platmcpm.c
++config DA9063_WATCHDOG
++	tristate "Dialog DA9063 Watchdog"
++	depends on MFD_DA9063
++	select WATCHDOG_CORE
++	help
++	  Support for the watchdog in the DA9063 PMIC.
++
+ config GPIO_WATCHDOG
+ 	tristate "Watchdog device controlled through GPIO-line"
+ 	depends on OF_GPIO
+diff --git a/drivers/watchdog/Makefile b/drivers/watchdog/Makefile
+index 7b8a91ed20e7..ce4a7632d863 100644
+--- a/drivers/watchdog/Makefile
++++ b/drivers/watchdog/Makefile
+@@ -172,6 +172,7 @@ obj-$(CONFIG_XEN_WDT) += xen_wdt.o
+ # Architecture Independent
+ obj-$(CONFIG_DA9052_WATCHDOG) += da9052_wdt.o
+ obj-$(CONFIG_DA9055_WATCHDOG) += da9055_wdt.o
++obj-$(CONFIG_DA9063_WATCHDOG) += da9063_wdt.o
+ obj-$(CONFIG_GPIO_WATCHDOG)	+= gpio_wdt.o
+ obj-$(CONFIG_WM831X_WATCHDOG) += wm831x_wdt.o
+ obj-$(CONFIG_WM8350_WATCHDOG) += wm8350_wdt.o
+diff --git a/drivers/watchdog/da9063_wdt.c b/drivers/watchdog/da9063_wdt.c
 new file mode 100644
-index 0000000..c75035e
+index 000000000000..cd32de6c5e9d
 --- /dev/null
-+++ b/arch/arm/mach-hisi/platmcpm.c
-@@ -0,0 +1,379 @@
++++ b/drivers/watchdog/da9063_wdt.c
+@@ -0,0 +1,229 @@
 +/*
-+ * Copyright (c) 2013-2014 Linaro Ltd.
-+ * Copyright (c) 2013-2014 Hisilicon Limited.
++ * Watchdog driver for DA9063 PMICs.
 + *
-+ * This program is free software; you can redistribute it and/or modify it
-+ * under the terms and conditions of the GNU General Public License,
-+ * version 2, as published by the Free Software Foundation.
++ * Copyright(c) 2012 Dialog Semiconductor Ltd.
++ *
++ * Author: Mariusz Wojtasik <mariusz.garbaciak@diasemi.com>
++ *
++ *  This program is free software; you can redistribute  it and/or modify it
++ *  under  the terms of  the GNU General  Public License as published by the
++ *  Free Software Foundation;  either version 2 of the  License, or (at your
++ *  option) any later version.
++ *
 + */
++
++#include <linux/kernel.h>
++#include <linux/module.h>
++#include <linux/watchdog.h>
++#include <linux/platform_device.h>
++#include <linux/uaccess.h>
++#include <linux/slab.h>
 +#include <linux/delay.h>
-+#include <linux/io.h>
-+#include <linux/memblock.h>
-+#include <linux/of_address.h>
++#include <linux/mfd/da9063/registers.h>
++#include <linux/mfd/da9063/core.h>
++#include <linux/regmap.h>
 +
-+#include <asm/cputype.h>
-+#include <asm/cp15.h>
-+#include <asm/mcpm.h>
++#define	DA9063_SUPPORTED_TIMEOUTS_STR		"2, 4, 8, 16, 32, 65, 131"
 +
-+#include "core.h"
++/* Watchdog selector to timeout in seconds.
++   0: WDT disabled;
++   others: timeout = 2048 ms * 2^(TWDSCALE-1). */
++static const int wdt_timeout[] = { 0, 2, 4, 8, 16, 32, 65, 131 };
++#define DA9063_TWDSCALE_DISABLE		0
++#define DA9063_TWDSCALE_MIN		1
++#define DA9063_TWDSCALE_MAX		(ARRAY_SIZE(wdt_timeout) - 1)
++#define DA9063_WDT_MIN_TIMEOUT		wdt_timeout[DA9063_TWDSCALE_MIN]
++#define DA9063_WDT_MAX_TIMEOUT		wdt_timeout[DA9063_TWDSCALE_MAX]
++#define DA9063_WDG_TIMEOUT		wdt_timeout[3]
 +
-+/* bits definition in SC_CPU_RESET_REQ[x]/SC_CPU_RESET_DREQ[x]
-+ * 1 -- unreset; 0 -- reset
-+ */
-+#define CORE_RESET_BIT(x)		(1 << x)
-+#define NEON_RESET_BIT(x)		(1 << (x + 4))
-+#define CORE_DEBUG_RESET_BIT(x)		(1 << (x + 9))
-+#define CLUSTER_L2_RESET_BIT		(1 << 8)
-+#define CLUSTER_DEBUG_RESET_BIT		(1 << 13)
 +
-+/*
-+ * bits definition in SC_CPU_RESET_STATUS[x]
-+ * 1 -- reset status; 0 -- unreset status
-+ */
-+#define CORE_RESET_STATUS(x)		(1 << x)
-+#define NEON_RESET_STATUS(x)		(1 << (x + 4))
-+#define CORE_DEBUG_RESET_STATUS(x)	(1 << (x + 9))
-+#define CLUSTER_L2_RESET_STATUS		(1 << 8)
-+#define CLUSTER_DEBUG_RESET_STATUS	(1 << 13)
-+#define CORE_WFI_STATUS(x)		(1 << (x + 16))
-+#define CORE_WFE_STATUS(x)		(1 << (x + 20))
-+#define CORE_DEBUG_ACK(x)		(1 << (x + 24))
++struct da9063_watchdog {
++	struct da9063 *da9063;
++	struct watchdog_device *wdtdev;
++	struct mutex lock;
++};
 +
-+#define SC_CPU_RESET_REQ(x)		(0x520 + (x << 3))	/* reset */
-+#define SC_CPU_RESET_DREQ(x)		(0x524 + (x << 3))	/* unreset */
-+#define SC_CPU_RESET_STATUS(x)		(0x1520 + (x << 3))
-+
-+#define FAB_SF_MODE			0x0c
-+#define FAB_SF_INVLD			0x10
-+
-+/* bits definition in FB_SF_INVLD */
-+#define FB_SF_INVLD_START		(1 << 8)
-+
-+#define HIP04_MAX_CLUSTERS		4
-+#define HIP04_MAX_CPUS_PER_CLUSTER	4
-+
-+#define POLL_MSEC	10
-+#define TIMEOUT_MSEC	100
-+
-+static void __iomem *sysctrl, *fabric;
-+static int hip04_cpu_table[HIP04_MAX_CLUSTERS][HIP04_MAX_CPUS_PER_CLUSTER];
-+static DEFINE_SPINLOCK(boot_lock);
-+static u32 fabric_phys_addr;
-+/*
-+ * [0]: bootwrapper physical address
-+ * [1]: bootwrapper size
-+ * [2]: relocation address
-+ * [3]: relocation size
-+ */
-+static u32 hip04_boot_method[4];
-+
-+static bool hip04_cluster_is_down(unsigned int cluster)
++static int _da9063_wdt_timeout_to_sel(int secs)
 +{
 +	int i;
 +
-+	for (i = 0; i < HIP04_MAX_CPUS_PER_CLUSTER; i++)
-+		if (hip04_cpu_table[cluster][i])
-+			return false;
-+	return true;
-+}
-+
-+static void hip04_set_snoop_filter(unsigned int cluster, unsigned int on)
-+{
-+	unsigned long data;
-+
-+	if (!fabric)
-+		BUG();
-+	data = readl_relaxed(fabric + FAB_SF_MODE);
-+	if (on)
-+		data |= 1 << cluster;
-+	else
-+		data &= ~(1 << cluster);
-+	writel_relaxed(data, fabric + FAB_SF_MODE);
-+	while (1) {
-+		if (data == readl_relaxed(fabric + FAB_SF_MODE))
-+			break;
++	for (i = DA9063_TWDSCALE_MIN; i <= DA9063_TWDSCALE_MAX; i++) {
++		if (wdt_timeout[i] >= secs)
++			return i;
 +	}
-+	return;
++
++	return 0;
 +}
 +
-+static int hip04_mcpm_power_up(unsigned int cpu, unsigned int cluster)
++static int _da9063_wdt_disable(struct da9063 *da9063)
 +{
-+	unsigned long data, mask;
-+	void __iomem *sys_dreq, *sys_status;
++	return regmap_update_bits(da9063->regmap, DA9063_REG_CONTROL_D,
++			DA9063_TWDSCALE_MASK,
++			DA9063_TWDSCALE_DISABLE << DA9063_TWDSCALE_SHIFT);
++}
 +
-+	if (!sysctrl)
-+		return -ENODEV;
-+	if (cluster >= HIP04_MAX_CLUSTERS || cpu >= HIP04_MAX_CPUS_PER_CLUSTER)
++static int _da9063_wdt_set_timeout(struct da9063 *da9063, unsigned int regval)
++{
++	if (regval < DA9063_TWDSCALE_MIN || regval > DA9063_TWDSCALE_MAX)
 +		return -EINVAL;
 +
-+	spin_lock_irq(&boot_lock);
-+
-+	if (hip04_cpu_table[cluster][cpu])
-+		goto out;
-+
-+	sys_dreq = sysctrl + SC_CPU_RESET_DREQ(cluster);
-+	sys_status = sysctrl + SC_CPU_RESET_STATUS(cluster);
-+	if (hip04_cluster_is_down(cluster)) {
-+		data = CLUSTER_DEBUG_RESET_BIT;
-+		writel_relaxed(data, sys_dreq);
-+		do {
-+			cpu_relax();
-+			mask = CLUSTER_DEBUG_RESET_STATUS;
-+			data = readl_relaxed(sys_status);
-+		} while (data & mask);
-+	}
-+
-+	data = CORE_RESET_BIT(cpu) | NEON_RESET_BIT(cpu) | \
-+	       CORE_DEBUG_RESET_BIT(cpu);
-+	writel_relaxed(data, sys_dreq);
-+	do {
-+		cpu_relax();
-+	} while (data == readl_relaxed(sys_status));
-+	udelay(20);
-+out:
-+	hip04_cpu_table[cluster][cpu]++;
-+	spin_unlock_irq(&boot_lock);
-+
-+	return 0;
++	return regmap_update_bits(da9063->regmap, DA9063_REG_CONTROL_D,
++			DA9063_TWDSCALE_MASK, regval << DA9063_TWDSCALE_SHIFT);
 +}
 +
-+static void hip04_mcpm_power_down(void)
++static int _da9063_wdt_kick(struct da9063 *da9063)
 +{
-+	unsigned int mpidr, cpu, cluster;
-+	bool skip_wfi = false, last_man = false;
-+
-+	mpidr = read_cpuid_mpidr();
-+	cpu = MPIDR_AFFINITY_LEVEL(mpidr, 0);
-+	cluster = MPIDR_AFFINITY_LEVEL(mpidr, 1);
-+
-+	__mcpm_cpu_going_down(cpu, cluster);
-+
-+	spin_lock_irq(&boot_lock);
-+	BUG_ON(__mcpm_cluster_state(cluster) != CLUSTER_UP);
-+	hip04_cpu_table[cluster][cpu]--;
-+	if (hip04_cpu_table[cluster][cpu] == 1) {
-+		/* A power_up request went ahead of us. */
-+		skip_wfi = true;
-+	} else if (hip04_cpu_table[cluster][cpu] > 1) {
-+		pr_err("Cluster %d CPU%d boots multiple times\n", cluster, cpu);
-+		BUG();
-+	}
-+
-+	last_man = hip04_cluster_is_down(cluster);
-+	if (last_man && __mcpm_outbound_enter_critical(cpu, cluster)) {
-+		spin_unlock(&boot_lock);
-+		v7_exit_coherency_flush(all);
-+		__mcpm_outbound_leave_critical(cluster, CLUSTER_DOWN);
-+	} else {
-+		spin_unlock(&boot_lock);
-+		v7_exit_coherency_flush(louis);
-+	}
-+
-+	__mcpm_cpu_down(cpu, cluster);
-+
-+	if (!skip_wfi)
-+		wfi();
++	return regmap_write(da9063->regmap, DA9063_REG_CONTROL_F,
++			DA9063_WATCHDOG);
 +}
 +
-+static int hip04_mcpm_wait_for_powerdown(unsigned int cpu, unsigned int cluster)
++static int da9063_wdt_start(struct watchdog_device *wdd)
 +{
-+	unsigned int data, tries, count;
++	struct da9063_watchdog *wdt = watchdog_get_drvdata(wdd);
++	unsigned int selector;
++	int ret = 0;
 +
-+	BUG_ON(cluster >= HIP04_MAX_CLUSTERS ||
-+	       cpu >= HIP04_MAX_CPUS_PER_CLUSTER);
-+
-+	count = TIMEOUT_MSEC / POLL_MSEC;
-+	spin_lock_irq(&boot_lock);
-+	/*
-+	 * Target core should enter WFI first.
-+	 * Then cluster could be disabled in snoop filter.
-+	 * At last, target core could be reset.
-+	 */
-+	for (tries = 0; tries < count; tries++) {
-+		cpu_relax();
-+		udelay(50);
-+		data = readl_relaxed(sysctrl + SC_CPU_RESET_STATUS(cluster));
-+		if (!hip04_cpu_table[cluster][cpu] || \
-+		    (data & CORE_WFI_STATUS(cpu))) {
-+			break;
-+		}
++	mutex_lock(&wdt->lock);
++	selector = _da9063_wdt_timeout_to_sel(wdt->wdtdev->timeout);
++	ret = _da9063_wdt_set_timeout(wdt->da9063, selector);
++	if (ret) {
++		dev_err(wdt->da9063->dev, "Watchdog failed to start (err = %d)\n",
++				ret);
 +	}
-+	if (tries >= count)
-+		goto err;
-+	if (hip04_cluster_is_down(cluster))
-+		hip04_set_snoop_filter(cluster, 0);
-+	data = CORE_RESET_BIT(cpu) | NEON_RESET_BIT(cpu) | \
-+	       CORE_DEBUG_RESET_BIT(cpu);
-+	writel_relaxed(data, sysctrl + SC_CPU_RESET_REQ(cluster));
-+	for (tries = 0; tries < count; tries++) {
-+		cpu_relax();
-+		udelay(50);
-+		data = readl_relaxed(sysctrl + SC_CPU_RESET_STATUS(cluster));
-+		if (!hip04_cpu_table[cluster][cpu] || \
-+		    (data & CORE_RESET_STATUS(cpu))) {
-+			break;
-+		}
++	mutex_unlock(&wdt->lock);
++
++	return ret;
++}
++
++static int da9063_wdt_stop(struct watchdog_device *wdd)
++{
++	struct da9063_watchdog *wdt = watchdog_get_drvdata(wdd);
++	int ret = 0;
++
++	mutex_lock(&wdt->lock);
++	ret = _da9063_wdt_disable(wdt->da9063);
++	if (ret)
++		dev_alert(wdt->da9063->dev,
++			  "Watchdog failed to stop (err = %d)\n", ret);
++	mutex_unlock(&wdt->lock);
++
++	return ret;
++}
++
++static int da9063_wdt_ping(struct watchdog_device *wdd)
++{
++	struct da9063_watchdog *wdt = watchdog_get_drvdata(wdd);
++	int ret = 0;
++
++	mutex_lock(&wdt->lock);
++	ret = _da9063_wdt_kick(wdt->da9063);
++	if (ret)
++		dev_alert(wdt->da9063->dev, "Failed to ping the watchdog (err = %d)\n",
++				ret);
++	mutex_unlock(&wdt->lock);
++
++	return ret;
++}
++
++static int da9063_wdt_set_timeout(struct watchdog_device *wdd,
++							unsigned int timeout)
++{
++	struct da9063_watchdog *wdt = watchdog_get_drvdata(wdd);
++	unsigned int selector;
++	int ret;
++
++	selector = _da9063_wdt_timeout_to_sel(timeout);
++	if (selector == 0) {
++		dev_err(wdt->da9063->dev, "Unsupported watchdog timeout (select from: "
++				DA9063_SUPPORTED_TIMEOUTS_STR ")\n");
++		return -EINVAL;
 +	}
-+	if (tries >= count)
-+		goto err;
-+	spin_unlock_irq(&boot_lock);
-+	return 0;
-+err:
-+	spin_unlock_irq(&boot_lock);
-+	return -EBUSY;
++
++	mutex_lock(&wdt->lock);
++
++	ret = _da9063_wdt_set_timeout(wdt->da9063, selector);
++	if (ret)
++		dev_err(wdt->da9063->dev, "Failed to set watchdog timeout (err = %d)\n",
++				ret);
++	else
++		wdd->timeout = wdt_timeout[selector];
++
++	mutex_unlock(&wdt->lock);
++
++	return ret;
 +}
 +
-+static void hip04_mcpm_powered_up(void)
-+{
-+	unsigned int mpidr, cpu, cluster;
-+
-+	mpidr = read_cpuid_mpidr();
-+	cpu = MPIDR_AFFINITY_LEVEL(mpidr, 0);
-+	cluster = MPIDR_AFFINITY_LEVEL(mpidr, 1);
-+
-+	spin_lock(&boot_lock);
-+	if (!hip04_cpu_table[cluster][cpu])
-+		hip04_cpu_table[cluster][cpu] = 1;
-+	spin_unlock(&boot_lock);
-+}
-+
-+static void __naked hip04_mcpm_power_up_setup(unsigned int affinity_level)
-+{
-+	asm volatile ("			\n"
-+"	cmp	r0, #0			\n"
-+"	bxeq	lr			\n"
-+	/* calculate fabric phys address */
-+"	adr	r2, 2f			\n"
-+"	ldmia	r2, {r1, r3}		\n"
-+"	sub	r0, r2, r1		\n"
-+"	ldr	r2, [r0, r3]		\n"
-+	/* get cluster id from MPIDR */
-+"	mrc	p15, 0, r0, c0, c0, 5	\n"
-+"	ubfx	r1, r0, #8, #8		\n"
-+	/* 1 << cluster id */
-+"	mov	r0, #1			\n"
-+"	mov	r3, r0, lsl r1		\n"
-+"	ldr	r0, [r2, #"__stringify(FAB_SF_MODE)"]	\n"
-+"	tst	r0, r3			\n"
-+"	bxne	lr			\n"
-+"	orr	r1, r0, r3		\n"
-+"	str	r1, [r2, #"__stringify(FAB_SF_MODE)"]	\n"
-+"1:	ldr	r0, [r2, #"__stringify(FAB_SF_MODE)"]	\n"
-+"	tst	r0, r3			\n"
-+"	beq	1b			\n"
-+"	bx	lr			\n"
-+
-+"	.align	2			\n"
-+"2:	.word	.			\n"
-+"	.word	fabric_phys_addr	\n"
-+	);
-+}
-+
-+static const struct mcpm_platform_ops hip04_mcpm_ops = {
-+	.power_up		= hip04_mcpm_power_up,
-+	.power_down		= hip04_mcpm_power_down,
-+	.wait_for_powerdown	= hip04_mcpm_wait_for_powerdown,
-+	.powered_up		= hip04_mcpm_powered_up,
++static struct watchdog_info da9063_watchdog_info = {
++	.options	= WDIOF_SETTIMEOUT | WDIOF_KEEPALIVEPING,
++	.identity	= "DA9063 Watchdog",
 +};
 +
-+static bool __init hip04_cpu_table_init(void)
++static struct watchdog_ops da9063_watchdog_ops = {
++	.owner		= THIS_MODULE,
++	.start		= da9063_wdt_start,
++	.stop		= da9063_wdt_stop,
++	.ping		= da9063_wdt_ping,
++	.set_timeout	= da9063_wdt_set_timeout,
++};
++
++static struct watchdog_device da9063_watchdog_device = {
++	.info	= &da9063_watchdog_info,
++	.ops	= &da9063_watchdog_ops,
++};
++
++static int da9063_wdt_probe(struct platform_device *pdev)
 +{
-+	unsigned int mpidr, cpu, cluster;
++	int ret;
++	struct da9063 *da9063 = dev_get_drvdata(pdev->dev.parent);
++	struct da9063_watchdog *wdt;
 +
-+	mpidr = read_cpuid_mpidr();
-+	cpu = MPIDR_AFFINITY_LEVEL(mpidr, 0);
-+	cluster = MPIDR_AFFINITY_LEVEL(mpidr, 1);
++	if (!da9063)
++		return -EPROBE_DEFER;
 +
-+	if (cluster >= HIP04_MAX_CLUSTERS ||
-+	    cpu >= HIP04_MAX_CPUS_PER_CLUSTER) {
-+		pr_err("%s: boot CPU is out of bound!\n", __func__);
-+		return false;
++	wdt = devm_kzalloc(&pdev->dev, sizeof(*wdt), GFP_KERNEL);
++	if (!wdt)
++		return -ENOMEM;
++
++	wdt->da9063 = da9063;
++	wdt->wdtdev = &da9063_watchdog_device;
++	mutex_init(&wdt->lock);
++
++	if (IS_ENABLED(CONFIG_WATCHDOG_NOWAYOUT))
++		set_bit(WDOG_NO_WAY_OUT, &wdt->wdtdev->status);
++
++	wdt->wdtdev->min_timeout = DA9063_WDT_MIN_TIMEOUT;
++	wdt->wdtdev->max_timeout = DA9063_WDT_MAX_TIMEOUT;
++	wdt->wdtdev->timeout = DA9063_WDG_TIMEOUT;
++
++	ret = watchdog_register_device(wdt->wdtdev);
++	if (ret) {
++		dev_err(da9063->dev, "da9063-watchdog registration failed (err = %d)",
++				ret);
++		return ret;
 +	}
-+	hip04_set_snoop_filter(cluster, 1);
-+	hip04_cpu_table[cluster][cpu] = 1;
-+	return true;
++
++	watchdog_set_drvdata(wdt->wdtdev, wdt);
++
++	return 0;
 +}
 +
-+static int __init hip04_mcpm_init(void)
++static int da9063_wdt_remove(struct platform_device *pdev)
 +{
-+	struct device_node *np, *np_sctl, *np_fab;
-+	struct resource fab_res;
-+	void __iomem *relocation;
-+	int ret = -ENODEV;
++	watchdog_unregister_device(&da9063_watchdog_device);
 +
-+	np = of_find_compatible_node(NULL, NULL, "hisilicon,hip04-bootwrapper");
-+	if (!np)
-+		goto err;
-+	ret = of_property_read_u32_array(np, "boot-method",
-+					 &hip04_boot_method[0], 4);
-+	if (ret)
-+		goto err;
-+	np_sctl = of_find_compatible_node(NULL, NULL, "hisilicon,sysctrl");
-+	if (!np_sctl)
-+		goto err;
-+	np_fab = of_find_compatible_node(NULL, NULL, "hisilicon,hip04-fabric");
-+	if (!np_fab)
-+		goto err;
-+
-+	ret = memblock_reserve(hip04_boot_method[0], hip04_boot_method[1]);
-+	if (ret)
-+		goto err;
-+
-+	relocation = ioremap(hip04_boot_method[2], hip04_boot_method[3]);
-+	if (!relocation) {
-+		pr_err("failed to map relocation space\n");
-+		ret = -ENOMEM;
-+		goto err_reloc;
-+	}
-+	sysctrl = of_iomap(np_sctl, 0);
-+	if (!sysctrl) {
-+		pr_err("failed to get sysctrl base\n");
-+		ret = -ENOMEM;
-+		goto err_sysctrl;
-+	}
-+	ret = of_address_to_resource(np_fab, 0, &fab_res);
-+	if (ret) {
-+		pr_err("failed to get fabric base phys\n");
-+		goto err_fabric;
-+	}
-+	fabric_phys_addr = fab_res.start;
-+	sync_cache_w(&fabric_phys_addr);
-+	fabric = of_iomap(np_fab, 0);
-+	if (!fabric) {
-+		pr_err("failed to get fabric base\n");
-+		ret = -ENOMEM;
-+		goto err_fabric;
-+	}
-+
-+	if (!hip04_cpu_table_init()) {
-+		ret = -EINVAL;
-+		goto err_table;
-+	}
-+	ret = mcpm_platform_register(&hip04_mcpm_ops);
-+	if (ret) {
-+		goto err_table;
-+	}
-+
-+	/* Make secondary core out of reset. */
-+	writel_relaxed(hip04_boot_method[0], relocation);
-+	writel_relaxed(0xa5a5a5a5, relocation + 4);	/* magic number */
-+	writel_relaxed(virt_to_phys(mcpm_entry_point), relocation + 8);
-+	writel_relaxed(0, relocation + 12);
-+	iounmap(relocation);
-+
-+	mcpm_sync_init(hip04_mcpm_power_up_setup);
-+	mcpm_smp_set_ops();
-+	pr_info("HiP04 MCPM initialized\n");
-+	return ret;
-+err_table:
-+	iounmap(fabric);
-+err_fabric:
-+	iounmap(sysctrl);
-+err_sysctrl:
-+	iounmap(relocation);
-+err_reloc:
-+	memblock_free(hip04_boot_method[0], hip04_boot_method[1]);
-+err:
-+	return ret;
++	return 0;
 +}
-+early_initcall(hip04_mcpm_init);
++
++static struct platform_driver da9063_wdt_driver = {
++	.probe = da9063_wdt_probe,
++	.remove = da9063_wdt_remove,
++	.driver = {
++		.name	= DA9063_DRVNAME_WATCHDOG,
++	},
++};
++module_platform_driver(da9063_wdt_driver);
++
++MODULE_AUTHOR("Mariusz Wojtasik <mariusz.garbaciak@diasemi.com>");
++MODULE_DESCRIPTION("Watchdog driver for Dialog DA9063");
++MODULE_LICENSE("GPL");
++MODULE_ALIAS("platform:" DA9063_DRVNAME_WATCHDOG);
+diff --git a/include/linux/mfd/da9063/registers.h b/include/linux/mfd/da9063/registers.h
+index 09a85c699da1..cc73f5d76cc8 100644
+--- a/include/linux/mfd/da9063/registers.h
++++ b/include/linux/mfd/da9063/registers.h
+@@ -431,6 +431,7 @@
+ 
+ /* DA9063_REG_CONTROL_D (addr=0x11) */
+ #define	DA9063_TWDSCALE_MASK			0x07
++#define DA9063_TWDSCALE_SHIFT			0x00
+ #define	DA9063_BLINK_FRQ_MASK			0x38
+ #define		DA9063_BLINK_FRQ_OFF		0x00
+ #define		DA9063_BLINK_FRQ_1S0		0x08
 -- 
-1.9.1
+2.0.1
