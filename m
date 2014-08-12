@@ -1,298 +1,219 @@
-From: mpa@pengutronix.de (Markus Pargmann)
-Date: Tue, 12 Aug 2014 11:56:43 +0200
-Subject: [PATCH v2] watchdog: Add DA906x PMIC watchdog driver.
-Message-ID: <1407837403-15863-1-git-send-email-mpa@pengutronix.de>
+From: ulf.hansson@linaro.org (Ulf Hansson)
+Date: Tue, 12 Aug 2014 12:09:56 +0200
+Subject: [GIT PULL] MMC for v.3.17
+Message-ID: <CAPDyKFps+wjnT2aXiRPKs2mM1tK2KjzCHF_NnMdFyWBCaAfehQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Krystian Garbaciak <krystian.garbaciak@diasemi.com>
+Hi Linus,
 
-This driver supports watchdog device inside DA906x PMIC.
+Me and Chris Ball decided to try out using my MMC tree as the primary
+one, to simplify handling of patches.
 
-Signed-off-by: Krystian Garbaciak <krystian.garbaciak@diasemi.com>
-Signed-off-by: Philipp Zabel <p.zabel@pengutronix.de>
-Signed-off-by: Markus Pargmann <mpa@pengutronix.de>
----
- drivers/watchdog/Kconfig             |   7 ++
- drivers/watchdog/Makefile            |   1 +
- drivers/watchdog/da9063_wdt.c        | 226 +++++++++++++++++++++++++++++++++++
- include/linux/mfd/da9063/registers.h |   1 +
- 4 files changed, 235 insertions(+)
- create mode 100644 drivers/watchdog/da9063_wdt.c
+This PR does thus contains all the MMC patches for 3.17 rc1, no PR
+from Chris this time. Please pull them in.
 
-diff --git a/drivers/watchdog/Kconfig b/drivers/watchdog/Kconfig
-index c845527b503a..8d5c9b33552a 100644
---- a/drivers/watchdog/Kconfig
-+++ b/drivers/watchdog/Kconfig
-@@ -87,6 +87,13 @@ config DA9055_WATCHDOG
- 	  This driver can also be built as a module.  If so, the module
- 	  will be called da9055_wdt.
- 
-+config DA9063_WATCHDOG
-+	tristate "Dialog DA9063 Watchdog"
-+	depends on MFD_DA9063
-+	select WATCHDOG_CORE
-+	help
-+	  Support for the watchdog in the DA9063 PMIC.
-+
- config GPIO_WATCHDOG
- 	tristate "Watchdog device controlled through GPIO-line"
- 	depends on OF_GPIO
-diff --git a/drivers/watchdog/Makefile b/drivers/watchdog/Makefile
-index 7b8a91ed20e7..ce4a7632d863 100644
---- a/drivers/watchdog/Makefile
-+++ b/drivers/watchdog/Makefile
-@@ -172,6 +172,7 @@ obj-$(CONFIG_XEN_WDT) += xen_wdt.o
- # Architecture Independent
- obj-$(CONFIG_DA9052_WATCHDOG) += da9052_wdt.o
- obj-$(CONFIG_DA9055_WATCHDOG) += da9055_wdt.o
-+obj-$(CONFIG_DA9063_WATCHDOG) += da9063_wdt.o
- obj-$(CONFIG_GPIO_WATCHDOG)	+= gpio_wdt.o
- obj-$(CONFIG_WM831X_WATCHDOG) += wm831x_wdt.o
- obj-$(CONFIG_WM8350_WATCHDOG) += wm8350_wdt.o
-diff --git a/drivers/watchdog/da9063_wdt.c b/drivers/watchdog/da9063_wdt.c
-new file mode 100644
-index 000000000000..befd6314f3f4
---- /dev/null
-+++ b/drivers/watchdog/da9063_wdt.c
-@@ -0,0 +1,226 @@
-+/*
-+ * Watchdog driver for DA9063 PMICs.
-+ *
-+ * Copyright(c) 2012 Dialog Semiconductor Ltd.
-+ *
-+ * Author: Mariusz Wojtasik <mariusz.wojtasik@diasemi.com>
-+ *
-+ * This program is free software; you can redistribute  it and/or modify it
-+ * under  the terms of  the GNU General  Public License as published by the
-+ * Free Software Foundation;  either version 2 of the  License, or (at your
-+ * option) any later version.
-+ */
-+
-+#include <linux/kernel.h>
-+#include <linux/module.h>
-+#include <linux/watchdog.h>
-+#include <linux/platform_device.h>
-+#include <linux/uaccess.h>
-+#include <linux/slab.h>
-+#include <linux/delay.h>
-+#include <linux/mfd/da9063/registers.h>
-+#include <linux/mfd/da9063/core.h>
-+#include <linux/regmap.h>
-+
-+/*
-+ * Watchdog selector to timeout in seconds.
-+ *   0: WDT disabled;
-+ *   others: timeout = 2048 ms * 2^(TWDSCALE-1).
-+ */
-+static const int wdt_timeout[] = { 0, 2, 4, 8, 16, 32, 65, 131 };
-+#define DA9063_TWDSCALE_DISABLE		0
-+#define DA9063_TWDSCALE_MIN		1
-+#define DA9063_TWDSCALE_MAX		(ARRAY_SIZE(wdt_timeout) - 1)
-+#define DA9063_WDT_MIN_TIMEOUT		wdt_timeout[DA9063_TWDSCALE_MIN]
-+#define DA9063_WDT_MAX_TIMEOUT		wdt_timeout[DA9063_TWDSCALE_MAX]
-+#define DA9063_WDG_TIMEOUT		wdt_timeout[3]
-+
-+struct da9063_watchdog {
-+	struct da9063 *da9063;
-+	struct watchdog_device *wdtdev;
-+	struct mutex lock;
-+};
-+
-+static int da9063_wdt_timeout_to_sel(int secs)
-+{
-+	int i;
-+
-+	for (i = DA9063_TWDSCALE_MIN; i <= DA9063_TWDSCALE_MAX; i++) {
-+		if (wdt_timeout[i] >= secs)
-+			return i;
-+	}
-+
-+	return 0;
-+}
-+
-+static int da9063_wdt_disable(struct da9063 *da9063)
-+{
-+	return regmap_update_bits(da9063->regmap, DA9063_REG_CONTROL_D,
-+			DA9063_TWDSCALE_MASK,
-+			DA9063_TWDSCALE_DISABLE << DA9063_TWDSCALE_SHIFT);
-+}
-+
-+static int _da9063_wdt_set_timeout(struct da9063 *da9063, unsigned int regval)
-+{
-+	if (regval < DA9063_TWDSCALE_MIN || regval > DA9063_TWDSCALE_MAX)
-+		return -EINVAL;
-+
-+	return regmap_update_bits(da9063->regmap, DA9063_REG_CONTROL_D,
-+			DA9063_TWDSCALE_MASK, regval << DA9063_TWDSCALE_SHIFT);
-+}
-+
-+static int _da9063_wdt_kick(struct da9063 *da9063)
-+{
-+	return regmap_write(da9063->regmap, DA9063_REG_CONTROL_F,
-+			DA9063_WATCHDOG);
-+}
-+
-+static int da9063_wdt_start(struct watchdog_device *wdd)
-+{
-+	struct da9063_watchdog *wdt = watchdog_get_drvdata(wdd);
-+	unsigned int selector;
-+	int ret = 0;
-+
-+	mutex_lock(&wdt->lock);
-+	selector = da9063_wdt_timeout_to_sel(wdt->wdtdev->timeout);
-+	ret = _da9063_wdt_set_timeout(wdt->da9063, selector);
-+	if (ret) {
-+		dev_err(wdt->da9063->dev, "Watchdog failed to start (err = %d)\n",
-+				ret);
-+	}
-+	mutex_unlock(&wdt->lock);
-+
-+	return ret;
-+}
-+
-+static int da9063_wdt_stop(struct watchdog_device *wdd)
-+{
-+	struct da9063_watchdog *wdt = watchdog_get_drvdata(wdd);
-+	int ret = 0;
-+
-+	mutex_lock(&wdt->lock);
-+	ret = da9063_wdt_disable(wdt->da9063);
-+	if (ret)
-+		dev_alert(wdt->da9063->dev,
-+			  "Watchdog failed to stop (err = %d)\n", ret);
-+	mutex_unlock(&wdt->lock);
-+
-+	return ret;
-+}
-+
-+static int da9063_wdt_ping(struct watchdog_device *wdd)
-+{
-+	struct da9063_watchdog *wdt = watchdog_get_drvdata(wdd);
-+	int ret = 0;
-+
-+	mutex_lock(&wdt->lock);
-+	ret = _da9063_wdt_kick(wdt->da9063);
-+	if (ret)
-+		dev_alert(wdt->da9063->dev, "Failed to ping the watchdog (err = %d)\n",
-+				ret);
-+	mutex_unlock(&wdt->lock);
-+
-+	return ret;
-+}
-+
-+static int da9063_wdt_set_timeout(struct watchdog_device *wdd,
-+							unsigned int timeout)
-+{
-+	struct da9063_watchdog *wdt = watchdog_get_drvdata(wdd);
-+	unsigned int selector;
-+	int ret;
-+
-+	selector = da9063_wdt_timeout_to_sel(timeout);
-+	if (selector == 0) {
-+		dev_err(wdt->da9063->dev, "Unsupported watchdog timeout (select from: 2, 4, 8, 16, 32, 65, 131)\n");
-+		return -EINVAL;
-+	}
-+
-+	mutex_lock(&wdt->lock);
-+
-+	ret = _da9063_wdt_set_timeout(wdt->da9063, selector);
-+	if (ret)
-+		dev_err(wdt->da9063->dev, "Failed to set watchdog timeout (err = %d)\n",
-+				ret);
-+	else
-+		wdd->timeout = wdt_timeout[selector];
-+
-+	mutex_unlock(&wdt->lock);
-+
-+	return ret;
-+}
-+
-+static const struct watchdog_info da9063_watchdog_info = {
-+	.options = WDIOF_SETTIMEOUT | WDIOF_KEEPALIVEPING,
-+	.identity = "DA9063 Watchdog",
-+};
-+
-+static const struct watchdog_ops da9063_watchdog_ops = {
-+	.owner = THIS_MODULE,
-+	.start = da9063_wdt_start,
-+	.stop = da9063_wdt_stop,
-+	.ping = da9063_wdt_ping,
-+	.set_timeout = da9063_wdt_set_timeout,
-+};
-+
-+static struct watchdog_device da9063_watchdog_device = {
-+	.info = &da9063_watchdog_info,
-+	.ops = &da9063_watchdog_ops,
-+};
-+
-+static int da9063_wdt_probe(struct platform_device *pdev)
-+{
-+	int ret;
-+	struct da9063 *da9063 = dev_get_drvdata(pdev->dev.parent);
-+	struct da9063_watchdog *wdt;
-+
-+	if (!da9063)
-+		return -EPROBE_DEFER;
-+
-+	wdt = devm_kzalloc(&pdev->dev, sizeof(*wdt), GFP_KERNEL);
-+	if (!wdt)
-+		return -ENOMEM;
-+
-+	wdt->da9063 = da9063;
-+	wdt->wdtdev = &da9063_watchdog_device;
-+	mutex_init(&wdt->lock);
-+
-+	if (IS_ENABLED(CONFIG_WATCHDOG_NOWAYOUT))
-+		set_bit(WDOG_NO_WAY_OUT, &wdt->wdtdev->status);
-+
-+	wdt->wdtdev->min_timeout = DA9063_WDT_MIN_TIMEOUT;
-+	wdt->wdtdev->max_timeout = DA9063_WDT_MAX_TIMEOUT;
-+	wdt->wdtdev->timeout = DA9063_WDG_TIMEOUT;
-+
-+	ret = watchdog_register_device(wdt->wdtdev);
-+	if (ret) {
-+		dev_err(da9063->dev, "da9063-watchdog registration failed (err = %d)",
-+				ret);
-+		return ret;
-+	}
-+
-+	watchdog_set_drvdata(wdt->wdtdev, wdt);
-+
-+	return 0;
-+}
-+
-+static int da9063_wdt_remove(struct platform_device *pdev)
-+{
-+	watchdog_unregister_device(&da9063_watchdog_device);
-+
-+	return 0;
-+}
-+
-+static struct platform_driver da9063_wdt_driver = {
-+	.probe = da9063_wdt_probe,
-+	.remove = da9063_wdt_remove,
-+	.driver = {
-+		.name = DA9063_DRVNAME_WATCHDOG,
-+	},
-+};
-+module_platform_driver(da9063_wdt_driver);
-+
-+MODULE_AUTHOR("Mariusz Wojtasik <mariusz.wojtasik@diasemi.com>");
-+MODULE_DESCRIPTION("Watchdog driver for Dialog DA9063");
-+MODULE_LICENSE("GPL");
-+MODULE_ALIAS("platform:" DA9063_DRVNAME_WATCHDOG);
-diff --git a/include/linux/mfd/da9063/registers.h b/include/linux/mfd/da9063/registers.h
-index 09a85c699da1..e11a66894afc 100644
---- a/include/linux/mfd/da9063/registers.h
-+++ b/include/linux/mfd/da9063/registers.h
-@@ -431,6 +431,7 @@
- 
- /* DA9063_REG_CONTROL_D (addr=0x11) */
- #define	DA9063_TWDSCALE_MASK			0x07
-+#define	DA9063_TWDSCALE_SHIFT			0x00
- #define	DA9063_BLINK_FRQ_MASK			0x38
- #define		DA9063_BLINK_FRQ_OFF		0x00
- #define		DA9063_BLINK_FRQ_1S0		0x08
--- 
-2.0.1
+Some more details in the signed tag.
+
+Kind regards
+Ulf Hansson
+
+
+The following changes since commit cd3de83f147601356395b57a8673e9c5ff1e59d1:
+
+  Linux 3.16-rc4 (2014-07-06 12:37:51 -0700)
+
+are available in the git repository at:
+
+  git://git.linaro.org/people/ulf.hansson/mmc.git tags/mmc-v3.17-1
+
+for you to fetch changes up to c83c8737e3edb33f60101d2d7692675d0cb6bdf1:
+
+  mmc: dw_mmc: modify the dt-binding for removing slot-node and
+supports-highspeed (2014-08-11 11:48:39 +0200)
+
+----------------------------------------------------------------
+MMC core:
+ - Forward compatibility for eMMC.
+ - Fix some blacklisted cards with broken secure discard.
+
+MMC host:
+ - mmci: Add support for Qualcomm variant.
+ - mmci: Fix regression for arm_variant.
+ - sdhci: Various fixes and cleanups.
+ - sdhci: Improve external VDD regulator support.
+ - sdhci: Support for DDR50 1.8V mode for BayTrail.
+ - sdhci-st: Add driver for ST SDHCI controller.
+ - sh-mmcif: DMA fixes.
+ - omap_hsmmc: Add support for SDIO interrupts.
+ - sdhci-pci: Add support for Intel Quark X1000.
+ - dw_mmc: Update the reset sequence.
+ - s3cmci: port DMA code to dmaengine API.
+
+----------------------------------------------------------------
+Alexander Stein (1):
+      mmc: quirks: Fixup debug message
+
+Andreas Fenkart (5):
+      mmc: omap_hsmmc: Enable SDIO interrupt
+      mmc: omap_hsmmc: Extend debugfs by SDIO IRQ handling, runtime state
+      mmc: omap_hsmmc: abort runtime suspend if pending sdio irq detected
+      mmc: omap_hsmmc: switch default/idle pinctrl states in runtime hooks
+      mmc: omap_hsmmc: Pin remux workaround to support SDIO interrupt on AM335x
+
+Axel Lin (2):
+      mmc: wmt-sdmmc: Fix settting BM_EIGHTBIT_MODE bit in wmt_mci_set_ios()
+      mmc: wmt-sdmmc: Remove deprecated IRQF_DISABLED
+
+Balaji T K (1):
+      mmc: omap_hsmmc: enable wakeup event for sdio OMAP4
+
+Ben Dooks (6):
+      mmc: sh-mmcif: update to print version and bus clock rate on probe
+      mmc: sh-mmcif: use devm_ for ioremap
+      mmc: sh-mmcif: use devm_ for clock management
+      mmc: sh-mmcif: use devm_ for irq management
+      mmc: sh-mmcif: no need to call pm_runtime_suspend on error
+      mmc: sh-mmcif: final error path cleanup
+
+Chuanxiao.Dong (1):
+      mmc: sdhci-pci: remove PCI PM functions in suspend/resume callback
+
+Derek Browne (1):
+      mmc: sdhci-pci: SDIO host controller support for Intel Quark X1000
+
+Geert Uytterhoeven (4):
+      mmc: tmio-mmc: Add renesas, sdhi-r8a7791 to binding documentation
+      mmc: MMC_OMAP_HS should depend on HAS_DMA
+      mmc: MMC_SH_MMCIF should depend on HAS_DMA
+      mmc: MMC_USDHI6ROL0 should depend on HAS_DMA
+
+Georgi Djakov (3):
+      mmc: sdhci-msm: Fix the binding example
+      mmc: sdhci-msm: Remove unnecessary header file inclusion
+      mmc: sdhci-msm: Get COMPILE_TEST support
+
+Jaehoon Chung (2):
+      mmc: dw_mmc: Slot quirk "disable-wp" is deprecated.
+      mmc: dw_mmc: modify the dt-binding for removing slot-node and
+supports-highspeed
+
+Johan Rudholm (1):
+      mmc: sd: warn if card stays busy during init
+
+Laurent Pinchart (5):
+      mmc: sh_mmcif: Document DT bindings
+      mmc: sh_mmcif: Fix DMA slave address configuration
+      mmc: sh_mmcif: Configure DMA slave bus width
+      mmc: tmio: Configure DMA slave bus width
+      mmc: sdhci-pxav3: Use devm_* managed helpers
+
+Lukas Czerner (1):
+      mmc: Do not advertise secure discard if it is blacklisted
+
+Markus Mayer (1):
+      mmc: sdhci: Replace host->mmc with mmc where possible
+
+Markus Pargmann (1):
+      mmc: sdhci: Remove unused ret variables
+
+Maurice Petallo (2):
+      mmc: sdhci: Preset value not supported in Baytrail eMMC
+      mmc: sdhci: add DDR50 1.8V mode support for BayTrail eMMC Controller
+
+Peter Griffin (3):
+      mmc: core: Fix DT documentation of eMMC high-speed DDR 1.8/1.2V bindings
+      mmc: sdhci-st: Intial support for ST SDHCI controller
+      mmc: sdhci-st: ST Microelectronics SDHCI binding documentation.
+
+Romain Izard (1):
+      mmc: Allow forward compatibility for eMMC
+
+Roman Peniaev (1):
+      mmc: mxs: fix card detection in case of 'broken-cd' flag set
+
+Russell King (1):
+      mmc: sdhci: avoid double-delay while transitioning to 1.8V
+
+Sachin Kamat (1):
+      mmc: moxart: Remove unneeded version.h inclusion
+
+Sonny Rao (1):
+      mmc: dw_mmc: change to use recommended reset procedure
+
+Srinivas Kandagatla (12):
+      mmc: mmci: use NSEC_PER_SEC macro
+      mmc: mmci: Add Qualcomm specific register defines.
+      mmc: mmci: Add enough delay between writes to CMD register.
+      mmc: mmci: Add Qcom datactrl register variant
+      mmc: mmci: add ddrmode mask to variant data
+      mmc: mmci: add 8bit bus support in variant data
+      mmc: mmci: add edge support to data and command out in variant data.
+      mmc: mmci: Add support to data commands via variant structure.
+      mmc: mmci: add f_max to variant structure
+      mmc: mmci: add explicit clk control
+      mmc: mmci: Add Qcom specific rx_fifocnt logic.
+      mmc: mmci: Add Qualcomm Id to amba id table
+
+Thierry Reding (1):
+      mmc: tegra: Do not include asm/gpio.h
+
+Tim Kryger (2):
+      mmc: sdhci: Use mmc core regulator infrastucture
+      mmc: sdhci: Improve external VDD regulator support
+
+Ulf Hansson (5):
+      mmc: core: Remove redundant runtime_idle callback
+      mmc: sdhci: Remove blank line
+      mmc: mmci: Remove redundant check of status for DATA irq
+      mmc: mmci: Move all CMD irq handling to mmci_cmd_irq()
+      mmc: mmci: Reverse IRQ handling for the arm_variant
+
+Vasily Khoruzhick (2):
+      mmc: s3cmci: Move to clk_prepare_enable/clk_disable_unprepare
+      mmc: s3cmci: port DMA code to dmaengine API
+
+ .../devicetree/bindings/mmc/exynos-dw-mshc.txt     |  17 +-
+ .../devicetree/bindings/mmc/k3-dw-mshc.txt         |  12 +-
+ Documentation/devicetree/bindings/mmc/mmc.txt      |   4 +-
+ .../devicetree/bindings/mmc/renesas,mmcif.txt      |  32 +++
+ .../devicetree/bindings/mmc/sdhci-msm.txt          |   8 +-
+ Documentation/devicetree/bindings/mmc/sdhci-st.txt |  33 +++
+ .../devicetree/bindings/mmc/synopsys-dw-mshc.txt   |  12 +-
+ .../devicetree/bindings/mmc/ti-omap-hsmmc.txt      |  54 ++++
+ Documentation/devicetree/bindings/mmc/tmio_mmc.txt |   1 +
+ drivers/mmc/card/block.c                           |   6 +-
+ drivers/mmc/core/bus.c                             |  10 +-
+ drivers/mmc/core/core.c                            |   3 +-
+ drivers/mmc/core/mmc.c                             |  11 +-
+ drivers/mmc/core/quirks.c                          |   2 +-
+ drivers/mmc/core/sd_ops.c                          |   3 +
+ drivers/mmc/host/Kconfig                           |  28 +-
+ drivers/mmc/host/Makefile                          |   1 +
+ drivers/mmc/host/dw_mmc.c                          |  98 +++++--
+ drivers/mmc/host/dw_mmc.h                          |   5 +
+ drivers/mmc/host/mmci.c                            | 168 ++++++++++--
+ drivers/mmc/host/mmci.h                            |  20 ++
+ drivers/mmc/host/moxart-mmc.c                      |   1 -
+ drivers/mmc/host/mxs-mmc.c                         |   3 +-
+ drivers/mmc/host/omap_hsmmc.c                      | 283 +++++++++++++++++++--
+ drivers/mmc/host/s3cmci.c                          | 186 ++++----------
+ drivers/mmc/host/s3cmci.h                          |   4 +-
+ drivers/mmc/host/sdhci-acpi.c                      |   4 +-
+ drivers/mmc/host/sdhci-msm.c                       |   1 -
+ drivers/mmc/host/sdhci-pci.c                       |  38 +--
+ drivers/mmc/host/sdhci-pci.h                       |   1 +
+ drivers/mmc/host/sdhci-pxav3.c                     |  13 +-
+ drivers/mmc/host/sdhci-st.c                        | 176 +++++++++++++
+ drivers/mmc/host/sdhci-tegra.c                     |   2 -
+ drivers/mmc/host/sdhci.c                           | 144 +++++------
+ drivers/mmc/host/sh_mmcif.c                        |  96 +++----
+ drivers/mmc/host/tmio_mmc_dma.c                    |   2 +
+ drivers/mmc/host/wmt-sdmmc.c                       |  33 ++-
+ include/linux/mmc/dw_mmc.h                         |   2 +
+ include/linux/mmc/sdhci.h                          |   3 -
+ include/linux/platform_data/mmc-omap.h             |   1 +
+ 40 files changed, 1050 insertions(+), 471 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/mmc/renesas,mmcif.txt
+ create mode 100644 Documentation/devicetree/bindings/mmc/sdhci-st.txt
+ create mode 100644 drivers/mmc/host/sdhci-st.c
