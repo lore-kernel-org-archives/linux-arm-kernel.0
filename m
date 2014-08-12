@@ -1,52 +1,64 @@
-From: anup.patel@linaro.org (Anup Patel)
-Date: Tue, 12 Aug 2014 09:17:39 +0530
-Subject: [PATCH Resend 0/2] arm64: Add PMU node for APM X-Gene Storm SoC
-In-Reply-To: <1407800853-3149-1-git-send-email-fkan@apm.com>
-References: <1407800853-3149-1-git-send-email-fkan@apm.com>
-Message-ID: <CALrVBkumLjUZMsfWTn3e_5U=jDFerx0LLzESiuNPZrnBVVfgQg@mail.gmail.com>
+From: olof@lixom.net (Olof Johansson)
+Date: Mon, 11 Aug 2014 20:52:38 -0700
+Subject: Building kernel for more than one SoC
+In-Reply-To: <20140811224328.GD30401@n2100.arm.linux.org.uk>
+References: <lrdi48$ls1$1@ger.gmane.org>
+ <20140804201712.GK30282@n2100.arm.linux.org.uk>
+ <53E8E469.9050807@atmel.com> <lsaoih$e9$1@ger.gmane.org>
+ <CAOCHtYgPoxveSjYpWWo8W+_0WwQdaCBga0piazg_Oq6aeZ=w-g@mail.gmail.com>
+ <lsb9tn$nnv$1@ger.gmane.org>
+ <20140811205909.GC30401@n2100.arm.linux.org.uk>
+ <lsbbp9$j4n$1@ger.gmane.org>
+ <20140811224328.GD30401@n2100.arm.linux.org.uk>
+Message-ID: <CAOesGMhufB2gm7MS0UjZv1A1YABRSE4upmpNw6Mp3oxECG5HLQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12 August 2014 05:17, Feng Kan <fkan@apm.com> wrote:
-> This patch series adds PMU node for APM X-Gene's Potenza CPU.
-> Potenza CPU PMU is compatible with ARMv8-PMUv3.
+On Mon, Aug 11, 2014 at 3:43 PM, Russell King - ARM Linux
+<linux@arm.linux.org.uk> wrote:
+> On Mon, Aug 11, 2014 at 09:15:22PM +0000, Grant Edwards wrote:
+>> On 2014-08-11, Russell King - ARM Linux <linux@arm.linux.org.uk> wrote:
+>> > On Mon, Aug 11, 2014 at 08:43:35PM +0000, Grant Edwards wrote:
+>> >> On 2014-08-11, Robert Nelson <robertcnelson@gmail.com> wrote:
+>> >> >> Now it's up to somebody else to decide if the price difference between
+>> >> >> a G20 and G25 is worth the engineering time to upgrade U-Boot and
+>> >> >> Linux kernel to versions that know about device trees...
+>> >> >
+>> >> > http://cateee.net/lkddb/web-lkddb/ARM_APPENDED_DTB.html
+>> >>
+>> >> Interesting.  That would still require modifying U-Boot so that at
+>> >> run-time it detects the SoC type and appends the proper DTB to the
+>> >> kernel image, but it that may be less work than "real" DTB support in
+>> >> U-Boot.
+>> >
+>> > The idea of that feature is:
+>> >
+>> > - You take the kernel zImage
+>> > - You take the appropriate dtb file
+>> > - You concatenate the dtb file into the zImage
+>> > - You run mkimage on the resulting combined image to create the special
+>> >   uboot format file for uboot to load
+>>
+>> The problem is now you've got a kernel image that won't run on both
+>> the '9g20 and the '9g25.  The requirement is to have a kernel image
+>> that will run on either.
 >
-> I have remove the previous notice regarding the dependancy on the GIC driver
-> from the commit message.
+> It depends what you call a kernel image.
 >
-> Feng Kan (1):
->   dt-bindings: Add Potenza PMU binding
+> As far as I'm concerned (and as I've been concerned from day one of uboot
+> coming into ARM), the kernel image is the zImage, not the crap that uboot
+> decides to dictate that you must provide for it to use.
 >
-> Vinayak Kale (1):
->   arm64: dts: Add PMU node for APM X-Gene Storm SOC
->
->  Documentation/devicetree/bindings/arm/pmu.txt | 1 +
->  arch/arm64/boot/dts/apm-storm.dtsi            | 5 +++++
->  2 files changed, 6 insertions(+)
->
-> --
-> 1.9.1
->
->
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+> I've been pretty clear over the years that I utterly despise uboot's
+> custom format - and you're starting to find out why.  Welcome to the
+> inflexibility has caused. :)
 
-Hi Feng,
+Note that u-boot grew a "bootz" command in recent year(s). It'll boot
+just a raw zImage instead of the mkimage-wrapped version.
 
-Please follow proper protocol when resending patchset originally
-authored by someone else.
-(http://comments.gmane.org/gmane.linux.ports.arm.kernel/310795)
+Of course, not all u-boots have it due to age of the vendor fork. I
+also have a board that tries to boot a zImage with the 'bootm' command
+instead. Yes, you heard that right. Sigh.
 
-Also, I see that original patchset clearly states that second patch
-depends on a GIC patch [1] authored by you:
 
-[1]- https://lkml.org/lkml/2014/2/27/605
-(irqchip:gic: change access of gicc_ctrl register to read modify write)
-
-I have recently posted RFC patch for PMU support in KVM ARM64
-which also requires your GIC patch for APM X-Gene.
-
-Regards,
-Anup
+-Olof
