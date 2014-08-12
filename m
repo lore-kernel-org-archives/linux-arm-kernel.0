@@ -1,37 +1,36 @@
 From: Liviu.Dudau@arm.com (Liviu Dudau)
-Date: Tue, 12 Aug 2014 17:25:18 +0100
-Subject: [PATCH v9 05/12] ARM: Define PCI_IOBASE as the base of virtual PCI IO
- space.
+Date: Tue, 12 Aug 2014 17:25:14 +0100
+Subject: [PATCH v9 01/12] Fix ioport_map() for !CONFIG_GENERIC_IOMAP cases.
 In-Reply-To: <1407860725-25202-1-git-send-email-Liviu.Dudau@arm.com>
 References: <1407860725-25202-1-git-send-email-Liviu.Dudau@arm.com>
-Message-ID: <1407860725-25202-6-git-send-email-Liviu.Dudau@arm.com>
+Message-ID: <1407860725-25202-2-git-send-email-Liviu.Dudau@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This is needed for calls into OF code that parses PCI ranges.
-It signals support for memory mapped PCI I/O accesses that
-are described be device trees.
+The inline version of ioport_map() that gets used when !CONFIG_GENERIC_IOMAP
+is wrong. It returns a mapped (i.e. virtual) address that can start from
+zero and completely ignores the PCI_IOBASE and IO_SPACE_LIMIT that most
+architectures that use !CONFIG_GENERIC_MAP define.
 
-Cc: Russell King <linux@arm.linux.org.uk>
-Cc: Catalin Marinas <catalin.marinas@arm.com>
-Cc: Arnd Bergmann <arnd@arndb.de>
-Cc: Rob Herring <robh+dt@kernel.org>
 Signed-off-by: Liviu Dudau <Liviu.Dudau@arm.com>
+Acked-by: Arnd Bergmann <arnd@arndb.de>
+Tested-by: Tanmay Inamdar <tinamdar@apm.com>
 ---
- arch/arm/include/asm/io.h | 1 +
- 1 file changed, 1 insertion(+)
+ include/asm-generic/io.h | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/arch/arm/include/asm/io.h b/arch/arm/include/asm/io.h
-index 3d23418..22b7529 100644
---- a/arch/arm/include/asm/io.h
-+++ b/arch/arm/include/asm/io.h
-@@ -178,6 +178,7 @@ static inline void __iomem *__typesafe_io(unsigned long addr)
+diff --git a/include/asm-generic/io.h b/include/asm-generic/io.h
+index 975e1cc..2e2161b 100644
+--- a/include/asm-generic/io.h
++++ b/include/asm-generic/io.h
+@@ -331,7 +331,7 @@ static inline void iounmap(void __iomem *addr)
+ #ifndef CONFIG_GENERIC_IOMAP
+ static inline void __iomem *ioport_map(unsigned long port, unsigned int nr)
+ {
+-	return (void __iomem *) port;
++	return (void __iomem *)(PCI_IOBASE + (port & IO_SPACE_LIMIT));
+ }
  
- /* PCI fixed i/o mapping */
- #define PCI_IO_VIRT_BASE	0xfee00000
-+#define PCI_IOBASE		PCI_IO_VIRT_BASE
- 
- #if defined(CONFIG_PCI)
- void pci_ioremap_set_mem_type(int mem_type);
+ static inline void ioport_unmap(void __iomem *p)
 -- 
 2.0.4
