@@ -1,113 +1,126 @@
 From: Liviu.Dudau@arm.com (Liviu Dudau)
-Date: Tue, 12 Aug 2014 17:25:13 +0100
-Subject: [PATCH v9 00/12] Support for creating generic PCI host bridges from DT
-Message-ID: <1407860725-25202-1-git-send-email-Liviu.Dudau@arm.com>
+Date: Tue, 12 Aug 2014 17:25:21 +0100
+Subject: [PATCH v9 08/12] PCI: Introduce generic domain handling for PCI
+ busses.
+In-Reply-To: <1407860725-25202-1-git-send-email-Liviu.Dudau@arm.com>
+References: <1407860725-25202-1-git-send-email-Liviu.Dudau@arm.com>
+Message-ID: <1407860725-25202-9-git-send-email-Liviu.Dudau@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This is my updated attempt at adding support for generic PCI host
-bridge controllers that make use of device tree information to
-configure themselves. This version incorporates Catalin's proposal
-for managing domain numbers that got Bjorn's approval. I am now requesting
-ACKs from the relevant maintainers as I would like to get the upstream ball
-rolling.
+The handling of PCI domains (or PCI segments in ACPI speak) is
+usually a straightforward affair but its implementation is
+currently left to the architectural code, with pci_domain_nr(b)
+querying the value of the domain associated with bus b.
 
-Of the more important changes vs v8, this version has an altered implementation
-of of_create_pci_host_bridge() that allows for easier conversion of architectures
-that use pci_scan_root_bus() in their code rather than pci_create_root_bus().
-With my v8 version of the patchset it would've meant adding back the code
-from pci_scan_root_bus() into architectural code. v9 fixes that and adds
-a callback parameter to of_create_pci_host_bridge() that permits the host
-controller driver to finish the driver setup before the bus is being scanned.
+This patch introduces CONFIG_PCI_DOMAINS_GENERIC as an
+option that can be selected if an architecture want a
+simple implementation where the value of the domain
+associated with a bus is stored in struct pci_bus.
 
-To repeat for the benefit of people writing host bridge drivers on top of
-my patchset: the API for of_create_pci_host_bridge() has changed and it will now
-do all the child bus and device scanning for you, so you only need to provide a
-setup function that will be called before scanning start. I will post a patch
-that Lorenzo has kindly constructed for converting pci-host-generic.c to my API.
+The architectures that select CONFIG_PCI_DOMAINS_GENERIC will
+then have to implement pci_bus_assign_domain_nr() as a way
+of setting the domain number associated with a root bus.
+All child busses except the root bus will inherit the domain_nr
+value from their parent.
 
-Changes from v8:
-  - Introduce a new helper function pci_pio_to_address() to translate between
-    I/O port numbers and CPU addresses. This is a temporary band aid
-    for drivers that rely on the old behaviour of of_pci_range_to_resource()
-    until they are converted to the new framework. ARM's Integrator AP
-    pci_v3.c makes use of that.
-  - Patch pci_v3.c against changes in of_pci_range_to_resource(). This is the
-    only driver that made use of the fact that the function was returning
-    CPU addresses rather than I/O port numbers.
-  - Added a warning when parsing more that one I/O range as this will discard
-    previous information regarding the CPU address of the range.
-  - Add support for generic domain number handling. The domain number is now
-    stored in the struct bus if CONFIG_PCI_DOMAINS_GENERIC is defined. This
-    is a cleanup of the patch that Catalin has proposed and Bjorn has ACKed,
-    but I've added it here without the ACK as I have slightly modified the
-    proposed API.
-  - Create a new function to managing domain numbers that will query the DT
-    for pci-domain information.
-  - Introduce an updated version of of_create_pci_host_bridge() that takes
-    a function pointer for a setup function that can be used by the host bridge
-    driver to finish the setup after the DT has been parsed and host bridge
-    created but before the scanning of the root bus has been initiated.
-    This makes of_create_pci_host_bridge() an easy swap for architectures that
-    do manual DT parsing and use pci_scan_root_bus()
-  - Added arguments to of_create_pci_host_bridge() to be able to pass the
-    bus number for the root bus and the maximum bus number to be used in
-    the bus range resource. Changed the return value from a pointer to
-    the pci_host_bridge into an int with the error code as the host bridge
-    is not needed now given that of_create_pci_host_bridge() does all the
-    scanning work.
-  - Introduce a new pgprot_device() for remapping I/O space. For architectures
-    that don't support it defaults to pgprot_noncached.
-  - Fix the generic function for remaping I/O space by using
-    pgprot_device(PAGE_KERNEL) as the parameter for ioremap_page_range()
-  - Header include fixes, initialisation fixes and misc cleanup
+Cc: Bjorn Helgaas <bhelgaas@google.com>
+Cc: Arnd Bergmann <arnd@arndb.de>
+Signed-off-by: Catalin Marinas <Catalin.Marinas@arm.com>
+[Renamed pci_set_domain_nr() to pci_bus_assign_domain_nr()]
+Signed-off-by: Liviu Dudau <Liviu.Dudau@arm.com>
+---
+ drivers/pci/probe.c | 11 ++++++++---
+ include/linux/pci.h | 21 +++++++++++++++++++++
+ 2 files changed, 29 insertions(+), 3 deletions(-)
 
-Changes from v7:
-  - Reordered the patches so that fixes and non-controversial patches
-    from v7 can be accepted more easily. If agreed I can split the
-    series again into patches that can be upstreamed easily and ones
-    that still need discussion.
-  - Moved the of_create_host_bridge() function to drivers/of/of_pci.c
-    to better reflect its target use.
-  - Added the function to remap the bus I/O resources that used to be
-    provided in my arm64 patch series and (re)named it pci_remap_iospace()
-  - Removed error code checking from parsing and mapping of IRQ from DT
-    in recognition that some PCI devices will not have legacy IRQ mappings.
-
-v8 thread here: https://lkml.org/lkml/2014/7/1/450
-v7 thread here with all the historic information: https://lkml.org/lkml/2014/3/14/279
-
-Best regards,
-Liviu
-
-Liviu Dudau (12):
-  Fix ioport_map() for !CONFIG_GENERIC_IOMAP cases.
-  PCI: OF: Parse and map the IRQ when adding the PCI device.
-  PCI: Introduce helper functions to deal with PCI I/O ranges.
-  PCI: OF: Fix the conversion of IO ranges into IO resources.
-  ARM: Define PCI_IOBASE as the base of virtual PCI IO space.
-  ARM: integrator: Correct usage of of_pci_range_to_resource()
-  PCI: Create pci_host_bridge before its associated bus in pci_create_root_bus.
-  PCI: Introduce generic domain handling for PCI busses.
-  OF: Introduce helper function for getting PCI domain_nr
-  OF: PCI: Add support for creating a generic host_bridge from DT
-  arm64: Add pgprot_device() interface for device mappings.
-  PCI: Introduce pci_remap_iospace() for remapping PCI I/O bus resources into CPU space
-
- arch/arm/include/asm/io.h         |   1 +
- arch/arm/mach-integrator/pci_v3.c |  24 ++---
- arch/arm64/include/asm/pgtable.h  |   2 +
- drivers/of/address.c              | 141 ++++++++++++++++++++++++++++
- drivers/of/of_pci.c               | 193 ++++++++++++++++++++++++++++++++++++++
- drivers/pci/host-bridge.c         |  15 +++
- drivers/pci/pci.c                 |  36 +++++++
- drivers/pci/probe.c               |  43 +++++----
- include/asm-generic/io.h          |   2 +-
- include/asm-generic/pgtable.h     |   4 +
- include/linux/of_address.h        |  15 +--
- include/linux/of_pci.h            |  20 ++++
- include/linux/pci.h               |  30 ++++++
- 13 files changed, 485 insertions(+), 41 deletions(-)
-
+diff --git a/drivers/pci/probe.c b/drivers/pci/probe.c
+index 5ff72ec..ef891d2 100644
+--- a/drivers/pci/probe.c
++++ b/drivers/pci/probe.c
+@@ -485,7 +485,7 @@ void pci_read_bridge_bases(struct pci_bus *child)
+ 	}
+ }
+ 
+-static struct pci_bus *pci_alloc_bus(void)
++static struct pci_bus *pci_alloc_bus(struct pci_bus *parent)
+ {
+ 	struct pci_bus *b;
+ 
+@@ -500,6 +500,10 @@ static struct pci_bus *pci_alloc_bus(void)
+ 	INIT_LIST_HEAD(&b->resources);
+ 	b->max_bus_speed = PCI_SPEED_UNKNOWN;
+ 	b->cur_bus_speed = PCI_SPEED_UNKNOWN;
++#ifdef CONFIG_PCI_DOMAINS_GENERIC
++	if (parent)
++		b->domain_nr = parent->domain_nr;
++#endif
+ 	return b;
+ }
+ 
+@@ -672,7 +676,7 @@ static struct pci_bus *pci_alloc_child_bus(struct pci_bus *parent,
+ 	/*
+ 	 * Allocate a new bus, and inherit stuff from the parent..
+ 	 */
+-	child = pci_alloc_bus();
++	child = pci_alloc_bus(parent);
+ 	if (!child)
+ 		return NULL;
+ 
+@@ -1768,13 +1772,14 @@ struct pci_bus *pci_create_root_bus(struct device *parent, int bus,
+ 
+ 	bridge->dev.parent = parent;
+ 
+-	b = pci_alloc_bus();
++	b = pci_alloc_bus(NULL);
+ 	if (!b)
+ 		goto err_out;
+ 
+ 	b->sysdata = sysdata;
+ 	b->ops = ops;
+ 	b->number = b->busn_res.start = bus;
++	pci_bus_assign_domain_nr(b, parent);
+ 	b2 = pci_find_bus(pci_domain_nr(b), bus);
+ 	if (b2) {
+ 		/* If we already got to this bus through a different bridge, ignore it */
+diff --git a/include/linux/pci.h b/include/linux/pci.h
+index 466bcd1..1d0e0b5 100644
+--- a/include/linux/pci.h
++++ b/include/linux/pci.h
+@@ -456,6 +456,9 @@ struct pci_bus {
+ 	unsigned char	primary;	/* number of primary bridge */
+ 	unsigned char	max_bus_speed;	/* enum pci_bus_speed */
+ 	unsigned char	cur_bus_speed;	/* enum pci_bus_speed */
++#ifdef CONFIG_PCI_DOMAINS_GENERIC
++	int		domain_nr;
++#endif
+ 
+ 	char		name[48];
+ 
+@@ -1288,6 +1291,24 @@ static inline int pci_domain_nr(struct pci_bus *bus) { return 0; }
+ static inline int pci_proc_domain(struct pci_bus *bus) { return 0; }
+ #endif /* CONFIG_PCI_DOMAINS */
+ 
++/*
++ * Generic implementation for PCI domain support. If your
++ * architecture does not need custom management of PCI
++ * domains then this implementation will be used
++ */
++#ifdef CONFIG_PCI_DOMAINS_GENERIC
++static inline int pci_domain_nr(struct pci_bus *bus)
++{
++	return bus->domain_nr;
++}
++void pci_bus_assign_domain_nr(struct pci_bus *bus, struct device *parent);
++#else
++static inline void pci_bus_assign_domain_nr(struct pci_bus *bus,
++					struct device *parent)
++{
++}
++#endif
++
+ /* some architectures require additional setup to direct VGA traffic */
+ typedef int (*arch_set_vga_state_t)(struct pci_dev *pdev, bool decode,
+ 		      unsigned int command_bits, u32 flags);
 -- 
 2.0.4
