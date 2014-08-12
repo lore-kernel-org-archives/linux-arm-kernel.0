@@ -1,45 +1,42 @@
-From: john.tobias.ph@gmail.com (John Tobias)
-Date: Tue, 12 Aug 2014 08:10:24 -0700
-Subject: Freescale: iMX6Q Sabre SD
-In-Reply-To: <CAOMZO5BD5EE6ZpVCz0ST3j=hoXf4rk7PXOC3ZpWAHn_2nN8t7g@mail.gmail.com>
-References: <CACUGKYM=jPGL+GB1=n9-UQPaphPv4ONQz3Fb5k9-5CA=Zx=1xw@mail.gmail.com>
- <CAOMZO5BJ6WS-OynZWJLE42pZbrvJ_nMM3qyndYVNsDYbBFWMmg@mail.gmail.com>
- <CAOMZO5BD5EE6ZpVCz0ST3j=hoXf4rk7PXOC3ZpWAHn_2nN8t7g@mail.gmail.com>
-Message-ID: <CACUGKYM-B18YKtbc1BE1=RvUwRTypt9iSwYgOmfXF7w2Yq_sBA@mail.gmail.com>
+From: b.zolnierkie@samsung.com (Bartlomiej Zolnierkiewicz)
+Date: Tue, 12 Aug 2014 17:11:55 +0200
+Subject: [PATCH v2 1/3] ARM: EXYNOS: Fix build with PM_SLEEP=n and
+ ARM_EXYNOS_CPUIDLE=n
+In-Reply-To: <1407856317-2457-1-git-send-email-b.zolnierkie@samsung.com>
+References: <1407856317-2457-1-git-send-email-b.zolnierkie@samsung.com>
+Message-ID: <1407856317-2457-2-git-send-email-b.zolnierkie@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Fabio,
+Fix building of exynos_defconfig with disabled CONFIG_PM_SLEEP by
+adding checking whether Exynos cpuidle support is enabled before
+accessing exynos_enter_aftr.
 
-Thanks for the info. I will check it.
+The build error message:
+arch/arm/mach-exynos/built-in.o:(.data+0x74): undefined reference to `exynos_enter_aftr'
+make: *** [vmlinux] Error 1
 
-Regards,
+This patch has been tested on Exynos4210 based Origen board.
 
-john
+Signed-off-by: Bartlomiej Zolnierkiewicz <b.zolnierkie@samsung.com>
+Acked-by: Kyungmin Park <kyungmin.park@samsung.com>
+---
+ arch/arm/mach-exynos/exynos.c | 2 ++
+ 1 file changed, 2 insertions(+)
 
-On Tue, Aug 12, 2014 at 6:42 AM, Fabio Estevam <festevam@gmail.com> wrote:
-> John,
->
-> On Mon, Aug 11, 2014 at 10:31 AM, Fabio Estevam <festevam@gmail.com> wrote:
->
->> I tested on my mx6qsabresd revC4 / rev C and the PCI link is not
->> detected just like you described.
->
-> Tested again today and my rev C4 detects the PCI card in U-boot and in
-> the kernel.
->
-> For U-boot I use top of tree u-boot-imx.
->
-> For kernel I am using linux-next 20140811 plus two patches:
->
-> 1. One patch from Lucas that allows the kernel to boot when the
-> bootloader has already configured PCI:
->
-> http://thread.gmane.org/gmane.linux.kernel.pci/33712/focus=33711
->
-> 2. A patch from Tim that fix occasional PCI linkup failures:
->
-> http://www.spinics.net/lists/linux-pci/msg33520.html
->
-> Let me know if using this kernel version allows your PCI card to be
-> detected on revC4 mx6qsabresd board.
+diff --git a/arch/arm/mach-exynos/exynos.c b/arch/arm/mach-exynos/exynos.c
+index 6a24e11..d57f136 100644
+--- a/arch/arm/mach-exynos/exynos.c
++++ b/arch/arm/mach-exynos/exynos.c
+@@ -161,7 +161,9 @@ static void exynos_restart(enum reboot_mode mode, const char *cmd)
+ 
+ static struct platform_device exynos_cpuidle = {
+ 	.name              = "exynos_cpuidle",
++#ifdef CONFIG_ARM_EXYNOS_CPUIDLE
+ 	.dev.platform_data = exynos_enter_aftr,
++#endif
+ 	.id                = -1,
+ };
+ 
+-- 
+1.8.2.3
