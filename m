@@ -1,70 +1,70 @@
-From: monstr@monstr.eu (Michal Simek)
-Date: Tue, 12 Aug 2014 11:37:22 +0200
-Subject: [PATCH v5] pcie: Add Xilinx PCIe Host Bridge IP driver
-In-Reply-To: <CA+mB=1LeZn1k2VHNby2TRBcb1xuFFTQio=C845_xe2A=ZciYqg@mail.gmail.com>
-References: <1406131381-25577-1-git-send-email-sthokal@xilinx.com>	<CA+mB=1JhDF=BBXcyTbgVB8S7qH=Mb1JH78HLL4pA9OBH19hQvA@mail.gmail.com>	<8258903.Rn4s07GKGV@wuerfel>
- <CA+mB=1LeZn1k2VHNby2TRBcb1xuFFTQio=C845_xe2A=ZciYqg@mail.gmail.com>
-Message-ID: <53E9E052.3070308@monstr.eu>
+From: will.deacon@arm.com (Will Deacon)
+Date: Tue, 12 Aug 2014 10:40:58 +0100
+Subject: [PATCH v5 3/3] arm64: Add seccomp support
+In-Reply-To: <53E9BAD5.3080201@linaro.org>
+References: <1406020499-5537-1-git-send-email-takahiro.akashi@linaro.org>
+ <1406020499-5537-4-git-send-email-takahiro.akashi@linaro.org>
+ <53D082E9.8090303@amacapital.net> <53D09C4F.9010104@linaro.org>
+ <CALCETrWTDS7VSyuR5wgGxpu-_YMWVUVmv9ht6t1tCSX=GA46cQ@mail.gmail.com>
+ <53D2255C.9050006@linaro.org>
+ <CAGXu5jJL=zXuSRNomGrB09kqpUhEpkuxDH18JN4NRbWocMw4xg@mail.gmail.com>
+ <53E47DCE.4080902@linaro.org> <20140811092409.GE15344@arm.com>
+ <53E9BAD5.3080201@linaro.org>
+Message-ID: <20140812094058.GD29013@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Bjorn,
+Hi Akashi,
 
-On 07/30/2014 01:24 PM, Srikanth Thokala wrote:
-> Hi Arnd,
+On Tue, Aug 12, 2014 at 07:57:25AM +0100, AKASHI Takahiro wrote:
+> On 08/11/2014 06:24 PM, Will Deacon wrote:
+> > On Fri, Aug 08, 2014 at 08:35:42AM +0100, AKASHI Takahiro wrote:
+> >> As discussed in a few weeks ago, aarch64 won't support PTRACE_SET_SYSCALL.
+> >
+> > Well, I don't think anything was set in stone. If you have a compelling
+> > reason why adding the new request gives you something over setting w8
+> > directly, then we can extend ptrace.
 > 
-> On Mon, Jul 28, 2014 at 6:32 PM, Arnd Bergmann <arnd@arndb.de> wrote:
->> On Monday 28 July 2014 18:04:34 Srikanth Thokala wrote:
->>> Hi Arnd and Rob,
->>>
->>> I discussed with Bjorn and we believe this patch is in good shape to
->>> apply.  And Bjorn requires ACKs to apply this patch.  So, could you
->>> guys please review this patch and provided your ACKs to this patch.
->>
->> Looks great for the most part. I've looked through the whole driver
->> again, and I have two small issues remaining:
->>
->> a) Please clarify in the changeset description why there is no support
->>    for PCI I/O space.
+> Yeah, I think I may have to change my mind. Looking into __secure_computing(),
+> I found the code below:
 > 
-> Sure, I will add to my changeset.
+>  >     case SECCOMP_MODE_FILTER:
+>  >         case SECCOMP_RET_TRACE:
+>  >             ...
+>  >             if (syscall_get_nr(current, regs) < 0)
+>  >                 goto skip;
 > 
->>
->> b) I think you should use the 'msi-parent' property, and the
->>    of_pci_find_msi_chip_by_node() to find the msi_chip for the
->>    PCI controller. This will make it possible to forward MSIs
->>    to the main interrupt controller in the system, which is more
->>    efficient. See the pcie-mvebu driver for an example of this.
-> 
-> Ok, I need to look into this and I will plan to implement on top of this patch.
-> 
->>
->> Other than these:
->>
->> Acked-by: Arnd Bergmann <arnd@arndb.de>
-> 
-> Thanks Arnd for the Ack.
+> This implies that we should modify syscallno *before* __secure_computing()
+> returns.
 
-What's the status on this one?
+Why does it imply that? There are four competing entities here:
 
-Srikanth:
-Isn't pcie-xilinx.c better name if this is just pcie host bridge?
+ - seccomp
+ - tracehook
+ - ftrace (trace_sys_*)
+ - audit
 
-Thanks,
-Michal
+With the exception of ftrace, they can all potentially rewrite the pt_regs
+(the code you cite above is just below a ptrace_event call), so we have
+to choose some order in which to call them.
 
--- 
-Michal Simek, Ing. (M.Eng), OpenPGP -> KeyID: FE3D1F91
-w: www.monstr.eu p: +42-0-721842854
-Maintainer of Linux kernel - Microblaze cpu - http://www.monstr.eu/fdt/
-Maintainer of Linux kernel - Xilinx Zynq ARM architecture
-Microblaze U-BOOT custodian and responsible for u-boot arm zynq platform
+On entry, x86 and arm call them in the order I listed above, so it seems
+sensible to follow that.
 
+> I assumed, in my next version, we could skip a system call by overwriting
+> syscallno with x8 in syscall_trace_enter() after __secure_computing()
+> returns 0, and it actually works.
 
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 198 bytes
-Desc: OpenPGP digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140812/8e618580/attachment.sig>
+Why does overwriting the syscallno with x8 skip the syscall?
+
+I thought the idea was that we would save w8 prior to each call that could
+change the pt_regs, then if it was changed to -1 we would replace it with
+the saved value and return -1? The only confusion I have is whether we
+should call the exit hooks after skipping a syscall. I *think* x86 does
+call them, but ARM doesn't. Andy says this can trigger an OOPs:
+
+  http://lists.infradead.org/pipermail/linux-arm-kernel/2014-July/274988.html
+
+so we should fix that for ARM while we're here.
+
+Will
