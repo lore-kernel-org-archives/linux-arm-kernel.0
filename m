@@ -1,50 +1,84 @@
-From: b.zolnierkie@samsung.com (Bartlomiej Zolnierkiewicz)
-Date: Tue, 12 Aug 2014 19:05:09 +0200
-Subject: [PATCH v2 1/1] ARM: exynos_defconfig: Enable SBS battery support
-In-Reply-To: <1407779837-10981-1-git-send-email-javier.martinez@collabora.co.uk>
-References: <1407779837-10981-1-git-send-email-javier.martinez@collabora.co.uk>
-Message-ID: <5085566.VKH3IuqYyi@amdc1032>
+From: nicolas.ferre@atmel.com (Nicolas Ferre)
+Date: Tue, 12 Aug 2014 19:08:53 +0200
+Subject: [PATCH] ARM: at91: sama5d3: add usart dma configurations
+In-Reply-To: <1407854277-328-1-git-send-email-ludovic.desroches@atmel.com>
+References: <1407854277-328-1-git-send-email-ludovic.desroches@atmel.com>
+Message-ID: <53EA4A25.1040707@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday, August 11, 2014 07:57:17 PM Javier Martinez Canillas wrote:
-> Many Exynos5 boards (e.g: Snow, Peach Pit and Pi) have
-> a SBS-compliant gas gauge battery. Enable to built it
-> so the needed support is available for these boards.
-> 
-> Suggested-by: Doug Anderson <dianders@chromium.org>
-> Signed-off-by: Javier Martinez Canillas <javier.martinez@collabora.co.uk>
-> Acked-by: Kukjin Kim <kgene.kim@samsung.com>
-> Reviewed-by: Doug Anderson <dianders@chromium.org>
+On 12/08/2014 16:37, Ludovic Desroches :
+> Add the DMA configuration for USARTs mainly because it is not obvious to
+> add the FIFO flag which is needed for rx.
 
-Thanks for updating the patch.
+Indeed.
 
-Reviewed-by: Bartlomiej Zolnierkiewicz <b.zolnierkie@samsung.com>
+> Signed-off-by: Ludovic Desroches <ludovic.desroches@atmel.com>
 
-Best regards,
---
-Bartlomiej Zolnierkiewicz
-Samsung R&D Institute Poland
-Samsung Electronics
+Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
+
+Thanks, best regards,
 
 > ---
+>  arch/arm/boot/dts/sama5d3.dtsi |   15 +++++++++++++++
+>  1 file changed, 15 insertions(+)
 > 
-> Changes since v1:
->  - Don't build it as a module since is the exception in exynos_defconfig.
->    Suggested by Bartlomiej Zolnierkiewicz.
+> diff --git a/arch/arm/boot/dts/sama5d3.dtsi b/arch/arm/boot/dts/sama5d3.dtsi
+> index e0b15a6..829c162 100644
+> --- a/arch/arm/boot/dts/sama5d3.dtsi
+> +++ b/arch/arm/boot/dts/sama5d3.dtsi
+> @@ -177,6 +177,9 @@
+>  				compatible = "atmel,at91sam9260-usart";
+>  				reg = <0xf001c000 0x100>;
+>  				interrupts = <12 IRQ_TYPE_LEVEL_HIGH 5>;
+> +				dmas = <&dma0 2 AT91_DMA_CFG_PER_ID(3)>,
+> +				       <&dma0 2 (AT91_DMA_CFG_PER_ID(4) | AT91_DMA_CFG_FIFOCFG_ASAP)>;
+> +				dma-names = "tx", "rx";
+>  				pinctrl-names = "default";
+>  				pinctrl-0 = <&pinctrl_usart0>;
+>  				clocks = <&usart0_clk>;
+> @@ -188,6 +191,9 @@
+>  				compatible = "atmel,at91sam9260-usart";
+>  				reg = <0xf0020000 0x100>;
+>  				interrupts = <13 IRQ_TYPE_LEVEL_HIGH 5>;
+> +				dmas = <&dma0 2 AT91_DMA_CFG_PER_ID(5)>,
+> +				       <&dma0 2 (AT91_DMA_CFG_PER_ID(6) | AT91_DMA_CFG_FIFOCFG_ASAP)>;
+> +				dma-names = "tx", "rx";
+>  				pinctrl-names = "default";
+>  				pinctrl-0 = <&pinctrl_usart1>;
+>  				clocks = <&usart1_clk>;
+> @@ -333,6 +339,9 @@
+>  				compatible = "atmel,at91sam9260-usart";
+>  				reg = <0xf8020000 0x100>;
+>  				interrupts = <14 IRQ_TYPE_LEVEL_HIGH 5>;
+> +				dmas = <&dma1 2 AT91_DMA_CFG_PER_ID(7)>,
+> +				       <&dma1 2 (AT91_DMA_CFG_PER_ID(8) | AT91_DMA_CFG_FIFOCFG_ASAP)>;
+> +				dma-names = "tx", "rx";
+>  				pinctrl-names = "default";
+>  				pinctrl-0 = <&pinctrl_usart2>;
+>  				clocks = <&usart2_clk>;
+> @@ -344,6 +353,9 @@
+>  				compatible = "atmel,at91sam9260-usart";
+>  				reg = <0xf8024000 0x100>;
+>  				interrupts = <15 IRQ_TYPE_LEVEL_HIGH 5>;
+> +				dmas = <&dma1 2 AT91_DMA_CFG_PER_ID(9)>,
+> +				       <&dma1 2 (AT91_DMA_CFG_PER_ID(10) | AT91_DMA_CFG_FIFOCFG_ASAP)>;
+> +				dma-names = "tx", "rx";
+>  				pinctrl-names = "default";
+>  				pinctrl-0 = <&pinctrl_usart3>;
+>  				clocks = <&usart3_clk>;
+> @@ -410,6 +422,9 @@
+>  				compatible = "atmel,at91sam9260-usart";
+>  				reg = <0xffffee00 0x200>;
+>  				interrupts = <2 IRQ_TYPE_LEVEL_HIGH 7>;
+> +				dmas = <&dma1 2 AT91_DMA_CFG_PER_ID(13)>,
+> +				       <&dma1 2 (AT91_DMA_CFG_PER_ID(14) | AT91_DMA_CFG_FIFOCFG_ASAP)>;
+> +				dma-names = "tx", "rx";
+>  				pinctrl-names = "default";
+>  				pinctrl-0 = <&pinctrl_dbgu>;
+>  				clocks = <&dbgu_clk>;
 > 
->  arch/arm/configs/exynos_defconfig | 1 +
->  1 file changed, 1 insertion(+)
-> 
-> diff --git a/arch/arm/configs/exynos_defconfig b/arch/arm/configs/exynos_defconfig
-> index fc7d168..c390bb9 100644
-> --- a/arch/arm/configs/exynos_defconfig
-> +++ b/arch/arm/configs/exynos_defconfig
-> @@ -77,6 +77,7 @@ CONFIG_SPI_S3C64XX=y
->  CONFIG_I2C_S3C2410=y
->  CONFIG_DEBUG_GPIO=y
->  CONFIG_POWER_SUPPLY=y
-> +CONFIG_BATTERY_SBS=y
->  CONFIG_CHARGER_TPS65090=y
->  # CONFIG_HWMON is not set
->  CONFIG_THERMAL=y
+
+
+-- 
+Nicolas Ferre
