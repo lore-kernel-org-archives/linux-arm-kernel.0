@@ -1,325 +1,434 @@
-From: wangyijing@huawei.com (Yijing Wang)
-Date: Tue, 12 Aug 2014 15:26:01 +0800
-Subject: [RFC PATCH 08/20] x86/xen/MSI: Use msi_chip instead of arch func to
- configure MSI/MSI-X
-In-Reply-To: <1407828373-24322-1-git-send-email-wangyijing@huawei.com>
-References: <1407828373-24322-1-git-send-email-wangyijing@huawei.com>
-Message-ID: <1407828373-24322-9-git-send-email-wangyijing@huawei.com>
+From: haojian.zhuang@linaro.org (Haojian Zhuang)
+Date: Tue, 12 Aug 2014 15:26:48 +0800
+Subject: [PATCH v18 2/8] ARM: hisi: enable MCPM implementation
+Message-ID: <1407828408-21431-1-git-send-email-haojian.zhuang@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Introduce a new struct msi_chip xen_msi_chip instead of weak arch
-functions to configure MSI/MSI-X.
+Multiple CPU clusters are used in Hisilicon HiP04 SoC. Now use MCPM
+framework to manage power on HiP04 SoC.
 
-Signed-off-by: Yijing Wang <wangyijing@huawei.com>
-CC: Konrad Rzeszutek Wilk <konrad.wilk@oracle.com>
+Changelog:
+v18:
+  * Fix to release resource in probe().
+  * Check whether cpu is already up in the process of making cpu down.
+  * Add udelay in power up/down sequence.
+  * Optimize on setting relocation entry.
+  * Optimize on polling status in wait_for_power_down().
+  * Add mcpm critical operations.
+v17:
+  * Parse bootwrapper parameters in DTS file.
+  * Fix to use msleep() in spinlock region.
+v16:
+  * Parse bootwrapper parameters in command line instead.
+v13:
+  * Restore power down operation in MCPM.
+  * Fix disabling snoop filter issue in MCPM.
+v12:
+  * Use wfi as power down state in MCPM.
+  * Remove wait_for_powerdown() in MCPM because wfi is used now.
+
+Signed-off-by: Haojian Zhuang <haojian.zhuang@linaro.org>
 ---
- arch/x86/pci/xen.c |  128 +++++++++++++++++++++++++++++----------------------
- 1 files changed, 73 insertions(+), 55 deletions(-)
+ arch/arm/mach-hisi/Makefile   |   1 +
+ arch/arm/mach-hisi/platmcpm.c | 379 ++++++++++++++++++++++++++++++++++++++++++
+ 2 files changed, 380 insertions(+)
+ create mode 100644 arch/arm/mach-hisi/platmcpm.c
 
-diff --git a/arch/x86/pci/xen.c b/arch/x86/pci/xen.c
-index 55c7858..0c4ed47 100644
---- a/arch/x86/pci/xen.c
-+++ b/arch/x86/pci/xen.c
-@@ -156,11 +156,12 @@ static int acpi_register_gsi_xen(struct device *dev, u32 gsi,
- struct xen_pci_frontend_ops *xen_pci_frontend;
- EXPORT_SYMBOL_GPL(xen_pci_frontend);
+diff --git a/arch/arm/mach-hisi/Makefile b/arch/arm/mach-hisi/Makefile
+index ee2506b..d64831e 100644
+--- a/arch/arm/mach-hisi/Makefile
++++ b/arch/arm/mach-hisi/Makefile
+@@ -3,4 +3,5 @@
+ #
  
--static int xen_setup_msi_irqs(struct pci_dev *dev, int nvec, int type)
-+static int xen_setup_msi_irqs(struct device *dev, int nvec, int type)
- {
- 	int irq, ret, i;
- 	struct msi_desc *msidesc;
- 	int *v;
-+	struct pci_dev *pdev = to_pci_dev(dev);
- 
- 	if (type == PCI_CAP_ID_MSI && nvec > 1)
- 		return 1;
-@@ -170,14 +171,14 @@ static int xen_setup_msi_irqs(struct pci_dev *dev, int nvec, int type)
- 		return -ENOMEM;
- 
- 	if (type == PCI_CAP_ID_MSIX)
--		ret = xen_pci_frontend_enable_msix(dev, v, nvec);
-+		ret = xen_pci_frontend_enable_msix(pdev, v, nvec);
- 	else
--		ret = xen_pci_frontend_enable_msi(dev, v);
-+		ret = xen_pci_frontend_enable_msi(pdev, v);
- 	if (ret)
- 		goto error;
- 	i = 0;
--	list_for_each_entry(msidesc, &dev->msi_list, list) {
--		irq = xen_bind_pirq_msi_to_irq(dev, msidesc, v[i],
-+	list_for_each_entry(msidesc, &pdev->msi_list, list) {
-+		irq = xen_bind_pirq_msi_to_irq(pdev, msidesc, v[i],
- 					       (type == PCI_CAP_ID_MSI) ? nvec : 1,
- 					       (type == PCI_CAP_ID_MSIX) ?
- 					       "pcifront-msi-x" :
-@@ -193,7 +194,7 @@ static int xen_setup_msi_irqs(struct pci_dev *dev, int nvec, int type)
- 	return 0;
- 
- error:
--	dev_err(&dev->dev, "Xen PCI frontend has not registered MSI/MSI-X support!\n");
-+	dev_err(dev, "Xen PCI frontend has not registered MSI/MSI-X support!\n");
- free:
- 	kfree(v);
- 	return ret;
-@@ -218,47 +219,48 @@ static void xen_msi_compose_msg(struct pci_dev *pdev, unsigned int pirq,
- 	msg->data = XEN_PIRQ_MSI_DATA;
- }
- 
--static int xen_hvm_setup_msi_irqs(struct pci_dev *dev, int nvec, int type)
-+static int xen_hvm_setup_msi_irqs(struct device *dev, int nvec, int type)
- {
- 	int irq, pirq;
- 	struct msi_desc *msidesc;
- 	struct msi_msg msg;
-+	struct pci_dev *pdev = to_pci_dev(dev);
- 
- 	if (type == PCI_CAP_ID_MSI && nvec > 1)
- 		return 1;
- 
--	list_for_each_entry(msidesc, &dev->msi_list, list) {
-+	list_for_each_entry(msidesc, &pdev->msi_list, list) {
- 		__read_msi_msg(msidesc, &msg);
- 		pirq = MSI_ADDR_EXT_DEST_ID(msg.address_hi) |
- 			((msg.address_lo >> MSI_ADDR_DEST_ID_SHIFT) & 0xff);
- 		if (msg.data != XEN_PIRQ_MSI_DATA ||
- 		    xen_irq_from_pirq(pirq) < 0) {
--			pirq = xen_allocate_pirq_msi(dev, msidesc);
-+			pirq = xen_allocate_pirq_msi(pdev, msidesc);
- 			if (pirq < 0) {
- 				irq = -ENODEV;
- 				goto error;
- 			}
--			xen_msi_compose_msg(dev, pirq, &msg);
-+			xen_msi_compose_msg(pdev, pirq, &msg);
- 			__write_msi_msg(msidesc, &msg);
--			dev_dbg(&dev->dev, "xen: msi bound to pirq=%d\n", pirq);
-+			dev_dbg(dev, "xen: msi bound to pirq=%d\n", pirq);
- 		} else {
--			dev_dbg(&dev->dev,
-+			dev_dbg(dev,
- 				"xen: msi already bound to pirq=%d\n", pirq);
- 		}
--		irq = xen_bind_pirq_msi_to_irq(dev, msidesc, pirq,
-+		irq = xen_bind_pirq_msi_to_irq(pdev, msidesc, pirq,
- 					       (type == PCI_CAP_ID_MSI) ? nvec : 1,
- 					       (type == PCI_CAP_ID_MSIX) ?
- 					       "msi-x" : "msi",
- 					       DOMID_SELF);
- 		if (irq < 0)
- 			goto error;
--		dev_dbg(&dev->dev,
-+		dev_dbg(dev,
- 			"xen: msi --> pirq=%d --> irq=%d\n", pirq, irq);
- 	}
- 	return 0;
- 
- error:
--	dev_err(&dev->dev,
-+	dev_err(dev,
- 		"Xen PCI frontend has not registered MSI/MSI-X support!\n");
- 	return irq;
- }
-@@ -266,16 +268,17 @@ error:
- #ifdef CONFIG_XEN_DOM0
- static bool __read_mostly pci_seg_supported = true;
- 
--static int xen_initdom_setup_msi_irqs(struct pci_dev *dev, int nvec, int type)
-+static int xen_initdom_setup_msi_irqs(struct device *dev, int nvec, int type)
- {
- 	int ret = 0;
- 	struct msi_desc *msidesc;
-+	struct pci_dev *pdev = to_pci_dev(dev);
- 
--	list_for_each_entry(msidesc, &dev->msi_list, list) {
-+	list_for_each_entry(msidesc, &pdev->msi_list, list) {
- 		struct physdev_map_pirq map_irq;
- 		domid_t domid;
- 
--		domid = ret = xen_find_device_domain_owner(dev);
-+		domid = ret = xen_find_device_domain_owner(pdev);
- 		/* N.B. Casting int's -ENODEV to uint16_t results in 0xFFED,
- 		 * hence check ret value for < 0. */
- 		if (ret < 0)
-@@ -286,9 +289,9 @@ static int xen_initdom_setup_msi_irqs(struct pci_dev *dev, int nvec, int type)
- 		map_irq.type = MAP_PIRQ_TYPE_MSI_SEG;
- 		map_irq.index = -1;
- 		map_irq.pirq = -1;
--		map_irq.bus = dev->bus->number |
--			      (pci_domain_nr(dev->bus) << 16);
--		map_irq.devfn = dev->devfn;
-+		map_irq.bus = pdev->bus->number |
-+			      (pci_domain_nr(pdev->bus) << 16);
-+		map_irq.devfn = pdev->devfn;
- 
- 		if (type == PCI_CAP_ID_MSI && nvec > 1) {
- 			map_irq.type = MAP_PIRQ_TYPE_MULTI_MSI;
-@@ -297,12 +300,12 @@ static int xen_initdom_setup_msi_irqs(struct pci_dev *dev, int nvec, int type)
- 			int pos;
- 			u32 table_offset, bir;
- 
--			pos = dev->msix_cap;
--			pci_read_config_dword(dev, pos + PCI_MSIX_TABLE,
-+			pos = pdev->msix_cap;
-+			pci_read_config_dword(pdev, pos + PCI_MSIX_TABLE,
- 					      &table_offset);
- 			bir = (u8)(table_offset & PCI_MSIX_TABLE_BIR);
- 
--			map_irq.table_base = pci_resource_start(dev, bir);
-+			map_irq.table_base = pci_resource_start(pdev, bir);
- 			map_irq.entry_nr = msidesc->msi_attrib.entry_nr;
- 		}
- 
-@@ -320,23 +323,23 @@ static int xen_initdom_setup_msi_irqs(struct pci_dev *dev, int nvec, int type)
- 			ret = 1;
- 			goto out;
- 		}
--		if (ret == -EINVAL && !pci_domain_nr(dev->bus)) {
-+		if (ret == -EINVAL && !pci_domain_nr(pdev->bus)) {
- 			map_irq.type = MAP_PIRQ_TYPE_MSI;
- 			map_irq.index = -1;
- 			map_irq.pirq = -1;
--			map_irq.bus = dev->bus->number;
-+			map_irq.bus = pdev->bus->number;
- 			ret = HYPERVISOR_physdev_op(PHYSDEVOP_map_pirq,
- 						    &map_irq);
- 			if (ret != -EINVAL)
- 				pci_seg_supported = false;
- 		}
- 		if (ret) {
--			dev_warn(&dev->dev, "xen map irq failed %d for %d domain\n",
-+			dev_warn(dev, "xen map irq failed %d for %d domain\n",
- 				 ret, domid);
- 			goto out;
- 		}
- 
--		ret = xen_bind_pirq_msi_to_irq(dev, msidesc, map_irq.pirq,
-+		ret = xen_bind_pirq_msi_to_irq(pdev, msidesc, map_irq.pirq,
- 		                               (type == PCI_CAP_ID_MSI) ? nvec : 1,
- 		                               (type == PCI_CAP_ID_MSIX) ? "msi-x" : "msi",
- 		                               domid);
-@@ -348,16 +351,17 @@ out:
- 	return ret;
- }
- 
--static void xen_initdom_restore_msi_irqs(struct pci_dev *dev)
-+static void xen_initdom_restore_msi_irqs(struct device *dev)
- {
- 	int ret = 0;
-+	struct pci_dev *pdev = to_pci_dev(dev);
- 
- 	if (pci_seg_supported) {
- 		struct physdev_pci_device restore_ext;
- 
--		restore_ext.seg = pci_domain_nr(dev->bus);
--		restore_ext.bus = dev->bus->number;
--		restore_ext.devfn = dev->devfn;
-+		restore_ext.seg = pci_domain_nr(pdev->bus);
-+		restore_ext.bus = pdev->bus->number;
-+		restore_ext.devfn = pdev->devfn;
- 		ret = HYPERVISOR_physdev_op(PHYSDEVOP_restore_msi_ext,
- 					&restore_ext);
- 		if (ret == -ENOSYS)
-@@ -367,33 +371,45 @@ static void xen_initdom_restore_msi_irqs(struct pci_dev *dev)
- 	if (!pci_seg_supported) {
- 		struct physdev_restore_msi restore;
- 
--		restore.bus = dev->bus->number;
--		restore.devfn = dev->devfn;
-+		restore.bus = pdev->bus->number;
-+		restore.devfn = pdev->devfn;
- 		ret = HYPERVISOR_physdev_op(PHYSDEVOP_restore_msi, &restore);
- 		WARN(ret && ret != -ENOSYS, "restore_msi -> %d\n", ret);
- 	}
- }
- #endif
- 
--static void xen_teardown_msi_irqs(struct pci_dev *dev)
-+static void xen_teardown_msi_irq(unsigned int irq)
- {
--	struct msi_desc *msidesc;
--
--	msidesc = list_entry(dev->msi_list.next, struct msi_desc, list);
--	if (msidesc->msi_attrib.is_msix)
--		xen_pci_frontend_disable_msix(dev);
--	else
--		xen_pci_frontend_disable_msi(dev);
--
--	/* Free the IRQ's and the msidesc using the generic code. */
--	default_teardown_msi_irqs(dev);
-+	xen_destroy_irq(irq);
- }
- 
--static void xen_teardown_msi_irq(unsigned int irq)
-+static void xen_teardown_msi_irqs(struct device *dev)
- {
--	xen_destroy_irq(irq);
-+	struct msi_desc *entry;
-+	struct pci_dev *pdev = to_pci_dev(dev);
+ obj-y	+= hisilicon.o
++obj-$(CONFIG_MCPM)		+= platmcpm.o
+ obj-$(CONFIG_SMP)		+= platsmp.o hotplug.o headsmp.o
+diff --git a/arch/arm/mach-hisi/platmcpm.c b/arch/arm/mach-hisi/platmcpm.c
+new file mode 100644
+index 0000000..c75035e
+--- /dev/null
++++ b/arch/arm/mach-hisi/platmcpm.c
+@@ -0,0 +1,379 @@
++/*
++ * Copyright (c) 2013-2014 Linaro Ltd.
++ * Copyright (c) 2013-2014 Hisilicon Limited.
++ *
++ * This program is free software; you can redistribute it and/or modify it
++ * under the terms and conditions of the GNU General Public License,
++ * version 2, as published by the Free Software Foundation.
++ */
++#include <linux/delay.h>
++#include <linux/io.h>
++#include <linux/memblock.h>
++#include <linux/of_address.h>
 +
-+	entry = list_entry(pdev->msi_list.next, struct msi_desc, list);
-+	if (entry->msi_attrib.is_msix)
-+		xen_pci_frontend_disable_msix(pdev);
++#include <asm/cputype.h>
++#include <asm/cp15.h>
++#include <asm/mcpm.h>
++
++#include "core.h"
++
++/* bits definition in SC_CPU_RESET_REQ[x]/SC_CPU_RESET_DREQ[x]
++ * 1 -- unreset; 0 -- reset
++ */
++#define CORE_RESET_BIT(x)		(1 << x)
++#define NEON_RESET_BIT(x)		(1 << (x + 4))
++#define CORE_DEBUG_RESET_BIT(x)		(1 << (x + 9))
++#define CLUSTER_L2_RESET_BIT		(1 << 8)
++#define CLUSTER_DEBUG_RESET_BIT		(1 << 13)
++
++/*
++ * bits definition in SC_CPU_RESET_STATUS[x]
++ * 1 -- reset status; 0 -- unreset status
++ */
++#define CORE_RESET_STATUS(x)		(1 << x)
++#define NEON_RESET_STATUS(x)		(1 << (x + 4))
++#define CORE_DEBUG_RESET_STATUS(x)	(1 << (x + 9))
++#define CLUSTER_L2_RESET_STATUS		(1 << 8)
++#define CLUSTER_DEBUG_RESET_STATUS	(1 << 13)
++#define CORE_WFI_STATUS(x)		(1 << (x + 16))
++#define CORE_WFE_STATUS(x)		(1 << (x + 20))
++#define CORE_DEBUG_ACK(x)		(1 << (x + 24))
++
++#define SC_CPU_RESET_REQ(x)		(0x520 + (x << 3))	/* reset */
++#define SC_CPU_RESET_DREQ(x)		(0x524 + (x << 3))	/* unreset */
++#define SC_CPU_RESET_STATUS(x)		(0x1520 + (x << 3))
++
++#define FAB_SF_MODE			0x0c
++#define FAB_SF_INVLD			0x10
++
++/* bits definition in FB_SF_INVLD */
++#define FB_SF_INVLD_START		(1 << 8)
++
++#define HIP04_MAX_CLUSTERS		4
++#define HIP04_MAX_CPUS_PER_CLUSTER	4
++
++#define POLL_MSEC	10
++#define TIMEOUT_MSEC	100
++
++static void __iomem *sysctrl, *fabric;
++static int hip04_cpu_table[HIP04_MAX_CLUSTERS][HIP04_MAX_CPUS_PER_CLUSTER];
++static DEFINE_SPINLOCK(boot_lock);
++static u32 fabric_phys_addr;
++/*
++ * [0]: bootwrapper physical address
++ * [1]: bootwrapper size
++ * [2]: relocation address
++ * [3]: relocation size
++ */
++static u32 hip04_boot_method[4];
++
++static bool hip04_cluster_is_down(unsigned int cluster)
++{
++	int i;
++
++	for (i = 0; i < HIP04_MAX_CPUS_PER_CLUSTER; i++)
++		if (hip04_cpu_table[cluster][i])
++			return false;
++	return true;
++}
++
++static void hip04_set_snoop_filter(unsigned int cluster, unsigned int on)
++{
++	unsigned long data;
++
++	if (!fabric)
++		BUG();
++	data = readl_relaxed(fabric + FAB_SF_MODE);
++	if (on)
++		data |= 1 << cluster;
 +	else
-+		xen_pci_frontend_disable_msi(pdev);
-+
-+	list_for_each_entry(entry, &pdev->msi_list, list) {
-+		int i, nvec;
-+		if (entry->irq == 0)
-+			continue;
-+		if (entry->nvec_used)
-+			nvec = entry->nvec_used;
-+		else
-+			nvec = 1 << entry->msi_attrib.multiple;
-+		for (i = 0; i < nvec; i++)
-+			xen_teardown_msi_irq(entry->irq + i);
++		data &= ~(1 << cluster);
++	writel_relaxed(data, fabric + FAB_SF_MODE);
++	while (1) {
++		if (data == readl_relaxed(fabric + FAB_SF_MODE))
++			break;
 +	}
- }
- 
-+struct msi_chip xen_msi_chip;
++	return;
++}
 +
- #endif
- 
- int __init pci_xen_init(void)
-@@ -414,9 +430,9 @@ int __init pci_xen_init(void)
- #endif
- 
- #ifdef CONFIG_PCI_MSI
--	x86_msi.setup_msi_irqs = xen_setup_msi_irqs;
--	x86_msi.teardown_msi_irq = xen_teardown_msi_irq;
--	x86_msi.teardown_msi_irqs = xen_teardown_msi_irqs;
-+	xen_msi_chip.setup_irqs = xen_setup_msi_irqs;
-+	xen_msi_chip.teardown_irqs = xen_teardown_msi_irqs;
-+	x86_msi_chip = &xen_msi_chip;
- #endif
- 	return 0;
- }
-@@ -435,8 +451,9 @@ int __init pci_xen_hvm_init(void)
- #endif
- 
- #ifdef CONFIG_PCI_MSI
--	x86_msi.setup_msi_irqs = xen_hvm_setup_msi_irqs;
--	x86_msi.teardown_msi_irq = xen_teardown_msi_irq;
-+	xen_msi_chip.setup_irqs = xen_hvm_setup_msi_irqs;
-+	xen_msi_chip.teardown_irq = xen_teardown_msi_irq;
-+	x86_msi_chip = &xen_msi_chip;
- #endif
- 	return 0;
- }
-@@ -493,9 +510,10 @@ int __init pci_xen_initial_domain(void)
- 	int irq;
- 
- #ifdef CONFIG_PCI_MSI
--	x86_msi.setup_msi_irqs = xen_initdom_setup_msi_irqs;
--	x86_msi.teardown_msi_irq = xen_teardown_msi_irq;
--	x86_msi.restore_msi_irqs = xen_initdom_restore_msi_irqs;
-+	xen_msi_chip.setup_irqs = xen_initdom_setup_msi_irqs;
-+	xen_msi_chip.teardown_irq = xen_teardown_msi_irq;
-+	xen_msi_chip.restore_irqs = xen_initdom_restore_msi_irqs;
-+	x86_msi_chip = &xen_msi_chip;
- #endif
- 	xen_setup_acpi_sci();
- 	__acpi_register_gsi = acpi_register_gsi_xen;
++static int hip04_mcpm_power_up(unsigned int cpu, unsigned int cluster)
++{
++	unsigned long data, mask;
++	void __iomem *sys_dreq, *sys_status;
++
++	if (!sysctrl)
++		return -ENODEV;
++	if (cluster >= HIP04_MAX_CLUSTERS || cpu >= HIP04_MAX_CPUS_PER_CLUSTER)
++		return -EINVAL;
++
++	spin_lock_irq(&boot_lock);
++
++	if (hip04_cpu_table[cluster][cpu])
++		goto out;
++
++	sys_dreq = sysctrl + SC_CPU_RESET_DREQ(cluster);
++	sys_status = sysctrl + SC_CPU_RESET_STATUS(cluster);
++	if (hip04_cluster_is_down(cluster)) {
++		data = CLUSTER_DEBUG_RESET_BIT;
++		writel_relaxed(data, sys_dreq);
++		do {
++			cpu_relax();
++			mask = CLUSTER_DEBUG_RESET_STATUS;
++			data = readl_relaxed(sys_status);
++		} while (data & mask);
++	}
++
++	data = CORE_RESET_BIT(cpu) | NEON_RESET_BIT(cpu) | \
++	       CORE_DEBUG_RESET_BIT(cpu);
++	writel_relaxed(data, sys_dreq);
++	do {
++		cpu_relax();
++	} while (data == readl_relaxed(sys_status));
++	udelay(20);
++out:
++	hip04_cpu_table[cluster][cpu]++;
++	spin_unlock_irq(&boot_lock);
++
++	return 0;
++}
++
++static void hip04_mcpm_power_down(void)
++{
++	unsigned int mpidr, cpu, cluster;
++	bool skip_wfi = false, last_man = false;
++
++	mpidr = read_cpuid_mpidr();
++	cpu = MPIDR_AFFINITY_LEVEL(mpidr, 0);
++	cluster = MPIDR_AFFINITY_LEVEL(mpidr, 1);
++
++	__mcpm_cpu_going_down(cpu, cluster);
++
++	spin_lock_irq(&boot_lock);
++	BUG_ON(__mcpm_cluster_state(cluster) != CLUSTER_UP);
++	hip04_cpu_table[cluster][cpu]--;
++	if (hip04_cpu_table[cluster][cpu] == 1) {
++		/* A power_up request went ahead of us. */
++		skip_wfi = true;
++	} else if (hip04_cpu_table[cluster][cpu] > 1) {
++		pr_err("Cluster %d CPU%d boots multiple times\n", cluster, cpu);
++		BUG();
++	}
++
++	last_man = hip04_cluster_is_down(cluster);
++	if (last_man && __mcpm_outbound_enter_critical(cpu, cluster)) {
++		spin_unlock(&boot_lock);
++		v7_exit_coherency_flush(all);
++		__mcpm_outbound_leave_critical(cluster, CLUSTER_DOWN);
++	} else {
++		spin_unlock(&boot_lock);
++		v7_exit_coherency_flush(louis);
++	}
++
++	__mcpm_cpu_down(cpu, cluster);
++
++	if (!skip_wfi)
++		wfi();
++}
++
++static int hip04_mcpm_wait_for_powerdown(unsigned int cpu, unsigned int cluster)
++{
++	unsigned int data, tries, count;
++
++	BUG_ON(cluster >= HIP04_MAX_CLUSTERS ||
++	       cpu >= HIP04_MAX_CPUS_PER_CLUSTER);
++
++	count = TIMEOUT_MSEC / POLL_MSEC;
++	spin_lock_irq(&boot_lock);
++	/*
++	 * Target core should enter WFI first.
++	 * Then cluster could be disabled in snoop filter.
++	 * At last, target core could be reset.
++	 */
++	for (tries = 0; tries < count; tries++) {
++		cpu_relax();
++		udelay(50);
++		data = readl_relaxed(sysctrl + SC_CPU_RESET_STATUS(cluster));
++		if (!hip04_cpu_table[cluster][cpu] || \
++		    (data & CORE_WFI_STATUS(cpu))) {
++			break;
++		}
++	}
++	if (tries >= count)
++		goto err;
++	if (hip04_cluster_is_down(cluster))
++		hip04_set_snoop_filter(cluster, 0);
++	data = CORE_RESET_BIT(cpu) | NEON_RESET_BIT(cpu) | \
++	       CORE_DEBUG_RESET_BIT(cpu);
++	writel_relaxed(data, sysctrl + SC_CPU_RESET_REQ(cluster));
++	for (tries = 0; tries < count; tries++) {
++		cpu_relax();
++		udelay(50);
++		data = readl_relaxed(sysctrl + SC_CPU_RESET_STATUS(cluster));
++		if (!hip04_cpu_table[cluster][cpu] || \
++		    (data & CORE_RESET_STATUS(cpu))) {
++			break;
++		}
++	}
++	if (tries >= count)
++		goto err;
++	spin_unlock_irq(&boot_lock);
++	return 0;
++err:
++	spin_unlock_irq(&boot_lock);
++	return -EBUSY;
++}
++
++static void hip04_mcpm_powered_up(void)
++{
++	unsigned int mpidr, cpu, cluster;
++
++	mpidr = read_cpuid_mpidr();
++	cpu = MPIDR_AFFINITY_LEVEL(mpidr, 0);
++	cluster = MPIDR_AFFINITY_LEVEL(mpidr, 1);
++
++	spin_lock(&boot_lock);
++	if (!hip04_cpu_table[cluster][cpu])
++		hip04_cpu_table[cluster][cpu] = 1;
++	spin_unlock(&boot_lock);
++}
++
++static void __naked hip04_mcpm_power_up_setup(unsigned int affinity_level)
++{
++	asm volatile ("			\n"
++"	cmp	r0, #0			\n"
++"	bxeq	lr			\n"
++	/* calculate fabric phys address */
++"	adr	r2, 2f			\n"
++"	ldmia	r2, {r1, r3}		\n"
++"	sub	r0, r2, r1		\n"
++"	ldr	r2, [r0, r3]		\n"
++	/* get cluster id from MPIDR */
++"	mrc	p15, 0, r0, c0, c0, 5	\n"
++"	ubfx	r1, r0, #8, #8		\n"
++	/* 1 << cluster id */
++"	mov	r0, #1			\n"
++"	mov	r3, r0, lsl r1		\n"
++"	ldr	r0, [r2, #"__stringify(FAB_SF_MODE)"]	\n"
++"	tst	r0, r3			\n"
++"	bxne	lr			\n"
++"	orr	r1, r0, r3		\n"
++"	str	r1, [r2, #"__stringify(FAB_SF_MODE)"]	\n"
++"1:	ldr	r0, [r2, #"__stringify(FAB_SF_MODE)"]	\n"
++"	tst	r0, r3			\n"
++"	beq	1b			\n"
++"	bx	lr			\n"
++
++"	.align	2			\n"
++"2:	.word	.			\n"
++"	.word	fabric_phys_addr	\n"
++	);
++}
++
++static const struct mcpm_platform_ops hip04_mcpm_ops = {
++	.power_up		= hip04_mcpm_power_up,
++	.power_down		= hip04_mcpm_power_down,
++	.wait_for_powerdown	= hip04_mcpm_wait_for_powerdown,
++	.powered_up		= hip04_mcpm_powered_up,
++};
++
++static bool __init hip04_cpu_table_init(void)
++{
++	unsigned int mpidr, cpu, cluster;
++
++	mpidr = read_cpuid_mpidr();
++	cpu = MPIDR_AFFINITY_LEVEL(mpidr, 0);
++	cluster = MPIDR_AFFINITY_LEVEL(mpidr, 1);
++
++	if (cluster >= HIP04_MAX_CLUSTERS ||
++	    cpu >= HIP04_MAX_CPUS_PER_CLUSTER) {
++		pr_err("%s: boot CPU is out of bound!\n", __func__);
++		return false;
++	}
++	hip04_set_snoop_filter(cluster, 1);
++	hip04_cpu_table[cluster][cpu] = 1;
++	return true;
++}
++
++static int __init hip04_mcpm_init(void)
++{
++	struct device_node *np, *np_sctl, *np_fab;
++	struct resource fab_res;
++	void __iomem *relocation;
++	int ret = -ENODEV;
++
++	np = of_find_compatible_node(NULL, NULL, "hisilicon,hip04-bootwrapper");
++	if (!np)
++		goto err;
++	ret = of_property_read_u32_array(np, "boot-method",
++					 &hip04_boot_method[0], 4);
++	if (ret)
++		goto err;
++	np_sctl = of_find_compatible_node(NULL, NULL, "hisilicon,sysctrl");
++	if (!np_sctl)
++		goto err;
++	np_fab = of_find_compatible_node(NULL, NULL, "hisilicon,hip04-fabric");
++	if (!np_fab)
++		goto err;
++
++	ret = memblock_reserve(hip04_boot_method[0], hip04_boot_method[1]);
++	if (ret)
++		goto err;
++
++	relocation = ioremap(hip04_boot_method[2], hip04_boot_method[3]);
++	if (!relocation) {
++		pr_err("failed to map relocation space\n");
++		ret = -ENOMEM;
++		goto err_reloc;
++	}
++	sysctrl = of_iomap(np_sctl, 0);
++	if (!sysctrl) {
++		pr_err("failed to get sysctrl base\n");
++		ret = -ENOMEM;
++		goto err_sysctrl;
++	}
++	ret = of_address_to_resource(np_fab, 0, &fab_res);
++	if (ret) {
++		pr_err("failed to get fabric base phys\n");
++		goto err_fabric;
++	}
++	fabric_phys_addr = fab_res.start;
++	sync_cache_w(&fabric_phys_addr);
++	fabric = of_iomap(np_fab, 0);
++	if (!fabric) {
++		pr_err("failed to get fabric base\n");
++		ret = -ENOMEM;
++		goto err_fabric;
++	}
++
++	if (!hip04_cpu_table_init()) {
++		ret = -EINVAL;
++		goto err_table;
++	}
++	ret = mcpm_platform_register(&hip04_mcpm_ops);
++	if (ret) {
++		goto err_table;
++	}
++
++	/* Make secondary core out of reset. */
++	writel_relaxed(hip04_boot_method[0], relocation);
++	writel_relaxed(0xa5a5a5a5, relocation + 4);	/* magic number */
++	writel_relaxed(virt_to_phys(mcpm_entry_point), relocation + 8);
++	writel_relaxed(0, relocation + 12);
++	iounmap(relocation);
++
++	mcpm_sync_init(hip04_mcpm_power_up_setup);
++	mcpm_smp_set_ops();
++	pr_info("HiP04 MCPM initialized\n");
++	return ret;
++err_table:
++	iounmap(fabric);
++err_fabric:
++	iounmap(sysctrl);
++err_sysctrl:
++	iounmap(relocation);
++err_reloc:
++	memblock_free(hip04_boot_method[0], hip04_boot_method[1]);
++err:
++	return ret;
++}
++early_initcall(hip04_mcpm_init);
 -- 
-1.7.1
+1.9.1
