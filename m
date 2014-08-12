@@ -1,80 +1,73 @@
-From: dianders@chromium.org (Doug Anderson)
-Date: Tue, 12 Aug 2014 14:06:11 -0700
-Subject: [PATCH v3 1/4] ARM: dts: Add emmc and sdmmc to the rk3288 device
- tree
-In-Reply-To: <1407344984-14176-2-git-send-email-dianders@chromium.org>
-References: <1407344984-14176-1-git-send-email-dianders@chromium.org>
- <1407344984-14176-2-git-send-email-dianders@chromium.org>
-Message-ID: <CAD=FV=Wsc-Pkvg9jumdg9i1oO+T1=jtZTfbc+qE5RDrCXaaezA@mail.gmail.com>
+From: m.smarduch@samsung.com (Mario Smarduch)
+Date: Tue, 12 Aug 2014 14:08:17 -0700
+Subject: [PATCH v9 2/4] arm: ARMv7  dirty page logging inital mem region
+ write protect (w/no huge PUD support)
+In-Reply-To: <20140812093618.GM10550@cbox>
+References: <1406249768-25315-1-git-send-email-m.smarduch@samsung.com>
+ <1406249768-25315-3-git-send-email-m.smarduch@samsung.com>
+ <20140811191257.GG10550@cbox> <53E96F8E.3070905@samsung.com>
+ <20140812093618.GM10550@cbox>
+Message-ID: <53EA8241.5070805@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Heiko,
+On 08/12/2014 02:36 AM, Christoffer Dall wrote:
+> On Mon, Aug 11, 2014 at 06:36:14PM -0700, Mario Smarduch wrote:
+>> On 08/11/2014 12:12 PM, Christoffer Dall wrote:
+> 
+> [...]
+> 
+>>>> +/**
+>>>> + * stage2_wp_range() - write protect stage2 memory region range
+>>>> + * @kvm:	The KVM pointer
+>>>> + * @start:	Start address of range
+>>>> + * &end:	End address of range
+>>>> + */
+>>>> +static void stage2_wp_range(struct kvm *kvm, phys_addr_t addr, phys_addr_t end)
+>>>> +{
+>>>> +	pgd_t *pgd;
+>>>> +	phys_addr_t next;
+>>>> +
+>>>> +	pgd = kvm->arch.pgd + pgd_index(addr);
+>>>> +	do {
+>>>> +		/*
+>>>> +		 * Release kvm_mmu_lock periodically if the memory region is
+>>>> +		 * large features like detect hung task, lock detector or lock
+>>>                    large.  Otherwise, we may see panics due to..
+>>>> +		 * dep  may panic. In addition holding the lock this long will
+>>>     extra white space ^^           Additionally, holding the lock for a
+>>>     long timer will
+>>>> +		 * also starve other vCPUs. Applies to huge VM memory regions.
+>>>                                             ^^^ I don't understand this
+>>> 					    last remark.
+>> Sorry overlooked this.
+>>
+>> While testing - VM regions that were small (~1GB) holding the mmu_lock
+>> caused not problems, but when I was running memory regions around 2GB large
+>> some kernel lockup detection/lock contention options (some selected by default) 
+>> caused deadlock warnings/panics in host kernel.
+>>
+>> This was in one my previous review comments sometime ago, I can go back
+>> and find the options.
+>>
+> 
+> Just drop the last part of the comment, so the whole thing reads:
+> 
+> /*
+>  * Release kvm_mmu_lock periodically if the memory region is
+>  * large. Otherwise, we may see kernel panics from debugging features
+>  * such as "detect hung task", "lock detector" or "lock dep checks".
+>  * Additionally, holding the lock too long will also starve other vCPUs.
+>  */
+> 
+> And check the actual names of those debugging features or use the
+> CONFIG_<WHATEVER> names and say "we may see kernel panics with CONFIG_X,
+> CONFIG_Y, and CONFIG_Z.
+> 
+> Makes sense?
 
-On Wed, Aug 6, 2014 at 10:09 AM, Doug Anderson <dianders@chromium.org> wrote:
-> This adds support for the sdmmc and emmc ports on the rk3288 using the
-> currently posted driver from Addy at:
->   https://patchwork.kernel.org/patch/4653631/
->
-> Note:
-> * This is not baesd on Jaehoon's patch series removing the slot node,
->   but it does use new syntax like putting the bus width at the top
->   level and using the new cap-mmc-highspeed / cap-sd-highspeed.  A
->   future patch will modify this one to remove the slot node.
->
-> Signed-off-by: Doug Anderson <dianders@chromium.org>
-> Acked-by: Arnd Bergmann <arnd@arndb.de>
-> ---
-> Changes in v3: None
-> Changes in v2:
-> - New patchwork link for Addy's patch
->
->  arch/arm/boot/dts/rk3288.dtsi | 22 ++++++++++++++++++++++
->  1 file changed, 22 insertions(+)
->
-> diff --git a/arch/arm/boot/dts/rk3288.dtsi b/arch/arm/boot/dts/rk3288.dtsi
-> index e7cb008..dc98a5b 100644
-> --- a/arch/arm/boot/dts/rk3288.dtsi
-> +++ b/arch/arm/boot/dts/rk3288.dtsi
-> @@ -78,6 +78,28 @@
->                 clock-frequency = <24000000>;
->         };
->
-> +       sdmmc: dwmmc at ff0c0000 {
-> +               compatible = "rockchip,rk3288-dw-mshc";
-> +               clocks = <&cru HCLK_SDMMC>, <&cru SCLK_SDMMC>;
-> +               clock-names = "biu", "ciu";
-> +               fifo-depth = <0x100>;
-> +               interrupts = <GIC_SPI 32 IRQ_TYPE_LEVEL_HIGH>;
-> +               reg = <0xff0c0000 0x4000>;
-> +               #address-cells = <1>;
-> +               #size-cells = <0>;
+Yep sure does.
 
-When doing other testing I realized that I missed a:
-  status = "disabled";
-
-...from both of these two nodes.  I'm happy to repost with this fix or
-I'm happy if you want to add to the patch when applying.
-
-Let me know.  Thanks!
-
-
-> +       };
-> +
-> +       emmc: dwmmc at ff0f0000 {
-> +               compatible = "rockchip,rk3288-dw-mshc";
-> +               clocks = <&cru HCLK_EMMC>, <&cru SCLK_EMMC>;
-> +               clock-names = "biu", "ciu";
-> +               fifo-depth = <0x100>;
-> +               interrupts = <GIC_SPI 35 IRQ_TYPE_LEVEL_HIGH>;
-> +               reg = <0xff0f0000 0x4000>;
-> +               #address-cells = <1>;
-> +               #size-cells = <0>;
-> +       };
-> +
->         i2c1: i2c at ff140000 {
->                 compatible = "rockchip,rk3288-i2c";
->                 reg = <0xff140000 0x1000>;
-> --
-> 2.0.0.526.g5318336
->
+> 
+> -Christoffer
+> 
