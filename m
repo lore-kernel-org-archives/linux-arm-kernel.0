@@ -1,59 +1,298 @@
-From: horms+renesas@verge.net.au (Simon Horman)
-Date: Tue, 12 Aug 2014 09:04:42 +0900
-Subject: [PATCH v2 5/5] ARM: shmobile: r8a7740: Remove
- r8a7740_add_standard_devices_dt
-In-Reply-To: <1407801882-2561-1-git-send-email-horms+renesas@verge.net.au>
-References: <1407801882-2561-1-git-send-email-horms+renesas@verge.net.au>
-Message-ID: <1407801882-2561-6-git-send-email-horms+renesas@verge.net.au>
+From: m.smarduch@samsung.com (Mario Smarduch)
+Date: Mon, 11 Aug 2014 17:16:21 -0700
+Subject: [PATCH v9 2/4] arm: ARMv7  dirty page logging inital mem region
+ write protect (w/no huge PUD support)
+In-Reply-To: <20140811191257.GG10550@cbox>
+References: <1406249768-25315-1-git-send-email-m.smarduch@samsung.com>
+ <1406249768-25315-3-git-send-email-m.smarduch@samsung.com>
+ <20140811191257.GG10550@cbox>
+Message-ID: <53E95CD5.9070809@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Now that r8a7740_add_standard_devices_dt() is simply a wrapper
-for a call to of_platform_populate() remove it and call
-of_platform_populate() directly.
+On 08/11/2014 12:12 PM, Christoffer Dall wrote:
+> Remove the parenthesis from the subject line.
 
-Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
----
- arch/arm/mach-shmobile/r8a7740.h       | 1 -
- arch/arm/mach-shmobile/setup-r8a7740.c | 7 +------
- 2 files changed, 1 insertion(+), 7 deletions(-)
+Hmmm have to check this don't see it my patch file.
+> 
+> On Thu, Jul 24, 2014 at 05:56:06PM -0700, Mario Smarduch wrote:
+>> Patch adds  support for initial write protection VM memlsot. This patch series
+>             ^^                                    ^
+> stray whitespace                                 of
+> 
+Need to watch out for these adds delays to review cycle.
+> 
+>> assumes that huge PUDs will not be used in 2nd stage tables.
+> 
+> may be worth mentioning that this is always valid on ARMv7.
+> 
 
-diff --git a/arch/arm/mach-shmobile/r8a7740.h b/arch/arm/mach-shmobile/r8a7740.h
-index 1d1a5fd..3352fb8 100644
---- a/arch/arm/mach-shmobile/r8a7740.h
-+++ b/arch/arm/mach-shmobile/r8a7740.h
-@@ -49,7 +49,6 @@ extern void r8a7740_init_irq_of(void);
- extern void r8a7740_map_io(void);
- extern void r8a7740_add_early_devices(void);
- extern void r8a7740_add_standard_devices(void);
--extern void r8a7740_add_standard_devices_dt(void);
- extern void r8a7740_clock_init(u8 md_ck);
- extern void r8a7740_pinmux_init(void);
- extern void r8a7740_pm_init(void);
-diff --git a/arch/arm/mach-shmobile/setup-r8a7740.c b/arch/arm/mach-shmobile/setup-r8a7740.c
-index dc44a44..8fe270d 100644
---- a/arch/arm/mach-shmobile/setup-r8a7740.c
-+++ b/arch/arm/mach-shmobile/setup-r8a7740.c
-@@ -781,11 +781,6 @@ void __init r8a7740_add_early_devices(void)
- 
- #ifdef CONFIG_USE_OF
- 
--void __init r8a7740_add_standard_devices_dt(void)
--{
--	of_platform_populate(NULL, of_default_bus_match_table, NULL, NULL);
--}
--
- void __init r8a7740_init_irq_of(void)
- {
- 	void __iomem *intc_prio_base = ioremap_nocache(0xe6900010, 0x10);
-@@ -819,7 +814,7 @@ void __init r8a7740_init_irq_of(void)
- static void __init r8a7740_generic_init(void)
- {
- 	r8a7740_clock_init(0);
--	r8a7740_add_standard_devices_dt();
-+	of_platform_populate(NULL, of_default_bus_match_table, NULL, NULL);
- }
- 
- static const char *r8a7740_boards_compat_dt[] __initdata = {
--- 
-2.0.0.rc2
+Yep definitely.
+
+>>
+>> Signed-off-by: Mario Smarduch <m.smarduch@samsung.com>
+>> ---
+>>  arch/arm/include/asm/kvm_host.h       |    1 +
+>>  arch/arm/include/asm/kvm_mmu.h        |   20 ++++++
+>>  arch/arm/include/asm/pgtable-3level.h |    1 +
+>>  arch/arm/kvm/arm.c                    |    9 +++
+>>  arch/arm/kvm/mmu.c                    |  128 +++++++++++++++++++++++++++++++++
+>>  5 files changed, 159 insertions(+)
+>>
+>> diff --git a/arch/arm/include/asm/kvm_host.h b/arch/arm/include/asm/kvm_host.h
+>> index 042206f..6521a2d 100644
+>> --- a/arch/arm/include/asm/kvm_host.h
+>> +++ b/arch/arm/include/asm/kvm_host.h
+>> @@ -231,5 +231,6 @@ int kvm_perf_teardown(void);
+>>  u64 kvm_arm_timer_get_reg(struct kvm_vcpu *, u64 regid);
+>>  int kvm_arm_timer_set_reg(struct kvm_vcpu *, u64 regid, u64 value);
+>>  void kvm_arch_flush_remote_tlbs(struct kvm *);
+>> +void kvm_mmu_wp_memory_region(struct kvm *kvm, int slot);
+>>  
+>>  #endif /* __ARM_KVM_HOST_H__ */
+>> diff --git a/arch/arm/include/asm/kvm_mmu.h b/arch/arm/include/asm/kvm_mmu.h
+>> index 5cc0b0f..08ab5e8 100644
+>> --- a/arch/arm/include/asm/kvm_mmu.h
+>> +++ b/arch/arm/include/asm/kvm_mmu.h
+>> @@ -114,6 +114,26 @@ static inline void kvm_set_s2pmd_writable(pmd_t *pmd)
+>>  	pmd_val(*pmd) |= L_PMD_S2_RDWR;
+>>  }
+>>  
+>> +static inline void kvm_set_s2pte_readonly(pte_t *pte)
+>> +{
+>> +	pte_val(*pte) = (pte_val(*pte) & ~L_PTE_S2_RDWR) | L_PTE_S2_RDONLY;
+>> +}
+>> +
+>> +static inline bool kvm_s2pte_readonly(pte_t *pte)
+>> +{
+>> +	return (pte_val(*pte) & L_PTE_S2_RDWR) == L_PTE_S2_RDONLY;
+>> +}
+>> +
+>> +static inline void kvm_set_s2pmd_readonly(pmd_t *pmd)
+>> +{
+>> +	pmd_val(*pmd) = (pmd_val(*pmd) & ~L_PMD_S2_RDWR) | L_PMD_S2_RDONLY;
+>> +}
+>> +
+>> +static inline bool kvm_s2pmd_readonly(pmd_t *pmd)
+>> +{
+>> +	return (pmd_val(*pmd) & L_PMD_S2_RDWR) == L_PMD_S2_RDONLY;
+>> +}
+>> +
+>>  /* Open coded p*d_addr_end that can deal with 64bit addresses */
+>>  #define kvm_pgd_addr_end(addr, end)					\
+>>  ({	u64 __boundary = ((addr) + PGDIR_SIZE) & PGDIR_MASK;		\
+>> diff --git a/arch/arm/include/asm/pgtable-3level.h b/arch/arm/include/asm/pgtable-3level.h
+>> index 85c60ad..d8bb40b 100644
+>> --- a/arch/arm/include/asm/pgtable-3level.h
+>> +++ b/arch/arm/include/asm/pgtable-3level.h
+>> @@ -129,6 +129,7 @@
+>>  #define L_PTE_S2_RDONLY			(_AT(pteval_t, 1) << 6)   /* HAP[1]   */
+>>  #define L_PTE_S2_RDWR			(_AT(pteval_t, 3) << 6)   /* HAP[2:1] */
+>>  
+>> +#define L_PMD_S2_RDONLY			(_AT(pteval_t, 1) << 6)   /* HAP[1]   */
+>>  #define L_PMD_S2_RDWR			(_AT(pmdval_t, 3) << 6)   /* HAP[2:1] */
+>>  
+>>  /*
+>> diff --git a/arch/arm/kvm/arm.c b/arch/arm/kvm/arm.c
+>> index 3c82b37..e11c2dd 100644
+>> --- a/arch/arm/kvm/arm.c
+>> +++ b/arch/arm/kvm/arm.c
+>> @@ -242,6 +242,15 @@ void kvm_arch_commit_memory_region(struct kvm *kvm,
+>>  				   const struct kvm_memory_slot *old,
+>>  				   enum kvm_mr_change change)
+>>  {
+>> +#ifdef CONFIG_ARM
+>> +	/*
+>> +	 * At this point memslot has been committed and there is an
+>> +	 * allocated dirty_bitmap[], dirty pages will be be tracked while the
+>> +	 * memory slot is write protected.
+>> +	 */
+>> +	if ((change != KVM_MR_DELETE) && (mem->flags & KVM_MEM_LOG_DIRTY_PAGES))
+>> +		kvm_mmu_wp_memory_region(kvm, mem->slot);
+>> +#endif
+>>  }
+>>  
+>>  void kvm_arch_flush_shadow_all(struct kvm *kvm)
+>> diff --git a/arch/arm/kvm/mmu.c b/arch/arm/kvm/mmu.c
+>> index 35254c6..7bfc792 100644
+>> --- a/arch/arm/kvm/mmu.c
+>> +++ b/arch/arm/kvm/mmu.c
+>> @@ -763,6 +763,134 @@ static bool transparent_hugepage_adjust(pfn_t *pfnp, phys_addr_t *ipap)
+>>  	return false;
+>>  }
+>>  
+>> +#ifdef CONFIG_ARM
+>> +/**
+>> + * stage2_wp_pte_range - write protect PTE range
+>> + * @pmd:	pointer to pmd entry
+>> + * @addr:	range start address
+>> + * @end:	range end address
+>> + */
+>> +static void stage2_wp_pte_range(pmd_t *pmd, phys_addr_t addr, phys_addr_t end)
+>> +{
+>> +	pte_t *pte;
+>> +
+>> +	pte = pte_offset_kernel(pmd, addr);
+>> +	do {
+>> +		if (!pte_none(*pte)) {
+>> +			if (!kvm_s2pte_readonly(pte))
+>> +				kvm_set_s2pte_readonly(pte);
+>> +		}
+>> +	} while (pte++, addr += PAGE_SIZE, addr != end);
+>> +}
+>> +
+>> +/**
+>> + * stage2_wp_pmd_range - write protect PMD range
+>> + * @pud:	pointer to pud entry
+>> + * @addr:	range start address
+>> + * @end:	range end address
+>> + */
+>> +static void stage2_wp_pmd_range(pud_t *pud, phys_addr_t addr, phys_addr_t end)
+>> +{
+>> +	pmd_t *pmd;
+>> +	phys_addr_t next;
+>> +
+>> +	pmd = pmd_offset(pud, addr);
+>> +
+>> +	do {
+>> +		next = kvm_pmd_addr_end(addr, end);
+>> +		if (!pmd_none(*pmd)) {
+>> +			if (kvm_pmd_huge(*pmd)) {
+>> +				if (!kvm_s2pmd_readonly(pmd))
+>> +					kvm_set_s2pmd_readonly(pmd);
+>> +			} else
+>> +				stage2_wp_pte_range(pmd, addr, next);
+> please use a closing brace when the first part of the if-statement is a
+> multi-line block with braces, as per the CodingStyle.
+Will fix.
+>> +
+> 
+> stray blank line
+
+Not sure how it got by checkpatch, will fix.
+> 
+>> +		}
+>> +	} while (pmd++, addr = next, addr != end);
+>> +}
+>> +
+>> +/**
+>> +  * stage2_wp_pud_range - write protect PUD range
+>> +  * @kvm:	pointer to kvm structure
+>> +  * @pud:	pointer to pgd entry
+>         pgd
+>> +  * @addr:	range start address
+>> +  * @end:	range end address
+>> +  *
+>> +  * While walking the PUD range huge PUD pages are ignored, in the future this
+>                              range, huge PUDs are ignored.  In the future...
+>> +  * may need to be revisited. Determine how to handle huge PUDs when logging
+>> +  * of dirty pages is enabled.
+> 
+> I don't understand the last sentence?
+
+Probably last two sentences should be combined.
+".... to determine how to handle huge PUT...". Would that be
+clear enough?
+
+The overall theme is what to do about PUDs - mark all pages dirty
+in the region, attempt to breakup such huge regions?
+
+> 
+>> +  */
+>> +static void  stage2_wp_pud_range(struct kvm *kvm, pgd_t *pgd,
+>> +				phys_addr_t addr, phys_addr_t end)
+>> +{
+>> +	pud_t *pud;
+>> +	phys_addr_t next;
+>> +
+>> +	pud = pud_offset(pgd, addr);
+>> +	do {
+>> +		next = kvm_pud_addr_end(addr, end);
+>> +		/* TODO: huge PUD not supported, revisit later */
+>> +		BUG_ON(pud_huge(*pud));
+> 
+> we should probably define kvm_pud_huge()
+
+Yep will add it.
+
+> 
+>> +		if (!pud_none(*pud))
+>> +			stage2_wp_pmd_range(pud, addr, next);
+>> +	} while (pud++, addr = next, addr != end);
+>> +}
+>> +
+>> +/**
+>> + * stage2_wp_range() - write protect stage2 memory region range
+>> + * @kvm:	The KVM pointer
+>> + * @start:	Start address of range
+>> + * &end:	End address of range
+>> + */
+>> +static void stage2_wp_range(struct kvm *kvm, phys_addr_t addr, phys_addr_t end)
+>> +{
+>> +	pgd_t *pgd;
+>> +	phys_addr_t next;
+>> +
+>> +	pgd = kvm->arch.pgd + pgd_index(addr);
+>> +	do {
+>> +		/*
+>> +		 * Release kvm_mmu_lock periodically if the memory region is
+>> +		 * large features like detect hung task, lock detector or lock
+>                    large.  Otherwise, we may see panics due to..
+>> +		 * dep  may panic. In addition holding the lock this long will
+>     extra white space ^^           Additionally, holding the lock for a
+>     long timer will
+>> +		 * also starve other vCPUs. Applies to huge VM memory regions.
+>                                             ^^^ I don't understand this
+> 					    last remark.
+>> +		 */
+>> +		if (need_resched() || spin_needbreak(&kvm->mmu_lock))
+>> +			cond_resched_lock(&kvm->mmu_lock);
+>> +
+>> +		next = kvm_pgd_addr_end(addr, end);
+>> +		if (pgd_present(*pgd))
+>> +			stage2_wp_pud_range(kvm, pgd, addr, next);
+>> +	} while (pgd++, addr = next, addr != end);
+>> +}
+>> +
+>> +/**
+>> + * kvm_mmu_wp_memory_region() - write protect stage 2 entries for memory slot
+>> + * @kvm:	The KVM pointer
+>> + * @slot:	The memory slot to write protect
+>> + *
+>> + * Called to start logging dirty pages after memory region
+>> + * KVM_MEM_LOG_DIRTY_PAGES operation is called. After this function returns
+>> + * all present PMD and PTEs are write protected in the memory region.
+>> + * Afterwards read of dirty page log can be called.
+>> + *
+>> + * Acquires kvm_mmu_lock. Called with kvm->slots_lock mutex acquired,
+>> + * serializing operations for VM memory regions.
+>> + */
+>> +
+>> +void kvm_mmu_wp_memory_region(struct kvm *kvm, int slot)
+>> +{
+>> +	struct kvm_memory_slot *memslot = id_to_memslot(kvm->memslots, slot);
+>> +	phys_addr_t start = memslot->base_gfn << PAGE_SHIFT;
+>> +	phys_addr_t end = (memslot->base_gfn + memslot->npages) << PAGE_SHIFT;
+>> +
+>> +	spin_lock(&kvm->mmu_lock);
+>> +	stage2_wp_range(kvm, start, end);
+>> +	kvm_flush_remote_tlbs(kvm);
+>> +	spin_unlock(&kvm->mmu_lock);
+>> +}
+>> +#endif
+>> +
+>>  static int user_mem_abort(struct kvm_vcpu *vcpu, phys_addr_t fault_ipa,
+>>  			  struct kvm_memory_slot *memslot,
+>>  			  unsigned long fault_status)
+>> -- 
+>> 1.7.9.5
+>>
+> 
+> Besides the commenting and whitespace stuff, this is beginning to look
+> good.
+
+I'll clean it up for next iteration.
+> 
+> Thanks,
+> -Christoffer
+> 
