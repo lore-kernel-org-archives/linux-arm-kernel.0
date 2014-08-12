@@ -1,73 +1,38 @@
-From: m.smarduch@samsung.com (Mario Smarduch)
-Date: Tue, 12 Aug 2014 14:08:17 -0700
-Subject: [PATCH v9 2/4] arm: ARMv7  dirty page logging inital mem region
- write protect (w/no huge PUD support)
-In-Reply-To: <20140812093618.GM10550@cbox>
-References: <1406249768-25315-1-git-send-email-m.smarduch@samsung.com>
- <1406249768-25315-3-git-send-email-m.smarduch@samsung.com>
- <20140811191257.GG10550@cbox> <53E96F8E.3070905@samsung.com>
- <20140812093618.GM10550@cbox>
-Message-ID: <53EA8241.5070805@samsung.com>
+From: broonie@kernel.org (Mark Brown)
+Date: Tue, 12 Aug 2014 22:27:57 +0100
+Subject: [PATCH 6/6] ARM: dts: Add tps65090 FETs constraints
+In-Reply-To: <53EA61B9.2070805@collabora.co.uk>
+References: <1407861868-20097-1-git-send-email-javier.martinez@collabora.co.uk>
+ <1407861868-20097-7-git-send-email-javier.martinez@collabora.co.uk>
+ <20140812172552.GU17528@sirena.org.uk>
+ <53EA61B9.2070805@collabora.co.uk>
+Message-ID: <20140812212757.GY17528@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08/12/2014 02:36 AM, Christoffer Dall wrote:
-> On Mon, Aug 11, 2014 at 06:36:14PM -0700, Mario Smarduch wrote:
->> On 08/11/2014 12:12 PM, Christoffer Dall wrote:
-> 
-> [...]
-> 
->>>> +/**
->>>> + * stage2_wp_range() - write protect stage2 memory region range
->>>> + * @kvm:	The KVM pointer
->>>> + * @start:	Start address of range
->>>> + * &end:	End address of range
->>>> + */
->>>> +static void stage2_wp_range(struct kvm *kvm, phys_addr_t addr, phys_addr_t end)
->>>> +{
->>>> +	pgd_t *pgd;
->>>> +	phys_addr_t next;
->>>> +
->>>> +	pgd = kvm->arch.pgd + pgd_index(addr);
->>>> +	do {
->>>> +		/*
->>>> +		 * Release kvm_mmu_lock periodically if the memory region is
->>>> +		 * large features like detect hung task, lock detector or lock
->>>                    large.  Otherwise, we may see panics due to..
->>>> +		 * dep  may panic. In addition holding the lock this long will
->>>     extra white space ^^           Additionally, holding the lock for a
->>>     long timer will
->>>> +		 * also starve other vCPUs. Applies to huge VM memory regions.
->>>                                             ^^^ I don't understand this
->>> 					    last remark.
->> Sorry overlooked this.
->>
->> While testing - VM regions that were small (~1GB) holding the mmu_lock
->> caused not problems, but when I was running memory regions around 2GB large
->> some kernel lockup detection/lock contention options (some selected by default) 
->> caused deadlock warnings/panics in host kernel.
->>
->> This was in one my previous review comments sometime ago, I can go back
->> and find the options.
->>
-> 
-> Just drop the last part of the comment, so the whole thing reads:
-> 
-> /*
->  * Release kvm_mmu_lock periodically if the memory region is
->  * large. Otherwise, we may see kernel panics from debugging features
->  * such as "detect hung task", "lock detector" or "lock dep checks".
->  * Additionally, holding the lock too long will also starve other vCPUs.
->  */
-> 
-> And check the actual names of those debugging features or use the
-> CONFIG_<WHATEVER> names and say "we may see kernel panics with CONFIG_X,
-> CONFIG_Y, and CONFIG_Z.
-> 
-> Makes sense?
+On Tue, Aug 12, 2014 at 08:49:29PM +0200, Javier Martinez Canillas wrote:
 
-Yep sure does.
+> So, is adding these voltages ranges (the design limits) in the Peach Pit DTS
+> file directly an acceptable solution? Basically what my previous patch [0] did.
 
-> 
-> -Christoffer
-> 
+> That matches what is in the board schematic so I assume that it's safe to use
+> these voltage ranges for that machine. If so I'll drop this series and repost
+> that patch fixing the typo error and commit message pointed by Doug that were
+> already addressed in $subject.
+
+Well, I think the question is if you understand where those numbers come
+from and if they make sense.  I've not seen the schematic for the board
+so I can't comment but it is quite unusual to see ranges listed for so
+many supplies, for things like SD it's obviously normal but things like
+video_mid are a bit more surprising.  Does anything actually vary those
+voltages?
+
+The change where you fix up the supply mappings still makes sense of
+course.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140812/07d469ba/attachment.sig>
