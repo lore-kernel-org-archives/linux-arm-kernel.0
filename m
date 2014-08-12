@@ -1,70 +1,163 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Tue, 12 Aug 2014 10:40:58 +0100
-Subject: [PATCH v5 3/3] arm64: Add seccomp support
-In-Reply-To: <53E9BAD5.3080201@linaro.org>
-References: <1406020499-5537-1-git-send-email-takahiro.akashi@linaro.org>
- <1406020499-5537-4-git-send-email-takahiro.akashi@linaro.org>
- <53D082E9.8090303@amacapital.net> <53D09C4F.9010104@linaro.org>
- <CALCETrWTDS7VSyuR5wgGxpu-_YMWVUVmv9ht6t1tCSX=GA46cQ@mail.gmail.com>
- <53D2255C.9050006@linaro.org>
- <CAGXu5jJL=zXuSRNomGrB09kqpUhEpkuxDH18JN4NRbWocMw4xg@mail.gmail.com>
- <53E47DCE.4080902@linaro.org> <20140811092409.GE15344@arm.com>
- <53E9BAD5.3080201@linaro.org>
-Message-ID: <20140812094058.GD29013@arm.com>
+From: christoffer.dall@linaro.org (Christoffer Dall)
+Date: Tue, 12 Aug 2014 11:50:45 +0200
+Subject: [PATCH v9 4/4] arm: ARMv7 dirty page logging 2nd stage page
+ fault handling support
+In-Reply-To: <53E96CF1.6040806@samsung.com>
+References: <1406249768-25315-1-git-send-email-m.smarduch@samsung.com>
+ <1406249768-25315-5-git-send-email-m.smarduch@samsung.com>
+ <20140811191315.GI10550@cbox> <53E96CF1.6040806@samsung.com>
+Message-ID: <20140812095045.GN10550@cbox>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Akashi,
-
-On Tue, Aug 12, 2014 at 07:57:25AM +0100, AKASHI Takahiro wrote:
-> On 08/11/2014 06:24 PM, Will Deacon wrote:
-> > On Fri, Aug 08, 2014 at 08:35:42AM +0100, AKASHI Takahiro wrote:
-> >> As discussed in a few weeks ago, aarch64 won't support PTRACE_SET_SYSCALL.
-> >
-> > Well, I don't think anything was set in stone. If you have a compelling
-> > reason why adding the new request gives you something over setting w8
-> > directly, then we can extend ptrace.
+On Mon, Aug 11, 2014 at 06:25:05PM -0700, Mario Smarduch wrote:
+> On 08/11/2014 12:13 PM, Christoffer Dall wrote:
+> > On Thu, Jul 24, 2014 at 05:56:08PM -0700, Mario Smarduch wrote:
+> >> This patch adds support for handling 2nd stage page faults during migration,
+> >> it disables faulting in huge pages, and dissolves huge pages to page tables.
+> >> In case migration is canceled huge pages will be used again.
+> >>
+> >> Signed-off-by: Mario Smarduch <m.smarduch@samsung.com>
+> >> ---
+> >>  arch/arm/kvm/mmu.c |   31 +++++++++++++++++++++++++------
+> >>  1 file changed, 25 insertions(+), 6 deletions(-)
+> >>
+> >> diff --git a/arch/arm/kvm/mmu.c b/arch/arm/kvm/mmu.c
+> >> index ca84331..a17812a 100644
+> >> --- a/arch/arm/kvm/mmu.c
+> >> +++ b/arch/arm/kvm/mmu.c
+> >> @@ -642,7 +642,8 @@ static int stage2_set_pmd_huge(struct kvm *kvm, struct kvm_mmu_memory_cache
+> >>  }
+> >>  
+> >>  static int stage2_set_pte(struct kvm *kvm, struct kvm_mmu_memory_cache *cache,
+> >> -			  phys_addr_t addr, const pte_t *new_pte, bool iomap)
+> >> +			  phys_addr_t addr, const pte_t *new_pte, bool iomap,
+> >> +			  bool logging_active)
+> >>  {
+> >>  	pmd_t *pmd;
+> >>  	pte_t *pte, old_pte;
+> >> @@ -657,6 +658,15 @@ static int stage2_set_pte(struct kvm *kvm, struct kvm_mmu_memory_cache *cache,
+> >>  		return 0;
+> >>  	}
+> >>  
+> >> +	/*
+> >> +	 * While dirty memory logging, clear PMD entry for huge page and split
+> >> +	 * into smaller pages, to track dirty memory at page granularity.
+> >> +	 */
+> >> +	if (logging_active && kvm_pmd_huge(*pmd)) {
+> >> +		phys_addr_t ipa = pmd_pfn(*pmd) << PAGE_SHIFT;
+> >> +		clear_pmd_entry(kvm, pmd, ipa);
+> > 
+> > clear_pmd_entry has a VM_BUG_ON(kvm_pmd_huge(*pmd)) so that is
+> > definitely not the right thing to call.
 > 
-> Yeah, I think I may have to change my mind. Looking into __secure_computing(),
-> I found the code below:
+> I don't see that in 3.15rc1/rc4 -
 > 
->  >     case SECCOMP_MODE_FILTER:
->  >         case SECCOMP_RET_TRACE:
->  >             ...
->  >             if (syscall_get_nr(current, regs) < 0)
->  >                 goto skip;
+> static void clear_pmd_entry(struct kvm *kvm, pmd_t *pmd, phys_addr_t addr)
+> {
+>         if (kvm_pmd_huge(*pmd)) {
+>                 pmd_clear(pmd);
+>                 kvm_tlb_flush_vmid_ipa(kvm, addr);
+>         } else {
+>                   [....]
+> }
 > 
-> This implies that we should modify syscallno *before* __secure_computing()
-> returns.
+> I thought the purpose of this function was to clear PMD entry. Also
+> ran hundreds of tests no problems. Hmmm confused.
+> 
 
-Why does it imply that? There are four competing entities here:
+You need to rebase on kvm/next or linus/master, something that contains:
 
- - seccomp
- - tracehook
- - ftrace (trace_sys_*)
- - audit
+4f853a7 arm/arm64: KVM: Fix and refactor unmap_range
 
-With the exception of ftrace, they can all potentially rewrite the pt_regs
-(the code you cite above is just below a ptrace_event call), so we have
-to choose some order in which to call them.
+> > 
+> >> +	}
+> >> +
+> >>  	/* Create stage-2 page mappings - Level 2 */
+> >>  	if (pmd_none(*pmd)) {
+> >>  		if (!cache)
+> >> @@ -709,7 +719,7 @@ int kvm_phys_addr_ioremap(struct kvm *kvm, phys_addr_t guest_ipa,
+> >>  		if (ret)
+> >>  			goto out;
+> >>  		spin_lock(&kvm->mmu_lock);
+> >> -		ret = stage2_set_pte(kvm, &cache, addr, &pte, true);
+> >> +		ret = stage2_set_pte(kvm, &cache, addr, &pte, true, false);
+> >>  		spin_unlock(&kvm->mmu_lock);
+> >>  		if (ret)
+> >>  			goto out;
+> >> @@ -926,6 +936,12 @@ static int user_mem_abort(struct kvm_vcpu *vcpu, phys_addr_t fault_ipa,
+> >>  	struct kvm_mmu_memory_cache *memcache = &vcpu->arch.mmu_page_cache;
+> >>  	struct vm_area_struct *vma;
+> >>  	pfn_t pfn;
+> >> +	/* Get logging status, if dirty_bitmap is not NULL then logging is on */
+> >> +	#ifdef CONFIG_ARM
+> >> +		bool logging_active = !!memslot->dirty_bitmap;
+> >> +	#else
+> >> +		bool logging_active = false;
+> >> +	#endif
+> > 
+> > can you make this an inline in the header files for now please?
+> 
+> Yes definitely.
+> 
+> > 
+> >>  
+> >>  	write_fault = kvm_is_write_fault(kvm_vcpu_get_hsr(vcpu));
+> >>  	if (fault_status == FSC_PERM && !write_fault) {
+> >> @@ -936,7 +952,7 @@ static int user_mem_abort(struct kvm_vcpu *vcpu, phys_addr_t fault_ipa,
+> >>  	/* Let's check if we will get back a huge page backed by hugetlbfs */
+> >>  	down_read(&current->mm->mmap_sem);
+> >>  	vma = find_vma_intersection(current->mm, hva, hva + 1);
+> >> -	if (is_vm_hugetlb_page(vma)) {
+> >> +	if (is_vm_hugetlb_page(vma) && !logging_active) {
+> >>  		hugetlb = true;
+> >>  		gfn = (fault_ipa & PMD_MASK) >> PAGE_SHIFT;
+> >>  	} else {
+> >> @@ -979,7 +995,7 @@ static int user_mem_abort(struct kvm_vcpu *vcpu, phys_addr_t fault_ipa,
+> >>  	spin_lock(&kvm->mmu_lock);
+> >>  	if (mmu_notifier_retry(kvm, mmu_seq))
+> >>  		goto out_unlock;
+> >> -	if (!hugetlb && !force_pte)
+> >> +	if (!hugetlb && !force_pte && !logging_active)
+> >>  		hugetlb = transparent_hugepage_adjust(&pfn, &fault_ipa);
+> >>  
+> >>  	if (hugetlb) {
+> >> @@ -998,9 +1014,12 @@ static int user_mem_abort(struct kvm_vcpu *vcpu, phys_addr_t fault_ipa,
+> >>  			kvm_set_pfn_dirty(pfn);
+> >>  		}
+> >>  		coherent_cache_guest_page(vcpu, hva, PAGE_SIZE);
+> >> -		ret = stage2_set_pte(kvm, memcache, fault_ipa, &new_pte, false);
+> >> +		ret = stage2_set_pte(kvm, memcache, fault_ipa, &new_pte, false,
+> >> +					logging_active);
+> >>  	}
+> >>  
+> >> +	if (write_fault)
+> >> +		mark_page_dirty(kvm, gfn);
+> >>  
+> >>  out_unlock:
+> >>  	spin_unlock(&kvm->mmu_lock);
+> >> @@ -1151,7 +1170,7 @@ static void kvm_set_spte_handler(struct kvm *kvm, gpa_t gpa, void *data)
+> >>  {
+> >>  	pte_t *pte = (pte_t *)data;
+> >>  
+> >> -	stage2_set_pte(kvm, NULL, gpa, pte, false);
+> >> +	stage2_set_pte(kvm, NULL, gpa, pte, false, false);
+> > 
+> > why is logging never active if we are called from MMU notifiers?
+> 
+> mmu notifiers update sptes, but I don't see how these updates
+> can result in guest dirty pages. Also guest pages are marked dirty
+> from 2nd stage page fault handlers (searching through the code).
+> 
+Ok, then add:
 
-On entry, x86 and arm call them in the order I listed above, so it seems
-sensible to follow that.
+/*
+ * We can always call stage2_set_pte with logging_active == false,
+ * because MMU notifiers will have unmapped a huge PMD before calling
+ * ->change_pte() (which in turn calls kvm_set_spte_hva()) and therefore
+ * stage2_set_pte() never needs to clear out a huge PMD through this
+ * calling path.
+ */
 
-> I assumed, in my next version, we could skip a system call by overwriting
-> syscallno with x8 in syscall_trace_enter() after __secure_computing()
-> returns 0, and it actually works.
-
-Why does overwriting the syscallno with x8 skip the syscall?
-
-I thought the idea was that we would save w8 prior to each call that could
-change the pt_regs, then if it was changed to -1 we would replace it with
-the saved value and return -1? The only confusion I have is whether we
-should call the exit hooks after skipping a syscall. I *think* x86 does
-call them, but ARM doesn't. Andy says this can trigger an OOPs:
-
-  http://lists.infradead.org/pipermail/linux-arm-kernel/2014-July/274988.html
-
-so we should fix that for ARM while we're here.
-
-Will
+Thanks,
+-Christoffer
