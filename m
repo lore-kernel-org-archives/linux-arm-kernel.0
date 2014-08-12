@@ -1,101 +1,70 @@
 From: dyoung@redhat.com (Dave Young)
-Date: Tue, 12 Aug 2014 14:10:19 +0800
-Subject: [PATCH 2/5] efi: add kernel param efi=noruntime
+Date: Tue, 12 Aug 2014 14:10:21 +0800
+Subject: [PATCH 4/5] efi x86: clear EFI_RUNTIME_SERVICES bit in case failures
+ other than SetVirtualAddressMap
 In-Reply-To: <1407823822-23829-1-git-send-email-dyoung@redhat.com>
 References: <1407823822-23829-1-git-send-email-dyoung@redhat.com>
-Message-ID: <1407823822-23829-2-git-send-email-dyoung@redhat.com>
+Message-ID: <1407823822-23829-4-git-send-email-dyoung@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-noefi kernel param means actually disabling efi runtime, Per suggestion from
-Leif Lindholm efi=noruntime should be better. But since noefi is already used
-in X86 thus just adding another param efi=noruntime for same purpose.
+If enter virtual mode failed due to some reason other than the efi call
+the EFI_RUNTIME_SERVICES bit in efi.flags should be cleared thus users
+of efi runtime services can check the bit and handle the case instead of
+assume efi runtime is ok.
+
+Per Matt, if efi call SetVirtualAddressMap fails we will be not sure it's safe
+to make any assumptions about the state of the system. so kernel panics instead
+of clears EFI_RUNTIME_SERVICES bit.
 
 Signed-off-by: Dave Young <dyoung@redhat.com>
 ---
- Documentation/kernel-parameters.txt |  4 +++-
- arch/x86/platform/efi/efi.c         | 12 ------------
- drivers/firmware/efi/efi.c          | 22 ++++++++++++++++++++++
- 3 files changed, 25 insertions(+), 13 deletions(-)
+ arch/x86/platform/efi/efi.c | 10 ++++++++--
+ 1 file changed, 8 insertions(+), 2 deletions(-)
 
-diff --git a/Documentation/kernel-parameters.txt b/Documentation/kernel-parameters.txt
-index a8eb6af..09d8c54 100644
---- a/Documentation/kernel-parameters.txt
-+++ b/Documentation/kernel-parameters.txt
-@@ -992,11 +992,13 @@ bytes respectively. Such letter suffixes can also be entirely omitted.
- 			Format: {"off" | "on" | "skip[mbr]"}
- 
- 	efi=		[EFI]
--			Format: { "old_map" }
-+			Format: { "old_map" | "noruntime" }
- 			old_map [X86-64]: switch to the old ioremap-based EFI
- 			runtime services mapping. 32-bit still uses this one by
- 			default.
- 
-+			noruntime : disable EFI runtime services support
-+
- 	efi_no_storage_paranoia [EFI; X86]
- 			Using this parameter you can use more than 50% of
- 			your efi variable storage. Use this parameter only if
 diff --git a/arch/x86/platform/efi/efi.c b/arch/x86/platform/efi/efi.c
-index dd7aaa1..eae91be 100644
+index eae91be..c42f49b 100644
 --- a/arch/x86/platform/efi/efi.c
 +++ b/arch/x86/platform/efi/efi.c
-@@ -929,15 +929,3 @@ u64 efi_mem_attributes(unsigned long phys_addr)
+@@ -724,6 +724,7 @@ static void __init kexec_enter_virtual_mode(void)
+ 	 */
+ 	if (!efi_is_native()) {
+ 		efi_unmap_memmap();
++		clear_bit(EFI_RUNTIME_SERVICES, &efi.flags);
+ 		return;
  	}
- 	return 0;
- }
--
--static int __init parse_efi_cmdline(char *str)
--{
--	if (*str == '=')
--		str++;
--
--	if (!strncmp(str, "old_map", 7))
--		set_bit(EFI_OLD_MEMMAP, &efi.flags);
--
--	return 0;
--}
--early_param("efi", parse_efi_cmdline);
-diff --git a/drivers/firmware/efi/efi.c b/drivers/firmware/efi/efi.c
-index c8f01a7..f3ec3f2 100644
---- a/drivers/firmware/efi/efi.c
-+++ b/drivers/firmware/efi/efi.c
-@@ -24,6 +24,7 @@
- #include <linux/of_fdt.h>
- #include <linux/io.h>
- #include <linux/platform_device.h>
-+#include <asm/efi.h>
  
- struct efi __read_mostly efi = {
- 	.mps        = EFI_INVALID_TABLE_ADDR,
-@@ -54,6 +55,27 @@ bool efi_runtime_disabled(void)
- 	return disable_runtime;
- }
+@@ -797,6 +798,7 @@ static void __init __efi_enter_virtual_mode(void)
+ 	new_memmap = efi_map_regions(&count, &pg_shift);
+ 	if (!new_memmap) {
+ 		pr_err("Error reallocating memory, EFI runtime non-functional!\n");
++		clear_bit(EFI_RUNTIME_SERVICES, &efi.flags);
+ 		return;
+ 	}
  
-+static int __init parse_efi_cmdline(char *str)
-+{
-+	if (*str == '=')
-+		str++;
-+
-+#ifdef CONFIG_X86
-+	if (!strncmp(str, "old_map", 7)) {
-+		set_bit(EFI_OLD_MEMMAP, &efi.flags);
-+		goto out;
+@@ -804,8 +806,10 @@ static void __init __efi_enter_virtual_mode(void)
+ 
+ 	BUG_ON(!efi.systab);
+ 
+-	if (efi_setup_page_tables(__pa(new_memmap), 1 << pg_shift))
++	if (efi_setup_page_tables(__pa(new_memmap), 1 << pg_shift)) {
++		clear_bit(EFI_RUNTIME_SERVICES, &efi.flags);
+ 		return;
 +	}
-+#endif
-+	if (!strncmp(str, "noruntime", 9)) {
-+		disable_runtime = true;
-+		goto out;
-+	}
-+
-+out:
-+	return 0;
-+}
-+early_param("efi", parse_efi_cmdline);
-+
- static struct kobject *efi_kobj;
- static struct kobject *efivars_kobj;
  
+ 	efi_sync_low_kernel_mappings();
+ 	efi_dump_pagetable();
+@@ -882,8 +886,10 @@ static void __init __efi_enter_virtual_mode(void)
+ 
+ void __init efi_enter_virtual_mode(void)
+ {
+-	if (efi_enabled(EFI_PARAVIRT))
++	if (efi_enabled(EFI_PARAVIRT)) {
++		clear_bit(EFI_RUNTIME_SERVICES, &efi.flags);
+ 		return;
++	}
+ 
+ 	if (efi_setup)
+ 		kexec_enter_virtual_mode();
 -- 
 1.8.3.1
