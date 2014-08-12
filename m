@@ -1,444 +1,298 @@
-From: mperttunen@nvidia.com (Mikko Perttunen)
-Date: Tue, 12 Aug 2014 12:51:28 +0300
-Subject: [PATCH v3 4/4] thermal: Add Tegra SOCTHERM thermal management
- driver
-In-Reply-To: <20140811133221.GA6920@developer>
-References: <1407320706-17440-1-git-send-email-mperttunen@nvidia.com>
- <1407320706-17440-5-git-send-email-mperttunen@nvidia.com>
- <20140811133221.GA6920@developer>
-Message-ID: <53E9E3A0.70005@nvidia.com>
+From: mpa@pengutronix.de (Markus Pargmann)
+Date: Tue, 12 Aug 2014 11:56:43 +0200
+Subject: [PATCH v2] watchdog: Add DA906x PMIC watchdog driver.
+Message-ID: <1407837403-15863-1-git-send-email-mpa@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/08/14 16:32, Eduardo Valentin wrote:
-> Hello Mikko,
->
-> It follows more small comments.
->
-> On Wed, Aug 6, 2014 at 6:25 AM, Mikko Perttunen <mperttunen@nvidia.com> wrote:
->> This adds support for the Tegra SOCTHERM thermal sensing and management
->> system found in the Tegra124 system-on-chip. This initial driver supports
->> temperature polling for four thermal zones.
->>
->> Signed-off-by: Mikko Perttunen <mperttunen@nvidia.com>
->> ---
->> v3:
->> - changed commit message
->> - changed bool to tristate
->> - added text to Kconfig entry
->> - added const to t124_sensor_config
->> - removed .name and .config fields
->> - use sign_extend32 for sign extension
->>
->>   drivers/thermal/Kconfig          |  10 +
->>   drivers/thermal/Makefile         |   1 +
->>   drivers/thermal/tegra_soctherm.c | 430 +++++++++++++++++++++++++++++++++++++++
->>   3 files changed, 441 insertions(+)
->>   create mode 100644 drivers/thermal/tegra_soctherm.c
->>
->> diff --git a/drivers/thermal/Kconfig b/drivers/thermal/Kconfig
->> index 693208e..fd9d049 100644
->> --- a/drivers/thermal/Kconfig
->> +++ b/drivers/thermal/Kconfig
->> @@ -175,6 +175,16 @@ config ARMADA_THERMAL
->>            Enable this option if you want to have support for thermal management
->>            controller present in Armada 370 and Armada XP SoC.
->>
->> +config TEGRA_SOCTHERM
->> +       tristate "Tegra SOCTHERM thermal management"
->> +       depends on ARCH_TEGRA
->> +       help
->> +         Enable this option for integrated thermal management support on NVIDIA
->> +         Tegra124 systems-on-chip. The driver supports four thermal zones
->> +         (CPU, GPU, MEM, PLLX). Cooling devices can be bound to the thermal
->> +         zones to manage temperatures. This option is also required for the
->> +         emergency thermal reset (thermtrip) feature to function.
->> +
->
-> Way better now. Thanks for fixing.
->
->>   config DB8500_CPUFREQ_COOLING
->>          tristate "DB8500 cpufreq cooling"
->>          depends on ARCH_U8500
->> diff --git a/drivers/thermal/Makefile b/drivers/thermal/Makefile
->> index 31e232f..f0b94d5 100644
->> --- a/drivers/thermal/Makefile
->> +++ b/drivers/thermal/Makefile
->> @@ -33,3 +33,4 @@ obj-$(CONFIG_INTEL_SOC_DTS_THERMAL)   += intel_soc_dts_thermal.o
->>   obj-$(CONFIG_TI_SOC_THERMAL)   += ti-soc-thermal/
->>   obj-$(CONFIG_ACPI_INT3403_THERMAL)     += int3403_thermal.o
->>   obj-$(CONFIG_ST_THERMAL)       += st/
->> +obj-$(CONFIG_TEGRA_SOCTHERM)   += tegra_soctherm.o
->> diff --git a/drivers/thermal/tegra_soctherm.c b/drivers/thermal/tegra_soctherm.c
->> new file mode 100644
->> index 0000000..2e5cd88
->> --- /dev/null
->> +++ b/drivers/thermal/tegra_soctherm.c
->> @@ -0,0 +1,430 @@
->> +/*
->> + * drivers/thermal/tegra_soctherm.c
->> + *
->> + * Copyright (c) 2014, NVIDIA CORPORATION.  All rights reserved.
->> + *
->> + * Author:
->> + *     Mikko Perttunen <mperttunen@nvidia.com>
->> + *
->> + * This software is licensed under the terms of the GNU General Public
->> + * License version 2, as published by the Free Software Foundation, and
->> + * may be copied, distributed, and modified under those terms.
->> + *
->> + * This program is distributed in the hope that it will be useful,
->> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
->> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
->> + * GNU General Public License for more details.
->> + *
->> + */
->> +
->> +#include <linux/clk.h>
->> +#include <linux/err.h>
->> +#include <linux/io.h>
->> +#include <linux/module.h>
->> +#include <linux/of.h>
->> +#include <linux/platform_device.h>
->> +#include <linux/reset.h>
->> +#include <linux/thermal.h>
->> +#include <linux/delay.h>
->> +#include <linux/interrupt.h>
->> +#include <linux/bitops.h>
->> +#include <soc/tegra/fuse.h>
->> +
->> +#define SENSOR_CONFIG0                         0
->> +#define                SENSOR_CONFIG0_STOP             BIT(0)
->> +#define                SENSOR_CONFIG0_TALL_SHIFT       8
->> +#define                SENSOR_CONFIG0_TCALC_OVER       BIT(4)
->> +#define                SENSOR_CONFIG0_OVER             BIT(3)
->> +#define                SENSOR_CONFIG0_CPTR_OVER        BIT(2)
->> +#define SENSOR_CONFIG1                         4
->> +#define                SENSOR_CONFIG1_TSAMPLE_SHIFT    0
->> +#define                SENSOR_CONFIG1_TIDDQ_EN_SHIFT   15
->> +#define                SENSOR_CONFIG1_TEN_COUNT_SHIFT  24
->> +#define                SENSOR_CONFIG1_TEMP_ENABLE      BIT(31)
->> +#define SENSOR_CONFIG2                         8
->> +#define                SENSOR_CONFIG2_THERMA_SHIFT     16
->> +#define                SENSOR_CONFIG2_THERMB_SHIFT     0
->> +
->> +#define SENSOR_PDIV                            0x1c0
->> +#define                SENSOR_PDIV_T124                0x8888
->> +#define SENSOR_HOTSPOT_OFF                     0x1c4
->> +#define                SENSOR_HOTSPOT_OFF_T124         0x00060600
->> +#define SENSOR_TEMP1                           0x1c8
->> +#define SENSOR_TEMP2                           0x1cc
->> +
->> +#define FUSE_TSENSOR8_CALIB                    0x180
->> +#define FUSE_SPARE_REALIGNMENT_REG_0           0x1fc
->> +
->> +#define NOMINAL_CALIB_FT_T124                  105
->> +#define NOMINAL_CALIB_CP_T124                  25
->> +
->> +struct tegra_tsensor_configuration {
->> +       u32 tall, tsample, tiddq_en, ten_count;
->> +       u32 pdiv, tsample_ate, pdiv_ate;
->> +};
->> +
->> +struct tegra_tsensor {
->> +       u32 base;
->> +       u32 calib_fuse_offset;
->> +       /* Correction values used to modify values read from calibration fuses */
->> +       s32 fuse_corr_alpha, fuse_corr_beta;
->> +};
->> +
->> +struct tegra_thermctl_zone {
->> +       void __iomem *temp_reg;
->> +       int temp_shift;
->> +};
->> +
->> +static const struct tegra_tsensor_configuration t124_tsensor_config = {
->> +       .tall = 16300,
->> +       .tsample = 120,
->> +       .tiddq_en = 1,
->> +       .ten_count = 1,
->> +       .pdiv = 8,
->> +       .tsample_ate = 481,
->> +       .pdiv_ate = 8
->> +};
->> +
->> +static struct tegra_tsensor t124_tsensors[] = {
->
-> Shouldn't this one be const too?
+From: Krystian Garbaciak <krystian.garbaciak@diasemi.com>
 
-Ah, missed this one. Thanks.
+This driver supports watchdog device inside DA906x PMIC.
 
->
->> +       {
->> +               .base = 0xc0,
->> +               .calib_fuse_offset = 0x098,
->> +               .fuse_corr_alpha = 1135400,
->> +               .fuse_corr_beta = -6266900,
->> +       },
->> +       {
->> +               .base = 0xe0,
->> +               .calib_fuse_offset = 0x084,
->> +               .fuse_corr_alpha = 1122220,
->> +               .fuse_corr_beta = -5700700,
->> +       },
->> +       {
->> +               .base = 0x100,
->> +               .calib_fuse_offset = 0x088,
->> +               .fuse_corr_alpha = 1127000,
->> +               .fuse_corr_beta = -6768200,
->> +       },
->> +       {
->> +               .base = 0x120,
->> +               .calib_fuse_offset = 0x12c,
->> +               .fuse_corr_alpha = 1110900,
->> +               .fuse_corr_beta = -6232000,
->> +       },
->> +       {
->> +               .base = 0x140,
->> +               .calib_fuse_offset = 0x158,
->> +               .fuse_corr_alpha = 1122300,
->> +               .fuse_corr_beta = -5936400,
->> +       },
->> +       {
->> +               .base = 0x160,
->> +               .calib_fuse_offset = 0x15c,
->> +               .fuse_corr_alpha = 1145700,
->> +               .fuse_corr_beta = -7124600,
->> +       },
->> +       {
->> +               .base = 0x180,
->> +               .calib_fuse_offset = 0x154,
->> +               .fuse_corr_alpha = 1120100,
->> +               .fuse_corr_beta = -6000500,
->> +       },
->> +       {
->> +               .base = 0x1a0,
->> +               .calib_fuse_offset = 0x160,
->> +               .fuse_corr_alpha = 1106500,
->> +               .fuse_corr_beta = -6729300,
->> +       },
->> +};
->> +
->> +struct tegra_soctherm {
->> +       struct reset_control *reset;
->> +       struct clk *clock_tsensor;
->> +       struct clk *clock_soctherm;
->> +       void __iomem *regs;
->> +
->> +       struct thermal_zone_device *thermctl_tzs[4];
->
-> the amount of thermal zones is const here. Is there any case in which
-> the board would have a config that has more than 4 or less than 4 zones?
+Signed-off-by: Krystian Garbaciak <krystian.garbaciak@diasemi.com>
+Signed-off-by: Philipp Zabel <p.zabel@pengutronix.de>
+Signed-off-by: Markus Pargmann <mpa@pengutronix.de>
+---
+ drivers/watchdog/Kconfig             |   7 ++
+ drivers/watchdog/Makefile            |   1 +
+ drivers/watchdog/da9063_wdt.c        | 226 +++++++++++++++++++++++++++++++++++
+ include/linux/mfd/da9063/registers.h |   1 +
+ 4 files changed, 235 insertions(+)
+ create mode 100644 drivers/watchdog/da9063_wdt.c
 
-No. This number fixed in the IP block. SOCTHERM measures only 
-SoC-internal sensors, so the number is be fixed per SoC generation. 
-Future generations might change this number, but so can change many 
-other things.
-
->
->> +};
->> +
->> +struct tsensor_shared_calibration {
->> +       u32 base_cp, base_ft;
->> +       u32 actual_temp_cp, actual_temp_ft;
->> +};
->> +
->> +static int calculate_shared_calibration(struct tsensor_shared_calibration *r)
->> +{
->> +       u32 val;
->> +       u32 shifted_cp, shifted_ft;
->> +       int err;
->> +
->> +       err = tegra_fuse_readl(FUSE_TSENSOR8_CALIB, &val);
->> +       if (err)
->> +               return err;
->> +       r->base_cp = val & 0x3ff;
->> +       r->base_ft = (val & (0x7ff << 10)) >> 10;
->
-> Where these shifts and masks come from?
-
-These aren't very well documented in anything I can find (typical for 
-calibration data), but I suppose I can at least add some defines for the 
-shifts and masks.
-
->
->> +
->> +       err = tegra_fuse_readl(FUSE_SPARE_REALIGNMENT_REG_0, &val);
->> +       if (err)
->> +               return err;
->> +       shifted_cp = sign_extend32(val, 5);
->> +       val = ((val & (0x1f << 21)) >> 21);
->
-> ditto.
-
-Same.
-
->
->> +       shifted_ft = sign_extend32(val, 4);
->> +
->> +       r->actual_temp_cp = 2 * NOMINAL_CALIB_CP_T124 + shifted_cp;
->> +       r->actual_temp_ft = 2 * NOMINAL_CALIB_FT_T124 + shifted_ft;
->> +
->> +       return 0;
->> +}
->> +
->> +static int calculate_tsensor_calibration(
->> +       struct tegra_tsensor *sensor,
->> +       struct tsensor_shared_calibration shared,
->> +       u32 *calib
->> +)
->> +{
->> +       u32 val;
->> +       s32 actual_tsensor_ft, actual_tsensor_cp;
->> +       s32 delta_sens, delta_temp;
->> +       s32 mult, div;
->> +       s16 therma, thermb;
->> +       int err;
->> +
->> +       err = tegra_fuse_readl(sensor->calib_fuse_offset, &val);
->> +       if (err)
->> +               return err;
->> +
->> +       actual_tsensor_cp = (shared.base_cp * 64) + sign_extend32(val, 12);
->> +       val = (val & (0x1fff << 13)) >> 13;
->
-> ditto.
-
-Same.
-
->
->> +       actual_tsensor_ft = (shared.base_ft * 32) + sign_extend32(val, 12);
->> +
->> +       delta_sens = actual_tsensor_ft - actual_tsensor_cp;
->> +       delta_temp = shared.actual_temp_ft - shared.actual_temp_cp;
->> +
->> +       mult = t124_tsensor_config.pdiv * t124_tsensor_config.tsample_ate;
->> +       div = t124_tsensor_config.tsample * t124_tsensor_config.pdiv_ate;
->> +
->> +       therma = div_s64((s64) delta_temp * (1LL << 13) * mult,
->
-> ditto.
-
-Same.
-
->
->> +               (s64) delta_sens * div);
->> +       thermb = div_s64(((s64) actual_tsensor_ft * shared.actual_temp_cp) -
->> +               ((s64) actual_tsensor_cp * shared.actual_temp_ft),
->> +               (s64) delta_sens);
->> +
->> +       therma = div_s64((s64) therma * sensor->fuse_corr_alpha,
->> +               (s64) 1000000LL);
->> +       thermb = div_s64((s64) thermb * sensor->fuse_corr_alpha +
->> +               sensor->fuse_corr_beta,
->> +               (s64) 1000000LL);
->> +
->> +       *calib = ((u16)(therma) << SENSOR_CONFIG2_THERMA_SHIFT) |
->> +               ((u16)thermb << SENSOR_CONFIG2_THERMB_SHIFT);
->> +
->> +       return 0;
->> +}
->> +
->> +static int enable_tsensor(struct tegra_soctherm *tegra,
->> +                         struct tegra_tsensor *sensor,
->> +                         struct tsensor_shared_calibration shared)
->> +{
->> +       void * __iomem base = tegra->regs + sensor->base;
->> +       unsigned int val;
->> +       u32 calib;
->> +       int err;
->> +
->> +       err = calculate_tsensor_calibration(sensor, shared, &calib);
->> +       if (err)
->> +               return err;
->> +
->> +       val = 0;
->> +       val |= t124_tsensor_config.tall << SENSOR_CONFIG0_TALL_SHIFT;
->> +       writel(val, base + SENSOR_CONFIG0);
->> +
->> +       val = 0;
->> +       val |= (t124_tsensor_config.tsample - 1) <<
->> +               SENSOR_CONFIG1_TSAMPLE_SHIFT;
->> +       val |= t124_tsensor_config.tiddq_en << SENSOR_CONFIG1_TIDDQ_EN_SHIFT;
->> +       val |= t124_tsensor_config.ten_count << SENSOR_CONFIG1_TEN_COUNT_SHIFT;
->> +       val |= SENSOR_CONFIG1_TEMP_ENABLE;
->> +       writel(val, base + SENSOR_CONFIG1);
->> +
->> +       writel(calib, base + SENSOR_CONFIG2);
->> +
->> +       return 0;
->> +}
->> +
->> +static inline long translate_temp(u32 val)
->> +{
->
-> It would be kind to have a comment explaining the transformation.
-
-I will add one. This function converts a 16-bit value (I guess it should 
-take a u16) in what's called "soctherm temperature readback format" to 
-millicelsius.
-
->
->> +       long t;
->> +
->> +       t = ((val & 0xff00) >> 8) * 1000;
->> +       if (val & 0x80)
->> +               t += 500;
->> +       if (val & 0x01)
->> +               t *= -1;
->> +
->> +       return t;
->> +}
->> +
->> +static int tegra_thermctl_get_temp(void *data, long *out_temp)
->> +{
->> +       struct tegra_thermctl_zone *zone = data;
->> +       u32 val;
->> +
->> +       val = (readl(zone->temp_reg) >> zone->temp_shift) & 0xffff;
->> +       *out_temp = translate_temp(val);
->
-> Why the temp_shift is not part of the 'translate_temp' ?
-
-temp_reg contains two separate readings in the temperature readback 
-format, so I first shift to get the correct one, then convert it to 
-millicelsius.
-
->
->> +
->> +       return 0;
->> +}
->> +
->> +static struct of_device_id tegra_soctherm_of_match[] = {
->> +       { .compatible = "nvidia,tegra124-soctherm" },
->> +       { },
->> +};
->> +MODULE_DEVICE_TABLE(of, tegra_soctherm_of_match);
->> +
->> +static int thermctl_temp_offsets[] = {
->> +       SENSOR_TEMP1, SENSOR_TEMP2, SENSOR_TEMP1, SENSOR_TEMP2
->> +};
->> +
->> +static int thermctl_temp_shifts[] = {
->> +       16, 16, 0, 0
->> +};
->
-> I still missing why the two above cannot be part of
-> tegra_tsensor_configuration or tegra_tsensor. Would you mind
-> enlightining me?
-
-You can think of the tsensors as a hardware-level implementation detail. 
-There is no one-to-one mapping between the 4 thermctl zones and the 
-tsensors (clearly, as there are 8 tsensors). These registers 
-(SENSOR_TEMP1 and SENSOR_TEMP2) are related to the thermctl zones and 
-not tsensors, so it wouldn't make sense to have them described in the 
-tsensor data.
-
->...
-> --
-> Eduardo Bezerra Valentin
->
-
-Thanks for reviewing!
-
-Mikko
+diff --git a/drivers/watchdog/Kconfig b/drivers/watchdog/Kconfig
+index c845527b503a..8d5c9b33552a 100644
+--- a/drivers/watchdog/Kconfig
++++ b/drivers/watchdog/Kconfig
+@@ -87,6 +87,13 @@ config DA9055_WATCHDOG
+ 	  This driver can also be built as a module.  If so, the module
+ 	  will be called da9055_wdt.
+ 
++config DA9063_WATCHDOG
++	tristate "Dialog DA9063 Watchdog"
++	depends on MFD_DA9063
++	select WATCHDOG_CORE
++	help
++	  Support for the watchdog in the DA9063 PMIC.
++
+ config GPIO_WATCHDOG
+ 	tristate "Watchdog device controlled through GPIO-line"
+ 	depends on OF_GPIO
+diff --git a/drivers/watchdog/Makefile b/drivers/watchdog/Makefile
+index 7b8a91ed20e7..ce4a7632d863 100644
+--- a/drivers/watchdog/Makefile
++++ b/drivers/watchdog/Makefile
+@@ -172,6 +172,7 @@ obj-$(CONFIG_XEN_WDT) += xen_wdt.o
+ # Architecture Independent
+ obj-$(CONFIG_DA9052_WATCHDOG) += da9052_wdt.o
+ obj-$(CONFIG_DA9055_WATCHDOG) += da9055_wdt.o
++obj-$(CONFIG_DA9063_WATCHDOG) += da9063_wdt.o
+ obj-$(CONFIG_GPIO_WATCHDOG)	+= gpio_wdt.o
+ obj-$(CONFIG_WM831X_WATCHDOG) += wm831x_wdt.o
+ obj-$(CONFIG_WM8350_WATCHDOG) += wm8350_wdt.o
+diff --git a/drivers/watchdog/da9063_wdt.c b/drivers/watchdog/da9063_wdt.c
+new file mode 100644
+index 000000000000..befd6314f3f4
+--- /dev/null
++++ b/drivers/watchdog/da9063_wdt.c
+@@ -0,0 +1,226 @@
++/*
++ * Watchdog driver for DA9063 PMICs.
++ *
++ * Copyright(c) 2012 Dialog Semiconductor Ltd.
++ *
++ * Author: Mariusz Wojtasik <mariusz.wojtasik@diasemi.com>
++ *
++ * This program is free software; you can redistribute  it and/or modify it
++ * under  the terms of  the GNU General  Public License as published by the
++ * Free Software Foundation;  either version 2 of the  License, or (at your
++ * option) any later version.
++ */
++
++#include <linux/kernel.h>
++#include <linux/module.h>
++#include <linux/watchdog.h>
++#include <linux/platform_device.h>
++#include <linux/uaccess.h>
++#include <linux/slab.h>
++#include <linux/delay.h>
++#include <linux/mfd/da9063/registers.h>
++#include <linux/mfd/da9063/core.h>
++#include <linux/regmap.h>
++
++/*
++ * Watchdog selector to timeout in seconds.
++ *   0: WDT disabled;
++ *   others: timeout = 2048 ms * 2^(TWDSCALE-1).
++ */
++static const int wdt_timeout[] = { 0, 2, 4, 8, 16, 32, 65, 131 };
++#define DA9063_TWDSCALE_DISABLE		0
++#define DA9063_TWDSCALE_MIN		1
++#define DA9063_TWDSCALE_MAX		(ARRAY_SIZE(wdt_timeout) - 1)
++#define DA9063_WDT_MIN_TIMEOUT		wdt_timeout[DA9063_TWDSCALE_MIN]
++#define DA9063_WDT_MAX_TIMEOUT		wdt_timeout[DA9063_TWDSCALE_MAX]
++#define DA9063_WDG_TIMEOUT		wdt_timeout[3]
++
++struct da9063_watchdog {
++	struct da9063 *da9063;
++	struct watchdog_device *wdtdev;
++	struct mutex lock;
++};
++
++static int da9063_wdt_timeout_to_sel(int secs)
++{
++	int i;
++
++	for (i = DA9063_TWDSCALE_MIN; i <= DA9063_TWDSCALE_MAX; i++) {
++		if (wdt_timeout[i] >= secs)
++			return i;
++	}
++
++	return 0;
++}
++
++static int da9063_wdt_disable(struct da9063 *da9063)
++{
++	return regmap_update_bits(da9063->regmap, DA9063_REG_CONTROL_D,
++			DA9063_TWDSCALE_MASK,
++			DA9063_TWDSCALE_DISABLE << DA9063_TWDSCALE_SHIFT);
++}
++
++static int _da9063_wdt_set_timeout(struct da9063 *da9063, unsigned int regval)
++{
++	if (regval < DA9063_TWDSCALE_MIN || regval > DA9063_TWDSCALE_MAX)
++		return -EINVAL;
++
++	return regmap_update_bits(da9063->regmap, DA9063_REG_CONTROL_D,
++			DA9063_TWDSCALE_MASK, regval << DA9063_TWDSCALE_SHIFT);
++}
++
++static int _da9063_wdt_kick(struct da9063 *da9063)
++{
++	return regmap_write(da9063->regmap, DA9063_REG_CONTROL_F,
++			DA9063_WATCHDOG);
++}
++
++static int da9063_wdt_start(struct watchdog_device *wdd)
++{
++	struct da9063_watchdog *wdt = watchdog_get_drvdata(wdd);
++	unsigned int selector;
++	int ret = 0;
++
++	mutex_lock(&wdt->lock);
++	selector = da9063_wdt_timeout_to_sel(wdt->wdtdev->timeout);
++	ret = _da9063_wdt_set_timeout(wdt->da9063, selector);
++	if (ret) {
++		dev_err(wdt->da9063->dev, "Watchdog failed to start (err = %d)\n",
++				ret);
++	}
++	mutex_unlock(&wdt->lock);
++
++	return ret;
++}
++
++static int da9063_wdt_stop(struct watchdog_device *wdd)
++{
++	struct da9063_watchdog *wdt = watchdog_get_drvdata(wdd);
++	int ret = 0;
++
++	mutex_lock(&wdt->lock);
++	ret = da9063_wdt_disable(wdt->da9063);
++	if (ret)
++		dev_alert(wdt->da9063->dev,
++			  "Watchdog failed to stop (err = %d)\n", ret);
++	mutex_unlock(&wdt->lock);
++
++	return ret;
++}
++
++static int da9063_wdt_ping(struct watchdog_device *wdd)
++{
++	struct da9063_watchdog *wdt = watchdog_get_drvdata(wdd);
++	int ret = 0;
++
++	mutex_lock(&wdt->lock);
++	ret = _da9063_wdt_kick(wdt->da9063);
++	if (ret)
++		dev_alert(wdt->da9063->dev, "Failed to ping the watchdog (err = %d)\n",
++				ret);
++	mutex_unlock(&wdt->lock);
++
++	return ret;
++}
++
++static int da9063_wdt_set_timeout(struct watchdog_device *wdd,
++							unsigned int timeout)
++{
++	struct da9063_watchdog *wdt = watchdog_get_drvdata(wdd);
++	unsigned int selector;
++	int ret;
++
++	selector = da9063_wdt_timeout_to_sel(timeout);
++	if (selector == 0) {
++		dev_err(wdt->da9063->dev, "Unsupported watchdog timeout (select from: 2, 4, 8, 16, 32, 65, 131)\n");
++		return -EINVAL;
++	}
++
++	mutex_lock(&wdt->lock);
++
++	ret = _da9063_wdt_set_timeout(wdt->da9063, selector);
++	if (ret)
++		dev_err(wdt->da9063->dev, "Failed to set watchdog timeout (err = %d)\n",
++				ret);
++	else
++		wdd->timeout = wdt_timeout[selector];
++
++	mutex_unlock(&wdt->lock);
++
++	return ret;
++}
++
++static const struct watchdog_info da9063_watchdog_info = {
++	.options = WDIOF_SETTIMEOUT | WDIOF_KEEPALIVEPING,
++	.identity = "DA9063 Watchdog",
++};
++
++static const struct watchdog_ops da9063_watchdog_ops = {
++	.owner = THIS_MODULE,
++	.start = da9063_wdt_start,
++	.stop = da9063_wdt_stop,
++	.ping = da9063_wdt_ping,
++	.set_timeout = da9063_wdt_set_timeout,
++};
++
++static struct watchdog_device da9063_watchdog_device = {
++	.info = &da9063_watchdog_info,
++	.ops = &da9063_watchdog_ops,
++};
++
++static int da9063_wdt_probe(struct platform_device *pdev)
++{
++	int ret;
++	struct da9063 *da9063 = dev_get_drvdata(pdev->dev.parent);
++	struct da9063_watchdog *wdt;
++
++	if (!da9063)
++		return -EPROBE_DEFER;
++
++	wdt = devm_kzalloc(&pdev->dev, sizeof(*wdt), GFP_KERNEL);
++	if (!wdt)
++		return -ENOMEM;
++
++	wdt->da9063 = da9063;
++	wdt->wdtdev = &da9063_watchdog_device;
++	mutex_init(&wdt->lock);
++
++	if (IS_ENABLED(CONFIG_WATCHDOG_NOWAYOUT))
++		set_bit(WDOG_NO_WAY_OUT, &wdt->wdtdev->status);
++
++	wdt->wdtdev->min_timeout = DA9063_WDT_MIN_TIMEOUT;
++	wdt->wdtdev->max_timeout = DA9063_WDT_MAX_TIMEOUT;
++	wdt->wdtdev->timeout = DA9063_WDG_TIMEOUT;
++
++	ret = watchdog_register_device(wdt->wdtdev);
++	if (ret) {
++		dev_err(da9063->dev, "da9063-watchdog registration failed (err = %d)",
++				ret);
++		return ret;
++	}
++
++	watchdog_set_drvdata(wdt->wdtdev, wdt);
++
++	return 0;
++}
++
++static int da9063_wdt_remove(struct platform_device *pdev)
++{
++	watchdog_unregister_device(&da9063_watchdog_device);
++
++	return 0;
++}
++
++static struct platform_driver da9063_wdt_driver = {
++	.probe = da9063_wdt_probe,
++	.remove = da9063_wdt_remove,
++	.driver = {
++		.name = DA9063_DRVNAME_WATCHDOG,
++	},
++};
++module_platform_driver(da9063_wdt_driver);
++
++MODULE_AUTHOR("Mariusz Wojtasik <mariusz.wojtasik@diasemi.com>");
++MODULE_DESCRIPTION("Watchdog driver for Dialog DA9063");
++MODULE_LICENSE("GPL");
++MODULE_ALIAS("platform:" DA9063_DRVNAME_WATCHDOG);
+diff --git a/include/linux/mfd/da9063/registers.h b/include/linux/mfd/da9063/registers.h
+index 09a85c699da1..e11a66894afc 100644
+--- a/include/linux/mfd/da9063/registers.h
++++ b/include/linux/mfd/da9063/registers.h
+@@ -431,6 +431,7 @@
+ 
+ /* DA9063_REG_CONTROL_D (addr=0x11) */
+ #define	DA9063_TWDSCALE_MASK			0x07
++#define	DA9063_TWDSCALE_SHIFT			0x00
+ #define	DA9063_BLINK_FRQ_MASK			0x38
+ #define		DA9063_BLINK_FRQ_OFF		0x00
+ #define		DA9063_BLINK_FRQ_1S0		0x08
+-- 
+2.0.1
