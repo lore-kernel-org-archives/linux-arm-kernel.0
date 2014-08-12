@@ -1,66 +1,144 @@
 From: wangyijing@huawei.com (Yijing Wang)
-Date: Tue, 12 Aug 2014 15:25:53 +0800
-Subject: [RFC PATCH 00/20] Use msi_chip to configure MSI/MSI-X in all platforms
-Message-ID: <1407828373-24322-1-git-send-email-wangyijing@huawei.com>
+Date: Tue, 12 Aug 2014 15:25:58 +0800
+Subject: [RFC PATCH 05/20] MSI: Refactor struct msi_chip to become more common
+In-Reply-To: <1407828373-24322-1-git-send-email-wangyijing@huawei.com>
+References: <1407828373-24322-1-git-send-email-wangyijing@huawei.com>
+Message-ID: <1407828373-24322-6-git-send-email-wangyijing@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This series is mainly to use msi_chip instead of currently weak arch functions
-across all platforms. Also clean up current MSI code and make drivers support
-MSI easier.  
+Now there are a lot of __weak arch functions in MSI code.
+These functions make MSI driver complex, It's time to
+refactor it. Add .restore_irq(), .setup_irqs(), .teardown_irqs()
+to make msi_chip common across all platforms.
+Also replace the argument "struct pci_dev" with "struct device"
+to support future Non-PCI MSI device.
 
-Yijing Wang (20):
-  x86/xen/MSI: Eliminate arch_msix_mask_irq() and arch_msi_mask_irq()
-  MSI: Clean up struct msi_chip argument
-  PCI/MSI: Remove useless bus->msi assignment
-  MSI: Remove the redundant irq_set_chip_data()
-  MSI: Refactor struct msi_chip to become more common
-  PCI/MSI: Introduce arch_get_match_msi_chip() to find the match
-    msi_chip
-  x86/MSI: Use msi_chip instead of arch func to configure MSI/MSI-X
-  x86/xen/MSI: Use msi_chip instead of arch func to configure MSI/MSI-X
-  irq_remapping/MSI: Use msi_chip instead of arch func to configure
-    MSI/MSI-X
-  x86/MSI: Remove unused MSI weak arch functions
-  MIPS/Octeon/MSI: Use msi_chip instead of arch func to configure
-    MSI/MSI-X
-  MIPS/Xlp/MSI: Use msi_chip instead of arch func to configure
-    MSI/MSI-X
-  MIPS/xlr/MSI: Use msi_chip instead of arch func to configure
-    MSI/MSI-X
-  Powerpc/MSI: Use msi_chip instead of arch func to configure MSI/MSI-X
-  s390/MSI: Use msi_chip instead of arch func to configure MSI/MSI-X
-  arm/iop13xx/MSI: Use msi_chip instead of arch func to configure
-    MSI/MSI-X
-  IA64/MSI: Use msi_chip instead of arch func to configure MSI/MSI-X
-  Sparc/MSI: Use msi_chip instead of arch func to configure MSI/MSI-X
-  tile/MSI: Use msi_chip instead of arch func to configure MSI/MSI-X
-  PCI/MSI: Clean up unused MSI arch functions
+Signed-off-by: Yijing Wang <wangyijing@huawei.com>
+CC: Thierry Reding <thierry.reding@avionic-design.de>
+CC: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
+---
+ drivers/irqchip/irq-armada-370-xp.c |    4 ++--
+ drivers/pci/host/pci-tegra.c        |    3 ++-
+ drivers/pci/host/pcie-designware.c  |    4 ++--
+ drivers/pci/host/pcie-rcar.c        |    3 ++-
+ drivers/pci/msi.c                   |    4 ++--
+ include/linux/msi.h                 |    7 +++++--
+ 6 files changed, 15 insertions(+), 10 deletions(-)
 
- arch/arm/mach-iop13xx/include/mach/pci.h |    2 +
- arch/arm/mach-iop13xx/iq81340mc.c        |    1 +
- arch/arm/mach-iop13xx/iq81340sc.c        |    1 +
- arch/arm/mach-iop13xx/msi.c              |   14 +++-
- arch/arm/mach-iop13xx/pci.c              |    6 ++
- arch/ia64/kernel/msi_ia64.c              |   18 +++-
- arch/mips/pci/msi-octeon.c               |   45 ++++------
- arch/mips/pci/msi-xlp.c                  |   15 +++-
- arch/mips/pci/pci-xlr.c                  |   19 +++-
- arch/powerpc/kernel/msi.c                |   23 ++++--
- arch/s390/pci/pci.c                      |   16 +++-
- arch/sparc/kernel/pci.c                  |   18 +++-
- arch/tile/kernel/pci_gx.c                |   20 +++-
- arch/x86/include/asm/pci.h               |    4 +-
- arch/x86/include/asm/x86_init.h          |    3 -
- arch/x86/kernel/apic/io_apic.c           |   35 +++++++-
- arch/x86/kernel/x86_init.c               |   34 -------
- arch/x86/pci/xen.c                       |  139 ++++++++++++++++--------------
- drivers/iommu/irq_remapping.c            |   13 ++-
- drivers/irqchip/irq-armada-370-xp.c      |   12 +--
- drivers/pci/host/pci-tegra.c             |    9 ++-
- drivers/pci/host/pcie-designware.c       |    6 +-
- drivers/pci/host/pcie-rcar.c             |    9 ++-
- drivers/pci/msi.c                        |  118 ++++++++++++--------------
- drivers/pci/probe.c                      |    1 -
- include/linux/msi.h                      |   13 ++--
- 26 files changed, 338 insertions(+), 256 deletions(-)
+diff --git a/drivers/irqchip/irq-armada-370-xp.c b/drivers/irqchip/irq-armada-370-xp.c
+index ee1f0ba..3761e52 100644
+--- a/drivers/irqchip/irq-armada-370-xp.c
++++ b/drivers/irqchip/irq-armada-370-xp.c
+@@ -129,7 +129,7 @@ static void armada_370_xp_free_msi(int hwirq)
+ 	mutex_unlock(&msi_used_lock);
+ }
+ 
+-static int armada_370_xp_setup_msi_irq(struct pci_dev *pdev, 
++static int armada_370_xp_setup_msi_irq(struct device *dev,
+ 		struct msi_desc *desc)
+ {
+ 	struct msi_msg msg;
+@@ -164,7 +164,7 @@ static void armada_370_xp_teardown_msi_irq(unsigned int irq)
+ 	armada_370_xp_free_msi(hwirq);
+ }
+ 
+-static int armada_370_xp_check_msi_device(struct pci_dev *dev, 
++static int armada_370_xp_check_msi_device(struct device *dev,
+ 		int nvec, int type)
+ {
+ 	/* We support MSI, but not MSI-X */
+diff --git a/drivers/pci/host/pci-tegra.c b/drivers/pci/host/pci-tegra.c
+index 3872bc0..a2fa0ec 100644
+--- a/drivers/pci/host/pci-tegra.c
++++ b/drivers/pci/host/pci-tegra.c
+@@ -1192,9 +1192,10 @@ static irqreturn_t tegra_pcie_msi_irq(int irq, void *data)
+ 	return processed > 0 ? IRQ_HANDLED : IRQ_NONE;
+ }
+ 
+-static int tegra_msi_setup_irq(struct pci_dev *pdev,
++static int tegra_msi_setup_irq(struct device *dev,
+ 			       struct msi_desc *desc)
+ {
++	struct pci_dev *pdev = to_pci_dev(dev);
+ 	struct msi_chip *chip = pdev->bus->msi;
+ 	struct tegra_msi *msi = to_tegra_msi(chip);
+ 	struct msi_msg msg;
+diff --git a/drivers/pci/host/pcie-designware.c b/drivers/pci/host/pcie-designware.c
+index 2204456..9c3816d 100644
+--- a/drivers/pci/host/pcie-designware.c
++++ b/drivers/pci/host/pcie-designware.c
+@@ -342,12 +342,12 @@ static void clear_irq(unsigned int irq)
+ 	msi->msi_attrib.multiple = 0;
+ }
+ 
+-static int dw_msi_setup_irq(struct pci_dev *pdev,
+-			struct msi_desc *desc)
++static int dw_msi_setup_irq(struct device *dev, struct msi_desc *desc)
+ {
+ 	int irq, pos, msgvec;
+ 	u16 msg_ctr;
+ 	struct msi_msg msg;
++	struct pci_dev *pdev = to_pci_dev(dev);
+ 	struct pcie_port *pp = sys_to_pcie(pdev->bus->sysdata);
+ 
+ 	if (!pp) {
+diff --git a/drivers/pci/host/pcie-rcar.c b/drivers/pci/host/pcie-rcar.c
+index 647bc9f..fa33432 100644
+--- a/drivers/pci/host/pcie-rcar.c
++++ b/drivers/pci/host/pcie-rcar.c
+@@ -615,9 +615,10 @@ static irqreturn_t rcar_pcie_msi_irq(int irq, void *data)
+ 	return IRQ_HANDLED;
+ }
+ 
+-static int rcar_msi_setup_irq(struct pci_dev *pdev,
++static int rcar_msi_setup_irq(struct device *dev,
+ 			      struct msi_desc *desc)
+ {
++	struct pci_dev *pdev = to_pci_dev(dev);
+ 	struct msi_chip *chip = pdev->bus->msi;
+ 	struct rcar_msi *msi = to_rcar_msi(chip);
+ 	struct rcar_pcie *pcie = container_of(chip, struct rcar_pcie, msi.chip);
+diff --git a/drivers/pci/msi.c b/drivers/pci/msi.c
+index 242d775..7b7abe9 100644
+--- a/drivers/pci/msi.c
++++ b/drivers/pci/msi.c
+@@ -37,7 +37,7 @@ int __weak arch_setup_msi_irq(struct pci_dev *dev, struct msi_desc *desc)
+ 	if (!chip || !chip->setup_irq)
+ 		return -EINVAL;
+ 
+-	err = chip->setup_irq(dev, desc);
++	err = chip->setup_irq(&dev->dev, desc);
+ 	if (err < 0)
+ 		return err;
+ 
+@@ -61,7 +61,7 @@ int __weak arch_msi_check_device(struct pci_dev *dev, int nvec, int type)
+ 	if (!chip || !chip->check_device)
+ 		return 0;
+ 
+-	return chip->check_device(dev, nvec, type);
++	return chip->check_device(&dev->dev, nvec, type);
+ }
+ 
+ int __weak arch_setup_msi_irqs(struct pci_dev *dev, int nvec, int type)
+diff --git a/include/linux/msi.h b/include/linux/msi.h
+index a510d25..2068d25 100644
+--- a/include/linux/msi.h
++++ b/include/linux/msi.h
+@@ -72,9 +72,12 @@ struct msi_chip {
+ 	struct device_node *of_node;
+ 	struct list_head list;
+ 
+-	int (*setup_irq)(struct pci_dev *dev, struct msi_desc *desc);
++	int (*check_device)(struct device *dev, int nvec, int type);
++	int (*setup_irq)(struct device *dev, struct msi_desc *desc);
++	int (*setup_irqs)(struct device *dev, int nvec, int type);
+ 	void (*teardown_irq)(unsigned int irq);
+-	int (*check_device)(struct pci_dev *dev, int nvec, int type);
++	void (*teardown_irqs)(struct device *dev);
++	void (*restore_irqs)(struct device *dev);
+ };
+ 
+ #endif /* LINUX_MSI_H */
+-- 
+1.7.1
