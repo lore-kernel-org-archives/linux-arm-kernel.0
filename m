@@ -1,81 +1,101 @@
 From: dyoung@redhat.com (Dave Young)
-Date: Tue, 12 Aug 2014 14:10:18 +0800
-Subject: [PATCH 1/5] efi: move noefi early param code out of x86 arch code
-Message-ID: <1407823822-23829-1-git-send-email-dyoung@redhat.com>
+Date: Tue, 12 Aug 2014 14:10:19 +0800
+Subject: [PATCH 2/5] efi: add kernel param efi=noruntime
+In-Reply-To: <1407823822-23829-1-git-send-email-dyoung@redhat.com>
+References: <1407823822-23829-1-git-send-email-dyoung@redhat.com>
+Message-ID: <1407823822-23829-2-git-send-email-dyoung@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-noefi param can be used for arches other than X86 later, thus move it out of
-x86 platform code.
+noefi kernel param means actually disabling efi runtime, Per suggestion from
+Leif Lindholm efi=noruntime should be better. But since noefi is already used
+in X86 thus just adding another param efi=noruntime for same purpose.
 
 Signed-off-by: Dave Young <dyoung@redhat.com>
 ---
- arch/x86/platform/efi/efi.c | 10 +---------
- drivers/firmware/efi/efi.c  | 13 +++++++++++++
- include/linux/efi.h         |  1 +
- 3 files changed, 15 insertions(+), 9 deletions(-)
+ Documentation/kernel-parameters.txt |  4 +++-
+ arch/x86/platform/efi/efi.c         | 12 ------------
+ drivers/firmware/efi/efi.c          | 22 ++++++++++++++++++++++
+ 3 files changed, 25 insertions(+), 13 deletions(-)
 
+diff --git a/Documentation/kernel-parameters.txt b/Documentation/kernel-parameters.txt
+index a8eb6af..09d8c54 100644
+--- a/Documentation/kernel-parameters.txt
++++ b/Documentation/kernel-parameters.txt
+@@ -992,11 +992,13 @@ bytes respectively. Such letter suffixes can also be entirely omitted.
+ 			Format: {"off" | "on" | "skip[mbr]"}
+ 
+ 	efi=		[EFI]
+-			Format: { "old_map" }
++			Format: { "old_map" | "noruntime" }
+ 			old_map [X86-64]: switch to the old ioremap-based EFI
+ 			runtime services mapping. 32-bit still uses this one by
+ 			default.
+ 
++			noruntime : disable EFI runtime services support
++
+ 	efi_no_storage_paranoia [EFI; X86]
+ 			Using this parameter you can use more than 50% of
+ 			your efi variable storage. Use this parameter only if
 diff --git a/arch/x86/platform/efi/efi.c b/arch/x86/platform/efi/efi.c
-index 850da94..dd7aaa1 100644
+index dd7aaa1..eae91be 100644
 --- a/arch/x86/platform/efi/efi.c
 +++ b/arch/x86/platform/efi/efi.c
-@@ -70,14 +70,6 @@ static efi_config_table_type_t arch_tables[] __initdata = {
- 
- u64 efi_setup;		/* efi setup_data physical address */
- 
--static bool disable_runtime __initdata = false;
--static int __init setup_noefi(char *arg)
+@@ -929,15 +929,3 @@ u64 efi_mem_attributes(unsigned long phys_addr)
+ 	}
+ 	return 0;
+ }
+-
+-static int __init parse_efi_cmdline(char *str)
 -{
--	disable_runtime = true;
+-	if (*str == '=')
+-		str++;
+-
+-	if (!strncmp(str, "old_map", 7))
+-		set_bit(EFI_OLD_MEMMAP, &efi.flags);
+-
 -	return 0;
 -}
--early_param("noefi", setup_noefi);
--
- int add_efi_memmap;
- EXPORT_SYMBOL(add_efi_memmap);
- 
-@@ -492,7 +484,7 @@ void __init efi_init(void)
- 	if (!efi_runtime_supported())
- 		pr_info("No EFI runtime due to 32/64-bit mismatch with kernel\n");
- 	else {
--		if (disable_runtime || efi_runtime_init())
-+		if (efi_runtime_disabled() || efi_runtime_init())
- 			return;
- 	}
- 	if (efi_memmap_init())
+-early_param("efi", parse_efi_cmdline);
 diff --git a/drivers/firmware/efi/efi.c b/drivers/firmware/efi/efi.c
-index 64ecbb5..c8f01a7 100644
+index c8f01a7..f3ec3f2 100644
 --- a/drivers/firmware/efi/efi.c
 +++ b/drivers/firmware/efi/efi.c
-@@ -41,6 +41,19 @@ struct efi __read_mostly efi = {
- };
- EXPORT_SYMBOL(efi);
+@@ -24,6 +24,7 @@
+ #include <linux/of_fdt.h>
+ #include <linux/io.h>
+ #include <linux/platform_device.h>
++#include <asm/efi.h>
  
-+static bool disable_runtime;
-+static int __init setup_noefi(char *arg)
+ struct efi __read_mostly efi = {
+ 	.mps        = EFI_INVALID_TABLE_ADDR,
+@@ -54,6 +55,27 @@ bool efi_runtime_disabled(void)
+ 	return disable_runtime;
+ }
+ 
++static int __init parse_efi_cmdline(char *str)
 +{
-+	disable_runtime = true;
++	if (*str == '=')
++		str++;
++
++#ifdef CONFIG_X86
++	if (!strncmp(str, "old_map", 7)) {
++		set_bit(EFI_OLD_MEMMAP, &efi.flags);
++		goto out;
++	}
++#endif
++	if (!strncmp(str, "noruntime", 9)) {
++		disable_runtime = true;
++		goto out;
++	}
++
++out:
 +	return 0;
 +}
-+early_param("noefi", setup_noefi);
-+
-+bool efi_runtime_disabled(void)
-+{
-+	return disable_runtime;
-+}
++early_param("efi", parse_efi_cmdline);
 +
  static struct kobject *efi_kobj;
  static struct kobject *efivars_kobj;
  
-diff --git a/include/linux/efi.h b/include/linux/efi.h
-index 45cb4ff..06d7c03 100644
---- a/include/linux/efi.h
-+++ b/include/linux/efi.h
-@@ -1227,4 +1227,5 @@ efi_status_t handle_cmdline_files(efi_system_table_t *sys_table_arg,
- 				  unsigned long *load_addr,
- 				  unsigned long *load_size);
- 
-+bool efi_runtime_disabled(void);
- #endif /* _LINUX_EFI_H */
 -- 
 1.8.3.1
