@@ -1,159 +1,82 @@
-From: achandran@mvista.com (Arun Chandran)
-Date: Tue, 12 Aug 2014 18:12:45 +0530
-Subject: [PATCH] Arm64: convert soft_restart() to assembly code
-Message-ID: <1407847365-10873-1-git-send-email-achandran@mvista.com>
+From: wangnan0@huawei.com (Wang Nan)
+Date: Tue, 12 Aug 2014 21:03:02 +0800
+Subject: [PATCH v4] kprobes: arm: enable OPTPROBES for ARM 32
+In-Reply-To: <1407819388-52145-1-git-send-email-wangnan0@huawei.com>
+References: <1407819388-52145-1-git-send-email-wangnan0@huawei.com>
+Message-ID: <53EA1086.4010606@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-soft_restart() will fail on arm64 systems that does not
-quarantee the flushing of cache to PoC with flush_cache_all().
+Hi Masami and everyone,
 
-soft_restart(addr)
-{
-	push_to_stack(addr);
+When checking my code I found a problem: if we replace a stack operatinon instruction,
+it is possible that the emulate execution of such instruction destroy the stack used
+by kprobeopt:
 
-	Do mm setup for restart;
-	Flush&turnoff D-cache;
+> +
+> +asm (
+> +			".global optprobe_template_entry\n"
+> +			"optprobe_template_entry:\n"
+> +			"	sub	sp, sp, #80\n"
+> +			"	stmia	sp, {r0 - r14} \n"
 
-	pop_from_stack(addr); --> fails here as addr is not at PoC
-	cpu_reset(addr) --> Jumps to invalid address
-}
+Here, trampoline code sub sp with 80 (0x50, I choose this number without much thinking), and then
+use stmia to push r0 - r14 (registers except pc) onto the stack. Assume the original sp is
+0xd0000050, the stack becomes:
 
-So convert the whole code to assembly to make sure that addr
-is not pushed to stack.
+0xd0000000: r0
+0xd0000004: r1
+0xd0000008: r2
+...
+0xd0000038: r14
+0xd000003c: r15 (place holder)
+0xd0000040: cpsr (place holder)
+0xd0000044: ?
+0xd0000048: ?
+0xd000004c: ?
+0xd0000050: original stack
 
-Signed-off-by: Arun Chandran <achandran@mvista.com>
----
- arch/arm64/include/asm/proc-fns.h    |    1 +
- arch/arm64/include/asm/system_misc.h |    1 -
- arch/arm64/kernel/process.c          |   38 ++--------------------------------
- arch/arm64/mm/proc.S                 |   34 ++++++++++++++++++++++++++++++
- 4 files changed, 37 insertions(+), 37 deletions(-)
+If the replaced code operates stack, for example, push {r0 - r10}, it will overwrite our register.
+For that reason, sub sp, #80 is not enough, we need at least 64 bytes stack space, so the first instruction
+here should be sub sp, #128.
 
-diff --git a/arch/arm64/include/asm/proc-fns.h b/arch/arm64/include/asm/proc-fns.h
-index 0c657bb..e18d5d0 100644
---- a/arch/arm64/include/asm/proc-fns.h
-+++ b/arch/arm64/include/asm/proc-fns.h
-@@ -32,6 +32,7 @@ extern void cpu_cache_off(void);
- extern void cpu_do_idle(void);
- extern void cpu_do_switch_mm(unsigned long pgd_phys, struct mm_struct *mm);
- extern void cpu_reset(unsigned long addr) __attribute__((noreturn));
-+extern void cpu_soft_restart(unsigned long addr) __attribute__((noreturn));
- extern void cpu_do_suspend(struct cpu_suspend_ctx *ptr);
- extern u64 cpu_do_resume(phys_addr_t ptr, u64 idmap_ttbr);
- 
-diff --git a/arch/arm64/include/asm/system_misc.h b/arch/arm64/include/asm/system_misc.h
-index 7a18fab..659fbf5 100644
---- a/arch/arm64/include/asm/system_misc.h
-+++ b/arch/arm64/include/asm/system_misc.h
-@@ -41,7 +41,6 @@ struct mm_struct;
- extern void show_pte(struct mm_struct *mm, unsigned long addr);
- extern void __show_regs(struct pt_regs *);
- 
--void soft_restart(unsigned long);
- extern void (*arm_pm_restart)(enum reboot_mode reboot_mode, const char *cmd);
- 
- #define UDBG_UNDEFINED	(1 << 0)
-diff --git a/arch/arm64/kernel/process.c b/arch/arm64/kernel/process.c
-index 1309d64..3ca1ade 100644
---- a/arch/arm64/kernel/process.c
-+++ b/arch/arm64/kernel/process.c
-@@ -57,40 +57,6 @@ unsigned long __stack_chk_guard __read_mostly;
- EXPORT_SYMBOL(__stack_chk_guard);
- #endif
- 
--static void setup_restart(void)
--{
--	/*
--	 * Tell the mm system that we are going to reboot -
--	 * we may need it to insert some 1:1 mappings so that
--	 * soft boot works.
--	 */
--	setup_mm_for_reboot();
--
--	/* Clean and invalidate caches */
--	flush_cache_all();
--
--	/* Turn D-cache off */
--	cpu_cache_off();
--
--	/* Push out any further dirty data, and ensure cache is empty */
--	flush_cache_all();
--}
--
--void soft_restart(unsigned long addr)
--{
--	typedef void (*phys_reset_t)(unsigned long);
--	phys_reset_t phys_reset;
--
--	setup_restart();
--
--	/* Switch to the identity mapping */
--	phys_reset = (phys_reset_t)virt_to_phys(cpu_reset);
--	phys_reset(addr);
--
--	/* Should never get here */
--	BUG();
--}
--
- /*
-  * Function pointers to optional machine specific functions
-  */
-@@ -162,8 +128,8 @@ void machine_power_off(void)
- 
- /*
-  * Restart requires that the secondary CPUs stop performing any activity
-- * while the primary CPU resets the system. Systems with a single CPU can
-- * use soft_restart() as their machine descriptor's .restart hook, since that
-+ * while the primary CPU resets the system. Systems with a single CPU can use
-+ * cpu_soft_restart() as their machine descriptor's .restart hook, since that
-  * will cause the only available CPU to reset. Systems with multiple CPUs must
-  * provide a HW restart implementation, to ensure that all CPUs reset@once.
-  * This is required so that any code running after reset on the primary CPU
-diff --git a/arch/arm64/mm/proc.S b/arch/arm64/mm/proc.S
-index 7736779..a7c3fce 100644
---- a/arch/arm64/mm/proc.S
-+++ b/arch/arm64/mm/proc.S
-@@ -76,6 +76,40 @@ ENTRY(cpu_reset)
- 	ret	x0
- ENDPROC(cpu_reset)
- 
-+	.align 3
-+1:	.quad	memstart_addr
-+
-+ENTRY(cpu_soft_restart)
-+	adr	x1, cpu_reset
-+	adr	x2, 1b
-+
-+	/* virt_to_phys(cpu_reset) */
-+	ldr	x3, [x2]
-+	ldr	x3, [x3]
-+	mov	x4, #1
-+	lsl	x4, x4, #(VA_BITS - 1)
-+	add	x1, x1, x4
-+	add	x1, x1, x3
-+
-+	/* Save it; We can't use stack as it is going to run with caches OFF */
-+	mov	x19, x0
-+	mov	x20, x1
-+
-+	bl	setup_mm_for_reboot
-+
-+	bl	flush_cache_all
-+	/* Turn D-cache off */
-+	bl	cpu_cache_off
-+	/* Push out any further dirty data, and ensure cache is empty */
-+	bl	flush_cache_all
-+
-+	mov	x0, x19
-+
-+	br	x20
-+	/* It should never come back */
-+	bl	panic
-+ENDPROC(cpu_soft_restart)
-+
- /*
-  *	cpu_do_idle()
-  *
--- 
-1.7.9.5
+However, it increase stack requirement. Moreover, although rare, there may be sp relative addressing,
+such as: str r1, [sp, #-132].
+
+To make every situations safe, do you think we need to alloc a pre-cpu optprobe private stack?
+
+For example:
+
+str sp, [pc, #??]     (store original sp first)
+ldr sp, [pc, #??]     (load pre-cpu stack)
+sub sp, #68
+stmia	sp, {r0 - r12}
+...                   (fix sp and pc in stack)
+ldmia   sp, {r0 - r15}
+optprobe_template_sp:
+1: .long 0          (placeholder for saved sp)
+optprobe_template_private_stack:
+2: .long 0          (placeholder for per-cpu private stack)
+optprobe_template_pc:
+3: .long 0          (placeholder for pc)
+
+> +			"	add	r3, sp, #80\n"
+> +			"	str	r3, [sp, #52]\n"
+> +			"	mrs	r4, cpsr\n"
+> +			"	str	r4, [sp, #64]\n"
+> +			"	mov	r1, sp\n"
+> +			"	ldr	r0, 1f\n"
+> +			"	ldr	r2, 2f\n"
+> +			"	blx	r2\n"
+> +			"	ldr	r1, [sp, #64]\n"
+> +			"	msr	cpsr_fs, r1\n"
+> +			"	ldmia	sp, {r0 - r15}\n"
+> +			".global optprobe_template_val\n"
+> +			"optprobe_template_val:\n"
+> +			"1:	.long 0\n"
+> +			".global optprobe_template_call\n"
+> +			"optprobe_template_call:\n"
+> +			"2:	.long 0\n"
+> +			".global optprobe_template_end\n"
+> +			"optprobe_template_end:\n");
+> +
