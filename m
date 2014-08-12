@@ -1,19 +1,54 @@
-From: festevam@gmail.com (Fabio Estevam)
-Date: Tue, 12 Aug 2014 17:30:55 -0300
-Subject: Freescale: iMX6Q Sabre SD
-In-Reply-To: <CACUGKYNvj=WRz9gU84Qyo6CakTqU2MfegqPHxm9uYZd5s6o9Bg@mail.gmail.com>
-References: <CACUGKYM=jPGL+GB1=n9-UQPaphPv4ONQz3Fb5k9-5CA=Zx=1xw@mail.gmail.com>
- <CAOMZO5BJ6WS-OynZWJLE42pZbrvJ_nMM3qyndYVNsDYbBFWMmg@mail.gmail.com>
- <CAOMZO5BD5EE6ZpVCz0ST3j=hoXf4rk7PXOC3ZpWAHn_2nN8t7g@mail.gmail.com>
- <CACUGKYM-B18YKtbc1BE1=RvUwRTypt9iSwYgOmfXF7w2Yq_sBA@mail.gmail.com>
- <CACUGKYNvj=WRz9gU84Qyo6CakTqU2MfegqPHxm9uYZd5s6o9Bg@mail.gmail.com>
-Message-ID: <CAOMZO5CnkvBAo84yQZMW4OTeqxX-8D1ERj78=s5kbCK8ekUwdA@mail.gmail.com>
+From: daniel.lezcano@linaro.org (Daniel Lezcano)
+Date: Tue, 12 Aug 2014 22:49:12 +0200
+Subject: [PATCH v2 1/3] ARM: EXYNOS: Fix build with PM_SLEEP=n and
+ ARM_EXYNOS_CPUIDLE=n
+In-Reply-To: <1407856317-2457-2-git-send-email-b.zolnierkie@samsung.com>
+References: <1407856317-2457-1-git-send-email-b.zolnierkie@samsung.com>
+ <1407856317-2457-2-git-send-email-b.zolnierkie@samsung.com>
+Message-ID: <53EA7DC8.6040801@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Aug 12, 2014 at 5:18 PM, John Tobias <john.tobias.ph@gmail.com> wrote:
-> Hi Fabio,
+On 08/12/2014 05:11 PM, Bartlomiej Zolnierkiewicz wrote:
+> Fix building of exynos_defconfig with disabled CONFIG_PM_SLEEP by
+> adding checking whether Exynos cpuidle support is enabled before
+> accessing exynos_enter_aftr.
 >
-> After applying the patches, it works...
+> The build error message:
+> arch/arm/mach-exynos/built-in.o:(.data+0x74): undefined reference to `exynos_enter_aftr'
+> make: *** [vmlinux] Error 1
+ >
+> This patch has been tested on Exynos4210 based Origen board.
+>
+> Signed-off-by: Bartlomiej Zolnierkiewicz <b.zolnierkie@samsung.com>
+> Acked-by: Kyungmin Park <kyungmin.park@samsung.com>
+> ---
+>   arch/arm/mach-exynos/exynos.c | 2 ++
+>   1 file changed, 2 insertions(+)
+>
+> diff --git a/arch/arm/mach-exynos/exynos.c b/arch/arm/mach-exynos/exynos.c
+> index 6a24e11..d57f136 100644
+> --- a/arch/arm/mach-exynos/exynos.c
+> +++ b/arch/arm/mach-exynos/exynos.c
+> @@ -161,7 +161,9 @@ static void exynos_restart(enum reboot_mode mode, const char *cmd)
+>
+>   static struct platform_device exynos_cpuidle = {
+>   	.name              = "exynos_cpuidle",
+> +#ifdef CONFIG_ARM_EXYNOS_CPUIDLE
+>   	.dev.platform_data = exynos_enter_aftr,
+> +#endif
+>   	.id                = -1,
+>   };
 
-Excellent! Thanks for testing.
+This patch does not address the real issue of the compilation error. The 
+cpuidle driver needs the exynos_enter_aftr function in order to work 
+correctly. Hence the Makefile should be fixed in order to compile pm.o 
+if cpuidle or pm_sleep are set.
+
+
+-- 
+  <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
+
+Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
+<http://twitter.com/#!/linaroorg> Twitter |
+<http://www.linaro.org/linaro-blog/> Blog
