@@ -1,63 +1,69 @@
-From: masami.hiramatsu.pt@hitachi.com (Masami Hiramatsu)
-Date: Wed, 13 Aug 2014 00:12:55 +0900
-Subject: [PATCH v4] kprobes: arm: enable OPTPROBES for ARM 32
-In-Reply-To: <53EA1086.4010606@huawei.com>
-References: <1407819388-52145-1-git-send-email-wangnan0@huawei.com>
- <53EA1086.4010606@huawei.com>
-Message-ID: <53EA2EF7.9060209@hitachi.com>
+From: dianders@chromium.org (Doug Anderson)
+Date: Tue, 12 Aug 2014 08:13:41 -0700
+Subject: io-domain voltages as regulators?
+In-Reply-To: <CAPDyKFpiHf+urR85iJPqAXxREO+yPrDMcXM4K+BJqq=ur3DZtA@mail.gmail.com>
+References: <3923586.SsVg941346@diego>
+ <CACRpkdaJS0PUDLaCnrhtiuXPf4ccx51uNTqYWVWm47mhOhGEbA@mail.gmail.com>
+ <CAPDyKFpiHf+urR85iJPqAXxREO+yPrDMcXM4K+BJqq=ur3DZtA@mail.gmail.com>
+Message-ID: <CAD=FV=Vewr5QkNEiBEOXA=FdKHKzg0ag5+Cf4KXuXWjcshSq_g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-(2014/08/12 22:03), Wang Nan wrote:
-> Hi Masami and everyone,
-> 
-> When checking my code I found a problem: if we replace a stack operatinon instruction,
-> it is possible that the emulate execution of such instruction destroy the stack used
-> by kprobeopt:
-> 
->> +
->> +asm (
->> +			".global optprobe_template_entry\n"
->> +			"optprobe_template_entry:\n"
->> +			"	sub	sp, sp, #80\n"
->> +			"	stmia	sp, {r0 - r14} \n"
-> 
-> Here, trampoline code sub sp with 80 (0x50, I choose this number without much thinking), and then
-> use stmia to push r0 - r14 (registers except pc) onto the stack. Assume the original sp is
-> 0xd0000050, the stack becomes:
-> 
-> 0xd0000000: r0
-> 0xd0000004: r1
-> 0xd0000008: r2
-> ...
-> 0xd0000038: r14
-> 0xd000003c: r15 (place holder)
-> 0xd0000040: cpsr (place holder)
-> 0xd0000044: ?
-> 0xd0000048: ?
-> 0xd000004c: ?
-> 0xd0000050: original stack
-> 
-> If the replaced code operates stack, for example, push {r0 - r10}, it will overwrite our register.
-> For that reason, sub sp, #80 is not enough, we need at least 64 bytes stack space, so the first instruction
-> here should be sub sp, #128.
-> 
-> However, it increase stack requirement. Moreover, although rare, there may be sp relative addressing,
-> such as: str r1, [sp, #-132].
+Hi,
 
-Hmm, I see the increasing stack is clearly hard to emulate, but
-why is it hard to emulate sp relative instruction? It should
-access the memory under the stack pointer.
+On Mon, Aug 11, 2014 at 5:46 AM, Ulf Hansson <ulf.hansson@linaro.org> wrote:
+> On 11 August 2014 09:44, Linus Walleij <linus.walleij@linaro.org> wrote:
+>> On Mon, Aug 4, 2014 at 12:18 AM, Heiko St?bner <heiko@sntech.de> wrote:
+>>
+>> [Adding Ulf Hansson to this discussion...]
+>>
+>>> Hi Mark, Linus,
+>>>
+>>> I'd like to clarify what the appropriate way to handle pin output voltages is.
+>>> On the Rockchip SoCs the voltage for some groups of pins can be set between
+>>> 3.3V and 1.8V ... like the MMC/SD pins who need this to support UHS mode
+>>> cards.
+>>
+>> This is called "vqmmc" in the mmc/sd subsystem.
+>>
+>> grep for mmc_set_signal_voltage() in drivers/mmc/core/*
+>>
+>> In drivers/mmc/core/core.c, you find:
+>>
+>>  mmc->supply.vqmmc = devm_regulator_get_optional(dev, "vqmmc");
+>>
+>> Which gets the regulator to set the signal voltage, if such
+>> a regulator is specified for the host.
+>>
+>> Very simple and straight-forward, and handled by the MMC core.
+>>
+>>> In [0] when talking about something different, Linus Walleij described a
+>>> similar case as
+>>>
+>>> "I think we need to have a discussion with Mark Brown on how to
+>>> handle this.
+>>> We have previously had the case of MMC/SD level-shifters, where
+>>> a certain setting gives a certain level of signals out, and another setting
+>>> gives another level. Like two discrete levels.
+>>> So we modeled that as a regulator provider inside the pin control
+>>> driver eventually, see sh-pfc/pfc-sh73a0.c"
+>>>
+>>> As this sound like exactly the thing I'm trying to solve, is handling this via
+>>> a regulator the correct general way?
+>>
+>> Ithinkso.
+>
+> Just to confirm, I fully agree with the above said.
+>
+> You may also find a good example in the mmci host driver for how to
+> make use of the vqmmc regulator.
 
-> To make every situations safe, do you think we need to alloc a pre-cpu optprobe private stack?
+Yuvaraj also submitted patches for dw_mmc:
 
-Of course, that is one possible idea, but the simplest way is just not
-optimizing such instructions. Why not can_optimize() check that? ;)
+4401241 New          [1/3] mmc: dw_mmc: use mmc_regulator_get_supply
+to handle regulators
+4401261 New          [2/3] mmc: dw_mmc: Dont cut off vqmmc and vmmc
+4401281 New          [3/3] mmc: dw_mmc: Support voltage changes
 
-Thank you,
-
--- 
-Masami HIRAMATSU
-Software Platform Research Dept. Linux Technology Research Center
-Hitachi, Ltd., Yokohama Research Laboratory
-E-mail: masami.hiramatsu.pt at hitachi.com
+He seems to have dropped these patches on the floor and I had review
+feedback on them, but I think they're in the right direction.
