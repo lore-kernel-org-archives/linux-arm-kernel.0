@@ -1,55 +1,68 @@
 From: keescook@chromium.org (Kees Cook)
-Date: Tue, 12 Aug 2014 11:24:22 -0700
-Subject: [PATCH v3 0/7] arm: support CONFIG_RODATA
-Message-ID: <1407867869-5194-1-git-send-email-keescook@chromium.org>
+Date: Tue, 12 Aug 2014 11:24:26 -0700
+Subject: [PATCH v3 4/7] ARM: kexec: Make .text R/W in machine_kexec
+In-Reply-To: <1407867869-5194-1-git-send-email-keescook@chromium.org>
+References: <1407867869-5194-1-git-send-email-keescook@chromium.org>
+Message-ID: <1407867869-5194-5-git-send-email-keescook@chromium.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This is a series of patches to support CONFIG_RODATA on ARM, so that
-the kernel text is RO, and non-text sections default to NX. To support
-on-the-fly kernel text patching (via ftrace, kprobes, etc), fixmap
-support has been finalized based on several versions of various patches
-that are floating around on the mailing list. This series attempts to
-include the least intrusive version, so that others can build on it for
-future fixmap work.
+From: Nikolay Borisov <Nikolay.Borisov@arm.com>
 
-The series has been heavily tested, and appears to be working correctly:
+With the introduction of Kees Cook's patch to make the kernel .text
+read-only the existing method by which kexec works got broken since it
+directly pokes some values in the template code, which resides in the
+.text section.
 
-With CONFIG_ARM_PTDUMP, expected page table permissions are seen in
-/sys/kernel/debug/kernel_page_tables.
+The current patch changes the way those values are inserted so that poking
+.text section occurs only in machine_kexec (e.g when we are about to nuke
+the old kernel and are beyond the point of return). This allows to use
+set_kernel_text_rw() to directly patch the values in the .text section.
 
-Using CONFIG_LKDTM, the kernel now correctly detects bad accesses for
-for the following lkdtm tests via /sys/kernel/debug/provoke-crash/DIRECT:
-        EXEC_DATA
-        WRITE_RO
-        WRITE_KERN
+I had already sent a patch which achieved this but it was significantly
+more complicated, so this is a cleaner/straight-forward approach.
 
-ftrace works:
-        CONFIG_FTRACE_STARTUP_TEST passes
-        Enabling tracing works:
-                echo function > /sys/kernel/debug/tracing/current_tracer
+Signed-off-by: Nikolay Borisov <Nikolay.Borisov@arm.com>
+Acked-by: Will Deacon <will.deacon@arm.com>
+[kees: collapsed kexec_boot_atags (will.daecon)]
+[kees: for bisectability, moved set_kernel_text_rw() to RODATA patch]
+Signed-off-by: Kees Cook <keescook@chromium.org>
+---
+ arch/arm/kernel/machine_kexec.c | 8 ++++----
+ 1 file changed, 4 insertions(+), 4 deletions(-)
 
-kprobes works:
-        CONFIG_ARM_KPROBES_TEST passes
-
-kexec works:
-        kexec will load and start a new kernel
-
-Built with and without CONFIG_HIGHMEM. Current limitation on fixmap is
-that builds do not support 32 CPUs (max 31). This will be addressed by
-additional patches to expand the fixmap to 3MB.
-
-Thanks to everyone who has been testing this series and working on its
-various pieces!
-
--Kees
-
-v3:
-- more cleanups in switch to generic fixmap (lauraa, robh)
-- fixed kexec merge hunk glitch (will.deacon)
-- added tested-by tags where appropriate from v2 testing
-
-v2:
-- fix typo in kexec merge (buildbot)
-- flip index order for highmem pte access (lauraa)
-- added kgdb updates (dianders)
+diff --git a/arch/arm/kernel/machine_kexec.c b/arch/arm/kernel/machine_kexec.c
+index 8cf0996aa1a8..8f75250cbe30 100644
+--- a/arch/arm/kernel/machine_kexec.c
++++ b/arch/arm/kernel/machine_kexec.c
+@@ -29,6 +29,7 @@ extern unsigned long kexec_boot_atags;
+ 
+ static atomic_t waiting_for_crash_ipi;
+ 
++static unsigned long dt_mem;
+ /*
+  * Provide a dummy crash_notes definition while crash dump arrives to arm.
+  * This prevents breakage of crash_notes attribute in kernel/ksysfs.c.
+@@ -64,7 +65,7 @@ int machine_kexec_prepare(struct kimage *image)
+ 			return err;
+ 
+ 		if (be32_to_cpu(header) == OF_DT_HEADER)
+-			kexec_boot_atags = current_segment->mem;
++			dt_mem = current_segment->mem;
+ 	}
+ 	return 0;
+ }
+@@ -166,9 +167,8 @@ void machine_kexec(struct kimage *image)
+ 	kexec_start_address = image->start;
+ 	kexec_indirection_page = page_list;
+ 	kexec_mach_type = machine_arch_type;
+-	if (!kexec_boot_atags)
+-		kexec_boot_atags = image->start - KEXEC_ARM_ZIMAGE_OFFSET + KEXEC_ARM_ATAGS_OFFSET;
+-
++	kexec_boot_atags = dt_mem ?: image->start - KEXEC_ARM_ZIMAGE_OFFSET
++				     + KEXEC_ARM_ATAGS_OFFSET;
+ 
+ 	/* copy our kernel relocation code to the control code page */
+ 	reboot_entry = fncpy(reboot_code_buffer,
+-- 
+1.9.1
