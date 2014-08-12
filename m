@@ -1,30 +1,49 @@
-From: viresh.kumar@linaro.org (Viresh Kumar)
-Date: Tue, 12 Aug 2014 14:47:43 +0530
-Subject: [PATCH v4 3/5] cpufreq: Don't destroy/realloc policy/sysfs on
- hotplug/suspend
-In-Reply-To: <CAKohpo=QrZBmFoWq0hBRBDUbP=AiyTRjnTtJ1R5q_r=dhBO3Og@mail.gmail.com>
-References: <1406250448-470-1-git-send-email-skannan@codeaurora.org>
- <1406250448-470-4-git-send-email-skannan@codeaurora.org>
- <3141717.0s1tLjazMZ@vostro.rjw.lan>
- <CAKohpo=QrZBmFoWq0hBRBDUbP=AiyTRjnTtJ1R5q_r=dhBO3Og@mail.gmail.com>
-Message-ID: <CAKohpokBE=r0oxF9Y-Cmu2HuLHnwKV4w+kFays=WY8TwD93oFw@mail.gmail.com>
+From: b20788@freescale.com (Anson Huang)
+Date: Tue, 12 Aug 2014 17:26:03 +0800
+Subject: [PATCH] ARM: imx: correct gpu2d_axi and gpu3d_axi clock setting
+Message-ID: <1407835563-28220-1-git-send-email-b20788@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 7 August 2014 16:21, Viresh Kumar <viresh.kumar@linaro.org> wrote:
-> On 1 August 2014 03:26, Rafael J. Wysocki <rjw@rjwysocki.net> wrote:
->> I'm still quite unsure how this is going to work with the real CPU hot-remove
->> that makes the entire sysfs cpu directories go away.  Can you please explain
->> that?
->
-> I have little less knowledge on this kind of hotplugs, can you please enlighten
-> me with some info about this?
->
-> Are we talking about big servers which are actually a combination of multiple
-> motherboards (with SoC's), and any motherboard can be plugged out at
-> run time. Obviously a single kernel would be running for all these motherboards.
->
-> I don't know if we already support that.. Sorry for my lack of
-> knowledge on this..
+On i.MX6Q, gpu2d_axi and gpu3d_axi are either from AXI or
+AHB clock, but on i.MX6DL, gpu2d_axi and gpu3d_axi are
+from mmdc_ch0_axi_podf, and they can NOT be gated by mmdc_ch0_axi
+'s clock gate, the mux option register field(CCM_CBCMR)
+is marked as "Reserved" now on i.MX6DL RM, so correct these
+two clks setting.
 
-Ping!!
+Signed-off-by: Anson Huang <b20788@freescale.com>
+---
+ arch/arm/mach-imx/clk-imx6q.c |   10 ++++++++--
+ 1 file changed, 8 insertions(+), 2 deletions(-)
+
+diff --git a/arch/arm/mach-imx/clk-imx6q.c b/arch/arm/mach-imx/clk-imx6q.c
+index 6cceb77..29d4129 100644
+--- a/arch/arm/mach-imx/clk-imx6q.c
++++ b/arch/arm/mach-imx/clk-imx6q.c
+@@ -194,6 +194,10 @@ static void __init imx6q_clocks_init(struct device_node *ccm_node)
+ 	clk[IMX6QDL_CLK_PLL3_80M]  = imx_clk_fixed_factor("pll3_80m",  "pll3_usb_otg",   1, 6);
+ 	clk[IMX6QDL_CLK_PLL3_60M]  = imx_clk_fixed_factor("pll3_60m",  "pll3_usb_otg",   1, 8);
+ 	clk[IMX6QDL_CLK_TWD]       = imx_clk_fixed_factor("twd",       "arm",            1, 2);
++	if (cpu_is_imx6dl()) {
++		clk[IMX6QDL_CLK_GPU2D_AXI] = imx_clk_fixed_factor("gpu2d_axi", "mmdc_ch0_axi_podf", 1, 1);
++		clk[IMX6QDL_CLK_GPU3D_AXI] = imx_clk_fixed_factor("gpu3d_axi", "mmdc_ch0_axi_podf", 1, 1);
++	}
+ 
+ 	clk[IMX6QDL_CLK_PLL4_POST_DIV] = clk_register_divider_table(NULL, "pll4_post_div", "pll4_audio", CLK_SET_RATE_PARENT, base + 0x70, 19, 2, 0, post_div_table, &imx_ccm_lock);
+ 	clk[IMX6QDL_CLK_PLL4_AUDIO_DIV] = clk_register_divider(NULL, "pll4_audio_div", "pll4_post_div", CLK_SET_RATE_PARENT, base + 0x170, 15, 1, 0, &imx_ccm_lock);
+@@ -217,8 +221,10 @@ static void __init imx6q_clocks_init(struct device_node *ccm_node)
+ 	clk[IMX6QDL_CLK_ESAI_SEL]         = imx_clk_mux("esai_sel",         base + 0x20, 19, 2, audio_sels,        ARRAY_SIZE(audio_sels));
+ 	clk[IMX6QDL_CLK_ASRC_SEL]         = imx_clk_mux("asrc_sel",         base + 0x30, 7,  2, audio_sels,        ARRAY_SIZE(audio_sels));
+ 	clk[IMX6QDL_CLK_SPDIF_SEL]        = imx_clk_mux("spdif_sel",        base + 0x30, 20, 2, audio_sels,        ARRAY_SIZE(audio_sels));
+-	clk[IMX6QDL_CLK_GPU2D_AXI]        = imx_clk_mux("gpu2d_axi",        base + 0x18, 0,  1, gpu_axi_sels,      ARRAY_SIZE(gpu_axi_sels));
+-	clk[IMX6QDL_CLK_GPU3D_AXI]        = imx_clk_mux("gpu3d_axi",        base + 0x18, 1,  1, gpu_axi_sels,      ARRAY_SIZE(gpu_axi_sels));
++	if (cpu_is_imx6q()) {
++		clk[IMX6QDL_CLK_GPU2D_AXI]        = imx_clk_mux("gpu2d_axi",        base + 0x18, 0,  1, gpu_axi_sels,      ARRAY_SIZE(gpu_axi_sels));
++		clk[IMX6QDL_CLK_GPU3D_AXI]        = imx_clk_mux("gpu3d_axi",        base + 0x18, 1,  1, gpu_axi_sels,      ARRAY_SIZE(gpu_axi_sels));
++	}
+ 	clk[IMX6QDL_CLK_GPU2D_CORE_SEL]   = imx_clk_mux("gpu2d_core_sel",   base + 0x18, 16, 2, gpu2d_core_sels,   ARRAY_SIZE(gpu2d_core_sels));
+ 	clk[IMX6QDL_CLK_GPU3D_CORE_SEL]   = imx_clk_mux("gpu3d_core_sel",   base + 0x18, 4,  2, gpu3d_core_sels,   ARRAY_SIZE(gpu3d_core_sels));
+ 	clk[IMX6QDL_CLK_GPU3D_SHADER_SEL] = imx_clk_mux("gpu3d_shader_sel", base + 0x18, 8,  2, gpu3d_shader_sels, ARRAY_SIZE(gpu3d_shader_sels));
+-- 
+1.7.9.5
