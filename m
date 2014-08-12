@@ -1,68 +1,95 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Tue, 12 Aug 2014 12:10:30 +0100
-Subject: [PATCH 2/2] asm-generic: add memfd_create system call to unistd.h
-In-Reply-To: <20140812102734.GG29013@arm.com>
-References: <1407764228-7904-1-git-send-email-will.deacon@arm.com>
- <CANq1E4Q0gDaJ5XGnkoCQsG8xLh1Q-EBErtEVPpeeZgGj+Nr8dQ@mail.gmail.com>
- <20140811171511.GF8828@arm.com> <201408112057.01177.arnd@arndb.de>
- <CAMuHMdWZ30ZKO2ddh8whmw5ThrKZC0wsU+rhgoc8fRZni0Zduw@mail.gmail.com>
- <20140812102734.GG29013@arm.com>
-Message-ID: <20140812111030.GK29013@arm.com>
+From: wangyijing@huawei.com (Yijing Wang)
+Date: Tue, 12 Aug 2014 19:11:53 +0800
+Subject: [Xen-devel] [RFC PATCH 01/20] x86/xen/MSI: Eliminate
+ arch_msix_mask_irq() and arch_msi_mask_irq()
+In-Reply-To: <53E9D9DD.3060901@citrix.com>
+References: <1407828373-24322-1-git-send-email-wangyijing@huawei.com>
+ <1407828373-24322-2-git-send-email-wangyijing@huawei.com>
+ <53E9D9DD.3060901@citrix.com>
+Message-ID: <53E9F679.8060302@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Aug 12, 2014 at 11:27:34AM +0100, Will Deacon wrote:
-> On Mon, Aug 11, 2014 at 08:37:41PM +0100, Geert Uytterhoeven wrote:
-> > On Mon, Aug 11, 2014 at 8:57 PM, Arnd Bergmann <arnd@arndb.de> wrote:
-> > > On Monday 11 August 2014, Will Deacon wrote:
-> > >> On Mon, Aug 11, 2014 at 05:54:08PM +0100, David Herrmann wrote:
-> > >> > On Mon, Aug 11, 2014 at 3:37 PM, Will Deacon <will.deacon@arm.com> wrote:
-> > >> > > Commit 9183df25fe7b ("shm: add memfd_create() syscall") added a new
-> > >> > > system call (memfd_create) but didn't update the asm-generic unistd
-> > >> > > header.
-> > >> > >
-> > >> > > This patch adds the new system call to the asm-generic version of
-> > >> > > unistd.h so that it can be used by architectures such as arm64.
-> > >> > >
-> > >> > > Cc: Arnd Bergmann <arnd@arndb.de>
-> > >> > > Cc: David Herrmann <dh.herrmann@gmail.com>
-> > >> > > Signed-off-by: Will Deacon <will.deacon@arm.com>
-> > >> >
-> > >> > Reviewed-by: David Herrmann <dh.herrmann@gmail.com>
-> > >>
-> > >> Thanks, David.
-> > >>
-> > >> Arnd: shall I take this via the arm64 tree, or do you already have some
-> > >> asm-generic patches queued?
-> > >
-> > > Please take it for arm64, I don't have any other patches queued at the moment
-> > > and am currently on vacation.
-> > 
-> > Thanks, I was just going to look into adding it...
-> > 
-> > BTW, another one sneaked in: kexec_file_load. I say "sneaked", as
-> > scripts/checksyscalls.sh doesn't catch it, due to it being wired up on
-> > amd64 only.
+On 2014/8/12 17:09, David Vrabel wrote:
+> On 12/08/14 08:25, Yijing Wang wrote:
+>> Commit 0e4ccb150 added two __weak arch functions arch_msix_mask_irq()
+>> and arch_msi_mask_irq() to fix a bug found when running xen in x86.
+>> Introduced these two funcntions make MSI code complex. This patch
+>> reverted commit 0e4ccb150 and add #ifdef for x86 msi_chip to fix this
+>> bug for simplicity. Also this is preparation for using struct
+>> msi_chip instead of weak arch MSI functions in all platforms.
+> [...]
+>>  static struct irq_chip msi_chip = {
+>>  	.name			= "PCI-MSI",
+>> +#ifdef CONFIG_XEN
+>> +	.irq_unmask		= nop_unmask_msi_irq,
+>> +	.irq_mask		= nop_mask_msi_irq,
+>> +#else
+>>  	.irq_unmask		= unmask_msi_irq,
+>>  	.irq_mask		= mask_msi_irq,
+>> +#endif
 > 
-> Oh, well spotted!
+> No.  CONFIG_XEN kernels can run on Xen and bare metal so this must be a
+> runtime option.
+
+Hi David, that's my mistake, what about export struct irq_chip msi_chip, then
+change the msi_chip->irq_mask/irq_unmask() in xen init functions.
+
+
+Eg.
+
+diff --git a/arch/x86/include/asm/apic.h b/arch/x86/include/asm/apic.h
+index 19b0eba..bb6af00 100644
+--- a/arch/x86/include/asm/apic.h
++++ b/arch/x86/include/asm/apic.h
+@@ -43,6 +43,10 @@ static inline void generic_apic_probe(void)
+ }
+ #endif
+
++#ifdef CONFIG_PCI_MSI
++extern struct irq_chip msi_chip;
++#endif
++
+ #ifdef CONFIG_X86_LOCAL_APIC
+[...]
++
++#ifdef CONFIG_PCI_MSI
++void xen_nop_msi_mask(struct irq_data *data)
+ {
+-       return 0;
+ }
+ #endif
+
+@@ -424,8 +423,8 @@ int __init pci_xen_init(void)
+        x86_msi.setup_msi_irqs = xen_setup_msi_irqs;
+        x86_msi.teardown_msi_irq = xen_teardown_msi_irq;
+        x86_msi.teardown_msi_irqs = xen_teardown_msi_irqs;
+-       x86_msi.msi_mask_irq = xen_nop_msi_mask_irq;
+-       x86_msi.msix_mask_irq = xen_nop_msix_mask_irq;
++       msi_chip.irq_mask = xen_nop_msi_mask;
++       msi_chip.irq_unmask = xen_nop_msi_mask;
+ #endif
+        return 0;
+ }
+@@ -505,8 +504,8 @@ int __init pci_xen_initial_domain(void)
+        x86_msi.setup_msi_irqs = xen_initdom_setup_msi_irqs;
+        x86_msi.teardown_msi_irq = xen_teardown_msi_irq;
+        x86_msi.restore_msi_irqs = xen_initdom_restore_msi_irqs;
+-       x86_msi.msi_mask_irq = xen_nop_msi_mask_irq;
+-       x86_msi.msix_mask_irq = xen_nop_msix_mask_irq;
++       msi_chip.irq_mask = xen_nop_msi_mask;
++       msi_chip.irq_unmask = xen_nop_msi_mask;
+ #endif
+        xen_setup_acpi_sci();
+
+
 > 
-> > Will, you can please add that one, too, while you're at it?
+> David
 > 
-> Sure, I'll add an extra patch and repost.
+> .
+> 
 
-Hmm, so whilst I can easily wire-up the new syscall, it's pretty useless for
-anybody other than x86 at the moment. There are a bunch of arch helpers:
 
- arch_kexec_kernel_image_probe
- arch_kexec_kernel_verify_sig
- arch_kexec_kernel_image_load
- arch_kimage_file_post_load_cleanup
-
-which are only implemented for x86 (arch/x86/kernel/machine_kexec_64.c),
-even though I don't really see what makes them arch-specific as opposed to
-file format specific.
-
-So this syscall will always fail with -ENOEXEC at the moment. Is it still
-worth wiring it up?
-
-Will
+-- 
+Thanks!
+Yijing
