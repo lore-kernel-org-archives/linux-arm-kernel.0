@@ -1,38 +1,62 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Tue, 12 Aug 2014 22:27:57 +0100
-Subject: [PATCH 6/6] ARM: dts: Add tps65090 FETs constraints
-In-Reply-To: <53EA61B9.2070805@collabora.co.uk>
-References: <1407861868-20097-1-git-send-email-javier.martinez@collabora.co.uk>
- <1407861868-20097-7-git-send-email-javier.martinez@collabora.co.uk>
- <20140812172552.GU17528@sirena.org.uk>
- <53EA61B9.2070805@collabora.co.uk>
-Message-ID: <20140812212757.GY17528@sirena.org.uk>
+From: sboyd@codeaurora.org (Stephen Boyd)
+Date: Tue, 12 Aug 2014 14:39:09 -0700
+Subject: [PATCH v3 3/7] arm: use fixmap for text patching when text is RO
+In-Reply-To: <1407867869-5194-4-git-send-email-keescook@chromium.org>
+References: <1407867869-5194-1-git-send-email-keescook@chromium.org>
+ <1407867869-5194-4-git-send-email-keescook@chromium.org>
+Message-ID: <53EA897D.8030901@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Aug 12, 2014 at 08:49:29PM +0200, Javier Martinez Canillas wrote:
+On 08/12/14 11:24, Kees Cook wrote:
+> diff --git a/arch/arm/kernel/patch.c b/arch/arm/kernel/patch.c
+> index 07314af47733..03dd4e39c833 100644
+> --- a/arch/arm/kernel/patch.c
+> +++ b/arch/arm/kernel/patch.c
+> @@ -13,21 +16,69 @@ struct patch {
+>  	unsigned int insn;
+>  };
+>  
+> -void __kprobes __patch_text(void *addr, unsigned int insn)
+> +static DEFINE_SPINLOCK(patch_lock);
+> +
+> +static void __kprobes *patch_map(void *addr, int fixmap, unsigned long *flags)
+> +{
+> +	unsigned int uintaddr = (uintptr_t) addr;
+> +	bool module = !core_kernel_text(uintaddr);
+> +	struct page *page;
+> +
+> +	if (module && IS_ENABLED(CONFIG_DEBUG_SET_MODULE_RONX))
+> +		page = vmalloc_to_page(addr);
+> +	else if (!module && IS_ENABLED(CONFIG_DEBUG_RODATA))
+> +		page = virt_to_page(addr);
+> +	else
+> +		return addr;
+> +
+> +	if (flags)
+> +		spin_lock_irqsave(&patch_lock, *flags);
+> +
+> +	set_fixmap(fixmap, page_to_phys(page));
+> +
+> +	return (void *) (__fix_to_virt(fixmap) + (uintaddr & ~PAGE_MASK));
+> +}
+> +
+> +static void __kprobes patch_unmap(int fixmap, unsigned long *flags)
+> +{
+> +	clear_fixmap(fixmap);
+> +
+> +	if (flags)
+> +		spin_unlock_irqrestore(&patch_lock, *flags);
+> +}
 
-> So, is adding these voltages ranges (the design limits) in the Peach Pit DTS
-> file directly an acceptable solution? Basically what my previous patch [0] did.
+Has the kbuildbot complained about this one yet?
 
-> That matches what is in the board schematic so I assume that it's safe to use
-> these voltage ranges for that machine. If so I'll drop this series and repost
-> that patch fixing the typo error and commit message pointed by Doug that were
-> already addressed in $subject.
+  CHECK  arch/arm/kernel/patch.c
+  arch/arm/kernel/patch.c:47:39: warning: context imbalance in
+'patch_unmap' - unexpected unlock
 
-Well, I think the question is if you understand where those numbers come
-from and if they make sense.  I've not seen the schematic for the board
-so I can't comment but it is quite unusual to see ranges listed for so
-many supplies, for things like SD it's obviously normal but things like
-video_mid are a bit more surprising.  Does anything actually vary those
-voltages?
+I guess we're going to ignore it.
 
-The change where you fix up the supply mappings still makes sense of
-course.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140812/07d469ba/attachment.sig>
+-- 
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+hosted by The Linux Foundation
