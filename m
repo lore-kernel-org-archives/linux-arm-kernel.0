@@ -1,187 +1,168 @@
 From: keescook@chromium.org (Kees Cook)
-Date: Tue, 12 Aug 2014 11:24:25 -0700
-Subject: [PATCH v3 3/7] arm: use fixmap for text patching when text is RO
+Date: Tue, 12 Aug 2014 11:24:23 -0700
+Subject: [PATCH v3 1/7] arm: use generic fixmap.h
 In-Reply-To: <1407867869-5194-1-git-send-email-keescook@chromium.org>
 References: <1407867869-5194-1-git-send-email-keescook@chromium.org>
-Message-ID: <1407867869-5194-4-git-send-email-keescook@chromium.org>
+Message-ID: <1407867869-5194-2-git-send-email-keescook@chromium.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Rabin Vincent <rabin@rab.in>
+From: Mark Salter <msalter@redhat.com>
 
-Use fixmaps for text patching when the kernel text is read-only,
-inspired by x86.  This makes jump labels and kprobes work with the
-currently available CONFIG_DEBUG_SET_MODULE_RONX and the upcoming
-CONFIG_DEBUG_RODATA options.
+ARM is different from other architectures in that fixmap pages are indexed
+with a positive offset from FIXADDR_START.  Other architectures index with
+a negative offset from FIXADDR_TOP.  In order to use the generic fixmap.h
+definitions, this patch redefines FIXADDR_TOP to be inclusive of the
+useable range.  That is, FIXADDR_TOP is the virtual address of the topmost
+fixed page.  The newly defined FIXADDR_END is the first virtual address
+past the fixed mappings.
 
-Signed-off-by: Rabin Vincent <rabin@rab.in>
-[kees: fixed up for merge with "arm: use generic fixmap.h"]
+Signed-off-by: Mark Salter <msalter@redhat.com>
+Reviewed-by: Doug Anderson <dianders@chromium.org>
+[kees: update for a05e54c103b0b8 "ARM: 8031/2: change fixmap ..."]
+[kees: fixed highmem usage, thanks to Laura Abbott and Rob Herring]
 Signed-off-by: Kees Cook <keescook@chromium.org>
+Cc: Laura Abbott <lauraa@codeaurora.org>
+Cc: Rob Herring <robh@kernel.org>
 ---
- arch/arm/include/asm/fixmap.h |  4 +++
- arch/arm/kernel/jump_label.c  |  2 +-
- arch/arm/kernel/patch.c       | 70 ++++++++++++++++++++++++++++++++++++++-----
- arch/arm/kernel/patch.h       | 12 +++++++-
- 4 files changed, 79 insertions(+), 9 deletions(-)
+ arch/arm/include/asm/fixmap.h  | 27 +++++++++------------------
+ arch/arm/include/asm/highmem.h |  1 -
+ arch/arm/mm/highmem.c          | 15 ++++++++-------
+ arch/arm/mm/init.c             |  2 +-
+ arch/arm/mm/mmu.c              |  6 +++---
+ 5 files changed, 21 insertions(+), 30 deletions(-)
 
 diff --git a/arch/arm/include/asm/fixmap.h b/arch/arm/include/asm/fixmap.h
-index 48935cc5004f..0d5e1b002002 100644
+index 74124b0d0d79..a7add6f9315d 100644
 --- a/arch/arm/include/asm/fixmap.h
 +++ b/arch/arm/include/asm/fixmap.h
-@@ -11,6 +11,10 @@ enum fixed_addresses {
- 	FIX_KMAP_BEGIN,
- 	FIX_KMAP_END = FIX_KMAP_BEGIN + (KM_TYPE_NR * NR_CPUS) - 1,
+@@ -2,27 +2,18 @@
+ #define _ASM_FIXMAP_H
  
-+	/* Support writing RO kernel text via kprobes, jump labels, etc. */
-+	FIX_TEXT_POKE0,
-+	FIX_TEXT_POKE1,
-+
- 	__end_of_fixed_addresses
- };
+ #define FIXADDR_START		0xffc00000UL
+-#define FIXADDR_TOP		0xffe00000UL
+-#define FIXADDR_SIZE		(FIXADDR_TOP - FIXADDR_START)
++#define FIXADDR_END		0xffe00000UL
++#define FIXADDR_TOP		(FIXADDR_END - PAGE_SIZE)
  
-diff --git a/arch/arm/kernel/jump_label.c b/arch/arm/kernel/jump_label.c
-index 4ce4f789446d..afeeb9ea6f43 100644
---- a/arch/arm/kernel/jump_label.c
-+++ b/arch/arm/kernel/jump_label.c
-@@ -19,7 +19,7 @@ static void __arch_jump_label_transform(struct jump_entry *entry,
- 		insn = arm_gen_nop();
+-#define FIX_KMAP_NR_PTES	(FIXADDR_SIZE >> PAGE_SHIFT)
++#include <asm/kmap_types.h>
  
- 	if (is_static)
--		__patch_text(addr, insn);
-+		__patch_text_early(addr, insn);
- 	else
- 		patch_text(addr, insn);
- }
-diff --git a/arch/arm/kernel/patch.c b/arch/arm/kernel/patch.c
-index 07314af47733..03dd4e39c833 100644
---- a/arch/arm/kernel/patch.c
-+++ b/arch/arm/kernel/patch.c
-@@ -1,8 +1,11 @@
- #include <linux/kernel.h>
-+#include <linux/spinlock.h>
- #include <linux/kprobes.h>
-+#include <linux/mm.h>
- #include <linux/stop_machine.h>
+-#define __fix_to_virt(x)	(FIXADDR_START + ((x) << PAGE_SHIFT))
+-#define __virt_to_fix(x)	(((x) - FIXADDR_START) >> PAGE_SHIFT)
++enum fixed_addresses {
++	FIX_KMAP_BEGIN,
++	FIX_KMAP_END = FIX_KMAP_BEGIN + (KM_TYPE_NR * NR_CPUS) - 1,
  
- #include <asm/cacheflush.h>
-+#include <asm/fixmap.h>
- #include <asm/smp_plat.h>
- #include <asm/opcodes.h>
+-extern void __this_fixmap_does_not_exist(void);
++	__end_of_fixed_addresses
++};
  
-@@ -13,21 +16,69 @@ struct patch {
- 	unsigned int insn;
- };
- 
--void __kprobes __patch_text(void *addr, unsigned int insn)
-+static DEFINE_SPINLOCK(patch_lock);
-+
-+static void __kprobes *patch_map(void *addr, int fixmap, unsigned long *flags)
-+{
-+	unsigned int uintaddr = (uintptr_t) addr;
-+	bool module = !core_kernel_text(uintaddr);
-+	struct page *page;
-+
-+	if (module && IS_ENABLED(CONFIG_DEBUG_SET_MODULE_RONX))
-+		page = vmalloc_to_page(addr);
-+	else if (!module && IS_ENABLED(CONFIG_DEBUG_RODATA))
-+		page = virt_to_page(addr);
-+	else
-+		return addr;
-+
-+	if (flags)
-+		spin_lock_irqsave(&patch_lock, *flags);
-+
-+	set_fixmap(fixmap, page_to_phys(page));
-+
-+	return (void *) (__fix_to_virt(fixmap) + (uintaddr & ~PAGE_MASK));
-+}
-+
-+static void __kprobes patch_unmap(int fixmap, unsigned long *flags)
-+{
-+	clear_fixmap(fixmap);
-+
-+	if (flags)
-+		spin_unlock_irqrestore(&patch_lock, *flags);
-+}
-+
-+void __kprobes __patch_text_real(void *addr, unsigned int insn, bool remap)
- {
- 	bool thumb2 = IS_ENABLED(CONFIG_THUMB2_KERNEL);
-+	unsigned int uintaddr = (uintptr_t) addr;
-+	bool twopage = false;
-+	unsigned long flags;
-+	void *waddr = addr;
- 	int size;
- 
-+	if (remap)
-+		waddr = patch_map(addr, FIX_TEXT_POKE0, &flags);
-+
- 	if (thumb2 && __opcode_is_thumb16(insn)) {
--		*(u16 *)addr = __opcode_to_mem_thumb16(insn);
-+		*(u16 *)waddr = __opcode_to_mem_thumb16(insn);
- 		size = sizeof(u16);
--	} else if (thumb2 && ((uintptr_t)addr & 2)) {
-+	} else if (thumb2 && (uintaddr & 2)) {
- 		u16 first = __opcode_thumb32_first(insn);
- 		u16 second = __opcode_thumb32_second(insn);
--		u16 *addrh = addr;
-+		u16 *addrh0 = waddr;
-+		u16 *addrh1 = waddr + 2;
- 
--		addrh[0] = __opcode_to_mem_thumb16(first);
--		addrh[1] = __opcode_to_mem_thumb16(second);
-+		twopage = (uintaddr & ~PAGE_MASK) == PAGE_SIZE - 2;
-+		if (twopage && remap)
-+			addrh1 = patch_map(addr + 2, FIX_TEXT_POKE1, NULL);
-+
-+		*addrh0 = __opcode_to_mem_thumb16(first);
-+		*addrh1 = __opcode_to_mem_thumb16(second);
-+
-+		if (twopage && addrh1 != addr + 2) {
-+			flush_kernel_vmap_range(addrh1, 2);
-+			patch_unmap(FIX_TEXT_POKE1, NULL);
-+		}
- 
- 		size = sizeof(u32);
- 	} else {
-@@ -36,10 +87,15 @@ void __kprobes __patch_text(void *addr, unsigned int insn)
- 		else
- 			insn = __opcode_to_mem_arm(insn);
- 
--		*(u32 *)addr = insn;
-+		*(u32 *)waddr = insn;
- 		size = sizeof(u32);
- 	}
- 
-+	if (waddr != addr) {
-+		flush_kernel_vmap_range(waddr, twopage ? size / 2 : size);
-+		patch_unmap(FIX_TEXT_POKE0, &flags);
-+	}
-+
- 	flush_icache_range((uintptr_t)(addr),
- 			   (uintptr_t)(addr) + size);
- }
-diff --git a/arch/arm/kernel/patch.h b/arch/arm/kernel/patch.h
-index b4731f2dac38..77e054c2f6cd 100644
---- a/arch/arm/kernel/patch.h
-+++ b/arch/arm/kernel/patch.h
-@@ -2,6 +2,16 @@
- #define _ARM_KERNEL_PATCH_H
- 
- void patch_text(void *addr, unsigned int insn);
--void __patch_text(void *addr, unsigned int insn);
-+void __patch_text_real(void *addr, unsigned int insn, bool remap);
-+
-+static inline void __patch_text(void *addr, unsigned int insn)
-+{
-+	__patch_text_real(addr, insn, true);
-+}
-+
-+static inline void __patch_text_early(void *addr, unsigned int insn)
-+{
-+	__patch_text_real(addr, insn, false);
-+}
+-static inline unsigned long fix_to_virt(const unsigned int idx)
+-{
+-	if (idx >= FIX_KMAP_NR_PTES)
+-		__this_fixmap_does_not_exist();
+-	return __fix_to_virt(idx);
+-}
+-
+-static inline unsigned int virt_to_fix(const unsigned long vaddr)
+-{
+-	BUG_ON(vaddr >= FIXADDR_TOP || vaddr < FIXADDR_START);
+-	return __virt_to_fix(vaddr);
+-}
++#include <asm-generic/fixmap.h>
  
  #endif
+diff --git a/arch/arm/include/asm/highmem.h b/arch/arm/include/asm/highmem.h
+index 535579511ed0..91b99abe7a95 100644
+--- a/arch/arm/include/asm/highmem.h
++++ b/arch/arm/include/asm/highmem.h
+@@ -18,7 +18,6 @@
+ 	} while (0)
+ 
+ extern pte_t *pkmap_page_table;
+-extern pte_t *fixmap_page_table;
+ 
+ extern void *kmap_high(struct page *page);
+ extern void kunmap_high(struct page *page);
+diff --git a/arch/arm/mm/highmem.c b/arch/arm/mm/highmem.c
+index 45aeaaca9052..f87e0b89b738 100644
+--- a/arch/arm/mm/highmem.c
++++ b/arch/arm/mm/highmem.c
+@@ -18,19 +18,20 @@
+ #include <asm/tlbflush.h>
+ #include "mm.h"
+ 
+-pte_t *fixmap_page_table;
+-
+ static inline void set_fixmap_pte(int idx, pte_t pte)
+ {
+ 	unsigned long vaddr = __fix_to_virt(idx);
+-	set_pte_ext(fixmap_page_table + idx, pte, 0);
++	pte_t *ppte = pte_offset_kernel(pmd_off_k(FIXADDR_START), vaddr);
++
++	set_pte_ext(ppte, pte, 0);
+ 	local_flush_tlb_kernel_page(vaddr);
+ }
+ 
+ static inline pte_t get_fixmap_pte(unsigned long vaddr)
+ {
+-	unsigned long idx = __virt_to_fix(vaddr);
+-	return *(fixmap_page_table + idx);
++	pte_t *ppte = pte_offset_kernel(pmd_off_k(FIXADDR_START), vaddr);
++
++	return *ppte;
+ }
+ 
+ void *kmap(struct page *page)
+@@ -84,7 +85,7 @@ void *kmap_atomic(struct page *page)
+ 	 * With debugging enabled, kunmap_atomic forces that entry to 0.
+ 	 * Make sure it was indeed properly unmapped.
+ 	 */
+-	BUG_ON(!pte_none(*(fixmap_page_table + idx)));
++	BUG_ON(!pte_none(*get_fixmap_pte(vaddr)));
+ #endif
+ 	/*
+ 	 * When debugging is off, kunmap_atomic leaves the previous mapping
+@@ -134,7 +135,7 @@ void *kmap_atomic_pfn(unsigned long pfn)
+ 	idx = type + KM_TYPE_NR * smp_processor_id();
+ 	vaddr = __fix_to_virt(idx);
+ #ifdef CONFIG_DEBUG_HIGHMEM
+-	BUG_ON(!pte_none(*(fixmap_page_table + idx)));
++	BUG_ON(!pte_none(*get_fixmap_pte(vaddr)));
+ #endif
+ 	set_fixmap_pte(idx, pfn_pte(pfn, kmap_prot));
+ 
+diff --git a/arch/arm/mm/init.c b/arch/arm/mm/init.c
+index 659c75d808dc..ad82c05bfc3a 100644
+--- a/arch/arm/mm/init.c
++++ b/arch/arm/mm/init.c
+@@ -570,7 +570,7 @@ void __init mem_init(void)
+ 			MLK(DTCM_OFFSET, (unsigned long) dtcm_end),
+ 			MLK(ITCM_OFFSET, (unsigned long) itcm_end),
+ #endif
+-			MLK(FIXADDR_START, FIXADDR_TOP),
++			MLK(FIXADDR_START, FIXADDR_END),
+ 			MLM(VMALLOC_START, VMALLOC_END),
+ 			MLM(PAGE_OFFSET, (unsigned long)high_memory),
+ #ifdef CONFIG_HIGHMEM
+diff --git a/arch/arm/mm/mmu.c b/arch/arm/mm/mmu.c
+index 8348ed6b2efe..7fa0966cd15f 100644
+--- a/arch/arm/mm/mmu.c
++++ b/arch/arm/mm/mmu.c
+@@ -1326,10 +1326,10 @@ static void __init kmap_init(void)
+ #ifdef CONFIG_HIGHMEM
+ 	pkmap_page_table = early_pte_alloc(pmd_off_k(PKMAP_BASE),
+ 		PKMAP_BASE, _PAGE_KERNEL_TABLE);
+-
+-	fixmap_page_table = early_pte_alloc(pmd_off_k(FIXADDR_START),
+-		FIXADDR_START, _PAGE_KERNEL_TABLE);
+ #endif
++
++	early_pte_alloc(pmd_off_k(FIXADDR_START), FIXADDR_START,
++			_PAGE_KERNEL_TABLE);
+ }
+ 
+ static void __init map_lowmem(void)
 -- 
 1.9.1
