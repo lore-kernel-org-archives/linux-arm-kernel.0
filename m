@@ -1,65 +1,224 @@
-From: mturquette@linaro.org (Mike Turquette)
-Date: Mon, 11 Aug 2014 20:34:56 -0700
-Subject: [PATCH v2] usb: gadget: at91_udc: move prepare clk into process
- context
-In-Reply-To: <1407330702-2926-1-git-send-email-ronald.wahl@raritan.com>
-References: <1407330702-2926-1-git-send-email-ronald.wahl@raritan.com>
-Message-ID: <20140812033456.16355.48522@quantum>
+From: wangnan0@huawei.com (Wang Nan)
+Date: Tue, 12 Aug 2014 11:37:47 +0800
+Subject: [PATCH v3] kprobes: arm: enable OPTPROBES for ARM 32
+In-Reply-To: <53E96FFF.8030101@hitachi.com>
+References: <1407550339-34805-1-git-send-email-wangnan0@huawei.com>
+ <20140811134832.GD15853@arm.com> <53E96FFF.8030101@hitachi.com>
+Message-ID: <53E98C0B.8000804@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Quoting Ronald Wahl (2014-08-06 06:11:42)
-> Commit 7628083227b6bc4a7e33d7c381d7a4e558424b6b added clock preparation in
-> interrupt context. This is not allowed as it might sleep. Move clock
-> preparation into process context (at91udc_probe).
-> ---
->  drivers/usb/gadget/udc/at91_udc.c | 39 ++++++++++++++++++++++++++++++---------
->  1 file changed, 30 insertions(+), 9 deletions(-)
+On 2014/8/12 9:38, Masami Hiramatsu wrote:
+> (2014/08/11 22:48), Will Deacon wrote:
+>> Hello,
+>>
+>> On Sat, Aug 09, 2014 at 03:12:19AM +0100, Wang Nan wrote:
+>>> This patch introduce kprobeopt for ARM 32.
+>>>
+>>> Limitations:
+>>>  - Currently only kernel compiled with ARM ISA is supported.
+>>>
+>>>  - Offset between probe point and optinsn slot must not larger than
+>>>    32MiB. Masami Hiramatsu suggests replacing 2 words, it will make
+>>>    things complex. Futher patch can make such optimization.
+>>>
+>>> Kprobe opt on ARM is relatively simpler than kprobe opt on x86 because
+>>> ARM instruction is always 4 bytes aligned and 4 bytes long. This patch
+>>> replace probed instruction by a 'b', branch to trampoline code and then
+>>> calls optimized_callback(). optimized_callback() calls opt_pre_handler()
+>>> to execute kprobe handler. It also emulate/simulate replaced instruction.
+>>
+>> Could you briefly describe the optimisation please?
 > 
-> diff --git a/drivers/usb/gadget/udc/at91_udc.c b/drivers/usb/gadget/udc/at91_udc.c
-> index cfd18bc..0b347a0 100644
-> --- a/drivers/usb/gadget/udc/at91_udc.c
-> +++ b/drivers/usb/gadget/udc/at91_udc.c
-> @@ -872,10 +872,10 @@ static void clk_on(struct at91_udc *udc)
->  
->         if (IS_ENABLED(CONFIG_COMMON_CLK)) {
+> On arm32, optimization means "replacing a breakpoint with a branch".
+> Of course simple branch instruction doesn't memorize the source(probe)
+> address, optprobe makes a trampoline code for each probe point and
+> each trampoline stores "struct kprobe" of that probe point.
+> 
+> At first, the kprobe puts a breakpoint into the probe site, and builds
+> a trampoline. After a while, it starts optimizing the probe site by
+> replacing the breakpoint with a branch.
+> 
+>> I'm not familiar with
+>> kprobes internals, but if you're trying to patch an arbitrary instruction
+>> with a branch then that's not guaranteed to be atomic by the ARM
+>> architecture.
+> 
+> Hmm, I'm not sure about arm32 too. Would you mean patch_text() can't
+> replace an instruction atomically? Or only the breakpoint is special?
+> (for cache?)
+> optprobe always swaps branch and breakpoint, isn't that safe?
+> 
 
-Why is this check necessary at all? Drivers shouldn't have to care at
-all about the underlying clock framework implementation.
 
->                 clk_set_rate(udc->uclk, 48000000);
-> -               clk_prepare_enable(udc->uclk);
-> +               clk_enable(udc->uclk);
->         }
-> -       clk_prepare_enable(udc->iclk);
-> -       clk_prepare_enable(udc->fclk);
-> +       clk_enable(udc->iclk);
-> +       clk_enable(udc->fclk);
->  }
->  
->  static void clk_off(struct at91_udc *udc)
-> @@ -884,10 +884,10 @@ static void clk_off(struct at91_udc *udc)
->                 return;
->         udc->clocked = 0;
->         udc->gadget.speed = USB_SPEED_UNKNOWN;
-> -       clk_disable_unprepare(udc->fclk);
-> -       clk_disable_unprepare(udc->iclk);
-> +       clk_disable(udc->fclk);
-> +       clk_disable(udc->iclk);
->         if (IS_ENABLED(CONFIG_COMMON_CLK))
-> -               clk_disable_unprepare(udc->uclk);
-> +               clk_disable(udc->uclk);
->  }
->  
->  /*
-> @@ -1780,14 +1780,23 @@ static int at91udc_probe(struct platform_device *pdev)
->         }
->  
->         /* don't do anything until we have both gadget driver and VBUS */
-> +       if (IS_ENABLED(CONFIG_COMMON_CLK)) {
+Same question.
 
-Same question here. What does the clock framework implementation have to
-do with uclk?
+OPTPROBES always replace a breakpoint instruction to a branch, not "an arbitrary
+instruction". Do you mean the previous breakpoint patching is unsafe?
 
-Regards,
-Mike
+__patch_text() uses
+
+    *(u32 *)addr = insn;
+
+to patch an instruction, do you mean that it is unsafe?
+
+ARM's kprobe and kprobeopt always use it to replace instructions. In some special
+case (a thumb instruction cross 2 words), it wraps such store using stop_machine,
+but in ARM case, it assume such store to be atomic.
+
+>>
+>> We can, however, patch branches with other branches.
+>>
+>> Anyway, minor comments in-line:
+>>
+>>> +/* Caller must ensure addr & 3 == 0 */
+>>> +static int can_optimize(unsigned long paddr)
+>>> +{
+>>> +	return 1;
+>>> +}
+>>
+>> Why not check the paddr alignment here, rather than have a comment?
+> 
+> Actually, we don't need to care about that. The alignment is already
+> checked before calling this function (at arch_prepare_kprobe() in
+> arch/arm/kernel/kprobes.c).
+> 
+>>
+>>> +/* Free optimized instruction slot */
+>>> +static void
+>>> +__arch_remove_optimized_kprobe(struct optimized_kprobe *op, int dirty)
+>>> +{
+>>> +	if (op->optinsn.insn) {
+>>> +		free_optinsn_slot(op->optinsn.insn, dirty);
+>>> +		op->optinsn.insn = NULL;
+>>> +	}
+>>> +}
+>>> +
+>>> +extern void kprobe_handler(struct pt_regs *regs);
+>>> +
+>>> +static void
+>>> +optimized_callback(struct optimized_kprobe *op, struct pt_regs *regs)
+>>> +{
+>>> +	unsigned long flags;
+>>> +	struct kprobe *p = &op->kp;
+>>> +	struct kprobe_ctlblk *kcb = get_kprobe_ctlblk();
+>>> +
+>>> +	/* Save skipped registers */
+>>> +	regs->ARM_pc = (unsigned long)op->kp.addr;
+>>> +	regs->ARM_ORIG_r0 = ~0UL;
+>>
+>> Why are you writing ORIG_r0?
+> 
+> In x86, optimization(breakpoint to jump) is transparently done, thus
+> we have to mimic all registers as the breakpoint exception. And in x86
+> int3(which is the breakpoint) exception sets -1 to orig_ax.
+> So, if arm32's breakpoint doesn't attach the ARM_ORIG_r0, you don't
+> need to touch it. We just consider the pt_regs looks same as that
+> at the breakpoint handler.
+> 
+>>
+>>> +	local_irq_save(flags);
+>>> +
+>>> +	if (kprobe_running()) {
+>>> +		kprobes_inc_nmissed_count(&op->kp);
+>>> +	} else {
+>>> +		__this_cpu_write(current_kprobe, &op->kp);
+>>> +		kcb->kprobe_status = KPROBE_HIT_ACTIVE;
+>>> +		opt_pre_handler(&op->kp, regs);
+>>> +		__this_cpu_write(current_kprobe, NULL);
+>>> +	}
+>>> +
+>>> +	/* In each case, we must singlestep the replaced instruction. */
+>>> +	op->kp.ainsn.insn_singlestep(p->opcode, &p->ainsn, regs);
+>>> +
+>>> +	local_irq_restore(flags);
+>>> +}
+>>> +
+>>> +int arch_prepare_optimized_kprobe(struct optimized_kprobe *op)
+>>> +{
+>>> +	u8 *buf;
+>>> +	unsigned long rel_chk;
+>>> +	unsigned long val;
+>>> +
+>>> +	if (!can_optimize((unsigned long)op->kp.addr))
+>>> +		return -EILSEQ;
+>>> +
+>>> +	op->optinsn.insn = get_optinsn_slot();
+>>> +	if (!op->optinsn.insn)
+>>> +		return -ENOMEM;
+>>> +
+>>> +	/*
+>>> +	 * Verify if the address gap is in 32MiB range, because this uses
+>>> +	 * a relative jump.
+>>> +	 *
+>>> +	 * kprobe opt use a 'b' instruction to branch to optinsn.insn.
+>>> +	 * According to ARM manual, branch instruction is:
+>>> +	 *
+>>> +	 *   31  28 27           24 23             0
+>>> +	 *  +------+---+---+---+---+----------------+
+>>> +	 *  | cond | 1 | 0 | 1 | 0 |      imm24     |
+>>> +	 *  +------+---+---+---+---+----------------+
+>>> +	 *
+>>> +	 * imm24 is a signed 24 bits integer. The real branch offset is computed
+>>> +	 * by: imm32 = SignExtend(imm24:'00', 32);
+>>> +	 *
+>>> +	 * So the maximum forward branch should be:
+>>> +	 *   (0x007fffff << 2) = 0x01fffffc =  0x1fffffc
+>>> +	 * The maximum backword branch should be:
+>>> +	 *   (0xff800000 << 2) = 0xfe000000 = -0x2000000
+>>> +	 *
+>>> +	 * We can simply check (rel & 0xfe000003):
+>>> +	 *  if rel is positive, (rel & 0xfe000000) shoule be 0
+>>> +	 *  if rel is negitive, (rel & 0xfe000000) should be 0xfe000000
+>>> +	 *  the last '3' is used for alignment checking.
+>>> +	 */
+>>> +	rel_chk = (unsigned long)((long)op->optinsn.insn -
+>>> +			(long)op->kp.addr + 8) & 0xfe000003;
+>>> +
+>>> +	if ((rel_chk != 0) && (rel_chk != 0xfe000000)) {
+>>> +		__arch_remove_optimized_kprobe(op, 0);
+>>> +		return -ERANGE;
+>>> +	}
+>>> +
+>>> +	buf = (u8 *)op->optinsn.insn;
+>>> +
+>>> +	/* Copy arch-dep-instance from template */
+>>> +	memcpy(buf, &optprobe_template_entry, TMPL_END_IDX);
+>>> +
+>>> +	/* Set probe information */
+>>> +	val = (unsigned long)op;
+>>> +	memcpy(buf + TMPL_VAL_IDX, &val, sizeof(val));
+>>> +
+>>> +	/* Set probe function call */
+>>> +	val = (unsigned long)optimized_callback;
+>>> +	memcpy(buf + TMPL_CALL_IDX, &val, sizeof(val));
+>>
+>> Ok, so this is updating the `offset' portion of a b instruction, right? What
+>> if memcpy does that byte-by-byte?
+> 
+> No, as you can see a indirect call "blx r2" in optprobe_template_entry(
+> inline asm), this sets .data bytes at optprobe_template_call which is loaded
+> to r2 register. :-)
+> So all the 4bytes are used for storing the address.
+> 
+> Thank you,
+> 
+
+However, the replaced code is an 'nop', may be it's misleading.
+
+By the way, while reading __patch_text(), I find a bug in my v3 patch:
+
++		/*
++		 * Backup instructions which will be replaced
++		 * by jump address
++		 */
++		memcpy(op->optinsn.copied_insn, op->kp.addr,
++				RELATIVEJUMP_SIZE);
++
+
+Here, it seems we meed to use __opcode_to_mem_arm to translate.
+
+Other memcpy in arch_prepare_optimized_kprobe() is no problem, because copied
+stuff are value, not instruction.
+
+I'll send a v4 patch to fix this problem.
