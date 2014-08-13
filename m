@@ -1,54 +1,130 @@
-From: abrestic@chromium.org (Andrew Bresticker)
-Date: Wed, 13 Aug 2014 10:17:50 -0700
-Subject: [PATCH 1/2] ARM: tegra: add Acer Chromebook 13 device tree
-In-Reply-To: <53EB9C61.1070406@wwwdotorg.org>
-References: <1407894967-18300-1-git-send-email-dgreid@chromium.org>
- <20140813085304.GE7735@ulmo> <53EB9786.6010809@wwwdotorg.org>
- <CAL1qeaGxcp4okVTYCMj0zMh-4HzsGLBvngv0+A1m8o3sZPDj2A@mail.gmail.com>
- <53EB9C61.1070406@wwwdotorg.org>
-Message-ID: <CAL1qeaG0DL6tSvoNgW1gBmVE8vvAp-ZKHKThdOvRVr9nf6UF5Q@mail.gmail.com>
+From: bhelgaas@google.com (Bjorn Helgaas)
+Date: Wed, 13 Aug 2014 11:21:55 -0600
+Subject: [RFC] PCI: pcie-designware: allow drivers as loadable modules
+In-Reply-To: <5303286.K45Li7B92z@wuerfel>
+References: <5303286.K45Li7B92z@wuerfel>
+Message-ID: <20140813172155.GB7298@google.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Aug 13, 2014 at 10:12 AM, Stephen Warren <swarren@wwwdotorg.org> wrote:
-> On 08/13/2014 11:04 AM, Andrew Bresticker wrote:
->>
->> On Wed, Aug 13, 2014 at 9:51 AM, Stephen Warren <swarren@wwwdotorg.org>
->> wrote:
->>>
->>> On 08/13/2014 02:53 AM, Thierry Reding wrote:
->>>>
->>>>
->>>> On Tue, Aug 12, 2014 at 06:56:07PM -0700, Dylan Reid wrote:
->>>>>
->>>>>
->>>>> The Acer Chromebook 13, codenamed "Big", contains an NVIDIA tegra124
->>>>> processor and is similar to the Venice2 reference platform.
->>>>>
->>>>> The keyboard, USB 2, audio, HDMI, sdcard and emmc have been tested
->>>>> and work on the 1366x768 models.  I haven't tried on the HD systems
->>>>> yet.
->>>>
->>>>
->>>>
->>>> Presumably the HD systems will have a different compatible? Is it only
->>>> the panel that's different or are there other changes?
->>>
->>>
->>>
->>> Yes, we definitely need to plan ahead for the different SKUs. I assume
->>> we'll
->>> have different board names for each board, which then translates int DT
->>> filenames and U-Boot/cbootimage-configs/tegra-uboot-flasher board
->>
->>
->> The firmware does not differentiate between the HD and non-HD boards,
->> so it will look for the same compatible string.  As I mentioned in my
->> response to Thierry, we'd need to parse the EDID to figure out which
->> panel is being used.
->
->
-> Well, that's if we do it at run-time. We could just have a separate DT per
-> SKU, couldn't we?
+On Thu, Jul 24, 2014 at 11:17:45AM +0200, Arnd Bergmann wrote:
+> From 0ee79c7451851a34e5a7c33eb6020befcdcb2b24 Mon Sep 17 00:00:00 2001
+> From: Arnd Bergmann <arnd@arndb.de>
+> Date: Thu, 24 Jul 2014 11:12:48 +0200
+> Subject: [PATCH] PCI: pcie-designware: allow drivers as loadable modules
+> 
+> The new pcie-spear13xx driver uses the pcie-designware library
+> and in the current form it can be built as a loadable module.
+> However, the functions it uses from the base driver are not exported,
+> so this results in a build failure and a module that can never
+> be loaded:
+> 
+> ERROR: "dw_pcie_host_init" [drivers/pci/host/pcie-spear13xx.ko] undefined!
+> ERROR: "dw_handle_msi_irq" [drivers/pci/host/pcie-spear13xx.ko] undefined!
+> ERROR: "dw_pcie_msi_init" [drivers/pci/host/pcie-spear13xx.ko] undefined!
+> ERROR: "dw_pcie_cfg_write" [drivers/pci/host/pcie-spear13xx.ko] undefined!
+> ERROR: "dw_pcie_cfg_read" [drivers/pci/host/pcie-spear13xx.ko] undefined!
+> ERROR: "dw_pcie_setup_rc" [drivers/pci/host/pcie-spear13xx.ko] undefined!
+> ERROR: "dw_pcie_link_up" [drivers/pci/host/pcie-spear13xx.ko] undefined!
+> 
+> If we want to allow loadable pcie-designware drivers, we have to
+> export all those symbols and ensure none of them are marked as __init.
+> This also requires making pci_assign_unassigned_resources available
+> after boot.
+> 
+> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+> ---
+> If we don't want this patch for some reason, we should instead mark
+> this driver 'bool' in Kconfig, so it becomes impossible to encounter
+> this build error.
 
-Oh right - yes, that would work.
+I'm not opposed to doing this, but I applied Sachin's patch that changes
+the Kconfig option to bool, so I'll drop this one for now.
+
+> diff --git a/drivers/pci/host/pcie-designware.c b/drivers/pci/host/pcie-designware.c
+> index 1eaf4df3618a..0348408ebc68 100644
+> --- a/drivers/pci/host/pcie-designware.c
+> +++ b/drivers/pci/host/pcie-designware.c
+> @@ -88,6 +88,7 @@ int dw_pcie_cfg_read(void __iomem *addr, int where, int size, u32 *val)
+>  
+>  	return PCIBIOS_SUCCESSFUL;
+>  }
+> +EXPORT_SYMBOL_GPL(dw_pcie_cfg_read);
+>  
+>  int dw_pcie_cfg_write(void __iomem *addr, int where, int size, u32 val)
+>  {
+> @@ -102,6 +103,7 @@ int dw_pcie_cfg_write(void __iomem *addr, int where, int size, u32 val)
+>  
+>  	return PCIBIOS_SUCCESSFUL;
+>  }
+> +EXPORT_SYMBOL_GPL(dw_pcie_cfg_write);
+>  
+>  static inline void dw_pcie_readl_rc(struct pcie_port *pp, u32 reg, u32 *val)
+>  {
+> @@ -182,6 +184,7 @@ irqreturn_t dw_handle_msi_irq(struct pcie_port *pp)
+>  
+>  	return ret;
+>  }
+> +EXPORT_SYMBOL_GPL(dw_handle_msi_irq);
+>  
+>  void dw_pcie_msi_init(struct pcie_port *pp)
+>  {
+> @@ -192,6 +195,7 @@ void dw_pcie_msi_init(struct pcie_port *pp)
+>  			virt_to_phys((void *)pp->msi_data));
+>  	dw_pcie_wr_own_conf(pp, PCIE_MSI_ADDR_HI, 4, 0);
+>  }
+> +EXPORT_SYMBOL_GPL(dw_pcie_msi_init);
+>  
+>  static int find_valid_pos0(struct pcie_port *pp, int msgvec, int pos, int *pos0)
+>  {
+> @@ -378,6 +382,7 @@ int dw_pcie_link_up(struct pcie_port *pp)
+>  	else
+>  		return 0;
+>  }
+> +EXPORT_SYMBOL_GPL(dw_pcie_link_up);
+>  
+>  static int dw_pcie_msi_map(struct irq_domain *domain, unsigned int irq,
+>  			irq_hw_number_t hwirq)
+> @@ -393,7 +398,7 @@ static const struct irq_domain_ops msi_domain_ops = {
+>  	.map = dw_pcie_msi_map,
+>  };
+>  
+> -int __init dw_pcie_host_init(struct pcie_port *pp)
+> +int dw_pcie_host_init(struct pcie_port *pp)
+>  {
+>  	struct device_node *np = pp->dev->of_node;
+>  	struct of_pci_range range;
+> @@ -503,6 +508,7 @@ int __init dw_pcie_host_init(struct pcie_port *pp)
+>  
+>  	return 0;
+>  }
+> +EXPORT_SYMBOL_GPL(dw_pcie_host_init);
+>  
+>  static void dw_pcie_prog_viewport_cfg0(struct pcie_port *pp, u32 busdev)
+>  {
+> @@ -829,6 +835,7 @@ void dw_pcie_setup_rc(struct pcie_port *pp)
+>  		PCI_COMMAND_MASTER | PCI_COMMAND_SERR;
+>  	dw_pcie_writel_rc(pp, val, PCI_COMMAND);
+>  }
+> +EXPORT_SYMBOL_GPL(dw_pcie_setup_rc);
+>  
+>  MODULE_AUTHOR("Jingoo Han <jg1.han@samsung.com>");
+>  MODULE_DESCRIPTION("Designware PCIe host controller driver");
+> diff --git a/drivers/pci/setup-bus.c b/drivers/pci/setup-bus.c
+> index 6373985ad3f7..eeef7a1f4d0d 100644
+> --- a/drivers/pci/setup-bus.c
+> +++ b/drivers/pci/setup-bus.c
+> @@ -1634,7 +1634,7 @@ dump:
+>  	pci_bus_dump_resources(bus);
+>  }
+>  
+> -void __init pci_assign_unassigned_resources(void)
+> +void pci_assign_unassigned_resources(void)
+>  {
+>  	struct pci_bus *root_bus;
+>  
+> 
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-pci" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
