@@ -1,36 +1,74 @@
-From: dann.frazier@canonical.com (Dann Frazier)
-Date: Wed, 13 Aug 2014 16:31:39 -0600
-Subject: [PATCH Resend v2 0/2] arm64: Add PMU node for APM X-Gene Storm SoC
-In-Reply-To: <1407954730-9768-1-git-send-email-fkan@apm.com>
-References: <1407954730-9768-1-git-send-email-fkan@apm.com>
-Message-ID: <CALdTtns=oOxqfrak0umDyhRO4L2EUF-jOJq3Rq8PpjYX_xOfPA@mail.gmail.com>
+From: computersforpeace@gmail.com (Brian Norris)
+Date: Wed, 13 Aug 2014 15:50:02 -0700
+Subject: [PATCH v10] ARM: brcmstb: add debug UART for earlyprintk support
+Message-ID: <1407970202-3685-1-git-send-email-computersforpeace@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Aug 13, 2014 at 12:32 PM, Feng Kan <fkan@apm.com> wrote:
-> This patch series adds PMU node for APM X-Gene's Potenza CPU.
-> Potenza CPU PMU is compatible with ARMv8-PMUv3.
->
-> I am resending this patch since the original author has left the company and
-> I am taking over for the work. There is no change to the original patch.
->
-> Just a comment on the dependency on the second part of the patch. Though I
-> agree that without the GIC patch, perf utility does not function correctly on
-> our current platform. However, it also requires the correct bootloader to be
-> installed to perform the correct actions. This does not break Linux, which
-> lead me to remove the statement in the previous attempt. I have since put
-> back the statement and hope that the maintainer would provide some guidance
-> on if the patch would be postponed because the dependancy.
->
-> Feng Kan (2):
->   dt-bindings: Add Potenza PMU binding
->   arm64: dts: Add PMU node for APM X-Gene Storm SOC
->
->  Documentation/devicetree/bindings/arm/pmu.txt | 1 +
->  arch/arm64/boot/dts/apm-storm.dtsi            | 5 +++++
->  2 files changed, 6 insertions(+)
+From: Marc Carino <marc.ceeeee@gmail.com>
 
-I can confirm that this gives me hardware counter support with perf on
-X-Gene on latest linus with*out* the referenced additional GIC patch.
+Add the UART definitions needed to support earlyprintk on brcmstb machines.
 
-Tested-by: dann frazier <dann.frazier@canonical.com>
+Signed-off-by: Marc Carino <marc.ceeeee@gmail.com>
+Acked-by: Florian Fainelli <f.fainelli@gmail.com>
+Acked-by: Arnd Bergmann <arnd@arndb.de>
+Signed-off-by: Brian Norris <computersforpeace@gmail.com>
+---
+This patch was left out in the cold, since Russell wouldn't take it
+
+Sent against Linus' current head, since there were Kconfig.debug changes merged
+from both arm-soc/next/dt and arm-soc/next/soc (this is confusing!)
+
+ arch/arm/Kconfig.debug | 16 +++++++++++++++-
+ 1 file changed, 15 insertions(+), 1 deletion(-)
+
+diff --git a/arch/arm/Kconfig.debug b/arch/arm/Kconfig.debug
+index b11ad54f8d17..a985c2898075 100644
+--- a/arch/arm/Kconfig.debug
++++ b/arch/arm/Kconfig.debug
+@@ -130,6 +130,17 @@ choice
+ 		  Say Y here if you want kernel low-level debugging support
+ 		  on Marvell Berlin SoC based platforms.
+ 
++	config DEBUG_BRCMSTB_UART
++		bool "Use BRCMSTB UART for low-level debug"
++		depends on ARCH_BRCMSTB
++		select DEBUG_UART_8250
++		help
++		  Say Y here if you want the debug print routines to direct
++		  their output to the first serial port on these devices.
++
++		  If you have a Broadcom STB chip and would like early print
++		  messages to appear over the UART, select this option.
++
+ 	config DEBUG_CLPS711X_UART1
+ 		bool "Kernel low-level debugging messages via UART1"
+ 		depends on ARCH_CLPS711X
+@@ -1110,6 +1121,7 @@ config DEBUG_UART_PHYS
+ 	default 0xd4018000 if DEBUG_MMP_UART3
+ 	default 0xe0000000 if ARCH_SPEAR13XX
+ 	default 0xf0000be0 if ARCH_EBSA110
++	default 0xf040ab00 if DEBUG_BRCMSTB_UART
+ 	default 0xf1012000 if DEBUG_MVEBU_UART_ALTERNATE
+ 	default 0xf1012000 if ARCH_DOVE || ARCH_MV78XX0 || \
+ 				ARCH_ORION5X
+@@ -1157,6 +1169,7 @@ config DEBUG_UART_VIRT
+ 	default 0xfa71e000 if DEBUG_QCOM_UARTDM
+ 	default 0xfb009000 if DEBUG_REALVIEW_STD_PORT
+ 	default 0xfb10c000 if DEBUG_REALVIEW_PB1176_PORT
++	default 0xfc40ab00 if DEBUG_BRCMSTB_UART
+ 	default 0xfd000000 if ARCH_SPEAR3XX || ARCH_SPEAR6XX
+ 	default 0xfd000000 if ARCH_SPEAR13XX
+ 	default 0xfd012000 if ARCH_MV78XX0
+@@ -1210,7 +1223,8 @@ config DEBUG_UART_8250_WORD
+ 		ARCH_KEYSTONE || \
+ 		DEBUG_DAVINCI_DMx_UART0 || DEBUG_DAVINCI_DA8XX_UART1 || \
+ 		DEBUG_DAVINCI_DA8XX_UART2 || \
+-		DEBUG_BCM_KONA_UART || DEBUG_RK32_UART2
++		DEBUG_BCM_KONA_UART || DEBUG_RK32_UART2 || \
++		DEBUG_BRCMSTB_UART
+ 
+ config DEBUG_UART_8250_FLOW_CONTROL
+ 	bool "Enable flow control for 8250 UART"
+-- 
+1.9.1
