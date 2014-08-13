@@ -1,55 +1,115 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Wed, 13 Aug 2014 21:34:06 +0100
-Subject: [PATCH/RFC V8 1/1] clk: Support for clock parents and rates
- assigned from device tree
-In-Reply-To: <20140725214231.5177.86866@quantum>
-References: <1403105372-30403-1-git-send-email-s.nawrocki@samsung.com>
- <1403105372-30403-2-git-send-email-s.nawrocki@samsung.com>
- <53B59221.5080100@samsung.com> <20140725214231.5177.86866@quantum>
-Message-ID: <20140813203406.GU17528@sirena.org.uk>
+From: jonsmirl@gmail.com (jonsmirl at gmail.com)
+Date: Wed, 13 Aug 2014 16:41:20 -0400
+Subject: [linux-sunxi] Re: [PATCH 3/4] simplefb: disable dt node upon
+ remove
+In-Reply-To: <CACxGe6szX3LyhGHbVHrEFfaWGYUcgcxgkuhfc9ac-R0qJs-HXw@mail.gmail.com>
+References: <1407914239-12054-1-git-send-email-libv@skynet.be>
+ <1407914239-12054-4-git-send-email-libv@skynet.be>
+ <CACxGe6vaPUa4QvYWBA-QY7MTmJYoeqnPt9Zh5jpky6S9UYbrvQ@mail.gmail.com>
+ <CANq1E4ReOB87RX8VhnW1Ln=SK3Tw5V962ujcsfuz-2E9Uc61yQ@mail.gmail.com>
+ <CACxGe6vQrhd8QOAyGnjRppmuANpT60Ao2+KmkDfF4FNeoZSZgw@mail.gmail.com>
+ <20140813094524.GC31326@skynet.be>
+ <20140813101923.GD31326@skynet.be>
+ <CAKON4OwLOAq1EOzZmuefcnZ4hw0i35e3k0F6XGNRy-5jer2vyA@mail.gmail.com>
+ <CACxGe6szX3LyhGHbVHrEFfaWGYUcgcxgkuhfc9ac-R0qJs-HXw@mail.gmail.com>
+Message-ID: <CAKON4OzQbuaQsbTCDXuaqxLRxvat_5+wmf71S-rWXdfiT1gkvA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jul 25, 2014 at 02:42:31PM -0700, Mike Turquette wrote:
-> Quoting Sylwester Nawrocki (2014-07-03 10:25:53)
+On Wed, Aug 13, 2014 at 3:14 PM, Grant Likely <grant.likely@secretlab.ca> wrote:
+> On Wed, Aug 13, 2014 at 1:54 PM, jonsmirl at gmail.com <jonsmirl@gmail.com> wrote:
+>> On Wed, Aug 13, 2014 at 6:19 AM, Luc Verhaegen <libv@skynet.be> wrote:
+>>> On Wed, Aug 13, 2014 at 11:45:24AM +0200, Luc Verhaegen wrote:
+>>>> On Wed, Aug 13, 2014 at 10:23:14AM +0100, Grant Likely wrote:
+>>>> >
+>>>> > The majority of the DT code is based on the assumption of a static
+>>>> > tree. Pantelis has been working on being able to modify it at runtime
+>>>> > with overlays, but he has had to go through a lot of rework because it
+>>>> > is not a trivial task. When you get into modifying the DT, you need to
+>>>> > have a lot more understanding of the side effects to changing the
+>>>> > tree. The DT structure also has a lifecycle that can go beyond the
+>>>> > current lifecycle of the kernel. The kexec tool will extract the
+>>>> > current tree from the kernel, make the appropriate modifications, and
+>>>> > use that to boot the next kernel. Allowing any driver to modify the
+>>>> > tree has side effects beyond just the current kernel.
+>>>> >
+>>>> > In this specific case, it will interact badly with the work Pantelis
+>>>> > is doing to make platform devices work with overlays. Modifying the
+>>>> > status property will cause the associated struct device to get removed
+>>>> > in the middle of probing a driver for that device! That will most
+>>>> > likely cause an oops.
+>>>> >
+>>>> > Besides, Luc straight out *said*: "...even though it has no real value
+>>>> > today". In what circumstance is that justification for modifying the
+>>>> > tree?
+>>>>
+>>>> With that sentence i meant that given the current state of things, it
+>>>> has no real value.
+>>>>
+>>>> It has no value currently as re-probing simplefb is not going to happen.
+>>>> But it's not a big leap to turn simplefb into a proper module. Not that
+>>>> that makes much sense, but that's never stopped anyone.
+>>>>
+>>>> To me it seemed simple, dt is what drives simplefb, so dt then also
+>>>> becomes responsible for making sure that simplefb or another driver does
+>>>> not attempt to blindly use this info again. The way this is implemented
+>>>> i do not care for in any way, i just knew that i could not do nothing
+>>>> here, given the catastrophic effect disabling the clocks has on simplefb
+>>>> on sunxi. Given the discussion that errupted here, i'd say that this
+>>>> does need some resolution, and altering the dt is going to have to be
+>>>> part of the solution.
+>>>>
+>>>> In any case, i will gladly drop this patch, as it is not absolutely
+>>>> necessary. But it should be very clear that there is no going back on
+>>>> this dt node after the clocks were released once.
+>>>>
+>>>> Luc Verhaegen.
+>>>
+>>> What about approaching this from the other end? U-Boot could add a
+>>> property named "once-only" or so.
+>>
+>> Device tree is supposed to be a static description of the hardware
+>> usable on all operating systems. It is the wrong mechanism for
+>> communicating between uboot and the kernel. Use something like atags
+>> or the kernel command line to tell the kernel that the console has
+>> already been set up.
+>
+> Not accurate. While it is primarily hardware description, it is also
+> used for firmware communication. There is loads of precedence for
+> this. The /chosen node is the most significant example, but there are
+> other places where the tree is used to provide state. For example, the
+> current-speed property on UART nodes.
 
-> > I would appreciate a DT, SPI or the I2C maintainer opinions.
+I do seem to recall you telling me a long time ago that those chosen
+nodes were a mistake (or maybe it was Matt Sealey). I'm pretty wary of
+opening to door to device trees carrying a bunch of state.  Five years
+from now the DT is going to look like a Christmas tree.
 
-> Yes, Acks from SPI and I2C maintainers would be good. I might need to
-> drop those parts of this patch if they don't come through :-(
+>
+>> The switch over from simple to KMS should not be done via a node
+>> add/del to the device tree either.  No one has removed the device from
+>> the system, the device tree should not be changing.
+>
+> The simple-framebuffer binding appears to be insufficient in this
+> regard in that it doesn't have any linkage with the actual device
+> providing the framebuffer. Ideally, I would put the simple framebuffer
+> state directly into the video device node and use the chosen node to
+> point to the stdout device (probably with the stdout-path property).
+> Then the driver already knows it can just ignore the simple properties
+> because it owns the device node when it binds.
+>
+> That said, simple-framebuffer as it stands is in use so we're not
+> going to deprecate it. I would like to see an addition that specifies
+> how a controller can be associated with a simple framebuffer node.
+>
+> BTW, Is anyone currently using the simple framebuffer for early
+> console? For early console we would want to start using it well before
+> setting up platform devices.
+>
+> g.
 
-So, I just noticed this.  The reason I didn't see this earlier is that
-it was buried at the end of a large clock API patch rather than a split
-out patch for the SPI subsystem so it fell towards the bottom of
-my review queue.  There seems to be no dependency on adding the feature
-as part of one commit so it should really have been split out.
 
-Please don't assume that people are going to look in detail at patches
-that aren't obviously for them - I know I end up ignoring a lot of what
-I get sent since I get CCed on a lot of random things for no apparent
-reason (or get tediously large numbers of resends of things that are
-tangentially related), I imagine others do the same.  If you're doing
-that please draw attention to it, splitting out per subsystem is the
-best way of doing that.
 
-This is particularly unfortunate since I am actually a bit confused as
-to why we need to open code this for every bus rather than doing it in
-the driver core, there doesn't seem to be anything at all bus specific
-going on here.  Why can't we just call this from the driver core?
-Having the feature work for some buses and not others is going to get
-old fast.
-
-It's also not clear to me why we're passing false to of_clk_set_defaults()
-when we do call it - it's quite common for I2C and SPI devices to be
-clock providers and have clock trees.  As far as I can tell the
-reasoning is that what's actually going on here is that this is actually
-a mechanism to defer the initialisation to adding of the clock providers
-in which case contrary to the documentation for the function it's
-actually about device registration.  Is that right?
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140813/4d45d120/attachment.sig>
+-- 
+Jon Smirl
+jonsmirl at gmail.com
