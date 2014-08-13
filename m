@@ -1,140 +1,65 @@
-From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Wed, 13 Aug 2014 10:56:11 +0200
-Subject: [PATCH v4] usb: gadget: at91_udc: move prepare clk into process
- context
-In-Reply-To: <1407490962-16702-1-git-send-email-ronald.wahl@raritan.com>
-References: <1407490962-16702-1-git-send-email-ronald.wahl@raritan.com>
-Message-ID: <53EB282B.2090600@atmel.com>
+From: thierry.reding@gmail.com (Thierry Reding)
+Date: Wed, 13 Aug 2014 10:57:29 +0200
+Subject: [PATCH 0/3] Thermal reset support in PMC
+In-Reply-To: <53EB250D.5070207@nvidia.com>
+References: <1407226380-747-1-git-send-email-mperttunen@nvidia.com>
+ <20140813080744.GD7735@ulmo> <53EB1DF5.301@nvidia.com>
+ <53EB250D.5070207@nvidia.com>
+Message-ID: <20140813085728.GF7735@ulmo>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08/08/2014 11:42, Ronald Wahl :
-> Commit 7628083227b6bc4a7e33d7c381d7a4e558424b6b (usb: gadget: at91_udc:
-> prepare clk before calling enable) added clock preparation in interrupt
-> context. This is not allowed as it might sleep. Also setting the clock
-> rate is unsafe to call from there for the same reason. Move clock
-> preparation and setting clock rate into process context (at91udc_probe).
+On Wed, Aug 13, 2014 at 11:42:53AM +0300, Mikko Perttunen wrote:
 > 
-> Signed-off-by: Ronald Wahl <ronald.wahl@raritan.com>
+> 
+> On 13/08/14 11:12, Mikko Perttunen wrote:
+> >On 13/08/14 11:07, Thierry Reding wrote:
+> >>* PGP Signed by an unknown key
+> >>
+> >>On Tue, Aug 05, 2014 at 11:12:57AM +0300, Mikko Perttunen wrote:
+> >>>Hi,
+> >>>
+> >>>this series adds support for hardware-triggered thermal reset to the PMC
+> >>>driver. Namely, it adds device tree properties for specifying the I2C
+> >>>command to be sent when thermtrip is triggered. It is to be noted
+> >>>that thermtrip won't be ever triggered without a soctherm driver to
+> >>>calibrate the sensors, but I'll follow up with that patch.
+> >>>
+> >>>pmc.c required some juggling around to make the match data usable in
+> >>>probe, since I didn't want to put the code into the initcall either, since
+> >>>the soctherm driver won't be initialized by that point anyway.
+> >>>
+> >>>Series tested on Jetson-TK1. Should work on Tegra30 and Tegra114 too.
+> >>
+> >>Can you describe the procedure used to test this? We currently have a
+> >>bunch of features in Tegra that some people have tested at some point
+> >>during development but the test procedures never got documented. That
+> >>means whenever we want to test something we need to go and reinvent a
+> >>bunch of tests after the fact.
+> >>
+> >>So what I'd like to start doing is collect tests (preferably in some
+> >>scripted way) so that they can be kept in a repository that people can
+> >>easily clone and run on devices.
+> >>
+> >>Could you provide something like that for thermtrip?
+> >
+> >Sure. I'll see if I can make a just a test script or if a local patch is
+> >needed to test. Btw, I also have a pretty nice test script for EMC
+> >ready, and I agree that such a repository would be very nice.
+> 
+> Here is a test program. It it works, the device with immediately shut down.
+> 
+> https://gist.github.com/cyndis/66126c9c176b5f94a76f
 
-Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
+Is there a way to set the trip temperature without going through
+/dev/mem? I'd expect the device to have a sysfs interface of some
+sort.
 
-> ---
-> v3 -> v4:
->     - no code changes
->     - update commit message
->     - add changelog
-> 
-> v2 -> v3: (NOTE: this patch was also send with the v2 tag)
->     - moved setting the clock rate into process context as well as it may
->       also sleep
->     - update commit message
-> 
-> v1 -> v2:
->     - no changes (first v2 got out accidently)
-> 
->  drivers/usb/gadget/udc/at91_udc.c | 44 ++++++++++++++++++++++++++++-----------
->  1 file changed, 32 insertions(+), 12 deletions(-)
-> 
-> diff --git a/drivers/usb/gadget/udc/at91_udc.c b/drivers/usb/gadget/udc/at91_udc.c
-> index cfd18bc..0d685d0 100644
-> --- a/drivers/usb/gadget/udc/at91_udc.c
-> +++ b/drivers/usb/gadget/udc/at91_udc.c
-> @@ -870,12 +870,10 @@ static void clk_on(struct at91_udc *udc)
->  		return;
->  	udc->clocked = 1;
->  
-> -	if (IS_ENABLED(CONFIG_COMMON_CLK)) {
-> -		clk_set_rate(udc->uclk, 48000000);
-> -		clk_prepare_enable(udc->uclk);
-> -	}
-> -	clk_prepare_enable(udc->iclk);
-> -	clk_prepare_enable(udc->fclk);
-> +	if (IS_ENABLED(CONFIG_COMMON_CLK))
-> +		clk_enable(udc->uclk);
-> +	clk_enable(udc->iclk);
-> +	clk_enable(udc->fclk);
->  }
->  
->  static void clk_off(struct at91_udc *udc)
-> @@ -884,10 +882,10 @@ static void clk_off(struct at91_udc *udc)
->  		return;
->  	udc->clocked = 0;
->  	udc->gadget.speed = USB_SPEED_UNKNOWN;
-> -	clk_disable_unprepare(udc->fclk);
-> -	clk_disable_unprepare(udc->iclk);
-> +	clk_disable(udc->fclk);
-> +	clk_disable(udc->iclk);
->  	if (IS_ENABLED(CONFIG_COMMON_CLK))
-> -		clk_disable_unprepare(udc->uclk);
-> +		clk_disable(udc->uclk);
->  }
->  
->  /*
-> @@ -1780,14 +1778,24 @@ static int at91udc_probe(struct platform_device *pdev)
->  	}
->  
->  	/* don't do anything until we have both gadget driver and VBUS */
-> +	if (IS_ENABLED(CONFIG_COMMON_CLK)) {
-> +		clk_set_rate(udc->uclk, 48000000);
-> +		retval = clk_prepare(udc->uclk);
-> +		if (retval)
-> +			goto fail1;
-> +	}
-> +	retval = clk_prepare(udc->fclk);
-> +	if (retval)
-> +		goto fail1a;
-> +
->  	retval = clk_prepare_enable(udc->iclk);
->  	if (retval)
-> -		goto fail1;
-> +		goto fail1b;
->  	at91_udp_write(udc, AT91_UDP_TXVC, AT91_UDP_TXVC_TXVDIS);
->  	at91_udp_write(udc, AT91_UDP_IDR, 0xffffffff);
->  	/* Clear all pending interrupts - UDP may be used by bootloader. */
->  	at91_udp_write(udc, AT91_UDP_ICR, 0xffffffff);
-> -	clk_disable_unprepare(udc->iclk);
-> +	clk_disable(udc->iclk);
->  
->  	/* request UDC and maybe VBUS irqs */
->  	udc->udp_irq = platform_get_irq(pdev, 0);
-> @@ -1795,7 +1803,7 @@ static int at91udc_probe(struct platform_device *pdev)
->  			0, driver_name, udc);
->  	if (retval < 0) {
->  		DBG("request irq %d failed\n", udc->udp_irq);
-> -		goto fail1;
-> +		goto fail1c;
->  	}
->  	if (gpio_is_valid(udc->board.vbus_pin)) {
->  		retval = gpio_request(udc->board.vbus_pin, "udc_vbus");
-> @@ -1848,6 +1856,13 @@ fail3:
->  		gpio_free(udc->board.vbus_pin);
->  fail2:
->  	free_irq(udc->udp_irq, udc);
-> +fail1c:
-> +	clk_unprepare(udc->iclk);
-> +fail1b:
-> +	clk_unprepare(udc->fclk);
-> +fail1a:
-> +	if (IS_ENABLED(CONFIG_COMMON_CLK))
-> +		clk_unprepare(udc->uclk);
->  fail1:
->  	if (IS_ENABLED(CONFIG_COMMON_CLK) && !IS_ERR(udc->uclk))
->  		clk_put(udc->uclk);
-> @@ -1896,6 +1911,11 @@ static int __exit at91udc_remove(struct platform_device *pdev)
->  	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
->  	release_mem_region(res->start, resource_size(res));
->  
-> +	if (IS_ENABLED(CONFIG_COMMON_CLK))
-> +		clk_unprepare(udc->uclk);
-> +	clk_unprepare(udc->fclk);
-> +	clk_unprepare(udc->iclk);
-> +
->  	clk_put(udc->iclk);
->  	clk_put(udc->fclk);
->  	if (IS_ENABLED(CONFIG_COMMON_CLK))
-> 
-
-
--- 
-Nicolas Ferre
+Thierry
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: not available
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140813/87b09ed0/attachment-0001.sig>
