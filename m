@@ -1,38 +1,40 @@
 From: gabriel.fernandez@st.com (Gabriel FERNANDEZ)
-Date: Wed, 13 Aug 2014 17:34:30 +0200
-Subject: [PATCH 0/5] phy: miphy28lp: Introduce support for MiPHY28lp
-Message-ID: <1407944075-8093-1-git-send-email-gabriel.fernandez@linaro.org>
+Date: Wed, 13 Aug 2014 17:34:32 +0200
+Subject: [PATCH 2/5] phy: miphy28lp: Add MiPHY28lp header file for DT x Driver
+ defines
+In-Reply-To: <1407944075-8093-1-git-send-email-gabriel.fernandez@linaro.org>
+References: <1407944075-8093-1-git-send-email-gabriel.fernandez@linaro.org>
+Message-ID: <1407944075-8093-3-git-send-email-gabriel.fernandez@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Kishon,
+This provides the shared header file which will be reference from both
+the MiPHY28lp driver and its associated Device Tree node(s).
 
-The goal of this series is to add the support of MiPHY28lp Generic PHY.
-I tried to be as close as possible to the MiPHY365x Lee Jones proposal.
-
-Best Regards
-Gabriel.
-
-Gabriel Fernandez (5):
-  phy: miphy28lp: Add Device Tree bindings for the MiPHY28lp
-  phy: miphy28lp: Add MiPHY28lp header file for DT x Driver defines
-  phy: miphy28lp: Provide support for the MiPHY28lp Generic PHY
-  ARM: DT: STi: STiH407: Add DT node for MiPHY28lp
-  ARM: multi_v7_defconfig: Enable MiPHY28lp - ST's Generic (SATA, PCIe &
-    USB3) PHY
-
- .../devicetree/bindings/phy/phy-miphy28lp.txt      | 126 ++++
- arch/arm/boot/dts/stih407-b2120.dts                |  11 +
- arch/arm/boot/dts/stih407.dtsi                     |  65 ++
- arch/arm/configs/multi_v7_defconfig                |   1 +
- drivers/phy/Kconfig                                |   8 +
- drivers/phy/Makefile                               |   1 +
- drivers/phy/phy-miphy28lp.c                        | 736 +++++++++++++++++++++
- include/dt-bindings/phy/phy-miphy28lp.h            |  12 +
- 8 files changed, 960 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/phy/phy-miphy28lp.txt
- create mode 100644 drivers/phy/phy-miphy28lp.c
+Signed-off-by: alexandre torgue <alexandre.torgue@st.com>
+Signed-off-by: Gabriel Fernandez <gabriel.fernandez@linaro.org>
+---
+ include/dt-bindings/phy/phy-miphy28lp.h | 12 ++++++++++++
+ 1 file changed, 12 insertions(+)
  create mode 100644 include/dt-bindings/phy/phy-miphy28lp.h
 
+diff --git a/include/dt-bindings/phy/phy-miphy28lp.h b/include/dt-bindings/phy/phy-miphy28lp.h
+new file mode 100644
+index 0000000..7cf9bce
+--- /dev/null
++++ b/include/dt-bindings/phy/phy-miphy28lp.h
+@@ -0,0 +1,12 @@
++/*
++ * This header provides constants for the phy framework
++ * based on the STMicroelectronics miph28lp.
++ */
++#ifndef _DT_BINDINGS_PHY_MIPHY28LP
++#define _DT_BINDINGS_PHY_MIPHY28LP
++
++#define MIPHY_TYPE_SATA		1
++#define MIPHY_TYPE_PCIE		2
++#define MIPHY_TYPE_USB		3
++
++#endif /* _DT_BINDINGS_PHY_MIPHY28LP */
 -- 
 1.9.1
