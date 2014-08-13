@@ -1,95 +1,40 @@
-From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
-Date: Wed, 13 Aug 2014 23:11:01 +0100
-Subject: [PATCH v7 2/8] Documentation: arm: define DT idle states bindings
-In-Reply-To: <20140813192533.GA32624@ilina-mac.local>
-References: <1407945127-27554-1-git-send-email-lorenzo.pieralisi@arm.com>
- <1407945127-27554-3-git-send-email-lorenzo.pieralisi@arm.com>
- <20140813192533.GA32624@ilina-mac.local>
-Message-ID: <20140813221101.GA32697@e102568-lin.cambridge.arm.com>
+From: computersforpeace@gmail.com (Brian Norris)
+Date: Wed, 13 Aug 2014 15:11:50 -0700
+Subject: [PATCH v8 03/11] ARM: brcmstb: add debug UART for earlyprintk
+ support
+In-Reply-To: <20140804165627.GT3711@ld-irv-0074>
+References: <1405976886-27807-1-git-send-email-computersforpeace@gmail.com>
+ <1405976886-27807-4-git-send-email-computersforpeace@gmail.com>
+ <20140802083040.GY30282@n2100.arm.linux.org.uk>
+ <20140804165627.GT3711@ld-irv-0074>
+Message-ID: <CAN8TOE8w5bUT5byHiJrYr8AzaZ+EADzE+aoH6f2x2tFc1+1eQw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Aug 13, 2014 at 08:25:36PM +0100, Lina Iyer wrote:
-> Hi Lorenzo,
-> 
-> On Wed, Aug 13, 2014 at 04:52:01PM +0100, Lorenzo Pieralisi wrote:
-> >+===========================================
-> >+4 - Examples
-> >+===========================================
-> >+
-> >+Example 1 (ARM 64-bit, 16-cpu system, PSCI enable-method):
-> >+
-> >+cpus {
-> >+	#size-cells = <0>;
-> >+	#address-cells = <2>;
-> >+
-> >+	CPU0: cpu at 0 {
-> >+		device_type = "cpu";
-> >+		compatible = "arm,cortex-a57";
-> >+		reg = <0x0 0x0>;
-> >+		enable-method = "psci";
-> >+		cpu-idle-states = <&CPU_RETENTION_0_0 &CPU_SLEEP_0_0
-> >+				   &CLUSTER_RETENTION_0 &CLUSTER_SLEEP_0>;
-> >+	};
-> Sorry for jumping in late. I havent gone through all the patches yet or
-> followed on previous discussions, if somebody could answer this or point
-> me to the discussion, it would be great.
-> Why is the cpu defining the possible cluster idle states? Would it be
-> better that cluster states form a separate node, something like this -
-> 
-> 	CLUSTER0: cluster at 0 {
-> 		...
-> 		cpus = <&CPU0 &CPU1 &CPU2 &CPU3>;
-> 		cluster-idle-states = <&CLUTER_RETENTION_0, &CLUSTER_SLEEP_0>;
-> 		};
-> 	};	
-> 		
-> Allowing for something like this to be defined - 
-> 
-> 	super_cluster0: cluster at 101 {
-> 		...
-> 		clusters = <&CLUSTER0  &CLUSTER1>;
-> 		cluster-idle-states = <&SOC_RETENTION, &SOC_SLEEP>;
-> 		};
-> 	};
-> 
-> And each cluster-idle-state follows the general idle definition as
-> provided in this document, and an indicator what the compising
-> components should idle at, for this idle state to be available.
-> 
-> 	CLUSTER_SLEEP_0: cluster-sleep at 0 {
-> 		...
-> 		/* sleep definition for cluster0's retention */
-> 		min-idle-state = <CPU_SLEEP_0>;
-> 	};
-> 
-> 	SOC_SLEEP: cluster-sleep at 101 {
-> 		...
-> 		min-idle-state = <&CLUSTER_SLEEP_0>;
-> 	};
-> 		
-> 
-> Opens up the idle state for a lot of heirarchical possibilities, which
-> if you think, is generally how the SoC is. 
+Ping (Olof or Matt?)
 
-We have been thinking for 7 patch versions + some more for this specific
-document, which is ready to go after extensive debate.
+On Mon, Aug 4, 2014 at 9:56 AM, Brian Norris
+<computersforpeace@gmail.com> wrote:
+> On Sat, Aug 02, 2014 at 09:30:40AM +0100, Russell King wrote:
+>> On Mon, Jul 21, 2014 at 02:07:58PM -0700, Brian Norris wrote:
+>> > From: Marc Carino <marc.ceeeee@gmail.com>
+>> >
+>> > Add the UART definitions needed to support earlyprintk on brcmstb machines.
+>> >
+>> > Signed-off-by: Marc Carino <marc.ceeeee@gmail.com>
+>> > Acked-by: Florian Fainelli <f.fainelli@gmail.com>
+>> > Signed-off-by: Brian Norris <computersforpeace@gmail.com>
+>>
+>> I noticed that you sent this to the patch system.  I asked Olof last
+>> night whether he had anything in arm-soc touching Kconfig.debug, and
+>> he does (a number of other platforms have updated it.)  This means
+>> that if I apply it to my tree, it may conflict, so I'm reluctant to
+>> take it.
+>
+> OK... Matt told me that such patches go through you. So which is it?
+> Should all Kconfig.debug patches go through the arm-soc route?
 
-It is probably better to have a look at archives first since honestly it
-is impossible to summarize 6 months worth of discussions in few lines.
+How should this get in? Should I rebase/resend through Matt and
+arm-soc? Or can you pick this up as-is?
 
-I think the hierarchy you mention should be implemented using power
-domains, which is how the SoC implements power management and that's
-what defines idle states hierarchy.
-
-To be 100% precise, I would like to detect what cpus are affected by an
-idle state entry by defining for each idle state what power domain
-(which can be hierarchical) is affected, not by grouping them under
-a tag "cluster" "supercluster" or whatchamacallit.
-
-I removed power domains to simplify the current proposal which is sufficient
-as a starting point, but they are next on my TODO list and were part of the
-initial bindings, consider yourself welcome to help us define the way forward
-keeping this document as a starting point.
-
-Lorenzo
+Brian
