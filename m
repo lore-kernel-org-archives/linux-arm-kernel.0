@@ -1,78 +1,182 @@
-From: matthias.bgg@gmail.com (Matthias Brugger)
-Date: Wed, 13 Aug 2014 11:29:12 +0200
-Subject: [PATCH 6/7] arm: mediatek: enable gpt6 on boot up to make arch
- timer working
-In-Reply-To: <CACRpkdZOB=9wQ3R3sfcBEiNXLVRtgob4iLZ9QWXyVrgjqyvGXQ@mail.gmail.com>
-References: <1406824943-24052-1-git-send-email-matthias.bgg@gmail.com>
- <1406824943-24052-7-git-send-email-matthias.bgg@gmail.com>
- <CACRpkdbRhGE8tcKj+W_4F9-xmcm-fxcYuCmLOqX-ESC+3PAmyA@mail.gmail.com>
- <CABuKBe+Q3tnN0s22EMY-dK_6FeN_xN9SmrsW3dPONR6QDJ+V_w@mail.gmail.com>
- <CACRpkdZOB=9wQ3R3sfcBEiNXLVRtgob4iLZ9QWXyVrgjqyvGXQ@mail.gmail.com>
-Message-ID: <CABuKBeJOgkDZ8drPf3LnT2jPH7PEWX2__HDM7_jZbg2BhDRy3g@mail.gmail.com>
+From: kpark3469@gmail.com (kpark3469 at gmail.com)
+Date: Wed, 13 Aug 2014 18:31:04 +0900
+Subject: [PATCH] ARM: debug: uncompress debug support for omap2plus
+Message-ID: <1407922264-6214-1-git-send-email-kpark3469@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2014-08-13 10:47 GMT+02:00 Linus Walleij <linus.walleij@linaro.org>:
-> On Tue, Aug 12, 2014 at 11:02 AM, Matthias Brugger
-> <matthias.bgg@gmail.com> wrote:
->> 2014-08-11 9:15 GMT+02:00 Linus Walleij <linus.walleij@linaro.org>:
->>> On Thu, Jul 31, 2014 at 6:42 PM, Matthias Brugger
->>> <matthias.bgg@gmail.com> wrote:
->>>
->>>> We enable GTP6 which ungates the arch timer clock. Apart we write the
->>>> frequency with which the timer is running in the CNTFREQ register.
->>>> In the future this should be done in the bootloader.
->>>>
->>>> Signed-off-by: Matthias Brugger <matthias.bgg@gmail.com>
->>> (...)
->>>
->>>> +       if (of_machine_is_compatible("mediatek,mt6589")) {
->>>> +               /* set cntfreq register which is not done in bootloader */
->>>> +               asm volatile("mcr p15, 0, %0, c14, c0, 0" : : "r" (13000000));
->>>
->>> I guess this is for something like the ARM arch timer in
->>> drivers/clocksource/arm_arch_timer.c
->>>
->>> Instead of doing this, use the DT property "clock-frequency" on
->>> the ARM arch timer node, as that overrides the CP15 setting.
->>>
->>>> +
->>>> +               /* turn on GPT6 which ungates arch timer clocks */
->>>> +               gpt_base = ioremap(GPT6_CON_MT65xx, 0x04);
->>>> +       }
->>>> +
->>>> +       /* enabel clock and set to free-run */
->>>> +       if (gpt_base)
->>>> +               writel(0x31, gpt_base);
->>>
->>> Why is this not done properly in the GPT driver (I guess
->>> in drivers/clocksource/mtk_timer.c) instead of remapping
->>> it and fiddling around in the machine?
->>
->> I didn't put it in the GPT driver, because that would mean, that you
->> need to have the mtk_timer to be able to use the ARM arch timer.
->> From my understanding this are two independent blocks in the SoC.
->> Apart from that, as stated in the commit message, this patch is a
->> workaround until we have a bootloader which does this for us.
->> Therefore I thought the init_time function would be the better place to do this.
->
-> OK I get the point...
->
-> What about the ARM arch timer fixup then, will that also be
-> fixed in the boot loader eventually?
+From: Sahara <keun-o.park@windriver.com>
 
-Do you refer to clock frequency in the cntfreq register? I think that
-this should go in the DTS as you said.
-Same holds for the magic 0x31, which should be done through defines.
+Since OMAP low-level debug code places data in the .data section,
+The symbol DEBUG_UNCOMPRESS was defined with !DEBUG_OMAP2PLUS_UART.
+This patch removes the part using data section in debug/omap2plus.S,
+so DEBUG_UNCOMPRESS is now available on OMAP system.
 
-Cheers,
-Matthias
+Signed-off-by: Sahara <keun-o.park@windriver.com>
+---
+ arch/arm/Kconfig.debug             |    3 +-
+ arch/arm/include/debug/omap2plus.S |   96 ++++++++++--------------------------
+ 2 files changed, 27 insertions(+), 72 deletions(-)
 
->
-> Yours,
-> Linus Walleij
-
-
-
+diff --git a/arch/arm/Kconfig.debug b/arch/arm/Kconfig.debug
+index b11ad54..c0ad3e4 100644
+--- a/arch/arm/Kconfig.debug
++++ b/arch/arm/Kconfig.debug
+@@ -1220,8 +1220,7 @@ config DEBUG_UART_8250_FLOW_CONTROL
+ config DEBUG_UNCOMPRESS
+ 	bool
+ 	depends on ARCH_MULTIPLATFORM || ARCH_MSM || PLAT_SAMSUNG
+-	default y if DEBUG_LL && !DEBUG_OMAP2PLUS_UART && \
+-		     (!DEBUG_TEGRA_UART || !ZBOOT_ROM)
++	default y if DEBUG_LL && (!DEBUG_TEGRA_UART || !ZBOOT_ROM)
+ 	help
+ 	  This option influences the normal decompressor output for
+ 	  multiplatform kernels.  Normally, multiplatform kernels disable
+diff --git a/arch/arm/include/debug/omap2plus.S b/arch/arm/include/debug/omap2plus.S
+index 6d867ae..0b7ec89 100644
+--- a/arch/arm/include/debug/omap2plus.S
++++ b/arch/arm/include/debug/omap2plus.S
+@@ -58,115 +58,71 @@
+ 
+ #define UART_OFFSET(addr)	((addr) & 0x00ffffff)
+ 
+-		.pushsection .data
+-omap_uart_phys:	.word	0
+-omap_uart_virt:	.word	0
+-omap_uart_lsr:	.word	0
+-		.popsection
+-
+ 		.macro	addruart, rp, rv, tmp
+ 
+-		/* Use omap_uart_phys/virt if already configured */
+-10:		adr	\rp, 99f		@ get effective addr of 99f
+-		ldr	\rv, [\rp]		@ get absolute addr of 99f
+-		sub	\rv, \rv, \rp		@ offset between the two
+-		ldr	\rp, [\rp, #4]		@ abs addr of omap_uart_phys
+-		sub	\tmp, \rp, \rv		@ make it effective
+-		ldr	\rp, [\tmp, #0]		@ omap_uart_phys
+-		ldr	\rv, [\tmp, #4]		@ omap_uart_virt
+-		cmp	\rp, #0			@ is port configured?
+-		cmpne	\rv, #0
+-		bne	100f			@ already configured
+-
+ 		/* Configure the UART offset from the phys/virt base */
+-#ifdef CONFIG_DEBUG_OMAP2UART1
++#if defined(CONFIG_DEBUG_OMAP2UART1)
+ 		mov	\rp, #UART_OFFSET(OMAP2_UART1_BASE)	@ omap2/3/4
+ 		b	98f
+-#endif
+-#ifdef CONFIG_DEBUG_OMAP2UART2
++#elif defined(CONFIG_DEBUG_OMAP2UART2)
+ 		mov	\rp, #UART_OFFSET(OMAP2_UART2_BASE)	@ omap2/3/4
+ 		b	98f
+-#endif
+-#ifdef CONFIG_DEBUG_OMAP2UART3
++#elif defined(CONFIG_DEBUG_OMAP2UART3)
+ 		mov	\rp, #UART_OFFSET(OMAP2_UART3_BASE)
+ 		b	98f
+-#endif
+-#ifdef CONFIG_DEBUG_OMAP3UART3
++#elif defined(CONFIG_DEBUG_OMAP3UART3)
+ 		mov	\rp, #UART_OFFSET(OMAP3_UART1_BASE)
+ 		add	\rp, \rp, #0x00fb0000
+ 		add	\rp, \rp, #0x00006000		@ OMAP3_UART3_BASE
+ 		b	98f
+-#endif
+-#ifdef CONFIG_DEBUG_OMAP4UART3
++#elif defined(CONFIG_DEBUG_OMAP4UART3)
+ 		mov	\rp, #UART_OFFSET(OMAP4_UART3_BASE)
+ 		b	98f
+-#endif
+-#ifdef CONFIG_DEBUG_OMAP3UART4
++#elif defined(CONFIG_DEBUG_OMAP3UART4)
+ 		mov	\rp, #UART_OFFSET(OMAP3_UART1_BASE)
+ 		add	\rp, \rp, #0x00fb0000
+ 		add	\rp, \rp, #0x00028000		@ OMAP3_UART4_BASE
+ 		b	98f
+-#endif
+-#ifdef CONFIG_DEBUG_OMAP4UART4
++#elif defined(CONFIG_DEBUG_OMAP4UART4)
+ 		mov	\rp, #UART_OFFSET(OMAP4_UART4_BASE)
+ 		b	98f
+-#endif
+-#ifdef CONFIG_DEBUG_TI81XXUART1
++#elif defined(CONFIG_DEBUG_TI81XXUART1)
+ 		mov	\rp, #UART_OFFSET(TI81XX_UART1_BASE)
+ 		b	98f
+-#endif
+-#ifdef CONFIG_DEBUG_TI81XXUART2
++#elif defined(CONFIG_DEBUG_TI81XXUART2)
+ 		mov	\rp, #UART_OFFSET(TI81XX_UART2_BASE)
+ 		b	98f
+-#endif
+-#ifdef CONFIG_DEBUG_TI81XXUART3
++#elif defined(CONFIG_DEBUG_TI81XXUART3)
+ 		mov	\rp, #UART_OFFSET(TI81XX_UART3_BASE)
+ 		b	98f
+-#endif
+-#ifdef CONFIG_DEBUG_AM33XXUART1
++#elif defined(CONFIG_DEBUG_AM33XXUART1)
+ 		ldr	\rp, =AM33XX_UART1_BASE
+ 		and	\rp, \rp, #0x00ffffff
+ 		b	97f
+-#endif
+-#ifdef CONFIG_DEBUG_ZOOM_UART
++#elif defined(CONFIG_DEBUG_ZOOM_UART)
+ 		ldr	\rp, =ZOOM_UART_BASE
+-		str	\rp, [\tmp, #0]		@ omap_uart_phys
+-		ldr	\rp, =ZOOM_UART_VIRT
+-		str	\rp, [\tmp, #4]		@ omap_uart_virt
+-		mov	\rp, #(UART_LSR << ZOOM_PORT_SHIFT)
+-		str	\rp, [\tmp, #8]		@ omap_uart_lsr
++		ldr	\rv, =ZOOM_UART_VIRT
++		mov	\tmp, #(UART_LSR << ZOOM_PORT_SHIFT)
++		b	100f
++#else
++#error "Error! No proper debug option is defined."
+ #endif
+-		b	10b
+ 
+ 		/* AM33XX: Store both phys and virt address for the uart */
+ 97:		add	\rp, \rp, #0x44000000	@ phys base
+-		str	\rp, [\tmp, #0]		@ omap_uart_phys
+-		sub	\rp, \rp, #0x44000000	@ phys base
+-		add	\rp, \rp, #0xf9000000	@ virt base
+-		str	\rp, [\tmp, #4]		@ omap_uart_virt
+-		mov	\rp, #(UART_LSR << OMAP_PORT_SHIFT)
+-		str	\rp, [\tmp, #8]		@ omap_uart_lsr
++		sub	\rv, \rp, #0x44000000	@ phys base
++		add	\rv, \rv, #0xf9000000	@ virt base
++		mov	\tmp, #(UART_LSR << OMAP_PORT_SHIFT)
+ 
+-		b	10b
++		b	100f
+ 
+ 		/* Store both phys and virt address for the uart */
+ 98:		add	\rp, \rp, #0x48000000	@ phys base
+-		str	\rp, [\tmp, #0]		@ omap_uart_phys
+-		sub	\rp, \rp, #0x48000000	@ phys base
+-		add	\rp, \rp, #0xfa000000	@ virt base
+-		str	\rp, [\tmp, #4]		@ omap_uart_virt
+-		mov	\rp, #(UART_LSR << OMAP_PORT_SHIFT)
+-		str	\rp, [\tmp, #8]		@ omap_uart_lsr
+-
+-		b	10b
+-
+-		.align
+-99:		.word	.
+-		.word	omap_uart_phys
+-		.ltorg
+-
+-100:		/* Pass the UART_LSR reg address */
+-		ldr	\tmp, [\tmp, #8]	@ omap_uart_lsr
++		sub	\rv, \rp, #0x48000000	@ phys base
++		add	\rv, \rv, #0xfa000000	@ virt base
++		mov	\tmp, #(UART_LSR << OMAP_PORT_SHIFT)
++
++100:		/* Add the UART_LSR reg address */
+ 		add	\rp, \rp, \tmp
+ 		add	\rv, \rv, \tmp
+ 		.endm
 -- 
-motzblog.wordpress.com
+1.7.9.5
