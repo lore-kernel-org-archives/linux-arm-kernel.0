@@ -1,76 +1,89 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Wed, 13 Aug 2014 10:23:07 -0700
-Subject: [PATCH 1/2] ARM: tegra: add Acer Chromebook 13 device tree
-In-Reply-To: <53EB9BF0.9010002@wwwdotorg.org>
-References: <1407894967-18300-1-git-send-email-dgreid@chromium.org>
- <53EB9BF0.9010002@wwwdotorg.org>
-Message-ID: <CAOesGMhAzx==sXnHBg4dhAtO3=JP-s-MmzujskctA=7OUC0uRg@mail.gmail.com>
+From: jonsmirl@gmail.com (jonsmirl at gmail.com)
+Date: Wed, 13 Aug 2014 13:26:22 -0400
+Subject: [linux-sunxi] Re: [PATCH 3/4] simplefb: disable dt node upon
+ remove
+In-Reply-To: <53EB95D4.6010500@wwwdotorg.org>
+References: <1407914239-12054-1-git-send-email-libv@skynet.be>
+ <1407914239-12054-4-git-send-email-libv@skynet.be>
+ <CACxGe6vaPUa4QvYWBA-QY7MTmJYoeqnPt9Zh5jpky6S9UYbrvQ@mail.gmail.com>
+ <CANq1E4ReOB87RX8VhnW1Ln=SK3Tw5V962ujcsfuz-2E9Uc61yQ@mail.gmail.com>
+ <53EB95D4.6010500@wwwdotorg.org>
+Message-ID: <CAKON4OxoPDCAvOK8UEeMaJDuzFfQHwb0pVbFgoqSkn=_W5pAYw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Aug 13, 2014 at 10:10 AM, Stephen Warren <swarren@wwwdotorg.org> wrote:
-> On 08/12/2014 07:56 PM, Dylan Reid wrote:
+On Wed, Aug 13, 2014 at 12:44 PM, Stephen Warren <swarren@wwwdotorg.org> wrote:
+> On 08/13/2014 02:49 AM, David Herrmann wrote:
 >>
->> The Acer Chromebook 13, codenamed "Big", contains an NVIDIA tegra124
->> processor and is similar to the Venice2 reference platform.
+>> Hi
 >>
->> The keyboard, USB 2, audio, HDMI, sdcard and emmc have been tested
->> and work on the 1366x768 models.  I haven't tried on the HD systems
->> yet.
+>> On Wed, Aug 13, 2014 at 10:40 AM, Grant Likely
+>> <grant.likely@secretlab.ca> wrote:
+>>>
+>>> On Wed, Aug 13, 2014 at 8:17 AM, Luc Verhaegen <libv@skynet.be> wrote:
+>>>>
+>>>> The next commit will handle clocks correctly, so that these do not get
+>>>> automatically disabled on certain SoC simplefb implementations. As a
+>>>> result, the removal of this simplefb driver, and the release of the
+>>>> clocks, is rather final, and only a full display driver can work after
+>>>> this. So, it makes sense to also flag the dt node as disabled, even
+>>>> though it has no real value today.
+>>>>
+>>>> Signed-off-by: Luc Verhaegen <libv@skynet.be>
+>>>
+>>>
+>>> Please, no.
+>>>
+>>> Drivers should not be modifying the device tree without and
+>>> exceptionally good reason for doing so. Drivers are to treat the DT as
+>>> immutable.
+>>>
+>>> * the exception is an overlay driver which add new devices to the
+>>> kernel. Definitely not the case here.
 >>
->> WiFi does not yet work, it needs at least some PMIC changes to enable
->> the 32k clock.
 >>
->> The elan trackpad is not yet functional but hopefully will be soon as
->> there are patches under review.
->>
->> There is also an issue on reboot because the TPM isn't reset.  It will
->> cause the stock firmware to enter recovery mode.  This can be worked
->> around by an EC-reset, press refresh and power at the same time.
+>> Why? I think we have exactly that case:
+>>   * DT describes the real hw properly and those parts are immutable
+>>   * Additionally, bootloaders create firmware-framebuffers and
+>>     create simple-framebuffer devices for them. Those are
+>>     valid as long as no driver reconfigured the real hw.
+>>   * Once a real hw-driver loads, it might destroy the existing
+>>     framebuffers, thus, it should also destroy the platform device.
+>>   * If the real hw-driver is unloaded, it might re-create the FB
+>>     and thus create a new (or enable the old) platform device.
 >
 >
->> diff --git a/arch/arm/boot/dts/tegra124-big.dts
->> b/arch/arm/boot/dts/tegra124-big.dts
->
->
-> I think we need to include the SKU name in the filename and compatible value
-> below, or at least plan out that for other SKUs, we'll add the SKU name on.
->
->
->> +/ {
->> +       model = "Google Big";
->> +       compatible = "google,nyan-big", "nvidia,tegra124";
->
->
-> I think it'd be more user-friendly if the filename and compatible value more
-> obviously tied to the end-user-visible product name.
+> My intention was always that a bootloader's addition of a simplefb node to
+> the DT would be user-configurable or driven by the original DT content. As
+> such, there shouldn't ever be both a DT node describing the "real" HW and
+> simplefb. In other words, if the DT already has the "real" DT node, the
+> bootloader should automatically (or under user command) not add the simpefb
+> node.
 
-We didn't prefix the reference platform on the very first one we
-shipped (snow), but for the peach platforms we used peach-pit and
-peach-pi. Those had different SoCs inside (albeit very similar ones),
-so there was a reason for separate DTS files.
+DT is just the wrong mechanism to signal this, use an ATAG or kernel
+command line parameter.
 
-Here, we should probably prefix with nyan (so tegra124-nyan-big.dts).
-Users have shown themselves to be quite happy to use the internal
-names, they also tend to be less confusing (since we can't rely on the
-vendor to rename the product when the internals change, so we would
-need a separate namespace anyway).
+real hardware has compatible = "real-hardware-name, simplefb"
 
-What we did on pit/pi was to add a more-specific revision of the
-hardware in front. That was more about dealing with various
-generations of the hardware though (as components sometimes change
-over the lifetime production). Here it's more about the basic
-SKU/feature set (panel size, touch screen). I suspect we'll do a
-big-touch.dts that just includes this and appends the TS device.
+simplefb is built into kernel. It will attach to the device because of
+the compatible string. Then it can look at the command line and see if
+the bootloader also supported simplefb and already set things up.
 
-For the panel sizes, do we need the specifics in the DT instead of via
-EDID? Do we really need to describe the exact panel in the DTS? Note
-that panels are pretty common to change over the production run of a
-product too, second sourcing, etc.
+Then some mechanism will have to be designed to arrange a handoff
+between simplefb and the chip specific KMS driver. But that's a Linux
+problem, not a DT one.
 
-Model could be changed to "Acer Chromebook 13", I suppose. In the past
-we've used "Google Peach Pit", "Google Snow". No user has complained
-yet about that.
+>
+>
+> --
+> You received this message because you are subscribed to the Google Groups
+> "linux-sunxi" group.
+> To unsubscribe from this group and stop receiving emails from it, send an
+> email to linux-sunxi+unsubscribe at googlegroups.com.
+> For more options, visit https://groups.google.com/d/optout.
 
 
--Olof
+
+-- 
+Jon Smirl
+jonsmirl at gmail.com
