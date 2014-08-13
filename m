@@ -1,115 +1,92 @@
-From: jonsmirl@gmail.com (jonsmirl at gmail.com)
-Date: Wed, 13 Aug 2014 16:41:20 -0400
-Subject: [linux-sunxi] Re: [PATCH 3/4] simplefb: disable dt node upon
- remove
-In-Reply-To: <CACxGe6szX3LyhGHbVHrEFfaWGYUcgcxgkuhfc9ac-R0qJs-HXw@mail.gmail.com>
-References: <1407914239-12054-1-git-send-email-libv@skynet.be>
- <1407914239-12054-4-git-send-email-libv@skynet.be>
- <CACxGe6vaPUa4QvYWBA-QY7MTmJYoeqnPt9Zh5jpky6S9UYbrvQ@mail.gmail.com>
- <CANq1E4ReOB87RX8VhnW1Ln=SK3Tw5V962ujcsfuz-2E9Uc61yQ@mail.gmail.com>
- <CACxGe6vQrhd8QOAyGnjRppmuANpT60Ao2+KmkDfF4FNeoZSZgw@mail.gmail.com>
- <20140813094524.GC31326@skynet.be>
- <20140813101923.GD31326@skynet.be>
- <CAKON4OwLOAq1EOzZmuefcnZ4hw0i35e3k0F6XGNRy-5jer2vyA@mail.gmail.com>
- <CACxGe6szX3LyhGHbVHrEFfaWGYUcgcxgkuhfc9ac-R0qJs-HXw@mail.gmail.com>
-Message-ID: <CAKON4OzQbuaQsbTCDXuaqxLRxvat_5+wmf71S-rWXdfiT1gkvA@mail.gmail.com>
+From: mitchelh@codeaurora.org (Mitchel Humpherys)
+Date: Wed, 13 Aug 2014 14:07:30 -0700
+Subject: [PATCH 1/6] iommu/arm-smmu: add support for specifying clocks
+In-Reply-To: <1407891099-24641-2-git-send-email-mitchelh@codeaurora.org>
+ (Mitchel Humpherys's message of "Tue, 12 Aug 2014 17:51:34 -0700")
+References: <1407891099-24641-1-git-send-email-mitchelh@codeaurora.org>
+ <1407891099-24641-2-git-send-email-mitchelh@codeaurora.org>
+Message-ID: <vnkwmwb8f699.fsf@mitchelh-linux.qualcomm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Aug 13, 2014 at 3:14 PM, Grant Likely <grant.likely@secretlab.ca> wrote:
-> On Wed, Aug 13, 2014 at 1:54 PM, jonsmirl at gmail.com <jonsmirl@gmail.com> wrote:
->> On Wed, Aug 13, 2014 at 6:19 AM, Luc Verhaegen <libv@skynet.be> wrote:
->>> On Wed, Aug 13, 2014 at 11:45:24AM +0200, Luc Verhaegen wrote:
->>>> On Wed, Aug 13, 2014 at 10:23:14AM +0100, Grant Likely wrote:
->>>> >
->>>> > The majority of the DT code is based on the assumption of a static
->>>> > tree. Pantelis has been working on being able to modify it at runtime
->>>> > with overlays, but he has had to go through a lot of rework because it
->>>> > is not a trivial task. When you get into modifying the DT, you need to
->>>> > have a lot more understanding of the side effects to changing the
->>>> > tree. The DT structure also has a lifecycle that can go beyond the
->>>> > current lifecycle of the kernel. The kexec tool will extract the
->>>> > current tree from the kernel, make the appropriate modifications, and
->>>> > use that to boot the next kernel. Allowing any driver to modify the
->>>> > tree has side effects beyond just the current kernel.
->>>> >
->>>> > In this specific case, it will interact badly with the work Pantelis
->>>> > is doing to make platform devices work with overlays. Modifying the
->>>> > status property will cause the associated struct device to get removed
->>>> > in the middle of probing a driver for that device! That will most
->>>> > likely cause an oops.
->>>> >
->>>> > Besides, Luc straight out *said*: "...even though it has no real value
->>>> > today". In what circumstance is that justification for modifying the
->>>> > tree?
->>>>
->>>> With that sentence i meant that given the current state of things, it
->>>> has no real value.
->>>>
->>>> It has no value currently as re-probing simplefb is not going to happen.
->>>> But it's not a big leap to turn simplefb into a proper module. Not that
->>>> that makes much sense, but that's never stopped anyone.
->>>>
->>>> To me it seemed simple, dt is what drives simplefb, so dt then also
->>>> becomes responsible for making sure that simplefb or another driver does
->>>> not attempt to blindly use this info again. The way this is implemented
->>>> i do not care for in any way, i just knew that i could not do nothing
->>>> here, given the catastrophic effect disabling the clocks has on simplefb
->>>> on sunxi. Given the discussion that errupted here, i'd say that this
->>>> does need some resolution, and altering the dt is going to have to be
->>>> part of the solution.
->>>>
->>>> In any case, i will gladly drop this patch, as it is not absolutely
->>>> necessary. But it should be very clear that there is no going back on
->>>> this dt node after the clocks were released once.
->>>>
->>>> Luc Verhaegen.
->>>
->>> What about approaching this from the other end? U-Boot could add a
->>> property named "once-only" or so.
->>
->> Device tree is supposed to be a static description of the hardware
->> usable on all operating systems. It is the wrong mechanism for
->> communicating between uboot and the kernel. Use something like atags
->> or the kernel command line to tell the kernel that the console has
->> already been set up.
->
-> Not accurate. While it is primarily hardware description, it is also
-> used for firmware communication. There is loads of precedence for
-> this. The /chosen node is the most significant example, but there are
-> other places where the tree is used to provide state. For example, the
-> current-speed property on UART nodes.
+Well hopefully this isn't too Nick Krouse-esque, but I have some
+comments on my own patch below. I sat on these for a few days but have
+noticed a few things after testing on another platform...
 
-I do seem to recall you telling me a long time ago that those chosen
-nodes were a mistake (or maybe it was Matt Sealey). I'm pretty wary of
-opening to door to device trees carrying a bunch of state.  Five years
-from now the DT is going to look like a Christmas tree.
+On Tue, Aug 12 2014 at 05:51:34 PM, Mitchel Humpherys <mitchelh@codeaurora.org> wrote:
+> On some platforms with tight power constraints it is polite to only
+> leave your clocks on for as long as you absolutely need them. Currently
+> we assume that all clocks necessary for SMMU register access are always
+> on.
+>
+> Add some optional device tree properties to specify any clocks that are
+> necessary for SMMU register access and turn them on and off as needed.
+>
+> If no clocks are specified in the device tree things continue to work
+> the way they always have: we assume all necessary clocks are always
+> turned on.
+>
+> Signed-off-by: Mitchel Humpherys <mitchelh@codeaurora.org>
+> ---
+>  .../devicetree/bindings/iommu/arm,smmu.txt         |  11 ++
+>  drivers/iommu/arm-smmu.c                           | 127 +++++++++++++++++++--
+>  2 files changed, 129 insertions(+), 9 deletions(-)
 
->
->> The switch over from simple to KMS should not be done via a node
->> add/del to the device tree either.  No one has removed the device from
->> the system, the device tree should not be changing.
->
-> The simple-framebuffer binding appears to be insufficient in this
-> regard in that it doesn't have any linkage with the actual device
-> providing the framebuffer. Ideally, I would put the simple framebuffer
-> state directly into the video device node and use the chosen node to
-> point to the stdout device (probably with the stdout-path property).
-> Then the driver already knows it can just ignore the simple properties
-> because it owns the device node when it binds.
->
-> That said, simple-framebuffer as it stands is in use so we're not
-> going to deprecate it. I would like to see an addition that specifies
-> how a controller can be associated with a simple framebuffer node.
->
-> BTW, Is anyone currently using the simple framebuffer for early
-> console? For early console we would want to start using it well before
-> setting up platform devices.
->
-> g.
+[...]
+
+> -static int arm_smmu_device_cfg_probe(struct arm_smmu_device *smmu)
+> +static int arm_smmu_init_clocks(struct arm_smmu_device *smmu)
+> +{
+> +	const char *cname;
+> +	struct property *prop;
+> +	int i;
+> +	struct device *dev = smmu->dev;
+> +
+> +	smmu->num_clocks = of_property_count_strings(dev->of_node,
+> +						"clock-names");
+> +
+> +	if (!smmu->num_clocks)
+> +		return 0;
+> +
+> +	smmu->clocks = devm_kzalloc(
+> +		dev, sizeof(*smmu->clocks) * smmu->num_clocks,
+> +		GFP_KERNEL);
+> +
+> +	if (!smmu->clocks) {
+> +		dev_err(dev,
+> +			"Failed to allocate memory for clocks\n");
+> +		return -ENODEV;
+> +	}
+> +
+> +	i = 0;
+> +	of_property_for_each_string(dev->of_node, "clock-names",
+> +				prop, cname) {
+> +		struct clk *c = devm_clk_get(dev, cname);
+> +		if (IS_ERR(c)) {
+> +			dev_err(dev, "Couldn't get clock: %s",
+> +				cname);
+> +			return -ENODEV;
+> +		}
+> +
+> +		if (clk_get_rate(c) == 0) {
+> +			long rate = clk_round_rate(c, 1000);
+> +			clk_set_rate(c, rate);
+> +		}
+> +
+> +		smmu->clocks[i] = c;
+> +
+> +		++i;
+> +	}
+> +	return 0;
+> +}
+> +
+> +int arm_smmu_device_cfg_probe(struct arm_smmu_device *smmu)
+
+The `static' was dropped unintentionally here.
 
 
+-Mitch
 
 -- 
-Jon Smirl
-jonsmirl at gmail.com
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
+hosted by The Linux Foundation
