@@ -1,45 +1,46 @@
-From: javier.martinez@collabora.co.uk (Javier Martinez Canillas)
-Date: Wed, 13 Aug 2014 19:01:31 +0200
-Subject: [PATCH 6/6] ARM: dts: Add tps65090 FETs constraints
-In-Reply-To: <53EB8F50.7090505@wwwdotorg.org>
-References: <1407861868-20097-1-git-send-email-javier.martinez@collabora.co.uk>
- <1407861868-20097-7-git-send-email-javier.martinez@collabora.co.uk>
- <53EB8F50.7090505@wwwdotorg.org>
-Message-ID: <53EB99EB.5020404@collabora.co.uk>
+From: abrestic@chromium.org (Andrew Bresticker)
+Date: Wed, 13 Aug 2014 10:04:38 -0700
+Subject: [PATCH 1/2] ARM: tegra: add Acer Chromebook 13 device tree
+In-Reply-To: <53EB9786.6010809@wwwdotorg.org>
+References: <1407894967-18300-1-git-send-email-dgreid@chromium.org>
+ <20140813085304.GE7735@ulmo> <53EB9786.6010809@wwwdotorg.org>
+Message-ID: <CAL1qeaGxcp4okVTYCMj0zMh-4HzsGLBvngv0+A1m8o3sZPDj2A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Stephen,
+On Wed, Aug 13, 2014 at 9:51 AM, Stephen Warren <swarren@wwwdotorg.org> wrote:
+> On 08/13/2014 02:53 AM, Thierry Reding wrote:
+>>
+>> On Tue, Aug 12, 2014 at 06:56:07PM -0700, Dylan Reid wrote:
+>>>
+>>> The Acer Chromebook 13, codenamed "Big", contains an NVIDIA tegra124
+>>> processor and is similar to the Venice2 reference platform.
+>>>
+>>> The keyboard, USB 2, audio, HDMI, sdcard and emmc have been tested
+>>> and work on the 1366x768 models.  I haven't tried on the HD systems
+>>> yet.
+>>
+>>
+>> Presumably the HD systems will have a different compatible? Is it only
+>> the panel that's different or are there other changes?
+>
+>
+> Yes, we definitely need to plan ahead for the different SKUs. I assume we'll
+> have different board names for each board, which then translates int DT
+> filenames and U-Boot/cbootimage-configs/tegra-uboot-flasher board
 
-On 08/13/2014 06:16 PM, Stephen Warren wrote:
-> 
-> I'm worried that this file represents the limits of the PMIC itself, 
-> whereas the DT should be representing the limits of the circuits that 
-> the various PMIC regulators are attached to on the board.
-> 
-> For example:
-> 
->> diff --git a/arch/arm/boot/dts/tps65090.dtsi b/arch/arm/boot/dts/tps65090.dtsi
-> 
->>   		tps65090_fet3: fet3 {
->> +			regulator-min-microvolt = <3000000>;
->> +			regulator-max-microvolt = <5500000>;
->>   		};
-> 
-> I guess that on some boards, this output rail might be attached to 
-> devices that must run at 3.3V exactly, and on other boards it might be 
-> attached to devices that must run at 5V exactly. The DT for those two 
-> boards should each have regulator-{min,max}-microvolt set to the same 
-> value, which describes the board requirements.
-> 
-> It feels dangerous/misleading to define the PMIC range by default. It 
-> might lead people to think that since the property already has a defined 
-> value, they don't need to think about what the correct value for their 
-> board is, and hence not change the value in their board file.
-> 
+The firmware does not differentiate between the HD and non-HD boards,
+so it will look for the same compatible string.  As I mentioned in my
+response to Thierry, we'd need to parse the EDID to figure out which
+panel is being used.
 
-Yes, Mark already explained to me why this approach was broken so I've
-dropped the whole series. Thanks a lot for your feedback.
+>>> +       compatible = "google,nyan-big", "nvidia,tegra124";
+>>
+>>
+>> What's "nyan"? Are there other variants of "big" other than "nyan"?
+>
+>
+> I thought this board was known as Nike?
 
-Best regards,
-Javier
+Nike is Acer's name for the board.  We call Tegra124-based boards
+Nyan-${variant}.
