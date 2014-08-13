@@ -1,75 +1,109 @@
-From: nicolas.pitre@linaro.org (Nicolas Pitre)
-Date: Wed, 13 Aug 2014 13:38:24 -0400 (EDT)
-Subject: [PATCH v4 0/8] arm: support CONFIG_RODATA
-In-Reply-To: <1407949593-16121-1-git-send-email-keescook@chromium.org>
-References: <1407949593-16121-1-git-send-email-keescook@chromium.org>
-Message-ID: <alpine.LFD.2.11.1408131337360.1133@knanqh.ubzr>
+From: jonsmirl@gmail.com (jonsmirl at gmail.com)
+Date: Wed, 13 Aug 2014 13:44:07 -0400
+Subject: [linux-sunxi] Re: [PATCH 3/4] simplefb: disable dt node upon
+ remove
+In-Reply-To: <53EBA18F.1030309@wwwdotorg.org>
+References: <1407914239-12054-1-git-send-email-libv@skynet.be>
+ <1407914239-12054-4-git-send-email-libv@skynet.be>
+ <CACxGe6vaPUa4QvYWBA-QY7MTmJYoeqnPt9Zh5jpky6S9UYbrvQ@mail.gmail.com>
+ <CANq1E4ReOB87RX8VhnW1Ln=SK3Tw5V962ujcsfuz-2E9Uc61yQ@mail.gmail.com>
+ <53EB95D4.6010500@wwwdotorg.org>
+ <CAKON4OxoPDCAvOK8UEeMaJDuzFfQHwb0pVbFgoqSkn=_W5pAYw@mail.gmail.com>
+ <53EBA18F.1030309@wwwdotorg.org>
+Message-ID: <CAKON4OxUe7csTB=1BcU4SR9Kk9_pFKfmNGgm0Gw28jOj+TF5FA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 13 Aug 2014, Kees Cook wrote:
+On Wed, Aug 13, 2014 at 1:34 PM, Stephen Warren <swarren@wwwdotorg.org> wrote:
+> On 08/13/2014 11:26 AM, jonsmirl at gmail.com wrote:
+>>
+>> On Wed, Aug 13, 2014 at 12:44 PM, Stephen Warren <swarren@wwwdotorg.org>
+>> wrote:
+>>>
+>>> On 08/13/2014 02:49 AM, David Herrmann wrote:
+>>>>
+>>>>
+>>>> Hi
+>>>>
+>>>> On Wed, Aug 13, 2014 at 10:40 AM, Grant Likely
+>>>> <grant.likely@secretlab.ca> wrote:
+>>>>>
+>>>>>
+>>>>> On Wed, Aug 13, 2014 at 8:17 AM, Luc Verhaegen <libv@skynet.be> wrote:
+>>>>>>
+>>>>>>
+>>>>>> The next commit will handle clocks correctly, so that these do not get
+>>>>>> automatically disabled on certain SoC simplefb implementations. As a
+>>>>>> result, the removal of this simplefb driver, and the release of the
+>>>>>> clocks, is rather final, and only a full display driver can work after
+>>>>>> this. So, it makes sense to also flag the dt node as disabled, even
+>>>>>> though it has no real value today.
+>>>>>>
+>>>>>> Signed-off-by: Luc Verhaegen <libv@skynet.be>
+>>>>>
+>>>>>
+>>>>>
+>>>>> Please, no.
+>>>>>
+>>>>> Drivers should not be modifying the device tree without and
+>>>>> exceptionally good reason for doing so. Drivers are to treat the DT as
+>>>>> immutable.
+>>>>>
+>>>>> * the exception is an overlay driver which add new devices to the
+>>>>> kernel. Definitely not the case here.
+>>>>
+>>>>
+>>>>
+>>>> Why? I think we have exactly that case:
+>>>>    * DT describes the real hw properly and those parts are immutable
+>>>>    * Additionally, bootloaders create firmware-framebuffers and
+>>>>      create simple-framebuffer devices for them. Those are
+>>>>      valid as long as no driver reconfigured the real hw.
+>>>>    * Once a real hw-driver loads, it might destroy the existing
+>>>>      framebuffers, thus, it should also destroy the platform device.
+>>>>    * If the real hw-driver is unloaded, it might re-create the FB
+>>>>      and thus create a new (or enable the old) platform device.
+>>>
+>>>
+>>>
+>>> My intention was always that a bootloader's addition of a simplefb node
+>>> to
+>>> the DT would be user-configurable or driven by the original DT content.
+>>> As
+>>> such, there shouldn't ever be both a DT node describing the "real" HW and
+>>> simplefb. In other words, if the DT already has the "real" DT node, the
+>>> bootloader should automatically (or under user command) not add the
+>>> simpefb
+>>> node.
+>>
+>>
+>> DT is just the wrong mechanism to signal this, use an ATAG or kernel
+>> command line parameter.
+>>
+>> real hardware has compatible = "real-hardware-name, simplefb"
+>>
+>> simplefb is built into kernel. It will attach to the device because of
+>> the compatible string. Then it can look at the command line and see if
+>> the bootloader also supported simplefb and already set things up.
+>>
+>> Then some mechanism will have to be designed to arrange a handoff
+>> between simplefb and the chip specific KMS driver. But that's a Linux
+>> problem, not a DT one.
+>
+>
+> Having a single DT node that conforms to both the binding for
+> "real-hardware-name" and "simplefb" doesn't seem like a good approach. What
+> if the properties required by the two bindings conflict in some way? The
+> approach you advocate certainly hasn't ever been used AFAIK.
 
-> This is a series of patches to support CONFIG_RODATA on ARM, so that
-> the kernel text is RO, and non-text sections default to NX. To support
-> on-the-fly kernel text patching (via ftrace, kprobes, etc), fixmap
-> support has been finalized based on several versions of various patches
-> that are floating around on the mailing list. This series attempts to
-> include the least intrusive version, so that others can build on it for
-> future fixmap work.
-> 
-> The series has been heavily tested, and appears to be working correctly:
-> 
-> With CONFIG_ARM_PTDUMP, expected page table permissions are seen in
-> /sys/kernel/debug/kernel_page_tables.
-> 
-> Using CONFIG_LKDTM, the kernel now correctly detects bad accesses for
-> for the following lkdtm tests via /sys/kernel/debug/provoke-crash/DIRECT:
->         EXEC_DATA
->         WRITE_RO
->         WRITE_KERN
-> 
-> ftrace works:
->         CONFIG_FTRACE_STARTUP_TEST passes
->         Enabling tracing works:
->                 echo function > /sys/kernel/debug/tracing/current_tracer
-> 
-> kprobes works:
->         CONFIG_ARM_KPROBES_TEST passes
-> 
-> kexec works:
->         kexec will load and start a new kernel
-> 
-> Built with and without CONFIG_HIGHMEM, CONFIG_HIGHMEM_DEBUG, and
-> CONFIG_NR_CPUS=32.
-> 
-> Thanks to everyone who has been testing this series and working on its
-> various pieces!
+I believe we do have something like this - SPI core implements a lot
+of core DT functions. All SPI nodes use this core. Then hardware
+specific attributes are added.
 
-For the whole series:
+The conflicts would need to get sorted out. That's why we should have
+a schema in place for device tree. Then the properties for specific
+video hardware would inherit from the properties for simplefb.
 
-Acked-by: Nicolas Pitre <nico@linaro.org>
-
-
-
-> 
-> -Kees
-> 
-> v4:
-> - expanded fixmap to 3MB to support 32 CPUs (robh)
-> - corrected pmd-finding via vaddr instead of FIXMAP_START (robh)
-> - switched structure size test to BUILD_BUG_ON (sboyd)
-> - added locking annotations to keep sparse happy (sboyd)
-> - adding missing "static" declarations noticed by sparse
-> - reorganized fixmap portion of patches
-> 
-> v3:
-> - more cleanups in switch to generic fixmap (lauraa, robh)
-> - fixed kexec merge hunk glitch (will.deacon)
-> - added tested-by tags where appropriate from v2 testing
-> 
-> v2:
-> - fix typo in kexec merge (buildbot)
-> - flip index order for highmem pte access (lauraa)
-> - added kgdb updates (dianders)
-> 
-> 
+-- 
+Jon Smirl
+jonsmirl at gmail.com
