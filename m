@@ -1,54 +1,52 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Wed, 13 Aug 2014 11:44:31 +0100
-Subject: [PATCH] cpuidle/cpuidle-big_little: fix reading cpu id part number
-In-Reply-To: <53EB381D.7080604@arm.com>
-References: <1407501757-15231-1-git-send-email-juri.lelli@arm.com>
- <20140808132105.GB30282@n2100.arm.linux.org.uk>
- <20140808164737.GB11623@e102568-lin.cambridge.arm.com>
- <53EB381D.7080604@arm.com>
-Message-ID: <20140813104431.GJ30401@n2100.arm.linux.org.uk>
+From: mpa@pengutronix.de (Markus Pargmann)
+Date: Wed, 13 Aug 2014 12:50:01 +0200
+Subject: [PATCH v3] watchdog: Add DA906x PMIC watchdog driver.
+In-Reply-To: <1407926776-16700-1-git-send-email-mpa@pengutronix.de>
+References: <1407926776-16700-1-git-send-email-mpa@pengutronix.de>
+Message-ID: <20140813105001.GF17027@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Aug 13, 2014 at 11:04:13AM +0100, Juri Lelli wrote:
-> Thanks a lot for the comment. Does what below address it?
+Hi,
 
-Yes, thanks, but a few of nitpicks though.
+On Wed, Aug 13, 2014 at 12:46:16PM +0200, Markus Pargmann wrote:
+> From: Krystian Garbaciak <krystian.garbaciak@diasemi.com>
+> 
+> This driver supports the watchdog device inside the DA906x PMIC.
+> 
+> Signed-off-by: Krystian Garbaciak <krystian.garbaciak@diasemi.com>
+> Signed-off-by: Philipp Zabel <p.zabel@pengutronix.de>
+> Signed-off-by: Markus Pargmann <mpa@pengutronix.de>
+> ---
+>  drivers/watchdog/Kconfig      |   7 ++
+>  drivers/watchdog/Makefile     |   1 +
+>  drivers/watchdog/da9063_wdt.c | 228 ++++++++++++++++++++++++++++++++++++++++++
+>  3 files changed, 236 insertions(+)
+>  create mode 100644 drivers/watchdog/da9063_wdt.c
 
-> +/*
-> + * smp_cpuid_part() - return part id for a given cpu
-> + *
-> + * @cpu: logical cpu id
-> + *
-> + * Return: part id of logical cpu passed as argument
-> + *
-> + */
+Forgot to add --notes to send-email.
 
-If this is supposed to be a kerneldoc-compatible comment, please read
-Documentation/kernel-doc-nano-HOWTO.txt for the correct format.
+Here are the changes in v3:
+     - Cleanup error handling for timeout selection and setting
+     - Fix race condition due to late wdt drvdata setup
+     - Remove static struct watchdog_device. It is not initialized in the probe
+       function
+     - Use WATCHDOG_NOWAYOUT_INIT_STATUS for the status
+     - Remove 0 shift using DA9063_TWDSCALE_SHIFT
 
-> +static inline unsigned int smp_cpuid_part(int cpu)
-> +{
-> +	struct cpuinfo_arm *cpu_info = &per_cpu(cpu_data, cpu);
-> +
-> +	return is_smp() ? (cpu_info->cpuid  & ARM_CPU_PART_MASK) :
+Best regards,
 
-Parens are not required, and there's a double space before &.
-
-The BNF for the ?: operator is:
-
-cond-expr:
-	log-or-expr ? expr : cond-expr
-
-So the compiler knows that whatever is between the ? and : is a single
-expression, and the parens are surplus.
-
-> -static int __init bl_idle_driver_init(struct cpuidle_driver *drv, int cpu_id)
-> +static int __init bl_idle_driver_init(struct cpuidle_driver *drv, int match_id)
-
-If we're changing the name, "part_id" would probably be better than the
-opaque "match_id" here.
+Markus Pargmann
 
 -- 
-FTTC broadband for 0.8mile line: currently at 9.5Mbps down 400kbps up
-according to speedtest.net.
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140813/f4c51265/attachment.sig>
