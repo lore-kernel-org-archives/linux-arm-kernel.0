@@ -1,183 +1,147 @@
-From: dyoung@redhat.com (Dave Young)
-Date: Wed, 13 Aug 2014 16:13:47 +0800
-Subject: [PATCH 2/5] efi: add kernel param efi=noruntime
-In-Reply-To: <1407823822-23829-2-git-send-email-dyoung@redhat.com>
-References: <1407823822-23829-1-git-send-email-dyoung@redhat.com>
- <1407823822-23829-2-git-send-email-dyoung@redhat.com>
-Message-ID: <20140813081347.GA3977@darkstar.nay.redhat.com>
+From: Ludovic.Desroches@atmel.com (Desroches, Ludovic)
+Date: Wed, 13 Aug 2014 10:13:46 +0200
+Subject: [PATCH] spi: atmel: fix corruption caused by too early transfer
+ completion
+In-Reply-To: <B256D81BAE5131468A838E5D7A2436419D1F4087@penmbx01>
+References: <1407330035-2212-1-git-send-email-ronald.wahl@raritan.com>
+ <B256D81BAE5131468A838E5D7A2436419D1F2032@penmbx01>
+ <20140813061638.GF2452@ldesroches-Latitude-E6320>
+ <B256D81BAE5131468A838E5D7A2436419D1F4087@penmbx01>
+Message-ID: <20140813081346.GG2452@ldesroches-Latitude-E6320>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08/12/14 at 02:10pm, Dave Young wrote:
-> noefi kernel param means actually disabling efi runtime, Per suggestion from
-> Leif Lindholm efi=noruntime should be better. But since noefi is already used
-> in X86 thus just adding another param efi=noruntime for same purpose.
+On Wed, Aug 13, 2014 at 09:05:22AM +0200, Yang, Wenyou wrote:
 > 
-> Signed-off-by: Dave Young <dyoung@redhat.com>
-> ---
->  Documentation/kernel-parameters.txt |  4 +++-
->  arch/x86/platform/efi/efi.c         | 12 ------------
->  drivers/firmware/efi/efi.c          | 22 ++++++++++++++++++++++
->  3 files changed, 25 insertions(+), 13 deletions(-)
 > 
-> diff --git a/Documentation/kernel-parameters.txt b/Documentation/kernel-parameters.txt
-> index a8eb6af..09d8c54 100644
-> --- a/Documentation/kernel-parameters.txt
-> +++ b/Documentation/kernel-parameters.txt
-> @@ -992,11 +992,13 @@ bytes respectively. Such letter suffixes can also be entirely omitted.
->  			Format: {"off" | "on" | "skip[mbr]"}
->  
->  	efi=		[EFI]
-> -			Format: { "old_map" }
-> +			Format: { "old_map" | "noruntime" }
->  			old_map [X86-64]: switch to the old ioremap-based EFI
->  			runtime services mapping. 32-bit still uses this one by
->  			default.
->  
-> +			noruntime : disable EFI runtime services support
-> +
->  	efi_no_storage_paranoia [EFI; X86]
->  			Using this parameter you can use more than 50% of
->  			your efi variable storage. Use this parameter only if
-> diff --git a/arch/x86/platform/efi/efi.c b/arch/x86/platform/efi/efi.c
-> index dd7aaa1..eae91be 100644
-> --- a/arch/x86/platform/efi/efi.c
-> +++ b/arch/x86/platform/efi/efi.c
-> @@ -929,15 +929,3 @@ u64 efi_mem_attributes(unsigned long phys_addr)
->  	}
->  	return 0;
->  }
-> -
-> -static int __init parse_efi_cmdline(char *str)
-> -{
-> -	if (*str == '=')
-> -		str++;
-> -
-> -	if (!strncmp(str, "old_map", 7))
-> -		set_bit(EFI_OLD_MEMMAP, &efi.flags);
-> -
-> -	return 0;
-> -}
-> -early_param("efi", parse_efi_cmdline);
-> diff --git a/drivers/firmware/efi/efi.c b/drivers/firmware/efi/efi.c
-> index c8f01a7..f3ec3f2 100644
-> --- a/drivers/firmware/efi/efi.c
-> +++ b/drivers/firmware/efi/efi.c
-> @@ -24,6 +24,7 @@
->  #include <linux/of_fdt.h>
->  #include <linux/io.h>
->  #include <linux/platform_device.h>
-> +#include <asm/efi.h>
->  
->  struct efi __read_mostly efi = {
->  	.mps        = EFI_INVALID_TABLE_ADDR,
-> @@ -54,6 +55,27 @@ bool efi_runtime_disabled(void)
->  	return disable_runtime;
->  }
->  
-> +static int __init parse_efi_cmdline(char *str)
-> +{
-> +	if (*str == '=')
-> +		str++;
-> +
-> +#ifdef CONFIG_X86
-> +	if (!strncmp(str, "old_map", 7)) {
-> +		set_bit(EFI_OLD_MEMMAP, &efi.flags);
-> +		goto out;
-> +	}
-> +#endif
-> +	if (!strncmp(str, "noruntime", 9)) {
-> +		disable_runtime = true;
-> +		goto out;
-> +	}
-> +
+> > -----Original Message-----
+> > From: Ludovic Desroches [mailto:ludovic.desroches at atmel.com]
+> > Sent: Wednesday, August 13, 2014 2:17 PM
+> > To: Yang, Wenyou
+> > Cc: Ronald Wahl; linux-arm-kernel at lists.infradead.org; Ferre, Nicolas
+> > Subject: Re: [PATCH] spi: atmel: fix corruption caused by too early transfer
+> > completion
+> > 
+> > Hi,
+> > 
+> > On Wed, Aug 13, 2014 at 01:20:13AM +0000, Yang, Wenyou wrote:
+> > > Hi,
+> > > > -----Original Message-----
+> > > > From: linux-arm-kernel
+> > > > [mailto:linux-arm-kernel-bounces at lists.infradead.org] On Behalf Of
+> > > > Ronald Wahl
+> > > > Sent: Wednesday, August 06, 2014 9:01 PM
+> > > > To: linux-arm-kernel at lists.infradead.org
+> > > > Subject: [PATCH] spi: atmel: fix corruption caused by too early
+> > > > transfer completion
+> > > >
+> > > > The PDC (peripheral DMA controller) on AT91 supports two transfer
+> > > > counters and associated registers - one for current and one for the
+> > > > next transfer. If the current transfer is done the next transfer is
+> > > > moved into the current transfer. Now there are two interrupts: one
+> > > > is raised whenever a single transfer is done (ENDRX) and the other one is
+> > raised when the current and the next transfer has finished (RXBUFF).
+> > > > The issue is that the driver only enables the ENDRX interrupt which
+> > > > may lead to queuing a new request while there is still a transfer running.
+> > > > This can lead to overruns and/or corruption. By using the RXBUFF
+> > > > interrupt only we queue new requests only when the hardware queue is
+> > > > empty avoiding this problem.
+> > >
+> > > The patch can work, but it maybe decrease the performance.
+> > 
+> > Can you give more details? I had also the same feeling at the beginning but due to
+> > the way pdc is implemented in the spi driver (doesn't really take advantage of the
+> > double buffer), I think it should not change performances.
+> I am not sure, but the next transfer registers is used in the driver code
 
-For sharing functions I moved old_map here, but rethinking about it maybe
-it's better to keep it in arch code.
+Yes it is used but not in the optimal way. Here, we configure the
+transfer to send two buffers. Once done, we will do it again if needed.
 
-Matt, I see you have some code for libstub option parsing, I will rebase
-on your efi/next and I'm thinking to add a generic function for parsing
-params like below (for old_map, but libstub can not use it):
+Taking advantage of the double buffer means when we receive ENDRX we
+immediately prepare the next transfer. Then we won't have dead time.
+Since it's not done in this way in the driver I don't think it will
+decrease performances.
 
-diff --git a/arch/x86/platform/efi/efi.c b/arch/x86/platform/efi/efi.c
-index c90d3cd..c73a7df5 100644
---- a/arch/x86/platform/efi/efi.c
-+++ b/arch/x86/platform/efi/efi.c
-@@ -932,26 +932,8 @@ u64 efi_mem_attributes(unsigned long phys_addr)
- 
- static int __init parse_efi_cmdline(char *str)
- {
--	if (*str == '=')
--		str++;
--
--	while (*str) {
--		if (!strncmp(str, "old_map", 7)) {
--			set_bit(EFI_OLD_MEMMAP, &efi.flags);
--			str += strlen("old_map");
--		}
--
--		/*
--		 * Skip any options we don't understand. Presumably
--		 * they apply to the EFI boot stub.
--		 */
--		while (*str && *str != ',')
--			str++;
--
--		/* If we hit a delimiter, skip it */
--		if (*str == ',')
--			str++;
--	}
-+	if (parse_option_str(str, "old_map"))
-+		set_bit(EFI_OLD_MEMMAP, &efi.flags);
- 
- 	return 0;
- }
-diff --git a/include/linux/kernel.h b/include/linux/kernel.h
-index 4c52907..d612718 100644
---- a/include/linux/kernel.h
-+++ b/include/linux/kernel.h
-@@ -407,6 +407,7 @@ int vsscanf(const char *, const char *, va_list);
- extern int get_option(char **str, int *pint);
- extern char *get_options(const char *str, int nints, int *ints);
- extern unsigned long long memparse(const char *ptr, char **retptr);
-+extern bool parse_option_str(const char *str, const char *option);
- 
- extern int core_kernel_text(unsigned long addr);
- extern int core_kernel_data(unsigned long addr);
-diff --git a/lib/cmdline.c b/lib/cmdline.c
-index d4932f7..f384125 100644
---- a/lib/cmdline.c
-+++ b/lib/cmdline.c
-@@ -155,3 +155,32 @@ unsigned long long memparse(const char *ptr, char **retptr)
- 	return ret;
- }
- EXPORT_SYMBOL(memparse);
-+
-+/**
-+ *	parse_option_str - Parse a string and check an option is set or not 
-+ *	@str: String to be parsed
-+ *	@option: the option name
-+ *
-+ *	This function parses a string containing a comma-separated
-+ *	list of strings like a=b,c.
-+ *
-+ *	Return true if there's such option in the string, or return false.
-+ */
-++bool parse_option_str(const char *str, const char *option)
-+{
-+	while (*str) {
-+		if (!strncmp(str, option, strlen(option))) {
-+			str += strlen(option);
-+			if (!*str || *str == ',')
-+				return true;
-+		}
-+
-+		while (*str && *str != ',')
-+			str++;
-+
-+		if (*str == ',')
-+			str++;
-+	}
-+
-+	return false;
-+}
+> 
+> > 
+> > My only concern is why ENDRX was chosen instead of RXBUFF? Simple bug or
+> > to manage a specific case we are thinking about.
+> Both the current transfer and the next transfer is done,  RXBUFF bit  is set.
+> Either the current transfer or the next transfer is done, ENDRX bit set.
+> I think it is OK.
+> 
+> > 
+> > >
+> > > Could you share the scenario caused the overruns and/or corruption, or log
+> > message?
+> > >
+> > > >
+> > > > Signed-off-by: Ronald Wahl <ronald.wahl@raritan.com>
+> > > > ---
+> > > >  drivers/spi/spi-atmel.c | 17 ++++++++---------
+> > > >  1 file changed, 8 insertions(+), 9 deletions(-)
+> > > >
+> > > > diff --git a/drivers/spi/spi-atmel.c b/drivers/spi/spi-atmel.c index
+> > > > 113c83f..3f7d138
+> > > > 100644
+> > > > --- a/drivers/spi/spi-atmel.c
+> > > > +++ b/drivers/spi/spi-atmel.c
+> > > > @@ -775,17 +775,17 @@ static void atmel_spi_pdc_next_xfer(struct
+> > > > spi_master *master,
+> > > >  			(unsigned long long)xfer->rx_dma);
+> > > >  	}
+> > > >
+> > > > -	/* REVISIT: We're waiting for ENDRX before we start the next
+> > > > +	/* REVISIT: We're waiting for RXBUFF before we start the next
+> > > >  	 * transfer because we need to handle some difficult timing
+> > > > -	 * issues otherwise. If we wait for ENDTX in one transfer and
+> > > > -	 * then starts waiting for ENDRX in the next, it's difficult
+> > > > -	 * to tell the difference between the ENDRX interrupt we're
+> > > > -	 * actually waiting for and the ENDRX interrupt of the
+> > > > +	 * issues otherwise. If we wait for TXBUFE in one transfer and
+> > > > +	 * then starts waiting for RXBUFF in the next, it's difficult
+> > > > +	 * to tell the difference between the RXBUFF interrupt we're
+> > > > +	 * actually waiting for and the RXBUFF interrupt of the
+> > > >  	 * previous transfer.
+> > > >  	 *
+> > > >  	 * It should be doable, though. Just not now...
+> > > >  	 */
+> > > > -	spi_writel(as, IER, SPI_BIT(ENDRX) | SPI_BIT(OVRES));
+> > > > +	spi_writel(as, IER, SPI_BIT(RXBUFF) | SPI_BIT(OVRES));
+> > > >  	spi_writel(as, PTCR, SPI_BIT(TXTEN) | SPI_BIT(RXTEN));  }
+> > > >
+> > > > @@ -956,8 +956,7 @@ atmel_spi_pdc_interrupt(int irq, void *dev_id)
+> > > >
+> > > >  		ret = IRQ_HANDLED;
+> > > >
+> > > > -		spi_writel(as, IDR, (SPI_BIT(RXBUFF) | SPI_BIT(ENDRX)
+> > > > -				     | SPI_BIT(OVRES)));
+> > > > +		spi_writel(as, IDR, (SPI_BIT(RXBUFF) | SPI_BIT(OVRES)));
+> > > >
+> > > >  		/* Clear any overrun happening while cleaning up */
+> > > >  		spi_readl(as, SR);
+> > > > @@ -966,7 +965,7 @@ atmel_spi_pdc_interrupt(int irq, void *dev_id)
+> > > >
+> > > >  		complete(&as->xfer_completion);
+> > > >
+> > > > -	} else if (pending & (SPI_BIT(RXBUFF) | SPI_BIT(ENDRX))) {
+> > > > +	} else if (pending & (SPI_BIT(RXBUFF))) {
+> > > >  		ret = IRQ_HANDLED;
+> > > >
+> > > >  		spi_writel(as, IDR, pending);
+> > > > --
+> > > > 1.9.3
+> > > >
+> > > >
+> > > > _______________________________________________
+> > > > linux-arm-kernel mailing list
+> > > > linux-arm-kernel at lists.infradead.org
+> > > > http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+> > >
+> > > Best Regards,
+> > > Wenyou Yang
+> > >
+> > > _______________________________________________
+> > > linux-arm-kernel mailing list
+> > > linux-arm-kernel at lists.infradead.org
+> > > http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
