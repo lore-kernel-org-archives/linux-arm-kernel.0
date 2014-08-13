@@ -1,147 +1,35 @@
-From: Ludovic.Desroches@atmel.com (Desroches, Ludovic)
-Date: Wed, 13 Aug 2014 10:13:46 +0200
-Subject: [PATCH] spi: atmel: fix corruption caused by too early transfer
- completion
-In-Reply-To: <B256D81BAE5131468A838E5D7A2436419D1F4087@penmbx01>
-References: <1407330035-2212-1-git-send-email-ronald.wahl@raritan.com>
- <B256D81BAE5131468A838E5D7A2436419D1F2032@penmbx01>
- <20140813061638.GF2452@ldesroches-Latitude-E6320>
- <B256D81BAE5131468A838E5D7A2436419D1F4087@penmbx01>
-Message-ID: <20140813081346.GG2452@ldesroches-Latitude-E6320>
+From: philipp.tomsich@theobroma-systems.com (Dr. Philipp Tomsich)
+Date: Wed, 13 Aug 2014 10:19:08 +0200
+Subject: [PATCH V2] arm64: optimized copy_to_user and copy_from_user
+ assembly code
+In-Reply-To: <53EAD7C8.7070001@linaro.org>
+References: <1407538940-9167-1-git-send-email-fkan@apm.com>	<CAC8NTUXb1JmHwMLjmJtEKXjb+xYtuO4qKnSqMRWwACs35P8_HA@mail.gmail.com>
+ <CAL85gmChQCM3iw-xqy-bkGRWH0jDvGf7v-GnxynS4HoOkL-cwQ@mail.gmail.com>
+ <53EAD7C8.7070001@linaro.org>
+Message-ID: <ADD43F5F-DFD2-4EF5-B5F9-65EDAF6B34AE@theobroma-systems.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Aug 13, 2014 at 09:05:22AM +0200, Yang, Wenyou wrote:
-> 
-> 
-> > -----Original Message-----
-> > From: Ludovic Desroches [mailto:ludovic.desroches at atmel.com]
-> > Sent: Wednesday, August 13, 2014 2:17 PM
-> > To: Yang, Wenyou
-> > Cc: Ronald Wahl; linux-arm-kernel at lists.infradead.org; Ferre, Nicolas
-> > Subject: Re: [PATCH] spi: atmel: fix corruption caused by too early transfer
-> > completion
-> > 
-> > Hi,
-> > 
-> > On Wed, Aug 13, 2014 at 01:20:13AM +0000, Yang, Wenyou wrote:
-> > > Hi,
-> > > > -----Original Message-----
-> > > > From: linux-arm-kernel
-> > > > [mailto:linux-arm-kernel-bounces at lists.infradead.org] On Behalf Of
-> > > > Ronald Wahl
-> > > > Sent: Wednesday, August 06, 2014 9:01 PM
-> > > > To: linux-arm-kernel at lists.infradead.org
-> > > > Subject: [PATCH] spi: atmel: fix corruption caused by too early
-> > > > transfer completion
-> > > >
-> > > > The PDC (peripheral DMA controller) on AT91 supports two transfer
-> > > > counters and associated registers - one for current and one for the
-> > > > next transfer. If the current transfer is done the next transfer is
-> > > > moved into the current transfer. Now there are two interrupts: one
-> > > > is raised whenever a single transfer is done (ENDRX) and the other one is
-> > raised when the current and the next transfer has finished (RXBUFF).
-> > > > The issue is that the driver only enables the ENDRX interrupt which
-> > > > may lead to queuing a new request while there is still a transfer running.
-> > > > This can lead to overruns and/or corruption. By using the RXBUFF
-> > > > interrupt only we queue new requests only when the hardware queue is
-> > > > empty avoiding this problem.
-> > >
-> > > The patch can work, but it maybe decrease the performance.
-> > 
-> > Can you give more details? I had also the same feeling at the beginning but due to
-> > the way pdc is implemented in the spi driver (doesn't really take advantage of the
-> > double buffer), I think it should not change performances.
-> I am not sure, but the next transfer registers is used in the driver code
+Feng & Zhichang,
 
-Yes it is used but not in the optimal way. Here, we configure the
-transfer to send two buffers. Once done, we will do it again if needed.
+On 13 Aug 2014, at 05:13 , zhichang.yuan <zhichang.yuan@linaro.org> wrote:
 
-Taking advantage of the double buffer means when we receive ENDRX we
-immediately prepare the next transfer. Then we won't have dead time.
-Since it's not done in this way in the driver I don't think it will
-decrease performances.
+> If the both dst and src are not aligned and their alignment offset are not equal, i haven't found better way
+> to handle.
+> But it is lucky ARMv8 support the non-align memory access.
+> At the beginning of my patch work, i also think maybe it is more better that all load or store are aligned. I
+> wrote the code just like the ARMv7 memcpy, firstly loaded the data from SRC and buffered them in several
+> registers and combined as a new word( 16 bytes), then stored it to the aligned DST. But the performance is a
+> bit worst.
 
-> 
-> > 
-> > My only concern is why ENDRX was chosen instead of RXBUFF? Simple bug or
-> > to manage a specific case we are thinking about.
-> Both the current transfer and the next transfer is done,  RXBUFF bit  is set.
-> Either the current transfer or the next transfer is done, ENDRX bit set.
-> I think it is OK.
-> 
-> > 
-> > >
-> > > Could you share the scenario caused the overruns and/or corruption, or log
-> > message?
-> > >
-> > > >
-> > > > Signed-off-by: Ronald Wahl <ronald.wahl@raritan.com>
-> > > > ---
-> > > >  drivers/spi/spi-atmel.c | 17 ++++++++---------
-> > > >  1 file changed, 8 insertions(+), 9 deletions(-)
-> > > >
-> > > > diff --git a/drivers/spi/spi-atmel.c b/drivers/spi/spi-atmel.c index
-> > > > 113c83f..3f7d138
-> > > > 100644
-> > > > --- a/drivers/spi/spi-atmel.c
-> > > > +++ b/drivers/spi/spi-atmel.c
-> > > > @@ -775,17 +775,17 @@ static void atmel_spi_pdc_next_xfer(struct
-> > > > spi_master *master,
-> > > >  			(unsigned long long)xfer->rx_dma);
-> > > >  	}
-> > > >
-> > > > -	/* REVISIT: We're waiting for ENDRX before we start the next
-> > > > +	/* REVISIT: We're waiting for RXBUFF before we start the next
-> > > >  	 * transfer because we need to handle some difficult timing
-> > > > -	 * issues otherwise. If we wait for ENDTX in one transfer and
-> > > > -	 * then starts waiting for ENDRX in the next, it's difficult
-> > > > -	 * to tell the difference between the ENDRX interrupt we're
-> > > > -	 * actually waiting for and the ENDRX interrupt of the
-> > > > +	 * issues otherwise. If we wait for TXBUFE in one transfer and
-> > > > +	 * then starts waiting for RXBUFF in the next, it's difficult
-> > > > +	 * to tell the difference between the RXBUFF interrupt we're
-> > > > +	 * actually waiting for and the RXBUFF interrupt of the
-> > > >  	 * previous transfer.
-> > > >  	 *
-> > > >  	 * It should be doable, though. Just not now...
-> > > >  	 */
-> > > > -	spi_writel(as, IER, SPI_BIT(ENDRX) | SPI_BIT(OVRES));
-> > > > +	spi_writel(as, IER, SPI_BIT(RXBUFF) | SPI_BIT(OVRES));
-> > > >  	spi_writel(as, PTCR, SPI_BIT(TXTEN) | SPI_BIT(RXTEN));  }
-> > > >
-> > > > @@ -956,8 +956,7 @@ atmel_spi_pdc_interrupt(int irq, void *dev_id)
-> > > >
-> > > >  		ret = IRQ_HANDLED;
-> > > >
-> > > > -		spi_writel(as, IDR, (SPI_BIT(RXBUFF) | SPI_BIT(ENDRX)
-> > > > -				     | SPI_BIT(OVRES)));
-> > > > +		spi_writel(as, IDR, (SPI_BIT(RXBUFF) | SPI_BIT(OVRES)));
-> > > >
-> > > >  		/* Clear any overrun happening while cleaning up */
-> > > >  		spi_readl(as, SR);
-> > > > @@ -966,7 +965,7 @@ atmel_spi_pdc_interrupt(int irq, void *dev_id)
-> > > >
-> > > >  		complete(&as->xfer_completion);
-> > > >
-> > > > -	} else if (pending & (SPI_BIT(RXBUFF) | SPI_BIT(ENDRX))) {
-> > > > +	} else if (pending & (SPI_BIT(RXBUFF))) {
-> > > >  		ret = IRQ_HANDLED;
-> > > >
-> > > >  		spi_writel(as, IDR, pending);
-> > > > --
-> > > > 1.9.3
-> > > >
-> > > >
-> > > > _______________________________________________
-> > > > linux-arm-kernel mailing list
-> > > > linux-arm-kernel at lists.infradead.org
-> > > > http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
-> > >
-> > > Best Regards,
-> > > Wenyou Yang
-> > >
-> > > _______________________________________________
-> > > linux-arm-kernel mailing list
-> > > linux-arm-kernel at lists.infradead.org
-> > > http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+When looking at the underlying effects in the execution pipeline, the store-operations are non-critical for the throughput and we need to optimize for optimal throughput on the load-operations. This is because the store operations have no dependent operations and the store-pipeline will take care of any lingering effects from the misalignment (given that mechanisms like write-allocate make cache-effects on the store-operations more difficult to predict, I?m glad we don?t have to go into too much detail on those), as there are no throughput/bandwidth limits on the store-pipeline that we could even theoretically hit with such a loop.
+
+The load-operations are much more critical in the context of what we try to achieve: as our progress through the loop depends on the load-operations getting their results, so we process the associated stores, we need to ensure optimal and deterministic throughput on those. As a misaligned load is likely to carry a penalty (e.g. on XGene it will typically carry a small penalty when crossing a cache line, especially if the second cache-line isn?t cached yet), we need to avoid misaligned loads.
+
+If we would try to buffer data and then perform aligned stores, we?ll only introduce additional instructions and latency into our critical loop. 
+At the same time?given what I wrote above misaligned store-operations being essentially free?there?s no benefit to be gained from the extra work required.
+
+I hope this explains the observed behaviour somewhat better.
+
+Cheers,
+Philipp.
