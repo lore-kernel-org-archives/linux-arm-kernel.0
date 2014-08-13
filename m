@@ -1,51 +1,78 @@
-From: computersforpeace@gmail.com (Brian Norris)
-Date: Wed, 13 Aug 2014 12:40:47 -0700
-Subject: [PATCH] ARM: drop ISAR0 workaround for B15
-In-Reply-To: <1407797053-12544-1-git-send-email-gregory.0xf0@gmail.com>
-References: <1407797053-12544-1-git-send-email-gregory.0xf0@gmail.com>
-Message-ID: <20140813194047.GA18411@ld-irv-0074>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Wed, 13 Aug 2014 13:56:28 -0600
+Subject: [PATCH 1/2] ARM: tegra: add Acer Chromebook 13 device tree
+In-Reply-To: <CAEUnVG6ki9O5hzw9OvJ1+8Www_G1+rqXujmNyJy+qOP-z_JR=A@mail.gmail.com>
+References: <1407894967-18300-1-git-send-email-dgreid@chromium.org>
+ <53EB9BF0.9010002@wwwdotorg.org>
+ <CAEUnVG6ki9O5hzw9OvJ1+8Www_G1+rqXujmNyJy+qOP-z_JR=A@mail.gmail.com>
+Message-ID: <53EBC2EC.1010300@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The Brahma-B15's ISAR0 correcty advertises UDIV/SDIV support in both ARM
-and Thumb2 modes (CPUID_EXT_ISAR0=02101110), so we don't need to
-manually apply this hwcap.
+On 08/13/2014 01:07 PM, Dylan Reid wrote:
+> On Wed, Aug 13, 2014 at 10:10 AM, Stephen Warren <swarren@wwwdotorg.org> wrote:
+>> On 08/12/2014 07:56 PM, Dylan Reid wrote:
+>>>
+>>> The Acer Chromebook 13, codenamed "Big", contains an NVIDIA tegra124
+>>> processor and is similar to the Venice2 reference platform.
+>>>
+>>> The keyboard, USB 2, audio, HDMI, sdcard and emmc have been tested
+>>> and work on the 1366x768 models.  I haven't tried on the HD systems
+>>> yet.
+>>>
+>>> WiFi does not yet work, it needs at least some PMIC changes to enable
+>>> the 32k clock.
+>>>
+>>> The elan trackpad is not yet functional but hopefully will be soon as
+>>> there are patches under review.
+>>>
+>>> There is also an issue on reboot because the TPM isn't reset.  It will
+>>> cause the stock firmware to enter recovery mode.  This can be worked
+>>> around by an EC-reset, press refresh and power at the same time.
+>>
+>>
+>>> diff --git a/arch/arm/boot/dts/tegra124-big.dts
+>>> b/arch/arm/boot/dts/tegra124-big.dts
+>>
+>>
+>> I think we need to include the SKU name in the filename and compatible value
+>> below, or at least plan out that for other SKUs, we'll add the SKU name on.
+>>
+>>
+>>> +/ {
+>>> +       model = "Google Big";
+>>> +       compatible = "google,nyan-big", "nvidia,tegra124";
+>>
+>>
+>> I think it'd be more user-friendly if the filename and compatible value more
+>> obviously tied to the end-user-visible product name.
+>
+> I'll change the model to "Acer Chromebook 13"
 
-The code in question actually predates the following commit, which made
-our hwcaps unnecessary:
+Would mentioning "CB5" in the model be a good idea; that's what it's 
+sold as.
 
-    commit 8164f7af88d9ad3a757bd14f634b23997ee77f6b
-    Author: Stephen Boyd <sboyd@codeaurora.org>
-    Date:   Mon Mar 18 19:44:15 2013 +0100
+> If we need a separate DT for the FullHD skew, then can we add a file
+> 'tegra124-nyan-big-full-hd.dtsi'?  We may also add
+> 'tegra124-nyan-big-full-hd-touch.dtsi' as well.  They would just
+> override the necessary things from this file.
 
-        ARM: 7680/1: Detect support for SDIV/UDIV from ISAR0 register
+*.dts rather than *.dtsi I suspect? Yes, having a common include file 
+and separate top-level files sounds like a good idea.
 
-Signed-off-by: Brian Norris <computersforpeace@gmail.com>
-Cc: Will Deacon <will.deacon@arm.com>
-Cc: Mark Rutland <mark.rutland@arm.com>
----
-Supersedes Gregory's previous patch.
+>>> +       gpio-keys {
+>>> +               compatible = "gpio-keys";
+>>> +
+>>> +               lid {
+>>> +                       label = "Lid";
+>>> +                       gpios = <&gpio TEGRA_GPIO(R, 4) GPIO_ACTIVE_LOW>;
+>>> +                       linux,input-type = <5>;
+>>> +                       linux,code = <0>;
+>>
+>>
+>> Aren't there #defines for the 5 and 0 there?
+>
+> yes for code, apparently not for input-type.  I think 5 means EV_SW,
+> maybe that should get added to include/dt-bindings/input somewhere?
 
-This addresses some very old review comments from Mark and Will:
-
-  http://lists.infradead.org/pipermail/linux-arm-kernel/2014-January/225895.html
-  http://lists.infradead.org/pipermail/linux-arm-kernel/2014-January/227916.html
-
- arch/arm/mm/proc-v7.S | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
-
-diff --git a/arch/arm/mm/proc-v7.S b/arch/arm/mm/proc-v7.S
-index b5d67db20897..b3a947863ac7 100644
---- a/arch/arm/mm/proc-v7.S
-+++ b/arch/arm/mm/proc-v7.S
-@@ -570,7 +570,7 @@ __v7_ca15mp_proc_info:
- __v7_b15mp_proc_info:
- 	.long	0x420f00f0
- 	.long	0xff0ffff0
--	__v7_proc __v7_b15mp_setup, hwcaps = HWCAP_IDIV
-+	__v7_proc __v7_b15mp_setup
- 	.size	__v7_b15mp_proc_info, . - __v7_b15mp_proc_info
- 
- 	/*
--- 
-1.9.1
+Yes, that sounds like a good idea.
