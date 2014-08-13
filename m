@@ -1,215 +1,257 @@
 From: keescook@chromium.org (Kees Cook)
-Date: Wed, 13 Aug 2014 10:06:33 -0700
-Subject: [PATCH v4 8/8] ARM: mm: allow text and rodata sections to be read-only
+Date: Wed, 13 Aug 2014 10:06:32 -0700
+Subject: [PATCH v4 7/8] ARM: mm: allow non-text sections to be non-executable
 In-Reply-To: <1407949593-16121-1-git-send-email-keescook@chromium.org>
 References: <1407949593-16121-1-git-send-email-keescook@chromium.org>
-Message-ID: <1407949593-16121-9-git-send-email-keescook@chromium.org>
+Message-ID: <1407949593-16121-8-git-send-email-keescook@chromium.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This introduces CONFIG_DEBUG_RODATA, making kernel text and rodata
-read-only. Additionally, this splits rodata from text so that rodata can
-also be NX, which may lead to wasted memory when aligning to SECTION_SIZE.
-The read-only areas are made writable during ftrace updates and kexec.
+Adds CONFIG_ARM_KERNMEM_PERMS to separate the kernel memory regions
+into section-sized areas that can have different permisions. Performs
+the NX permission changes during free_initmem, so that init memory can be
+reclaimed.
+
+This uses section size instead of PMD size to reduce memory lost to
+padding on non-LPAE systems.
+
+Based on work by Brad Spengler, Larry Bassel, and Laura Abbott.
 
 Signed-off-by: Kees Cook <keescook@chromium.org>
 Tested-by: Laura Abbott <lauraa@codeaurora.org>
 ---
- arch/arm/include/asm/cacheflush.h | 10 ++++++++
- arch/arm/kernel/ftrace.c          | 19 ++++++++++++++++
- arch/arm/kernel/machine_kexec.c   |  1 +
- arch/arm/kernel/vmlinux.lds.S     |  3 +++
- arch/arm/mm/Kconfig               | 12 ++++++++++
- arch/arm/mm/init.c                | 48 ++++++++++++++++++++++++++++++++++++++-
- 6 files changed, 92 insertions(+), 1 deletion(-)
+ arch/arm/kernel/vmlinux.lds.S |  17 +++++++
+ arch/arm/mm/Kconfig           |   9 ++++
+ arch/arm/mm/init.c            | 106 ++++++++++++++++++++++++++++++++++++++++++
+ arch/arm/mm/mmu.c             |  13 +++++-
+ 4 files changed, 144 insertions(+), 1 deletion(-)
 
-diff --git a/arch/arm/include/asm/cacheflush.h b/arch/arm/include/asm/cacheflush.h
-index fd43f7f55b70..0cdf1e31df86 100644
---- a/arch/arm/include/asm/cacheflush.h
-+++ b/arch/arm/include/asm/cacheflush.h
-@@ -487,6 +487,16 @@ int set_memory_rw(unsigned long addr, int numpages);
- int set_memory_x(unsigned long addr, int numpages);
- int set_memory_nx(unsigned long addr, int numpages);
- 
-+#ifdef CONFIG_DEBUG_RODATA
-+void mark_rodata_ro(void);
-+void set_kernel_text_rw(void);
-+void set_kernel_text_ro(void);
-+#else
-+static inline void set_kernel_text_rw(void) { }
-+static inline void set_kernel_text_ro(void) { }
-+#endif
-+
- void flush_uprobe_xol_access(struct page *page, unsigned long uaddr,
- 			     void *kaddr, unsigned long len);
-+
- #endif
-diff --git a/arch/arm/kernel/ftrace.c b/arch/arm/kernel/ftrace.c
-index af9a8a927a4e..b8c75e45a950 100644
---- a/arch/arm/kernel/ftrace.c
-+++ b/arch/arm/kernel/ftrace.c
-@@ -15,6 +15,7 @@
- #include <linux/ftrace.h>
- #include <linux/uaccess.h>
- #include <linux/module.h>
-+#include <linux/stop_machine.h>
- 
- #include <asm/cacheflush.h>
- #include <asm/opcodes.h>
-@@ -35,6 +36,22 @@
- 
- #define	OLD_NOP		0xe1a00000	/* mov r0, r0 */
- 
-+static int __ftrace_modify_code(void *data)
-+{
-+	int *command = data;
-+
-+	set_kernel_text_rw();
-+	ftrace_modify_all_code(*command);
-+	set_kernel_text_ro();
-+
-+	return 0;
-+}
-+
-+void arch_ftrace_update_code(int command)
-+{
-+	stop_machine(__ftrace_modify_code, &command, NULL);
-+}
-+
- static unsigned long ftrace_nop_replace(struct dyn_ftrace *rec)
- {
- 	return rec->arch.old_mcount ? OLD_NOP : NOP;
-@@ -73,6 +90,8 @@ int ftrace_arch_code_modify_prepare(void)
- int ftrace_arch_code_modify_post_process(void)
- {
- 	set_all_modules_text_ro();
-+	/* Make sure any TLB misses during machine stop are cleared. */
-+	flush_tlb_all();
- 	return 0;
- }
- 
-diff --git a/arch/arm/kernel/machine_kexec.c b/arch/arm/kernel/machine_kexec.c
-index 8f75250cbe30..4423a565ef6f 100644
---- a/arch/arm/kernel/machine_kexec.c
-+++ b/arch/arm/kernel/machine_kexec.c
-@@ -164,6 +164,7 @@ void machine_kexec(struct kimage *image)
- 	reboot_code_buffer = page_address(image->control_code_page);
- 
- 	/* Prepare parameters for reboot_code_buffer*/
-+	set_kernel_text_rw();
- 	kexec_start_address = image->start;
- 	kexec_indirection_page = page_list;
- 	kexec_mach_type = machine_arch_type;
 diff --git a/arch/arm/kernel/vmlinux.lds.S b/arch/arm/kernel/vmlinux.lds.S
-index a3d07ca2bbb4..542e58919bd9 100644
+index 6f57cb94367f..a3d07ca2bbb4 100644
 --- a/arch/arm/kernel/vmlinux.lds.S
 +++ b/arch/arm/kernel/vmlinux.lds.S
-@@ -120,6 +120,9 @@ SECTIONS
- 			ARM_CPU_KEEP(PROC_INFO)
+@@ -8,6 +8,9 @@
+ #include <asm/thread_info.h>
+ #include <asm/memory.h>
+ #include <asm/page.h>
++#ifdef CONFIG_ARM_KERNMEM_PERMS
++#include <asm/pgtable.h>
++#endif
+ 	
+ #define PROC_INFO							\
+ 	. = ALIGN(4);							\
+@@ -90,6 +93,11 @@ SECTIONS
+ 		_text = .;
+ 		HEAD_TEXT
  	}
- 
-+#ifdef CONFIG_DEBUG_RODATA
++
++#ifdef CONFIG_ARM_KERNMEM_PERMS
 +	. = ALIGN(1<<SECTION_SHIFT);
 +#endif
- 	RO_DATA(PAGE_SIZE)
++
+ 	.text : {			/* Real text segment		*/
+ 		_stext = .;		/* Text and read-only data	*/
+ 			__exception_text_start = .;
+@@ -145,7 +153,11 @@ SECTIONS
+ 	_etext = .;			/* End of text and rodata section */
  
- 	. = ALIGN(4);
+ #ifndef CONFIG_XIP_KERNEL
++# ifdef CONFIG_ARM_KERNMEM_PERMS
++	. = ALIGN(1<<SECTION_SHIFT);
++# else
+ 	. = ALIGN(PAGE_SIZE);
++# endif
+ 	__init_begin = .;
+ #endif
+ 	/*
+@@ -220,7 +232,12 @@ SECTIONS
+ 	. = PAGE_OFFSET + TEXT_OFFSET;
+ #else
+ 	__init_end = .;
++
++#ifdef CONFIG_ARM_KERNMEM_PERMS
++	. = ALIGN(1<<SECTION_SHIFT);
++#else
+ 	. = ALIGN(THREAD_SIZE);
++#endif
+ 	__data_loc = .;
+ #endif
+ 
 diff --git a/arch/arm/mm/Kconfig b/arch/arm/mm/Kconfig
-index 7a0756df91a2..c9cd9c5bf1e1 100644
+index ae69809a9e47..7a0756df91a2 100644
 --- a/arch/arm/mm/Kconfig
 +++ b/arch/arm/mm/Kconfig
-@@ -1017,3 +1017,15 @@ config ARM_KERNMEM_PERMS
- 	  padded to section-size (1MiB) boundaries (because their permissions
- 	  are different and splitting the 1M pages into 4K ones causes TLB
- 	  performance problems), wasting memory.
+@@ -1008,3 +1008,12 @@ config ARCH_SUPPORTS_BIG_ENDIAN
+ 	help
+ 	  This option specifies the architecture can support big endian
+ 	  operation.
 +
-+config DEBUG_RODATA
-+	bool "Make kernel text and rodata read-only"
-+	depends on ARM_KERNMEM_PERMS
-+	default y
++config ARM_KERNMEM_PERMS
++	bool "Restrict kernel memory permissions"
 +	help
-+	  If this is set, kernel text and rodata will be made read-only. This
-+	  is to help catch accidental or malicious attempts to change the
-+	  kernel's executable code. Additionally splits rodata from kernel
-+	  text so it can be made explicitly non-executable. This creates
-+	  another section-size padded region, so it can waste more memory
-+	  space while gaining the read-only protections.
++	  If this is set, kernel memory other than kernel text (and rodata)
++	  will be made non-executable. The tradeoff is that each region is
++	  padded to section-size (1MiB) boundaries (because their permissions
++	  are different and splitting the 1M pages into 4K ones causes TLB
++	  performance problems), wasting memory.
 diff --git a/arch/arm/mm/init.c b/arch/arm/mm/init.c
-index ccf392ef40d4..35c838da90d5 100644
+index ad82c05bfc3a..ccf392ef40d4 100644
 --- a/arch/arm/mm/init.c
 +++ b/arch/arm/mm/init.c
-@@ -626,9 +626,10 @@ struct section_perm {
- 	unsigned long end;
- 	pmdval_t mask;
- 	pmdval_t prot;
-+	pmdval_t clear;
- };
+@@ -32,6 +32,11 @@
+ #include <asm/tlb.h>
+ #include <asm/fixmap.h>
  
--struct section_perm nx_perms[] = {
-+static struct section_perm nx_perms[] = {
- 	/* Make pages tables, etc before _stext RW (set NX). */
- 	{
- 		.start	= PAGE_OFFSET,
-@@ -643,8 +644,35 @@ struct section_perm nx_perms[] = {
- 		.mask	= ~PMD_SECT_XN,
- 		.prot	= PMD_SECT_XN,
- 	},
-+#ifdef CONFIG_DEBUG_RODATA
-+	/* Make rodata NX (set RO in ro_perms below). */
++#ifdef CONFIG_ARM_KERNMEM_PERMS
++#include <asm/system_info.h>
++#include <asm/cp15.h>
++#endif
++
+ #include <asm/mach/arch.h>
+ #include <asm/mach/map.h>
+ 
+@@ -615,11 +620,112 @@ void __init mem_init(void)
+ 	}
+ }
+ 
++#ifdef CONFIG_ARM_KERNMEM_PERMS
++struct section_perm {
++	unsigned long start;
++	unsigned long end;
++	pmdval_t mask;
++	pmdval_t prot;
++};
++
++struct section_perm nx_perms[] = {
++	/* Make pages tables, etc before _stext RW (set NX). */
 +	{
-+		.start  = (unsigned long)__start_rodata,
-+		.end    = (unsigned long)__init_begin,
-+		.mask   = ~PMD_SECT_XN,
-+		.prot   = PMD_SECT_XN,
++		.start	= PAGE_OFFSET,
++		.end	= (unsigned long)_stext,
++		.mask	= ~PMD_SECT_XN,
++		.prot	= PMD_SECT_XN,
 +	},
-+#endif
- };
- 
-+#ifdef CONFIG_DEBUG_RODATA
-+static struct section_perm ro_perms[] = {
-+	/* Make kernel code and rodata RX (set RO). */
++	/* Make init RW (set NX). */
 +	{
-+		.start  = (unsigned long)_stext,
-+		.end    = (unsigned long)__init_begin,
-+#ifdef CONFIG_ARM_LPAE
-+		.mask   = ~PMD_SECT_RDONLY,
-+		.prot   = PMD_SECT_RDONLY,
-+#else
-+		.mask   = ~(PMD_SECT_APX | PMD_SECT_AP_WRITE),
-+		.prot   = PMD_SECT_APX | PMD_SECT_AP_WRITE,
-+		.clear  = PMD_SECT_AP_WRITE,
-+#endif
++		.start	= (unsigned long)__init_begin,
++		.end	= (unsigned long)_sdata,
++		.mask	= ~PMD_SECT_XN,
++		.prot	= PMD_SECT_XN,
 +	},
 +};
++
++/*
++ * Updates section permissions only for the current mm (sections are
++ * copied into each mm). During startup, this is the init_mm.
++ */
++static inline void section_update(unsigned long addr, pmdval_t mask,
++				  pmdval_t prot)
++{
++	struct mm_struct *mm;
++	pmd_t *pmd;
++
++	mm = current->active_mm;
++	pmd = pmd_offset(pud_offset(pgd_offset(mm, addr), addr), addr);
++
++#ifdef CONFIG_ARM_LPAE
++	pmd[0] = __pmd((pmd_val(pmd[0]) & mask) | prot);
++#else
++	if (addr & SECTION_SIZE)
++		pmd[1] = __pmd((pmd_val(pmd[1]) & mask) | prot);
++	else
++		pmd[0] = __pmd((pmd_val(pmd[0]) & mask) | prot);
++#endif
++	flush_pmd_entry(pmd);
++	local_flush_tlb_kernel_range(addr, addr + SECTION_SIZE);
++}
++
++/* Make sure extended page tables are in use. */
++static inline bool arch_has_strict_perms(void)
++{
++	unsigned int cr;
++
++	if (cpu_architecture() < CPU_ARCH_ARMv6)
++		return false;
++
++	cr = get_cr();
++	if (!(cr & CR_XP))
++		return false;
++
++	return true;
++}
++
++#define set_section_perms(perms, field)	{				\
++	size_t i;							\
++	unsigned long addr;						\
++									\
++	if (!arch_has_strict_perms())					\
++		return;							\
++									\
++	for (i = 0; i < ARRAY_SIZE(perms); i++) {			\
++		if (!IS_ALIGNED(perms[i].start, SECTION_SIZE) ||	\
++		    !IS_ALIGNED(perms[i].end, SECTION_SIZE)) {		\
++			pr_err("BUG: section %lx-%lx not aligned to %lx\n", \
++				perms[i].start, perms[i].end,		\
++				SECTION_SIZE);				\
++			continue;					\
++		}							\
++									\
++		for (addr = perms[i].start;				\
++		     addr < perms[i].end;				\
++		     addr += SECTION_SIZE)				\
++			section_update(addr, perms[i].mask,		\
++				       perms[i].field);			\
++	}								\
++}
++
++static inline void fix_kernmem_perms(void)
++{
++	set_section_perms(nx_perms, prot);
++}
++#else
++static inline void fix_kernmem_perms(void) { }
++#endif /* CONFIG_ARM_KERNMEM_PERMS */
++
+ void free_initmem(void)
+ {
+ #ifdef CONFIG_HAVE_TCM
+ 	extern char __tcm_start, __tcm_end;
 +#endif
 +
- /*
-  * Updates section permissions only for the current mm (sections are
-  * copied into each mm). During startup, this is the init_mm.
-@@ -713,6 +741,24 @@ static inline void fix_kernmem_perms(void)
- {
- 	set_section_perms(nx_perms, prot);
- }
++	fix_kernmem_perms();
+ 
++#ifdef CONFIG_HAVE_TCM
+ 	poison_init_mem(&__tcm_start, &__tcm_end - &__tcm_start);
+ 	free_reserved_area(&__tcm_start, &__tcm_end, -1, "TCM link");
+ #endif
+diff --git a/arch/arm/mm/mmu.c b/arch/arm/mm/mmu.c
+index 94eecb913f15..c9227bf59b45 100644
+--- a/arch/arm/mm/mmu.c
++++ b/arch/arm/mm/mmu.c
+@@ -1368,13 +1368,24 @@ static void __init map_lowmem(void)
+ 		if (start >= end)
+ 			break;
+ 
+-		if (end < kernel_x_start || start >= kernel_x_end) {
++		if (end < kernel_x_start) {
+ 			map.pfn = __phys_to_pfn(start);
+ 			map.virtual = __phys_to_virt(start);
+ 			map.length = end - start;
+ 			map.type = MT_MEMORY_RWX;
+ 
+ 			create_mapping(&map);
++		} else if (start >= kernel_x_end) {
++			map.pfn = __phys_to_pfn(start);
++			map.virtual = __phys_to_virt(start);
++			map.length = end - start;
++#ifdef CONFIG_ARM_KERNMEM_PERMS
++			map.type = MT_MEMORY_RW;
++#else
++			map.type = MT_MEMORY_RWX;
++#endif
 +
-+#ifdef CONFIG_DEBUG_RODATA
-+void mark_rodata_ro(void)
-+{
-+	set_section_perms(ro_perms, prot);
-+}
-+
-+void set_kernel_text_rw(void)
-+{
-+	set_section_perms(ro_perms, clear);
-+}
-+
-+void set_kernel_text_ro(void)
-+{
-+	set_section_perms(ro_perms, prot);
-+}
-+#endif /* CONFIG_DEBUG_RODATA */
-+
- #else
- static inline void fix_kernmem_perms(void) { }
- #endif /* CONFIG_ARM_KERNMEM_PERMS */
++			create_mapping(&map);
+ 		} else {
+ 			/* This better cover the entire kernel */
+ 			if (start < kernel_x_start) {
 -- 
 1.9.1
