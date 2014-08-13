@@ -1,101 +1,81 @@
-From: dh.herrmann@gmail.com (David Herrmann)
-Date: Wed, 13 Aug 2014 09:25:24 +0200
-Subject: [PATCH 1/4] simplefb: formalize pseudo palette handling
-In-Reply-To: <1407914239-12054-2-git-send-email-libv@skynet.be>
-References: <1407914239-12054-1-git-send-email-libv@skynet.be>
- <1407914239-12054-2-git-send-email-libv@skynet.be>
-Message-ID: <CANq1E4ShhaUMT3MpAei4sgo7Nr-jHfD+TpF8dzAVbn58Feroiw@mail.gmail.com>
+From: robherring2@gmail.com (Rob Herring)
+Date: Wed, 13 Aug 2014 02:33:31 -0500
+Subject: [PATCH] ARM: expand fixmap region to 3MB
+In-Reply-To: <CAGXu5j+Wm7LzdTZWsjLpisBqgcKxx-_t=O_LWsn8hP+_KiBxEw@mail.gmail.com>
+References: <1407511404-11997-1-git-send-email-robherring2@gmail.com>
+ <20140811161448.GA4002@bivouac.eciton.net>
+ <CAGXu5j+Wm7LzdTZWsjLpisBqgcKxx-_t=O_LWsn8hP+_KiBxEw@mail.gmail.com>
+Message-ID: <CAL_JsqKnDBtLEHNw0Hk1vdZTnH-3MRi3=YqTo=5DCEF9hPRc5g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi
+On Tue, Aug 12, 2014 at 12:55 PM, Kees Cook <keescook@chromium.org> wrote:
+> On Mon, Aug 11, 2014 at 9:14 AM, Leif Lindholm <leif.lindholm@linaro.org> wrote:
+>> On Fri, Aug 08, 2014 at 10:23:24AM -0500, Rob Herring wrote:
+>>> From: Rob Herring <robh@kernel.org>
+>>>
+>>> With commit a05e54c103b0b8 "ARM: 8031/2: change fixmap mapping region to
+>>> support 32 CPUs", the fixmap region was expanded to 2MB, but it
+>>> precluded any other uses of the fixmap region in order to support up to
+>>> 32 CPUs. In order to support other uses the fixmap region needs to be
+>>> expanded beyond 2MB. Fortunately, the adjacent 1MB range
+>>> 0xffe00000-0xfff00000 is availabe to use.
+>>>
+>>> Remove fixmap_page_table ptr and lookup the page table via the virtual
+>>> address so that the fixmap region can span more that one pmd. The 2nd
+>>> pmd is already created since it is shared with the vector page.
+>>>
+>>> Cc: Leif Lindholm <leif.lindholm@linaro.org>
+>>> Cc: Kees Cook <keescook@chromium.org>
+>>> Cc: Russell King <linux@arm.linux.org.uk>
+>>> Signed-off-by: Rob Herring <robh@kernel.org>
+>>> ---
+>>>
+>>> This patch can come before or after the generic fixmap.h. There's a
+>>> single line conflict with the ending address
+>>
+>> Tested-by: Leif Lindholm <leif.lindholm@linaro.org>
+>> For Kees' set with this addition + generic fixmap + early_ioremap +
+>> UEFI.
+>>
+>>> This worked for earlycon, but I've not done any highmem specific
+>>> testing. My full series is available here:
+>>>
+>>> git://git.kernel.org/pub/scm/linux/kernel/git/robh/linux.git fixmap
+>>
+>> I was hoping to be able to give you a tested-by for that series on
+>> next-20140811 with the UEFI patches, but that setup fails to boot
+>> right now. Looking into why.
+>
+> For me, the 3MB change doesn't work. It acts like the PTE isn't there:
+>
+> lkdtm: Performing direct entry WRITE_KERN
+> lkdtm: attempting 52 byte write at 804331cc
+> lkdtm: 804331cc mapped RW via ffe7f1cc
+> Unable to handle kernel paging request at virtual address ffe7f1cc
+> pgd = 9ea40000
+> [ffe7f1cc] *pgd=9fffd821, *pte=00000000, *ppte=00000000
+>
+> And it weirdly leaves this hanging around in
+> /sys/kernel/debug/kernel_page_tables:
+>
+> 0xffc7f000-0xffc80000           4K     RW NX SHD MEM/CACHED/WBWA
+>
+> If I use all the other changes to clean up the code, everything is
+> fine. The only change I have been the trees now is just this:
+>
+> -#define FIXADDR_END            0xffe00000UL
+> +#define FIXADDR_END            0xfff00000UL
+>
+> I think my build isn't catching this extra area via the vector table pmd.
 
-On Wed, Aug 13, 2014 at 9:17 AM, Luc Verhaegen <libv@skynet.be> wrote:
-> Signed-off-by: Luc Verhaegen <libv@skynet.be>
-> ---
->  drivers/video/fbdev/simplefb.c |   15 ++++++++++++---
->  1 files changed, 12 insertions(+), 3 deletions(-)
->
-> diff --git a/drivers/video/fbdev/simplefb.c b/drivers/video/fbdev/simplefb.c
-> index 210f3a0..32be590 100644
-> --- a/drivers/video/fbdev/simplefb.c
-> +++ b/drivers/video/fbdev/simplefb.c
-> @@ -41,6 +41,8 @@ static struct fb_var_screeninfo simplefb_var = {
->         .vmode          = FB_VMODE_NONINTERLACED,
->  };
->
-> +#define PSEUDO_PALETTE_SIZE 16
-> +
->  static int simplefb_setcolreg(u_int regno, u_int red, u_int green, u_int blue,
->                               u_int transp, struct fb_info *info)
->  {
-> @@ -50,7 +52,7 @@ static int simplefb_setcolreg(u_int regno, u_int red, u_int green, u_int blue,
->         u32 cb = blue >> (16 - info->var.blue.length);
->         u32 value;
->
-> -       if (regno >= 16)
-> +       if (regno >= PSEUDO_PALETTE_SIZE)
->                 return -EINVAL;
->
->         value = (cr << info->var.red.offset) |
-> @@ -163,11 +165,16 @@ static int simplefb_parse_pd(struct platform_device *pdev,
->         return 0;
->  }
->
-> +struct simplefb_par {
-> +       u32 palette[PSEUDO_PALETTE_SIZE];
-> +};
-> +
+I commented in patch 3 of your series where the problem is.
 
-I'd move that definition to the top of the file.
+> So, instead of continuing to beat my head against this, I've changed
+> my series around to use NR_CPUS as Rob was doing, and added
 
->  static int simplefb_probe(struct platform_device *pdev)
->  {
->         int ret;
->         struct simplefb_params params;
->         struct fb_info *info;
-> +       struct simplefb_par *par;
->         struct resource *mem;
->
->         if (fb_get_options("simplefb", NULL))
-> @@ -188,11 +195,13 @@ static int simplefb_probe(struct platform_device *pdev)
->                 return -EINVAL;
->         }
->
-> -       info = framebuffer_alloc(sizeof(u32) * 16, &pdev->dev);
-> +       info = framebuffer_alloc(sizeof(struct simplefb_par), &pdev->dev);
->         if (!info)
->                 return -ENOMEM;
->         platform_set_drvdata(pdev, info);
->
-> +       par = info->par;
-> +
->         info->fix = simplefb_fix;
->         info->fix.smem_start = mem->start;
->         info->fix.smem_len = resource_size(mem);
-> @@ -225,7 +234,7 @@ static int simplefb_probe(struct platform_device *pdev)
->                 framebuffer_release(info);
->                 return -ENODEV;
->         }
-> -       info->pseudo_palette = (void *)(info + 1);
-> +       info->pseudo_palette = (void *) par->palette;
+My use of NR_CPUS was not intentional, but rather it was just based on
+the older versions of the patch. I don't have a strong opinion either
+way.
 
-I think coding-style is this (i.e., no whitespace):
-    info->pseudo_palette = (void*)par->palette;
-
-Patch is fine with me:
-Reviewed-by: David Herrmann <dh.herrmann@gmail.com>
-
-Thanks
-David
-
->
->         dev_info(&pdev->dev, "framebuffer at 0x%lx, 0x%x bytes, mapped to 0x%p\n",
->                              info->fix.smem_start, info->fix.smem_len,
-> --
-> 1.7.7
->
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-fbdev" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+Rob
