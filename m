@@ -1,68 +1,73 @@
 From: keescook@chromium.org (Kees Cook)
-Date: Wed, 13 Aug 2014 10:06:30 -0700
-Subject: [PATCH v4 5/8] ARM: kexec: Make .text R/W in machine_kexec
+Date: Wed, 13 Aug 2014 10:06:28 -0700
+Subject: [PATCH v4 3/8] arm: fixmap: implement __set_fixmap()
 In-Reply-To: <1407949593-16121-1-git-send-email-keescook@chromium.org>
 References: <1407949593-16121-1-git-send-email-keescook@chromium.org>
-Message-ID: <1407949593-16121-6-git-send-email-keescook@chromium.org>
+Message-ID: <1407949593-16121-4-git-send-email-keescook@chromium.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Nikolay Borisov <Nikolay.Borisov@arm.com>
+This is used from set_fixmap() and clear_fixmap() via asm-generic/fixmap.h.
+Also makes sure that the fixmap allocation fits into the expected range.
 
-With the introduction of Kees Cook's patch to make the kernel .text
-read-only the existing method by which kexec works got broken since it
-directly pokes some values in the template code, which resides in the
-.text section.
+Based on patch by Rabin Vincent.
 
-The current patch changes the way those values are inserted so that poking
-.text section occurs only in machine_kexec (e.g when we are about to nuke
-the old kernel and are beyond the point of return). This allows to use
-set_kernel_text_rw() to directly patch the values in the .text section.
-
-I had already sent a patch which achieved this but it was significantly
-more complicated, so this is a cleaner/straight-forward approach.
-
-Signed-off-by: Nikolay Borisov <Nikolay.Borisov@arm.com>
-Acked-by: Will Deacon <will.deacon@arm.com>
-[kees: collapsed kexec_boot_atags (will.daecon)]
-[kees: for bisectability, moved set_kernel_text_rw() to RODATA patch]
 Signed-off-by: Kees Cook <keescook@chromium.org>
+Cc: Rabin Vincent <rabin@rab.in>
 ---
- arch/arm/kernel/machine_kexec.c | 8 ++++----
- 1 file changed, 4 insertions(+), 4 deletions(-)
+ arch/arm/include/asm/fixmap.h |  2 ++
+ arch/arm/mm/mmu.c             | 19 +++++++++++++++++++
+ 2 files changed, 21 insertions(+)
 
-diff --git a/arch/arm/kernel/machine_kexec.c b/arch/arm/kernel/machine_kexec.c
-index 8cf0996aa1a8..8f75250cbe30 100644
---- a/arch/arm/kernel/machine_kexec.c
-+++ b/arch/arm/kernel/machine_kexec.c
-@@ -29,6 +29,7 @@ extern unsigned long kexec_boot_atags;
+diff --git a/arch/arm/include/asm/fixmap.h b/arch/arm/include/asm/fixmap.h
+index d984ca69ce19..714606f70425 100644
+--- a/arch/arm/include/asm/fixmap.h
++++ b/arch/arm/include/asm/fixmap.h
+@@ -14,6 +14,8 @@ enum fixed_addresses {
+ 	__end_of_fixed_addresses
+ };
  
- static atomic_t waiting_for_crash_ipi;
++void __set_fixmap(enum fixed_addresses idx, phys_addr_t phys, pgprot_t prot);
++
+ #include <asm-generic/fixmap.h>
  
-+static unsigned long dt_mem;
+ #endif
+diff --git a/arch/arm/mm/mmu.c b/arch/arm/mm/mmu.c
+index 7fa0966cd15f..94eecb913f15 100644
+--- a/arch/arm/mm/mmu.c
++++ b/arch/arm/mm/mmu.c
+@@ -22,6 +22,7 @@
+ #include <asm/cputype.h>
+ #include <asm/sections.h>
+ #include <asm/cachetype.h>
++#include <asm/fixmap.h>
+ #include <asm/sections.h>
+ #include <asm/setup.h>
+ #include <asm/smp_plat.h>
+@@ -392,6 +393,24 @@ SET_MEMORY_FN(rw, pte_set_rw)
+ SET_MEMORY_FN(x, pte_set_x)
+ SET_MEMORY_FN(nx, pte_set_nx)
+ 
++void __set_fixmap(enum fixed_addresses idx, phys_addr_t phys, pgprot_t prot)
++{
++	unsigned long vaddr = __fix_to_virt(idx);
++	pte_t *pte = pte_offset_kernel(pmd_off_k(vaddr), vaddr);
++
++	/* Make sure fixmap region does not exceed available allocation. */
++	BUILD_BUG_ON(FIXADDR_START + (__end_of_fixed_addresses * PAGE_SIZE) >
++		     FIXADDR_END);
++	BUG_ON(idx >= __end_of_fixed_addresses);
++
++	if (pgprot_val(prot))
++		set_pte_at(NULL, vaddr, pte,
++			pfn_pte(phys >> PAGE_SHIFT, prot));
++	else
++		pte_clear(NULL, vaddr, pte);
++	flush_tlb_kernel_range(vaddr, vaddr + PAGE_SIZE);
++}
++
  /*
-  * Provide a dummy crash_notes definition while crash dump arrives to arm.
-  * This prevents breakage of crash_notes attribute in kernel/ksysfs.c.
-@@ -64,7 +65,7 @@ int machine_kexec_prepare(struct kimage *image)
- 			return err;
- 
- 		if (be32_to_cpu(header) == OF_DT_HEADER)
--			kexec_boot_atags = current_segment->mem;
-+			dt_mem = current_segment->mem;
- 	}
- 	return 0;
- }
-@@ -166,9 +167,8 @@ void machine_kexec(struct kimage *image)
- 	kexec_start_address = image->start;
- 	kexec_indirection_page = page_list;
- 	kexec_mach_type = machine_arch_type;
--	if (!kexec_boot_atags)
--		kexec_boot_atags = image->start - KEXEC_ARM_ZIMAGE_OFFSET + KEXEC_ARM_ATAGS_OFFSET;
--
-+	kexec_boot_atags = dt_mem ?: image->start - KEXEC_ARM_ZIMAGE_OFFSET
-+				     + KEXEC_ARM_ATAGS_OFFSET;
- 
- 	/* copy our kernel relocation code to the control code page */
- 	reboot_entry = fncpy(reboot_code_buffer,
+  * Adjust the PMD section entries according to the CPU in use.
+  */
 -- 
 1.9.1
