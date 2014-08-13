@@ -1,40 +1,29 @@
 From: gabriel.fernandez@st.com (Gabriel FERNANDEZ)
-Date: Wed, 13 Aug 2014 17:34:32 +0200
-Subject: [PATCH 2/5] phy: miphy28lp: Add MiPHY28lp header file for DT x Driver
- defines
+Date: Wed, 13 Aug 2014 17:34:35 +0200
+Subject: [PATCH 5/5] ARM: multi_v7_defconfig: Enable MiPHY28lp - ST's Generic
+ (SATA, PCIe & USB3) PHY
 In-Reply-To: <1407944075-8093-1-git-send-email-gabriel.fernandez@linaro.org>
 References: <1407944075-8093-1-git-send-email-gabriel.fernandez@linaro.org>
-Message-ID: <1407944075-8093-3-git-send-email-gabriel.fernandez@linaro.org>
+Message-ID: <1407944075-8093-6-git-send-email-gabriel.fernandez@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This provides the shared header file which will be reference from both
-the MiPHY28lp driver and its associated Device Tree node(s).
-
-Signed-off-by: alexandre torgue <alexandre.torgue@st.com>
 Signed-off-by: Gabriel Fernandez <gabriel.fernandez@linaro.org>
 ---
- include/dt-bindings/phy/phy-miphy28lp.h | 12 ++++++++++++
- 1 file changed, 12 insertions(+)
- create mode 100644 include/dt-bindings/phy/phy-miphy28lp.h
+ arch/arm/configs/multi_v7_defconfig | 1 +
+ 1 file changed, 1 insertion(+)
 
-diff --git a/include/dt-bindings/phy/phy-miphy28lp.h b/include/dt-bindings/phy/phy-miphy28lp.h
-new file mode 100644
-index 0000000..7cf9bce
---- /dev/null
-+++ b/include/dt-bindings/phy/phy-miphy28lp.h
-@@ -0,0 +1,12 @@
-+/*
-+ * This header provides constants for the phy framework
-+ * based on the STMicroelectronics miph28lp.
-+ */
-+#ifndef _DT_BINDINGS_PHY_MIPHY28LP
-+#define _DT_BINDINGS_PHY_MIPHY28LP
-+
-+#define MIPHY_TYPE_SATA		1
-+#define MIPHY_TYPE_PCIE		2
-+#define MIPHY_TYPE_USB		3
-+
-+#endif /* _DT_BINDINGS_PHY_MIPHY28LP */
+diff --git a/arch/arm/configs/multi_v7_defconfig b/arch/arm/configs/multi_v7_defconfig
+index 5fb95fb..641e367 100644
+--- a/arch/arm/configs/multi_v7_defconfig
++++ b/arch/arm/configs/multi_v7_defconfig
+@@ -386,6 +386,7 @@ CONFIG_PWM_TEGRA=y
+ CONFIG_PWM_VT8500=y
+ CONFIG_OMAP_USB2=y
+ CONFIG_TI_PIPE3=y
++CONFIG_PHY_MIPHY28LP=y
+ CONFIG_PHY_MIPHY365X=y
+ CONFIG_PHY_SUN4I_USB=y
+ CONFIG_EXT4_FS=y
 -- 
 1.9.1
