@@ -1,232 +1,115 @@
-From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
-Date: Wed, 13 Aug 2014 16:52:05 +0100
-Subject: [PATCH v7 6/8] drivers: cpuidle: CPU idle ARM64 driver
-In-Reply-To: <1407945127-27554-1-git-send-email-lorenzo.pieralisi@arm.com>
-References: <1407945127-27554-1-git-send-email-lorenzo.pieralisi@arm.com>
-Message-ID: <1407945127-27554-7-git-send-email-lorenzo.pieralisi@arm.com>
+From: nicolas.ferre@atmel.com (Nicolas Ferre)
+Date: Wed, 13 Aug 2014 17:55:49 +0200
+Subject: [PATCH v2] usb: gadget: at91_udc: move prepare clk into process
+ context
+In-Reply-To: <20140813172023.52ad3902@bbrezillon>
+References: <1407330702-2926-1-git-send-email-ronald.wahl@raritan.com>	<20140812033456.16355.48522@quantum>	<20140813145348.GA26008@piout.net>
+ <20140813172023.52ad3902@bbrezillon>
+Message-ID: <53EB8A85.6070509@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch implements a generic CPU idle driver for ARM64 machines.
+On 13/08/2014 17:20, Boris BREZILLON :
+> On Wed, 13 Aug 2014 16:53:49 +0200
+> Alexandre Belloni <alexandre.belloni@free-electrons.com> wrote:
+> 
+>> Hi Mike,
+>>
+>> On 11/08/2014 at 20:34:56 -0700, Mike Turquette wrote :
+>>> Quoting Ronald Wahl (2014-08-06 06:11:42)
+>>>> Commit 7628083227b6bc4a7e33d7c381d7a4e558424b6b added clock preparation in
+>>>> interrupt context. This is not allowed as it might sleep. Move clock
+>>>> preparation into process context (at91udc_probe).
+>>>> ---
+>>>>  drivers/usb/gadget/udc/at91_udc.c | 39 ++++++++++++++++++++++++++++++---------
+>>>>  1 file changed, 30 insertions(+), 9 deletions(-)
+>>>>
+>>>> diff --git a/drivers/usb/gadget/udc/at91_udc.c b/drivers/usb/gadget/udc/at91_udc.c
+>>>> index cfd18bc..0b347a0 100644
+>>>> --- a/drivers/usb/gadget/udc/at91_udc.c
+>>>> +++ b/drivers/usb/gadget/udc/at91_udc.c
+>>>> @@ -872,10 +872,10 @@ static void clk_on(struct at91_udc *udc)
+>>>>  
+>>>>         if (IS_ENABLED(CONFIG_COMMON_CLK)) {
+>>>
+>>> Why is this check necessary at all? Drivers shouldn't have to care at
+>>> all about the underlying clock framework implementation.
+>>>
+>>
+>> I believe it has been done because without the common clock framework,
+>> usb_clk is not defined.
+> 
+> Absolutely: uclk is only available when using the CCF. In the old at91
+> clock implementation the USB clock rate was configured during early boot
+> at registration time.
+> With the CCF implementation USB clk rate is no longer hardcoded at init
+> time and we have to configure it appropriately before using it (the
+> prepare and enable actions are useless though because uclk is the parent
+> of fclk, and thus will be prepared/enabled when fclk is
+> prepared/enabled).
+> 
+> What we could do here is test for CONFIG_COMMON_CLK_AT91 instead of
+> CONFIG_COMMON_CLK (so that there's no direct dependency on the CCF).
+> 
+> Another option is to implement determine_rate in the new at91 usb clk
+> implementation and then call clk_set_rate on fclk (without testing the
+> return code, because the old clk implementation will always return
+> -EINVAL).
 
-It relies on the DT idle states infrastructure to initialize idle
-states count and respective parameters. Current code assumes the driver
-is managing idle states on all possible CPUs but can be easily
-generalized to support heterogenous systems and build cpumasks at
-runtime using MIDRs or DT cpu nodes compatible properties.
+I would recommend to keep it like that until we remove all need for the
+old clock implementation. Then we will be able to remove this test and
+simplify the code.
+In the meantime, it is stated explicitly and I find it more obvious than
+trying to hide this matter of fact.
 
-The driver relies on the arm64 CPU operations to call the idle
-initialization hook used to parse and save suspend back-end specific
-idle states information upon probing.
+Bye,
 
-Idle state index 0 is always initialized as a simple wfi state, ie always
-considered present and functional on all ARM64 platforms.
+>>>>                 clk_set_rate(udc->uclk, 48000000);
+>>>> -               clk_prepare_enable(udc->uclk);
+>>>> +               clk_enable(udc->uclk);
+>>>>         }
+>>>> -       clk_prepare_enable(udc->iclk);
+>>>> -       clk_prepare_enable(udc->fclk);
+>>>> +       clk_enable(udc->iclk);
+>>>> +       clk_enable(udc->fclk);
+>>>>  }
+>>>>  
+>>>>  static void clk_off(struct at91_udc *udc)
+>>>> @@ -884,10 +884,10 @@ static void clk_off(struct at91_udc *udc)
+>>>>                 return;
+>>>>         udc->clocked = 0;
+>>>>         udc->gadget.speed = USB_SPEED_UNKNOWN;
+>>>> -       clk_disable_unprepare(udc->fclk);
+>>>> -       clk_disable_unprepare(udc->iclk);
+>>>> +       clk_disable(udc->fclk);
+>>>> +       clk_disable(udc->iclk);
+>>>>         if (IS_ENABLED(CONFIG_COMMON_CLK))
+>>>> -               clk_disable_unprepare(udc->uclk);
+>>>> +               clk_disable(udc->uclk);
+>>>>  }
+>>>>  
+>>>>  /*
+>>>> @@ -1780,14 +1780,23 @@ static int at91udc_probe(struct platform_device *pdev)
+>>>>         }
+>>>>  
+>>>>         /* don't do anything until we have both gadget driver and VBUS */
+>>>> +       if (IS_ENABLED(CONFIG_COMMON_CLK)) {
+>>>
+>>> Same question here. What does the clock framework implementation have to
+>>> do with uclk?
+>>>
+>>> Regards,
+>>> Mike
+>>>
+>>> _______________________________________________
+>>> linux-arm-kernel mailing list
+>>> linux-arm-kernel at lists.infradead.org
+>>> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+>>
+> 
+> 
+> 
 
-Idle state indices higher than 0 trigger idle state entry by calling
-the cpu_suspend function, that triggers the suspend operation through
-the CPU operations suspend back-end hook. cpu_suspend passes the idle
-state index as a parameter so that the CPU operations suspend back-end
-can retrieve the required idle state data by using the idle state
-index to execute a look-up on its internal data structures.
 
-Reviewed-by: Ashwin Chaugule <ashwin.chaugule@linaro.org>
-Signed-off-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
----
- drivers/cpuidle/Kconfig         |   5 ++
- drivers/cpuidle/Kconfig.arm64   |  14 +++++
- drivers/cpuidle/Makefile        |   4 ++
- drivers/cpuidle/cpuidle-arm64.c | 131 ++++++++++++++++++++++++++++++++++++++++
- 4 files changed, 154 insertions(+)
- create mode 100644 drivers/cpuidle/Kconfig.arm64
- create mode 100644 drivers/cpuidle/cpuidle-arm64.c
-
-diff --git a/drivers/cpuidle/Kconfig b/drivers/cpuidle/Kconfig
-index 8deb934..c5029c1 100644
---- a/drivers/cpuidle/Kconfig
-+++ b/drivers/cpuidle/Kconfig
-@@ -33,6 +33,11 @@ depends on ARM
- source "drivers/cpuidle/Kconfig.arm"
- endmenu
- 
-+menu "ARM64 CPU Idle Drivers"
-+depends on ARM64
-+source "drivers/cpuidle/Kconfig.arm64"
-+endmenu
-+
- menu "MIPS CPU Idle Drivers"
- depends on MIPS
- source "drivers/cpuidle/Kconfig.mips"
-diff --git a/drivers/cpuidle/Kconfig.arm64 b/drivers/cpuidle/Kconfig.arm64
-new file mode 100644
-index 0000000..d0a08ed
---- /dev/null
-+++ b/drivers/cpuidle/Kconfig.arm64
-@@ -0,0 +1,14 @@
-+#
-+# ARM64 CPU Idle drivers
-+#
-+
-+config ARM64_CPUIDLE
-+	bool "Generic ARM64 CPU idle Driver"
-+	select ARM64_CPU_SUSPEND
-+	select DT_IDLE_STATES
-+	help
-+	  Select this to enable generic cpuidle driver for ARM64.
-+	  It provides a generic idle driver whose idle states are configured
-+	  at run-time through DT nodes. The CPUidle suspend backend is
-+	  initialized by calling the CPU operations init idle hook
-+	  provided by architecture code.
-diff --git a/drivers/cpuidle/Makefile b/drivers/cpuidle/Makefile
-index 002b653..4d177b9 100644
---- a/drivers/cpuidle/Makefile
-+++ b/drivers/cpuidle/Makefile
-@@ -23,6 +23,10 @@ obj-$(CONFIG_ARM_EXYNOS_CPUIDLE)        += cpuidle-exynos.o
- obj-$(CONFIG_MIPS_CPS_CPUIDLE)		+= cpuidle-cps.o
- 
- ###############################################################################
-+# ARM64 drivers
-+obj-$(CONFIG_ARM64_CPUIDLE)		+= cpuidle-arm64.o
-+
-+###############################################################################
- # POWERPC drivers
- obj-$(CONFIG_PSERIES_CPUIDLE)		+= cpuidle-pseries.o
- obj-$(CONFIG_POWERNV_CPUIDLE)		+= cpuidle-powernv.o
-diff --git a/drivers/cpuidle/cpuidle-arm64.c b/drivers/cpuidle/cpuidle-arm64.c
-new file mode 100644
-index 0000000..25ec622
---- /dev/null
-+++ b/drivers/cpuidle/cpuidle-arm64.c
-@@ -0,0 +1,131 @@
-+/*
-+ * ARM64 generic CPU idle driver.
-+ *
-+ * Copyright (C) 2014 ARM Ltd.
-+ * Author: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+ */
-+
-+#define pr_fmt(fmt) "CPUidle arm64: " fmt
-+
-+#include <linux/cpuidle.h>
-+#include <linux/cpumask.h>
-+#include <linux/cpu_pm.h>
-+#include <linux/kernel.h>
-+#include <linux/module.h>
-+#include <linux/of.h>
-+#include <linux/slab.h>
-+
-+#include <asm/cpuidle.h>
-+#include <asm/suspend.h>
-+
-+#include "dt_idle_states.h"
-+
-+/*
-+ * arm_enter_idle_state - Programs CPU to enter the specified state
-+ *
-+ * dev: cpuidle device
-+ * drv: cpuidle driver
-+ * idx: state index
-+ *
-+ * Called from the CPUidle framework to program the device to the
-+ * specified target state selected by the governor.
-+ */
-+static int arm_enter_idle_state(struct cpuidle_device *dev,
-+				struct cpuidle_driver *drv, int idx)
-+{
-+	int ret;
-+
-+	if (!idx) {
-+		cpu_do_idle();
-+		return idx;
-+	}
-+
-+	ret = cpu_pm_enter();
-+	if (!ret) {
-+		/*
-+		 * Pass idle state index to cpu_suspend which in turn will
-+		 * call the CPU ops suspend protocol with idle index as a
-+		 * parameter.
-+		 */
-+		ret = cpu_suspend(idx);
-+
-+		cpu_pm_exit();
-+	}
-+
-+	return ret ? -1 : idx;
-+}
-+
-+struct cpuidle_driver arm64_idle_driver = {
-+	.name = "arm64_idle",
-+	.owner = THIS_MODULE,
-+	/*
-+	 * State at index 0 is standby wfi and considered standard
-+	 * on all ARM platforms. If in some platforms simple wfi
-+	 * can't be used as "state 0", DT bindings must be implemented
-+	 * to work around this issue and allow installing a special
-+	 * handler for idle state index 0.
-+	 */
-+	.states[0] = {
-+		.enter                  = arm_enter_idle_state,
-+		.exit_latency           = 1,
-+		.target_residency       = 1,
-+		.power_usage		= UINT_MAX,
-+		.flags                  = CPUIDLE_FLAG_TIME_VALID,
-+		.name                   = "WFI",
-+		.desc                   = "ARM64 WFI",
-+	}
-+};
-+
-+/*
-+ * arm64_idle_init
-+ *
-+ * Registers the arm64 specific cpuidle driver with the cpuidle
-+ * framework. It relies on core code to parse the idle states
-+ * and initialize them using driver data structures accordingly.
-+ */
-+static int __init arm64_idle_init(void)
-+{
-+	int i, ret;
-+	struct cpuidle_driver *drv = &arm64_idle_driver;
-+
-+	drv->cpumask = kzalloc(cpumask_size(), GFP_KERNEL);
-+	if (!drv->cpumask)
-+		return -ENOMEM;
-+
-+	cpumask_copy(drv->cpumask, cpu_possible_mask);
-+	/*
-+	 * Initialize idle states data, starting at index 1.
-+	 * This driver is DT only, if no DT idle states are detected (ret == 0)
-+	 * let the driver initialization fail accordingly since there is no
-+	 * reason to initialize the idle driver if only wfi is supported.
-+	 */
-+	ret = dt_init_idle_driver(drv, 1);
-+	if (ret <= 0)
-+		goto free_mem;
-+	/*
-+	 * Call arch CPU operations in order to initialize
-+	 * idle states suspend back-end specific data
-+	 */
-+	for_each_cpu(i, drv->cpumask) {
-+		ret = cpu_init_idle(i);
-+		if (ret)
-+			goto free_mem;
-+	}
-+
-+	for (i = 1; i < drv->state_count; i++)
-+		drv->states[i].enter = arm_enter_idle_state;
-+
-+	ret = cpuidle_register(drv, NULL);
-+	if (ret)
-+		goto free_mem;
-+
-+	return 0;
-+free_mem:
-+	kfree(drv->cpumask);
-+	return ret;
-+}
-+device_initcall(arm64_idle_init);
 -- 
-1.9.1
+Nicolas Ferre
