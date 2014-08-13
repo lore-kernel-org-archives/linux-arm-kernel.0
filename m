@@ -1,210 +1,55 @@
-From: keescook@chromium.org (Kees Cook)
-Date: Tue, 12 Aug 2014 19:39:16 -0700
-Subject: [PATCH v3 3/7] arm: use fixmap for text patching when text is RO
-In-Reply-To: <53EAB104.1050208@codeaurora.org>
-References: <1407867869-5194-1-git-send-email-keescook@chromium.org>
- <1407867869-5194-4-git-send-email-keescook@chromium.org>
- <53EA897D.8030901@codeaurora.org>
- <CAGXu5j+TPBs9h9YvVDt=g4WFykHgzcde9Ujuef=cRQAou8hZoA@mail.gmail.com>
- <53EAB104.1050208@codeaurora.org>
-Message-ID: <CAGXu5jKDZc+V+=LD-yN5_PCcorXMx6B+AMeL7rMSfTXFRKqj+A@mail.gmail.com>
+From: zhichang.yuan@linaro.org (zhichang.yuan)
+Date: Wed, 13 Aug 2014 11:13:12 +0800
+Subject: [PATCH V2] arm64: optimized copy_to_user and copy_from_user
+ assembly code
+In-Reply-To: <CAL85gmChQCM3iw-xqy-bkGRWH0jDvGf7v-GnxynS4HoOkL-cwQ@mail.gmail.com>
+References: <1407538940-9167-1-git-send-email-fkan@apm.com>	<CAC8NTUXb1JmHwMLjmJtEKXjb+xYtuO4qKnSqMRWwACs35P8_HA@mail.gmail.com>
+ <CAL85gmChQCM3iw-xqy-bkGRWH0jDvGf7v-GnxynS4HoOkL-cwQ@mail.gmail.com>
+Message-ID: <53EAD7C8.7070001@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Aug 12, 2014 at 5:27 PM, Stephen Boyd <sboyd@codeaurora.org> wrote:
-> On 08/12/14 14:47, Kees Cook wrote:
->> On Tue, Aug 12, 2014 at 2:39 PM, Stephen Boyd <sboyd@codeaurora.org> wrote:
->>> On 08/12/14 11:24, Kees Cook wrote:
->>>> diff --git a/arch/arm/kernel/patch.c b/arch/arm/kernel/patch.c
->>>> index 07314af47733..03dd4e39c833 100644
->>>> --- a/arch/arm/kernel/patch.c
->>>> +++ b/arch/arm/kernel/patch.c
->>>> @@ -13,21 +16,69 @@ struct patch {
->>>>       unsigned int insn;
->>>>  };
->>>>
->>>> -void __kprobes __patch_text(void *addr, unsigned int insn)
->>>> +static DEFINE_SPINLOCK(patch_lock);
->>>> +
->>>> +static void __kprobes *patch_map(void *addr, int fixmap, unsigned long *flags)
->>>> +{
->>>> +     unsigned int uintaddr = (uintptr_t) addr;
->>>> +     bool module = !core_kernel_text(uintaddr);
->>>> +     struct page *page;
->>>> +
->>>> +     if (module && IS_ENABLED(CONFIG_DEBUG_SET_MODULE_RONX))
->>>> +             page = vmalloc_to_page(addr);
->>>> +     else if (!module && IS_ENABLED(CONFIG_DEBUG_RODATA))
->>>> +             page = virt_to_page(addr);
->>>> +     else
->>>> +             return addr;
->>>> +
->>>> +     if (flags)
->>>> +             spin_lock_irqsave(&patch_lock, *flags);
->>>> +
->>>> +     set_fixmap(fixmap, page_to_phys(page));
->>>> +
->>>> +     return (void *) (__fix_to_virt(fixmap) + (uintaddr & ~PAGE_MASK));
->>>> +}
->>>> +
->>>> +static void __kprobes patch_unmap(int fixmap, unsigned long *flags)
->>>> +{
->>>> +     clear_fixmap(fixmap);
->>>> +
->>>> +     if (flags)
->>>> +             spin_unlock_irqrestore(&patch_lock, *flags);
->>>> +}
->>> Has the kbuildbot complained about this one yet?
->>>
->>>   CHECK  arch/arm/kernel/patch.c
->>>   arch/arm/kernel/patch.c:47:39: warning: context imbalance in
->>> 'patch_unmap' - unexpected unlock
->>>
->>> I guess we're going to ignore it.
->> No, nothing yet from buildbot, let me do a sparse run -- I think we
->> can just add annotation and we'll be okay.
+Hi Feng,
+
+On 2014?08?12? 02:05, Feng Kan wrote:
+> On Sun, Aug 10, 2014 at 8:01 PM, Radha Mohan <mohun106@gmail.com> wrote:
+>> Hi Feng,
 >>
 >>
+>>> +
+>>> +.Lcpy_not_short:
+>>> +       /*
+>>> +        * We don't much care about the alignment of DST, but we want SRC
+>>> +        * to be 128-bit (16 byte) aligned so that we don't cross cache line
+>>> +        * boundaries on both loads and stores.
+>>> +        */
+>> Could you please tell why is destination alignment not an issue? Is
+>> this a generic implementation that you are referring to or specific to
+>> your platform?
+> This is per Linaro Cortext String optimization routines.
 >
-> Ok. I tried to move code around but sparse still complains because of
-> conditional locking.
+> https://launchpad.net/cortex-strings
+>
+> Zhichang submitted something similar for the memcpy from the
+> same optimization.
+>
+> Sorry resend in text mode.
 
-Oh, sorry! I should have mentioned I fixed this already. It just
-requires some declarations. Here's how it looks now:
+If the both dst and src are not aligned and their alignment offset are not equal, i haven't found better way
+to handle.
+But it is lucky ARMv8 support the non-align memory access.
+At the beginning of my patch work, i also think maybe it is more better that all load or store are aligned. I
+wrote the code just like the ARMv7 memcpy, firstly loaded the data from SRC and buffered them in several
+registers and combined as a new word( 16 bytes), then stored it to the aligned DST. But the performance is a
+bit worst.
 
-https://git.kernel.org/cgit/linux/kernel/git/kees/linux.git/commit/?h=arm/ro-nx&id=847a4a489d31b76797e7c7a78cd3e98c7948df4b
+~Zhichang
 
-+static void __kprobes *patch_map(void *addr, int fixmap, unsigned long *flags)
-+ __acquires(&patch_lock)
-+{
-...
-+ if (flags)
-+ spin_lock_irqsave(&patch_lock, *flags);
-+ else
-+ __acquire(&patch_lock);
-
-etc.
-
-Thanks for poking at this!
-
--Kees
-
->
-> ---8<---
->
-> diff --git a/arch/arm/kernel/patch.c b/arch/arm/kernel/patch.c
-> index 03dd4e39c833..f6d4de3826a0 100644
-> --- a/arch/arm/kernel/patch.c
-> +++ b/arch/arm/kernel/patch.c
-> @@ -18,33 +18,17 @@ struct patch {
->
->  static DEFINE_SPINLOCK(patch_lock);
->
-> -static void __kprobes *patch_map(void *addr, int fixmap, unsigned long *flags)
-> +static struct page __kprobes *patch_page(void *addr)
->  {
->         unsigned int uintaddr = (uintptr_t) addr;
->         bool module = !core_kernel_text(uintaddr);
-> -       struct page *page;
->
->         if (module && IS_ENABLED(CONFIG_DEBUG_SET_MODULE_RONX))
-> -               page = vmalloc_to_page(addr);
-> +               return vmalloc_to_page(addr);
->         else if (!module && IS_ENABLED(CONFIG_DEBUG_RODATA))
-> -               page = virt_to_page(addr);
-> -       else
-> -               return addr;
-> +               return virt_to_page(addr);
->
-> -       if (flags)
-> -               spin_lock_irqsave(&patch_lock, *flags);
-> -
-> -       set_fixmap(fixmap, page_to_phys(page));
-> -
-> -       return (void *) (__fix_to_virt(fixmap) + (uintaddr & ~PAGE_MASK));
-> -}
-> -
-> -static void __kprobes patch_unmap(int fixmap, unsigned long *flags)
-> -{
-> -       clear_fixmap(fixmap);
-> -
-> -       if (flags)
-> -               spin_unlock_irqrestore(&patch_lock, *flags);
-> +       return NULL;
->  }
->
->  void __kprobes __patch_text_real(void *addr, unsigned int insn, bool remap)
-> @@ -54,10 +38,18 @@ void __kprobes __patch_text_real(void *addr, unsigned int insn, bool remap)
->         bool twopage = false;
->         unsigned long flags;
->         void *waddr = addr;
-> +       struct page *page = NULL;
->         int size;
->
-> -       if (remap)
-> -               waddr = patch_map(addr, FIX_TEXT_POKE0, &flags);
-> +       if (remap) {
-> +               page = patch_page(addr);
-> +               if (page) {
-> +                       spin_lock_irqsave(&patch_lock, flags);
-> +                       set_fixmap(FIX_TEXT_POKE0, page_to_phys(page));
-> +                       waddr = (void *)(__fix_to_virt(FIX_TEXT_POKE0) +
-> +                               (uintaddr & ~PAGE_MASK));
-> +               }
-> +       }
->
->         if (thumb2 && __opcode_is_thumb16(insn)) {
->                 *(u16 *)waddr = __opcode_to_mem_thumb16(insn);
-> @@ -69,15 +61,25 @@ void __kprobes __patch_text_real(void *addr, unsigned int insn, bool remap)
->                 u16 *addrh1 = waddr + 2;
->
->                 twopage = (uintaddr & ~PAGE_MASK) == PAGE_SIZE - 2;
-> -               if (twopage && remap)
-> -                       addrh1 = patch_map(addr + 2, FIX_TEXT_POKE1, NULL);
-> +               if (twopage && remap) {
-> +                       struct page *page2;
-> +
-> +                       page2 = patch_page(addr + 2);
-> +                       if (page2) {
-> +                               set_fixmap(FIX_TEXT_POKE1, page_to_phys(page));
-> +                               addrh1 = (u16 *)(__fix_to_virt(FIX_TEXT_POKE1) +
-> +                                               (uintaddr & ~PAGE_MASK));
-> +                       } else {
-> +                               addrh1 = addr + 2;
-> +                       }
-> +               }
->
->                 *addrh0 = __opcode_to_mem_thumb16(first);
->                 *addrh1 = __opcode_to_mem_thumb16(second);
->
->                 if (twopage && addrh1 != addr + 2) {
->                         flush_kernel_vmap_range(addrh1, 2);
-> -                       patch_unmap(FIX_TEXT_POKE1, NULL);
-> +                       clear_fixmap(FIX_TEXT_POKE1);
->                 }
->
->                 size = sizeof(u32);
-> @@ -91,9 +93,10 @@ void __kprobes __patch_text_real(void *addr, unsigned int insn, bool remap)
->                 size = sizeof(u32);
->         }
->
-> -       if (waddr != addr) {
-> +       if (page) {
->                 flush_kernel_vmap_range(waddr, twopage ? size / 2 : size);
-> -               patch_unmap(FIX_TEXT_POKE0, &flags);
-> +               clear_fixmap(FIX_TEXT_POKE0);
-> +               spin_unlock_irqrestore(&patch_lock, flags);
->         }
->
->         flush_icache_range((uintptr_t)(addr),
->
-> --
-> Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-> hosted by The Linux Foundation
->
-
-
-
--- 
-Kees Cook
-Chrome OS Security
+>>> --
+>>> 1.9.1
+>>>
+>>>
+>>> _______________________________________________
+>>> linux-arm-kernel mailing list
+>>> linux-arm-kernel at lists.infradead.org
+>>> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
