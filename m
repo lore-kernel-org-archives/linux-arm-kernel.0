@@ -1,87 +1,65 @@
-From: koen@dominion.thruhere.net (Koen Kooi)
-Date: Wed, 13 Aug 2014 12:16:57 +0200
-Subject: [linux-sunxi] simplefb: add clock handling
-In-Reply-To: <53EB238B.5010404@redhat.com>
+From: libv@skynet.be (Luc Verhaegen)
+Date: Wed, 13 Aug 2014 12:19:23 +0200
+Subject: [linux-sunxi] Re: [PATCH 3/4] simplefb: disable dt node upon
+ remove
+In-Reply-To: <20140813094524.GC31326@skynet.be>
 References: <1407914239-12054-1-git-send-email-libv@skynet.be>
- <CANq1E4Re79+D5H-pf8pW87NZ5MWz9UFknd5Dk2GKCvhzm5MNSA@mail.gmail.com>
- <BFCF4C2C-77ED-4719-903B-921DEB250B7A@dominion.thruhere.net>
- <53EB238B.5010404@redhat.com>
-Message-ID: <958E7D39-A034-42AC-A6FF-130609E46967@dominion.thruhere.net>
+ <1407914239-12054-4-git-send-email-libv@skynet.be>
+ <CACxGe6vaPUa4QvYWBA-QY7MTmJYoeqnPt9Zh5jpky6S9UYbrvQ@mail.gmail.com>
+ <CANq1E4ReOB87RX8VhnW1Ln=SK3Tw5V962ujcsfuz-2E9Uc61yQ@mail.gmail.com>
+ <CACxGe6vQrhd8QOAyGnjRppmuANpT60Ao2+KmkDfF4FNeoZSZgw@mail.gmail.com>
+ <20140813094524.GC31326@skynet.be>
+Message-ID: <20140813101923.GD31326@skynet.be>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Wed, Aug 13, 2014 at 11:45:24AM +0200, Luc Verhaegen wrote:
+> On Wed, Aug 13, 2014 at 10:23:14AM +0100, Grant Likely wrote:
+> > 
+> > The majority of the DT code is based on the assumption of a static
+> > tree. Pantelis has been working on being able to modify it at runtime
+> > with overlays, but he has had to go through a lot of rework because it
+> > is not a trivial task. When you get into modifying the DT, you need to
+> > have a lot more understanding of the side effects to changing the
+> > tree. The DT structure also has a lifecycle that can go beyond the
+> > current lifecycle of the kernel. The kexec tool will extract the
+> > current tree from the kernel, make the appropriate modifications, and
+> > use that to boot the next kernel. Allowing any driver to modify the
+> > tree has side effects beyond just the current kernel.
+> > 
+> > In this specific case, it will interact badly with the work Pantelis
+> > is doing to make platform devices work with overlays. Modifying the
+> > status property will cause the associated struct device to get removed
+> > in the middle of probing a driver for that device! That will most
+> > likely cause an oops.
+> > 
+> > Besides, Luc straight out *said*: "...even though it has no real value
+> > today". In what circumstance is that justification for modifying the
+> > tree?
+> 
+> With that sentence i meant that given the current state of things, it 
+> has no real value.
+> 
+> It has no value currently as re-probing simplefb is not going to happen. 
+> But it's not a big leap to turn simplefb into a proper module. Not that 
+> that makes much sense, but that's never stopped anyone.
+> 
+> To me it seemed simple, dt is what drives simplefb, so dt then also 
+> becomes responsible for making sure that simplefb or another driver does 
+> not attempt to blindly use this info again. The way this is implemented 
+> i do not care for in any way, i just knew that i could not do nothing 
+> here, given the catastrophic effect disabling the clocks has on simplefb 
+> on sunxi. Given the discussion that errupted here, i'd say that this 
+> does need some resolution, and altering the dt is going to have to be 
+> part of the solution.
+> 
+> In any case, i will gladly drop this patch, as it is not absolutely 
+> necessary. But it should be very clear that there is no going back on 
+> this dt node after the clocks were released once.
+> 
+> Luc Verhaegen.
 
-Op 13 aug. 2014, om 10:36 heeft Hans de Goede <hdegoede@redhat.com> het volgende geschreven:
+What about approaching this from the other end? U-Boot could add a 
+property named "once-only" or so.
 
-> Hi,
-> 
-> On 08/13/2014 10:21 AM, Koen Kooi wrote:
->> 
->> Op 13 aug. 2014, om 09:54 heeft David Herrmann <dh.herrmann@gmail.com> het volgende geschreven:
->> 
->>> Hi
->>> 
->>> On Wed, Aug 13, 2014 at 9:17 AM, Luc Verhaegen <libv@skynet.be> wrote:
->>>> This is needed for the sunxi platform, where the u-boot initialized display
->>>> engine gets disabled by the clocks framework if certain clocks are not
->>>> claimed. Once these clocks are disabled, register content is lost, and there
->>>> is no turning back unless a full display driver is loaded, which kind of
->>>> beats the purpose of having simplefb running.
->>>> 
->>>> The lack of clock handling should plague more hardware, but so far rpi is the
->>>> best known user of simplefb, and its stepmotherly handling of the arm core
->>>> has kept these sort of issues from the kernel.
->>>> 
->>>> The sunxi u-boot side code can be found here:
->>>> https://groups.google.com/forum/#!topic/linux-sunxi/dPs958sIXvY
->>>> 
->>>> Patch 3 might be controversial, as this does not achieve anything real today,
->>>> since the status property in dt is only really evaluated when dealing with a
->>>> nodes memory. It still seems like a good idea to at least flag this memory or
->>>> node as disabled, as we really have no way back when the clocks get disabled.
->>> 
->>> Hans de Goede shortly told me about this and, tbh, I am not very
->>> pleased. Stephen tried to keep simplefd "as simple as possible", your
->>> patch now adds hardware-specific features. To be fair, the patch is
->>> simple and clocks are easy to handle, but I somehow fear we have to
->>> add more and more hardware-support that is required to keep the
->>> framebuffer active. This really defeats the purpose of simplefb.
->>> 
->>> The biggest question I have, is why do you add the clocks to your DT
->>> at all? The framebuffer is set up by your boot-loader (or maybe
->>> platform code) and should prepare the clocks. I don't see why we add
->>> the clocks to DT now. If they're not added, then no-one will disable
->>> them and simplefb works just fine, right?
->> 
->> All clocks known to linux without a consumer will get disabled on most (all?) ARM systems to save power. Years ago OMAP had a Kconfig option to change that behaviour and add printk warnings for the clocks it would touch. 
->> To be honest, I don't get why sunxi needs a simplefb to begin with, only a proper kms/drm driver is needed which would register the clocks it needs properly. These patches and discussion seem like a lot of effort wasted on the wrong thing. But I can't complain about that since I'm not the one doing the work. 
-> 
-> I believe that having some simple generic fb driver will be useful
-> on non x86, since we don't have vga-console there, and most distros
-> will build kms drivers as modules. Having the kernel / initrd code being
-> able to show output (like e.g. missing symbols in the kms drivers) seems
-> a very useful feature to me.
-> 
-> The way I envision this to work is:
-> 
-> u-boot lights up display, if it fails to load the kernel / ftd / ramdisk,
-> it can show this on the display
-> 
-> kernel takes over using something like simplefb (built into the kernel)
-> for its initial output / any error messages.
-> 
-> initrd loads kms, kms takes over.
-> 
-> This way we've a way to show error messages during boot at all times.
-> 
-> As we start supporting more ARM htpc boxes out of the box, telling the
-> user to hook up a serial console (which often involves soldering wires
-> to some test points) when things don't work really is not a viable
-> answer.
-
-So what you are saying is that the only reason it is needed is because some distros choose to build DRM drivers as modules. So as soon as they stop doing that the problem goes away, right?
-Worse, the experience I have with ARM DRM drivers is that they fail horrible when being built as modules, but that's a different problem.
-
-regards,
-
-Koen
+Luc Verhaegen.
