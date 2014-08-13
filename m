@@ -1,71 +1,80 @@
-From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
-Date: Wed, 13 Aug 2014 18:04:40 +0100
-Subject: [PATCH v7 3/8] drivers: cpuidle: implement DT based idle states
- infrastructure
-In-Reply-To: <alpine.LFD.2.11.1408131223501.1133@knanqh.ubzr>
-References: <1407945127-27554-1-git-send-email-lorenzo.pieralisi@arm.com>
- <1407945127-27554-4-git-send-email-lorenzo.pieralisi@arm.com>
- <alpine.LFD.2.11.1408131223501.1133@knanqh.ubzr>
-Message-ID: <20140813170440.GA30822@e102568-lin.cambridge.arm.com>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Wed, 13 Aug 2014 19:01:06 +0200
+Subject: [PATCH 4/4] simplefb: add clock handling code
+In-Reply-To: <53EB9471.3090204@wwwdotorg.org>
+References: <1407914239-12054-1-git-send-email-libv@skynet.be>
+ <1407914239-12054-5-git-send-email-libv@skynet.be>
+ <53EB9471.3090204@wwwdotorg.org>
+Message-ID: <20140813170106.GT15297@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Aug 13, 2014 at 05:31:11PM +0100, Nicolas Pitre wrote:
-> On Wed, 13 Aug 2014, Lorenzo Pieralisi wrote:
+On Wed, Aug 13, 2014 at 10:38:09AM -0600, Stephen Warren wrote:
+> On 08/13/2014 01:17 AM, Luc Verhaegen wrote:
+> >This claims and enables clocks listed in the simple framebuffer dt node.
+> >This is needed so that the display engine, in case the required clocks
+> >are known by the kernel code and are described in the dt, will remain
+> >properly enabled.
 > 
-> > On most common ARM systems, the low-power states a CPU can be put into are
-> > not discoverable in HW and require device tree bindings to describe
-> > power down suspend operations and idle states parameters.
-> > 
-> > In order to enable DT based idle states and configure idle drivers, this
-> > patch implements the bulk infrastructure required to parse the device tree
-> > idle states bindings and initialize the corresponding CPUidle driver states
-> > data.
-> > 
-> > The parsing API accepts a start index that defines the first idle state
-> > that should be initialized by the parsing code in order to give new and
-> > legacy driver flexibility over which states should be parsed using the
-> > new DT mechanism.
-> > 
-> > The idle states list is obtained from the first cpu in the driver
-> > cpumask, which implicitly means the parsing code expects idle states
-> > (and related list of phandles) to be the same for all CPUs in the
-> > CPUidle driver mask. The kernel does not check this assumption, it must
-> > be enforced by the bootloader to ensure correct system behaviour.
+> I think this make simplefb not simple any more, which rather goes
+> against the whole point of it.
 > 
-> Can we make the kernel a little less reliant on bootloader to ensure 
-> correct system behaviour please?  If assumptions are assumed by the 
-> kernel, it should at least print a warning and simply ignore the 
-> information when such assumption are not respected.
+> I specifically conceived simplefb to know about nothing more than
+> the memory address and pixel layout of the memory buffer. I
+> certainly don't like the idea of expanding simplefb to anything
+> beyond that, and IIRC *not* extending is was a condition agreed when
+> it was first merged. If more knowledge than that is required, then
+> there needs to be a HW-specific driver to manage any
+> clocks/resets/video registers, etc.
 
-I think the check adds complexity (it means stashing the idle states
-phandles for the first cpu, loop through the cpus in the mask and compare
-the phandles to the ones stashed for the first cpu for all cpus in the
-driver mask) for not much.
+I'm sorry, but how is that not simple? clocks enabling is step 1 in a
+driver in order to communicate somehow with the controller. Reset is a
+different story, because arguably, if simplefb is there, the
+controller is already out of reset.
 
-I was told that it is not up to the kernel to validate the DT, but if
-you want I can implement the check even though I really think it is
-overkill.
+And I don't see why video registers are coming into the discussion
+here. The code Luc posted doesn't access any register, at all. It just
+makes sure the needed controller keep going.
 
-> > +	/*
-> > +	 * We get the idle states for the first logical cpu in the
-> > +	 * driver mask. The kernel does not check idle states on all
-> > +	 * cpus in the driver mask, they are assumed to be the same
-> > +	 * by default.
-> > +	 */
-> 
-> What if they're not?
+> The correct way to handle this without a complete DRM/KMS/... driver
+> is to avoid the clocks in question being turned off at boot.
 
-It boils down to detecting what CPUs share the same idle states and
-initialize dynamically a number of CPU idle drivers accordingly. It is
-doable on top of this patch which is usable on homogeneous machines as a
-starting point.
-I do not think it is a big issue to live with this limitation at the moment,
-given that it can be augmented when this code gets in the kernel. I did not
-want to add more complexity to this already complex patch series, that's
-the reason why I have not implemented the multiple driver (whose first
-target is obviously bL systems) approach from the beginning, and I think
-that's reasonable.
+Which is exactly what this code does, using the generic DT bindings to
+express dependency for a given clock. How is this wrong?
 
-Thanks,
-Lorenzo
+> I thought there was a per-clock flag to prevent disabling an unused
+> clock?
+
+No, last time I heard, Mike Turquette was against it.
+
+> If not, perhaps the clock driver should force the clock to be
+> enabled (perhaps only if the DRM/KMS driver isn't enabled?).
+
+I'm sorry, but I'm not going to take any code that will do that in our
+clock driver.
+
+I'm not going to have a huge list of ifdef depending on configuration
+options to know which clock to enable, especially when clk_get should
+have the consumer device as an argument.
+
+> For example, the Tegra clock driver has a clock initialization table
+> which IIRC was used for this purpose before we got a DRM/KMS driver.
+> That way, all the details are kept inside the kernel code, and don't
+> end up influencing the DT representation of simplefb.
+
+I don't really see how the optional usage of a generic property
+influences badly the DT representation of simplefb.
+
+Maxime
+
+-- 
+Maxime Ripard, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140813/a2333ac8/attachment.sig>
