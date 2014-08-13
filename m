@@ -1,225 +1,152 @@
-From: mitchelh@codeaurora.org (Mitchel Humpherys)
-Date: Tue, 12 Aug 2014 17:51:39 -0700
-Subject: [PATCH 6/6] iommu/arm-smmu: add .domain_{set,
- get}_attr for coherent walk control
-In-Reply-To: <1407891099-24641-1-git-send-email-mitchelh@codeaurora.org>
-References: <1407891099-24641-1-git-send-email-mitchelh@codeaurora.org>
-Message-ID: <1407891099-24641-7-git-send-email-mitchelh@codeaurora.org>
+From: sboyd@codeaurora.org (Stephen Boyd)
+Date: Tue, 12 Aug 2014 17:54:24 -0700
+Subject: [PATCH v3] irqchip: gic: Allow gic_arch_extn hooks to call into
+ scheduler
+Message-ID: <1407891264-4826-1-git-send-email-sboyd@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Under certain conditions coherent hardware translation table walks can
-result in degraded performance. Add a new domain attribute to
-disable/enable this feature in generic code along with the domain
-attribute setter and getter to handle it in the ARM SMMU driver.
+Commit 1a6b69b6548c (ARM: gic: add CPU migration support,
+2012-04-12) introduced an acquisition of the irq_controller_lock
+in gic_raise_softirq() which can lead to a spinlock recursion if
+the gic_arch_extn hooks call into the scheduler (via complete()
+or wake_up(), etc.). This happens because gic_arch_extn hooks are
+normally called with the irq_controller_lock held and calling
+into the scheduler may cause us to call smp_send_reschedule()
+which will grab the irq_controller_lock again. Here's an example
+from a vendor kernel (note that the gic_arch_extn hook code here
+isn't actually in mainline):
 
-Signed-off-by: Mitchel Humpherys <mitchelh@codeaurora.org>
+BUG: spinlock recursion on CPU#0, swapper/0/1
+ lock: irq_controller_lock+0x0/0x18, .magic: dead4ead, .owner: sw
+er_cpu: 0
+CPU: 0 PID: 1 Comm: swapper/0 Not tainted 3.14.10-00430-g3d433c4e
+
+Call trace:
+[<ffffffc000087e1c>] dump_backtrace+0x0/0x140
+[<ffffffc000087f6c>] show_stack+0x10/0x1c
+[<ffffffc00064732c>] dump_stack+0x74/0xc4
+[<ffffffc0006446c0>] spin_dump+0x78/0x88
+[<ffffffc0006446f4>] spin_bug+0x24/0x34
+[<ffffffc0000d47d0>] do_raw_spin_lock+0x58/0x148
+[<ffffffc00064d398>] _raw_spin_lock_irqsave+0x24/0x38
+[<ffffffc0002c9d7c>] gic_raise_softirq+0x2c/0xbc
+[<ffffffc00008daa4>] smp_send_reschedule+0x34/0x40
+[<ffffffc0000c1e94>] try_to_wake_up+0x224/0x288
+[<ffffffc0000c1f4c>] default_wake_function+0xc/0x18
+[<ffffffc0000ceef0>] __wake_up_common+0x50/0x8c
+[<ffffffc0000cef3c>] __wake_up_locked+0x10/0x1c
+[<ffffffc0000cf734>] complete+0x3c/0x5c
+[<ffffffc0002f0e78>] msm_mpm_enable_irq_exclusive+0x1b8/0x1c8
+[<ffffffc0002f0f58>] __msm_mpm_enable_irq+0x4c/0x7c
+[<ffffffc0002f0f94>] msm_mpm_enable_irq+0xc/0x18
+[<ffffffc0002c9bb0>] gic_unmask_irq+0x40/0x7c
+[<ffffffc0000de5f4>] irq_enable+0x2c/0x48
+[<ffffffc0000de65c>] irq_startup+0x4c/0x74
+[<ffffffc0000dd2fc>] __setup_irq+0x264/0x3f0
+[<ffffffc0000dd5e0>] request_threaded_irq+0xcc/0x11c
+[<ffffffc0000df254>] devm_request_threaded_irq+0x68/0xb4
+[<ffffffc000471520>] msm_iommu_ctx_probe+0x124/0x2d4
+[<ffffffc000337374>] platform_drv_probe+0x20/0x54
+[<ffffffc00033598c>] driver_probe_device+0x158/0x340
+[<ffffffc000335c20>] __driver_attach+0x60/0x90
+[<ffffffc000333c9c>] bus_for_each_dev+0x6c/0x8c
+[<ffffffc000335304>] driver_attach+0x1c/0x28
+[<ffffffc000334f14>] bus_add_driver+0x120/0x204
+[<ffffffc0003362e4>] driver_register+0xbc/0x10c
+[<ffffffc000337348>] __platform_driver_register+0x5c/0x68
+[<ffffffc00094c478>] msm_iommu_driver_init+0x54/0x7c
+[<ffffffc0000813ec>] do_one_initcall+0xa4/0x130
+[<ffffffc00091d928>] kernel_init_freeable+0x138/0x1dc
+[<ffffffc000642578>] kernel_init+0xc/0xd4
+
+We really just want to synchronize the sending of an SGI with the
+update of the gic_cpu_map[], so introduce a new SGI lock that we
+can use to synchronize the two code paths. Three main events are
+happening that we have to consider:
+
+  1. We're updating the gic_cpu_mask to point to an incoming CPU
+
+  2. We're (potentially) sending an SGI to the outgoing CPU
+
+  3. We're redirecting any pending SGIs for the outgoing CPU to the
+     incoming CPU.
+
+Events 1 and 3 are already ordered within the same CPU by means
+of program order and use of I/O accessors. Events 1 and 2 don't
+need to be ordered, but events 2 and 3 do because any SGIs for
+the outgoing CPU need to be pending before we can redirect them.
+Synchronize by acquiring a new lock around event 2 and before
+event 3. Use smp_mb__after_unlock_lock() before event 3 to ensure
+that event 1 is seen before event 3 on other CPUs that may be
+executing event 2. We put this all behind the b.L switcher config
+option so that if we're not using this feature we don't have to
+acquire any locks at all in the IPI path.
+
+Cc: Nicolas Pitre <nico@linaro.org>
+Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
 ---
- drivers/iommu/arm-smmu.c | 57 +++++++++++++++++++++++++++++++-----------------
- include/linux/iommu.h    |  1 +
- 2 files changed, 38 insertions(+), 20 deletions(-)
+ drivers/irqchip/irq-gic.c | 25 ++++++++++++++++++++++---
+ 1 file changed, 22 insertions(+), 3 deletions(-)
 
-diff --git a/drivers/iommu/arm-smmu.c b/drivers/iommu/arm-smmu.c
-index 73d056668b..11672a8371 100644
---- a/drivers/iommu/arm-smmu.c
-+++ b/drivers/iommu/arm-smmu.c
-@@ -426,6 +426,7 @@ struct arm_smmu_cfg {
- 	u8				irptndx;
- 	u32				cbar;
- 	pgd_t				*pgd;
-+	bool				htw_disable;
- };
- #define INVALID_IRPTNDX			0xff
+diff --git a/drivers/irqchip/irq-gic.c b/drivers/irqchip/irq-gic.c
+index 7c131cf7cc13..c1dc65209899 100644
+--- a/drivers/irqchip/irq-gic.c
++++ b/drivers/irqchip/irq-gic.c
+@@ -81,6 +81,11 @@ static DEFINE_RAW_SPINLOCK(irq_controller_lock);
+ #define NR_GIC_CPU_IF 8
+ static u8 gic_cpu_map[NR_GIC_CPU_IF] __read_mostly;
  
-@@ -833,14 +834,17 @@ static irqreturn_t arm_smmu_global_fault(int irq, void *dev)
- 	return IRQ_HANDLED;
++#ifdef CONFIG_BL_SWITCHER
++/* Synchronize switching CPU interface and sending SGIs */
++static DEFINE_RAW_SPINLOCK(gic_sgi_lock);
++#endif
++
+ /*
+  * Supported arch specific GIC irq extension.
+  * Default make them NULL.
+@@ -656,9 +661,12 @@ static void __init gic_pm_init(struct gic_chip_data *gic)
+ static void gic_raise_softirq(const struct cpumask *mask, unsigned int irq)
+ {
+ 	int cpu;
+-	unsigned long flags, map = 0;
++	unsigned long map = 0;
++#ifdef CONFIG_BL_SWITCHER
++	unsigned long flags;
+ 
+-	raw_spin_lock_irqsave(&irq_controller_lock, flags);
++	raw_spin_lock_irqsave(&gic_sgi_lock, flags);
++#endif
+ 
+ 	/* Convert our logical CPU mask into a physical one. */
+ 	for_each_cpu(cpu, mask)
+@@ -673,7 +681,9 @@ static void gic_raise_softirq(const struct cpumask *mask, unsigned int irq)
+ 	/* this always happens on GIC0 */
+ 	writel_relaxed(map << 16 | irq, gic_data_dist_base(&gic_data[0]) + GIC_DIST_SOFTINT);
+ 
+-	raw_spin_unlock_irqrestore(&irq_controller_lock, flags);
++#ifdef CONFIG_BL_SWITCHER
++	raw_spin_unlock_irqrestore(&gic_sgi_lock, flags);
++#endif
  }
+ #endif
  
--static void arm_smmu_flush_pgtable(struct arm_smmu_device *smmu, void *addr,
--				   size_t size)
-+static void arm_smmu_flush_pgtable(struct arm_smmu_domain *smmu_domain,
-+				   void *addr, size_t size)
- {
-+	struct arm_smmu_cfg *cfg = &smmu_domain->cfg;
-+	struct arm_smmu_device *smmu = smmu_domain->smmu;
- 	unsigned long offset = (unsigned long)addr & ~PAGE_MASK;
+@@ -764,6 +774,15 @@ void gic_migrate_target(unsigned int new_cpu_id)
  
+ 	raw_spin_unlock(&irq_controller_lock);
  
- 	/* Ensure new page tables are visible to the hardware walker */
--	if (smmu->features & ARM_SMMU_FEAT_COHERENT_WALK) {
-+	if ((smmu->features & ARM_SMMU_FEAT_COHERENT_WALK) &&
-+		!cfg->htw_disable) {
- 		dsb(ishst);
- 	} else {
- 		/*
-@@ -943,7 +947,7 @@ static void arm_smmu_init_context_bank(struct arm_smmu_domain *smmu_domain)
- 	}
- 
- 	/* TTBR0 */
--	arm_smmu_flush_pgtable(smmu, cfg->pgd,
-+	arm_smmu_flush_pgtable(smmu_domain, cfg->pgd,
- 			       PTRS_PER_PGD * sizeof(pgd_t));
- 	reg = __pa(cfg->pgd);
- 	writel_relaxed(reg, cb_base + ARM_SMMU_CB_TTBR0_LO);
-@@ -1468,7 +1472,8 @@ static bool arm_smmu_pte_is_contiguous_range(unsigned long addr,
- 		(addr + ARM_SMMU_PTE_CONT_SIZE <= end);
- }
- 
--static int arm_smmu_alloc_init_pte(struct arm_smmu_device *smmu, pmd_t *pmd,
-+static int arm_smmu_alloc_init_pte(struct arm_smmu_domain *smmu_domain,
-+				   pmd_t *pmd,
- 				   unsigned long addr, unsigned long end,
- 				   unsigned long pfn, int prot, int stage)
- {
-@@ -1482,9 +1487,10 @@ static int arm_smmu_alloc_init_pte(struct arm_smmu_device *smmu, pmd_t *pmd,
- 		if (!table)
- 			return -ENOMEM;
- 
--		arm_smmu_flush_pgtable(smmu, page_address(table), PAGE_SIZE);
-+		arm_smmu_flush_pgtable(smmu_domain, page_address(table),
-+				PAGE_SIZE);
- 		pmd_populate(NULL, pmd, table);
--		arm_smmu_flush_pgtable(smmu, pmd, sizeof(*pmd));
-+		arm_smmu_flush_pgtable(smmu_domain, pmd, sizeof(*pmd));
- 	}
- 
- 	if (stage == 1) {
-@@ -1558,7 +1564,7 @@ static int arm_smmu_alloc_init_pte(struct arm_smmu_device *smmu, pmd_t *pmd,
- 				pte_val(*(cont_start + j)) &=
- 					~ARM_SMMU_PTE_CONT;
- 
--			arm_smmu_flush_pgtable(smmu, cont_start,
-+			arm_smmu_flush_pgtable(smmu_domain, cont_start,
- 					       sizeof(*pte) *
- 					       ARM_SMMU_PTE_CONT_ENTRIES);
- 		}
-@@ -1568,11 +1574,13 @@ static int arm_smmu_alloc_init_pte(struct arm_smmu_device *smmu, pmd_t *pmd,
- 		} while (pte++, pfn++, addr += PAGE_SIZE, --i);
- 	} while (addr != end);
- 
--	arm_smmu_flush_pgtable(smmu, start, sizeof(*pte) * (pte - start));
-+	arm_smmu_flush_pgtable(smmu_domain, start,
-+			sizeof(*pte) * (pte - start));
- 	return 0;
- }
- 
--static int arm_smmu_alloc_init_pmd(struct arm_smmu_device *smmu, pud_t *pud,
-+static int arm_smmu_alloc_init_pmd(struct arm_smmu_domain *smmu_domain,
-+				   pud_t *pud,
- 				   unsigned long addr, unsigned long end,
- 				   phys_addr_t phys, int prot, int stage)
- {
-@@ -1586,9 +1594,9 @@ static int arm_smmu_alloc_init_pmd(struct arm_smmu_device *smmu, pud_t *pud,
- 		if (!pmd)
- 			return -ENOMEM;
- 
--		arm_smmu_flush_pgtable(smmu, pmd, PAGE_SIZE);
-+		arm_smmu_flush_pgtable(smmu_domain, pmd, PAGE_SIZE);
- 		pud_populate(NULL, pud, pmd);
--		arm_smmu_flush_pgtable(smmu, pud, sizeof(*pud));
-+		arm_smmu_flush_pgtable(smmu_domain, pud, sizeof(*pud));
- 
- 		pmd += pmd_index(addr);
- 	} else
-@@ -1597,7 +1605,7 @@ static int arm_smmu_alloc_init_pmd(struct arm_smmu_device *smmu, pud_t *pud,
- 
- 	do {
- 		next = pmd_addr_end(addr, end);
--		ret = arm_smmu_alloc_init_pte(smmu, pmd, addr, next, pfn,
-+		ret = arm_smmu_alloc_init_pte(smmu_domain, pmd, addr, next, pfn,
- 					      prot, stage);
- 		phys += next - addr;
- 	} while (pmd++, addr = next, addr < end);
-@@ -1605,7 +1613,8 @@ static int arm_smmu_alloc_init_pmd(struct arm_smmu_device *smmu, pud_t *pud,
- 	return ret;
- }
- 
--static int arm_smmu_alloc_init_pud(struct arm_smmu_device *smmu, pgd_t *pgd,
-+static int arm_smmu_alloc_init_pud(struct arm_smmu_domain *smmu_domain,
-+				   pgd_t *pgd,
- 				   unsigned long addr, unsigned long end,
- 				   phys_addr_t phys, int prot, int stage)
- {
-@@ -1619,9 +1628,9 @@ static int arm_smmu_alloc_init_pud(struct arm_smmu_device *smmu, pgd_t *pgd,
- 		if (!pud)
- 			return -ENOMEM;
- 
--		arm_smmu_flush_pgtable(smmu, pud, PAGE_SIZE);
-+		arm_smmu_flush_pgtable(smmu_domain, pud, PAGE_SIZE);
- 		pgd_populate(NULL, pgd, pud);
--		arm_smmu_flush_pgtable(smmu, pgd, sizeof(*pgd));
-+		arm_smmu_flush_pgtable(smmu_domain, pgd, sizeof(*pgd));
- 
- 		pud += pud_index(addr);
- 	} else
-@@ -1630,8 +1639,8 @@ static int arm_smmu_alloc_init_pud(struct arm_smmu_device *smmu, pgd_t *pgd,
- 
- 	do {
- 		next = pud_addr_end(addr, end);
--		ret = arm_smmu_alloc_init_pmd(smmu, pud, addr, next, phys,
--					      prot, stage);
-+		ret = arm_smmu_alloc_init_pmd(smmu_domain, pud, addr, next,
-+					      phys, prot, stage);
- 		phys += next - addr;
- 	} while (pud++, addr = next, addr < end);
- 
-@@ -1677,8 +1686,8 @@ static int arm_smmu_handle_mapping(struct arm_smmu_domain *smmu_domain,
- 	do {
- 		unsigned long next = pgd_addr_end(iova, end);
- 
--		ret = arm_smmu_alloc_init_pud(smmu, pgd, iova, next, paddr,
--					      prot, stage);
-+		ret = arm_smmu_alloc_init_pud(smmu_domain, pgd, iova, next,
-+					      paddr, prot, stage);
- 		if (ret)
- 			goto out_unlock;
- 
-@@ -1908,11 +1917,15 @@ static int arm_smmu_domain_get_attr(struct iommu_domain *domain,
- 				    enum iommu_attr attr, void *data)
- {
- 	struct arm_smmu_domain *smmu_domain = domain->priv;
-+	struct arm_smmu_cfg *cfg = &smmu_domain->cfg;
- 
- 	switch (attr) {
- 	case DOMAIN_ATTR_NESTING:
- 		*(int *)data = (smmu_domain->stage == ARM_SMMU_DOMAIN_NESTED);
- 		return 0;
-+	case DOMAIN_ATTR_COHERENT_HTW_DISABLE:
-+		*((bool *)data) = cfg->htw_disable;
-+		return 0;
- 	default:
- 		return -ENODEV;
- 	}
-@@ -1922,6 +1935,7 @@ static int arm_smmu_domain_set_attr(struct iommu_domain *domain,
- 				    enum iommu_attr attr, void *data)
- {
- 	struct arm_smmu_domain *smmu_domain = domain->priv;
-+	struct arm_smmu_cfg *cfg = &smmu_domain->cfg;
- 
- 	switch (attr) {
- 	case DOMAIN_ATTR_NESTING:
-@@ -1933,6 +1947,9 @@ static int arm_smmu_domain_set_attr(struct iommu_domain *domain,
- 			smmu_domain->stage = ARM_SMMU_DOMAIN_S1;
- 
- 		return 0;
-+	case DOMAIN_ATTR_COHERENT_HTW_DISABLE:
-+		cfg->htw_disable = *((bool *)data);
-+		return 0;
- 	default:
- 		return -ENODEV;
- 	}
-diff --git a/include/linux/iommu.h b/include/linux/iommu.h
-index 0550286df4..8a6449857a 100644
---- a/include/linux/iommu.h
-+++ b/include/linux/iommu.h
-@@ -81,6 +81,7 @@ enum iommu_attr {
- 	DOMAIN_ATTR_FSL_PAMU_ENABLE,
- 	DOMAIN_ATTR_FSL_PAMUV1,
- 	DOMAIN_ATTR_NESTING,	/* two stages of translation */
-+	DOMAIN_ATTR_COHERENT_HTW_DISABLE,
- 	DOMAIN_ATTR_MAX,
- };
- 
++	raw_spin_lock(&gic_sgi_lock);
++	/*
++	 * Ensure that the gic_cpu_map update above is seen in
++	 * gic_raise_softirq() before we redirect any pending SGIs that
++	 * may have been raised for the outgoing CPU (cur_cpu_id)
++	 */
++	smp_mb__after_unlock_lock();
++	raw_spin_unlock(&gic_sgi_lock);
++
+ 	/*
+ 	 * Now let's migrate and clear any potential SGIs that might be
+ 	 * pending for us (cur_cpu_id).  Since GIC_DIST_SGI_PENDING_SET
 -- 
 The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
 hosted by The Linux Foundation
