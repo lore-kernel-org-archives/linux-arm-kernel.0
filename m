@@ -1,26 +1,105 @@
 From: libv@skynet.be (Luc Verhaegen)
-Date: Wed, 13 Aug 2014 09:17:15 +0200
-Subject: simplefb: add clock handling
-Message-ID: <1407914239-12054-1-git-send-email-libv@skynet.be>
+Date: Wed, 13 Aug 2014 09:17:18 +0200
+Subject: [PATCH 3/4] simplefb: disable dt node upon remove
+In-Reply-To: <1407914239-12054-1-git-send-email-libv@skynet.be>
+References: <1407914239-12054-1-git-send-email-libv@skynet.be>
+Message-ID: <1407914239-12054-4-git-send-email-libv@skynet.be>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This is needed for the sunxi platform, where the u-boot initialized display 
-engine gets disabled by the clocks framework if certain clocks are not 
-claimed. Once these clocks are disabled, register content is lost, and there
-is no turning back unless a full display driver is loaded, which kind of
-beats the purpose of having simplefb running.
+The next commit will handle clocks correctly, so that these do not get
+automatically disabled on certain SoC simplefb implementations. As a
+result, the removal of this simplefb driver, and the release of the
+clocks, is rather final, and only a full display driver can work after
+this. So, it makes sense to also flag the dt node as disabled, even
+though it has no real value today.
 
-The lack of clock handling should plague more hardware, but so far rpi is the 
-best known user of simplefb, and its stepmotherly handling of the arm core
-has kept these sort of issues from the kernel.
+Signed-off-by: Luc Verhaegen <libv@skynet.be>
+---
+ drivers/video/fbdev/simplefb.c |   43 ++++++++++++++++++++++++++++++++++++---
+ 1 files changed, 39 insertions(+), 4 deletions(-)
 
-The sunxi u-boot side code can be found here:
-https://groups.google.com/forum/#!topic/linux-sunxi/dPs958sIXvY
-
-Patch 3 might be controversial, as this does not achieve anything real today,
-since the status property in dt is only really evaluated when dealing with a
-nodes memory. It still seems like a good idea to at least flag this memory or
-node as disabled, as we really have no way back when the clocks get disabled.
-
-Luc Verhaegen.
+diff --git a/drivers/video/fbdev/simplefb.c b/drivers/video/fbdev/simplefb.c
+index 72a4f20..74c4b2a 100644
+--- a/drivers/video/fbdev/simplefb.c
++++ b/drivers/video/fbdev/simplefb.c
+@@ -138,6 +138,32 @@ static int simplefb_parse_dt(struct platform_device *pdev,
+ 	return 0;
+ }
+ 
++/*
++ * Make sure that nothing tries to inadvertedly re-use this node...
++ */
++static int
++simplefb_dt_disable(struct platform_device *pdev)
++{
++	struct device_node *np = pdev->dev.of_node;
++	struct property *property;
++	int ret;
++
++	property = kzalloc(sizeof(struct property), GFP_KERNEL);
++	if (!property)
++		return -ENOMEM;
++
++	property->name = "status";
++	property->value = "disabled";
++	property->length = strlen(property->value) + 1;
++
++	ret = of_update_property(np, property);
++	if (ret)
++		dev_err(&pdev->dev, "%s: failed to update property: %d\n",
++			__func__, ret);
++
++	return ret;
++}
++
+ static int simplefb_parse_pd(struct platform_device *pdev,
+ 			     struct simplefb_params *params)
+ {
+@@ -187,17 +213,20 @@ static int simplefb_probe(struct platform_device *pdev)
+ 		ret = simplefb_parse_dt(pdev, &params);
+ 
+ 	if (ret)
+-		return ret;
++		goto error_dt_disable;
+ 
+ 	mem = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+ 	if (!mem) {
+ 		dev_err(&pdev->dev, "No memory resource\n");
+-		return -EINVAL;
++		ret = -EINVAL;
++		goto error_dt_disable;
+ 	}
+ 
+ 	info = framebuffer_alloc(sizeof(struct simplefb_par), &pdev->dev);
+-	if (!info)
+-		return -ENOMEM;
++	if (!info) {
++		ret = -ENOMEM;
++		goto error_dt_disable;
++	}
+ 	platform_set_drvdata(pdev, info);
+ 
+ 	par = info->par;
+@@ -260,6 +289,10 @@ static int simplefb_probe(struct platform_device *pdev)
+  error_fb_release:
+ 	framebuffer_release(info);
+ 
++ error_dt_disable:
++	if (!dev_get_platdata(&pdev->dev) && pdev->dev.of_node)
++		simplefb_dt_disable(pdev);
++
+ 	return ret;
+ }
+ 
+@@ -269,6 +302,8 @@ static int simplefb_remove(struct platform_device *pdev)
+ 
+ 	unregister_framebuffer(info);
+ 	framebuffer_release(info);
++	if (!dev_get_platdata(&pdev->dev) && pdev->dev.of_node)
++		simplefb_dt_disable(pdev);
+ 
+ 	return 0;
+ }
+-- 
+1.7.7
