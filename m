@@ -1,165 +1,287 @@
-From: daniel.thompson@linaro.org (Daniel Thompson)
-Date: Wed, 13 Aug 2014 11:44:25 +0100
-Subject: [PATCH v3] irqchip: gic: Allow gic_arch_extn hooks to call into
- scheduler
-In-Reply-To: <1407891264-4826-1-git-send-email-sboyd@codeaurora.org>
-References: <1407891264-4826-1-git-send-email-sboyd@codeaurora.org>
-Message-ID: <53EB4189.7080007@linaro.org>
+From: mpa@pengutronix.de (Markus Pargmann)
+Date: Wed, 13 Aug 2014 12:46:16 +0200
+Subject: [PATCH v3] watchdog: Add DA906x PMIC watchdog driver.
+Message-ID: <1407926776-16700-1-git-send-email-mpa@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 13/08/14 01:54, Stephen Boyd wrote:
-> Commit 1a6b69b6548c (ARM: gic: add CPU migration support,
-> 2012-04-12) introduced an acquisition of the irq_controller_lock
-> in gic_raise_softirq() which can lead to a spinlock recursion if
-> the gic_arch_extn hooks call into the scheduler (via complete()
-> or wake_up(), etc.). This happens because gic_arch_extn hooks are
-> normally called with the irq_controller_lock held and calling
-> into the scheduler may cause us to call smp_send_reschedule()
-> which will grab the irq_controller_lock again. Here's an example
-> from a vendor kernel (note that the gic_arch_extn hook code here
-> isn't actually in mainline):
-> 
-> BUG: spinlock recursion on CPU#0, swapper/0/1
->  lock: irq_controller_lock+0x0/0x18, .magic: dead4ead, .owner: sw
-> er_cpu: 0
-> CPU: 0 PID: 1 Comm: swapper/0 Not tainted 3.14.10-00430-g3d433c4e
-> 
-> Call trace:
-> [<ffffffc000087e1c>] dump_backtrace+0x0/0x140
-> [<ffffffc000087f6c>] show_stack+0x10/0x1c
-> [<ffffffc00064732c>] dump_stack+0x74/0xc4
-> [<ffffffc0006446c0>] spin_dump+0x78/0x88
-> [<ffffffc0006446f4>] spin_bug+0x24/0x34
-> [<ffffffc0000d47d0>] do_raw_spin_lock+0x58/0x148
-> [<ffffffc00064d398>] _raw_spin_lock_irqsave+0x24/0x38
-> [<ffffffc0002c9d7c>] gic_raise_softirq+0x2c/0xbc
-> [<ffffffc00008daa4>] smp_send_reschedule+0x34/0x40
-> [<ffffffc0000c1e94>] try_to_wake_up+0x224/0x288
-> [<ffffffc0000c1f4c>] default_wake_function+0xc/0x18
-> [<ffffffc0000ceef0>] __wake_up_common+0x50/0x8c
-> [<ffffffc0000cef3c>] __wake_up_locked+0x10/0x1c
-> [<ffffffc0000cf734>] complete+0x3c/0x5c
-> [<ffffffc0002f0e78>] msm_mpm_enable_irq_exclusive+0x1b8/0x1c8
-> [<ffffffc0002f0f58>] __msm_mpm_enable_irq+0x4c/0x7c
-> [<ffffffc0002f0f94>] msm_mpm_enable_irq+0xc/0x18
-> [<ffffffc0002c9bb0>] gic_unmask_irq+0x40/0x7c
-> [<ffffffc0000de5f4>] irq_enable+0x2c/0x48
-> [<ffffffc0000de65c>] irq_startup+0x4c/0x74
-> [<ffffffc0000dd2fc>] __setup_irq+0x264/0x3f0
-> [<ffffffc0000dd5e0>] request_threaded_irq+0xcc/0x11c
-> [<ffffffc0000df254>] devm_request_threaded_irq+0x68/0xb4
-> [<ffffffc000471520>] msm_iommu_ctx_probe+0x124/0x2d4
-> [<ffffffc000337374>] platform_drv_probe+0x20/0x54
-> [<ffffffc00033598c>] driver_probe_device+0x158/0x340
-> [<ffffffc000335c20>] __driver_attach+0x60/0x90
-> [<ffffffc000333c9c>] bus_for_each_dev+0x6c/0x8c
-> [<ffffffc000335304>] driver_attach+0x1c/0x28
-> [<ffffffc000334f14>] bus_add_driver+0x120/0x204
-> [<ffffffc0003362e4>] driver_register+0xbc/0x10c
-> [<ffffffc000337348>] __platform_driver_register+0x5c/0x68
-> [<ffffffc00094c478>] msm_iommu_driver_init+0x54/0x7c
-> [<ffffffc0000813ec>] do_one_initcall+0xa4/0x130
-> [<ffffffc00091d928>] kernel_init_freeable+0x138/0x1dc
-> [<ffffffc000642578>] kernel_init+0xc/0xd4
-> 
-> We really just want to synchronize the sending of an SGI with the
-> update of the gic_cpu_map[], so introduce a new SGI lock that we
-> can use to synchronize the two code paths. Three main events are
-> happening that we have to consider:
-> 
->   1. We're updating the gic_cpu_mask to point to an incoming CPU
-> 
->   2. We're (potentially) sending an SGI to the outgoing CPU
-> 
->   3. We're redirecting any pending SGIs for the outgoing CPU to the
->      incoming CPU.
-> 
-> Events 1 and 3 are already ordered within the same CPU by means
-> of program order and use of I/O accessors. Events 1 and 2 don't
-> need to be ordered, but events 2 and 3 do because any SGIs for
-> the outgoing CPU need to be pending before we can redirect them.
-> Synchronize by acquiring a new lock around event 2 and before
-> event 3. Use smp_mb__after_unlock_lock() before event 3 to ensure
-> that event 1 is seen before event 3 on other CPUs that may be
-> executing event 2. We put this all behind the b.L switcher config
-> option so that if we're not using this feature we don't have to
-> acquire any locks at all in the IPI path.
-> 
-> Cc: Nicolas Pitre <nico@linaro.org>
-> Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
-> ---
->  drivers/irqchip/irq-gic.c | 25 ++++++++++++++++++++++---
->  1 file changed, 22 insertions(+), 3 deletions(-)
-> 
-> diff --git a/drivers/irqchip/irq-gic.c b/drivers/irqchip/irq-gic.c
-> index 7c131cf7cc13..c1dc65209899 100644
-> --- a/drivers/irqchip/irq-gic.c
-> +++ b/drivers/irqchip/irq-gic.c
-> @@ -81,6 +81,11 @@ static DEFINE_RAW_SPINLOCK(irq_controller_lock);
->  #define NR_GIC_CPU_IF 8
->  static u8 gic_cpu_map[NR_GIC_CPU_IF] __read_mostly;
->  
-> +#ifdef CONFIG_BL_SWITCHER
-> +/* Synchronize switching CPU interface and sending SGIs */
-> +static DEFINE_RAW_SPINLOCK(gic_sgi_lock);
-> +#endif
+From: Krystian Garbaciak <krystian.garbaciak@diasemi.com>
 
-I really like this patch.
+This driver supports the watchdog device inside the DA906x PMIC.
 
-After I've reviewed things properly I will probably propose a patch to
-change gic_sgi_lock to a raw_rwlock_t. My motivation is that I think
-that using a rwlock renders it safe to call smp_send_reschedule() from
-FIQ handlers.
+Signed-off-by: Krystian Garbaciak <krystian.garbaciak@diasemi.com>
+Signed-off-by: Philipp Zabel <p.zabel@pengutronix.de>
+Signed-off-by: Markus Pargmann <mpa@pengutronix.de>
+---
+ drivers/watchdog/Kconfig      |   7 ++
+ drivers/watchdog/Makefile     |   1 +
+ drivers/watchdog/da9063_wdt.c | 228 ++++++++++++++++++++++++++++++++++++++++++
+ 3 files changed, 236 insertions(+)
+ create mode 100644 drivers/watchdog/da9063_wdt.c
 
-No need to wait for me though. The change is good as it is:
-Reviewed-by: Daniel Thompson <daniel.thompson@linaro.org>
-
-
-> +
->  /*
->   * Supported arch specific GIC irq extension.
->   * Default make them NULL.
-> @@ -656,9 +661,12 @@ static void __init gic_pm_init(struct gic_chip_data *gic)
->  static void gic_raise_softirq(const struct cpumask *mask, unsigned int irq)
->  {
->  	int cpu;
-> -	unsigned long flags, map = 0;
-> +	unsigned long map = 0;
-> +#ifdef CONFIG_BL_SWITCHER
-> +	unsigned long flags;
->  
-> -	raw_spin_lock_irqsave(&irq_controller_lock, flags);
-> +	raw_spin_lock_irqsave(&gic_sgi_lock, flags);
-> +#endif
->  
->  	/* Convert our logical CPU mask into a physical one. */
->  	for_each_cpu(cpu, mask)
-> @@ -673,7 +681,9 @@ static void gic_raise_softirq(const struct cpumask *mask, unsigned int irq)
->  	/* this always happens on GIC0 */
->  	writel_relaxed(map << 16 | irq, gic_data_dist_base(&gic_data[0]) + GIC_DIST_SOFTINT);
->  
-> -	raw_spin_unlock_irqrestore(&irq_controller_lock, flags);
-> +#ifdef CONFIG_BL_SWITCHER
-> +	raw_spin_unlock_irqrestore(&gic_sgi_lock, flags);
-> +#endif
->  }
->  #endif
->  
-> @@ -764,6 +774,15 @@ void gic_migrate_target(unsigned int new_cpu_id)
->  
->  	raw_spin_unlock(&irq_controller_lock);
->  
-> +	raw_spin_lock(&gic_sgi_lock);
-> +	/*
-> +	 * Ensure that the gic_cpu_map update above is seen in
-> +	 * gic_raise_softirq() before we redirect any pending SGIs that
-> +	 * may have been raised for the outgoing CPU (cur_cpu_id)
-> +	 */
-> +	smp_mb__after_unlock_lock();
-> +	raw_spin_unlock(&gic_sgi_lock);
-> +
->  	/*
->  	 * Now let's migrate and clear any potential SGIs that might be
->  	 * pending for us (cur_cpu_id).  Since GIC_DIST_SGI_PENDING_SET
-> 
+diff --git a/drivers/watchdog/Kconfig b/drivers/watchdog/Kconfig
+index c845527b503a..8d5c9b33552a 100644
+--- a/drivers/watchdog/Kconfig
++++ b/drivers/watchdog/Kconfig
+@@ -87,6 +87,13 @@ config DA9055_WATCHDOG
+ 	  This driver can also be built as a module.  If so, the module
+ 	  will be called da9055_wdt.
+ 
++config DA9063_WATCHDOG
++	tristate "Dialog DA9063 Watchdog"
++	depends on MFD_DA9063
++	select WATCHDOG_CORE
++	help
++	  Support for the watchdog in the DA9063 PMIC.
++
+ config GPIO_WATCHDOG
+ 	tristate "Watchdog device controlled through GPIO-line"
+ 	depends on OF_GPIO
+diff --git a/drivers/watchdog/Makefile b/drivers/watchdog/Makefile
+index 7b8a91ed20e7..ce4a7632d863 100644
+--- a/drivers/watchdog/Makefile
++++ b/drivers/watchdog/Makefile
+@@ -172,6 +172,7 @@ obj-$(CONFIG_XEN_WDT) += xen_wdt.o
+ # Architecture Independent
+ obj-$(CONFIG_DA9052_WATCHDOG) += da9052_wdt.o
+ obj-$(CONFIG_DA9055_WATCHDOG) += da9055_wdt.o
++obj-$(CONFIG_DA9063_WATCHDOG) += da9063_wdt.o
+ obj-$(CONFIG_GPIO_WATCHDOG)	+= gpio_wdt.o
+ obj-$(CONFIG_WM831X_WATCHDOG) += wm831x_wdt.o
+ obj-$(CONFIG_WM8350_WATCHDOG) += wm8350_wdt.o
+diff --git a/drivers/watchdog/da9063_wdt.c b/drivers/watchdog/da9063_wdt.c
+new file mode 100644
+index 000000000000..2b5ce564c4c1
+--- /dev/null
++++ b/drivers/watchdog/da9063_wdt.c
+@@ -0,0 +1,228 @@
++/*
++ * Watchdog driver for DA9063 PMICs.
++ *
++ * Copyright(c) 2012 Dialog Semiconductor Ltd.
++ *
++ * Author: Mariusz Wojtasik <mariusz.wojtasik@diasemi.com>
++ *
++ * This program is free software; you can redistribute  it and/or modify it
++ * under  the terms of  the GNU General  Public License as published by the
++ * Free Software Foundation;  either version 2 of the  License, or (at your
++ * option) any later version.
++ */
++
++#include <linux/kernel.h>
++#include <linux/module.h>
++#include <linux/watchdog.h>
++#include <linux/platform_device.h>
++#include <linux/uaccess.h>
++#include <linux/slab.h>
++#include <linux/delay.h>
++#include <linux/mfd/da9063/registers.h>
++#include <linux/mfd/da9063/core.h>
++#include <linux/regmap.h>
++
++/*
++ * Watchdog selector to timeout in seconds.
++ *   0: WDT disabled;
++ *   others: timeout = 2048 ms * 2^(TWDSCALE-1).
++ */
++static const int wdt_timeout[] = { 0, 2, 4, 8, 16, 32, 65, 131 };
++#define DA9063_TWDSCALE_DISABLE		0
++#define DA9063_TWDSCALE_MIN		1
++#define DA9063_TWDSCALE_MAX		(ARRAY_SIZE(wdt_timeout) - 1)
++#define DA9063_WDT_MIN_TIMEOUT		wdt_timeout[DA9063_TWDSCALE_MIN]
++#define DA9063_WDT_MAX_TIMEOUT		wdt_timeout[DA9063_TWDSCALE_MAX]
++#define DA9063_WDG_TIMEOUT		wdt_timeout[3]
++
++struct da9063_watchdog {
++	struct da9063 *da9063;
++	struct watchdog_device wdtdev;
++	struct mutex lock;
++};
++
++static int da9063_wdt_timeout_to_sel(int secs)
++{
++	int i;
++
++	for (i = DA9063_TWDSCALE_MIN; i <= DA9063_TWDSCALE_MAX; i++) {
++		if (wdt_timeout[i] >= secs)
++			return i;
++	}
++
++	return -EINVAL;
++}
++
++static int da9063_wdt_disable(struct da9063 *da9063)
++{
++	return regmap_update_bits(da9063->regmap, DA9063_REG_CONTROL_D,
++			DA9063_TWDSCALE_MASK,
++			DA9063_TWDSCALE_DISABLE);
++}
++
++static int _da9063_wdt_set_timeout(struct da9063 *da9063, unsigned int regval)
++{
++	return regmap_update_bits(da9063->regmap, DA9063_REG_CONTROL_D,
++			DA9063_TWDSCALE_MASK, regval);
++}
++
++static int _da9063_wdt_kick(struct da9063 *da9063)
++{
++	return regmap_write(da9063->regmap, DA9063_REG_CONTROL_F,
++			DA9063_WATCHDOG);
++}
++
++static int da9063_wdt_start(struct watchdog_device *wdd)
++{
++	struct da9063_watchdog *wdt = watchdog_get_drvdata(wdd);
++	unsigned int selector;
++	int ret = 0;
++
++	mutex_lock(&wdt->lock);
++	selector = da9063_wdt_timeout_to_sel(wdt->wdtdev.timeout);
++	if (selector < 0) {
++		dev_err(wdt->da9063->dev, "Timeout out of range (timeout=%d)\n",
++				wdt->wdtdev.timeout);
++		return selector;
++	}
++
++	ret = _da9063_wdt_set_timeout(wdt->da9063, selector);
++	if (ret) {
++		dev_err(wdt->da9063->dev, "Watchdog failed to start (err = %d)\n",
++				ret);
++	}
++	mutex_unlock(&wdt->lock);
++
++	return ret;
++}
++
++static int da9063_wdt_stop(struct watchdog_device *wdd)
++{
++	struct da9063_watchdog *wdt = watchdog_get_drvdata(wdd);
++	int ret = 0;
++
++	mutex_lock(&wdt->lock);
++	ret = da9063_wdt_disable(wdt->da9063);
++	if (ret)
++		dev_alert(wdt->da9063->dev,
++			  "Watchdog failed to stop (err = %d)\n", ret);
++	mutex_unlock(&wdt->lock);
++
++	return ret;
++}
++
++static int da9063_wdt_ping(struct watchdog_device *wdd)
++{
++	struct da9063_watchdog *wdt = watchdog_get_drvdata(wdd);
++	int ret = 0;
++
++	mutex_lock(&wdt->lock);
++	ret = _da9063_wdt_kick(wdt->da9063);
++	if (ret)
++		dev_alert(wdt->da9063->dev, "Failed to ping the watchdog (err = %d)\n",
++				ret);
++	mutex_unlock(&wdt->lock);
++
++	return ret;
++}
++
++static int da9063_wdt_set_timeout(struct watchdog_device *wdd,
++							unsigned int timeout)
++{
++	struct da9063_watchdog *wdt = watchdog_get_drvdata(wdd);
++	unsigned int selector;
++	int ret;
++
++	selector = da9063_wdt_timeout_to_sel(timeout);
++	if (selector < 0) {
++		dev_err(wdt->da9063->dev, "Unsupported watchdog timeout, should be between 2 and 131\n");
++		return -EINVAL;
++	}
++
++	mutex_lock(&wdt->lock);
++
++	ret = _da9063_wdt_set_timeout(wdt->da9063, selector);
++	if (ret)
++		dev_err(wdt->da9063->dev, "Failed to set watchdog timeout (err = %d)\n",
++				ret);
++	else
++		wdd->timeout = wdt_timeout[selector];
++
++	mutex_unlock(&wdt->lock);
++
++	return ret;
++}
++
++static const struct watchdog_info da9063_watchdog_info = {
++	.options = WDIOF_SETTIMEOUT | WDIOF_KEEPALIVEPING,
++	.identity = "DA9063 Watchdog",
++};
++
++static const struct watchdog_ops da9063_watchdog_ops = {
++	.owner = THIS_MODULE,
++	.start = da9063_wdt_start,
++	.stop = da9063_wdt_stop,
++	.ping = da9063_wdt_ping,
++	.set_timeout = da9063_wdt_set_timeout,
++};
++
++static int da9063_wdt_probe(struct platform_device *pdev)
++{
++	int ret;
++	struct da9063 *da9063 = dev_get_drvdata(pdev->dev.parent);
++	struct da9063_watchdog *wdt;
++
++	if (!da9063)
++		return -EPROBE_DEFER;
++
++	wdt = devm_kzalloc(&pdev->dev, sizeof(*wdt), GFP_KERNEL);
++	if (!wdt)
++		return -ENOMEM;
++
++	wdt->da9063 = da9063;
++	mutex_init(&wdt->lock);
++
++	wdt->wdtdev.info = &da9063_watchdog_info;
++	wdt->wdtdev.ops = &da9063_watchdog_ops;
++	wdt->wdtdev.min_timeout = DA9063_WDT_MIN_TIMEOUT;
++	wdt->wdtdev.max_timeout = DA9063_WDT_MAX_TIMEOUT;
++	wdt->wdtdev.timeout = DA9063_WDG_TIMEOUT;
++
++	if (IS_ENABLED(CONFIG_WATCHDOG_NOWAYOUT))
++		wdt->wdtdev.status = WATCHDOG_NOWAYOUT_INIT_STATUS;
++
++	watchdog_set_drvdata(&wdt->wdtdev, wdt);
++	dev_set_drvdata(&pdev->dev, wdt);
++
++	ret = watchdog_register_device(&wdt->wdtdev);
++	if (ret) {
++		dev_err(da9063->dev, "da9063-watchdog registration failed (err = %d)",
++				ret);
++		return ret;
++	}
++
++	return 0;
++}
++
++static int da9063_wdt_remove(struct platform_device *pdev)
++{
++	struct da9063_watchdog *wdt = dev_get_drvdata(&pdev->dev);
++
++	watchdog_unregister_device(&wdt->wdtdev);
++
++	return 0;
++}
++
++static struct platform_driver da9063_wdt_driver = {
++	.probe = da9063_wdt_probe,
++	.remove = da9063_wdt_remove,
++	.driver = {
++		.name = DA9063_DRVNAME_WATCHDOG,
++	},
++};
++module_platform_driver(da9063_wdt_driver);
++
++MODULE_AUTHOR("Mariusz Wojtasik <mariusz.wojtasik@diasemi.com>");
++MODULE_DESCRIPTION("Watchdog driver for Dialog DA9063");
++MODULE_LICENSE("GPL");
++MODULE_ALIAS("platform:" DA9063_DRVNAME_WATCHDOG);
+-- 
+2.0.1
