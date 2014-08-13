@@ -1,255 +1,339 @@
 From: mitchelh@codeaurora.org (Mitchel Humpherys)
-Date: Tue, 12 Aug 2014 17:51:35 -0700
-Subject: [PATCH 2/6] iommu/arm-smmu: add support for specifying regulators
+Date: Tue, 12 Aug 2014 17:51:34 -0700
+Subject: [PATCH 1/6] iommu/arm-smmu: add support for specifying clocks
 In-Reply-To: <1407891099-24641-1-git-send-email-mitchelh@codeaurora.org>
 References: <1407891099-24641-1-git-send-email-mitchelh@codeaurora.org>
-Message-ID: <1407891099-24641-3-git-send-email-mitchelh@codeaurora.org>
+Message-ID: <1407891099-24641-2-git-send-email-mitchelh@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On some power-constrained platforms it's useful to disable power when a
-device is not in use. Add support for specifying regulators for SMMUs
-and only leave power on as long as the SMMU is in use (attached).
+On some platforms with tight power constraints it is polite to only
+leave your clocks on for as long as you absolutely need them. Currently
+we assume that all clocks necessary for SMMU register access are always
+on.
+
+Add some optional device tree properties to specify any clocks that are
+necessary for SMMU register access and turn them on and off as needed.
+
+If no clocks are specified in the device tree things continue to work
+the way they always have: we assume all necessary clocks are always
+turned on.
 
 Signed-off-by: Mitchel Humpherys <mitchelh@codeaurora.org>
 ---
- .../devicetree/bindings/iommu/arm,smmu.txt         |   3 +
- drivers/iommu/arm-smmu.c                           | 102 ++++++++++++++++++---
- 2 files changed, 93 insertions(+), 12 deletions(-)
+ .../devicetree/bindings/iommu/arm,smmu.txt         |  11 ++
+ drivers/iommu/arm-smmu.c                           | 127 +++++++++++++++++++--
+ 2 files changed, 129 insertions(+), 9 deletions(-)
 
 diff --git a/Documentation/devicetree/bindings/iommu/arm,smmu.txt b/Documentation/devicetree/bindings/iommu/arm,smmu.txt
-index ceae3fe207..dbc1ddad79 100644
+index 2d0f7cd867..ceae3fe207 100644
 --- a/Documentation/devicetree/bindings/iommu/arm,smmu.txt
 +++ b/Documentation/devicetree/bindings/iommu/arm,smmu.txt
-@@ -59,6 +59,9 @@ conditions.
-                   Documentation/devicetree/bindings/clock/clock-bindings.txt
-                   for more info.
+@@ -48,6 +48,17 @@ conditions.
+                   aliases of secure registers have to be used during
+                   SMMU configuration.
  
-+- vdd-supply    : Phandle of the regulator that should be powered on during
-+                  SMMU register access.
++- clocks        : List of clocks to be used during SMMU register access. See
++                  Documentation/devicetree/bindings/clock/clock-bindings.txt
++                  for information about the format. For each clock specified
++                  here, there must be a corresponding entery in clock-names
++                  (see below).
++
++- clock-names   : List of clock names corresponding to the clocks specified in
++                  the "clocks" property (above). See
++                  Documentation/devicetree/bindings/clock/clock-bindings.txt
++                  for more info.
 +
  Example:
  
          smmu {
 diff --git a/drivers/iommu/arm-smmu.c b/drivers/iommu/arm-smmu.c
-index e123d75db3..7fdc58d8f8 100644
+index 9fd8754db0..e123d75db3 100644
 --- a/drivers/iommu/arm-smmu.c
 +++ b/drivers/iommu/arm-smmu.c
-@@ -402,6 +402,11 @@ struct arm_smmu_device {
+@@ -399,6 +399,9 @@ struct arm_smmu_device {
  
- 	int num_clocks;
- 	struct clk **clocks;
+ 	struct list_head		list;
+ 	struct rb_root			masters;
 +
-+	struct regulator *gdsc;
-+
-+	struct mutex			attach_lock;
-+	unsigned int			attach_count;
++	int num_clocks;
++	struct clk **clocks;
  };
  
  struct arm_smmu_cfg {
-@@ -617,6 +622,22 @@ static void arm_smmu_disable_clocks(struct arm_smmu_device *smmu)
- 		clk_disable_unprepare(smmu->clocks[i]);
+@@ -589,6 +592,31 @@ static void __arm_smmu_free_bitmap(unsigned long *map, int idx)
+ 	clear_bit(idx, map);
  }
  
-+static int arm_smmu_enable_regulators(struct arm_smmu_device *smmu)
++static int arm_smmu_enable_clocks(struct arm_smmu_device *smmu)
 +{
-+	if (!smmu->gdsc)
-+		return 0;
++	int i, ret = 0;
 +
-+	return regulator_enable(smmu->gdsc);
++	for (i = 0; i < smmu->num_clocks; ++i) {
++		ret = clk_prepare_enable(smmu->clocks[i]);
++		if (ret) {
++			dev_err(smmu->dev, "Couldn't enable clock #%d\n", i);
++			while (i--)
++				clk_disable_unprepare(smmu->clocks[i]);
++			break;
++		}
++	}
++
++	return ret;
 +}
 +
-+static int arm_smmu_disable_regulators(struct arm_smmu_device *smmu)
++static void arm_smmu_disable_clocks(struct arm_smmu_device *smmu)
 +{
-+	if (!smmu->gdsc)
-+		return 0;
++	int i;
 +
-+	return regulator_disable(smmu->gdsc);
++	for (i = 0; i < smmu->num_clocks; ++i)
++		clk_disable_unprepare(smmu->clocks[i]);
 +}
 +
  /* Wait for any pending TLB invalidations to complete */
  static void arm_smmu_tlb_sync(struct arm_smmu_device *smmu)
  {
-@@ -1275,6 +1296,8 @@ static void arm_smmu_domain_remove_master(struct arm_smmu_domain *smmu_domain,
- 	arm_smmu_disable_clocks(smmu);
+@@ -644,11 +672,15 @@ static irqreturn_t arm_smmu_context_fault(int irq, void *dev)
+ 	struct arm_smmu_device *smmu = smmu_domain->smmu;
+ 	void __iomem *cb_base;
+ 
++	arm_smmu_enable_clocks(smmu);
++
+ 	cb_base = ARM_SMMU_CB_BASE(smmu) + ARM_SMMU_CB(smmu, cfg->cbndx);
+ 	fsr = readl_relaxed(cb_base + ARM_SMMU_CB_FSR);
+ 
+-	if (!(fsr & FSR_FAULT))
++	if (!(fsr & FSR_FAULT)) {
++		arm_smmu_disable_clocks(smmu);
+ 		return IRQ_NONE;
++	}
+ 
+ 	if (fsr & FSR_IGN)
+ 		dev_err_ratelimited(smmu->dev,
+@@ -683,6 +715,8 @@ static irqreturn_t arm_smmu_context_fault(int irq, void *dev)
+ 	if (fsr & FSR_SS)
+ 		writel_relaxed(resume, cb_base + ARM_SMMU_CB_RESUME);
+ 
++	arm_smmu_disable_clocks(smmu);
++
+ 	return ret;
  }
  
-+static void arm_smmu_device_reset(struct arm_smmu_device *smmu);
+@@ -692,13 +726,17 @@ static irqreturn_t arm_smmu_global_fault(int irq, void *dev)
+ 	struct arm_smmu_device *smmu = dev;
+ 	void __iomem *gr0_base = ARM_SMMU_GR0_NS(smmu);
+ 
++	arm_smmu_enable_clocks(smmu);
 +
+ 	gfsr = readl_relaxed(gr0_base + ARM_SMMU_GR0_sGFSR);
+ 	gfsynr0 = readl_relaxed(gr0_base + ARM_SMMU_GR0_sGFSYNR0);
+ 	gfsynr1 = readl_relaxed(gr0_base + ARM_SMMU_GR0_sGFSYNR1);
+ 	gfsynr2 = readl_relaxed(gr0_base + ARM_SMMU_GR0_sGFSYNR2);
+ 
+-	if (!gfsr)
++	if (!gfsr) {
++		arm_smmu_disable_clocks(smmu);
+ 		return IRQ_NONE;
++	}
+ 
+ 	dev_err_ratelimited(smmu->dev,
+ 		"Unexpected global fault, this could be serious\n");
+@@ -707,6 +745,7 @@ static irqreturn_t arm_smmu_global_fault(int irq, void *dev)
+ 		gfsr, gfsynr0, gfsynr1, gfsynr2);
+ 
+ 	writel(gfsr, gr0_base + ARM_SMMU_GR0_sGFSR);
++	arm_smmu_disable_clocks(smmu);
+ 	return IRQ_HANDLED;
+ }
+ 
+@@ -991,10 +1030,12 @@ static void arm_smmu_destroy_domain_context(struct iommu_domain *domain)
+ 	if (!smmu)
+ 		return;
+ 
++	arm_smmu_enable_clocks(smmu_domain->smmu);
+ 	/* Disable the context bank and nuke the TLB before freeing it. */
+ 	cb_base = ARM_SMMU_CB_BASE(smmu) + ARM_SMMU_CB(smmu, cfg->cbndx);
+ 	writel_relaxed(0, cb_base + ARM_SMMU_CB_SCTLR);
+ 	arm_smmu_tlb_inv_context(smmu_domain);
++	arm_smmu_disable_clocks(smmu_domain->smmu);
+ 
+ 	if (cfg->irptndx != INVALID_IRPTNDX) {
+ 		irq = smmu->irqs[smmu->num_global_irqs + cfg->irptndx];
+@@ -1222,6 +1263,7 @@ static void arm_smmu_domain_remove_master(struct arm_smmu_domain *smmu_domain,
+ 	 * We *must* clear the S2CR first, because freeing the SMR means
+ 	 * that it can be re-allocated immediately.
+ 	 */
++	arm_smmu_enable_clocks(smmu);
+ 	for (i = 0; i < cfg->num_streamids; ++i) {
+ 		u32 idx = cfg->smrs ? cfg->smrs[i].idx : cfg->streamids[i];
+ 
+@@ -1230,6 +1272,7 @@ static void arm_smmu_domain_remove_master(struct arm_smmu_domain *smmu_domain,
+ 	}
+ 
+ 	arm_smmu_master_free_smrs(smmu, cfg);
++	arm_smmu_disable_clocks(smmu);
+ }
+ 
  static int arm_smmu_attach_dev(struct iommu_domain *domain, struct device *dev)
- {
- 	int ret;
-@@ -1293,7 +1316,15 @@ static int arm_smmu_attach_dev(struct iommu_domain *domain, struct device *dev)
+@@ -1250,6 +1293,8 @@ static int arm_smmu_attach_dev(struct iommu_domain *domain, struct device *dev)
  		return -EEXIST;
  	}
  
--	arm_smmu_enable_clocks(smmu);
-+	mutex_lock(&smmu->attach_lock);
-+	if (!smmu->attach_count++) {
-+		arm_smmu_enable_regulators(smmu);
-+		arm_smmu_enable_clocks(smmu);
-+		arm_smmu_device_reset(smmu);
-+	} else {
-+		arm_smmu_enable_clocks(smmu);
-+	}
-+	mutex_unlock(&smmu->attach_lock);
- 
++	arm_smmu_enable_clocks(smmu);
++
  	/*
  	 * Sanity check the domain. We don't support domains across
-@@ -1304,7 +1335,7 @@ static int arm_smmu_attach_dev(struct iommu_domain *domain, struct device *dev)
+ 	 * different SMMUs.
+@@ -1259,7 +1304,7 @@ static int arm_smmu_attach_dev(struct iommu_domain *domain, struct device *dev)
  		/* Now that we have a master, we can finalise the domain */
  		ret = arm_smmu_init_domain_context(domain, smmu);
  		if (IS_ERR_VALUE(ret))
--			goto disable_clocks;
-+			goto err_disable_clocks;
+-			return ret;
++			goto disable_clocks;
  
  		dom_smmu = smmu_domain->smmu;
  	}
-@@ -1314,28 +1345,46 @@ static int arm_smmu_attach_dev(struct iommu_domain *domain, struct device *dev)
+@@ -1268,17 +1313,22 @@ static int arm_smmu_attach_dev(struct iommu_domain *domain, struct device *dev)
+ 		dev_err(dev,
  			"cannot attach to SMMU %s whilst already attached to domain on SMMU %s\n",
  			dev_name(smmu_domain->smmu->dev), dev_name(smmu->dev));
- 		ret = -EINVAL;
--		goto disable_clocks;
-+		goto err_disable_clocks;
+-		return -EINVAL;
++		ret = -EINVAL;
++		goto disable_clocks;
  	}
  
  	/* Looks ok, so add the device to the domain */
  	cfg = find_smmu_master_cfg(dev);
- 	if (!cfg) {
- 		ret = -ENODEV;
--		goto disable_clocks;
-+		goto err_disable_clocks;
- 	}
+-	if (!cfg)
+-		return -ENODEV;
++	if (!cfg) {
++		ret = -ENODEV;
++		goto disable_clocks;
++	}
  
  	ret = arm_smmu_domain_add_master(smmu_domain, cfg);
  	if (!ret)
  		dev->archdata.iommu = domain;
--disable_clocks:
- 	arm_smmu_disable_clocks(smmu);
++disable_clocks:
++	arm_smmu_disable_clocks(smmu);
  	return ret;
-+
-+err_disable_clocks:
-+	arm_smmu_disable_clocks(smmu);
-+	mutex_lock(&smmu->attach_lock);
-+	if (!--smmu->attach_count)
-+		arm_smmu_disable_regulators(smmu);
-+	mutex_unlock(&smmu->attach_lock);
-+	return ret;
-+}
-+
-+static void arm_smmu_power_off(struct arm_smmu_device *smmu)
-+{
-+	/* Turn the thing off */
-+	arm_smmu_enable_clocks(smmu);
-+	writel_relaxed(sCR0_CLIENTPD,
-+		ARM_SMMU_GR0_NS(smmu) + ARM_SMMU_GR0_sCR0);
-+	arm_smmu_disable_clocks(smmu);
-+	arm_smmu_disable_regulators(smmu);
  }
  
- static void arm_smmu_detach_dev(struct iommu_domain *domain, struct device *dev)
- {
+@@ -1544,7 +1594,9 @@ static size_t arm_smmu_unmap(struct iommu_domain *domain, unsigned long iova,
  	struct arm_smmu_domain *smmu_domain = domain->priv;
- 	struct arm_smmu_master_cfg *cfg;
-+	struct arm_smmu_device *smmu = smmu_domain->smmu;
  
- 	cfg = find_smmu_master_cfg(dev);
- 	if (!cfg)
-@@ -1343,6 +1392,10 @@ static void arm_smmu_detach_dev(struct iommu_domain *domain, struct device *dev)
- 
- 	dev->archdata.iommu = NULL;
- 	arm_smmu_domain_remove_master(smmu_domain, cfg);
-+	mutex_lock(&smmu->attach_lock);
-+	if (!--smmu->attach_count)
-+		arm_smmu_power_off(smmu);
-+	mutex_unlock(&smmu->attach_lock);
+ 	ret = arm_smmu_handle_mapping(smmu_domain, iova, 0, size, 0);
++	arm_smmu_enable_clocks(smmu_domain->smmu);
+ 	arm_smmu_tlb_inv_context(smmu_domain);
++	arm_smmu_disable_clocks(smmu_domain->smmu);
+ 	return ret ? 0 : size;
  }
  
- static bool arm_smmu_pte_is_contiguous_range(unsigned long addr,
-@@ -1844,6 +1897,20 @@ static int arm_smmu_id_size_to_bits(int size)
+@@ -1792,7 +1844,52 @@ static int arm_smmu_id_size_to_bits(int size)
  	}
  }
  
-+static int arm_smmu_init_regulators(struct arm_smmu_device *smmu)
+-static int arm_smmu_device_cfg_probe(struct arm_smmu_device *smmu)
++static int arm_smmu_init_clocks(struct arm_smmu_device *smmu)
 +{
++	const char *cname;
++	struct property *prop;
++	int i;
 +	struct device *dev = smmu->dev;
 +
-+	if (!of_get_property(dev->of_node, "vdd-supply", NULL))
++	smmu->num_clocks = of_property_count_strings(dev->of_node,
++						"clock-names");
++
++	if (!smmu->num_clocks)
 +		return 0;
 +
-+	smmu->gdsc = devm_regulator_get(dev, "vdd");
-+	if (IS_ERR(smmu->gdsc))
-+		return PTR_ERR(smmu->gdsc);
++	smmu->clocks = devm_kzalloc(
++		dev, sizeof(*smmu->clocks) * smmu->num_clocks,
++		GFP_KERNEL);
 +
++	if (!smmu->clocks) {
++		dev_err(dev,
++			"Failed to allocate memory for clocks\n");
++		return -ENODEV;
++	}
++
++	i = 0;
++	of_property_for_each_string(dev->of_node, "clock-names",
++				prop, cname) {
++		struct clk *c = devm_clk_get(dev, cname);
++		if (IS_ERR(c)) {
++			dev_err(dev, "Couldn't get clock: %s",
++				cname);
++			return -ENODEV;
++		}
++
++		if (clk_get_rate(c) == 0) {
++			long rate = clk_round_rate(c, 1000);
++			clk_set_rate(c, rate);
++		}
++
++		smmu->clocks[i] = c;
++
++		++i;
++	}
 +	return 0;
 +}
 +
- static int arm_smmu_init_clocks(struct arm_smmu_device *smmu)
++int arm_smmu_device_cfg_probe(struct arm_smmu_device *smmu)
  {
- 	const char *cname;
-@@ -2065,6 +2132,7 @@ static int arm_smmu_device_dt_probe(struct platform_device *pdev)
- 		return -ENOMEM;
- 	}
- 	smmu->dev = dev;
-+	mutex_init(&smmu->attach_lock);
- 
- 	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
- 	smmu->base = devm_ioremap_resource(dev, res);
-@@ -2124,13 +2192,19 @@ static int arm_smmu_device_dt_probe(struct platform_device *pdev)
+ 	unsigned long size;
+ 	void __iomem *gr0_base = ARM_SMMU_GR0(smmu);
+@@ -2027,10 +2124,16 @@ static int arm_smmu_device_dt_probe(struct platform_device *pdev)
  	}
  	dev_notice(dev, "registered %d master devices\n", i);
  
-+	err = arm_smmu_init_regulators(smmu);
-+	if (err)
-+		goto out_put_masters;
-+
- 	err = arm_smmu_init_clocks(smmu);
+-	err = arm_smmu_device_cfg_probe(smmu);
++	err = arm_smmu_init_clocks(smmu);
  	if (err)
  		goto out_put_masters;
  
-+	arm_smmu_enable_regulators(smmu);
- 	arm_smmu_enable_clocks(smmu);
--
- 	err = arm_smmu_device_cfg_probe(smmu);
-+	arm_smmu_disable_clocks(smmu);
-+	arm_smmu_disable_regulators(smmu);
- 	if (err)
- 		goto out_disable_clocks;
++	arm_smmu_enable_clocks(smmu);
++
++	err = arm_smmu_device_cfg_probe(smmu);
++	if (err)
++		goto out_disable_clocks;
++
+ 	parse_driver_options(smmu);
  
-@@ -2163,8 +2237,6 @@ static int arm_smmu_device_dt_probe(struct platform_device *pdev)
- 	list_add(&smmu->list, &arm_smmu_devices);
+ 	if (smmu->version > 1 &&
+@@ -2039,7 +2142,7 @@ static int arm_smmu_device_dt_probe(struct platform_device *pdev)
+ 			"found only %d context interrupt(s) but %d required\n",
+ 			smmu->num_context_irqs, smmu->num_context_banks);
+ 		err = -ENODEV;
+-		goto out_put_masters;
++		goto out_disable_clocks;
+ 	}
+ 
+ 	for (i = 0; i < smmu->num_global_irqs; ++i) {
+@@ -2061,12 +2164,16 @@ static int arm_smmu_device_dt_probe(struct platform_device *pdev)
  	spin_unlock(&arm_smmu_devices_lock);
  
--	arm_smmu_device_reset(smmu);
--	arm_smmu_disable_clocks(smmu);
+ 	arm_smmu_device_reset(smmu);
++	arm_smmu_disable_clocks(smmu);
  	return 0;
  
  out_free_irqs:
-@@ -2173,6 +2245,7 @@ out_free_irqs:
- 
- out_disable_clocks:
- 	arm_smmu_disable_clocks(smmu);
-+	arm_smmu_disable_regulators(smmu);
- 
- out_put_masters:
- 	for (node = rb_first(&smmu->masters); node; node = rb_next(node)) {
-@@ -2216,10 +2289,15 @@ static int arm_smmu_device_remove(struct platform_device *pdev)
- 	for (i = 0; i < smmu->num_global_irqs; ++i)
+ 	while (i--)
  		free_irq(smmu->irqs[i], smmu);
  
--	/* Turn the thing off */
--	arm_smmu_enable_clocks(smmu);
--	writel(sCR0_CLIENTPD, ARM_SMMU_GR0_NS(smmu) + ARM_SMMU_GR0_sCR0);
--	arm_smmu_disable_clocks(smmu);
-+	mutex_lock(&smmu->attach_lock);
-+	/*
-+	 * If all devices weren't detached for some reason, we're
-+	 * still powered on. Power off now.
-+	 */
-+	if (smmu->attach_count)
-+		arm_smmu_power_off(smmu);
-+	mutex_unlock(&smmu->attach_lock);
++out_disable_clocks:
++	arm_smmu_disable_clocks(smmu);
 +
+ out_put_masters:
+ 	for (node = rb_first(&smmu->masters); node; node = rb_next(node)) {
+ 		struct arm_smmu_master *master
+@@ -2110,7 +2217,9 @@ static int arm_smmu_device_remove(struct platform_device *pdev)
+ 		free_irq(smmu->irqs[i], smmu);
+ 
+ 	/* Turn the thing off */
++	arm_smmu_enable_clocks(smmu);
+ 	writel(sCR0_CLIENTPD, ARM_SMMU_GR0_NS(smmu) + ARM_SMMU_GR0_sCR0);
++	arm_smmu_disable_clocks(smmu);
  	return 0;
  }
  
