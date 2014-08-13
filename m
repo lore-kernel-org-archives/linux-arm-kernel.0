@@ -1,200 +1,36 @@
-From: ulf.hansson@linaro.org (Ulf Hansson)
-Date: Wed, 13 Aug 2014 10:44:42 +0200
-Subject: [PATCH 13/14] mmc: sunxi: Convert MMC driver to the standard
- clock phase API
-In-Reply-To: <1405588134-2396-14-git-send-email-maxime.ripard@free-electrons.com>
-References: <1405588134-2396-1-git-send-email-maxime.ripard@free-electrons.com>
- <1405588134-2396-14-git-send-email-maxime.ripard@free-electrons.com>
-Message-ID: <CAPDyKFq7pnD=0ee1xkY0Ucm9i-HpyEYKvmcsBVPSWPmWoxFSrw@mail.gmail.com>
+From: geert@linux-m68k.org (Geert Uytterhoeven)
+Date: Wed, 13 Aug 2014 10:46:54 +0200
+Subject: [PATCH 1/4] simplefb: formalize pseudo palette handling
+In-Reply-To: <CANq1E4ShhaUMT3MpAei4sgo7Nr-jHfD+TpF8dzAVbn58Feroiw@mail.gmail.com>
+References: <1407914239-12054-1-git-send-email-libv@skynet.be>
+ <1407914239-12054-2-git-send-email-libv@skynet.be>
+ <CANq1E4ShhaUMT3MpAei4sgo7Nr-jHfD+TpF8dzAVbn58Feroiw@mail.gmail.com>
+Message-ID: <CAMuHMdVROkKvW1VYWbOtecO9sQAudtgS-mJtZb5ZLUCMaZdGAA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 17 July 2014 11:08, Maxime Ripard <maxime.ripard@free-electrons.com> wrote:
-> Now that we have proper support to use the generic phase API in our clock
-> driver, switch the MMC driver to use it.
+On Wed, Aug 13, 2014 at 9:25 AM, David Herrmann <dh.herrmann@gmail.com> wrote:
+>> @@ -225,7 +234,7 @@ static int simplefb_probe(struct platform_device *pdev)
+>>                 framebuffer_release(info);
+>>                 return -ENODEV;
+>>         }
+>> -       info->pseudo_palette = (void *)(info + 1);
+>> +       info->pseudo_palette = (void *) par->palette;
 >
-> Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+> I think coding-style is this (i.e., no whitespace):
+>     info->pseudo_palette = (void*)par->palette;
 
-I see there are a dependency of the clk patches with the mmc patch. I
-suppose it's best to take this set through Mike's clk tree then.
+<casts-are-evil>
+Is this cast even needed?
+</casts-are-evil>
 
-Acked-by: Ulf Hansson <ulf.hansson@linaro.org>
+Gr{oetje,eeting}s,
 
-Kind regards
-Uffe
+                        Geert
 
-> ---
->  .../devicetree/bindings/mmc/sunxi-mmc.txt          |  8 +--
->  drivers/mmc/host/sunxi-mmc.c                       | 72 +++++++++++++++-------
->  2 files changed, 53 insertions(+), 27 deletions(-)
->
-> diff --git a/Documentation/devicetree/bindings/mmc/sunxi-mmc.txt b/Documentation/devicetree/bindings/mmc/sunxi-mmc.txt
-> index 91b3a3467150..4bf41d833804 100644
-> --- a/Documentation/devicetree/bindings/mmc/sunxi-mmc.txt
-> +++ b/Documentation/devicetree/bindings/mmc/sunxi-mmc.txt
-> @@ -10,8 +10,8 @@ Absolute maximum transfer rate is 200MB/s
->  Required properties:
->   - compatible : "allwinner,sun4i-a10-mmc" or "allwinner,sun5i-a13-mmc"
->   - reg : mmc controller base registers
-> - - clocks : a list with 2 phandle + clock specifier pairs
-> - - clock-names : must contain "ahb" and "mmc"
-> + - clocks : a list with 4 phandle + clock specifier pairs
-> + - clock-names : must contain "ahb", "mmc", "output" and "sample"
->   - interrupts : mmc controller interrupt
->
->  Optional properties:
-> @@ -25,8 +25,8 @@ Examples:
->         mmc0: mmc at 01c0f000 {
->                 compatible = "allwinner,sun5i-a13-mmc";
->                 reg = <0x01c0f000 0x1000>;
-> -               clocks = <&ahb_gates 8>, <&mmc0_clk>;
-> -               clock-names = "ahb", "mod";
-> +               clocks = <&ahb_gates 8>, <&mmc0_clk>, <&mmc0_output_clk>, <&mmc0_sample_clk>;
-> +               clock-names = "ahb", "mod", "output", "sample";
->                 interrupts = <0 32 4>;
->                 status = "disabled";
->         };
-> diff --git a/drivers/mmc/host/sunxi-mmc.c b/drivers/mmc/host/sunxi-mmc.c
-> index 024f67c98cdc..8719cefa590d 100644
-> --- a/drivers/mmc/host/sunxi-mmc.c
-> +++ b/drivers/mmc/host/sunxi-mmc.c
-> @@ -22,7 +22,6 @@
->
->  #include <linux/clk.h>
->  #include <linux/clk-private.h>
-> -#include <linux/clk/sunxi.h>
->
->  #include <linux/gpio.h>
->  #include <linux/platform_device.h>
-> @@ -230,6 +229,8 @@ struct sunxi_mmc_host {
->         /* clock management */
->         struct clk      *clk_ahb;
->         struct clk      *clk_mmc;
-> +       struct clk      *clk_sample;
-> +       struct clk      *clk_output;
->
->         /* irq */
->         spinlock_t      lock;
-> @@ -617,7 +618,7 @@ static int sunxi_mmc_oclk_onoff(struct sunxi_mmc_host *host, u32 oclk_en)
->  static int sunxi_mmc_clk_set_rate(struct sunxi_mmc_host *host,
->                                   struct mmc_ios *ios)
->  {
-> -       u32 rate, oclk_dly, rval, sclk_dly, src_clk;
-> +       u32 rate, oclk_dly, rval, sclk_dly;
->         int ret;
->
->         rate = clk_round_rate(host->clk_mmc, ios->clock);
-> @@ -643,34 +644,31 @@ static int sunxi_mmc_clk_set_rate(struct sunxi_mmc_host *host,
->
->         /* determine delays */
->         if (rate <= 400000) {
-> -               oclk_dly = 0;
-> -               sclk_dly = 7;
-> +               oclk_dly = 180;
-> +               sclk_dly = 42;
->         } else if (rate <= 25000000) {
-> -               oclk_dly = 0;
-> -               sclk_dly = 5;
-> +               oclk_dly = 180;
-> +               sclk_dly = 75;
->         } else if (rate <= 50000000) {
->                 if (ios->timing == MMC_TIMING_UHS_DDR50) {
-> -                       oclk_dly = 2;
-> -                       sclk_dly = 4;
-> +                       oclk_dly = 60;
-> +                       sclk_dly = 120;
->                 } else {
-> -                       oclk_dly = 3;
-> -                       sclk_dly = 5;
-> +                       oclk_dly = 90;
-> +                       sclk_dly = 150;
->                 }
-> +       } else if (rate <= 100000000) {
-> +               oclk_dly = 6;
-> +               sclk_dly = 24;
-> +       } else if (rate <= 200000000) {
-> +               oclk_dly = 3;
-> +               sclk_dly = 12;
->         } else {
-> -               /* rate > 50000000 */
-> -               oclk_dly = 2;
-> -               sclk_dly = 4;
-> +               return -EINVAL;
->         }
->
-> -       src_clk = clk_get_rate(clk_get_parent(host->clk_mmc));
-> -       if (src_clk >= 300000000 && src_clk <= 400000000) {
-> -               if (oclk_dly)
-> -                       oclk_dly--;
-> -               if (sclk_dly)
-> -                       sclk_dly--;
-> -       }
-> -
-> -       clk_sunxi_mmc_phase_control(host->clk_mmc, sclk_dly, oclk_dly);
-> +       clk_set_phase(host->clk_sample, sclk_dly);
-> +       clk_set_phase(host->clk_output, oclk_dly);
->
->         return sunxi_mmc_oclk_onoff(host, 1);
->  }
-> @@ -909,6 +907,18 @@ static int sunxi_mmc_resource_request(struct sunxi_mmc_host *host,
->                 return PTR_ERR(host->clk_mmc);
->         }
->
-> +       host->clk_output = devm_clk_get(&pdev->dev, "output");
-> +       if (IS_ERR(host->clk_output)) {
-> +               dev_err(&pdev->dev, "Could not get output clock\n");
-> +               return PTR_ERR(host->clk_output);
-> +       }
-> +
-> +       host->clk_sample = devm_clk_get(&pdev->dev, "sample");
-> +       if (IS_ERR(host->clk_sample)) {
-> +               dev_err(&pdev->dev, "Could not get sample clock\n");
-> +               return PTR_ERR(host->clk_sample);
-> +       }
-> +
->         host->reset = devm_reset_control_get(&pdev->dev, "ahb");
->
->         ret = clk_prepare_enable(host->clk_ahb);
-> @@ -923,11 +933,23 @@ static int sunxi_mmc_resource_request(struct sunxi_mmc_host *host,
->                 goto error_disable_clk_ahb;
->         }
->
-> +       ret = clk_prepare_enable(host->clk_output);
-> +       if (ret) {
-> +               dev_err(&pdev->dev, "Enable output clk err %d\n", ret);
-> +               goto error_disable_clk_mmc;
-> +       }
-> +
-> +       ret = clk_prepare_enable(host->clk_sample);
-> +       if (ret) {
-> +               dev_err(&pdev->dev, "Enable sample clk err %d\n", ret);
-> +               goto error_disable_clk_output;
-> +       }
-> +
->         if (!IS_ERR(host->reset)) {
->                 ret = reset_control_deassert(host->reset);
->                 if (ret) {
->                         dev_err(&pdev->dev, "reset err %d\n", ret);
-> -                       goto error_disable_clk_mmc;
-> +                       goto error_disable_clk_sample;
->                 }
->         }
->
-> @@ -946,6 +968,10 @@ static int sunxi_mmc_resource_request(struct sunxi_mmc_host *host,
->  error_assert_reset:
->         if (!IS_ERR(host->reset))
->                 reset_control_assert(host->reset);
-> +error_disable_clk_sample:
-> +       clk_disable_unprepare(host->clk_sample);
-> +error_disable_clk_output:
-> +       clk_disable_unprepare(host->clk_output);
->  error_disable_clk_mmc:
->         clk_disable_unprepare(host->clk_mmc);
->  error_disable_clk_ahb:
-> --
-> 2.0.1
->
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-mmc" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+--
+Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+
+In personal conversations with technical people, I call myself a hacker. But
+when I'm talking to journalists I just say "programmer" or something like that.
+                                -- Linus Torvalds
