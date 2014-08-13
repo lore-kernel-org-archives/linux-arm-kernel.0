@@ -1,44 +1,45 @@
-From: fkan@apm.com (Feng Kan)
-Date: Wed, 13 Aug 2014 11:32:10 -0700
-Subject: [PATCH Resend v2 2/2] arm64: dts: Add PMU node for APM X-Gene Storm
- SOC
-In-Reply-To: <1407954730-9768-1-git-send-email-fkan@apm.com>
-References: <1407954730-9768-1-git-send-email-fkan@apm.com>
-Message-ID: <1407954730-9768-3-git-send-email-fkan@apm.com>
+From: f.fainelli@gmail.com (Florian Fainelli)
+Date: Wed, 13 Aug 2014 11:41:05 -0700
+Subject: PL310 cache initialization/fixup for BCM63138
+In-Reply-To: <20140813182435.GM30401@n2100.arm.linux.org.uk>
+References: <53EBA9CF.4030902@gmail.com>
+ <20140813182435.GM30401@n2100.arm.linux.org.uk>
+Message-ID: <53EBB141.7050206@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Vinayak Kale <vkale@apm.com>
+On 08/13/2014 11:24 AM, Russell King - ARM Linux wrote:
+> On Wed, Aug 13, 2014 at 11:09:19AM -0700, Florian Fainelli wrote:
+>> Hi Russell, Arnd,
+>>
+>> The PL310 cache present on BCM63138 comes up with wrong values out of
+>> reset in particular, I need to at least override the way-size to be
+>> 32KiB otherwise.
+>>
+>> Right now, I am overriding the auxiliary control register by supplying a
+>> non 0xffffffff aux_ctrl_mask to l2x0_of_init().
+>>
+>> Should I rather use a separate compatible string for it and perform the
+>> "fixup" in a separate of_parse() callback, or in a separate fixup()
+>> callback?
+>>
+>> Or is it recommended to keep overriding the aux_ctrl_mask as part of the
+>> call to l2x0_of_init()?
+> 
+> The correct answer is to research how to specify cache attributes in DT,
+> and create an appropriate set of properties described by that, and have
+> the l2x0 OF init code parse those, and create the appropriate aux control
+> register values from those.
+> 
+> I forget exactly what they are, but I do know that there is a standardised
+> set of DT properties to describe the geometry of caches - I came across
+> them about six months back when I worked on the L2 code.
 
-This patch adds the PMU device tree node for APM X-Gene Storm SOC.
+Alright, I will take a stab at using the ePAPR cache properties.
 
-Please note that this patch has dependancy on a GIC driver patch [1] which is
-yet to be approved by maintainers.
+How about PL310 specific properties such as instruction prefetc and
+non-secure access, would boolean properties work for these?
 
-[1]- https://lkml.org/lkml/2014/2/27/605
-(irqchip:gic: change access of gicc_ctrl register to read modify write)
-
-Signed-off-by: Vinayak Kale <vkale@apm.com>
-Signed-off-by: Feng Kan <fkan@apm.com>
----
- arch/arm64/boot/dts/apm-storm.dtsi | 5 +++++
- 1 file changed, 5 insertions(+)
-
-diff --git a/arch/arm64/boot/dts/apm-storm.dtsi b/arch/arm64/boot/dts/apm-storm.dtsi
-index 40aa96c..a2bb25e 100644
---- a/arch/arm64/boot/dts/apm-storm.dtsi
-+++ b/arch/arm64/boot/dts/apm-storm.dtsi
-@@ -97,6 +97,11 @@
- 		clock-frequency = <50000000>;
- 	};
- 
-+	pmu {
-+		compatible = "apm,potenza-pmu", "arm,armv8-pmuv3";
-+		interrupts = <1 12 0xff04>;
-+	};
-+
- 	soc {
- 		compatible = "simple-bus";
- 		#address-cells = <2>;
--- 
-1.9.1
+Thanks!
+--
+Florian
