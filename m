@@ -1,65 +1,30 @@
-From: libv@skynet.be (Luc Verhaegen)
-Date: Wed, 13 Aug 2014 12:19:23 +0200
-Subject: [linux-sunxi] Re: [PATCH 3/4] simplefb: disable dt node upon
- remove
-In-Reply-To: <20140813094524.GC31326@skynet.be>
+From: dh.herrmann@gmail.com (David Herrmann)
+Date: Wed, 13 Aug 2014 12:24:36 +0200
+Subject: [linux-sunxi] simplefb: add clock handling
+In-Reply-To: <958E7D39-A034-42AC-A6FF-130609E46967@dominion.thruhere.net>
 References: <1407914239-12054-1-git-send-email-libv@skynet.be>
- <1407914239-12054-4-git-send-email-libv@skynet.be>
- <CACxGe6vaPUa4QvYWBA-QY7MTmJYoeqnPt9Zh5jpky6S9UYbrvQ@mail.gmail.com>
- <CANq1E4ReOB87RX8VhnW1Ln=SK3Tw5V962ujcsfuz-2E9Uc61yQ@mail.gmail.com>
- <CACxGe6vQrhd8QOAyGnjRppmuANpT60Ao2+KmkDfF4FNeoZSZgw@mail.gmail.com>
- <20140813094524.GC31326@skynet.be>
-Message-ID: <20140813101923.GD31326@skynet.be>
+ <CANq1E4Re79+D5H-pf8pW87NZ5MWz9UFknd5Dk2GKCvhzm5MNSA@mail.gmail.com>
+ <BFCF4C2C-77ED-4719-903B-921DEB250B7A@dominion.thruhere.net>
+ <53EB238B.5010404@redhat.com>
+ <958E7D39-A034-42AC-A6FF-130609E46967@dominion.thruhere.net>
+Message-ID: <CANq1E4S3fv16_U-O16K2TPSMMiwZoXBzAWL3ektXz_tWnuYXaw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Aug 13, 2014 at 11:45:24AM +0200, Luc Verhaegen wrote:
-> On Wed, Aug 13, 2014 at 10:23:14AM +0100, Grant Likely wrote:
-> > 
-> > The majority of the DT code is based on the assumption of a static
-> > tree. Pantelis has been working on being able to modify it at runtime
-> > with overlays, but he has had to go through a lot of rework because it
-> > is not a trivial task. When you get into modifying the DT, you need to
-> > have a lot more understanding of the side effects to changing the
-> > tree. The DT structure also has a lifecycle that can go beyond the
-> > current lifecycle of the kernel. The kexec tool will extract the
-> > current tree from the kernel, make the appropriate modifications, and
-> > use that to boot the next kernel. Allowing any driver to modify the
-> > tree has side effects beyond just the current kernel.
-> > 
-> > In this specific case, it will interact badly with the work Pantelis
-> > is doing to make platform devices work with overlays. Modifying the
-> > status property will cause the associated struct device to get removed
-> > in the middle of probing a driver for that device! That will most
-> > likely cause an oops.
-> > 
-> > Besides, Luc straight out *said*: "...even though it has no real value
-> > today". In what circumstance is that justification for modifying the
-> > tree?
-> 
-> With that sentence i meant that given the current state of things, it 
-> has no real value.
-> 
-> It has no value currently as re-probing simplefb is not going to happen. 
-> But it's not a big leap to turn simplefb into a proper module. Not that 
-> that makes much sense, but that's never stopped anyone.
-> 
-> To me it seemed simple, dt is what drives simplefb, so dt then also 
-> becomes responsible for making sure that simplefb or another driver does 
-> not attempt to blindly use this info again. The way this is implemented 
-> i do not care for in any way, i just knew that i could not do nothing 
-> here, given the catastrophic effect disabling the clocks has on simplefb 
-> on sunxi. Given the discussion that errupted here, i'd say that this 
-> does need some resolution, and altering the dt is going to have to be 
-> part of the solution.
-> 
-> In any case, i will gladly drop this patch, as it is not absolutely 
-> necessary. But it should be very clear that there is no going back on 
-> this dt node after the clocks were released once.
-> 
-> Luc Verhaegen.
+Hi
 
-What about approaching this from the other end? U-Boot could add a 
-property named "once-only" or so.
+On Wed, Aug 13, 2014 at 12:16 PM, Koen Kooi <koen@dominion.thruhere.net> wrote:
+> So what you are saying is that the only reason it is needed is because some distros choose to build DRM drivers as modules. So as soon as they stop doing that the problem goes away, right?
+> Worse, the experience I have with ARM DRM drivers is that they fail horrible when being built as modules, but that's a different problem.
 
-Luc Verhaegen.
+Exactly. But there's no intention to stop building them as modules.
+Imagine you build a kernel that's supposed to run on multiple
+different platforms (like x86), you really don't want all DRM drivers
+built-in. Instead, you load the correct driver during boot-up. To
+still provide early graphics access, we use simplefb.
+
+Note that there might be legitimate reasons to make DRM drivers
+built-in. But at least general purpose distros avoid that.
+
+Thanks
+David
