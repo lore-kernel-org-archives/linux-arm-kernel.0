@@ -1,44 +1,40 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Wed, 13 Aug 2014 14:12:32 +0100
-Subject: [PATCH] backlight: remove .owner field for drivers using
- module_platform_driver
-In-Reply-To: <1407933518-7214-1-git-send-email-peter.griffin@linaro.org>
-References: <1407933518-7214-1-git-send-email-peter.griffin@linaro.org>
-Message-ID: <20140813131232.GA8258@lee--X1>
+From: michal.simek@xilinx.com (Michal Simek)
+Date: Wed, 13 Aug 2014 15:21:29 +0200
+Subject: [PATCH 1/2] spi: xilinx: Remove .owner field for driver
+In-Reply-To: <20140813123343.GR17528@sirena.org.uk>
+References: <d35c656e50eb7cc951499f13ef339d6aa1a23deb.1407930755.git.michal.simek@xilinx.com>
+ <20140813123343.GR17528@sirena.org.uk>
+Message-ID: <b172f93e-b2fb-4cf4-a2de-d2ca62cdb83f@BN1BFFO11FD016.protection.gbl>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 13 Aug 2014, Peter Griffin wrote:
-
-> This patch removes the superflous .owner field for drivers which
-> use the module_platform_driver or platform_driver_register api,
-> as this is overriden in __platform_driver_register.
+On 08/13/2014 02:33 PM, Mark Brown wrote:
+> On Wed, Aug 13, 2014 at 01:52:39PM +0200, Michal Simek wrote:
+>> There is no need to init .owner field.
+>>
+>> Based on the patch from Peter Griffin <peter.griffin@linaro.org>
+>> "mmc: remove .owner field for drivers using module_platform_driver"
+>>
+>> This patch removes the superflous .owner field for drivers which
+>> use the module_platform_driver API, as this is overriden in
+>> platform_driver_register anyway."
 > 
-> Signed-off-by: Peter Griffin <peter.griffin@linaro.org>
-> ---
->  drivers/video/backlight/88pm860x_bl.c    | 1 -
->  drivers/video/backlight/aat2870_bl.c     | 1 -
->  drivers/video/backlight/adp5520_bl.c     | 1 -
->  drivers/video/backlight/as3711_bl.c      | 1 -
->  drivers/video/backlight/da903x_bl.c      | 1 -
->  drivers/video/backlight/da9052_bl.c      | 1 -
->  drivers/video/backlight/ep93xx_bl.c      | 1 -
->  drivers/video/backlight/gpio_backlight.c | 1 -
->  drivers/video/backlight/lm3533_bl.c      | 1 -
->  drivers/video/backlight/lp8788_bl.c      | 1 -
->  drivers/video/backlight/max8925_bl.c     | 1 -
->  drivers/video/backlight/ot200_bl.c       | 1 -
->  drivers/video/backlight/pandora_bl.c     | 1 -
->  drivers/video/backlight/platform_lcd.c   | 1 -
->  drivers/video/backlight/pwm_bl.c         | 1 -
->  drivers/video/backlight/tps65217_bl.c    | 1 -
->  drivers/video/backlight/wm831x_bl.c      | 1 -
->  17 files changed, 17 deletions(-)
+> Would it not be better to do this as a tree wide or at least subsystem
+> wide sweep with something like cocinelle?
 
-Applied, thanks.
+Feel free to use cocinelle for fixing this everywhere.
+For me was just easier to fix all xilinx drivers to ensure
+that none else will copy it for new drivers.
 
--- 
-Lee Jones
-Linaro STMicroelectronics Landing Team Lead
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+Thanks,
+Michal
+
+
+
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 198 bytes
+Desc: OpenPGP digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140813/874bcdc0/attachment-0001.sig>
