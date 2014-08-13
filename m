@@ -1,130 +1,81 @@
-From: f.fainelli@gmail.com (Florian Fainelli)
-Date: Wed, 13 Aug 2014 16:29:31 -0700
-Subject: [PATCH 3/3] ARM: l2c: parse 'cache-size' and 'cache-sets' properties
-In-Reply-To: <1407972571-8986-1-git-send-email-f.fainelli@gmail.com>
-References: <1407972571-8986-1-git-send-email-f.fainelli@gmail.com>
-Message-ID: <1407972571-8986-4-git-send-email-f.fainelli@gmail.com>
+From: computersforpeace@gmail.com (Brian Norris)
+Date: Wed, 13 Aug 2014 16:47:06 -0700
+Subject: [PATCH v8 01/11] ARM: brcmstb: add infrastructure for ARM-based
+ Broadcom STB SoCs
+In-Reply-To: <20140802092756.GZ30282@n2100.arm.linux.org.uk>
+References: <1405976886-27807-1-git-send-email-computersforpeace@gmail.com>
+ <1405976886-27807-2-git-send-email-computersforpeace@gmail.com>
+ <CAL_Jsq+Nbk7m9KXhG+Chdpvurp75RrvhFR2oE_LGxV444GSe9Q@mail.gmail.com>
+ <20140731022320.GM3711@ld-irv-0074>
+ <20140731084315.GJ30282@n2100.arm.linux.org.uk>
+ <20140731220642.GQ3711@ld-irv-0074>
+ <20140802092756.GZ30282@n2100.arm.linux.org.uk>
+Message-ID: <20140813234706.GC18411@ld-irv-0074>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-When both 'cache-size' and 'cache-sets' are specified for a L2 cache
-controller node, parse those properties and make sure we validate the
-way_size based on which type of L2 cache controller we are using.
+Hi Russell,
 
-Update the L2 cache controller Device Tree binding with the optional
-'cache-size' and 'cache-sets' properties.
+Picking up this thread again, as things are now set for dropping this
+patch and resubmitting SMP support for 3.18.
 
-Signed-off-by: Florian Fainelli <f.fainelli@gmail.com>
----
- Documentation/devicetree/bindings/arm/l2cc.txt |  2 +
- arch/arm/mm/cache-l2x0.c                       | 61 ++++++++++++++++++++++++++
- 2 files changed, 63 insertions(+)
+On Sat, Aug 02, 2014 at 10:27:56AM +0100, Russell King wrote:
+> On Thu, Jul 31, 2014 at 03:06:42PM -0700, Brian Norris wrote:
+> > Yes, I noticed this. What I meant is that smp_ops.cpu_die() and
+> > smp_ops.cpu_kill() are not synchronized.
+> ...
+> > We're not relying on the L1 cache, though. Don't sync_cache_{r,w}()
+> > ensure all reads/writes reach at least the L2?
+> 
+> What exactly are you trying to achieve here?
 
-diff --git a/Documentation/devicetree/bindings/arm/l2cc.txt b/Documentation/devicetree/bindings/arm/l2cc.txt
-index b265ef25e55d..e5d9bbe540e2 100644
---- a/Documentation/devicetree/bindings/arm/l2cc.txt
-+++ b/Documentation/devicetree/bindings/arm/l2cc.txt
-@@ -45,6 +45,8 @@ Optional properties:
-   string is used.
- - cache-id-part: cache id part number to be used if it is not present
-   on hardware
-+- cache-size : specifies the size in bytes of the cache
-+- cache-sets : specifies the number of associativity sets of the cache
- - interrupts : 1 combined interrupt.
- - wt-override: If present then L2 is forced to Write through mode
- 
-diff --git a/arch/arm/mm/cache-l2x0.c b/arch/arm/mm/cache-l2x0.c
-index 80488e78ce32..e681f36e9c07 100644
---- a/arch/arm/mm/cache-l2x0.c
-+++ b/arch/arm/mm/cache-l2x0.c
-@@ -945,6 +945,61 @@ static int l2_wt_override;
-  * pass it though the device tree */
- static u32 cache_id_part_number_from_dt;
- 
-+static void __init l2x0_cache_size_of_parse(const struct device_node *np,
-+					    u32 *aux_val, u32 *aux_mask,
-+					    u32 max_way_size)
-+{
-+	u32 mask = 0, val = 0;
-+	u32 size = 0, sets = 0;
-+	u32 way_size = 0, way_size_bits = 1;
-+
-+	of_property_read_u32(np, "cache-size", &size);
-+	of_property_read_u32(np, "cache-sets", &sets);
-+
-+	if (!size || !sets)
-+		return;
-+
-+	way_size = size / sets;
-+
-+	if (way_size > max_way_size) {
-+		pr_warn("L2C: way size %dKB is too large\n", way_size >> 10);
-+		return;
-+	}
-+
-+	way_size >>= 10;
-+	switch (way_size) {
-+	case 512:
-+		way_size_bits = 6;
-+		break;
-+	case 256:
-+		way_size_bits = 5;
-+		break;
-+	case 128:
-+		way_size_bits = 4;
-+		break;
-+	case 64:
-+		way_size_bits = 3;
-+		break;
-+	case 32:
-+		way_size_bits = 2;
-+		break;
-+	case 16:
-+		way_size_bits = 1;
-+		break;
-+	default:
-+		pr_err("cache way size: %d KB is not mapped\n",
-+		       way_size);
-+		break;
-+	}
-+
-+	mask |= L2C_AUX_CTRL_WAY_SIZE_MASK;
-+	val |= (way_size_bits << L2C_AUX_CTRL_WAY_SIZE_SHIFT);
-+
-+	*aux_val &= ~mask;
-+	*aux_val |= val;
-+	*aux_mask &= ~mask;
-+}
-+
- static void __init l2x0_of_parse(const struct device_node *np,
- 				 u32 *aux_val, u32 *aux_mask)
- {
-@@ -974,6 +1029,8 @@ static void __init l2x0_of_parse(const struct device_node *np,
- 		val |= (dirty - 1) << L2X0_AUX_CTRL_DIRTY_LATENCY_SHIFT;
- 	}
- 
-+	l2x0_cache_size_of_parse(np, aux_val, aux_mask, SZ_256K);
-+
- 	*aux_val &= ~mask;
- 	*aux_val |= val;
- 	*aux_mask &= ~mask;
-@@ -1047,6 +1104,8 @@ static void __init l2c310_of_parse(const struct device_node *np,
- 		writel_relaxed((filter[0] & ~(SZ_1M - 1)) | L310_ADDR_FILTER_EN,
- 			       l2x0_base + L310_ADDR_FILTER_START);
- 	}
-+
-+	l2x0_cache_size_of_parse(np, aux_val, aux_mask, SZ_512K);
- }
- 
- static const struct l2c_init_data of_l2c310_data __initconst = {
-@@ -1253,6 +1312,8 @@ static void __init aurora_of_parse(const struct device_node *np,
- 	*aux_val &= ~mask;
- 	*aux_val |= val;
- 	*aux_mask &= ~mask;
-+
-+	l2x0_cache_size_of_parse(np, aux_val, aux_mask, SZ_256K);
- }
- 
- static const struct l2c_init_data of_aurora_with_outer_data __initconst = {
--- 
-1.9.1
+Synchronization between v7_exit_coherency_flush() (on the dying CPU) and
+yanking the power (brcmstb_cpu_kill(), on the murderous CPU). The core
+completion-based synchronization is not sufficient, since it allows
+brcmstb_smp_ops.smp_kill and brcmstb_smp_ops.smp_die to race.
+
+Am I somehow not achieving what I intend here?
+
+> > How does that ensure that the CPU is down by the time the work is
+> > scheduled? It seems like this would just defer the work long enough that
+> > it *most likely* has quiesced, but I don't see how this gives us a
+> > better guarantee. Or maybe I'm missing something. (If so, please do
+> > enlighten!)
+> 
+> Note that I said a delayed work queue.  The dying CPU runs a predictable
+> sequence once cpu_die() has been entered - interrupts at the GIC have
+> been programmed to be routed to other CPUs, interrupts at the CPU are
+> masked, so the CPU isn't going to be doing anything else except executing
+> that code path.  So, it's going to be a predictable number of CPU cycles.
+> 
+> That allows you to arrange a delayed workqueue (or a timer) to fire
+> after a period of time that you can guarantee that the dying CPU has
+> reached that wfi().
+
+OK, that sounds workable for the active hotplug case.
+
+But what about for the suspend case? CPUs are hot-unplugged during
+disable_nonboot_cpus(), and I don't see that this would guarantee the
+workqueue will complete before we enter suspend.
+
+> Another point which raises itself in your patch is this:
+> 
+> +       /* Settle-time from Broadcom-internal DVT reference code */
+> +       udelay(7);
+> 
+> 7us looks very precise, but udelay() may not be that precise.  What is
+> the actual specification?  Does it say "you must wait at least 7us"?
+> 
+> udelay() _may_ return early, especially if it is using the CPU delay
+> loop to perform the delay - I've explained why this happens previously,
+> and why it isn't a bug.
+> 
+> If you're using a timer-based delay for udelay() (which you should be
+> using if you support cpufreq) then the delay should be more accurate,
+> but it's still good practise to give a little leeway on the figure.
+
+I'm looking into this specific delay. I'd bet it's just "wait at least
+7us." I could probably factor in some leeway to be safe.
+
+Thanks,
+Brian
