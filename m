@@ -1,65 +1,57 @@
-From: nicolas.pitre@linaro.org (Nicolas Pitre)
-Date: Wed, 13 Aug 2014 13:29:49 -0400 (EDT)
-Subject: [PATCH v7 3/8] drivers: cpuidle: implement DT based idle states
- infrastructure
-In-Reply-To: <20140813170440.GA30822@e102568-lin.cambridge.arm.com>
-References: <1407945127-27554-1-git-send-email-lorenzo.pieralisi@arm.com>
- <1407945127-27554-4-git-send-email-lorenzo.pieralisi@arm.com>
- <alpine.LFD.2.11.1408131223501.1133@knanqh.ubzr>
- <20140813170440.GA30822@e102568-lin.cambridge.arm.com>
-Message-ID: <alpine.LFD.2.11.1408131319210.1133@knanqh.ubzr>
+From: leif.lindholm@linaro.org (Leif Lindholm)
+Date: Wed, 13 Aug 2014 18:29:58 +0100
+Subject: [PATCH 0/3 v2] arm64/efi: improve TEXT_OFFSET handling
+In-Reply-To: <1406717944-24725-1-git-send-email-ard.biesheuvel@linaro.org>
+References: <1406717944-24725-1-git-send-email-ard.biesheuvel@linaro.org>
+Message-ID: <20140813172958.GA22224@bivouac.eciton.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 13 Aug 2014, Lorenzo Pieralisi wrote:
-
-> On Wed, Aug 13, 2014 at 05:31:11PM +0100, Nicolas Pitre wrote:
-> > On Wed, 13 Aug 2014, Lorenzo Pieralisi wrote:
-> > 
-> > > On most common ARM systems, the low-power states a CPU can be put into are
-> > > not discoverable in HW and require device tree bindings to describe
-> > > power down suspend operations and idle states parameters.
-> > > 
-> > > In order to enable DT based idle states and configure idle drivers, this
-> > > patch implements the bulk infrastructure required to parse the device tree
-> > > idle states bindings and initialize the corresponding CPUidle driver states
-> > > data.
-> > > 
-> > > The parsing API accepts a start index that defines the first idle state
-> > > that should be initialized by the parsing code in order to give new and
-> > > legacy driver flexibility over which states should be parsed using the
-> > > new DT mechanism.
-> > > 
-> > > The idle states list is obtained from the first cpu in the driver
-> > > cpumask, which implicitly means the parsing code expects idle states
-> > > (and related list of phandles) to be the same for all CPUs in the
-> > > CPUidle driver mask. The kernel does not check this assumption, it must
-> > > be enforced by the bootloader to ensure correct system behaviour.
-> > 
-> > Can we make the kernel a little less reliant on bootloader to ensure 
-> > correct system behaviour please?  If assumptions are assumed by the 
-> > kernel, it should at least print a warning and simply ignore the 
-> > information when such assumption are not respected.
+On Wed, Jul 30, 2014 at 12:59:01PM +0200, Ard Biesheuvel wrote:
+> Resending this series sent out yesterday with only minor changes and acks etc
+> added.
 > 
-> I think the check adds complexity (it means stashing the idle states
-> phandles for the first cpu, loop through the cpus in the mask and compare
-> the phandles to the ones stashed for the first cpu for all cpus in the
-> driver mask) for not much.
+> In summary: patch #3 relaxes the requirements imposed by the EFI stub on where
+> Image may be loaded, but this breaks APM Mustang (if booting via UEFI) if patch
+> #1 does not go in first. Patch #2 prevents potential boot issues when Image is
+> loaded such that the stub does not have to relocate it.
 > 
-> I was told that it is not up to the kernel to validate the DT, but if
-> you want I can implement the check even though I really think it is
-> overkill.
+> @Will: as discussed on the list yesterday, these patches should be kept in
+> sequence when going upstream, so it is best to take them through a single tree.
+> However, patch #3 will not apply cleanly to the arm64 tree until after 3.16-rc1
+> is released as it depends on a trivial change going in through x86/tip [efi].
+> [https://git.kernel.org/cgit/linux/kernel/git/mfleming/efi.git/commit/?h=next&id=6091c9c447370c4717ec9975813c874af490eb36]
+> 
+> If you are ok with these patches, how would you like to proceed? Patches #1 and
+> #2 could go in straight away (through arm64), and I can send Catalin and you a
+> gentle reminder once -rc1 is released to take #3? Or instead, ack them and ask
+> Matt to queue them for 3.17-late? It would be nice if this makes 3.17 as it
+> fixes actual boot problems on hardware that is under development.
+> 
+> Changes in v2:
+> - add (__force void *) cast to patch #1, as suggested in LAKML discussion
+> - add tested-by/acked-by lines
+> - rebased patch #3 onto efi-next
+> 
+> Mark Rutland (1):
+>   arm64: spin-table: handle unmapped cpu-release-addrs
+> 
+> Ard Biesheuvel (2):
+>   arm64/efi: efistub: cover entire static mem footprint in PE/COFF .text
+>   arm64/efi: efistub: don't abort if base of DRAM is occupied
+> 
+>  arch/arm64/kernel/efi-stub.c       | 18 ++++++------------
+>  arch/arm64/kernel/head.S           |  6 +++---
+>  arch/arm64/kernel/smp_spin_table.c | 21 ++++++++++++++++-----
+>  3 files changed, 25 insertions(+), 20 deletions(-)
+> 
+> -- 
+> 1.8.3.2
 
-DT validation is not the same as resiliance against messed-up DT 
-content.  If the kernel is going to boot regardless then this is fine.  
-If the kernel is going to crash, or work suboptimally without returning 
-a clue because some implicit assumptions are not respected then this is 
-bad.
+Since this set fixes two separate bugs on actual hardware platforms,
+for the entire set - for what it's worth:
+Acked-by: Leif Lindholm <leif.lindholm@linaro.org>
+Tested-by: Leif Lindholm <leif.lindholm@linaro.org>
 
-And people _will_ mess up their DT from time to time.
-
-So if you tell me a messed-up DT won't bear much consequences then I'm 
-fine with that.
-
-
-Nicolas
+/
+    Leif
