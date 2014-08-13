@@ -1,104 +1,100 @@
-From: dgreid@chromium.org (Dylan Reid)
-Date: Wed, 13 Aug 2014 12:07:59 -0700
-Subject: [PATCH 1/2] ARM: tegra: add Acer Chromebook 13 device tree
-In-Reply-To: <53EB9BF0.9010002@wwwdotorg.org>
-References: <1407894967-18300-1-git-send-email-dgreid@chromium.org>
- <53EB9BF0.9010002@wwwdotorg.org>
-Message-ID: <CAEUnVG6ki9O5hzw9OvJ1+8Www_G1+rqXujmNyJy+qOP-z_JR=A@mail.gmail.com>
+From: grant.likely@secretlab.ca (Grant Likely)
+Date: Wed, 13 Aug 2014 20:14:37 +0100
+Subject: [linux-sunxi] Re: [PATCH 3/4] simplefb: disable dt node upon
+ remove
+In-Reply-To: <CAKON4OwLOAq1EOzZmuefcnZ4hw0i35e3k0F6XGNRy-5jer2vyA@mail.gmail.com>
+References: <1407914239-12054-1-git-send-email-libv@skynet.be>
+ <1407914239-12054-4-git-send-email-libv@skynet.be>
+ <CACxGe6vaPUa4QvYWBA-QY7MTmJYoeqnPt9Zh5jpky6S9UYbrvQ@mail.gmail.com>
+ <CANq1E4ReOB87RX8VhnW1Ln=SK3Tw5V962ujcsfuz-2E9Uc61yQ@mail.gmail.com>
+ <CACxGe6vQrhd8QOAyGnjRppmuANpT60Ao2+KmkDfF4FNeoZSZgw@mail.gmail.com>
+ <20140813094524.GC31326@skynet.be> <20140813101923.GD31326@skynet.be>
+ <CAKON4OwLOAq1EOzZmuefcnZ4hw0i35e3k0F6XGNRy-5jer2vyA@mail.gmail.com>
+Message-ID: <CACxGe6szX3LyhGHbVHrEFfaWGYUcgcxgkuhfc9ac-R0qJs-HXw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Aug 13, 2014 at 10:10 AM, Stephen Warren <swarren@wwwdotorg.org> wrote:
-> On 08/12/2014 07:56 PM, Dylan Reid wrote:
+On Wed, Aug 13, 2014 at 1:54 PM, jonsmirl at gmail.com <jonsmirl@gmail.com> wrote:
+> On Wed, Aug 13, 2014 at 6:19 AM, Luc Verhaegen <libv@skynet.be> wrote:
+>> On Wed, Aug 13, 2014 at 11:45:24AM +0200, Luc Verhaegen wrote:
+>>> On Wed, Aug 13, 2014 at 10:23:14AM +0100, Grant Likely wrote:
+>>> >
+>>> > The majority of the DT code is based on the assumption of a static
+>>> > tree. Pantelis has been working on being able to modify it at runtime
+>>> > with overlays, but he has had to go through a lot of rework because it
+>>> > is not a trivial task. When you get into modifying the DT, you need to
+>>> > have a lot more understanding of the side effects to changing the
+>>> > tree. The DT structure also has a lifecycle that can go beyond the
+>>> > current lifecycle of the kernel. The kexec tool will extract the
+>>> > current tree from the kernel, make the appropriate modifications, and
+>>> > use that to boot the next kernel. Allowing any driver to modify the
+>>> > tree has side effects beyond just the current kernel.
+>>> >
+>>> > In this specific case, it will interact badly with the work Pantelis
+>>> > is doing to make platform devices work with overlays. Modifying the
+>>> > status property will cause the associated struct device to get removed
+>>> > in the middle of probing a driver for that device! That will most
+>>> > likely cause an oops.
+>>> >
+>>> > Besides, Luc straight out *said*: "...even though it has no real value
+>>> > today". In what circumstance is that justification for modifying the
+>>> > tree?
+>>>
+>>> With that sentence i meant that given the current state of things, it
+>>> has no real value.
+>>>
+>>> It has no value currently as re-probing simplefb is not going to happen.
+>>> But it's not a big leap to turn simplefb into a proper module. Not that
+>>> that makes much sense, but that's never stopped anyone.
+>>>
+>>> To me it seemed simple, dt is what drives simplefb, so dt then also
+>>> becomes responsible for making sure that simplefb or another driver does
+>>> not attempt to blindly use this info again. The way this is implemented
+>>> i do not care for in any way, i just knew that i could not do nothing
+>>> here, given the catastrophic effect disabling the clocks has on simplefb
+>>> on sunxi. Given the discussion that errupted here, i'd say that this
+>>> does need some resolution, and altering the dt is going to have to be
+>>> part of the solution.
+>>>
+>>> In any case, i will gladly drop this patch, as it is not absolutely
+>>> necessary. But it should be very clear that there is no going back on
+>>> this dt node after the clocks were released once.
+>>>
+>>> Luc Verhaegen.
 >>
->> The Acer Chromebook 13, codenamed "Big", contains an NVIDIA tegra124
->> processor and is similar to the Venice2 reference platform.
->>
->> The keyboard, USB 2, audio, HDMI, sdcard and emmc have been tested
->> and work on the 1366x768 models.  I haven't tried on the HD systems
->> yet.
->>
->> WiFi does not yet work, it needs at least some PMIC changes to enable
->> the 32k clock.
->>
->> The elan trackpad is not yet functional but hopefully will be soon as
->> there are patches under review.
->>
->> There is also an issue on reboot because the TPM isn't reset.  It will
->> cause the stock firmware to enter recovery mode.  This can be worked
->> around by an EC-reset, press refresh and power at the same time.
+>> What about approaching this from the other end? U-Boot could add a
+>> property named "once-only" or so.
 >
->
->> diff --git a/arch/arm/boot/dts/tegra124-big.dts
->> b/arch/arm/boot/dts/tegra124-big.dts
->
->
-> I think we need to include the SKU name in the filename and compatible value
-> below, or at least plan out that for other SKUs, we'll add the SKU name on.
->
->
->> +/ {
->> +       model = "Google Big";
->> +       compatible = "google,nyan-big", "nvidia,tegra124";
->
->
-> I think it'd be more user-friendly if the filename and compatible value more
-> obviously tied to the end-user-visible product name.
+> Device tree is supposed to be a static description of the hardware
+> usable on all operating systems. It is the wrong mechanism for
+> communicating between uboot and the kernel. Use something like atags
+> or the kernel command line to tell the kernel that the console has
+> already been set up.
 
-I'll change the model to "Acer Chromebook 13"
+Not accurate. While it is primarily hardware description, it is also
+used for firmware communication. There is loads of precedence for
+this. The /chosen node is the most significant example, but there are
+other places where the tree is used to provide state. For example, the
+current-speed property on UART nodes.
 
-If we need a separate DT for the FullHD skew, then can we add a file
-'tegra124-nyan-big-full-hd.dtsi'?  We may also add
-'tegra124-nyan-big-full-hd-touch.dtsi' as well.  They would just
-override the necessary things from this file.
+> The switch over from simple to KMS should not be done via a node
+> add/del to the device tree either.  No one has removed the device from
+> the system, the device tree should not be changing.
 
->
->
->> +       gpio-keys {
->> +               compatible = "gpio-keys";
->> +
->> +               lid {
->> +                       label = "Lid";
->> +                       gpios = <&gpio TEGRA_GPIO(R, 4) GPIO_ACTIVE_LOW>;
->> +                       linux,input-type = <5>;
->> +                       linux,code = <0>;
->
->
-> Aren't there #defines for the 5 and 0 there?
+The simple-framebuffer binding appears to be insufficient in this
+regard in that it doesn't have any linkage with the actual device
+providing the framebuffer. Ideally, I would put the simple framebuffer
+state directly into the video device node and use the chosen node to
+point to the stdout device (probably with the stdout-path property).
+Then the driver already knows it can just ignore the simple properties
+because it owns the device node when it binds.
 
-yes for code, apparently not for input-type.  I think 5 means EV_SW,
-maybe that should get added to include/dt-bindings/input somewhere?
+That said, simple-framebuffer as it stands is in use so we're not
+going to deprecate it. I would like to see an addition that specifies
+how a controller can be associated with a simple framebuffer node.
 
->
->
->> +       sound {
->> +               compatible = "nvidia,tegra-audio-max98090-venice2",
->> +                            "nvidia,tegra-audio-max98090";
->> +               nvidia,model = "NVIDIA Tegra Venice2";
->
->
-> Those strings should all use the same board name as the filename, compatible
-> value, and model of the root node. Based on the content in your patch, I
-> would expect:
->
->                 compatible = "nvidia,tegra-audio-max98090-big",
->                              "nvidia,tegra-audio-max98090";
->                 nvidia,model = "Google Big";
+BTW, Is anyone currently using the simple framebuffer for early
+console? For early console we would want to start using it well before
+setting up platform devices.
 
-Changed model to Acer Chromebook 13 and the compativle string to 'nyan-big'.
-
->
-> In particular, nvidia,model is used to index into /var/lib/alsa/asound.state
-> by name, so it needs to be unique for each board.
->
->
->> +               nvidia,mic-det-gpios = <&gpio TEGRA_GPIO(R, 7)
->> +                                                       GPIO_ACTIVE_HIGH>;
->
->
-> That property doesn't (yet) exist in the binding/code upstream. It could
-> obviously be added.
-
-I will remove it from this patch, and get it added to the driver first.
-
-Thanks for reviewing!
+g.
