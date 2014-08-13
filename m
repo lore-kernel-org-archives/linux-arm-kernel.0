@@ -1,100 +1,75 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Wed, 13 Aug 2014 10:37:15 -0700
-Subject: [PATCH 1/2] ARM: tegra: add Acer Chromebook 13 device tree
-In-Reply-To: <53EBA0ED.30607@wwwdotorg.org>
-References: <1407894967-18300-1-git-send-email-dgreid@chromium.org>
- <53EB9BF0.9010002@wwwdotorg.org>
- <CAOesGMhAzx==sXnHBg4dhAtO3=JP-s-MmzujskctA=7OUC0uRg@mail.gmail.com>
- <53EBA0ED.30607@wwwdotorg.org>
-Message-ID: <CAOesGMgeLbuURwA1VVxkLp=vH9PB_VdUHFJthH=ae-_ZDVYyAA@mail.gmail.com>
+From: nicolas.pitre@linaro.org (Nicolas Pitre)
+Date: Wed, 13 Aug 2014 13:38:24 -0400 (EDT)
+Subject: [PATCH v4 0/8] arm: support CONFIG_RODATA
+In-Reply-To: <1407949593-16121-1-git-send-email-keescook@chromium.org>
+References: <1407949593-16121-1-git-send-email-keescook@chromium.org>
+Message-ID: <alpine.LFD.2.11.1408131337360.1133@knanqh.ubzr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Aug 13, 2014 at 10:31 AM, Stephen Warren <swarren@wwwdotorg.org> wrote:
-> On 08/13/2014 11:23 AM, Olof Johansson wrote:
->>
->> On Wed, Aug 13, 2014 at 10:10 AM, Stephen Warren <swarren@wwwdotorg.org>
->> wrote:
->>>
->>> On 08/12/2014 07:56 PM, Dylan Reid wrote:
->>>>
->>>>
->>>> The Acer Chromebook 13, codenamed "Big", contains an NVIDIA tegra124
->>>> processor and is similar to the Venice2 reference platform.
->>>>
->>>> The keyboard, USB 2, audio, HDMI, sdcard and emmc have been tested
->>>> and work on the 1366x768 models.  I haven't tried on the HD systems
->>>> yet.
->>>>
->>>> WiFi does not yet work, it needs at least some PMIC changes to enable
->>>> the 32k clock.
->>>>
->>>> The elan trackpad is not yet functional but hopefully will be soon as
->>>> there are patches under review.
->>>>
->>>> There is also an issue on reboot because the TPM isn't reset.  It will
->>>> cause the stock firmware to enter recovery mode.  This can be worked
->>>> around by an EC-reset, press refresh and power at the same time.
->>>
->>>
->>>
->>>> diff --git a/arch/arm/boot/dts/tegra124-big.dts
->>>> b/arch/arm/boot/dts/tegra124-big.dts
->>>
->>>
->>>
->>> I think we need to include the SKU name in the filename and compatible
->>> value
->>> below, or at least plan out that for other SKUs, we'll add the SKU name
->>> on.
->>>
->>>
->>>> +/ {
->>>> +       model = "Google Big";
->>>> +       compatible = "google,nyan-big", "nvidia,tegra124";
->>>
->>>
->>>
->>> I think it'd be more user-friendly if the filename and compatible value
->>> more
->>> obviously tied to the end-user-visible product name.
->>
->>
->> We didn't prefix the reference platform on the very first one we
->> shipped (snow), but for the peach platforms we used peach-pit and
->> peach-pi. Those had different SoCs inside (albeit very similar ones),
->> so there was a reason for separate DTS files.
->>
->> Here, we should probably prefix with nyan (so tegra124-nyan-big.dts).
->> Users have shown themselves to be quite happy to use the internal
->> names, they also tend to be less confusing (since we can't rely on the
->> vendor to rename the product when the internals change, so we would
->> need a separate namespace anyway).
->
->
-> I can see that the vendor might change the internals without changing the
-> product name. That kind of thing happens too frequently across all kinds of
-> products. So, there are certainly disadvantages using consumer marketing
-> names here.
->
-> Presumably though the name "big" would no longer apply to any modified HW?
-> Hence, I can't understand the need to say "nyan-big" rather than just "big".
-> Is "nyan-" really needed to fully qualify the name? Also, the board isn't a
-> Nyan, albeit the design may have been strongly derived from the reference
-> board named Nyan.
+On Wed, 13 Aug 2014, Kees Cook wrote:
 
-it's more about partitioning the namespace and showing similarities
-(nyan-big and nyan-foo might be able to share a common dtsi for most
-of the platform, for example).
+> This is a series of patches to support CONFIG_RODATA on ARM, so that
+> the kernel text is RO, and non-text sections default to NX. To support
+> on-the-fly kernel text patching (via ftrace, kprobes, etc), fixmap
+> support has been finalized based on several versions of various patches
+> that are floating around on the mailing list. This series attempts to
+> include the least intrusive version, so that others can build on it for
+> future fixmap work.
+> 
+> The series has been heavily tested, and appears to be working correctly:
+> 
+> With CONFIG_ARM_PTDUMP, expected page table permissions are seen in
+> /sys/kernel/debug/kernel_page_tables.
+> 
+> Using CONFIG_LKDTM, the kernel now correctly detects bad accesses for
+> for the following lkdtm tests via /sys/kernel/debug/provoke-crash/DIRECT:
+>         EXEC_DATA
+>         WRITE_RO
+>         WRITE_KERN
+> 
+> ftrace works:
+>         CONFIG_FTRACE_STARTUP_TEST passes
+>         Enabling tracing works:
+>                 echo function > /sys/kernel/debug/tracing/current_tracer
+> 
+> kprobes works:
+>         CONFIG_ARM_KPROBES_TEST passes
+> 
+> kexec works:
+>         kexec will load and start a new kernel
+> 
+> Built with and without CONFIG_HIGHMEM, CONFIG_HIGHMEM_DEBUG, and
+> CONFIG_NR_CPUS=32.
+> 
+> Thanks to everyone who has been testing this series and working on its
+> various pieces!
 
-See https://chromium.googlesource.com/chromiumos/third_party/kernel-next/+/chromeos-3.10/arch/arm/boot/dts/
-for how it's done in the product tree (some of those bindings are of
-course divergent from upstream, so it's more about the file structure
-in this case).
+For the whole series:
 
-It's a model that's working pretty well for us w.r.t
-sharing/inheriting/expanding dts contents. If you have a better idea
-we'd be willing to consider it, of course.
+Acked-by: Nicolas Pitre <nico@linaro.org>
 
 
--Olof
+
+> 
+> -Kees
+> 
+> v4:
+> - expanded fixmap to 3MB to support 32 CPUs (robh)
+> - corrected pmd-finding via vaddr instead of FIXMAP_START (robh)
+> - switched structure size test to BUILD_BUG_ON (sboyd)
+> - added locking annotations to keep sparse happy (sboyd)
+> - adding missing "static" declarations noticed by sparse
+> - reorganized fixmap portion of patches
+> 
+> v3:
+> - more cleanups in switch to generic fixmap (lauraa, robh)
+> - fixed kexec merge hunk glitch (will.deacon)
+> - added tested-by tags where appropriate from v2 testing
+> 
+> v2:
+> - fix typo in kexec merge (buildbot)
+> - flip index order for highmem pte access (lauraa)
+> - added kgdb updates (dianders)
+> 
+> 
