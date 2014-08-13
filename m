@@ -1,7 +1,7 @@
 From: michal.simek@xilinx.com (Michal Simek)
-Date: Wed, 13 Aug 2014 13:53:42 +0200
-Subject: [PATCH 1/2] tty: serial: xuartps: Remove .owner field for driver
-Message-ID: <54c1e2bd13d6a6e679e1481818d6e068d352ba18.1407930818.git.michal.simek@xilinx.com>
+Date: Wed, 13 Aug 2014 13:54:22 +0200
+Subject: [PATCH] net: xilinx: Remove .owner field for driver
+Message-ID: <a63aa03f310bb32779833fc905579458a34be6ce.1407930852.git.michal.simek@xilinx.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -17,21 +17,47 @@ platform_driver_register anyway."
 Signed-off-by: Michal Simek <michal.simek@xilinx.com>
 ---
 
- drivers/tty/serial/xilinx_uartps.c | 1 -
- 1 file changed, 1 deletion(-)
+ drivers/net/ethernet/xilinx/ll_temac_main.c       | 1 -
+ drivers/net/ethernet/xilinx/xilinx_axienet_main.c | 1 -
+ drivers/net/ethernet/xilinx/xilinx_emaclite.c     | 1 -
+ 3 files changed, 3 deletions(-)
 
-diff --git a/drivers/tty/serial/xilinx_uartps.c b/drivers/tty/serial/xilinx_uartps.c
-index 01951d27cc03..c3c252db8b61 100644
---- a/drivers/tty/serial/xilinx_uartps.c
-+++ b/drivers/tty/serial/xilinx_uartps.c
-@@ -1428,7 +1428,6 @@ static struct platform_driver cdns_uart_platform_driver = {
- 	.probe   = cdns_uart_probe,
- 	.remove  = cdns_uart_remove,
- 	.driver  = {
+diff --git a/drivers/net/ethernet/xilinx/ll_temac_main.c b/drivers/net/ethernet/xilinx/ll_temac_main.c
+index 8a6e5c2d6f95..b58442fd15fa 100644
+--- a/drivers/net/ethernet/xilinx/ll_temac_main.c
++++ b/drivers/net/ethernet/xilinx/ll_temac_main.c
+@@ -1171,7 +1171,6 @@ static struct platform_driver temac_of_driver = {
+ 	.probe = temac_of_probe,
+ 	.remove = temac_of_remove,
+ 	.driver = {
 -		.owner = THIS_MODULE,
- 		.name = CDNS_UART_NAME,
- 		.of_match_table = cdns_uart_of_match,
- 		.pm = &cdns_uart_dev_pm_ops,
+ 		.name = "xilinx_temac",
+ 		.of_match_table = temac_of_match,
+ 	},
+diff --git a/drivers/net/ethernet/xilinx/xilinx_axienet_main.c b/drivers/net/ethernet/xilinx/xilinx_axienet_main.c
+index 7b0a73556264..30f133046914 100644
+--- a/drivers/net/ethernet/xilinx/xilinx_axienet_main.c
++++ b/drivers/net/ethernet/xilinx/xilinx_axienet_main.c
+@@ -1646,7 +1646,6 @@ static struct platform_driver axienet_of_driver = {
+ 	.probe = axienet_of_probe,
+ 	.remove = axienet_of_remove,
+ 	.driver = {
+-		 .owner = THIS_MODULE,
+ 		 .name = "xilinx_axienet",
+ 		 .of_match_table = axienet_of_match,
+ 	},
+diff --git a/drivers/net/ethernet/xilinx/xilinx_emaclite.c b/drivers/net/ethernet/xilinx/xilinx_emaclite.c
+index 782bb9373cd8..28dbbdc393eb 100644
+--- a/drivers/net/ethernet/xilinx/xilinx_emaclite.c
++++ b/drivers/net/ethernet/xilinx/xilinx_emaclite.c
+@@ -1245,7 +1245,6 @@ MODULE_DEVICE_TABLE(of, xemaclite_of_match);
+ static struct platform_driver xemaclite_of_driver = {
+ 	.driver = {
+ 		.name = DRIVER_NAME,
+-		.owner = THIS_MODULE,
+ 		.of_match_table = xemaclite_of_match,
+ 	},
+ 	.probe		= xemaclite_of_probe,
 --
 1.8.2.3
 
@@ -41,4 +67,4 @@ Name: not available
 Type: application/pgp-signature
 Size: 198 bytes
 Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140813/e9e0b5d7/attachment.sig>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140813/ac021da7/attachment.sig>
