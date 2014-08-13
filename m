@@ -1,92 +1,82 @@
-From: christoffer.dall@linaro.org (Christoffer Dall)
-Date: Wed, 13 Aug 2014 13:33:00 +0200
-Subject: [PATCH v4] arm64: fix VTTBR_BADDR_MASK
-In-Reply-To: <20140812160521.GO10550@cbox>
-References: <20140811203823.2828.36074.stgit@joelaarch64.amd.com>
- <20140812160521.GO10550@cbox>
-Message-ID: <20140813113300.GA25475@cbox>
+From: guodong.xu@linaro.org (Guodong Xu)
+Date: Wed, 13 Aug 2014 19:33:37 +0800
+Subject: [PATCH v5 0/7] Add MFD and regulator drivers for Hi6421 PMIC SoC
+Message-ID: <1407929624-8737-1-git-send-email-guodong.xu@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Aug 12, 2014 at 06:05:21PM +0200, Christoffer Dall wrote:
-> On Mon, Aug 11, 2014 at 03:38:23PM -0500, Joel Schopp wrote:
-> > The current VTTBR_BADDR_MASK only masks 39 bits, which is broken on current
-> > systems.  Rather than just add a bit it seems like a good time to also set
-> > things at run-time instead of compile time to accomodate more hardware.
-> > 
-> > This patch sets TCR_EL2.PS, VTCR_EL2.T0SZ and vttbr_baddr_mask in runtime,
-> > not compile time.
-> > 
-> > In ARMv8, EL2 physical address size (TCR_EL2.PS) and stage2 input address
-> > size (VTCR_EL2.T0SZE) cannot be determined in compile time since they
-> > depend on hardware capability.
-> > 
-> > According to Table D4-23 and Table D4-25 in ARM DDI 0487A.b document,
-> > vttbr_x is calculated using different fixed values with consideration
-> > of T0SZ, granule size and the level of translation tables. Therefore,
-> > vttbr_baddr_mask should be determined dynamically.
-> > 
-> > Changes since v3:
-> > Another rebase
-> > Addressed minor comments from v2
-> > 
-> > Changes since v2:
-> > Rebased on https://git.kernel.org/pub/scm/linux/kernel/git/kvmarm/kvmarm.git next branch
-> > 
-> > Changes since v1:
-> > Rebased fix on Jungseok Lee's patch https://lkml.org/lkml/2014/5/12/189 to
-> > provide better long term fix.  Updated that patch to log error instead of
-> > silently fail on unaligned vttbr.
-> > 
-> > Cc: Christoffer Dall <christoffer.dall@linaro.org>
-> > Cc: Sungjinn Chung <sungjinn.chung@samsung.com>
-> > Signed-off-by: Jungseok Lee <jays.lee@samsung.com>
-> > Signed-off-by: Joel Schopp <joel.schopp@amd.com>
-> > ---
-> >  arch/arm/kvm/arm.c               |  116 +++++++++++++++++++++++++++++++++++++-
-> >  arch/arm64/include/asm/kvm_arm.h |   17 +-----
-> >  arch/arm64/kvm/hyp-init.S        |   20 +++++--
-> >  3 files changed, 131 insertions(+), 22 deletions(-)
-> > 
-> > diff --git a/arch/arm/kvm/arm.c b/arch/arm/kvm/arm.c
-> > index 3c82b37..b4859fa 100644
-> > --- a/arch/arm/kvm/arm.c
-> > +++ b/arch/arm/kvm/arm.c
-> > @@ -37,6 +37,7 @@
-> >  #include <asm/mman.h>
-> >  #include <asm/tlbflush.h>
-> >  #include <asm/cacheflush.h>
-> > +#include <asm/cputype.h>
-> >  #include <asm/virt.h>
-> >  #include <asm/kvm_arm.h>
-> >  #include <asm/kvm_asm.h>
-> > @@ -61,6 +62,8 @@ static atomic64_t kvm_vmid_gen = ATOMIC64_INIT(1);
-> >  static u8 kvm_next_vmid;
-> >  static DEFINE_SPINLOCK(kvm_vmid_lock);
-> >  
-> > +static u64 vttbr_baddr_mask;
-> > +
-> >  static bool vgic_present;
-> >  
-> >  static void kvm_arm_set_running_vcpu(struct kvm_vcpu *vcpu)
-> > @@ -412,6 +415,103 @@ static bool need_new_vmid_gen(struct kvm *kvm)
-> >  	return unlikely(kvm->arch.vmid_gen != atomic64_read(&kvm_vmid_gen));
-> >  }
-> >  
-> > +
-> > +
-> > +	/*
-> > +	 * ARMv8 64K architecture limitations:
-> > +	 * 16 <= T0SZ <= 21 is valid under 3 level of translation tables
-> > +	 * 18 <= T0SZ <= 34 is valid under 2 level of translation tables
-> > +	 * 31 <= T0SZ <= 39 is valid under 1 level of transltaion tables
-> > +	 *
-> > +	 * ARMv8 4K architecture limitations:
-> > +	 * 16 <= T0SZ <= 24 is valid under 4 level of translation tables
-> > +	 * 21 <= T0SZ <= 30 is valid under 3 level of translation tables
-> 
-> this is still wrong, as I pointed out, it should be 21 <= T0SZ <= 30
-> 
-typo: I meant: 21 <= T0SZ <= 33
+This patchset adds an MFD core driver and a regulator driver for Hi6421 PMIC
+SoC.
 
--Christoffer
+Hi6421 is a PMIC SoC designed and manufactured by HiSilicon Ltd. It includes
+multi-functions, such as regulators, codec, ADCs, Coulomb counter, etc.
+Hi6421 can be used in various Hi3620 SoC based boards. Registers in Hi6421 are
+memory bus mapped, so in this design they are accessed by regmap-mmio APIs.
+
+Hi6421 has a requirement to keep a guard delay between its regulator's
+disable and next enable. Implement this requirement in regulator core,
+per Mark Brown's suggestion.
+
+---
+changes in v5:
+ * rename _regulator_delay to _regulator_enable_delay
+ * clean up hi6421_regulator_enable(), add 100us protective gap into
+     regulator_desc's .enable_time
+ * code clean up, fixes for style checking
+changes in v4:
+ * regulator: core:
+  - add const qualifier to ops in struct regulator_desc
+  - factor out _regulator_delay from _regulator_do_enable
+  - add guard delay between calling regulator_disable and _enable
+ * hi6421 regulator:
+  - bug fix: missing min_uV for linear regualtor BUCK0~2
+  - bug fix: wrong volt values in buck_3_voltages table
+  - add const to hi6421 regulator_ops
+  - use ldo_linear and ldo_linear_range in applicable LDOs.
+  - rename regulator-name to conform to names in board schematics.
+changes in v3:
+ * hi6421: regulator: remove setting of constraints on board-specific
+     capabilities
+ * delete unecessary compatible property "hisilicon,hi6421-regulators"
+ * change regulator enable/disable callback APIs to support protection
+gaps, as
+     required by hi6421 spec
+ * split regulator set_mode/get_mode callback APIs to LDOs and BUCKs
+ * delete hi6421.dtsi, mfd and regulator nodes are now in board config .dts
+changes in v2:
+ * use MFD APIs to manage sub-devices of Hi6421
+ * use regmap-mmio for register access
+ * use only generic regulator device tree property
+ * rewrite regulator driver using helper APIs from both regulator and regmap
+v1: first drop
+
+Guodong Xu (7):
+  regulator: core: add const qualifier to ops in struct regulator_desc
+  regulator: core: factor out delay function from _regulator_do_enable
+  regulator: core: add guard delay between calling regulator_disable and
+    _enable
+  mfd: Add hi6421 PMIC core driver
+  regulator: add driver for hi6421 voltage regulator
+  ARM: dts: hi3620-hi4511: Add HI6421 MFD and regulator nodes
+  ARM: hi3xxx_defconfig: Enable HI6421 MFD and Regulators
+
+ Documentation/devicetree/bindings/mfd/hi6421.txt |  37 ++
+ arch/arm/boot/dts/hi3620-hi4511.dts              | 233 ++++++++
+ arch/arm/configs/hi3xxx_defconfig                |   3 +
+ drivers/mfd/Kconfig                              |  13 +
+ drivers/mfd/Makefile                             |   1 +
+ drivers/mfd/hi6421-pmic-core.c                   | 119 ++++
+ drivers/regulator/Kconfig                        |  10 +
+ drivers/regulator/Makefile                       |   1 +
+ drivers/regulator/core.c                         | 129 +++--
+ drivers/regulator/hi6421-regulator.c             | 657 +++++++++++++++++++++++
+ include/linux/mfd/hi6421-pmic.h                  |  39 ++
+ include/linux/regulator/driver.h                 |   8 +-
+ 12 files changed, 1203 insertions(+), 47 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/mfd/hi6421.txt
+ create mode 100644 drivers/mfd/hi6421-pmic-core.c
+ create mode 100644 drivers/regulator/hi6421-regulator.c
+ create mode 100644 include/linux/mfd/hi6421-pmic.h
+
+-- 
+1.9.1
