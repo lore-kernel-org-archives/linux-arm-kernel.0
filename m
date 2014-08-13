@@ -1,105 +1,66 @@
 From: libv@skynet.be (Luc Verhaegen)
-Date: Wed, 13 Aug 2014 09:17:18 +0200
-Subject: [PATCH 3/4] simplefb: disable dt node upon remove
+Date: Wed, 13 Aug 2014 09:17:17 +0200
+Subject: [PATCH 2/4] simplefb: add goto error path to probe
 In-Reply-To: <1407914239-12054-1-git-send-email-libv@skynet.be>
 References: <1407914239-12054-1-git-send-email-libv@skynet.be>
-Message-ID: <1407914239-12054-4-git-send-email-libv@skynet.be>
+Message-ID: <1407914239-12054-3-git-send-email-libv@skynet.be>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The next commit will handle clocks correctly, so that these do not get
-automatically disabled on certain SoC simplefb implementations. As a
-result, the removal of this simplefb driver, and the release of the
-clocks, is rather final, and only a full display driver can work after
-this. So, it makes sense to also flag the dt node as disabled, even
-though it has no real value today.
-
 Signed-off-by: Luc Verhaegen <libv@skynet.be>
 ---
- drivers/video/fbdev/simplefb.c |   43 ++++++++++++++++++++++++++++++++++++---
- 1 files changed, 39 insertions(+), 4 deletions(-)
+ drivers/video/fbdev/simplefb.c |   20 +++++++++++++-------
+ 1 files changed, 13 insertions(+), 7 deletions(-)
 
 diff --git a/drivers/video/fbdev/simplefb.c b/drivers/video/fbdev/simplefb.c
-index 72a4f20..74c4b2a 100644
+index 32be590..72a4f20 100644
 --- a/drivers/video/fbdev/simplefb.c
 +++ b/drivers/video/fbdev/simplefb.c
-@@ -138,6 +138,32 @@ static int simplefb_parse_dt(struct platform_device *pdev,
- 	return 0;
- }
+@@ -220,8 +220,8 @@ static int simplefb_probe(struct platform_device *pdev)
  
-+/*
-+ * Make sure that nothing tries to inadvertedly re-use this node...
-+ */
-+static int
-+simplefb_dt_disable(struct platform_device *pdev)
-+{
-+	struct device_node *np = pdev->dev.of_node;
-+	struct property *property;
-+	int ret;
-+
-+	property = kzalloc(sizeof(struct property), GFP_KERNEL);
-+	if (!property)
-+		return -ENOMEM;
-+
-+	property->name = "status";
-+	property->value = "disabled";
-+	property->length = strlen(property->value) + 1;
-+
-+	ret = of_update_property(np, property);
-+	if (ret)
-+		dev_err(&pdev->dev, "%s: failed to update property: %d\n",
-+			__func__, ret);
-+
-+	return ret;
-+}
-+
- static int simplefb_parse_pd(struct platform_device *pdev,
- 			     struct simplefb_params *params)
- {
-@@ -187,17 +213,20 @@ static int simplefb_probe(struct platform_device *pdev)
- 		ret = simplefb_parse_dt(pdev, &params);
+ 	info->apertures = alloc_apertures(1);
+ 	if (!info->apertures) {
+-		framebuffer_release(info);
+-		return -ENOMEM;
++		ret = -ENOMEM;
++		goto error_fb_release;
+ 	}
+ 	info->apertures->ranges[0].base = info->fix.smem_start;
+ 	info->apertures->ranges[0].size = info->fix.smem_len;
+@@ -231,8 +231,8 @@ static int simplefb_probe(struct platform_device *pdev)
+ 	info->screen_base = ioremap_wc(info->fix.smem_start,
+ 				       info->fix.smem_len);
+ 	if (!info->screen_base) {
+-		framebuffer_release(info);
+-		return -ENODEV;
++		ret = -ENODEV;
++		goto error_fb_release;
+ 	}
+ 	info->pseudo_palette = (void *) par->palette;
  
- 	if (ret)
+@@ -247,14 +247,20 @@ static int simplefb_probe(struct platform_device *pdev)
+ 	ret = register_framebuffer(info);
+ 	if (ret < 0) {
+ 		dev_err(&pdev->dev, "Unable to register simplefb: %d\n", ret);
+-		iounmap(info->screen_base);
+-		framebuffer_release(info);
 -		return ret;
-+		goto error_dt_disable;
- 
- 	mem = platform_get_resource(pdev, IORESOURCE_MEM, 0);
- 	if (!mem) {
- 		dev_err(&pdev->dev, "No memory resource\n");
--		return -EINVAL;
-+		ret = -EINVAL;
-+		goto error_dt_disable;
++		goto error_unmap;
  	}
  
- 	info = framebuffer_alloc(sizeof(struct simplefb_par), &pdev->dev);
--	if (!info)
--		return -ENOMEM;
-+	if (!info) {
-+		ret = -ENOMEM;
-+		goto error_dt_disable;
-+	}
- 	platform_set_drvdata(pdev, info);
- 
- 	par = info->par;
-@@ -260,6 +289,10 @@ static int simplefb_probe(struct platform_device *pdev)
-  error_fb_release:
- 	framebuffer_release(info);
- 
-+ error_dt_disable:
-+	if (!dev_get_platdata(&pdev->dev) && pdev->dev.of_node)
-+		simplefb_dt_disable(pdev);
-+
- 	return ret;
- }
- 
-@@ -269,6 +302,8 @@ static int simplefb_remove(struct platform_device *pdev)
- 
- 	unregister_framebuffer(info);
- 	framebuffer_release(info);
-+	if (!dev_get_platdata(&pdev->dev) && pdev->dev.of_node)
-+		simplefb_dt_disable(pdev);
+ 	dev_info(&pdev->dev, "fb%d: simplefb registered!\n", info->node);
  
  	return 0;
++
++ error_unmap:
++	iounmap(info->screen_base);
++
++ error_fb_release:
++	framebuffer_release(info);
++
++	return ret;
  }
+ 
+ static int simplefb_remove(struct platform_device *pdev)
 -- 
 1.7.7
