@@ -1,58 +1,30 @@
-From: Mattis.Lorentzon@autoliv.com (Mattis Lorentzon)
-Date: Wed, 13 Aug 2014 13:39:27 +0000
-Subject: Oops: 17 SMP ARM (v3.16-rc2)
-In-Reply-To: <CAOMZO5B8GR+ABBoJ=dJcFqw3Wagfaip7HM+C1FTz+aE4CmqiPw@mail.gmail.com>
-References: <20140626151424.GT32514@n2100.arm.linux.org.uk>
- <20140627112151.GF32514@n2100.arm.linux.org.uk>
- <3FFB61A7A8473C49831AF20FA193534A43CADFA7@ALVA-EXMB01.alv.autoliv.int>
- <20140627163108.GP32514@n2100.arm.linux.org.uk>
- <C4A61A5CA4AD2246942F4BA6F20ACB8043575072@ALVA-EXMB04.alv.autoliv.int>
- <20140806095012.GN30282@n2100.arm.linux.org.uk>
- <C4A61A5CA4AD2246942F4BA6F20ACB8043575172@ALVA-EXMB04.alv.autoliv.int>
- <20140806125550.GO30282@n2100.arm.linux.org.uk>
- <C4A61A5CA4AD2246942F4BA6F20ACB804357526C@ALVA-EXMB04.alv.autoliv.int>
- <20140807121248.GY30282@n2100.arm.linux.org.uk>
- <20140808180900.GG30282@n2100.arm.linux.org.uk>
- <C4A61A5CA4AD2246942F4BA6F20ACB8043576356@ALVA-EXMB04.alv.autoliv.int>
- <CAOMZO5B8GR+ABBoJ=dJcFqw3Wagfaip7HM+C1FTz+aE4CmqiPw@mail.gmail.com>
-Message-ID: <C4A61A5CA4AD2246942F4BA6F20ACB80435774FD@ALVA-EXMB04.alv.autoliv.int>
+From: LW@KARO-electronics.de (=?UTF-8?q?Lothar=20Wa=C3=9Fmann?=)
+Date: Wed, 13 Aug 2014 15:47:47 +0200
+Subject: [PATCH BUGFIX] ARM: dts: i.MX53: fix apparent bug in VPU clks
+Message-ID: <1407937667-26678-1-git-send-email-LW@KARO-electronics.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Fabio and Russell,
+The VPU on i.MX53 has two distinct clocks for register access and
+internal function.
 
-> In order to try to narrow down whether this is a board issue, could you try to
-> run the same kernel on a mx6q development board, such as mx6qsabresd,
-> cubox-i, wandboard, etc?
+Signed-off-by: Lothar Wa?mann <LW@KARO-electronics.de>
+---
+ arch/arm/boot/dts/imx53.dtsi |    2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-Indeed, we have a Sabrelite development board and have run the same kernel
-configuration (please find attached). Russells 30 FEC related patches are applied.
-We have also tried with and without the extended interrupts entry in the DT.
-
-All our tests seem to behave the same way on the Sabrelite as on our own board.
-A working theory is that the switch (3Com Switch 4400) triggers the degeneration
-of the network stack from which Linux does not seem to recover, even if we later
-bypass the switch and directly connect the board to the server machine.
-
-Since the problem is stochastic in nature we are not completely sure if we can
-trigger the problem without the switch. It's the switch that allows us to run many
-cards simultaneously and thus trigger the problem more easily. :-)
-
-What are your thoughts?
-
-Best regards,
-Mattis Lorentzon
-
-***************************************************************
-Consider the environment before printing this message.
-
-To read Autoliv's Information and Confidentiality Notice, follow this link:
-http://www.autoliv.com/disclaimer.html
-***************************************************************
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: config.gz
-Type: application/x-gzip
-Size: 14775 bytes
-Desc: config.gz
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140813/f7f2884e/attachment.bin>
+diff --git a/arch/arm/boot/dts/imx53.dtsi b/arch/arm/boot/dts/imx53.dtsi
+index 6456a00..87f902d 100644
+--- a/arch/arm/boot/dts/imx53.dtsi
++++ b/arch/arm/boot/dts/imx53.dtsi
+@@ -724,7 +724,7 @@
+ 				compatible = "fsl,imx53-vpu";
+ 				reg = <0x63ff4000 0x1000>;
+ 				interrupts = <9>;
+-				clocks = <&clks IMX5_CLK_VPU_GATE>,
++				clocks = <&clks IMX5_CLK_VPU_REFERENCE_GATE>,
+ 				         <&clks IMX5_CLK_VPU_GATE>;
+ 				clock-names = "per", "ahb";
+ 				resets = <&src 1>;
+-- 
+1.7.10.4
