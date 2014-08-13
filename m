@@ -1,43 +1,41 @@
 From: srv_yingjoe.chen@mediatek.com (Joe.C)
-Date: Wed, 13 Aug 2014 10:11:24 +0800
-Subject: [RESEND PATCH v2 4/4] dt-bindings: add bindings for mediatek intpol
-In-Reply-To: <1407895884-18131-1-git-send-email-srv_yingjoe.chen@mediatek.com>
-References: <1407895884-18131-1-git-send-email-srv_yingjoe.chen@mediatek.com>
-Message-ID: <1407895884-18131-5-git-send-email-srv_yingjoe.chen@mediatek.com>
+Date: Wed, 13 Aug 2014 10:11:20 +0800
+Subject: [RESEND PATCH v2 0/4] arm: mediatek: Add support for GIC interrupt
+ polarity extension.
+Message-ID: <1407895884-18131-1-git-send-email-srv_yingjoe.chen@mediatek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: "Joe.C" <yingjoe.chen@mediatek.com>
+[Sorry, resend to include all maintainers.]
 
-Add binding documentation for Mediatek SoC GIC interrupt polarity extension.
+This series add support for mediatek GIC interrupt polarity extension.
+Several components in mediatek SoC have low level triggered interrupt and
+require this support.
 
-Signed-off-by: Joe.C <yingjoe.chen@mediatek.com>
----
- .../bindings/interrupt-controller/mediatek,intpol.txt    | 16 ++++++++++++++++
- 1 file changed, 16 insertions(+)
+This also correct 6589 timer irq polarity. Previous version works because
+6589 boot loader already set correct polarity for timer interrupt.
+
+The patch set is based on Matthias's Mediatek basic support for v3.17 [1].
+
+v2:
+- Make mt6589.dtsi changes as a separate commit as Matthias suggest.
+
+[1] http://lists.infradead.org/pipermail/linux-arm-kernel/2014-July/272561.html
+
+Joe.C (4):
+  irqchip: gic: Change irq type check when extension is
+  arm: mediatek: Add support for GIC interrupt polarity
+  arm: mediatek: Add intpol in mt6589.dtsi
+  dt-bindings: add bindings for mediatek intpol
+
+ Documentation/devicetree/bindings/interrupt-controller/mediatek,intpol.txt |   16 ++
+ arch/arm/boot/dts/mt6589.dtsi                                              |    7 -
+ arch/arm/mach-mediatek/Makefile                                            |    2
+ arch/arm/mach-mediatek/common.h                                            |   19 +++
+ arch/arm/mach-mediatek/intpol.c                                            |   61 ++++++++++
+ arch/arm/mach-mediatek/mediatek.c                                          |   10 +
+ drivers/irqchip/irq-gic.c                                                  |   27 ++--
+ 7 files changed, 131 insertions(+), 11 deletions(-)
  create mode 100644 Documentation/devicetree/bindings/interrupt-controller/mediatek,intpol.txt
-
-diff --git a/Documentation/devicetree/bindings/interrupt-controller/mediatek,intpol.txt b/Documentation/devicetree/bindings/interrupt-controller/mediatek,intpol.txt
-new file mode 100644
-index 0000000..16ea372
---- /dev/null
-+++ b/Documentation/devicetree/bindings/interrupt-controller/mediatek,intpol.txt
-@@ -0,0 +1,16 @@
-+Mediatek 65xx/81xx GIC interrupt polarity extension
-+
-+Mediatek SOCs contain controllable inverter for each GIC SPI interrupt,
-+these can be used as GIC interrupt polarity extension.
-+
-+Required properties:
-+- compatible: Compatible property value should be "mediatek,mt6577-intpol"
-+
-+- reg: Physical base address of the int pol registers and length of memory
-+  mapped region.
-+
-+Example:
-+       intpol: intpol at 10200100 {
-+               compatible = "mediatek,mt6577-intpol";
-+               reg = <0x10200100 0x1c>;
-+       };
--- 
-1.8.1.1.dirty
+ create mode 100644 arch/arm/mach-mediatek/common.h
+ create mode 100644 arch/arm/mach-mediatek/intpol.c
