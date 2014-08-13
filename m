@@ -1,216 +1,166 @@
-From: u.kleine-koenig@pengutronix.de (=?UTF-8?q?Uwe=20Kleine-K=C3=B6nig?=)
-Date: Wed, 13 Aug 2014 17:44:16 +0200
-Subject: [PATCH v3] mmc: implement Driver Stage Register handling
-Message-ID: <1407944656-14592-1-git-send-email-u.kleine-koenig@pengutronix.de>
+From: nicolas.pitre@linaro.org (Nicolas Pitre)
+Date: Wed, 13 Aug 2014 11:44:48 -0400 (EDT)
+Subject: [PATCH v4] irqchip: gic: Allow gic_arch_extn hooks to call into
+ scheduler
+In-Reply-To: <1407938238-21413-1-git-send-email-sboyd@codeaurora.org>
+References: <1407938238-21413-1-git-send-email-sboyd@codeaurora.org>
+Message-ID: <alpine.LFD.2.11.1408131139400.1133@knanqh.ubzr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Sascha Hauer <s.hauer@pengutronix.de>
+On Wed, 13 Aug 2014, Stephen Boyd wrote:
 
-Some (e)MMC and SD cards implement a DSR register that allows to tune
-raise/fall times and drive strength of the CMD and DATA outputs.
-The values to use depend on the card in use and the host.
-It might be needed to reduce the drive strength to prevent voltage peaks
-above the host's specification.
+> Commit 1a6b69b6548c (ARM: gic: add CPU migration support,
+> 2012-04-12) introduced an acquisition of the irq_controller_lock
+> in gic_raise_softirq() which can lead to a spinlock recursion if
+> the gic_arch_extn hooks call into the scheduler (via complete()
+> or wake_up(), etc.). This happens because gic_arch_extn hooks are
+> normally called with the irq_controller_lock held and calling
+> into the scheduler may cause us to call smp_send_reschedule()
+> which will grab the irq_controller_lock again. Here's an example
+> from a vendor kernel (note that the gic_arch_extn hook code here
+> isn't actually in mainline):
+> 
+> BUG: spinlock recursion on CPU#0, swapper/0/1
+>  lock: irq_controller_lock+0x0/0x18, .magic: dead4ead, .owner: sw
+> er_cpu: 0
+> CPU: 0 PID: 1 Comm: swapper/0 Not tainted 3.14.10-00430-g3d433c4e
+> 
+> Call trace:
+> [<ffffffc000087e1c>] dump_backtrace+0x0/0x140
+> [<ffffffc000087f6c>] show_stack+0x10/0x1c
+> [<ffffffc00064732c>] dump_stack+0x74/0xc4
+> [<ffffffc0006446c0>] spin_dump+0x78/0x88
+> [<ffffffc0006446f4>] spin_bug+0x24/0x34
+> [<ffffffc0000d47d0>] do_raw_spin_lock+0x58/0x148
+> [<ffffffc00064d398>] _raw_spin_lock_irqsave+0x24/0x38
+> [<ffffffc0002c9d7c>] gic_raise_softirq+0x2c/0xbc
+> [<ffffffc00008daa4>] smp_send_reschedule+0x34/0x40
+> [<ffffffc0000c1e94>] try_to_wake_up+0x224/0x288
+> [<ffffffc0000c1f4c>] default_wake_function+0xc/0x18
+> [<ffffffc0000ceef0>] __wake_up_common+0x50/0x8c
+> [<ffffffc0000cef3c>] __wake_up_locked+0x10/0x1c
+> [<ffffffc0000cf734>] complete+0x3c/0x5c
+> [<ffffffc0002f0e78>] msm_mpm_enable_irq_exclusive+0x1b8/0x1c8
+> [<ffffffc0002f0f58>] __msm_mpm_enable_irq+0x4c/0x7c
+> [<ffffffc0002f0f94>] msm_mpm_enable_irq+0xc/0x18
+> [<ffffffc0002c9bb0>] gic_unmask_irq+0x40/0x7c
+> [<ffffffc0000de5f4>] irq_enable+0x2c/0x48
+> [<ffffffc0000de65c>] irq_startup+0x4c/0x74
+> [<ffffffc0000dd2fc>] __setup_irq+0x264/0x3f0
+> [<ffffffc0000dd5e0>] request_threaded_irq+0xcc/0x11c
+> [<ffffffc0000df254>] devm_request_threaded_irq+0x68/0xb4
+> [<ffffffc000471520>] msm_iommu_ctx_probe+0x124/0x2d4
+> [<ffffffc000337374>] platform_drv_probe+0x20/0x54
+> [<ffffffc00033598c>] driver_probe_device+0x158/0x340
+> [<ffffffc000335c20>] __driver_attach+0x60/0x90
+> [<ffffffc000333c9c>] bus_for_each_dev+0x6c/0x8c
+> [<ffffffc000335304>] driver_attach+0x1c/0x28
+> [<ffffffc000334f14>] bus_add_driver+0x120/0x204
+> [<ffffffc0003362e4>] driver_register+0xbc/0x10c
+> [<ffffffc000337348>] __platform_driver_register+0x5c/0x68
+> [<ffffffc00094c478>] msm_iommu_driver_init+0x54/0x7c
+> [<ffffffc0000813ec>] do_one_initcall+0xa4/0x130
+> [<ffffffc00091d928>] kernel_init_freeable+0x138/0x1dc
+> [<ffffffc000642578>] kernel_init+0xc/0xd4
+> 
+> We really just want to synchronize the sending of an SGI with the
+> update of the gic_cpu_map[], so introduce a new SGI lock that we
+> can use to synchronize the two code paths. Three main events are
+> happening that we have to consider:
+> 
+> 	1. We're updating the gic_cpu_mask to point to an
+> 	incoming CPU
+> 
+> 	2. We're (potentially) sending an SGI to the outgoing CPU
+> 
+> 	3. We're redirecting any pending SGIs for the outgoing
+> 	CPU to the incoming CPU.
+> 
+> Events 1 and 3 are already ordered within the same CPU by means
+> of program order and use of I/O accessors. Events 1 and 2 don't
+> need to be ordered, but events 2 and 3 do because any SGIs for
+> the outgoing CPU need to be pending before we can redirect them.
+> Synchronize by acquiring a new lock around event 2 and before
+> event 3. Use smp_mb__after_unlock_lock() before event 3 to ensure
+> that event 1 is seen before event 3 on other CPUs that may be
+> executing event 2. We put this all behind the b.L switcher config
+> option so that if we're not using this feature we don't have to
+> acquire any locks at all in the IPI path.
+> 
+> Cc: Nicolas Pitre <nico@linaro.org>
+> Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
 
-Implement a 'dsr' devicetree property that allows to specify the value
-to set the DSR to. For non-dt setups the new members of mmc_host can be
-set by board code.
+Russell's concerns notwithstanding, this is a worthwhile optimization 
+and cleanup.
 
-This patch was initially authored by Sascha Hauer. It contains
-improvements authored by Markus Niebel and Uwe Kleine-K?nig.
+Reviewed-by: Nicolas Pitre <nico@linaro.org>
 
-Signed-off-by: Sascha Hauer <s.hauer@pengutronix.de>
-Signed-off-by: Markus Niebel <Markus.Niebel@tq-group.com>
-Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
----
-Hello,
+Of course it would be good to clarify things wrt Russell's remark 
+independently from this patch.
 
-earlier incarnations of this patch can be found at
 
-	http://lists.infradead.org/pipermail/linux-arm-kernel/2014-July/272983.html
-	http://lists.infradead.org/pipermail/linux-arm-kernel/2014-May/259281.html
-
-I need this functionallity on a machine where the default driver strength of
-the eMMC chip is too big for the SoC. It seems to work without adapting the
-drive strength, but the vendor reports that the DSR should be set to a certain
-value to prevent poor signal integrity and increased wearout.
-
-Best regards
-Uwe
-
- Documentation/devicetree/bindings/mmc/mmc.txt |  2 ++
- drivers/mmc/core/host.c                       |  8 ++++++++
- drivers/mmc/core/mmc.c                        |  8 ++++++++
- drivers/mmc/core/mmc_ops.c                    | 21 +++++++++++++++++++++
- drivers/mmc/core/mmc_ops.h                    |  1 +
- drivers/mmc/core/sd.c                         |  8 ++++++++
- include/linux/mmc/card.h                      |  3 ++-
- include/linux/mmc/host.h                      |  3 +++
- 8 files changed, 53 insertions(+), 1 deletion(-)
-
-diff --git a/Documentation/devicetree/bindings/mmc/mmc.txt b/Documentation/devicetree/bindings/mmc/mmc.txt
-index 3c18001dfd5d..05bac770b4d0 100644
---- a/Documentation/devicetree/bindings/mmc/mmc.txt
-+++ b/Documentation/devicetree/bindings/mmc/mmc.txt
-@@ -40,6 +40,8 @@ Optional properties:
- - mmc-hs200-1_2v: eMMC HS200 mode(1.2V I/O) is supported
- - mmc-hs400-1_8v: eMMC HS400 mode(1.8V I/O) is supported
- - mmc-hs400-1_2v: eMMC HS400 mode(1.2V I/O) is supported
-+- dsr: Value the card's (optional) Driver Stage Register (DSR) should be
-+  programmed with.
- 
- *NOTE* on CD and WP polarity. To use common for all SD/MMC host controllers line
- polarity properties, we have to fix the meaning of the "normal" and "inverted"
-diff --git a/drivers/mmc/core/host.c b/drivers/mmc/core/host.c
-index 95cceae96944..52e83f389428 100644
---- a/drivers/mmc/core/host.c
-+++ b/drivers/mmc/core/host.c
-@@ -452,6 +452,14 @@ int mmc_of_parse(struct mmc_host *host)
- 	if (of_find_property(np, "mmc-hs400-1_2v", &len))
- 		host->caps2 |= MMC_CAP2_HS400_1_2V | MMC_CAP2_HS200_1_2V_SDR;
- 
-+	if (of_find_property(np, "dsr", &len)) {
-+		u32 tmp;
-+
-+		of_property_read_u32(np, "dsr", &tmp);
-+		host->dsr_req = 1;
-+		host->dsr = (u16)tmp;
-+	}
-+
- 	return 0;
- 
- out:
-diff --git a/drivers/mmc/core/mmc.c b/drivers/mmc/core/mmc.c
-index 793c6f7ddb04..fdc1ac1360c4 100644
---- a/drivers/mmc/core/mmc.c
-+++ b/drivers/mmc/core/mmc.c
-@@ -162,6 +162,7 @@ static int mmc_decode_csd(struct mmc_card *card)
- 	csd->read_partial = UNSTUFF_BITS(resp, 79, 1);
- 	csd->write_misalign = UNSTUFF_BITS(resp, 78, 1);
- 	csd->read_misalign = UNSTUFF_BITS(resp, 77, 1);
-+	csd->dsr_imp = UNSTUFF_BITS(resp, 76, 1);
- 	csd->r2w_factor = UNSTUFF_BITS(resp, 26, 3);
- 	csd->write_blkbits = UNSTUFF_BITS(resp, 22, 4);
- 	csd->write_partial = UNSTUFF_BITS(resp, 21, 1);
-@@ -1273,6 +1274,13 @@ static int mmc_init_card(struct mmc_host *host, u32 ocr,
- 	}
- 
- 	/*
-+	 * handling only for cards supporting DSR and hosts requesting
-+	 * DSR configuration
-+	 */
-+	if (card->csd.dsr_imp && host->dsr_req)
-+		mmc_set_dsr(host);
-+
-+	/*
- 	 * Select card, as all following commands rely on that.
- 	 */
- 	if (!mmc_host_is_spi(host)) {
-diff --git a/drivers/mmc/core/mmc_ops.c b/drivers/mmc/core/mmc_ops.c
-index f51b5ba3bbea..37ed493d8030 100644
---- a/drivers/mmc/core/mmc_ops.c
-+++ b/drivers/mmc/core/mmc_ops.c
-@@ -93,6 +93,27 @@ int mmc_deselect_cards(struct mmc_host *host)
- 	return _mmc_select_card(host, NULL);
- }
- 
-+/*
-+ * Write the value specified in the device tree or board code into the optional
-+ * 16 bit Driver Stage Register. This can be used to tune raise/fall times and
-+ * drive strength of the DAT and CMD outputs. The actual meaning of a given
-+ * value is hardware dependant.
-+ * The presence of the DSR register can be determined from the CSD register,
-+ * bit 76.
-+ */
-+int mmc_set_dsr(struct mmc_host *host)
-+{
-+	int err;
-+	struct mmc_command cmd = {0};
-+
-+	cmd.opcode = MMC_SET_DSR;
-+
-+	cmd.arg = ((u32)host->dsr << 16) | 0xffff;
-+	cmd.flags = MMC_RSP_NONE | MMC_CMD_AC;
-+
-+	return mmc_wait_for_cmd(host, &cmd, MMC_CMD_RETRIES);
-+}
-+
- int mmc_go_idle(struct mmc_host *host)
- {
- 	int err;
-diff --git a/drivers/mmc/core/mmc_ops.h b/drivers/mmc/core/mmc_ops.h
-index 80ae9f4e0293..390dac665b2a 100644
---- a/drivers/mmc/core/mmc_ops.h
-+++ b/drivers/mmc/core/mmc_ops.h
-@@ -14,6 +14,7 @@
- 
- int mmc_select_card(struct mmc_card *card);
- int mmc_deselect_cards(struct mmc_host *host);
-+int mmc_set_dsr(struct mmc_host *host);
- int mmc_go_idle(struct mmc_host *host);
- int mmc_send_op_cond(struct mmc_host *host, u32 ocr, u32 *rocr);
- int mmc_all_send_cid(struct mmc_host *host, u32 *cid);
-diff --git a/drivers/mmc/core/sd.c b/drivers/mmc/core/sd.c
-index 0c44510bf717..25913889cbaa 100644
---- a/drivers/mmc/core/sd.c
-+++ b/drivers/mmc/core/sd.c
-@@ -127,6 +127,7 @@ static int mmc_decode_csd(struct mmc_card *card)
- 		csd->read_partial = UNSTUFF_BITS(resp, 79, 1);
- 		csd->write_misalign = UNSTUFF_BITS(resp, 78, 1);
- 		csd->read_misalign = UNSTUFF_BITS(resp, 77, 1);
-+		csd->dsr_imp = UNSTUFF_BITS(resp, 76, 1);
- 		csd->r2w_factor = UNSTUFF_BITS(resp, 26, 3);
- 		csd->write_blkbits = UNSTUFF_BITS(resp, 22, 4);
- 		csd->write_partial = UNSTUFF_BITS(resp, 21, 1);
-@@ -954,6 +955,13 @@ static int mmc_sd_init_card(struct mmc_host *host, u32 ocr,
- 	}
- 
- 	/*
-+	 * handling only for cards supporting DSR and hosts requesting
-+	 * DSR configuration
-+	 */
-+	if (card->csd.dsr_imp && host->dsr_req)
-+		mmc_set_dsr(host);
-+
-+	/*
- 	 * Select card, as all following commands rely on that.
- 	 */
- 	if (!mmc_host_is_spi(host)) {
-diff --git a/include/linux/mmc/card.h b/include/linux/mmc/card.h
-index d424b9de3aff..680a7f0188bb 100644
---- a/include/linux/mmc/card.h
-+++ b/include/linux/mmc/card.h
-@@ -42,7 +42,8 @@ struct mmc_csd {
- 	unsigned int		read_partial:1,
- 				read_misalign:1,
- 				write_partial:1,
--				write_misalign:1;
-+				write_misalign:1,
-+				dsr_imp:1;
- };
- 
- struct mmc_ext_csd {
-diff --git a/include/linux/mmc/host.h b/include/linux/mmc/host.h
-index 7960424d0bc0..9e9ad7b31bb9 100644
---- a/include/linux/mmc/host.h
-+++ b/include/linux/mmc/host.h
-@@ -319,6 +319,7 @@ struct mmc_host {
- #ifdef CONFIG_MMC_DEBUG
- 	unsigned int		removed:1;	/* host is being removed */
- #endif
-+	unsigned int		dsr_req:1;	/* DSR is requested for Host */
- 
- 	int			rescan_disable;	/* disable card detection */
- 	int			rescan_entered;	/* used with nonremovable devices */
-@@ -365,6 +366,8 @@ struct mmc_host {
- 
- 	unsigned int		slotno;	/* used for sdio acpi binding */
- 
-+	u16			dsr;	/* optional driver stage (dsr) value */
-+
- 	unsigned long		private[0] ____cacheline_aligned;
- };
- 
--- 
-2.0.1
+> ---
+>  drivers/irqchip/irq-gic.c | 23 +++++++++++++++++++++--
+>  1 file changed, 21 insertions(+), 2 deletions(-)
+> 
+> diff --git a/drivers/irqchip/irq-gic.c b/drivers/irqchip/irq-gic.c
+> index 7c131cf7cc13..b9e669cb1c1e 100644
+> --- a/drivers/irqchip/irq-gic.c
+> +++ b/drivers/irqchip/irq-gic.c
+> @@ -81,6 +81,16 @@ static DEFINE_RAW_SPINLOCK(irq_controller_lock);
+>  #define NR_GIC_CPU_IF 8
+>  static u8 gic_cpu_map[NR_GIC_CPU_IF] __read_mostly;
+>  
+> +#ifdef CONFIG_BL_SWITCHER
+> +/* Synchronize switching CPU interface and sending SGIs */
+> +static DEFINE_RAW_SPINLOCK(gic_sgi_lock);
+> +#define sgi_map_lock(flags) raw_spin_lock_irqsave(&gic_sgi_lock, flags)
+> +#define sgi_map_unlock(flags) raw_spin_unlock_irqrestore(&gic_sgi_lock, flags)
+> +#else
+> +#define sgi_map_lock(flags) (void)(flags)
+> +#define sgi_map_unlock(flags) (void)(flags)
+> +#endif
+> +
+>  /*
+>   * Supported arch specific GIC irq extension.
+>   * Default make them NULL.
+> @@ -658,7 +668,7 @@ static void gic_raise_softirq(const struct cpumask *mask, unsigned int irq)
+>  	int cpu;
+>  	unsigned long flags, map = 0;
+>  
+> -	raw_spin_lock_irqsave(&irq_controller_lock, flags);
+> +	sgi_map_lock(flags);
+>  
+>  	/* Convert our logical CPU mask into a physical one. */
+>  	for_each_cpu(cpu, mask)
+> @@ -673,7 +683,7 @@ static void gic_raise_softirq(const struct cpumask *mask, unsigned int irq)
+>  	/* this always happens on GIC0 */
+>  	writel_relaxed(map << 16 | irq, gic_data_dist_base(&gic_data[0]) + GIC_DIST_SOFTINT);
+>  
+> -	raw_spin_unlock_irqrestore(&irq_controller_lock, flags);
+> +	sgi_map_unlock(flags);
+>  }
+>  #endif
+>  
+> @@ -764,6 +774,15 @@ void gic_migrate_target(unsigned int new_cpu_id)
+>  
+>  	raw_spin_unlock(&irq_controller_lock);
+>  
+> +	raw_spin_lock(&gic_sgi_lock);
+> +	/*
+> +	 * Ensure that the gic_cpu_map update above is seen in
+> +	 * gic_raise_softirq() before we redirect any pending SGIs that
+> +	 * may have been raised for the outgoing CPU (cur_cpu_id)
+> +	 */
+> +	smp_mb__after_unlock_lock();
+> +	raw_spin_unlock(&gic_sgi_lock);
+> +
+>  	/*
+>  	 * Now let's migrate and clear any potential SGIs that might be
+>  	 * pending for us (cur_cpu_id).  Since GIC_DIST_SGI_PENDING_SET
+> -- 
+> The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
+> hosted by The Linux Foundation
+> 
+> 
