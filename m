@@ -1,70 +1,128 @@
-From: michal.simek@xilinx.com (Michal Simek)
-Date: Wed, 13 Aug 2014 13:54:22 +0200
-Subject: [PATCH] net: xilinx: Remove .owner field for driver
-Message-ID: <a63aa03f310bb32779833fc905579458a34be6ce.1407930852.git.michal.simek@xilinx.com>
+From: achandran@mvista.com (Arun Chandran)
+Date: Wed, 13 Aug 2014 17:24:41 +0530
+Subject: [PATCH] Arm64: convert part of soft_restart() to assembly
+Message-ID: <1407930881-533-1-git-send-email-achandran@mvista.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-There is no need to init .owner field.
+The current soft_restart() and setup_restart implementations incorrectly
+assume that compiler will not spill/fill values to/from stack. However
+this assumption seems to be wrong, revealed by the disassembly of the
+currently existing code (v3.16) built with Linaro GCC 4.9-2014.05.
 
-Based on the patch from Peter Griffin <peter.griffin@linaro.org>
-"mmc: remove .owner field for drivers using module_platform_driver"
+ffffffc000085224 <soft_restart>:
+ffffffc000085224:  a9be7bfd  stp    x29, x30, [sp,#-32]!
+ffffffc000085228:  910003fd  mov    x29, sp
+ffffffc00008522c:  f9000fa0  str    x0, [x29,#24]
+ffffffc000085230:  94003d21  bl     ffffffc0000946b4 <setup_mm_for_reboot>
+ffffffc000085234:  94003b33  bl     ffffffc000093f00 <flush_cache_all>
+ffffffc000085238:  94003dfa  bl     ffffffc000094a20 <cpu_cache_off>
+ffffffc00008523c:  94003b31  bl     ffffffc000093f00 <flush_cache_all>
+ffffffc000085240:  b0003321  adrp   x1, ffffffc0006ea000 <reset_devices>
 
-This patch removes the superflous .owner field for drivers which
-use the module_platform_driver API, as this is overriden in
-platform_driver_register anyway."
+ffffffc000085244:  f9400fa0  ldr    x0, [x29,#24] ----> spilled addr
+ffffffc000085248:  f942fc22  ldr    x2, [x1,#1528] ----> spilled memstart_addr
 
-Signed-off-by: Michal Simek <michal.simek@xilinx.com>
+ffffffc00008524c:  f0000061  adrp   x1, ffffffc000094000 <__inval_cache_range+0x40>
+ffffffc000085250:  91290021  add    x1, x1, #0xa40
+ffffffc000085254:  8b010041  add    x1, x2, x1
+ffffffc000085258:  d2c00802  mov    x2, #0x4000000000           // #274877906944
+ffffffc00008525c:  8b020021  add    x1, x1, x2
+ffffffc000085260:  d63f0020  blr    x1
+...
+
+The compiler is clearly spilling here around the cache being disabled,
+resulting in stale values being restored. As we cannot control the compiler's
+spilling behaviour we must rewrite the functions in assembly to
+avoid use of the stack.
+
+Signed-off-by: Arun Chandran <achandran@mvista.com>
 ---
+ arch/arm64/include/asm/proc-fns.h |    2 ++
+ arch/arm64/kernel/process.c       |   30 ++----------------------------
+ arch/arm64/mm/proc.S              |   14 ++++++++++++++
+ 3 files changed, 18 insertions(+), 28 deletions(-)
 
- drivers/net/ethernet/xilinx/ll_temac_main.c       | 1 -
- drivers/net/ethernet/xilinx/xilinx_axienet_main.c | 1 -
- drivers/net/ethernet/xilinx/xilinx_emaclite.c     | 1 -
- 3 files changed, 3 deletions(-)
-
-diff --git a/drivers/net/ethernet/xilinx/ll_temac_main.c b/drivers/net/ethernet/xilinx/ll_temac_main.c
-index 8a6e5c2d6f95..b58442fd15fa 100644
---- a/drivers/net/ethernet/xilinx/ll_temac_main.c
-+++ b/drivers/net/ethernet/xilinx/ll_temac_main.c
-@@ -1171,7 +1171,6 @@ static struct platform_driver temac_of_driver = {
- 	.probe = temac_of_probe,
- 	.remove = temac_of_remove,
- 	.driver = {
--		.owner = THIS_MODULE,
- 		.name = "xilinx_temac",
- 		.of_match_table = temac_of_match,
- 	},
-diff --git a/drivers/net/ethernet/xilinx/xilinx_axienet_main.c b/drivers/net/ethernet/xilinx/xilinx_axienet_main.c
-index 7b0a73556264..30f133046914 100644
---- a/drivers/net/ethernet/xilinx/xilinx_axienet_main.c
-+++ b/drivers/net/ethernet/xilinx/xilinx_axienet_main.c
-@@ -1646,7 +1646,6 @@ static struct platform_driver axienet_of_driver = {
- 	.probe = axienet_of_probe,
- 	.remove = axienet_of_remove,
- 	.driver = {
--		 .owner = THIS_MODULE,
- 		 .name = "xilinx_axienet",
- 		 .of_match_table = axienet_of_match,
- 	},
-diff --git a/drivers/net/ethernet/xilinx/xilinx_emaclite.c b/drivers/net/ethernet/xilinx/xilinx_emaclite.c
-index 782bb9373cd8..28dbbdc393eb 100644
---- a/drivers/net/ethernet/xilinx/xilinx_emaclite.c
-+++ b/drivers/net/ethernet/xilinx/xilinx_emaclite.c
-@@ -1245,7 +1245,6 @@ MODULE_DEVICE_TABLE(of, xemaclite_of_match);
- static struct platform_driver xemaclite_of_driver = {
- 	.driver = {
- 		.name = DRIVER_NAME,
--		.owner = THIS_MODULE,
- 		.of_match_table = xemaclite_of_match,
- 	},
- 	.probe		= xemaclite_of_probe,
---
-1.8.2.3
-
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: not available
-Type: application/pgp-signature
-Size: 198 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140813/ac021da7/attachment.sig>
+diff --git a/arch/arm64/include/asm/proc-fns.h b/arch/arm64/include/asm/proc-fns.h
+index 0c657bb..86be4f9 100644
+--- a/arch/arm64/include/asm/proc-fns.h
++++ b/arch/arm64/include/asm/proc-fns.h
+@@ -32,6 +32,8 @@ extern void cpu_cache_off(void);
+ extern void cpu_do_idle(void);
+ extern void cpu_do_switch_mm(unsigned long pgd_phys, struct mm_struct *mm);
+ extern void cpu_reset(unsigned long addr) __attribute__((noreturn));
++extern void cpu_soft_restart(phys_addr_t cpu_reset,
++		unsigned long addr) __attribute__((noreturn));
+ extern void cpu_do_suspend(struct cpu_suspend_ctx *ptr);
+ extern u64 cpu_do_resume(phys_addr_t ptr, u64 idmap_ttbr);
+ 
+diff --git a/arch/arm64/kernel/process.c b/arch/arm64/kernel/process.c
+index 1309d64..bf66922 100644
+--- a/arch/arm64/kernel/process.c
++++ b/arch/arm64/kernel/process.c
+@@ -57,36 +57,10 @@ unsigned long __stack_chk_guard __read_mostly;
+ EXPORT_SYMBOL(__stack_chk_guard);
+ #endif
+ 
+-static void setup_restart(void)
+-{
+-	/*
+-	 * Tell the mm system that we are going to reboot -
+-	 * we may need it to insert some 1:1 mappings so that
+-	 * soft boot works.
+-	 */
+-	setup_mm_for_reboot();
+-
+-	/* Clean and invalidate caches */
+-	flush_cache_all();
+-
+-	/* Turn D-cache off */
+-	cpu_cache_off();
+-
+-	/* Push out any further dirty data, and ensure cache is empty */
+-	flush_cache_all();
+-}
+-
+ void soft_restart(unsigned long addr)
+ {
+-	typedef void (*phys_reset_t)(unsigned long);
+-	phys_reset_t phys_reset;
+-
+-	setup_restart();
+-
+-	/* Switch to the identity mapping */
+-	phys_reset = (phys_reset_t)virt_to_phys(cpu_reset);
+-	phys_reset(addr);
+-
++	setup_mm_for_reboot();
++	cpu_soft_restart(virt_to_phys(cpu_reset), addr);
+ 	/* Should never get here */
+ 	BUG();
+ }
+diff --git a/arch/arm64/mm/proc.S b/arch/arm64/mm/proc.S
+index 7736779..0eff5ee 100644
+--- a/arch/arm64/mm/proc.S
++++ b/arch/arm64/mm/proc.S
+@@ -76,6 +76,20 @@ ENTRY(cpu_reset)
+ 	ret	x0
+ ENDPROC(cpu_reset)
+ 
++ENTRY(cpu_soft_restart)
++	/* Save address of cpu_reset() and reset address */
++	mov	x19, x0
++	mov	x20, x1
++
++	/* Turn D-cache off */
++	bl	cpu_cache_off
++	/* Push out all dirty data, and ensure cache is empty */
++	bl	flush_cache_all
++
++	mov	x0, x20
++	ret	x19
++ENDPROC(cpu_soft_restart)
++
+ /*
+  *	cpu_do_idle()
+  *
+-- 
+1.7.9.5
