@@ -1,75 +1,372 @@
-From: mperttunen@nvidia.com (Mikko Perttunen)
-Date: Wed, 13 Aug 2014 12:52:22 +0300
-Subject: [PATCH 0/3] Thermal reset support in PMC
-In-Reply-To: <20140813085728.GF7735@ulmo>
-References: <1407226380-747-1-git-send-email-mperttunen@nvidia.com>
- <20140813080744.GD7735@ulmo> <53EB1DF5.301@nvidia.com>
- <53EB250D.5070207@nvidia.com> <20140813085728.GF7735@ulmo>
-Message-ID: <53EB3556.9010504@nvidia.com>
+From: mpa@pengutronix.de (Markus Pargmann)
+Date: Wed, 13 Aug 2014 11:52:09 +0200
+Subject: [PATCH v2] watchdog: Add DA906x PMIC watchdog driver.
+In-Reply-To: <53EA3D05.8000408@roeck-us.net>
+References: <1407837403-15863-1-git-send-email-mpa@pengutronix.de>
+ <53EA3D05.8000408@roeck-us.net>
+Message-ID: <20140813095209.GE17027@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 13/08/14 11:57, Thierry Reding wrote:
-> * PGP Signed by an unknown key
->
-> On Wed, Aug 13, 2014 at 11:42:53AM +0300, Mikko Perttunen wrote:
->>
->>
->> On 13/08/14 11:12, Mikko Perttunen wrote:
->>> On 13/08/14 11:07, Thierry Reding wrote:
->>>>> Old Signed by an unknown key
->>>>
->>>> On Tue, Aug 05, 2014 at 11:12:57AM +0300, Mikko Perttunen wrote:
->>>>> Hi,
->>>>>
->>>>> this series adds support for hardware-triggered thermal reset to the PMC
->>>>> driver. Namely, it adds device tree properties for specifying the I2C
->>>>> command to be sent when thermtrip is triggered. It is to be noted
->>>>> that thermtrip won't be ever triggered without a soctherm driver to
->>>>> calibrate the sensors, but I'll follow up with that patch.
->>>>>
->>>>> pmc.c required some juggling around to make the match data usable in
->>>>> probe, since I didn't want to put the code into the initcall either, since
->>>>> the soctherm driver won't be initialized by that point anyway.
->>>>>
->>>>> Series tested on Jetson-TK1. Should work on Tegra30 and Tegra114 too.
->>>>
->>>> Can you describe the procedure used to test this? We currently have a
->>>> bunch of features in Tegra that some people have tested at some point
->>>> during development but the test procedures never got documented. That
->>>> means whenever we want to test something we need to go and reinvent a
->>>> bunch of tests after the fact.
->>>>
->>>> So what I'd like to start doing is collect tests (preferably in some
->>>> scripted way) so that they can be kept in a repository that people can
->>>> easily clone and run on devices.
->>>>
->>>> Could you provide something like that for thermtrip?
->>>
->>> Sure. I'll see if I can make a just a test script or if a local patch is
->>> needed to test. Btw, I also have a pretty nice test script for EMC
->>> ready, and I agree that such a repository would be very nice.
->>
->> Here is a test program. It it works, the device with immediately shut down.
->>
->> https://gist.github.com/cyndis/66126c9c176b5f94a76f
->
-> Is there a way to set the trip temperature without going through
-> /dev/mem? I'd expect the device to have a sysfs interface of some
-> sort.
+Hi,
 
-The thermtrip "device" isn't currently exposed in any way. If it were 
-exposed, I suppose it would be exposed as thermal zone devices, each 
-with one trip point. Even then, the thermal framework doesn't really 
-support this properly; none of the trip point types really apply to this 
-kind of trip point, and x86 systems don't expose their trips either. 
-Anyway, since debugging is pretty much the only use case for modifying 
-the trip temperature, I thought adding the tz_devices would be a bit 
-overkill.
+On Tue, Aug 12, 2014 at 09:12:53AM -0700, Guenter Roeck wrote:
+> On 08/12/2014 02:56 AM, Markus Pargmann wrote:
+> >From: Krystian Garbaciak <krystian.garbaciak@diasemi.com>
+> >
+> >This driver supports watchdog device inside DA906x PMIC.
+> >
+> >Signed-off-by: Krystian Garbaciak <krystian.garbaciak@diasemi.com>
+> >Signed-off-by: Philipp Zabel <p.zabel@pengutronix.de>
+> >Signed-off-by: Markus Pargmann <mpa@pengutronix.de>
+> 
+> What is different to v1 ?
 
->
-> Thierry
->
-> * Unknown Key
-> * 0x7F3EB3A1
->
+I made some style fixes like removing strange indention, removing the
+"_" function prefixes and so on.
+
+> 
+> >---
+> >  drivers/watchdog/Kconfig             |   7 ++
+> >  drivers/watchdog/Makefile            |   1 +
+> >  drivers/watchdog/da9063_wdt.c        | 226 +++++++++++++++++++++++++++++++++++
+> >  include/linux/mfd/da9063/registers.h |   1 +
+> >  4 files changed, 235 insertions(+)
+> >  create mode 100644 drivers/watchdog/da9063_wdt.c
+> >
+> >diff --git a/drivers/watchdog/Kconfig b/drivers/watchdog/Kconfig
+> >index c845527b503a..8d5c9b33552a 100644
+> >--- a/drivers/watchdog/Kconfig
+> >+++ b/drivers/watchdog/Kconfig
+> >@@ -87,6 +87,13 @@ config DA9055_WATCHDOG
+> >  	  This driver can also be built as a module.  If so, the module
+> >  	  will be called da9055_wdt.
+> >
+> >+config DA9063_WATCHDOG
+> >+	tristate "Dialog DA9063 Watchdog"
+> >+	depends on MFD_DA9063
+> >+	select WATCHDOG_CORE
+> >+	help
+> >+	  Support for the watchdog in the DA9063 PMIC.
+> >+
+> >  config GPIO_WATCHDOG
+> >  	tristate "Watchdog device controlled through GPIO-line"
+> >  	depends on OF_GPIO
+> >diff --git a/drivers/watchdog/Makefile b/drivers/watchdog/Makefile
+> >index 7b8a91ed20e7..ce4a7632d863 100644
+> >--- a/drivers/watchdog/Makefile
+> >+++ b/drivers/watchdog/Makefile
+> >@@ -172,6 +172,7 @@ obj-$(CONFIG_XEN_WDT) += xen_wdt.o
+> >  # Architecture Independent
+> >  obj-$(CONFIG_DA9052_WATCHDOG) += da9052_wdt.o
+> >  obj-$(CONFIG_DA9055_WATCHDOG) += da9055_wdt.o
+> >+obj-$(CONFIG_DA9063_WATCHDOG) += da9063_wdt.o
+> >  obj-$(CONFIG_GPIO_WATCHDOG)	+= gpio_wdt.o
+> >  obj-$(CONFIG_WM831X_WATCHDOG) += wm831x_wdt.o
+> >  obj-$(CONFIG_WM8350_WATCHDOG) += wm8350_wdt.o
+> >diff --git a/drivers/watchdog/da9063_wdt.c b/drivers/watchdog/da9063_wdt.c
+> >new file mode 100644
+> >index 000000000000..befd6314f3f4
+> >--- /dev/null
+> >+++ b/drivers/watchdog/da9063_wdt.c
+> >@@ -0,0 +1,226 @@
+> >+/*
+> >+ * Watchdog driver for DA9063 PMICs.
+> >+ *
+> >+ * Copyright(c) 2012 Dialog Semiconductor Ltd.
+> >+ *
+> >+ * Author: Mariusz Wojtasik <mariusz.wojtasik@diasemi.com>
+> >+ *
+> >+ * This program is free software; you can redistribute  it and/or modify it
+> >+ * under  the terms of  the GNU General  Public License as published by the
+> >+ * Free Software Foundation;  either version 2 of the  License, or (at your
+> >+ * option) any later version.
+> >+ */
+> >+
+> >+#include <linux/kernel.h>
+> >+#include <linux/module.h>
+> >+#include <linux/watchdog.h>
+> >+#include <linux/platform_device.h>
+> >+#include <linux/uaccess.h>
+> >+#include <linux/slab.h>
+> >+#include <linux/delay.h>
+> >+#include <linux/mfd/da9063/registers.h>
+> >+#include <linux/mfd/da9063/core.h>
+> >+#include <linux/regmap.h>
+> >+
+> >+/*
+> >+ * Watchdog selector to timeout in seconds.
+> >+ *   0: WDT disabled;
+> >+ *   others: timeout = 2048 ms * 2^(TWDSCALE-1).
+> >+ */
+> >+static const int wdt_timeout[] = { 0, 2, 4, 8, 16, 32, 65, 131 };
+> >+#define DA9063_TWDSCALE_DISABLE		0
+> >+#define DA9063_TWDSCALE_MIN		1
+> >+#define DA9063_TWDSCALE_MAX		(ARRAY_SIZE(wdt_timeout) - 1)
+> >+#define DA9063_WDT_MIN_TIMEOUT		wdt_timeout[DA9063_TWDSCALE_MIN]
+> >+#define DA9063_WDT_MAX_TIMEOUT		wdt_timeout[DA9063_TWDSCALE_MAX]
+> >+#define DA9063_WDG_TIMEOUT		wdt_timeout[3]
+> >+
+> >+struct da9063_watchdog {
+> >+	struct da9063 *da9063;
+> >+	struct watchdog_device *wdtdev;
+> >+	struct mutex lock;
+> >+};
+> >+
+> >+static int da9063_wdt_timeout_to_sel(int secs)
+> >+{
+> >+	int i;
+> >+
+> >+	for (i = DA9063_TWDSCALE_MIN; i <= DA9063_TWDSCALE_MAX; i++) {
+> >+		if (wdt_timeout[i] >= secs)
+> >+			return i;
+> >+	}
+> >+
+> >+	return 0;
+> 
+> It might be better to return -EINVAL and use it in the calling code.
+
+Right, will fix that.
+
+> 
+> >+}
+> >+
+> >+static int da9063_wdt_disable(struct da9063 *da9063)
+> >+{
+> >+	return regmap_update_bits(da9063->regmap, DA9063_REG_CONTROL_D,
+> >+			DA9063_TWDSCALE_MASK,
+> >+			DA9063_TWDSCALE_DISABLE << DA9063_TWDSCALE_SHIFT);
+> >+}
+> >+
+> >+static int _da9063_wdt_set_timeout(struct da9063 *da9063, unsigned int regval)
+> >+{
+> >+	if (regval < DA9063_TWDSCALE_MIN || regval > DA9063_TWDSCALE_MAX)
+> >+		return -EINVAL;
+> >+
+> >+	return regmap_update_bits(da9063->regmap, DA9063_REG_CONTROL_D,
+> >+			DA9063_TWDSCALE_MASK, regval << DA9063_TWDSCALE_SHIFT);
+> >+}
+> >+
+> >+static int _da9063_wdt_kick(struct da9063 *da9063)
+> >+{
+> >+	return regmap_write(da9063->regmap, DA9063_REG_CONTROL_F,
+> >+			DA9063_WATCHDOG);
+> >+}
+> >+
+> >+static int da9063_wdt_start(struct watchdog_device *wdd)
+> >+{
+> >+	struct da9063_watchdog *wdt = watchdog_get_drvdata(wdd);
+> >+	unsigned int selector;
+> >+	int ret = 0;
+> >+
+> >+	mutex_lock(&wdt->lock);
+> >+	selector = da9063_wdt_timeout_to_sel(wdt->wdtdev->timeout);
+> >+	ret = _da9063_wdt_set_timeout(wdt->da9063, selector);
+> >+	if (ret) {
+> >+		dev_err(wdt->da9063->dev, "Watchdog failed to start (err = %d)\n",
+> >+				ret);
+> >+	}
+> >+	mutex_unlock(&wdt->lock);
+> >+
+> >+	return ret;
+> >+}
+> >+
+> >+static int da9063_wdt_stop(struct watchdog_device *wdd)
+> >+{
+> >+	struct da9063_watchdog *wdt = watchdog_get_drvdata(wdd);
+> >+	int ret = 0;
+> >+
+> >+	mutex_lock(&wdt->lock);
+> >+	ret = da9063_wdt_disable(wdt->da9063);
+> >+	if (ret)
+> >+		dev_alert(wdt->da9063->dev,
+> >+			  "Watchdog failed to stop (err = %d)\n", ret);
+> >+	mutex_unlock(&wdt->lock);
+> >+
+> >+	return ret;
+> >+}
+> >+
+> >+static int da9063_wdt_ping(struct watchdog_device *wdd)
+> >+{
+> >+	struct da9063_watchdog *wdt = watchdog_get_drvdata(wdd);
+> >+	int ret = 0;
+> >+
+> >+	mutex_lock(&wdt->lock);
+> >+	ret = _da9063_wdt_kick(wdt->da9063);
+> >+	if (ret)
+> >+		dev_alert(wdt->da9063->dev, "Failed to ping the watchdog (err = %d)\n",
+> >+				ret);
+> >+	mutex_unlock(&wdt->lock);
+> >+
+> >+	return ret;
+> >+}
+> >+
+> >+static int da9063_wdt_set_timeout(struct watchdog_device *wdd,
+> >+							unsigned int timeout)
+> >+{
+> >+	struct da9063_watchdog *wdt = watchdog_get_drvdata(wdd);
+> >+	unsigned int selector;
+> >+	int ret;
+> >+
+> >+	selector = da9063_wdt_timeout_to_sel(timeout);
+> >+	if (selector == 0) {
+> >+		dev_err(wdt->da9063->dev, "Unsupported watchdog timeout (select from: 2, 4, 8, 16, 32, 65, 131)\n");
+> 
+> This error case should never happen, since the range is checked by the calling code.
+> Besides, the error message is wrong. You do accept the entire range of [1 .. 131],
+> not just selected values.
+> 
+> Overall the error checking is inconsistent. Above you don't check the return code
+> but depend on _da9063_wdt_set_timeout to detect a range error.
+
+Right I will fix the error handling.
+
+> 
+> >+		return -EINVAL;
+> >+	}
+> >+
+> >+	mutex_lock(&wdt->lock);
+> >+
+> >+	ret = _da9063_wdt_set_timeout(wdt->da9063, selector);
+> >+	if (ret)
+> >+		dev_err(wdt->da9063->dev, "Failed to set watchdog timeout (err = %d)\n",
+> >+				ret);
+> >+	else
+> >+		wdd->timeout = wdt_timeout[selector];
+> >+
+> >+	mutex_unlock(&wdt->lock);
+> >+
+> >+	return ret;
+> >+}
+> >+
+> >+static const struct watchdog_info da9063_watchdog_info = {
+> >+	.options = WDIOF_SETTIMEOUT | WDIOF_KEEPALIVEPING,
+> >+	.identity = "DA9063 Watchdog",
+> >+};
+> >+
+> >+static const struct watchdog_ops da9063_watchdog_ops = {
+> >+	.owner = THIS_MODULE,
+> >+	.start = da9063_wdt_start,
+> >+	.stop = da9063_wdt_stop,
+> >+	.ping = da9063_wdt_ping,
+> >+	.set_timeout = da9063_wdt_set_timeout,
+> >+};
+> >+
+> >+static struct watchdog_device da9063_watchdog_device = {
+> >+	.info = &da9063_watchdog_info,
+> >+	.ops = &da9063_watchdog_ops,
+> >+};
+> >+
+> >+static int da9063_wdt_probe(struct platform_device *pdev)
+> >+{
+> >+	int ret;
+> >+	struct da9063 *da9063 = dev_get_drvdata(pdev->dev.parent);
+> >+	struct da9063_watchdog *wdt;
+> >+
+> >+	if (!da9063)
+> >+		return -EPROBE_DEFER;
+> >+
+> >+	wdt = devm_kzalloc(&pdev->dev, sizeof(*wdt), GFP_KERNEL);
+> >+	if (!wdt)
+> >+		return -ENOMEM;
+> >+
+> >+	wdt->da9063 = da9063;
+> >+	wdt->wdtdev = &da9063_watchdog_device;
+> >+	mutex_init(&wdt->lock);
+> >+
+> >+	if (IS_ENABLED(CONFIG_WATCHDOG_NOWAYOUT))
+> >+		set_bit(WDOG_NO_WAY_OUT, &wdt->wdtdev->status);
+> >+
+> Why not use watchdog_set_nowayout, or initialize .status with
+> WATCHDOG_NOWAYOUT_INIT_STATUS, as suggested in the API documentation ?
+
+No specific reason for that, WATCHDOG_NOWAYOUT_INIT_STATUS seems better.
+
+> 
+> >+	wdt->wdtdev->min_timeout = DA9063_WDT_MIN_TIMEOUT;
+> >+	wdt->wdtdev->max_timeout = DA9063_WDT_MAX_TIMEOUT;
+> >+	wdt->wdtdev->timeout = DA9063_WDG_TIMEOUT;
+> >+
+> 
+> Why don't you set those variables directly in da9063_watchdog_device ?
+> If you want to set it here, you might as well set ops and info
+> and get rid of the static variable (by including the entire structure
+> in wdt, not just a pointer to it).
+
+Especially as watchdog_register_device is directly altering the struct,
+it seems better to also assign ops and info here.
+
+> 
+> >+	ret = watchdog_register_device(wdt->wdtdev);
+> >+	if (ret) {
+> >+		dev_err(da9063->dev, "da9063-watchdog registration failed (err = %d)",
+> >+				ret);
+> >+		return ret;
+> >+	}
+> >+
+> >+	watchdog_set_drvdata(wdt->wdtdev, wdt);
+> >+
+> This creates a race condition, because at least in theory an access could
+> already occur between the watchdog registration above and this code.
+
+Yes, I will move it above the registration code.
+
+> 
+> >+	return 0;
+> >+}
+> >+
+> >+static int da9063_wdt_remove(struct platform_device *pdev)
+> >+{
+> >+	watchdog_unregister_device(&da9063_watchdog_device);
+> >+
+> >+	return 0;
+> >+}
+> >+
+> >+static struct platform_driver da9063_wdt_driver = {
+> >+	.probe = da9063_wdt_probe,
+> >+	.remove = da9063_wdt_remove,
+> >+	.driver = {
+> >+		.name = DA9063_DRVNAME_WATCHDOG,
+> >+	},
+> >+};
+> >+module_platform_driver(da9063_wdt_driver);
+> >+
+> >+MODULE_AUTHOR("Mariusz Wojtasik <mariusz.wojtasik@diasemi.com>");
+> >+MODULE_DESCRIPTION("Watchdog driver for Dialog DA9063");
+> >+MODULE_LICENSE("GPL");
+> >+MODULE_ALIAS("platform:" DA9063_DRVNAME_WATCHDOG);
+> >diff --git a/include/linux/mfd/da9063/registers.h b/include/linux/mfd/da9063/registers.h
+> >index 09a85c699da1..e11a66894afc 100644
+> >--- a/include/linux/mfd/da9063/registers.h
+> >+++ b/include/linux/mfd/da9063/registers.h
+> >@@ -431,6 +431,7 @@
+> >
+> >  /* DA9063_REG_CONTROL_D (addr=0x11) */
+> >  #define	DA9063_TWDSCALE_MASK			0x07
+> >+#define	DA9063_TWDSCALE_SHIFT			0x00
+> 
+> That is unnecessary. Why shift if there is nothing to shift ?
+> It just adds unnecessary complexity to the code.
+
+I thought it would be a bit nicer to see directly that it is shifted to
+the correct location in the code. But I don't have any problem removing
+it.
+
+Thanks for your review.
+
+Best regards,
+
+Markus Pargmann
+
+-- 
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140813/20a67456/attachment-0001.sig>
