@@ -1,40 +1,77 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Wed, 13 Aug 2014 10:16:16 -0600
-Subject: [PATCH 6/6] ARM: dts: Add tps65090 FETs constraints
-In-Reply-To: <1407861868-20097-7-git-send-email-javier.martinez@collabora.co.uk>
-References: <1407861868-20097-1-git-send-email-javier.martinez@collabora.co.uk>
- <1407861868-20097-7-git-send-email-javier.martinez@collabora.co.uk>
-Message-ID: <53EB8F50.7090505@wwwdotorg.org>
+From: achandran@mvista.com (Arun Chandran)
+Date: Wed, 13 Aug 2014 21:47:24 +0530
+Subject: [PATCH] Arm64: convert part of soft_restart() to assembly
+In-Reply-To: <20140813144942.GF32644@leverpostej>
+References: <1407930881-533-1-git-send-email-achandran@mvista.com>
+ <20140813144942.GF32644@leverpostej>
+Message-ID: <CAFdej02hEz6y8xvtDfn-V_J5JfaEKYZnF5+HxKUqUof9=Q7pWw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08/12/2014 10:44 AM, Javier Martinez Canillas wrote:
-> The tps65090 PMU data manual [0] has a table that list the
-> "Recommended operating conditions" for each regulator. Add
-> the information about the FET constraints to its dtsi file.
+Hi Mark,
+On 8/13/14, Mark Rutland <mark.rutland@arm.com> wrote:
+> Hi Arun,
 >
-> [0]: http://www.ti.com/lit/ds/symlink/tps65090.pdf
+> On Wed, Aug 13, 2014 at 12:54:41PM +0100, Arun Chandran wrote:
+>> The current soft_restart() and setup_restart implementations incorrectly
+>> assume that compiler will not spill/fill values to/from stack. However
+>> this assumption seems to be wrong, revealed by the disassembly of the
+>> currently existing code (v3.16) built with Linaro GCC 4.9-2014.05.
+>>
+>> ffffffc000085224 <soft_restart>:
+>> ffffffc000085224:  a9be7bfd  stp    x29, x30, [sp,#-32]!
+>> ffffffc000085228:  910003fd  mov    x29, sp
+>> ffffffc00008522c:  f9000fa0  str    x0, [x29,#24]
+>> ffffffc000085230:  94003d21  bl     ffffffc0000946b4
+>> <setup_mm_for_reboot>
+>> ffffffc000085234:  94003b33  bl     ffffffc000093f00 <flush_cache_all>
+>> ffffffc000085238:  94003dfa  bl     ffffffc000094a20 <cpu_cache_off>
+>> ffffffc00008523c:  94003b31  bl     ffffffc000093f00 <flush_cache_all>
+>> ffffffc000085240:  b0003321  adrp   x1, ffffffc0006ea000 <reset_devices>
+>>
+>> ffffffc000085244:  f9400fa0  ldr    x0, [x29,#24] ----> spilled addr
+>> ffffffc000085248:  f942fc22  ldr    x2, [x1,#1528] ----> spilled
+>> memstart_addr
+>
+> Nit: s/spilled memstart_addr/global memstart_addr/
+>
+>> ffffffc00008524c:  f0000061  adrp   x1, ffffffc000094000
+>> <__inval_cache_range+0x40>
+>> ffffffc000085250:  91290021  add    x1, x1, #0xa40
+>> ffffffc000085254:  8b010041  add    x1, x2, x1
+>> ffffffc000085258:  d2c00802  mov    x2, #0x4000000000           //
+>> #274877906944
+>> ffffffc00008525c:  8b020021  add    x1, x1, x2
+>> ffffffc000085260:  d63f0020  blr    x1
+>> ...
+>>
+>> The compiler is clearly spilling here around the cache being disabled,
+>> resulting in stale values being restored. As we cannot control the
+>> compiler's
+>> spilling behaviour we must rewrite the functions in assembly to
+>> avoid use of the stack.
+>
+> Given we also seeing accesses to globals, let's change this to:
+>
+> Here the compiler generates memory accesses after the cache is disabled,
+> loading stale values for the spilled value global variable. As we cannot
+> control when the compiler will access memory we must rewrite the
+> functions in assembly to stash values we need in registers prior to
+> disabling the cache, avoiding the use of memory.
+>
 
-I'm worried that this file represents the limits of the PMIC itself, 
-whereas the DT should be representing the limits of the circuits that 
-the various PMIC regulators are attached to on the board.
+Will do that.
 
-For example:
+>> Signed-off-by: Arun Chandran <achandran@mvista.com>
+>
+> Given that:
+>
+> Reviewed-by: Mark Rutland <mark.rutland@arm.com>
+>
+> Thanks for putting this together, and thanks for bearing with me for the
+> last few revisions.
+>
+No problem. Thanks for bearing with a new comer (me). Will post a new
+one tomorrow.
 
-> diff --git a/arch/arm/boot/dts/tps65090.dtsi b/arch/arm/boot/dts/tps65090.dtsi
-
->   		tps65090_fet3: fet3 {
-> +			regulator-min-microvolt = <3000000>;
-> +			regulator-max-microvolt = <5500000>;
->   		};
-
-I guess that on some boards, this output rail might be attached to 
-devices that must run at 3.3V exactly, and on other boards it might be 
-attached to devices that must run at 5V exactly. The DT for those two 
-boards should each have regulator-{min,max}-microvolt set to the same 
-value, which describes the board requirements.
-
-It feels dangerous/misleading to define the PMIC range by default. It 
-might lead people to think that since the property already has a defined 
-value, they don't need to think about what the correct value for their 
-board is, and hence not change the value in their board file.
+--Arun
