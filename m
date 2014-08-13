@@ -1,64 +1,48 @@
 From: thierry.reding@gmail.com (Thierry Reding)
-Date: Wed, 13 Aug 2014 09:35:44 +0200
-Subject: [PATCH 1/3] of: Add descriptions of thermtrip properties to
- Tegra PMC bindings
-In-Reply-To: <1407226380-747-2-git-send-email-mperttunen@nvidia.com>
+Date: Wed, 13 Aug 2014 09:37:38 +0200
+Subject: [PATCH 2/3] ARM: tegra: Add PMC thermtrip programming to Jetson
+ TK1 device tree
+In-Reply-To: <1407226380-747-3-git-send-email-mperttunen@nvidia.com>
 References: <1407226380-747-1-git-send-email-mperttunen@nvidia.com>
- <1407226380-747-2-git-send-email-mperttunen@nvidia.com>
-Message-ID: <20140813073541.GA17466@ulmo>
+ <1407226380-747-3-git-send-email-mperttunen@nvidia.com>
+Message-ID: <20140813073736.GB17466@ulmo>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Aug 05, 2014 at 11:12:58AM +0300, Mikko Perttunen wrote:
-> Hardware-triggered thermal reset requires configuring the I2C
-> reset procedure. This configuration is read from the device tree,
-> so document the relevant properties in the binding documentation.
+On Tue, Aug 05, 2014 at 11:12:59AM +0300, Mikko Perttunen wrote:
+> This adds the required information to reset the board during an overheating
+> situation to the Jetson TK1 device tree. The thermal reset is handled by the
+> PMC by sending an I2C message to the PMIC. The entries specify the I2C
+> message to be sent.
 > 
 > Signed-off-by: Mikko Perttunen <mperttunen@nvidia.com>
 > ---
->  .../devicetree/bindings/arm/tegra/nvidia,tegra20-pmc.txt    | 13 +++++++++++++
->  1 file changed, 13 insertions(+)
+>  arch/arm/boot/dts/tegra124-jetson-tk1.dts | 5 +++++
+>  1 file changed, 5 insertions(+)
 > 
-> diff --git a/Documentation/devicetree/bindings/arm/tegra/nvidia,tegra20-pmc.txt b/Documentation/devicetree/bindings/arm/tegra/nvidia,tegra20-pmc.txt
-> index 68ac65f..140e2aa 100644
-> --- a/Documentation/devicetree/bindings/arm/tegra/nvidia,tegra20-pmc.txt
-> +++ b/Documentation/devicetree/bindings/arm/tegra/nvidia,tegra20-pmc.txt
-> @@ -38,6 +38,19 @@ Required properties when nvidia,suspend-mode is specified:
->  			      Core power good time in uS.
->  - nvidia,core-pwr-off-time : Core power off time in uS.
->  
-> +Required properties for hardware-triggered thermal reset:
-> +    (only tegra30, tegra114, tegra124)
-> +- nvidia,thermtrip-pmu-i2c-addr : I2C address of the power management unit.
-> +- nvidia,thermtrip-i2c-controller : Index of the I2C controller the PMU is
-> +                                    attached to.
-
-This duplicates information already associated with the PMU device. Can
-this be turned into something like:
-
-	nvidia,thermtrip-pmu: phandle to Power Management Unit
-
-Then we can query the relevant information from the I2C client resolved
-from the phandle.
-
-One problem with that might be that the I2C controller index may not
-match the hardware ID.
-
-> +- nvidia,thermtrip-reg-addr : Address (byte) to send reset command to.
-> +- nvidia,thermtrip-reg-data : Data (byte) to use as reset command.
+> diff --git a/arch/arm/boot/dts/tegra124-jetson-tk1.dts b/arch/arm/boot/dts/tegra124-jetson-tk1.dts
+> index 624b0fb..ee178c4 100644
+> --- a/arch/arm/boot/dts/tegra124-jetson-tk1.dts
+> +++ b/arch/arm/boot/dts/tegra124-jetson-tk1.dts
+> @@ -1617,6 +1617,11 @@
+>  		nvidia,core-pwr-off-time = <61036>;
+>  		nvidia,core-power-req-active-high;
+>  		nvidia,sys-clock-req-active-high;
 > +
-> +Optional properties for hardware-triggered thermal reset:
-> +    (only tegra30, tegra114, tegra124)
-> +- nvidia,thermtrip-pinmux : Pinmux ID used for I2C access.
+> +		nvidia,thermtrip-pmu-i2c-addr = <0x40>;
+> +		nvidia,thermtrip-i2c-controller = <4>;
+> +		nvidia,thermtrip-reg-addr = <0x36>;
+> +		nvidia,thermtrip-reg-data = <0x2>;
 
-I suppose this takes a phandle? If so the description should probably
-say so.
+Given the number of properties that this can potentially have, I wonder
+if perhaps it would be a good idea to put this into a subnode, like
+this:
 
-> +- nvidia,thermtrip-pmu-16bit-ops : Use 16-bit operations.
-
-What exactly does "16-bit operations" mean? And isn't this a property of
-the I2C device, therefore could be queried from the I2C slave via the
-phandle?
+		thermtrip {
+			pmu-i2c-addr = <0x40>;
+			i2c-controller = <4>;
+			...
+		};
 
 Thierry
 -------------- next part --------------
@@ -67,4 +51,4 @@ Name: not available
 Type: application/pgp-signature
 Size: 819 bytes
 Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140813/edf4791e/attachment.sig>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140813/a767a113/attachment-0001.sig>
