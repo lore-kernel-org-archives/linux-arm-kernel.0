@@ -1,36 +1,44 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Wed, 13 Aug 2014 13:58:45 +0100
-Subject: [PATCH v2 1/3] arm64: spin-table: handle unmapped
- cpu-release-addrs
-In-Reply-To: <CAKv+Gu_UjRNhhiM0GPsKRdXRtmEnY6cbpY-JZ33RUMapbPYsbQ@mail.gmail.com>
-References: <CAKv+Gu_UjRNhhiM0GPsKRdXRtmEnY6cbpY-JZ33RUMapbPYsbQ@mail.gmail.com>
-Message-ID: <20140813125844.GE32644@leverpostej>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Wed, 13 Aug 2014 14:12:32 +0100
+Subject: [PATCH] backlight: remove .owner field for drivers using
+ module_platform_driver
+In-Reply-To: <1407933518-7214-1-git-send-email-peter.griffin@linaro.org>
+References: <1407933518-7214-1-git-send-email-peter.griffin@linaro.org>
+Message-ID: <20140813131232.GA8258@lee--X1>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Ard,
+On Wed, 13 Aug 2014, Peter Griffin wrote:
 
-> Gents,
+> This patch removes the superflous .owner field for drivers which
+> use the module_platform_driver or platform_driver_register api,
+> as this is overriden in __platform_driver_register.
 > 
-> With the 3.17 merge window not far from closing, is there anything we
-> could still do this cycle to get $subject addressed?
-> As I have indicated before, the newly introduced TEXT_OFFSET fuzzing
-> may break APM Mustang if booting from UEFI (i.e., for low values of
-> rand()), and as this option is recommended for distribution kernels,
-> it could make apt-get update'ing your kernel a frustrating experience.
-> However, the fix for that issue triggers the issue addressed by
-> $subject.
-> 
-> In my personal opinion, relaxing the requirements imposed on where
-> your cpu-release-addr may live could remain a separate discussion. In
-> the APM Mustang case, even when adhering to booting.txt by the letter
-> (i.e., pu cpu-release-addr in a memreserved area in DRAM and load
-> Image at a 2 meg boundary + TEXT_OFFSET), the kernel fails to bring up
-> the secondaries if the cpu-release-addr is below the kernel.
+> Signed-off-by: Peter Griffin <peter.griffin@linaro.org>
+> ---
+>  drivers/video/backlight/88pm860x_bl.c    | 1 -
+>  drivers/video/backlight/aat2870_bl.c     | 1 -
+>  drivers/video/backlight/adp5520_bl.c     | 1 -
+>  drivers/video/backlight/as3711_bl.c      | 1 -
+>  drivers/video/backlight/da903x_bl.c      | 1 -
+>  drivers/video/backlight/da9052_bl.c      | 1 -
+>  drivers/video/backlight/ep93xx_bl.c      | 1 -
+>  drivers/video/backlight/gpio_backlight.c | 1 -
+>  drivers/video/backlight/lm3533_bl.c      | 1 -
+>  drivers/video/backlight/lp8788_bl.c      | 1 -
+>  drivers/video/backlight/max8925_bl.c     | 1 -
+>  drivers/video/backlight/ot200_bl.c       | 1 -
+>  drivers/video/backlight/pandora_bl.c     | 1 -
+>  drivers/video/backlight/platform_lcd.c   | 1 -
+>  drivers/video/backlight/pwm_bl.c         | 1 -
+>  drivers/video/backlight/tps65217_bl.c    | 1 -
+>  drivers/video/backlight/wm831x_bl.c      | 1 -
+>  17 files changed, 17 deletions(-)
 
-For the moment I would be happy with the patch as it stands (using
-ioremap_cache).
+Applied, thanks.
 
-Catalin, Will?
-
-Mark.
+-- 
+Lee Jones
+Linaro STMicroelectronics Landing Team Lead
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
