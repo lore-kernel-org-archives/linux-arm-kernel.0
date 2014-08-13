@@ -1,75 +1,44 @@
-From: mperttunen@nvidia.com (Mikko Perttunen)
-Date: Wed, 13 Aug 2014 11:06:14 +0300
-Subject: [PATCH 2/3] ARM: tegra: Add PMC thermtrip programming to Jetson
- TK1 device tree
-In-Reply-To: <20140813080324.GC7735@ulmo>
+From: thierry.reding@gmail.com (Thierry Reding)
+Date: Wed, 13 Aug 2014 10:07:45 +0200
+Subject: [PATCH 0/3] Thermal reset support in PMC
+In-Reply-To: <1407226380-747-1-git-send-email-mperttunen@nvidia.com>
 References: <1407226380-747-1-git-send-email-mperttunen@nvidia.com>
- <1407226380-747-3-git-send-email-mperttunen@nvidia.com>
- <20140813073736.GB17466@ulmo> <53EB1932.9040601@nvidia.com>
- <20140813080324.GC7735@ulmo>
-Message-ID: <53EB1C76.2000702@nvidia.com>
+Message-ID: <20140813080744.GD7735@ulmo>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Tue, Aug 05, 2014 at 11:12:57AM +0300, Mikko Perttunen wrote:
+> Hi,
+> 
+> this series adds support for hardware-triggered thermal reset to the PMC
+> driver. Namely, it adds device tree properties for specifying the I2C
+> command to be sent when thermtrip is triggered. It is to be noted
+> that thermtrip won't be ever triggered without a soctherm driver to
+> calibrate the sensors, but I'll follow up with that patch.
+> 
+> pmc.c required some juggling around to make the match data usable in
+> probe, since I didn't want to put the code into the initcall either, since
+> the soctherm driver won't be initialized by that point anyway.
+> 
+> Series tested on Jetson-TK1. Should work on Tegra30 and Tegra114 too.
 
+Can you describe the procedure used to test this? We currently have a
+bunch of features in Tegra that some people have tested at some point
+during development but the test procedures never got documented. That
+means whenever we want to test something we need to go and reinvent a
+bunch of tests after the fact.
 
-On 13/08/14 11:03, Thierry Reding wrote:
-> * PGP Signed by an unknown key
->
-> On Wed, Aug 13, 2014 at 10:52:18AM +0300, Mikko Perttunen wrote:
->> On 13/08/14 10:37, Thierry Reding wrote:
->>>> Old Signed by an unknown key
->>>
->>> On Tue, Aug 05, 2014 at 11:12:59AM +0300, Mikko Perttunen wrote:
->>>> This adds the required information to reset the board during an overheating
->>>> situation to the Jetson TK1 device tree. The thermal reset is handled by the
->>>> PMC by sending an I2C message to the PMIC. The entries specify the I2C
->>>> message to be sent.
->>>>
->>>> Signed-off-by: Mikko Perttunen <mperttunen@nvidia.com>
->>>> ---
->>>>   arch/arm/boot/dts/tegra124-jetson-tk1.dts | 5 +++++
->>>>   1 file changed, 5 insertions(+)
->>>>
->>>> diff --git a/arch/arm/boot/dts/tegra124-jetson-tk1.dts b/arch/arm/boot/dts/tegra124-jetson-tk1.dts
->>>> index 624b0fb..ee178c4 100644
->>>> --- a/arch/arm/boot/dts/tegra124-jetson-tk1.dts
->>>> +++ b/arch/arm/boot/dts/tegra124-jetson-tk1.dts
->>>> @@ -1617,6 +1617,11 @@
->>>>   		nvidia,core-pwr-off-time = <61036>;
->>>>   		nvidia,core-power-req-active-high;
->>>>   		nvidia,sys-clock-req-active-high;
->>>> +
->>>> +		nvidia,thermtrip-pmu-i2c-addr = <0x40>;
->>>> +		nvidia,thermtrip-i2c-controller = <4>;
->>>> +		nvidia,thermtrip-reg-addr = <0x36>;
->>>> +		nvidia,thermtrip-reg-data = <0x2>;
->>>
->>> Given the number of properties that this can potentially have, I wonder
->>> if perhaps it would be a good idea to put this into a subnode, like
->>> this:
->>>
->>> 		thermtrip {
->>> 			pmu-i2c-addr = <0x40>;
->>> 			i2c-controller = <4>;
->>> 			...
->>> 		};
->>
->> I guess that'd look a bit nicer.
->
-> Mind you, this may be somewhat on the edge of what's considered good
-> practice for DT content, so maybe wait for a second opinion before going
-> ahead with this.
->
-> I don't have any objections to a set of nvidia,thermtrip-* properties, I
-> just think it's fairly redundant to keep repeating that prefix (and it
-> causes ugliness in drivers, too).
+So what I'd like to start doing is collect tests (preferably in some
+scripted way) so that they can be kept in a repository that people can
+easily clone and run on devices.
 
-Hmm, ok. I'll fix the other stuff first.
+Could you provide something like that for thermtrip?
 
->
-> Thierry
->
-> * Unknown Key
-> * 0x7F3EB3A1
->
+Thierry
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: not available
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140813/daa816b7/attachment.sig>
