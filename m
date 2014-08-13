@@ -1,125 +1,65 @@
-From: grant.likely@secretlab.ca (Grant Likely)
-Date: Wed, 13 Aug 2014 09:40:46 +0100
-Subject: [PATCH 3/4] simplefb: disable dt node upon remove
-In-Reply-To: <1407914239-12054-4-git-send-email-libv@skynet.be>
-References: <1407914239-12054-1-git-send-email-libv@skynet.be>
- <1407914239-12054-4-git-send-email-libv@skynet.be>
-Message-ID: <CACxGe6vaPUa4QvYWBA-QY7MTmJYoeqnPt9Zh5jpky6S9UYbrvQ@mail.gmail.com>
+From: mperttunen@nvidia.com (Mikko Perttunen)
+Date: Wed, 13 Aug 2014 11:42:53 +0300
+Subject: [PATCH 0/3] Thermal reset support in PMC
+In-Reply-To: <53EB1DF5.301@nvidia.com>
+References: <1407226380-747-1-git-send-email-mperttunen@nvidia.com>
+ <20140813080744.GD7735@ulmo> <53EB1DF5.301@nvidia.com>
+Message-ID: <53EB250D.5070207@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Aug 13, 2014 at 8:17 AM, Luc Verhaegen <libv@skynet.be> wrote:
-> The next commit will handle clocks correctly, so that these do not get
-> automatically disabled on certain SoC simplefb implementations. As a
-> result, the removal of this simplefb driver, and the release of the
-> clocks, is rather final, and only a full display driver can work after
-> this. So, it makes sense to also flag the dt node as disabled, even
-> though it has no real value today.
->
-> Signed-off-by: Luc Verhaegen <libv@skynet.be>
 
-Please, no.
 
-Drivers should not be modifying the device tree without and
-exceptionally good reason for doing so. Drivers are to treat the DT as
-immutable.
+On 13/08/14 11:12, Mikko Perttunen wrote:
+> On 13/08/14 11:07, Thierry Reding wrote:
+>> * PGP Signed by an unknown key
+>>
+>> On Tue, Aug 05, 2014 at 11:12:57AM +0300, Mikko Perttunen wrote:
+>>> Hi,
+>>>
+>>> this series adds support for hardware-triggered thermal reset to the PMC
+>>> driver. Namely, it adds device tree properties for specifying the I2C
+>>> command to be sent when thermtrip is triggered. It is to be noted
+>>> that thermtrip won't be ever triggered without a soctherm driver to
+>>> calibrate the sensors, but I'll follow up with that patch.
+>>>
+>>> pmc.c required some juggling around to make the match data usable in
+>>> probe, since I didn't want to put the code into the initcall either, since
+>>> the soctherm driver won't be initialized by that point anyway.
+>>>
+>>> Series tested on Jetson-TK1. Should work on Tegra30 and Tegra114 too.
+>>
+>> Can you describe the procedure used to test this? We currently have a
+>> bunch of features in Tegra that some people have tested at some point
+>> during development but the test procedures never got documented. That
+>> means whenever we want to test something we need to go and reinvent a
+>> bunch of tests after the fact.
+>>
+>> So what I'd like to start doing is collect tests (preferably in some
+>> scripted way) so that they can be kept in a repository that people can
+>> easily clone and run on devices.
+>>
+>> Could you provide something like that for thermtrip?
+>
+> Sure. I'll see if I can make a just a test script or if a local patch is
+> needed to test. Btw, I also have a pretty nice test script for EMC
+> ready, and I agree that such a repository would be very nice.
 
-* the exception is an overlay driver which add new devices to the
-kernel. Definitely not the case here.
+Here is a test program. It it works, the device with immediately shut down.
 
-g.
+https://gist.github.com/cyndis/66126c9c176b5f94a76f
 
-> ---
->  drivers/video/fbdev/simplefb.c |   43 ++++++++++++++++++++++++++++++++++++---
->  1 files changed, 39 insertions(+), 4 deletions(-)
 >
-> diff --git a/drivers/video/fbdev/simplefb.c b/drivers/video/fbdev/simplefb.c
-> index 72a4f20..74c4b2a 100644
-> --- a/drivers/video/fbdev/simplefb.c
-> +++ b/drivers/video/fbdev/simplefb.c
-> @@ -138,6 +138,32 @@ static int simplefb_parse_dt(struct platform_device *pdev,
->         return 0;
->  }
+>>
+>> Thierry
+>>
+>> * Unknown Key
+>> * 0x7F3EB3A1
+>>
 >
-> +/*
-> + * Make sure that nothing tries to inadvertedly re-use this node...
-> + */
-> +static int
-> +simplefb_dt_disable(struct platform_device *pdev)
-> +{
-> +       struct device_node *np = pdev->dev.of_node;
-> +       struct property *property;
-> +       int ret;
-> +
-> +       property = kzalloc(sizeof(struct property), GFP_KERNEL);
-> +       if (!property)
-> +               return -ENOMEM;
-> +
-> +       property->name = "status";
-> +       property->value = "disabled";
-> +       property->length = strlen(property->value) + 1;
-> +
-> +       ret = of_update_property(np, property);
-> +       if (ret)
-> +               dev_err(&pdev->dev, "%s: failed to update property: %d\n",
-> +                       __func__, ret);
-> +
-> +       return ret;
-> +}
-> +
->  static int simplefb_parse_pd(struct platform_device *pdev,
->                              struct simplefb_params *params)
->  {
-> @@ -187,17 +213,20 @@ static int simplefb_probe(struct platform_device *pdev)
->                 ret = simplefb_parse_dt(pdev, &params);
->
->         if (ret)
-> -               return ret;
-> +               goto error_dt_disable;
->
->         mem = platform_get_resource(pdev, IORESOURCE_MEM, 0);
->         if (!mem) {
->                 dev_err(&pdev->dev, "No memory resource\n");
-> -               return -EINVAL;
-> +               ret = -EINVAL;
-> +               goto error_dt_disable;
->         }
->
->         info = framebuffer_alloc(sizeof(struct simplefb_par), &pdev->dev);
-> -       if (!info)
-> -               return -ENOMEM;
-> +       if (!info) {
-> +               ret = -ENOMEM;
-> +               goto error_dt_disable;
-> +       }
->         platform_set_drvdata(pdev, info);
->
->         par = info->par;
-> @@ -260,6 +289,10 @@ static int simplefb_probe(struct platform_device *pdev)
->   error_fb_release:
->         framebuffer_release(info);
->
-> + error_dt_disable:
-> +       if (!dev_get_platdata(&pdev->dev) && pdev->dev.of_node)
-> +               simplefb_dt_disable(pdev);
-> +
->         return ret;
->  }
->
-> @@ -269,6 +302,8 @@ static int simplefb_remove(struct platform_device *pdev)
->
->         unregister_framebuffer(info);
->         framebuffer_release(info);
-> +       if (!dev_get_platdata(&pdev->dev) && pdev->dev.of_node)
-> +               simplefb_dt_disable(pdev);
->
->         return 0;
->  }
+> Cheers, Mikko
 > --
-> 1.7.7
+> To unsubscribe from this list: send the line "unsubscribe linux-tegra" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
 >
->
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
