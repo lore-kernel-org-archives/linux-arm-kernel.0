@@ -1,31 +1,36 @@
-From: koen@dominion.thruhere.net (Koen Kooi)
-Date: Wed, 13 Aug 2014 14:58:09 +0200
-Subject: [linux-sunxi] simplefb: add clock handling
-In-Reply-To: <jwvsil0r3gc.fsf-monnier+gmane.comp.hardware.netbook.arm.sunxi@gnu.org>
-References: <1407914239-12054-1-git-send-email-libv@skynet.be>
- <CANq1E4Re79+D5H-pf8pW87NZ5MWz9UFknd5Dk2GKCvhzm5MNSA@mail.gmail.com>
- <BFCF4C2C-77ED-4719-903B-921DEB250B7A@dominion.thruhere.net>
- <53EB238B.5010404@redhat.com>
- <958E7D39-A034-42AC-A6FF-130609E46967@dominion.thruhere.net>
- <jwvsil0r3gc.fsf-monnier+gmane.comp.hardware.netbook.arm.sunxi@gnu.org>
-Message-ID: <5359ABC7-2F55-46DB-AFB8-95C0300A4BA5@dominion.thruhere.net>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Wed, 13 Aug 2014 13:58:45 +0100
+Subject: [PATCH v2 1/3] arm64: spin-table: handle unmapped
+ cpu-release-addrs
+In-Reply-To: <CAKv+Gu_UjRNhhiM0GPsKRdXRtmEnY6cbpY-JZ33RUMapbPYsbQ@mail.gmail.com>
+References: <CAKv+Gu_UjRNhhiM0GPsKRdXRtmEnY6cbpY-JZ33RUMapbPYsbQ@mail.gmail.com>
+Message-ID: <20140813125844.GE32644@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi Ard,
 
-Op 13 aug. 2014, om 14:17 heeft Stefan Monnier <monnier@iro.umontreal.ca> het volgende geschreven:
-
->> So what you are saying is that the only reason it is needed is because some
->> distros choose to build DRM drivers as modules.  So as soon as they stop
->> doing that the problem goes away, right?
+> Gents,
 > 
-> I think many people will be very happy to be able to get some visual
-> feedback on their boot problems.  Having to connect a serial console is
-> a deal breaker for most people.
+> With the 3.17 merge window not far from closing, is there anything we
+> could still do this cycle to get $subject addressed?
+> As I have indicated before, the newly introduced TEXT_OFFSET fuzzing
+> may break APM Mustang if booting from UEFI (i.e., for low values of
+> rand()), and as this option is recommended for distribution kernels,
+> it could make apt-get update'ing your kernel a frustrating experience.
+> However, the fix for that issue triggers the issue addressed by
+> $subject.
+> 
+> In my personal opinion, relaxing the requirements imposed on where
+> your cpu-release-addr may live could remain a separate discussion. In
+> the APM Mustang case, even when adhering to booting.txt by the letter
+> (i.e., pu cpu-release-addr in a memreserved area in DRAM and load
+> Image at a 2 meg boundary + TEXT_OFFSET), the kernel fails to bring up
+> the secondaries if the cpu-release-addr is below the kernel.
 
-As was said earlier in the thread, a proper DRM/KMS driver doesn't prevent that. The only thing preventing that would be:
+For the moment I would be happy with the patch as it stands (using
+ioremap_cache).
 
-a) kernels with graphics drivers disabled
-b) kernels with graphics drivers as modules that get loaded late.
+Catalin, Will?
 
-Please stop insinuation that DRM/KMS drivers can't handle boot messages.
+Mark.
