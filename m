@@ -1,108 +1,72 @@
-From: boris.brezillon@free-electrons.com (Boris BREZILLON)
-Date: Wed, 13 Aug 2014 17:20:23 +0200
-Subject: [PATCH v2] usb: gadget: at91_udc: move prepare clk into process
- context
-In-Reply-To: <20140813145348.GA26008@piout.net>
-References: <1407330702-2926-1-git-send-email-ronald.wahl@raritan.com>
- <20140812033456.16355.48522@quantum>
- <20140813145348.GA26008@piout.net>
-Message-ID: <20140813172023.52ad3902@bbrezillon>
+From: sboyd@codeaurora.org (Stephen Boyd)
+Date: Wed, 13 Aug 2014 08:31:29 -0700
+Subject: [PATCH v4] irqchip: gic: Allow gic_arch_extn hooks to call into
+ scheduler
+In-Reply-To: <20140813150540.GL30401@n2100.arm.linux.org.uk>
+References: <1407938238-21413-1-git-send-email-sboyd@codeaurora.org>
+ <20140813142257.GK30401@n2100.arm.linux.org.uk>
+ <20140813145526.GF32301@codeaurora.org>
+ <20140813150540.GL30401@n2100.arm.linux.org.uk>
+Message-ID: <20140813153129.GH32301@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 13 Aug 2014 16:53:49 +0200
-Alexandre Belloni <alexandre.belloni@free-electrons.com> wrote:
-
-> Hi Mike,
-> 
-> On 11/08/2014 at 20:34:56 -0700, Mike Turquette wrote :
-> > Quoting Ronald Wahl (2014-08-06 06:11:42)
-> > > Commit 7628083227b6bc4a7e33d7c381d7a4e558424b6b added clock preparation in
-> > > interrupt context. This is not allowed as it might sleep. Move clock
-> > > preparation into process context (at91udc_probe).
-> > > ---
-> > >  drivers/usb/gadget/udc/at91_udc.c | 39 ++++++++++++++++++++++++++++++---------
-> > >  1 file changed, 30 insertions(+), 9 deletions(-)
+On 08/13, Russell King - ARM Linux wrote:
+> On Wed, Aug 13, 2014 at 07:55:26AM -0700, Stephen Boyd wrote:
+> > On 08/13, Russell King - ARM Linux wrote:
+> > > On Wed, Aug 13, 2014 at 06:57:18AM -0700, Stephen Boyd wrote:
+> > > > Commit 1a6b69b6548c (ARM: gic: add CPU migration support,
+> > > > 2012-04-12) introduced an acquisition of the irq_controller_lock
+> > > > in gic_raise_softirq() which can lead to a spinlock recursion if
+> > > > the gic_arch_extn hooks call into the scheduler (via complete()
+> > > > or wake_up(), etc.). This happens because gic_arch_extn hooks are
+> > > > normally called with the irq_controller_lock held and calling
+> > > > into the scheduler may cause us to call smp_send_reschedule()
+> > > > which will grab the irq_controller_lock again. Here's an example
+> > > > from a vendor kernel (note that the gic_arch_extn hook code here
+> > > > isn't actually in mainline):
 > > > 
-> > > diff --git a/drivers/usb/gadget/udc/at91_udc.c b/drivers/usb/gadget/udc/at91_udc.c
-> > > index cfd18bc..0b347a0 100644
-> > > --- a/drivers/usb/gadget/udc/at91_udc.c
-> > > +++ b/drivers/usb/gadget/udc/at91_udc.c
-> > > @@ -872,10 +872,10 @@ static void clk_on(struct at91_udc *udc)
-> > >  
-> > >         if (IS_ENABLED(CONFIG_COMMON_CLK)) {
+> > > Here's a question: why would you want to call into the scheduler from
+> > > the gic_arch_extn code?
 > > 
-> > Why is this check necessary at all? Drivers shouldn't have to care at
-> > all about the underlying clock framework implementation.
-> > 
+> > In this case we want to send a message to another processor when
+> > an interrupt is enabled that's only a wakeup interrupt in certain
+> > low power states. It's done sort of indirectly, but basically we
+> > block that low power state from being entered so we can ensure
+> > that the interrupt wakes us up from a lighter version of suspend.
 > 
-> I believe it has been done because without the common clock framework,
-> usb_clk is not defined.
-
-Absolutely: uclk is only available when using the CCF. In the old at91
-clock implementation the USB clock rate was configured during early boot
-at registration time.
-With the CCF implementation USB clk rate is no longer hardcoded at init
-time and we have to configure it appropriately before using it (the
-prepare and enable actions are useless though because uclk is the parent
-of fclk, and thus will be prepared/enabled when fclk is
-prepared/enabled).
-
-What we could do here is test for CONFIG_COMMON_CLK_AT91 instead of
-CONFIG_COMMON_CLK (so that there's no direct dependency on the CCF).
-
-Another option is to implement determine_rate in the new at91 usb clk
-implementation and then call clk_set_rate on fclk (without testing the
-return code, because the old clk implementation will always return
--EINVAL).
-
+> No, that's not the correct answer for the question I asked.  I did not
+> ask "why would you want to call into the IRQ code from the scheduler".
+> I asked "why would you want to call into the scheduler from the
+> gic_arch_extn code?"
 > 
-> > >                 clk_set_rate(udc->uclk, 48000000);
-> > > -               clk_prepare_enable(udc->uclk);
-> > > +               clk_enable(udc->uclk);
-> > >         }
-> > > -       clk_prepare_enable(udc->iclk);
-> > > -       clk_prepare_enable(udc->fclk);
-> > > +       clk_enable(udc->iclk);
-> > > +       clk_enable(udc->fclk);
-> > >  }
-> > >  
-> > >  static void clk_off(struct at91_udc *udc)
-> > > @@ -884,10 +884,10 @@ static void clk_off(struct at91_udc *udc)
-> > >                 return;
-> > >         udc->clocked = 0;
-> > >         udc->gadget.speed = USB_SPEED_UNKNOWN;
-> > > -       clk_disable_unprepare(udc->fclk);
-> > > -       clk_disable_unprepare(udc->iclk);
-> > > +       clk_disable(udc->fclk);
-> > > +       clk_disable(udc->iclk);
-> > >         if (IS_ENABLED(CONFIG_COMMON_CLK))
-> > > -               clk_disable_unprepare(udc->uclk);
-> > > +               clk_disable(udc->uclk);
-> > >  }
-> > >  
-> > >  /*
-> > > @@ -1780,14 +1780,23 @@ static int at91udc_probe(struct platform_device *pdev)
-> > >         }
-> > >  
-> > >         /* don't do anything until we have both gadget driver and VBUS */
-> > > +       if (IS_ENABLED(CONFIG_COMMON_CLK)) {
-> > 
-> > Same question here. What does the clock framework implementation have to
-> > do with uclk?
-> > 
-> > Regards,
-> > Mike
-> > 
-> > _______________________________________________
-> > linux-arm-kernel mailing list
-> > linux-arm-kernel at lists.infradead.org
-> > http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
-> 
+> That's a completely different question.  Let me rephrase to try and get
+> an answer to my question: Why are you calling complete() or wake_up()
+> from the gic_arch_extn code?
 
+That's the answer. I guess you think "another processor" means
+some other CPU running linux? That isn't the case. We aren't
+calling into the IRQ code from the scheduler. The IRQ code is
+calling the gic_arch_extn code which is calling into the
+scheduler. Let me try to clarify. The path from the stacktrace I
+posted is:
 
+ request_irq()
+  irq_enable()
+   gic_unmask_irq()
+    msm_mpm_enable_irq()
+     ...
+     complete()
+
+In this case a driver is requesting an interrupt that is wakeup
+capable even in the lowest power state, so we wakeup a thread
+that's sitting around waiting on that completion to notify the
+non-linux running remote processor that we can go into the lowest
+power state. We can only communicate with the other processor via
+sleeping APIs. Another way to do it would be to schedule a work
+but we would get into the same situation as this because
+scheduling works may call into the scheduler too.
 
 -- 
-Boris Brezillon, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+hosted by The Linux Foundation
