@@ -1,52 +1,67 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Wed, 13 Aug 2014 12:21:01 +0100
-Subject: [PATCH] Arm64: convert part of soft_restart() to assembly
-In-Reply-To: <CAFdej00kapRsQB+YSO4PPN5NODiKrxzYrczof34LUD3iqwXhbA@mail.gmail.com>
-References: <1407847365-10873-1-git-send-email-achandran@mvista.com>
- <1407915801-8703-1-git-send-email-achandran@mvista.com>
- <20140813105829.GC32644@leverpostej>
- <CAFdej00kapRsQB+YSO4PPN5NODiKrxzYrczof34LUD3iqwXhbA@mail.gmail.com>
-Message-ID: <20140813112101.GD32644@leverpostej>
+From: javier.martinez@collabora.co.uk (Javier Martinez Canillas)
+Date: Wed, 13 Aug 2014 13:31:44 +0200
+Subject: [PATCH 6/6] ARM: dts: Add tps65090 FETs constraints
+In-Reply-To: <20140812212757.GY17528@sirena.org.uk>
+References: <1407861868-20097-1-git-send-email-javier.martinez@collabora.co.uk>
+ <1407861868-20097-7-git-send-email-javier.martinez@collabora.co.uk>
+ <20140812172552.GU17528@sirena.org.uk> <53EA61B9.2070805@collabora.co.uk>
+ <20140812212757.GY17528@sirena.org.uk>
+Message-ID: <53EB4CA0.3010006@collabora.co.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Aug 13, 2014 at 12:17:54PM +0100, Arun Chandran wrote:
-> Hi Mark,
-> 
-> > On Wed, Aug 13, 2014 at 08:43:21AM +0100, Arun Chandran wrote:
-> >> The current soft_restart() and setup_restart implementations incorrectly
-> >> assume that compiler will not spill/fill values to/from stack. However
-> >> this assumption seems to be wrong, revealed by the disassembly of the
-> >> currently existing code.
-> >>
-> >> Pseudo code for disassembly looks like
-> >>
-> >> soft_restart(addr)
-> >> {
-> >>       __push_to_stack(addr)
-> >>
-> >>       branch to setup_mm_for_reboot()
-> >>       branch to flush_cache_all() --> This is unnecessary
-> >>       branch to cpu_cache_off()
-> >>       branch to flush_cache_all() --> Not guaranteed of flushing to PoC
-> >>
-> >>       __pop_from_stack(addr) --> Fails here as addr is not at PoC
-> >>
-> >>       cpu_reset(addr) --> cpu_reset receives invalid reset address
-> >> }
-> >
-> > As I mentioned before, I think having pseudocode here is confusing.
-> > Either we should have a real disassembly or we should drop it. I get the
-> > following when I build a v3.16 arm64 defconfig with Linaro GCC
-> > 4.9-2014.05:
-> >
-> 
-> Hmm. I think It is better to drop it as different compilers give different
-> output. My compiler's output is according to the commit message, but
-> your's is not. I will send another one soon.
+Hello Mark,
 
-Well, either output would be fine as an example. I'd just like to see
-the real asm rather than pseudocode.
+On 08/12/2014 11:27 PM, Mark Brown wrote:
+> On Tue, Aug 12, 2014 at 08:49:29PM +0200, Javier Martinez Canillas wrote:
+> 
+>> So, is adding these voltages ranges (the design limits) in the Peach Pit DTS
+>> file directly an acceptable solution? Basically what my previous patch [0] did.
+> 
+>> That matches what is in the board schematic so I assume that it's safe to use
+>> these voltage ranges for that machine. If so I'll drop this series and repost
+>> that patch fixing the typo error and commit message pointed by Doug that were
+>> already addressed in $subject.
+> 
+> Well, I think the question is if you understand where those numbers come
+> from and if they make sense.  I've not seen the schematic for the board
+> so I can't comment but it is quite unusual to see ranges listed for so
+> many supplies, for things like SD it's obviously normal but things like
+> video_mid are a bit more surprising.  Does anything actually vary those
+> voltages?
+> 
 
-Cheers,
-Mark.
+You are right, in fact even the voltage for the SD supply (tps65090 fet4) does
+not change but still their constraints have to be defined, since it is used as a
+vmmc-supply and the series "Adding UHS support for dw_mmc driver" [0] calls
+mmc_regulator_get_ocrmask()/mmc_regulator_set_ocr() for mmc->supply.vmmc.
+
+For fixed regulators (like fet4), mmc_regulator_set_ocr() just skips varying the
+regulator voltage but still expects to be able to obtain its voltage.
+
+Since the FET is just a switch and doesn't have an output voltage, the regulator
+core gets its parent supply voltage but regulator_list_voltge() [1] checks that
+the obtained parent voltage is between the child regulator constraints.
+
+So in this particular case it makes sense to compare that the parent voltage is
+between the (design limits) voltage ranges for the FET but I agree that it may
+not make sense on other boards.
+
+Since I needed to add the ranges for fet4 I (wrongly) thought that it would make
+sense to add the ranges for all the other FETs in case other boards had a
+similar need. But now I understand your concerns about this series so I'll drop
+it and just post a patch that adds to the Peach Pit and Pi DTS, the constraints
+for the fet4 used as vmmc-supply instead of pretending that it's a common setup.
+
+> The change where you fix up the supply mappings still makes sense of
+> course.
+>
+
+Good to know, again thanks a lot for your feedback and explanations.
+
+Best regards,
+Javier
+
+[0]: http://lists.infradead.org/pipermail/linux-arm-kernel/2014-June/265657.html
+[1]:
+https://git.kernel.org/cgit/linux/kernel/git/broonie/regulator.git/tree/drivers/regulator/core.c?h=for-next#n2209
