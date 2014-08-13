@@ -1,90 +1,53 @@
-From: libv@skynet.be (Luc Verhaegen)
-Date: Wed, 13 Aug 2014 10:11:00 +0200
-Subject: simplefb: add clock handling
-In-Reply-To: <CANq1E4Re79+D5H-pf8pW87NZ5MWz9UFknd5Dk2GKCvhzm5MNSA@mail.gmail.com>
-References: <1407914239-12054-1-git-send-email-libv@skynet.be>
- <CANq1E4Re79+D5H-pf8pW87NZ5MWz9UFknd5Dk2GKCvhzm5MNSA@mail.gmail.com>
-Message-ID: <20140813081100.GB31326@skynet.be>
+From: gang.chen.5i5j@gmail.com (Chen Gang)
+Date: Wed, 13 Aug 2014 16:16:32 +0800
+Subject: [PATCH v2] arch: Kconfig: Let all little endian architectures
+ define CPU_LITTLE_ENDIAN explicitly
+In-Reply-To: <CAMuHMdV_2b-A+eE--cXEFA68=72HK6mqx8+TCXRMVkyhESLYxQ@mail.gmail.com>
+References: <53EA99C3.90203@gmail.com>
+ <CAMuHMdV_2b-A+eE--cXEFA68=72HK6mqx8+TCXRMVkyhESLYxQ@mail.gmail.com>
+Message-ID: <53EB1EE0.20002@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Aug 13, 2014 at 09:54:21AM +0200, David Herrmann wrote:
-> Hi
+
+On 8/13/14 16:03, Geert Uytterhoeven wrote:
+> CC kbuild
 > 
-> Hans de Goede shortly told me about this and, tbh, I am not very
-> pleased. Stephen tried to keep simplefd "as simple as possible", your
-> patch now adds hardware-specific features. To be fair, the patch is
-> simple and clocks are easy to handle, but I somehow fear we have to
-> add more and more hardware-support that is required to keep the
-> framebuffer active. This really defeats the purpose of simplefb.
-
-SimpleFB is a really deceptive name. If you lie to your ARM core all the 
-time, and do most things behind its back, like RPi does, then you can 
-get away with simplefb.
-
-If not, it quickly becomes a lot more complicated, fast. This should've 
-been called rpibootfb or something.
-
-How does one deal with this dealbreaker issue of clocks? Or memory, 
-apart from telling the kernel that the fb area is simple not accessible 
-as normal ram. Or dpms?
-
-> The biggest question I have, is why do you add the clocks to your DT
-> at all?
-
-I didn't, someone else did.
-
-> The framebuffer is set up by your boot-loader (or maybe
-> platform code) and should prepare the clocks. I don't see why we add
-> the clocks to DT now. If they're not added, then no-one will disable
-> them and simplefb works just fine, right?
+> On Wed, Aug 13, 2014 at 12:48 AM, Chen Gang <gang.chen.5i5j@gmail.com> wrote:
+>> diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+>> index c49a775..0510a5d 100644
+>> --- a/arch/arm/Kconfig
+>> +++ b/arch/arm/Kconfig
+>> @@ -199,6 +199,11 @@ config NEED_DMA_MAP_STATE
+>>  config ARCH_SUPPORTS_UPROBES
+>>         def_bool y
+>>
+>> +config CPU_LITTLE_ENDIAN
+>> +       depends on !CPU_BIG_ENDIAN
+>> +       def_bool y
+>> +
+>> +
+>>  config ARCH_HAS_DMA_SET_COHERENT_MASK
+>>         bool
 > 
-> Or is there some requirement to make DT a _complete_ hw-description?
+> As this is a common symbol, and replicated for all affected architectures,
+> I'm wondering if we should have the "config CPU_LITTLE_ENDIAN" in
+> common Kconfig code instead, and make the individual architectures do a
+> "select CPU_LITTLE_ENDIAN"?
+> 
 
-Again, i am not responsible for that part. But my impression is that it 
-should be absolutely complete, and i have been whining about actual bit 
-offsets into registers being provided from the dt :(
+That sounds a good idea to me.
 
-> Or is there some parent clock which might be used by other drivers and
-> controls the clock used for your display?
+> Also we could have "config CPU_BIG_ENDIAN", too, and error out
+> if none or both are selected (can Kconfig error out?).
+> 
 
-Not at this point for sunxi, but there will be.
+It is a good idea to me, welcome any members ideas, especially Kbuild
+members' ideas, suggestions or completions.
 
-> The only reason I see to add the clocks, is to support both, simplefb
-> *and* a hardware-driver. However, fbdev hand-over is horribly racy and
-> I'd much rather prefer a solution like sysfb that does proper handover
-> from primitive firmware-FBs to real hardware-drivers. In that case,
-> we'd have to figure out how to deal with clocks, but we could do it in
-> sysfb (which is meant to deal with those issues) with the benefit of
-> controlling hand-over directly, and allowing hw-dependent features.
 
-Yes, a KMS driver is being worked on. I was, as a first order 
-approximation (when i move it to mainline code), going to manually do 
-some of this handover from simplefb.
+Thanks.
+-- 
+Chen Gang
 
-> My sysfb patches haven't been updated for a while, though, and you
-> have a working solution here. So I'm not going to NAK this, I
-> appreciate people working on this. But I'd like to get a discussion
-> started so we can at least figure out some nicer solution for the
-> future which might replace your code.
-
-So much for this being simple. again :)
-
-> Btw., my current idea was to destroy the platform-devices of EFI/VGA
-> framebuffers during hand-over (because usually the underlying hw is
-> shutdown/modified). This automatically unloads simplefb and makes sure
-> the real hw-driver can be probed without other drivers touching the
-> hardware in parallel. Iff you unload the hw-driver afterwards, it can
-> re-create the firmware framebuffer and add a platform-device to make
-> simplefb load again (in case anyone really needs this).
-> Looking at your 3rd patch, I wonder whether this works with DT based
-> machines, or whether we'd have to use the "disable" mechanism you
-> chose. Any reason destroying the device would not work there? If yes,
-> I will look into the "disable-idea".
-
-The clocks we currently claim handle the ahb gating of different display 
-engines. Disable the gating bit, and all power is lost to the respective 
-engine, and register content vanishes. So there is absolutely no coming 
-back from that, apart from starting a proper display driver.
-
-Luc Verhaegen.
+Open, share, and attitude like air, water, and life which God blessed
