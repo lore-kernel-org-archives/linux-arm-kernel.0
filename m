@@ -1,24 +1,79 @@
-From: matt@console-pimps.org (Matt Fleming)
-Date: Wed, 13 Aug 2014 15:22:07 +0100
-Subject: [PATCH 2/5] efi: add kernel param efi=noruntime
-In-Reply-To: <20140813081347.GA3977@darkstar.nay.redhat.com>
-References: <1407823822-23829-1-git-send-email-dyoung@redhat.com>
- <1407823822-23829-2-git-send-email-dyoung@redhat.com>
- <20140813081347.GA3977@darkstar.nay.redhat.com>
-Message-ID: <20140813142207.GR15082@console-pimps.org>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Wed, 13 Aug 2014 15:22:57 +0100
+Subject: [PATCH v4] irqchip: gic: Allow gic_arch_extn hooks to call
+ into scheduler
+In-Reply-To: <1407938238-21413-1-git-send-email-sboyd@codeaurora.org>
+References: <1407938238-21413-1-git-send-email-sboyd@codeaurora.org>
+Message-ID: <20140813142257.GK30401@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 13 Aug, at 04:13:47PM, Dave Young wrote:
-> 
-> For sharing functions I moved old_map here, but rethinking about it maybe
-> it's better to keep it in arch code.
-> 
-> Matt, I see you have some code for libstub option parsing, I will rebase
-> on your efi/next and I'm thinking to add a generic function for parsing
-> params like below (for old_map, but libstub can not use it):
- 
-Makes sense to me.
+On Wed, Aug 13, 2014 at 06:57:18AM -0700, Stephen Boyd wrote:
+> Commit 1a6b69b6548c (ARM: gic: add CPU migration support,
+> 2012-04-12) introduced an acquisition of the irq_controller_lock
+> in gic_raise_softirq() which can lead to a spinlock recursion if
+> the gic_arch_extn hooks call into the scheduler (via complete()
+> or wake_up(), etc.). This happens because gic_arch_extn hooks are
+> normally called with the irq_controller_lock held and calling
+> into the scheduler may cause us to call smp_send_reschedule()
+> which will grab the irq_controller_lock again. Here's an example
+> from a vendor kernel (note that the gic_arch_extn hook code here
+> isn't actually in mainline):
+
+Here's a question: why would you want to call into the scheduler from
+the gic_arch_extn code?
+
+Oh.  My.  God.  Thomas, what have you done to the generic IRQ layer?
+This is /totally/ unsafe:
+
+void disable_irq(unsigned int irq)
+{
+        if (!__disable_irq_nosync(irq))
+                synchronize_irq(irq);
+}
+
+static int __disable_irq_nosync(unsigned int irq)
+{
+        unsigned long flags;
+        struct irq_desc *desc = irq_get_desc_buslock(irq, &flags, IRQ_GET_DESC_CHECK_GLOBAL);
+
+        if (!desc)
+                return -EINVAL;
+        __disable_irq(desc, irq, false);
+        irq_put_desc_busunlock(desc, flags);
+        return 0;
+}
+
+void __disable_irq(struct irq_desc *desc, unsigned int irq, bool suspend)
+{
+        if (suspend) {
+                if (!desc->action || (desc->action->flags & IRQF_NO_SUSPEND))
+                        return;
+                desc->istate |= IRQS_SUSPENDED;
+        }
+
+        if (!desc->depth++)
+                irq_disable(desc);
+}
+
+You realise that disable_irq() and enable_irq() can be called by
+concurrently by different drivers for the /same/ interrupt.  For
+starters, that post-increment there is completely unprotected against
+races.  Secondly, the above is completely racy against a concurrent
+enable_irq() - what if we're in disable_irq(), we've incremented
+depth, but have yet to call irq_disable().  The count now has a
+value of 1.
+
+We then preempt, and run another thread which calls enable_irq()
+on it.  This results in the depth being decremented, and the IRQ
+is now enabled.
+
+We resume the original thread, and continue to call irq_disable(),
+resulting in the interrupt being disabled.
+
+That's not nice (the right answer is that it's strictly an unbalanced
+enable_irq(), but that's no excuse here.)
 
 -- 
-Matt Fleming, Intel Open Source Technology Center
+FTTC broadband for 0.8mile line: currently at 9.5Mbps down 400kbps up
+according to speedtest.net.
