@@ -1,44 +1,83 @@
-From: michal.simek@xilinx.com (Michal Simek)
-Date: Wed, 13 Aug 2014 13:57:42 +0200
-Subject: [PATCH] dma: xilinx: Remove .owner field for driver
-Message-ID: <f82330042cf6185a1f4e18232ebf6999662ae48f.1407931050.git.michal.simek@xilinx.com>
+From: leif.lindholm@linaro.org (Leif Lindholm)
+Date: Wed, 13 Aug 2014 13:22:39 +0100
+Subject: [PATCH] arm64: ignore DT memreserve entries when booting in UEFI
+ mode
+In-Reply-To: <20140728181449.GF2576@leverpostej>
+References: <1406570583-22848-1-git-send-email-leif.lindholm@linaro.org>
+ <20140728181449.GF2576@leverpostej>
+Message-ID: <20140813122239.GA15356@bivouac.eciton.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-There is no need to init .owner field.
+On Mon, Jul 28, 2014 at 07:14:49PM +0100, Mark Rutland wrote:
+> On Mon, Jul 28, 2014 at 07:03:03PM +0100, Leif Lindholm wrote:
+> > UEFI provides its own method for marking regions to reserve, via the
+> > memory map which is also used to initialise memblock. So when using the
+> > UEFI memory map, ignore any memreserve entries present in the DT.
+> 
+> It's worth noting that no-one is relying on this at present, and were
+> they it would imply that their UEFI implementation is broken (providing
+> a dodgy memory map).
+> 
+> So before people start doing dodgy things, let's, close that hole. If we
+> need a way of modifying the memory map we should come up with a more
+> general plan.
 
-Based on the patch from Peter Griffin <peter.griffin@linaro.org>
-"mmc: remove .owner field for drivers using module_platform_driver"
+Catalin - any comments?
+As it is a bugfix, can it go into 3.17?
 
-This patch removes the superflous .owner field for drivers which
-use the module_platform_driver API, as this is overriden in
-platform_driver_register anyway."
-
-Signed-off-by: Michal Simek <michal.simek@xilinx.com>
----
-
- drivers/dma/xilinx/xilinx_vdma.c | 1 -
- 1 file changed, 1 deletion(-)
-
-diff --git a/drivers/dma/xilinx/xilinx_vdma.c b/drivers/dma/xilinx/xilinx_vdma.c
-index 42a13e8d4607..a6e64767186e 100644
---- a/drivers/dma/xilinx/xilinx_vdma.c
-+++ b/drivers/dma/xilinx/xilinx_vdma.c
-@@ -1365,7 +1365,6 @@ static const struct of_device_id xilinx_vdma_of_ids[] = {
- static struct platform_driver xilinx_vdma_driver = {
- 	.driver = {
- 		.name = "xilinx-vdma",
--		.owner = THIS_MODULE,
- 		.of_match_table = xilinx_vdma_of_ids,
- 	},
- 	.probe = xilinx_vdma_probe,
---
-1.8.2.3
-
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: not available
-Type: application/pgp-signature
-Size: 198 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140813/289720ab/attachment.sig>
+/
+    Leif
+ 
+> > Reported-by: Mark Rutland <mark.rutland@arm.com>
+> > Signed-off-by: Leif Lindholm <leif.lindholm@linaro.org>
+> > ---
+> >  arch/arm64/kernel/efi.c |    2 ++
+> >  arch/arm64/mm/init.c    |    4 +++-
+> >  2 files changed, 5 insertions(+), 1 deletion(-)
+> > 
+> > diff --git a/arch/arm64/kernel/efi.c b/arch/arm64/kernel/efi.c
+> > index 14db1f6..7ad17b2 100644
+> > --- a/arch/arm64/kernel/efi.c
+> > +++ b/arch/arm64/kernel/efi.c
+> > @@ -188,6 +188,8 @@ static __init void reserve_regions(void)
+> >  		if (uefi_debug)
+> >  			pr_cont("\n");
+> >  	}
+> > +
+> > +	set_bit(EFI_MEMMAP, &efi.flags);
+> 
+> Nothing outside of arch/x86 seems to hang off this, so using it here
+> looks fine.
+> 
+> >  }
+> >  
+> >  
+> > diff --git a/arch/arm64/mm/init.c b/arch/arm64/mm/init.c
+> > index e90c542..58dbf2e 100644
+> > --- a/arch/arm64/mm/init.c
+> > +++ b/arch/arm64/mm/init.c
+> > @@ -32,6 +32,7 @@
+> >  #include <linux/of_fdt.h>
+> >  #include <linux/dma-mapping.h>
+> >  #include <linux/dma-contiguous.h>
+> > +#include <linux/efi.h>
+> >  
+> >  #include <asm/sections.h>
+> >  #include <asm/setup.h>
+> > @@ -151,7 +152,8 @@ void __init arm64_memblock_init(void)
+> >  	memblock_reserve(__pa(swapper_pg_dir), SWAPPER_DIR_SIZE);
+> >  	memblock_reserve(__pa(idmap_pg_dir), IDMAP_DIR_SIZE);
+> >  
+> > -	early_init_fdt_scan_reserved_mem();
+> > +	if (!efi_enabled(EFI_MEMMAP))
+> > +		early_init_fdt_scan_reserved_mem();
+> 
+> And this is a false stub for !EFI, so that looks fine.
+> 
+> FWIW:
+> 
+> Reviewed-by: Mark Rutland <mark.rutland@arm.com>
+> 
+> I wonder if we have any other flat tree uses we need to be careful of
+> when booting via EFI.
