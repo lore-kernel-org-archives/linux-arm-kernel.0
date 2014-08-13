@@ -1,7 +1,7 @@
 From: michal.simek@xilinx.com (Michal Simek)
-Date: Wed, 13 Aug 2014 14:02:05 +0200
-Subject: [PATCH] char: xilinx_hwicap: Remove .owner field for driver
-Message-ID: <b2fb97b7fe72ba11ce1bef74ad2038d4e932b5a9.1407931319.git.michal.simek@xilinx.com>
+Date: Wed, 13 Aug 2014 13:57:42 +0200
+Subject: [PATCH] dma: xilinx: Remove .owner field for driver
+Message-ID: <f82330042cf6185a1f4e18232ebf6999662ae48f.1407931050.git.michal.simek@xilinx.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -17,21 +17,21 @@ platform_driver_register anyway."
 Signed-off-by: Michal Simek <michal.simek@xilinx.com>
 ---
 
- drivers/char/xilinx_hwicap/xilinx_hwicap.c | 1 -
+ drivers/dma/xilinx/xilinx_vdma.c | 1 -
  1 file changed, 1 deletion(-)
 
-diff --git a/drivers/char/xilinx_hwicap/xilinx_hwicap.c b/drivers/char/xilinx_hwicap/xilinx_hwicap.c
-index 9b1a5ac4881d..c07dfe5c4da3 100644
---- a/drivers/char/xilinx_hwicap/xilinx_hwicap.c
-+++ b/drivers/char/xilinx_hwicap/xilinx_hwicap.c
-@@ -843,7 +843,6 @@ static struct platform_driver hwicap_platform_driver = {
- 	.probe = hwicap_drv_probe,
- 	.remove = hwicap_drv_remove,
+diff --git a/drivers/dma/xilinx/xilinx_vdma.c b/drivers/dma/xilinx/xilinx_vdma.c
+index 42a13e8d4607..a6e64767186e 100644
+--- a/drivers/dma/xilinx/xilinx_vdma.c
++++ b/drivers/dma/xilinx/xilinx_vdma.c
+@@ -1365,7 +1365,6 @@ static const struct of_device_id xilinx_vdma_of_ids[] = {
+ static struct platform_driver xilinx_vdma_driver = {
  	.driver = {
+ 		.name = "xilinx-vdma",
 -		.owner = THIS_MODULE,
- 		.name = DRIVER_NAME,
- 		.of_match_table = hwicap_of_match,
+ 		.of_match_table = xilinx_vdma_of_ids,
  	},
+ 	.probe = xilinx_vdma_probe,
 --
 1.8.2.3
 
@@ -41,4 +41,4 @@ Name: not available
 Type: application/pgp-signature
 Size: 198 bytes
 Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140813/571d3402/attachment.sig>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140813/289720ab/attachment.sig>
