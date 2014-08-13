@@ -1,67 +1,24 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Wed, 13 Aug 2014 19:53:03 +0200
-Subject: [PATCH] arm64: align randomized TEXT_OFFSET on 4 kB boundary
-Message-ID: <1407952383-1214-1-git-send-email-ard.biesheuvel@linaro.org>
+From: linux@roeck-us.net (Guenter Roeck)
+Date: Wed, 13 Aug 2014 10:58:16 -0700
+Subject: [PATCH] watchdog: xilinx: Remove .owner field for driver
+In-Reply-To: <e8e4f914035bfd055525e224da9d3e62e70edb1b.1407930684.git.michal.simek@xilinx.com>
+References: <e8e4f914035bfd055525e224da9d3e62e70edb1b.1407930684.git.michal.simek@xilinx.com>
+Message-ID: <20140813175816.GA16662@roeck-us.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-When booting via UEFI, the kernel Image is loaded at a 4 kB boundary and
-the embedded EFI stub is executed in place. The EFI stub relocates the
-Image to reside TEXT_OFFSET bytes above a 2 MB boundary, and jumps into
-the kernel proper.
+On Wed, Aug 13, 2014 at 01:51:28PM +0200, Michal Simek wrote:
+> There is no need to init .owner field.
+> 
+> Based on the patch from Peter Griffin <peter.griffin@linaro.org>
+> "mmc: remove .owner field for drivers using module_platform_driver"
+> 
+> This patch removes the superflous .owner field for drivers which
+> use the module_platform_driver API, as this is overriden in
+> platform_driver_register anyway."
+> 
+> Signed-off-by: Michal Simek <michal.simek@xilinx.com>
 
-In AArch64, PC relative symbol references are emitted using adrp/add or
-adrp/ldr pairs, where the offset into a 4 kB page is resolved using a
-separate :lo12: relocation. This implicitly assumes that the code will
-always be executed at the same relative offset with respect to a 4 kB
-boundary, or the references will point to the wrong address.
+Reviewed-by: Guenter Roeck <linux@roeck-us.net>
 
-This means we should link the kernel at a 4 kB aligned base address in
-order to remain compatible with the base address the UEFI loader uses
-when doing the initial load of Image. So update the code that generates
-TEXT_OFFSET to choose a multiple of 4 kB.
-
-At the same time, update the code so it chooses from the interval [0..2MB)
-as the author originally intended.
-
-Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
----
- arch/arm64/Makefile      | 2 +-
- arch/arm64/kernel/head.S | 8 ++++----
- 2 files changed, 5 insertions(+), 5 deletions(-)
-
-diff --git a/arch/arm64/Makefile b/arch/arm64/Makefile
-index 57833546bf00..2df5e5daeebe 100644
---- a/arch/arm64/Makefile
-+++ b/arch/arm64/Makefile
-@@ -39,7 +39,7 @@ head-y		:= arch/arm64/kernel/head.o
- 
- # The byte offset of the kernel image in RAM from the start of RAM.
- ifeq ($(CONFIG_ARM64_RANDOMIZE_TEXT_OFFSET), y)
--TEXT_OFFSET := $(shell awk 'BEGIN {srand(); printf "0x%04x0\n", int(65535 * rand())}')
-+TEXT_OFFSET := $(shell awk 'BEGIN {srand(); printf "0x%03x000\n", int(512 * rand())}')
- else
- TEXT_OFFSET := 0x00080000
- endif
-diff --git a/arch/arm64/kernel/head.S b/arch/arm64/kernel/head.S
-index b6ca95aee348..ae055a18b04a 100644
---- a/arch/arm64/kernel/head.S
-+++ b/arch/arm64/kernel/head.S
-@@ -38,11 +38,11 @@
- 
- #define KERNEL_RAM_VADDR	(PAGE_OFFSET + TEXT_OFFSET)
- 
--#if (TEXT_OFFSET & 0xf) != 0
--#error TEXT_OFFSET must be at least 16B aligned
--#elif (PAGE_OFFSET & 0xfffff) != 0
-+#if (TEXT_OFFSET & 0xfff) != 0
-+#error TEXT_OFFSET must be at least 4kB aligned
-+#elif (PAGE_OFFSET & 0x1fffff) != 0
- #error PAGE_OFFSET must be at least 2MB aligned
--#elif TEXT_OFFSET > 0xfffff
-+#elif TEXT_OFFSET > 0x1fffff
- #error TEXT_OFFSET must be less than 2MB
- #endif
- 
--- 
-1.8.3.2
+Guenter
