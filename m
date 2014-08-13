@@ -1,44 +1,86 @@
-From: yao.yuan@freescale.com (Yuan Yao)
-Date: Wed, 13 Aug 2014 17:46:55 +0800
-Subject: [PATCH v7 2/2] Documentation:add DMA support for freescale i2c driver
-In-Reply-To: <1407923215-3749-1-git-send-email-yao.yuan@freescale.com>
-References: <1407923215-3749-1-git-send-email-yao.yuan@freescale.com>
-Message-ID: <1407923215-3749-3-git-send-email-yao.yuan@freescale.com>
+From: thierry.reding@gmail.com (Thierry Reding)
+Date: Wed, 13 Aug 2014 12:36:14 +0200
+Subject: [PATCH 0/3] Thermal reset support in PMC
+In-Reply-To: <53EB3556.9010504@nvidia.com>
+References: <1407226380-747-1-git-send-email-mperttunen@nvidia.com>
+ <20140813080744.GD7735@ulmo> <53EB1DF5.301@nvidia.com>
+ <53EB250D.5070207@nvidia.com> <20140813085728.GF7735@ulmo>
+ <53EB3556.9010504@nvidia.com>
+Message-ID: <20140813103613.GA7624@ulmo>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add i2c dts node properties for eDMA support, them depend on the eDMA driver.
+On Wed, Aug 13, 2014 at 12:52:22PM +0300, Mikko Perttunen wrote:
+> On 13/08/14 11:57, Thierry Reding wrote:
+> >* PGP Signed by an unknown key
+> >
+> >On Wed, Aug 13, 2014 at 11:42:53AM +0300, Mikko Perttunen wrote:
+> >>
+> >>
+> >>On 13/08/14 11:12, Mikko Perttunen wrote:
+> >>>On 13/08/14 11:07, Thierry Reding wrote:
+> >>>>>Old Signed by an unknown key
+> >>>>
+> >>>>On Tue, Aug 05, 2014 at 11:12:57AM +0300, Mikko Perttunen wrote:
+> >>>>>Hi,
+> >>>>>
+> >>>>>this series adds support for hardware-triggered thermal reset to the PMC
+> >>>>>driver. Namely, it adds device tree properties for specifying the I2C
+> >>>>>command to be sent when thermtrip is triggered. It is to be noted
+> >>>>>that thermtrip won't be ever triggered without a soctherm driver to
+> >>>>>calibrate the sensors, but I'll follow up with that patch.
+> >>>>>
+> >>>>>pmc.c required some juggling around to make the match data usable in
+> >>>>>probe, since I didn't want to put the code into the initcall either, since
+> >>>>>the soctherm driver won't be initialized by that point anyway.
+> >>>>>
+> >>>>>Series tested on Jetson-TK1. Should work on Tegra30 and Tegra114 too.
+> >>>>
+> >>>>Can you describe the procedure used to test this? We currently have a
+> >>>>bunch of features in Tegra that some people have tested at some point
+> >>>>during development but the test procedures never got documented. That
+> >>>>means whenever we want to test something we need to go and reinvent a
+> >>>>bunch of tests after the fact.
+> >>>>
+> >>>>So what I'd like to start doing is collect tests (preferably in some
+> >>>>scripted way) so that they can be kept in a repository that people can
+> >>>>easily clone and run on devices.
+> >>>>
+> >>>>Could you provide something like that for thermtrip?
+> >>>
+> >>>Sure. I'll see if I can make a just a test script or if a local patch is
+> >>>needed to test. Btw, I also have a pretty nice test script for EMC
+> >>>ready, and I agree that such a repository would be very nice.
+> >>
+> >>Here is a test program. It it works, the device with immediately shut down.
+> >>
+> >>https://gist.github.com/cyndis/66126c9c176b5f94a76f
+> >
+> >Is there a way to set the trip temperature without going through
+> >/dev/mem? I'd expect the device to have a sysfs interface of some
+> >sort.
+> 
+> The thermtrip "device" isn't currently exposed in any way. If it were
+> exposed, I suppose it would be exposed as thermal zone devices, each with
+> one trip point. Even then, the thermal framework doesn't really support this
+> properly; none of the trip point types really apply to this kind of trip
+> point, and x86 systems don't expose their trips either.
 
-Signed-off-by: Yuan Yao <yao.yuan@freescale.com>
----
- Documentation/devicetree/bindings/i2c/i2c-imx.txt | 11 +++++++++++
- 1 file changed, 11 insertions(+)
+Okay. The reason why I asked is because I'm not sure yet that having C
+programs in the test suite would be good, so having something that's
+easily scriptable would be preferred.
 
-diff --git a/Documentation/devicetree/bindings/i2c/i2c-imx.txt b/Documentation/devicetree/bindings/i2c/i2c-imx.txt
-index 4a8513e..52d37fd 100644
---- a/Documentation/devicetree/bindings/i2c/i2c-imx.txt
-+++ b/Documentation/devicetree/bindings/i2c/i2c-imx.txt
-@@ -11,6 +11,8 @@ Required properties:
- Optional properties:
- - clock-frequency : Constains desired I2C/HS-I2C bus clock frequency in Hz.
-   The absence of the propoerty indicates the default frequency 100 kHz.
-+- dmas: A list of two dma specifiers, one for each entry in dma-names.
-+- dma-names: should contain "tx" and "rx".
- 
- Examples:
- 
-@@ -26,3 +28,12 @@ i2c at 70038000 { /* HS-I2C on i.MX51 */
- 	interrupts = <64>;
- 	clock-frequency = <400000>;
- };
-+
-+i2c0: i2c at 40066000 { /* i2c0 on vf610 */
-+	compatible = "fsl,vf610-i2c";
-+	reg = <0x40066000 0x1000>;
-+	interrupts =<0 71 0x04>;
-+	dmas = <&edma0 0 50>,
-+		<&edma0 0 51>;
-+	dma-names = "rx","tx";
-+};
--- 
-1.8.4
+> Anyway, since debugging is pretty much the only use case for modifying
+> the trip temperature, I thought adding the tz_devices would be a bit
+> overkill.
+
+An alternative could be a file in debugfs.
+
+Thierry
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: not available
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140813/905db0b0/attachment.sig>
