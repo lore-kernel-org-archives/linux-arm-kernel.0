@@ -1,49 +1,55 @@
-From: nicolas.pitre@linaro.org (Nicolas Pitre)
-Date: Wed, 13 Aug 2014 12:31:11 -0400 (EDT)
-Subject: [PATCH v7 3/8] drivers: cpuidle: implement DT based idle states
- infrastructure
-In-Reply-To: <1407945127-27554-4-git-send-email-lorenzo.pieralisi@arm.com>
-References: <1407945127-27554-1-git-send-email-lorenzo.pieralisi@arm.com>
- <1407945127-27554-4-git-send-email-lorenzo.pieralisi@arm.com>
-Message-ID: <alpine.LFD.2.11.1408131223501.1133@knanqh.ubzr>
+From: tony@atomide.com (Tony Lindgren)
+Date: Wed, 13 Aug 2014 09:37:23 -0700
+Subject: [PATCH 5/5] tty: serial: Add 8250-core based omap driver
+In-Reply-To: <53EB9066.3060208@linutronix.de>
+References: <1405521903-5877-1-git-send-email-bigeasy@linutronix.de>
+ <1405521903-5877-6-git-send-email-bigeasy@linutronix.de>
+ <20140717070859.GD18374@atomide.com>
+ <20140717074219.GA29193@linutronix.de>
+ <20140717081232.GH18374@atomide.com> <53C7A01C.50107@linutronix.de>
+ <20140718062456.GJ18374@atomide.com>
+ <20140721093528.GS18374@atomide.com>
+ <53EB9066.3060208@linutronix.de>
+Message-ID: <20140813163722.GA9239@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 13 Aug 2014, Lorenzo Pieralisi wrote:
-
-> On most common ARM systems, the low-power states a CPU can be put into are
-> not discoverable in HW and require device tree bindings to describe
-> power down suspend operations and idle states parameters.
+* Sebastian Andrzej Siewior <bigeasy@linutronix.de> [140813 09:23]:
+> On 07/21/2014 11:35 AM, Tony Lindgren wrote:
 > 
-> In order to enable DT based idle states and configure idle drivers, this
-> patch implements the bulk infrastructure required to parse the device tree
-> idle states bindings and initialize the corresponding CPUidle driver states
-> data.
+> > Looks like the following is needed to avoid the error, no idea why..
+> > But this is what we also do in omap-serial.c. It may be needed in
+> > other places too?
 > 
-> The parsing API accepts a start index that defines the first idle state
-> that should be initialized by the parsing code in order to give new and
-> legacy driver flexibility over which states should be parsed using the
-> new DT mechanism.
+> Yes, there was a third one on shutdown.
+
+OK
+ 
+> > Also, no luck yet on runtime PM. If the console is enabled omap won't
+> > idle, and if no serial console is enabled, it just hangs. Will try
+> > to debug this part further, it may be also related to the above.
 > 
-> The idle states list is obtained from the first cpu in the driver
-> cpumask, which implicitly means the parsing code expects idle states
-> (and related list of phandles) to be the same for all CPUs in the
-> CPUidle driver mask. The kernel does not check this assumption, it must
-> be enforced by the bootloader to ensure correct system behaviour.
+> My beaglebone xm won't do idle:
+> 
+> | omap3_pm_off_mode_enable: Core OFF disabled due to errata i583
+> 
+> but it would if it could, right? That means that I can't test the wake
+> via UART on this one?
 
-Can we make the kernel a little less reliant on bootloader to ensure 
-correct system behaviour please?  If assumptions are assumed by the 
-kernel, it should at least print a warning and simply ignore the 
-information when such assumption are not respected.
+Hmm OK yes that's disabled for some earlier ES revisions. I guess you
+could comment out the limitations for PM_SDRC_WAKEUP_ERRATUM_i583
+in both cpuidle34xx.c and pm34xx.c and see if off-idle is usable for
+your tests :) It might be flakey but still usable for testing.
+ 
+> So I will try to fix the tx-pm, fold patches and then prepare another
+> batch.
 
-> +	/*
-> +	 * We get the idle states for the first logical cpu in the
-> +	 * driver mask. The kernel does not check idle states on all
-> +	 * cpus in the driver mask, they are assumed to be the same
-> +	 * by default.
-> +	 */
+OK great, let me know if you need more help.
 
-What if they're not?
+> And I could verify that DMA works on that omap3 :)
 
+OK
 
-Nicolas
+Regards,
+
+Tony
