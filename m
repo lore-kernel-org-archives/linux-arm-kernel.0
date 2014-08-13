@@ -1,65 +1,21 @@
-From: thierry.reding@gmail.com (Thierry Reding)
-Date: Wed, 13 Aug 2014 10:57:29 +0200
-Subject: [PATCH 0/3] Thermal reset support in PMC
-In-Reply-To: <53EB250D.5070207@nvidia.com>
-References: <1407226380-747-1-git-send-email-mperttunen@nvidia.com>
- <20140813080744.GD7735@ulmo> <53EB1DF5.301@nvidia.com>
- <53EB250D.5070207@nvidia.com>
-Message-ID: <20140813085728.GF7735@ulmo>
+From: zhangfei.gao@linaro.org (Zhangfei Gao)
+Date: Wed, 13 Aug 2014 17:03:24 +0800
+Subject: [PATCH 0/2] Introduce hix5hd2 IR transmitter driver
+Message-ID: <1407920606-18788-1-git-send-email-zhangfei.gao@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Aug 13, 2014 at 11:42:53AM +0300, Mikko Perttunen wrote:
-> 
-> 
-> On 13/08/14 11:12, Mikko Perttunen wrote:
-> >On 13/08/14 11:07, Thierry Reding wrote:
-> >>* PGP Signed by an unknown key
-> >>
-> >>On Tue, Aug 05, 2014 at 11:12:57AM +0300, Mikko Perttunen wrote:
-> >>>Hi,
-> >>>
-> >>>this series adds support for hardware-triggered thermal reset to the PMC
-> >>>driver. Namely, it adds device tree properties for specifying the I2C
-> >>>command to be sent when thermtrip is triggered. It is to be noted
-> >>>that thermtrip won't be ever triggered without a soctherm driver to
-> >>>calibrate the sensors, but I'll follow up with that patch.
-> >>>
-> >>>pmc.c required some juggling around to make the match data usable in
-> >>>probe, since I didn't want to put the code into the initcall either, since
-> >>>the soctherm driver won't be initialized by that point anyway.
-> >>>
-> >>>Series tested on Jetson-TK1. Should work on Tegra30 and Tegra114 too.
-> >>
-> >>Can you describe the procedure used to test this? We currently have a
-> >>bunch of features in Tegra that some people have tested at some point
-> >>during development but the test procedures never got documented. That
-> >>means whenever we want to test something we need to go and reinvent a
-> >>bunch of tests after the fact.
-> >>
-> >>So what I'd like to start doing is collect tests (preferably in some
-> >>scripted way) so that they can be kept in a repository that people can
-> >>easily clone and run on devices.
-> >>
-> >>Could you provide something like that for thermtrip?
-> >
-> >Sure. I'll see if I can make a just a test script or if a local patch is
-> >needed to test. Btw, I also have a pretty nice test script for EMC
-> >ready, and I agree that such a repository would be very nice.
-> 
-> Here is a test program. It it works, the device with immediately shut down.
-> 
-> https://gist.github.com/cyndis/66126c9c176b5f94a76f
+Guoxiong Yan (2):
+  [media] rc: Add DT bindings for hix5hd2
+  [media] rc: Introduce hix5hd2 IR transmitter driver
 
-Is there a way to set the trip temperature without going through
-/dev/mem? I'd expect the device to have a sysfs interface of some
-sort.
+ .../devicetree/bindings/media/hix5hd2-ir.txt       |   19 ++
+ drivers/media/rc/Kconfig                           |   11 +
+ drivers/media/rc/Makefile                          |    1 +
+ drivers/media/rc/ir-hix5hd2.c                      |  347 ++++++++++++++++++++
+ 4 files changed, 378 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/media/hix5hd2-ir.txt
+ create mode 100644 drivers/media/rc/ir-hix5hd2.c
 
-Thierry
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: not available
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140813/87b09ed0/attachment-0001.sig>
+-- 
+1.7.9.5
