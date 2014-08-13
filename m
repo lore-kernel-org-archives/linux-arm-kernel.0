@@ -1,57 +1,85 @@
-From: leif.lindholm@linaro.org (Leif Lindholm)
-Date: Wed, 13 Aug 2014 18:29:58 +0100
-Subject: [PATCH 0/3 v2] arm64/efi: improve TEXT_OFFSET handling
-In-Reply-To: <1406717944-24725-1-git-send-email-ard.biesheuvel@linaro.org>
-References: <1406717944-24725-1-git-send-email-ard.biesheuvel@linaro.org>
-Message-ID: <20140813172958.GA22224@bivouac.eciton.net>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Wed, 13 Aug 2014 11:31:25 -0600
+Subject: [PATCH 1/2] ARM: tegra: add Acer Chromebook 13 device tree
+In-Reply-To: <CAOesGMhAzx==sXnHBg4dhAtO3=JP-s-MmzujskctA=7OUC0uRg@mail.gmail.com>
+References: <1407894967-18300-1-git-send-email-dgreid@chromium.org>	<53EB9BF0.9010002@wwwdotorg.org>
+ <CAOesGMhAzx==sXnHBg4dhAtO3=JP-s-MmzujskctA=7OUC0uRg@mail.gmail.com>
+Message-ID: <53EBA0ED.30607@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jul 30, 2014 at 12:59:01PM +0200, Ard Biesheuvel wrote:
-> Resending this series sent out yesterday with only minor changes and acks etc
-> added.
-> 
-> In summary: patch #3 relaxes the requirements imposed by the EFI stub on where
-> Image may be loaded, but this breaks APM Mustang (if booting via UEFI) if patch
-> #1 does not go in first. Patch #2 prevents potential boot issues when Image is
-> loaded such that the stub does not have to relocate it.
-> 
-> @Will: as discussed on the list yesterday, these patches should be kept in
-> sequence when going upstream, so it is best to take them through a single tree.
-> However, patch #3 will not apply cleanly to the arm64 tree until after 3.16-rc1
-> is released as it depends on a trivial change going in through x86/tip [efi].
-> [https://git.kernel.org/cgit/linux/kernel/git/mfleming/efi.git/commit/?h=next&id=6091c9c447370c4717ec9975813c874af490eb36]
-> 
-> If you are ok with these patches, how would you like to proceed? Patches #1 and
-> #2 could go in straight away (through arm64), and I can send Catalin and you a
-> gentle reminder once -rc1 is released to take #3? Or instead, ack them and ask
-> Matt to queue them for 3.17-late? It would be nice if this makes 3.17 as it
-> fixes actual boot problems on hardware that is under development.
-> 
-> Changes in v2:
-> - add (__force void *) cast to patch #1, as suggested in LAKML discussion
-> - add tested-by/acked-by lines
-> - rebased patch #3 onto efi-next
-> 
-> Mark Rutland (1):
->   arm64: spin-table: handle unmapped cpu-release-addrs
-> 
-> Ard Biesheuvel (2):
->   arm64/efi: efistub: cover entire static mem footprint in PE/COFF .text
->   arm64/efi: efistub: don't abort if base of DRAM is occupied
-> 
->  arch/arm64/kernel/efi-stub.c       | 18 ++++++------------
->  arch/arm64/kernel/head.S           |  6 +++---
->  arch/arm64/kernel/smp_spin_table.c | 21 ++++++++++++++++-----
->  3 files changed, 25 insertions(+), 20 deletions(-)
-> 
-> -- 
-> 1.8.3.2
+On 08/13/2014 11:23 AM, Olof Johansson wrote:
+> On Wed, Aug 13, 2014 at 10:10 AM, Stephen Warren <swarren@wwwdotorg.org> wrote:
+>> On 08/12/2014 07:56 PM, Dylan Reid wrote:
+>>>
+>>> The Acer Chromebook 13, codenamed "Big", contains an NVIDIA tegra124
+>>> processor and is similar to the Venice2 reference platform.
+>>>
+>>> The keyboard, USB 2, audio, HDMI, sdcard and emmc have been tested
+>>> and work on the 1366x768 models.  I haven't tried on the HD systems
+>>> yet.
+>>>
+>>> WiFi does not yet work, it needs at least some PMIC changes to enable
+>>> the 32k clock.
+>>>
+>>> The elan trackpad is not yet functional but hopefully will be soon as
+>>> there are patches under review.
+>>>
+>>> There is also an issue on reboot because the TPM isn't reset.  It will
+>>> cause the stock firmware to enter recovery mode.  This can be worked
+>>> around by an EC-reset, press refresh and power at the same time.
+>>
+>>
+>>> diff --git a/arch/arm/boot/dts/tegra124-big.dts
+>>> b/arch/arm/boot/dts/tegra124-big.dts
+>>
+>>
+>> I think we need to include the SKU name in the filename and compatible value
+>> below, or at least plan out that for other SKUs, we'll add the SKU name on.
+>>
+>>
+>>> +/ {
+>>> +       model = "Google Big";
+>>> +       compatible = "google,nyan-big", "nvidia,tegra124";
+>>
+>>
+>> I think it'd be more user-friendly if the filename and compatible value more
+>> obviously tied to the end-user-visible product name.
+>
+> We didn't prefix the reference platform on the very first one we
+> shipped (snow), but for the peach platforms we used peach-pit and
+> peach-pi. Those had different SoCs inside (albeit very similar ones),
+> so there was a reason for separate DTS files.
+>
+> Here, we should probably prefix with nyan (so tegra124-nyan-big.dts).
+> Users have shown themselves to be quite happy to use the internal
+> names, they also tend to be less confusing (since we can't rely on the
+> vendor to rename the product when the internals change, so we would
+> need a separate namespace anyway).
 
-Since this set fixes two separate bugs on actual hardware platforms,
-for the entire set - for what it's worth:
-Acked-by: Leif Lindholm <leif.lindholm@linaro.org>
-Tested-by: Leif Lindholm <leif.lindholm@linaro.org>
+I can see that the vendor might change the internals without changing 
+the product name. That kind of thing happens too frequently across all 
+kinds of products. So, there are certainly disadvantages using consumer 
+marketing names here.
 
-/
-    Leif
+Presumably though the name "big" would no longer apply to any modified 
+HW? Hence, I can't understand the need to say "nyan-big" rather than 
+just "big". Is "nyan-" really needed to fully qualify the name? Also, 
+the board isn't a Nyan, albeit the design may have been strongly derived 
+from the reference board named Nyan.
+
+> What we did on pit/pi was to add a more-specific revision of the
+> hardware in front. That was more about dealing with various
+> generations of the hardware though (as components sometimes change
+> over the lifetime production). Here it's more about the basic
+> SKU/feature set (panel size, touch screen). I suspect we'll do a
+> big-touch.dts that just includes this and appends the TS device.
+>
+> For the panel sizes, do we need the specifics in the DT instead of via
+> EDID? Do we really need to describe the exact panel in the DTS? Note
+> that panels are pretty common to change over the production run of a
+> product too, second sourcing, etc.
+>
+> Model could be changed to "Acer Chromebook 13", I suppose. In the past
+> we've used "Google Peach Pit", "Google Snow". No user has complained
+> yet about that.
