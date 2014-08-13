@@ -1,30 +1,44 @@
-From: dh.herrmann@gmail.com (David Herrmann)
-Date: Wed, 13 Aug 2014 12:24:36 +0200
-Subject: [linux-sunxi] simplefb: add clock handling
-In-Reply-To: <958E7D39-A034-42AC-A6FF-130609E46967@dominion.thruhere.net>
-References: <1407914239-12054-1-git-send-email-libv@skynet.be>
- <CANq1E4Re79+D5H-pf8pW87NZ5MWz9UFknd5Dk2GKCvhzm5MNSA@mail.gmail.com>
- <BFCF4C2C-77ED-4719-903B-921DEB250B7A@dominion.thruhere.net>
- <53EB238B.5010404@redhat.com>
- <958E7D39-A034-42AC-A6FF-130609E46967@dominion.thruhere.net>
-Message-ID: <CANq1E4S3fv16_U-O16K2TPSMMiwZoXBzAWL3ektXz_tWnuYXaw@mail.gmail.com>
+From: yao.yuan@freescale.com (Yuan Yao)
+Date: Wed, 13 Aug 2014 17:37:56 +0800
+Subject: [PATCH v7 2/2] Documentation:add DMA support for freescale i2c driver
+In-Reply-To: <1407922676-31438-2-git-send-email-yao.yuan@freescale.com>
+References: <1407922676-31438-2-git-send-email-yao.yuan@freescale.com>
+Message-ID: <1407922676-31438-3-git-send-email-yao.yuan@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi
+Add i2c dts node properties for eDMA support, them depend on the eDMA driver.
 
-On Wed, Aug 13, 2014 at 12:16 PM, Koen Kooi <koen@dominion.thruhere.net> wrote:
-> So what you are saying is that the only reason it is needed is because some distros choose to build DRM drivers as modules. So as soon as they stop doing that the problem goes away, right?
-> Worse, the experience I have with ARM DRM drivers is that they fail horrible when being built as modules, but that's a different problem.
+Signed-off-by: Yuan Yao <yao.yuan@freescale.com>
+---
+ Documentation/devicetree/bindings/i2c/i2c-imx.txt | 11 +++++++++++
+ 1 file changed, 11 insertions(+)
 
-Exactly. But there's no intention to stop building them as modules.
-Imagine you build a kernel that's supposed to run on multiple
-different platforms (like x86), you really don't want all DRM drivers
-built-in. Instead, you load the correct driver during boot-up. To
-still provide early graphics access, we use simplefb.
-
-Note that there might be legitimate reasons to make DRM drivers
-built-in. But at least general purpose distros avoid that.
-
-Thanks
-David
+diff --git a/Documentation/devicetree/bindings/i2c/i2c-imx.txt b/Documentation/devicetree/bindings/i2c/i2c-imx.txt
+index 4a8513e..52d37fd 100644
+--- a/Documentation/devicetree/bindings/i2c/i2c-imx.txt
++++ b/Documentation/devicetree/bindings/i2c/i2c-imx.txt
+@@ -11,6 +11,8 @@ Required properties:
+ Optional properties:
+ - clock-frequency : Constains desired I2C/HS-I2C bus clock frequency in Hz.
+   The absence of the propoerty indicates the default frequency 100 kHz.
++- dmas: A list of two dma specifiers, one for each entry in dma-names.
++- dma-names: should contain "tx" and "rx".
+ 
+ Examples:
+ 
+@@ -26,3 +28,12 @@ i2c at 70038000 { /* HS-I2C on i.MX51 */
+ 	interrupts = <64>;
+ 	clock-frequency = <400000>;
+ };
++
++i2c0: i2c at 40066000 { /* i2c0 on vf610 */
++	compatible = "fsl,vf610-i2c";
++	reg = <0x40066000 0x1000>;
++	interrupts =<0 71 0x04>;
++	dmas = <&edma0 0 50>,
++		<&edma0 0 51>;
++	dma-names = "rx","tx";
++};
+-- 
+1.8.4
