@@ -1,67 +1,92 @@
-From: javier.martinez@collabora.co.uk (Javier Martinez Canillas)
-Date: Wed, 13 Aug 2014 13:31:44 +0200
-Subject: [PATCH 6/6] ARM: dts: Add tps65090 FETs constraints
-In-Reply-To: <20140812212757.GY17528@sirena.org.uk>
-References: <1407861868-20097-1-git-send-email-javier.martinez@collabora.co.uk>
- <1407861868-20097-7-git-send-email-javier.martinez@collabora.co.uk>
- <20140812172552.GU17528@sirena.org.uk> <53EA61B9.2070805@collabora.co.uk>
- <20140812212757.GY17528@sirena.org.uk>
-Message-ID: <53EB4CA0.3010006@collabora.co.uk>
+From: christoffer.dall@linaro.org (Christoffer Dall)
+Date: Wed, 13 Aug 2014 13:33:00 +0200
+Subject: [PATCH v4] arm64: fix VTTBR_BADDR_MASK
+In-Reply-To: <20140812160521.GO10550@cbox>
+References: <20140811203823.2828.36074.stgit@joelaarch64.amd.com>
+ <20140812160521.GO10550@cbox>
+Message-ID: <20140813113300.GA25475@cbox>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Mark,
-
-On 08/12/2014 11:27 PM, Mark Brown wrote:
-> On Tue, Aug 12, 2014 at 08:49:29PM +0200, Javier Martinez Canillas wrote:
+On Tue, Aug 12, 2014 at 06:05:21PM +0200, Christoffer Dall wrote:
+> On Mon, Aug 11, 2014 at 03:38:23PM -0500, Joel Schopp wrote:
+> > The current VTTBR_BADDR_MASK only masks 39 bits, which is broken on current
+> > systems.  Rather than just add a bit it seems like a good time to also set
+> > things at run-time instead of compile time to accomodate more hardware.
+> > 
+> > This patch sets TCR_EL2.PS, VTCR_EL2.T0SZ and vttbr_baddr_mask in runtime,
+> > not compile time.
+> > 
+> > In ARMv8, EL2 physical address size (TCR_EL2.PS) and stage2 input address
+> > size (VTCR_EL2.T0SZE) cannot be determined in compile time since they
+> > depend on hardware capability.
+> > 
+> > According to Table D4-23 and Table D4-25 in ARM DDI 0487A.b document,
+> > vttbr_x is calculated using different fixed values with consideration
+> > of T0SZ, granule size and the level of translation tables. Therefore,
+> > vttbr_baddr_mask should be determined dynamically.
+> > 
+> > Changes since v3:
+> > Another rebase
+> > Addressed minor comments from v2
+> > 
+> > Changes since v2:
+> > Rebased on https://git.kernel.org/pub/scm/linux/kernel/git/kvmarm/kvmarm.git next branch
+> > 
+> > Changes since v1:
+> > Rebased fix on Jungseok Lee's patch https://lkml.org/lkml/2014/5/12/189 to
+> > provide better long term fix.  Updated that patch to log error instead of
+> > silently fail on unaligned vttbr.
+> > 
+> > Cc: Christoffer Dall <christoffer.dall@linaro.org>
+> > Cc: Sungjinn Chung <sungjinn.chung@samsung.com>
+> > Signed-off-by: Jungseok Lee <jays.lee@samsung.com>
+> > Signed-off-by: Joel Schopp <joel.schopp@amd.com>
+> > ---
+> >  arch/arm/kvm/arm.c               |  116 +++++++++++++++++++++++++++++++++++++-
+> >  arch/arm64/include/asm/kvm_arm.h |   17 +-----
+> >  arch/arm64/kvm/hyp-init.S        |   20 +++++--
+> >  3 files changed, 131 insertions(+), 22 deletions(-)
+> > 
+> > diff --git a/arch/arm/kvm/arm.c b/arch/arm/kvm/arm.c
+> > index 3c82b37..b4859fa 100644
+> > --- a/arch/arm/kvm/arm.c
+> > +++ b/arch/arm/kvm/arm.c
+> > @@ -37,6 +37,7 @@
+> >  #include <asm/mman.h>
+> >  #include <asm/tlbflush.h>
+> >  #include <asm/cacheflush.h>
+> > +#include <asm/cputype.h>
+> >  #include <asm/virt.h>
+> >  #include <asm/kvm_arm.h>
+> >  #include <asm/kvm_asm.h>
+> > @@ -61,6 +62,8 @@ static atomic64_t kvm_vmid_gen = ATOMIC64_INIT(1);
+> >  static u8 kvm_next_vmid;
+> >  static DEFINE_SPINLOCK(kvm_vmid_lock);
+> >  
+> > +static u64 vttbr_baddr_mask;
+> > +
+> >  static bool vgic_present;
+> >  
+> >  static void kvm_arm_set_running_vcpu(struct kvm_vcpu *vcpu)
+> > @@ -412,6 +415,103 @@ static bool need_new_vmid_gen(struct kvm *kvm)
+> >  	return unlikely(kvm->arch.vmid_gen != atomic64_read(&kvm_vmid_gen));
+> >  }
+> >  
+> > +
+> > +
+> > +	/*
+> > +	 * ARMv8 64K architecture limitations:
+> > +	 * 16 <= T0SZ <= 21 is valid under 3 level of translation tables
+> > +	 * 18 <= T0SZ <= 34 is valid under 2 level of translation tables
+> > +	 * 31 <= T0SZ <= 39 is valid under 1 level of transltaion tables
+> > +	 *
+> > +	 * ARMv8 4K architecture limitations:
+> > +	 * 16 <= T0SZ <= 24 is valid under 4 level of translation tables
+> > +	 * 21 <= T0SZ <= 30 is valid under 3 level of translation tables
 > 
->> So, is adding these voltages ranges (the design limits) in the Peach Pit DTS
->> file directly an acceptable solution? Basically what my previous patch [0] did.
+> this is still wrong, as I pointed out, it should be 21 <= T0SZ <= 30
 > 
->> That matches what is in the board schematic so I assume that it's safe to use
->> these voltage ranges for that machine. If so I'll drop this series and repost
->> that patch fixing the typo error and commit message pointed by Doug that were
->> already addressed in $subject.
-> 
-> Well, I think the question is if you understand where those numbers come
-> from and if they make sense.  I've not seen the schematic for the board
-> so I can't comment but it is quite unusual to see ranges listed for so
-> many supplies, for things like SD it's obviously normal but things like
-> video_mid are a bit more surprising.  Does anything actually vary those
-> voltages?
-> 
+typo: I meant: 21 <= T0SZ <= 33
 
-You are right, in fact even the voltage for the SD supply (tps65090 fet4) does
-not change but still their constraints have to be defined, since it is used as a
-vmmc-supply and the series "Adding UHS support for dw_mmc driver" [0] calls
-mmc_regulator_get_ocrmask()/mmc_regulator_set_ocr() for mmc->supply.vmmc.
-
-For fixed regulators (like fet4), mmc_regulator_set_ocr() just skips varying the
-regulator voltage but still expects to be able to obtain its voltage.
-
-Since the FET is just a switch and doesn't have an output voltage, the regulator
-core gets its parent supply voltage but regulator_list_voltge() [1] checks that
-the obtained parent voltage is between the child regulator constraints.
-
-So in this particular case it makes sense to compare that the parent voltage is
-between the (design limits) voltage ranges for the FET but I agree that it may
-not make sense on other boards.
-
-Since I needed to add the ranges for fet4 I (wrongly) thought that it would make
-sense to add the ranges for all the other FETs in case other boards had a
-similar need. But now I understand your concerns about this series so I'll drop
-it and just post a patch that adds to the Peach Pit and Pi DTS, the constraints
-for the fet4 used as vmmc-supply instead of pretending that it's a common setup.
-
-> The change where you fix up the supply mappings still makes sense of
-> course.
->
-
-Good to know, again thanks a lot for your feedback and explanations.
-
-Best regards,
-Javier
-
-[0]: http://lists.infradead.org/pipermail/linux-arm-kernel/2014-June/265657.html
-[1]:
-https://git.kernel.org/cgit/linux/kernel/git/broonie/regulator.git/tree/drivers/regulator/core.c?h=for-next#n2209
+-Christoffer
