@@ -1,72 +1,73 @@
 From: thierry.reding@gmail.com (Thierry Reding)
-Date: Wed, 13 Aug 2014 12:28:53 +0200
-Subject: [PATCH v4 3/8] sparc: Remove unnecessary volatile usage
+Date: Wed, 13 Aug 2014 12:28:54 +0200
+Subject: [PATCH v4 4/8] [IA64] Change xlate_dev_{kmem,mem}_ptr() prototypes
 In-Reply-To: <1407925738-26170-1-git-send-email-thierry.reding@gmail.com>
 References: <1407925738-26170-1-git-send-email-thierry.reding@gmail.com>
-Message-ID: <1407925738-26170-4-git-send-email-thierry.reding@gmail.com>
+Message-ID: <1407925738-26170-5-git-send-email-thierry.reding@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Thierry Reding <treding@nvidia.com>
 
-The volatile keyword is only necessary in accessors that immediately
-perform memory accesses. Wrappers around such accessors, such as the
-_memset_io() and _memcpy_{to,from}io() functions don't need them.
+xlate_dev_mem_ptr() is used to convert a physical address to an uncached
+kernel virtual address mapping, so make it use phys_addr_t as type for
+the physical address and return void * for the kernel virtual address.
+
+xlate_dev_kmem_ptr() converts a cached kernel virtual address mapping to
+an uncached kernel virtual address mapping, so make it use void * for
+both the input parameter and return value.
 
 Signed-off-by: Thierry Reding <treding@nvidia.com>
 ---
 Changes in v4:
 - new patch
 
- arch/sparc/include/asm/io_32.h | 18 +++++++-----------
- 1 file changed, 7 insertions(+), 11 deletions(-)
+ arch/ia64/include/asm/uaccess.h | 16 ++++++++--------
+ 1 file changed, 8 insertions(+), 8 deletions(-)
 
-diff --git a/arch/sparc/include/asm/io_32.h b/arch/sparc/include/asm/io_32.h
-index 9f532902627c..49267f2575d7 100644
---- a/arch/sparc/include/asm/io_32.h
-+++ b/arch/sparc/include/asm/io_32.h
-@@ -16,18 +16,15 @@
- 
- #include <asm-generic/io.h>
- 
--static inline void _memset_io(volatile void __iomem *dst,
--                              int c, __kernel_size_t n)
-+static inline void _memset_io(void __iomem *dst, int c, __kernel_size_t n)
- {
--	volatile void __iomem *d = dst;
--
- 	while (n--) {
--		writeb(c, d);
--		d++;
-+		writeb(c, dst);
-+		dst++;
- 	}
+diff --git a/arch/ia64/include/asm/uaccess.h b/arch/ia64/include/asm/uaccess.h
+index 449c8c0fa2bd..103bedc59644 100644
+--- a/arch/ia64/include/asm/uaccess.h
++++ b/arch/ia64/include/asm/uaccess.h
+@@ -365,15 +365,15 @@ ia64_done_with_exception (struct pt_regs *regs)
  }
  
--static inline void _memcpy_fromio(void *dst, const volatile void __iomem *src,
-+static inline void _memcpy_fromio(void *dst, const void __iomem *src,
-                                   __kernel_size_t n)
+ #define ARCH_HAS_TRANSLATE_MEM_PTR	1
+-static __inline__ char *
+-xlate_dev_mem_ptr (unsigned long p)
++static __inline__ void *
++xlate_dev_mem_ptr(phys_addr_t p)
  {
- 	char *d = dst;
-@@ -39,16 +36,15 @@ static inline void _memcpy_fromio(void *dst, const volatile void __iomem *src,
- 	}
- }
+ 	struct page *page;
+-	char * ptr;
++	void *ptr;
  
--static inline void _memcpy_toio(volatile void __iomem *dst, const void *src,
-+static inline void _memcpy_toio(void __iomem *dst, const void *src,
-                                 __kernel_size_t n)
+ 	page = pfn_to_page(p >> PAGE_SHIFT);
+ 	if (PageUncached(page))
+-		ptr = (char *)p + __IA64_UNCACHED_OFFSET;
++		ptr = (void *)p + __IA64_UNCACHED_OFFSET;
+ 	else
+ 		ptr = __va(p);
+ 
+@@ -383,15 +383,15 @@ xlate_dev_mem_ptr (unsigned long p)
+ /*
+  * Convert a virtual cached kernel memory pointer to an uncached pointer
+  */
+-static __inline__ char *
+-xlate_dev_kmem_ptr (char * p)
++static __inline__ void *
++xlate_dev_kmem_ptr(void *p)
  {
- 	const char *s = src;
--	volatile void __iomem *d = dst;
+ 	struct page *page;
+-	char * ptr;
++	void *ptr;
  
- 	while (n--) {
- 		char tmp = *s++;
--		writeb(tmp, d);
--		d++;
-+		writeb(tmp, dst);
-+		dst++;
- 	}
- }
+ 	page = virt_to_page((unsigned long)p);
+ 	if (PageUncached(page))
+-		ptr = (char *)__pa(p) + __IA64_UNCACHED_OFFSET;
++		ptr = (void *)__pa(p) + __IA64_UNCACHED_OFFSET;
+ 	else
+ 		ptr = p;
  
 -- 
 2.0.4
