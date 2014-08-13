@@ -1,69 +1,80 @@
-From: rongjun.ying@csr.com (Rongjun Ying)
-Date: Wed, 13 Aug 2014 16:31:40 +0800
-Subject: [PATCH 1/1] ASoC: sirf: usp: Add bitclock inversion support
-Message-ID: <1407918700-23972-1-git-send-email-rongjun.ying@csr.com>
+From: hdegoede@redhat.com (Hans de Goede)
+Date: Wed, 13 Aug 2014 10:36:27 +0200
+Subject: [linux-sunxi] simplefb: add clock handling
+In-Reply-To: <BFCF4C2C-77ED-4719-903B-921DEB250B7A@dominion.thruhere.net>
+References: <1407914239-12054-1-git-send-email-libv@skynet.be>
+ <CANq1E4Re79+D5H-pf8pW87NZ5MWz9UFknd5Dk2GKCvhzm5MNSA@mail.gmail.com>
+ <BFCF4C2C-77ED-4719-903B-921DEB250B7A@dominion.thruhere.net>
+Message-ID: <53EB238B.5010404@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Signed-off-by: Rongjun Ying <rongjun.ying@csr.com>
----
- sound/soc/sirf/sirf-usp.c | 24 +++++++++++++++++++++++-
- 1 file changed, 23 insertions(+), 1 deletion(-)
+Hi,
 
-diff --git a/sound/soc/sirf/sirf-usp.c b/sound/soc/sirf/sirf-usp.c
-index 3a73037..186dc7f 100644
---- a/sound/soc/sirf/sirf-usp.c
-+++ b/sound/soc/sirf/sirf-usp.c
-@@ -100,6 +100,16 @@ static int sirf_usp_pcm_set_dai_fmt(struct snd_soc_dai *dai,
- 		return -EINVAL;
- 	}
- 
-+	switch (fmt & SND_SOC_DAIFMT_INV_MASK) {
-+	case SND_SOC_DAIFMT_NB_NF:
-+		break;
-+	case SND_SOC_DAIFMT_IB_NF:
-+		usp->daifmt_format |= (fmt & SND_SOC_DAIFMT_INV_MASK);
-+		break;
-+	default:
-+		return -EINVAL;
-+	}
-+
- 	return 0;
- }
- 
-@@ -177,7 +187,7 @@ static int sirf_usp_pcm_hw_params(struct snd_pcm_substream *substream,
- 
- 	shifter_len = data_len;
- 
--	switch (usp->daifmt_format) {
-+	switch (usp->daifmt_format & SND_SOC_DAIFMT_FORMAT_MASK) {
- 	case SND_SOC_DAIFMT_I2S:
- 		regmap_update_bits(usp->regmap, USP_RX_FRAME_CTRL,
- 			USP_I2S_SYNC_CHG, USP_I2S_SYNC_CHG);
-@@ -193,6 +203,18 @@ static int sirf_usp_pcm_hw_params(struct snd_pcm_substream *substream,
- 		return -EINVAL;
- 	}
- 
-+	switch (usp->daifmt_format & SND_SOC_DAIFMT_INV_MASK) {
-+	case SND_SOC_DAIFMT_NB_NF:
-+		break;
-+	case SND_SOC_DAIFMT_IB_NF:
-+		regmap_update_bits(usp->regmap, USP_MODE1,
-+			USP_RXD_ACT_EDGE_FALLING | USP_TXD_ACT_EDGE_FALLING,
-+			USP_RXD_ACT_EDGE_FALLING);
-+		break;
-+	default:
-+		return -EINVAL;
-+	}
-+
- 	if (substream->stream == SNDRV_PCM_STREAM_PLAYBACK)
- 		regmap_update_bits(usp->regmap, USP_TX_FRAME_CTRL,
- 			USP_TXC_DATA_LEN_MASK | USP_TXC_FRAME_LEN_MASK
--- 
-2.0.4
+On 08/13/2014 10:21 AM, Koen Kooi wrote:
+> 
+> Op 13 aug. 2014, om 09:54 heeft David Herrmann <dh.herrmann@gmail.com> het volgende geschreven:
+> 
+>> Hi
+>>
+>> On Wed, Aug 13, 2014 at 9:17 AM, Luc Verhaegen <libv@skynet.be> wrote:
+>>> This is needed for the sunxi platform, where the u-boot initialized display
+>>> engine gets disabled by the clocks framework if certain clocks are not
+>>> claimed. Once these clocks are disabled, register content is lost, and there
+>>> is no turning back unless a full display driver is loaded, which kind of
+>>> beats the purpose of having simplefb running.
+>>>
+>>> The lack of clock handling should plague more hardware, but so far rpi is the
+>>> best known user of simplefb, and its stepmotherly handling of the arm core
+>>> has kept these sort of issues from the kernel.
+>>>
+>>> The sunxi u-boot side code can be found here:
+>>> https://groups.google.com/forum/#!topic/linux-sunxi/dPs958sIXvY
+>>>
+>>> Patch 3 might be controversial, as this does not achieve anything real today,
+>>> since the status property in dt is only really evaluated when dealing with a
+>>> nodes memory. It still seems like a good idea to at least flag this memory or
+>>> node as disabled, as we really have no way back when the clocks get disabled.
+>>
+>> Hans de Goede shortly told me about this and, tbh, I am not very
+>> pleased. Stephen tried to keep simplefd "as simple as possible", your
+>> patch now adds hardware-specific features. To be fair, the patch is
+>> simple and clocks are easy to handle, but I somehow fear we have to
+>> add more and more hardware-support that is required to keep the
+>> framebuffer active. This really defeats the purpose of simplefb.
+>>
+>> The biggest question I have, is why do you add the clocks to your DT
+>> at all? The framebuffer is set up by your boot-loader (or maybe
+>> platform code) and should prepare the clocks. I don't see why we add
+>> the clocks to DT now. If they're not added, then no-one will disable
+>> them and simplefb works just fine, right?
+> 
+> All clocks known to linux without a consumer will get disabled on most (all?) ARM systems to save power. Years ago OMAP had a Kconfig option to change that behaviour and add printk warnings for the clocks it would touch. 
+> To be honest, I don't get why sunxi needs a simplefb to begin with, only a proper kms/drm driver is needed which would register the clocks it needs properly. These patches and discussion seem like a lot of effort wasted on the wrong thing. But I can't complain about that since I'm not the one doing the work. 
 
+I believe that having some simple generic fb driver will be useful
+on non x86, since we don't have vga-console there, and most distros
+will build kms drivers as modules. Having the kernel / initrd code being
+able to show output (like e.g. missing symbols in the kms drivers) seems
+a very useful feature to me.
 
+The way I envision this to work is:
 
-Member of the CSR plc group of companies. CSR plc registered in England and Wales, registered number 4187346, registered office Churchill House, Cambridge Business Park, Cowley Road, Cambridge, CB4 0WZ, United Kingdom
-More information can be found at www.csr.com. Keep up to date with CSR on our technical blog, www.csr.com/blog, CSR people blog, www.csr.com/people, YouTube, www.youtube.com/user/CSRplc, Facebook, www.facebook.com/pages/CSR/191038434253534, or follow us on Twitter at www.twitter.com/CSR_plc.
-New for 2014, you can now access the wide range of products powered by aptX at www.aptx.com.
+u-boot lights up display, if it fails to load the kernel / ftd / ramdisk,
+it can show this on the display
+
+kernel takes over using something like simplefb (built into the kernel)
+for its initial output / any error messages.
+
+initrd loads kms, kms takes over.
+
+This way we've a way to show error messages during boot at all times.
+
+As we start supporting more ARM htpc boxes out of the box, telling the
+user to hook up a serial console (which often involves soldering wires
+to some test points) when things don't work really is not a viable
+answer.
+
+Regards,
+
+Hans
