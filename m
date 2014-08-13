@@ -1,53 +1,52 @@
-From: gang.chen.5i5j@gmail.com (Chen Gang)
-Date: Wed, 13 Aug 2014 16:16:32 +0800
-Subject: [PATCH v2] arch: Kconfig: Let all little endian architectures
- define CPU_LITTLE_ENDIAN explicitly
-In-Reply-To: <CAMuHMdV_2b-A+eE--cXEFA68=72HK6mqx8+TCXRMVkyhESLYxQ@mail.gmail.com>
-References: <53EA99C3.90203@gmail.com>
- <CAMuHMdV_2b-A+eE--cXEFA68=72HK6mqx8+TCXRMVkyhESLYxQ@mail.gmail.com>
-Message-ID: <53EB1EE0.20002@gmail.com>
+From: mperttunen@nvidia.com (Mikko Perttunen)
+Date: Wed, 13 Aug 2014 11:12:37 +0300
+Subject: [PATCH 0/3] Thermal reset support in PMC
+In-Reply-To: <20140813080744.GD7735@ulmo>
+References: <1407226380-747-1-git-send-email-mperttunen@nvidia.com>
+ <20140813080744.GD7735@ulmo>
+Message-ID: <53EB1DF5.301@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-On 8/13/14 16:03, Geert Uytterhoeven wrote:
-> CC kbuild
-> 
-> On Wed, Aug 13, 2014 at 12:48 AM, Chen Gang <gang.chen.5i5j@gmail.com> wrote:
->> diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
->> index c49a775..0510a5d 100644
->> --- a/arch/arm/Kconfig
->> +++ b/arch/arm/Kconfig
->> @@ -199,6 +199,11 @@ config NEED_DMA_MAP_STATE
->>  config ARCH_SUPPORTS_UPROBES
->>         def_bool y
+On 13/08/14 11:07, Thierry Reding wrote:
+> * PGP Signed by an unknown key
+>
+> On Tue, Aug 05, 2014 at 11:12:57AM +0300, Mikko Perttunen wrote:
+>> Hi,
 >>
->> +config CPU_LITTLE_ENDIAN
->> +       depends on !CPU_BIG_ENDIAN
->> +       def_bool y
->> +
->> +
->>  config ARCH_HAS_DMA_SET_COHERENT_MASK
->>         bool
-> 
-> As this is a common symbol, and replicated for all affected architectures,
-> I'm wondering if we should have the "config CPU_LITTLE_ENDIAN" in
-> common Kconfig code instead, and make the individual architectures do a
-> "select CPU_LITTLE_ENDIAN"?
-> 
+>> this series adds support for hardware-triggered thermal reset to the PMC
+>> driver. Namely, it adds device tree properties for specifying the I2C
+>> command to be sent when thermtrip is triggered. It is to be noted
+>> that thermtrip won't be ever triggered without a soctherm driver to
+>> calibrate the sensors, but I'll follow up with that patch.
+>>
+>> pmc.c required some juggling around to make the match data usable in
+>> probe, since I didn't want to put the code into the initcall either, since
+>> the soctherm driver won't be initialized by that point anyway.
+>>
+>> Series tested on Jetson-TK1. Should work on Tegra30 and Tegra114 too.
+>
+> Can you describe the procedure used to test this? We currently have a
+> bunch of features in Tegra that some people have tested at some point
+> during development but the test procedures never got documented. That
+> means whenever we want to test something we need to go and reinvent a
+> bunch of tests after the fact.
+>
+> So what I'd like to start doing is collect tests (preferably in some
+> scripted way) so that they can be kept in a repository that people can
+> easily clone and run on devices.
+>
+> Could you provide something like that for thermtrip?
 
-That sounds a good idea to me.
+Sure. I'll see if I can make a just a test script or if a local patch is 
+needed to test. Btw, I also have a pretty nice test script for EMC 
+ready, and I agree that such a repository would be very nice.
 
-> Also we could have "config CPU_BIG_ENDIAN", too, and error out
-> if none or both are selected (can Kconfig error out?).
-> 
+>
+> Thierry
+>
+> * Unknown Key
+> * 0x7F3EB3A1
+>
 
-It is a good idea to me, welcome any members ideas, especially Kbuild
-members' ideas, suggestions or completions.
-
-
-Thanks.
--- 
-Chen Gang
-
-Open, share, and attitude like air, water, and life which God blessed
+Cheers, Mikko
