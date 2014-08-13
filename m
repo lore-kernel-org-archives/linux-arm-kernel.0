@@ -1,35 +1,52 @@
 From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Wed, 13 Aug 2014 10:38:09 -0600
-Subject: [PATCH 4/4] simplefb: add clock handling code
-In-Reply-To: <1407914239-12054-5-git-send-email-libv@skynet.be>
+Date: Wed, 13 Aug 2014 10:44:04 -0600
+Subject: [PATCH 3/4] simplefb: disable dt node upon remove
+In-Reply-To: <CANq1E4ReOB87RX8VhnW1Ln=SK3Tw5V962ujcsfuz-2E9Uc61yQ@mail.gmail.com>
 References: <1407914239-12054-1-git-send-email-libv@skynet.be>
- <1407914239-12054-5-git-send-email-libv@skynet.be>
-Message-ID: <53EB9471.3090204@wwwdotorg.org>
+ <1407914239-12054-4-git-send-email-libv@skynet.be>
+ <CACxGe6vaPUa4QvYWBA-QY7MTmJYoeqnPt9Zh5jpky6S9UYbrvQ@mail.gmail.com>
+ <CANq1E4ReOB87RX8VhnW1Ln=SK3Tw5V962ujcsfuz-2E9Uc61yQ@mail.gmail.com>
+Message-ID: <53EB95D4.6010500@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08/13/2014 01:17 AM, Luc Verhaegen wrote:
-> This claims and enables clocks listed in the simple framebuffer dt node.
-> This is needed so that the display engine, in case the required clocks
-> are known by the kernel code and are described in the dt, will remain
-> properly enabled.
+On 08/13/2014 02:49 AM, David Herrmann wrote:
+> Hi
+>
+> On Wed, Aug 13, 2014 at 10:40 AM, Grant Likely
+> <grant.likely@secretlab.ca> wrote:
+>> On Wed, Aug 13, 2014 at 8:17 AM, Luc Verhaegen <libv@skynet.be> wrote:
+>>> The next commit will handle clocks correctly, so that these do not get
+>>> automatically disabled on certain SoC simplefb implementations. As a
+>>> result, the removal of this simplefb driver, and the release of the
+>>> clocks, is rather final, and only a full display driver can work after
+>>> this. So, it makes sense to also flag the dt node as disabled, even
+>>> though it has no real value today.
+>>>
+>>> Signed-off-by: Luc Verhaegen <libv@skynet.be>
+>>
+>> Please, no.
+>>
+>> Drivers should not be modifying the device tree without and
+>> exceptionally good reason for doing so. Drivers are to treat the DT as
+>> immutable.
+>>
+>> * the exception is an overlay driver which add new devices to the
+>> kernel. Definitely not the case here.
+>
+> Why? I think we have exactly that case:
+>   * DT describes the real hw properly and those parts are immutable
+>   * Additionally, bootloaders create firmware-framebuffers and
+>     create simple-framebuffer devices for them. Those are
+>     valid as long as no driver reconfigured the real hw.
+>   * Once a real hw-driver loads, it might destroy the existing
+>     framebuffers, thus, it should also destroy the platform device.
+>   * If the real hw-driver is unloaded, it might re-create the FB
+>     and thus create a new (or enable the old) platform device.
 
-I think this make simplefb not simple any more, which rather goes 
-against the whole point of it.
-
-I specifically conceived simplefb to know about nothing more than the 
-memory address and pixel layout of the memory buffer. I certainly don't 
-like the idea of expanding simplefb to anything beyond that, and IIRC 
-*not* extending is was a condition agreed when it was first merged. If 
-more knowledge than that is required, then there needs to be a 
-HW-specific driver to manage any clocks/resets/video registers, etc.
-
-The correct way to handle this without a complete DRM/KMS/... driver is 
-to avoid the clocks in question being turned off at boot. I thought 
-there was a per-clock flag to prevent disabling an unused clock? If not, 
-perhaps the clock driver should force the clock to be enabled (perhaps 
-only if the DRM/KMS driver isn't enabled?). For example, the Tegra clock 
-driver has a clock initialization table which IIRC was used for this 
-purpose before we got a DRM/KMS driver. That way, all the details are 
-kept inside the kernel code, and don't end up influencing the DT 
-representation of simplefb.
+My intention was always that a bootloader's addition of a simplefb node 
+to the DT would be user-configurable or driven by the original DT 
+content. As such, there shouldn't ever be both a DT node describing the 
+"real" HW and simplefb. In other words, if the DT already has the "real" 
+DT node, the bootloader should automatically (or under user command) not 
+add the simpefb node.
