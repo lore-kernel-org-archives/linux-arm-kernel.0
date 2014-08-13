@@ -1,70 +1,82 @@
-From: christoffer.dall@linaro.org (Christoffer Dall)
-Date: Wed, 13 Aug 2014 09:30:08 +0200
-Subject: [PATCH v9 4/4] arm: ARMv7 dirty page logging 2nd stage page
- fault handling support
-In-Reply-To: <53EABEEF.9070907@samsung.com>
-References: <1406249768-25315-1-git-send-email-m.smarduch@samsung.com>
- <1406249768-25315-5-git-send-email-m.smarduch@samsung.com>
- <20140811191315.GI10550@cbox> <53E96CF1.6040806@samsung.com>
- <20140812095045.GN10550@cbox> <53EABEEF.9070907@samsung.com>
-Message-ID: <20140813073008.GP10550@cbox>
+From: thierry.reding@gmail.com (Thierry Reding)
+Date: Wed, 13 Aug 2014 10:01:39 +0200
+Subject: [PATCH 1/3] of: Add descriptions of thermtrip properties to
+ Tegra PMC bindings
+In-Reply-To: <53EB18E6.3070203@nvidia.com>
+References: <1407226380-747-1-git-send-email-mperttunen@nvidia.com>
+ <1407226380-747-2-git-send-email-mperttunen@nvidia.com>
+ <20140813073541.GA17466@ulmo> <53EB18E6.3070203@nvidia.com>
+Message-ID: <20140813080138.GB7735@ulmo>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Aug 12, 2014 at 06:27:11PM -0700, Mario Smarduch wrote:
-> On 08/12/2014 02:50 AM, Christoffer Dall wrote:
-> > On Mon, Aug 11, 2014 at 06:25:05PM -0700, Mario Smarduch wrote:
-> >> On 08/11/2014 12:13 PM, Christoffer Dall wrote:
-> >>> On Thu, Jul 24, 2014 at 05:56:08PM -0700, Mario Smarduch wrote:
-
+On Wed, Aug 13, 2014 at 10:51:02AM +0300, Mikko Perttunen wrote:
+> On 13/08/14 10:35, Thierry Reding wrote:
+> >On Tue, Aug 05, 2014 at 11:12:58AM +0300, Mikko Perttunen wrote:
 [...]
-
-> >>>> @@ -1151,7 +1170,7 @@ static void kvm_set_spte_handler(struct kvm *kvm, gpa_t gpa, void *data)
-> >>>>  {
-> >>>>  	pte_t *pte = (pte_t *)data;
-> >>>>  
-> >>>> -	stage2_set_pte(kvm, NULL, gpa, pte, false);
-> >>>> +	stage2_set_pte(kvm, NULL, gpa, pte, false, false);
-> >>>
-> >>> why is logging never active if we are called from MMU notifiers?
-> >>
-> >> mmu notifiers update sptes, but I don't see how these updates
-> >> can result in guest dirty pages. Also guest pages are marked dirty
-> >> from 2nd stage page fault handlers (searching through the code).
-> >>
-> > Ok, then add:
-> > 
-> > /*
-> >  * We can always call stage2_set_pte with logging_active == false,
-> >  * because MMU notifiers will have unmapped a huge PMD before calling
-> >  * ->change_pte() (which in turn calls kvm_set_spte_hva()) and therefore
-> >  * stage2_set_pte() never needs to clear out a huge PMD through this
-> >  * calling path.
-> >  */
+> >>+Required properties for hardware-triggered thermal reset:
+> >>+    (only tegra30, tegra114, tegra124)
+> >>+- nvidia,thermtrip-pmu-i2c-addr : I2C address of the power management unit.
+> >>+- nvidia,thermtrip-i2c-controller : Index of the I2C controller the PMU is
+> >>+                                    attached to.
+> >
+> >This duplicates information already associated with the PMU device. Can
+> >this be turned into something like:
+> >
+> >	nvidia,thermtrip-pmu: phandle to Power Management Unit
+> >
+> >Then we can query the relevant information from the I2C client resolved
+> >from the phandle.
 > 
-> So here on permission change to primary pte's kernel first invalidates
-> related s2ptes followed by ->change_pte calls to synchronize s2ptes. As
-> consequence of invalidation we unmap huge PMDs, if a page falls in that
-> range.
+> True, that would look nicer.
 > 
-> Is the comment to point out use of logging flag under various scenarios?
-
-The comment is because when you look at this function it is not obvious
-why we pass logging_active=false, despite logging may actually be
-active.  This could suggest that the parameter to stage2_set_pte()
-should be named differently (break_huge_pmds) or something like that,
-but we can also be satisfied with the comment.
-
+> >
+> >One problem with that might be that the I2C controller index may not
+> >match the hardware ID.
 > 
-> Should I add comments on flag use in other places as well?
+> Maybe we could resort to checking the controller address in this case. This
+> is a safety feature, so programming the wrong controller index accidentally
+> would be bad.
+
+What we've done in the past (for the display controllers) is to add a
+special property that has the "hardware index" of the controller. I
+think in this case it would be appropriate to add one as well. That way
+we could reach into the I2C adapter of the I2C client and parse it from
+the associated device tree node (client->adapter->dev.of_node).
+
+> >>+- nvidia,thermtrip-reg-addr : Address (byte) to send reset command to.
+> >>+- nvidia,thermtrip-reg-data : Data (byte) to use as reset command.
+> >>+
+> >>+Optional properties for hardware-triggered thermal reset:
+> >>+    (only tegra30, tegra114, tegra124)
+> >>+- nvidia,thermtrip-pinmux : Pinmux ID used for I2C access.
+> >
+> >I suppose this takes a phandle? If so the description should probably
+> >say so.
 > 
+> No, it takes a pinmux ID, described in the boot process (non-public in T124
+> I guess..) section of the TRM. It seems, though, that all platforms
+> supported by the downstream kernel have pinmux == 0.
 
-It's always a judgement call.  I didn't find it necessarry to put a
-comment elsewhere because I think it's pretty obivous that we would
-never care about logging writes to device regions.
+Ugh... we'll need to get this documented publicly.
 
-However, this made me think, are we making sure that we are not marking
-device mappings as read-only in the wp_range functions?  I think it's
-quite bad if we mark the VCPU interface as read-only for example.
+> >What exactly does "16-bit operations" mean? And isn't this a property of
+> >the I2C device, therefore could be queried from the I2C slave via the
+> >phandle?
+> 
+> That's how it's described in the TRM, but I just found a comment in the
+> downstream kernel about it. Apparently it controls the amount of data sent
+> to the PMIC. The downstream kernel says, though, that the option is not
+> supported and must always be left as zero, so I guess it could be dropped.
 
--Christoffer
+Indeed. If ever it becomes necessary we can add it then (and fall back
+to 8-bit "operations" if it's not present).
+
+Thierry
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: not available
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140813/c055f530/attachment.sig>
