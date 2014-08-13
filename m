@@ -1,37 +1,60 @@
 From: mperttunen@nvidia.com (Mikko Perttunen)
-Date: Wed, 13 Aug 2014 15:41:20 +0300
-Subject: [PATCH v2 0/5] Thermal reset support in PMC
-Message-ID: <1407933685-12404-1-git-send-email-mperttunen@nvidia.com>
+Date: Wed, 13 Aug 2014 15:41:21 +0300
+Subject: [PATCH v2 1/5] of: Add descriptions of thermtrip properties to Tegra
+ PMC bindings
+In-Reply-To: <1407933685-12404-1-git-send-email-mperttunen@nvidia.com>
+References: <1407933685-12404-1-git-send-email-mperttunen@nvidia.com>
+Message-ID: <1407933685-12404-2-git-send-email-mperttunen@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Hardware-triggered thermal reset requires configuring the I2C
+reset procedure. This configuration is read from the device tree,
+so document the relevant properties in the binding documentation.
 
-this series adds support for hardware-triggered thermal reset to the PMC
-driver. Namely, it adds device tree properties for specifying the I2C
-command to be sent when thermtrip is triggered. It is to be noted
-that thermtrip won't be ever triggered without a soctherm driver to
-calibrate the sensors.
+Signed-off-by: Mikko Perttunen <mperttunen@nvidia.com>
+---
+ .../bindings/arm/tegra/nvidia,tegra20-pmc.txt       | 21 +++++++++++++++++++++
+ 1 file changed, 21 insertions(+)
 
-Git repo at
-  git://github.com/cyndis/linux.git pmc-thermtrip-v2
-
-Testing script at https://gist.github.com/cyndis/66126c9c176b5f94a76f.
-If your fan stops it is working.
-
-Mikko Perttunen (5):
-  of: Add descriptions of thermtrip properties to Tegra PMC bindings
-  of: Add nvidia,controller-id property to Tegra I2C bindings
-  ARM: tegra124: Add I2C controller ids to device tree
-  ARM: tegra: Add PMC thermtrip programming to Jetson TK1 device tree
-  ARM: tegra: Add thermal reset (thermtrip) support to PMC
-
- .../bindings/arm/tegra/nvidia,tegra20-pmc.txt      |  21 ++
- .../devicetree/bindings/i2c/nvidia,tegra20-i2c.txt |   5 +
- arch/arm/boot/dts/tegra124-jetson-tk1.dts          |   6 +
- arch/arm/boot/dts/tegra124.dtsi                    |   6 +
- drivers/soc/tegra/pmc.c                            | 379 ++++++++++++++-------
- 5 files changed, 285 insertions(+), 132 deletions(-)
-
+diff --git a/Documentation/devicetree/bindings/arm/tegra/nvidia,tegra20-pmc.txt b/Documentation/devicetree/bindings/arm/tegra/nvidia,tegra20-pmc.txt
+index 68ac65f..ae6aef8 100644
+--- a/Documentation/devicetree/bindings/arm/tegra/nvidia,tegra20-pmc.txt
++++ b/Documentation/devicetree/bindings/arm/tegra/nvidia,tegra20-pmc.txt
+@@ -47,6 +47,19 @@ Required properties when nvidia,suspend-mode=<0>:
+   sleep mode, the warm boot code will restore some PLLs, clocks and then
+   bring up CPU0 for resuming the system.
+ 
++Hardware-triggered thermal reset:
++On Tegra30, Tegra114 and Tegra124, if the 'i2c-thermtrip' subnode exists,
++hardware-triggered thermal reset will be enabled.
++
++Required properties for hardware-triggered thermal reset (inside 'i2c-thermtrip'):
++- nvidia,pmu : Phandle to power management unit / PMIC handling poweroff
++- nvidia,reg-addr : I2C register address to write poweroff command to
++- nvidia,reg-data : Poweroff command to write to PMU
++
++Optional properties for hardware-triggered thermal reset (inside 'i2c-thermtrip'):
++- nvidia,pinmux-id : Pinmux used by the hardware when issuing poweroff command.
++                     Defaults to 0.
++
+ Example:
+ 
+ / SoC dts including file
+@@ -69,6 +82,14 @@ pmc at 7000f400 {
+ / Tegra board dts file
+ {
+ 	...
++	pmc at 7000f400 {
++		i2c-thermtrip {
++			nvidia,pmu = <&pmic>;
++			nvidia,reg-addr = <0x36>;
++			nvidia,reg-data = <0x2>;
++		};
++	};
++	...
+ 	clocks {
+ 		compatible = "simple-bus";
+ 		#address-cells = <1>;
 -- 
 1.8.1.5
