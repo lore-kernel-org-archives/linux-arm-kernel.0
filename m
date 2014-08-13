@@ -1,59 +1,139 @@
 From: grygorii.strashko@ti.com (Grygorii Strashko)
-Date: Wed, 13 Aug 2014 19:16:19 +0300
-Subject: [PATCH 1/4] gpio: syscon: add soc specific callback to assign output
- value
+Date: Wed, 13 Aug 2014 19:16:20 +0300
+Subject: [PATCH 2/4] gpio: syscon: retrive syscon node and regs offsets from dt
 In-Reply-To: <1407946582-20927-1-git-send-email-grygorii.strashko@ti.com>
 References: <1407946582-20927-1-git-send-email-grygorii.strashko@ti.com>
-Message-ID: <1407946582-20927-2-git-send-email-grygorii.strashko@ti.com>
+Message-ID: <1407946582-20927-3-git-send-email-grygorii.strashko@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Some SoCs (like Keystone) may require to perform special
-sequence of operations to assign output GPIO value, so default
-implementation of .set() callback from gpio-syscon driver
-can't be used.
+This patch adds handling of new "gpio,syscon-dev" DT property,
+which allows to specify syscon node and data/direction registers
+offsets in DT.
 
-Hence, add optional, SoC specific callback to assign output
-gpio value.
+"gpio,syscon-dev" has following format:
+	gpio,syscon-dev = <&syscon_dev data_reg_offset [direction_reg_offset]>;
+
+where
+ - syscon_dev - phandle on syscon node
+ - data_reg_offset - offset of data register (in bytes)
+ - direction_reg_offset - offset of dirrection register (optional, in bytes)
+
+for example:
+	gpio,syscon-dev = <&devctrl 0x254>;
+
+In such way, the support of multiple Syscon GPIO devices is added.
 
 Signed-off-by: Grygorii Strashko <grygorii.strashko@ti.com>
 ---
- drivers/gpio/gpio-syscon.c |    9 +++++++++
- 1 file changed, 9 insertions(+)
+ drivers/gpio/gpio-syscon.c |   51 +++++++++++++++++++++++++++++++++++++-------
+ 1 file changed, 43 insertions(+), 8 deletions(-)
 
 diff --git a/drivers/gpio/gpio-syscon.c b/drivers/gpio/gpio-syscon.c
-index 30884fb..03b4699 100644
+index 03b4699..05d528f 100644
 --- a/drivers/gpio/gpio-syscon.c
 +++ b/drivers/gpio/gpio-syscon.c
-@@ -37,6 +37,8 @@
-  * dat_bit_offset:	Offset (in bits) to the first GPIO bit.
-  * dir_bit_offset:	Optional offset (in bits) to the first bit to switch
-  *			GPIO direction (Used with GPIO_SYSCON_FEAT_DIR flag).
-+ * set:		HW specific callback to assigns output value
-+ *			for signal "offset"
-  */
- 
- struct syscon_gpio_data {
-@@ -45,6 +47,8 @@ struct syscon_gpio_data {
- 	unsigned int	bit_count;
- 	unsigned int	dat_bit_offset;
- 	unsigned int	dir_bit_offset;
-+	void		(*set)(struct gpio_chip *chip,
-+			       unsigned offset, int value);
+@@ -55,6 +55,8 @@ struct syscon_gpio_priv {
+ 	struct gpio_chip		chip;
+ 	struct regmap			*syscon;
+ 	const struct syscon_gpio_data	*data;
++	u32				dreg_offset;
++	u32				dir_reg_offset;
  };
  
- struct syscon_gpio_priv {
-@@ -77,6 +81,11 @@ static void syscon_gpio_set(struct gpio_chip *chip, unsigned offset, int val)
+ static inline struct syscon_gpio_priv *to_syscon_gpio(struct gpio_chip *chip)
+@@ -65,9 +67,11 @@ static inline struct syscon_gpio_priv *to_syscon_gpio(struct gpio_chip *chip)
+ static int syscon_gpio_get(struct gpio_chip *chip, unsigned offset)
+ {
  	struct syscon_gpio_priv *priv = to_syscon_gpio(chip);
- 	unsigned int offs = priv->data->dat_bit_offset + offset;
+-	unsigned int val, offs = priv->data->dat_bit_offset + offset;
++	unsigned int val, offs;
+ 	int ret;
  
-+	if (priv->data->set) {
-+		priv->data->set(chip, offset, val);
-+		return;
-+	}
++	offs = priv->dreg_offset + priv->data->dat_bit_offset + offset;
 +
- 	regmap_update_bits(priv->syscon,
- 			   (offs / SYSCON_REG_BITS) * SYSCON_REG_SIZE,
- 			   BIT(offs % SYSCON_REG_BITS),
+ 	ret = regmap_read(priv->syscon,
+ 			  (offs / SYSCON_REG_BITS) * SYSCON_REG_SIZE, &val);
+ 	if (ret)
+@@ -79,7 +83,9 @@ static int syscon_gpio_get(struct gpio_chip *chip, unsigned offset)
+ static void syscon_gpio_set(struct gpio_chip *chip, unsigned offset, int val)
+ {
+ 	struct syscon_gpio_priv *priv = to_syscon_gpio(chip);
+-	unsigned int offs = priv->data->dat_bit_offset + offset;
++	unsigned int offs;
++
++	offs = priv->dreg_offset + priv->data->dat_bit_offset + offset;
+ 
+ 	if (priv->data->set) {
+ 		priv->data->set(chip, offset, val);
+@@ -97,7 +103,10 @@ static int syscon_gpio_dir_in(struct gpio_chip *chip, unsigned offset)
+ 	struct syscon_gpio_priv *priv = to_syscon_gpio(chip);
+ 
+ 	if (priv->data->flags & GPIO_SYSCON_FEAT_DIR) {
+-		unsigned int offs = priv->data->dir_bit_offset + offset;
++		unsigned int offs;
++
++		offs = priv->dir_reg_offset +
++		       priv->data->dir_bit_offset + offset;
+ 
+ 		regmap_update_bits(priv->syscon,
+ 				   (offs / SYSCON_REG_BITS) * SYSCON_REG_SIZE,
+@@ -112,7 +121,10 @@ static int syscon_gpio_dir_out(struct gpio_chip *chip, unsigned offset, int val)
+ 	struct syscon_gpio_priv *priv = to_syscon_gpio(chip);
+ 
+ 	if (priv->data->flags & GPIO_SYSCON_FEAT_DIR) {
+-		unsigned int offs = priv->data->dir_bit_offset + offset;
++		unsigned int offs;
++
++		offs = priv->dir_reg_offset +
++		       priv->data->dir_bit_offset + offset;
+ 
+ 		regmap_update_bits(priv->syscon,
+ 				   (offs / SYSCON_REG_BITS) * SYSCON_REG_SIZE,
+@@ -147,6 +159,8 @@ static int syscon_gpio_probe(struct platform_device *pdev)
+ 	struct device *dev = &pdev->dev;
+ 	const struct of_device_id *of_id = of_match_device(syscon_gpio_ids, dev);
+ 	struct syscon_gpio_priv *priv;
++	struct device_node *np = dev->of_node;
++	int ret;
+ 
+ 	priv = devm_kzalloc(dev, sizeof(*priv), GFP_KERNEL);
+ 	if (!priv)
+@@ -154,10 +168,31 @@ static int syscon_gpio_probe(struct platform_device *pdev)
+ 
+ 	priv->data = of_id->data;
+ 
+-	priv->syscon =
+-		syscon_regmap_lookup_by_compatible(priv->data->compatible);
+-	if (IS_ERR(priv->syscon))
+-		return PTR_ERR(priv->syscon);
++	if (priv->data->compatible) {
++		priv->syscon = syscon_regmap_lookup_by_compatible(
++					priv->data->compatible);
++		if (IS_ERR(priv->syscon))
++			return PTR_ERR(priv->syscon);
++	} else {
++		priv->syscon =
++			syscon_regmap_lookup_by_phandle(np, "gpio,syscon-dev");
++		if (IS_ERR(priv->syscon))
++			return PTR_ERR(priv->syscon);
++
++		ret = of_property_read_u32_index(np, "gpio,syscon-dev", 1,
++						 &priv->dreg_offset);
++		if (ret)
++			dev_err(dev, "can't read the data register offset!\n");
++
++		priv->dreg_offset <<= 3;
++
++		ret = of_property_read_u32_index(np, "gpio,syscon-dev", 2,
++						 &priv->dir_reg_offset);
++		if (ret)
++			dev_err(dev, "can't read the dir register offset!\n");
++
++		priv->dir_reg_offset <<= 3;
++	}
+ 
+ 	priv->chip.dev = dev;
+ 	priv->chip.owner = THIS_MODULE;
 -- 
 1.7.9.5
