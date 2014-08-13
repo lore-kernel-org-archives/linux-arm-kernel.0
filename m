@@ -1,43 +1,79 @@
-From: libv@skynet.be (Luc Verhaegen)
-Date: Wed, 13 Aug 2014 18:47:23 +0200
-Subject: [PATCH 4/4] simplefb: add clock handling code
-In-Reply-To: <53EB9471.3090204@wwwdotorg.org>
-References: <1407914239-12054-1-git-send-email-libv@skynet.be>
- <1407914239-12054-5-git-send-email-libv@skynet.be>
- <53EB9471.3090204@wwwdotorg.org>
-Message-ID: <20140813164723.GG31326@skynet.be>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Wed, 13 Aug 2014 10:51:18 -0600
+Subject: [PATCH 1/2] ARM: tegra: add Acer Chromebook 13 device tree
+In-Reply-To: <20140813085304.GE7735@ulmo>
+References: <1407894967-18300-1-git-send-email-dgreid@chromium.org>
+ <20140813085304.GE7735@ulmo>
+Message-ID: <53EB9786.6010809@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Aug 13, 2014 at 10:38:09AM -0600, Stephen Warren wrote:
+On 08/13/2014 02:53 AM, Thierry Reding wrote:
+> On Tue, Aug 12, 2014 at 06:56:07PM -0700, Dylan Reid wrote:
+>> The Acer Chromebook 13, codenamed "Big", contains an NVIDIA tegra124
+>> processor and is similar to the Venice2 reference platform.
+>>
+>> The keyboard, USB 2, audio, HDMI, sdcard and emmc have been tested
+>> and work on the 1366x768 models.  I haven't tried on the HD systems
+>> yet.
 >
-> I think this make simplefb not simple any more, which rather goes  
-> against the whole point of it.
+> Presumably the HD systems will have a different compatible? Is it only
+> the panel that's different or are there other changes?
+
+Yes, we definitely need to plan ahead for the different SKUs. I assume 
+we'll have different board names for each board, which then translates 
+int DT filenames and U-Boot/cbootimage-configs/tegra-uboot-flasher board
+
+>> There is also an issue on reboot because the TPM isn't reset.  It will
+>> cause the stock firmware to enter recovery mode.  This can be worked
+>> around by an EC-reset, press refresh and power at the same time.
 >
-> I specifically conceived simplefb to know about nothing more than the  
-> memory address and pixel layout of the memory buffer. I certainly don't  
-> like the idea of expanding simplefb to anything beyond that, and IIRC  
-> *not* extending is was a condition agreed when it was first merged. If  
-> more knowledge than that is required, then there needs to be a  
-> HW-specific driver to manage any clocks/resets/video registers, etc.
+> It's not clear to me what exactly this implies. Does it mean the system
+> won't boot unless you manually press "refresh" and "power"? Are those
+> keyboard buttons or keys on some debug board?
+>
+>> diff --git a/arch/arm/boot/dts/tegra124-big.dts b/arch/arm/boot/dts/tegra124-big.dts
 
-Yes. Simplefb quickly becomes anything but, doesn't it. Perhaps DenialFB 
-would've been a better name for it ;p
+>> +/ {
+>> +	model = "Google Big";
+>
+> Perhaps this should at least mention that it's the Acer Chromebook 13.
+> Otherwise this could just as well be some random development board.
+>
+>> +	compatible = "google,nyan-big", "nvidia,tegra124";
+>
+> What's "nyan"? Are there other variants of "big" other than "nyan"?
 
-> The correct way to handle this without a complete DRM/KMS/... driver is  
-> to avoid the clocks in question being turned off at boot. I thought  
-> there was a per-clock flag to prevent disabling an unused clock? If not,  
-> perhaps the clock driver should force the clock to be enabled (perhaps  
-> only if the DRM/KMS driver isn't enabled?). For example, the Tegra clock  
-> driver has a clock initialization table which IIRC was used for this  
-> purpose before we got a DRM/KMS driver. That way, all the details are  
-> kept inside the kernel code, and don't end up influencing the DT  
-> representation of simplefb.
+I thought this board was known as Nike?
 
-How was simplefb handled on tegra? Where is the code for that? I didn't 
-see anything in u-boot for instance.
+>> +	pinmux: pinmux at 0,70000868 {
+>> +		pinctrl-names = "default";
+>> +		pinctrl-0 = <&pinmux_default>;
+>> +
+>> +		pinmux_default: common {
+>> +			dap_mclk1_pw4 {
+>> +				nvidia,pins = "dap_mclk1_pw4";
+>> +				nvidia,function = "extperiph1";
+>> +				nvidia,enable-input = <TEGRA_PIN_DISABLE>;
+>> +				nvidia,pull = <TEGRA_PIN_PULL_NONE>;
+>> +				nvidia,tristate = <TEGRA_PIN_DISABLE>;
+>> +			};
+>
+> Stephen proposed a patch not so long ago that removes the static pinmux
+> settings from DTS files[0]. I'd expect he'll have objections to this DTS
+> providing the static settings.
+>
+> The assumption with that patch is that the bootloader will have to set
+> up the entire pinmux anyway (to prevent conflicting settings), therefore
+> there'd be no need to do it in the kernel. Is this something that your
+> bootloader already does (or could be modified to do)?
+>
+> [0]: http://patchwork.ozlabs.org/patch/363222/
 
-But the code for handling clocks where they are supposed to be handled 
-is pretty generic from where i sit.
+Yes, definitely I want to remove the pinmux from the kernel, since the 
+HW design implies that the bootloader must set this up completely.
 
-Luc Verhaegen.
+IIRC, the bootloader on this device doesn't. However, the workaround was 
+that the U-Boot that the firmware chain-loads in order to load Linux 
+(which IIRC is mandatory for non-Google kernels?) would do this setup 
+before booting the kernel.
