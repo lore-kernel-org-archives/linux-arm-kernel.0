@@ -1,83 +1,85 @@
-From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
-Date: Wed, 13 Aug 2014 16:53:49 +0200
-Subject: [PATCH v2] usb: gadget: at91_udc: move prepare clk into process
- context
-In-Reply-To: <20140812033456.16355.48522@quantum>
-References: <1407330702-2926-1-git-send-email-ronald.wahl@raritan.com>
- <20140812033456.16355.48522@quantum>
-Message-ID: <20140813145348.GA26008@piout.net>
+From: daniel.thompson@linaro.org (Daniel Thompson)
+Date: Wed, 13 Aug 2014 15:53:43 +0100
+Subject: [PATCH v4] irqchip: gic: Allow gic_arch_extn hooks to call into
+ scheduler
+In-Reply-To: <20140813142257.GK30401@n2100.arm.linux.org.uk>
+References: <1407938238-21413-1-git-send-email-sboyd@codeaurora.org>
+ <20140813142257.GK30401@n2100.arm.linux.org.uk>
+Message-ID: <53EB7BF7.1080702@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Mike,
+On 13/08/14 15:22, Russell King - ARM Linux wrote:
+> On Wed, Aug 13, 2014 at 06:57:18AM -0700, Stephen Boyd wrote:
+>> Commit 1a6b69b6548c (ARM: gic: add CPU migration support,
+>> 2012-04-12) introduced an acquisition of the irq_controller_lock
+>> in gic_raise_softirq() which can lead to a spinlock recursion if
+>> the gic_arch_extn hooks call into the scheduler (via complete()
+>> or wake_up(), etc.). This happens because gic_arch_extn hooks are
+>> normally called with the irq_controller_lock held and calling
+>> into the scheduler may cause us to call smp_send_reschedule()
+>> which will grab the irq_controller_lock again. Here's an example
+>> from a vendor kernel (note that the gic_arch_extn hook code here
+>> isn't actually in mainline):
+> 
+> Here's a question: why would you want to call into the scheduler from
+> the gic_arch_extn code?
+> 
+> Oh.  My.  God.  Thomas, what have you done to the generic IRQ layer?
+> This is /totally/ unsafe:
+> 
+> void disable_irq(unsigned int irq)
+> {
+>         if (!__disable_irq_nosync(irq))
+>                 synchronize_irq(irq);
+> }
+> 
+> static int __disable_irq_nosync(unsigned int irq)
+> {
+>         unsigned long flags;
+>         struct irq_desc *desc = irq_get_desc_buslock(irq, &flags, IRQ_GET_DESC_CHECK_GLOBAL);
 
-On 11/08/2014 at 20:34:56 -0700, Mike Turquette wrote :
-> Quoting Ronald Wahl (2014-08-06 06:11:42)
-> > Commit 7628083227b6bc4a7e33d7c381d7a4e558424b6b added clock preparation in
-> > interrupt context. This is not allowed as it might sleep. Move clock
-> > preparation into process context (at91udc_probe).
-> > ---
-> >  drivers/usb/gadget/udc/at91_udc.c | 39 ++++++++++++++++++++++++++++++---------
-> >  1 file changed, 30 insertions(+), 9 deletions(-)
-> > 
-> > diff --git a/drivers/usb/gadget/udc/at91_udc.c b/drivers/usb/gadget/udc/at91_udc.c
-> > index cfd18bc..0b347a0 100644
-> > --- a/drivers/usb/gadget/udc/at91_udc.c
-> > +++ b/drivers/usb/gadget/udc/at91_udc.c
-> > @@ -872,10 +872,10 @@ static void clk_on(struct at91_udc *udc)
-> >  
-> >         if (IS_ENABLED(CONFIG_COMMON_CLK)) {
-> 
-> Why is this check necessary at all? Drivers shouldn't have to care at
-> all about the underlying clock framework implementation.
-> 
+irq_get_desc_buslock() results in us owning the descriptor's lock
+(raw_spinlock_t).
 
-I believe it has been done because without the common clock framework,
-usb_clk is not defined.
+> 
+>         if (!desc)
+>                 return -EINVAL;
+>         __disable_irq(desc, irq, false);
+>         irq_put_desc_busunlock(desc, flags);
+>         return 0;
+> }
+> 
+> void __disable_irq(struct irq_desc *desc, unsigned int irq, bool suspend)
+> {
+>         if (suspend) {
+>                 if (!desc->action || (desc->action->flags & IRQF_NO_SUSPEND))
+>                         return;
+>                 desc->istate |= IRQS_SUSPENDED;
+>         }
+> 
+>         if (!desc->depth++)
+>                 irq_disable(desc);
+> }
+> 
+> You realise that disable_irq() and enable_irq() can be called by
+> concurrently by different drivers for the /same/ interrupt.  For
+> starters, that post-increment there is completely unprotected against
+> races.  Secondly, the above is completely racy against a concurrent
+> enable_irq() - what if we're in disable_irq(), we've incremented
+> depth, but have yet to call irq_disable().  The count now has a
+> value of 1.
+> 
+> We then preempt, and run another thread which calls enable_irq()
+> on it.  This results in the depth being decremented, and the IRQ
+> is now enabled.
 
-> >                 clk_set_rate(udc->uclk, 48000000);
-> > -               clk_prepare_enable(udc->uclk);
-> > +               clk_enable(udc->uclk);
-> >         }
-> > -       clk_prepare_enable(udc->iclk);
-> > -       clk_prepare_enable(udc->fclk);
-> > +       clk_enable(udc->iclk);
-> > +       clk_enable(udc->fclk);
-> >  }
-> >  
-> >  static void clk_off(struct at91_udc *udc)
-> > @@ -884,10 +884,10 @@ static void clk_off(struct at91_udc *udc)
-> >                 return;
-> >         udc->clocked = 0;
-> >         udc->gadget.speed = USB_SPEED_UNKNOWN;
-> > -       clk_disable_unprepare(udc->fclk);
-> > -       clk_disable_unprepare(udc->iclk);
-> > +       clk_disable(udc->fclk);
-> > +       clk_disable(udc->iclk);
-> >         if (IS_ENABLED(CONFIG_COMMON_CLK))
-> > -               clk_disable_unprepare(udc->uclk);
-> > +               clk_disable(udc->uclk);
-> >  }
-> >  
-> >  /*
-> > @@ -1780,14 +1780,23 @@ static int at91udc_probe(struct platform_device *pdev)
-> >         }
-> >  
-> >         /* don't do anything until we have both gadget driver and VBUS */
-> > +       if (IS_ENABLED(CONFIG_COMMON_CLK)) {
-> 
-> Same question here. What does the clock framework implementation have to
-> do with uclk?
-> 
-> Regards,
-> Mike
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+We shouldn't get that far due to the spinlock taken during the disable.
 
--- 
-Alexandre Belloni, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
+
+> We resume the original thread, and continue to call irq_disable(),
+> resulting in the interrupt being disabled.
+> 
+> That's not nice (the right answer is that it's strictly an unbalanced
+> enable_irq(), but that's no excuse here.)
+> 
