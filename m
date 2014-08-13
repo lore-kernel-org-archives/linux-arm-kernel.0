@@ -1,33 +1,44 @@
 From: fkan@apm.com (Feng Kan)
-Date: Wed, 13 Aug 2014 11:32:09 -0700
-Subject: [PATCH Resend v2 1/2] dt-bindings: Add Potenza PMU binding
+Date: Wed, 13 Aug 2014 11:32:10 -0700
+Subject: [PATCH Resend v2 2/2] arm64: dts: Add PMU node for APM X-Gene Storm
+ SOC
 In-Reply-To: <1407954730-9768-1-git-send-email-fkan@apm.com>
 References: <1407954730-9768-1-git-send-email-fkan@apm.com>
-Message-ID: <1407954730-9768-2-git-send-email-fkan@apm.com>
+Message-ID: <1407954730-9768-3-git-send-email-fkan@apm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Vinayak Kale <vkale@apm.com>
 
-This patch documents the compatible string for APM X-Gene Potenza CPU's PMU.
+This patch adds the PMU device tree node for APM X-Gene Storm SOC.
+
+Please note that this patch has dependancy on a GIC driver patch [1] which is
+yet to be approved by maintainers.
+
+[1]- https://lkml.org/lkml/2014/2/27/605
+(irqchip:gic: change access of gicc_ctrl register to read modify write)
 
 Signed-off-by: Vinayak Kale <vkale@apm.com>
 Signed-off-by: Feng Kan <fkan@apm.com>
 ---
- Documentation/devicetree/bindings/arm/pmu.txt | 1 +
- 1 file changed, 1 insertion(+)
+ arch/arm64/boot/dts/apm-storm.dtsi | 5 +++++
+ 1 file changed, 5 insertions(+)
 
-diff --git a/Documentation/devicetree/bindings/arm/pmu.txt b/Documentation/devicetree/bindings/arm/pmu.txt
-index 75ef91d..6d268b3 100644
---- a/Documentation/devicetree/bindings/arm/pmu.txt
-+++ b/Documentation/devicetree/bindings/arm/pmu.txt
-@@ -7,6 +7,7 @@ representation in the device tree should be done as under:-
- Required properties:
+diff --git a/arch/arm64/boot/dts/apm-storm.dtsi b/arch/arm64/boot/dts/apm-storm.dtsi
+index 40aa96c..a2bb25e 100644
+--- a/arch/arm64/boot/dts/apm-storm.dtsi
++++ b/arch/arm64/boot/dts/apm-storm.dtsi
+@@ -97,6 +97,11 @@
+ 		clock-frequency = <50000000>;
+ 	};
  
- - compatible : should be one of
-+	"apm,potenza-pmu"
- 	"arm,armv8-pmuv3"
- 	"arm,cortex-a17-pmu"
- 	"arm,cortex-a15-pmu"
++	pmu {
++		compatible = "apm,potenza-pmu", "arm,armv8-pmuv3";
++		interrupts = <1 12 0xff04>;
++	};
++
+ 	soc {
+ 		compatible = "simple-bus";
+ 		#address-cells = <2>;
 -- 
 1.9.1
