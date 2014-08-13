@@ -1,184 +1,95 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Wed, 13 Aug 2014 22:45:25 +0100
-Subject: [PATCH v8 4/4] ARM: Add KGDB/KDB FIQ debugger generic code
-In-Reply-To: <1404979427-12943-5-git-send-email-daniel.thompson@linaro.org>
-References: <1404118391-3850-1-git-send-email-daniel.thompson@linaro.org>
- <1404979427-12943-1-git-send-email-daniel.thompson@linaro.org>
- <1404979427-12943-5-git-send-email-daniel.thompson@linaro.org>
-Message-ID: <20140813214525.GQ30401@n2100.arm.linux.org.uk>
+From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
+Date: Wed, 13 Aug 2014 23:11:01 +0100
+Subject: [PATCH v7 2/8] Documentation: arm: define DT idle states bindings
+In-Reply-To: <20140813192533.GA32624@ilina-mac.local>
+References: <1407945127-27554-1-git-send-email-lorenzo.pieralisi@arm.com>
+ <1407945127-27554-3-git-send-email-lorenzo.pieralisi@arm.com>
+ <20140813192533.GA32624@ilina-mac.local>
+Message-ID: <20140813221101.GA32697@e102568-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jul 10, 2014 at 09:03:47AM +0100, Daniel Thompson wrote:
-> From: Anton Vorontsov <anton.vorontsov@linaro.org>
+On Wed, Aug 13, 2014 at 08:25:36PM +0100, Lina Iyer wrote:
+> Hi Lorenzo,
 > 
-> The FIQ debugger may be used to debug situations when the kernel stuck
-> in uninterruptable sections, e.g. the kernel infinitely loops or
-> deadlocked in an interrupt or with interrupts disabled.
+> On Wed, Aug 13, 2014 at 04:52:01PM +0100, Lorenzo Pieralisi wrote:
+> >+===========================================
+> >+4 - Examples
+> >+===========================================
+> >+
+> >+Example 1 (ARM 64-bit, 16-cpu system, PSCI enable-method):
+> >+
+> >+cpus {
+> >+	#size-cells = <0>;
+> >+	#address-cells = <2>;
+> >+
+> >+	CPU0: cpu at 0 {
+> >+		device_type = "cpu";
+> >+		compatible = "arm,cortex-a57";
+> >+		reg = <0x0 0x0>;
+> >+		enable-method = "psci";
+> >+		cpu-idle-states = <&CPU_RETENTION_0_0 &CPU_SLEEP_0_0
+> >+				   &CLUSTER_RETENTION_0 &CLUSTER_SLEEP_0>;
+> >+	};
+> Sorry for jumping in late. I havent gone through all the patches yet or
+> followed on previous discussions, if somebody could answer this or point
+> me to the discussion, it would be great.
+> Why is the cpu defining the possible cluster idle states? Would it be
+> better that cluster states form a separate node, something like this -
 > 
-> By default KGDB FIQ is disabled in runtime, but can be enabled with
-> kgdb_fiq.enable=1 kernel command line option.
+> 	CLUSTER0: cluster at 0 {
+> 		...
+> 		cpus = <&CPU0 &CPU1 &CPU2 &CPU3>;
+> 		cluster-idle-states = <&CLUTER_RETENTION_0, &CLUSTER_SLEEP_0>;
+> 		};
+> 	};	
+> 		
+> Allowing for something like this to be defined - 
+> 
+> 	super_cluster0: cluster at 101 {
+> 		...
+> 		clusters = <&CLUSTER0  &CLUSTER1>;
+> 		cluster-idle-states = <&SOC_RETENTION, &SOC_SLEEP>;
+> 		};
+> 	};
+> 
+> And each cluster-idle-state follows the general idle definition as
+> provided in this document, and an indicator what the compising
+> components should idle at, for this idle state to be available.
+> 
+> 	CLUSTER_SLEEP_0: cluster-sleep at 0 {
+> 		...
+> 		/* sleep definition for cluster0's retention */
+> 		min-idle-state = <CPU_SLEEP_0>;
+> 	};
+> 
+> 	SOC_SLEEP: cluster-sleep at 101 {
+> 		...
+> 		min-idle-state = <&CLUSTER_SLEEP_0>;
+> 	};
+> 		
+> 
+> Opens up the idle state for a lot of heirarchical possibilities, which
+> if you think, is generally how the SoC is. 
 
-I know you've been around the loop on this patch set quite a number of
-times.  However, there are two issues.  The first is a simple concern,
-the second is more a design decision...
+We have been thinking for 7 patch versions + some more for this specific
+document, which is ready to go after extensive debate.
 
-I've recently been hitting a problem on iMX6Q with a irqs-off deadlock
-on CPU0 (somehow, it always hit CPU0 every time I tested.)  This wasn't
-particularly good as it prevented much in the way of diagnosis.
+It is probably better to have a look at archives first since honestly it
+is impossible to summarize 6 months worth of discussions in few lines.
 
-Of course, things like the spinlock lockup fired... but nothing could
-give me a trace from CPU0.
+I think the hierarchy you mention should be implemented using power
+domains, which is how the SoC implements power management and that's
+what defines idle states hierarchy.
 
-On x86, they have this fixed by using the NMI to trigger a backtrace
-on all CPUs when a RCU lockup or spinlock lockup occurs.  There's a
-generic hook for this called arch_trigger_all_cpu_backtrace().
+To be 100% precise, I would like to detect what cpus are affected by an
+idle state entry by defining for each idle state what power domain
+(which can be hierarchical) is affected, not by grouping them under
+a tag "cluster" "supercluster" or whatchamacallit.
 
-So, I set about using the contents of some of your patches to implement
-this for ARM, and I came out with something which works.  In doing this,
-I started wondering whether the default FIQ handler should not be just
-"subs pc, lr, #4" but mostly your FIQ assembly code you have below.
-This, along with your GIC patches to move all IRQs to group 1, then
-gives us a way to send a FIQ IPI to CPUs in the system - and the FIQ
-IPI could be caught and used to dump a backtrace.
+I removed power domains to simplify the current proposal which is sufficient
+as a starting point, but they are next on my TODO list and were part of the
+initial bindings, consider yourself welcome to help us define the way forward
+keeping this document as a starting point.
 
-Here's the changes I did for that, which are a tad hacky:
-
-irq-gic.c - SGI 8 gets used to trigger a backtrace.  Note it must be
-high priority too.
-
-gic_cpu_init()
-+       /*
-+        * Set all PPI and SGI interrupts to be group 1.
-+        *
-+        * If grouping is not available (not implemented or prohibited by
-+        * security mode) these registers are read-as-zero/write-ignored.
-+        */
-+       writel_relaxed(0xfffffeff, dist_base + GIC_DIST_IGROUP + 0);
-+       writel_relaxed(0xa0a0a000, dist_base + GIC_DIST_PRI + 8);
-
-gic_raise_softirq()
-+       softirq = map << 16 | irq;
-+       if (irq != 8)
-+               softirq |= 0x8000;
-+
-
-arch/arm/kernel/smp.c:
-+/* For reliability, we're prepared to waste bits here. */
-+static DECLARE_BITMAP(backtrace_mask, NR_CPUS) __read_mostly;
-+
-...
-+static void ipi_cpu_backtrace(struct pt_regs *regs)
-+{
-+       int cpu = smp_processor_id();
-+
-+       if (cpumask_test_cpu(cpu, to_cpumask(backtrace_mask))) {
-+               static arch_spinlock_t lock = __ARCH_SPIN_LOCK_UNLOCKED;
-+
-+               arch_spin_lock(&lock);
-+               printk(KERN_WARNING "FIQ backtrace for cpu %d\n", cpu);
-+               show_regs(regs);
-+               arch_spin_unlock(&lock);
-+               cpumask_clear_cpu(cpu, to_cpumask(backtrace_mask));
-+       }
-+}
-+
-...
-+void arch_trigger_all_cpu_backtrace(bool include_self)
-+{
-+       static unsigned long backtrace_flag;
-+       int i, cpu = get_cpu();
-+
-+       if (test_and_set_bit(0, &backtrace_flag)) {
-+               /*
-+                * If there is already a trigger_all_cpu_backtrace() in progress
-+                * (backtrace_flag == 1), don't output double cpu dump infos.
-+                */
-+               put_cpu();
-+               return;
-+       }
-+
-+       cpumask_copy(to_cpumask(backtrace_mask), cpu_online_mask);
-+       if (!include_self)
-+               cpumask_clear_cpu(cpu, to_cpumask(backtrace_mask));
-+
-+       if (!cpumask_empty(to_cpumask(backtrace_mask))) {
-+               pr_info("Sending FIQ to %s CPUs:\n",
-+                       (include_self ? "all" : "other"));
-+               smp_cross_call(to_cpumask(backtrace_mask), IPI_CPU_BACKTRACE);
-+       }
-+
-+       /* Wait for up to 10 seconds for all CPUs to do the backtrace */
-+       for (i = 0; i < 10 * 1000; i++) {
-+               if (cpumask_empty(to_cpumask(backtrace_mask)))
-+                       break;
-+
-+               mdelay(1);
-+       }
-+
-+       clear_bit(0, &backtrace_flag);
-+       smp_mb__after_atomic();
-+       put_cpu();
-+}
-+
-+void __fiq_handle(struct pt_regs *regs)
-+{
-+       ipi_cpu_backtrace(regs);
-+}
-
-arch/arm/kernel/setup.c:
-+static unsigned int fiq_stack[4][1024];
-+
-...
-cpu_init()
--       "msr    cpsr_c, %7"
-+       "msr    cpsr_c, %7\n\t"
-+       "mov    sp, %8\n\t"
-+       "msr    cpsr_c, %9"
-...
-+             PLC (PSR_F_BIT | PSR_I_BIT | FIQ_MODE),
-+             "r" (&fiq_stack[cpu][1024]),
-
-The FIQ assembly code is basically the same as yours, but with:
-
-+       .macro  fiq_handler
-+       bl      __fiq_handle
-+       .endm
-
-and the code in svc_exit_via_fiq testing the PSR I flag and calling
-trace_hardirqs_on removed.
-
-This does have one deficiency, and that is it doesn't EOI the FIQ
-interrupt - that's something which should be fixed, but for my
-purposes to track down where the locked CPU was, it wasn't strictly
-necessary that the system continued to work after this point.
-
-This brings me to my second concern, and is the reason I decided not
-to ask for it for this merge window.
-
-Calling the trace_* functions is a no-no from FIQ code.
-trace_hardirqs_on() can itself take locks, which can result in a
-deadlock.
-
-I thought I'd made it clear that FIQ code can't take locks because
-there's no way of knowing what state they're in at the point that the
-FIQ fires - _irq() variants won't save you - and that's kind of the
-point of FIQ.  It's almost never masked by the kernel.
-
-Now, You'll be forgiven if you now point out that in the code above,
-I'm taking a spinlock.  That's absolutely true.  Analyse the code
-a little closer and you'll notice it's done in a safe way.  There's
-only one time where that spinlock is taken and that's from FIQ code,
-never from any other code, and only once per CPU - notice how
-arch_trigger_all_cpu_backtrace() protects itself against multiple
-callers, and how ipi_cpu_backtrace() is careful to check that its
-CPU bit is set.  This is exactly the same method which x86 code uses
-(in fact, much of the above code was stolen from x86!)
-
-So, how about moving the FIQ assembly code to entry-armv.S and making
-it less kgdb specific?  (Though... we do want to keep a /very/ close
-eye on users to ensure that they don't do silly stuff with locking.)
-
--- 
-FTTC broadband for 0.8mile line: currently@9.5Mbps down 400kbps up
-according to speedtest.net.
+Lorenzo
