@@ -1,46 +1,71 @@
-From: abrestic@chromium.org (Andrew Bresticker)
-Date: Wed, 13 Aug 2014 10:04:38 -0700
-Subject: [PATCH 1/2] ARM: tegra: add Acer Chromebook 13 device tree
-In-Reply-To: <53EB9786.6010809@wwwdotorg.org>
-References: <1407894967-18300-1-git-send-email-dgreid@chromium.org>
- <20140813085304.GE7735@ulmo> <53EB9786.6010809@wwwdotorg.org>
-Message-ID: <CAL1qeaGxcp4okVTYCMj0zMh-4HzsGLBvngv0+A1m8o3sZPDj2A@mail.gmail.com>
+From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
+Date: Wed, 13 Aug 2014 18:04:40 +0100
+Subject: [PATCH v7 3/8] drivers: cpuidle: implement DT based idle states
+ infrastructure
+In-Reply-To: <alpine.LFD.2.11.1408131223501.1133@knanqh.ubzr>
+References: <1407945127-27554-1-git-send-email-lorenzo.pieralisi@arm.com>
+ <1407945127-27554-4-git-send-email-lorenzo.pieralisi@arm.com>
+ <alpine.LFD.2.11.1408131223501.1133@knanqh.ubzr>
+Message-ID: <20140813170440.GA30822@e102568-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Aug 13, 2014 at 9:51 AM, Stephen Warren <swarren@wwwdotorg.org> wrote:
-> On 08/13/2014 02:53 AM, Thierry Reding wrote:
->>
->> On Tue, Aug 12, 2014 at 06:56:07PM -0700, Dylan Reid wrote:
->>>
->>> The Acer Chromebook 13, codenamed "Big", contains an NVIDIA tegra124
->>> processor and is similar to the Venice2 reference platform.
->>>
->>> The keyboard, USB 2, audio, HDMI, sdcard and emmc have been tested
->>> and work on the 1366x768 models.  I haven't tried on the HD systems
->>> yet.
->>
->>
->> Presumably the HD systems will have a different compatible? Is it only
->> the panel that's different or are there other changes?
->
->
-> Yes, we definitely need to plan ahead for the different SKUs. I assume we'll
-> have different board names for each board, which then translates int DT
-> filenames and U-Boot/cbootimage-configs/tegra-uboot-flasher board
+On Wed, Aug 13, 2014 at 05:31:11PM +0100, Nicolas Pitre wrote:
+> On Wed, 13 Aug 2014, Lorenzo Pieralisi wrote:
+> 
+> > On most common ARM systems, the low-power states a CPU can be put into are
+> > not discoverable in HW and require device tree bindings to describe
+> > power down suspend operations and idle states parameters.
+> > 
+> > In order to enable DT based idle states and configure idle drivers, this
+> > patch implements the bulk infrastructure required to parse the device tree
+> > idle states bindings and initialize the corresponding CPUidle driver states
+> > data.
+> > 
+> > The parsing API accepts a start index that defines the first idle state
+> > that should be initialized by the parsing code in order to give new and
+> > legacy driver flexibility over which states should be parsed using the
+> > new DT mechanism.
+> > 
+> > The idle states list is obtained from the first cpu in the driver
+> > cpumask, which implicitly means the parsing code expects idle states
+> > (and related list of phandles) to be the same for all CPUs in the
+> > CPUidle driver mask. The kernel does not check this assumption, it must
+> > be enforced by the bootloader to ensure correct system behaviour.
+> 
+> Can we make the kernel a little less reliant on bootloader to ensure 
+> correct system behaviour please?  If assumptions are assumed by the 
+> kernel, it should at least print a warning and simply ignore the 
+> information when such assumption are not respected.
 
-The firmware does not differentiate between the HD and non-HD boards,
-so it will look for the same compatible string.  As I mentioned in my
-response to Thierry, we'd need to parse the EDID to figure out which
-panel is being used.
+I think the check adds complexity (it means stashing the idle states
+phandles for the first cpu, loop through the cpus in the mask and compare
+the phandles to the ones stashed for the first cpu for all cpus in the
+driver mask) for not much.
 
->>> +       compatible = "google,nyan-big", "nvidia,tegra124";
->>
->>
->> What's "nyan"? Are there other variants of "big" other than "nyan"?
->
->
-> I thought this board was known as Nike?
+I was told that it is not up to the kernel to validate the DT, but if
+you want I can implement the check even though I really think it is
+overkill.
 
-Nike is Acer's name for the board.  We call Tegra124-based boards
-Nyan-${variant}.
+> > +	/*
+> > +	 * We get the idle states for the first logical cpu in the
+> > +	 * driver mask. The kernel does not check idle states on all
+> > +	 * cpus in the driver mask, they are assumed to be the same
+> > +	 * by default.
+> > +	 */
+> 
+> What if they're not?
+
+It boils down to detecting what CPUs share the same idle states and
+initialize dynamically a number of CPU idle drivers accordingly. It is
+doable on top of this patch which is usable on homogeneous machines as a
+starting point.
+I do not think it is a big issue to live with this limitation at the moment,
+given that it can be augmented when this code gets in the kernel. I did not
+want to add more complexity to this already complex patch series, that's
+the reason why I have not implemented the multiple driver (whose first
+target is obviously bL systems) approach from the beginning, and I think
+that's reasonable.
+
+Thanks,
+Lorenzo
