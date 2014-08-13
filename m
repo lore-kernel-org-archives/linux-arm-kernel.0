@@ -1,44 +1,72 @@
 From: thierry.reding@gmail.com (Thierry Reding)
-Date: Wed, 13 Aug 2014 12:28:52 +0200
-Subject: [PATCH v4 2/8] serial: sunzilog: Remove unnecessary volatile keyword
+Date: Wed, 13 Aug 2014 12:28:53 +0200
+Subject: [PATCH v4 3/8] sparc: Remove unnecessary volatile usage
 In-Reply-To: <1407925738-26170-1-git-send-email-thierry.reding@gmail.com>
 References: <1407925738-26170-1-git-send-email-thierry.reding@gmail.com>
-Message-ID: <1407925738-26170-3-git-send-email-thierry.reding@gmail.com>
+Message-ID: <1407925738-26170-4-git-send-email-thierry.reding@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Thierry Reding <treding@nvidia.com>
 
-The field annotated with volatile are all accessed through I/O accessors
-so they don't need to be explicitly marked. The accessors will take care
-of it.
+The volatile keyword is only necessary in accessors that immediately
+perform memory accesses. Wrappers around such accessors, such as the
+_memset_io() and _memcpy_{to,from}io() functions don't need them.
 
 Signed-off-by: Thierry Reding <treding@nvidia.com>
 ---
 Changes in v4:
 - new patch
 
- drivers/tty/serial/sunzilog.h | 8 ++++----
- 1 file changed, 4 insertions(+), 4 deletions(-)
+ arch/sparc/include/asm/io_32.h | 18 +++++++-----------
+ 1 file changed, 7 insertions(+), 11 deletions(-)
 
-diff --git a/drivers/tty/serial/sunzilog.h b/drivers/tty/serial/sunzilog.h
-index 5dec7b47cc38..de2850c1ab57 100644
---- a/drivers/tty/serial/sunzilog.h
-+++ b/drivers/tty/serial/sunzilog.h
-@@ -2,10 +2,10 @@
- #define _SUNZILOG_H
+diff --git a/arch/sparc/include/asm/io_32.h b/arch/sparc/include/asm/io_32.h
+index 9f532902627c..49267f2575d7 100644
+--- a/arch/sparc/include/asm/io_32.h
++++ b/arch/sparc/include/asm/io_32.h
+@@ -16,18 +16,15 @@
  
- struct zilog_channel {
--	volatile unsigned char control;
--	volatile unsigned char __pad1;
--	volatile unsigned char data;
--	volatile unsigned char __pad2;
-+	unsigned char control;
-+	unsigned char __pad1;
-+	unsigned char data;
-+	unsigned char __pad2;
- };
+ #include <asm-generic/io.h>
  
- struct zilog_layout {
+-static inline void _memset_io(volatile void __iomem *dst,
+-                              int c, __kernel_size_t n)
++static inline void _memset_io(void __iomem *dst, int c, __kernel_size_t n)
+ {
+-	volatile void __iomem *d = dst;
+-
+ 	while (n--) {
+-		writeb(c, d);
+-		d++;
++		writeb(c, dst);
++		dst++;
+ 	}
+ }
+ 
+-static inline void _memcpy_fromio(void *dst, const volatile void __iomem *src,
++static inline void _memcpy_fromio(void *dst, const void __iomem *src,
+                                   __kernel_size_t n)
+ {
+ 	char *d = dst;
+@@ -39,16 +36,15 @@ static inline void _memcpy_fromio(void *dst, const volatile void __iomem *src,
+ 	}
+ }
+ 
+-static inline void _memcpy_toio(volatile void __iomem *dst, const void *src,
++static inline void _memcpy_toio(void __iomem *dst, const void *src,
+                                 __kernel_size_t n)
+ {
+ 	const char *s = src;
+-	volatile void __iomem *d = dst;
+ 
+ 	while (n--) {
+ 		char tmp = *s++;
+-		writeb(tmp, d);
+-		d++;
++		writeb(tmp, dst);
++		dst++;
+ 	}
+ }
+ 
 -- 
 2.0.4
