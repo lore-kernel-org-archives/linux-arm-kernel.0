@@ -1,54 +1,63 @@
-From: thierry.reding@gmail.com (Thierry Reding)
-Date: Wed, 13 Aug 2014 09:37:38 +0200
-Subject: [PATCH 2/3] ARM: tegra: Add PMC thermtrip programming to Jetson
- TK1 device tree
-In-Reply-To: <1407226380-747-3-git-send-email-mperttunen@nvidia.com>
-References: <1407226380-747-1-git-send-email-mperttunen@nvidia.com>
- <1407226380-747-3-git-send-email-mperttunen@nvidia.com>
-Message-ID: <20140813073736.GB17466@ulmo>
+From: gang.chen.5i5j@gmail.com (Chen Gang)
+Date: Wed, 13 Aug 2014 15:44:18 +0800
+Subject: [PATCH v2] arch: Kconfig: Let all little endian architectures
+ define CPU_LITTLE_ENDIAN explicitly
+In-Reply-To: <53EB0AF6.6060208@zytor.com>
+References: <53EA99C3.90203@gmail.com> <20140813050809.GB30459@ravnborg.org>
+ <53EAF85E.3000208@gmail.com> <53EB0AF6.6060208@zytor.com>
+Message-ID: <53EB1752.9010601@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Aug 05, 2014 at 11:12:59AM +0300, Mikko Perttunen wrote:
-> This adds the required information to reset the board during an overheating
-> situation to the Jetson TK1 device tree. The thermal reset is handled by the
-> PMC by sending an I2C message to the PMIC. The entries specify the I2C
-> message to be sent.
+
+
+On 8/13/14 14:51, H. Peter Anvin wrote:
+> On 08/12/2014 10:32 PM, Chen Gang wrote:
+>>
+>> Yeah, we need.
+>>
+>>> The solution you suggest assumes that an arch is either little or big endian.
+>>> But we cannot ignore the hybriads that can do both.
+>>>
+>>
+>> For the architectures which can do both, for me, they are: sh, powerpc,
+>> m32r, and mips (may mark CPU_LITTLE_ENDIAN), also are: arm/arm64, and
+>> c6x (may mark !CPU_BIG_ENDIAN).
+>>
+>> For the architectures which only support little endian: x86, and ia64.
+>>
+>> The left, I assumes they are big endian (no any 'ENDIAN' can be found
+>> in their Kconfig files). In my memory, except related with Intel, all
+>> are (or support) big endian.
+>>
 > 
-> Signed-off-by: Mikko Perttunen <mperttunen@nvidia.com>
-> ---
->  arch/arm/boot/dts/tegra124-jetson-tk1.dts | 5 +++++
->  1 file changed, 5 insertions(+)
+> I'm quite certain that is wrong.  From memory, for example, I believe
+> CRIS is littleendian, and sure enough:
 > 
-> diff --git a/arch/arm/boot/dts/tegra124-jetson-tk1.dts b/arch/arm/boot/dts/tegra124-jetson-tk1.dts
-> index 624b0fb..ee178c4 100644
-> --- a/arch/arm/boot/dts/tegra124-jetson-tk1.dts
-> +++ b/arch/arm/boot/dts/tegra124-jetson-tk1.dts
-> @@ -1617,6 +1617,11 @@
->  		nvidia,core-pwr-off-time = <61036>;
->  		nvidia,core-power-req-active-high;
->  		nvidia,sys-clock-req-active-high;
-> +
-> +		nvidia,thermtrip-pmu-i2c-addr = <0x40>;
-> +		nvidia,thermtrip-i2c-controller = <4>;
-> +		nvidia,thermtrip-reg-addr = <0x36>;
-> +		nvidia,thermtrip-reg-data = <0x2>;
+> : tazenda 103 ; less arch/cris/include/uapi/asm/byteorder.h
+> #ifndef _CRIS_BYTEORDER_H
+> #define _CRIS_BYTEORDER_H
+> 
+> #include <linux/byteorder/little_endian.h>
+> 
+> #endif
+> 
 
-Given the number of properties that this can potentially have, I wonder
-if perhaps it would be a good idea to put this into a subnode, like
-this:
+OK, what you said sounds reasonable to me. After search "endian" in
+"./arch", xtensa also can be support both big endian or little endian.
 
-		thermtrip {
-			pmu-i2c-addr = <0x40>;
-			i2c-controller = <4>;
-			...
-		};
+> As far as I know, endianism is always a compile-time option on Linux, so
+> we should be able to relatively easily define the architecture so that
+> we either have hardwired littleendian, bigendian, or prompt.
+> 
 
-Thierry
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: not available
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140813/a767a113/attachment-0001.sig>
+Yeah, but that may break building and re-config manually. So it is still
+necessary to check little endian or big endian during configuration time
+("make *config").
+
+
+Thanks.
+-- 
+Chen Gang
+
+Open, share, and attitude like air, water, and life which God blessed
