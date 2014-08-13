@@ -1,63 +1,56 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Wed, 13 Aug 2014 10:47:48 +0200
-Subject: [PATCH 6/7] arm: mediatek: enable gpt6 on boot up to make arch
- timer working
-In-Reply-To: <CABuKBe+Q3tnN0s22EMY-dK_6FeN_xN9SmrsW3dPONR6QDJ+V_w@mail.gmail.com>
-References: <1406824943-24052-1-git-send-email-matthias.bgg@gmail.com>
- <1406824943-24052-7-git-send-email-matthias.bgg@gmail.com>
- <CACRpkdbRhGE8tcKj+W_4F9-xmcm-fxcYuCmLOqX-ESC+3PAmyA@mail.gmail.com>
- <CABuKBe+Q3tnN0s22EMY-dK_6FeN_xN9SmrsW3dPONR6QDJ+V_w@mail.gmail.com>
-Message-ID: <CACRpkdZOB=9wQ3R3sfcBEiNXLVRtgob4iLZ9QWXyVrgjqyvGXQ@mail.gmail.com>
+From: dh.herrmann@gmail.com (David Herrmann)
+Date: Wed, 13 Aug 2014 10:49:32 +0200
+Subject: [PATCH 3/4] simplefb: disable dt node upon remove
+In-Reply-To: <CACxGe6vaPUa4QvYWBA-QY7MTmJYoeqnPt9Zh5jpky6S9UYbrvQ@mail.gmail.com>
+References: <1407914239-12054-1-git-send-email-libv@skynet.be>
+ <1407914239-12054-4-git-send-email-libv@skynet.be>
+ <CACxGe6vaPUa4QvYWBA-QY7MTmJYoeqnPt9Zh5jpky6S9UYbrvQ@mail.gmail.com>
+Message-ID: <CANq1E4ReOB87RX8VhnW1Ln=SK3Tw5V962ujcsfuz-2E9Uc61yQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Aug 12, 2014 at 11:02 AM, Matthias Brugger
-<matthias.bgg@gmail.com> wrote:
-> 2014-08-11 9:15 GMT+02:00 Linus Walleij <linus.walleij@linaro.org>:
->> On Thu, Jul 31, 2014 at 6:42 PM, Matthias Brugger
->> <matthias.bgg@gmail.com> wrote:
+Hi
+
+On Wed, Aug 13, 2014 at 10:40 AM, Grant Likely
+<grant.likely@secretlab.ca> wrote:
+> On Wed, Aug 13, 2014 at 8:17 AM, Luc Verhaegen <libv@skynet.be> wrote:
+>> The next commit will handle clocks correctly, so that these do not get
+>> automatically disabled on certain SoC simplefb implementations. As a
+>> result, the removal of this simplefb driver, and the release of the
+>> clocks, is rather final, and only a full display driver can work after
+>> this. So, it makes sense to also flag the dt node as disabled, even
+>> though it has no real value today.
 >>
->>> We enable GTP6 which ungates the arch timer clock. Apart we write the
->>> frequency with which the timer is running in the CNTFREQ register.
->>> In the future this should be done in the bootloader.
->>>
->>> Signed-off-by: Matthias Brugger <matthias.bgg@gmail.com>
->> (...)
->>
->>> +       if (of_machine_is_compatible("mediatek,mt6589")) {
->>> +               /* set cntfreq register which is not done in bootloader */
->>> +               asm volatile("mcr p15, 0, %0, c14, c0, 0" : : "r" (13000000));
->>
->> I guess this is for something like the ARM arch timer in
->> drivers/clocksource/arm_arch_timer.c
->>
->> Instead of doing this, use the DT property "clock-frequency" on
->> the ARM arch timer node, as that overrides the CP15 setting.
->>
->>> +
->>> +               /* turn on GPT6 which ungates arch timer clocks */
->>> +               gpt_base = ioremap(GPT6_CON_MT65xx, 0x04);
->>> +       }
->>> +
->>> +       /* enabel clock and set to free-run */
->>> +       if (gpt_base)
->>> +               writel(0x31, gpt_base);
->>
->> Why is this not done properly in the GPT driver (I guess
->> in drivers/clocksource/mtk_timer.c) instead of remapping
->> it and fiddling around in the machine?
+>> Signed-off-by: Luc Verhaegen <libv@skynet.be>
 >
-> I didn't put it in the GPT driver, because that would mean, that you
-> need to have the mtk_timer to be able to use the ARM arch timer.
-> From my understanding this are two independent blocks in the SoC.
-> Apart from that, as stated in the commit message, this patch is a
-> workaround until we have a bootloader which does this for us.
-> Therefore I thought the init_time function would be the better place to do this.
+> Please, no.
+>
+> Drivers should not be modifying the device tree without and
+> exceptionally good reason for doing so. Drivers are to treat the DT as
+> immutable.
+>
+> * the exception is an overlay driver which add new devices to the
+> kernel. Definitely not the case here.
 
-OK I get the point...
+Why? I think we have exactly that case:
+ * DT describes the real hw properly and those parts are immutable
+ * Additionally, bootloaders create firmware-framebuffers and
+   create simple-framebuffer devices for them. Those are
+   valid as long as no driver reconfigured the real hw.
+ * Once a real hw-driver loads, it might destroy the existing
+   framebuffers, thus, it should also destroy the platform device.
+ * If the real hw-driver is unloaded, it might re-create the FB
+   and thus create a new (or enable the old) platform device.
 
-What about the ARM arch timer fixup then, will that also be
-fixed in the boot loader eventually?
+Or, in a nutshell: A "simple-framebuffer" device is basically a
+platform-device for framebuffers. Framebuffers can be created and
+destroyed during runtime. The reason we create platform-devices for
+them, is to allow dummy drivers to be probed. Real hw-drivers
+obviously bind to the parent bus device.
 
-Yours,
-Linus Walleij
+Other ideas are obviously welcome, but so far all of the other ideas
+sounded like big hacks (like remove_conflicting_framebuffers() so
+far..).
+
+Thanks
+David
