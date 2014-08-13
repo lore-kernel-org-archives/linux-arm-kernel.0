@@ -1,7 +1,7 @@
 From: michal.simek@xilinx.com (Michal Simek)
-Date: Wed, 13 Aug 2014 14:00:59 +0200
-Subject: [PATCH] iio: adc: xilinx: Remove .owner field for driver
-Message-ID: <32522124850adfda5c6cb8a7759d0e3a63893c1e.1407931250.git.michal.simek@xilinx.com>
+Date: Wed, 13 Aug 2014 14:01:21 +0200
+Subject: [PATCH] gpio: zynq: Remove .owner field for driver
+Message-ID: <78682b5ace6f31f2b52496823823116076eefd61.1407931277.git.michal.simek@xilinx.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -17,21 +17,21 @@ platform_driver_register anyway."
 Signed-off-by: Michal Simek <michal.simek@xilinx.com>
 ---
 
- drivers/iio/adc/xilinx-xadc-core.c | 1 -
+ drivers/gpio/gpio-zynq.c | 1 -
  1 file changed, 1 deletion(-)
 
-diff --git a/drivers/iio/adc/xilinx-xadc-core.c b/drivers/iio/adc/xilinx-xadc-core.c
-index fd2745c62943..92541a80b041 100644
---- a/drivers/iio/adc/xilinx-xadc-core.c
-+++ b/drivers/iio/adc/xilinx-xadc-core.c
-@@ -1322,7 +1322,6 @@ static struct platform_driver xadc_driver = {
- 	.remove = xadc_remove,
- 	.driver = {
- 		.name = "xadc",
+diff --git a/drivers/gpio/gpio-zynq.c b/drivers/gpio/gpio-zynq.c
+index c3145f91fda3..a94db67c23b0 100644
+--- a/drivers/gpio/gpio-zynq.c
++++ b/drivers/gpio/gpio-zynq.c
+@@ -668,7 +668,6 @@ MODULE_DEVICE_TABLE(of, zynq_gpio_of_match);
+ static struct platform_driver zynq_gpio_driver = {
+ 	.driver	= {
+ 		.name = DRIVER_NAME,
 -		.owner = THIS_MODULE,
- 		.of_match_table = xadc_of_match_table,
+ 		.pm = &zynq_gpio_dev_pm_ops,
+ 		.of_match_table = zynq_gpio_of_match,
  	},
- };
 --
 1.8.2.3
 
@@ -41,4 +41,4 @@ Name: not available
 Type: application/pgp-signature
 Size: 198 bytes
 Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140813/4730dcb3/attachment.sig>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140813/1d3b011c/attachment.sig>
