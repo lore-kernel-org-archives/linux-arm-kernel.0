@@ -1,74 +1,71 @@
-From: computersforpeace@gmail.com (Brian Norris)
-Date: Wed, 13 Aug 2014 15:50:02 -0700
-Subject: [PATCH v10] ARM: brcmstb: add debug UART for earlyprintk support
-Message-ID: <1407970202-3685-1-git-send-email-computersforpeace@gmail.com>
+From: rjw@rjwysocki.net (Rafael J. Wysocki)
+Date: Thu, 14 Aug 2014 01:41:46 +0200
+Subject: [PATCH 19/19] Documentation: ACPI for ARM64
+In-Reply-To: <20140812182347.GA4100@arm.com>
+References: <1406206825-15590-1-git-send-email-hanjun.guo@linaro.org>
+ <CAOesGMjs1dM37ZoFA-xs7tYYaXP-XC3NjJsj291bCNoDwAXwiw@mail.gmail.com>
+ <20140812182347.GA4100@arm.com>
+Message-ID: <2152407.NpXOMHAEH6@vostro.rjw.lan>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Marc Carino <marc.ceeeee@gmail.com>
+On Tuesday, August 12, 2014 07:23:47 PM Catalin Marinas wrote:
+> On Mon, Jul 28, 2014 at 07:27:52PM +0100, Olof Johansson wrote:
+> > On Mon, Jul 28, 2014 at 10:00 AM, Mark Rutland <mark.rutland@arm.com> wrote:
+> > > On Mon, Jul 28, 2014 at 05:27:50PM +0100, Olof Johansson wrote:
+> > >> On Mon, Jul 28, 2014 at 11:07:50AM +0200, Arnd Bergmann wrote:
+> > >> > On Saturday 26 July 2014 19:34:48 Olof Johansson wrote:
+> > >> > > On Thu, Jul 24, 2014 at 6:00 AM, Hanjun Guo <hanjun.guo@linaro.org> wrote:
+> > >> > > > +Relationship with Device Tree
+> > >> > > > +-----------------------------
+> > >> > > > +
+> > >> > > > +ACPI support in drivers and subsystems for ARMv8 should never be mutually
+> > >> > > > +exclusive with DT support at compile time.
+> > >> > > > +
+> > >> > > > +At boot time the kernel will only use one description method depending on
+> > >> > > > +parameters passed from the bootloader.
+> > >> > >
+> > >> > > Possibly overriden by kernel bootargs. And as debated for quite a
+> > >> > > while earlier this year, acpi should still default to off -- if a DT
+> > >> > > and ACPI are both passed in, DT should at this time be given priority.
+> > >> >
+> > >> > I think this would be harder to do with the way that ACPI is passed in
+> > >> > to the kernel. IIRC, you always have a minimal DT information based on
+> > >> > the ARM64 boot protocol, but in the case of ACPI, this contains pointers
+> > >> > to the ACPI tables, which are then used for populating the Linux platform
+> > >> > devices (unless acpi=disabled is set), while the other contents of the
+> > >> > DTB may be present but we skip the of_platform_populate state.
+> > >>
+> > >> How can it be harder to do? If you support acpi=off, then you should support
+> > >> acpi=on.
+> > >>
+> > >> Another alternative would be to have an early fixup that stubs out
+> > >> the acpi properties from the DTB unless there's an 'acpi' or 'acpi=on'
+> > >> argument on the cmdline. Not quite as tidy a solution, though.
+> > >
+> > > I don't follow:
+> > >
+> > > If you want to disable ACPI, you can pass acpi=off. This is your
+> > > workaround for broken ACPI (and only if you happen to have wrirten your
+> > > own DTB, because many/most ACPI systems WILL NOT have a DTB to begin
+> > > with).
+> > 
+> > All ACPI should be assumed broken at this time, so acpi=off _must_ be
+> > the default.
+> 
+> (catching up with emails after holiday and I may have missed some of
+> your arguments)
+> 
+> If we consider ACPI unusable on ARM but we still want to start merging
+> patches, we should rather make the config option depend on BROKEN
+> (though if it is that unusable that no real platform can use it, I would
+> rather not merge it at all at this stage).
 
-Add the UART definitions needed to support earlyprintk on brcmstb machines.
+I agree here.
 
-Signed-off-by: Marc Carino <marc.ceeeee@gmail.com>
-Acked-by: Florian Fainelli <f.fainelli@gmail.com>
-Acked-by: Arnd Bergmann <arnd@arndb.de>
-Signed-off-by: Brian Norris <computersforpeace@gmail.com>
----
-This patch was left out in the cold, since Russell wouldn't take it
+I would recommend creating a separate branch for that living outside of the
+mainline kernel and merging it when there are real users.
 
-Sent against Linus' current head, since there were Kconfig.debug changes merged
-from both arm-soc/next/dt and arm-soc/next/soc (this is confusing!)
-
- arch/arm/Kconfig.debug | 16 +++++++++++++++-
- 1 file changed, 15 insertions(+), 1 deletion(-)
-
-diff --git a/arch/arm/Kconfig.debug b/arch/arm/Kconfig.debug
-index b11ad54f8d17..a985c2898075 100644
---- a/arch/arm/Kconfig.debug
-+++ b/arch/arm/Kconfig.debug
-@@ -130,6 +130,17 @@ choice
- 		  Say Y here if you want kernel low-level debugging support
- 		  on Marvell Berlin SoC based platforms.
- 
-+	config DEBUG_BRCMSTB_UART
-+		bool "Use BRCMSTB UART for low-level debug"
-+		depends on ARCH_BRCMSTB
-+		select DEBUG_UART_8250
-+		help
-+		  Say Y here if you want the debug print routines to direct
-+		  their output to the first serial port on these devices.
-+
-+		  If you have a Broadcom STB chip and would like early print
-+		  messages to appear over the UART, select this option.
-+
- 	config DEBUG_CLPS711X_UART1
- 		bool "Kernel low-level debugging messages via UART1"
- 		depends on ARCH_CLPS711X
-@@ -1110,6 +1121,7 @@ config DEBUG_UART_PHYS
- 	default 0xd4018000 if DEBUG_MMP_UART3
- 	default 0xe0000000 if ARCH_SPEAR13XX
- 	default 0xf0000be0 if ARCH_EBSA110
-+	default 0xf040ab00 if DEBUG_BRCMSTB_UART
- 	default 0xf1012000 if DEBUG_MVEBU_UART_ALTERNATE
- 	default 0xf1012000 if ARCH_DOVE || ARCH_MV78XX0 || \
- 				ARCH_ORION5X
-@@ -1157,6 +1169,7 @@ config DEBUG_UART_VIRT
- 	default 0xfa71e000 if DEBUG_QCOM_UARTDM
- 	default 0xfb009000 if DEBUG_REALVIEW_STD_PORT
- 	default 0xfb10c000 if DEBUG_REALVIEW_PB1176_PORT
-+	default 0xfc40ab00 if DEBUG_BRCMSTB_UART
- 	default 0xfd000000 if ARCH_SPEAR3XX || ARCH_SPEAR6XX
- 	default 0xfd000000 if ARCH_SPEAR13XX
- 	default 0xfd012000 if ARCH_MV78XX0
-@@ -1210,7 +1223,8 @@ config DEBUG_UART_8250_WORD
- 		ARCH_KEYSTONE || \
- 		DEBUG_DAVINCI_DMx_UART0 || DEBUG_DAVINCI_DA8XX_UART1 || \
- 		DEBUG_DAVINCI_DA8XX_UART2 || \
--		DEBUG_BCM_KONA_UART || DEBUG_RK32_UART2
-+		DEBUG_BCM_KONA_UART || DEBUG_RK32_UART2 || \
-+		DEBUG_BRCMSTB_UART
- 
- config DEBUG_UART_8250_FLOW_CONTROL
- 	bool "Enable flow control for 8250 UART"
 -- 
-1.9.1
+I speak only for myself.
+Rafael J. Wysocki, Intel Open Source Technology Center.
