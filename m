@@ -1,56 +1,66 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Wed, 13 Aug 2014 16:05:40 +0100
-Subject: [PATCH v4] irqchip: gic: Allow gic_arch_extn hooks to call
- into scheduler
-In-Reply-To: <20140813145526.GF32301@codeaurora.org>
-References: <1407938238-21413-1-git-send-email-sboyd@codeaurora.org>
- <20140813142257.GK30401@n2100.arm.linux.org.uk>
- <20140813145526.GF32301@codeaurora.org>
-Message-ID: <20140813150540.GL30401@n2100.arm.linux.org.uk>
+From: geert+renesas@glider.be (Geert Uytterhoeven)
+Date: Wed, 13 Aug 2014 17:18:53 +0200
+Subject: [PATCH] pwm: Fix period and polarity in pwm_get() for non-perfect
+ matches
+Message-ID: <1407943133-18170-1-git-send-email-geert+renesas@glider.be>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Aug 13, 2014 at 07:55:26AM -0700, Stephen Boyd wrote:
-> On 08/13, Russell King - ARM Linux wrote:
-> > On Wed, Aug 13, 2014 at 06:57:18AM -0700, Stephen Boyd wrote:
-> > > Commit 1a6b69b6548c (ARM: gic: add CPU migration support,
-> > > 2012-04-12) introduced an acquisition of the irq_controller_lock
-> > > in gic_raise_softirq() which can lead to a spinlock recursion if
-> > > the gic_arch_extn hooks call into the scheduler (via complete()
-> > > or wake_up(), etc.). This happens because gic_arch_extn hooks are
-> > > normally called with the irq_controller_lock held and calling
-> > > into the scheduler may cause us to call smp_send_reschedule()
-> > > which will grab the irq_controller_lock again. Here's an example
-> > > from a vendor kernel (note that the gic_arch_extn hook code here
-> > > isn't actually in mainline):
-> > 
-> > Here's a question: why would you want to call into the scheduler from
-> > the gic_arch_extn code?
-> 
-> In this case we want to send a message to another processor when
-> an interrupt is enabled that's only a wakeup interrupt in certain
-> low power states. It's done sort of indirectly, but basically we
-> block that low power state from being entered so we can ensure
-> that the interrupt wakes us up from a lighter version of suspend.
+If pwm_get() finds a look-up entry with a perfect match (both dev_id and
+con_id match), the loop is aborted, and "p" still points to the correct
+struct pwm_lookup.
 
-No, that's not the correct answer for the question I asked.  I did not
-ask "why would you want to call into the IRQ code from the scheduler".
-I asked "why would you want to call into the scheduler from the
-gic_arch_extn code?"
+If only an entry with a matching dev_id or con_id is found, the loop
+terminates after traversing the whole list, and "p" now points to
+arbitrary memory, not part of the pwm_lookup list.
+Then pwm_set_period() and pwm_set_polarity() will set random values for
+period resp. polarity.
 
-That's a completely different question.  Let me rephrase to try and get
-an answer to my question: Why are you calling complete() or wake_up()
-from the gic_arch_extn code?
+To fix this, save period and polarity when finding a new best match,
+just like is done for chip (for the provider) and index.
 
-> > static int __disable_irq_nosync(unsigned int irq)
-> > {
-> >         unsigned long flags;
-> >         struct irq_desc *desc = irq_get_desc_buslock(irq, &flags, IRQ_GET_DESC_CHECK_GLOBAL);
-> 
-> We got the lock here.
+This fixes the LCD backlight on r8a7740/armadillo-legacy, which was fed
+period 0 and polarity -1068821144 instead of 33333 resp. 1.
 
-Yes, Daniel pointed that out, which makes this fine of course.
+Fixes: 3796ce1d4d4b330a75005c5eda105603ce9d4071 ("pwm: add period and polarity to struct pwm_lookup")
+Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
+Cc: stable at vger.kernel.org
+---
+ drivers/pwm/core.c | 8 ++++++--
+ 1 file changed, 6 insertions(+), 2 deletions(-)
 
+diff --git a/drivers/pwm/core.c b/drivers/pwm/core.c
+index 4b66bf09ee55..d2c35920ff08 100644
+--- a/drivers/pwm/core.c
++++ b/drivers/pwm/core.c
+@@ -606,6 +606,8 @@ struct pwm_device *pwm_get(struct device *dev, const char *con_id)
+ 	unsigned int best = 0;
+ 	struct pwm_lookup *p;
+ 	unsigned int match;
++	unsigned int period;
++	enum pwm_polarity polarity;
+ 
+ 	/* look up via DT first */
+ 	if (IS_ENABLED(CONFIG_OF) && dev && dev->of_node)
+@@ -653,6 +655,8 @@ struct pwm_device *pwm_get(struct device *dev, const char *con_id)
+ 		if (match > best) {
+ 			chip = pwmchip_find_by_name(p->provider);
+ 			index = p->index;
++			period = p->period;
++			polarity = p->polarity;
+ 
+ 			if (match != 3)
+ 				best = match;
+@@ -668,8 +672,8 @@ struct pwm_device *pwm_get(struct device *dev, const char *con_id)
+ 	if (IS_ERR(pwm))
+ 		return pwm;
+ 
+-	pwm_set_period(pwm, p->period);
+-	pwm_set_polarity(pwm, p->polarity);
++	pwm_set_period(pwm, period);
++	pwm_set_polarity(pwm, polarity);
+ 
+ 
+ 	return pwm;
 -- 
-FTTC broadband for 0.8mile line: currently at 9.5Mbps down 400kbps up
-according to speedtest.net.
+1.9.1
