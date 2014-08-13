@@ -1,7 +1,7 @@
 From: michal.simek@xilinx.com (Michal Simek)
-Date: Wed, 13 Aug 2014 14:01:43 +0200
-Subject: [PATCH] ARM: zynq: cpuidle: Remove .owner field for driver
-Message-ID: <01b4472cb5b1a5d03c98ec78cdd223970a52bd54.1407931299.git.michal.simek@xilinx.com>
+Date: Wed, 13 Aug 2014 14:02:05 +0200
+Subject: [PATCH] char: xilinx_hwicap: Remove .owner field for driver
+Message-ID: <b2fb97b7fe72ba11ce1bef74ad2038d4e932b5a9.1407931319.git.michal.simek@xilinx.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -17,21 +17,21 @@ platform_driver_register anyway."
 Signed-off-by: Michal Simek <michal.simek@xilinx.com>
 ---
 
- drivers/cpuidle/cpuidle-zynq.c | 1 -
+ drivers/char/xilinx_hwicap/xilinx_hwicap.c | 1 -
  1 file changed, 1 deletion(-)
 
-diff --git a/drivers/cpuidle/cpuidle-zynq.c b/drivers/cpuidle/cpuidle-zynq.c
-index aded75928028..6e03734e3508 100644
---- a/drivers/cpuidle/cpuidle-zynq.c
-+++ b/drivers/cpuidle/cpuidle-zynq.c
-@@ -80,7 +80,6 @@ static int zynq_cpuidle_probe(struct platform_device *pdev)
- static struct platform_driver zynq_cpuidle_driver = {
+diff --git a/drivers/char/xilinx_hwicap/xilinx_hwicap.c b/drivers/char/xilinx_hwicap/xilinx_hwicap.c
+index 9b1a5ac4881d..c07dfe5c4da3 100644
+--- a/drivers/char/xilinx_hwicap/xilinx_hwicap.c
++++ b/drivers/char/xilinx_hwicap/xilinx_hwicap.c
+@@ -843,7 +843,6 @@ static struct platform_driver hwicap_platform_driver = {
+ 	.probe = hwicap_drv_probe,
+ 	.remove = hwicap_drv_remove,
  	.driver = {
- 		.name = "cpuidle-zynq",
 -		.owner = THIS_MODULE,
+ 		.name = DRIVER_NAME,
+ 		.of_match_table = hwicap_of_match,
  	},
- 	.probe = zynq_cpuidle_probe,
- };
 --
 1.8.2.3
 
@@ -41,4 +41,4 @@ Name: not available
 Type: application/pgp-signature
 Size: 198 bytes
 Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140813/edd1941d/attachment.sig>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140813/571d3402/attachment.sig>
