@@ -1,150 +1,218 @@
-From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Wed, 13 Aug 2014 06:57:18 -0700
-Subject: [PATCH v4] irqchip: gic: Allow gic_arch_extn hooks to call into
- scheduler
-Message-ID: <1407938238-21413-1-git-send-email-sboyd@codeaurora.org>
+From: ludovic.desroches@atmel.com (Ludovic Desroches)
+Date: Wed, 13 Aug 2014 15:58:42 +0200
+Subject: [PATCH] spi: atmel: fix corruption caused by too early transfer
+ completion
+In-Reply-To: <53EB3213.5070905@raritan.com>
+References: <1407330035-2212-1-git-send-email-ronald.wahl@raritan.com>
+ <B256D81BAE5131468A838E5D7A2436419D1F2032@penmbx01>
+ <20140813061638.GF2452@ldesroches-Latitude-E6320>
+ <B256D81BAE5131468A838E5D7A2436419D1F4087@penmbx01>
+ <20140813081346.GG2452@ldesroches-Latitude-E6320>
+ <53EB213F.60207@raritan.com>
+ <20140813091650.GH2452@ldesroches-Latitude-E6320>
+ <53EB3213.5070905@raritan.com>
+Message-ID: <20140813135842.GI2452@ldesroches-Latitude-E6320>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Commit 1a6b69b6548c (ARM: gic: add CPU migration support,
-2012-04-12) introduced an acquisition of the irq_controller_lock
-in gic_raise_softirq() which can lead to a spinlock recursion if
-the gic_arch_extn hooks call into the scheduler (via complete()
-or wake_up(), etc.). This happens because gic_arch_extn hooks are
-normally called with the irq_controller_lock held and calling
-into the scheduler may cause us to call smp_send_reschedule()
-which will grab the irq_controller_lock again. Here's an example
-from a vendor kernel (note that the gic_arch_extn hook code here
-isn't actually in mainline):
+On Wed, Aug 13, 2014 at 11:38:27AM +0200, Ronald Wahl wrote:
+> 
+> 
+> On 13.08.2014 11:16, Ludovic Desroches wrote:
+> >On Wed, Aug 13, 2014 at 10:26:39AM +0200, Ronald Wahl wrote:
+> >>
+> >>
+> >>On 13.08.2014 10:13, Desroches, Ludovic wrote:
+> >>>On Wed, Aug 13, 2014 at 09:05:22AM +0200, Yang, Wenyou wrote:
+> >>>>
+> >>>>
+> >>>>>-----Original Message-----
+> >>>>>From: Ludovic Desroches [mailto:ludovic.desroches at atmel.com]
+> >>>>>Sent: Wednesday, August 13, 2014 2:17 PM
+> >>>>>To: Yang, Wenyou
+> >>>>>Cc: Ronald Wahl; linux-arm-kernel at lists.infradead.org; Ferre, Nicolas
+> >>>>>Subject: Re: [PATCH] spi: atmel: fix corruption caused by too early transfer
+> >>>>>completion
+> >>>>>
+> >>>>>Hi,
+> >>>>>
+> >>>>>On Wed, Aug 13, 2014 at 01:20:13AM +0000, Yang, Wenyou wrote:
+> >>>>>>Hi,
+> >>>>>>>-----Original Message-----
+> >>>>>>>From: linux-arm-kernel
+> >>>>>>>[mailto:linux-arm-kernel-bounces at lists.infradead.org] On Behalf Of
+> >>>>>>>Ronald Wahl
+> >>>>>>>Sent: Wednesday, August 06, 2014 9:01 PM
+> >>>>>>>To: linux-arm-kernel at lists.infradead.org
+> >>>>>>>Subject: [PATCH] spi: atmel: fix corruption caused by too early
+> >>>>>>>transfer completion
+> >>>>>>>
+> >>>>>>>The PDC (peripheral DMA controller) on AT91 supports two transfer
+> >>>>>>>counters and associated registers - one for current and one for the
+> >>>>>>>next transfer. If the current transfer is done the next transfer is
+> >>>>>>>moved into the current transfer. Now there are two interrupts: one
+> >>>>>>>is raised whenever a single transfer is done (ENDRX) and the other one is
+> >>>>>raised when the current and the next transfer has finished (RXBUFF).
+> >>>>>>>The issue is that the driver only enables the ENDRX interrupt which
+> >>>>>>>may lead to queuing a new request while there is still a transfer running.
+> >>>>>>>This can lead to overruns and/or corruption. By using the RXBUFF
+> >>>>>>>interrupt only we queue new requests only when the hardware queue is
+> >>>>>>>empty avoiding this problem.
+> >>>>>>
+> >>>>>>The patch can work, but it maybe decrease the performance.
+> >>>>>
+> >>>>>Can you give more details? I had also the same feeling at the beginning but due to
+> >>>>>the way pdc is implemented in the spi driver (doesn't really take advantage of the
+> >>>>>double buffer), I think it should not change performances.
+> >>>>I am not sure, but the next transfer registers is used in the driver code
+> >>>
+> >>>Yes it is used but not in the optimal way. Here, we configure the
+> >>>transfer to send two buffers. Once done, we will do it again if needed.
+> >>>
+> >>>Taking advantage of the double buffer means when we receive ENDRX we
+> >>>immediately prepare the next transfer. Then we won't have dead time.
+> >>>Since it's not done in this way in the driver I don't think it will
+> >>>decrease performances.
+> >>
+> >>In kernel 3.10 the code was designed this way (programming next
+> >>transfer registers while a transfer was still running). Scheduling
+> >>the next transfer was happening from ENDRX interrupt context. The
+> >>only thing I'm not sure about is if it behaves correctly when the
+> >>primary transfer finishes but the driver thinks it is still running
+> >>and so only programs the next transfer. Will this transfer start?
+> >>
+> >
+> >I don't see in which case it can progam only the next transfer (on
+> >3.16). It configures the primary transfer and the next transfer if there
+> >are remaining bytes but maybe I miss something.
+> >
+> >In a general way, when using PDC, at the end of the primary transfer, if
+> >RNCR is not zero then RNPR and RNCR are copied to RPR and RCR. So yes,
+> >PDC will start the transfer.
+> 
+> Current driver design does not have this issue but also does not
+> make efficient use of the double buffering. My question above was
+> related to the driver design in 3.10 where the double buffering was
+> used more effectively.
+> 
+> So what happens if primary and next transfer is RCR and RNCR are
+> both already zero (hence no transfer running anymore) and only RNCR
+> is programmed? I think this can happen in the old driver design in
+> 3.10. I ask just because someone might want to rearrage the driver
+> so that it uses the next transfer more effectively as it was in
+> 3.10.
 
-BUG: spinlock recursion on CPU#0, swapper/0/1
- lock: irq_controller_lock+0x0/0x18, .magic: dead4ead, .owner: sw
-er_cpu: 0
-CPU: 0 PID: 1 Comm: swapper/0 Not tainted 3.14.10-00430-g3d433c4e
+The transfer should start, writting into RNCR should trigger a copy of
+RNCR to RCR. You could always write into RNCR and never into RCR.
 
-Call trace:
-[<ffffffc000087e1c>] dump_backtrace+0x0/0x140
-[<ffffffc000087f6c>] show_stack+0x10/0x1c
-[<ffffffc00064732c>] dump_stack+0x74/0xc4
-[<ffffffc0006446c0>] spin_dump+0x78/0x88
-[<ffffffc0006446f4>] spin_bug+0x24/0x34
-[<ffffffc0000d47d0>] do_raw_spin_lock+0x58/0x148
-[<ffffffc00064d398>] _raw_spin_lock_irqsave+0x24/0x38
-[<ffffffc0002c9d7c>] gic_raise_softirq+0x2c/0xbc
-[<ffffffc00008daa4>] smp_send_reschedule+0x34/0x40
-[<ffffffc0000c1e94>] try_to_wake_up+0x224/0x288
-[<ffffffc0000c1f4c>] default_wake_function+0xc/0x18
-[<ffffffc0000ceef0>] __wake_up_common+0x50/0x8c
-[<ffffffc0000cef3c>] __wake_up_locked+0x10/0x1c
-[<ffffffc0000cf734>] complete+0x3c/0x5c
-[<ffffffc0002f0e78>] msm_mpm_enable_irq_exclusive+0x1b8/0x1c8
-[<ffffffc0002f0f58>] __msm_mpm_enable_irq+0x4c/0x7c
-[<ffffffc0002f0f94>] msm_mpm_enable_irq+0xc/0x18
-[<ffffffc0002c9bb0>] gic_unmask_irq+0x40/0x7c
-[<ffffffc0000de5f4>] irq_enable+0x2c/0x48
-[<ffffffc0000de65c>] irq_startup+0x4c/0x74
-[<ffffffc0000dd2fc>] __setup_irq+0x264/0x3f0
-[<ffffffc0000dd5e0>] request_threaded_irq+0xcc/0x11c
-[<ffffffc0000df254>] devm_request_threaded_irq+0x68/0xb4
-[<ffffffc000471520>] msm_iommu_ctx_probe+0x124/0x2d4
-[<ffffffc000337374>] platform_drv_probe+0x20/0x54
-[<ffffffc00033598c>] driver_probe_device+0x158/0x340
-[<ffffffc000335c20>] __driver_attach+0x60/0x90
-[<ffffffc000333c9c>] bus_for_each_dev+0x6c/0x8c
-[<ffffffc000335304>] driver_attach+0x1c/0x28
-[<ffffffc000334f14>] bus_add_driver+0x120/0x204
-[<ffffffc0003362e4>] driver_register+0xbc/0x10c
-[<ffffffc000337348>] __platform_driver_register+0x5c/0x68
-[<ffffffc00094c478>] msm_iommu_driver_init+0x54/0x7c
-[<ffffffc0000813ec>] do_one_initcall+0xa4/0x130
-[<ffffffc00091d928>] kernel_init_freeable+0x138/0x1dc
-[<ffffffc000642578>] kernel_init+0xc/0xd4
-
-We really just want to synchronize the sending of an SGI with the
-update of the gic_cpu_map[], so introduce a new SGI lock that we
-can use to synchronize the two code paths. Three main events are
-happening that we have to consider:
-
-	1. We're updating the gic_cpu_mask to point to an
-	incoming CPU
-
-	2. We're (potentially) sending an SGI to the outgoing CPU
-
-	3. We're redirecting any pending SGIs for the outgoing
-	CPU to the incoming CPU.
-
-Events 1 and 3 are already ordered within the same CPU by means
-of program order and use of I/O accessors. Events 1 and 2 don't
-need to be ordered, but events 2 and 3 do because any SGIs for
-the outgoing CPU need to be pending before we can redirect them.
-Synchronize by acquiring a new lock around event 2 and before
-event 3. Use smp_mb__after_unlock_lock() before event 3 to ensure
-that event 1 is seen before event 3 on other CPUs that may be
-executing event 2. We put this all behind the b.L switcher config
-option so that if we're not using this feature we don't have to
-acquire any locks at all in the IPI path.
-
-Cc: Nicolas Pitre <nico@linaro.org>
-Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
----
- drivers/irqchip/irq-gic.c | 23 +++++++++++++++++++++--
- 1 file changed, 21 insertions(+), 2 deletions(-)
-
-diff --git a/drivers/irqchip/irq-gic.c b/drivers/irqchip/irq-gic.c
-index 7c131cf7cc13..b9e669cb1c1e 100644
---- a/drivers/irqchip/irq-gic.c
-+++ b/drivers/irqchip/irq-gic.c
-@@ -81,6 +81,16 @@ static DEFINE_RAW_SPINLOCK(irq_controller_lock);
- #define NR_GIC_CPU_IF 8
- static u8 gic_cpu_map[NR_GIC_CPU_IF] __read_mostly;
- 
-+#ifdef CONFIG_BL_SWITCHER
-+/* Synchronize switching CPU interface and sending SGIs */
-+static DEFINE_RAW_SPINLOCK(gic_sgi_lock);
-+#define sgi_map_lock(flags) raw_spin_lock_irqsave(&gic_sgi_lock, flags)
-+#define sgi_map_unlock(flags) raw_spin_unlock_irqrestore(&gic_sgi_lock, flags)
-+#else
-+#define sgi_map_lock(flags) (void)(flags)
-+#define sgi_map_unlock(flags) (void)(flags)
-+#endif
-+
- /*
-  * Supported arch specific GIC irq extension.
-  * Default make them NULL.
-@@ -658,7 +668,7 @@ static void gic_raise_softirq(const struct cpumask *mask, unsigned int irq)
- 	int cpu;
- 	unsigned long flags, map = 0;
- 
--	raw_spin_lock_irqsave(&irq_controller_lock, flags);
-+	sgi_map_lock(flags);
- 
- 	/* Convert our logical CPU mask into a physical one. */
- 	for_each_cpu(cpu, mask)
-@@ -673,7 +683,7 @@ static void gic_raise_softirq(const struct cpumask *mask, unsigned int irq)
- 	/* this always happens on GIC0 */
- 	writel_relaxed(map << 16 | irq, gic_data_dist_base(&gic_data[0]) + GIC_DIST_SOFTINT);
- 
--	raw_spin_unlock_irqrestore(&irq_controller_lock, flags);
-+	sgi_map_unlock(flags);
- }
- #endif
- 
-@@ -764,6 +774,15 @@ void gic_migrate_target(unsigned int new_cpu_id)
- 
- 	raw_spin_unlock(&irq_controller_lock);
- 
-+	raw_spin_lock(&gic_sgi_lock);
-+	/*
-+	 * Ensure that the gic_cpu_map update above is seen in
-+	 * gic_raise_softirq() before we redirect any pending SGIs that
-+	 * may have been raised for the outgoing CPU (cur_cpu_id)
-+	 */
-+	smp_mb__after_unlock_lock();
-+	raw_spin_unlock(&gic_sgi_lock);
-+
- 	/*
- 	 * Now let's migrate and clear any potential SGIs that might be
- 	 * pending for us (cur_cpu_id).  Since GIC_DIST_SGI_PENDING_SET
--- 
-The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
-hosted by The Linux Foundation
+> 
+> >Nevertheless, it will be safer to use RXBUFF before configuring PDC
+> >again because it can cause some corruption as you observed.
+> >
+> >>>>>My only concern is why ENDRX was chosen instead of RXBUFF? Simple bug or
+> >>>>>to manage a specific case we are thinking about.
+> >>>>Both the current transfer and the next transfer is done,  RXBUFF bit  is set.
+> >>>>Either the current transfer or the next transfer is done, ENDRX bit set.
+> >>>>I think it is OK.
+> >>>>
+> >>>>>
+> >>>>>>
+> >>>>>>Could you share the scenario caused the overruns and/or corruption, or log
+> >>>>>message?
+> >>>>>>
+> >>>>>>>
+> >>>>>>>Signed-off-by: Ronald Wahl <ronald.wahl@raritan.com>
+> >>>>>>>---
+> >>>>>>>  drivers/spi/spi-atmel.c | 17 ++++++++---------
+> >>>>>>>  1 file changed, 8 insertions(+), 9 deletions(-)
+> >>>>>>>
+> >>>>>>>diff --git a/drivers/spi/spi-atmel.c b/drivers/spi/spi-atmel.c index
+> >>>>>>>113c83f..3f7d138
+> >>>>>>>100644
+> >>>>>>>--- a/drivers/spi/spi-atmel.c
+> >>>>>>>+++ b/drivers/spi/spi-atmel.c
+> >>>>>>>@@ -775,17 +775,17 @@ static void atmel_spi_pdc_next_xfer(struct
+> >>>>>>>spi_master *master,
+> >>>>>>>  			(unsigned long long)xfer->rx_dma);
+> >>>>>>>  	}
+> >>>>>>>
+> >>>>>>>-	/* REVISIT: We're waiting for ENDRX before we start the next
+> >>>>>>>+	/* REVISIT: We're waiting for RXBUFF before we start the next
+> >>>>>>>  	 * transfer because we need to handle some difficult timing
+> >>>>>>>-	 * issues otherwise. If we wait for ENDTX in one transfer and
+> >>>>>>>-	 * then starts waiting for ENDRX in the next, it's difficult
+> >>>>>>>-	 * to tell the difference between the ENDRX interrupt we're
+> >>>>>>>-	 * actually waiting for and the ENDRX interrupt of the
+> >>>>>>>+	 * issues otherwise. If we wait for TXBUFE in one transfer and
+> >>>>>>>+	 * then starts waiting for RXBUFF in the next, it's difficult
+> >>>>>>>+	 * to tell the difference between the RXBUFF interrupt we're
+> >>>>>>>+	 * actually waiting for and the RXBUFF interrupt of the
+> >>>>>>>  	 * previous transfer.
+> >>>>>>>  	 *
+> >>>>>>>  	 * It should be doable, though. Just not now...
+> >>>>>>>  	 */
+> >>>>>>>-	spi_writel(as, IER, SPI_BIT(ENDRX) | SPI_BIT(OVRES));
+> >>>>>>>+	spi_writel(as, IER, SPI_BIT(RXBUFF) | SPI_BIT(OVRES));
+> >>>>>>>  	spi_writel(as, PTCR, SPI_BIT(TXTEN) | SPI_BIT(RXTEN));  }
+> >>>>>>>
+> >>>>>>>@@ -956,8 +956,7 @@ atmel_spi_pdc_interrupt(int irq, void *dev_id)
+> >>>>>>>
+> >>>>>>>  		ret = IRQ_HANDLED;
+> >>>>>>>
+> >>>>>>>-		spi_writel(as, IDR, (SPI_BIT(RXBUFF) | SPI_BIT(ENDRX)
+> >>>>>>>-				     | SPI_BIT(OVRES)));
+> >>>>>>>+		spi_writel(as, IDR, (SPI_BIT(RXBUFF) | SPI_BIT(OVRES)));
+> >>>>>>>
+> >>>>>>>  		/* Clear any overrun happening while cleaning up */
+> >>>>>>>  		spi_readl(as, SR);
+> >>>>>>>@@ -966,7 +965,7 @@ atmel_spi_pdc_interrupt(int irq, void *dev_id)
+> >>>>>>>
+> >>>>>>>  		complete(&as->xfer_completion);
+> >>>>>>>
+> >>>>>>>-	} else if (pending & (SPI_BIT(RXBUFF) | SPI_BIT(ENDRX))) {
+> >>>>>>>+	} else if (pending & (SPI_BIT(RXBUFF))) {
+> >>>>>>>  		ret = IRQ_HANDLED;
+> >>>>>>>
+> >>>>>>>  		spi_writel(as, IDR, pending);
+> >>>>>>>--
+> >>>>>>>1.9.3
+> >>>>>>>
+> >>>>>>>
+> >>>>>>>_______________________________________________
+> >>>>>>>linux-arm-kernel mailing list
+> >>>>>>>linux-arm-kernel at lists.infradead.org
+> >>>>>>>http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+> >>>>>>
+> >>>>>>Best Regards,
+> >>>>>>Wenyou Yang
+> >>>>>>
+> >>>>>>_______________________________________________
+> >>>>>>linux-arm-kernel mailing list
+> >>>>>>linux-arm-kernel at lists.infradead.org
+> >>>>>>http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+> >>>
+> >>
+> >>--
+> >>Ronald Wahl - ronald.wahl at raritan.com - Phone +49 375271349-0 Fax -99
+> >>Raritan Deutschland GmbH, Kornmarkt 7, 08056 Zwickau, Germany
+> >>USt-IdNr. DE813094160, Steuer-Nr. 227/117/01749
+> >>Amtsgericht Chemnitz HRB 23605
+> >>Gesch?ftsf?hrung: Stuart Hopper, Ralf Ploenes
+> >>
+> >>_______________________________________________
+> >>linux-arm-kernel mailing list
+> >>linux-arm-kernel at lists.infradead.org
+> >>http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+> >
+> 
+> -- 
+> Ronald Wahl - ronald.wahl at raritan.com - Phone +49 375271349-0 Fax -99
+> Raritan Deutschland GmbH, Kornmarkt 7, 08056 Zwickau, Germany
+> USt-IdNr. DE813094160, Steuer-Nr. 227/117/01749
+> Amtsgericht Chemnitz HRB 23605
+> Gesch?ftsf?hrung: Stuart Hopper, Ralf Ploenes
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
