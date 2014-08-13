@@ -1,180 +1,44 @@
-From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Tue, 12 Aug 2014 17:27:48 -0700
-Subject: [PATCH v3 3/7] arm: use fixmap for text patching when text is RO
-In-Reply-To: <CAGXu5j+TPBs9h9YvVDt=g4WFykHgzcde9Ujuef=cRQAou8hZoA@mail.gmail.com>
-References: <1407867869-5194-1-git-send-email-keescook@chromium.org>
- <1407867869-5194-4-git-send-email-keescook@chromium.org>
- <53EA897D.8030901@codeaurora.org>
- <CAGXu5j+TPBs9h9YvVDt=g4WFykHgzcde9Ujuef=cRQAou8hZoA@mail.gmail.com>
-Message-ID: <53EAB104.1050208@codeaurora.org>
+From: nicolas.pitre@linaro.org (Nicolas Pitre)
+Date: Tue, 12 Aug 2014 20:39:37 -0400 (EDT)
+Subject: [PATCH v2] irqchip: gic: Allow gic_arch_extn hooks to call into
+ scheduler
+In-Reply-To: <53EA970C.9070003@codeaurora.org>
+References: <alpine.LFD.2.11.1408041858570.6061@knanqh.ubzr>
+ <1407194837-27190-1-git-send-email-sboyd@codeaurora.org>
+ <53E118EE.5040205@codeaurora.org>
+ <alpine.LFD.2.11.1408051537250.6061@knanqh.ubzr>
+ <53E14B33.9080701@codeaurora.org>
+ <alpine.LFD.2.11.1408052222350.6061@knanqh.ubzr>
+ <53EA970C.9070003@codeaurora.org>
+Message-ID: <alpine.LFD.2.11.1408122038500.6061@knanqh.ubzr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08/12/14 14:47, Kees Cook wrote:
-> On Tue, Aug 12, 2014 at 2:39 PM, Stephen Boyd <sboyd@codeaurora.org> wrote:
->> On 08/12/14 11:24, Kees Cook wrote:
->>> diff --git a/arch/arm/kernel/patch.c b/arch/arm/kernel/patch.c
->>> index 07314af47733..03dd4e39c833 100644
->>> --- a/arch/arm/kernel/patch.c
->>> +++ b/arch/arm/kernel/patch.c
->>> @@ -13,21 +16,69 @@ struct patch {
->>>       unsigned int insn;
->>>  };
->>>
->>> -void __kprobes __patch_text(void *addr, unsigned int insn)
->>> +static DEFINE_SPINLOCK(patch_lock);
->>> +
->>> +static void __kprobes *patch_map(void *addr, int fixmap, unsigned long *flags)
->>> +{
->>> +     unsigned int uintaddr = (uintptr_t) addr;
->>> +     bool module = !core_kernel_text(uintaddr);
->>> +     struct page *page;
->>> +
->>> +     if (module && IS_ENABLED(CONFIG_DEBUG_SET_MODULE_RONX))
->>> +             page = vmalloc_to_page(addr);
->>> +     else if (!module && IS_ENABLED(CONFIG_DEBUG_RODATA))
->>> +             page = virt_to_page(addr);
->>> +     else
->>> +             return addr;
->>> +
->>> +     if (flags)
->>> +             spin_lock_irqsave(&patch_lock, *flags);
->>> +
->>> +     set_fixmap(fixmap, page_to_phys(page));
->>> +
->>> +     return (void *) (__fix_to_virt(fixmap) + (uintaddr & ~PAGE_MASK));
->>> +}
->>> +
->>> +static void __kprobes patch_unmap(int fixmap, unsigned long *flags)
->>> +{
->>> +     clear_fixmap(fixmap);
->>> +
->>> +     if (flags)
->>> +             spin_unlock_irqrestore(&patch_lock, *flags);
->>> +}
->> Has the kbuildbot complained about this one yet?
->>
->>   CHECK  arch/arm/kernel/patch.c
->>   arch/arm/kernel/patch.c:47:39: warning: context imbalance in
->> 'patch_unmap' - unexpected unlock
->>
->> I guess we're going to ignore it.
-> No, nothing yet from buildbot, let me do a sparse run -- I think we
-> can just add annotation and we'll be okay.
->
->
+On Tue, 12 Aug 2014, Stephen Boyd wrote:
 
-Ok. I tried to move code around but sparse still complains because of
-conditional locking.
+> On 08/05/14 19:34, Nicolas Pitre wrote:
+> >
+> >> It allows us to synchronize with another CPU that may be inside
+> >> gic_raise_softirq(). If the other CPU was in that function then this CPU
+> >> would wait until it was done sending the IPI to continue along and
+> >> reroute them. If the other CPU was just about to grab the sgi lock then
+> >> we would guarantee that the CPU would see the new gic_cpu_map value and
+> >> thus any redirection is not necessary.
+> > OK I get it now.
+> >
+> >> I hoped that the commit text explained this.
+> > I'm possibly not bright enough to get it the first time.
+> >
+> >> Honestly it probably isn't a noticeable performance boost either way 
+> >> but I think this is the best we can do.
+> > Sure, agreed.
+> >
+> >
+> >
+> 
+> Ok, so which patch is preferred?
 
----8<---
+I'd say the later.
 
-diff --git a/arch/arm/kernel/patch.c b/arch/arm/kernel/patch.c
-index 03dd4e39c833..f6d4de3826a0 100644
---- a/arch/arm/kernel/patch.c
-+++ b/arch/arm/kernel/patch.c
-@@ -18,33 +18,17 @@ struct patch {
- 
- static DEFINE_SPINLOCK(patch_lock);
- 
--static void __kprobes *patch_map(void *addr, int fixmap, unsigned long *flags)
-+static struct page __kprobes *patch_page(void *addr)
- {
- 	unsigned int uintaddr = (uintptr_t) addr;
- 	bool module = !core_kernel_text(uintaddr);
--	struct page *page;
- 
- 	if (module && IS_ENABLED(CONFIG_DEBUG_SET_MODULE_RONX))
--		page = vmalloc_to_page(addr);
-+		return vmalloc_to_page(addr);
- 	else if (!module && IS_ENABLED(CONFIG_DEBUG_RODATA))
--		page = virt_to_page(addr);
--	else
--		return addr;
-+		return virt_to_page(addr);
- 
--	if (flags)
--		spin_lock_irqsave(&patch_lock, *flags);
--
--	set_fixmap(fixmap, page_to_phys(page));
--
--	return (void *) (__fix_to_virt(fixmap) + (uintaddr & ~PAGE_MASK));
--}
--
--static void __kprobes patch_unmap(int fixmap, unsigned long *flags)
--{
--	clear_fixmap(fixmap);
--
--	if (flags)
--		spin_unlock_irqrestore(&patch_lock, *flags);
-+	return NULL;
- }
- 
- void __kprobes __patch_text_real(void *addr, unsigned int insn, bool remap)
-@@ -54,10 +38,18 @@ void __kprobes __patch_text_real(void *addr, unsigned int insn, bool remap)
- 	bool twopage = false;
- 	unsigned long flags;
- 	void *waddr = addr;
-+	struct page *page = NULL;
- 	int size;
- 
--	if (remap)
--		waddr = patch_map(addr, FIX_TEXT_POKE0, &flags);
-+	if (remap) {
-+		page = patch_page(addr);
-+		if (page) {
-+			spin_lock_irqsave(&patch_lock, flags);
-+			set_fixmap(FIX_TEXT_POKE0, page_to_phys(page));
-+			waddr = (void *)(__fix_to_virt(FIX_TEXT_POKE0) +
-+				(uintaddr & ~PAGE_MASK));
-+		}
-+	}
- 
- 	if (thumb2 && __opcode_is_thumb16(insn)) {
- 		*(u16 *)waddr = __opcode_to_mem_thumb16(insn);
-@@ -69,15 +61,25 @@ void __kprobes __patch_text_real(void *addr, unsigned int insn, bool remap)
- 		u16 *addrh1 = waddr + 2;
- 
- 		twopage = (uintaddr & ~PAGE_MASK) == PAGE_SIZE - 2;
--		if (twopage && remap)
--			addrh1 = patch_map(addr + 2, FIX_TEXT_POKE1, NULL);
-+		if (twopage && remap) {
-+			struct page *page2;
-+
-+			page2 = patch_page(addr + 2);
-+			if (page2) {
-+				set_fixmap(FIX_TEXT_POKE1, page_to_phys(page));
-+				addrh1 = (u16 *)(__fix_to_virt(FIX_TEXT_POKE1) +
-+						(uintaddr & ~PAGE_MASK));
-+			} else {
-+				addrh1 = addr + 2;
-+			}
-+		}
- 
- 		*addrh0 = __opcode_to_mem_thumb16(first);
- 		*addrh1 = __opcode_to_mem_thumb16(second);
- 
- 		if (twopage && addrh1 != addr + 2) {
- 			flush_kernel_vmap_range(addrh1, 2);
--			patch_unmap(FIX_TEXT_POKE1, NULL);
-+			clear_fixmap(FIX_TEXT_POKE1);
- 		}
- 
- 		size = sizeof(u32);
-@@ -91,9 +93,10 @@ void __kprobes __patch_text_real(void *addr, unsigned int insn, bool remap)
- 		size = sizeof(u32);
- 	}
- 
--	if (waddr != addr) {
-+	if (page) {
- 		flush_kernel_vmap_range(waddr, twopage ? size / 2 : size);
--		patch_unmap(FIX_TEXT_POKE0, &flags);
-+		clear_fixmap(FIX_TEXT_POKE0);
-+		spin_unlock_irqrestore(&patch_lock, flags);
- 	}
- 
- 	flush_icache_range((uintptr_t)(addr),
 
--- 
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-hosted by The Linux Foundation
+Nicolas
