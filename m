@@ -1,100 +1,110 @@
-From: grant.likely@secretlab.ca (Grant Likely)
-Date: Wed, 13 Aug 2014 20:14:37 +0100
-Subject: [linux-sunxi] Re: [PATCH 3/4] simplefb: disable dt node upon
- remove
-In-Reply-To: <CAKON4OwLOAq1EOzZmuefcnZ4hw0i35e3k0F6XGNRy-5jer2vyA@mail.gmail.com>
-References: <1407914239-12054-1-git-send-email-libv@skynet.be>
- <1407914239-12054-4-git-send-email-libv@skynet.be>
- <CACxGe6vaPUa4QvYWBA-QY7MTmJYoeqnPt9Zh5jpky6S9UYbrvQ@mail.gmail.com>
- <CANq1E4ReOB87RX8VhnW1Ln=SK3Tw5V962ujcsfuz-2E9Uc61yQ@mail.gmail.com>
- <CACxGe6vQrhd8QOAyGnjRppmuANpT60Ao2+KmkDfF4FNeoZSZgw@mail.gmail.com>
- <20140813094524.GC31326@skynet.be> <20140813101923.GD31326@skynet.be>
- <CAKON4OwLOAq1EOzZmuefcnZ4hw0i35e3k0F6XGNRy-5jer2vyA@mail.gmail.com>
-Message-ID: <CACxGe6szX3LyhGHbVHrEFfaWGYUcgcxgkuhfc9ac-R0qJs-HXw@mail.gmail.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Wed, 13 Aug 2014 20:18:11 +0100
+Subject: CMA region and highmem
+Message-ID: <20140813191811.GP30401@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Aug 13, 2014 at 1:54 PM, jonsmirl at gmail.com <jonsmirl@gmail.com> wrote:
-> On Wed, Aug 13, 2014 at 6:19 AM, Luc Verhaegen <libv@skynet.be> wrote:
->> On Wed, Aug 13, 2014 at 11:45:24AM +0200, Luc Verhaegen wrote:
->>> On Wed, Aug 13, 2014 at 10:23:14AM +0100, Grant Likely wrote:
->>> >
->>> > The majority of the DT code is based on the assumption of a static
->>> > tree. Pantelis has been working on being able to modify it at runtime
->>> > with overlays, but he has had to go through a lot of rework because it
->>> > is not a trivial task. When you get into modifying the DT, you need to
->>> > have a lot more understanding of the side effects to changing the
->>> > tree. The DT structure also has a lifecycle that can go beyond the
->>> > current lifecycle of the kernel. The kexec tool will extract the
->>> > current tree from the kernel, make the appropriate modifications, and
->>> > use that to boot the next kernel. Allowing any driver to modify the
->>> > tree has side effects beyond just the current kernel.
->>> >
->>> > In this specific case, it will interact badly with the work Pantelis
->>> > is doing to make platform devices work with overlays. Modifying the
->>> > status property will cause the associated struct device to get removed
->>> > in the middle of probing a driver for that device! That will most
->>> > likely cause an oops.
->>> >
->>> > Besides, Luc straight out *said*: "...even though it has no real value
->>> > today". In what circumstance is that justification for modifying the
->>> > tree?
->>>
->>> With that sentence i meant that given the current state of things, it
->>> has no real value.
->>>
->>> It has no value currently as re-probing simplefb is not going to happen.
->>> But it's not a big leap to turn simplefb into a proper module. Not that
->>> that makes much sense, but that's never stopped anyone.
->>>
->>> To me it seemed simple, dt is what drives simplefb, so dt then also
->>> becomes responsible for making sure that simplefb or another driver does
->>> not attempt to blindly use this info again. The way this is implemented
->>> i do not care for in any way, i just knew that i could not do nothing
->>> here, given the catastrophic effect disabling the clocks has on simplefb
->>> on sunxi. Given the discussion that errupted here, i'd say that this
->>> does need some resolution, and altering the dt is going to have to be
->>> part of the solution.
->>>
->>> In any case, i will gladly drop this patch, as it is not absolutely
->>> necessary. But it should be very clear that there is no going back on
->>> this dt node after the clocks were released once.
->>>
->>> Luc Verhaegen.
->>
->> What about approaching this from the other end? U-Boot could add a
->> property named "once-only" or so.
->
-> Device tree is supposed to be a static description of the hardware
-> usable on all operating systems. It is the wrong mechanism for
-> communicating between uboot and the kernel. Use something like atags
-> or the kernel command line to tell the kernel that the console has
-> already been set up.
+Marek,
 
-Not accurate. While it is primarily hardware description, it is also
-used for firmware communication. There is loads of precedence for
-this. The /chosen node is the most significant example, but there are
-other places where the tree is used to provide state. For example, the
-current-speed property on UART nodes.
+Is there a reason that CMA only steals memory from lowmem, and does
+not allocate from highmem?
 
-> The switch over from simple to KMS should not be done via a node
-> add/del to the device tree either.  No one has removed the device from
-> the system, the device tree should not be changing.
+The reason I ask is that this morning, I was greeted by this excellent
+OOM on one of my platforms.  It has 2G of memory, and no real DMA
+restrictions, and with much of the memory still available, it OOM'd
+because I need a relatively large CMA block.
 
-The simple-framebuffer binding appears to be insufficient in this
-regard in that it doesn't have any linkage with the actual device
-providing the framebuffer. Ideally, I would put the simple framebuffer
-state directly into the video device node and use the chosen node to
-point to the stdout device (probably with the stdout-path property).
-Then the driver already knows it can just ignore the simple properties
-because it owns the device node when it binds.
+If CMA were pushed into highmem, this OOM would not have happened.
 
-That said, simple-framebuffer as it stands is in use so we're not
-going to deprecate it. I would like to see an addition that specifies
-how a controller can be associated with a simple framebuffer node.
+Please don't mention anything suggesting that the reason it's in lowmem
+is because of DMA-able memory restrictions - that's a totally bogus and
+insane argument.  The highmem/lowmem split is purely a software thing
+and has nothing to do with the hardware at all.  I'll illustrate:
 
-BTW, Is anyone currently using the simple framebuffer for early
-console? For early console we would want to start using it well before
-setting up platform devices.
+ Take a platform with 2G of memory.  You configure it with PAGE_OFFSET
+ at 3GB.  You end up with about 760MB of lowmem, the rest as highmem.
+ Let's say (for the sake of argument) that you rely on that split,
+ beacuse you have devices which don't work with the second 1GB of
+ memory.
 
-g.
+ Now I build that same kernel, but configure PAGE_OFFSET at 1GB.  Bingo,
+ all 2G of memory is now mapped as lowmem, and there is nothing stopping
+ any of the 2G of memory being handed out for DMA purposes.
+
+Therefore, talking about highmem/lowmem in the same sentence as DMA-able
+memory is totally wrong.
+
+Anyway, back to the OOM:
+
+xdg-screensaver invoked oom-killer: gfp_mask=0x4d0, order=2, oom_score_adj=0
+CPU: 2 PID: 6476 Comm: xdg-screensaver Not tainted 3.16.0+ #1322
+...
+[<c001c8e8>] (pgd_alloc) from [<c00237b8>] (mm_init.isra.51+0xc0/0x120)
+...
+Mem-info:
+Normal per-cpu:
+CPU    0: hi:  186, btch:  31 usd:  29
+CPU    1: hi:  186, btch:  31 usd:   0
+CPU    2: hi:  186, btch:  31 usd:   0
+CPU    3: hi:  186, btch:  31 usd:   0
+HighMem per-cpu:
+CPU    0: hi:  186, btch:  31 usd:   0
+CPU    1: hi:  186, btch:  31 usd:  21
+CPU    2: hi:  186, btch:  31 usd:   0
+CPU    3: hi:  186, btch:  31 usd:   0
+active_anon:47933 inactive_anon:2583 isolated_anon:0
+ active_file:16171 inactive_file:71321 isolated_file:0
+ unevictable:0 dirty:0 writeback:0 unstable:0
+ free:244622 slab_reclaimable:3605 slab_unreclaimable:95994
+ mapped:21360 shmem:5230 pagetables:1176 bounce:0
+ free_cma:37697
+Normal free:159400kB min:3440kB low:4300kB high:5160kB active_anon:54336kB
+ inactive_anon:2580kB active_file:56kB inactive_file:204kB unevictable:0kB
+ isolated(anon):0kB isolated(file):0kB present:778240kB managed:740044kB
+ mlocked:0kB dirty:0kB writeback:0kB mapped:5336kB shmem:5428kB
+ slab_reclaimable:14420kB slab_unreclaimable:383976kB kernel_stack:2512kB
+ pagetables:1088kB unstable:0kB bounce:0kB free_cma:150788kB
+ writeback_tmp:0kB pages_scanned:0 all_unreclaimable? no
+lowmem_reserve[]: 0 10304 10304
+HighMem free:818228kB min:512kB low:2044kB high:3576kB active_anon:138352kB
+ inactive_anon:7752kB active_file:64692kB inactive_file:285204kB unevictable:0kB
+ isolated(anon):0kB isolated(file):0kB present:1318912kB managed:1318912kB
+ mlocked:0kB dirty:0kB writeback:0kB mapped:80072kB shmem:15492kB
+ slab_reclaimable:0kB slab_unreclaimable:0kB kernel_stack:0kB
+ pagetables:3636kB unstable:0kB bounce:0kB free_cma:0kB
+ writeback_tmp:0kB pages_scanned:0 all_unreclaimable? no
+lowmem_reserve[]: 0 0 0
+Normal: 117*4kB (UEMC) 959*8kB (UEMC) 2*16kB (C) 2*32kB
+ (C) 2*64kB (C) 0*128kB 0*256kB 0*512kB 1*1024kB (C) 1*2048kB (C)
+ 36*4096kB (C) = 158892kB
+HighMem: 32*4kB (UM) 75*8kB (UM) 633*16kB (UM) 377*32kB (UM) 191*64kB
+ (UM) 86*128kB (UM) 40*256kB (M) 19*512kB (M) 14*1024kB (UM) 6*2048kB
+ (UM) 177*4096kB (MR) = 817736kB
+92769 total pagecache pages
+0 pages in swap cache
+Swap cache stats: add 0, delete 0, find 0/0
+Free swap  = 0kB
+Total swap = 0kB
+524288 pages of RAM
+244139 free pages
+9549 reserved pages
+27079 slab pages
+55230910 pages shared
+0 pages swap cached
+...
+Out of memory: Kill process 3460 (vlc) score 38 or sacrifice child
+Killed process 3460 (vlc) total-vm:278340kB, anon-rss:30360kB, file-rss:48988kB
+
+As you can see, there's plenty of precious lowmem still available, but
+because we only have 760MB of lowmem, from which we steal 256MB for
+CMA, this leaves around 500MB of lowmem free - and that puts quite a
+lot of pressure on lowmem.  Meanwhile, we have oodles of highmem still
+available which would be better suited to CMA - especially as CMA would
+not have to do dance around changing the page tables.
+
+Any thoughts?
+
+-- 
+FTTC broadband for 0.8mile line: currently at 9.5Mbps down 400kbps up
+according to speedtest.net.
