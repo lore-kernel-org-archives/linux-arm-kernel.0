@@ -1,99 +1,58 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Wed, 13 Aug 2014 11:31:34 +0200
-Subject: [PATCH 2/6] leds: add device tree bindings for syscon LEDs
-In-Reply-To: <CAL_Jsq+-G68wjBLDbELHRDFcGYRa65-Hx9WoD6HypXNjJKVDvA@mail.gmail.com>
-References: <1406294628-16079-1-git-send-email-linus.walleij@linaro.org>
- <1406294628-16079-3-git-send-email-linus.walleij@linaro.org>
- <CAL_Jsq+-G68wjBLDbELHRDFcGYRa65-Hx9WoD6HypXNjJKVDvA@mail.gmail.com>
-Message-ID: <CACRpkdYrzsBrvW3dSGDS5yT3YLzpoL+sgAgUJaczR09NfohsdQ@mail.gmail.com>
+From: dh.herrmann@gmail.com (David Herrmann)
+Date: Wed, 13 Aug 2014 11:32:10 +0200
+Subject: [PATCH 3/4] simplefb: disable dt node upon remove
+In-Reply-To: <CACxGe6vQrhd8QOAyGnjRppmuANpT60Ao2+KmkDfF4FNeoZSZgw@mail.gmail.com>
+References: <1407914239-12054-1-git-send-email-libv@skynet.be>
+ <1407914239-12054-4-git-send-email-libv@skynet.be>
+ <CACxGe6vaPUa4QvYWBA-QY7MTmJYoeqnPt9Zh5jpky6S9UYbrvQ@mail.gmail.com>
+ <CANq1E4ReOB87RX8VhnW1Ln=SK3Tw5V962ujcsfuz-2E9Uc61yQ@mail.gmail.com>
+ <CACxGe6vQrhd8QOAyGnjRppmuANpT60Ao2+KmkDfF4FNeoZSZgw@mail.gmail.com>
+Message-ID: <CANq1E4QwYX+XY0PUdGenqB6cUDPSTbQEKzv_6VxT=NpvuEmFFA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jul 25, 2014 at 4:07 PM, Rob Herring <robh@kernel.org> wrote:
-> On Fri, Jul 25, 2014 at 8:23 AM, Linus Walleij <linus.walleij@linaro.org> wrote:
->> This adds the device tree bindings used by syscon-based LEDs.
-(...)
->> +Device Tree Bindings for Syscon LEDs
->> +
->> +Required properties:
->> +- compatible : must be "syscon-leds".
+Hi
+
+On Wed, Aug 13, 2014 at 11:23 AM, Grant Likely
+<grant.likely@secretlab.ca> wrote:
+> On Wed, Aug 13, 2014 at 9:49 AM, David Herrmann <dh.herrmann@gmail.com> wrote:
+>> On Wed, Aug 13, 2014 at 10:40 AM, Grant Likely
+>> <grant.likely@secretlab.ca> wrote:
+>>> * the exception is an overlay driver which add new devices to the
+>>> kernel. Definitely not the case here.
+>>
+>> Why?
 >
-> Not really happy with the name... More below.
+> The majority of the DT code is based on the assumption of a static
+> tree. Pantelis has been working on being able to modify it at runtime
+> with overlays, but he has had to go through a lot of rework because it
+> is not a trivial task. When you get into modifying the DT, you need to
+> have a lot more understanding of the side effects to changing the
+> tree. The DT structure also has a lifecycle that can go beyond the
+> current lifecycle of the kernel. The kexec tool will extract the
+> current tree from the kernel, make the appropriate modifications, and
+> use that to boot the next kernel. Allowing any driver to modify the
+> tree has side effects beyond just the current kernel.
 
-[copy paste]
+Ok, fair enough. So we leave the DT untouched. That still allows
+calling device_add() / device_del() on platform-devices, right?
 
-> I think the compatible should be something like
-> "register-bit-led" (perhaps someone has a better name) as syscon is
-> somewhat linux specific term and you could use this binding for any
-> LEDs that have a single register bit control.
-
-Hm... this driver:
-drivers/gpio/gpio-syscon.c
-
-Has some bindings specific to a certain controller here:
-Documentation/devicetree/bindings/gpio/cirrus,clps711x-mctrl-gpio.txt
-
-Maybe I should think of something generic for that one
-along the same lines then, so we get some consensus on
-this.
-
-Documentation/devicetree/bindings/mfd/syscon.txt
-Specifies the string "syscon" for such regmap ranges, maybe
-it should rather use the compatible string "misc-register-range"
-or something.
-
->> +LED sub-node properties:
->> +- offset : register offset to the register controlling this LED
->> +- mask : bit mask for the bit controlling this LED in the register
->> +  typically 0x01, 0x02, 0x04 ...
+> In this specific case, it will interact badly with the work Pantelis
+> is doing to make platform devices work with overlays. Modifying the
+> status property will cause the associated struct device to get removed
+> in the middle of probing a driver for that device! That will most
+> likely cause an oops.
 >
-> This would be a single bit, right? What about inverted bits (i.e. 0 is
-> on or 1 is on)?
+> Besides, Luc straight out *said*: "...even though it has no real value
+> today". In what circumstance is that justification for modifying the
+> tree?
 
-I can of course add inversion bindings, but cannot add it to
-the driver as I can't test it. Just an "active-low;" string would
-do I guess.
+Sorry, I wasn't clear enough: I'm not arguing in favor of this patch.
+I just want to figure out what to do once we implement
+hardware-handover for graphics devices on non-x86 (which this series
+is kinda preparing for). This patch just reminded me, that we could do
+this on a DT level, instead of driver-core level. But I'm fine with
+avoiding that, if you warn about complications.
 
->> +- label : (optional)
->
-> Please group all required and optional properties under those headings.
-
-OK.
-
->> +Example:
->> +
->> +leds: leds at 08 {
->> +       compatible = "syscon-leds";
->> +       regmap = <&syscon>;
->> +
->> +       led at bit0 {
->
-> Perhaps we can define a way to express unit address as offset+bit like
-> <offset>_<bit> or <offset>.<bit>.
-
-I'll come up with something. We don't really have a place to
-document such schemas do we?
-
-> I think we should get rid of the leds node and put this within the
-> syscon device node and each node here should have a compatible
-> property.
-
-OK. But then I guess you also expect to get rid of the
-phandle <&syscon> from the node, so that it implicitly uses
-the syscon it's embedded in? Or is it OK to keep? Or should
-it be optional, so the (syscon) driver will look upward when
-locating the syscon for a node?
-
-Like I need to add a new function
-syscon_regmap_lookup_by_hierarchy() to syscon.c...
-It already has like three ways to look up syscons, now
-we add another one.
-
-I know that is a Linux implementation detail but it reflects the
-fact that similar code will be needed in all operating systems
-using syscon-type things, if it's a case-by-case question
-whether a phandle or hierarchy traversal is to be used for
-getting hold of the interface.
-
-Your,
-Linus Walleij
+Thanks
+David
