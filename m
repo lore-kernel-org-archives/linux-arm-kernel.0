@@ -1,80 +1,59 @@
-From: yuvaraj.lkml@gmail.com (Yuvaraj Cd)
-Date: Wed, 13 Aug 2014 11:52:38 +0530
-Subject: io-domain voltages as regulators?
-In-Reply-To: <CAD=FV=Vewr5QkNEiBEOXA=FdKHKzg0ag5+Cf4KXuXWjcshSq_g@mail.gmail.com>
-References: <3923586.SsVg941346@diego>
- <CACRpkdaJS0PUDLaCnrhtiuXPf4ccx51uNTqYWVWm47mhOhGEbA@mail.gmail.com>
- <CAPDyKFpiHf+urR85iJPqAXxREO+yPrDMcXM4K+BJqq=ur3DZtA@mail.gmail.com>
- <CAD=FV=Vewr5QkNEiBEOXA=FdKHKzg0ag5+Cf4KXuXWjcshSq_g@mail.gmail.com>
-Message-ID: <CA+NduCCi20Xaq08X71Hc+Ma=jFigd_mAkFPopG0LwOjEoAt_7w@mail.gmail.com>
+From: b.zolnierkie@samsung.com (Bartlomiej Zolnierkiewicz)
+Date: Wed, 13 Aug 2014 08:40:47 +0200
+Subject: [PATCH v2 1/3] ARM: EXYNOS: Fix build with PM_SLEEP=n and
+ ARM_EXYNOS_CPUIDLE=n
+In-Reply-To: <53EA7DC8.6040801@linaro.org>
+References: <1407856317-2457-1-git-send-email-b.zolnierkie@samsung.com>
+ <1407856317-2457-2-git-send-email-b.zolnierkie@samsung.com>
+ <53EA7DC8.6040801@linaro.org>
+Message-ID: <2126575.mQYDXuNU1Q@amdc1032>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Aug 12, 2014 at 8:43 PM, Doug Anderson <dianders@chromium.org> wrote:
-> Hi,
->
-> On Mon, Aug 11, 2014 at 5:46 AM, Ulf Hansson <ulf.hansson@linaro.org> wrote:
->> On 11 August 2014 09:44, Linus Walleij <linus.walleij@linaro.org> wrote:
->>> On Mon, Aug 4, 2014 at 12:18 AM, Heiko St?bner <heiko@sntech.de> wrote:
->>>
->>> [Adding Ulf Hansson to this discussion...]
->>>
->>>> Hi Mark, Linus,
->>>>
->>>> I'd like to clarify what the appropriate way to handle pin output voltages is.
->>>> On the Rockchip SoCs the voltage for some groups of pins can be set between
->>>> 3.3V and 1.8V ... like the MMC/SD pins who need this to support UHS mode
->>>> cards.
->>>
->>> This is called "vqmmc" in the mmc/sd subsystem.
->>>
->>> grep for mmc_set_signal_voltage() in drivers/mmc/core/*
->>>
->>> In drivers/mmc/core/core.c, you find:
->>>
->>>  mmc->supply.vqmmc = devm_regulator_get_optional(dev, "vqmmc");
->>>
->>> Which gets the regulator to set the signal voltage, if such
->>> a regulator is specified for the host.
->>>
->>> Very simple and straight-forward, and handled by the MMC core.
->>>
->>>> In [0] when talking about something different, Linus Walleij described a
->>>> similar case as
->>>>
->>>> "I think we need to have a discussion with Mark Brown on how to
->>>> handle this.
->>>> We have previously had the case of MMC/SD level-shifters, where
->>>> a certain setting gives a certain level of signals out, and another setting
->>>> gives another level. Like two discrete levels.
->>>> So we modeled that as a regulator provider inside the pin control
->>>> driver eventually, see sh-pfc/pfc-sh73a0.c"
->>>>
->>>> As this sound like exactly the thing I'm trying to solve, is handling this via
->>>> a regulator the correct general way?
->>>
->>> Ithinkso.
->>
->> Just to confirm, I fully agree with the above said.
->>
->> You may also find a good example in the mmci host driver for how to
->> make use of the vqmmc regulator.
->
-> Yuvaraj also submitted patches for dw_mmc:
->
-> 4401241 New          [1/3] mmc: dw_mmc: use mmc_regulator_get_supply
-> to handle regulators
-> 4401261 New          [2/3] mmc: dw_mmc: Dont cut off vqmmc and vmmc
-> 4401281 New          [3/3] mmc: dw_mmc: Support voltage changes
->
-> He seems to have dropped these patches on the floor and I had review
-> feedback on them, but I think they're in the right direction.
-I have not dropped these patches.I am trying out  [3/3] mmc: dw_mmc:
-Support voltage changes without extra state machine as Seungwon Jeon
-suggested.
-I will post the next version soon.
->
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+
+Hi,
+
+On Tuesday, August 12, 2014 10:49:12 PM Daniel Lezcano wrote:
+> On 08/12/2014 05:11 PM, Bartlomiej Zolnierkiewicz wrote:
+> > Fix building of exynos_defconfig with disabled CONFIG_PM_SLEEP by
+> > adding checking whether Exynos cpuidle support is enabled before
+> > accessing exynos_enter_aftr.
+> >
+> > The build error message:
+> > arch/arm/mach-exynos/built-in.o:(.data+0x74): undefined reference to `exynos_enter_aftr'
+> > make: *** [vmlinux] Error 1
+>  >
+> > This patch has been tested on Exynos4210 based Origen board.
+> >
+> > Signed-off-by: Bartlomiej Zolnierkiewicz <b.zolnierkie@samsung.com>
+> > Acked-by: Kyungmin Park <kyungmin.park@samsung.com>
+> > ---
+> >   arch/arm/mach-exynos/exynos.c | 2 ++
+> >   1 file changed, 2 insertions(+)
+> >
+> > diff --git a/arch/arm/mach-exynos/exynos.c b/arch/arm/mach-exynos/exynos.c
+> > index 6a24e11..d57f136 100644
+> > --- a/arch/arm/mach-exynos/exynos.c
+> > +++ b/arch/arm/mach-exynos/exynos.c
+> > @@ -161,7 +161,9 @@ static void exynos_restart(enum reboot_mode mode, const char *cmd)
+> >
+> >   static struct platform_device exynos_cpuidle = {
+> >   	.name              = "exynos_cpuidle",
+> > +#ifdef CONFIG_ARM_EXYNOS_CPUIDLE
+> >   	.dev.platform_data = exynos_enter_aftr,
+> > +#endif
+> >   	.id                = -1,
+> >   };
+> 
+> This patch does not address the real issue of the compilation error. The 
+> cpuidle driver needs the exynos_enter_aftr function in order to work 
+> correctly. Hence the Makefile should be fixed in order to compile pm.o 
+> if cpuidle or pm_sleep are set.
+
+Please take a look at patch #3.
+
+Best regards,
+--
+Bartlomiej Zolnierkiewicz
+Samsung R&D Institute Poland
+Samsung Electronics
