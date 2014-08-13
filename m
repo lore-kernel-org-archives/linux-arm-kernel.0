@@ -1,102 +1,44 @@
-From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Wed, 13 Aug 2014 07:55:26 -0700
-Subject: [PATCH v4] irqchip: gic: Allow gic_arch_extn hooks to call into
- scheduler
-In-Reply-To: <20140813142257.GK30401@n2100.arm.linux.org.uk>
-References: <1407938238-21413-1-git-send-email-sboyd@codeaurora.org>
- <20140813142257.GK30401@n2100.arm.linux.org.uk>
-Message-ID: <20140813145526.GF32301@codeaurora.org>
+From: suravee.suthikulpanit@amd.com (suravee.suthikulpanit at amd.com)
+Date: Wed, 13 Aug 2014 10:00:39 -0500
+Subject: [PATCH 0/2 V4] irqchip: gic: Introduce ARM GICv2m MSI(-X) support
+Message-ID: <1407942041-3291-1-git-send-email-suravee.suthikulpanit@amd.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08/13, Russell King - ARM Linux wrote:
-> On Wed, Aug 13, 2014 at 06:57:18AM -0700, Stephen Boyd wrote:
-> > Commit 1a6b69b6548c (ARM: gic: add CPU migration support,
-> > 2012-04-12) introduced an acquisition of the irq_controller_lock
-> > in gic_raise_softirq() which can lead to a spinlock recursion if
-> > the gic_arch_extn hooks call into the scheduler (via complete()
-> > or wake_up(), etc.). This happens because gic_arch_extn hooks are
-> > normally called with the irq_controller_lock held and calling
-> > into the scheduler may cause us to call smp_send_reschedule()
-> > which will grab the irq_controller_lock again. Here's an example
-> > from a vendor kernel (note that the gic_arch_extn hook code here
-> > isn't actually in mainline):
-> 
-> Here's a question: why would you want to call into the scheduler from
-> the gic_arch_extn code?
+From: Suravee Suthikulpanit <Suravee.Suthikulpanit@amd.com>
 
-In this case we want to send a message to another processor when
-an interrupt is enabled that's only a wakeup interrupt in certain
-low power states. It's done sort of indirectly, but basically we
-block that low power state from being entered so we can ensure
-that the interrupt wakes us up from a lighter version of suspend.
+This patch set introduces support for MSI(-X) in GICv2m specification,
+which is implemented in some variation of GIC400.
 
-> 
-> Oh.  My.  God.  Thomas, what have you done to the generic IRQ layer?
-> This is /totally/ unsafe:
-> 
-> void disable_irq(unsigned int irq)
-> {
->         if (!__disable_irq_nosync(irq))
->                 synchronize_irq(irq);
-> }
-> 
-> static int __disable_irq_nosync(unsigned int irq)
-> {
->         unsigned long flags;
->         struct irq_desc *desc = irq_get_desc_buslock(irq, &flags, IRQ_GET_DESC_CHECK_GLOBAL);
+This depends on and has been tested with the V7 of"Add support for PCI in AArch64"
+(https://lkml.org/lkml/2014/3/14/320).
 
-We got the lock here.
+Changes in V4:
+    * Rebase to git://git.infradead.org/users/jcooper/linux.git irqchip/core
+    * Remove patch 2 from previous version
+    * Merge patch 1 and 3 from previous version
+    * Reworks the GICv2m initialization based on Marc Zyngier review comments.
+    * Introduce "v2m" subnode in GIC binding
+    * Moves the "struct msi_chip" from "struct gic_chip_data" to "struct v2m_data".
 
-> 
->         if (!desc)
->                 return -EINVAL;
->         __disable_irq(desc, irq, false);
->         irq_put_desc_busunlock(desc, flags);
->         return 0;
-> }
-> 
-> void __disable_irq(struct irq_desc *desc, unsigned int irq, bool suspend)
-> {
->         if (suspend) {
->                 if (!desc->action || (desc->action->flags & IRQF_NO_SUSPEND))
->                         return;
->                 desc->istate |= IRQS_SUSPENDED;
->         }
-> 
->         if (!desc->depth++)
+Suravee Suthikulpanit (2):
+  irqchip: gic: Add supports for ARM GICv2m MSI(-X)
+  irqchip: gicv2m: Add support for multiple MSI for ARM64 GICv2m
 
-We're still holding the lock here right?
-
->                 irq_disable(desc);
-> }
-> 
-> You realise that disable_irq() and enable_irq() can be called by
-> concurrently by different drivers for the /same/ interrupt. 
-
-Sure.
-
-> For
-> starters, that post-increment there is completely unprotected against
-> races.  Secondly, the above is completely racy against a concurrent
-> enable_irq() - what if we're in disable_irq(), we've incremented
-> depth, but have yet to call irq_disable().  The count now has a
-> value of 1.
-> 
-> We then preempt, and run another thread which calls enable_irq()
-> on it.  This results in the depth being decremented, and the IRQ
-> is now enabled.
-
-How? Aren't we holding the descriptor lock?
-
-> 
-> We resume the original thread, and continue to call irq_disable(),
-> resulting in the interrupt being disabled.
-> 
-> That's not nice (the right answer is that it's strictly an unbalanced
-> enable_irq(), but that's no excuse here.)
-> 
+ Documentation/devicetree/bindings/arm/gic.txt |  32 +++
+ arch/arm64/include/asm/msi.h                  |  15 ++
+ arch/arm64/kernel/Makefile                    |   1 +
+ arch/arm64/kernel/msi.c                       |  57 +++++
+ drivers/irqchip/Kconfig                       |   7 +
+ drivers/irqchip/Makefile                      |   1 +
+ drivers/irqchip/irq-gic-v2m.c                 | 294 ++++++++++++++++++++++++++
+ drivers/irqchip/irq-gic.c                     |  75 ++++---
+ drivers/irqchip/irq-gic.h                     |  48 +++++
+ 9 files changed, 500 insertions(+), 30 deletions(-)
+ create mode 100644 arch/arm64/include/asm/msi.h
+ create mode 100644 arch/arm64/kernel/msi.c
+ create mode 100644 drivers/irqchip/irq-gic-v2m.c
+ create mode 100644 drivers/irqchip/irq-gic.h
 
 -- 
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-hosted by The Linux Foundation
+1.9.0
