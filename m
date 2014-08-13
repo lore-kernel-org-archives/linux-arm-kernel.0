@@ -1,172 +1,166 @@
-From: juri.lelli@arm.com (Juri Lelli)
-Date: Wed, 13 Aug 2014 12:14:40 +0100
-Subject: [PATCH] cpuidle/cpuidle-big_little: fix reading cpu id part number
-In-Reply-To: <20140813104431.GJ30401@n2100.arm.linux.org.uk>
-References: <1407501757-15231-1-git-send-email-juri.lelli@arm.com>
- <20140808132105.GB30282@n2100.arm.linux.org.uk>
- <20140808164737.GB11623@e102568-lin.cambridge.arm.com>
- <53EB381D.7080604@arm.com> <20140813104431.GJ30401@n2100.arm.linux.org.uk>
-Message-ID: <53EB48A0.3040204@arm.com>
+From: achandran@mvista.com (Arun Chandran)
+Date: Wed, 13 Aug 2014 16:47:54 +0530
+Subject: [PATCH] Arm64: convert part of soft_restart() to assembly
+In-Reply-To: <20140813105829.GC32644@leverpostej>
+References: <1407847365-10873-1-git-send-email-achandran@mvista.com>
+ <1407915801-8703-1-git-send-email-achandran@mvista.com>
+ <20140813105829.GC32644@leverpostej>
+Message-ID: <CAFdej00kapRsQB+YSO4PPN5NODiKrxzYrczof34LUD3iqwXhbA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 13/08/14 11:44, Russell King - ARM Linux wrote:
-> On Wed, Aug 13, 2014 at 11:04:13AM +0100, Juri Lelli wrote:
->> Thanks a lot for the comment. Does what below address it?
-> 
-> Yes, thanks, but a few of nitpicks though.
-> 
->> +/*
->> + * smp_cpuid_part() - return part id for a given cpu
->> + *
->> + * @cpu: logical cpu id
->> + *
->> + * Return: part id of logical cpu passed as argument
->> + *
->> + */
-> 
-> If this is supposed to be a kerneldoc-compatible comment, please read
-> Documentation/kernel-doc-nano-HOWTO.txt for the correct format.
-> 
->> +static inline unsigned int smp_cpuid_part(int cpu)
->> +{
->> +	struct cpuinfo_arm *cpu_info = &per_cpu(cpu_data, cpu);
+Hi Mark,
+
+> On Wed, Aug 13, 2014 at 08:43:21AM +0100, Arun Chandran wrote:
+>> The current soft_restart() and setup_restart implementations incorrectly
+>> assume that compiler will not spill/fill values to/from stack. However
+>> this assumption seems to be wrong, revealed by the disassembly of the
+>> currently existing code.
+>>
+>> Pseudo code for disassembly looks like
+>>
+>> soft_restart(addr)
+>> {
+>>       __push_to_stack(addr)
+>>
+>>       branch to setup_mm_for_reboot()
+>>       branch to flush_cache_all() --> This is unnecessary
+>>       branch to cpu_cache_off()
+>>       branch to flush_cache_all() --> Not guaranteed of flushing to PoC
+>>
+>>       __pop_from_stack(addr) --> Fails here as addr is not at PoC
+>>
+>>       cpu_reset(addr) --> cpu_reset receives invalid reset address
+>> }
+>
+> As I mentioned before, I think having pseudocode here is confusing.
+> Either we should have a real disassembly or we should drop it. I get the
+> following when I build a v3.16 arm64 defconfig with Linaro GCC
+> 4.9-2014.05:
+>
+
+Hmm. I think It is better to drop it as different compilers give different
+output. My compiler's output is according to the commit message, but
+your's is not. I will send another one soon.
+
+> ffffffc000085224 <soft_restart>:
+> ffffffc000085224:       a9be7bfd        stp     x29, x30, [sp,#-32]!
+> ffffffc000085228:       910003fd        mov     x29, sp
+> ffffffc00008522c:       f9000fa0        str     x0, [x29,#24]
+> ffffffc000085230:       94003b16        bl      ffffffc000093e88 <setup_mm_for_reboot>
+> ffffffc000085234:       94003927        bl      ffffffc0000936d0 <flush_cache_all>
+> ffffffc000085238:       94003bf2        bl      ffffffc000094200 <cpu_cache_off>
+> ffffffc00008523c:       94003925        bl      ffffffc0000936d0 <flush_cache_all>
+> ffffffc000085240:       b00031c1        adrp    x1, ffffffc0006be000 <reset_devices>
+> ffffffc000085244:       f9400fa0        ldr     x0, [x29,#24]
+> ffffffc000085248:       f941c822        ldr     x2, [x1,#912]
+> ffffffc00008524c:       f0000061        adrp    x1, ffffffc000094000 <set_mm_context+0x10>
+> ffffffc000085250:       91088021        add     x1, x1, #0x220
+> ffffffc000085254:       8b010041        add     x1, x2, x1
+> ffffffc000085258:       d2c00802        mov     x2, #0x4000000000               // #274877906944
+> ffffffc00008525c:       8b020021        add     x1, x1, x2
+> ffffffc000085260:       d63f0020        blr     x1
+> ...
+>
+> The two ldrs correspond to the spilled addr variable and memstart_addr
+> respectively.
+>
+>>
+>> The compiler is clearly spilling here around the cache being disabled,
+>> resulting in stale values being restored.  As we cannot control the compiler's
+>
+> Nit: double spacing here doesn't match the rest of the message.
+>
+>> spilling behaviour we must rewrite the functions in assembly to
+>> avoid use of the stack.
+>>
+>> Signed-off-by: Arun Chandran <achandran@mvista.com>
+>> ---
+>>  arch/arm64/include/asm/proc-fns.h |    2 ++
+>>  arch/arm64/kernel/process.c       |   30 ++----------------------------
+>>  arch/arm64/mm/proc.S              |   14 ++++++++++++++
+>>  3 files changed, 18 insertions(+), 28 deletions(-)
+>>
+>> diff --git a/arch/arm64/include/asm/proc-fns.h b/arch/arm64/include/asm/proc-fns.h
+>> index 0c657bb..86be4f9 100644
+>> --- a/arch/arm64/include/asm/proc-fns.h
+>> +++ b/arch/arm64/include/asm/proc-fns.h
+>> @@ -32,6 +32,8 @@ extern void cpu_cache_off(void);
+>>  extern void cpu_do_idle(void);
+>>  extern void cpu_do_switch_mm(unsigned long pgd_phys, struct mm_struct *mm);
+>>  extern void cpu_reset(unsigned long addr) __attribute__((noreturn));
+>> +extern void cpu_soft_restart(phys_addr_t cpu_reset,
+>> +             unsigned long addr) __attribute__((noreturn));
+>>  extern void cpu_do_suspend(struct cpu_suspend_ctx *ptr);
+>>  extern u64 cpu_do_resume(phys_addr_t ptr, u64 idmap_ttbr);
+>>
+>> diff --git a/arch/arm64/kernel/process.c b/arch/arm64/kernel/process.c
+>> index 1309d64..bf66922 100644
+>> --- a/arch/arm64/kernel/process.c
+>> +++ b/arch/arm64/kernel/process.c
+>> @@ -57,36 +57,10 @@ unsigned long __stack_chk_guard __read_mostly;
+>>  EXPORT_SYMBOL(__stack_chk_guard);
+>>  #endif
+>>
+>> -static void setup_restart(void)
+>> -{
+>> -     /*
+>> -      * Tell the mm system that we are going to reboot -
+>> -      * we may need it to insert some 1:1 mappings so that
+>> -      * soft boot works.
+>> -      */
+>> -     setup_mm_for_reboot();
+>> -
+>> -     /* Clean and invalidate caches */
+>> -     flush_cache_all();
+>> -
+>> -     /* Turn D-cache off */
+>> -     cpu_cache_off();
+>> -
+>> -     /* Push out any further dirty data, and ensure cache is empty */
+>> -     flush_cache_all();
+>> -}
+>> -
+>>  void soft_restart(unsigned long addr)
+>>  {
+>> -     typedef void (*phys_reset_t)(unsigned long);
+>> -     phys_reset_t phys_reset;
+>> -
+>> -     setup_restart();
+>> -
+>> -     /* Switch to the identity mapping */
+>> -     phys_reset = (phys_reset_t)virt_to_phys(cpu_reset);
+>> -     phys_reset(addr);
+>> -
+>> +     setup_mm_for_reboot();
+>> +     cpu_soft_restart(virt_to_phys(cpu_reset), addr);
+>>       /* Should never get here */
+>>       BUG();
+>>  }
+>> diff --git a/arch/arm64/mm/proc.S b/arch/arm64/mm/proc.S
+>> index 7736779..0eff5ee 100644
+>> --- a/arch/arm64/mm/proc.S
+>> +++ b/arch/arm64/mm/proc.S
+>> @@ -76,6 +76,20 @@ ENTRY(cpu_reset)
+>>       ret     x0
+>>  ENDPROC(cpu_reset)
+>>
+>> +ENTRY(cpu_soft_restart)
+>> +     /* Save address of cpu_reset() and reset address */
+>> +     mov     x19, x0
+>> +     mov     x20, x1
 >> +
->> +	return is_smp() ? (cpu_info->cpuid  & ARM_CPU_PART_MASK) :
-> 
-> Parens are not required, and there's a double space before &.
-> 
-> The BNF for the ?: operator is:
-> 
-> cond-expr:
-> 	log-or-expr ? expr : cond-expr
-> 
-> So the compiler knows that whatever is between the ? and : is a single
-> expression, and the parens are surplus.
-> 
->> -static int __init bl_idle_driver_init(struct cpuidle_driver *drv, int cpu_id)
->> +static int __init bl_idle_driver_init(struct cpuidle_driver *drv, int match_id)
-> 
-> If we're changing the name, "part_id" would probably be better than the
-> opaque "match_id" here.
-> 
+>> +     /* Turn D-cache off */
+>> +     bl      cpu_cache_off
+>> +     /* Push out all dirty data, and ensure cache is empty */
+>> +     bl      flush_cache_all
+>> +
+>> +     mov     x0, x20
+>> +     ret     x19
+>> +ENDPROC(cpu_soft_restart)
+>
+> The code change looks good to me.
 
-Right, thanks! What follows has those fixed. Should I send it as a new post?
+OK. Thanks
 
-Thanks,
-
-- Juri
-
->From 61b88de0f021213f894e843c8e4673203f953ca9 Mon Sep 17 00:00:00 2001
-From: Juri Lelli <juri.lelli@arm.com>
-Date: Thu, 7 Aug 2014 17:26:54 +0100
-Subject: [PATCH] cpuidle/cpuidle-big_little: fix reading cpu id part number
-
-Commit af040ffc9ba1e079ee4c0748aff64fa3d4716fa5 by Russell King changed
-ARM_CPU_PART_X masks, and the way they are returned and checked against.
-Usage of read_cpuid_part_number() is now deprecated, and calling places
-updated accordingly. This actually broke cpuidle-big_little initialization,
-as bl_idle_driver_init() performs a check using and hardcoded mask on
-cpu_id.
-
-Create an interface to perform the check (that is now even easier to read).
-Define also a proper mask (ARM_CPU_PART_MASK) that makes this kind of checks
-cleaner and helps preventing bugs in the future. Update usage accordingly.
-
-Signed-off-by: Juri Lelli <juri.lelli@arm.com>
-Signed-off-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
----
- arch/arm/include/asm/cputype.h       |  3 ++-
- arch/arm/include/asm/smp_plat.h      | 15 +++++++++++++++
- drivers/cpuidle/cpuidle-big_little.c | 13 +++----------
- 3 files changed, 20 insertions(+), 11 deletions(-)
-
-diff --git a/arch/arm/include/asm/cputype.h b/arch/arm/include/asm/cputype.h
-index 963a251..819777d 100644
---- a/arch/arm/include/asm/cputype.h
-+++ b/arch/arm/include/asm/cputype.h
-@@ -74,6 +74,7 @@
- #define ARM_CPU_PART_CORTEX_A12		0x4100c0d0
- #define ARM_CPU_PART_CORTEX_A17		0x4100c0e0
- #define ARM_CPU_PART_CORTEX_A15		0x4100c0f0
-+#define ARM_CPU_PART_MASK		0xff00fff0
- 
- #define ARM_CPU_XSCALE_ARCH_MASK	0xe000
- #define ARM_CPU_XSCALE_ARCH_V1		0x2000
-@@ -179,7 +180,7 @@ static inline unsigned int __attribute_const__ read_cpuid_implementor(void)
-  */
- static inline unsigned int __attribute_const__ read_cpuid_part(void)
- {
--	return read_cpuid_id() & 0xff00fff0;
-+	return read_cpuid_id() & ARM_CPU_PART_MASK;
- }
- 
- static inline unsigned int __attribute_const__ __deprecated read_cpuid_part_number(void)
-diff --git a/arch/arm/include/asm/smp_plat.h b/arch/arm/include/asm/smp_plat.h
-index a252c0b..0ad7d49 100644
---- a/arch/arm/include/asm/smp_plat.h
-+++ b/arch/arm/include/asm/smp_plat.h
-@@ -8,6 +8,7 @@
- #include <linux/cpumask.h>
- #include <linux/err.h>
- 
-+#include <asm/cpu.h>
- #include <asm/cputype.h>
- 
- /*
-@@ -25,6 +26,20 @@ static inline bool is_smp(void)
- #endif
- }
- 
-+/**
-+ * smp_cpuid_part() - return part id for a given cpu
-+ * @cpu:	logical cpu id.
-+ *
-+ * Return: part id of logical cpu passed as argument.
-+ */
-+static inline unsigned int smp_cpuid_part(int cpu)
-+{
-+	struct cpuinfo_arm *cpu_info = &per_cpu(cpu_data, cpu);
-+
-+	return is_smp() ? cpu_info->cpuid & ARM_CPU_PART_MASK :
-+			  read_cpuid_part();
-+}
-+
- /* all SMP configurations have the extended CPUID registers */
- #ifndef CONFIG_MMU
- #define tlb_ops_need_broadcast()	0
-diff --git a/drivers/cpuidle/cpuidle-big_little.c b/drivers/cpuidle/cpuidle-big_little.c
-index 344d79fa..ef94c3b 100644
---- a/drivers/cpuidle/cpuidle-big_little.c
-+++ b/drivers/cpuidle/cpuidle-big_little.c
-@@ -138,25 +138,18 @@ static int bl_enter_powerdown(struct cpuidle_device *dev,
- 	return idx;
- }
- 
--static int __init bl_idle_driver_init(struct cpuidle_driver *drv, int cpu_id)
-+static int __init bl_idle_driver_init(struct cpuidle_driver *drv, int part_id)
- {
--	struct cpuinfo_arm *cpu_info;
- 	struct cpumask *cpumask;
--	unsigned long cpuid;
- 	int cpu;
- 
- 	cpumask = kzalloc(cpumask_size(), GFP_KERNEL);
- 	if (!cpumask)
- 		return -ENOMEM;
- 
--	for_each_possible_cpu(cpu) {
--		cpu_info = &per_cpu(cpu_data, cpu);
--		cpuid = is_smp() ? cpu_info->cpuid : read_cpuid_id();
--
--		/* read cpu id part number */
--		if ((cpuid & 0xFFF0) == cpu_id)
-+	for_each_possible_cpu(cpu)
-+		if (smp_cpuid_part(cpu) == part_id)
- 			cpumask_set_cpu(cpu, cpumask);
--	}
- 
- 	drv->cpumask = cpumask;
- 
--- 
-2.0.4
+--Arun
