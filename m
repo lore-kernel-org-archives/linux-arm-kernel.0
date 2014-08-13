@@ -1,200 +1,210 @@
-From: nicolas.pitre@linaro.org (Nicolas Pitre)
-Date: Tue, 12 Aug 2014 22:19:12 -0400 (EDT)
-Subject: [PATCH v18 2/8] ARM: hisi: enable MCPM implementation
-In-Reply-To: <CAD6h2NTOe936fW+ipqbxjQkBcm+3rxfuuXOM+KbkVqMt8-DaHQ@mail.gmail.com>
-References: <1407828408-21431-1-git-send-email-haojian.zhuang@linaro.org>
- <alpine.LFD.2.11.1408121129440.6061@knanqh.ubzr>
- <CAD6h2NTOe936fW+ipqbxjQkBcm+3rxfuuXOM+KbkVqMt8-DaHQ@mail.gmail.com>
-Message-ID: <alpine.LFD.2.11.1408122214000.6061@knanqh.ubzr>
+From: keescook@chromium.org (Kees Cook)
+Date: Tue, 12 Aug 2014 19:39:16 -0700
+Subject: [PATCH v3 3/7] arm: use fixmap for text patching when text is RO
+In-Reply-To: <53EAB104.1050208@codeaurora.org>
+References: <1407867869-5194-1-git-send-email-keescook@chromium.org>
+ <1407867869-5194-4-git-send-email-keescook@chromium.org>
+ <53EA897D.8030901@codeaurora.org>
+ <CAGXu5j+TPBs9h9YvVDt=g4WFykHgzcde9Ujuef=cRQAou8hZoA@mail.gmail.com>
+ <53EAB104.1050208@codeaurora.org>
+Message-ID: <CAGXu5jKDZc+V+=LD-yN5_PCcorXMx6B+AMeL7rMSfTXFRKqj+A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 13 Aug 2014, Haojian Zhuang wrote:
+On Tue, Aug 12, 2014 at 5:27 PM, Stephen Boyd <sboyd@codeaurora.org> wrote:
+> On 08/12/14 14:47, Kees Cook wrote:
+>> On Tue, Aug 12, 2014 at 2:39 PM, Stephen Boyd <sboyd@codeaurora.org> wrote:
+>>> On 08/12/14 11:24, Kees Cook wrote:
+>>>> diff --git a/arch/arm/kernel/patch.c b/arch/arm/kernel/patch.c
+>>>> index 07314af47733..03dd4e39c833 100644
+>>>> --- a/arch/arm/kernel/patch.c
+>>>> +++ b/arch/arm/kernel/patch.c
+>>>> @@ -13,21 +16,69 @@ struct patch {
+>>>>       unsigned int insn;
+>>>>  };
+>>>>
+>>>> -void __kprobes __patch_text(void *addr, unsigned int insn)
+>>>> +static DEFINE_SPINLOCK(patch_lock);
+>>>> +
+>>>> +static void __kprobes *patch_map(void *addr, int fixmap, unsigned long *flags)
+>>>> +{
+>>>> +     unsigned int uintaddr = (uintptr_t) addr;
+>>>> +     bool module = !core_kernel_text(uintaddr);
+>>>> +     struct page *page;
+>>>> +
+>>>> +     if (module && IS_ENABLED(CONFIG_DEBUG_SET_MODULE_RONX))
+>>>> +             page = vmalloc_to_page(addr);
+>>>> +     else if (!module && IS_ENABLED(CONFIG_DEBUG_RODATA))
+>>>> +             page = virt_to_page(addr);
+>>>> +     else
+>>>> +             return addr;
+>>>> +
+>>>> +     if (flags)
+>>>> +             spin_lock_irqsave(&patch_lock, *flags);
+>>>> +
+>>>> +     set_fixmap(fixmap, page_to_phys(page));
+>>>> +
+>>>> +     return (void *) (__fix_to_virt(fixmap) + (uintaddr & ~PAGE_MASK));
+>>>> +}
+>>>> +
+>>>> +static void __kprobes patch_unmap(int fixmap, unsigned long *flags)
+>>>> +{
+>>>> +     clear_fixmap(fixmap);
+>>>> +
+>>>> +     if (flags)
+>>>> +             spin_unlock_irqrestore(&patch_lock, *flags);
+>>>> +}
+>>> Has the kbuildbot complained about this one yet?
+>>>
+>>>   CHECK  arch/arm/kernel/patch.c
+>>>   arch/arm/kernel/patch.c:47:39: warning: context imbalance in
+>>> 'patch_unmap' - unexpected unlock
+>>>
+>>> I guess we're going to ignore it.
+>> No, nothing yet from buildbot, let me do a sparse run -- I think we
+>> can just add annotation and we'll be okay.
+>>
+>>
+>
+> Ok. I tried to move code around but sparse still complains because of
+> conditional locking.
 
-> On 12 August 2014 23:52, Nicolas Pitre <nicolas.pitre@linaro.org> wrote:
-> > On Tue, 12 Aug 2014, Haojian Zhuang wrote:
-> >
-> >> +static int hip04_mcpm_power_up(unsigned int cpu, unsigned int cluster)
-> >> +{
-> >> +     unsigned long data, mask;
-> >> +     void __iomem *sys_dreq, *sys_status;
-> >> +
-> >> +     if (!sysctrl)
-> >> +             return -ENODEV;
-> >> +     if (cluster >= HIP04_MAX_CLUSTERS || cpu >= HIP04_MAX_CPUS_PER_CLUSTER)
-> >> +             return -EINVAL;
-> >> +
-> >> +     spin_lock_irq(&boot_lock);
-> >> +
-> >> +     if (hip04_cpu_table[cluster][cpu])
-> >> +             goto out;
-> >> +
-> >> +     sys_dreq = sysctrl + SC_CPU_RESET_DREQ(cluster);
-> >> +     sys_status = sysctrl + SC_CPU_RESET_STATUS(cluster);
-> >> +     if (hip04_cluster_is_down(cluster)) {
-> >> +             data = CLUSTER_DEBUG_RESET_BIT;
-> >> +             writel_relaxed(data, sys_dreq);
-> >> +             do {
-> >> +                     cpu_relax();
-> >> +                     mask = CLUSTER_DEBUG_RESET_STATUS;
-> >> +                     data = readl_relaxed(sys_status);
-> >> +             } while (data & mask);
-> >> +     }
-> >> +
-> >> +     data = CORE_RESET_BIT(cpu) | NEON_RESET_BIT(cpu) | \
-> >> +            CORE_DEBUG_RESET_BIT(cpu);
-> >> +     writel_relaxed(data, sys_dreq);
-> >> +     do {
-> >> +             cpu_relax();
-> >> +     } while (data == readl_relaxed(sys_status));
-> >> +     udelay(20);
-> >
-> > You really need this even if the snoops aren't disabled in
-> > hip04_mcpm_power_down() ?
-> >
-> 
-> I really need this. Otherwise, I failed to power up core again. And I
-> can't get any clue from document. It's based on tests.
+Oh, sorry! I should have mentioned I fixed this already. It just
+requires some declarations. Here's how it looks now:
 
-Please add this explanation as a comment in the code.
+https://git.kernel.org/cgit/linux/kernel/git/kees/linux.git/commit/?h=arm/ro-nx&id=847a4a489d31b76797e7c7a78cd3e98c7948df4b
 
-> >> +out:
-> >> +     hip04_cpu_table[cluster][cpu]++;
-> >> +     spin_unlock_irq(&boot_lock);
-> >> +
-> >> +     return 0;
-> >> +}
-> >> +
-> >> +static void hip04_mcpm_power_down(void)
-> >> +{
-> >> +     unsigned int mpidr, cpu, cluster;
-> >> +     bool skip_wfi = false, last_man = false;
-> >> +
-> >> +     mpidr = read_cpuid_mpidr();
-> >> +     cpu = MPIDR_AFFINITY_LEVEL(mpidr, 0);
-> >> +     cluster = MPIDR_AFFINITY_LEVEL(mpidr, 1);
-> >> +
-> >> +     __mcpm_cpu_going_down(cpu, cluster);
-> >> +
-> >> +     spin_lock_irq(&boot_lock);
-> >> +     BUG_ON(__mcpm_cluster_state(cluster) != CLUSTER_UP);
-> >> +     hip04_cpu_table[cluster][cpu]--;
-> >> +     if (hip04_cpu_table[cluster][cpu] == 1) {
-> >> +             /* A power_up request went ahead of us. */
-> >> +             skip_wfi = true;
-> >> +     } else if (hip04_cpu_table[cluster][cpu] > 1) {
-> >> +             pr_err("Cluster %d CPU%d boots multiple times\n", cluster, cpu);
-> >> +             BUG();
-> >> +     }
-> >> +
-> >> +     last_man = hip04_cluster_is_down(cluster);
-> >> +     if (last_man && __mcpm_outbound_enter_critical(cpu, cluster)) {
-> >> +             spin_unlock(&boot_lock);
-> >> +             v7_exit_coherency_flush(all);
-> >> +             __mcpm_outbound_leave_critical(cluster, CLUSTER_DOWN);
-> >> +     } else {
-> >> +             spin_unlock(&boot_lock);
-> >> +             v7_exit_coherency_flush(louis);
-> >> +     }
-> >> +
-> >> +     __mcpm_cpu_down(cpu, cluster);
-> >> +
-> >> +     if (!skip_wfi)
-> >> +             wfi();
-> >> +}
-> >> +
-> >> +static int hip04_mcpm_wait_for_powerdown(unsigned int cpu, unsigned int cluster)
-> >> +{
-> >> +     unsigned int data, tries, count;
-> >> +
-> >> +     BUG_ON(cluster >= HIP04_MAX_CLUSTERS ||
-> >> +            cpu >= HIP04_MAX_CPUS_PER_CLUSTER);
-> >> +
-> >> +     count = TIMEOUT_MSEC / POLL_MSEC;
-> >
-> > This count value doesn't make much sense anymore, does it?  Nothing
-> > relates to POLL_MSEC afterwards.
-> >
-> Yes, you're right. I'll fix.
-> 
-> >> +     spin_lock_irq(&boot_lock);
-> >> +     /*
-> >> +      * Target core should enter WFI first.
-> >> +      * Then cluster could be disabled in snoop filter.
-> >> +      * At last, target core could be reset.
-> >> +      */
-> >
-> > You should verify that the CPU usage count is still 0 here as I
-> > suggested.
-> >
-> I'll move the checking at here. And report error if the count is still 0.
-> 
-> >> +     for (tries = 0; tries < count; tries++) {
-> >> +             cpu_relax();
-> >
-> > There is probably no point calling cpu_relax() if it is followed by
-> > udelay().
-> >
-> This delay is required for power down the cluster. I should check if
-> all cores in cluster should be down.
++static void __kprobes *patch_map(void *addr, int fixmap, unsigned long *flags)
++ __acquires(&patch_lock)
++{
+...
++ if (flags)
++ spin_lock_irqsave(&patch_lock, *flags);
++ else
++ __acquire(&patch_lock);
 
-My point is: if you call udelay() then you don't need cpu_relax().
+etc.
 
-> If I removed the delay, I found that kernel panic reports. I guess
-> that L2 is still in the process of clean.
-> 
-> With this delay, everything works well. I failed to find a command to
-> clean L2 in coretex a15. It seems that I have to disable MMU & C bit
-> in target cpu. It worth trying but I need more time. So as a
-> workaround, I use udelay(50) at here.
+Thanks for poking at this!
 
-Please add this explanation to a comment in the code.
+-Kees
 
-> >> +             udelay(50);
-> >> +             data = readl_relaxed(sysctrl + SC_CPU_RESET_STATUS(cluster));
-> >> +             if (!hip04_cpu_table[cluster][cpu] || \
-> >> +                 (data & CORE_WFI_STATUS(cpu))) {
-> >> +                     break;
-> >> +             }
-> >> +     }
-> >> +     if (tries >= count)
-> >> +             goto err;
-> >> +     if (hip04_cluster_is_down(cluster))
-> >> +             hip04_set_snoop_filter(cluster, 0);
-> >> +     data = CORE_RESET_BIT(cpu) | NEON_RESET_BIT(cpu) | \
-> >> +            CORE_DEBUG_RESET_BIT(cpu);
-> >> +     writel_relaxed(data, sysctrl + SC_CPU_RESET_REQ(cluster));
-> >> +     for (tries = 0; tries < count; tries++) {
-> >> +             cpu_relax();
-> >> +             udelay(50);
-> >> +             data = readl_relaxed(sysctrl + SC_CPU_RESET_STATUS(cluster));
-> >> +             if (!hip04_cpu_table[cluster][cpu] || \
-> >> +                 (data & CORE_RESET_STATUS(cpu))) {
-> >> +                     break;
-> >> +             }
-> >> +     }
-> >> +     if (tries >= count)
-> >> +             goto err;
-> >> +     spin_unlock_irq(&boot_lock);
-> >> +     return 0;
-> >> +err:
-> >> +     spin_unlock_irq(&boot_lock);
-> >> +     return -EBUSY;
-> >> +}
-> >
-> > I don't really like the way things are done in general.  And we're
-> > apparently going in circle over this. This is almost like if MCPM was of
-> > no benefit to you given all the things which look "wrong".  But given
-> > that no usable documentation is available, preventing me and others from
-> > suggesting better ways, then this platform is going to be limited to
-> > suboptimal CPU hotplug support.  So if you fix the minor issues I've
-> > noted above then I'll provide my reluctant ACK for this patch if nothing
-> > else can be helped.
-> >
-> OK. I'll fix them. But I can't delete these delay. Otherwise, I may
-> meet failure on hotplug.
-
-Those are hacks.  I want them to be commented as such please.
+>
+> ---8<---
+>
+> diff --git a/arch/arm/kernel/patch.c b/arch/arm/kernel/patch.c
+> index 03dd4e39c833..f6d4de3826a0 100644
+> --- a/arch/arm/kernel/patch.c
+> +++ b/arch/arm/kernel/patch.c
+> @@ -18,33 +18,17 @@ struct patch {
+>
+>  static DEFINE_SPINLOCK(patch_lock);
+>
+> -static void __kprobes *patch_map(void *addr, int fixmap, unsigned long *flags)
+> +static struct page __kprobes *patch_page(void *addr)
+>  {
+>         unsigned int uintaddr = (uintptr_t) addr;
+>         bool module = !core_kernel_text(uintaddr);
+> -       struct page *page;
+>
+>         if (module && IS_ENABLED(CONFIG_DEBUG_SET_MODULE_RONX))
+> -               page = vmalloc_to_page(addr);
+> +               return vmalloc_to_page(addr);
+>         else if (!module && IS_ENABLED(CONFIG_DEBUG_RODATA))
+> -               page = virt_to_page(addr);
+> -       else
+> -               return addr;
+> +               return virt_to_page(addr);
+>
+> -       if (flags)
+> -               spin_lock_irqsave(&patch_lock, *flags);
+> -
+> -       set_fixmap(fixmap, page_to_phys(page));
+> -
+> -       return (void *) (__fix_to_virt(fixmap) + (uintaddr & ~PAGE_MASK));
+> -}
+> -
+> -static void __kprobes patch_unmap(int fixmap, unsigned long *flags)
+> -{
+> -       clear_fixmap(fixmap);
+> -
+> -       if (flags)
+> -               spin_unlock_irqrestore(&patch_lock, *flags);
+> +       return NULL;
+>  }
+>
+>  void __kprobes __patch_text_real(void *addr, unsigned int insn, bool remap)
+> @@ -54,10 +38,18 @@ void __kprobes __patch_text_real(void *addr, unsigned int insn, bool remap)
+>         bool twopage = false;
+>         unsigned long flags;
+>         void *waddr = addr;
+> +       struct page *page = NULL;
+>         int size;
+>
+> -       if (remap)
+> -               waddr = patch_map(addr, FIX_TEXT_POKE0, &flags);
+> +       if (remap) {
+> +               page = patch_page(addr);
+> +               if (page) {
+> +                       spin_lock_irqsave(&patch_lock, flags);
+> +                       set_fixmap(FIX_TEXT_POKE0, page_to_phys(page));
+> +                       waddr = (void *)(__fix_to_virt(FIX_TEXT_POKE0) +
+> +                               (uintaddr & ~PAGE_MASK));
+> +               }
+> +       }
+>
+>         if (thumb2 && __opcode_is_thumb16(insn)) {
+>                 *(u16 *)waddr = __opcode_to_mem_thumb16(insn);
+> @@ -69,15 +61,25 @@ void __kprobes __patch_text_real(void *addr, unsigned int insn, bool remap)
+>                 u16 *addrh1 = waddr + 2;
+>
+>                 twopage = (uintaddr & ~PAGE_MASK) == PAGE_SIZE - 2;
+> -               if (twopage && remap)
+> -                       addrh1 = patch_map(addr + 2, FIX_TEXT_POKE1, NULL);
+> +               if (twopage && remap) {
+> +                       struct page *page2;
+> +
+> +                       page2 = patch_page(addr + 2);
+> +                       if (page2) {
+> +                               set_fixmap(FIX_TEXT_POKE1, page_to_phys(page));
+> +                               addrh1 = (u16 *)(__fix_to_virt(FIX_TEXT_POKE1) +
+> +                                               (uintaddr & ~PAGE_MASK));
+> +                       } else {
+> +                               addrh1 = addr + 2;
+> +                       }
+> +               }
+>
+>                 *addrh0 = __opcode_to_mem_thumb16(first);
+>                 *addrh1 = __opcode_to_mem_thumb16(second);
+>
+>                 if (twopage && addrh1 != addr + 2) {
+>                         flush_kernel_vmap_range(addrh1, 2);
+> -                       patch_unmap(FIX_TEXT_POKE1, NULL);
+> +                       clear_fixmap(FIX_TEXT_POKE1);
+>                 }
+>
+>                 size = sizeof(u32);
+> @@ -91,9 +93,10 @@ void __kprobes __patch_text_real(void *addr, unsigned int insn, bool remap)
+>                 size = sizeof(u32);
+>         }
+>
+> -       if (waddr != addr) {
+> +       if (page) {
+>                 flush_kernel_vmap_range(waddr, twopage ? size / 2 : size);
+> -               patch_unmap(FIX_TEXT_POKE0, &flags);
+> +               clear_fixmap(FIX_TEXT_POKE0);
+> +               spin_unlock_irqrestore(&patch_lock, flags);
+>         }
+>
+>         flush_icache_range((uintptr_t)(addr),
+>
+> --
+> Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+> hosted by The Linux Foundation
+>
 
 
-Nicolas
+
+-- 
+Kees Cook
+Chrome OS Security
