@@ -1,56 +1,35 @@
 From: dh.herrmann@gmail.com (David Herrmann)
-Date: Wed, 13 Aug 2014 10:49:32 +0200
-Subject: [PATCH 3/4] simplefb: disable dt node upon remove
-In-Reply-To: <CACxGe6vaPUa4QvYWBA-QY7MTmJYoeqnPt9Zh5jpky6S9UYbrvQ@mail.gmail.com>
+Date: Wed, 13 Aug 2014 10:50:51 +0200
+Subject: [PATCH 1/4] simplefb: formalize pseudo palette handling
+In-Reply-To: <CAMuHMdVROkKvW1VYWbOtecO9sQAudtgS-mJtZb5ZLUCMaZdGAA@mail.gmail.com>
 References: <1407914239-12054-1-git-send-email-libv@skynet.be>
- <1407914239-12054-4-git-send-email-libv@skynet.be>
- <CACxGe6vaPUa4QvYWBA-QY7MTmJYoeqnPt9Zh5jpky6S9UYbrvQ@mail.gmail.com>
-Message-ID: <CANq1E4ReOB87RX8VhnW1Ln=SK3Tw5V962ujcsfuz-2E9Uc61yQ@mail.gmail.com>
+ <1407914239-12054-2-git-send-email-libv@skynet.be>
+ <CANq1E4ShhaUMT3MpAei4sgo7Nr-jHfD+TpF8dzAVbn58Feroiw@mail.gmail.com>
+ <CAMuHMdVROkKvW1VYWbOtecO9sQAudtgS-mJtZb5ZLUCMaZdGAA@mail.gmail.com>
+Message-ID: <CANq1E4Q01JEvfCZuvPaUmEo7VmaFt3U=xjrPnLHSJcfk3AhZMw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Hi
 
-On Wed, Aug 13, 2014 at 10:40 AM, Grant Likely
-<grant.likely@secretlab.ca> wrote:
-> On Wed, Aug 13, 2014 at 8:17 AM, Luc Verhaegen <libv@skynet.be> wrote:
->> The next commit will handle clocks correctly, so that these do not get
->> automatically disabled on certain SoC simplefb implementations. As a
->> result, the removal of this simplefb driver, and the release of the
->> clocks, is rather final, and only a full display driver can work after
->> this. So, it makes sense to also flag the dt node as disabled, even
->> though it has no real value today.
+On Wed, Aug 13, 2014 at 10:46 AM, Geert Uytterhoeven
+<geert@linux-m68k.org> wrote:
+> On Wed, Aug 13, 2014 at 9:25 AM, David Herrmann <dh.herrmann@gmail.com> wrote:
+>>> @@ -225,7 +234,7 @@ static int simplefb_probe(struct platform_device *pdev)
+>>>                 framebuffer_release(info);
+>>>                 return -ENODEV;
+>>>         }
+>>> -       info->pseudo_palette = (void *)(info + 1);
+>>> +       info->pseudo_palette = (void *) par->palette;
 >>
->> Signed-off-by: Luc Verhaegen <libv@skynet.be>
+>> I think coding-style is this (i.e., no whitespace):
+>>     info->pseudo_palette = (void*)par->palette;
 >
-> Please, no.
->
-> Drivers should not be modifying the device tree without and
-> exceptionally good reason for doing so. Drivers are to treat the DT as
-> immutable.
->
-> * the exception is an overlay driver which add new devices to the
-> kernel. Definitely not the case here.
+> <casts-are-evil>
+> Is this cast even needed?
+> </casts-are-evil>
 
-Why? I think we have exactly that case:
- * DT describes the real hw properly and those parts are immutable
- * Additionally, bootloaders create firmware-framebuffers and
-   create simple-framebuffer devices for them. Those are
-   valid as long as no driver reconfigured the real hw.
- * Once a real hw-driver loads, it might destroy the existing
-   framebuffers, thus, it should also destroy the platform device.
- * If the real hw-driver is unloaded, it might re-create the FB
-   and thus create a new (or enable the old) platform device.
-
-Or, in a nutshell: A "simple-framebuffer" device is basically a
-platform-device for framebuffers. Framebuffers can be created and
-destroyed during runtime. The reason we create platform-devices for
-them, is to allow dummy drivers to be probed. Real hw-drivers
-obviously bind to the parent bus device.
-
-Other ideas are obviously welcome, but so far all of the other ideas
-sounded like big hacks (like remove_conflicting_framebuffers() so
-far..).
+"pseudo_palette" is "void*", so not at all.
 
 Thanks
 David
