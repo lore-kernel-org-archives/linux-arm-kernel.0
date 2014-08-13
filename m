@@ -1,72 +1,58 @@
-From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Wed, 13 Aug 2014 08:31:29 -0700
-Subject: [PATCH v4] irqchip: gic: Allow gic_arch_extn hooks to call into
- scheduler
-In-Reply-To: <20140813150540.GL30401@n2100.arm.linux.org.uk>
-References: <1407938238-21413-1-git-send-email-sboyd@codeaurora.org>
- <20140813142257.GK30401@n2100.arm.linux.org.uk>
- <20140813145526.GF32301@codeaurora.org>
- <20140813150540.GL30401@n2100.arm.linux.org.uk>
-Message-ID: <20140813153129.GH32301@codeaurora.org>
+From: grygorii.strashko@ti.com (Grygorii Strashko)
+Date: Wed, 13 Aug 2014 19:16:18 +0300
+Subject: [PATCH 0/4] gpio: syscon: reuse for keystone 2 socs
+Message-ID: <1407946582-20927-1-git-send-email-grygorii.strashko@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08/13, Russell King - ARM Linux wrote:
-> On Wed, Aug 13, 2014 at 07:55:26AM -0700, Stephen Boyd wrote:
-> > On 08/13, Russell King - ARM Linux wrote:
-> > > On Wed, Aug 13, 2014 at 06:57:18AM -0700, Stephen Boyd wrote:
-> > > > Commit 1a6b69b6548c (ARM: gic: add CPU migration support,
-> > > > 2012-04-12) introduced an acquisition of the irq_controller_lock
-> > > > in gic_raise_softirq() which can lead to a spinlock recursion if
-> > > > the gic_arch_extn hooks call into the scheduler (via complete()
-> > > > or wake_up(), etc.). This happens because gic_arch_extn hooks are
-> > > > normally called with the irq_controller_lock held and calling
-> > > > into the scheduler may cause us to call smp_send_reschedule()
-> > > > which will grab the irq_controller_lock again. Here's an example
-> > > > from a vendor kernel (note that the gic_arch_extn hook code here
-> > > > isn't actually in mainline):
-> > > 
-> > > Here's a question: why would you want to call into the scheduler from
-> > > the gic_arch_extn code?
-> > 
-> > In this case we want to send a message to another processor when
-> > an interrupt is enabled that's only a wakeup interrupt in certain
-> > low power states. It's done sort of indirectly, but basically we
-> > block that low power state from being entered so we can ensure
-> > that the interrupt wakes us up from a lighter version of suspend.
-> 
-> No, that's not the correct answer for the question I asked.  I did not
-> ask "why would you want to call into the IRQ code from the scheduler".
-> I asked "why would you want to call into the scheduler from the
-> gic_arch_extn code?"
-> 
-> That's a completely different question.  Let me rephrase to try and get
-> an answer to my question: Why are you calling complete() or wake_up()
-> from the gic_arch_extn code?
+Hi,
 
-That's the answer. I guess you think "another processor" means
-some other CPU running linux? That isn't the case. We aren't
-calling into the IRQ code from the scheduler. The IRQ code is
-calling the gic_arch_extn code which is calling into the
-scheduler. Let me try to clarify. The path from the stacktrace I
-posted is:
+This series intended to integrate Keystone 2 DSP GPIO controller functionality into
+gpio-syscon driver (drivers/gpio/gpio-syscon.c) as requested by Linus Walleij.
 
- request_irq()
-  irq_enable()
-   gic_unmask_irq()
-    msm_mpm_enable_irq()
-     ...
-     complete()
+On Keystone SOCs, ARM host can send interrupts to DSP cores using the
+DSP GPIO controller IP. Each DSP GPIO controller provides 28 IRQ signals for
+each DSP core. This is one of the component used by the IPC mechanism used
+on Keystone SOCs.
 
-In this case a driver is requesting an interrupt that is wakeup
-capable even in the lowest power state, so we wakeup a thread
-that's sitting around waiting on that completion to notify the
-non-linux running remote processor that we can go into the lowest
-power state. We can only communicate with the other processor via
-sleeping APIs. Another way to do it would be to schedule a work
-but we would get into the same situation as this because
-scheduling works may call into the scheduler too.
+Keystone 2 DSP GPIO controller has specific features:
+- each GPIO can be configured only as output pin;
+- setting GPIO value to 1 causes IRQ generation on target DSP core;
+- reading pin value returns 0 - if IRQ was handled or 1 - IRQ is still
+  pending.
+
+The gpio-syscon driver was need to be updated to satisfy Keystone 2 SoC
+requirements:
+1) special sequence of operations need to be used to assign output GPIO value.
+   As result, first patch introduces SoC specific callback .set() to configure
+   output GPIO value.
+
+2) - eight (8) GPIO banks should be supported, but current gpio-syscon driver
+   supports only one.
+   - there can be more than on syscon devices per SoC and GPIO specific registers 
+   can be placed any where. More over, number of syscon devices and their
+   configuration can vary even between two versions of the same SoC. 
+   As result, second patch introduces new DT property for gpio-syscon devices:
+ 	gpio,syscon-dev = <&syscon_dev data_reg_offset [direction_reg_offset]>;
+   which allows to specify syscon node and data/direction registers offsets in DT.
+
+Also, patch 4 added to illustrate DSP GPIO configuration in DT used by Keystone 2.
+
+Related sicussions:
+ [1] https://lkml.org/lkml/2014/7/16/170
+ [2] https://lkml.org/lkml/2014/7/23/352
+
+Grygorii Strashko (4):
+  gpio: syscon: add soc specific callback to assign output value
+  gpio: syscon: retrive syscon node and regs offsets from dt
+  gpio: syscon: reuse for keystone 2 socs
+  ARM: dts: keystone-k2hk: add dsp gpio controllers nodes
+
+ .../bindings/gpio/gpio-mctrl-keystone.txt          |   39 ++++++++
+ arch/arm/boot/dts/k2hk.dtsi                        |   56 +++++++++++
+ drivers/gpio/gpio-syscon.c                         |   99 ++++++++++++++++++--
+ 3 files changed, 186 insertions(+), 8 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/gpio/gpio-mctrl-keystone.txt
 
 -- 
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-hosted by The Linux Foundation
+1.7.9.5
