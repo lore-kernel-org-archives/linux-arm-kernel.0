@@ -1,81 +1,70 @@
-From: robherring2@gmail.com (Rob Herring)
-Date: Wed, 13 Aug 2014 02:33:31 -0500
-Subject: [PATCH] ARM: expand fixmap region to 3MB
-In-Reply-To: <CAGXu5j+Wm7LzdTZWsjLpisBqgcKxx-_t=O_LWsn8hP+_KiBxEw@mail.gmail.com>
-References: <1407511404-11997-1-git-send-email-robherring2@gmail.com>
- <20140811161448.GA4002@bivouac.eciton.net>
- <CAGXu5j+Wm7LzdTZWsjLpisBqgcKxx-_t=O_LWsn8hP+_KiBxEw@mail.gmail.com>
-Message-ID: <CAL_JsqKnDBtLEHNw0Hk1vdZTnH-3MRi3=YqTo=5DCEF9hPRc5g@mail.gmail.com>
+From: thierry.reding@gmail.com (Thierry Reding)
+Date: Wed, 13 Aug 2014 09:35:44 +0200
+Subject: [PATCH 1/3] of: Add descriptions of thermtrip properties to
+ Tegra PMC bindings
+In-Reply-To: <1407226380-747-2-git-send-email-mperttunen@nvidia.com>
+References: <1407226380-747-1-git-send-email-mperttunen@nvidia.com>
+ <1407226380-747-2-git-send-email-mperttunen@nvidia.com>
+Message-ID: <20140813073541.GA17466@ulmo>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Aug 12, 2014 at 12:55 PM, Kees Cook <keescook@chromium.org> wrote:
-> On Mon, Aug 11, 2014 at 9:14 AM, Leif Lindholm <leif.lindholm@linaro.org> wrote:
->> On Fri, Aug 08, 2014 at 10:23:24AM -0500, Rob Herring wrote:
->>> From: Rob Herring <robh@kernel.org>
->>>
->>> With commit a05e54c103b0b8 "ARM: 8031/2: change fixmap mapping region to
->>> support 32 CPUs", the fixmap region was expanded to 2MB, but it
->>> precluded any other uses of the fixmap region in order to support up to
->>> 32 CPUs. In order to support other uses the fixmap region needs to be
->>> expanded beyond 2MB. Fortunately, the adjacent 1MB range
->>> 0xffe00000-0xfff00000 is availabe to use.
->>>
->>> Remove fixmap_page_table ptr and lookup the page table via the virtual
->>> address so that the fixmap region can span more that one pmd. The 2nd
->>> pmd is already created since it is shared with the vector page.
->>>
->>> Cc: Leif Lindholm <leif.lindholm@linaro.org>
->>> Cc: Kees Cook <keescook@chromium.org>
->>> Cc: Russell King <linux@arm.linux.org.uk>
->>> Signed-off-by: Rob Herring <robh@kernel.org>
->>> ---
->>>
->>> This patch can come before or after the generic fixmap.h. There's a
->>> single line conflict with the ending address
->>
->> Tested-by: Leif Lindholm <leif.lindholm@linaro.org>
->> For Kees' set with this addition + generic fixmap + early_ioremap +
->> UEFI.
->>
->>> This worked for earlycon, but I've not done any highmem specific
->>> testing. My full series is available here:
->>>
->>> git://git.kernel.org/pub/scm/linux/kernel/git/robh/linux.git fixmap
->>
->> I was hoping to be able to give you a tested-by for that series on
->> next-20140811 with the UEFI patches, but that setup fails to boot
->> right now. Looking into why.
->
-> For me, the 3MB change doesn't work. It acts like the PTE isn't there:
->
-> lkdtm: Performing direct entry WRITE_KERN
-> lkdtm: attempting 52 byte write at 804331cc
-> lkdtm: 804331cc mapped RW via ffe7f1cc
-> Unable to handle kernel paging request at virtual address ffe7f1cc
-> pgd = 9ea40000
-> [ffe7f1cc] *pgd=9fffd821, *pte=00000000, *ppte=00000000
->
-> And it weirdly leaves this hanging around in
-> /sys/kernel/debug/kernel_page_tables:
->
-> 0xffc7f000-0xffc80000           4K     RW NX SHD MEM/CACHED/WBWA
->
-> If I use all the other changes to clean up the code, everything is
-> fine. The only change I have been the trees now is just this:
->
-> -#define FIXADDR_END            0xffe00000UL
-> +#define FIXADDR_END            0xfff00000UL
->
-> I think my build isn't catching this extra area via the vector table pmd.
+On Tue, Aug 05, 2014 at 11:12:58AM +0300, Mikko Perttunen wrote:
+> Hardware-triggered thermal reset requires configuring the I2C
+> reset procedure. This configuration is read from the device tree,
+> so document the relevant properties in the binding documentation.
+> 
+> Signed-off-by: Mikko Perttunen <mperttunen@nvidia.com>
+> ---
+>  .../devicetree/bindings/arm/tegra/nvidia,tegra20-pmc.txt    | 13 +++++++++++++
+>  1 file changed, 13 insertions(+)
+> 
+> diff --git a/Documentation/devicetree/bindings/arm/tegra/nvidia,tegra20-pmc.txt b/Documentation/devicetree/bindings/arm/tegra/nvidia,tegra20-pmc.txt
+> index 68ac65f..140e2aa 100644
+> --- a/Documentation/devicetree/bindings/arm/tegra/nvidia,tegra20-pmc.txt
+> +++ b/Documentation/devicetree/bindings/arm/tegra/nvidia,tegra20-pmc.txt
+> @@ -38,6 +38,19 @@ Required properties when nvidia,suspend-mode is specified:
+>  			      Core power good time in uS.
+>  - nvidia,core-pwr-off-time : Core power off time in uS.
+>  
+> +Required properties for hardware-triggered thermal reset:
+> +    (only tegra30, tegra114, tegra124)
+> +- nvidia,thermtrip-pmu-i2c-addr : I2C address of the power management unit.
+> +- nvidia,thermtrip-i2c-controller : Index of the I2C controller the PMU is
+> +                                    attached to.
 
-I commented in patch 3 of your series where the problem is.
+This duplicates information already associated with the PMU device. Can
+this be turned into something like:
 
-> So, instead of continuing to beat my head against this, I've changed
-> my series around to use NR_CPUS as Rob was doing, and added
+	nvidia,thermtrip-pmu: phandle to Power Management Unit
 
-My use of NR_CPUS was not intentional, but rather it was just based on
-the older versions of the patch. I don't have a strong opinion either
-way.
+Then we can query the relevant information from the I2C client resolved
+from the phandle.
 
-Rob
+One problem with that might be that the I2C controller index may not
+match the hardware ID.
+
+> +- nvidia,thermtrip-reg-addr : Address (byte) to send reset command to.
+> +- nvidia,thermtrip-reg-data : Data (byte) to use as reset command.
+> +
+> +Optional properties for hardware-triggered thermal reset:
+> +    (only tegra30, tegra114, tegra124)
+> +- nvidia,thermtrip-pinmux : Pinmux ID used for I2C access.
+
+I suppose this takes a phandle? If so the description should probably
+say so.
+
+> +- nvidia,thermtrip-pmu-16bit-ops : Use 16-bit operations.
+
+What exactly does "16-bit operations" mean? And isn't this a property of
+the I2C device, therefore could be queried from the I2C slave via the
+phandle?
+
+Thierry
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: not available
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140813/edf4791e/attachment.sig>
