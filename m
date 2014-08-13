@@ -1,114 +1,79 @@
-From: ludovic.desroches@atmel.com (Ludovic Desroches)
-Date: Wed, 13 Aug 2014 08:16:39 +0200
-Subject: [PATCH] spi: atmel: fix corruption caused by too early transfer
- completion
-In-Reply-To: <B256D81BAE5131468A838E5D7A2436419D1F2032@penmbx01>
-References: <1407330035-2212-1-git-send-email-ronald.wahl@raritan.com>
- <B256D81BAE5131468A838E5D7A2436419D1F2032@penmbx01>
-Message-ID: <20140813061638.GF2452@ldesroches-Latitude-E6320>
+From: yuvaraj.lkml@gmail.com (Yuvaraj Cd)
+Date: Wed, 13 Aug 2014 11:52:38 +0530
+Subject: io-domain voltages as regulators?
+In-Reply-To: <CAD=FV=Vewr5QkNEiBEOXA=FdKHKzg0ag5+Cf4KXuXWjcshSq_g@mail.gmail.com>
+References: <3923586.SsVg941346@diego>
+ <CACRpkdaJS0PUDLaCnrhtiuXPf4ccx51uNTqYWVWm47mhOhGEbA@mail.gmail.com>
+ <CAPDyKFpiHf+urR85iJPqAXxREO+yPrDMcXM4K+BJqq=ur3DZtA@mail.gmail.com>
+ <CAD=FV=Vewr5QkNEiBEOXA=FdKHKzg0ag5+Cf4KXuXWjcshSq_g@mail.gmail.com>
+Message-ID: <CA+NduCCi20Xaq08X71Hc+Ma=jFigd_mAkFPopG0LwOjEoAt_7w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-
-On Wed, Aug 13, 2014 at 01:20:13AM +0000, Yang, Wenyou wrote:
+On Tue, Aug 12, 2014 at 8:43 PM, Doug Anderson <dianders@chromium.org> wrote:
 > Hi,
-> > -----Original Message-----
-> > From: linux-arm-kernel [mailto:linux-arm-kernel-bounces at lists.infradead.org] On
-> > Behalf Of Ronald Wahl
-> > Sent: Wednesday, August 06, 2014 9:01 PM
-> > To: linux-arm-kernel at lists.infradead.org
-> > Subject: [PATCH] spi: atmel: fix corruption caused by too early transfer
-> > completion
-> > 
-> > The PDC (peripheral DMA controller) on AT91 supports two transfer counters and
-> > associated registers - one for current and one for the next transfer. If the current
-> > transfer is done the next transfer is moved into the current transfer. Now there are
-> > two interrupts: one is raised whenever a single transfer is done (ENDRX) and the
-> > other one is raised when the current and the next transfer has finished (RXBUFF).
-> > The issue is that the driver only enables the ENDRX interrupt which may lead to
-> > queuing a new request while there is still a transfer running.
-> > This can lead to overruns and/or corruption. By using the RXBUFF interrupt only
-> > we queue new requests only when the hardware queue is empty avoiding this
-> > problem.
-> 
-> The patch can work, but it maybe decrease the performance.
-
-Can you give more details? I had also the same feeling at the beginning
-but due to the way pdc is implemented in the spi driver (doesn't really
-take advantage of the double buffer), I think it should not change performances.
-
-My only concern is why ENDRX was chosen instead of RXBUFF? Simple bug or
-to manage a specific case we are thinking about.
-
-> 
-> Could you share the scenario caused the overruns and/or corruption, or log message?
-> 
-> > 
-> > Signed-off-by: Ronald Wahl <ronald.wahl@raritan.com>
-> > ---
-> >  drivers/spi/spi-atmel.c | 17 ++++++++---------
-> >  1 file changed, 8 insertions(+), 9 deletions(-)
-> > 
-> > diff --git a/drivers/spi/spi-atmel.c b/drivers/spi/spi-atmel.c index 113c83f..3f7d138
-> > 100644
-> > --- a/drivers/spi/spi-atmel.c
-> > +++ b/drivers/spi/spi-atmel.c
-> > @@ -775,17 +775,17 @@ static void atmel_spi_pdc_next_xfer(struct spi_master
-> > *master,
-> >  			(unsigned long long)xfer->rx_dma);
-> >  	}
-> > 
-> > -	/* REVISIT: We're waiting for ENDRX before we start the next
-> > +	/* REVISIT: We're waiting for RXBUFF before we start the next
-> >  	 * transfer because we need to handle some difficult timing
-> > -	 * issues otherwise. If we wait for ENDTX in one transfer and
-> > -	 * then starts waiting for ENDRX in the next, it's difficult
-> > -	 * to tell the difference between the ENDRX interrupt we're
-> > -	 * actually waiting for and the ENDRX interrupt of the
-> > +	 * issues otherwise. If we wait for TXBUFE in one transfer and
-> > +	 * then starts waiting for RXBUFF in the next, it's difficult
-> > +	 * to tell the difference between the RXBUFF interrupt we're
-> > +	 * actually waiting for and the RXBUFF interrupt of the
-> >  	 * previous transfer.
-> >  	 *
-> >  	 * It should be doable, though. Just not now...
-> >  	 */
-> > -	spi_writel(as, IER, SPI_BIT(ENDRX) | SPI_BIT(OVRES));
-> > +	spi_writel(as, IER, SPI_BIT(RXBUFF) | SPI_BIT(OVRES));
-> >  	spi_writel(as, PTCR, SPI_BIT(TXTEN) | SPI_BIT(RXTEN));  }
-> > 
-> > @@ -956,8 +956,7 @@ atmel_spi_pdc_interrupt(int irq, void *dev_id)
-> > 
-> >  		ret = IRQ_HANDLED;
-> > 
-> > -		spi_writel(as, IDR, (SPI_BIT(RXBUFF) | SPI_BIT(ENDRX)
-> > -				     | SPI_BIT(OVRES)));
-> > +		spi_writel(as, IDR, (SPI_BIT(RXBUFF) | SPI_BIT(OVRES)));
-> > 
-> >  		/* Clear any overrun happening while cleaning up */
-> >  		spi_readl(as, SR);
-> > @@ -966,7 +965,7 @@ atmel_spi_pdc_interrupt(int irq, void *dev_id)
-> > 
-> >  		complete(&as->xfer_completion);
-> > 
-> > -	} else if (pending & (SPI_BIT(RXBUFF) | SPI_BIT(ENDRX))) {
-> > +	} else if (pending & (SPI_BIT(RXBUFF))) {
-> >  		ret = IRQ_HANDLED;
-> > 
-> >  		spi_writel(as, IDR, pending);
-> > --
-> > 1.9.3
-> > 
-> > 
-> > _______________________________________________
-> > linux-arm-kernel mailing list
-> > linux-arm-kernel at lists.infradead.org
-> > http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
-> 
-> Best Regards,
-> Wenyou Yang
-> 
+>
+> On Mon, Aug 11, 2014 at 5:46 AM, Ulf Hansson <ulf.hansson@linaro.org> wrote:
+>> On 11 August 2014 09:44, Linus Walleij <linus.walleij@linaro.org> wrote:
+>>> On Mon, Aug 4, 2014 at 12:18 AM, Heiko St?bner <heiko@sntech.de> wrote:
+>>>
+>>> [Adding Ulf Hansson to this discussion...]
+>>>
+>>>> Hi Mark, Linus,
+>>>>
+>>>> I'd like to clarify what the appropriate way to handle pin output voltages is.
+>>>> On the Rockchip SoCs the voltage for some groups of pins can be set between
+>>>> 3.3V and 1.8V ... like the MMC/SD pins who need this to support UHS mode
+>>>> cards.
+>>>
+>>> This is called "vqmmc" in the mmc/sd subsystem.
+>>>
+>>> grep for mmc_set_signal_voltage() in drivers/mmc/core/*
+>>>
+>>> In drivers/mmc/core/core.c, you find:
+>>>
+>>>  mmc->supply.vqmmc = devm_regulator_get_optional(dev, "vqmmc");
+>>>
+>>> Which gets the regulator to set the signal voltage, if such
+>>> a regulator is specified for the host.
+>>>
+>>> Very simple and straight-forward, and handled by the MMC core.
+>>>
+>>>> In [0] when talking about something different, Linus Walleij described a
+>>>> similar case as
+>>>>
+>>>> "I think we need to have a discussion with Mark Brown on how to
+>>>> handle this.
+>>>> We have previously had the case of MMC/SD level-shifters, where
+>>>> a certain setting gives a certain level of signals out, and another setting
+>>>> gives another level. Like two discrete levels.
+>>>> So we modeled that as a regulator provider inside the pin control
+>>>> driver eventually, see sh-pfc/pfc-sh73a0.c"
+>>>>
+>>>> As this sound like exactly the thing I'm trying to solve, is handling this via
+>>>> a regulator the correct general way?
+>>>
+>>> Ithinkso.
+>>
+>> Just to confirm, I fully agree with the above said.
+>>
+>> You may also find a good example in the mmci host driver for how to
+>> make use of the vqmmc regulator.
+>
+> Yuvaraj also submitted patches for dw_mmc:
+>
+> 4401241 New          [1/3] mmc: dw_mmc: use mmc_regulator_get_supply
+> to handle regulators
+> 4401261 New          [2/3] mmc: dw_mmc: Dont cut off vqmmc and vmmc
+> 4401281 New          [3/3] mmc: dw_mmc: Support voltage changes
+>
+> He seems to have dropped these patches on the floor and I had review
+> feedback on them, but I think they're in the right direction.
+I have not dropped these patches.I am trying out  [3/3] mmc: dw_mmc:
+Support voltage changes without extra state machine as Seungwon Jeon
+suggested.
+I will post the next version soon.
+>
 > _______________________________________________
 > linux-arm-kernel mailing list
 > linux-arm-kernel at lists.infradead.org
