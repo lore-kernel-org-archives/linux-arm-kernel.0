@@ -1,110 +1,39 @@
-From: thierry.reding@gmail.com (Thierry Reding)
-Date: Wed, 13 Aug 2014 12:53:54 +0200
-Subject: [PATCH 0/3] Thermal reset support in PMC
-In-Reply-To: <53EB40F0.4000300@nvidia.com>
-References: <1407226380-747-1-git-send-email-mperttunen@nvidia.com>
- <20140813080744.GD7735@ulmo> <53EB1DF5.301@nvidia.com>
- <53EB250D.5070207@nvidia.com> <20140813085728.GF7735@ulmo>
- <53EB3556.9010504@nvidia.com> <20140813103613.GA7624@ulmo>
- <53EB40F0.4000300@nvidia.com>
-Message-ID: <20140813105354.GA4843@ulmo>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Wed, 13 Aug 2014 11:53:58 +0100
+Subject: [PATCH v9 12/12] PCI: Introduce pci_remap_iospace() for
+ remapping PCI I/O bus resources into CPU space
+In-Reply-To: <20140813103311.GQ25761@e106497-lin.cambridge.arm.com>
+References: <1407860725-25202-1-git-send-email-Liviu.Dudau@arm.com>
+ <1407860725-25202-13-git-send-email-Liviu.Dudau@arm.com>
+ <20140813100118.GC18495@arm.com>
+ <20140813103311.GQ25761@e106497-lin.cambridge.arm.com>
+Message-ID: <20140813105358.GD18495@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Aug 13, 2014 at 01:41:52PM +0300, Mikko Perttunen wrote:
+On Wed, Aug 13, 2014 at 11:33:11AM +0100, Liviu Dudau wrote:
+> On Wed, Aug 13, 2014 at 11:01:18AM +0100, Catalin Marinas wrote:
+> > On Tue, Aug 12, 2014 at 05:25:25PM +0100, Liviu Dudau wrote:
+> > > Introduce a default implementation for remapping PCI bus I/O resources
+> > > onto the CPU address space. Architectures with special needs may
+> > > provide their own version, but most should be able to use this one.
+> > > 
+> > > Cc: Bjorn Helgaas <bhelgaas@google.com>
+> > > Cc: Arnd Bergmann <arnd@arndb.de>
+> > > Cc: Rob Herring <robh+dt@kernel.org>
+> > > Signed-off-by: Liviu Dudau <Liviu.Dudau@arm.com>
+> > 
+> > I guess you could have added the generic pgprot_device definition to
+> > this patch and the arm64 specific one in the separate arm64 PCIe support
+> > (and one less patch in total). But not a big issue either way.
 > 
-> 
-> On 13/08/14 13:36, Thierry Reding wrote:
-> >* PGP Signed by an unknown key
-> >
-> >On Wed, Aug 13, 2014 at 12:52:22PM +0300, Mikko Perttunen wrote:
-> >>On 13/08/14 11:57, Thierry Reding wrote:
-> >>>>Old Signed by an unknown key
-> >>>
-> >>>On Wed, Aug 13, 2014 at 11:42:53AM +0300, Mikko Perttunen wrote:
-> >>>>
-> >>>>
-> >>>>On 13/08/14 11:12, Mikko Perttunen wrote:
-> >>>>>On 13/08/14 11:07, Thierry Reding wrote:
-> >>>>>>>Old Signed by an unknown key
-> >>>>>>
-> >>>>>>On Tue, Aug 05, 2014 at 11:12:57AM +0300, Mikko Perttunen wrote:
-> >>>>>>>Hi,
-> >>>>>>>
-> >>>>>>>this series adds support for hardware-triggered thermal reset to the PMC
-> >>>>>>>driver. Namely, it adds device tree properties for specifying the I2C
-> >>>>>>>command to be sent when thermtrip is triggered. It is to be noted
-> >>>>>>>that thermtrip won't be ever triggered without a soctherm driver to
-> >>>>>>>calibrate the sensors, but I'll follow up with that patch.
-> >>>>>>>
-> >>>>>>>pmc.c required some juggling around to make the match data usable in
-> >>>>>>>probe, since I didn't want to put the code into the initcall either, since
-> >>>>>>>the soctherm driver won't be initialized by that point anyway.
-> >>>>>>>
-> >>>>>>>Series tested on Jetson-TK1. Should work on Tegra30 and Tegra114 too.
-> >>>>>>
-> >>>>>>Can you describe the procedure used to test this? We currently have a
-> >>>>>>bunch of features in Tegra that some people have tested at some point
-> >>>>>>during development but the test procedures never got documented. That
-> >>>>>>means whenever we want to test something we need to go and reinvent a
-> >>>>>>bunch of tests after the fact.
-> >>>>>>
-> >>>>>>So what I'd like to start doing is collect tests (preferably in some
-> >>>>>>scripted way) so that they can be kept in a repository that people can
-> >>>>>>easily clone and run on devices.
-> >>>>>>
-> >>>>>>Could you provide something like that for thermtrip?
-> >>>>>
-> >>>>>Sure. I'll see if I can make a just a test script or if a local patch is
-> >>>>>needed to test. Btw, I also have a pretty nice test script for EMC
-> >>>>>ready, and I agree that such a repository would be very nice.
-> >>>>
-> >>>>Here is a test program. It it works, the device with immediately shut down.
-> >>>>
-> >>>>https://gist.github.com/cyndis/66126c9c176b5f94a76f
-> >>>
-> >>>Is there a way to set the trip temperature without going through
-> >>>/dev/mem? I'd expect the device to have a sysfs interface of some
-> >>>sort.
-> >>
-> >>The thermtrip "device" isn't currently exposed in any way. If it were
-> >>exposed, I suppose it would be exposed as thermal zone devices, each with
-> >>one trip point. Even then, the thermal framework doesn't really support this
-> >>properly; none of the trip point types really apply to this kind of trip
-> >>point, and x86 systems don't expose their trips either.
-> >
-> >Okay. The reason why I asked is because I'm not sure yet that having C
-> >programs in the test suite would be good, so having something that's
-> >easily scriptable would be preferred.
-> 
-> I agree. Looks like Python's stdlib has mmap support, so maybe we could use
-> that.
+> I went by the established history on that file, where a new interface gets
+> introduced together with its use. I guess it makes backing out the change
+> much easier?
 
-Yes, possibly. It still means that somebody needs to have some kind of
-advanced scripting available to test this. While having a testsuite is
-useful, it would still be nice to occasionally be able to test things
-with just simple shell commands.
+The point is that the only user of pgprot_device is pci_remap_iospace()
+currently, so it makes sense to introduce the generic definition
+together with this patch.
 
-> >>Anyway, since debugging is pretty much the only use case for modifying
-> >>the trip temperature, I thought adding the tz_devices would be a bit
-> >>overkill.
-> >
-> >An alternative could be a file in debugfs.
-> 
-> True, though there's the "don't expose dangerous stuff in debugfs" argument
-> against that. I don't really have problem with it, though.
-> Although in this case I think the script approach would be good enough.
-
-I've said this before and I don't think "dangerous stuff in debugfs" is
-a valid argument. You need superuser privileges to access debugfs, and
-if you have such privileges you can do pretty much what you want (run
-the test program you posted for example).
-
-Thierry
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: not available
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140813/8ebadfd9/attachment.sig>
+-- 
+Catalin
