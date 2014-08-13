@@ -1,60 +1,55 @@
-From: libv@skynet.be (Luc Verhaegen)
-Date: Wed, 13 Aug 2014 22:19:16 +0200
-Subject: [PATCH 3/4] simplefb: disable dt node upon remove
-In-Reply-To: <CACxGe6t3+7cqgOSjof60oCO_QD65Qx_cqtMSnSgU0jttyuK9tg@mail.gmail.com>
-References: <1407914239-12054-4-git-send-email-libv@skynet.be>
- <CACxGe6vaPUa4QvYWBA-QY7MTmJYoeqnPt9Zh5jpky6S9UYbrvQ@mail.gmail.com>
- <CANq1E4ReOB87RX8VhnW1Ln=SK3Tw5V962ujcsfuz-2E9Uc61yQ@mail.gmail.com>
- <CACxGe6vQrhd8QOAyGnjRppmuANpT60Ao2+KmkDfF4FNeoZSZgw@mail.gmail.com>
- <20140813094524.GC31326@skynet.be> <20140813101923.GD31326@skynet.be>
- <CAKON4OwLOAq1EOzZmuefcnZ4hw0i35e3k0F6XGNRy-5jer2vyA@mail.gmail.com>
- <CACxGe6szX3LyhGHbVHrEFfaWGYUcgcxgkuhfc9ac-R0qJs-HXw@mail.gmail.com>
- <20140813192506.GH31326@skynet.be>
- <CACxGe6t3+7cqgOSjof60oCO_QD65Qx_cqtMSnSgU0jttyuK9tg@mail.gmail.com>
-Message-ID: <20140813201916.GJ31326@skynet.be>
+From: broonie@kernel.org (Mark Brown)
+Date: Wed, 13 Aug 2014 21:34:06 +0100
+Subject: [PATCH/RFC V8 1/1] clk: Support for clock parents and rates
+ assigned from device tree
+In-Reply-To: <20140725214231.5177.86866@quantum>
+References: <1403105372-30403-1-git-send-email-s.nawrocki@samsung.com>
+ <1403105372-30403-2-git-send-email-s.nawrocki@samsung.com>
+ <53B59221.5080100@samsung.com> <20140725214231.5177.86866@quantum>
+Message-ID: <20140813203406.GU17528@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Aug 13, 2014 at 09:00:07PM +0100, Grant Likely wrote:
-> 
-> Both of which make sense and should be supported, so I agree we need
-> to find a solution.
-> 
-> The problem I think comes down to the handoff mechanism. There are a
-> lot of different video controllers which could all be configured for a
-> simple framebuffer.
-> 
-> I don't think the "run this only once" test is the right approach.
-> Sometimes the simple framebuffer will never be torn down. It is
-> conceivable that a simple framebuffer will get /added/ at runtime with
-> an overlay, or even rebound to the driver. The simple framebuffer
-> driver really needs to be explicitly told from outside itself that it
-> is being taken over since it doesn't actually have the information to
-> know when a framebuffer becomes invalid. Only the real video driver
-> can provide that information.
+On Fri, Jul 25, 2014 at 02:42:31PM -0700, Mike Turquette wrote:
+> Quoting Sylwester Nawrocki (2014-07-03 10:25:53)
 
-There really are two separate issues here:
-1) making sure that nothing tries to use the freshly died simplefb 
-again.
-2) doing a clean handover to another, usually hw specific, driver.
+> > I would appreciate a DT, SPI or the I2C maintainer opinions.
 
-1 is what i hoped to superficially solve with this patch.
-2 can be very smart about things as the replacement driver actually 
-should know the hw.
+> Yes, Acks from SPI and I2C maintainers would be good. I might need to
+> drop those parts of this patch if they don't come through :-(
 
-I kind of like the idea of an "only-once" (there must be a better name 
-for this) property. This allows the driver/device infrastructure to 
-handle things much more cleanly, and allows me to state this from u-boot 
-for sunxi, while Stephen wouldn't need to for rpi. I currently don't 
-know how or where this could be handled, i just know that this smells 
-like a decent solution which could solve my concern while at least 
-avoiding the probe issue you mentioned earlier.
+So, I just noticed this.  The reason I didn't see this earlier is that
+it was buried at the end of a large clock API patch rather than a split
+out patch for the SPI subsystem so it fell towards the bottom of
+my review queue.  There seems to be no dependency on adding the feature
+as part of one commit so it should really have been split out.
 
-> How does the sunxi driver currently take over from the simplefb?
+Please don't assume that people are going to look in detail at patches
+that aren't obviously for them - I know I end up ignoring a lot of what
+I get sent since I get CCed on a lot of random things for no apparent
+reason (or get tediously large numbers of resends of things that are
+tangentially related), I imagine others do the same.  If you're doing
+that please draw attention to it, splitting out per subsystem is the
+best way of doing that.
 
-Not at all. A big blob of KMS code exists for our sunxi-3.4 kernel, 
-where i can load the original display driver quickly and easily. This 
-tree predates most of DT. I was rather hoping that the simplefb stop-gap
-didn't require me to have fully engineered everything yesterday already.
+This is particularly unfortunate since I am actually a bit confused as
+to why we need to open code this for every bus rather than doing it in
+the driver core, there doesn't seem to be anything at all bus specific
+going on here.  Why can't we just call this from the driver core?
+Having the feature work for some buses and not others is going to get
+old fast.
 
-Luc Verhaegen.
+It's also not clear to me why we're passing false to of_clk_set_defaults()
+when we do call it - it's quite common for I2C and SPI devices to be
+clock providers and have clock trees.  As far as I can tell the
+reasoning is that what's actually going on here is that this is actually
+a mechanism to defer the initialisation to adding of the clock providers
+in which case contrary to the documentation for the function it's
+actually about device registration.  Is that right?
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140813/4d45d120/attachment.sig>
