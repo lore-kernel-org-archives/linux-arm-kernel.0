@@ -1,98 +1,124 @@
-From: Wenyou.Yang@atmel.com (Yang, Wenyou)
-Date: Wed, 13 Aug 2014 01:20:13 +0000
-Subject: [PATCH] spi: atmel: fix corruption caused by too early transfer
- completion
-In-Reply-To: <1407330035-2212-1-git-send-email-ronald.wahl@raritan.com>
-References: <1407330035-2212-1-git-send-email-ronald.wahl@raritan.com>
-Message-ID: <B256D81BAE5131468A838E5D7A2436419D1F2032@penmbx01>
+From: wangyijing@huawei.com (Yijing Wang)
+Date: Wed, 13 Aug 2014 09:16:46 +0800
+Subject: [RFC PATCH 07/20] x86/MSI: Use msi_chip instead of arch func
+ to configure MSI/MSI-X
+In-Reply-To: <20140812190947.GD13996@laptop.dumpdata.com>
+References: <1407828373-24322-1-git-send-email-wangyijing@huawei.com>
+ <1407828373-24322-8-git-send-email-wangyijing@huawei.com>
+ <20140812190947.GD13996@laptop.dumpdata.com>
+Message-ID: <53EABC7E.6080103@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-> -----Original Message-----
-> From: linux-arm-kernel [mailto:linux-arm-kernel-bounces at lists.infradead.org] On
-> Behalf Of Ronald Wahl
-> Sent: Wednesday, August 06, 2014 9:01 PM
-> To: linux-arm-kernel at lists.infradead.org
-> Subject: [PATCH] spi: atmel: fix corruption caused by too early transfer
-> completion
+On 2014/8/13 3:09, Konrad Rzeszutek Wilk wrote:
+> On Tue, Aug 12, 2014 at 03:26:00PM +0800, Yijing Wang wrote:
+>> Introduce a new struct msi_chip apic_msi_chip instead of weak arch
+>> functions to configure MSI/MSI-X in x86.
 > 
-> The PDC (peripheral DMA controller) on AT91 supports two transfer counters and
-> associated registers - one for current and one for the next transfer. If the current
-> transfer is done the next transfer is moved into the current transfer. Now there are
-> two interrupts: one is raised whenever a single transfer is done (ENDRX) and the
-> other one is raised when the current and the next transfer has finished (RXBUFF).
-> The issue is that the driver only enables the ENDRX interrupt which may lead to
-> queuing a new request while there is still a transfer running.
-> This can lead to overruns and/or corruption. By using the RXBUFF interrupt only
-> we queue new requests only when the hardware queue is empty avoiding this
-> problem.
+> Why not 'x86_msi_ops' (see  arch/x86/kernel/x86_init.c)
 
-The patch can work, but it maybe decrease the performance.
+Hi Konrad, I think currently lots of weak arch functions make MSI code
+complex, we have following weak arch functions
 
-Could you share the scenario caused the overruns and/or corruption, or log message?
+arch_setup_msi_irqs
+arch_setup_msi_irq
+arch_msi_check_device
+arch_teardown_msi_irqs
+arch_teardown_msi_irq
+arch_restore_msi_irqs
+arch_msi_mask_irq
+arch_msix_mask_irq
 
-> 
-> Signed-off-by: Ronald Wahl <ronald.wahl@raritan.com>
-> ---
->  drivers/spi/spi-atmel.c | 17 ++++++++---------
->  1 file changed, 8 insertions(+), 9 deletions(-)
-> 
-> diff --git a/drivers/spi/spi-atmel.c b/drivers/spi/spi-atmel.c index 113c83f..3f7d138
-> 100644
-> --- a/drivers/spi/spi-atmel.c
-> +++ b/drivers/spi/spi-atmel.c
-> @@ -775,17 +775,17 @@ static void atmel_spi_pdc_next_xfer(struct spi_master
-> *master,
->  			(unsigned long long)xfer->rx_dma);
->  	}
-> 
-> -	/* REVISIT: We're waiting for ENDRX before we start the next
-> +	/* REVISIT: We're waiting for RXBUFF before we start the next
->  	 * transfer because we need to handle some difficult timing
-> -	 * issues otherwise. If we wait for ENDTX in one transfer and
-> -	 * then starts waiting for ENDRX in the next, it's difficult
-> -	 * to tell the difference between the ENDRX interrupt we're
-> -	 * actually waiting for and the ENDRX interrupt of the
-> +	 * issues otherwise. If we wait for TXBUFE in one transfer and
-> +	 * then starts waiting for RXBUFF in the next, it's difficult
-> +	 * to tell the difference between the RXBUFF interrupt we're
-> +	 * actually waiting for and the RXBUFF interrupt of the
->  	 * previous transfer.
->  	 *
->  	 * It should be doable, though. Just not now...
->  	 */
-> -	spi_writel(as, IER, SPI_BIT(ENDRX) | SPI_BIT(OVRES));
-> +	spi_writel(as, IER, SPI_BIT(RXBUFF) | SPI_BIT(OVRES));
->  	spi_writel(as, PTCR, SPI_BIT(TXTEN) | SPI_BIT(RXTEN));  }
-> 
-> @@ -956,8 +956,7 @@ atmel_spi_pdc_interrupt(int irq, void *dev_id)
-> 
->  		ret = IRQ_HANDLED;
-> 
-> -		spi_writel(as, IDR, (SPI_BIT(RXBUFF) | SPI_BIT(ENDRX)
-> -				     | SPI_BIT(OVRES)));
-> +		spi_writel(as, IDR, (SPI_BIT(RXBUFF) | SPI_BIT(OVRES)));
-> 
->  		/* Clear any overrun happening while cleaning up */
->  		spi_readl(as, SR);
-> @@ -966,7 +965,7 @@ atmel_spi_pdc_interrupt(int irq, void *dev_id)
-> 
->  		complete(&as->xfer_completion);
-> 
-> -	} else if (pending & (SPI_BIT(RXBUFF) | SPI_BIT(ENDRX))) {
-> +	} else if (pending & (SPI_BIT(RXBUFF))) {
->  		ret = IRQ_HANDLED;
-> 
->  		spi_writel(as, IDR, pending);
-> --
-> 1.9.3
-> 
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+And Thierry Reding and Thomas Petazzoni introduce a new MSI chip infrastructure which
+is used in arm platform now. Use msi_chip let us focus on implementing msi_chip ops functions(no need to implement all),
+but now, we should know much of MSI enable flow, then override the weak functions.
+I think use the unified MSI framework in all platforms is better.
+Also this series is preparation to support Non-PCI MSI device use common MSI framework in linux. Non-PCI MSI devices
+include hpet, dmar and the coming consolidator(introduced in ARM GICv3 spec, which is similar to MSI relay device).
 
-Best Regards,
-Wenyou Yang
+
+Thanks!
+Yijing.
+
+>>
+>> Signed-off-by: Yijing Wang <wangyijing@huawei.com>
+>> ---
+>>  arch/x86/include/asm/pci.h     |    1 +
+>>  arch/x86/kernel/apic/io_apic.c |   20 ++++++++++++++++----
+>>  2 files changed, 17 insertions(+), 4 deletions(-)
+>>
+>> diff --git a/arch/x86/include/asm/pci.h b/arch/x86/include/asm/pci.h
+>> index 0892ea0..878a06d 100644
+>> --- a/arch/x86/include/asm/pci.h
+>> +++ b/arch/x86/include/asm/pci.h
+>> @@ -101,6 +101,7 @@ void native_teardown_msi_irq(unsigned int irq);
+>>  void native_restore_msi_irqs(struct pci_dev *dev);
+>>  int setup_msi_irq(struct pci_dev *dev, struct msi_desc *msidesc,
+>>  		  unsigned int irq_base, unsigned int irq_offset);
+>> +extern struct msi_chip *x86_msi_chip;
+>>  #else
+>>  #define native_setup_msi_irqs		NULL
+>>  #define native_teardown_msi_irq		NULL
+>> diff --git a/arch/x86/kernel/apic/io_apic.c b/arch/x86/kernel/apic/io_apic.c
+>> index 2609dcd..eb8ab7c 100644
+>> --- a/arch/x86/kernel/apic/io_apic.c
+>> +++ b/arch/x86/kernel/apic/io_apic.c
+>> @@ -3077,24 +3077,25 @@ int setup_msi_irq(struct pci_dev *dev, struct msi_desc *msidesc,
+>>  	return 0;
+>>  }
+>>  
+>> -int native_setup_msi_irqs(struct pci_dev *dev, int nvec, int type)
+>> +int native_setup_msi_irqs(struct device *dev, int nvec, int type)
+>>  {
+>>  	struct msi_desc *msidesc;
+>>  	unsigned int irq;
+>>  	int node, ret;
+>> +	struct pci_dev *pdev = to_pci_dev(dev);
+>>  
+>>  	/* Multiple MSI vectors only supported with interrupt remapping */
+>>  	if (type == PCI_CAP_ID_MSI && nvec > 1)
+>>  		return 1;
+>>  
+>> -	node = dev_to_node(&dev->dev);
+>> +	node = dev_to_node(dev);
+>>  
+>> -	list_for_each_entry(msidesc, &dev->msi_list, list) {
+>> +	list_for_each_entry(msidesc, &pdev->msi_list, list) {
+>>  		irq = irq_alloc_hwirq(node);
+>>  		if (!irq)
+>>  			return -ENOSPC;
+>>  
+>> -		ret = setup_msi_irq(dev, msidesc, irq, 0);
+>> +		ret = setup_msi_irq(pdev, msidesc, irq, 0);
+>>  		if (ret < 0) {
+>>  			irq_free_hwirq(irq);
+>>  			return ret;
+>> @@ -3214,6 +3215,17 @@ int default_setup_hpet_msi(unsigned int irq, unsigned int id)
+>>  }
+>>  #endif
+>>  
+>> +struct msi_chip apic_msi_chip = {
+>> +	.setup_irqs = native_setup_msi_irqs,
+>> +	.teardown_irq = native_teardown_msi_irq,
+>> +};
+>> +
+>> +struct msi_chip *arch_get_match_msi_chip(struct device *dev)
+>> +{
+>> +	return x86_msi_chip;
+>> +}
+>> +
+>> +struct msi_chip *x86_msi_chip = &apic_msi_chip;
+>>  #endif /* CONFIG_PCI_MSI */
+>>  /*
+>>   * Hypertransport interrupt support
+>> -- 
+>> 1.7.1
+>>
+> 
+> .
+> 
+
+
+-- 
+Thanks!
+Yijing
