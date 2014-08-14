@@ -1,369 +1,91 @@
-From: jg1.han@samsung.com (Jingoo Han)
-Date: Thu, 14 Aug 2014 11:56:45 +0900
-Subject: [PATCH 1/2 V4] irqchip: gic: Add supports for ARM GICv2m MSI(-X)
-In-Reply-To: <1407942041-3291-2-git-send-email-suravee.suthikulpanit@amd.com>
-References: <1407942041-3291-1-git-send-email-suravee.suthikulpanit@amd.com>
- <1407942041-3291-2-git-send-email-suravee.suthikulpanit@amd.com>
-Message-ID: <003d01cfb76b$629b43c0$27d1cb40$%han@samsung.com>
+From: hanjun.guo@linaro.org (Hanjun Guo)
+Date: Thu, 14 Aug 2014 11:21:25 +0800
+Subject: [PATCH 19/19] Documentation: ACPI for ARM64
+In-Reply-To: <2152407.NpXOMHAEH6@vostro.rjw.lan>
+References: <1406206825-15590-1-git-send-email-hanjun.guo@linaro.org>
+ <CAOesGMjs1dM37ZoFA-xs7tYYaXP-XC3NjJsj291bCNoDwAXwiw@mail.gmail.com>
+ <20140812182347.GA4100@arm.com> <2152407.NpXOMHAEH6@vostro.rjw.lan>
+Message-ID: <53EC2B35.5010302@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday, August 14, 2014 12:01 AM, Suravee Suthikulpanit wrote:
+On 2014-8-14 7:41, Rafael J. Wysocki wrote:
+> On Tuesday, August 12, 2014 07:23:47 PM Catalin Marinas wrote:
+>> On Mon, Jul 28, 2014 at 07:27:52PM +0100, Olof Johansson wrote:
+>>> On Mon, Jul 28, 2014 at 10:00 AM, Mark Rutland <mark.rutland@arm.com> wrote:
+>>>> On Mon, Jul 28, 2014 at 05:27:50PM +0100, Olof Johansson wrote:
+>>>>> On Mon, Jul 28, 2014 at 11:07:50AM +0200, Arnd Bergmann wrote:
+>>>>>> On Saturday 26 July 2014 19:34:48 Olof Johansson wrote:
+>>>>>>> On Thu, Jul 24, 2014 at 6:00 AM, Hanjun Guo <hanjun.guo@linaro.org> wrote:
+>>>>>>>> +Relationship with Device Tree
+>>>>>>>> +-----------------------------
+>>>>>>>> +
+>>>>>>>> +ACPI support in drivers and subsystems for ARMv8 should never be mutually
+>>>>>>>> +exclusive with DT support at compile time.
+>>>>>>>> +
+>>>>>>>> +At boot time the kernel will only use one description method depending on
+>>>>>>>> +parameters passed from the bootloader.
+>>>>>>>
+>>>>>>> Possibly overriden by kernel bootargs. And as debated for quite a
+>>>>>>> while earlier this year, acpi should still default to off -- if a DT
+>>>>>>> and ACPI are both passed in, DT should at this time be given priority.
+>>>>>>
+>>>>>> I think this would be harder to do with the way that ACPI is passed in
+>>>>>> to the kernel. IIRC, you always have a minimal DT information based on
+>>>>>> the ARM64 boot protocol, but in the case of ACPI, this contains pointers
+>>>>>> to the ACPI tables, which are then used for populating the Linux platform
+>>>>>> devices (unless acpi=disabled is set), while the other contents of the
+>>>>>> DTB may be present but we skip the of_platform_populate state.
+>>>>>
+>>>>> How can it be harder to do? If you support acpi=off, then you should support
+>>>>> acpi=on.
+>>>>>
+>>>>> Another alternative would be to have an early fixup that stubs out
+>>>>> the acpi properties from the DTB unless there's an 'acpi' or 'acpi=on'
+>>>>> argument on the cmdline. Not quite as tidy a solution, though.
+>>>>
+>>>> I don't follow:
+>>>>
+>>>> If you want to disable ACPI, you can pass acpi=off. This is your
+>>>> workaround for broken ACPI (and only if you happen to have wrirten your
+>>>> own DTB, because many/most ACPI systems WILL NOT have a DTB to begin
+>>>> with).
+>>>
+>>> All ACPI should be assumed broken at this time, so acpi=off _must_ be
+>>> the default.
+>>
+>> (catching up with emails after holiday and I may have missed some of
+>> your arguments)
+>>
+>> If we consider ACPI unusable on ARM but we still want to start merging
+>> patches, we should rather make the config option depend on BROKEN
+>> (though if it is that unusable that no real platform can use it, I would
+>> rather not merge it at all at this stage).
 > 
-> From: Suravee Suthikulpanit <Suravee.Suthikulpanit@amd.com>
+> I agree here.
 > 
-> ARM GICv2m specification extends GICv2 to support MSI(-X) with
-> a new set of register frame. This patch introduces support for
-> the non-secure GICv2m register frame. Currently, GICV2m is available
-> in certain version of GIC-400.
-> 
-> The patch introduces a new property in ARM gic binding, the v2m subnode.
-> It is optional.
+> I would recommend creating a separate branch for that living outside of the
+> mainline kernel and merging it when there are real users.
 
-Hi Suravee Suthikulpanit,
+Real users will coming soon, we already tested this patch set on real hardware
+(ARM64 Juno platform), and I think ARM64 server chips and platforms will show
+up before 3.18 is released.
 
-I added some minor comments.
+For this patch set, DT is the first class citizen at now:
 
-> 
-> Signed-off-by: Suravee Suthikulpanit <Suravee.Suthikulpanit@amd.com>
-> Cc: Mark Rutland <Mark.Rutland@arm.com>
-> Cc: Marc Zyngier <Marc.Zyngier@arm.com>
-> Cc: Jason Cooper <jason@lakedaemon.net>
-> Cc: Catalin Marinas <Catalin.Marinas@arm.com>
-> Cc: Will Deacon <Will.Deacon@arm.com>
-> ---
->  Documentation/devicetree/bindings/arm/gic.txt |  32 ++++
->  drivers/irqchip/Kconfig                       |   7 +
->  drivers/irqchip/Makefile                      |   1 +
->  drivers/irqchip/irq-gic-v2m.c                 | 215 ++++++++++++++++++++++++++
->  drivers/irqchip/irq-gic.c                     |  75 +++++----
->  drivers/irqchip/irq-gic.h                     |  48 ++++++
->  6 files changed, 348 insertions(+), 30 deletions(-)
->  create mode 100644 drivers/irqchip/irq-gic-v2m.c
->  create mode 100644 drivers/irqchip/irq-gic.h
-> 
-> diff --git a/Documentation/devicetree/bindings/arm/gic.txt
-> b/Documentation/devicetree/bindings/arm/gic.txt
-> index 5573c08..8a64179 100644
-> --- a/Documentation/devicetree/bindings/arm/gic.txt
-> +++ b/Documentation/devicetree/bindings/arm/gic.txt
-> @@ -95,3 +95,35 @@ Example:
->  		      <0x2c006000 0x2000>;
->  		interrupts = <1 9 0xf04>;
->  	};
-> +
-> +
+a) We can always set CONFIG_ACPI as off in Kconfig, and use DT only;
 
-Please remove the unnecessary line.
+b) Even if we set CONFIG_ACPI=Y, we also can use DT as normal:
 
-> +* GICv2m extension for MSI/MSI-x support (Optional)
-> +
-> +Certain revision of GIC-400 supports MSI/MSI-x via V2M register frame.
-> +This is enabled by specifying v2m sub-node.
-> +
-> +Required properties:
-> +
-> +- msi-controller : Identifies the node as an MSI controller.
-> +
-> +- reg : GICv2m MSI interface register base and size
-> +
-> +Example:
-> +
-> +	interrupt-controller at e1101000 {
-> +		compatible = "arm,gic-400";
-> +		#interrupt-cells = <3>;
-> +		#address-cells = <2>;
-> +		#size-cells = <2>;
-> +		interrupt-controller;
-> +		interrupts = <1 8 0xf04>;
-> +		ranges = <0 0 0 0xe1100000 0 0x100000>;
-> +		reg = <0x0 0xe1110000 0 0x01000>,
-> +		      <0x0 0xe112f000 0 0x02000>,
-> +		      <0x0 0xe1140000 0 0x10000>,
-> +		      <0x0 0xe1160000 0 0x10000>;
-> +		v2m {
-> +			msi-controller;
-> +			reg = <0x0 0x80000 0 0x1000>;
-> +		};
-> +	};
-> diff --git a/drivers/irqchip/Kconfig b/drivers/irqchip/Kconfig
-> index 4e230e7..9aa5edc 100644
-> --- a/drivers/irqchip/Kconfig
-> +++ b/drivers/irqchip/Kconfig
-> @@ -7,6 +7,13 @@ config ARM_GIC
->  	select IRQ_DOMAIN
->  	select MULTI_IRQ_HANDLER
-> 
-> +config ARM_GIC_V2M
-> +	bool
-> +	select IRQ_DOMAIN
-> +	select MULTI_IRQ_HANDLER
-> +	depends on ARM_GIC
-> +	depends on PCI && PCI_MSI
-> +
->  config GIC_NON_BANKED
->  	bool
-> 
-> diff --git a/drivers/irqchip/Makefile b/drivers/irqchip/Makefile
-> index 73052ba..3bda951 100644
-> --- a/drivers/irqchip/Makefile
-> +++ b/drivers/irqchip/Makefile
-> @@ -17,6 +17,7 @@ obj-$(CONFIG_ARCH_SUNXI)		+= irq-sun4i.o
->  obj-$(CONFIG_ARCH_SUNXI)		+= irq-sunxi-nmi.o
->  obj-$(CONFIG_ARCH_SPEAR3XX)		+= spear-shirq.o
->  obj-$(CONFIG_ARM_GIC)			+= irq-gic.o irq-gic-common.o
-> +obj-$(CONFIG_ARM_GIC_V2M)		+= irq-gic-v2m.o
->  obj-$(CONFIG_ARM_GIC_V3)		+= irq-gic-v3.o irq-gic-common.o
->  obj-$(CONFIG_ARM_NVIC)			+= irq-nvic.o
->  obj-$(CONFIG_ARM_VIC)			+= irq-vic.o
-> diff --git a/drivers/irqchip/irq-gic-v2m.c b/drivers/irqchip/irq-gic-v2m.c
-> new file mode 100644
-> index 0000000..1ac0ace
-> --- /dev/null
-> +++ b/drivers/irqchip/irq-gic-v2m.c
-> @@ -0,0 +1,215 @@
-> +/*
-> + * ARM GIC v2m MSI(-X) support
-> + * Support for Message Signalelled Interrupts for systems that
+  - Pass DT blob without (valid) ACPI tables (just as we boot the kernel now),
+    ACPI will disabled in the very early stage and FDT will still to be
+    unflattened, so will not break DT booting.
 
-s/Signalelled/Signaled
+  - We can pass ACPI=off to disable ACPI and use DT even if we got valid
+    ACPI tables (in the v1 patch set);
 
-> + * implement ARM Generic Interrupt Controller: GICv2m.
-> + *
-> + * Copyright (C) 2014 Advanced Micro Devices, Inc.
-> + * Authors: Suravee Suthikulpanit <suravee.suthikulpanit@amd.com>
-> + *          Harish Kasiviswanathan <harish.kasiviswanathan@amd.com>
-> + *          Brandon Anderson <brandon.anderson@amd.com>
-> + *
-> + * This program is free software; you can redistribute it and/or modify it
-> + * under the terms of the GNU General Public License version 2 as published
-> + * by the Free Software Foundation.
-> + */
-> +
-> +#include <linux/kernel.h>
-> +#include <linux/module.h>
-> +#include <linux/platform_device.h>
-> +#include <linux/pci.h>
-> +#include <linux/irq.h>
-> +#include <linux/spinlock.h>
-> +#include <linux/slab.h>
-> +#include <linux/of_address.h>
-> +#include <linux/of_pci.h>
-> +#include <linux/bitmap.h>
+So it is safe for people who want to use DT, and didn't change any behavior
+of DT booting except some extra test of if(acpi_disabled).
 
-Please, re-order these headers alphabetically.
-It enhances the readability.
-
-> +
-> +#include "irqchip.h"
-> +#include "irq-gic.h"
-> +
-> +/*
-> +* MSI_TYPER:
-> +*     [31:26] Reserved
-> +*     [25:16] lowest SPI assigned to MSI
-> +*     [15:10] Reserved
-> +*     [9:0]   Numer of SPIs assigned to MSI
-> +*/
-> +#define V2M_MSI_TYPER			0x008
-> +#define V2M_MSI_TYPER_BASE_SHIFT	(16)
-> +#define V2M_MSI_TYPER_BASE_MASK		(0x3FF)
-> +#define V2M_MSI_TYPER_NUM_MASK		(0x3FF)
-
-These braces are unnecessary.
-Please remove them as follows.
-
-+#define V2M_MSI_TYPER_BASE_SHIFT	16
-+#define V2M_MSI_TYPER_BASE_MASK		0x3FF
-+#define V2M_MSI_TYPER_NUM_MASK		0x3FF
-
-> +#define V2M_MSI_SETSPI_NS		0x040
-> +#define V2M_MIN_SPI			32
-> +#define V2M_MAX_SPI			1019
-> +
-> +/*
-> + * alloc_msi_irq - Allocate MSIs from avaialbe MSI bitmap.
-
-s/avaialbe/available
-
-> + * @data: Pointer to v2m_data
-> + * @nvec: Number of interrupts to allocate
-> + * @irq: Pointer to the allocated irq
-> + *
-> + * Allocates interrupts only if the contiguous range of MSIs
-> + * with specified nvec are available. Otherwise return the number
-> + * of available interrupts. If none are available, then returns -ENOENT.
-> + */
-> +static int alloc_msi_irq(struct v2m_data *data, int nvec, int *irq)
-> +{
-> +	int size = data->nr_spis;
-> +	int next = size, i = nvec, ret;
-> +
-> +	/* We should never allocate more than available nr_spis */
-> +	if (i >= size)
-> +		i = size;
-> +
-> +	spin_lock(&data->msi_cnt_lock);
-> +
-> +	for (; i > 0; i--) {
-> +		next = bitmap_find_next_zero_area(data->bm,
-> +					size, 0, i, 0);
-> +		if (next < size)
-> +			break;
-> +	}
-> +
-> +	if (i != nvec) {
-> +		ret = i ? : -ENOENT;
-> +	} else {
-> +		bitmap_set(data->bm, next, nvec);
-> +		*irq = data->spi_start + next;
-> +		ret = 0;
-> +	}
-> +
-> +	spin_unlock(&data->msi_cnt_lock);
-> +
-> +	return ret;
-> +}
-> +
-> +static void gicv2m_teardown_msi_irq(struct msi_chip *chip, unsigned int irq)
-> +{
-> +	int pos;
-> +	struct v2m_data *data = container_of(chip, struct v2m_data, msi_chip);
-> +
-> +	spin_lock(&data->msi_cnt_lock);
-> +
-> +	pos = irq - data->spi_start;
-> +	if (pos >= 0 && pos < data->nr_spis)
-> +		bitmap_clear(data->bm, pos, 1);
-> +
-> +	spin_unlock(&data->msi_cnt_lock);
-> +}
-> +
-> +static int gicv2m_setup_msi_irq(struct msi_chip *chip, struct pci_dev *pdev,
-> +		      struct msi_desc *desc)
-> +{
-> +	int avail, irq = 0;
-> +	struct msi_msg msg;
-> +	phys_addr_t addr;
-> +	struct v2m_data *data = container_of(chip, struct v2m_data, msi_chip);
-> +
-> +	if (!desc) {
-> +		dev_err(&pdev->dev,
-> +			"GICv2m: MSI setup failed. Invalid msi descriptor\n");
-> +		return -EINVAL;
-> +	}
-> +
-> +	avail = alloc_msi_irq(data, 1, &irq);
-> +	if (avail != 0) {
-> +		dev_err(&pdev->dev,
-> +			"GICv2m: MSI setup failed. Cannnot allocate IRQ\n");
-> +		return -ENOSPC;
-> +	}
-> +
-> +	irq_set_chip_data(irq, chip);
-> +	irq_set_msi_desc(irq, desc);
-> +	irq_set_irq_type(irq, IRQ_TYPE_EDGE_RISING);
-> +
-> +	addr = data->res.start + V2M_MSI_SETSPI_NS;
-> +
-> +	msg.address_hi = (u32)(addr >> 32);
-> +	msg.address_lo = (u32)(addr);
-> +	msg.data = irq;
-> +	write_msi_msg(irq, &msg);
-> +
-> +	return 0;
-> +}
-> +
-> +static void gicv2m_mask_irq(struct irq_data *d)
-> +{
-> +	gic_mask_irq(d);
-> +	if (d->msi_desc)
-> +		mask_msi_irq(d);
-> +}
-> +
-> +static void gicv2m_unmask_irq(struct irq_data *d)
-> +{
-> +	gic_unmask_irq(d);
-> +	if (d->msi_desc)
-> +		unmask_msi_irq(d);
-> +}
-> +
-> +static struct irq_chip gicv2m_chip;
-> +
-> +#ifdef CONFIG_OF
-> +int __init
-> +gicv2m_of_init(struct device_node *node, struct gic_chip_data *gic)
-> +{
-> +	int ret;
-> +	unsigned int val;
-> +	struct v2m_data *v2m = &gic->v2m_data;
-> +
-> +	v2m->msi_chip.owner = THIS_MODULE;
-> +	v2m->msi_chip.of_node = node;
-> +	v2m->msi_chip.setup_irq = gicv2m_setup_msi_irq;
-> +	v2m->msi_chip.teardown_irq = gicv2m_teardown_msi_irq;
-> +	ret = of_pci_msi_chip_add(&v2m->msi_chip);
-> +	if (ret) {
-> +		pr_info("GICv2m: Failed to add msi_chip.\n");
-
-You don't need to add "GICv2m:" to all pr_*() functions.
-Instead, you can add the following one at the top of the this .c file.
-
-#define pr_fmt(fmt) " GICv2m: " fmt
-
-
-> +		return ret;
-> +	}
-> +
-> +	if (of_address_to_resource(node, 0, &v2m->res)) {
-> +		pr_err("GICv2m: Failed locate GICv2m MSI register frame\n");
-> +		return -EINVAL;
-> +	}
-> +
-> +	v2m->base = of_iomap(node, 0);
-> +	if (!v2m->base) {
-> +		pr_err("GICv2m: Failed to map GIC MSI registers\n");
-> +		return -EINVAL;
-> +	}
-> +
-> +	val = readl_relaxed(v2m->base + V2M_MSI_TYPER);
-> +	if (!val) {
-> +		pr_warn("GICv2m: Failed to read V2M_MSI_TYPER register\n");
-> +		return -EINVAL;
-> +	}
-> +
-> +	v2m->spi_start = (val >> V2M_MSI_TYPER_BASE_SHIFT) &
-> +				V2M_MSI_TYPER_BASE_MASK;
-> +	v2m->nr_spis = val & V2M_MSI_TYPER_NUM_MASK;
-> +	if ((v2m->spi_start < V2M_MIN_SPI) || (v2m->nr_spis >= V2M_MAX_SPI)) {
-> +			pr_err("GICv2m: Invalid MSI_TYPER (%#x)\n", val);
-> +			return -EINVAL;
-> +	}
-> +
-> +	v2m->bm = kzalloc(sizeof(long) * BITS_TO_LONGS(v2m->nr_spis),
-> +			  GFP_KERNEL);
-> +	if (!v2m->bm) {
-> +		pr_err("GICv2m: Failed to allocate MSI bitmap\n");
-> +		return -ENOMEM;
-> +	}
-> +
-> +	spin_lock_init(&v2m->msi_cnt_lock);
-> +
-> +	pr_info("GICv2m: SPI range [%d:%d]\n",
-> +		v2m->spi_start, (v2m->spi_start + v2m->nr_spis));
-> +
-> +	memcpy(&gicv2m_chip, gic->irq_chip, sizeof(struct irq_chip));
-> +	gicv2m_chip.name = "GICv2m",
-> +	gicv2m_chip.irq_mask = gicv2m_mask_irq;
-> +	gicv2m_chip.irq_unmask = gicv2m_unmask_irq;
-> +	gic->irq_chip = &gicv2m_chip;
-> +
-> +	return 0;
-> +}
-> +
-> +#endif /* CONFIG_OF */
-
-[.....]
-
-Best regards,
-Jingoo Han
+Thanks
+Hanjun
