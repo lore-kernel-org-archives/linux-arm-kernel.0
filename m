@@ -1,118 +1,69 @@
-From: grygorii.strashko@ti.com (Grygorii Strashko)
-Date: Thu, 14 Aug 2014 18:57:08 +0300
-Subject: [PATCH 4/4] ARM: dts: keystone-k2hk: add dsp gpio controllers
- nodes
-In-Reply-To: <1408018321.928492982@f270.i.mail.ru>
-References: <1407946582-20927-1-git-send-email-grygorii.strashko@ti.com>
- <1407945984.545232249@f170.i.mail.ru> <53ECA7F3.7030702@ti.com>
- <1408018321.928492982@f270.i.mail.ru>
-Message-ID: <53ECDC54.3060005@ti.com>
+From: rob.jones@codethink.co.uk (Rob Jones)
+Date: Thu, 14 Aug 2014 16:17:02 +0100
+Subject: [PATCH 1/5] gpiolib: devres: Introduce the function
+ devm_request_gpio_array
+In-Reply-To: <CABxcv==adT6YPEekjD1y3ncrj9ghWE8UMuc64AeVWCPVb0ywFw@mail.gmail.com>
+References: <cover.1404665589.git.himangi774@gmail.com>	<1a1752ce7455bac8f2505a9790da891a830699f5.1404665589.git.himangi774@gmail.com>	<53BD2509.6070803@codethink.co.uk>	<CACRpkdZWfYN14aki-UqvWp1K0exVj-mMK92q431QueSVvjZFuA@mail.gmail.com>	<53BE7288.6060503@codethink.co.uk>	<CABxcv=mhMMQxqVRM28NucnSW62v_3ghnT58JqFxvK=2bjxizdw@mail.gmail.com>	<53BFB659.8050306@codethink.co.uk>
+ <CABxcv==adT6YPEekjD1y3ncrj9ghWE8UMuc64AeVWCPVb0ywFw@mail.gmail.com>
+Message-ID: <53ECD2EE.6020101@codethink.co.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08/14/2014 03:12 PM, Alexander Shiyan wrote:
-> Thu, 14 Aug 2014 15:13:39 +0300 ?? Grygorii Strashko <grygorii.strashko@ti.com>:
->> Hi Alexander,
+I'm afraid too many other things have been landing on my plate and I
+don't think I will be able to get on this for the foreseeable future,
+sorry about this.
+
+On 11/07/14 11:07, Javier Martinez Canillas wrote:
+> Hello Rob,
+>
+> On Fri, Jul 11, 2014 at 12:03 PM, Rob Jones <rob.jones@codethink.co.uk> wrote:
 >>
->> On 08/13/2014 07:06 PM, Alexander Shiyan wrote:
->>> Wed, 13 Aug 2014 19:16:22 +0300 ?? Grygorii Strashko <grygorii.strashko@ti.com>:
->>>> Add Keystone 2 DSP GPIO nodes.
->>>> DSP GPIO banks 0-7 correspond to DSP0-DSP7
+>>
+>> On 11/07/14 01:35, Javier Martinez Canillas wrote:
+>>>
+>>> Hello Rob,
+>>>
+>>> On Thu, Jul 10, 2014 at 1:01 PM, Rob Jones <rob.jones@codethink.co.uk>
+>>> wrote:
+>>
+>>
+>> <snip>
+>>
+>>
 >>>>
->>>> Signed-off-by: Grygorii Strashko <grygorii.strashko@ti.com>
->>>> ---
->>>>    arch/arm/boot/dts/k2hk.dtsi |   56 +++++++++++++++++++++++++++++++++++++++++++
->>>>    1 file changed, 56 insertions(+)
+>>>> I will certainly consider it. I'm in the middle of something else right
+>>>> now but I should be available in a day or two and I'll have a look.
 >>>>
->>>> diff --git a/arch/arm/boot/dts/k2hk.dtsi b/arch/arm/boot/dts/k2hk.dtsi
->>>> index 321ba2f..009e180 100644
->>>> --- a/arch/arm/boot/dts/k2hk.dtsi
->>>> +++ b/arch/arm/boot/dts/k2hk.dtsi
->>>> @@ -50,5 +50,61 @@
->>>>    			#interrupt-cells = <1>;
->>>>    			ti,syscon-dev = <&devctrl 0x2a0>;
->>>>    		};
->>>> +
->>>> +		dspgpio0: keystone_dsp_gpio at 02620240 {
->>>> +			compatible = "ti,keystone-mctrl-gpio";
->>>> +			gpio-controller;
->>>> +			#gpio-cells = <2>;
->>>> +			gpio,syscon-dev = <&devctrl 0x240>;
->>>> +		};
->>>> +
->>>> +		dspgpio1: keystone_dsp_gpio at 2620244 {
->>>> +			compatible = "ti,keystone-mctrl-gpio";
->>>> +			gpio-controller;
->>>> +			#gpio-cells = <2>;
->>>> +			gpio,syscon-dev = <&devctrl 0x244>;
->>>> +		};
->>> ...
->>>> +		dspgpio7: keystone_dsp_gpio at 262025C {
->>>> +			compatible = "ti,keystone-mctrl-gpio";
->>>> +			gpio-controller;
->>>> +			#gpio-cells = <2>;
->>>> +			gpio,syscon-dev = <&devctrl 0x25c>;
->>>> +		};
+>>>>
 >>>
->>> So, devctrl is a syscon device and this DTS introduce several
->>> identical GPIO descriptions?
+>>> I'm working on a driver for a PMIC which uses a set of GPIO to select
+>>> a particular register. Right now I'm getting each GPIO independently
+>>> but Linus mentioned [0] the devm_gpio_request_array() patch you
+>>> posted.
 >>>
->>> On my opinion this should be placed in the gpio-syscon.c,
->>> where you can add support for ti,keystone-dsp0{..7}-gpio.
->>> Such change will avoid parts 2 and 3 of this patch.
+>>> Now, I'm not using the integer-based GPIO API but the new
+>>> descriptor-based one so I was wondering if you are already
+>>> implementing a devm_gpiod_get_array() or if you want me to implement
+>>> it myself.
 >>>
->>> static const struct syscon_gpio_data ti_keystone_dsp0_gpio = {
->>>     .compatible = "ti,keystone-syscon",
->>>     .dat_bit_offset = 0x240 * 8,
->>>     ...
->>>     .set = etc...
->>> };
 >>
->> So, if I understand you right, you propose to add 8 additional compatible
->> strings just to encode different register offsets. Is it?
->> 1) add "ti,keystone-mctrl-gpio0"..."ti,keystone-mctrl-gpio7"
-> 
-> Yes, but replace "mctrl" with "dsp" since mctrl is not applicable here.
-> 
->> 2) add 8 structures keystone_mctrl_gpio0..keystone_mctrl_gpio7 in gpio-syscon.c
->>     (which will have only different values of field - .dat_bit_offset = 0x2yy * 8,)
+>> As I said, I'm deep in something else for the next day or two so if you
+>> need it urgently you should probably do it yourself but if you don't
+>> mind waiting until next week, I can have a go.
 >>
->> 3) add 8 additional items in array syscon_gpio_ids
->> 	{
->> 		.compatible	= "ti,keystone-mctrl-gpio0",
->> 		.data		= &keystone_mctrl_gpio0,
->> 	}, ...
+>> Your call, let me know.
 >>
->> I can do it if you strictly insist, BUT I don't like it :(
->> - just imagine how your driver will look look like if 5 or 6 SoCs will re-use it ;)
->> - as I mentioned in cover letter and commit messages even each SoC revision can have
->>    different Syscon implementation with different registers offsets and with different
->>    number of Syscon register ranges (for example for Keystone 2 we already have two
->>    Syscon devices defined in DT).
-> 
-> The initial version of this driver contains addresses and offsets in, but this approach has
-> been criticized by DT maintainers.
+>
+> I'm not in a hurry, just wanted to know if it was on your plate. I'll
+> wait for your patch then, thanks!
+>
+> Best regards,
+> Javier
+>
+>
 
-Could you provide link on this thread^, pls?
-
-Curious, it looks like Rob Herring has just proposed to encode offsets & bits in DT:
-"Re: [PATCH 2/6] leds: add device tree bindings for syscon LEDs"
-http://www.spinics.net/lists/arm-kernel/msg354182.html
-
-> 
-> "different Syscon with different registers" - is OK, since we use compatible string in definition.
-> If you have two identical syscon, just append an unique additional string and use it in this driver.
-> 
->> Now we already have 3 Keystone 2 SoC revisions (K2HK, K2L, K2E)  and there are no guarantee
->> that the next revision k2X will have the same register offset for GPIO0.
-> 
-> Then use more exact string for syscon-gpio, like ti,keystone-k2hk-dsp-gpio0.
-
-Nothing to say :) - DT is funny thing. It has such good feature as phandle, but
-people continue hard-coding relation between HW blocks in code :(
-
-Any way, Thanks for your comments. I'll wait a bit then update and resend.
-
-
-Best regards,
--grygorii
+-- 
+Rob Jones
+Codethink Ltd
+mailto:rob.jones at codethink.co.uk
+tel:+44 161 236 5575
