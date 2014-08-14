@@ -1,53 +1,39 @@
 From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Thu, 14 Aug 2014 18:08:25 +0100
-Subject: [PATCH] arm64: align randomized TEXT_OFFSET on 4 kB boundary
-In-Reply-To: <CAKv+Gu8yne5zdtgsVcsc+D=C--qQcMoOuanPuHeWg+BiKO8xfA@mail.gmail.com>
-References: <1407952383-1214-1-git-send-email-ard.biesheuvel@linaro.org>
- <20140814102307.GB24018@leverpostej>
- <CAKv+Gu8yne5zdtgsVcsc+D=C--qQcMoOuanPuHeWg+BiKO8xfA@mail.gmail.com>
-Message-ID: <20140814170825.GG9039@arm.com>
+Date: Thu, 14 Aug 2014 18:13:23 +0100
+Subject: [PATCH v2 1/3] arm64: spin-table: handle unmapped
+ cpu-release-addrs
+In-Reply-To: <20140813125844.GE32644@leverpostej>
+References: <CAKv+Gu_UjRNhhiM0GPsKRdXRtmEnY6cbpY-JZ33RUMapbPYsbQ@mail.gmail.com>
+ <20140813125844.GE32644@leverpostej>
+Message-ID: <20140814171323.GH9039@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Aug 14, 2014 at 11:31:35AM +0100, Ard Biesheuvel wrote:
-> On 14 August 2014 12:23, Mark Rutland <mark.rutland@arm.com> wrote:
-> > On Wed, Aug 13, 2014 at 06:53:03PM +0100, Ard Biesheuvel wrote:
-> >> diff --git a/arch/arm64/kernel/head.S b/arch/arm64/kernel/head.S
-> >> index b6ca95aee348..ae055a18b04a 100644
-> >> --- a/arch/arm64/kernel/head.S
-> >> +++ b/arch/arm64/kernel/head.S
-> >> @@ -38,11 +38,11 @@
-> >>
-> >>  #define KERNEL_RAM_VADDR     (PAGE_OFFSET + TEXT_OFFSET)
-> >>
-> >> -#if (TEXT_OFFSET & 0xf) != 0
-> >> -#error TEXT_OFFSET must be at least 16B aligned
-> >> -#elif (PAGE_OFFSET & 0xfffff) != 0
-> >> +#if (TEXT_OFFSET & 0xfff) != 0
-> >> +#error TEXT_OFFSET must be at least 4kB aligned
-> >
-> > Minor nit, but can we have "KB" here to match "MB"?
+On Wed, Aug 13, 2014 at 01:58:45PM +0100, Mark Rutland wrote:
+> > With the 3.17 merge window not far from closing, is there anything we
+> > could still do this cycle to get $subject addressed?
+> > As I have indicated before, the newly introduced TEXT_OFFSET fuzzing
+> > may break APM Mustang if booting from UEFI (i.e., for low values of
+> > rand()), and as this option is recommended for distribution kernels,
+> > it could make apt-get update'ing your kernel a frustrating experience.
+> > However, the fix for that issue triggers the issue addressed by
+> > $subject.
+> > 
+> > In my personal opinion, relaxing the requirements imposed on where
+> > your cpu-release-addr may live could remain a separate discussion. In
+> > the APM Mustang case, even when adhering to booting.txt by the letter
+> > (i.e., pu cpu-release-addr in a memreserved area in DRAM and load
+> > Image at a 2 meg boundary + TEXT_OFFSET), the kernel fails to bring up
+> > the secondaries if the cpu-release-addr is below the kernel.
 > 
-> Ack
+> For the moment I would be happy with the patch as it stands (using
+> ioremap_cache).
 > 
-> >> +#elif (PAGE_OFFSET & 0x1fffff) != 0
-> >>  #error PAGE_OFFSET must be at least 2MB aligned
-> >> -#elif TEXT_OFFSET > 0xfffff
-> >> +#elif TEXT_OFFSET > 0x1fffff
-> >>  #error TEXT_OFFSET must be less than 2MB
-> >>  #endif
-> >
-> > I thought I'd left wording in Kconfig.debug, but that doesn't seem to be
-> > the case. This looks sane to me, so:
-> >
-> > Reviewed-by: Mark Rutland <mark.rutland@arm.com>
-> >
-> > Catalin, can you pick this up? Without it UEFI boot can be broken by
-> > ARM64_RANDOMIZE_TEXT_OFFSET.
-> 
-> I assume the above change does not require a v2.
+> Catalin, Will?
 
-I can fix it up. Thanks.
+Using ioremap_cache() sounds fine to me but I have to dig the original
+patches as I've only been cc'ed in the middle of the thread (and that's
+just for patch 1/3).
 
 -- 
 Catalin
