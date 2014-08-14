@@ -1,63 +1,38 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Thu, 14 Aug 2014 15:53:02 +0100
-Subject: [PATCH 6/6] arm/arm64: KVM: vgic: Clarify and correct vgic
- documentation
-In-Reply-To: <1405003196-12403-7-git-send-email-christoffer.dall@linaro.org>
- (Christoffer Dall's message of "Thu, 10 Jul 2014 15:39:56 +0100")
-References: <1405003196-12403-1-git-send-email-christoffer.dall@linaro.org>
- <1405003196-12403-7-git-send-email-christoffer.dall@linaro.org>
-Message-ID: <87a977rult.fsf@approximate.cambridge.arm.com>
+From: semen.protsenko@linaro.org (Semen Protsenko)
+Date: Thu, 14 Aug 2014 17:55:22 +0300
+Subject: [PATCH] efi/arm64: store Runtime Services revision
+Message-ID: <1408028122-1784-1-git-send-email-semen.protsenko@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jul 10 2014 at  3:39:56 pm BST, Christoffer Dall <christoffer.dall@linaro.org> wrote:
-> The VGIC virtual distributor implementation documentation was written a
-> very long time ago, before the true nature of the beast had been
-> partially absorbed into my bloodstream.  Clarify the docs.
->
-> Plus, it fixes an actual bug.  ICFRn, pfff.
->
-> Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
+"efi" global data structure contains "runtime_version" field which must
+be assigned in order to use it later in Runtime Services virtual calls
+(virt_efi_* functions).
 
-Acked-by: Marc Zyngier <marc.zyngier@arm.com>
+Before this patch "runtime_version" was unassigned (0), so each
+Runtime Service virtual call that checks revision would fail.
 
-> ---
->  virt/kvm/arm/vgic.c | 13 +++++++------
->  1 file changed, 7 insertions(+), 6 deletions(-)
->
-> diff --git a/virt/kvm/arm/vgic.c b/virt/kvm/arm/vgic.c
-> index 2c13384..df0785c 100644
-> --- a/virt/kvm/arm/vgic.c
-> +++ b/virt/kvm/arm/vgic.c
-> @@ -36,21 +36,22 @@
->   * How the whole thing works (courtesy of Christoffer Dall):
->   *
->   * - At any time, the dist->irq_pending_on_cpu is the oracle that knows if
-> - *   something is pending
-> - * - VGIC pending interrupts are stored on the vgic.irq_pending vgic
-> - *   bitmap (this bitmap is updated by both user land ioctls and guest
-> - *   mmio ops, and other in-kernel peripherals such as the
-> - *   arch. timers) and indicate the 'wire' state.
-> + *   something is pending on the CPU interface.
-> + * - Interrupts that are pending on the distributor are stored on the
-> + *   vgic.irq_pending vgic bitmap (this bitmap is updated by both user land
-> + *   ioctls and guest mmio ops, and other in-kernel peripherals such as the
-> + *   arch. timers).
->   * - Every time the bitmap changes, the irq_pending_on_cpu oracle is
->   *   recalculated
->   * - To calculate the oracle, we need info for each cpu from
->   *   compute_pending_for_cpu, which considers:
->   *   - PPI: dist->irq_pending & dist->irq_enable
->   *   - SPI: dist->irq_pending & dist->irq_enable & dist->irq_spi_target
-> - *   - irq_spi_target is a 'formatted' version of the GICD_ICFGR
-> + *   - irq_spi_target is a 'formatted' version of the GICD_ITARGETSRn
->   *     registers, stored on each vcpu. We only keep one bit of
->   *     information per interrupt, making sure that only one vcpu can
->   *     accept the interrupt.
-> + * - If any of the above state changes, we must recalculate the oracle.
->   * - The same is true when injecting an interrupt, except that we only
->   *   consider a single interrupt at a time. The irq_spi_cpu array
->   *   contains the target CPU for each SPI.
+Runtime Services revision being passed in UEFI system table from UEFI
+to kernel (see efi_entry() function). In UEFI it's being stored at
+MdePkg/Include/Uefi/UefiSpec.h as EFI_RUNTIME_SERVICES_REVISION.
 
+Signed-off-by: Semen Protsenko <semen.protsenko@linaro.org>
+---
+ arch/arm64/kernel/efi.c | 2 ++
+ 1 file changed, 2 insertions(+)
+
+diff --git a/arch/arm64/kernel/efi.c b/arch/arm64/kernel/efi.c
+index e72f310..5dbb7bd 100644
+--- a/arch/arm64/kernel/efi.c
++++ b/arch/arm64/kernel/efi.c
+@@ -463,6 +463,8 @@ static int __init arm64_enter_virtual_mode(void)
+ 	efi_native_runtime_setup();
+ 	set_bit(EFI_RUNTIME_SERVICES, &efi.flags);
+ 
++	efi.runtime_version = efi.systab->hdr.revision;
++
+ 	return 0;
+ 
+ err_unmap:
 -- 
-Jazz is not dead. It just smells funny.
+2.0.1
