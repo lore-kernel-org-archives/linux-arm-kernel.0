@@ -1,23 +1,22 @@
 From: pavel@denx.de (Pavel Machek)
-Date: Thu, 14 Aug 2014 20:49:49 +0200
-Subject: [PATCHv10 2/2] arm: dts: Add Altera SDRAM EDAC bindings &
- devicetree entries.
-In-Reply-To: <1407770293-27190-3-git-send-email-tthayer@opensource.altera.com>
-References: <1407770293-27190-1-git-send-email-tthayer@opensource.altera.com>
- <1407770293-27190-3-git-send-email-tthayer@opensource.altera.com>
-Message-ID: <20140814184949.GC11558@amd.pavel.ucw.cz>
+Date: Thu, 14 Aug 2014 20:51:58 +0200
+Subject: [PATCH 2/3] ARM: dts: socfpga: Add SD card detect
+In-Reply-To: <1408031491-15609-3-git-send-email-dinguyen@opensource.altera.com>
+References: <1408031491-15609-1-git-send-email-dinguyen@opensource.altera.com>
+ <1408031491-15609-3-git-send-email-dinguyen@opensource.altera.com>
+Message-ID: <20140814185158.GD11558@amd.pavel.ucw.cz>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon 2014-08-11 10:18:13, tthayer at opensource.altera.com wrote:
-> From: Thor Thayer <tthayer@opensource.altera.com>
+On Thu 2014-08-14 10:51:30, dinguyen at opensource.altera.com wrote:
+> From: Dinh Nguyen <dinguyen@opensource.altera.com>
 > 
-> Add the Altera SDRAM EDAC bindings and device tree changes to the Altera SoC project.
-> 
-> Signed-off-by: Thor Thayer <tthayer@opensource.altera.com>
+> Revision D of the SOCFGPA devkit has a GPIO line used for SD/MMC
+> card detect.
 
-Acked-by: Pavel Machek <pavel@denx.de>
+Are there previous revisions outside Altera?
 
+									Pavel
 
 -- 
 (english) http://www.livejournal.com/~pavelmachek
