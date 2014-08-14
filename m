@@ -1,108 +1,51 @@
-From: addy.ke@rock-chips.com (Addy Ke)
-Date: Thu, 14 Aug 2014 13:49:20 +0800
-Subject: [PATCH] ARM: dts: Add sdio0 and sdio1 to the rk3288
-Message-ID: <1407995360-26009-1-git-send-email-addy.ke@rock-chips.com>
+From: hdoyu@nvidia.com (Hiroshi Doyu)
+Date: Thu, 14 Aug 2014 09:47:42 +0300
+Subject: [PATCH v5] devicetree: Add generic IOMMU device tree bindings
+In-Reply-To: <1406803383-11601-1-git-send-email-thierry.reding@gmail.com>
+References: <1406803383-11601-1-git-send-email-thierry.reding@gmail.com>
+Message-ID: <87a9774lf5.fsf@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Signed-off-by: Addy Ke <addy.ke@rock-chips.com>
----
- arch/arm/boot/dts/rk3288.dtsi | 76 +++++++++++++++++++++++++++++++++++++++++++
- 1 file changed, 76 insertions(+)
 
-diff --git a/arch/arm/boot/dts/rk3288.dtsi b/arch/arm/boot/dts/rk3288.dtsi
-index 7a9173d..a440869 100644
---- a/arch/arm/boot/dts/rk3288.dtsi
-+++ b/arch/arm/boot/dts/rk3288.dtsi
-@@ -120,6 +120,32 @@
- 		//fifo-depth = <0x100>;
- 	};
- 
-+	sdio0: dwmmc at ff0d0000 {
-+		compatible = "rockchip,rk3288-dw-mshc";
-+		reg = <0xff0d0000 0x4000>;
-+		interrupts = <GIC_SPI 33 IRQ_TYPE_LEVEL_HIGH>;
-+		#address-cells = <1>;
-+		#size-cells = <0>;
-+
-+		clocks = <&cru HCLK_SDIO0>, <&cru SCLK_SDIO0>;
-+		clock-names = "biu", "ciu";
-+
-+		fifo-depth = <0x100>;
-+	};
-+
-+	sdio1: dwmmc at ff0e0000 {
-+		compatible = "rockchip,rk3288-dw-mshc";
-+		reg = <0xff0e0000 0x4000>;
-+		interrupts = <GIC_SPI 34 IRQ_TYPE_LEVEL_HIGH>;
-+		#address-cells = <1>;
-+		#size-cells = <0>;
-+
-+		clocks = <&cru HCLK_SDIO1>, <&cru SCLK_SDIO1>;
-+		clock-names = "biu", "ciu";
-+
-+		fifo-depth = <0x100>;
-+	};
-+
- 	emmc: dwmmc at ff0f0000 {
- 		compatible = "rockchip,rk3288-dw-mshc";
- 		reg = <0xff0f0000 0x4000>;
-@@ -589,6 +615,56 @@
- 			};
- 		};
- 
-+		sdio0 {
-+			sdio0_clk: sdio0-clk {
-+				rockchip,pins = <4 25 RK_FUNC_1 &pcfg_pull_none>;
-+			};
-+
-+			sdio0_cmd: sdio0-cmd {
-+				rockchip,pins = <4 24 RK_FUNC_1 &pcfg_pull_up>;
-+			};
-+
-+			sdio0_pwr: sdio0-pwr {
-+				rockchip,pins = <4 28 RK_FUNC_1 &pcfg_pull_up>;
-+			};
-+
-+			sdio0_bus1: sdio0-bus1 {
-+				rockchip,pins = <4 20 RK_FUNC_1 &pcfg_pull_up>;
-+			};
-+
-+			sdio0_bus4: sdio0-bus4 {
-+				rockchip,pins = <4 20 RK_FUNC_1 &pcfg_pull_up>,
-+						<4 21 RK_FUNC_1 &pcfg_pull_up>,
-+						<4 22 RK_FUNC_1 &pcfg_pull_up>,
-+						<4 23 RK_FUNC_1 &pcfg_pull_up>;
-+			};
-+		};
-+
-+		sdio1 {
-+			sdio1_clk: sdio1-clk {
-+				rockchip,pins = <4 7 RK_FUNC_4 &pcfg_pull_none>;
-+			};
-+
-+			sdio1_cmd: sdio1-cmd {
-+				rockchip,pins = <4 6 RK_FUNC_4 &pcfg_pull_up>;
-+			};
-+
-+			sdio1_pwr: sdio1-pwr {
-+				rockchip,pins = <4 9 RK_FUNC_4 &pcfg_pull_up>;
-+			};
-+
-+			sdio1_bus1: sdio1-bus1 {
-+				rockchip,pins = <4 24 RK_FUNC_4 &pcfg_pull_up>;
-+			};
-+
-+			sdio1_bus4: sdio1-bus4 {
-+				rockchip,pins = <3 24 RK_FUNC_4 &pcfg_pull_up>,
-+						<3 25 RK_FUNC_4 &pcfg_pull_up>,
-+						<3 26 RK_FUNC_4 &pcfg_pull_up>,
-+						<3 27 RK_FUNC_4 &pcfg_pull_up>;
-+			};
-+		};
-+
- 		emmc {
- 			emmc_clk: emmc-clk {
- 				rockchip,pins = <3 18 RK_FUNC_2 &pcfg_pull_none>;
--- 
-1.8.3.2
+Thierry Reding <thierry.reding@gmail.com> writes:
+
+> +Multiple-master IOMMU:
+> +----------------------
+> +
+> +       iommu {
+> +               /* the specifier represents the ID of the master */
+> +               #iommu-cells = <1>;
+> +       };
+> +
+> +       master at 1 {
+> +               /* device has master ID 42 in the IOMMU */
+> +               iommus = <&{/iommu} 42>;
+> +       };
+> +
+> +       master at 2 {
+> +               /* device has master IDs 23 and 24 in the IOMMU */
+> +               iommus = <&{/iommu} 23>, <&{/iommu} 24>;
+> +       };
+
+I think that this "master ID" will be parsed in IOMMU driver. For
+example, ARM,SMMU expects "streamID" as "master ID", right?
+
+If a SoC has a feature to configure to assign streamID to devices at
+runtime, "streamID" is not equal to "master ID".
+
+  iommus = <&{/smmu} "soc specific master ID">;
+
+"soc master ID" needs to be translated into "streamID" by SoC SW. It
+seems that ARM,SMMU kernel driver doesn't expect this kind of ID
+translation. If ARM,SMMU kernel driver is used as is, "soc master ID"
+would be incompatible? ARM,SMMU needs such translation before
+parsing. Is this my understanding right?
+
+If so I think that this master ID configuration/translation may be quite
+reasonable requirment for SoC using ARM,SMMU.
+
+Can we consider this ID translation within ARM,SMMU compatibility?
+
+IOW, is it possible to implement some SoC specific hook for ID
+translation/configuration in ARM,SMMU kernel driver?
