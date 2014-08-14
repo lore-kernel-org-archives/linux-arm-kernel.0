@@ -1,61 +1,39 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Thu, 14 Aug 2014 20:10:13 +0200
-Subject: [PATCH v2 1/3] arm64: spin-table: handle unmapped
- cpu-release-addrs
-In-Reply-To: <20140814171323.GH9039@arm.com>
-References: <CAKv+Gu_UjRNhhiM0GPsKRdXRtmEnY6cbpY-JZ33RUMapbPYsbQ@mail.gmail.com>
- <20140813125844.GE32644@leverpostej>
- <20140814171323.GH9039@arm.com>
-Message-ID: <CAKv+Gu9ftjZby+5U5Vs0hXhyFdNLwx4MwvC-LL=y3a9eSz34iQ@mail.gmail.com>
+From: pavel@denx.de (Pavel Machek)
+Date: Thu, 14 Aug 2014 20:47:12 +0200
+Subject: socfpga mmc (was Re: [GIT PULL] SOCFPGA DTS updates for 3.17)
+In-Reply-To: <53C4D874.2040206@samsung.com>
+References: <1405397216-909-1-git-send-email-dinguyen@altera.com>
+ <53C4D874.2040206@samsung.com>
+Message-ID: <20140814184710.GA11558@amd.pavel.ucw.cz>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 14 August 2014 19:13, Catalin Marinas <catalin.marinas@arm.com> wrote:
-> On Wed, Aug 13, 2014 at 01:58:45PM +0100, Mark Rutland wrote:
->> > With the 3.17 merge window not far from closing, is there anything we
->> > could still do this cycle to get $subject addressed?
->> > As I have indicated before, the newly introduced TEXT_OFFSET fuzzing
->> > may break APM Mustang if booting from UEFI (i.e., for low values of
->> > rand()), and as this option is recommended for distribution kernels,
->> > it could make apt-get update'ing your kernel a frustrating experience.
->> > However, the fix for that issue triggers the issue addressed by
->> > $subject.
->> >
->> > In my personal opinion, relaxing the requirements imposed on where
->> > your cpu-release-addr may live could remain a separate discussion. In
->> > the APM Mustang case, even when adhering to booting.txt by the letter
->> > (i.e., pu cpu-release-addr in a memreserved area in DRAM and load
->> > Image at a 2 meg boundary + TEXT_OFFSET), the kernel fails to bring up
->> > the secondaries if the cpu-release-addr is below the kernel.
->>
->> For the moment I would be happy with the patch as it stands (using
->> ioremap_cache).
->>
->> Catalin, Will?
->
-> Using ioremap_cache() sounds fine to me but I have to dig the original
-> patches as I've only been cc'ed in the middle of the thread (and that's
-> just for patch 1/3).
->
+Hi!
 
-http://marc.info/?l=linux-arm-kernel&m=140671806332258&w=2
-http://marc.info/?l=linux-arm-kernel&m=140671807532262&w=2
-http://marc.info/?l=linux-arm-kernel&m=140671807732263&w=2
+I tried booting kernel based on ba36899, and got:
 
-Patch 3/3 makes the EFI stub load Image at the lowest 2 meg boundary +
-TEXT_OFFSET instead of erroring out when base of DRAM + TEXT_OFFSET is
-occupied. This is necessary as the randomized TEXT_OFFSET could
-potentially conflict with reserved areas at the base of DRAM if a low
-value happens to be chosen.
+mmc0: new SDHC card at address b368                                             
+mmcblk0: mmc0:b368 USD   7.45 GiB                                               
+ mmcblk0: p1 p2 p3 p4                                                           
+VFS: Cannot open root device "mmcblk0p2" or unknown-block(0,0): error
+-6        
+Please append a correct "root=" boot option; here are the available
+partitions: 
+b300         7822336 mmcblk0  driver: mmcblk                                    
+  b301          102400 mmcblk0p1 00082434-01                                    
+  b302         1048576 mmcblk0p2 00082434-02                                    
+  b303            1024 mmcblk0p3 00082434-03                                    
+  b304         6086656 mmcblk0p4 00082434-04                                    
+Kernel panic - not syncing: VFS: Unable to mount root fs on
+unknown-block(0,0)  
+CPU: 0 PID: 1 Comm: swapper/0 Not tainted 3.16.0-11208-gef74117-dirty
+#2        
 
-Patch 1/3 fixes the resulting breakage on APM Mustang in bringing up
-the secondaries, as on that board in particular, the reserved area at
-the base of DRAM contains the holding pen, and loading Image higher up
-makes the mailbox inaccessible through the linear mapping hence the
-need for ioremap_cache()
+IIRC it worked ok in 3.16 in similar config. It may be stupid mistake,
+but if you know what I did wrong, I'd like to know... (-6 is ENXIO, so
+-- how can the device be there and not be there at the same time?)
 
-Patch 2/3 is also a fix for a potential issue on UEFI boot, but it is
-unrelated to 1/3 and 3/3
-
+									Pavel
 -- 
-Ard.
+(english) http://www.livejournal.com/~pavelmachek
+(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
