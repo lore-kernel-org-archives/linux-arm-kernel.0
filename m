@@ -1,69 +1,47 @@
-From: haojian.zhuang@linaro.org (Haojian Zhuang)
-Date: Thu, 14 Aug 2014 09:37:22 +0800
-Subject: [PATCH v19 2/8] ARM: hisi: enable MCPM implementation
-In-Reply-To: <alpine.LFD.2.11.1408131345160.1133@knanqh.ubzr>
-References: <1407912091-29866-1-git-send-email-haojian.zhuang@linaro.org>
- <alpine.LFD.2.11.1408131345160.1133@knanqh.ubzr>
-Message-ID: <CAD6h2NQmFK++j9FxB7JXs5RHtzy9FyKMMhvo1Ed2RzBUq4JjPw@mail.gmail.com>
+From: minchan@kernel.org (Minchan Kim)
+Date: Thu, 14 Aug 2014 10:53:31 +0900
+Subject: [PATCH v14 7/8] arm64: add pmd_[dirty|mkclean] for THP
+In-Reply-To: <1407981212-17818-1-git-send-email-minchan@kernel.org>
+References: <1407981212-17818-1-git-send-email-minchan@kernel.org>
+Message-ID: <1407981212-17818-8-git-send-email-minchan@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 14 August 2014 02:01, Nicolas Pitre <nicolas.pitre@linaro.org> wrote:
-> On Wed, 13 Aug 2014, Haojian Zhuang wrote:
->
->> +static int hip04_mcpm_wait_for_powerdown(unsigned int cpu, unsigned int cluster)
->> +{
->> +     unsigned int data, tries;
->> +
->> +     BUG_ON(cluster >= HIP04_MAX_CLUSTERS ||
->> +            cpu >= HIP04_MAX_CPUS_PER_CLUSTER);
->> +
->> +     spin_lock_irq(&boot_lock);
->> +     /*
->> +      * Target core should enter WFI first.
->> +      * Then cluster could be disabled in snoop filter.
->> +      * At last, target core could be reset.
->
-> Please add: "This is safe only against concurrent calls to
-> hip04_mcpm_power_up().  This is not safe with asynchronous CPU wake-ups
-> and therefore cannot be used to implement deep idle C-states."
->
+MADV_FREE needs pmd_dirty and pmd_mkclean for detecting recent
+overwrite of the contents since MADV_FREE syscall is called for
+THP page.
 
-Now I can move disabling snoop filter into power_down() after L2
-prefetch disabled. So I don't need the comment any more.
+This patch adds pmd_dirty and pmd_mkclean for THP page MADV_FREE
+support.
 
->> +      */
->> +     for (tries = 0; tries < MAX_TRIES; tries++) {
->> +             if (hip04_cpu_table[cluster][cpu])
->> +                     goto err;
->
-> I'd suggest returning a different error code in this case.
+Cc: Will Deacon <will.deacon@arm.com>
+Cc: Russell King <linux@arm.linux.org.uk>
+Cc: linux-arm-kernel at lists.infradead.org
+Cc: Steve Capper <steve.capper@linaro.org>
+Cc: Catalin Marinas <catalin.marinas@arm.com>
+Acked-by: Steve Capper <steve.capper@linaro.org>
+Acked-by: Catalin Marinas <catalin.marinas@arm.com>
+Signed-off-by: Minchan Kim <minchan@kernel.org>
+---
+ arch/arm64/include/asm/pgtable.h | 2 ++
+ 1 file changed, 2 insertions(+)
 
-OK. How about use EBUSY when the count in hipp04_cpu_table is set? And
-use ETIMEOUT when status result unmatch our expected value.
-
->
->> +             /*
->> +              * We'll meet kernel panic without delay. Maybe L2 is still
->> +              * in the process of clean.
->> +              * Since there's no command to clean L2 in Cortex A15. It
->> +              * seems that we need to disable MMU & C bit in target cpu.
->
-> That's what v7_exit_coherency_flush() does: disabling C bit and MMU on
-> the calling CPU.
-
-Just clarify that v7_exit_coherency_flush() disable C bit in SCTLR &
-SMP bit in ACTLR. MMU bit in SCTLR is always on. Otherwise, we need to
-calculate the PA, and jump to PA in this function.
-
->
-> Also, maybe you need to disable the L2 prefetching before disabling
-> the cache if those are
-> A15 cores.  See tc2_pm.c.
-
-After disabling the L2 prefetching, this issue is gone. So I don't
-need both delay & disabling snoop filter in wait_for_power_down().
-Great thanks for your help.
-
-Best Regards
-Haojian
+diff --git a/arch/arm64/include/asm/pgtable.h b/arch/arm64/include/asm/pgtable.h
+index ffe1ba0506d1..efb1b2fc4d39 100644
+--- a/arch/arm64/include/asm/pgtable.h
++++ b/arch/arm64/include/asm/pgtable.h
+@@ -259,10 +259,12 @@ static inline pmd_t pte_pmd(pte_t pte)
+ #endif
+ 
+ #define pmd_young(pmd)		pte_young(pmd_pte(pmd))
++#define pmd_dirty(pmd)		pte_dirty(pmd_pte(pmd))
+ #define pmd_wrprotect(pmd)	pte_pmd(pte_wrprotect(pmd_pte(pmd)))
+ #define pmd_mksplitting(pmd)	pte_pmd(pte_mkspecial(pmd_pte(pmd)))
+ #define pmd_mkold(pmd)		pte_pmd(pte_mkold(pmd_pte(pmd)))
+ #define pmd_mkwrite(pmd)	pte_pmd(pte_mkwrite(pmd_pte(pmd)))
++#define pmd_mkclean(pmd)	pte_pmd(pte_mkclean(pmd_pte(pmd)))
+ #define pmd_mkdirty(pmd)	pte_pmd(pte_mkdirty(pmd_pte(pmd)))
+ #define pmd_mkyoung(pmd)	pte_pmd(pte_mkyoung(pmd_pte(pmd)))
+ #define pmd_mknotpresent(pmd)	(__pmd(pmd_val(pmd) & ~PMD_TYPE_MASK))
+-- 
+2.0.0
