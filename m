@@ -1,49 +1,30 @@
 From: zonque@gmail.com (Daniel Mack)
-Date: Thu, 14 Aug 2014 11:40:24 +0200
-Subject: [PATCH] gpio: pxa: Documentation: provide example bindings for PXA3xx
-Message-ID: <1408009224-15838-1-git-send-email-zonque@gmail.com>
+Date: Thu, 14 Aug 2014 11:46:12 +0200
+Subject: [PATCH 1/2] ARM: pxa: dts: fix mmc controller compatible string
+Message-ID: <1408009573-24523-1-git-send-email-zonque@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add another example to describe bindings that work for PXA3xx boards.
+The vendor prefix was renamed from "mrvl" to "marvell". Follow this
+change in the dts file.
 
 Signed-off-by: Daniel Mack <zonque@gmail.com>
 ---
- Documentation/devicetree/bindings/gpio/mrvl-gpio.txt | 15 ++++++++++++++-
- 1 file changed, 14 insertions(+), 1 deletion(-)
+ arch/arm/boot/dts/pxa2xx.dtsi | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/Documentation/devicetree/bindings/gpio/mrvl-gpio.txt b/Documentation/devicetree/bindings/gpio/mrvl-gpio.txt
-index 6641626..b2afdb2 100644
---- a/Documentation/devicetree/bindings/gpio/mrvl-gpio.txt
-+++ b/Documentation/devicetree/bindings/gpio/mrvl-gpio.txt
-@@ -19,7 +19,7 @@ Required properties:
- - gpio-controller : Marks the device node as a gpio controller.
- - #gpio-cells : Should be one.  It is the pin number.
+diff --git a/arch/arm/boot/dts/pxa2xx.dtsi b/arch/arm/boot/dts/pxa2xx.dtsi
+index febd391..f188f8c 100644
+--- a/arch/arm/boot/dts/pxa2xx.dtsi
++++ b/arch/arm/boot/dts/pxa2xx.dtsi
+@@ -128,7 +128,7 @@
+ 		};
  
--Example:
-+Example for a MMP platform:
- 
- 	gpio: gpio at d4019000 {
- 		compatible = "marvell,mmp-gpio";
-@@ -32,6 +32,19 @@ Example:
- 		#interrupt-cells = <1>;
-       };
- 
-+Example for a PXA3xx platform:
-+
-+	gpio: gpio at 40e00000 {
-+		compatible = "intel,pxa3xx-gpio";
-+		reg = <0x40e00000 0x10000>;
-+		interrupt-names = "gpio0", "gpio1", "gpio_mux";
-+		interrupts = <8 9 10>;
-+		gpio-controller;
-+		#gpio-cells = <0x2>;
-+		interrupt-controller;
-+		#interrupt-cells = <0x2>;
-+	};
-+
- * Marvell Orion GPIO Controller
- 
- Required properties:
+ 		mmc0: mmc at 41100000 {
+-			compatible = "mrvl,pxa-mmc";
++			compatible = "marvell,pxa-mmc";
+ 			reg = <0x41100000 0x1000>;
+ 			interrupts = <23>;
+ 			dmas = <&dma 21
 -- 
 2.0.4
