@@ -1,47 +1,54 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Thu, 14 Aug 2014 20:57:16 +0100
-Subject: [PATCH] arm64: configs: Enable X-Gene SATA and ethernet in defconfig
-Message-ID: <1408046236-21005-1-git-send-email-broonie@kernel.org>
+From: dmitry.torokhov@gmail.com (Dmitry Torokhov)
+Date: Thu, 14 Aug 2014 13:09:36 -0700
+Subject: [PATCH] spi: rockchip: return 0 if tx_buf and rx_buf are NULL
+In-Reply-To: <1407977544-2989-1-git-send-email-addy.ke@rock-chips.com>
+References: <1407977544-2989-1-git-send-email-addy.ke@rock-chips.com>
+Message-ID: <20140814200936.GA13458@core.coreip.homeip.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Mark Brown <broonie@linaro.org>
+Hi Addy,
 
-Currently when run on an APM platform the ARMv8 defconfig has no viable
-options for rootfs other than ramdisk which is rather limiting. Since
-we already have both SATA and the bits needed for NFS root enabled we just
-need to enable the relevant drivers so do that, helping enable direct
-testing of upstream.
+On Thu, Aug 14, 2014 at 08:52:24AM +0800, Addy Ke wrote:
+> To do so, spi communication can use an empty buf to pull up CS.
+> 
+> This patch merged from ChromiumOS tree.
+> Cros_ec use this function to turn off CS and add a delay to ensure
+> the rising edge doesn't come too soon after the end of the data.
+> 
+> Tested-by: Doug Anderson <dianders@chromium.org>
+> Signed-off-by: Doug Anderson <dianders@chromium.org>
+> Signed-off-by: Addy Ke <addy.ke@rock-chips.com>
+> ---
+>  drivers/spi/spi-rockchip.c | 4 ++--
+>  1 file changed, 2 insertions(+), 2 deletions(-)
+> 
+> diff --git a/drivers/spi/spi-rockchip.c b/drivers/spi/spi-rockchip.c
+> index 72fb287..1e3bcfa 100644
+> --- a/drivers/spi/spi-rockchip.c
+> +++ b/drivers/spi/spi-rockchip.c
+> @@ -511,8 +511,8 @@ static int rockchip_spi_transfer_one(struct spi_master *master,
+>  	WARN_ON((readl_relaxed(rs->regs + ROCKCHIP_SPI_SR) & SR_BUSY));
+>  
+>  	if (!xfer->tx_buf && !xfer->rx_buf) {
+> -		dev_err(rs->dev, "No buffer for transfer\n");
+> -		return -EINVAL;
+> +		dev_dbg(rs->dev, "No buffer for transfer\n");
+> +		return 0;
+>  	}
 
-If the configuration ends up becoming too big we can consider modularising
-some of the drivers and asking people to use an initramfs but for now this
-is not an issue.
+Maybe we should only return 0 if xfer->len is also 0, otherwise keep
+complaining loudly?
 
-Signed-off-by: Mark Brown <broonie@linaro.org>
----
- arch/arm64/configs/defconfig | 3 +++
- 1 file changed, 3 insertions(+)
+	if (!xfer->tx_buf && !xfer->rx_buf) {
+		if (xfer->len == 0)
+			return 0;
 
-diff --git a/arch/arm64/configs/defconfig b/arch/arm64/configs/defconfig
-index 1e52b741d806..d92ef3c54161 100644
---- a/arch/arm64/configs/defconfig
-+++ b/arch/arm64/configs/defconfig
-@@ -64,6 +64,8 @@ CONFIG_VIRTIO_BLK=y
- CONFIG_BLK_DEV_SD=y
- # CONFIG_SCSI_LOWLEVEL is not set
- CONFIG_ATA=y
-+CONFIG_AHCI_XGENE=y
-+CONFIG_PHY_XGENE=y
- CONFIG_PATA_PLATFORM=y
- CONFIG_PATA_OF_PLATFORM=y
- CONFIG_NETDEVICES=y
-@@ -71,6 +73,7 @@ CONFIG_TUN=y
- CONFIG_VIRTIO_NET=y
- CONFIG_SMC91X=y
- CONFIG_SMSC911X=y
-+CONFIG_NET_XGENE=y
- # CONFIG_WLAN is not set
- CONFIG_INPUT_EVDEV=y
- # CONFIG_SERIO_SERPORT is not set
+		dev_err(rs->dev, "Missing transfer buffer\n");
+		return -EINVAL;
+	}
+
+Thanks.
+
 -- 
-2.0.1
+Dmitry
