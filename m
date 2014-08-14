@@ -1,31 +1,24 @@
-From: horms+renesas@verge.net.au (Simon Horman)
-Date: Fri, 15 Aug 2014 06:36:28 +0900
-Subject: [PATCH] ARM: shmobile: bockw: Do not disable SUSPEND in defconfig
-Message-ID: <1408052188-8551-1-git-send-email-horms+renesas@verge.net.au>
+From: davem@redhat.com (David Miller)
+Date: Thu, 14 Aug 2014 14:39:11 -0700 (PDT)
+Subject: [PATCH] net: xilinx: Remove .owner field for driver
+In-Reply-To: <a63aa03f310bb32779833fc905579458a34be6ce.1407930852.git.michal.simek@xilinx.com>
+References: <a63aa03f310bb32779833fc905579458a34be6ce.1407930852.git.michal.simek@xilinx.com>
+Message-ID: <20140814.143911.339730226328001321.davem@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-As of "ARM: shmobile: r8a7778: Add missing call to shmobile_init_late()"
-suspend-to-ram is now supported on the r8a7778 SoC and thus the bockw
-board.
+From: Michal Simek <michal.simek@xilinx.com>
+Date: Wed, 13 Aug 2014 13:54:22 +0200
 
-Cc: Geert Uytterhoeven <geert+renesas@glider.be>
-Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
----
- arch/arm/configs/bockw_defconfig | 1 -
- 1 file changed, 1 deletion(-)
+> There is no need to init .owner field.
+> 
+> Based on the patch from Peter Griffin <peter.griffin@linaro.org>
+> "mmc: remove .owner field for drivers using module_platform_driver"
+> 
+> This patch removes the superflous .owner field for drivers which
+> use the module_platform_driver API, as this is overriden in
+> platform_driver_register anyway."
+> 
+> Signed-off-by: Michal Simek <michal.simek@xilinx.com>
 
-diff --git a/arch/arm/configs/bockw_defconfig b/arch/arm/configs/bockw_defconfig
-index 70b3f45..1dde5da 100644
---- a/arch/arm/configs/bockw_defconfig
-+++ b/arch/arm/configs/bockw_defconfig
-@@ -29,7 +29,6 @@ CONFIG_ZBOOT_ROM_BSS=0x0
- CONFIG_ARM_APPENDED_DTB=y
- CONFIG_VFP=y
- # CONFIG_CORE_DUMP_DEFAULT_ELF_HEADERS is not set
--# CONFIG_SUSPEND is not set
- CONFIG_PM_RUNTIME=y
- CONFIG_NET=y
- CONFIG_PACKET=y
--- 
-2.0.1
+Applied.
