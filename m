@@ -1,53 +1,105 @@
-From: zonque@gmail.com (Daniel Mack)
-Date: Thu, 14 Aug 2014 10:35:00 +0200
-Subject: [PATCH 1/2] ARM: pxa: ssp: provide platform_device_id for PXA3xx
-In-Reply-To: <CAN1soZz0Fo_PNvc1dK7d9ZU49Pi0FortL4k1dwAjHEDZNcf_zg@mail.gmail.com>
-References: <1407959959-4977-1-git-send-email-zonque@gmail.com>
- <CAN1soZz0Fo_PNvc1dK7d9ZU49Pi0FortL4k1dwAjHEDZNcf_zg@mail.gmail.com>
-Message-ID: <53EC74B4.1050007@gmail.com>
+From: dgreid@chromium.org (Dylan Reid)
+Date: Thu, 14 Aug 2014 01:40:43 -0700
+Subject: [PATCH 1/2] ARM: tegra: add Acer Chromebook 13 device tree
+In-Reply-To: <53EBC2EC.1010300@wwwdotorg.org>
+References: <1407894967-18300-1-git-send-email-dgreid@chromium.org>
+ <53EB9BF0.9010002@wwwdotorg.org>
+ <CAEUnVG6ki9O5hzw9OvJ1+8Www_G1+rqXujmNyJy+qOP-z_JR=A@mail.gmail.com>
+ <53EBC2EC.1010300@wwwdotorg.org>
+Message-ID: <CAEUnVG4=Jr=L=0x1_MrYqNYvpL_2s3Fnicg0vME_k6NjAxREYQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Haojian,
-
-On 08/14/2014 04:08 AM, Haojian Zhuang wrote:
-> On Thu, Aug 14, 2014 at 3:59 AM, Daniel Mack <zonque@gmail.com> wrote:
->> Provide an explicit match string for PXA3xx SSP ports.
+On Wed, Aug 13, 2014 at 12:56 PM, Stephen Warren <swarren@wwwdotorg.org> wrote:
+> On 08/13/2014 01:07 PM, Dylan Reid wrote:
 >>
->> Signed-off-by: Daniel Mack <zonque@gmail.com>
->> ---
->>  arch/arm/plat-pxa/ssp.c | 1 +
->>  1 file changed, 1 insertion(+)
+>> On Wed, Aug 13, 2014 at 10:10 AM, Stephen Warren <swarren@wwwdotorg.org>
+>> wrote:
+>>>
+>>> On 08/12/2014 07:56 PM, Dylan Reid wrote:
+>>>>
+>>>>
+>>>> The Acer Chromebook 13, codenamed "Big", contains an NVIDIA tegra124
+>>>> processor and is similar to the Venice2 reference platform.
+>>>>
+>>>> The keyboard, USB 2, audio, HDMI, sdcard and emmc have been tested
+>>>> and work on the 1366x768 models.  I haven't tried on the HD systems
+>>>> yet.
+>>>>
+>>>> WiFi does not yet work, it needs at least some PMIC changes to enable
+>>>> the 32k clock.
+>>>>
+>>>> The elan trackpad is not yet functional but hopefully will be soon as
+>>>> there are patches under review.
+>>>>
+>>>> There is also an issue on reboot because the TPM isn't reset.  It will
+>>>> cause the stock firmware to enter recovery mode.  This can be worked
+>>>> around by an EC-reset, press refresh and power at the same time.
+>>>
+>>>
+>>>
+>>>> diff --git a/arch/arm/boot/dts/tegra124-big.dts
+>>>> b/arch/arm/boot/dts/tegra124-big.dts
+>>>
+>>>
+>>>
+>>> I think we need to include the SKU name in the filename and compatible
+>>> value
+>>> below, or at least plan out that for other SKUs, we'll add the SKU name
+>>> on.
+>>>
+>>>
+>>>> +/ {
+>>>> +       model = "Google Big";
+>>>> +       compatible = "google,nyan-big", "nvidia,tegra124";
+>>>
+>>>
+>>>
+>>> I think it'd be more user-friendly if the filename and compatible value
+>>> more
+>>> obviously tied to the end-user-visible product name.
 >>
->> diff --git a/arch/arm/plat-pxa/ssp.c b/arch/arm/plat-pxa/ssp.c
->> index 3ea0290..1f5ee17 100644
->> --- a/arch/arm/plat-pxa/ssp.c
->> +++ b/arch/arm/plat-pxa/ssp.c
->> @@ -258,6 +258,7 @@ static const struct platform_device_id ssp_id_table[] = {
->>         { "pxa25x-ssp",         PXA25x_SSP },
->>         { "pxa25x-nssp",        PXA25x_NSSP },
->>         { "pxa27x-ssp",         PXA27x_SSP },
->> +       { "pxa3xx-ssp",         PXA3xx_SSP },
->>         { "pxa168-ssp",         PXA168_SSP },
->>         { "pxa910-ssp",         PXA910_SSP },
->>         { },
->> --
+>>
+>> I'll change the model to "Acer Chromebook 13"
+>
+>
+> Would mentioning "CB5" in the model be a good idea; that's what it's sold
+> as.
 
-> I don't agree on this. SSP1,SSP2,SSP3 on pxa3xx are same with pxa27x.
-> So we reuse the name.
-> For the new SSP4, we create pxa3xx_device_ssp4.
+I am OK with either,  most of the press has referred to "Acer
+Chromebook 13" although the CB5-311 model number has showed up a few
+times too.
 
-Well, the problem is that the code in sound/soc/pxa/pxa-ssp.c is full of
-checks like "ssp->type == PXA3xx_SSP", but unless the devices are
-instantiated via DT, this value is never set appropriately, not even for
-ssp4.
-
-That's a regression caused by 972a55b62 ("ASoC: fix pxa-ssp compiling
-issue under mach-mmp"), btw, that added the PXA3xx_SSP enum value but
-forgot to make sure it is actually used.
-
-Hence, this commit could even get a stable tag for 3.5+.
-
-
-Thanks,
-Daniel
+>
+>
+>> If we need a separate DT for the FullHD skew, then can we add a file
+>> 'tegra124-nyan-big-full-hd.dtsi'?  We may also add
+>> 'tegra124-nyan-big-full-hd-touch.dtsi' as well.  They would just
+>> override the necessary things from this file.
+>
+>
+> *.dts rather than *.dtsi I suspect? Yes, having a common include file and
+> separate top-level files sounds like a good idea.
+>
+>
+>>>> +       gpio-keys {
+>>>> +               compatible = "gpio-keys";
+>>>> +
+>>>> +               lid {
+>>>> +                       label = "Lid";
+>>>> +                       gpios = <&gpio TEGRA_GPIO(R, 4)
+>>>> GPIO_ACTIVE_LOW>;
+>>>> +                       linux,input-type = <5>;
+>>>> +                       linux,code = <0>;
+>>>
+>>>
+>>>
+>>> Aren't there #defines for the 5 and 0 there?
+>>
+>>
+>> yes for code, apparently not for input-type.  I think 5 means EV_SW,
+>> maybe that should get added to include/dt-bindings/input somewhere?
+>
+>
+> Yes, that sounds like a good idea.
+>
