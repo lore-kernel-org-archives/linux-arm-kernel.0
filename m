@@ -1,40 +1,77 @@
-From: haojian.zhuang@gmail.com (Haojian Zhuang)
-Date: Thu, 14 Aug 2014 10:08:51 +0800
-Subject: [PATCH 1/2] ARM: pxa: ssp: provide platform_device_id for PXA3xx
-In-Reply-To: <1407959959-4977-1-git-send-email-zonque@gmail.com>
-References: <1407959959-4977-1-git-send-email-zonque@gmail.com>
-Message-ID: <CAN1soZz0Fo_PNvc1dK7d9ZU49Pi0FortL4k1dwAjHEDZNcf_zg@mail.gmail.com>
+From: nicolas.pitre@linaro.org (Nicolas Pitre)
+Date: Wed, 13 Aug 2014 22:11:59 -0400 (EDT)
+Subject: [PATCH v19 2/8] ARM: hisi: enable MCPM implementation
+In-Reply-To: <CAD6h2NQmFK++j9FxB7JXs5RHtzy9FyKMMhvo1Ed2RzBUq4JjPw@mail.gmail.com>
+References: <1407912091-29866-1-git-send-email-haojian.zhuang@linaro.org>
+ <alpine.LFD.2.11.1408131345160.1133@knanqh.ubzr>
+ <CAD6h2NQmFK++j9FxB7JXs5RHtzy9FyKMMhvo1Ed2RzBUq4JjPw@mail.gmail.com>
+Message-ID: <alpine.LFD.2.11.1408132209230.1133@knanqh.ubzr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Aug 14, 2014 at 3:59 AM, Daniel Mack <zonque@gmail.com> wrote:
-> Provide an explicit match string for PXA3xx SSP ports.
->
-> Signed-off-by: Daniel Mack <zonque@gmail.com>
-> ---
->  arch/arm/plat-pxa/ssp.c | 1 +
->  1 file changed, 1 insertion(+)
->
-> diff --git a/arch/arm/plat-pxa/ssp.c b/arch/arm/plat-pxa/ssp.c
-> index 3ea0290..1f5ee17 100644
-> --- a/arch/arm/plat-pxa/ssp.c
-> +++ b/arch/arm/plat-pxa/ssp.c
-> @@ -258,6 +258,7 @@ static const struct platform_device_id ssp_id_table[] = {
->         { "pxa25x-ssp",         PXA25x_SSP },
->         { "pxa25x-nssp",        PXA25x_NSSP },
->         { "pxa27x-ssp",         PXA27x_SSP },
-> +       { "pxa3xx-ssp",         PXA3xx_SSP },
->         { "pxa168-ssp",         PXA168_SSP },
->         { "pxa910-ssp",         PXA910_SSP },
->         { },
-> --
-> 2.0.4
->
-I don't agree on this. SSP1,SSP2,SSP3 on pxa3xx are same with pxa27x.
-So we reuse the name.
-For the new SSP4, we create pxa3xx_device_ssp4.
+On Thu, 14 Aug 2014, Haojian Zhuang wrote:
 
-We just want to reuse these code.
+> On 14 August 2014 02:01, Nicolas Pitre <nicolas.pitre@linaro.org> wrote:
+> > On Wed, 13 Aug 2014, Haojian Zhuang wrote:
+> >
+> >> +static int hip04_mcpm_wait_for_powerdown(unsigned int cpu, unsigned int cluster)
+> >> +{
+> >> +     unsigned int data, tries;
+> >> +
+> >> +     BUG_ON(cluster >= HIP04_MAX_CLUSTERS ||
+> >> +            cpu >= HIP04_MAX_CPUS_PER_CLUSTER);
+> >> +
+> >> +     spin_lock_irq(&boot_lock);
+> >> +     /*
+> >> +      * Target core should enter WFI first.
+> >> +      * Then cluster could be disabled in snoop filter.
+> >> +      * At last, target core could be reset.
+> >
+> > Please add: "This is safe only against concurrent calls to
+> > hip04_mcpm_power_up().  This is not safe with asynchronous CPU wake-ups
+> > and therefore cannot be used to implement deep idle C-states."
+> >
+> 
+> Now I can move disabling snoop filter into power_down() after L2
+> prefetch disabled. So I don't need the comment any more.
 
-Regards
-Haojian
+Good!  This is getting close.
+
+> >> +     for (tries = 0; tries < MAX_TRIES; tries++) {
+> >> +             if (hip04_cpu_table[cluster][cpu])
+> >> +                     goto err;
+> >
+> > I'd suggest returning a different error code in this case.
+> 
+> OK. How about use EBUSY when the count in hipp04_cpu_table is set? And
+> use ETIMEOUT when status result unmatch our expected value.
+
+Yes.
+
+> >> +             /*
+> >> +              * We'll meet kernel panic without delay. Maybe L2 is still
+> >> +              * in the process of clean.
+> >> +              * Since there's no command to clean L2 in Cortex A15. It
+> >> +              * seems that we need to disable MMU & C bit in target cpu.
+> >
+> > That's what v7_exit_coherency_flush() does: disabling C bit and MMU on
+> > the calling CPU.
+> 
+> Just clarify that v7_exit_coherency_flush() disable C bit in SCTLR &
+> SMP bit in ACTLR. MMU bit in SCTLR is always on. Otherwise, we need to
+> calculate the PA, and jump to PA in this function.
+
+You're right.  Sorry for the confusion.
+
+> > Also, maybe you need to disable the L2 prefetching before disabling
+> > the cache if those are
+> > A15 cores.  See tc2_pm.c.
+> 
+> After disabling the L2 prefetching, this issue is gone. So I don't
+> need both delay & disabling snoop filter in wait_for_power_down().
+> Great thanks for your help.
+
+Goodie.
+
+
+Nicolas
