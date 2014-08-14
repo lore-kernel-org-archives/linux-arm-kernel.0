@@ -1,314 +1,57 @@
-From: mpa@pengutronix.de (Markus Pargmann)
-Date: Thu, 14 Aug 2014 11:57:34 +0200
-Subject: [PATCH v3] watchdog: Add DA906x PMIC watchdog driver.
-In-Reply-To: <53EC487E.2000602@roeck-us.net>
-References: <1407926776-16700-1-git-send-email-mpa@pengutronix.de>
- <53EC487E.2000602@roeck-us.net>
-Message-ID: <20140814095733.GG17027@pengutronix.de>
+From: mkl@pengutronix.de (Marc Kleine-Budde)
+Date: Thu, 14 Aug 2014 12:04:51 +0200
+Subject: [PATCH v3 0/4] ARM: vf610: add FlexCAN support
+In-Reply-To: <53C532B0.9020507@pengutronix.de>
+References: <cover.1405428166.git.stefan@agner.ch>
+ <53C532B0.9020507@pengutronix.de>
+Message-ID: <53EC89C3.3070800@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Aug 13, 2014 at 10:26:22PM -0700, Guenter Roeck wrote:
-> On 08/13/2014 03:46 AM, Markus Pargmann wrote:
-> >From: Krystian Garbaciak <krystian.garbaciak@diasemi.com>
-> >
-> >This driver supports the watchdog device inside the DA906x PMIC.
-> >
-> >Signed-off-by: Krystian Garbaciak <krystian.garbaciak@diasemi.com>
-> >Signed-off-by: Philipp Zabel <p.zabel@pengutronix.de>
-> >Signed-off-by: Markus Pargmann <mpa@pengutronix.de>
+On 07/15/2014 03:54 PM, Marc Kleine-Budde wrote:
+> On 07/15/2014 02:56 PM, Stefan Agner wrote:
+>> This series adds support for Vybrid (aka vf610) to the FlexCAN
+>> controller and extends the device tree accordingly.
+>>
+>> Changes in v3:
+>> - Return error number in flexcan_get_berr_counter if clock enabling fails
+>> - Add the FLEXCANX_EN clocks as new clocks
+>>
+>> Changes in v2:
+>> - Split out patch (seperate dt, clocks and driver changes)
+>> - Use spaces for hardware feature flags table
+>> - Remove drive-by change of esdhc register length
+>> - Added related fix which enables clock in berr_counter
+>>
+>> Stefan Agner (4):
+>>   ARM: dts: vf610: add FlexCAN node
+>>   ARM: imx: clk-vf610: fix FlexCAN clock gating
+>>   can: flexcan: switch on clocks before accessing ecr register
+>>   can: flexcan: add vf610 support for FlexCAN
+>>
+>>  arch/arm/boot/dts/vf610.dtsi            | 23 +++++++++
+>>  arch/arm/mach-imx/clk-vf610.c           |  6 ++-
+>>  drivers/net/can/flexcan.c               | 91 +++++++++++++++++++++++++++++----
+>>  include/dt-bindings/clock/vf610-clock.h |  4 +-
+>>  4 files changed, 110 insertions(+), 14 deletions(-)
 > 
-> Couple of additional comments.
-> 
-> Guenter
-> 
-> >---
-> >  drivers/watchdog/Kconfig      |   7 ++
-> >  drivers/watchdog/Makefile     |   1 +
-> >  drivers/watchdog/da9063_wdt.c | 228 ++++++++++++++++++++++++++++++++++++++++++
-> >  3 files changed, 236 insertions(+)
-> >  create mode 100644 drivers/watchdog/da9063_wdt.c
-> >
-> >diff --git a/drivers/watchdog/Kconfig b/drivers/watchdog/Kconfig
-> >index c845527b503a..8d5c9b33552a 100644
-> >--- a/drivers/watchdog/Kconfig
-> >+++ b/drivers/watchdog/Kconfig
-> >@@ -87,6 +87,13 @@ config DA9055_WATCHDOG
-> >  	  This driver can also be built as a module.  If so, the module
-> >  	  will be called da9055_wdt.
-> >
-> >+config DA9063_WATCHDOG
-> >+	tristate "Dialog DA9063 Watchdog"
-> >+	depends on MFD_DA9063
-> >+	select WATCHDOG_CORE
-> >+	help
-> >+	  Support for the watchdog in the DA9063 PMIC.
-> >+
-> >  config GPIO_WATCHDOG
-> >  	tristate "Watchdog device controlled through GPIO-line"
-> >  	depends on OF_GPIO
-> >diff --git a/drivers/watchdog/Makefile b/drivers/watchdog/Makefile
-> >index 7b8a91ed20e7..ce4a7632d863 100644
-> >--- a/drivers/watchdog/Makefile
-> >+++ b/drivers/watchdog/Makefile
-> >@@ -172,6 +172,7 @@ obj-$(CONFIG_XEN_WDT) += xen_wdt.o
-> >  # Architecture Independent
-> >  obj-$(CONFIG_DA9052_WATCHDOG) += da9052_wdt.o
-> >  obj-$(CONFIG_DA9055_WATCHDOG) += da9055_wdt.o
-> >+obj-$(CONFIG_DA9063_WATCHDOG) += da9063_wdt.o
-> >  obj-$(CONFIG_GPIO_WATCHDOG)	+= gpio_wdt.o
-> >  obj-$(CONFIG_WM831X_WATCHDOG) += wm831x_wdt.o
-> >  obj-$(CONFIG_WM8350_WATCHDOG) += wm8350_wdt.o
-> >diff --git a/drivers/watchdog/da9063_wdt.c b/drivers/watchdog/da9063_wdt.c
-> >new file mode 100644
-> >index 000000000000..2b5ce564c4c1
-> >--- /dev/null
-> >+++ b/drivers/watchdog/da9063_wdt.c
-> >@@ -0,0 +1,228 @@
-> >+/*
-> >+ * Watchdog driver for DA9063 PMICs.
-> >+ *
-> >+ * Copyright(c) 2012 Dialog Semiconductor Ltd.
-> >+ *
-> >+ * Author: Mariusz Wojtasik <mariusz.wojtasik@diasemi.com>
-> >+ *
-> >+ * This program is free software; you can redistribute  it and/or modify it
-> >+ * under  the terms of  the GNU General  Public License as published by the
-> >+ * Free Software Foundation;  either version 2 of the  License, or (at your
-> >+ * option) any later version.
-> >+ */
-> >+
-> >+#include <linux/kernel.h>
-> >+#include <linux/module.h>
-> >+#include <linux/watchdog.h>
-> >+#include <linux/platform_device.h>
-> >+#include <linux/uaccess.h>
-> >+#include <linux/slab.h>
-> >+#include <linux/delay.h>
-> >+#include <linux/mfd/da9063/registers.h>
-> >+#include <linux/mfd/da9063/core.h>
-> >+#include <linux/regmap.h>
-> >+
-> >+/*
-> >+ * Watchdog selector to timeout in seconds.
-> >+ *   0: WDT disabled;
-> >+ *   others: timeout = 2048 ms * 2^(TWDSCALE-1).
-> >+ */
-> >+static const int wdt_timeout[] = { 0, 2, 4, 8, 16, 32, 65, 131 };
-> >+#define DA9063_TWDSCALE_DISABLE		0
-> >+#define DA9063_TWDSCALE_MIN		1
-> >+#define DA9063_TWDSCALE_MAX		(ARRAY_SIZE(wdt_timeout) - 1)
-> >+#define DA9063_WDT_MIN_TIMEOUT		wdt_timeout[DA9063_TWDSCALE_MIN]
-> >+#define DA9063_WDT_MAX_TIMEOUT		wdt_timeout[DA9063_TWDSCALE_MAX]
-> >+#define DA9063_WDG_TIMEOUT		wdt_timeout[3]
-> >+
-> >+struct da9063_watchdog {
-> >+	struct da9063 *da9063;
-> >+	struct watchdog_device wdtdev;
-> >+	struct mutex lock;
-> >+};
-> >+
-> >+static int da9063_wdt_timeout_to_sel(int secs)
-> >+{
-> >+	int i;
-> >+
-> >+	for (i = DA9063_TWDSCALE_MIN; i <= DA9063_TWDSCALE_MAX; i++) {
-> >+		if (wdt_timeout[i] >= secs)
-> >+			return i;
-> >+	}
-> >+
-> >+	return -EINVAL;
-> >+}
-> >+
-> >+static int da9063_wdt_disable(struct da9063 *da9063)
-> >+{
-> >+	return regmap_update_bits(da9063->regmap, DA9063_REG_CONTROL_D,
-> >+			DA9063_TWDSCALE_MASK,
-> >+			DA9063_TWDSCALE_DISABLE);
-> >+}
-> >+
-> >+static int _da9063_wdt_set_timeout(struct da9063 *da9063, unsigned int regval)
-> >+{
-> >+	return regmap_update_bits(da9063->regmap, DA9063_REG_CONTROL_D,
-> >+			DA9063_TWDSCALE_MASK, regval);
-> >+}
-> >+
-> >+static int _da9063_wdt_kick(struct da9063 *da9063)
-> >+{
-> >+	return regmap_write(da9063->regmap, DA9063_REG_CONTROL_F,
-> >+			DA9063_WATCHDOG);
-> >+}
-> >+
-> >+static int da9063_wdt_start(struct watchdog_device *wdd)
-> >+{
-> >+	struct da9063_watchdog *wdt = watchdog_get_drvdata(wdd);
-> >+	unsigned int selector;
-> >+	int ret = 0;
-> 
-> Unnecessary initialization.
+> I'm taking patch 3+4 via the linux-can-next tree.
 
-Thanks, I fixed all these initializations.
-> 
-> >+
-> >+	mutex_lock(&wdt->lock);
-> >+	selector = da9063_wdt_timeout_to_sel(wdt->wdtdev.timeout);
-> >+	if (selector < 0) {
-> >+		dev_err(wdt->da9063->dev, "Timeout out of range (timeout=%d)\n",
-> >+				wdt->wdtdev.timeout);
-> >+		return selector;
-> 
-> That only works if you move the lock further down, which should be ok.
-> Otherwise you'll need to assign the return code to ret and jump to
-> the unlock below.
-
-Yes, moved.
-
-> 
-> >+	}
-> >+
-> >+	ret = _da9063_wdt_set_timeout(wdt->da9063, selector);
-> >+	if (ret) {
-> >+		dev_err(wdt->da9063->dev, "Watchdog failed to start (err = %d)\n",
-> >+				ret);
-> >+	}
-> >+	mutex_unlock(&wdt->lock);
-> >+
-> >+	return ret;
-> >+}
-> >+
-> >+static int da9063_wdt_stop(struct watchdog_device *wdd)
-> >+{
-> >+	struct da9063_watchdog *wdt = watchdog_get_drvdata(wdd);
-> >+	int ret = 0;
-> 
-> Unnecessary initialization.
-> 
-> >+
-> >+	mutex_lock(&wdt->lock);
-> >+	ret = da9063_wdt_disable(wdt->da9063);
-> >+	if (ret)
-> >+		dev_alert(wdt->da9063->dev,
-> >+			  "Watchdog failed to stop (err = %d)\n", ret);
-> >+	mutex_unlock(&wdt->lock);
-> >+
-> >+	return ret;
-> >+}
-> >+
-> >+static int da9063_wdt_ping(struct watchdog_device *wdd)
-> >+{
-> >+	struct da9063_watchdog *wdt = watchdog_get_drvdata(wdd);
-> >+	int ret = 0;
-> >+
-> Unnecessary initialization.
-> 
-> >+	mutex_lock(&wdt->lock);
-> >+	ret = _da9063_wdt_kick(wdt->da9063);
-> >+	if (ret)
-> >+		dev_alert(wdt->da9063->dev, "Failed to ping the watchdog (err = %d)\n",
-> >+				ret);
-> >+	mutex_unlock(&wdt->lock);
-> >+
-> >+	return ret;
-> >+}
-> >+
-> >+static int da9063_wdt_set_timeout(struct watchdog_device *wdd,
-> >+							unsigned int timeout)
-> 
-> Sometimes it seems to me people go through great pains not to follow Linux
-> indentation rules, and use the "as many different indentations as possible"
-> rule instead ;-). No, I am not enforcing it; that would be up to Wim if he cares.
-
-I fixed this indentation to the same style as the rest of the driver.
-
-> 
-> >+{
-> >+	struct da9063_watchdog *wdt = watchdog_get_drvdata(wdd);
-> >+	unsigned int selector;
-> >+	int ret;
-> >+
-> >+	selector = da9063_wdt_timeout_to_sel(timeout);
-> >+	if (selector < 0) {
-> >+		dev_err(wdt->da9063->dev, "Unsupported watchdog timeout, should be between 2 and 131\n");
-> >+		return -EINVAL;
-> >+	}
-> >+
-> >+	mutex_lock(&wdt->lock);
-> >+
-> >+	ret = _da9063_wdt_set_timeout(wdt->da9063, selector);
-> >+	if (ret)
-> >+		dev_err(wdt->da9063->dev, "Failed to set watchdog timeout (err = %d)\n",
-> >+				ret);
-> >+	else
-> >+		wdd->timeout = wdt_timeout[selector];
-> >+
-> >+	mutex_unlock(&wdt->lock);
-> >+
-> >+	return ret;
-> >+}
-> >+
-> >+static const struct watchdog_info da9063_watchdog_info = {
-> >+	.options = WDIOF_SETTIMEOUT | WDIOF_KEEPALIVEPING,
-> >+	.identity = "DA9063 Watchdog",
-> >+};
-> >+
-> >+static const struct watchdog_ops da9063_watchdog_ops = {
-> >+	.owner = THIS_MODULE,
-> >+	.start = da9063_wdt_start,
-> >+	.stop = da9063_wdt_stop,
-> >+	.ping = da9063_wdt_ping,
-> >+	.set_timeout = da9063_wdt_set_timeout,
-> >+};
-> >+
-> >+static int da9063_wdt_probe(struct platform_device *pdev)
-> >+{
-> >+	int ret;
-> >+	struct da9063 *da9063 = dev_get_drvdata(pdev->dev.parent);
-> >+	struct da9063_watchdog *wdt;
-> >+
-> >+	if (!da9063)
-> >+		return -EPROBE_DEFER;
-> 
-> Can this ever happen ? Isn't this driver instantiated from its parent,
-> which would ensure that the parent's driver data is set ?
-
-No this can't happen. I replaced it with BUG_ON and also introduced a
-BUG_ON check for dev.parent.
-
-> 
-> >+
-> >+	wdt = devm_kzalloc(&pdev->dev, sizeof(*wdt), GFP_KERNEL);
-> >+	if (!wdt)
-> >+		return -ENOMEM;
-> >+
-> >+	wdt->da9063 = da9063;
-> >+	mutex_init(&wdt->lock);
-> >+
-> >+	wdt->wdtdev.info = &da9063_watchdog_info;
-> >+	wdt->wdtdev.ops = &da9063_watchdog_ops;
-> >+	wdt->wdtdev.min_timeout = DA9063_WDT_MIN_TIMEOUT;
-> >+	wdt->wdtdev.max_timeout = DA9063_WDT_MAX_TIMEOUT;
-> >+	wdt->wdtdev.timeout = DA9063_WDG_TIMEOUT;
-> >+
-> >+	if (IS_ENABLED(CONFIG_WATCHDOG_NOWAYOUT))
-> >+		wdt->wdtdev.status = WATCHDOG_NOWAYOUT_INIT_STATUS;
-> 
-> You don't need the if() here. That is embedded in WATCHDOG_NOWAYOUT_INIT_STATUS.
-
-Removed.
+Applied to linux-can-next, with the modified version of the 3/4.
 
 Thanks,
-
-Markus
+Marc
 
 -- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+Pengutronix e.K.                  | Marc Kleine-Budde           |
+Industrial Linux Solutions        | Phone: +49-231-2826-924     |
+Vertretung West/Dortmund          | Fax:   +49-5121-206917-5555 |
+Amtsgericht Hildesheim, HRA 2686  | http://www.pengutronix.de   |
+
 -------------- next part --------------
 A non-text attachment was scrubbed...
 Name: signature.asc
 Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140814/0c823e14/attachment-0001.sig>
+Size: 181 bytes
+Desc: OpenPGP digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140814/f104fc15/attachment.sig>
