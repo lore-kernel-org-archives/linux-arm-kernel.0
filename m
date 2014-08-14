@@ -1,132 +1,118 @@
-From: daniel.thompson@linaro.org (Daniel Thompson)
-Date: Thu, 14 Aug 2014 16:02:10 +0100
-Subject: [PATCH v8 4/4] ARM: Add KGDB/KDB FIQ debugger generic code
-In-Reply-To: <20140814123655.GT30401@n2100.arm.linux.org.uk>
-References: <1404118391-3850-1-git-send-email-daniel.thompson@linaro.org>
- <1404979427-12943-1-git-send-email-daniel.thompson@linaro.org>
- <1404979427-12943-5-git-send-email-daniel.thompson@linaro.org>
- <20140813214525.GQ30401@n2100.arm.linux.org.uk> <53EC9404.5010908@linaro.org>
- <20140814123655.GT30401@n2100.arm.linux.org.uk>
-Message-ID: <53ECCF72.5050102@linaro.org>
+From: grygorii.strashko@ti.com (Grygorii Strashko)
+Date: Thu, 14 Aug 2014 18:57:08 +0300
+Subject: [PATCH 4/4] ARM: dts: keystone-k2hk: add dsp gpio controllers
+ nodes
+In-Reply-To: <1408018321.928492982@f270.i.mail.ru>
+References: <1407946582-20927-1-git-send-email-grygorii.strashko@ti.com>
+ <1407945984.545232249@f170.i.mail.ru> <53ECA7F3.7030702@ti.com>
+ <1408018321.928492982@f270.i.mail.ru>
+Message-ID: <53ECDC54.3060005@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 14/08/14 13:36, Russell King - ARM Linux wrote:
-> On Thu, Aug 14, 2014 at 11:48:36AM +0100, Daniel Thompson wrote:
->> Don't worry, you certainly did make it clear!
+On 08/14/2014 03:12 PM, Alexander Shiyan wrote:
+> Thu, 14 Aug 2014 15:13:39 +0300 ?? Grygorii Strashko <grygorii.strashko@ti.com>:
+>> Hi Alexander,
 >>
->> I actually went as far as removing the trace_* calls before having a
->> change of heart. As a result I spent some time looking at the
->> trace_hardirqs_on() code and, as far as I remember, I couldn't find a
->> lock in the code that wasn't bypassed when in_nmi() returned true.
+>> On 08/13/2014 07:06 PM, Alexander Shiyan wrote:
+>>> Wed, 13 Aug 2014 19:16:22 +0300 ?? Grygorii Strashko <grygorii.strashko@ti.com>:
+>>>> Add Keystone 2 DSP GPIO nodes.
+>>>> DSP GPIO banks 0-7 correspond to DSP0-DSP7
+>>>>
+>>>> Signed-off-by: Grygorii Strashko <grygorii.strashko@ti.com>
+>>>> ---
+>>>>    arch/arm/boot/dts/k2hk.dtsi |   56 +++++++++++++++++++++++++++++++++++++++++++
+>>>>    1 file changed, 56 insertions(+)
+>>>>
+>>>> diff --git a/arch/arm/boot/dts/k2hk.dtsi b/arch/arm/boot/dts/k2hk.dtsi
+>>>> index 321ba2f..009e180 100644
+>>>> --- a/arch/arm/boot/dts/k2hk.dtsi
+>>>> +++ b/arch/arm/boot/dts/k2hk.dtsi
+>>>> @@ -50,5 +50,61 @@
+>>>>    			#interrupt-cells = <1>;
+>>>>    			ti,syscon-dev = <&devctrl 0x2a0>;
+>>>>    		};
+>>>> +
+>>>> +		dspgpio0: keystone_dsp_gpio at 02620240 {
+>>>> +			compatible = "ti,keystone-mctrl-gpio";
+>>>> +			gpio-controller;
+>>>> +			#gpio-cells = <2>;
+>>>> +			gpio,syscon-dev = <&devctrl 0x240>;
+>>>> +		};
+>>>> +
+>>>> +		dspgpio1: keystone_dsp_gpio at 2620244 {
+>>>> +			compatible = "ti,keystone-mctrl-gpio";
+>>>> +			gpio-controller;
+>>>> +			#gpio-cells = <2>;
+>>>> +			gpio,syscon-dev = <&devctrl 0x244>;
+>>>> +		};
+>>> ...
+>>>> +		dspgpio7: keystone_dsp_gpio at 262025C {
+>>>> +			compatible = "ti,keystone-mctrl-gpio";
+>>>> +			gpio-controller;
+>>>> +			#gpio-cells = <2>;
+>>>> +			gpio,syscon-dev = <&devctrl 0x25c>;
+>>>> +		};
+>>>
+>>> So, devctrl is a syscon device and this DTS introduce several
+>>> identical GPIO descriptions?
+>>>
+>>> On my opinion this should be placed in the gpio-syscon.c,
+>>> where you can add support for ti,keystone-dsp0{..7}-gpio.
+>>> Such change will avoid parts 2 and 3 of this patch.
+>>>
+>>> static const struct syscon_gpio_data ti_keystone_dsp0_gpio = {
+>>>     .compatible = "ti,keystone-syscon",
+>>>     .dat_bit_offset = 0x240 * 8,
+>>>     ...
+>>>     .set = etc...
+>>> };
 >>
->> However the code is pretty complex and its certainly possible that I
->> missed something. Are you in a position to point any particular lock to
->> show I messed this up or are you working from memory?
+>> So, if I understand you right, you propose to add 8 additional compatible
+>> strings just to encode different register offsets. Is it?
+>> 1) add "ti,keystone-mctrl-gpio0"..."ti,keystone-mctrl-gpio7"
 > 
-> The complexity alone is an argument against calling it from FIQ context,
-> because there's no guarantee that what's there will stay that way.
+> Yes, but replace "mctrl" with "dsp" since mctrl is not applicable here.
 > 
-> trace_hardirqs_on() is made more complex because there's not one function
-> with that name, but two.  One is in the trace code, the other is in the
-> lockdep code.  Here's the trace code, which has at least two problems:
-> 
-> trace_hardirqs_on
->  -> stop_critical_timing
->   -> check_critical_timing
->    -> raw_spin_lock_irqsave(&max_trace_lock, flags);
->    -> __trace_stack
->     -> __ftrace_trace_stack
->      -> save_stack_trace
->       -> __save_stack_trace
->        -> walk_stackframe
->         -> unwind_frame
->          -> unwind_find_idx
->           -> spin_lock_irqsave(&unwind_lock, flags);
-
-Looks like I had an out-by-one error when reviewing this... sadly the
-value was boolean.
-
-Thanks this is very clear.
-
-
->>> So, how about moving the FIQ assembly code to entry-armv.S and making
->>> it less kgdb specific?  (Though... we do want to keep a /very/ close
->>> eye on users to ensure that they don't do silly stuff with locking.)
+>> 2) add 8 structures keystone_mctrl_gpio0..keystone_mctrl_gpio7 in gpio-syscon.c
+>>     (which will have only different values of field - .dat_bit_offset = 0x2yy * 8,)
 >>
->> I think I can do that.
+>> 3) add 8 additional items in array syscon_gpio_ids
+>> 	{
+>> 		.compatible	= "ti,keystone-mctrl-gpio0",
+>> 		.data		= &keystone_mctrl_gpio0,
+>> 	}, ...
 >>
->> Something like this?
->>
->> 1. Install the current trap handler code by default (either with or
->>    without trace_* calls).
+>> I can do it if you strictly insist, BUT I don't like it :(
+>> - just imagine how your driver will look look like if 5 or 6 SoCs will re-use it ;)
+>> - as I mentioned in cover letter and commit messages even each SoC revision can have
+>>    different Syscon implementation with different registers offsets and with different
+>>    number of Syscon register ranges (for example for Keystone 2 we already have two
+>>    Syscon devices defined in DT).
 > 
-> Without trace_* calls.  The FIQ should be transparent to tracing -
-> tracing and lockdep is too much of an unknown (due to size and
-> complexity) to ensure that it always follows the rules.
+> The initial version of this driver contains addresses and offsets in, but this approach has
+> been criticized by DT maintainers.
 
-Will do.
+Could you provide link on this thread^, pls?
 
+Curious, it looks like Rob Herring has just proposed to encode offsets & bits in DT:
+"Re: [PATCH 2/6] leds: add device tree bindings for syscon LEDs"
+http://www.spinics.net/lists/arm-kernel/msg354182.html
 
->> 2. Have default trap handler call an RCU notifier chain to allow it to
->>    hook up with "normal" code without any hard coding (kgdb, IPI
->>    handling, etc)
 > 
-> Maybe... that sounds like it opens up FIQ for general purpose use which
-> is something I want to avoid - I've little motivation to ensure that
-> everyone plays by the rules.  Given the choice, I'd rather maintain our
-> present stance that using FIQs is hard and requires a lot of thought.
-
-I'll see what feels natural. Not exporting the symbol to register for
-notification would go some way to preventing abuse whilst still allowing
-decoupling from kgdb (which cannot be a module).
-
-
->> 3. Retain existing install_fiq() behaviour for people who want FIQ
->>    to be a fast-interrupt rather than an NMI (for example, the
->>    Raspberry pi USB optimizations).
+> "different Syscon with different registers" - is OK, since we use compatible string in definition.
+> If you have two identical syscon, just append an unique additional string and use it in this driver.
 > 
-> Yes, arch/arm/kernel/fiq.c should be relatively untouched by the core
-> mods I suggested - we're just replacing the default "subs" instruction
-> (which just ignores the FIQ) with something which can do something
-> with it.
+>> Now we already have 3 Keystone 2 SoC revisions (K2HK, K2L, K2E)  and there are no guarantee
+>> that the next revision k2X will have the same register offset for GPIO0.
 > 
-> It should be noted that using arch/arm/kernel/fiq.c would override this
-> default FIQ handler - and that's a feature of it - fiq.c is based on
-> the premise that there is only one single owner of the FIQ at any one
-> time and there is no sharing of it, and that's something we want to
-> retain.
+> Then use more exact string for syscon-gpio, like ti,keystone-k2hk-dsp-gpio0.
 
-However, particularly for IPIs, if we've build useful debug features
-using them it would be nice to provide hooks that the owner can use to
-keep them working if they wish.
+Nothing to say :) - DT is funny thing. It has such good feature as phandle, but
+people continue hard-coding relation between HW blocks in code :(
 
-However I agree with your response to #4; interfacing at a level lower
-than C ABI isn't right. To use any hooks the owner must first make it
-safe to call C.
+Any way, Thanks for your comments. I'll wait a bit then update and resend.
 
 
->> 4. Ensure default handler is an exported symbol to allow the meths
->>    drinkers from #3 to chain to logic for NMI/debug features
->>    if they want to.
-> 
-> That's not something I particularly want to permit - especially as the
-> requirements for each "handler" are different - this new default code
-> relies upon r13 pointing at some storage to save some registers, which
-> may not be true of other FIQ handlers.  Chaining it means that we
-> force that use of r13 on others, and we then have to also come up with
-> some way to export the correct r13 value.
-> 
-> Given that fiq.c doesn't work with SMP, this isn't something I want to
-> encourage.
-
-Makes sense.
-
-
-> Further more, I can't get excited about Raspberry Pi "optimisations"
-> using FIQ until I see the code, and I see no reason to think about
-> catering for such stuff until the patches become visible here.
-
-IIRC they don't add any use-cases beyond the existing in-kernel FIQ
-users (such as R-PC floppy disc). It's just that they do it on more
-recent hardware (and as you say, out-of-tree).
+Best regards,
+-grygorii
