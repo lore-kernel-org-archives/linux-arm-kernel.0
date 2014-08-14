@@ -1,19 +1,28 @@
 From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Thu, 14 Aug 2014 13:51:43 +0100
-Subject: [PATCH] ARM: Use 'model' property to set machine_name from
- Device Tree
-In-Reply-To: <1404697991-32191-1-git-send-email-cw00.choi@samsung.com>
-References: <1404697991-32191-1-git-send-email-cw00.choi@samsung.com>
-Message-ID: <20140814125143.GC9039@arm.com>
+Date: Thu, 14 Aug 2014 13:58:24 +0100
+Subject: [PATCH v7 07/11] arm64: mm: Implement 4 levels of translation
+ tables
+In-Reply-To: <CAFpQJXU_8HTaL5s+gyZKA7F6HS_jeAfOrEwahEe0P-EKo1FaHA@mail.gmail.com>
+References: <CAGoO6fLT6B_vx+Wtm6bKHD6YkjQcM8f=deD7SDP3BR_uC+1c5w@mail.gmail.com>
+ <ACF42928-55EE-4466-B217-982839BB98C4@gmail.com>
+ <53D7AD7A.8050706@amd.com>
+ <9DF712F2-52EB-412B-9E6F-41FC8212AE1F@gmail.com>
+ <CAFpQJXU_8HTaL5s+gyZKA7F6HS_jeAfOrEwahEe0P-EKo1FaHA@mail.gmail.com>
+Message-ID: <20140814125823.GD9039@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jul 07, 2014 at 02:53:11AM +0100, Chanwoo Choi wrote:
-> This patch use 'model' property from Device Tree to set machine_name.
-> The arm64 has already got the machine_name from Device Tree.
+On Thu, Aug 14, 2014 at 12:42:12PM +0100, Ganapatrao Kulkarni wrote:
+> IMHO, the Macro MAX_PHYSMEM_BITS needs to be set to 48 in file
+> arch/arm64/include/asm/sparsemem.h
+> 
+> with 40 bit set, for RAM address beyond 40 bit,  seeeing below warning message.
+> WARNING: CPU: 0 PID: 0 at mm/sparse.c:164
+> mminit_validate_memmodel_limits+0xf8/0x118()
 
-FWIW, we removed this entirely from arm64 (see commit d7a49086f2 "arm64:
-cpuinfo: print info for all CPUs").
+I agree. Would you mind sending a patch?
+
+Thanks.
 
 -- 
 Catalin
