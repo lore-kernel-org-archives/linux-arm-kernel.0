@@ -1,106 +1,95 @@
 From: dyoung@redhat.com (Dave Young)
-Date: Thu, 14 Aug 2014 17:15:27 +0800
-Subject: [PATCH 2/7] Add a generic cmdline parse function parse_option_str
-In-Reply-To: <1408007731-15081-1-git-send-email-dyoung@redhat.com>
-References: <1408007731-15081-1-git-send-email-dyoung@redhat.com>
-Message-ID: <1408007731-15081-2-git-send-email-dyoung@redhat.com>
+Date: Thu, 14 Aug 2014 17:15:26 +0800
+Subject: [PATCH 1/7] efi: move noefi early param code out of x86 arch code
+Message-ID: <1408007731-15081-1-git-send-email-dyoung@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-There should be a generic function to parse params like a=b,c
-Adding parse_option_str in lib/cmdline.c which will return true
-if there's specified option set in the params.
-
-Also updated efi=old_map parsing code to use the new function
+noefi param can be used for arches other than X86 later, thus move it out of
+x86 platform code.
 
 Signed-off-by: Dave Young <dyoung@redhat.com>
 ---
- arch/x86/platform/efi/efi.c | 22 ++--------------------
- include/linux/kernel.h      |  1 +
- lib/cmdline.c               | 29 +++++++++++++++++++++++++++++
- 3 files changed, 32 insertions(+), 20 deletions(-)
+ Documentation/kernel-parameters.txt |  2 +-
+ arch/x86/platform/efi/efi.c         | 10 +---------
+ drivers/firmware/efi/efi.c          | 13 +++++++++++++
+ include/linux/efi.h                 |  1 +
+ 4 files changed, 16 insertions(+), 10 deletions(-)
 
+diff --git a/Documentation/kernel-parameters.txt b/Documentation/kernel-parameters.txt
+index 7c5fc8e..31c50c1 100644
+--- a/Documentation/kernel-parameters.txt
++++ b/Documentation/kernel-parameters.txt
+@@ -2132,7 +2132,7 @@ bytes respectively. Such letter suffixes can also be entirely omitted.
+ 
+ 	nodsp		[SH] Disable hardware DSP at boot time.
+ 
+-	noefi		[X86] Disable EFI runtime services support.
++	noefi		Disable EFI runtime services support.
+ 
+ 	noexec		[IA-64]
+ 
 diff --git a/arch/x86/platform/efi/efi.c b/arch/x86/platform/efi/efi.c
-index c90d3cd..c73a7df5 100644
+index a1f745b..c90d3cd 100644
 --- a/arch/x86/platform/efi/efi.c
 +++ b/arch/x86/platform/efi/efi.c
-@@ -932,26 +932,8 @@ u64 efi_mem_attributes(unsigned long phys_addr)
+@@ -70,14 +70,6 @@ static efi_config_table_type_t arch_tables[] __initdata = {
  
- static int __init parse_efi_cmdline(char *str)
- {
--	if (*str == '=')
--		str++;
--
--	while (*str) {
--		if (!strncmp(str, "old_map", 7)) {
--			set_bit(EFI_OLD_MEMMAP, &efi.flags);
--			str += strlen("old_map");
--		}
--
--		/*
--		 * Skip any options we don't understand. Presumably
--		 * they apply to the EFI boot stub.
--		 */
--		while (*str && *str != ',')
--			str++;
--
--		/* If we hit a delimiter, skip it */
--		if (*str == ',')
--			str++;
--	}
-+	if (parse_option_str(str, "old_map"))
-+		set_bit(EFI_OLD_MEMMAP, &efi.flags);
+ u64 efi_setup;		/* efi setup_data physical address */
  
- 	return 0;
- }
-diff --git a/include/linux/kernel.h b/include/linux/kernel.h
-index 4c52907..d612718 100644
---- a/include/linux/kernel.h
-+++ b/include/linux/kernel.h
-@@ -407,6 +407,7 @@ int vsscanf(const char *, const char *, va_list);
- extern int get_option(char **str, int *pint);
- extern char *get_options(const char *str, int nints, int *ints);
- extern unsigned long long memparse(const char *ptr, char **retptr);
-+extern bool parse_option_str(const char *str, const char *option);
+-static bool disable_runtime __initdata = false;
+-static int __init setup_noefi(char *arg)
+-{
+-	disable_runtime = true;
+-	return 0;
+-}
+-early_param("noefi", setup_noefi);
+-
+ int add_efi_memmap;
+ EXPORT_SYMBOL(add_efi_memmap);
  
- extern int core_kernel_text(unsigned long addr);
- extern int core_kernel_data(unsigned long addr);
-diff --git a/lib/cmdline.c b/lib/cmdline.c
-index d4932f7..7f1a182 100644
---- a/lib/cmdline.c
-+++ b/lib/cmdline.c
-@@ -155,3 +155,32 @@ unsigned long long memparse(const char *ptr, char **retptr)
- 	return ret;
- }
- EXPORT_SYMBOL(memparse);
-+
-+/**
-+ *	parse_option_str - Parse a string and check an option is set or not
-+ *	@str: String to be parsed
-+ *	@option: option name
-+ *
-+ *	This function parses a string containing a comma-separated list of
-+ *	strings like a=b,c.
-+ *
-+ *	Return true if there's such option in the string, or return false.
-+ */
-+bool parse_option_str(const char *str, const char *option)
+@@ -492,7 +484,7 @@ void __init efi_init(void)
+ 	if (!efi_runtime_supported())
+ 		pr_info("No EFI runtime due to 32/64-bit mismatch with kernel\n");
+ 	else {
+-		if (disable_runtime || efi_runtime_init())
++		if (efi_runtime_disabled() || efi_runtime_init())
+ 			return;
+ 	}
+ 	if (efi_memmap_init())
+diff --git a/drivers/firmware/efi/efi.c b/drivers/firmware/efi/efi.c
+index 36ffa17..1f396eb 100644
+--- a/drivers/firmware/efi/efi.c
++++ b/drivers/firmware/efi/efi.c
+@@ -41,6 +41,19 @@ struct efi __read_mostly efi = {
+ };
+ EXPORT_SYMBOL(efi);
+ 
++static bool disable_runtime;
++static int __init setup_noefi(char *arg)
 +{
-+	while (*str) {
-+		if (!strncmp(str, option, strlen(option))) {
-+			str += strlen(option);
-+			if (!*str || *str == ',')
-+				return true;
-+		}
-+
-+		while (*str && *str != ',')
-+			str++;
-+
-+		if (*str == ',')
-+			str++;
-+	}
-+
-+	return false;
++	disable_runtime = true;
++	return 0;
 +}
++early_param("noefi", setup_noefi);
++
++bool efi_runtime_disabled(void)
++{
++	return disable_runtime;
++}
++
+ static struct kobject *efi_kobj;
+ static struct kobject *efivars_kobj;
+ 
+diff --git a/include/linux/efi.h b/include/linux/efi.h
+index 0d37d33..833329f 100644
+--- a/include/linux/efi.h
++++ b/include/linux/efi.h
+@@ -1210,4 +1210,5 @@ efi_status_t handle_cmdline_files(efi_system_table_t *sys_table_arg,
+ 
+ efi_status_t efi_parse_options(char *cmdline);
+ 
++bool efi_runtime_disabled(void);
+ #endif /* _LINUX_EFI_H */
 -- 
 1.8.3.1
