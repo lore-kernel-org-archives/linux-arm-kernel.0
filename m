@@ -1,42 +1,106 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Thu, 14 Aug 2014 09:57:53 +0100
-Subject: [PATCH] Documentation: dmaengine: Add a documentation for the
- dma controller API
-In-Reply-To: <20140814085301.GJ2452@ldesroches-Latitude-E6320>
-References: <1406736193-26685-1-git-send-email-maxime.ripard@free-electrons.com>
- <20140814085301.GJ2452@ldesroches-Latitude-E6320>
-Message-ID: <20140814085753.GS30401@n2100.arm.linux.org.uk>
+From: dyoung@redhat.com (Dave Young)
+Date: Thu, 14 Aug 2014 17:15:27 +0800
+Subject: [PATCH 2/7] Add a generic cmdline parse function parse_option_str
+In-Reply-To: <1408007731-15081-1-git-send-email-dyoung@redhat.com>
+References: <1408007731-15081-1-git-send-email-dyoung@redhat.com>
+Message-ID: <1408007731-15081-2-git-send-email-dyoung@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Aug 14, 2014 at 10:53:01AM +0200, Ludovic Desroches wrote:
-> On Wed, Jul 30, 2014 at 06:03:13PM +0200, Maxime Ripard wrote:
-> > The dmaengine is neither trivial nor properly documented at the moment, which
-> > means a lot of trial and error development, which is not that good for such a
-> > central piece of the system.
-> > 
-> > Attempt at making such a documentation.
-> 
-> Good idea, many questions are asked when writing a new dmaengine driver.
-> 
-> For instance I didn't find how to use the DMA_CTRL_ACK flags.
-> 
-> - How this flag has to be managed? For instance, async_tx_ack is used in
-> dmaengine driver but also in some devices.
-> - Is it mandatory to deal with this flag? It seems some dmaengine
-> drivers don't care about it.
+There should be a generic function to parse params like a=b,c
+Adding parse_option_str in lib/cmdline.c which will return true
+if there's specified option set in the params.
 
-This is one part of the DMA engine API that even I don't understand.
+Also updated efi=old_map parsing code to use the new function
 
-It's got something to do with the async engine API, and seems to be
-something to do with whether a descriptor can have other transactions
-added to it, and whether a descriptor can be re-used (async-tx engines
-typically allocate a fixed set of descriptors and recycle them.)
+Signed-off-by: Dave Young <dyoung@redhat.com>
+---
+ arch/x86/platform/efi/efi.c | 22 ++--------------------
+ include/linux/kernel.h      |  1 +
+ lib/cmdline.c               | 29 +++++++++++++++++++++++++++++
+ 3 files changed, 32 insertions(+), 20 deletions(-)
 
-I was never able to get to the bottom of what that flag meant or how
-it should be used with the DMA slave API (and I suspect everyone else
-just gave up trying to understand it as well.)
-
+diff --git a/arch/x86/platform/efi/efi.c b/arch/x86/platform/efi/efi.c
+index c90d3cd..c73a7df5 100644
+--- a/arch/x86/platform/efi/efi.c
++++ b/arch/x86/platform/efi/efi.c
+@@ -932,26 +932,8 @@ u64 efi_mem_attributes(unsigned long phys_addr)
+ 
+ static int __init parse_efi_cmdline(char *str)
+ {
+-	if (*str == '=')
+-		str++;
+-
+-	while (*str) {
+-		if (!strncmp(str, "old_map", 7)) {
+-			set_bit(EFI_OLD_MEMMAP, &efi.flags);
+-			str += strlen("old_map");
+-		}
+-
+-		/*
+-		 * Skip any options we don't understand. Presumably
+-		 * they apply to the EFI boot stub.
+-		 */
+-		while (*str && *str != ',')
+-			str++;
+-
+-		/* If we hit a delimiter, skip it */
+-		if (*str == ',')
+-			str++;
+-	}
++	if (parse_option_str(str, "old_map"))
++		set_bit(EFI_OLD_MEMMAP, &efi.flags);
+ 
+ 	return 0;
+ }
+diff --git a/include/linux/kernel.h b/include/linux/kernel.h
+index 4c52907..d612718 100644
+--- a/include/linux/kernel.h
++++ b/include/linux/kernel.h
+@@ -407,6 +407,7 @@ int vsscanf(const char *, const char *, va_list);
+ extern int get_option(char **str, int *pint);
+ extern char *get_options(const char *str, int nints, int *ints);
+ extern unsigned long long memparse(const char *ptr, char **retptr);
++extern bool parse_option_str(const char *str, const char *option);
+ 
+ extern int core_kernel_text(unsigned long addr);
+ extern int core_kernel_data(unsigned long addr);
+diff --git a/lib/cmdline.c b/lib/cmdline.c
+index d4932f7..7f1a182 100644
+--- a/lib/cmdline.c
++++ b/lib/cmdline.c
+@@ -155,3 +155,32 @@ unsigned long long memparse(const char *ptr, char **retptr)
+ 	return ret;
+ }
+ EXPORT_SYMBOL(memparse);
++
++/**
++ *	parse_option_str - Parse a string and check an option is set or not
++ *	@str: String to be parsed
++ *	@option: option name
++ *
++ *	This function parses a string containing a comma-separated list of
++ *	strings like a=b,c.
++ *
++ *	Return true if there's such option in the string, or return false.
++ */
++bool parse_option_str(const char *str, const char *option)
++{
++	while (*str) {
++		if (!strncmp(str, option, strlen(option))) {
++			str += strlen(option);
++			if (!*str || *str == ',')
++				return true;
++		}
++
++		while (*str && *str != ',')
++			str++;
++
++		if (*str == ',')
++			str++;
++	}
++
++	return false;
++}
 -- 
-FTTC broadband for 0.8mile line: currently at 9.5Mbps down 400kbps up
-according to speedtest.net.
+1.8.3.1
