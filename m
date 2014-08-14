@@ -1,24 +1,57 @@
-From: davem@redhat.com (David Miller)
-Date: Thu, 14 Aug 2014 14:39:11 -0700 (PDT)
-Subject: [PATCH] net: xilinx: Remove .owner field for driver
-In-Reply-To: <a63aa03f310bb32779833fc905579458a34be6ce.1407930852.git.michal.simek@xilinx.com>
-References: <a63aa03f310bb32779833fc905579458a34be6ce.1407930852.git.michal.simek@xilinx.com>
-Message-ID: <20140814.143911.339730226328001321.davem@redhat.com>
+From: horms+renesas@verge.net.au (Simon Horman)
+Date: Fri, 15 Aug 2014 07:19:10 +0900
+Subject: [PATCH] ARM: shmobile: koelsch: Remove non-existent i2c6 pinmux
+Message-ID: <1408054750-9642-1-git-send-email-horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Michal Simek <michal.simek@xilinx.com>
-Date: Wed, 13 Aug 2014 13:54:22 +0200
+From: Geert Uytterhoeven <geert+renesas@glider.be>
 
-> There is no need to init .owner field.
-> 
-> Based on the patch from Peter Griffin <peter.griffin@linaro.org>
-> "mmc: remove .owner field for drivers using module_platform_driver"
-> 
-> This patch removes the superflous .owner field for drivers which
-> use the module_platform_driver API, as this is overriden in
-> platform_driver_register anyway."
-> 
-> Signed-off-by: Michal Simek <michal.simek@xilinx.com>
+On r8a7791, i2c6 (aka iic3) doesn't need pinmux, but the koelsch dts
+refers to non-existent pinmux configuration data:
 
-Applied.
+pinmux core: sh-pfc does not support function i2c6
+sh-pfc e6060000.pfc: invalid function i2c6 in map table
+
+Remove it to fix this.
+
+Fixes: commit 1d41f36a68c0f4e9b01d563ce33bab5201858b54 ("ARM: shmobile:
+       koelsch dts: Add VDD MPU regulator for DVFS")
+
+Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
+Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
+---
+ arch/arm/boot/dts/r8a7791-koelsch.dts | 7 -------
+ 1 file changed, 7 deletions(-)
+
+Hi Olof, Arnd, Kevin,
+
+please consider this as a fix for v3.17.
+
+diff --git a/arch/arm/boot/dts/r8a7791-koelsch.dts b/arch/arm/boot/dts/r8a7791-koelsch.dts
+index 23486c0..be59014 100644
+--- a/arch/arm/boot/dts/r8a7791-koelsch.dts
++++ b/arch/arm/boot/dts/r8a7791-koelsch.dts
+@@ -275,11 +275,6 @@
+ 		renesas,function = "msiof0";
+ 	};
+ 
+-	i2c6_pins: i2c6 {
+-		renesas,groups = "i2c6";
+-		renesas,function = "i2c6";
+-	};
+-
+ 	usb0_pins: usb0 {
+ 		renesas,groups = "usb0";
+ 		renesas,function = "usb0";
+@@ -420,8 +415,6 @@
+ };
+ 
+ &i2c6 {
+-	pinctrl-names = "default";
+-	pinctrl-0 = <&i2c6_pins>;
+ 	status = "okay";
+ 	clock-frequency = <100000>;
+ 
+-- 
+2.0.1
