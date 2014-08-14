@@ -1,41 +1,50 @@
 From: dinguyen@opensource.altera.com (dinguyen at opensource.altera.com)
-Date: Thu, 14 Aug 2014 16:13:32 -0500
-Subject: [PATCHv2 1/3] ARM: dts: socfpga: remove extra alias in the ArriaV
- devkit
+Date: Thu, 14 Aug 2014 16:13:33 -0500
+Subject: [PATCHv2 2/3] ARM: dts: socfpga: Add SD card detect
 In-Reply-To: <1408050814-28595-1-git-send-email-dinguyen@opensource.altera.com>
 References: <1408050814-28595-1-git-send-email-dinguyen@opensource.altera.com>
-Message-ID: <1408050814-28595-2-git-send-email-dinguyen@opensource.altera.com>
+Message-ID: <1408050814-28595-3-git-send-email-dinguyen@opensource.altera.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Dinh Nguyen <dinguyen@opensource.altera.com>
 
-commit [2755e187 dts: socfpga: Add DTS entry for adding the stmmac glue
-layer for stmmac.] added an extra ethernet alias in the ArriaV devkit
-board file. This patch removes it.
+Revision D of the SOCFGPA devkit has a GPIO line used for SD/MMC card detect.
 
 Signed-off-by: Dinh Nguyen <dinguyen@opensource.altera.com>
+Acked-by: Pavel Machek <pavel@denx.de>
 ---
- arch/arm/boot/dts/socfpga_arria5_socdk.dts | 7 -------
- 1 file changed, 7 deletions(-)
+ arch/arm/boot/dts/socfpga_cyclone5.dtsi      | 2 +-
+ arch/arm/boot/dts/socfpga_cyclone5_socdk.dts | 4 ++++
+ 2 files changed, 5 insertions(+), 1 deletion(-)
 
-diff --git a/arch/arm/boot/dts/socfpga_arria5_socdk.dts b/arch/arm/boot/dts/socfpga_arria5_socdk.dts
-index d532d17..27d551c 100644
---- a/arch/arm/boot/dts/socfpga_arria5_socdk.dts
-+++ b/arch/arm/boot/dts/socfpga_arria5_socdk.dts
-@@ -37,13 +37,6 @@
- 		*/
- 		ethernet0 = &gmac1;
+diff --git a/arch/arm/boot/dts/socfpga_cyclone5.dtsi b/arch/arm/boot/dts/socfpga_cyclone5.dtsi
+index 1ee03c4..33cad8b 100644
+--- a/arch/arm/boot/dts/socfpga_cyclone5.dtsi
++++ b/arch/arm/boot/dts/socfpga_cyclone5.dtsi
+@@ -28,7 +28,7 @@
+ 			};
+ 		};
+ 
+-		dwmmc0 at ff704000 {
++		mmc0: dwmmc0 at ff704000 {
+ 			num-slots = <1>;
+ 			broken-cd;
+ 			bus-width = <4>;
+diff --git a/arch/arm/boot/dts/socfpga_cyclone5_socdk.dts b/arch/arm/boot/dts/socfpga_cyclone5_socdk.dts
+index 45de151..d7296a5 100644
+--- a/arch/arm/boot/dts/socfpga_cyclone5_socdk.dts
++++ b/arch/arm/boot/dts/socfpga_cyclone5_socdk.dts
+@@ -68,6 +68,10 @@
  	};
--
--	aliases {
--		/* this allow the ethaddr uboot environmnet variable contents
--		 * to be added to the gmac1 device tree blob.
--		 */
--		ethernet0 = &gmac1;
--	};
  };
  
- &gmac1 {
++&mmc0 {
++	cd-gpios = <&gpio1 18 0>;
++};
++
+ &usb1 {
+ 	status = "okay";
+ };
 -- 
 2.0.3
