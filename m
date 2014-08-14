@@ -1,53 +1,47 @@
 From: broonie@kernel.org (Mark Brown)
-Date: Thu, 14 Aug 2014 20:09:31 +0100
-Subject: [alsa-devel] [PATCH] ASoC: rt286: Add API to set supported jack
- type
-In-Reply-To: <1408004988.2506.13.camel@loki>
-References: <1407217970-20126-1-git-send-email-bardliao@realtek.com>
- <20140806205421.GZ17528@sirena.org.uk>
- <ABFD875FF5FB574BA706497D987D48D7608E00@RTITMBSV03.realtek.com.tw>
- <20140807173136.GN17528@sirena.org.uk>
- <1407751185.2487.150.camel@loki>
- <20140811122415.GZ17528@sirena.org.uk>
- <1408004988.2506.13.camel@loki>
-Message-ID: <20140814190931.GD17528@sirena.org.uk>
+Date: Thu, 14 Aug 2014 20:57:16 +0100
+Subject: [PATCH] arm64: configs: Enable X-Gene SATA and ethernet in defconfig
+Message-ID: <1408046236-21005-1-git-send-email-broonie@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Aug 14, 2014 at 09:29:48AM +0100, Liam Girdwood wrote:
-> On Mon, 2014-08-11 at 13:24 +0100, Mark Brown wrote:
+From: Mark Brown <broonie@linaro.org>
 
-> > Sounds like DMI is going to be needed then - whatever ends up being done
-> > I'd expect it should just be a case of putting the checks done to work
-> > out the machine configuration into the CODEC driver instead of the
-> > machine driver.  If it looks ugly this can be used to explain to people
-> > why we need something more sensible!
+Currently when run on an APM platform the ARMv8 defconfig has no viable
+options for rootfs other than ramdisk which is rather limiting. Since
+we already have both SATA and the bits needed for NFS root enabled we just
+need to enable the relevant drivers so do that, helping enable direct
+testing of upstream.
 
-> It sure will be ugly ;) This would involve the codec driver checking for
-> the existence of the Broadwell ADSP ACPI ID and then configuring jack
-> mode depending on whether it finds this ID or not.
+If the configuration ends up becoming too big we can consider modularising
+some of the drivers and asking people to use an initramfs but for now this
+is not an issue.
 
-> We have the opposite implementation atm where the Broadwell machine
-> driver sets the jack mode at machine driver init time.
+Signed-off-by: Mark Brown <broonie@linaro.org>
+---
+ arch/arm64/configs/defconfig | 3 +++
+ 1 file changed, 3 insertions(+)
 
-> I'm not sure that showing ugly code here would help justify anything
-> either as we will kind of be at the mercy of whether the Windows driver
-> needs this information or not.
-
-It's going to be ugly either way, it's just a question of how the code
-get partitioned - I'd expect that whatever does this is going to end up
-having to cope with working out which configuration to apply anyway.
-
-What it does buy us is consistency in where these things get handled -
-it's easier to have a consistent rule that the device is responsible for
-platform data (wherever that actually comes from) than to have different
-rules for different firmware styles and it'll help with back pressure on
-other people who do care more about Linux even if it doesn't help with
-the immediate use cases.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140814/939d3f31/attachment.sig>
+diff --git a/arch/arm64/configs/defconfig b/arch/arm64/configs/defconfig
+index 1e52b741d806..d92ef3c54161 100644
+--- a/arch/arm64/configs/defconfig
++++ b/arch/arm64/configs/defconfig
+@@ -64,6 +64,8 @@ CONFIG_VIRTIO_BLK=y
+ CONFIG_BLK_DEV_SD=y
+ # CONFIG_SCSI_LOWLEVEL is not set
+ CONFIG_ATA=y
++CONFIG_AHCI_XGENE=y
++CONFIG_PHY_XGENE=y
+ CONFIG_PATA_PLATFORM=y
+ CONFIG_PATA_OF_PLATFORM=y
+ CONFIG_NETDEVICES=y
+@@ -71,6 +73,7 @@ CONFIG_TUN=y
+ CONFIG_VIRTIO_NET=y
+ CONFIG_SMC91X=y
+ CONFIG_SMSC911X=y
++CONFIG_NET_XGENE=y
+ # CONFIG_WLAN is not set
+ CONFIG_INPUT_EVDEV=y
+ # CONFIG_SERIO_SERPORT is not set
+-- 
+2.0.1
