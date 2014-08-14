@@ -1,49 +1,34 @@
-From: pavel@denx.de (Pavel Machek)
-Date: Thu, 14 Aug 2014 23:03:19 +0200
-Subject: [PATCH 3/3] ARM: dts: socfpga: memreserve first 4KB for SMP code
-In-Reply-To: <53ED2295.3020700@opensource.altera.com>
-References: <1408031491-15609-1-git-send-email-dinguyen@opensource.altera.com>
- <1408031491-15609-4-git-send-email-dinguyen@opensource.altera.com>
- <20140814185432.GE11558@amd.pavel.ucw.cz>
- <53ED2295.3020700@opensource.altera.com>
-Message-ID: <20140814210319.GC26857@amd.pavel.ucw.cz>
+From: broonie@kernel.org (Mark Brown)
+Date: Thu, 14 Aug 2014 22:02:53 +0100
+Subject: [PATCH] spi: rockchip: return 0 if tx_buf and rx_buf are NULL
+In-Reply-To: <1407977544-2989-1-git-send-email-addy.ke@rock-chips.com>
+References: <1407977544-2989-1-git-send-email-addy.ke@rock-chips.com>
+Message-ID: <20140814210253.GF17528@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu 2014-08-14 15:56:53, Dinh Nguyen wrote:
-> 
-> 
-> On 8/14/14, 1:54 PM, Pavel Machek wrote:
-> > On Thu 2014-08-14 10:51:31, dinguyen at opensource.altera.com wrote:
-> >> From: Dinh Nguyen <dinguyen@opensource.altera.com>
-> >>
-> >> The SOCFPGA's SMP code uses 0x0 for as the location for the trampoline to
-> >> bring secondary cores online. This patch adds a /memreserve/ section to
-> >> reserve the first 4K for the SMP trampoline code.
-> >>
-> >> Signed-off-by: Dinh Nguyen <dinguyen@opensource.altera.com>
-> >> ---
-> >>  arch/arm/boot/dts/socfpga_arria5.dtsi   | 1 +
-> >>  arch/arm/boot/dts/socfpga_cyclone5.dtsi | 1 +
-> >>  2 files changed, 2 insertions(+)
-> >>
-> >> diff --git a/arch/arm/boot/dts/socfpga_arria5.dtsi b/arch/arm/boot/dts/socfpga_arria5.dtsi
-> >> index 468fc4c..73b939e 100644
-> >> --- a/arch/arm/boot/dts/socfpga_arria5.dtsi
-> >> +++ b/arch/arm/boot/dts/socfpga_arria5.dtsi
-> >> @@ -15,6 +15,7 @@
-> >>   */
-> >>  
-> >>  /dts-v1/;
-> >> +/memreserve/ 0x00000000 0x0001000;
-> > 
-> > Actually, comment here explaining that ROM code uses 0x0 for the
-> > trampoline would be nice here... if I understand it correctly.
-> 
-> Sure...I'll add a single line comment.
+On Thu, Aug 14, 2014 at 08:52:24AM +0800, Addy Ke wrote:
+> To do so, spi communication can use an empty buf to pull up CS.
 
-Thanks. You can add my acked-by then :-).
-									Pavel
--- 
-(english) http://www.livejournal.com/~pavelmachek
-(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
+> This patch merged from ChromiumOS tree.
+> Cros_ec use this function to turn off CS and add a delay to ensure
+> the rising edge doesn't come too soon after the end of the data.
+
+>  	if (!xfer->tx_buf && !xfer->rx_buf) {
+> -		dev_err(rs->dev, "No buffer for transfer\n");
+> -		return -EINVAL;
+> +		dev_dbg(rs->dev, "No buffer for transfer\n");
+> +		return 0;
+>  	}
+
+We should be implementing this in the core rather than the driver - just
+not even call into the controller driver if there's nothing to do.  That
+way we make sure that every driver works properly.  After all, the delay
+itself is implemented in the core.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140814/19f8f028/attachment.sig>
