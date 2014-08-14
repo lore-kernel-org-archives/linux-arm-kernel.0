@@ -1,58 +1,36 @@
 From: dyoung@redhat.com (Dave Young)
-Date: Thu, 14 Aug 2014 17:15:31 +0800
-Subject: [PATCH 6/7] x86/efi: clear EFI_RUNTIME_SERVICES bit in case failures
- while entering virtual mode
+Date: Thu, 14 Aug 2014 17:19:13 +0800
+Subject: [PATCH 7/7] efi_rtc: probe function error out in case no efi runtime
+ enabled
 In-Reply-To: <1408007731-15081-1-git-send-email-dyoung@redhat.com>
 References: <1408007731-15081-1-git-send-email-dyoung@redhat.com>
-Message-ID: <1408007731-15081-6-git-send-email-dyoung@redhat.com>
+Message-ID: <1408007953-15151-1-git-send-email-dyoung@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-If enter virtual mode failed due to some reason other than the efi call
-the EFI_RUNTIME_SERVICES bit in efi.flags should be cleared thus users
-of efi runtime services can check the bit and handle the case instead of
-assume efi runtime is ok.
+efi rtc depends on efi runtime services, so if efi runtime services are not
+usable it should error out.
 
-Per Matt, if efi call SetVirtualAddressMap fails we will be not sure it's safe
-to make any assumptions about the state of the system. so kernel panics instead
-of clears EFI_RUNTIME_SERVICES bit.
+Without this patch rtc-efi will panic with 'noefi' boot
 
 Signed-off-by: Dave Young <dyoung@redhat.com>
 ---
- arch/x86/platform/efi/efi.c | 6 +++++-
- 1 file changed, 5 insertions(+), 1 deletion(-)
+ drivers/rtc/rtc-efi.c | 3 +++
+ 1 file changed, 3 insertions(+)
 
-diff --git a/arch/x86/platform/efi/efi.c b/arch/x86/platform/efi/efi.c
-index 00f4cc5..d3096c0 100644
---- a/arch/x86/platform/efi/efi.c
-+++ b/arch/x86/platform/efi/efi.c
-@@ -724,6 +724,7 @@ static void __init kexec_enter_virtual_mode(void)
- 	 */
- 	if (!efi_is_native()) {
- 		efi_unmap_memmap();
-+		clear_bit(EFI_RUNTIME_SERVICES, &efi.flags);
- 		return;
- 	}
+diff --git a/drivers/rtc/rtc-efi.c b/drivers/rtc/rtc-efi.c
+index c4c3843..ca2487b 100644
+--- a/drivers/rtc/rtc-efi.c
++++ b/drivers/rtc/rtc-efi.c
+@@ -191,6 +191,9 @@ static int __init efi_rtc_probe(struct platform_device *dev)
+ {
+ 	struct rtc_device *rtc;
  
-@@ -797,6 +798,7 @@ static void __init __efi_enter_virtual_mode(void)
- 	new_memmap = efi_map_regions(&count, &pg_shift);
- 	if (!new_memmap) {
- 		pr_err("Error reallocating memory, EFI runtime non-functional!\n");
-+		clear_bit(EFI_RUNTIME_SERVICES, &efi.flags);
- 		return;
- 	}
- 
-@@ -804,8 +806,10 @@ static void __init __efi_enter_virtual_mode(void)
- 
- 	BUG_ON(!efi.systab);
- 
--	if (efi_setup_page_tables(__pa(new_memmap), 1 << pg_shift))
-+	if (efi_setup_page_tables(__pa(new_memmap), 1 << pg_shift)) {
-+		clear_bit(EFI_RUNTIME_SERVICES, &efi.flags);
- 		return;
-+	}
- 
- 	efi_sync_low_kernel_mappings();
- 	efi_dump_pagetable();
++	if (!efi_enabled(EFI_RUNTIME_SERVICES))
++		return -ENODEV;
++
+ 	rtc = devm_rtc_device_register(&dev->dev, "rtc-efi", &efi_rtc_ops,
+ 					THIS_MODULE);
+ 	if (IS_ERR(rtc))
 -- 
 1.8.3.1
