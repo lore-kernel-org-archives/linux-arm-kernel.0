@@ -1,78 +1,80 @@
-From: hdoyu@nvidia.com (Hiroshi Doyu)
-Date: Thu, 14 Aug 2014 19:04:52 +0300
-Subject: [PATCH v5] devicetree: Add generic IOMMU device tree bindings
-In-Reply-To: <cfb1d2ff66004685b7ead3f5e6321681@BL2PR03MB468.namprd03.prod.outlook.com>
-References: <1406803383-11601-1-git-send-email-thierry.reding@gmail.com>
- <87a9774lf5.fsf@nvidia.com>
- <cfb1d2ff66004685b7ead3f5e6321681@BL2PR03MB468.namprd03.prod.outlook.com>
-Message-ID: <87y4ur2h23.fsf@nvidia.com>
+From: grygorii.strashko@ti.com (Grygorii Strashko)
+Date: Thu, 14 Aug 2014 19:54:09 +0300
+Subject: [PATCH 4/4] ARM: dts: keystone-k2hk: add dsp gpio controllers
+ nodes
+In-Reply-To: <1408029982.880621027@f126.i.mail.ru>
+References: <1407946582-20927-1-git-send-email-grygorii.strashko@ti.com>
+ <1408018321.928492982@f270.i.mail.ru> <53ECDC54.3060005@ti.com>
+ <1408029982.880621027@f126.i.mail.ru>
+Message-ID: <53ECE9B1.4060303@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Varun,
+On 08/14/2014 06:26 PM, Alexander Shiyan wrote:
+> Thu, 14 Aug 2014 18:57:08 +0300 ?? Grygorii Strashko <grygorii.strashko@ti.com>:
+> ...
+>>>>>> +		dspgpio7: keystone_dsp_gpio at 262025C {
+>>>>>> +			compatible = "ti,keystone-mctrl-gpio";
+>>>>>> +			gpio-controller;
+>>>>>> +			#gpio-cells = <2>;
+>>>>>> +			gpio,syscon-dev = <&devctrl 0x25c>;
+>>>>>> +		};
+>>>>>
+>>>>> So, devctrl is a syscon device and this DTS introduce several
+>>>>> identical GPIO descriptions?
+>>>>>
+>>>>> On my opinion this should be placed in the gpio-syscon.c,
+>>>>> where you can add support for ti,keystone-dsp0{..7}-gpio.
+>>>>> Such change will avoid parts 2 and 3 of this patch.
+>>>>>
+>>>>> static const struct syscon_gpio_data ti_keystone_dsp0_gpio = {
+>>>>>      .compatible = "ti,keystone-syscon",
+>>>>>      .dat_bit_offset = 0x240 * 8,
+>>>>>      ...
+>>>>>      .set = etc...
+>>>>> };
+>>>>
+>>>> So, if I understand you right, you propose to add 8 additional compatible
+>>>> strings just to encode different register offsets. Is it?
+>>>> 1) add "ti,keystone-mctrl-gpio0"..."ti,keystone-mctrl-gpio7"
+>>>
+>>> Yes, but replace "mctrl" with "dsp" since mctrl is not applicable here.
+>>>
+>>>> 2) add 8 structures keystone_mctrl_gpio0..keystone_mctrl_gpio7 in gpio-syscon.c
+>>>>      (which will have only different values of field - .dat_bit_offset = 0x2yy * 8,)
+>>>>
+>>>> 3) add 8 additional items in array syscon_gpio_ids
+>>>> 	{
+>>>> 		.compatible	= "ti,keystone-mctrl-gpio0",
+>>>> 		.data		= &keystone_mctrl_gpio0,
+>>>> 	}, ...
+>>>>
+>>>> I can do it if you strictly insist, BUT I don't like it :(
+>>>> - just imagine how your driver will look look like if 5 or 6 SoCs will re-use it ;)
+>>>> - as I mentioned in cover letter and commit messages even each SoC revision can have
+>>>>     different Syscon implementation with different registers offsets and with different
+>>>>     number of Syscon register ranges (for example for Keystone 2 we already have two
+>>>>     Syscon devices defined in DT).
+>>>
+>>> The initial version of this driver contains addresses and offsets in, but this approach has
+>>> been criticized by DT maintainers.
+>>
+>> Could you provide link on this thread^, pls?
+> 
+> Here is a link to first version:
+> https://www.mail-archive.com/linux-gpio at vger.kernel.org/msg01616.html
 
-Varun Sethi <Varun.Sethi@freescale.com> writes:
+10x
 
->> -----Original Message-----
->> From: iommu-bounces at lists.linux-foundation.org [mailto:iommu-
->> bounces at lists.linux-foundation.org] On Behalf Of Hiroshi Doyu
->> Sent: Thursday, August 14, 2014 12:18 PM
->> To: Thierry Reding; Stephen Warren; Arnd Bergmann; Will Deacon
->> Cc: Mark Rutland; devicetree at vger.kernel.org; Olof Johansson;
->> iommu at lists.linux-foundation.org; Rob Herring; linux-tegra at vger.kernel.org;
->> linux-arm-kernel at lists.infradead.org
->> Subject: Re: [PATCH v5] devicetree: Add generic IOMMU device tree bindings
->> 
->> 
->> Thierry Reding <thierry.reding@gmail.com> writes:
->> 
->> > +Multiple-master IOMMU:
->> > +----------------------
->> > +
->> > +       iommu {
->> > +               /* the specifier represents the ID of the master */
->> > +               #iommu-cells = <1>;
->> > +       };
->> > +
->> > +       master at 1 {
->> > +               /* device has master ID 42 in the IOMMU */
->> > +               iommus = <&{/iommu} 42>;
->> > +       };
->> > +
->> > +       master at 2 {
->> > +               /* device has master IDs 23 and 24 in the IOMMU */
->> > +               iommus = <&{/iommu} 23>, <&{/iommu} 24>;
->> > +       };
->> 
->> I think that this "master ID" will be parsed in IOMMU driver. For example,
->> ARM,SMMU expects "streamID" as "master ID", right?
->> 
->> If a SoC has a feature to configure to assign streamID to devices at runtime,
->> "streamID" is not equal to "master ID".
->> 
->>   iommus = <&{/smmu} "soc specific master ID">;
->> 
->> "soc master ID" needs to be translated into "streamID" by SoC SW. It seems
->> that ARM,SMMU kernel driver doesn't expect this kind of ID translation. If
->> ARM,SMMU kernel driver is used as is, "soc master ID"
->> would be incompatible? ARM,SMMU needs such translation before parsing. Is
->> this my understanding right?
->> 
->> If so I think that this master ID configuration/translation may be quite
->> reasonable requirment for SoC using ARM,SMMU.
->> 
->> Can we consider this ID translation within ARM,SMMU compatibility?
->> 
->> IOW, is it possible to implement some SoC specific hook for ID
->> translation/configuration in ARM,SMMU kernel driver?
->
->
-> Can the id translation be done using a SMR mask?
+> 
+> Unfortunately, I lost thread for DT-related stuffs.
+> 
 
-No, "SoC master ID" is completely independenf of SMR.
+Oh, I've just checked ARM dts directory and found that 
+constructions like this:
+	vendor,syscon = <&syscon_phandle>; /// or even this vendor,syscon = <&syscon_phandle 0x60 2>;
+are widely used as of now.
+Also, According to the bindings doc, the Syscon is not a Linux specific definition (mfd/syscon.txt).
 
-> Also, for dynamic stream ID allocation we would need to represent the
-> specific master register (to store the stream ID) in the device tree.
-
-I assmue that the above means that iMX has such configuration register
-to map steramID and a device dynamically.
+Regards,
+-grygorii
