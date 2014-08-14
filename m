@@ -1,47 +1,63 @@
-From: dinguyen@opensource.altera.com (dinguyen at opensource.altera.com)
-Date: Thu, 14 Aug 2014 10:51:31 -0500
-Subject: [PATCH 3/3] ARM: dts: socfpga: memreserve first 4KB for SMP code
-In-Reply-To: <1408031491-15609-1-git-send-email-dinguyen@opensource.altera.com>
-References: <1408031491-15609-1-git-send-email-dinguyen@opensource.altera.com>
-Message-ID: <1408031491-15609-4-git-send-email-dinguyen@opensource.altera.com>
+From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
+Date: Thu, 14 Aug 2014 17:02:12 +0100
+Subject: [PATCH v7 3/8] drivers: cpuidle: implement DT based idle states
+ infrastructure
+In-Reply-To: <alpine.LFD.2.11.1408141142530.29347@knanqh.ubzr>
+References: <1407945127-27554-1-git-send-email-lorenzo.pieralisi@arm.com>
+ <1407945127-27554-4-git-send-email-lorenzo.pieralisi@arm.com>
+ <alpine.LFD.2.11.1408131223501.1133@knanqh.ubzr>
+ <20140813170440.GA30822@e102568-lin.cambridge.arm.com>
+ <alpine.LFD.2.11.1408131319210.1133@knanqh.ubzr>
+ <20140814112911.GA5039@red-moon>
+ <alpine.LFD.2.11.1408141142530.29347@knanqh.ubzr>
+Message-ID: <20140814160212.GA5328@red-moon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Dinh Nguyen <dinguyen@opensource.altera.com>
+On Thu, Aug 14, 2014 at 04:47:57PM +0100, Nicolas Pitre wrote:
+> On Thu, 14 Aug 2014, Lorenzo Pieralisi wrote:
+> 
+> > On Wed, Aug 13, 2014 at 06:29:49PM +0100, Nicolas Pitre wrote:
+> > > So if you tell me a messed-up DT won't bear much consequences then I'm 
+> > > fine with that.
+> > 
+> > Nico, on second thoughts, since Ashwin raised the point too and I think
+> > that at these early stages it might turn out useful, I gave coding
+> > the check a go. I tried to make the check self contained so that we can
+> > yank it out if we do not want it in the final version or we will want
+> > to remove it later.
+> > 
+> > Here the refreshed patch is:
+> > 
+> > -- >8 --
+> > Subject: [PATCH] drivers: cpuidle: implement DT based idle states
+> >  infrastructure
+> > 
+> > On most common ARM systems, the low-power states a CPU can be put into are
+> > not discoverable in HW and require device tree bindings to describe
+> > power down suspend operations and idle states parameters.
+> > 
+> > In order to enable DT based idle states and configure idle drivers, this
+> > patch implements the bulk infrastructure required to parse the device tree
+> > idle states bindings and initialize the corresponding CPUidle driver states
+> > data.
+> > 
+> > The parsing API accepts a start index that defines the first idle state
+> > that should be initialized by the parsing code in order to give new and
+> > legacy driver flexibility over which states should be parsed using the
+> > new DT mechanism.
+> > 
+> > The idle states list is obtained from the first cpu in the driver
+> > cpumask, which implicitly means the parsing code expects idle states
+> > (and related list of phandles) to be the same for all CPUs in the
+> > CPUidle driver mask. The kernel does not check this assumption, it must
+> > be enforced by the bootloader to ensure correct system behaviour.
+> 
+> Is this last sentence still true?
 
-The SOCFPGA's SMP code uses 0x0 for as the location for the trampoline to
-bring secondary cores online. This patch adds a /memreserve/ section to
-reserve the first 4K for the SMP trampoline code.
+Nope, you are right. Fixed the commit log, a stale comment in the code
+and dt nodes ref counting, if I get no additional comments I will post
+this patch with v8, that should be final.
 
-Signed-off-by: Dinh Nguyen <dinguyen@opensource.altera.com>
----
- arch/arm/boot/dts/socfpga_arria5.dtsi   | 1 +
- arch/arm/boot/dts/socfpga_cyclone5.dtsi | 1 +
- 2 files changed, 2 insertions(+)
-
-diff --git a/arch/arm/boot/dts/socfpga_arria5.dtsi b/arch/arm/boot/dts/socfpga_arria5.dtsi
-index 468fc4c..73b939e 100644
---- a/arch/arm/boot/dts/socfpga_arria5.dtsi
-+++ b/arch/arm/boot/dts/socfpga_arria5.dtsi
-@@ -15,6 +15,7 @@
-  */
- 
- /dts-v1/;
-+/memreserve/ 0x00000000 0x0001000;
- #include "socfpga.dtsi"
- 
- / {
-diff --git a/arch/arm/boot/dts/socfpga_cyclone5.dtsi b/arch/arm/boot/dts/socfpga_cyclone5.dtsi
-index 33cad8b..f0785f0 100644
---- a/arch/arm/boot/dts/socfpga_cyclone5.dtsi
-+++ b/arch/arm/boot/dts/socfpga_cyclone5.dtsi
-@@ -16,6 +16,7 @@
-  */
- 
- /dts-v1/;
-+/memreserve/ 0x00000000 0x0001000;
- #include "socfpga.dtsi"
- 
- / {
--- 
-2.0.3
+Thank you !!!
+Lorenzo
