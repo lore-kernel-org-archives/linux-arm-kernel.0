@@ -1,46 +1,148 @@
-From: haojian.zhuang@linaro.org (Haojian Zhuang)
-Date: Thu, 14 Aug 2014 10:41:33 +0800
-Subject: [PATCH v17 8/9] irq: enable hip04 irq chip
-In-Reply-To: <1407408695-19626-9-git-send-email-haojian.zhuang@linaro.org>
-References: <1407408695-19626-1-git-send-email-haojian.zhuang@linaro.org>
- <1407408695-19626-9-git-send-email-haojian.zhuang@linaro.org>
-Message-ID: <CAD6h2NQMXb2XPbg4noQW65zKeAF7b5Av6FjHqnkYOJxRZddtAw@mail.gmail.com>
+From: frowand.list@gmail.com (Frank Rowand)
+Date: Wed, 13 Aug 2014 19:42:04 -0700
+Subject: [PATCH to be tested] serial: msm_serial: add missing sysrq
+ handling
+In-Reply-To: <53EC1FEA.5070907@gmail.com>
+References: <53E2C573.7090709@gmail.com> <53EAB01B.5030102@codeaurora.org>
+ <53EC1FEA.5070907@gmail.com>
+Message-ID: <53EC21FC.4000204@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 7 August 2014 18:51, Haojian Zhuang <haojian.zhuang@linaro.org> wrote:
-> HiP04 GIC is the variate of ARM GICv2.
->
-> ARM GICv2 supports 8 cores. HiP04 GIC extends to support 16 cores. It
-> results that bit fields in GIC_DIST_TARGET & GIC_DIST_SOFTINT are
-> different from ARM GICv2. And the maximium IRQ is downgrade from 1020 to 510.
->
-> Since different register offset & bitfields definitation breaks
-> compartible with ARM GICv2, create a new hip04 irq driver.
->
-> And this driver is derived from irq-gic.c to support the Hisilicon HiP04
-> interrupt controller, which is similar to the GIC, but deviates at some
-> points. Support for power management, non-banked registers, cascaded
-> GICs (and multiple controllers in general) and bigLittle support has
-> been removed from the GIC driver.
->
-> Affinity related functions have been adjusted to match the Hisilicon
-> hardware implementation.
->
-> Signed-off-by: Haojian Zhuang <haojian.zhuang@linaro.org>
-> ---
->  drivers/irqchip/Makefile    |   1 +
->  drivers/irqchip/irq-hip04.c | 424 ++++++++++++++++++++++++++++++++++++++++++++
->  2 files changed, 425 insertions(+)
->  create mode 100644 drivers/irqchip/irq-hip04.c
->
+On 8/13/2014 7:33 PM, Frank Rowand wrote:
+> On 8/12/2014 5:23 PM, Stephen Boyd wrote:
+>> On 08/06/14 17:16, Frank Rowand wrote:
 
-Hi Jason,
+< snip >
 
-All other HiP04 patches are ready. How do you think about this one? Is
-it OK for you? If so,
-will you take it into your git tree or we take it through armsoc tree
-with your Ack?
+> The patches you sent are a little hard to read since they modify further code
+> that my patch modified.  So I have redone your patches, as if my patch was
+> not previously applied.  Hopefully I did not make any mistakes there.  I will
+> reply to this email with each of your redone patches.
 
-Best Regards
-Haojian
+< snip >
+
+Stephen's patch alternative number 1:
+
+
+---
+ drivers/tty/serial/msm_serial.c |   44 ++++++++++++++++++++++++++++------------
+ drivers/tty/serial/msm_serial.h |    8 +++++++
+ 2 files changed, 39 insertions(+), 13 deletions(-)
+
+Index: b/drivers/tty/serial/msm_serial.c
+===================================================================
+--- a/drivers/tty/serial/msm_serial.c
++++ b/drivers/tty/serial/msm_serial.c
+@@ -125,25 +125,28 @@ static void handle_rx_dm(struct uart_por
+ 	port->icount.rx += count;
+ 
+ 	while (count > 0) {
+-		unsigned int c;
++		unsigned char buf[4];
++		unsigned char *p = buf;
++		int sysrq, r_count;
+ 
+ 		sr = msm_read(port, UART_SR);
+ 		if ((sr & UART_SR_RX_READY) == 0) {
+ 			msm_port->old_snap_state -= count;
+ 			break;
+ 		}
+-		c = msm_read(port, UARTDM_RF);
+-		if (sr & UART_SR_RX_BREAK) {
+-			port->icount.brk++;
+-			if (uart_handle_break(port))
+-				continue;
+-		} else if (sr & UART_SR_PAR_FRAME_ERR)
+-			port->icount.frame++;
++		readsl(port->membase + UARTDM_RF, p, 1);
+ 
+-		/* TODO: handle sysrq */
+-		tty_insert_flip_string(tport, (char *)&c,
+-				       (count > 4) ? 4 : count);
+-		count -= 4;
++		spin_unlock(&port->lock);
++		sysrq = uart_handle_sysrq_char(port, buf[0]);
++		spin_lock(&port->lock);
++		if (sysrq) {
++			p++;
++			count--;
++		}
++		r_count = min_t(int, count, sizeof(buf) - sysrq);
++		if (r_count)
++			tty_insert_flip_string(tport, p, r_count);
++		count -= r_count;
+ 	}
+ 
+ 	spin_unlock(&port->lock);
+@@ -285,6 +288,17 @@ static irqreturn_t msm_irq(int irq, void
+ 	misr = msm_read(port, UART_MISR);
+ 	msm_write(port, 0, UART_IMR); /* disable interrupt */
+ 
++	if (misr & UART_IMR_RXBREAK_END) {
++		uart_handle_break(port);
++		port->icount.brk++;
++		msm_write(port, UART_CR_CMD_RESET_RXBREAK_END, UART_CR);
++	}
++
++	if (misr & UART_IMR_PAR_FRAME_ERR) {
++		port->icount.frame++;
++		msm_write(port, UART_CR_CMD_RESET_PAR_FRAME_ERR, UART_CR);
++	}
++
+ 	if (misr & (UART_IMR_RXLEV | UART_IMR_RXSTALE)) {
+ 		if (msm_port->is_uartdm)
+ 			handle_rx_dm(port, misr);
+@@ -491,7 +505,8 @@ static int msm_startup(struct uart_port
+ 
+ 	/* turn on RX and CTS interrupts */
+ 	msm_port->imr = UART_IMR_RXLEV | UART_IMR_RXSTALE |
+-			UART_IMR_CURRENT_CTS;
++			UART_IMR_CURRENT_CTS | UART_IMR_RXBREAK_END |
++			UART_IMR_PAR_FRAME_ERR;
+ 
+ 	if (msm_port->is_uartdm) {
+ 		msm_write(port, 0xFFFFFF, UARTDM_DMRX);
+@@ -566,6 +581,9 @@ static void msm_set_termios(struct uart_
+ 	else
+ 		mr |= UART_MR2_STOP_BIT_LEN_ONE;
+ 
++	mr |= UART_MR2_RX_BREAK_ZERO_CHAR_OFF;
++	mr |= UART_MR2_RX_ERROR_CHAR_OFF;
++
+ 	/* set parity, bits per char, and stop bit */
+ 	msm_write(port, mr, UART_MR2);
+ 
+Index: b/drivers/tty/serial/msm_serial.h
+===================================================================
+--- a/drivers/tty/serial/msm_serial.h
++++ b/drivers/tty/serial/msm_serial.h
+@@ -24,6 +24,8 @@
+ #define UART_MR1_CTS_CTL       		(1 << 6)
+ 
+ #define UART_MR2			0x0004
++#define UART_MR2_RX_ERROR_CHAR_OFF	(1 << 9)
++#define UART_MR2_RX_BREAK_ZERO_CHAR_OFF	(1 << 8)
+ #define UART_MR2_ERROR_MODE		(1 << 6)
+ #define UART_MR2_BITS_PER_CHAR		0x30
+ #define UART_MR2_BITS_PER_CHAR_5	(0x0 << 4)
+@@ -65,6 +67,9 @@
+ #define UART_CR_TX_ENABLE		(1 << 2)
+ #define UART_CR_RX_DISABLE		(1 << 1)
+ #define UART_CR_RX_ENABLE		(1 << 0)
++#define UART_CR_CMD_RESET_RXBREAK_START	((1 << 11) | (2 << 4))
++#define UART_CR_CMD_RESET_RXBREAK_END	((1 << 11) | (3 << 4))
++#define UART_CR_CMD_RESET_PAR_FRAME_ERR	((1 << 11) | (4 << 4))
+ 
+ #define UART_IMR		0x0014
+ #define UART_IMR_TXLEV		(1 << 0)
+@@ -72,6 +77,9 @@
+ #define UART_IMR_RXLEV		(1 << 4)
+ #define UART_IMR_DELTA_CTS	(1 << 5)
+ #define UART_IMR_CURRENT_CTS	(1 << 6)
++#define UART_IMR_RXBREAK_START	(1 << 10)
++#define UART_IMR_RXBREAK_END	(1 << 11)
++#define UART_IMR_PAR_FRAME_ERR	(1 << 12)
+ 
+ #define UART_IPR_RXSTALE_LAST		0x20
+ #define UART_IPR_STALE_LSB		0x1F
