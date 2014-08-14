@@ -1,64 +1,90 @@
-From: p.zabel@pengutronix.de (Philipp Zabel)
-Date: Thu, 14 Aug 2014 11:36:38 +0200
-Subject: [RFC PATCH v3] reset: Add a defer reset object to send board
- specific reset
-In-Reply-To: <20140811173356.GN15297@lukather>
-References: <1403098673-3058-1-git-send-email-houcheng@gmail.com>
- <CACRpkdYfu8HmVCkn9JFh+YP5OPdr8o9nTfoCnkJ7SSpGoenQUg@mail.gmail.com>
- <20140708080535.GJ13423@lukather>
- <CACRpkdbFPAsu1gE-AVyD=-RxyE7mUJPSbFga7HLh0mxjE-mQuQ@mail.gmail.com>
- <1407507789.3354.20.camel@paszta.hi.pengutronix.de>
- <20140811173356.GN15297@lukather>
-Message-ID: <1408008998.4035.43.camel@paszta.hi.pengutronix.de>
+From: hdegoede@redhat.com (Hans de Goede)
+Date: Thu, 14 Aug 2014 11:37:19 +0200
+Subject: [linux-sunxi] Re: [PATCH 4/4] simplefb: add clock handling code
+In-Reply-To: <20140813170106.GT15297@lukather>
+References: <1407914239-12054-1-git-send-email-libv@skynet.be>
+ <1407914239-12054-5-git-send-email-libv@skynet.be>
+ <53EB9471.3090204@wwwdotorg.org> <20140813170106.GT15297@lukather>
+Message-ID: <53EC834F.6020307@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Maxime,
+Hi,
 
-Am Montag, den 11.08.2014, 19:33 +0200 schrieb Maxime Ripard:
-> > Mostly because Maxime and I seem to have a completely different opinion
-> > and nobody else argued one way or the other.
+On 08/13/2014 07:01 PM, Maxime Ripard wrote:
+> On Wed, Aug 13, 2014 at 10:38:09AM -0600, Stephen Warren wrote:
+>> On 08/13/2014 01:17 AM, Luc Verhaegen wrote:
+>>> This claims and enables clocks listed in the simple framebuffer dt node.
+>>> This is needed so that the display engine, in case the required clocks
+>>> are known by the kernel code and are described in the dt, will remain
+>>> properly enabled.
+>>
+>> I think this make simplefb not simple any more, which rather goes
+>> against the whole point of it.
+>>
+>> I specifically conceived simplefb to know about nothing more than
+>> the memory address and pixel layout of the memory buffer. I
+>> certainly don't like the idea of expanding simplefb to anything
+>> beyond that, and IIRC *not* extending is was a condition agreed when
+>> it was first merged. If more knowledge than that is required, then
+>> there needs to be a HW-specific driver to manage any
+>> clocks/resets/video registers, etc.
 > 
-> Yep, mostly because I don't see how a generic approach can work.
+> I'm sorry, but how is that not simple? clocks enabling is step 1 in a
+> driver in order to communicate somehow with the controller. Reset is a
+> different story, because arguably, if simplefb is there, the
+> controller is already out of reset.
 > 
-> The existing reset-gpios property only provide the gpio to use, but
-> some informations are encoded in the driver, such as the reset
-> duration, or a reset sequence if any.
-
-The driver should provide the duration. I'd really like to see an
-example where sequencing is necessary.
-I agree that as soon as things get significantly more complicated than
-pulsing a single GPIO, the reset-gpios binding is too limited.
-Still, I'm not happy to mandate a separate gpio reset device for each
-reset line if most devices are simple enough for it to work without.
-What about using reset-gpios for the majority of simple cases and have a
-separate gpio-reset-sequencer driver when multiple GPIO resets have to
-be timed?
-
-> How do you plan on giving that information to your generic driver?
+> And I don't see why video registers are coming into the discussion
+> here. The code Luc posted doesn't access any register, at all. It just
+> makes sure the needed controller keep going.
 > 
-> The only solution I can think of would be to add an extra property
-> that your code would parse. But then, you break the existing DT
-> bindings.
->
-> And if we're going to break those bindings, at least do it in a way
-> consistent with reset bindings.
+>> The correct way to handle this without a complete DRM/KMS/... driver
+>> is to avoid the clocks in question being turned off at boot.
+> 
+> Which is exactly what this code does, using the generic DT bindings to
+> express dependency for a given clock. How is this wrong?
+> 
+>> I thought there was a per-clock flag to prevent disabling an unused
+>> clock?
+> 
+> No, last time I heard, Mike Turquette was against it.
+> 
+>> If not, perhaps the clock driver should force the clock to be
+>> enabled (perhaps only if the DRM/KMS driver isn't enabled?).
+> 
+> I'm sorry, but I'm not going to take any code that will do that in our
+> clock driver.
+> 
+> I'm not going to have a huge list of ifdef depending on configuration
+> options to know which clock to enable, especially when clk_get should
+> have the consumer device as an argument.
+> 
+>> For example, the Tegra clock driver has a clock initialization table
+>> which IIRC was used for this purpose before we got a DRM/KMS driver.
+>> That way, all the details are kept inside the kernel code, and don't
+>> end up influencing the DT representation of simplefb.
+> 
+> I don't really see how the optional usage of a generic property
+> influences badly the DT representation of simplefb.
 
-For the backwards compatibility case, the driver already has to provide
-the duration. I don't want to break the existing bindings at all.
++1 to all that Maxime said.
 
-> Plus, your approach doesn't cover the weird corner cases such as:
->   - reset-gpio
->   - wlf,reset-gpios
->   - phy-reset-gpios
->   - snps,reset-gpio
->   - the drivers that need several gpio and expect the reset one as a
->     positional argument.
->   - etc.
+Also as can be seen in other discussion on this patch set, simplefb
+should not be seen as something orthogonal to having a full kms driver.
 
-Those are just an issue of the implementation I posted earlier because
-gpiod_get doesn't support custom names other than %s-gpios. This could
-be extended and handled just as well if deemed necessary.
+So just write a full kms driver is not the answer IMHO. What we want
+is for a bootloader setup console to be available through simplefb
+bindings so that the kernel can show output without depending on
+module loading, and thus can show errors if things go bad before
+a kms driver gets loaded.
 
-regards
-Philipp
+And no build kms into the kernel is not the answer. We've all been
+working hard to be able to build more generic kernels, so as to get
+generic distro support. And generic distros will build kms as modules,
+as there are simply to many different kms drivers to build them all
+in.
+
+Regards,
+
+Hans
