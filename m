@@ -1,60 +1,102 @@
-From: tomeu.vizoso@collabora.com (Tomeu Vizoso)
-Date: Thu, 14 Aug 2014 14:11:22 +0200
-Subject: [PATCH v6 0/6] Per-user clock constraints
-Message-ID: <1408018287-14217-1-git-send-email-tomeu.vizoso@collabora.com>
+From: shc_work@mail.ru (=?UTF-8?B?QWxleGFuZGVyIFNoaXlhbg==?=)
+Date: Thu, 14 Aug 2014 16:12:01 +0400
+Subject: =?UTF-8?B?UmU6IFtQQVRDSCA0LzRdIEFSTTogZHRzOiBrZXlzdG9uZS1rMmhrOiBhZGQg?=
+ =?UTF-8?B?ZHNwIGdwaW8gY29udHJvbGxlcnMgbm9kZXM=?=
+In-Reply-To: <53ECA7F3.7030702@ti.com>
+References: <1407946582-20927-1-git-send-email-grygorii.strashko@ti.com>
+ <1407945984.545232249@f170.i.mail.ru> <53ECA7F3.7030702@ti.com>
+Message-ID: <1408018321.928492982@f270.i.mail.ru>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Thu, 14 Aug 2014 15:13:39 +0300 ?? Grygorii Strashko <grygorii.strashko@ti.com>:
+> Hi Alexander,
+> 
+> On 08/13/2014 07:06 PM, Alexander Shiyan wrote:
+> > Wed, 13 Aug 2014 19:16:22 +0300 ?? Grygorii Strashko <grygorii.strashko@ti.com>:
+> >> Add Keystone 2 DSP GPIO nodes.
+> >> DSP GPIO banks 0-7 correspond to DSP0-DSP7
+> >>
+> >> Signed-off-by: Grygorii Strashko <grygorii.strashko@ti.com>
+> >> ---
+> >>   arch/arm/boot/dts/k2hk.dtsi |   56 +++++++++++++++++++++++++++++++++++++++++++
+> >>   1 file changed, 56 insertions(+)
+> >>
+> >> diff --git a/arch/arm/boot/dts/k2hk.dtsi b/arch/arm/boot/dts/k2hk.dtsi
+> >> index 321ba2f..009e180 100644
+> >> --- a/arch/arm/boot/dts/k2hk.dtsi
+> >> +++ b/arch/arm/boot/dts/k2hk.dtsi
+> >> @@ -50,5 +50,61 @@
+> >>   			#interrupt-cells = <1>;
+> >>   			ti,syscon-dev = <&devctrl 0x2a0>;
+> >>   		};
+> >> +
+> >> +		dspgpio0: keystone_dsp_gpio at 02620240 {
+> >> +			compatible = "ti,keystone-mctrl-gpio";
+> >> +			gpio-controller;
+> >> +			#gpio-cells = <2>;
+> >> +			gpio,syscon-dev = <&devctrl 0x240>;
+> >> +		};
+> >> +
+> >> +		dspgpio1: keystone_dsp_gpio at 2620244 {
+> >> +			compatible = "ti,keystone-mctrl-gpio";
+> >> +			gpio-controller;
+> >> +			#gpio-cells = <2>;
+> >> +			gpio,syscon-dev = <&devctrl 0x244>;
+> >> +		};
+> > ...
+> >> +		dspgpio7: keystone_dsp_gpio at 262025C {
+> >> +			compatible = "ti,keystone-mctrl-gpio";
+> >> +			gpio-controller;
+> >> +			#gpio-cells = <2>;
+> >> +			gpio,syscon-dev = <&devctrl 0x25c>;
+> >> +		};
+> > 
+> > So, devctrl is a syscon device and this DTS introduce several
+> > identical GPIO descriptions?
+> > 
+> > On my opinion this should be placed in the gpio-syscon.c,
+> > where you can add support for ti,keystone-dsp0{..7}-gpio.
+> > Such change will avoid parts 2 and 3 of this patch.
+> > 
+> > static const struct syscon_gpio_data ti_keystone_dsp0_gpio = {
+> >    .compatible = "ti,keystone-syscon",
+> >    .dat_bit_offset = 0x240 * 8,
+> >    ...
+> >    .set = etc...
+> > };
+> 
+> So, if I understand you right, you propose to add 8 additional compatible
+> strings just to encode different register offsets. Is it?
+> 1) add "ti,keystone-mctrl-gpio0"..."ti,keystone-mctrl-gpio7"
 
-in this v6 of the patchset I have only rebased on top of latest clk-next. Thanks to Boris Brezillon doing the rebase itself and pointing out those files that needed a re-run of the script. Follows the original cover letter blurb:
+Yes, but replace "mctrl" with "dsp" since mctrl is not applicable here.
 
-I'm retaking Rabin's patches [0] for splitting the clk API in two: one API for
-clk consumers and another for providers. The consumer API uses a clk structure
-that just keeps track of the consumer and has a reference to the actual
-clk_core struct, which is used internally.
+> 2) add 8 structures keystone_mctrl_gpio0..keystone_mctrl_gpio7 in gpio-syscon.c
+>    (which will have only different values of field - .dat_bit_offset = 0x2yy * 8,)
+> 
+> 3) add 8 additional items in array syscon_gpio_ids
+> 	{
+> 		.compatible	= "ti,keystone-mctrl-gpio0",
+> 		.data		= &keystone_mctrl_gpio0,
+> 	}, ...
+> 
+> I can do it if you strictly insist, BUT I don't like it :(
+> - just imagine how your driver will look look like if 5 or 6 SoCs will re-use it ;)
+> - as I mentioned in cover letter and commit messages even each SoC revision can have
+>   different Syscon implementation with different registers offsets and with different
+>   number of Syscon register ranges (for example for Keystone 2 we already have two
+>   Syscon devices defined in DT).
 
-I have kept a patch from Rabin that aims to aid in debugging nested
-enable/disable calls, though my personal aim is to allow more than one consumer
-to influence the final, effective frequency rate. For now this is limited to
-setting floor and ceiling constraints, with the short-term aim of allowing
-devfreq and thermal drivers to set floor and ceiling frequencies on the memory
-clock, respectively.
+The initial version of this driver contains addresses and offsets in, but this approach has
+been criticized by DT maintainers.
 
-For those functions in the consumer clk API that were called from providers, I
-have added variants to clk-provider.h that are the same only that accept a
-clk_core instead. These functions are prefixed with clk_provider_.
+"different Syscon with different registers" - is OK, since we use compatible string in definition.
+If you have two identical syscon, just append an unique additional string and use it in this driver.
 
-Patch 1/6 just adds a bunch of defines with the goal of having all the renames
-in their own commit while preserving git-bisectability, with patch 3/6
-containing the rename itself as generated by the Coccinelle script in [1].
-Patch 2/6 is needed because sound/soc/mxs/mxs-saif.c calls both the consumer
-and the provider API. The actual implementation of the API split comes in patch
-4/6. I will be happy to organize the refactoring differently if anybody has a
-better idea.
+> Now we already have 3 Keystone 2 SoC revisions (K2HK, K2L, K2E)  and there are no guarantee
+> that the next revision k2X will have the same register offset for GPIO0.
 
-Patch 5/6 warns when there's an unbalanced usage of the enable and disable
-APIs, and patch 6/6 adds the API for setting floor and ceiling frequencies, per
-consumer.
+Then use more exact string for syscon-gpio, like ti,keystone-k2hk-dsp-gpio0.
 
-[0] http://thread.gmane.org/gmane.linux.kernel/1402006
-[1] http://cgit.collabora.com/git/user/tomeu/linux.git/commit/?id=da9c7e34d9
-
-Thanks,
-
-Tomeu
-
-Tomeu Vizoso (6):
-  clk: Add temporary mapping to the existing API
-  ASoC: mxs-saif: fix mixed use of public and provider clk API
-  clk: Move all drivers to use internal API
-  clk: use struct clk only for external API
-  clk: per-user clock accounting for debug
-  clk: Add floor and ceiling constraints to clock rates
-
-[detailed diffstat omitted for brevity sake]
-
- 245 files changed, 2297 insertions(+), 1827 deletions(-)
-
--- 
-1.9.3
+---
