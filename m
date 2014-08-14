@@ -1,47 +1,26 @@
 From: dinguyen@opensource.altera.com (Dinh Nguyen)
-Date: Thu, 14 Aug 2014 15:56:53 -0500
-Subject: [PATCH 3/3] ARM: dts: socfpga: memreserve first 4KB for SMP code
-In-Reply-To: <20140814185432.GE11558@amd.pavel.ucw.cz>
+Date: Thu, 14 Aug 2014 15:57:52 -0500
+Subject: [PATCH 2/3] ARM: dts: socfpga: Add SD card detect
+In-Reply-To: <20140814185158.GD11558@amd.pavel.ucw.cz>
 References: <1408031491-15609-1-git-send-email-dinguyen@opensource.altera.com>
- <1408031491-15609-4-git-send-email-dinguyen@opensource.altera.com>
- <20140814185432.GE11558@amd.pavel.ucw.cz>
-Message-ID: <53ED2295.3020700@opensource.altera.com>
+ <1408031491-15609-3-git-send-email-dinguyen@opensource.altera.com>
+ <20140814185158.GD11558@amd.pavel.ucw.cz>
+Message-ID: <53ED22D0.3060404@opensource.altera.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 
 
-On 8/14/14, 1:54 PM, Pavel Machek wrote:
-> On Thu 2014-08-14 10:51:31, dinguyen at opensource.altera.com wrote:
+On 8/14/14, 1:51 PM, Pavel Machek wrote:
+> On Thu 2014-08-14 10:51:30, dinguyen at opensource.altera.com wrote:
 >> From: Dinh Nguyen <dinguyen@opensource.altera.com>
 >>
->> The SOCFPGA's SMP code uses 0x0 for as the location for the trampoline to
->> bring secondary cores online. This patch adds a /memreserve/ section to
->> reserve the first 4K for the SMP trampoline code.
->>
->> Signed-off-by: Dinh Nguyen <dinguyen@opensource.altera.com>
->> ---
->>  arch/arm/boot/dts/socfpga_arria5.dtsi   | 1 +
->>  arch/arm/boot/dts/socfpga_cyclone5.dtsi | 1 +
->>  2 files changed, 2 insertions(+)
->>
->> diff --git a/arch/arm/boot/dts/socfpga_arria5.dtsi b/arch/arm/boot/dts/socfpga_arria5.dtsi
->> index 468fc4c..73b939e 100644
->> --- a/arch/arm/boot/dts/socfpga_arria5.dtsi
->> +++ b/arch/arm/boot/dts/socfpga_arria5.dtsi
->> @@ -15,6 +15,7 @@
->>   */
->>  
->>  /dts-v1/;
->> +/memreserve/ 0x00000000 0x0001000;
+>> Revision D of the SOCFGPA devkit has a GPIO line used for SD/MMC
+>> card detect.
 > 
-> Actually, comment here explaining that ROM code uses 0x0 for the
-> trampoline would be nice here... if I understand it correctly.
+> Are there previous revisions outside Altera?
+> 
 
-Sure...I'll add a single line comment.
+Not with SD card detect.
 
-Dinh
-> 
-> Thanks,
-> 									Pavel
-> 
+dinh
