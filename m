@@ -1,108 +1,74 @@
-From: jonsmirl@gmail.com (jonsmirl at gmail.com)
-Date: Thu, 14 Aug 2014 08:07:26 -0400
-Subject: [linux-sunxi] Re: [PATCH 3/4] simplefb: disable dt node upon
- remove
-In-Reply-To: <CACxGe6v1UPHMF5aPpe-boh+RuoPArJmKK_cQWr7aXsRjDUZrfQ@mail.gmail.com>
-References: <1407914239-12054-1-git-send-email-libv@skynet.be>
- <1407914239-12054-4-git-send-email-libv@skynet.be>
- <CACxGe6vaPUa4QvYWBA-QY7MTmJYoeqnPt9Zh5jpky6S9UYbrvQ@mail.gmail.com>
- <CANq1E4ReOB87RX8VhnW1Ln=SK3Tw5V962ujcsfuz-2E9Uc61yQ@mail.gmail.com>
- <CACxGe6vQrhd8QOAyGnjRppmuANpT60Ao2+KmkDfF4FNeoZSZgw@mail.gmail.com>
- <20140813094524.GC31326@skynet.be>
- <20140813101923.GD31326@skynet.be>
- <CAKON4OwLOAq1EOzZmuefcnZ4hw0i35e3k0F6XGNRy-5jer2vyA@mail.gmail.com>
- <CACxGe6szX3LyhGHbVHrEFfaWGYUcgcxgkuhfc9ac-R0qJs-HXw@mail.gmail.com>
- <CAKON4OzQbuaQsbTCDXuaqxLRxvat_5+wmf71S-rWXdfiT1gkvA@mail.gmail.com>
- <CACxGe6v1UPHMF5aPpe-boh+RuoPArJmKK_cQWr7aXsRjDUZrfQ@mail.gmail.com>
-Message-ID: <CAKON4OypgToTSXxjShCt6uTGZBU69LpJxRwVoz=PnotpL=zm4w@mail.gmail.com>
+From: tomeu.vizoso@collabora.com (Tomeu Vizoso)
+Date: Thu, 14 Aug 2014 14:07:46 +0200
+Subject: [PATCH v5 0/6] Per-user clock constraints
+In-Reply-To: <20140813114618.2466ade6@bbrezillon>
+References: <1407333368-31979-1-git-send-email-tomeu.vizoso@collabora.com>
+ <20140813114618.2466ade6@bbrezillon>
+Message-ID: <53ECA692.6090604@collabora.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Aug 14, 2014 at 6:15 AM, Grant Likely <grant.likely@secretlab.ca> wrote:
-> On Wed, Aug 13, 2014 at 9:41 PM, jonsmirl at gmail.com <jonsmirl@gmail.com> wrote:
->> On Wed, Aug 13, 2014 at 3:14 PM, Grant Likely <grant.likely@secretlab.ca> wrote:
->>> On Wed, Aug 13, 2014 at 1:54 PM, jonsmirl at gmail.com <jonsmirl@gmail.com> wrote:
->>>> On Wed, Aug 13, 2014 at 6:19 AM, Luc Verhaegen <libv@skynet.be> wrote:
->>>>> On Wed, Aug 13, 2014 at 11:45:24AM +0200, Luc Verhaegen wrote:
->>>>>> On Wed, Aug 13, 2014 at 10:23:14AM +0100, Grant Likely wrote:
->>>>>> >
->>>>>> > The majority of the DT code is based on the assumption of a static
->>>>>> > tree. Pantelis has been working on being able to modify it at runtime
->>>>>> > with overlays, but he has had to go through a lot of rework because it
->>>>>> > is not a trivial task. When you get into modifying the DT, you need to
->>>>>> > have a lot more understanding of the side effects to changing the
->>>>>> > tree. The DT structure also has a lifecycle that can go beyond the
->>>>>> > current lifecycle of the kernel. The kexec tool will extract the
->>>>>> > current tree from the kernel, make the appropriate modifications, and
->>>>>> > use that to boot the next kernel. Allowing any driver to modify the
->>>>>> > tree has side effects beyond just the current kernel.
->>>>>> >
->>>>>> > In this specific case, it will interact badly with the work Pantelis
->>>>>> > is doing to make platform devices work with overlays. Modifying the
->>>>>> > status property will cause the associated struct device to get removed
->>>>>> > in the middle of probing a driver for that device! That will most
->>>>>> > likely cause an oops.
->>>>>> >
->>>>>> > Besides, Luc straight out *said*: "...even though it has no real value
->>>>>> > today". In what circumstance is that justification for modifying the
->>>>>> > tree?
->>>>>>
->>>>>> With that sentence i meant that given the current state of things, it
->>>>>> has no real value.
->>>>>>
->>>>>> It has no value currently as re-probing simplefb is not going to happen.
->>>>>> But it's not a big leap to turn simplefb into a proper module. Not that
->>>>>> that makes much sense, but that's never stopped anyone.
->>>>>>
->>>>>> To me it seemed simple, dt is what drives simplefb, so dt then also
->>>>>> becomes responsible for making sure that simplefb or another driver does
->>>>>> not attempt to blindly use this info again. The way this is implemented
->>>>>> i do not care for in any way, i just knew that i could not do nothing
->>>>>> here, given the catastrophic effect disabling the clocks has on simplefb
->>>>>> on sunxi. Given the discussion that errupted here, i'd say that this
->>>>>> does need some resolution, and altering the dt is going to have to be
->>>>>> part of the solution.
->>>>>>
->>>>>> In any case, i will gladly drop this patch, as it is not absolutely
->>>>>> necessary. But it should be very clear that there is no going back on
->>>>>> this dt node after the clocks were released once.
->>>>>>
->>>>>> Luc Verhaegen.
->>>>>
->>>>> What about approaching this from the other end? U-Boot could add a
->>>>> property named "once-only" or so.
->>>>
->>>> Device tree is supposed to be a static description of the hardware
->>>> usable on all operating systems. It is the wrong mechanism for
->>>> communicating between uboot and the kernel. Use something like atags
->>>> or the kernel command line to tell the kernel that the console has
->>>> already been set up.
->>>
->>> Not accurate. While it is primarily hardware description, it is also
->>> used for firmware communication. There is loads of precedence for
->>> this. The /chosen node is the most significant example, but there are
->>> other places where the tree is used to provide state. For example, the
->>> current-speed property on UART nodes.
+On 08/13/2014 11:46 AM, Boris BREZILLON wrote:
+> Hi Tomeu,
+>
+> Sorry for the late reply.
+>
+> On Wed,  6 Aug 2014 15:56:03 +0200
+> Tomeu Vizoso <tomeu.vizoso@collabora.com> wrote:
+>
+>> Hi,
 >>
->> I do seem to recall you telling me a long time ago that those chosen
->> nodes were a mistake (or maybe it was Matt Sealey). I'm pretty wary of
->> opening to door to device trees carrying a bunch of state.  Five years
->> from now the DT is going to look like a Christmas tree.
+>> in this v5 of the patchset I have just moved the storage of the clock constraints to the struct clk, as suggested by Stephen. Follows the original cover letter blurb:
+>>
+>> I'm retaking Rabin's patches [0] for splitting the clk API in two: one API for
+>> clk consumers and another for providers. The consumer API uses a clk structure
+>> that just keeps track of the consumer and has a reference to the actual
+>> clk_core struct, which is used internally.
+>>
+>> I have kept a patch from Rabin that aims to aid in debugging nested
+>> enable/disable calls, though my personal aim is to allow more than one consumer
+>> to influence the final, effective frequency rate. For now this is limited to
+>> setting floor and ceiling constraints, with the short-term aim of allowing
+>> devfreq and thermal drivers to set floor and ceiling frequencies on the memory
+>> clock, respectively.
+>>
+>> For those functions in the consumer clk API that were called from providers, I
+>> have added variants to clk-provider.h that are the same only that accept a
+>> clk_core instead. These functions are prefixed with clk_provider_.
+>>
+>> Patch 1/6 just adds a bunch of defines with the goal of having all the renames
+>> in their own commit while preserving git-bisectability, with patch 3/6
+>> containing the rename itself as generated by the Coccinelle script in [1].
+>> Patch 2/6 is needed because sound/soc/mxs/mxs-saif.c calls both the consumer
+>> and the provider API. The actual implementation of the API split comes in patch
+>> 4/6. I will be happy to organize the refactoring differently if anybody has a
+>> better idea.
+>>
+>> Patch 5/6 warns when there's an unbalanced usage of the enable and disable
+>> APIs, and patch 6/6 adds the API for setting floor and ceiling frequencies, per
+>> consumer.
 >
-> Wasn't me. Carrying state in the DT provided by firmware is perfectly
-> reasonable in my opinion.
-
-So what are the rules going to be? Once the OS is up and starts
-changing things the state in the DT and the OS are going to diverge.
-How does this get handled for a kernel driver that can load/unload?
-Should the kernel remove those state nodes as soon as it alters the
-state?
-
+> I tested your patch series on an at91 platform (sama5d3), and it works
+> as expected, but I had to fix some conflicts when applying your patches
+> on clk-next, and then got a few errors at compile time.
 >
-> g.
+> Anyway here is my branch with all those conflicts resolved: [1]. The
+> last commit [2] fixes the build errors (I'll let you squash/split the
+> changes as you wish).
 
+Thanks a lot, it has saved me quite some time.
 
+I have just re-run my coccinelle script and added the new file to the 
+input file list. Will be sending v6 now.
 
--- 
-Jon Smirl
-jonsmirl at gmail.com
+Regards,
+
+Tomeu
+
+> Best Regards,
+>
+> Boris
+>
+> [1]https://github.com/bbrezillon/linux-at91/tree/per-clk-contraints
+> [2]https://github.com/bbrezillon/linux-at91/commit/d366c37dcfa5f06de3e27fc3c2807017bece9a2f
+>
