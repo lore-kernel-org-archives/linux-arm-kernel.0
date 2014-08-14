@@ -1,48 +1,60 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Thu, 14 Aug 2014 08:40:23 +0100
-Subject: [PATCH] ARM: Use 'model' property to set machine_name from
- Device Tree
-In-Reply-To: <53EC0B2A.2070308@samsung.com>
-References: <1404697991-32191-1-git-send-email-cw00.choi@samsung.com>
- <53EC0B2A.2070308@samsung.com>
-Message-ID: <20140814074023.GR30401@n2100.arm.linux.org.uk>
+From: l.stach@pengutronix.de (Lucas Stach)
+Date: Thu, 14 Aug 2014 10:26:00 +0200
+Subject: [PATCH] ARM: tegra: remove pinmux setup from Tegra124 boards
+In-Reply-To: <53EB91D4.8050402@wwwdotorg.org>
+References: <1403563506-6461-1-git-send-email-swarren@wwwdotorg.org>
+ <1407921548.5835.20.camel@weser.hi.pengutronix.de>
+ <53EB91D4.8050402@wwwdotorg.org>
+Message-ID: <1408004760.4649.11.camel@weser.hi.pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Aug 14, 2014 at 10:04:42AM +0900, Chanwoo Choi wrote:
-> On 07/07/2014 10:53 AM, Chanwoo Choi wrote:
-> > This patch use 'model' property from Device Tree to set machine_name.
-> > The arm64 has already got the machine_name from Device Tree.
-> > 
-> > Signed-off-by: Chanwoo Choi <cw00.choi@samsung.com>
-> > ---
-> >  arch/arm/kernel/setup.c | 4 ++++
-> >  1 file changed, 4 insertions(+)
-> > 
-> > diff --git a/arch/arm/kernel/setup.c b/arch/arm/kernel/setup.c
-> > index 8a16ee5..698616f 100644
-> > --- a/arch/arm/kernel/setup.c
-> > +++ b/arch/arm/kernel/setup.c
-> > @@ -878,7 +878,11 @@ void __init setup_arch(char **cmdline_p)
-> >  	if (!mdesc)
-> >  		mdesc = setup_machine_tags(__atags_pointer, __machine_arch_type);
-> >  	machine_desc = mdesc;
-> > +#if CONFIG_OF
-> > +	machine_name = of_flat_dt_get_machine_name();
-> > +#else
-> >  	machine_name = mdesc->name;
-> > +#endif
-> >  
-> >  	if (mdesc->reboot_mode != REBOOT_HARD)
-> >  		reboot_mode = mdesc->reboot_mode;
-> > 
+Am Mittwoch, den 13.08.2014, 10:27 -0600 schrieb Stephen Warren:
+> On 08/13/2014 03:19 AM, Lucas Stach wrote:
+> > Hi Stephen,
+> >
+> > sorry for getting on this late, I completely missed this and only now
+> > stumbled upon this.
+> >
+> > I'm not really fond of this change. The barebox bootloader completely
+> > probes itself from DT, including the pinmux. We try to stay as close as
+> > possible to the upstream kernel DTs and only introduce minimal changes.
+> > Removing the pinmux from the DTS will completely break barebox, as we
+> > don't have any static pinmux tables there.
 > 
-> Ping.
+> Probing bootloaders from DT seems like a huge mistake to me, but that's 
+> probably a separate discussion.
+> 
+Bringing DT into the bootloader was one the single most important
+things for productivity we ever did.
+On i.MX (the best supported arch in Barebox) it has brought down bringup
+time for boards already supported by Linux to a few hours and enables us
+to share effort spent for bootloader development on new boards with
+later Linux development. Writing a single DT description for the
+hardware to bring up the bootloader greatly reduces the time needed to
+bring up Linux later on.
 
-This has come up before, and the decision was against exposing this.
+> The pinmux generator scripts spit out DT, so you can easily generate a 
+> DT representation of the board pinmux, and add that to the DT file in 
+> Barebox. See https://github.com/NVIDIA/tegra-pinmux-scripts.
+> 
+I could do that, but...
 
-Thanks.
+> > In order to not break the bootloader use-case I strongly advocate to
+> > keep the static pinmux in the DT. Can't we just rename the the state to
+> > something like "initial", so Linux won't try to set it by default?
+> 
+> That doesn't seem like a good idea. There's no reason for the DT to 
+> contain data that we know has no use.
+> 
+Just because the DTS are still located in the kernel tree doesn't mean
+the kernel is the only user. DT is meant to be a hardware description.
+IMHO knowing that the kernel isn't using some information contained in
+there is no argument for omitting the info.
+
+Regards,
+Lucas
 
 -- 
-FTTC broadband for 0.8mile line: currently at 9.5Mbps down 400kbps up
-according to speedtest.net.
+Pengutronix e.K.             | Lucas Stach                 |
+Industrial Linux Solutions   | http://www.pengutronix.de/  |
