@@ -1,31 +1,67 @@
-From: festevam@gmail.com (Fabio Estevam)
-Date: Thu, 14 Aug 2014 12:30:46 -0300
-Subject: Oops: 17 SMP ARM (v3.16-rc2)
-In-Reply-To: <C4A61A5CA4AD2246942F4BA6F20ACB80435776D3@ALVA-EXMB04.alv.autoliv.int>
-References: <20140626151424.GT32514@n2100.arm.linux.org.uk>
- <20140627112151.GF32514@n2100.arm.linux.org.uk>
- <3FFB61A7A8473C49831AF20FA193534A43CADFA7@ALVA-EXMB01.alv.autoliv.int>
- <20140627163108.GP32514@n2100.arm.linux.org.uk>
- <C4A61A5CA4AD2246942F4BA6F20ACB8043575072@ALVA-EXMB04.alv.autoliv.int>
- <20140806095012.GN30282@n2100.arm.linux.org.uk>
- <C4A61A5CA4AD2246942F4BA6F20ACB8043575172@ALVA-EXMB04.alv.autoliv.int>
- <20140806125550.GO30282@n2100.arm.linux.org.uk>
- <C4A61A5CA4AD2246942F4BA6F20ACB804357526C@ALVA-EXMB04.alv.autoliv.int>
- <20140807121248.GY30282@n2100.arm.linux.org.uk>
- <20140808180900.GG30282@n2100.arm.linux.org.uk>
- <C4A61A5CA4AD2246942F4BA6F20ACB8043576356@ALVA-EXMB04.alv.autoliv.int>
- <CAOMZO5B8GR+ABBoJ=dJcFqw3Wagfaip7HM+C1FTz+aE4CmqiPw@mail.gmail.com>
- <C4A61A5CA4AD2246942F4BA6F20ACB80435776D3@ALVA-EXMB04.alv.autoliv.int>
-Message-ID: <CAOMZO5B7FgzB7ThVyV2Vk7wTwYgjRWjEnkkAN5uwwKMaBKq1yg@mail.gmail.com>
+From: nicolas.ferre@atmel.com (Nicolas Ferre)
+Date: Thu, 14 Aug 2014 17:45:56 +0200
+Subject: [GIT PULL] at91: move of AIC drivers for 3.17: fixes #1
+Message-ID: <1408031156-13573-1-git-send-email-nicolas.ferre@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Aug 14, 2014 at 11:43 AM, Mattis Lorentzon
-<Mattis.Lorentzon@autoliv.com> wrote:
+Arnd, Olof, Kevin,
 
-> After a few more tests we have finally been able to trigger the exact same stalls
-> on the Sabrelite board with a direct network connection (i.e. without the switch).
+Boris moved both of our AIC drivers to their new home: the drivers/irqchip
+directory taking advantage of the genirc framework. For DT-enabled SoCs, we can
+use these drivers (aic and aic5) right now: Jason merged them and they are
+available in early 3.17 merge window.
+So, I build this pull-request for enabling the use of these drivers now as:
+- we are very early in 3.17 development
+- it allowed us to avoid having to depend on Jason's branch before the opening
+  of the merge window
+- it removes some code from the mach-at91 directory: including the whole
+  aic5 driver
+- we'd have quite a bit of time to solve issues if we found a bug
+- the code is basically moved so it should be error free.
 
-Do the stalls also happen on a pure 3.16 kernel?
+I base my pull-request on Linus' tree at the point you built your previous
+"3.17 fixes-for-linus" tag.
+Tell me if you think it can be integrated now.
 
-How can we reproduce the error?
+Thanks, best regards,
+
+The following changes since commit c309bfa9b481e7dbd3e1ab819271bf3009f44859:
+
+  Merge tag 'for-linus-20140808' of git://git.infradead.org/linux-mtd (2014-08-08 18:13:21 -0700)
+
+are available in the git repository at:
+
+
+  git://github.com/at91linux/linux-at91.git tags/at91-fixes
+
+for you to fetch changes up to 98561f0d9e82682c4be74b6690cb605ccabec364:
+
+  ARM: at91: remove old irq material (2014-08-14 17:00:04 +0200)
+
+----------------------------------------------------------------
+AT91 irqchip enhancement for 3.17 (aka fixes #1)
+Following the merge of AIC/AIC5 code as standard irqchip drivers during early
+3.17 merge window, we can use these drivers for AT91 DT-enabled chips and
+boards.
+
+----------------------------------------------------------------
+Boris BREZILLON (4):
+      ARM: at91: introduce OLD_IRQ_AT91 Kconfig option
+      ARM: at91: enclose at91_aic_xx calls in IS_ENABLED(CONFIG_OLD_IRQ_AT91) blocks
+      ARM: at91: make use of the new AIC driver for dt enabled boards
+      ARM: at91: remove old irq material
+
+ arch/arm/mach-at91/Kconfig           |  17 +--
+ arch/arm/mach-at91/Kconfig.non_dt    |   6 +
+ arch/arm/mach-at91/Makefile          |   3 +-
+ arch/arm/mach-at91/board-dt-rm9200.c |  13 --
+ arch/arm/mach-at91/board-dt-sam9.c   |  13 --
+ arch/arm/mach-at91/board-dt-sama5.c  |  13 --
+ arch/arm/mach-at91/irq.c             | 270 +----------------------------------
+ arch/arm/mach-at91/pm.c              |  32 +++--
+ arch/arm/mach-at91/setup.c           |   3 +-
+ 9 files changed, 45 insertions(+), 325 deletions(-)
+
+-- 
+Nicolas Ferre
