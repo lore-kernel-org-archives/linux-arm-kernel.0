@@ -1,49 +1,56 @@
-From: addy.ke@rock-chips.com (addy ke)
-Date: Thu, 14 Aug 2014 11:57:02 +0800
-Subject: [PATCH] ARM: dts: Add mmc0 and mmc1 aliases for rk3288
-In-Reply-To: <CAD=FV=XNJ9RRnOaJ5e-D60S5vjZu6UbphdWqqfRq_YfZaXoq+A@mail.gmail.com>
-References: <1407974880-30626-1-git-send-email-dianders@chromium.org>	<53EC177B.1080706@rock-chips.com>
- <CAD=FV=XNJ9RRnOaJ5e-D60S5vjZu6UbphdWqqfRq_YfZaXoq+A@mail.gmail.com>
-Message-ID: <53EC338E.9060409@rock-chips.com>
+From: horms@verge.net.au (Simon Horman)
+Date: Thu, 14 Aug 2014 14:25:57 +0900
+Subject: [PATCH] ARM: shmobile: defconfig: enable initrd and atag dtb
+ compat
+In-Reply-To: <1407974835-11064-1-git-send-email-khilman@linaro.org>
+References: <1407974835-11064-1-git-send-email-khilman@linaro.org>
+Message-ID: <20140814052557.GA27045@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> Addy,
+On Wed, Aug 13, 2014 at 05:07:15PM -0700, Kevin Hilman wrote:
+> Enable ATAG_DTB_COMPAT support for passing commandline from bootloader.
+> Enable initrd support.
 > 
-> On Wed, Aug 13, 2014 at 6:57 PM, Addy <addy.ke@rock-chips.com> wrote:
+> Signed-off-by: Kevin Hilman <khilman@linaro.org>
+> ---
+> With this, I can finally integrate the kzm9d into the board farm because I use
+> initrafms for the primary rootfs, and set the command-line from u-boot.
 > 
->> I think maybe it is suitable as follows:
->> mmc0 = &sdmmc
->> mmc1 = &sdio0
->> mmc2 = &sdio1
->> mmc3 = &emmc
-> 
-> Right, except the only ones that have landed in Heiko's tree are sdmmc
-> and emmc, so we can't do sdio0 and sdio1 yet.  You could post support
-> for sdio0 and adio1?
+> Tested on next-20140813
 
-yes, I will post it today.
+Thanks, I will queue this up for v3.18 and push it to next
+once v3.17-rc1 has been released.
+
 > 
-> Also: it's really handy if emmc is 0.  See below: I don't think it's
-> great to use the ID to find the sysconfig registers.
+>  arch/arm/configs/shmobile_defconfig | 2 ++
+>  1 file changed, 2 insertions(+)
 > 
+> diff --git a/arch/arm/configs/shmobile_defconfig b/arch/arm/configs/shmobile_defconfig
+> index 3b136144cc83..d655f088ac58 100644
+> --- a/arch/arm/configs/shmobile_defconfig
+> +++ b/arch/arm/configs/shmobile_defconfig
+> @@ -3,6 +3,7 @@ CONFIG_NO_HZ=y
+>  CONFIG_IKCONFIG=y
+>  CONFIG_IKCONFIG_PROC=y
+>  CONFIG_LOG_BUF_SHIFT=16
+> +CONFIG_BLK_DEV_INITRD=y
+>  CONFIG_CC_OPTIMIZE_FOR_SIZE=y
+>  CONFIG_SYSCTL_SYSCALL=y
+>  CONFIG_EMBEDDED=y
+> @@ -33,6 +34,7 @@ CONFIG_HIGHMEM=y
+>  CONFIG_ZBOOT_ROM_TEXT=0x0
+>  CONFIG_ZBOOT_ROM_BSS=0x0
+>  CONFIG_ARM_APPENDED_DTB=y
+> +CONFIG_ARM_ATAG_DTB_COMPAT=y
+>  CONFIG_KEXEC=y
+>  CONFIG_VFP=y
+>  CONFIG_NEON=y
+> -- 
+> 1.9.2
 > 
->> So we can get ctrl_id:
->> ctrl_id = of_alias_get_id(host->dev->of_node, "mshc");
-> 
-> Somehow I hadn't realized that was there.  I guess we could use that
-> too.  I'd vote to remove that and use the standard "mmc" numbering
-> (and get some momentum to land those patches).  If you want I'll
-> repost using the mshc stuff, though.
-> 
-> 
->> and can get offset of registers:
->> offset = 0x200 + ctrl_id * 8 + 4 * drive_or_sample
-> 
-> I thought the plan was to actually implement the phase stuff as a clock driver.
-> 
-> ...even if we didn't, I'd rather not rely on ID like this to find the
-> right address.  It's really non-obvious.
-> 
-> 
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-sh" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
 > 
