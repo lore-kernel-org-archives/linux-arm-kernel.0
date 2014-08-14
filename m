@@ -1,97 +1,93 @@
-From: koen@dominion.thruhere.net (Koen Kooi)
-Date: Thu, 14 Aug 2014 12:31:50 +0200
-Subject: [linux-sunxi] [PATCH 4/4] simplefb: add clock handling code
-In-Reply-To: <53EC834F.6020307@redhat.com>
+From: dh.herrmann@gmail.com (David Herrmann)
+Date: Thu, 14 Aug 2014 12:33:55 +0200
+Subject: [PATCH 2/4] simplefb: add goto error path to probe
+In-Reply-To: <20140814102940.GA1000@skynet.be>
 References: <1407914239-12054-1-git-send-email-libv@skynet.be>
- <1407914239-12054-5-git-send-email-libv@skynet.be>
- <53EB9471.3090204@wwwdotorg.org> <20140813170106.GT15297@lukather>
- <53EC834F.6020307@redhat.com>
-Message-ID: <9B9D62CA-8037-4653-BCF0-C79BFFEB4279@dominion.thruhere.net>
+ <1407914239-12054-3-git-send-email-libv@skynet.be>
+ <CANq1E4Tsi6-a5wL8=SFZuX=+K68txAzp-WBjLSM+ZhW+k4tMfg@mail.gmail.com>
+ <20140814102940.GA1000@skynet.be>
+Message-ID: <CANq1E4TAf=Lyuz5psPJE+MWyUO8db8V+-BqXmVyvdLvmY5g=iQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi
 
-Op 14 aug. 2014, om 11:37 heeft Hans de Goede <hdegoede@redhat.com> het volgende geschreven:
+On Thu, Aug 14, 2014 at 12:29 PM, Luc Verhaegen <libv@skynet.be> wrote:
+> On Wed, Aug 13, 2014 at 09:27:46AM +0200, David Herrmann wrote:
+>> Hi
+>>
+>> On Wed, Aug 13, 2014 at 9:17 AM, Luc Verhaegen <libv@skynet.be> wrote:
+>> > Signed-off-by: Luc Verhaegen <libv@skynet.be>
+>> > ---
+>> >  drivers/video/fbdev/simplefb.c |   20 +++++++++++++-------
+>> >  1 files changed, 13 insertions(+), 7 deletions(-)
+>> >
+>> > diff --git a/drivers/video/fbdev/simplefb.c b/drivers/video/fbdev/simplefb.c
+>> > index 32be590..72a4f20 100644
+>> > --- a/drivers/video/fbdev/simplefb.c
+>> > +++ b/drivers/video/fbdev/simplefb.c
+>> > @@ -220,8 +220,8 @@ static int simplefb_probe(struct platform_device *pdev)
+>> >
+>> >         info->apertures = alloc_apertures(1);
+>> >         if (!info->apertures) {
+>> > -               framebuffer_release(info);
+>> > -               return -ENOMEM;
+>> > +               ret = -ENOMEM;
+>> > +               goto error_fb_release;
+>> >         }
+>> >         info->apertures->ranges[0].base = info->fix.smem_start;
+>> >         info->apertures->ranges[0].size = info->fix.smem_len;
+>> > @@ -231,8 +231,8 @@ static int simplefb_probe(struct platform_device *pdev)
+>> >         info->screen_base = ioremap_wc(info->fix.smem_start,
+>> >                                        info->fix.smem_len);
+>> >         if (!info->screen_base) {
+>> > -               framebuffer_release(info);
+>> > -               return -ENODEV;
+>> > +               ret = -ENODEV;
+>> > +               goto error_fb_release;
+>> >         }
+>> >         info->pseudo_palette = (void *) par->palette;
+>> >
+>> > @@ -247,14 +247,20 @@ static int simplefb_probe(struct platform_device *pdev)
+>> >         ret = register_framebuffer(info);
+>> >         if (ret < 0) {
+>> >                 dev_err(&pdev->dev, "Unable to register simplefb: %d\n", ret);
+>> > -               iounmap(info->screen_base);
+>> > -               framebuffer_release(info);
+>> > -               return ret;
+>> > +               goto error_unmap;
+>> >         }
+>> >
+>> >         dev_info(&pdev->dev, "fb%d: simplefb registered!\n", info->node);
+>> >
+>> >         return 0;
+>> > +
+>> > + error_unmap:
+>> > +       iounmap(info->screen_base);
+>> > +
+>> > + error_fb_release:
+>> > +       framebuffer_release(info);
+>> > +
+>> > +       return ret;
+>>
+>> Again, I'd use different coding-style, but I will leave that to
+>> Stephen and Tomi:
+>>
+>> Reviewed-by: David Herrmann <dh.herrmann@gmail.com>
+>
+> While the discussion about the last two patches rages on, can you state
+> what coding style changes you would like to see here, as i am not clear
+> as to what exactly is off with the above code.
 
-> Hi,
-> 
-> On 08/13/2014 07:01 PM, Maxime Ripard wrote:
->> On Wed, Aug 13, 2014 at 10:38:09AM -0600, Stephen Warren wrote:
->>> On 08/13/2014 01:17 AM, Luc Verhaegen wrote:
->>>> This claims and enables clocks listed in the simple framebuffer dt node.
->>>> This is needed so that the display engine, in case the required clocks
->>>> are known by the kernel code and are described in the dt, will remain
->>>> properly enabled.
->>> 
->>> I think this make simplefb not simple any more, which rather goes
->>> against the whole point of it.
->>> 
->>> I specifically conceived simplefb to know about nothing more than
->>> the memory address and pixel layout of the memory buffer. I
->>> certainly don't like the idea of expanding simplefb to anything
->>> beyond that, and IIRC *not* extending is was a condition agreed when
->>> it was first merged. If more knowledge than that is required, then
->>> there needs to be a HW-specific driver to manage any
->>> clocks/resets/video registers, etc.
->> 
->> I'm sorry, but how is that not simple? clocks enabling is step 1 in a
->> driver in order to communicate somehow with the controller. Reset is a
->> different story, because arguably, if simplefb is there, the
->> controller is already out of reset.
->> 
->> And I don't see why video registers are coming into the discussion
->> here. The code Luc posted doesn't access any register, at all. It just
->> makes sure the needed controller keep going.
->> 
->>> The correct way to handle this without a complete DRM/KMS/... driver
->>> is to avoid the clocks in question being turned off at boot.
->> 
->> Which is exactly what this code does, using the generic DT bindings to
->> express dependency for a given clock. How is this wrong?
->> 
->>> I thought there was a per-clock flag to prevent disabling an unused
->>> clock?
->> 
->> No, last time I heard, Mike Turquette was against it.
->> 
->>> If not, perhaps the clock driver should force the clock to be
->>> enabled (perhaps only if the DRM/KMS driver isn't enabled?).
->> 
->> I'm sorry, but I'm not going to take any code that will do that in our
->> clock driver.
->> 
->> I'm not going to have a huge list of ifdef depending on configuration
->> options to know which clock to enable, especially when clk_get should
->> have the consumer device as an argument.
->> 
->>> For example, the Tegra clock driver has a clock initialization table
->>> which IIRC was used for this purpose before we got a DRM/KMS driver.
->>> That way, all the details are kept inside the kernel code, and don't
->>> end up influencing the DT representation of simplefb.
->> 
->> I don't really see how the optional usage of a generic property
->> influences badly the DT representation of simplefb.
-> 
-> +1 to all that Maxime said.
-> 
-> Also as can be seen in other discussion on this patch set, simplefb
-> should not be seen as something orthogonal to having a full kms driver.
-> 
-> So just write a full kms driver is not the answer IMHO. What we want
-> is for a bootloader setup console to be available through simplefb
-> bindings so that the kernel can show output without depending on
-> module loading, and thus can show errors if things go bad before
-> a kms driver gets loaded.
-> 
-> And no build kms into the kernel is not the answer. We've all been
-> working hard to be able to build more generic kernels, so as to get
-> generic distro support. And generic distros will build kms as modules,
-> as there are simply to many different kms drivers to build them all
-> in.
+I'd skip the leading whitespace and the newlines, like this:
 
-How many DRM drivers are there on ARM and what's the size impact of building them all into the kernel? I know from experience that it's not possible on x86 especially with efifb in the mix, but I wonder what the situation on ARM is. I only have TI, sunxi and exynos boards to test on and building in both TI drm drivers and the exynos one seems to work. 
-Note that I'm not talking about the non-DRM abortions that maskerade as graphics drivers for ARM SoCs, only proper DRM ones.
++error_unmap:
++        iounmap(info->screen_base);
++error_fb_release:
++        framebuffer_release(info);
++        return ret;
 
-regards,
+at least that's my conception how we format error paths in drivers/video/.
 
-Koen
+Thanks
+David
