@@ -1,131 +1,77 @@
-From: dongas86@gmail.com (Dong Aisheng)
-Date: Thu, 14 Aug 2014 17:30:19 +0800
-Subject: [PATCH v5 1/2] can: m_can: add device tree binding documentation
-In-Reply-To: <53D8DC6F.8070307@pengutronix.de>
-References: <1405503050-16796-1-git-send-email-b29396@freescale.com>
- <53D8DC6F.8070307@pengutronix.de>
-Message-ID: <CAA+hA=R94tPcEsbtSODPjV9oxM48rrc4gLAFaoXhL+1H4BmUHQ@mail.gmail.com>
+From: matthias.bgg@gmail.com (Matthias Brugger)
+Date: Thu, 14 Aug 2014 11:35:56 +0200
+Subject: [PATCH 6/7] arm: mediatek: enable gpt6 on boot up to make arch
+ timer working
+In-Reply-To: <1407983065.3412.8.camel@mtksdaap41>
+References: <1406824943-24052-1-git-send-email-matthias.bgg@gmail.com>
+ <1406824943-24052-7-git-send-email-matthias.bgg@gmail.com>
+ <CACRpkdbRhGE8tcKj+W_4F9-xmcm-fxcYuCmLOqX-ESC+3PAmyA@mail.gmail.com>
+ <CABuKBe+Q3tnN0s22EMY-dK_6FeN_xN9SmrsW3dPONR6QDJ+V_w@mail.gmail.com>
+ <1407983065.3412.8.camel@mtksdaap41>
+Message-ID: <CABuKBe+0HRCg_gK2r60vS-wKCe7dCT5CzVn5-ck4feM-+aUR4g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Ping...
+2014-08-14 4:24 GMT+02:00 Joe.C <srv_yingjoe.chen@mediatek.com>:
+> On Tue, 2014-08-12 at 11:02 +0200, Matthias Brugger wrote:
+>> 2014-08-11 9:15 GMT+02:00 Linus Walleij <linus.walleij@linaro.org>:
+>> > On Thu, Jul 31, 2014 at 6:42 PM, Matthias Brugger
+>> > <matthias.bgg@gmail.com> wrote:
+>> >
+>> >> We enable GTP6 which ungates the arch timer clock. Apart we write the
+>> >> frequency with which the timer is running in the CNTFREQ register.
+>> >> In the future this should be done in the bootloader.
+>> >>
+>> >> Signed-off-by: Matthias Brugger <matthias.bgg@gmail.com>
+>> > (...)
+>> >
+>> >> +       if (of_machine_is_compatible("mediatek,mt6589")) {
+>> >> +               /* set cntfreq register which is not done in bootloader */
+>> >> +               asm volatile("mcr p15, 0, %0, c14, c0, 0" : : "r" (13000000));
+>> >
+>> > I guess this is for something like the ARM arch timer in
+>> > drivers/clocksource/arm_arch_timer.c
+>> >
+>> > Instead of doing this, use the DT property "clock-frequency" on
+>> > the ARM arch timer node, as that overrides the CP15 setting.
+>> >
+>> >> +
+>> >> +               /* turn on GPT6 which ungates arch timer clocks */
+>> >> +               gpt_base = ioremap(GPT6_CON_MT65xx, 0x04);
+>> >> +       }
+>> >> +
+>> >> +       /* enabel clock and set to free-run */
+>> >> +       if (gpt_base)
+>> >> +               writel(0x31, gpt_base);
+>> >
+>> > Why is this not done properly in the GPT driver (I guess
+>> > in drivers/clocksource/mtk_timer.c) instead of remapping
+>> > it and fiddling around in the machine?
+>>
+>> I didn't put it in the GPT driver, because that would mean, that you
+>> need to have the mtk_timer to be able to use the ARM arch timer.
+>> From my understanding this are two independent blocks in the SoC.
+>> Apart from that, as stated in the commit message, this patch is a
+>> workaround until we have a bootloader which does this for us.
+>> Therefore I thought the init_time function would be the better place to do this.
+>
+> Can we have a separate node like mt6577-timerfixup then?
+> I'm preparing patch for mt8127 and mt8135. They all need this and use
+> same address and. In current form, I'll have to make this check against
+> a compatible string array.
 
-On Wed, Jul 30, 2014 at 7:52 PM, Marc Kleine-Budde <mkl@pengutronix.de> wrote:
-> On 07/16/2014 11:30 AM, Dong Aisheng wrote:
->> add M_CAN device tree binding documentation
->>
->> Cc: Wolfgang Grandegger <wg@grandegger.com>
->> Cc: Marc Kleine-Budde <mkl@pengutronix.de>
->> Cc: Mark Rutland <mark.rutland@arm.com>
->> Cc: Oliver Hartkopp <socketcan@hartkopp.net>
->> Cc: Varka Bhadram <varkabhadram@gmail.com>
->> Signed-off-by: Dong Aisheng <b29396@freescale.com>
+The way to go is to add another of_machine_is_compatible for every
+SoC. If the address is the same just use logical or.
+
+Cheers,
+Matthias
+
 >
-> Are there any comment from the DT side to this patch?
-> Preferred an Acked-by :)
->
-> The series looks good to me, I'm waiting for an Ack to apply it to the
-> linux-can-next tree.
->
-> Marc
->
->> ---
->> Changes since v4:
->> - change the name of board dtsi to board dts which is more common
->>
->> Changes since v3:
->> - change mram-cfg property name to bosch,mram-cfg
->> - indent change
->> ---
->>  .../devicetree/bindings/net/can/m_can.txt          |   67 ++++++++++++++++++++
->>  1 files changed, 67 insertions(+), 0 deletions(-)
->>  create mode 100644 Documentation/devicetree/bindings/net/can/m_can.txt
->>
->> diff --git a/Documentation/devicetree/bindings/net/can/m_can.txt b/Documentation/devicetree/bindings/net/can/m_can.txt
->> new file mode 100644
->> index 0000000..9e33177
->> --- /dev/null
->> +++ b/Documentation/devicetree/bindings/net/can/m_can.txt
->> @@ -0,0 +1,67 @@
->> +Bosch MCAN controller Device Tree Bindings
->> +-------------------------------------------------
->> +
->> +Required properties:
->> +- compatible         : Should be "bosch,m_can" for M_CAN controllers
->> +- reg                        : physical base address and size of the M_CAN
->> +                       registers map and Message RAM
->> +- reg-names          : Should be "m_can" and "message_ram"
->> +- interrupts         : Should be the interrupt number of M_CAN interrupt
->> +                       line 0 and line 1, could be same if sharing
->> +                       the same interrupt.
->> +- interrupt-names    : Should contain "int0" and "int1"
->> +- clocks             : Clocks used by controller, should be host clock
->> +                       and CAN clock.
->> +- clock-names                : Should contain "hclk" and "cclk"
->> +- pinctrl-<n>                : Pinctrl states as described in bindings/pinctrl/pinctrl-bindings.txt
->> +- pinctrl-names      : Names corresponding to the numbered pinctrl states
->> +- bosch,mram-cfg     : Message RAM configuration data.
->> +                       Multiple M_CAN instances can share the same Message
->> +                       RAM and each element(e.g Rx FIFO or Tx Buffer and etc)
->> +                       number in Message RAM is also configurable,
->> +                       so this property is telling driver how the shared or
->> +                       private Message RAM are used by this M_CAN controller.
->> +
->> +                       The format should be as follows:
->> +                       <offset sidf_elems xidf_elems rxf0_elems rxf1_elems
->> +                        rxb_elems txe_elems txb_elems>
->> +                       The 'offset' is an address offset of the Message RAM
->> +                       where the following elements start from. This is
->> +                       usually set to 0x0 if you're using a private Message
->> +                       RAM. The remain cells are used to specify how many
->> +                       elements are used for each FIFO/Buffer.
->> +
->> +                       M_CAN includes the following elements according to user manual:
->> +                       11-bit Filter 0-128 elements / 0-128 words
->> +                       29-bit Filter 0-64 elements / 0-128 words
->> +                       Rx FIFO 0     0-64 elements / 0-1152 words
->> +                       Rx FIFO 1     0-64 elements / 0-1152 words
->> +                       Rx Buffers    0-64 elements / 0-1152 words
->> +                       Tx Event FIFO 0-32 elements / 0-64 words
->> +                       Tx Buffers    0-32 elements / 0-576 words
->> +
->> +                       Please refer to 2.4.1 Message RAM Configuration in
->> +                       Bosch M_CAN user manual for details.
->> +
->> +Example:
->> +SoC dtsi:
->> +m_can1: can at 020e8000 {
->> +     compatible = "bosch,m_can";
->> +     reg = <0x020e8000 0x4000>, <0x02298000 0x4000>;
->> +     reg-names = "m_can", "message_ram";
->> +     interrupts = <0 114 0x04>,
->> +                  <0 114 0x04>;
->> +     interrupt-names = "int0", "int1";
->> +     clocks = <&clks IMX6SX_CLK_CANFD>,
->> +              <&clks IMX6SX_CLK_CANFD>;
->> +     clock-names = "hclk", "cclk";
->> +     bosch,mram-cfg = <0x0 0 0 32 0 0 0 1>;
->> +     status = "disabled";
->> +};
->> +
->> +Board dts:
->> +&m_can1 {
->> +     pinctrl-names = "default";
->> +     pinctrl-0 = <&pinctrl_m_can1>;
->> +     status = "enabled";
->> +};
->>
+> Joe.C
 >
 >
-> --
-> Pengutronix e.K.                  | Marc Kleine-Budde           |
-> Industrial Linux Solutions        | Phone: +49-231-2826-924     |
-> Vertretung West/Dortmund          | Fax:   +49-5121-206917-5555 |
-> Amtsgericht Hildesheim, HRA 2686  | http://www.pengutronix.de   |
->
->
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
->
+
+
+
+-- 
+motzblog.wordpress.com
