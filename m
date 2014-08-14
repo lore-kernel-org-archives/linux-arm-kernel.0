@@ -1,129 +1,49 @@
-From: juri.lelli@arm.com (Juri Lelli)
-Date: Thu, 14 Aug 2014 09:27:45 +0100
-Subject: [PATCH v2] cpuidle/cpuidle-big_little: fix reading cpu id part number
-Message-ID: <1408004865-27525-1-git-send-email-juri.lelli@arm.com>
+From: liam.r.girdwood@linux.intel.com (Liam Girdwood)
+Date: Thu, 14 Aug 2014 09:29:48 +0100
+Subject: [alsa-devel] [PATCH] ASoC: rt286: Add API to set supported jack
+ type
+In-Reply-To: <20140811122415.GZ17528@sirena.org.uk>
+References: <1407217970-20126-1-git-send-email-bardliao@realtek.com>
+ <20140806205421.GZ17528@sirena.org.uk>
+ <ABFD875FF5FB574BA706497D987D48D7608E00@RTITMBSV03.realtek.com.tw>
+ <20140807173136.GN17528@sirena.org.uk> <1407751185.2487.150.camel@loki>
+ <20140811122415.GZ17528@sirena.org.uk>
+Message-ID: <1408004988.2506.13.camel@loki>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Commit af040ffc9ba1 ("ARM: make it easier to check the CPU part number
-correctly") changed ARM_CPU_PART_X masks, and the way they are returned and
-checked against. Usage of read_cpuid_part_number() is now deprecated, and
-calling places updated accordingly. This actually broke cpuidle-big_little
-initialization, as bl_idle_driver_init() performs a check using an hardcoded
-mask on cpu_id.
+On Mon, 2014-08-11 at 13:24 +0100, Mark Brown wrote:
+> On Mon, Aug 11, 2014 at 10:59:45AM +0100, Liam Girdwood wrote:
+> > On Thu, 2014-08-07 at 18:31 +0100, Mark Brown wrote:
+> 
+> > > I've CCed in Graeme Gregory who's been writing some guidelines for this
+> > > sort of thing in the context of ARMv8 serviers - the most recent patch
+> > > is:
+> 
+> > >    http://thread.gmane.org/gmane.linux.acpi.devel/69757
+> 
+> > > The advice there looks good to me - see the "Device Enumeration"
+> > > section.
+> 
+> > This is indeed good, just too late for the initial Broadwell BIOSes that
+> > wont have this _DSD field for the codec (it will be hard coded for
+> > Windows anyway).
+> 
+> Sounds like DMI is going to be needed then - whatever ends up being done
+> I'd expect it should just be a case of putting the checks done to work
+> out the machine configuration into the CODEC driver instead of the
+> machine driver.  If it looks ugly this can be used to explain to people
+> why we need something more sensible!
 
-Create an interface to perform the check (that is now even easier to read).
-Define also a proper mask (ARM_CPU_PART_MASK) that makes this kind of checks
-cleaner and helps preventing bugs in the future. Update usage accordingly.
+It sure will be ugly ;) This would involve the codec driver checking for
+the existence of the Broadwell ADSP ACPI ID and then configuring jack
+mode depending on whether it finds this ID or not.
 
-Signed-off-by: Juri Lelli <juri.lelli@arm.com>
-Signed-off-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
-Cc: Russell King <linux@arm.linux.org.uk>
-Cc: Daniel Lezcano <daniel.lezcano@linaro.org>
-Cc: "Rafael J. Wysocki" <rjw@rjwysocki.net>
-Cc: Will Deacon <will.deacon@arm.com>
-Cc: Chao Xie <chao.xie@marvell.com>
-Cc: Stephen Warren <swarren@nvidia.com>
-Cc: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
-Cc: Rob Herring <rob.herring@calxeda.com>
-Cc: Jonathan Austin <Jonathan.Austin@arm.com>
-Cc: Chao Xie Linux <xiechao.mail@gmail.com>
-Cc: Juri Lelli <juri.lelli@gmail.com>
-Cc: linux-pm at vger.kernel.org
-Cc: linux-arm-kernel at lists.infradead.org
-Cc: linux-kernel at vger.kernel.org
----
- arch/arm/include/asm/cputype.h       |  3 ++-
- arch/arm/include/asm/smp_plat.h      | 15 +++++++++++++++
- drivers/cpuidle/cpuidle-big_little.c | 13 +++----------
- 3 files changed, 20 insertions(+), 11 deletions(-)
+We have the opposite implementation atm where the Broadwell machine
+driver sets the jack mode at machine driver init time.
 
-diff --git a/arch/arm/include/asm/cputype.h b/arch/arm/include/asm/cputype.h
-index 963a251..819777d 100644
---- a/arch/arm/include/asm/cputype.h
-+++ b/arch/arm/include/asm/cputype.h
-@@ -74,6 +74,7 @@
- #define ARM_CPU_PART_CORTEX_A12		0x4100c0d0
- #define ARM_CPU_PART_CORTEX_A17		0x4100c0e0
- #define ARM_CPU_PART_CORTEX_A15		0x4100c0f0
-+#define ARM_CPU_PART_MASK		0xff00fff0
- 
- #define ARM_CPU_XSCALE_ARCH_MASK	0xe000
- #define ARM_CPU_XSCALE_ARCH_V1		0x2000
-@@ -179,7 +180,7 @@ static inline unsigned int __attribute_const__ read_cpuid_implementor(void)
-  */
- static inline unsigned int __attribute_const__ read_cpuid_part(void)
- {
--	return read_cpuid_id() & 0xff00fff0;
-+	return read_cpuid_id() & ARM_CPU_PART_MASK;
- }
- 
- static inline unsigned int __attribute_const__ __deprecated read_cpuid_part_number(void)
-diff --git a/arch/arm/include/asm/smp_plat.h b/arch/arm/include/asm/smp_plat.h
-index a252c0b..0ad7d49 100644
---- a/arch/arm/include/asm/smp_plat.h
-+++ b/arch/arm/include/asm/smp_plat.h
-@@ -8,6 +8,7 @@
- #include <linux/cpumask.h>
- #include <linux/err.h>
- 
-+#include <asm/cpu.h>
- #include <asm/cputype.h>
- 
- /*
-@@ -25,6 +26,20 @@ static inline bool is_smp(void)
- #endif
- }
- 
-+/**
-+ * smp_cpuid_part() - return part id for a given cpu
-+ * @cpu:	logical cpu id.
-+ *
-+ * Return: part id of logical cpu passed as argument.
-+ */
-+static inline unsigned int smp_cpuid_part(int cpu)
-+{
-+	struct cpuinfo_arm *cpu_info = &per_cpu(cpu_data, cpu);
-+
-+	return is_smp() ? cpu_info->cpuid & ARM_CPU_PART_MASK :
-+			  read_cpuid_part();
-+}
-+
- /* all SMP configurations have the extended CPUID registers */
- #ifndef CONFIG_MMU
- #define tlb_ops_need_broadcast()	0
-diff --git a/drivers/cpuidle/cpuidle-big_little.c b/drivers/cpuidle/cpuidle-big_little.c
-index 344d79fa..ef94c3b 100644
---- a/drivers/cpuidle/cpuidle-big_little.c
-+++ b/drivers/cpuidle/cpuidle-big_little.c
-@@ -138,25 +138,18 @@ static int bl_enter_powerdown(struct cpuidle_device *dev,
- 	return idx;
- }
- 
--static int __init bl_idle_driver_init(struct cpuidle_driver *drv, int cpu_id)
-+static int __init bl_idle_driver_init(struct cpuidle_driver *drv, int part_id)
- {
--	struct cpuinfo_arm *cpu_info;
- 	struct cpumask *cpumask;
--	unsigned long cpuid;
- 	int cpu;
- 
- 	cpumask = kzalloc(cpumask_size(), GFP_KERNEL);
- 	if (!cpumask)
- 		return -ENOMEM;
- 
--	for_each_possible_cpu(cpu) {
--		cpu_info = &per_cpu(cpu_data, cpu);
--		cpuid = is_smp() ? cpu_info->cpuid : read_cpuid_id();
--
--		/* read cpu id part number */
--		if ((cpuid & 0xFFF0) == cpu_id)
-+	for_each_possible_cpu(cpu)
-+		if (smp_cpuid_part(cpu) == part_id)
- 			cpumask_set_cpu(cpu, cpumask);
--	}
- 
- 	drv->cpumask = cpumask;
- 
--- 
-2.0.4
+I'm not sure that showing ugly code here would help justify anything
+either as we will kind of be at the mercy of whether the Windows driver
+needs this information or not.
+
+Liam
