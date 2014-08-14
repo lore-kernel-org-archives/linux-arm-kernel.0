@@ -1,60 +1,51 @@
-From: tomasz.figa@gmail.com (Tomasz Figa)
-Date: Thu, 14 Aug 2014 03:12:29 +0200
-Subject: Building kernel for more than one SoC
-In-Reply-To: <lsbi2f$pib$1@ger.gmane.org>
-References: <lrdi48$ls1$1@ger.gmane.org>
- <20140804201712.GK30282@n2100.arm.linux.org.uk> <53E8E469.9050807@atmel.com>
- <lsaoih$e9$1@ger.gmane.org>
- <CAOCHtYgPoxveSjYpWWo8W+_0WwQdaCBga0piazg_Oq6aeZ=w-g@mail.gmail.com>
- <lsb9tn$nnv$1@ger.gmane.org> <20140811205909.GC30401@n2100.arm.linux.org.uk>
- <lsbbp9$j4n$1@ger.gmane.org> <20140811224328.GD30401@n2100.arm.linux.org.uk>
- <lsbi2f$pib$1@ger.gmane.org>
-Message-ID: <53EC0CFD.70303@gmail.com>
+From: tharvey@gateworks.com (Tim Harvey)
+Date: Wed, 13 Aug 2014 18:13:35 -0700
+Subject: [PATCH] devicetree: bindings: Document Gateworks vendor prefix
+In-Reply-To: <53E7D325.4060802@gmail.com>
+References: <1407658509-1773-1-git-send-email-tharvey@gateworks.com>
+ <53E7D325.4060802@gmail.com>
+Message-ID: <CAJ+vNU1QXMMke+pUy6xbxaYhNqqRivM=_qLpVLPePTQLicj_Zg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12.08.2014 01:02, Grant Edwards wrote:
-> On 2014-08-11, Russell King - ARM Linux <linux@arm.linux.org.uk> wrote:
+On Sun, Aug 10, 2014 at 1:16 PM, Florian Fainelli <f.fainelli@gmail.com> wrote:
+> Le 10/08/2014 01:15, Tim Harvey a ?crit :
+>
+>> Add Gateworks Corporation to the list of device tree vendor prefixes.
 >>
->>> The problem is now you've got a kernel image that won't run on both
->>> the '9g20 and the '9g25.  The requirement is to have a kernel image
->>> that will run on either.
+>> Gateworks designs and manufactures single board computers designed for
+>> embedded wireless and wired network applications.
 >>
->> It depends what you call a kernel image.
+>> Signed-off-by: Tim Harvey <tharvey@gateworks.com>
+>> ---
+>>   Documentation/devicetree/bindings/vendor-prefixes.txt | 1 +
+>>   1 file changed, 1 insertion(+)
 >>
->> As far as I'm concerned (and as I've been concerned from day one of uboot
->> coming into ARM), the kernel image is the zImage, not the crap that uboot
->> decides to dictate that you must provide for it to use.
->>
->> I've been pretty clear over the years that I utterly despise uboot's
->> custom format - and you're starting to find out why.  Welcome to the
->> inflexibility has caused. :)
-> 
-> Yea, I've got my own issues with U-Boot, but that's a whole 'nother
-> thread.  In the end, it was a lot less painful to put up with U-Boot's
-> issues than it was to write/port something else.
-> 
->> While you have a point there, that's a choice of how you do your
->> kernel upgrades.
->>
->> If you supply a zImage, all the dtbs, a script which does the
->> programming of the kernel onto the target, and a copy of mkimage,
->> then you can do all the steps I've highlighted above on the target -
->> without the customer even having to know what platform they're on,
->> because your script can work it out.
-> 
-> Good point.
-> 
->> There's plenty of workarounds possible for the old uboot dilemma...
-> 
-> Definitely.  It all comes to do trying to figure out when the
-> work-arounds add up to more work than doing it the "right" way and
-> upgrading everything.
-> 
+>> diff --git a/Documentation/devicetree/bindings/vendor-prefixes.txt
+>> b/Documentation/devicetree/bindings/vendor-prefixes.txt
+>> index 46a311e..803fa4f 100644
+>> --- a/Documentation/devicetree/bindings/vendor-prefixes.txt
+>> +++ b/Documentation/devicetree/bindings/vendor-prefixes.txt
+>> @@ -54,6 +54,7 @@ globalscale   Globalscale Technologies, Inc.
+>>   gmt   Global Mixed-mode Technology, Inc.
+>>   google        Google, Inc.
+>>   gumstix       Gumstix, Inc.
+>> +gw     Gateworks Corporation
+>
+>
+> I would go with "gateworks" here, "gw" is usually a shorter term for
+> "gateway", and there is an actual company called "Gateway" also
+> manufacturing various types of computers.
+> --
+> Florian
 
-Is this maybe what you're looking for?
+Hi Florian,
 
-https://github.com/zonque/pxa-impedance-matcher
+Well... I got to the table first with Gateworks so I don't see why I
+can't take the 'gw' prefix personally. Note that I do have several
+devicetree files in arch/arm/dts/imx6-gw*.dts* already in mainline
+that use the 'gw' vendor prefix (albeit one could argue that I should
+have been asked to add 'gw' to the vendor-prefixes.txt back then, but
+that is not the way things went down).
 
-Best regards,
-Tomasz
+Tim
