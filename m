@@ -1,80 +1,29 @@
-From: grygorii.strashko@ti.com (Grygorii Strashko)
-Date: Thu, 14 Aug 2014 19:54:09 +0300
-Subject: [PATCH 4/4] ARM: dts: keystone-k2hk: add dsp gpio controllers
- nodes
-In-Reply-To: <1408029982.880621027@f126.i.mail.ru>
-References: <1407946582-20927-1-git-send-email-grygorii.strashko@ti.com>
- <1408018321.928492982@f270.i.mail.ru> <53ECDC54.3060005@ti.com>
- <1408029982.880621027@f126.i.mail.ru>
-Message-ID: <53ECE9B1.4060303@ti.com>
+From: broonie@kernel.org (Mark Brown)
+Date: Thu, 14 Aug 2014 17:40:00 +0100
+Subject: [PATCH v5 0/7] Add MFD and regulator drivers for Hi6421 PMIC SoC
+In-Reply-To: <CAD6h2NQ7jfP6A4TV0Lw4hpKGO2oeJ90tEM0u-J5mYBBQ7M=+Rw@mail.gmail.com>
+References: <1407929624-8737-1-git-send-email-guodong.xu@linaro.org>
+ <20140813185357.GH17528@sirena.org.uk>
+ <CAD6h2NQ7jfP6A4TV0Lw4hpKGO2oeJ90tEM0u-J5mYBBQ7M=+Rw@mail.gmail.com>
+Message-ID: <20140814164000.GC17528@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08/14/2014 06:26 PM, Alexander Shiyan wrote:
-> Thu, 14 Aug 2014 18:57:08 +0300 ?? Grygorii Strashko <grygorii.strashko@ti.com>:
-> ...
->>>>>> +		dspgpio7: keystone_dsp_gpio at 262025C {
->>>>>> +			compatible = "ti,keystone-mctrl-gpio";
->>>>>> +			gpio-controller;
->>>>>> +			#gpio-cells = <2>;
->>>>>> +			gpio,syscon-dev = <&devctrl 0x25c>;
->>>>>> +		};
->>>>>
->>>>> So, devctrl is a syscon device and this DTS introduce several
->>>>> identical GPIO descriptions?
->>>>>
->>>>> On my opinion this should be placed in the gpio-syscon.c,
->>>>> where you can add support for ti,keystone-dsp0{..7}-gpio.
->>>>> Such change will avoid parts 2 and 3 of this patch.
->>>>>
->>>>> static const struct syscon_gpio_data ti_keystone_dsp0_gpio = {
->>>>>      .compatible = "ti,keystone-syscon",
->>>>>      .dat_bit_offset = 0x240 * 8,
->>>>>      ...
->>>>>      .set = etc...
->>>>> };
->>>>
->>>> So, if I understand you right, you propose to add 8 additional compatible
->>>> strings just to encode different register offsets. Is it?
->>>> 1) add "ti,keystone-mctrl-gpio0"..."ti,keystone-mctrl-gpio7"
->>>
->>> Yes, but replace "mctrl" with "dsp" since mctrl is not applicable here.
->>>
->>>> 2) add 8 structures keystone_mctrl_gpio0..keystone_mctrl_gpio7 in gpio-syscon.c
->>>>      (which will have only different values of field - .dat_bit_offset = 0x2yy * 8,)
->>>>
->>>> 3) add 8 additional items in array syscon_gpio_ids
->>>> 	{
->>>> 		.compatible	= "ti,keystone-mctrl-gpio0",
->>>> 		.data		= &keystone_mctrl_gpio0,
->>>> 	}, ...
->>>>
->>>> I can do it if you strictly insist, BUT I don't like it :(
->>>> - just imagine how your driver will look look like if 5 or 6 SoCs will re-use it ;)
->>>> - as I mentioned in cover letter and commit messages even each SoC revision can have
->>>>     different Syscon implementation with different registers offsets and with different
->>>>     number of Syscon register ranges (for example for Keystone 2 we already have two
->>>>     Syscon devices defined in DT).
->>>
->>> The initial version of this driver contains addresses and offsets in, but this approach has
->>> been criticized by DT maintainers.
->>
->> Could you provide link on this thread^, pls?
-> 
-> Here is a link to first version:
-> https://www.mail-archive.com/linux-gpio at vger.kernel.org/msg01616.html
+On Thu, Aug 14, 2014 at 08:51:09AM +0800, Haojian Zhuang wrote:
 
-10x
+> Thanks a lot on taking these patches. Please left the patch of
+> hi3xxx_defconfig. We plan to go through armsoc tree by ourselves since
+> some following patches will rename it to hisi_defconfig. The reason is
+> that we need to support HiP04 SoC in the same defconfig. So three
+> Hisilicon SoC will be supported by hi3xxx_defconfig, but only Hi3620
+> belongs to hi3xxx.
 
-> 
-> Unfortunately, I lost thread for DT-related stuffs.
-> 
-
-Oh, I've just checked ARM dts directory and found that 
-constructions like this:
-	vendor,syscon = <&syscon_phandle>; /// or even this vendor,syscon = <&syscon_phandle 0x60 2>;
-are widely used as of now.
-Also, According to the bindings doc, the Syscon is not a Linux specific definition (mfd/syscon.txt).
-
-Regards,
--grygorii
+Like I said I'm only going to take the regulator patches - I also won't
+be taking the MFD patch.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140814/e4929559/attachment.sig>
