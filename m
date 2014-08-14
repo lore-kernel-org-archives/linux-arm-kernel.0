@@ -1,69 +1,63 @@
-From: Varun.Sethi@freescale.com (Varun Sethi)
-Date: Thu, 14 Aug 2014 14:45:45 +0000
-Subject: [PATCH v5] devicetree: Add generic IOMMU device tree bindings
-In-Reply-To: <87a9774lf5.fsf@nvidia.com>
-References: <1406803383-11601-1-git-send-email-thierry.reding@gmail.com>
- <87a9774lf5.fsf@nvidia.com>
-Message-ID: <cfb1d2ff66004685b7ead3f5e6321681@BL2PR03MB468.namprd03.prod.outlook.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Thu, 14 Aug 2014 15:53:02 +0100
+Subject: [PATCH 6/6] arm/arm64: KVM: vgic: Clarify and correct vgic
+ documentation
+In-Reply-To: <1405003196-12403-7-git-send-email-christoffer.dall@linaro.org>
+ (Christoffer Dall's message of "Thu, 10 Jul 2014 15:39:56 +0100")
+References: <1405003196-12403-1-git-send-email-christoffer.dall@linaro.org>
+ <1405003196-12403-7-git-send-email-christoffer.dall@linaro.org>
+Message-ID: <87a977rult.fsf@approximate.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Thu, Jul 10 2014 at  3:39:56 pm BST, Christoffer Dall <christoffer.dall@linaro.org> wrote:
+> The VGIC virtual distributor implementation documentation was written a
+> very long time ago, before the true nature of the beast had been
+> partially absorbed into my bloodstream.  Clarify the docs.
+>
+> Plus, it fixes an actual bug.  ICFRn, pfff.
+>
+> Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
 
+Acked-by: Marc Zyngier <marc.zyngier@arm.com>
 
-> -----Original Message-----
-> From: iommu-bounces at lists.linux-foundation.org [mailto:iommu-
-> bounces at lists.linux-foundation.org] On Behalf Of Hiroshi Doyu
-> Sent: Thursday, August 14, 2014 12:18 PM
-> To: Thierry Reding; Stephen Warren; Arnd Bergmann; Will Deacon
-> Cc: Mark Rutland; devicetree at vger.kernel.org; Olof Johansson;
-> iommu at lists.linux-foundation.org; Rob Herring; linux-tegra at vger.kernel.org;
-> linux-arm-kernel at lists.infradead.org
-> Subject: Re: [PATCH v5] devicetree: Add generic IOMMU device tree bindings
-> 
-> 
-> Thierry Reding <thierry.reding@gmail.com> writes:
-> 
-> > +Multiple-master IOMMU:
-> > +----------------------
-> > +
-> > +       iommu {
-> > +               /* the specifier represents the ID of the master */
-> > +               #iommu-cells = <1>;
-> > +       };
-> > +
-> > +       master at 1 {
-> > +               /* device has master ID 42 in the IOMMU */
-> > +               iommus = <&{/iommu} 42>;
-> > +       };
-> > +
-> > +       master at 2 {
-> > +               /* device has master IDs 23 and 24 in the IOMMU */
-> > +               iommus = <&{/iommu} 23>, <&{/iommu} 24>;
-> > +       };
-> 
-> I think that this "master ID" will be parsed in IOMMU driver. For example,
-> ARM,SMMU expects "streamID" as "master ID", right?
-> 
-> If a SoC has a feature to configure to assign streamID to devices at runtime,
-> "streamID" is not equal to "master ID".
-> 
->   iommus = <&{/smmu} "soc specific master ID">;
-> 
-> "soc master ID" needs to be translated into "streamID" by SoC SW. It seems
-> that ARM,SMMU kernel driver doesn't expect this kind of ID translation. If
-> ARM,SMMU kernel driver is used as is, "soc master ID"
-> would be incompatible? ARM,SMMU needs such translation before parsing. Is
-> this my understanding right?
-> 
-> If so I think that this master ID configuration/translation may be quite
-> reasonable requirment for SoC using ARM,SMMU.
-> 
-> Can we consider this ID translation within ARM,SMMU compatibility?
-> 
-> IOW, is it possible to implement some SoC specific hook for ID
-> translation/configuration in ARM,SMMU kernel driver?
+> ---
+>  virt/kvm/arm/vgic.c | 13 +++++++------
+>  1 file changed, 7 insertions(+), 6 deletions(-)
+>
+> diff --git a/virt/kvm/arm/vgic.c b/virt/kvm/arm/vgic.c
+> index 2c13384..df0785c 100644
+> --- a/virt/kvm/arm/vgic.c
+> +++ b/virt/kvm/arm/vgic.c
+> @@ -36,21 +36,22 @@
+>   * How the whole thing works (courtesy of Christoffer Dall):
+>   *
+>   * - At any time, the dist->irq_pending_on_cpu is the oracle that knows if
+> - *   something is pending
+> - * - VGIC pending interrupts are stored on the vgic.irq_pending vgic
+> - *   bitmap (this bitmap is updated by both user land ioctls and guest
+> - *   mmio ops, and other in-kernel peripherals such as the
+> - *   arch. timers) and indicate the 'wire' state.
+> + *   something is pending on the CPU interface.
+> + * - Interrupts that are pending on the distributor are stored on the
+> + *   vgic.irq_pending vgic bitmap (this bitmap is updated by both user land
+> + *   ioctls and guest mmio ops, and other in-kernel peripherals such as the
+> + *   arch. timers).
+>   * - Every time the bitmap changes, the irq_pending_on_cpu oracle is
+>   *   recalculated
+>   * - To calculate the oracle, we need info for each cpu from
+>   *   compute_pending_for_cpu, which considers:
+>   *   - PPI: dist->irq_pending & dist->irq_enable
+>   *   - SPI: dist->irq_pending & dist->irq_enable & dist->irq_spi_target
+> - *   - irq_spi_target is a 'formatted' version of the GICD_ICFGR
+> + *   - irq_spi_target is a 'formatted' version of the GICD_ITARGETSRn
+>   *     registers, stored on each vcpu. We only keep one bit of
+>   *     information per interrupt, making sure that only one vcpu can
+>   *     accept the interrupt.
+> + * - If any of the above state changes, we must recalculate the oracle.
+>   * - The same is true when injecting an interrupt, except that we only
+>   *   consider a single interrupt at a time. The irq_spi_cpu array
+>   *   contains the target CPU for each SPI.
 
-
-Can the id translation be done using a SMR mask? Also, for dynamic stream ID allocation we would need to represent the specific master register (to store the stream ID) in the device tree.
-
--Varun
+-- 
+Jazz is not dead. It just smells funny.
