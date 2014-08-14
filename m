@@ -1,92 +1,83 @@
-From: grant.likely@secretlab.ca (Grant Likely)
-Date: Thu, 14 Aug 2014 11:15:58 +0100
-Subject: [linux-sunxi] Re: [PATCH 3/4] simplefb: disable dt node upon
- remove
-In-Reply-To: <CAKON4OzQbuaQsbTCDXuaqxLRxvat_5+wmf71S-rWXdfiT1gkvA@mail.gmail.com>
-References: <1407914239-12054-1-git-send-email-libv@skynet.be>
- <1407914239-12054-4-git-send-email-libv@skynet.be>
- <CACxGe6vaPUa4QvYWBA-QY7MTmJYoeqnPt9Zh5jpky6S9UYbrvQ@mail.gmail.com>
- <CANq1E4ReOB87RX8VhnW1Ln=SK3Tw5V962ujcsfuz-2E9Uc61yQ@mail.gmail.com>
- <CACxGe6vQrhd8QOAyGnjRppmuANpT60Ao2+KmkDfF4FNeoZSZgw@mail.gmail.com>
- <20140813094524.GC31326@skynet.be> <20140813101923.GD31326@skynet.be>
- <CAKON4OwLOAq1EOzZmuefcnZ4hw0i35e3k0F6XGNRy-5jer2vyA@mail.gmail.com>
- <CACxGe6szX3LyhGHbVHrEFfaWGYUcgcxgkuhfc9ac-R0qJs-HXw@mail.gmail.com>
- <CAKON4OzQbuaQsbTCDXuaqxLRxvat_5+wmf71S-rWXdfiT1gkvA@mail.gmail.com>
-Message-ID: <CACxGe6v1UPHMF5aPpe-boh+RuoPArJmKK_cQWr7aXsRjDUZrfQ@mail.gmail.com>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Thu, 14 Aug 2014 11:23:07 +0100
+Subject: [PATCH] arm64: align randomized TEXT_OFFSET on 4 kB boundary
+In-Reply-To: <1407952383-1214-1-git-send-email-ard.biesheuvel@linaro.org>
+References: <1407952383-1214-1-git-send-email-ard.biesheuvel@linaro.org>
+Message-ID: <20140814102307.GB24018@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Aug 13, 2014 at 9:41 PM, jonsmirl at gmail.com <jonsmirl@gmail.com> wrote:
-> On Wed, Aug 13, 2014 at 3:14 PM, Grant Likely <grant.likely@secretlab.ca> wrote:
->> On Wed, Aug 13, 2014 at 1:54 PM, jonsmirl at gmail.com <jonsmirl@gmail.com> wrote:
->>> On Wed, Aug 13, 2014 at 6:19 AM, Luc Verhaegen <libv@skynet.be> wrote:
->>>> On Wed, Aug 13, 2014 at 11:45:24AM +0200, Luc Verhaegen wrote:
->>>>> On Wed, Aug 13, 2014 at 10:23:14AM +0100, Grant Likely wrote:
->>>>> >
->>>>> > The majority of the DT code is based on the assumption of a static
->>>>> > tree. Pantelis has been working on being able to modify it at runtime
->>>>> > with overlays, but he has had to go through a lot of rework because it
->>>>> > is not a trivial task. When you get into modifying the DT, you need to
->>>>> > have a lot more understanding of the side effects to changing the
->>>>> > tree. The DT structure also has a lifecycle that can go beyond the
->>>>> > current lifecycle of the kernel. The kexec tool will extract the
->>>>> > current tree from the kernel, make the appropriate modifications, and
->>>>> > use that to boot the next kernel. Allowing any driver to modify the
->>>>> > tree has side effects beyond just the current kernel.
->>>>> >
->>>>> > In this specific case, it will interact badly with the work Pantelis
->>>>> > is doing to make platform devices work with overlays. Modifying the
->>>>> > status property will cause the associated struct device to get removed
->>>>> > in the middle of probing a driver for that device! That will most
->>>>> > likely cause an oops.
->>>>> >
->>>>> > Besides, Luc straight out *said*: "...even though it has no real value
->>>>> > today". In what circumstance is that justification for modifying the
->>>>> > tree?
->>>>>
->>>>> With that sentence i meant that given the current state of things, it
->>>>> has no real value.
->>>>>
->>>>> It has no value currently as re-probing simplefb is not going to happen.
->>>>> But it's not a big leap to turn simplefb into a proper module. Not that
->>>>> that makes much sense, but that's never stopped anyone.
->>>>>
->>>>> To me it seemed simple, dt is what drives simplefb, so dt then also
->>>>> becomes responsible for making sure that simplefb or another driver does
->>>>> not attempt to blindly use this info again. The way this is implemented
->>>>> i do not care for in any way, i just knew that i could not do nothing
->>>>> here, given the catastrophic effect disabling the clocks has on simplefb
->>>>> on sunxi. Given the discussion that errupted here, i'd say that this
->>>>> does need some resolution, and altering the dt is going to have to be
->>>>> part of the solution.
->>>>>
->>>>> In any case, i will gladly drop this patch, as it is not absolutely
->>>>> necessary. But it should be very clear that there is no going back on
->>>>> this dt node after the clocks were released once.
->>>>>
->>>>> Luc Verhaegen.
->>>>
->>>> What about approaching this from the other end? U-Boot could add a
->>>> property named "once-only" or so.
->>>
->>> Device tree is supposed to be a static description of the hardware
->>> usable on all operating systems. It is the wrong mechanism for
->>> communicating between uboot and the kernel. Use something like atags
->>> or the kernel command line to tell the kernel that the console has
->>> already been set up.
->>
->> Not accurate. While it is primarily hardware description, it is also
->> used for firmware communication. There is loads of precedence for
->> this. The /chosen node is the most significant example, but there are
->> other places where the tree is used to provide state. For example, the
->> current-speed property on UART nodes.
+Hi Ard,
+
+On Wed, Aug 13, 2014 at 06:53:03PM +0100, Ard Biesheuvel wrote:
+> When booting via UEFI, the kernel Image is loaded at a 4 kB boundary and
+> the embedded EFI stub is executed in place. The EFI stub relocates the
+> Image to reside TEXT_OFFSET bytes above a 2 MB boundary, and jumps into
+> the kernel proper.
+> 
+> In AArch64, PC relative symbol references are emitted using adrp/add or
+> adrp/ldr pairs, where the offset into a 4 kB page is resolved using a
+> separate :lo12: relocation. This implicitly assumes that the code will
+> always be executed at the same relative offset with respect to a 4 kB
+> boundary, or the references will point to the wrong address.
+> 
+> This means we should link the kernel at a 4 kB aligned base address in
+> order to remain compatible with the base address the UEFI loader uses
+> when doing the initial load of Image. So update the code that generates
+> TEXT_OFFSET to choose a multiple of 4 kB.
+> 
+> At the same time, update the code so it chooses from the interval [0..2MB)
+> as the author originally intended.
 >
-> I do seem to recall you telling me a long time ago that those chosen
-> nodes were a mistake (or maybe it was Matt Sealey). I'm pretty wary of
-> opening to door to device trees carrying a bunch of state.  Five years
-> from now the DT is going to look like a Christmas tree.
+> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+> ---
+>  arch/arm64/Makefile      | 2 +-
+>  arch/arm64/kernel/head.S | 8 ++++----
+>  2 files changed, 5 insertions(+), 5 deletions(-)
+> 
+> diff --git a/arch/arm64/Makefile b/arch/arm64/Makefile
+> index 57833546bf00..2df5e5daeebe 100644
+> --- a/arch/arm64/Makefile
+> +++ b/arch/arm64/Makefile
+> @@ -39,7 +39,7 @@ head-y		:= arch/arm64/kernel/head.o
+>  
+>  # The byte offset of the kernel image in RAM from the start of RAM.
+>  ifeq ($(CONFIG_ARM64_RANDOMIZE_TEXT_OFFSET), y)
+> -TEXT_OFFSET := $(shell awk 'BEGIN {srand(); printf "0x%04x0\n", int(65535 * rand())}')
+> +TEXT_OFFSET := $(shell awk 'BEGIN {srand(); printf "0x%03x000\n", int(512 * rand())}')
+>  else
+>  TEXT_OFFSET := 0x00080000
+>  endif
+> diff --git a/arch/arm64/kernel/head.S b/arch/arm64/kernel/head.S
+> index b6ca95aee348..ae055a18b04a 100644
+> --- a/arch/arm64/kernel/head.S
+> +++ b/arch/arm64/kernel/head.S
+> @@ -38,11 +38,11 @@
+>  
+>  #define KERNEL_RAM_VADDR	(PAGE_OFFSET + TEXT_OFFSET)
+>  
+> -#if (TEXT_OFFSET & 0xf) != 0
+> -#error TEXT_OFFSET must be at least 16B aligned
+> -#elif (PAGE_OFFSET & 0xfffff) != 0
+> +#if (TEXT_OFFSET & 0xfff) != 0
+> +#error TEXT_OFFSET must be at least 4kB aligned
 
-Wasn't me. Carrying state in the DT provided by firmware is perfectly
-reasonable in my opinion.
+Minor nit, but can we have "KB" here to match "MB"?
 
-g.
+> +#elif (PAGE_OFFSET & 0x1fffff) != 0
+>  #error PAGE_OFFSET must be at least 2MB aligned
+> -#elif TEXT_OFFSET > 0xfffff
+> +#elif TEXT_OFFSET > 0x1fffff
+>  #error TEXT_OFFSET must be less than 2MB
+>  #endif
+
+I thought I'd left wording in Kconfig.debug, but that doesn't seem to be
+the case. This looks sane to me, so:
+
+Reviewed-by: Mark Rutland <mark.rutland@arm.com>
+
+Catalin, can you pick this up? Without it UEFI boot can be broken by
+ARM64_RANDOMIZE_TEXT_OFFSET.
+
+Cheers,
+Mark.
