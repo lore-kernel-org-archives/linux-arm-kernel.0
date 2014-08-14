@@ -1,39 +1,69 @@
-From: Mattis.Lorentzon@autoliv.com (Mattis Lorentzon)
-Date: Thu, 14 Aug 2014 14:43:56 +0000
-Subject: Oops: 17 SMP ARM (v3.16-rc2)
-References: <20140626151424.GT32514@n2100.arm.linux.org.uk>
- <20140627112151.GF32514@n2100.arm.linux.org.uk>
- <3FFB61A7A8473C49831AF20FA193534A43CADFA7@ALVA-EXMB01.alv.autoliv.int>
- <20140627163108.GP32514@n2100.arm.linux.org.uk>
- <C4A61A5CA4AD2246942F4BA6F20ACB8043575072@ALVA-EXMB04.alv.autoliv.int>
- <20140806095012.GN30282@n2100.arm.linux.org.uk>
- <C4A61A5CA4AD2246942F4BA6F20ACB8043575172@ALVA-EXMB04.alv.autoliv.int>
- <20140806125550.GO30282@n2100.arm.linux.org.uk>
- <C4A61A5CA4AD2246942F4BA6F20ACB804357526C@ALVA-EXMB04.alv.autoliv.int>
- <20140807121248.GY30282@n2100.arm.linux.org.uk>
- <20140808180900.GG30282@n2100.arm.linux.org.uk>
- <C4A61A5CA4AD2246942F4BA6F20ACB8043576356@ALVA-EXMB04.alv.autoliv.int>
- <CAOMZO5B8GR+ABBoJ=dJcFqw3Wagfaip7HM+C1FTz+aE4CmqiPw@mail.gmail.com>
-Message-ID: <C4A61A5CA4AD2246942F4BA6F20ACB80435776D3@ALVA-EXMB04.alv.autoliv.int>
+From: Varun.Sethi@freescale.com (Varun Sethi)
+Date: Thu, 14 Aug 2014 14:45:45 +0000
+Subject: [PATCH v5] devicetree: Add generic IOMMU device tree bindings
+In-Reply-To: <87a9774lf5.fsf@nvidia.com>
+References: <1406803383-11601-1-git-send-email-thierry.reding@gmail.com>
+ <87a9774lf5.fsf@nvidia.com>
+Message-ID: <cfb1d2ff66004685b7ead3f5e6321681@BL2PR03MB468.namprd03.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Fabio and Russell,
 
-> A working theory is that the switch (3Com Switch 4400) triggers the
-> degeneration of the network stack from which Linux does not seem to
-> recover, even if we later bypass the switch and directly connect the board to
-> the server machine.
 
-After a few more tests we have finally been able to trigger the exact same stalls
-on the Sabrelite board with a direct network connection (i.e. without the switch).
+> -----Original Message-----
+> From: iommu-bounces at lists.linux-foundation.org [mailto:iommu-
+> bounces at lists.linux-foundation.org] On Behalf Of Hiroshi Doyu
+> Sent: Thursday, August 14, 2014 12:18 PM
+> To: Thierry Reding; Stephen Warren; Arnd Bergmann; Will Deacon
+> Cc: Mark Rutland; devicetree at vger.kernel.org; Olof Johansson;
+> iommu at lists.linux-foundation.org; Rob Herring; linux-tegra at vger.kernel.org;
+> linux-arm-kernel at lists.infradead.org
+> Subject: Re: [PATCH v5] devicetree: Add generic IOMMU device tree bindings
+> 
+> 
+> Thierry Reding <thierry.reding@gmail.com> writes:
+> 
+> > +Multiple-master IOMMU:
+> > +----------------------
+> > +
+> > +       iommu {
+> > +               /* the specifier represents the ID of the master */
+> > +               #iommu-cells = <1>;
+> > +       };
+> > +
+> > +       master at 1 {
+> > +               /* device has master ID 42 in the IOMMU */
+> > +               iommus = <&{/iommu} 42>;
+> > +       };
+> > +
+> > +       master at 2 {
+> > +               /* device has master IDs 23 and 24 in the IOMMU */
+> > +               iommus = <&{/iommu} 23>, <&{/iommu} 24>;
+> > +       };
+> 
+> I think that this "master ID" will be parsed in IOMMU driver. For example,
+> ARM,SMMU expects "streamID" as "master ID", right?
+> 
+> If a SoC has a feature to configure to assign streamID to devices at runtime,
+> "streamID" is not equal to "master ID".
+> 
+>   iommus = <&{/smmu} "soc specific master ID">;
+> 
+> "soc master ID" needs to be translated into "streamID" by SoC SW. It seems
+> that ARM,SMMU kernel driver doesn't expect this kind of ID translation. If
+> ARM,SMMU kernel driver is used as is, "soc master ID"
+> would be incompatible? ARM,SMMU needs such translation before parsing. Is
+> this my understanding right?
+> 
+> If so I think that this master ID configuration/translation may be quite
+> reasonable requirment for SoC using ARM,SMMU.
+> 
+> Can we consider this ID translation within ARM,SMMU compatibility?
+> 
+> IOW, is it possible to implement some SoC specific hook for ID
+> translation/configuration in ARM,SMMU kernel driver?
 
-Best regards,
-Mattis Lorentzon
 
-***************************************************************
-Consider the environment before printing this message.
+Can the id translation be done using a SMR mask? Also, for dynamic stream ID allocation we would need to represent the specific master register (to store the stream ID) in the device tree.
 
-To read Autoliv's Information and Confidentiality Notice, follow this link:
-http://www.autoliv.com/disclaimer.html
-***************************************************************
+-Varun
