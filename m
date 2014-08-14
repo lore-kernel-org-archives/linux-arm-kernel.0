@@ -1,61 +1,117 @@
-From: srv_yingjoe.chen@mediatek.com (Joe.C)
-Date: Thu, 14 Aug 2014 10:24:25 +0800
-Subject: [PATCH 6/7] arm: mediatek: enable gpt6 on boot up to make arch
- timer working
-In-Reply-To: <CABuKBe+Q3tnN0s22EMY-dK_6FeN_xN9SmrsW3dPONR6QDJ+V_w@mail.gmail.com>
-References: <1406824943-24052-1-git-send-email-matthias.bgg@gmail.com>
- <1406824943-24052-7-git-send-email-matthias.bgg@gmail.com>
- <CACRpkdbRhGE8tcKj+W_4F9-xmcm-fxcYuCmLOqX-ESC+3PAmyA@mail.gmail.com>
- <CABuKBe+Q3tnN0s22EMY-dK_6FeN_xN9SmrsW3dPONR6QDJ+V_w@mail.gmail.com>
-Message-ID: <1407983065.3412.8.camel@mtksdaap41>
+From: frowand.list@gmail.com (Frank Rowand)
+Date: Wed, 13 Aug 2014 19:33:14 -0700
+Subject: [PATCH to be tested] serial: msm_serial: add missing sysrq
+ handling
+In-Reply-To: <53EAB01B.5030102@codeaurora.org>
+References: <53E2C573.7090709@gmail.com> <53EAB01B.5030102@codeaurora.org>
+Message-ID: <53EC1FEA.5070907@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 2014-08-12 at 11:02 +0200, Matthias Brugger wrote:
-> 2014-08-11 9:15 GMT+02:00 Linus Walleij <linus.walleij@linaro.org>:
-> > On Thu, Jul 31, 2014 at 6:42 PM, Matthias Brugger
-> > <matthias.bgg@gmail.com> wrote:
-> >
-> >> We enable GTP6 which ungates the arch timer clock. Apart we write the
-> >> frequency with which the timer is running in the CNTFREQ register.
-> >> In the future this should be done in the bootloader.
-> >>
-> >> Signed-off-by: Matthias Brugger <matthias.bgg@gmail.com>
-> > (...)
-> >
-> >> +       if (of_machine_is_compatible("mediatek,mt6589")) {
-> >> +               /* set cntfreq register which is not done in bootloader */
-> >> +               asm volatile("mcr p15, 0, %0, c14, c0, 0" : : "r" (13000000));
-> >
-> > I guess this is for something like the ARM arch timer in
-> > drivers/clocksource/arm_arch_timer.c
-> >
-> > Instead of doing this, use the DT property "clock-frequency" on
-> > the ARM arch timer node, as that overrides the CP15 setting.
-> >
-> >> +
-> >> +               /* turn on GPT6 which ungates arch timer clocks */
-> >> +               gpt_base = ioremap(GPT6_CON_MT65xx, 0x04);
-> >> +       }
-> >> +
-> >> +       /* enabel clock and set to free-run */
-> >> +       if (gpt_base)
-> >> +               writel(0x31, gpt_base);
-> >
-> > Why is this not done properly in the GPT driver (I guess
-> > in drivers/clocksource/mtk_timer.c) instead of remapping
-> > it and fiddling around in the machine?
+On 8/12/2014 5:23 PM, Stephen Boyd wrote:
+> On 08/06/14 17:16, Frank Rowand wrote:
+>> Stephen,
+>>
+>> Can you test this patch on v 1.3 hardware?  It works on my v 1.4.
+>>
+>> If you use kdmx2, the way to send a break is '~B'.  The previous
+>> key pressed must be <enter> for the '~' escape to be recognized.
+>>
+>> Thanks!
+>>
+>> -Frank
+>>
+>>
+>>
+>> From: Frank Rowand <frank.rowand@sonymobile.com>
+>>
+>> Add missing sysrq handling to msm_serial.
+>>
+>> Signed-off-by: Frank Rowand <frank.rowand@sonymobile.com>
+>>
+>> ---
 > 
-> I didn't put it in the GPT driver, because that would mean, that you
-> need to have the mtk_timer to be able to use the ARM arch timer.
-> From my understanding this are two independent blocks in the SoC.
-> Apart from that, as stated in the commit message, this patch is a
-> workaround until we have a bootloader which does this for us.
-> Therefore I thought the init_time function would be the better place to do this.
+> It works but I have questions.
+> 
+>>  drivers/tty/serial/msm_serial.c |   26 +++++++++++++++++++++-----
+>>  1 file changed, 21 insertions(+), 5 deletions(-)
+>>
+>> Index: b/drivers/tty/serial/msm_serial.c
+>> ===================================================================
+>> --- a/drivers/tty/serial/msm_serial.c
+>> +++ b/drivers/tty/serial/msm_serial.c
+>> @@ -126,6 +126,8 @@ static void handle_rx_dm(struct uart_por
+>>  
+>>  	while (count > 0) {
+>>  		unsigned int c;
+>> +		unsigned char *cp;
+>> +		int res;
+>>  
+>>  		sr = msm_read(port, UART_SR);
+>>  		if ((sr & UART_SR_RX_READY) == 0) {
+>> @@ -135,15 +137,29 @@ static void handle_rx_dm(struct uart_por
+>>  		c = msm_read(port, UARTDM_RF);
+>>  		if (sr & UART_SR_RX_BREAK) {
+>>  			port->icount.brk++;
+>> -			if (uart_handle_break(port))
+>> +			if (uart_handle_break(port)) {
+>> +				count -= 1;
+>>  				continue;
+>> +			}
+> 
+> This looks wrong. If it's a break then I think the fifo takes in a break
+> character indicated by all zeros. We could possibly have 3 other
+> characters after it in the fifo, or maybe 2 characters in front of it,
+> or it could be 30 characters in. We can change this behavior by setting
+> a bit in the MR2 register so that the all zero character doesn't enter
+> the fifo. The same goes for the parity and frame error conditions, we
+> can drop those characters too.
+> 
+> I asked the designers how we're supposed to deal with a break in the
+> middle of the fifo and they recommended using the start/stop rx break
+> interrupts. Unfortunately, I don't think we can rely on the interrupts
+> being distinct so that might not work (but see attached patch). There's
+> also a break interrupt that triggers on the start and stop rx break
+> events. I don't know how this is useful either because we might get two
+> interrupts or we might get one.
+> 
+> So perhaps we need to scan through the 4 characters for a zero character
+> when the SR_RX_BREAK bit it set? The second diff does that.
+> 
+> Add another twist with port->read_status_mask. I guess that's there to
+> make it so that break characters still enter the tty layer? Is there any
+> documentation on this stuff? I'm lost on what the tty layer expects.
 
-Can we have a separate node like mt6577-timerfixup then?
-I'm preparing patch for mt8127 and mt8135. They all need this and use
-same address and. In current form, I'll have to make this check against
-a compatible string array.
+< snip >
 
-Joe.C
+Yep, the whole break in the middle of a fifo is interesting.  If I understand
+correctly, there is not enough information to determine where in the byte
+stream the break actually occurred.  If interrupts were not disabled for any
+length of time, then it was probably after all of the characters in the fifo.
+But I don't like to depend on winning races.  As you noted, finding a \0 in
+the fifo is likely the location in the byte stream where the break occurred.
+But \0 is also valid data.
+
+I read through the two alternate patches that you attached and read some tty
+layer stuff.  Your patches look like better code than my original code, and
+also leave less cruft in the input stream when stress tested.  One stress
+test that I have not attempted to create is to hold off processing the break
+until after more character have entered the fifo.
+
+The patches you sent are a little hard to read since they modify further code
+that my patch modified.  So I have redone your patches, as if my patch was
+not previously applied.  Hopefully I did not make any mistakes there.  I will
+reply to this email with each of your redone patches.
+
+I do not have a strong preference between the two alternatives you provided,
+without digging deeper into the tty layer, which I won't have time for in
+the next week.  Both alternatives improve the break handling (leave less
+cruft in the input stream when stress tested than before applying the
+patches).  Both alternatives support sysrq in my testing.
+
+If you do not want to submit either of your alternatives, I can dig into
+this again in a couple weeks.
+
+Thanks!
+
+-Frank
