@@ -1,7 +1,9 @@
 From: zonque@gmail.com (Daniel Mack)
-Date: Thu, 14 Aug 2014 11:46:12 +0200
-Subject: [PATCH 1/2] ARM: pxa: dts: fix mmc controller compatible string
-Message-ID: <1408009573-24523-1-git-send-email-zonque@gmail.com>
+Date: Thu, 14 Aug 2014 11:46:13 +0200
+Subject: [PATCH 2/2] ARM: pxa: dts: fix ohci controller compatible string
+In-Reply-To: <1408009573-24523-1-git-send-email-zonque@gmail.com>
+References: <1408009573-24523-1-git-send-email-zonque@gmail.com>
+Message-ID: <1408009573-24523-2-git-send-email-zonque@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -14,17 +16,17 @@ Signed-off-by: Daniel Mack <zonque@gmail.com>
  1 file changed, 1 insertion(+), 1 deletion(-)
 
 diff --git a/arch/arm/boot/dts/pxa2xx.dtsi b/arch/arm/boot/dts/pxa2xx.dtsi
-index febd391..f188f8c 100644
+index f188f8c..6d52a72 100644
 --- a/arch/arm/boot/dts/pxa2xx.dtsi
 +++ b/arch/arm/boot/dts/pxa2xx.dtsi
-@@ -128,7 +128,7 @@
+@@ -121,7 +121,7 @@
  		};
  
- 		mmc0: mmc at 41100000 {
--			compatible = "mrvl,pxa-mmc";
-+			compatible = "marvell,pxa-mmc";
- 			reg = <0x41100000 0x1000>;
- 			interrupts = <23>;
- 			dmas = <&dma 21
+ 		usb0: ohci at 4c000000 {
+-			compatible = "mrvl,pxa-ohci";
++			compatible = "marvell,pxa-ohci";
+ 			reg = <0x4c000000 0x10000>;
+ 			interrupts = <3>;
+ 			status = "disabled";
 -- 
 2.0.4
