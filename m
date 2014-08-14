@@ -1,37 +1,41 @@
-From: addy.ke@rock-chips.com (Addy Ke)
-Date: Thu, 14 Aug 2014 08:52:24 +0800
-Subject: [PATCH] spi: rockchip: return 0 if tx_buf and rx_buf are NULL
-Message-ID: <1407977544-2989-1-git-send-email-addy.ke@rock-chips.com>
+From: cw00.choi@samsung.com (Chanwoo Choi)
+Date: Thu, 14 Aug 2014 10:04:42 +0900
+Subject: [PATCH] ARM: Use 'model' property to set machine_name from Device
+ Tree
+In-Reply-To: <1404697991-32191-1-git-send-email-cw00.choi@samsung.com>
+References: <1404697991-32191-1-git-send-email-cw00.choi@samsung.com>
+Message-ID: <53EC0B2A.2070308@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-To do so, spi communication can use an empty buf to pull up CS.
+On 07/07/2014 10:53 AM, Chanwoo Choi wrote:
+> This patch use 'model' property from Device Tree to set machine_name.
+> The arm64 has already got the machine_name from Device Tree.
+> 
+> Signed-off-by: Chanwoo Choi <cw00.choi@samsung.com>
+> ---
+>  arch/arm/kernel/setup.c | 4 ++++
+>  1 file changed, 4 insertions(+)
+> 
+> diff --git a/arch/arm/kernel/setup.c b/arch/arm/kernel/setup.c
+> index 8a16ee5..698616f 100644
+> --- a/arch/arm/kernel/setup.c
+> +++ b/arch/arm/kernel/setup.c
+> @@ -878,7 +878,11 @@ void __init setup_arch(char **cmdline_p)
+>  	if (!mdesc)
+>  		mdesc = setup_machine_tags(__atags_pointer, __machine_arch_type);
+>  	machine_desc = mdesc;
+> +#if CONFIG_OF
+> +	machine_name = of_flat_dt_get_machine_name();
+> +#else
+>  	machine_name = mdesc->name;
+> +#endif
+>  
+>  	if (mdesc->reboot_mode != REBOOT_HARD)
+>  		reboot_mode = mdesc->reboot_mode;
+> 
 
-This patch merged from ChromiumOS tree.
-Cros_ec use this function to turn off CS and add a delay to ensure
-the rising edge doesn't come too soon after the end of the data.
+Ping.
 
-Tested-by: Doug Anderson <dianders@chromium.org>
-Signed-off-by: Doug Anderson <dianders@chromium.org>
-Signed-off-by: Addy Ke <addy.ke@rock-chips.com>
----
- drivers/spi/spi-rockchip.c | 4 ++--
- 1 file changed, 2 insertions(+), 2 deletions(-)
-
-diff --git a/drivers/spi/spi-rockchip.c b/drivers/spi/spi-rockchip.c
-index 72fb287..1e3bcfa 100644
---- a/drivers/spi/spi-rockchip.c
-+++ b/drivers/spi/spi-rockchip.c
-@@ -511,8 +511,8 @@ static int rockchip_spi_transfer_one(struct spi_master *master,
- 	WARN_ON((readl_relaxed(rs->regs + ROCKCHIP_SPI_SR) & SR_BUSY));
- 
- 	if (!xfer->tx_buf && !xfer->rx_buf) {
--		dev_err(rs->dev, "No buffer for transfer\n");
--		return -EINVAL;
-+		dev_dbg(rs->dev, "No buffer for transfer\n");
-+		return 0;
- 	}
- 
- 	rs->speed = xfer->speed_hz;
--- 
-1.8.3.2
+Best Regards,
+Chanwoo Choi
