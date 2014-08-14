@@ -1,53 +1,48 @@
-From: hverkuil@xs4all.nl (Hans Verkuil)
-Date: Thu, 14 Aug 2014 09:27:09 +0200
-Subject: [PATCH] videobuf2-core: modify the num of users
-In-Reply-To: <1408000262-2774-1-git-send-email-panpan1.liu@samsung.com>
-References: <1408000262-2774-1-git-send-email-panpan1.liu@samsung.com>
-Message-ID: <53EC64CD.8020709@xs4all.nl>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Thu, 14 Aug 2014 08:40:23 +0100
+Subject: [PATCH] ARM: Use 'model' property to set machine_name from
+ Device Tree
+In-Reply-To: <53EC0B2A.2070308@samsung.com>
+References: <1404697991-32191-1-git-send-email-cw00.choi@samsung.com>
+ <53EC0B2A.2070308@samsung.com>
+Message-ID: <20140814074023.GR30401@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Thu, Aug 14, 2014 at 10:04:42AM +0900, Chanwoo Choi wrote:
+> On 07/07/2014 10:53 AM, Chanwoo Choi wrote:
+> > This patch use 'model' property from Device Tree to set machine_name.
+> > The arm64 has already got the machine_name from Device Tree.
+> > 
+> > Signed-off-by: Chanwoo Choi <cw00.choi@samsung.com>
+> > ---
+> >  arch/arm/kernel/setup.c | 4 ++++
+> >  1 file changed, 4 insertions(+)
+> > 
+> > diff --git a/arch/arm/kernel/setup.c b/arch/arm/kernel/setup.c
+> > index 8a16ee5..698616f 100644
+> > --- a/arch/arm/kernel/setup.c
+> > +++ b/arch/arm/kernel/setup.c
+> > @@ -878,7 +878,11 @@ void __init setup_arch(char **cmdline_p)
+> >  	if (!mdesc)
+> >  		mdesc = setup_machine_tags(__atags_pointer, __machine_arch_type);
+> >  	machine_desc = mdesc;
+> > +#if CONFIG_OF
+> > +	machine_name = of_flat_dt_get_machine_name();
+> > +#else
+> >  	machine_name = mdesc->name;
+> > +#endif
+> >  
+> >  	if (mdesc->reboot_mode != REBOOT_HARD)
+> >  		reboot_mode = mdesc->reboot_mode;
+> > 
+> 
+> Ping.
 
-I've got a few questions:
+This has come up before, and the decision was against exposing this.
 
-On 08/14/2014 09:11 AM, panpan liu wrote:
-> If num_users returns 1 or more than 1, that means we are not the
-> only user of the plane's memory.
+Thanks.
 
-Why do think this is wrong? When the buffer is allocated the refcount is set to 1,
-so anyone mapping that buffer will increase the refcount making it 'in use'.
-
-Seems perfectly OK to me.
-
-So if your patch solves a problem for you, then I'd like to know what that problem
-is. You might be solving it in the wrong place.
-
->
-> Signed-off-by: panpan liu <panpan1.liu@samsung.com>
-> ---
->   drivers/media/v4l2-core/videobuf2-core.c |    2 +-
->   1 file changed, 1 insertion(+), 1 deletion(-)
->
-> diff --git a/drivers/media/v4l2-core/videobuf2-core.c b/drivers/media/v4l2-core/videobuf2-core.c
-> index c359006..d3a4b8f 100644
-> --- a/drivers/media/v4l2-core/videobuf2-core.c
-> +++ b/drivers/media/v4l2-core/videobuf2-core.c
-> @@ -625,7 +625,7 @@ static bool __buffer_in_use(struct vb2_queue *q, struct vb2_buffer *vb)
->   		 * case anyway. If num_users() returns more than 1,
->   		 * we are not the only user of the plane's memory.
-
-And even if there was a bug, then your patch is incomplete because you didn't update
-the comment.
-
->   		 */
-> -		if (mem_priv && call_memop(vb, num_users, mem_priv) > 1)
-> +		if (mem_priv && call_memop(vb, num_users, mem_priv) >= 1)
->   			return true;
->   	}
->   	return false;
->
-
-Regards,
-
-	Hans
+-- 
+FTTC broadband for 0.8mile line: currently at 9.5Mbps down 400kbps up
+according to speedtest.net.
