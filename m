@@ -1,102 +1,179 @@
-From: shc_work@mail.ru (=?UTF-8?B?QWxleGFuZGVyIFNoaXlhbg==?=)
-Date: Thu, 14 Aug 2014 16:12:01 +0400
-Subject: =?UTF-8?B?UmU6IFtQQVRDSCA0LzRdIEFSTTogZHRzOiBrZXlzdG9uZS1rMmhrOiBhZGQg?=
- =?UTF-8?B?ZHNwIGdwaW8gY29udHJvbGxlcnMgbm9kZXM=?=
-In-Reply-To: <53ECA7F3.7030702@ti.com>
-References: <1407946582-20927-1-git-send-email-grygorii.strashko@ti.com>
- <1407945984.545232249@f170.i.mail.ru> <53ECA7F3.7030702@ti.com>
-Message-ID: <1408018321.928492982@f270.i.mail.ru>
+From: tomeu.vizoso@collabora.com (Tomeu Vizoso)
+Date: Thu, 14 Aug 2014 14:11:23 +0200
+Subject: [PATCH v6 1/6] clk: Add temporary mapping to the existing API
+In-Reply-To: <1408018287-14217-1-git-send-email-tomeu.vizoso@collabora.com>
+References: <1408018287-14217-1-git-send-email-tomeu.vizoso@collabora.com>
+Message-ID: <1408018287-14217-2-git-send-email-tomeu.vizoso@collabora.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Thu, 14 Aug 2014 15:13:39 +0300 ?? Grygorii Strashko <grygorii.strashko@ti.com>:
-> Hi Alexander,
-> 
-> On 08/13/2014 07:06 PM, Alexander Shiyan wrote:
-> > Wed, 13 Aug 2014 19:16:22 +0300 ?? Grygorii Strashko <grygorii.strashko@ti.com>:
-> >> Add Keystone 2 DSP GPIO nodes.
-> >> DSP GPIO banks 0-7 correspond to DSP0-DSP7
-> >>
-> >> Signed-off-by: Grygorii Strashko <grygorii.strashko@ti.com>
-> >> ---
-> >>   arch/arm/boot/dts/k2hk.dtsi |   56 +++++++++++++++++++++++++++++++++++++++++++
-> >>   1 file changed, 56 insertions(+)
-> >>
-> >> diff --git a/arch/arm/boot/dts/k2hk.dtsi b/arch/arm/boot/dts/k2hk.dtsi
-> >> index 321ba2f..009e180 100644
-> >> --- a/arch/arm/boot/dts/k2hk.dtsi
-> >> +++ b/arch/arm/boot/dts/k2hk.dtsi
-> >> @@ -50,5 +50,61 @@
-> >>   			#interrupt-cells = <1>;
-> >>   			ti,syscon-dev = <&devctrl 0x2a0>;
-> >>   		};
-> >> +
-> >> +		dspgpio0: keystone_dsp_gpio at 02620240 {
-> >> +			compatible = "ti,keystone-mctrl-gpio";
-> >> +			gpio-controller;
-> >> +			#gpio-cells = <2>;
-> >> +			gpio,syscon-dev = <&devctrl 0x240>;
-> >> +		};
-> >> +
-> >> +		dspgpio1: keystone_dsp_gpio at 2620244 {
-> >> +			compatible = "ti,keystone-mctrl-gpio";
-> >> +			gpio-controller;
-> >> +			#gpio-cells = <2>;
-> >> +			gpio,syscon-dev = <&devctrl 0x244>;
-> >> +		};
-> > ...
-> >> +		dspgpio7: keystone_dsp_gpio at 262025C {
-> >> +			compatible = "ti,keystone-mctrl-gpio";
-> >> +			gpio-controller;
-> >> +			#gpio-cells = <2>;
-> >> +			gpio,syscon-dev = <&devctrl 0x25c>;
-> >> +		};
-> > 
-> > So, devctrl is a syscon device and this DTS introduce several
-> > identical GPIO descriptions?
-> > 
-> > On my opinion this should be placed in the gpio-syscon.c,
-> > where you can add support for ti,keystone-dsp0{..7}-gpio.
-> > Such change will avoid parts 2 and 3 of this patch.
-> > 
-> > static const struct syscon_gpio_data ti_keystone_dsp0_gpio = {
-> >    .compatible = "ti,keystone-syscon",
-> >    .dat_bit_offset = 0x240 * 8,
-> >    ...
-> >    .set = etc...
-> > };
-> 
-> So, if I understand you right, you propose to add 8 additional compatible
-> strings just to encode different register offsets. Is it?
-> 1) add "ti,keystone-mctrl-gpio0"..."ti,keystone-mctrl-gpio7"
+To preserve git-bisectability, add aliases from the future provider API to the
+existing public API.
 
-Yes, but replace "mctrl" with "dsp" since mctrl is not applicable here.
+Also includes clk-provider.h and clk-dev.h in a few places so the right
+functions are defined.
 
-> 2) add 8 structures keystone_mctrl_gpio0..keystone_mctrl_gpio7 in gpio-syscon.c
->    (which will have only different values of field - .dat_bit_offset = 0x2yy * 8,)
-> 
-> 3) add 8 additional items in array syscon_gpio_ids
-> 	{
-> 		.compatible	= "ti,keystone-mctrl-gpio0",
-> 		.data		= &keystone_mctrl_gpio0,
-> 	}, ...
-> 
-> I can do it if you strictly insist, BUT I don't like it :(
-> - just imagine how your driver will look look like if 5 or 6 SoCs will re-use it ;)
-> - as I mentioned in cover letter and commit messages even each SoC revision can have
->   different Syscon implementation with different registers offsets and with different
->   number of Syscon register ranges (for example for Keystone 2 we already have two
->   Syscon devices defined in DT).
-
-The initial version of this driver contains addresses and offsets in, but this approach has
-been criticized by DT maintainers.
-
-"different Syscon with different registers" - is OK, since we use compatible string in definition.
-If you have two identical syscon, just append an unique additional string and use it in this driver.
-
-> Now we already have 3 Keystone 2 SoC revisions (K2HK, K2L, K2E)  and there are no guarantee
-> that the next revision k2X will have the same register offset for GPIO0.
-
-Then use more exact string for syscon-gpio, like ti,keystone-k2hk-dsp-gpio0.
+Signed-off-by: Tomeu Vizoso <tomeu.vizoso@collabora.com>
 
 ---
+v6: * Include linux/clkdev.h in clk-conf.c (thanks to Boris Brezillon)
+
+v4: * Add more clk-provider.h includes to clk implementations
+    * Add mapping for clk_provider_round_rate
+---
+ arch/arm/mach-omap2/display.c                 |  1 +
+ arch/arm/mach-omap2/omap_device.c             |  1 +
+ arch/arm/plat-orion/common.c                  |  1 +
+ drivers/clk/berlin/bg2.c                      |  1 +
+ drivers/clk/berlin/bg2q.c                     |  1 +
+ drivers/clk/clk-conf.c                        |  1 +
+ drivers/clk/clkdev.c                          |  1 +
+ drivers/media/platform/exynos4-is/media-dev.c |  1 +
+ include/linux/clk-provider.h                  | 23 +++++++++++++++++++++++
+ include/linux/clk/zynq.h                      |  1 +
+ 10 files changed, 32 insertions(+)
+
+diff --git a/arch/arm/mach-omap2/display.c b/arch/arm/mach-omap2/display.c
+index bf852d7..0f9e479 100644
+--- a/arch/arm/mach-omap2/display.c
++++ b/arch/arm/mach-omap2/display.c
+@@ -21,6 +21,7 @@
+ #include <linux/platform_device.h>
+ #include <linux/io.h>
+ #include <linux/clk.h>
++#include <linux/clk-provider.h>
+ #include <linux/err.h>
+ #include <linux/delay.h>
+ #include <linux/of.h>
+diff --git a/arch/arm/mach-omap2/omap_device.c b/arch/arm/mach-omap2/omap_device.c
+index 01ef59d..fbe8cf0 100644
+--- a/arch/arm/mach-omap2/omap_device.c
++++ b/arch/arm/mach-omap2/omap_device.c
+@@ -32,6 +32,7 @@
+ #include <linux/io.h>
+ #include <linux/clk.h>
+ #include <linux/clkdev.h>
++#include <linux/clk-provider.h>
+ #include <linux/pm_runtime.h>
+ #include <linux/of.h>
+ #include <linux/notifier.h>
+diff --git a/arch/arm/plat-orion/common.c b/arch/arm/plat-orion/common.c
+index 3ec6e8e..961b593 100644
+--- a/arch/arm/plat-orion/common.c
++++ b/arch/arm/plat-orion/common.c
+@@ -15,6 +15,7 @@
+ #include <linux/serial_8250.h>
+ #include <linux/ata_platform.h>
+ #include <linux/clk.h>
++#include <linux/clk-provider.h>
+ #include <linux/clkdev.h>
+ #include <linux/mv643xx_eth.h>
+ #include <linux/mv643xx_i2c.h>
+diff --git a/drivers/clk/berlin/bg2.c b/drivers/clk/berlin/bg2.c
+index 515fb13..4c81e09 100644
+--- a/drivers/clk/berlin/bg2.c
++++ b/drivers/clk/berlin/bg2.c
+@@ -19,6 +19,7 @@
+ 
+ #include <linux/clk.h>
+ #include <linux/clk-provider.h>
++#include <linux/clkdev.h>
+ #include <linux/kernel.h>
+ #include <linux/of.h>
+ #include <linux/of_address.h>
+diff --git a/drivers/clk/berlin/bg2q.c b/drivers/clk/berlin/bg2q.c
+index 21784e4..748da9b 100644
+--- a/drivers/clk/berlin/bg2q.c
++++ b/drivers/clk/berlin/bg2q.c
+@@ -19,6 +19,7 @@
+ 
+ #include <linux/clk.h>
+ #include <linux/clk-provider.h>
++#include <linux/clkdev.h>
+ #include <linux/kernel.h>
+ #include <linux/of.h>
+ #include <linux/of_address.h>
+diff --git a/drivers/clk/clk-conf.c b/drivers/clk/clk-conf.c
+index aad4796..d36a7b3 100644
+--- a/drivers/clk/clk-conf.c
++++ b/drivers/clk/clk-conf.c
+@@ -8,6 +8,7 @@
+  */
+ 
+ #include <linux/clk.h>
++#include <linux/clkdev.h>
+ #include <linux/clk-provider.h>
+ #include <linux/clk/clk-conf.h>
+ #include <linux/device.h>
+diff --git a/drivers/clk/clkdev.c b/drivers/clk/clkdev.c
+index da4bda8..c751d0c 100644
+--- a/drivers/clk/clkdev.c
++++ b/drivers/clk/clkdev.c
+@@ -18,6 +18,7 @@
+ #include <linux/string.h>
+ #include <linux/mutex.h>
+ #include <linux/clk.h>
++#include <linux/clk-provider.h>
+ #include <linux/clkdev.h>
+ #include <linux/of.h>
+ 
+diff --git a/drivers/media/platform/exynos4-is/media-dev.c b/drivers/media/platform/exynos4-is/media-dev.c
+index 344718d..2620c48 100644
+--- a/drivers/media/platform/exynos4-is/media-dev.c
++++ b/drivers/media/platform/exynos4-is/media-dev.c
+@@ -13,6 +13,7 @@
+ #include <linux/bug.h>
+ #include <linux/clk.h>
+ #include <linux/clk-provider.h>
++#include <linux/clkdev.h>
+ #include <linux/device.h>
+ #include <linux/errno.h>
+ #include <linux/i2c.h>
+diff --git a/include/linux/clk-provider.h b/include/linux/clk-provider.h
+index 411dd7e..b1a8633 100644
+--- a/include/linux/clk-provider.h
++++ b/include/linux/clk-provider.h
+@@ -16,6 +16,29 @@
+ 
+ #ifdef CONFIG_COMMON_CLK
+ 
++/* Temporarily map the to-be-added API to the old API, just so stuff compiles */
++#define clk_core			clk
++
++#define __clk_create_clk
++
++#define clk_provider_get		clk_get
++#define clk_provider_get_sys		clk_get_sys
++#define devm_clk_provider_get		devm_clk_get
++#define of_clk_provider_get		of_clk_get
++#define of_clk_provider_get_by_name	of_clk_get_by_name
++
++#define clk_provider_set_rate		clk_set_rate
++#define clk_provider_get_rate		clk_get_rate
++#define clk_provider_round_rate		clk_round_rate
++#define clk_provider_set_parent		clk_set_parent
++#define clk_provider_get_parent		clk_get_parent
++#define clk_provider_prepare		clk_prepare
++#define clk_provider_unprepare		clk_unprepare
++#define clk_provider_enable		clk_enable
++#define clk_provider_disable		clk_disable
++#define clk_provider_prepare_enable	clk_prepare_enable
++#define clk_provider_disable_unprepare	clk_unprepare
++
+ /*
+  * flags used across common struct clk.  these flags should only affect the
+  * top-level framework.  custom flags for dealing with hardware specifics
+diff --git a/include/linux/clk/zynq.h b/include/linux/clk/zynq.h
+index 7a5633b..a990a59 100644
+--- a/include/linux/clk/zynq.h
++++ b/include/linux/clk/zynq.h
+@@ -21,6 +21,7 @@
+ #define __LINUX_CLK_ZYNQ_H_
+ 
+ #include <linux/spinlock.h>
++#include <linux/clk-provider.h>
+ 
+ void zynq_clock_init(void);
+ 
+-- 
+1.9.3
