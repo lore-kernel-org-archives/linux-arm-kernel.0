@@ -1,38 +1,62 @@
-From: semen.protsenko@linaro.org (Semen Protsenko)
-Date: Thu, 14 Aug 2014 17:55:22 +0300
-Subject: [PATCH] efi/arm64: store Runtime Services revision
-Message-ID: <1408028122-1784-1-git-send-email-semen.protsenko@linaro.org>
+From: weiyang@linux.vnet.ibm.com (Wei Yang)
+Date: Thu, 14 Aug 2014 22:58:04 +0800
+Subject: [PATCH v9 02/12] PCI: OF: Parse and map the IRQ when adding the
+ PCI device.
+In-Reply-To: <1407860725-25202-3-git-send-email-Liviu.Dudau@arm.com>
+References: <1407860725-25202-1-git-send-email-Liviu.Dudau@arm.com>
+ <1407860725-25202-3-git-send-email-Liviu.Dudau@arm.com>
+Message-ID: <20140814145804.GA5586@richard>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-"efi" global data structure contains "runtime_version" field which must
-be assigned in order to use it later in Runtime Services virtual calls
-(virt_efi_* functions).
+On Tue, Aug 12, 2014 at 05:25:15PM +0100, Liviu Dudau wrote:
+>Enhance the default implementation of pcibios_add_device() to
+>parse and map the IRQ of the device if a DT binding is available.
+>
+>Cc: Bjorn Helgaas <bhelgaas@google.com>
+>Cc: Grant Likely <grant.likely@linaro.org>
+>Cc: Rob Herring <robh+dt@kernel.org>
+>Signed-off-by: Liviu Dudau <Liviu.Dudau@arm.com>
+>---
+> drivers/pci/pci.c | 3 +++
+> 1 file changed, 3 insertions(+)
+>
+>diff --git a/drivers/pci/pci.c b/drivers/pci/pci.c
+>index 1c8592b..29d1775 100644
+>--- a/drivers/pci/pci.c
+>+++ b/drivers/pci/pci.c
+>@@ -17,6 +17,7 @@
+> #include <linux/spinlock.h>
+> #include <linux/string.h>
+> #include <linux/log2.h>
+>+#include <linux/of_pci.h>
+> #include <linux/pci-aspm.h>
+> #include <linux/pm_wakeup.h>
+> #include <linux/interrupt.h>
+>@@ -1453,6 +1454,8 @@ EXPORT_SYMBOL(pcim_pin_device);
+>  */
+> int __weak pcibios_add_device(struct pci_dev *dev)
+> {
+>+	dev->irq = of_irq_parse_and_map_pci(dev, 0, 0);
+>+
+> 	return 0;
+> }
 
-Before this patch "runtime_version" was unassigned (0), so each
-Runtime Service virtual call that checks revision would fail.
+Liviu,
 
-Runtime Services revision being passed in UEFI system table from UEFI
-to kernel (see efi_entry() function). In UEFI it's being stored at
-MdePkg/Include/Uefi/UefiSpec.h as EFI_RUNTIME_SERVICES_REVISION.
+For this, my suggestion is to add arch dependent function to setup the irq
+line for pci devices. I can't find an obvious reason this won't work on other
+archs, but maybe this will hurt some of them?
 
-Signed-off-by: Semen Protsenko <semen.protsenko@linaro.org>
----
- arch/arm64/kernel/efi.c | 2 ++
- 1 file changed, 2 insertions(+)
+>
+>-- 
+>2.0.4
+>
+>--
+>To unsubscribe from this list: send the line "unsubscribe linux-pci" in
+>the body of a message to majordomo at vger.kernel.org
+>More majordomo info at  http://vger.kernel.org/majordomo-info.html
 
-diff --git a/arch/arm64/kernel/efi.c b/arch/arm64/kernel/efi.c
-index e72f310..5dbb7bd 100644
---- a/arch/arm64/kernel/efi.c
-+++ b/arch/arm64/kernel/efi.c
-@@ -463,6 +463,8 @@ static int __init arm64_enter_virtual_mode(void)
- 	efi_native_runtime_setup();
- 	set_bit(EFI_RUNTIME_SERVICES, &efi.flags);
- 
-+	efi.runtime_version = efi.systab->hdr.revision;
-+
- 	return 0;
- 
- err_unmap:
 -- 
-2.0.1
+Richard Yang
+Help you, Help me
