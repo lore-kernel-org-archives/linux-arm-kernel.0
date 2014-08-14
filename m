@@ -1,103 +1,61 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Thu, 14 Aug 2014 18:55:26 +0100
-Subject: [PATCH 1/2 V4] irqchip: gic: Add supports for ARM GICv2m MSI(-X)
-In-Reply-To: <1407942041-3291-2-git-send-email-suravee.suthikulpanit@amd.com>
-References: <1407942041-3291-1-git-send-email-suravee.suthikulpanit@amd.com>
- <1407942041-3291-2-git-send-email-suravee.suthikulpanit@amd.com>
-Message-ID: <20140814175525.GI24018@leverpostej>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Thu, 14 Aug 2014 20:10:13 +0200
+Subject: [PATCH v2 1/3] arm64: spin-table: handle unmapped
+ cpu-release-addrs
+In-Reply-To: <20140814171323.GH9039@arm.com>
+References: <CAKv+Gu_UjRNhhiM0GPsKRdXRtmEnY6cbpY-JZ33RUMapbPYsbQ@mail.gmail.com>
+ <20140813125844.GE32644@leverpostej>
+ <20140814171323.GH9039@arm.com>
+Message-ID: <CAKv+Gu9ftjZby+5U5Vs0hXhyFdNLwx4MwvC-LL=y3a9eSz34iQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Aug 13, 2014 at 04:00:40PM +0100, suravee.suthikulpanit at amd.com wrote:
-> From: Suravee Suthikulpanit <Suravee.Suthikulpanit@amd.com>
-> 
-> ARM GICv2m specification extends GICv2 to support MSI(-X) with
-> a new set of register frame. This patch introduces support for
-> the non-secure GICv2m register frame. Currently, GICV2m is available
-> in certain version of GIC-400.
-> 
-> The patch introduces a new property in ARM gic binding, the v2m subnode.
-> It is optional.
-> 
-> Signed-off-by: Suravee Suthikulpanit <Suravee.Suthikulpanit@amd.com>
-> Cc: Mark Rutland <Mark.Rutland@arm.com>
-> Cc: Marc Zyngier <Marc.Zyngier@arm.com>
-> Cc: Jason Cooper <jason@lakedaemon.net>
-> Cc: Catalin Marinas <Catalin.Marinas@arm.com>
-> Cc: Will Deacon <Will.Deacon@arm.com>
-> ---
->  Documentation/devicetree/bindings/arm/gic.txt |  32 ++++
->  drivers/irqchip/Kconfig                       |   7 +
->  drivers/irqchip/Makefile                      |   1 +
->  drivers/irqchip/irq-gic-v2m.c                 | 215 ++++++++++++++++++++++++++
->  drivers/irqchip/irq-gic.c                     |  75 +++++----
->  drivers/irqchip/irq-gic.h                     |  48 ++++++
->  6 files changed, 348 insertions(+), 30 deletions(-)
->  create mode 100644 drivers/irqchip/irq-gic-v2m.c
->  create mode 100644 drivers/irqchip/irq-gic.h
-> 
-> diff --git a/Documentation/devicetree/bindings/arm/gic.txt b/Documentation/devicetree/bindings/arm/gic.txt
-> index 5573c08..8a64179 100644
-> --- a/Documentation/devicetree/bindings/arm/gic.txt
-> +++ b/Documentation/devicetree/bindings/arm/gic.txt
-> @@ -95,3 +95,35 @@ Example:
->                       <0x2c006000 0x2000>;
->                 interrupts = <1 9 0xf04>;
->         };
-> +
-> +
-> +* GICv2m extension for MSI/MSI-x support (Optional)
-> +
-> +Certain revision of GIC-400 supports MSI/MSI-x via V2M register frame.
-> +This is enabled by specifying v2m sub-node.
-> +
-> +Required properties:
-> +
-> +- msi-controller : Identifies the node as an MSI controller.
-> +
-> +- reg : GICv2m MSI interface register base and size
-> +
-> +Example:
-> +
-> +       interrupt-controller at e1101000 {
-> +               compatible = "arm,gic-400";
-> +               #interrupt-cells = <3>;
-> +               #address-cells = <2>;
-> +               #size-cells = <2>;
-> +               interrupt-controller;
-> +               interrupts = <1 8 0xf04>;
-> +               ranges = <0 0 0 0xe1100000 0 0x100000>;
-> +               reg = <0x0 0xe1110000 0 0x01000>,
-> +                     <0x0 0xe112f000 0 0x02000>,
-> +                     <0x0 0xe1140000 0 0x10000>,
-> +                     <0x0 0xe1160000 0 0x10000>;
-> +               v2m {
-> +                       msi-controller;
-> +                       reg = <0x0 0x80000 0 0x1000>;
-> +               };
-> +       };
+On 14 August 2014 19:13, Catalin Marinas <catalin.marinas@arm.com> wrote:
+> On Wed, Aug 13, 2014 at 01:58:45PM +0100, Mark Rutland wrote:
+>> > With the 3.17 merge window not far from closing, is there anything we
+>> > could still do this cycle to get $subject addressed?
+>> > As I have indicated before, the newly introduced TEXT_OFFSET fuzzing
+>> > may break APM Mustang if booting from UEFI (i.e., for low values of
+>> > rand()), and as this option is recommended for distribution kernels,
+>> > it could make apt-get update'ing your kernel a frustrating experience.
+>> > However, the fix for that issue triggers the issue addressed by
+>> > $subject.
+>> >
+>> > In my personal opinion, relaxing the requirements imposed on where
+>> > your cpu-release-addr may live could remain a separate discussion. In
+>> > the APM Mustang case, even when adhering to booting.txt by the letter
+>> > (i.e., pu cpu-release-addr in a memreserved area in DRAM and load
+>> > Image at a 2 meg boundary + TEXT_OFFSET), the kernel fails to bring up
+>> > the secondaries if the cpu-release-addr is below the kernel.
+>>
+>> For the moment I would be happy with the patch as it stands (using
+>> ioremap_cache).
+>>
+>> Catalin, Will?
+>
+> Using ioremap_cache() sounds fine to me but I have to dig the original
+> patches as I've only been cc'ed in the middle of the thread (and that's
+> just for patch 1/3).
+>
 
-[...]
+http://marc.info/?l=linux-arm-kernel&m=140671806332258&w=2
+http://marc.info/?l=linux-arm-kernel&m=140671807532262&w=2
+http://marc.info/?l=linux-arm-kernel&m=140671807732263&w=2
 
-> @@ -1009,6 +1012,16 @@ gic_of_init(struct device_node *node, struct device_node *parent)
->         if (of_property_read_u32(node, "cpu-offset", &percpu_offset))
->                 percpu_offset = 0;
-> 
-> +       gic_data[gic_cnt].irq_chip = &gic_chip;
-> +
-> +       /* Currently, we only support one v2m subnode. */
-> +       child = of_get_child_by_name(node, "v2m");
-> +       if (child) {
-> +               ret = gicv2m_of_init(child, &gic_data[gic_cnt]);
-> +               if (ret)
-> +                       return ret;
-> +       }
+Patch 3/3 makes the EFI stub load Image at the lowest 2 meg boundary +
+TEXT_OFFSET instead of erroring out when base of DRAM + TEXT_OFFSET is
+occupied. This is necessary as the randomized TEXT_OFFSET could
+potentially conflict with reserved areas at the base of DRAM if a low
+value happens to be chosen.
 
-I can't see how you'd sanely expand this to multiple children, which was
-the main point of having a separate node for the M block.
+Patch 1/3 fixes the resulting breakage on APM Mustang in bringing up
+the secondaries, as on that board in particular, the reserved area at
+the base of DRAM contains the holding pen, and loading Image higher up
+makes the mailbox inaccessible through the linear mapping hence the
+need for ioremap_cache()
 
-Give the M block a compatible string and look for children with that
-string.
+Patch 2/3 is also a fix for a potential issue on UEFI boot, but it is
+unrelated to 1/3 and 3/3
 
-Thanks,
-Mark.
+-- 
+Ard.
