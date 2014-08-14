@@ -1,93 +1,77 @@
-From: grygorii.strashko@ti.com (Grygorii Strashko)
-Date: Thu, 14 Aug 2014 15:13:39 +0300
-Subject: [PATCH 4/4] ARM: dts: keystone-k2hk: add dsp gpio controllers
- nodes
-In-Reply-To: <1407945984.545232249@f170.i.mail.ru>
-References: <1407946582-20927-1-git-send-email-grygorii.strashko@ti.com>
- <1407946582-20927-5-git-send-email-grygorii.strashko@ti.com>
- <1407945984.545232249@f170.i.mail.ru>
-Message-ID: <53ECA7F3.7030702@ti.com>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Thu, 14 Aug 2014 12:31:25 +0100
+Subject: [PATCH v2 2/3] arm64/efi: efistub: cover entire static mem
+ footprint in PE/COFF .text
+In-Reply-To: <1406717944-24725-3-git-send-email-ard.biesheuvel@linaro.org>
+References: <1406717944-24725-1-git-send-email-ard.biesheuvel@linaro.org>
+ <1406717944-24725-3-git-send-email-ard.biesheuvel@linaro.org>
+Message-ID: <20140814113125.GD24018@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Alexander,
-
-On 08/13/2014 07:06 PM, Alexander Shiyan wrote:
-> Wed, 13 Aug 2014 19:16:22 +0300 ?? Grygorii Strashko <grygorii.strashko@ti.com>:
->> Add Keystone 2 DSP GPIO nodes.
->> DSP GPIO banks 0-7 correspond to DSP0-DSP7
->>
->> Signed-off-by: Grygorii Strashko <grygorii.strashko@ti.com>
->> ---
->>   arch/arm/boot/dts/k2hk.dtsi |   56 +++++++++++++++++++++++++++++++++++++++++++
->>   1 file changed, 56 insertions(+)
->>
->> diff --git a/arch/arm/boot/dts/k2hk.dtsi b/arch/arm/boot/dts/k2hk.dtsi
->> index 321ba2f..009e180 100644
->> --- a/arch/arm/boot/dts/k2hk.dtsi
->> +++ b/arch/arm/boot/dts/k2hk.dtsi
->> @@ -50,5 +50,61 @@
->>   			#interrupt-cells = <1>;
->>   			ti,syscon-dev = <&devctrl 0x2a0>;
->>   		};
->> +
->> +		dspgpio0: keystone_dsp_gpio at 02620240 {
->> +			compatible = "ti,keystone-mctrl-gpio";
->> +			gpio-controller;
->> +			#gpio-cells = <2>;
->> +			gpio,syscon-dev = <&devctrl 0x240>;
->> +		};
->> +
->> +		dspgpio1: keystone_dsp_gpio at 2620244 {
->> +			compatible = "ti,keystone-mctrl-gpio";
->> +			gpio-controller;
->> +			#gpio-cells = <2>;
->> +			gpio,syscon-dev = <&devctrl 0x244>;
->> +		};
-> ...
->> +		dspgpio7: keystone_dsp_gpio at 262025C {
->> +			compatible = "ti,keystone-mctrl-gpio";
->> +			gpio-controller;
->> +			#gpio-cells = <2>;
->> +			gpio,syscon-dev = <&devctrl 0x25c>;
->> +		};
+On Wed, Jul 30, 2014 at 11:59:03AM +0100, Ard Biesheuvel wrote:
+> The static memory footprint of a kernel Image at boot is larger than the
+> Image file itself. Things like .bss data and initial page tables are allocated
+> statically but populated dynamically so their content is not contained in the
+> Image file.
 > 
-> So, devctrl is a syscon device and this DTS introduce several
-> identical GPIO descriptions?
+> However, if EFI (or GRUB) has loaded the Image at precisely the desired offset
+> of base of DRAM + TEXT_OFFSET, the Image will be booted in place, and we have
+> to make sure that the allocation done by the PE/COFF loader is large enough.
 > 
-> On my opinion this should be placed in the gpio-syscon.c,
-> where you can add support for ti,keystone-dsp0{..7}-gpio.
-> Such change will avoid parts 2 and 3 of this patch.
+> Fix this by growing the PE/COFF .text section to cover the entire static
+> memory footprint. The part of the section that is not covered by the payload
+> will be zero initialised by the PE/COFF loader.
 > 
-> static const struct syscon_gpio_data ti_keystone_dsp0_gpio = {
->    .compatible = "ti,keystone-syscon",
->    .dat_bit_offset = 0x240 * 8,
->    ...
->    .set = etc...
-> };
+> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+> Acked-by: Mark Salter <msalter@redhat.com>
 
-So, if I understand you right, you propose to add 8 additional compatible
-strings just to encode different register offsets. Is it?
-1) add "ti,keystone-mctrl-gpio0"..."ti,keystone-mctrl-gpio7"
+This looks sane to me and it seems we do the same for x86 as of
+c7fb93ec51d4 (x86/efi: Include a .bss section within the PE/COFF
+headers). So:
 
-2) add 8 structures keystone_mctrl_gpio0..keystone_mctrl_gpio7 in gpio-syscon.c
-   (which will have only different values of field - .dat_bit_offset = 0x2yy * 8,)
+Acked-by: Mark Rutland <mark.rutland@arm.com>
 
-3) add 8 additional items in array syscon_gpio_ids
-	{
-		.compatible	= "ti,keystone-mctrl-gpio0",
-		.data		= &keystone_mctrl_gpio0,
-	}, ...
-
-I can do it if you strictly insist, BUT I don't like it :(
-- just imagine how your driver will look look like if 5 or 6 SoCs will re-use it ;)
-- as I mentioned in cover letter and commit messages even each SoC revision can have
-  different Syscon implementation with different registers offsets and with different
-  number of Syscon register ranges (for example for Keystone 2 we already have two
-  Syscon devices defined in DT).
-
-Now we already have 3 Keystone 2 SoC revisions (K2HK, K2L, K2E)  and there are no guarantee
-that the next revision k2X will have the same register offset for GPIO0.
-
-Best regards,
--grygorii
+> ---
+>  arch/arm64/kernel/head.S | 6 +++---
+>  1 file changed, 3 insertions(+), 3 deletions(-)
+> 
+> diff --git a/arch/arm64/kernel/head.S b/arch/arm64/kernel/head.S
+> index 144f10567f82..b6ca95aee348 100644
+> --- a/arch/arm64/kernel/head.S
+> +++ b/arch/arm64/kernel/head.S
+> @@ -151,7 +151,7 @@ optional_header:
+>  	.short	0x20b				// PE32+ format
+>  	.byte	0x02				// MajorLinkerVersion
+>  	.byte	0x14				// MinorLinkerVersion
+> -	.long	_edata - stext			// SizeOfCode
+> +	.long	_end - stext			// SizeOfCode
+>  	.long	0				// SizeOfInitializedData
+>  	.long	0				// SizeOfUninitializedData
+>  	.long	efi_stub_entry - efi_head	// AddressOfEntryPoint
+> @@ -169,7 +169,7 @@ extra_header_fields:
+>  	.short	0				// MinorSubsystemVersion
+>  	.long	0				// Win32VersionValue
+>  
+> -	.long	_edata - efi_head		// SizeOfImage
+> +	.long	_end - efi_head			// SizeOfImage
+>  
+>  	// Everything before the kernel image is considered part of the header
+>  	.long	stext - efi_head		// SizeOfHeaders
+> @@ -216,7 +216,7 @@ section_table:
+>  	.byte	0
+>  	.byte	0
+>  	.byte	0        		// end of 0 padding of section name
+> -	.long	_edata - stext		// VirtualSize
+> +	.long	_end - stext		// VirtualSize
+>  	.long	stext - efi_head	// VirtualAddress
+>  	.long	_edata - stext		// SizeOfRawData
+>  	.long	stext - efi_head	// PointerToRawData
+> -- 
+> 1.8.3.2
+> 
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-efi" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> 
