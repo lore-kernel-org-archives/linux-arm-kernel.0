@@ -1,29 +1,53 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Thu, 14 Aug 2014 17:40:00 +0100
-Subject: [PATCH v5 0/7] Add MFD and regulator drivers for Hi6421 PMIC SoC
-In-Reply-To: <CAD6h2NQ7jfP6A4TV0Lw4hpKGO2oeJ90tEM0u-J5mYBBQ7M=+Rw@mail.gmail.com>
-References: <1407929624-8737-1-git-send-email-guodong.xu@linaro.org>
- <20140813185357.GH17528@sirena.org.uk>
- <CAD6h2NQ7jfP6A4TV0Lw4hpKGO2oeJ90tEM0u-J5mYBBQ7M=+Rw@mail.gmail.com>
-Message-ID: <20140814164000.GC17528@sirena.org.uk>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Thu, 14 Aug 2014 18:08:25 +0100
+Subject: [PATCH] arm64: align randomized TEXT_OFFSET on 4 kB boundary
+In-Reply-To: <CAKv+Gu8yne5zdtgsVcsc+D=C--qQcMoOuanPuHeWg+BiKO8xfA@mail.gmail.com>
+References: <1407952383-1214-1-git-send-email-ard.biesheuvel@linaro.org>
+ <20140814102307.GB24018@leverpostej>
+ <CAKv+Gu8yne5zdtgsVcsc+D=C--qQcMoOuanPuHeWg+BiKO8xfA@mail.gmail.com>
+Message-ID: <20140814170825.GG9039@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Aug 14, 2014 at 08:51:09AM +0800, Haojian Zhuang wrote:
+On Thu, Aug 14, 2014 at 11:31:35AM +0100, Ard Biesheuvel wrote:
+> On 14 August 2014 12:23, Mark Rutland <mark.rutland@arm.com> wrote:
+> > On Wed, Aug 13, 2014 at 06:53:03PM +0100, Ard Biesheuvel wrote:
+> >> diff --git a/arch/arm64/kernel/head.S b/arch/arm64/kernel/head.S
+> >> index b6ca95aee348..ae055a18b04a 100644
+> >> --- a/arch/arm64/kernel/head.S
+> >> +++ b/arch/arm64/kernel/head.S
+> >> @@ -38,11 +38,11 @@
+> >>
+> >>  #define KERNEL_RAM_VADDR     (PAGE_OFFSET + TEXT_OFFSET)
+> >>
+> >> -#if (TEXT_OFFSET & 0xf) != 0
+> >> -#error TEXT_OFFSET must be at least 16B aligned
+> >> -#elif (PAGE_OFFSET & 0xfffff) != 0
+> >> +#if (TEXT_OFFSET & 0xfff) != 0
+> >> +#error TEXT_OFFSET must be at least 4kB aligned
+> >
+> > Minor nit, but can we have "KB" here to match "MB"?
+> 
+> Ack
+> 
+> >> +#elif (PAGE_OFFSET & 0x1fffff) != 0
+> >>  #error PAGE_OFFSET must be at least 2MB aligned
+> >> -#elif TEXT_OFFSET > 0xfffff
+> >> +#elif TEXT_OFFSET > 0x1fffff
+> >>  #error TEXT_OFFSET must be less than 2MB
+> >>  #endif
+> >
+> > I thought I'd left wording in Kconfig.debug, but that doesn't seem to be
+> > the case. This looks sane to me, so:
+> >
+> > Reviewed-by: Mark Rutland <mark.rutland@arm.com>
+> >
+> > Catalin, can you pick this up? Without it UEFI boot can be broken by
+> > ARM64_RANDOMIZE_TEXT_OFFSET.
+> 
+> I assume the above change does not require a v2.
 
-> Thanks a lot on taking these patches. Please left the patch of
-> hi3xxx_defconfig. We plan to go through armsoc tree by ourselves since
-> some following patches will rename it to hisi_defconfig. The reason is
-> that we need to support HiP04 SoC in the same defconfig. So three
-> Hisilicon SoC will be supported by hi3xxx_defconfig, but only Hi3620
-> belongs to hi3xxx.
+I can fix it up. Thanks.
 
-Like I said I'm only going to take the regulator patches - I also won't
-be taking the MFD patch.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140814/e4929559/attachment.sig>
+-- 
+Catalin
