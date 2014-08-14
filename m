@@ -1,39 +1,37 @@
-From: computersforpeace@gmail.com (Brian Norris)
-Date: Thu, 14 Aug 2014 15:40:13 -0700
-Subject: [PATCH 0/8] mtd: nand: Support for new DT NAND driver
-In-Reply-To: <1407921127-8590-1-git-send-email-lee.jones@linaro.org>
-References: <1407921127-8590-1-git-send-email-lee.jones@linaro.org>
-Message-ID: <20140814224013.GE18411@ld-irv-0074>
+From: horms+renesas@verge.net.au (Simon Horman)
+Date: Fri, 15 Aug 2014 08:03:25 +0900
+Subject: [PATCH] ARM: shmobile: defconfig: enable
+ ARM_ATAG_DTB_COMPAT_CMDLINE_EXTEND
+Message-ID: <1408057405-10568-1-git-send-email-horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Aug 13, 2014 at 10:11:59AM +0100, Lee Jones wrote:
-> Hi Brian, Pekon,
-> 
-> I believe all of your queries have either been answered or addressed
-> and I am hoping this will be the last submission. :)
-> 
-> /me crosses fingers!
-> 
-> Kind regards,
-> Lee
+"ARM: shmobile: defconfig: enable initrd and atag dtb compat" enables
+CONFIG_ARM_ATAG_DTB_COMPAT, however, empirically
+ARM_ATAG_DTB_COMPAT_CMDLINE_EXTEND is also required for my kzm9d board to
+boot.
 
-I didn't look through the patches yet, but my build tools tell me you
-didn't compile-test this. Please compile, test, and resend your patches.
+Cc: Kevin Hilman <khilman@linaro.org>
+Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 
-In file included from drivers/mtd/nand/stm_nand_bch.c:26:0:
-include/linux/mtd/stm_nand_bbt.h:16:13: warning: no previous prototype for 'nandi_dump_bad_blocks' [-Wmissing-prototypes]
-drivers/mtd/nand/stm_nand_bch.c: In function 'nandi_set_mtd_defaults':
-drivers/mtd/nand/stm_nand_bch.c:870:19: error: 'bch_scan_bbt' undeclared (first use in this function)
-drivers/mtd/nand/stm_nand_bch.c:870:19: note: each undeclared identifier is reported only once for each function it appears in
-drivers/mtd/nand/stm_nand_bch.c:871:20: error: 'bch_block_isbad' undeclared (first use in this function)
-drivers/mtd/nand/stm_nand_bch.c:872:24: error: 'bch_block_markbad' undeclared (first use in this function)
-drivers/mtd/nand/stm_nand_bch.c: In function 'bch_calc_timing_registers':
-drivers/mtd/nand/stm_nand_bch.c:1022:6: warning: variable 'ren_half_off' set but not used [-Wunused-but-set-variable]
-drivers/mtd/nand/stm_nand_bch.c:1021:6: warning: variable 'ren_half_on' set but not used [-Wunused-but-set-variable]
+---
 
-Particularly, take a hard look at rewriting
-include/linux/mtd/stm_nand_bbt.h.
+Without this change I do not see any kernel console output at all.
+---
+ arch/arm/configs/shmobile_defconfig | 1 +
+ 1 file changed, 1 insertion(+)
 
-Thanks,
-Brian
+diff --git a/arch/arm/configs/shmobile_defconfig b/arch/arm/configs/shmobile_defconfig
+index f847a9f..e343dc8 100644
+--- a/arch/arm/configs/shmobile_defconfig
++++ b/arch/arm/configs/shmobile_defconfig
+@@ -35,6 +35,7 @@ CONFIG_ZBOOT_ROM_TEXT=0x0
+ CONFIG_ZBOOT_ROM_BSS=0x0
+ CONFIG_ARM_APPENDED_DTB=y
+ CONFIG_ARM_ATAG_DTB_COMPAT=y
++CONFIG_ARM_ATAG_DTB_COMPAT_CMDLINE_EXTEND=y
+ CONFIG_KEXEC=y
+ CONFIG_VFP=y
+ CONFIG_NEON=y
+-- 
+2.0.1
