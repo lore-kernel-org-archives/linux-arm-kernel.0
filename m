@@ -1,40 +1,50 @@
-From: zhangwm@marvell.com (Neil Zhang)
-Date: Fri, 15 Aug 2014 15:31:57 +0800
-Subject: [PATCH] arm: irq: fix the affinity when migrate a irq
-Message-ID: <1408087917-22603-1-git-send-email-zhangwm@marvell.com>
+From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
+Date: Fri, 15 Aug 2014 10:21:48 +0200
+Subject: [PATCH v3] mmc: implement Driver Stage Register handling
+In-Reply-To: <CAPDyKFqKVvwFi+JoOG-O1jznOB1UyhQW_ovb_N=+G_FtoqXQXA@mail.gmail.com>
+References: <1407944656-14592-1-git-send-email-u.kleine-koenig@pengutronix.de>
+ <CAPDyKFqKVvwFi+JoOG-O1jznOB1UyhQW_ovb_N=+G_FtoqXQXA@mail.gmail.com>
+Message-ID: <20140815082148.GF5134@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Commit ffde1de64012 ("irqchip: Gic: Support forced affinity setting")
-has enable the forcing cpu affinity of interrupts for gic.
+Hello Ulf,
 
-The current code of migrate_one_irq will pass the current affinity mask
-to irq_set_affinity with force is true, it may select the cpu being
-offlined as the target CPU again, then the interrupt won't be migrated
-correctly.
+On Thu, Aug 14, 2014 at 11:26:28AM +0200, Ulf Hansson wrote:
+> > diff --git a/drivers/mmc/core/host.c b/drivers/mmc/core/host.c
+> > index 95cceae96944..52e83f389428 100644
+> > --- a/drivers/mmc/core/host.c
+> > +++ b/drivers/mmc/core/host.c
+> > @@ -452,6 +452,14 @@ int mmc_of_parse(struct mmc_host *host)
+> >         if (of_find_property(np, "mmc-hs400-1_2v", &len))
+> >                 host->caps2 |= MMC_CAP2_HS400_1_2V | MMC_CAP2_HS200_1_2V_SDR;
+> >
+> > +       if (of_find_property(np, "dsr", &len)) {
+> > +               u32 tmp;
+> > +
+> > +               of_property_read_u32(np, "dsr", &tmp);
+> > +               host->dsr_req = 1;
+> > +               host->dsr = (u16)tmp;
+> > +       }
+> > +
+> 
+> Let's simplify the above with just:
+> of_property_read_u16(np, "dsr", &host->dsr);
+The downside here is that the syntax changes when using
+of_property_read_u16. Instead of
 
-Signed-off-by: Neil Zhang <zhangwm@marvell.com>
----
- arch/arm/kernel/irq.c |    5 ++---
- 1 file changed, 2 insertions(+), 3 deletions(-)
+	dsr = <0x100>
 
-diff --git a/arch/arm/kernel/irq.c b/arch/arm/kernel/irq.c
-index 2c42576..6f5a878 100644
---- a/arch/arm/kernel/irq.c
-+++ b/arch/arm/kernel/irq.c
-@@ -167,11 +167,10 @@ static bool migrate_one_irq(struct irq_desc *desc)
- 	if (irqd_is_per_cpu(d) || !cpumask_test_cpu(smp_processor_id(), affinity))
- 		return false;
- 
--	if (cpumask_any_and(affinity, cpu_online_mask) >= nr_cpu_ids) {
--		affinity = cpu_online_mask;
-+	if (cpumask_any_and(affinity, cpu_online_mask) >= nr_cpu_ids)
- 		ret = true;
--	}
- 
-+	affinity = cpu_online_mask;
- 	c = irq_data_get_irq_chip(d);
- 	if (!c->irq_set_affinity)
- 		pr_debug("IRQ%u: unable to set affinity\n", d->irq);
+the following must be written then:
+
+	dsr = /bits/ 16 <0x100>;
+
+so I'd prefer to stay with of_property_read_u32. The block can still be
+simplified. Will fix that in v4.
+
+Best regards
+Uwe
+
 -- 
-1.7.9.5
+Pengutronix e.K.                           | Uwe Kleine-K?nig            |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
