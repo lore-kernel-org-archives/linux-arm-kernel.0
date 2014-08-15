@@ -1,8 +1,8 @@
 From: peter.griffin@linaro.org (Peter Griffin)
-Date: Fri, 15 Aug 2014 13:55:42 +0100
-Subject: [PATCH v2] mmc: sdhci-pxav3: set_uhs_signaling is initialized twice
+Date: Fri, 15 Aug 2014 14:02:15 +0100
+Subject: [PATCH v3] mmc: sdhci-pxav3: set_uhs_signaling is initialized twice
  differently
-Message-ID: <1408107342-20318-1-git-send-email-peter.griffin@linaro.org>
+Message-ID: <1408107735-20775-1-git-send-email-peter.griffin@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -22,18 +22,24 @@ initialisers always follow the declaration order in the structure definition.
 
 Signed-off-by: Peter Griffin <peter.griffin@linaro.org>
 ---
- drivers/mmc/host/sdhci-pxav3.c | 1 -
- 1 file changed, 1 deletion(-)
+ drivers/mmc/host/sdhci-pxav3.c | 3 +--
+ 1 file changed, 1 insertion(+), 2 deletions(-)
 
 diff --git a/drivers/mmc/host/sdhci-pxav3.c b/drivers/mmc/host/sdhci-pxav3.c
-index 6f842fb..3f350ea 100644
+index 6f842fb..3434c79 100644
 --- a/drivers/mmc/host/sdhci-pxav3.c
 +++ b/drivers/mmc/host/sdhci-pxav3.c
-@@ -229,7 +229,6 @@ static const struct sdhci_ops pxav3_sdhci_ops = {
+@@ -224,12 +224,11 @@ static void pxav3_set_uhs_signaling(struct sdhci_host *host, unsigned int uhs)
+ 
+ static const struct sdhci_ops pxav3_sdhci_ops = {
+ 	.set_clock = sdhci_set_clock,
+-	.set_uhs_signaling = pxav3_set_uhs_signaling,
+ 	.platform_send_init_74_clocks = pxav3_gen_init_74_clocks,
  	.get_max_clock = sdhci_pltfm_clk_get_max_clock,
  	.set_bus_width = sdhci_set_bus_width,
  	.reset = pxav3_reset,
 -	.set_uhs_signaling = sdhci_set_uhs_signaling,
++	.set_uhs_signaling = pxav3_set_uhs_signaling,
  };
  
  static struct sdhci_pltfm_data sdhci_pxav3_pdata = {
