@@ -1,49 +1,41 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Fri, 15 Aug 2014 13:53:24 +0100
-Subject: [PATCH v2 1/3] arm64: spin-table: handle unmapped
- cpu-release-addrs
-In-Reply-To: <CAKv+Gu-2RyWY4V7zoOQEi3As96kmmAMae2s3YauJ4bL9-h+sdg@mail.gmail.com>
-References: <CAKv+Gu_UjRNhhiM0GPsKRdXRtmEnY6cbpY-JZ33RUMapbPYsbQ@mail.gmail.com>
- <20140813125844.GE32644@leverpostej>
- <20140814171323.GH9039@arm.com>
- <CAKv+Gu9ftjZby+5U5Vs0hXhyFdNLwx4MwvC-LL=y3a9eSz34iQ@mail.gmail.com>
- <20140815115714.GP27466@arm.com>
- <CAKv+Gu-2RyWY4V7zoOQEi3As96kmmAMae2s3YauJ4bL9-h+sdg@mail.gmail.com>
-Message-ID: <20140815125324.GQ27466@arm.com>
+From: peter.griffin@linaro.org (Peter Griffin)
+Date: Fri, 15 Aug 2014 13:55:42 +0100
+Subject: [PATCH v2] mmc: sdhci-pxav3: set_uhs_signaling is initialized twice
+ differently
+Message-ID: <1408107342-20318-1-git-send-email-peter.griffin@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Aug 15, 2014 at 01:07:16PM +0100, Ard Biesheuvel wrote:
-> On 15 August 2014 13:57, Will Deacon <will.deacon@arm.com> wrote:
-> > On Thu, Aug 14, 2014 at 07:10:13PM +0100, Ard Biesheuvel wrote:
-> >> Patch 3/3 makes the EFI stub load Image at the lowest 2 meg boundary +
-> >> TEXT_OFFSET instead of erroring out when base of DRAM + TEXT_OFFSET is
-> >> occupied. This is necessary as the randomized TEXT_OFFSET could
-> >> potentially conflict with reserved areas at the base of DRAM if a low
-> >> value happens to be chosen.
-> >>
-> >> Patch 1/3 fixes the resulting breakage on APM Mustang in bringing up
-> >> the secondaries, as on that board in particular, the reserved area at
-> >> the base of DRAM contains the holding pen, and loading Image higher up
-> >> makes the mailbox inaccessible through the linear mapping hence the
-> >> need for ioremap_cache()
-> >>
-> >> Patch 2/3 is also a fix for a potential issue on UEFI boot, but it is
-> >> unrelated to 1/3 and 3/3
-> >
-> > I was planning to take all of these for 3.18 as there's no regression here
-> > (the fuzzing is a new debug feature and defaults to `n'). Do you think these
-> > qualify as -rc1 material?
-> >
-> 
-> Considering that TEXT_OFFSET fuzzing is recommended to be turned on
-> for distro kernels, I would say this is definitely appropriate for
-> 3.17
+.set_uhs_signaling field is currently initialised twice once to the
+arch specific callback pxav3_set_uhs_signaling, and also to the generic
+sdhci_set_uhs_signaling callback.
 
-Whilst I see that in the commit log, the same recommendation doesn't appear
-in the Kconfig text and I'm not sure that it's such a wise thing to say
-either. From a distribution's point of view, I think I'd want any kernel
-issues to be as reproducible as possible, and fuzzing the text offset seems
-to go against that.
+This means that uhs is currently broken for this platform currently, as pxav3
+has some special constriants which means it can't use the generic callback.
 
-Will
+This happened in
+commit 96d7b78cfc2f ("mmc: sdhci: convert sdhci_set_uhs_signaling() into a library function")
+commit a702c8abb2a9 ("mmc: host: split up sdhci-pxa, create sdhci-pxav3.c")'
+
+Fix this and hopefully prevent it happening in the future by ensuring named
+initialisers always follow the declaration order in the structure definition.
+
+Signed-off-by: Peter Griffin <peter.griffin@linaro.org>
+---
+ drivers/mmc/host/sdhci-pxav3.c | 1 -
+ 1 file changed, 1 deletion(-)
+
+diff --git a/drivers/mmc/host/sdhci-pxav3.c b/drivers/mmc/host/sdhci-pxav3.c
+index 6f842fb..3f350ea 100644
+--- a/drivers/mmc/host/sdhci-pxav3.c
++++ b/drivers/mmc/host/sdhci-pxav3.c
+@@ -229,7 +229,6 @@ static const struct sdhci_ops pxav3_sdhci_ops = {
+ 	.get_max_clock = sdhci_pltfm_clk_get_max_clock,
+ 	.set_bus_width = sdhci_set_bus_width,
+ 	.reset = pxav3_reset,
+-	.set_uhs_signaling = sdhci_set_uhs_signaling,
+ };
+ 
+ static struct sdhci_pltfm_data sdhci_pxav3_pdata = {
+-- 
+1.9.1
