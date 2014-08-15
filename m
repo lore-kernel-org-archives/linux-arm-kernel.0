@@ -1,51 +1,119 @@
-From: mpa@pengutronix.de (Markus Pargmann)
-Date: Fri, 15 Aug 2014 10:51:05 +0200
-Subject: [PATCH v3] watchdog: Add DA906x PMIC watchdog driver.
-In-Reply-To: <53ECD85A.8050903@roeck-us.net>
-References: <1407926776-16700-1-git-send-email-mpa@pengutronix.de>
- <53EC487E.2000602@roeck-us.net>
- <20140814095733.GG17027@pengutronix.de>
- <53ECD85A.8050903@roeck-us.net>
-Message-ID: <20140815085105.GH17027@pengutronix.de>
+From: weiyang@linux.vnet.ibm.com (Wei Yang)
+Date: Fri, 15 Aug 2014 16:56:32 +0800
+Subject: [PATCH v9 02/12] PCI: OF: Parse and map the IRQ when adding the
+ PCI device.
+In-Reply-To: <20140814154959.GG25761@e106497-lin.cambridge.arm.com>
+References: <1407860725-25202-1-git-send-email-Liviu.Dudau@arm.com>
+ <1407860725-25202-3-git-send-email-Liviu.Dudau@arm.com>
+ <20140814145804.GA5586@richard>
+ <20140814154959.GG25761@e106497-lin.cambridge.arm.com>
+Message-ID: <20140815085632.GA4954@richard>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Aug 14, 2014 at 08:40:10AM -0700, Guenter Roeck wrote:
-> On 08/14/2014 02:57 AM, Markus Pargmann wrote:
-> 
-> >>>+
-> >>>+static int da9063_wdt_probe(struct platform_device *pdev)
-> >>>+{
-> >>>+	int ret;
-> >>>+	struct da9063 *da9063 = dev_get_drvdata(pdev->dev.parent);
-> >>>+	struct da9063_watchdog *wdt;
-> >>>+
-> >>>+	if (!da9063)
-> >>>+		return -EPROBE_DEFER;
-> >>
-> >>Can this ever happen ? Isn't this driver instantiated from its parent,
-> >>which would ensure that the parent's driver data is set ?
-> >
-> >No this can't happen. I replaced it with BUG_ON and also introduced a
-> >BUG_ON check for dev.parent.
-> >
-> That is a bit too much. You should only use BUG_ON if the kernel can not
-> continue to run, which should not be the case here. I would suggest
-> to return -ENODEV.
+On Thu, Aug 14, 2014 at 04:49:59PM +0100, Liviu Dudau wrote:
+>On Thu, Aug 14, 2014 at 03:58:04PM +0100, Wei Yang wrote:
+>> On Tue, Aug 12, 2014 at 05:25:15PM +0100, Liviu Dudau wrote:
+>> >Enhance the default implementation of pcibios_add_device() to
+>> >parse and map the IRQ of the device if a DT binding is available.
+>> >
+>> >Cc: Bjorn Helgaas <bhelgaas@google.com>
+>> >Cc: Grant Likely <grant.likely@linaro.org>
+>> >Cc: Rob Herring <robh+dt@kernel.org>
+>> >Signed-off-by: Liviu Dudau <Liviu.Dudau@arm.com>
+>> >---
+>> > drivers/pci/pci.c | 3 +++
+>> > 1 file changed, 3 insertions(+)
+>> >
+>> >diff --git a/drivers/pci/pci.c b/drivers/pci/pci.c
+>> >index 1c8592b..29d1775 100644
+>> >--- a/drivers/pci/pci.c
+>> >+++ b/drivers/pci/pci.c
+>> >@@ -17,6 +17,7 @@
+>> > #include <linux/spinlock.h>
+>> > #include <linux/string.h>
+>> > #include <linux/log2.h>
+>> >+#include <linux/of_pci.h>
+>> > #include <linux/pci-aspm.h>
+>> > #include <linux/pm_wakeup.h>
+>> > #include <linux/interrupt.h>
+>> >@@ -1453,6 +1454,8 @@ EXPORT_SYMBOL(pcim_pin_device);
+>> >  */
+>> > int __weak pcibios_add_device(struct pci_dev *dev)
+>> > {
+>> >+	dev->irq = of_irq_parse_and_map_pci(dev, 0, 0);
+>> >+
+>> > 	return 0;
+>> > }
+>> 
+>> Liviu,
+>> 
+>> For this, my suggestion is to add arch dependent function to setup the irq
+>> line for pci devices. I can't find an obvious reason this won't work on other
+>> archs, but maybe this will hurt some of them?
+>
+>Hi Wei,
+>
+>I'm not sure I understand your point. Architectures that support OF will obviously
+>benefit from this common approach, and for the other ones the function is empty
+>so it will not change existing behaviour. If you are suggesting that I should
+>create a new API that each architecture could go and implement for setting up the
+>IRQ line then I would agree that it would be nice to have that, but the question
+>is how many architectures are outside OF that need this?
 
-Okay, thanks.
+My suggestion is to define the pcibios_add_device() for arm arch, like the one
+in arch/powerpc/kernel/pci-common.c. If my understanding is correct, this
+patch set address the pci bus setup mostly on arm arch.
 
-Markus
+For those archs not support OF, this function is empty and has no effect. I
+agree on this one.
+
+For those archs rely on OF, we still have two cases:
+    1. they would have implement this function like powerpc
+    2. have other way to fix it up,  otherwise how it works now?
+If my assumption is correct, this change will either have no effect, or fix up
+the irq line the second time. Not harmful, but not necessary.
+
+I am not familiar with other arch, so the second case is my deduction. If this
+is not correct, please let me know.
+
+>
+>If I understood you correctly, it is a nice idea but slightly outside the scope
+>of my current patchset.
+>
+>Best regards,
+>Liviu
+>
+>> 
+>> >
+>> >-- 
+>> >2.0.4
+>> >
+>> >--
+>> >To unsubscribe from this list: send the line "unsubscribe linux-pci" in
+>> >the body of a message to majordomo at vger.kernel.org
+>> >More majordomo info at  http://vger.kernel.org/majordomo-info.html
+>> 
+>> -- 
+>> Richard Yang
+>> Help you, Help me
+>> 
+>> --
+>> To unsubscribe from this list: send the line "unsubscribe linux-pci" in
+>> the body of a message to majordomo at vger.kernel.org
+>> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+>> 
+>
+>-- 
+>====================
+>| I would like to |
+>| fix the world,  |
+>| but they're not |
+>| giving me the   |
+> \ source code!  /
+>  ---------------
+>    ?\_(?)_/?
 
 -- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140815/9dfe2659/attachment.sig>
+Richard Yang
+Help you, Help me
