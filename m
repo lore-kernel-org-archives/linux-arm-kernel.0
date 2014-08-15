@@ -1,80 +1,101 @@
-From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
-Date: Fri, 15 Aug 2014 18:47:15 +0400
-Subject: [PATCH v5 3/5] usb: host: ehci-st: Add ehci-st devicetree bindings
- documentation
-In-Reply-To: <1408111410-14375-4-git-send-email-peter.griffin@linaro.org>
-References: <1408111410-14375-1-git-send-email-peter.griffin@linaro.org>
- <1408111410-14375-4-git-send-email-peter.griffin@linaro.org>
-Message-ID: <53EE1D73.6030006@cogentembedded.com>
+From: suravee.suthikulpanit@amd.com (Suravee Suthikulanit)
+Date: Fri, 15 Aug 2014 09:53:25 -0500
+Subject: [PATCH 2/2 V4] irqchip: gicv2m: Add support for multiple MSI
+ for ARM64 GICv2m
+In-Reply-To: <87k369ri9k.fsf@approximate.cambridge.arm.com>
+References: <1407942041-3291-1-git-send-email-suravee.suthikulpanit@amd.com>
+ <1407942041-3291-3-git-send-email-suravee.suthikulpanit@amd.com>
+ <87k369ri9k.fsf@approximate.cambridge.arm.com>
+Message-ID: <53EE1EE5.3060103@amd.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello.
+On 8/15/2014 8:31 AM, Marc Zyngier wrote:
+> Hi Suravee,
+>
+>> +/*
+>> + * ARM64 function for seting up MSI irqs.
+>> + * Copied from driver/pci/msi.c: arch_setup_msi_irqs().
+>> + */
+>> +int arm64_setup_msi_irqs(struct pci_dev *dev, int nvec, int type)
+>> +{
+>> +	struct msi_desc *entry;
+>> +	int ret;
+>> +
+>> +	if (type == PCI_CAP_ID_MSI && nvec > 1)
+>> +		return 1;
+>> +
+>> +	list_for_each_entry(entry, &dev->msi_list, list) {
+>> +		ret = arch_setup_msi_irq(dev, entry);
+>> +		if (ret < 0)
+>> +			return ret;
+>> +		if (ret > 0)
+>> +			return -ENOSPC;
+>> +	}
+>> +
+>> +	return 0;
+>> +}
+>
+> I'm going to reiterate what I said last time: Why do we need this?
 
-On 08/15/2014 06:03 PM, Peter Griffin wrote:
+[Suravee] Marc, I understand what you described last time but I think 
+there is one point that missing here. See below.
 
-> This patch documents the device tree bindings required for the
-> ehci on-chip controller found in ST consumer electronics SoC's.
+> So far, we have two MSI-capable controllers on their way upstream:
+> GICv2m and GICv3. Both are perfectly capable of handling more than a
+> single MSI per device.
 
-> Signed-off-by: Peter Griffin <peter.griffin@linaro.org>
-> ---
->   Documentation/devicetree/bindings/usb/ehci-st.txt | 39 +++++++++++++++++++++++
->   1 file changed, 39 insertions(+)
->   create mode 100644 Documentation/devicetree/bindings/usb/ehci-st.txt
+[Suravee] I am aware of this.
 
-> diff --git a/Documentation/devicetree/bindings/usb/ehci-st.txt b/Documentation/devicetree/bindings/usb/ehci-st.txt
-> new file mode 100644
-> index 0000000..fb45fa5
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/usb/ehci-st.txt
-> @@ -0,0 +1,39 @@
-> +ST USB EHCI controller
-> +
-> +Required properties:
-> + - compatible		: must be "st,st-ehci-300x"
-> + - reg			: physical base addresses of the controller and length of memory mapped
-> +			  region
-> + - interrupts		: one EHCI interrupt should be described here
-> + - pinctrl-names	: a pinctrl state named "default" must be defined
-> + - pinctrl-0		: phandle referencing pin configuration of the USB controller
-> +See: Documentation/devicetree/bindings/pinctrl/pinctrl-binding.txt
-> + - clocks		: phandle list of usb clocks
-> + - clock-names		: should be "ic" for interconnect clock and "clk48"
+> So why should we cater for this? My gut feeling is that we should just
+> have:
+>
+> int arch_setup_msi_irqs(struct pci_dev *dev, int nvec, int type)
+> {
+>          struct msi_desc *entry;
+>          int ret;
+>
+>          /*
+>           * So far, all our MSI controllers are capable of handling more
+>           * than a single MSI per device. Should we encounter less
+>           * capable devices, we'll consider doing something special for
+>           * them.
+>           */
+>          list_for_each_entry(entry, &dev->msi_list, list) {
+>                  ret = arch_setup_msi_irq(dev, entry);
+>                  if (ret < 0)
+>                          return ret;
+>                  if (ret > 0)
+>                          return -ENOSPC;
+>          }
+>
+>          return 0;
+> }
+>
+> and nothing else. Your driver should be able to retrieve the number of
+> MSI needed by the device, and allocate them. GICv3 manages it, and so
+> should GICv2m.
+>
 
-    This sentence seems unfinished?
+[Suravee] Multi-MSI and MSI-x are not the same. For MSI-X, you can treat 
+each of the MSI separately since it MSI-X capability structure has a 
+table specific for each one of them.  For Multi-MSI, there is only one 
+MSI capability structure which control all of them, and you need to 
+program the "multiple-message enable" field with the encoding for 
+"power-of-two", and therefore must be in contiguous range.
 
-> +See: Documentation/devicetree/bindings/clock/clock-bindings.txt
-> +
-> + - phys			: phandle for the PHY device
-> + - phy-names		: should be "usb"
-> + - resets		: phandle + reset specifier pairs to the powerdown and softreset lines
-> +			  of the USB IP
-> + - reset-names		: should be "power" and "softreset"
-> +See: Documentation/devicetree/bindings/reset/st,sti-powerdown.txt
-> +See: Documentation/devicetree/bindings/reset/reset.txt
-> +
-> +Example:
-> +
-> +	ehci1: usb at 0xfe203e00 {
-> +		compatible = "st,st-ehci-300x";
-> +		reg = <0xfe203e00 0x100>;
-> +		interrupts = <GIC_SPI 148 IRQ_TYPE_NONE>;
-> +		pinctrl-names = "default";
-> +		pinctrl-0 = <&pinctrl_usb1>;
-> +		clocks = <&clk_s_a1_ls 0>;
+Your logic above is what the standard MSI-x setup code is using. It is 
+not handling of how many it can allocate all at once.
 
-    You said that "clock-names" is a required prop but you didn't specify it.
+As for sharing the logic b/w GICv2m and GICv3, unless they are sharing 
+the same common data structure (e.g. the struct v2m which contans 
+msi_chip), and the allocation function (e.g. generic 
+gic_alloc_msi_irqs()), you pretty much need to do this separately since 
+we need to walk the msi_chip back to its container structure.
 
-> +		phys = <&usb2_phy>;
-> +		phy-names = "usb";
-> +		status = "okay";
+I am not saying this cannot be done, but we need to work out the detail 
+together b/w GICv2m and GICv3.
 
-    Not necessary.
+Thanks,
 
-> +
-> +		resets = <&powerdown STIH416_USB1_POWERDOWN>,
-> +			 <&softreset STIH416_USB1_SOFTRESET>;
-> +		reset-names = "power", "softreset";
-> +	};
-
-WBR, Sergei
+Suravee
