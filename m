@@ -1,163 +1,83 @@
-From: lina.iyer@linaro.org (Lina Iyer)
-Date: Fri, 15 Aug 2014 15:12:33 -0600
-Subject: [PATCH v7 8/8] drivers: cpuidle: initialize Exynos driver
- through DT
-In-Reply-To: <1407945127-27554-9-git-send-email-lorenzo.pieralisi@arm.com>
-References: <1407945127-27554-1-git-send-email-lorenzo.pieralisi@arm.com>
- <1407945127-27554-9-git-send-email-lorenzo.pieralisi@arm.com>
-Message-ID: <20140815211233.GA46224@ilina-mac.local>
+From: mans@mansr.com (=?iso-8859-1?Q?M=E5ns_Rullg=E5rd?=)
+Date: Fri, 15 Aug 2014 22:24:39 +0100
+Subject: VFP available on a single CPU in a dual-CPU complex
+In-Reply-To: <53EE58B7.6030207@gmail.com> (Florian Fainelli's message of "Fri,
+ 15 Aug 2014 12:00:07 -0700")
+References: <CAGVrzcaX4n2rJko_Kny81jkzQbV6z5TmcA2coGrj6BU-ahiOTA@mail.gmail.com>
+ <201408151103.01349.arnd@arndb.de> <20140815091445.GC27466@arm.com>
+ <8014330.Y4lYRxBeEx@wuerfel> <53EE58B7.6030207@gmail.com>
+Message-ID: <yw1x4mxd30q0.fsf@unicorn.mansr.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Aug 13, 2014 at 04:52:07PM +0100, Lorenzo Pieralisi wrote:
->With the introduction of DT based idle states, CPUidle drivers for
->ARM can now initialize idle states data through properties in the device
->tree.
+Florian Fainelli <f.fainelli@gmail.com> writes:
+
+> On 08/15/2014 11:54 AM, Arnd Bergmann wrote:
+>> On Friday 15 August 2014 10:14:45 Will Deacon wrote:
+>>> On Fri, Aug 15, 2014 at 10:03:01AM +0100, Arnd Bergmann wrote:
+>>>> On Friday 15 August 2014, Florian Fainelli wrote:
+>>>>> Hello,
+>>>>>
+>>>>> On Broadcom's BCM63138 SoC, the second Cortex A9 CPU does not have
+>>>>> VFP, which is a problem as one might imagine because we currently
+>>>>> assume it is available for all CPUs within the complex.
+>>>>
+>>>> Wow, that is pretty crazy.
+>>>>
+>>>>> I started to patch vfp_support_entry to test for CPU1 and branch to a
+>>>>> different location, but that raises a bunch of question, in particular
+>>>>> what to do if NEON/VFP came from the kernel, how can we migrate that
+>>>>> execution to CPU0?
+>>>>>
+>>>>> If the answer is don't use VFP, I guess that's fine, and I can have a
+>>>>> runtime check in vfp_init() that checks for BCM63138 and set
+>>>>> vfp_vector to vfp_null_entry even though we are running on a multi-v7
+>>>>> kernel with VFP enabled.
+>>>>
+>>>> I think adding hooks to the scheduler for this case is problematic, so
+>>>> the easiest way would of course be to give the user a choice between
+>>>> VFP or SMP on this hardware. For anything beyond that, you could do
+>>>> a prototype patch (possibly for integration into OpenWRT) so we can
+>>>> see how ugly it gets to support this setup.
+>>>
+>>> I agree. We have something similar on the Realview-PBX (dual A9, only one
+>>> CPU with NEON) and the answer is not to enable NEON if you want SMP.
+>> 
+>> Does that work with a multiplatform kernel?
+>> 
+>> I have patches to enable realview for ARCH_MULTIPLATFORM, and I wonder
+>> if that gets in the way. Do we have code to detect this setup at runtime
+>> and disable NEON/VFP if only a subset of the enabled CPUs have it?
 >
->This patch adds code to the Exynos CPUidle driver to dynamically
->initialize idle states data through the updated device tree source
->files.
+> I was wondering about that too, here are the two options I see for these
+> pathological cases:
 >
->Cc: Chander Kashyap <k.chander@samsung.com>
->Cc: Kukjin Kim <kgene.kim@samsung.com>
->Cc: Tomasz Figa <t.figa@samsung.com>
->Signed-off-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
->---
-> arch/arm/boot/dts/exynos4210.dtsi | 11 +++++++++++
-> arch/arm/boot/dts/exynos5250.dtsi | 11 +++++++++++
-> drivers/cpuidle/Kconfig.arm       |  1 +
-> drivers/cpuidle/cpuidle-exynos.c  | 27 ++++++++++++++++++++++++---
-> 4 files changed, 47 insertions(+), 3 deletions(-)
+> - if SMP is enabled, and CONFIG_VFP is also enabled, refuse bringing up
+> cores that do not support VFP/NEON, thus becoming a SMP on UP, and do
+> that for the platform/SoC-specific SMP support code
 >
->diff --git a/arch/arm/boot/dts/exynos4210.dtsi b/arch/arm/boot/dts/exynos4210.dtsi
->index eab7c7b..69fd1a0 100644
->--- a/arch/arm/boot/dts/exynos4210.dtsi
->+++ b/arch/arm/boot/dts/exynos4210.dtsi
->@@ -48,12 +48,23 @@
-> 			device_type = "cpu";
-> 			compatible = "arm,cortex-a9";
-> 			reg = <0x900>;
->+			cpu-idle-states = <&CLUSTER_SLEEP_0>;
-> 		};
+> - or, in the VFP initialization, completely disable VFP (overriding
+> VFP_arch in SoC specific code?) because at least one of CPU does not
+> support it
 >
-> 		cpu at 901 {
-> 			device_type = "cpu";
-> 			compatible = "arm,cortex-a9";
-> 			reg = <0x901>;
->+			cpu-idle-states = <&CLUSTER_SLEEP_0>;
->+		};
->+
->+		idle-states {
->+			CLUSTER_SLEEP_0: cluster-sleep-0 {
->+				compatible = "arm,idle-state";
->+				entry-latency-us = <1000>;
->+				exit-latency-us = <300>;
->+				min-residency-us = <100000>;
->+			};
-> 		};
-> 	};
->
->diff --git a/arch/arm/boot/dts/exynos5250.dtsi b/arch/arm/boot/dts/exynos5250.dtsi
->index 492e1ef..3a758ff 100644
->--- a/arch/arm/boot/dts/exynos5250.dtsi
->+++ b/arch/arm/boot/dts/exynos5250.dtsi
->@@ -63,12 +63,23 @@
-> 			compatible = "arm,cortex-a15";
-> 			reg = <0>;
-> 			clock-frequency = <1700000000>;
->+			cpu-idle-states = <&CLUSTER_SLEEP_0>;
-> 		};
-> 		cpu at 1 {
-> 			device_type = "cpu";
-> 			compatible = "arm,cortex-a15";
-> 			reg = <1>;
-> 			clock-frequency = <1700000000>;
->+			cpu-idle-states = <&CLUSTER_SLEEP_0>;
->+		};
->+
->+		idle-states {
->+			CLUSTER_SLEEP_0: cluster-sleep-0 {
->+				compatible = "arm,idle-state";
->+				entry-latency-us = <1000>;
->+				exit-latency-us = <300>;
->+				min-residency-us = <100000>;
->+			};
-> 		};
-> 	};
->
->diff --git a/drivers/cpuidle/Kconfig.arm b/drivers/cpuidle/Kconfig.arm
->index e339c7f..04cc229 100644
->--- a/drivers/cpuidle/Kconfig.arm
->+++ b/drivers/cpuidle/Kconfig.arm
->@@ -55,6 +55,7 @@ config ARM_AT91_CPUIDLE
-> config ARM_EXYNOS_CPUIDLE
-> 	bool "Cpu Idle Driver for the Exynos processors"
-> 	depends on ARCH_EXYNOS
->+	select DT_IDLE_STATES
-> 	help
-> 	  Select this to enable cpuidle for Exynos processors
->
->diff --git a/drivers/cpuidle/cpuidle-exynos.c b/drivers/cpuidle/cpuidle-exynos.c
->index ba9b34b..6dff982 100644
->--- a/drivers/cpuidle/cpuidle-exynos.c
->+++ b/drivers/cpuidle/cpuidle-exynos.c
->@@ -13,11 +13,14 @@
-> #include <linux/export.h>
-> #include <linux/module.h>
-> #include <linux/platform_device.h>
->+#include <linux/slab.h>
->
-> #include <asm/proc-fns.h>
-> #include <asm/suspend.h>
-> #include <asm/cpuidle.h>
->
->+#include "dt_idle_states.h"
->+
-> static void (*exynos_enter_aftr)(void);
->
-> static int exynos_enter_lowpower(struct cpuidle_device *dev,
->@@ -58,17 +61,35 @@ static struct cpuidle_driver exynos_idle_driver = {
->
-> static int exynos_cpuidle_probe(struct platform_device *pdev)
-> {
->-	int ret;
->+	int ret, i;
->+	struct cpuidle_driver *drv = &exynos_idle_driver;
->
-> 	exynos_enter_aftr = (void *)(pdev->dev.platform_data);
->
->-	ret = cpuidle_register(&exynos_idle_driver, NULL);
->+	drv->cpumask = kzalloc(cpumask_size(), GFP_KERNEL);
->+	if (!drv->cpumask)
->+		return -ENOMEM;
-drv->cpumask would not have any cpu set. I dont see it being modified
-elsewhere.
->+
->+	/* Start at index 1, index 0 standard WFI */
->+	ret = dt_init_idle_driver(drv, 1);
->+	if (ret < 0) {
->+		dev_err(&pdev->dev, "failed to initialize idle states\n");
->+		goto free_mem;
->+	}
->+
->+	for (i = 1; i < drv->state_count; i++)
->+		drv->states[i].enter = exynos_enter_lowpower;
->+
->+	ret = cpuidle_register(drv, NULL);
-> 	if (ret) {
-> 		dev_err(&pdev->dev, "failed to register cpuidle driver\n");
->-		return ret;
->+		goto free_mem;
-> 	}
->
-> 	return 0;
->+free_mem:
->+	kfree(drv->cpumask);
->+	return ret;
-> }
->
-> static struct platform_driver exynos_cpuidle_driver = {
->-- 
->1.9.1
->
->
+> I would favor enabling SMP over enabling VFP, because that's probably
+> what most people would expect.
+
+The Realview system has VFP on both cores but NEON on only one IIRC.
+
+For pathological cases like these, and these are the only two I've heard
+of, disallowing VFP/NEON in kernel code is probably the sanest choice.
+For userspace, it makes sense to enable it as usual and rely on CPU
+affinity to keep things working.  If these systems were common,
+extending the per-task VFP enabling to also limit the CPU affinity would
+probably be something to consider.  As such configurations seem to be
+quite rare, it's probably just as well to leave this to the system
+builder.  Whatever the kernel does, a regular softfloat system will work
+as expected.  Leaving the option for those who know what they're doing
+to run VFP/NEON code with the appropriate CPU affinity set lets such
+people take full advantage of the hardware without unduly complicating
+the kernel for these rare situation.
+
+-- 
+M?ns Rullg?rd
+mans at mansr.com
