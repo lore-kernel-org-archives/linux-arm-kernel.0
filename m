@@ -1,56 +1,40 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 15 Aug 2014 09:11:47 +0200
-Subject: [PATCH v2 3/5] ARM: BCM63XX: add BCM63138 minimal Device Tree
-In-Reply-To: <1408061487-20984-4-git-send-email-f.fainelli@gmail.com>
-References: <1408061487-20984-1-git-send-email-f.fainelli@gmail.com>
- <1408061487-20984-4-git-send-email-f.fainelli@gmail.com>
-Message-ID: <2248656.tvg1indprx@wuerfel>
+From: zhangwm@marvell.com (Neil Zhang)
+Date: Fri, 15 Aug 2014 15:31:57 +0800
+Subject: [PATCH] arm: irq: fix the affinity when migrate a irq
+Message-ID: <1408087917-22603-1-git-send-email-zhangwm@marvell.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday 14 August 2014 17:11:25 Florian Fainelli wrote:
-> Add a very minimalistic BCM63138 Device Tree include file which
-> describes the BCM63138 SoC with only the basic set of required
-> peripherals:
-> 
-> - Cortex A9 CPUs
-> - ARM GIC
-> - ARM SCU
-> - PL310 Level-2 cache controller
-> - ARM TWD & Global timers
-> - ARM TWD watchdog
-> - legacy MIPS bus (UBUS)
-> - BCM6345-style UARTs (disabled by default)
-> 
-> Since the PL310 L2 cache controller does not come out of reset with
-> correct default values, we need to override the 'cache-sets' and
-> 'cache-size' properties to get its geometry right.
-> 
-> Signed-off-by: Florian Fainelli <f.fainelli@gmail.com>
+Commit ffde1de64012 ("irqchip: Gic: Support forced affinity setting")
+has enable the forcing cpu affinity of interrupts for gic.
 
-Acked-by: Arnd Bergmann <arnd@arndb.de>
+The current code of migrate_one_irq will pass the current affinity mask
+to irq_set_affinity with force is true, it may select the cpu being
+offlined as the target CPU again, then the interrupt won't be migrated
+correctly.
 
-Looks all good to me except one tiny detail:
+Signed-off-by: Neil Zhang <zhangwm@marvell.com>
+---
+ arch/arm/kernel/irq.c |    5 ++---
+ 1 file changed, 2 insertions(+), 3 deletions(-)
 
-> +	/* Legacy UBUS base */
-> +	ubus at fffe8000 {
-> +		compatible = "simple-bus";
-> +		#address-cells = <1>;
-> +		#size-cells = <1>;
-> +		ranges = <0 0xfffe8000 0x8100>;
-> +
-> +		serial0: uart at 600 {
-> +			compatible = "brcm,bcm6345-uart";
-> +			reg = <0x600 0x1b>;
-> +			interrupts = <GIC_SPI 32 0>;
-> +			clocks = <&periph_clk>;
-> +			clock-names = "periph";
-> +			status = "disabled";
-> +		};
-
-The recommended name for a uart is serial at 600, not uart at 600.
-We are highly inconsistent with the existing dts files, so I'm
-not blaming you, I'm just trying to make new files do it the
-right way.
-
-	Arnd
+diff --git a/arch/arm/kernel/irq.c b/arch/arm/kernel/irq.c
+index 2c42576..6f5a878 100644
+--- a/arch/arm/kernel/irq.c
++++ b/arch/arm/kernel/irq.c
+@@ -167,11 +167,10 @@ static bool migrate_one_irq(struct irq_desc *desc)
+ 	if (irqd_is_per_cpu(d) || !cpumask_test_cpu(smp_processor_id(), affinity))
+ 		return false;
+ 
+-	if (cpumask_any_and(affinity, cpu_online_mask) >= nr_cpu_ids) {
+-		affinity = cpu_online_mask;
++	if (cpumask_any_and(affinity, cpu_online_mask) >= nr_cpu_ids)
+ 		ret = true;
+-	}
+ 
++	affinity = cpu_online_mask;
+ 	c = irq_data_get_irq_chip(d);
+ 	if (!c->irq_set_affinity)
+ 		pr_debug("IRQ%u: unable to set affinity\n", d->irq);
+-- 
+1.7.9.5
