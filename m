@@ -1,28 +1,49 @@
-From: peter.griffin@linaro.org (Peter Griffin)
-Date: Fri, 15 Aug 2014 14:05:50 +0100
-Subject: [PATCH v2] mmc: sdhci-pxav3: set_uhs_signaling is initialized
- twice differently
-In-Reply-To: <1408107342-20318-1-git-send-email-peter.griffin@linaro.org>
-References: <1408107342-20318-1-git-send-email-peter.griffin@linaro.org>
-Message-ID: <20140815130550.GA20932@griffinp-ThinkPad-X1-Carbon-2nd>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Fri, 15 Aug 2014 14:10:26 +0100
+Subject: [PATCH 4/6] arm64: Add DTS support for FSL's LS2085A SoC
+In-Reply-To: <af793f09683b48b5a0db42a482210c4a@BY2PR0301MB0743.namprd03.prod.outlook.com>
+References: <1408096156-29772-1-git-send-email-bhupesh.sharma@freescale.com>
+ <1408096156-29772-5-git-send-email-bhupesh.sharma@freescale.com>
+ <20140815101249.GA19939@localhost>
+ <af793f09683b48b5a0db42a482210c4a@BY2PR0301MB0743.namprd03.prod.outlook.com>
+Message-ID: <20140815131026.GB18863@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-
-> This means that uhs is currently broken for this platform currently, as pxav3
-> has some special constriants which means it can't use the generic callback.
+On Fri, Aug 15, 2014 at 01:53:13PM +0100, Stuart Yoder wrote:
+> > On Fri, Aug 15, 2014 at 10:49:13AM +0100, Bhupesh Sharma wrote:
+> > > +	cpus {
+> > > +		#address-cells = <2>;
+> > > +		#size-cells = <0>;
+> > > +
+> > > +		/* We have 4 clusters having 2 Cortex-A57 cores each */
+> > > +		cpu at 0 {
+> > > +			device_type = "cpu";
+> > > +			compatible = "arm,cortex-a57";
+> > > +			reg = <0x0 0x0>;
+> > > +			enable-method = "spin-table";
+> > > +			cpu-release-addr = <0x0 0x8000fff8>;
+> > > +		};
+> > 
+> > Why not PSCI?
 > 
-> This happened in
-> commit 96d7b78cfc2f ("mmc: sdhci: convert sdhci_set_uhs_signaling() into a library function")
-> commit a702c8abb2a9 ("mmc: host: split up sdhci-pxa, create sdhci-pxav3.c")'
-> 
-> Fix this and hopefully prevent it happening in the future by ensuring named
-> initialisers always follow the declaration order in the structure definition.
+> It simply is where we are today-- we don't have functioning PSCI yet
+> but plan to get there over time.
 
-Or it would if I actually committed the change. Sorry for the noise, please ignore this patch.
-I've just sent a V3.
+Thanks for clarification.
 
-regards,
+> All the existing device trees
+> in arch/arm64 use "spin-table", so it seems that other platforms are
+> in the same situation:
+>    apm-storm.dtsi
 
-Peter.
+Not possible because there is no EL3 mode on the CPU implementation.
+
+>    foundation-v8.dts
+>    rtsm_ve-aemv8a.dts
+
+These work with the latest boot wrapper (which overrides the DT nodes
+and passes the PSCI information).
+
+-- 
+Catalin
