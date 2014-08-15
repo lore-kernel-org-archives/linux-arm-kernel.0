@@ -1,10 +1,10 @@
 From: peter.griffin@linaro.org (Peter Griffin)
-Date: Fri, 15 Aug 2014 13:40:11 +0100
-Subject: [PATCH 4/9] phy: phy-ti-pipe3: Remove unncessary site specific OOM
- messages
+Date: Fri, 15 Aug 2014 13:40:12 +0100
+Subject: [PATCH 5/9] phy: phy-spear1310-miphy: Remove unncessary site specific
+ OOM messages
 In-Reply-To: <1408106416-19044-1-git-send-email-peter.griffin@linaro.org>
 References: <1408106416-19044-1-git-send-email-peter.griffin@linaro.org>
-Message-ID: <1408106416-19044-5-git-send-email-peter.griffin@linaro.org>
+Message-ID: <1408106416-19044-6-git-send-email-peter.griffin@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -18,25 +18,24 @@ found which doesn't would be considered a bug in kzalloc.
 
 Signed-off-by: Peter Griffin <peter.griffin@linaro.org>
 ---
- drivers/phy/phy-ti-pipe3.c | 5 ++---
- 1 file changed, 2 insertions(+), 3 deletions(-)
+ drivers/phy/phy-spear1310-miphy.c | 4 +---
+ 1 file changed, 1 insertion(+), 3 deletions(-)
 
-diff --git a/drivers/phy/phy-ti-pipe3.c b/drivers/phy/phy-ti-pipe3.c
-index b964aa9..9280ef8 100644
---- a/drivers/phy/phy-ti-pipe3.c
-+++ b/drivers/phy/phy-ti-pipe3.c
-@@ -299,10 +299,9 @@ static int ti_pipe3_probe(struct platform_device *pdev)
- 	struct clk *clk;
+diff --git a/drivers/phy/phy-spear1310-miphy.c b/drivers/phy/phy-spear1310-miphy.c
+index 6dcbfcd..911d25b 100644
+--- a/drivers/phy/phy-spear1310-miphy.c
++++ b/drivers/phy/phy-spear1310-miphy.c
+@@ -212,10 +212,8 @@ static int spear1310_miphy_probe(struct platform_device *pdev)
+ 	struct phy_provider *phy_provider;
  
- 	phy = devm_kzalloc(&pdev->dev, sizeof(*phy), GFP_KERNEL);
--	if (!phy) {
--		dev_err(&pdev->dev, "unable to alloc mem for TI PIPE3 PHY\n");
-+	if (!phy)
+ 	priv = devm_kzalloc(dev, sizeof(*priv), GFP_KERNEL);
+-	if (!priv) {
+-		dev_err(dev, "can't alloc spear1310_miphy private date memory\n");
++	if (!priv)
  		return -ENOMEM;
 -	}
-+
- 	phy->dev		= &pdev->dev;
  
- 	if (!of_device_is_compatible(node, "ti,phy-pipe3-pcie")) {
+ 	priv->misc =
+ 		syscon_regmap_lookup_by_phandle(dev->of_node, "misc");
 -- 
 1.9.1
