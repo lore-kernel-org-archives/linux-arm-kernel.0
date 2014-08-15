@@ -1,48 +1,17 @@
-From: bigeasy@linutronix.de (Sebastian Andrzej Siewior)
-Date: Fri, 15 Aug 2014 19:42:41 +0200
-Subject: [PATCH 13/15] arm: dts: am33xx: add DMA properties for UART
-In-Reply-To: <1408124563-31541-1-git-send-email-bigeasy@linutronix.de>
-References: <1408124563-31541-1-git-send-email-bigeasy@linutronix.de>
-Message-ID: <1408124563-31541-14-git-send-email-bigeasy@linutronix.de>
+From: richardcochran@gmail.com (Richard Cochran)
+Date: Fri, 15 Aug 2014 20:15:58 +0200
+Subject: Random MAC address on my BeagleBone White
+In-Reply-To: <20140815134221.08c546a0@gandalf.local.home>
+References: <20140815134221.08c546a0@gandalf.local.home>
+Message-ID: <20140815181558.GA7267@localhost.localdomain>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Cc: devicetree at vger.kernel.org
-Signed-off-by: Sebastian Andrzej Siewior <bigeasy@linutronix.de>
----
- arch/arm/boot/dts/am33xx.dtsi | 6 ++++++
- 1 file changed, 6 insertions(+)
+On Fri, Aug 15, 2014 at 01:42:21PM -0400, Steven Rostedt wrote:
+> Thanks, this is rather annoying.
 
-diff --git a/arch/arm/boot/dts/am33xx.dtsi b/arch/arm/boot/dts/am33xx.dtsi
-index 4a4e02d..cdccbd6 100644
---- a/arch/arm/boot/dts/am33xx.dtsi
-+++ b/arch/arm/boot/dts/am33xx.dtsi
-@@ -200,6 +200,8 @@
- 			reg = <0x44e09000 0x2000>;
- 			interrupts = <72>;
- 			status = "disabled";
-+			dmas = <&edma 26>, <&edma 27>;
-+			dma-names = "tx", "rx";
- 		};
- 
- 		uart1: serial at 48022000 {
-@@ -209,6 +211,8 @@
- 			reg = <0x48022000 0x2000>;
- 			interrupts = <73>;
- 			status = "disabled";
-+			dmas = <&edma 28>, <&edma 29>;
-+			dma-names = "tx", "rx";
- 		};
- 
- 		uart2: serial at 48024000 {
-@@ -218,6 +222,8 @@
- 			reg = <0x48024000 0x2000>;
- 			interrupts = <74>;
- 			status = "disabled";
-+			dmas = <&edma 30>, <&edma 31>;
-+			dma-names = "tx", "rx";
- 		};
- 
- 		uart3: serial at 481a6000 {
--- 
-2.0.1
+You must be new here ;)
+
+
+Cheers,
+Richard
