@@ -1,37 +1,141 @@
-From: rostedt@goodmis.org (Steven Rostedt)
-Date: Fri, 15 Aug 2014 14:41:20 -0400
-Subject: Random MAC address on my BeagleBone White
-In-Reply-To: <53EE5233.6000605@yahoo.com>
-References: <20140815134221.08c546a0@gandalf.local.home>
- <53EE5233.6000605@yahoo.com>
-Message-ID: <20140815144120.58597f37@gandalf.local.home>
+From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
+Date: Fri, 15 Aug 2014 20:42:44 +0200
+Subject: [PATCH v4] mmc: implement Driver Stage Register handling
+In-Reply-To: <CAPDyKFp=1BDeZUC-GNLLT+BK0gqisQ0mP8x4chu43F2pKujGsg@mail.gmail.com>
+References: <1408091882-32123-1-git-send-email-u.kleine-koenig@pengutronix.de>
+ <CAPDyKFp=1BDeZUC-GNLLT+BK0gqisQ0mP8x4chu43F2pKujGsg@mail.gmail.com>
+Message-ID: <20140815184244.GJ5134@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, 16 Aug 2014 00:02:19 +0530
-Anand Moon <moon.linux@yahoo.com> wrote:
+Hello Ulf,
 
-> Hi Steven,
+On Fri, Aug 15, 2014 at 11:05:39AM +0200, Ulf Hansson wrote:
+> On 15 August 2014 10:38, Uwe Kleine-K?nig
+> <u.kleine-koenig@pengutronix.de> wrote:
+> > From: Sascha Hauer <s.hauer@pengutronix.de>
+> >
+> > Some eMMC and SD cards implement a DSR register that allows to tune
+> > raise/fall times and drive strength of the CMD and DATA outputs.
+> > The values to use depend on the card in use and the host.
+> > It might be needed to reduce the drive strength to prevent voltage peaks
+> > above the host's specification.
+> >
+> > Implement a 'dsr' devicetree property that allows to specify the value
+> > to set the DSR to. For non-dt setups the new members of mmc_host can be
+> > set by board code.
+> >
+> > This patch was initially authored by Sascha Hauer. It contains
+> > improvements authored by Markus Niebel and Uwe Kleine-K?nig.
+> >
+> > Signed-off-by: Sascha Hauer <s.hauer@pengutronix.de>
+> > Signed-off-by: Markus Niebel <Markus.Niebel@tq-group.com>
+> > Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
+> > ---
+> > Changes since v3:
+> >
+> >  - fix a compiler warning about err not being used.
+> >  - clearified valid range. I didn't write "16-bit value" because the
+> >    value is still expected to be written as 32-bit value in the device
+> >    tree.
+> >  - make host->dsr an u32, which simplified parsing the device tree and
+> >    also makes casting in mmc_set_dsr unnecessary.
+> > ---
+> >  Documentation/devicetree/bindings/mmc/mmc.txt |  2 ++
+> >  drivers/mmc/core/host.c                       |  8 ++++++++
+> >  drivers/mmc/core/mmc.c                        |  8 ++++++++
+> >  drivers/mmc/core/mmc_ops.c                    | 20 ++++++++++++++++++++
+> >  drivers/mmc/core/mmc_ops.h                    |  1 +
+> >  drivers/mmc/core/sd.c                         |  8 ++++++++
+> >  include/linux/mmc/card.h                      |  3 ++-
+> >  include/linux/mmc/host.h                      |  3 +++
+> >  8 files changed, 52 insertions(+), 1 deletion(-)
+> >
+> > diff --git a/Documentation/devicetree/bindings/mmc/mmc.txt b/Documentation/devicetree/bindings/mmc/mmc.txt
+> > index 3c18001dfd5d..a3fe21f2b709 100644
+> > --- a/Documentation/devicetree/bindings/mmc/mmc.txt
+> > +++ b/Documentation/devicetree/bindings/mmc/mmc.txt
+> > @@ -40,6 +40,8 @@ Optional properties:
+> >  - mmc-hs200-1_2v: eMMC HS200 mode(1.2V I/O) is supported
+> >  - mmc-hs400-1_8v: eMMC HS400 mode(1.8V I/O) is supported
+> >  - mmc-hs400-1_2v: eMMC HS400 mode(1.2V I/O) is supported
+> > +- dsr: Value the card's (optional) Driver Stage Register (DSR) should be
+> > +  programmed with. Valid range: [0 .. 0xffff].
+> >
+> >  *NOTE* on CD and WP polarity. To use common for all SD/MMC host controllers line
+> >  polarity properties, we have to fix the meaning of the "normal" and "inverted"
+> > diff --git a/drivers/mmc/core/host.c b/drivers/mmc/core/host.c
+> > index 95cceae96944..6442eecb672e 100644
+> > --- a/drivers/mmc/core/host.c
+> > +++ b/drivers/mmc/core/host.c
+> > @@ -452,6 +452,14 @@ int mmc_of_parse(struct mmc_host *host)
+> >         if (of_find_property(np, "mmc-hs400-1_2v", &len))
+> >                 host->caps2 |= MMC_CAP2_HS400_1_2V | MMC_CAP2_HS200_1_2V_SDR;
+> >
+> > +       host->dsr_req = of_property_read_u32(np, "dsr", &host->dsr);
+> > +       if (host->dsr_req && (host->dsr & ~0xffff)) {
 > 
-> Please follow the bellow link to set mac address.
+> This doesn't look correct.
+> I guess what you want is: if (!host->dsr_req && (host->dsr & ~0xffff))
+Ah, you're right. I thought that of_property_read_u32 returned true if
+it worked and false if not. But it returns 0 for success and -ESOMETHING
+otherwise.
+
+So I want host->dsr_req = !of_property_read_u32(np, "dsr", &host->dsr);
+
+I now have some working hardware again, will test again and send an v5.
+
 > 
-> http://www.armadeus.com/wiki/index.php?title=Ethernet_MAC_address
+> > +               dev_err(host->parent,
+> > +                       "device tree specified broken value for DSR: 0x%x, ignoring\n",
+> > +                       host->dsr);
+> > +               host->dsr_req = 0;
+> > +       }
+> > +
+> >         return 0;
+> >
+> >  out:
+> > diff --git a/drivers/mmc/core/mmc.c b/drivers/mmc/core/mmc.c
+> > index 793c6f7ddb04..fdc1ac1360c4 100644
+> > --- a/drivers/mmc/core/mmc.c
+> > +++ b/drivers/mmc/core/mmc.c
+> > @@ -162,6 +162,7 @@ static int mmc_decode_csd(struct mmc_card *card)
+> >         csd->read_partial = UNSTUFF_BITS(resp, 79, 1);
+> >         csd->write_misalign = UNSTUFF_BITS(resp, 78, 1);
+> >         csd->read_misalign = UNSTUFF_BITS(resp, 77, 1);
+> > +       csd->dsr_imp = UNSTUFF_BITS(resp, 76, 1);
+> >         csd->r2w_factor = UNSTUFF_BITS(resp, 26, 3);
+> >         csd->write_blkbits = UNSTUFF_BITS(resp, 22, 4);
+> >         csd->write_partial = UNSTUFF_BITS(resp, 21, 1);
+> > @@ -1273,6 +1274,13 @@ static int mmc_init_card(struct mmc_host *host, u32 ocr,
+> >         }
+> >
+> >         /*
+> > +        * handling only for cards supporting DSR and hosts requesting
+> > +        * DSR configuration
+> > +        */
+> > +       if (card->csd.dsr_imp && host->dsr_req)
 > 
-> -Anand Moon
+> if (card->csd.dsr_imp && !host->dsr_req)
+With the above change my line is correct.
 
-Hi,
+> >  struct mmc_ext_csd {
+> > diff --git a/include/linux/mmc/host.h b/include/linux/mmc/host.h
+> > index 7960424d0bc0..8acaebd866a7 100644
+> > --- a/include/linux/mmc/host.h
+> > +++ b/include/linux/mmc/host.h
+> > @@ -319,6 +319,7 @@ struct mmc_host {
+> >  #ifdef CONFIG_MMC_DEBUG
+> >         unsigned int            removed:1;      /* host is being removed */
+> >  #endif
+> > +       unsigned int            dsr_req:1;      /* DSR is requested for Host */
+> 
+> Should be an int instead.
+I don't care much, can change to int.
 
-My U-Boot already has a ethaddr defined. It's what is used by the
-default kernel that came with the board (3.2).
+Best regards
+Uwe
 
-U-Boot# printenv
-[...]
-ethaddr=d4:94:a1:8b:ec:78
-
-The problem is that this is ignored by the latest kernel and it
-replaces it with some random mac.
-
-Note, I boot via bootp, thus it has to have a mac. That mac is what
-tells my dhcp server what kernel image to load this board.
-
--- Steve
+-- 
+Pengutronix e.K.                           | Uwe Kleine-K?nig            |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
