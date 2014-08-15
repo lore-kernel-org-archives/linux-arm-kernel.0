@@ -1,76 +1,66 @@
 From: will.deacon@arm.com (Will Deacon)
-Date: Fri, 15 Aug 2014 12:51:11 +0100
-Subject: [PATCH v5] devicetree: Add generic IOMMU device tree bindings
-In-Reply-To: <87a9774lf5.fsf@nvidia.com>
-References: <1406803383-11601-1-git-send-email-thierry.reding@gmail.com>
- <87a9774lf5.fsf@nvidia.com>
-Message-ID: <20140815115110.GO27466@arm.com>
+Date: Fri, 15 Aug 2014 12:57:14 +0100
+Subject: [PATCH v2 1/3] arm64: spin-table: handle unmapped
+ cpu-release-addrs
+In-Reply-To: <CAKv+Gu9ftjZby+5U5Vs0hXhyFdNLwx4MwvC-LL=y3a9eSz34iQ@mail.gmail.com>
+References: <CAKv+Gu_UjRNhhiM0GPsKRdXRtmEnY6cbpY-JZ33RUMapbPYsbQ@mail.gmail.com>
+ <20140813125844.GE32644@leverpostej>
+ <20140814171323.GH9039@arm.com>
+ <CAKv+Gu9ftjZby+5U5Vs0hXhyFdNLwx4MwvC-LL=y3a9eSz34iQ@mail.gmail.com>
+Message-ID: <20140815115714.GP27466@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Aug 14, 2014 at 07:47:42AM +0100, Hiroshi Doyu wrote:
-> Thierry Reding <thierry.reding@gmail.com> writes:
+On Thu, Aug 14, 2014 at 07:10:13PM +0100, Ard Biesheuvel wrote:
+> On 14 August 2014 19:13, Catalin Marinas <catalin.marinas@arm.com> wrote:
+> > On Wed, Aug 13, 2014 at 01:58:45PM +0100, Mark Rutland wrote:
+> >> > With the 3.17 merge window not far from closing, is there anything we
+> >> > could still do this cycle to get $subject addressed?
+> >> > As I have indicated before, the newly introduced TEXT_OFFSET fuzzing
+> >> > may break APM Mustang if booting from UEFI (i.e., for low values of
+> >> > rand()), and as this option is recommended for distribution kernels,
+> >> > it could make apt-get update'ing your kernel a frustrating experience.
+> >> > However, the fix for that issue triggers the issue addressed by
+> >> > $subject.
+> >> >
+> >> > In my personal opinion, relaxing the requirements imposed on where
+> >> > your cpu-release-addr may live could remain a separate discussion. In
+> >> > the APM Mustang case, even when adhering to booting.txt by the letter
+> >> > (i.e., pu cpu-release-addr in a memreserved area in DRAM and load
+> >> > Image at a 2 meg boundary + TEXT_OFFSET), the kernel fails to bring up
+> >> > the secondaries if the cpu-release-addr is below the kernel.
+> >>
+> >> For the moment I would be happy with the patch as it stands (using
+> >> ioremap_cache).
+> >>
+> >> Catalin, Will?
+> >
+> > Using ioremap_cache() sounds fine to me but I have to dig the original
+> > patches as I've only been cc'ed in the middle of the thread (and that's
+> > just for patch 1/3).
+> >
 > 
-> > +Multiple-master IOMMU:
-> > +----------------------
-> > +
-> > +       iommu {
-> > +               /* the specifier represents the ID of the master */
-> > +               #iommu-cells = <1>;
-> > +       };
-> > +
-> > +       master at 1 {
-> > +               /* device has master ID 42 in the IOMMU */
-> > +               iommus = <&{/iommu} 42>;
-> > +       };
-> > +
-> > +       master at 2 {
-> > +               /* device has master IDs 23 and 24 in the IOMMU */
-> > +               iommus = <&{/iommu} 23>, <&{/iommu} 24>;
-> > +       };
+> http://marc.info/?l=linux-arm-kernel&m=140671806332258&w=2
+> http://marc.info/?l=linux-arm-kernel&m=140671807532262&w=2
+> http://marc.info/?l=linux-arm-kernel&m=140671807732263&w=2
 > 
-> I think that this "master ID" will be parsed in IOMMU driver. For
-> example, ARM,SMMU expects "streamID" as "master ID", right?
+> Patch 3/3 makes the EFI stub load Image at the lowest 2 meg boundary +
+> TEXT_OFFSET instead of erroring out when base of DRAM + TEXT_OFFSET is
+> occupied. This is necessary as the randomized TEXT_OFFSET could
+> potentially conflict with reserved areas at the base of DRAM if a low
+> value happens to be chosen.
 > 
-> If a SoC has a feature to configure to assign streamID to devices at
-> runtime, "streamID" is not equal to "master ID".
+> Patch 1/3 fixes the resulting breakage on APM Mustang in bringing up
+> the secondaries, as on that board in particular, the reserved area at
+> the base of DRAM contains the holding pen, and loading Image higher up
+> makes the mailbox inaccessible through the linear mapping hence the
+> need for ioremap_cache()
 > 
->   iommus = <&{/smmu} "soc specific master ID">;
-> 
-> "soc master ID" needs to be translated into "streamID" by SoC SW. It
-> seems that ARM,SMMU kernel driver doesn't expect this kind of ID
-> translation. If ARM,SMMU kernel driver is used as is, "soc master ID"
-> would be incompatible? ARM,SMMU needs such translation before
-> parsing. Is this my understanding right?
-> 
-> If so I think that this master ID configuration/translation may be quite
-> reasonable requirment for SoC using ARM,SMMU.
-> 
-> Can we consider this ID translation within ARM,SMMU compatibility?
-> 
-> IOW, is it possible to implement some SoC specific hook for ID
-> translation/configuration in ARM,SMMU kernel driver?
+> Patch 2/3 is also a fix for a potential issue on UEFI boot, but it is
+> unrelated to 1/3 and 3/3
 
-I think there's some confusion here. The ARM architected SMMU does not
-perform any StreamID translation -- it sees an incoming ID and uses that to
-lookup a set of translation tables. However, for hotpluggable buses (e.g.
-PCI), we need a way to communicate the StreamIDs for a newly discovered
-device to the SMMU. I expect that this would be described as a translation
-from another ID (e.g. requester id for PCI), so *that* is where the
-translation occurs.
-
-This translation can be described as a simple base + offset calculation,
-e.g. StreamID = RequesterID + offset. Ideally, you'd have one offset per
-host controller (and described in the host controller DT node), but you
-could also imagine building tables where each RequesterID maps to a
-different StreamID.
-
-The final thing to mention is that some SoCs may have device hotplug
-architectures that aren't like PCIe, so we may well need glue code there to
-`allocate' StreamIDs from a fixed portion of the numberspace.
-
-We don't need to solve all of these problems in one go, but the base +
-offset code will certainly be useful; not just for the SMMU but also for
-the GIC (where we have DeviceIDs). Mark Rutland is looking at this.
+I was planning to take all of these for 3.18 as there's no regression here
+(the fuzzing is a new debug feature and defaults to `n'). Do you think these
+qualify as -rc1 material?
 
 Will
