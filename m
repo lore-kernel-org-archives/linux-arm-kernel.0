@@ -1,35 +1,36 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 15 Aug 2014 09:01:50 +0200
-Subject: [PATCH v2 1/5] ARM: BCM63XX: add basic support for the Broadcom
- BCM63138 DSL SoC
-In-Reply-To: <1408061487-20984-2-git-send-email-f.fainelli@gmail.com>
+Date: Fri, 15 Aug 2014 09:05:22 +0200
+Subject: [PATCH v2 4/5] ARM: BCM63XX: add BCM963138DVT Reference platform
+ DTS
+In-Reply-To: <1408061487-20984-5-git-send-email-f.fainelli@gmail.com>
 References: <1408061487-20984-1-git-send-email-f.fainelli@gmail.com>
- <1408061487-20984-2-git-send-email-f.fainelli@gmail.com>
-Message-ID: <3533813.fmr1R5OBqN@wuerfel>
+ <1408061487-20984-5-git-send-email-f.fainelli@gmail.com>
+Message-ID: <1522800.uXzhrGiWzF@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday 14 August 2014 17:11:23 Florian Fainelli wrote:
-> +static void __init bcm63xx_init(void)
-> +{
-> +       of_platform_populate(NULL, of_default_bus_match_table, NULL,
-> +               &platform_bus);
-> +       l2x0_of_init(0, ~0);
-> +}
+On Thursday 14 August 2014 17:11:26 Florian Fainelli wrote:
+> +/ {
+> +       compatible = "brcm,BCM963138DVT", "brcm,bcm63138";
+> +       model = "Broadcom BCM963138DVT";
 > +
-> +static const char * const bcm63xx_dt_compat[] = {
-> +       "brcm,bcm63138",
-> +       NULL
+> +       memory {
+> +               reg = <0x0 0x08000000>;
+> +       };
+> +
 > +};
 > +
-> +DT_MACHINE_START(BCM63XXX_DT, "BCM63xx DSL SoC")
-> +       .init_machine   = bcm63xx_init,
-> +       .dt_compat      = bcm63xx_dt_compat,
-> +MACHINE_END
+> +&serial0 {
+> +       status = "okay";
+> +};
+> +
+> +&serial1 {
+> +       status = "okay";
+> +};
 > 
 
-You should be able to remove that bcm63xx_init() function if you add
-the l2c_aux_val/l2c_aux_mask settings in the machine descriptor
-instead.
+You should probably add a 'stdout-path' property in the aliases node
+to pick the uart that is used for the console. It might require
+a change to the driver as well.
 
 	Arnd
