@@ -1,34 +1,100 @@
-From: peter.maydell@linaro.org (Peter Maydell)
-Date: Fri, 15 Aug 2014 13:21:59 +0100
-Subject: [PATCH] arm/arm64: KVM: Support KVM_CAP_READONLY_MEM
-In-Reply-To: <20140815091550.GS10550@cbox>
-References: <1405003351-12973-1-git-send-email-christoffer.dall@linaro.org>
- <8761hvrs4z.fsf@approximate.cambridge.arm.com> <20140815091550.GS10550@cbox>
-Message-ID: <CAFEAcA8XqEYsh8RWRf=LiS1A5N+69-X97MsTsfzeqPqs=O21YQ@mail.gmail.com>
+From: hdoyu@nvidia.com (Hiroshi Doyu)
+Date: Fri, 15 Aug 2014 15:29:41 +0300
+Subject: [PATCH v5] devicetree: Add generic IOMMU device tree bindings
+In-Reply-To: <20140815115110.GO27466@arm.com>
+References: <1406803383-11601-1-git-send-email-thierry.reding@gmail.com>
+ <87a9774lf5.fsf@nvidia.com> <20140815115110.GO27466@arm.com>
+Message-ID: <87tx5ehr62.fsf@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 15 August 2014 10:15, Christoffer Dall <christoffer.dall@linaro.org> wrote:
-> On Thu, Aug 14, 2014 at 04:46:20PM +0100, Marc Zyngier wrote:
->> So the consequence of a write to a ROM region would be to do an IO
->> emulation? That seems a bit weird. Shouldn't we have a separate error
->> path for this (possibly ignoring the write entierely)?
 
-> It's part of the ABI, see Documentation/virtual/kvm/api.txt section
-> 4.35:
+Will Deacon <will.deacon@arm.com> writes:
+
+> On Thu, Aug 14, 2014 at 07:47:42AM +0100, Hiroshi Doyu wrote:
+>> Thierry Reding <thierry.reding@gmail.com> writes:
+>> 
+>> > +Multiple-master IOMMU:
+>> > +----------------------
+>> > +
+>> > +       iommu {
+>> > +               /* the specifier represents the ID of the master */
+>> > +               #iommu-cells = <1>;
+>> > +       };
+>> > +
+>> > +       master at 1 {
+>> > +               /* device has master ID 42 in the IOMMU */
+>> > +               iommus = <&{/iommu} 42>;
+>> > +       };
+>> > +
+>> > +       master at 2 {
+>> > +               /* device has master IDs 23 and 24 in the IOMMU */
+>> > +               iommus = <&{/iommu} 23>, <&{/iommu} 24>;
+>> > +       };
+>> 
+>> I think that this "master ID" will be parsed in IOMMU driver. For
+>> example, ARM,SMMU expects "streamID" as "master ID", right?
+>> 
+>> If a SoC has a feature to configure to assign streamID to devices at
+>> runtime, "streamID" is not equal to "master ID".
+>> 
+>>   iommus = <&{/smmu} "soc specific master ID">;
+>> 
+>> "soc master ID" needs to be translated into "streamID" by SoC SW. It
+>> seems that ARM,SMMU kernel driver doesn't expect this kind of ID
+>> translation. If ARM,SMMU kernel driver is used as is, "soc master ID"
+>> would be incompatible? ARM,SMMU needs such translation before
+>> parsing. Is this my understanding right?
+>> 
+>> If so I think that this master ID configuration/translation may be quite
+>> reasonable requirment for SoC using ARM,SMMU.
+>> 
+>> Can we consider this ID translation within ARM,SMMU compatibility?
+>> 
+>> IOW, is it possible to implement some SoC specific hook for ID
+>> translation/configuration in ARM,SMMU kernel driver?
 >
-> "The latter [KVM_KVM_READONLY] can be set, if KVM_CAP_READONLY_MEM
-> capability allows it, to make a new slot read-only.  In this case,
-> writes to this memory will be posted to userspace as KVM_EXIT_MMIO
-> exits."
+> I think there's some confusion here. The ARM architected SMMU does not
+> perform any StreamID translation -- it sees an incoming ID and uses that to
+> lookup a set of translation tables. However, for hotpluggable buses (e.g.
+> PCI), we need a way to communicate the StreamIDs for a newly discovered
+> device to the SMMU. I expect that this would be described as a translation
+> from another ID (e.g. requester id for PCI), so *that* is where the
+> translation occurs.
+>
+> This translation can be described as a simple base + offset calculation,
+> e.g. StreamID = RequesterID + offset. Ideally, you'd have one offset per
+> host controller (and described in the host controller DT node), but you
+> could also imagine building tables where each RequesterID maps to a
+> different StreamID.
+>
+> The final thing to mention is that some SoCs may have device hotplug
+> architectures that aren't like PCIe, so we may well need glue code there to
+> `allocate' StreamIDs from a fixed portion of the numberspace.
 
-...and the reason for this is so we can execute out of things
-like NOR flash devices, which typically have "reads just read
-but writes are interpreted as command bytes to do block
-erase or write of the flash device" semantics. If userspace
-wants "reads should fault" behaviour it can implement it
-itself (well, it could if the KVM MMIO API supported having
-an MMIO exit return "this should fault", but that's a separate
-thing.)
+Ok, I can assume that, when parsing generic IOMMU binding, SoC specific
+callback could be called from ARM,SMMU driver to assign allocated
+"StreamIDs" to thier "RequesterIDs".
 
--- PMM
+IOW, IOMMU generic binding for ARM,SMMU can have RequresterID instead of
+StreamID.
+
+  Not:
+  	iommus = <&{/arm-smmu} "StreamID">;
+  
+  Instead, can be:
+  	iommus = <&{/arm-smmu} "RequresterID">;
+
+If I extend the above, even ARM,SMMU driver could have any number of
+params, which SoC requires with keeping "arm,mmu-*" compatibility?
+
+  	iommus = <&{/arm-msmmu} param1 param2 param3 param4 .....>;
+
+How to parse params depends on SoC. Parsing params is done at SoC
+callback, right?
+
+> We don't need to solve all of these problems in one go, but the base +
+> offset code will certainly be useful; not just for the SMMU but also for
+> the GIC (where we have DeviceIDs). Mark Rutland is looking at this.
+
+Any pointer would be really appreciated.
