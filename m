@@ -1,28 +1,56 @@
-From: zonque@gmail.com (Daniel Mack)
-Date: Fri, 15 Aug 2014 10:41:29 +0200
-Subject: [PATCH 1/2] ARM: pxa: ssp: provide platform_device_id for PXA3xx
-In-Reply-To: <CAN1soZyj+ddcuP60F5kB2pwUYGYG7bF6mFckoak97xr6n7wCYg@mail.gmail.com>
-References: <1407959959-4977-1-git-send-email-zonque@gmail.com>	<CAN1soZz0Fo_PNvc1dK7d9ZU49Pi0FortL4k1dwAjHEDZNcf_zg@mail.gmail.com>	<53EC74B4.1050007@gmail.com>
- <CAN1soZyj+ddcuP60F5kB2pwUYGYG7bF6mFckoak97xr6n7wCYg@mail.gmail.com>
-Message-ID: <53EDC7B9.9060000@gmail.com>
+From: sudeep.holla@arm.com (Sudeep Holla)
+Date: Fri, 15 Aug 2014 09:45:19 +0100
+Subject: [PATCH] arm: irq: fix the affinity when migrate a irq
+In-Reply-To: <1408087917-22603-1-git-send-email-zhangwm@marvell.com>
+References: <1408087917-22603-1-git-send-email-zhangwm@marvell.com>
+Message-ID: <53EDC89F.4020300@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08/15/2014 10:33 AM, Haojian Zhuang wrote:
-> On Thu, Aug 14, 2014 at 4:35 PM, Daniel Mack <zonque@gmail.com> wrote:
+Hi Neil,
 
->> That's a regression caused by 972a55b62 ("ASoC: fix pxa-ssp compiling
->> issue under mach-mmp"), btw, that added the PXA3xx_SSP enum value but
->> forgot to make sure it is actually used.
->>
->> Hence, this commit could even get a stable tag for 3.5+.
->>
->>
-> Yes, you're right. We should append this string.
+On 15/08/14 08:31, Neil Zhang wrote:
+> Commit ffde1de64012 ("irqchip: Gic: Support forced affinity setting")
+> has enable the forcing cpu affinity of interrupts for gic.
+>
+> The current code of migrate_one_irq will pass the current affinity mask
+> to irq_set_affinity with force is true, it may select the cpu being
+> offlined as the target CPU again, then the interrupt won't be migrated
+> correctly.
+>
 
-The stable@ tag you mean? Well, OTOH, it went unnoticed since 3.5, so we
-can as well just apply it for 3.17 :)
+I had posted similar patch [1] a while ago and the discussion[2] did not 
+conclude. We need feedback from Thomas Gleixner.
 
+Regards,
+Sudeep
 
-Thanks,
-Daniel
+[1] 
+http://lists.infradead.org/pipermail/linux-arm-kernel/2014-May/254838.html
+[2] 
+http://lists.infradead.org/pipermail/linux-arm-kernel/2014-June/265191.html
+
+> Signed-off-by: Neil Zhang <zhangwm@marvell.com>
+> ---
+>   arch/arm/kernel/irq.c |    5 ++---
+>   1 file changed, 2 insertions(+), 3 deletions(-)
+>
+> diff --git a/arch/arm/kernel/irq.c b/arch/arm/kernel/irq.c
+> index 2c42576..6f5a878 100644
+> --- a/arch/arm/kernel/irq.c
+> +++ b/arch/arm/kernel/irq.c
+> @@ -167,11 +167,10 @@ static bool migrate_one_irq(struct irq_desc *desc)
+>   	if (irqd_is_per_cpu(d) || !cpumask_test_cpu(smp_processor_id(), affinity))
+>   		return false;
+>
+> -	if (cpumask_any_and(affinity, cpu_online_mask) >= nr_cpu_ids) {
+> -		affinity = cpu_online_mask;
+> +	if (cpumask_any_and(affinity, cpu_online_mask) >= nr_cpu_ids)
+>   		ret = true;
+> -	}
+>
+> +	affinity = cpu_online_mask;
+>   	c = irq_data_get_irq_chip(d);
+>   	if (!c->irq_set_affinity)
+>   		pr_debug("IRQ%u: unable to set affinity\n", d->irq);
+>
