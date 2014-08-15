@@ -1,151 +1,86 @@
-From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
-Date: Fri, 15 Aug 2014 18:51:52 +0100
-Subject: [PATCH v7 2/8] Documentation: arm: define DT idle states bindings
-In-Reply-To: <20140815172030.GA45197@ilina-mac.local>
-References: <1407945127-27554-1-git-send-email-lorenzo.pieralisi@arm.com>
- <1407945127-27554-3-git-send-email-lorenzo.pieralisi@arm.com>
- <20140815172030.GA45197@ilina-mac.local>
-Message-ID: <20140815175152.GA8803@e102568-lin.cambridge.arm.com>
+From: bigeasy@linutronix.de (Sebastian Andrzej Siewior)
+Date: Fri, 15 Aug 2014 19:42:38 +0200
+Subject: [PATCH 10/15] tty: serial: 8250_dma: Add a TX trigger workaround for
+ AM33xx
+In-Reply-To: <1408124563-31541-1-git-send-email-bigeasy@linutronix.de>
+References: <1408124563-31541-1-git-send-email-bigeasy@linutronix.de>
+Message-ID: <1408124563-31541-11-git-send-email-bigeasy@linutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Aug 15, 2014 at 06:20:30PM +0100, Lina Iyer wrote:
+At least on AM335x the following problem exists: Even if the TX FIFO is
+empty and a TX transfer is programmed (and started) the UART does not
+trigger the DMA transfer.
+After $TRESHOLD number of bytes have been written to the FIFO manually the
+UART reevaluates the whole situation and decides that now there is enough
+room in the FIFO and so the transfer begins.
+This problem has not been seen on DRA7 or beaglebone (OMAP3).
 
-[...]
+The workaround is to use a threshold of one byte, program the DMA
+transfer minus one byte and then to put the first byte into the FIFO to
+kick start the transfer.
 
-> >+===========================================
-> >+3 - idle-states node
-> >+===========================================
-> >+
-> >+ARM processor idle states are defined within the idle-states node, which is
-> >+a direct child of the cpus node [1] and provides a container where the
-> >+processor idle states, defined as device tree nodes, are listed.
-> >+
-> >+- idle-states node
-> >+
-> >+      Usage: Optional - On ARM systems, it is a container of processor idle
-> >+                        states nodes. If the system does not provide CPU
-> >+                        power management capabilities or the processor just
-> >+                        supports idle_standby an idle-states node is not
-> >+                        required.
-> >+
-> >+      Description: idle-states node is a container node, where its
-> >+                   subnodes describe the CPU idle states.
-> >+
-> >+      Node name must be "idle-states".
-> >+
-> >+      The idle-states node's parent node must be the cpus node.
-> >+
-> >+      The idle-states node's child nodes can be:
-> >+
-> >+      - one or more state nodes
-> >+
-> >+      Any other configuration is considered invalid.
-> >+
-> >+      An idle-states node defines the following properties:
-> >+
-> >+      - entry-method
-> >+              Value type: <stringlist>
-> >+              Usage and definition depend on ARM architecture version.
-> >+                      # On ARM v8 64-bit this property is required and must
-> >+                        be one of:
-> >+                         - "psci" (see bindings in [2])
-> >+                      # On ARM 32-bit systems this property is optional
-> >+
-> >+The nodes describing the idle states (state) can only be defined within the
-> >+idle-states node, any other configuration is considered invalid and therefore
-> >+must be ignored.
-> >+
-> >+===========================================
-> >+4 - state node
-> >+===========================================
-> >+
-> >+A state node represents an idle state description and must be defined as
-> >+follows:
-> >+
-> >+- state node
-> >+
-> >+      Description: must be child of the idle-states node
-> >+
-> >+      The state node name shall follow standard device tree naming
-> >+      rules ([5], 2.2.1 "Node names"), in particular state nodes which
-> >+      are siblings within a single common parent must be given a unique name.
-> >+
-> >+      The idle state entered by executing the wfi instruction (idle_standby
-> >+      SBSA,[3][4]) is considered standard on all ARM platforms and therefore
-> >+      must not be listed.
-> >+
-> >+      With the definitions provided above, the following list represents
-> >+      the valid properties for a state node:
-> >+
-> >+      - compatible
-> >+              Usage: Required
-> >+              Value type: <stringlist>
-> >+              Definition: Must be "arm,idle-state".
-> >+
-> >+      - local-timer-stop
-> >+              Usage: See definition
-> >+              Value type: <none>
-> >+              Definition: if present the CPU local timer control logic is
-> >+                          lost on state entry, otherwise it is retained.
-> >+
-> >+      - entry-latency-us
-> >+              Usage: Required
-> >+              Value type: <prop-encoded-array>
-> >+              Definition: u32 value representing worst case latency in
-> >+                          microseconds required to enter the idle state.
-> >+                          The exit-latency-us duration may be guaranteed
-> >+                          only after entry-latency-us has passed.
-> >+
-> >+      - exit-latency-us
-> >+              Usage: Required
-> >+              Value type: <prop-encoded-array>
-> >+              Definition: u32 value representing worst case latency
-> >+                          in microseconds required to exit the idle state.
-> >+
-> >+      - min-residency-us
-> >+              Usage: Required
-> >+              Value type: <prop-encoded-array>
-> >+              Definition: u32 value representing minimum residency duration
-> >+                          in microseconds, inclusive of preparation and
-> >+                          entry, for this idle state to be considered
-> >+                          worthwhile energy wise (refer to section 2 of
-> >+                          this document for a complete description).
-> >+
-> >+      - wakeup-latency-us:
-> >+              Usage: Optional
-> >+              Value type: <prop-encoded-array>
-> >+              Definition: u32 value representing maximum delay between the
-> >+                          signaling of a wake-up event and the CPU being
-> >+                          able to execute normal code again. If omitted,
-> >+                          this is assumed to be equal to:
-> >+
-> >+                              entry-latency-us + exit-latency-us
-> >+
-> >+                          It is important to supply this value on systems
-> >+                          where the duration of PREP phase (see diagram 1,
-> >+                          section 2) is non-neglibigle.
-> >+                          In such systems entry-latency-us + exit-latency-us
-> >+                          will exceed wakeup-latency-us by this duration.
-> >+
-> >+      In addition to the properties listed above, a state node may require
-> >+      additional properties specifics to the entry-method defined in the
-> >+      idle-states node, please refer to the entry-method bindings
-> >+      documentation for properties definitions.
-> How are the different idle-states node differenciated?
-> Say, I want to choose a different entry point function for each of these
-> node sepately.
+Signed-off-by: Sebastian Andrzej Siewior <bigeasy@linutronix.de>
+---
+ drivers/tty/serial/8250/8250.h     |  1 +
+ drivers/tty/serial/8250/8250_dma.c | 18 +++++++++++++++---
+ 2 files changed, 16 insertions(+), 3 deletions(-)
 
-You add an idle state entry method specific parameter (as PSCI does,
-and it's part of this patch already) to each idle state and document it
-in the respective binding.
-
-> Also, not all targets may support all idle states. If we do not want to enter
-> retention on one target, while an other target might, there is no way
-> to know what the idle state node is to set up the correct entry function.
-
-What's a target ? A CPU ? Every CPU lists its idle states through the
-cpu-idle-states phandle list. If a CPU does not support an idle state it must
-not be there.
-
-Lorenzo
+diff --git a/drivers/tty/serial/8250/8250.h b/drivers/tty/serial/8250/8250.h
+index 1bcb4b2..d6a3f5c 100644
+--- a/drivers/tty/serial/8250/8250.h
++++ b/drivers/tty/serial/8250/8250.h
+@@ -79,6 +79,7 @@ struct serial8250_config {
+ #define UART_BUG_NOMSR	(1 << 2)	/* UART has buggy MSR status bits (Au1x00) */
+ #define UART_BUG_THRE	(1 << 3)	/* UART has buggy THRE reassertion */
+ #define UART_BUG_PARITY	(1 << 4)	/* UART mishandles parity if FIFO enabled */
++#define UART_BUG_DMATX	(1 << 5)	/* UART needs one byte in FIFO for kickstart */
+ 
+ #define PROBE_RSA	(1 << 0)
+ #define PROBE_ANY	(~0)
+diff --git a/drivers/tty/serial/8250/8250_dma.c b/drivers/tty/serial/8250/8250_dma.c
+index 7417ed5..dc1294b 100644
+--- a/drivers/tty/serial/8250/8250_dma.c
++++ b/drivers/tty/serial/8250/8250_dma.c
+@@ -83,6 +83,7 @@ int serial8250_tx_dma(struct uart_8250_port *p)
+ 	struct uart_8250_dma		*dma = p->dma;
+ 	struct circ_buf			*xmit = &p->port.state->xmit;
+ 	struct dma_async_tx_descriptor	*desc;
++	unsigned int			skip_byte = 0;
+ 	int ret;
+ 
+ 	if (uart_tx_stopped(&p->port) || dma->tx_running ||
+@@ -91,10 +92,18 @@ int serial8250_tx_dma(struct uart_8250_port *p)
+ 
+ 	dma->tx_size = CIRC_CNT_TO_END(xmit->head, xmit->tail, UART_XMIT_SIZE);
+ 
++	if (p->bugs & UART_BUG_DMATX) {
++		if (dma->tx_size < 4) {
++			ret = -EINVAL;
++			goto err;
++		}
++		skip_byte = 1;
++	}
++
+ 	desc = dmaengine_prep_slave_single(dma->txchan,
+-					   dma->tx_addr + xmit->tail,
+-					   dma->tx_size, DMA_MEM_TO_DEV,
+-					   DMA_PREP_INTERRUPT | DMA_CTRL_ACK);
++			dma->tx_addr + xmit->tail + skip_byte,
++			dma->tx_size - skip_byte, DMA_MEM_TO_DEV,
++			DMA_PREP_INTERRUPT | DMA_CTRL_ACK);
+ 	if (!desc) {
+ 		ret = -EBUSY;
+ 		goto err;
+@@ -118,6 +127,9 @@ int serial8250_tx_dma(struct uart_8250_port *p)
+ 			serial_out(p, UART_IER, p->ier);
+ 		}
+ 	}
++	if (skip_byte)
++		serial_out(p, UART_TX, xmit->buf[xmit->tail]);
++
+ 	return 0;
+ err:
+ 	p->dma_tx_err = 1;
+-- 
+2.0.1
