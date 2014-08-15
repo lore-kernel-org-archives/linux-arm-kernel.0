@@ -1,41 +1,26 @@
 From: f.fainelli@gmail.com (Florian Fainelli)
-Date: Thu, 14 Aug 2014 20:03:35 -0700
-Subject: [PATCH v2 3/5] ARM: BCM63XX: add BCM63138 minimal Device Tree
-In-Reply-To: <1408061487-20984-4-git-send-email-f.fainelli@gmail.com>
-References: <1408061487-20984-1-git-send-email-f.fainelli@gmail.com>
- <1408061487-20984-4-git-send-email-f.fainelli@gmail.com>
-Message-ID: <CAGVrzcZZEDBLkBq1=SC-1Ege3AE-jn4e8v9SYBELwFnO6_riGA@mail.gmail.com>
+Date: Thu, 14 Aug 2014 21:45:09 -0700
+Subject: VFP available on a single CPU in a dual-CPU complex
+Message-ID: <CAGVrzcaX4n2rJko_Kny81jkzQbV6z5TmcA2coGrj6BU-ahiOTA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2014-08-14 17:11 GMT-07:00 Florian Fainelli <f.fainelli@gmail.com>:
-> Add a very minimalistic BCM63138 Device Tree include file which
-> describes the BCM63138 SoC with only the basic set of required
-> peripherals:
->
-> - Cortex A9 CPUs
-> - ARM GIC
-> - ARM SCU
-> - PL310 Level-2 cache controller
-> - ARM TWD & Global timers
-> - ARM TWD watchdog
-> - legacy MIPS bus (UBUS)
-> - BCM6345-style UARTs (disabled by default)
->
-> Since the PL310 L2 cache controller does not come out of reset with
-> correct default values, we need to override the 'cache-sets' and
-> 'cache-size' properties to get its geometry right.
->
-> Signed-off-by: Florian Fainelli <f.fainelli@gmail.com>
+Hello,
 
-[snip]
+On Broadcom's BCM63138 SoC, the second Cortex A9 CPU does not have
+VFP, which is a problem as one might imagine because we currently
+assume it is available for all CPUs within the complex.
 
-> +       /* ARM bus */
-> +       axi at 80000000 {
-> +               compatible = "simple-bus";
-> +               ranges = <0 0x80000000 0x84000>;
+I started to patch vfp_support_entry to test for CPU1 and branch to a
+different location, but that raises a bunch of question, in particular
+what to do if NEON/VFP came from the kernel, how can we migrate that
+execution to CPU0?
 
-I made a typo here, the range declared here is narrower than it really
-is, I will re-submit this after getting some more feedback. Thanks!
---
+If the answer is don't use VFP, I guess that's fine, and I can have a
+runtime check in vfp_init() that checks for BCM63138 and set
+vfp_vector to vfp_null_entry even though we are running on a multi-v7
+kernel with VFP enabled.
+
+Thanks!
+-- 
 Florian
