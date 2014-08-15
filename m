@@ -1,14 +1,72 @@
 From: mark.rutland@arm.com (Mark Rutland)
-Date: Fri, 15 Aug 2014 12:15:49 +0100
-Subject: [PATCH 1/2] ARM: abort: don't clear the exclusive monitors
-In-Reply-To: <1407749048-18909-1-git-send-email-mark.rutland@arm.com>
-References: <1407749048-18909-1-git-send-email-mark.rutland@arm.com>
-Message-ID: <20140815111548.GD15621@leverpostej>
+Date: Fri, 15 Aug 2014 12:27:58 +0100
+Subject: [PATCHv2 3/3] ARM: dts: socfpga: memreserve first 4KB for SMP code
+In-Reply-To: <1408050814-28595-4-git-send-email-dinguyen@opensource.altera.com>
+References: <1408050814-28595-1-git-send-email-dinguyen@opensource.altera.com>
+ <1408050814-28595-4-git-send-email-dinguyen@opensource.altera.com>
+Message-ID: <20140815112758.GE15621@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On the assumption these are fine I've dropped both into the patch system
-(as 8128/1 and 8129/1 respectively).
+Hi Dinh,
+
+On Thu, Aug 14, 2014 at 10:13:34PM +0100, dinguyen at opensource.altera.com wrote:
+> From: Dinh Nguyen <dinguyen@opensource.altera.com>
+> 
+> The SOCFPGA's SMP code uses 0x0 for as the location for the trampoline to
+> bring secondary cores online. This patch adds a /memreserve/ section to
+> reserve the first 4K for the SMP trampoline code.
+
+I'm slightly confused. 
+
+Sorry to split hairs here, but I think the comment is subtly wrong.
+
+The trampoline code seems to be placed in this location by Linux, so
+it's not that we're protecting the trampoline code, but rather we're
+preserving the location for future use.
+
+I take it that the reset address isn't configurable?
 
 Thanks,
 Mark.
+
+> 
+> Signed-off-by: Dinh Nguyen <dinguyen@opensource.altera.com>
+> Acked-by: Pavel Machek <pavel@denx.de>
+> ---
+> v2: Add a comment in the dts files
+> ---
+>  arch/arm/boot/dts/socfpga_arria5.dtsi   | 2 ++
+>  arch/arm/boot/dts/socfpga_cyclone5.dtsi | 2 ++
+>  2 files changed, 4 insertions(+)
+> 
+> diff --git a/arch/arm/boot/dts/socfpga_arria5.dtsi b/arch/arm/boot/dts/socfpga_arria5.dtsi
+> index 468fc4c..03e8268 100644
+> --- a/arch/arm/boot/dts/socfpga_arria5.dtsi
+> +++ b/arch/arm/boot/dts/socfpga_arria5.dtsi
+> @@ -15,6 +15,8 @@
+>   */
+>  
+>  /dts-v1/;
+> +/* First 4KB has trampoline code for secondary cores. */
+> +/memreserve/ 0x00000000 0x0001000;
+>  #include "socfpga.dtsi"
+>  
+>  / {
+> diff --git a/arch/arm/boot/dts/socfpga_cyclone5.dtsi b/arch/arm/boot/dts/socfpga_cyclone5.dtsi
+> index 33cad8b..28c05e7 100644
+> --- a/arch/arm/boot/dts/socfpga_cyclone5.dtsi
+> +++ b/arch/arm/boot/dts/socfpga_cyclone5.dtsi
+> @@ -16,6 +16,8 @@
+>   */
+>  
+>  /dts-v1/;
+> +/* First 4KB has trampoline code for secondary cores. */
+> +/memreserve/ 0x00000000 0x0001000;
+>  #include "socfpga.dtsi"
+>  
+>  / {
+> -- 
+> 2.0.3
+> 
+> 
