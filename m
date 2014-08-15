@@ -1,40 +1,59 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Fri, 15 Aug 2014 10:14:45 +0100
-Subject: VFP available on a single CPU in a dual-CPU complex
-In-Reply-To: <201408151103.01349.arnd@arndb.de>
-References: <CAGVrzcaX4n2rJko_Kny81jkzQbV6z5TmcA2coGrj6BU-ahiOTA@mail.gmail.com>
- <201408151103.01349.arnd@arndb.de>
-Message-ID: <20140815091445.GC27466@arm.com>
+From: christoffer.dall@linaro.org (Christoffer Dall)
+Date: Fri, 15 Aug 2014 11:15:50 +0200
+Subject: [PATCH] arm/arm64: KVM: Support KVM_CAP_READONLY_MEM
+In-Reply-To: <8761hvrs4z.fsf@approximate.cambridge.arm.com>
+References: <1405003351-12973-1-git-send-email-christoffer.dall@linaro.org>
+ <8761hvrs4z.fsf@approximate.cambridge.arm.com>
+Message-ID: <20140815091550.GS10550@cbox>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Aug 15, 2014 at 10:03:01AM +0100, Arnd Bergmann wrote:
-> On Friday 15 August 2014, Florian Fainelli wrote:
-> > Hello,
-> > 
-> > On Broadcom's BCM63138 SoC, the second Cortex A9 CPU does not have
-> > VFP, which is a problem as one might imagine because we currently
-> > assume it is available for all CPUs within the complex.
-> 
-> Wow, that is pretty crazy.
-> 
-> > I started to patch vfp_support_entry to test for CPU1 and branch to a
-> > different location, but that raises a bunch of question, in particular
-> > what to do if NEON/VFP came from the kernel, how can we migrate that
-> > execution to CPU0?
+On Thu, Aug 14, 2014 at 04:46:20PM +0100, Marc Zyngier wrote:
+> On Thu, Jul 10 2014 at  3:42:31 pm BST, Christoffer Dall <christoffer.dall@linaro.org> wrote:
+> > When userspace loads code and data in a read-only memory regions, KVM
+> > needs to be able to handle this on arm and arm64.  Specifically this is
+> > used when running code directly from a read-only flash device; the
+> > common scenario is a UEFI blob loaded with the -bios option in QEMU.
 > >
-> > If the answer is don't use VFP, I guess that's fine, and I can have a
-> > runtime check in vfp_init() that checks for BCM63138 and set
-> > vfp_vector to vfp_null_entry even though we are running on a multi-v7
-> > kernel with VFP enabled.
+> > To avoid looking through the memslots twice and to reuse the hva error
+> > checking of gfn_to_hva_prot(), add a new gfn_to_hva_memslot_prot()
+> > function and refactor gfn_to_hva_prot() to use this function.
+> >
+> > Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
 > 
-> I think adding hooks to the scheduler for this case is problematic, so
-> the easiest way would of course be to give the user a choice between
-> VFP or SMP on this hardware. For anything beyond that, you could do
-> a prototype patch (possibly for integration into OpenWRT) so we can
-> see how ugly it gets to support this setup.
+> This looks good to me, but you may want to split the patch in two
+> (generic stuff, and the ARM code).
 
-I agree. We have something similar on the Realview-PBX (dual A9, only one
-CPU with NEON) and the answer is not to enable NEON if you want SMP.
+sure, I can split it up.
 
-Will
+> 
+> One question though...
+> 
+
+[...]
+
+> >  
+> > @@ -882,7 +882,10 @@ int kvm_handle_guest_abort(struct kvm_vcpu *vcpu, struct kvm_run *run)
+> >  	idx = srcu_read_lock(&vcpu->kvm->srcu);
+> >  
+> >  	gfn = fault_ipa >> PAGE_SHIFT;
+> > -	if (!kvm_is_visible_gfn(vcpu->kvm, gfn)) {
+> > +	memslot = gfn_to_memslot(vcpu->kvm, gfn);
+> > +	hva = gfn_to_hva_memslot_prot(memslot, gfn, &writable);
+> > +	write_fault = kvm_is_write_fault(kvm_vcpu_get_hsr(vcpu));
+> > +	if (kvm_is_error_hva(hva) || (write_fault && !writable)) {
+> 
+> So the consequence of a write to a ROM region would be to do an IO
+> emulation? That seems a bit weird. Shouldn't we have a separate error
+> path for this (possibly ignoring the write entierely)?
+> 
+
+It's part of the ABI, see Documentation/virtual/kvm/api.txt section
+4.35:
+
+"The latter [KVM_KVM_READONLY] can be set, if KVM_CAP_READONLY_MEM
+capability allows it, to make a new slot read-only.  In this case,
+writes to this memory will be posted to userspace as KVM_EXIT_MMIO
+exits."
+
+-Christoffer
