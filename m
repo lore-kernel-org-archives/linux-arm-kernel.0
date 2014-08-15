@@ -1,63 +1,71 @@
-From: galak@codeaurora.org (Kumar Gala)
-Date: Fri, 15 Aug 2014 09:40:45 -0500
-Subject: [PATCH 4/6] arm64: Add DTS support for FSL's LS2085A SoC
-In-Reply-To: <a46429bdbde94e23a458923f893b437e@BN1PR03MB220.namprd03.prod.outlook.com>
-References: <1408096156-29772-1-git-send-email-bhupesh.sharma@freescale.com>
- <1408096156-29772-5-git-send-email-bhupesh.sharma@freescale.com>
- <0E51617C-0C5C-4A9A-AB90-394FB7FBE55D@codeaurora.org>
- <a46429bdbde94e23a458923f893b437e@BN1PR03MB220.namprd03.prod.outlook.com>
-Message-ID: <FBFA42DA-C94D-40B9-A4F8-714B26713790@codeaurora.org>
+From: boris.brezillon@free-electrons.com (Boris BREZILLON)
+Date: Fri, 15 Aug 2014 16:41:50 +0200
+Subject: [GIT PULL] at91: move of AIC drivers for 3.17: fixes #1
+In-Reply-To: <20140815142225.GF5063@titan.lakedaemon.net>
+References: <1408031156-13573-1-git-send-email-nicolas.ferre@atmel.com>
+ <20140815142225.GF5063@titan.lakedaemon.net>
+Message-ID: <20140815164150.5085b324@bbrezillon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi Jason,
 
-On Aug 15, 2014, at 9:26 AM, bhupesh.sharma at freescale.com wrote:
+On Fri, 15 Aug 2014 10:22:25 -0400
+Jason Cooper <jason@lakedaemon.net> wrote:
 
->> -----Original Message-----
->> From: Kumar Gala [mailto:galak at codeaurora.org]
->> Sent: Friday, August 15, 2014 7:00 PM
->> To: Sharma Bhupesh-B45370
->> Cc: devicetree-discuss at lists.ozlabs.org; Catalin.Marinas at arm.com;
->> arnd at arndb.de; Will.Deacon at arm.com; Yoder Stuart-B08248;
->> grant.likely at secretlab.ca; Basu Arnab-B45036; linux-arm-
->> kernel at lists.infradead.org
->> Subject: Re: [PATCH 4/6] arm64: Add DTS support for FSL's LS2085A SoC
->> 
->> 
->> On Aug 15, 2014, at 4:49 AM, Bhupesh Sharma <bhupesh.sharma@freescale.com>
->> wrote:
->> 
->>> This patch adds the device tree support for FSL LS2085A SoC based on
->>> ARMv8 architecture.
->>> 
->>> Following levels of DTSI/DTS files have been created for the LS2085A
->>> SoC family:
->>> 
->>> - fsl-ls2085a.dtsi:
->>> DTS-Include file for FSL LS2085A SoC.
->>> 
->>> - fsl-ls2085a-simu.dts:
->>> DTS file for FSL LS2085a software simulator model.
->>> 
->>> Signed-off-by: Bhupesh Sharma <bhupesh.sharma@freescale.com>
->>> Signed-off-by: Arnab Basu <arnab.basu@freescale.com>
->>> Signed-off-by: Stuart Yoder <stuart.yoder@freescale.com>
->>> ---
->>> arch/arm64/boot/dts/fsl-ls2085a-simu.dts |   29 ++++++
->> 
->> Hmm, outside of something like qemu, we don't normally have simulation
->> model dts/support in the kernel.
+> Nicolas,
 > 
-> Well for ARMv8 - foundation model is an existing simulation model having DTS
-> support.
+> On Thu, Aug 14, 2014 at 05:45:56PM +0200, Nicolas Ferre wrote:
+> > Arnd, Olof, Kevin,
+> > 
+> > Boris moved both of our AIC drivers to their new home: the drivers/irqchip
+> > directory taking advantage of the genirc framework. For DT-enabled SoCs, we can
+> > use these drivers (aic and aic5) right now: Jason merged them and they are
+> > available in early 3.17 merge window.
+> > So, I build this pull-request for enabling the use of these drivers now as:
+> > - we are very early in 3.17 development
+> > - it allowed us to avoid having to depend on Jason's branch before the opening
+> >   of the merge window
 > 
-> Regards,
-> Bhupesh
+> Then why did I create a topic branch for you to base on?
+> 
+>   git://git.infradead.org/users/jcooper/linux.git irqchip/atmel-aic
 
-True but that model was generally available to the open source community and was to get the base armv8 support going.
+Don't blame Nicolas for this, he was in vacation when you created this
+branch (he came back this week), and I should have told you that he
+couldn't use it for this release cycle.
 
-- k
+> 
+> > - it removes some code from the mach-at91 directory: including the whole
+> >   aic5 driver
+> > - we'd have quite a bit of time to solve issues if we found a bug
+> > - the code is basically moved so it should be error free.
+> 
+> Well, this is certainly up to Arnd, Olof and Kevin, but it seems a bit
+> unusual.  You're basically asking to merge changes into the current window
+> that has had _no_ time in -next...  Sounds like a recipe for trouble to
+> me.
+> 
+> In the future, please let me know if you're not going to need a topic
+> branch.
+
+This is all my fault, I'm the one who asked Nicolas to get these patches
+merged in 3.17, and, as I said, I should have told you that he was in
+vacation and thus could not use your topic branch for this release
+cycle.
+
+Anyway, I understand your concern about merging stuff that have not been
+tested on linux-next.
+
+Arnd, Olof, Kevin, I'd totally understand if you refuses to takes these
+patches for this release cycle.
+
+Best Regards,
+
+Boris
+
 
 -- 
-Employee of Qualcomm Innovation Center, Inc.
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum, hosted by The Linux Foundation
+Boris Brezillon, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
