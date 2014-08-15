@@ -1,26 +1,43 @@
-From: masami.hiramatsu.pt@hitachi.com (Masami Hiramatsu)
-Date: Sat, 16 Aug 2014 00:23:39 +0900
-Subject: [PATCH v4] kprobes: arm: enable OPTPROBES for ARM 32
-In-Reply-To: <1407819388-52145-1-git-send-email-wangnan0@huawei.com>
-References: <1407819388-52145-1-git-send-email-wangnan0@huawei.com>
-Message-ID: <53EE25FB.4070201@hitachi.com>
+From: galak@codeaurora.org (Kumar Gala)
+Date: Fri, 15 Aug 2014 10:26:11 -0500
+Subject: [PATCH 4/6] arm64: Add DTS support for FSL's LS2085A SoC
+In-Reply-To: <c43739ed82a34f6eb2adbbe240e07c5d@DM2PR03MB317.namprd03.prod.outlook.com>
+References: <1408096156-29772-1-git-send-email-bhupesh.sharma@freescale.com>
+ <1408096156-29772-5-git-send-email-bhupesh.sharma@freescale.com>
+ <20140815102329.GB596@leverpostej>
+ <c43739ed82a34f6eb2adbbe240e07c5d@DM2PR03MB317.namprd03.prod.outlook.com>
+Message-ID: <0DC5667C-E45A-4781-9AE6-0C5E1C70F268@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-(2014/08/12 13:56), Wang Nan wrote:
-> +/* Caller must ensure addr & 3 == 0 */
-> +static int can_optimize(unsigned long paddr)
-> +{
-> +	return 1;
-> +}
 
-As we have talked on another thread, we'd better filter-out all stack-pushing
-instructions here, since (as you said) that will corrupt pt_regs on the stack.
+On Aug 15, 2014, at 10:21 AM, arnab.basu at freescale.com wrote:
 
-Thank you,
+>>> 
+>>> +	cpus {
+>>> +		#address-cells = <2>;
+>>> +		#size-cells = <0>;
+>>> +
+>>> +		/* We have 4 clusters having 2 Cortex-A57 cores each */
+>>> +		cpu at 0 {
+>>> +			device_type = "cpu";
+>>> +			compatible = "arm,cortex-a57";
+>>> +			reg = <0x0 0x0>;
+>>> +			enable-method = "spin-table";
+>>> +			cpu-release-addr = <0x0 0x8000fff8>;
+>>> +		};
+>> 
+>> I would strongly recommend having a unique cpu-release-addr for each CPU.
+>> 
+> 
+> This is more of a place holder, we intend to patch this address from U-Boot
+> and use individual release addresses for each CPU.
 
+If you are going to patch it in u-boot, than why not just have u-boot add the property and drop it from here.
+
+If you intend to keep it here, than make <0x0 0x0> and add a comment that says u-boot will fill it out
+
+- k
 -- 
-Masami HIRAMATSU
-Software Platform Research Dept. Linux Technology Research Center
-Hitachi, Ltd., Yokohama Research Laboratory
-E-mail: masami.hiramatsu.pt at hitachi.com
+Employee of Qualcomm Innovation Center, Inc.
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum, hosted by The Linux Foundation
