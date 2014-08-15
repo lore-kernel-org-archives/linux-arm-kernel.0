@@ -1,71 +1,62 @@
-From: moon.linux@yahoo.com (Anand Moon)
-Date: Sat, 16 Aug 2014 00:02:19 +0530
-Subject: Random MAC address on my BeagleBone White
-In-Reply-To: <20140815134221.08c546a0@gandalf.local.home>
-References: <20140815134221.08c546a0@gandalf.local.home>
-Message-ID: <53EE5233.6000605@yahoo.com>
+From: lsorense@csclub.uwaterloo.ca (Lennart Sorensen)
+Date: Fri, 15 Aug 2014 14:37:31 -0400
+Subject: [PATCH 05/15] tty: serial: Add 8250-core based omap driver
+In-Reply-To: <1408124563-31541-6-git-send-email-bigeasy@linutronix.de>
+References: <1408124563-31541-1-git-send-email-bigeasy@linutronix.de>
+ <1408124563-31541-6-git-send-email-bigeasy@linutronix.de>
+Message-ID: <20140815183731.GI17769@csclub.uwaterloo.ca>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Steven,
+On Fri, Aug 15, 2014 at 07:42:33PM +0200, Sebastian Andrzej Siewior wrote:
+> This patch provides a 8250-core based UART driver for the internal OMAP
+> UART. The long term goal is to provide the same functionality as the
+> current OMAP uart driver and DMA support.
+> I tried to merge omap-serial code together with the 8250-core code.
+> There should should be hardly a noticable difference. The trigger levels
+> are different compared to omap-serial:
+> - omap serial
+>   TX: Interrupt comes after TX FIFO has room for 16 bytes.
+>       TX of 4096 bytes in one go results in 256 interrupts
+> 
+>   RX: Interrupt comes after there is on byte in the FIFO.
+                                       one
+>       RX of 4096 bytes results in 4096 interrupts.
+> 
+> - this driver
+>   TX: Interrupt comes once the TX FIFO is empty.
+>       TX of 4096 bytes results in 65 interrupts. That means there will
+>       be gaps on the line while the driver reloads the FIFO.
 
-Please follow the bellow link to set mac address.
+Any idea how long the gap is likely to be?  Probably not much.  I like
+the reduction in the number of interrupts.
 
-http://www.armadeus.com/wiki/index.php?title=Ethernet_MAC_address
+I suppose if you did an interrupt when half empty or 3/4 empty, you
+would avoid the gap, and only increase the interrupt amount a little bit.
+Waiting until completely empty gives you larger dma transfers and less
+interrupts, but reduces your effective bandwidth on the port.  Is that
+really the right tradeoff?  I think the original driver behaviour there
+was fairly sane, although the 16 byte value could perhaps be increased
+to 32 or 48.
 
--Anand Moon
-On 8/15/2014 11:12 PM, Steven Rostedt wrote:
-> Hi,
->
-> I'm using my BeagleBone White to debug some ftrace code and with the
-> help from people like Robert Nelson I was finally able to boot it and
-> test my kernel.
->
-> But I'm still having some other issues. The most annoying one is that
-> the new kernel assigns some random MAC address to my NIC and I can't
-> give my board the proper IP address via DHCP.
->
-> Seems there was talk about adding this via the device tree, but it was
-> rejected because U-Boot can do it. The problem I have is that U-Boot
-> doesn't!
->
-> I downloaded the latest U-Boot from git://git.denx.de/u-boot.git (Is
-> that the right place?) and had to tweak it so that I can boot a kernel
-> via tftp and still use the filesystem on the SD card.
->
-> When I place the 3.2 kernel that came with the board on my tftp server,
-> all works fine. I get the same MAC addr each boot and things just work.
-> But if I place the 3.16 kernel that I build on the tftp server, I get
-> some random MAC address, and then a dynamic IP to go with it :-(
->
-> This is in my dmesg:
->
-> [    2.304970] cpsw 4a100000.ethernet: Random MACID = 8a:fc:f5:aa:b6:e1
->
-> I can also see in the file arch/arm/boot/dts/am33xx.dtsi:
->
->
->                          cpsw_emac0: slave at 4a100200 {
->                                  /* Filled in by U-Boot */
->                                  mac-address = [ 00 00 00 00 00 00 ];
->                          };
->
-> Well, it's not filled in by U-Boot.
->
-> My question to all of you is, how do I fix this? I need a static mac
-> addr.
->
-> One way is that I might have to update that file myself with a temp
-> patch, but I think that's a hack and not something worth doing.
->
-> What's the proper way to have the board always come up with the same
-> MAC addr?
->
-> Thanks, this is rather annoying.
->
-> -- Steve
->
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+>   RX: Interrupt comes once there are 48 bytes in the FIFO or less over
+>       "longer" time frame. We have
+>           1 / 11520 * 10^3 * 16 => 1.38? ms
+>       1.38ms to react and purge the FIFO on 115200,8N1. Since the other
+>       driver fired after each byte it had ~5.47ms time to react. This
+>       _may_ cause problems if one relies on no missing bytes and has no
+>       flow control. On the other hand we get only 85 interrupts for the
+>       same amount of data.
+
+Hmm, so if this was 32 instead of 48, it would double the amount of
+time you have to react, while only increasing the interrupt rate by 50%
+(1 every 32 rather than 1 every 48).  Could be interesting to tweak to
+get the balance just right.  Maybe it could have an optional dtb entry
+to control it if you don't like the default or is there a way to change
+it from user space already?
+
+I know for our system we would like to be able to tolerate 1ms at 230400
+without data loss.
+
+-- 
+Len Sorensen
