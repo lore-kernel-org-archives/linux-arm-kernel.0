@@ -1,144 +1,152 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Fri, 15 Aug 2014 11:23:30 +0100
-Subject: [PATCH 4/6] arm64: Add DTS support for FSL's LS2085A SoC
-In-Reply-To: <1408096156-29772-5-git-send-email-bhupesh.sharma@freescale.com>
-References: <1408096156-29772-1-git-send-email-bhupesh.sharma@freescale.com>
- <1408096156-29772-5-git-send-email-bhupesh.sharma@freescale.com>
-Message-ID: <20140815102329.GB596@leverpostej>
+From: Liviu.Dudau@arm.com (Liviu Dudau)
+Date: Fri, 15 Aug 2014 11:30:52 +0100
+Subject: [PATCH v9 02/12] PCI: OF: Parse and map the IRQ when adding the
+ PCI device.
+In-Reply-To: <20140815085632.GA4954@richard>
+References: <1407860725-25202-1-git-send-email-Liviu.Dudau@arm.com>
+ <1407860725-25202-3-git-send-email-Liviu.Dudau@arm.com>
+ <20140814145804.GA5586@richard>
+ <20140814154959.GG25761@e106497-lin.cambridge.arm.com>
+ <20140815085632.GA4954@richard>
+Message-ID: <20140815103052.GD27553@e106497-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-
-On Fri, Aug 15, 2014 at 10:49:13AM +0100, Bhupesh Sharma wrote:
-> This patch adds the device tree support for FSL LS2085A SoC
-> based on ARMv8 architecture.
+On Fri, Aug 15, 2014 at 09:56:32AM +0100, Wei Yang wrote:
+> On Thu, Aug 14, 2014 at 04:49:59PM +0100, Liviu Dudau wrote:
+> >On Thu, Aug 14, 2014 at 03:58:04PM +0100, Wei Yang wrote:
+> >> On Tue, Aug 12, 2014 at 05:25:15PM +0100, Liviu Dudau wrote:
+> >> >Enhance the default implementation of pcibios_add_device() to
+> >> >parse and map the IRQ of the device if a DT binding is available.
+> >> >
+> >> >Cc: Bjorn Helgaas <bhelgaas@google.com>
+> >> >Cc: Grant Likely <grant.likely@linaro.org>
+> >> >Cc: Rob Herring <robh+dt@kernel.org>
+> >> >Signed-off-by: Liviu Dudau <Liviu.Dudau@arm.com>
+> >> >---
+> >> > drivers/pci/pci.c | 3 +++
+> >> > 1 file changed, 3 insertions(+)
+> >> >
+> >> >diff --git a/drivers/pci/pci.c b/drivers/pci/pci.c
+> >> >index 1c8592b..29d1775 100644
+> >> >--- a/drivers/pci/pci.c
+> >> >+++ b/drivers/pci/pci.c
+> >> >@@ -17,6 +17,7 @@
+> >> > #include <linux/spinlock.h>
+> >> > #include <linux/string.h>
+> >> > #include <linux/log2.h>
+> >> >+#include <linux/of_pci.h>
+> >> > #include <linux/pci-aspm.h>
+> >> > #include <linux/pm_wakeup.h>
+> >> > #include <linux/interrupt.h>
+> >> >@@ -1453,6 +1454,8 @@ EXPORT_SYMBOL(pcim_pin_device);
+> >> >  */
+> >> > int __weak pcibios_add_device(struct pci_dev *dev)
+> >> > {
+> >> >+	dev->irq = of_irq_parse_and_map_pci(dev, 0, 0);
+> >> >+
+> >> > 	return 0;
+> >> > }
+> >> 
+> >> Liviu,
+> >> 
+> >> For this, my suggestion is to add arch dependent function to setup the irq
+> >> line for pci devices. I can't find an obvious reason this won't work on other
+> >> archs, but maybe this will hurt some of them?
+> >
+> >Hi Wei,
+> >
+> >I'm not sure I understand your point. Architectures that support OF will obviously
+> >benefit from this common approach, and for the other ones the function is empty
+> >so it will not change existing behaviour. If you are suggesting that I should
+> >create a new API that each architecture could go and implement for setting up the
+> >IRQ line then I would agree that it would be nice to have that, but the question
+> >is how many architectures are outside OF that need this?
 > 
-> Following levels of DTSI/DTS files have been created for the
-> LS2085A SoC family:
+> My suggestion is to define the pcibios_add_device() for arm arch, like the one
+> in arch/powerpc/kernel/pci-common.c. If my understanding is correct, this
+> patch set address the pci bus setup mostly on arm arch.
+
+And also arm64 at the least.
+
 > 
-> - fsl-ls2085a.dtsi:
-> DTS-Include file for FSL LS2085A SoC.
+> For those archs not support OF, this function is empty and has no effect. I
+> agree on this one.
 > 
-> - fsl-ls2085a-simu.dts:
-> DTS file for FSL LS2085a software simulator model.
+> For those archs rely on OF, we still have two cases:
+>     1. they would have implement this function like powerpc
+
+Actually, powerpc seems to be the only OF platform reimplementing this function.
+s390 and x86 are not OF platforms.
+
+>     2. have other way to fix it up,  otherwise how it works now?
+
+Don't forget that my patchset aims to replace existing house-made code with a more
+generic version. When architectures and platforms switch to my code they will have
+to add this back in their code if it's needed.
+
+> If my assumption is correct, this change will either have no effect, or fix up
+> the irq line the second time. Not harmful, but not necessary.
+
+Well, it will become necessary as old code gets dismantled and converted towards
+this patchset. To give you an example that I'm familiar with, for arch/arm the
+host bridge drivers have moved into drivers/pci/host, but they still depend/use
+the bios32 infrastructure that takes care of setting up the irq. When they switch
+to my version they would have to go and debug the "irq not being assigned" issue
+and it is quite likely that some of the people doing the conversion will complain
+about my code rather than understanding the issue. What I'm trying to do is to
+make switching to my patchset as painless as possible, with a cleanup to remove
+redundant operations coming after the switchover.
+
+Does that sound like a reasonable plan?
+
+Best regards,
+Liviu
+
 > 
-> Signed-off-by: Bhupesh Sharma <bhupesh.sharma@freescale.com>
-> Signed-off-by: Arnab Basu <arnab.basu@freescale.com>
-> Signed-off-by: Stuart Yoder <stuart.yoder@freescale.com>
-> ---
->  arch/arm64/boot/dts/fsl-ls2085a-simu.dts |   29 ++++++
->  arch/arm64/boot/dts/fsl-ls2085a.dtsi     |  145 ++++++++++++++++++++++++++++++
->  2 files changed, 174 insertions(+)
->  create mode 100644 arch/arm64/boot/dts/fsl-ls2085a-simu.dts
->  create mode 100644 arch/arm64/boot/dts/fsl-ls2085a.dtsi
+> I am not familiar with other arch, so the second case is my deduction. If this
+> is not correct, please let me know.
 > 
-> diff --git a/arch/arm64/boot/dts/fsl-ls2085a-simu.dts b/arch/arm64/boot/dts/fsl-ls2085a-simu.dts
-> new file mode 100644
-> index 0000000..8a55710
-> --- /dev/null
-> +++ b/arch/arm64/boot/dts/fsl-ls2085a-simu.dts
-> @@ -0,0 +1,29 @@
-> +/*
-> + * Device Tree file for Freescale LS2085a software Simulator model
-> + *
-> + * Copyright (C) 2014, Freescale Semiconductor
-> + *
-> + * Bhupesh Sharma <bhupesh.sharma@freescale.com>
-> + *
-> + * This file is licensed under the terms of the GNU General Public
-> + * License version 2.  This program is licensed "as is" without any
-> + * warranty of any kind, whether express or implied.
-> + */
-> +
-> +/dts-v1/;
-> +
-> +/include/ "fsl-ls2085a.dtsi"
-> +
-> +/ {
-> +	model = "Freescale Layerscape 2085a software Simulator model";
-> +	compatible = "fsl,ls2085a-simu", "fsl,ls2085a";
-> +
-> +	ethernet at 2210000 {
-> +		#address-cells = <2>;
-> +		#size-cells = <2>;
+> >
+> >If I understood you correctly, it is a nice idea but slightly outside the scope
+> >of my current patchset.
+> >
+> >Best regards,
+> >Liviu
+> >
+> >> 
+> >> >
+> >> >-- 
+> >> >2.0.4
+> >> >
+> >> >--
+> >> >To unsubscribe from this list: send the line "unsubscribe linux-pci" in
+> >> >the body of a message to majordomo at vger.kernel.org
+> >> >More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> >> 
+> >> -- 
+> >> Richard Yang
+> >> Help you, Help me
+> >> 
+> >> --
+> >> To unsubscribe from this list: send the line "unsubscribe linux-pci" in
+> >> the body of a message to majordomo at vger.kernel.org
+> >> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> >> 
+> >
+> 
+> -- 
+> Richard Yang
+> Help you, Help me
+> 
+> 
 
-As far as I am aware, this cannot have children. So the #address-cells
-and #size-cells properties look redundant here.
-
-> +
-> +		compatible = "smsc,lan91c111";
-> +		reg = <0x0 0x2210000 0x0 0x100>;
-> +		interrupts = <0 58 0x1>;
-> +	};
-> +};
-> diff --git a/arch/arm64/boot/dts/fsl-ls2085a.dtsi b/arch/arm64/boot/dts/fsl-ls2085a.dtsi
-> new file mode 100644
-> index 0000000..aca48ac
-> --- /dev/null
-> +++ b/arch/arm64/boot/dts/fsl-ls2085a.dtsi
-> @@ -0,0 +1,145 @@
-> +/*
-> + * Device Tree Include file for Freescale Layerscape-2085A family SoC.
-> + *
-> + * Copyright (C) 2014, Freescale Semiconductor
-> + *
-> + * Bhupesh Sharma <bhupesh.sharma@freescale.com>
-> + *
-> + * This file is licensed under the terms of the GNU General Public
-> + * License version 2.  This program is licensed "as is" without any
-> + * warranty of any kind, whether express or implied.
-> + */
-> +
-> +/* Preventing Linux from using the following memory chunk */
-> +/memreserve/ 0x80000000 0x00010000;
-
-A more useful comment would describe what this is intended to protect.
-
-Ideally any bootloader would inject this as required. Inevitably this
-kind of thing varies over firmware/bootloader revisions.
-
-> +
-> +/ {
-> +	compatible = "fsl,ls2085a";
-> +	interrupt-parent = <&gic>;
-> +	#address-cells = <2>;
-> +	#size-cells = <2>;
-> +
-> +	cpus {
-> +		#address-cells = <2>;
-> +		#size-cells = <0>;
-> +
-> +		/* We have 4 clusters having 2 Cortex-A57 cores each */
-> +		cpu at 0 {
-> +			device_type = "cpu";
-> +			compatible = "arm,cortex-a57";
-> +			reg = <0x0 0x0>;
-> +			enable-method = "spin-table";
-> +			cpu-release-addr = <0x0 0x8000fff8>;
-> +		};
-
-I would strongly recommend having a unique cpu-release-addr for each
-CPU.
-
-[...]
-
-> +	serial0: serial at 21c4500 {
-> +		device_type = "serial";
-> +		compatible = "fsl,ns16550", "ns16550a";
-> +		reg = <0x0 0x21c4500 0x0 0x100>;
-> +		clock-frequency = <0>;
-
-Do we expect this to be filled in by the bootloader?
-
-[...]
-
-> > +	fsl_mc: fsl-mc at 80c000000 {
-> +		compatible = "fsl,qoriq-mc";
-> +		reg = <0x00000008 0x0c000000 0 0x40	/* MC portal base */
-> +		       0x00000000 0x08340000 0 0x40000 >; /* MC control reg */
-
-Nit: please bracket these individually as with other reg entries.
-
-Thanks,
-Mark.
+-- 
+====================
+| I would like to |
+| fix the world,  |
+| but they're not |
+| giving me the   |
+ \ source code!  /
+  ---------------
+    ?\_(?)_/?
