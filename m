@@ -1,81 +1,151 @@
-From: bigeasy@linutronix.de (Sebastian Andrzej Siewior)
-Date: Fri, 15 Aug 2014 19:42:35 +0200
-Subject: [PATCH 07/15] tty: serial: 8250_dma: enqueue RX dma again on
- completion.
-In-Reply-To: <1408124563-31541-1-git-send-email-bigeasy@linutronix.de>
-References: <1408124563-31541-1-git-send-email-bigeasy@linutronix.de>
-Message-ID: <1408124563-31541-8-git-send-email-bigeasy@linutronix.de>
+From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
+Date: Fri, 15 Aug 2014 18:51:52 +0100
+Subject: [PATCH v7 2/8] Documentation: arm: define DT idle states bindings
+In-Reply-To: <20140815172030.GA45197@ilina-mac.local>
+References: <1407945127-27554-1-git-send-email-lorenzo.pieralisi@arm.com>
+ <1407945127-27554-3-git-send-email-lorenzo.pieralisi@arm.com>
+ <20140815172030.GA45197@ilina-mac.local>
+Message-ID: <20140815175152.GA8803@e102568-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The omap needs a DMA request pending right away. If it is enqueued once
-the bytes are in the FIFO then nothing will happen and the FIFO will be
-later purged via RX-timeout interrupt.
-This patch enqueues RX-DMA request on completion but not if it was
-aborted on error. The first enqueue will happen in the driver in
-startup.
+On Fri, Aug 15, 2014 at 06:20:30PM +0100, Lina Iyer wrote:
 
-Signed-off-by: Sebastian Andrzej Siewior <bigeasy@linutronix.de>
----
- drivers/tty/serial/8250/8250_core.c |  3 +++
- drivers/tty/serial/8250/8250_dma.c  | 12 +++++++++---
- 2 files changed, 12 insertions(+), 3 deletions(-)
+[...]
 
-diff --git a/drivers/tty/serial/8250/8250_core.c b/drivers/tty/serial/8250/8250_core.c
-index 7498ce1..ab2de27 100644
---- a/drivers/tty/serial/8250/8250_core.c
-+++ b/drivers/tty/serial/8250/8250_core.c
-@@ -1598,6 +1598,9 @@ int serial8250_handle_irq(struct uart_port *port, unsigned int iir)
- 
- 		if (!up->dma || dma_err)
- 			status = serial8250_rx_chars(up, status);
-+
-+		if (dma_err && port->type == PORT_OMAP_16750)
-+			serial8250_rx_dma(up, 0);
- 	}
- 	serial8250_modem_status(up);
- 	if ((!up->dma || up->dma_tx_err) && (status & UART_LSR_THRE))
-diff --git a/drivers/tty/serial/8250/8250_dma.c b/drivers/tty/serial/8250/8250_dma.c
-index 5c59b15..7417ed5 100644
---- a/drivers/tty/serial/8250/8250_dma.c
-+++ b/drivers/tty/serial/8250/8250_dma.c
-@@ -50,9 +50,8 @@ static void __dma_tx_complete(void *param)
- 	spin_unlock_irqrestore(&p->port.lock, flags);
- }
- 
--static void __dma_rx_complete(void *param)
-+static void __dma_rx_do_complete(struct uart_8250_port *p, bool error)
- {
--	struct uart_8250_port	*p = param;
- 	struct uart_8250_dma	*dma = p->dma;
- 	struct tty_port		*tty_port = &p->port.state->port;
- 	struct dma_tx_state	state;
-@@ -68,10 +67,17 @@ static void __dma_rx_complete(void *param)
- 
- 	tty_insert_flip_string(tty_port, dma->rx_buf, count);
- 	p->port.icount.rx += count;
-+	if (!error && p->port.type == PORT_OMAP_16750)
-+		serial8250_rx_dma(p, 0);
- 
- 	tty_flip_buffer_push(tty_port);
- }
- 
-+static void __dma_rx_complete(void *param)
-+{
-+	__dma_rx_do_complete(param, false);
-+}
-+
- int serial8250_tx_dma(struct uart_8250_port *p)
- {
- 	struct uart_8250_dma		*dma = p->dma;
-@@ -139,7 +145,7 @@ int serial8250_rx_dma(struct uart_8250_port *p, unsigned int iir)
- 		 */
- 		if (dma_status == DMA_IN_PROGRESS) {
- 			dmaengine_pause(dma->rxchan);
--			__dma_rx_complete(p);
-+			__dma_rx_do_complete(p, true);
- 		}
- 		return -ETIMEDOUT;
- 	default:
--- 
-2.0.1
+> >+===========================================
+> >+3 - idle-states node
+> >+===========================================
+> >+
+> >+ARM processor idle states are defined within the idle-states node, which is
+> >+a direct child of the cpus node [1] and provides a container where the
+> >+processor idle states, defined as device tree nodes, are listed.
+> >+
+> >+- idle-states node
+> >+
+> >+      Usage: Optional - On ARM systems, it is a container of processor idle
+> >+                        states nodes. If the system does not provide CPU
+> >+                        power management capabilities or the processor just
+> >+                        supports idle_standby an idle-states node is not
+> >+                        required.
+> >+
+> >+      Description: idle-states node is a container node, where its
+> >+                   subnodes describe the CPU idle states.
+> >+
+> >+      Node name must be "idle-states".
+> >+
+> >+      The idle-states node's parent node must be the cpus node.
+> >+
+> >+      The idle-states node's child nodes can be:
+> >+
+> >+      - one or more state nodes
+> >+
+> >+      Any other configuration is considered invalid.
+> >+
+> >+      An idle-states node defines the following properties:
+> >+
+> >+      - entry-method
+> >+              Value type: <stringlist>
+> >+              Usage and definition depend on ARM architecture version.
+> >+                      # On ARM v8 64-bit this property is required and must
+> >+                        be one of:
+> >+                         - "psci" (see bindings in [2])
+> >+                      # On ARM 32-bit systems this property is optional
+> >+
+> >+The nodes describing the idle states (state) can only be defined within the
+> >+idle-states node, any other configuration is considered invalid and therefore
+> >+must be ignored.
+> >+
+> >+===========================================
+> >+4 - state node
+> >+===========================================
+> >+
+> >+A state node represents an idle state description and must be defined as
+> >+follows:
+> >+
+> >+- state node
+> >+
+> >+      Description: must be child of the idle-states node
+> >+
+> >+      The state node name shall follow standard device tree naming
+> >+      rules ([5], 2.2.1 "Node names"), in particular state nodes which
+> >+      are siblings within a single common parent must be given a unique name.
+> >+
+> >+      The idle state entered by executing the wfi instruction (idle_standby
+> >+      SBSA,[3][4]) is considered standard on all ARM platforms and therefore
+> >+      must not be listed.
+> >+
+> >+      With the definitions provided above, the following list represents
+> >+      the valid properties for a state node:
+> >+
+> >+      - compatible
+> >+              Usage: Required
+> >+              Value type: <stringlist>
+> >+              Definition: Must be "arm,idle-state".
+> >+
+> >+      - local-timer-stop
+> >+              Usage: See definition
+> >+              Value type: <none>
+> >+              Definition: if present the CPU local timer control logic is
+> >+                          lost on state entry, otherwise it is retained.
+> >+
+> >+      - entry-latency-us
+> >+              Usage: Required
+> >+              Value type: <prop-encoded-array>
+> >+              Definition: u32 value representing worst case latency in
+> >+                          microseconds required to enter the idle state.
+> >+                          The exit-latency-us duration may be guaranteed
+> >+                          only after entry-latency-us has passed.
+> >+
+> >+      - exit-latency-us
+> >+              Usage: Required
+> >+              Value type: <prop-encoded-array>
+> >+              Definition: u32 value representing worst case latency
+> >+                          in microseconds required to exit the idle state.
+> >+
+> >+      - min-residency-us
+> >+              Usage: Required
+> >+              Value type: <prop-encoded-array>
+> >+              Definition: u32 value representing minimum residency duration
+> >+                          in microseconds, inclusive of preparation and
+> >+                          entry, for this idle state to be considered
+> >+                          worthwhile energy wise (refer to section 2 of
+> >+                          this document for a complete description).
+> >+
+> >+      - wakeup-latency-us:
+> >+              Usage: Optional
+> >+              Value type: <prop-encoded-array>
+> >+              Definition: u32 value representing maximum delay between the
+> >+                          signaling of a wake-up event and the CPU being
+> >+                          able to execute normal code again. If omitted,
+> >+                          this is assumed to be equal to:
+> >+
+> >+                              entry-latency-us + exit-latency-us
+> >+
+> >+                          It is important to supply this value on systems
+> >+                          where the duration of PREP phase (see diagram 1,
+> >+                          section 2) is non-neglibigle.
+> >+                          In such systems entry-latency-us + exit-latency-us
+> >+                          will exceed wakeup-latency-us by this duration.
+> >+
+> >+      In addition to the properties listed above, a state node may require
+> >+      additional properties specifics to the entry-method defined in the
+> >+      idle-states node, please refer to the entry-method bindings
+> >+      documentation for properties definitions.
+> How are the different idle-states node differenciated?
+> Say, I want to choose a different entry point function for each of these
+> node sepately.
+
+You add an idle state entry method specific parameter (as PSCI does,
+and it's part of this patch already) to each idle state and document it
+in the respective binding.
+
+> Also, not all targets may support all idle states. If we do not want to enter
+> retention on one target, while an other target might, there is no way
+> to know what the idle state node is to set up the correct entry function.
+
+What's a target ? A CPU ? Every CPU lists its idle states through the
+cpu-idle-states phandle list. If a CPU does not support an idle state it must
+not be there.
+
+Lorenzo
