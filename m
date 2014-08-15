@@ -1,137 +1,64 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Fri, 15 Aug 2014 16:03:44 +0100
-Subject: [PATCH 1/6] Documentation: DT: Add bindings for FSL NS16550A The
- UART
-In-Reply-To: <e0350675b3a6462d87cb06a33a1b6dc9@BN1PR03MB220.namprd03.prod.outlook.com>
-References: <1408096156-29772-1-git-send-email-bhupesh.sharma@freescale.com>
- <1408096156-29772-2-git-send-email-bhupesh.sharma@freescale.com>
- <20140815104606.GB15621@leverpostej>
- <e0350675b3a6462d87cb06a33a1b6dc9@BN1PR03MB220.namprd03.prod.outlook.com>
-Message-ID: <20140815150344.GA21908@leverpostej>
+From: jason@lakedaemon.net (Jason Cooper)
+Date: Fri, 15 Aug 2014 11:05:03 -0400
+Subject: [GIT PULL] at91: move of AIC drivers for 3.17: fixes #1
+In-Reply-To: <20140815164150.5085b324@bbrezillon>
+References: <1408031156-13573-1-git-send-email-nicolas.ferre@atmel.com>
+ <20140815142225.GF5063@titan.lakedaemon.net>
+ <20140815164150.5085b324@bbrezillon>
+Message-ID: <20140815150503.GG5063@titan.lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Bhupesh,
-
-On Fri, Aug 15, 2014 at 03:42:09PM +0100, bhupesh.sharma at freescale.com wrote:
-> > -----Original Message-----
-> > From: Mark Rutland [mailto:mark.rutland at arm.com]
-> > Sent: Friday, August 15, 2014 4:16 PM
-> > To: Sharma Bhupesh-B45370
-> > Cc: devicetree-discuss at lists.ozlabs.org; Catalin Marinas; arnd at arndb.de;
-> > Will Deacon; Yoder Stuart-B08248; grant.likely at secretlab.ca; Basu Arnab-
-> > B45036; linux-arm-kernel at lists.infradead.org
-> > Subject: Re: [PATCH 1/6] Documentation: DT: Add bindings for FSL NS16550A
-> > UART
+On Fri, Aug 15, 2014 at 04:41:50PM +0200, Boris BREZILLON wrote:
+> On Fri, 15 Aug 2014 10:22:25 -0400 Jason Cooper <jason@lakedaemon.net> wrote:
+> > On Thu, Aug 14, 2014 at 05:45:56PM +0200, Nicolas Ferre wrote:
+> > > Arnd, Olof, Kevin,
+> > > 
+> > > Boris moved both of our AIC drivers to their new home: the drivers/irqchip
+> > > directory taking advantage of the genirc framework. For DT-enabled SoCs, we can
+> > > use these drivers (aic and aic5) right now: Jason merged them and they are
+> > > available in early 3.17 merge window.
+> > > So, I build this pull-request for enabling the use of these drivers now as:
+> > > - we are very early in 3.17 development
+> > > - it allowed us to avoid having to depend on Jason's branch before the opening
+> > >   of the merge window
 > > 
-> > On Fri, Aug 15, 2014 at 10:49:10AM +0100, Bhupesh Sharma wrote:
-> > > This patch addss the device-tree documentation for Freescale's
-> > > NS16550 UART (also called DUART).
-> > >
-> > > There is a specific errata fix required in FSL NS16550 UART which
-> > > ensures that an random interrupt storm is not observed when a break is
-> > > provided as an input to the UART.
+> > Then why did I create a topic branch for you to base on?
 > > 
-> > Should this not go in
-> > Documentation/devicetree/bindings/serial/of-serial.txt as with other
-> > NS16550A variations?
-> > 
-> > The only code for handling this string seems to live in
-> > arch/powerpc/kernel/legacy_serial.c. Is there a patch factoring that out
-> > into common code? Or is the erratum not applicable to the revision used in
-> > your ARMv8 SoC?
-> > 
+> >   git://git.infradead.org/users/jcooper/linux.git irqchip/atmel-aic
 > 
-> The FSL specific 8250 (or NS16550A0 driver) at path drivers/tty/serial/8250/8250_fsl.c 
-> uses this string and provides the code to handle the erratum (see [1])
+> Don't blame Nicolas for this, he was in vacation when you created this
+> branch (he came back this week), and I should have told you that he
+> couldn't use it for this release cycle.
 
-While the workaround itself is in that file, as far as I can see the detection
-and setup is not. Even in next-20140815 it seems that only happens in
-arch/powerpc/kernel/legacy_serial.c (see [2]):
+'Blame' is too strong a word. :)  It was more of a friendly, "wtf?"  I
+guess I could have worded it better...
 
-[mark at leverpostej:~/src/linux]% git grep fsl8250_handle_irq next-20140815                 
-next-20140815:arch/powerpc/kernel/legacy_serial.c:              port->handle_irq = fsl8250_handle_irq;
-next-20140815:drivers/tty/serial/8250/8250_fsl.c:int fsl8250_handle_irq(struct uart_port *port)
-next-20140815:include/linux/serial_8250.h:extern int fsl8250_handle_irq(struct uart_port *port);
-
-I cannot see any use of the string outside of arch/powerpc:
-
-[mark at leverpostej:~/src/linux]% git grep fsl,ns16550 next-20140815 | wc -l
-102
-[mark at leverpostej:~/src/linux]% git grep fsl,ns16550 next-20140815 -- arch/powerpc | wc -l
-102
-
-Am I missing something? Perhaps some macro is getting in the way of a simple
-grep.
-
-> The NS16550 UART present on our SoC and the corresponding simulator model has this erratum and
-> hence the specific way in which IRQ are handled (fsl8250_handle_irq) by the driver (in [1])
-> is applicable here as well.
-
-Assuming I've not missed something, do you need to factor out the detection and
-setup? Do things just happen to work on the simulator without the workaround?
-
-Thanks,
-Mark.
-
-[2] https://git.kernel.org/cgit/linux/kernel/git/next/linux-next.git/tree/arch/powerpc/kernel/legacy_serial.c?id=refs/tags/next-20140815#n478
-
-> [1] https://git.kernel.org/cgit/linux/kernel/git/next/linux-next.git/tree/drivers/tty/serial/8250/8250_fsl.c?id=refs/tags/next-20140815
-> 
-> Regards,
-> Bhupesh
-> 
-> > Thanks,
-> > Mark.
+> > > - it removes some code from the mach-at91 directory: including the whole
+> > >   aic5 driver
+> > > - we'd have quite a bit of time to solve issues if we found a bug
+> > > - the code is basically moved so it should be error free.
 > > 
-> > >
-> > > Signed-off-by: Bhupesh Sharma <bhupesh.sharma@freescale.com>
-> > > ---
-> > >  .../devicetree/bindings/serial/fsl-ns16550.txt     |   24
-> > ++++++++++++++++++++
-> > >  1 file changed, 24 insertions(+)
-> > >  create mode 100644
-> > > Documentation/devicetree/bindings/serial/fsl-ns16550.txt
-> > >
-> > > diff --git a/Documentation/devicetree/bindings/serial/fsl-ns16550.txt
-> > > b/Documentation/devicetree/bindings/serial/fsl-ns16550.txt
-> > > new file mode 100644
-> > > index 0000000..9926e10
-> > > --- /dev/null
-> > > +++ b/Documentation/devicetree/bindings/serial/fsl-ns16550.txt
-> > > @@ -0,0 +1,24 @@
-> > > +* Freescale DUART is very similar to the PC16552D (and to a
-> > > +  pair of NS16550A), albeit with some nonstandard behavior such as
-> > > +  erratum A-004737 (relating to incorrect BRK handling).
-> > > +
-> > > +- compatible: "fsl,ns16550"
-> > > +
-> > > +  Represents a single port that is compatible with the DUART found
-> > > + on many Freescale chips (examples include mpc8349, mpc8548,
-> > > + mpc8641d, p4080 and ls2085a).
-> > > +
-> > > +- reg: The base address of the UART register bank.
-> > > +
-> > > +- interrupts: A single interrupt specifier.
-> > > +
-> > > +- clock-frequency = Input clock to the baud rate divider.
-> > > +
-> > > +Example:
-> > > +	serial1: serial at 21c4600 {
-> > > +		compatible = "fsl,ns16550", "ns16550a";
-> > > +		reg = <0x0 0x21c4600 0x0 0x100>;
-> > > +		clock-frequency = <0>;
-> > > +		interrupts = <0 32 0x1>;
-> > > +	};
-> > > +
-> > > --
-> > > 1.7.9.5
-> > >
-> > >
-> > >
-> > > _______________________________________________
-> > > linux-arm-kernel mailing list
-> > > linux-arm-kernel at lists.infradead.org
-> > > http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
-> > >
+> > Well, this is certainly up to Arnd, Olof and Kevin, but it seems a bit
+> > unusual.  You're basically asking to merge changes into the current window
+> > that has had _no_ time in -next...  Sounds like a recipe for trouble to
+> > me.
+> > 
+> > In the future, please let me know if you're not going to need a topic
+> > branch.
 > 
+> This is all my fault, I'm the one who asked Nicolas to get these patches
+> merged in 3.17, and, as I said, I should have told you that he was in
+> vacation and thus could not use your topic branch for this release
+> cycle.
+
+Ah, no problem.  If there was nothing exciting going on in the SoC
+directory, I probably could have kept the whole series together in one
+branch with just an Ack.  But that's water under the bridge now.
+
+We'll see what arm-soc says, but I suspect it's going to be wait for the
+next window...
+
+thx,
+
+Jason.
