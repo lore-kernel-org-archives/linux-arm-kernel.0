@@ -1,98 +1,86 @@
 From: stuart.yoder@freescale.com (Stuart Yoder)
-Date: Fri, 15 Aug 2014 15:49:53 +0000
+Date: Fri, 15 Aug 2014 15:57:13 +0000
 Subject: [PATCH 4/6] arm64: Add DTS support for FSL's LS2085A SoC
-In-Reply-To: <3537CF6F-9BF9-4905-B051-EB94034FC1C2@codeaurora.org>
+In-Reply-To: <20140815152832.GE18863@arm.com>
 References: <1408096156-29772-1-git-send-email-bhupesh.sharma@freescale.com>
  <1408096156-29772-5-git-send-email-bhupesh.sharma@freescale.com>
- <20140815102329.GB596@leverpostej>
- <c43739ed82a34f6eb2adbbe240e07c5d@DM2PR03MB317.namprd03.prod.outlook.com>
- <0DC5667C-E45A-4781-9AE6-0C5E1C70F268@codeaurora.org>
- <9c8daab7efa446c884409ae3aaaaa151@BY2PR0301MB0743.namprd03.prod.outlook.com>
- <3537CF6F-9BF9-4905-B051-EB94034FC1C2@codeaurora.org>
-Message-ID: <77e80a2d69ee470a8458a85450a1510c@BY2PR0301MB0743.namprd03.prod.outlook.com>
+ <20140815101249.GA19939@localhost>
+ <af793f09683b48b5a0db42a482210c4a@BY2PR0301MB0743.namprd03.prod.outlook.com>
+ <20140815131026.GB18863@arm.com>
+ <29cf47df79b145ea928da6944ff3de57@BN1PR03MB220.namprd03.prod.outlook.com>
+ <20140815152832.GE18863@arm.com>
+Message-ID: <7010d864a31e437d9cccebafdb5f50e7@BY2PR0301MB0743.namprd03.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 
 
 > -----Original Message-----
-> From: Kumar Gala [mailto:galak at codeaurora.org]
-> Sent: Friday, August 15, 2014 10:44 AM
-> To: Yoder Stuart-B08248
-> Cc: Basu Arnab-B45036; Mark Rutland; Sharma Bhupesh-B45370; arnd at arndb.de;
-> Catalin Marinas; Will Deacon; grant.likely at secretlab.ca; linux-arm-
-> kernel at lists.infradead.org; devicetree at vger.kernel.org
+> From: Catalin Marinas [mailto:catalin.marinas at arm.com]
+> Sent: Friday, August 15, 2014 10:29 AM
+> To: Sharma Bhupesh-B45370
+> Cc: Yoder Stuart-B08248; devicetree-discuss at lists.ozlabs.org; Will Deacon;
+> arnd at arndb.de; grant.likely at secretlab.ca; linux-arm-kernel at lists.infradead.org;
+> Basu Arnab-B45036
 > Subject: Re: [PATCH 4/6] arm64: Add DTS support for FSL's LS2085A SoC
 > 
-> 
-> On Aug 15, 2014, at 10:41 AM, Stuart Yoder <stuart.yoder@freescale.com> wrote:
-> 
+> On Fri, Aug 15, 2014 at 03:31:48PM +0100, bhupesh.sharma at freescale.com wrote:
+> > > On Fri, Aug 15, 2014 at 01:53:13PM +0100, Stuart Yoder wrote:
+> > > > > On Fri, Aug 15, 2014 at 10:49:13AM +0100, Bhupesh Sharma wrote:
+> > > > > > +	cpus {
+> > > > > > +		#address-cells = <2>;
+> > > > > > +		#size-cells = <0>;
+> > > > > > +
+> > > > > > +		/* We have 4 clusters having 2 Cortex-A57 cores each */
+> > > > > > +		cpu at 0 {
+> > > > > > +			device_type = "cpu";
+> > > > > > +			compatible = "arm,cortex-a57";
+> > > > > > +			reg = <0x0 0x0>;
+> > > > > > +			enable-method = "spin-table";
+> > > > > > +			cpu-release-addr = <0x0 0x8000fff8>;
+> > > > > > +		};
+> > > > >
+> > > > > Why not PSCI?
+> > > >
+> > > > It simply is where we are today-- we don't have functioning PSCI yet
+> > > > but plan to get there over time.
+> > >
+> > > Thanks for clarification.
+> > >
+> > > > All the existing device trees
+> > > > in arch/arm64 use "spin-table", so it seems that other platforms are
+> > > > in the same situation:
+> > > >    apm-storm.dtsi
+> > >
+> > > Not possible because there is no EL3 mode on the CPU implementation.
+> > >
+> > > >    foundation-v8.dts
+> > > >    rtsm_ve-aemv8a.dts
+> > >
+> > > These work with the latest boot wrapper (which overrides the DT nodes and
+> > > passes the PSCI information).
 > >
+> > Right. We are working on our PSCI handler implementation in EL3 and the spin-
+> table
+> > approach it something we are currently supporting on the simulator model
+> using
+> > u-boot bootloader setting up the spin-tables.
 > >
-> >> -----Original Message-----
-> >> From: Kumar Gala [mailto:galak at codeaurora.org]
-> >> Sent: Friday, August 15, 2014 10:26 AM
-> >> To: Basu Arnab-B45036
-> >> Cc: Mark Rutland; Sharma Bhupesh-B45370; arnd at arndb.de; Catalin Marinas;
-> >> devicetree-discuss at lists.ozlabs.org; Will Deacon; Yoder Stuart-B08248;
-> >> grant.likely at secretlab.ca; linux-arm-kernel at lists.infradead.org
-> >> Subject: Re: [PATCH 4/6] arm64: Add DTS support for FSL's LS2085A SoC
-> >>
-> >>
-> >> On Aug 15, 2014, at 10:21 AM, arnab.basu at freescale.com wrote:
-> >>
-> >>>>>
-> >>>>> +	cpus {
-> >>>>> +		#address-cells = <2>;
-> >>>>> +		#size-cells = <0>;
-> >>>>> +
-> >>>>> +		/* We have 4 clusters having 2 Cortex-A57 cores each */
-> >>>>> +		cpu at 0 {
-> >>>>> +			device_type = "cpu";
-> >>>>> +			compatible = "arm,cortex-a57";
-> >>>>> +			reg = <0x0 0x0>;
-> >>>>> +			enable-method = "spin-table";
-> >>>>> +			cpu-release-addr = <0x0 0x8000fff8>;
-> >>>>> +		};
-> >>>>
-> >>>> I would strongly recommend having a unique cpu-release-addr for each CPU.
-> >>>>
-> >>>
-> >>> This is more of a place holder, we intend to patch this address from U-Boot
-> >>> and use individual release addresses for each CPU.
-> >>
-> >> If you are going to patch it in u-boot, than why not just have u-boot add
-> the
-> >> property and drop it from here.
-> >>
-> >> If you intend to keep it here, than make <0x0 0x0> and add a comment that
-> says
-> >> u-boot will fill it out
-> >
-> > As I said to Mark re: the comment on having different release addresses
-> > per CPU, we are just following existing practice from the existing
-> > arch/arm64 device trees:
-> >   apm-storm.dtsi
-> >   foundation-v8.dts
-> >   rtsm_ve-aemv8a.dts
-> >
-> > I think one of the reasons the cpu-release-addr is not 0x0 is that
-> > UEFI had(?)/has(?) limited ability to do device tree fix ups.  It's
-> > not a problem at all in u-boot, but there is some reason all
-> > existing device trees have the same hardcoded address for all
-> > CPUs.
+> > Our patches for implementing spin-table approach in armv8 u-boot are already
+> under
+> > review and corresponding rework [1].
 > 
-> Are you guys planning on supporting UEFI on this platform?
-
-Yes.
-
-> > So we want to do the standard/conventional thing here that will
-> > allow are device trees to be used in more than u-boot.
+> It would be better if you helped with this effort to bring PSCI to
+> U-Boot (ARMv7 currently but easy to port to AArch64):
 > 
-> Well, I think the guys would say the standard thing is to move to PSCI.
+> https://git.kernel.org/cgit/linux/kernel/git/maz/u-boot.git/log/?h=wip/psci-v4
+> https://git.kernel.org/cgit/linux/kernel/git/maz/u-boot.git/log/?h=wip/psci-v4-
+> a20
 
-Agree.  That is our plan.  But it looks like at this point in
-time all the device tree have a common denominator spin table
-mechanim that gets updated/overriden if PSCI is supported.
+Is the intent to eventually purge the device trees of enable-method/cpu-release-addr
+and have that set by the boot firmware?  Or, keep the spin-table method 
+around as a least common denominator mechanism and override it when
+necessary?   Wondering what the longer term thinking is...
 
+Thanks,
 Stuart
