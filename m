@@ -1,32 +1,60 @@
-From: pdeschrijver@nvidia.com (Peter De Schrijver)
-Date: Sat, 16 Aug 2014 01:45:13 +0300
-Subject: [PATCH 1/6] clk: tegra: don't abort clk init on error
-In-Reply-To: <53CE9C5F.1030005@wwwdotorg.org>
-References: <1405437890-6468-1-git-send-email-pdeschrijver@nvidia.com>
- <1405437890-6468-2-git-send-email-pdeschrijver@nvidia.com>
- <53CE9C5F.1030005@wwwdotorg.org>
-Message-ID: <20140815224513.GM1626@tbergstrom-lnx.Nvidia.com>
+From: rvaswani@codeaurora.org (Rohit Vaswani)
+Date: Fri, 15 Aug 2014 16:12:09 -0700
+Subject: [PATCH] arm64: smp: Update the topology masks before calling
+ CPU_STARTING notifiers
+In-Reply-To: <20140815104333.GH27466@arm.com>
+References: <1407892269-28650-1-git-send-email-rvaswani@codeaurora.org>
+ <20140815104333.GH27466@arm.com>
+Message-ID: <53EE93C9.9060306@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jul 22, 2014 at 07:16:15PM +0200, Stephen Warren wrote:
-> On 07/15/2014 09:24 AM, Peter De Schrijver wrote:
-> > Just continue initializing clocks if there's an error on one of them. This
-> > is useful if there's a mistake in the inittable, because the system could
-> > hang if clk_disable_unused() disables some of the critical clocks in this
-> > table.
-> 
-> If there's a problem in the init table, we should simply fix it instead
-> of working around it.
-> 
+On 8/15/2014 3:43 AM, Will Deacon wrote:
+> On Wed, Aug 13, 2014 at 02:11:09AM +0100, Rohit Vaswani wrote:
+>> Currently, the CPU_STARTING notifiers would observe an incorrect sibling
+>> mask since the notifier chain is called before the topology masks are updated
+>> for the new cpu.
+>> Update the topology masks before calling the notifier chain to fix this
+>> problem.
+>>
+>> Signed-off-by: Rohit Vaswani <rvaswani@codeaurora.org>
+>> ---
+>>   arch/arm/kernel/smp.c   | 4 ++--
+>>   arch/arm64/kernel/smp.c | 4 ++--
+>>   2 files changed, 4 insertions(+), 4 deletions(-)
+>>
+>> diff --git a/arch/arm/kernel/smp.c b/arch/arm/kernel/smp.c
+>> index 7c4fada..0e2237c 100644
+>> --- a/arch/arm/kernel/smp.c
+>> +++ b/arch/arm/kernel/smp.c
+>> @@ -363,12 +363,12 @@ asmlinkage void secondary_start_kernel(void)
+>>   	if (smp_ops.smp_secondary_init)
+>>   		smp_ops.smp_secondary_init(cpu);
+>>   
+>> +	smp_store_cpu_info(cpu);
+>> +
+>>   	notify_cpu_starting(cpu);
+>>   
+>>   	calibrate_delay();
+>>   
+>> -	smp_store_cpu_info(cpu);
+>> -
+> Hmm, smp_store_cpu_info takes a copy of loops_per_jiffy. Are you sure it's
+> safe to move the call before calibrate_delay?
 
-Yes, ofcourse. However today we silently stop processing the init_table if a
-clock cannot be found. That doesn't sound right either to me and makes detecting
-wrong entries in the table more complex than it should be.
+Right! - I had looked at the arm64 version .  I checked for arm32 now 
+and I think we should be
+safe to move calibrate_delay before the smp_store_cpu_info and I can 
+push a v2 version if
+there are no concerns. I did not see calibrate_delay having any 
+dependency for cpu_starting notifiers.
 
-> At the very least, we need to WARN on this rather than just ignoring
-> problems.
+-Rohit
+> Will
 
-Cheers,
 
-Peter.
+Thanks,
+Rohit Vaswani
+
+-- 
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum, hosted by The Linux Foundation
