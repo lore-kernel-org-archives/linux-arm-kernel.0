@@ -1,72 +1,26 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Fri, 15 Aug 2014 12:27:58 +0100
-Subject: [PATCHv2 3/3] ARM: dts: socfpga: memreserve first 4KB for SMP code
-In-Reply-To: <1408050814-28595-4-git-send-email-dinguyen@opensource.altera.com>
-References: <1408050814-28595-1-git-send-email-dinguyen@opensource.altera.com>
- <1408050814-28595-4-git-send-email-dinguyen@opensource.altera.com>
-Message-ID: <20140815112758.GE15621@leverpostej>
+From: broonie@kernel.org (Mark Brown)
+Date: Fri, 15 Aug 2014 12:41:47 +0100
+Subject: [PATCH] regulator: as3722: .name field initialized twice
+ differently
+In-Reply-To: <1408100984-11757-1-git-send-email-peter.griffin@linaro.org>
+References: <1408100984-11757-1-git-send-email-peter.griffin@linaro.org>
+Message-ID: <20140815114147.GK17528@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Dinh,
-
-On Thu, Aug 14, 2014 at 10:13:34PM +0100, dinguyen at opensource.altera.com wrote:
-> From: Dinh Nguyen <dinguyen@opensource.altera.com>
+On Fri, Aug 15, 2014 at 12:09:44PM +0100, Peter Griffin wrote:
+> Regulator AS3722_REGULATOR_ID_LDO3 and AS3722_REGULATOR_ID_LDO4
+> have there .name field initialised twice with different values.
 > 
-> The SOCFPGA's SMP code uses 0x0 for as the location for the trampoline to
-> bring secondary cores online. This patch adds a /memreserve/ section to
-> reserve the first 4K for the SMP trampoline code.
+> Looking at the code the second entry should have been .sname
+> which is what this patch corrects.
 
-I'm slightly confused. 
-
-Sorry to split hairs here, but I think the comment is subtly wrong.
-
-The trampoline code seems to be placed in this location by Linux, so
-it's not that we're protecting the trampoline code, but rather we're
-preserving the location for future use.
-
-I take it that the reset address isn't configurable?
-
-Thanks,
-Mark.
-
-> 
-> Signed-off-by: Dinh Nguyen <dinguyen@opensource.altera.com>
-> Acked-by: Pavel Machek <pavel@denx.de>
-> ---
-> v2: Add a comment in the dts files
-> ---
->  arch/arm/boot/dts/socfpga_arria5.dtsi   | 2 ++
->  arch/arm/boot/dts/socfpga_cyclone5.dtsi | 2 ++
->  2 files changed, 4 insertions(+)
-> 
-> diff --git a/arch/arm/boot/dts/socfpga_arria5.dtsi b/arch/arm/boot/dts/socfpga_arria5.dtsi
-> index 468fc4c..03e8268 100644
-> --- a/arch/arm/boot/dts/socfpga_arria5.dtsi
-> +++ b/arch/arm/boot/dts/socfpga_arria5.dtsi
-> @@ -15,6 +15,8 @@
->   */
->  
->  /dts-v1/;
-> +/* First 4KB has trampoline code for secondary cores. */
-> +/memreserve/ 0x00000000 0x0001000;
->  #include "socfpga.dtsi"
->  
->  / {
-> diff --git a/arch/arm/boot/dts/socfpga_cyclone5.dtsi b/arch/arm/boot/dts/socfpga_cyclone5.dtsi
-> index 33cad8b..28c05e7 100644
-> --- a/arch/arm/boot/dts/socfpga_cyclone5.dtsi
-> +++ b/arch/arm/boot/dts/socfpga_cyclone5.dtsi
-> @@ -16,6 +16,8 @@
->   */
->  
->  /dts-v1/;
-> +/* First 4KB has trampoline code for secondary cores. */
-> +/memreserve/ 0x00000000 0x0001000;
->  #include "socfpga.dtsi"
->  
->  / {
-> -- 
-> 2.0.3
-> 
-> 
+This change appears to already be present in current code - please
+submit against current code, or Linus' tree for bug fixes.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140815/bf6c22ee/attachment.sig>
