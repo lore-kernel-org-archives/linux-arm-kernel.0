@@ -1,43 +1,26 @@
-From: jason@lakedaemon.net (Jason Cooper)
-Date: Fri, 15 Aug 2014 10:22:25 -0400
-Subject: [GIT PULL] at91: move of AIC drivers for 3.17: fixes #1
-In-Reply-To: <1408031156-13573-1-git-send-email-nicolas.ferre@atmel.com>
-References: <1408031156-13573-1-git-send-email-nicolas.ferre@atmel.com>
-Message-ID: <20140815142225.GF5063@titan.lakedaemon.net>
+From: will.deacon@arm.com (Will Deacon)
+Date: Fri, 15 Aug 2014 15:23:52 +0100
+Subject: [PATCH 10/10 v3] ARM: removing support for etb/etm in
+ "arch/arm/kernel/"
+In-Reply-To: <1407435706-19441-11-git-send-email-mathieu.poirier@linaro.org>
+References: <1407435706-19441-1-git-send-email-mathieu.poirier@linaro.org>
+ <1407435706-19441-11-git-send-email-mathieu.poirier@linaro.org>
+Message-ID: <20140815142352.GU27466@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Nicolas,
-
-On Thu, Aug 14, 2014 at 05:45:56PM +0200, Nicolas Ferre wrote:
-> Arnd, Olof, Kevin,
+On Thu, Aug 07, 2014 at 07:21:46PM +0100, mathieu.poirier at linaro.org wrote:
+> From: Mathieu Poirier <mathieu.poirier@linaro.org>
 > 
-> Boris moved both of our AIC drivers to their new home: the drivers/irqchip
-> directory taking advantage of the genirc framework. For DT-enabled SoCs, we can
-> use these drivers (aic and aic5) right now: Jason merged them and they are
-> available in early 3.17 merge window.
-> So, I build this pull-request for enabling the use of these drivers now as:
-> - we are very early in 3.17 development
-> - it allowed us to avoid having to depend on Jason's branch before the opening
->   of the merge window
+> Removing minimal support for etb/etm to favour an implentation
+> that is more flexible, extensible and capable of handling more
+> platforms.
+> 
+> Also removing the only client of the old driver.  That code can
+> easily be replaced by entries for etb/etm in the device tree.
+> 
+> Signed-off-by: Mathieu Poirier <mathieu.poirier@linaro.org>
 
-Then why did I create a topic branch for you to base on?
+Acked-by: Will Deacon <will.deacon@arm.com>
 
-  git://git.infradead.org/users/jcooper/linux.git irqchip/atmel-aic
-
-> - it removes some code from the mach-at91 directory: including the whole
->   aic5 driver
-> - we'd have quite a bit of time to solve issues if we found a bug
-> - the code is basically moved so it should be error free.
-
-Well, this is certainly up to Arnd, Olof and Kevin, but it seems a bit
-unusual.  You're basically asking to merge changes into the current window
-that has had _no_ time in -next...  Sounds like a recipe for trouble to
-me.
-
-In the future, please let me know if you're not going to need a topic
-branch.
-
-thx,
-
-Jason.
+Will
