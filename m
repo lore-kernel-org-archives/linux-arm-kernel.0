@@ -1,49 +1,34 @@
-From: andrew@lunn.ch (Andrew Lunn)
-Date: Fri, 15 Aug 2014 15:10:26 +0200
-Subject: [PATCH 2/9] phy: phy-mvebu-sata: Add missing error check for
- devm_kzalloc
-In-Reply-To: <1408106416-19044-3-git-send-email-peter.griffin@linaro.org>
-References: <1408106416-19044-1-git-send-email-peter.griffin@linaro.org>
- <1408106416-19044-3-git-send-email-peter.griffin@linaro.org>
-Message-ID: <20140815131026.GA17800@lunn.ch>
+From: semen.protsenko@linaro.org (Semen Protsenko)
+Date: Fri, 15 Aug 2014 16:22:44 +0300
+Subject: [PATCH v2] efi/arm64: store Runtime Services revision
+Message-ID: <1408108964-28650-1-git-send-email-semen.protsenko@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Aug 15, 2014 at 01:40:09PM +0100, Peter Griffin wrote:
-> Currently this driver is missing a check on the return value of devm_kzalloc,
-> which would cause a NULL pointer dereference in a OOM situation.
-> 
-> This patch adds the aformentioned missing check.
-> 
-> Signed-off-by: Peter Griffin <peter.griffin@linaro.org>
+"efi" global data structure contains "runtime_version" field which must
+be assigned in order to use it later in Runtime Services virtual calls
+(virt_efi_* functions).
 
-Acked-by: Andrew Lunn <andrew@lunn.ch>
+Before this patch "runtime_version" was unassigned (0), so each
+Runtime Service virtual call that checks revision would fail.
 
-Thanks
-	Andrew
+Signed-off-by: Semen Protsenko <semen.protsenko@linaro.org>
+---
+ arch/arm64/kernel/efi.c | 2 ++
+ 1 file changed, 2 insertions(+)
 
-> ---
->  drivers/phy/phy-mvebu-sata.c | 2 ++
->  1 file changed, 2 insertions(+)
-> 
-> diff --git a/drivers/phy/phy-mvebu-sata.c b/drivers/phy/phy-mvebu-sata.c
-> index cc3c0e1..10bb8e5 100644
-> --- a/drivers/phy/phy-mvebu-sata.c
-> +++ b/drivers/phy/phy-mvebu-sata.c
-> @@ -89,6 +89,8 @@ static int phy_mvebu_sata_probe(struct platform_device *pdev)
->  	struct phy *phy;
->  
->  	priv = devm_kzalloc(&pdev->dev, sizeof(*priv), GFP_KERNEL);
-> +	if (!priv)
-> +		return -ENOMEM;
->  
->  	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
->  	priv->base = devm_ioremap_resource(&pdev->dev, res);
-> -- 
-> 1.9.1
-> 
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+diff --git a/arch/arm64/kernel/efi.c b/arch/arm64/kernel/efi.c
+index e72f310..5dbb7bd 100644
+--- a/arch/arm64/kernel/efi.c
++++ b/arch/arm64/kernel/efi.c
+@@ -463,6 +463,8 @@ static int __init arm64_enter_virtual_mode(void)
+ 	efi_native_runtime_setup();
+ 	set_bit(EFI_RUNTIME_SERVICES, &efi.flags);
+ 
++	efi.runtime_version = efi.systab->hdr.revision;
++
+ 	return 0;
+ 
+ err_unmap:
+-- 
+2.0.1
