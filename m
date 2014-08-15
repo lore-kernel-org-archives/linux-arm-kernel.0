@@ -1,65 +1,68 @@
 From: bhupesh.sharma@freescale.com (bhupesh.sharma at freescale.com)
-Date: Fri, 15 Aug 2014 14:26:39 +0000
+Date: Fri, 15 Aug 2014 14:31:48 +0000
 Subject: [PATCH 4/6] arm64: Add DTS support for FSL's LS2085A SoC
-In-Reply-To: <0E51617C-0C5C-4A9A-AB90-394FB7FBE55D@codeaurora.org>
+In-Reply-To: <20140815131026.GB18863@arm.com>
 References: <1408096156-29772-1-git-send-email-bhupesh.sharma@freescale.com>
  <1408096156-29772-5-git-send-email-bhupesh.sharma@freescale.com>
- <0E51617C-0C5C-4A9A-AB90-394FB7FBE55D@codeaurora.org>
-Message-ID: <a46429bdbde94e23a458923f893b437e@BN1PR03MB220.namprd03.prod.outlook.com>
+ <20140815101249.GA19939@localhost>
+ <af793f09683b48b5a0db42a482210c4a@BY2PR0301MB0743.namprd03.prod.outlook.com>
+ <20140815131026.GB18863@arm.com>
+Message-ID: <29cf47df79b145ea928da6944ff3de57@BN1PR03MB220.namprd03.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 > -----Original Message-----
-> From: Kumar Gala [mailto:galak at codeaurora.org]
-> Sent: Friday, August 15, 2014 7:00 PM
-> To: Sharma Bhupesh-B45370
-> Cc: devicetree-discuss at lists.ozlabs.org; Catalin.Marinas at arm.com;
-> arnd at arndb.de; Will.Deacon at arm.com; Yoder Stuart-B08248;
-> grant.likely at secretlab.ca; Basu Arnab-B45036; linux-arm-
-> kernel at lists.infradead.org
+> From: Catalin Marinas [mailto:catalin.marinas at arm.com]
+> Sent: Friday, August 15, 2014 6:40 PM
+> To: Yoder Stuart-B08248
+> Cc: Sharma Bhupesh-B45370; devicetree-discuss at lists.ozlabs.org; Will
+> Deacon; arnd at arndb.de; grant.likely at secretlab.ca; linux-arm-
+> kernel at lists.infradead.org; Basu Arnab-B45036
 > Subject: Re: [PATCH 4/6] arm64: Add DTS support for FSL's LS2085A SoC
 > 
+> On Fri, Aug 15, 2014 at 01:53:13PM +0100, Stuart Yoder wrote:
+> > > On Fri, Aug 15, 2014 at 10:49:13AM +0100, Bhupesh Sharma wrote:
+> > > > +	cpus {
+> > > > +		#address-cells = <2>;
+> > > > +		#size-cells = <0>;
+> > > > +
+> > > > +		/* We have 4 clusters having 2 Cortex-A57 cores each */
+> > > > +		cpu at 0 {
+> > > > +			device_type = "cpu";
+> > > > +			compatible = "arm,cortex-a57";
+> > > > +			reg = <0x0 0x0>;
+> > > > +			enable-method = "spin-table";
+> > > > +			cpu-release-addr = <0x0 0x8000fff8>;
+> > > > +		};
+> > >
+> > > Why not PSCI?
+> >
+> > It simply is where we are today-- we don't have functioning PSCI yet
+> > but plan to get there over time.
 > 
-> On Aug 15, 2014, at 4:49 AM, Bhupesh Sharma <bhupesh.sharma@freescale.com>
-> wrote:
+> Thanks for clarification.
 > 
-> > This patch adds the device tree support for FSL LS2085A SoC based on
-> > ARMv8 architecture.
-> >
-> > Following levels of DTSI/DTS files have been created for the LS2085A
-> > SoC family:
-> >
-> > - fsl-ls2085a.dtsi:
-> > DTS-Include file for FSL LS2085A SoC.
-> >
-> > - fsl-ls2085a-simu.dts:
-> > DTS file for FSL LS2085a software simulator model.
-> >
-> > Signed-off-by: Bhupesh Sharma <bhupesh.sharma@freescale.com>
-> > Signed-off-by: Arnab Basu <arnab.basu@freescale.com>
-> > Signed-off-by: Stuart Yoder <stuart.yoder@freescale.com>
-> > ---
-> > arch/arm64/boot/dts/fsl-ls2085a-simu.dts |   29 ++++++
+> > All the existing device trees
+> > in arch/arm64 use "spin-table", so it seems that other platforms are
+> > in the same situation:
+> >    apm-storm.dtsi
 > 
-> Hmm, outside of something like qemu, we don't normally have simulation
-> model dts/support in the kernel.
+> Not possible because there is no EL3 mode on the CPU implementation.
+> 
+> >    foundation-v8.dts
+> >    rtsm_ve-aemv8a.dts
+> 
+> These work with the latest boot wrapper (which overrides the DT nodes and
+> passes the PSCI information).
 
-Well for ARMv8 - foundation model is an existing simulation model having DTS
-support.
+Right. We are working on our PSCI handler implementation in EL3 and the spin-table
+approach it something we are currently supporting on the simulator model using
+u-boot bootloader setting up the spin-tables.
+
+Our patches for implementing spin-table approach in armv8 u-boot are already under
+review and corresponding rework [1].
+
+[1] http://lists.denx.de/pipermail/u-boot/2014-July/183692.html
 
 Regards,
 Bhupesh
-
-> 
-> > arch/arm64/boot/dts/fsl-ls2085a.dtsi     |  145
-> ++++++++++++++++++++++++++++++
-> > 2 files changed, 174 insertions(+)
-> > create mode 100644 arch/arm64/boot/dts/fsl-ls2085a-simu.dts
-> > create mode 100644 arch/arm64/boot/dts/fsl-ls2085a.dtsi
-> 
-> - k
-> 
-> --
-> Employee of Qualcomm Innovation Center, Inc.
-> Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum, hosted
-> by The Linux Foundation
