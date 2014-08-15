@@ -1,79 +1,107 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Fri, 15 Aug 2014 08:43:36 +0200
-Subject: [linux-sunxi] Re: [PATCH 3/4] simplefb: disable dt node upon
- remove
-In-Reply-To: <CAKON4Oyp0qCucAhTNeXu7LELv_MRXPkYum+jOH2QADHb4Lw_HA@mail.gmail.com>
-References: <CACxGe6vQrhd8QOAyGnjRppmuANpT60Ao2+KmkDfF4FNeoZSZgw@mail.gmail.com>
- <20140813094524.GC31326@skynet.be>
- <20140813101923.GD31326@skynet.be>
- <CAKON4OwLOAq1EOzZmuefcnZ4hw0i35e3k0F6XGNRy-5jer2vyA@mail.gmail.com>
- <CACxGe6szX3LyhGHbVHrEFfaWGYUcgcxgkuhfc9ac-R0qJs-HXw@mail.gmail.com>
- <CAKON4OzQbuaQsbTCDXuaqxLRxvat_5+wmf71S-rWXdfiT1gkvA@mail.gmail.com>
- <CACxGe6v1UPHMF5aPpe-boh+RuoPArJmKK_cQWr7aXsRjDUZrfQ@mail.gmail.com>
- <CAKON4OypgToTSXxjShCt6uTGZBU69LpJxRwVoz=PnotpL=zm4w@mail.gmail.com>
- <1408063512.890.22.camel@localhost>
- <CAKON4Oyp0qCucAhTNeXu7LELv_MRXPkYum+jOH2QADHb4Lw_HA@mail.gmail.com>
-Message-ID: <20140815064336.GX15297@lukather>
+From: s.trumtrar@pengutronix.de (Steffen Trumtrar)
+Date: Fri, 15 Aug 2014 08:42:19 +0200
+Subject: [PATCHv10 2/2] arm: dts: Add Altera SDRAM EDAC bindings &
+ devicetree entries.
+In-Reply-To: <1407770293-27190-3-git-send-email-tthayer@opensource.altera.com>
+References: <1407770293-27190-1-git-send-email-tthayer@opensource.altera.com>
+ <1407770293-27190-3-git-send-email-tthayer@opensource.altera.com>
+Message-ID: <73vbputf04.fsf@dude.hi.pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Aug 14, 2014 at 09:27:14PM -0400, jonsmirl at gmail.com wrote:
-> On Thu, Aug 14, 2014 at 8:45 PM, Henrik Nordstr?m
-> <henrik@henriknordstrom.net> wrote:
-> > tor 2014-08-14 klockan 08:07 -0400 skrev jonsmirl at gmail.com:
-> >
-> >> So what are the rules going to be? Once the OS is up and starts
-> >> changing things the state in the DT and the OS are going to diverge.
-> >> How does this get handled for a kernel driver that can load/unload?
-> >> Should the kernel remove those state nodes as soon as it alters the
-> >> state?
-> >
-> > hardware that is no longer there should also not be represented/active
-> > in DT.
-> >
-> > A simple fb that have been torn down is no more, no different from never
-> > having been there. It can be argued that it never was in the first place
-> > (i.e. that it is not actually hardware) but that it another can of worms
-> > and both have their benefits and drawbacks. One thing is certain
-> > however, as far as simplefb is concerned it is hardware, not really any
-> > different from a persistent framebuffer with hardwired settings in
-> > hardware.
-> 
-> How does the kernel know what clocks to protect? A list in the
-> simplefb node?  This list of clocks is a reason for adding simplefb to
-> the compatible list for the real hardware.  That way it won't be
-> duplicated.
-> 
-> The issues with parameter conflicts between simplefb and the real
-> hardware can be dealt with.  If the real hardware wants to add the
-> simplefb compatible field it will need to get its parameters sorted
-> out so that they don't conflict. Clock syntax is standardized in the
-> DTS so it shouldn't be a problem.
 
-It shouldn't be, but apparently, some disagree.
+Hi!
 
-Anyway, I'm not sure having the simplefb compatible would work in this
-use-case, mainly for two reasons:
-  - Most likely, the bindings are going to be very different. Not only
-    about which properties you'll have, but also what you will place
-    in these properties. reg for example have the memory address of
-    the buffer in the simplefb case, while in the KMS driver case, it
-    would have the memory address of the registers.
-  - There's will be a single driver probed. So if you want to go down
-    the hand over road (which is a bit premature at this point if you
-    ask me, but anyway), you will have no driver probed to hand over
-    to.
+tthayer at opensource.altera.com writes:
 
-Maxime
+> From: Thor Thayer <tthayer@opensource.altera.com>
+>
+> Add the Altera SDRAM EDAC bindings and device tree changes to the Altera SoC project.
+>
+> Signed-off-by: Thor Thayer <tthayer@opensource.altera.com>
+> ---
+> v2: Changes to SoC SDRAM EDAC code.
+>
+> v3: Implement code suggestions for SDRAM EDAC code.
+>
+> v4: Remove syscon from SDRAM controller bindings.
+>
+> v5: No Change, bump version for consistency.
+>
+> v6: Only map the ctrlcfg register as syscon.
+>
+> v7: No change. Bump for consistency.
+>
+> v8: No change. Bump for consistency.
+>
+> v9: Changes to support a MFD SDRAM controller with nested EDAC.
+>
+> v10: Revert to using syscon based on feedback.
+> ---
+>  .../bindings/arm/altera/socfpga-sdram-edac.txt     |   15 +++++++++++++++
+>  arch/arm/boot/dts/socfpga.dtsi                     |   11 +++++++++++
+>  2 files changed, 26 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/arm/altera/socfpga-sdram-edac.txt
+>
+> diff --git a/Documentation/devicetree/bindings/arm/altera/socfpga-sdram-edac.txt b/Documentation/devicetree/bindings/arm/altera/socfpga-sdram-edac.txt
+> new file mode 100644
+> index 0000000..d0ce01d
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/arm/altera/socfpga-sdram-edac.txt
+> @@ -0,0 +1,15 @@
+> +Altera SOCFPGA SDRAM Error Detection & Correction [EDAC]
+> +The EDAC accesses a range of registers in the SDRAM controller.
+> +
+> +Required properties:
+> +- compatible : should contain "altr,sdram-edac";
+> +- altr,sdr-syscon : phandle of the sdr module
+> +- interrupts : Should contain the SDRAM ECC IRQ in the
+> +	appropriate format for the IRQ controller.
+> +
+> +Example:
+> +	sdramedac {
+> +		compatible = "altr,sdram-edac";
+> +		altr,sdr-syscon = <&sdr>;
+> +		interrupts = <0 39 4>;
+> +	};
+> diff --git a/arch/arm/boot/dts/socfpga.dtsi b/arch/arm/boot/dts/socfpga.dtsi
+> index 4676f25..45b361e 100644
+> --- a/arch/arm/boot/dts/socfpga.dtsi
+> +++ b/arch/arm/boot/dts/socfpga.dtsi
+> @@ -603,6 +603,17 @@
+>  			};
+>  		};
+>  
+> +		sdr: sdr at ffc25000 {
+> +			compatible = "syscon";
+> +			reg = <0xffc25000 0x1000>;
+> +		};
+> +
+> +		sdramedac {
+> +			compatible = "altr,sdram-edac";
+> +			altr,sdr-syscon = <&sdr>;
+> +			interrupts = <0 39 4>;
+> +		};
+> +
+>  		L2: l2-cache at fffef000 {
+>  			compatible = "arm,pl310-cache";
+>  			reg = <0xfffef000 0x1000>;
+
+Sorry, but I personally still don't like this approach.
+
+If we do it like this however, shouldn't the different regions of the
+SDR (EDAC, FPGAPORTRST, ...) at least be child nodes of the syscon?
+That seems to match the syscon binding and describes the actual hardware
+better IMHO.
+Oh, and "reg = <...>" for the sdram-edac, maybe ?
+How would I know where the start address of the EDAC is, if I would use
+this DT on another OS where I don't have the same driver?
+
+Regards,
+Steffen
 
 -- 
-Maxime Ripard, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140815/3cb2347d/attachment.sig>
+Pengutronix e.K.                           | Steffen Trumtrar            |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
