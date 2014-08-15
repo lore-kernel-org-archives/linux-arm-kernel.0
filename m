@@ -1,56 +1,316 @@
-From: lsorense@csclub.uwaterloo.ca (Lennart Sorensen)
-Date: Fri, 15 Aug 2014 15:33:52 -0400
-Subject: [PATCH 05/15] tty: serial: Add 8250-core based omap driver
-In-Reply-To: <53EE5F3F.2000707@linutronix.de>
-References: <1408124563-31541-1-git-send-email-bigeasy@linutronix.de>
- <1408124563-31541-6-git-send-email-bigeasy@linutronix.de>
- <20140815183731.GI17769@csclub.uwaterloo.ca>
- <53EE5F3F.2000707@linutronix.de>
-Message-ID: <20140815193352.GC17765@csclub.uwaterloo.ca>
+From: geoff@infradead.org (Geoff Levand)
+Date: Fri, 15 Aug 2014 12:48:50 -0700
+Subject: [RFC] arm64: Add new cpu-return-addr device tree binding
+Message-ID: <1408132130.22761.64.camel@smoke>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Aug 15, 2014 at 09:27:59PM +0200, Sebastian Andrzej Siewior wrote:
-> If you want to change this to reduce the gap, then you have first
-> change 8250 core code. Currently it waits until the shift register is
-> empty.
+Add a new device tree binding cpu-return-addr.  This binding is required for
+all ARM v8 CPUs that have an "enable-method" property value of "spin-table". The
+value is a 64 bit read-only physical address that secondary CPU execution will
+transfer to upon CPU shutdown.
 
-Oh the 8250 normally works this way?  I didn't know that.
+Signed-off-by: Geoff Levand <geoff@infradead.org>
+---
+Hi All,
 
-> On the other hand if you use DMA then it can handle transfers > 64bytes
-> in one go and you can start transfers while the FIFO is not completely
-> empty.
+We currently have no way for arm64 spin-table CPUs to re-enter the spin
+table code, and some way to do so is needed to implement a hot-plug
+cpu_die() for these CPUs.  
 
-You can dma more than the fifo size?
+I just wanted to get this binding patch out for review now.  I have other
+patches that implement the spin-table hot-plug in my kexec repo [1].
 
-> If you use DMA. You program one transfer says 100 bytes. You get an
-> dma-transfer complete once the 100 bytes are transfered which means the
-> FIFO has 63 bytes. From this point on you could enqueue the next
-> transfer with say another 100 bytes. In that scenario you don't see the
-> gap.
-> 
-> You get only to the gap if you use the non-DMA mode (and not UARTs
-> support DMA). In that case, yes waiting till there only 16 bytes before
-> starting the refill would make sense if you want to utilize the port by
-> 100%. But as I said in 0/15, you need to teach the core this first.
-> Otherwise it will return doing nothing until the shift register is
-> empty (i.e. until the FIFO is completely empty).
+Please consider.
 
-Well if DMA takes care of it, and the normal 8250 is already like this,
-then I suppose it is already better than the typical case.
+-Geoff
 
-> There is patch in Greg's tty tree already where you are able to
-> configure the RX trigger level. We could wire this up once we agree
-> which levels we want support. The OMAP supports all levels from 1?63.
+[1] https://git.linaro.org/people/geoff.levand/linux-kexec.git
 
-All? or just every 4 (that's what I just read in the DRA7xx docs).
+ Documentation/devicetree/bindings/arm/cpus.txt     | 26 ++++++++++++++++++++++
+ Documentation/devicetree/bindings/arm/topology.txt | 16 +++++++++++++
+ 2 files changed, 42 insertions(+)
 
-> Yes, true. However this is only an issue without HW control. With DMA
-> the buffer is slightly larger. The DMA engine starts the transfer on
-> its own once there 48 bytes in the FIFO (except in the few cases where
-> it does not).
-
-That's nice of it.  I will have to give this a try.
-
+diff --git a/Documentation/devicetree/bindings/arm/cpus.txt b/Documentation/devicetree/bindings/arm/cpus.txt
+index 1fe72a0..24b98a9 100644
+--- a/Documentation/devicetree/bindings/arm/cpus.txt
++++ b/Documentation/devicetree/bindings/arm/cpus.txt
+@@ -201,6 +201,16 @@ nodes to be present and contain the properties described below.
+ 			  property identifying a 64-bit zero-initialised
+ 			  memory location.
+ 
++	- cpu-return-addr
++		Usage: required for all ARM v8 CPUs that have an "enable-method"
++		       property value of "spin-table".
++		Value type: <prop-encoded-array>
++		Definition:
++			# On ARM v8 64-bit systems must be a two cell property.
++			The value is a 64 bit read-only physical address that
++			secondary CPU execution will transfer to upon CPU
++			shutdown.
++
+ 	- qcom,saw
+ 		Usage: required for systems that have an "enable-method"
+ 		       property value of "qcom,kpss-acc-v1" or
+@@ -285,6 +295,7 @@ cpus {
+ 		reg = <0x0 0x0>;
+ 		enable-method = "spin-table";
+ 		cpu-release-addr = <0 0x20000000>;
++		cpu-return-addr = <0 0x20001000>
+ 	};
+ 
+ 	cpu at 1 {
+@@ -293,6 +304,7 @@ cpus {
+ 		reg = <0x0 0x1>;
+ 		enable-method = "spin-table";
+ 		cpu-release-addr = <0 0x20000000>;
++		cpu-return-addr = <0 0x20001000>
+ 	};
+ 
+ 	cpu at 100 {
+@@ -301,6 +313,7 @@ cpus {
+ 		reg = <0x0 0x100>;
+ 		enable-method = "spin-table";
+ 		cpu-release-addr = <0 0x20000000>;
++		cpu-return-addr = <0 0x20001000>
+ 	};
+ 
+ 	cpu at 101 {
+@@ -309,6 +322,7 @@ cpus {
+ 		reg = <0x0 0x101>;
+ 		enable-method = "spin-table";
+ 		cpu-release-addr = <0 0x20000000>;
++		cpu-return-addr = <0 0x20001000>
+ 	};
+ 
+ 	cpu at 10000 {
+@@ -317,6 +331,7 @@ cpus {
+ 		reg = <0x0 0x10000>;
+ 		enable-method = "spin-table";
+ 		cpu-release-addr = <0 0x20000000>;
++		cpu-return-addr = <0 0x20001000>
+ 	};
+ 
+ 	cpu at 10001 {
+@@ -325,6 +340,7 @@ cpus {
+ 		reg = <0x0 0x10001>;
+ 		enable-method = "spin-table";
+ 		cpu-release-addr = <0 0x20000000>;
++		cpu-return-addr = <0 0x20001000>
+ 	};
+ 
+ 	cpu at 10100 {
+@@ -333,6 +349,7 @@ cpus {
+ 		reg = <0x0 0x10100>;
+ 		enable-method = "spin-table";
+ 		cpu-release-addr = <0 0x20000000>;
++		cpu-return-addr = <0 0x20001000>
+ 	};
+ 
+ 	cpu at 10101 {
+@@ -341,6 +358,7 @@ cpus {
+ 		reg = <0x0 0x10101>;
+ 		enable-method = "spin-table";
+ 		cpu-release-addr = <0 0x20000000>;
++		cpu-return-addr = <0 0x20001000>
+ 	};
+ 
+ 	cpu at 100000000 {
+@@ -349,6 +367,7 @@ cpus {
+ 		reg = <0x1 0x0>;
+ 		enable-method = "spin-table";
+ 		cpu-release-addr = <0 0x20000000>;
++		cpu-return-addr = <0 0x20001000>
+ 	};
+ 
+ 	cpu at 100000001 {
+@@ -357,6 +376,7 @@ cpus {
+ 		reg = <0x1 0x1>;
+ 		enable-method = "spin-table";
+ 		cpu-release-addr = <0 0x20000000>;
++		cpu-return-addr = <0 0x20001000>
+ 	};
+ 
+ 	cpu at 100000100 {
+@@ -365,6 +385,7 @@ cpus {
+ 		reg = <0x1 0x100>;
+ 		enable-method = "spin-table";
+ 		cpu-release-addr = <0 0x20000000>;
++		cpu-return-addr = <0 0x20001000>
+ 	};
+ 
+ 	cpu at 100000101 {
+@@ -373,6 +394,7 @@ cpus {
+ 		reg = <0x1 0x101>;
+ 		enable-method = "spin-table";
+ 		cpu-release-addr = <0 0x20000000>;
++		cpu-return-addr = <0 0x20001000>
+ 	};
+ 
+ 	cpu at 100010000 {
+@@ -381,6 +403,7 @@ cpus {
+ 		reg = <0x1 0x10000>;
+ 		enable-method = "spin-table";
+ 		cpu-release-addr = <0 0x20000000>;
++		cpu-return-addr = <0 0x20001000>
+ 	};
+ 
+ 	cpu at 100010001 {
+@@ -389,6 +412,7 @@ cpus {
+ 		reg = <0x1 0x10001>;
+ 		enable-method = "spin-table";
+ 		cpu-release-addr = <0 0x20000000>;
++		cpu-return-addr = <0 0x20001000>
+ 	};
+ 
+ 	cpu at 100010100 {
+@@ -397,6 +421,7 @@ cpus {
+ 		reg = <0x1 0x10100>;
+ 		enable-method = "spin-table";
+ 		cpu-release-addr = <0 0x20000000>;
++		cpu-return-addr = <0 0x20001000>
+ 	};
+ 
+ 	cpu at 100010101 {
+@@ -405,6 +430,7 @@ cpus {
+ 		reg = <0x1 0x10101>;
+ 		enable-method = "spin-table";
+ 		cpu-release-addr = <0 0x20000000>;
++		cpu-return-addr = <0 0x20001000>
+ 	};
+ };
+ 
+diff --git a/Documentation/devicetree/bindings/arm/topology.txt b/Documentation/devicetree/bindings/arm/topology.txt
+index 1061faf..29e2193 100644
+--- a/Documentation/devicetree/bindings/arm/topology.txt
++++ b/Documentation/devicetree/bindings/arm/topology.txt
+@@ -260,6 +260,7 @@ cpus {
+ 		reg = <0x0 0x0>;
+ 		enable-method = "spin-table";
+ 		cpu-release-addr = <0 0x20000000>;
++		cpu-return-addr = <0 0x20001000>
+ 	};
+ 
+ 	CPU1: cpu at 1 {
+@@ -268,6 +269,7 @@ cpus {
+ 		reg = <0x0 0x1>;
+ 		enable-method = "spin-table";
+ 		cpu-release-addr = <0 0x20000000>;
++		cpu-return-addr = <0 0x20001000>
+ 	};
+ 
+ 	CPU2: cpu at 100 {
+@@ -276,6 +278,7 @@ cpus {
+ 		reg = <0x0 0x100>;
+ 		enable-method = "spin-table";
+ 		cpu-release-addr = <0 0x20000000>;
++		cpu-return-addr = <0 0x20001000>
+ 	};
+ 
+ 	CPU3: cpu at 101 {
+@@ -284,6 +287,7 @@ cpus {
+ 		reg = <0x0 0x101>;
+ 		enable-method = "spin-table";
+ 		cpu-release-addr = <0 0x20000000>;
++		cpu-return-addr = <0 0x20001000>
+ 	};
+ 
+ 	CPU4: cpu at 10000 {
+@@ -292,6 +296,7 @@ cpus {
+ 		reg = <0x0 0x10000>;
+ 		enable-method = "spin-table";
+ 		cpu-release-addr = <0 0x20000000>;
++		cpu-return-addr = <0 0x20001000>
+ 	};
+ 
+ 	CPU5: cpu at 10001 {
+@@ -300,6 +305,7 @@ cpus {
+ 		reg = <0x0 0x10001>;
+ 		enable-method = "spin-table";
+ 		cpu-release-addr = <0 0x20000000>;
++		cpu-return-addr = <0 0x20001000>
+ 	};
+ 
+ 	CPU6: cpu at 10100 {
+@@ -308,6 +314,7 @@ cpus {
+ 		reg = <0x0 0x10100>;
+ 		enable-method = "spin-table";
+ 		cpu-release-addr = <0 0x20000000>;
++		cpu-return-addr = <0 0x20001000>
+ 	};
+ 
+ 	CPU7: cpu at 10101 {
+@@ -316,6 +323,7 @@ cpus {
+ 		reg = <0x0 0x10101>;
+ 		enable-method = "spin-table";
+ 		cpu-release-addr = <0 0x20000000>;
++		cpu-return-addr = <0 0x20001000>
+ 	};
+ 
+ 	CPU8: cpu at 100000000 {
+@@ -324,6 +332,7 @@ cpus {
+ 		reg = <0x1 0x0>;
+ 		enable-method = "spin-table";
+ 		cpu-release-addr = <0 0x20000000>;
++		cpu-return-addr = <0 0x20001000>
+ 	};
+ 
+ 	CPU9: cpu at 100000001 {
+@@ -332,6 +341,7 @@ cpus {
+ 		reg = <0x1 0x1>;
+ 		enable-method = "spin-table";
+ 		cpu-release-addr = <0 0x20000000>;
++		cpu-return-addr = <0 0x20001000>
+ 	};
+ 
+ 	CPU10: cpu at 100000100 {
+@@ -340,6 +350,7 @@ cpus {
+ 		reg = <0x1 0x100>;
+ 		enable-method = "spin-table";
+ 		cpu-release-addr = <0 0x20000000>;
++		cpu-return-addr = <0 0x20001000>
+ 	};
+ 
+ 	CPU11: cpu at 100000101 {
+@@ -348,6 +359,7 @@ cpus {
+ 		reg = <0x1 0x101>;
+ 		enable-method = "spin-table";
+ 		cpu-release-addr = <0 0x20000000>;
++		cpu-return-addr = <0 0x20001000>
+ 	};
+ 
+ 	CPU12: cpu at 100010000 {
+@@ -356,6 +368,7 @@ cpus {
+ 		reg = <0x1 0x10000>;
+ 		enable-method = "spin-table";
+ 		cpu-release-addr = <0 0x20000000>;
++		cpu-return-addr = <0 0x20001000>
+ 	};
+ 
+ 	CPU13: cpu at 100010001 {
+@@ -364,6 +377,7 @@ cpus {
+ 		reg = <0x1 0x10001>;
+ 		enable-method = "spin-table";
+ 		cpu-release-addr = <0 0x20000000>;
++		cpu-return-addr = <0 0x20001000>
+ 	};
+ 
+ 	CPU14: cpu at 100010100 {
+@@ -372,6 +386,7 @@ cpus {
+ 		reg = <0x1 0x10100>;
+ 		enable-method = "spin-table";
+ 		cpu-release-addr = <0 0x20000000>;
++		cpu-return-addr = <0 0x20001000>
+ 	};
+ 
+ 	CPU15: cpu at 100010101 {
+@@ -380,6 +395,7 @@ cpus {
+ 		reg = <0x1 0x10101>;
+ 		enable-method = "spin-table";
+ 		cpu-release-addr = <0 0x20000000>;
++		cpu-return-addr = <0 0x20001000>
+ 	};
+ };
+ 
 -- 
-Len Sorensen
+1.9.1
