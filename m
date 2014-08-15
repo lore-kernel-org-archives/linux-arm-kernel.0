@@ -1,54 +1,52 @@
-From: Mattis.Lorentzon@autoliv.com (Mattis Lorentzon)
-Date: Fri, 15 Aug 2014 05:42:12 +0000
-Subject: Oops: 17 SMP ARM (v3.16-rc2)
-In-Reply-To: <CAOMZO5B7FgzB7ThVyV2Vk7wTwYgjRWjEnkkAN5uwwKMaBKq1yg@mail.gmail.com>
-References: <20140626151424.GT32514@n2100.arm.linux.org.uk>
- <20140627112151.GF32514@n2100.arm.linux.org.uk>
- <3FFB61A7A8473C49831AF20FA193534A43CADFA7@ALVA-EXMB01.alv.autoliv.int>
- <20140627163108.GP32514@n2100.arm.linux.org.uk>
- <C4A61A5CA4AD2246942F4BA6F20ACB8043575072@ALVA-EXMB04.alv.autoliv.int>
- <20140806095012.GN30282@n2100.arm.linux.org.uk>
- <C4A61A5CA4AD2246942F4BA6F20ACB8043575172@ALVA-EXMB04.alv.autoliv.int>
- <20140806125550.GO30282@n2100.arm.linux.org.uk>
- <C4A61A5CA4AD2246942F4BA6F20ACB804357526C@ALVA-EXMB04.alv.autoliv.int>
- <20140807121248.GY30282@n2100.arm.linux.org.uk>
- <20140808180900.GG30282@n2100.arm.linux.org.uk>
- <C4A61A5CA4AD2246942F4BA6F20ACB8043576356@ALVA-EXMB04.alv.autoliv.int>
- <CAOMZO5B8GR+ABBoJ=dJcFqw3Wagfaip7HM+C1FTz+aE4CmqiPw@mail.gmail.com>
- <C4A61A5CA4AD2246942F4BA6F20ACB80435776D3@ALVA-EXMB04.alv.autoliv.int>
- <CAOMZO5B7FgzB7ThVyV2Vk7wTwYgjRWjEnkkAN5uwwKMaBKq1yg@mail.gmail.com>
-Message-ID: <C4A61A5CA4AD2246942F4BA6F20ACB8043577770@ALVA-EXMB04.alv.autoliv.int>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Fri, 15 Aug 2014 08:10:03 +0200
+Subject: [PATCH] efi/arm64: store Runtime Services revision
+In-Reply-To: <1408028122-1784-1-git-send-email-semen.protsenko@linaro.org>
+References: <1408028122-1784-1-git-send-email-semen.protsenko@linaro.org>
+Message-ID: <CAKv+Gu9-1WNEw2XJc9VG3b9UOnM_BzWNEt37x0d865EmWfDdLw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Fabio,
+On 14 August 2014 16:55, Semen Protsenko <semen.protsenko@linaro.org> wrote:
+> "efi" global data structure contains "runtime_version" field which must
+> be assigned in order to use it later in Runtime Services virtual calls
+> (virt_efi_* functions).
+>
+> Before this patch "runtime_version" was unassigned (0), so each
+> Runtime Service virtual call that checks revision would fail.
+>
+> Runtime Services revision being passed in UEFI system table from UEFI
+> to kernel (see efi_entry() function). In UEFI it's being stored at
+> MdePkg/Include/Uefi/UefiSpec.h as EFI_RUNTIME_SERVICES_REVISION.
+>
 
-> Do the stalls also happen on a pure 3.16 kernel?
+Could you drop the last line with the Tianocore path? Tianocore is
+just one of the many UEFI implementations the kernel should be
+compatible with, so where it happens to store this value is not
+entirely relevant.
 
-Yes, we just tried this out overnight and we get the same stalls here.
-We have seen similar problems on a Zynq-based board. It might be
-worth noting that a common chip between all three boards is, for
-example, the KSZ9021RN, while the FEC driver, for example, only
-runs on the two iMX6-boards.
+> Signed-off-by: Semen Protsenko <semen.protsenko@linaro.org>
 
-> How can we reproduce the error?
+Acked-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
 
-We mostly run SSH with benchmarks using NFS, it can probably be
-triggered by using only SSH with the following loop:
 
-# while : ; do ssh arm-card date; done
-
-Our (pure) 3.16 kernel uses the following config.
-http://lkml.iu.edu/hypermail/linux/kernel/1408.1/03045/config.gz
-
-(We have quite generously disabled a lot of sub-systems in our config.)
-
-Best regards,
-Mattis Lorentzon
-
-***************************************************************
-Consider the environment before printing this message.
-
-To read Autoliv's Information and Confidentiality Notice, follow this link:
-http://www.autoliv.com/disclaimer.html
-***************************************************************
+> ---
+>  arch/arm64/kernel/efi.c | 2 ++
+>  1 file changed, 2 insertions(+)
+>
+> diff --git a/arch/arm64/kernel/efi.c b/arch/arm64/kernel/efi.c
+> index e72f310..5dbb7bd 100644
+> --- a/arch/arm64/kernel/efi.c
+> +++ b/arch/arm64/kernel/efi.c
+> @@ -463,6 +463,8 @@ static int __init arm64_enter_virtual_mode(void)
+>         efi_native_runtime_setup();
+>         set_bit(EFI_RUNTIME_SERVICES, &efi.flags);
+>
+> +       efi.runtime_version = efi.systab->hdr.revision;
+> +
+>         return 0;
+>
+>  err_unmap:
+> --
+> 2.0.1
+>
