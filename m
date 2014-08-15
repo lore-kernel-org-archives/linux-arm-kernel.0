@@ -1,42 +1,14 @@
-From: peter.griffin@linaro.org (Peter Griffin)
-Date: Fri, 15 Aug 2014 12:09:44 +0100
-Subject: [PATCH] regulator: as3722: .name field initialized twice differently
-Message-ID: <1408100984-11757-1-git-send-email-peter.griffin@linaro.org>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Fri, 15 Aug 2014 12:15:49 +0100
+Subject: [PATCH 1/2] ARM: abort: don't clear the exclusive monitors
+In-Reply-To: <1407749048-18909-1-git-send-email-mark.rutland@arm.com>
+References: <1407749048-18909-1-git-send-email-mark.rutland@arm.com>
+Message-ID: <20140815111548.GD15621@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Regulator AS3722_REGULATOR_ID_LDO3 and AS3722_REGULATOR_ID_LDO4
-have there .name field initialised twice with different values.
+On the assumption these are fine I've dropped both into the patch system
+(as 8128/1 and 8129/1 respectively).
 
-Looking at the code the second entry should have been .sname
-which is what this patch corrects.
-
-Signed-off-by: Peter Griffin <peter.griffin@linaro.org>
----
- drivers/regulator/as3722-regulator.c | 4 ++--
- 1 file changed, 2 insertions(+), 2 deletions(-)
-
-diff --git a/drivers/regulator/as3722-regulator.c b/drivers/regulator/as3722-regulator.c
-index ad9e0c9..b68f05f 100644
---- a/drivers/regulator/as3722-regulator.c
-+++ b/drivers/regulator/as3722-regulator.c
-@@ -219,7 +219,7 @@ static const struct as3722_register_mapping as3722_reg_lookup[] = {
- 	{
- 		.regulator_id = AS3722_REGULATOR_ID_LDO3,
- 		.name = "as3722-ldo3",
--		.name = "vin-ldo3-4",
-+		.sname = "vin-ldo3-4",
- 		.vsel_reg = AS3722_LDO3_VOLTAGE_REG,
- 		.vsel_mask = AS3722_LDO3_VSEL_MASK,
- 		.enable_reg = AS3722_LDOCONTROL0_REG,
-@@ -231,7 +231,7 @@ static const struct as3722_register_mapping as3722_reg_lookup[] = {
- 	{
- 		.regulator_id = AS3722_REGULATOR_ID_LDO4,
- 		.name = "as3722-ldo4",
--		.name = "vin-ldo3-4",
-+		.sname = "vin-ldo3-4",
- 		.vsel_reg = AS3722_LDO4_VOLTAGE_REG,
- 		.vsel_mask = AS3722_LDO_VSEL_MASK,
- 		.enable_reg = AS3722_LDOCONTROL0_REG,
--- 
-1.9.1
+Thanks,
+Mark.
