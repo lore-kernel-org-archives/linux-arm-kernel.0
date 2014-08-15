@@ -1,344 +1,73 @@
-From: christoffer.dall@linaro.org (Christoffer Dall)
-Date: Fri, 15 Aug 2014 11:32:04 +0200
-Subject: [PATCH 4/6] arm/arm64: KVM: vgic: Improve handling of
- GICD_I{CS}PENDRn
-In-Reply-To: <87egwjrv28.fsf@approximate.cambridge.arm.com>
-References: <1405003196-12403-1-git-send-email-christoffer.dall@linaro.org>
- <1405003196-12403-5-git-send-email-christoffer.dall@linaro.org>
- <87egwjrv28.fsf@approximate.cambridge.arm.com>
-Message-ID: <20140815093204.GT10550@cbox>
+From: zhangwm@marvell.com (Neil Zhang)
+Date: Fri, 15 Aug 2014 02:45:09 -0700
+Subject: [PATCH] arm: irq: fix the affinity when migrate a irq
+In-Reply-To: <53EDC89F.4020300@arm.com>
+References: <1408087917-22603-1-git-send-email-zhangwm@marvell.com>
+ <53EDC89F.4020300@arm.com>
+Message-ID: <9034CBD80F070943B59700D7F8149ED9020D8CC38A@SC-VEXCH4.marvell.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Aug 14, 2014 at 03:43:11PM +0100, Marc Zyngier wrote:
-> On Thu, Jul 10 2014 at  3:39:54 pm BST, Christoffer Dall <christoffer.dall@linaro.org> wrote:
-> > Writes to GICD_ISPENDRn and GICD_ICPENDRn are currently not handled
-> > correctly for level-triggered interrupts.  The spec states that for
-> > level-triggered interrupts, writes to the GICD_ISPENDRn activate the
-> > output of a flip-flop which is in turn or'ed with the actual input
-> > interrupt signal.  Correspondingly, writes to GICD_ICPENDRn simply
-> > deactivates the output of that flip-flop, but does not (of course) affect
-> > the external input signal.  Reads from GICC_IAR will also deactivate the
-> > flip-flop output.
+
+
+> -----Original Message-----
+> From: Sudeep Holla [mailto:sudeep.holla at arm.com]
+> Sent: 2014?8?15? 16:45
+> To: Neil Zhang; linux at arm.linux.org.uk
+> Cc: Sudeep Holla; linux-kernel at vger.kernel.org;
+> linux-arm-kernel at lists.infradead.org
+> Subject: Re: [PATCH] arm: irq: fix the affinity when migrate a irq
+> 
+> Hi Neil,
+> 
+> On 15/08/14 08:31, Neil Zhang wrote:
+> > Commit ffde1de64012 ("irqchip: Gic: Support forced affinity setting")
+> > has enable the forcing cpu affinity of interrupts for gic.
 > >
-> > This requires us to track the state of the level-input separately from
-> > the state in the flip-flop.  We therefore introduce two new variables on
-> > the distributor struct to track these two states.  Astute readers may
-> > notice that this is introducing more state than required (because an OR
-> > of the two states gives you the pending state), but the remaining vgic
-> > code uses the pending bitmap for optimized operations to figure out, at
-> > the end of the day, if an interrupt is pending or not on the distributor
-> > side.  Refactoring the code to consider the two state variables all the
-> > places where we currently access the precomputed pending value, did not
-> > look pretty.
+> > The current code of migrate_one_irq will pass the current affinity
+> > mask to irq_set_affinity with force is true, it may select the cpu
+> > being offlined as the target CPU again, then the interrupt won't be
+> > migrated correctly.
 > >
-> > Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
+> 
+> I had posted similar patch [1] a while ago and the discussion[2] did not
+> conclude. We need feedback from Thomas Gleixner.
+> 
+> Regards,
+> Sudeep
+> 
+> [1]
+> http://lists.infradead.org/pipermail/linux-arm-kernel/2014-May/254838.html
+> [2]
+> http://lists.infradead.org/pipermail/linux-arm-kernel/2014-June/265191.html
+
+I see, thanks.
+
+> 
+> > Signed-off-by: Neil Zhang <zhangwm@marvell.com>
 > > ---
-> >  include/kvm/arm_vgic.h |  16 ++++++-
-> >  virt/kvm/arm/vgic.c    | 123 ++++++++++++++++++++++++++++++++++++++++++++-----
-> >  2 files changed, 127 insertions(+), 12 deletions(-)
+> >   arch/arm/kernel/irq.c |    5 ++---
+> >   1 file changed, 2 insertions(+), 3 deletions(-)
 > >
-> > diff --git a/include/kvm/arm_vgic.h b/include/kvm/arm_vgic.h
-> > index 7d8e61f..f074539 100644
-> > --- a/include/kvm/arm_vgic.h
-> > +++ b/include/kvm/arm_vgic.h
-> > @@ -140,9 +140,23 @@ struct vgic_dist {
-> >  	/* Interrupt enabled (one bit per IRQ) */
-> >  	struct vgic_bitmap	irq_enabled;
-> >  
-> > -	/* Interrupt state is pending on the distributor */
-> > +	/* Level-triggered interrupt external input is asserted */
-> > +	struct vgic_bitmap	irq_level;
-> > +
-> > +	/*
-> > +	 * Interrupt state is pending on the distributor
-> > +	 */
-> >  	struct vgic_bitmap	irq_pending;
-> >  
-> > +	/*
-> > +	 * Tracks writes to GICD_ISPENDRn and GICD_ICPENDRn for level-triggered
-> > +	 * interrupts.  Essentially holds the state of the flip-flop in
-> > +	 * Figure 4-10 on page 4-101 in ARM IHI 0048B.b.
-> > +	 * Once set, it is only cleared for level-triggered interrupts on
-> > +	 * guest ACKs (when we queue it) or writes to GICD_ICPENDRn.
-> > +	 */
-> > +	struct vgic_bitmap	irq_soft_pend;
-> > +
-> >  	/* Level-triggered interrupt queued on VCPU interface */
-> >  	struct vgic_bitmap	irq_queued;
-> >  
-> > diff --git a/virt/kvm/arm/vgic.c b/virt/kvm/arm/vgic.c
-> > index 1b85f42..7b0ab7f 100644
-> > --- a/virt/kvm/arm/vgic.c
-> > +++ b/virt/kvm/arm/vgic.c
-> > @@ -67,6 +67,11 @@
-> >   * - When the interrupt is EOIed, the maintenance interrupt fires,
-> >   *   and clears the corresponding bit in irq_queued. This allow the
-> >   *   interrupt line to be sampled again.
-> > + * - Note that level-triggered interrupts can also be set to pending from
-> > + *   writes to GICD_ISPENDRn and lowering the external input line does not
-> > + *   cause the interrupt to become inactive in such a situation.
-> > + *   Conversely, writes to GICD_ICPENDRn do not cause the interrupt to become
-> > + *   inactive as long as the external input line is held high.
-> >   */
-> >  
-> >  #define VGIC_ADDR_UNDEF		(-1)
-> > @@ -217,6 +222,41 @@ static void vgic_irq_clear_queued(struct kvm_vcpu *vcpu, int irq)
-> >  	vgic_bitmap_set_irq_val(&dist->irq_queued, vcpu->vcpu_id, irq, 0);
-> >  }
-> >  
-> > +static int vgic_dist_irq_get_level(struct kvm_vcpu *vcpu, int irq)
-> > +{
-> > +	struct vgic_dist *dist = &vcpu->kvm->arch.vgic;
-> > +
-> > +	return vgic_bitmap_get_irq_val(&dist->irq_level, vcpu->vcpu_id, irq);
-> > +}
-> > +
-> > +static void vgic_dist_irq_set_level(struct kvm_vcpu *vcpu, int irq)
-> > +{
-> > +	struct vgic_dist *dist = &vcpu->kvm->arch.vgic;
-> > +
-> > +	vgic_bitmap_set_irq_val(&dist->irq_level, vcpu->vcpu_id, irq, 1);
-> > +}
-> > +
-> > +static void vgic_dist_irq_clear_level(struct kvm_vcpu *vcpu, int irq)
-> > +{
-> > +	struct vgic_dist *dist = &vcpu->kvm->arch.vgic;
-> > +
-> > +	vgic_bitmap_set_irq_val(&dist->irq_level, vcpu->vcpu_id, irq, 0);
-> > +}
-> > +
-> > +static int vgic_dist_irq_soft_pend(struct kvm_vcpu *vcpu, int irq)
-> > +{
-> > +	struct vgic_dist *dist = &vcpu->kvm->arch.vgic;
-> > +
-> > +	return vgic_bitmap_get_irq_val(&dist->irq_soft_pend, vcpu->vcpu_id, irq);
-> > +}
-> > +
-> > +static void vgic_dist_irq_clear_soft_pend(struct kvm_vcpu *vcpu, int irq)
-> > +{
-> > +	struct vgic_dist *dist = &vcpu->kvm->arch.vgic;
-> > +
-> > +	vgic_bitmap_set_irq_val(&dist->irq_soft_pend, vcpu->vcpu_id, irq, 0);
-> > +}
-> > +
-> >  static int vgic_dist_irq_is_pending(struct kvm_vcpu *vcpu, int irq)
-> >  {
-> >  	struct vgic_dist *dist = &vcpu->kvm->arch.vgic;
-> > @@ -409,11 +449,26 @@ static bool handle_mmio_set_pending_reg(struct kvm_vcpu *vcpu,
-> >  					struct kvm_exit_mmio *mmio,
-> >  					phys_addr_t offset)
-> >  {
-> > -	u32 *reg = vgic_bitmap_get_reg(&vcpu->kvm->arch.vgic.irq_pending,
-> > -				       vcpu->vcpu_id, offset);
-> > +	u32 *reg;
-> > +	u32 level_mask;
-> > +	struct vgic_dist *dist = &vcpu->kvm->arch.vgic;
-> > +
-> > +	reg = vgic_bitmap_get_reg(&dist->irq_cfg, vcpu->vcpu_id, offset);
-> > +	level_mask = (~(*reg));
-> > +
-> > +	/* Mark both level and edge triggered irqs as pending */
-> > +	reg = vgic_bitmap_get_reg(&dist->irq_pending, vcpu->vcpu_id, offset);
-> >  	vgic_reg_access(mmio, reg, offset,
-> >  			ACCESS_READ_VALUE | ACCESS_WRITE_SETBIT);
-> > +
-> >  	if (mmio->is_write) {
-> > +		/* Set the soft-pending flag only for level-triggered irqs */
-> > +		reg = vgic_bitmap_get_reg(&dist->irq_soft_pend,
-> > +					  vcpu->vcpu_id, offset);
-> > +		vgic_reg_access(mmio, reg, offset,
-> > +				ACCESS_READ_VALUE | ACCESS_WRITE_SETBIT);
-> > +		*reg &= level_mask;
-> 
-> I'm a bit confused here. You're doing the MMIO access, and then updating
-> the register again?
-> 
+> > diff --git a/arch/arm/kernel/irq.c b/arch/arm/kernel/irq.c index
+> > 2c42576..6f5a878 100644
+> > --- a/arch/arm/kernel/irq.c
+> > +++ b/arch/arm/kernel/irq.c
+> > @@ -167,11 +167,10 @@ static bool migrate_one_irq(struct irq_desc *desc)
+> >   	if (irqd_is_per_cpu(d) || !cpumask_test_cpu(smp_processor_id(), affinity))
+> >   		return false;
+> >
+> > -	if (cpumask_any_and(affinity, cpu_online_mask) >= nr_cpu_ids) {
+> > -		affinity = cpu_online_mask;
+> > +	if (cpumask_any_and(affinity, cpu_online_mask) >= nr_cpu_ids)
+> >   		ret = true;
+> > -	}
+> >
+> > +	affinity = cpu_online_mask;
+> >   	c = irq_data_get_irq_chip(d);
+> >   	if (!c->irq_set_affinity)
+> >   		pr_debug("IRQ%u: unable to set affinity\n", d->irq);
+> >
 
-not quite, notice that I change the reg pointer to the soft_pending flag
-if we're doing a write.  I then reuse the functionality in
-vgic_reg_access to figure out the right offsets, mmio len access etc.,
-to write the soft bits for all the bits set in the register passed to
-the store function by the guest, but then I use the level_mask variable
-to clear the bits for the level-triggered interrupts.
-
-This can be rewritten to be slightly more straight forward, but at the
-cost of code duplication and an increased code length.
-
-> > +
-> >  		vgic_update_state(vcpu->kvm);
-> >  		return true;
-> >  	}
-> > @@ -425,11 +480,27 @@ static bool handle_mmio_clear_pending_reg(struct kvm_vcpu *vcpu,
-> >  					  struct kvm_exit_mmio *mmio,
-> >  					  phys_addr_t offset)
-> >  {
-> > -	u32 *reg = vgic_bitmap_get_reg(&vcpu->kvm->arch.vgic.irq_pending,
-> > -				       vcpu->vcpu_id, offset);
-> > +	u32 *level_active;
-> > +	u32 *reg;
-> > +	struct vgic_dist *dist = &vcpu->kvm->arch.vgic;
-> > +
-> > +	reg = vgic_bitmap_get_reg(&dist->irq_pending, vcpu->vcpu_id, offset);
-> >  	vgic_reg_access(mmio, reg, offset,
-> >  			ACCESS_READ_VALUE | ACCESS_WRITE_CLEARBIT);
-> >  	if (mmio->is_write) {
-> > +		/* Re-set level triggered level-active interrupts */
-> > +		level_active = vgic_bitmap_get_reg(&dist->irq_level,
-> > +					  vcpu->vcpu_id, offset);
-> > +		reg = vgic_bitmap_get_reg(&dist->irq_pending,
-> > +					  vcpu->vcpu_id, offset);
-> > +		*reg |= *level_active;
-> 
-> So here we're updating the main pending bitmap with what comes from the
-> wires...
-> 
-
-correct
-
-> > +		/* Clear soft-pending flags */
-> > +		reg = vgic_bitmap_get_reg(&dist->irq_soft_pend,
-> > +					  vcpu->vcpu_id, offset);
-> > +		vgic_reg_access(mmio, reg, offset,
-> > +				ACCESS_READ_VALUE | ACCESS_WRITE_CLEARBIT);
-> > +
-> 
-> ... and then clearing the soft bits only. But we're supposed to have
-> "pending = wire | soft" at any time, aren't we? Here, I read "pending =
-> wire", and the soft bits not having influence on pending.
-> 
-> I'm probably missing something obvious...
-> 
-
-I'm not sure it's obvious, but:
-
-1) we clear the irq_pending bit for the set bits in the guest source
-register (on the first vgic_reg_access, before the if (mmio->is_write))
-
-2) we may now have cleared bits that shouldn't actually be cleared,
-because we need to or it with the wire state, so
-
-3) fetch the wire state
-
-4) set the irq_pending bit for those with an active wire state (*reg |=
-*level_active)
-
-5) now we deal with the soft pending flags, which should simply be
-cleared according tot he source register
-
-Your question on soft bits not having influence on pending can be
-answered by saying, "this is a write to the clear register for the soft
-state, so the soft state for all relevant irqs we are dealing with here
-is always 0 (we are clearing it right now), so
-
-  pending = wire | soft && soft == 0   =>
-  pending = wire
-
-  for those interrupts addressed with bits set in the source register.
-
-
-does this help?
-
-> >  		vgic_update_state(vcpu->kvm);
-> >  		return true;
-> >  	}
-> > @@ -1263,17 +1334,36 @@ static bool vgic_process_maintenance(struct kvm_vcpu *vcpu)
-> >  
-> >  		for_each_set_bit(lr, eisr_ptr, vgic->nr_lr) {
-> >  			struct vgic_lr vlr = vgic_get_lr(vcpu, lr);
-> > +			WARN_ON(vgic_irq_is_edge(vcpu, vlr.irq));
-> >  
-> >  			vgic_irq_clear_queued(vcpu, vlr.irq);
-> >  			WARN_ON(vlr.state & LR_STATE_MASK);
-> >  			vlr.state = 0;
-> >  			vgic_set_lr(vcpu, lr, vlr);
-> >  
-> > +			/*
-> > +			 * If the IRQ was EOIed it was also ACKed and we we
-> > +			 * therefore assume we can clear the soft pending
-> > +			 * state (should it had been set) for this interrupt.
-> > +			 *
-> > +			 * Note: if the IRQ soft pending state was set after
-> > +			 * the IRQ was acked, it actually shouldn't be
-> > +			 * cleared, but we have no way of knowing that unless
-> > +			 * we start trapping ACKs when the soft-pending state
-> > +			 * is set.
-> > +			 */
-> > +			vgic_dist_irq_clear_soft_pend(vcpu, vlr.irq);
-> > +
-> >  			/* Any additional pending interrupt? */
-> > -			if (vgic_dist_irq_is_pending(vcpu, vlr.irq)) {
-> > +			if (vgic_dist_irq_get_level(vcpu, vlr.irq)) {
-> > +				/*
-> > +				 * XXX: vgic_cpu_irq_set not always be true in
-> > +				 * this case?
-> > +				 */
-> >  				vgic_cpu_irq_set(vcpu, vlr.irq);
-> >  				level_pending = true;
-> >  			} else {
-> > +				vgic_dist_irq_clear_pending(vcpu, vlr.irq);
-> >  				vgic_cpu_irq_clear(vcpu, vlr.irq);
-> >  			}
-> >  
-> > @@ -1379,17 +1469,19 @@ static void vgic_kick_vcpus(struct kvm *kvm)
-> >  static int vgic_validate_injection(struct kvm_vcpu *vcpu, int irq, int level)
-> >  {
-> >  	int edge_triggered = vgic_irq_is_edge(vcpu, irq);
-> > -	int state = vgic_dist_irq_is_pending(vcpu, irq);
-> >  
-> >  	/*
-> >  	 * Only inject an interrupt if:
-> >  	 * - edge triggered and we have a rising edge
-> >  	 * - level triggered and we change level
-> >  	 */
-> > -	if (edge_triggered)
-> > +	if (edge_triggered) {
-> > +		int state = vgic_dist_irq_is_pending(vcpu, irq);
-> >  		return level > state;
-> > -	else
-> > +	} else {
-> > +		int state = vgic_dist_irq_get_level(vcpu, irq);
-> >  		return level != state;
-> > +	}
-> >  }
-> >  
-> >  static bool vgic_update_irq_pending(struct kvm *kvm, int cpuid,
-> > @@ -1419,10 +1511,19 @@ static bool vgic_update_irq_pending(struct kvm *kvm, int cpuid,
-> >  
-> >  	kvm_debug("Inject IRQ%d level %d CPU%d\n", irq_num, level, cpuid);
-> >  
-> > -	if (level)
-> > +	if (level) {
-> > +		if (level_triggered)
-> > +			vgic_dist_irq_set_level(vcpu, irq_num);
-> >  		vgic_dist_irq_set_pending(vcpu, irq_num);
-> > -	else
-> > -		vgic_dist_irq_clear_pending(vcpu, irq_num);
-> > +	} else {
-> > +		if (level_triggered) {
-> > +			vgic_dist_irq_clear_level(vcpu, irq_num);
-> > +			if (!vgic_dist_irq_soft_pend(vcpu, irq_num))
-> > +				vgic_dist_irq_clear_pending(vcpu, irq_num);
-> > +		} else {
-> > +			vgic_dist_irq_clear_pending(vcpu, irq_num);
-> > +		}
-> > +	}
-> >  
-> >  	enabled = vgic_irq_is_enabled(vcpu, irq_num);
-> 
-> Overall, I find the change a bit confusing. I understand the need to
-> maintain two different bitmaps for wire and soft, but I don't really get
-> the logic that you've introduced here... Maybe I should try more coffee
-> or something? ;-)
-
-Is this comment targeted at the changes to vgic_update_irq_pending, or
-the whole patch?
-
-For the whole patch, and specifically the mmio accessors, I started out
-trying to write the code more straight-forward, trying to factor out
-some stuff from vgic_bitmap_get_reg(), but it became really ugly and
-very long and really easier to folllow.  I can try to rewrite the whole
-thing again, but I really thought the more verbose version of the mmio
-accessors was more difficult to follow.
-
--Christoffer
+Best Regards,
+Neil Zhang
