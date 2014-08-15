@@ -1,33 +1,37 @@
-From: bigeasy@linutronix.de (Sebastian Andrzej Siewior)
-Date: Fri, 15 Aug 2014 22:20:53 +0200
-Subject: [PATCH 05/15] tty: serial: Add 8250-core based omap driver
-In-Reply-To: <20140815193352.GC17765@csclub.uwaterloo.ca>
+From: tony@atomide.com (Tony Lindgren)
+Date: Fri, 15 Aug 2014 13:28:27 -0700
+Subject: [PATCH v7] 8250-core based serial driver for OMAP + DMA
+In-Reply-To: <53EE5BF8.3010007@linutronix.de>
 References: <1408124563-31541-1-git-send-email-bigeasy@linutronix.de>
- <1408124563-31541-6-git-send-email-bigeasy@linutronix.de>
- <20140815183731.GI17769@csclub.uwaterloo.ca> <53EE5F3F.2000707@linutronix.de>
- <20140815193352.GC17765@csclub.uwaterloo.ca>
-Message-ID: <53EE6BA5.2060101@linutronix.de>
+ <20140815181704.GH17769@csclub.uwaterloo.ca>
+ <53EE5BF8.3010007@linutronix.de>
+Message-ID: <20140815202826.GC9239@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08/15/2014 09:33 PM, Lennart Sorensen wrote:
->> On the other hand if you use DMA then it can handle transfers > 64bytes
->> in one go and you can start transfers while the FIFO is not completely
->> empty.
+* Sebastian Andrzej Siewior <bigeasy@linutronix.de> [140815 12:16]:
+> On 08/15/2014 08:17 PM, Lennart Sorensen wrote:
 > 
-> You can dma more than the fifo size?
-
-Yes. The UART asserts the DMA line as long as there is room for
-$TRESHOLD number of bytes. So we never overflow the FIFO. That is why we
-can't take any DMA channel but only *the* one.
-
->> There is patch in Greg's tty tree already where you are able to
->> configure the RX trigger level. We could wire this up once we agree
->> which levels we want support. The OMAP supports all levels from 1?63.
+> > Are you saying that with the new driver you have to respond to the RX
+> > irq faster than before to avoid overflows?  It is not quite clear.
 > 
-> All? or just every 4 (that's what I just read in the DRA7xx docs).
+> Yes. The irq fires 46 bytes giving you 16 bytes buffer before overflow
+> vs 63 bytes buffer the old one had.
+> 
+> > I do think 40000 interrupts to handle 40000 bytes of date does seem a
+> > tad inefficient, so dropping to 854 looks a lot nicer.  Was the omap
+> > driver not using the fifo trigger levels at all?
+> 
+> It configured the trigger levels to 1 for RX and 16 for TX.
 
-All. Take a look at the RX_TRIGGER constant while comparing source vs
-manual :)
+Hmm that weird RX trigger level is a workaround for lost characters.
 
-Sebastian
+See commit 0ba5f66836 (tty: serial: OMAP: use a 1-byte RX FIFO
+threshold in PIO mode :)
+
+There's paste test in that commit, I wonder if the 8250 drivers
+can deal with it any better?
+
+Regards,
+
+Tony
