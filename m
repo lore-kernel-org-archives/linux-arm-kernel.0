@@ -1,60 +1,48 @@
-From: rvaswani@codeaurora.org (Rohit Vaswani)
-Date: Fri, 15 Aug 2014 16:12:09 -0700
-Subject: [PATCH] arm64: smp: Update the topology masks before calling
- CPU_STARTING notifiers
-In-Reply-To: <20140815104333.GH27466@arm.com>
-References: <1407892269-28650-1-git-send-email-rvaswani@codeaurora.org>
- <20140815104333.GH27466@arm.com>
-Message-ID: <53EE93C9.9060306@codeaurora.org>
+From: broonie@kernel.org (Mark Brown)
+Date: Sat, 16 Aug 2014 00:19:25 +0100
+Subject: [PATCH 19/19] Documentation: ACPI for ARM64
+In-Reply-To: <201408152149.44283.arnd@arndb.de>
+References: <1406206825-15590-1-git-send-email-hanjun.guo@linaro.org>
+ <8599266.1aeEWcB8r7@wuerfel>
+ <CAOesGMiOzRYmmYcBV=eFr8U-e_BJAUg9gpnT0DPwJuyxBz9-1g@mail.gmail.com>
+ <201408152149.44283.arnd@arndb.de>
+Message-ID: <20140815231925.GO17528@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 8/15/2014 3:43 AM, Will Deacon wrote:
-> On Wed, Aug 13, 2014 at 02:11:09AM +0100, Rohit Vaswani wrote:
->> Currently, the CPU_STARTING notifiers would observe an incorrect sibling
->> mask since the notifier chain is called before the topology masks are updated
->> for the new cpu.
->> Update the topology masks before calling the notifier chain to fix this
->> problem.
->>
->> Signed-off-by: Rohit Vaswani <rvaswani@codeaurora.org>
->> ---
->>   arch/arm/kernel/smp.c   | 4 ++--
->>   arch/arm64/kernel/smp.c | 4 ++--
->>   2 files changed, 4 insertions(+), 4 deletions(-)
->>
->> diff --git a/arch/arm/kernel/smp.c b/arch/arm/kernel/smp.c
->> index 7c4fada..0e2237c 100644
->> --- a/arch/arm/kernel/smp.c
->> +++ b/arch/arm/kernel/smp.c
->> @@ -363,12 +363,12 @@ asmlinkage void secondary_start_kernel(void)
->>   	if (smp_ops.smp_secondary_init)
->>   		smp_ops.smp_secondary_init(cpu);
->>   
->> +	smp_store_cpu_info(cpu);
->> +
->>   	notify_cpu_starting(cpu);
->>   
->>   	calibrate_delay();
->>   
->> -	smp_store_cpu_info(cpu);
->> -
-> Hmm, smp_store_cpu_info takes a copy of loops_per_jiffy. Are you sure it's
-> safe to move the call before calibrate_delay?
+On Fri, Aug 15, 2014 at 09:49:44PM +0200, Arnd Bergmann wrote:
 
-Right! - I had looked at the arm64 version .  I checked for arm32 now 
-and I think we should be
-safe to move calibrate_delay before the smp_store_cpu_info and I can 
-push a v2 version if
-there are no concerns. I did not see calibrate_delay having any 
-dependency for cpu_starting notifiers.
+> Agreed. I think we had already concluded previously when discussing this
+> patch that the clock management in APCI-5.1 should not be used on ARM64,
+> but I think there is a problem one level deeper: The 5.0 and 5.1 versions
+> apparently add a lot of new features that are meant for either ARM64
+> servers or embedded x86 machines. These two typically have conflicting
+> requirements, and it would be better for the specification itself to
+> provide clearer statements to which parts apply in what use case rather
+> than us (the Linux people) making claims about what parts of the spec
+> are acceptable or not.
 
--Rohit
-> Will
+> There are already two specified classes of systems, the legacy x86
+> and itanium machines, and the "reduced hardware" profile, which
+> apparently covers both of the new types of machines mentioned above.
 
+We also have legacy machines taking bits of the new stuff to contend
+with.
 
-Thanks,
-Rohit Vaswani
+> What would be the process to get a clarification into the next version
+> of ACPI that makes them more distinct?
 
--- 
-The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum, hosted by The Linux Foundation
+I agree with this, I actually had some patches come in this week which
+seem to be worse than anything we've talked about and were intended just
+key off DMI data instead of any form of platform data AFAICT.  The
+pushback was that the Windows driver was doing this and the BIOS wasn't
+about to change for us.  I'm not really convinced that waving some Linux
+internal document about ARM servers at them is going to be terribly
+persuasive to get them to improve future systems.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140816/83150d07/attachment.sig>
