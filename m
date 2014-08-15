@@ -1,63 +1,43 @@
-From: f.fainelli@gmail.com (Florian Fainelli)
-Date: Fri, 15 Aug 2014 12:00:07 -0700
-Subject: VFP available on a single CPU in a dual-CPU complex
-In-Reply-To: <8014330.Y4lYRxBeEx@wuerfel>
-References: <CAGVrzcaX4n2rJko_Kny81jkzQbV6z5TmcA2coGrj6BU-ahiOTA@mail.gmail.com>
- <201408151103.01349.arnd@arndb.de> <20140815091445.GC27466@arm.com>
- <8014330.Y4lYRxBeEx@wuerfel>
-Message-ID: <53EE58B7.6030207@gmail.com>
+From: rostedt@goodmis.org (Steven Rostedt)
+Date: Fri, 15 Aug 2014 15:03:14 -0400
+Subject: Random MAC address on my BeagleBone White
+In-Reply-To: <20140815184911.GJ17027@pengutronix.de>
+References: <20140815134221.08c546a0@gandalf.local.home>
+ <20140815184911.GJ17027@pengutronix.de>
+Message-ID: <20140815150314.60d01877@gandalf.local.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08/15/2014 11:54 AM, Arnd Bergmann wrote:
-> On Friday 15 August 2014 10:14:45 Will Deacon wrote:
->> On Fri, Aug 15, 2014 at 10:03:01AM +0100, Arnd Bergmann wrote:
->>> On Friday 15 August 2014, Florian Fainelli wrote:
->>>> Hello,
->>>>
->>>> On Broadcom's BCM63138 SoC, the second Cortex A9 CPU does not have
->>>> VFP, which is a problem as one might imagine because we currently
->>>> assume it is available for all CPUs within the complex.
->>>
->>> Wow, that is pretty crazy.
->>>
->>>> I started to patch vfp_support_entry to test for CPU1 and branch to a
->>>> different location, but that raises a bunch of question, in particular
->>>> what to do if NEON/VFP came from the kernel, how can we migrate that
->>>> execution to CPU0?
->>>>
->>>> If the answer is don't use VFP, I guess that's fine, and I can have a
->>>> runtime check in vfp_init() that checks for BCM63138 and set
->>>> vfp_vector to vfp_null_entry even though we are running on a multi-v7
->>>> kernel with VFP enabled.
->>>
->>> I think adding hooks to the scheduler for this case is problematic, so
->>> the easiest way would of course be to give the user a choice between
->>> VFP or SMP on this hardware. For anything beyond that, you could do
->>> a prototype patch (possibly for integration into OpenWRT) so we can
->>> see how ugly it gets to support this setup.
->>
->> I agree. We have something similar on the Realview-PBX (dual A9, only one
->> CPU with NEON) and the answer is not to enable NEON if you want SMP.
+On Fri, 15 Aug 2014 20:49:11 +0200
+Markus Pargmann <mpa@pengutronix.de> wrote:
+
+> Hi Steven,
 > 
-> Does that work with a multiplatform kernel?
+ 
+> The am335x SoC already has 4 registers which contain two unique vendor
+> MAC addresses, so they should be used automatically instead of a random
+> one.
 > 
-> I have patches to enable realview for ARCH_MULTIPLATFORM, and I wonder
-> if that gets in the way. Do we have code to detect this setup at runtime
-> and disable NEON/VFP if only a subset of the enabled CPUs have it?
+> As you mentioned above, I sent a series to read and use those addresses
+> in the linux kernel. There were some problems with the series which I
+> fixed to send a new version of the series, but I didn't send it yet. I
+> will try to resend it tomorrow and Cc you. It would be great if you
+> could test it.
+> 
 
-I was wondering about that too, here are the two options I see for these
-pathological cases:
+Yep, but I don't work on weekends (Chief Home Officer's orders). Well,
+I should say, I don't do computer work on weekends. House work on the
+other hand, plenty (Again, the CHO's orders). It will have to wait till
+Monday.
 
-- if SMP is enabled, and CONFIG_VFP is also enabled, refuse bringing up
-cores that do not support VFP/NEON, thus becoming a SMP on UP, and do
-that for the platform/SoC-specific SMP support code
+> As far as I know, barebox also works with the beaglebone white and it
+> should set the correct MAC address as well. So if you need the same IP
+> address in linux as in the bootloader, you could try barebox.
 
-- or, in the VFP initialization, completely disable VFP (overriding
-VFP_arch in SoC specific code?) because at least one of CPU does not
-support it
+Maybe I'll give it a try. But if your stuff works I'll be fine with
+that.
 
-I would favor enabling SMP over enabling VFP, because that's probably
-what most people would expect.
---
-Florian
+Thanks! Hopefully I'll be using this board in my ktest tutorial at
+ELCEU in October.
+
+-- Steve
