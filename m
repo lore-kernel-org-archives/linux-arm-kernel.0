@@ -1,133 +1,180 @@
 From: f.fainelli@gmail.com (Florian Fainelli)
-Date: Thu, 14 Aug 2014 17:11:24 -0700
-Subject: [PATCH v2 2/5] ARM: BCM63XX: add low-level UART debug support
+Date: Thu, 14 Aug 2014 17:11:25 -0700
+Subject: [PATCH v2 3/5] ARM: BCM63XX: add BCM63138 minimal Device Tree
 In-Reply-To: <1408061487-20984-1-git-send-email-f.fainelli@gmail.com>
 References: <1408061487-20984-1-git-send-email-f.fainelli@gmail.com>
-Message-ID: <1408061487-20984-3-git-send-email-f.fainelli@gmail.com>
+Message-ID: <1408061487-20984-4-git-send-email-f.fainelli@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Broadcom BCM63xx DSL SoCs have a different UART implementation for which
-we need specially crafted low-level debug assembly code to support. Add
-support for this using the standard definitions provided in
-include/linux/serial_bcm63xx.h (shared with their MIPS counterparts).
+Add a very minimalistic BCM63138 Device Tree include file which
+describes the BCM63138 SoC with only the basic set of required
+peripherals:
+
+- Cortex A9 CPUs
+- ARM GIC
+- ARM SCU
+- PL310 Level-2 cache controller
+- ARM TWD & Global timers
+- ARM TWD watchdog
+- legacy MIPS bus (UBUS)
+- BCM6345-style UARTs (disabled by default)
+
+Since the PL310 L2 cache controller does not come out of reset with
+correct default values, we need to override the 'cache-sets' and
+'cache-size' properties to get its geometry right.
 
 Signed-off-by: Florian Fainelli <f.fainelli@gmail.com>
 ---
 Changes in v2:
-- rebased
+- removed buses 'reg' properties since they are unused
+- align buses 'ranges' properties on a nicer boundary
+- moved mpcore peripherals one level higher in the axi bus
+- added uart nodes since we have a driver for it (bcm63xx_uart)
 
- arch/arm/Kconfig.debug           | 18 ++++++++++++++++--
- arch/arm/include/debug/bcm63xx.S | 33 +++++++++++++++++++++++++++++++++
- 2 files changed, 49 insertions(+), 2 deletions(-)
- create mode 100644 arch/arm/include/debug/bcm63xx.S
+ arch/arm/boot/dts/bcm63138.dtsi | 134 ++++++++++++++++++++++++++++++++++++++++
+ 1 file changed, 134 insertions(+)
+ create mode 100644 arch/arm/boot/dts/bcm63138.dtsi
 
-diff --git a/arch/arm/Kconfig.debug b/arch/arm/Kconfig.debug
-index b11ad54f8d17..07e9dd5eda26 100644
---- a/arch/arm/Kconfig.debug
-+++ b/arch/arm/Kconfig.debug
-@@ -122,6 +122,11 @@ choice
- 		  mobile SoCs in the Kona family of chips (e.g. bcm28155,
- 		  bcm11351, etc...)
- 
-+	config DEBUG_BCM63XX
-+		bool "Kernel low-level debugging on BCM63XX UART"
-+		depends on ARCH_BCM_63XX
-+		select DEBUG_UART_BCM63XX
-+
- 	config DEBUG_BERLIN_UART
- 		bool "Marvell Berlin SoC Debug UART"
- 		depends on ARCH_BERLIN
-@@ -1038,6 +1043,7 @@ config DEBUG_LL_INCLUDE
- 	default "debug/vf.S" if DEBUG_VF_UART
- 	default "debug/vt8500.S" if DEBUG_VT8500_UART0
- 	default "debug/zynq.S" if DEBUG_ZYNQ_UART0 || DEBUG_ZYNQ_UART1
-+	default "debug/bcm63xx.S" if DEBUG_UART_BCM63XX
- 	default "mach/debug-macro.S"
- 
- # Compatibility options for PL01x
-@@ -1057,6 +1063,10 @@ config DEBUG_UART_8250
- 		ARCH_IOP33X || ARCH_IXP4XX || \
- 		ARCH_LPC32XX || ARCH_MV78XX0 || ARCH_ORION5X || ARCH_RPC
- 
-+# Compatibility options for BCM63xx
-+config DEBUG_UART_BCM63XX
-+	def_bool ARCH_BCM_63XX
-+
- config DEBUG_UART_PHYS
- 	hex "Physical base address of debug UART"
- 	default 0x01c20000 if DEBUG_DAVINCI_DMx_UART0
-@@ -1122,11 +1132,13 @@ config DEBUG_UART_PHYS
- 	default 0xffc02000 if DEBUG_SOCFPGA_UART
- 	default 0xffd82340 if ARCH_IOP13XX
- 	default 0xfff36000 if DEBUG_HIGHBANK_UART
-+	default 0xfffe8600 if DEBUG_UART_BCM63XX
- 	default 0xfffff700 if ARCH_IOP33X
- 	depends on DEBUG_LL_UART_8250 || DEBUG_LL_UART_PL01X || \
- 		DEBUG_LL_UART_EFM32 || \
- 		DEBUG_UART_8250 || DEBUG_UART_PL01X || \
--		DEBUG_MSM_UART || DEBUG_QCOM_UARTDM || DEBUG_S3C24XX_UART
-+		DEBUG_MSM_UART || DEBUG_QCOM_UARTDM || DEBUG_S3C24XX_UART || \
-+		DEBUG_UART_BCM63XX
- 
- config DEBUG_UART_VIRT
- 	hex "Virtual base address of debug UART"
-@@ -1157,6 +1169,7 @@ config DEBUG_UART_VIRT
- 	default 0xfa71e000 if DEBUG_QCOM_UARTDM
- 	default 0xfb009000 if DEBUG_REALVIEW_STD_PORT
- 	default 0xfb10c000 if DEBUG_REALVIEW_PB1176_PORT
-+	default 0xfcfe8600 if DEBUG_UART_BCM63XX
- 	default 0xfd000000 if ARCH_SPEAR3XX || ARCH_SPEAR6XX
- 	default 0xfd000000 if ARCH_SPEAR13XX
- 	default 0xfd012000 if ARCH_MV78XX0
-@@ -1194,7 +1207,8 @@ config DEBUG_UART_VIRT
- 	default DEBUG_UART_PHYS if !MMU
- 	depends on DEBUG_LL_UART_8250 || DEBUG_LL_UART_PL01X || \
- 		DEBUG_UART_8250 || DEBUG_UART_PL01X || \
--		DEBUG_MSM_UART || DEBUG_QCOM_UARTDM || DEBUG_S3C24XX_UART
-+		DEBUG_MSM_UART || DEBUG_QCOM_UARTDM || DEBUG_S3C24XX_UART || \
-+		DEBUG_UART_BCM63XX
- 
- config DEBUG_UART_8250_SHIFT
- 	int "Register offset shift for the 8250 debug UART"
-diff --git a/arch/arm/include/debug/bcm63xx.S b/arch/arm/include/debug/bcm63xx.S
+diff --git a/arch/arm/boot/dts/bcm63138.dtsi b/arch/arm/boot/dts/bcm63138.dtsi
 new file mode 100644
-index 000000000000..e7164d570f44
+index 000000000000..b7ce4da3d742
 --- /dev/null
-+++ b/arch/arm/include/debug/bcm63xx.S
-@@ -0,0 +1,33 @@
++++ b/arch/arm/boot/dts/bcm63138.dtsi
+@@ -0,0 +1,134 @@
 +/*
-+ * Broadcom BCM63xx low-level UART debug
-+ *
-+ * Copyright (C) 2014 Broadcom Corporation
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
++ * Broadcom BCM63138 DSL SoCs Device Tree
 + */
 +
-+#include <linux/serial_bcm63xx.h>
++#include <dt-bindings/interrupt-controller/arm-gic.h>
++#include <dt-bindings/interrupt-controller/irq.h>
 +
-+	.macro	addruart, rp, rv, tmp
-+	ldr	\rp, =CONFIG_DEBUG_UART_PHYS
-+	ldr	\rv, =CONFIG_DEBUG_UART_VIRT
-+	.endm
++#include "skeleton.dtsi"
 +
-+	.macro	senduart, rd, rx
-+	/* word access do not work */
-+	strb	\rd, [\rx, #UART_FIFO_REG]
-+	.endm
++/ {
++	compatible = "brcm,bcm63138";
++	model = "Broadcom BCM63138 DSL SoC";
++	interrupt-parent = <&gic>;
 +
-+	.macro	waituart, rd, rx
-+1001:	ldr	\rd, [\rx, #UART_IR_REG]
-+	tst	\rd, #(1 << UART_IR_TXEMPTY)
-+	beq	1001b
-+	.endm
++	aliases {
++		uart0 = &serial0;
++		uart1 = &serial1;
++	};
 +
-+	.macro	busyuart, rd, rx
-+1002:	ldr	\rd, [\rx, #UART_IR_REG]
-+	tst	\rd, #(1 << UART_IR_TXTRESH)
-+	beq	1002b
-+	.endm
++	cpus {
++		#address-cells = <1>;
++		#size-cells = <0>;
++
++		cpu at 0 {
++			device_type = "cpu";
++			compatible = "arm,cortex-a9";
++			next-level-cache = <&L2>;
++			reg = <0>;
++		};
++
++		cpu at 1 {
++			device_type = "cpu";
++			compatible = "arm,cortex-a9";
++			next-level-cache = <&L2>;
++			reg = <1>;
++		};
++	};
++
++	clocks {
++		#address-cells = <1>;
++		#size-cells = <0>;
++
++		arm_timer_clk: arm_timer_clk {
++			#clock-cells = <0>;
++			compatible = "fixed-clock";
++			clock-frequency = <500000000>;
++		};
++
++		periph_clk: periph_clk {
++			#clock-cells = <0>;
++			compatible = "fixed-clock";
++			clock-frequency = <50000000>;
++			clock-output-names = "periph";
++		};
++	};
++
++	/* ARM bus */
++	axi at 80000000 {
++		compatible = "simple-bus";
++		ranges = <0 0x80000000 0x84000>;
++		#address-cells = <1>;
++		#size-cells = <1>;
++
++		L2: cache-controller at 1d000 {
++			compatible = "arm,pl310-cache";
++			reg = <0x1d000 0x1000>;
++			cache-unified;
++			cache-level = <2>;
++			cache-sets = <16>;
++			cache-size = <0x80000>;
++			interrupts = <GIC_PPI 0 IRQ_TYPE_LEVEL_HIGH>;
++		};
++
++		scu: scu at 1e000 {
++			compatible = "arm,cortex-a9-scu";
++			reg = <0x1e000 0x100>;
++		};
++
++		gic: interrupt-controller at 1e100 {
++			compatible = "arm,cortex-a9-gic";
++			reg = <0x1f000 0x1000
++				0x1e100 0x100>;
++			#interrupt-cells = <3>;
++			#address-cells = <0>;
++			interrupt-controller;
++		};
++
++		global_timer: timer at 1e200 {
++			compatible = "arm,cortex-a9-global-timer";
++			reg = <0x1e200 0x20>;
++			interrupts = <GIC_PPI 11 IRQ_TYPE_LEVEL_HIGH>;
++			clocks = <&arm_timer_clk>;
++		};
++
++		local_timer: local-timer at 1e600 {
++			compatible = "arm,cortex-a9-twd-timer";
++			reg = <0x1e600 0x20>;
++			interrupts = <GIC_PPI 13 IRQ_TYPE_LEVEL_HIGH>;
++			clocks = <&arm_timer_clk>;
++		};
++
++		twd_watchdog: watchdog at 1e620 {
++			compatible = "arm,cortex-a9-twd-wdt";
++			reg = <0x1e620 0x20>;
++			interupts = <GIC_PPI 14 IRQ_TYPE_LEVEL_HIGH>;
++		};
++	};
++
++	/* Legacy UBUS base */
++	ubus at fffe8000 {
++		compatible = "simple-bus";
++		#address-cells = <1>;
++		#size-cells = <1>;
++		ranges = <0 0xfffe8000 0x8100>;
++
++		serial0: uart at 600 {
++			compatible = "brcm,bcm6345-uart";
++			reg = <0x600 0x1b>;
++			interrupts = <GIC_SPI 32 0>;
++			clocks = <&periph_clk>;
++			clock-names = "periph";
++			status = "disabled";
++		};
++
++		serial1: uart at 620 {
++			compatible = "brcm,bcm6345-uart";
++			reg = <0x620 0x1b>;
++			interrupts = <GIC_SPI 33 0>;
++			clocks = <&periph_clk>;
++			clock-names = "periph";
++			status = "disabled";
++		};
++	};
++};
 -- 
 1.9.1
