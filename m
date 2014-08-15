@@ -1,68 +1,42 @@
 From: f.fainelli@gmail.com (Florian Fainelli)
-Date: Thu, 14 Aug 2014 17:11:26 -0700
-Subject: [PATCH v2 4/5] ARM: BCM63XX: add BCM963138DVT Reference platform DTS
+Date: Thu, 14 Aug 2014 17:11:27 -0700
+Subject: [PATCH v2 5/5] MAINTAINERS: add entry for the Broadcom BCM63xx ARM
+ SoCs
 In-Reply-To: <1408061487-20984-1-git-send-email-f.fainelli@gmail.com>
 References: <1408061487-20984-1-git-send-email-f.fainelli@gmail.com>
-Message-ID: <1408061487-20984-5-git-send-email-f.fainelli@gmail.com>
+Message-ID: <1408061487-20984-6-git-send-email-f.fainelli@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add a DTS file for the Broadcom BCM963138DVT reference platform board
-which leverages the bcm63138.dtsi SoC DTSi file.
+Add a MAINTAINERS entry covering all the Broadcom BCM63xx ARM DSL SoCs
+files along with the relevant git tree and mailing-list.
 
 Signed-off-by: Florian Fainelli <f.fainelli@gmail.com>
 ---
 Changes in v2:
-- consistently use the prefix 963138 since this is a reference board
-- enable UARTs for that reference board so we get to a prompt
+- rebased against latest changes
 
- arch/arm/boot/dts/Makefile         |  1 +
- arch/arm/boot/dts/bcm963138dvt.dts | 25 +++++++++++++++++++++++++
- 2 files changed, 26 insertions(+)
- create mode 100644 arch/arm/boot/dts/bcm963138dvt.dts
+ MAINTAINERS | 8 ++++++++
+ 1 file changed, 8 insertions(+)
 
-diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
-index b8c5cd3ddeb9..7ffe736abcf8 100644
---- a/arch/arm/boot/dts/Makefile
-+++ b/arch/arm/boot/dts/Makefile
-@@ -53,6 +53,7 @@ dtb-$(CONFIG_ARCH_ATLAS6) += atlas6-evb.dtb
- dtb-$(CONFIG_ARCH_AXXIA) += axm5516-amarillo.dtb
- dtb-$(CONFIG_ARCH_BCM2835) += bcm2835-rpi-b.dtb
- dtb-$(CONFIG_ARCH_BCM_5301X) += bcm4708-netgear-r6250.dtb
-+dtb-$(CONFIG_ARCH_BCM_63XX) += bcm963138dvt.dtb
- dtb-$(CONFIG_ARCH_BCM_MOBILE) += bcm28155-ap.dtb \
- 	bcm21664-garnet.dtb
- dtb-$(CONFIG_ARCH_BERLIN) += \
-diff --git a/arch/arm/boot/dts/bcm963138dvt.dts b/arch/arm/boot/dts/bcm963138dvt.dts
-new file mode 100644
-index 000000000000..c5f7620881f7
---- /dev/null
-+++ b/arch/arm/boot/dts/bcm963138dvt.dts
-@@ -0,0 +1,25 @@
-+/*
-+ * Broadcom BCM63138 Reference Board DTS
-+ */
+diff --git a/MAINTAINERS b/MAINTAINERS
+index 7e2eb4c646e3..2075bb579853 100644
+--- a/MAINTAINERS
++++ b/MAINTAINERS
+@@ -2013,6 +2013,14 @@ F:	arch/arm/mach-bcm/bcm_5301x.c
+ F:	arch/arm/boot/dts/bcm5301x.dtsi
+ F:	arch/arm/boot/dts/bcm470*
+ 
++BROADCOM BCM63XX ARM ARCHITECTURE
++M:	Florian Fainelli <f.fainelli@gmail.com>
++L:	linux-arm-kernel at lists.infradead.org
++T:	git git://git.github.com/broadcom/arm-bcm63xx
++S:	Maintained
++F:	arch/arm/mach-bcm/bcm63xx.c
++F:	arch/arm/include/debug/bcm63xx.S
 +
-+/dts-v1/;
-+
-+#include "bcm63138.dtsi"
-+
-+/ {
-+	compatible = "brcm,BCM963138DVT", "brcm,bcm63138";
-+	model = "Broadcom BCM963138DVT";
-+
-+	memory {
-+		reg = <0x0 0x08000000>;
-+	};
-+
-+};
-+
-+&serial0 {
-+	status = "okay";
-+};
-+
-+&serial1 {
-+	status = "okay";
-+};
+ BROADCOM BCM7XXX ARM ARCHITECTURE
+ M:	Marc Carino <marc.ceeeee@gmail.com>
+ M:	Brian Norris <computersforpeace@gmail.com>
 -- 
 1.9.1
