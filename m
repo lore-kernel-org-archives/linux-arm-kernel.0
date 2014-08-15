@@ -1,141 +1,88 @@
-From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
-Date: Fri, 15 Aug 2014 20:42:44 +0200
-Subject: [PATCH v4] mmc: implement Driver Stage Register handling
-In-Reply-To: <CAPDyKFp=1BDeZUC-GNLLT+BK0gqisQ0mP8x4chu43F2pKujGsg@mail.gmail.com>
-References: <1408091882-32123-1-git-send-email-u.kleine-koenig@pengutronix.de>
- <CAPDyKFp=1BDeZUC-GNLLT+BK0gqisQ0mP8x4chu43F2pKujGsg@mail.gmail.com>
-Message-ID: <20140815184244.GJ5134@pengutronix.de>
+From: mpa@pengutronix.de (Markus Pargmann)
+Date: Fri, 15 Aug 2014 20:49:11 +0200
+Subject: Random MAC address on my BeagleBone White
+In-Reply-To: <20140815134221.08c546a0@gandalf.local.home>
+References: <20140815134221.08c546a0@gandalf.local.home>
+Message-ID: <20140815184911.GJ17027@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Ulf,
+Hi Steven,
 
-On Fri, Aug 15, 2014 at 11:05:39AM +0200, Ulf Hansson wrote:
-> On 15 August 2014 10:38, Uwe Kleine-K?nig
-> <u.kleine-koenig@pengutronix.de> wrote:
-> > From: Sascha Hauer <s.hauer@pengutronix.de>
-> >
-> > Some eMMC and SD cards implement a DSR register that allows to tune
-> > raise/fall times and drive strength of the CMD and DATA outputs.
-> > The values to use depend on the card in use and the host.
-> > It might be needed to reduce the drive strength to prevent voltage peaks
-> > above the host's specification.
-> >
-> > Implement a 'dsr' devicetree property that allows to specify the value
-> > to set the DSR to. For non-dt setups the new members of mmc_host can be
-> > set by board code.
-> >
-> > This patch was initially authored by Sascha Hauer. It contains
-> > improvements authored by Markus Niebel and Uwe Kleine-K?nig.
-> >
-> > Signed-off-by: Sascha Hauer <s.hauer@pengutronix.de>
-> > Signed-off-by: Markus Niebel <Markus.Niebel@tq-group.com>
-> > Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
-> > ---
-> > Changes since v3:
-> >
-> >  - fix a compiler warning about err not being used.
-> >  - clearified valid range. I didn't write "16-bit value" because the
-> >    value is still expected to be written as 32-bit value in the device
-> >    tree.
-> >  - make host->dsr an u32, which simplified parsing the device tree and
-> >    also makes casting in mmc_set_dsr unnecessary.
-> > ---
-> >  Documentation/devicetree/bindings/mmc/mmc.txt |  2 ++
-> >  drivers/mmc/core/host.c                       |  8 ++++++++
-> >  drivers/mmc/core/mmc.c                        |  8 ++++++++
-> >  drivers/mmc/core/mmc_ops.c                    | 20 ++++++++++++++++++++
-> >  drivers/mmc/core/mmc_ops.h                    |  1 +
-> >  drivers/mmc/core/sd.c                         |  8 ++++++++
-> >  include/linux/mmc/card.h                      |  3 ++-
-> >  include/linux/mmc/host.h                      |  3 +++
-> >  8 files changed, 52 insertions(+), 1 deletion(-)
-> >
-> > diff --git a/Documentation/devicetree/bindings/mmc/mmc.txt b/Documentation/devicetree/bindings/mmc/mmc.txt
-> > index 3c18001dfd5d..a3fe21f2b709 100644
-> > --- a/Documentation/devicetree/bindings/mmc/mmc.txt
-> > +++ b/Documentation/devicetree/bindings/mmc/mmc.txt
-> > @@ -40,6 +40,8 @@ Optional properties:
-> >  - mmc-hs200-1_2v: eMMC HS200 mode(1.2V I/O) is supported
-> >  - mmc-hs400-1_8v: eMMC HS400 mode(1.8V I/O) is supported
-> >  - mmc-hs400-1_2v: eMMC HS400 mode(1.2V I/O) is supported
-> > +- dsr: Value the card's (optional) Driver Stage Register (DSR) should be
-> > +  programmed with. Valid range: [0 .. 0xffff].
-> >
-> >  *NOTE* on CD and WP polarity. To use common for all SD/MMC host controllers line
-> >  polarity properties, we have to fix the meaning of the "normal" and "inverted"
-> > diff --git a/drivers/mmc/core/host.c b/drivers/mmc/core/host.c
-> > index 95cceae96944..6442eecb672e 100644
-> > --- a/drivers/mmc/core/host.c
-> > +++ b/drivers/mmc/core/host.c
-> > @@ -452,6 +452,14 @@ int mmc_of_parse(struct mmc_host *host)
-> >         if (of_find_property(np, "mmc-hs400-1_2v", &len))
-> >                 host->caps2 |= MMC_CAP2_HS400_1_2V | MMC_CAP2_HS200_1_2V_SDR;
-> >
-> > +       host->dsr_req = of_property_read_u32(np, "dsr", &host->dsr);
-> > +       if (host->dsr_req && (host->dsr & ~0xffff)) {
+On Fri, Aug 15, 2014 at 01:42:21PM -0400, Steven Rostedt wrote:
+> Hi,
 > 
-> This doesn't look correct.
-> I guess what you want is: if (!host->dsr_req && (host->dsr & ~0xffff))
-Ah, you're right. I thought that of_property_read_u32 returned true if
-it worked and false if not. But it returns 0 for success and -ESOMETHING
-otherwise.
-
-So I want host->dsr_req = !of_property_read_u32(np, "dsr", &host->dsr);
-
-I now have some working hardware again, will test again and send an v5.
-
+> I'm using my BeagleBone White to debug some ftrace code and with the
+> help from people like Robert Nelson I was finally able to boot it and
+> test my kernel.
 > 
-> > +               dev_err(host->parent,
-> > +                       "device tree specified broken value for DSR: 0x%x, ignoring\n",
-> > +                       host->dsr);
-> > +               host->dsr_req = 0;
-> > +       }
-> > +
-> >         return 0;
-> >
-> >  out:
-> > diff --git a/drivers/mmc/core/mmc.c b/drivers/mmc/core/mmc.c
-> > index 793c6f7ddb04..fdc1ac1360c4 100644
-> > --- a/drivers/mmc/core/mmc.c
-> > +++ b/drivers/mmc/core/mmc.c
-> > @@ -162,6 +162,7 @@ static int mmc_decode_csd(struct mmc_card *card)
-> >         csd->read_partial = UNSTUFF_BITS(resp, 79, 1);
-> >         csd->write_misalign = UNSTUFF_BITS(resp, 78, 1);
-> >         csd->read_misalign = UNSTUFF_BITS(resp, 77, 1);
-> > +       csd->dsr_imp = UNSTUFF_BITS(resp, 76, 1);
-> >         csd->r2w_factor = UNSTUFF_BITS(resp, 26, 3);
-> >         csd->write_blkbits = UNSTUFF_BITS(resp, 22, 4);
-> >         csd->write_partial = UNSTUFF_BITS(resp, 21, 1);
-> > @@ -1273,6 +1274,13 @@ static int mmc_init_card(struct mmc_host *host, u32 ocr,
-> >         }
-> >
-> >         /*
-> > +        * handling only for cards supporting DSR and hosts requesting
-> > +        * DSR configuration
-> > +        */
-> > +       if (card->csd.dsr_imp && host->dsr_req)
+> But I'm still having some other issues. The most annoying one is that
+> the new kernel assigns some random MAC address to my NIC and I can't
+> give my board the proper IP address via DHCP.
 > 
-> if (card->csd.dsr_imp && !host->dsr_req)
-With the above change my line is correct.
-
-> >  struct mmc_ext_csd {
-> > diff --git a/include/linux/mmc/host.h b/include/linux/mmc/host.h
-> > index 7960424d0bc0..8acaebd866a7 100644
-> > --- a/include/linux/mmc/host.h
-> > +++ b/include/linux/mmc/host.h
-> > @@ -319,6 +319,7 @@ struct mmc_host {
-> >  #ifdef CONFIG_MMC_DEBUG
-> >         unsigned int            removed:1;      /* host is being removed */
-> >  #endif
-> > +       unsigned int            dsr_req:1;      /* DSR is requested for Host */
+> Seems there was talk about adding this via the device tree, but it was
+> rejected because U-Boot can do it. The problem I have is that U-Boot
+> doesn't!
 > 
-> Should be an int instead.
-I don't care much, can change to int.
+> I downloaded the latest U-Boot from git://git.denx.de/u-boot.git (Is
+> that the right place?) and had to tweak it so that I can boot a kernel
+> via tftp and still use the filesystem on the SD card.
+> 
+> When I place the 3.2 kernel that came with the board on my tftp server,
+> all works fine. I get the same MAC addr each boot and things just work.
+> But if I place the 3.16 kernel that I build on the tftp server, I get
+> some random MAC address, and then a dynamic IP to go with it :-(
+> 
+> This is in my dmesg:
+> 
+> [    2.304970] cpsw 4a100000.ethernet: Random MACID = 8a:fc:f5:aa:b6:e1
+> 
+> I can also see in the file arch/arm/boot/dts/am33xx.dtsi:
+> 
+> 
+>                         cpsw_emac0: slave at 4a100200 {
+>                                 /* Filled in by U-Boot */
+>                                 mac-address = [ 00 00 00 00 00 00 ];
+>                         };
+> 
+> Well, it's not filled in by U-Boot.
+> 
+> My question to all of you is, how do I fix this? I need a static mac
+> addr.
+> 
+> One way is that I might have to update that file myself with a temp
+> patch, but I think that's a hack and not something worth doing.
+> 
+> What's the proper way to have the board always come up with the same
+> MAC addr?
 
-Best regards
-Uwe
+The am335x SoC already has 4 registers which contain two unique vendor
+MAC addresses, so they should be used automatically instead of a random
+one.
+
+As you mentioned above, I sent a series to read and use those addresses
+in the linux kernel. There were some problems with the series which I
+fixed to send a new version of the series, but I didn't send it yet. I
+will try to resend it tomorrow and Cc you. It would be great if you
+could test it.
+
+As far as I know, barebox also works with the beaglebone white and it
+should set the correct MAC address as well. So if you need the same IP
+address in linux as in the bootloader, you could try barebox.
+
+Best Regards,
+
+Markus
 
 -- 
-Pengutronix e.K.                           | Uwe Kleine-K?nig            |
+Pengutronix e.K.                           |                             |
 Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140815/efe32b4d/attachment.sig>
