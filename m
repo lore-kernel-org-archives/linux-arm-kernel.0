@@ -1,110 +1,98 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Thu, 14 Aug 2014 18:02:33 -0700
-Subject: [PATCH 19/19] Documentation: ACPI for ARM64
-In-Reply-To: <8599266.1aeEWcB8r7@wuerfel>
-References: <1406206825-15590-1-git-send-email-hanjun.guo@linaro.org>
- <53EC2B35.5010302@linaro.org> <20140814102723.GB9039@arm.com>
- <8599266.1aeEWcB8r7@wuerfel>
-Message-ID: <CAOesGMiOzRYmmYcBV=eFr8U-e_BJAUg9gpnT0DPwJuyxBz9-1g@mail.gmail.com>
+From: jonsmirl@gmail.com (jonsmirl at gmail.com)
+Date: Thu, 14 Aug 2014 21:27:14 -0400
+Subject: [linux-sunxi] Re: [PATCH 3/4] simplefb: disable dt node upon
+ remove
+In-Reply-To: <1408063512.890.22.camel@localhost>
+References: <1407914239-12054-1-git-send-email-libv@skynet.be>
+ <1407914239-12054-4-git-send-email-libv@skynet.be>
+ <CACxGe6vaPUa4QvYWBA-QY7MTmJYoeqnPt9Zh5jpky6S9UYbrvQ@mail.gmail.com>
+ <CANq1E4ReOB87RX8VhnW1Ln=SK3Tw5V962ujcsfuz-2E9Uc61yQ@mail.gmail.com>
+ <CACxGe6vQrhd8QOAyGnjRppmuANpT60Ao2+KmkDfF4FNeoZSZgw@mail.gmail.com>
+ <20140813094524.GC31326@skynet.be>
+ <20140813101923.GD31326@skynet.be>
+ <CAKON4OwLOAq1EOzZmuefcnZ4hw0i35e3k0F6XGNRy-5jer2vyA@mail.gmail.com>
+ <CACxGe6szX3LyhGHbVHrEFfaWGYUcgcxgkuhfc9ac-R0qJs-HXw@mail.gmail.com>
+ <CAKON4OzQbuaQsbTCDXuaqxLRxvat_5+wmf71S-rWXdfiT1gkvA@mail.gmail.com>
+ <CACxGe6v1UPHMF5aPpe-boh+RuoPArJmKK_cQWr7aXsRjDUZrfQ@mail.gmail.com>
+ <CAKON4OypgToTSXxjShCt6uTGZBU69LpJxRwVoz=PnotpL=zm4w@mail.gmail.com>
+ <1408063512.890.22.camel@localhost>
+Message-ID: <CAKON4Oyp0qCucAhTNeXu7LELv_MRXPkYum+jOH2QADHb4Lw_HA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Aug 14, 2014 at 1:53 PM, Arnd Bergmann <arnd@arndb.de> wrote:
-> On Thursday 14 August 2014 11:27:23 Catalin Marinas wrote:
->> On Thu, Aug 14, 2014 at 04:21:25AM +0100, Hanjun Guo wrote:
->> > On 2014-8-14 7:41, Rafael J. Wysocki wrote:
->> > > On Tuesday, August 12, 2014 07:23:47 PM Catalin Marinas wrote:
->> > >> If we consider ACPI unusable on ARM but we still want to start merging
->> > >> patches, we should rather make the config option depend on BROKEN
->> > >> (though if it is that unusable that no real platform can use it, I would
->> > >> rather not merge it at all at this stage).
->> > >
->> > > I agree here.
->> > >
->> > > I would recommend creating a separate branch for that living outside of the
->> > > mainline kernel and merging it when there are real users.
->> >
->> > Real users will coming soon, we already tested this patch set on real hardware
->> > (ARM64 Juno platform),
->>
->> I don't consider Juno a server platform  (but it's good enough for
->> development).
+On Thu, Aug 14, 2014 at 8:45 PM, Henrik Nordstr?m
+<henrik@henriknordstrom.net> wrote:
+> tor 2014-08-14 klockan 08:07 -0400 skrev jonsmirl at gmail.com:
 >
-> I would expect that Juno is a superset of what servers need. If this
-> ACPI patch set is sufficient to support every device present on Juno
-> with an ACPI firmware, what would be a strong indication that server
-> platforms work as well.
+>> So what are the rules going to be? Once the OS is up and starts
+>> changing things the state in the DT and the OS are going to diverge.
+>> How does this get handled for a kernel driver that can load/unload?
+>> Should the kernel remove those state nodes as soon as it alters the
+>> state?
 >
-> OTOH, if ACPI on Juno only supports half the features that the hardware
-> has, that doesn't tell us much about the suitability of ACPI for any
-> real-world system, server or not.
-
-Juno is lacking in several components compared to a server platform,
-it doesn't have PCIe, SATA, or real ethernet. So it's in many ways
-just a few cores with RAM and a few slow interfaces.
-
-The scary parts from the ACPI 5.1 docs (the peripheral ones in
-particular) are around the modelling of clocks and other things that
-we thought ACPI was going to stay away from. Until we see how steep
-that slope is, we're better off taking it easy with merging the
-support. It could get quite messy very quickly, and we'd be stuck
-supporting whatever solutions are tried in the first ACPI generations
-forever if we do enable them now. That's the main reason for holding
-off and being conservative (and seeing several real platforms and how
-they end up modelling these things).
-
-As I've also commented on some of the documents, I am not excited
-about how the ACPI platform code is integrated: Add some ACPI
-functions in an acpi-only file that exports some variables. Then, in a
-shared file, create a completely separate code path that uses said
-variables to do whatever it needs. I'm not crazy at all at the split
-of code paths between the platforms, and I want to see it more data
-driven (filling in shared structures and sharing code paths). There
-are some challenges to make that happen but I also don't think there's
-been a whole lot of effort to make it happen -- the ACPI developers
-don't seem to like touching the DT code paths to make them fit better.
-:-)
-
->> > and I think ARM64 server chips and platforms will show up before 3.18
->> > is released.
->>
->> That's what I've heard/seen. The questions I have are (a) whether
->> current ACPI patchset is enough to successfully run Linux on such
->> _hardware_ platform (maybe not fully optimised, for example just WFI
->> cpuidle) and (b) whether we still want to mandate a DT in the kernel for
->> such platforms.
->>
->> Given the answer to (a) and what other features are needed, we may or
->> may not mandate (b). We were pretty clear few months ago that (b) is
->> still required but at the time we were only openly talking about ACPI
->> 5.0 which was lacking many features. I think we need to revisit that
->> position based on how usable ACPI 5.1 for ARM (and current kernel
->> implementation) is. Would you mind elaborating what an ACPI-only
->> platform miss?
->>
->> I would expect a new server platform designed with ACPI in mind to
->> require minimal SoC specific code, so we may only see a few patches
->> under drivers/ for such platforms adding ACPI-specific probing (possibly
->> new drivers as well if it's a new component).
+> hardware that is no longer there should also not be represented/active
+> in DT.
 >
-> That is at least the hope, but I have no way of knowing whether it
-> works that way or not, other than seeing the actual patches.
+> A simple fb that have been torn down is no more, no different from never
+> having been there. It can be argued that it never was in the first place
+> (i.e. that it is not actually hardware) but that it another can of worms
+> and both have their benefits and drawbacks. One thing is certain
+> however, as far as simplefb is concerned it is hardware, not really any
+> different from a persistent framebuffer with hardwired settings in
+> hardware.
+
+How does the kernel know what clocks to protect? A list in the
+simplefb node?  This list of clocks is a reason for adding simplefb to
+the compatible list for the real hardware.  That way it won't be
+duplicated.
+
+The issues with parameter conflicts between simplefb and the real
+hardware can be dealt with.  If the real hardware wants to add the
+simplefb compatible field it will need to get its parameters sorted
+out so that they don't conflict. Clock syntax is standardized in the
+DTS so it shouldn't be a problem.
+
+You can also argue that simplefb should never occur in a DTS file. It
+is something that uboot will add. And then the kernel will remove when
+simplefb loads KMS.
+
+That logic should apply to all of these dynamic fields. You don't want
+stale state data in the DT.
+
 >
-> It is rather annoying that we first have to wait for hardware
-> to become available to actually see that code, but I guess that
-> means that those hardware vendors no longer see ACPI as something
-> on their critical path, so we definitely shouldn't hurry things
-> until we understand the reason for the endless delay of platform
-> support patches.
+> Regarding kexec, it's the responsibility of the kernel doing kexec to
+> make sure DT and hardware matches for the next started kernel. With
+> hardware that can be reconfigured it is not safe to assume that the DT
+> can be passed as-is from before the kernel reconfigured hardware. If the
+> currently running kernel wants to set up a framebuffer for simplefb use
+> by the next kernel than it's free to do so, but in either case it needs
+> to provide the right information to next kernel.
+>
+> If it was given a simplefb node, but then killed the simplefb then no
+> simplefb node should be provided to the next kernel. If it was not given
+> a simplefb node, but have configured the hardware suitable for simplefb
+> node then it may provide a simplefb node.
+>
+> A UART that have changed rate no longer have that rate.
+>
+> Same applies to numerous other items as well. If a kernel remaps IRQs,
+> bus addresses, or whatever in hardware aspects where such changes is
+> possible then DT needs to be updated as well. A bit less common than a
+> simplefb being destroyed by driver reconfiguring the framebuffer, but if
+> you look at it from a little distance then the problem is exactly the
+> same. Hardware is not 100% static, and therefore hardware description
+> also can not be 100% static. And hardware is getting more and more
+> dynamically reconfigurable.
+>
+> A DT that contains false information is generally worse than no DT / not
+> having that information at all.
+>
+> Regards
+> Henrik
+>
 
-I've tried reaching out to several vendors but I've heard nothing back
-from any of them. Very disappointing.
-
-It is quite concerning that they are not willing to talk to the
-community, but it also makes it easy to decide what kind of priority
-we should put on reviewing and merging their patches when they do get
-posted -- their lack of planning does not constitute an emergency on
-our behalf.
 
 
--Olof
+-- 
+Jon Smirl
+jonsmirl at gmail.com
