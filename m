@@ -1,73 +1,32 @@
-From: tremyfr@gmail.com (Philippe Reynes)
-Date: Sat, 16 Aug 2014 18:22:49 +0200
-Subject: [RFC] usb issue on imx27: 3 clocks are needed
-In-Reply-To: <CAOMZO5CSGUp5qsgtDtqdoVq69EGmxV=quDD0CBSvHiOL5JNiwg@mail.gmail.com>
-References: <53EF7AF6.2000405@gmail.com>
- <CAOMZO5CSGUp5qsgtDtqdoVq69EGmxV=quDD0CBSvHiOL5JNiwg@mail.gmail.com>
-Message-ID: <53EF8559.7010103@gmail.com>
+From: wsa@the-dreams.de (Wolfram Sang)
+Date: Sat, 16 Aug 2014 11:46:48 -0500
+Subject: [PATCH v3 5/7] net: cpsw: Add am33xx MACID readout
+In-Reply-To: <1408202315-20006-6-git-send-email-mpa@pengutronix.de>
+References: <1408202315-20006-1-git-send-email-mpa@pengutronix.de>
+ <1408202315-20006-6-git-send-email-mpa@pengutronix.de>
+Message-ID: <20140816164647.GA2858@katana>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Fabio,
 
+> diff --git a/drivers/net/ethernet/ti/Makefile b/drivers/net/ethernet/ti/Makefile
+> index 9cfaab8152be..5a31c2b322ee 100644
+> --- a/drivers/net/ethernet/ti/Makefile
+> +++ b/drivers/net/ethernet/ti/Makefile
+> @@ -8,5 +8,6 @@ obj-$(CONFIG_TI_DAVINCI_EMAC) += davinci_emac.o
+>  obj-$(CONFIG_TI_DAVINCI_MDIO) += davinci_mdio.o
+>  obj-$(CONFIG_TI_DAVINCI_CPDMA) += davinci_cpdma.o
+>  obj-$(CONFIG_TI_CPSW_PHY_SEL) += cpsw-phy-sel.o
+> +obj-$(CONFIG_TI_CPSW_CTRL_MACID) += cpsw-ctrl-macid.o
+>  obj-$(CONFIG_TI_CPSW) += ti_cpsw.o
+>  ti_cpsw-y := cpsw_ale.o cpsw.o cpts.o
 
-On 16/08/14 18:01, Fabio Estevam wrote:
-> Hi Philippe,
->
-> On Sat, Aug 16, 2014 at 12:38 PM, Philippe Reynes<tremyfr@gmail.com>  wrote:
->> Hi all,
->>
->> i.MX27's usb needs three clocks (usb_ipg_gate, usb_ahb_gate and usb_div)
->> but the current chipidea driver implementation, and devicetree, provides
->> only ipg and ahb. Consequently, if the bootloader don't enable the last
->> one, the kernel will crash.
->
-> Which kernel version and what is the crash log you are getting?
+Leftover from your last series?
 
-I use linux git kernel (from linus) and 3.16.
-Both has the same result, a crash in the function hw_phymode_configure.
-  
-> I used to get a USB crash on mx27, which was fixed with the following commit:
->
-> commit b67b19447eb4f60d4f004f48298154630d4bed39
-> Author: Fabio Estevam<fabio.estevam@freescale.com>
-> Date:   Wed Apr 16 14:53:18 2014 -0300
->
->      ARM: dts: imx27: Use the correct usb clock gate
->
->      USB Host1, Host2 and OTG are gated via 'usb_ipg_gate' clock, so
-> fix it in order
->      to avoid the following kernel oops:
->
->      usbcore: registered new interface driver usb-storage
->      10024000.usb supply vbus not found, using dummy regulator
->      Unhandled fault: external abort on non-linefetch (0x808) at 0xf4424184
->      Internal error: : 808 [#1] PREEMPT ARM
->      Modules linked in:
->      CPU: 0 PID: 1 Comm: swapper Not tainted 3.15.0-rc1-26325-g971f9fd-dirty #64
->      task: c7829aa0 ti: c7836000 task.ti: c7836000
->      PC is at ci_hdrc_probe+0x3a4/0x634
->      LR is at ci_hdrc_probe+0x100/0x634
->      pc : [<c036cc78>]    lr : [<c036c9d4>]    psr: 60000013
->      sp : c7837d48  ip : 00000001  fp : 00000000
->      r10: 00000000  r9 : 00000000  r8 : c791b6c0
->      r7 : c7945000  r6 : f4424000  r5 : c7945010  r4 : c794e010
->      r3 : f4424184  r2 : 00000000  r1 : 8c000004  r0 : 0c000004
->      Flags: nZCv  IRQs on  FIQs on  Mode SVC_32  ISA ARM  Segment kernel
->      Control: 0005317f  Table: a0004000  DAC: 00000017
->      Process swapper (pid: 1, stack limit = 0xc78361c0)
->      Stack: (0xc7837d48 to 0xc7838000)
->
->      Signed-off-by: Fabio Estevam<fabio.estevam@freescale.com>
->      Signed-off-by: Shawn Guo<shawn.guo@freescale.com>
->
-> Do you have this one applied?
-
-Yes, I've got this commit on my kernel.
-
-This patch enable clock ipg, but the clock usb_div is disable,
-so the "crash" still happen. The only way we found to get the
-usb working is to enable the three usb clock : ipg, ahb and per.
-
-Best regards,
-Philippe
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140816/928038f0/attachment.sig>
