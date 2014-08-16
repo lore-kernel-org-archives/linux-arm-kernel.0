@@ -1,24 +1,24 @@
-From: graeme.gregory@linaro.org (graeme.gregory at linaro.org)
-Date: Sat, 16 Aug 2014 13:51:11 +0100
-Subject: [PATCH 19/19] Documentation: ACPI for ARM64
-In-Reply-To: <201408152149.44283.arnd@arndb.de>
-References: <1406206825-15590-1-git-send-email-hanjun.guo@linaro.org>
- <8599266.1aeEWcB8r7@wuerfel>
- <CAOesGMiOzRYmmYcBV=eFr8U-e_BJAUg9gpnT0DPwJuyxBz9-1g@mail.gmail.com>
- <201408152149.44283.arnd@arndb.de>
-Message-ID: <20140816125111.GB25975@xora-haswell.xora.org.uk>
+From: tj@kernel.org (Tejun Heo)
+Date: Sat, 16 Aug 2014 09:09:45 -0400
+Subject: [PATCH v6 1/2] ahci_xgene: Removing NCQ support from the APM
+ X-Gene SoC AHCI SATA Host Controller driver.
+In-Reply-To: <1407514466-25312-2-git-send-email-stripathi@apm.com>
+References: <1407514466-25312-1-git-send-email-stripathi@apm.com>
+ <1407514466-25312-2-git-send-email-stripathi@apm.com>
+Message-ID: <20140816130945.GI9305@htj.dyndns.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Aug 15, 2014 at 09:49:44PM +0200, Arnd Bergmann wrote:
-> What would be the process to get a clarification into the next version
-> of ACPI that makes them more distinct?
+On Fri, Aug 08, 2014 at 09:44:25PM +0530, Suman Tripathi wrote:
+> This patch removes the NCQ support from the APM X-Gene SoC AHCI
+> Host Controller driver as it doesn't support it.
 > 
-If you work for a UEFI member you can sign up to become a ASWG member on
-the UEFI webpage. You can then submit at ECR (Engineering Change Request)
-with the clarifications.
+> Signed-off-by: Loc Ho <lho@apm.com>
+> Signed-off-by: Suman Tripathi <stripathi@apm.com>
 
-If you do not work for a UEFI member I guess you would have to do this
-by proxy.
+Applied to libata/for-3.17-fixes w/ stable cc'd.
 
-Graeme
+Thanks.
+
+-- 
+tejun
