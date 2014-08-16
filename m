@@ -1,37 +1,30 @@
-From: wsa@the-dreams.de (Wolfram Sang)
-Date: Sat, 16 Aug 2014 11:55:53 -0500
-Subject: [PATCH v3 0/7] net: cpsw: Support for am335x chip MACIDs
-In-Reply-To: <1408202315-20006-1-git-send-email-mpa@pengutronix.de>
-References: <1408202315-20006-1-git-send-email-mpa@pengutronix.de>
-Message-ID: <20140816165549.GC2858@katana>
+From: broonie@kernel.org (Mark Brown)
+Date: Sat, 16 Aug 2014 16:21:44 +0100
+Subject: [PATCH 1/2] spi: xilinx: Remove .owner field for driver
+In-Reply-To: <b172f93e-b2fb-4cf4-a2de-d2ca62cdb83f@BN1BFFO11FD016.protection.gbl>
+References: <d35c656e50eb7cc951499f13ef339d6aa1a23deb.1407930755.git.michal.simek@xilinx.com>
+ <20140813123343.GR17528@sirena.org.uk>
+ <b172f93e-b2fb-4cf4-a2de-d2ca62cdb83f@BN1BFFO11FD016.protection.gbl>
+Message-ID: <20140816152144.GT28623@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Aug 16, 2014 at 05:18:28PM +0200, Markus Pargmann wrote:
-> Hi,
-> 
-> This series adds support to the cpsw driver to read the MACIDs of the am335x
-> chip and use them as fallback. These addresses are only used if there are no
-> mac addresses in the devicetree, for example set by a bootloader.
-> 
-> In v3 I removed the previously seperate driver and included the changes into
-> the main cpsw driver. I now check for a am33xx machine to not make this
-> operation when running on davinci.
-> 
-> Patches 1-4 are some minor fixes for the cpsw driver.
-> Patch 5 adds the readout support.
-> Patches 6 and 7 are for am33xx.dtsi to actually enable this feature.
+On Wed, Aug 13, 2014 at 03:21:29PM +0200, Michal Simek wrote:
+> On 08/13/2014 02:33 PM, Mark Brown wrote:
 
-Minor comments, but in general, looks good to me:
+> > Would it not be better to do this as a tree wide or at least subsystem
+> > wide sweep with something like cocinelle?
 
-Reviewed-by: Wolfram Sang <wsa@the-dreams.de>
+> Feel free to use cocinelle for fixing this everywhere.
+> For me was just easier to fix all xilinx drivers to ensure
+> that none else will copy it for new drivers.
 
-Tests on real HW need to wait another 9 days...
-
+I'd expect people would be more likely to copy a random driver for the
+subsystem they're working with than specifically a Xilinx driver...
 -------------- next part --------------
 A non-text attachment was scrubbed...
 Name: signature.asc
 Type: application/pgp-signature
 Size: 819 bytes
 Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140816/91783b38/attachment-0001.sig>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140816/8bb6f379/attachment.sig>
