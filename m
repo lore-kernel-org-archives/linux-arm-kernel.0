@@ -1,24 +1,30 @@
-From: carlo@caione.org (Carlo Caione)
-Date: Sun, 17 Aug 2014 17:25:49 +0200
-Subject: [PATCH 0/7] ARM: meson: add preliminary support for MesonX/Meson6
- SoCs
-In-Reply-To: <20140817142912.GA29963@gmail.com>
-References: <1408272594-10814-1-git-send-email-carlo@caione.org>
- <20140817142912.GA29963@gmail.com>
-Message-ID: <CAOQ7t2bdBqS=AdhqYZdNeqygF_RB9tKMJ_y3XtpA7z6XbJsKXQ@mail.gmail.com>
+From: jason@lakedaemon.net (Jason Cooper)
+Date: Sun, 17 Aug 2014 12:57:36 -0400
+Subject: [PATCH] irqchip: gic-v3: Only define gic_peek_irq() when
+ building SMP
+In-Reply-To: <1406480224-24628-1-git-send-email-broonie@kernel.org>
+References: <1406480224-24628-1-git-send-email-broonie@kernel.org>
+Message-ID: <20140817165736.GD12769@titan.lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Aug 17, 2014 at 4:29 PM, Beniamino Galvani <b.galvani@gmail.com> wrote:
+Mark,
 
-> nice job! The patches work fine on a Tronsmart Vega S89 Elite TV box
-> (Meson8 S802 SoC) just changing the fixed-clock frequency in the dts.
+On Sun, Jul 27, 2014 at 05:57:04PM +0100, Mark Brown wrote:
+> From: Mark Brown <broonie@linaro.org>
+> 
+> If building with CONFIG_SMP disbled (for example, with allnoconfig) then
+> GCC complains that the static function gic_peek_irq() is defined but not
+> used since the only reference is in the SMP initialisation code. Fix this
+> by moving the function definition inside the ifdef.
+> 
+> Signed-off-by: Mark Brown <broonie@linaro.org>
+> ---
+>  drivers/irqchip/irq-gic-v3.c | 26 +++++++++++++-------------
+>  1 file changed, 13 insertions(+), 13 deletions(-)
 
-This means that probably also the timer driver can be somehow shared
-between Meson6 and Meson8. If this is confirmed in v2 I can make a
-generic clocksource/clockevents driver for both the architectures.
+Applied to irqchip/urgent with Mark's Ack.
 
-Thanks,
+thx,
 
--- 
-Carlo Caione
+Jason.
