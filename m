@@ -1,47 +1,54 @@
-From: wens@csie.org (Chen-Yu Tsai)
-Date: Sun, 17 Aug 2014 23:20:44 +0800
-Subject: [PATCH 11/12] ARM: dts: sun8i: Add i2c controller nodes
-In-Reply-To: <20140817080204.GY15297@lukather>
-References: <1408247538-16950-1-git-send-email-wens@csie.org>
- <1408247538-16950-12-git-send-email-wens@csie.org>
- <20140817080204.GY15297@lukather>
-Message-ID: <CAGb2v67NwsJORoFrgEECDtexXGtF5qOx7NX1PVpZHkjVs-mG2A@mail.gmail.com>
+From: carlo@caione.org (Carlo Caione)
+Date: Sun, 17 Aug 2014 17:21:23 +0200
+Subject: [PATCH 5/7] ARM: meson: dts: add basic Meson/Meson6/Meson6-atv1200
+ DTSI/DTS
+In-Reply-To: <20140817144201.GB29963@gmail.com>
+References: <1408272594-10814-1-git-send-email-carlo@caione.org>
+ <1408272594-10814-6-git-send-email-carlo@caione.org>
+ <20140817144201.GB29963@gmail.com>
+Message-ID: <CAOQ7t2Ye2FjB-+YYQJg6xnFyfj4VNpdm9NFqjE2A+inTZ1=BkQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-
-On Sun, Aug 17, 2014 at 4:02 PM, Maxime Ripard
-<maxime.ripard@free-electrons.com> wrote:
+On Sun, Aug 17, 2014 at 4:42 PM, Beniamino Galvani <b.galvani@gmail.com> wrote:
 > Hi,
+
+>> +/include/ "meson.dtsi"
+>> +
+>> +/ {
+>> +     model = "Amlogic Meson6 SoC";
+>> +     compatible = "amlogic,meson6", "amlogic,8726_mx";
+>> +
+>> +     interrupt-parent = <&gic>;
+>> +
+>> +     cpus {
+>> +             #address-cells = <1>;
+>> +             #size-cells = <0>;
+>> +
+>> +             cpu at 0 {
 >
-> On Sun, Aug 17, 2014 at 11:52:17AM +0800, Chen-Yu Tsai wrote:
->> Add nodes for the 3 i2c controllers found on A23 SoCs to the sun8i DTSI.
->>
->> Signed-off-by: Chen-Yu Tsai <wens@csie.org>
->> ---
->>  arch/arm/boot/dts/sun8i-a23.dtsi | 36 ++++++++++++++++++++++++++++++++++++
->>  1 file changed, 36 insertions(+)
->>
->> diff --git a/arch/arm/boot/dts/sun8i-a23.dtsi b/arch/arm/boot/dts/sun8i-a23.dtsi
->> index 4658998..53ef350 100644
->> --- a/arch/arm/boot/dts/sun8i-a23.dtsi
->> +++ b/arch/arm/boot/dts/sun8i-a23.dtsi
->> @@ -387,6 +387,42 @@
->>                       status = "disabled";
->>               };
->>
->> +             i2c0: i2c at 01c2ac00 {
->> +                     compatible = "allwinner,sun6i-a31-i2c";
->> +                     reg = <0x01c2ac00 0x400>;
->> +                     interrupts = <0 6 4>;
->> +                     clocks = <&apb2_gates 0>;
->> +                     clock-frequency = <100000>;
+> The address after the @ should match the value of the 'reg' property.
+
+Agree
+
+>> +                     device_type = "cpu";
+>> +                     compatible = "arm,cortex-a9";
+>> +                     reg = <0x200>;
+>> +             };
+>> +
+>> +             cpu at 1 {
+>> +                     device_type = "cpu";
+>> +                     compatible = "arm,cortex-a9";
+>> +                     reg = <0x1>;
 >
-> It's the default, you don't need to set it.
+> According to Documentation/devicetree/bindings/arm/cpus.txt, this
+> should be set to bits [23:0] of the CPU MPIDR register, in this case
+> 0x201.
 
-Ah, just checked the driver, it is indeed the default.
-All the other sunxi dtsi have it though. Do we want to be consistent?
+Right. Thanks for noticing.
+I will fix it in v2.
 
+Thank you,
 
-ChenYu
+-- 
+Carlo Caione
