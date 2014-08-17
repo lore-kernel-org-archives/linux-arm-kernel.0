@@ -1,28 +1,32 @@
-From: jonsmirl@gmail.com (jonsmirl at gmail.com)
-Date: Sun, 17 Aug 2014 16:20:49 -0400
-Subject: [PATCHv5 1/2] pwm: Add Allwinner SoC support
-In-Reply-To: <CAKON4OyywLZ1bktuUbjagVvzjr0bJf7p9xpR7jeOq6FBe+6P=g@mail.gmail.com>
-References: <1400523003-27082-1-git-send-email-alexandre.belloni@free-electrons.com>
- <1400523003-27082-2-git-send-email-alexandre.belloni@free-electrons.com>
- <20140617232605.GB25525@mithrandir>
- <20140623170115.GA11436@piout.net>
- <CAKON4OyywLZ1bktuUbjagVvzjr0bJf7p9xpR7jeOq6FBe+6P=g@mail.gmail.com>
-Message-ID: <CAKON4Oxuqs0EXqhLucx6gMm5jnFWrhLaAutzrCR8GTDh11xCvA@mail.gmail.com>
+From: bigeasy@linutronix.de (Sebastian Andrzej Siewior)
+Date: Sun, 17 Aug 2014 22:35:12 +0200
+Subject: [PATCH v7] 8250-core based serial driver for OMAP + DMA
+In-Reply-To: <20140815202826.GC9239@atomide.com>
+References: <1408124563-31541-1-git-send-email-bigeasy@linutronix.de>
+ <20140815181704.GH17769@csclub.uwaterloo.ca>
+ <53EE5BF8.3010007@linutronix.de>
+ <20140815202826.GC9239@atomide.com>
+Message-ID: <20140817203512.GA24330@linutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-New version that adds better support for the A10 plus it fixes an
-issue in the previous version.
+* Tony Lindgren | 2014-08-15 13:28:27 [-0700]:
 
-Note that the A10 does not support the 24Mhz bypass mode.
+>> It configured the trigger levels to 1 for RX and 16 for TX.
+>
+>Hmm that weird RX trigger level is a workaround for lost characters.
+>
+>See commit 0ba5f66836 (tty: serial: OMAP: use a 1-byte RX FIFO
+>threshold in PIO mode :)
+>
+>There's paste test in that commit, I wonder if the 8250 drivers
+>can deal with it any better?
 
--- 
-Jon Smirl
-jonsmirl at gmail.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: pwm
-Type: application/octet-stream
-Size: 18574 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140817/f59907ba/attachment-0001.obj>
+I recall that I used it as a console and didn't see any missing chars.
+I will try test but I am traveling this week?
+
+>Regards,
+>
+>Tony
+
+Sebastian
