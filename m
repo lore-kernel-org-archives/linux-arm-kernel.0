@@ -1,31 +1,41 @@
-From: chetannanda@gmail.com (Chetan Nanda)
-Date: Sun, 17 Aug 2014 13:25:27 +0530
-Subject: Option CONFIG_DEBUG_SET_MODULE_RONX not working for kernel 3.10
-In-Reply-To: <53ECEFA5.8070206@mentor.com>
-References: <CAPrYoTGBZ5EwBYt35TbtORo1_VKG6S=onAnB8Stkte7V_S9uOQ@mail.gmail.com>
- <53ECEFA5.8070206@mentor.com>
-Message-ID: <CAPrYoTGDBrfEvwo6RgXeH_-7UCHgWOKR+=vS15HSapvK8K_quA@mail.gmail.com>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Sun, 17 Aug 2014 10:03:33 +0200
+Subject: [PATCH 00/12] ARM: sun8i: Enable pinctrl, i2c and mmc
+In-Reply-To: <1408247538-16950-1-git-send-email-wens@csie.org>
+References: <1408247538-16950-1-git-send-email-wens@csie.org>
+Message-ID: <20140817080333.GZ15297@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Aug 14, 2014 at 10:49 PM, Nathan Lynch <Nathan_Lynch@mentor.com> wrote:
-> On 08/14/2014 05:24 AM, Chetan Nanda wrote:
->> Hi,
->>
->> I am trying to enable 'CONFIG_DEBUG_SET_MODULE_RONX' config option on
->> 3.10 kernel via writing  CONFIG_DEBUG_SET_MODULE_RONX=y at the end of
->> board specific config file.
->>
->> But .config generated after kernel build do not have this option enabled.
->
-> That feature appears to have been added well after 3.10, so unless
-> you've backported it, this is expected behavior.
->
- Hi Nathan,
-Thanks for you mail, It seems that support is there in 3.10 kernel
-(atleast module.c file contains this flag) could be that CONFIG
-support for ARM is missing,
-As there is no entry for this flag in arm/Kconfig.debug.
+Hi,
 
-Thanks,
-Chetan Nanda
+On Sun, Aug 17, 2014 at 11:52:06AM +0800, Chen-Yu Tsai wrote:
+> Hi Maxime,
+> 
+> This series enables all the controllers on sun8i that we already have
+> drivers for, excluding SPI as the tablet I have does not use it and
+> I cannot test it. If there's a way to test it without external connections
+> or devices please let me know.
+> 
+> This series is based on 3.17-rc1, however it should cleanly apply over
+> the sun8i-rtc patch you've queued.
+> 
+> The commit logs pretty much explain themselves. Note that PLL6 is not
+> implemented yet. I've some patches for the clocks that I will send later.
+
+Merged patches 1-10.
+
+Thanks!
+Maxime
+
+-- 
+Maxime Ripard, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140817/69c37926/attachment.sig>
