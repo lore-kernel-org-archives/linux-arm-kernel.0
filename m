@@ -1,65 +1,26 @@
-From: wens@csie.org (Chen-Yu Tsai)
-Date: Sun, 17 Aug 2014 11:52:17 +0800
-Subject: [PATCH 11/12] ARM: dts: sun8i: Add i2c controller nodes
-In-Reply-To: <1408247538-16950-1-git-send-email-wens@csie.org>
-References: <1408247538-16950-1-git-send-email-wens@csie.org>
-Message-ID: <1408247538-16950-12-git-send-email-wens@csie.org>
+From: arjun024@gmail.com (Arjun Sreedharan)
+Date: Sun, 17 Aug 2014 09:36:14 +0530
+Subject: [PATCH] cpufreq: exynos: free memory immediately on unknown SoC
+Message-ID: <1408248374-1638-1-git-send-email-arjun024@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add nodes for the 3 i2c controllers found on A23 SoCs to the sun8i DTSI.
-
-Signed-off-by: Chen-Yu Tsai <wens@csie.org>
+Signed-off-by: Arjun Sreedharan <arjun024@gmail.com>
 ---
- arch/arm/boot/dts/sun8i-a23.dtsi | 36 ++++++++++++++++++++++++++++++++++++
- 1 file changed, 36 insertions(+)
+ drivers/cpufreq/exynos-cpufreq.c | 1 +
+ 1 file changed, 1 insertion(+)
 
-diff --git a/arch/arm/boot/dts/sun8i-a23.dtsi b/arch/arm/boot/dts/sun8i-a23.dtsi
-index 4658998..53ef350 100644
---- a/arch/arm/boot/dts/sun8i-a23.dtsi
-+++ b/arch/arm/boot/dts/sun8i-a23.dtsi
-@@ -387,6 +387,42 @@
- 			status = "disabled";
- 		};
+diff --git a/drivers/cpufreq/exynos-cpufreq.c b/drivers/cpufreq/exynos-cpufreq.c
+index 1e0ec57..e47d165 100644
+--- a/drivers/cpufreq/exynos-cpufreq.c
++++ b/drivers/cpufreq/exynos-cpufreq.c
+@@ -178,6 +178,7 @@ static int exynos_cpufreq_probe(struct platform_device *pdev)
+ 		ret = exynos5250_cpufreq_init(exynos_info);
+ 	} else {
+ 		pr_err("%s: Unknown SoC type\n", __func__);
++		kfree(exynos_info);
+ 		return -ENODEV;
+ 	}
  
-+		i2c0: i2c at 01c2ac00 {
-+			compatible = "allwinner,sun6i-a31-i2c";
-+			reg = <0x01c2ac00 0x400>;
-+			interrupts = <0 6 4>;
-+			clocks = <&apb2_gates 0>;
-+			clock-frequency = <100000>;
-+			resets = <&apb2_rst 0>;
-+			status = "disabled";
-+			#address-cells = <1>;
-+			#size-cells = <0>;
-+		};
-+
-+		i2c1: i2c at 01c2b000 {
-+			compatible = "allwinner,sun6i-a31-i2c";
-+			reg = <0x01c2b000 0x400>;
-+			interrupts = <0 7 4>;
-+			clocks = <&apb2_gates 1>;
-+			clock-frequency = <100000>;
-+			resets = <&apb2_rst 1>;
-+			status = "disabled";
-+			#address-cells = <1>;
-+			#size-cells = <0>;
-+		};
-+
-+		i2c2: i2c at 01c2b400 {
-+			compatible = "allwinner,sun6i-a31-i2c";
-+			reg = <0x01c2b400 0x400>;
-+			interrupts = <0 8 4>;
-+			clocks = <&apb2_gates 2>;
-+			clock-frequency = <100000>;
-+			resets = <&apb2_rst 2>;
-+			status = "disabled";
-+			#address-cells = <1>;
-+			#size-cells = <0>;
-+		};
-+
- 		gic: interrupt-controller at 01c81000 {
- 			compatible = "arm,cortex-a7-gic", "arm,cortex-a15-gic";
- 			reg = <0x01c81000 0x1000>,
 -- 
-2.1.0
+1.7.11.7
