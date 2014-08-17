@@ -1,51 +1,69 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Sun, 17 Aug 2014 10:02:04 +0200
-Subject: [PATCH 11/12] ARM: dts: sun8i: Add i2c controller nodes
-In-Reply-To: <1408247538-16950-12-git-send-email-wens@csie.org>
-References: <1408247538-16950-1-git-send-email-wens@csie.org>
- <1408247538-16950-12-git-send-email-wens@csie.org>
-Message-ID: <20140817080204.GY15297@lukather>
+From: carlo@caione.org (Carlo Caione)
+Date: Sun, 17 Aug 2014 12:49:47 +0200
+Subject: [PATCH 0/7] ARM: meson: add preliminary support for MesonX/Meson6 SoCs
+Message-ID: <1408272594-10814-1-git-send-email-carlo@caione.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Amlogic AML8726-MX (codename Meson6) is a highly integrated multimedia
+application processor SoC for Multimedia Internet Device (MID), tablet
+and Set Top Box (STB). It integrates a powerful CPU, a 2D/3D graphics
+subsystem and a state-of-the-art video decoding engine together with
+all major peripherals. It is manufactured by Amlogic, inc.
 
-On Sun, Aug 17, 2014 at 11:52:17AM +0800, Chen-Yu Tsai wrote:
-> Add nodes for the 3 i2c controllers found on A23 SoCs to the sun8i DTSI.
-> 
-> Signed-off-by: Chen-Yu Tsai <wens@csie.org>
-> ---
->  arch/arm/boot/dts/sun8i-a23.dtsi | 36 ++++++++++++++++++++++++++++++++++++
->  1 file changed, 36 insertions(+)
-> 
-> diff --git a/arch/arm/boot/dts/sun8i-a23.dtsi b/arch/arm/boot/dts/sun8i-a23.dtsi
-> index 4658998..53ef350 100644
-> --- a/arch/arm/boot/dts/sun8i-a23.dtsi
-> +++ b/arch/arm/boot/dts/sun8i-a23.dtsi
-> @@ -387,6 +387,42 @@
->  			status = "disabled";
->  		};
->  
-> +		i2c0: i2c at 01c2ac00 {
-> +			compatible = "allwinner,sun6i-a31-i2c";
-> +			reg = <0x01c2ac00 0x400>;
-> +			interrupts = <0 6 4>;
-> +			clocks = <&apb2_gates 0>;
-> +			clock-frequency = <100000>;
+This patchset introduces preliminary support for Meson6-based SoCs but
+several IPs and drivers are common among all the MesonX SoCs.
 
-It's the default, you don't need to set it.
+Amlogic doesn't release any documentation about their SoCs, so the code
+has been reverse-engineered from the messy source code released at:
 
-Thanks!
-Maxime
+http://openlinux.amlogic.com:8000/download/
+
+Carlo Caione (7):
+  ARM: meson: debug: add debug UART for earlyprintk support
+  ARM: meson: serial: add MesonX SoC on-chip uart driver
+  ARM: meson6: clocksource: add Meson6 timer support
+  ARM: meson: add basic support for MesonX SoCs
+  ARM: meson: dts: add basic Meson/Meson6/Meson6-atv1200 DTSI/DTS
+  ARM: meson: update defconfigs
+  ARM: meson: update documentation (uart, timer and vendors)
+
+ .../bindings/serial/amlogic,meson-uart.txt         |  17 +
+ .../bindings/timer/amlogic,meson6-timer.txt        |  16 +
+ .../devicetree/bindings/vendor-prefixes.txt        |   1 +
+ arch/arm/Kconfig                                   |   2 +
+ arch/arm/Kconfig.debug                             |  14 +-
+ arch/arm/Makefile                                  |   1 +
+ arch/arm/boot/dts/Makefile                         |   1 +
+ arch/arm/boot/dts/meson.dtsi                       |  75 +++
+ arch/arm/boot/dts/meson6-atv1200.dts               |  27 +
+ arch/arm/boot/dts/meson6.dtsi                      |  44 ++
+ arch/arm/configs/meson_defconfig                   |  99 ++++
+ arch/arm/configs/multi_v7_defconfig                |   3 +
+ arch/arm/include/debug/meson.S                     |  35 ++
+ arch/arm/mach-meson/Kconfig                        |  13 +
+ arch/arm/mach-meson/Makefile                       |   1 +
+ arch/arm/mach-meson/meson.c                        |  36 ++
+ drivers/clocksource/Kconfig                        |   3 +
+ drivers/clocksource/Makefile                       |   1 +
+ drivers/clocksource/meson6_timer.c                 | 187 ++++++
+ drivers/tty/serial/Kconfig                         |  18 +
+ drivers/tty/serial/Makefile                        |   1 +
+ drivers/tty/serial/meson_uart.c                    | 634 +++++++++++++++++++++
+ include/uapi/linux/serial_core.h                   |   3 +
+ 23 files changed, 1230 insertions(+), 2 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/serial/amlogic,meson-uart.txt
+ create mode 100644 Documentation/devicetree/bindings/timer/amlogic,meson6-timer.txt
+ create mode 100644 arch/arm/boot/dts/meson.dtsi
+ create mode 100644 arch/arm/boot/dts/meson6-atv1200.dts
+ create mode 100644 arch/arm/boot/dts/meson6.dtsi
+ create mode 100644 arch/arm/configs/meson_defconfig
+ create mode 100644 arch/arm/include/debug/meson.S
+ create mode 100644 arch/arm/mach-meson/Kconfig
+ create mode 100644 arch/arm/mach-meson/Makefile
+ create mode 100644 arch/arm/mach-meson/meson.c
+ create mode 100644 drivers/clocksource/meson6_timer.c
+ create mode 100644 drivers/tty/serial/meson_uart.c
 
 -- 
-Maxime Ripard, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140817/5b804898/attachment.sig>
+1.9.1
