@@ -1,54 +1,24 @@
 From: carlo@caione.org (Carlo Caione)
-Date: Sun, 17 Aug 2014 17:21:23 +0200
-Subject: [PATCH 5/7] ARM: meson: dts: add basic Meson/Meson6/Meson6-atv1200
- DTSI/DTS
-In-Reply-To: <20140817144201.GB29963@gmail.com>
+Date: Sun, 17 Aug 2014 17:25:49 +0200
+Subject: [PATCH 0/7] ARM: meson: add preliminary support for MesonX/Meson6
+ SoCs
+In-Reply-To: <20140817142912.GA29963@gmail.com>
 References: <1408272594-10814-1-git-send-email-carlo@caione.org>
- <1408272594-10814-6-git-send-email-carlo@caione.org>
- <20140817144201.GB29963@gmail.com>
-Message-ID: <CAOQ7t2Ye2FjB-+YYQJg6xnFyfj4VNpdm9NFqjE2A+inTZ1=BkQ@mail.gmail.com>
+ <20140817142912.GA29963@gmail.com>
+Message-ID: <CAOQ7t2bdBqS=AdhqYZdNeqygF_RB9tKMJ_y3XtpA7z6XbJsKXQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Aug 17, 2014 at 4:42 PM, Beniamino Galvani <b.galvani@gmail.com> wrote:
-> Hi,
+On Sun, Aug 17, 2014 at 4:29 PM, Beniamino Galvani <b.galvani@gmail.com> wrote:
 
->> +/include/ "meson.dtsi"
->> +
->> +/ {
->> +     model = "Amlogic Meson6 SoC";
->> +     compatible = "amlogic,meson6", "amlogic,8726_mx";
->> +
->> +     interrupt-parent = <&gic>;
->> +
->> +     cpus {
->> +             #address-cells = <1>;
->> +             #size-cells = <0>;
->> +
->> +             cpu at 0 {
->
-> The address after the @ should match the value of the 'reg' property.
+> nice job! The patches work fine on a Tronsmart Vega S89 Elite TV box
+> (Meson8 S802 SoC) just changing the fixed-clock frequency in the dts.
 
-Agree
+This means that probably also the timer driver can be somehow shared
+between Meson6 and Meson8. If this is confirmed in v2 I can make a
+generic clocksource/clockevents driver for both the architectures.
 
->> +                     device_type = "cpu";
->> +                     compatible = "arm,cortex-a9";
->> +                     reg = <0x200>;
->> +             };
->> +
->> +             cpu at 1 {
->> +                     device_type = "cpu";
->> +                     compatible = "arm,cortex-a9";
->> +                     reg = <0x1>;
->
-> According to Documentation/devicetree/bindings/arm/cpus.txt, this
-> should be set to bits [23:0] of the CPU MPIDR register, in this case
-> 0x201.
-
-Right. Thanks for noticing.
-I will fix it in v2.
-
-Thank you,
+Thanks,
 
 -- 
 Carlo Caione
