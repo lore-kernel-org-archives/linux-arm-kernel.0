@@ -1,62 +1,52 @@
 From: wens@csie.org (Chen-Yu Tsai)
-Date: Sun, 17 Aug 2014 11:52:14 +0800
-Subject: [PATCH 08/12] ARM: dts: sun8i: Add mmc controller nodes
+Date: Sun, 17 Aug 2014 11:52:16 +0800
+Subject: [PATCH 10/12] ARM: dts: sun8i: Add pin-muxing info for the i2c
+ controllers
 In-Reply-To: <1408247538-16950-1-git-send-email-wens@csie.org>
 References: <1408247538-16950-1-git-send-email-wens@csie.org>
-Message-ID: <1408247538-16950-9-git-send-email-wens@csie.org>
+Message-ID: <1408247538-16950-11-git-send-email-wens@csie.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add nodes for the 3 mmc controllers found on A23 SoCs to the sun8i DTSI.
+This adds pin-muxing info for the i2c controller / port combinations
+which are known to be used on actual boards.
 
 Signed-off-by: Chen-Yu Tsai <wens@csie.org>
 ---
- arch/arm/boot/dts/sun8i-a23.dtsi | 33 +++++++++++++++++++++++++++++++++
- 1 file changed, 33 insertions(+)
+ arch/arm/boot/dts/sun8i-a23.dtsi | 21 +++++++++++++++++++++
+ 1 file changed, 21 insertions(+)
 
 diff --git a/arch/arm/boot/dts/sun8i-a23.dtsi b/arch/arm/boot/dts/sun8i-a23.dtsi
-index 348fb07..62144e2 100644
+index 62144e2..4658998 100644
 --- a/arch/arm/boot/dts/sun8i-a23.dtsi
 +++ b/arch/arm/boot/dts/sun8i-a23.dtsi
-@@ -211,6 +211,39 @@
- 		#size-cells = <1>;
- 		ranges;
+@@ -277,6 +277,27 @@
+ 				allwinner,drive = <2>;
+ 				allwinner,pull = <0>;
+ 			};
++
++			i2c0_pins_a: i2c0 at 0 {
++				allwinner,pins = "PH2", "PH3";
++				allwinner,function = "i2c0";
++				allwinner,drive = <0>;
++				allwinner,pull = <0>;
++			};
++
++			i2c1_pins_a: i2c1 at 0 {
++				allwinner,pins = "PH4", "PH5";
++				allwinner,function = "i2c1";
++				allwinner,drive = <0>;
++				allwinner,pull = <0>;
++			};
++
++			i2c2_pins_a: i2c2 at 0 {
++				allwinner,pins = "PE12", "PE13";
++				allwinner,function = "i2c2";
++				allwinner,drive = <0>;
++				allwinner,pull = <0>;
++			};
+ 		};
  
-+		mmc0: mmc at 01c0f000 {
-+			compatible = "allwinner,sun5i-a13-mmc";
-+			reg = <0x01c0f000 0x1000>;
-+			clocks = <&ahb1_gates 8>, <&mmc0_clk>;
-+			clock-names = "ahb", "mmc";
-+			resets = <&ahb1_rst 8>;
-+			reset-names = "ahb";
-+			interrupts = <0 60 4>;
-+			status = "disabled";
-+		};
-+
-+		mmc1: mmc at 01c10000 {
-+			compatible = "allwinner,sun5i-a13-mmc";
-+			reg = <0x01c10000 0x1000>;
-+			clocks = <&ahb1_gates 9>, <&mmc1_clk>;
-+			clock-names = "ahb", "mmc";
-+			resets = <&ahb1_rst 9>;
-+			reset-names = "ahb";
-+			interrupts = <0 61 4>;
-+			status = "disabled";
-+		};
-+
-+		mmc2: mmc at 01c11000 {
-+			compatible = "allwinner,sun5i-a13-mmc";
-+			reg = <0x01c11000 0x1000>;
-+			clocks = <&ahb1_gates 10>, <&mmc2_clk>;
-+			clock-names = "ahb", "mmc";
-+			resets = <&ahb1_rst 10>;
-+			reset-names = "ahb";
-+			interrupts = <0 62 4>;
-+			status = "disabled";
-+		};
-+
- 		pio: pinctrl at 01c20800 {
- 			compatible = "allwinner,sun8i-a23-pinctrl";
- 			reg = <0x01c20800 0x400>;
+ 		ahb1_rst: reset at 01c202c0 {
 -- 
 2.1.0
