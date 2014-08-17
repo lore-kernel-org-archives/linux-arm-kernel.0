@@ -1,26 +1,31 @@
-From: arjun024@gmail.com (Arjun Sreedharan)
-Date: Sun, 17 Aug 2014 09:36:14 +0530
-Subject: [PATCH] cpufreq: exynos: free memory immediately on unknown SoC
-Message-ID: <1408248374-1638-1-git-send-email-arjun024@gmail.com>
+From: chetannanda@gmail.com (Chetan Nanda)
+Date: Sun, 17 Aug 2014 13:25:27 +0530
+Subject: Option CONFIG_DEBUG_SET_MODULE_RONX not working for kernel 3.10
+In-Reply-To: <53ECEFA5.8070206@mentor.com>
+References: <CAPrYoTGBZ5EwBYt35TbtORo1_VKG6S=onAnB8Stkte7V_S9uOQ@mail.gmail.com>
+ <53ECEFA5.8070206@mentor.com>
+Message-ID: <CAPrYoTGDBrfEvwo6RgXeH_-7UCHgWOKR+=vS15HSapvK8K_quA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Signed-off-by: Arjun Sreedharan <arjun024@gmail.com>
----
- drivers/cpufreq/exynos-cpufreq.c | 1 +
- 1 file changed, 1 insertion(+)
+On Thu, Aug 14, 2014 at 10:49 PM, Nathan Lynch <Nathan_Lynch@mentor.com> wrote:
+> On 08/14/2014 05:24 AM, Chetan Nanda wrote:
+>> Hi,
+>>
+>> I am trying to enable 'CONFIG_DEBUG_SET_MODULE_RONX' config option on
+>> 3.10 kernel via writing  CONFIG_DEBUG_SET_MODULE_RONX=y at the end of
+>> board specific config file.
+>>
+>> But .config generated after kernel build do not have this option enabled.
+>
+> That feature appears to have been added well after 3.10, so unless
+> you've backported it, this is expected behavior.
+>
+ Hi Nathan,
+Thanks for you mail, It seems that support is there in 3.10 kernel
+(atleast module.c file contains this flag) could be that CONFIG
+support for ARM is missing,
+As there is no entry for this flag in arm/Kconfig.debug.
 
-diff --git a/drivers/cpufreq/exynos-cpufreq.c b/drivers/cpufreq/exynos-cpufreq.c
-index 1e0ec57..e47d165 100644
---- a/drivers/cpufreq/exynos-cpufreq.c
-+++ b/drivers/cpufreq/exynos-cpufreq.c
-@@ -178,6 +178,7 @@ static int exynos_cpufreq_probe(struct platform_device *pdev)
- 		ret = exynos5250_cpufreq_init(exynos_info);
- 	} else {
- 		pr_err("%s: Unknown SoC type\n", __func__);
-+		kfree(exynos_info);
- 		return -ENODEV;
- 	}
- 
--- 
-1.7.11.7
+Thanks,
+Chetan Nanda
