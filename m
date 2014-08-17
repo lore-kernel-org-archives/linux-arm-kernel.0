@@ -1,30 +1,94 @@
-From: jason@lakedaemon.net (Jason Cooper)
-Date: Sun, 17 Aug 2014 12:57:36 -0400
-Subject: [PATCH] irqchip: gic-v3: Only define gic_peek_irq() when
- building SMP
-In-Reply-To: <1406480224-24628-1-git-send-email-broonie@kernel.org>
-References: <1406480224-24628-1-git-send-email-broonie@kernel.org>
-Message-ID: <20140817165736.GD12769@titan.lakedaemon.net>
+From: jonsmirl@gmail.com (jonsmirl at gmail.com)
+Date: Sun, 17 Aug 2014 13:03:34 -0400
+Subject: [PATCHv5 1/2] pwm: Add Allwinner SoC support
+In-Reply-To: <20140623170115.GA11436@piout.net>
+References: <1400523003-27082-1-git-send-email-alexandre.belloni@free-electrons.com>
+ <1400523003-27082-2-git-send-email-alexandre.belloni@free-electrons.com>
+ <20140617232605.GB25525@mithrandir>
+ <20140623170115.GA11436@piout.net>
+Message-ID: <CAKON4OyywLZ1bktuUbjagVvzjr0bJf7p9xpR7jeOq6FBe+6P=g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Mark,
+I was unaware of this driver and reimplemented it. Patch is attached.
+Some differences I noticed...
 
-On Sun, Jul 27, 2014 at 05:57:04PM +0100, Mark Brown wrote:
-> From: Mark Brown <broonie@linaro.org>
-> 
-> If building with CONFIG_SMP disbled (for example, with allnoconfig) then
-> GCC complains that the static function gic_peek_irq() is defined but not
-> used since the only reference is in the SMP initialisation code. Fix this
-> by moving the function definition inside the ifdef.
-> 
-> Signed-off-by: Mark Brown <broonie@linaro.org>
-> ---
->  drivers/irqchip/irq-gic-v3.c | 26 +++++++++++++-------------
->  1 file changed, 13 insertions(+), 13 deletions(-)
+1) I implemented bypass mode
+2) I had to do math in picoseconds to avoid round off/truncation errors.
+3) counter registers are different lengths on SUN4 vs rest.
 
-Applied to irqchip/urgent with Mark's Ack.
+Can someone with a scope verify if the prescaler of 1 works at high
+frequencies? Like cycles/active of 2/1, 3/1, 4,1...
 
-thx,
+On Mon, Jun 23, 2014 at 1:01 PM, Alexandre Belloni
+<alexandre.belloni@free-electrons.com> wrote:
+> On 18/06/2014 at 01:26:06 +0200, Thierry Reding wrote :
+>> On Mon, May 19, 2014 at 08:10:02PM +0200, Alexandre Belloni wrote:
+>> > +   /* By default, the polarity is inversed, set it to normal */
+>> > +   sunxi_pwm_writel(sunxi_pwm, PWM_CTRL_REG,
+>> > +                    BIT_CH(PWM_ACT_STATE, 0) |
+>> > +                    BIT_CH(PWM_ACT_STATE, 1));
+>> > +   clk_disable_unprepare(sunxi_pwm->clk);
+>>
+>> Why do you need to do this here? Doesn't this potentially cause
+>> transients if a bootloader had this configured with inversed polarity?
+>
+>
+> It was done a few months ago but what I remember is the following
+> happens:
+>
+> The PWM subsystem assumes that the polarity is PWM_POLARITY_NORMAL
+> because of the kzalloc pwmchip_add(). Would you prefer something like:
+>
+>         val = sunxi_pwm_readl(sunxi_pwm, PWM_CTRL_REG);
+>         for (i = 0; i < sunxi_pwm->chip.npwm; i++) {
+>                 if (!(val & BIT_CH(PWM_ACT_STATE, i)))
+>                         sunxi_pwm->chip.pwms[i].polarity = PWM_POLARITY_INVERSED;
+>         }
+>
+> Then, you would have a race where the PWM polarity is not correct in
+> sysfs between pwmchip_add() and that code.
+>
+> Also, if you want to preserve the state set by the bootloader, you
+> actually have an issue with getting back the other members of the
+> pwm_device struct (duty, period) and more importantly the PWMF_ENABLED
+> flag. It now assumed that the PWM channel is not enabled when
+> registering the chip. If you now say that it may be enabled before linux
+> is booting and you want to keep it running, then you have an
+> inconsistency between the real state of the PWM (enabled, with a duty,
+> period and polarity set) and what the PWM susbsytem actually knows about
+> the PWM (not enabled, duty and period == 0 and polarity is normal).
+>
+> I would agree that the usual use case would be that another driver will
+> take the PWM and set the duty, period and polarity anyway but the issue
+> with the PWMF_ENABLED flag remains.
+>
+> How do you want to fix this? Would you add a new callback that would be
+> called by pwmchip_add(), before pwmchip_sysfs_export()?
+>
+> I actually find it ugly to set the pwm_device members from the probe,
+> especially the flags. I would prefer they stay hidden by the API.
+>
+>
+> --
+> Alexandre Belloni, Free Electrons
+> Embedded Linux, Kernel and Android engineering
+> http://free-electrons.com
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-kernel" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> Please read the FAQ at  http://www.tux.org/lkml/
 
-Jason.
+
+
+-- 
+Jon Smirl
+jonsmirl at gmail.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: pwm
+Type: application/octet-stream
+Size: 18099 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140817/deb2dce2/attachment-0001.obj>
