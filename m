@@ -1,32 +1,38 @@
-From: bigeasy@linutronix.de (Sebastian Andrzej Siewior)
-Date: Sun, 17 Aug 2014 22:35:12 +0200
-Subject: [PATCH v7] 8250-core based serial driver for OMAP + DMA
-In-Reply-To: <20140815202826.GC9239@atomide.com>
-References: <1408124563-31541-1-git-send-email-bigeasy@linutronix.de>
- <20140815181704.GH17769@csclub.uwaterloo.ca>
- <53EE5BF8.3010007@linutronix.de>
- <20140815202826.GC9239@atomide.com>
-Message-ID: <20140817203512.GA24330@linutronix.de>
+From: ipaton0@gmail.com (Iain Paton)
+Date: Sun, 17 Aug 2014 22:34:46 +0100
+Subject: Oops: 17 SMP ARM (v3.16-rc2)
+In-Reply-To: <C4A61A5CA4AD2246942F4BA6F20ACB8043577770@ALVA-EXMB04.alv.autoliv.int>
+References: <20140626151424.GT32514@n2100.arm.linux.org.uk>
+ <20140627112151.GF32514@n2100.arm.linux.org.uk>
+ <3FFB61A7A8473C49831AF20FA193534A43CADFA7@ALVA-EXMB01.alv.autoliv.int>
+ <20140627163108.GP32514@n2100.arm.linux.org.uk>
+ <C4A61A5CA4AD2246942F4BA6F20ACB8043575072@ALVA-EXMB04.alv.autoliv.int>
+ <20140806095012.GN30282@n2100.arm.linux.org.uk>
+ <C4A61A5CA4AD2246942F4BA6F20ACB8043575172@ALVA-EXMB04.alv.autoliv.int>
+ <20140806125550.GO30282@n2100.arm.linux.org.uk>
+ <C4A61A5CA4AD2246942F4BA6F20ACB804357526C@ALVA-EXMB04.alv.autoliv.int>
+ <20140807121248.GY30282@n2100.arm.linux.org.uk>
+ <20140808180900.GG30282@n2100.arm.linux.org.uk>
+ <C4A61A5CA4AD2246942F4BA6F20ACB8043576356@ALVA-EXMB04.alv.autoliv.int>
+ <CAOMZO5B8GR+ABBoJ=dJcFqw3Wagfaip7HM+C1FTz+aE4CmqiPw@mail.gmail.com>
+ <C4A61A5CA4AD2246942F4BA6F20ACB80435776D3@ALVA-EXMB04.alv.autoliv.int>
+ <CAOMZO5B7FgzB7ThVyV2Vk7wTwYgjRWjEnkkAN5uwwKMaBKq1yg@mail.gmail.com>
+ <C4A61A5CA4AD2246942F4BA6F20ACB8043577770@ALVA-EXMB04.alv.autoliv.int>
+Message-ID: <53F11FF6.8030303@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Tony Lindgren | 2014-08-15 13:28:27 [-0700]:
+On 15/08/14 06:42, Mattis Lorentzon wrote:
 
->> It configured the trigger levels to 1 for RX and 16 for TX.
->
->Hmm that weird RX trigger level is a workaround for lost characters.
->
->See commit 0ba5f66836 (tty: serial: OMAP: use a 1-byte RX FIFO
->threshold in PIO mode :)
->
->There's paste test in that commit, I wonder if the 8250 drivers
->can deal with it any better?
+> We mostly run SSH with benchmarks using NFS, it can probably be
+> triggered by using only SSH with the following loop:
+> 
+> # while : ; do ssh arm-card date; done
 
-I recall that I used it as a console and didn't see any missing chars.
-I will try test but I am traveling this week?
+Mattis,
 
->Regards,
->
->Tony
+What sort of time does it take for you to see a problem?
 
-Sebastian
+I've been running the above for nearly two days on 3.16.0 on a board 
+with fec interrupts routed through gpio_6 and haven't seen a hint of 
+a problem.
