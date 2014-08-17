@@ -1,42 +1,82 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Sun, 17 Aug 2014 09:26:37 -0500
-Subject: [PATCH] arm64: audit: Fix build for audit changes
-Message-ID: <1408285597-30913-1-git-send-email-broonie@kernel.org>
+From: b.galvani@gmail.com (Beniamino Galvani)
+Date: Sun, 17 Aug 2014 16:29:13 +0200
+Subject: [PATCH 0/7] ARM: meson: add preliminary support for
+ MesonX/Meson6 SoCs
+In-Reply-To: <1408272594-10814-1-git-send-email-carlo@caione.org>
+References: <1408272594-10814-1-git-send-email-carlo@caione.org>
+Message-ID: <20140817142912.GA29963@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Mark Brown <broonie@linaro.org>
+On Sun, Aug 17, 2014 at 12:49:47PM +0200, Carlo Caione wrote:
+> Amlogic AML8726-MX (codename Meson6) is a highly integrated multimedia
+> application processor SoC for Multimedia Internet Device (MID), tablet
+> and Set Top Box (STB). It integrates a powerful CPU, a 2D/3D graphics
+> subsystem and a state-of-the-art video decoding engine together with
+> all major peripherals. It is manufactured by Amlogic, inc.
+> 
+> This patchset introduces preliminary support for Meson6-based SoCs but
+> several IPs and drivers are common among all the MesonX SoCs.
 
-Commit 3efe33f5d2 (audit: x86: drop arch from __audit_syscall_entry()
-interface) removed the arch parameter from __audit_syscall_entry() and
-updated the only current user in mainline but this breaks the ARMv8 audit
-code that has been added in -next. Fix this by making the equivalent
-update to ARMv8.
+Hi Carlo,
 
-Signed-off-by: Mark Brown <broonie@linaro.org>
----
+nice job! The patches work fine on a Tronsmart Vega S89 Elite TV box
+(Meson8 S802 SoC) just changing the fixed-clock frequency in the dts.
 
-Now -rc1 is out this should be applied to the audit tree (or squashed
-into the commit above) - the arm64 audit support is in mainline now and
--next is failing to build arm64 due to this.
+Beniamino
 
- arch/arm64/kernel/ptrace.c | 4 ++--
- 1 file changed, 2 insertions(+), 2 deletions(-)
-
-diff --git a/arch/arm64/kernel/ptrace.c b/arch/arm64/kernel/ptrace.c
-index 0310811..159251f 100644
---- a/arch/arm64/kernel/ptrace.c
-+++ b/arch/arm64/kernel/ptrace.c
-@@ -1116,8 +1116,8 @@ asmlinkage int syscall_trace_enter(struct pt_regs *regs)
- 		trace_sys_enter(regs, regs->syscallno);
- 
- #ifdef CONFIG_AUDITSYSCALL
--	audit_syscall_entry(syscall_get_arch(), regs->syscallno,
--		regs->orig_x0, regs->regs[1], regs->regs[2], regs->regs[3]);
-+	audit_syscall_entry(regs->syscallno, regs->orig_x0, regs->regs[1],
-+			    regs->regs[2], regs->regs[3]);
- #endif
- 
- 	return regs->syscallno;
--- 
-2.1.0.rc1
+> 
+> Amlogic doesn't release any documentation about their SoCs, so the code
+> has been reverse-engineered from the messy source code released at:
+> 
+> http://openlinux.amlogic.com:8000/download/
+> 
+> Carlo Caione (7):
+>   ARM: meson: debug: add debug UART for earlyprintk support
+>   ARM: meson: serial: add MesonX SoC on-chip uart driver
+>   ARM: meson6: clocksource: add Meson6 timer support
+>   ARM: meson: add basic support for MesonX SoCs
+>   ARM: meson: dts: add basic Meson/Meson6/Meson6-atv1200 DTSI/DTS
+>   ARM: meson: update defconfigs
+>   ARM: meson: update documentation (uart, timer and vendors)
+> 
+>  .../bindings/serial/amlogic,meson-uart.txt         |  17 +
+>  .../bindings/timer/amlogic,meson6-timer.txt        |  16 +
+>  .../devicetree/bindings/vendor-prefixes.txt        |   1 +
+>  arch/arm/Kconfig                                   |   2 +
+>  arch/arm/Kconfig.debug                             |  14 +-
+>  arch/arm/Makefile                                  |   1 +
+>  arch/arm/boot/dts/Makefile                         |   1 +
+>  arch/arm/boot/dts/meson.dtsi                       |  75 +++
+>  arch/arm/boot/dts/meson6-atv1200.dts               |  27 +
+>  arch/arm/boot/dts/meson6.dtsi                      |  44 ++
+>  arch/arm/configs/meson_defconfig                   |  99 ++++
+>  arch/arm/configs/multi_v7_defconfig                |   3 +
+>  arch/arm/include/debug/meson.S                     |  35 ++
+>  arch/arm/mach-meson/Kconfig                        |  13 +
+>  arch/arm/mach-meson/Makefile                       |   1 +
+>  arch/arm/mach-meson/meson.c                        |  36 ++
+>  drivers/clocksource/Kconfig                        |   3 +
+>  drivers/clocksource/Makefile                       |   1 +
+>  drivers/clocksource/meson6_timer.c                 | 187 ++++++
+>  drivers/tty/serial/Kconfig                         |  18 +
+>  drivers/tty/serial/Makefile                        |   1 +
+>  drivers/tty/serial/meson_uart.c                    | 634 +++++++++++++++++++++
+>  include/uapi/linux/serial_core.h                   |   3 +
+>  23 files changed, 1230 insertions(+), 2 deletions(-)
+>  create mode 100644 Documentation/devicetree/bindings/serial/amlogic,meson-uart.txt
+>  create mode 100644 Documentation/devicetree/bindings/timer/amlogic,meson6-timer.txt
+>  create mode 100644 arch/arm/boot/dts/meson.dtsi
+>  create mode 100644 arch/arm/boot/dts/meson6-atv1200.dts
+>  create mode 100644 arch/arm/boot/dts/meson6.dtsi
+>  create mode 100644 arch/arm/configs/meson_defconfig
+>  create mode 100644 arch/arm/include/debug/meson.S
+>  create mode 100644 arch/arm/mach-meson/Kconfig
+>  create mode 100644 arch/arm/mach-meson/Makefile
+>  create mode 100644 arch/arm/mach-meson/meson.c
+>  create mode 100644 drivers/clocksource/meson6_timer.c
+>  create mode 100644 drivers/tty/serial/meson_uart.c
+> 
+> -- 
+> 1.9.1
+> 
