@@ -1,44 +1,45 @@
-From: horms@verge.net.au (Simon Horman)
-Date: Sun, 17 Aug 2014 09:38:36 +0900
-Subject: [PATCH] ARM: shmobile: defconfig: enable
- ARM_ATAG_DTB_COMPAT_CMDLINE_EXTEND
-In-Reply-To: <1408057405-10568-1-git-send-email-horms+renesas@verge.net.au>
-References: <1408057405-10568-1-git-send-email-horms+renesas@verge.net.au>
-Message-ID: <20140817003836.GB7887@verge.net.au>
+From: wens@csie.org (Chen-Yu Tsai)
+Date: Sun, 17 Aug 2014 11:52:06 +0800
+Subject: [PATCH 00/12] ARM: sun8i: Enable pinctrl, i2c and mmc
+Message-ID: <1408247538-16950-1-git-send-email-wens@csie.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Aug 15, 2014 at 08:03:25AM +0900, Simon Horman wrote:
-> "ARM: shmobile: defconfig: enable initrd and atag dtb compat" enables
-> CONFIG_ARM_ATAG_DTB_COMPAT, however, empirically
-> ARM_ATAG_DTB_COMPAT_CMDLINE_EXTEND is also required for my kzm9d board to
-> boot.
-> 
-> Cc: Kevin Hilman <khilman@linaro.org>
-> Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
+Hi Maxime,
 
-I have decided to drop the above patch and am withdrawing this
-patch accordingly.
+This series enables all the controllers on sun8i that we already have
+drivers for, excluding SPI as the tablet I have does not use it and
+I cannot test it. If there's a way to test it without external connections
+or devices please let me know.
 
-> ---
-> 
-> Without this change I do not see any kernel console output at all.
-> ---
->  arch/arm/configs/shmobile_defconfig | 1 +
->  1 file changed, 1 insertion(+)
-> 
-> diff --git a/arch/arm/configs/shmobile_defconfig b/arch/arm/configs/shmobile_defconfig
-> index f847a9f..e343dc8 100644
-> --- a/arch/arm/configs/shmobile_defconfig
-> +++ b/arch/arm/configs/shmobile_defconfig
-> @@ -35,6 +35,7 @@ CONFIG_ZBOOT_ROM_TEXT=0x0
->  CONFIG_ZBOOT_ROM_BSS=0x0
->  CONFIG_ARM_APPENDED_DTB=y
->  CONFIG_ARM_ATAG_DTB_COMPAT=y
-> +CONFIG_ARM_ATAG_DTB_COMPAT_CMDLINE_EXTEND=y
->  CONFIG_KEXEC=y
->  CONFIG_VFP=y
->  CONFIG_NEON=y
-> -- 
-> 2.0.1
-> 
+This series is based on 3.17-rc1, however it should cleanly apply over
+the sun8i-rtc patch you've queued.
+
+The commit logs pretty much explain themselves. Note that PLL6 is not
+implemented yet. I've some patches for the clocks that I will send later.
+
+
+Cheers
+ChenYu
+
+
+Chen-Yu Tsai (12):
+  ARM: dts: sun8i: Add PIO controller node to the sun8i dtsi
+  ARM: dts: sun8i: Add R_PIO controller node to the dtsi
+  ARM: dts: sun8i: Add pinmux set for uart0
+  ARM: dts: sun8i: Add pin muxing option for R_UART
+  ARM: dts: sun8i: ippo-q8h: Add pinctrl properties for R_UART
+  ARM: dts: sun8i: Add mmc clocks to the dtsi
+  ARM: dts: sun8i: Add pin-muxing info for the mmc controllers
+  ARM: dts: sun8i: Add mmc controller nodes
+  ARM: dts: sun8i: Enable mmc controller on ippo-q8h-v5
+  ARM: dts: sun8i: Add pin-muxing info for the i2c controllers
+  ARM: dts: sun8i: Add i2c controller nodes
+  ARM: dts: sun8i: Enable i2c controllers on ippo-q8h-v5
+
+ arch/arm/boot/dts/sun8i-a23-ippo-q8h-v5.dts |  41 +++++++
+ arch/arm/boot/dts/sun8i-a23.dtsi            | 169 ++++++++++++++++++++++++++++
+ 2 files changed, 210 insertions(+)
+
+-- 
+2.1.0
