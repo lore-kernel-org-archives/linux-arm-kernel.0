@@ -1,63 +1,70 @@
-From: leif.lindholm@linaro.org (Leif Lindholm)
-Date: Sun, 17 Aug 2014 01:06:09 +0100
-Subject: [PATCH v2 1/3] arm64: spin-table: handle unmapped
- cpu-release-addrs
-In-Reply-To: <20140815143804.GW27466@arm.com>
-References: <CAKv+Gu_UjRNhhiM0GPsKRdXRtmEnY6cbpY-JZ33RUMapbPYsbQ@mail.gmail.com>
- <20140813125844.GE32644@leverpostej>
- <20140814171323.GH9039@arm.com>
- <CAKv+Gu9ftjZby+5U5Vs0hXhyFdNLwx4MwvC-LL=y3a9eSz34iQ@mail.gmail.com>
- <20140815115714.GP27466@arm.com>
- <CAKv+Gu-2RyWY4V7zoOQEi3As96kmmAMae2s3YauJ4bL9-h+sdg@mail.gmail.com>
- <20140815125324.GQ27466@arm.com>
- <CAKv+Gu9vj=b3pOJC3-x+QdjcErHShicEw-_6UHABG_j3qkGGOw@mail.gmail.com>
- <1408113355.599.146.camel@deneb.redhat.com>
- <20140815143804.GW27466@arm.com>
-Message-ID: <20140817000609.GC22224@bivouac.eciton.net>
+From: horms@verge.net.au (Simon Horman)
+Date: Sun, 17 Aug 2014 09:37:48 +0900
+Subject: [PATCH] ARM: shmobile: defconfig: enable initrd and atag dtb
+ compat
+In-Reply-To: <20140814052557.GA27045@verge.net.au>
+References: <1407974835-11064-1-git-send-email-khilman@linaro.org>
+ <20140814052557.GA27045@verge.net.au>
+Message-ID: <20140817003748.GA7887@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Aug 15, 2014 at 03:38:04PM +0100, Will Deacon wrote:
-> On Fri, Aug 15, 2014 at 03:35:55PM +0100, Mark Salter wrote:
-> > On Fri, 2014-08-15 at 15:28 +0200, Ard Biesheuvel wrote:
-> > > On 15 August 2014 14:53, Will Deacon <will.deacon@arm.com> wrote:
-> > > > On Fri, Aug 15, 2014 at 01:07:16PM +0100, Ard Biesheuvel wrote:
-> > > >> On 15 August 2014 13:57, Will Deacon <will.deacon@arm.com> wrote:
-> > > >> > I was planning to take all of these for 3.18 as there's no regression here
-> > > >> > (the fuzzing is a new debug feature and defaults to `n'). Do you think these
-> > > >> > qualify as -rc1 material?
-> > > >> >
-> > > >>
-> > > >> Considering that TEXT_OFFSET fuzzing is recommended to be turned on
-> > > >> for distro kernels, I would say this is definitely appropriate for
-> > > >> 3.17
-> > > >
-> > > > Whilst I see that in the commit log, the same recommendation doesn't appear
-> > > > in the Kconfig text and I'm not sure that it's such a wise thing to say
-> > > > either. From a distribution's point of view, I think I'd want any kernel
-> > > > issues to be as reproducible as possible, and fuzzing the text offset seems
-> > > > to go against that.
-> > > 
-> > > OK. There is one other real world issue that 3/3 addresses, which are
-> > > platforms that have memreserves at the base of DRAM containing bits of
-> > > UEFI itself (this is what got this whole discussion going in the first
-> > > place). Currently, we cannot boot via UEFI on these platforms, as the
-> > > EFI stub will only consider base of DRAM + TEXT_OFFSET as an option,
-> > > and fail the boot if it is not available.
-> > > 
-> > > If this is something that could wait until 3.18 as well (Mark S?),
-> > > then it's fine by me.
+On Thu, Aug 14, 2014 at 02:25:57PM +0900, Simon Horman wrote:
+> On Wed, Aug 13, 2014 at 05:07:15PM -0700, Kevin Hilman wrote:
+> > Enable ATAG_DTB_COMPAT support for passing commandline from bootloader.
+> > Enable initrd support.
 > > 
-> > I don't see a problem with waiting until 3.18.
+> > Signed-off-by: Kevin Hilman <khilman@linaro.org>
+> > ---
+> > With this, I can finally integrate the kzm9d into the board farm because I use
+> > initrafms for the primary rootfs, and set the command-line from u-boot.
+> > 
+> > Tested on next-20140813
 > 
-> Cheers, I've applied the series to our for-next branch and I'll push
-> everything out at -rc1.
+> Thanks, I will queue this up for v3.18 and push it to next
+> once v3.17-rc1 has been released.
 
-Late to the discussion since I was on an 11h flight, and still chiming
-in since I don't think previous speakers were explicit enough about
-the implication:
-Bumping 3/3 to 3.18 means the upstream kernel will not boot on AMD
-Seattle until at least December. This sounds suboptimal to me.
+Hi Kevin,
 
-/
-    Leif
+I have decided to drop this patch for now as it appears to
+cause my kzm9d (of all things) not to boot. And per a follow-up email
+from you it no longer appears to be required in your environment.
+
+I'm more than happy to revisit this if it turns out to be useful again.
+
+> >  arch/arm/configs/shmobile_defconfig | 2 ++
+> >  1 file changed, 2 insertions(+)
+> > 
+> > diff --git a/arch/arm/configs/shmobile_defconfig b/arch/arm/configs/shmobile_defconfig
+> > index 3b136144cc83..d655f088ac58 100644
+> > --- a/arch/arm/configs/shmobile_defconfig
+> > +++ b/arch/arm/configs/shmobile_defconfig
+> > @@ -3,6 +3,7 @@ CONFIG_NO_HZ=y
+> >  CONFIG_IKCONFIG=y
+> >  CONFIG_IKCONFIG_PROC=y
+> >  CONFIG_LOG_BUF_SHIFT=16
+> > +CONFIG_BLK_DEV_INITRD=y
+> >  CONFIG_CC_OPTIMIZE_FOR_SIZE=y
+> >  CONFIG_SYSCTL_SYSCALL=y
+> >  CONFIG_EMBEDDED=y
+> > @@ -33,6 +34,7 @@ CONFIG_HIGHMEM=y
+> >  CONFIG_ZBOOT_ROM_TEXT=0x0
+> >  CONFIG_ZBOOT_ROM_BSS=0x0
+> >  CONFIG_ARM_APPENDED_DTB=y
+> > +CONFIG_ARM_ATAG_DTB_COMPAT=y
+> >  CONFIG_KEXEC=y
+> >  CONFIG_VFP=y
+> >  CONFIG_NEON=y
+> > -- 
+> > 1.9.2
+> > 
+> > --
+> > To unsubscribe from this list: send the line "unsubscribe linux-sh" in
+> > the body of a message to majordomo at vger.kernel.org
+> > More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> > 
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-sh" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> 
