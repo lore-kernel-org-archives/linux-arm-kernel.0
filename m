@@ -1,81 +1,47 @@
-From: b.galvani@gmail.com (Beniamino Galvani)
-Date: Sun, 17 Aug 2014 16:42:01 +0200
-Subject: [PATCH 5/7] ARM: meson: dts: add basic
- Meson/Meson6/Meson6-atv1200 DTSI/DTS
-In-Reply-To: <1408272594-10814-6-git-send-email-carlo@caione.org>
-References: <1408272594-10814-1-git-send-email-carlo@caione.org>
- <1408272594-10814-6-git-send-email-carlo@caione.org>
-Message-ID: <20140817144201.GB29963@gmail.com>
+From: wens@csie.org (Chen-Yu Tsai)
+Date: Sun, 17 Aug 2014 23:20:44 +0800
+Subject: [PATCH 11/12] ARM: dts: sun8i: Add i2c controller nodes
+In-Reply-To: <20140817080204.GY15297@lukather>
+References: <1408247538-16950-1-git-send-email-wens@csie.org>
+ <1408247538-16950-12-git-send-email-wens@csie.org>
+ <20140817080204.GY15297@lukather>
+Message-ID: <CAGb2v67NwsJORoFrgEECDtexXGtF5qOx7NX1PVpZHkjVs-mG2A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Hi,
 
-On Sun, Aug 17, 2014 at 12:49:52PM +0200, Carlo Caione wrote:
-> The Meson6 SoC is produced by Amlogic inc. and it is based on 2 Cortex A9
-> and an ARM Mali-400 GPU.
-> This patch adds two basic DTSI for the preliminary support of Meson and
-> Meson6 SoCs. Another DTS is also added for supporting the atv1200 board,
-> produced by Geniatech inc.
-> index 0000000..d62add4
-(...)
-> --- /dev/null
-> +++ b/arch/arm/boot/dts/meson6.dtsi
-> @@ -0,0 +1,44 @@
-> +/*
-> + * Copyright 2014 Carlo Caione <carlo@caione.org>
-> + *
-> + * This program is free software; you can redistribute it and/or modify it
-> + * under the terms of the GNU General Public License as published by the
-> + * Free Software Foundation; either version 2 of the License, or (at your
-> + * option) any later version.
-> + */
-> +
-> +/include/ "meson.dtsi"
-> +
-> +/ {
-> +	model = "Amlogic Meson6 SoC";
-> +	compatible = "amlogic,meson6", "amlogic,8726_mx";
-> +
-> +	interrupt-parent = <&gic>;
-> +
-> +	cpus {
-> +		#address-cells = <1>;
-> +		#size-cells = <0>;
-> +
-> +		cpu at 0 {
+On Sun, Aug 17, 2014 at 4:02 PM, Maxime Ripard
+<maxime.ripard@free-electrons.com> wrote:
+> Hi,
+>
+> On Sun, Aug 17, 2014 at 11:52:17AM +0800, Chen-Yu Tsai wrote:
+>> Add nodes for the 3 i2c controllers found on A23 SoCs to the sun8i DTSI.
+>>
+>> Signed-off-by: Chen-Yu Tsai <wens@csie.org>
+>> ---
+>>  arch/arm/boot/dts/sun8i-a23.dtsi | 36 ++++++++++++++++++++++++++++++++++++
+>>  1 file changed, 36 insertions(+)
+>>
+>> diff --git a/arch/arm/boot/dts/sun8i-a23.dtsi b/arch/arm/boot/dts/sun8i-a23.dtsi
+>> index 4658998..53ef350 100644
+>> --- a/arch/arm/boot/dts/sun8i-a23.dtsi
+>> +++ b/arch/arm/boot/dts/sun8i-a23.dtsi
+>> @@ -387,6 +387,42 @@
+>>                       status = "disabled";
+>>               };
+>>
+>> +             i2c0: i2c at 01c2ac00 {
+>> +                     compatible = "allwinner,sun6i-a31-i2c";
+>> +                     reg = <0x01c2ac00 0x400>;
+>> +                     interrupts = <0 6 4>;
+>> +                     clocks = <&apb2_gates 0>;
+>> +                     clock-frequency = <100000>;
+>
+> It's the default, you don't need to set it.
 
-The address after the @ should match the value of the 'reg' property.
+Ah, just checked the driver, it is indeed the default.
+All the other sunxi dtsi have it though. Do we want to be consistent?
 
-> +			device_type = "cpu";
-> +			compatible = "arm,cortex-a9";
-> +			reg = <0x200>;
-> +		};
-> +
-> +		cpu at 1 {
-> +			device_type = "cpu";
-> +			compatible = "arm,cortex-a9";
-> +			reg = <0x1>;
 
-According to Documentation/devicetree/bindings/arm/cpus.txt, this
-should be set to bits [23:0] of the CPU MPIDR register, in this case
-0x201.
-
-Beniamino
-
-> +		};
-> +	};
-> +
-> +	clocks {
-> +		#address-cells = <1>;
-> +
-> +		clk81: clk at 0 {
-> +			#clock-cells = <0>;
-> +			compatible = "fixed-clock";
-> +			clock-frequency = <200000000>;
-> +		};
-> +	};
-> +}; /* end of / */
-> -- 
-> 1.9.1
-> 
+ChenYu
