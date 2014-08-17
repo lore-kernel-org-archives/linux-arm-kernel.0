@@ -1,44 +1,61 @@
 From: jason@lakedaemon.net (Jason Cooper)
-Date: Sun, 17 Aug 2014 14:38:05 -0400
-Subject: [PATCH v2] ARM: mvebu: Add RTC support for Armada 375
-In-Reply-To: <1406817122-15675-1-git-send-email-gregory.clement@free-electrons.com>
-References: <1406817122-15675-1-git-send-email-gregory.clement@free-electrons.com>
-Message-ID: <20140817183805.GH12769@titan.lakedaemon.net>
+Date: Sun, 17 Aug 2014 14:42:58 -0400
+Subject: [PATCH v2 0/6] mvebu: Network devicetree pin muxing
+In-Reply-To: <1407759281-11513-1-git-send-email-ezequiel.garcia@free-electrons.com>
+References: <1407759281-11513-1-git-send-email-ezequiel.garcia@free-electrons.com>
+Message-ID: <20140817184258.GI12769@titan.lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Gregory,
+Ezequiel,
 
-On Thu, Jul 31, 2014 at 04:32:02PM +0200, Gregory CLEMENT wrote:
-> The Armada 375 SoC has the same real time clock as the one used in
-> other Marvell EBU platforms. This patch consequently updates the
-> Device Tree of the Armada 375 SoC to describe the internal RTC.
+On Mon, Aug 11, 2014 at 09:14:35AM -0300, Ezequiel Garcia wrote:
+> This series adds the proper devicetree pin muxing for the network interfaces
+> on all Armada 370 boards.
 > 
-> Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
-> ---
-> Hi Jason,
+> The MDIO interface uses pins MPP17 and MPP18, and so this is needed
+> on all devices using MDIO.
 > 
-> We missed it for the initial support of the SoC.
+> For the ethernet interfaces, only the boards connecting with RGMII/GMII/MII
+> need the mux. On this SoC, the SGMII is available on dedicated SerDes lanes,
+> and so no MPP pin mux is required.
 > 
-> I know that it is very late for including for 3.17, so if it is
-> postpone for 3.18, it's fine.
+> Given all the supported board use either RGMII or SGMII, we only add RGMII mux
+> configuration. The only board which uses SGMII is the Armada 370 Reference
+> Design board.
 > 
-> However given the little change, maybe it is still possible to push it
-> in 3.17 ^_^
+> Patches have been tested on Armada 370 Mirabox only, using the recently submitted
+> mvneta support for barebox. The series is based on v3.16.
 > 
-> Thanks,
+> It would be great if someone else can test on the other boards, to make sure
+> no regressions are introduced.
 > 
-> Gregory
+> Changes from v1:
 > 
-> Changelog:
+>   * Replaced mux node name: ge{0,1}_pins -> ge{0,1}_rgmii_pins to be clear
+>     about the MII.
 > 
-> v1->v2:
->  - Fixed typos and improved the commit log
+>   * Replaced {}_pins -> {}-pins, to be consistent.
 > 
->  arch/arm/boot/dts/armada-375.dtsi | 6 ++++++
->  1 file changed, 6 insertions(+)
+>   * Massaged the commit logs a bit.
+> 
+> Ezequiel Garcia (6):
+>   ARM: mvebu: Add network pin mux configuration for the Armada 370 SoC
+>   ARM: mvebu: Add proper pin muxing on Globalscale Mirabox board
+>   ARM: mvebu: Add proper pin muxing on the Armada 370 DB board
+>   ARM: mvebu: Add proper pin muxing on Netgear ReadyNAS 102
+>   ARM: mvebu: Add proper pin muxing on Netgear ReadyNAS 104
+>   ARM: mvebu: Add proper pin muxing on Armada 370 RD board
+> 
+>  arch/arm/boot/dts/armada-370-db.dts            |  6 ++++++
+>  arch/arm/boot/dts/armada-370-mirabox.dts       |  6 ++++++
+>  arch/arm/boot/dts/armada-370-netgear-rn102.dts |  4 ++++
+>  arch/arm/boot/dts/armada-370-netgear-rn104.dts |  6 ++++++
+>  arch/arm/boot/dts/armada-370-rd.dts            |  4 ++++
+>  arch/arm/boot/dts/armada-370.dtsi              | 19 +++++++++++++++++++
+>  6 files changed, 45 insertions(+)
 
-Applied to mvebu/dt
+Applied whole series to mvebu/dt with Andrew's Ack.
 
 thx,
 
