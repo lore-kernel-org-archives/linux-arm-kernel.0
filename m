@@ -1,57 +1,57 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Mon, 18 Aug 2014 22:52:25 +0100
-Subject: [PATCH v9 03/12] PCI: Introduce helper functions to deal with
- PCI I/O ranges.
-In-Reply-To: <20140818213446.GC13147@bart.dudau.co.uk>
-References: <1407860725-25202-1-git-send-email-Liviu.Dudau@arm.com>
- <1407860725-25202-4-git-send-email-Liviu.Dudau@arm.com>
- <20140818142604.GO20043@localhost>
- <20140818213446.GC13147@bart.dudau.co.uk>
-Message-ID: <20140818215225.GI24600@localhost>
+From: joro@8bytes.org (Joerg Roedel)
+Date: Mon, 18 Aug 2014 23:55:54 +0200
+Subject: [PATCH v5 1/1] iommu-api: Add map_sg/unmap_sg functions
+In-Reply-To: <1407797150-515-2-git-send-email-ohaugan@codeaurora.org>
+References: <1407797150-515-1-git-send-email-ohaugan@codeaurora.org>
+ <1407797150-515-2-git-send-email-ohaugan@codeaurora.org>
+Message-ID: <20140818215553.GJ9809@8bytes.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Aug 18, 2014 at 10:34:46PM +0100, Liviu Dudau wrote:
-> On Mon, Aug 18, 2014 at 03:26:04PM +0100, Catalin Marinas wrote:
-> > On Tue, Aug 12, 2014 at 05:25:16PM +0100, Liviu Dudau wrote:
-> > > Some architectures do not have a simple view of the PCI I/O space
-> > > and instead use a range of CPU addresses that map to bus addresses.
-> > > For some architectures these ranges will be expressed by OF bindings
-> > > in a device tree file.
-> > > 
-> > > This patch introduces a pci_register_io_range() helper function with
-> > > a generic implementation that can be used by such architectures to
-> > > keep track of the I/O ranges described by the PCI bindings. If the
-> > > PCI_IOBASE macro is not defined that signals lack of support for PCI
-> > > and we return an error.
-> > > 
-> > > In order to retrieve the CPU address associated with an I/O port, a
-> > > new helper function pci_pio_to_address() is introduced. This will
-> > > search in the list of ranges registered with pci_register_io_range()
-> > > and return the CPU address that corresponds to the given port.
-> > > 
-> > > Cc: Grant Likely <grant.likely@linaro.org>
-> > > Cc: Rob Herring <robh+dt@kernel.org>
-> > > Cc: Arnd Bergmann <arnd@arndb.de>
-> > > Signed-off-by: Liviu Dudau <Liviu.Dudau@arm.com>
-> > > ---
-> > >  drivers/of/address.c       | 95 ++++++++++++++++++++++++++++++++++++++++++++++
-> > >  include/linux/of_address.h |  2 +
-> > >  2 files changed, 97 insertions(+)
-> > 
-> > Actually, I think we moved too much code into drivers/of/. Is there
-> > anything OF specific about this code to live here (apart from
-> > OF_BAD_ADDR)? I think driver/pci/ more appropriate?
-> 
-> I have no strong preference for one place vs the other. While this does
-> not use any OF specific code, it should be called only from OF enabled
-> code. So the relationship is not one of depending on of_* but on being
-> dependent on.
+On Mon, Aug 11, 2014 at 03:45:50PM -0700, Olav Haugan wrote:
+> +int default_iommu_map_sg(struct iommu_domain *domain, unsigned long iova,
+> +			 struct scatterlist *sg, unsigned int nents,
+> +			 int prot, unsigned long flags)
+> +{
+> +	int ret = 0;
+> +	unsigned long offset = 0;
+> +	unsigned int i;
+> +	struct scatterlist *s;
+> +
+> +	for_each_sg(sg, s, nents, i) {
+> +		phys_addr_t phys = page_to_phys(sg_page(s));
+> +		size_t page_len = s->offset + s->length;
+> +
+> +		ret = iommu_map(domain, iova + offset, phys, page_len,
+> +				prot);
 
-In this case it's probably ok to keep them here for the time being.
+This isn't going to work, iova + offset, phys and page_len need to be
+aligned to the minimum page-size the given IOMMU implementation
+supports. See the iommu_map implementation for details.
 
-I wonder whether it would also be useful for ACPI. But I have no idea
-how ACPI would fit with the ACPI patches.
+> +int default_iommu_unmap_sg(struct iommu_domain *domain, unsigned long iova,
+> +			       size_t size, unsigned long flags)
 
--- 
-Catalin
+Another asymmentry here, why don't you just pass a scatterlist and nents
+like in the map_sg function? if you implement it like this it is just a
+duplication of iommu_unmap().
+
+> +static inline int iommu_map_sg(struct iommu_domain *domain, unsigned long iova,
+> +			       struct scatterlist *sg, unsigned int nents,
+> +			       int prot, unsigned long flags)
+> +{
+> +	return domain->ops->map_sg(domain, iova, sg, nents, prot, flags);
+> +}
+> +
+> +static inline int iommu_unmap_sg(struct iommu_domain *domain,
+> +				 unsigned long iova, size_t size,
+> +				 unsigned long flags)
+> +{
+> +	return domain->ops->unmap_sg(domain, iova, size, flags);
+> +}
+
+These function pointers need to be checked for != NULL before calling
+them.
+
+
+	Joerg
