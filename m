@@ -1,88 +1,83 @@
-From: gpkulkarni@gmail.com (Ganapatrao Kulkarni)
-Date: Mon, 18 Aug 2014 13:09:48 +0530
-Subject: [PATCH] arm64: topology: add MPIDR-based detection
-In-Reply-To: <20140604171030.GE10775@e102568-lin.cambridge.arm.com>
-References: <1401644249-23792-1-git-send-email-broonie@kernel.org>
- <20140603173103.GA18004@red-moon>
- <20140603210424.GJ31751@sirena.org.uk>
- <20140604093452.GA8057@e102568-lin.cambridge.arm.com>
- <20140604115751.GH2520@sirena.org.uk>
- <20140604130114.GB10775@e102568-lin.cambridge.arm.com>
- <20140604135431.GL2520@sirena.org.uk>
- <20140604155129.GD10775@e102568-lin.cambridge.arm.com>
- <20140604163400.GQ2520@sirena.org.uk>
- <20140604171030.GE10775@e102568-lin.cambridge.arm.com>
-Message-ID: <CAFpQJXVmj0v=L_5NSGs1TdNuZDuKv_zxEoSVpCVSSsjSqFgiMg@mail.gmail.com>
+From: a.hajda@samsung.com (Andrzej Hajda)
+Date: Mon, 18 Aug 2014 09:43:19 +0200
+Subject: [PATCH v2] imx-drm: imx-drm-core: add suspend/resume support
+In-Reply-To: <1406269240-24622-1-git-send-email-shawn.guo@freescale.com>
+References: <1406269240-24622-1-git-send-email-shawn.guo@freescale.com>
+Message-ID: <53F1AE97.8090807@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-How we map non SMT (MT bit24=0) cores of dual/multi socket system with
-the topology which is using only aff0 and aff1?
-can we use aff2  ( or concatenating aff2 and aff3)  to represent socket-id?
-
-thanks
-Ganapat
+Hi Shawn,
 
 
-On Wed, Jun 4, 2014 at 10:40 PM, Lorenzo Pieralisi
-<lorenzo.pieralisi@arm.com> wrote:
-> On Wed, Jun 04, 2014 at 05:34:00PM +0100, Mark Brown wrote:
->> On Wed, Jun 04, 2014 at 04:51:29PM +0100, Lorenzo Pieralisi wrote:
->>
->> > My question is: is it better to pack affinity levels and "guess" what aff3
->> > (and aff2 on non-SMT) means or add an additional level of hierarchy in the
->> > arm64 topology code (eg book_id - implemented only for s390 to the best
->> > of my knowledge) ?
->>
->> Shoving them in there would address the issue as well, yes (though we'd
->> still have to combine aff2 and aff3 for the non-SMT case).  I don't know
->> if having books enabled has some overhead we don't want though.
->>
->> > I personally prefer the latter approach but I think it boils down to
->> > understanding what do we want to provide the scheduler with if we have
->> > a hierarchy that extends beyond "cluster" level.
->>
->> > I will be glad to help you implement it when time comes (and this will also
->> > fix the clusters of clusters DT issue we are facing - ie how to treat them).
->>
->> > Now, I do not think it is a major problem at the moment, merging the
->> > patch I sent will give us more time to discuss how to define the
->> > topology for clusters of clusters, because that's what we are talking
->> > about.
->>
->> In so far as you're saying that we don't really need to worry about
->> exactly how we handle multi-level clusters properly at the minute I
->> agree with you - until we have some idea what they physically look like
->> and can consider how well that maps onto the scheduler and whatnot it
->> doesn't really matter and we can just ignore it.  Given that I'm not
->> concerned about just reporting everything as flat like we do with DT at
->> the minute and don't see a real need to theorise about it, it'll just be
->> a performance problem and not a correctness problem when it is
->> encountered.  That feels like a better position to leave things in as it
->> will be less stress for whoever is bringing up such a fancy new system,
->> they can stand a reasonable chance of getting things at least running
->> with minimal effort.
->
-> Ok, I think we have an agreement, let's merge the patch I sent and
-> discuss the way forward to cater for systems with clusters of clusters
-> when we reasonably expect them to hit production, the scheduler expected
-> topology might well change by that time and now we are well positioned
-> to cope with future extensions (and actually packing affinity levels
-> might well be the final solution if the scheduler expects a "flat"
-> topology at the higher topology level).
->
->> > Does it make sense ?
->>
->> Like I say I do think that merging your current code is better than
->> nothing.
->
-> Great, thanks for bearing with me.
->
-> Thanks !
-> Lorenzo
->
->
-> _______________________________________________
-> linaro-kernel mailing list
-> linaro-kernel at lists.linaro.org
-> http://lists.linaro.org/mailman/listinfo/linaro-kernel
+On 07/25/2014 08:20 AM, Shawn Guo wrote:
+> HDMI currently stops working after a system suspend/resume cycle.  The
+> cause is that the mode setting states in hardware gets lost and isn't
+> restored across the suspend/resume cycle.
+> 
+> The patch adds a very basic suspend/resume support to imx-drm driver,
+> and calls drm_helper_resume_force_mode() in .resume hook to restore the
+> mode setting states, so that HDMI can continue working after a system
+> suspend/resume cycle.
+> 
+> Signed-off-by: Shawn Guo <shawn.guo@freescale.com>
+> ---
+> Changs since v1:
+>  - Do not walk through connector->funcs->dpms() but only call
+>    drm_helper_resume_force_mode() in .resume.
+> 
+>  drivers/staging/imx-drm/imx-drm-core.c | 24 ++++++++++++++++++++++++
+>  1 file changed, 24 insertions(+)
+> 
+> diff --git a/drivers/staging/imx-drm/imx-drm-core.c b/drivers/staging/imx-drm/imx-drm-core.c
+> index def8280d7ee6..ab41152089a3 100644
+> --- a/drivers/staging/imx-drm/imx-drm-core.c
+> +++ b/drivers/staging/imx-drm/imx-drm-core.c
+> @@ -696,6 +696,29 @@ static int imx_drm_platform_remove(struct platform_device *pdev)
+>  	return 0;
+>  }
+>  
+> +#ifdef CONFIG_PM_SLEEP
+> +static int imx_drm_suspend(struct device *dev)
+> +{
+> +	struct drm_device *drm_dev = dev_get_drvdata(dev);
+> +
+> +	drm_kms_helper_poll_disable(drm_dev);
+
+drm_dev can be NULL here. You should add check before.
+
+> +
+> +	return 0;
+> +}
+> +
+> +static int imx_drm_resume(struct device *dev)
+> +{
+> +	struct drm_device *drm_dev = dev_get_drvdata(dev);
+> +
+> +	drm_helper_resume_force_mode(drm_dev);
+
+ditto
+
+Regards
+Andrzej
+
+> +	drm_kms_helper_poll_enable(drm_dev);
+> +
+> +	return 0;
+> +}
+> +#endif
+> +
+> +static SIMPLE_DEV_PM_OPS(imx_drm_pm_ops, imx_drm_suspend, imx_drm_resume);
+> +
+>  static const struct of_device_id imx_drm_dt_ids[] = {
+>  	{ .compatible = "fsl,imx-display-subsystem", },
+>  	{ /* sentinel */ },
+> @@ -708,6 +731,7 @@ static struct platform_driver imx_drm_pdrv = {
+>  	.driver		= {
+>  		.owner	= THIS_MODULE,
+>  		.name	= "imx-drm",
+> +		.pm	= &imx_drm_pm_ops,
+>  		.of_match_table = imx_drm_dt_ids,
+>  	},
+>  };
+> 
