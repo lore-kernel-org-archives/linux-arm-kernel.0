@@ -1,84 +1,41 @@
-From: ohaugan@codeaurora.org (Olav Haugan)
-Date: Mon, 18 Aug 2014 15:47:56 -0700
-Subject: [PATCH v5 1/1] iommu-api: Add map_sg/unmap_sg functions
-In-Reply-To: <20140818215553.GJ9809@8bytes.org>
-References: <1407797150-515-1-git-send-email-ohaugan@codeaurora.org>
- <1407797150-515-2-git-send-email-ohaugan@codeaurora.org>
- <20140818215553.GJ9809@8bytes.org>
-Message-ID: <53F2829C.2040809@codeaurora.org>
+From: javier@dowhile0.org (Javier Martinez Canillas)
+Date: Tue, 19 Aug 2014 00:50:59 +0200
+Subject: [PATCH v3 5/7] net: cpsw: Add am33xx MACID readout
+In-Reply-To: <53F25AD1.8040504@ti.com>
+References: <1408202315-20006-1-git-send-email-mpa@pengutronix.de>
+ <1408202315-20006-6-git-send-email-mpa@pengutronix.de>
+ <53F244DA.3070803@ti.com>
+ <20140818154112.6601cbff@gandalf.local.home>
+ <53F25AD1.8040504@ti.com>
+Message-ID: <CABxcv=npv6bRq=VF8RT5trNxUzDj3bAm-PkvDEhcLVJ+uf8hCg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 8/18/2014 2:55 PM, Joerg Roedel wrote:
-> On Mon, Aug 11, 2014 at 03:45:50PM -0700, Olav Haugan wrote:
->> +int default_iommu_map_sg(struct iommu_domain *domain, unsigned long iova,
->> +			 struct scatterlist *sg, unsigned int nents,
->> +			 int prot, unsigned long flags)
->> +{
->> +	int ret = 0;
->> +	unsigned long offset = 0;
->> +	unsigned int i;
->> +	struct scatterlist *s;
->> +
->> +	for_each_sg(sg, s, nents, i) {
->> +		phys_addr_t phys = page_to_phys(sg_page(s));
->> +		size_t page_len = s->offset + s->length;
->> +
->> +		ret = iommu_map(domain, iova + offset, phys, page_len,
->> +				prot);
-> 
-> This isn't going to work, iova + offset, phys and page_len need to be
-> aligned to the minimum page-size the given IOMMU implementation
-> supports. See the iommu_map implementation for details.
+Hello Mugunthan,
 
-If the alignment is not correct then iommu_map() will return error. Not
-sure what other option we have here (and why make it different behavior
-than iommu_map which just return error when it is not aligned properly).
-I don't think we want to force any kind of alignment automatically. I
-would rather have the API tell me I am doing something wrong than having
-the function aligning the values and possibly undermap or overmap.
+On Mon, Aug 18, 2014 at 9:58 PM, Mugunthan V N <mugunthanvnm@ti.com> wrote:
+>>
+>> Thus, for this patchset, as is:
+>>
+>> Tested-by: Steven Rostedt <rostedt@goodmis.org>
+>
+> This will fail for DRA7xx not in AM33xx
+>
 
->> +int default_iommu_unmap_sg(struct iommu_domain *domain, unsigned long iova,
->> +			       size_t size, unsigned long flags)
-> 
-> Another asymmentry here, why don't you just pass a scatterlist and nents
-> like in the map_sg function? if you implement it like this it is just a
-> duplication of iommu_unmap().
+cpsw_am33xx_cm_get_macid() checks for
+of_machine_is_compatible("ti,am33xx") and returns 0 if the machine is
+not an am33xx. cpsw_probe_dt() only propagates the return value if is
+not 0 so this patch does not change the semantics for other SoCs
+besides am33xx.
 
-Yes, I am aware of that. However, several people prefer this than
-passing in scatterlist. It is not very convenient to pass a scatterlist
-in some use cases. Someone mentioned a use case where they would have to
-create a dummy sg list and populate it with the iova just to do an
-unmap. I believe we would have to do this also. There is no use for
-sglist when unmapping. However, would like to keep separate API from
-iommu_unmap() to keep the API function names symmetric (map_sg/unmap_sg).
+If the driver already fails for DRA7xx that certainly is not this
+patch's fault. Of course it would be nice to add support for DRA7xx as
+well but I think that could be a follow-up patch and shouldn't be a
+blocker to merge this change if is useful for users.
 
->> +static inline int iommu_map_sg(struct iommu_domain *domain, unsigned long iova,
->> +			       struct scatterlist *sg, unsigned int nents,
->> +			       int prot, unsigned long flags)
->> +{
->> +	return domain->ops->map_sg(domain, iova, sg, nents, prot, flags);
->> +}
->> +
->> +static inline int iommu_unmap_sg(struct iommu_domain *domain,
->> +				 unsigned long iova, size_t size,
->> +				 unsigned long flags)
->> +{
->> +	return domain->ops->unmap_sg(domain, iova, size, flags);
->> +}
-> 
-> These function pointers need to be checked for != NULL before calling
-> them.
+> Regards
+> Mugunthan V N
+> --
 
-I thought that was why we added the default fallback and set all the
-drivers to point to these fallback functions. Several people wanted this
-so that we don't have to have NULL-check in these functions (and have
-the functions be simple inline functions).
-
-Thanks,
-
-Olav
-
--- 
-The Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-hosted by The Linux Foundation
+Best regards,
+Javier
