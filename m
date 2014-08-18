@@ -1,49 +1,31 @@
-From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Mon, 18 Aug 2014 12:40:12 -0500
-Subject: [PATCHv10 3/5] ARM: dts: exynos: unuse the slot-node and deprecate
- the supports-highspeed for dw-mmc
-In-Reply-To: <53F23283.8040303@suse.de>
-References: <1407397082-32495-1-git-send-email-jh80.chung@samsung.com>
- <1407397082-32495-4-git-send-email-jh80.chung@samsung.com>
- <53F1F027.7060609@samsung.com> <53F20955.2050806@suse.de>
- <53F22FBB.4010801@samsung.com> <53F23283.8040303@suse.de>
-Message-ID: <53F23A7C.3060404@samsung.com>
+From: mugunthanvnm@ti.com (Mugunthan V N)
+Date: Mon, 18 Aug 2014 23:54:26 +0530
+Subject: [PATCH v3 5/7] net: cpsw: Add am33xx MACID readout
+In-Reply-To: <1408202315-20006-6-git-send-email-mpa@pengutronix.de>
+References: <1408202315-20006-1-git-send-email-mpa@pengutronix.de>
+ <1408202315-20006-6-git-send-email-mpa@pengutronix.de>
+Message-ID: <53F244DA.3070803@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08/18/14 12:06, Andreas F?rber wrote:
-> Am 18.08.2014 18:54, schrieb Kukjin Kim:
->> On 08/18/14 09:10, Andreas F?rber wrote:
->>> Hi Jaehoon,
->>>
->>> Am 18.08.2014 14:23, schrieb Jaehoon Chung:
->>>> Socfpga and Rockchip were queued into each SoC tree.
->>>> I want to know whether this patch is queued or not into Samsung-Soc
->>>> tree.
->>>> Do you have any other plan for this patch?
->>>
->>> It isn't applied in his tree:
->>>
->>> http://git.kernel.org/cgit/linux/kernel/git/kgene/linux-samsung.git/
->>>
->>> In fact Kukjin has not applied any patches for 3 weeks now, which likely
->>> means he's on vacation. I am hoping he will review this and the other
->>> pending conflicting patches to decide on a merge order and fix any
->>> trivial conflicts himself. ;)
->>>
->> Oh, I thought it has been queued in previous merge window with my ack.
->>
->> OK, I've applied this in my tree for 3.18.
->
-> So, are you dropping the snow mmc pinctrl patch Doug asked you to queue
-> before this one, and are you merging this with my exynos5250
-> cros-common/style cleanups yourself or do I need yet another respin?
->
-Hi Andreas,
+On Saturday 16 August 2014 08:48 PM, Markus Pargmann wrote:
+> +	mac_addr[5] = (macid_lo >> 8) & 0xff;
+> +	mac_addr[4] = macid_lo & 0xff;
+> +	mac_addr[3] = (macid_hi >> 24) & 0xff;
+> +	mac_addr[2] = (macid_hi >> 16) & 0xff;
+> +	mac_addr[1] = (macid_hi >> 8) & 0xff;
+> +	mac_addr[0] = macid_hi & 0xff;
+> +
+This will fail incase of DRA74x and DRA72x platforms, please check for
+u-boot src for parsing logic as TRM is not out yet. Below is the actual
+code for DRA7 platforms for MAC address parsing
 
-Thanks for your gentle reminder and I think I can handle it when I apply 
-it in my tree :)
+mac_addr[0] = (mac_hi & 0xFF0000) >> 16;
+mac_addr[1] = (mac_hi & 0xFF00) >> 8;
+mac_addr[2] = mac_hi & 0xFF;
+mac_addr[3] = (mac_lo & 0xFF0000) >> 16;
+mac_addr[4] = (mac_lo & 0xFF00) >> 8;
+mac_addr[5] = mac_lo & 0xFF;
 
-Note I will check them today and if any problems, I'll let you know.
-
-- Kukjin
+Regards
+Mugunthan V N
