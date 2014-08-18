@@ -1,19 +1,16 @@
-From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
-Date: Mon, 18 Aug 2014 09:11:04 +0200
-Subject: [PATCH] irq: gic-v3: Tag all low level accessors __maybey_unused
-In-Reply-To: <1406748194-21094-1-git-send-email-broonie@kernel.org>
-References: <1406748194-21094-1-git-send-email-broonie@kernel.org>
-Message-ID: <20140818071104.GA2207@pengutronix.de>
+From: shawn.guo@freescale.com (Shawn Guo)
+Date: Mon, 18 Aug 2014 15:17:31 +0800
+Subject: [PATCH BUGFIX] ARM: dts: i.MX53: fix apparent bug in VPU clks
+In-Reply-To: <1407937667-26678-1-git-send-email-LW@KARO-electronics.de>
+References: <1407937667-26678-1-git-send-email-LW@KARO-electronics.de>
+Message-ID: <20140818071730.GH2114@dragon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+On Wed, Aug 13, 2014 at 03:47:47PM +0200, Lothar Wa?mann wrote:
+> The VPU on i.MX53 has two distinct clocks for register access and
+> internal function.
+> 
+> Signed-off-by: Lothar Wa?mann <LW@KARO-electronics.de>
 
-typo in the Subject line. s/maybey/maybe/
-
-Best regards
-Uwe
-
--- 
-Pengutronix e.K.                           | Uwe Kleine-K?nig            |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Applied, thanks.
