@@ -1,81 +1,55 @@
-From: vinceh@nvidia.com (Vince Hsu)
-Date: Mon, 18 Aug 2014 14:05:55 +0800
-Subject: [PATCH v2 04/16] clk: tegra: Add library for the DFLL clock source
- (open-loop mode)
-In-Reply-To: <1405957142-19416-5-git-send-email-ttynkkynen@nvidia.com>
-References: <1405957142-19416-1-git-send-email-ttynkkynen@nvidia.com>
- <1405957142-19416-5-git-send-email-ttynkkynen@nvidia.com>
-Message-ID: <53F197C3.5010002@nvidia.com>
+From: shawn.guo@freescale.com (Shawn Guo)
+Date: Mon, 18 Aug 2014 14:06:07 +0800
+Subject: [PATCH V3 3/3] ARM: clk-imx6q: Add missing lvds and anaclk clock
+ to the clock tree
+In-Reply-To: <20140811030935.GB13158@audiosh1>
+References: <cover.1407481023.git.shengjiu.wang@freescale.com>
+ <9ecf6480464cffb3b4347ad3fd8ec5f07462a0fc.1407481023.git.shengjiu.wang@freescale.com>
+ <20140809135841.GB8849@dragon> <20140811030935.GB13158@audiosh1>
+Message-ID: <20140818060521.GA2114@dragon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Mon, Aug 11, 2014 at 11:09:36AM +0800, Shengjiu Wang wrote:
+> On Sat, Aug 09, 2014 at 09:58:42PM +0800, Shawn Guo wrote:
+> > On Fri, Aug 08, 2014 at 03:02:49PM +0800, Shengjiu Wang wrote:
+> > > @@ -176,8 +182,12 @@ static void __init imx6q_clocks_init(struct device_node *ccm_node)
+> > >  	 * the "output_enable" bit as a gate, even though it's really just
+> > >  	 * enabling clock output.
+> > >  	 */
+> > > -	clk[IMX6QDL_CLK_LVDS1_GATE] = imx_clk_gate("lvds1_gate", "lvds1_sel", base + 0x160, 10);
+> > > -	clk[IMX6QDL_CLK_LVDS2_GATE] = imx_clk_gate("lvds2_gate", "lvds2_sel", base + 0x160, 11);
+> > > +	clk[IMX6QDL_CLK_LVDS1_GATE] = imx_clk_gate2("lvds1_gate", "lvds1_sel", base + 0x160, 10);
+> > > +	clk[IMX6QDL_CLK_LVDS2_GATE] = imx_clk_gate2("lvds2_gate", "lvds2_sel", base + 0x160, 11);
+> > 
+> > I do not think you can simply change to use imx_clk_gate2() here.  It's
+> > designed for those CCGR gate clocks, each of which is controlled by two
+> > bits.
+> > 
+> > Shawn
+> >
+> As Lucas Stach's suggestion, we need to do add some method for mutually exclusive clock, 
+> lvds1_gate with lvds1_in, lvds2_gate with lvds2_in. I add imx_clk_gate2_exclusive() function in clk-gate2.c.
+> So I change imx_clk_gate() to imx_clk_gate2() here.
+> As you said, this is not good solution.
 
-On 07/21/2014 11:38 PM, Tuomas Tynkkynen wrote:
-> Add shared code to support the Tegra DFLL clocksource in open-loop
-> mode. This root clocksource is present on the Tegra124 SoCs. The
-> DFLL is the intended primary clock source for the fast CPU cluster.
->
-> This code is very closely based on a patch by Paul Walmsley from
-> December (http://comments.gmane.org/gmane.linux.ports.tegra/15273),
-> which in turn comes from the internal driver by originally created
-> by Aleksandr Frid <afrid@nvidia.com>.
->
-> Subsequent patches will add support for closed loop mode and drivers
-> for the Tegra124 fast CPU cluster DFLL devices, which rely on this
-> code.
->
-> Signed-off-by: Paul Walmsley <pwalmsley@nvidia.com>
-> Signed-off-by: Tuomas Tynkkynen <ttynkkynen@nvidia.com>
-> ---
-> v2 changes:
->      - minor, moved the devm_regulator_get here
->
->   drivers/clk/tegra/Makefile   |    1 +
->   drivers/clk/tegra/clk-dfll.c | 1085 ++++++++++++++++++++++++++++++++++++++++++
->   drivers/clk/tegra/clk-dfll.h |   55 +++
->   3 files changed, 1141 insertions(+)
->   create mode 100644 drivers/clk/tegra/clk-dfll.c
->   create mode 100644 drivers/clk/tegra/clk-dfll.h
-...
-> --- /dev/null
-> +++ b/drivers/clk/tegra/clk-dfll.c
-...
-> +
-> +/*
-> + * Output clock scaler helpers
-> + */
-> +
-> +/**
-> + * dfll_scale_dvco_rate - calculate scaled rate from the DVCO rate
-> + * @scale_bits: clock scaler value (bits in the DFLL_FREQ_REQ_SCALE field)
-> + * @dvco_rate: the DVCO rate
-> + *
-> + * Apply the same scaling formula that the DFLL hardware uses to scale
-> + * the DVCO rate.
-> + */
-> +static unsigned long dfll_scale_dvco_rate(int scale_bits,
-> +					  unsigned long dvco_rate)
-> +{
-> +	return (u64)dvco_rate * (scale_bits + 1) / DFLL_FREQ_REQ_SCALE_MAX;
-> +}
-...
-> +static u64 dfll_read_monitor_rate(struct tegra_dfll *td)
-> +{
-> +	u32 v, s;
-> +	u64 pre_scaler_rate, post_scaler_rate;
-> +
-> +	if (!dfll_is_running(td))
-> +		return 0;
-> +
-> +	v = dfll_readl(td, DFLL_MONITOR_DATA);
-> +	v = (v & DFLL_MONITOR_DATA_VAL_MASK) >> DFLL_MONITOR_DATA_VAL_SHIFT;
-> +	pre_scaler_rate = dfll_calc_monitored_rate(v, td->ref_rate);
-> +
-> +	s = dfll_readl(td, DFLL_FREQ_REQ);
-> +	s = (s & DFLL_FREQ_REQ_SCALE_MASK) >> DFLL_FREQ_REQ_SCALE_SHIFT;
-> +	post_scaler_rate = dfll_scale_dvco_rate(pre_scaler_rate, s);
-Should be dfll_scale_dvco_rate(s, pre_scaler_rate);
+It's not just a "not good" solution but wrong and broken one.  The net
+result of that is if you call clk_enable() on lvds1_gate, both bit 10
+and 11 will be set.
 
-Thanks,
-Vince
+> So I need your suggestion, how can I do?
+
+I guess we will need a new clock type to handle such mutually exclusive
+clocks, rather than patching clk-gate2.
+
+> First, is it allowable that to add imx_clk_gate2_exclusive() function, is there a more better way?
+
+Again, this is completely wrong.
+
+> second, or should I change the clk-gate.c to add exclusive control?
+
+If such mutually exclusive clocks are somehow common across different
+clock controllers, we can propose to change clk-gate.c for handling
+them.  But I'm not sure this is a common case.
+
+Shawn
