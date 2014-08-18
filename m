@@ -1,54 +1,43 @@
 From: wens@csie.org (Chen-Yu Tsai)
-Date: Tue, 19 Aug 2014 00:51:51 +0800
-Subject: [PATCH v2 2/2] ARM: dts: sun8i: Enable i2c controllers on ippo-q8h-v5
-In-Reply-To: <1408380711-26308-1-git-send-email-wens@csie.org>
-References: <1408380711-26308-1-git-send-email-wens@csie.org>
-Message-ID: <1408380711-26308-3-git-send-email-wens@csie.org>
+Date: Tue, 19 Aug 2014 00:51:49 +0800
+Subject: [PATCH v2 0/2] ARM: sun8i: Enable pinctrl, i2c and mmc
+Message-ID: <1408380711-26308-1-git-send-email-wens@csie.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-i2c0 is connected to the gsl1680 capacitive touch panel controller.
-i2c1 is connected to an mma7660 3-axis accelerometer.
-i2c2 is connected to the front and back gc0309 camera sensors.
-The camera sensors require additional regulators be enabled before
-they are available.
+Hi Maxime,
 
-All these peripherals are not supported by the kernel yet.
+This is v2 of the remaining sun8i series. I've dropped the patches you
+merged. The remaining patches have been rebased onto sunxi-next.
 
-Signed-off-by: Chen-Yu Tsai <wens@csie.org>
----
- arch/arm/boot/dts/sun8i-a23-ippo-q8h-v5.dts | 19 +++++++++++++++++++
- 1 file changed, 19 insertions(+)
+This series enables all the controllers on sun8i that we already have
+drivers for, excluding SPI as the tablet I have does not use it and
+I cannot test it. If there's a way to test it without external connections
+or devices please let me know.
 
-diff --git a/arch/arm/boot/dts/sun8i-a23-ippo-q8h-v5.dts b/arch/arm/boot/dts/sun8i-a23-ippo-q8h-v5.dts
-index ef1e4f3..e9b8cca 100644
---- a/arch/arm/boot/dts/sun8i-a23-ippo-q8h-v5.dts
-+++ b/arch/arm/boot/dts/sun8i-a23-ippo-q8h-v5.dts
-@@ -43,6 +43,25 @@
- 			};
- 		};
- 
-+		i2c0: i2c at 01c2ac00 {
-+			pinctrl-names = "default";
-+			pinctrl-0 = <&i2c0_pins_a>;
-+			status = "okay";
-+		};
-+
-+		i2c1: i2c at 01c2b000 {
-+			pinctrl-names = "default";
-+			pinctrl-0 = <&i2c1_pins_a>;
-+			status = "okay";
-+		};
-+
-+		i2c2: i2c at 01c2b400 {
-+			pinctrl-names = "default";
-+			pinctrl-0 = <&i2c2_pins_a>;
-+			/* pull-ups and devices require PMIC regulator */
-+			status = "failed";
-+		};
-+
- 		r_uart: serial at 01f02800 {
- 			pinctrl-names = "default";
- 			pinctrl-0 = <&r_uart_pins_a>;
+The commit logs pretty much explain themselves. Note that PLL6 is not
+implemented yet. I've some patches for the clocks that I will send later.
+
+
+Cheers
+ChenYu
+
+
+Changes since v1:
+
+  - Removed clock-frequency from i2c controller nodes, as they match
+    the default value.
+  - Dropped patches that were merged in v1.
+  - Rebased onto sunxi-next.
+
+
+Chen-Yu Tsai (2):
+  ARM: dts: sun8i: Add i2c controller nodes
+  ARM: dts: sun8i: Enable i2c controllers on ippo-q8h-v5
+
+ arch/arm/boot/dts/sun8i-a23-ippo-q8h-v5.dts | 19 +++++++++++++++++
+ arch/arm/boot/dts/sun8i-a23.dtsi            | 33 +++++++++++++++++++++++++++++
+ 2 files changed, 52 insertions(+)
+
 -- 
 2.1.0
