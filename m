@@ -1,205 +1,50 @@
 From: javier.martinez@collabora.co.uk (Javier Martinez Canillas)
-Date: Mon, 18 Aug 2014 10:33:03 +0200
-Subject: [PATCH v9 5/6] clk: Add driver for Maxim 77802 PMIC clocks
-In-Reply-To: <1408350784-15577-1-git-send-email-javier.martinez@collabora.co.uk>
-References: <1408350784-15577-1-git-send-email-javier.martinez@collabora.co.uk>
-Message-ID: <1408350784-15577-6-git-send-email-javier.martinez@collabora.co.uk>
+Date: Mon, 18 Aug 2014 10:34:35 +0200
+Subject: [PATCH v9 3/5] rtc: max77686: Fail to probe if no RTC regmap irqchip
+ is set
+In-Reply-To: <1408350877-15921-1-git-send-email-javier.martinez@collabora.co.uk>
+References: <1408350877-15921-1-git-send-email-javier.martinez@collabora.co.uk>
+Message-ID: <1408350877-15921-4-git-send-email-javier.martinez@collabora.co.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The MAX77802 PMIC has two 32.768kHz Buffered Clock Outputs with
-Low Jitter Mode. This patch adds support for these two clocks.
+The max77686 mfd driver adds a regmap IRQ chip which creates an
+IRQ domain that is used to map the virtual RTC alarm1 interrupt.
 
+The RTC driver assumes that this will always be true since the
+PMIC IRQ is a required property according to the max77686 DT
+binding doc. If an "interrupts" property is not defined for a
+max77686 PMIC, then the mfd probe function will fail and the
+RTC platform driver will never be probed. But even when it is
+not possible to probe the rtc-max77686 driver without a regmap
+IRQ chip, it's better to explicitly check if the IRQ chip data
+is not NULL and gracefully fail instead of getting an OOPS.
+
+Reported-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
 Signed-off-by: Javier Martinez Canillas <javier.martinez@collabora.co.uk>
-Reviewed-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
-Acked-by: Mike Turquette <mturquette@linaro.org>
 ---
 
-Changes since v6: None
-
-Changes since v5: None
-
-Changes since v4: None
-
-Changes since v3: None
-
-Changes since v2: None
-
-Changes since v1:
- - Use module_platform_driver() instead of having init/exit functions.
-   Suggested by Mark Brown.
- - Use the generic maxim clock driver to reduce code duplication with
-   clk-max77686.c driver.
+Fixes the issue reported by Krzystof in: https://lkml.org/lkml/2014/8/8/121
 ---
- drivers/clk/Kconfig                        |  7 +++
- drivers/clk/Makefile                       |  1 +
- drivers/clk/clk-max77802.c                 | 98 ++++++++++++++++++++++++++++++
- include/dt-bindings/clock/maxim,max77802.h | 22 +++++++
- 4 files changed, 128 insertions(+)
- create mode 100644 drivers/clk/clk-max77802.c
- create mode 100644 include/dt-bindings/clock/maxim,max77802.h
+ drivers/rtc/rtc-max77686.c | 6 ++++++
+ 1 file changed, 6 insertions(+)
 
-diff --git a/drivers/clk/Kconfig b/drivers/clk/Kconfig
-index d68b14b..85131ae 100644
---- a/drivers/clk/Kconfig
-+++ b/drivers/clk/Kconfig
-@@ -42,6 +42,13 @@ config COMMON_CLK_MAX77686
- 	---help---
- 	  This driver supports Maxim 77686 crystal oscillator clock. 
+diff --git a/drivers/rtc/rtc-max77686.c b/drivers/rtc/rtc-max77686.c
+index 7bb5433..55396bb 100644
+--- a/drivers/rtc/rtc-max77686.c
++++ b/drivers/rtc/rtc-max77686.c
+@@ -466,6 +466,12 @@ static int max77686_rtc_probe(struct platform_device *pdev)
+ 		goto err_rtc;
+ 	}
  
-+config COMMON_CLK_MAX77802
-+	tristate "Clock driver for Maxim 77802 PMIC"
-+	depends on MFD_MAX77686
-+	select COMMON_CLK_MAX_GEN
-+	---help---
-+	  This driver supports Maxim 77802 crystal oscillator clock.
-+
- config COMMON_CLK_SI5351
- 	tristate "Clock driver for SiLabs 5351A/B/C"
- 	depends on I2C
-diff --git a/drivers/clk/Makefile b/drivers/clk/Makefile
-index 9de85f6..27c542b 100644
---- a/drivers/clk/Makefile
-+++ b/drivers/clk/Makefile
-@@ -24,6 +24,7 @@ obj-$(CONFIG_ARCH_HIGHBANK)		+= clk-highbank.o
- obj-$(CONFIG_MACH_LOONGSON1)		+= clk-ls1x.o
- obj-$(CONFIG_COMMON_CLK_MAX_GEN)	+= clk-max-gen.o
- obj-$(CONFIG_COMMON_CLK_MAX77686)	+= clk-max77686.o
-+obj-$(CONFIG_COMMON_CLK_MAX77802)	+= clk-max77802.o
- obj-$(CONFIG_ARCH_MOXART)		+= clk-moxart.o
- obj-$(CONFIG_ARCH_NOMADIK)		+= clk-nomadik.o
- obj-$(CONFIG_ARCH_NSPIRE)		+= clk-nspire.o
-diff --git a/drivers/clk/clk-max77802.c b/drivers/clk/clk-max77802.c
-new file mode 100644
-index 0000000..8e480c5
---- /dev/null
-+++ b/drivers/clk/clk-max77802.c
-@@ -0,0 +1,98 @@
-+/*
-+ * clk-max77802.c - Clock driver for Maxim 77802
-+ *
-+ * Copyright (C) 2014 Google, Inc
-+ *
-+ * Copyright (C) 2012 Samsung Electornics
-+ * Jonghwa Lee <jonghwa3.lee@samsung.com>
-+ *
-+ * This program is free software; you can redistribute  it and/or modify it
-+ * under  the terms of  the GNU General  Public License as published by the
-+ * Free Software Foundation;  either version 2 of the  License, or (at your
-+ * option) any later version.
-+ *
-+ * This program is distributed in the hope that it will be useful,
-+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ * GNU General Public License for more details.
-+ *
-+ * This driver is based on clk-max77686.c
-+ */
-+
-+#include <linux/kernel.h>
-+#include <linux/slab.h>
-+#include <linux/err.h>
-+#include <linux/platform_device.h>
-+#include <linux/mfd/max77686-private.h>
-+#include <linux/clk-provider.h>
-+#include <linux/mutex.h>
-+#include <linux/clkdev.h>
-+
-+#include <dt-bindings/clock/maxim,max77802.h>
-+#include "clk-max-gen.h"
-+
-+#define MAX77802_CLOCK_OPMODE_MASK	0x1
-+#define MAX77802_CLOCK_LOW_JITTER_SHIFT 0x3
-+
-+static struct clk_init_data max77802_clks_init[MAX77802_CLKS_NUM] = {
-+	[MAX77802_CLK_32K_AP] = {
-+		.name = "32khz_ap",
-+		.ops = &max_gen_clk_ops,
-+		.flags = CLK_IS_ROOT,
-+	},
-+	[MAX77802_CLK_32K_CP] = {
-+		.name = "32khz_cp",
-+		.ops = &max_gen_clk_ops,
-+		.flags = CLK_IS_ROOT,
-+	},
-+};
-+
-+static int max77802_clk_probe(struct platform_device *pdev)
-+{
-+	struct max77686_dev *iodev = dev_get_drvdata(pdev->dev.parent);
-+	int ret;
-+
-+	ret = max_gen_clk_probe(pdev, iodev->regmap, MAX77802_REG_32KHZ,
-+				max77802_clks_init, MAX77802_CLKS_NUM);
-+
-+	if (ret) {
-+		dev_err(&pdev->dev, "generic probe failed %d\n", ret);
-+		return ret;
++	if (!max77686->rtc_irq_data) {
++		ret = -EINVAL;
++		dev_err(&pdev->dev, "%s: no RTC regmap IRQ chip\n", __func__);
++		goto err_rtc;
 +	}
 +
-+	/* Enable low-jitter mode on the 32khz clocks. */
-+	ret = regmap_update_bits(iodev->regmap, MAX77802_REG_32KHZ,
-+				 1 << MAX77802_CLOCK_LOW_JITTER_SHIFT,
-+				 1 << MAX77802_CLOCK_LOW_JITTER_SHIFT);
-+	if (ret < 0)
-+		dev_err(&pdev->dev, "failed to enable low-jitter mode\n");
-+
-+	return ret;
-+}
-+
-+static int max77802_clk_remove(struct platform_device *pdev)
-+{
-+	return max_gen_clk_remove(pdev, MAX77802_CLKS_NUM);
-+}
-+
-+static const struct platform_device_id max77802_clk_id[] = {
-+	{ "max77802-clk", 0},
-+	{ },
-+};
-+MODULE_DEVICE_TABLE(platform, max77802_clk_id);
-+
-+static struct platform_driver max77802_clk_driver = {
-+	.driver = {
-+		.name  = "max77802-clk",
-+		.owner = THIS_MODULE,
-+	},
-+	.probe = max77802_clk_probe,
-+	.remove = max77802_clk_remove,
-+	.id_table = max77802_clk_id,
-+};
-+
-+module_platform_driver(max77802_clk_driver);
-+
-+MODULE_DESCRIPTION("MAXIM 77802 Clock Driver");
-+MODULE_AUTHOR("Javier Martinez Canillas <javier.martinez@collabora.co.uk>");
-+MODULE_LICENSE("GPL");
-diff --git a/include/dt-bindings/clock/maxim,max77802.h b/include/dt-bindings/clock/maxim,max77802.h
-new file mode 100644
-index 0000000..997312e
---- /dev/null
-+++ b/include/dt-bindings/clock/maxim,max77802.h
-@@ -0,0 +1,22 @@
-+/*
-+ * Copyright (C) 2014 Google, Inc
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+ *
-+ * Device Tree binding constants clocks for the Maxim 77802 PMIC.
-+ */
-+
-+#ifndef _DT_BINDINGS_CLOCK_MAXIM_MAX77802_CLOCK_H
-+#define _DT_BINDINGS_CLOCK_MAXIM_MAX77802_CLOCK_H
-+
-+/* Fixed rate clocks. */
-+
-+#define MAX77802_CLK_32K_AP		0
-+#define MAX77802_CLK_32K_CP		1
-+
-+/* Total number of clocks. */
-+#define MAX77802_CLKS_NUM		(MAX77802_CLK_32K_CP + 1)
-+
-+#endif /* _DT_BINDINGS_CLOCK_MAXIM_MAX77802_CLOCK_H */
+ 	info->virq = regmap_irq_get_virq(max77686->rtc_irq_data,
+ 					 MAX77686_RTCIRQ_RTCA1);
+ 	if (!info->virq) {
 -- 
-2.0.1
+2.0.0.rc2
