@@ -1,82 +1,70 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Mon, 18 Aug 2014 19:22:54 +0200
-Subject: [PATCH v2 1/3] arm64: spin-table: handle unmapped
- cpu-release-addrs
-In-Reply-To: <20140818164721.GC24600@localhost>
-References: <20140813125844.GE32644@leverpostej>
- <20140814171323.GH9039@arm.com>
- <CAKv+Gu9ftjZby+5U5Vs0hXhyFdNLwx4MwvC-LL=y3a9eSz34iQ@mail.gmail.com>
- <20140815115714.GP27466@arm.com>
- <CAKv+Gu-2RyWY4V7zoOQEi3As96kmmAMae2s3YauJ4bL9-h+sdg@mail.gmail.com>
- <20140815125324.GQ27466@arm.com>
- <CAKv+Gu9vj=b3pOJC3-x+QdjcErHShicEw-_6UHABG_j3qkGGOw@mail.gmail.com>
- <1408113355.599.146.camel@deneb.redhat.com>
- <20140815143804.GW27466@arm.com>
- <20140817000609.GC22224@bivouac.eciton.net>
- <20140818164721.GC24600@localhost>
-Message-ID: <CAKv+Gu9ou48Xhmkwnx8dGzds-ZP6V2pPE68Bjr2_dPFyfBzgsQ@mail.gmail.com>
+From: boris.brezillon@free-electrons.com (Boris BREZILLON)
+Date: Mon, 18 Aug 2014 19:26:28 +0200
+Subject: [PATCH v4 2/2] mtd: nand: add sunxi NFC dt bindings doc
+In-Reply-To: <1408382788-32153-1-git-send-email-boris.brezillon@free-electrons.com>
+References: <1408382788-32153-1-git-send-email-boris.brezillon@free-electrons.com>
+Message-ID: <1408382788-32153-3-git-send-email-boris.brezillon@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 18 August 2014 18:47, Catalin Marinas <catalin.marinas@arm.com> wrote:
-> On Sun, Aug 17, 2014 at 01:06:09AM +0100, Leif Lindholm wrote:
->> On Fri, Aug 15, 2014 at 03:38:04PM +0100, Will Deacon wrote:
->> > On Fri, Aug 15, 2014 at 03:35:55PM +0100, Mark Salter wrote:
->> > > On Fri, 2014-08-15 at 15:28 +0200, Ard Biesheuvel wrote:
->> > > > On 15 August 2014 14:53, Will Deacon <will.deacon@arm.com> wrote:
->> > > > > On Fri, Aug 15, 2014 at 01:07:16PM +0100, Ard Biesheuvel wrote:
->> > > > >> On 15 August 2014 13:57, Will Deacon <will.deacon@arm.com> wrote:
->> > > > >> > I was planning to take all of these for 3.18 as there's no regression here
->> > > > >> > (the fuzzing is a new debug feature and defaults to `n'). Do you think these
->> > > > >> > qualify as -rc1 material?
->> > > > >>
->> > > > >> Considering that TEXT_OFFSET fuzzing is recommended to be turned on
->> > > > >> for distro kernels, I would say this is definitely appropriate for
->> > > > >> 3.17
->> > > > >
->> > > > > Whilst I see that in the commit log, the same recommendation doesn't appear
->> > > > > in the Kconfig text and I'm not sure that it's such a wise thing to say
->> > > > > either. From a distribution's point of view, I think I'd want any kernel
->> > > > > issues to be as reproducible as possible, and fuzzing the text offset seems
->> > > > > to go against that.
->> > > >
->> > > > OK. There is one other real world issue that 3/3 addresses, which are
->> > > > platforms that have memreserves at the base of DRAM containing bits of
->> > > > UEFI itself (this is what got this whole discussion going in the first
->> > > > place). Currently, we cannot boot via UEFI on these platforms, as the
->> > > > EFI stub will only consider base of DRAM + TEXT_OFFSET as an option,
->> > > > and fail the boot if it is not available.
->> > > >
->> > > > If this is something that could wait until 3.18 as well (Mark S?),
->> > > > then it's fine by me.
->> > >
->> > > I don't see a problem with waiting until 3.18.
->> >
->> > Cheers, I've applied the series to our for-next branch and I'll push
->> > everything out at -rc1.
->>
->> Late to the discussion since I was on an 11h flight, and still chiming
->> in since I don't think previous speakers were explicit enough about
->> the implication:
->> Bumping 3/3 to 3.18 means the upstream kernel will not boot on AMD
->> Seattle until at least December. This sounds suboptimal to me.
->
-> Not unless they use PSCI. That's already working (the spin-table is
-> meant for platforms where PSCI cannot be implemented).
->
+Add the sunxi NAND Flash Controller dt bindings documentation.
 
-No, that is patch #1
+Signed-off-by: Boris BREZILLON <boris.brezillon@free-electrons.com>
+---
+ .../devicetree/bindings/mtd/sunxi-nand.txt         | 45 ++++++++++++++++++++++
+ 1 file changed, 45 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/mtd/sunxi-nand.txt
 
-#3 allows other base addresses than base of DRAM + TEXT_OFFSET when
-booting via UEFI, which is needed by AMD Seattle.
-However, #3 breaks booting the secondaries on APM Mustang, hence #1.
-
+diff --git a/Documentation/devicetree/bindings/mtd/sunxi-nand.txt b/Documentation/devicetree/bindings/mtd/sunxi-nand.txt
+new file mode 100644
+index 0000000..798c691
+--- /dev/null
++++ b/Documentation/devicetree/bindings/mtd/sunxi-nand.txt
+@@ -0,0 +1,45 @@
++Allwinner NAND Flash Controller (NFC)
++
++Required properties:
++- compatible : "allwinner,sun4i-nand".
++- reg : shall contain registers location and length for data and reg.
++- interrupts : shall define the nand controller interrupt.
++- #address-cells: shall be set to 1. Encode the nand CS.
++- #size-cells : shall be set to 0.
++- clocks : shall reference nand controller clocks.
++- clock-names : nand controller internal clock names. Shall contain :
++    * "ahb_clk" : AHB gating clock
++    * "sclk" : nand controller clock
++
++Optional children nodes:
++Children nodes represent the available nand chips.
++
++Optional properties:
++- allwinner,rb : shall contain the native Ready/Busy ids.
++ or
++- rb-gpios : shall contain the gpios used as R/B pins.
++- nand-ecc-mode : one of the supported ECC modes ("hw", "hw_syndrome", "soft",
++  "soft_bch" or "none")
++
++see Documentation/devicetree/mtd/nand.txt for generic bindings.
++
++
++Examples:
++nfc: nand at 01c03000 {
++	compatible = "allwinner,sun4i-nand";
++	reg = <0x01c03000 0x1000>;
++	interrupts = <0 37 1>;
++	clocks = <&ahb_gates 13>, <&nand_clk>;
++	clock-names = "ahb_clk", "sclk";
++	#address-cells = <1>;
++	#size-cells = <0>;
++	pinctrl-names = "default";
++	pinctrl-0 = <&nand_pins_a &nand_cs0_pins_a &nand_rb0_pins_a>;
++	status = "okay";
++
++	nand at 0 {
++		reg = <0>;
++		allwinner,rb = <0>;
++		nand-ecc-mode = "soft_bch";
++	};
++};
 -- 
-Ard.
-
-
-> BTW, is Seattle officially supported by the mainline kernel (it was
-> barely announced AFAICT)?
->
-> --
-> Catalin
+1.9.1
