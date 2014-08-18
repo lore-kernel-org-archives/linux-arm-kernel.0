@@ -1,45 +1,63 @@
-From: minchan@kernel.org (Minchan Kim)
-Date: Mon, 18 Aug 2014 09:17:55 +0900
-Subject: [PATCH v15 6/7] arm64: add pmd_[dirty|mkclean] for THP
-In-Reply-To: <1408321076-2231-1-git-send-email-minchan@kernel.org>
-References: <1408321076-2231-1-git-send-email-minchan@kernel.org>
-Message-ID: <1408321076-2231-7-git-send-email-minchan@kernel.org>
+From: dyoung@redhat.com (Dave Young)
+Date: Mon, 18 Aug 2014 09:24:54 +0800
+Subject: [PATCH 5/7] arm64/efi: do not enter virtual mode in case booting
+ with efi=noruntime or noefi
+In-Reply-To: <20140815150952.GY27466@arm.com>
+References: <1408007731-15081-1-git-send-email-dyoung@redhat.com>
+ <1408007731-15081-5-git-send-email-dyoung@redhat.com>
+ <20140815150952.GY27466@arm.com>
+Message-ID: <20140818012454.GA3379@darkstar.nay.redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-MADV_FREE needs pmd_dirty and pmd_mkclean for detecting recent
-overwrite of the contents since MADV_FREE syscall is called for
-THP page.
+On 08/15/14 at 04:09pm, Will Deacon wrote:
+> On Thu, Aug 14, 2014 at 10:15:30AM +0100, Dave Young wrote:
+> > In case efi runtime disabled via noefi kernel cmdline arm64_enter_virtual_mode
+> > should error out.
+> > 
+> > At the same time move early_memunmap(memmap.map, mapsize) to the beginning of
+> > the function or it will leak early mem.
+> > 
+> > Signed-off-by: Dave Young <dyoung@redhat.com>
+> > ---
+> >  arch/arm64/kernel/efi.c | 9 +++++++--
+> >  1 file changed, 7 insertions(+), 2 deletions(-)
+> > 
+> > diff --git a/arch/arm64/kernel/efi.c b/arch/arm64/kernel/efi.c
+> > index 6ed0362..309fab1 100644
+> > --- a/arch/arm64/kernel/efi.c
+> > +++ b/arch/arm64/kernel/efi.c
+> > @@ -392,11 +392,16 @@ static int __init arm64_enter_virtual_mode(void)
+> >  		return -1;
+> >  	}
+> >  
+> > +	mapsize = memmap.map_end - memmap.map;
+> > +	if (efi_runtime_disabled()) {
+> > +		early_memunmap(memmap.map, mapsize);
+> 
+> Should this early_memunmap really be conditional? With this change, we no
+> longer unmap it before setting up the permanent mapping below.
 
-This patch adds pmd_dirty and pmd_mkclean for THP page MADV_FREE
-support.
+Ooops, I tested the right version but sent a wrong version for this arm64 patch.
 
-Cc: Russell King <linux@arm.linux.org.uk>
-Cc: linux-arm-kernel at lists.infradead.org
-Acked-by: Will Deacon <will.deacon@arm.com>
-Acked-by: Steve Capper <steve.capper@linaro.org>
-Acked-by: Catalin Marinas <catalin.marinas@arm.com>
-Signed-off-by: Minchan Kim <minchan@kernel.org>
----
- arch/arm64/include/asm/pgtable.h | 2 ++
- 1 file changed, 2 insertions(+)
+Thanks for catch.
 
-diff --git a/arch/arm64/include/asm/pgtable.h b/arch/arm64/include/asm/pgtable.h
-index ffe1ba0506d1..efb1b2fc4d39 100644
---- a/arch/arm64/include/asm/pgtable.h
-+++ b/arch/arm64/include/asm/pgtable.h
-@@ -259,10 +259,12 @@ static inline pmd_t pte_pmd(pte_t pte)
- #endif
- 
- #define pmd_young(pmd)		pte_young(pmd_pte(pmd))
-+#define pmd_dirty(pmd)		pte_dirty(pmd_pte(pmd))
- #define pmd_wrprotect(pmd)	pte_pmd(pte_wrprotect(pmd_pte(pmd)))
- #define pmd_mksplitting(pmd)	pte_pmd(pte_mkspecial(pmd_pte(pmd)))
- #define pmd_mkold(pmd)		pte_pmd(pte_mkold(pmd_pte(pmd)))
- #define pmd_mkwrite(pmd)	pte_pmd(pte_mkwrite(pmd_pte(pmd)))
-+#define pmd_mkclean(pmd)	pte_pmd(pte_mkclean(pmd_pte(pmd)))
- #define pmd_mkdirty(pmd)	pte_pmd(pte_mkdirty(pmd_pte(pmd)))
- #define pmd_mkyoung(pmd)	pte_pmd(pte_mkyoung(pmd_pte(pmd)))
- #define pmd_mknotpresent(pmd)	(__pmd(pmd_val(pmd) & ~PMD_TYPE_MASK))
--- 
-2.0.0
+> 
+> Will
+> 
+> > +		pr_info("EFI runtime services will be disabled.\n");
+> > +		return -1;
+> > +	}
+> > +
+> >  	pr_info("Remapping and enabling EFI services.\n");
+> >  
+> >  	/* replace early memmap mapping with permanent mapping */
+> > -	mapsize = memmap.map_end - memmap.map;
+> > -	early_memunmap(memmap.map, mapsize);
+> >  	memmap.map = (__force void *)ioremap_cache((phys_addr_t)memmap.phys_map,
+> >  						   mapsize);
+> >  	memmap.map_end = memmap.map + mapsize;
+> > -- 
+> > 1.8.3.1
+> > 
+> > 
