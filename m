@@ -1,29 +1,34 @@
-From: joro@8bytes.org (joro at 8bytes.org)
-Date: Mon, 18 Aug 2014 16:07:30 +0200
-Subject: [PATCH v5 1/1] iommu-api: Add map_sg/unmap_sg functions
-In-Reply-To: <53EA472B.3020900@codeaurora.org>
-References: <1407797150-515-1-git-send-email-ohaugan@codeaurora.org>
- <1407797150-515-2-git-send-email-ohaugan@codeaurora.org>
- <871tsm5vcn.fsf@nvidia.com>
- <CAF6AEGvZUanVtPxAt76+AAdOaNwyMJ3cmcJ1srsEYBeG7ELkBQ@mail.gmail.com>
- <53EA472B.3020900@codeaurora.org>
-Message-ID: <20140818140730.GC9809@8bytes.org>
+From: afaerber@suse.de (=?ISO-8859-1?Q?Andreas_F=E4rber?=)
+Date: Mon, 18 Aug 2014 16:10:29 +0200
+Subject: [PATCHv10 3/5] ARM: dts: exynos: unuse the slot-node and deprecate
+ the supports-highspeed for dw-mmc
+In-Reply-To: <53F1F027.7060609@samsung.com>
+References: <1407397082-32495-1-git-send-email-jh80.chung@samsung.com>
+ <1407397082-32495-4-git-send-email-jh80.chung@samsung.com>
+ <53F1F027.7060609@samsung.com>
+Message-ID: <53F20955.2050806@suse.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Aug 12, 2014 at 09:56:11AM -0700, Olav Haugan wrote:
-> On 8/12/2014 3:48 AM, Rob Clark wrote:
-> > iirc, one plan for 'flags' was some sort of DONT_FLUSH_TLB flag for
-> > drivers which wanted to map/unmap N buffers with a single flush at the
-> > end.  There might have been some other usages envisioned.
-> 
-> Yes, that was the original intent of the flags for now. I am sure we can
-> find other uses for this in the future.
+Hi Jaehoon,
 
-Do you have anything else in mind already besides the DONT_FLUSH_TLB
-flag?
+Am 18.08.2014 14:23, schrieb Jaehoon Chung:
+> Socfpga and Rockchip were queued into each SoC tree.
+> I want to know whether this patch is queued or not into Samsung-Soc tree.
+> Do you have any other plan for this patch?
 
-How is the IOTLB supposed to be flushed when this flag is used?
+It isn't applied in his tree:
 
+http://git.kernel.org/cgit/linux/kernel/git/kgene/linux-samsung.git/
 
-	Joerg
+In fact Kukjin has not applied any patches for 3 weeks now, which likely
+means he's on vacation. I am hoping he will review this and the other
+pending conflicting patches to decide on a merge order and fix any
+trivial conflicts himself. ;)
+
+Cheers,
+Andreas
+
+-- 
+SUSE LINUX Products GmbH, Maxfeldstr. 5, 90409 N?rnberg, Germany
+GF: Jeff Hawn, Jennifer Guild, Felix Imend?rffer; HRB 16746 AG N?rnberg
