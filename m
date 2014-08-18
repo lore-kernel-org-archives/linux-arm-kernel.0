@@ -1,42 +1,33 @@
-From: f.fainelli@gmail.com (Florian Fainelli)
-Date: Mon, 18 Aug 2014 12:24:59 -0700
-Subject: [PATCH v3 5/5] MAINTAINERS: add entry for the Broadcom BCM63xx ARM
- SoCs
-In-Reply-To: <1408389899-1022-1-git-send-email-f.fainelli@gmail.com>
-References: <1408389899-1022-1-git-send-email-f.fainelli@gmail.com>
-Message-ID: <1408389899-1022-6-git-send-email-f.fainelli@gmail.com>
+From: abrestic@chromium.org (Andrew Bresticker)
+Date: Mon, 18 Aug 2014 12:35:42 -0700
+Subject: [PATCH v2 0/9] Tegra xHCI support
+In-Reply-To: <53F2381B.8020801@wwwdotorg.org>
+References: <1408381705-3623-1-git-send-email-abrestic@chromium.org>
+ <53F2381B.8020801@wwwdotorg.org>
+Message-ID: <CAL1qeaGuMWbaZ4GQWATtrnYe-RjuTwLpFnrdhibWGNWm0iF+=g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add a MAINTAINERS entry covering all the Broadcom BCM63xx ARM DSL SoCs
-files along with the relevant git tree and mailing-list.
+On Mon, Aug 18, 2014 at 10:30 AM, Stephen Warren <swarren@wwwdotorg.org> wrote:
+> On 08/18/2014 11:08 AM, Andrew Bresticker wrote:
+>>
+>> This series adds support for xHCI on NVIDIA Tegra SoCs.  This includes:
+>>   - adding a driver for the mailbox used to communicate with the xHCI
+>>     controller's firmware,
+>>   - extending the XUSB pad controller driver to support the USB PHY
+>>     types (UTMI, HSIC, and USB3), and
+>>   - adding a xHCI host-controller driver.
+>
+>
+> Can you please remind us what dependencies exist between the patches? In
+> other words, is it possible to apply parts of the series to their usual
+> subsystem branches, or does the whole thing need to go into a single topic
+> branch in order to avoid compile-time problems, or run-time problems in
+> features unrelated to the new functionality? Thanks.
 
-Signed-off-by: Florian Fainelli <f.fainelli@gmail.com>
----
-Changes in v2 and v3:
-- rebased against latest changes
-
- MAINTAINERS | 8 ++++++++
- 1 file changed, 8 insertions(+)
-
-diff --git a/MAINTAINERS b/MAINTAINERS
-index aefa94841ff3..1806edcb91b3 100644
---- a/MAINTAINERS
-+++ b/MAINTAINERS
-@@ -2021,6 +2021,14 @@ F:	arch/arm/mach-bcm/bcm_5301x.c
- F:	arch/arm/boot/dts/bcm5301x.dtsi
- F:	arch/arm/boot/dts/bcm470*
- 
-+BROADCOM BCM63XX ARM ARCHITECTURE
-+M:	Florian Fainelli <f.fainelli@gmail.com>
-+L:	linux-arm-kernel at lists.infradead.org
-+T:	git git://git.github.com/broadcom/arm-bcm63xx
-+S:	Maintained
-+F:	arch/arm/mach-bcm/bcm63xx.c
-+F:	arch/arm/include/debug/bcm63xx.S
-+
- BROADCOM BCM7XXX ARM ARCHITECTURE
- M:	Marc Carino <marc.ceeeee@gmail.com>
- M:	Brian Norris <computersforpeace@gmail.com>
--- 
-1.9.1
+The whole thing will probably need to go into one branch.  Patch 4/9
+("pinctrl: tegra-xusb: Add USB PHY support") has compile-time
+dependencies on patch 2/9 ("mailbox: Add NVIDIA Tegra XUSB mailbox
+driver") and patch 6/9 ("usb: xhci: Add NVIDIA Tegra xHCI
+host-controller driver") has compile-time dependencies on both patches
+2/9 and 4/9.
