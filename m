@@ -1,92 +1,125 @@
-From: tthayer@opensource.altera.com (Thor Thayer)
-Date: Mon, 18 Aug 2014 09:44:38 -0500
-Subject: [PATCHv9 3/3] arm: dts: Add Altera SDRAM controller bindings
-In-Reply-To: <53F14DC2.70000@gmail.com>
-References: <1406744573-609-1-git-send-email-tthayer@opensource.altera.com>
- <1406744573-609-4-git-send-email-tthayer@opensource.altera.com>
- <53F14DC2.70000@gmail.com>
-Message-ID: <53F21156.70400@opensource.altera.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Mon, 18 Aug 2014 15:27:28 +0100
+Subject: [PATCH v2 06/18] ARM64 / ACPI: Parse MADT to map logical cpu to
+ MPIDR and get cpu_possible/present_map
+In-Reply-To: <1407166105-17675-7-git-send-email-hanjun.guo@linaro.org>
+References: <1407166105-17675-1-git-send-email-hanjun.guo@linaro.org>
+ <1407166105-17675-7-git-send-email-hanjun.guo@linaro.org>
+Message-ID: <20140818142728.GS20043@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Mon, Aug 04, 2014 at 04:28:13PM +0100, Hanjun Guo wrote:
+> diff --git a/arch/arm64/include/asm/acpi.h b/arch/arm64/include/asm/acpi.h
+> index 6e04868..e877967 100644
+> --- a/arch/arm64/include/asm/acpi.h
+> +++ b/arch/arm64/include/asm/acpi.h
+> @@ -64,6 +64,8 @@ static inline void arch_fix_phys_package_id(int num, u32 slot) { }
+>  extern int (*acpi_suspend_lowlevel)(void);
+>  #define acpi_wakeup_address 0
+>  
+> +#define MAX_GIC_CPU_INTERFACE 65535
 
-On 08/17/2014 07:50 PM, Rob Herring wrote:
-> On 07/30/2014 01:22 PM, tthayer at opensource.altera.com wrote:
->> From: Thor Thayer <tthayer@opensource.altera.com>
->>
->> Add the Altera SDRAM controller bindings and device tree changes to the Altera SoC project.
->>
->> Signed-off-by: Thor Thayer <tthayer@opensource.altera.com>
->> ---
->> v2: Changes to SoC SDRAM EDAC code.
->>
->> v3: Implement code suggestions for SDRAM EDAC code.
->>
->> v4: Remove syscon from SDRAM controller bindings.
->>
->> v5: No Change, bump version for consistency.
->>
->> v6: Only map the ctrlcfg register as syscon.
->>
->> v7: No change. Bump for consistency.
->>
->> v8: No change. Bump for consistency.
->>
->> v9: Changes to support a MFD SDRAM controller with nested EDAC.
->> ---
->>   .../devicetree/bindings/arm/altera/socfpga-sdr.txt |   13 +++++++++++++
->>   arch/arm/boot/dts/socfpga.dtsi                     |   10 ++++++++++
->>   2 files changed, 23 insertions(+)
->>   create mode 100644 Documentation/devicetree/bindings/arm/altera/socfpga-sdr.txt
->>
->> diff --git a/Documentation/devicetree/bindings/arm/altera/socfpga-sdr.txt b/Documentation/devicetree/bindings/arm/altera/socfpga-sdr.txt
->> new file mode 100644
->> index 0000000..2bb1ddf
->> --- /dev/null
->> +++ b/Documentation/devicetree/bindings/arm/altera/socfpga-sdr.txt
->> @@ -0,0 +1,13 @@
->> +Altera SOCFPGA SDRAM Controller
->> +The SDRAM controller is implemented as a MFD so various drivers may
->> +nest under this main SDRAM controller binding.
->> +
->> +Required properties:
->> +- compatible : "altr,sdr";
->> +- reg : Should contain 1 register range(address and length)
->> +
->> +Example:
->> +	sdr at 0xffc25000 {
->> +		compatible = "altr,sdr";
->> +		reg = <0xffc25000 0x1000>;
->> +	};
->> diff --git a/arch/arm/boot/dts/socfpga.dtsi b/arch/arm/boot/dts/socfpga.dtsi
->> index 4676f25..ecb306d 100644
->> --- a/arch/arm/boot/dts/socfpga.dtsi
->> +++ b/arch/arm/boot/dts/socfpga.dtsi
->> @@ -603,6 +603,16 @@
->>   			};
->>   		};
->>   
->> +		sdr at 0xffc25000 {
->> +			compatible = "altr,sdr";
->> +			reg = <0xffc25000 0x1000>;
->> +
->> +			sdramedac at 0 {
->> +				compatible = "altr,sdram-edac";
->> +				interrupts = <0 39 4>;
->> +			};
-> This doesn't match the documentation, but I don't think this is a move
-> in the right direction anyway. Because Linux has/wants an MFD driver is
-> not a reason to add a sub node. It is a single h/w block and DT should
-> reflect that.
->
-> Rob
-Hi Rob,
+Does this need to be more than NR_CPUS?
 
-Thanks for reviewing. After discussions with the community and 
-internally, I reverted to using the syscon case in revision 10. I 
-apologize for the confusion but the syscon method seems to be a cleaner 
-solution. I submitted the sycon version on 8/11/14.
+> +/**
+> + * acpi_register_gic_cpu_interface - register a gic cpu interface and
+> + * generates a logical cpu number
+> + * @mpidr: CPU's hardware id to register, MPIDR represented in MADT
+> + * @enabled: this cpu is enabled or not
+> + *
+> + * Returns the logical cpu number which maps to the gic cpu interface
+> + */
+> +static int acpi_register_gic_cpu_interface(u64 mpidr, u8 enabled)
+> +{
+> +	int cpu;
+> +
+> +	if (mpidr == INVALID_HWID) {
+> +		pr_info("Skip invalid cpu hardware ID\n");
+> +		return -EINVAL;
+> +	}
+> +
+> +	total_cpus++;
+> +	if (!enabled)
+> +		return -EINVAL;
+> +
+> +	if (enabled_cpus >=  NR_CPUS) {
+> +		pr_warn("NR_CPUS limit of %d reached, Processor %d/0x%llx ignored.\n",
+> +			NR_CPUS, total_cpus, mpidr);
+> +		return -EINVAL;
+> +	}
+> +
+> +	/* If it is the first CPU, no need to check duplicate MPIDRs */
+> +	if (!enabled_cpus)
+> +		goto skip_mpidr_check;
+> +
+> +	/*
+> +	 * Duplicate MPIDRs are a recipe for disaster. Scan
+> +	 * all initialized entries and check for
+> +	 * duplicates. If any is found just ignore the CPU.
+> +	 */
+> +	for_each_present_cpu(cpu) {
+> +		if (cpu_logical_map(cpu) == mpidr) {
+> +			pr_err("Firmware bug, duplicate CPU MPIDR: 0x%llx in MADT\n",
+> +			       mpidr);
+> +			return -EINVAL;
+> +		}
+> +	}
+> +
+> +skip_mpidr_check:
+> +	enabled_cpus++;
+> +
+> +	/* allocate a logical cpu id for the new comer */
+> +	if (cpu_logical_map(0) == mpidr) {
+> +		/*
+> +		 * boot_cpu_init() already hold bit 0 in cpu_present_mask
+> +		 * for BSP, no need to allocate again.
+> +		 */
+> +		cpu = 0;
+> +	} else {
+> +		cpu = cpumask_next_zero(-1, cpu_present_mask);
+> +	}
+> +
+> +	/* map the logical cpu id to cpu MPIDR */
+> +	cpu_logical_map(cpu) = mpidr;
+> +
+> +	set_cpu_possible(cpu, true);
+> +	set_cpu_present(cpu, true);
+> +
+> +	return cpu;
+> +}
 
-Thanks,
+Why not only set the cpu possible here (with the additional mpidr
+validity checks changed to for_each_possible_cpu)...
 
-Thor
+> diff --git a/arch/arm64/kernel/smp.c b/arch/arm64/kernel/smp.c
+> index 40f38f4..8f1d37c 100644
+> --- a/arch/arm64/kernel/smp.c
+> +++ b/arch/arm64/kernel/smp.c
+> @@ -36,6 +36,7 @@
+>  #include <linux/completion.h>
+>  #include <linux/of.h>
+>  #include <linux/irq_work.h>
+> +#include <linux/acpi.h>
+>  
+>  #include <asm/atomic.h>
+>  #include <asm/cacheflush.h>
+> @@ -458,7 +459,14 @@ void __init smp_prepare_cpus(unsigned int max_cpus)
+>  		if (err)
+>  			continue;
+>  
+> -		set_cpu_present(cpu, true);
+> +		/*
+> +		 * In ACPI mode, cpu_present_map was initialised when
+> +		 * MADT table was parsed which before this function
+> +		 * is called.
+> +		 */
+> +		if (acpi_disabled)
+> +			set_cpu_present(cpu, true);
+> +
+>  		max_cpus--;
+
+... and don't touch this at all.
+
+-- 
+Catalin
